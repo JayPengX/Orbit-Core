@@ -1247,10 +1247,26 @@ const MATCH_RECOMMEND_MAX_FIELD_LEN = 160;
 // that worked). Neither Pro model has been verified live the way
 // MATCH_RECOMMEND_MODELS' flash models have (no Pro-tier route existed to
 // test against before this one) - both are tried, in order, before
-// falling back to the one model this file already knows works, so a
-// wrong guess here still degrades to "no smarter than usual" rather than
-// failing the request outright.
-const MATCH_RECOMMEND_REFINE_MODELS = ['gemini-3.1-pro-preview', 'gemini-2.5-pro', 'gemini-3.7-flash'];
+// falling back to the SAME Flash-tier chain the base /match-recommend
+// route uses, not just its first member.
+//
+// That tail used to be just 'gemini-3.7-flash' on its own - live logs from
+// a real GitHub Actions build showed the refine route retrying that ONE
+// model 5 times in a row, every attempt a 429 "Quota exceeded ... model:
+// gemini-3.7-flash", while build-data.mjs's own base-pass call (a separate
+// request, using MATCH_RECOMMEND_MODELS' full 3-model list) had already
+// succeeded moments earlier - confirming the OTHER two Flash-tier models
+// (gemini-3.5-flash-lite, gemini-3.1-flash-lite) still had quota headroom
+// the whole time. Because the two Pro-tier models above 404 near-instantly
+// on this account (see this comment's own opening), every refine call was
+// effectively hard-coded to gemini-3.7-flash alone with no real fallback
+// once ITS quota was the one that ran out - exactly the "quota exceeded,
+// but not on every model" failure mode this spread across the full chain
+// fixes: a 429 on gemini-3.7-flash now falls through to the two lite
+// models actually sitting on their own separate quota, same as the base
+// pass already does, instead of exhausting the same limited model over and
+// over across several sequential cluster refine calls.
+const MATCH_RECOMMEND_REFINE_MODELS = ['gemini-3.1-pro-preview', 'gemini-2.5-pro', ...MATCH_RECOMMEND_MODELS];
 const MATCH_RECOMMEND_REFINE_RATE_LIMIT = 10;
 // A "cluster" of fixtures genuinely contesting the same slot is small by
 // nature (rarely more than 3-4 overlapping fixtures with similar scores at
