@@ -1226,9 +1226,67 @@ const MATCH_RECOMMEND_MAX_FIELD_LEN = 160;
 // competitors' name+record (see Match Find's build-data.mjs oddsContext),
 // and this Worker's own fetchGroundedMatchInfo appends a further
 // "[Recent: ...]" clause server-side AFTER this length check already ran
-// (see withResearchNote) - so this only needs to comfortably fit the
+// (see withResearchEvidence) - so this only needs to comfortably fit the
 // CLIENT-supplied half, not the whole enriched string.
 const MATCH_RECOMMEND_MAX_CONTEXT_LEN = 240;
+
+// ---- Structured evidence (see fetchGroundedMatchInfo/withResearchEvidence) -
+//
+// Match Find's own recommendation-engine audit (see that repo's docs/
+// recommendation-engine-audit.md) specifically asked for online search
+// results to become durable, structured evidence - source/category/finding/
+// retrievedAt - rather than one opaque free-text sentence folded into a
+// prompt and then thrown away. These four categories are that report's own
+// vocabulary (its section 19's `evidence: {competitiveness, mediaAttention,
+// eventImportance, recentContext}`), kept as the literal category values so
+// a reader can trace this code straight back to that report without a
+// translation step.
+const EVIDENCE_CATEGORIES = ['competitiveness', 'mediaAttention', 'eventImportance', 'recentContext'];
+// Small on purpose - this is a handful of concrete, CURRENT facts search
+// actually turned up, not a research dossier. Bounds prompt/response size
+// and Gemini cost the same way MATCH_RECOMMEND_MAX_ITEMS bounds the fixture
+// list itself.
+const EVIDENCE_MAX_ITEMS_PER_FIXTURE = 3;
+const EVIDENCE_MAX_FINDING_LEN = 200;
+// "source" here is a short, honest, SELF-DESCRIBED label from the model
+// itself (e.g. "current league standings", "recent sports news coverage") -
+// not a verified citation URL. This route's grounded call
+// (tools: [{google_search: {}}]) genuinely does search before answering,
+// same trust level this Worker has always placed in that pass's own text
+// output (see fetchGroundedMatchInfo's own comment) - but reliably
+// correlating Gemini's raw per-request groundingMetadata (grounding
+// chunks/citations) back to one SPECIFIC finding, inside a single batched
+// multi-fixture free-text response, isn't something this pass can do with
+// real confidence, so this deliberately doesn't claim more precision than
+// it actually has.
+const EVIDENCE_MAX_SOURCE_LEN = 80;
+
+// Bounds and validates one fixture's raw `evidence` array from the grounded
+// pass before it's stored/forwarded anywhere - this is still "our own"
+// Gemini call, but the response is free-form text (see
+// buildGroundedMatchInfoPrompt's own comment on why this route can't be
+// schema-constrained), so it gets the same defensive treatment as any other
+// upstream JSON this file doesn't fully trust the shape of. An
+// unrecognized `category` falls back to "recentContext" (the catch-all)
+// rather than being dropped outright - the finding itself is still real,
+// concrete evidence even if the model mislabeled which bucket it belongs
+// in. `retrievedAt` is stamped HERE, server-side, at the moment this
+// grounded search pass actually resolved - never something the model
+// itself reports, since only this Worker actually knows when the request
+// happened.
+function sanitizeEvidence(raw, retrievedAt) {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter(item => item && typeof item === 'object')
+    .slice(0, EVIDENCE_MAX_ITEMS_PER_FIXTURE)
+    .map(item => ({
+      category: EVIDENCE_CATEGORIES.includes(item.category) ? item.category : 'recentContext',
+      finding: typeof item.finding === 'string' ? item.finding.trim().slice(0, EVIDENCE_MAX_FINDING_LEN) : '',
+      source: typeof item.source === 'string' ? item.source.trim().slice(0, EVIDENCE_MAX_SOURCE_LEN) : '',
+      retrievedAt
+    }))
+    .filter(item => item.finding); // a category/source with no actual finding isn't evidence of anything
+}
 
 // /match-recommend-refine - a SEPARATE, small-volume route Match Find only
 // calls for a handful of genuinely contested fixtures a day (see that
@@ -1416,29 +1474,38 @@ Rules:
 //
 // Does double duty: originally just the Taiwan broadcast lookup, now also
 // the ONE grounded/search-backed pass this whole route gets, via the
-// "note" field - one call doing two jobs rather than two separate grounded
-// calls (twice the quota cost, twice the latency this route's caller has
-// to budget for). "note" exists because the scoring prompt's own
-// competitiveness/watchability/broadcastQuality judgment used to run
-// entirely on Gemini's training-data knowledge of these teams - fine for
-// well-known storylines, but blind to anything genuinely CURRENT (a live
-// streak, a fresh injury, this week's actual standings picture) that
-// training data simply can't have. A short, current, search-backed fact
-// folded back into that same fixture's own "context" (see
-// withResearchNote/handleMatchRecommendRequest) gives the scoring pass
-// something real and current to weigh instead of just its own possibly-
-// stale priors.
+// "evidence" field - one call doing two jobs rather than two separate
+// grounded calls (twice the quota cost, twice the latency this route's
+// caller has to budget for). "evidence" exists because the scoring
+// prompt's own competitiveness/watchability/broadcastQuality judgment used
+// to run entirely on Gemini's training-data knowledge of these teams -
+// fine for well-known storylines, but blind to anything genuinely CURRENT
+// (a live streak, a fresh injury, this week's actual standings picture)
+// that training data simply can't have. A short list of current,
+// search-backed facts, categorized and stamped with when they were
+// actually found (see sanitizeEvidence), folded back into that same
+// fixture's own "context" (see withResearchEvidence/
+// handleMatchRecommendRequest) gives the scoring pass something real and
+// current to weigh instead of just its own possibly-stale priors - AND
+// gets returned to the caller as durable, structured evidence in its own
+// right (see handleMatchRecommendRequest's own pick.evidence), not just
+// folded into a prompt and discarded once scoring finishes.
 function buildGroundedMatchInfoPrompt(matches) {
-  return `Use Google Search to find, for EACH of these upcoming sports fixtures: (1) the ACTUAL, CURRENT Taiwan TV channel or streaming service, and (2) any concrete, CURRENT real-world fact that should affect how competitive or notable this specific fixture is right now.
+  return `Use Google Search to find, for EACH of these upcoming sports fixtures: (1) the ACTUAL, CURRENT Taiwan TV channel or streaming service, and (2) up to ${EVIDENCE_MAX_ITEMS_PER_FIXTURE} pieces of concrete, CURRENT real-world evidence that should affect how competitive, important, or newsworthy this specific fixture is right now.
 
 (1) "channel": Each fixture may include a "broadcast" field - ESPN's own on-record NATIONAL (usually US) broadcaster, e.g. "Apple TV", "TBS", "Fox". This is a strong hint FOR MLB SPECIFICALLY, not the Taiwan answer itself: if an MLB fixture's "broadcast" names a genuine GLOBAL streaming exclusive with no regional blackout (most notably MLB's Apple TV "Friday Night Baseball" package), verify with search whether that same global service - not 愛爾達體育台/緯來體育台 - is also how Taiwanese viewers watch it, since MLB's international deals with 愛爾達/緯來 typically exclude Apple TV's exclusive slate entirely. An ordinary US regional network name in "broadcast" doesn't imply anything about Taiwan by itself. This override does NOT apply to F1: F1's international broadcaster is Apple TV, but F1 in Taiwan is broadcast exclusively by 愛爾達體育台 regardless - for F1, always answer "愛爾達體育台" and don't let "broadcast" override that. Broadcast rights are often team-specific or game-specific, not sport-wide, so check each fixture individually rather than assuming the sport's usual channel. If an MLB fixture is genuinely carried by BOTH 緯來體育台 and 愛爾達體育台 (common for an ordinary MLB game), answer "愛爾達體育台". Map to "無已知台灣轉播" if search leaves you with no real basis to know, rather than guessing.
 
-(2) "note": one short factual sentence (under 30 words, in English) giving whatever concrete, CURRENT information search actually turns up that's relevant to this fixture's competitiveness or watchability right now - a live win/loss streak, current standings/wild-card/relegation position, a significant injury or return, a rivalry or grudge angle, why this particular game is getting real media attention this week. Search for it - don't reason from memory. Return "" (empty string) if search turns up nothing beyond generic background you'd already know without searching, or nothing genuinely current - never pad with filler, restate the matchup itself, or invent a plausible-sounding storyline you didn't actually find.
+(2) "evidence": an array of up to ${EVIDENCE_MAX_ITEMS_PER_FIXTURE} objects, each {"category": one of "competitiveness" | "mediaAttention" | "eventImportance" | "recentContext", "finding": a short factual sentence (under 30 words, in English) stating a concrete, CURRENT fact search actually found, "source": a short label (under 10 words) for what kind of source it came from, e.g. "current league standings", "recent sports news coverage", "official injury report", "betting market reporting"}. Use:
+  - "competitiveness": a fact bearing on how close/contested the game is likely to be (current records, head-to-head history, an injury affecting parity).
+  - "mediaAttention": a fact about how much real, current public/media attention this specific fixture is getting right now.
+  - "eventImportance": a fact about what's actually at stake (standings, playoff/relegation implications, a title race, a milestone).
+  - "recentContext": any other concrete, current fact worth knowing (a win/loss streak, a return from injury, a rivalry storyline) that doesn't fit the other three categories.
+  Search for these - don't reason from memory, and don't invent a plausible-sounding finding you didn't actually find. Return an EMPTY array (not filler, not a restatement of the matchup itself) if search turns up nothing beyond generic background you'd already know without searching, or nothing genuinely current.
 
 Fixtures (each already has an "id" - use it to key your answer):
 ${JSON.stringify(matches.map(m => ({ id: m.id, sport: m.sport, name: m.name, startTimeUtc: m.startTimeUtc, broadcast: m.broadcast })))}
 
-Respond with ONLY a raw JSON object (no markdown fences, no extra text) mapping each given "id" to {"channel": "...", "note": "..."} - e.g. {"abc123": {"channel": "愛爾達體育台", "note": "Team X has lost 6 straight and is now 8 games out of a playoff spot."}, "def456": {"channel": "Apple TV", "note": ""}}. Include every given id exactly once.`;
+Respond with ONLY a raw JSON object (no markdown fences, no extra text) mapping each given "id" to {"channel": "...", "evidence": [...]} - e.g. {"abc123": {"channel": "愛爾達體育台", "evidence": [{"category": "recentContext", "finding": "Team X has lost 6 straight and is now 8 games out of a playoff spot.", "source": "current league standings"}]}, "def456": {"channel": "Apple TV", "evidence": []}}. Include every given id exactly once.`;
 }
 
 // Salvages a JSON object out of a plain-text model response that was NOT
@@ -1533,14 +1600,35 @@ async function fetchStructuredPicks(matches, env, models, prompt) {
 // room for fetchStructuredPicks afterward.
 const GROUNDED_MATCH_INFO_ATTEMPT_TIMEOUT_MS = 8_000;
 
+// Validates/bounds fetchGroundedMatchInfo's own raw parsed response -
+// per-id {channel, evidence} - the same defensive posture
+// sanitizeEvidence's own comment describes, applied one level up (id keys
+// and the channel string, not just each evidence array). `retrievedAt` is
+// threaded straight through to sanitizeEvidence so every evidence item
+// from this one grounded pass carries the SAME real timestamp, however
+// long the rest of the request (scoring, etc.) takes afterward.
+function sanitizeGroundedResult(parsed, retrievedAt) {
+  const result = {};
+  for (const [id, value] of Object.entries(parsed)) {
+    if (typeof id !== 'string' || !id) continue;
+    result[id] = {
+      channel: typeof value?.channel === 'string' ? value.channel : '',
+      evidence: sanitizeEvidence(value?.evidence, retrievedAt)
+    };
+  }
+  return result;
+}
+
 // Best-effort, never fatal to the request: any failure here (quota, no
 // model accepts grounding, every attempt timing out, an unparseable
 // response) just means every fixture's whereToWatchTw falls back to
-// fetchStructuredPicks' own ungrounded guess and its "context" goes into
-// scoring with no research note added - exactly the behavior this whole
-// route had before this lookup existed at all. Tries every model in
-// MATCH_RECOMMEND_MODELS, not just the first, since a quota/availability
-// issue on one model says nothing about another.
+// fetchStructuredPicks' own ungrounded guess, its "context" goes into
+// scoring with no research evidence folded in, and its "evidence" comes
+// back as an empty array - exactly the behavior this whole route had
+// before this lookup existed at all, just with an explicit empty list
+// instead of a missing field. Tries every model in MATCH_RECOMMEND_MODELS,
+// not just the first, since a quota/availability issue on one model says
+// nothing about another.
 async function fetchGroundedMatchInfo(matches, env) {
   const prompt = buildGroundedMatchInfoPrompt(matches);
   for (const model of MATCH_RECOMMEND_MODELS) {
@@ -1561,7 +1649,10 @@ async function fetchGroundedMatchInfo(matches, env) {
       const data = await upstream.json();
       const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
       const parsed = extractJsonObject(text);
-      if (parsed && typeof parsed === 'object') return parsed;
+      // Stamped the instant this grounded pass actually resolved - see
+      // sanitizeEvidence's own comment on why this can never come from the
+      // model itself.
+      if (parsed && typeof parsed === 'object') return sanitizeGroundedResult(parsed, new Date().toISOString());
     } catch {
       // Best-effort - fall through to the next model, and eventually to
       // the caller's own fallback, on any failure (including this
@@ -1571,19 +1662,25 @@ async function fetchGroundedMatchInfo(matches, env) {
   return null;
 }
 
-// Folds a fixture's grounded "note" (see buildGroundedMatchInfoPrompt)
-// into its own "context" string, the same free-form field
-// buildMatchRecommendPrompt already reads competitor records from - a
-// bracketed "[Recent: ...]" clause is enough for that prompt's own
-// instructions (see its "context" paragraph) to recognize and weigh
-// without needing a whole new schema field threaded through
-// cleanMatchRecommendItem. Returns the fixture unchanged when there's no
-// real note (missing research, or the model legitimately found nothing
-// current worth adding - see that field's own "" convention).
-function withResearchNote(match, research) {
-  const note = research?.[match.id]?.note;
-  if (typeof note !== 'string' || !note.trim()) return match;
-  return { ...match, context: `${match.context} [Recent: ${note.trim().slice(0, 200)}]` };
+// Folds a fixture's grounded evidence findings (see
+// buildGroundedMatchInfoPrompt/sanitizeEvidence) into its own "context"
+// string, the same free-form field buildMatchRecommendPrompt already reads
+// competitor records from - a bracketed "[Recent: ...]" clause is enough
+// for that prompt's own instructions (see its "context" paragraph) to
+// recognize and weigh, without needing a whole new schema field threaded
+// through cleanMatchRecommendItem. The STRUCTURED evidence array itself
+// (category/finding/source/retrievedAt) is kept and returned to the
+// caller separately (see handleMatchRecommendRequest's own pick.evidence)
+// - this function only builds the plain-text digest the SCORING pass
+// reads, it's not evidence's only home. Returns the fixture unchanged when
+// there's no real evidence (missing research, or the model legitimately
+// found nothing current worth adding).
+function withResearchEvidence(match, research) {
+  const evidence = research?.[match.id]?.evidence;
+  if (!Array.isArray(evidence) || !evidence.length) return match;
+  const combined = evidence.map(item => item.finding).join(' ').trim().slice(0, 200);
+  if (!combined) return match;
+  return { ...match, context: `${match.context} [Recent: ${combined}]` };
 }
 
 async function handleMatchRecommendRequest(request, env, headers, ip) {
@@ -1622,7 +1719,7 @@ async function handleMatchRecommendRequest(request, env, headers, ip) {
 
   let picksResult;
   try {
-    // Sequential now, not parallel: fetchGroundedMatchInfo's "note" per
+    // Sequential now, not parallel: fetchGroundedMatchInfo's evidence per
     // fixture needs to be folded into that fixture's own "context" BEFORE
     // buildMatchRecommendPrompt ever runs, so the scoring pass can
     // actually see and weigh it - a plain Promise.all (the old shape, back
@@ -1632,7 +1729,7 @@ async function handleMatchRecommendRequest(request, env, headers, ip) {
     // function's own comment) specifically so this added step can't eat
     // the scoring call's own share of the caller's 60s request budget.
     const grounded = await fetchGroundedMatchInfo(matches, env);
-    const enrichedMatches = grounded ? matches.map(m => withResearchNote(m, grounded)) : matches;
+    const enrichedMatches = grounded ? matches.map(m => withResearchEvidence(m, grounded)) : matches;
     const structured = await fetchStructuredPicks(
       enrichedMatches,
       env,
@@ -1640,16 +1737,22 @@ async function handleMatchRecommendRequest(request, env, headers, ip) {
       buildMatchRecommendPrompt(enrichedMatches)
     );
     picksResult = structured;
-    if (grounded && Array.isArray(picksResult?.picks)) {
+    if (Array.isArray(picksResult?.picks)) {
       for (const pick of picksResult.picks) {
-        const groundedChannel = grounded[pick.id]?.channel;
+        const info = grounded?.[pick.id];
         // Only overrides with a real answer - a grounded "無已知台灣轉播"
         // doesn't get to stomp out a specific channel name the ungrounded
         // pass already guessed; it just means the search came up empty,
         // which isn't more informative than the existing guess.
-        if (typeof groundedChannel === 'string' && groundedChannel.trim() && groundedChannel !== '無已知台灣轉播') {
-          pick.whereToWatchTw = groundedChannel.trim().slice(0, MATCH_RECOMMEND_MAX_FIELD_LEN);
+        if (info?.channel && info.channel !== '無已知台灣轉播') {
+          pick.whereToWatchTw = info.channel.slice(0, MATCH_RECOMMEND_MAX_FIELD_LEN);
         }
+        // Always present, even when grounding failed entirely (info is
+        // undefined) - Match Find's own cache can then rely on
+        // pick.evidence always being an array, never a missing field to
+        // special-case (same "explicit empty, not absent" convention
+        // fetchGroundedMatchInfo's own comment describes).
+        pick.evidence = info?.evidence || [];
       }
     }
   } catch (error) {
@@ -1742,7 +1845,7 @@ async function handleMatchRecommendRefineRequest(request, env, headers, ip) {
     // buildMatchRefinePrompt's own comment), only competitiveness/
     // watchability/broadcastQuality/reason.
     const grounded = await fetchGroundedMatchInfo(matches, env);
-    const enrichedMatches = grounded ? matches.map(m => withResearchNote(m, grounded)) : matches;
+    const enrichedMatches = grounded ? matches.map(m => withResearchEvidence(m, grounded)) : matches;
     picksResult = await fetchStructuredPicks(
       enrichedMatches,
       env,
