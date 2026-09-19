@@ -1285,11 +1285,30 @@ const MATCH_RECOMMEND_RESPONSE_SCHEMA = {
           id: { type: 'string' },
           competitiveness: { type: 'integer' },
           watchability: { type: 'integer' },
+          // How good the VIEWING EXPERIENCE itself is expected to be
+          // (production quality, camera work, commentary), independent of
+          // how good the matchup is - see buildMatchRecommendPrompt's own
+          // instructions for this field. A separate axis from
+          // competitiveness/watchability on purpose: Match Find's viewers
+          // can choose to rank by any one of the three (see that repo's
+          // public/app.js "Recommendation style setting"), and a close,
+          // high-stakes game on a bare regional feed vs. a one-sided
+          // blowout on a beautifully-produced national broadcast is
+          // exactly the case those styles need to disagree on.
+          broadcastQuality: { type: 'integer' },
           reason: { type: 'string' },
           venueZh: { type: 'string' },
           whereToWatchTw: { type: 'string' }
         },
-        required: ['id', 'competitiveness', 'watchability', 'reason', 'venueZh', 'whereToWatchTw']
+        required: [
+          'id',
+          'competitiveness',
+          'watchability',
+          'broadcastQuality',
+          'reason',
+          'venueZh',
+          'whereToWatchTw'
+        ]
       }
     }
   },
@@ -1339,7 +1358,8 @@ function buildMatchRecommendPrompt(matches) {
   return `You are a knowledgeable sports fan helping Traditional-Chinese-speaking viewers in Taiwan decide which upcoming fixture is most worth watching. You are given a list of fixtures across several leagues/series (e.g. Premier League, MLS, MLB, NBA, F1), each with a "venue". For EACH fixture, using your own real-world knowledge of these specific teams/drivers (current form, standings position, rivalry history, star players, championship/relegation/playoff stakes) and of Taiwan sports broadcasting, return:
 - "competitiveness": integer 1-10, how close/contested you expect the fixture to be.
 - "watchability": integer 1-10, how entertaining or notable it is to a general sports fan regardless of closeness (rivalry, stakes, star power, drama, historical significance).
-- "reason": one short sentence (under 40 Traditional Chinese characters) in Traditional Chinese explaining the two scores.
+- "broadcastQuality": integer 1-10, how good the VIEWING EXPERIENCE itself is expected to be - production value, camera work, and commentary team - independent of how good the matchup is. Use the given "broadcast" field (ESPN's on-record broadcaster, e.g. "Apple TV", "TBS", "Fox", "ESPN", "NBC", "TNT") plus your own general knowledge of that sport's platforms/networks: a league's own flagship in-house production, or a platform broadly known for polished, well-produced sports coverage (Apple TV's MLB "Friday Night Baseball" package is one well-known example, but reason from whichever platform/network this specific fixture actually has, across any sport, not just that one), typically scores well above a bare-bones regional/local feed or an unlisted/unknown broadcaster. If "broadcast" is empty and you have no other basis to judge, score it conservatively (4-6) rather than guessing a specific platform's reputation.
+- "reason": one short sentence (under 40 Traditional Chinese characters) in Traditional Chinese explaining the scores.
 - "venueZh": the given "venue" written in Traditional Chinese - the commonly used Chinese name for that stadium/arena/circuit if you know one, otherwise a reasonable transliteration. Return "" if you have no real basis to translate it rather than guessing.
 - "whereToWatchTw": your best guess at the TV channel or streaming service Taiwanese viewers would typically use to watch THIS SPECIFIC fixture live (e.g. "愛爾達體育台", "DAZN", "Apple TV", "Disney+", "myVideo", "緯來體育台"), in Traditional Chinese, as short as possible - a channel/platform name, not a sentence. DAZN completed its acquisition of ELEVEN Sports in February 2023, and the ELEVEN Sports brand itself was fully retired in Taiwan by mid-2024 - if your own knowledge points at "ELEVEN SPORTS" for a fixture, answer "DAZN" instead, since that's the same service under its current name, not two different ones. This is only a FALLBACK guess from memory, not a search result (a separate grounded lookup - see handleMatchRecommendRequest - takes priority when it has an answer). Each fixture may include a "broadcast" field - ESPN's own on-record NATIONAL (usually US) broadcaster for it, e.g. "Apple TV", "TBS", "Fox", "ESPN". This is NOT itself the Taiwan answer, but treat it as a strong hint FOR MLB SPECIFICALLY: if an MLB fixture's "broadcast" names a service that is a genuine GLOBAL streaming exclusive with no regional blackout (most notably MLB's Apple TV "Friday Night Baseball" package), that same service is very likely also how it's watched in Taiwan, NOT 愛爾達體育台/緯來體育台 - MLB's international broadcast deals with 愛爾達/緯來 typically do NOT include Apple TV's exclusive slate at all. An ordinary US regional cable network name in "broadcast" (Fox, TBS, ESPN, a team's own regional network, etc.) does NOT imply anything about Taiwan on its own. This "broadcast" override does NOT apply to F1: F1's US/international broadcaster is Apple TV, but F1 in Taiwan is broadcast exclusively by 愛爾達體育台 regardless of that - for F1 specifically, always answer "愛爾達體育台" and ignore "broadcast" entirely. If an MLB fixture is carried by BOTH 緯來體育台 and 愛爾達體育台 (common for an ordinary MLB game), answer "愛爾達體育台", not "緯來體育台". Return "無已知台灣轉播" if you have no real basis to know rather than guessing.
 
@@ -1348,7 +1368,7 @@ ${JSON.stringify(matches)}
 
 Rules:
 - Return exactly one entry per given "id" - never add, drop, or merge fixtures.
-- If you don't recognize a team/driver, or have no real basis to judge a fixture, score both fields conservatively (4-6) and say so plainly in "reason" rather than inventing form, stats, or a rivalry that isn't real.
+- If you don't recognize a team/driver, or have no real basis to judge a fixture, score competitiveness/watchability conservatively (4-6) and say so plainly in "reason" rather than inventing form, stats, or a rivalry that isn't real (broadcastQuality has its own conservative-default rule above).
 - Never invent an injury, transfer, statistic, broadcaster, or venue translation you're not confident is real - an empty/placeholder value is always better than a guess stated as fact.
 - Return ONLY the raw JSON object matching the given schema - no markdown fences, no extra text.`;
 }
@@ -1568,7 +1588,8 @@ function buildMatchRefinePrompt(matches) {
   return `These ${matches.length} sports fixtures overlap in time and scored closely on an initial pass - you're being asked specifically because they need a more careful, COMPARATIVE judgment than a quick independent score can give. Using your own real-world knowledge (current standings/wild-card races, recent form, rivalry history, star players, injuries, how much real-world media/fan attention each is actually getting right now), decide which is genuinely the bigger deal and score them to reflect that clearly - don't default back to similar numbers just because the first pass did. For EACH fixture return:
 - "competitiveness": integer 1-10, how close/contested you expect it to be.
 - "watchability": integer 1-10, how entertaining or notable it is regardless of closeness.
-- "reason": one short sentence (under 40 Traditional Chinese characters) in Traditional Chinese explaining the two scores, written as a direct comparison where it's warranted (e.g. noting why this one edges out the others in the group).
+- "broadcastQuality": integer 1-10, how good the viewing experience itself is expected to be (production value, camera work, commentary), independent of the matchup - same basis as the base scoring pass: the given "broadcast" field plus your own knowledge of that sport's platforms/networks. This one isn't a comparative judgment like the other two - Match Find only ever keeps this field from the FIRST scoring pass, so just give your best independent estimate for each fixture.
+- "reason": one short sentence (under 40 Traditional Chinese characters) in Traditional Chinese explaining the scores, written as a direct comparison where it's warranted (e.g. noting why this one edges out the others in the group).
 - "venueZh": the given "venue" in Traditional Chinese, or "" if you have no real basis to translate it.
 - "whereToWatchTw": your best guess at the Taiwan broadcaster, or "無已知台灣轉播" if unsure - this is a fallback only, a separate grounded lookup may override it.
 
