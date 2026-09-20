@@ -45,6 +45,19 @@
 //                            below. Match Find has no sync route at all -
 //                            its own settings/"Prefer" pick are local-only,
 //                            never sent to this Worker or anywhere else.
+//   GET       /sports-proxy - a thin, host-allowlisted CORS passthrough to
+//                            ESPN's/the MLB Stats API's/the Jolpica F1
+//                            API's own public JSON, so Match Find's browser
+//                            can poll live scores/odds directly - see "====
+//                            /sports-proxy" below.
+//   POST      /match-dispatch - fires a workflow_dispatch against Match
+//                            Find's own GitHub Actions build, so an
+//                            ordinary visitor's "重新整理資料"/"AI 重新評估"
+//                            button can trigger a real rebuild rather than
+//                            only re-reading whatever the last scheduled
+//                            run already published - see "==== /match-dispatch"
+//                            below. Needs its own MATCH_FIND_DISPATCH_TOKEN
+//                            secret (unrelated to GEMINI_API_KEY).
 //
 // /sync and /vocab-sync both hold a Firebase service-account key
 // server-side and proxy Firestore, so the pairing code isn't the only thing
@@ -2594,6 +2607,150 @@ const VOCAB_SYNC_APP = {
   credentialPattern: VOCAB_PASSCODE_PATTERN
 };
 
+// ==== /sports-proxy - CORS passthrough for public sports data ==============
+//
+// Match Find's browser-side live-score/live-odds polling and its "refresh
+// now"/"AI 重新評估" Settings buttons (see that repo's README) need to read
+// ESPN's/the MLB Stats API's/the Jolpica F1 API's own public JSON directly
+// from the VIEWER'S browser, not just from Match Find's own scheduled
+// build - none of the three sets CORS headers for arbitrary origins, so a
+// plain client-side fetch() to any of them fails outright from a browser
+// regardless of how the request is shaped (the same reason /gemini's own
+// proxying exists for Gemini itself, just for a read-only public GET
+// instead of an authenticated call). This route is a thin, read-only
+// pass-through: it validates the requested URL against a fixed host
+// allowlist, fetches it SERVER-SIDE (no CORS restriction applies to a
+// Worker's own outbound fetch), and pipes the response back with this
+// Worker's own permissive-to-allowed-origins CORS headers already attached.
+// No API key, no response transformation, and nothing sport-specific
+// hardcoded here - Match Find's own client code (public/lib/espn.mjs)
+// builds the real upstream URL and does all the interpreting; this Worker
+// only ever forwards bytes for a HOST it already trusts, never an arbitrary
+// one, so this can't become an open proxy for anything else.
+const SPORTS_PROXY_ALLOWED_HOSTS = ['site.api.espn.com', 'statsapi.mlb.com', 'api.jolpi.ca'];
+// Generous - a viewer with several live matches open at once can easily
+// poll every 20-30s per match (see Match Find's own polling interval) - but
+// still a real bound against a runaway tab/script hammering this route.
+const SPORTS_PROXY_RATE_LIMIT = 600;
+
+async function handleSportsProxyRequest(request, env, headers, ip) {
+  if (request.method !== 'GET') return json({ error: { message: 'GET only' } }, 405, headers);
+
+  const rateLimit = await isRateLimited(env, ip, 'sports-proxy', SPORTS_PROXY_RATE_LIMIT);
+  headers['X-RateLimit-Backend'] = rateLimit.backend;
+  if (rateLimit.limited) {
+    return json({ error: { message: 'Too many requests, please try again later.' } }, 429, headers);
+  }
+
+  const target = new URL(request.url).searchParams.get('url') || '';
+  let upstreamUrl;
+  try {
+    upstreamUrl = new URL(target);
+  } catch {
+    return json({ error: { message: 'Missing or invalid url' } }, 400, headers);
+  }
+  if (upstreamUrl.protocol !== 'https:' || !SPORTS_PROXY_ALLOWED_HOSTS.includes(upstreamUrl.hostname)) {
+    return json({ error: { message: 'Host not allowed' } }, 400, headers);
+  }
+
+  try {
+    const upstream = await fetch(upstreamUrl.toString(), { signal: AbortSignal.timeout(15_000) });
+    // Piped straight through, same reasoning as /gemini's own upstream.body
+    // passthrough - the body is JSON the client parses itself either way.
+    return new Response(upstream.body, {
+      status: upstream.status,
+      headers: { ...headers, 'Content-Type': upstream.headers.get('Content-Type') || 'application/json' }
+    });
+  } catch (error) {
+    return json({ error: { message: error.message || 'Upstream request failed' } }, 502, headers);
+  }
+}
+
+// ==== /match-dispatch - trigger Match Find's own GitHub Actions build ======
+//
+// Match Find's "重新整理資料"/"AI 重新評估" Settings buttons used to be able to
+// do only one real thing from a static page with no server of its own:
+// re-fetch whatever the last SCHEDULED build already published. There was
+// no client-safe way to make a NEW build actually run on demand - that
+// needs a GitHub sign-in with repo write access, which only Match Find's
+// own owner has. This route is what closes that gap for ordinary viewers:
+// it holds a fine-grained GitHub Personal Access Token (repo-scoped,
+// Actions: write only - see this repo's README for the one-time setup)
+// server-side and fires a workflow_dispatch against Match Find's own
+// deploy.yml - the exact same build a viewer would otherwise have to wait
+// for the next 15-minute cron tick (for fresh ESPN data) or the next
+// AI_FETCH_MIN_INTERVAL_HOURS window (for a fresh Gemini validation pass)
+// to get.
+//
+// This is deliberately the ONLY thing this route does - it does not decide
+// whether the resulting build actually calls Gemini (that's still entirely
+// build-data.mjs's own data/ai-meta.json-based hourly throttle, unaffected
+// by what triggered the run - see that repo's README's "AI validation"
+// section) - so mashing this button cannot burn extra AI quota beyond that
+// same shared hourly cap every OTHER trigger already respects; it can only
+// ever get a fresh ESPN/live-score pass sooner.
+const MATCH_DISPATCH_OWNER = 'jaypengx-collab';
+const MATCH_DISPATCH_REPO = 'Match-Find';
+const MATCH_DISPATCH_WORKFLOW = 'deploy.yml';
+const MATCH_DISPATCH_RATE_LIMIT = 12;
+// A GLOBAL (not per-IP) hourly cap, keyed by a fixed bucket name rather
+// than IP via the same KV-backed isRateLimited machinery - there's no real
+// reason for many visitors clicking the button minutes apart to each queue
+// their own GitHub Actions run (the workflow's own `concurrency` group
+// already serializes them, so a burst just means several queued runs
+// burning nothing useful beyond Actions minutes on a public repo, which
+// aren't metered - see deploy.yml's own comment - but still worth a plain
+// sanity bound). Not meant to be precise second-by-second spacing, just a
+// courtesy ceiling on top of the real, exact throttle build-data.mjs's own
+// ai-meta.json clock already enforces for the part that actually costs
+// anything (Gemini quota).
+const MATCH_DISPATCH_GLOBAL_HOURLY_LIMIT = 30;
+
+async function handleMatchDispatchRequest(request, env, headers, ip) {
+  if (request.method !== 'POST') return json({ error: { message: 'POST only' } }, 405, headers);
+
+  const rateLimit = await isRateLimited(env, ip, 'match-dispatch', MATCH_DISPATCH_RATE_LIMIT);
+  headers['X-RateLimit-Backend'] = rateLimit.backend;
+  if (rateLimit.limited) {
+    return json({ error: { message: 'Too many requests, please try again later.' } }, 429, headers);
+  }
+  const globalLimit = await isRateLimited(env, 'global', 'match-dispatch-global', MATCH_DISPATCH_GLOBAL_HOURLY_LIMIT);
+  if (globalLimit.limited) {
+    return json({ error: { message: 'A Match Find build was just requested - please try again shortly.' } }, 429, headers);
+  }
+  if (!env.MATCH_FIND_DISPATCH_TOKEN) {
+    return json({ error: { message: 'Worker has not configured MATCH_FIND_DISPATCH_TOKEN.' } }, 500, headers);
+  }
+
+  try {
+    const upstream = await fetch(
+      `https://api.github.com/repos/${MATCH_DISPATCH_OWNER}/${MATCH_DISPATCH_REPO}/actions/workflows/${MATCH_DISPATCH_WORKFLOW}/dispatches`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${env.MATCH_FIND_DISPATCH_TOKEN}`,
+          Accept: 'application/vnd.github+json',
+          'Content-Type': 'application/json',
+          'User-Agent': 'shared-proxy-match-dispatch'
+        },
+        body: JSON.stringify({ ref: 'main' }),
+        signal: AbortSignal.timeout(15_000)
+      }
+    );
+    // GitHub's workflow_dispatch endpoint returns 204 No Content on success -
+    // there's no response body to relay either way.
+    if (upstream.status === 204) return json({ ok: true }, 200, headers);
+    const errorBody = await upstream.text().catch(() => '');
+    return json(
+      { error: { message: `GitHub dispatch failed: HTTP ${upstream.status} ${errorBody.slice(0, 200)}` } },
+      502,
+      headers
+    );
+  } catch (error) {
+    return json({ error: { message: error.message || 'Dispatch request failed' } }, 502, headers);
+  }
+}
+
 // ==== Routing ================================================================
 
 export default {
@@ -2613,6 +2770,8 @@ export default {
     if (path === '/vocab-ai') return handleVocabAiRequest(request, env, headers, ip);
     if (path === '/match-recommend') return handleMatchRecommendRequest(request, env, headers, ip);
     if (path === '/match-recommend-refine') return handleMatchRecommendRefineRequest(request, env, headers, ip);
+    if (path === '/sports-proxy') return handleSportsProxyRequest(request, env, headers, ip);
+    if (path === '/match-dispatch') return handleMatchDispatchRequest(request, env, headers, ip);
     return json({ error: { message: 'Not found' } }, 404, headers);
   }
 };

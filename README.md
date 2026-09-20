@@ -30,6 +30,8 @@ thing about it: the URL.
 | `/vocab-ai` | POST | Orbit Vocab | Live, per-learner personalized mnemonics. |
 | `/match-recommend` | POST | Match Find | Daily "which fixture is worth watching" scoring, called a handful of times a day by Match Find's own scheduled build - never per visitor. |
 | `/match-recommend-refine` | POST | Match Find | A small, rare Pro-tier-model follow-up for fixtures that came out genuinely contesting the same time slot on the first pass. |
+| `/sports-proxy` | GET | Match Find | Host-allowlisted CORS passthrough to ESPN/MLB Stats API/Jolpica, so the viewer's own browser can poll live scores/odds directly. |
+| `/match-dispatch` | POST | Match Find | Fires Match Find's own GitHub Actions build on demand, so an ordinary visitor's "重新整理資料"/"AI 重新評估" button can trigger a real rebuild. |
 
 Every route validates and rate-limits itself independently (see
 `isRateLimited` in `worker.js` - every call site passes its own `feature`
@@ -102,6 +104,28 @@ an `X-Worker-Colo` header naming the actual colo that handled it (an IATA
 airport code, e.g. `IAD` = Virginia, `HKG` = Hong Kong) - useful for
 confirming this is actually taking effect, or diagnosing a future report of
 the same error.
+
+### Match Find live data (`/sports-proxy`)
+
+Nothing to configure - this route needs no secret at all, it's a plain
+host-allowlisted passthrough to public, keyless sports APIs (see
+`SPORTS_PROXY_ALLOWED_HOSTS` in `worker.js`). It's live the moment this
+Worker is deployed.
+
+### Match Find on-demand rebuilds (`/match-dispatch`)
+
+1. Create a fine-grained GitHub Personal Access Token scoped to **only**
+   the `Match-Find` repository, with **Actions: Read and write** permission
+   and nothing else: GitHub → Settings → Developer settings → Fine-grained
+   tokens → Generate new token → Repository access: "Only select
+   repositories" → `Match-Find` → Permissions → Actions → Read and write.
+2. Worker Settings → Variables and Secrets → add `MATCH_FIND_DISPATCH_TOKEN`
+   (the token from step 1), type **Secret** → Save and Deploy.
+
+That's it - `/match-dispatch` is a completely separate secret from
+`GEMINI_API_KEY`, scoped narrowly enough that a leak of it could only ever
+trigger extra Match Find builds, never touch this Worker's other features,
+Match Find's code, or any other repository.
 
 ### Sync features (`/sync`, `/vocab-sync`)
 
