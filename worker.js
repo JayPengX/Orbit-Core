@@ -1730,10 +1730,19 @@ function sanitizeGroundedResult(parsed, retrievedAt) {
 // instead of a missing field. Tries every model in MATCH_RECOMMEND_MODELS,
 // not just the first, since a quota/availability issue on one model says
 // nothing about another.
-async function fetchGroundedMatchInfo(matches, env) {
+// `debugLog`, when passed (an array), gets one entry per model attempt -
+// status/finishReason/a text snippet/whether extractJsonObject actually
+// parsed it - so a genuine production failure of this best-effort, never-
+// fatal pass (see this function's own comment) can be diagnosed from
+// OUTSIDE the Worker (no Cloudflare dashboard/log access needed) by asking
+// /match-recommend for it explicitly (see handleMatchRecommendRequest's
+// `debugGrounding`). Never populated unless a caller asks - zero behavior/
+// cost change to the normal path.
+async function fetchGroundedMatchInfo(matches, env, debugLog) {
   const prompt = buildGroundedMatchInfoPrompt(matches);
   for (const model of MATCH_RECOMMEND_MODELS) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${env.GEMINI_API_KEY}`;
+    const entry = debugLog ? { model } : null;
     try {
       const upstream = await fetch(url, {
         method: 'POST',
@@ -1746,15 +1755,36 @@ async function fetchGroundedMatchInfo(matches, env) {
         }),
         signal: AbortSignal.timeout(GROUNDED_MATCH_INFO_ATTEMPT_TIMEOUT_MS)
       });
-      if (!upstream.ok) continue;
+      if (entry) entry.status = upstream.status;
+      if (!upstream.ok) {
+        if (entry) {
+          entry.errorBody = (await upstream.text().catch(() => null))?.slice(0, 500) || null;
+          debugLog.push(entry);
+        }
+        continue;
+      }
       const data = await upstream.json();
       const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (entry) {
+        entry.finishReason = data?.candidates?.[0]?.finishReason || null;
+        entry.partsCount = data?.candidates?.[0]?.content?.parts?.length ?? null;
+        entry.textSnippet = typeof text === 'string' ? text.slice(0, 800) : null;
+        entry.textType = typeof text;
+      }
       const parsed = extractJsonObject(text);
+      if (entry) {
+        entry.parsed = !!parsed;
+        debugLog.push(entry);
+      }
       // Stamped the instant this grounded pass actually resolved - see
       // sanitizeEvidence's own comment on why this can never come from the
       // model itself.
       if (parsed && typeof parsed === 'object') return sanitizeGroundedResult(parsed, new Date().toISOString());
-    } catch {
+    } catch (error) {
+      if (entry) {
+        entry.error = error && error.message;
+        debugLog.push(entry);
+      }
       // Best-effort - fall through to the next model, and eventually to
       // the caller's own fallback, on any failure (including this
       // attempt's own timeout).
@@ -1818,6 +1848,12 @@ async function handleMatchRecommendRequest(request, env, headers, ip) {
     return json({ error: { message: 'Missing or invalid matches' } }, 400, headers);
   }
 
+  // Opt-in, response-only diagnostic for fetchGroundedMatchInfo's own
+  // best-effort/never-fatal failure mode (see that function's comment) -
+  // never set unless a caller explicitly asks, so this can't change
+  // normal response shape/size/cost for Match Find's own real traffic.
+  const debugLog = body?.debugGrounding === true ? [] : null;
+
   let picksResult;
   try {
     // Sequential now, not parallel: fetchGroundedMatchInfo's evidence per
@@ -1833,7 +1869,7 @@ async function handleMatchRecommendRequest(request, env, headers, ip) {
     // own comment) so that time budget is spent on a batch small enough to
     // plausibly get genuinely researched, not spread thin across this
     // whole (up to 80-fixture) request.
-    const grounded = await fetchGroundedMatchInfo(selectFixturesForGrounding(matches, GROUNDED_MATCH_INFO_MAX_ITEMS), env);
+    const grounded = await fetchGroundedMatchInfo(selectFixturesForGrounding(matches, GROUNDED_MATCH_INFO_MAX_ITEMS), env, debugLog);
     const enrichedMatches = grounded ? matches.map(m => withResearchEvidence(m, grounded)) : matches;
     const structured = await fetchStructuredPicks(
       enrichedMatches,
@@ -1865,8 +1901,9 @@ async function handleMatchRecommendRequest(request, env, headers, ip) {
       }
     }
   } catch (error) {
-    return json({ error: { message: error.message || 'Upstream request failed' } }, error.status || 502, headers);
+    return json({ error: { message: error.message || 'Upstream request failed' }, _groundingDebug: debugLog }, error.status || 502, headers);
   }
+  if (debugLog) picksResult._groundingDebug = debugLog;
   return json(picksResult, 200, headers);
 }
 
