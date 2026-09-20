@@ -1863,6 +1863,19 @@ const VOCAB_SYNC_APP = {
 // and does all the interpreting; this Worker only ever forwards bytes for
 // a HOST it already trusts, never an arbitrary one, so this can't become
 // an open proxy for anything else.
+// A real, live 403 hit while wiring up Match Find's own client-side
+// rebuild (buildMatches, called straight from the viewer's own browser
+// through this route): this Worker's own outbound fetch to ESPN, with NO
+// User-Agent header at all, gets rejected outright by an Akamai edge block
+// ("Access Denied", errors.edgesuite.net) - the exact same live-confirmed
+// bot-manager block Match Find's own Node build script already works
+// around with a transparent, honest UA (see that repo's scripts/
+// build-data.mjs's own FETCH_USER_AGENT comment) - Cloudflare Workers'
+// default outbound UA is apparently ALSO on whatever blocklist catches
+// Node's bare "node" one. A Worker's own server-side fetch (unlike a
+// browser's) can set any header it wants, so this closes the gap the same
+// honest way: identify the traffic truthfully rather than spoof a browser.
+const SPORTS_PROXY_FETCH_USER_AGENT = 'Match-Find-Bot/1.0 (+https://github.com/jaypengx-collab/Match-Find)';
 const SPORTS_PROXY_ALLOWED_HOSTS = [
   'site.api.espn.com',
   'statsapi.mlb.com',
@@ -1895,7 +1908,10 @@ async function handleSportsProxyRequest(request, env, headers, ip) {
   }
 
   try {
-    const upstream = await fetch(upstreamUrl.toString(), { signal: AbortSignal.timeout(15_000) });
+    const upstream = await fetch(upstreamUrl.toString(), {
+      headers: { 'User-Agent': SPORTS_PROXY_FETCH_USER_AGENT },
+      signal: AbortSignal.timeout(15_000)
+    });
     // Piped straight through, same reasoning as /gemini's own upstream.body
     // passthrough - the body is JSON the client parses itself either way.
     return new Response(upstream.body, {
