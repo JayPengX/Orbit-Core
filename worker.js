@@ -1164,11 +1164,18 @@ async function handleVocabAiRequest(request, env, headers, ip) {
 //
 // Match Find (github.com/jaypengx-collab/Match-Find) is a static site that
 // recommends which upcoming fixture across several leagues is worth
-// watching. Ranking "worth watching" needs real-world sports knowledge -
-// current form, standings stakes, rivalry history - that no deterministic
-// heuristic over raw fixture data can approximate well, so that judgment is
-// what gets delegated here; everything else (fetching each league's
-// fixtures from ESPN's own public API, converting to the viewer's local
+// watching. Its own build script now computes each fixture's
+// competitiveness/watchability/enduranceScore/broadcastQuality
+// DETERMINISTICALLY, from real sports-data APIs (season record, recent
+// form, standings proximity, betting odds, championship-race intensity -
+// see that repo's scripts/objective-score.mjs) - what gets delegated here
+// is narrower than that score itself: VALIDATING it against real-world
+// knowledge no formula has access to (an injury, a rivalry's real history,
+// which player is in form right now) and returning a small, bounded
+// adjustment, never a score invented from scratch (see
+// buildMatchRecommendPrompt's own comment for exactly what that means).
+// Everything else (fetching each league's fixtures from ESPN's own public
+// API, the objective scoring itself, converting to the viewer's local
 // time, resolving same-time conflicts by score) happens entirely in Match
 // Find's own build script with no need for this Worker at all.
 //
@@ -1333,6 +1340,19 @@ const MATCH_RECOMMEND_REFINE_RATE_LIMIT = 10;
 // regardless of what the caller sends.
 const MATCH_RECOMMEND_REFINE_MAX_ITEMS = 6;
 
+// The magnitude any single adjustment field can carry, in EITHER
+// direction - the entire point of "validation, not replacement" (see this
+// route's own top-of-file comment): Match Find's build script
+// (scripts/objective-score.mjs) has already computed a real, deterministic
+// score from actual sports-data APIs before this fixture ever reaches this
+// prompt, so Gemini's job is to nudge that score, at most, never to
+// overwrite it outright. Mirrors Match Find's own AI_ADJUSTMENT_BOUND
+// (scripts/build-data.mjs), which clamps again independently on that side
+// of the boundary - this Worker's own clamp (see sanitizeAdjustment below)
+// is what actually enforces it before a response ever leaves this Worker,
+// the client-side one is defense in depth, not the only place it's real.
+const MATCH_RECOMMEND_ADJUSTMENT_BOUND = 2;
+
 const MATCH_RECOMMEND_RESPONSE_SCHEMA = {
   type: 'object',
   properties: {
@@ -1342,39 +1362,29 @@ const MATCH_RECOMMEND_RESPONSE_SCHEMA = {
         type: 'object',
         properties: {
           id: { type: 'string' },
-          competitiveness: { type: 'integer' },
-          watchability: { type: 'integer' },
-          // How good the VIEWING EXPERIENCE itself is expected to be
-          // (production quality, camera work, commentary), independent of
-          // how good the matchup is - see buildMatchRecommendPrompt's own
-          // instructions for this field. A separate axis from
-          // competitiveness/watchability on purpose: Match Find's viewers
-          // can choose to rank by any one of the three (see that repo's
-          // public/app.js "Recommendation style setting"), and a close,
-          // high-stakes game on a bare regional feed vs. a one-sided
-          // blowout on a beautifully-produced national broadcast is
-          // exactly the case those styles need to disagree on.
-          broadcastQuality: { type: 'integer' },
-          // How likely the fixture is to STAY genuinely worth watching all
-          // the way to its natural end, rather than turning into a
-          // lopsided blowout worth switching away from partway through -
-          // see buildMatchRecommendPrompt's own instructions for this
-          // field. Match Find's client uses this to decide how much of a
-          // fixture's nominal broadcast length to actually reserve when
-          // building a back-to-back viewing plan: a fixture unlikely to
-          // stay watchable to the end effectively frees up sooner, so the
-          // next pick in the plan can start earlier than that fixture's
-          // full listed length would otherwise suggest.
-          enduranceScore: { type: 'integer' },
+          // Each *Adjustment field is added to the OBJECTIVE score Match
+          // Find already computed for this fixture (see
+          // cleanMatchRecommendItem's own `objective` parsing below) -
+          // never a replacement score. 0 is a completely valid, expected
+          // answer: most fixtures need no adjustment at all, since the
+          // deterministic formula already accounts for the real signals
+          // (record, form, standings proximity, odds) it has access to -
+          // an adjustment should only be non-zero when Gemini's own
+          // real-world knowledge disagrees for a SPECIFIC, nameable reason
+          // the formula couldn't see (see buildMatchRecommendPrompt).
+          competitivenessAdjustment: { type: 'integer' },
+          watchabilityAdjustment: { type: 'integer' },
+          broadcastQualityAdjustment: { type: 'integer' },
+          enduranceScoreAdjustment: { type: 'integer' },
           reason: { type: 'string' },
           venueZh: { type: 'string' }
         },
         required: [
           'id',
-          'competitiveness',
-          'watchability',
-          'broadcastQuality',
-          'enduranceScore',
+          'competitivenessAdjustment',
+          'watchabilityAdjustment',
+          'broadcastQualityAdjustment',
+          'enduranceScoreAdjustment',
           'reason',
           'venueZh'
         ]
@@ -1384,71 +1394,114 @@ const MATCH_RECOMMEND_RESPONSE_SCHEMA = {
   required: ['picks']
 };
 
+// A submitted fixture's own already-computed objective score (see Match
+// Find's scripts/objective-score.mjs) - four 1-10 numbers plus a short list
+// of the real, concrete facts (English, internal - not meant for display)
+// that produced them. Bounds/re-validates every field the same defensive
+// way the rest of this function does: a malformed or out-of-range value
+// here would otherwise get embedded directly into the prompt Gemini reads
+// as ground truth.
+const OBJECTIVE_SCORE_FIELDS = ['competitiveness', 'watchability', 'enduranceScore', 'broadcastQuality'];
+const OBJECTIVE_MAX_FACTORS = 8;
+const OBJECTIVE_MAX_FACTOR_LEN = 120;
+
+function cleanObjectiveScore(objective) {
+  if (!objective || typeof objective !== 'object') return null;
+  const cleaned = {};
+  for (const field of OBJECTIVE_SCORE_FIELDS) {
+    const value = Number(objective[field]);
+    if (!Number.isFinite(value)) return null; // an incomplete objective score isn't safe to validate against at all
+    cleaned[field] = Math.max(1, Math.min(10, Math.round(value)));
+  }
+  cleaned.factors = Array.isArray(objective.factors)
+    ? objective.factors
+        .filter(factor => typeof factor === 'string' && factor.trim())
+        .slice(0, OBJECTIVE_MAX_FACTORS)
+        .map(factor => factor.trim().slice(0, OBJECTIVE_MAX_FACTOR_LEN))
+    : [];
+  return cleaned;
+}
+
+// Clamps one adjustment field from Gemini's own response to
+// MATCH_RECOMMEND_ADJUSTMENT_BOUND in either direction, defaulting to 0 for
+// anything non-numeric - the actual enforcement point for "validation,
+// never replacement" (see that constant's own comment).
+function sanitizeAdjustment(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return 0;
+  return Math.max(-MATCH_RECOMMEND_ADJUSTMENT_BOUND, Math.min(MATCH_RECOMMEND_ADJUSTMENT_BOUND, Math.round(number)));
+}
+
 // Bounds/shape-checks one submitted fixture before it's embedded in the
 // prompt - same posture as cleanVocabAiText/readGeminiFiles: this route has
 // no passcode gate either, reachable by anyone who knows the URL, so every
 // field is treated as untrusted regardless of how Match Find's own build
 // script actually behaves. Returns null (never a silently truncated value)
-// so the caller 400s outright rather than forwarding a malformed fixture.
+// so the caller 400s outright rather than forwarding a malformed fixture -
+// including when `objective` itself doesn't parse, since this whole route
+// now has nothing to validate against without it.
 function cleanMatchRecommendItem(item) {
   if (!item || typeof item !== 'object') return null;
   const id = typeof item.id === 'string' ? item.id.trim().slice(0, 64) : '';
   const sport = typeof item.sport === 'string' ? item.sport.trim().slice(0, 40) : '';
   const name =
     typeof item.name === 'string' ? item.name.trim().slice(0, MATCH_RECOMMEND_MAX_FIELD_LEN) : '';
-  if (!id || !sport || !name) return null;
+  const objective = cleanObjectiveScore(item.objective);
+  if (!id || !sport || !name || !objective) return null;
   const startTimeUtc = typeof item.startTimeUtc === 'string' ? item.startTimeUtc.trim().slice(0, 40) : '';
   const context =
     typeof item.context === 'string' ? item.context.trim().slice(0, MATCH_RECOMMEND_MAX_CONTEXT_LEN) : '';
   const venue =
     typeof item.venue === 'string' ? item.venue.trim().slice(0, MATCH_RECOMMEND_MAX_FIELD_LEN) : '';
   // ESPN's own on-record national broadcaster (e.g. "Apple TV", "TBS") -
-  // optional (older callers or a fixture ESPN has no broadcaster listed
-  // for both send/have ""), see buildMatchRecommendPrompt for how it's
-  // used.
+  // optional (a fixture ESPN has no broadcaster listed for both send/have
+  // ""), see buildMatchRecommendPrompt for how it's used.
   const broadcast =
     typeof item.broadcast === 'string' ? item.broadcast.trim().slice(0, MATCH_RECOMMEND_MAX_FIELD_LEN) : '';
-  return { id, sport, name, startTimeUtc, context, venue, broadcast };
+  return { id, sport, name, startTimeUtc, context, venue, broadcast, objective };
 }
 
-// The fixed, server-owned prompt - Match Find's build script only ever sends
-// {matches: [...]}, never prompt text of its own, same discipline as every
-// other route in this file (see top-of-file comment). Match Find's UI is
-// Traditional Chinese throughout (see that repo's public/app.js) - "reason"
-// is written in Chinese too now so the one AI-generated sentence on the
-// page doesn't stick out as the only English text on an otherwise Chinese
-// card. venueZh exists for the same reason plain "venue" alone wasn't
-// enough: a Taiwanese viewer cares less about a US stadium's English name
-// than about its commonly-used Chinese one, which has to come from the
-// model's own knowledge, same as the competitiveness/watchability
-// judgment itself. Where to watch a fixture in Taiwan used to be asked for
-// here too, but Match Find now decides that with its own deterministic
-// rule instead (see buildGroundedMatchInfoPrompt's own comment).
+// The fixed, server-owned prompt - Match Find's build script only ever
+// sends {matches: [...]}, never prompt text of its own, same discipline as
+// every other route in this file (see top-of-file comment).
+//
+// THIS IS A VALIDATION PROMPT, NOT A SCORING PROMPT. Match Find's own
+// scripts/objective-score.mjs has already computed each fixture's
+// competitiveness/watchability/enduranceScore/broadcastQuality
+// deterministically, from real sports-data APIs (season record, recent
+// form, standings proximity, championship-race intensity, betting odds) -
+// every fixture's own `objective` field below carries that score plus the
+// actual `factors` that produced it. Gemini's job is narrower than the old
+// version of this prompt: read the objective score and its factors, decide
+// whether real-world knowledge the FORMULA couldn't see (a fresh injury, a
+// rivalry's real history, a star player's current form, genuine current
+// media attention) justifies nudging it, and return a small, bounded
+// *Adjustment for each dimension - added to, never replacing, the
+// objective score. Returning all zeros is the expected, common answer, not
+// a failure to engage - it means the deterministic score already looks
+// right.
 function buildMatchRecommendPrompt(matches) {
-  return `You are a knowledgeable sports fan helping Traditional-Chinese-speaking viewers in Taiwan decide which upcoming fixture is most worth watching. You are given a list of fixtures across several leagues/series (e.g. Premier League, MLB, NBA, F1), each with a "venue", a "startTimeUtc", and a "context" field. For EACH fixture, using your own real-world knowledge of these specific teams/drivers (current form, standings position, rivalry history, star players, championship/relegation/playoff stakes) and of Taiwan sports broadcasting, return:
+  return `You are a knowledgeable sports fan VALIDATING a set of already-computed fixture scores for Traditional-Chinese-speaking viewers in Taiwan deciding what's worth watching. Each fixture already has an "objective" field: {competitiveness, watchability, enduranceScore, broadcastQuality} (each 1-10, computed deterministically from real, current sports-data APIs - season record, recent form, standings proximity, betting odds, championship-race intensity) and "factors" (a short list of the specific real data points that produced those numbers, e.g. "season win% gap 4.5pp", "last 10: 7-3 vs 5-5", "postseason game"). You are NOT scoring these fixtures from scratch - you are checking whether your own real-world knowledge (which the formula has no access to at all: injuries, a rivalry's real history, which specific player is in form right now, genuine current media buzz) says the objective number is meaningfully wrong, and if so, by how much.
 
-COMPARE, DON'T JUST JUDGE EACH FIXTURE ALONE - you are given the WHOLE batch of fixtures at once specifically so you can weigh them against each other, not just so you can process them in one request. Before scoring, group the fixtures by which ones start on the same calendar day (using each fixture's own "startTimeUtc") AND, within a day, notice which ones start close enough in time that a viewer could plausibly only watch one of them - these are each other's real alternatives. Then score with that comparison in mind: two fixtures on the same day that are both genuinely excellent should both score high - don't flatten them toward each other just because they're similar, and don't invent a gap that isn't real - but when one is clearly the bigger story (bigger stakes, a rivalry with real history, a player in obviously better form, a tighter market spread) and a same-day/overlapping alternative is comparatively routine, that gap should show up clearly in "competitiveness"/"watchability", not get lost in both landing on similar middling numbers the way scoring each fixture in total isolation tends to produce. This is a signal for a separate scheduler to weigh alongside timing/continuity/variety - it does not decide the final lineup by itself, so there's no need to force artificial separation between fixtures that are genuinely comparable, only to avoid the opposite failure of never differentiating real alternatives from each other.
+COMPARE, DON'T JUST JUDGE EACH FIXTURE ALONE - you are given the WHOLE batch of fixtures at once specifically so you can weigh them against each other, not just process them in isolation. Group fixtures by which ones start on the same calendar day (using each fixture's own "startTimeUtc") AND, within a day, notice which ones start close enough in time that a viewer could plausibly only watch one of them - these are each other's real alternatives. If your own knowledge says one is clearly the bigger story than a same-day/overlapping alternative in a way the objective scores don't already reflect, that should show up as a real adjustment on the bigger story (or the smaller one, or both) - not by inflating everything indiscriminately.
 
-IMPORTANT - "context" may carry REAL, CURRENT signals you did not have to recall from memory, each in its own bracketed clause - prefer these over your own general knowledge whenever they're present, since your own knowledge of these specific teams may be stale, and these were gathered fresh:
-- "[Odds: ...]" is real betting-market data for this fixture (e.g. "[Odds: LAD -1.5, O/U 8.5]"). A small spread means the market itself expects a genuinely close, competitive game - weight this heavily for "competitiveness", even if your own general impression of the two teams would suggest otherwise. A large spread means a lopsided game is expected, regardless of team reputation. The over/under (O/U) total is a rough proxy for expected scoring/pace, relevant to "watchability" (a high total suggests an action-heavy, offense-driven game; a low one suggests a tighter, more defensive one).
-- "[Recent: ...]" is a fact a live web search found moments ago (a current streak, standings/wild-card position, an injury or return, a rivalry angle, why this game is getting real attention right now) - treat it as more reliable and current than anything you already "know" about these teams, and let it override your own assumptions where the two conflict.
-Not every fixture has either clause (not every sport/game has a posted line, and search doesn't always turn up something genuinely new) - fall back to your own general knowledge exactly as before when they're absent, same as always.
-- "competitiveness": integer 1-10, how close/contested you expect the fixture to be.
-- "watchability": integer 1-10, how entertaining or notable it is to a general sports fan regardless of closeness (rivalry, stakes, star power, drama, historical significance).
-- "broadcastQuality": integer 1-10, how good the VIEWING EXPERIENCE itself is expected to be - production value, camera work, and commentary team - independent of how good the matchup is. Use the given "broadcast" field (ESPN's on-record broadcaster, e.g. "Apple TV", "TBS", "Fox", "ESPN", "NBC", "TNT") plus your own general knowledge of that sport's platforms/networks: a league's own flagship in-house production, or a platform broadly known for polished, well-produced sports coverage (Apple TV's MLB "Friday Night Baseball" package is one well-known example, but reason from whichever platform/network this specific fixture actually has, across any sport, not just that one), typically scores well above a bare-bones regional/local feed or an unlisted/unknown broadcaster. If "broadcast" is empty and you have no other basis to judge, score it conservatively (4-6) rather than guessing a specific platform's reputation.
-- "enduranceScore": integer 1-10, how likely this fixture is to STAY worth watching all the way to its natural end, rather than turning into a lopsided blowout a viewer would want to switch away from partway through. This is a DIFFERENT axis from "competitiveness" (which is about how close the game is expected to be from the START) and "watchability" (which is about how notable/newsworthy it is regardless of score) - it's specifically about the shape of the whole event over time. Score it high for a genuine toss-up between two evenly-matched, consistent teams/drivers with no strong history of one-sided results, or a format where the outcome routinely stays uncertain deep into the event; score it low when one side is a clear, heavy favorite, when this matchup (or this team/driver) has a real recent history of blowouts or fading badly once behind, or when the format itself tends to decide early (e.g. a race where the front runner routinely builds an uncontested gap). Use your own knowledge of these specific teams'/drivers' consistency and this matchup's typical competitive arc, not just whether the pregame odds are close - a close spread does not by itself guarantee the ACTUAL game stays close once underway.
-- "reason": one short sentence (under 40 Traditional Chinese characters) in Traditional Chinese explaining the scores. When this fixture's "context" carries a "[Recent: ...]" or "[Odds: ...]" clause, GROUND this sentence in that concrete fact specifically (the actual streak, standings position, injury, spread, etc.) rather than a generic phrase like "雙方戰績接近" ("the two teams are evenly matched") that could apply to any fixture - a viewer reading this sentence should be able to tell it was written about THIS specific game, not a template. Fall back to your own general knowledge exactly as before when neither clause is present.
+For EACH fixture, using your own real-world knowledge (current form, standings stakes, rivalry history, star players, injuries) AND this fixture's own "context" (which may carry a real, current "[Odds: ...]" or "[Recent: ...]" bracketed clause a live search or the betting market already surfaced - treat these as more reliable than your own possibly-stale training knowledge where they conflict), return:
+- "competitivenessAdjustment": integer from -2 to +2. Non-zero ONLY when you have a specific, nameable reason the objective score's own "factors" don't already cover (e.g. a star pitcher's return the record-based formula has no way to see). Do not adjust merely because you'd have guessed a slightly different number yourself from general impressions - the objective score is already grounded in real, current data your own training knowledge might not have.
+- "watchabilityAdjustment": integer from -2 to +2, same standard - a genuinely bigger story (real rivalry history, a milestone, a star player's specific current form) the objective score's own factors don't capture.
+- "broadcastQualityAdjustment": integer from -2 to +2 - the objective score's own baseline is a coarse network-tier guess (see Match Find's scripts/objective-score.mjs); adjust only when you have real, specific knowledge of that platform's actual production quality for this sport that the coarse baseline wouldn't know (e.g. a league's own award-winning in-house broadcast, or a bare-bones regional feed with a poor reputation).
+- "enduranceScoreAdjustment": integer from -2 to +2 - adjust when you know something concrete about this SPECIFIC matchup's real competitive arc (a real recent history of one side fading once behind, or of routinely staying close deep into the event) beyond what the record-based objective score already reflects.
+- "reason": one short sentence (under 40 Traditional Chinese characters) in Traditional Chinese. If every adjustment above is 0, this should still explain briefly why the objective score already looks right, grounded in the fixture's own "factors" or "context" (e.g. citing the actual record gap, streak, or odds) - never a generic template phrase. If any adjustment is non-zero, name the SPECIFIC real-world fact that justified it.
 - "venueZh": the given "venue" written in Traditional Chinese - the commonly used Chinese name for that stadium/arena/circuit if you know one, otherwise a reasonable transliteration. Return "" if you have no real basis to translate it rather than guessing.
 
-(Taiwan broadcast source is no longer asked for here - Match Find now decides it with a deterministic rule of its own, not a per-fixture AI guess: 愛爾達體育台 by default, Apple TV only for an MLB fixture whose ESPN-reported "broadcast" field already says so. See that repo's README, "Duration and Taiwan broadcast source are deterministic, not AI-guessed".)
+(Taiwan broadcast source is not asked for here - Match Find decides it with a deterministic rule of its own: 愛爾達體育台 by default, Apple TV only for an MLB fixture whose ESPN-reported "broadcast" field already says so.)
 
 Fixtures (each already has an "id" - use it to key your answer, never invent or rely on ordering alone):
 ${JSON.stringify(matches)}
 
 Rules:
 - Return exactly one entry per given "id" - never add, drop, or merge fixtures.
-- If you don't recognize a team/driver, or have no real basis to judge a fixture, score competitiveness/watchability conservatively (4-6) and say so plainly in "reason" rather than inventing form, stats, or a rivalry that isn't real (broadcastQuality has its own conservative-default rule above).
-- Never invent an injury, transfer, statistic, broadcaster, or venue translation you're not confident is real - an empty/placeholder value is always better than a guess stated as fact.
+- Every adjustment defaults to 0 - only move a number when you have a specific, real reason the objective score's own factors don't already cover. Do not adjust every fixture by habit; a batch where most fixtures get all zeros is the normal, expected outcome.
+- Never invent an injury, transfer, statistic, broadcaster, or venue translation you're not confident is real - a zero adjustment or an empty value is always better than a guess stated as fact.
 - Return ONLY the raw JSON object matching the given schema - no markdown fences, no extra text.`;
 }
 
@@ -1733,6 +1786,17 @@ async function handleMatchRecommendRequest(request, env, headers, ip) {
     picksResult = structured;
     if (Array.isArray(picksResult?.picks)) {
       for (const pick of picksResult.picks) {
+        // The actual enforcement point for "validation, never replacement"
+        // (see MATCH_RECOMMEND_ADJUSTMENT_BOUND's own comment) - clamped
+        // here, server-side, regardless of what Gemini's own schema-
+        // constrained output claims, before this response ever leaves the
+        // Worker. Match Find's build-data.mjs clamps again independently
+        // on its own side of the boundary; neither side trusts the other
+        // to be the only enforcement.
+        pick.competitivenessAdjustment = sanitizeAdjustment(pick.competitivenessAdjustment);
+        pick.watchabilityAdjustment = sanitizeAdjustment(pick.watchabilityAdjustment);
+        pick.broadcastQualityAdjustment = sanitizeAdjustment(pick.broadcastQualityAdjustment);
+        pick.enduranceScoreAdjustment = sanitizeAdjustment(pick.enduranceScoreAdjustment);
         const info = grounded?.[pick.id];
         // Always present, even when grounding failed entirely (info is
         // undefined) - Match Find's own cache can then rely on
@@ -1748,29 +1812,32 @@ async function handleMatchRecommendRequest(request, env, headers, ip) {
   return json(picksResult, 200, headers);
 }
 
-// A small, comparative re-score for fixtures that already went through
+// A small, comparative re-check for fixtures that already went through
 // buildMatchRecommendPrompt once and came out genuinely contesting the
-// same viewing slot (see Match Find's build-data.mjs "contested cluster"
-// detection - this route never sees the rest of the day's fixtures, only
-// ones already flagged as a close call). The base prompt scores each
-// fixture in isolation, one at a time in a big batch, which is fine for
-// "roughly how good is this" but weak at "which of these two SPECIFIC
-// fixtures is actually the bigger deal right now" - a real answer to that
-// needs the model to weigh them against each other with a bit more
-// reasoning depth, which is what buying a Pro-tier model for just this
-// small, rare case is for (see MATCH_RECOMMEND_REFINE_MODELS' own
-// comment).
+// same viewing slot with near-identical final scores (see Match Find's
+// build-data.mjs "contested cluster" detection - this route never sees the
+// rest of the day's fixtures, only ones already flagged as a close call).
+// The base validation pass adjusts each fixture independently, in one big
+// batch, which is fine for "does this objective score roughly hold up" but
+// weak at "which of these two SPECIFIC fixtures is actually the bigger
+// deal right now" - a real answer to that needs the model to weigh them
+// against each other with a bit more reasoning depth, which is what buying
+// a Pro-tier model for just this small, rare case is for (see
+// MATCH_RECOMMEND_REFINE_MODELS' own comment). Same "validate, don't
+// replace" posture as the base prompt: Match Find's build-data.mjs only
+// ever reads competitivenessAdjustment/watchabilityAdjustment/reason back
+// from THIS route's response (broadcastQuality/enduranceScore/venueZh stay
+// whatever the base pass already decided) - the schema still requires
+// every field since it's shared with the base route, but only those three
+// are ever actually used from a refine response.
 function buildMatchRefinePrompt(matches) {
-  return `These ${matches.length} sports fixtures overlap in time and scored closely on an initial pass - you're being asked specifically because they need a more careful, COMPARATIVE judgment than a quick independent score can give. Using your own real-world knowledge (current standings/wild-card races, recent form, rivalry history, star players, injuries, how much real-world media/fan attention each is actually getting right now), decide which is genuinely the bigger deal and score them to reflect that clearly - don't default back to similar numbers just because the first pass did.
-
-Each fixture's "context" field may carry the same two REAL, CURRENT bracketed signals the base scoring pass uses - prefer these over memory, and let them break ties your own knowledge alone can't: "[Odds: ...]" is real betting-market data (a small spread means the market itself expects a close game; the O/U total is a scoring-pace proxy), and "[Recent: ...]" is a fact a live web search just found (a streak, standings position, an injury, a hot storyline) - exactly the kind of concrete, current difference that should decide a close comparative call like this one. Not every fixture has either clause; fall back to memory when absent.
+  return `These ${matches.length} sports fixtures overlap in time and landed on near-identical FINAL scores (objective score plus the base validation pass's own adjustment) - you're being asked specifically because they need a more careful, COMPARATIVE judgment than an independent check can give. Each fixture's "objective" field is Match Find's own deterministically-computed score (from real sports-data APIs) plus the "factors" that produced it - same meaning as the base validation prompt. Using your own real-world knowledge (current standings/wild-card races, recent form, rivalry history, star players, injuries, how much real-world media/fan attention each is actually getting right now) AND each fixture's own "context" (which may carry a real "[Odds: ...]" or "[Recent: ...]" clause - prefer these over memory where they conflict), decide which is genuinely the bigger deal RIGHT NOW and reflect that clearly in your adjustments - don't default every fixture to the same small nudge just because they started out close.
 
 For EACH fixture return:
-- "competitiveness": integer 1-10, how close/contested you expect it to be.
-- "watchability": integer 1-10, how entertaining or notable it is regardless of closeness.
-- "broadcastQuality": integer 1-10, how good the viewing experience itself is expected to be (production value, camera work, commentary), independent of the matchup - same basis as the base scoring pass: the given "broadcast" field plus your own knowledge of that sport's platforms/networks. This one isn't a comparative judgment like the other two - Match Find only ever keeps this field from the FIRST scoring pass, so just give your best independent estimate for each fixture.
-- "enduranceScore": integer 1-10, how likely the fixture is to stay worth watching all the way to its end rather than becoming a lopsided blowout - same meaning as the base scoring pass's own instructions for this field. Also not a comparative judgment - give your best independent estimate per fixture, same as "broadcastQuality".
-- "reason": one short sentence (under 40 Traditional Chinese characters) in Traditional Chinese explaining the scores, written as a direct comparison where it's warranted (e.g. noting why this one edges out the others in the group). Same grounding rule as the base scoring pass: when a fixture's "context" carries a "[Recent: ...]" or "[Odds: ...]" clause, cite that concrete fact specifically rather than a generic phrase - it's exactly the kind of concrete difference that should be VISIBLE in why one fixture edges out another here.
+- "competitivenessAdjustment": integer -2 to +2, added to this fixture's own "objective.competitiveness" - a COMPARATIVE judgment: if one fixture in this group is genuinely closer/more contested right now than the others, its adjustment should be visibly higher than theirs, not just independently estimated.
+- "watchabilityAdjustment": integer -2 to +2, added to "objective.watchability" - same comparative standard: a clearly bigger story here should pull ahead of a comparatively routine fixture in the same group, even if their objective scores started similar.
+- "broadcastQualityAdjustment" and "enduranceScoreAdjustment": integer -2 to +2 each - NOT a comparative judgment, Match Find ignores these two from this particular route's response (it only ever re-uses the base validation pass's own answer for both), so just give your best independent estimate per fixture, same standard as the base validation prompt.
+- "reason": one short sentence (under 40 Traditional Chinese characters) in Traditional Chinese, written as a direct comparison where it's warranted (e.g. noting why this one edges out the others in the group). Ground it in the fixture's own "objective.factors" or "context" clause where possible, rather than a generic phrase.
 - "venueZh": the given "venue" in Traditional Chinese, or "" if you have no real basis to translate it.
 
 Fixtures (each already has an "id" - use it to key your answer, never invent or rely on ordering alone):
@@ -1778,7 +1845,8 @@ ${JSON.stringify(matches)}
 
 Rules:
 - Return exactly one entry per given "id" - never add, drop, or merge fixtures.
-- A genuine tie is a valid answer - don't manufacture a preference where the real-world stakes are actually comparable - but don't default to sameness out of caution either when one fixture is clearly the bigger story.
+- A genuine tie is a valid answer (equal adjustments) - don't manufacture a preference where the real-world stakes are actually comparable - but don't default to identical adjustments out of caution either when one fixture is clearly the bigger story.
+- Every adjustment still defaults to 0 unless you have a specific, real reason - the same standard as the base validation pass, just applied comparatively for competitiveness/watchability here.
 - Never invent an injury, transfer, statistic, broadcaster, or venue translation you're not confident is real.
 - Return ONLY the raw JSON object matching the given schema - no markdown fences, no extra text.`;
 }
@@ -1826,11 +1894,12 @@ async function handleMatchRecommendRefineRequest(request, env, headers, ip) {
     // finds is exactly what breaks a tie memory alone can't. A small
     // batch (MATCH_RECOMMEND_REFINE_MAX_ITEMS, at most 6) keeps the added
     // grounded call cheap here regardless. build-data.mjs's
-    // refineContestedClusters only ever reads competitiveness/
-    // watchability/reason back from a refine response - broadcastQuality/
-    // enduranceScore stay whatever the base pass decided, and
-    // whereToWatchTw isn't asked for here at all anymore (see
-    // buildMatchRefinePrompt's own comment).
+    // refineContestedClusters only ever reads
+    // competitivenessAdjustment/watchabilityAdjustment/reason back from a
+    // refine response - broadcastQualityAdjustment/enduranceScoreAdjustment
+    // are still sanitized below (never trust upstream blindly, even for a
+    // field this particular caller ignores) but stay unused on Match
+    // Find's side, same as buildMatchRefinePrompt's own comment describes.
     const grounded = await fetchGroundedMatchInfo(matches, env);
     const enrichedMatches = grounded ? matches.map(m => withResearchEvidence(m, grounded)) : matches;
     picksResult = await fetchStructuredPicks(
@@ -1839,6 +1908,14 @@ async function handleMatchRecommendRefineRequest(request, env, headers, ip) {
       MATCH_RECOMMEND_REFINE_MODELS,
       buildMatchRefinePrompt(enrichedMatches)
     );
+    if (Array.isArray(picksResult?.picks)) {
+      for (const pick of picksResult.picks) {
+        pick.competitivenessAdjustment = sanitizeAdjustment(pick.competitivenessAdjustment);
+        pick.watchabilityAdjustment = sanitizeAdjustment(pick.watchabilityAdjustment);
+        pick.broadcastQualityAdjustment = sanitizeAdjustment(pick.broadcastQualityAdjustment);
+        pick.enduranceScoreAdjustment = sanitizeAdjustment(pick.enduranceScoreAdjustment);
+      }
+    }
   } catch (error) {
     return json({ error: { message: error.message || 'Upstream request failed' } }, error.status || 502, headers);
   }
