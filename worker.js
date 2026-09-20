@@ -42,16 +42,9 @@
 //                            allowed to reach for a Pro-tier model, and
 //                            only for a handful of fixtures a day, never
 //                            the full list - see "==== /match-recommend"
-//                            below.
-//   GET/POST/PATCH   /match-find-sync - Match Find's cross-device settings
-//                            sync (sport priority, enabled sports,
-//                            subscribed services - see that repo's
-//                            public/app.js). Same reuse reasoning as
-//                            /vocab-sync, and the same one-passcode shape
-//                            (no separate manager role - see
-//                            MATCH_FIND_SYNC_APP's own comment), just a
-//                            different Firestore collection and its own
-//                            rate-limit counters.
+//                            below. Match Find has no sync route at all -
+//                            its own settings/"Prefer" pick are local-only,
+//                            never sent to this Worker or anywhere else.
 //
 // /sync and /vocab-sync both hold a Firebase service-account key
 // server-side and proxy Firestore, so the pairing code isn't the only thing
@@ -1433,7 +1426,9 @@ function cleanMatchRecommendItem(item) {
 // so it has to come from the model's own knowledge, same as the
 // competitiveness/watchability judgment itself.
 function buildMatchRecommendPrompt(matches) {
-  return `You are a knowledgeable sports fan helping Traditional-Chinese-speaking viewers in Taiwan decide which upcoming fixture is most worth watching. You are given a list of fixtures across several leagues/series (e.g. Premier League, MLS, MLB, NBA, F1), each with a "venue" and a "context" field. For EACH fixture, using your own real-world knowledge of these specific teams/drivers (current form, standings position, rivalry history, star players, championship/relegation/playoff stakes) and of Taiwan sports broadcasting, return:
+  return `You are a knowledgeable sports fan helping Traditional-Chinese-speaking viewers in Taiwan decide which upcoming fixture is most worth watching. You are given a list of fixtures across several leagues/series (e.g. Premier League, MLB, NBA, F1), each with a "venue", a "startTimeUtc", and a "context" field. For EACH fixture, using your own real-world knowledge of these specific teams/drivers (current form, standings position, rivalry history, star players, championship/relegation/playoff stakes) and of Taiwan sports broadcasting, return:
+
+COMPARE, DON'T JUST JUDGE EACH FIXTURE ALONE - you are given the WHOLE batch of fixtures at once specifically so you can weigh them against each other, not just so you can process them in one request. Before scoring, group the fixtures by which ones start on the same calendar day (using each fixture's own "startTimeUtc") AND, within a day, notice which ones start close enough in time that a viewer could plausibly only watch one of them - these are each other's real alternatives. Then score with that comparison in mind: two fixtures on the same day that are both genuinely excellent should both score high - don't flatten them toward each other just because they're similar, and don't invent a gap that isn't real - but when one is clearly the bigger story (bigger stakes, a rivalry with real history, a player in obviously better form, a tighter market spread) and a same-day/overlapping alternative is comparatively routine, that gap should show up clearly in "competitiveness"/"watchability", not get lost in both landing on similar middling numbers the way scoring each fixture in total isolation tends to produce. This is a signal for a separate scheduler to weigh alongside timing/continuity/variety - it does not decide the final lineup by itself, so there's no need to force artificial separation between fixtures that are genuinely comparable, only to avoid the opposite failure of never differentiating real alternatives from each other.
 
 IMPORTANT - "context" may carry REAL, CURRENT signals you did not have to recall from memory, each in its own bracketed clause - prefer these over your own general knowledge whenever they're present, since your own knowledge of these specific teams may be stale, and these were gathered fresh:
 - "[Odds: ...]" is real betting-market data for this fixture (e.g. "[Odds: LAD -1.5, O/U 8.5]"). A small spread means the market itself expects a genuinely close, competitive game - weight this heavily for "competitiveness", even if your own general impression of the two teams would suggest otherwise. A large spread means a lopsided game is expected, regardless of team reputation. The over/under (O/U) total is a rough proxy for expected scoring/pace, relevant to "watchability" (a high total suggests an action-heavy, offense-driven game; a low one suggests a tighter, more defensive one).
@@ -2530,38 +2525,6 @@ const VOCAB_SYNC_APP = {
   credentialPattern: VOCAB_PASSCODE_PATTERN
 };
 
-// Match Find's /match-find-sync: same reuse reasoning as /vocab-sync above
-// (one already-deployed Worker, one already-deployed Firebase project,
-// rather than standing up a second of each for another sibling static
-// site), and the same singleCredential shape as /vocab-sync rather than
-// Orbit's own code+manager-passcode one - a viewer's sport-priority/
-// enabled-sports/subscribed-services settings are "one person's own
-// preferences synced across their own devices", the same "no
-// teacher/student broadcast, no read-only viewer role" situation
-// /vocab-sync's own comment describes, not "one person's schedule read by
-// many". The payload itself is tiny (a handful of settings, not a whole
-// week's schedule or a learner's whole progress history) - its own much
-// smaller MAX_PAYLOAD_LENGTH reflects that rather than reusing Vocab's.
-const MATCH_FIND_SYNC_PASSCODE_LENGTH = 16;
-const MATCH_FIND_SYNC_PASSCODE_PATTERN = /^[2-9A-HJ-NP-Z]{16}$/;
-const MATCH_FIND_SYNC_READ_RATE_LIMIT = 6000;
-const MATCH_FIND_SYNC_WRITE_RATE_LIMIT = 300;
-const MATCH_FIND_SYNC_DELETE_RATE_LIMIT = 20;
-const MATCH_FIND_SYNC_CREATE_RATE_LIMIT = 20;
-const MATCH_FIND_SYNC_MAX_PAYLOAD_LENGTH = 4096;
-const MATCH_FIND_SYNC_APP = {
-  collection: 'match-find-sync',
-  featurePrefix: 'match-find-sync',
-  maxPayloadLength: MATCH_FIND_SYNC_MAX_PAYLOAD_LENGTH,
-  readLimit: MATCH_FIND_SYNC_READ_RATE_LIMIT,
-  writeLimit: MATCH_FIND_SYNC_WRITE_RATE_LIMIT,
-  deleteLimit: MATCH_FIND_SYNC_DELETE_RATE_LIMIT,
-  createLimit: MATCH_FIND_SYNC_CREATE_RATE_LIMIT,
-  singleCredential: true,
-  credentialLength: MATCH_FIND_SYNC_PASSCODE_LENGTH,
-  credentialPattern: MATCH_FIND_SYNC_PASSCODE_PATTERN
-};
-
 // ==== Routing ================================================================
 
 export default {
@@ -2578,7 +2541,6 @@ export default {
     if (path === '/nl-edit') return handleNlEditRequest(request, env, headers, ip);
     if (path === '/sync') return handleSyncRequest(request, env, headers, ip, ORBIT_SYNC_APP);
     if (path === '/vocab-sync') return handleSyncRequest(request, env, headers, ip, VOCAB_SYNC_APP);
-    if (path === '/match-find-sync') return handleSyncRequest(request, env, headers, ip, MATCH_FIND_SYNC_APP);
     if (path === '/vocab-ai') return handleVocabAiRequest(request, env, headers, ip);
     if (path === '/match-recommend') return handleMatchRecommendRequest(request, env, headers, ip);
     if (path === '/match-recommend-refine') return handleMatchRecommendRefineRequest(request, env, headers, ip);
