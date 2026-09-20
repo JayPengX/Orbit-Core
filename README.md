@@ -30,7 +30,6 @@ thing about it: the URL.
 | `/vocab-ai` | POST | Orbit Vocab | Live, per-learner personalized mnemonics. |
 | `/match-recommend` | POST | Match Find | Daily "which fixture is worth watching" scoring, called a handful of times a day by Match Find's own scheduled build - never per visitor. |
 | `/match-recommend-refine` | POST | Match Find | A small, rare Pro-tier-model follow-up for fixtures that came out genuinely contesting the same time slot on the first pass. |
-| `/match-find-sync` | GET/POST/PATCH | Match Find | Cross-device settings sync (sport priority, enabled sports, subscribed services - single passcode). |
 
 Every route validates and rate-limits itself independently (see
 `isRateLimited` in `worker.js` - every call site passes its own `feature`
@@ -40,16 +39,17 @@ on the *consuming* app's side: not configuring a `PROXY_URL` (or its route
 not being reachable) just makes that one feature unavailable, never a
 broken build.
 
-`/sync` and `/vocab-sync`/`/match-find-sync` (Orbit's own vs. the two
-sibling apps') use two different pairing shapes:
+`/sync` and `/vocab-sync` (Orbit's own vs. Orbit Vocab's) use two different
+pairing shapes - Match Find has no sync route at all; its own settings and
+"Prefer" pick are local-only, in the viewer's own browser, never synced
+anywhere (see that repo's README):
 
 - **Orbit's `/sync`**: a plain sync code (read access, share freely) plus a
   separate manager passcode (write/delete access) - built for "one teacher
   broadcasts a schedule to many read-only student devices."
-- **`/vocab-sync` and `/match-find-sync`**: a single passcode that's both
-  the identifier and the only credential - built for "one person's own
-  multiple devices," where there's no reason to have a public read-only
-  code at all.
+- **`/vocab-sync`**: a single passcode that's both the identifier and the
+  only credential - built for "one person's own multiple devices," where
+  there's no reason to have a public read-only code at all.
 
 See the top-of-file comment in `worker.js`, and the comment above each
 route's handler, for the full reasoning behind each design choice - this
@@ -103,9 +103,9 @@ airport code, e.g. `IAD` = Virginia, `HKG` = Hong Kong) - useful for
 confirming this is actually taking effect, or diagnosing a future report of
 the same error.
 
-### Sync features (`/sync`, `/vocab-sync`, `/match-find-sync`)
+### Sync features (`/sync`, `/vocab-sync`)
 
-All three share one Firebase project and one service-account credential:
+Both share one Firebase project and one service-account credential:
 
 1. Create a project at the [Firebase Console](https://console.firebase.google.com/)
    and enable Firestore.
@@ -130,8 +130,8 @@ All three share one Firebase project and one service-account credential:
 4. (Optional but recommended) Workers & Pages → KV → Create namespace (any
    name) → back on this Worker's Settings → Bindings → Add → KV Namespace →
    variable name `RATE_LIMIT_KV` → pick the namespace you just created →
-   redeploy (a Binding change needs a fresh "Deploy" to take effect). All
-   three sync routes (and every AI route) share this one binding with
+   redeploy (a Binding change needs a fresh "Deploy" to take effect). Both
+   sync routes (and every AI route) share this one binding with
    per-feature key prefixes, so there's never any cross-feature interference.
 5. Back in the Firebase Console's "Rules" tab, paste:
    ```
@@ -149,14 +149,12 @@ All three share one Firebase project and one service-account credential:
    unauthenticated client access to Firestore. That's the actual point of
    this whole Worker for the sync routes - not one more check on top of an
    open database, but removing the open database entirely. The wildcard
-   covers every collection (`orbit-schedules`, `vocab-progress-sync`,
-   `match-find-sync`) so adding a fourth sync consumer later never needs
-   this rule touched again.
+   covers every collection (`orbit-schedules`, `vocab-progress-sync`) so
+   adding a third sync consumer later never needs this rule touched again.
 
-Once this is done, `/sync`, `/vocab-sync`, and `/match-find-sync` are all
-live - each already uses its own Firestore collection and its own
-rate-limit counters (see the table above), so none of them can affect the
-others' data or quota.
+Once this is done, `/sync` and `/vocab-sync` are both live - each already
+uses its own Firestore collection and its own rate-limit counters (see the
+table above), so neither can affect the other's data or quota.
 
 ### Optional: auto-deploy via GitHub Actions
 
@@ -197,7 +195,7 @@ path suffix** - each app's own frontend code appends its own hardcoded path.
 | --- | --- | --- |
 | Orbit | GitHub Settings → Secrets and variables → Actions → **Variables** | `PROXY_URL` (built into the client bundle by Vite - see `src/proxy-config.js`) |
 | Orbit Vocab | GitHub Settings → Secrets and variables → Actions → **Variables** | `PROXY_URL` (substituted into `sync.js`/`vocab-ai.js` at build time - see `.github/workflows/pages.yml`) |
-| Match Find | GitHub Settings → Secrets and variables → Actions → **Variables** | `PROXY_URL` (read by `scripts/build-data.mjs` at build time; also baked into `public/data/matches.json` for `public/app.js`'s own `/match-find-sync` calls) |
+| Match Find | GitHub Settings → Secrets and variables → Actions → **Variables** | `PROXY_URL` (read by `scripts/build-data.mjs` at build time only, for `/match-recommend`/`/match-recommend-refine` - never shipped to the browser: Match Find's client has no server-side sync or any other network call besides fetching its own `matches.json`) |
 
 All three deliberately use a GitHub Actions **Variable**, not a Secret -
 this value ends up in each site's public client bundle either way (a static
