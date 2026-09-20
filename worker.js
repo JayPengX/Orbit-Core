@@ -1721,6 +1721,26 @@ function sanitizeGroundedResult(parsed, retrievedAt) {
   return result;
 }
 
+// Confirmed live (via the debugGrounding diagnostic above) that Google
+// Search grounding sits on its OWN, much stricter quota than plain
+// generateContent on this account: every one of MATCH_RECOMMEND_MODELS
+// returns a 429 RESOURCE_EXHAUSTED for a grounded request while the exact
+// same models succeed instantly for the ungrounded scoring call. That's an
+// account/billing-tier limit, not a per-model or transient one - retrying
+// all 3 models on every batch, every build, is 3 guaranteed-failing round
+// trips of pure latency with zero chance of success until the quota
+// actually resets. GROUNDING_COOLDOWN_KEY (via the same RATE_LIMIT_KV
+// binding isRateLimited already uses) short-circuits that: the first
+// all-429 batch after a cooldown records how long to stop trying, and
+// every batch within that window skips the attempt entirely rather than
+// paying for 3 known-doomed requests. This does NOT fix evidence being
+// empty (that needs either enabling billing for Search grounding on this
+// Gemini API key, or a genuinely different real-time-search source - a
+// real decision, not something to silently paper over here) - it only
+// stops wasting request time proving the same failure repeatedly.
+const GROUNDING_COOLDOWN_KV_KEY = 'grounding:quota-exhausted-until';
+const GROUNDING_COOLDOWN_SECONDS = 1800;
+
 // Best-effort, never fatal to the request: any failure here (quota, no
 // model accepts grounding, every attempt timing out, an unparseable
 // response) just means each fixture's "context" goes into scoring with no
@@ -1739,7 +1759,20 @@ function sanitizeGroundedResult(parsed, retrievedAt) {
 // `debugGrounding`). Never populated unless a caller asks - zero behavior/
 // cost change to the normal path.
 async function fetchGroundedMatchInfo(matches, env, debugLog) {
+  if (env.RATE_LIMIT_KV) {
+    try {
+      const cooldownUntil = await env.RATE_LIMIT_KV.get(GROUNDING_COOLDOWN_KV_KEY);
+      if (cooldownUntil && Number(cooldownUntil) > Date.now()) {
+        if (debugLog) debugLog.push({ skipped: 'cooldown-active', cooldownUntil: new Date(Number(cooldownUntil)).toISOString() });
+        return null;
+      }
+    } catch {
+      // No KV, or a transient KV error - fall through and try live, same
+      // fail-open posture isRateLimited's own KV read failure already has.
+    }
+  }
   const prompt = buildGroundedMatchInfoPrompt(matches);
+  let allAttemptsWereQuotaExhausted = true;
   for (const model of MATCH_RECOMMEND_MODELS) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${env.GEMINI_API_KEY}`;
     const entry = debugLog ? { model } : null;
@@ -1756,6 +1789,7 @@ async function fetchGroundedMatchInfo(matches, env, debugLog) {
         signal: AbortSignal.timeout(GROUNDED_MATCH_INFO_ATTEMPT_TIMEOUT_MS)
       });
       if (entry) entry.status = upstream.status;
+      if (upstream.status !== 429) allAttemptsWereQuotaExhausted = false;
       if (!upstream.ok) {
         if (entry) {
           entry.errorBody = (await upstream.text().catch(() => null))?.slice(0, 500) || null;
@@ -1781,6 +1815,7 @@ async function fetchGroundedMatchInfo(matches, env, debugLog) {
       // model itself.
       if (parsed && typeof parsed === 'object') return sanitizeGroundedResult(parsed, new Date().toISOString());
     } catch (error) {
+      allAttemptsWereQuotaExhausted = false; // a network/timeout failure, not a confirmed quota one - don't cool down on a guess
       if (entry) {
         entry.error = error && error.message;
         debugLog.push(entry);
@@ -1789,6 +1824,12 @@ async function fetchGroundedMatchInfo(matches, env, debugLog) {
       // the caller's own fallback, on any failure (including this
       // attempt's own timeout).
     }
+  }
+  if (allAttemptsWereQuotaExhausted && env.RATE_LIMIT_KV) {
+    const until = Date.now() + GROUNDING_COOLDOWN_SECONDS * 1000;
+    await env.RATE_LIMIT_KV.put(GROUNDING_COOLDOWN_KV_KEY, String(until), {
+      expirationTtl: GROUNDING_COOLDOWN_SECONDS
+    }).catch(() => {});
   }
   return null;
 }
