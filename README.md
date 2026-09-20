@@ -28,8 +28,7 @@ thing about it: the URL.
 | `/sync` | GET/PATCH/DELETE | Orbit | Cross-device schedule sync (code + manager passcode; reads are open, writes/deletes need the passcode). |
 | `/vocab-sync` | GET/PATCH/DELETE | Orbit Vocab | Cross-device learning-progress sync (single passcode, no separate read-only code). |
 | `/vocab-ai` | POST | Orbit Vocab | Live, per-learner personalized mnemonics. |
-| `/sports-proxy` | GET | Match Find | Host-allowlisted CORS passthrough to ESPN/MLB Stats API/Jolpica, so the viewer's own browser can poll live scores/odds directly. |
-| `/match-dispatch` | POST | Match Find | Fires Match Find's own GitHub Actions build on demand, so an ordinary visitor's "重新整理資料" button can trigger a real rebuild. |
+| `/sports-proxy` | GET | Match Find | Host-allowlisted CORS passthrough to ESPN/the MLB Stats API/Jolpica/Polymarket's Gamma API, so the viewer's own browser can fetch and score its whole live match list directly. |
 
 Match Find used to also have `/match-recommend`/`/match-recommend-refine`
 (Gemini-based fixture scoring/validation) - removed as of that repo's
@@ -37,8 +36,13 @@ Match Find used to also have `/match-recommend`/`/match-recommend-refine`
 couldn't sustain the workload, and Match Find's own deterministic
 objective-score engine was always the primary source of truth for every
 fixture's score anyway, so removing the AI validation layer on top cost no
-real scoring quality. Match Find's build no longer calls this Worker for
-any AI/scoring purpose at all - only the two routes above.
+real scoring quality. It also used to have `/match-dispatch` (fired a
+GitHub Actions rebuild on demand) - removed once Match Find moved its own
+match-building pipeline to run fully client-side (see that repo's
+public/app.js) rather than on a scheduled server-side build there was ever
+anything to dispatch. Match Find's own client no longer calls this Worker
+for any AI/scoring/build-trigger purpose at all - only the one route
+above.
 
 Every route validates and rate-limits itself independently (see
 `isRateLimited` in `worker.js` - every call site passes its own `feature`
@@ -118,21 +122,6 @@ Nothing to configure - this route needs no secret at all, it's a plain
 host-allowlisted passthrough to public, keyless sports APIs (see
 `SPORTS_PROXY_ALLOWED_HOSTS` in `worker.js`). It's live the moment this
 Worker is deployed.
-
-### Match Find on-demand rebuilds (`/match-dispatch`)
-
-1. Create a fine-grained GitHub Personal Access Token scoped to **only**
-   the `Match-Find` repository, with **Actions: Read and write** permission
-   and nothing else: GitHub → Settings → Developer settings → Fine-grained
-   tokens → Generate new token → Repository access: "Only select
-   repositories" → `Match-Find` → Permissions → Actions → Read and write.
-2. Worker Settings → Variables and Secrets → add `MATCH_FIND_DISPATCH_TOKEN`
-   (the token from step 1), type **Secret** → Save and Deploy.
-
-That's it - `/match-dispatch` is a completely separate secret from
-`GEMINI_API_KEY`, scoped narrowly enough that a leak of it could only ever
-trigger extra Match Find builds, never touch this Worker's other features,
-Match Find's code, or any other repository.
 
 ### Sync features (`/sync`, `/vocab-sync`)
 
@@ -226,18 +215,21 @@ path suffix** - each app's own frontend code appends its own hardcoded path.
 | --- | --- | --- |
 | Orbit | GitHub Settings → Secrets and variables → Actions → **Variables** | `PROXY_URL` (built into the client bundle by Vite - see `src/proxy-config.js`) |
 | Orbit Vocab | GitHub Settings → Secrets and variables → Actions → **Variables** | `PROXY_URL` (substituted into `sync.js`/`vocab-ai.js` at build time - see `.github/workflows/pages.yml`) |
-| Match Find | GitHub Settings → Secrets and variables → Actions → **Variables** | `PROXY_URL` (read by `scripts/build-data.mjs` at build time, then passed straight through into `matches.json`'s own `proxyUrl` field so the BROWSER can build its own `/sports-proxy`/`/match-dispatch` requests - the build script itself no longer calls this Worker for anything) |
+| Match Find | Hardcoded directly as a `PROXY_URL` constant in `public/app.js` | None - there's no build step left to inject a build-time variable from (its whole match list is fetched/scored live in the browser - see that repo's public/lib/match-builder.mjs), so this is a plain source-code constant instead |
 
-All three deliberately use a GitHub Actions **Variable**, not a Secret -
-this value ends up in each site's public client bundle either way (a static
-site has no server to keep it hidden behind), so there's nothing gained by
-treating it as one. If you're running all three sites yourself, all three
-`PROXY_URL` values are identical - the same deployed Worker, just a
+Orbit/Orbit Vocab deliberately use a GitHub Actions **Variable**, not a
+Secret - this value ends up in each site's public client bundle either way
+(a static site has no server to keep it hidden behind), so there's nothing
+gained by treating it as one; Match Find's own hardcoded constant is the
+same non-secret value, just written directly into source since it has no
+build-time substitution step to use instead. If you're running all three
+sites yourself, all three apps point at the same deployed Worker, just a
 different path per feature.
 
-Leaving `PROXY_URL` unset in any of the three apps is fine: that app's
-AI/sync features are simply unavailable, and everything else about it works
-normally.
+Leaving `PROXY_URL` unset in Orbit/Orbit Vocab is fine: that app's AI/sync
+features are simply unavailable, and everything else about it works
+normally. Match Find has no such "unset" state - update its own hardcoded
+constant directly if you deploy your own Worker for it.
 
 ## Why one Worker instead of three
 
