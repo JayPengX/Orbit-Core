@@ -1842,23 +1842,33 @@ const VOCAB_SYNC_APP = {
 //
 // Match Find's browser-side live-score/live-odds polling and its "refresh
 // now"/"AI 重新評估" Settings buttons (see that repo's README) need to read
-// ESPN's/the MLB Stats API's/the Jolpica F1 API's own public JSON directly
-// from the VIEWER'S browser, not just from Match Find's own scheduled
-// build - none of the three sets CORS headers for arbitrary origins, so a
-// plain client-side fetch() to any of them fails outright from a browser
-// regardless of how the request is shaped (the same reason /gemini's own
-// proxying exists for Gemini itself, just for a read-only public GET
-// instead of an authenticated call). This route is a thin, read-only
-// pass-through: it validates the requested URL against a fixed host
-// allowlist, fetches it SERVER-SIDE (no CORS restriction applies to a
-// Worker's own outbound fetch), and pipes the response back with this
-// Worker's own permissive-to-allowed-origins CORS headers already attached.
-// No API key, no response transformation, and nothing sport-specific
-// hardcoded here - Match Find's own client code (public/lib/espn.mjs)
-// builds the real upstream URL and does all the interpreting; this Worker
-// only ever forwards bytes for a HOST it already trusts, never an arbitrary
-// one, so this can't become an open proxy for anything else.
-const SPORTS_PROXY_ALLOWED_HOSTS = ['site.api.espn.com', 'statsapi.mlb.com', 'api.jolpi.ca'];
+// ESPN's/the MLB Stats API's/the Jolpica F1 API's/Polymarket's Gamma API's
+// own public JSON directly from the VIEWER'S browser, not just from Match
+// Find's own scheduled build - none of the four sets CORS headers for
+// arbitrary origins, so a plain client-side fetch() to any of them fails
+// outright from a browser regardless of how the request is shaped (the
+// same reason /gemini's own proxying exists for Gemini itself, just for a
+// read-only public GET instead of an authenticated call). Polymarket
+// specifically backs Match Find's own on-card win% odds display (see that
+// repo's public/lib/polymarket.mjs) - added after an earlier version of
+// that feature (ESPN's own sportsbook-odds feed) was dropped entirely, in
+// favor of a real prediction market's own trade price. This route is a
+// thin, read-only pass-through: it validates the requested URL against a
+// fixed host allowlist, fetches it SERVER-SIDE (no CORS restriction
+// applies to a Worker's own outbound fetch), and pipes the response back
+// with this Worker's own permissive-to-allowed-origins CORS headers
+// already attached. No API key, no response transformation, and nothing
+// sport-specific hardcoded here - Match Find's own client code (public/
+// lib/espn.mjs, public/lib/polymarket.mjs) builds the real upstream URL
+// and does all the interpreting; this Worker only ever forwards bytes for
+// a HOST it already trusts, never an arbitrary one, so this can't become
+// an open proxy for anything else.
+const SPORTS_PROXY_ALLOWED_HOSTS = [
+  'site.api.espn.com',
+  'statsapi.mlb.com',
+  'api.jolpi.ca',
+  'gamma-api.polymarket.com'
+];
 // Generous - a viewer with several live matches open at once can easily
 // poll every 20-30s per match (see Match Find's own polling interval) - but
 // still a real bound against a runaway tab/script hammering this route.
