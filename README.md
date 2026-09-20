@@ -28,10 +28,17 @@ thing about it: the URL.
 | `/sync` | GET/PATCH/DELETE | Orbit | Cross-device schedule sync (code + manager passcode; reads are open, writes/deletes need the passcode). |
 | `/vocab-sync` | GET/PATCH/DELETE | Orbit Vocab | Cross-device learning-progress sync (single passcode, no separate read-only code). |
 | `/vocab-ai` | POST | Orbit Vocab | Live, per-learner personalized mnemonics. |
-| `/match-recommend` | POST | Match Find | Daily "which fixture is worth watching" scoring, called a handful of times a day by Match Find's own scheduled build - never per visitor. |
-| `/match-recommend-refine` | POST | Match Find | A small, rare Pro-tier-model follow-up for fixtures that came out genuinely contesting the same time slot on the first pass. |
 | `/sports-proxy` | GET | Match Find | Host-allowlisted CORS passthrough to ESPN/MLB Stats API/Jolpica, so the viewer's own browser can poll live scores/odds directly. |
-| `/match-dispatch` | POST | Match Find | Fires Match Find's own GitHub Actions build on demand, so an ordinary visitor's "重新整理資料"/"AI 重新評估" button can trigger a real rebuild. |
+| `/match-dispatch` | POST | Match Find | Fires Match Find's own GitHub Actions build on demand, so an ordinary visitor's "重新整理資料" button can trigger a real rebuild. |
+
+Match Find used to also have `/match-recommend`/`/match-recommend-refine`
+(Gemini-based fixture scoring/validation) - removed as of that repo's
+`docs/recommendation-engine-audit.md` Round 11: free-tier Gemini quota
+couldn't sustain the workload, and Match Find's own deterministic
+objective-score engine was always the primary source of truth for every
+fixture's score anyway, so removing the AI validation layer on top cost no
+real scoring quality. Match Find's build no longer calls this Worker for
+any AI/scoring purpose at all - only the two routes above.
 
 Every route validates and rate-limits itself independently (see
 `isRateLimited` in `worker.js` - every call site passes its own `feature`
@@ -67,21 +74,21 @@ You don't need to install anything to get started:
 3. "Edit code" → paste the entire contents of `worker.js` → Save and Deploy.
 4. Copy the Worker's URL (`https://<name>.<subdomain>.workers.dev`) -
    **no path suffix**. Every consuming app appends its own hardcoded path
-   (`/gemini`, `/sync`, `/match-recommend`, etc.) - see "Wiring up a
+   (`/gemini`, `/sync`, `/vocab-ai`, etc.) - see "Wiring up a
    consuming app" below.
 
 That alone gives you a live Worker with every route returning "not
 configured" until you add the secrets each feature needs:
 
-### AI features (`/gemini`, `/nl-edit`, `/vocab-ai`, `/match-recommend`, `/match-recommend-refine`)
+### AI features (`/gemini`, `/nl-edit`, `/vocab-ai`)
 
-All five share one secret:
+All three share one secret:
 
 - Worker Settings → Variables and Secrets → add `GEMINI_API_KEY`
   ([get one here](https://aistudio.google.com/apikey)), type **Secret** →
   Save and Deploy.
 
-That's it - once `GEMINI_API_KEY` is set, all five AI routes work. Nothing
+That's it - once `GEMINI_API_KEY` is set, all three AI routes work. Nothing
 else to configure per-route.
 
 **`[placement]` matters here.** `wrangler.toml` pins
@@ -219,7 +226,7 @@ path suffix** - each app's own frontend code appends its own hardcoded path.
 | --- | --- | --- |
 | Orbit | GitHub Settings → Secrets and variables → Actions → **Variables** | `PROXY_URL` (built into the client bundle by Vite - see `src/proxy-config.js`) |
 | Orbit Vocab | GitHub Settings → Secrets and variables → Actions → **Variables** | `PROXY_URL` (substituted into `sync.js`/`vocab-ai.js` at build time - see `.github/workflows/pages.yml`) |
-| Match Find | GitHub Settings → Secrets and variables → Actions → **Variables** | `PROXY_URL` (read by `scripts/build-data.mjs` at build time only, for `/match-recommend`/`/match-recommend-refine` - never shipped to the browser: Match Find's client has no server-side sync or any other network call besides fetching its own `matches.json`) |
+| Match Find | GitHub Settings → Secrets and variables → Actions → **Variables** | `PROXY_URL` (read by `scripts/build-data.mjs` at build time, then passed straight through into `matches.json`'s own `proxyUrl` field so the BROWSER can build its own `/sports-proxy`/`/match-dispatch` requests - the build script itself no longer calls this Worker for anything) |
 
 All three deliberately use a GitHub Actions **Variable**, not a Secret -
 this value ends up in each site's public client bundle either way (a static
