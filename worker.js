@@ -1261,6 +1261,47 @@ const EVIDENCE_CATEGORIES = ['competitiveness', 'mediaAttention', 'eventImportan
 // list itself.
 const EVIDENCE_MAX_ITEMS_PER_FIXTURE = 3;
 const EVIDENCE_MAX_FINDING_LEN = 200;
+
+// How many fixtures ONE fetchGroundedMatchInfo call actually asks Gemini to
+// research, out of a base validation batch that can carry up to
+// MATCH_RECOMMEND_MAX_ITEMS (80). Asking a single Google Search-grounded
+// call to genuinely research 80 completely unrelated sports fixtures inside
+// GROUNDED_MATCH_INFO_ATTEMPT_TIMEOUT_MS is not a realistic amount of work
+// for the model to actually carry out per fixture - in practice a request
+// that large is far more likely to fall back to reasoning from training
+// data (or returning empty evidence arrays across the board) than to
+// perform 80 distinct, real searches, which is indistinguishable from
+// grounding "not working" from the caller's side even though the call
+// itself succeeds. Capping the grounded batch to a smaller, genuinely
+// researchable set (selectFixturesForGrounding picks the highest-scoring
+// ones - the fixtures actually contending to be recommended, where a real
+// media-attention/injury/storyline fact would matter) trades "every
+// fixture nominally gets a grounding attempt" for "the fixtures that
+// matter get one that plausibly actually happened". Fixtures outside this
+// cap are unaffected otherwise - they still get scored, just with no
+// research evidence folded in, identical to what already happens whenever
+// grounding fails or finds nothing.
+const GROUNDED_MATCH_INFO_MAX_ITEMS = 20;
+
+// Selects which fixtures from a base validation batch actually get a
+// grounding/evidence-search attempt (see GROUNDED_MATCH_INFO_MAX_ITEMS's
+// own comment) - the highest objective-score fixtures first, since those
+// are the ones actually contending for a recommendation slot and where a
+// real "media buzz"/injury/storyline fact could change the outcome. A
+// mediocre fixture that was never going to be recommended anyway doesn't
+// need its own slice of a bounded research budget. Ties (and the "no
+// scores at all" case) keep the caller's own original order, so this stays
+// deterministic rather than depending on object key iteration order.
+function selectFixturesForGrounding(matches, maxItems) {
+  if (matches.length <= maxItems) return matches;
+  const objectiveAverage = m =>
+    (m.objective.competitiveness + m.objective.watchability + m.objective.enduranceScore + m.objective.broadcastQuality) / 4;
+  return matches
+    .map((match, index) => ({ match, index }))
+    .sort((a, b) => objectiveAverage(b.match) - objectiveAverage(a.match) || a.index - b.index)
+    .slice(0, maxItems)
+    .map(entry => entry.match);
+}
 // "source" here is a short, honest, SELF-DESCRIBED label from the model
 // itself (e.g. "current league standings", "recent sports news coverage") -
 // not a verified citation URL. This route's grounded call
@@ -1787,8 +1828,12 @@ async function handleMatchRecommendRequest(request, env, headers, ip) {
     // both sides would start from the same un-enriched matches at once.
     // Bounded by GROUNDED_MATCH_INFO_ATTEMPT_TIMEOUT_MS (see that
     // function's own comment) specifically so this added step can't eat
-    // the scoring call's own share of the caller's 60s request budget.
-    const grounded = await fetchGroundedMatchInfo(matches, env);
+    // the scoring call's own share of the caller's 60s request budget, AND
+    // by GROUNDED_MATCH_INFO_MAX_ITEMS (see selectFixturesForGrounding's
+    // own comment) so that time budget is spent on a batch small enough to
+    // plausibly get genuinely researched, not spread thin across this
+    // whole (up to 80-fixture) request.
+    const grounded = await fetchGroundedMatchInfo(selectFixturesForGrounding(matches, GROUNDED_MATCH_INFO_MAX_ITEMS), env);
     const enrichedMatches = grounded ? matches.map(m => withResearchEvidence(m, grounded)) : matches;
     const structured = await fetchStructuredPicks(
       enrichedMatches,
