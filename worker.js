@@ -1367,8 +1367,7 @@ const MATCH_RECOMMEND_RESPONSE_SCHEMA = {
           // full listed length would otherwise suggest.
           enduranceScore: { type: 'integer' },
           reason: { type: 'string' },
-          venueZh: { type: 'string' },
-          whereToWatchTw: { type: 'string' }
+          venueZh: { type: 'string' }
         },
         required: [
           'id',
@@ -1377,8 +1376,7 @@ const MATCH_RECOMMEND_RESPONSE_SCHEMA = {
           'broadcastQuality',
           'enduranceScore',
           'reason',
-          'venueZh',
-          'whereToWatchTw'
+          'venueZh'
         ]
       }
     }
@@ -1419,12 +1417,13 @@ function cleanMatchRecommendItem(item) {
 // Traditional Chinese throughout (see that repo's public/app.js) - "reason"
 // is written in Chinese too now so the one AI-generated sentence on the
 // page doesn't stick out as the only English text on an otherwise Chinese
-// card. venueZh/whereToWatchTw exist for the same reason "venue" alone
-// wasn't enough: a Taiwanese viewer cares less about a US stadium's English
-// name than about which local channel/streaming service actually carries
-// this specific fixture - something ESPN's API has no concept of at all,
-// so it has to come from the model's own knowledge, same as the
-// competitiveness/watchability judgment itself.
+// card. venueZh exists for the same reason plain "venue" alone wasn't
+// enough: a Taiwanese viewer cares less about a US stadium's English name
+// than about its commonly-used Chinese one, which has to come from the
+// model's own knowledge, same as the competitiveness/watchability
+// judgment itself. Where to watch a fixture in Taiwan used to be asked for
+// here too, but Match Find now decides that with its own deterministic
+// rule instead (see buildGroundedMatchInfoPrompt's own comment).
 function buildMatchRecommendPrompt(matches) {
   return `You are a knowledgeable sports fan helping Traditional-Chinese-speaking viewers in Taiwan decide which upcoming fixture is most worth watching. You are given a list of fixtures across several leagues/series (e.g. Premier League, MLB, NBA, F1), each with a "venue", a "startTimeUtc", and a "context" field. For EACH fixture, using your own real-world knowledge of these specific teams/drivers (current form, standings position, rivalry history, star players, championship/relegation/playoff stakes) and of Taiwan sports broadcasting, return:
 
@@ -1440,7 +1439,8 @@ Not every fixture has either clause (not every sport/game has a posted line, and
 - "enduranceScore": integer 1-10, how likely this fixture is to STAY worth watching all the way to its natural end, rather than turning into a lopsided blowout a viewer would want to switch away from partway through. This is a DIFFERENT axis from "competitiveness" (which is about how close the game is expected to be from the START) and "watchability" (which is about how notable/newsworthy it is regardless of score) - it's specifically about the shape of the whole event over time. Score it high for a genuine toss-up between two evenly-matched, consistent teams/drivers with no strong history of one-sided results, or a format where the outcome routinely stays uncertain deep into the event; score it low when one side is a clear, heavy favorite, when this matchup (or this team/driver) has a real recent history of blowouts or fading badly once behind, or when the format itself tends to decide early (e.g. a race where the front runner routinely builds an uncontested gap). Use your own knowledge of these specific teams'/drivers' consistency and this matchup's typical competitive arc, not just whether the pregame odds are close - a close spread does not by itself guarantee the ACTUAL game stays close once underway.
 - "reason": one short sentence (under 40 Traditional Chinese characters) in Traditional Chinese explaining the scores. When this fixture's "context" carries a "[Recent: ...]" or "[Odds: ...]" clause, GROUND this sentence in that concrete fact specifically (the actual streak, standings position, injury, spread, etc.) rather than a generic phrase like "雙方戰績接近" ("the two teams are evenly matched") that could apply to any fixture - a viewer reading this sentence should be able to tell it was written about THIS specific game, not a template. Fall back to your own general knowledge exactly as before when neither clause is present.
 - "venueZh": the given "venue" written in Traditional Chinese - the commonly used Chinese name for that stadium/arena/circuit if you know one, otherwise a reasonable transliteration. Return "" if you have no real basis to translate it rather than guessing.
-- "whereToWatchTw": your best guess at the TV channel or streaming service Taiwanese viewers would typically use to watch THIS SPECIFIC fixture live (e.g. "愛爾達體育台", "DAZN", "Apple TV", "Disney+", "myVideo", "緯來體育台"), in Traditional Chinese, as short as possible - a channel/platform name, not a sentence. DAZN completed its acquisition of ELEVEN Sports in February 2023, and the ELEVEN Sports brand itself was fully retired in Taiwan by mid-2024 - if your own knowledge points at "ELEVEN SPORTS" for a fixture, answer "DAZN" instead, since that's the same service under its current name, not two different ones. This is only a FALLBACK guess from memory, not a search result (a separate grounded lookup - see handleMatchRecommendRequest - takes priority when it has an answer). Each fixture may include a "broadcast" field - ESPN's own on-record NATIONAL (usually US) broadcaster for it, e.g. "Apple TV", "TBS", "Fox", "ESPN". This is NOT itself the Taiwan answer, but treat it as a strong hint FOR MLB SPECIFICALLY: if an MLB fixture's "broadcast" names a service that is a genuine GLOBAL streaming exclusive with no regional blackout (most notably MLB's Apple TV "Friday Night Baseball" package), that same service is very likely also how it's watched in Taiwan, NOT 愛爾達體育台/緯來體育台 - MLB's international broadcast deals with 愛爾達/緯來 typically do NOT include Apple TV's exclusive slate at all. An ordinary US regional cable network name in "broadcast" (Fox, TBS, ESPN, a team's own regional network, etc.) does NOT imply anything about Taiwan on its own. This "broadcast" override does NOT apply to F1: F1's US/international broadcaster is Apple TV, but F1 in Taiwan is broadcast exclusively by 愛爾達體育台 regardless of that - for F1 specifically, always answer "愛爾達體育台" and ignore "broadcast" entirely. If an MLB fixture is carried by BOTH 緯來體育台 and 愛爾達體育台 (common for an ordinary MLB game), answer "愛爾達體育台", not "緯來體育台". Return "無已知台灣轉播" if you have no real basis to know rather than guessing.
+
+(Taiwan broadcast source is no longer asked for here - Match Find now decides it with a deterministic rule of its own, not a per-fixture AI guess: 愛爾達體育台 by default, Apple TV only for an MLB fixture whose ESPN-reported "broadcast" field already says so. See that repo's README, "Duration and Taiwan broadcast source are deterministic, not AI-guessed".)
 
 Fixtures (each already has an "id" - use it to key your answer, never invent or rely on ordering alone):
 ${JSON.stringify(matches)}
@@ -1467,30 +1467,33 @@ Rules:
 // generation, so this pass either genuinely searches or visibly fails
 // (network/quota error), never silently no-ops.
 //
-// Does double duty: originally just the Taiwan broadcast lookup, now also
-// the ONE grounded/search-backed pass this whole route gets, via the
-// "evidence" field - one call doing two jobs rather than two separate
-// grounded calls (twice the quota cost, twice the latency this route's
-// caller has to budget for). "evidence" exists because the scoring
-// prompt's own competitiveness/watchability/broadcastQuality judgment used
-// to run entirely on Gemini's training-data knowledge of these teams -
-// fine for well-known storylines, but blind to anything genuinely CURRENT
-// (a live streak, a fresh injury, this week's actual standings picture)
-// that training data simply can't have. A short list of current,
-// search-backed facts, categorized and stamped with when they were
-// actually found (see sanitizeEvidence), folded back into that same
-// fixture's own "context" (see withResearchEvidence/
-// handleMatchRecommendRequest) gives the scoring pass something real and
-// current to weigh instead of just its own possibly-stale priors - AND
-// gets returned to the caller as durable, structured evidence in its own
-// right (see handleMatchRecommendRequest's own pick.evidence), not just
-// folded into a prompt and discarded once scoring finishes.
+// Used to do double duty - originally the Taiwan broadcast lookup AND this
+// evidence search in one call - but Match Find now decides its broadcast
+// source with its own deterministic rule (愛爾達體育台 by default, Apple TV
+// only for an MLB fixture ESPN's own `broadcast` field already names) that
+// needs no search at all: it's a plain string check against data Match
+// Find's build script already has, not a fact that changes fixture to
+// fixture the way this route's actual remaining job - current, searched
+// evidence - does. Dropping the channel lookup here cuts this call's
+// prompt size and lets it focus on the one thing it still uniquely
+// provides: "evidence" exists because the scoring prompt's own
+// competitiveness/watchability/broadcastQuality judgment used to run
+// entirely on Gemini's training-data knowledge of these teams - fine for
+// well-known storylines, but blind to anything genuinely CURRENT (a live
+// streak, a fresh injury, this week's actual standings picture) that
+// training data simply can't have. A short list of current, search-backed
+// facts, categorized and stamped with when they were actually found (see
+// sanitizeEvidence), folded back into that same fixture's own "context"
+// (see withResearchEvidence/handleMatchRecommendRequest) gives the scoring
+// pass something real and current to weigh instead of just its own
+// possibly-stale priors - AND gets returned to the caller as durable,
+// structured evidence in its own right (see handleMatchRecommendRequest's
+// own pick.evidence), not just folded into a prompt and discarded once
+// scoring finishes.
 function buildGroundedMatchInfoPrompt(matches) {
-  return `Use Google Search to find, for EACH of these upcoming sports fixtures: (1) the ACTUAL, CURRENT Taiwan TV channel or streaming service, and (2) up to ${EVIDENCE_MAX_ITEMS_PER_FIXTURE} pieces of concrete, CURRENT real-world evidence that should affect how competitive, important, or newsworthy this specific fixture is right now.
+  return `Use Google Search to find, for EACH of these upcoming sports fixtures, up to ${EVIDENCE_MAX_ITEMS_PER_FIXTURE} pieces of concrete, CURRENT real-world evidence that should affect how competitive, important, or newsworthy this specific fixture is right now.
 
-(1) "channel": Each fixture may include a "broadcast" field - ESPN's own on-record NATIONAL (usually US) broadcaster, e.g. "Apple TV", "TBS", "Fox". This is a strong hint FOR MLB SPECIFICALLY, not the Taiwan answer itself: if an MLB fixture's "broadcast" names a genuine GLOBAL streaming exclusive with no regional blackout (most notably MLB's Apple TV "Friday Night Baseball" package), verify with search whether that same global service - not 愛爾達體育台/緯來體育台 - is also how Taiwanese viewers watch it, since MLB's international deals with 愛爾達/緯來 typically exclude Apple TV's exclusive slate entirely. An ordinary US regional network name in "broadcast" doesn't imply anything about Taiwan by itself. This override does NOT apply to F1: F1's international broadcaster is Apple TV, but F1 in Taiwan is broadcast exclusively by 愛爾達體育台 regardless - for F1, always answer "愛爾達體育台" and don't let "broadcast" override that. Broadcast rights are often team-specific or game-specific, not sport-wide, so check each fixture individually rather than assuming the sport's usual channel. If an MLB fixture is genuinely carried by BOTH 緯來體育台 and 愛爾達體育台 (common for an ordinary MLB game), answer "愛爾達體育台". Map to "無已知台灣轉播" if search leaves you with no real basis to know, rather than guessing.
-
-(2) "evidence": an array of up to ${EVIDENCE_MAX_ITEMS_PER_FIXTURE} objects, each {"category": one of "competitiveness" | "mediaAttention" | "eventImportance" | "recentContext", "finding": a short factual sentence (under 30 words, in English) stating a concrete, CURRENT fact search actually found, "source": a short label (under 10 words) for what kind of source it came from, e.g. "current league standings", "recent sports news coverage", "official injury report", "betting market reporting"}. Use:
+"evidence": an array of up to ${EVIDENCE_MAX_ITEMS_PER_FIXTURE} objects, each {"category": one of "competitiveness" | "mediaAttention" | "eventImportance" | "recentContext", "finding": a short factual sentence (under 30 words, in English) stating a concrete, CURRENT fact search actually found, "source": a short label (under 10 words) for what kind of source it came from, e.g. "current league standings", "recent sports news coverage", "official injury report", "betting market reporting"}. Use:
   - "competitiveness": a fact bearing on how close/contested the game is likely to be (current records, head-to-head history, an injury affecting parity).
   - "mediaAttention": a fact about how much real, current public/media attention this specific fixture is getting right now.
   - "eventImportance": a fact about what's actually at stake (standings, playoff/relegation implications, a title race, a milestone).
@@ -1498,9 +1501,9 @@ function buildGroundedMatchInfoPrompt(matches) {
   Search for these - don't reason from memory, and don't invent a plausible-sounding finding you didn't actually find. Return an EMPTY array (not filler, not a restatement of the matchup itself) if search turns up nothing beyond generic background you'd already know without searching, or nothing genuinely current.
 
 Fixtures (each already has an "id" - use it to key your answer):
-${JSON.stringify(matches.map(m => ({ id: m.id, sport: m.sport, name: m.name, startTimeUtc: m.startTimeUtc, broadcast: m.broadcast })))}
+${JSON.stringify(matches.map(m => ({ id: m.id, sport: m.sport, name: m.name, startTimeUtc: m.startTimeUtc })))}
 
-Respond with ONLY a raw JSON object (no markdown fences, no extra text) mapping each given "id" to {"channel": "...", "evidence": [...]} - e.g. {"abc123": {"channel": "愛爾達體育台", "evidence": [{"category": "recentContext", "finding": "Team X has lost 6 straight and is now 8 games out of a playoff spot.", "source": "current league standings"}]}, "def456": {"channel": "Apple TV", "evidence": []}}. Include every given id exactly once.`;
+Respond with ONLY a raw JSON object (no markdown fences, no extra text) mapping each given "id" to {"evidence": [...]} - e.g. {"abc123": {"evidence": [{"category": "recentContext", "finding": "Team X has lost 6 straight and is now 8 games out of a playoff spot.", "source": "current league standings"}]}, "def456": {"evidence": []}}. Include every given id exactly once.`;
 }
 
 // Salvages a JSON object out of a plain-text model response that was NOT
@@ -1523,9 +1526,9 @@ function extractJsonObject(text) {
   }
 }
 
-// The scoring/reason/venueZh/whereToWatchTw-guess call - schema-constrained,
-// never grounded (see buildGroundedMatchInfoPrompt's comment for why those
-// two don't mix reliably). `models` is tried in order, same resilience
+// The scoring/reason/venueZh call - schema-constrained, never grounded
+// (see buildGroundedMatchInfoPrompt's comment for why those two don't mix
+// reliably). `models` is tried in order, same resilience
 // reasoning as /gemini's own tryGeminiModels - the base /match-recommend
 // route passes MATCH_RECOMMEND_MODELS (verified Flash-tier), the refine
 // route passes MATCH_RECOMMEND_REFINE_MODELS (an unverified Pro-tier guess
@@ -1596,30 +1599,26 @@ async function fetchStructuredPicks(matches, env, models, prompt) {
 const GROUNDED_MATCH_INFO_ATTEMPT_TIMEOUT_MS = 8_000;
 
 // Validates/bounds fetchGroundedMatchInfo's own raw parsed response -
-// per-id {channel, evidence} - the same defensive posture
-// sanitizeEvidence's own comment describes, applied one level up (id keys
-// and the channel string, not just each evidence array). `retrievedAt` is
-// threaded straight through to sanitizeEvidence so every evidence item
-// from this one grounded pass carries the SAME real timestamp, however
-// long the rest of the request (scoring, etc.) takes afterward.
+// per-id {evidence} - the same defensive posture sanitizeEvidence's own
+// comment describes, applied one level up (id keys, not just each evidence
+// array). `retrievedAt` is threaded straight through to sanitizeEvidence so
+// every evidence item from this one grounded pass carries the SAME real
+// timestamp, however long the rest of the request (scoring, etc.) takes
+// afterward.
 function sanitizeGroundedResult(parsed, retrievedAt) {
   const result = {};
   for (const [id, value] of Object.entries(parsed)) {
     if (typeof id !== 'string' || !id) continue;
-    result[id] = {
-      channel: typeof value?.channel === 'string' ? value.channel : '',
-      evidence: sanitizeEvidence(value?.evidence, retrievedAt)
-    };
+    result[id] = { evidence: sanitizeEvidence(value?.evidence, retrievedAt) };
   }
   return result;
 }
 
 // Best-effort, never fatal to the request: any failure here (quota, no
 // model accepts grounding, every attempt timing out, an unparseable
-// response) just means every fixture's whereToWatchTw falls back to
-// fetchStructuredPicks' own ungrounded guess, its "context" goes into
-// scoring with no research evidence folded in, and its "evidence" comes
-// back as an empty array - exactly the behavior this whole route had
+// response) just means each fixture's "context" goes into scoring with no
+// research evidence folded in, and its "evidence" comes back as an empty
+// array - exactly the behavior this whole route had
 // before this lookup existed at all, just with an explicit empty list
 // instead of a missing field. Tries every model in MATCH_RECOMMEND_MODELS,
 // not just the first, since a quota/availability issue on one model says
@@ -1735,13 +1734,6 @@ async function handleMatchRecommendRequest(request, env, headers, ip) {
     if (Array.isArray(picksResult?.picks)) {
       for (const pick of picksResult.picks) {
         const info = grounded?.[pick.id];
-        // Only overrides with a real answer - a grounded "無已知台灣轉播"
-        // doesn't get to stomp out a specific channel name the ungrounded
-        // pass already guessed; it just means the search came up empty,
-        // which isn't more informative than the existing guess.
-        if (info?.channel && info.channel !== '無已知台灣轉播') {
-          pick.whereToWatchTw = info.channel.slice(0, MATCH_RECOMMEND_MAX_FIELD_LEN);
-        }
         // Always present, even when grounding failed entirely (info is
         // undefined) - Match Find's own cache can then rely on
         // pick.evidence always being an array, never a missing field to
@@ -1780,7 +1772,6 @@ For EACH fixture return:
 - "enduranceScore": integer 1-10, how likely the fixture is to stay worth watching all the way to its end rather than becoming a lopsided blowout - same meaning as the base scoring pass's own instructions for this field. Also not a comparative judgment - give your best independent estimate per fixture, same as "broadcastQuality".
 - "reason": one short sentence (under 40 Traditional Chinese characters) in Traditional Chinese explaining the scores, written as a direct comparison where it's warranted (e.g. noting why this one edges out the others in the group). Same grounding rule as the base scoring pass: when a fixture's "context" carries a "[Recent: ...]" or "[Odds: ...]" clause, cite that concrete fact specifically rather than a generic phrase - it's exactly the kind of concrete difference that should be VISIBLE in why one fixture edges out another here.
 - "venueZh": the given "venue" in Traditional Chinese, or "" if you have no real basis to translate it.
-- "whereToWatchTw": your best guess at the Taiwan broadcaster, or "無已知台灣轉播" if unsure - this is a fallback only, a separate grounded lookup may override it.
 
 Fixtures (each already has an "id" - use it to key your answer, never invent or rely on ordering alone):
 ${JSON.stringify(matches)}
@@ -1834,11 +1825,12 @@ async function handleMatchRecommendRefineRequest(request, env, headers, ip) {
     // confidently tell apart, so a real, current fact search actually
     // finds is exactly what breaks a tie memory alone can't. A small
     // batch (MATCH_RECOMMEND_REFINE_MAX_ITEMS, at most 6) keeps the added
-    // grounded call cheap here regardless. The channel half of the result
-    // is unused on purpose - build-data.mjs's refineContestedClusters
-    // never reads whereToWatchTw from a refine response either (see
-    // buildMatchRefinePrompt's own comment), only competitiveness/
-    // watchability/broadcastQuality/reason.
+    // grounded call cheap here regardless. build-data.mjs's
+    // refineContestedClusters only ever reads competitiveness/
+    // watchability/reason back from a refine response - broadcastQuality/
+    // enduranceScore stay whatever the base pass decided, and
+    // whereToWatchTw isn't asked for here at all anymore (see
+    // buildMatchRefinePrompt's own comment).
     const grounded = await fetchGroundedMatchInfo(matches, env);
     const enrichedMatches = grounded ? matches.map(m => withResearchEvidence(m, grounded)) : matches;
     picksResult = await fetchStructuredPicks(
