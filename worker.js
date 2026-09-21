@@ -1884,6 +1884,26 @@ const SPORTS_PROXY_ALLOWED_HOSTS = [
 // still a real bound against a runaway tab/script hammering this route.
 const SPORTS_PROXY_RATE_LIMIT = 600;
 
+// How long a single cache-MISS is allowed to wait on the real upstream API
+// before this route gives up on it and returns a 502 (every caller already
+// treats a failed sports-proxy request as "no data for this one", never a
+// fatal error - see Match Find's own fetchTeamLeagueMatches/
+// enrichWithPolymarketOdds/fetchMlbStandings, each wrapped in its own
+// try/catch or Promise.allSettled). This is what actually caps the WORST
+// CASE latency any single one of Match Find's own ~50+ parallel requests
+// per refresh can contribute - live-reported as "updating data takes
+// 10-20 seconds, sometimes more, sometimes less": with this value at its
+// old 15 seconds, a refresh's total wall-clock time was bounded by
+// whichever ONE of those 50+ concurrent requests happened to hit a slow
+// upstream that cycle, up to the full 15s, which is a real, avoidable
+// contributor to both the length AND the inconsistency of that reported
+// number (which slow request "wins" varies refresh to refresh). ESPN's own
+// scoreboard endpoint responds in well under 1 second on a normal request
+// (confirmed live) - 8 seconds is still generous headroom above that for a
+// genuinely slow-but-real upstream response, while cutting the pathological
+// worst case roughly in half.
+const SPORTS_PROXY_UPSTREAM_TIMEOUT_MS = 8_000;
+
 // A short shared edge cache is what actually keeps that 600/hr budget
 // realistic. Measured directly against Match Find's own real refresh
 // tiers: a single open tab's near-term (60s) + full-window (5min) buildMatches
@@ -1950,7 +1970,7 @@ async function handleSportsProxyRequest(request, env, headers, ip, ctx) {
   try {
     const upstream = await fetch(upstreamUrl.toString(), {
       headers: { 'User-Agent': SPORTS_PROXY_FETCH_USER_AGENT },
-      signal: AbortSignal.timeout(15_000)
+      signal: AbortSignal.timeout(SPORTS_PROXY_UPSTREAM_TIMEOUT_MS)
     });
     const contentType = upstream.headers.get('Content-Type') || 'application/json';
     if (upstream.status !== 200) {
