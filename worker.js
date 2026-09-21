@@ -28,26 +28,26 @@
 //                            /gemini's GEMINI_API_KEY secret instead of
 //                            /vocab-sync's Firebase ones - see "==== /vocab-ai"
 //                            below.
-//   GET       /sports-proxy - a thin, host-allowlisted CORS passthrough to
-//                            ESPN's/the MLB Stats API's/the Jolpica F1
-//                            API's/Polymarket's Gamma API's own public JSON,
-//                            so Match Find's own browser can fetch/score its
-//                            whole live match list directly, client-side -
-//                            see "==== /sports-proxy" below. Match Find has
-//                            no sync route, no scoring route, and (as of
-//                            its own move to a fully client-side live
-//                            rebuild - see that repo's public/app.js) no
-//                            build-dispatch route here at all anymore -
-//                            there is no scheduled build left to trigger on
-//                            demand, and its own client computes every
-//                            fixture's score deterministically, never
-//                            calling this Worker for AI of any kind (see
-//                            that repo's docs/recommendation-engine-audit.md,
-//                            Round 11 - free-tier Gemini quota couldn't
-//                            sustain the workload, and removing it cost no
-//                            real scoring quality since the deterministic
-//                            engine was always the primary source of
-//                            truth).
+//
+// Match Find's own /sports-proxy route (a thin, host-allowlisted CORS
+// passthrough to ESPN's/the MLB Stats API's/the Jolpica F1 API's/
+// Polymarket's Gamma API's own public JSON) used to live here as a fourth
+// route, but was pulled into its own separate Worker - see
+// sports-proxy-worker.js's own top comment for why: this Worker's
+// [placement] region pin (needed below for /gemini and /vocab-ai) applies
+// to the whole script, not per-route, so it was forcing /sports-proxy
+// through the same Virginia-region isolate too, adding a real, live-
+// confirmed transatlantic-scale round trip to every single one of Match
+// Find's requests for a codebase with nothing calling Gemini at all. Match
+// Find has no sync route, no scoring route, and (as of its own move to a
+// fully client-side live rebuild - see that repo's public/app.js) no
+// build-dispatch route here at all anymore - there is no scheduled build
+// left to trigger on demand, and its own client computes every fixture's
+// score deterministically, never calling either Worker for AI of any kind
+// (see that repo's docs/recommendation-engine-audit.md, Round 11 - free-
+// tier Gemini quota couldn't sustain the workload, and removing it cost no
+// real scoring quality since the deterministic engine was always the
+// primary source of truth).
 //
 // /sync and /vocab-sync both hold a Firebase service-account key
 // server-side and proxy Firestore, so the pairing code isn't the only thing
@@ -1835,170 +1835,14 @@ const VOCAB_SYNC_APP = {
   credentialPattern: VOCAB_PASSCODE_PATTERN
 };
 
-// ==== /sports-proxy - CORS passthrough for public sports data ==============
-//
-// Match Find's browser-side live-score/live-odds polling and its "refresh
-// now"/"AI 重新評估" Settings buttons (see that repo's README) need to read
-// ESPN's/the MLB Stats API's/the Jolpica F1 API's/Polymarket's Gamma API's
-// own public JSON directly from the VIEWER'S browser, not just from Match
-// Find's own scheduled build - none of the four sets CORS headers for
-// arbitrary origins, so a plain client-side fetch() to any of them fails
-// outright from a browser regardless of how the request is shaped (the
-// same reason /gemini's own proxying exists for Gemini itself, just for a
-// read-only public GET instead of an authenticated call). Polymarket
-// specifically backs Match Find's own on-card win% odds display (see that
-// repo's public/lib/polymarket.mjs) - added after an earlier version of
-// that feature (ESPN's own sportsbook-odds feed) was dropped entirely, in
-// favor of a real prediction market's own trade price. This route is a
-// thin, read-only pass-through: it validates the requested URL against a
-// fixed host allowlist, fetches it SERVER-SIDE (no CORS restriction
-// applies to a Worker's own outbound fetch), and pipes the response back
-// with this Worker's own permissive-to-allowed-origins CORS headers
-// already attached. No API key, no response transformation, and nothing
-// sport-specific hardcoded here - Match Find's own client code (public/
-// lib/espn.mjs, public/lib/polymarket.mjs) builds the real upstream URL
-// and does all the interpreting; this Worker only ever forwards bytes for
-// a HOST it already trusts, never an arbitrary one, so this can't become
-// an open proxy for anything else.
-// A real, live 403 hit while wiring up Match Find's own client-side
-// rebuild (buildMatches, called straight from the viewer's own browser
-// through this route): this Worker's own outbound fetch to ESPN, with NO
-// User-Agent header at all, gets rejected outright by an Akamai edge block
-// ("Access Denied", errors.edgesuite.net) - the exact same live-confirmed
-// bot-manager block Match Find's own Node build script already works
-// around with a transparent, honest UA (see that repo's scripts/
-// build-data.mjs's own FETCH_USER_AGENT comment) - Cloudflare Workers'
-// default outbound UA is apparently ALSO on whatever blocklist catches
-// Node's bare "node" one. A Worker's own server-side fetch (unlike a
-// browser's) can set any header it wants, so this closes the gap the same
-// honest way: identify the traffic truthfully rather than spoof a browser.
-const SPORTS_PROXY_FETCH_USER_AGENT = 'Match-Find-Bot/1.0 (+https://github.com/jaypengx-collab/Match-Find)';
-const SPORTS_PROXY_ALLOWED_HOSTS = [
-  'site.api.espn.com',
-  'statsapi.mlb.com',
-  'api.jolpi.ca',
-  'gamma-api.polymarket.com'
-];
-// Generous - a viewer with several live matches open at once can easily
-// poll every 20-30s per match (see Match Find's own polling interval) - but
-// still a real bound against a runaway tab/script hammering this route.
-const SPORTS_PROXY_RATE_LIMIT = 600;
-
-// How long a single cache-MISS is allowed to wait on the real upstream API
-// before this route gives up on it and returns a 502 (every caller already
-// treats a failed sports-proxy request as "no data for this one", never a
-// fatal error - see Match Find's own fetchTeamLeagueMatches/
-// enrichWithPolymarketOdds/fetchMlbStandings, each wrapped in its own
-// try/catch or Promise.allSettled). This is what actually caps the WORST
-// CASE latency any single one of Match Find's own ~50+ parallel requests
-// per refresh can contribute - live-reported as "updating data takes
-// 10-20 seconds, sometimes more, sometimes less": with this value at its
-// old 15 seconds, a refresh's total wall-clock time was bounded by
-// whichever ONE of those 50+ concurrent requests happened to hit a slow
-// upstream that cycle, up to the full 15s, which is a real, avoidable
-// contributor to both the length AND the inconsistency of that reported
-// number (which slow request "wins" varies refresh to refresh). ESPN's own
-// scoreboard endpoint responds in well under 1 second on a normal request
-// (confirmed live) - 8 seconds is still generous headroom above that for a
-// genuinely slow-but-real upstream response, while cutting the pathological
-// worst case roughly in half.
-const SPORTS_PROXY_UPSTREAM_TIMEOUT_MS = 8_000;
-
-// A short shared edge cache is what actually keeps that 600/hr budget
-// realistic. Measured directly against Match Find's own real refresh
-// tiers: a single open tab's near-term (60s) + full-window (5min) buildMatches
-// tiers ALONE already add up to roughly 1,750+ requests/hour with no cache
-// at all - about 3x this route's own per-IP limit - because every tier
-// re-requests the same handful of ESPN scoreboard URLs (today/tomorrow,
-// often yesterday too) that the OTHER tier, or that tier's own previous
-// tick, already just fetched seconds or minutes earlier; the same is true
-// across CONCURRENT VIEWERS, who each independently re-fetch the exact same
-// upstream URLs at the exact same time with no cache to share the cost.
-// Keying this cache by the upstream URL ALONE (never by viewer/IP/Origin -
-// see handleSportsProxyRequest's own CORS-header handling below) turns
-// every one of those duplicate/concurrent requests into a single shared
-// upstream fetch. The TTL is set close to Match Find's own live-poll
-// interval (30s) specifically so a cache HIT is never meaningfully staler
-// than waiting for that viewer's own next scheduled poll would have been
-// anyway - this isn't trading correctness for volume, it's just refusing to
-// pay for the exact same answer twice within one polling interval.
-const SPORTS_PROXY_CACHE_TTL_SECONDS = 20;
-
-async function handleSportsProxyRequest(request, env, headers, ip, ctx) {
-  if (request.method !== 'GET') return json({ error: { message: 'GET only' } }, 405, headers);
-
-  const target = new URL(request.url).searchParams.get('url') || '';
-  let upstreamUrl;
-  try {
-    upstreamUrl = new URL(target);
-  } catch {
-    return json({ error: { message: 'Missing or invalid url' } }, 400, headers);
-  }
-  if (upstreamUrl.protocol !== 'https:' || !SPORTS_PROXY_ALLOWED_HOSTS.includes(upstreamUrl.hostname)) {
-    return json({ error: { message: 'Host not allowed' } }, 400, headers);
-  }
-
-  // Cache key is the bare upstream URL, deliberately NOT this request's own
-  // URL/Origin/IP - every viewer asking for the same upstream URL should
-  // share the same cached answer. The response actually STORED here never
-  // carries this request's own CORS headers (which are Origin-specific,
-  // see corsHeaders) - those get attached fresh below on every serve,
-  // cache hit or miss, so a cached body can never leak a stale or wrong
-  // Access-Control-Allow-Origin to a different caller.
-  const cache = caches.default;
-  const cacheKey = new Request(upstreamUrl.toString());
-  const cached = await cache.match(cacheKey);
-  if (cached) {
-    return new Response(cached.body, {
-      status: cached.status,
-      headers: {
-        ...headers,
-        'Content-Type': cached.headers.get('Content-Type') || 'application/json',
-        'X-Sports-Proxy-Cache': 'HIT'
-      }
-    });
-  }
-
-  // Only a genuine cache MISS costs this viewer's own rate-limit budget -
-  // see this function's own top comment for why that's the point.
-  const rateLimit = await isRateLimited(env, ip, 'sports-proxy', SPORTS_PROXY_RATE_LIMIT);
-  headers['X-RateLimit-Backend'] = rateLimit.backend;
-  if (rateLimit.limited) {
-    return json({ error: { message: 'Too many requests, please try again later.' } }, 429, headers);
-  }
-
-  try {
-    const upstream = await fetch(upstreamUrl.toString(), {
-      headers: { 'User-Agent': SPORTS_PROXY_FETCH_USER_AGENT },
-      signal: AbortSignal.timeout(SPORTS_PROXY_UPSTREAM_TIMEOUT_MS)
-    });
-    const contentType = upstream.headers.get('Content-Type') || 'application/json';
-    if (upstream.status !== 200) {
-      // Never cache a non-200 - a real upstream hiccup shouldn't get stuck
-      // being served back to every viewer for the rest of the cache window.
-      return new Response(upstream.body, { status: upstream.status, headers: { ...headers, 'Content-Type': contentType } });
-    }
-    // Buffered rather than piped straight through (unlike /gemini's own
-    // upstream.body passthrough) because `upstream.body` can only be read
-    // ONCE, and this needs to both populate the shared cache and answer
-    // this actual request from the same bytes.
-    const body = await upstream.arrayBuffer();
-    ctx.waitUntil(
-      cache.put(
-        cacheKey,
-        new Response(body, {
-          status: 200,
-          headers: { 'Content-Type': contentType, 'Cache-Control': `public, max-age=${SPORTS_PROXY_CACHE_TTL_SECONDS}` }
-        })
-      )
-    );
-    return new Response(body, { status: 200, headers: { ...headers, 'Content-Type': contentType, 'X-Sports-Proxy-Cache': 'MISS' } });
-  } catch (error) {
-    return json({ error: { message: error.message || 'Upstream request failed' } }, 502, headers);
-  }
-}
-
 // ==== Routing ================================================================
+//
+// /sports-proxy used to live here too - see sports-proxy-worker.js's own
+// top comment for exactly why it was pulled into its own separately
+// deployed Worker (a real, live-confirmed latency bug: this Worker's
+// [placement] region pin, needed for /gemini and /vocab-ai, was forcing
+// EVERY route including /sports-proxy through an isolate in Virginia
+// regardless of where the request actually came from).
 
 export default {
   async fetch(request, env, ctx) {
@@ -2015,7 +1859,6 @@ export default {
     if (path === '/sync') return handleSyncRequest(request, env, headers, ip, ORBIT_SYNC_APP);
     if (path === '/vocab-sync') return handleSyncRequest(request, env, headers, ip, VOCAB_SYNC_APP);
     if (path === '/vocab-ai') return handleVocabAiRequest(request, env, headers, ip);
-    if (path === '/sports-proxy') return handleSportsProxyRequest(request, env, headers, ip, ctx);
     return json({ error: { message: 'Not found' } }, 404, headers);
   }
 };

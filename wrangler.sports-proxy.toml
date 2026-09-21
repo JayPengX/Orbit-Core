@@ -1,0 +1,37 @@
+# Deploys sports-proxy-worker.js as its OWN Cloudflare Worker, separate
+# from wrangler.toml's "orbit-workers-proxy" - see that file for the
+# deliberately unset [placement] below: this Worker's own top comment
+# explains why it can't share worker.js's region pin (needed there for
+# Gemini's region-availability restriction, actively harmful here since
+# nothing this route calls has that constraint, and the pin was forcing
+# every Match Find request through a Virginia isolate regardless of the
+# real caller's own location).
+#
+# CLI path (see wrangler.toml's own comment for the CI path, which is what
+# actually deploys this on every push - this is only for a manual/local
+# deploy):
+#   npx wrangler deploy -c wrangler.sports-proxy.toml
+#   npx wrangler kv namespace create RATE_LIMIT_KV   (only if not reusing
+#     the same namespace id as wrangler.toml's own - reusing it, as below,
+#     is fine: this route's rate-limit keys are IP-only, with no `feature`
+#     prefix to collide with worker.js's own gemini:/sync:/vocab-sync:/
+#     vocab-ai: keys - see sports-proxy-worker.js's own isRateLimited).
+name = "sports-proxy"
+main = "sports-proxy-worker.js"
+compatibility_date = "2025-01-01"
+
+# Deliberately no [placement] block - see this file's own top comment and
+# sports-proxy-worker.js's. Cloudflare's default (no override) runs each
+# request's isolate at whichever colo actually received it, i.e. near the
+# real caller - exactly what a plain CORS/cache passthrough with no
+# region-restricted upstream wants.
+
+# Optional but recommended, same reasoning as wrangler.toml's own - a real,
+# cross-request rate limit instead of the in-memory per-isolate fallback.
+# Reuses the SAME namespace id as wrangler.toml's RATE_LIMIT_KV binding
+# (both Workers can safely share one KV namespace - see this file's own
+# top comment on why the keys never collide); point this at a namespace of
+# your own if you'd rather keep them separate.
+[[kv_namespaces]]
+binding = "RATE_LIMIT_KV"
+id = "8b24d75fbe0a4a69aef0f35cb7a8d847"

@@ -6,6 +6,8 @@ on:
     paths:
       - 'worker.js'
       - 'wrangler.toml'
+      - 'sports-proxy-worker.js'
+      - 'wrangler.sports-proxy.toml'
   workflow_dispatch:
 
 jobs:
@@ -14,7 +16,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Deploy with Wrangler
+      - name: Deploy orbit-workers-proxy (gemini/nl-edit/sync/vocab-sync/vocab-ai)
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -29,4 +31,11 @@ jobs:
           # explicitly rather than relying on the action's own default,
           # so a future change to that default can't silently break this
           # again the same way.
+          wranglerVersion: '4'
+      - name: Deploy sports-proxy (Match Find's own route, no region pin - see wrangler.sports-proxy.toml)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --config wrangler.sports-proxy.toml
           wranglerVersion: '4'

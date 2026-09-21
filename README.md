@@ -1,7 +1,7 @@
 # Shared Proxy
 
-A single Cloudflare Worker (`worker.js`) that backs the optional server-side
-features of three otherwise-independent static sites:
+Two Cloudflare Workers, deployed from this one repo, that back the optional
+server-side features of three otherwise-independent static sites:
 
 - [Orbit](https://github.com/jaypengx-collab/Orbit) - a class-schedule
   dashboard.
@@ -28,7 +28,11 @@ thing about it: the URL.
 | `/sync` | GET/PATCH/DELETE | Orbit | Cross-device schedule sync (code + manager passcode; reads are open, writes/deletes need the passcode). |
 | `/vocab-sync` | GET/PATCH/DELETE | Orbit Vocab | Cross-device learning-progress sync (single passcode, no separate read-only code). |
 | `/vocab-ai` | POST | Orbit Vocab | Live, per-learner personalized mnemonics. |
-| `/sports-proxy` | GET | Match Find | Host-allowlisted CORS passthrough to ESPN/the MLB Stats API/Jolpica/Polymarket's Gamma API, so the viewer's own browser can fetch and score its whole live match list directly. |
+| `/sports-proxy` (separate Worker - see below) | GET | Match Find | Host-allowlisted CORS passthrough to ESPN/the MLB Stats API/Jolpica/Polymarket's Gamma API, so the viewer's own browser can fetch and score its whole live match list directly. |
+
+`/sports-proxy` is deployed as its own Worker (`sports-proxy-worker.js` +
+`wrangler.sports-proxy.toml`), not part of `worker.js`/`wrangler.toml` above -
+see "Match Find live data" below for why.
 
 Match Find used to also have `/match-recommend`/`/match-recommend-refine`
 (Gemini-based fixture scoring/validation) - removed as of that repo's
@@ -70,7 +74,11 @@ README only covers what's needed to deploy and consume it.
 
 ## One-time deploy setup
 
-You don't need to install anything to get started:
+You don't need to install anything to get started. This covers the main
+`orbit-workers-proxy` Worker (`/gemini`, `/nl-edit`, `/sync`, `/vocab-sync`,
+`/vocab-ai`) - see "Match Find live data (`/sports-proxy`)" below for the
+separate `sports-proxy` Worker Match Find needs, which is a second,
+near-identical run of the same first three steps against a different file:
 
 1. Sign up for a free [Cloudflare account](https://dash.cloudflare.com/sign-up)
    (email only, no credit card).
@@ -116,20 +124,52 @@ airport code, e.g. `IAD` = Virginia, `HKG` = Hong Kong) - useful for
 confirming this is actually taking effect, or diagnosing a future report of
 the same error.
 
-### Match Find live data (`/sports-proxy`)
+### Match Find live data (`/sports-proxy`) - a separate Worker
+
+This one is deployed **from a different file** (`sports-proxy-worker.js` +
+`wrangler.sports-proxy.toml`) as its **own Worker**, not pasted into the
+same one as `/gemini`/`/sync`/etc:
+
+1. Workers & Pages → Create → Create Worker, give it its own name (e.g.
+   `sports-proxy`) → Deploy.
+2. "Edit code" → paste the entire contents of `sports-proxy-worker.js` →
+   Save and Deploy.
+3. Copy this Worker's own URL - this is the one Match Find's `PROXY_URL`
+   points at (see "Wiring up a consuming app" below), a *different* URL
+   from the `orbit-workers-proxy` Worker the other four routes live on.
+
+Why separate: `wrangler.toml`'s `[placement] region = "gcp:us-east4"` pin
+(needed for `/gemini`/`/vocab-ai` - see that section above) is a
+whole-*script* setting, not a per-route one. Sharing one Worker meant
+`/sports-proxy` was being forced through that same Virginia isolate too,
+even though nothing it calls (ESPN, the MLB Stats API, Jolpica, Polymarket)
+has Gemini's region restriction - confirmed live via the `X-Worker-Colo`
+response header returning `IAD` for a plain `/sports-proxy` request. For
+Match Find's actual Taiwan-based audience, that meant every one of its
+dozens of near-term/full-window/live-poll requests per refresh paid a full
+Taiwan↔Virginia round trip for no reason, and was a real, live-confirmed
+contributor to reports of the site going blank for 10+ seconds on first
+load and refreshes taking 10-20+ seconds. Deploying this route as its own
+Worker with no `[placement]` override lets Cloudflare's own default apply -
+run near whichever colo actually received the request, i.e. near the real
+caller.
 
 Nothing to configure - this route needs no secret at all, it's a
 host-allowlisted passthrough to public, keyless sports APIs (see
-`SPORTS_PROXY_ALLOWED_HOSTS` in `worker.js`). It's live the moment this
-Worker is deployed. Every successful upstream response is cached for
-`SPORTS_PROXY_CACHE_TTL_SECONDS` (20s) in Cloudflare's shared edge cache,
-keyed by the upstream URL alone - so every viewer asking for the same
-scoreboard/odds URL within that window shares one upstream fetch instead of
-each paying for their own, and a cache hit doesn't count against
+`SPORTS_PROXY_ALLOWED_HOSTS` in `sports-proxy-worker.js`). It's live the
+moment this Worker is deployed. Every successful upstream response is
+cached for `SPORTS_PROXY_CACHE_TTL_SECONDS` (20s) in Cloudflare's shared
+edge cache, keyed by the upstream URL alone - so every viewer asking for the
+same scoreboard/odds URL within that window shares one upstream fetch
+instead of each paying for their own, and a cache hit doesn't count against
 `SPORTS_PROXY_RATE_LIMIT` at all (see `handleSportsProxyRequest`'s own
 comment for why this exists - without it, Match Find's own near-term +
 full-window refresh tiers alone already exceeded this route's per-IP rate
-limit).
+limit). The optional `RATE_LIMIT_KV` binding (see "Optional: auto-deploy via
+GitHub Actions" below) can safely be the same KV namespace as
+`orbit-workers-proxy`'s own - this Worker's rate-limit keys are IP-only, with
+no `feature` prefix to collide with the other Worker's `gemini:`/`sync:`/
+`vocab-sync:`/`vocab-ai:` keys.
 
 ### Sync features (`/sync`, `/vocab-sync`)
 
@@ -186,10 +226,12 @@ table above), so neither can affect the other's data or quota.
 
 ### Optional: auto-deploy via GitHub Actions
 
-Without this, updating `worker.js` means manually re-pasting it into the
-Cloudflare dashboard every time. With it, a push to `main` deploys
-automatically (`.github/workflows/deploy.yml`, triggered by changes to
-`worker.js` or `wrangler.toml`; also runnable manually from the Actions tab):
+Without this, updating either Worker means manually re-pasting its file into
+the Cloudflare dashboard every time. With it, a push to `main` deploys both
+automatically (`.github/workflows/deploy.yml` runs two Wrangler deploy steps,
+one per `wrangler*.toml` - triggered by changes to `worker.js`,
+`wrangler.toml`, `sports-proxy-worker.js`, or `wrangler.sports-proxy.toml`;
+also runnable manually from the Actions tab):
 
 1. [Cloudflare Dashboard](https://dash.cloudflare.com/) → account menu (top
    right) → My Profile → API Tokens → Create Token → **Edit Cloudflare
@@ -198,21 +240,26 @@ automatically (`.github/workflows/deploy.yml`, triggered by changes to
    `CLOUDFLARE_API_TOKEN` with that token.
 3. Same page, add another Secret: `CLOUDFLARE_ACCOUNT_ID`, from the
    Cloudflare Dashboard's sidebar (or its URL).
-4. **Important**: `wrangler deploy` pushes `wrangler.toml`'s `[vars]` and
-   `[[kv_namespaces]]` as the Worker's *entire* config, replacing whatever's
+4. **Important**: `wrangler deploy` pushes a `wrangler*.toml`'s `[vars]` and
+   `[[kv_namespaces]]` as that Worker's *entire* config, replacing whatever's
    live - it does not merge with dashboard-made changes. Before relying on
-   this workflow, make sure `wrangler.toml` in this repo already matches
-   what's live (the real `FIREBASE_PROJECT_ID`, and the real KV namespace id
-   if you're using `RATE_LIMIT_KV`), or the first automated deploy will
-   silently overwrite them with placeholders. Secrets themselves
-   (`GEMINI_API_KEY`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`) are
-   never touched by `wrangler deploy` - they aren't stored in this repo at
-   all.
+   this workflow, make sure both `wrangler.toml` and `wrangler.sports-proxy.toml`
+   in this repo already match what's live (the real `FIREBASE_PROJECT_ID`,
+   and the real KV namespace id(s) if you're using `RATE_LIMIT_KV`), or the
+   first automated deploy will silently overwrite them with placeholders.
+   Secrets themselves (`GEMINI_API_KEY`, `FIREBASE_CLIENT_EMAIL`,
+   `FIREBASE_PRIVATE_KEY`) are never touched by `wrangler deploy` - they
+   aren't stored in this repo at all, and `/sports-proxy` doesn't use any.
+5. The same token deploys both Workers - the "Edit Cloudflare Workers"
+   template grants `Workers Scripts:Edit` account-wide, not scoped to one
+   script, so it can create the `sports-proxy` Worker the first time this
+   runs just as readily as it updates the existing `orbit-workers-proxy` one.
 
 You can also deploy from the command line instead of setting up CI - see the
-comment block at the top of `wrangler.toml` for the exact `wrangler` CLI
-commands (login, deploy, `secret put` for each secret, KV namespace
-creation).
+comment block at the top of `wrangler.toml` (for `orbit-workers-proxy`) or
+`wrangler.sports-proxy.toml` (for `sports-proxy`) for the exact `wrangler`
+CLI commands (login, deploy with `-c <file>`, `secret put` for each secret,
+KV namespace creation).
 
 ## Wiring up a consuming app
 
@@ -230,23 +277,31 @@ Secret - this value ends up in each site's public client bundle either way
 (a static site has no server to keep it hidden behind), so there's nothing
 gained by treating it as one; Match Find's own hardcoded constant is the
 same non-secret value, just written directly into source since it has no
-build-time substitution step to use instead. If you're running all three
-sites yourself, all three apps point at the same deployed Worker, just a
-different path per feature.
+build-time substitution step to use instead. Orbit and Orbit Vocab point at
+the `orbit-workers-proxy` Worker's URL (their features live there); Match
+Find points at the separate `sports-proxy` Worker's URL instead (see "Match
+Find live data" above for why it's a different deployment) - the two
+`PROXY_URL`s in a full self-hosted setup are genuinely different URLs, not
+the same Worker with a different path.
 
 Leaving `PROXY_URL` unset in Orbit/Orbit Vocab is fine: that app's AI/sync
 features are simply unavailable, and everything else about it works
 normally. Match Find has no such "unset" state - update its own hardcoded
 constant directly if you deploy your own Worker for it.
 
-## Why one Worker instead of three
+## Why one Worker for most routes, but two overall
 
 Cloudflare's Workers Free plan's daily request cap (100,000/day) is
-per-*account*, not per-Worker, so splitting these routes into separate
-Workers would never have bought any of the three apps extra headroom - it
-would only have meant three KV bindings, three sets of secrets, and three
-things to keep deployed instead of one. The routes still fully isolate their
-own trust boundaries and quotas from each other (see the table above and
-`isRateLimited` in `worker.js`); combining them was purely an operational
-convenience, never a reason to let one route's traffic or secrets reach
-another's.
+per-*account*, not per-Worker, so splitting `/gemini`/`/nl-edit`/`/sync`/
+`/vocab-sync`/`/vocab-ai` into separate Workers would never have bought any
+of the three apps extra headroom - it would only have meant several KV
+bindings, several sets of secrets, and several things to keep deployed
+instead of one. Those five stay combined for exactly that operational
+convenience. `/sports-proxy` is the one deliberate exception, split out into
+its own `sports-proxy` Worker - not for a quota reason, but because it's the
+one route that must NOT share the other five's `[placement]` region pin (see
+"Match Find live data" above). The routes still fully isolate their own
+trust boundaries and quotas from each other either way (see the table above,
+`isRateLimited` in `worker.js`, and its own copy in `sports-proxy-worker.js`);
+combining most of them was purely an operational convenience, never a reason
+to let one route's traffic or secrets reach another's.
