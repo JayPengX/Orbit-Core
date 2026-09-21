@@ -176,17 +176,39 @@ async function handleSportsProxyRequest(request, env, headers, ip, ctx) {
     });
   }
 
-  const rateLimit = await isRateLimited(env, ip, SPORTS_PROXY_RATE_LIMIT);
+  // The rate-limit check (a KV read - see isRateLimited/isRateLimitedKV)
+  // and the actual upstream fetch are independent of each other - neither
+  // needs the other's result to START, only this function's own final
+  // decision needs both. Running them concurrently instead of awaiting the
+  // rate-limit check FIRST removes a real KV round trip from the critical
+  // path of every single ordinary (not rate-limited) request, which is the
+  // vast majority of traffic under SPORTS_PROXY_RATE_LIMIT's own generous
+  // budget. That round trip used to be invisible next to this Worker's own
+  // former cross-region [placement] pin (hundreds of ms) - now that it's
+  // gone (see this file's own top comment), a KV read is proportionally a
+  // much bigger slice of what's left, so it's worth taking off the
+  // critical path too. The one trade-off: a request that DOES turn out to
+  // be rate-limited still pays for the upstream fetch it didn't need -
+  // acceptable since that's the rare, already-abusive case, not the common
+  // one this route is actually optimizing for.
+  const upstreamPromise = fetch(upstreamUrl.toString(), {
+    headers: { 'User-Agent': SPORTS_PROXY_FETCH_USER_AGENT },
+    signal: AbortSignal.timeout(SPORTS_PROXY_UPSTREAM_TIMEOUT_MS)
+  }).catch(error => ({ fetchError: error }));
+  const [rateLimit, upstreamResult] = await Promise.all([
+    isRateLimited(env, ip, SPORTS_PROXY_RATE_LIMIT),
+    upstreamPromise
+  ]);
   headers['X-RateLimit-Backend'] = rateLimit.backend;
   if (rateLimit.limited) {
     return json({ error: { message: 'Too many requests, please try again later.' } }, 429, headers);
   }
+  if (upstreamResult.fetchError) {
+    return json({ error: { message: upstreamResult.fetchError.message || 'Upstream request failed' } }, 502, headers);
+  }
 
   try {
-    const upstream = await fetch(upstreamUrl.toString(), {
-      headers: { 'User-Agent': SPORTS_PROXY_FETCH_USER_AGENT },
-      signal: AbortSignal.timeout(SPORTS_PROXY_UPSTREAM_TIMEOUT_MS)
-    });
+    const upstream = upstreamResult;
     const contentType = upstream.headers.get('Content-Type') || 'application/json';
     if (upstream.status !== 200) {
       return new Response(upstream.body, { status: upstream.status, headers: { ...headers, 'Content-Type': contentType } });
