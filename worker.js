@@ -9,6 +9,15 @@
 //   POST      /gemini     - AI schedule-photo import (see src/gemini-ocr.js).
 //                            Holds the real Gemini API key server-side so
 //                            end users never need one of their own.
+//   POST      /match-recommend - Match Find's bounded, at-most-once-per-day
+//                            tie-break between a small set of close-scoring
+//                            candidates for one day's headline slot - see
+//                            "==== /match-recommend" below for why this is
+//                            NOT the per-fixture validation call Match Find
+//                            removed in its own Round 11 (that one burned
+//                            through free-tier quota; this one's call volume
+//                            is orders of magnitude smaller by design).
+//                            Reuses GEMINI_API_KEY, same as /gemini.
 //   GET/PATCH/DELETE /sync - Orbit's own cross-device schedule sync (see
 //                            src/sync.js).
 //   GET/PATCH/DELETE /vocab-sync - Orbit Vocab's cross-device
@@ -38,16 +47,19 @@
 // to the whole script, not per-route, so it was forcing /sports-proxy
 // through the same Virginia-region isolate too, adding a real, live-
 // confirmed transatlantic-scale round trip to every single one of Match
-// Find's requests for a codebase with nothing calling Gemini at all. Match
-// Find has no sync route, no scoring route, and (as of its own move to a
+// Find's requests for a codebase whose Gemini usage, when it exists at all,
+// is now tiny. Match Find has no sync route and (as of its own move to a
 // fully client-side live rebuild - see that repo's public/app.js) no
 // build-dispatch route here at all anymore - there is no scheduled build
 // left to trigger on demand, and its own client computes every fixture's
-// score deterministically, never calling either Worker for AI of any kind
-// (see that repo's docs/recommendation-engine-audit.md, Round 11 - free-
-// tier Gemini quota couldn't sustain the workload, and removing it cost no
-// real scoring quality since the deterministic engine was always the
-// primary source of truth).
+// score deterministically. It does NOT call this Worker for AI on every
+// fixture the way an earlier version did (see that repo's docs/
+// recommendation-engine-audit.md, Round 11 - free-tier Gemini quota
+// couldn't sustain that workload). Round 32 reintroduced a single, much
+// narrower call (/match-recommend above) as a bounded daily tie-break, not
+// a return to per-fixture validation - the deterministic engine is still
+// the primary source of truth for every fixture; this only ever nudges the
+// one already-close call a formula genuinely can't resolve.
 //
 // /sync and /vocab-sync both hold a Firebase service-account key
 // server-side and proxy Firestore, so the pairing code isn't the only thing
@@ -684,6 +696,169 @@ async function handleGeminiRequest(request, env, headers, ip) {
     return json({ error: { message: error.message || 'Upstream request failed' } }, 502, headers);
   }
 }
+
+// ==== /match-recommend - bounded daily tie-break for Match Find ============
+//
+// Reintroduces a Gemini call for Match Find, deliberately NOT the way the
+// original per-fixture validation call worked before it was removed (see
+// this file's own top comment and Match Find's docs/recommendation-engine-
+// audit.md Round 11) - that version asked Gemini to score EVERY fixture
+// every build, which is exactly what burned through the free tier's daily
+// quota (Round 9: Google Search grounding hit 429 RESOURCE_EXHAUSTED on
+// 100% of requests). This version is called AT MOST ONCE PER DAY-KEY, and
+// only for the single already-computed best-scoring slot of that day, and
+// only when Match Find's own deterministic engine (public/lib/
+// recommendation.mjs) finds 2-4 candidates within a small margin of each
+// other - see Round 32 of that audit doc for the concrete case this exists
+// for: a real 2026-09-23 slate where the deterministic score alone
+// couldn't distinguish "genuinely the better recommendation tonight" from
+// "statistically similar" without either overfitting the weights to that
+// one date or under-fitting a different, already-correct date. No search
+// grounding tool is requested here - this reads on Gemini's own training-
+// data knowledge of these teams/players (which is often already good
+// enough for "is this a big draw / storyline" style judgment), not live
+// web results, so it can never hit the same grounding-quota wall Round 9
+// did. If Gemini is unavailable, mis-configured, or returns something this
+// can't validate, this returns a plain error and Match Find's own client
+// keeps its deterministic pick unchanged - this is a NUDGE on top of an
+// already-complete recommendation, never something the feature can be
+// broken by losing.
+const MATCH_RECOMMEND_RATE_LIMIT = 60;
+const MATCH_RECOMMEND_MODEL = 'gemini-3.5-flash-lite';
+const MATCH_RECOMMEND_MAX_CANDIDATES = 4;
+const MATCH_RECOMMEND_MIN_CANDIDATES = 2;
+const MATCH_RECOMMEND_MAX_STRING_LEN = 200;
+const MATCH_RECOMMEND_MAX_FACTS = 8;
+
+const MATCH_RECOMMEND_RESPONSE_SCHEMA = {
+  type: 'object',
+  properties: {
+    pickId: { type: 'string' },
+    reason: { type: 'string' }
+  },
+  required: ['pickId', 'reason']
+};
+
+function cleanMatchRecommendText(value, maxLen) {
+  return typeof value === 'string' ? value.trim().slice(0, maxLen) : '';
+}
+
+// Validates the client's candidate list into a plain, bounded shape this
+// can safely embed in a prompt - never trusting field lengths/counts from
+// the request body directly (same posture as readGeminiFiles/
+// cleanVocabAiText above). Returns { error } on anything malformed.
+function readMatchRecommendCandidates(body) {
+  const day = cleanMatchRecommendText(body?.day, 20);
+  const candidates = Array.isArray(body?.candidates) ? body.candidates : null;
+  if (!day || !candidates) return { error: 'Missing or invalid day/candidates' };
+  if (candidates.length < MATCH_RECOMMEND_MIN_CANDIDATES || candidates.length > MATCH_RECOMMEND_MAX_CANDIDATES) {
+    return { error: `candidates must have between ${MATCH_RECOMMEND_MIN_CANDIDATES} and ${MATCH_RECOMMEND_MAX_CANDIDATES} entries` };
+  }
+  const cleaned = [];
+  const seenIds = new Set();
+  for (const candidate of candidates) {
+    const id = cleanMatchRecommendText(candidate?.id, MATCH_RECOMMEND_MAX_STRING_LEN);
+    const sport = cleanMatchRecommendText(candidate?.sport, MATCH_RECOMMEND_MAX_STRING_LEN);
+    const name = cleanMatchRecommendText(candidate?.name, MATCH_RECOMMEND_MAX_STRING_LEN);
+    const reason = cleanMatchRecommendText(candidate?.reason, MATCH_RECOMMEND_MAX_STRING_LEN);
+    const score = Number(candidate?.score);
+    if (!id || seenIds.has(id) || !sport || !name || !Number.isFinite(score)) {
+      return { error: 'Missing or invalid candidate fields' };
+    }
+    seenIds.add(id);
+    const facts = (Array.isArray(candidate?.facts) ? candidate.facts : [])
+      .filter(f => typeof f === 'string' && f.trim())
+      .slice(0, MATCH_RECOMMEND_MAX_FACTS)
+      .map(f => cleanMatchRecommendText(f, MATCH_RECOMMEND_MAX_STRING_LEN));
+    cleaned.push({ id, sport, name, score, reason, facts });
+  }
+  return { day, candidates: cleaned };
+}
+
+// Deliberately asks for a JUDGMENT CALL, not a re-derivation of the score -
+// every candidate already carries the deterministic engine's own number and
+// the real statistical facts that produced it, so this prompt's whole job
+// is to add whatever real-world context (team storylines, star players, how
+// big a draw this specific matchup is) that a box-score-only formula has no
+// way to see, the same gap Match Find's own README documents for isBigClub/
+// isRivalry-style fixed lists - except here it's Gemini's own knowledge
+// doing that job generically instead of one more hand-maintained list.
+function buildMatchRecommendPrompt(day, candidates) {
+  const listing = candidates
+    .map((c, i) => {
+      const facts = c.facts.length ? ` Facts: ${c.facts.join('; ')}.` : '';
+      const reason = c.reason ? ` (${c.reason})` : '';
+      return `${i + 1}. id="${c.id}" [${c.sport}] ${c.name} - deterministic score ${c.score.toFixed(2)}/10.${reason}${facts}`;
+    })
+    .join('\n');
+  return `You are helping a casual sports fan in Taiwan decide which ONE of the following ${candidates.length} games, all airing around the same time on ${day}, is the single most worth watching tonight. Each one already has a score from a deterministic formula built from real season stats (win%, standings proximity, recent form, betting-market spread) - these scores are close together, so the formula alone cannot confidently separate them.
+
+${listing}
+
+Use your own real-world knowledge of these specific teams and any players involved (current storylines, historic significance of the matchup, star power, rivalry intensity) to judge which game is genuinely the better recommendation right now - not just which one has the highest listed score. If you have no confident reason to prefer a different one, pick the highest-scored candidate.
+
+Respond with a JSON object: {"pickId": the exact id string of your chosen candidate (copied exactly from above, never invented), "reason": one short sentence (in Traditional Chinese) explaining the pick in plain, viewer-facing language}.`;
+}
+
+async function handleMatchRecommendRequest(request, env, headers, ip) {
+  if (request.method === 'GET') return json({ ok: true }, 200, headers);
+  if (request.method !== 'POST') return json({ error: { message: 'POST only' } }, 405, headers);
+
+  const rateLimit = await isRateLimited(env, ip, 'match-recommend', MATCH_RECOMMEND_RATE_LIMIT);
+  headers['X-RateLimit-Backend'] = rateLimit.backend;
+  if (rateLimit.limited) {
+    return json({ error: { message: '請求過於頻繁，請稍後再試。' } }, 429, headers);
+  }
+  if (!env.GEMINI_API_KEY) {
+    return json({ error: { message: 'Worker 尚未設定 GEMINI_API_KEY。' } }, 500, headers);
+  }
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: { message: 'Invalid JSON body' } }, 400, headers);
+  }
+  const parsed = readMatchRecommendCandidates(body);
+  if (parsed.error) return json({ error: { message: parsed.error } }, 400, headers);
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(MATCH_RECOMMEND_MODEL)}:generateContent?key=${env.GEMINI_API_KEY}`;
+  try {
+    const upstream = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: buildMatchRecommendPrompt(parsed.day, parsed.candidates) }] }],
+        generationConfig: buildGenerationConfig(MATCH_RECOMMEND_MODEL, MATCH_RECOMMEND_RESPONSE_SCHEMA)
+      })
+    });
+    if (!upstream.ok) {
+      return json({ error: { message: `Gemini API error ${upstream.status}` } }, 502, headers);
+    }
+    const data = await upstream.json();
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (typeof text !== 'string') return json({ error: { message: 'Gemini response missing text' } }, 502, headers);
+    let result;
+    try {
+      result = JSON.parse(text);
+    } catch {
+      return json({ error: { message: 'Gemini returned invalid JSON' } }, 502, headers);
+    }
+    // Never trust the model to only ever name a real id - validated against
+    // the exact candidate list this same request submitted, the same
+    // "the model can suggest, never invent a fact this Worker can't check"
+    // posture as every other Gemini-backed route in this file.
+    const validIds = new Set(parsed.candidates.map(c => c.id));
+    if (typeof result?.pickId !== 'string' || !validIds.has(result.pickId)) {
+      return json({ error: { message: 'Gemini picked an id that was not offered' } }, 502, headers);
+    }
+    const reason = cleanMatchRecommendText(result.reason, 300);
+    return json({ pickId: result.pickId, reason }, 200, headers);
+  } catch (error) {
+    return json({ error: { message: error.message || 'Upstream request failed' } }, 502, headers);
+  }
+}
+
 // ==== /nl-edit - natural-language schedule edits ============================
 //
 // Same discipline as /gemini above: the client (src/editor-nl-edit.js) only
@@ -1855,6 +2030,7 @@ export default {
     const path = new URL(request.url).pathname.replace(/\/+$/, '');
 
     if (path === '/gemini') return handleGeminiRequest(request, env, headers, ip);
+    if (path === '/match-recommend') return handleMatchRecommendRequest(request, env, headers, ip);
     if (path === '/nl-edit') return handleNlEditRequest(request, env, headers, ip);
     if (path === '/sync') return handleSyncRequest(request, env, headers, ip, ORBIT_SYNC_APP);
     if (path === '/vocab-sync') return handleSyncRequest(request, env, headers, ip, VOCAB_SYNC_APP);
