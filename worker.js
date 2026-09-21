@@ -1884,14 +1884,28 @@ const SPORTS_PROXY_ALLOWED_HOSTS = [
 // still a real bound against a runaway tab/script hammering this route.
 const SPORTS_PROXY_RATE_LIMIT = 600;
 
-async function handleSportsProxyRequest(request, env, headers, ip) {
-  if (request.method !== 'GET') return json({ error: { message: 'GET only' } }, 405, headers);
+// A short shared edge cache is what actually keeps that 600/hr budget
+// realistic. Measured directly against Match Find's own real refresh
+// tiers: a single open tab's near-term (60s) + full-window (5min) buildMatches
+// tiers ALONE already add up to roughly 1,750+ requests/hour with no cache
+// at all - about 3x this route's own per-IP limit - because every tier
+// re-requests the same handful of ESPN scoreboard URLs (today/tomorrow,
+// often yesterday too) that the OTHER tier, or that tier's own previous
+// tick, already just fetched seconds or minutes earlier; the same is true
+// across CONCURRENT VIEWERS, who each independently re-fetch the exact same
+// upstream URLs at the exact same time with no cache to share the cost.
+// Keying this cache by the upstream URL ALONE (never by viewer/IP/Origin -
+// see handleSportsProxyRequest's own CORS-header handling below) turns
+// every one of those duplicate/concurrent requests into a single shared
+// upstream fetch. The TTL is set close to Match Find's own live-poll
+// interval (30s) specifically so a cache HIT is never meaningfully staler
+// than waiting for that viewer's own next scheduled poll would have been
+// anyway - this isn't trading correctness for volume, it's just refusing to
+// pay for the exact same answer twice within one polling interval.
+const SPORTS_PROXY_CACHE_TTL_SECONDS = 20;
 
-  const rateLimit = await isRateLimited(env, ip, 'sports-proxy', SPORTS_PROXY_RATE_LIMIT);
-  headers['X-RateLimit-Backend'] = rateLimit.backend;
-  if (rateLimit.limited) {
-    return json({ error: { message: 'Too many requests, please try again later.' } }, 429, headers);
-  }
+async function handleSportsProxyRequest(request, env, headers, ip, ctx) {
+  if (request.method !== 'GET') return json({ error: { message: 'GET only' } }, 405, headers);
 
   const target = new URL(request.url).searchParams.get('url') || '';
   let upstreamUrl;
@@ -1904,17 +1918,61 @@ async function handleSportsProxyRequest(request, env, headers, ip) {
     return json({ error: { message: 'Host not allowed' } }, 400, headers);
   }
 
+  // Cache key is the bare upstream URL, deliberately NOT this request's own
+  // URL/Origin/IP - every viewer asking for the same upstream URL should
+  // share the same cached answer. The response actually STORED here never
+  // carries this request's own CORS headers (which are Origin-specific,
+  // see corsHeaders) - those get attached fresh below on every serve,
+  // cache hit or miss, so a cached body can never leak a stale or wrong
+  // Access-Control-Allow-Origin to a different caller.
+  const cache = caches.default;
+  const cacheKey = new Request(upstreamUrl.toString());
+  const cached = await cache.match(cacheKey);
+  if (cached) {
+    return new Response(cached.body, {
+      status: cached.status,
+      headers: {
+        ...headers,
+        'Content-Type': cached.headers.get('Content-Type') || 'application/json',
+        'X-Sports-Proxy-Cache': 'HIT'
+      }
+    });
+  }
+
+  // Only a genuine cache MISS costs this viewer's own rate-limit budget -
+  // see this function's own top comment for why that's the point.
+  const rateLimit = await isRateLimited(env, ip, 'sports-proxy', SPORTS_PROXY_RATE_LIMIT);
+  headers['X-RateLimit-Backend'] = rateLimit.backend;
+  if (rateLimit.limited) {
+    return json({ error: { message: 'Too many requests, please try again later.' } }, 429, headers);
+  }
+
   try {
     const upstream = await fetch(upstreamUrl.toString(), {
       headers: { 'User-Agent': SPORTS_PROXY_FETCH_USER_AGENT },
       signal: AbortSignal.timeout(15_000)
     });
-    // Piped straight through, same reasoning as /gemini's own upstream.body
-    // passthrough - the body is JSON the client parses itself either way.
-    return new Response(upstream.body, {
-      status: upstream.status,
-      headers: { ...headers, 'Content-Type': upstream.headers.get('Content-Type') || 'application/json' }
-    });
+    const contentType = upstream.headers.get('Content-Type') || 'application/json';
+    if (upstream.status !== 200) {
+      // Never cache a non-200 - a real upstream hiccup shouldn't get stuck
+      // being served back to every viewer for the rest of the cache window.
+      return new Response(upstream.body, { status: upstream.status, headers: { ...headers, 'Content-Type': contentType } });
+    }
+    // Buffered rather than piped straight through (unlike /gemini's own
+    // upstream.body passthrough) because `upstream.body` can only be read
+    // ONCE, and this needs to both populate the shared cache and answer
+    // this actual request from the same bytes.
+    const body = await upstream.arrayBuffer();
+    ctx.waitUntil(
+      cache.put(
+        cacheKey,
+        new Response(body, {
+          status: 200,
+          headers: { 'Content-Type': contentType, 'Cache-Control': `public, max-age=${SPORTS_PROXY_CACHE_TTL_SECONDS}` }
+        })
+      )
+    );
+    return new Response(body, { status: 200, headers: { ...headers, 'Content-Type': contentType, 'X-Sports-Proxy-Cache': 'MISS' } });
   } catch (error) {
     return json({ error: { message: error.message || 'Upstream request failed' } }, 502, headers);
   }
@@ -1923,7 +1981,7 @@ async function handleSportsProxyRequest(request, env, headers, ip) {
 // ==== Routing ================================================================
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const origin = request.headers.get('Origin') || '';
     const headers = corsHeaders(origin, request.cf?.colo);
 
@@ -1937,7 +1995,7 @@ export default {
     if (path === '/sync') return handleSyncRequest(request, env, headers, ip, ORBIT_SYNC_APP);
     if (path === '/vocab-sync') return handleSyncRequest(request, env, headers, ip, VOCAB_SYNC_APP);
     if (path === '/vocab-ai') return handleVocabAiRequest(request, env, headers, ip);
-    if (path === '/sports-proxy') return handleSportsProxyRequest(request, env, headers, ip);
+    if (path === '/sports-proxy') return handleSportsProxyRequest(request, env, headers, ip, ctx);
     return json({ error: { message: 'Not found' } }, 404, headers);
   }
 };

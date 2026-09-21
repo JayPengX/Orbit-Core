@@ -118,10 +118,18 @@ the same error.
 
 ### Match Find live data (`/sports-proxy`)
 
-Nothing to configure - this route needs no secret at all, it's a plain
+Nothing to configure - this route needs no secret at all, it's a
 host-allowlisted passthrough to public, keyless sports APIs (see
 `SPORTS_PROXY_ALLOWED_HOSTS` in `worker.js`). It's live the moment this
-Worker is deployed.
+Worker is deployed. Every successful upstream response is cached for
+`SPORTS_PROXY_CACHE_TTL_SECONDS` (20s) in Cloudflare's shared edge cache,
+keyed by the upstream URL alone - so every viewer asking for the same
+scoreboard/odds URL within that window shares one upstream fetch instead of
+each paying for their own, and a cache hit doesn't count against
+`SPORTS_PROXY_RATE_LIMIT` at all (see `handleSportsProxyRequest`'s own
+comment for why this exists - without it, Match Find's own near-term +
+full-window refresh tiers alone already exceeded this route's per-IP rate
+limit).
 
 ### Sync features (`/sync`, `/vocab-sync`)
 
