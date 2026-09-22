@@ -112,7 +112,7 @@ function corsHeaders(origin, colo) {
     'Access-Control-Allow-Origin': isAllowedOrigin(origin) ? origin : 'null',
     'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Expose-Headers': 'X-Worker-Colo',
+    'Access-Control-Expose-Headers': 'X-Worker-Colo, X-Vocab-Ai-Cache',
     'X-Worker-Colo': colo || 'unknown',
     Vary: 'Origin'
   };
@@ -1104,6 +1104,54 @@ function cleanVocabAiText(value, maxLen) {
   return trimmed;
 }
 
+// ---- /vocab-ai response cache (Workers KV, keyed by the full request shape) ----
+//
+// buildGenerationConfig sets temperature: 0 for every route including this
+// one - src/vocab-ai's mnemonic is therefore already a pure function of
+// {word, pos, meaning, wrongAnswers}, not a creative one-of-many output
+// worth regenerating on every tap. And unlike /gemini (every photo is
+// unique) or /nl-edit (every instruction+school-schedule context is
+// unique), this route's real input space is small and heavily repeated:
+// pos/meaning come straight from Orbit Vocab's own static vocab.json, so
+// they're identical for every learner asking about a given word, and
+// wrongAnswers is a small set of the SAME handful of common misspellings
+// most learners actually make for a given word (e.g. "believe" -> "belive"
+// is the mistake almost everyone makes). Caching the finished mnemonic by
+// exact request shape turns most repeat taps - across one learner
+// re-visiting a word, and across different learners hitting the same
+// popular word/mistake pair - into a free KV read instead of a billed
+// Gemini call, with the model's own determinism meaning a cache hit is
+// never a worse answer than a fresh call would have given.
+//
+// Reuses RATE_LIMIT_KV rather than needing its own binding - one more small
+// key namespace on an already-provisioned store, same reasoning as every
+// other feature in this file reusing shared infrastructure. Cache keys
+// (`vocabai-cache:...`) and rate-limit keys (`rl:...`/`daily-cap:...`) never
+// collide, and - importantly, given this KV namespace's 1000-writes/day
+// account-wide ceiling (see the rate-limiting section's own comment) - a
+// cache WRITE only happens once per genuinely distinct request shape ever
+// seen (first time only; every later hit is a read), so this competes for
+// that write budget only in proportion to how much real variety of
+// word/mistake pairs shows up, never in proportion to total request volume.
+// No TTL: a spelling mnemonic for a fixed mistake pattern doesn't go stale
+// the way a rate-limit window does, so entries are left to live indefinitely
+// rather than forcing a cold, re-billed regeneration for no reason.
+async function vocabAiCacheKey(kind, fields) {
+  // word/pos/meaning are lowercased/trimmed already by cleanVocabAiText's
+  // caller for word - meaning/pos are compared as-is since they're free-form
+  // Chinese text where case doesn't apply. wrongAnswers is sorted so the
+  // same set of mistakes hits the same key regardless of the order this
+  // learner happened to make them in.
+  const normalized = JSON.stringify([
+    kind,
+    String(fields.word || '').toLowerCase(),
+    fields.pos || '',
+    fields.meaning || '',
+    [...(fields.wrongAnswers || [])].map((w) => w.toLowerCase()).sort()
+  ]);
+  return `vocabai-cache:${await sha256Hex(normalized)}`;
+}
+
 // Names the exact letter-level mistake between what the learner typed and
 // the correct spelling ourselves, in plain deterministic code, instead of
 // making the model diagnose it from the two raw strings (an earlier version
@@ -1209,16 +1257,16 @@ async function callVocabAiGemini(prompt, schema, env) {
 async function handleVocabAiRequest(request, env, headers, ip) {
   if (request.method !== 'POST') return json({ error: { message: 'POST only' } }, 405, headers);
 
+  // Kept unconditional (unlike isDailyGlobalCapped/GEMINI_API_KEY below,
+  // both deferred past the cache check) - this bounds plain per-IP request
+  // volume against the Worker itself regardless of what the body contains,
+  // the same basic flood protection every other route here gets. A cache
+  // hit further down still counts against it; only the real, billed spend
+  // ceiling and the key requirement are what a free cache hit gets to skip.
   const rateLimit = await isRateLimited(env, ip, 'vocab-ai', VOCAB_AI_RATE_LIMIT);
   headers['X-RateLimit-Backend'] = rateLimit.backend;
   if (rateLimit.limited) {
     return json({ error: { message: '請求過於頻繁，請稍後再試。' } }, 429, headers);
-  }
-  if (await isDailyGlobalCapped(env, 'vocab-ai', VOCAB_AI_DAILY_GLOBAL_CAP)) {
-    return json({ error: { message: '今日額度已用盡，請明天再試。' } }, 429, headers);
-  }
-  if (!env.GEMINI_API_KEY) {
-    return json({ error: { message: 'Worker 尚未設定 GEMINI_API_KEY。' } }, 500, headers);
   }
 
   let body;
@@ -1239,9 +1287,37 @@ async function handleVocabAiRequest(request, env, headers, ip) {
         .slice(0, VOCAB_AI_MAX_WRONG_ANSWERS)
         .map((w) => w.trim().slice(0, VOCAB_AI_MAX_WRONG_ANSWER_LEN));
 
+      // Cache check BEFORE isDailyGlobalCapped/GEMINI_API_KEY, deliberately:
+      // a hit costs one KV read, calls no Gemini endpoint, and so should
+      // count against neither the billed-call daily cap (a hit that still
+      // consumed from it would eventually start failing purely because the
+      // cache was doing its job) nor require a configured key at all (an
+      // entry cached before a key was ever rotated out stays servable). See
+      // vocabAiCacheKey's own comment for why this route's request shape
+      // caches well.
+      const cacheKey = env.RATE_LIMIT_KV
+        ? await vocabAiCacheKey('mnemonic', { word, pos, meaning, wrongAnswers })
+        : null;
+      if (cacheKey) {
+        const cached = await env.RATE_LIMIT_KV.get(cacheKey).catch(() => null);
+        if (cached) {
+          headers['X-Vocab-Ai-Cache'] = 'hit';
+          return json({ mnemonic: cached }, 200, headers);
+        }
+      }
+      headers['X-Vocab-Ai-Cache'] = 'miss';
+
+      if (await isDailyGlobalCapped(env, 'vocab-ai', VOCAB_AI_DAILY_GLOBAL_CAP)) {
+        return json({ error: { message: '今日額度已用盡，請明天再試。' } }, 429, headers);
+      }
+      if (!env.GEMINI_API_KEY) {
+        return json({ error: { message: 'Worker 尚未設定 GEMINI_API_KEY。' } }, 500, headers);
+      }
+
       const result = await callVocabAiGemini(buildVocabMnemonicPrompt(word, pos, meaning, wrongAnswers), VOCAB_MNEMONIC_RESPONSE_SCHEMA, env);
       const mnemonic = typeof result.mnemonic === 'string' ? result.mnemonic.trim() : '';
       if (!mnemonic) return json({ error: { message: 'AI 沒有回傳有效的記憶法。' } }, 502, headers);
+      if (cacheKey) await env.RATE_LIMIT_KV.put(cacheKey, mnemonic).catch(() => {});
       return json({ mnemonic }, 200, headers);
     }
 
