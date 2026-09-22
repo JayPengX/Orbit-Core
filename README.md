@@ -1,91 +1,128 @@
 # Shared Proxy
 
-Two Cloudflare Workers, deployed from this one repo, that back the optional
-server-side features of three otherwise-independent static sites:
+Shared Cloudflare Workers backend for Orbit, Orbit Vocab, and Match Find.
 
-- [Orbit](https://github.com/jaypengx-collab/Orbit) - a class-schedule
-  dashboard.
-- [Orbit Vocab](https://github.com/jaypengx-collab/Orbit-Vocab) - a
-  vocabulary trainer.
-- [Match Find](https://github.com/jaypengx-collab/Match-Find) - a "what's
-  worth watching today" sports site.
+This repository holds two Cloudflare Workers that back the optional
+server-side features of three otherwise-independent static sites. None of
+the three sites needs a database, a server, or its own API key to use these
+features — each one just points at a deployed Worker URL.
 
-None of the three needs a database, a server, or its own API key for these
-features to work - they just point at this one deployed Worker's URL. This
-repo used to be a folder inside Orbit's own repo (`cloudflare-worker/`), but
-it was never really Orbit-specific: it already served all three sites, and
-keeping it inside one of its own consumers made "which repo do I even touch
-to change the proxy" a real question. It now lives here, on its own, with
-its own deploy pipeline, so each of the three apps only ever has to know one
-thing about it: the URL.
+- **Orbit** — class schedule dashboard
+  Repo: https://github.com/jaypengx-collab/Orbit
+  Live: https://jaypengx-collab.github.io/Orbit/
+- **Orbit Vocab** — vocabulary trainer
+  Repo: https://github.com/jaypengx-collab/Orbit-Vocab
+  Live: https://jaypengx-collab.github.io/Orbit-Vocab/
+- **Match Find** — sports recommendation site
+  Repo: https://github.com/jaypengx-collab/Match-Find
+  Live: https://jaypengx-collab.github.io/Match-Find/
 
-## What it does, and who calls it
+## Table of Contents
 
-| Route | Method(s) | Used by | What it's for |
+- [Overview](#overview)
+- [Routes & Consumers](#routes--consumers)
+- [Security Hardening](#security-hardening)
+- [Sync Design](#sync-design)
+- [One-Time Deploy Setup](#one-time-deploy-setup)
+- [Optional: Auto-Deploy via GitHub Actions](#optional-auto-deploy-via-github-actions)
+- [Wiring Up a Consuming App](#wiring-up-a-consuming-app)
+- [Why One Worker for Most Routes, But Two Overall](#why-one-worker-for-most-routes-but-two-overall)
+- [Related Projects](#related-projects)
+
+## Overview
+
+This repo used to be a folder inside Orbit's own repository
+(`cloudflare-worker/`), but it was never really Orbit-specific — it already
+served all three sites, and keeping it nested inside one of its own
+consumers made "which repo do I even touch to change the proxy" a real
+question. It now lives here on its own, with its own deploy pipeline, so
+each of the three apps only ever has to know one thing about it: the URL.
+
+Two Workers are deployed from this repo:
+
+- **`orbit-workers-proxy`** (`worker.js` + `wrangler.toml`) — serves
+  `/gemini`, `/nl-edit`, `/sync`, `/vocab-sync`, `/vocab-ai`.
+- **`sports-proxy`** (`sports-proxy-worker.js` + `wrangler.sports-proxy.toml`) —
+  serves `/sports-proxy` as its own, separately deployed Worker. See
+  [Why One Worker for Most Routes, But Two Overall](#why-one-worker-for-most-routes-but-two-overall)
+  for the reasoning behind the split.
+
+Every route validates and rate-limits itself independently (see
+`isRateLimited` in `worker.js` — every call site passes its own `feature`
+key), so a burst of traffic against one route can never eat into another
+route's, or another app's, quota. Every feature is also entirely optional on
+the *consuming* app's side: not configuring a `PROXY_URL` (or that route not
+being reachable) just makes that one feature unavailable, never a broken
+build.
+
+## Routes & Consumers
+
+| Route | Method(s) | Used by | Purpose |
 | --- | --- | --- | --- |
-| `/gemini` | GET (warm-up), POST | Orbit | AI schedule-photo import - holds the real Gemini API key server-side. |
-| `/nl-edit` | POST | Orbit | AI natural-language schedule edits ("把我週二第三節改成物理"). |
+| `/gemini` | GET (warm-up), POST | Orbit | AI schedule-photo import — holds the real Gemini API key server-side. |
+| `/nl-edit` | POST | Orbit | AI natural-language schedule edits (e.g. "把我週二第三節改成物理"). |
 | `/sync` | GET/PATCH/DELETE | Orbit | Cross-device schedule sync (code + manager passcode; reads are open, writes/deletes need the passcode). |
 | `/vocab-sync` | GET/PATCH/DELETE | Orbit Vocab | Cross-device learning-progress sync (single passcode, no separate read-only code). |
-| `/vocab-ai` | POST | Orbit Vocab | Live, per-learner personalized mnemonics - responses are cached in `RATE_LIMIT_KV` by exact request shape (word/pos/meaning/wrongAnswers), so a repeat of the same word+mistake pattern (common - see `vocabAiCacheKey`'s own comment in `worker.js`) is a free KV read, not a billed Gemini call. `X-Vocab-Ai-Cache: hit`/`miss` on every response says which happened. |
-| `/sports-proxy` (separate Worker - see below) | GET | Match Find | Host-allowlisted CORS passthrough to ESPN/the MLB Stats API/Jolpica/Polymarket's Gamma API, so the viewer's own browser can fetch and score its whole live match list directly. |
+| `/vocab-ai` | POST | Orbit Vocab | Live, per-learner personalized mnemonics. Responses are cached in `RATE_LIMIT_KV` by exact request shape (word/pos/meaning/wrongAnswers), so a repeat of the same word + mistake pattern (common — see `vocabAiCacheKey`'s own comment in `worker.js`) is a free KV read, not a billed Gemini call. The `X-Vocab-Ai-Cache: hit`/`miss` response header says which happened. |
+| `/sports-proxy` (separate Worker — see below) | GET | Match Find | Host-allowlisted CORS passthrough to ESPN, the MLB Stats API, Jolpica, and Polymarket's Gamma API, so the viewer's own browser can fetch and score its whole live match list directly. |
 
 `/sports-proxy` is deployed as its own Worker (`sports-proxy-worker.js` +
-`wrangler.sports-proxy.toml`), not part of `worker.js`/`wrangler.toml` above -
-see "Match Find live data" below for why.
+`wrangler.sports-proxy.toml`), not part of `worker.js`/`wrangler.toml` above
+— see [One-Time Deploy Setup](#one-time-deploy-setup) for why.
+
+### Removed routes
 
 Match Find used to also have a Gemini-backed recommendation route on this
 Worker, in three successive shapes, all now removed:
-`/match-recommend`/`/match-recommend-refine` (scoring/validating EVERY
-fixture, every build - removed in that repo's Round 11: free-tier quota
-couldn't sustain that workload), then a much narrower `/match-recommend`
-reintroduced in Round 32 (a bounded, at-most-once-per-day tie-break between
-a small set of close-scoring candidates for one day's headline slot). That
-narrower version is ALSO gone as of Round 41: direct instruction that its
-real, now-billed cost outweighed its actual improvement to the
-recommendation - its own two live test calls (Round 37/38) had already shown
-Gemini's independent judgment simply agreeing with the deterministic
-engine's own pick both times. Match Find's deterministic objective-score
-engine (`public/lib/recommendation.mjs`, that repo) is its only
-recommendation logic now - no Gemini call of any kind. It also used to
-have `/match-dispatch` (fired a GitHub Actions rebuild on demand) - removed
-once Match Find moved its own match-building pipeline to run fully
-client-side (see that repo's public/app.js) rather than on a scheduled
-server-side build there was ever anything to dispatch.
 
-Every route validates and rate-limits itself independently (see
-`isRateLimited` in `worker.js` - every call site passes its own `feature`
-key), so a burst of traffic against one route can never eat into another
-route's, or another app's, quota. Every feature is also entirely optional
-on the *consuming* app's side: not configuring a `PROXY_URL` (or its route
-not being reachable) just makes that one feature unavailable, never a
-broken build.
+- `/match-recommend` / `/match-recommend-refine` — scored and validated
+  *every* fixture on *every* build. Removed in Match Find's Round 11: the
+  free-tier Gemini quota couldn't sustain that workload.
+- A much narrower `/match-recommend` was reintroduced in Round 32 — a
+  bounded, at-most-once-per-day tie-break between a small set of
+  close-scoring candidates for one day's headline slot. This version is
+  also gone as of Round 41: direct instruction that its real, now-billed
+  cost outweighed its actual improvement to the recommendation. Its own two
+  live test calls (Round 37/38) had already shown Gemini's independent
+  judgment simply agreeing with the deterministic engine's own pick both
+  times.
+- `/match-dispatch` — fired a GitHub Actions rebuild on demand. Removed once
+  Match Find moved its own match-building pipeline to run fully client-side
+  (see that repo's `public/app.js`), leaving nothing left to dispatch from a
+  scheduled server-side build.
 
-### Round 38 (2026-09-22): locking down the real, billed Gemini routes
+Match Find's deterministic objective-score engine
+(`public/lib/recommendation.mjs` in that repo) is its only recommendation
+logic today — no Gemini call of any kind.
 
-Until this round, `/gemini`, `/vocab-ai`, `/nl-edit`, and `/match-recommend`
-(every route that makes a real, now-billed Gemini API call) were callable by
-anyone who simply knew the URL - `ALLOWED_ORIGINS`/`isAllowedOrigin` only
-ever fed the CORS response headers, which is purely advisory (it stops a
-well-behaved *browser* from reading a disallowed page's response, but never
-stopped the request - including the real Gemini call - from being
-processed first). A direct `curl` doesn't send or care about CORS at all.
-Live-proven that same session by this repo's own maintainer's assistant,
-which called `/match-recommend` directly with plain `curl` and got a full,
-real response back. Two changes close this:
+## Security Hardening
+
+Until a hardening pass on 2026-09-22, `/gemini`, `/vocab-ai`, `/nl-edit`,
+and the (since-removed) `/match-recommend` — every route that makes a real,
+billed Gemini API call — were callable by anyone who simply knew the URL.
+`ALLOWED_ORIGINS`/`isAllowedOrigin` only ever fed the CORS response headers,
+which is purely advisory: it stops a well-behaved *browser* from reading a
+disallowed page's response, but it never stopped the request itself —
+including the real Gemini call — from being processed first. A direct
+`curl` doesn't send or care about CORS at all. This was live-proven that
+same session by this repo's own maintainer's assistant, which called
+`/match-recommend` directly with plain `curl` and got a full, real response
+back.
+
+Two changes closed this gap:
 
 1. **The origin check is now an enforced gate, not just a CORS header.**
    `worker.js`'s top-level router now rejects with `403` before ever
    reaching a billed handler if `Origin` is missing or not in
-   `ALLOWED_ORIGINS`. This costs a real caller nothing - every one of these
+   `ALLOWED_ORIGINS`. This costs a real caller nothing — every one of these
    routes is a POST with a JSON body, which browsers always attach a real
    `Origin` header to (preflight included), so Match Find/Orbit/Orbit
    Vocab's own already-working pages are unaffected. Only a bare
    script/`curl` call, or another site embedding a `fetch` to this Worker,
    is newly rejected.
 2. **A hard daily global cap per feature** (`isDailyGlobalCapped`,
-   `*_DAILY_GLOBAL_CAP` next to each route's existing `*_RATE_LIMIT`) -
-   unlike the existing per-IP rate limit, this counts every caller
+   `*_DAILY_GLOBAL_CAP` next to each route's existing `*_RATE_LIMIT`).
+   Unlike the existing per-IP rate limit, this counts every caller
    *combined*, so it can't be outrun by spreading requests across IPs. Once
    a feature hits its daily cap, every further call for that feature
    returns `429` with no upstream Gemini call at all, for the rest of that
@@ -94,60 +131,64 @@ real response back. Two changes close this:
 
 **Honest limit, stated plainly rather than oversold:** an `Origin` header is
 just text a non-browser client can set to anything it wants, and this is a
-public, open-source repo - a targeted attacker who reads this file can
+public, open-source repo — a targeted attacker who reads this file can
 trivially copy the allowed origin value verbatim. This gate stops
-opportunistic/naive abuse (URL scanners, another page silently spending
-your quota through its visitors' browsers) and, combined with the daily
-cap, hard-bounds the worst case even against someone who does spoof it. It
-is **not** real authentication - there are no user accounts here to
+opportunistic/naive abuse (URL scanners, another page silently spending your
+quota through its visitors' browsers) and, combined with the daily cap,
+hard-bounds the worst case even against someone who does spoof it. It is
+**not** real authentication — there are no user accounts here to
 authenticate, and no client-side secret can ever be genuinely secret in a
 fully public static site's own source. Real lock-down would need a backend
 with real user identity, a materially bigger change than any route here
 currently has another reason to need.
 
-Verified locally with a mocked `env.RATE_LIMIT_KV` and a mocked
-`global.fetch` (never touching the real Gemini API or spending any real
-quota/credit) - confirmed: no-`Origin` and wrong-`Origin` requests are
-rejected before the upstream call happens at all; a correct `Origin`
-passes through unaffected; the daily cap kicks in exactly at its limit and
-never lets a real upstream call happen past it; an unrelated/unknown path
-is unaffected (still a plain `404`, not swept up by the gate).
+**Verification.** Verified locally with a mocked `env.RATE_LIMIT_KV` and a
+mocked `global.fetch` (never touching the real Gemini API or spending any
+real quota/credit) — confirmed: no-`Origin` and wrong-`Origin` requests are
+rejected before the upstream call happens at all; a correct `Origin` passes
+through unaffected; the daily cap kicks in exactly at its limit and never
+lets a real upstream call happen past it; an unrelated/unknown path is
+unaffected (still a plain `404`, not swept up by the gate).
+
+## Sync Design
 
 `/sync` and `/vocab-sync` (Orbit's own vs. Orbit Vocab's) use two different
-pairing shapes - Match Find has no sync route at all; its own settings and
+pairing shapes. Match Find has no sync route at all — its own settings and
 "Prefer" pick are local-only, in the viewer's own browser, never synced
-anywhere (see that repo's README):
+anywhere (see that repo's README).
 
-- **Orbit's `/sync`**: a plain sync code (read access, share freely) plus a
-  separate manager passcode (write/delete access) - built for "one teacher
+- **Orbit's `/sync`** — a plain sync code (read access, share freely) plus a
+  separate manager passcode (write/delete access). Built for "one teacher
   broadcasts a schedule to many read-only student devices."
-- **`/vocab-sync`**: a single passcode that's both the identifier and the
-  only credential - built for "one person's own multiple devices," where
+- **`/vocab-sync`** — a single passcode that's both the identifier and the
+  only credential. Built for "one person's own multiple devices," where
   there's no reason to have a public read-only code at all.
 
 See the top-of-file comment in `worker.js`, and the comment above each
-route's handler, for the full reasoning behind each design choice - this
+route's handler, for the full reasoning behind each design choice — this
 README only covers what's needed to deploy and consume it.
 
-## One-time deploy setup
+## One-Time Deploy Setup
 
 You don't need to install anything to get started. This covers the main
 `orbit-workers-proxy` Worker (`/gemini`, `/nl-edit`, `/sync`, `/vocab-sync`,
-`/vocab-ai`) - see "Match Find live data (`/sports-proxy`)" below for the
-separate `sports-proxy` Worker Match Find needs, which is a second,
-near-identical run of the same first three steps against a different file:
+`/vocab-ai`) first, followed by the separate `sports-proxy` Worker Match
+Find needs, which is a second, near-identical run of the same first three
+steps against a different file.
+
+### `orbit-workers-proxy`: initial deploy
 
 1. Sign up for a free [Cloudflare account](https://dash.cloudflare.com/sign-up)
    (email only, no credit card).
 2. Workers & Pages → Create → Create Worker, give it a name → Deploy.
 3. "Edit code" → paste the entire contents of `worker.js` → Save and Deploy.
-4. Copy the Worker's URL (`https://<name>.<subdomain>.workers.dev`) -
-   **no path suffix**. Every consuming app appends its own hardcoded path
-   (`/gemini`, `/sync`, `/vocab-ai`, etc.) - see "Wiring up a
-   consuming app" below.
+4. Copy the Worker's URL (`https://<name>.<subdomain>.workers.dev`) — **no
+   path suffix**. Every consuming app appends its own hardcoded path
+   (`/gemini`, `/sync`, `/vocab-ai`, etc.) — see
+   [Wiring Up a Consuming App](#wiring-up-a-consuming-app) below.
 
 That alone gives you a live Worker with every route returning "not
-configured" until you add the secrets each feature needs:
+configured" until you add the secrets each feature needs.
 
 ### AI features (`/gemini`, `/nl-edit`, `/vocab-ai`)
 
@@ -157,76 +198,79 @@ All three share one secret:
   ([get one here](https://aistudio.google.com/apikey)), type **Secret** →
   Save and Deploy.
 
-That's it - once `GEMINI_API_KEY` is set, all four AI routes work. Nothing
+That's it — once `GEMINI_API_KEY` is set, all three AI routes work. Nothing
 else to configure per-route.
 
 **`[placement]` matters here.** `wrangler.toml` pins
 `[placement] region = "gcp:us-east4"` rather than leaving Cloudflare's
-default "Smart Placement" in charge. This was a real, live-tested fix, not
-a guess: Smart Placement's latency heuristic consistently ran this Worker's
+default "Smart Placement" in charge. This was a real, live-tested fix, not a
+guess: Smart Placement's latency heuristic consistently ran this Worker's
 Gemini-facing routes out of Cloudflare's Hong Kong colo (a very reasonable
 "closest to Google's Asia-Pacific presence" pick for traffic that's mostly
-Taiwan-based) - except Google's Gemini API refuses all traffic from Hong
+Taiwan-based) — except Google's Gemini API refuses all traffic from Hong
 Kong and mainland China outright, by policy, not as an occasional bad-luck
 colo. `region` instead pins the Worker to whichever real datacenter has the
-lowest latency to `us-east4` (Ashburn, VA) - a target confirmed live against
+lowest latency to `us-east4` (Ashburn, VA) — a target confirmed live against
 this same API (15/15 successful calls). This setting only takes effect via
-Wrangler/CI (see "Optional: auto-deploy via GitHub Actions" below) - the
-Cloudflare dashboard's own "Settings → Placement" only exposes the Smart
-toggle, not a `region` field.
+Wrangler/CI (see
+[Optional: Auto-Deploy via GitHub Actions](#optional-auto-deploy-via-github-actions)
+below) — the Cloudflare dashboard's own "Settings → Placement" only exposes
+the Smart toggle, not a `region` field.
 
 Every response (including a Gemini "location not supported" error) carries
 an `X-Worker-Colo` header naming the actual colo that handled it (an IATA
-airport code, e.g. `IAD` = Virginia, `HKG` = Hong Kong) - useful for
+airport code, e.g. `IAD` = Virginia, `HKG` = Hong Kong) — useful for
 confirming this is actually taking effect, or diagnosing a future report of
 the same error.
 
-### Match Find live data (`/sports-proxy`) - a separate Worker
+### Match Find live data (`/sports-proxy`) — a separate Worker
 
 This one is deployed **from a different file** (`sports-proxy-worker.js` +
-`wrangler.sports-proxy.toml`) as its **own Worker**, not pasted into the
-same one as `/gemini`/`/sync`/etc:
+`wrangler.sports-proxy.toml`) as its **own Worker**, not pasted into the same
+one as `/gemini`/`/sync`/etc.:
 
 1. Workers & Pages → Create → Create Worker, give it its own name (e.g.
    `sports-proxy`) → Deploy.
 2. "Edit code" → paste the entire contents of `sports-proxy-worker.js` →
    Save and Deploy.
-3. Copy this Worker's own URL - this is the one Match Find's `PROXY_URL`
-   points at (see "Wiring up a consuming app" below), a *different* URL
-   from the `orbit-workers-proxy` Worker the other four routes live on.
+3. Copy this Worker's own URL — this is the one Match Find's `PROXY_URL`
+   points at (see [Wiring Up a Consuming App](#wiring-up-a-consuming-app)
+   below), a *different* URL from the `orbit-workers-proxy` Worker the other
+   five routes live on.
 
 Why separate: `wrangler.toml`'s `[placement] region = "gcp:us-east4"` pin
-(needed for `/gemini`/`/vocab-ai` - see that section above) is a
+(needed for `/gemini`/`/vocab-ai` — see the section above) is a
 whole-*script* setting, not a per-route one. Sharing one Worker meant
 `/sports-proxy` was being forced through that same Virginia isolate too,
 even though nothing it calls (ESPN, the MLB Stats API, Jolpica, Polymarket)
-has Gemini's region restriction - confirmed live via the `X-Worker-Colo`
+has Gemini's region restriction — confirmed live via the `X-Worker-Colo`
 response header returning `IAD` for a plain `/sports-proxy` request. For
 Match Find's actual Taiwan-based audience, that meant every one of its
 dozens of near-term/full-window/live-poll requests per refresh paid a full
 Taiwan↔Virginia round trip for no reason, and was a real, live-confirmed
-contributor to reports of the site going blank for 10+ seconds on first
-load and refreshes taking 10-20+ seconds. Deploying this route as its own
-Worker with no `[placement]` override lets Cloudflare's own default apply -
-run near whichever colo actually received the request, i.e. near the real
+contributor to reports of the site going blank for 10+ seconds on first load
+and refreshes taking 10-20+ seconds. Deploying this route as its own Worker
+with no `[placement]` override lets Cloudflare's own default apply — run
+near whichever colo actually received the request, i.e. near the real
 caller.
 
-Nothing to configure - this route needs no secret at all, it's a
+Nothing to configure — this route needs no secret at all, it's a
 host-allowlisted passthrough to public, keyless sports APIs (see
 `SPORTS_PROXY_ALLOWED_HOSTS` in `sports-proxy-worker.js`). It's live the
-moment this Worker is deployed. Every successful upstream response is
-cached for `SPORTS_PROXY_CACHE_TTL_SECONDS` (20s) in Cloudflare's shared
-edge cache, keyed by the upstream URL alone - so every viewer asking for the
-same scoreboard/odds URL within that window shares one upstream fetch
-instead of each paying for their own, and a cache hit doesn't count against
+moment this Worker is deployed. Every successful upstream response is cached
+for `SPORTS_PROXY_CACHE_TTL_SECONDS` (20s) in Cloudflare's shared edge
+cache, keyed by the upstream URL alone — so every viewer asking for the same
+scoreboard/odds URL within that window shares one upstream fetch instead of
+each paying for their own, and a cache hit doesn't count against
 `SPORTS_PROXY_RATE_LIMIT` at all (see `handleSportsProxyRequest`'s own
-comment for why this exists - without it, Match Find's own near-term +
+comment for why this exists — without it, Match Find's own near-term +
 full-window refresh tiers alone already exceeded this route's per-IP rate
-limit). The optional `RATE_LIMIT_KV` binding (see "Optional: auto-deploy via
-GitHub Actions" below) can safely be the same KV namespace as
-`orbit-workers-proxy`'s own - this Worker's rate-limit keys are IP-only, with
-no `feature` prefix to collide with the other Worker's `gemini:`/`sync:`/
-`vocab-sync:`/`vocab-ai:` keys.
+limit). The optional `RATE_LIMIT_KV` binding (see
+[Optional: Auto-Deploy via GitHub Actions](#optional-auto-deploy-via-github-actions)
+below) can safely be the same KV namespace as `orbit-workers-proxy`'s own —
+this Worker's rate-limit keys are IP-only, with no `feature` prefix to
+collide with the other Worker's `gemini:`/`sync:`/`vocab-sync:`/`vocab-ai:`
+keys.
 
 ### Sync features (`/sync`, `/vocab-sync`)
 
@@ -235,29 +279,29 @@ Both share one Firebase project and one service-account credential:
 1. Create a project at the [Firebase Console](https://console.firebase.google.com/)
    and enable Firestore.
 2. Project Settings → Service accounts → Generate new private key → download
-   the JSON. Treat this like a password - it grants full read/write access
+   the JSON. Treat this like a password — it grants full read/write access
    to the whole Firestore project, bypassing Firestore Security Rules
-   entirely (that's the point - see below). If your Firebase project is
+   entirely (that's the point — see below). If your Firebase project is
    managed under a school/work Google Workspace account and this button is
    greyed out, try the same key from
    [Google Cloud Console](https://console.cloud.google.com/) → IAM & Admin →
    Service Accounts → the `firebase-adminsdk-...` account → Keys → Add Key →
    Create new key → JSON. If that's blocked too, that Google account can't
-   generate a key at all - use a personal Google account's own Firebase
+   generate a key at all — use a personal Google account's own Firebase
    project instead.
 3. Worker Settings → Variables and Secrets, add:
-   - `FIREBASE_PROJECT_ID` (plain variable) - the Firebase project's ID.
-   - `FIREBASE_CLIENT_EMAIL` (Secret) - the downloaded JSON's `client_email`.
-   - `FIREBASE_PRIVATE_KEY` (Secret) - the downloaded JSON's `private_key`.
+   - `FIREBASE_PROJECT_ID` (plain variable) — the Firebase project's ID.
+   - `FIREBASE_CLIENT_EMAIL` (Secret) — the downloaded JSON's `client_email`.
+   - `FIREBASE_PRIVATE_KEY` (Secret) — the downloaded JSON's `private_key`.
      Paste the real line breaks (the PEM content itself), not the JSON
-     string's literal `\n` escapes - both are accepted, but this is the
+     string's literal `\n` escapes — both are accepted, but this is the
      easiest step to get wrong.
 4. (Optional but recommended) Workers & Pages → KV → Create namespace (any
    name) → back on this Worker's Settings → Bindings → Add → KV Namespace →
    variable name `RATE_LIMIT_KV` → pick the namespace you just created →
    redeploy (a Binding change needs a fresh "Deploy" to take effect). Both
-   sync routes (and every AI route) share this one binding with
-   per-feature key prefixes, so there's never any cross-feature interference.
+   sync routes (and every AI route) share this one binding with per-feature
+   key prefixes, so there's never any cross-feature interference.
 5. Back in the Firebase Console's "Rules" tab, paste:
    ```
    rules_version = '2';
@@ -270,23 +314,23 @@ Both share one Firebase project and one service-account credential:
    }
    ```
    The service account's access already bypasses Firestore Security Rules
-   (same as the Admin SDK) - this rule only closes the *other* door: direct,
+   (same as the Admin SDK) — this rule only closes the *other* door: direct,
    unauthenticated client access to Firestore. That's the actual point of
-   this whole Worker for the sync routes - not one more check on top of an
+   this whole Worker for the sync routes — not one more check on top of an
    open database, but removing the open database entirely. The wildcard
    covers every collection (`orbit-schedules`, `vocab-progress-sync`) so
    adding a third sync consumer later never needs this rule touched again.
 
-Once this is done, `/sync` and `/vocab-sync` are both live - each already
+Once this is done, `/sync` and `/vocab-sync` are both live — each already
 uses its own Firestore collection and its own rate-limit counters (see the
-table above), so neither can affect the other's data or quota.
+route table above), so neither can affect the other's data or quota.
 
-### Optional: auto-deploy via GitHub Actions
+## Optional: Auto-Deploy via GitHub Actions
 
 Without this, updating either Worker means manually re-pasting its file into
 the Cloudflare dashboard every time. With it, a push to `main` deploys both
-automatically (`.github/workflows/deploy.yml` runs two Wrangler deploy steps,
-one per `wrangler*.toml` - triggered by changes to `worker.js`,
+automatically (`.github/workflows/deploy.yml` runs two Wrangler deploy
+steps, one per `wrangler*.toml` — triggered by changes to `worker.js`,
 `wrangler.toml`, `sports-proxy-worker.js`, or `wrangler.sports-proxy.toml`;
 also runnable manually from the Actions tab):
 
@@ -299,66 +343,87 @@ also runnable manually from the Actions tab):
    Cloudflare Dashboard's sidebar (or its URL).
 4. **Important**: `wrangler deploy` pushes a `wrangler*.toml`'s `[vars]` and
    `[[kv_namespaces]]` as that Worker's *entire* config, replacing whatever's
-   live - it does not merge with dashboard-made changes. Before relying on
-   this workflow, make sure both `wrangler.toml` and `wrangler.sports-proxy.toml`
-   in this repo already match what's live (the real `FIREBASE_PROJECT_ID`,
-   and the real KV namespace id(s) if you're using `RATE_LIMIT_KV`), or the
-   first automated deploy will silently overwrite them with placeholders.
-   Secrets themselves (`GEMINI_API_KEY`, `FIREBASE_CLIENT_EMAIL`,
-   `FIREBASE_PRIVATE_KEY`) are never touched by `wrangler deploy` - they
-   aren't stored in this repo at all, and `/sports-proxy` doesn't use any.
-5. The same token deploys both Workers - the "Edit Cloudflare Workers"
+   live — it does not merge with dashboard-made changes. Before relying on
+   this workflow, make sure both `wrangler.toml` and
+   `wrangler.sports-proxy.toml` in this repo already match what's live (the
+   real `FIREBASE_PROJECT_ID`, and the real KV namespace id(s) if you're
+   using `RATE_LIMIT_KV`), or the first automated deploy will silently
+   overwrite them with placeholders. Secrets themselves (`GEMINI_API_KEY`,
+   `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`) are never touched by
+   `wrangler deploy` — they aren't stored in this repo at all, and
+   `/sports-proxy` doesn't use any.
+5. The same token deploys both Workers — the "Edit Cloudflare Workers"
    template grants `Workers Scripts:Edit` account-wide, not scoped to one
    script, so it can create the `sports-proxy` Worker the first time this
-   runs just as readily as it updates the existing `orbit-workers-proxy` one.
+   runs just as readily as it updates the existing `orbit-workers-proxy`
+   one.
 
-You can also deploy from the command line instead of setting up CI - see the
+You can also deploy from the command line instead of setting up CI — see the
 comment block at the top of `wrangler.toml` (for `orbit-workers-proxy`) or
 `wrangler.sports-proxy.toml` (for `sports-proxy`) for the exact `wrangler`
 CLI commands (login, deploy with `-c <file>`, `secret put` for each secret,
 KV namespace creation).
 
-## Wiring up a consuming app
+## Wiring Up a Consuming App
 
 Every consumer takes exactly one setting: the Worker's base URL, **with no
-path suffix** - each app's own frontend code appends its own hardcoded path.
+path suffix** — each app's own frontend code appends its own hardcoded path.
 
 | Repo | Where the URL goes | Env var |
 | --- | --- | --- |
-| Orbit | GitHub Settings → Secrets and variables → Actions → **Variables** | `PROXY_URL` (built into the client bundle by Vite - see `src/proxy-config.js`) |
-| Orbit Vocab | GitHub Settings → Secrets and variables → Actions → **Variables** | `PROXY_URL` (substituted into `sync.js`/`vocab-ai.js` at build time - see `.github/workflows/pages.yml`) |
-| Match Find | Hardcoded directly as the `PROXY_URL` constant in `public/app.js` | None - there's no build step left to inject a build-time variable from (its whole match list is fetched/scored live in the browser - see that repo's public/lib/match-builder.mjs), so this is a plain source-code constant instead |
+| Orbit | GitHub Settings → Secrets and variables → Actions → **Variables** | `PROXY_URL` (built into the client bundle by Vite — see `src/proxy-config.js`) |
+| Orbit Vocab | GitHub Settings → Secrets and variables → Actions → **Variables** | `PROXY_URL` (substituted into `sync.js`/`vocab-ai.js` at build time — see `.github/workflows/pages.yml`) |
+| Match Find | Hardcoded directly as the `PROXY_URL` constant in `public/app.js` | None — there's no build step left to inject a build-time variable from (its whole match list is fetched/scored live in the browser — see that repo's `public/lib/match-builder.mjs`), so this is a plain source-code constant instead |
 
-Orbit/Orbit Vocab deliberately use a GitHub Actions **Variable**, not a
-Secret - this value ends up in each site's public client bundle either way
+Orbit and Orbit Vocab deliberately use a GitHub Actions **Variable**, not a
+Secret — this value ends up in each site's public client bundle either way
 (a static site has no server to keep it hidden behind), so there's nothing
-gained by treating it as one; Match Find's own hardcoded constant is the
+gained by treating it as one. Match Find's own hardcoded constant is the
 same non-secret value, just written directly into source since it has no
 build-time substitution step to use instead. Orbit and Orbit Vocab point at
 the `orbit-workers-proxy` Worker's URL (their features live there); Match
-Find points only at the separate `sports-proxy` Worker (see "Match Find live
-data" above for why it's a different deployment) - it has no Gemini-backed
-route of its own on `orbit-workers-proxy` anymore (see "What it does, and
-who calls it" above for the full history of its now-removed
-`/match-recommend` route).
+Find points only at the separate `sports-proxy` Worker (see
+[One-Time Deploy Setup](#one-time-deploy-setup) above for why it's a
+different deployment) — it has no Gemini-backed route of its own on
+`orbit-workers-proxy` anymore (see [Removed routes](#removed-routes) above
+for the full history of its now-removed `/match-recommend` route).
 
 Leaving `PROXY_URL` unset in Orbit/Orbit Vocab/Match Find is fine either
-way: that app's AI/sync features are simply unavailable, and everything
-else about it works normally.
+way: that app's AI/sync features are simply unavailable, and everything else
+about it works normally.
 
-## Why one Worker for most routes, but two overall
+## Why One Worker for Most Routes, But Two Overall
 
 Cloudflare's Workers Free plan's daily request cap (100,000/day) is
 per-*account*, not per-Worker, so splitting `/gemini`/`/nl-edit`/`/sync`/
 `/vocab-sync`/`/vocab-ai` into separate Workers would never have bought any
-of the three apps extra headroom - it would only have meant several KV
+of the three apps extra headroom — it would only have meant several KV
 bindings, several sets of secrets, and several things to keep deployed
 instead of one. Those five stay combined for exactly that operational
-convenience. `/sports-proxy` is the one deliberate exception, split out into
-its own `sports-proxy` Worker - not for a quota reason, but because it's the
-one route that must NOT share the other five's `[placement]` region pin (see
-"Match Find live data" above). The routes still fully isolate their own
-trust boundaries and quotas from each other either way (see the table above,
-`isRateLimited` in `worker.js`, and its own copy in `sports-proxy-worker.js`);
-combining most of them was purely an operational convenience, never a reason
-to let one route's traffic or secrets reach another's.
+convenience.
+
+`/sports-proxy` is the one deliberate exception, split out into its own
+`sports-proxy` Worker — not for a quota reason, but because it's the one
+route that must NOT share the other five's `[placement]` region pin (see
+"Match Find live data" in
+[One-Time Deploy Setup](#one-time-deploy-setup) above). The routes still
+fully isolate their own trust boundaries and quotas from each other either
+way (see the route table above, `isRateLimited` in `worker.js`, and its own
+copy in `sports-proxy-worker.js`); combining most of them was purely an
+operational convenience, never a reason to let one route's traffic or
+secrets reach another's.
+
+## Related Projects
+
+- [Orbit](https://github.com/jaypengx-collab/Orbit) — class schedule
+  dashboard; consumes `/gemini`, `/nl-edit`, and `/sync`.
+- [Orbit Vocab](https://github.com/jaypengx-collab/Orbit-Vocab) — vocabulary
+  trainer; consumes `/vocab-sync` and `/vocab-ai`.
+- [Match Find](https://github.com/jaypengx-collab/Match-Find) — sports
+  recommendation site; consumes `/sports-proxy` only.
+
+---
+
+This repo has no user-facing site of its own — it exists purely so three
+independent static sites can each have one line of server-side capability
+without any of them needing to run, or pay for, a server.
