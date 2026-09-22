@@ -58,6 +58,58 @@ on the *consuming* app's side: not configuring a `PROXY_URL` (or its route
 not being reachable) just makes that one feature unavailable, never a
 broken build.
 
+### Round 38 (2026-09-22): locking down the real, billed Gemini routes
+
+Until this round, `/gemini`, `/vocab-ai`, `/nl-edit`, and `/match-recommend`
+(every route that makes a real, now-billed Gemini API call) were callable by
+anyone who simply knew the URL - `ALLOWED_ORIGINS`/`isAllowedOrigin` only
+ever fed the CORS response headers, which is purely advisory (it stops a
+well-behaved *browser* from reading a disallowed page's response, but never
+stopped the request - including the real Gemini call - from being
+processed first). A direct `curl` doesn't send or care about CORS at all.
+Live-proven that same session by this repo's own maintainer's assistant,
+which called `/match-recommend` directly with plain `curl` and got a full,
+real response back. Two changes close this:
+
+1. **The origin check is now an enforced gate, not just a CORS header.**
+   `worker.js`'s top-level router now rejects with `403` before ever
+   reaching a billed handler if `Origin` is missing or not in
+   `ALLOWED_ORIGINS`. This costs a real caller nothing - every one of these
+   routes is a POST with a JSON body, which browsers always attach a real
+   `Origin` header to (preflight included), so Match Find/Orbit/Orbit
+   Vocab's own already-working pages are unaffected. Only a bare
+   script/`curl` call, or another site embedding a `fetch` to this Worker,
+   is newly rejected.
+2. **A hard daily global cap per feature** (`isDailyGlobalCapped`,
+   `*_DAILY_GLOBAL_CAP` next to each route's existing `*_RATE_LIMIT`) -
+   unlike the existing per-IP rate limit, this counts every caller
+   *combined*, so it can't be outrun by spreading requests across IPs. Once
+   a feature hits its daily cap, every further call for that feature
+   returns `429` with no upstream Gemini call at all, for the rest of that
+   day, regardless of who's calling or from where. This is the real
+   financial backstop.
+
+**Honest limit, stated plainly rather than oversold:** an `Origin` header is
+just text a non-browser client can set to anything it wants, and this is a
+public, open-source repo - a targeted attacker who reads this file can
+trivially copy the allowed origin value verbatim. This gate stops
+opportunistic/naive abuse (URL scanners, another page silently spending
+your quota through its visitors' browsers) and, combined with the daily
+cap, hard-bounds the worst case even against someone who does spoof it. It
+is **not** real authentication - there are no user accounts here to
+authenticate, and no client-side secret can ever be genuinely secret in a
+fully public static site's own source. Real lock-down would need a backend
+with real user identity, a materially bigger change than any route here
+currently has another reason to need.
+
+Verified locally with a mocked `env.RATE_LIMIT_KV` and a mocked
+`global.fetch` (never touching the real Gemini API or spending any real
+quota/credit) - confirmed: no-`Origin` and wrong-`Origin` requests are
+rejected before the upstream call happens at all; a correct `Origin`
+passes through unaffected; the daily cap kicks in exactly at its limit and
+never lets a real upstream call happen past it; an unrelated/unknown path
+is unaffected (still a plain `404`, not swept up by the gate).
+
 `/sync` and `/vocab-sync` (Orbit's own vs. Orbit Vocab's) use two different
 pairing shapes - Match Find has no sync route at all; its own settings and
 "Prefer" pick are local-only, in the viewer's own browser, never synced

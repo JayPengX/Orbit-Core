@@ -174,18 +174,23 @@ const RATE_WINDOW_SECONDS = RATE_WINDOW_MS / 1000;
 const KV_FLUSH_INTERVAL_MS = 60 * 1000;
 const pendingCounters = new Map();
 
-async function flushPendingCounter(kv, key, pending) {
+async function flushPendingCounter(kv, key, pending, windowSeconds = RATE_WINDOW_SECONDS) {
   const total = pending.base + pending.delta;
   pending.base = total;
   pending.delta = 0;
   pending.lastFlushAt = Date.now();
   // expirationTtl a little past the window so a key never outlives its own
   // bucket by much, instead of accumulating in the namespace forever.
-  await kv.put(key, String(total), { expirationTtl: RATE_WINDOW_SECONDS + 60 });
+  await kv.put(key, String(total), { expirationTtl: windowSeconds + 60 });
 }
 
-async function isRateLimitedKV(kv, bucketKey, limit) {
-  const windowBucket = Math.floor(Date.now() / RATE_WINDOW_MS);
+// `windowMs` defaults to the per-IP hourly window every existing call site
+// already relies on; isDailyGlobalCapped below passes a full day instead,
+// reusing this exact same batched-counter machinery for a completely
+// different shape of limit (see that function's own comment).
+async function isRateLimitedKV(kv, bucketKey, limit, windowMs = RATE_WINDOW_MS) {
+  const windowSeconds = windowMs / 1000;
+  const windowBucket = Math.floor(Date.now() / windowMs);
   let pending = pendingCounters.get(bucketKey);
   if (pending && pending.windowBucket !== windowBucket) {
     // The previous window just ended - flush its final tally so other
@@ -194,7 +199,7 @@ async function isRateLimitedKV(kv, bucketKey, limit) {
     // very last increments are invisible elsewhere, no worse than what the
     // old per-request behavior already tolerated between accounts).
     if (pending.delta > 0) {
-      await flushPendingCounter(kv, `rl:${bucketKey}:${pending.windowBucket}`, pending).catch(
+      await flushPendingCounter(kv, `rl:${bucketKey}:${pending.windowBucket}`, pending, windowSeconds).catch(
         () => {}
       );
     }
@@ -208,15 +213,15 @@ async function isRateLimitedKV(kv, bucketKey, limit) {
   if (pending.base + pending.delta >= limit) return true;
   pending.delta += 1;
   if (Date.now() - pending.lastFlushAt >= KV_FLUSH_INTERVAL_MS) {
-    await flushPendingCounter(kv, `rl:${bucketKey}:${windowBucket}`, pending);
+    await flushPendingCounter(kv, `rl:${bucketKey}:${windowBucket}`, pending, windowSeconds);
   }
   return false;
 }
 
 const requestLog = new Map();
-function isRateLimitedInMemory(bucketKey, limit) {
+function isRateLimitedInMemory(bucketKey, limit, windowMs = RATE_WINDOW_MS) {
   const now = Date.now();
-  const timestamps = (requestLog.get(bucketKey) || []).filter(time => now - time < RATE_WINDOW_MS);
+  const timestamps = (requestLog.get(bucketKey) || []).filter(time => now - time < windowMs);
   const limited = timestamps.length >= limit;
   timestamps.push(now);
   requestLog.set(bucketKey, timestamps);
@@ -231,20 +236,84 @@ function isRateLimitedInMemory(bucketKey, limit) {
 // to inspect a live Worker's internal state otherwise (no log access from
 // outside the Cloudflare dashboard), and "is the binding even wired up"
 // has turned out to need a real, checkable answer more than once.
-async function isRateLimited(env, ip, feature, limit) {
+//
+// `windowMs` is optional (defaults to the per-IP hourly window) so this
+// same function/bucket machinery can also serve isDailyGlobalCapped's
+// completely different shape of limit below - one shared, already-tested
+// counter implementation instead of a second one.
+async function isRateLimited(env, ip, feature, limit, windowMs = RATE_WINDOW_MS) {
   const bucketKey = `${feature}:${ip}`;
   if (env.RATE_LIMIT_KV) {
     try {
-      return { limited: await isRateLimitedKV(env.RATE_LIMIT_KV, bucketKey, limit), backend: 'kv' };
+      return { limited: await isRateLimitedKV(env.RATE_LIMIT_KV, bucketKey, limit, windowMs), backend: 'kv' };
     } catch (error) {
       return {
-        limited: isRateLimitedInMemory(bucketKey, limit),
+        limited: isRateLimitedInMemory(bucketKey, limit, windowMs),
         backend: `kv-error:${(error && error.message) || error}`
       };
     }
   }
-  return { limited: isRateLimitedInMemory(bucketKey, limit), backend: 'memory-no-binding' };
+  return { limited: isRateLimitedInMemory(bucketKey, limit, windowMs), backend: 'memory-no-binding' };
 }
+
+const DAY_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+// A hard ceiling on TOTAL calls to a real, billed Gemini route across EVERY
+// caller combined - not per-IP like isRateLimited above, which a caller
+// spread across enough source IPs (or behind enough proxies) can still
+// outrun. Round 38 (2026-09-22): added after live-proving that every one of
+// these routes was, until now, fully callable by anyone who simply knew the
+// URL, curl included, with real billing now active on this account's
+// GEMINI_API_KEY (see this file's own top comment on the origin gate below
+// for the other half of this defense). This is the actual financial
+// backstop: whatever else fails to keep an abuser out, this Worker will
+// stop making real upstream Gemini calls once this many have happened
+// today for this feature, full stop, no matter how many different IPs or
+// spoofed headers the calls came from. Reuses isRateLimited's exact same
+// batched-KV-counter machinery via a fixed pseudo-IP ('global') and a full
+// day's window instead of an hour's - see that function's own comment.
+async function isDailyGlobalCapped(env, feature, limit) {
+  const result = await isRateLimited(env, 'global', `daily-cap:${feature}`, limit, DAY_WINDOW_MS);
+  return result.limited;
+}
+
+// ---- Origin gate for every route that calls the real, billed Gemini API ---
+//
+// Until Round 38, `isAllowedOrigin` only ever fed corsHeaders (see that
+// function's own comment) - purely ADVISORY, since CORS is a browser-side
+// promise, not a server-side one: it stops a well-behaved BROWSER from
+// reading a disallowed page's response, but the request itself was always
+// fully processed (including the real, billed Gemini call) before that
+// browser was ever told no. A direct curl/script call doesn't send or care
+// about CORS at all, so every one of these routes was, in practice,
+// callable by anyone who simply knew the URL - exactly the exposure a
+// public GitHub repo whose client source contains that same URL creates
+// (see public/app.js's own MATCH_RECOMMEND_PROXY_URL for Match Find's).
+//
+// This makes the check an actual, enforced GATE instead: reject before
+// EVER reaching a billed handler if Origin is missing or not in
+// ALLOWED_ORIGINS. This costs every real caller nothing - every route this
+// applies to is a POST with a JSON body, which browsers always treat as a
+// CORS "non-simple" request and always attach a real Origin header to,
+// preflight included - so a legitimate call from Match Find/Orbit/Orbit
+// Vocab's own already-working pages is completely unaffected; only a bare
+// script/curl call (no Origin at all) or a request from some OTHER site
+// embedding a fetch to this Worker (a real Origin, just not an allowed
+// one) is newly rejected.
+//
+// HONEST LIMIT: an Origin header is just text a non-browser client can set
+// to whatever it wants - a targeted attacker who reads this file (this is
+// a public, open-source repo) can trivially copy the allowed Origin value
+// verbatim. This gate stops opportunistic/naive abuse (URL scanners,
+// another site's page silently spending your quota through its visitors'
+// browsers) and, combined with isDailyGlobalCapped above, hard-bounds the
+// worst case even against someone who does spoof it. It is NOT real
+// authentication - this app has no user accounts to authenticate, and no
+// client-side secret can ever be genuinely secret in a fully public static
+// site's own source. Real lock-down would need a backend with real user
+// identity, which is a materially bigger change than this route currently
+// has any other reason to need.
+const GEMINI_BILLED_PATHS = new Set(['/gemini', '/match-recommend', '/nl-edit', '/vocab-ai']);
 
 // ==== /gemini - AI schedule-photo import ====================================
 
@@ -588,6 +657,9 @@ const MAX_FILES_PER_REQUEST = 6;
 // bad luck (or a couple of manual retries on top of it) burn through a
 // tighter limit for reasons that have nothing to do with actual abuse.
 const GEMINI_RATE_LIMIT = 30;
+// See isDailyGlobalCapped's own comment - a hard ceiling on TOTAL real
+// Gemini calls across every caller combined, independent of source IP.
+const GEMINI_DAILY_GLOBAL_CAP = 300;
 
 // Reads either the current `files: [{mime_type, data}, ...]` body or the
 // older single-`image` one, so a client still running from a stale service
@@ -638,6 +710,9 @@ async function handleGeminiRequest(request, env, headers, ip) {
   headers['X-RateLimit-Backend'] = rateLimit.backend;
   if (rateLimit.limited) {
     return json({ error: { message: '請求過於頻繁，請稍後再試。' } }, 429, headers);
+  }
+  if (await isDailyGlobalCapped(env, 'gemini', GEMINI_DAILY_GLOBAL_CAP)) {
+    return json({ error: { message: '今日額度已用盡，請明天再試。' } }, 429, headers);
   }
 
   let body;
@@ -739,6 +814,12 @@ async function handleGeminiRequest(request, env, headers, ip) {
 // can't validate, this returns a plain error and Match Find's own client
 // keeps its deterministic pick unchanged.
 const MATCH_RECOMMEND_RATE_LIMIT = 60;
+// This route is meant to fire at most once per viewing day per slot,
+// cached client-side (see recommendation.mjs) - real legitimate daily
+// volume should be a handful of calls at most, so this cap is a generous
+// multiple of that, not a tight budget. See isDailyGlobalCapped's own
+// comment for why this exists at all.
+const MATCH_RECOMMEND_DAILY_GLOBAL_CAP = 30;
 const MATCH_RECOMMEND_MODEL = 'gemini-3.5-flash-lite';
 const MATCH_RECOMMEND_MAX_CANDIDATES = 4;
 const MATCH_RECOMMEND_MIN_CANDIDATES = 2;
@@ -824,6 +905,9 @@ async function handleMatchRecommendRequest(request, env, headers, ip) {
   if (rateLimit.limited) {
     return json({ error: { message: '請求過於頻繁，請稍後再試。' } }, 429, headers);
   }
+  if (await isDailyGlobalCapped(env, 'match-recommend', MATCH_RECOMMEND_DAILY_GLOBAL_CAP)) {
+    return json({ error: { message: '今日額度已用盡，請明天再試。' } }, 429, headers);
+  }
   if (!env.GEMINI_API_KEY) {
     return json({ error: { message: 'Worker 尚未設定 GEMINI_API_KEY。' } }, 500, headers);
   }
@@ -905,6 +989,7 @@ const MAX_NL_EDIT_CONTEXT_LENGTH = 40000;
 // See GEMINI_RATE_LIMIT's own comment - same reasoning, same 3x headroom for
 // the location-block retry's own worst case.
 const NL_EDIT_RATE_LIMIT = 30;
+const NL_EDIT_DAILY_GLOBAL_CAP = 300;
 
 // /nl-edit's own schedule-cell edit shape: one (day, period, key) triple -
 // see NL_EDIT_RESPONSE_SCHEMA's own comment for why the response describes
@@ -1087,6 +1172,9 @@ async function handleNlEditRequest(request, env, headers, ip) {
   if (rateLimit.limited) {
     return json({ error: { message: '請求過於頻繁，請稍後再試。' } }, 429, headers);
   }
+  if (await isDailyGlobalCapped(env, 'nl-edit', NL_EDIT_DAILY_GLOBAL_CAP)) {
+    return json({ error: { message: '今日額度已用盡，請明天再試。' } }, 429, headers);
+  }
 
   let body;
   try {
@@ -1176,6 +1264,7 @@ const VOCAB_AI_MODEL = 'gemini-3.7-flash';
 // "產生記憶法" while reviewing) - generous for real use, still bounded per
 // IP.
 const VOCAB_AI_RATE_LIMIT = 30;
+const VOCAB_AI_DAILY_GLOBAL_CAP = 300;
 // Bounds on every piece of client-submitted text below - see
 // cleanVocabAiText's own comment on why these are enforced here rather than
 // trusted from the client.
@@ -1318,6 +1407,9 @@ async function handleVocabAiRequest(request, env, headers, ip) {
   headers['X-RateLimit-Backend'] = rateLimit.backend;
   if (rateLimit.limited) {
     return json({ error: { message: '請求過於頻繁，請稍後再試。' } }, 429, headers);
+  }
+  if (await isDailyGlobalCapped(env, 'vocab-ai', VOCAB_AI_DAILY_GLOBAL_CAP)) {
+    return json({ error: { message: '今日額度已用盡，請明天再試。' } }, 429, headers);
   }
   if (!env.GEMINI_API_KEY) {
     return json({ error: { message: 'Worker 尚未設定 GEMINI_API_KEY。' } }, 500, headers);
@@ -2043,6 +2135,12 @@ export default {
 
     const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
     const path = new URL(request.url).pathname.replace(/\/+$/, '');
+
+    // See GEMINI_BILLED_PATHS' own comment - a real, enforced reject, not
+    // just the advisory CORS headers already computed above.
+    if (GEMINI_BILLED_PATHS.has(path) && !isAllowedOrigin(origin)) {
+      return json({ error: { message: 'Forbidden origin' } }, 403, headers);
+    }
 
     if (path === '/gemini') return handleGeminiRequest(request, env, headers, ip);
     if (path === '/match-recommend') return handleMatchRecommendRequest(request, env, headers, ip);
