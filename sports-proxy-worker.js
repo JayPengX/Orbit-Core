@@ -140,6 +140,9 @@ async function isRateLimited(env, ip, limit) {
 const SPORTS_PROXY_FETCH_USER_AGENT = 'Match-Find-Bot/1.0 (+https://github.com/jaypengx-collab/Match-Find)';
 const SPORTS_PROXY_ALLOWED_HOSTS = [
   'site.api.espn.com',
+  // Per-fixture odds (Match Find's pre-game line for games already in
+  // progress - the scoreboard drops it once a game starts).
+  'sports.core.api.espn.com',
   'statsapi.mlb.com',
   'api.jolpi.ca',
   'gamma-api.polymarket.com'
