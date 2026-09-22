@@ -125,6 +125,100 @@ function json(data, status, headers) {
   });
 }
 
+// ---- Bilingual error responses ----------------------------------------
+//
+// Every error this Worker returns used to be a plain, fixed-language
+// `message` string - some written in English, some in Traditional Chinese,
+// picked ad hoc by whoever wrote that call site rather than by any
+// consistent rule. That made the response impossible for a caller to
+// localize (an English-reading Match Find-style consumer would see raw
+// Chinese with no way to tell what it meant) and impossible to branch on
+// reliably (matching against message text breaks the moment the wording is
+// tweaked).
+//
+// The fix: every error carries a stable, never-translated `code` (for a
+// caller that wants to render its own UI string) alongside a `message` that
+// is picked at response time from ERROR_MESSAGES based on the request's
+// `Accept-Language` header (for a caller that just wants to display
+// something reasonable as-is, same as before). Adding a third language
+// later is "add one more field to each entry below," not a rewrite of any
+// call site.
+//
+// `en` is treated as authoritative for the codes that were already English
+// before this change (POST_ONLY, INVALID_JSON, etc.) - the zh-TW text next
+// to them is a new translation, not a change to English callers' behavior.
+// The codes that were already Chinese (RATE_LIMITED, DAILY_QUOTA_EXCEEDED,
+// MISSING_API_KEY, INVALID_MNEMONIC) keep their existing zh-TW wording
+// byte-for-byte, with English added alongside.
+const ERROR_MESSAGES = {
+  POST_ONLY: { en: 'POST only', 'zh-TW': '僅支援 POST 方法。' },
+  RATE_LIMITED: { en: 'Too many requests. Please try again later.', 'zh-TW': '請求過於頻繁，請稍後再試。' },
+  DAILY_QUOTA_EXCEEDED: {
+    en: "Today's quota has been used up. Please try again tomorrow.",
+    'zh-TW': '今日額度已用盡，請明天再試。'
+  },
+  INVALID_JSON: { en: 'Invalid JSON body', 'zh-TW': '無效的 JSON 請求內容。' },
+  UNSUPPORTED_MODEL: { en: 'Unsupported model', 'zh-TW': '不支援的模型。' },
+  MISSING_API_KEY: {
+    en: 'The worker has not configured GEMINI_API_KEY.',
+    'zh-TW': 'Worker 尚未設定 GEMINI_API_KEY。'
+  },
+  MISSING_TEXT: { en: 'Missing or invalid text', 'zh-TW': '缺少或無效的文字內容。' },
+  MISSING_CONTEXT: { en: 'Missing or invalid context', 'zh-TW': '缺少或無效的情境資料。' },
+  CONTEXT_TOO_LARGE: { en: 'Context too large', 'zh-TW': '情境資料過大。' },
+  MISSING_WORD: { en: 'Missing or invalid word', 'zh-TW': '缺少或無效的單字。' },
+  INVALID_MNEMONIC: {
+    en: 'The AI did not return a valid mnemonic.',
+    'zh-TW': 'AI 沒有回傳有效的記憶法。'
+  },
+  MISSING_KIND: { en: 'Missing or invalid kind', 'zh-TW': '缺少或無效的種類參數。' },
+  SYNC_METHOD_NOT_ALLOWED: {
+    en: 'GET, POST, PATCH or DELETE only',
+    'zh-TW': '僅支援 GET、POST、PATCH 或 DELETE 方法。'
+  },
+  MISSING_FIREBASE_CONFIG: {
+    en: 'The worker has not configured its Firebase service account.',
+    'zh-TW': 'Worker 尚未設定 Firebase 服務帳戶。'
+  },
+  INVALID_PASSCODE: { en: 'Invalid passcode', 'zh-TW': '無效的密碼。' },
+  INVALID_PAIRING_CODE: { en: 'Invalid pairing code', 'zh-TW': '無效的配對代碼。' },
+  MISSING_PAYLOAD: { en: 'Missing or invalid payload', 'zh-TW': '缺少或無效的內容資料。' },
+  SYNC_PASSCODE_NOT_FOUND: { en: 'This sync passcode was not found.', 'zh-TW': '找不到這組同步密碼。' },
+  PAIRING_CODE_NOT_FOUND: { en: 'This pairing code was not found.', 'zh-TW': '找不到這組配對代碼。' },
+  MANAGER_PASSCODE_REQUIRED_WRITE: {
+    en: 'The correct passcode is required to write.',
+    'zh-TW': '需要正確的密碼才能寫入。'
+  },
+  MANAGER_PASSCODE_REQUIRED_DELETE: {
+    en: 'The correct passcode is required to delete the whole sync.',
+    'zh-TW': '需要正確的密碼才能刪除整個同步。'
+  },
+  FORBIDDEN_ORIGIN: { en: 'Forbidden origin', 'zh-TW': '不允許的來源。' },
+  NOT_FOUND: { en: 'Not found', 'zh-TW': '找不到此路徑。' }
+};
+
+// Defaults to zh-TW whenever the header is absent or doesn't clearly prefer
+// English, to preserve current behavior for existing callers (orbit/
+// orbit-vocab) that don't send this header today - only a request that
+// actually says English first (`en`, `en-US`, `..., en;q=...`, etc.) gets
+// English back.
+function pickLocale(request) {
+  const header = (request.headers.get('Accept-Language') || '').trim();
+  if (/^en\b/i.test(header) || /,\s*en\b/i.test(header)) return 'en';
+  return 'zh-TW';
+}
+
+// Every static, fixed-wording error goes through this - looks up `code` in
+// ERROR_MESSAGES and picks the response language from the request's
+// Accept-Language header. The response shape (`{ error: { code, message } }`)
+// keeps the pre-existing `message` field so callers that just display
+// `error.message` raw keep working unchanged.
+function errorJson(code, status, headers, request) {
+  const msgs = ERROR_MESSAGES[code];
+  const message = msgs[pickLocale(request)] ?? msgs['zh-TW'];
+  return json({ error: { code, message } }, status, headers);
+}
+
 // ---- Shared rate limiting (Workers KV, one counter per feature+IP+hour) ----
 //
 // Real, cross-request rate limiting via Workers KV (env.RATE_LIMIT_KV - see
@@ -693,7 +787,7 @@ async function handleGeminiRequest(request, env, headers, ip) {
   // warming the path for, or it would be a worse denial-of-service target
   // than the real endpoint.
   if (request.method === 'GET') return json({ ok: true }, 200, headers);
-  if (request.method !== 'POST') return json({ error: { message: 'POST only' } }, 405, headers);
+  if (request.method !== 'POST') return errorJson('POST_ONLY', 405, headers, request);
 
   const rateLimit = await isRateLimited(env, ip, 'gemini', GEMINI_RATE_LIMIT);
   // Diagnostic only - not sensitive (no IPs, no counts, just which code
@@ -701,26 +795,27 @@ async function handleGeminiRequest(request, env, headers, ip) {
   // request instead of needing dashboard log access.
   headers['X-RateLimit-Backend'] = rateLimit.backend;
   if (rateLimit.limited) {
-    return json({ error: { message: '請求過於頻繁，請稍後再試。' } }, 429, headers);
+    return errorJson('RATE_LIMITED', 429, headers, request);
   }
   if (await isDailyGlobalCapped(env, 'gemini', GEMINI_DAILY_GLOBAL_CAP)) {
-    return json({ error: { message: '今日額度已用盡，請明天再試。' } }, 429, headers);
+    return errorJson('DAILY_QUOTA_EXCEEDED', 429, headers, request);
   }
 
   let body;
   try {
     body = await request.json();
   } catch {
-    return json({ error: { message: 'Invalid JSON body' } }, 400, headers);
+    return errorJson('INVALID_JSON', 400, headers, request);
   }
   const { model } = body || {};
   if (!GEMINI_ALLOWED_MODELS.includes(model)) {
-    return json({ error: { message: 'Unsupported model' } }, 400, headers);
+    return errorJson('UNSUPPORTED_MODEL', 400, headers, request);
   }
   const parsedFiles = readGeminiFiles(body);
-  if (parsedFiles.error) return json({ error: { message: parsedFiles.error } }, 400, headers);
+  if (parsedFiles.error)
+    return json({ error: { code: 'FILE_PARSE_ERROR', message: parsedFiles.error } }, 400, headers);
   if (!env.GEMINI_API_KEY) {
-    return json({ error: { message: 'Worker 尚未設定 GEMINI_API_KEY。' } }, 500, headers);
+    return errorJson('MISSING_API_KEY', 500, headers, request);
   }
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${env.GEMINI_API_KEY}`;
@@ -760,7 +855,7 @@ async function handleGeminiRequest(request, env, headers, ip) {
       headers: { ...headers, 'Content-Type': 'application/json' }
     });
   } catch (error) {
-    return json({ error: { message: error.message || 'Upstream request failed' } }, 502, headers);
+    return json({ error: { code: 'UPSTREAM_FAILED', message: error.message || 'Upstream request failed' } }, 502, headers);
   }
 }
 
@@ -971,38 +1066,38 @@ function readNlEditContext(context) {
 }
 
 async function handleNlEditRequest(request, env, headers, ip) {
-  if (request.method !== 'POST') return json({ error: { message: 'POST only' } }, 405, headers);
+  if (request.method !== 'POST') return errorJson('POST_ONLY', 405, headers, request);
 
   const rateLimit = await isRateLimited(env, ip, 'nl-edit', NL_EDIT_RATE_LIMIT);
   headers['X-RateLimit-Backend'] = rateLimit.backend;
   if (rateLimit.limited) {
-    return json({ error: { message: '請求過於頻繁，請稍後再試。' } }, 429, headers);
+    return errorJson('RATE_LIMITED', 429, headers, request);
   }
   if (await isDailyGlobalCapped(env, 'nl-edit', NL_EDIT_DAILY_GLOBAL_CAP)) {
-    return json({ error: { message: '今日額度已用盡，請明天再試。' } }, 429, headers);
+    return errorJson('DAILY_QUOTA_EXCEEDED', 429, headers, request);
   }
 
   let body;
   try {
     body = await request.json();
   } catch {
-    return json({ error: { message: 'Invalid JSON body' } }, 400, headers);
+    return errorJson('INVALID_JSON', 400, headers, request);
   }
   const { model } = body || {};
   if (!GEMINI_ALLOWED_MODELS.includes(model)) {
-    return json({ error: { message: 'Unsupported model' } }, 400, headers);
+    return errorJson('UNSUPPORTED_MODEL', 400, headers, request);
   }
   const text = typeof body?.text === 'string' ? body.text.trim() : '';
   if (!text || text.length > MAX_NL_EDIT_TEXT_LENGTH) {
-    return json({ error: { message: 'Missing or invalid text' } }, 400, headers);
+    return errorJson('MISSING_TEXT', 400, headers, request);
   }
   const context = readNlEditContext(body?.context);
-  if (!context) return json({ error: { message: 'Missing or invalid context' } }, 400, headers);
+  if (!context) return errorJson('MISSING_CONTEXT', 400, headers, request);
   if (JSON.stringify(context).length > MAX_NL_EDIT_CONTEXT_LENGTH) {
-    return json({ error: { message: 'Context too large' } }, 400, headers);
+    return errorJson('CONTEXT_TOO_LARGE', 400, headers, request);
   }
   if (!env.GEMINI_API_KEY) {
-    return json({ error: { message: 'Worker 尚未設定 GEMINI_API_KEY。' } }, 500, headers);
+    return errorJson('MISSING_API_KEY', 500, headers, request);
   }
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${env.GEMINI_API_KEY}`;
@@ -1023,7 +1118,7 @@ async function handleNlEditRequest(request, env, headers, ip) {
       headers: { ...headers, 'Content-Type': 'application/json' }
     });
   } catch (error) {
-    return json({ error: { message: error.message || 'Upstream request failed' } }, 502, headers);
+    return json({ error: { code: 'UPSTREAM_FAILED', message: error.message || 'Upstream request failed' } }, 502, headers);
   }
 }
 
@@ -1255,7 +1350,7 @@ async function callVocabAiGemini(prompt, schema, env) {
 }
 
 async function handleVocabAiRequest(request, env, headers, ip) {
-  if (request.method !== 'POST') return json({ error: { message: 'POST only' } }, 405, headers);
+  if (request.method !== 'POST') return errorJson('POST_ONLY', 405, headers, request);
 
   // Kept unconditional (unlike isDailyGlobalCapped/GEMINI_API_KEY below,
   // both deferred past the cache check) - this bounds plain per-IP request
@@ -1266,20 +1361,20 @@ async function handleVocabAiRequest(request, env, headers, ip) {
   const rateLimit = await isRateLimited(env, ip, 'vocab-ai', VOCAB_AI_RATE_LIMIT);
   headers['X-RateLimit-Backend'] = rateLimit.backend;
   if (rateLimit.limited) {
-    return json({ error: { message: '請求過於頻繁，請稍後再試。' } }, 429, headers);
+    return errorJson('RATE_LIMITED', 429, headers, request);
   }
 
   let body;
   try {
     body = await request.json();
   } catch {
-    return json({ error: { message: 'Invalid JSON body' } }, 400, headers);
+    return errorJson('INVALID_JSON', 400, headers, request);
   }
 
   try {
     if (body?.kind === 'mnemonic') {
       const word = cleanVocabAiText(body.word, VOCAB_AI_MAX_WORD_LEN);
-      if (!word) return json({ error: { message: 'Missing or invalid word' } }, 400, headers);
+      if (!word) return errorJson('MISSING_WORD', 400, headers, request);
       const pos = typeof body.pos === 'string' ? body.pos.trim().slice(0, VOCAB_AI_MAX_POS_LEN) : '';
       const meaning = typeof body.meaning === 'string' ? body.meaning.trim().slice(0, VOCAB_AI_MAX_MEANING_LEN) : '';
       const wrongAnswers = (Array.isArray(body.wrongAnswers) ? body.wrongAnswers : [])
@@ -1308,22 +1403,22 @@ async function handleVocabAiRequest(request, env, headers, ip) {
       headers['X-Vocab-Ai-Cache'] = 'miss';
 
       if (await isDailyGlobalCapped(env, 'vocab-ai', VOCAB_AI_DAILY_GLOBAL_CAP)) {
-        return json({ error: { message: '今日額度已用盡，請明天再試。' } }, 429, headers);
+        return errorJson('DAILY_QUOTA_EXCEEDED', 429, headers, request);
       }
       if (!env.GEMINI_API_KEY) {
-        return json({ error: { message: 'Worker 尚未設定 GEMINI_API_KEY。' } }, 500, headers);
+        return errorJson('MISSING_API_KEY', 500, headers, request);
       }
 
       const result = await callVocabAiGemini(buildVocabMnemonicPrompt(word, pos, meaning, wrongAnswers), VOCAB_MNEMONIC_RESPONSE_SCHEMA, env);
       const mnemonic = typeof result.mnemonic === 'string' ? result.mnemonic.trim() : '';
-      if (!mnemonic) return json({ error: { message: 'AI 沒有回傳有效的記憶法。' } }, 502, headers);
+      if (!mnemonic) return errorJson('INVALID_MNEMONIC', 502, headers, request);
       if (cacheKey) await env.RATE_LIMIT_KV.put(cacheKey, mnemonic).catch(() => {});
       return json({ mnemonic }, 200, headers);
     }
 
-    return json({ error: { message: 'Missing or invalid kind' } }, 400, headers);
+    return errorJson('MISSING_KIND', 400, headers, request);
   } catch (error) {
-    return json({ error: { message: error.message || 'Upstream request failed' } }, 502, headers);
+    return json({ error: { code: 'UPSTREAM_FAILED', message: error.message || 'Upstream request failed' } }, 502, headers);
   }
 }
 
@@ -1703,18 +1798,18 @@ async function handleSyncCreate(request, env, headers, ip, appConfig) {
   );
   headers['X-RateLimit-Backend'] = rateLimit.backend;
   if (rateLimit.limited) {
-    return json({ error: { message: '請求過於頻繁，請稍後再試。' } }, 429, headers);
+    return errorJson('RATE_LIMITED', 429, headers, request);
   }
 
   let body;
   try {
     body = await request.json();
   } catch {
-    return json({ error: { message: 'Invalid JSON body' } }, 400, headers);
+    return errorJson('INVALID_JSON', 400, headers, request);
   }
   const payload = body?.payload;
   if (typeof payload !== 'string' || !payload || payload.length > appConfig.maxPayloadLength) {
-    return json({ error: { message: 'Missing or invalid payload' } }, 400, headers);
+    return errorJson('MISSING_PAYLOAD', 400, headers, request);
   }
 
   try {
@@ -1743,7 +1838,7 @@ async function handleSyncCreate(request, env, headers, ip, appConfig) {
     );
     return json({ code, managerPasscode, updateTime: created.updateTime }, 200, headers);
   } catch (error) {
-    return json({ error: { message: error.message || 'Upstream request failed' } }, 502, headers);
+    return json({ error: { code: 'UPSTREAM_FAILED', message: error.message || 'Upstream request failed' } }, 502, headers);
   }
 }
 
@@ -1754,11 +1849,11 @@ async function handleSyncRequest(request, env, headers, ip, appConfig) {
     request.method !== 'PATCH' &&
     request.method !== 'DELETE'
   ) {
-    return json({ error: { message: 'GET, POST, PATCH or DELETE only' } }, 405, headers);
+    return errorJson('SYNC_METHOD_NOT_ALLOWED', 405, headers, request);
   }
 
   if (!env.FIREBASE_PROJECT_ID || !env.FIREBASE_CLIENT_EMAIL || !env.FIREBASE_PRIVATE_KEY) {
-    return json({ error: { message: 'Worker 尚未設定 Firebase 服務帳戶。' } }, 500, headers);
+    return errorJson('MISSING_FIREBASE_CONFIG', 500, headers, request);
   }
 
   // Creating a new pairing needs no identifier at all yet - it mints one -
@@ -1780,13 +1875,13 @@ async function handleSyncRequest(request, env, headers, ip, appConfig) {
   let docId;
   if (appConfig.singleCredential) {
     if (!appConfig.credentialPattern.test(suppliedPasscode)) {
-      return json({ error: { message: 'Invalid passcode' } }, 400, headers);
+      return errorJson('INVALID_PASSCODE', 400, headers, request);
     }
     docId = await docIdForPasscode(suppliedPasscode);
   } else {
     const code = (url.searchParams.get('code') || '').trim().toUpperCase();
     if (!SYNC_CODE_PATTERN.test(code)) {
-      return json({ error: { message: 'Invalid pairing code' } }, 400, headers);
+      return errorJson('INVALID_PAIRING_CODE', 400, headers, request);
     }
     docId = code;
   }
@@ -1805,7 +1900,7 @@ async function handleSyncRequest(request, env, headers, ip, appConfig) {
       );
       headers['X-RateLimit-Backend'] = rateLimit.backend;
       if (rateLimit.limited) {
-        return json({ error: { message: '請求過於頻繁，請稍後再試。' } }, 429, headers);
+        return errorJson('RATE_LIMITED', 429, headers, request);
       }
       try {
         const doc = await firestoreGet(env, appConfig.collection, docId);
@@ -1821,7 +1916,7 @@ async function handleSyncRequest(request, env, headers, ip, appConfig) {
         );
       } catch (error) {
         return json(
-          { error: { message: error.message || 'Upstream request failed' } },
+          { error: { code: 'UPSTREAM_FAILED', message: error.message || 'Upstream request failed' } },
           502,
           headers
         );
@@ -1843,7 +1938,7 @@ async function handleSyncRequest(request, env, headers, ip, appConfig) {
     const rateLimit = await isRateLimited(env, ip, `${appConfig.featurePrefix}:${kind}`, limit);
     headers['X-RateLimit-Backend'] = rateLimit.backend;
     if (rateLimit.limited) {
-      return json({ error: { message: '請求過於頻繁，請稍後再試。' } }, 429, headers);
+      return errorJson('RATE_LIMITED', 429, headers, request);
     }
     try {
       const doc = await firestoreGet(env, appConfig.collection, docId);
@@ -1855,7 +1950,7 @@ async function handleSyncRequest(request, env, headers, ip, appConfig) {
       }
       return json(result, 200, headers);
     } catch (error) {
-      return json({ error: { message: error.message || 'Upstream request failed' } }, 502, headers);
+      return json({ error: { code: 'UPSTREAM_FAILED', message: error.message || 'Upstream request failed' } }, 502, headers);
     }
   }
 
@@ -1868,17 +1963,17 @@ async function handleSyncRequest(request, env, headers, ip, appConfig) {
     );
     headers['X-RateLimit-Backend'] = rateLimit.backend;
     if (rateLimit.limited) {
-      return json({ error: { message: '請求過於頻繁，請稍後再試。' } }, 429, headers);
+      return errorJson('RATE_LIMITED', 429, headers, request);
     }
     let body;
     try {
       body = await request.json();
     } catch {
-      return json({ error: { message: 'Invalid JSON body' } }, 400, headers);
+      return errorJson('INVALID_JSON', 400, headers, request);
     }
     const payload = body?.payload;
     if (typeof payload !== 'string' || !payload || payload.length > appConfig.maxPayloadLength) {
-      return json({ error: { message: 'Missing or invalid payload' } }, 400, headers);
+      return errorJson('MISSING_PAYLOAD', 400, headers, request);
     }
     if (appConfig.singleCredential) {
       // Nothing further to check here: docId (derived above from the
@@ -1889,12 +1984,12 @@ async function handleSyncRequest(request, env, headers, ip, appConfig) {
       // it's simply wrong.
       try {
         const doc = await firestoreGet(env, appConfig.collection, docId);
-        if (!doc.exists) return json({ error: { message: '找不到這組同步密碼。' } }, 404, headers);
+        if (!doc.exists) return errorJson('SYNC_PASSCODE_NOT_FOUND', 404, headers, request);
         const result = await firestorePatch(env, appConfig.collection, docId, payload);
         return json(result, 200, headers);
       } catch (error) {
         return json(
-          { error: { message: error.message || 'Upstream request failed' } },
+          { error: { code: 'UPSTREAM_FAILED', message: error.message || 'Upstream request failed' } },
           502,
           headers
         );
@@ -1906,15 +2001,15 @@ async function handleSyncRequest(request, env, headers, ip, appConfig) {
     const managerPasscode = typeof body?.passcode === 'string' ? body.passcode.trim() : '';
     try {
       const doc = await firestoreGet(env, appConfig.collection, docId);
-      if (!doc.exists) return json({ error: { message: '找不到這組配對代碼。' } }, 404, headers);
+      if (!doc.exists) return errorJson('PAIRING_CODE_NOT_FOUND', 404, headers, request);
       const passcodeHash = managerPasscode ? await sha256Hex(managerPasscode) : '';
       if (!managerPasscode || passcodeHash !== doc.managerPasscodeHash) {
-        return json({ error: { message: '需要正確的密碼才能寫入。' } }, 403, headers);
+        return errorJson('MANAGER_PASSCODE_REQUIRED_WRITE', 403, headers, request);
       }
       const result = await firestorePatch(env, appConfig.collection, docId, payload);
       return json(result, 200, headers);
     } catch (error) {
-      return json({ error: { message: error.message || 'Upstream request failed' } }, 502, headers);
+      return json({ error: { code: 'UPSTREAM_FAILED', message: error.message || 'Upstream request failed' } }, 502, headers);
     }
   }
 
@@ -1930,7 +2025,7 @@ async function handleSyncRequest(request, env, headers, ip, appConfig) {
   );
   headers['X-RateLimit-Backend'] = rateLimit.backend;
   if (rateLimit.limited) {
-    return json({ error: { message: '請求過於頻繁，請稍後再試。' } }, 429, headers);
+    return errorJson('RATE_LIMITED', 429, headers, request);
   }
   if (appConfig.singleCredential) {
     try {
@@ -1941,7 +2036,7 @@ async function handleSyncRequest(request, env, headers, ip, appConfig) {
       await firestoreDelete(env, appConfig.collection, docId);
       return json({ deleted: true }, 200, headers);
     } catch (error) {
-      return json({ error: { message: error.message || 'Upstream request failed' } }, 502, headers);
+      return json({ error: { code: 'UPSTREAM_FAILED', message: error.message || 'Upstream request failed' } }, 502, headers);
     }
   }
   try {
@@ -1952,12 +2047,12 @@ async function handleSyncRequest(request, env, headers, ip, appConfig) {
     if (!doc.exists) return json({ deleted: true }, 200, headers);
     const passcodeHash = suppliedPasscode ? await sha256Hex(suppliedPasscode) : '';
     if (!suppliedPasscode || passcodeHash !== doc.managerPasscodeHash) {
-      return json({ error: { message: '需要正確的密碼才能刪除整個同步。' } }, 403, headers);
+      return errorJson('MANAGER_PASSCODE_REQUIRED_DELETE', 403, headers, request);
     }
     await firestoreDelete(env, appConfig.collection, docId);
     return json({ deleted: true }, 200, headers);
   } catch (error) {
-    return json({ error: { message: error.message || 'Upstream request failed' } }, 502, headers);
+    return json({ error: { code: 'UPSTREAM_FAILED', message: error.message || 'Upstream request failed' } }, 502, headers);
   }
 }
 
@@ -2021,7 +2116,7 @@ export default {
     // See GEMINI_BILLED_PATHS' own comment - a real, enforced reject, not
     // just the advisory CORS headers already computed above.
     if (GEMINI_BILLED_PATHS.has(path) && !isAllowedOrigin(origin)) {
-      return json({ error: { message: 'Forbidden origin' } }, 403, headers);
+      return errorJson('FORBIDDEN_ORIGIN', 403, headers, request);
     }
 
     if (path === '/gemini') return handleGeminiRequest(request, env, headers, ip);
@@ -2029,6 +2124,6 @@ export default {
     if (path === '/sync') return handleSyncRequest(request, env, headers, ip, ORBIT_SYNC_APP);
     if (path === '/vocab-sync') return handleSyncRequest(request, env, headers, ip, VOCAB_SYNC_APP);
     if (path === '/vocab-ai') return handleVocabAiRequest(request, env, headers, ip);
-    return json({ error: { message: 'Not found' } }, 404, headers);
+    return errorJson('NOT_FOUND', 404, headers, request);
   }
 };
