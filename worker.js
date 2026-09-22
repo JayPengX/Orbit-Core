@@ -799,16 +799,24 @@ async function handleGeminiRequest(request, env, headers, ip) {
 // gemini-3.7-flash call made in the same test only hit an ordinary,
 // unrelated transient 503 ("high demand", the kind any model occasionally
 // returns). That's the exact 429 RESOURCE_EXHAUSTED signature Round 9
-// documented - this account's Google Search grounding quota for this model
-// is its own separate, apparently very low bucket, and Match Find's own
-// call frequency doesn't change how exhausted that bucket already is.
-// Reverted to the pre-Round-35 shape: no grounding, gemini-3.5-flash-lite,
-// response_schema-enforced JSON (schema-constrained decoding and tool use
-// don't reliably compose, so dropping the tool call lets the schema come
-// back too). If a future account/billing change lifts this quota, Round 35's
-// own reasoning about doing so is still sound and grounding can be
-// reintroduced the same way - just verify with a live call first, the way
-// this round did, rather than reasoning about volume alone.
+// documented - a FREE-TIER-specific grounding quota, separate from and far
+// lower than the model's own general quota. Reverted to no grounding that
+// round, live-verified a plain call succeeding but missing exactly the kind
+// of current-news context (a team already clinched and coasting, a specific
+// ace starting) grounding exists to catch (see recommendation-engine-
+// audit.md's own Round 37 for the concrete case).
+//
+// Round 38 (2026-09-22): the account's Google Cloud project behind
+// GEMINI_API_KEY moved onto a paid billing plan specifically to lift this
+// quota, per direct instruction. Grounding is back on, model back to
+// gemini-3.7-flash. NOT re-verified with a live call this round - direct
+// instruction was to stop spending real, now-billed credit on manual
+// verification calls, so this is UNTESTED since the revert; the first real
+// exercise will be organic app usage. If it 429s again even on the paid
+// tier, that means billing didn't actually change the grounding-specific
+// quota (some APIs gate tool-use/grounding on a separate allowlist from
+// general paid-tier access) - revert the same way Round 37 did rather than
+// assuming billing alone guarantees this works.
 //
 // If Gemini is unavailable, mis-configured, or returns something this
 // can't validate, this returns a plain error and Match Find's own client
@@ -818,22 +826,25 @@ const MATCH_RECOMMEND_RATE_LIMIT = 60;
 // cached client-side (see recommendation.mjs) - real legitimate daily
 // volume should be a handful of calls at most, so this cap is a generous
 // multiple of that, not a tight budget. See isDailyGlobalCapped's own
-// comment for why this exists at all.
+// comment for why this exists at all - this is also now the hard ceiling
+// on real BILLED grounded calls per day, regardless of who's calling.
 const MATCH_RECOMMEND_DAILY_GLOBAL_CAP = 30;
-const MATCH_RECOMMEND_MODEL = 'gemini-3.5-flash-lite';
+// gemini-3.7-flash, not the -lite model other routes use - grounding-
+// integrated reasoning benefits from the more capable model, and call
+// volume here (at most once a day, cached, now also hard-capped globally)
+// makes the cost/latency difference irrelevant.
+const MATCH_RECOMMEND_MODEL = 'gemini-3.7-flash';
+const MATCH_RECOMMEND_MAX_OUTPUT_TOKENS = 4096;
+// Pulls the LAST {...} block out of an otherwise free-form response - a
+// grounded request can't reliably combine with response_schema-enforced
+// JSON decoding (tool use and schema-constrained decoding don't compose
+// the same way a schema-only request does), so the prompt asks for the
+// JSON object as the last thing in the response instead.
+const MATCH_RECOMMEND_JSON_PATTERN = /\{[\s\S]*\}/;
 const MATCH_RECOMMEND_MAX_CANDIDATES = 4;
 const MATCH_RECOMMEND_MIN_CANDIDATES = 2;
 const MATCH_RECOMMEND_MAX_STRING_LEN = 200;
 const MATCH_RECOMMEND_MAX_FACTS = 8;
-
-const MATCH_RECOMMEND_RESPONSE_SCHEMA = {
-  type: 'object',
-  properties: {
-    pickId: { type: 'string' },
-    reason: { type: 'string' }
-  },
-  required: ['pickId', 'reason']
-};
 
 function cleanMatchRecommendText(value, maxLen) {
   return typeof value === 'string' ? value.trim().slice(0, maxLen) : '';
@@ -891,9 +902,9 @@ function buildMatchRecommendPrompt(day, candidates) {
 
 ${listing}
 
-Use your own real-world knowledge of these specific teams and any players involved (current storylines, historic significance of the matchup, star power, rivalry intensity) to judge which game is genuinely the better recommendation right now - not just which one has the highest listed score. If you have no confident reason to prefer a different one, pick the highest-scored candidate.
+You have Google Search available - use it to check for anything CURRENT that could matter (an injury, a milestone chase, a suddenly-hyped storyline, a probable-pitcher/lineup announcement, whether a team has already clinched and is resting players/looking ahead to its real postseason opener) on top of your own general knowledge of these specific teams and players (historic significance of the matchup, star power, rivalry intensity). Judge which game is genuinely the better recommendation right now - not just which one has the highest listed score. If you have no confident reason to prefer a different one, pick the highest-scored candidate.
 
-Respond with a JSON object: {"pickId": the exact id string of your chosen candidate (copied exactly from above, never invented), "reason": one short sentence (in Traditional Chinese) explaining the pick in plain, viewer-facing language}.`;
+After your reasoning, respond with a JSON object as the VERY LAST thing in your response, on its own, with no markdown fences and nothing after it: {"pickId": the exact id string of your chosen candidate (copied exactly from above, never invented), "reason": one short sentence (in Traditional Chinese) explaining the pick in plain, viewer-facing language}.`;
 }
 
 async function handleMatchRecommendRequest(request, env, headers, ip) {
@@ -928,18 +939,36 @@ async function handleMatchRecommendRequest(request, env, headers, ip) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: buildMatchRecommendPrompt(parsed.day, parsed.candidates) }] }],
-        generationConfig: buildGenerationConfig(MATCH_RECOMMEND_MODEL, MATCH_RECOMMEND_RESPONSE_SCHEMA)
+        // Google Search grounding - deliberately NOT buildGenerationConfig's
+        // own response_schema-enforced JSON (tool use and a schema-
+        // constrained decode don't reliably compose) - plain
+        // generationConfig instead, with the JSON pulled back out of
+        // free-form text below.
+        tools: [{ google_search: {} }],
+        generationConfig: {
+          temperature: 0,
+          maxOutputTokens: MATCH_RECOMMEND_MAX_OUTPUT_TOKENS,
+          thinkingConfig: /^gemini-2\./.test(MATCH_RECOMMEND_MODEL) ? { thinkingBudget: 0 } : { thinkingLevel: 'low' }
+        }
       })
     });
     if (!upstream.ok) {
       return json({ error: { message: `Gemini API error ${upstream.status}` } }, 502, headers);
     }
     const data = await upstream.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (typeof text !== 'string') return json({ error: { message: 'Gemini response missing text' } }, 502, headers);
+    // A grounded response can carry several parts (the model's own
+    // reasoning/search-result narration alongside the final JSON line) -
+    // join every text part rather than assuming the whole answer sits in
+    // parts[0] the way an unconstrained, non-tool response always did.
+    const text = (data?.candidates?.[0]?.content?.parts || [])
+      .map(part => (typeof part?.text === 'string' ? part.text : ''))
+      .join('');
+    if (!text) return json({ error: { message: 'Gemini response missing text' } }, 502, headers);
+    const jsonMatch = text.match(MATCH_RECOMMEND_JSON_PATTERN);
+    if (!jsonMatch) return json({ error: { message: 'Gemini response had no JSON object' } }, 502, headers);
     let result;
     try {
-      result = JSON.parse(text);
+      result = JSON.parse(jsonMatch[0]);
     } catch {
       return json({ error: { message: 'Gemini returned invalid JSON' } }, 502, headers);
     }
