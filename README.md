@@ -28,23 +28,26 @@ thing about it: the URL.
 | `/sync` | GET/PATCH/DELETE | Orbit | Cross-device schedule sync (code + manager passcode; reads are open, writes/deletes need the passcode). |
 | `/vocab-sync` | GET/PATCH/DELETE | Orbit Vocab | Cross-device learning-progress sync (single passcode, no separate read-only code). |
 | `/vocab-ai` | POST | Orbit Vocab | Live, per-learner personalized mnemonics. |
-| `/match-recommend` | POST | Match Find | Bounded, at-most-once-per-day Gemini tie-break between a small set of close-scoring candidates for one day's headline slot. |
 | `/sports-proxy` (separate Worker - see below) | GET | Match Find | Host-allowlisted CORS passthrough to ESPN/the MLB Stats API/Jolpica/Polymarket's Gamma API, so the viewer's own browser can fetch and score its whole live match list directly. |
 
 `/sports-proxy` is deployed as its own Worker (`sports-proxy-worker.js` +
 `wrangler.sports-proxy.toml`), not part of `worker.js`/`wrangler.toml` above -
 see "Match Find live data" below for why.
 
-Match Find used to also have `/match-recommend`/`/match-recommend-refine`
-(Gemini-based fixture scoring/validation on EVERY fixture, every build) -
-removed as of that repo's `docs/recommendation-engine-audit.md` Round 11:
-free-tier Gemini quota couldn't sustain that per-fixture workload, and
-Match Find's own deterministic objective-score engine was always the
-primary source of truth for every fixture's score anyway. `/match-recommend`
-above is a *different*, much narrower route reintroduced in that repo's
-Round 32, reusing the old path name but not its old per-fixture shape - see
-`worker.js`'s own "==== /match-recommend" comment for the call-volume
-argument for why this one doesn't hit the same quota wall. It also used to
+Match Find used to also have a Gemini-backed recommendation route on this
+Worker, in three successive shapes, all now removed:
+`/match-recommend`/`/match-recommend-refine` (scoring/validating EVERY
+fixture, every build - removed in that repo's Round 11: free-tier quota
+couldn't sustain that workload), then a much narrower `/match-recommend`
+reintroduced in Round 32 (a bounded, at-most-once-per-day tie-break between
+a small set of close-scoring candidates for one day's headline slot). That
+narrower version is ALSO gone as of Round 41: direct instruction that its
+real, now-billed cost outweighed its actual improvement to the
+recommendation - its own two live test calls (Round 37/38) had already shown
+Gemini's independent judgment simply agreeing with the deterministic
+engine's own pick both times. Match Find's deterministic objective-score
+engine (`public/lib/recommendation.mjs`, that repo) is its only
+recommendation logic now - no Gemini call of any kind. It also used to
 have `/match-dispatch` (fired a GitHub Actions rebuild on demand) - removed
 once Match Find moved its own match-building pipeline to run fully
 client-side (see that repo's public/app.js) rather than on a scheduled
@@ -146,9 +149,9 @@ near-identical run of the same first three steps against a different file:
 That alone gives you a live Worker with every route returning "not
 configured" until you add the secrets each feature needs:
 
-### AI features (`/gemini`, `/nl-edit`, `/vocab-ai`, `/match-recommend`)
+### AI features (`/gemini`, `/nl-edit`, `/vocab-ai`)
 
-All four share one secret:
+All three share one secret:
 
 - Worker Settings → Variables and Secrets → add `GEMINI_API_KEY`
   ([get one here](https://aistudio.google.com/apikey)), type **Secret** →
@@ -223,7 +226,7 @@ limit). The optional `RATE_LIMIT_KV` binding (see "Optional: auto-deploy via
 GitHub Actions" below) can safely be the same KV namespace as
 `orbit-workers-proxy`'s own - this Worker's rate-limit keys are IP-only, with
 no `feature` prefix to collide with the other Worker's `gemini:`/`sync:`/
-`vocab-sync:`/`vocab-ai:`/`match-recommend:` keys.
+`vocab-sync:`/`vocab-ai:` keys.
 
 ### Sync features (`/sync`, `/vocab-sync`)
 
@@ -324,29 +327,24 @@ path suffix** - each app's own frontend code appends its own hardcoded path.
 | --- | --- | --- |
 | Orbit | GitHub Settings → Secrets and variables → Actions → **Variables** | `PROXY_URL` (built into the client bundle by Vite - see `src/proxy-config.js`) |
 | Orbit Vocab | GitHub Settings → Secrets and variables → Actions → **Variables** | `PROXY_URL` (substituted into `sync.js`/`vocab-ai.js` at build time - see `.github/workflows/pages.yml`) |
-| Match Find | Hardcoded directly as `PROXY_URL`/`MATCH_RECOMMEND_PROXY_URL` constants in `public/app.js`/`public/lib/recommendation.mjs` | None - there's no build step left to inject a build-time variable from (its whole match list is fetched/scored live in the browser - see that repo's public/lib/match-builder.mjs), so these are plain source-code constants instead |
+| Match Find | Hardcoded directly as the `PROXY_URL` constant in `public/app.js` | None - there's no build step left to inject a build-time variable from (its whole match list is fetched/scored live in the browser - see that repo's public/lib/match-builder.mjs), so this is a plain source-code constant instead |
 
 Orbit/Orbit Vocab deliberately use a GitHub Actions **Variable**, not a
 Secret - this value ends up in each site's public client bundle either way
 (a static site has no server to keep it hidden behind), so there's nothing
-gained by treating it as one; Match Find's own hardcoded constants are the
-same non-secret values, just written directly into source since it has no
+gained by treating it as one; Match Find's own hardcoded constant is the
+same non-secret value, just written directly into source since it has no
 build-time substitution step to use instead. Orbit and Orbit Vocab point at
 the `orbit-workers-proxy` Worker's URL (their features live there); Match
-Find points at TWO different Workers - `PROXY_URL` at the separate
-`sports-proxy` Worker (see "Match Find live data" above for why it's a
-different deployment), and `MATCH_RECOMMEND_PROXY_URL` at THIS repo's own
-`orbit-workers-proxy` Worker with `/match-recommend` appended, the same one
-Orbit/Orbit Vocab's AI features live on - Match Find's own Gemini usage is
-small enough (see `/match-recommend`'s own comment) that it shares this
-Worker rather than needing a dedicated one.
+Find points only at the separate `sports-proxy` Worker (see "Match Find live
+data" above for why it's a different deployment) - it has no Gemini-backed
+route of its own on `orbit-workers-proxy` anymore (see "What it does, and
+who calls it" above for the full history of its now-removed
+`/match-recommend` route).
 
-Leaving `PROXY_URL`/`MATCH_RECOMMEND_PROXY_URL` unset in Orbit/Orbit
-Vocab/Match Find is fine either way: that app's AI/sync/tie-break features
-are simply unavailable, and everything else about it works normally -
-Match Find's own client already treats `/match-recommend` failing, timing
-out, or being unconfigured as "keep the deterministic pick," never a hard
-error.
+Leaving `PROXY_URL` unset in Orbit/Orbit Vocab/Match Find is fine either
+way: that app's AI/sync features are simply unavailable, and everything
+else about it works normally.
 
 ## Why one Worker for most routes, but two overall
 
