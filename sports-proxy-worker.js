@@ -29,7 +29,7 @@ function corsHeaders(origin, colo) {
     'Access-Control-Allow-Origin': isAllowedOrigin(origin) ? origin : 'null',
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Expose-Headers': 'X-Worker-Colo',
+    'Access-Control-Expose-Headers': 'X-Worker-Colo, X-Sports-Proxy-Cache, X-Sports-Proxy-Cache-Tier, X-Sports-Proxy-Age',
     'X-Worker-Colo': colo || 'unknown',
     Vary: 'Origin'
   };
@@ -117,7 +117,76 @@ const SPORTS_PROXY_ALLOWED_HOSTS = [
 ];
 const SPORTS_PROXY_RATE_LIMIT = 600;
 const SPORTS_PROXY_UPSTREAM_TIMEOUT_MS = 8_000;
-const SPORTS_PROXY_CACHE_TTL_SECONDS = 20;
+
+// ---- Shared cache lifetimes ------------------------------------------------
+// Every successful upstream response is kept in this colo's cache and served
+// to every viewer who asks for the same URL - one upstream fetch, shared by
+// everyone. How long a copy counts as fresh depends on how fast that data
+// actually changes: today's scores need to be seconds old, a fixture ten
+// days out or a standings table doesn't.
+//
+// `fresh`: served as-is, no upstream request.
+// `stale`: past `fresh` but within this extra window, the saved copy is
+// STILL returned immediately and the refresh happens in the background
+// (stale-while-revalidate), so the viewer never waits on the upstream API
+// for slow-moving data - the next viewer gets the refreshed copy. 0 means
+// an expired copy is never served (live scores).
+const SECOND = 1;
+const MINUTE = 60 * SECOND;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
+const CACHE_LIVE = { tier: 'live', fresh: 20 * SECOND, stale: 0 };
+// Polymarket's pages mix every open market for a league, today's games
+// included, so they stay short - but a copy up to 2 minutes old is still
+// served instantly while a fresh one is fetched.
+const CACHE_ODDS = { tier: 'odds', fresh: 30 * SECOND, stale: 2 * MINUTE };
+const CACHE_SCHEDULE = { tier: 'schedule', fresh: 10 * MINUTE, stale: DAY };
+const CACHE_STANDINGS = { tier: 'standings', fresh: 30 * MINUTE, stale: DAY };
+// ESPN core odds is only ever asked for a game's PRE-game line, which
+// can't change once the game has started.
+const CACHE_PREGAME_LINE = { tier: 'pregame-line', fresh: HOUR, stale: DAY };
+
+function utcDayNumber(yyyymmdd) {
+  const ms = Date.UTC(Number(yyyymmdd.slice(0, 4)), Number(yyyymmdd.slice(4, 6)) - 1, Number(yyyymmdd.slice(6, 8)));
+  return Math.floor(ms / (DAY * 1000));
+}
+
+// A scoreboard is "live" when any day it covers is within a day of today
+// (UTC) - that span holds every game that can still be in progress, since a
+// US-evening game's ESPN date runs up to ~1 UTC day behind. Everything
+// further out is either already final or not yet started.
+function scoreboardPolicy(url) {
+  const dates = url.searchParams.get('dates');
+  if (!dates) return CACHE_LIVE;
+  const match = /^(\d{8})(?:-(\d{8}))?$/.exec(dates);
+  if (!match) return CACHE_LIVE;
+  const today = Math.floor(Date.now() / (DAY * 1000));
+  const from = utcDayNumber(match[1]);
+  const to = match[2] ? utcDayNumber(match[2]) : from;
+  if (!Number.isFinite(from) || !Number.isFinite(to)) return CACHE_LIVE;
+  return from <= today + 1 && to >= today - 1 ? CACHE_LIVE : CACHE_SCHEDULE;
+}
+
+function cachePolicyFor(url) {
+  switch (url.hostname) {
+    case 'site.api.espn.com':
+      return url.pathname.endsWith('/scoreboard') ? scoreboardPolicy(url) : CACHE_STANDINGS;
+    case 'sports.core.api.espn.com':
+      return CACHE_PREGAME_LINE;
+    case 'statsapi.mlb.com':
+    case 'api.jolpi.ca':
+      return CACHE_STANDINGS;
+    case 'gamma-api.polymarket.com':
+      return CACHE_ODDS;
+    default:
+      return CACHE_LIVE;
+  }
+}
+
+// Background refreshes already running in this isolate, so a burst of
+// viewers hitting the same stale entry triggers one upstream fetch, not one
+// each.
+const refreshesInFlight = new Set();
 
 // Opt-in (`&trim=polymarket-events`) response trimming for Gamma's
 // /events pages. Each page nests every market of every event with ~80
@@ -154,6 +223,49 @@ function trimPolymarketEvents(events) {
   }));
 }
 
+// Fetches `upstreamUrl`, applies the optional trim, and saves a 200 into the
+// shared cache. Resolves to { status, contentType, body } or
+// { fetchError }. Never throws.
+async function fetchUpstream(upstreamUrl, trim) {
+  let upstream;
+  try {
+    upstream = await fetch(upstreamUrl.toString(), {
+      headers: { 'User-Agent': SPORTS_PROXY_FETCH_USER_AGENT },
+      signal: AbortSignal.timeout(SPORTS_PROXY_UPSTREAM_TIMEOUT_MS)
+    });
+  } catch (error) {
+    return { fetchError: error };
+  }
+  try {
+    const contentType = upstream.headers.get('Content-Type') || 'application/json';
+    if (upstream.status !== 200) return { status: upstream.status, contentType, body: upstream.body };
+    let body = await upstream.arrayBuffer();
+    if (trim) {
+      try {
+        body = JSON.stringify(trimPolymarketEvents(JSON.parse(new TextDecoder().decode(body))));
+      } catch {
+        // Not the JSON array shape expected - pass it through untouched.
+      }
+    }
+    return { status: 200, contentType, body };
+  } catch (error) {
+    return { fetchError: error };
+  }
+}
+
+function cacheEntry(result, policy) {
+  return new Response(result.body, {
+    status: 200,
+    headers: {
+      'Content-Type': result.contentType,
+      // The cache itself keeps the entry for the whole fresh + stale span;
+      // X-Sports-Proxy-Stored-At is what decides which of the two it's in.
+      'Cache-Control': `public, max-age=${policy.fresh + policy.stale}`,
+      'X-Sports-Proxy-Stored-At': String(Date.now())
+    }
+  });
+}
+
 async function handleSportsProxyRequest(request, env, headers, ip, ctx) {
   if (request.method !== 'GET') return json({ error: { message: 'GET only' } }, 405, headers);
 
@@ -173,6 +285,8 @@ async function handleSportsProxyRequest(request, env, headers, ip, ctx) {
     requestParams.get('trim') === TRIM_POLYMARKET_EVENTS &&
     upstreamUrl.hostname === 'gamma-api.polymarket.com' &&
     upstreamUrl.pathname === '/events';
+  const policy = cachePolicyFor(upstreamUrl);
+  headers['X-Sports-Proxy-Cache-Tier'] = policy.tier;
 
   const cache = caches.default;
   // A trimmed response is cached under its own key (a marker param on the
@@ -183,14 +297,31 @@ async function handleSportsProxyRequest(request, env, headers, ip, ctx) {
   const cacheKey = new Request(cacheKeyUrl.toString());
   const cached = await cache.match(cacheKey);
   if (cached) {
-    return new Response(cached.body, {
-      status: cached.status,
-      headers: {
-        ...headers,
-        'Content-Type': cached.headers.get('Content-Type') || 'application/json',
-        'X-Sports-Proxy-Cache': 'HIT'
+    const storedAt = Number(cached.headers.get('X-Sports-Proxy-Stored-At'));
+    // Entries from before this header existed carry the old 20s lifetime,
+    // so they're simply treated as fresh until the cache drops them.
+    const ageSeconds = Number.isFinite(storedAt) && storedAt > 0 ? (Date.now() - storedAt) / 1000 : 0;
+    const isFresh = ageSeconds <= policy.fresh;
+    if (isFresh || ageSeconds <= policy.fresh + policy.stale) {
+      if (!isFresh && !refreshesInFlight.has(cacheKey.url)) {
+        refreshesInFlight.add(cacheKey.url);
+        ctx.waitUntil(
+          fetchUpstream(upstreamUrl, trim)
+            .then(result => (result.status === 200 ? cache.put(cacheKey, cacheEntry(result, policy)) : null))
+            .catch(() => {})
+            .finally(() => refreshesInFlight.delete(cacheKey.url))
+        );
       }
-    });
+      return new Response(cached.body, {
+        status: cached.status,
+        headers: {
+          ...headers,
+          'Content-Type': cached.headers.get('Content-Type') || 'application/json',
+          'X-Sports-Proxy-Cache': isFresh ? 'HIT' : 'STALE',
+          'X-Sports-Proxy-Age': String(Math.round(ageSeconds))
+        }
+      });
+    }
   }
 
   // The rate-limit check (a KV read) and the upstream fetch run
@@ -198,49 +329,22 @@ async function handleSportsProxyRequest(request, env, headers, ip, ctx) {
   // off the critical path of every ordinary request. The trade-off: a
   // request that turns out to be rate-limited still pays for the upstream
   // fetch - acceptable, since that's the rare, already-abusive case.
-  const upstreamPromise = fetch(upstreamUrl.toString(), {
-    headers: { 'User-Agent': SPORTS_PROXY_FETCH_USER_AGENT },
-    signal: AbortSignal.timeout(SPORTS_PROXY_UPSTREAM_TIMEOUT_MS)
-  }).catch(error => ({ fetchError: error }));
-  const [rateLimit, upstreamResult] = await Promise.all([
-    isRateLimited(env, ip, SPORTS_PROXY_RATE_LIMIT),
-    upstreamPromise
-  ]);
+  const [rateLimit, result] = await Promise.all([isRateLimited(env, ip, SPORTS_PROXY_RATE_LIMIT), fetchUpstream(upstreamUrl, trim)]);
   headers['X-RateLimit-Backend'] = rateLimit.backend;
   if (rateLimit.limited) {
     return json({ error: { message: 'Too many requests, please try again later.' } }, 429, headers);
   }
-  if (upstreamResult.fetchError) {
-    return json({ error: { message: upstreamResult.fetchError.message || 'Upstream request failed' } }, 502, headers);
+  if (result.fetchError) {
+    return json({ error: { message: result.fetchError.message || 'Upstream request failed' } }, 502, headers);
   }
-
-  try {
-    const upstream = upstreamResult;
-    const contentType = upstream.headers.get('Content-Type') || 'application/json';
-    if (upstream.status !== 200) {
-      return new Response(upstream.body, { status: upstream.status, headers: { ...headers, 'Content-Type': contentType } });
-    }
-    let body = await upstream.arrayBuffer();
-    if (trim) {
-      try {
-        body = JSON.stringify(trimPolymarketEvents(JSON.parse(new TextDecoder().decode(body))));
-      } catch {
-        // Not the JSON array shape expected - pass it through untouched.
-      }
-    }
-    ctx.waitUntil(
-      cache.put(
-        cacheKey,
-        new Response(body, {
-          status: 200,
-          headers: { 'Content-Type': contentType, 'Cache-Control': `public, max-age=${SPORTS_PROXY_CACHE_TTL_SECONDS}` }
-        })
-      )
-    );
-    return new Response(body, { status: 200, headers: { ...headers, 'Content-Type': contentType, 'X-Sports-Proxy-Cache': 'MISS' } });
-  } catch (error) {
-    return json({ error: { message: error.message || 'Upstream request failed' } }, 502, headers);
+  if (result.status !== 200) {
+    return new Response(result.body, { status: result.status, headers: { ...headers, 'Content-Type': result.contentType } });
   }
+  ctx.waitUntil(cache.put(cacheKey, cacheEntry(result, policy)));
+  return new Response(result.body, {
+    status: 200,
+    headers: { ...headers, 'Content-Type': result.contentType, 'X-Sports-Proxy-Cache': 'MISS' }
+  });
 }
 
 // ==== Routing ================================================================

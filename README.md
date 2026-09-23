@@ -260,10 +260,22 @@ Nothing to configure — this route needs no secret at all, it's a
 host-allowlisted passthrough to public, keyless sports APIs (see
 `SPORTS_PROXY_ALLOWED_HOSTS` in `sports-proxy-worker.js`). It's live the
 moment this Worker is deployed. Every successful upstream response is cached
-for `SPORTS_PROXY_CACHE_TTL_SECONDS` (20s) in Cloudflare's shared edge
-cache, keyed by the upstream URL alone — so every viewer asking for the same
-scoreboard/odds URL within that window shares one upstream fetch instead of
-each paying for their own, and a cache hit doesn't count against
+in Cloudflare's shared edge cache (per data center), keyed by the upstream
+URL — so every viewer asking for the same URL shares one upstream fetch.
+How long a copy lasts depends on how fast that data changes (see
+`cachePolicyFor`):
+
+| Tier | What | Fresh for | Then served instantly while refreshing, for up to |
+| --- | --- | --- | --- |
+| `live` | Scoreboards covering yesterday–tomorrow (UTC), live polls | 20s | — (never served expired) |
+| `odds` | Polymarket `/events` pages | 30s | 2 min |
+| `schedule` | Scoreboards for days ≥2 away | 10 min | 1 day |
+| `standings` | ESPN/MLB/Jolpica standings | 30 min | 1 day |
+| `pregame-line` | ESPN core per-game odds | 1 hour | 1 day |
+
+The `X-Sports-Proxy-Cache` response header is `HIT`, `STALE` (served
+while refreshing in the background) or `MISS`, and
+`X-Sports-Proxy-Cache-Tier` names the tier. A cache hit doesn't count against
 `SPORTS_PROXY_RATE_LIMIT` at all (see `handleSportsProxyRequest`'s own
 comment for why this exists — without it, Match Find's own near-term +
 full-window refresh tiers alone already exceeded this route's per-IP rate
