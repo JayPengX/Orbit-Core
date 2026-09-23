@@ -274,8 +274,27 @@ How long a copy lasts depends on how fast that data changes (see
 | `pregame-line` | ESPN core per-game odds | 1 hour | 1 day |
 
 The `X-Sports-Proxy-Cache` response header is `HIT`, `STALE` (served
-while refreshing in the background) or `MISS`, and
-`X-Sports-Proxy-Cache-Tier` names the tier. A cache hit doesn't count against
+while refreshing in the background) or `MISS`, `X-Sports-Proxy-Cache-Tier`
+names the tier, and `X-Sports-Proxy-Age` gives a cached copy's age in
+seconds.
+
+**Trimmed Polymarket pages.** Adding `&trim=polymarket-events` to a
+Gamma `/events` URL returns each event and market with only the fields
+Match Find reads (`trimPolymarketEvents`) — a 100-event MLB page goes from
+~11.5MB to ~0.45MB. It's opt-in so the client can fall back to the plain
+passthrough if the trim (the one place this Worker parses JSON) ever
+fails; the trimmed copy is cached under its own key, so the two never mix.
+
+**Why the match list isn't built here.** Match Find's prebuilt
+first-screen snapshot is built by a GitHub Action in that repo
+(`.github/workflows/snapshot.yml`), not by this Worker: one build makes
+~85 upstream requests and parses megabytes of JSON, well past the Workers
+Free plan's 50-subrequest and 10ms-CPU limits per invocation. A batch
+endpoint here (many URLs per request) was also tried and dropped: sending
+~80 upstream requests at the same instant made ESPN occasionally stall one
+for 7-8 seconds, holding up the whole response.
+
+A cache hit doesn't count against
 `SPORTS_PROXY_RATE_LIMIT` at all (see `handleSportsProxyRequest`'s own
 comment for why this exists — without it, Match Find's own near-term +
 full-window refresh tiers alone already exceeded this route's per-IP rate
