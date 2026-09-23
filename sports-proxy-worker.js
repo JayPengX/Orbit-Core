@@ -1,54 +1,22 @@
 // ---- sports-proxy-worker.js ----
 // /sports-proxy - a thin, host-allowlisted CORS passthrough to ESPN's/the
 // MLB Stats API's/the Jolpica F1 API's/Polymarket's Gamma API's own public
-// JSON, so Match Find's own browser can fetch/score its whole live match
-// list directly, client-side. See worker.js's own top comment for the full
-// picture of what this repo serves - this route used to live there too,
-// alongside /gemini, /nl-edit, /sync, /vocab-sync, /vocab-ai, until a real,
-// live-confirmed latency bug forced it apart into its own deployment:
+// JSON, so Match Find's own browser can fetch and score its whole live
+// match list client-side.
 //
-// worker.js's wrangler.toml pins [placement] to region = "gcp:us-east4"
-// (Virginia) - necessary for /gemini and /vocab-ai, whose one outbound
-// fetch to Google's Gemini API 400s outright from Cloudflare's Hong Kong
-// colo (see that file's own [placement] comment for the full story). But
-// [placement] is a whole-SCRIPT setting, not a per-route one - Cloudflare
-// has no way to pin only some of a Worker's routes to a region while
-// leaving others on the default "run near whichever colo the request
-// itself arrived at" behavior. So every request to that shared Worker,
-// /sports-proxy included, was being forced through an isolate running in
-// Virginia regardless of where the actual caller was - confirmed live via
-// curl against the deployed Worker: an ordinary /sports-proxy request came
-// back with `X-Worker-Colo: IAD`, not a colo anywhere near Match Find's
-// actual Taiwan-based audience.
+// Deployed as its own Worker (wrangler.sports-proxy.toml), separate from
+// worker.js, for one reason: worker.js's wrangler.toml pins [placement] to
+// region "gcp:us-east4" (Virginia), which Gemini needs, and [placement] is a
+// whole-script setting. While /sports-proxy lived there, every Match Find
+// request - from a mostly Taiwan-based audience - went through a Virginia
+// isolate (confirmed live: `X-Worker-Colo: IAD`), adding a transpacific
+// round trip to each of the dozens of requests per refresh. Nothing this
+// route calls has Gemini's region restriction, so this Worker has no
+// [placement] block and runs near the caller.
 //
-// For a viewer in Taiwan, that means every single one of Match Find's
-// dozens of near-term/full-window/live-poll requests per refresh was
-// paying a full Taiwan<->Virginia round trip on top of whatever the
-// upstream API itself took - live-reported as "the first load goes blank
-// for 10+ seconds" and "updating data takes 10-20 seconds, inconsistently"
-// (this repo's docs/recommendation-engine-audit.md's own Round 25 entry
-// documented two other real, smaller contributors to that same symptom -
-// buildMatches's own serial fetch stages and this route's own 15s upstream
-// timeout - but couldn't reproduce the reported magnitude from a
-// US-based sandbox, which is exactly what you'd expect if THIS was the
-// dominant cost all along: a US-based tester's own request already lands
-// near Virginia with nothing to gain from moving, so the region pin's real
-// cost is invisible from there and only shows up for a caller on the other
-// side of the world).
-//
-// The fix is this file: deployed as its own separate Worker (see
-// wrangler.sports-proxy.toml, no [placement] block at all), so Cloudflare's
-// own default behavior applies - run the isolate at whichever colo actually
-// received the request, i.e. near the real caller. Nothing this route calls
-// (ESPN, the MLB Stats API, Jolpica, Polymarket) has Gemini's
-// region-availability restriction, so there is no reason for it to share
-// worker.js's pin at all. worker.js keeps /gemini, /nl-edit, /sync,
-// /vocab-sync, /vocab-ai - none of Orbit Class/Vocab's own consuming code
-// changes, since none of them ever called /sports-proxy.
-//
-// Everything below (CORS/rate-limiting/the route handler itself) is
-// otherwise unchanged from what used to live in worker.js - see git history
-// there for this code's own prior comments/context if needed.
+// Deliberately self-contained (no imports) so it can still be pasted into
+// the Cloudflare dashboard as a single file; the CORS helpers and KV rate
+// limiter below are a trimmed copy of worker.js's.
 
 const ALLOWED_ORIGINS = ['https://jaypengx-collab.github.io'];
 
@@ -179,21 +147,11 @@ async function handleSportsProxyRequest(request, env, headers, ip, ctx) {
     });
   }
 
-  // The rate-limit check (a KV read - see isRateLimited/isRateLimitedKV)
-  // and the actual upstream fetch are independent of each other - neither
-  // needs the other's result to START, only this function's own final
-  // decision needs both. Running them concurrently instead of awaiting the
-  // rate-limit check FIRST removes a real KV round trip from the critical
-  // path of every single ordinary (not rate-limited) request, which is the
-  // vast majority of traffic under SPORTS_PROXY_RATE_LIMIT's own generous
-  // budget. That round trip used to be invisible next to this Worker's own
-  // former cross-region [placement] pin (hundreds of ms) - now that it's
-  // gone (see this file's own top comment), a KV read is proportionally a
-  // much bigger slice of what's left, so it's worth taking off the
-  // critical path too. The one trade-off: a request that DOES turn out to
-  // be rate-limited still pays for the upstream fetch it didn't need -
-  // acceptable since that's the rare, already-abusive case, not the common
-  // one this route is actually optimizing for.
+  // The rate-limit check (a KV read) and the upstream fetch run
+  // concurrently rather than one after the other, taking a KV round trip
+  // off the critical path of every ordinary request. The trade-off: a
+  // request that turns out to be rate-limited still pays for the upstream
+  // fetch - acceptable, since that's the rare, already-abusive case.
   const upstreamPromise = fetch(upstreamUrl.toString(), {
     headers: { 'User-Agent': SPORTS_PROXY_FETCH_USER_AGENT },
     signal: AbortSignal.timeout(SPORTS_PROXY_UPSTREAM_TIMEOUT_MS)

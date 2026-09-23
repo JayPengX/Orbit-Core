@@ -9,50 +9,26 @@
 //   POST      /gemini     - AI schedule-photo import (see src/gemini-ocr.js).
 //                            Holds the real Gemini API key server-side so
 //                            end users never need one of their own.
-//   GET/PATCH/DELETE /sync - Orbit's own cross-device schedule sync (see
-//                            src/sync.js).
-//   GET/PATCH/DELETE /vocab-sync - Orbit Vocab's cross-device
-//                            progress sync (see that repo's sync.js). Not
-//                            Orbit's own feature - this Worker is simply
-//                            reused as shared infrastructure for a sibling
-//                            static site, so its owner doesn't have to
-//                            stand up and pay attention to a second Worker,
-//                            a second Firebase project, or a second set of
-//                            rate-limit tuning just to give that app the
-//                            same kind of sync. See "==== /vocab-sync"
-//                            below for how it differs from /sync.
-//   POST      /vocab-ai   - Orbit Vocab's live, per-learner AI features
-//                            (personalized mnemonics + memory-palace
-//                            stories - see that repo's vocab-ai.js). Same
-//                            reuse reasoning as /vocab-sync, but shares
-//                            /gemini's GEMINI_API_KEY secret instead of
-//                            /vocab-sync's Firebase ones - see "==== /vocab-ai"
-//                            below.
+//   POST      /nl-edit    - Orbit's natural-language schedule edits (see
+//                            src/editor-nl-edit.js). Same key as /gemini.
+//   GET/POST/PATCH/DELETE /sync - Orbit's own cross-device schedule sync
+//                            (see src/sync.js).
+//   GET/POST/PATCH/DELETE /vocab-sync - Orbit Vocab's cross-device
+//                            progress sync (see that repo's sync.js). This
+//                            Worker is simply reused as shared
+//                            infrastructure so that app doesn't need a
+//                            second Worker, Firebase project, or set of
+//                            rate-limit tuning. See "==== /sync" below for
+//                            how the two differ.
+//   POST      /vocab-ai   - Orbit Vocab's live, per-learner AI mnemonics
+//                            (see that repo's vocab-ai.js). Same reuse
+//                            reasoning as /vocab-sync, but shares /gemini's
+//                            GEMINI_API_KEY - see "==== /vocab-ai" below.
 //
-// Match Find's own /sports-proxy route (a thin, host-allowlisted CORS
-// passthrough to ESPN's/the MLB Stats API's/the Jolpica F1 API's/
-// Polymarket's Gamma API's own public JSON) used to live here as a fourth
-// route, but was pulled into its own separate Worker - see
-// sports-proxy-worker.js's own top comment for why: this Worker's
-// [placement] region pin (needed below for /gemini and /vocab-ai) applies
-// to the whole script, not per-route, so it was forcing /sports-proxy
-// through the same Virginia-region isolate too, adding a real, live-
-// confirmed transatlantic-scale round trip to every single one of Match
-// Find's requests for a codebase whose Gemini usage, when it exists at all,
-// is now tiny. Match Find has no sync route and (as of its own move to a
-// fully client-side live rebuild - see that repo's public/app.js) no
-// build-dispatch route here at all anymore - there is no scheduled build
-// left to trigger on demand, and its own client computes every fixture's
-// score deterministically. It does NOT call this Worker for AI at all -
-// Round 11 removed an earlier per-fixture validation call (free-tier
-// quota couldn't sustain it), Round 32-38 tried a much narrower bounded
-// daily tie-break (/match-recommend), and Round 41 of that repo's own
-// docs/recommendation-engine-audit.md removed that too, route and all:
-// direct instruction that its real billed cost outweighed its actual
-// improvement, especially once its own two live test calls showed
-// Gemini's independent judgment simply agreeing with the deterministic
-// engine's own pick both times. The deterministic engine (public/lib/
-// recommendation.mjs) is Match Find's only source of truth now.
+// Match Find's /sports-proxy lives in its own Worker (sports-proxy-worker.js)
+// because this one's [placement] region pin (needed for Gemini) applies to
+// the whole script - see that file's top comment. Match Find makes no AI
+// calls at all.
 //
 // /sync and /vocab-sync both hold a Firebase service-account key
 // server-side and proxy Firestore, so the pairing code isn't the only thing
@@ -71,11 +47,10 @@
 // its own rate-limit counters, both cheap to add to an already-deployed
 // Worker.
 //
-// All three routes have very different trust boundaries - /gemini only
-// ever runs a fixed prompt against a submitted image, /sync holds
-// credentials with full read/write access to Orbit's own shared documents,
-// /vocab-sync the same but for a different app's documents - so each
-// validates and rate-limits its own requests independently (see
+// The routes have very different trust boundaries - the AI routes only
+// ever run a fixed server-owned prompt, /sync holds credentials with full
+// read/write access to Orbit's own shared documents, /vocab-sync the same
+// but for a different app's documents - so each validates and rate-limits its own requests independently (see
 // isRateLimited: every call passes its own `feature` key, so a burst
 // against one path can never eat into another's quota) and no path touches
 // another's secrets or code.
@@ -85,10 +60,7 @@
 // shared by /sync and /vocab-sync) just makes that path (or both sync
 // paths at once, since they share the same Firebase secrets) return a "not
 // configured" error - the other features still work normally. See README
-// for the one-time setup each needs (paste this file into a new Worker in
-// the Cloudflare dashboard, set whichever secrets apply, point the
-// matching proxy-URL env var at this Worker's *.workers.dev URL with
-// /gemini, /sync, or /vocab-sync appended).
+// for the one-time setup each needs.
 
 import en from './locales/en.js';
 import zhTW from './locales/zh-TW.js';
@@ -183,6 +155,20 @@ function errorJson(code, status, headers, request) {
   const msgs = ERROR_MESSAGES[code];
   const message = msgs[pickLocale(request)] ?? msgs['zh-TW'];
   return json({ error: { code, message } }, status, headers);
+}
+
+// The one error whose message is dynamic (the upstream's own error text),
+// so it can't come from ERROR_MESSAGES.
+function upstreamFailed(error, headers) {
+  return json({ error: { code: 'UPSTREAM_FAILED', message: error.message || 'Upstream request failed' } }, 502, headers);
+}
+
+// request.json() resolves to any JSON value, `null` included, so a failed
+// parse needs a sentinel of its own: `(await readJsonBody(request)) ===
+// INVALID_BODY` means the caller should answer INVALID_JSON.
+const INVALID_BODY = Symbol('invalid body');
+function readJsonBody(request) {
+  return request.json().catch(() => INVALID_BODY);
 }
 
 // ---- Shared rate limiting (Workers KV, one counter per feature+IP+hour) ----
@@ -309,16 +295,25 @@ async function isRateLimited(env, ip, feature, limit, windowMs = RATE_WINDOW_MS)
   return { limited: isRateLimitedInMemory(bucketKey, limit, windowMs), backend: 'memory-no-binding' };
 }
 
+// Charges one request against `feature`'s per-IP hourly counter and returns
+// the 429 response to send if it's over `limit`, else null. Also sets
+// X-RateLimit-Backend on every response - diagnostic only (no IPs, no
+// counts, just which code path ran), so "is the KV binding even wired up"
+// can be checked with one curl instead of needing dashboard log access.
+async function rateLimitResponse(env, ip, feature, limit, headers, request) {
+  const { limited, backend } = await isRateLimited(env, ip, feature, limit);
+  headers['X-RateLimit-Backend'] = backend;
+  return limited ? errorJson('RATE_LIMITED', 429, headers, request) : null;
+}
+
 const DAY_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 // A hard ceiling on TOTAL calls to a real, billed Gemini route across EVERY
 // caller combined - not per-IP like isRateLimited above, which a caller
 // spread across enough source IPs (or behind enough proxies) can still
-// outrun. Round 38 (2026-09-22): added after live-proving that every one of
-// these routes was, until now, fully callable by anyone who simply knew the
-// URL, curl included, with real billing now active on this account's
-// GEMINI_API_KEY (see this file's own top comment on the origin gate below
-// for the other half of this defense). This is the actual financial
+// outrun. Added once real billing was active on this account's
+// GEMINI_API_KEY (see the origin gate below for the other half of this
+// defense). This is the actual financial
 // backstop: whatever else fails to keep an abuser out, this Worker will
 // stop making real upstream Gemini calls once this many have happened
 // today for this feature, full stop, no matter how many different IPs or
@@ -332,8 +327,7 @@ async function isDailyGlobalCapped(env, feature, limit) {
 
 // ---- Origin gate for every route that calls the real, billed Gemini API ---
 //
-// Until Round 38, `isAllowedOrigin` only ever fed corsHeaders (see that
-// function's own comment) - purely ADVISORY, since CORS is a browser-side
+// On its own, `isAllowedOrigin` only feeds corsHeaders - purely ADVISORY, since CORS is a browser-side
 // promise, not a server-side one: it stops a well-behaved BROWSER from
 // reading a disallowed page's response, but the request itself was always
 // fully processed (including the real, billed Gemini call) before that
@@ -342,13 +336,13 @@ async function isDailyGlobalCapped(env, feature, limit) {
 // callable by anyone who simply knew the URL - exactly the exposure a
 // public GitHub repo whose client source contains that same URL creates.
 //
-// This makes the check an actual, enforced GATE instead: reject before
+// GEMINI_BILLED_PATHS makes the check an actual, enforced GATE instead: reject before
 // EVER reaching a billed handler if Origin is missing or not in
 // ALLOWED_ORIGINS. This costs every real caller nothing - every route this
 // applies to is a POST with a JSON body, which browsers always treat as a
 // CORS "non-simple" request and always attach a real Origin header to,
-// preflight included - so a legitimate call from Match Find/Orbit/Orbit
-// Vocab's own already-working pages is completely unaffected; only a bare
+// preflight included - so a legitimate call from Orbit/Orbit Vocab's own
+// already-working pages is completely unaffected; only a bare
 // script/curl call (no Origin at all) or a request from some OTHER site
 // embedding a fetch to this Worker (a real Origin, just not an allowed
 // one) is newly rejected.
@@ -371,7 +365,7 @@ const GEMINI_BILLED_PATHS = new Set(['/gemini', '/nl-edit', '/vocab-ai']);
 
 // Taiwan is UTC+8 with no DST, so a fixed offset gives the exact local
 // calendar date - no timezone database needed for a Worker that otherwise
-// runs in UTC. Used to anchor GEMINI_PROMPT's year-less-date rule to "today"
+// runs in UTC. Used to anchor buildGeminiPrompt's year-less-date rule to "today"
 // from this app's users' own point of view, not the server's.
 function todayIsoInTaipei() {
   return new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -486,6 +480,10 @@ Regardless of documentKind:
 // single- and multi-file live runs.
 const GEMINI_ALLOWED_MODELS = ['gemini-3.5-flash-lite', 'gemini-3.7-flash'];
 
+function geminiUrl(model, env) {
+  return `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${env.GEMINI_API_KEY}`;
+}
+
 // The exact shape src/gemini-ocr.js's normalizeAIOutput() reads back,
 // handed to the model as a response schema rather than only described in
 // prompt prose. Constrained decoding is the single biggest lever this proxy
@@ -532,20 +530,21 @@ const GEMINI_DAY_SCHEMA = { type: 'array', items: { type: 'string', nullable: tr
 // definition of each instead of two that could quietly drift apart. classes
 // is the one exception (see NL_EDIT_CLASS_SCHEMA below) - the two endpoints
 // need different `required` lists for the same fields.
+const GEMINI_CLASS_PROPERTIES = {
+  key: { type: 'string' },
+  subject: { type: 'string' },
+  teacher: { type: 'string' },
+  location: { type: 'string' }
+};
 const GEMINI_CLASS_SCHEMA = {
   type: 'object',
-  properties: {
-    key: { type: 'string' },
-    subject: { type: 'string' },
-    teacher: { type: 'string' },
-    location: { type: 'string' }
-  },
+  properties: GEMINI_CLASS_PROPERTIES,
   // teacher/location genuinely are optional here: a freshly scanned photo
   // legitimately may not show a room number or a name at all.
   required: ['key', 'subject']
 };
-// /nl-edit's own classes schema, deliberately NOT the same object as
-// GEMINI_CLASS_SCHEMA above despite having identical properties: unlike photo
+// /nl-edit's own classes schema - same properties as GEMINI_CLASS_SCHEMA
+// above, deliberately different `required`: unlike photo
 // import, /nl-edit's prompt requires the model to echo every class it isn't
 // touching back byte-for-byte from the given context, and under a schema
 // where teacher/location are optional, Gemini would sometimes just omit
@@ -558,12 +557,7 @@ const GEMINI_CLASS_SCHEMA = {
 // copies it rather than inventing one.
 const NL_EDIT_CLASS_SCHEMA = {
   type: 'object',
-  properties: {
-    key: { type: 'string' },
-    subject: { type: 'string' },
-    teacher: { type: 'string' },
-    location: { type: 'string' }
-  },
+  properties: GEMINI_CLASS_PROPERTIES,
   required: ['key', 'subject', 'teacher', 'location']
 };
 const GEMINI_BREAK_TIME_SCHEMA = {
@@ -600,7 +594,7 @@ const GEMINI_COUNTDOWN_EVENTS_SCHEMA = {
     required: ['name', 'startDate', 'endDate']
   }
 };
-// One shape covering everything GEMINI_PROMPT can return, discriminated by
+// One shape covering everything buildGeminiPrompt's prompt can return, discriminated by
 // "documentKind" - see that prompt's own comment for why this is one prompt
 // and one schema now rather than two: which fields the model actually fills
 // in depends on what it decided the file was, never on which request it
@@ -672,6 +666,30 @@ function buildGenerationConfig(model, schema) {
     maxOutputTokens: 24576,
     thinkingConfig: /^gemini-2\./.test(model) ? { thinkingBudget: 0 } : { thinkingLevel: 'low' }
   };
+}
+
+// The shared upstream call for /gemini and /nl-edit. The response is piped
+// straight through rather than parsed and re-serialized here: the body is
+// JSON the client parses itself either way, and buffering the whole thing
+// in the Worker first only adds the upstream's full download time to every
+// request before a single byte reaches the browser.
+async function proxyGeminiRequest(model, parts, schema, env, headers) {
+  try {
+    const upstream = await fetch(geminiUrl(model, env), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts }],
+        generationConfig: buildGenerationConfig(model, schema)
+      })
+    });
+    return new Response(upstream.body, {
+      status: upstream.status,
+      headers: { ...headers, 'Content-Type': 'application/json' }
+    });
+  } catch (error) {
+    return upstreamFailed(error, headers);
+  }
 }
 
 // What a single submitted file may be. Images and PDFs are the two things
@@ -755,36 +773,26 @@ async function handleGeminiRequest(request, env, headers, ip) {
   if (request.method === 'GET') return json({ ok: true }, 200, headers);
   if (request.method !== 'POST') return errorJson('POST_ONLY', 405, headers, request);
 
-  const rateLimit = await isRateLimited(env, ip, 'gemini', GEMINI_RATE_LIMIT);
-  // Diagnostic only - not sensitive (no IPs, no counts, just which code
-  // path ran) - on every response so it can be checked with one curl
-  // request instead of needing dashboard log access.
-  headers['X-RateLimit-Backend'] = rateLimit.backend;
-  if (rateLimit.limited) {
-    return errorJson('RATE_LIMITED', 429, headers, request);
-  }
+  const limited = await rateLimitResponse(env, ip, 'gemini', GEMINI_RATE_LIMIT, headers, request);
+  if (limited) return limited;
   if (await isDailyGlobalCapped(env, 'gemini', GEMINI_DAILY_GLOBAL_CAP)) {
     return errorJson('DAILY_QUOTA_EXCEEDED', 429, headers, request);
   }
 
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return errorJson('INVALID_JSON', 400, headers, request);
-  }
+  const body = await readJsonBody(request);
+  if (body === INVALID_BODY) return errorJson('INVALID_JSON', 400, headers, request);
   const { model } = body || {};
   if (!GEMINI_ALLOWED_MODELS.includes(model)) {
     return errorJson('UNSUPPORTED_MODEL', 400, headers, request);
   }
   const parsedFiles = readGeminiFiles(body);
-  if (parsedFiles.error)
+  if (parsedFiles.error) {
     return json({ error: { code: 'FILE_PARSE_ERROR', message: parsedFiles.error } }, 400, headers);
+  }
   if (!env.GEMINI_API_KEY) {
     return errorJson('MISSING_API_KEY', 500, headers, request);
   }
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${env.GEMINI_API_KEY}`;
   // Every submitted file goes into one part list, in the order the user
   // picked them. In practice src/gemini-ocr.js now sends exactly one file
   // per request (each classified and extracted independently - see
@@ -792,37 +800,13 @@ async function handleGeminiRequest(request, env, headers, ip) {
   // e.g. two photos of one physical page split across the frame. The prompt
   // leads, so the instructions are in context before the first file rather
   // than after the last.
-  const contents = [
-    {
-      parts: [
-        { text: buildGeminiPrompt(todayIsoInTaipei()) },
-        ...parsedFiles.files.map(file => ({
-          inline_data: { mime_type: file.mime_type, data: file.data }
-        }))
-      ]
-    }
+  const parts = [
+    { text: buildGeminiPrompt(todayIsoInTaipei()) },
+    ...parsedFiles.files.map(file => ({
+      inline_data: { mime_type: file.mime_type, data: file.data }
+    }))
   ];
-  try {
-    const upstream = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents,
-        generationConfig: buildGenerationConfig(model, GEMINI_RESPONSE_SCHEMA)
-      })
-    });
-    // Piped straight through rather than parsed and re-serialized here: the
-    // body is JSON the client parses itself either way, and buffering the
-    // whole thing in the Worker first only adds the upstream's full
-    // download time to every request before a single byte reaches the
-    // browser.
-    return new Response(upstream.body, {
-      status: upstream.status,
-      headers: { ...headers, 'Content-Type': 'application/json' }
-    });
-  } catch (error) {
-    return json({ error: { code: 'UPSTREAM_FAILED', message: error.message || 'Upstream request failed' } }, 502, headers);
-  }
+  return proxyGeminiRequest(model, parts, GEMINI_RESPONSE_SCHEMA, env, headers);
 }
 
 // ==== /nl-edit - natural-language schedule edits ============================
@@ -1034,21 +1018,14 @@ function readNlEditContext(context) {
 async function handleNlEditRequest(request, env, headers, ip) {
   if (request.method !== 'POST') return errorJson('POST_ONLY', 405, headers, request);
 
-  const rateLimit = await isRateLimited(env, ip, 'nl-edit', NL_EDIT_RATE_LIMIT);
-  headers['X-RateLimit-Backend'] = rateLimit.backend;
-  if (rateLimit.limited) {
-    return errorJson('RATE_LIMITED', 429, headers, request);
-  }
+  const limited = await rateLimitResponse(env, ip, 'nl-edit', NL_EDIT_RATE_LIMIT, headers, request);
+  if (limited) return limited;
   if (await isDailyGlobalCapped(env, 'nl-edit', NL_EDIT_DAILY_GLOBAL_CAP)) {
     return errorJson('DAILY_QUOTA_EXCEEDED', 429, headers, request);
   }
 
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return errorJson('INVALID_JSON', 400, headers, request);
-  }
+  const body = await readJsonBody(request);
+  if (body === INVALID_BODY) return errorJson('INVALID_JSON', 400, headers, request);
   const { model } = body || {};
   if (!GEMINI_ALLOWED_MODELS.includes(model)) {
     return errorJson('UNSUPPORTED_MODEL', 400, headers, request);
@@ -1066,26 +1043,7 @@ async function handleNlEditRequest(request, env, headers, ip) {
     return errorJson('MISSING_API_KEY', 500, headers, request);
   }
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${env.GEMINI_API_KEY}`;
-  const contents = [{ parts: [{ text: buildNlEditPrompt(text, context) }] }];
-  try {
-    const upstream = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents,
-        generationConfig: buildGenerationConfig(model, NL_EDIT_RESPONSE_SCHEMA)
-      })
-    });
-    // Piped straight through, same reasoning as handleGeminiRequest's own
-    // response - the client parses this JSON itself either way.
-    return new Response(upstream.body, {
-      status: upstream.status,
-      headers: { ...headers, 'Content-Type': 'application/json' }
-    });
-  } catch (error) {
-    return json({ error: { code: 'UPSTREAM_FAILED', message: error.message || 'Upstream request failed' } }, 502, headers);
-  }
+  return proxyGeminiRequest(model, [{ text: buildNlEditPrompt(text, context) }], NL_EDIT_RESPONSE_SCHEMA, env, headers);
 }
 
 // ==== /vocab-ai - Orbit Vocab's live, per-learner AI feature ================
@@ -1126,10 +1084,8 @@ async function handleNlEditRequest(request, env, headers, ip) {
 // being generic and repetitive, not latency - so it trades a little speed
 // for the stronger model's better creative writing.
 const VOCAB_AI_MODEL = 'gemini-3.7-flash';
-// Tighter than GEMINI_RATE_LIMIT (20/hour is for a whole schedule-photo
-// import session; this is for a single learner's own occasional taps on
-// "產生記憶法" while reviewing) - generous for real use, still bounded per
-// IP.
+// Per IP per hour - a single learner's own occasional taps on "產生記憶法"
+// while reviewing; generous for real use, still bounded.
 const VOCAB_AI_RATE_LIMIT = 30;
 const VOCAB_AI_DAILY_GLOBAL_CAP = 300;
 // Bounds on every piece of client-submitted text below - see
@@ -1198,11 +1154,11 @@ function cleanVocabAiText(value, maxLen) {
 // the way a rate-limit window does, so entries are left to live indefinitely
 // rather than forcing a cold, re-billed regeneration for no reason.
 async function vocabAiCacheKey(kind, fields) {
-  // word/pos/meaning are lowercased/trimmed already by cleanVocabAiText's
-  // caller for word - meaning/pos are compared as-is since they're free-form
-  // Chinese text where case doesn't apply. wrongAnswers is sorted so the
-  // same set of mistakes hits the same key regardless of the order this
-  // learner happened to make them in.
+  // Every field arrives already trimmed (see handleVocabAiRequest). word and
+  // wrongAnswers are lowercased here; pos/meaning are compared as-is since
+  // they're free-form Chinese text where case doesn't apply. wrongAnswers
+  // is sorted so the same set of mistakes hits the same key regardless of
+  // the order this learner happened to make them in.
   const normalized = JSON.stringify([
     kind,
     String(fields.word || '').toLowerCase(),
@@ -1297,8 +1253,7 @@ Do NOT give generic study advice such as "多加練習"、"多寫幾次"、"多�
 }
 
 async function callVocabAiGemini(prompt, schema, env) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(VOCAB_AI_MODEL)}:generateContent?key=${env.GEMINI_API_KEY}`;
-  const response = await fetch(url, {
+  const response = await fetch(geminiUrl(VOCAB_AI_MODEL, env), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -1324,18 +1279,11 @@ async function handleVocabAiRequest(request, env, headers, ip) {
   // the same basic flood protection every other route here gets. A cache
   // hit further down still counts against it; only the real, billed spend
   // ceiling and the key requirement are what a free cache hit gets to skip.
-  const rateLimit = await isRateLimited(env, ip, 'vocab-ai', VOCAB_AI_RATE_LIMIT);
-  headers['X-RateLimit-Backend'] = rateLimit.backend;
-  if (rateLimit.limited) {
-    return errorJson('RATE_LIMITED', 429, headers, request);
-  }
+  const limited = await rateLimitResponse(env, ip, 'vocab-ai', VOCAB_AI_RATE_LIMIT, headers, request);
+  if (limited) return limited;
 
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return errorJson('INVALID_JSON', 400, headers, request);
-  }
+  const body = await readJsonBody(request);
+  if (body === INVALID_BODY) return errorJson('INVALID_JSON', 400, headers, request);
 
   try {
     if (body?.kind === 'mnemonic') {
@@ -1384,7 +1332,7 @@ async function handleVocabAiRequest(request, env, headers, ip) {
 
     return errorJson('MISSING_KIND', 400, headers, request);
   } catch (error) {
-    return json({ error: { code: 'UPSTREAM_FAILED', message: error.message || 'Upstream request failed' } }, 502, headers);
+    return upstreamFailed(error, headers);
   }
 }
 
@@ -1478,10 +1426,12 @@ async function docIdForPasscode(passcode) {
   return sha256Hex(passcode);
 }
 
-// Same cap as the Firestore rule (request.resource.data.payload.size() <
-// 20000) - checked again here so an oversized write is rejected before ever
-// spending a Firestore call on it, not because the rule can't be trusted.
-const MAX_PAYLOAD_LENGTH = 20000;
+// Same cap as the Firestore rule guarding this collection (see README,
+// request.resource.data.payload.size() < 20000) - checked again here so an
+// oversized write is rejected before ever spending a Firestore call on it.
+// Orbit's own schedule payload is already a compressed transfer string, so
+// this stays small.
+const ORBIT_MAX_PAYLOAD_LENGTH = 20000;
 
 // Sync's own legitimate traffic looks nothing like the AI import feature's:
 // two paired devices poll every 8 seconds *for as long as the tab stays
@@ -1513,11 +1463,6 @@ const SYNC_CREATE_RATE_LIMIT = 20;
 // an 8-character passcode is remotely feasible at any rate limit - this is
 // just not the bucket meant for high-frequency legitimate traffic.)
 const SYNC_VERIFY_RATE_LIMIT = 300;
-
-// Same cap as the Firestore rule guarding this collection (see README) -
-// Orbit's own schedule payload is already a compressed transfer string, so
-// this stays small.
-const ORBIT_MAX_PAYLOAD_LENGTH = MAX_PAYLOAD_LENGTH;
 
 // ---- /vocab-sync's own single-passcode design -------------------------
 //
@@ -1748,35 +1693,28 @@ async function firestoreDelete(env, collection, code) {
 // collection, which rate-limit counters/limits, how big a payload is
 // allowed, and how a request identifies+authenticates itself.
 // `appConfig.singleCredential` picks between the two designs: Orbit's own
-// /sync keeps its original code+separate-manager-passcode shape (reads open
-// to any code holder, only writes/deletes need the passcode); Orbit Vocab's
+// /sync keeps its code+separate-manager-passcode shape (reads open to any
+// code holder, only writes/deletes need the passcode); Orbit Vocab's
 // /vocab-sync (see VOCAB_SYNC_APP's own comment, and docIdForPasscode
 // above) uses one passcode as both identifier and credential for every
-// operation, including reads. Every error message, status code, and field
-// name for Orbit's own /sync traffic stays byte-for-byte identical to
-// before this was generalized.
-async function handleSyncCreate(request, env, headers, ip, appConfig) {
-  const rateLimit = await isRateLimited(
-    env,
-    ip,
-    `${appConfig.featurePrefix}:create`,
-    appConfig.createLimit
-  );
-  headers['X-RateLimit-Backend'] = rateLimit.backend;
-  if (rateLimit.limited) {
-    return errorJson('RATE_LIMITED', 429, headers, request);
-  }
+// operation, including reads.
+function isValidPayload(payload, appConfig) {
+  return typeof payload === 'string' && Boolean(payload) && payload.length <= appConfig.maxPayloadLength;
+}
 
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return errorJson('INVALID_JSON', 400, headers, request);
-  }
+// Whether `passcode` is `doc`'s manager passcode (ORBIT_SYNC_APP only).
+async function isManagerPasscode(passcode, doc) {
+  return Boolean(passcode) && (await sha256Hex(passcode)) === doc.managerPasscodeHash;
+}
+
+async function handleSyncCreate(request, env, headers, ip, appConfig) {
+  const limited = await rateLimitResponse(env, ip, `${appConfig.featurePrefix}:create`, appConfig.createLimit, headers, request);
+  if (limited) return limited;
+
+  const body = await readJsonBody(request);
+  if (body === INVALID_BODY) return errorJson('INVALID_JSON', 400, headers, request);
   const payload = body?.payload;
-  if (typeof payload !== 'string' || !payload || payload.length > appConfig.maxPayloadLength) {
-    return errorJson('MISSING_PAYLOAD', 400, headers, request);
-  }
+  if (!isValidPayload(payload, appConfig)) return errorJson('MISSING_PAYLOAD', 400, headers, request);
 
   try {
     if (appConfig.singleCredential) {
@@ -1788,33 +1726,20 @@ async function handleSyncCreate(request, env, headers, ip, appConfig) {
       // An ordinary upsert PATCH (see firestorePatch) is exactly as much
       // "create" as this design ever needs.
       const passcode = generateSyncCode(appConfig.credentialLength);
-      const docId = await docIdForPasscode(passcode);
-      const created = await firestorePatch(env, appConfig.collection, docId, payload);
+      const created = await firestorePatch(env, appConfig.collection, await docIdForPasscode(passcode), payload);
       return json({ passcode, updateTime: created.updateTime }, 200, headers);
     }
     const code = generateSyncCode();
     const managerPasscode = generateSyncCode();
-    const managerPasscodeHash = await sha256Hex(managerPasscode);
-    const created = await firestoreCreate(
-      env,
-      appConfig.collection,
-      code,
-      managerPasscodeHash,
-      payload
-    );
+    const created = await firestoreCreate(env, appConfig.collection, code, await sha256Hex(managerPasscode), payload);
     return json({ code, managerPasscode, updateTime: created.updateTime }, 200, headers);
   } catch (error) {
-    return json({ error: { code: 'UPSTREAM_FAILED', message: error.message || 'Upstream request failed' } }, 502, headers);
+    return upstreamFailed(error, headers);
   }
 }
 
 async function handleSyncRequest(request, env, headers, ip, appConfig) {
-  if (
-    request.method !== 'GET' &&
-    request.method !== 'POST' &&
-    request.method !== 'PATCH' &&
-    request.method !== 'DELETE'
-  ) {
+  if (!['GET', 'POST', 'PATCH', 'DELETE'].includes(request.method)) {
     return errorJson('SYNC_METHOD_NOT_ALLOWED', 405, headers, request);
   }
 
@@ -1828,16 +1753,15 @@ async function handleSyncRequest(request, env, headers, ip, appConfig) {
   if (request.method === 'POST') return handleSyncCreate(request, env, headers, ip, appConfig);
 
   const url = new URL(request.url);
-  // `suppliedPasscode` is unconditionally read here (not just under
-  // singleCredential) because ORBIT_SYNC_APP's own GET/DELETE branches
-  // below reuse this same query-string value for their manager-passcode
-  // check - only PATCH (there, sent in the body instead) needs its own.
+  // The single-credential design's identifier, and ORBIT_SYNC_APP's
+  // GET/DELETE manager-passcode check (PATCH sends its passcode in the body
+  // instead).
   const suppliedPasscode = (url.searchParams.get('passcode') || '').trim();
   // The single-credential design (see VOCAB_SYNC_APP) never takes a raw
   // client-supplied identifier as a Firestore document id - see
-  // docIdForPasscode's own comment on why. Every other app keeps the
-  // original design: the plain code itself, pattern-validated up front so
-  // a malformed one never even reaches Firestore.
+  // docIdForPasscode's own comment on why. ORBIT_SYNC_APP uses the plain
+  // code itself, pattern-validated up front so a malformed one never even
+  // reaches Firestore.
   let docId;
   if (appConfig.singleCredential) {
     if (!appConfig.credentialPattern.test(suppliedPasscode)) {
@@ -1853,183 +1777,94 @@ async function handleSyncRequest(request, env, headers, ip, appConfig) {
   }
 
   if (request.method === 'GET') {
-    if (appConfig.singleCredential) {
-      // Every GET here already supplied (and, via docId above, was just
-      // checked against) the real passcode - there's nothing left to
-      // distinguish a "verify" call from ordinary polling the way Orbit's
-      // own /sync does below, so this is simply the one read bucket.
-      const rateLimit = await isRateLimited(
-        env,
-        ip,
-        `${appConfig.featurePrefix}:read`,
-        appConfig.readLimit
-      );
-      headers['X-RateLimit-Backend'] = rateLimit.backend;
-      if (rateLimit.limited) {
-        return errorJson('RATE_LIMITED', 429, headers, request);
-      }
-      try {
-        const doc = await firestoreGet(env, appConfig.collection, docId);
-        // A wrong passcode and a never-created one both land here and look
-        // identical to the caller - see docIdForPasscode's own comment: the
-        // document only ever exists under the hash of the correct
-        // passcode, so there's nothing else to check it against.
-        if (!doc.exists) return json({ exists: false, updateTime: '', payload: '' }, 200, headers);
-        return json(
-          { exists: true, updateTime: doc.updateTime, payload: doc.payload },
-          200,
-          headers
-        );
-      } catch (error) {
-        return json(
-          { error: { code: 'UPSTREAM_FAILED', message: error.message || 'Upstream request failed' } },
-          502,
-          headers
-        );
-      }
-    }
-    // ORBIT_SYNC_APP's own code+manager-passcode design, unchanged from
-    // before this was generalized. A passcode riding along on GET resolves
-    // whether it's *this* document's manager passcode (join-time role
-    // check, or an already-joined viewer device unlocking manager mode) -
-    // see the SYNC_VERIFY_RATE_LIMIT comment above for why that gets its
-    // own bucket instead of sharing ordinary polling's. Orbit's /sync
-    // deliberately leaves reads open to anyone holding the plain sync code
-    // (a teacher broadcasting one schedule to many read-only student
-    // devices), so there's no passcode-less-GET refusal here the way
-    // singleCredential's branch above never needs either (it never gets a
-    // passcode-less GET past the docId derivation to begin with).
-    const kind = suppliedPasscode ? 'verify' : 'read';
-    const limit = suppliedPasscode ? appConfig.verifyLimit : appConfig.readLimit;
-    const rateLimit = await isRateLimited(env, ip, `${appConfig.featurePrefix}:${kind}`, limit);
-    headers['X-RateLimit-Backend'] = rateLimit.backend;
-    if (rateLimit.limited) {
-      return errorJson('RATE_LIMITED', 429, headers, request);
-    }
+    // For ORBIT_SYNC_APP, a passcode riding along on GET resolves whether
+    // it's *this* document's manager passcode (join-time role check, or an
+    // already-joined viewer device unlocking manager mode) - see
+    // SYNC_VERIFY_RATE_LIMIT for why that gets its own bucket instead of
+    // sharing ordinary polling's. Reads themselves stay open to anyone
+    // holding the plain sync code (a teacher broadcasting one schedule to
+    // many read-only student devices). A single-credential GET already
+    // proved the passcode via docId above, so it's always a plain read.
+    const verifying = !appConfig.singleCredential && Boolean(suppliedPasscode);
+    const limited = await rateLimitResponse(
+      env,
+      ip,
+      `${appConfig.featurePrefix}:${verifying ? 'verify' : 'read'}`,
+      verifying ? appConfig.verifyLimit : appConfig.readLimit,
+      headers,
+      request
+    );
+    if (limited) return limited;
     try {
       const doc = await firestoreGet(env, appConfig.collection, docId);
+      // For the single-credential design a wrong passcode and a
+      // never-created one both land here and look identical to the caller -
+      // the document only ever exists under the hash of the correct
+      // passcode, so there's nothing else to check it against.
       if (!doc.exists) return json({ exists: false, updateTime: '', payload: '' }, 200, headers);
       const result = { exists: true, updateTime: doc.updateTime, payload: doc.payload };
-      if (suppliedPasscode) {
-        const suppliedHash = await sha256Hex(suppliedPasscode);
-        if (suppliedHash === doc.managerPasscodeHash) result.role = 'manager';
-      }
+      if (verifying && (await isManagerPasscode(suppliedPasscode, doc))) result.role = 'manager';
       return json(result, 200, headers);
     } catch (error) {
-      return json({ error: { code: 'UPSTREAM_FAILED', message: error.message || 'Upstream request failed' } }, 502, headers);
+      return upstreamFailed(error, headers);
     }
   }
 
   if (request.method === 'PATCH') {
-    const rateLimit = await isRateLimited(
-      env,
-      ip,
-      `${appConfig.featurePrefix}:write`,
-      appConfig.writeLimit
-    );
-    headers['X-RateLimit-Backend'] = rateLimit.backend;
-    if (rateLimit.limited) {
-      return errorJson('RATE_LIMITED', 429, headers, request);
-    }
-    let body;
-    try {
-      body = await request.json();
-    } catch {
-      return errorJson('INVALID_JSON', 400, headers, request);
-    }
+    const limited = await rateLimitResponse(env, ip, `${appConfig.featurePrefix}:write`, appConfig.writeLimit, headers, request);
+    if (limited) return limited;
+    const body = await readJsonBody(request);
+    if (body === INVALID_BODY) return errorJson('INVALID_JSON', 400, headers, request);
     const payload = body?.payload;
-    if (typeof payload !== 'string' || !payload || payload.length > appConfig.maxPayloadLength) {
-      return errorJson('MISSING_PAYLOAD', 400, headers, request);
-    }
-    if (appConfig.singleCredential) {
-      // Nothing further to check here: docId (derived above from the
-      // supplied passcode) only ever names a document a correct passcode
-      // could reach in the first place - see docIdForPasscode's own
-      // comment. A 404 below means either this passcode was never used to
-      // create a pairing, or (functionally identical from the outside)
-      // it's simply wrong.
-      try {
-        const doc = await firestoreGet(env, appConfig.collection, docId);
-        if (!doc.exists) return errorJson('SYNC_PASSCODE_NOT_FOUND', 404, headers, request);
-        const result = await firestorePatch(env, appConfig.collection, docId, payload);
-        return json(result, 200, headers);
-      } catch (error) {
-        return json(
-          { error: { code: 'UPSTREAM_FAILED', message: error.message || 'Upstream request failed' } },
-          502,
-          headers
-        );
-      }
-    }
-    // ORBIT_SYNC_APP's own manager-passcode design, unchanged - sent in the
-    // body (unlike GET/DELETE's query-string `suppliedPasscode`) since this
-    // app already sends a JSON body for every PATCH anyway.
-    const managerPasscode = typeof body?.passcode === 'string' ? body.passcode.trim() : '';
+    if (!isValidPayload(payload, appConfig)) return errorJson('MISSING_PAYLOAD', 400, headers, request);
     try {
       const doc = await firestoreGet(env, appConfig.collection, docId);
-      if (!doc.exists) return errorJson('PAIRING_CODE_NOT_FOUND', 404, headers, request);
-      const passcodeHash = managerPasscode ? await sha256Hex(managerPasscode) : '';
-      if (!managerPasscode || passcodeHash !== doc.managerPasscodeHash) {
-        return errorJson('MANAGER_PASSCODE_REQUIRED_WRITE', 403, headers, request);
+      if (appConfig.singleCredential) {
+        // Nothing further to check: docId only ever names a document a
+        // correct passcode could reach. A 404 means either this passcode was
+        // never used to create a pairing, or (functionally identical from
+        // the outside) it's simply wrong.
+        if (!doc.exists) return errorJson('SYNC_PASSCODE_NOT_FOUND', 404, headers, request);
+      } else {
+        if (!doc.exists) return errorJson('PAIRING_CODE_NOT_FOUND', 404, headers, request);
+        const managerPasscode = typeof body?.passcode === 'string' ? body.passcode.trim() : '';
+        if (!(await isManagerPasscode(managerPasscode, doc))) {
+          return errorJson('MANAGER_PASSCODE_REQUIRED_WRITE', 403, headers, request);
+        }
       }
-      const result = await firestorePatch(env, appConfig.collection, docId, payload);
-      return json(result, 200, headers);
+      return json(await firestorePatch(env, appConfig.collection, docId, payload), 200, headers);
     } catch (error) {
-      return json({ error: { code: 'UPSTREAM_FAILED', message: error.message || 'Upstream request failed' } }, 502, headers);
+      return upstreamFailed(error, headers);
     }
   }
 
   // DELETE - single-credential apps need nothing beyond docId itself (see
   // PATCH above); ORBIT_SYNC_APP still needs the manager passcode, taken
-  // from the query string (`suppliedPasscode`, computed above) since
-  // neither app ever sends a DELETE body.
-  const rateLimit = await isRateLimited(
-    env,
-    ip,
-    `${appConfig.featurePrefix}:delete`,
-    appConfig.deleteLimit
-  );
-  headers['X-RateLimit-Backend'] = rateLimit.backend;
-  if (rateLimit.limited) {
-    return errorJson('RATE_LIMITED', 429, headers, request);
-  }
-  if (appConfig.singleCredential) {
-    try {
-      const doc = await firestoreGet(env, appConfig.collection, docId);
-      // Already gone (or never existed) - not an error from the caller's
-      // point of view, same as ORBIT_SYNC_APP's own 404-as-success below.
-      if (!doc.exists) return json({ deleted: true }, 200, headers);
-      await firestoreDelete(env, appConfig.collection, docId);
-      return json({ deleted: true }, 200, headers);
-    } catch (error) {
-      return json({ error: { code: 'UPSTREAM_FAILED', message: error.message || 'Upstream request failed' } }, 502, headers);
-    }
-  }
+  // from the query string since neither app ever sends a DELETE body.
+  const limited = await rateLimitResponse(env, ip, `${appConfig.featurePrefix}:delete`, appConfig.deleteLimit, headers, request);
+  if (limited) return limited;
   try {
     const doc = await firestoreGet(env, appConfig.collection, docId);
-    // Nothing to check a passcode against - already gone (or never
-    // existed), same as a 404 from the old design: not an error from the
-    // caller's point of view.
+    // Already gone (or never existed) - not an error from the caller's
+    // point of view.
     if (!doc.exists) return json({ deleted: true }, 200, headers);
-    const passcodeHash = suppliedPasscode ? await sha256Hex(suppliedPasscode) : '';
-    if (!suppliedPasscode || passcodeHash !== doc.managerPasscodeHash) {
+    if (!appConfig.singleCredential && !(await isManagerPasscode(suppliedPasscode, doc))) {
       return errorJson('MANAGER_PASSCODE_REQUIRED_DELETE', 403, headers, request);
     }
     await firestoreDelete(env, appConfig.collection, docId);
     return json({ deleted: true }, 200, headers);
   } catch (error) {
-    return json({ error: { code: 'UPSTREAM_FAILED', message: error.message || 'Upstream request failed' } }, 502, headers);
+    return upstreamFailed(error, headers);
   }
 }
 
 // ---- Per-app configuration for the generic handlers above -----------
 //
-// Orbit's own /sync: unchanged behavior from before generalization - reads
-// stay open to any holder of the plain sync code (the teacher/manager
-// broadcasts to many read-only student/viewer devices), only writes and
-// deletes need the manager passcode. `singleCredential` is left unset
-// (falsy), same as always taking the code+manager-passcode branch in
-// handleSyncCreate/handleSyncRequest above.
+// Orbit's own /sync: reads stay open to any holder of the plain sync code
+// (the teacher/manager broadcasts to many read-only student/viewer
+// devices), only writes and deletes need the manager passcode.
+// `singleCredential` is left unset, which takes the code+manager-passcode
+// branch in handleSyncCreate/handleSyncRequest above.
 const ORBIT_SYNC_APP = {
   collection: 'orbit-schedules',
   featurePrefix: 'sync',
@@ -2061,16 +1896,9 @@ const VOCAB_SYNC_APP = {
 };
 
 // ==== Routing ================================================================
-//
-// /sports-proxy used to live here too - see sports-proxy-worker.js's own
-// top comment for exactly why it was pulled into its own separately
-// deployed Worker (a real, live-confirmed latency bug: this Worker's
-// [placement] region pin, needed for /gemini and /vocab-ai, was forcing
-// EVERY route including /sports-proxy through an isolate in Virginia
-// regardless of where the request actually came from).
 
 export default {
-  async fetch(request, env, ctx) {
+  async fetch(request, env) {
     const origin = request.headers.get('Origin') || '';
     const headers = corsHeaders(origin, request.cf?.colo);
 

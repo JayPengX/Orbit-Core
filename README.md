@@ -181,7 +181,9 @@ steps against a different file.
 1. Sign up for a free [Cloudflare account](https://dash.cloudflare.com/sign-up)
    (email only, no credit card).
 2. Workers & Pages → Create → Create Worker, give it a name → Deploy.
-3. "Edit code" → paste the entire contents of `worker.js` → Save and Deploy.
+3. "Edit code" → paste the entire contents of `worker.js`, then add two more
+   files next to it, `locales/en.js` and `locales/zh-TW.js`, with those
+   files' contents (`worker.js` imports them) → Save and Deploy.
 4. Copy the Worker's URL (`https://<name>.<subdomain>.workers.dev`) — **no
    path suffix**. Every consuming app appends its own hardcoded path
    (`/gemini`, `/sync`, `/vocab-ai`, etc.) — see

@@ -1,7 +1,6 @@
 # Optional: only needed if you deploy this worker with the Wrangler CLI
-# instead of pasting worker.js into the Cloudflare dashboard's online
-# editor (the dashboard route needs no CLI or local install at all - see
-# README, which documents both paths for each feature).
+# instead of the Cloudflare dashboard's online editor (see README, which
+# documents both paths for each feature).
 #
 # CLI path:
 #   npx wrangler login
@@ -13,7 +12,8 @@
 #     (then uncomment the [[kv_namespaces]] block below with the printed id)
 #
 # CI path (.github/workflows/deploy.yml deploys this file with Wrangler on
-# every push to main that touches worker.js or wrangler.toml): a
+# every push to main that touches worker.js, locales/, or either wrangler
+# file): a
 # `wrangler deploy` pushes THIS FILE's [vars]/[[kv_namespaces]] as the
 # worker's whole config, replacing whatever's live on Cloudflare - it does
 # not merge with dashboard-made changes. Before ever relying on that
@@ -26,13 +26,9 @@
 name = "orbit-workers-proxy"
 # ^ Must match the Worker's actual name in the Cloudflare dashboard exactly -
 # `wrangler deploy` targets whatever's named here, and a mismatch silently
-# creates/updates an unrelated second Worker instead of erroring. Confirmed
-# against the real deployed URL (see PROXY_URL in each consuming app) rather
-# than assumed from the filename - worker.js is just this repo's source file
-# name, not necessarily the deployed Worker's name. The name below
-# ("orbit-workers-proxy") is the actual live Worker's name from before this
-# code moved into its own repo - kept unchanged on purpose (see the comment
-# above it), not a sign this is still Orbit-specific.
+# creates/updates an unrelated second Worker instead of erroring. This is
+# the live Worker's name from before this code moved into its own repo,
+# kept unchanged on purpose - not a sign this is still Orbit-specific.
 main = "worker.js"
 compatibility_date = "2025-01-01"
 
@@ -75,7 +71,7 @@ compatibility_date = "2025-01-01"
 [placement]
 region = "gcp:us-east4"
 
-# Only needed for the /sync path (see worker.js's handleSyncRequest).
+# Only needed for /sync and /vocab-sync (see worker.js's handleSyncRequest).
 # Not a secret on its own - it's already public today in the no-proxy
 # fallback path (VITE_ORBIT_SYNC_PROJECT_ID ships inside the client JS
 # bundle) - kept as a plain var here so it's easy to see/change in the
@@ -83,9 +79,10 @@ region = "gcp:us-east4"
 [vars]
 FIREBASE_PROJECT_ID = "orbit-project-76897"
 
-# GEMINI_API_KEY (for /gemini) and FIREBASE_CLIENT_EMAIL / FIREBASE_PRIVATE_KEY
-# (for /sync, from Firebase Console -> Project Settings -> Service accounts
-# -> Generate new private key) are set as Secrets, not [vars] - see the CLI
+# GEMINI_API_KEY (for /gemini, /nl-edit, /vocab-ai) and
+# FIREBASE_CLIENT_EMAIL / FIREBASE_PRIVATE_KEY (for /sync and /vocab-sync,
+# from Firebase Console -> Project Settings -> Service accounts -> Generate
+# new private key) are set as Secrets, not [vars] - see the CLI
 # commands above, or the dashboard's Settings -> Variables and Secrets.
 # Treat the Firebase service-account key like a password: it grants full
 # read/write access to that Firebase project, bypassing Firestore Security
@@ -95,8 +92,9 @@ FIREBASE_PROJECT_ID = "orbit-project-76897"
 
 # Optional but recommended: a real, cross-request rate limit instead of the
 # in-memory per-isolate fallback the worker uses when this isn't bound - see
-# worker.js's isRateLimited(). Shared by both /gemini and /sync (their
-# keys are prefixed per-feature and never collide). Free on Cloudflare's
+# worker.js's isRateLimited(). Shared by every route (their keys are
+# prefixed per-feature and never collide), and also caches /vocab-ai
+# mnemonics. Free on Cloudflare's
 # Workers KV free tier (no billing account needed). Dashboard path: Workers
 # & Pages -> KV -> Create namespace -> name it anything -> back on this
 # Worker's Settings -> Bindings -> Add -> KV Namespace -> variable name
