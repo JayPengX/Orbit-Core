@@ -90,6 +90,9 @@
 // matching proxy-URL env var at this Worker's *.workers.dev URL with
 // /gemini, /sync, or /vocab-sync appended).
 
+import en from './locales/en.js';
+import zhTW from './locales/zh-TW.js';
+
 const ALLOWED_ORIGINS = ['https://jaypengx-collab.github.io'];
 
 function isAllowedOrigin(origin) {
@@ -140,62 +143,25 @@ function json(data, status, headers) {
 // caller that wants to render its own UI string) alongside a `message` that
 // is picked at response time from ERROR_MESSAGES based on the request's
 // `Accept-Language` header (for a caller that just wants to display
-// something reasonable as-is, same as before). Adding a third language
-// later is "add one more field to each entry below," not a rewrite of any
-// call site.
+// something reasonable as-is, same as before).
+//
+// Each language's actual text lives in its own file under locales/ (see
+// locales/en.js, locales/zh-TW.js, imported at the top of this file) -
+// ERROR_MESSAGES below just zips them together by code, so errorJson() can
+// keep doing `ERROR_MESSAGES[code][locale]`. Adding a third language later:
+// copy locales/en.js to locales/<code>.js (every code `en` has should exist
+// there too), import it above, add one line below, and add a branch to
+// pickLocale().
 //
 // `en` is treated as authoritative for the codes that were already English
-// before this change (POST_ONLY, INVALID_JSON, etc.) - the zh-TW text next
-// to them is a new translation, not a change to English callers' behavior.
-// The codes that were already Chinese (RATE_LIMITED, DAILY_QUOTA_EXCEEDED,
-// MISSING_API_KEY, INVALID_MNEMONIC) keep their existing zh-TW wording
-// byte-for-byte, with English added alongside.
-const ERROR_MESSAGES = {
-  POST_ONLY: { en: 'POST only', 'zh-TW': '僅支援 POST 方法。' },
-  RATE_LIMITED: { en: 'Too many requests. Please try again later.', 'zh-TW': '請求過於頻繁，請稍後再試。' },
-  DAILY_QUOTA_EXCEEDED: {
-    en: "Today's quota has been used up. Please try again tomorrow.",
-    'zh-TW': '今日額度已用盡，請明天再試。'
-  },
-  INVALID_JSON: { en: 'Invalid JSON body', 'zh-TW': '無效的 JSON 請求內容。' },
-  UNSUPPORTED_MODEL: { en: 'Unsupported model', 'zh-TW': '不支援的模型。' },
-  MISSING_API_KEY: {
-    en: 'The worker has not configured GEMINI_API_KEY.',
-    'zh-TW': 'Worker 尚未設定 GEMINI_API_KEY。'
-  },
-  MISSING_TEXT: { en: 'Missing or invalid text', 'zh-TW': '缺少或無效的文字內容。' },
-  MISSING_CONTEXT: { en: 'Missing or invalid context', 'zh-TW': '缺少或無效的情境資料。' },
-  CONTEXT_TOO_LARGE: { en: 'Context too large', 'zh-TW': '情境資料過大。' },
-  MISSING_WORD: { en: 'Missing or invalid word', 'zh-TW': '缺少或無效的單字。' },
-  INVALID_MNEMONIC: {
-    en: 'The AI did not return a valid mnemonic.',
-    'zh-TW': 'AI 沒有回傳有效的記憶法。'
-  },
-  MISSING_KIND: { en: 'Missing or invalid kind', 'zh-TW': '缺少或無效的種類參數。' },
-  SYNC_METHOD_NOT_ALLOWED: {
-    en: 'GET, POST, PATCH or DELETE only',
-    'zh-TW': '僅支援 GET、POST、PATCH 或 DELETE 方法。'
-  },
-  MISSING_FIREBASE_CONFIG: {
-    en: 'The worker has not configured its Firebase service account.',
-    'zh-TW': 'Worker 尚未設定 Firebase 服務帳戶。'
-  },
-  INVALID_PASSCODE: { en: 'Invalid passcode', 'zh-TW': '無效的密碼。' },
-  INVALID_PAIRING_CODE: { en: 'Invalid pairing code', 'zh-TW': '無效的配對代碼。' },
-  MISSING_PAYLOAD: { en: 'Missing or invalid payload', 'zh-TW': '缺少或無效的內容資料。' },
-  SYNC_PASSCODE_NOT_FOUND: { en: 'This sync passcode was not found.', 'zh-TW': '找不到這組同步密碼。' },
-  PAIRING_CODE_NOT_FOUND: { en: 'This pairing code was not found.', 'zh-TW': '找不到這組配對代碼。' },
-  MANAGER_PASSCODE_REQUIRED_WRITE: {
-    en: 'The correct passcode is required to write.',
-    'zh-TW': '需要正確的密碼才能寫入。'
-  },
-  MANAGER_PASSCODE_REQUIRED_DELETE: {
-    en: 'The correct passcode is required to delete the whole sync.',
-    'zh-TW': '需要正確的密碼才能刪除整個同步。'
-  },
-  FORBIDDEN_ORIGIN: { en: 'Forbidden origin', 'zh-TW': '不允許的來源。' },
-  NOT_FOUND: { en: 'Not found', 'zh-TW': '找不到此路徑。' }
-};
+// before bilingual support existed (POST_ONLY, INVALID_JSON, etc.) - the
+// zh-TW text next to them is a later translation, not a change to English
+// callers' behavior. The codes that were already Chinese (RATE_LIMITED,
+// DAILY_QUOTA_EXCEEDED, MISSING_API_KEY, INVALID_MNEMONIC) keep their
+// original zh-TW wording byte-for-byte, with English added alongside.
+const ERROR_MESSAGES = Object.fromEntries(
+  Object.keys(en).map((code) => [code, { en: en[code], 'zh-TW': zhTW[code] }])
+);
 
 // Defaults to zh-TW whenever the header is absent or doesn't clearly prefer
 // English, to preserve current behavior for existing callers (orbit/

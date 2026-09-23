@@ -8,6 +8,7 @@ on:
       - 'wrangler.toml'
       - 'sports-proxy-worker.js'
       - 'wrangler.sports-proxy.toml'
+      - 'locales/**'
   workflow_dispatch:
 
 jobs:
