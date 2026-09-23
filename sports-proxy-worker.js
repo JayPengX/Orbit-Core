@@ -119,10 +119,46 @@ const SPORTS_PROXY_RATE_LIMIT = 600;
 const SPORTS_PROXY_UPSTREAM_TIMEOUT_MS = 8_000;
 const SPORTS_PROXY_CACHE_TTL_SECONDS = 20;
 
+// Opt-in (`&trim=polymarket-events`) response trimming for Gamma's
+// /events pages. Each page nests every market of every event with ~80
+// fields apiece (descriptions, token ids, fee schedules...) - live-measured
+// at 11.5MB raw / ~1MB gzipped for one 100-event MLB page, of which Match
+// Find reads only the fields kept below (see public/lib/polymarket.mjs's
+// findTeamEvent / parse*Markets / find*WinnerEvent in that repo). Trimmed,
+// the same page is ~0.45MB raw (a few dozen KB compressed), which is what
+// lets odds arrive together with the match list instead of seconds after.
+// Opt-in rather than automatic so the client can fall back to the plain
+// passthrough if this parse-and-rebuild step ever fails here (it's the one
+// place this Worker does real CPU work) - and the cached copy is the
+// trimmed one, so that work happens at most once per TTL per colo.
+const TRIM_POLYMARKET_EVENTS = 'polymarket-events';
+
+function trimPolymarketEvents(events) {
+  if (!Array.isArray(events)) return events;
+  return events.map(event => ({
+    id: event.id,
+    slug: event.slug,
+    title: event.title,
+    startDate: event.startDate,
+    startTime: event.startTime,
+    eventDate: event.eventDate,
+    teams: event.teams,
+    markets: Array.isArray(event.markets)
+      ? event.markets.map(market => ({
+          question: market.question,
+          outcomes: market.outcomes,
+          outcomePrices: market.outcomePrices,
+          liquidity: market.liquidity
+        }))
+      : event.markets
+  }));
+}
+
 async function handleSportsProxyRequest(request, env, headers, ip, ctx) {
   if (request.method !== 'GET') return json({ error: { message: 'GET only' } }, 405, headers);
 
-  const target = new URL(request.url).searchParams.get('url') || '';
+  const requestParams = new URL(request.url).searchParams;
+  const target = requestParams.get('url') || '';
   let upstreamUrl;
   try {
     upstreamUrl = new URL(target);
@@ -133,8 +169,18 @@ async function handleSportsProxyRequest(request, env, headers, ip, ctx) {
     return json({ error: { message: 'Host not allowed' } }, 400, headers);
   }
 
+  const trim =
+    requestParams.get('trim') === TRIM_POLYMARKET_EVENTS &&
+    upstreamUrl.hostname === 'gamma-api.polymarket.com' &&
+    upstreamUrl.pathname === '/events';
+
   const cache = caches.default;
-  const cacheKey = new Request(upstreamUrl.toString());
+  // A trimmed response is cached under its own key (a marker param on the
+  // cache key only - never sent upstream), so it can't be served to a
+  // caller that asked for the full passthrough, or vice versa.
+  const cacheKeyUrl = new URL(upstreamUrl.toString());
+  if (trim) cacheKeyUrl.searchParams.set('__sports_proxy_trim', TRIM_POLYMARKET_EVENTS);
+  const cacheKey = new Request(cacheKeyUrl.toString());
   const cached = await cache.match(cacheKey);
   if (cached) {
     return new Response(cached.body, {
@@ -174,7 +220,14 @@ async function handleSportsProxyRequest(request, env, headers, ip, ctx) {
     if (upstream.status !== 200) {
       return new Response(upstream.body, { status: upstream.status, headers: { ...headers, 'Content-Type': contentType } });
     }
-    const body = await upstream.arrayBuffer();
+    let body = await upstream.arrayBuffer();
+    if (trim) {
+      try {
+        body = JSON.stringify(trimPolymarketEvents(JSON.parse(new TextDecoder().decode(body))));
+      } catch {
+        // Not the JSON array shape expected - pass it through untouched.
+      }
+    }
     ctx.waitUntil(
       cache.put(
         cacheKey,
