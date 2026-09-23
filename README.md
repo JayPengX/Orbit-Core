@@ -268,7 +268,7 @@ How long a copy lasts depends on how fast that data changes (see
 | Tier | What | Fresh for | Then served instantly while refreshing, for up to |
 | --- | --- | --- | --- |
 | `live` | Scoreboards covering yesterday–tomorrow (UTC), live polls | 20s | — (never served expired) |
-| `odds` | Polymarket `/events` pages | 30s | 2 min |
+| `odds` | Polymarket `/events` pages | 20s | — (never served expired; the live-odds poll needs every tick fresh) |
 | `schedule` | Scoreboards for days ≥2 away | 10 min | 1 day |
 | `standings` | ESPN/MLB/Jolpica standings | 30 min | 1 day |
 | `pregame-line` | ESPN core per-game odds | 1 hour | 1 day |

@@ -137,9 +137,12 @@ const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 const CACHE_LIVE = { tier: 'live', fresh: 20 * SECOND, stale: 0 };
 // Polymarket's pages mix every open market for a league, today's games
-// included, so they stay short - but a copy up to 2 minutes old is still
-// served instantly while a fresh one is fetched.
-const CACHE_ODDS = { tier: 'odds', fresh: 30 * SECOND, stale: 2 * MINUTE };
+// included, and Match Find's live-odds poll asks for them every 30s - so
+// they follow the same strict rule as live scores. (An earlier version
+// served a copy up to 2 minutes old while refreshing in the background;
+// since the poll interval is longer than any short fresh window, every
+// poll then got the PREVIOUS poll's odds - always one tick behind.)
+const CACHE_ODDS = { tier: 'odds', fresh: 20 * SECOND, stale: 0 };
 const CACHE_SCHEDULE = { tier: 'schedule', fresh: 10 * MINUTE, stale: DAY };
 const CACHE_STANDINGS = { tier: 'standings', fresh: 30 * MINUTE, stale: DAY };
 // ESPN core odds is only ever asked for a game's PRE-game line, which
