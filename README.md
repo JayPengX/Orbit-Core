@@ -7,9 +7,9 @@ server-side features of three otherwise-independent static sites. None of
 the three sites needs a database, a server, or its own API key to use these
 features — each one just points at a deployed Worker URL.
 
-- **Orbit** — class schedule dashboard
-  Repo: https://github.com/JayPengX/Orbit
-  Live: https://jaypengx.github.io/Orbit/
+- **Orbit Class** — class schedule dashboard
+  Repo: https://github.com/JayPengX/Orbit-Class
+  Live: https://jaypengx.github.io/Orbit-Class/
 - **Orbit Vocab** — vocabulary trainer
   Repo: https://github.com/JayPengX/Orbit-Vocab
   Live: https://jaypengx.github.io/Orbit-Vocab/
@@ -448,7 +448,7 @@ secrets reach another's.
 
 ## Related Projects
 
-- [Orbit](https://github.com/JayPengX/Orbit) — class schedule
+- [Orbit Class](https://github.com/JayPengX/Orbit-Class) — class schedule
   dashboard; consumes `/gemini`, `/nl-edit`, and `/sync`.
 - [Orbit Vocab](https://github.com/JayPengX/Orbit-Vocab) — vocabulary
   trainer; consumes `/vocab-sync` and `/vocab-ai`.
