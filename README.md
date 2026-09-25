@@ -8,14 +8,14 @@ the three sites needs a database, a server, or its own API key to use these
 features — each one just points at a deployed Worker URL.
 
 - **Orbit** — class schedule dashboard
-  Repo: https://github.com/jaypengx-collab/Orbit
-  Live: https://jaypengx-collab.github.io/Orbit/
+  Repo: https://github.com/JayPengX/Orbit
+  Live: https://jaypengx.github.io/Orbit/
 - **Orbit Vocab** — vocabulary trainer
-  Repo: https://github.com/jaypengx-collab/Orbit-Vocab
-  Live: https://jaypengx-collab.github.io/Orbit-Vocab/
+  Repo: https://github.com/JayPengX/Orbit-Vocab
+  Live: https://jaypengx.github.io/Orbit-Vocab/
 - **Match Find** — sports recommendation site
-  Repo: https://github.com/jaypengx-collab/Match-Find
-  Live: https://jaypengx-collab.github.io/Match-Find/
+  Repo: https://github.com/JayPengX/Match-Find
+  Live: https://jaypengx.github.io/Match-Find/
 
 ## Table of Contents
 
@@ -448,11 +448,11 @@ secrets reach another's.
 
 ## Related Projects
 
-- [Orbit](https://github.com/jaypengx-collab/Orbit) — class schedule
+- [Orbit](https://github.com/JayPengX/Orbit) — class schedule
   dashboard; consumes `/gemini`, `/nl-edit`, and `/sync`.
-- [Orbit Vocab](https://github.com/jaypengx-collab/Orbit-Vocab) — vocabulary
+- [Orbit Vocab](https://github.com/JayPengX/Orbit-Vocab) — vocabulary
   trainer; consumes `/vocab-sync` and `/vocab-ai`.
-- [Match Find](https://github.com/jaypengx-collab/Match-Find) — sports
+- [Match Find](https://github.com/JayPengX/Match-Find) — sports
   recommendation site; consumes `/sports-proxy` only.
 
 ---

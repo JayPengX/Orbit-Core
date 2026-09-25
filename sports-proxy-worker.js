@@ -18,7 +18,7 @@
 // the Cloudflare dashboard as a single file; the CORS helpers and KV rate
 // limiter below are a trimmed copy of worker.js's.
 
-const ALLOWED_ORIGINS = ['https://jaypengx-collab.github.io'];
+const ALLOWED_ORIGINS = ['https://jaypengx.github.io'];
 
 function isAllowedOrigin(origin) {
   return ALLOWED_ORIGINS.includes(origin) || /^http:\/\/localhost:\d+$/.test(origin || '');
@@ -105,7 +105,7 @@ async function isRateLimited(env, ip, limit) {
 }
 
 // ==== /sports-proxy - CORS passthrough for public sports data ==============
-const SPORTS_PROXY_FETCH_USER_AGENT = 'Match-Find-Bot/1.0 (+https://github.com/jaypengx-collab/Match-Find)';
+const SPORTS_PROXY_FETCH_USER_AGENT = 'Match-Find-Bot/1.0 (+https://github.com/JayPengX/Match-Find)';
 const SPORTS_PROXY_ALLOWED_HOSTS = [
   'site.api.espn.com',
   // Per-fixture odds (Match Find's pre-game line for games already in

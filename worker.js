@@ -65,7 +65,7 @@
 import en from './locales/en.js';
 import zhTW from './locales/zh-TW.js';
 
-const ALLOWED_ORIGINS = ['https://jaypengx-collab.github.io'];
+const ALLOWED_ORIGINS = ['https://jaypengx.github.io'];
 
 function isAllowedOrigin(origin) {
   return ALLOWED_ORIGINS.includes(origin) || /^http:\/\/localhost:\d+$/.test(origin || '');
