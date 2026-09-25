@@ -1,10 +1,10 @@
 # Shared Proxy
 
-Shared Cloudflare Workers backend for Orbit, Orbit Vocab, and Match Find.
+Shared Cloudflare Workers backend for Orbit, Orbit Vocab, Match Find, and Odds Study.
 
 This repository holds two Cloudflare Workers that back the optional
-server-side features of three otherwise-independent static sites. None of
-the three sites needs a database, a server, or its own API key to use these
+server-side features of four otherwise-independent static sites. None of
+the four sites needs a database, a server, or its own API key to use these
 features — each one just points at a deployed Worker URL.
 
 - **Orbit Class** — class schedule dashboard
@@ -16,6 +16,9 @@ features — each one just points at a deployed Worker URL.
 - **Match Find** — sports recommendation site
   Repo: https://github.com/JayPengX/Match-Find
   Live: https://jaypengx.github.io/Match-Find/
+- **Odds Study** — educational page on Taiwan Sports Lottery odds math
+  Repo: https://github.com/JayPengX/Odds-Study
+  Live: https://jaypengx.github.io/Odds-Study/
 
 ## Table of Contents
 
@@ -33,10 +36,10 @@ features — each one just points at a deployed Worker URL.
 
 This repo used to be a folder inside Orbit's own repository
 (`cloudflare-worker/`), but it was never really Orbit-specific — it already
-served all three sites, and keeping it nested inside one of its own
+served all of its consumer sites, and keeping it nested inside one of its own
 consumers made "which repo do I even touch to change the proxy" a real
 question. It now lives here on its own, with its own deploy pipeline, so
-each of the three apps only ever has to know one thing about it: the URL.
+each of the apps only ever has to know one thing about it: the URL.
 
 Two Workers are deployed from this repo:
 
@@ -64,7 +67,7 @@ build.
 | `/sync` | GET/PATCH/DELETE | Orbit | Cross-device schedule sync (code + manager passcode; reads are open, writes/deletes need the passcode). |
 | `/vocab-sync` | GET/PATCH/DELETE | Orbit Vocab | Cross-device learning-progress sync (single passcode, no separate read-only code). |
 | `/vocab-ai` | POST | Orbit Vocab | Live, per-learner personalized mnemonics. Responses are cached in `RATE_LIMIT_KV` by exact request shape (word/pos/meaning/wrongAnswers), so a repeat of the same word + mistake pattern (common — see `vocabAiCacheKey`'s own comment in `worker.js`) is a free KV read, not a billed Gemini call. The `X-Vocab-Ai-Cache: hit`/`miss` response header says which happened. |
-| `/sports-proxy` (separate Worker — see below) | GET | Match Find | Host-allowlisted CORS passthrough to ESPN (site and core APIs), the MLB Stats API, Jolpica, and Polymarket's Gamma API, so the viewer's own browser can fetch and score its whole live match list directly. Optional `&trim=polymarket-events` on a Gamma `/events` URL returns only the fields Match Find reads (~25× smaller - see `trimPolymarketEvents`). |
+| `/sports-proxy` (separate Worker — see below) | GET | Match Find, Odds Study | Host-allowlisted CORS passthrough to ESPN (site and core APIs), the MLB Stats API, Jolpica, and Polymarket's Gamma API, so the viewer's own browser can fetch and score its whole live match list directly. Optional `&trim=polymarket-events` on a Gamma `/events` URL returns only the fields Match Find reads (~25× smaller - see `trimPolymarketEvents`). Odds Study uses ESPN's site API and Gamma only, and requests the trim for its MLB and Premier League pages. |
 
 `/sports-proxy` is deployed as its own Worker (`sports-proxy-worker.js` +
 `wrangler.sports-proxy.toml`), not part of `worker.js`/`wrangler.toml` above
@@ -235,8 +238,8 @@ one as `/gemini`/`/sync`/etc.:
    `sports-proxy`) → Deploy.
 2. "Edit code" → paste the entire contents of `sports-proxy-worker.js` →
    Save and Deploy.
-3. Copy this Worker's own URL — this is the one Match Find's `PROXY_URL`
-   points at (see [Wiring Up a Consuming App](#wiring-up-a-consuming-app)
+3. Copy this Worker's own URL — this is the one Match Find's and Odds
+   Study's `PROXY_URL` points at (see [Wiring Up a Consuming App](#wiring-up-a-consuming-app)
    below), a *different* URL from the `orbit-workers-proxy` Worker the other
    five routes live on.
 
@@ -407,6 +410,7 @@ path suffix** — each app's own frontend code appends its own hardcoded path.
 | Orbit | GitHub Settings → Secrets and variables → Actions → **Variables** | `PROXY_URL` (built into the client bundle by Vite — see `src/proxy-config.js`) |
 | Orbit Vocab | GitHub Settings → Secrets and variables → Actions → **Variables** | `PROXY_URL` (substituted into `sync.js`/`vocab-ai.js` at build time — see `.github/workflows/pages.yml`) |
 | Match Find | Hardcoded directly as the `PROXY_URL` constant in `public/app.js` | None — there's no build step left to inject a build-time variable from (its whole match list is fetched/scored live in the browser — see that repo's `public/lib/match-builder.mjs`), so this is a plain source-code constant instead |
+| Odds Study | Hardcoded as the `PROXY_URL` constant in `public/lib/sources.mjs` | None — a static site with no build step, same as Match Find |
 
 Orbit and Orbit Vocab deliberately use a GitHub Actions **Variable**, not a
 Secret — this value ends up in each site's public client bundle either way
@@ -419,18 +423,20 @@ Find points only at the separate `sports-proxy` Worker (see
 [One-Time Deploy Setup](#one-time-deploy-setup) above for why it's a
 different deployment) — it has no Gemini-backed route of its own on
 `orbit-workers-proxy` anymore (see [Removed routes](#removed-routes) above
-for the full history of its now-removed `/match-recommend` route).
+for the full history of its now-removed `/match-recommend` route). Odds
+Study likewise points only at the `sports-proxy` Worker.
 
 Leaving `PROXY_URL` unset in Orbit/Orbit Vocab/Match Find is fine either
 way: that app's AI/sync features are simply unavailable, and everything else
-about it works normally.
+about it works normally. Odds Study is the exception: every odds number it
+shows comes through `/sports-proxy`, so without it the page has no data.
 
 ## Why One Worker for Most Routes, But Two Overall
 
 Cloudflare's Workers Free plan's daily request cap (100,000/day) is
 per-*account*, not per-Worker, so splitting `/gemini`/`/nl-edit`/`/sync`/
 `/vocab-sync`/`/vocab-ai` into separate Workers would never have bought any
-of the three apps extra headroom — it would only have meant several KV
+of the apps extra headroom — it would only have meant several KV
 bindings, several sets of secrets, and several things to keep deployed
 instead of one. Those five stay combined for exactly that operational
 convenience.
@@ -454,9 +460,13 @@ secrets reach another's.
   trainer; consumes `/vocab-sync` and `/vocab-ai`.
 - [Match Find](https://github.com/JayPengX/Match-Find) — sports
   recommendation site; consumes `/sports-proxy` only.
+- [Odds Study](https://github.com/JayPengX/Odds-Study) — educational page
+  on Taiwan Sports Lottery odds math; consumes `/sports-proxy` only (ESPN
+  and Polymarket's Gamma API). It reads a subset of the fields
+  `trimPolymarketEvents` keeps, so dropping a field there can break it too.
 
 ---
 
-This repo has no user-facing site of its own — it exists purely so three
+This repo has no user-facing site of its own — it exists purely so four
 independent static sites can each have one line of server-side capability
 without any of them needing to run, or pay for, a server.
