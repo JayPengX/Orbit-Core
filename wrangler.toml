@@ -102,3 +102,9 @@ FIREBASE_PROJECT_ID = "orbit-project-76897"
 [[kv_namespaces]]
 binding = "RATE_LIMIT_KV"
 id = "8b24d75fbe0a4a69aef0f35cb7a8d847"
+
+# Keeps console.log output (e.g. worker.js's gemini_usage token counts) in
+# the Cloudflare dashboard's Workers Logs, instead of only live via
+# `wrangler tail`.
+[observability]
+enabled = true

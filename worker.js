@@ -673,7 +673,7 @@ function buildGenerationConfig(model, schema) {
 // JSON the client parses itself either way, and buffering the whole thing
 // in the Worker first only adds the upstream's full download time to every
 // request before a single byte reaches the browser.
-async function proxyGeminiRequest(model, parts, schema, env, headers) {
+async function proxyGeminiRequest(model, parts, schema, env, headers, ctx, feature) {
   try {
     const upstream = await fetch(geminiUrl(model, env), {
       method: 'POST',
@@ -683,12 +683,45 @@ async function proxyGeminiRequest(model, parts, schema, env, headers) {
         generationConfig: buildGenerationConfig(model, schema)
       })
     });
-    return new Response(upstream.body, {
+    let body = upstream.body;
+    if (upstream.ok && body && ctx) {
+      const [toClient, toLog] = body.tee();
+      body = toClient;
+      ctx.waitUntil(logGeminiUsage(toLog, feature, model));
+    }
+    return new Response(body, {
       status: upstream.status,
       headers: { ...headers, 'Content-Type': 'application/json' }
     });
   } catch (error) {
     return upstreamFailed(error, headers);
+  }
+}
+
+// One log line per billed Gemini call, with the token counts Gemini itself
+// reports (usageMetadata) - how many were read from the implicit cache and
+// how many went to thinking are exactly the numbers needed to judge further
+// cost tuning. Read off a tee of the upstream body after the client's copy
+// is already streaming (see proxyGeminiRequest), so it adds no latency; see
+// it with `wrangler tail` or the Cloudflare dashboard's Workers logs. Only
+// counts are logged - never the prompt, the schedule, or the reply text.
+async function logGeminiUsage(stream, feature, model) {
+  try {
+    const usage = JSON.parse(await new Response(stream).text()).usageMetadata || {};
+    console.log(
+      JSON.stringify({
+        event: 'gemini_usage',
+        feature,
+        model,
+        prompt: usage.promptTokenCount ?? 0,
+        cached: usage.cachedContentTokenCount ?? 0,
+        thoughts: usage.thoughtsTokenCount ?? 0,
+        output: usage.candidatesTokenCount ?? 0,
+        total: usage.totalTokenCount ?? 0
+      })
+    );
+  } catch {
+    // Logging must never affect the request it describes.
   }
 }
 
@@ -760,7 +793,7 @@ function readGeminiFiles(body) {
   return { files };
 }
 
-async function handleGeminiRequest(request, env, headers, ip) {
+async function handleGeminiRequest(request, env, headers, ip, ctx) {
   // A warm-up ping, sent the moment the user opens the file picker (see
   // src/gemini-ocr.js's warmUpGeminiProxy) - long before there's anything
   // to actually send. It exists purely to pay the connection's setup cost
@@ -806,7 +839,7 @@ async function handleGeminiRequest(request, env, headers, ip) {
       inline_data: { mime_type: file.mime_type, data: file.data }
     }))
   ];
-  return proxyGeminiRequest(model, parts, GEMINI_RESPONSE_SCHEMA, env, headers);
+  return proxyGeminiRequest(model, parts, GEMINI_RESPONSE_SCHEMA, env, headers, ctx, 'gemini');
 }
 
 // ==== /nl-edit - natural-language schedule edits ============================
@@ -1020,7 +1053,7 @@ function readNlEditContext(context) {
   return { weeklySchedule, classes, bellTimes, breakTimes, countdownEvents, reverseWeek };
 }
 
-async function handleNlEditRequest(request, env, headers, ip) {
+async function handleNlEditRequest(request, env, headers, ip, ctx) {
   if (request.method !== 'POST') return errorJson('POST_ONLY', 405, headers, request);
 
   const limited = await rateLimitResponse(env, ip, 'nl-edit', NL_EDIT_RATE_LIMIT, headers, request);
@@ -1048,7 +1081,15 @@ async function handleNlEditRequest(request, env, headers, ip) {
     return errorJson('MISSING_API_KEY', 500, headers, request);
   }
 
-  return proxyGeminiRequest(model, [{ text: buildNlEditPrompt(text, context) }], NL_EDIT_RESPONSE_SCHEMA, env, headers);
+  return proxyGeminiRequest(
+    model,
+    [{ text: buildNlEditPrompt(text, context) }],
+    NL_EDIT_RESPONSE_SCHEMA,
+    env,
+    headers,
+    ctx,
+    'nl-edit'
+  );
 }
 
 // ==== /vocab-ai - Orbit Vocab's live, per-learner AI feature ================
@@ -1903,7 +1944,7 @@ const VOCAB_SYNC_APP = {
 // ==== Routing ================================================================
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const origin = request.headers.get('Origin') || '';
     const headers = corsHeaders(origin, request.cf?.colo);
 
@@ -1918,8 +1959,8 @@ export default {
       return errorJson('FORBIDDEN_ORIGIN', 403, headers, request);
     }
 
-    if (path === '/gemini') return handleGeminiRequest(request, env, headers, ip);
-    if (path === '/nl-edit') return handleNlEditRequest(request, env, headers, ip);
+    if (path === '/gemini') return handleGeminiRequest(request, env, headers, ip, ctx);
+    if (path === '/nl-edit') return handleNlEditRequest(request, env, headers, ip, ctx);
     if (path === '/sync') return handleSyncRequest(request, env, headers, ip, ORBIT_SYNC_APP);
     if (path === '/vocab-sync') return handleSyncRequest(request, env, headers, ip, VOCAB_SYNC_APP);
     if (path === '/vocab-ai') return handleVocabAiRequest(request, env, headers, ip);
