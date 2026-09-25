@@ -969,6 +969,7 @@ Field shapes and meaning:
 
 Day numbering: 0 = 週日, 1 = 週一, 2 = 週二, 3 = 週三, 4 = 週四, 5 = 週五, 6 = 週六 (matches JavaScript's Date.getDay(), the same numbering the context's own weeklySchedule keys use).
 Period numbering: 0-based, matching the index into a weeklySchedule day array and into bellTimes (period 0 is 第一節, period 1 is 第二節, and so on).
+Run-together numerals: users often type the day and the periods as one unbroken run of Chinese numerals with no separator, e.g. "星期三二三節對調" / "週三二三節對調" (= 週三 的 第二節 and 第三節, swap them), "週五一二節" (= 週五 第一節 and 第二節), "禮拜一三四節" (= 週一 第三節 and 第四節). Read the FIRST numeral right after 星期/週/禮拜 as the day, and every following numeral before 節 as a separate period number - never merge them into one multi-digit number (e.g. "二三節" is periods 2 and 3, never period 23). A range like "二到四節" / "2-4節" means every period from the first to the last inclusive. Arabic digits work the same way ("週3 2、3節").
 
 The instruction to translate: "${text}"
 
