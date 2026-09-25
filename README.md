@@ -44,7 +44,7 @@ each of the apps only ever has to know one thing about it: the URL.
 Two Workers are deployed from this repo:
 
 - **`orbit-workers-proxy`** (`worker.js` + `wrangler.toml`) — serves
-  `/gemini`, `/nl-edit`, `/sync`, `/vocab-sync`, `/vocab-ai`.
+  `/gemini`, `/nl-edit`, `/sync`, `/vocab-sync`, `/odds-sync`, `/vocab-ai`.
 - **`sports-proxy`** (`sports-proxy-worker.js` + `wrangler.sports-proxy.toml`) —
   serves `/sports-proxy` as its own, separately deployed Worker. See
   [Why One Worker for Most Routes, But Two Overall](#why-one-worker-for-most-routes-but-two-overall)
@@ -66,6 +66,7 @@ build.
 | `/nl-edit` | POST | Orbit | AI natural-language schedule edits (e.g. "把我週二第三節改成物理"). |
 | `/sync` | GET/PATCH/DELETE | Orbit | Cross-device schedule sync (code + manager passcode; reads are open, writes/deletes need the passcode). |
 | `/vocab-sync` | GET/PATCH/DELETE | Orbit Vocab | Cross-device learning-progress sync (single passcode, no separate read-only code). |
+| `/odds-sync` | GET/POST/PATCH/DELETE | Odds Study | Cross-device sync of the simulated betting account (play-money balance, weekly top-ups, saved slips). Same single-passcode design as `/vocab-sync`, with an 8-character passcode; Firestore collection `odds-study-accounts`. |
 | `/vocab-ai` | POST | Orbit Vocab | Live, per-learner personalized mnemonics. Responses are cached in `RATE_LIMIT_KV` by exact request shape (word/pos/meaning/wrongAnswers), so a repeat of the same word + mistake pattern (common — see `vocabAiCacheKey`'s own comment in `worker.js`) is a free KV read, not a billed Gemini call. The `X-Vocab-Ai-Cache: hit`/`miss` response header says which happened. |
 | `/sports-proxy` (separate Worker — see below) | GET | Match Find, Odds Study | Host-allowlisted CORS passthrough to ESPN (site and core APIs), the MLB Stats API, Jolpica, and Polymarket's Gamma API, so the viewer's own browser can fetch and score its whole live match list directly. Optional `&trim=polymarket-events` on a Gamma `/events` URL returns only the fields Match Find reads (~25× smaller - see `trimPolymarketEvents`). Odds Study uses ESPN's site API and Gamma only, and requests the trim for its MLB and Premier League pages. |
 
@@ -166,6 +167,9 @@ anywhere (see that repo's README).
 - **`/vocab-sync`** — a single passcode that's both the identifier and the
   only credential. Built for "one person's own multiple devices," where
   there's no reason to have a public read-only code at all.
+- **`/odds-sync`** — the same single-passcode design for Odds Study's
+  play-money account, with an 8-character passcode (32^8, about 10^12)
+  short enough to type on a phone. It holds no real money or personal data.
 
 See the top-of-file comment in `worker.js`, and the comment above each
 route's handler, for the full reasoning behind each design choice — this
@@ -308,7 +312,7 @@ this Worker's rate-limit keys are IP-only, with no `feature` prefix to
 collide with the other Worker's `gemini:`/`sync:`/`vocab-sync:`/`vocab-ai:`
 keys.
 
-### Sync features (`/sync`, `/vocab-sync`)
+### Sync features (`/sync`, `/vocab-sync`, `/odds-sync`)
 
 Both share one Firebase project and one service-account credential:
 
@@ -354,10 +358,11 @@ Both share one Firebase project and one service-account credential:
    unauthenticated client access to Firestore. That's the actual point of
    this whole Worker for the sync routes — not one more check on top of an
    open database, but removing the open database entirely. The wildcard
-   covers every collection (`orbit-schedules`, `vocab-progress-sync`) so
+   covers every collection (`orbit-schedules`, `vocab-progress-sync`,
+   `odds-study-accounts`) so
    adding a third sync consumer later never needs this rule touched again.
 
-Once this is done, `/sync` and `/vocab-sync` are both live — each already
+Once this is done, `/sync`, `/vocab-sync` and `/odds-sync` are all live — each already
 uses its own Firestore collection and its own rate-limit counters (see the
 route table above), so neither can affect the other's data or quota.
 
@@ -461,8 +466,8 @@ secrets reach another's.
 - [Match Find](https://github.com/JayPengX/Match-Find) — sports
   recommendation site; consumes `/sports-proxy` only.
 - [Odds Study](https://github.com/JayPengX/Odds-Study) — educational page
-  on Taiwan Sports Lottery odds math; consumes `/sports-proxy` only (ESPN
-  and Polymarket's Gamma API). It reads a subset of the fields
+  on Taiwan Sports Lottery odds math; consumes `/sports-proxy` (ESPN
+  and Polymarket's Gamma API) and `/odds-sync`. It reads a subset of the fields
   `trimPolymarketEvents` keeps, so dropping a field there can break it too.
 
 ---

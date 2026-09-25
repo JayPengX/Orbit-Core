@@ -20,6 +20,11 @@
 //                            second Worker, Firebase project, or set of
 //                            rate-limit tuning. See "==== /sync" below for
 //                            how the two differ.
+//   GET/POST/PATCH/DELETE /odds-sync - Odds Study's simulated betting
+//                            account (balance and saved slips) across
+//                            devices. Same single-passcode design as
+//                            /vocab-sync, with an 8-character passcode - see
+//                            ODDS_SYNC_APP below.
 //   POST      /vocab-ai   - Orbit Vocab's live, per-learner AI mnemonics
 //                            (see that repo's vocab-ai.js). Same reuse
 //                            reasoning as /vocab-sync, but shares /gemini's
@@ -1941,6 +1946,31 @@ const VOCAB_SYNC_APP = {
   credentialPattern: VOCAB_PASSCODE_PATTERN
 };
 
+// Odds Study's /odds-sync: one person's simulated betting account (play
+// money only - a balance, weekly top-ups and saved slips, never real money
+// or personal data) on their own devices. Same single-passcode design as
+// /vocab-sync, but 8 characters instead of 16: the site asks for a passcode
+// short enough to type on a phone, and what it guards is a play-money
+// balance. 32^8 is still about 10^12 passcodes, far past what the write
+// and read limits below let anyone try.
+const ODDS_PASSCODE_LENGTH = 8;
+const ODDS_PASSCODE_PATTERN = /^[2-9A-HJ-NP-Z]{8}$/;
+// A saved slip is a few hundred bytes of JSON; a year of daily slips fits
+// well under this.
+const ODDS_MAX_PAYLOAD_LENGTH = 262144;
+const ODDS_SYNC_APP = {
+  collection: 'odds-study-accounts',
+  featurePrefix: 'odds-sync',
+  maxPayloadLength: ODDS_MAX_PAYLOAD_LENGTH,
+  readLimit: 3000,
+  writeLimit: 300,
+  deleteLimit: 20,
+  createLimit: 20,
+  singleCredential: true,
+  credentialLength: ODDS_PASSCODE_LENGTH,
+  credentialPattern: ODDS_PASSCODE_PATTERN
+};
+
 // ==== Routing ================================================================
 
 export default {
@@ -1963,6 +1993,7 @@ export default {
     if (path === '/nl-edit') return handleNlEditRequest(request, env, headers, ip, ctx);
     if (path === '/sync') return handleSyncRequest(request, env, headers, ip, ORBIT_SYNC_APP);
     if (path === '/vocab-sync') return handleSyncRequest(request, env, headers, ip, VOCAB_SYNC_APP);
+    if (path === '/odds-sync') return handleSyncRequest(request, env, headers, ip, ODDS_SYNC_APP);
     if (path === '/vocab-ai') return handleVocabAiRequest(request, env, headers, ip);
     return errorJson('NOT_FOUND', 404, headers, request);
   }
