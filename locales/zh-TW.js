@@ -28,8 +28,5 @@ export default {
   MANAGER_PASSCODE_REQUIRED_WRITE: '需要正確的密碼才能寫入。',
   MANAGER_PASSCODE_REQUIRED_DELETE: '需要正確的密碼才能刪除整個同步。',
   FORBIDDEN_ORIGIN: '不允許的來源。',
-  LEAGUE_NOT_FOUND: '找不到這個聯盟。',
-  LEAGUE_NOT_YOURS: '這一列屬於別人。',
-  LEAGUE_FULL: '這個聯盟已滿（50 人）。',
   NOT_FOUND: '找不到此路徑。'
 };

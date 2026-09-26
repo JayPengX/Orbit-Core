@@ -47,7 +47,7 @@ each of the apps only ever has to know one thing about it: the URL.
 Two Workers are deployed from this repo:
 
 - **`orbit-workers-proxy`** (`worker.js` + `wrangler.toml`) — serves
-  `/gemini`, `/nl-edit`, `/sync`, `/vocab-sync`, `/odds-sync`, `/stock-sync`, `/stock-league`, `/vocab-ai`.
+  `/gemini`, `/nl-edit`, `/sync`, `/vocab-sync`, `/odds-sync`, `/stock-sync`, `/vocab-ai`.
 - **`sports-proxy`** (`sports-proxy-worker.js` + `wrangler.sports-proxy.toml`) —
   serves `/sports-proxy` as its own, separately deployed Worker. See
   [Why One Worker for Most Routes, But Two Overall](#why-one-worker-for-most-routes-but-two-overall)
@@ -71,7 +71,6 @@ build.
 | `/vocab-sync` | GET/PATCH/DELETE | Orbit Vocab | Cross-device learning-progress sync (single passcode, no separate read-only code). |
 | `/odds-sync` | GET/POST/PATCH/DELETE | Odds Study | Cross-device sync of the simulated betting account (play-money balance, weekly top-ups, saved slips). Same single-passcode design as `/vocab-sync`, with an 8-character passcode; Firestore collection `odds-study-accounts`. Payloads up to 1,000,000 characters (slip history is kept for good; just under Firestore's 1 MiB document limit). |
 | `/stock-sync` | GET/POST/PATCH/DELETE | Stock Study | Cross-device sync of the simulated brokerage account (wallets per currency, holdings, orders, loans, history). Exactly `/odds-sync`'s design and limits (8-character passcode, 1,000,000 characters), in its own Firestore collection `stock-study-accounts` with its own rate-limit counters. |
-| `/stock-league` | GET/POST/PATCH/DELETE | Stock Study | Friend leagues: a shared leaderboard of play-money returns. `POST {name}` creates a league and returns its 8-character code; `GET ?code=` reads it; `PATCH ?code=` with `{id, secret, nick, pct, nw, dep, since, trades, top}` writes one member's row (a one-key update mask, so members saving at once never clash); `DELETE ?code=&member=&secret=` leaves. A row can only be changed by the browser that created it (the hash of its secret is kept with the row and never returned). At most 50 members, 2,000 characters a row. Firestore collection `stock-study-leagues`. |
 | `/vocab-ai` | POST | Orbit Vocab | Live, per-learner personalized mnemonics. Responses are cached in `RATE_LIMIT_KV` by exact request shape (word/pos/meaning/wrongAnswers), so a repeat of the same word + mistake pattern (common — see `vocabAiCacheKey`'s own comment in `worker.js`) is a free KV read, not a billed Gemini call. The `X-Vocab-Ai-Cache: hit`/`miss` response header says which happened. |
 | `/sports-proxy` (separate Worker — see below) | GET | Match Find, Odds Study | Host-allowlisted CORS passthrough to ESPN (site and core APIs), the MLB Stats API, Jolpica, and Polymarket's Gamma API, so the viewer's own browser can fetch and score its whole live match list directly. Optional `&trim=polymarket-events` on a Gamma `/events` URL returns only the fields Match Find reads (~25× smaller - see `trimPolymarketEvents`). Odds Study uses ESPN's site API, Gamma (its `/events` pages with the trim, and `/public-search` for championship markets, cached 10 minutes fresh + a day stale) and Kambi's public odds feed (`eu-offering-api.kambicdn.com`: list views cached 2 minutes fresh + 10 stale, the live feed 20 seconds), with `&trim=kambi-events` keeping only the event, price and live-score fields it reads (~5× smaller). Stock Study uses Yahoo Finance's public `query1`/`query2.finance.yahoo.com` endpoints: `/v7/finance/spark` (up to 20 quotes per request) and `/v8/finance/chart` (charts, dividends, splits), cached 30 seconds for a day or five of data and 30 minutes (+ a day stale) for longer charts, and `/v1/finance/search`, cached a day (with news, 30 minutes). `/v7/finance/quote` and `/v10/finance/quoteSummary` (a company's P/E, market value, dividend yield and profile) need Yahoo's session cookie and crumb: the Worker fetches them itself (with a browser User-Agent, which Yahoo requires for the crumb), keeps them 6 hours, adds them to those requests only, and caches the answers an hour fresh + a day stale. |
 
@@ -367,7 +366,7 @@ Both share one Firebase project and one service-account credential:
    this whole Worker for the sync routes — not one more check on top of an
    open database, but removing the open database entirely. The wildcard
    covers every collection (`orbit-schedules`, `vocab-progress-sync`,
-   `odds-study-accounts`, `stock-study-accounts`, `stock-study-leagues`) so
+   `odds-study-accounts`, `stock-study-accounts`) so
    adding a third sync consumer later never needs this rule touched again.
 
 Once this is done, `/sync`, `/vocab-sync` and `/odds-sync` are all live — each already
