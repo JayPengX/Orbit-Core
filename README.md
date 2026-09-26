@@ -1,6 +1,6 @@
 # Shared Proxy
 
-Shared Cloudflare Workers backend for Orbit, Orbit Vocab, Match Find, and Odds Study.
+Shared Cloudflare Workers backend for Orbit, Orbit Vocab, Match Find, Odds Study, and Stock Study.
 
 This repository holds two Cloudflare Workers that back the optional
 server-side features of four otherwise-independent static sites. None of
@@ -19,6 +19,9 @@ features — each one just points at a deployed Worker URL.
 - **Odds Study** — educational page on Taiwan Sports Lottery odds math
   Repo: https://github.com/JayPengX/Odds-Study
   Live: https://jaypengx.github.io/Odds-Study/
+- **Stock Study** — play-money brokerage simulator for markets worldwide
+  Repo: https://github.com/JayPengX/Stock-Study
+  Live: https://jaypengx.github.io/Stock-Study/
 
 ## Table of Contents
 
@@ -44,7 +47,7 @@ each of the apps only ever has to know one thing about it: the URL.
 Two Workers are deployed from this repo:
 
 - **`orbit-workers-proxy`** (`worker.js` + `wrangler.toml`) — serves
-  `/gemini`, `/nl-edit`, `/sync`, `/vocab-sync`, `/odds-sync`, `/vocab-ai`.
+  `/gemini`, `/nl-edit`, `/sync`, `/vocab-sync`, `/odds-sync`, `/stock-sync`, `/vocab-ai`.
 - **`sports-proxy`** (`sports-proxy-worker.js` + `wrangler.sports-proxy.toml`) —
   serves `/sports-proxy` as its own, separately deployed Worker. See
   [Why One Worker for Most Routes, But Two Overall](#why-one-worker-for-most-routes-but-two-overall)
@@ -67,8 +70,9 @@ build.
 | `/sync` | GET/PATCH/DELETE | Orbit | Cross-device schedule sync (code + manager passcode; reads are open, writes/deletes need the passcode). |
 | `/vocab-sync` | GET/PATCH/DELETE | Orbit Vocab | Cross-device learning-progress sync (single passcode, no separate read-only code). |
 | `/odds-sync` | GET/POST/PATCH/DELETE | Odds Study | Cross-device sync of the simulated betting account (play-money balance, weekly top-ups, saved slips). Same single-passcode design as `/vocab-sync`, with an 8-character passcode; Firestore collection `odds-study-accounts`. Payloads up to 1,000,000 characters (slip history is kept for good; just under Firestore's 1 MiB document limit). |
+| `/stock-sync` | GET/POST/PATCH/DELETE | Stock Study | Cross-device sync of the simulated brokerage account (wallets per currency, holdings, orders, loans, history). Exactly `/odds-sync`'s design and limits (8-character passcode, 1,000,000 characters), in its own Firestore collection `stock-study-accounts` with its own rate-limit counters. |
 | `/vocab-ai` | POST | Orbit Vocab | Live, per-learner personalized mnemonics. Responses are cached in `RATE_LIMIT_KV` by exact request shape (word/pos/meaning/wrongAnswers), so a repeat of the same word + mistake pattern (common — see `vocabAiCacheKey`'s own comment in `worker.js`) is a free KV read, not a billed Gemini call. The `X-Vocab-Ai-Cache: hit`/`miss` response header says which happened. |
-| `/sports-proxy` (separate Worker — see below) | GET | Match Find, Odds Study | Host-allowlisted CORS passthrough to ESPN (site and core APIs), the MLB Stats API, Jolpica, and Polymarket's Gamma API, so the viewer's own browser can fetch and score its whole live match list directly. Optional `&trim=polymarket-events` on a Gamma `/events` URL returns only the fields Match Find reads (~25× smaller - see `trimPolymarketEvents`). Odds Study uses ESPN's site API, Gamma (its `/events` pages with the trim, and `/public-search` for championship markets, cached 10 minutes fresh + a day stale) and Kambi's public odds feed (`eu-offering-api.kambicdn.com`: list views cached 2 minutes fresh + 10 stale, the live feed 20 seconds), with `&trim=kambi-events` keeping only the event, price and live-score fields it reads (~5× smaller). |
+| `/sports-proxy` (separate Worker — see below) | GET | Match Find, Odds Study | Host-allowlisted CORS passthrough to ESPN (site and core APIs), the MLB Stats API, Jolpica, and Polymarket's Gamma API, so the viewer's own browser can fetch and score its whole live match list directly. Optional `&trim=polymarket-events` on a Gamma `/events` URL returns only the fields Match Find reads (~25× smaller - see `trimPolymarketEvents`). Odds Study uses ESPN's site API, Gamma (its `/events` pages with the trim, and `/public-search` for championship markets, cached 10 minutes fresh + a day stale) and Kambi's public odds feed (`eu-offering-api.kambicdn.com`: list views cached 2 minutes fresh + 10 stale, the live feed 20 seconds), with `&trim=kambi-events` keeping only the event, price and live-score fields it reads (~5× smaller). Stock Study uses Yahoo Finance's public `query1`/`query2.finance.yahoo.com` endpoints: `/v7/finance/spark` (up to 20 quotes per request) and `/v8/finance/chart` (charts, dividends, splits), cached 30 seconds for a day or five of data and 30 minutes (+ a day stale) for longer charts, and `/v1/finance/search`, cached a day. |
 
 `/sports-proxy` is deployed as its own Worker (`sports-proxy-worker.js` +
 `wrangler.sports-proxy.toml`), not part of `worker.js`/`wrangler.toml` above
@@ -279,6 +283,9 @@ How long a copy lasts depends on how fast that data changes (see
 | `schedule` | Scoreboards for days ≥2 away | 10 min | 1 day |
 | `standings` | ESPN/MLB/Jolpica standings | 30 min | 1 day |
 | `pregame-line` | ESPN core per-game odds | 1 hour | 1 day |
+| `quotes` | Yahoo Finance quotes and charts over 1 or 5 days | 30s | — (never served expired: orders fill at these prices) |
+| `history` | Yahoo Finance charts of a month and longer | 30 min | 1 day |
+| `search` | Yahoo Finance symbol search | 1 day | 7 days |
 
 The `X-Sports-Proxy-Cache` response header is `HIT`, `STALE` (served
 while refreshing in the background) or `MISS`, `X-Sports-Proxy-Cache-Tier`
@@ -359,7 +366,7 @@ Both share one Firebase project and one service-account credential:
    this whole Worker for the sync routes — not one more check on top of an
    open database, but removing the open database entirely. The wildcard
    covers every collection (`orbit-schedules`, `vocab-progress-sync`,
-   `odds-study-accounts`) so
+   `odds-study-accounts`, `stock-study-accounts`) so
    adding a third sync consumer later never needs this rule touched again.
 
 Once this is done, `/sync`, `/vocab-sync` and `/odds-sync` are all live — each already
@@ -416,6 +423,7 @@ path suffix** — each app's own frontend code appends its own hardcoded path.
 | Orbit Vocab | GitHub Settings → Secrets and variables → Actions → **Variables** | `PROXY_URL` (substituted into `sync.js`/`vocab-ai.js` at build time — see `.github/workflows/pages.yml`) |
 | Match Find | Hardcoded directly as the `PROXY_URL` constant in `public/app.js` | None — there's no build step left to inject a build-time variable from (its whole match list is fetched/scored live in the browser — see that repo's `public/lib/match-builder.mjs`), so this is a plain source-code constant instead |
 | Odds Study | Hardcoded as the `PROXY_URL` constant in `public/lib/sources.mjs` | None — a static site with no build step, same as Match Find |
+| Stock Study | Hardcoded as `PROXY_URL` in `public/lib/quotes.mjs` (and `SYNC_URL` in `public/lib/sync.mjs`) | None — a static site with no build step |
 
 Orbit and Orbit Vocab deliberately use a GitHub Actions **Variable**, not a
 Secret — this value ends up in each site's public client bundle either way
@@ -469,9 +477,12 @@ secrets reach another's.
   on Taiwan Sports Lottery odds math; consumes `/sports-proxy` (ESPN
   and Polymarket's Gamma API) and `/odds-sync`. It reads a subset of the fields
   `trimPolymarketEvents` keeps, so dropping a field there can break it too.
+- [Stock Study](https://github.com/JayPengX/Stock-Study) — play-money
+  brokerage simulator; consumes `/sports-proxy` (Yahoo Finance) and
+  `/stock-sync`.
 
 ---
 
-This repo has no user-facing site of its own — it exists purely so four
+This repo has no user-facing site of its own — it exists purely so five
 independent static sites can each have one line of server-side capability
 without any of them needing to run, or pay for, a server.

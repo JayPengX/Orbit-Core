@@ -25,6 +25,9 @@
 //                            devices. Same single-passcode design as
 //                            /vocab-sync, with an 8-character passcode - see
 //                            ODDS_SYNC_APP below.
+//   GET/POST/PATCH/DELETE /stock-sync - Stock Study's simulated
+//                            brokerage account across devices. Same design
+//                            and limits as /odds-sync - see STOCK_SYNC_APP.
 //   POST      /vocab-ai   - Orbit Vocab's live, per-learner AI mnemonics
 //                            (see that repo's vocab-ai.js). Same reuse
 //                            reasoning as /vocab-sync, but shares /gemini's
@@ -1973,6 +1976,17 @@ const ODDS_SYNC_APP = {
   credentialPattern: ODDS_PASSCODE_PATTERN
 };
 
+// Stock Study's /stock-sync: one person's simulated brokerage account (play
+// money only - wallets in several currencies, holdings, orders, loans and
+// their history, never real money or personal data) on their own devices.
+// Exactly /odds-sync's design and limits (8-character passcode, 1 MB), in
+// its own Firestore collection and with its own rate-limit counters.
+const STOCK_SYNC_APP = {
+  ...ODDS_SYNC_APP,
+  collection: 'stock-study-accounts',
+  featurePrefix: 'stock-sync'
+};
+
 // ==== Routing ================================================================
 
 export default {
@@ -1996,6 +2010,7 @@ export default {
     if (path === '/sync') return handleSyncRequest(request, env, headers, ip, ORBIT_SYNC_APP);
     if (path === '/vocab-sync') return handleSyncRequest(request, env, headers, ip, VOCAB_SYNC_APP);
     if (path === '/odds-sync') return handleSyncRequest(request, env, headers, ip, ODDS_SYNC_APP);
+    if (path === '/stock-sync') return handleSyncRequest(request, env, headers, ip, STOCK_SYNC_APP);
     if (path === '/vocab-ai') return handleVocabAiRequest(request, env, headers, ip);
     return errorJson('NOT_FOUND', 404, headers, request);
   }

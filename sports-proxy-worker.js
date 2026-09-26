@@ -116,7 +116,12 @@ const SPORTS_PROXY_ALLOWED_HOSTS = [
   'gamma-api.polymarket.com',
   // Kambi's public odds feed: Odds Study's tennis, badminton, table tennis,
   // volleyball, snooker and Asian baseball/basketball odds and live scores.
-  'eu-offering-api.kambicdn.com'
+  'eu-offering-api.kambicdn.com',
+  // Yahoo Finance's public chart, spark and search endpoints (no key): Stock
+  // Study's quotes, charts, dividends and splits for stocks, ETFs, funds,
+  // currencies, crypto, metals and indexes worldwide.
+  'query1.finance.yahoo.com',
+  'query2.finance.yahoo.com'
 ];
 const SPORTS_PROXY_RATE_LIMIT = 600;
 const SPORTS_PROXY_UPSTREAM_TIMEOUT_MS = 8_000;
@@ -157,6 +162,20 @@ const CACHE_PREGAME_LINE = { tier: 'pregame-line', fresh: HOUR, stale: DAY };
 const CACHE_PREMATCH = { tier: 'prematch', fresh: 2 * MINUTE, stale: 10 * MINUTE };
 // Championship markets (Polymarket's search) change over days.
 const CACHE_FUTURES = { tier: 'futures', fresh: 10 * MINUTE, stale: DAY };
+// Yahoo Finance (Stock Study). Today's quotes (spark or chart over a day or
+// five) move every few seconds but the page polls them every 45 seconds:
+// 30 seconds fresh, never served expired, so an order always fills at a
+// price under a minute old. Longer charts (a month and up, daily points or
+// wider) only gain a point a day. Search results barely change.
+const CACHE_QUOTES = { tier: 'quotes', fresh: 30 * SECOND, stale: 0 };
+const CACHE_HISTORY = { tier: 'history', fresh: 30 * MINUTE, stale: DAY };
+const CACHE_SEARCH = { tier: 'search', fresh: DAY, stale: 7 * DAY };
+
+function yahooPolicy(url) {
+  if (url.pathname.startsWith('/v1/finance/search')) return CACHE_SEARCH;
+  const range = url.searchParams.get('range') || '1d';
+  return range === '1d' || range === '5d' ? CACHE_QUOTES : CACHE_HISTORY;
+}
 
 function utcDayNumber(yyyymmdd) {
   const ms = Date.UTC(Number(yyyymmdd.slice(0, 4)), Number(yyyymmdd.slice(4, 6)) - 1, Number(yyyymmdd.slice(6, 8)));
@@ -192,6 +211,9 @@ function cachePolicyFor(url) {
       return url.pathname === '/public-search' ? CACHE_FUTURES : CACHE_ODDS;
     case 'eu-offering-api.kambicdn.com':
       return url.pathname.includes('/listView/') ? CACHE_PREMATCH : CACHE_LIVE;
+    case 'query1.finance.yahoo.com':
+    case 'query2.finance.yahoo.com':
+      return yahooPolicy(url);
     default:
       return CACHE_LIVE;
   }
