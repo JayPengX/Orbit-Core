@@ -113,7 +113,10 @@ const SPORTS_PROXY_ALLOWED_HOSTS = [
   'sports.core.api.espn.com',
   'statsapi.mlb.com',
   'api.jolpi.ca',
-  'gamma-api.polymarket.com'
+  'gamma-api.polymarket.com',
+  // Kambi's public odds feed: Odds Study's tennis, badminton, table tennis,
+  // volleyball, snooker and Asian baseball/basketball odds and live scores.
+  'eu-offering-api.kambicdn.com'
 ];
 const SPORTS_PROXY_RATE_LIMIT = 600;
 const SPORTS_PROXY_UPSTREAM_TIMEOUT_MS = 8_000;
@@ -148,6 +151,12 @@ const CACHE_STANDINGS = { tier: 'standings', fresh: 30 * MINUTE, stale: DAY };
 // ESPN core odds is only ever asked for a game's PRE-game line, which
 // can't change once the game has started.
 const CACHE_PREGAME_LINE = { tier: 'pregame-line', fresh: HOUR, stale: DAY };
+// Pre-match odds from Kambi's list views move slowly (minutes, not seconds),
+// and every viewer asks for the same few leagues: one upstream fetch every 2
+// minutes per colo, a slightly older copy while it refreshes.
+const CACHE_PREMATCH = { tier: 'prematch', fresh: 2 * MINUTE, stale: 10 * MINUTE };
+// Championship markets (Polymarket's search) change over days.
+const CACHE_FUTURES = { tier: 'futures', fresh: 10 * MINUTE, stale: DAY };
 
 function utcDayNumber(yyyymmdd) {
   const ms = Date.UTC(Number(yyyymmdd.slice(0, 4)), Number(yyyymmdd.slice(4, 6)) - 1, Number(yyyymmdd.slice(6, 8)));
@@ -180,7 +189,9 @@ function cachePolicyFor(url) {
     case 'api.jolpi.ca':
       return CACHE_STANDINGS;
     case 'gamma-api.polymarket.com':
-      return CACHE_ODDS;
+      return url.pathname === '/public-search' ? CACHE_FUTURES : CACHE_ODDS;
+    case 'eu-offering-api.kambicdn.com':
+      return url.pathname.includes('/listView/') ? CACHE_PREMATCH : CACHE_LIVE;
     default:
       return CACHE_LIVE;
   }
@@ -204,6 +215,29 @@ const refreshesInFlight = new Set();
 // place this Worker does real CPU work) - and the cached copy is the
 // trimmed one, so that work happens at most once per TTL per colo.
 const TRIM_POLYMARKET_EVENTS = 'polymarket-events';
+// Opt-in (`&trim=kambi-events`) trimming for Kambi's list views and live
+// feed: only the fields Odds Study reads (lib/kambi.mjs), a small fraction
+// of each event's full record.
+const TRIM_KAMBI_EVENTS = 'kambi-events';
+
+function trimKambi(data) {
+  if (!data || typeof data !== 'object') return data;
+  const event = e =>
+    e && { id: e.id, name: e.name, homeName: e.homeName, awayName: e.awayName, start: e.start, state: e.state, group: e.group, sport: e.sport };
+  const offers = list =>
+    Array.isArray(list)
+      ? list.map(o => ({
+          criterion: { englishLabel: o.criterion?.englishLabel },
+          betOfferType: { englishName: o.betOfferType?.englishName },
+          outcomes: (o.outcomes || []).map(x => ({ type: x.type, odds: x.odds, line: x.line }))
+        }))
+      : list;
+  const live = d => d && { score: d.score, statistics: d.statistics?.sets ? { sets: d.statistics.sets } : undefined };
+  return {
+    events: Array.isArray(data.events) ? data.events.map(item => ({ event: event(item.event), betOffers: offers(item.betOffers) })) : undefined,
+    liveEvents: Array.isArray(data.liveEvents) ? data.liveEvents.map(item => ({ event: event(item.event), liveData: live(item.liveData) })) : undefined
+  };
+}
 
 function trimPolymarketEvents(events) {
   if (!Array.isArray(events)) return events;
@@ -245,9 +279,10 @@ async function fetchUpstream(upstreamUrl, trim) {
     let body = await upstream.arrayBuffer();
     if (trim) {
       try {
-        body = JSON.stringify(trimPolymarketEvents(JSON.parse(new TextDecoder().decode(body))));
+        const parsed = JSON.parse(new TextDecoder().decode(body));
+        body = JSON.stringify(trim === TRIM_KAMBI_EVENTS ? trimKambi(parsed) : trimPolymarketEvents(parsed));
       } catch {
-        // Not the JSON array shape expected - pass it through untouched.
+        // Not the JSON shape expected - pass it through untouched.
       }
     }
     return { status: 200, contentType, body };
@@ -284,10 +319,13 @@ async function handleSportsProxyRequest(request, env, headers, ip, ctx) {
     return json({ error: { message: 'Host not allowed' } }, 400, headers);
   }
 
+  const trimParam = requestParams.get('trim');
   const trim =
-    requestParams.get('trim') === TRIM_POLYMARKET_EVENTS &&
-    upstreamUrl.hostname === 'gamma-api.polymarket.com' &&
-    upstreamUrl.pathname === '/events';
+    trimParam === TRIM_POLYMARKET_EVENTS && upstreamUrl.hostname === 'gamma-api.polymarket.com' && upstreamUrl.pathname === '/events'
+      ? TRIM_POLYMARKET_EVENTS
+      : trimParam === TRIM_KAMBI_EVENTS && upstreamUrl.hostname === 'eu-offering-api.kambicdn.com'
+        ? TRIM_KAMBI_EVENTS
+        : null;
   const policy = cachePolicyFor(upstreamUrl);
   headers['X-Sports-Proxy-Cache-Tier'] = policy.tier;
 
@@ -296,7 +334,7 @@ async function handleSportsProxyRequest(request, env, headers, ip, ctx) {
   // cache key only - never sent upstream), so it can't be served to a
   // caller that asked for the full passthrough, or vice versa.
   const cacheKeyUrl = new URL(upstreamUrl.toString());
-  if (trim) cacheKeyUrl.searchParams.set('__sports_proxy_trim', TRIM_POLYMARKET_EVENTS);
+  if (trim) cacheKeyUrl.searchParams.set('__sports_proxy_trim', trim);
   const cacheKey = new Request(cacheKeyUrl.toString());
   const cached = await cache.match(cacheKey);
   if (cached) {
