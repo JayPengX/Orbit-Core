@@ -170,9 +170,15 @@ const CACHE_FUTURES = { tier: 'futures', fresh: 10 * MINUTE, stale: DAY };
 const CACHE_QUOTES = { tier: 'quotes', fresh: 30 * SECOND, stale: 0 };
 const CACHE_HISTORY = { tier: 'history', fresh: 30 * MINUTE, stale: DAY };
 const CACHE_SEARCH = { tier: 'search', fresh: DAY, stale: 7 * DAY };
+// A company's numbers (P/E, market value, dividend yield, what it does)
+// change with the price at most: an hour fresh, a day's copy while it
+// refreshes. Search with news (newsCount > 0) is kept 30 minutes.
+const CACHE_FUNDAMENTALS = { tier: 'fundamentals', fresh: HOUR, stale: DAY };
+const CACHE_NEWS = { tier: 'news', fresh: 30 * MINUTE, stale: DAY };
 
 function yahooPolicy(url) {
-  if (url.pathname.startsWith('/v1/finance/search')) return CACHE_SEARCH;
+  if (url.pathname.startsWith('/v1/finance/search')) return Number(url.searchParams.get('newsCount')) > 0 ? CACHE_NEWS : CACHE_SEARCH;
+  if (needsYahooCrumb(url)) return CACHE_FUNDAMENTALS;
   const range = url.searchParams.get('range') || '1d';
   return range === '1d' || range === '5d' ? CACHE_QUOTES : CACHE_HISTORY;
 }
@@ -282,16 +288,67 @@ function trimPolymarketEvents(events) {
   }));
 }
 
+// ---- Yahoo's crumb -----------------------------------------------------------
+// Yahoo's quote and quoteSummary endpoints (a company's P/E, market value,
+// dividend yield and profile) want a session: the cookie fc.yahoo.com sets,
+// and a "crumb" token fetched with it. The Worker gets one, keeps it for 6
+// hours in this isolate, adds both to those requests only (never to the
+// cache key), and gets a new one once if Yahoo turns the old one down.
+const YAHOO_CRUMB_PATHS = ['/v7/finance/quote', '/v10/finance/quoteSummary/'];
+const YAHOO_SESSION_MS = 6 * 3600 * 1000;
+// Yahoo refuses the crumb to a bot's User-Agent (HTTP 429).
+const YAHOO_BROWSER_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
+let yahooSession = null;
+
+function needsYahooCrumb(url) {
+  return (url.hostname === 'query1.finance.yahoo.com' || url.hostname === 'query2.finance.yahoo.com') && YAHOO_CRUMB_PATHS.some(p => url.pathname.startsWith(p));
+}
+
+async function getYahooSession(renew = false) {
+  if (!renew && yahooSession && Date.now() - yahooSession.at < YAHOO_SESSION_MS) return yahooSession;
+  const first = await fetch('https://fc.yahoo.com/', {
+    headers: { 'User-Agent': YAHOO_BROWSER_UA },
+    redirect: 'manual',
+    signal: AbortSignal.timeout(SPORTS_PROXY_UPSTREAM_TIMEOUT_MS)
+  });
+  const setCookies = typeof first.headers.getSetCookie === 'function' ? first.headers.getSetCookie() : [first.headers.get('Set-Cookie') || ''];
+  const cookie = setCookies.map(c => c.split(';')[0]).filter(Boolean).join('; ');
+  if (!cookie) throw new Error('Yahoo session unavailable');
+  const res = await fetch('https://query2.finance.yahoo.com/v1/test/getcrumb', {
+    headers: { 'User-Agent': YAHOO_BROWSER_UA, Cookie: cookie },
+    signal: AbortSignal.timeout(SPORTS_PROXY_UPSTREAM_TIMEOUT_MS)
+  });
+  const crumb = (await res.text()).trim();
+  if (res.status !== 200 || !crumb || crumb.length > 64 || /\s|</.test(crumb)) throw new Error('Yahoo crumb unavailable');
+  yahooSession = { cookie, crumb, at: Date.now() };
+  return yahooSession;
+}
+
+async function fetchYahooWithCrumb(upstreamUrl) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const session = await getYahooSession(attempt > 0);
+    const url = new URL(upstreamUrl.toString());
+    url.searchParams.set('crumb', session.crumb);
+    const res = await fetch(url.toString(), {
+      headers: { 'User-Agent': YAHOO_BROWSER_UA, Cookie: session.cookie },
+      signal: AbortSignal.timeout(SPORTS_PROXY_UPSTREAM_TIMEOUT_MS)
+    });
+    if ((res.status !== 401 && res.status !== 403) || attempt > 0) return res;
+  }
+}
+
 // Fetches `upstreamUrl`, applies the optional trim, and saves a 200 into the
 // shared cache. Resolves to { status, contentType, body } or
 // { fetchError }. Never throws.
 async function fetchUpstream(upstreamUrl, trim) {
   let upstream;
   try {
-    upstream = await fetch(upstreamUrl.toString(), {
-      headers: { 'User-Agent': SPORTS_PROXY_FETCH_USER_AGENT },
-      signal: AbortSignal.timeout(SPORTS_PROXY_UPSTREAM_TIMEOUT_MS)
-    });
+    upstream = needsYahooCrumb(upstreamUrl)
+      ? await fetchYahooWithCrumb(upstreamUrl)
+      : await fetch(upstreamUrl.toString(), {
+          headers: { 'User-Agent': SPORTS_PROXY_FETCH_USER_AGENT },
+          signal: AbortSignal.timeout(SPORTS_PROXY_UPSTREAM_TIMEOUT_MS)
+        });
   } catch (error) {
     return { fetchError: error };
   }

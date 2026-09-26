@@ -28,6 +28,9 @@
 //   GET/POST/PATCH/DELETE /stock-sync - Stock Study's simulated
 //                            brokerage account across devices. Same design
 //                            and limits as /odds-sync - see STOCK_SYNC_APP.
+//   GET/POST/PATCH/DELETE /stock-league - Stock Study's friend leagues:
+//                            a shared leaderboard of play-money returns -
+//                            see "==== /stock-league" below.
 //   POST      /vocab-ai   - Orbit Vocab's live, per-learner AI mnemonics
 //                            (see that repo's vocab-ai.js). Same reuse
 //                            reasoning as /vocab-sync, but shares /gemini's
@@ -1987,6 +1990,140 @@ const STOCK_SYNC_APP = {
   featurePrefix: 'stock-sync'
 };
 
+// ==== /stock-league ==========================================================
+//
+// Stock Study's friend leagues: a group of friends compares their play-money
+// accounts by return (not by size, so any starting amount is fair). A
+// league is one Firestore document named by an 8-character code anyone in
+// the group can share: { name, created, members: { m_<id>: "<json>" } }.
+// Each member's row is a small JSON string (nickname, return, net worth,
+// money put in, top holdings, updated) written with a one-key update mask,
+// so two friends saving at once never overwrite each other. A row can only
+// be changed or removed by whoever created it: the first write stores the
+// hash of a random secret the member's browser keeps, later writes must
+// bring the same secret. Nothing here is money or personal data.
+const LEAGUE_COLLECTION = 'stock-study-leagues';
+const LEAGUE_MEMBER_PATTERN = /^[a-z0-9]{12}$/;
+const LEAGUE_SECRET_PATTERN = /^[A-Za-z0-9]{16,64}$/;
+const LEAGUE_MAX_MEMBERS = 50;
+const LEAGUE_MAX_ROW = 2000;
+const LEAGUE_LIMITS = { read: 3000, write: 600, create: 20, delete: 60 };
+
+const leagueText = (value, max) => (typeof value === 'string' ? value.replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, max) : '');
+const leagueNumber = value => (Number.isFinite(value) ? Math.round(value * 1e6) / 1e6 : null);
+
+// A member's row, cleaned: only these fields, bounded.
+function leagueRow(input, secretHash) {
+  const holdings = Array.isArray(input?.top)
+    ? input.top.slice(0, 5).map(h => ({ s: leagueText(h?.s, 24), n: leagueText(h?.n, 40), w: leagueNumber(h?.w) })).filter(h => h.s)
+    : [];
+  return {
+    nick: leagueText(input?.nick, 20) || '?',
+    pct: leagueNumber(input?.pct),
+    nw: leagueNumber(input?.nw),
+    dep: leagueNumber(input?.dep),
+    since: leagueNumber(input?.since),
+    trades: leagueNumber(input?.trades),
+    top: holdings,
+    t: Date.now(),
+    h: secretHash
+  };
+}
+
+async function leagueGet(env, code) {
+  const token = await getFirebaseAccessToken(env);
+  const response = await fetch(firestoreDocUrl(env, LEAGUE_COLLECTION, code), { headers: { Authorization: `Bearer ${token}` } });
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error(await firestoreErrorMessage(response));
+  const doc = await response.json();
+  const members = {};
+  for (const [key, value] of Object.entries(doc.fields?.members?.mapValue?.fields || {})) {
+    try {
+      members[key.slice(2)] = JSON.parse(value.stringValue || '{}');
+    } catch {}
+  }
+  return { name: doc.fields?.name?.stringValue || '', created: Number(doc.fields?.created?.integerValue || 0), members };
+}
+
+// Writes (or with `row` null, removes) one member's row, touching nothing else.
+async function leagueSetMember(env, code, memberId, row) {
+  const token = await getFirebaseAccessToken(env);
+  const field = `members.m_${memberId}`;
+  const fields = row ? { members: { mapValue: { fields: { [`m_${memberId}`]: { stringValue: JSON.stringify(row) } } } } } : {};
+  const response = await fetch(`${firestoreDocUrl(env, LEAGUE_COLLECTION, code)}?updateMask.fieldPaths=${encodeURIComponent(field)}&currentDocument.exists=true`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fields })
+  });
+  if (!response.ok) throw new Error(await firestoreErrorMessage(response));
+}
+
+// What a viewer gets: every row without its secret hash.
+function publicLeague(code, league) {
+  const members = Object.entries(league.members).map(([id, m]) => {
+    const { h, ...rest } = m;
+    return { id, ...rest };
+  });
+  return { code, name: league.name, created: league.created, members };
+}
+
+async function handleLeagueRequest(request, env, headers, ip) {
+  if (!['GET', 'POST', 'PATCH', 'DELETE'].includes(request.method)) return errorJson('SYNC_METHOD_NOT_ALLOWED', 405, headers, request);
+  if (!env.FIREBASE_PROJECT_ID || !env.FIREBASE_CLIENT_EMAIL || !env.FIREBASE_PRIVATE_KEY) return errorJson('MISSING_FIREBASE_CONFIG', 500, headers, request);
+  const url = new URL(request.url);
+  const kind = { GET: 'read', POST: 'create', PATCH: 'write', DELETE: 'delete' }[request.method];
+  const limited = await rateLimitResponse(env, ip, `stock-league:${kind}`, LEAGUE_LIMITS[kind], headers, request);
+  if (limited) return limited;
+
+  try {
+    if (request.method === 'POST') {
+      const body = await readJsonBody(request);
+      if (body === INVALID_BODY) return errorJson('INVALID_JSON', 400, headers, request);
+      const name = leagueText(body?.name, 40);
+      if (!name) return errorJson('MISSING_PAYLOAD', 400, headers, request);
+      const code = generateSyncCode();
+      const token = await getFirebaseAccessToken(env);
+      const created = Date.now();
+      const response = await fetch(`${firestoreDocUrl(env, LEAGUE_COLLECTION, code)}?currentDocument.exists=false`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: { name: { stringValue: name }, created: { integerValue: String(created) }, members: { mapValue: { fields: {} } } } })
+      });
+      if (!response.ok) throw new Error(await firestoreErrorMessage(response));
+      return json({ code, name, created, members: [] }, 200, headers);
+    }
+
+    const code = (url.searchParams.get('code') || '').trim().toUpperCase();
+    if (!SYNC_CODE_PATTERN.test(code)) return errorJson('INVALID_PAIRING_CODE', 400, headers, request);
+    const league = await leagueGet(env, code);
+    if (!league) return errorJson('LEAGUE_NOT_FOUND', 404, headers, request);
+    if (request.method === 'GET') return json(publicLeague(code, league), 200, headers);
+
+    const body = request.method === 'PATCH' ? await readJsonBody(request) : null;
+    if (body === INVALID_BODY) return errorJson('INVALID_JSON', 400, headers, request);
+    const memberId = String((request.method === 'PATCH' ? body?.id : url.searchParams.get('member')) || '');
+    const secret = String((request.method === 'PATCH' ? body?.secret : url.searchParams.get('secret')) || '');
+    if (!LEAGUE_MEMBER_PATTERN.test(memberId) || !LEAGUE_SECRET_PATTERN.test(secret)) return errorJson('INVALID_PASSCODE', 400, headers, request);
+    const secretHash = await sha256Hex(secret);
+    const existing = league.members[memberId];
+    if (existing && existing.h !== secretHash) return errorJson('LEAGUE_NOT_YOURS', 403, headers, request);
+
+    if (request.method === 'DELETE') {
+      if (existing) await leagueSetMember(env, code, memberId, null);
+      delete league.members[memberId];
+      return json(publicLeague(code, league), 200, headers);
+    }
+    if (!existing && Object.keys(league.members).length >= LEAGUE_MAX_MEMBERS) return errorJson('LEAGUE_FULL', 409, headers, request);
+    const row = leagueRow(body, secretHash);
+    if (JSON.stringify(row).length > LEAGUE_MAX_ROW) return errorJson('MISSING_PAYLOAD', 400, headers, request);
+    await leagueSetMember(env, code, memberId, row);
+    league.members[memberId] = row;
+    return json(publicLeague(code, league), 200, headers);
+  } catch (error) {
+    return upstreamFailed(error, headers);
+  }
+}
+
 // ==== Routing ================================================================
 
 export default {
@@ -2011,6 +2148,7 @@ export default {
     if (path === '/vocab-sync') return handleSyncRequest(request, env, headers, ip, VOCAB_SYNC_APP);
     if (path === '/odds-sync') return handleSyncRequest(request, env, headers, ip, ODDS_SYNC_APP);
     if (path === '/stock-sync') return handleSyncRequest(request, env, headers, ip, STOCK_SYNC_APP);
+    if (path === '/stock-league') return handleLeagueRequest(request, env, headers, ip);
     if (path === '/vocab-ai') return handleVocabAiRequest(request, env, headers, ip);
     return errorJson('NOT_FOUND', 404, headers, request);
   }

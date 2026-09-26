@@ -27,5 +27,8 @@ export default {
   MANAGER_PASSCODE_REQUIRED_WRITE: 'The correct passcode is required to write.',
   MANAGER_PASSCODE_REQUIRED_DELETE: 'The correct passcode is required to delete the whole sync.',
   FORBIDDEN_ORIGIN: 'Forbidden origin',
+  LEAGUE_NOT_FOUND: 'This league was not found.',
+  LEAGUE_NOT_YOURS: 'That row belongs to someone else.',
+  LEAGUE_FULL: 'This league is full (50 members).',
   NOT_FOUND: 'Not found'
 };
