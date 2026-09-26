@@ -2,6 +2,12 @@
 
 Shared Cloudflare Workers backend for Orbit, Orbit Vocab, Match Find, Odds Study, and Stock Study.
 
+Four of them (all but Orbit Class) now form **Quadra 四方**: Quadra
+Securities 四方證券 (Stock Study), Quadra Sportsbook 四方運彩 (Odds Study),
+Quadra Fixtures 四方賽程 (Match Find) and Quadra Words 四方單字 (Orbit Vocab),
+sharing one account, the **Quadra Pass 四方通行碼**, through `/eco` (see
+[The Quadra Pass](#the-quadra-pass-eco)). Orbit Class stays on its own.
+
 This repository holds two Cloudflare Workers that back the optional
 server-side features of four otherwise-independent static sites. None of
 the four sites needs a database, a server, or its own API key to use these
@@ -71,6 +77,7 @@ build.
 | `/vocab-sync` | GET/PATCH/DELETE | Orbit Vocab | Cross-device learning-progress sync (single passcode, no separate read-only code). |
 | `/odds-sync` | GET/POST/PATCH/DELETE | Odds Study | Cross-device sync of the simulated betting account (play-money balance, weekly top-ups, saved slips). Same single-passcode design as `/vocab-sync`, with an 8-character passcode; Firestore collection `odds-study-accounts`. Payloads up to 1,000,000 characters (slip history is kept for good; just under Firestore's 1 MiB document limit). |
 | `/stock-sync` | GET/POST/PATCH/DELETE | Stock Study | Cross-device sync of the simulated brokerage account (wallets per currency, holdings, orders, loans, history). Exactly `/odds-sync`'s design and limits (8-character passcode, 1,000,000 characters), in its own Firestore collection `stock-study-accounts` with its own rate-limit counters. |
+| `/eco` | GET/POST/PATCH/DELETE | All four Quadra apps | The Quadra Pass: one 10-character passcode for a shared NT$ money pool (the wallet, merged by this Worker), each app's own data, transfers between accounts and the one-time merge of old codes. See [The Quadra Pass](#the-quadra-pass-eco). |
 | `/vocab-ai` | POST | Orbit Vocab | Live, per-learner personalized mnemonics. Responses are cached in `RATE_LIMIT_KV` by exact request shape (word/pos/meaning/wrongAnswers), so a repeat of the same word + mistake pattern (common — see `vocabAiCacheKey`'s own comment in `worker.js`) is a free KV read, not a billed Gemini call. The `X-Vocab-Ai-Cache: hit`/`miss` response header says which happened. |
 | `/sports-proxy` (separate Worker — see below) | GET | Match Find, Odds Study | Host-allowlisted CORS passthrough to ESPN (site and core APIs), the MLB Stats API, Jolpica, and Polymarket's Gamma API, so the viewer's own browser can fetch and score its whole live match list directly. Optional `&trim=polymarket-events` on a Gamma `/events` URL returns only the fields Match Find reads (~25× smaller - see `trimPolymarketEvents`). Odds Study uses ESPN's site API, Gamma (its `/events` pages with the trim, and `/public-search` for championship markets, cached 10 minutes fresh + a day stale) and Kambi's public odds feed (`eu-offering-api.kambicdn.com`: list views cached 2 minutes fresh + 10 stale, the live feed 20 seconds), with `&trim=kambi-events` keeping only the event, price and live-score fields it reads (~5× smaller). Stock Study uses Yahoo Finance's public `query1`/`query2.finance.yahoo.com` endpoints: `/v7/finance/spark` (up to 20 quotes per request) and `/v8/finance/chart` (charts, dividends, splits), cached 30 seconds for a day or five of data and 30 minutes (+ a day stale) for longer charts, and `/v1/finance/search`, cached a day (with news, 30 minutes). `/v7/finance/quote` and `/v10/finance/quoteSummary` (a company's P/E, market value, dividend yield and profile) need Yahoo's session cookie and crumb: the Worker fetches them itself (with a browser User-Agent, which Yahoo requires for the crumb), keeps them 6 hours, adds them to those requests only, and caches the answers an hour fresh + a day stale. |
 
@@ -178,6 +185,42 @@ anywhere (see that repo's README).
 See the top-of-file comment in `worker.js`, and the comment above each
 route's handler, for the full reasoning behind each design choice — this
 README only covers what's needed to deploy and consume it.
+
+## The Quadra Pass (`/eco`)
+
+`eco.js` (tests in `tests/eco.test.mjs`, `npm test`). One random
+10-character passcode (32^10) is the account's address and its only key,
+stored only as its SHA-256, like `/odds-sync`. New accounts in every Quadra
+app are Quadra Passes; the old app-only routes stay for accounts that
+haven't moved yet.
+
+- **The wallet** (Firestore `eco-wallets`, plain JSON so the Worker can merge
+  it): `entries` (money in or out of the shared pool, each with a fixed id so
+  nothing counts twice: Quadra Sportsbook's ledger, Quadra Words' rewards,
+  transfers, carried-over money), `snap` (each app's latest figure, newest
+  wins: Quadra Securities' own NT$ cash, money in open bets), `settings`
+  (the betting limit, followed sports), `pins` (matches pinned for Quadra
+  Fixtures), `apps` (first and last opened) and `inbox`. Every write reads,
+  merges and writes again only if nobody wrote in between (Firestore's
+  `currentDocument.updateTime` precondition), retrying up to five times, so
+  two apps writing at once never lose each other's entries.
+- **The pool** is every entry plus every app's shared cash figure. Each app
+  shows it as its NT$ cash: its own part from its own data, the rest from
+  the wallet.
+- **App data** stays in each app's existing collection, under the same
+  passcode hash, as the same gzip payload it always synced.
+
+| Call | What |
+| --- | --- |
+| `GET /eco?passcode=P&app=A[&inbox=1]` | The wallet and pool, app A's data (`payload`, empty if none yet) and, with `inbox=1`, merged-in data waiting for app A |
+| `PATCH /eco?passcode=P&app=A` `{ payload?, wallet? }` | App A's data and/or a wallet change (merged) |
+| `DELETE /eco?passcode=P[&app=A][&inbox=ID]` | App A's data, one inbox item, or the whole account |
+| `POST /eco` `{ op: 'create', payload? }` (`?app=A`) | A new Quadra Pass |
+| `POST /eco` `{ op: 'transfer', passcode, to, amount, id, note? }` | Money to another Quadra Pass, recorded on both sides under one id (a retry never sends twice), refused past the pool's balance |
+| `POST /eco` `{ op: 'merge', passcode?, sources: [{ app, passcode }] }` | The one-time merge tool: old Stock Study, Odds Study and Orbit Vocab codes and other Quadra Passes into one (new unless `passcode` names one). Every source is read first; each app's data becomes the target's, or waits in its inbox for the app to fold in with its own rules; other passes' money is carried over under new ids; only then are the sources deleted |
+
+Rate limits (per IP an hour): reads 6,000, writes 600, creates, deletes and
+merges 20, transfers 60.
 
 ## One-Time Deploy Setup
 

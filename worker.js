@@ -25,6 +25,9 @@
 //                            devices. Same single-passcode design as
 //                            /vocab-sync, with an 8-character passcode - see
 //                            ODDS_SYNC_APP below.
+//   GET/POST/PATCH/DELETE /eco - the Quadra Pass: one account (and a
+//                            shared NT$ money pool) across the four Quadra
+//                            apps; see eco.js.
 //   GET/POST/PATCH/DELETE /stock-sync - Stock Study's simulated
 //                            brokerage account across devices. Same design
 //                            and limits as /odds-sync - see STOCK_SYNC_APP.
@@ -72,6 +75,7 @@
 
 import en from './locales/en.js';
 import zhTW from './locales/zh-TW.js';
+import { handleEcoRequest } from './eco.js';
 
 const ALLOWED_ORIGINS = ['https://jaypengx.github.io'];
 
@@ -1722,6 +1726,32 @@ async function firestorePatch(env, collection, code, payload) {
   return { updateTime: doc.updateTime || '' };
 }
 
+// /eco's writes (see eco.js): the same single-field write as
+// firestorePatch, optionally only if the document is still as it was read
+// (`{ updateTime }`) or doesn't exist yet (`{ exists: false }`). A write that
+// lost that race throws an error marked `precondition`, and eco.js reads
+// and merges again.
+async function firestoreWrite(env, collection, code, payload, precondition) {
+  const token = await getFirebaseAccessToken(env);
+  let query = 'updateMask.fieldPaths=payload';
+  if (precondition?.updateTime) query += `&currentDocument.updateTime=${encodeURIComponent(precondition.updateTime)}`;
+  else if (precondition?.exists === false) query += '&currentDocument.exists=false';
+  const response = await fetch(`${firestoreDocUrl(env, collection, code)}?${query}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fields: { payload: { stringValue: payload } } })
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    const error = new Error(body.error?.message || response.statusText || `HTTP ${response.status}`);
+    const status = body.error?.status || '';
+    if (precondition && (status === 'FAILED_PRECONDITION' || status === 'ALREADY_EXISTS' || status === 'NOT_FOUND' || response.status === 409)) error.precondition = true;
+    throw error;
+  }
+  const doc = await response.json();
+  return { updateTime: doc.updateTime || '' };
+}
+
 // Wipes the shared document entirely - see src/sync.js's
 // orbitSyncDeleteForEveryone (and its vocab-sync client-side equivalent).
 // Unlike unlinking (a purely client-side, one device forgetting its own
@@ -1987,6 +2017,22 @@ const STOCK_SYNC_APP = {
   featurePrefix: 'stock-sync'
 };
 
+// ---- /eco: the Quadra Pass (see eco.js) ------------------------------------
+const ECO_DEPS = {
+  json,
+  errorJson,
+  upstreamFailed,
+  readJsonBody,
+  INVALID_BODY,
+  rateLimitResponse,
+  fsGet: firestoreGet,
+  fsWrite: firestoreWrite,
+  fsDelete: firestoreDelete,
+  sha256Hex,
+  generateCode: generateSyncCode,
+  now: () => Date.now()
+};
+
 // ==== Routing ================================================================
 
 export default {
@@ -2011,6 +2057,7 @@ export default {
     if (path === '/vocab-sync') return handleSyncRequest(request, env, headers, ip, VOCAB_SYNC_APP);
     if (path === '/odds-sync') return handleSyncRequest(request, env, headers, ip, ODDS_SYNC_APP);
     if (path === '/stock-sync') return handleSyncRequest(request, env, headers, ip, STOCK_SYNC_APP);
+    if (path === '/eco') return handleEcoRequest(request, env, headers, ip, ECO_DEPS);
     if (path === '/vocab-ai') return handleVocabAiRequest(request, env, headers, ip);
     return errorJson('NOT_FOUND', 404, headers, request);
   }

@@ -9,6 +9,7 @@ on:
       - 'sports-proxy-worker.js'
       - 'wrangler.sports-proxy.toml'
       - 'locales/**'
+      - 'eco.js'
   workflow_dispatch:
 
 jobs:

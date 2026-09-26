@@ -27,5 +27,13 @@ export default {
   MANAGER_PASSCODE_REQUIRED_WRITE: 'The correct passcode is required to write.',
   MANAGER_PASSCODE_REQUIRED_DELETE: 'The correct passcode is required to delete the whole sync.',
   FORBIDDEN_ORIGIN: 'Forbidden origin',
+  ECO_UNKNOWN_APP: 'Unknown app',
+  ECO_UNKNOWN_OP: 'Unknown operation',
+  ECO_INVALID_RECIPIENT: 'That is not a Quadra Pass code.',
+  ECO_SAME_ACCOUNT: 'You cannot send money to the same account.',
+  ECO_INVALID_AMOUNT: 'Invalid amount',
+  ECO_RECIPIENT_NOT_FOUND: 'No account has that Quadra Pass code.',
+  ECO_INSUFFICIENT_FUNDS: 'Not enough money in the pool.',
+  ECO_INVALID_SOURCES: 'List 1 to 12 codes to merge.',
   NOT_FOUND: 'Not found'
 };

@@ -28,5 +28,13 @@ export default {
   MANAGER_PASSCODE_REQUIRED_WRITE: '需要正確的密碼才能寫入。',
   MANAGER_PASSCODE_REQUIRED_DELETE: '需要正確的密碼才能刪除整個同步。',
   FORBIDDEN_ORIGIN: '不允許的來源。',
+  ECO_UNKNOWN_APP: '未知的應用程式',
+  ECO_UNKNOWN_OP: '未知的操作',
+  ECO_INVALID_RECIPIENT: '這不是四方通行碼。',
+  ECO_SAME_ACCOUNT: '不能轉給同一個帳戶。',
+  ECO_INVALID_AMOUNT: '金額無效',
+  ECO_RECIPIENT_NOT_FOUND: '找不到這組四方通行碼的帳戶。',
+  ECO_INSUFFICIENT_FUNDS: '資金池的錢不夠。',
+  ECO_INVALID_SOURCES: '請列出 1 到 12 組要合併的代碼。',
   NOT_FOUND: '找不到此路徑。'
 };
