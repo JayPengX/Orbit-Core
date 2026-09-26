@@ -1955,9 +1955,11 @@ const VOCAB_SYNC_APP = {
 // and read limits below let anyone try.
 const ODDS_PASSCODE_LENGTH = 8;
 const ODDS_PASSCODE_PATTERN = /^[2-9A-HJ-NP-Z]{8}$/;
-// A saved slip is a few hundred bytes of JSON; a year of daily slips fits
-// well under this.
-const ODDS_MAX_PAYLOAD_LENGTH = 262144;
+// Slip history is kept for good, so the account only grows: a gzipped slip
+// is roughly 100-300 bytes, so this holds several thousand slips (years of
+// daily betting). Just under Firestore's 1 MiB document limit, with room
+// for the document's other fields.
+const ODDS_MAX_PAYLOAD_LENGTH = 1_000_000;
 const ODDS_SYNC_APP = {
   collection: 'odds-study-accounts',
   featurePrefix: 'odds-sync',
