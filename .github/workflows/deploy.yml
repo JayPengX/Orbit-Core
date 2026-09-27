@@ -10,6 +10,7 @@ on:
       - 'wrangler.sports-proxy.toml'
       - 'locales/**'
       - 'eco.js'
+      - 'kambi.js'
   workflow_dispatch:
 
 jobs:

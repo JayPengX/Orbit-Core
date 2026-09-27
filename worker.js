@@ -76,6 +76,7 @@
 import en from './locales/en.js';
 import zhTW from './locales/zh-TW.js';
 import { handleEcoRequest } from './eco.js';
+import { handleKambiRequest, refreshKambiWatch, fetchKambiLive } from './kambi.js';
 
 const ALLOWED_ORIGINS = ['https://jaypengx.github.io'];
 
@@ -1752,6 +1753,17 @@ async function firestoreWrite(env, collection, code, payload, precondition) {
   return { updateTime: doc.updateTime || '' };
 }
 
+// Every document of a collection (up to `pageSize`): [{ id, payload }].
+// For /kambi's cron (kambi.js), whose collection stays small.
+async function firestoreList(env, collection, pageSize = 300) {
+  const token = await getFirebaseAccessToken(env);
+  const base = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(env.FIREBASE_PROJECT_ID)}/databases/(default)/documents/${encodeURIComponent(collection)}`;
+  const response = await fetch(`${base}?pageSize=${pageSize}`, { headers: { Authorization: `Bearer ${token}` } });
+  if (!response.ok) throw new Error(await firestoreErrorMessage(response));
+  const data = await response.json();
+  return (data.documents || []).map(doc => ({ id: decodeURIComponent(doc.name.split('/').pop()), payload: doc.fields?.payload?.stringValue || '' }));
+}
+
 // Wipes the shared document entirely - see src/sync.js's
 // orbitSyncDeleteForEveryone (and its vocab-sync client-side equivalent).
 // Unlike unlinking (a purely client-side, one device forgetting its own
@@ -2033,6 +2045,9 @@ const ECO_DEPS = {
   now: () => Date.now()
 };
 
+// /kambi (kambi.js): the same plumbing, and Kambi's live data.
+const KAMBI_DEPS = { ...ECO_DEPS, fsList: firestoreList, fetchLive: fetchKambiLive };
+
 // ==== Routing ================================================================
 
 export default {
@@ -2058,7 +2073,15 @@ export default {
     if (path === '/odds-sync') return handleSyncRequest(request, env, headers, ip, ODDS_SYNC_APP);
     if (path === '/stock-sync') return handleSyncRequest(request, env, headers, ip, STOCK_SYNC_APP);
     if (path === '/eco') return handleEcoRequest(request, env, headers, ip, ECO_DEPS);
+    if (path === '/kambi') return handleKambiRequest(request, env, headers, ip, KAMBI_DEPS);
     if (path === '/vocab-ai') return handleVocabAiRequest(request, env, headers, ip);
     return errorJson('NOT_FOUND', 404, headers, request);
+  },
+
+  // The cron (wrangler.toml [triggers]): every 10 minutes, the latest score
+  // of each Kambi match Quadra Sportsbook has bets on (kambi.js).
+  async scheduled(event, env, ctx) {
+    if (!env.FIREBASE_PROJECT_ID || !env.FIREBASE_CLIENT_EMAIL || !env.FIREBASE_PRIVATE_KEY) return;
+    ctx.waitUntil(refreshKambiWatch(env, KAMBI_DEPS).then(r => console.log('kambi watch', JSON.stringify(r))));
   }
 };
