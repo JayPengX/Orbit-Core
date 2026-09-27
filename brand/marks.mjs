@@ -2,10 +2,10 @@
 // family (four tiles, one per app) and one icon per app: the same four
 // tiles on the app's own colour, its own tile solid white with its symbol.
 export const APPS = {
-  stock: { zh: '四方證券', en: 'Quadra Securities', tagZh: '全球股市模擬交易：真實報價、真實手續費、換匯與融資', tagEn: 'A play-money brokerage for markets worldwide', from: '#2dd4bf', to: '#0f3d5c', ink: '#0f766e', tile: 0, repo: 'Stock-Study' },
-  odds: { zh: '四方運彩', en: 'Quadra Sportsbook', tagZh: '用數學看運彩：公平機率、估計賠率、模擬下注', tagEn: 'Sports lottery odds, the maths and a practice account', from: '#60a5fa', to: '#1e3a8a', ink: '#1d4ed8', tile: 1, repo: 'Odds-Study' },
-  match: { zh: '四方賽程', en: 'Quadra Fixtures', tagZh: '今晚看什麼：依精彩程度排好的賽程', tagEn: 'What\'s worth watching, planned in your own time', from: '#fbbf24', to: '#9a3412', ink: '#c2410c', tile: 2, repo: 'Match-Find' },
-  vocab: { zh: '四方單字', en: 'Quadra Words', tagZh: '高中英文 Level 4–6 聽寫與複習，答對還能賺錢', tagEn: 'High-school English words, dictation and review', from: '#a5b4fc', to: '#312e81', ink: '#4f46e5', tile: 3, repo: 'Orbit-Vocab' }
+  stock: { zh: '四方證券', en: 'Quadra Securities', tagZh: '全球股市模擬交易：真實報價、真實手續費、換匯與融資', tagEn: 'A play-money brokerage for markets worldwide', from: '#2dd4bf', to: '#0f3d5c', ink: '#0f766e', tile: 0, repo: 'Quadra-Securities' },
+  odds: { zh: '四方運彩', en: 'Quadra Sportsbook', tagZh: '用數學看運彩：公平機率、估計賠率、模擬下注', tagEn: 'Sports lottery odds, the maths and a practice account', from: '#60a5fa', to: '#1e3a8a', ink: '#1d4ed8', tile: 1, repo: 'Quadra-Sportsbook' },
+  match: { zh: '四方賽程', en: 'Quadra Fixtures', tagZh: '今晚看什麼：依精彩程度排好的賽程', tagEn: 'What\'s worth watching, planned in your own time', from: '#fbbf24', to: '#9a3412', ink: '#c2410c', tile: 2, repo: 'Quadra-Fixtures' },
+  vocab: { zh: '四方單字', en: 'Quadra Words', tagZh: '高中英文 Level 4–6 聽寫與複習，答對還能賺錢', tagEn: 'High-school English words, dictation and review', from: '#a5b4fc', to: '#312e81', ink: '#4f46e5', tile: 3, repo: 'Quadra-Words' }
 };
 
 // Each app's symbol, drawn in a 128×128 tile, in `c`.

@@ -1,6 +1,6 @@
 // Writes Quadra's icons and link preview cards into the four app repos,
-// checked out next to this one (../Stock-Study, ../Odds-Study,
-// ../Match-Find, ../Orbit-Vocab). Needs Playwright's Chromium:
+// checked out next to this one (../Quadra-Securities, ../Quadra-Sportsbook,
+// ../Quadra-Fixtures, ../Quadra-Words). Needs Playwright's Chromium:
 //   node brand/generate.mjs
 import { writeFile, mkdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -12,10 +12,10 @@ const { chromium } = require('playwright');
 const root = new URL('../../', import.meta.url).pathname;
 // Where each app keeps its site's files, and which icon files it uses.
 const OUT = {
-  stock: { dir: 'Stock-Study/public', icons: { 'icons/apple-touch-icon.png': 180, 'icons/icon-192.png': 192, 'icons/icon-512.png': 512 }, og: 'og-image.png', ogSquare: 'og-image-square.png' },
-  odds: { dir: 'Odds-Study/public', icons: { 'icons/apple-touch-icon.png': 180, 'icons/icon-192.png': 192, 'icons/icon-512.png': 512 }, og: 'og-image.jpg', ogSquare: 'og-image-square.jpg' },
-  match: { dir: 'Match-Find/public', icons: { 'icons/icon-180.png': 180, 'icons/icon-192.png': 192, 'icons/icon-512.png': 512 }, og: 'og-image.jpg', ogSquare: 'og-image-square.jpg' },
-  vocab: { dir: 'Orbit-Vocab', icons: { 'icons/apple-touch-icon.png': 180, 'icons/icon-192.png': 192, 'icons/icon-512.png': 512, 'icons/favicon-32.png': 32, 'icons/favicon-16.png': 16 }, og: 'assets/og-card.jpg', ogSquare: 'assets/og-card-square.jpg' }
+  stock: { dir: 'Quadra-Securities/public', icons: { 'icons/apple-touch-icon.png': 180, 'icons/icon-192.png': 192, 'icons/icon-512.png': 512 }, og: 'og-image.png', ogSquare: 'og-image-square.png' },
+  odds: { dir: 'Quadra-Sportsbook/public', icons: { 'icons/apple-touch-icon.png': 180, 'icons/icon-192.png': 192, 'icons/icon-512.png': 512 }, og: 'og-image.jpg', ogSquare: 'og-image-square.jpg' },
+  match: { dir: 'Quadra-Fixtures/public', icons: { 'icons/icon-180.png': 180, 'icons/icon-192.png': 192, 'icons/icon-512.png': 512 }, og: 'og-image.jpg', ogSquare: 'og-image-square.jpg' },
+  vocab: { dir: 'Quadra-Words', icons: { 'icons/apple-touch-icon.png': 180, 'icons/icon-192.png': 192, 'icons/icon-512.png': 512, 'icons/favicon-32.png': 32, 'icons/favicon-16.png': 16 }, og: 'assets/og-card.jpg', ogSquare: 'assets/og-card-square.jpg' }
 };
 
 const browser = await chromium.launch();

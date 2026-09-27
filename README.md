@@ -17,17 +17,17 @@ features — each one just points at a deployed Worker URL.
   Repo: https://github.com/JayPengX/Orbit-Class
   Live: https://jaypengx.github.io/Orbit-Class/
 - **Orbit Vocab** — vocabulary trainer
-  Repo: https://github.com/JayPengX/Orbit-Vocab
-  Live: https://jaypengx.github.io/Orbit-Vocab/
+  Repo: https://github.com/JayPengX/Quadra-Words
+  Live: https://jaypengx.github.io/Quadra-Words/
 - **Match Find** — sports recommendation site
-  Repo: https://github.com/JayPengX/Match-Find
-  Live: https://jaypengx.github.io/Match-Find/
+  Repo: https://github.com/JayPengX/Quadra-Fixtures
+  Live: https://jaypengx.github.io/Quadra-Fixtures/
 - **Odds Study** — educational page on Taiwan Sports Lottery odds math
-  Repo: https://github.com/JayPengX/Odds-Study
-  Live: https://jaypengx.github.io/Odds-Study/
+  Repo: https://github.com/JayPengX/Quadra-Sportsbook
+  Live: https://jaypengx.github.io/Quadra-Sportsbook/
 - **Stock Study** — play-money brokerage simulator for markets worldwide
-  Repo: https://github.com/JayPengX/Stock-Study
-  Live: https://jaypengx.github.io/Stock-Study/
+  Repo: https://github.com/JayPengX/Quadra-Securities
+  Live: https://jaypengx.github.io/Quadra-Securities/
 
 ## Table of Contents
 
@@ -217,7 +217,7 @@ haven't moved yet.
 | `DELETE /eco?passcode=P[&app=A][&inbox=ID]` | App A's data, one inbox item, or the whole account |
 | `POST /eco` `{ op: 'create', payload? }` (`?app=A`) | A new Quadra Pass |
 | `POST /eco` `{ op: 'transfer', passcode, to, amount, id, note? }` | Money to another Quadra Pass, recorded on both sides under one id (a retry never sends twice), refused past the pool's balance |
-| `POST /eco` `{ op: 'merge', passcode?, sources: [{ app, passcode }] }` | The one-time merge tool: old Stock Study, Odds Study and Orbit Vocab codes and other Quadra Passes into one (new unless `passcode` names one). Every source is read first; each app's data becomes the target's, or waits in its inbox for the app to fold in with its own rules; other passes' money is carried over under new ids; only then are the sources deleted |
+| `POST /eco` `{ op: 'merge', passcode?, sources: [{ app, passcode }] }` | Codes into one pass (the apps use it to turn an old one-app code into a pass by itself): old Stock Study, Odds Study and Orbit Vocab codes and other Quadra Passes into one (new unless `passcode` names one). Every source is read first; each app's data becomes the target's, or waits in its inbox for the app to fold in with its own rules; other passes' money is carried over under new ids; only then are the sources deleted |
 
 Rate limits (per IP an hour): reads 6,000, writes 600, creates, deletes and
 merges 20, transfers 60.
@@ -512,15 +512,15 @@ secrets reach another's.
 
 - [Orbit Class](https://github.com/JayPengX/Orbit-Class) — class schedule
   dashboard; consumes `/gemini`, `/nl-edit`, and `/sync`.
-- [Orbit Vocab](https://github.com/JayPengX/Orbit-Vocab) — vocabulary
+- [Orbit Vocab](https://github.com/JayPengX/Quadra-Words) — vocabulary
   trainer; consumes `/vocab-sync` and `/vocab-ai`.
-- [Match Find](https://github.com/JayPengX/Match-Find) — sports
+- [Match Find](https://github.com/JayPengX/Quadra-Fixtures) — sports
   recommendation site; consumes `/sports-proxy` only.
-- [Odds Study](https://github.com/JayPengX/Odds-Study) — educational page
+- [Odds Study](https://github.com/JayPengX/Quadra-Sportsbook) — educational page
   on Taiwan Sports Lottery odds math; consumes `/sports-proxy` (ESPN
   and Polymarket's Gamma API) and `/odds-sync`. It reads a subset of the fields
   `trimPolymarketEvents` keeps, so dropping a field there can break it too.
-- [Stock Study](https://github.com/JayPengX/Stock-Study) — play-money
+- [Stock Study](https://github.com/JayPengX/Quadra-Securities) — play-money
   brokerage simulator; consumes `/sports-proxy` (Yahoo Finance) and
   `/stock-sync`.
 

@@ -105,7 +105,7 @@ async function isRateLimited(env, ip, limit) {
 }
 
 // ==== /sports-proxy - CORS passthrough for public sports data ==============
-const SPORTS_PROXY_FETCH_USER_AGENT = 'Match-Find-Bot/1.0 (+https://github.com/JayPengX/Match-Find)';
+const SPORTS_PROXY_FETCH_USER_AGENT = 'Quadra-Fixtures-Bot/1.0 (+https://github.com/JayPengX/Quadra-Fixtures)';
 const SPORTS_PROXY_ALLOWED_HOSTS = [
   'site.api.espn.com',
   // Per-fixture odds (Match Find's pre-game line for games already in
