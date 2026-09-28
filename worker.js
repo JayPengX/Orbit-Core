@@ -169,8 +169,8 @@ function pickLocale(request) {
 // keeps the pre-existing `message` field so callers that just display
 // `error.message` raw keep working unchanged.
 function errorJson(code, status, headers, request) {
-  const msgs = ERROR_MESSAGES[code];
-  const message = msgs[pickLocale(request)] ?? msgs['zh-TW'];
+  const msgs = ERROR_MESSAGES[code] || {};
+  const message = msgs[pickLocale(request)] ?? msgs['zh-TW'] ?? code;
   return json({ error: { code, message } }, status, headers);
 }
 

@@ -35,5 +35,13 @@ export default {
   ECO_RECIPIENT_NOT_FOUND: 'No account has that Quadra Pass code.',
   ECO_INSUFFICIENT_FUNDS: 'Not enough money in the pool.',
   ECO_INVALID_SOURCES: 'List 1 to 12 codes to merge.',
-  NOT_FOUND: 'Not found'
+  NOT_FOUND: 'Not found',
+  ECO_TOKEN_INVALID: 'Your sign-in has expired. Signing in again…',
+  ECO_SIGNED_OUT: 'This device was signed out. Sign in with your Quadra Pass.',
+  ECO_SESSION_MOVED: 'Quadra is open in another app.',
+  ECO_HANDOFF_EXPIRED: 'This link has expired. Sign in with your Quadra Pass.',
+  ECO_NOTHING_TO_SHARE: 'There is no schedule to share yet.',
+  ECO_SHARE_NOT_FOUND: 'No schedule has this key, or it has expired.',
+  ECO_LINK_GONE: 'The owner stopped sharing this schedule.',
+  ECO_SOURCE_LOCKED: 'The manager passcode is not right.'
 };

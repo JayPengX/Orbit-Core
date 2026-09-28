@@ -36,5 +36,13 @@ export default {
   ECO_RECIPIENT_NOT_FOUND: '找不到這組四方通行碼的帳戶。',
   ECO_INSUFFICIENT_FUNDS: '資金池的錢不夠。',
   ECO_INVALID_SOURCES: '請列出 1 到 12 組要合併的代碼。',
-  NOT_FOUND: '找不到此路徑。'
+  NOT_FOUND: '找不到此路徑。',
+  ECO_TOKEN_INVALID: '登入已過期，正在重新登入…',
+  ECO_SIGNED_OUT: '這台裝置已登出，請用 Quadra Pass 登入。',
+  ECO_SESSION_MOVED: 'Quadra 正在另一個 App 使用中。',
+  ECO_HANDOFF_EXPIRED: '這個連結已過期，請用 Quadra Pass 登入。',
+  ECO_NOTHING_TO_SHARE: '還沒有課表可以分享。',
+  ECO_SHARE_NOT_FOUND: '找不到這組金鑰，或已過期。',
+  ECO_LINK_GONE: '擁有者已停止分享這份課表。',
+  ECO_SOURCE_LOCKED: '管理密碼不正確。'
 };
