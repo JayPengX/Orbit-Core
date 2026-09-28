@@ -181,10 +181,11 @@ test('device code: signs in another device once, within ten minutes', async () =
   assert.equal((await t.call('POST', '', { op: 'pair-redeem', code: late.data.code, app: 'match' })).status, 404);
 });
 
-test('payday: a month and a week once, from the cut-over on', () => {
+test('payday: once a month, from the cut-over on', () => {
   const oct = Date.UTC(2026, 9, 7, 3);
   const due = paydayEntries({ entries: [] }, oct).map(e => e.id);
-  assert.deepEqual(due, ['eco:pay:2026-10', 'eco:week:2026-10-05']);
+  assert.deepEqual(due, ['eco:pay:2026-10']);
+  assert.equal(paydayEntries({ entries: [] }, oct)[0].amount, 7_000);
   assert.deepEqual(paydayEntries({ entries: due.map(id => ({ id })) }, oct), []);
   assert.deepEqual(paydayEntries({ entries: [] }, Date.UTC(2026, 8, 20)), []);
 });
