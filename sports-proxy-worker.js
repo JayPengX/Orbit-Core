@@ -162,6 +162,7 @@ const CACHE_LIVE = { tier: 'live', fresh: 20 * SECOND, stale: 0 };
 // poll then got the PREVIOUS poll's odds - always one tick behind.)
 const CACHE_ODDS = { tier: 'odds', fresh: 20 * SECOND, stale: 0 };
 const CACHE_SCHEDULE = { tier: 'schedule', fresh: 10 * MINUTE, stale: DAY };
+const CACHE_SEASON = { tier: 'season', fresh: 3 * MINUTE, stale: 30 * MINUTE };
 const CACHE_STANDINGS = { tier: 'standings', fresh: 30 * MINUTE, stale: DAY };
 // ESPN core odds is only ever asked for a game's PRE-game line, which
 // can't change once the game has started.
@@ -205,6 +206,8 @@ function utcDayNumber(yyyymmdd) {
 function scoreboardPolicy(url) {
   const dates = url.searchParams.get('dates');
   if (!dates) return CACHE_LIVE;
+  // A whole year (a race series' or tour's season): a few minutes fresh.
+  if (/^\d{4}$/.test(dates)) return CACHE_SEASON;
   const match = /^(\d{8})(?:-(\d{8}))?$/.exec(dates);
   if (!match) return CACHE_LIVE;
   const today = Math.floor(Date.now() / (DAY * 1000));
@@ -393,39 +396,26 @@ function cacheEntry(result, policy) {
   });
 }
 
-async function handleSportsProxyRequest(request, env, headers, ip, ctx) {
-  if (request.method !== 'GET') return json({ error: { message: 'GET only' } }, 405, headers);
+// Which trim (if any) applies to a URL: only the hosts each one is for.
+function trimFor(trimParam, upstreamUrl) {
+  if (trimParam === TRIM_POLYMARKET_EVENTS && upstreamUrl.hostname === 'gamma-api.polymarket.com' && upstreamUrl.pathname === '/events') return TRIM_POLYMARKET_EVENTS;
+  if (trimParam === TRIM_KAMBI_EVENTS && upstreamUrl.hostname === 'eu-offering-api.kambicdn.com') return TRIM_KAMBI_EVENTS;
+  return null;
+}
 
-  const requestParams = new URL(request.url).searchParams;
-  const target = requestParams.get('url') || '';
-  let upstreamUrl;
+function parseTarget(target) {
   try {
-    upstreamUrl = new URL(target);
+    const u = new URL(target);
+    return u.protocol === 'https:' && SPORTS_PROXY_ALLOWED_HOSTS.includes(u.hostname) ? u : null;
   } catch {
-    return json({ error: { message: 'Missing or invalid url' } }, 400, headers);
+    return null;
   }
-  if (upstreamUrl.protocol !== 'https:' || !SPORTS_PROXY_ALLOWED_HOSTS.includes(upstreamUrl.hostname)) {
-    return json({ error: { message: 'Host not allowed' } }, 400, headers);
-  }
+}
 
-  // The Quadra Pass gate (see the top of this file).
-  let session = null;
-  if (env.ECO_TOKEN_SECRET) {
-    session = await readToken(env.ECO_TOKEN_SECRET, requestParams.get('qt') || '', 'ses');
-    if (!session) return json({ error: { code: 'QUADRA_PASS_REQUIRED', message: 'Sign in with a Quadra Pass.' } }, 401, headers);
-    if (sessionLimited(session.s, SESSION_RATE_LIMIT)) return json({ error: { message: 'Too many requests, please try again later.' } }, 429, headers);
-  }
-
-  const trimParam = requestParams.get('trim');
-  const trim =
-    trimParam === TRIM_POLYMARKET_EVENTS && upstreamUrl.hostname === 'gamma-api.polymarket.com' && upstreamUrl.pathname === '/events'
-      ? TRIM_POLYMARKET_EVENTS
-      : trimParam === TRIM_KAMBI_EVENTS && upstreamUrl.hostname === 'eu-offering-api.kambicdn.com'
-        ? TRIM_KAMBI_EVENTS
-        : null;
+// One upstream URL through the shared cache: { status, contentType, body,
+// cache, age } or { fetchError }. `body` is a stream or an ArrayBuffer.
+async function resolveOne(upstreamUrl, trim, ctx) {
   const policy = cachePolicyFor(upstreamUrl);
-  headers['X-Sports-Proxy-Cache-Tier'] = policy.tier;
-
   const cache = caches.default;
   // A trimmed response is cached under its own key (a marker param on the
   // cache key only - never sent upstream), so it can't be served to a
@@ -450,38 +440,91 @@ async function handleSportsProxyRequest(request, env, headers, ip, ctx) {
             .finally(() => refreshesInFlight.delete(cacheKey.url))
         );
       }
-      return new Response(cached.body, {
-        status: cached.status,
-        headers: {
-          ...headers,
-          'Content-Type': cached.headers.get('Content-Type') || 'application/json',
-          'X-Sports-Proxy-Cache': isFresh ? 'HIT' : 'STALE',
-          'X-Sports-Proxy-Age': String(Math.round(ageSeconds))
-        }
-      });
+      return { status: cached.status, contentType: cached.headers.get('Content-Type') || 'application/json', body: cached.body, cache: isFresh ? 'HIT' : 'STALE', age: Math.round(ageSeconds), policy };
     }
   }
+  const result = await fetchUpstream(upstreamUrl, trim);
+  if (result.status === 200) ctx.waitUntil(cache.put(cacheKey, cacheEntry(result, policy)));
+  return { ...result, cache: 'MISS', age: 0, policy };
+}
 
-  // The rate-limit check (a KV read) and the upstream fetch run
-  // concurrently rather than one after the other, taking a KV round trip
-  // off the critical path of every ordinary request. The trade-off: a
-  // request that turns out to be rate-limited still pays for the upstream
-  // fetch - acceptable, since that's the rare, already-abusive case.
-  const [rateLimit, result] = await Promise.all([session ? { limited: false, backend: 'session' } : isRateLimited(env, ip, SPORTS_PROXY_RATE_LIMIT), fetchUpstream(upstreamUrl, trim)]);
+// How long the browser may keep an answer itself (its own copy, by the
+// address it asked for): the fresh part of the cache policy, at most 10
+// minutes. Live data only a few seconds.
+const browserMaxAge = policy => Math.min(policy.fresh, 600);
+
+async function checkSession(env, requestParams, headers, weight = 1) {
+  if (!env.ECO_TOKEN_SECRET) return { session: null };
+  const session = await readToken(env.ECO_TOKEN_SECRET, requestParams.get('qt') || '', 'ses');
+  if (!session) return { error: json({ error: { code: 'QUADRA_PASS_REQUIRED', message: 'Sign in with a Quadra Pass.' } }, 401, headers) };
+  for (let i = 0; i < weight; i++) if (sessionLimited(session.s, SESSION_RATE_LIMIT)) return { error: json({ error: { message: 'Too many requests, please try again later.' } }, 429, headers) };
+  return { session };
+}
+
+// A batch: `?batch=1&u=<url>&u=<url>…` (each optionally `<trim>!<url>`),
+// answered as one JSON document { r: [{ s: status, b: body } …] } in the
+// same order. One Worker request instead of many - the Workers plan bills
+// per request, and a page's first paint asks for a dozen lists at once.
+// Every URL still goes through the shared cache on its own.
+const BATCH_MAX = 12;
+async function handleBatch(request, env, headers, ip, ctx, requestParams) {
+  const items = requestParams.getAll('u').slice(0, BATCH_MAX);
+  if (!items.length) return json({ error: { message: 'Missing u' } }, 400, headers);
+  const gate = await checkSession(env, requestParams, headers, items.length);
+  if (gate.error) return gate.error;
+  if (!gate.session) {
+    const rl = await isRateLimited(env, ip, SPORTS_PROXY_RATE_LIMIT);
+    if (rl.limited) return json({ error: { message: 'Too many requests, please try again later.' } }, 429, headers);
+  }
+  const results = await Promise.all(
+    items.map(async item => {
+      const bang = item.indexOf('!');
+      const [trimParam, target] = bang > 0 && !item.slice(0, bang).includes(':') ? [item.slice(0, bang), item.slice(bang + 1)] : [null, item];
+      const upstreamUrl = parseTarget(target);
+      if (!upstreamUrl) return '{"s":400}';
+      const r = await resolveOne(upstreamUrl, trimFor(trimParam, upstreamUrl), ctx).catch(error => ({ fetchError: error }));
+      if (r.fetchError || r.status !== 200 || !/json|javascript/i.test(r.contentType || '')) {
+        if (r.body?.cancel) r.body.cancel().catch(() => {});
+        return `{"s":${r.fetchError ? 502 : r.status === 200 ? 415 : r.status}}`;
+      }
+      const text = r.body instanceof ArrayBuffer ? new TextDecoder().decode(r.body) : await new Response(r.body).text();
+      return `{"s":200,"a":${r.age},"b":${text}}`;
+    })
+  );
+  return new Response(`{"r":[${results.join(',')}]}`, { status: 200, headers: { ...headers, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+}
+
+async function handleSportsProxyRequest(request, env, headers, ip, ctx) {
+  if (request.method !== 'GET') return json({ error: { message: 'GET only' } }, 405, headers);
+
+  const requestParams = new URL(request.url).searchParams;
+  if (requestParams.has('batch')) return handleBatch(request, env, headers, ip, ctx, requestParams);
+  const target = requestParams.get('url') || '';
+  const upstreamUrl = parseTarget(target);
+  if (!upstreamUrl) return json({ error: { message: target ? 'Host not allowed' : 'Missing or invalid url' } }, 400, headers);
+
+  // The Quadra Pass gate (see the top of this file).
+  const gate = await checkSession(env, requestParams, headers);
+  if (gate.error) return gate.error;
+  const trim = trimFor(requestParams.get('trim'), upstreamUrl);
+  headers['X-Sports-Proxy-Cache-Tier'] = cachePolicyFor(upstreamUrl).tier;
+
+  // The rate-limit check (a KV read, only without a session) and the
+  // lookup run concurrently.
+  const [rateLimit, result] = await Promise.all([gate.session ? { limited: false, backend: 'session' } : isRateLimited(env, ip, SPORTS_PROXY_RATE_LIMIT), resolveOne(upstreamUrl, trim, ctx)]);
   headers['X-RateLimit-Backend'] = rateLimit.backend;
-  if (rateLimit.limited) {
-    return json({ error: { message: 'Too many requests, please try again later.' } }, 429, headers);
-  }
-  if (result.fetchError) {
-    return json({ error: { message: result.fetchError.message || 'Upstream request failed' } }, 502, headers);
-  }
-  if (result.status !== 200) {
-    return new Response(result.body, { status: result.status, headers: { ...headers, 'Content-Type': result.contentType } });
-  }
-  ctx.waitUntil(cache.put(cacheKey, cacheEntry(result, policy)));
+  if (rateLimit.limited) return json({ error: { message: 'Too many requests, please try again later.' } }, 429, headers);
+  if (result.fetchError) return json({ error: { message: result.fetchError.message || 'Upstream request failed' } }, 502, headers);
+  if (result.status !== 200) return new Response(result.body, { status: result.status, headers: { ...headers, 'Content-Type': result.contentType } });
   return new Response(result.body, {
     status: 200,
-    headers: { ...headers, 'Content-Type': result.contentType, 'X-Sports-Proxy-Cache': 'MISS' }
+    headers: {
+      ...headers,
+      'Content-Type': result.contentType,
+      'Cache-Control': `private, max-age=${browserMaxAge(result.policy)}`,
+      'X-Sports-Proxy-Cache': result.cache,
+      'X-Sports-Proxy-Age': String(result.age)
+    }
   });
 }
 

@@ -58,6 +58,51 @@ test('pass codes', () => {
   assert.ok(kit.isPass('ABCDE-23456'));
 });
 
+test('account details: this month in and out, latest entries first', () => {
+  const now = Date.UTC(2026, 9, 15, 4);
+  const w = {
+    created: Date.UTC(2026, 0, 1),
+    entries: [
+      { id: 'a', t: Date.UTC(2026, 8, 30), amount: 500, app: 'vocab', kind: 'reward' },
+      { id: 'b', t: Date.UTC(2026, 9, 2), amount: 7000, app: 'eco', kind: 'pay' },
+      { id: 'c', t: Date.UTC(2026, 9, 3), amount: -200, app: 'odds', kind: 'stake' }
+    ]
+  };
+  const d = kit.accountDetails(w, 'zh', now);
+  assert.equal(d.in, 7000);
+  assert.equal(d.out, -200);
+  assert.equal(d.count, 2);
+  assert.equal(d.recent[0].amount, -200);
+  assert.match(d.recent[1].text, /Quadra · 每月薪資/);
+});
+
+test('proxyJson batches requests made together and remembers answers', async () => {
+  const calls = [];
+  globalThis.fetch = async url => {
+    calls.push(String(url));
+    const u = new URL(url);
+    if (u.searchParams.has('batch')) {
+      const r = u.searchParams.getAll('u').map(x => ({ s: 200, b: { echo: x } }));
+      return new Response(JSON.stringify({ r }), { status: 200 });
+    }
+    return new Response(JSON.stringify({ echo: u.searchParams.get('url') }), { status: 200 });
+  };
+  const [a, b, c] = await Promise.all([kit.proxyJson('https://x.test/a', { persist: false }), kit.proxyJson('https://x.test/b', { persist: false }), kit.proxyJson('https://x.test/c', { trim: 'kambi-events', persist: false })]);
+  assert.equal(calls.length, 1);
+  assert.ok(calls[0].includes('batch=1'));
+  assert.equal(a.echo, 'https://x.test/a');
+  assert.equal(b.echo, 'https://x.test/b');
+  assert.equal(c.echo, 'kambi-events!https://x.test/c');
+  // Asked again within its time: from memory.
+  await kit.proxyJson('https://x.test/a', { persist: false });
+  assert.equal(calls.length, 1);
+  // Alone: a plain request.
+  const d = await kit.proxyJson('https://x.test/d', { persist: false });
+  assert.equal(d.echo, 'https://x.test/d');
+  assert.equal(calls.length, 2);
+  assert.ok(!calls[1].includes('batch=1'));
+});
+
 test('a device keeps its sign-in and the account id, never the pass', () => {
   store.clear();
   assert.equal(kit.storedAccount(), '');
