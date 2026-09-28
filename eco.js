@@ -244,7 +244,7 @@ export function publicWallet(w) {
 }
 
 const isActive = (wallet, claims) => wallet?.live?.sid === claims.s && wallet?.live?.app === claims.a;
-const gen = wallet => wallet?.sec?.gen || 0;
+export const gen = wallet => wallet?.sec?.gen || 0;
 const liveOf = wallet => (wallet?.live ? { app: wallet.live.app, t: wallet.live.t } : null);
 
 // ---- Handler ---------------------------------------------------------------

@@ -14,10 +14,10 @@
 // The token is checked against ADMIN_TOKEN_HASH (its SHA-256; the token
 // itself is never in the repo). Clearing the hash turns this off.
 
-import { ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, ECO_LIMITS, parseWallet, tidyWallet } from './eco.js';
+import { ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, PAIR_MS, ECO_LIMITS, parseWallet, tidyWallet, poolBalance, gen } from './eco.js';
 import { KAMBI_COLLECTION } from './kambi.js';
 
-export const ADMIN_TOKEN_HASH = '';
+export const ADMIN_TOKEN_HASH = 'ec7ab37efca45856b80414c8263af775b53cea025ca86b7b6f55110a98a1bb43';
 export const RETIRED_COLLECTIONS = ['orbit-schedules', 'eco-links', 'stock-study-leagues'];
 // (A function: eco.js and this file import each other.)
 const keep = () => new Set([WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, KAMBI_COLLECTION, ...Object.values(ECO_APPS).map(a => a.collection)]);
@@ -30,6 +30,21 @@ export async function handleAdmin({ env, deps, headers, request, ip, body }) {
   if (limited) return limited;
   if (!ADMIN_TOKEN_HASH || typeof body.token !== 'string' || (await deps.sha256Hex(body.token)) !== ADMIN_TOKEN_HASH) return deps.errorJson('FORBIDDEN', 403, headers, request);
   if (!deps.fsList || !deps.fsCollections || !deps.fsBatch) return deps.errorJson('ECO_UNKNOWN_OP', 400, headers, request);
+  // Getting an account back whose pass was lost: `wallets` lists every pass
+  // (a short reference, when it was made and last used, balance, entries),
+  // `device-code` { wallet: reference } makes a one-time device code for it
+  // (10 minutes), so its owner signs in and sets a new pass.
+  if (body.action === 'wallets') return deps.json({ wallets: await walletList(env, deps) }, 200, headers);
+  if (body.action === 'device-code') {
+    const ref = typeof body.wallet === 'string' ? body.wallet : '';
+    const hits = ref.length >= 6 ? (await deps.fsList(env, WALLET_COLLECTION, 300)).filter(w => w.id.startsWith(ref)) : [];
+    if (hits.length !== 1) return deps.errorJson('ECO_PAIR_NOT_FOUND', 404, headers, request);
+    const wallet = parseWallet(hits[0].payload);
+    const code = deps.generateCode(8);
+    const exp = deps.now() + PAIR_MS;
+    await deps.fsWrite(env, PAIR_COLLECTION, code, JSON.stringify({ d: hits[0].id, g: gen(wallet), exp }));
+    return deps.json({ code, exp }, 200, headers);
+  }
   const plan = await planClean(env, deps);
   if (body.action === 'scan') return deps.json(summary(plan), 200, headers);
   if (body.action !== 'clean') return deps.errorJson('ECO_UNKNOWN_OP', 400, headers, request);
@@ -43,6 +58,24 @@ export async function handleAdmin({ env, deps, headers, request, ip, body }) {
   for (let i = 0; i < tidy.length; i += 200) await deps.fsBatch(env, tidy.slice(i, i + 200).map(t => ({ update: [WALLET_COLLECTION, t.id, JSON.stringify(t.wallet)], updateTime: t.updateTime })));
   done.tidied = tidy.length;
   return deps.json({ ...done, left: plan.deletes.length - done.deleted + plan.tidy.length - done.tidied, done: plan.deletes.length === done.deleted && plan.tidy.length === done.tidied }, 200, headers);
+}
+
+async function walletList(env, deps) {
+  const wallets = await deps.fsList(env, WALLET_COLLECTION, 300);
+  return wallets.map(w => {
+    const wallet = parseWallet(w.payload);
+    const last = Math.max(0, ...Object.values(wallet?.apps || {}).map(a => a.last || 0));
+    return {
+      ref: w.id.slice(0, 8),
+      created: wallet?.created ? new Date(wallet.created).toISOString() : null,
+      lastUsed: last ? new Date(last).toISOString() : null,
+      apps: Object.keys(wallet?.apps || {}),
+      entries: wallet?.entries?.length || 0,
+      balance: wallet ? poolBalance(wallet) : null,
+      gen: wallet ? gen(wallet) : null,
+      updateTime: w.updateTime
+    };
+  });
 }
 
 // Everything a clean would do: { counts, deletes: [[collection, id]], tidy: [{ id, wallet, updateTime }] }.
