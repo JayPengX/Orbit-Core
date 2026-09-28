@@ -18,7 +18,7 @@ import { ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_C
 import { KAMBI_COLLECTION } from './kambi.js';
 
 export const ADMIN_TOKEN_HASH = '863f673335f39a73d7d50a6ab73864985aedb251b6aaee43967f8f864595db63';
-export const RETIRED_COLLECTIONS = ['orbit-schedules', 'eco-links'];
+export const RETIRED_COLLECTIONS = ['orbit-schedules', 'eco-links', 'stock-study-leagues'];
 // (A function: eco.js and this file import each other.)
 const keep = () => new Set([WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, KAMBI_COLLECTION, ...Object.values(ECO_APPS).map(a => a.collection)]);
 // Firestore batch writes take up to 500 at a time; a call stops after this
