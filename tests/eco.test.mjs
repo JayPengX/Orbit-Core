@@ -188,6 +188,11 @@ test('payday: once a month, from the cut-over on', () => {
   assert.equal(paydayEntries({ entries: [] }, oct)[0].amount, 7_000);
   assert.deepEqual(paydayEntries({ entries: due.map(id => ({ id })) }, oct), []);
   assert.deepEqual(paydayEntries({ entries: [] }, Date.UTC(2026, 8, 20)), []);
+  // Back pay: months nobody opened an app are paid the next time.
+  const made = Date.UTC(2026, 8, 1);
+  assert.deepEqual(paydayEntries({ created: made, entries: [{ id: 'eco:pay:2026-10' }] }, Date.UTC(2027, 0, 5)).map(e => e.id), ['eco:pay:2026-11', 'eco:pay:2026-12', 'eco:pay:2027-01']);
+  // Not for months before the pass was made.
+  assert.deepEqual(paydayEntries({ created: Date.UTC(2026, 11, 3), entries: [] }, Date.UTC(2027, 0, 5)).map(e => e.id), ['eco:pay:2026-12', 'eco:pay:2027-01']);
 });
 
 test('rotate: a new pass holds everything, every other device is out', async () => {

@@ -95,14 +95,19 @@ export function emptyWallet(now = Date.now()) {
 // ---- One pool, one payday ------------------------------------------------------
 //
 // The Worker pays everyone's income into the pool: one payday, NT$7,000 each
-// Taiwan month (from the 1st), on the first sign-in or refresh that month
-// (never back pay). A pass made since v2 also gets its opening NT$110,000
+// Taiwan month (from the 1st), on the first sign-in or refresh that month;
+// a month nobody opened an app is paid the next time (back pay, for every
+// month since the pass was made, from 2026-10). A pass made since v2 also gets its opening NT$110,000
 // here. (A weekly NT$500 allowance was planned too: dropped, one clear
 // payday is simpler; the week's id is never paid.)
 export const PAY = { start: 110_000, month: 7_000 };
 export const PAY_FROM_MONTH = '2026-10';
 const TPE = 8 * 3_600_000;
 const WEEK = 7 * 86_400_000;
+const nextMonth = m => {
+  const [y, mo] = m.split('-').map(Number);
+  return mo === 12 ? `${y + 1}-01` : `${y}-${String(mo + 1).padStart(2, '0')}`;
+};
 export const taipeiMonth = t => new Date(t + TPE).toISOString().slice(0, 7);
 // The Monday (Taipei) a moment's week starts, as a UTC timestamp.
 export function weekStart(t) {
@@ -117,7 +122,9 @@ export function paydayEntries(wallet, now) {
   const out = [];
   if (wallet.v2 && !have.has('eco:start')) out.push({ id: 'eco:start', t: now, app: 'eco', kind: 'start', amount: PAY.start });
   const month = taipeiMonth(now);
-  if (month >= PAY_FROM_MONTH && !have.has(`eco:pay:${month}`)) out.push({ id: `eco:pay:${month}`, t: now, app: 'eco', kind: 'pay', amount: PAY.month });
+  const made = Number.isFinite(wallet.created) ? taipeiMonth(Math.min(wallet.created, now)) : month;
+  let m = made > PAY_FROM_MONTH ? made : PAY_FROM_MONTH;
+  for (let n = 0; m <= month && n < 120; n++, m = nextMonth(m)) if (!have.has(`eco:pay:${m}`)) out.push({ id: `eco:pay:${m}`, t: now, app: 'eco', kind: 'pay', amount: PAY.month });
   return out;
 }
 export { WEEK };
