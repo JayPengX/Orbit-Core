@@ -129,7 +129,11 @@ const SPORTS_PROXY_ALLOWED_HOSTS = [
   // Study's quotes, charts, dividends and splits for stocks, ETFs, funds,
   // currencies, crypto, metals and indexes worldwide.
   'query1.finance.yahoo.com',
-  'query2.finance.yahoo.com'
+  'query2.finance.yahoo.com',
+  // Google's translate endpoint (the Chrome dictionary's, no key): a
+  // company's description in the reader's language (Securities). Only
+  // /translate_a/t; sent upstream as a POST (see fetchUpstream), kept a month.
+  'clients5.google.com'
 ];
 const SPORTS_PROXY_RATE_LIMIT = 600;
 // Per signed-in session, a minute, in memory (cache hits included).
@@ -186,6 +190,7 @@ const CACHE_SEARCH = { tier: 'search', fresh: DAY, stale: 7 * DAY };
 // refreshes. Search with news (newsCount > 0) is kept 30 minutes.
 const CACHE_FUNDAMENTALS = { tier: 'fundamentals', fresh: HOUR, stale: DAY };
 const CACHE_NEWS = { tier: 'news', fresh: 30 * MINUTE, stale: DAY };
+const CACHE_TRANSLATE = { tier: 'translate', fresh: 30 * DAY, stale: 30 * DAY };
 
 function yahooPolicy(url) {
   if (url.pathname.startsWith('/v1/finance/search')) return Number(url.searchParams.get('newsCount')) > 0 ? CACHE_NEWS : CACHE_SEARCH;
@@ -233,6 +238,8 @@ function cachePolicyFor(url) {
     case 'query1.finance.yahoo.com':
     case 'query2.finance.yahoo.com':
       return yahooPolicy(url);
+    case 'clients5.google.com':
+      return CACHE_TRANSLATE;
     default:
       return CACHE_LIVE;
   }
@@ -350,6 +357,20 @@ async function fetchYahooWithCrumb(upstreamUrl) {
   }
 }
 
+// The translate endpoint: the text goes in a POST body (a GET mixes in
+// simplified characters for zh-TW, and long texts don't fit an address).
+async function translateUpstream(upstreamUrl) {
+  const url = new URL(upstreamUrl.toString());
+  const q = url.searchParams.get('q') || '';
+  url.searchParams.delete('q');
+  return fetch(url.toString(), {
+    method: 'POST',
+    headers: { 'User-Agent': YAHOO_BROWSER_UA, 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+    body: new URLSearchParams({ q }).toString(),
+    signal: AbortSignal.timeout(SPORTS_PROXY_UPSTREAM_TIMEOUT_MS)
+  });
+}
+
 // Fetches `upstreamUrl`, applies the optional trim, and saves a 200 into the
 // shared cache. Resolves to { status, contentType, body } or
 // { fetchError }. Never throws.
@@ -358,7 +379,9 @@ async function fetchUpstream(upstreamUrl, trim) {
   try {
     upstream = needsYahooCrumb(upstreamUrl)
       ? await fetchYahooWithCrumb(upstreamUrl)
-      : await fetch(upstreamUrl.toString(), {
+      : upstreamUrl.hostname === 'clients5.google.com'
+        ? await translateUpstream(upstreamUrl)
+        : await fetch(upstreamUrl.toString(), {
           headers: { 'User-Agent': SPORTS_PROXY_FETCH_USER_AGENT },
           signal: AbortSignal.timeout(SPORTS_PROXY_UPSTREAM_TIMEOUT_MS)
         });
@@ -406,6 +429,7 @@ function trimFor(trimParam, upstreamUrl) {
 function parseTarget(target) {
   try {
     const u = new URL(target);
+    if (u.hostname === 'clients5.google.com' && (u.pathname !== '/translate_a/t' || (u.searchParams.get('q') || '').length > 5000)) return null;
     return u.protocol === 'https:' && SPORTS_PROXY_ALLOWED_HOSTS.includes(u.hostname) ? u : null;
   } catch {
     return null;
