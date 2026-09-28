@@ -1,260 +1,111 @@
 # Shared Proxy
 
-Shared Cloudflare Workers backend for Orbit, Orbit Vocab, Match Find, Odds Study, and Stock Study.
+The server side of **Quadra**: Quadra Securities, Quadra Play, Quadra
+Fixtures and Quadra Rewards, with Orbit Class beside them. One account, the
+**Quadra Pass**, works in every app, and it is the only place anything is
+saved.
 
-Four of them (all but Orbit Class) now form **Quadra 四方**: Quadra
-Securities 四方證券 (Stock Study), Quadra Sportsbook 四方運彩 (Odds Study),
-Quadra Fixtures 四方賽程 (Match Find) and Quadra Words 四方單字 (Orbit Vocab),
-sharing one account, the **Quadra Pass 四方通行碼**, through `/eco` (see
-[The Quadra Pass](#the-quadra-pass-eco)). Orbit Class stays on its own.
-
-This repository holds two Cloudflare Workers that back the optional
-server-side features of four otherwise-independent static sites. None of
-the four sites needs a database, a server, or its own API key to use these
-features — each one just points at a deployed Worker URL.
-
-- **Orbit Class** — class schedule dashboard
-  Repo: https://github.com/JayPengX/Orbit-Class
-  Live: https://jaypengx.github.io/Orbit-Class/
-- **Orbit Vocab** — vocabulary trainer
-  Repo: https://github.com/JayPengX/Quadra-Words
-  Live: https://jaypengx.github.io/Quadra-Words/
-- **Match Find** — sports recommendation site
-  Repo: https://github.com/JayPengX/Quadra-Fixtures
-  Live: https://jaypengx.github.io/Quadra-Fixtures/
-- **Odds Study** — educational page on Taiwan Sports Lottery odds math
-  Repo: https://github.com/JayPengX/Quadra-Sportsbook
-  Live: https://jaypengx.github.io/Quadra-Sportsbook/
-- **Stock Study** — play-money brokerage simulator for markets worldwide
-  Repo: https://github.com/JayPengX/Quadra-Securities
-  Live: https://jaypengx.github.io/Quadra-Securities/
+| App | Repo | Live |
+| --- | --- | --- |
+| Quadra Securities | [Quadra-Securities](https://github.com/JayPengX/Quadra-Securities) | https://jaypengx.github.io/Quadra-Securities/ |
+| Quadra Play | [Quadra-Play](https://github.com/JayPengX/Quadra-Play) | https://jaypengx.github.io/Quadra-Play/ |
+| Quadra Fixtures | [Quadra-Fixtures](https://github.com/JayPengX/Quadra-Fixtures) | https://jaypengx.github.io/Quadra-Fixtures/ |
+| Quadra Rewards | [Quadra-Rewards](https://github.com/JayPengX/Quadra-Rewards) | https://jaypengx.github.io/Quadra-Rewards/ |
+| Orbit Class | [Orbit-Class](https://github.com/JayPengX/Orbit-Class) | https://jaypengx.github.io/Orbit-Class/ |
 
 ## Table of Contents
 
-- [Overview](#overview)
-- [Routes & Consumers](#routes--consumers)
-- [Security Hardening](#security-hardening)
-- [Sync Design](#sync-design)
+- [The two Workers](#the-two-workers)
+- [The Quadra Pass (`/eco`)](#the-quadra-pass-eco)
+- [Keeping the store clean](#keeping-the-store-clean)
+- [The shared kit and brand](#the-shared-kit-and-brand)
 - [One-Time Deploy Setup](#one-time-deploy-setup)
 - [Optional: Auto-Deploy via GitHub Actions](#optional-auto-deploy-via-github-actions)
-- [Wiring Up a Consuming App](#wiring-up-a-consuming-app)
 - [Why One Worker for Most Routes, But Two Overall](#why-one-worker-for-most-routes-but-two-overall)
-- [Related Projects](#related-projects)
 
-## Overview
+## The two Workers
 
-This repo used to be a folder inside Orbit's own repository
-(`cloudflare-worker/`), but it was never really Orbit-specific — it already
-served all of its consumer sites, and keeping it nested inside one of its own
-consumers made "which repo do I even touch to change the proxy" a real
-question. It now lives here on its own, with its own deploy pipeline, so
-each of the apps only ever has to know one thing about it: the URL.
+- **`orbit-workers-proxy`** (`worker.js`, `eco.js`, `eco-admin.js`,
+  `kambi.js`, `quadra-token.js`, `wrangler.toml`):
 
-Two Workers are deployed from this repo:
+  | Route | What |
+  | --- | --- |
+  | `/eco` | The Quadra Pass (below) |
+  | `/gemini`, `/nl-edit` | Orbit Class's AI schedule-photo import and natural-language edits; the Gemini key stays here |
+  | `/kambi` | The last live data of Kambi matches Quadra Play has bets on (a 10-minute cron keeps it) |
 
-- **`orbit-workers-proxy`** (`worker.js` + `wrangler.toml`) — serves
-  `/gemini`, `/nl-edit`, `/sync`, `/vocab-sync`, `/odds-sync`, `/stock-sync`, `/vocab-ai`.
-- **`sports-proxy`** (`sports-proxy-worker.js` + `wrangler.sports-proxy.toml`) —
-  serves `/sports-proxy` as its own, separately deployed Worker. See
-  [Why One Worker for Most Routes, But Two Overall](#why-one-worker-for-most-routes-but-two-overall)
-  for the reasoning behind the split.
+- **`sports-proxy`** (`sports-proxy-worker.js`, `wrangler.sports-proxy.toml`):
+  `/sports-proxy`, a host-allowlisted passthrough to ESPN, the MLB Stats
+  API, Jolpica, Polymarket, Kambi and Yahoo Finance, with trimming and edge
+  caching per source (see the file's comments).
 
-Every route validates and rate-limits itself independently (see
-`isRateLimited` in `worker.js` — every call site passes its own `feature`
-key), so a burst of traffic against one route can never eat into another
-route's, or another app's, quota. Every feature is also entirely optional on
-the *consuming* app's side: not configuring a `PROXY_URL` (or that route not
-being reachable) just makes that one feature unavailable, never a broken
-build.
-
-## Routes & Consumers
-
-| Route | Method(s) | Used by | Purpose |
-| --- | --- | --- | --- |
-| `/gemini` | GET (warm-up), POST | Orbit | AI schedule-photo import — holds the real Gemini API key server-side. |
-| `/nl-edit` | POST | Orbit | AI natural-language schedule edits (e.g. "把我週二第三節改成物理"). |
-| `/sync` | GET/PATCH/DELETE | Orbit | Cross-device schedule sync (code + manager passcode; reads are open, writes/deletes need the passcode). |
-| `/vocab-sync` | GET/PATCH/DELETE | Orbit Vocab | Cross-device learning-progress sync (single passcode, no separate read-only code). |
-| `/odds-sync` | GET/POST/PATCH/DELETE | Odds Study | Cross-device sync of the simulated betting account (play-money balance, weekly top-ups, saved slips). Same single-passcode design as `/vocab-sync`, with an 8-character passcode; Firestore collection `odds-study-accounts`. Payloads up to 1,000,000 characters (slip history is kept for good; just under Firestore's 1 MiB document limit). |
-| `/stock-sync` | GET/POST/PATCH/DELETE | Stock Study | Cross-device sync of the simulated brokerage account (wallets per currency, holdings, orders, loans, history). Exactly `/odds-sync`'s design and limits (8-character passcode, 1,000,000 characters), in its own Firestore collection `stock-study-accounts` with its own rate-limit counters. |
-| `/eco` | GET/POST/PATCH/DELETE | All four Quadra apps | The Quadra Pass: one 10-character passcode for a shared NT$ money pool (the wallet, merged by this Worker), each app's own data, transfers between accounts and the one-time merge of old codes. See [The Quadra Pass](#the-quadra-pass-eco). |
-| `/vocab-ai` | POST | Orbit Vocab | Live, per-learner personalized mnemonics. Responses are cached in `RATE_LIMIT_KV` by exact request shape (word/pos/meaning/wrongAnswers), so a repeat of the same word + mistake pattern (common — see `vocabAiCacheKey`'s own comment in `worker.js`) is a free KV read, not a billed Gemini call. The `X-Vocab-Ai-Cache: hit`/`miss` response header says which happened. |
-| `/sports-proxy` (separate Worker — see below) | GET | Match Find, Odds Study | Host-allowlisted CORS passthrough to ESPN (site and core APIs), the MLB Stats API, Jolpica, and Polymarket's Gamma API, so the viewer's own browser can fetch and score its whole live match list directly. Optional `&trim=polymarket-events` on a Gamma `/events` URL returns only the fields Match Find reads (~25× smaller - see `trimPolymarketEvents`). Odds Study uses ESPN's site API, Gamma (its `/events` pages with the trim, and `/public-search` for championship markets, cached 10 minutes fresh + a day stale) and Kambi's public odds feed (`eu-offering-api.kambicdn.com`: list views cached 2 minutes fresh + 10 stale, the live feed 20 seconds), with `&trim=kambi-events` keeping only the event, price and live-score fields it reads (~5× smaller). Stock Study uses Yahoo Finance's public `query1`/`query2.finance.yahoo.com` endpoints: `/v7/finance/spark` (up to 20 quotes per request) and `/v8/finance/chart` (charts, dividends, splits), cached 30 seconds for a day or five of data and 30 minutes (+ a day stale) for longer charts, and `/v1/finance/search`, cached a day (with news, 30 minutes). `/v7/finance/quote` and `/v10/finance/quoteSummary` (a company's P/E, market value, dividend yield and profile) need Yahoo's session cookie and crumb: the Worker fetches them itself (with a browser User-Agent, which Yahoo requires for the crumb), keeps them 6 hours, adds them to those requests only, and caches the answers an hour fresh + a day stale. |
-
-`/sports-proxy` is deployed as its own Worker (`sports-proxy-worker.js` +
-`wrangler.sports-proxy.toml`), not part of `worker.js`/`wrangler.toml` above
-— see [One-Time Deploy Setup](#one-time-deploy-setup) for why.
-
-### Removed routes
-
-Match Find used to also have a Gemini-backed recommendation route on this
-Worker, in three successive shapes, all now removed:
-
-- `/match-recommend` / `/match-recommend-refine` — scored and validated
-  *every* fixture on *every* build. Removed in Match Find's Round 11: the
-  free-tier Gemini quota couldn't sustain that workload.
-- A much narrower `/match-recommend` was reintroduced in Round 32 — a
-  bounded, at-most-once-per-day tie-break between a small set of
-  close-scoring candidates for one day's headline slot. This version is
-  also gone as of Round 41: direct instruction that its real, now-billed
-  cost outweighed its actual improvement to the recommendation. Its own two
-  live test calls (Round 37/38) had already shown Gemini's independent
-  judgment simply agreeing with the deterministic engine's own pick both
-  times.
-- `/match-dispatch` — fired a GitHub Actions rebuild on demand. Removed once
-  Match Find moved its own match-building pipeline to run fully client-side
-  (see that repo's `public/app.js`), leaving nothing left to dispatch from a
-  scheduled server-side build.
-
-Match Find's deterministic objective-score engine
-(`public/lib/recommendation.mjs` in that repo) is its only recommendation
-logic today — no Gemini call of any kind.
-
-## Security Hardening
-
-Until a hardening pass on 2026-09-22, `/gemini`, `/vocab-ai`, `/nl-edit`,
-and the (since-removed) `/match-recommend` — every route that makes a real,
-billed Gemini API call — were callable by anyone who simply knew the URL.
-`ALLOWED_ORIGINS`/`isAllowedOrigin` only ever fed the CORS response headers,
-which is purely advisory: it stops a well-behaved *browser* from reading a
-disallowed page's response, but it never stopped the request itself —
-including the real Gemini call — from being processed first. A direct
-`curl` doesn't send or care about CORS at all. This was live-proven that
-same session by this repo's own maintainer's assistant, which called
-`/match-recommend` directly with plain `curl` and got a full, real response
-back.
-
-Two changes closed this gap:
-
-1. **The origin check is now an enforced gate, not just a CORS header.**
-   `worker.js`'s top-level router now rejects with `403` before ever
-   reaching a billed handler if `Origin` is missing or not in
-   `ALLOWED_ORIGINS`. This costs a real caller nothing — every one of these
-   routes is a POST with a JSON body, which browsers always attach a real
-   `Origin` header to (preflight included), so Match Find/Orbit/Orbit
-   Vocab's own already-working pages are unaffected. Only a bare
-   script/`curl` call, or another site embedding a `fetch` to this Worker,
-   is newly rejected.
-2. **A hard daily global cap per feature** (`isDailyGlobalCapped`,
-   `*_DAILY_GLOBAL_CAP` next to each route's existing `*_RATE_LIMIT`).
-   Unlike the existing per-IP rate limit, this counts every caller
-   *combined*, so it can't be outrun by spreading requests across IPs. Once
-   a feature hits its daily cap, every further call for that feature
-   returns `429` with no upstream Gemini call at all, for the rest of that
-   day, regardless of who's calling or from where. This is the real
-   financial backstop.
-
-**Honest limit, stated plainly rather than oversold:** an `Origin` header is
-just text a non-browser client can set to anything it wants, and this is a
-public, open-source repo — a targeted attacker who reads this file can
-trivially copy the allowed origin value verbatim. This gate stops
-opportunistic/naive abuse (URL scanners, another page silently spending your
-quota through its visitors' browsers) and, combined with the daily cap,
-hard-bounds the worst case even against someone who does spoof it. It is
-**not** real authentication — there are no user accounts here to
-authenticate, and no client-side secret can ever be genuinely secret in a
-fully public static site's own source. Real lock-down would need a backend
-with real user identity, a materially bigger change than any route here
-currently has another reason to need.
-
-**Verification.** Verified locally with a mocked `env.RATE_LIMIT_KV` and a
-mocked `global.fetch` (never touching the real Gemini API or spending any
-real quota/credit) — confirmed: no-`Origin` and wrong-`Origin` requests are
-rejected before the upstream call happens at all; a correct `Origin` passes
-through unaffected; the daily cap kicks in exactly at its limit and never
-lets a real upstream call happen past it; an unrelated/unknown path is
-unaffected (still a plain `404`, not swept up by the gate).
-
-## Sync Design
-
-`/sync` and `/vocab-sync` (Orbit's own vs. Orbit Vocab's) use two different
-pairing shapes. Match Find has no sync route at all — its own settings and
-"Prefer" pick are local-only, in the viewer's own browser, never synced
-anywhere (see that repo's README).
-
-- **Orbit's `/sync`** — a plain sync code (read access, share freely) plus a
-  separate manager passcode (write/delete access). Built for "one teacher
-  broadcasts a schedule to many read-only student devices."
-- **`/vocab-sync`** — a single passcode that's both the identifier and the
-  only credential. Built for "one person's own multiple devices," where
-  there's no reason to have a public read-only code at all.
-- **`/odds-sync`** — the same single-passcode design for Odds Study's
-  play-money account, with an 8-character passcode (32^8, about 10^12)
-  short enough to type on a phone. It holds no real money or personal data.
-
-See the top-of-file comment in `worker.js`, and the comment above each
-route's handler, for the full reasoning behind each design choice — this
-README only covers what's needed to deploy and consume it.
+Every route but signing in needs a Quadra Pass session (`qt=`), counted per
+session in memory; only the sign-in calls and the daily cap on billed Gemini
+calls use KV. The old per-app sync routes (`/sync`, `/vocab-sync`,
+`/odds-sync`, `/stock-sync`) and `/vocab-ai` are gone.
 
 ## The Quadra Pass (`/eco`)
 
-`eco.js` (tests in `tests/eco.test.mjs`, `npm test`). One random
-10-character passcode (32^10) is the account's address and its only key,
-stored only as its SHA-256, like `/odds-sync`. New accounts in every Quadra
-app are Quadra Passes; the old app-only routes stay for accounts that
-haven't moved yet.
+`eco.js` (tests in `tests/eco.test.mjs`, `npm test`). A pass is a random
+10-character code (32^10), stored only as its SHA-256, which is the
+account's document id.
 
-- **The wallet** (Firestore `eco-wallets`, plain JSON so the Worker can merge
-  it): `entries` (money in or out of the shared pool, each with a fixed id so
-  nothing counts twice: Quadra Sportsbook's ledger, Quadra Words' rewards,
-  transfers, carried-over money), `snap` (each app's latest figure, newest
-  wins: Quadra Securities' own NT$ cash, money in open bets), `settings`
-  (the betting limit, followed sports), `pins` (matches pinned for Quadra
-  Fixtures), `apps` (first and last opened) and `inbox`. Every write reads,
-  merges and writes again only if nobody wrote in between (Firestore's
-  `currentDocument.updateTime` precondition), retrying up to five times, so
-  two apps writing at once never lose each other's entries.
-- **The pool** is every entry plus every app's shared cash figure. Each app
-  shows it as its NT$ cash: its own part from its own data, the rest from
-  the wallet.
-- **App data** stays in each app's existing collection, under the same
-  passcode hash, as the same gzip payload it always synced.
-
-| Call | What |
-| --- | --- |
-| `GET /eco?passcode=P&app=A[&inbox=1]` | The wallet and pool, app A's data (`payload`, empty if none yet) and, with `inbox=1`, merged-in data waiting for app A |
-| `PATCH /eco?passcode=P&app=A` `{ payload?, wallet? }` | App A's data and/or a wallet change (merged) |
-| `DELETE /eco?passcode=P[&app=A][&inbox=ID]` | App A's data, one inbox item, or the whole account |
-| `POST /eco` `{ op: 'create', payload? }` (`?app=A`) | A new Quadra Pass |
-| `POST /eco` `{ op: 'transfer', passcode, to, amount, id, note? }` | Money to another Quadra Pass, recorded on both sides under one id (a retry never sends twice), refused past the pool's balance |
-| `POST /eco` `{ op: 'merge', passcode?, sources: [{ app, passcode }] }` | Codes into one pass (the apps use it to turn an old one-app code into a pass by itself): old Stock Study, Odds Study and Orbit Vocab codes and other Quadra Passes into one (new unless `passcode` names one). Every source is read first; each app's data becomes the target's, or waits in its inbox for the app to fold in with its own rules; other passes' money is carried over under new ids; only then are the sources deleted |
-
-Rate limits (per IP an hour): reads 6,000, writes 600, creates, deletes and
-merges 20, transfers 60.
-
-### Sessions (v2), sharing, payday
-
-The apps no longer send the pass itself after signing in. `quadra-token.js`
-signs short-lived session tokens and refresh tokens (HMAC with
-`ECO_TOKEN_SECRET`; set it as a Worker secret, or it's derived from
-`FIREBASE_PRIVATE_KEY`), and seals a pass for cross-app links.
+- **Devices never keep the pass.** Signing in (with the pass, or a device
+  code) gives the device a refresh token (60 days, renewed each use) and the
+  app a 20-minute session token (`quadra-token.js`, HMAC with
+  `ECO_TOKEN_SECRET`, or one derived from `FIREBASE_PRIVATE_KEY` until
+  that's set). The pass is shown once when it's made or changed.
+- **One app at a time**: the session that signed in or claimed last is the
+  live one (`wallet.live`); a write from any other answers
+  `409 ECO_SESSION_MOVED`.
+- **The wallet** (`eco-wallets`, JSON the Worker merges): `entries` (money
+  in or out of the one NT$ pool, fixed ids so nothing counts twice),
+  `snap` (each app's latest figure), `settings`, `pins`, `apps`, `inbox`.
+  Writes read-merge-write under Firestore's `updateTime` precondition.
+- **App data** in each app's collection under the same id:
+  `stock-study-accounts`, `odds-study-accounts`, `match-find-settings`,
+  `vocab-progress-sync`, `orbit-quadra`.
+- **Payday** on any sign-in or read: NT$110,000 to open, NT$5,000 a Taiwan
+  month, NT$500 a Taiwan week.
 
 | Call | What |
 | --- | --- |
-| `POST /eco` `{ op: 'login', passcode, app }` | A session (`token`) and a `refresh` token; this app on this device becomes the live one (`wallet.live`) |
-| `POST /eco` `{ op: 'refresh', refresh, app, claim? }` | A new session; `claim` makes this one live |
-| `GET / PATCH / DELETE /eco?qt=T&app=A` | As above with the session instead of the pass; a PATCH from a session that isn't live answers `409 ECO_SESSION_MOVED` (one app, one device at a time) |
-| `POST /eco` `{ op: 'handoff', qt, passcode }` / `{ op: 'redeem', handoff }` | The pass sealed for a link to another app (home-screen apps don't share storage) |
-| `POST /eco` `{ op: 'signout-all', qt }` / `{ op: 'rotate', passcode }` | Sign every device out / swap the pass for a new one |
-| `POST /eco` `{ op: 'create', v2: true }` | A new pass with its opening NT$110,000 and a session |
-| `POST /eco` `{ op: 'merge', qt, sources: [{ app: 'orbit', passcode, manager }] }` | An old Orbit Class sync code (with its manager passcode) into the signed-in pass |
-| `POST /eco` `{ op: 'share-create' \| 'share-redeem' \| 'follow' \| 'share-revoke', qt, … }` | Orbit Class merge keys: a key (8 characters, a day) to the owner's schedule; follow it or copy it; stop all followers |
+| `POST { op: 'create', app }` | A new pass, signed in (the pass comes back this once) |
+| `POST { op: 'login', passcode, app }` | Sign in on this device |
+| `POST { op: 'refresh', refresh, app, claim?, data?, inbox? }` | A session (and a renewed refresh token); `claim` makes this app live |
+| `GET /eco?qt=T[&app=A][&inbox=1]` | The wallet, pool and app A's data |
+| `PATCH /eco?qt=T&app=A` `{ payload?, wallet? }` | App A's data and/or a wallet change (live session only) |
+| `DELETE /eco?qt=T[&app=A][&inbox=ID]` | The account, one app's data, or one inbox item |
+| `POST { op: 'pair-create', qt }` / `{ op: 'pair-redeem', code, app }` | A device code (8 characters, 10 minutes, once) and signing in with it |
+| `POST { op: 'handoff', qt }` / `{ op: 'redeem', handoff, app }` | A sealed sign-in (3 minutes) for a link to another app; home-screen apps don't share storage |
+| `POST { op: 'signout-all', qt }` | Every other device signed out; this one comes back signed in |
+| `POST { op: 'rotate', qt }` | A new pass for the same account; the old one stops working, every other device is signed out |
+| `POST { op: 'merge', qt, sources: [{ passcode }] }` | Other passes into this one (their data, or its inbox; their money), then deleted |
+| `POST { op: 'share-create', qt }` / `{ op: 'share-redeem', qt, key }` | Orbit Class: a key (8 characters, a day) that gives another pass a copy of the schedule |
 
-Payday is written by the Worker on any read: `eco:pay:YYYY-MM` (NT$5,000 a
-Taiwan month) and `eco:week:YYYY-MM-DD` (NT$500 a Taiwan week).
+Sign-in calls are limited per IP an hour (create 20, login and device codes
+30, merges 20).
 
-Signed-in data calls don't touch KV: `/sports-proxy` (the other Worker),
-`/kambi`, `/gemini` and `/nl-edit` take `qt=` and are counted per session in
-memory. `/gemini` and `/nl-edit` require a session. (The daily global cap on
-billed Gemini calls stays in KV as a spending backstop.)
+## Keeping the store clean
 
-### The shared kit and brand
+`eco-admin.js`: `POST /eco { op: 'admin', token, action: 'scan' | 'clean' }`
+counts what's in Firestore and removes anything that isn't Quadra data:
+retired collections (`orbit-schedules`, `eco-links`, `stock-study-leagues`),
+app documents with no pass behind them, orphaned inbox items, expired device
+codes and share keys, and retired wallet settings (`tidyWallet`). It runs in
+bounded batches (`clean` again until `done`). The token is checked against
+`ADMIN_TOKEN_HASH`; it's empty (off) unless a clean-up is under way.
 
-`kit/quadra.mjs` and `kit/quadra.css` are the Quadra apps' shared account
-code and look (sign-in, the account sheet, the one-app-at-a-time notice, the
-recommendation engine, help links, the tab bar); `node kit/sync.mjs` copies
-them into every app. `brand/generate.mjs [app…]` draws every app's icons and
-link cards from `brand/marks.mjs`.
+## The shared kit and brand
+
+`kit/quadra.mjs` and `kit/quadra.css` are every app's shared account code
+and look: the sign-in screen (pass or device code), the one-time new-pass
+screen, the account sheet (Add a device, sign out elsewhere, change the
+pass, notifications), the one-app-at-a-time notice, notifications (an
+in-app banner, system notices when allowed), the recommendation engine,
+help links and the tab bar. `node kit/sync.mjs` copies them into every app
+(never edit an app's copy). `brand/generate.mjs [app…]` draws every app's
+icons and link cards from `brand/marks.mjs`.
 
 ## One-Time Deploy Setup
 
@@ -280,7 +131,7 @@ steps against a different file.
 That alone gives you a live Worker with every route returning "not
 configured" until you add the secrets each feature needs.
 
-### AI features (`/gemini`, `/nl-edit`, `/vocab-ai`)
+### AI features (`/gemini`, `/nl-edit`)
 
 All three share one secret:
 
@@ -313,7 +164,7 @@ airport code, e.g. `IAD` = Virginia, `HKG` = Hong Kong) — useful for
 confirming this is actually taking effect, or diagnosing a future report of
 the same error.
 
-### Match Find live data (`/sports-proxy`) — a separate Worker
+### Live data (`/sports-proxy`) — a separate Worker
 
 This one is deployed **from a different file** (`sports-proxy-worker.js` +
 `wrangler.sports-proxy.toml`) as its **own Worker**, not pasted into the same
@@ -396,7 +247,7 @@ this Worker's rate-limit keys are IP-only, with no `feature` prefix to
 collide with the other Worker's `gemini:`/`sync:`/`vocab-sync:`/`vocab-ai:`
 keys.
 
-### Sync features (`/sync`, `/vocab-sync`, `/odds-sync`)
+### The Quadra Pass store (Firestore)
 
 Both share one Firebase project and one service-account credential:
 
@@ -446,9 +297,7 @@ Both share one Firebase project and one service-account credential:
    `odds-study-accounts`, `stock-study-accounts`) so
    adding a third sync consumer later never needs this rule touched again.
 
-Once this is done, `/sync`, `/vocab-sync` and `/odds-sync` are all live — each already
-uses its own Firestore collection and its own rate-limit counters (see the
-route table above), so neither can affect the other's data or quota.
+Once this is done, `/eco` is live.
 
 ## Optional: Auto-Deploy via GitHub Actions
 
