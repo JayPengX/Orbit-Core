@@ -63,6 +63,22 @@ edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
 - **Polish:** every tab of every app checked at 360px (no sideways scroll);
   Securities' rates board no longer breaks currency names mid-word.
 
+## Then
+
+- Everything pushed to `main`.
+- **Orbit Class data loss fixed:** sync used to push the device's copy
+  before pulling, so a device left open with an older schedule overwrote
+  the newer one (on coming back, becoming the live app, or a style save).
+  Now: pull first; a device uploads only its own saved edits and only while
+  the pass still holds the copy it last saw; otherwise the newer copy wins
+  and the local change is set aside (`orbitSetAside`). Tests:
+  `test/quadra-sync-newer.test.js` (fail on the old code).
+- **Orbit Class is phone-only:** a computer gets `phoneOnlyGate` (kit) with
+  a QR code (`qrcode-generator`) and the steps.
+- **No browser pop-ups left:** the kit's `ask` / `tell` (styled confirm and
+  alert) replace every `confirm` / `alert` (account sheet, Securities'
+  plan stop, Play's scratch-card funds).
+
 ## Ideas for later
 
 - Rewards: word ladder, reaction game, a shared leaderboard (needs the
