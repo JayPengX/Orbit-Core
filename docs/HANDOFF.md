@@ -39,27 +39,35 @@ edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
   (cards with quick pick, basket buying, grouped tickets), notices.
 - **Rewards:** Orbit mission; all help text updated.
 
-## Still to do (from the user's list)
+## Done in the next round
 
-1. **Securities: improve the 資產 (assets) page.** `Quadra-Securities/public/app.js`
-   (`poolCardHtml`, `sourcesCardHtml` and the portfolio render). Ideas: an
-   allocation donut by category/market, total return and today's change up
-   top, per-holding cards with sparkline and weight, income (dividends)
-   and a clearer cash section. Securities has its own notification setting
-   in `settingsEl()`; switch it to the kit's `notify` and account-sheet
-   toggle (order filled, price alerts).
-2. **Rewards: more games and content** (the app feels empty).
-   `Quadra-Rewards/public/games-ui.js`, `lib/games.mjs` (pay rules and
-   tests), `app.js` home. Ideas: more word games (spelling bee, word
-   ladder, hangman, speed match), non-word games (memory, reaction, sudoku
-   mini), a daily challenge with a streak bonus, weekly goals, an
-   achievements/badges page, a leaderboard of your own bests, a word of the
-   day on home. Keep pay inside `ECONOMY` caps.
-3. **Notifications in Securities, Rewards and Orbit** (the kit's `notify`):
-   Rewards (missions ready to claim, streak about to break), Orbit (next
-   class starting), Securities (as above).
-4. **Overall polish:** keep unifying UI on the kit (`quadra.css`), look for
-   rough edges on phone width.
+- **Securities' 資產 page:** allocation ring (total inside, by kind /
+  currency / market), holding rows with today's price line and a weight bar,
+  a cash card (spendable total, held for orders, settling, cash interest
+  rate, wallets), an income card (dividends, coupons and cash interest over
+  12 months and this year, yield on holdings, top payers, dividends on the
+  way; `incomeSummary` in `lib/account.mjs`, `donut` / `miniBars` in
+  `lib/chart.mjs`), tidier "where the money came from" rows. Its own
+  notification setting is gone: price alerts and filled orders use the
+  kit's `notify` and the account sheet's toggle.
+- **Rewards:** four new games (speed match, hangman, colour memory, mini
+  sudoku; 8 in all, in "word games" and "a break from words"), a daily
+  challenge (`dailyGame`, first paid round adds NT$10-40 by days in a row,
+  inside the games' cap), weekly goals (paid as missions), badges, your
+  bests (wallet setting `bests:vocab`), word of the day on home. Notices:
+  a mission or weekly goal newly ready to claim, a streak ending tonight.
+- **Orbit Class:** a notice five minutes before each class
+  (`classStartingSoon`).
+- `kit/sync.mjs` pointed at `Quadra-Sportsbook` (now Quadra-Play), so it
+  skipped Play; fixed.
+- **Polish:** every tab of every app checked at 360px (no sideways scroll);
+  Securities' rates board no longer breaks currency names mid-word.
+
+## Ideas for later
+
+- Rewards: word ladder, reaction game, a shared leaderboard (needs the
+  Worker).
+- `Quadra-Play/undefined/` holds two stray screenshots from an old commit.
 
 ## Notes
 

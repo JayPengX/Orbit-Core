@@ -7,7 +7,7 @@ const root = new URL('../../', import.meta.url).pathname;
 const kit = new URL('./', import.meta.url).pathname;
 const TARGETS = [
   ['Quadra-Securities/public/lib/quadra.mjs', 'Quadra-Securities/public/quadra.css'],
-  ['Quadra-Sportsbook/public/lib/quadra.mjs', 'Quadra-Sportsbook/public/quadra.css'],
+  ['Quadra-Play/public/lib/quadra.mjs', 'Quadra-Play/public/quadra.css'],
   ['Quadra-Fixtures/public/lib/quadra.mjs', 'Quadra-Fixtures/public/quadra.css'],
   ['Quadra-Rewards/public/lib/quadra.mjs', 'Quadra-Rewards/public/quadra.css'],
   ['Orbit-Class/src/quadra.mjs', 'Orbit-Class/css/quadra.css']
