@@ -92,3 +92,29 @@ edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
   tokens; `/eco` derives a key from the Firebase key).
 - One old test pass from an earlier session may still exist (harmless).
 - Never commit anyone's pass or codes into a repo.
+
+## And then
+
+- **Account recovery (done):** a pass lost to the new-pass screen opening
+  behind the account sheet was found with `eco-admin.js`'s `wallets` and
+  `device-code` actions (admin switched off again: `ADMIN_TOKEN_HASH` empty).
+  The kit now closes the sheet first, shows the new pass as a full-screen
+  modal dialog, and only closes it once its last 5 characters are typed
+  back. A pasted pass with its dash (11 characters) no longer loses a
+  character (no maxlength on the sign-in box).
+- **Kit:** each notice kind has its own switch (`NOTICE_KINDS`, `kindOn`);
+  no double-tap zoom; the page is locked behind the loading screen; apps
+  no longer use `viewport-fit=cover` (iOS blurred what scrolled under the
+  status bar).
+- **Play:** lost never-settled slips refunded after 3 days (`refundLost`);
+  lottery can't overspend a pool below zero; slips filed by the day their
+  games were played; quick picks only fill the list; 我的彩券 lives in 紀錄;
+  統計分析 remade (`stats-ui.js`); opens right after the main board; scratch
+  cards redone; tab bar keeps room for the home indicator.
+- **Rewards:** 35 arcade games (`lib/arcade.mjs`, `public/arcade/`), a new
+  games list (search, categories, favourites, recent), how-to-play cards.
+- **Fixtures:** F1 drivers' and constructors' tables; followed leagues
+  weigh 0.6 in today's picks.
+- **Orbit Class:** the dashboard title is fitted once it's on screen.
+- Not verifiable here (no real phone): the status-bar blur fix and the
+  tab bar's bottom room; worth a look on the device.
