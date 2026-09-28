@@ -12,6 +12,7 @@ on:
       - 'eco.js'
       - 'kambi.js'
       - 'quadra-token.js'
+      - 'eco-admin.js'
   workflow_dispatch:
 
 jobs:
@@ -22,7 +23,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Deploy orbit-workers-proxy (gemini/nl-edit/sync/vocab-sync/vocab-ai)
+      - name: Deploy orbit-workers-proxy (eco/gemini/nl-edit/kambi)
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}

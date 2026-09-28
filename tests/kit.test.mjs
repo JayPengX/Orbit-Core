@@ -57,3 +57,17 @@ test('pass codes', () => {
   assert.equal(kit.formatPass('ABCDE23456'), 'ABCDE-23456');
   assert.ok(kit.isPass('ABCDE-23456'));
 });
+
+test('a device keeps its sign-in and the account id, never the pass', () => {
+  store.clear();
+  assert.equal(kit.storedAccount(), '');
+  const claims = Buffer.from(JSON.stringify({ k: 'ref', d: 'abcdef0123456789abcdef', s: 'S', g: 0, e: 9e15 })).toString('base64url');
+  store.set('quadra.refresh', `${claims}.sig`);
+  store.set('quadra.account', 'abcdef0123456789');
+  assert.equal(kit.storedAccount(), 'abcdef0123456789');
+  store.delete('quadra.refresh');
+  assert.equal(kit.storedAccount(), '', 'no sign-in, no account');
+  assert.equal(kit.formatPass('ABCDE23456'), 'ABCDE-23456');
+  assert.equal(kit.formatPass('ABCD2345'), 'ABCD-2345');
+  assert.ok(kit.DEVICE_CODE_PATTERN.test('ABCD2345'));
+});

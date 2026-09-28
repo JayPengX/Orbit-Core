@@ -1,77 +1,21 @@
 // ---- worker.js ----
-// A single Cloudflare Worker serving three sibling static sites' optional
-// server-side features (Orbit Class, Orbit Vocab, Match Find) - AI (Gemini)
-// features and cross-device sync - kept in this dedicated repo rather than
-// inside any one of those three, because it was never really "Orbit's own"
-// infrastructure to begin with; see README.md for what each route does, who
-// consumes it, and one-time deploy/setup instructions. Routed by path:
+// orbit-workers-proxy: the Quadra apps' server side (Quadra Securities,
+// Quadra Play, Quadra Fixtures, Quadra Rewards and Orbit Class). Routed by
+// path:
 //
-//   POST      /gemini     - AI schedule-photo import (see src/gemini-ocr.js).
-//                            Holds the real Gemini API key server-side so
-//                            end users never need one of their own.
-//   POST      /nl-edit    - Orbit's natural-language schedule edits (see
-//                            src/editor-nl-edit.js). Same key as /gemini.
-//   GET/POST/PATCH/DELETE /sync - Orbit's own cross-device schedule sync
-//                            (see src/sync.js).
-//   GET/POST/PATCH/DELETE /vocab-sync - Orbit Vocab's cross-device
-//                            progress sync (see that repo's sync.js). This
-//                            Worker is simply reused as shared
-//                            infrastructure so that app doesn't need a
-//                            second Worker, Firebase project, or set of
-//                            rate-limit tuning. See "==== /sync" below for
-//                            how the two differ.
-//   GET/POST/PATCH/DELETE /odds-sync - Odds Study's simulated betting
-//                            account (balance and saved slips) across
-//                            devices. Same single-passcode design as
-//                            /vocab-sync, with an 8-character passcode - see
-//                            ODDS_SYNC_APP below.
-//   GET/POST/PATCH/DELETE /eco - the Quadra Pass: one account (and a
-//                            shared NT$ money pool) across the four Quadra
-//                            apps; see eco.js.
-//   GET/POST/PATCH/DELETE /stock-sync - Stock Study's simulated
-//                            brokerage account across devices. Same design
-//                            and limits as /odds-sync - see STOCK_SYNC_APP.
-//   POST      /vocab-ai   - Orbit Vocab's live, per-learner AI mnemonics
-//                            (see that repo's vocab-ai.js). Same reuse
-//                            reasoning as /vocab-sync, but shares /gemini's
-//                            GEMINI_API_KEY - see "==== /vocab-ai" below.
+//   GET/POST/PATCH/DELETE /eco   the Quadra Pass: one account and one NT$
+//                                money pool for every Quadra app, and each
+//                                app's data (eco.js)
+//   POST  /gemini                Orbit Class's AI schedule-photo import
+//   POST  /nl-edit               Orbit Class's natural-language edits
+//   GET   /kambi                 Kambi's live scores for Quadra Play (kambi.js)
 //
-// Match Find's /sports-proxy lives in its own Worker (sports-proxy-worker.js)
-// because this one's [placement] region pin (needed for Gemini) applies to
-// the whole script - see that file's top comment. Match Find makes no AI
-// calls at all.
-//
-// /sync and /vocab-sync both hold a Firebase service-account key
-// server-side and proxy Firestore, so the pairing code isn't the only thing
-// standing between the internet and that Firestore project. DELETE wipes
-// the shared document outright on either path (see orbitSyncDeleteForEveryone
-// and its vocab-sync equivalent).
-//
-// Combined into one file/one deployment purely for setup convenience - one
-// Worker, one KV binding, one set of secrets to manage - not for any
-// technical reason: Cloudflare's Workers Free plan daily request cap
-// (100,000/day) is per-account, not per-Worker, so splitting these into
-// separate Workers never bought any extra headroom in the first place. The
-// same reasoning is why /vocab-sync reuses the *same* Firebase project and
-// service-account credentials as /sync rather than needing its own - it
-// only needs its own Firestore collection (see VOCAB_SYNC_APP below) and
-// its own rate-limit counters, both cheap to add to an already-deployed
-// Worker.
-//
-// The routes have very different trust boundaries - the AI routes only
-// ever run a fixed server-owned prompt, /sync holds credentials with full
-// read/write access to Orbit's own shared documents, /vocab-sync the same
-// but for a different app's documents - so each validates and rate-limits its own requests independently (see
-// isRateLimited: every call passes its own `feature` key, so a burst
-// against one path can never eat into another's quota) and no path touches
-// another's secrets or code.
-//
-// Every feature is entirely optional. Not configuring GEMINI_API_KEY (see
-// handleGeminiRequest) or the FIREBASE_* secrets (see handleSyncRequest,
-// shared by /sync and /vocab-sync) just makes that path (or both sync
-// paths at once, since they share the same Firebase secrets) return a "not
-// configured" error - the other features still work normally. See README
-// for the one-time setup each needs.
+// Every route but /eco's sign-in needs a Quadra Pass session (`qt=`). The
+// Quadra Pass is the only way anything is saved: the old per-app sync routes
+// (/sync, /vocab-sync, /odds-sync, /stock-sync) and /vocab-ai are gone.
+// Quadra Fixtures' /sports-proxy lives in its own Worker
+// (sports-proxy-worker.js): this one's [placement] region pin (for Gemini)
+// applies to the whole script.
 
 import en from './locales/en.js';
 import zhTW from './locales/zh-TW.js';
@@ -101,7 +45,7 @@ function corsHeaders(origin, colo) {
     'Access-Control-Allow-Origin': isAllowedOrigin(origin) ? origin : 'null',
     'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Expose-Headers': 'X-Worker-Colo, X-Vocab-Ai-Cache',
+    'Access-Control-Expose-Headers': 'X-Worker-Colo',
     // Browsers keep a preflight this long (Chrome caps it at 2 hours): the
     // apps' JSON writes don't each cost a second Worker request.
     'Access-Control-Max-Age': '86400',
@@ -376,7 +320,7 @@ async function isDailyGlobalCapped(env, feature, limit) {
 // site's own source. Real lock-down would need a backend with real user
 // identity, which is a materially bigger change than this route currently
 // has any other reason to need.
-const GEMINI_BILLED_PATHS = new Set(['/gemini', '/nl-edit', '/vocab-ai']);
+const GEMINI_BILLED_PATHS = new Set(['/gemini', '/nl-edit']);
 
 // ==== /gemini - AI schedule-photo import ====================================
 
@@ -1110,475 +1054,29 @@ async function handleNlEditRequest(request, env, headers, ip, ctx, session = nul
   );
 }
 
-// ==== /vocab-ai - Orbit Vocab's live, per-learner AI feature ================
+// ==== Firestore (the Quadra Pass's store) =====================================
 //
-// An on-demand feature from the sibling repo Orbit Vocab (see that repo's
-// README/vocab-ai.js), genuinely needing a LIVE, per-request Gemini call
-// rather than that repo's offline batch script
-// (scripts/generate_ai_signals.py, which pre-generates one static
-// confusedWith/mnemonic/priorDifficulty per word into data/ai_signals.json
-// at build time): the request here depends on THIS learner's own data -
-// their actual recorded wrong-answer history for one word - which a
-// build-time batch job run once for every word in the vocabulary has no
-// way to know.
-//   - kind: "mnemonic" - one memory hook targeted at a specific word's
-//     recorded wrong-answer pattern for THIS learner, not the generic
-//     one-per-word hook data/ai_signals.json already ships offline.
-// No passcode/identity check here (unlike /vocab-sync) - this isn't tied to
-// any one learner's sync pairing, so it uses the same trust model /gemini
-// already does: rate-limited by IP and gated by GEMINI_API_KEY, callable by
-// anyone who knows the URL (CORS only stops a browser from a disallowed
-// origin reading the response, not a direct request from reaching this
-// far - see readGeminiFiles/cleanVocabAiText's own comments for why every
-// field is still treated as untrusted input regardless). Its own rate-limit
-// bucket ('vocab-ai', see isRateLimited's `feature` keying) means abuse here
-// can never eat into /gemini's or /vocab-sync's own quota, and vice versa -
-// same reasoning as every other route in this file.
+// One Firebase service account, held here as secrets (FIREBASE_PROJECT_ID,
+// FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY): Firestore's own rules deny
+// every client, so this Worker is the only way in. Every document has one
+// string field, `payload`.
 
-// Reuses /gemini's own GEMINI_API_KEY secret (see handleGeminiRequest) -
-// nothing new to configure once AI 辨識課表照片 is already set up. Not
-// client-selectable (unlike /gemini's own `model` field): this feature has a
-// small, fixed-shape request, so there's no multi-model fallback chain worth
-// maintaining, just a single pick from GEMINI_ALLOWED_MODELS above. Picks
-// the other one of the two rather than the lite model /gemini and /nl-edit
-// use: those routes are bulk/structured extraction, where the lite model's
-// speed matters and "thinking" buys nothing (see buildGenerationConfig).
-// This route is the opposite - one mnemonic, generated on a single manual
-// tap, where the bottleneck users actually complained about was the writing
-// being generic and repetitive, not latency - so it trades a little speed
-// for the stronger model's better creative writing.
-const VOCAB_AI_MODEL = 'gemini-3.7-flash';
-// Per IP per hour - a single learner's own occasional taps on "產生記憶法"
-// while reviewing; generous for real use, still bounded.
-const VOCAB_AI_RATE_LIMIT = 30;
-const VOCAB_AI_DAILY_GLOBAL_CAP = 300;
-// Bounds on every piece of client-submitted text below - see
-// cleanVocabAiText's own comment on why these are enforced here rather than
-// trusted from the client.
-const VOCAB_AI_MAX_WORD_LEN = 40;
-const VOCAB_AI_MAX_POS_LEN = 20;
-const VOCAB_AI_MAX_MEANING_LEN = 200;
-const VOCAB_AI_MAX_WRONG_ANSWERS = 5;
-const VOCAB_AI_MAX_WRONG_ANSWER_LEN = 40;
-
-const VOCAB_MNEMONIC_RESPONSE_SCHEMA = {
-  type: 'object',
-  properties: { mnemonic: { type: 'string' } },
-  required: ['mnemonic']
-};
-
-// Bounds and normalizes one piece of client-submitted text (a word, a POS
-// tag, a Chinese meaning, a past wrong answer) before it ever reaches a
-// prompt. This path has no passcode gating the way /vocab-sync does (see
-// that section's own comment) - a POST here is reachable by anyone who
-// knows the URL, not just this app's own frontend - so every field is
-// treated as untrusted input, same posture as /gemini's own
-// readGeminiFiles, even though in normal use it's always this app's own
-// vocab.json words and the learner's own typed spelling attempts. Returns
-// null (never a silently truncated value) for anything that doesn't look
-// like real short text, so the caller 400s outright rather than forwarding
-// garbage into a prompt.
-function cleanVocabAiText(value, maxLen) {
-  if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
-  if (!trimmed || trimmed.length > maxLen) return null;
-  return trimmed;
-}
-
-// ---- /vocab-ai response cache (Workers KV, keyed by the full request shape) ----
-//
-// buildGenerationConfig sets temperature: 0 for every route including this
-// one - src/vocab-ai's mnemonic is therefore already a pure function of
-// {word, pos, meaning, wrongAnswers}, not a creative one-of-many output
-// worth regenerating on every tap. And unlike /gemini (every photo is
-// unique) or /nl-edit (every instruction+school-schedule context is
-// unique), this route's real input space is small and heavily repeated:
-// pos/meaning come straight from Orbit Vocab's own static vocab.json, so
-// they're identical for every learner asking about a given word, and
-// wrongAnswers is a small set of the SAME handful of common misspellings
-// most learners actually make for a given word (e.g. "believe" -> "belive"
-// is the mistake almost everyone makes). Caching the finished mnemonic by
-// exact request shape turns most repeat taps - across one learner
-// re-visiting a word, and across different learners hitting the same
-// popular word/mistake pair - into a free KV read instead of a billed
-// Gemini call, with the model's own determinism meaning a cache hit is
-// never a worse answer than a fresh call would have given.
-//
-// Reuses RATE_LIMIT_KV rather than needing its own binding - one more small
-// key namespace on an already-provisioned store, same reasoning as every
-// other feature in this file reusing shared infrastructure. Cache keys
-// (`vocabai-cache:...`) and rate-limit keys (`rl:...`/`daily-cap:...`) never
-// collide, and - importantly, given this KV namespace's 1000-writes/day
-// account-wide ceiling (see the rate-limiting section's own comment) - a
-// cache WRITE only happens once per genuinely distinct request shape ever
-// seen (first time only; every later hit is a read), so this competes for
-// that write budget only in proportion to how much real variety of
-// word/mistake pairs shows up, never in proportion to total request volume.
-// No TTL: a spelling mnemonic for a fixed mistake pattern doesn't go stale
-// the way a rate-limit window does, so entries are left to live indefinitely
-// rather than forcing a cold, re-billed regeneration for no reason.
-async function vocabAiCacheKey(kind, fields) {
-  // Every field arrives already trimmed (see handleVocabAiRequest). word and
-  // wrongAnswers are lowercased here; pos/meaning are compared as-is since
-  // they're free-form Chinese text where case doesn't apply. wrongAnswers
-  // is sorted so the same set of mistakes hits the same key regardless of
-  // the order this learner happened to make them in.
-  const normalized = JSON.stringify([
-    kind,
-    String(fields.word || '').toLowerCase(),
-    fields.pos || '',
-    fields.meaning || '',
-    [...(fields.wrongAnswers || [])].map((w) => w.toLowerCase()).sort()
-  ]);
-  return `vocabai-cache:${await sha256Hex(normalized)}`;
-}
-
-// Names the exact letter-level mistake between what the learner typed and
-// the correct spelling ourselves, in plain deterministic code, instead of
-// making the model diagnose it from the two raw strings (an earlier version
-// of this prompt did exactly that: asked the model to "diagnose the pattern
-// and state it before writing the mnemonic"). That was the real source of
-// two separate complaints at once - the diagnosis itself was inconsistent
-// (a fast model given e.g. "wierd" vs "weird" would routinely miscount
-// which letters were swapped, or invent a pattern that wasn't there), and
-// because the prompt asked for the diagnosis to be stated "before writing
-// the mnemonic", the model's answer always opened with a throwaway sentence
-// describing the mistake instead of going straight into something useful.
-// Handing over an exact, code-computed diagnosis fixes the first problem by
-// construction (string comparison doesn't miscount), and lets the prompt
-// below flatly forbid restating it, fixing the second.
-//
-// Only handles the shapes real spelling mistakes actually take - one
-// substituted letter, two adjacent letters swapped, one letter missing, one
-// extra letter - exactly, via plain string comparison (same length ->
-// substitution or transposition; length differs by one -> first point of
-// divergence is the missing/extra letter). Anything messier than that
-// (several scattered differences) deliberately falls back to a description
-// that doesn't claim a specific pattern, rather than guessing one - a wrong
-// but confident diagnosis handed to the model would be worse than admitting
-// there isn't a single clean one.
-function diagnoseSpellingMistake(word, wrong) {
-  if (!wrong || wrong === word) return null;
-  if (wrong.length === word.length) {
-    const diffIdx = [];
-    for (let i = 0; i < word.length; i++) {
-      if (wrong[i] !== word[i]) diffIdx.push(i);
-    }
-    if (diffIdx.length === 1) {
-      const i = diffIdx[0];
-      return `wrote "${wrong[i]}" instead of "${word[i]}" as letter #${i + 1} (of ${word.length}) in "${word}" (typed "${wrong}")`;
-    }
-    if (diffIdx.length === 2) {
-      const [i, j] = diffIdx;
-      if (wrong[i] === word[j] && wrong[j] === word[i]) {
-        return `swapped letters #${i + 1} and #${j + 1} of "${word}" ("${word[i]}" and "${word[j]}"), writing "${wrong}" instead`;
-      }
-    }
-  } else if (Math.abs(wrong.length - word.length) === 1) {
-    const shorterLen = Math.min(wrong.length, word.length);
-    let i = 0;
-    while (i < shorterLen && wrong[i] === word[i]) i++;
-    if (wrong.length < word.length) {
-      return `left out letter #${i + 1} of "${word}" ("${word[i]}"), writing "${wrong}" instead`;
-    }
-    return `added an extra letter not in "${word}" around position #${i + 1}, writing "${wrong}" instead`;
-  }
-  return `misspelled "${word}" as "${wrong}" - no single clean letter-level pattern here, so just pick the most visually distinctive difference between the two spellings`;
-}
-
-// The banned-phrases list below was added after real generations kept
-// landing on generic study-advice filler ("多加練習就會記住"、"多寫幾次自
-// 然會拼對") that technically answered the prompt but gave the learner
-// nothing to actually latch onto. The "output ONLY the mnemonic" rule and
-// its own banned-openers list (see diagnoseSpellingMistake's comment for
-// why this changed) were added for the same reason: a diagnosis-first
-// sentence isn't a memory hook, it's just a recap of an error the learner
-// already knows they made.
-function buildVocabMnemonicPrompt(word, pos, meaning, wrongAnswers) {
-  const diagnoses = wrongAnswers.map((w) => diagnoseSpellingMistake(word, w)).filter(Boolean);
-  const mistakesLine = diagnoses.length
-    ? `This learner has previously misspelled this exact word. Here is exactly what went wrong each time, already worked out by code - trust it as fact, don't re-derive or contradict it, just build the mnemonic around it:\n${diagnoses
-        .map((d) => `- ${d}`)
-        .join('\n')}`
-    : `No specific past misspelling was recorded for this word - pick the single most error-prone part of its spelling (a silent letter, a doubled letter, an unusual letter combination) and treat that as the target pattern.`;
-  return `You are helping a Taiwanese high school student remember how to correctly spell an English vocabulary word they keep getting wrong.
-
-Word: "${word}" (${pos || 'unknown part of speech'})
-Chinese meaning: ${meaning || '(none given)'}
-${mistakesLine}
-
-Write ONE mnemonic (under 40 words, in Traditional Chinese, weaving in the actual English letters/word) that uses a real memory technique - a sound-alike association, a keyword/imagery hook, or a tiny vivid story - built specifically around the exact letters named above. Name the specific letters; don't just gesture vaguely at "this part of the word".
-
-Example of the right shape (a different word, "believe", where the learner dropped the second "e" and wrote "belive"): "『believe』中間藏著一個 lie（謊言）－ b-e-LIE-ve，你要先相信（believe）一個謊言（lie）才會被騙，所以中間是 l-i-e 兩個字母都不能少。"
-
-Output ONLY the mnemonic itself. Do NOT open with a sentence naming or restating the mistake (e.g. "你把...拼成..."、"這個字你常把...搞混"、"正確拼法是...") - that's not a memory hook, it's just a description of an error the learner already knows about. Go straight into the technique.
-
-Do NOT give generic study advice such as "多加練習"、"多寫幾次"、"多背幾次就會記住"、"注意拼法" or anything to that effect - if nothing else fits, invent a vivid image or sound association for the trickiest letters instead. Never restate the correct spelling on its own without a memory hook attached to it.`;
-}
-
-async function callVocabAiGemini(prompt, schema, env) {
-  const response = await fetch(geminiUrl(VOCAB_AI_MODEL, env), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: buildGenerationConfig(VOCAB_AI_MODEL, schema)
-    })
-  });
-  if (!response.ok) {
-    throw new Error(`Gemini API error ${response.status}: ${(await response.text()).slice(0, 500)}`);
-  }
-  const data = await response.json();
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (typeof text !== 'string') throw new Error('Gemini response missing text');
-  return JSON.parse(text);
-}
-
-async function handleVocabAiRequest(request, env, headers, ip) {
-  if (request.method !== 'POST') return errorJson('POST_ONLY', 405, headers, request);
-
-  // Kept unconditional (unlike isDailyGlobalCapped/GEMINI_API_KEY below,
-  // both deferred past the cache check) - this bounds plain per-IP request
-  // volume against the Worker itself regardless of what the body contains,
-  // the same basic flood protection every other route here gets. A cache
-  // hit further down still counts against it; only the real, billed spend
-  // ceiling and the key requirement are what a free cache hit gets to skip.
-  const limited = await rateLimitResponse(env, ip, 'vocab-ai', VOCAB_AI_RATE_LIMIT, headers, request);
-  if (limited) return limited;
-
-  const body = await readJsonBody(request);
-  if (body === INVALID_BODY) return errorJson('INVALID_JSON', 400, headers, request);
-
-  try {
-    if (body?.kind === 'mnemonic') {
-      const word = cleanVocabAiText(body.word, VOCAB_AI_MAX_WORD_LEN);
-      if (!word) return errorJson('MISSING_WORD', 400, headers, request);
-      const pos = typeof body.pos === 'string' ? body.pos.trim().slice(0, VOCAB_AI_MAX_POS_LEN) : '';
-      const meaning = typeof body.meaning === 'string' ? body.meaning.trim().slice(0, VOCAB_AI_MAX_MEANING_LEN) : '';
-      const wrongAnswers = (Array.isArray(body.wrongAnswers) ? body.wrongAnswers : [])
-        .filter((w) => typeof w === 'string' && w.trim())
-        .slice(0, VOCAB_AI_MAX_WRONG_ANSWERS)
-        .map((w) => w.trim().slice(0, VOCAB_AI_MAX_WRONG_ANSWER_LEN));
-
-      // Cache check BEFORE isDailyGlobalCapped/GEMINI_API_KEY, deliberately:
-      // a hit costs one KV read, calls no Gemini endpoint, and so should
-      // count against neither the billed-call daily cap (a hit that still
-      // consumed from it would eventually start failing purely because the
-      // cache was doing its job) nor require a configured key at all (an
-      // entry cached before a key was ever rotated out stays servable). See
-      // vocabAiCacheKey's own comment for why this route's request shape
-      // caches well.
-      const cacheKey = env.RATE_LIMIT_KV
-        ? await vocabAiCacheKey('mnemonic', { word, pos, meaning, wrongAnswers })
-        : null;
-      if (cacheKey) {
-        const cached = await env.RATE_LIMIT_KV.get(cacheKey).catch(() => null);
-        if (cached) {
-          headers['X-Vocab-Ai-Cache'] = 'hit';
-          return json({ mnemonic: cached }, 200, headers);
-        }
-      }
-      headers['X-Vocab-Ai-Cache'] = 'miss';
-
-      if (await isDailyGlobalCapped(env, 'vocab-ai', VOCAB_AI_DAILY_GLOBAL_CAP)) {
-        return errorJson('DAILY_QUOTA_EXCEEDED', 429, headers, request);
-      }
-      if (!env.GEMINI_API_KEY) {
-        return errorJson('MISSING_API_KEY', 500, headers, request);
-      }
-
-      const result = await callVocabAiGemini(buildVocabMnemonicPrompt(word, pos, meaning, wrongAnswers), VOCAB_MNEMONIC_RESPONSE_SCHEMA, env);
-      const mnemonic = typeof result.mnemonic === 'string' ? result.mnemonic.trim() : '';
-      if (!mnemonic) return errorJson('INVALID_MNEMONIC', 502, headers, request);
-      if (cacheKey) await env.RATE_LIMIT_KV.put(cacheKey, mnemonic).catch(() => {});
-      return json({ mnemonic }, 200, headers);
-    }
-
-    return errorJson('MISSING_KIND', 400, headers, request);
-  } catch (error) {
-    return upstreamFailed(error, headers);
-  }
-}
-
-// ==== /sync - cross-device sync proxy =======================================
-//
-// Requires more setup than /gemini, because closing the gap properly means
-// closing Firestore's direct, ruleset-gated door entirely - otherwise an
-// abuser just skips this Worker and hits Firestore directly, same as
-// before. That means:
-//   1. This Worker authenticates to Firestore as a Google Cloud *service
-//      account* (FIREBASE_CLIENT_EMAIL / FIREBASE_PRIVATE_KEY below), not
-//      as an anonymous client. Service-account access is treated the same
-//      as the Admin SDK: it bypasses Firestore Security Rules entirely, by
-//      design - the rules only ever gated unauthenticated client access.
-//   2. Once this Worker is live, set the Firestore rule for
-//      /orbit-schedules/{doc} to `allow read, write: if false`. That
-//      closes the direct-client door completely - real, unauthenticated
-//      public access - since actual devices now only ever reach this
-//      Worker, and this Worker's own traffic to Firestore ignores that
-//      rule anyway (see point 1). See README's cross-device sync section
-//      for the exact rule text and the full one-time setup this needs.
-//
-// One shared sync code plus a separate manager passcode, with the passcode
-// gating *only* write access - not two parallel codes:
-//   - Creating a sync (POST, below) mints a plain sync code (the document's
-//     own ID, same as the original single-code design) and a separate,
-//     unrelated *manager passcode*, returning both to the caller once. Only
-//     the passcode's SHA-256 hash is ever stored, as `managerPasscodeHash`
-//     on the document, so a leak of the Firestore data itself can't be
-//     turned back into a working passcode.
-//   - GET (read/poll) never needs the passcode - anyone with the sync code
-//     can read, exactly like the original design. Optionally supplying
-//     `&passcode=` resolves whether that passcode is *this* document's
-//     manager passcode (`role: 'manager'` in the response if so) - used at
-//     join time and by an already-joined device unlocking manager mode
-//     later, never by ordinary polling.
-//   - PATCH (write) and DELETE both require the correct passcode - in the
-//     JSON body for PATCH, as a query param for DELETE (which this app
-//     never sends a body with). Missing or wrong passcode is a 403,
-//     distinct from a nonexistent/mistyped code (its own message) - this is
-//     the actual fix for what used to be true only by UI convention
-//     (src/sync.js's applyEditorRoleLock): previously *any* holder of the
-//     single code could PATCH or DELETE, because there was nothing else to
-//     check.
-
-// Must match the code/passcode format the client (and this Worker's own
-// generateSyncCode below) produce - rejecting a malformed code here means
-// it never even reaches Firestore, and the error message is the same
-// either way. Passcodes reuse the exact same shape - they're just another
-// random string from the same alphabet, generated the same way.
-const SYNC_CODE_PATTERN = /^[2-9A-HJ-NP-Z]{8}$/;
-const SYNC_CODE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
-const SYNC_CODE_LENGTH = 8;
-
-// `length` defaults to Orbit's own 8-character code/passcode shape;
-// VOCAB_SYNC_APP's single-passcode design (see below) passes a longer one,
-// since that one string is the ONLY secret standing between the internet
-// and a learner's progress, unlike Orbit's own code+passcode pair.
-function generateSyncCode(length = SYNC_CODE_LENGTH) {
+const CODE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+// A random code (passes, session ids, keys): never 0, 1, O or I.
+function generateCode(length) {
   const bytes = new Uint8Array(length);
   crypto.getRandomValues(bytes);
-  return Array.from(bytes, byte => SYNC_CODE_ALPHABET[byte % SYNC_CODE_ALPHABET.length]).join('');
+  return Array.from(bytes, byte => CODE_ALPHABET[byte % CODE_ALPHABET.length]).join('');
 }
 
-// Passcodes are high-entropy and randomly generated (never user-chosen), so
-// a plain, fast SHA-256 - no salt, no slow KDF - is enough: there's no weak
-// human-picked passphrase here for an attacker to dictionary-guess, only a
-// ~40-bit random string they'd have to brute force from scratch either way.
-// This exists purely so a leak of the Firestore data itself (e.g. project
-// access, a misconfigured export) doesn't also hand over live write access
-// - the hash can't be turned back into the passcode.
+// Codes are random (never chosen by a person), so a plain SHA-256 is enough:
+// a leak of the database never hands over a working pass.
 async function sha256Hex(text) {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
   return Array.from(new Uint8Array(digest))
     .map(byte => byte.toString(16).padStart(2, '0'))
     .join('');
 }
-
-// /vocab-sync's single-passcode design (see VOCAB_SYNC_APP below) never uses
-// a client-supplied passcode as a Firestore document id directly - that
-// would put the plaintext secret in plain sight in the database itself
-// (visible to anyone with Firestore/GCP console access, a backup export, or
-// a misconfigured rule), the exact thing hashing a passcode is for
-// elsewhere in this file. Hashing it into the lookup key instead means the
-// only way to ever reach a given document is to already know the passcode
-// that hashes to it - there's nothing else here to check it against, and
-// nothing else needed: same "prove you know the secret" property as
-// ORBIT_SYNC_APP's managerPasscodeHash comparison, just reached by using
-// the hash AS the address instead of storing it alongside one.
-async function docIdForPasscode(passcode) {
-  return sha256Hex(passcode);
-}
-
-// Same cap as the Firestore rule guarding this collection (see README,
-// request.resource.data.payload.size() < 20000) - checked again here so an
-// oversized write is rejected before ever spending a Firestore call on it.
-// Orbit's own schedule payload is already a compressed transfer string, so
-// this stays small.
-const ORBIT_MAX_PAYLOAD_LENGTH = 20000;
-
-// Sync's own legitimate traffic looks nothing like the AI import feature's:
-// two paired devices poll every 8 seconds *for as long as the tab stays
-// open*, so a single active device is ~450 requests/hour all on its own,
-// and a shared IP (school Wi-Fi, one household) can easily be several
-// devices at once. Reads (GET, i.e. polling) need a limit generous enough
-// that this normal, legitimate traffic pattern never trips it - it's only
-// meant to catch a genuine scripted flood, not "several classmates behind
-// the same NAT". Writes (PATCH) are rarer in normal use (only when a
-// manager device actually has unsaved changes to publish) so they get a
-// much tighter cap, since a write is also the only request that can create
-// throwaway Firestore documents or burn write quota.
-const SYNC_READ_RATE_LIMIT = 6000;
-const SYNC_WRITE_RATE_LIMIT = 300;
-// A manager deleting the whole shared document (see src/sync.js's
-// orbitSyncDeleteForEveryone) is rare and destructive by nature - once per
-// pairing at most in any normal flow - so this gets its own tight limit,
-// tighter than an ordinary write, on its own counter (kind 'delete') rather
-// than sharing the write bucket.
-const SYNC_DELETE_RATE_LIMIT = 20;
-// Creating a brand new pairing (see src/sync.js's orbitSyncCreate) is just
-// as rare/one-off as deleting one - same tight cap, own counter.
-const SYNC_CREATE_RATE_LIMIT = 20;
-// A GET that also carries a passcode is a credential check (join-time role
-// resolution, or an existing viewer device unlocking manager mode) - unlike
-// ordinary polling there's no legitimate reason to do this often, so it
-// gets its own bucket at the same tight cap as an actual write rather than
-// sharing the generous read bucket polling needs. (Not that brute-forcing
-// an 8-character passcode is remotely feasible at any rate limit - this is
-// just not the bucket meant for high-frequency legitimate traffic.)
-const SYNC_VERIFY_RATE_LIMIT = 300;
-
-// ---- /vocab-sync's own single-passcode design -------------------------
-//
-// Orbit Vocab has no manager/viewer split the way Orbit's own /sync does
-// (see VOCAB_SYNC_APP's singleCredential below) - every pairing belongs to
-// one learner's own devices, and every operation (including a plain read)
-// already needs the real secret. Rather than mint a separate public "code"
-// alongside a passcode the way /sync does (which would just be one more
-// string to type/copy for no security benefit here - see that app's own
-// sync.js), /vocab-sync uses ONE random string as both the pairing's
-// identifier and its only credential: the client sends it as `?passcode=`
-// on every request, and this Worker derives the actual Firestore document
-// id from it (see docIdForPasscode below) rather than ever using it, or
-// anything derived from it, as a client-facing lookup key on its own.
-//
-// Longer than Orbit's own 8-character code/passcode (see SYNC_CODE_LENGTH)
-// specifically because it's now the ONLY secret guarding a learner's
-// progress, not one of two. 16 characters from the same 32-symbol alphabet
-// is 80 bits of entropy (32^16) - comfortably beyond brute-force range even
-// before VOCAB_SYNC_WRITE_RATE_LIMIT/VOCAB_SYNC_DELETE_RATE_LIMIT below are
-// factored in.
-const VOCAB_PASSCODE_LENGTH = 16;
-const VOCAB_PASSCODE_PATTERN = /^[2-9A-HJ-NP-Z]{16}$/;
-
-// ---- /vocab-sync's own rate-limit buckets ----------------------------
-//
-// A separate set of counters from /sync's above (see isRateLimited's
-// `feature` keying) - vocab-sync's traffic shape is different enough to
-// tune independently. There's no 'verify' bucket distinct from 'read' any
-// more (unlike an earlier revision of this design): every read already
-// carries and checks the passcode, so there's no passcode-less "just
-// polling" read left to charge against a separate, cheaper bucket - this is
-// simply the bucket ordinary activity-driven polling lands in (see that
-// app's sync.js), generous for the same reason Orbit's own read limit is.
-const VOCAB_SYNC_READ_RATE_LIMIT = 6000;
-const VOCAB_SYNC_WRITE_RATE_LIMIT = 300;
-const VOCAB_SYNC_DELETE_RATE_LIMIT = 20;
-const VOCAB_SYNC_CREATE_RATE_LIMIT = 20;
-// Firestore's own per-document cap is ~1 MiB, but this is set far below
-// that on purpose: Orbit Vocab's sync.js writes progress as
-// gzip-compressed, delta-timestamped, positional tuples rather than plain
-// keyed JSON (see that file's "Compact wire format" comment) specifically
-// to keep this small - every field that isn't read back anywhere is
-// dropped before it's ever compressed, not just compressed harder. Even a
-// worst case of every one of Orbit Class's 3,060 vocab words fully attempted,
-// each with a maxed-out recent-mistakes history, comes in well under
-// 250,000 bytes once compressed and base64-encoded; this cap stays a
-// comfortable multiple above that real worst case while still refusing a
-// payload that's clearly not this format at all (a client bug, or a
-// request that skipped sync.js's own encoding entirely) long before it
-// costs a Firestore write.
-const VOCAB_MAX_PAYLOAD_LENGTH = 262144;
 
 function base64UrlFromBytes(bytes) {
   let binary = '';
@@ -1657,12 +1155,11 @@ async function getFirebaseAccessToken(env) {
   return cachedFirebaseToken.token;
 }
 
-// `collection` lets the same helpers below serve both /sync
-// (orbit-schedules) and /vocab-sync (vocab-progress-sync) - see
-// ORBIT_SYNC_APP/VOCAB_SYNC_APP - without duplicating any of this file's
-// actual Firestore/JWT plumbing.
 function firestoreDocUrl(env, collection, code) {
-  return `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(env.FIREBASE_PROJECT_ID)}/databases/(default)/documents/${encodeURIComponent(collection)}/${encodeURIComponent(code)}`;
+  return `${firestoreBase(env)}/${encodeURIComponent(collection)}/${encodeURIComponent(code)}`;
+}
+function firestoreBase(env) {
+  return `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(env.FIREBASE_PROJECT_ID)}/databases/(default)/documents`;
 }
 async function firestoreErrorMessage(response) {
   const errorJson = await response.json().catch(() => ({}));
@@ -1674,66 +1171,13 @@ async function firestoreGet(env, collection, code) {
   const response = await fetch(firestoreDocUrl(env, collection, code), {
     headers: { Authorization: `Bearer ${token}` }
   });
-  if (response.status === 404) {
-    return { exists: false, updateTime: '', payload: '', managerPasscodeHash: '' };
-  }
+  if (response.status === 404) return { exists: false, updateTime: '', payload: '' };
   if (!response.ok) throw new Error(await firestoreErrorMessage(response));
   const doc = await response.json();
-  return {
-    exists: true,
-    updateTime: doc.updateTime || '',
-    payload: doc.fields?.payload?.stringValue || '',
-    managerPasscodeHash: doc.fields?.managerPasscodeHash?.stringValue || ''
-  };
+  return { exists: true, updateTime: doc.updateTime || '', payload: doc.fields?.payload?.stringValue || '' };
 }
 
-// Seeds both fields the document will ever have at once - `payload` and the
-// passcode hash it'll be checked against for every future write. Explicitly
-// listing both in updateMask (rather than the single-field mask an ordinary
-// write uses - see firestorePatch below) is what makes this a real create
-// instead of a same-shaped update: without it there'd be nothing here
-// distinguishing "first write" from "later write", and no way to seed
-// managerPasscodeHash at all through the single-field write path.
-async function firestoreCreate(env, collection, code, managerPasscodeHash, payload) {
-  const token = await getFirebaseAccessToken(env);
-  const response = await fetch(
-    `${firestoreDocUrl(env, collection, code)}?updateMask.fieldPaths=payload&updateMask.fieldPaths=managerPasscodeHash`,
-    {
-      method: 'PATCH',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        fields: {
-          payload: { stringValue: payload },
-          managerPasscodeHash: { stringValue: managerPasscodeHash }
-        }
-      })
-    }
-  );
-  if (!response.ok) throw new Error(await firestoreErrorMessage(response));
-  const doc = await response.json();
-  return { updateTime: doc.updateTime || '' };
-}
-
-// An ordinary write - the single-field mask means this can never touch
-// managerPasscodeHash, however it's called, so a write is never able to
-// change the passcode a document was created with.
-async function firestorePatch(env, collection, code, payload) {
-  const token = await getFirebaseAccessToken(env);
-  const response = await fetch(
-    `${firestoreDocUrl(env, collection, code)}?updateMask.fieldPaths=payload`,
-    {
-      method: 'PATCH',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fields: { payload: { stringValue: payload } } })
-    }
-  );
-  if (!response.ok) throw new Error(await firestoreErrorMessage(response));
-  const doc = await response.json();
-  return { updateTime: doc.updateTime || '' };
-}
-
-// /eco's writes (see eco.js): the same single-field write as
-// firestorePatch, optionally only if the document is still as it was read
+// /eco's writes (see eco.js): the single `payload` field, optionally only if the document is still as it was read
 // (`{ updateTime }`) or doesn't exist yet (`{ exists: false }`). A write that
 // lost that race throws an error marked `precondition`, and eco.js reads
 // and merges again.
@@ -1758,281 +1202,71 @@ async function firestoreWrite(env, collection, code, payload, precondition) {
   return { updateTime: doc.updateTime || '' };
 }
 
-// Every document of a collection (up to `pageSize`): [{ id, payload }].
-// For /kambi's cron (kambi.js), whose collection stays small.
-async function firestoreList(env, collection, pageSize = 300) {
+// Every document of a collection: [{ id, payload, updateTime }], a page at
+// a time (`limit`: stop after that many).
+// `idsOnly`: names without the payloads (a mask on a field no document has).
+async function firestoreList(env, collection, pageSize = 300, { limit = Infinity, idsOnly = false } = {}) {
   const token = await getFirebaseAccessToken(env);
-  const base = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(env.FIREBASE_PROJECT_ID)}/databases/(default)/documents/${encodeURIComponent(collection)}`;
-  const response = await fetch(`${base}?pageSize=${pageSize}`, { headers: { Authorization: `Bearer ${token}` } });
-  if (!response.ok) throw new Error(await firestoreErrorMessage(response));
-  const data = await response.json();
-  return (data.documents || []).map(doc => ({ id: decodeURIComponent(doc.name.split('/').pop()), payload: doc.fields?.payload?.stringValue || '' }));
+  const out = [];
+  let pageToken = '';
+  do {
+    const response = await fetch(`${firestoreBase(env)}/${encodeURIComponent(collection)}?pageSize=${pageSize}${idsOnly ? '&mask.fieldPaths=_none' : ''}${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!response.ok) throw new Error(await firestoreErrorMessage(response));
+    const data = await response.json();
+    for (const doc of data.documents || []) out.push({ id: decodeURIComponent(doc.name.split('/').pop()), payload: doc.fields?.payload?.stringValue || '', updateTime: doc.updateTime || '' });
+    pageToken = data.nextPageToken || '';
+  } while (pageToken && out.length < limit);
+  return out;
 }
 
-// Wipes the shared document entirely - see src/sync.js's
-// orbitSyncDeleteForEveryone (and its vocab-sync client-side equivalent).
-// Unlike unlinking (a purely client-side, one device forgetting its own
-// pairing code), this is the one operation that actually reaches into
-// Firestore and removes the document every paired device reads from, so
-// every device sharing this code loses its sync target at once. A 404
-// (already gone, e.g. a retry after a dropped response) is treated the
-// same as success - deleting something that's already deleted isn't an
-// error from the caller's point of view.
+// The collections that exist (for the store's clean-up, eco-admin.js).
+async function firestoreCollections(env) {
+  const token = await getFirebaseAccessToken(env);
+  const response = await fetch(`${firestoreBase(env)}:listCollectionIds`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pageSize: 100 })
+  });
+  if (!response.ok) throw new Error(await firestoreErrorMessage(response));
+  return (await response.json()).collectionIds || [];
+}
+
+// Up to 500 writes in one request: { delete: [collection, id] } or
+// { update: [collection, id, payload], updateTime? } (only if unchanged).
+// Each write stands alone: one that fails doesn't stop the rest.
+async function firestoreBatch(env, writes) {
+  const token = await getFirebaseAccessToken(env);
+  const name = (c, id) => `projects/${env.FIREBASE_PROJECT_ID}/databases/(default)/documents/${c}/${id}`;
+  const response = await fetch(`${firestoreBase(env)}:batchWrite`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      writes: writes.map(w =>
+        w.delete
+          ? { delete: name(...w.delete) }
+          : {
+              update: { name: name(w.update[0], w.update[1]), fields: { payload: { stringValue: w.update[2] } } },
+              updateMask: { fieldPaths: ['payload'] },
+              ...(w.updateTime ? { currentDocument: { updateTime: w.updateTime } } : {})
+            }
+      )
+    })
+  });
+  if (!response.ok) throw new Error(await firestoreErrorMessage(response));
+  return response.json();
+}
+
+// Deletes a document; one already gone counts as deleted.
 async function firestoreDelete(env, collection, code) {
   const token = await getFirebaseAccessToken(env);
   const response = await fetch(firestoreDocUrl(env, collection, code), {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` }
   });
-  if (!response.ok && response.status !== 404) {
-    throw new Error(await firestoreErrorMessage(response));
-  }
+  if (!response.ok && response.status !== 404) throw new Error(await firestoreErrorMessage(response));
 }
-
-// `appConfig` (see ORBIT_SYNC_APP/VOCAB_SYNC_APP below) is what lets this
-// one pair of functions serve both /sync and /vocab-sync: which Firestore
-// collection, which rate-limit counters/limits, how big a payload is
-// allowed, and how a request identifies+authenticates itself.
-// `appConfig.singleCredential` picks between the two designs: Orbit's own
-// /sync keeps its code+separate-manager-passcode shape (reads open to any
-// code holder, only writes/deletes need the passcode); Orbit Vocab's
-// /vocab-sync (see VOCAB_SYNC_APP's own comment, and docIdForPasscode
-// above) uses one passcode as both identifier and credential for every
-// operation, including reads.
-function isValidPayload(payload, appConfig) {
-  return typeof payload === 'string' && Boolean(payload) && payload.length <= appConfig.maxPayloadLength;
-}
-
-// Whether `passcode` is `doc`'s manager passcode (ORBIT_SYNC_APP only).
-async function isManagerPasscode(passcode, doc) {
-  return Boolean(passcode) && (await sha256Hex(passcode)) === doc.managerPasscodeHash;
-}
-
-async function handleSyncCreate(request, env, headers, ip, appConfig) {
-  const limited = await rateLimitResponse(env, ip, `${appConfig.featurePrefix}:create`, appConfig.createLimit, headers, request);
-  if (limited) return limited;
-
-  const body = await readJsonBody(request);
-  if (body === INVALID_BODY) return errorJson('INVALID_JSON', 400, headers, request);
-  const payload = body?.payload;
-  if (!isValidPayload(payload, appConfig)) return errorJson('MISSING_PAYLOAD', 400, headers, request);
-
-  try {
-    if (appConfig.singleCredential) {
-      // One random string is both this pairing's identifier and its only
-      // credential (see VOCAB_SYNC_APP's own comment) - there's no separate
-      // managerPasscodeHash field to seed the way Orbit's own /sync needs,
-      // because the document id itself (derived below) only ever names a
-      // document reachable by someone who supplies the correct passcode.
-      // An ordinary upsert PATCH (see firestorePatch) is exactly as much
-      // "create" as this design ever needs.
-      const passcode = generateSyncCode(appConfig.credentialLength);
-      const created = await firestorePatch(env, appConfig.collection, await docIdForPasscode(passcode), payload);
-      return json({ passcode, updateTime: created.updateTime }, 200, headers);
-    }
-    const code = generateSyncCode();
-    const managerPasscode = generateSyncCode();
-    const created = await firestoreCreate(env, appConfig.collection, code, await sha256Hex(managerPasscode), payload);
-    return json({ code, managerPasscode, updateTime: created.updateTime }, 200, headers);
-  } catch (error) {
-    return upstreamFailed(error, headers);
-  }
-}
-
-async function handleSyncRequest(request, env, headers, ip, appConfig) {
-  if (!['GET', 'POST', 'PATCH', 'DELETE'].includes(request.method)) {
-    return errorJson('SYNC_METHOD_NOT_ALLOWED', 405, headers, request);
-  }
-
-  if (!env.FIREBASE_PROJECT_ID || !env.FIREBASE_CLIENT_EMAIL || !env.FIREBASE_PRIVATE_KEY) {
-    return errorJson('MISSING_FIREBASE_CONFIG', 500, headers, request);
-  }
-
-  // Creating a new pairing needs no identifier at all yet - it mints one -
-  // so it branches off before the identifier handling every other method
-  // needs.
-  if (request.method === 'POST') return handleSyncCreate(request, env, headers, ip, appConfig);
-
-  const url = new URL(request.url);
-  // The single-credential design's identifier, and ORBIT_SYNC_APP's
-  // GET/DELETE manager-passcode check (PATCH sends its passcode in the body
-  // instead).
-  const suppliedPasscode = (url.searchParams.get('passcode') || '').trim();
-  // The single-credential design (see VOCAB_SYNC_APP) never takes a raw
-  // client-supplied identifier as a Firestore document id - see
-  // docIdForPasscode's own comment on why. ORBIT_SYNC_APP uses the plain
-  // code itself, pattern-validated up front so a malformed one never even
-  // reaches Firestore.
-  let docId;
-  if (appConfig.singleCredential) {
-    if (!appConfig.credentialPattern.test(suppliedPasscode)) {
-      return errorJson('INVALID_PASSCODE', 400, headers, request);
-    }
-    docId = await docIdForPasscode(suppliedPasscode);
-  } else {
-    const code = (url.searchParams.get('code') || '').trim().toUpperCase();
-    if (!SYNC_CODE_PATTERN.test(code)) {
-      return errorJson('INVALID_PAIRING_CODE', 400, headers, request);
-    }
-    docId = code;
-  }
-
-  if (request.method === 'GET') {
-    // For ORBIT_SYNC_APP, a passcode riding along on GET resolves whether
-    // it's *this* document's manager passcode (join-time role check, or an
-    // already-joined viewer device unlocking manager mode) - see
-    // SYNC_VERIFY_RATE_LIMIT for why that gets its own bucket instead of
-    // sharing ordinary polling's. Reads themselves stay open to anyone
-    // holding the plain sync code (a teacher broadcasting one schedule to
-    // many read-only student devices). A single-credential GET already
-    // proved the passcode via docId above, so it's always a plain read.
-    const verifying = !appConfig.singleCredential && Boolean(suppliedPasscode);
-    const limited = await rateLimitResponse(
-      env,
-      ip,
-      `${appConfig.featurePrefix}:${verifying ? 'verify' : 'read'}`,
-      verifying ? appConfig.verifyLimit : appConfig.readLimit,
-      headers,
-      request
-    );
-    if (limited) return limited;
-    try {
-      const doc = await firestoreGet(env, appConfig.collection, docId);
-      // For the single-credential design a wrong passcode and a
-      // never-created one both land here and look identical to the caller -
-      // the document only ever exists under the hash of the correct
-      // passcode, so there's nothing else to check it against.
-      if (!doc.exists) return json({ exists: false, updateTime: '', payload: '' }, 200, headers);
-      const result = { exists: true, updateTime: doc.updateTime, payload: doc.payload };
-      if (verifying && (await isManagerPasscode(suppliedPasscode, doc))) result.role = 'manager';
-      return json(result, 200, headers);
-    } catch (error) {
-      return upstreamFailed(error, headers);
-    }
-  }
-
-  if (request.method === 'PATCH') {
-    const limited = await rateLimitResponse(env, ip, `${appConfig.featurePrefix}:write`, appConfig.writeLimit, headers, request);
-    if (limited) return limited;
-    const body = await readJsonBody(request);
-    if (body === INVALID_BODY) return errorJson('INVALID_JSON', 400, headers, request);
-    const payload = body?.payload;
-    if (!isValidPayload(payload, appConfig)) return errorJson('MISSING_PAYLOAD', 400, headers, request);
-    try {
-      const doc = await firestoreGet(env, appConfig.collection, docId);
-      if (appConfig.singleCredential) {
-        // Nothing further to check: docId only ever names a document a
-        // correct passcode could reach. A 404 means either this passcode was
-        // never used to create a pairing, or (functionally identical from
-        // the outside) it's simply wrong.
-        if (!doc.exists) return errorJson('SYNC_PASSCODE_NOT_FOUND', 404, headers, request);
-      } else {
-        if (!doc.exists) return errorJson('PAIRING_CODE_NOT_FOUND', 404, headers, request);
-        const managerPasscode = typeof body?.passcode === 'string' ? body.passcode.trim() : '';
-        if (!(await isManagerPasscode(managerPasscode, doc))) {
-          return errorJson('MANAGER_PASSCODE_REQUIRED_WRITE', 403, headers, request);
-        }
-      }
-      return json(await firestorePatch(env, appConfig.collection, docId, payload), 200, headers);
-    } catch (error) {
-      return upstreamFailed(error, headers);
-    }
-  }
-
-  // DELETE - single-credential apps need nothing beyond docId itself (see
-  // PATCH above); ORBIT_SYNC_APP still needs the manager passcode, taken
-  // from the query string since neither app ever sends a DELETE body.
-  const limited = await rateLimitResponse(env, ip, `${appConfig.featurePrefix}:delete`, appConfig.deleteLimit, headers, request);
-  if (limited) return limited;
-  try {
-    const doc = await firestoreGet(env, appConfig.collection, docId);
-    // Already gone (or never existed) - not an error from the caller's
-    // point of view.
-    if (!doc.exists) return json({ deleted: true }, 200, headers);
-    if (!appConfig.singleCredential && !(await isManagerPasscode(suppliedPasscode, doc))) {
-      return errorJson('MANAGER_PASSCODE_REQUIRED_DELETE', 403, headers, request);
-    }
-    await firestoreDelete(env, appConfig.collection, docId);
-    return json({ deleted: true }, 200, headers);
-  } catch (error) {
-    return upstreamFailed(error, headers);
-  }
-}
-
-// ---- Per-app configuration for the generic handlers above -----------
-//
-// Orbit's own /sync: reads stay open to any holder of the plain sync code
-// (the teacher/manager broadcasts to many read-only student/viewer
-// devices), only writes and deletes need the manager passcode.
-// `singleCredential` is left unset, which takes the code+manager-passcode
-// branch in handleSyncCreate/handleSyncRequest above.
-const ORBIT_SYNC_APP = {
-  collection: 'orbit-schedules',
-  featurePrefix: 'sync',
-  maxPayloadLength: ORBIT_MAX_PAYLOAD_LENGTH,
-  readLimit: SYNC_READ_RATE_LIMIT,
-  verifyLimit: SYNC_VERIFY_RATE_LIMIT,
-  writeLimit: SYNC_WRITE_RATE_LIMIT,
-  deleteLimit: SYNC_DELETE_RATE_LIMIT,
-  createLimit: SYNC_CREATE_RATE_LIMIT
-};
-// Orbit Vocab's /vocab-sync: every pairing belongs to one learner syncing
-// their own progress across their own devices - there is no teacher/student
-// broadcast use case the way Orbit has, so there is no viewer role, and
-// nothing for a separate, less-sensitive "public code" to protect either
-// (see VOCAB_PASSCODE_LENGTH's own comment). `singleCredential: true` is
-// what sends handleSyncCreate/handleSyncRequest down the one-passcode
-// branch instead of Orbit's own code+manager-passcode one.
-const VOCAB_SYNC_APP = {
-  collection: 'vocab-progress-sync',
-  featurePrefix: 'vocab-sync',
-  maxPayloadLength: VOCAB_MAX_PAYLOAD_LENGTH,
-  readLimit: VOCAB_SYNC_READ_RATE_LIMIT,
-  writeLimit: VOCAB_SYNC_WRITE_RATE_LIMIT,
-  deleteLimit: VOCAB_SYNC_DELETE_RATE_LIMIT,
-  createLimit: VOCAB_SYNC_CREATE_RATE_LIMIT,
-  singleCredential: true,
-  credentialLength: VOCAB_PASSCODE_LENGTH,
-  credentialPattern: VOCAB_PASSCODE_PATTERN
-};
-
-// Odds Study's /odds-sync: one person's simulated betting account (play
-// money only - a balance, weekly top-ups and saved slips, never real money
-// or personal data) on their own devices. Same single-passcode design as
-// /vocab-sync, but 8 characters instead of 16: the site asks for a passcode
-// short enough to type on a phone, and what it guards is a play-money
-// balance. 32^8 is still about 10^12 passcodes, far past what the write
-// and read limits below let anyone try.
-const ODDS_PASSCODE_LENGTH = 8;
-const ODDS_PASSCODE_PATTERN = /^[2-9A-HJ-NP-Z]{8}$/;
-// Slip history is kept for good, so the account only grows: a gzipped slip
-// is roughly 100-300 bytes, so this holds several thousand slips (years of
-// daily betting). Just under Firestore's 1 MiB document limit, with room
-// for the document's other fields.
-const ODDS_MAX_PAYLOAD_LENGTH = 1_000_000;
-const ODDS_SYNC_APP = {
-  collection: 'odds-study-accounts',
-  featurePrefix: 'odds-sync',
-  maxPayloadLength: ODDS_MAX_PAYLOAD_LENGTH,
-  readLimit: 3000,
-  writeLimit: 300,
-  deleteLimit: 20,
-  createLimit: 20,
-  singleCredential: true,
-  credentialLength: ODDS_PASSCODE_LENGTH,
-  credentialPattern: ODDS_PASSCODE_PATTERN
-};
-
-// Stock Study's /stock-sync: one person's simulated brokerage account (play
-// money only - wallets in several currencies, holdings, orders, loans and
-// their history, never real money or personal data) on their own devices.
-// Exactly /odds-sync's design and limits (8-character passcode, 1 MB), in
-// its own Firestore collection and with its own rate-limit counters.
-const STOCK_SYNC_APP = {
-  ...ODDS_SYNC_APP,
-  collection: 'stock-study-accounts',
-  featurePrefix: 'stock-sync'
-};
 
 // ---- /eco: the Quadra Pass (see eco.js) ------------------------------------
 const ECO_DEPS = {
@@ -2045,8 +1279,11 @@ const ECO_DEPS = {
   fsGet: firestoreGet,
   fsWrite: firestoreWrite,
   fsDelete: firestoreDelete,
+  fsList: firestoreList,
+  fsCollections: firestoreCollections,
+  fsBatch: firestoreBatch,
   sha256Hex,
-  generateCode: generateSyncCode,
+  generateCode,
   now: () => Date.now()
 };
 
@@ -2077,20 +1314,15 @@ export default {
       const session = qt ? await readToken(await tokenSecret(env), qt, 'ses') : null;
       return path === '/gemini' ? handleGeminiRequest(request, env, headers, ip, ctx, session) : handleNlEditRequest(request, env, headers, ip, ctx, session);
     }
-    if (path === '/sync') return handleSyncRequest(request, env, headers, ip, ORBIT_SYNC_APP);
-    if (path === '/vocab-sync') return handleSyncRequest(request, env, headers, ip, VOCAB_SYNC_APP);
-    if (path === '/odds-sync') return handleSyncRequest(request, env, headers, ip, ODDS_SYNC_APP);
-    if (path === '/stock-sync') return handleSyncRequest(request, env, headers, ip, STOCK_SYNC_APP);
     if (path === '/eco') return handleEcoRequest(request, env, headers, ip, ECO_DEPS);
     if (path === '/kambi') {
-      // Signed in (a Quadra Pass session): counted per session in memory,
-      // not in KV.
+      // A Quadra Pass session only, counted per session in memory.
       const qt = new URL(request.url).searchParams.get('qt');
       const session = qt ? await readToken(await tokenSecret(env), qt, 'ses') : null;
-      const deps = session ? { ...KAMBI_DEPS, rateLimitResponse: async () => (sessionLimited(`k:${session.s}`, 60) ? errorJson('RATE_LIMITED', 429, headers, request) : null) } : KAMBI_DEPS;
+      if (!session) return errorJson('ECO_TOKEN_INVALID', 401, headers, request);
+      const deps = { ...KAMBI_DEPS, rateLimitResponse: async () => (sessionLimited(`k:${session.s}`, 60) ? errorJson('RATE_LIMITED', 429, headers, request) : null) };
       return handleKambiRequest(request, env, headers, ip, deps);
     }
-    if (path === '/vocab-ai') return handleVocabAiRequest(request, env, headers, ip);
     return errorJson('NOT_FOUND', 404, headers, request);
   },
 
