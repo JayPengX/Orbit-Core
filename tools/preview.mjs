@@ -3,6 +3,7 @@
 //
 //   node tools/preview.mjs <app> [hash…] [--out dir] [--width 390] [--height 844]
 //                          [--full] [--lang zh|en] [--dark] [--wait ms] [--click selector]
+//                          [--signed-out]  (the sign-in screen, as a new device sees it)
 //
 //   app   fixtures | play | securities | rewards | orbit (or the repo's folder name)
 //   hash  the page's #hash to open (a tab), one screenshot each; none: the start
@@ -60,6 +61,7 @@ const payloadFile = opt('payload', '');
 const clicks = [];
 for (let c; (c = opt('click', null)); ) clicks.push(c);
 const full = flag('full');
+const signedOut = flag('signed-out');
 const dark = flag('dark');
 const [appArg, ...hashes] = args;
 
@@ -141,12 +143,12 @@ await context.addInitScript(
   ([refresh, lang]) => {
     try {
       sessionStorage.setItem('quadra.visit', '1');
-      localStorage.setItem('quadra.refresh', refresh);
-      localStorage.setItem('quadra.account', '0123456789abcdef');
+      if (refresh) localStorage.setItem('quadra.refresh', refresh);
+      if (refresh) localStorage.setItem('quadra.account', '0123456789abcdef');
       localStorage.setItem('quadra.lang', lang);
     } catch {}
   },
-  [refresh, lang]
+  [signedOut ? '' : refresh, lang]
 );
 await context.route('https://orbit-workers-proxy.pengzjay.workers.dev/**', async route => {
   const req = route.request();
