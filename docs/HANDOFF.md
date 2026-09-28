@@ -118,3 +118,41 @@ edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
 - **Orbit Class:** the dashboard title is fitted once it's on screen.
 - Not verifiable here (no real phone): the status-bar blur fix and the
   tab bar's bottom room; worth a look on the device.
+
+## Round: Fixtures rebuilt, speed and cost, Rewards and Securities (branch `claude/fixtures-app-restructure-v5tuby`)
+
+Everything is on `claude/fixtures-app-restructure-v5tuby` in all six repos,
+not yet on `main` (so not deployed). The Workers (batch, translate, season
+tier) deploy from `main` too; until then the apps fall back (one request at
+a time; untranslated text).
+
+- **Kit:** `proxyJson` (batches of 12 per Worker request, memory + Cache
+  Storage per URL for its lifetime), `peekJson`, `cachedPayload` (a signed-in
+  phone opens on its last data at once), `translate()`, account badge
+  instead of the balance, account details card in the pass sheet
+  (`accountDetails`), `watchUpdates` applies a new deploy when the app is
+  put away or right after opening (never under the thumb on coming back),
+  `rememberPlace`/`restorePlace`, two-line `.q-rec-sub`.
+- **sports-proxy:** `?batch=1&u=…` (`trim!url` per item), `Cache-Control:
+  private, max-age` on single answers, `dates=<year>` season tier,
+  `clients5.google.com/translate_a/t` (POSTed upstream, kept 30 days).
+- **Fixtures:** tabs 推薦 / 賽事 / 直播 / 追蹤 / 排名; stages and playoff
+  series (`lib/stage.mjs`); Taiwan broadcasts (`lib/broadcast.mjs`, checked
+  2026-09: keep it current); whole seasons for F1/golf/tennis/UFC; table
+  gaps; player pages and follows for individual sports; stat bars per side;
+  Chinese stat names (`lib/statnames.mjs`).
+- **Securities:** 換匯・融資 in three views; translated "what it does"; no
+  news; the money-sources card removed (account details are in the kit).
+- **Play:** data through `proxyJson`.
+- **Rewards:** every word recorded (Microsoft en-US Jenny, like the old
+  4-6 clips; `tools/word-audio.py`), audio started in the tap, voice
+  fallback/picker (`lib/voice.mjs`); faster boxes (1, 2, 5, 14 days; known
+  words jump to box 3), missed words retried in the round, 10/20/30 rounds;
+  long games (`lib/long.mjs`: sudoku 9×9, solitaire, minesweeper XL,
+  checkers) and word search; full-screen play; help in one shape.
+- **All:** top-right is help · refresh · account in every app.
+- **Tools:** `tools/preview.mjs` (signed-in phone screenshots with real
+  data), `tools/espn.mjs`, `tools/word-audio.py`; see `tools/README.md`.
+
+Ideas for later: Play's own cold-start cache (like Fixtures'), a playoff
+bracket view in Fixtures, saving a long game in progress.
