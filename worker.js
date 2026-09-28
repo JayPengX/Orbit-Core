@@ -810,7 +810,7 @@ function readGeminiFiles(body) {
   return { files };
 }
 
-async function handleGeminiRequest(request, env, headers, ip, ctx) {
+async function handleGeminiRequest(request, env, headers, ip, ctx, session = null) {
   // A warm-up ping, sent the moment the user opens the file picker (see
   // src/gemini-ocr.js's warmUpGeminiProxy) - long before there's anything
   // to actually send. It exists purely to pay the connection's setup cost
@@ -823,8 +823,9 @@ async function handleGeminiRequest(request, env, headers, ip, ctx) {
   if (request.method === 'GET') return json({ ok: true }, 200, headers);
   if (request.method !== 'POST') return errorJson('POST_ONLY', 405, headers, request);
 
-  const limited = await rateLimitResponse(env, ip, 'gemini', GEMINI_RATE_LIMIT, headers, request);
-  if (limited) return limited;
+  // Signed in with a Quadra Pass (required): counted per session in memory.
+  if (!session) return errorJson('ECO_TOKEN_INVALID', 401, headers, request);
+  if (sessionLimited(`g:${session.s}`, GEMINI_RATE_LIMIT, 3_600_000)) return errorJson('RATE_LIMITED', 429, headers, request);
   if (await isDailyGlobalCapped(env, 'gemini', GEMINI_DAILY_GLOBAL_CAP)) {
     return errorJson('DAILY_QUOTA_EXCEEDED', 429, headers, request);
   }
@@ -1070,11 +1071,11 @@ function readNlEditContext(context) {
   return { weeklySchedule, classes, bellTimes, breakTimes, countdownEvents, reverseWeek };
 }
 
-async function handleNlEditRequest(request, env, headers, ip, ctx) {
+async function handleNlEditRequest(request, env, headers, ip, ctx, session = null) {
   if (request.method !== 'POST') return errorJson('POST_ONLY', 405, headers, request);
 
-  const limited = await rateLimitResponse(env, ip, 'nl-edit', NL_EDIT_RATE_LIMIT, headers, request);
-  if (limited) return limited;
+  if (!session) return errorJson('ECO_TOKEN_INVALID', 401, headers, request);
+  if (sessionLimited(`n:${session.s}`, NL_EDIT_RATE_LIMIT, 3_600_000)) return errorJson('RATE_LIMITED', 429, headers, request);
   if (await isDailyGlobalCapped(env, 'nl-edit', NL_EDIT_DAILY_GLOBAL_CAP)) {
     return errorJson('DAILY_QUOTA_EXCEEDED', 429, headers, request);
   }
@@ -2070,8 +2071,12 @@ export default {
       return errorJson('FORBIDDEN_ORIGIN', 403, headers, request);
     }
 
-    if (path === '/gemini') return handleGeminiRequest(request, env, headers, ip, ctx);
-    if (path === '/nl-edit') return handleNlEditRequest(request, env, headers, ip, ctx);
+    // Orbit Class's AI features need a Quadra Pass session (`qt=`).
+    if (path === '/gemini' || path === '/nl-edit') {
+      const qt = new URL(request.url).searchParams.get('qt');
+      const session = qt ? await readToken(await tokenSecret(env), qt, 'ses') : null;
+      return path === '/gemini' ? handleGeminiRequest(request, env, headers, ip, ctx, session) : handleNlEditRequest(request, env, headers, ip, ctx, session);
+    }
     if (path === '/sync') return handleSyncRequest(request, env, headers, ip, ORBIT_SYNC_APP);
     if (path === '/vocab-sync') return handleSyncRequest(request, env, headers, ip, VOCAB_SYNC_APP);
     if (path === '/odds-sync') return handleSyncRequest(request, env, headers, ip, ODDS_SYNC_APP);

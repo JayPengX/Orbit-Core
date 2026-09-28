@@ -222,6 +222,40 @@ haven't moved yet.
 Rate limits (per IP an hour): reads 6,000, writes 600, creates, deletes and
 merges 20, transfers 60.
 
+### Sessions (v2), sharing, payday
+
+The apps no longer send the pass itself after signing in. `quadra-token.js`
+signs short-lived session tokens and refresh tokens (HMAC with
+`ECO_TOKEN_SECRET`; set it as a Worker secret, or it's derived from
+`FIREBASE_PRIVATE_KEY`), and seals a pass for cross-app links.
+
+| Call | What |
+| --- | --- |
+| `POST /eco` `{ op: 'login', passcode, app }` | A session (`token`) and a `refresh` token; this app on this device becomes the live one (`wallet.live`) |
+| `POST /eco` `{ op: 'refresh', refresh, app, claim? }` | A new session; `claim` makes this one live |
+| `GET / PATCH / DELETE /eco?qt=T&app=A` | As above with the session instead of the pass; a PATCH from a session that isn't live answers `409 ECO_SESSION_MOVED` (one app, one device at a time) |
+| `POST /eco` `{ op: 'handoff', qt, passcode }` / `{ op: 'redeem', handoff }` | The pass sealed for a link to another app (home-screen apps don't share storage) |
+| `POST /eco` `{ op: 'signout-all', qt }` / `{ op: 'rotate', passcode }` | Sign every device out / swap the pass for a new one |
+| `POST /eco` `{ op: 'create', v2: true }` | A new pass with its opening NT$110,000 and a session |
+| `POST /eco` `{ op: 'merge', qt, sources: [{ app: 'orbit', passcode, manager }] }` | An old Orbit Class sync code (with its manager passcode) into the signed-in pass |
+| `POST /eco` `{ op: 'share-create' \| 'share-redeem' \| 'follow' \| 'share-revoke', qt, … }` | Orbit Class merge keys: a key (8 characters, a day) to the owner's schedule; follow it or copy it; stop all followers |
+
+Payday is written by the Worker on any read: `eco:pay:YYYY-MM` (NT$5,000 a
+Taiwan month) and `eco:week:YYYY-MM-DD` (NT$500 a Taiwan week).
+
+Signed-in data calls don't touch KV: `/sports-proxy` (the other Worker),
+`/kambi`, `/gemini` and `/nl-edit` take `qt=` and are counted per session in
+memory. `/gemini` and `/nl-edit` require a session. (The daily global cap on
+billed Gemini calls stays in KV as a spending backstop.)
+
+### The shared kit and brand
+
+`kit/quadra.mjs` and `kit/quadra.css` are the Quadra apps' shared account
+code and look (sign-in, the account sheet, the one-app-at-a-time notice, the
+recommendation engine, help links, the tab bar); `node kit/sync.mjs` copies
+them into every app. `brand/generate.mjs [app…]` draws every app's icons and
+link cards from `brand/marks.mjs`.
+
 ## One-Time Deploy Setup
 
 You don't need to install anything to get started. This covers the main
