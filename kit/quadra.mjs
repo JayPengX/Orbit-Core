@@ -29,7 +29,7 @@ export const APPS = {
   odds: { name: 'Quadra Play', short: 'Play', path: '/Quadra-Play/', color: '#2563eb', role: { zh: '運彩與彩券', en: 'Sports bets and lottery' } },
   match: { name: 'Quadra Fixtures', short: 'Fixtures', path: '/Quadra-Fixtures/', color: '#ea580c', role: { zh: '賽事資料中心', en: 'Every sport, every stat' } },
   vocab: { name: 'Quadra Rewards', short: 'Rewards', path: '/Quadra-Rewards/', color: '#7c3aed', role: { zh: '賺錢、目標與說明', en: 'Earn, goals and help' } },
-  orbit: { name: 'Orbit Class', short: 'Orbit Class', path: '/Orbit-Class/', color: '#0ea5e9', related: true, role: { zh: '課表', en: 'Class schedule' } }
+  orbit: { name: 'Orbit Class', short: 'Orbit Class', tile: 'Orbit', path: '/Orbit-Class/', color: '#0ea5e9', related: true, role: { zh: '課表', en: 'Class schedule' } }
 };
 export const FAMILY = ['stock', 'odds', 'match', 'vocab'];
 export const appName = app => APPS[app]?.name || app;
@@ -754,12 +754,13 @@ function hideMoved() {
 // apps, and the security actions. `extra`: an element the app adds (its
 // own settings).
 
-export function accountButton(s) {
+// extra(): the app's own settings for the sheet (an element), optional.
+export function accountButton(s, { extra = null } = {}) {
   const btn = node('button', { class: 'q-account', type: 'button', 'aria-label': s.lang === 'en' ? 'Account' : '帳戶' }, [node('span', { class: 'q-account-pool' }), node('span', { class: 'q-account-dot', 'aria-hidden': 'true' })]);
   const paint = () => (btn.firstChild.textContent = s.wallet ? money(s.pool) : 'Quadra');
   paint();
   s.on('wallet', paint);
-  btn.addEventListener('click', () => accountSheet(s));
+  btn.addEventListener('click', () => accountSheet(s, { extra: extra ? extra() : null }));
   return btn;
 }
 
@@ -814,7 +815,7 @@ export function accountSheet(s, { extra = null } = {}) {
             s.go(id);
           }
         },
-        [node('img', { src: `${a.path}favicon.svg`, alt: '' }), node('span', { text: a.short })]
+        [node('img', { src: `${a.path}favicon.svg`, alt: '' }), node('span', { text: a.tile || a.short })]
       )
     )
   );
@@ -825,7 +826,7 @@ export function accountSheet(s, { extra = null } = {}) {
     node('p', { class: 'q-sheet-sub', text: T('這組通行碼是帳戶唯一的鑰匙，請記下來。', 'This pass is the only key to your account: keep it somewhere safe.') }),
     node('h3', { class: 'q-sheet-h', text: T('Quadra 的 App', 'Quadra apps') }),
     tiles,
-    extra,
+    ...(extra ? [extra] : []),
     node('h3', { class: 'q-sheet-h', text: T('帳戶安全', 'Security') }),
     node('div', { class: 'q-rows' }, [
       act(T('在其他所有裝置登出', 'Sign out on every other device'), async () => {
