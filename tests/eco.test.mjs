@@ -151,3 +151,149 @@ test('deleting the account removes everything', async () => {
   assert.equal(store.size, 0);
   assert.ok(![...store.keys()].some(k => k.startsWith(WALLET_COLLECTION)));
 });
+
+// ---- v2: sessions, one live app, handoff, rotate, Orbit sharing ----------------
+
+import { paydayEntries, PAY, LINK_COLLECTION } from '../eco.js';
+
+async function v2Account(t) {
+  const made = await t.call('POST', '?app=stock', { op: 'create', v2: true });
+  assert.equal(made.status, 200);
+  return made.data;
+}
+
+test('v2 create: opening money from the Worker, signed in, live', async () => {
+  const t = setup();
+  const acct = await v2Account(t);
+  assert.ok(acct.token && acct.refresh);
+  assert.equal(acct.active, true);
+  assert.ok(acct.pool >= PAY.start);
+  assert.equal(acct.wallet.sec, undefined);
+  const read = await t.call('GET', `?qt=${encodeURIComponent(acct.token)}&app=stock`);
+  assert.equal(read.status, 200);
+  assert.equal(read.data.active, true);
+  assert.ok(read.data.token);
+});
+
+test('one app at a time: another app claiming makes the first read-only', async () => {
+  const t = setup();
+  const acct = await v2Account(t);
+  const play = await t.call('POST', '', { op: 'refresh', refresh: acct.refresh, app: 'odds', claim: true });
+  assert.equal(play.status, 200);
+  assert.equal(play.data.active, true);
+  // Securities is no longer live: reads say so, writes are refused.
+  const read = await t.call('GET', `?qt=${encodeURIComponent(acct.token)}`);
+  assert.equal(read.data.active, false);
+  assert.equal(read.data.live.app, 'odds');
+  assert.equal(read.data.token, undefined);
+  const write = await t.call('PATCH', `?qt=${encodeURIComponent(acct.token)}&app=stock`, { payload: 'gz1:x' });
+  assert.equal(write.status, 409);
+  assert.equal(write.data.error.code, 'ECO_SESSION_MOVED');
+  // Without claim, a refresh only reports where it's live.
+  const peek = await t.call('POST', '', { op: 'refresh', refresh: acct.refresh, app: 'stock' });
+  assert.equal(peek.data.active, false);
+  // Claiming back.
+  const back = await t.call('POST', '', { op: 'refresh', refresh: acct.refresh, app: 'stock', claim: true });
+  assert.equal(back.data.active, true);
+  const ok = await t.call('PATCH', `?qt=${encodeURIComponent(back.data.token)}&app=stock`, { payload: 'gz1:y' });
+  assert.equal(ok.status, 200);
+});
+
+test('login with the pass; a bad token or pass is refused', async () => {
+  const t = setup();
+  const acct = await v2Account(t);
+  const login = await t.call('POST', '', { op: 'login', passcode: acct.passcode, app: 'vocab' });
+  assert.equal(login.status, 200);
+  assert.ok(login.data.refresh);
+  assert.equal((await t.call('POST', '', { op: 'login', passcode: 'ABCDEFGHJK', app: 'vocab' })).status, 404);
+  assert.equal((await t.call('GET', '?qt=nope.nope')).status, 401);
+  const forged = login.data.token.split('.')[0] + '.AAAA';
+  assert.equal((await t.call('GET', `?qt=${forged}`)).status, 401);
+});
+
+test('sign out everywhere: every earlier token stops working', async () => {
+  const t = setup();
+  const acct = await v2Account(t);
+  assert.equal((await t.call('POST', '', { op: 'signout-all', qt: acct.token })).status, 200);
+  assert.equal((await t.call('GET', `?qt=${encodeURIComponent(acct.token)}`)).status, 401);
+  assert.equal((await t.call('POST', '', { op: 'refresh', refresh: acct.refresh, app: 'stock', claim: true })).status, 401);
+  // The pass itself still signs in.
+  assert.equal((await t.call('POST', '', { op: 'login', passcode: acct.passcode, app: 'stock' })).status, 200);
+});
+
+test('handoff: the pass sealed for a link, redeemed once opened', async () => {
+  const t = setup();
+  const acct = await v2Account(t);
+  const h = await t.call('POST', '', { op: 'handoff', qt: acct.token, passcode: acct.passcode });
+  assert.equal(h.status, 200);
+  assert.ok(!h.data.handoff.includes(acct.passcode));
+  const r = await t.call('POST', '', { op: 'redeem', handoff: h.data.handoff });
+  assert.equal(r.data.passcode, acct.passcode);
+  // Someone else's pass can't be sealed with this session.
+  assert.equal((await t.call('POST', '', { op: 'handoff', qt: acct.token, passcode: 'ABCDEFGHJK' })).status, 400);
+});
+
+test('payday: a month and a week once, from the cut-over on', () => {
+  const oct = Date.UTC(2026, 9, 7, 3);
+  const due = paydayEntries({ entries: [] }, oct).map(e => e.id);
+  assert.deepEqual(due, ['eco:pay:2026-10', 'eco:week:2026-10-05']);
+  assert.deepEqual(paydayEntries({ entries: due.map(id => ({ id })) }, oct), []);
+  // Before it, the apps still paid their own.
+  assert.deepEqual(paydayEntries({ entries: [] }, Date.UTC(2026, 8, 20)), []);
+});
+
+test('rotate: a new pass holds everything, the old one is gone', async () => {
+  const t = setup();
+  const acct = await v2Account(t);
+  await t.call('PATCH', `?qt=${encodeURIComponent(acct.token)}&app=stock`, { payload: 'gz1:mine' });
+  const r = await t.call('POST', '', { op: 'rotate', passcode: acct.passcode });
+  assert.equal(r.status, 200);
+  assert.notEqual(r.data.passcode, acct.passcode);
+  assert.equal((await t.call('GET', `?passcode=${acct.passcode}`)).data.exists, false);
+  const read = await t.call('GET', `?passcode=${r.data.passcode}&app=stock`);
+  assert.equal(read.data.payload, 'gz1:mine');
+  assert.equal(read.data.pool, acct.pool);
+});
+
+test('Orbit: the old sync code merges into a pass with its manager passcode', async () => {
+  const t = setup();
+  const acct = await v2Account(t);
+  const hash = (await t.deps.sha256Hex('MGRPASS1'));
+  t.store.set('orbit-schedules/QRST2345', { payload: '[ORBIT]abc', updateTime: 'o1', managerPasscodeHash: hash });
+  const bad = await t.call('POST', '', { op: 'merge', qt: acct.token, sources: [{ app: 'orbit', passcode: 'QRST2345', manager: 'WRONG' }] });
+  assert.equal(bad.status, 403);
+  const ok = await t.call('POST', '', { op: 'merge', qt: acct.token, sources: [{ app: 'orbit', passcode: 'QRST2345', manager: 'MGRPASS1' }] });
+  assert.equal(ok.status, 200);
+  assert.equal(ok.data.passcode, undefined);
+  const read = await t.call('GET', `?qt=${encodeURIComponent(acct.token)}&app=orbit`);
+  assert.equal(read.data.payload, '[ORBIT]abc');
+  // The old code keeps working for devices still on it.
+  assert.ok(t.store.has('orbit-schedules/QRST2345'));
+});
+
+test('Orbit sharing: a key lets another pass follow, only until revoked', async () => {
+  const t = setup();
+  const owner = await v2Account(t);
+  const ownerOrbit = (await t.call('POST', '', { op: 'refresh', refresh: owner.refresh, app: 'orbit', claim: true })).data;
+  await t.call('PATCH', `?qt=${encodeURIComponent(ownerOrbit.token)}&app=orbit`, { payload: '[ORBIT]sched' });
+  const share = await t.call('POST', '', { op: 'share-create', qt: ownerOrbit.token });
+  assert.equal(share.status, 200);
+  assert.match(share.data.key, /^[2-9A-HJ-NP-Z]{8}$/);
+  const friend = await v2Account(t);
+  const got = await t.call('POST', '', { op: 'share-redeem', qt: friend.token, key: share.data.key });
+  assert.equal(got.status, 200);
+  assert.equal(got.data.payload, '[ORBIT]sched');
+  assert.equal(got.data.own, false);
+  // The owner edits: the follower sees it.
+  await t.call('PATCH', `?qt=${encodeURIComponent(ownerOrbit.token)}&app=orbit`, { payload: '[ORBIT]v2' });
+  const follow = await t.call('POST', '', { op: 'follow', qt: friend.token, link: got.data.link });
+  assert.equal(follow.data.payload, '[ORBIT]v2');
+  // A second key reuses the same link.
+  const again = await t.call('POST', '', { op: 'share-create', qt: ownerOrbit.token });
+  const got2 = await t.call('POST', '', { op: 'share-redeem', qt: friend.token, key: again.data.key });
+  assert.equal(got2.data.link, got.data.link);
+  // Revoked: gone for every follower.
+  await t.call('POST', '', { op: 'share-revoke', qt: ownerOrbit.token });
+  assert.equal((await t.call('POST', '', { op: 'follow', qt: friend.token, link: got.data.link })).status, 404);
+  assert.ok(![...t.store.keys()].some(k => k.startsWith(`${LINK_COLLECTION}/`)));
+});

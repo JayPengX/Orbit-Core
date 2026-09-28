@@ -11,11 +11,14 @@ on:
       - 'locales/**'
       - 'eco.js'
       - 'kambi.js'
+      - 'quadra-token.js'
   workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      HAS_TOKEN_SECRET: ${{ secrets.ECO_TOKEN_SECRET != '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -42,3 +45,17 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy --config wrangler.sports-proxy.toml
           wranglerVersion: '4'
+      # The Quadra Pass token secret, the same on both Workers (see
+      # quadra-token.js): /eco signs session tokens with it and
+      # /sports-proxy checks them. Only when the repo has the secret
+      # ECO_TOKEN_SECRET (any long random string); until then the proxy's
+      # Quadra Pass gate is simply off.
+      - name: Quadra Pass token secret on both Workers
+        if: ${{ env.HAS_TOKEN_SECRET == 'true' }}
+        run: |
+          printf '%s' "$ECO_TOKEN_SECRET" | npx --yes wrangler@4 secret put ECO_TOKEN_SECRET
+          printf '%s' "$ECO_TOKEN_SECRET" | npx --yes wrangler@4 secret put ECO_TOKEN_SECRET --config wrangler.sports-proxy.toml
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          ECO_TOKEN_SECRET: ${{ secrets.ECO_TOKEN_SECRET }}

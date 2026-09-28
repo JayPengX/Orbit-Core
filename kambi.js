@@ -23,6 +23,11 @@
 // it was last read), gone (Kambi no longer has it), checked, done }.
 
 export const KAMBI_COLLECTION = 'kambi-results';
+// One document listing every watched match and its start, so each cron run
+// costs one read instead of listing the whole collection (the cron runs
+// every 2 minutes: short matches, table tennis's especially, end and drop
+// out of Kambi's feed within minutes, and a 10-minute cron missed them).
+export const KAMBI_INDEX = '_index';
 const KAMBI_LIVE = id => `https://eu-offering-api.kambicdn.com/offering/v2018/ub/event/${encodeURIComponent(id)}/livedata.json?lang=en_GB&market=GB`;
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
@@ -82,6 +87,7 @@ export async function handleKambiRequest(request, env, headers, ip, deps) {
         .filter(e => Date.parse(e.start) > now - WATCH_FOR && Date.parse(e.start) < now + 2 * DAY)
         .slice(0, MAX_IDS);
       let added = 0;
+      if (events.length) await addToIndex(env, deps, events);
       await Promise.all(
         events.map(async e => {
           const entry = { id: String(e.id), start: new Date(e.start).toISOString(), live: null, seen: 0, gone: false, checked: 0, done: false };
@@ -102,20 +108,65 @@ export async function handleKambiRequest(request, env, headers, ip, deps) {
   }
 }
 
+async function readIndex(env, deps) {
+  const doc = await deps.fsGet(env, KAMBI_COLLECTION, KAMBI_INDEX);
+  const index = doc.exists ? parse(doc.payload) : null;
+  return { index: index && typeof index.ids === 'object' ? index : null, updateTime: doc.updateTime, exists: doc.exists };
+}
+
+async function writeIndex(env, deps, change) {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const { index, updateTime, exists } = await readIndex(env, deps);
+    const next = change(index || { ids: {} });
+    try {
+      await deps.fsWrite(env, KAMBI_COLLECTION, KAMBI_INDEX, JSON.stringify(next), exists ? { updateTime } : { exists: false });
+      return next;
+    } catch (error) {
+      if (!error.precondition) throw error;
+    }
+  }
+  return null;
+}
+
+const addToIndex = (env, deps, events) =>
+  writeIndex(env, deps, index => {
+    const ids = { ...index.ids };
+    for (const e of events) if (!index.done?.[String(e.id)]) ids[String(e.id)] = new Date(e.start).toISOString();
+    return { ...index, ids };
+  });
+
 // One cron run: reads the watched matches that have started and aren't
 // done, the least recently checked first, and saves what changed.
 export async function refreshKambiWatch(env, deps) {
   const now = deps.now();
-  const docs = await deps.fsList(env, KAMBI_COLLECTION, 300);
-  const entries = docs.map(d => ({ doc: d.id, entry: parse(d.payload) })).filter(x => x.entry);
-  // Long past: forgotten.
-  const old = entries.filter(x => now - Date.parse(x.entry.start) > KEEP_FOR);
-  await Promise.all(old.map(x => deps.fsDelete(env, KAMBI_COLLECTION, x.doc).catch(() => {})));
+  let { index } = await readIndex(env, deps);
+  if (!index) {
+    // No index yet (entries from before it): built once from the collection.
+    const docs = await deps.fsList(env, KAMBI_COLLECTION, 300);
+    const ids = {};
+    for (const d of docs) {
+      const e = d.id !== KAMBI_INDEX && parse(d.payload);
+      if (e?.start && !e.done) ids[d.id] = e.start;
+    }
+    index = (await writeIndex(env, deps, () => ({ ids }))) || { ids };
+  }
+  // Long past, or not started: nothing to read.
+  const dueIds = Object.entries(index.ids).filter(([, start]) => Date.parse(start) <= now && now - Date.parse(start) <= WATCH_FOR);
+  const stale = Object.entries(index.ids).filter(([, start]) => now - Date.parse(start) > WATCH_FOR).map(([id]) => id);
+  const entries = [];
+  for (const [id] of dueIds) {
+    const doc = await deps.fsGet(env, KAMBI_COLLECTION, id);
+    const entry = doc.exists ? parse(doc.payload) : null;
+    if (entry) entries.push({ doc: id, entry });
+  }
+  const old = [];
   const due = entries
-    .filter(x => !x.entry.done && Date.parse(x.entry.start) <= now && now - Date.parse(x.entry.start) <= WATCH_FOR)
+    .filter(x => !x.entry.done)
     .sort((a, b) => (a.entry.checked || 0) - (b.entry.checked || 0))
     .slice(0, CRON_BATCH);
+  const finished = entries.filter(x => x.entry.done).map(x => x.doc);
   let saved = 0;
+  const doneNow = [];
   for (const { doc, entry } of due) {
     let next = { ...entry, checked: now };
     try {
@@ -131,10 +182,26 @@ export async function refreshKambiWatch(env, deps) {
     } catch {
       // Kambi unreachable this time: tried again next run.
     }
+    if (next.done) doneNow.push(doc);
+    // Only what changed is written (the score, or its end).
+    if (next.seen === entry.seen && next.done === entry.done && next.gone === entry.gone && (entry.checked || 0) > now - 30 * 60_000) continue;
     try {
       await deps.fsWrite(env, KAMBI_COLLECTION, doc, JSON.stringify(next));
       saved++;
     } catch {}
   }
-  return { watched: entries.length, checked: due.length, saved, forgotten: old.length };
+  // Finished and long-past matches leave the index (their entries stay a
+  // while for the apps to read, and go with the next cleanup).
+  const drop = new Set([...stale, ...finished, ...doneNow]);
+  const expired = Object.entries(index.done || {}).filter(([, start]) => now - Date.parse(start) > KEEP_FOR).map(([id]) => id);
+  if (drop.size || expired.length)
+    await writeIndex(env, deps, idx => {
+      const done = { ...(idx.done || {}) };
+      for (const id of drop) if (idx.ids[id] && !stale.includes(id)) done[id] = idx.ids[id];
+      for (const id of expired) delete done[id];
+      return { ids: Object.fromEntries(Object.entries(idx.ids).filter(([id]) => !drop.has(id))), done };
+    }).catch(() => {});
+  for (const id of [...stale, ...expired]) await deps.fsDelete(env, KAMBI_COLLECTION, id).catch(() => {});
+  old.push(...stale, ...expired);
+  return { watched: Object.keys(index.ids).length, checked: due.length, saved, forgotten: old.length };
 }

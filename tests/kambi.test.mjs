@@ -52,7 +52,21 @@ test('matches are watched once, scored while live, and kept after Kambi drops th
   // Four days on it's forgotten.
   now.t += 5 * 86_400_000;
   await refreshKambiWatch(env, deps);
-  assert.equal(store.size, 0);
+  // Only the index of watched matches is left.
+  assert.deepEqual([...store.keys()], ['_index']);
+});
+
+test('a cron run with nothing on reads only the index', async () => {
+  const now = { t: Date.parse('2026-09-26T08:00:00Z') };
+  const { store, deps } = setup(now);
+  await refreshKambiWatch(env, deps);
+  let reads = 0;
+  const get = deps.fsGet;
+  deps.fsGet = async (...a) => (reads++, get(...a));
+  deps.fsList = async () => assert.fail('no listing once the index exists');
+  await refreshKambiWatch(env, deps);
+  assert.equal(reads, 1);
+  assert.ok(store.has('_index'));
 });
 
 test('not started yet: not read; never seen and long past: given up', async () => {

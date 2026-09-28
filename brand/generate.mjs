@@ -1,6 +1,7 @@
-// Writes Quadra's icons and link preview cards into the four app repos,
-// checked out next to this one (../Quadra-Securities, ../Quadra-Sportsbook,
-// ../Quadra-Fixtures, ../Quadra-Words). Needs Playwright's Chromium:
+// Writes Quadra's icons and link preview cards into the app repos, checked
+// out next to this one (../Quadra-Securities, ../Quadra-Sportsbook (Quadra
+// Play), ../Quadra-Fixtures, ../Quadra-Rewards, ../Orbit-Class). Needs
+// Playwright's Chromium:
 //   node brand/generate.mjs
 import { writeFile, mkdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -13,9 +14,11 @@ const root = new URL('../../', import.meta.url).pathname;
 // Where each app keeps its site's files, and which icon files it uses.
 const OUT = {
   stock: { dir: 'Quadra-Securities/public', icons: { 'icons/apple-touch-icon.png': 180, 'icons/icon-192.png': 192, 'icons/icon-512.png': 512 }, og: 'og-image.png', ogSquare: 'og-image-square.png' },
+  // Quadra Play: still checked out under its old repo name until it's renamed.
   odds: { dir: 'Quadra-Sportsbook/public', icons: { 'icons/apple-touch-icon.png': 180, 'icons/icon-192.png': 192, 'icons/icon-512.png': 512 }, og: 'og-image.jpg', ogSquare: 'og-image-square.jpg' },
-  match: { dir: 'Quadra-Fixtures/public', icons: { 'icons/icon-180.png': 180, 'icons/icon-192.png': 192, 'icons/icon-512.png': 512 }, og: 'og-image.jpg', ogSquare: 'og-image-square.jpg' },
-  vocab: { dir: 'Quadra-Words', icons: { 'icons/apple-touch-icon.png': 180, 'icons/icon-192.png': 192, 'icons/icon-512.png': 512, 'icons/favicon-32.png': 32, 'icons/favicon-16.png': 16 }, og: 'assets/og-card.jpg', ogSquare: 'assets/og-card-square.jpg' }
+  match: { dir: 'Quadra-Fixtures/public', icons: { 'icons/apple-touch-icon.png': 180, 'icons/icon-192.png': 192, 'icons/icon-512.png': 512 }, og: 'og-image.jpg', ogSquare: 'og-image-square.jpg' },
+  vocab: { dir: 'Quadra-Rewards/public', icons: { 'icons/apple-touch-icon.png': 180, 'icons/icon-192.png': 192, 'icons/icon-512.png': 512 }, og: 'og-image.jpg', ogSquare: 'og-image-square.jpg' },
+  orbit: { dir: 'Orbit-Class/public', icons: { 'icons/apple-touch-icon.png': 180, 'icons/icon-192.png': 192, 'icons/icon-512.png': 512, 'icons/favicon-32.png': 32, 'icons/favicon-16.png': 16 }, og: 'og-card.jpg', ogSquare: 'og-card-square.jpg' }
 };
 
 const browser = await chromium.launch();

@@ -76,6 +76,7 @@
 import en from './locales/en.js';
 import zhTW from './locales/zh-TW.js';
 import { handleEcoRequest } from './eco.js';
+import { readToken, tokenSecret, sessionLimited } from './quadra-token.js';
 import { handleKambiRequest, refreshKambiWatch, fetchKambiLive } from './kambi.js';
 
 const ALLOWED_ORIGINS = ['https://jaypengx.github.io'];
@@ -101,6 +102,9 @@ function corsHeaders(origin, colo) {
     'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Expose-Headers': 'X-Worker-Colo, X-Vocab-Ai-Cache',
+    // Browsers keep a preflight this long (Chrome caps it at 2 hours): the
+    // apps' JSON writes don't each cost a second Worker request.
+    'Access-Control-Max-Age': '86400',
     'X-Worker-Colo': colo || 'unknown',
     Vary: 'Origin'
   };
@@ -2073,7 +2077,14 @@ export default {
     if (path === '/odds-sync') return handleSyncRequest(request, env, headers, ip, ODDS_SYNC_APP);
     if (path === '/stock-sync') return handleSyncRequest(request, env, headers, ip, STOCK_SYNC_APP);
     if (path === '/eco') return handleEcoRequest(request, env, headers, ip, ECO_DEPS);
-    if (path === '/kambi') return handleKambiRequest(request, env, headers, ip, KAMBI_DEPS);
+    if (path === '/kambi') {
+      // Signed in (a Quadra Pass session): counted per session in memory,
+      // not in KV.
+      const qt = new URL(request.url).searchParams.get('qt');
+      const session = qt ? await readToken(await tokenSecret(env), qt, 'ses') : null;
+      const deps = session ? { ...KAMBI_DEPS, rateLimitResponse: async () => (sessionLimited(`k:${session.s}`, 60) ? errorJson('RATE_LIMITED', 429, headers, request) : null) } : KAMBI_DEPS;
+      return handleKambiRequest(request, env, headers, ip, deps);
+    }
     if (path === '/vocab-ai') return handleVocabAiRequest(request, env, headers, ip);
     return errorJson('NOT_FOUND', 404, headers, request);
   },

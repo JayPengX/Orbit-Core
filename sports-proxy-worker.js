@@ -14,9 +14,17 @@
 // route calls has Gemini's region restriction, so this Worker has no
 // [placement] block and runs near the caller.
 //
-// Deliberately self-contained (no imports) so it can still be pasted into
-// the Cloudflare dashboard as a single file; the CORS helpers and KV rate
-// limiter below are a trimmed copy of worker.js's.
+// The CORS helpers and KV rate limiter below are a trimmed copy of
+// worker.js's. It imports one file, quadra-token.js, to check Quadra Pass
+// session tokens (deployed with Wrangler, which bundles it).
+//
+// A Quadra Pass is required: every request carries `qt=<session token>`
+// (from Shared-Proxy's /eco), checked here with the shared ECO_TOKEN_SECRET.
+// A request with a valid token is counted per session in this isolate's
+// memory, never in KV, so ordinary use costs no KV operations at all. Until
+// ECO_TOKEN_SECRET is set on this Worker the gate is off and the old per-IP
+// KV limit applies.
+import { readToken, sessionLimited } from './quadra-token.js';
 
 const ALLOWED_ORIGINS = ['https://jaypengx.github.io'];
 
@@ -124,6 +132,8 @@ const SPORTS_PROXY_ALLOWED_HOSTS = [
   'query2.finance.yahoo.com'
 ];
 const SPORTS_PROXY_RATE_LIMIT = 600;
+// Per signed-in session, a minute, in memory (cache hits included).
+const SESSION_RATE_LIMIT = 240;
 const SPORTS_PROXY_UPSTREAM_TIMEOUT_MS = 8_000;
 
 // ---- Shared cache lifetimes ------------------------------------------------
@@ -398,6 +408,14 @@ async function handleSportsProxyRequest(request, env, headers, ip, ctx) {
     return json({ error: { message: 'Host not allowed' } }, 400, headers);
   }
 
+  // The Quadra Pass gate (see the top of this file).
+  let session = null;
+  if (env.ECO_TOKEN_SECRET) {
+    session = await readToken(env.ECO_TOKEN_SECRET, requestParams.get('qt') || '', 'ses');
+    if (!session) return json({ error: { code: 'QUADRA_PASS_REQUIRED', message: 'Sign in with a Quadra Pass.' } }, 401, headers);
+    if (sessionLimited(session.s, SESSION_RATE_LIMIT)) return json({ error: { message: 'Too many requests, please try again later.' } }, 429, headers);
+  }
+
   const trimParam = requestParams.get('trim');
   const trim =
     trimParam === TRIM_POLYMARKET_EVENTS && upstreamUrl.hostname === 'gamma-api.polymarket.com' && upstreamUrl.pathname === '/events'
@@ -449,7 +467,7 @@ async function handleSportsProxyRequest(request, env, headers, ip, ctx) {
   // off the critical path of every ordinary request. The trade-off: a
   // request that turns out to be rate-limited still pays for the upstream
   // fetch - acceptable, since that's the rare, already-abusive case.
-  const [rateLimit, result] = await Promise.all([isRateLimited(env, ip, SPORTS_PROXY_RATE_LIMIT), fetchUpstream(upstreamUrl, trim)]);
+  const [rateLimit, result] = await Promise.all([session ? { limited: false, backend: 'session' } : isRateLimited(env, ip, SPORTS_PROXY_RATE_LIMIT), fetchUpstream(upstreamUrl, trim)]);
   headers['X-RateLimit-Backend'] = rateLimit.backend;
   if (rateLimit.limited) {
     return json({ error: { message: 'Too many requests, please try again later.' } }, 429, headers);
