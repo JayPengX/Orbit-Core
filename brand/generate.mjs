@@ -28,7 +28,10 @@ async function png(svg, size, path, { rounded = true } = {}) {
   await page.setContent(`<html><body style="margin:0;background:transparent"><img style="width:${size}px;height:${size}px;display:block" src="data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}"></body></html>`);
   await page.screenshot({ path, omitBackground: rounded, type: 'png' });
 }
+// `node brand/generate.mjs match vocab` makes only those apps' files.
+const only = process.argv.slice(2);
 for (const [id, out] of Object.entries(OUT)) {
+  if (only.length && !only.includes(id)) continue;
   const dir = `${root}${out.dir}/`;
   await mkdir(`${dir}icons`, { recursive: true });
   await writeFile(`${dir}favicon.svg`, appIcon(id));
