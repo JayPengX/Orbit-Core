@@ -101,7 +101,7 @@ export async function sendPush(env, sub, message) {
     body: await encryptPush(sub, JSON.stringify(message))
   });
   if (res.status === 404 || res.status === 410) return 'gone';
-  return res.ok ? 'sent' : `failed ${res.status}`;
+  return res.ok ? 'sent' : `failed ${res.status} ${(await res.text().catch(() => '')).slice(0, 120)}`.trim();
 }
 
 // ---- The lists ------------------------------------------------------------------
@@ -146,6 +146,20 @@ export async function handlePush(request, env, headers, session, path) {
   if (request.method !== 'POST') return reply({ error: { message: 'POST only' } }, 405);
   if (!session?.d || !APP_KEYS.has(session.a)) return reply({ error: { code: 'QUADRA_PASS_REQUIRED', message: 'Sign in with a Quadra Pass.' } }, 401);
   const body = await request.json().catch(() => null);
+  // Each app's state for this account: subscribed, how many notices wait,
+  // the last send's answer; `test` sends every subscribed app a notice now.
+  if (path === '/push/status' || path === '/push/test') {
+    const apps = {};
+    for (const app of APP_KEYS) {
+      const record = await kv.get(recordKey(session.d, app), 'json');
+      if (!record) continue;
+      apps[app] = { sub: record.sub ? new URL(record.sub.endpoint).host : null, items: record.items.length, next: record.items[0]?.at || null, last: record.last || null };
+      if (path === '/push/test' && record.sub) {
+        apps[app].test = await sendPush(env, record.sub, { title: 'Quadra', body: record.lang === 'en' ? `Test notice (${app})` : `測試通知（${app}）`, tag: `test-${app}` }).catch(e => `failed ${e?.message || e}`);
+      }
+    }
+    return reply({ apps });
+  }
   const key = recordKey(session.d, session.a);
   const record = (await kv.get(key, 'json')) || { items: [] };
   if (path === '/push/subscribe') {
@@ -217,9 +231,10 @@ export async function sendDue(env, now = Date.now()) {
         }
         message = { ...message, title: item.title || found.title, body: item.body || found.body };
       }
-      const r = await sendPush(env, record.sub, message).catch(() => 'failed');
+      const r = await sendPush(env, record.sub, message).catch(e => `failed ${e?.message || e}`);
+      record.last = { at: now, r };
       if (r === 'gone') gone = true;
-      else sent++;
+      else if (r === 'sent') sent++;
     }
     if (gone) {
       await kv.delete(key);
