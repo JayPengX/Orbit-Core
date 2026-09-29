@@ -3,6 +3,7 @@
 //
 //   node tools/preview.mjs <app> [hash…] [--out dir] [--width 390] [--height 844]
 //                          [--full] [--lang zh|en] [--dark] [--wait ms] [--click selector]
+//                          [--type 'selector=text']  (fills a field after the clicks)
 //                          [--signed-out]  (the sign-in screen, as a new device sees it)
 //                          [--fixture 'text-in-url=file.json']  (repeatable: that saved answer
 //                          for any upstream URL containing the text, e.g. when Yahoo rate-limits)
@@ -67,6 +68,9 @@ for (let f = opt('fixture', ''); f; f = opt('fixture', '')) {
 }
 const clicks = [];
 for (let c; (c = opt('click', null)); ) clicks.push(c);
+// --type 'selector=text': types into a field after the clicks (repeatable).
+const typings = [];
+for (let c; (c = opt('type', null)); ) typings.push([c.slice(0, c.indexOf('=')), c.slice(c.indexOf('=') + 1)]);
 const full = flag('full');
 const signedOut = flag('signed-out');
 const dark = flag('dark');
@@ -209,6 +213,10 @@ for (const hash of hashes.length ? hashes : ['']) {
   for (const sel of clicks) {
     await page.click(sel).catch(e => errors.push(`click ${sel}: ${e.message.split('\n')[0]}`));
     await page.waitForTimeout(2500);
+  }
+  for (const [sel, text] of typings) {
+    await page.fill(sel, text).catch(e => errors.push(`type ${sel}: ${e.message.split('\n')[0]}`));
+    await page.waitForTimeout(4000);
   }
   const file = join(out, `${key}-${hash || 'start'}${clicks.length ? '-clicked' : ''}${dark ? '-dark' : ''}.png`);
   await page.screenshot({ path: file, fullPage: full });
