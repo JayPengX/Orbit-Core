@@ -4,6 +4,8 @@
 //   node tools/preview.mjs <app> [hash…] [--out dir] [--width 390] [--height 844]
 //                          [--full] [--lang zh|en] [--dark] [--wait ms] [--click selector]
 //                          [--signed-out]  (the sign-in screen, as a new device sees it)
+//                          [--fixture 'text-in-url=file.json']  (repeatable: that saved answer
+//                          for any upstream URL containing the text, e.g. when Yahoo rate-limits)
 //
 //   app   fixtures | play | securities | rewards | orbit (or the repo's folder name)
 //   hash  the page's #hash to open (a tab), one screenshot each; none: the start
@@ -58,6 +60,11 @@ const height = Number(opt('height', 844));
 const lang = opt('lang', 'zh');
 const wait = Number(opt('wait', 6000));
 const payloadFile = opt('payload', '');
+const fixtures = [];
+for (let f = opt('fixture', ''); f; f = opt('fixture', '')) {
+  const i = f.indexOf('=');
+  fixtures.push([f.slice(0, i), resolve(f.slice(i + 1))]);
+}
 const clicks = [];
 for (let c; (c = opt('click', null)); ) clicks.push(c);
 const full = flag('full');
@@ -102,6 +109,8 @@ const curl = url =>
 const cache = new Map();
 const DEBUG = Boolean(process.env.DEBUG);
 const upstream = url => {
+  const fixture = fixtures.find(([text]) => url.includes(text));
+  if (fixture) return readFile(fixture[1], 'utf8').then(body => ({ status: 200, body }));
   if (!cache.has(url)) cache.set(url, curl(url).then(r => (DEBUG && console.log(r.status, r.body.length, url.slice(0, 140)), r)));
   return cache.get(url);
 };
