@@ -212,27 +212,34 @@ const LOGO_SEEN_KEY = 'quadra.logos.v1';
 const logoSeen = (() => {
   try {
     const saved = JSON.parse(sessionStorage.getItem(LOGO_SEEN_KEY) || '{}');
-    return { ok: new Set(saved.ok || []), bad: new Set(saved.bad || []) };
+    return { ok: new Set(saved.ok || []), bad: new Map(Object.entries(saved.bad && !Array.isArray(saved.bad) ? saved.bad : {})) };
   } catch {
-    return { ok: new Set(), bad: new Set() };
+    return { ok: new Set(), bad: new Map() };
   }
 })();
 let logoSaveTimer = 0;
+// A failure is remembered for 10 minutes only (a bad connection's, not the logo's).
+const BAD_FOR_MS = 10 * 60_000;
+const knownBad = url => Date.now() - (logoSeen.bad.get(url) ?? 0) < BAD_FOR_MS;
 function noteLogo(url, ok) {
-  const set = ok ? logoSeen.ok : logoSeen.bad;
-  if (set.has(url)) return;
-  set.add(url);
-  (ok ? logoSeen.bad : logoSeen.ok).delete(url);
+  if (ok ? logoSeen.ok.has(url) : knownBad(url)) return;
+  if (ok) {
+    logoSeen.ok.add(url);
+    logoSeen.bad.delete(url);
+  } else {
+    logoSeen.bad.set(url, Date.now());
+    logoSeen.ok.delete(url);
+  }
   clearTimeout(logoSaveTimer);
   logoSaveTimer = setTimeout(() => {
     try {
-      sessionStorage.setItem(LOGO_SEEN_KEY, JSON.stringify({ ok: [...logoSeen.ok].slice(-600), bad: [...logoSeen.bad].slice(-200) }));
+      sessionStorage.setItem(LOGO_SEEN_KEY, JSON.stringify({ ok: [...logoSeen.ok].slice(-600), bad: Object.fromEntries([...logoSeen.bad].slice(-200)) }));
     } catch {}
   }, 500);
 }
 
 export function logoPicture(light, dark, cls, fallback) {
-  if (!light || logoSeen.bad.has(light)) return fallback();
+  if (!light || knownBad(light)) return fallback();
   const img = document.createElement('img');
   const known = logoSeen.ok.has(light);
   // Hidden until it has drawn: never the browser's broken-picture icon.

@@ -75,6 +75,9 @@ for (let c; (c = opt('type', null)); ) typings.push([c.slice(0, c.indexOf('=')),
 // --store 'key=value': a localStorage entry the page starts with (repeatable).
 const stores = [];
 for (let c; (c = opt('store', null)); ) stores.push([c.slice(0, c.indexOf('=')), c.slice(c.indexOf('=') + 1)]);
+// --eval 'js': an expression run on the page after the clicks; its result is printed.
+const evals = [];
+for (let c; (c = opt('eval', null)); ) evals.push(c);
 const full = flag('full');
 const signedOut = flag('signed-out');
 const dark = flag('dark');
@@ -146,6 +149,8 @@ const refresh = `${b64(JSON.stringify({ d: '0123456789abcdef0123456789abcdef' })
 
 const browser = await chromium.launch();
 const context = await browser.newContext({
+  // No service workers: their fetches would miss the routes below.
+  serviceWorkers: 'block',
   viewport: { width, height },
   deviceScaleFactor: 2,
   isMobile: true,
@@ -201,7 +206,10 @@ const curlBin = url =>
 await context.route(/^https:\/\/(?!orbit-workers-proxy|sports-proxy)/, async route => {
   const url = route.request().url();
   const body = await curlBin(url);
-  if (!body) return route.abort();
+  if (!body) {
+    if (DEBUG) console.log('failed', url.slice(0, 140));
+    return route.abort();
+  }
   const type = /\.svg/.test(url) ? 'image/svg+xml' : /\.png/.test(url) ? 'image/png' : /\.jpe?g/.test(url) ? 'image/jpeg' : /\.css|fonts\.googleapis/.test(url) ? 'text/css' : /\.m?js/.test(url) ? 'text/javascript' : 'application/octet-stream';
   await route.fulfill({ status: 200, contentType: type, body });
 });
@@ -223,6 +231,7 @@ for (const hash of hashes.length ? hashes : ['']) {
     await page.fill(sel, text).catch(e => errors.push(`type ${sel}: ${e.message.split('\n')[0]}`));
     await page.waitForTimeout(4000);
   }
+  for (const js of evals) console.log('eval:', JSON.stringify(await page.evaluate(js).catch(e => `error ${e.message}`)));
   const file = join(out, `${key}-${hash || 'start'}${clicks.length ? '-clicked' : ''}${dark ? '-dark' : ''}.png`);
   await page.screenshot({ path: file, fullPage: full });
   // Anything wider than the screen (a sideways scroll on a phone).
