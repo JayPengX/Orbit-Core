@@ -92,15 +92,45 @@ export function emptyWallet(now = Date.now()) {
   return { v: 1, created: now, entries: [], snap: {}, settings: {}, pins: {}, apps: {}, inbox: {} };
 }
 
-// ---- One pool, one payday ------------------------------------------------------
+// ---- One pool, one allowance ---------------------------------------------------
 //
-// The Worker pays everyone's income into the pool: one payday, NT$7,000 each
-// Taiwan month (from the 1st), on the first sign-in or refresh that month;
-// a month nobody opened an app is paid the next time (back pay, for every
-// month since the pass was made, from 2026-10). A pass made since v2 also gets its opening NT$110,000
-// here. (A weekly NT$500 allowance was planned too: dropped, one clear
-// payday is simpler; the week's id is never paid.)
-export const PAY = { start: 110_000, month: 7_000 };
+// The Worker pays everyone's income into the pool: one allowance each Taiwan
+// month (from the 1st), on the first sign-in or refresh that month; a month
+// nobody opened an app is paid the next time (back pay, for every month since
+// the pass was made, from 2026-10). A pass made since v2 also gets its
+// opening money here.
+//
+// The economy (tools/economy.mjs has the numbers): the allowance goes by what
+// the account is worth, so money matters at every size: the full amount to
+// get going or to get back in the game, less once there's plenty, never
+// nothing. Worth is the pool plus Securities' holdings less its loans (its
+// snap's `holdings`). A new pass opens with about five months of it.
+export const PAY_TIERS = [
+  [40_000, 6_000],
+  [100_000, 4_000],
+  [250_000, 2_000],
+  [Infinity, 1_000]
+];
+export const PAY = { start: 30_000, month: PAY_TIERS[0][1] };
+// The reset for accounts made before this economy: their opening money
+// (NT$110,000, from the Worker or, before v2, from Securities and Play)
+// comes down to the new NT$30,000, once, as `eco:rebase:v3`. It can take the
+// cash below zero: that's an overdraft, and it's fine (see below).
+export const REBASE = { id: 'eco:rebase:v3', amount: -80_000 };
+const rebaseDue = wallet => {
+  const start = (wallet?.entries || []).find(e => e.id === 'eco:start');
+  // Before v2 the opening money was the apps' own (Securities' cash, Play's
+  // ledger): any such account has something in the pool.
+  return start ? start.amount > PAY.start : !wallet?.v2 && ((wallet?.entries || []).length > 0 || Object.keys(wallet?.snap || {}).length > 0);
+};
+// An overdraft (the pool below zero) costs OVERDRAFT_RATE a month, charged
+// with the month's allowance on what was owed then, as `eco:od:<month>`:
+// cheaper to sell something (or borrow on margin in Securities) than to sit
+// on it.
+export const OVERDRAFT_RATE = 0.01;
+const finiteOr0 = v => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+export const worthOf = wallet => poolBalance(wallet) + finiteOr0(wallet?.snap?.stock?.holdings);
+export const payFor = worth => PAY_TIERS.find(([below]) => !(worth >= below))[1];
 export const PAY_FROM_MONTH = '2026-10';
 const TPE = 8 * 3_600_000;
 const WEEK = 7 * 86_400_000;
@@ -121,10 +151,21 @@ export function paydayEntries(wallet, now) {
   const have = new Set((wallet.entries || []).map(e => e.id));
   const out = [];
   if (wallet.v2 && !have.has('eco:start')) out.push({ id: 'eco:start', t: now, app: 'eco', kind: 'start', amount: PAY.start });
+  if (!have.has(REBASE.id) && rebaseDue(wallet)) out.push({ id: REBASE.id, t: now, app: 'eco', kind: 'rebase', amount: REBASE.amount });
   const month = taipeiMonth(now);
+  // This month's overdraft interest, on what's owed before the allowance.
+  const owed = -(poolBalance(wallet) + out.reduce((sum, e) => sum + e.amount, 0));
+  if (owed >= 100 && month >= PAY_FROM_MONTH && !have.has(`eco:od:${month}`)) out.push({ id: `eco:od:${month}`, t: now, app: 'eco', kind: 'od', amount: -Math.round(owed * OVERDRAFT_RATE) });
   const made = Number.isFinite(wallet.created) ? taipeiMonth(Math.min(wallet.created, now)) : month;
   let m = made > PAY_FROM_MONTH ? made : PAY_FROM_MONTH;
-  for (let n = 0; m <= month && n < 120; n++, m = nextMonth(m)) if (!have.has(`eco:pay:${m}`)) out.push({ id: `eco:pay:${m}`, t: now, app: 'eco', kind: 'pay', amount: PAY.month });
+  // Each month's allowance by the worth then (back pay counts as it's paid).
+  let worth = worthOf(wallet) + out.reduce((sum, e) => sum + e.amount, 0);
+  for (let n = 0; m <= month && n < 120; n++, m = nextMonth(m)) {
+    if (have.has(`eco:pay:${m}`)) continue;
+    const amount = payFor(worth);
+    out.push({ id: `eco:pay:${m}`, t: now, app: 'eco', kind: 'pay', amount });
+    worth += amount;
+  }
   // Quadra Plus renews for this month (after the pay, so the pay covers it).
   out.push(...plusRenewal(wallet, now, out.reduce((sum, e) => sum + e.amount, 0)));
   return out;

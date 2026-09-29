@@ -73,7 +73,7 @@ test('account details: this month in and out, latest entries first', () => {
   assert.equal(d.out, -200);
   assert.equal(d.count, 2);
   assert.equal(d.recent[0].amount, -200);
-  assert.match(d.recent[1].text, /Quadra · 每月薪資/);
+  assert.match(d.recent[1].text, /Quadra · 每月津貼/);
 });
 
 test('proxyJson batches requests made together and remembers answers', async () => {
@@ -129,4 +129,11 @@ test('Quadra Plus: a month is a member’s when the Worker billed it; joining is
   assert.equal(kit.plusJoinPrice({ entries: [] }, oct), 0);
   // 22 of 31 days left.
   assert.equal(kit.plusJoinPrice(w, oct), 210);
+});
+
+test('the allowance: by what the account is worth, Securities holdings included', () => {
+  assert.equal(kit.paydayFor({ entries: [] }), 6_000);
+  assert.equal(kit.paydayFor({ entries: [{ id: 'a', amount: 60_000, app: 'odds' }] }), 4_000);
+  assert.equal(kit.paydayFor({ entries: [], snap: { stock: { cash: 50_000, holdings: 500_000, t: 1 } } }), 1_000);
+  assert.match(kit.paydayText('zh', Date.UTC(2026, 9, 5), { entries: [] }), /NT\$6,000/);
 });

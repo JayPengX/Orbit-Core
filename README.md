@@ -71,8 +71,19 @@ account's document id.
   or read while the `plus` setting is on and the pool covers it. A month no
   app is opened is never charged. Apps read membership from that entry
   alone (the kit's `plusMember`, `plusMonths`).
-- **Payday** on any sign-in or read: NT$110,000 to open, NT$5,000 a Taiwan
-  month, NT$500 a Taiwan week.
+- **The allowance** on any sign-in or read: NT$30,000 to open a new pass,
+  then each Taiwan month an amount by what the account is worth (the pool
+  plus Securities' `snap.stock.holdings`): NT$6,000 under NT$40,000, 4,000
+  under 100,000, 2,000 under 250,000, 1,000 above (`PAY_TIERS`). Months
+  missed are paid on return, stepping down as they land.
+- **The reset** (once, `eco:rebase:v3`, −NT$80,000): every account that
+  opened on the old NT$110,000 comes down to the new NT$30,000.
+- **Overdrafts are allowed:** the pool can go below zero (after the reset,
+  or anything else); spending stops until it's covered, selling and cash
+  outs still work, and it costs 1% a month (`eco:od:<month>`, charged with
+  the allowance). Securities has 賣出補足, the fewest sales that cover it. The numbers come
+  from `tools/economy.mjs` (`node tools/economy.mjs` prints each kind of
+  user's month under the current and the old settings).
 
 | Call | What |
 | --- | --- |

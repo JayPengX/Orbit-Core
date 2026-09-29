@@ -6,6 +6,7 @@
 //                          [--type 'selector=text']  (fills a field after the clicks)
 //                          [--store 'key=value']  (a localStorage entry to start with)
 //                          [--signed-out]  (the sign-in screen, as a new device sees it)
+//                          [--entry '{json}']  (a wallet entry to add: an economy scenario)
 //                          [--fixture 'text-in-url=file.json']  (repeatable: that saved answer
 //                          for any upstream URL containing the text, e.g. when Yahoo rate-limits)
 //
@@ -75,6 +76,10 @@ for (let c; (c = opt('type', null)); ) typings.push([c.slice(0, c.indexOf('=')),
 // --store 'key=value': a localStorage entry the page starts with (repeatable).
 const stores = [];
 for (let c; (c = opt('store', null)); ) stores.push([c.slice(0, c.indexOf('=')), c.slice(c.indexOf('=') + 1)]);
+// --entry 'json': a wallet entry to add to the made-up account (repeatable),
+// e.g. '{"id":"eco:rebase:v3","app":"eco","kind":"rebase","amount":-80000}'.
+const extraEntries = [];
+for (let c; (c = opt('entry', null)); ) extraEntries.push({ t: Date.now(), ...JSON.parse(c) });
 // --eval 'js': an expression run on the page after the clicks; its result is printed.
 const evals = [];
 for (let c; (c = opt('eval', null)); ) evals.push(c);
@@ -135,7 +140,8 @@ const wallet = {
     { id: 'eco:start', t: now - 120 * 86_400_000, app: 'eco', kind: 'start', amount: 110000 },
     { id: 'eco:pay:1', t: now - 20 * 86_400_000, app: 'eco', kind: 'pay', amount: 7000 },
     { id: 'vocab:r1', t: now - 2 * 86_400_000, app: 'vocab', kind: 'reward', amount: 240 },
-    { id: 'odds:s1', t: now - 86_400_000, app: 'odds', kind: 'stake', amount: -500 }
+    { id: 'odds:s1', t: now - 86_400_000, app: 'odds', kind: 'stake', amount: -500 },
+    ...extraEntries
   ],
   snap: {},
   settings: {},

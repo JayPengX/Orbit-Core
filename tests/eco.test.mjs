@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { handleEcoRequest, mergeWallet, poolBalance, cleanPatch, emptyWallet, paydayEntries, plusJoinEntry, plusJoinEntries, plusMember, tidyWallet, PAY, PLUS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, ECO_APPS } from '../eco.js';
+import { handleEcoRequest, mergeWallet, poolBalance, cleanPatch, emptyWallet, paydayEntries, payFor, worthOf, PAY_TIERS, REBASE, OVERDRAFT_RATE, plusJoinEntry, plusJoinEntries, plusMember, tidyWallet, PAY, PLUS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, ECO_APPS } from '../eco.js';
 import { planClean } from '../eco-admin.js';
 
 function setup() {
@@ -185,12 +185,12 @@ test('payday: once a month, from the cut-over on', () => {
   const oct = Date.UTC(2026, 9, 7, 3);
   const due = paydayEntries({ entries: [] }, oct).map(e => e.id);
   assert.deepEqual(due, ['eco:pay:2026-10']);
-  assert.equal(paydayEntries({ entries: [] }, oct)[0].amount, 7_000);
-  assert.deepEqual(paydayEntries({ entries: due.map(id => ({ id })) }, oct), []);
+  assert.equal(paydayEntries({ entries: [] }, oct)[0].amount, 6_000);
+  assert.deepEqual(paydayEntries({ entries: [...due.map(id => ({ id, amount: 6_000 })), { id: 'eco:rebase:v3', t: 1, app: 'eco', kind: 'rebase', amount: 0 }] }, oct), []);
   assert.deepEqual(paydayEntries({ entries: [] }, Date.UTC(2026, 8, 20)), []);
   // Back pay: months nobody opened an app are paid the next time.
   const made = Date.UTC(2026, 8, 1);
-  assert.deepEqual(paydayEntries({ created: made, entries: [{ id: 'eco:pay:2026-10' }] }, Date.UTC(2027, 0, 5)).map(e => e.id), ['eco:pay:2026-11', 'eco:pay:2026-12', 'eco:pay:2027-01']);
+  assert.deepEqual(paydayEntries({ created: made, entries: [{ id: 'eco:pay:2026-10', amount: 6_000 }, { id: 'eco:rebase:v3', t: 1, app: 'eco', kind: 'rebase', amount: 0 }] }, Date.UTC(2027, 0, 5)).map(e => e.id), ['eco:pay:2026-11', 'eco:pay:2026-12', 'eco:pay:2027-01']);
   // Not for months before the pass was made.
   assert.deepEqual(paydayEntries({ created: Date.UTC(2026, 11, 3), entries: [] }, Date.UTC(2027, 0, 5)).map(e => e.id), ['eco:pay:2026-12', 'eco:pay:2027-01']);
 });
@@ -310,9 +310,9 @@ test('Quadra Plus: rejoining costs the rest of the month; a short pool does not 
   // 17 of 31 days left: about NT$160.
   assert.equal(e.amount, -160);
   assert.equal(plusJoinEntry({ entries: [] }, oct15).amount, 0);
-  const broke = { settings: { plus: { value: { on: true }, t: 1 } }, entries: [{ id: 'eco:plus:2026-10', t: 1, app: 'eco', kind: 'plus', amount: 0 }, { id: 'x', t: 1, app: 'odds', amount: -14_000 }] };
+  const broke = { settings: { plus: { value: { on: true }, t: 1 } }, entries: [{ id: 'eco:plus:2026-10', t: 1, app: 'eco', kind: 'plus', amount: 0 }, { id: 'eco:rebase:v3', t: 1, app: 'eco', kind: 'rebase', amount: 0 }, { id: 'x', t: 1, app: 'odds', amount: -12_500 }] };
   assert.ok(!paydayEntries({ ...broke, created: oct15 }, Date.UTC(2026, 10, 2)).some(x => x.kind === 'plus'));
-  const ok = { ...broke, entries: broke.entries.slice(0, 1) };
+  const ok = { ...broke, entries: broke.entries.slice(0, 2) };
   assert.ok(paydayEntries({ ...ok, created: oct15 }, Date.UTC(2026, 10, 2)).some(x => x.id === 'eco:plus:2026-11'));
   assert.equal(plusMember(ok, oct15), true);
   assert.equal(plusMember(ok, Date.UTC(2026, 10, 2)), false);
@@ -355,4 +355,47 @@ test('Quadra Plus yearly on top of a month already held starts next month', () =
   assert.equal(e[0].id, 'eco:plus:2026-11');
   assert.equal(e.at(-1).id, 'eco:plus:2027-10');
   assert.equal(e[0].amount, -PLUS.year);
+});
+
+test('the allowance goes by worth: full to start or restart, less with plenty, never nothing', () => {
+  assert.equal(payFor(0), 6_000);
+  assert.equal(payFor(39_999), 6_000);
+  assert.equal(payFor(40_000), 4_000);
+  assert.equal(payFor(150_000), 2_000);
+  assert.equal(payFor(5_000_000), 1_000);
+  // Worth counts Securities' holdings, not only cash.
+  const w = { entries: [{ id: 'a', t: 1, app: 'odds', amount: 20_000 }, { id: 'eco:rebase:v3', t: 1, app: 'eco', kind: 'rebase', amount: 0 }], snap: { stock: { cash: 5_000, holdings: 300_000, t: 1 } } };
+  assert.equal(worthOf(w), 325_000);
+  const oct = Date.UTC(2026, 9, 3);
+  assert.equal(paydayEntries({ ...w, created: oct }, oct).find(e => e.kind === 'pay').amount, 1_000);
+  // Back pay steps down as it lands.
+  const back = paydayEntries({ entries: [{ id: 'x', t: 1, app: 'odds', amount: 36_000 }, { id: 'eco:rebase:v3', t: 1, app: 'eco', kind: 'rebase', amount: 0 }], created: oct }, Date.UTC(2027, 0, 5)).filter(e => e.kind === 'pay');
+  assert.deepEqual(back.map(e => e.amount), [6_000, 4_000, 4_000, 4_000]);
+  assert.equal(PAY_TIERS.at(-1)[1] > 0, true);
+});
+
+test('the reset: accounts that opened with NT$110,000 come down to NT$30,000 once; cash may go below zero', () => {
+  const oct = Date.UTC(2026, 9, 3);
+  const old = { v2: 1, entries: [{ id: 'eco:start', t: 1, app: 'eco', kind: 'start', amount: 110_000 }, { id: 'odds:stake-1', t: 2, app: 'odds', kind: 'stake', amount: -100_000 }], snap: { stock: { cash: 0, holdings: 60_000, t: 1 } } };
+  const due = paydayEntries(old, oct);
+  assert.equal(due[0].id, REBASE.id);
+  assert.equal(due[0].amount, -80_000);
+  // Worth after the reset: 10,000 - 80,000 + 60,000 held = -10,000: the full allowance.
+  assert.equal(due.find(e => e.kind === 'pay').amount, 6_000);
+  // Overdrawn when the month starts: 1% of what's owed.
+  assert.equal(due.find(e => e.kind === 'od').amount, -Math.round(70_000 * OVERDRAFT_RATE));
+  // Once only.
+  const after = { ...old, entries: [...old.entries, ...due] };
+  assert.deepEqual(paydayEntries(after, oct), []);
+  // Before v2: an account with money in the pool from the apps themselves.
+  assert.equal(paydayEntries({ entries: [], snap: { stock: { cash: 100_000, t: 1 } } }, oct)[0].id, REBASE.id);
+  // A pass made in this economy never gets it.
+  assert.ok(!paydayEntries({ v2: 1, entries: [{ id: 'eco:start', t: 1, app: 'eco', kind: 'start', amount: 30_000 }] }, oct).some(e => e.id === REBASE.id));
+});
+
+test('a new pass today opens with NT$30,000 and no reset', async () => {
+  const t = setup();
+  const acct = await newPass(t, 'odds');
+  assert.equal(acct.wallet.entries.find(e => e.id === 'eco:start').amount, 30_000);
+  assert.ok(!acct.wallet.entries.some(e => e.id === REBASE.id));
 });

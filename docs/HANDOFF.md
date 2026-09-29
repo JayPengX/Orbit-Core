@@ -235,3 +235,44 @@ package everything as premium and useful while being profit-first.
   quick size; no "worst trade" line.
 - **Fixtures:** match sheets carry a Quadra Play card.
 - Rewards still has the older kit (not reachable from these sessions).
+
+## Round: the economy, balanced so money matters
+
+`node tools/economy.mjs` models five kinds of user (casual, regular bettor,
+high roller, investor, Rewards grinder) over a year: faucets (opening money,
+allowance, Rewards, market) against sinks (Play's hold: 13.6% of a single,
+~33% of a treble; the lottery ~50%, scratch ~32%; trading costs; Plus).
+
+- **Before:** everyone but a whale got richer every month (regular bettor
+  +NT$4.5k, investor +12.9k, grinder +28k); balances reached 20-60 months
+  of pay, so the house's take never mattered.
+- **Now (Worker, live):** a new pass opens with NT$30,000 (was 110,000);
+  the monthly allowance goes by worth (pool + Securities holdings, which
+  Securities now sends as `snap.stock.holdings`): 6,000 / 4,000 / 2,000 /
+  1,000 at < 40k / < 100k / < 250k / above. Existing money is untouched;
+  a rich account simply stops getting much for free.
+- **Pending Rewards:** the kit's `ECONOMY` now caps effort at NT$400 a day
+  (vocab 200, games 120, missions 80; about NT$12 a minute). Rewards only
+  takes it after `node kit/sync.mjs` with Rewards checked out (and its own
+  use of these constants checked). Until then a grinder still mints about
+  NT$25k a month, the biggest leak left.
+- With all of it: a regular bettor is about level (needs a little Rewards
+  effort to stay there), an investor grows by the market, a grinder earns
+  but can't outrun the house, a high roller drains fast.
+- **Existing accounts, reset (live):** the Worker adds `eco:rebase:v3`
+  (−NT$80,000) once to every account that opened on the old NT$110,000
+  (an `eco:start` above 30,000, or a pre-v2 account with money in the
+  pool); new passes never get it. The kit shows a one-time notice
+  (`quadra.seen.rebase-v3` per device) with the amount and what to do.
+- **Overdrafts:** the pool may go negative. Spending is blocked by the apps'
+  own balance checks; selling, cash out and the allowance still work. The
+  Worker charges 1% a month on what's owed at the month's first read
+  (`eco:od:<month>`, from 2026-10). Play's home shows the negative balance
+  and "賣出持股補足" (into Securities); Securities shows an overdraft card
+  with `coverPlan` (largest holdings first, only what's needed, +1% for
+  costs) and one-tap market sells, and a red strip on the markets home.
+- `tools/preview.mjs --entry '{json}'` adds wallet entries for scenarios
+  (e.g. the reset and a big stake, to see an overdraft).
+- **Rewards next:** `docs/REWARDS-NEXT.md` is the brief for the agent that
+  takes Rewards (sync the kit, close the effort faucet, make Rewards
+  profit-oriented, remove its loss-talk).
