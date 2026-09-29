@@ -13,6 +13,7 @@
 //                          many of the app's own files and how deep their import chain was)
 //                          [--latency ms]  (each of the app's own files answers this much later:
 //                          a phone's round trip to GitHub Pages, e.g. 150)
+//                          [--root dir]  (the repos from there, e.g. a stamped copy)
 //
 //   app   fixtures | play | securities | rewards | orbit (or the repo's folder name)
 //   hash  the page's #hash to open (a tab), one screenshot each; none: the start
@@ -92,9 +93,11 @@ const timing = flag('timing');
 const full = flag('full');
 const signedOut = flag('signed-out');
 const dark = flag('dark');
+// --root dir: where the repos are (default: next to this one), e.g. a copy
+// stamped by scripts/stamp-version.mjs, to see a deploy's loading.
+const ROOT = resolve(opt('root', new URL('../../', import.meta.url).pathname));
 const [appArg, ...hashes] = args;
 
-const ROOT = resolve(new URL('../../', import.meta.url).pathname);
 const APPS = { fixtures: ['Quadra-Fixtures', 'match'], play: ['Quadra-Play', 'odds'], securities: ['Quadra-Securities', 'stock'], rewards: ['Quadra-Rewards', 'vocab'], orbit: ['Orbit-Class', 'orbit'] };
 const key = Object.keys(APPS).find(k => k === appArg || APPS[k][0].toLowerCase() === String(appArg).toLowerCase());
 if (!key) throw new Error(`usage: node tools/preview.mjs <${Object.keys(APPS).join('|')}> [hash…]`);

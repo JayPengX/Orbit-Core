@@ -146,3 +146,23 @@ test('free bets: Rewards gives them, Play spends each once, they last a week', (
   assert.deepEqual(kit.freeBets(w, t, ['vocab:fb:a']), []);
   assert.deepEqual(kit.freeBets(w, t + 8 * 86_400_000), []);
 });
+
+test('token requests made together share one sign-in call to the Worker', async () => {
+  store.clear();
+  const claims = Buffer.from(JSON.stringify({ k: 'ref', d: 'abcdef0123456789abcdef', s: 'S', g: 0, e: 9e15 })).toString('base64url');
+  store.set('quadra.refresh', `${claims}.sig`);
+  store.set('quadra.account', 'abcdef0123456789');
+  const calls = [];
+  globalThis.fetch = async (url, init = {}) => {
+    calls.push(JSON.parse(init.body || '{}').op);
+    await new Promise(r => setTimeout(r, 20));
+    return new Response(JSON.stringify({ token: 'tok', wallet: { entries: [] }, active: true }), { status: 200 });
+  };
+  const s = kit.quadraSession('stock', { heartbeat: 1e9 });
+  const [a, b, c] = await Promise.all([s.ensureToken(), s.ensureToken(), s.ensureToken()]);
+  assert.deepEqual([a, b, c], ['tok', 'tok', 'tok']);
+  assert.deepEqual(calls, ['refresh']);
+  // Fresh: no call at all.
+  await s.ensureToken();
+  assert.equal(calls.length, 1);
+});
