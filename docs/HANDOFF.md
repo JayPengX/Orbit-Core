@@ -352,3 +352,36 @@ allowance, Rewards, market) against sinks (Play's hold: 13.6% of a single,
   (it doesn't use the tab bar; run `node kit/sync.mjs` with it checked
   out).
 
+## Round: live everywhere (Play, Fixtures, sports-proxy)
+
+The owner saw Play's live betting vanish once games started and Fixtures'
+直播 show only the big games.
+
+- **Play's 場中 covered MLB and the Premier League only**; every other game
+  left the board at its start with nowhere to go. Now every league Play
+  sells has live betting:
+  - Kambi's sports (NPB, KBO, CPBL, EuroLeague, B.League, tennis,
+    badminton, table tennis, volleyball, snooker): Kambi's own live prices
+    (`listView/<league>/in-play.json`, `parseKambiInPlay`), margin out,
+    the house's live cut; winner, and for baseball and basketball the main
+    handicap and total. A suspended price isn't offered.
+  - Every ESPN soccer league: the soccer model (three-way winner, totals).
+  - NHL: goals left by the share of the clock (`liveGoals`); NFL, NCAAF,
+    NBA, WNBA, NCAA basketball: the points model scaled to the clock left
+    (`livePoints`, `shareLeft`).
+  - Which ESPN leagues are read: MLB and the Premier League always, and
+    any league whose scoreboard (read for the board) had a start within
+    its sport's length (`liveLeagues`). Pregame lines from those
+    scoreboards, else the game's summary (a failed read is retried).
+  - The live cut is `houseCut({ base: 'live' })` (MLB and the Premier
+    League unchanged; lesser leagues a little more). `ODDS_ERROR.liveOther`.
+  - Fixed on the way: `pointsMarkets` with no posted spread put its main
+    handicap on the wrong side (`half(-margin)`), so such games got none.
+- **Fixtures' 直播** read only the followed leagues and those on Taiwan TV
+  (up to 24). Once it's open it now also reads every other league's
+  current scoreboard (`loadRest`), so every game on anywhere is listed,
+  headline leagues first in each sport; the tab's badge counts them all.
+- **sports-proxy:** Kambi `…/in-play.json` is cached 20 s (was the 2-minute
+  pre-match tier); the Kambi trim keeps each price's `status` and the
+  match clock.
+

@@ -239,6 +239,8 @@ function cachePolicyFor(url) {
     case 'gamma-api.polymarket.com':
       return url.pathname === '/public-search' ? CACHE_FUTURES : CACHE_ODDS;
     case 'eu-offering-api.kambicdn.com':
+      // A league's matches in play (Play's live board) move by the second.
+      if (url.pathname.endsWith('/in-play.json')) return CACHE_ODDS;
       return url.pathname.includes('/listView/') ? CACHE_PREMATCH : CACHE_LIVE;
     case 'query1.finance.yahoo.com':
     case 'query2.finance.yahoo.com':
@@ -282,10 +284,10 @@ function trimKambi(data) {
       ? list.map(o => ({
           criterion: { englishLabel: o.criterion?.englishLabel },
           betOfferType: { englishName: o.betOfferType?.englishName },
-          outcomes: (o.outcomes || []).map(x => ({ type: x.type, odds: x.odds, line: x.line }))
+          outcomes: (o.outcomes || []).map(x => ({ type: x.type, odds: x.odds, line: x.line, status: x.status }))
         }))
       : list;
-  const live = d => d && { score: d.score, statistics: d.statistics?.sets ? { sets: d.statistics.sets } : undefined };
+  const live = d => d && { score: d.score, statistics: d.statistics?.sets ? { sets: d.statistics.sets } : undefined, matchClock: d.matchClock ? { periodId: d.matchClock.periodId, minute: d.matchClock.minute, running: d.matchClock.running } : undefined };
   return {
     events: Array.isArray(data.events) ? data.events.map(item => ({ event: event(item.event), betOffers: offers(item.betOffers), liveData: live(item.liveData) })) : undefined,
     liveEvents: Array.isArray(data.liveEvents) ? data.liveEvents.map(item => ({ event: event(item.event), liveData: live(item.liveData) })) : undefined
