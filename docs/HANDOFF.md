@@ -385,3 +385,39 @@ The owner saw Play's live betting vanish once games started and Fixtures'
   pre-match tier); the Kambi trim keeps each price's `status` and the
   match clock.
 
+
+## Round: Asian baseball, sports split, next game day, F1 pole, one catalogue
+
+- **Asian baseball in Fixtures:** Kambi lists NPB, KBO and CPBL only a day
+  or so ahead (none at all some days), so 賽事 said "no recent games"
+  mid-season. The sports proxy now gathers them from the leagues' own
+  sites (`asia-baseball.js`: npb.jp's monthly page, koreabaseball.com's
+  monthly list, cpbl.com.tw's season list with its anti-forgery token;
+  TheSportsDB's day lists for CPBL when its site refuses) and answers as
+  `https://asia-baseball.quadra/<league>/<YYYY-MM>.json` (this month and
+  next a minute fresh). Fixtures reads them (`asiaEvents`), past games
+  with scores, home and away, void rain-outs. Play still prices them from
+  Kambi when Kambi has them.
+- **One catalogue (`kit/leagues.mjs`, synced as `lib/catalog.mjs`):** every
+  sport and league once, with where each app reads it (`data` for
+  Fixtures, `bet` / `odds` for Play). Fixtures' `lib/leagues.mjs` and
+  Play's `LEAGUES` (`lib/teams.mjs`) are views of it (Play's table was
+  checked equal, all 62 leagues). Add or fix a league there, run
+  `node kit/sync.mjs`, commit both apps. The Asian baseball reader
+  (`asiaMonth`) lives there too.
+- **球拍與其他 split:** 羽球, 桌球, 排球, 司諾克 are sports of their own;
+  a saved `racket` follow becomes the ones of its followed leagues (all
+  four if none).
+- **賽事** opens on the day with a game on (today first), else the next
+  game day however far (it used to stop at 4 days, then showed the last
+  round).
+- **F1:** 排位賽第一 (pole position) in Play until qualifying starts:
+  Polymarket's driver pole market when open, Kambi's if it lists one, else
+  the winner's chances sharpened (`f1PoleFromWinner`, unchecked); settled
+  from ESPN's `Qual` session (`parseEspnPole`). Play reads ESPN's whole F1
+  season (`dates=<year>`): the plain scoreboard stays on the last race all
+  week, so the qualifying time (and the winner board's before/after
+  qualifying prices) was missing until the weekend. Fixtures: 投注 on F1
+  qualifying and races (rows and sheets) opens Play's F1 board
+  (`#game=f1` / `#game=f1pole`); Play's link also finds a game already
+  live, and teams spelt differently by the two sources.
