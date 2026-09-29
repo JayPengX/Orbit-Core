@@ -278,3 +278,25 @@ export function logoPicture(light, dark, cls, fallback) {
   });
   return picture;
 }
+
+// An F1 race's short name: "新加坡站" / "Singapore GP", from any of the long
+// ones (ESPN's "Singapore Airlines Singapore Grand Prix", Kambi's "Singapore
+// GP", Polymarket's titles). A name that isn't a Grand Prix comes back as is.
+const GP = [
+  ['abu dhabi', '阿布達比', 'Abu Dhabi'], ['united states', '美國', 'United States'], ['las vegas', '拉斯維加斯', 'Las Vegas'], ['mexico', '墨西哥', 'Mexico City'],
+  ['são paulo', '巴西', 'São Paulo'], ['sao paulo', '巴西', 'São Paulo'], ['brazil', '巴西', 'Brazilian'], ['saudi', '沙烏地', 'Saudi Arabian'], ['barcelona', '巴塞隆納', 'Barcelona'],
+  ['australia', '澳洲', 'Australian'], ['chin', '中國', 'Chinese'], ['japan', '日本', 'Japanese'], ['bahrain', '巴林', 'Bahrain'], ['miami', '邁阿密', 'Miami'],
+  ['canad', '加拿大', 'Canadian'], ['monaco', '摩納哥', 'Monaco'], ['austria', '奧地利', 'Austrian'], ['brit', '英國', 'British'], ['belgi', '比利時', 'Belgian'],
+  ['hungar', '匈牙利', 'Hungarian'], ['dutch', '荷蘭', 'Dutch'], ['ital', '義大利', 'Italian'], ['emilia', '伊莫拉', 'Emilia-Romagna'], ['spanish', '西班牙', 'Spanish'], ['spain', '西班牙', 'Spanish'],
+  ['madrid', '馬德里', 'Madrid'], ['azerbaijan', '亞塞拜然', 'Azerbaijan'], ['singapore', '新加坡', 'Singapore'], ['qatar', '卡達', 'Qatar'], ['portug', '葡萄牙', 'Portuguese'], ['turk', '土耳其', 'Turkish']
+];
+export function raceName(name, lang = 'zh') {
+  const text = String(name || '');
+  // The two words before "Grand Prix" / "GP": past any sponsor.
+  const m = /([\p{L}.'&-]+(?:\s+[\p{L}.'&-]+)?)\s+(?:Grand Prix|GP)\b/iu.exec(text);
+  if (!m) return text;
+  const place = m[1].toLowerCase();
+  const hit = GP.find(([key]) => place.includes(key));
+  if (hit) return lang === 'en' ? `${hit[2]} GP` : `${hit[1]}站`;
+  return `${m[1].split(/\s+/).at(-1)} GP`;
+}
