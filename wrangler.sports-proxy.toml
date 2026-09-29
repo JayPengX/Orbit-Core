@@ -20,3 +20,7 @@ compatibility_date = "2025-01-01"
 [[kv_namespaces]]
 binding = "RATE_LIMIT_KV"
 id = "8b24d75fbe0a4a69aef0f35cb7a8d847"
+
+# Web Push (push.js): the notices that are due, sent every 5 minutes.
+[triggers]
+crons = ["*/5 * * * *"]

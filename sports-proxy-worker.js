@@ -24,6 +24,7 @@
 // memory, never in KV, so ordinary use costs no KV operations at all. Until
 // ECO_TOKEN_SECRET is set on this Worker the gate is off and the old per-IP
 // KV limit applies.
+import { handlePush, sendDue } from './push.js';
 import { readToken, sessionLimited } from './quadra-token.js';
 
 const ALLOWED_ORIGINS = ['https://jaypengx.github.io'];
@@ -35,7 +36,7 @@ function isAllowedOrigin(origin) {
 function corsHeaders(origin, colo) {
   return {
     'Access-Control-Allow-Origin': isAllowedOrigin(origin) ? origin : 'null',
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Expose-Headers': 'X-Worker-Colo, X-Sports-Proxy-Cache, X-Sports-Proxy-Cache-Tier, X-Sports-Proxy-Age',
     'X-Worker-Colo': colo || 'unknown',
@@ -565,6 +566,19 @@ export default {
     const path = new URL(request.url).pathname.replace(/\/+$/, '');
 
     if (path === '/sports-proxy') return handleSportsProxyRequest(request, env, headers, ip, ctx);
+    if (path.startsWith('/push/')) {
+      const params = new URL(request.url).searchParams;
+      const session = env.ECO_TOKEN_SECRET && params.get('qt') ? await readToken(env.ECO_TOKEN_SECRET, params.get('qt'), 'ses') : null;
+      if (path !== '/push/key') {
+        const rl = await isRateLimited(env, ip, SPORTS_PROXY_RATE_LIMIT);
+        if (rl.limited) return json({ error: { message: 'Too many requests, please try again later.' } }, 429, headers);
+      }
+      return handlePush(request, env, headers, session, path);
+    }
     return json({ error: { message: 'Not found' } }, 404, headers);
+  },
+  // Every 5 minutes: the notices that are due (push.js).
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(sendDue(env));
   }
 };

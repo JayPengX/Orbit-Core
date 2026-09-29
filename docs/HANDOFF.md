@@ -156,3 +156,19 @@ a time; untranslated text).
 
 Ideas for later: Play's own cold-start cache (like Fixtures'), a playoff
 bracket view in Fixtures, saving a long game in progress.
+
+
+## Notices while an app is closed (Web Push)
+
+Phones stop a home-screen app in the background, so notices can't come from
+the app itself once it's closed. The kit's `schedulePush(s, items)` hands the
+Worker each app's coming notices (a followed game's start and final score, a
+class, a streak about to end, a price alert or order reaching its price, a
+monthly plan's day, a slip's games being over); `push.js` in the
+sports-proxy Worker stores them in KV and a cron (every 5 minutes) sends the
+due ones with Web Push (VAPID key pair made on first use, kept in KV as
+`push:vapid`). Checks (`espn` final score, `yahoo` price reached) are made by
+the Worker itself. Each app's `sw.js` shows them (`push` event). On an iPhone
+this needs the app on the home screen (iOS 16.4+) and notices turned on in
+the account sheet. Notices that arrive together while the app is open are
+one grouped banner.

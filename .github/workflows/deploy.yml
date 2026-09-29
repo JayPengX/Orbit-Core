@@ -12,6 +12,7 @@ on:
       - 'eco.js'
       - 'kambi.js'
       - 'quadra-token.js'
+      - 'push.js'
       - 'eco-admin.js'
   workflow_dispatch:
 
