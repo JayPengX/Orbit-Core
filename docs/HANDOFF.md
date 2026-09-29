@@ -83,7 +83,6 @@ edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
 
 - Rewards: word ladder, reaction game, a shared leaderboard (needs the
   Worker).
-- `Quadra-Play/undefined/` holds two stray screenshots from an old commit.
 
 ## Notes
 
@@ -270,11 +269,11 @@ allowance, Rewards, market) against sinks (Play's hold: 13.6% of a single,
   costs) and one-tap market sells, and a red strip on the markets home.
 - `tools/preview.mjs --entry '{json}'` adds wallet entries for scenarios
   (e.g. the reset and a big stake, to see an overdraft).
-- **Rewards next:** `docs/REWARDS-NEXT.md` is the brief for the agent that
-  takes Rewards (sync the kit, close the effort faucet, make Rewards
-  profit-oriented, remove its loss-talk).
+- **Rewards next:** the brief for Rewards (sync the kit, close the effort
+  faucet, make Rewards profit-oriented, remove its loss-talk) is done; see
+  the round below.
 
-## Round: Rewards, profit-oriented (docs/REWARDS-NEXT.md, done)
+## Round: Rewards, profit-oriented (done)
 
 - **Kit and caps:** Rewards runs the current kit; pay rescaled to the
   NT$400 day (missions NT$15-25, weekly goals 40-60, the daily challenge
@@ -307,4 +306,49 @@ allowance, Rewards, market) against sinks (Play's hold: 13.6% of a single,
 - **Kit statement labels:** `shop` (Rewards 加值), `freeze`, `freebet`.
 - `tools/economy.mjs` has a v4 setting (the shop and free bets) and a
   Rewards-only persona (只背單字).
+
+## Round: one tab bar, faster opening, clean-up (all repos, pushed to `main`)
+
+- **One app frame (kit):** `tabBar({ tabs, onSelect })` draws every app's
+  tab bar from the same markup and icons (`ICONS`): on a phone the chosen
+  tab has a pill behind its icon, badges sit on the icon (`badge(id, n, {
+  tone })`), each tab keeps its place, tapping the open tab scrolls it to
+  the top (at the top: `onSelect(id, { again: true })`), arrow keys move
+  between tabs, and only a change of tab moves the address.
+  `topActions(s, { help, refresh, extra })` is the top right everywhere:
+  help, refresh (apps with live data), the account. Every index.html has
+  the same header (`.q-appbar`, `#title`, `#status`, `#tabs`,
+  `#top-actions`); the apps' own header, tab and mobile-bar CSS is gone.
+  Page padding uses the kit's `--q-nav` and `--q-page-max`.
+- **Tabs:** the first tab is 首頁 (house) in every app (Fixtures' 推薦 and
+  Securities' 市場 renamed). Fixtures gained a refresh button (tap 首頁
+  again at the top: back to today). **Rewards:** 首頁 · 單字 · 遊戲 · 任務;
+  任務 has every mission, weekly goals, badges and ranks with a count of
+  what's ready to claim; home keeps the next three missions; help is a
+  sheet from the ? (and from other apps' `#help=` links). Help text and
+  READMEs follow.
+- **Faster opening:** each sw.js serves the kept page at once and
+  refreshes it behind (`pageFirst`; a `?v=` address, the update reload,
+  still asks the network): an installed app no longer waits a round trip.
+  Deploys add `modulepreload` for the whole static import graph
+  (`scripts/stamp-version.mjs`): 3 waves of requests instead of 5-6
+  (measured with `tools/preview.mjs --timing --latency 150 --root`). The
+  Worker is preconnected in every app. The kit's session shares one
+  sign-in call when several token requests come at once (test in
+  `tests/kit.test.mjs`).
+- **Clean-up:** ~1,400 unused i18n entries (Play's old analysis,
+  leaderboards and simulator; Securities' lessons and costs card; a few
+  in Fixtures and Rewards), unused CSS rules and keyframes, dead
+  functions, constants and imports (checked with `tsc --checkJs
+  --noUnusedLocals`: nothing unresolved, nothing unused), the unused
+  `useSession` hooks, Play's stray `undefined/` screenshots and dead
+  `build` script, and the finished `docs/REWARDS-NEXT.md`. Tests that
+  listed keys of removed screens were updated.
+- Not changed on purpose: Fixtures still holds its loading screen until
+  the picks settle (a cached day without its tables would reshuffle on
+  screen); Play's first-ever open is bound by its odds sources (later
+  opens draw the saved board at once).
+- Orbit Class wasn't in this session: its kit copy is one version behind
+  (it doesn't use the tab bar; run `node kit/sync.mjs` with it checked
+  out).
 
