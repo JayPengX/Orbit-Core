@@ -210,3 +210,28 @@ and for the cheap cash-grab features to go. What changed:
   app's copy stands alone).
 - Ideas: a daily price boost on one marquee game (capped stake); same-game
   parlays (need correlated pricing); a Plus-only monthly statement.
+
+## Round: full throttle (all repos, pushed to `main`)
+
+The owner asked to remove anything that could discourage spending and to
+package everything as premium and useful while being profit-first.
+
+- **Removed discouragers (Play):** the 統計分析 tab (net loss, luck vs the
+  cut, per-100 returns) is now 戰績, wins only (`stats-ui.js`); slips show
+  no expected return, no negative result; groups, the summary and the
+  account show 累計中獎 instead of 輸贏; no "lost" filter; the lottery shows
+  prizes but no odds, no scratch win rates, no net-loss chips, no purchase
+  confirmation. Old analysis strings in `i18n.mjs` are unused leftovers.
+- **Play conversion:** sticky slip bar, parlay by default from two picks,
+  quick stakes with a remembered stake (NT$500 default), 精選串關 on home,
+  "投注成功 · 繼續挑比賽" after a bet.
+- **Plus yearly plan:** NT$2,900 for twelve months (entries for all twelve
+  at once, the fee on the first), renewed by the year (or by the month if
+  the pool can't cover a year). The sheet has a plan picker (yearly marked
+  最划算; monthly keeps the one-time free month); cancelling is still there,
+  under 管理會員.
+- **Securities:** buying power (cash + margin room) on the markets home;
+  融資買進 borrows the shortfall and places the order in one tap; 融資最大
+  quick size; no "worst trade" line.
+- **Fixtures:** match sheets carry a Quadra Play card.
+- Rewards still has the older kit (not reachable from these sessions).

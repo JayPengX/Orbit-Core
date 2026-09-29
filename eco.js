@@ -126,8 +126,7 @@ export function paydayEntries(wallet, now) {
   let m = made > PAY_FROM_MONTH ? made : PAY_FROM_MONTH;
   for (let n = 0; m <= month && n < 120; n++, m = nextMonth(m)) if (!have.has(`eco:pay:${m}`)) out.push({ id: `eco:pay:${m}`, t: now, app: 'eco', kind: 'pay', amount: PAY.month });
   // Quadra Plus renews for this month (after the pay, so the pay covers it).
-  const renew = plusRenewal(wallet, now, out.reduce((sum, e) => sum + e.amount, 0));
-  if (renew) out.push(renew);
+  out.push(...plusRenewal(wallet, now, out.reduce((sum, e) => sum + e.amount, 0)));
   return out;
 }
 export { WEEK };
@@ -141,32 +140,52 @@ export { WEEK };
 // first time ever, the rest of the month is free; after that the rest of the
 // month costs its share of the fee. It renews on the first sign-in or read
 // of a month while the `plus` setting is on and the pool covers it; a month
-// nobody opened an app is never charged. Leaving keeps the paid month.
-export const PLUS = { fee: 290 };
+// nobody opened an app is never charged. The yearly plan (PLUS.year, about
+// two months free) pays twelve months at once and renews by the year.
+// Leaving stops renewal and keeps every month already paid.
+export const PLUS = { fee: 290, year: 2_900 };
 const PLUS_ID = m => `eco:plus:${m}`;
-const plusOn = wallet => wallet?.settings?.plus?.value?.on === true;
+const plusSetting = wallet => wallet?.settings?.plus?.value || {};
+const plusOn = wallet => plusSetting(wallet).on === true;
 export const plusMember = (wallet, now) => (wallet?.entries || []).some(e => e.id === PLUS_ID(taipeiMonth(now)) && e.app === 'eco');
 function monthDays(m) {
   const [y, mo] = m.split('-').map(Number);
   return new Date(Date.UTC(y, mo, 0)).getUTCDate();
 }
+const monthsFrom = (m, n) => Array.from({ length: n }, (_, i) => (i ? (m = nextMonth(m)) : m));
+// A year paid now: twelve months from `first`, the fee on the first, the
+// rest already covered (amount 0), skipping any month already held.
+function yearEntries(wallet, first, now) {
+  const have = new Set((wallet?.entries || []).map(e => e.id));
+  const months = monthsFrom(first, 12).filter(m => !have.has(PLUS_ID(m)));
+  return months.map((m, i) => ({ id: PLUS_ID(m), t: now, app: 'eco', kind: 'plus', amount: i ? 0 : -PLUS.year, note: 'year' }));
+}
+// Renewal for this month: a yearly member renews for another year (or, if
+// the pool can't cover a year, a month); a monthly one for a month.
 function plusRenewal(wallet, now, adding = 0) {
   const month = taipeiMonth(now);
   const entries = wallet?.entries || [];
-  if (!plusOn(wallet) || !entries.some(e => e.id?.startsWith('eco:plus:')) || entries.some(e => e.id === PLUS_ID(month))) return null;
-  if (poolBalance(wallet) + adding < PLUS.fee) return null;
-  return { id: PLUS_ID(month), t: now, app: 'eco', kind: 'plus', amount: -PLUS.fee };
+  if (!plusOn(wallet) || !entries.some(e => e.id?.startsWith('eco:plus:')) || entries.some(e => e.id === PLUS_ID(month))) return [];
+  const pool = poolBalance(wallet) + adding;
+  if (plusSetting(wallet).plan === 'year' && pool >= PLUS.year) return yearEntries(wallet, month, now);
+  if (pool < PLUS.fee) return [];
+  return [{ id: PLUS_ID(month), t: now, app: 'eco', kind: 'plus', amount: -PLUS.fee }];
 }
-// What joining now costs: nothing the first time, else the rest of the month's share.
-export function plusJoinEntry(wallet, now) {
+// What joining now takes. Monthly: nothing the first time ever, else the
+// rest of the month's share of the fee. Yearly: PLUS.year for twelve months,
+// from this month (or from next month when this one is already a member's).
+export function plusJoinEntries(wallet, now, plan = 'month') {
   const month = taipeiMonth(now);
-  if (plusMember(wallet, now)) return null;
+  const member = plusMember(wallet, now);
+  if (plan === 'year') return yearEntries(wallet, member ? nextMonth(month) : month, now);
+  if (member) return [];
   const tried = (wallet?.entries || []).some(e => e.id?.startsWith('eco:plus:'));
   const days = monthDays(month);
   const left = days - Number(new Date(now + TPE).toISOString().slice(8, 10)) + 1;
   const amount = tried ? -Math.max(10, Math.round((PLUS.fee * left) / days / 10) * 10) : 0;
-  return { id: PLUS_ID(month), t: now, app: 'eco', kind: 'plus', amount, ...(tried ? {} : { note: 'trial' }) };
+  return [{ id: PLUS_ID(month), t: now, app: 'eco', kind: 'plus', amount, ...(tried ? {} : { note: 'trial' }) }];
 }
+export const plusJoinEntry = (wallet, now) => plusJoinEntries(wallet, now)[0] ?? null;
 
 const isObj = v => Boolean(v) && typeof v === 'object' && !Array.isArray(v);
 const str = (v, max) => (typeof v === 'string' ? v.slice(0, max) : undefined);
@@ -541,6 +560,7 @@ async function ecoPlus(ctx) {
   if (!c) return deps.errorJson('ECO_TOKEN_INVALID', 401, headers, request);
   if (sessionLimited(`plus:${c.s}`, 10, 60_000, now)) return deps.errorJson('RATE_LIMITED', 429, headers, request);
   const on = body.on === true;
+  const plan = body.plan === 'year' ? 'year' : 'month';
   let refused = null;
   const result = await updateWallet(
     env,
@@ -551,9 +571,9 @@ async function ecoPlus(ctx) {
       if (gen(w) !== c.g) return (refused = 'ECO_SIGNED_OUT'), w;
       if (!isActive(w, c)) return (refused = 'ECO_SESSION_MOVED'), w;
       const paid = mergeWallet(w, { entries: paydayEntries(w, now) });
-      const join = on ? plusJoinEntry(paid, now) : null;
-      if (join && poolBalance(paid) + join.amount < 0) return (refused = 'ECO_PLUS_FUNDS'), w;
-      return mergeWallet(paid, { entries: join ? [join] : [], settings: { plus: { value: { on, t: now }, t: now } } });
+      const join = on ? plusJoinEntries(paid, now, plan) : [];
+      if (join.length && poolBalance(paid) + join.reduce((sum, e) => sum + e.amount, 0) < 0) return (refused = 'ECO_PLUS_FUNDS'), w;
+      return mergeWallet(paid, { entries: join, settings: { plus: { value: { on, plan, t: now }, t: now } } });
     },
     { skipIf: () => refused }
   );

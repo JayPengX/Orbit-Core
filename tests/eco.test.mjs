@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { handleEcoRequest, mergeWallet, poolBalance, cleanPatch, emptyWallet, paydayEntries, plusJoinEntry, plusMember, tidyWallet, PAY, PLUS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, ECO_APPS } from '../eco.js';
+import { handleEcoRequest, mergeWallet, poolBalance, cleanPatch, emptyWallet, paydayEntries, plusJoinEntry, plusJoinEntries, plusMember, tidyWallet, PAY, PLUS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, ECO_APPS } from '../eco.js';
 import { planClean } from '../eco-admin.js';
 
 function setup() {
@@ -325,4 +325,34 @@ test('Quadra Plus: only the live app can join, and an app cannot write the entry
   const moved = await t.call('POST', '', { op: 'plus', qt: acct.token, on: true });
   assert.equal(moved.data.error.code, 'ECO_SESSION_MOVED');
   assert.deepEqual(cleanPatch({ entries: [{ id: 'eco:plus:2026-10', t: 1, app: 'eco', kind: 'plus', amount: 0 }, { id: 'eco:plus:2026-11', t: 1, app: 'odds', kind: 'plus', amount: 0 }] }).entries, []);
+});
+
+test('Quadra Plus yearly: twelve months paid at once, renewed by the year', async () => {
+  const t = setup();
+  const acct = await newPass(t, 'stock');
+  const join = await t.call('POST', '', { op: 'plus', qt: acct.token, on: true, plan: 'year' });
+  assert.equal(join.status, 200);
+  const plus = join.data.wallet.entries.filter(e => e.kind === 'plus');
+  assert.equal(plus.length, 12);
+  assert.equal(plus.reduce((s, e) => s + e.amount, 0), -PLUS.year);
+  assert.equal(join.data.wallet.settings.plus.value.plan, 'year');
+  // Eleven months on: nothing new is charged.
+  t.advance(11 * 31 * 86_400_000 - 40 * 86_400_000);
+  const mid = await t.call('POST', '', { op: 'login', passcode: acct.passcode, app: 'stock' });
+  assert.equal(mid.data.wallet.entries.filter(e => e.kind === 'plus').length, 12);
+  // Past the year: another year.
+  t.advance(80 * 86_400_000);
+  const later = await t.call('POST', '', { op: 'login', passcode: acct.passcode, app: 'stock' });
+  const after = later.data.wallet.entries.filter(e => e.kind === 'plus');
+  assert.ok(after.length >= 24 - 2, `renewed: ${after.length}`);
+  assert.equal(after.filter(e => e.amount === -PLUS.year).length, 2);
+});
+
+test('Quadra Plus yearly on top of a month already held starts next month', () => {
+  const oct = Date.UTC(2026, 9, 10, 4);
+  const w = { entries: [{ id: 'eco:plus:2026-10', t: 1, app: 'eco', kind: 'plus', amount: 0 }] };
+  const e = plusJoinEntries(w, oct, 'year');
+  assert.equal(e[0].id, 'eco:plus:2026-11');
+  assert.equal(e.at(-1).id, 'eco:plus:2027-10');
+  assert.equal(e[0].amount, -PLUS.year);
 });

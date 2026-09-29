@@ -84,7 +84,7 @@ account's document id.
 | `DELETE /eco?qt=T[&app=A][&inbox=ID]` | The account, one app's data, or one inbox item |
 | `POST { op: 'pair-create', qt }` / `{ op: 'pair-redeem', code, app }` | A device code (8 characters, 10 minutes, once) and signing in with it |
 | `POST { op: 'handoff', qt }` / `{ op: 'redeem', handoff, app }` | A sealed sign-in (3 minutes) for a link to another app; home-screen apps don't share storage |
-| `POST { op: 'plus', qt, on }` | Quadra Plus: join (`on: true`; the first month ever free, later the rest of the month's share of NT$290) or stop renewing (`on: false`; the paid month stays). Live app only |
+| `POST { op: 'plus', qt, on, plan }` | Quadra Plus: join (`on: true`; `plan: 'month'`: the first month ever free, later the rest of the month's share of NT$290; `plan: 'year'`: NT$2,900 for twelve months at once) or stop renewing (`on: false`; paid months stay). Live app only |
 | `POST { op: 'signout-all', qt }` | Every other device signed out; this one comes back signed in |
 | `POST { op: 'rotate', qt }` | A new pass for the same account; the old one stops working, every other device is signed out |
 | `POST { op: 'merge', qt, sources: [{ passcode }] }` | Other passes into this one (their data, or its inbox; their money), then deleted |
