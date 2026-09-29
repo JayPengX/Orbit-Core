@@ -37,6 +37,7 @@ import { existsSync } from 'node:fs';
 import { join, extname, resolve } from 'node:path';
 import { execFile } from 'node:child_process';
 import { createRequire } from 'node:module';
+import { ASIA_HOST, asiaBaseballResponse } from '../asia-baseball.js';
 
 const require = createRequire(import.meta.url);
 let chromium;
@@ -137,6 +138,11 @@ const DEBUG = Boolean(process.env.DEBUG);
 const upstream = url => {
   const fixture = fixtures.find(([text]) => url.includes(text));
   if (fixture) return readFile(fixture[1], 'utf8').then(body => ({ status: 200, body }));
+  // Asian baseball: gathered here by the Worker's own module (asia-baseball.js).
+  if (url.startsWith(`https://${ASIA_HOST}/`)) {
+    if (!cache.has(url)) cache.set(url, asiaBaseballResponse(new URL(url)).then(async r => ({ status: r.status, body: await r.text() })));
+    return cache.get(url);
+  }
   if (!cache.has(url)) cache.set(url, curl(url).then(r => (DEBUG && console.log(r.status, r.body.length, url.slice(0, 140)), r)));
   return cache.get(url);
 };

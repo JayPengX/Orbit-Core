@@ -7,6 +7,7 @@ on:
       - 'worker.js'
       - 'wrangler.toml'
       - 'sports-proxy-worker.js'
+      - 'asia-baseball.js'
       - 'wrangler.sports-proxy.toml'
       - 'locales/**'
       - 'eco.js'

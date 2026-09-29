@@ -25,6 +25,7 @@
 // ECO_TOKEN_SECRET is set on this Worker the gate is off and the old per-IP
 // KV limit applies.
 import { readToken, sessionLimited } from './quadra-token.js';
+import { ASIA_HOST, asiaBaseballResponse, asiaTarget } from './asia-baseball.js';
 
 const ALLOWED_ORIGINS = ['https://jaypengx.github.io'];
 
@@ -136,7 +137,10 @@ const SPORTS_PROXY_ALLOWED_HOSTS = [
   // Google's translate endpoint (the Chrome dictionary's, no key): a
   // company's description in the reader's language (Securities). Only
   // /translate_a/t; sent upstream as a POST (see fetchUpstream), kept a month.
-  'clients5.google.com'
+  'clients5.google.com',
+  // Not a real host: Asian baseball's schedules and scores, gathered by this
+  // Worker from the leagues' own sites (asia-baseball.js).
+  ASIA_HOST
 ];
 const SPORTS_PROXY_RATE_LIMIT = 600;
 // Per signed-in session, a minute, in memory (cache hits included).
@@ -195,6 +199,18 @@ const CACHE_FUNDAMENTALS = { tier: 'fundamentals', fresh: HOUR, stale: DAY };
 const CACHE_NEWS = { tier: 'news', fresh: 30 * MINUTE, stale: DAY };
 const CACHE_TRANSLATE = { tier: 'translate', fresh: 30 * DAY, stale: 30 * DAY };
 
+// Asian baseball by month: this month and next change with every score (a
+// minute); a past month only with a late fix.
+const CACHE_ASIA_NOW = { tier: 'asia-now', fresh: MINUTE, stale: MINUTE };
+function asiaPolicy(url) {
+  const target = asiaTarget(url);
+  if (!target) return CACHE_LIVE;
+  const now = new Date();
+  const months = target.year * 12 + target.month - (now.getUTCFullYear() * 12 + now.getUTCMonth() + 1);
+  // Last month too on the 1st (a game the evening before, Asian time).
+  return months >= 0 || (months === -1 && now.getUTCDate() <= 1) ? CACHE_ASIA_NOW : CACHE_STANDINGS;
+}
+
 function yahooPolicy(url) {
   if (url.pathname.startsWith('/v1/finance/search')) return Number(url.searchParams.get('newsCount')) > 0 ? CACHE_NEWS : CACHE_SEARCH;
   if (needsYahooCrumb(url)) return CACHE_FUNDAMENTALS;
@@ -247,6 +263,8 @@ function cachePolicyFor(url) {
       return yahooPolicy(url);
     case 'clients5.google.com':
       return CACHE_TRANSLATE;
+    case ASIA_HOST:
+      return asiaPolicy(url);
     default:
       return CACHE_LIVE;
   }
@@ -384,7 +402,9 @@ async function translateUpstream(upstreamUrl) {
 async function fetchUpstream(upstreamUrl, trim) {
   let upstream;
   try {
-    upstream = needsYahooCrumb(upstreamUrl)
+    upstream = upstreamUrl.hostname === ASIA_HOST
+      ? await asiaBaseballResponse(upstreamUrl)
+      : needsYahooCrumb(upstreamUrl)
       ? await fetchYahooWithCrumb(upstreamUrl)
       : upstreamUrl.hostname === 'clients5.google.com'
         ? await translateUpstream(upstreamUrl)
