@@ -242,9 +242,11 @@ export function logoPicture(light, dark, cls, fallback) {
   if (!light || knownBad(light)) return fallback();
   const img = document.createElement('img');
   const known = logoSeen.ok.has(light);
-  // Hidden until it has drawn: never the browser's broken-picture icon.
+  // A new one hidden until it has drawn (never the browser's broken-picture
+  // icon); one that's drawn before this session shows at once, so a redraw
+  // (a pick tapped, the app back on screen) doesn't blink it out.
   Object.assign(img, { className: cls, alt: '', loading: known ? 'eager' : 'lazy', decoding: known ? 'sync' : 'async' });
-  img.style.visibility = 'hidden';
+  if (!known) img.style.visibility = 'hidden';
   img.addEventListener('load', () => {
     img.style.visibility = '';
     noteLogo(light, true);
