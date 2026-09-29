@@ -1,5 +1,8 @@
 # Quadra Rewards: the next round (brief for the agent picking it up)
 
+**Status: done** (see the last round in `HANDOFF.md`). Game challenges with a
+stake were built and then removed: betting stays in Play.
+
 Rewards was out of reach in the session that rebalanced the economy and made
 the rest of Quadra profit-first (see `HANDOFF.md`, the rounds from "profit
 the smart way" on). This is what Rewards needs, in order. The owner's

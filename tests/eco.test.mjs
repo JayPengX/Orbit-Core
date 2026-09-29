@@ -93,6 +93,24 @@ test("an app cannot forge the Worker's own entries", () => {
   assert.deepEqual(p.entries.map(e => e.id), ['y']);
 });
 
+test("Rewards' purchases pay at least their price; a free card, boost or pack is dropped", () => {
+  const e = (id, amount, kind = 'shop') => ({ id, t: 1, app: 'vocab', kind, amount });
+  const p = cleanPatch({
+    entries: [
+      e('vocab:shop:freeze:a', -300), e('vocab:shop:freeze:b', 0), e('vocab:shop:boost:c', -150), e('vocab:shop:boost:d', -1),
+      e('vocab:shop:pack:toeic', -990), e('vocab:shop:pack:ielts', -745), e('vocab:shop:pack:biz', -500), e('vocab:shop:pack:x', -5000),
+      e('vocab:shop:freeze:e', -300, 'game'), { id: 'odds:shop:freeze:f', t: 1, app: 'odds', kind: 'shop', amount: -300 }, e('vocab:g:1', 20, 'game')
+    ]
+  });
+  assert.deepEqual(p.entries.map(x => x.id), ['vocab:shop:freeze:a', 'vocab:shop:boost:c', 'vocab:shop:pack:toeic', 'vocab:shop:pack:ielts', 'odds:shop:freeze:f', 'vocab:g:1']);
+});
+
+test('free bets: worth nothing in the pool, a value of NT$10 to 500 in the note', () => {
+  const fb = (id, amount, note, kind = 'freebet') => ({ id, t: 1, app: 'vocab', kind, amount, note });
+  const p = cleanPatch({ entries: [fb('vocab:fb:1', 0, '100'), fb('vocab:fb:2', 100, '100'), fb('vocab:fb:3', 0, '1000'), fb('vocab:fb:4', 0, '105'), fb('vocab:fb:5', 0, '50', 'mission'), fb('vocab:fb:6', 0, '500')] });
+  assert.deepEqual(p.entries.map(x => x.id), ['vocab:fb:1', 'vocab:fb:6']);
+});
+
 test('wallet merge: entries by id, newest settings and figures', () => {
   const a = mergeWallet(emptyWallet(10), { entries: [{ id: 'a', t: 2, app: 'odds', amount: 5 }], settings: { k: { value: 1, t: 1 } }, snap: { stock: { cash: 10, t: 1 } } });
   const b = mergeWallet(a, { entries: [{ id: 'a', t: 2, app: 'odds', amount: 7 }, { id: 'b', t: 1, app: 'vocab', amount: 3 }], settings: { k: { value: 2, t: 3 } }, snap: { stock: { cash: 4, t: 0 } } });

@@ -237,6 +237,18 @@ const cleanCode = v =>
     .toUpperCase()
     .replace(/[\s-]/g, '');
 
+// What Quadra Rewards sells (its lib/shop.mjs): each purchase is one entry
+// 'vocab:shop:<item>:<key>' of kind 'shop', and a word pack's id is fixed
+// ('vocab:shop:pack:<pack>'), so it's bought once. An entry claiming one
+// must pay at least the lowest price (packs are half price for Plus), or
+// it's dropped: an app can't write itself a free card, boost or pack.
+export const REWARDS_SHOP = { freeze: 300, boost: 150, pack: { toeic: 495, ielts: 745, biz: 995 } };
+function shopPaid(id, amount) {
+  const [, , item, key] = id.split(':');
+  const least = item === 'pack' ? REWARDS_SHOP.pack[key] : REWARDS_SHOP[item];
+  return typeof least === 'number' && amount <= -least;
+}
+
 // One entry as stored: anything malformed is dropped, not stored.
 export function cleanEntry(e, { allowEco = false } = {}) {
   if (!isObj(e)) return null;
@@ -248,6 +260,10 @@ export function cleanEntry(e, { allowEco = false } = {}) {
   if (!(ENTRY_APPS.has(app) || (allowEco && app === 'eco'))) return null;
   // The Worker's own ids (pay, Quadra Plus) are its alone.
   if (!allowEco && id.startsWith('eco:')) return null;
+  if (id.startsWith('vocab:shop:') && !(app === 'vocab' && e.kind === 'shop' && shopPaid(id, amount))) return null;
+  // A free bet (Rewards' missions give them, Play stakes them): worth
+  // nothing in the pool itself, its value (NT$10 to 500) in the note.
+  if (id.startsWith('vocab:fb:') && !(app === 'vocab' && e.kind === 'freebet' && amount === 0 && /^[1-9]\d{0,2}0$/.test(String(e.note)) && Number(e.note) <= 500)) return null;
   const out = { id, t: Math.round(t), app, kind: str(e.kind, 24) || 'other', amount: Math.round(amount * 100) / 100 };
   const note = str(e.note, 80);
   if (note) out.note = note;

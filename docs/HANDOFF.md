@@ -234,7 +234,7 @@ package everything as premium and useful while being profit-first.
   融資買進 borrows the shortfall and places the order in one tap; 融資最大
   quick size; no "worst trade" line.
 - **Fixtures:** match sheets carry a Quadra Play card.
-- Rewards still has the older kit (not reachable from these sessions).
+- Rewards now has the current kit (synced in the Rewards round below).
 
 ## Round: the economy, balanced so money matters
 
@@ -251,11 +251,8 @@ allowance, Rewards, market) against sinks (Play's hold: 13.6% of a single,
   Securities now sends as `snap.stock.holdings`): 6,000 / 4,000 / 2,000 /
   1,000 at < 40k / < 100k / < 250k / above. Existing money is untouched;
   a rich account simply stops getting much for free.
-- **Pending Rewards:** the kit's `ECONOMY` now caps effort at NT$400 a day
-  (vocab 200, games 120, missions 80; about NT$12 a minute). Rewards only
-  takes it after `node kit/sync.mjs` with Rewards checked out (and its own
-  use of these constants checked). Until then a grinder still mints about
-  NT$25k a month, the biggest leak left.
+- **Rewards (done, see the Rewards round below):** effort is capped at
+  NT$400 a day (vocab 200, games 120, missions 80; about NT$12 a minute).
 - With all of it: a regular bettor is about level (needs a little Rewards
   effort to stay there), an investor grows by the market, a grinder earns
   but can't outrun the house, a high roller drains fast.
@@ -276,3 +273,38 @@ allowance, Rewards, market) against sinks (Play's hold: 13.6% of a single,
 - **Rewards next:** `docs/REWARDS-NEXT.md` is the brief for the agent that
   takes Rewards (sync the kit, close the effort faucet, make Rewards
   profit-oriented, remove its loss-talk).
+
+## Round: Rewards, profit-oriented (docs/REWARDS-NEXT.md, done)
+
+- **Kit and caps:** Rewards runs the current kit; pay rescaled to the
+  NT$400 day (missions NT$15-25, weekly goals 40-60, the daily challenge
+  bonus 5-20); ranks start at NT$50,000. Home shows the cap as progress
+  (今日可賺 NT$400 · 已賺 …) and one quiet line into Play and Securities.
+- **Shop (`Quadra-Rewards/public/lib/shop.mjs`):** 連續紀錄保護卡 NT$300
+  (hold 3, used by itself on a missed day: `vocab:fz:<day>`, amount 0);
+  word pay ×2 for 30 minutes NT$150 (that day's word cap +200); word packs
+  TOEIC NT$990 / IELTS 1,490 / Business 1,990 (`data/packs.json`, about 150
+  themed words each sharing progress with the main list, 212 new words
+  recorded). Purchases are `vocab:shop:<item>:<key>` entries of kind
+  `shop`; the Worker drops any that pays less than the lowest price
+  (`REWARDS_SHOP` in eco.js), so a free card or pack can't be written.
+- **Plus in Rewards:** a protection card every Plus month, word cap +NT$50,
+  packs half price; the kit's `plusPerks` and Plus sheet list them.
+- **Free bets (Rewards missions → Play):** three missions (a parlay of 3+
+  in Play, a scratch card, a monthly plan in Securities) give a token
+  instead of cash: `vocab:fb:<day>:<mission>`, kind `freebet`, amount 0,
+  its value (NT$30-50) in the note; the Worker keeps only well-formed ones.
+  Play's slip offers unspent tokens (kit `freeBets`, 7 days): one slip, the
+  token's value as stake, nothing off the balance, the token marked spent
+  (`odds:fb-<token id>`), a win pays the winnings only (`placeFreeSlip`,
+  `applyResults`), no cash out. Play tracks `parlay` and `scratch`,
+  Securities `plan`, for the missions.
+- **No betting in Rewards:** a staked game challenge was built and then
+  removed at the owner's word (betting belongs to Play only).
+- **說明** is a product guide now: no expected losses, per-100 returns or
+  "simulated" wording; Plus monthly/yearly, allowance by worth, overdraft,
+  fees, parlay boost, cash out, free bets, the shop and packs.
+- **Kit statement labels:** `shop` (Rewards 加值), `freeze`, `freebet`.
+- `tools/economy.mjs` has a v4 setting (the shop and free bets) and a
+  Rewards-only persona (只背單字).
+

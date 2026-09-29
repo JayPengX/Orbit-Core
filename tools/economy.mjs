@@ -37,18 +37,29 @@ export const SETTINGS = {
   now: { name: 'Now', start: 110_000, pay: () => 7_000, effortRate: 18, effortCap: 600 + 400 + 300, plus: 290 },
   // What the Worker changes on its own (Rewards still earns as it does).
   worker: { name: 'Proposed, Worker only (until Rewards takes the new caps)', start: 30_000, pay: payFor, effortRate: 18, effortCap: 600 + 400 + 300, plus: 290 },
-  v3: { name: 'Proposed, all of it', start: 30_000, pay: payFor, effortRate: 12, effortCap: 200 + 120 + 80, plus: 290 }
+  v3: { name: 'Proposed, all of it', start: 30_000, pay: payFor, effortRate: 12, effortCap: 200 + 120 + 80, plus: 290 },
+  // Rewards' shop (a word boost: NT$150 for 30 minutes of ×2 word pay and a
+  // cap NT$200 higher that day; protection cards and word packs) and the
+  // missions' free bets (a free bet returns its winnings only: about 45% of
+  // its face on a treble, FREEBET_RETURN).
+  v4: { name: 'Now: v3 with the Rewards shop and free bets', start: 30_000, pay: payFor, effortRate: 12, effortCap: 200 + 120 + 80, plus: 290, shop: true }
 };
+const BOOST = { price: 150, cap: 200 };
+const FREEBET_RETURN = 0.45;
 
 // Per day unless said: bets (slips a day, stake, share that are trebles),
 // lottery and scratch (NT$ a day), Rewards minutes a day (about NT$18 a
-// minute before the cap), share of wealth invested, turnover a month.
+// minute before the cap), share of wealth invested, turnover a month;
+// Rewards' shop: boosted days a month, other shop spending a month (cards,
+// packs), free bets claimed a day (NT$ face value).
 export const PEOPLE = [
   { key: 'casual', zh: '偶爾玩', slips: 2 / 7, stake: 300, trebles: 0, draw: 100 / 7, scratch: 0, effort: 0, invested: 0, turnover: 0 },
-  { key: 'regular', zh: '常玩', slips: 2, stake: 500, trebles: 0.5, draw: 50, scratch: 200 / 7, effort: 10, invested: 0.2, turnover: 10_000 },
+  { key: 'regular', zh: '常玩', slips: 2, stake: 500, trebles: 0.5, draw: 50, scratch: 200 / 7, effort: 10, invested: 0.2, turnover: 10_000, freebets: 80 },
   { key: 'roller', zh: '大戶', slips: 4, stake: 2_000, trebles: 0.5, draw: 500, scratch: 1_000 / 7, effort: 0, invested: 0, turnover: 0, plus: true },
   { key: 'investor', zh: '投資派', slips: 1, stake: 500, trebles: 0, draw: 0, scratch: 0, effort: 15, invested: 0.7, turnover: 50_000, plus: true },
-  { key: 'grinder', zh: '認真賺', slips: 3, stake: 500, trebles: 0.5, draw: 50, scratch: 0, effort: 60, invested: 0, turnover: 0 }
+  { key: 'grinder', zh: '認真賺', slips: 3, stake: 500, trebles: 0.5, draw: 50, scratch: 0, effort: 60, invested: 0, turnover: 0, boostDays: 20, shopMonth: 300, freebets: 80 },
+  // Rewards only: words and games most days, a boost now and then, a protection card and a pack over the year.
+  { key: 'learner', zh: '只背單字', slips: 0, stake: 0, trebles: 0, draw: 0, scratch: 0, effort: 30, invested: 0, turnover: 0, boostDays: 6, shopMonth: 300 + 990 / 12 }
 ];
 
 export function simulate(settings, p, months = 12) {
@@ -56,16 +67,20 @@ export function simulate(settings, p, months = 12) {
   const rows = [];
   for (let m = 0; m < months && worth > 0; m++) {
     const pay = settings.pay(worth);
-    const effort = Math.min(settings.effortCap, p.effort * settings.effortRate) * DAYS;
+    const boosted = settings.shop ? p.boostDays || 0 : 0;
+    const perDay = cap => Math.min(cap, p.effort * settings.effortRate);
+    const effort = perDay(settings.effortCap) * (DAYS - boosted) + perDay(settings.effortCap + BOOST.cap) * boosted;
+    const shop = settings.shop ? boosted * BOOST.price + (p.shopMonth || 0) : 0;
+    const freebet = settings.shop ? (p.freebets || 0) * DAYS * FREEBET_RETURN : 0;
     const bets = p.slips * p.stake * DAYS;
     const betHold = bets * ((1 - p.trebles) * HOLD.single + p.trebles * HOLD.treble);
     const lotto = p.draw * DAYS * HOLD.draw + p.scratch * DAYS * HOLD.scratch;
     const invested = Math.max(0, worth * p.invested);
     const market = invested * MARKET - p.turnover * TRADE_COST;
     const plus = p.plus ? settings.plus : 0;
-    const flow = pay + effort + market - betHold - lotto - plus;
+    const flow = pay + effort + market + freebet - betHold - lotto - plus - shop;
     worth += flow;
-    rows.push({ month: m + 1, pay, effort, market, take: betHold + lotto + plus, flow, worth });
+    rows.push({ month: m + 1, pay, effort, market, take: betHold + lotto + plus + shop - freebet, flow, worth });
   }
   return rows;
 }

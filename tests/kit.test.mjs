@@ -137,3 +137,12 @@ test('the allowance: by what the account is worth, Securities holdings included'
   assert.equal(kit.paydayFor({ entries: [], snap: { stock: { cash: 50_000, holdings: 500_000, t: 1 } } }), 1_000);
   assert.match(kit.paydayText('zh', Date.UTC(2026, 9, 5), { entries: [] }), /NT\$6,000/);
 });
+
+test('free bets: Rewards gives them, Play spends each once, they last a week', () => {
+  const t = Date.UTC(2026, 9, 1);
+  const tok = (id, note, at = t) => ({ id, t: at, app: 'vocab', kind: 'freebet', amount: 0, note });
+  const w = { entries: [tok('vocab:fb:a', '100'), tok('vocab:fb:b', '50', t + 1000), tok('vocab:fb:c', '7'), tok('vocab:fb:old', '100', t - 8 * 86_400_000), { id: 'odds:fb-vocab:fb:b', t, app: 'odds', kind: 'freebet', amount: 0 }] };
+  assert.deepEqual(kit.freeBets(w, t).map(x => [x.id, x.value]), [['vocab:fb:a', 100]]);
+  assert.deepEqual(kit.freeBets(w, t, ['vocab:fb:a']), []);
+  assert.deepEqual(kit.freeBets(w, t + 8 * 86_400_000), []);
+});
