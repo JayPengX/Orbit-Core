@@ -4,6 +4,7 @@
 //   node tools/preview.mjs <app> [hash…] [--out dir] [--width 390] [--height 844]
 //                          [--full] [--lang zh|en] [--dark] [--wait ms] [--click selector]
 //                          [--type 'selector=text']  (fills a field after the clicks)
+//                          [--store 'key=value']  (a localStorage entry to start with)
 //                          [--signed-out]  (the sign-in screen, as a new device sees it)
 //                          [--fixture 'text-in-url=file.json']  (repeatable: that saved answer
 //                          for any upstream URL containing the text, e.g. when Yahoo rate-limits)
@@ -71,6 +72,9 @@ for (let c; (c = opt('click', null)); ) clicks.push(c);
 // --type 'selector=text': types into a field after the clicks (repeatable).
 const typings = [];
 for (let c; (c = opt('type', null)); ) typings.push([c.slice(0, c.indexOf('=')), c.slice(c.indexOf('=') + 1)]);
+// --store 'key=value': a localStorage entry the page starts with (repeatable).
+const stores = [];
+for (let c; (c = opt('store', null)); ) stores.push([c.slice(0, c.indexOf('=')), c.slice(c.indexOf('=') + 1)]);
 const full = flag('full');
 const signedOut = flag('signed-out');
 const dark = flag('dark');
@@ -153,15 +157,16 @@ const context = await browser.newContext({
   ignoreHTTPSErrors: true
 });
 await context.addInitScript(
-  ([refresh, lang]) => {
+  ([refresh, lang, stores]) => {
     try {
+      for (const [k, v] of stores) localStorage.setItem(k, v);
       sessionStorage.setItem('quadra.visit', '1');
       if (refresh) localStorage.setItem('quadra.refresh', refresh);
       if (refresh) localStorage.setItem('quadra.account', '0123456789abcdef');
       localStorage.setItem('quadra.lang', lang);
     } catch {}
   },
-  [signedOut ? '' : refresh, lang]
+  [signedOut ? '' : refresh, lang, stores]
 );
 await context.route('https://orbit-workers-proxy.pengzjay.workers.dev/**', async route => {
   const req = route.request();
