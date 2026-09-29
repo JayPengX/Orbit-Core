@@ -22,6 +22,7 @@ import zhTW from './locales/zh-TW.js';
 import { handleEcoRequest } from './eco.js';
 import { readToken, tokenSecret, sessionLimited } from './quadra-token.js';
 import { handleKambiRequest, refreshKambiWatch, fetchKambiLive } from './kambi.js';
+import { handlePush, sendDue } from './push.js';
 
 const ALLOWED_ORIGINS = ['https://jaypengx.github.io'];
 
@@ -1323,12 +1324,21 @@ export default {
       const deps = { ...KAMBI_DEPS, rateLimitResponse: async () => (sessionLimited(`k:${session.s}`, 60) ? errorJson('RATE_LIMITED', 429, headers, request) : null) };
       return handleKambiRequest(request, env, headers, ip, deps);
     }
+    // Web Push (push.js): here, where the Quadra Pass tokens can be read.
+    if (path.startsWith('/push/')) {
+      const qt = new URL(request.url).searchParams.get('qt');
+      const session = qt ? await readToken(await tokenSecret(env), qt, 'ses') : null;
+      if (session && sessionLimited(`p:${session.s}`, 30)) return errorJson('RATE_LIMITED', 429, headers, request);
+      return handlePush(request, env, headers, session, path);
+    }
     return errorJson('NOT_FOUND', 404, headers, request);
   },
 
-  // The cron (wrangler.toml [triggers]): every 10 minutes, the latest score
-  // of each Kambi match Quadra Sportsbook has bets on (kambi.js).
+  // The cron (wrangler.toml [triggers]): the notices that are due (push.js),
+  // and the latest score of each Kambi match Quadra Sportsbook has bets on
+  // (kambi.js).
   async scheduled(event, env, ctx) {
+    ctx.waitUntil(sendDue(env).then(r => r.sent && console.log('push sent', JSON.stringify(r))));
     if (!env.FIREBASE_PROJECT_ID || !env.FIREBASE_CLIENT_EMAIL || !env.FIREBASE_PRIVATE_KEY) return;
     ctx.waitUntil(refreshKambiWatch(env, KAMBI_DEPS).then(r => console.log('kambi watch', JSON.stringify(r))));
   }
