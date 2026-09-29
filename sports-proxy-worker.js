@@ -125,6 +125,9 @@ const SPORTS_PROXY_ALLOWED_HOSTS = [
   // Kambi's public odds feed: Odds Study's tennis, badminton, table tennis,
   // volleyball, snooker and Asian baseball/basketball odds and live scores.
   'eu-offering-api.kambicdn.com',
+  // OpenF1's race control messages: Quadra Play's safety car, VSC and red
+  // flag picks are settled from them.
+  'api.openf1.org',
   // Yahoo Finance's public chart, spark and search endpoints (no key): Stock
   // Study's quotes, charts, dividends and splits for stocks, ETFs, funds,
   // currencies, crypto, metals and indexes worldwide.
@@ -231,6 +234,8 @@ function cachePolicyFor(url) {
     case 'statsapi.mlb.com':
     case 'api.jolpi.ca':
       return CACHE_STANDINGS;
+    case 'api.openf1.org':
+      return CACHE_ODDS;
     case 'gamma-api.polymarket.com':
       return url.pathname === '/public-search' ? CACHE_FUTURES : CACHE_ODDS;
     case 'eu-offering-api.kambicdn.com':

@@ -205,10 +205,45 @@ export function countryFlag(name) {
 // ---- On screen ------------------------------------------------------------------
 
 // A logo with its dark-background version, or `fallback()` if it fails.
+// Logos that loaded (drawn again at once, not lazily) and ones that failed
+// (the fallback straight away, no broken picture first), remembered for
+// the session so a redraw — coming back to the app — doesn't flash them.
+const LOGO_SEEN_KEY = 'quadra.logos.v1';
+const logoSeen = (() => {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(LOGO_SEEN_KEY) || '{}');
+    return { ok: new Set(saved.ok || []), bad: new Set(saved.bad || []) };
+  } catch {
+    return { ok: new Set(), bad: new Set() };
+  }
+})();
+let logoSaveTimer = 0;
+function noteLogo(url, ok) {
+  const set = ok ? logoSeen.ok : logoSeen.bad;
+  if (set.has(url)) return;
+  set.add(url);
+  (ok ? logoSeen.bad : logoSeen.ok).delete(url);
+  clearTimeout(logoSaveTimer);
+  logoSaveTimer = setTimeout(() => {
+    try {
+      sessionStorage.setItem(LOGO_SEEN_KEY, JSON.stringify({ ok: [...logoSeen.ok].slice(-600), bad: [...logoSeen.bad].slice(-200) }));
+    } catch {}
+  }, 500);
+}
+
 export function logoPicture(light, dark, cls, fallback) {
-  if (!light) return fallback();
+  if (!light || logoSeen.bad.has(light)) return fallback();
   const img = document.createElement('img');
-  Object.assign(img, { className: cls, src: light, alt: '', loading: 'lazy', decoding: 'async' });
+  const known = logoSeen.ok.has(light);
+  // Hidden until it has drawn: never the browser's broken-picture icon.
+  Object.assign(img, { className: cls, alt: '', loading: known ? 'eager' : 'lazy', decoding: known ? 'sync' : 'async' });
+  img.style.visibility = 'hidden';
+  img.addEventListener('load', () => {
+    img.style.visibility = '';
+    noteLogo(light, true);
+  });
+  img.src = light;
+  if (img.complete && img.naturalWidth) img.style.visibility = '';
   const picture = document.createElement('picture');
   picture.className = 'logo-wrap';
   if (dark) {
@@ -221,7 +256,10 @@ export function logoPicture(light, dark, cls, fallback) {
   // then gives way to the fallback.
   let retried = false;
   img.addEventListener('error', () => {
-    if (retried || !navigator.onLine) return picture.replaceWith(fallback());
+    if (retried || !navigator.onLine) {
+      if (navigator.onLine) noteLogo(light, false);
+      return picture.replaceWith(fallback());
+    }
     retried = true;
     // The same address again (TheSportsDB refuses any extra ?query).
     setTimeout(() => {
