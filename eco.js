@@ -125,9 +125,48 @@ export function paydayEntries(wallet, now) {
   const made = Number.isFinite(wallet.created) ? taipeiMonth(Math.min(wallet.created, now)) : month;
   let m = made > PAY_FROM_MONTH ? made : PAY_FROM_MONTH;
   for (let n = 0; m <= month && n < 120; n++, m = nextMonth(m)) if (!have.has(`eco:pay:${m}`)) out.push({ id: `eco:pay:${m}`, t: now, app: 'eco', kind: 'pay', amount: PAY.month });
+  // Quadra Plus renews for this month (after the pay, so the pay covers it).
+  const renew = plusRenewal(wallet, now, out.reduce((sum, e) => sum + e.amount, 0));
+  if (renew) out.push(renew);
   return out;
 }
 export { WEEK };
+
+// ---- Quadra Plus -------------------------------------------------------------------
+//
+// The membership: PLUS.fee each Taiwan month, taken from the pool by this
+// Worker (an app can't write 'eco' entries, so no app can grant itself a
+// month). A month is a member's when the wallet holds `eco:plus:<month>`;
+// every app reads its perks from that alone. Joining is `op: 'plus'`: the
+// first time ever, the rest of the month is free; after that the rest of the
+// month costs its share of the fee. It renews on the first sign-in or read
+// of a month while the `plus` setting is on and the pool covers it; a month
+// nobody opened an app is never charged. Leaving keeps the paid month.
+export const PLUS = { fee: 290 };
+const PLUS_ID = m => `eco:plus:${m}`;
+const plusOn = wallet => wallet?.settings?.plus?.value?.on === true;
+export const plusMember = (wallet, now) => (wallet?.entries || []).some(e => e.id === PLUS_ID(taipeiMonth(now)) && e.app === 'eco');
+function monthDays(m) {
+  const [y, mo] = m.split('-').map(Number);
+  return new Date(Date.UTC(y, mo, 0)).getUTCDate();
+}
+function plusRenewal(wallet, now, adding = 0) {
+  const month = taipeiMonth(now);
+  const entries = wallet?.entries || [];
+  if (!plusOn(wallet) || !entries.some(e => e.id?.startsWith('eco:plus:')) || entries.some(e => e.id === PLUS_ID(month))) return null;
+  if (poolBalance(wallet) + adding < PLUS.fee) return null;
+  return { id: PLUS_ID(month), t: now, app: 'eco', kind: 'plus', amount: -PLUS.fee };
+}
+// What joining now costs: nothing the first time, else the rest of the month's share.
+export function plusJoinEntry(wallet, now) {
+  const month = taipeiMonth(now);
+  if (plusMember(wallet, now)) return null;
+  const tried = (wallet?.entries || []).some(e => e.id?.startsWith('eco:plus:'));
+  const days = monthDays(month);
+  const left = days - Number(new Date(now + TPE).toISOString().slice(8, 10)) + 1;
+  const amount = tried ? -Math.max(10, Math.round((PLUS.fee * left) / days / 10) * 10) : 0;
+  return { id: PLUS_ID(month), t: now, app: 'eco', kind: 'plus', amount, ...(tried ? {} : { note: 'trial' }) };
+}
 
 const isObj = v => Boolean(v) && typeof v === 'object' && !Array.isArray(v);
 const str = (v, max) => (typeof v === 'string' ? v.slice(0, max) : undefined);
@@ -147,6 +186,8 @@ export function cleanEntry(e, { allowEco = false } = {}) {
   const app = str(e.app, 12);
   if (!id || t == null || amount == null || Math.abs(amount) > MAX_AMOUNT) return null;
   if (!(ENTRY_APPS.has(app) || (allowEco && app === 'eco'))) return null;
+  // The Worker's own ids (pay, Quadra Plus) are its alone.
+  if (!allowEco && id.startsWith('eco:')) return null;
   const out = { id, t: Math.round(t), app, kind: str(e.kind, 24) || 'other', amount: Math.round(amount * 100) / 100 };
   const note = str(e.note, 80);
   if (note) out.note = note;
@@ -274,6 +315,7 @@ const OPS = {
   merge: ecoMerge,
   'share-create': shareCreate,
   'share-redeem': shareRedeem,
+  plus: ecoPlus,
   admin: ctx => handleAdmin(ctx)
 };
 
@@ -487,6 +529,37 @@ async function liveSession(ctx) {
   const doc = await ctx.deps.fsGet(ctx.env, WALLET_COLLECTION, c.d);
   const wallet = doc.exists ? parseWallet(doc.payload) : null;
   return wallet && gen(wallet) === c.g ? c : null;
+}
+
+// Quadra Plus: { op: 'plus', qt, on }. Joining takes this month's entry
+// (free the first time) and turns renewal on; leaving turns renewal off and
+// keeps the month already paid. Only the live app can do either.
+async function ecoPlus(ctx) {
+  const { env, deps, headers, request, body, secret } = ctx;
+  const now = deps.now();
+  const c = await readToken(secret, body.qt, 'ses', now);
+  if (!c) return deps.errorJson('ECO_TOKEN_INVALID', 401, headers, request);
+  if (sessionLimited(`plus:${c.s}`, 10, 60_000, now)) return deps.errorJson('RATE_LIMITED', 429, headers, request);
+  const on = body.on === true;
+  let refused = null;
+  const result = await updateWallet(
+    env,
+    deps,
+    c.d,
+    w => {
+      refused = null;
+      if (gen(w) !== c.g) return (refused = 'ECO_SIGNED_OUT'), w;
+      if (!isActive(w, c)) return (refused = 'ECO_SESSION_MOVED'), w;
+      const paid = mergeWallet(w, { entries: paydayEntries(w, now) });
+      const join = on ? plusJoinEntry(paid, now) : null;
+      if (join && poolBalance(paid) + join.amount < 0) return (refused = 'ECO_PLUS_FUNDS'), w;
+      return mergeWallet(paid, { entries: join ? [join] : [], settings: { plus: { value: { on, t: now }, t: now } } });
+    },
+    { skipIf: () => refused }
+  );
+  if (!result) return deps.errorJson('ECO_SIGNED_OUT', 401, headers, request);
+  if (refused) return deps.json({ error: { code: refused, message: refused }, live: liveOf(result.wallet) }, refused === 'ECO_SIGNED_OUT' ? 401 : 409, headers);
+  return deps.json({ wallet: publicWallet(result.wallet), walletTime: result.updateTime, pool: poolBalance(result.wallet), member: plusMember(result.wallet, now) }, 200, headers);
 }
 
 // A device code: 8 characters, good for PAIR_MS and once, to sign in on

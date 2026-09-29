@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { handleEcoRequest, mergeWallet, poolBalance, cleanPatch, emptyWallet, paydayEntries, tidyWallet, PAY, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, ECO_APPS } from '../eco.js';
+import { handleEcoRequest, mergeWallet, poolBalance, cleanPatch, emptyWallet, paydayEntries, plusJoinEntry, plusMember, tidyWallet, PAY, PLUS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, ECO_APPS } from '../eco.js';
 import { planClean } from '../eco-admin.js';
 
 function setup() {
@@ -274,4 +274,55 @@ test('clean-up: only Quadra data stays, and wallets lose retired settings', asyn
   // The admin op itself needs the token.
   assert.equal((await t.call('POST', '', { op: 'admin', token: 'wrong', action: 'scan' })).status, 403);
   assert.deepEqual(tidyWallet(tidyWallet(plan.tidy[0].wallet)), plan.tidy[0].wallet);
+});
+
+test('Quadra Plus: the first month free, renewal from the pool, leaving keeps the paid month', async () => {
+  const t = setup();
+  const acct = await newPass(t, 'odds');
+  const join = await t.call('POST', '', { op: 'plus', qt: acct.token, on: true });
+  assert.equal(join.status, 200);
+  assert.equal(join.data.member, true);
+  const first = join.data.wallet.entries.find(e => e.kind === 'plus');
+  assert.equal(first.amount, 0, 'the first month is on the house');
+  assert.equal(first.note, 'trial');
+  // Joining again the same month changes nothing.
+  const again = await t.call('POST', '', { op: 'plus', qt: acct.token, on: true });
+  assert.equal(again.data.wallet.entries.filter(e => e.kind === 'plus').length, 1);
+  // Next month: renewed on the first read, after the pay.
+  t.advance(32 * 86_400_000);
+  const read = await t.call('POST', '', { op: 'refresh', refresh: acct.refresh, app: 'odds', claim: true });
+  const plus = read.data.wallet.entries.filter(e => e.kind === 'plus');
+  assert.equal(plus.length, 2);
+  assert.equal(plus[1].amount, -PLUS.fee);
+  // Leaving: no renewal later, the paid month stays.
+  const leave = await t.call('POST', '', { op: 'plus', qt: read.data.token, on: false });
+  assert.equal(leave.data.member, true);
+  t.advance(32 * 86_400_000);
+  const later = await t.call('POST', '', { op: 'refresh', refresh: read.data.refresh, app: 'odds', claim: true });
+  assert.equal(later.data.wallet.entries.filter(e => e.kind === 'plus').length, 2);
+});
+
+test('Quadra Plus: rejoining costs the rest of the month; a short pool does not renew or join', () => {
+  const oct15 = Date.UTC(2026, 9, 15, 4);
+  const had = { entries: [{ id: 'eco:plus:2026-08', t: 1, app: 'eco', kind: 'plus', amount: 0 }] };
+  const e = plusJoinEntry(had, oct15);
+  assert.equal(e.id, 'eco:plus:2026-10');
+  // 17 of 31 days left: about NT$160.
+  assert.equal(e.amount, -160);
+  assert.equal(plusJoinEntry({ entries: [] }, oct15).amount, 0);
+  const broke = { settings: { plus: { value: { on: true }, t: 1 } }, entries: [{ id: 'eco:plus:2026-10', t: 1, app: 'eco', kind: 'plus', amount: 0 }, { id: 'x', t: 1, app: 'odds', amount: -14_000 }] };
+  assert.ok(!paydayEntries({ ...broke, created: oct15 }, Date.UTC(2026, 10, 2)).some(x => x.kind === 'plus'));
+  const ok = { ...broke, entries: broke.entries.slice(0, 1) };
+  assert.ok(paydayEntries({ ...ok, created: oct15 }, Date.UTC(2026, 10, 2)).some(x => x.id === 'eco:plus:2026-11'));
+  assert.equal(plusMember(ok, oct15), true);
+  assert.equal(plusMember(ok, Date.UTC(2026, 10, 2)), false);
+});
+
+test('Quadra Plus: only the live app can join, and an app cannot write the entry itself', async () => {
+  const t = setup();
+  const acct = await newPass(t, 'stock');
+  await t.call('POST', '', { op: 'refresh', refresh: acct.refresh, app: 'odds', claim: true });
+  const moved = await t.call('POST', '', { op: 'plus', qt: acct.token, on: true });
+  assert.equal(moved.data.error.code, 'ECO_SESSION_MOVED');
+  assert.deepEqual(cleanPatch({ entries: [{ id: 'eco:plus:2026-10', t: 1, app: 'eco', kind: 'plus', amount: 0 }, { id: 'eco:plus:2026-11', t: 1, app: 'odds', kind: 'plus', amount: 0 }] }).entries, []);
 });

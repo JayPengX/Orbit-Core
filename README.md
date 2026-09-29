@@ -65,6 +65,12 @@ account's document id.
 - **App data** in each app's collection under the same id:
   `stock-study-accounts`, `odds-study-accounts`, `match-find-settings`,
   `vocab-progress-sync`, `orbit-quadra`.
+- **Quadra Plus**, the one membership: NT$290 a Taiwan month as the entry
+  `eco:plus:<YYYY-MM>` (only this Worker writes `eco:` ids; an app's write
+  of one is dropped), renewed with the payday on the month's first sign-in
+  or read while the `plus` setting is on and the pool covers it. A month no
+  app is opened is never charged. Apps read membership from that entry
+  alone (the kit's `plusMember`, `plusMonths`).
 - **Payday** on any sign-in or read: NT$110,000 to open, NT$5,000 a Taiwan
   month, NT$500 a Taiwan week.
 
@@ -78,6 +84,7 @@ account's document id.
 | `DELETE /eco?qt=T[&app=A][&inbox=ID]` | The account, one app's data, or one inbox item |
 | `POST { op: 'pair-create', qt }` / `{ op: 'pair-redeem', code, app }` | A device code (8 characters, 10 minutes, once) and signing in with it |
 | `POST { op: 'handoff', qt }` / `{ op: 'redeem', handoff, app }` | A sealed sign-in (3 minutes) for a link to another app; home-screen apps don't share storage |
+| `POST { op: 'plus', qt, on }` | Quadra Plus: join (`on: true`; the first month ever free, later the rest of the month's share of NT$290) or stop renewing (`on: false`; the paid month stays). Live app only |
 | `POST { op: 'signout-all', qt }` | Every other device signed out; this one comes back signed in |
 | `POST { op: 'rotate', qt }` | A new pass for the same account; the old one stops working, every other device is signed out |
 | `POST { op: 'merge', qt, sources: [{ passcode }] }` | Other passes into this one (their data, or its inbox; their money), then deleted |

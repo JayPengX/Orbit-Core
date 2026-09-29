@@ -116,3 +116,17 @@ test('a device keeps its sign-in and the account id, never the pass', () => {
   assert.equal(kit.formatPass('ABCD2345'), 'ABCD-2345');
   assert.ok(kit.DEVICE_CODE_PATTERN.test('ABCD2345'));
 });
+
+test('Quadra Plus: a month is a member’s when the Worker billed it; joining is free once', () => {
+  const oct = Date.UTC(2026, 9, 10, 4);
+  const w = { entries: [{ id: 'eco:plus:2026-10', t: 1, app: 'eco', kind: 'plus', amount: 0 }], settings: { plus: { value: { on: true }, t: 1 } } };
+  assert.equal(kit.plusMember(w, oct), true);
+  assert.equal(kit.plusMember(w, Date.UTC(2026, 10, 2)), false);
+  assert.equal(kit.plusRenewing(w), true);
+  assert.deepEqual([...kit.plusMonths(w)], ['2026-10']);
+  // An app's own entry never counts.
+  assert.equal(kit.plusMember({ entries: [{ id: 'eco:plus:2026-10', app: 'odds', kind: 'plus' }] }, oct), false);
+  assert.equal(kit.plusJoinPrice({ entries: [] }, oct), 0);
+  // 22 of 31 days left.
+  assert.equal(kit.plusJoinPrice(w, oct), 210);
+});

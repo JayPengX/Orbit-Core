@@ -173,3 +173,40 @@ sent by its cron) because only it can read Quadra Pass tokens. Each app's `sw.js
 this needs the app on the home screen (iOS 16.4+) and notices turned on in
 the account sheet. Notices that arrive together while the app is open are
 one grouped banner.
+
+
+## Round: profit the smart way, and premium (all repos, pushed to `main`)
+
+The owner asked for Quadra to earn more while looking simple and premium,
+and for the cheap cash-grab features to go. What changed:
+
+- **Removed:** Play's 🔥 熱門串關 cards (unreadable, obscure table-tennis
+  legs), the dashed "follow in Fixtures" nag, the 試試看 rec cards, the
+  dashed 再加一場 upsell; Securities' fake 限時活動 promo strip and the
+  現金閒置中 idle-cash nag; Fixtures' gradient 下注 pills and "N 場開賣中"
+  banner.
+- **Quadra Plus** (the recurring revenue): NT$290 a month, billed by the
+  Worker (`op: 'plus'`, renewal in `paydayEntries`, entries
+  `eco:plus:<month>`; apps can no longer write `eco:` ids at all). First
+  month free once; rejoining costs the rest of the month's share. Perks,
+  one table in the kit (`PLUS`): Securities half commission, half FX
+  spread, loans 1 point cheaper, 2% on NT$ cash (by paid month); Play
+  parlay boost doubled, cash out keeps 2% not 5%. Shown in the account
+  sheet (`plusCard`, `openPlus`), once on Play's home and Securities' 資產
+  for non-members, and as one quiet "✦ Plus price" line where money is
+  spent (order ticket, FX desk, loan form, slip, cash out). A member gets a
+  gold star on the account button.
+- **Play:** new home (balance, featured big-league games with prices, your
+  bets with cash out, jackpots); board orders by league tier and folds the
+  thin leagues; **parlay boost** (3+ picks, 5-20%, stored per slip as
+  `boost`); **cash out** (`lib/cashout.mjs`, `cashOut` in `account.mjs`).
+- **Securities:** markets home = account strip, for you, movers side by
+  side; lists capped at 15 rows; Plus perks by time (`usePlus`).
+- **Fixtures:** a small outlined 投注 / 場中 chip in its own column.
+- **Not done:** Quadra-Rewards wasn't reachable from this session (adding
+  it was refused), so its kit copy is one version behind: run
+  `node kit/sync.mjs` with Rewards checked out and commit it. Until then
+  Rewards has no Plus card in its account sheet (nothing else breaks: every
+  app's copy stands alone).
+- Ideas: a daily price boost on one marquee game (capped stake); same-game
+  parlays (need correlated pricing); a Plus-only monthly statement.
