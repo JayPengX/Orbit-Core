@@ -121,7 +121,11 @@ export function cleanItems(items, now = Date.now()) {
       const item = { at: Math.round(x.at), title: cleanText(x.title, 120), body: cleanText(x.body, 240), tag: cleanText(x.tag, 80), url: okUrl(x.url) };
       if (Number.isFinite(x.until) && x.until > x.at && x.until < now + 40 * 86_400_000) item.until = Math.round(x.until);
       const c = x.check;
-      if (c?.espn && /^[a-z-]+\/[a-z0-9.-]+$/.test(c.espn) && /^\d+$/.test(String(c.event))) item.check = { espn: c.espn, event: String(c.event) };
+      if (c?.espn && /^[a-z-]+\/[a-z0-9.-]+$/.test(c.espn) && /^\d+$/.test(String(c.event))) {
+        item.check = { espn: c.espn, event: String(c.event) };
+        // The names the app shows (the Worker adds the score and who won).
+        if (Array.isArray(c.names) && c.names.length === 2) item.check.names = c.names.map(n => cleanText(n, 40));
+      }
       if (c?.yahoo && /^[\w.^=-]{1,20}$/.test(c.yahoo) && ['above', 'below'].includes(c.op) && Number.isFinite(c.price)) item.check = { yahoo: c.yahoo, op: c.op, price: c.price };
       return item;
     })
@@ -184,9 +188,20 @@ async function runCheck(check, lang) {
     const comp = (await res.json())?.header?.competitions?.[0];
     if (comp?.status?.type?.state !== 'post') return null;
     const side = h => comp.competitors?.find(c => c.homeAway === h);
-    const name = c => c?.team?.shortDisplayName || c?.team?.displayName || c?.athlete?.shortName || '';
+    const name = c => c?.team?.shortDisplayName || c?.team?.name || c?.team?.displayName || c?.athlete?.shortName || '';
     const [a, h] = [side('away'), side('home')];
-    return { title: `${name(a)} ${a?.score ?? ''} : ${h?.score ?? ''} ${name(h)}`.trim(), body: lang === 'en' ? 'Final' : '比賽結束' };
+    const [na, nh] = check.names || [name(a), name(h)];
+    const T = (zh, en) => (lang === 'en' ? en : zh);
+    const type = comp.status.type;
+    // Called off: no score, just what happened.
+    if (!type.completed) {
+      const result = /postpon|delay|suspend/i.test(type.name || '') ? T('延賽', 'Postponed') : /cancel/i.test(type.name || '') ? T('比賽取消', 'Canceled') : T('比賽結束', 'Final');
+      return { body: result, result };
+    }
+    const [as, hs] = [Number(a?.score), Number(h?.score)];
+    const won = a?.winner ? na : h?.winner ? nh : as > hs ? na : hs > as ? nh : null;
+    const result = won ? T(`${won} 贏了`, `${won} win`) : as === hs ? T('平手', 'Draw') : T('比賽結束', 'Final');
+    return { title: `${na} ${a?.score ?? ''} : ${h?.score ?? ''} ${nh}`, body: result, result };
   }
   if (check.yahoo) {
     const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(check.yahoo)}?range=1d&interval=5m`, { headers: { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1' } });
@@ -229,7 +244,7 @@ export async function sendDue(env, now = Date.now()) {
           if (now < (item.until || item.firstAt || item.at) + (item.until ? 0 : HOLD_MS)) keep.push({ ...item, firstAt: item.firstAt || item.at, at: now + CHECK_EVERY });
           continue;
         }
-        message = { ...message, title: found.title || item.title, body: item.body || found.body };
+        message = { ...message, title: found.title || item.title, body: (item.body || found.body || '').replace('{result}', found.result || '') };
       }
       const r = await sendPush(env, record.sub, message).catch(e => `failed ${e?.message || e}`);
       record.last = { at: now, r };
