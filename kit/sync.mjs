@@ -1,5 +1,5 @@
-// Copies the shared kit (quadra.mjs, quadra.css) into every app checked out
-// next to this repo. The apps never edit their copies: change the kit here,
+// Copies the shared kit (quadra.mjs, quadra.css, and logos.mjs for the apps
+// that show teams) into every app checked out next to this repo. The apps never edit their copies: change the kit here,
 // run `node kit/sync.mjs`, commit each app.
 import { copyFile, access } from 'node:fs/promises';
 
@@ -12,6 +12,8 @@ const TARGETS = [
   ['Quadra-Rewards/public/lib/quadra.mjs', 'Quadra-Rewards/public/quadra.css'],
   ['Orbit-Class/src/quadra.mjs', 'Orbit-Class/css/quadra.css']
 ];
+// The apps that show teams, leagues and drivers: the logos too.
+const LOGOS = { 'Quadra-Play': 'Quadra-Play/public/lib/logos.mjs', 'Quadra-Fixtures': 'Quadra-Fixtures/public/lib/logos.mjs' };
 for (const [js, css] of TARGETS) {
   const app = js.split('/')[0];
   try {
@@ -22,5 +24,6 @@ for (const [js, css] of TARGETS) {
   }
   await copyFile(`${kit}quadra.mjs`, `${root}${js}`).catch(e => console.log('skip', js, e.code));
   await copyFile(`${kit}quadra.css`, `${root}${css}`).catch(e => console.log('skip', css, e.code));
+  if (LOGOS[app]) await copyFile(`${kit}logos.mjs`, `${root}${LOGOS[app]}`).catch(e => console.log('skip', LOGOS[app], e.code));
   console.log('synced', app);
 }
