@@ -159,7 +159,10 @@ export async function handlePush(request, env, headers, session, path) {
       if (!record) continue;
       apps[app] = { sub: record.sub ? new URL(record.sub.endpoint).host : null, items: record.items.length, next: record.items[0]?.at || null, last: record.last || null };
       if (path === '/push/test' && record.sub) {
-        apps[app].test = await sendPush(env, record.sub, { title: 'Quadra', body: record.lang === 'en' ? 'Notices are working ✅' : '通知設定成功 ✅', tag: `test-${app}` }).catch(e => `failed ${e?.message || e}`);
+        // Samples of the app's notices (to this account's own devices), or one plain test.
+        const samples = Array.isArray(body?.samples?.[app]) ? body.samples[app].slice(0, 12) : [{ title: 'Quadra', body: record.lang === 'en' ? 'Notices are working ✅' : '通知設定成功 ✅' }];
+        apps[app].test = [];
+        for (const [i, x] of samples.entries()) apps[app].test.push(await sendPush(env, record.sub, { title: cleanText(x?.title, 120), body: cleanText(x?.body, 240), tag: `test-${app}-${i}` }).catch(e => `failed ${e?.message || e}`));
       }
     }
     return reply({ apps });
