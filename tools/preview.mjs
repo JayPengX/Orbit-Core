@@ -9,6 +9,10 @@
 //                          [--entry '{json}']  (a wallet entry to add: an economy scenario)
 //                          [--fixture 'text-in-url=file.json']  (repeatable: that saved answer
 //                          for any upstream URL containing the text, e.g. when Yahoo rate-limits)
+//                          [--timing]  (loading speed: when the loading screen went away, how
+//                          many of the app's own files and how deep their import chain was)
+//                          [--latency ms]  (each of the app's own files answers this much later:
+//                          a phone's round trip to GitHub Pages, e.g. 150)
 //
 //   app   fixtures | play | securities | rewards | orbit (or the repo's folder name)
 //   hash  the page's #hash to open (a tab), one screenshot each; none: the start
@@ -83,6 +87,8 @@ for (let c; (c = opt('entry', null)); ) extraEntries.push({ t: Date.now(), ...JS
 // --eval 'js': an expression run on the page after the clicks; its result is printed.
 const evals = [];
 for (let c; (c = opt('eval', null)); ) evals.push(c);
+const latency = Number(opt('latency', 0));
+const timing = flag('timing');
 const full = flag('full');
 const signedOut = flag('signed-out');
 const dark = flag('dark');
@@ -101,6 +107,7 @@ const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '
 const server = createServer(async (req, res) => {
   const path = decodeURIComponent(new URL(req.url, 'http://x').pathname);
   let file = join(dir, path.replace(/^\/[^/]+\//, '/'));
+  if (latency) await new Promise(r => setTimeout(r, latency));
   try {
     if ((await stat(file)).isDirectory()) file = join(file, 'index.html');
     res.writeHead(200, { 'Content-Type': TYPES[extname(file)] || 'application/octet-stream' });
@@ -227,7 +234,23 @@ for (const hash of hashes.length ? hashes : ['']) {
   const page = await context.newPage();
   page.on('console', m => m.type() === 'error' && errors.push(m.text()));
   page.on('pageerror', e => errors.push(String(e)));
+  const started = Date.now();
+  const own = [];
+  page.on('request', r => r.url().startsWith(base) && own.push({ url: r.url().slice(base.length) || '/', at: Date.now() - started }));
   await page.goto(`${base}${hash ? `#${hash}` : ''}`);
+  if (timing) {
+    const shown = await page
+      .waitForFunction(() => document.getElementById('loading')?.hidden, null, { timeout: 60_000, polling: 50 })
+      .then(() => Date.now() - started)
+      .catch(() => null);
+    const paint = await page.evaluate(() => performance.getEntriesByName('first-contentful-paint')[0]?.startTime ?? null);
+    // How many round trips the app's own files took: each request's start,
+    // in steps of the latency (or of 30 ms without one).
+    const step = latency || 30;
+    const waves = new Set(own.map(r => Math.round(r.at / step))).size;
+    console.log(`timing ${key}${hash ? `#${hash}` : ''}: loading screen gone after ${shown == null ? 'over 60 s' : `${shown} ms`}, first paint ${paint == null ? '?' : `${Math.round(paint)} ms`}, ${own.length} own files in ~${waves} waves (last asked at ${own.at(-1)?.at ?? 0} ms)`);
+    if (DEBUG) for (const r of own) console.log(`  ${String(r.at).padStart(6)} ms  ${r.url.slice(0, 100)}`);
+  }
   await page.waitForTimeout(wait);
   for (const sel of clicks) {
     await page.click(sel).catch(e => errors.push(`click ${sel}: ${e.message.split('\n')[0]}`));
