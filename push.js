@@ -155,7 +155,7 @@ export async function handlePush(request, env, headers, session, path) {
       if (!record) continue;
       apps[app] = { sub: record.sub ? new URL(record.sub.endpoint).host : null, items: record.items.length, next: record.items[0]?.at || null, last: record.last || null };
       if (path === '/push/test' && record.sub) {
-        apps[app].test = await sendPush(env, record.sub, { title: 'Quadra', body: record.lang === 'en' ? `Test notice (${app})` : `測試通知（${app}）`, tag: `test-${app}` }).catch(e => `failed ${e?.message || e}`);
+        apps[app].test = await sendPush(env, record.sub, { title: 'Quadra', body: record.lang === 'en' ? 'Notices are working ✅' : '通知設定成功 ✅', tag: `test-${app}` }).catch(e => `failed ${e?.message || e}`);
       }
     }
     return reply({ apps });
@@ -186,7 +186,7 @@ async function runCheck(check, lang) {
     const side = h => comp.competitors?.find(c => c.homeAway === h);
     const name = c => c?.team?.shortDisplayName || c?.team?.displayName || c?.athlete?.shortName || '';
     const [a, h] = [side('away'), side('home')];
-    return { title: lang === 'en' ? 'Final' : '比賽結束', body: `${name(a)} ${a?.score ?? ''} - ${h?.score ?? ''} ${name(h)}`.trim() };
+    return { title: `${name(a)} ${a?.score ?? ''} : ${h?.score ?? ''} ${name(h)}`.trim(), body: lang === 'en' ? 'Final' : '比賽結束' };
   }
   if (check.yahoo) {
     const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(check.yahoo)}?range=1d&interval=5m`, { headers: { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1' } });
@@ -229,7 +229,7 @@ export async function sendDue(env, now = Date.now()) {
           if (now < (item.until || item.firstAt || item.at) + (item.until ? 0 : HOLD_MS)) keep.push({ ...item, firstAt: item.firstAt || item.at, at: now + CHECK_EVERY });
           continue;
         }
-        message = { ...message, title: item.title || found.title, body: item.body || found.body };
+        message = { ...message, title: found.title || item.title, body: item.body || found.body };
       }
       const r = await sendPush(env, record.sub, message).catch(e => `failed ${e?.message || e}`);
       record.last = { at: now, r };
