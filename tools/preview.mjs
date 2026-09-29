@@ -221,8 +221,31 @@ for (const hash of hashes.length ? hashes : ['']) {
   const file = join(out, `${key}-${hash || 'start'}${clicks.length ? '-clicked' : ''}${dark ? '-dark' : ''}.png`);
   await page.screenshot({ path: file, fullPage: full });
   // Anything wider than the screen (a sideways scroll on a phone).
-  const wide = await page.evaluate(() => [...document.querySelectorAll('body *')].filter(el => el.getBoundingClientRect().right > innerWidth + 1 && getComputedStyle(el).position !== 'fixed' && !el.closest('.table-wrap, .q-chips, .segmented, [class*="scroll"]')).slice(0, 5).map(el => `${el.tagName.toLowerCase()}.${[...el.classList].join('.')}`));
-  console.log(file, wide.length ? `| wider than the screen: ${wide.join(', ')}` : '');
+  const wide = await page.evaluate(() => {
+    const clipped = el => {
+      for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) if (/auto|scroll|hidden|clip/.test(getComputedStyle(p).overflowX)) return true;
+      return false;
+    };
+    return [...document.querySelectorAll('body *')]
+      .filter(el => {
+        const r = el.getBoundingClientRect();
+        return r.width && (r.right > innerWidth + 1 || r.left < -1) && !clipped(el);
+      })
+      .slice(0, 6)
+      .map(el => {
+        const r = el.getBoundingClientRect();
+        return `${el.tagName.toLowerCase()}.${[...el.classList].join('.')} [${Math.round(r.left)}–${Math.round(r.right)}]`;
+      });
+  });
+  // Whether the page itself moves sideways (what a finger feels).
+  const sideways = await page.evaluate(() => {
+    const before = scrollX;
+    scrollTo(500, scrollY);
+    const moved = scrollX;
+    scrollTo(before, scrollY);
+    return moved ? `${document.documentElement.scrollWidth}px wide, scrolls ${moved}px sideways` : '';
+  });
+  console.log(file, wide.length ? `| wider than the screen: ${wide.join(', ')}` : '', sideways ? `| PAGE ${sideways}` : '');
   await page.close();
 }
 if (errors.length) console.log('console errors:\n ', [...new Set(errors)].slice(0, 20).join('\n  '));
