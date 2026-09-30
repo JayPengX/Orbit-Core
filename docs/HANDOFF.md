@@ -6,6 +6,15 @@ All repos develop on `claude/gifted-dijkstra-dv6w8a` and are pushed to
 edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
 `npx eslint .`).
 
+## Fixtures: one date strip (pushed to `main`)
+
+- 賽事 uses 首頁's `dateStrip` (weekday and date chips, 📅 for any day,
+  growing as it's scrolled) instead of its own chips with counts and ‹ ›:
+  `only` the league's game days, its own `range` per league (`sc.range`),
+  `grow` → `growScores` (sc.extra + 1, read without redrawing). A day picked
+  that isn't read yet (an ESPN league's) is read on its own
+  (`pickScoresDay`). `loadScores` is `fetchScores` + `applyScores` now.
+
 ## Round: more for points, and tidier pop-ups (all repos, pushed to `main`)
 
 - **Avatars** (kit `AVATARS`, `avatarOwned`, `avatarOf`): the account button in
