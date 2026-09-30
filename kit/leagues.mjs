@@ -1,3 +1,5 @@
+import { knowsNation, rememberNation } from './logos.mjs';
+
 // Every sport and league Quadra covers, once, for Fixtures and Play alike
 // (copied into both by kit/sync.mjs; never edit an app's copy). Each app
 // builds its own view of it (Fixtures' lib/leagues.mjs, Play's lib/teams.mjs),
@@ -272,6 +274,19 @@ const names = (text, a, b) => {
 export async function tsdbBoxingDays(days, fetchJson = directJson) {
   const lists = await Promise.all(days.map(d => fetchJson(`${TSDB_DAY}?d=${d}&l=${TSDB_BOXING}`).then(x => x?.events || []).catch(() => null)));
   return Object.fromEntries(days.map((d, i) => [d, lists[i]]));
+}
+// Boxers' nations, from TheSportsDB's player pages (a few a load, each once
+// a month at most), for their flags: remembered by the kit's logos.mjs.
+const TSDB_PLAYERS = 'https://www.thesportsdb.com/api/v1/json/3/searchplayers.php';
+export async function learnFighterNations(fighters, fetchJson = directJson) {
+  const todo = [...new Set(fighters)].filter(n => n && !knowsNation(n)).slice(0, 40);
+  await Promise.all(
+    todo.map(name =>
+      fetchJson(`${TSDB_PLAYERS}?p=${encodeURIComponent(name)}`)
+        .then(x => rememberNation(name, (x?.player || []).find(p => p.strSport === 'Fighting')?.strNationality || ''))
+        .catch(() => {})
+    )
+  );
 }
 // A bout worth listing: its two fighters named by one of the day's cards.
 export const notableFight = (home, away, events) => (events || []).some(e => names(e.strEvent, home, away));

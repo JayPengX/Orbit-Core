@@ -218,3 +218,18 @@ test('CPBL: a month the proxy can\'t fill comes from TheSportsDB\'s day lists on
   // The proxy's own list when it has one.
   assert.equal((await asiaMonth(async () => ({ games: [{ id: 'x' }] }), 'cpbl', '2026-10', { now, fetchJson })).length, 1);
 });
+
+test('pictures: national sides get flags, players found in either name order, fighters learned', async () => {
+  const L = await import('../kit/logos.mjs');
+  assert.equal(L.playerNation('Sri Lanka'), 'LK');
+  assert.equal(L.countryCode('England'), 'GB-ENG');
+  assert.equal(L.countryFlag('Wales'), '🇬🇧');
+  assert.match(L.teamBadge('kleague', 'Ulsan HD'), /thesportsdb/);
+  assert.match(L.teamBadge('cricket', 'West Indies'), /thesportsdb/);
+  L.rememberLogo('wta', 'Shi Han', 'https://a.espncdn.com/i/teamlogos/countries/500/chn.png');
+  assert.match(L.teamLogo('wta', 'Han Shi'), /chn\.png$/);
+  L.rememberNation('Some Boxer', 'Mexico');
+  assert.equal(L.playerNation('Some Boxer'), 'MX');
+  assert.ok(L.knowsNation('Some Boxer'));
+  for (const key of ['acb', 'nbl', 'cba', 'kbl', 'kleague', 'rugbyunion', 'cricket', 'boxing']) assert.ok(L.leagueLogo(key), key);
+});

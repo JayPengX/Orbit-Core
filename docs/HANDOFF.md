@@ -633,3 +633,15 @@ that didn't land on live games, and text cut on phones.
   bouts kept only when on a TheSportsDB card, `notable` / `notableFight`,
   results from its write-ups, `boxingResult`, void after 5 days unknown).
   Play's basketball filter group now follows the catalogue.
+- **Play's first screen** is the balance and the games on now too: the
+  loading screen waits for the account (read, merged with the pass:
+  `state.accountIn`) and the live games, from a saved board as well
+  (`SNAPSHOT_WAIT_MS`), and up to 2.5 s for the logos in view.
+- **Pictures for every sport:** league badges (TheSportsDB) for ACB, NBL,
+  CBA, KBL, K League, rugby, cricket and boxing; club badges for ACB, NBL,
+  CBA, KBL and K League (`TEAM_BADGES`, looked up one by one: the free key
+  lists 10 teams a league); national sides a round flag (`countryCode`;
+  England, Scotland, Wales, Northern Ireland their own); tennis players the
+  flag in ESPN's draw (`parseFighterFlags` reads draws too; either name
+  order); boxers their nation from TheSportsDB's player pages, kept on the
+  device (`learnFighterNations`, `rememberNation`) plus `BOXER_NATIONS`.

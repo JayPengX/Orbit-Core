@@ -63,7 +63,14 @@ export const TEAM_BADGES = {
   npb: { 'Chiba Lotte Marines': 'na10tn1576008207', 'Chunichi Dragons': 'jli5jv1576009060', 'Fukuoka SoftBank Hawks': 'ampozy1576009547', 'Hanshin Tigers': 'h2jhos1576009994', 'Hiroshima Toyo Carp': 'bv50e51576010505', 'Hokkaido Nippon-Ham Fighters': 'qxgzq01576011016', 'Orix Buffaloes': '53lv6f1576011517', 'Saitama Seibu Lions': 'onmvow1576012163', 'Tohoku Rakuten Golden Eagles': 'qx24pm1576012656', 'Tokyo Yakult Swallows': 'ryyku01576013231', 'Yokohama DeNA BayStars': 'fuhqf21576013789', 'Yomiuri Giants': '0qyqs41576014298' },
   kbo: { 'Doosan Bears': '2qo9zp1740573854', 'Hanwha Eagles': '7aztmc1740573842', 'KT Wiz': 'qk8erg1589709962', 'Kia Tigers': '2z389i1648069353', 'Kiwoom Heroes': 'qcj18p1589709259', 'LG Twins': 'ajpsiq1648069368', 'Lotte Giants': 'p7q92w1742225576', 'NC Dinos': '6gwcg81589708218', 'SSG Landers': 'kii9pd1742225451', 'Samsung Lions': '5u6k511589709673' },
   bleague: { 'Akita Northern Happinets': '87wsa61621334052', 'Altiri Chiba': '3mfjwn1759500326', 'Alvark Tokyo': 'kj4q7w1621334166', 'Chiba Jets Funabashi': '8usqds1737546623', 'Fighting Eagles Nagoya': 'b0rwjq1659455177', 'Gunma Crane Thunders': '9e5cxi1642097069', 'Hiroshima D': 'ex7l321622396493', 'Ibaraki Robots': 'nscmq91642097142', 'Kawasaki Brave Thunders': '9ahvnv1621334572', 'Kobe Storks': 'u13mbp1787663428', 'Koshigaya Alphas': 'lr8jgm1737548387', 'Kyoto Hannaryz': '229szh1621546129', 'Levanga Hokkaido': 'pw4n7h1622396675', 'Nagasaki Velca': 'dlywny1713956438', 'Nagoya Diamond Dolphins': 't8bcpf1622396582', 'Osaka Evessa': 'au25qr1621545182', 'Ryukyu Golden Kings': 'y9cedk1621346537', 'Saga Ballooners': 'nplg6o1713956383', 'SeaHorses Mikawa': '9eng811621456481', 'Sendai 89ers': 'x0nmfz1659455283', 'Shimane Susanoo Magic': 'db6kqq1621545848', 'Shinshu Brave Warriors': 'i9a85l1622396401', 'Tokyo SunRockers': 'jq3nm11586269789', 'Toyama Grouses': 'o34c4j1621346928', 'Utsunomiya Brex': 'id293x1621346227', 'Yokohama B-Corsairs': 'y6p5601723024480' },
-  euroleague: { 'AS Monaco Basket': 'fl2ti01649168915', 'Anadolu Efes SK': 'uldz0d1782050729', 'BC Žalgiris': 'dn7ouv1703960565', 'Baskonia': 'p4x3o61767366090', 'Bayern München Basketball': 'z2r3eh1678017187', 'Dubai Basketball': 'fgtnti1758215967', 'FC Barcelona Basquet': '0tz26j1729097443', 'Hapoel Tel Aviv BC': 'yrrsml1767366305', 'KK Crvena zvezda': '5tlez31767366440', 'KK Partizan': 'us0e1z1767366567', 'Maccabi Tel Aviv BC': 'z0mk1l1789281457', 'Olimpia Milano': 'aurbi61790186853', 'Olympiacos BC': '4s5lug1676581220', 'Panathinaikos BC': '7cdjwz1767366987', 'Paris Basketball': '9q0d6x1726681476', 'Real Madrid Baloncesto': 'g4ev2c1522175902', 'Valencia Basket': '9qyc231536398868' }
+  euroleague: { 'AS Monaco Basket': 'fl2ti01649168915', 'Anadolu Efes SK': 'uldz0d1782050729', 'BC Žalgiris': 'dn7ouv1703960565', 'Baskonia': 'p4x3o61767366090', 'Bayern München Basketball': 'z2r3eh1678017187', 'Dubai Basketball': 'fgtnti1758215967', 'FC Barcelona Basquet': '0tz26j1729097443', 'Hapoel Tel Aviv BC': 'yrrsml1767366305', 'KK Crvena zvezda': '5tlez31767366440', 'KK Partizan': 'us0e1z1767366567', 'Maccabi Tel Aviv BC': 'z0mk1l1789281457', 'Olimpia Milano': 'aurbi61790186853', 'Olympiacos BC': '4s5lug1676581220', 'Panathinaikos BC': '7cdjwz1767366987', 'Paris Basketball': '9q0d6x1726681476', 'Real Madrid Baloncesto': 'g4ev2c1522175902', 'Valencia Basket': '9qyc231536398868', 'Besiktas Basketbol': 'rx0o811667119583', 'ASVEL Lyon-Villeurbanne': 'qbaoia1602706639', 'Virtus Bologna': 'nfl8dz1786178078' },
+  // National sides without a country flag of their own.
+  cricket: { 'West Indies': '1x0a681646775209' },
+  acb: { 'Real Madrid Baloncesto': 'g4ev2c1522175902', 'FC Barcelona Basquet': '0tz26j1729097443', 'Baskonia': 'p4x3o61767366090', 'Valencia Basket': '9qyc231536398868', 'Baloncesto Málaga': 'ieeluq1778174522', 'CB 1939 Canarias': 'vpchdl1698244853', 'CB Gran Canaria': 'axb9qb1536397994', 'Joventut Badalona': 'vuqqry1425410580', 'UCAM Murcia': 'vuuwwp1471878623', 'Basket Zaragoza': 'yrames1721554095', 'Bàsquet Girona': 'lfmc951632570105', 'Basquet Manresa': 'f02ctj1684597687', 'CB Breogan': 'qzfhcs1645212147', 'BC Andorra': '4oyjtu1538210898', 'Bilbao Basket': 'v7bo1i1664476071', 'Básquet Coruña': '10iz0v1691223542', 'Força Lleida CE': 'xmypxg1786723117', 'CB Granada': 'vqz8kq1574880877', 'CB San Pablo Burgos': '60nftb1752259508' },
+  nbl: { 'Adelaide 36ers': 'zp72061755701355', 'Brisbane Bullets': 'ubzenr1545867000', 'Cairns Taipans': 'v2c1wc1550073460', 'Illawarra Hawks': 'juj7y91725980615', 'Melbourne United': 'adpuke1755702629', 'New Zealand Breakers': '83088b1725978587', 'Perth Wildcats': '7gkvnd1755701286', 'South East Melbourne Phoenix': '73xo0d1755702709', 'Sydney Kings': 'gsfe5x1550073324', 'Tasmania JackJumpers': 'xbmi6c1755702783' },
+  cba: { 'Beijing Ducks': '6y9pc61520164924', 'Beijing Royal Fighters': 'v0ugmi1700075249', 'Fujian Sturgeons': '195tkp1524998706', 'Guangdong Southern Tigers': 'he2jgc1524997963', 'Jiangsu Dragons': 'zuik5q1700075475', 'Jilin Northeast Tigers': 'ay723q1700048664', 'Liaoning Flying Leopards': 'o9hgu01700048757', 'Nanjing Monkey Kings': '2lesth1700075559', 'Ningbo Rockets': '4bwv6g1700075612', 'Qingdao Eagles': 'c34irb1700048843', 'Shandong Hi-Speed Kirin': 'iume8z1650191851', 'Shanghai Sharks': 'urfigb1700048926', 'Shanxi Loongs': 'v2mgbq1700075779', 'Shenzhen Leopards': '2l9qqi1700049148', 'Sichuan Blue Whales': 'at6j3b1700075926', 'Tianjin Pioneers': 'w4k1k11700076101', 'Xinjiang Flying Tigers': 'kmj19n1700076154', 'Zhejiang Golden Bulls': '6axmqo1700049549', 'Zhejiang Lions': '2kzvbg1700049627' },
+  kbl: { 'Anyang Jung Kwan Jang Red Boosters': 'qpqjmc1742844696', 'Busan KCC Egis': '9h9fqx1637980679', 'Changwon LG Sakers': 'hukrtk1637980666', 'Daegu KOGAS Pegasus': 'uscri01742844477', 'Goyang Sono Skygunners': 'l2qn7d1742844779', 'Seoul Samsung Thunders': 'gze7e01742844845', 'Seoul SK Knights': 'qkd9sv1593415101', 'Suwon KT Sonicboom': 'srxv0l1637980695', 'Ulsan Hyundai Mobis Phoebus': 'tbd2hd1742844034', 'Wonju DB Promy': 'ykuvm71742844633' },
+  kleague: { 'Ulsan HD': '0wooic1706533767', 'Pohang Steelers': '63jst01769097748', 'Jeonbuk Hyundai Motors': '8jif3b1747853225', 'FC Seoul': '31z1zf1579473186', 'Gangwon FC': 'c4igx71579729617', 'Gimcheon Sangmu': 'g4cjyk1609536787', 'Daegu FC': 'xzjzn11579473073', 'Daejeon Hana Citizen': 'o9z6eq1589558557', 'Suwon FC': 'x39pm41589559443', 'Jeju SK': 'hna7ae1736207131', 'Gwangju FC': 'uuzr4x1579473084', 'FC Anyang': '0tens91589557588', 'Incheon United': '2no9nq1579473100', 'Bucheon FC 1995': 'mhcuwe1589557777', 'Suwon Samsung Bluewings': 'ym5u611579473171', 'Jeonnam Dragons': 'fgmush1643552285' }
 };
 // Words too common to tell clubs apart.
 const COMMON_WORDS = new Set(['basket', 'basketball', 'baloncesto', 'club', 'tokyo', 'osaka', 'nagoya', 'city', 'the']);
@@ -94,7 +101,10 @@ export function teamLogo(sport, name, dark = false) {
   if (sport === 'nba' && NBA_ABBR[name]) return `${base}/nba/${size}/${NBA_ABBR[name]}.png`;
   if (sport === 'epl' && EPL_ESPN_ID[normalizeTeamName(name)]) return `${base}/soccer/${size}/${EPL_ESPN_ID[normalizeTeamName(name)]}.png`;
   // Otherwise a logo ESPN gave us for the club (scoreboards, team lists).
-  const seen = seenLogos.get(`${sport}|${normalizeTeamName(name)}`);
+  // Players' names in either order (Kambi's "Han Shi", ESPN's "Shi Han").
+  const key = normalizeTeamName(name);
+  const words = key.split(' ');
+  const seen = seenLogos.get(`${sport}|${key}`) ?? (words.length === 2 ? seenLogos.get(`${sport}|${words[1]} ${words[0]}`) : undefined);
   if (!seen) return dark ? null : teamBadge(sport, name);
   return dark ? seen.replace('/500/', '/500-dark/') : seen;
 }
@@ -111,7 +121,8 @@ const SOCCER_LOGO = {
 // TheSportsDB's league badges.
 const LEAGUE_BADGE = {
   npb: 'lk85rg1575038781', kbo: 'qfr1hx1589707979', cpbl: 'c3vetj1655924198', euroleague: '7xjtuy1554397263', bleague: 'vcx6gw1745501883',
-  wta: 'bddhun1768230678', badminton: 'd5xvqq1750423289', tabletennis: 'fvesg01750422363', volleyball: 'vy2eo01625239301', snooker: '0gmkgj1555600537'
+  wta: 'bddhun1768230678', acb: '4n3h6z1572778356', nbl: 'gvz6vb1726086476', cba: 'peygv31522257103', kbl: 'd9f3ve1642011224', kleague: 'zaw2cj1628430843',
+  rugbyunion: '1otaxh1773613283', cricket: 'zkdgid1583579197', boxing: 'j14hx41784791003', badminton: 'd5xvqq1750423289', tabletennis: 'fvesg01750422363', volleyball: 'vy2eo01625239301', snooker: '0gmkgj1555600537'
 };
 // ESPN's other league logos.
 const ESPN_LEAGUE = {
@@ -193,7 +204,7 @@ export function f1Constructor(name) {
 
 // National teams (volleyball, and any sport's national sides): a flag.
 const COUNTRY_CODES = {
-  argentina: 'AR', australia: 'AU', austria: 'AT', belgium: 'BE', brazil: 'BR', bulgaria: 'BG', canada: 'CA', chile: 'CL', china: 'CN', 'chinese taipei': 'TW', taiwan: 'TW', colombia: 'CO', croatia: 'HR', cuba: 'CU', 'czech republic': 'CZ', czechia: 'CZ', denmark: 'DK', egypt: 'EG', england: 'GB', estonia: 'EE', finland: 'FI', france: 'FR', germany: 'DE', greece: 'GR', hungary: 'HU', india: 'IN', indonesia: 'ID', iran: 'IR', ireland: 'IE', israel: 'IL', italy: 'IT', japan: 'JP', kazakhstan: 'KZ', 'south korea': 'KR', korea: 'KR', latvia: 'LV', lithuania: 'LT', mexico: 'MX', montenegro: 'ME', netherlands: 'NL', 'new zealand': 'NZ', norway: 'NO', poland: 'PL', portugal: 'PT', 'puerto rico': 'PR', qatar: 'QA', romania: 'RO', russia: 'RU', serbia: 'RS', slovakia: 'SK', slovenia: 'SI', spain: 'ES', sweden: 'SE', switzerland: 'CH', thailand: 'TH', tunisia: 'TN', turkey: 'TR', turkiye: 'TR', ukraine: 'UA', usa: 'US', 'united states': 'US', uruguay: 'UY', vietnam: 'VN', 'dominican republic': 'DO', philippines: 'PH', hongkong: 'HK', 'hong kong': 'HK', singapore: 'SG', malaysia: 'MY',
+  afghanistan: 'AF', argentina: 'AR', australia: 'AU', bangladesh: 'BD', kenya: 'KE', namibia: 'NA', nepal: 'NP', oman: 'OM', pakistan: 'PK', 'sri lanka': 'LK', zimbabwe: 'ZW', scotland: 'GB-SCT', wales: 'GB-WLS', 'northern ireland': 'GB-NIR', austria: 'AT', belgium: 'BE', brazil: 'BR', bulgaria: 'BG', canada: 'CA', chile: 'CL', china: 'CN', 'chinese taipei': 'TW', taiwan: 'TW', colombia: 'CO', croatia: 'HR', cuba: 'CU', 'czech republic': 'CZ', czechia: 'CZ', denmark: 'DK', egypt: 'EG', england: 'GB-ENG', estonia: 'EE', finland: 'FI', france: 'FR', germany: 'DE', greece: 'GR', hungary: 'HU', india: 'IN', indonesia: 'ID', iran: 'IR', ireland: 'IE', israel: 'IL', italy: 'IT', japan: 'JP', kazakhstan: 'KZ', 'south korea': 'KR', korea: 'KR', latvia: 'LV', lithuania: 'LT', mexico: 'MX', montenegro: 'ME', netherlands: 'NL', 'new zealand': 'NZ', norway: 'NO', poland: 'PL', portugal: 'PT', 'puerto rico': 'PR', qatar: 'QA', romania: 'RO', russia: 'RU', serbia: 'RS', slovakia: 'SK', slovenia: 'SI', spain: 'ES', sweden: 'SE', switzerland: 'CH', thailand: 'TH', tunisia: 'TN', turkey: 'TR', turkiye: 'TR', ukraine: 'UA', usa: 'US', 'united states': 'US', uruguay: 'UY', vietnam: 'VN', 'dominican republic': 'DO', philippines: 'PH', hongkong: 'HK', 'hong kong': 'HK', singapore: 'SG', malaysia: 'MY',
   britain: 'GB', 'great britain': 'GB', 'united kingdom': 'GB', uk: 'GB', monaco: 'MC', 'south africa': 'ZA', morocco: 'MA', nigeria: 'NG', ghana: 'GH', senegal: 'SN', 'ivory coast': 'CI', 'cote d ivoire': 'CI', cameroon: 'CM', algeria: 'DZ', peru: 'PE', ecuador: 'EC', paraguay: 'PY', venezuela: 'VE', bolivia: 'BO', jamaica: 'JM', 'saudi arabia': 'SA', 'united arab emirates': 'AE', uae: 'AE', georgia: 'GE', armenia: 'AM', azerbaijan: 'AZ', belarus: 'BY', moldova: 'MD', 'bosnia herzegovina': 'BA', bosnia: 'BA', albania: 'AL', 'north macedonia': 'MK', iceland: 'IS', luxembourg: 'LU', cyprus: 'CY', malta: 'MT', 'korea republic': 'KR', 'republic of korea': 'KR', fiji: 'FJ', samoa: 'WS', tonga: 'TO', 'papua new guinea': 'PG', uzbekistan: 'UZ', mongolia: 'MN', 'costa rica': 'CR', panama: 'PA', honduras: 'HN', 'el salvador': 'SV', guatemala: 'GT', haiti: 'HT', bahamas: 'BS', 'trinidad tobago': 'TT', curacao: 'CW'
 };
 // The home nations aren't countries to Intl: their names by hand.
@@ -215,9 +226,11 @@ export function countryName(name, lang = 'zh') {
 }
 // The flag emoji of a national team's name, or null.
 export function countryFlag(name) {
-  const code = COUNTRY_CODES[normalizeTeamName(name).replace(/\s+(women|men|u\d+)$/, '')];
-  return code ? String.fromCodePoint(...[...code].map(c => 0x1f1e6 + c.charCodeAt(0) - 65)) : null;
+  const code = countryCode(name);
+  return code ? String.fromCodePoint(...[...code.slice(0, 2)].map(c => 0x1f1e6 + c.charCodeAt(0) - 65)) : null;
 }
+// A national team's (or a country's) code, or null: "India", "England", "South Africa Women".
+export const countryCode = name => COUNTRY_CODES[normalizeTeamName(name).replace(/\s+(women|men|u\d+|a)$/, '')] ?? null;
 
 // ---- Players' nations (table tennis, badminton, snooker, fighters) -----------------
 //
@@ -312,8 +325,10 @@ const TENNIS_NATIONS = {
   EG: 'Mayar Sherif',
   MX: 'Renata Zarazua'
 };
+// Boxers TheSportsDB has no page for (the rest learned from it: learnFighterNations).
+const BOXER_NATIONS = { AU: 'Conor Wallace', US: 'Floyd Schofield', CA: 'Lucas Bahdi', FR: 'Christian Mbilli', TR: 'Elif Nur Turhan' };
 const NATION_OF = new Map();
-for (const [code, names] of [...Object.entries(TENNIS_NATIONS), ...Object.entries(NATIONS)]) for (const n of names.split('|')) NATION_OF.set(normalizeTeamName(n), code);
+for (const [code, names] of [...Object.entries(TENNIS_NATIONS), ...Object.entries(NATIONS), ...Object.entries(BOXER_NATIONS)]) for (const n of names.split('|')) NATION_OF.set(normalizeTeamName(n), code);
 // A domestic series' own name, or Kambi's path word, to its country.
 const SERIES_NATION = { 'tt elite series': 'PL', 'setka cup': 'UA', 'liga pro': 'CZ', 'czech liga pro': 'CZ', 'tt cup': 'CZ', 'win cup': 'UA', 'pro league russia': 'RU' };
 const nameKey = name => normalizeTeamName(name);
@@ -322,6 +337,10 @@ const nameKey = name => normalizeTeamName(name);
 export function playerNation(name, where = []) {
   const key = nameKey(name);
   if (NATION_OF.has(key)) return NATION_OF.get(key);
+  if (learned().get(key)) return learned().get(key);
+  // A national side (cricket's "India", "Sri Lanka").
+  const own = countryCode(name);
+  if (own) return own;
   // Kambi's "Surname Firstname" for some: the words in either order.
   const words = key.split(' ');
   if (words.length === 2 && NATION_OF.has(`${words[1]} ${words[0]}`)) return NATION_OF.get(`${words[1]} ${words[0]}`);
@@ -333,6 +352,32 @@ export function playerNation(name, where = []) {
   }
   return null;
 }
+// Nations learned from a source that names them (boxers' on TheSportsDB),
+// kept on the device: name → code, or '' for one looked up and not found
+// (asked again after a month).
+const LEARNED_KEY = 'quadra.nations.v1';
+let learnedMap = null;
+function learned() {
+  if (learnedMap) return learnedMap;
+  learnedMap = new Map();
+  try {
+    const saved = JSON.parse(globalThis.localStorage?.getItem(LEARNED_KEY) || '{}');
+    for (const [k, [code, at]] of Object.entries(saved)) if (code || Date.now() - at < 30 * 86_400_000) learnedMap.set(k, code);
+  } catch {}
+  return learnedMap;
+}
+export const knowsNation = name => learned().has(nameKey(name)) || NATION_OF.has(nameKey(name));
+export function rememberNation(name, country) {
+  const code = country ? (countryCode(country) ?? (/^[A-Z]{2}$/.test(country) ? country : '')) : '';
+  learned().set(nameKey(name), code);
+  try {
+    const saved = JSON.parse(globalThis.localStorage?.getItem(LEARNED_KEY) || '{}');
+    saved[nameKey(name)] = [code, Date.now()];
+    globalThis.localStorage?.setItem(LEARNED_KEY, JSON.stringify(saved));
+  } catch {}
+  return code;
+}
+
 // A round flag picture for a nation code (circle-flags, hot-linkable SVGs).
 export const flagUrl = code => (code ? `https://cdn.jsdelivr.net/gh/HatScripts/circle-flags@2.7.0/flags/${code.toLowerCase()}.svg` : null);
 // The flag emoji of a nation code (GB-ENG and the like: the UK's).
