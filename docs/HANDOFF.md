@@ -421,3 +421,69 @@ The owner saw Play's live betting vanish once games started and Fixtures'
   qualifying and races (rows and sheets) opens Play's F1 board
   (`#game=f1` / `#game=f1pole`); Play's link also finds a game already
   live, and teams spelt differently by the two sources.
+
+## Round: live on both homes, UFC/NRL/AFL in Play, one set of links, flags
+
+The owner saw no live game recommended on home, UFC in Fixtures but not in
+Play, no CPBL schedule, letters for table-tennis players, Fixtures→Play links
+that didn't land on live games, and text cut on phones.
+
+- **Fixtures 首頁 opened on tomorrow while games were live:** a day read
+  before the pass's follows arrived (zero leagues) counted as "nothing on
+  today", so `autoDay` jumped ahead. Days now remember the leagues they were
+  read for (`leaguesKey`), are read again when those change, and never jump
+  from a saved or half-read day. 首頁 opens with **正在進行** (the person's
+  games on now, ranked like the picks; with none of theirs on, the best of
+  everything on now), taken out of the lists below. Today's rest (every
+  league's current scoreboard) is read a moment after the first read, so
+  直播's badge is the same number everywhere.
+- **Play 首頁: 場中焦點**, live games with live win prices, ranked like
+  焦點賽事; the live board refreshes on home too. (Also fixed: reopening Play
+  on home with a saved board threw on `balance(null)` and threw the saved
+  board away, so every reopen was a cold start.)
+- **Delayed ≠ postponed:** ESPN's `STATUS_DELAYED` / rain delays were void
+  (延期) in Fixtures while Play had them live. Now `status.delayed`: 延遲開賽
+  before the start, "· 暫停" during.
+- **UFC, NRL, AFL, FA Cup in Play** (catalogue: `bet`, `odds: 'kambi'`,
+  `results` / `scores`): UFC bouts from Kambi (`ufc_mma/ufc`, winner only),
+  settled from ESPN's card (`parseEspnFight`, either order, draw/NC void),
+  fighters' flags from ESPN's cards (`rememberFighterFlags`); NRL and AFL
+  from Kambi with the points model (`SCORE_SPREAD.nrl/afl`, whole-game markets
+  only), settled from ESPN (`findEspnGame`, club words, sides turned when
+  needed); the FA Cup from ESPN like any soccer league. All four simulated
+  (`SIM_SPORTS`). **K League removed:** ESPN answers 400 for `kor.1`, no source.
+  **Not in Play:** golf, NASCAR, IndyCar (Kambi's public feed has no clean
+  winner market for them: several unlabeled "Finishing Position" offers for
+  golf, nothing for the series); Fixtures-only.
+- **Links Fixtures → Play:** `playTarget(e)` in Fixtures' ui.js is the one
+  place (rows, cards, sheets): `game=<id>` for games, `league=<key>` for a
+  fight card or tennis draw, F1 as before; each bout and draw match in a
+  sheet has its own chip (`playPairId`). Play: `#league=<key>` opens that
+  league once its games are in; a wanted game matches players in either
+  order, opens its **live card first** (the board can still hold it from
+  before the start), never the same clubs' next-day game (a baseball series;
+  the id match is kept within 12 h), and reads the game's league live even
+  if the board didn't list it (`loadLive(…, extra)`). Not found once every
+  league and the live list are in: its league's board with a line saying
+  why (`wanted-note`).
+- **CPBL schedule:** cpbl.com.tw's season list stopped at September's last
+  game while the season had a week to go (October returned 0). The proxy now
+  fills the days after its last game from TheSportsDB (`mergeCpbl`, day lists
+  cached 10 min at the edge).
+- **Players' flags** (kit `playerNation`, `playerFlag`, `flagUrl`: circle
+  flags from jsDelivr, emoji fallback): a table of the tours' regulars
+  (table tennis, badminton, snooker, tennis), else the country Kambi files the
+  match under (its path words, now kept by the proxy's Kambi trim, or a
+  domestic series' name: TT Elite Series → Poland, Czech Liga Pro → Czechia).
+  Catalogue `players: true` marks those leagues (tennis, UFC too).
+- **Nothing cut on a phone:** live status, league names, live lines, event
+  titles, side names and fighter names wrap to two lines; table tennis,
+  badminton and volleyball periods read 第N局 (tennis 第N盤); card and golf
+  statuses in Chinese (選手進場, 第2回合, 第2輪 進行中); ESPN's last play
+  translated in the match sheet; Play hides Kambi groups that only repeat the
+  league ("中職 · Chinese Professional Baseball"), and shows the catalogue's
+  headline leagues (CPBL) with the majors instead of folding them away.
+- **`node tools/leagues-audit.mjs`**: every catalogue league against its real
+  sources (Fixtures' schedule, Play's prices), one line each. Off-season and
+  Kambi-empty days (B.League before its season, badminton and volleyball
+  between events) show 0 there; that's the source, not the apps.

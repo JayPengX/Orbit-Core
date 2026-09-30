@@ -296,7 +296,7 @@ const TRIM_KAMBI_EVENTS = 'kambi-events';
 function trimKambi(data) {
   if (!data || typeof data !== 'object') return data;
   const event = e =>
-    e && { id: e.id, name: e.name, homeName: e.homeName, awayName: e.awayName, start: e.start, state: e.state, group: e.group, sport: e.sport };
+    e && { id: e.id, name: e.name, homeName: e.homeName, awayName: e.awayName, start: e.start, state: e.state, group: e.group, sport: e.sport, path: Array.isArray(e.path) ? e.path.map(p => p.termKey) : undefined };
   const offers = list =>
     Array.isArray(list)
       ? list.map(o => ({

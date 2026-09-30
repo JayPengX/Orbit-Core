@@ -202,6 +202,127 @@ export function countryFlag(name) {
   return code ? String.fromCodePoint(...[...code].map(c => 0x1f1e6 + c.charCodeAt(0) - 65)) : null;
 }
 
+// ---- Players' nations (table tennis, badminton, snooker, fighters) -----------------
+//
+// Kambi names players without their country, so a player's picture is their
+// nation's flag: from this table (the regular names on the world tours), else
+// the country the event is filed under (Kambi's path: "Czech Republic > Czech
+// Liga Pro", or a domestic series' own name). ISO codes; England, Scotland,
+// Wales and Northern Ireland as GB-ENG, GB-SCT, GB-WLS, GB-NIR.
+const NATIONS = {
+  CN: 'Fan Zhendong|Wang Chuqin|Ma Long|Lin Shidong|Liang Jingkun|Lin Gaoyuan|Xiang Peng|Zhou Qihao|Huang Youzheng|Xue Fei|Sun Yingsha|Wang Manyu|Chen Meng|Wang Yidi|Chen Xingtong|Kuai Man|Qian Tianyi|He Zhuojia|Shi Yuqi|Li Shifeng|Weng Hongyang|Lu Guangzu|Wang Zhiyi|Han Yue|Chen Yufei|Gao Fangjie|Liang Weikeng|Wang Chang|Chen Qingchen|Jia Yifan|Liu Shengshu|Tan Ning|Feng Yanzhe|Huang Dongping|Jiang Zhenbang|Wei Yaxin|Ding Junhui|Zhao Xintong|Si Jiahui|Fan Zhengyi|Yuan Sijun|Xu Si|Wu Yize|Zhang Anda|Xiao Guodong|Pang Junxu|Lei Peifan|Zhou Yuelong|Zhang Jiankang|Lyu Haotian|Lu Ning|He Guolong|Yan Bingtao|Liang Wenbo|Li Hang|Tian Pengfei|Zhou Yuelong|Gong Chenzhi|Wang Yuchen|Long Zehuang|Ma Hailong|Bai Langning|Liu Hongyu|Zhang Anda|Chang Bingyu|Jiang Jun',
+  TW: 'Lin Yun-Ju|Lin Yun Ju|Kao Cheng-Jui|Chuang Chih-Yuan|Huang Yan-Cheng|Feng Yi-Hsin|Cheng I-Ching|Chen Szu-Yu|Chien Tung-Chuan|Chou Tien-Chen|Chou Tien Chen|Lin Chun-Yi|Lin Chun Yi|Wang Tzu-Wei|Lee Yang|Wang Chi-Lin|Lee Jhe-Huei|Yang Po-Hsuan|Lee Chia-Hao|Tai Tzu-Ying|Tai Tzu Ying|Chiu Pin-Chian|Wang Po-Wei|Huang Yu-Kai|Lin Kuan Ting|Lee Fang-Jen|Lee Fang-Chih|Hsieh Pei-Shan|Hung En-Tzu|Lin Chih-Chun|Liu Kuang-Heng',
+  JP: 'Tomokazu Harimoto|Harimoto Tomokazu|Shunsuke Togami|Sora Matsushima|Yukiya Uda|Hiroto Shinozuka|Miwa Harimoto|Mima Ito|Hina Hayata|Miu Hirano|Satsuki Odo|Honoka Hashimoto|Kodai Naraoka|Kenta Nishimoto|Koki Watanabe|Kanta Tsuneyama|Akane Yamaguchi|Nozomi Okuhara|Aya Ohori|Takuro Hoki|Yugo Kobayashi|Mayu Matsumoto|Wakana Nagahara|Nami Matsuyama|Chiharu Shida|Yuta Watanabe|Arisa Higashino|Riku Hatano|Kenya Mitsuhashi|Hiroki Midorikawa|Kyohei Yamashita|Tomoka Miyazaki|Natsuki Nidaira|Yuki Fukushima|Sayaka Hirota|Rin Iwanaga|Kie Nakanishi',
+  KR: 'Jang Woojin|Lim Jonghoon|An Jaehyun|Oh Junsung|Shin Yubin|Jeon Jihee|Lee Eunhye|Joo Cheonhui|An Se-young|An Se Young|Seo Seung-jae|Kim Won-ho|Kang Min-hyuk|Baek Ha-na|Lee So-hee|Kim So-yeong|Kong Hee-yong|Jeon Hyeok-jin|Kim Ga-eun|Sim Yu-jin',
+  DE: 'Dang Qiu|Patrick Franziska|Dimitrij Ovtcharov|Benedikt Duda|Timo Boll|Han Ying|Nina Mittelham|Sabine Winter|Annett Kaufmann|Xiaona Shan|Fabian Rath|Yvonne Li',
+  FR: 'Felix Lebrun|Félix Lebrun|Alexis Lebrun|Simon Gauzy|Jia Nan Yuan|Prithika Pavade|Christopher Popov|Toma Junod|Alex Lanier|Christo Popov|Toma Junior Popov|Lucas Corvee|Arnaud Merkle|Thom Gicquel|Delphine Delrue|Leonice Huet',
+  SE: 'Truls Moregard|Truls Möregård|Anton Kallberg|Anton Källberg|Mattias Falck|Kristian Karlsson|Linda Bergstrom',
+  BR: 'Hugo Calderano|Bruna Takahashi|Kayque Valois|Ygor Coelho|Juliana Viana Vieira',
+  EG: 'Omar Assar|Hana Goda|Dina Meshref',
+  NG: 'Quadri Aruna|Aruna Quadri',
+  IN: 'Manika Batra|Sreeja Akula|Manav Thakkar|Sharath Kamal|Harmeet Desai|Satwiksairaj Rankireddy|Chirag Shetty|Lakshya Sen|H. S. Prannoy|HS Prannoy|Prannoy H. S.|P. V. Sindhu|Pusarla V. Sindhu|PV Sindhu|Kidambi Srikanth|Priyanshu Rajawat|Kiran George|Treesa Jolly|Gayatri Gopichand|Ayush Shetty|Unnati Hooda|Malvika Bansod|Anupama Upadhyaya|Tanvi Sharma',
+  HK: 'Wong Chun Ting|Doo Hoi Kem|Lam Siu Hang|Tang Chun Man|Tse Ying Suet|Lee Cheuk Yiu|Angus Ng Ka Long|Ng Ka Long Angus',
+  SG: 'Izaac Quek|Loh Kean Yew|Terry Hee|Jessica Tan|Yeo Jia Min',
+  PT: 'Marcos Freitas|Tiago Apolonia|Jieni Shao',
+  SI: 'Darko Jorgic',
+  AT: 'Robert Gardos|Sofia Polcanova|Daniel Habesohn',
+  RO: 'Bernadette Szocs|Eduard Ionescu|Ovidiu Ionescu|Elizabeta Samara',
+  HR: 'Andrej Gacina|Tomislav Pucar',
+  PL: 'Jakub Dyjas|Natalia Bajor',
+  CZ: 'Pavel Sirucek|Hana Matelova',
+  US: 'Kanak Jha|Lily Zhang|Amy Wang|Beiwen Zhang|Rachel Chang',
+  CA: 'Eugene Wang|Michelle Yip|Brian Yang|Victor Lai|Michelle Li',
+  PR: 'Adriana Diaz',
+  DK: 'Anders Lind|Viktor Axelsen|Anders Antonsen|Rasmus Gemke|Mia Blichfeldt|Kim Astrup|Anders Skaarup Rasmussen|Line Kjaersfeldt|Line Christophersen|Mathias Christiansen|Magnus Johannesen|Julie Dawall Jakobsen|Mads Christophersen|Jesper Toft|Amalie Magelund|Freja Ravn|Maiken Fruergaard|Sara Thygesen|Rasmus Kjaer|Frederik Sogaard|Mathias Thyrri',
+  ID: 'Jonatan Christie|Anthony Sinisuka Ginting|Alwi Farhan|Gregoria Mariska Tunjung|Putri Kusuma Wardani|Fajar Alfian|Muhammad Rian Ardianto|Leo Rolly Carnando|Daniel Marthin|Sabar Karyaman Gutama|Muhammad Reza Pahlevi Isfahani|Apriyani Rahayu|Siti Fadia Silva Ramadhanti|Dejan Ferdinansyah|Gloria Emanuelle Widjaja|Rinov Rivaldy|Pitha Haningtyas Mentari|Chico Aura Dwi Wardoyo|Ester Nurumi Tri Wardoyo|Komang Ayu Cahya Dewi|Febriana Dwipuji Kusuma|Amallia Cahaya Pratiwi|Lanny Tria Mayasari|Meilysa Trias Puspita Sari|Rachel Allessya Rose',
+  MY: 'Lee Zii Jia|Aaron Chia|Soh Wooi Yik|Goh Sze Fei|Nur Izzuddin|Man Wei Chong|Tee Kai Wun|Chen Tang Jie|Toh Ee Wei|Pearly Tan|Thinaah Muralitharan|Goh Soon Huat|Shevon Jemie Lai|Leong Jun Hao|Ng Tze Yong|Goh Jin Wei|Letshanaa Karupathevan|Wong Ling Ching|Kang Khai Xing|Aaron Tai',
+  TH: 'Kunlavut Vitidsarn|Kantaphon Wangcharoen|Kulkavut Vitidsarn|Ratchanok Intanon|Busanan Ongbamrungphan|Pornpawee Chochuwong|Supanida Katethong|Dechapol Puavaranukroh|Supissara Paewsampran|Jongkolphan Kititharakul|Rawinda Prajongjai|Benyapa Aimsaard|Nuntakarn Aimsaard|Thepchaiya Un-Nooh|Thepchaiya Un Nooh|Noppon Saengkham|Sunny Akani|Dechawat Poomjaeng',
+  VN: 'Nguyen Thuy Linh',
+  ES: 'Carolina Marin|Carolina Marín|Pablo Abian',
+  'GB-ENG': 'Liam Pitchford|Tin-Tin Ho|Ben Lane|Sean Vendy|Toby Penty|Judd Trump|Ronnie O\'Sullivan|Ronnie OSullivan|Mark Selby|Kyren Wilson|Shaun Murphy|Barry Hawkins|Ali Carter|Jack Lisowski|Tom Ford|Joe Perry|Stuart Bingham|David Gilbert|Gary Wilson|Mark Davis|Ricky Walden|Chris Wakelin|Michael Holt|Elliot Slessor|David Grace|Robert Milkins|Matthew Selt|Ben Woollaston|Martin Gould|Mark Joyce|Jimmy Robertson|Joe O\'Connor|Stan Moody|Ashley Carty|Oliver Lines|Zak Surety|Ian Burns|Louis Heathcote|Sam Craigie|Steven Hallworth|Jamie Clarke|Hammad Miah|Liam Graham|Allan Taylor|Andrew Higginson|Mitchell Mann|Jenson Kendrick',
+  'GB-SCT': 'John Higgins|Stephen Maguire|Anthony McGill|Graeme Dott|Scott Donaldson|Chris Totten|Ross Muir|Dean Young|Kirsty Gilmour',
+  'GB-WLS': 'Mark Williams|Jackson Page|Jak Jones|Ryan Day|Dominic Dale|Matthew Stevens|Jamie Jones|Michael White|Lee Walker|Liam Davies|Duane Jones',
+  'GB-NIR': 'Mark Allen|Jordan Brown',
+  IE: 'Aaron Hill|Ken Doherty|Fergal O\'Brien|Nhat Nguyen',
+  BE: 'Luca Brecel|Ben Mertens|Julien Leclercq',
+  AU: 'Neil Robertson|Ryan Thomerson',
+  IR: 'Hossein Vafaei|Hossein Vafaei Ayouri',
+  PK: 'Muhammad Asif',
+  CH: 'Alexander Ursenbacher',
+  PS: 'Mohammed Abu Alrob',
+  MT: 'Tony Drago'
+};
+// The tours' regulars in tennis (Play prices tennis from Kambi, which names no country).
+const TENNIS_NATIONS = {
+  IT: 'Jannik Sinner|Lorenzo Musetti|Matteo Berrettini|Flavio Cobolli|Lorenzo Sonego|Luciano Darderi|Jasmine Paolini|Elisabetta Cocciaretto|Matteo Arnaldi',
+  ES: 'Carlos Alcaraz|Alejandro Davidovich Fokina|Pablo Carreno Busta|Jaume Munar|Paula Badosa',
+  RS: 'Novak Djokovic|Olga Danilovic',
+  DE: 'Alexander Zverev|Jan-Lennard Struff|Laura Siegemund|Tatjana Maria',
+  US: 'Taylor Fritz|Ben Shelton|Tommy Paul|Frances Tiafoe|Sebastian Korda|Brandon Nakashima|Alex Michelsen|Learner Tien|Coco Gauff|Jessica Pegula|Madison Keys|Emma Navarro|Amanda Anisimova|Danielle Collins|Sofia Kenin|McCartney Kessler|Peyton Stearns|Hailey Baptiste|Iva Jovic|Reilly Opelka|Marcos Giron',
+  AU: 'Alex de Minaur|Alexei Popyrin|Jordan Thompson|Alex Bolt|Ajla Tomljanovic|Daria Kasatkina|Kimberly Birrell',
+  GB: 'Jack Draper|Cameron Norrie|Jacob Fearnley|Emma Raducanu|Katie Boulter|Sonay Kartal',
+  NO: 'Casper Ruud',
+  GR: 'Stefanos Tsitsipas|Maria Sakkari',
+  DK: 'Holger Rune|Clara Tauson',
+  CA: 'Felix Auger-Aliassime|Denis Shapovalov|Gabriel Diallo|Leylah Fernandez|Victoria Mboko',
+  BG: 'Grigor Dimitrov',
+  CZ: 'Jiri Lehecka|Jakub Mensik|Tomas Machac|Barbora Krejcikova|Karolina Muchova|Marketa Vondrousova|Linda Noskova|Karolina Pliskova|Marie Bouzkova',
+  FR: 'Arthur Fils|Ugo Humbert|Alexandre Muller|Giovanni Mpetshi Perricard|Arthur Rinderknech|Corentin Moutet|Caroline Garcia|Varvara Gracheva|Diane Parry',
+  AR: 'Francisco Cerundolo|Tomas Martin Etcheverry|Sebastian Baez|Francisco Comesana|Solana Sierra',
+  CL: 'Alejandro Tabilo|Nicolas Jarry',
+  BR: 'Joao Fonseca|Beatriz Haddad Maia',
+  PL: 'Hubert Hurkacz|Iga Swiatek|Magda Linette',
+  KZ: 'Alexander Bublik|Elena Rybakina|Yulia Putintseva',
+  BY: 'Aryna Sabalenka|Victoria Azarenka',
+  RU: 'Daniil Medvedev|Andrey Rublev|Karen Khachanov|Roman Safiullin|Mirra Andreeva|Anna Kalinskaya|Diana Shnaider|Ekaterina Alexandrova|Liudmila Samsonova|Veronika Kudermetova|Anastasia Pavlyuchenkova|Anna Blinkova|Kamilla Rakhimova',
+  CN: 'Zheng Qinwen|Wang Xinyu|Zhang Shuai|Zhu Lin|Yuan Yue|Zhang Zhizhen|Bu Yunchaokete|Shang Juncheng|Wu Yibing|Wang Xiyu',
+  JP: 'Kei Nishikori|Yoshihito Nishioka|Naomi Osaka|Moyuka Uchijima',
+  UA: 'Elina Svitolina|Marta Kostyuk|Dayana Yastremska',
+  TN: 'Ons Jabeur',
+  LV: 'Jelena Ostapenko',
+  HR: 'Donna Vekic|Marin Cilic|Borna Coric',
+  HU: 'Fabian Marozsan|Anna Bondar',
+  NL: 'Tallon Griekspoor|Botic van de Zandschulp',
+  BE: 'Elise Mertens|Zizou Bergs|David Goffin',
+  CH: 'Belinda Bencic|Stan Wawrinka',
+  PT: 'Nuno Borges',
+  RO: 'Sorana Cirstea|Jaqueline Cristian',
+  CO: 'Camila Osorio',
+  PH: 'Alexandra Eala',
+  TW: 'Hsieh Su-Wei|Chan Hao-Ching|Tseng Chun-Hsin|Hsu Yu-Hsiou',
+  SK: 'Anna Karolina Schmiedlova|Rebecca Sramkova',
+  SI: 'Tamara Zidansek',
+  EG: 'Mayar Sherif',
+  MX: 'Renata Zarazua'
+};
+const NATION_OF = new Map();
+for (const [code, names] of [...Object.entries(TENNIS_NATIONS), ...Object.entries(NATIONS)]) for (const n of names.split('|')) NATION_OF.set(normalizeTeamName(n), code);
+// A domestic series' own name, or Kambi's path word, to its country.
+const SERIES_NATION = { 'tt elite series': 'PL', 'setka cup': 'UA', 'liga pro': 'CZ', 'czech liga pro': 'CZ', 'tt cup': 'CZ', 'win cup': 'UA', 'pro league russia': 'RU' };
+const nameKey = name => normalizeTeamName(name);
+// A player's nation as an ISO code (or GB-ENG…), or null. `where`: the
+// event's group and Kambi's path words ("czech_republic", "poland").
+export function playerNation(name, where = []) {
+  const key = nameKey(name);
+  if (NATION_OF.has(key)) return NATION_OF.get(key);
+  // Kambi's "Surname Firstname" for some: the words in either order.
+  const words = key.split(' ');
+  if (words.length === 2 && NATION_OF.has(`${words[1]} ${words[0]}`)) return NATION_OF.get(`${words[1]} ${words[0]}`);
+  for (const w of [].concat(where || [])) {
+    const k = normalizeTeamName(String(w).replace(/_/g, ' '));
+    if (SERIES_NATION[k]) return SERIES_NATION[k];
+    const code = COUNTRY_CODES[k] ?? Object.entries(COUNTRY_CODES).find(([c]) => c.length > 4 && k.startsWith(`${c} `))?.[1];
+    if (code) return code;
+  }
+  return null;
+}
+// A round flag picture for a nation code (circle-flags, hot-linkable SVGs).
+export const flagUrl = code => (code ? `https://cdn.jsdelivr.net/gh/HatScripts/circle-flags@2.7.0/flags/${code.toLowerCase()}.svg` : null);
+// The flag emoji of a nation code (GB-ENG and the like: the UK's).
+export const flagEmoji = code => (code ? String.fromCodePoint(...[...code.slice(0, 2).toUpperCase()].map(c => 0x1f1e6 + c.charCodeAt(0) - 65)) : null);
+// A player's flag picture, or null.
+export const playerFlag = (name, where) => flagUrl(playerNation(name, where));
+
 // ---- On screen ------------------------------------------------------------------
 
 // A logo with its dark-background version, or `fallback()` if it fails.

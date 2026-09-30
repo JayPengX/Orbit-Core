@@ -14,7 +14,10 @@
 //   espn / kambi   the paths on each source (a league can have both)
 //   play-only details: family (the kind of markets), sets (best of how
 //   many, what a set is made of), neutral, cap (matches listed), results
-//   (ESPN path for results), logo (ESPN league logo id), icon, badge
+//   (ESPN path a player's result is read from: tennis, fights), scores
+//   (ESPN path a Kambi-priced team game's result is read from), logo (ESPN
+//   league logo id), icon, badge
+//   players  sides are people (their nation's flag as the picture)
 
 export const SPORTS = {
   soccer: { zh: '足球', en: 'Soccer', icon: '⚽' },
@@ -96,17 +99,16 @@ export const CATALOG = {
   libertadores: soccer('conmebol.libertadores', '解放者盃', 'Copa Libertadores', 'libertadores', { cup: true, logo: 58 }),
   sudamericana: soccer('conmebol.sudamericana', '南美球會盃', 'Copa Sudamericana', 'sudamericana', { cup: true, logo: 1208 }),
   jleague: soccer('jpn.1', '日職聯', 'J1 League', 'jleague', { logo: 2199 }),
-  kleague: soccer('kor.1', 'K 聯賽', 'K League 1', null),
   csl: soccer('chn.1', '中超', 'Chinese Super League', 'csl', { logo: 2350 }),
   aleague: soccer('aus.1', '澳超', 'A-League', 'aleague', { logo: 1308 }),
-  facup: soccer('eng.fa', '英足總盃', 'FA Cup', null, { cup: true }),
+  facup: soccer('eng.fa', '英足總盃', 'FA Cup', 'facup', { cup: true, logo: 40 }),
   leaguecup: soccer('eng.league_cup', '英聯盃', 'EFL Cup', 'leaguecup', { cup: true, logo: 41 }),
   copadelrey: soccer('esp.copa_del_rey', '國王盃', 'Copa del Rey', 'copadelrey', { cup: true, logo: 80 }),
   nationsleague: soccer('uefa.nations', '歐國聯', 'Nations League', 'nationsleague', { cup: true, logo: 2395 }),
   wcqeurope: soccer('fifa.worldq.uefa', '世界盃資格賽（歐洲）', 'WC qualifying (UEFA)', 'wcqeurope', { cup: true, logo: 67 }),
   // Tennis: Fixtures' draws from ESPN, Play's prices from Kambi (results from ESPN).
-  atp: { sport: 'tennis', kind: 'draw', data: 'espn', espn: 'tennis/atp', kambi: 'tennis/atp', zh: 'ATP 男網', en: 'ATP', bet: 'tennis', odds: 'kambi', results: 'tennis/atp', icon: '🎾', neutral: true, sets: { bestOf: 3, unit: 'games', target: 6 } },
-  wta: { sport: 'tennis', kind: 'draw', data: 'espn', espn: 'tennis/wta', kambi: 'tennis/wta', zh: 'WTA 女網', en: 'WTA', bet: 'wta', odds: 'kambi', results: 'tennis/wta', icon: '🎾', badge: 'bddhun1768230678', neutral: true, sets: { bestOf: 3, unit: 'games', target: 6 } },
+  atp: { sport: 'tennis', kind: 'draw', data: 'espn', espn: 'tennis/atp', kambi: 'tennis/atp', zh: 'ATP 男網', en: 'ATP', bet: 'tennis', odds: 'kambi', results: 'tennis/atp', icon: '🎾', neutral: true, players: true, sets: { bestOf: 3, unit: 'games', target: 6 } },
+  wta: { sport: 'tennis', kind: 'draw', data: 'espn', espn: 'tennis/wta', kambi: 'tennis/wta', zh: 'WTA 女網', en: 'WTA', bet: 'wta', odds: 'kambi', results: 'tennis/wta', icon: '🎾', badge: 'bddhun1768230678', neutral: true, players: true, sets: { bestOf: 3, unit: 'games', target: 6 } },
   // Racing
   f1: { sport: 'racing', kind: 'field', data: 'espn', espn: 'racing/f1', zh: 'F1 一級方程式', en: 'Formula 1', bet: 'f1', top: true, standings: true },
   indycar: { sport: 'racing', kind: 'field', data: 'espn', espn: 'racing/irl', zh: 'IndyCar', en: 'IndyCar' },
@@ -115,10 +117,11 @@ export const CATALOG = {
   pga: { sport: 'golf', kind: 'field', data: 'espn', espn: 'golf/pga', zh: 'PGA 巡迴賽', en: 'PGA Tour' },
   lpga: { sport: 'golf', kind: 'field', data: 'espn', espn: 'golf/lpga', zh: 'LPGA', en: 'LPGA' },
   // Fighting
-  ufc: { sport: 'mma', kind: 'card', data: 'espn', espn: 'mma/ufc', zh: 'UFC', en: 'UFC' },
-  // Rugby and Aussie rules
-  nrl: espn('rugby', 'rugby-league/3', 'NRL 聯盟式橄欖球', 'NRL', null),
-  afl: espn('aussie', 'australian-football/afl', 'AFL 澳式足球', 'AFL', null),
+  // Fixtures' cards from ESPN; Play's prices from Kambi (each bout a match), results from ESPN.
+  ufc: { sport: 'mma', kind: 'card', data: 'espn', espn: 'mma/ufc', kambi: 'ufc_mma/ufc', zh: 'UFC', en: 'UFC', bet: 'ufc', odds: 'kambi', results: 'mma/ufc', icon: '🥊', neutral: true, players: true },
+  // Rugby and Aussie rules: ESPN's schedules and scores, Kambi's prices.
+  nrl: { sport: 'rugby', kind: 'match', data: 'espn', espn: 'rugby-league/3', kambi: 'rugby_league/nrl', zh: 'NRL 聯盟式橄欖球', en: 'NRL', bet: 'nrl', odds: 'kambi', scores: 'rugby-league/3', icon: '🏉' },
+  afl: { sport: 'aussie', kind: 'match', data: 'espn', espn: 'australian-football/afl', kambi: 'australian_rules/afl', zh: 'AFL 澳式足球', en: 'AFL', bet: 'afl', odds: 'kambi', scores: 'australian-football/afl', icon: '🏉' },
   // Played in sets, from Kambi
   badminton: { sport: 'badminton', kind: 'match', data: 'kambi', kambi: 'badminton', zh: '羽球', en: 'Badminton', bet: 'badminton', odds: 'kambi', players: true, icon: '🏸', badge: 'd5xvqq1750423289', neutral: true, sets: { bestOf: 3, unit: 'points', target: 21, cap: 30 } },
   tabletennis: { sport: 'tabletennis', kind: 'match', data: 'kambi', kambi: 'table_tennis', zh: '桌球', en: 'Table tennis', bet: 'tabletennis', odds: 'kambi', players: true, icon: '🏓', badge: 'fvesg01750422363', neutral: true, sets: { bestOf: 5, unit: 'points', target: 11 }, cap: 16 },

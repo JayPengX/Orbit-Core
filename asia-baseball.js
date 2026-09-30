@@ -248,13 +248,15 @@ export function parseTsdbDay(data, now = Date.now()) {
     };
   });
 }
-async function fetchCpblTsdb(year, month) {
+// The days of the month from `from` up to two weeks ahead, each day's list
+// kept 10 minutes at Cloudflare's edge (TheSportsDB's free key is rate-limited).
+async function fetchCpblTsdb(year, month, { from = Date.UTC(year, month - 1, 1), now = Date.now() } = {}) {
   const days = [];
-  const last = Math.min(Date.UTC(year, month, 0), Date.now() + 14 * 24 * HOUR);
-  for (let t = Date.UTC(year, month - 1, 1); t <= last; t += 24 * HOUR) days.push(new Date(t).toISOString().slice(0, 10));
+  const last = Math.min(Date.UTC(year, month, 0), now + 14 * 24 * HOUR);
+  for (let t = Math.floor(from / (24 * HOUR)) * 24 * HOUR; t <= last; t += 24 * HOUR) days.push(new Date(t).toISOString().slice(0, 10));
   const lists = await Promise.all(
     days.map(d =>
-      fetch(`${TSDB}?d=${d}&l=${TSDB_CPBL}`, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(TIMEOUT) })
+      fetch(`${TSDB}?d=${d}&l=${TSDB_CPBL}`, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(TIMEOUT), cf: { cacheTtl: 600, cacheEverything: true } })
         .then(r => (r.ok ? r.json() : null))
         .then(parseTsdbDay)
         .catch(() => [])
@@ -262,7 +264,22 @@ async function fetchCpblTsdb(year, month) {
   );
   return lists.flat();
 }
-const cpbl = (year, month) => fetchCpbl(year, month).catch(() => fetchCpblTsdb(year, month));
+// CPBL's own list, and TheSportsDB's days after its last game: CPBL's list
+// can stop short of the month (October's games were missing from it while
+// the season still had a week to go, so Fixtures showed no schedule).
+async function cpbl(year, month, now = Date.now()) {
+  const own = await fetchCpbl(year, month).catch(() => null);
+  if (!own) return fetchCpblTsdb(year, month, { now });
+  const last = own.reduce((m, g) => Math.max(m, Date.parse(g.start)), 0);
+  const from = Math.max(Date.UTC(year, month - 1, 1), last ? last + 24 * HOUR : 0, now - 2 * 24 * HOUR);
+  return mergeCpbl(own, await fetchCpblTsdb(year, month, { from, now }).catch(() => []));
+}
+// One list from two sources: a game in both (the same Taiwan day and clubs) once, CPBL's own copy.
+const cpblKey = g => `${new Date(Date.parse(g.start) + 8 * HOUR).toISOString().slice(0, 10)}|${[g.home.en, g.away.en].sort().join('|')}`;
+export function mergeCpbl(own, extra) {
+  const seen = new Set(own.map(cpblKey));
+  return [...own, ...extra.filter(g => !seen.has(cpblKey(g)) && seen.add(cpblKey(g)))];
+}
 
 const FETCHERS = { npb: fetchNpb, kbo: fetchKbo, cpbl };
 

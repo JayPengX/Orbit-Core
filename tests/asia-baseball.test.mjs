@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { parseNpb, parseKbo, parseCpbl, parseTsdbDay, asiaTarget } from '../asia-baseball.js';
+import { parseNpb, parseKbo, parseCpbl, parseTsdbDay, asiaTarget, mergeCpbl } from '../asia-baseball.js';
 
 const fixture = name => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8');
 const now = Date.parse('2026-09-29T12:00:00Z');
@@ -41,6 +41,16 @@ test('CPBL: the season list, postponed games void; TheSportsDB when the site tur
   assert.equal(day.length, 3);
   assert.deepEqual([day[0].away.zh, day[0].awayScore, day[0].homeScore, day[0].home.zh, day[0].state], ['台鋼雄鷹', 10, 19, '中信兄弟', 'post']);
   assert.ok(day.some(g => g.away.en === 'Uni-President Lions'));
+});
+
+test("CPBL: TheSportsDB's days fill in after CPBL's own list stops, each game once", () => {
+  const own = parseCpbl(JSON.parse(fixture('cpbl-2026.json')), now);
+  const extra = parseTsdbDay(JSON.parse(fixture('tsdb-cpbl-2026-09-28.json')), now);
+  const twin = { ...own.at(-1), id: 'cpbl-tsdb-x' };
+  const merged = mergeCpbl(own, [...extra, twin]);
+  assert.equal(merged.length, own.length + extra.length);
+  assert.ok(!merged.some(g => g.id === 'cpbl-tsdb-x'));
+  assert.equal(mergeCpbl([], extra).length, extra.length);
 });
 
 test('the address names a league and a month', () => {
