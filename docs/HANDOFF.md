@@ -625,3 +625,11 @@ that didn't land on live games, and text cut on phones.
   on into the cache), so one slow upstream can't hold eleven others.
   `tools/preview.mjs` mirrors both (8 s upstream limit, 3 s batch items) and
   DEBUG prints each request's start and duration.
+- **More added:** the World Cup, Euro, Copa América and Club World Cup
+  (ESPN, month pages: empty between tournaments); K League 1 (Kambi soccer:
+  three-way prices, `scoreOnly`, settled by `decidedTeamGame` from the last
+  score), CBA and KBL (Kambi); international cricket (`PRO_CRICKET`, results
+  from ESPN's `cricket/scorepanel`, `parseCricketPanel`); boxing (Kambi's
+  bouts kept only when on a TheSportsDB card, `notable` / `notableFight`,
+  results from its write-ups, `boxingResult`, void after 5 days unknown).
+  Play's basketball filter group now follows the catalogue.

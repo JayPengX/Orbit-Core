@@ -35,7 +35,9 @@ export const SPORTS = {
   badminton: { zh: '羽球', en: 'Badminton', icon: '🏸' },
   tabletennis: { zh: '桌球', en: 'Table tennis', icon: '🏓' },
   volleyball: { zh: '排球', en: 'Volleyball', icon: '🏐' },
-  snooker: { zh: '司諾克', en: 'Snooker', icon: '🎱' }
+  snooker: { zh: '司諾克', en: 'Snooker', icon: '🎱' },
+  cricket: { zh: '板球', en: 'Cricket', icon: '🏏' },
+  boxing: { zh: '拳擊', en: 'Boxing', icon: '🥊' }
 };
 
 // Sports played in sets (the same kind of markets in Play).
@@ -48,6 +50,8 @@ const PRO_TABLE_TENNIS = /wtt|ittf|world_(team_)?champ|world_cup|olympic|asian_(
 // Volleyball's national teams, the big continental and world club events and
 // the top pro leagues (Italy, Poland, Turkey, Japan), not the lower divisions.
 const PRO_VOLLEYBALL = /superlega|serie_a1|plusliga|efeler|sultanlar|sv_league|v_league|champions_league|nations_league|vnl|world_champ|club_world|olympic|asian|fivb|cev/;
+// Cricket: the international game and the IPL, not the domestic leagues.
+const PRO_CRICKET = /^(international|icc|asian_games|world_cup|t20_world|champions_trophy|indian_premier|ipl|the_ashes)/;
 // Rugby union: the international game and Europe's Champions Cup, not the domestic leagues.
 const PRO_RUGBY = /^(international|six_nations|nations_championship|rugby_world_cup|rugby_championship|european_champions_cup|british_(and_)?irish_lions)/;
 const espn = (sport, path, zh, en, bet, extra = {}) => ({ sport, kind: 'match', data: 'espn', espn: path, zh, en, bet, odds: bet ? 'espn' : undefined, ...extra });
@@ -127,6 +131,12 @@ export const CATALOG = {
   // the Nations Championship, the World Cup, the Lions) and Europe's Champions
   // Cup: Kambi's schedule and prices, the results from ESPN's competitions.
   rugbyunion: { sport: 'rugby', kind: 'match', data: 'kambi', kambi: 'rugby_union', pro: PRO_RUGBY, zh: '國際橄欖球', en: 'International rugby', bet: 'rugbyunion', odds: 'kambi', scores: ['rugby/289234', 'rugby/180659', 'rugby/244293', 'rugby/17567', 'rugby/164205', 'rugby/268565', 'rugby/271937'], icon: '🏉' },
+  // International cricket (one-day internationals, T20s, the World Cups, the
+  // Asian Games, the IPL, the Ashes): Kambi's prices, results from ESPN's.
+  cricket: { sport: 'cricket', kind: 'match', data: 'kambi', kambi: 'cricket', pro: PRO_CRICKET, zh: '國際板球', en: 'International cricket', bet: 'cricket', odds: 'kambi', players: true, icon: '🏏' },
+  // Boxing: Kambi's bouts, only those on a card TheSportsDB lists (the main
+  // events, not every undercard), settled from its results (notableFights).
+  boxing: { sport: 'boxing', kind: 'match', data: 'kambi', kambi: 'boxing/upcoming_fights', notable: true, zh: '拳擊', en: 'Boxing', bet: 'boxing', odds: 'kambi', players: true, neutral: true, icon: '🥊' },
   // Played in sets, from Kambi
   badminton: { sport: 'badminton', kind: 'match', data: 'kambi', kambi: 'badminton', zh: '羽球', en: 'Badminton', bet: 'badminton', odds: 'kambi', players: true, icon: '🏸', badge: 'd5xvqq1750423289', neutral: true, sets: { bestOf: 3, unit: 'points', target: 21, cap: 30 } },
   tabletennis: { sport: 'tabletennis', kind: 'match', data: 'kambi', kambi: 'table_tennis', pro: PRO_TABLE_TENNIS, zh: '桌球', en: 'Table tennis', bet: 'tabletennis', odds: 'kambi', players: true, icon: '🏓', badge: 'fvesg01750422363', neutral: true, sets: { bestOf: 5, unit: 'points', target: 11 }, cap: 16 },
@@ -244,4 +254,44 @@ function directJson(url) {
   directCache.set(url, { at: Date.now(), p });
   p.catch(() => directCache.delete(url));
   return p;
+}
+
+// ---- Boxing from TheSportsDB ------------------------------------------------------
+//
+// Kambi lists every bout of a card; TheSportsDB (league 4445, its free key,
+// straight from the device) lists the cards that matter, named after their
+// main event ("Ben Whittaker vs Conor Wallace") and, once over, each bout's
+// result ("Johnny Fisher def. Michael Pirotton - Majority Decision …").
+export const TSDB_BOXING = '4445';
+const surname = name => String(name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z ]/g, '').trim().split(/\s+/).pop() || '';
+const names = (text, a, b) => {
+  const t = String(text || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  return [surname(a), surname(b)].every(s => s.length >= 3 && t.includes(s));
+};
+// The cards on these days (Taiwan's dates, "2026-10-03"): { day: events }.
+export async function tsdbBoxingDays(days, fetchJson = directJson) {
+  const lists = await Promise.all(days.map(d => fetchJson(`${TSDB_DAY}?d=${d}&l=${TSDB_BOXING}`).then(x => x?.events || []).catch(() => null)));
+  return Object.fromEntries(days.map((d, i) => [d, lists[i]]));
+}
+// A bout worth listing: its two fighters named by one of the day's cards.
+export const notableFight = (home, away, events) => (events || []).some(e => names(e.strEvent, home, away));
+// A bout's result from the cards' write-ups: { status: 'final', homeScore,
+// awayScore } (1-0), 'void' for a draw or no contest, or null while unknown.
+export function boxingResult(events, home, away) {
+  for (const e of events || []) {
+    const text = String(e.strResult || '');
+    for (const line of text.split(/\r?\n/)) {
+      if (!names(line, home, away)) continue;
+      if (/\b(draw|no contest|no decision)\b/i.test(line) && !/\bdef\./i.test(line)) return { status: 'void' };
+      const m = /^(.+?)\s+def\.\s+(.+?)(\s+-|$)/i.exec(line.trim());
+      if (m) return names(m[1], home, home) ? { status: 'final', homeScore: 1, awayScore: 0 } : { status: 'final', homeScore: 0, awayScore: 1 };
+    }
+    // A main event told in prose only: the fighter named first in its opening sentence won.
+    const first = text.split(/[.!]\s/)[0].toLowerCase();
+    if (names(first, home, away) && /\b(def|defeated|beat|won|retained|stopped|knocked)\b/.test(first)) {
+      const [h, a] = [first.indexOf(surname(home)), first.indexOf(surname(away))];
+      return h < a ? { status: 'final', homeScore: 1, awayScore: 0 } : { status: 'final', homeScore: 0, awayScore: 1 };
+    }
+  }
+  return null;
 }
