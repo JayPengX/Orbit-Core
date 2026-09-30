@@ -102,14 +102,17 @@ export function emptyWallet(now = Date.now()) {
 //
 // The economy (tools/economy.mjs has the numbers): the allowance goes by what
 // the account is worth, so money matters at every size: the full amount to
-// get going or to get back in the game, less once there's plenty, never
-// nothing. Worth is the pool plus Securities' holdings less its loans (its
-// snap's `holdings`). A new pass opens with about five months of it.
+// get going or to get back in the game, half once the account is past the
+// opening money, a token once there's plenty. Worth is the pool plus
+// Securities' holdings less its loans (its snap's `holdings`). A new pass
+// opens with about five months of it. v5 (2026-10): 6,000 / 3,000 / 1,500 /
+// 500 (was 4,000 / 2,000 / 1,000 above the first tier), so a regular player
+// levels out around NT$40,000 instead of drifting up every month.
 export const PAY_TIERS = [
   [40_000, 6_000],
-  [100_000, 4_000],
-  [250_000, 2_000],
-  [Infinity, 1_000]
+  [100_000, 3_000],
+  [250_000, 1_500],
+  [Infinity, 500]
 ];
 export const PAY = { start: 30_000, month: PAY_TIERS[0][1] };
 // The reset for accounts made before this economy: their opening money
