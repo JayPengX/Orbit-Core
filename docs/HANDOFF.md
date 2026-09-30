@@ -487,3 +487,58 @@ that didn't land on live games, and text cut on phones.
   sources (Fixtures' schedule, Play's prices), one line each. Off-season and
   Kambi-empty days (B.League before its season, badminton and volleyball
   between events) show 0 there; that's the source, not the apps.
+
+## Round: broadcasts, Chinese everywhere, sheets (branch `claude/live-games-recommendation-consistency-nm0x4l`)
+
+- **ELTA's own schedule** (`piceltaott-elta.cdn.hinet.net/…/sports_live_program_list.json`,
+  two weeks ahead; allowed and always trimmed by the proxy: `trimElta`, kept
+  30 min). Fixtures' `lib/broadcast.mjs` (`parseElta`, `eltaPrograms`,
+  `broadcastsFor`) and `lib/tv.mjs` (`tvOf`, `channelsOf`) match each program
+  to its game: same league, starting an hour before to 20 min after, either
+  side's Chinese name (`zhSame`: two characters in a row, so 里茲聯 = 利茲聯).
+  A program without the sides ("【onELTA 熱身賽】") goes to the only game near
+  it, or is marked 同時段擇一，待公布. Inside the schedule's days a game ELTA
+  doesn't carry isn't said to be on ELTA (the NBA: one game a day, from the
+  preseason's 10/6; `NBA_ELTA_FROM`); beyond them, the league list with the
+  NBA's note. Channels: 101/105/110/115 = 愛爾達體育1–4台 (MOD, cable,
+  ELTA.tv; Hami Video too), 540–549 = ELTA.tv 體育MAX1–10台; each has its
+  ELTA.tv watch page (`eltaWatchUrl`). Shown: a 📺 line under each game ELTA
+  carries, the pick cards' chips, a 台灣轉播 card with watch links in the
+  match sheet, and 直播's 愛爾達轉播表 (now and the next 12 h). "Your
+  services" picks use each game's own channels.
+- **Teams in Chinese:** kit `names.mjs` (synced to both apps as
+  `lib/names.mjs`): MLB, NBA, WNBA, NFL, NHL (city + nickname: rows show the
+  nickname, 海盜), Europe's clubs and MLS (one name, any competition), NPB,
+  KBO, CPBL (統一獅 in a row). Play's `teamZh` is the kit's now (NFL, NHL,
+  soccer beyond the EPL gained names). Fixtures' `localSide` puts the Chinese
+  in `name`/`short` and keeps the English in `en`: Play ids, follows (the
+  pass keeps English: Play matches by it), affinity keys (`eventKeys`) and
+  ELTA matching use `en`. National sides by the kit's `countryName` (Intl).
+  People keep their names (F1's drivers take the lottery's, as in Play).
+- **More in Chinese:** statuses (Final/OT → 終場（延長）…), standings groups
+  (`groupZh`), standing lines, positions (`posZh`), injury lists
+  (`injuryZh`), series lines (`seriesLineZh`), weather in °C, leaders'
+  values, baseball pitches (`pitchZh`: a translator read "Strike" as a
+  labour strike), fixed words for rounds, hands and stances (`fixedWord`,
+  before `translate()`), metric heights and weights, dates.
+- **投注 only where Play has it** (`lib/playable.mjs`): ESPN leagues need
+  DraftKings' line on the scoreboard (`priced`) and the game inside Play's
+  reach (MLB 8 days, soccer 21, others 7.5); Kambi leagues need the pair in
+  Kambi's priced list (read once asked, the page redrawn when it comes).
+- **Search:** ESPN files soccer clubs and players without a league id
+  (`s:600~t:382`): found by `defaultLeagueSlug` now (Man City was missing).
+  A league result opens the league (the search query used to redraw over it).
+- **Clubs:** a soccer club is read across all its competitions
+  (`soccer/all/teams/<id>/schedule` + `?fixture=true`: its next games showed
+  none before) and its squad from its own league (`defaultLeague`: a cup's
+  list can be last season's); each game says its competition.
+- **Players:** F1 drivers get the championship (place, points, gap), race by
+  race results, the next race and their team; tennis players the world
+  ranking and this season's matches (`rankings`, `playerMatches`).
+- **首頁's date strip has no end:** it grows two weeks at either end as it's
+  scrolled, and 📅 opens the date picker for any day.
+- **Sheets:** win probability labelled away left / home right (adding up to
+  100) with the chart's ends named; batter and pitcher on their own line on
+  a phone; form pills under their label; squad grouped by position, long
+  names wrap; the main bout first on a fight card; line scores by Chinese
+  names.

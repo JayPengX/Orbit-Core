@@ -76,6 +76,11 @@ const CLUBS = {
   'paris saint germain': '巴黎聖日耳曼', psg: '巴黎聖日耳曼', marseille: '馬賽', 'olympique marseille': '馬賽', monaco: '摩納哥', 'as monaco': '摩納哥', lille: '里爾', lyon: '里昂', 'olympique lyonnais': '里昂', nice: '尼斯', lens: '朗斯',
   rennes: '雷恩', 'stade rennais': '雷恩', strasbourg: '史特拉斯堡', nantes: '南特', toulouse: '土魯斯', brest: '布雷斯特', 'stade brestois 29': '布雷斯特', auxerre: '歐塞爾', angers: '昂熱', 'le havre': '勒阿弗爾', lorient: '洛里昂', metz: '梅斯',
   'paris': '巴黎 FC', reims: '蘭斯', montpellier: '蒙彼利埃', 'saint etienne': '聖埃蒂安',
+  // MLS
+  'atlanta united': '亞特蘭大聯', austin: '奧斯汀', charlotte: '夏洛特', 'chicago fire': '芝加哥火焰', cincinnati: '辛辛那提', 'colorado rapids': '科羅拉多急流', 'columbus crew': '哥倫布機員', 'd c united': '華盛頓聯', dallas: '達拉斯',
+  'houston dynamo': '休士頓迪納摩', 'inter miami': '邁阿密國際', 'la galaxy': '洛杉磯銀河', 'los angeles': '洛杉磯 FC', 'minnesota united': '明尼蘇達聯', montreal: '蒙特婁', nashville: '納什維爾', 'new england revolution': '新英格蘭革命',
+  'new york city': '紐約城', 'new york red bulls': '紐約紅牛', 'orlando city': '奧蘭多城', 'philadelphia union': '費城聯合', 'portland timbers': '波特蘭伐木者', 'real salt lake': '皇家鹽湖城', 'san diego': '聖地牙哥 FC',
+  'san jose earthquakes': '聖荷西地震', 'seattle sounders': '西雅圖海灣人', 'sporting kansas city': '堪薩斯城競技', 'st louis city': '聖路易城', toronto: '多倫多 FC', 'vancouver whitecaps': '溫哥華白帽',
   // Europe's others
   'sporting cp': '里斯本競技', sporting: '里斯本競技', benfica: '本菲卡', porto: '波爾圖', braga: '布拉加', 'psv eindhoven': 'PSV 燕豪芬', psv: 'PSV 燕豪芬', ajax: '阿賈克斯', feyenoord: '飛燕諾', 'az alkmaar': 'AZ 阿爾克馬爾', 'club brugge': '布魯日',
   celtic: '塞爾提克', rangers: '流浪者', galatasaray: '加拉塔薩雷', fenerbahce: '費內巴切', besiktas: '貝西克塔斯', olympiacos: '奧林匹亞科斯', 'slavia prague': '布拉格斯拉夫', 'sk slavia praha': '布拉格斯拉夫', 'sparta prague': '布拉格斯巴達',
