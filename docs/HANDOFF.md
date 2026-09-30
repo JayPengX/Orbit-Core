@@ -8,6 +8,19 @@ edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
 
 ## Done in this round
 
+- **Sell every game, one reach, one cut (Play + Fixtures):** Play sells every
+  league's games up to 14 days out (`SOLD_DAYS` in `kit/leagues.mjs`, the
+  same for all leagues and sources; Fixtures' 投注 uses it too, so every ESPN
+  game in reach gets 投注). A game no bookmaker prices yet (NBA preseason, a
+  game DraftKings hasn't posted) is priced by the house (`Quadra-Play/public/
+  lib/house.mjs`: ESPN standings, last season regressed, log5 plus home edge,
+  soccer's draw, preseason pulled halfway to even); DraftKings' line replaces
+  it once posted. Past the daily pages, ESPN's month pages (`dates=YYYYMM`)
+  fill the second week. The house cut is one rule now (`rules.mjs houseCut`):
+  the lottery's measured cut per kind of market, no league-tier, source-gap,
+  line-step or source-specific extras; one win K (`K_WIN`, 1.158), so prices
+  stay close to 運彩's.
+
 - **Data-loss fix (critical):** the kit's `q.start()` returned the session
   instead of the first reply, so every app thought the pass was empty and
   saved over it. Fixed; apps also refuse to save over a copy they can't

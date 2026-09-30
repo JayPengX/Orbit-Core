@@ -132,6 +132,13 @@ export const CATALOG = {
 // Play's kind of markets for a sport.
 export const familyOfSport = sport => (SET_SPORTS.has(sport) ? 'sets' : sport);
 
+// How far ahead Play sells a game (and Fixtures shows its 投注): one reach
+// for every league and every price, a bookmaker's or the house's own (Play's
+// house.mjs). Two weeks: the next two soccer matchweeks (an international
+// break between), two football weeks, two weeks of daily sports, while a
+// price still has most of the news it will get.
+export const SOLD_DAYS = 14;
+
 // The catalogue entry for one of Play's keys.
 export const byBetKey = Object.fromEntries(Object.entries(CATALOG).filter(([, l]) => l.bet).map(([key, l]) => [l.bet, { key, ...l }]));
 
