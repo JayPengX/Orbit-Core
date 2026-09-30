@@ -33,8 +33,7 @@ edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
   league's own schedule (`Quadra-Play/public/lib/schedules.mjs`): Asian
   baseball's month lists (strength from this season's results; settled from
   the lists, final-score markets only via `scoreOnly`), ESPN's UFC cards
-  (records), tennis draws (ranking points, each tour's singles), NRL/AFL
-  (ESPN schedules and standings), and every match in Kambi's list for the
+  (records), tennis draws (ranking points, each tour's singles), and every match in Kambi's list for the
   rest (priced or not; the 16-match cap is gone). Kambi's price replaces the
   house's once posted (`pricedByKambi`). Fixtures' 投注 no longer reads
   Kambi: every game of every league Play sells, within `SOLD_DAYS`.
@@ -594,3 +593,23 @@ that didn't land on live games, and text cut on phones.
   dividends, coupons, interest); `fill` also covers plan buys. Toasts open
   their tab when tapped; in-app banners (`#portfolio` …) now switch tabs
   (`hashchange`); a pending dividend's pay day is a push while closed.
+
+## Round: fewer, bigger leagues; pro events only; Asia and the national teams
+
+- **Second divisions and college basketball retired** (catalogue `retired`):
+  not listed in Fixtures nor sold in Play, still read by Play to settle old
+  slips. **Removed outright:** Austria, Switzerland, Denmark, Norway, Sweden,
+  Greece, Colombia, Chile, A-League, Chinese Super League, NWSL, NRL, AFL,
+  NASCAR, IndyCar (the `aussie` sport and Play's short-lived NASCAR/IndyCar
+  board with them).
+- **Pro events only** (catalogue `pro`, `kambiKept(key, event)`): Kambi's
+  table tennis (WTT, ITTF, title events; not Czech Liga Pro, TT Elite
+  Series…), volleyball (national teams, top leagues, big club events) and
+  rugby union (internationals, the Champions Cup). Both apps and
+  `tools/leagues-audit.mjs` apply it.
+- **Added:** AFC Champions League Elite, the Asian Cup and international
+  friendlies (ESPN), Liga ACB and the NBL (Kambi, basketball family),
+  international rugby union (`rugbyunion`: Kambi's schedule and prices,
+  results from ESPN's rugby competitions, `scores` a list of paths).
+- **Play:** 場中 only on today's board (the day strip keeps today while
+  games are on).

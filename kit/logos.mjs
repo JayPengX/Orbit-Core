@@ -104,9 +104,9 @@ export function teamLogo(sport, name, dark = false) {
 // ESPN's soccer league logo ids.
 const SOCCER_LOGO = {
   epl: 23, laliga: 15, seriea: 12, bundesliga: 10, ligue1: 9, ucl: 2, uel: 2310, uecl: 20296, eredivisie: 11, primeira: 14, championship: 24, league1: 25,
-  scotland: 45, bundesliga2: 97, laliga2: 107, serieb: 99, ligue2: 96, belgium: 6, austria: 5, swiss: 17, sweden: 16, greece: 98, superlig: 18, saudi: 2488,
-  mls: 19, usl: 2292, nwsl: 2323, ligamx: 22, brasileirao: 85, argentina: 1, colombia: 1543, chile: 86, libertadores: 58, sudamericana: 1208, jleague: 2199,
-  csl: 2350, aleague: 1308, facup: 40, leaguecup: 41, copadelrey: 80, nationsleague: 2395, wcqeurope: 67
+  scotland: 45, bundesliga2: 97, laliga2: 107, serieb: 99, ligue2: 96, belgium: 6, superlig: 18, saudi: 2488,
+  mls: 19, usl: 2292, ligamx: 22, brasileirao: 85, argentina: 1, libertadores: 58, sudamericana: 1208, jleague: 2199,
+  facup: 40, leaguecup: 41, copadelrey: 80, nationsleague: 2395, wcqeurope: 67, acl: 2200, asiancup: 2243, friendly: 53
 };
 // TheSportsDB's league badges.
 const LEAGUE_BADGE = {
@@ -117,8 +117,7 @@ const LEAGUE_BADGE = {
 const ESPN_LEAGUE = {
   mlb: 'teamlogos/leagues/500/mlb.png', nba: 'teamlogos/leagues/500/nba.png', wnba: 'teamlogos/leagues/500/wnba.png', nfl: 'teamlogos/leagues/500/nfl.png',
   nhl: 'teamlogos/leagues/500/nhl.png', f1: 'teamlogos/leagues/500/f1.png', ncaaf: 'espn/misc_logos/500/ncaa_football.png', ncaam: 'espn/misc_logos/500/ncaa.png',
-  ncaaw: 'espn/misc_logos/500/ncaa.png', pga: 'teamlogos/leagues/500/pgatour.png', lpga: 'teamlogos/leagues/500/lpga.png', ufc: 'teamlogos/leagues/500/ufc.png',
-  nrl: 'teamlogos/leagues/500/nrl.png', afl: 'teamlogos/leagues/500/afl.png', indycar: 'espn/teamlogos/500/indycar_series.png', nascar: 'espn/teamlogos/500/nascar.png'
+  ncaaw: 'espn/misc_logos/500/ncaa.png', pga: 'teamlogos/leagues/500/pgatour.png', lpga: 'teamlogos/leagues/500/lpga.png', ufc: 'teamlogos/leagues/500/ufc.png'
 };
 // The league's own logo (light backgrounds: the apps show it on a white disc), or null.
 export function leagueLogo(key, dark = false) {
