@@ -46,3 +46,14 @@ test('trims apply per URL in a batch', async () => {
   assert.equal(r[0].s, 200);
   assert.ok('events' in r[0].b || Object.keys(r[0].b).length === 0 || r[0].b.events === undefined);
 });
+
+test("ELTA's schedule: only its program list, always trimmed to each live program's time, channel, league and title", async () => {
+  const { trimElta } = await import('../sports-proxy-worker.js');
+  const out = trimElta({ game_type: [{ name: 'NBA' }], calendar: { '2026-10-09': [{ program_sn: 1, channel_number: 101, channel_icon: 'x.svg', start_time: 1791545400, end_time: 1791554400, game_icon: 'y.jpg', game_type: 'NBA', game_type_en: 'NBA', program_desc: '火箭 VS 獨行俠 10/9 熱身賽中國賽 LIVE' }] } });
+  assert.deepEqual(out, { programs: [{ d: '2026-10-09', s: 1791545400, e: 1791554400, ch: 101, g: 'NBA', t: '火箭 VS 獨行俠 10/9 熱身賽中國賽 LIVE' }] });
+  const list = 'https://piceltaott-elta.cdn.hinet.net/production/json/program_list/sports_live_program_list.json';
+  const res = await get(`https://proxy.test/sports-proxy?batch=1&u=${encodeURIComponent(list)}&u=${encodeURIComponent('https://piceltaott-elta.cdn.hinet.net/other.json')}`);
+  const { r } = await res.json();
+  assert.equal(r[0].s, 200);
+  assert.equal(r[1].s, 400);
+});

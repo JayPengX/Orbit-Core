@@ -114,6 +114,7 @@ async function isRateLimited(env, ip, limit) {
 }
 
 // ==== /sports-proxy - CORS passthrough for public sports data ==============
+const ELTA_HOST = 'piceltaott-elta.cdn.hinet.net';
 const SPORTS_PROXY_FETCH_USER_AGENT = 'Quadra-Fixtures-Bot/1.0 (+https://github.com/JayPengX/Quadra-Fixtures)';
 const SPORTS_PROXY_ALLOWED_HOSTS = [
   'site.api.espn.com',
@@ -138,11 +139,15 @@ const SPORTS_PROXY_ALLOWED_HOSTS = [
   // company's description in the reader's language (Securities). Only
   // /translate_a/t; sent upstream as a POST (see fetchUpstream), kept a month.
   'clients5.google.com',
+  // ELTA's (愛爾達) sports schedule: which game each of its channels carries,
+  // for Fixtures' "where to watch" (only the one list, always trimmed).
+  ELTA_HOST,
   // Not a real host: Asian baseball's schedules and scores, gathered by this
   // Worker from the leagues' own sites (asia-baseball.js).
   ASIA_HOST
 ];
 const SPORTS_PROXY_RATE_LIMIT = 600;
+const ELTA_PATH = '/production/json/program_list/sports_live_program_list.json';
 // Per signed-in session, a minute, in memory (cache hits included).
 const SESSION_RATE_LIMIT = 240;
 const SPORTS_PROXY_UPSTREAM_TIMEOUT_MS = 8_000;
@@ -263,6 +268,8 @@ function cachePolicyFor(url) {
       return yahooPolicy(url);
     case 'clients5.google.com':
       return CACHE_TRANSLATE;
+    case ELTA_HOST:
+      return CACHE_STANDINGS;
     case ASIA_HOST:
       return asiaPolicy(url);
     default:
@@ -310,6 +317,20 @@ function trimKambi(data) {
     events: Array.isArray(data.events) ? data.events.map(item => ({ event: event(item.event), betOffers: offers(item.betOffers), liveData: live(item.liveData) })) : undefined,
     liveEvents: Array.isArray(data.liveEvents) ? data.liveEvents.map(item => ({ event: event(item.event), liveData: live(item.liveData) })) : undefined
   };
+}
+
+// ELTA's schedule, a small fraction of it: each live program's day, start
+// and end (Unix seconds), channel, league (ELTA's English name) and title.
+const TRIM_ELTA = 'elta';
+export function trimElta(data) {
+  const programs = [];
+  for (const [day, list] of Object.entries(data?.calendar || {})) {
+    for (const p of Array.isArray(list) ? list : []) {
+      if (!p || !p.start_time) continue;
+      programs.push({ d: day, s: p.start_time, e: p.end_time, ch: p.channel_number, g: p.game_type_en || p.game_type || '', t: p.program_desc || '' });
+    }
+  }
+  return { programs };
 }
 
 function trimPolymarketEvents(events) {
@@ -422,7 +443,7 @@ async function fetchUpstream(upstreamUrl, trim) {
     if (trim) {
       try {
         const parsed = JSON.parse(new TextDecoder().decode(body));
-        body = JSON.stringify(trim === TRIM_KAMBI_EVENTS ? trimKambi(parsed) : trimPolymarketEvents(parsed));
+        body = JSON.stringify(trim === TRIM_KAMBI_EVENTS ? trimKambi(parsed) : trim === TRIM_ELTA ? trimElta(parsed) : trimPolymarketEvents(parsed));
       } catch {
         // Not the JSON shape expected - pass it through untouched.
       }
@@ -448,6 +469,7 @@ function cacheEntry(result, policy) {
 
 // Which trim (if any) applies to a URL: only the hosts each one is for.
 function trimFor(trimParam, upstreamUrl) {
+  if (upstreamUrl.hostname === ELTA_HOST) return TRIM_ELTA;
   if (trimParam === TRIM_POLYMARKET_EVENTS && upstreamUrl.hostname === 'gamma-api.polymarket.com' && upstreamUrl.pathname === '/events') return TRIM_POLYMARKET_EVENTS;
   if (trimParam === TRIM_KAMBI_EVENTS && upstreamUrl.hostname === 'eu-offering-api.kambicdn.com') return TRIM_KAMBI_EVENTS;
   return null;
@@ -457,6 +479,7 @@ function parseTarget(target) {
   try {
     const u = new URL(target);
     if (u.hostname === 'clients5.google.com' && (u.pathname !== '/translate_a/t' || (u.searchParams.get('q') || '').length > 5000)) return null;
+    if (u.hostname === ELTA_HOST && u.pathname !== ELTA_PATH) return null;
     return u.protocol === 'https:' && SPORTS_PROXY_ALLOWED_HOSTS.includes(u.hostname) ? u : null;
   } catch {
     return null;

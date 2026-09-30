@@ -194,8 +194,26 @@ export function f1Constructor(name) {
 
 // National teams (volleyball, and any sport's national sides): a flag.
 const COUNTRY_CODES = {
-  argentina: 'AR', australia: 'AU', austria: 'AT', belgium: 'BE', brazil: 'BR', bulgaria: 'BG', canada: 'CA', chile: 'CL', china: 'CN', 'chinese taipei': 'TW', taiwan: 'TW', colombia: 'CO', croatia: 'HR', cuba: 'CU', 'czech republic': 'CZ', czechia: 'CZ', denmark: 'DK', egypt: 'EG', england: 'GB', estonia: 'EE', finland: 'FI', france: 'FR', germany: 'DE', greece: 'GR', hungary: 'HU', india: 'IN', indonesia: 'ID', iran: 'IR', ireland: 'IE', israel: 'IL', italy: 'IT', japan: 'JP', kazakhstan: 'KZ', 'south korea': 'KR', korea: 'KR', latvia: 'LV', lithuania: 'LT', mexico: 'MX', montenegro: 'ME', netherlands: 'NL', 'new zealand': 'NZ', norway: 'NO', poland: 'PL', portugal: 'PT', 'puerto rico': 'PR', qatar: 'QA', romania: 'RO', russia: 'RU', serbia: 'RS', slovakia: 'SK', slovenia: 'SI', spain: 'ES', sweden: 'SE', switzerland: 'CH', thailand: 'TH', tunisia: 'TN', turkey: 'TR', turkiye: 'TR', ukraine: 'UA', usa: 'US', 'united states': 'US', uruguay: 'UY', vietnam: 'VN', 'dominican republic': 'DO', philippines: 'PH', hongkong: 'HK', 'hong kong': 'HK', singapore: 'SG', malaysia: 'MY'
+  argentina: 'AR', australia: 'AU', austria: 'AT', belgium: 'BE', brazil: 'BR', bulgaria: 'BG', canada: 'CA', chile: 'CL', china: 'CN', 'chinese taipei': 'TW', taiwan: 'TW', colombia: 'CO', croatia: 'HR', cuba: 'CU', 'czech republic': 'CZ', czechia: 'CZ', denmark: 'DK', egypt: 'EG', england: 'GB', estonia: 'EE', finland: 'FI', france: 'FR', germany: 'DE', greece: 'GR', hungary: 'HU', india: 'IN', indonesia: 'ID', iran: 'IR', ireland: 'IE', israel: 'IL', italy: 'IT', japan: 'JP', kazakhstan: 'KZ', 'south korea': 'KR', korea: 'KR', latvia: 'LV', lithuania: 'LT', mexico: 'MX', montenegro: 'ME', netherlands: 'NL', 'new zealand': 'NZ', norway: 'NO', poland: 'PL', portugal: 'PT', 'puerto rico': 'PR', qatar: 'QA', romania: 'RO', russia: 'RU', serbia: 'RS', slovakia: 'SK', slovenia: 'SI', spain: 'ES', sweden: 'SE', switzerland: 'CH', thailand: 'TH', tunisia: 'TN', turkey: 'TR', turkiye: 'TR', ukraine: 'UA', usa: 'US', 'united states': 'US', uruguay: 'UY', vietnam: 'VN', 'dominican republic': 'DO', philippines: 'PH', hongkong: 'HK', 'hong kong': 'HK', singapore: 'SG', malaysia: 'MY',
+  britain: 'GB', 'great britain': 'GB', 'united kingdom': 'GB', uk: 'GB', monaco: 'MC', 'south africa': 'ZA', morocco: 'MA', nigeria: 'NG', ghana: 'GH', senegal: 'SN', 'ivory coast': 'CI', 'cote d ivoire': 'CI', cameroon: 'CM', algeria: 'DZ', peru: 'PE', ecuador: 'EC', paraguay: 'PY', venezuela: 'VE', bolivia: 'BO', jamaica: 'JM', 'saudi arabia': 'SA', 'united arab emirates': 'AE', uae: 'AE', georgia: 'GE', armenia: 'AM', azerbaijan: 'AZ', belarus: 'BY', moldova: 'MD', 'bosnia herzegovina': 'BA', bosnia: 'BA', albania: 'AL', 'north macedonia': 'MK', iceland: 'IS', luxembourg: 'LU', cyprus: 'CY', malta: 'MT', 'korea republic': 'KR', 'republic of korea': 'KR', fiji: 'FJ', samoa: 'WS', tonga: 'TO', 'papua new guinea': 'PG', uzbekistan: 'UZ', mongolia: 'MN', 'costa rica': 'CR', panama: 'PA', honduras: 'HN', 'el salvador': 'SV', guatemala: 'GT', haiti: 'HT', bahamas: 'BS', 'trinidad tobago': 'TT', curacao: 'CW'
 };
+// The home nations aren't countries to Intl: their names by hand.
+const HOME_NATIONS = { england: ['英格蘭', 'England'], scotland: ['蘇格蘭', 'Scotland'], wales: ['威爾斯', 'Wales'], 'northern ireland': ['北愛爾蘭', 'Northern Ireland'] };
+let regionNames = null;
+// A country's name in the reader's language ("Netherlands" → 荷蘭), or the name as given.
+export function countryName(name, lang = 'zh') {
+  const key = normalizeTeamName(name);
+  if (!key) return name || '';
+  if (HOME_NATIONS[key]) return HOME_NATIONS[key][lang === 'en' ? 1 : 0];
+  const code = COUNTRY_CODES[key];
+  if (!code || lang === 'en') return name;
+  try {
+    regionNames ||= new Intl.DisplayNames(['zh-TW'], { type: 'region' });
+    return regionNames.of(code) || name;
+  } catch {
+    return name;
+  }
+}
 // The flag emoji of a national team's name, or null.
 export function countryFlag(name) {
   const code = COUNTRY_CODES[normalizeTeamName(name).replace(/\s+(women|men|u\d+)$/, '')];
