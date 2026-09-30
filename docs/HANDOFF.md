@@ -6,6 +6,36 @@ All repos develop on `claude/gifted-dijkstra-dv6w8a` and are pushed to
 edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
 `npx eslint .`).
 
+## Round: v9, Securities earns a little more (realistically) and Plus keeps members (all repos, pushed to `main`)
+
+- **Why Play earns and Securities doesn't:** per investor a month (the model's
+  NT$40,000, ~70% invested, NT$50,000 traded) Securities keeps ~143 commission
+  and ~157 sell tax and exchange fees (a sink like any other in play money),
+  but the market pays holdings ~7% a year (~163) and cash earns 0.8%: net
+  about +130, against ~7,900 from a regular bettor. That's realistic: a
+  broker keeps ~0.3% of turnover, a sportsbook 5-15% of stakes.
+- **Mutual funds** now pay a 1% subscription fee (申購手續費, `FUND_FEE` in
+  `markets.mjs`, a Taiwan online fund platform's discounted rate; Plus's
+  2.8折 applies) and nothing to redeem, instead of the US stock commission.
+- **Plus cash interest** is 2% on the first NT$100,000 only (kit
+  `PLUS.stock.cashCap`, like a Taiwan digital bank's high-interest tier);
+  0.8% on the rest.
+- **Plus at full use:** typical members cost about the fee (v8 table). The most
+  a bettor can take: a free bet staked on long odds returns up to ~86% of its
+  face (1 − the cut), about NT$750 a month, plus two cards (NT$600 only if
+  they'd have bought them) and ≤ NT$100 of cash interest. A heavy trader saves
+  72% of commission with no cap (as real brokers' discounts), but still pays
+  the rest and the 0.3% sell tax, so still earns the house money, just less.
+  Light users earn the house the most.
+- **Keeping members** (kit): the Plus sheet shows the fee, this month's
+  returns (free bets, cards at shop price, boosts), the month count and the
+  total since joining (`plusReturns({ all })`, `plusTenure`); a banner when
+  the weekly free bet arrives and three days before any renewal, the free
+  month included, with how to stop (`plusNotices`, notice kind `plus`);
+  stopping is one confirmation that states what Plus gave back and what
+  stays and stops; Rewards badges at 3, 6 and 12 Plus months. No dark
+  patterns: cancelling stays under 管理會員, and every charge is announced.
+
 ## Round: v8, points with a purpose and a Plus worth paying for (all repos, pushed to `main`)
 
 v7's Plus (NT$990) gave every kind of member less than its fee, so nobody

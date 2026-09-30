@@ -72,6 +72,9 @@ account's document id.
   app is opened is never charged. Apps read membership from that entry
   alone (the kit's `plusMember`, `plusMonths`). A member also gets a
   NT$200 free bet each Taiwan week (`eco:fb:<Monday>`, `plusBonusEntries`).
+  The kit tells members when it arrives and three days before a renewal
+  (`plusNotices`), and the Plus sheet shows what Plus gave back this month
+  and since joining (`plusReturns`, `plusTenure`).
 - **VIP cashback:** once a Taiwan month is over, its gaming stakes in Play
   (bets, lottery, scratch; less refunds) pay back 0.5-1.5% by tier
   (`VIP`, `vipEntries`: `eco:vip:<month>`, from 2026-10).

@@ -230,7 +230,7 @@ test('Plus: the weekly bonus bet is a free bet; what Plus gave back this month',
     { id: 'odds:plus-old', t: Date.UTC(2026, 8, 20), app: 'odds', kind: 'plusboost', amount: 99 }
   ] };
   assert.deepEqual(kit.freeBets(w, t).map(x => [x.id, x.value]), [['eco:fb:2026-10-05', 100]]);
-  assert.deepEqual(kit.plusReturns(w, t), { boosts: 42, bets: 100, total: 142 });
+  assert.deepEqual(kit.plusReturns(w, t), { boosts: 42, bets: 100, cards: 300 * kit.PLUS.vocab.cards, total: 142 + 300 * kit.PLUS.vocab.cards });
   assert.equal(kit.PLUS.odds.lift < 0.158, true);
   assert.match(kit.describeEntry({ app: 'odds', kind: 'plusboost', amount: 42 }), /Plus/);
 });
@@ -303,4 +303,30 @@ test('points: earned make the level and title, spent come off what is left', () 
   assert.equal(kit.PLUS.odds.lift, 0);
   assert.ok((kit.PLUS.odds.bonusBet * 52) / 12 + 300 * kit.PLUS.vocab.cards > 2.5 * kit.PLUS.fee);
   assert.ok(kit.plusPerks('en').every(p => p && !/winnings, every day/.test(p[1])));
+});
+
+test('Plus hooks: tenure, returns since joining, the weekly free bet and renewal notices once each', () => {
+  const plus = m => ({ id: `eco:plus:${m}`, t: Date.UTC(2026, 7, 1), app: 'eco', kind: 'plus', amount: -490 });
+  // Friday 30 Oct 2026, noon in Taiwan: the week of Monday the 26th, 2 days before the renewal.
+  const now = Date.UTC(2026, 9, 30, 4);
+  const w = {
+    entries: [plus('2026-09'), plus('2026-10'), { id: 'eco:fb:2026-10-26', t: now - 3_600_000, app: 'eco', kind: 'freebet', amount: 0, note: '200' }, { id: 'eco:fb:welcome', t: now, app: 'eco', kind: 'freebet', amount: 0, note: '200' }],
+    settings: { plus: { value: { on: true, plan: 'month' }, t: 1 } }
+  };
+  assert.equal(kit.plusTenure(w, now), 2);
+  const r = kit.plusReturns(w, now);
+  // The welcome offer isn't Plus's.
+  assert.deepEqual([r.bets, r.cards], [200, 300 * kit.PLUS.vocab.cards]);
+  assert.equal(kit.plusReturns(w, now, { all: true }).cards, 2 * 300 * kit.PLUS.vocab.cards);
+  const s = { wallet: w, lang: 'zh', app: 'odds' };
+  kit.plusNotices(s, now);
+  assert.equal(localStorage.getItem('quadra.seen.fb'), 'eco:fb:2026-10-26');
+  assert.equal(localStorage.getItem('quadra.seen.renew:2026-10'), '1');
+  // Ten days earlier: no renewal reminder yet.
+  kit.plusNotices(s, Date.UTC(2026, 9, 20, 4));
+  assert.equal(localStorage.getItem('quadra.seen.renew:2026-10'), '1');
+  assert.equal(localStorage.getItem('quadra.seen.renew:2026-09'), null);
+  // Not renewing: no reminder next month.
+  kit.plusNotices({ ...s, wallet: { ...w, entries: [...w.entries, plus('2026-11')], settings: { plus: { value: { on: false }, t: 2 } } } }, Date.UTC(2026, 10, 29, 4));
+  assert.equal(localStorage.getItem('quadra.seen.renew:2026-11'), null);
 });
