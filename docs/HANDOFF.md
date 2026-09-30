@@ -666,3 +666,50 @@ an idle account doubling in five months.
 - Seen, not changed: the `plan` mission counts saving a monthly plan in
   Securities, so re-saving one each day earns its NT$50 free bet daily
   (worth ~NT$22 at a free bet's ~45% return).
+
+## Round: the business model (all repos, pushed to `main`)
+
+The owner asked to run Quadra like a profit-minded business, generous where
+it pays back, realistic throughout. `node tools/economy.mjs` has a v6
+setting and a table of the house's side per user (gaming take, promotions
+and their share of it, commission, Plus and shop, house net), member and
+not. Real sportsbooks spend 20-30% of their gaming take on promotions;
+Quadra stays under 30% for anyone who plays much.
+
+- **Quadra Plus, reworked (NT$390 a month, NT$3,900 a year; was 290 /
+  2,900):** Play: a daily +10% winnings boost on one paid slip up to
+  NT$1,000 (`lift` on the slip; 10% is under every market's cut, so the
+  house stays ahead at any price; paid as `plus-<slip>`, kind
+  `plusboost`), a NT$100 free bet each week (the Worker's
+  `eco:fb:<Monday>`, `plusBonusEntries`), parlay boost doubled, cash out 2%.
+  Securities: commission 2.8折 (was 5折). Rewards: every word pack while a
+  member (`packOpen`, `packIncluded`; bought packs stay), +NT$50 words, a
+  protection card a month. The Plus card and sheet show what Plus gave
+  back this month (`plusReturns`: boosts paid and bonus bets). Price moved
+  with the value: a regular bettor gets back about 3× the fee; Plus makes
+  money on casual members. Existing monthly members renew at NT$390;
+  yearly ones keep what they paid.
+- **VIP cashback (free, by activity):** a Taiwan month's gaming stakes in
+  Play (bets, lottery, scratch; less refunds) set its tier: 🥉 10k 0.5%,
+  🥈 50k 0.8%, 🥇 150k 1.2%, ◆ 500k 1.5%. The Worker pays it on the first
+  read after the month (`eco:vip:<month>`, kind `vip`, from 2026-10, so
+  the first on 1 November). Every product keeps 14%+; cash out keeps 2-5%
+  of a price that already has the cut, so churning can't farm it. Play's
+  balance card shows the tier, the cashback so far and the next step.
+- **Welcome offers:** the first paid bet in Play brings a NT$200 free bet
+  (`eco:fb:welcome`, `welcomeEntries`); Securities' first trade pays no
+  commission (`withWelcome` / `firstTrade`). A Worker PATCH now also
+  writes what's due (payday entries, fixed ids), so the welcome bet lands
+  right after the bet.
+- **Rewards:** mission free bets 30 / 20 / 30 (were 50 / 30 / 50: the
+  biggest promotion); the plan mission counts only a plan for a symbol
+  that never had one (re-saving no longer farms it).
+- Kit: `VIP`, `vipStatus`, `vipName`, `WELCOME`, `welcomeDue`,
+  `plusReturns`; statement labels `plusboost`, `vip`, `welcome`; free
+  bets read the Worker's `eco:fb:` tokens too.
+- Model (a month at NT$40,000): a regular non-member leaves the house
+  ~NT$7.2k (promos 10% of take) and nets −NT$0.6k; as a member ~NT$6.3k
+  (27%) and nets +NT$0.4k. A high roller as a member: promos 10%.
+- Not done: a featured-game odds boost for everyone (board-wide price
+  changes; Plus's daily boost covers the need), tiered commission by
+  volume in Securities.

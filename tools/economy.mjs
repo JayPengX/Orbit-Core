@@ -56,10 +56,68 @@ export const SETTINGS = {
   // halves (a regular player now levels out near NT$40,000, where the full
   // allowance stops) and Rewards' day comes down to NT$330 (words 150,
   // games 120, missions 60), so a grinder earns a little, not a salary.
-  v5: { name: 'Now (v5): allowance 6,000/3,000/1,500/500, Rewards NT$330 a day', start: 30_000, pay: payFor, effortRate: 12, effortCap: 150 + 120 + 60, plus: 290, shop: true }
+  v5: { name: 'v5: allowance 6,000/3,000/1,500/500, Rewards NT$330 a day', start: 30_000, pay: payFor, effortRate: 12, effortCap: 150 + 120 + 60, plus: 290, shop: true },
+  // v5 and the business round: Plus reworked (a daily +10% winnings boost,
+  // a NT$100 free bet a week, 2.8折 commission, every word pack), VIP
+  // cashback on gaming stakes; monthOf has the details.
+  v6: { name: 'Now (v6): v5 with Plus reworked and VIP cashback', start: 30_000, pay: payFor, effortRate: 12, effortCap: 150 + 120 + 60, plus: 290, shop: true, vip: true, v6: true }
 };
 const BOOST = { price: 150, cap: 200 };
 const FREEBET_RETURN = 0.45;
+
+// ---- v6: the business (Quadra Plus reworked, VIP cashback) ----------------------
+//
+// The house's side of it: what each product keeps (the gaming take: Play's
+// hold, the lottery's and scratch cards'), what it gives back to bring play
+// in (promotions: Rewards' free bets, Plus's perks, VIP cashback), and what
+// it earns besides (Plus's fee, Securities' commission, Rewards' shop). A
+// real sportsbook spends 20-30% of its gaming take on promotions; Quadra's
+// should stay under that and never turn a product into a loss.
+const CUT = 1.158;
+const ODDS = 1.85;
+const trebleHold = boost => 1 - ((1 / CUT) ** 3 * (1 + (ODDS ** 3 - 1) * (1 + boost))) / ODDS ** 3;
+const singleHold = lift => 1 - (1 + (ODDS - 1) * (1 + lift)) / (ODDS * CUT);
+// The kit's PLUS and VIP (Shared-Proxy/kit/quadra.mjs, eco.js).
+export const PLUS_V6 = { fee: 390, lift: 0.1, liftMax: 1_000, bonusBet: 100, commission: 0.28, wordsCap: 50 };
+export const VIP_TIERS = [
+  [500_000, 0.015],
+  [150_000, 0.012],
+  [50_000, 0.008],
+  [10_000, 0.005]
+];
+const vipBack = stakes => (VIP_TIERS.find(([min]) => stakes >= min)?.[1] ?? 0) * stakes;
+const COMMISSION = 0.001425 * 2; // of turnover (a buy and a sell); the rest of TRADE_COST is the sell tax
+
+// One month for person `p` worth `worth`, a Plus member or not: every flow,
+// from the house's side and the person's.
+export function monthOf(settings, p, worth, member = false) {
+  const bets = p.slips * p.stake * DAYS;
+  const tickets = (p.draw + p.scratch) * DAYS;
+  const gaming = bets * ((1 - p.trebles) * HOLD.single + p.trebles * trebleHold(0.05)) + p.draw * DAYS * HOLD.draw + p.scratch * DAYS * HOLD.scratch;
+  // Promotions.
+  const freebets = settings.shop ? (p.freebetsV6 ?? p.freebets ?? 0) * DAYS * FREEBET_RETURN : 0;
+  const boostDouble = member ? bets * p.trebles * (trebleHold(0.05) - trebleHold(0.1)) : 0;
+  const liftStake = member && p.slips > 0 && p.stake <= PLUS_V6.liftMax ? Math.min(1, p.slips) * DAYS * p.stake : 0;
+  const lift = liftStake * ((1 - p.trebles) * (singleHold(0) - singleHold(PLUS_V6.lift)) + p.trebles * (trebleHold(0.1) - trebleHold(0.1 + PLUS_V6.lift)));
+  const bonus = member && p.slips > 0 ? ((PLUS_V6.bonusBet * 52) / 12) * FREEBET_RETURN : 0;
+  const vip = settings.vip ? vipBack(bets + tickets) : 0;
+  const promo = freebets + boostDouble + lift + bonus + vip;
+  // Other revenue.
+  const commission = p.turnover * COMMISSION * (member ? PLUS_V6.commission : 1);
+  const tax = p.turnover * (TRADE_COST - COMMISSION);
+  const plusFee = member ? PLUS_V6.fee : 0;
+  const boosted = settings.shop ? p.boostDays || 0 : 0;
+  const shop = settings.shop ? boosted * BOOST.price + (p.shopMonth || 0) + (member ? 0 : p.packMonth || 0) : 0;
+  // The person's income.
+  const pay = settings.pay(worth);
+  const wordsExtra = member ? PLUS_V6.wordsCap : 0;
+  const perDay = cap => Math.min(cap, p.effort * settings.effortRate);
+  const effort = perDay(settings.effortCap + wordsExtra) * (DAYS - boosted) + perDay(settings.effortCap + wordsExtra + BOOST.cap) * boosted;
+  const market = Math.max(0, worth * p.invested) * MARKET;
+  const house = gaming - promo + commission + plusFee + shop;
+  const flow = pay + effort + market - tax - house;
+  return { gaming, freebets, boostDouble, lift, bonus, vip, promo, commission, tax, plusFee, shop, pay, effort, market, house, flow };
+}
 
 // Per day unless said: bets (slips a day, stake, share that are trebles),
 // lottery and scratch (NT$ a day), Rewards minutes a day (about NT$18 a
@@ -68,15 +126,16 @@ const FREEBET_RETURN = 0.45;
 // packs), free bets claimed a day (NT$ face value).
 export const PEOPLE = [
   { key: 'casual', zh: '偶爾玩', slips: 2 / 7, stake: 300, trebles: 0, draw: 100 / 7, scratch: 0, effort: 0, invested: 0, turnover: 0 },
-  { key: 'regular', zh: '常玩', slips: 2, stake: 500, trebles: 0.5, draw: 50, scratch: 200 / 7, effort: 10, invested: 0.2, turnover: 10_000, freebets: 80 },
+  { key: 'regular', zh: '常玩', slips: 2, stake: 500, trebles: 0.5, draw: 50, scratch: 200 / 7, effort: 10, invested: 0.2, turnover: 10_000, freebets: 80, freebetsV6: 50 },
   { key: 'roller', zh: '大戶', slips: 4, stake: 2_000, trebles: 0.5, draw: 500, scratch: 1_000 / 7, effort: 0, invested: 0, turnover: 0, plus: true },
   { key: 'investor', zh: '投資派', slips: 1, stake: 500, trebles: 0, draw: 0, scratch: 0, effort: 15, invested: 0.7, turnover: 50_000, plus: true },
-  { key: 'grinder', zh: '認真賺', slips: 3, stake: 500, trebles: 0.5, draw: 50, scratch: 0, effort: 60, invested: 0, turnover: 0, boostDays: 20, shopMonth: 300, freebets: 80 },
+  { key: 'grinder', zh: '認真賺', slips: 3, stake: 500, trebles: 0.5, draw: 50, scratch: 0, effort: 60, invested: 0, turnover: 0, boostDays: 20, shopMonth: 300, freebets: 80, freebetsV6: 50 },
   // Rewards only: words and games most days, a boost now and then, a protection card and a pack over the year.
-  { key: 'learner', zh: '只背單字', slips: 0, stake: 0, trebles: 0, draw: 0, scratch: 0, effort: 30, invested: 0, turnover: 0, boostDays: 6, shopMonth: 300 + 990 / 12 }
+  { key: 'learner', zh: '只背單字', slips: 0, stake: 0, trebles: 0, draw: 0, scratch: 0, effort: 30, invested: 0, turnover: 0, boostDays: 6, shopMonth: 300, packMonth: 990 / 12 }
 ];
 
 export function simulate(settings, p, months = 12) {
+  if (settings.v6) return simulateV6(settings, p, months);
   let worth = settings.start;
   const rows = [];
   for (let m = 0; m < months && worth > 0; m++) {
@@ -99,6 +158,17 @@ export function simulate(settings, p, months = 12) {
   return rows;
 }
 
+function simulateV6(settings, p, months) {
+  let worth = settings.start;
+  const rows = [];
+  for (let m = 0; m < months && worth > 0; m++) {
+    const x = monthOf(settings, p, worth, Boolean(p.plus));
+    worth += x.flow;
+    rows.push({ month: m + 1, pay: x.pay, effort: x.effort, market: x.market, take: x.house, flow: x.flow, worth });
+  }
+  return rows;
+}
+
 const money = x => `${x < 0 ? '−' : ''}NT$${Math.round(Math.abs(x)).toLocaleString('en-US')}`;
 if (import.meta.url === `file://${process.argv[1]}`) {
   for (const s of Object.values(SETTINGS)) {
@@ -111,6 +181,18 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       const income = first.pay + first.effort + Math.max(0, first.market);
       const broke = rows.length < 12 || last.worth <= 0 ? ` (broke in month ${rows.findIndex(r => r.worth <= 0) + 1 || rows.length})` : '';
       console.log(`${p.zh.padEnd(6, '　')}  ${money(income).padStart(10)}  ${money(first.take).padStart(14)}  ${money(first.flow).padStart(10)}  ${money(last.flow).padStart(12)}  ${money(Math.max(0, last.worth)).padStart(12)}   ${(Math.max(0, last.worth) / PAY_TIERS[0][1]).toFixed(1).padStart(5)}${broke}`);
+    }
+  }
+  // The business, a month at NT$40,000: what the house keeps from each kind
+  // of user, what it gives back, as a member of Plus and not.
+  const s6 = SETTINGS.v6;
+  console.log(`\n== The house, a month per user at ${money(40_000)} (v6)`);
+  console.log('who          Plus   gaming take   promos (of take)   commission   Plus+shop   house net   user net');
+  for (const p of PEOPLE) {
+    for (const member of [false, true]) {
+      const x = monthOf(s6, p, 40_000, member);
+      const share = x.gaming > 0 ? `${Math.round((x.promo / x.gaming) * 100)}%` : '–';
+      console.log(`${p.zh.padEnd(6, '　')}  ${member ? ' yes' : '  no'}  ${money(x.gaming).padStart(12)}  ${money(x.promo).padStart(9)} ${`(${share})`.padStart(6)}  ${money(x.commission).padStart(11)}  ${money(x.plusFee + x.shop).padStart(10)}  ${money(x.house).padStart(10)}  ${money(x.flow).padStart(9)}`);
     }
   }
 }

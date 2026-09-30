@@ -171,7 +171,57 @@ export function paydayEntries(wallet, now) {
   }
   // Quadra Plus renews for this month (after the pay, so the pay covers it).
   out.push(...plusRenewal(wallet, now, out.reduce((sum, e) => sum + e.amount, 0)));
+  // A member's bonus bet for this week (after the renewal that makes them one).
+  out.push(...plusBonusEntries({ ...wallet, entries: [...(wallet.entries || []), ...out] }, now));
+  // VIP cashback on the months before this one, and the welcome bonus bet.
+  out.push(...vipEntries(wallet, now), ...welcomeEntries(wallet, now));
   return out;
+}
+
+// ---- VIP cashback and the welcome offer ---------------------------------------------
+//
+// VIP (the kit's VIP, the same table): a Taiwan month's gaming stakes (Play's
+// bets and lottery and scratch tickets, less refunds) set its tier, and the
+// tier's share of them is paid back once the month is over, on the first
+// read after it (`eco:vip:<month>`, kind 'vip', the tier in the note). Every
+// product keeps 14% or more of its stakes; the top rate is 1.5%.
+export const VIP = {
+  from: '2026-10',
+  tiers: [
+    { id: 'bronze', min: 10_000, back: 0.005 },
+    { id: 'silver', min: 50_000, back: 0.008 },
+    { id: 'gold', min: 150_000, back: 0.012 },
+    { id: 'black', min: 500_000, back: 0.015 }
+  ]
+};
+export function vipStakes(wallet, month) {
+  let sum = 0;
+  for (const e of wallet?.entries || []) {
+    if (e.app !== 'odds' || typeof e.t !== 'number' || taipeiMonth(e.t) !== month) continue;
+    if (e.kind === 'stake' || e.kind === 'lottery' || e.kind === 'refund') sum -= e.amount;
+  }
+  return Math.max(0, Math.round(sum));
+}
+export const vipTier = stakes => [...VIP.tiers].reverse().find(t => stakes >= t.min) ?? null;
+export function vipEntries(wallet, now) {
+  const have = new Set((wallet?.entries || []).map(e => e.id));
+  const month = taipeiMonth(now);
+  const out = [];
+  for (let m = VIP.from, n = 0; m < month && n < 36; m = nextMonth(m), n++) {
+    if (have.has(`eco:vip:${m}`)) continue;
+    const stakes = vipStakes(wallet, m);
+    const tier = vipTier(stakes);
+    if (tier) out.push({ id: `eco:vip:${m}`, t: now, app: 'eco', kind: 'vip', amount: Math.floor(stakes * tier.back), note: tier.id });
+  }
+  return out;
+}
+// The welcome offer: after the first paid bet in Play, a NT$WELCOME.bet free
+// bet (`eco:fb:welcome`, once per account; 7 days, like every free bet).
+export const WELCOME = { bet: 200 };
+export function welcomeEntries(wallet, now) {
+  const entries = wallet?.entries || [];
+  if (entries.some(e => e.id === 'eco:fb:welcome') || !entries.some(e => e.app === 'odds' && e.kind === 'stake' && e.amount < 0)) return [];
+  return [{ id: 'eco:fb:welcome', t: now, app: 'eco', kind: 'freebet', amount: 0, note: String(WELCOME.bet) }];
 }
 export { WEEK };
 
@@ -187,8 +237,19 @@ export { WEEK };
 // nobody opened an app is never charged. The yearly plan (PLUS.year, about
 // two months free) pays twelve months at once and renews by the year.
 // Leaving stops renewal and keeps every month already paid.
-export const PLUS = { fee: 290, year: 2_900 };
+export const PLUS = { fee: 390, year: 3_900, bonusBet: 100 };
 const PLUS_ID = m => `eco:plus:${m}`;
+// A member's weekly bonus bet: a free bet token for Quadra Play, NT$PLUS.bonusBet,
+// one each Taiwan week (from Monday) the account is a member and opens an
+// app: `eco:fb:<Monday>`, kind 'freebet', amount 0, its value in the note
+// (the kit's freeBets reads it like Rewards' tokens; a week missed isn't
+// paid later). Only this Worker can write it.
+export const bonusBetId = now => `eco:fb:${new Date(weekStart(now) + TPE).toISOString().slice(0, 10)}`;
+export function plusBonusEntries(wallet, now) {
+  const id = bonusBetId(now);
+  if (!plusMember(wallet, now) || (wallet?.entries || []).some(e => e.id === id)) return [];
+  return [{ id, t: now, app: 'eco', kind: 'freebet', amount: 0, note: String(PLUS.bonusBet) }];
+}
 const plusSetting = wallet => wallet?.settings?.plus?.value || {};
 const plusOn = wallet => plusSetting(wallet).on === true;
 export const plusMember = (wallet, now) => (wallet?.entries || []).some(e => e.id === PLUS_ID(taipeiMonth(now)) && e.app === 'eco');
@@ -464,7 +525,10 @@ export async function handleEcoRequest(request, env, headers, ip, deps) {
           // Only the live app writes: an app the person has moved away from
           // must not overwrite what the live one did since.
           if (!isActive(w, claims)) return (refused = 'ECO_SESSION_MOVED'), w;
-          return touchApp(mergeWallet(w, cleanPatch(body.wallet)), app, now);
+          // What falls due with the write comes with it (fixed ids: never
+          // twice): the welcome bonus bet right after a first bet.
+          const merged = mergeWallet(w, cleanPatch(body.wallet));
+          return touchApp(mergeWallet(merged, { entries: paydayEntries(merged, now) }), app, now);
         },
         { skipIf: () => refused }
       );
@@ -633,7 +697,9 @@ async function ecoPlus(ctx) {
       const paid = mergeWallet(w, { entries: paydayEntries(w, now) });
       const join = on ? plusJoinEntries(paid, now, plan) : [];
       if (join.length && poolBalance(paid) + join.reduce((sum, e) => sum + e.amount, 0) < 0) return (refused = 'ECO_PLUS_FUNDS'), w;
-      return mergeWallet(paid, { entries: join, settings: { plus: { value: { on, plan, t: now }, t: now } } });
+      const joined = mergeWallet(paid, { entries: join, settings: { plus: { value: { on, plan, t: now }, t: now } } });
+      // This week's bonus bet comes with joining.
+      return mergeWallet(joined, { entries: plusBonusEntries(joined, now) });
     },
     { skipIf: () => refused }
   );

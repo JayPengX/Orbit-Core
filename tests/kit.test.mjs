@@ -128,7 +128,7 @@ test('Quadra Plus: a month is a member’s when the Worker billed it; joining is
   assert.equal(kit.plusMember({ entries: [{ id: 'eco:plus:2026-10', app: 'odds', kind: 'plus' }] }, oct), false);
   assert.equal(kit.plusJoinPrice({ entries: [] }, oct), 0);
   // 22 of 31 days left.
-  assert.equal(kit.plusJoinPrice(w, oct), 210);
+  assert.equal(kit.plusJoinPrice(w, oct), 280);
 });
 
 test('the allowance: by what the account is worth, Securities holdings included', () => {
@@ -217,4 +217,43 @@ test('CPBL: a month the proxy can\'t fill comes from TheSportsDB\'s day lists on
   assert.deepEqual(await asiaMonth(refused, 'npb', '2026-10', { now, fetchJson }), []);
   // The proxy's own list when it has one.
   assert.equal((await asiaMonth(async () => ({ games: [{ id: 'x' }] }), 'cpbl', '2026-10', { now, fetchJson })).length, 1);
+});
+
+test('Plus: the weekly bonus bet is a free bet; what Plus gave back this month', () => {
+  const t = Date.UTC(2026, 9, 7, 4);
+  const w = { entries: [
+    { id: 'eco:plus:2026-10', t, app: 'eco', kind: 'plus', amount: -290 },
+    { id: 'eco:fb:2026-10-05', t, app: 'eco', kind: 'freebet', amount: 0, note: '100' },
+    // An app can't mint one: only the Worker's ('eco') count.
+    { id: 'eco:fb:fake', t, app: 'odds', kind: 'freebet', amount: 0, note: '500' },
+    { id: 'odds:plus-s1', t, app: 'odds', kind: 'plusboost', amount: 42 },
+    { id: 'odds:plus-old', t: Date.UTC(2026, 8, 20), app: 'odds', kind: 'plusboost', amount: 99 }
+  ] };
+  assert.deepEqual(kit.freeBets(w, t).map(x => [x.id, x.value]), [['eco:fb:2026-10-05', 100]]);
+  assert.deepEqual(kit.plusReturns(w, t), { boosts: 42, bets: 100, total: 142 });
+  assert.equal(kit.PLUS.odds.lift < 0.158, true);
+  assert.match(kit.describeEntry({ app: 'odds', kind: 'plusboost', amount: 42 }), /Plus/);
+});
+
+test('VIP in the kit: the same tiers as the Worker, this month so far', async () => {
+  const eco = await import('../eco.js');
+  assert.deepEqual(kit.VIP.tiers.map(t => [t.id, t.min, t.back]), eco.VIP.tiers.map(t => [t.id, t.min, t.back]));
+  assert.equal(kit.VIP.from, eco.VIP.from);
+  const now = Date.UTC(2026, 9, 20, 4);
+  const w = { entries: [
+    { id: 'odds:stake-a', t: now, app: 'odds', kind: 'stake', amount: -60_000 },
+    { id: 'eco:vip:2026-09', t: now - 1, app: 'eco', kind: 'vip', amount: 80, note: 'bronze' }
+  ] };
+  const v = kit.vipStatus(w, now);
+  assert.equal(v.stakes, 60_000);
+  assert.equal(v.tier.id, 'silver');
+  assert.equal(v.back, 480);
+  assert.equal(v.next.id, 'gold');
+  assert.equal(v.toNext, 90_000);
+  assert.equal(v.paid.amount, 80);
+  assert.equal(kit.vipStatus({ entries: [] }, now).tier, null);
+  assert.equal(kit.vipName(v.tier, 'en'), '🥈 Silver');
+  assert.equal(kit.WELCOME.bet, eco.WELCOME.bet);
+  assert.equal(kit.welcomeDue({ entries: [] }), true);
+  assert.equal(kit.welcomeDue(w), false);
 });

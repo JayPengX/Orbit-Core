@@ -65,12 +65,19 @@ account's document id.
 - **App data** in each app's collection under the same id:
   `stock-study-accounts`, `odds-study-accounts`, `match-find-settings`,
   `vocab-progress-sync`, `orbit-quadra`.
-- **Quadra Plus**, the one membership: NT$290 a Taiwan month as the entry
+- **Quadra Plus**, the one membership: NT$390 a Taiwan month as the entry
   `eco:plus:<YYYY-MM>` (only this Worker writes `eco:` ids; an app's write
   of one is dropped), renewed with the payday on the month's first sign-in
   or read while the `plus` setting is on and the pool covers it. A month no
   app is opened is never charged. Apps read membership from that entry
-  alone (the kit's `plusMember`, `plusMonths`).
+  alone (the kit's `plusMember`, `plusMonths`). A member also gets a
+  NT$100 free bet each Taiwan week (`eco:fb:<Monday>`, `plusBonusEntries`).
+- **VIP cashback:** once a Taiwan month is over, its gaming stakes in Play
+  (bets, lottery, scratch; less refunds) pay back 0.5-1.5% by tier
+  (`VIP`, `vipEntries`: `eco:vip:<month>`, from 2026-10).
+- **Welcome:** after the first paid bet in Play, a NT$200 free bet
+  (`eco:fb:welcome`, `welcomeEntries`). Reads, sign-ins and writes all add
+  what's due (fixed ids, so never twice).
 - **The allowance** on any sign-in or read: NT$30,000 to open a new pass,
   then each Taiwan month an amount by what the account is worth (the pool
   plus Securities' `snap.stock.holdings`): NT$6,000 under NT$40,000, 3,000
@@ -95,7 +102,7 @@ account's document id.
 | `DELETE /eco?qt=T[&app=A][&inbox=ID]` | The account, one app's data, or one inbox item |
 | `POST { op: 'pair-create', qt }` / `{ op: 'pair-redeem', code, app }` | A device code (8 characters, 10 minutes, once) and signing in with it |
 | `POST { op: 'handoff', qt }` / `{ op: 'redeem', handoff, app }` | A sealed sign-in (3 minutes) for a link to another app; home-screen apps don't share storage |
-| `POST { op: 'plus', qt, on, plan }` | Quadra Plus: join (`on: true`; `plan: 'month'`: the first month ever free, later the rest of the month's share of NT$290; `plan: 'year'`: NT$2,900 for twelve months at once) or stop renewing (`on: false`; paid months stay). Live app only |
+| `POST { op: 'plus', qt, on, plan }` | Quadra Plus: join (`on: true`; `plan: 'month'`: the first month ever free, later the rest of the month's share of NT$390; `plan: 'year'`: NT$3,900 for twelve months at once) or stop renewing (`on: false`; paid months stay). Live app only |
 | `POST { op: 'signout-all', qt }` | Every other device signed out; this one comes back signed in |
 | `POST { op: 'rotate', qt }` | A new pass for the same account; the old one stops working, every other device is signed out |
 | `POST { op: 'merge', qt, sources: [{ passcode }] }` | Other passes into this one (their data, or its inbox; their money), then deleted |
