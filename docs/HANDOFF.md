@@ -20,6 +20,15 @@ edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
   the lottery's measured cut per kind of market, no league-tier, source-gap,
   line-step or source-specific extras; one win K (`K_WIN`, 1.158), so prices
   stay close to 運彩's.
+- **Every sport (Kambi leagues too):** Play sells every game on a Kambi
+  league's own schedule (`Quadra-Play/public/lib/schedules.mjs`): Asian
+  baseball's month lists (strength from this season's results; settled from
+  the lists, final-score markets only via `scoreOnly`), ESPN's UFC cards
+  (records), tennis draws (ranking points, each tour's singles), NRL/AFL
+  (ESPN schedules and standings), and every match in Kambi's list for the
+  rest (priced or not; the 16-match cap is gone). Kambi's price replaces the
+  house's once posted (`pricedByKambi`). Fixtures' 投注 no longer reads
+  Kambi: every game of every league Play sells, within `SOLD_DAYS`.
 
 - **Data-loss fix (critical):** the kit's `q.start()` returned the session
   instead of the first reply, so every app thought the pass was empty and
