@@ -125,15 +125,17 @@ await new Promise(r => server.listen(0, r));
 const base = `http://localhost:${server.address().port}/${repo}/`;
 
 // ---- Upstream data, straight from the source ----
+// Given up after 8 s, like the Worker (SPORTS_PROXY_UPSTREAM_TIMEOUT_MS).
 const curl = url =>
   new Promise(resolve => {
-    execFile('curl', ['-s', '--compressed', '-m', '25', '-w', '\n%{http_code}', url], { maxBuffer: 64 * 1024 * 1024 }, (err, stdout) => {
+    execFile('curl', ['-s', '--compressed', '-m', '8', '-w', '\n%{http_code}', url], { maxBuffer: 64 * 1024 * 1024 }, (err, stdout) => {
       if (err) return resolve({ status: 502, body: '' });
       const i = stdout.lastIndexOf('\n');
       resolve({ status: Number(stdout.slice(i + 1)) || 502, body: stdout.slice(0, i) });
     });
   });
 const cache = new Map();
+const STARTED = Date.now();
 const DEBUG = Boolean(process.env.DEBUG);
 const upstream = url => {
   const fixture = fixtures.find(([text]) => url.includes(text));
@@ -143,7 +145,11 @@ const upstream = url => {
     if (!cache.has(url)) cache.set(url, asiaBaseballResponse(new URL(url)).then(async r => ({ status: r.status, body: await r.text() })));
     return cache.get(url);
   }
-  if (!cache.has(url)) cache.set(url, curl(url).then(r => (DEBUG && console.log(r.status, r.body.length, url.slice(0, 140)), r)));
+  if (!cache.has(url)) {
+    const t0 = Date.now();
+    // DEBUG: status, size, when it was asked (ms from start) and how long it took.
+    cache.set(url, curl(url).then(r => (DEBUG && console.log(r.status, r.body.length, `@${t0 - STARTED}`, `${Date.now() - t0}ms`, url.slice(0, 140)), r)));
+  }
   return cache.get(url);
 };
 
@@ -211,7 +217,8 @@ await context.route('https://sports-proxy.pengzjay.workers.dev/**', async route 
       const bang = x.indexOf('!');
       return bang > 0 && !x.slice(0, bang).includes(':') ? x.slice(bang + 1) : x;
     });
-    const results = await Promise.all(items.map(upstream));
+    // Like the Worker: an item not answered within 3 s answers 504 (asked again on its own; its fetch goes on).
+    const results = await Promise.all(items.map(url => Promise.race([upstream(url), new Promise(r => setTimeout(() => r({ status: 504, body: '' }), 3_000))])));
     const r = results.map(x => (x.status === 200 && /^[[{]/.test(x.body.trim()) ? `{"s":200,"b":${x.body}}` : `{"s":${x.status === 200 ? 415 : x.status}}`));
     return route.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: `{"r":[${r.join(',')}]}` });
   }

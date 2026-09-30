@@ -541,6 +541,10 @@ async function checkSession(env, requestParams, headers, weight = 1) {
 // per request, and a page's first paint asks for a dozen lists at once.
 // Every URL still goes through the shared cache on its own.
 const BATCH_MAX = 12;
+// One slow upstream mustn't hold back the rest of its batch: an item not
+// answered within this answers 504 (the app asks for it again on its own),
+// while its fetch goes on in the background into the shared cache.
+const BATCH_ITEM_WAIT_MS = 3_000;
 async function handleBatch(request, env, headers, ip, ctx, requestParams) {
   const items = requestParams.getAll('u').slice(0, BATCH_MAX);
   if (!items.length) return json({ error: { message: 'Missing u' } }, 400, headers);
@@ -551,21 +555,28 @@ async function handleBatch(request, env, headers, ip, ctx, requestParams) {
     if (rl.limited) return json({ error: { message: 'Too many requests, please try again later.' } }, 429, headers);
   }
   const results = await Promise.all(
-    items.map(async item => {
-      const bang = item.indexOf('!');
-      const [trimParam, target] = bang > 0 && !item.slice(0, bang).includes(':') ? [item.slice(0, bang), item.slice(bang + 1)] : [null, item];
-      const upstreamUrl = parseTarget(target);
-      if (!upstreamUrl) return '{"s":400}';
-      const r = await resolveOne(upstreamUrl, trimFor(trimParam, upstreamUrl), ctx).catch(error => ({ fetchError: error }));
-      if (r.fetchError || r.status !== 200 || !/json|javascript/i.test(r.contentType || '')) {
-        if (r.body?.cancel) r.body.cancel().catch(() => {});
-        return `{"s":${r.fetchError ? 502 : r.status === 200 ? 415 : r.status}}`;
-      }
-      const text = r.body instanceof ArrayBuffer ? new TextDecoder().decode(r.body) : await new Response(r.body).text();
-      return `{"s":200,"a":${r.age},"b":${text}}`;
+    items.map(item => {
+      const work = batchItem(item, ctx);
+      ctx?.waitUntil?.(work.catch(() => {}));
+      let timer;
+      const late = new Promise(resolve => (timer = setTimeout(() => resolve('{"s":504}'), BATCH_ITEM_WAIT_MS)));
+      return Promise.race([work.finally(() => clearTimeout(timer)), late]);
     })
   );
   return new Response(`{"r":[${results.join(',')}]}`, { status: 200, headers: { ...headers, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+}
+async function batchItem(item, ctx) {
+  const bang = item.indexOf('!');
+  const [trimParam, target] = bang > 0 && !item.slice(0, bang).includes(':') ? [item.slice(0, bang), item.slice(bang + 1)] : [null, item];
+  const upstreamUrl = parseTarget(target);
+  if (!upstreamUrl) return '{"s":400}';
+  const r = await resolveOne(upstreamUrl, trimFor(trimParam, upstreamUrl), ctx).catch(error => ({ fetchError: error }));
+  if (r.fetchError || r.status !== 200 || !/json|javascript/i.test(r.contentType || '')) {
+    if (r.body?.cancel) r.body.cancel().catch(() => {});
+    return `{"s":${r.fetchError ? 502 : r.status === 200 ? 415 : r.status}}`;
+  }
+  const text = r.body instanceof ArrayBuffer ? new TextDecoder().decode(r.body) : await new Response(r.body).text();
+  return `{"s":200,"a":${r.age},"b":${text}}`;
 }
 
 async function handleSportsProxyRequest(request, env, headers, ip, ctx) {

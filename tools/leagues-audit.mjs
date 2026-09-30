@@ -91,7 +91,7 @@ async function play(key, l) {
 }
 
 const rows = [];
-const keys = Object.keys(CATALOG).filter(k => !CATALOG[k].retired && (!only || CATALOG[k].sport === only));
+const keys = Object.keys(CATALOG).filter(k => !only || CATALOG[k].sport === only);
 for (let i = 0; i < keys.length; i += 6) {
   const batch = keys.slice(i, i + 6);
   rows.push(

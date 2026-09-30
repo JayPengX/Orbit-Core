@@ -18,8 +18,6 @@
 //   (ESPN path, or paths, a Kambi-priced team game's result is read from), logo (ESPN
 //   league logo id), icon, badge
 //   players  sides are people (their nation's flag as the picture)
-//   retired  no longer listed in Fixtures nor sold in Play; kept only so
-//            slips already on it still settle and show their league's name
 //   pro      Kambi's events of the league kept only where filed under one of
 //            these words (table tennis: the pro tours, not the betting leagues)
 
@@ -52,8 +50,6 @@ const PRO_TABLE_TENNIS = /wtt|ittf|world_(team_)?champ|world_cup|olympic|asian_(
 const PRO_VOLLEYBALL = /superlega|serie_a1|plusliga|efeler|sultanlar|sv_league|v_league|champions_league|nations_league|vnl|world_champ|club_world|olympic|asian|fivb|cev/;
 // Rugby union: the international game and Europe's Champions Cup, not the domestic leagues.
 const PRO_RUGBY = /^(international|six_nations|nations_championship|rugby_world_cup|rugby_championship|european_champions_cup|british_(and_)?irish_lions)/;
-// Second divisions and college basketball (2026-09-30): the board keeps to each nation's first tier.
-const RETIRED = { retired: true };
 const espn = (sport, path, zh, en, bet, extra = {}) => ({ sport, kind: 'match', data: 'espn', espn: path, zh, en, bet, odds: bet ? 'espn' : undefined, ...extra });
 const soccer = (path, zh, en, bet, extra = {}) => espn('soccer', `soccer/${path}`, zh, en, bet, extra);
 
@@ -66,8 +62,6 @@ export const CATALOG = {
   // Basketball
   nba: espn('basketball', 'basketball/nba', 'NBA', 'NBA', 'nba', { top: true }),
   wnba: espn('basketball', 'basketball/wnba', 'WNBA', 'WNBA', 'wnba'),
-  ncaam: espn('basketball', 'basketball/mens-college-basketball', 'NCAA 男籃', 'NCAA Men', 'ncaam', RETIRED),
-  ncaaw: espn('basketball', 'basketball/womens-college-basketball', 'NCAA 女籃', 'NCAA Women', 'ncaaw', RETIRED),
   euroleague: { sport: 'basketball', kind: 'match', data: 'kambi', kambi: 'basketball/euroleague', zh: '歐洲籃球聯賽', en: 'EuroLeague', bet: 'euroleague', odds: 'kambi', icon: '🏀', badge: '7xjtuy1554397263' },
   // Spain's Liga ACB (Europe's strongest national league) and Australia's NBL, from Kambi.
   acb: { sport: 'basketball', kind: 'match', data: 'kambi', kambi: 'basketball/spain/liga_acb', zh: '西班牙籃球聯賽', en: 'Liga ACB', bet: 'acb', odds: 'kambi', icon: '🏀' },
@@ -89,18 +83,11 @@ export const CATALOG = {
   uecl: soccer('uefa.europa.conf', '歐協聯', 'Conference League', 'uecl', { cup: true, logo: 20296 }),
   eredivisie: soccer('ned.1', '荷甲', 'Eredivisie', 'eredivisie', { logo: 11 }),
   primeira: soccer('por.1', '葡超', 'Primeira Liga', 'primeira', { logo: 14 }),
-  championship: soccer('eng.2', '英冠', 'Championship', 'championship', { ...RETIRED, logo: 24 }),
-  league1: soccer('eng.3', '英甲', 'League One', 'league1', { ...RETIRED, logo: 25 }),
   scotland: soccer('sco.1', '蘇超', 'Scottish Premiership', 'scotland', { logo: 45 }),
-  bundesliga2: soccer('ger.2', '德乙', '2. Bundesliga', 'bundesliga2', { ...RETIRED, logo: 97 }),
-  laliga2: soccer('esp.2', '西乙', 'LaLiga 2', 'laliga2', { ...RETIRED, logo: 107 }),
-  serieb: soccer('ita.2', '義乙', 'Serie B', 'serieb', { ...RETIRED, logo: 99 }),
-  ligue2: soccer('fra.2', '法乙', 'Ligue 2', 'ligue2', { ...RETIRED, logo: 96 }),
   belgium: soccer('bel.1', '比甲', 'Belgian Pro League', 'belgium', { logo: 6 }),
   superlig: soccer('tur.1', '土超', 'Süper Lig', 'superlig', { logo: 18 }),
   saudi: soccer('ksa.1', '沙烏地聯', 'Saudi Pro League', 'saudi', { logo: 2488 }),
   mls: soccer('usa.1', '美職足', 'MLS', 'mls', { logo: 19 }),
-  usl: soccer('usa.usl.1', 'USL', 'USL Championship', 'usl', { ...RETIRED, logo: 2292 }),
   ligamx: soccer('mex.1', '墨超', 'Liga MX', 'ligamx', { logo: 22 }),
   brasileirao: soccer('bra.1', '巴甲', 'Brasileirão', 'brasileirao', { logo: 85 }),
   argentina: soccer('arg.1', '阿甲', 'Liga Profesional', 'argentina', { logo: 1 }),

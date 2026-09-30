@@ -8,6 +8,7 @@ const upstreamCalls = [];
 globalThis.fetch = async url => {
   upstreamCalls.push(String(url));
   if (String(url).includes('fail')) return new Response('nope', { status: 500 });
+  if (String(url).includes('slow')) await new Promise(r => setTimeout(r, 3_500));
   return new Response(JSON.stringify({ from: String(url) }), { status: 200, headers: { 'Content-Type': 'application/json' } });
 };
 const worker = (await import('../sports-proxy-worker.js')).default;
@@ -56,4 +57,15 @@ test("ELTA's schedule: only its program list, always trimmed to each live progra
   const { r } = await res.json();
   assert.equal(r[0].s, 200);
   assert.equal(r[1].s, 400);
+});
+
+test("a slow URL answers 504 at once and doesn't hold back the rest of its batch", async () => {
+  const fast = 'https://site.api.espn.com/apis/site/v2/sports/soccer/fra.1/standings';
+  const slow = 'https://site.api.espn.com/apis/site/v2/sports/soccer/slow.1/standings';
+  const t0 = Date.now();
+  const res = await get(`https://proxy.test/sports-proxy?batch=1&u=${encodeURIComponent(fast)}&u=${encodeURIComponent(slow)}`);
+  const { r } = await res.json();
+  assert.ok(Date.now() - t0 < 3_400);
+  assert.equal(r[0].s, 200);
+  assert.equal(r[1].s, 504);
 });

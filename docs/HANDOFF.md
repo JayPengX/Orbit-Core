@@ -596,9 +596,7 @@ that didn't land on live games, and text cut on phones.
 
 ## Round: fewer, bigger leagues; pro events only; Asia and the national teams
 
-- **Second divisions and college basketball retired** (catalogue `retired`):
-  not listed in Fixtures nor sold in Play, still read by Play to settle old
-  slips. **Removed outright:** Austria, Switzerland, Denmark, Norway, Sweden,
+- **Removed:** second divisions and college basketball, and Austria, Switzerland, Denmark, Norway, Sweden,
   Greece, Colombia, Chile, A-League, Chinese Super League, NWSL, NRL, AFL,
   NASCAR, IndyCar (the `aussie` sport and Play's short-lived NASCAR/IndyCar
   board with them).
@@ -613,3 +611,17 @@ that didn't land on live games, and text cut on phones.
   results from ESPN's rugby competitions, `scores` a list of paths).
 - **Play:** 場中 only on today's board (the day strip keeps today while
   games are on).
+- **Cups were empty:** ESPN's calendar for a cup or the national teams is a
+  list of stages and its default page can be a past round (the Europa
+  League's showed Sept 17). Play now reads every ESPN league by its months'
+  pages (`fetchMonths`, odds included, far fewer requests); Fixtures reads
+  such leagues by months (`parseCalendar` → `{ months: true }`,
+  `monthsBetween`), and both read soccer's live games from dated pages.
+- **Loading screens:** Play waits for the whole board (leagues join one by
+  one via `loadExtraLeagues(now, onPart)`, capped at `BOOT_FULL_MS`); last
+  season's standings never hold the board (2.5 s). Securities retries its
+  first prices behind the loading screen (8 s cap). Worker batches: an item
+  not answered in 3 s answers 504 (the app re-asks it alone; its fetch goes
+  on into the cache), so one slow upstream can't hold eleven others.
+  `tools/preview.mjs` mirrors both (8 s upstream limit, 3 s batch items) and
+  DEBUG prints each request's start and duration.
