@@ -118,7 +118,7 @@ const ESPN_LEAGUE = {
   mlb: 'teamlogos/leagues/500/mlb.png', nba: 'teamlogos/leagues/500/nba.png', wnba: 'teamlogos/leagues/500/wnba.png', nfl: 'teamlogos/leagues/500/nfl.png',
   nhl: 'teamlogos/leagues/500/nhl.png', f1: 'teamlogos/leagues/500/f1.png', ncaaf: 'espn/misc_logos/500/ncaa_football.png', ncaam: 'espn/misc_logos/500/ncaa.png',
   ncaaw: 'espn/misc_logos/500/ncaa.png', pga: 'teamlogos/leagues/500/pgatour.png', lpga: 'teamlogos/leagues/500/lpga.png', ufc: 'teamlogos/leagues/500/ufc.png',
-  nrl: 'teamlogos/leagues/500/nrl.png', afl: 'teamlogos/leagues/500/afl.png', indycar: 'espn/teamlogos/500/indycar_series.png'
+  nrl: 'teamlogos/leagues/500/nrl.png', afl: 'teamlogos/leagues/500/afl.png', indycar: 'espn/teamlogos/500/indycar_series.png', nascar: 'espn/teamlogos/500/nascar.png'
 };
 // The league's own logo (light backgrounds: the apps show it on a white disc), or null.
 export function leagueLogo(key, dark = false) {

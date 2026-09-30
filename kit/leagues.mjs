@@ -10,7 +10,8 @@
 //           'kambi' (kambi path), 'asia' (the leagues' own sites, through the
 //           sports proxy: asiaMonth below)
 //   bet     Quadra Play's key when Play sells it; `odds` where Play prices it
-//           ('espn': DraftKings through ESPN; 'kambi'), F1 has its own board
+//           ('espn': DraftKings through ESPN; 'kambi'), F1 has its own board,
+//           NASCAR and IndyCar theirs (the next race's winner, from Kambi)
 //   espn / kambi   the paths on each source (a league can have both)
 //   play-only details: family (the kind of markets), sets (best of how
 //   many, what a set is made of), neutral, cap (matches listed), results
@@ -18,6 +19,10 @@
 //   (ESPN path a Kambi-priced team game's result is read from), logo (ESPN
 //   league logo id), icon, badge
 //   players  sides are people (their nation's flag as the picture)
+//   retired  no longer listed in Fixtures nor sold in Play; kept only so
+//            slips already on it still settle and show their league's name
+//   pro      Kambi's events of the league kept only where filed under one of
+//            these words (table tennis: the pro tours, not the betting leagues)
 
 export const SPORTS = {
   soccer: { zh: '足球', en: 'Soccer', icon: '⚽' },
@@ -40,6 +45,12 @@ export const SPORTS = {
 // Sports played in sets (the same kind of markets in Play).
 export const SET_SPORTS = new Set(['tennis', 'badminton', 'tabletennis', 'volleyball', 'snooker']);
 
+// Table tennis's pro tours and title events. Kambi also lists betting
+// leagues played round the clock (Czech Liga Pro, TT Elite Series, TT Cup,
+// Poland's Masters): those stay off both apps.
+const PRO_TABLE_TENNIS = /wtt|ittf|world_(team_)?champ|world_cup|olympic|asian_(games|champ)|european_(games|champ)|commonwealth/;
+// Second divisions and college basketball (2026-09-30): the board keeps to each nation's first tier.
+const RETIRED = { retired: true };
 const espn = (sport, path, zh, en, bet, extra = {}) => ({ sport, kind: 'match', data: 'espn', espn: path, zh, en, bet, odds: bet ? 'espn' : undefined, ...extra });
 const soccer = (path, zh, en, bet, extra = {}) => espn('soccer', `soccer/${path}`, zh, en, bet, extra);
 
@@ -52,8 +63,8 @@ export const CATALOG = {
   // Basketball
   nba: espn('basketball', 'basketball/nba', 'NBA', 'NBA', 'nba', { top: true }),
   wnba: espn('basketball', 'basketball/wnba', 'WNBA', 'WNBA', 'wnba'),
-  ncaam: espn('basketball', 'basketball/mens-college-basketball', 'NCAA 男籃', 'NCAA Men', 'ncaam'),
-  ncaaw: espn('basketball', 'basketball/womens-college-basketball', 'NCAA 女籃', 'NCAA Women', 'ncaaw'),
+  ncaam: espn('basketball', 'basketball/mens-college-basketball', 'NCAA 男籃', 'NCAA Men', 'ncaam', RETIRED),
+  ncaaw: espn('basketball', 'basketball/womens-college-basketball', 'NCAA 女籃', 'NCAA Women', 'ncaaw', RETIRED),
   euroleague: { sport: 'basketball', kind: 'match', data: 'kambi', kambi: 'basketball/euroleague', zh: '歐洲籃球聯賽', en: 'EuroLeague', bet: 'euroleague', odds: 'kambi', icon: '🏀', badge: '7xjtuy1554397263' },
   bleague: { sport: 'basketball', kind: 'match', data: 'kambi', kambi: 'basketball/japan/b1__league', zh: '日本 B 聯賽', en: 'B.League', bet: 'bleague', odds: 'kambi', icon: '🏀', badge: 'vcx6gw1745501883' },
   // Football
@@ -72,13 +83,13 @@ export const CATALOG = {
   uecl: soccer('uefa.europa.conf', '歐協聯', 'Conference League', 'uecl', { cup: true, logo: 20296 }),
   eredivisie: soccer('ned.1', '荷甲', 'Eredivisie', 'eredivisie', { logo: 11 }),
   primeira: soccer('por.1', '葡超', 'Primeira Liga', 'primeira', { logo: 14 }),
-  championship: soccer('eng.2', '英冠', 'Championship', 'championship', { logo: 24 }),
-  league1: soccer('eng.3', '英甲', 'League One', 'league1', { logo: 25 }),
+  championship: soccer('eng.2', '英冠', 'Championship', 'championship', { ...RETIRED, logo: 24 }),
+  league1: soccer('eng.3', '英甲', 'League One', 'league1', { ...RETIRED, logo: 25 }),
   scotland: soccer('sco.1', '蘇超', 'Scottish Premiership', 'scotland', { logo: 45 }),
-  bundesliga2: soccer('ger.2', '德乙', '2. Bundesliga', 'bundesliga2', { logo: 97 }),
-  laliga2: soccer('esp.2', '西乙', 'LaLiga 2', 'laliga2', { logo: 107 }),
-  serieb: soccer('ita.2', '義乙', 'Serie B', 'serieb', { logo: 99 }),
-  ligue2: soccer('fra.2', '法乙', 'Ligue 2', 'ligue2', { logo: 96 }),
+  bundesliga2: soccer('ger.2', '德乙', '2. Bundesliga', 'bundesliga2', { ...RETIRED, logo: 97 }),
+  laliga2: soccer('esp.2', '西乙', 'LaLiga 2', 'laliga2', { ...RETIRED, logo: 107 }),
+  serieb: soccer('ita.2', '義乙', 'Serie B', 'serieb', { ...RETIRED, logo: 99 }),
+  ligue2: soccer('fra.2', '法乙', 'Ligue 2', 'ligue2', { ...RETIRED, logo: 96 }),
   belgium: soccer('bel.1', '比甲', 'Belgian Pro League', 'belgium', { logo: 6 }),
   austria: soccer('aut.1', '奧超', 'Austrian Bundesliga', 'austria', { logo: 5 }),
   swiss: soccer('sui.1', '瑞士超', 'Swiss Super League', 'swiss', { logo: 17 }),
@@ -89,7 +100,7 @@ export const CATALOG = {
   superlig: soccer('tur.1', '土超', 'Süper Lig', 'superlig', { logo: 18 }),
   saudi: soccer('ksa.1', '沙烏地聯', 'Saudi Pro League', 'saudi', { logo: 2488 }),
   mls: soccer('usa.1', '美職足', 'MLS', 'mls', { logo: 19 }),
-  usl: soccer('usa.usl.1', 'USL', 'USL Championship', 'usl', { logo: 2292 }),
+  usl: soccer('usa.usl.1', 'USL', 'USL Championship', 'usl', { ...RETIRED, logo: 2292 }),
   nwsl: soccer('usa.nwsl', '美國女足聯', 'NWSL', 'nwsl', { logo: 2323 }),
   ligamx: soccer('mex.1', '墨超', 'Liga MX', 'ligamx', { logo: 22 }),
   brasileirao: soccer('bra.1', '巴甲', 'Brasileirão', 'brasileirao', { logo: 85 }),
@@ -111,8 +122,8 @@ export const CATALOG = {
   wta: { sport: 'tennis', kind: 'draw', data: 'espn', espn: 'tennis/wta', kambi: 'tennis/wta', zh: 'WTA 女網', en: 'WTA', bet: 'wta', odds: 'kambi', results: 'tennis/wta', icon: '🎾', badge: 'bddhun1768230678', neutral: true, players: true, sets: { bestOf: 3, unit: 'games', target: 6 } },
   // Racing
   f1: { sport: 'racing', kind: 'field', data: 'espn', espn: 'racing/f1', zh: 'F1 一級方程式', en: 'Formula 1', bet: 'f1', top: true, standings: true },
-  indycar: { sport: 'racing', kind: 'field', data: 'espn', espn: 'racing/irl', zh: 'IndyCar', en: 'IndyCar' },
-  nascar: { sport: 'racing', kind: 'field', data: 'espn', espn: 'racing/nascar-premier', zh: 'NASCAR', en: 'NASCAR Cup' },
+  indycar: { sport: 'racing', kind: 'field', data: 'espn', espn: 'racing/irl', zh: 'IndyCar', en: 'IndyCar', bet: 'indycar' },
+  nascar: { sport: 'racing', kind: 'field', data: 'espn', espn: 'racing/nascar-premier', zh: 'NASCAR', en: 'NASCAR Cup', bet: 'nascar' },
   // Golf
   pga: { sport: 'golf', kind: 'field', data: 'espn', espn: 'golf/pga', zh: 'PGA 巡迴賽', en: 'PGA Tour' },
   lpga: { sport: 'golf', kind: 'field', data: 'espn', espn: 'golf/lpga', zh: 'LPGA', en: 'LPGA' },
@@ -124,10 +135,20 @@ export const CATALOG = {
   afl: { sport: 'aussie', kind: 'match', data: 'espn', espn: 'australian-football/afl', kambi: 'australian_rules/afl', zh: 'AFL 澳式足球', en: 'AFL', bet: 'afl', odds: 'kambi', scores: 'australian-football/afl', icon: '🏉' },
   // Played in sets, from Kambi
   badminton: { sport: 'badminton', kind: 'match', data: 'kambi', kambi: 'badminton', zh: '羽球', en: 'Badminton', bet: 'badminton', odds: 'kambi', players: true, icon: '🏸', badge: 'd5xvqq1750423289', neutral: true, sets: { bestOf: 3, unit: 'points', target: 21, cap: 30 } },
-  tabletennis: { sport: 'tabletennis', kind: 'match', data: 'kambi', kambi: 'table_tennis', zh: '桌球', en: 'Table tennis', bet: 'tabletennis', odds: 'kambi', players: true, icon: '🏓', badge: 'fvesg01750422363', neutral: true, sets: { bestOf: 5, unit: 'points', target: 11 }, cap: 16 },
+  tabletennis: { sport: 'tabletennis', kind: 'match', data: 'kambi', kambi: 'table_tennis', pro: PRO_TABLE_TENNIS, zh: '桌球', en: 'Table tennis', bet: 'tabletennis', odds: 'kambi', players: true, icon: '🏓', badge: 'fvesg01750422363', neutral: true, sets: { bestOf: 5, unit: 'points', target: 11 }, cap: 16 },
   volleyball: { sport: 'volleyball', kind: 'match', data: 'kambi', kambi: 'volleyball', zh: '排球', en: 'Volleyball', bet: 'volleyball', odds: 'kambi', icon: '🏐', sets: { bestOf: 5, unit: 'points', target: 25, last: 15 }, cap: 16 },
   snooker: { sport: 'snooker', kind: 'match', data: 'kambi', kambi: 'snooker', zh: '司諾克', en: 'Snooker', bet: 'snooker', odds: 'kambi', players: true, icon: '🎱', badge: '0gmkgj1555600537', neutral: true, sets: { bestOf: null, unit: 'frames' } }
 };
+
+// Whether Kambi's event (its group and path words) belongs on the board of
+// the league with this catalogue key or Play key: every event, but for a
+// league with `pro` only those filed under one of its words.
+export function kambiKept(key, event) {
+  const pro = (CATALOG[key] ?? byBetKey[key])?.pro;
+  if (!pro) return true;
+  const words = [event?.group, ...(event?.path || []).map(p => (typeof p === 'string' ? p : p?.termKey))].filter(Boolean).map(w => String(w).toLowerCase().replace(/[\s-]+/g, '_'));
+  return words.some(w => pro.test(w));
+}
 
 // Play's kind of markets for a sport.
 export const familyOfSport = sport => (SET_SPORTS.has(sport) ? 'sets' : sport);
