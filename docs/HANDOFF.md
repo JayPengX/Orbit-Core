@@ -6,6 +6,35 @@ All repos develop on `claude/gifted-dijkstra-dv6w8a` and are pushed to
 edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
 `npx eslint .`).
 
+## Round: v8, points with a purpose and a Plus worth paying for (all repos, pushed to `main`)
+
+v7's Plus (NT$990) gave every kind of member less than its fee, so nobody
+would pay; points had no use. Now:
+
+- **Levels and titles** (kit `xpLevel`, `xpEarned`, `xpBalance`): level L
+  from 50·L·(L−1) XP (2 at 100, 5 at 1,000, 10 at 4,500, 20 at 19,000),
+  titles 新手 Rookie → 神話 Mythic. On Rewards' home (with the progress to
+  the next level) and every app's account sheet.
+- **Points buy things** in Rewards (shop.mjs `redeemEntry`): a streak card
+  600 XP, word points ×2 for 30 minutes 300 XP, packs 8,000 / 12,000 /
+  16,000 XP, next to the money price. Entries `vocab:xs:<item>:<key>`, kind
+  `redeem`, amount 0, the points in the note; the Worker drops one priced
+  under `REWARDS_XP` (the app checks the balance; like money, the Worker
+  doesn't). Spending lowers `xpBalance`, never the level.
+- **Plus v8** (`tools/economy.mjs` PLUS_V8, the v8 rows): NT$490 a month /
+  4,900 a year; a NT$200 free bet every Monday (was 100); two streak cards a
+  month (was one); Rewards points ×1.5; packs half price; Securities perks
+  and cash out as before; the daily +10% lift is gone (`PLUS.odds.lift: 0`,
+  Play hides its row). Face value to a bettor about NT$1,470 a month (3×
+  the fee); expected cost to the house NT$340-690, so the house earns about
+  the same from a member as from a non-member (casual +100, regular +79,
+  high roller +100, investor −3, heavy bettor −200 from cards it no longer
+  sells, words only +149).
+- **The free first month** (unchanged: the rest of the month you first
+  join) costs the house what the perks cost without the fee: NT$340-690 for
+  a full month, less mid-month.
+- The one-time notice is now `quadra.seen.v8` (v8Notice) with all of it.
+
 ## Round: v7, Rewards pays points, the only money is Quadra's (all repos, pushed to `main`)
 
 The owner asked that Rewards stop paying money: the opening money and the

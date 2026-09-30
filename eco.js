@@ -239,10 +239,11 @@ export { WEEK };
 // of a month while the `plus` setting is on and the pool covers it; a month
 // nobody opened an app is never charged. The yearly plan (PLUS.year, about
 // two months free) pays twelve months at once and renews by the year.
-// Leaving stops renewal and keeps every month already paid. v7: NT$990 (was
-// 390), so the fee covers what the perks give back for every kind of member
+// Leaving stops renewal and keeps every month already paid. v8: NT$490 and
+// a NT$200 weekly bonus bet (v7 was 990 and 100): the perks' face value is
+// about three times the fee and their expected cost about the fee
 // (tools/economy.mjs); a yearly plan already paid keeps its months.
-export const PLUS = { fee: 990, year: 9_900, bonusBet: 100 };
+export const PLUS = { fee: 490, year: 4_900, bonusBet: 200 };
 const PLUS_ID = m => `eco:plus:${m}`;
 // A member's weekly bonus bet: a free bet token for Quadra Play, NT$PLUS.bonusBet,
 // one each Taiwan week (from Monday) the account is a member and opens an
@@ -313,6 +314,15 @@ const cleanCode = v =>
 // must pay at least the lowest price (packs are half price for Plus), or
 // it's dropped: an app can't write itself a free card, boost or pack.
 export const REWARDS_SHOP = { freeze: 300, boost: 150, pack: { toeic: 495, ielts: 745, biz: 995 } };
+// Points (XP) buy the same things: 'vocab:xs:<item>:<key>', kind 'redeem',
+// amount 0, the points it cost in the note, at least REWARDS_XP's.
+export const REWARDS_XP = { freeze: 600, boost: 300, pack: { toeic: 8_000, ielts: 12_000, biz: 16_000 } };
+function xpPaid(id, e) {
+  const [, , item, key] = id.split(':');
+  const least = item === 'pack' ? REWARDS_XP.pack[key] : REWARDS_XP[item];
+  const cost = Number(e.note);
+  return typeof least === 'number' && e.kind === 'redeem' && Number.isInteger(cost) && cost >= least && cost <= 100_000;
+}
 function shopPaid(id, amount) {
   const [, , item, key] = id.split(':');
   const least = item === 'pack' ? REWARDS_SHOP.pack[key] : REWARDS_SHOP[item];
@@ -335,6 +345,7 @@ export function cleanEntry(e, { allowEco = false } = {}) {
   // points (`xp`, amount 0), and its missions no longer give free bets.
   // Entries it paid before stay: only new ones come through here.
   if (app === 'vocab' && (amount > 0 || id.startsWith('vocab:fb:'))) return null;
+  if (id.startsWith('vocab:xs:') && !(app === 'vocab' && amount === 0 && xpPaid(id, e))) return null;
   const out = { id, t: Math.round(t), app, kind: str(e.kind, 24) || 'other', amount: Math.round(amount * 100) / 100 };
   const note = str(e.note, 80);
   if (note) out.note = note;

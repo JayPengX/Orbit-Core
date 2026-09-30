@@ -128,7 +128,7 @@ test('Quadra Plus: a month is a member’s when the Worker billed it; joining is
   assert.equal(kit.plusMember({ entries: [{ id: 'eco:plus:2026-10', app: 'odds', kind: 'plus' }] }, oct), false);
   assert.equal(kit.plusJoinPrice({ entries: [] }, oct), 0);
   // 22 of 31 days left.
-  assert.equal(kit.plusJoinPrice(w, oct), 700);
+  assert.equal(kit.plusJoinPrice(w, oct), 350);
 });
 
 test('the allowance: by what the account is worth, Securities holdings included', () => {
@@ -283,4 +283,24 @@ test('v7: the kit and the Worker agree on the allowance and Plus; the statement 
   const d = kit.accountDetails(w, 'en', now);
   assert.deepEqual(d.recent.map(r => r.amount), [8_000]);
   assert.equal(d.count, 1);
+});
+
+test('points: earned make the level and title, spent come off what is left', () => {
+  assert.deepEqual([0, 99, 100, 999, 1_000, 4_500, 19_000, 43_500].map(x => kit.xpLevel(x).level), [1, 1, 2, 4, 5, 10, 20, 30]);
+  assert.equal(kit.xpLevel(4_500, 'en').title, 'Skilled');
+  assert.equal(kit.xpLevel(19_000).title, '達人');
+  const l = kit.xpLevel(550);
+  assert.deepEqual([l.level, l.from, l.to, l.toNext], [3, 300, 600, 50]);
+  const w = { entries: [
+    { id: 'vocab:g:1', t: 1, app: 'vocab', kind: 'game', amount: 0, xp: 700 },
+    { id: 'vocab:w:old', t: 1, app: 'vocab', kind: 'words', amount: 300 },
+    { id: 'vocab:xs:freeze:a', t: 2, app: 'vocab', kind: 'redeem', amount: 0, note: '600' },
+    { id: 'vocab:shop:boost:b', t: 2, app: 'vocab', kind: 'shop', amount: -150 },
+    { id: 'odds:x', t: 2, app: 'odds', kind: 'payout', amount: 500 }
+  ] };
+  assert.deepEqual([kit.xpEarned(w), kit.xpSpent(w), kit.xpBalance(w)], [1_000, 600, 400]);
+  // Plus v8: worth about three times its fee at face, and no daily lift.
+  assert.equal(kit.PLUS.odds.lift, 0);
+  assert.ok((kit.PLUS.odds.bonusBet * 52) / 12 + 300 * kit.PLUS.vocab.cards > 2.5 * kit.PLUS.fee);
+  assert.ok(kit.plusPerks('en').every(p => p && !/winnings, every day/.test(p[1])));
 });

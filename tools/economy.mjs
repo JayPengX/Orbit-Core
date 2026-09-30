@@ -54,6 +54,13 @@ export const PLUS_V6 = { fee: 390, boost: 2, lift: 0.1, liftMax: 1_000, bonusBet
 // doubled, the daily lift on one slip up to NT$500, packs half price, and a
 // fee the perks can't outgrow.
 export const PLUS_V7 = { fee: 990, boost: 1, lift: 0.1, liftMax: 500, bonusBet: 100, commission: 0.28, wordsCap: 0, packShare: 0.5 };
+// v8 (the kit's PLUS now): worth more than it costs to the member, yet
+// costing the house less than the fee. NT$490; the daily lift (the costly
+// perk, ~NT$600 a month for a regular) goes; the weekly free bet doubles to
+// NT$200 (NT$866 a month at face, about 45% of that in expected cost); two
+// streak cards a month (NT$600 at the shop's price, nothing to make) and
+// Rewards' points ×1.5 cost nothing but a shop sale.
+export const PLUS_V8 = { fee: 490, boost: 1, lift: 0, liftMax: 0, bonusBet: 200, commission: 0.28, wordsCap: 0, packShare: 0.5, cards: 2 };
 export const SETTINGS = {
   now: { name: 'Now', start: 110_000, pay: () => 7_000, effortRate: 18, effortCap: 600 + 400 + 300, plus: 290 },
   // What the Worker changes on its own (Rewards still earns as it does).
@@ -78,7 +85,8 @@ export const SETTINGS = {
   // bets; money comes only from the opening money and the allowance, which
   // rises to keep a regular player level without the effort pay. Plus as
   // PLUS_V7.
-  v7: { name: 'Now (v7): no Rewards pay, allowance 8,000/4,000/1,500/500, Plus NT$990', start: 30_000, pay: payFor, effortRate: 0, effortCap: 0, plus: 990, shop: true, vip: true, v6: true, noRewardsPay: true, plusCfg: PLUS_V7 }
+  v7: { name: 'v7: no Rewards pay, allowance 8,000/4,000/1,500/500, Plus NT$990', start: 30_000, pay: payFor, effortRate: 0, effortCap: 0, plus: 990, shop: true, vip: true, v6: true, noRewardsPay: true, plusCfg: PLUS_V7 },
+  v8: { name: 'Now (v8): v7 with Plus at NT$490 (NT$200 weekly free bet, no daily lift)', start: 30_000, pay: payFor, effortRate: 0, effortCap: 0, plus: 490, shop: true, vip: true, v6: true, noRewardsPay: true, plusCfg: PLUS_V8 }
 };
 const BOOST = { price: 150, cap: 200 };
 const FREEBET_RETURN = 0.45;
@@ -129,7 +137,9 @@ export function monthOf(settings, p, worth, member = false) {
   // modelled buying one.
   const boosted = settings.shop && !settings.noRewardsPay ? p.boostDays || 0 : 0;
   const packs = (p.packMonth || 0) * (member ? P.packShare : 1);
-  const shop = settings.shop ? boosted * BOOST.price + (p.shopMonth || 0) + packs : 0;
+  // A member's free streak cards replace the ones bought (shopMonth).
+  const bought = member && P.cards ? 0 : p.shopMonth || 0;
+  const shop = settings.shop ? boosted * BOOST.price + bought + packs : 0;
   // The person's income.
   const pay = settings.pay(worth);
   const wordsExtra = member ? P.wordsCap : 0;
@@ -207,8 +217,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   }
   // The business, a month at NT$40,000: what the house keeps from each kind
   // of user, what it gives back, as a member of Plus and not.
-  const s6 = SETTINGS.v7;
-  console.log(`\n== The house, a month per user at ${money(40_000)} (v7)`);
+  const s6 = SETTINGS.v8;
+  console.log(`\n== The house, a month per user at ${money(40_000)} (v8)`);
   console.log('who          Plus   gaming take   promos (of take)   commission   Plus+shop   house net   user net');
   for (const p of PEOPLE) {
     for (const member of [false, true]) {

@@ -334,8 +334,8 @@ test('Quadra Plus: rejoining costs the rest of the month; a short pool does not 
   const had = { entries: [{ id: 'eco:plus:2026-08', t: 1, app: 'eco', kind: 'plus', amount: 0 }] };
   const e = plusJoinEntry(had, oct15);
   assert.equal(e.id, 'eco:plus:2026-10');
-  // 17 of 31 days left: about NT$540.
-  assert.equal(e.amount, -540);
+  // 17 of 31 days left: about NT$270.
+  assert.equal(e.amount, -270);
   assert.equal(plusJoinEntry({ entries: [] }, oct15).amount, 0);
   const broke = { settings: { plus: { value: { on: true }, t: 1 } }, entries: [{ id: 'eco:plus:2026-10', t: 1, app: 'eco', kind: 'plus', amount: 0 }, { id: 'eco:rebase:v3', t: 1, app: 'eco', kind: 'rebase', amount: 0 }, { id: 'x', t: 1, app: 'odds', amount: -16_500 }] };
   assert.ok(!paydayEntries({ ...broke, created: oct15 }, Date.UTC(2026, 10, 2)).some(x => x.kind === 'plus'));
@@ -427,7 +427,7 @@ test('a new pass today opens with NT$30,000 and no reset', async () => {
   assert.ok(!acct.wallet.entries.some(e => e.id === REBASE.id));
 });
 
-test('Plus: a NT$100 bonus bet each week a member opens an app, from the Worker only', () => {
+test('Plus: a NT$200 bonus bet each week a member opens an app, from the Worker only', () => {
   // Wednesday 2026-10-07, Taiwan: the week of Monday the 5th.
   const now = Date.UTC(2026, 9, 7, 4);
   assert.equal(bonusBetId(now), 'eco:fb:2026-10-05');
@@ -435,7 +435,7 @@ test('Plus: a NT$100 bonus bet each week a member opens an app, from the Worker 
   assert.equal(bonusBetId(Date.UTC(2026, 9, 11, 15, 30)), 'eco:fb:2026-10-05');
   assert.equal(bonusBetId(Date.UTC(2026, 9, 11, 16, 30)), 'eco:fb:2026-10-12');
   const member = { entries: [{ id: 'eco:plus:2026-10', t: 1, app: 'eco', kind: 'plus', amount: -290 }] };
-  assert.deepEqual(plusBonusEntries(member, now), [{ id: 'eco:fb:2026-10-05', t: now, app: 'eco', kind: 'freebet', amount: 0, note: '100' }]);
+  assert.deepEqual(plusBonusEntries(member, now), [{ id: 'eco:fb:2026-10-05', t: now, app: 'eco', kind: 'freebet', amount: 0, note: '200' }]);
   assert.deepEqual(plusBonusEntries({ entries: [...member.entries, ...plusBonusEntries(member, now)] }, now), []);
   assert.deepEqual(plusBonusEntries({ entries: [] }, now), []);
   // Comes with the month's payday for a member, and never from an app.
@@ -484,4 +484,24 @@ test('welcome: a NT$200 free bet after the first paid bet, once; a write brings 
   const w = await t.call('PATCH', `${t.qt(acct.token)}&app=odds`, { wallet: { entries: [{ ...bet, t: 1_700_000_100_000 }] } });
   assert.equal(w.status, 200);
   assert.ok(w.data.wallet.entries.some(e => e.id === 'eco:fb:welcome' && e.app === 'eco'));
+});
+
+test('points buy what money does: a redemption costs at least REWARDS_XP, amount 0, Rewards only', async () => {
+  const { REWARDS_XP } = await import('../eco.js');
+  const r = (id, note, extra = {}) => ({ id, t: 1, app: 'vocab', kind: 'redeem', amount: 0, note, ...extra });
+  const p = cleanPatch({
+    entries: [
+      r('vocab:xs:freeze:a', String(REWARDS_XP.freeze)),
+      r('vocab:xs:freeze:b', '10'),
+      r('vocab:xs:boost:c', '300'),
+      r('vocab:xs:pack:toeic', '8000'),
+      r('vocab:xs:pack:biz', '8000'),
+      r('vocab:xs:pack:x', '99999'),
+      r('vocab:xs:freeze:d', '600', { amount: -5 }),
+      r('vocab:xs:freeze:e', '600', { kind: 'shop' }),
+      r('vocab:xs:freeze:f', '600.5'),
+      { id: 'vocab:xs:freeze:g', t: 1, app: 'odds', kind: 'redeem', amount: 0, note: '600' }
+    ]
+  });
+  assert.deepEqual(p.entries.map(e => e.id), ['vocab:xs:freeze:a', 'vocab:xs:boost:c', 'vocab:xs:pack:toeic']);
 });
