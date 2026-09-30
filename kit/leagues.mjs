@@ -153,7 +153,80 @@ export const ASIA_URL = 'https://asia-baseball.quadra';
 export const asiaMonthUrl = (league, ym) => `${ASIA_URL}/${league}/${ym}.json`;
 // "2026-09" for a date (Asia's own calendar: UTC+8 is close enough for all three).
 export const asiaMonthOf = ms => new Date(ms + 8 * 3_600_000).toISOString().slice(0, 7);
-export async function asiaMonth(getJson, league, ym) {
-  const data = await getJson(asiaMonthUrl(league, ym));
-  return Array.isArray(data?.games) ? data.games : [];
+// The month's games. CPBL's own site has stopped answering, and the proxy's
+// fallback (TheSportsDB) can refuse the proxy: a CPBL month the proxy can't
+// fill comes from TheSportsDB's day lists straight from the device (they
+// allow any site), the days from two weeks back to two weeks ahead.
+export async function asiaMonth(getJson, league, ym, { now = Date.now(), fetchJson = directJson } = {}) {
+  const data = await getJson(asiaMonthUrl(league, ym)).catch(() => null);
+  const games = Array.isArray(data?.games) ? data.games : [];
+  if (league !== 'cpbl' || games.length) return games;
+  const days = tsdbDays(ym, now);
+  const lists = await Promise.all(days.map(d => fetchJson(`${TSDB_DAY}?d=${d}&l=${TSDB_CPBL}`).then(x => parseTsdbDay(x, now)).catch(() => [])));
+  return lists.flat().sort((x, y) => x.start.localeCompare(y.start));
+}
+
+// ---- CPBL from TheSportsDB (the proxy's fallback, and the device's) ---------------
+//
+// Its free key answers a day's games a request (3 at most, CPBL's most in a
+// day). Clubs as the proxy names them (asia-baseball.js).
+export const TSDB_DAY = 'https://www.thesportsdb.com/api/v1/json/3/eventsday.php';
+export const TSDB_CPBL = '5111';
+const CPBL_CLUBS = [
+  ['CTBC Brothers', '中信兄弟'],
+  ['Uni-President Lions', '統一7-ELEVEn獅'],
+  ['Rakuten Monkeys', '樂天桃猿'],
+  ['Fubon Guardians', '富邦悍將'],
+  ['Wei Chuan Dragons', '味全龍'],
+  ['TSG Hawks', '台鋼雄鷹']
+];
+const CPBL_BY_EN = Object.fromEntries(CPBL_CLUBS.map(([en, zh]) => [en.toLowerCase(), { en, zh }]));
+const tsdbClub = name => CPBL_BY_EN[String(name || '').toLowerCase().replace(/ 7-eleven/, '')] ?? { en: name, zh: name };
+const tsdbNum = x => (x === '' || x == null || !Number.isFinite(Number(x)) ? null : Number(x));
+// A game past its start and not marked over counts as on for this long.
+const TSDB_LONGEST = 5 * 3_600_000;
+export function parseTsdbDay(data, now = Date.now()) {
+  return (data?.events || []).map(e => {
+    const start = new Date(`${String(e.strTimestamp || `${e.dateEvent}T${e.strTime || '10:35:00'}`).replace(/Z?$/, 'Z')}`).toISOString();
+    const status = String(e.strStatus || '').toUpperCase();
+    const homeScore = tsdbNum(e.intHomeScore);
+    const awayScore = tsdbNum(e.intAwayScore);
+    const t = Date.parse(start);
+    const state = /^(POST|PPD|CANC|ABD|AWD)/.test(status)
+      ? 'void'
+      : /^(FT|AOT|AET)/.test(status)
+        ? 'post'
+        : status && status !== 'NS'
+          ? 'in'
+          : now < t
+            ? 'pre'
+            : now - t < TSDB_LONGEST
+              ? 'in'
+              : homeScore != null && awayScore != null
+                ? 'post'
+                : 'pre';
+    return { id: `cpbl-tsdb-${e.idEvent}`, start, home: tsdbClub(e.strHomeTeam), away: tsdbClub(e.strAwayTeam), homeScore, awayScore, state, venue: e.strVenue || '' };
+  });
+}
+// The month's days (Taiwan's calendar) from two weeks back to two weeks ahead.
+export function tsdbDays(ym, now = Date.now()) {
+  const days = [];
+  for (let d = -14; d <= 14; d++) {
+    const day = new Date(now + d * 86_400_000 + 8 * 3_600_000).toISOString().slice(0, 10);
+    if (day.startsWith(ym)) days.push(day);
+  }
+  return days;
+}
+// Plain fetch, each answer kept 10 minutes in memory.
+const directCache = new Map();
+function directJson(url) {
+  const hit = directCache.get(url);
+  if (hit && Date.now() - hit.at < 10 * 60_000) return hit.p;
+  const p = fetch(url).then(r => {
+    if (!r.ok) throw new Error(String(r.status));
+    return r.json();
+  });
+  directCache.set(url, { at: Date.now(), p });
+  p.catch(() => directCache.delete(url));
+  return p;
 }

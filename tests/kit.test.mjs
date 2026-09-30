@@ -195,3 +195,26 @@ test('notice switches follow the pass: newest wins, old device switches carried 
   await kit.syncPrefs({ ...s, active: false });
   assert.equal(writes.length, 1);
 });
+
+test('CPBL: a month the proxy can\'t fill comes from TheSportsDB\'s day lists on the device', async () => {
+  const { asiaMonth, tsdbDays } = await import('../kit/leagues.mjs');
+  const now = Date.parse('2026-09-30T04:00:00Z');
+  assert.equal(tsdbDays('2026-10', now).length, 14);
+  assert.equal(tsdbDays('2026-08', now).length, 0);
+  const asked = [];
+  const fetchJson = async url => {
+    asked.push(url);
+    return url.includes('d=2026-10-02') ? { events: [{ idEvent: '1', strTimestamp: '2026-10-02T10:35:00', strHomeTeam: 'Fubon Guardians', strAwayTeam: 'Wei Chuan Dragons', strStatus: 'NS' }] } : { events: null };
+  };
+  const refused = async () => {
+    throw new Error('502');
+  };
+  const games = await asiaMonth(refused, 'cpbl', '2026-10', { now, fetchJson });
+  assert.equal(asked.length, 14);
+  assert.deepEqual(games.map(g => [g.start, g.home.zh, g.away.en, g.state]), [['2026-10-02T10:35:00.000Z', '富邦悍將', 'Wei Chuan Dragons', 'pre']]);
+  // An empty month from the proxy too; other leagues never.
+  assert.equal((await asiaMonth(async () => ({ games: [] }), 'cpbl', '2026-10', { now, fetchJson })).length, 1);
+  assert.deepEqual(await asiaMonth(refused, 'npb', '2026-10', { now, fetchJson }), []);
+  // The proxy's own list when it has one.
+  assert.equal((await asiaMonth(async () => ({ games: [{ id: 'x' }] }), 'cpbl', '2026-10', { now, fetchJson })).length, 1);
+});

@@ -13,6 +13,8 @@
 //     awayScore, state: 'pre' | 'in' | 'post' | 'void', venue }] }
 // `start` is UTC. A game "in" is one past its start and not yet marked over.
 
+import { parseTsdbDay, TSDB_DAY, TSDB_CPBL } from './kit/leagues.mjs';
+
 export const ASIA_HOST = 'asia-baseball.quadra';
 export const ASIA_LEAGUES = ['npb', 'kbo', 'cpbl'];
 
@@ -227,27 +229,11 @@ async function fetchCpbl(year, month) {
 // CPBL's site turns some networks away: TheSportsDB's day lists instead (its
 // free key answers 3 games a request, CPBL's most in a day). Each day of the
 // month up to two weeks ahead.
-const TSDB = 'https://www.thesportsdb.com/api/v1/json/3/eventsday.php';
-const TSDB_CPBL = '5111';
-const CPBL_BY_EN = Object.fromEntries(Object.values(CPBL_TEAMS).map(([en, zh]) => [en.toLowerCase(), { en, zh }]));
-const tsdbTeam = name => CPBL_BY_EN[String(name || '').toLowerCase().replace(/ 7-eleven/, '')] ?? { en: name, zh: name };
-export function parseTsdbDay(data, now = Date.now()) {
-  return (data?.events || []).map(e => {
-    const start = new Date(`${String(e.strTimestamp || `${e.dateEvent}T${e.strTime || '10:35:00'}`).replace(/Z?$/, 'Z')}`).toISOString();
-    const status = String(e.strStatus || '').toUpperCase();
-    const scored = num(e.intHomeScore) != null && num(e.intAwayScore) != null;
-    return {
-      id: `cpbl-tsdb-${e.idEvent}`,
-      start,
-      home: tsdbTeam(e.strHomeTeam),
-      away: tsdbTeam(e.strAwayTeam),
-      homeScore: num(e.intHomeScore),
-      awayScore: num(e.intAwayScore),
-      state: /^(POST|PPD|CANC|ABD|AWD)/.test(status) ? 'void' : /^(FT|AOT|AET)/.test(status) ? 'post' : status && status !== 'NS' ? 'in' : stateOf({ start, over: false, scored, now }),
-      venue: e.strVenue || ''
-    };
-  });
-}
+// The day lists and their parsing are the kit's (shared with the apps, which
+// read them straight from the device when this proxy can't).
+export { parseTsdbDay };
+const TSDB = TSDB_DAY;
+
 // The days of the month from `from` up to two weeks ahead, each day's list
 // kept 10 minutes at Cloudflare's edge (TheSportsDB's free key is rate-limited).
 async function fetchCpblTsdb(year, month, { from = Date.UTC(year, month - 1, 1), now = Date.now() } = {}) {

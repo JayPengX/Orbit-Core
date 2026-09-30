@@ -20,6 +20,15 @@ edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
   the lottery's measured cut per kind of market, no league-tier, source-gap,
   line-step or source-specific extras; one win K (`K_WIN`, 1.158), so prices
   stay close to 運彩's.
+- **CPBL empty on the live proxy (fixed on the device):** cpbl.com.tw
+  refuses Cloudflare (403; its /schedule page also 404s/loops from anywhere
+  now) and TheSportsDB rate-limits the Worker (429), so every CPBL month came
+  back as 0 games and was cached as if the league had none (Fixtures stuck on
+  August, Play only Kambi's day). The Worker now answers 502 with the reasons
+  (never cached); the kit's `asiaMonth` then reads TheSportsDB's day lists
+  straight from the device (CORS open), two weeks back to two weeks ahead
+  (`tsdbDays`, `parseTsdbDay`, shared with the Worker). Past months beyond
+  that stay empty until a server-side source works again.
 - **Every sport (Kambi leagues too):** Play sells every game on a Kambi
   league's own schedule (`Quadra-Play/public/lib/schedules.mjs`): Asian
   baseball's month lists (strength from this season's results; settled from
