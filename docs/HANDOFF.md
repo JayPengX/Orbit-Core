@@ -6,6 +6,29 @@ All repos develop on `claude/gifted-dijkstra-dv6w8a` and are pushed to
 edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
 `npx eslint .`).
 
+## Missions that count, and a streak that matters (pushed to `main`)
+
+- **Lost mission steps:** each app built its `act:<app>` counts from its copy
+  of the wallet, so two steps in a row (Play's `bet` then `parlay`, the
+  lottery's `lottery` then `scratch`) raced and the Worker kept only one
+  (same millisecond: whichever it read last). The kit's `activityPatch` now
+  keeps the day's counts on the device (`quadra.act.<app>`), merges by the
+  larger of each, and gives each write a newer `t`. A free bet's parlay
+  always went through `track('parlay')`; it was this race.
+- **Missions, concrete:** Securities `invest` counts an order placed
+  (`trade`; watching no longer counts); `quotes` (new) three different stocks
+  opened (`view`, once a stock a day, Securities `openDetail`) replaces the
+  daily 定期定額 (it counted only a symbol that never had a plan); Fixtures
+  `match` counts a match opened (`open`; following no longer counts).
+  Texts say exactly what to do.
+- **Streak** (kit `STREAK`, `activeDaySet`, `streakOf`, `longestStreakOf`,
+  `streakBonus`, `streakCards`): any word practice (flash cards and misses
+  too: a batch is written with 0 points) or finished game (0 points too)
+  counts; a protection card covers a day. Points ×(1 + 2% a day, up to +30%)
+  (Rewards `xpRate`); 7, 30, 100 days (longest ever) each unlock an avatar
+  (🐯 🦅 🏆) and a protection card, with a pop-up once. Home's level card
+  shows it; 任務 › 等級與頭像 has the streak road.
+
 ## Fixtures: one date strip (pushed to `main`)
 
 - 賽事 uses 首頁's `dateStrip` (weekday and date chips, 📅 for any day,

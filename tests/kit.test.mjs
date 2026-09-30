@@ -348,3 +348,42 @@ test('avatars: level ones with the level, bought ones with points (Worker prices
   const p = eco.cleanPatch({ entries: [{ id: 'vocab:xs:avatar:gem', t: 1, app: 'vocab', kind: 'redeem', amount: 0, note: '300' }, { id: 'vocab:xs:avatar:dog', t: 1, app: 'vocab', kind: 'redeem', amount: 0, note: '300' }, { id: 'vocab:xs:avatar:panda', t: 1, app: 'vocab', kind: 'redeem', amount: 0, note: '9000' }] });
   assert.deepEqual(p.entries.map(e => e.id), ['vocab:xs:avatar:dog']);
 });
+
+test('activity: two steps in a row both count, later one newer, a new day starts over', () => {
+  localStorage.removeItem('quadra.act.odds');
+  const now = Date.UTC(2026, 9, 5, 4);
+  const w = { settings: { 'act:odds': { value: { day: '2026-10-05', n: { bet: 2 } }, t: now - 5 } } };
+  // Both computed from the same (stale) wallet, as Play does when a parlay is placed.
+  const a = kit.activityPatch(w, 'odds', 'bet', 1, now).settings['act:odds'];
+  const b = kit.activityPatch(w, 'odds', 'parlay', 1, now).settings['act:odds'];
+  assert.deepEqual(b.value.n, { bet: 3, parlay: 1 });
+  assert.ok(b.t > a.t && a.t > now - 5);
+  // The Worker's merge keeps the newer: both counts survive.
+  const next = kit.activityPatch({ settings: { 'act:odds': b } }, 'odds', 'bet', 1, now + 1000).settings['act:odds'];
+  assert.deepEqual(next.value.n, { bet: 4, parlay: 1 });
+  const tomorrow = kit.activityPatch(w, 'odds', 'scratch', 1, now + 86_400_000).settings['act:odds'];
+  assert.deepEqual(tomorrow.value, { day: '2026-10-06', n: { scratch: 1 } });
+});
+
+test('streak: any practice or game counts (points or not), a card covers a day; bonus, milestones, avatars', () => {
+  const now = Date.UTC(2026, 9, 20, 4);
+  const day = n => now - n * 86_400_000;
+  const g = (n, xp = 0) => ({ id: `vocab:g:${n}`, t: day(n), app: 'vocab', kind: 'game', amount: 0, ...(xp ? { xp } : {}) });
+  // Played 1 to 8 days ago, except 4 days ago, which a card covered; nothing yet today.
+  const entries = [1, 2, 3, 5, 6, 7, 8].map(n => g(n));
+  entries.push({ id: `vocab:fz:${new Date(day(4) + 8 * 3_600_000).toISOString().slice(0, 10)}`, t: day(3), app: 'vocab', kind: 'freeze', amount: 0 });
+  const w = { entries };
+  assert.equal(kit.streakOf(w, now), 8);
+  assert.equal(kit.longestStreakOf(w), 8);
+  assert.equal(kit.streakBonus(8), 0.16);
+  assert.equal(kit.streakBonus(40), kit.STREAK.max);
+  assert.equal(kit.streakCards(8), 1);
+  assert.ok(kit.avatarOwned(w, 'tiger') && !kit.avatarOwned(w, 'eagle'));
+  // Missing yesterday ends it (the longest stays, and so does the tiger).
+  const broken = { entries: entries.filter(e => e.id !== 'vocab:g:1') };
+  assert.equal(kit.streakOf(broken, now), 0);
+  assert.equal(kit.longestStreakOf(broken), 7);
+  assert.ok(kit.avatarOwned(broken, 'tiger'));
+  // Other apps' entries don't count.
+  assert.equal(kit.streakOf({ entries: [{ id: 'odds:x', t: day(1), app: 'odds', kind: 'game', amount: 0 }] }, now), 0);
+});
