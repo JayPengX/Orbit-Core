@@ -58,3 +58,16 @@ test('the address names a league and a month', () => {
   assert.equal(asiaTarget(new URL('https://asia-baseball.quadra/mlb/2026-09.json')), null);
   assert.equal(asiaTarget(new URL('https://asia-baseball.quadra/npb/2026-13.json')), null);
 });
+
+test('CPBL: every source refusing is an error, never an empty month', async () => {
+  const { asiaBaseballResponse } = await import('../asia-baseball.js');
+  const real = globalThis.fetch;
+  globalThis.fetch = async url => new Response('no', { status: String(url).includes('thesportsdb') ? 403 : 404 });
+  try {
+    const r = await asiaBaseballResponse(new URL('https://asia-baseball.quadra/cpbl/2026-10.json'));
+    assert.equal(r.status, 502);
+    assert.match((await r.json()).error, /tsdb 403/);
+  } finally {
+    globalThis.fetch = real;
+  }
+});
