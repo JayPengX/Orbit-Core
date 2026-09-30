@@ -106,7 +106,7 @@ const SOCCER_LOGO = {
   epl: 23, laliga: 15, seriea: 12, bundesliga: 10, ligue1: 9, ucl: 2, uel: 2310, uecl: 20296, eredivisie: 11, primeira: 14,
   scotland: 45, belgium: 6, superlig: 18, saudi: 2488,
   mls: 19, ligamx: 22, brasileirao: 85, argentina: 1, libertadores: 58, sudamericana: 1208, jleague: 2199,
-  facup: 40, leaguecup: 41, copadelrey: 80, nationsleague: 2395, wcqeurope: 67, acl: 2200, asiancup: 2243, friendly: 53
+  facup: 40, leaguecup: 41, copadelrey: 80, nationsleague: 2395, wcqeurope: 67, acl: 2200, asiancup: 2243, friendly: 53, worldcup: 4, euro: 74, copaamerica: 83, clubworldcup: 1932
 };
 // TheSportsDB's league badges.
 const LEAGUE_BADGE = {

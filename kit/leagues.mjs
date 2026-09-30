@@ -66,6 +66,9 @@ export const CATALOG = {
   // Spain's Liga ACB (Europe's strongest national league) and Australia's NBL, from Kambi.
   acb: { sport: 'basketball', kind: 'match', data: 'kambi', kambi: 'basketball/spain/liga_acb', zh: '西班牙籃球聯賽', en: 'Liga ACB', bet: 'acb', odds: 'kambi', icon: '🏀' },
   nbl: { sport: 'basketball', kind: 'match', data: 'kambi', kambi: 'basketball/australia/nbl', zh: '澳洲職籃 NBL', en: 'NBL', bet: 'nbl', odds: 'kambi', icon: '🏀' },
+  // China's CBA and Korea's KBL, from Kambi (their seasons October to spring).
+  cba: { sport: 'basketball', kind: 'match', data: 'kambi', kambi: 'basketball/china/cba', zh: '中國職籃 CBA', en: 'CBA', bet: 'cba', odds: 'kambi', icon: '🏀' },
+  kbl: { sport: 'basketball', kind: 'match', data: 'kambi', kambi: 'basketball/south_korea/kbl', zh: '韓國職籃 KBL', en: 'KBL', bet: 'kbl', odds: 'kambi', icon: '🏀' },
   bleague: { sport: 'basketball', kind: 'match', data: 'kambi', kambi: 'basketball/japan/b1__league', zh: '日本 B 聯賽', en: 'B.League', bet: 'bleague', odds: 'kambi', icon: '🏀', badge: 'vcx6gw1745501883' },
   // Football
   nfl: espn('football', 'football/nfl', 'NFL', 'NFL', 'nfl', { top: true }),
@@ -93,6 +96,8 @@ export const CATALOG = {
   argentina: soccer('arg.1', '阿甲', 'Liga Profesional', 'argentina', { logo: 1 }),
   libertadores: soccer('conmebol.libertadores', '解放者盃', 'Copa Libertadores', 'libertadores', { cup: true, logo: 58 }),
   sudamericana: soccer('conmebol.sudamericana', '南美球會盃', 'Copa Sudamericana', 'sudamericana', { cup: true, logo: 1208 }),
+  // Korea's K League 1: not on ESPN, Kambi's schedule and prices (three-way).
+  kleague: { sport: 'soccer', kind: 'match', data: 'kambi', kambi: 'football/south_korea/k-league_1', zh: '韓國職業足球聯賽', en: 'K League 1', bet: 'kleague', odds: 'kambi', icon: '⚽' },
   jleague: soccer('jpn.1', '日職聯', 'J1 League', 'jleague', { logo: 2199 }),
   facup: soccer('eng.fa', '英足總盃', 'FA Cup', 'facup', { cup: true, logo: 40 }),
   leaguecup: soccer('eng.league_cup', '英聯盃', 'EFL Cup', 'leaguecup', { cup: true, logo: 41 }),
@@ -100,6 +105,11 @@ export const CATALOG = {
   acl: soccer('afc.champions', '亞冠菁英聯賽', 'AFC Champions League Elite', 'acl', { cup: true, logo: 2200 }),
   asiancup: soccer('afc.asian.cup', '亞洲盃', 'AFC Asian Cup', 'asiancup', { cup: true, logo: 2243 }),
   friendly: soccer('fifa.friendly', '國際友誼賽', 'International friendlies', 'friendly', { cup: true, logo: 53 }),
+  // The big tournaments: every few years, the board fills when one is on.
+  worldcup: soccer('fifa.world', '世界盃', 'FIFA World Cup', 'worldcup', { cup: true, logo: 4 }),
+  euro: soccer('uefa.euro', '歐洲國家盃', 'UEFA Euro', 'euro', { cup: true, logo: 74 }),
+  copaamerica: soccer('conmebol.america', '美洲盃', 'Copa América', 'copaamerica', { cup: true, logo: 83 }),
+  clubworldcup: soccer('fifa.cwc', '世界俱樂部盃', 'FIFA Club World Cup', 'clubworldcup', { cup: true, logo: 1932 }),
   nationsleague: soccer('uefa.nations', '歐國聯', 'Nations League', 'nationsleague', { cup: true, logo: 2395 }),
   wcqeurope: soccer('fifa.worldq.uefa', '世界盃資格賽（歐洲）', 'WC qualifying (UEFA)', 'wcqeurope', { cup: true, logo: 67 }),
   // Tennis: Fixtures' draws from ESPN, Play's prices from Kambi (results from ESPN).
