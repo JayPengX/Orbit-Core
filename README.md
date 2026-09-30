@@ -73,8 +73,8 @@ account's document id.
   alone (the kit's `plusMember`, `plusMonths`).
 - **The allowance** on any sign-in or read: NT$30,000 to open a new pass,
   then each Taiwan month an amount by what the account is worth (the pool
-  plus Securities' `snap.stock.holdings`): NT$6,000 under NT$40,000, 4,000
-  under 100,000, 2,000 under 250,000, 1,000 above (`PAY_TIERS`). Months
+  plus Securities' `snap.stock.holdings`): NT$6,000 under NT$40,000, 3,000
+  under 100,000, 1,500 under 250,000, 500 above (`PAY_TIERS`). Months
   missed are paid on return, stepping down as they land.
 - **The reset** (once, `eco:rebase:v3`, −NT$80,000): every account that
   opened on the old NT$110,000 comes down to the new NT$30,000.

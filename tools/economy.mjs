@@ -24,25 +24,39 @@ const TRADE_COST = 0.006; // Taiwan round trip: commission both ways and the sel
 
 // The allowance by what the account is worth (NT$ net worth: the pool plus
 // Securities' holdings less its loans): full to get going, less once there's
-// plenty, never nothing.
-export const PAY_TIERS = [
+// plenty, never nothing. v3/v4 paid 6,000 / 4,000 / 2,000 / 1,000; v5 (now,
+// eco.js) pays 6,000 / 3,000 / 1,500 / 500.
+const tiered = tiers => worth => tiers.find(([below]) => worth < below)[1];
+const PAY_V3 = tiered([
   [40_000, 6_000],
   [100_000, 4_000],
   [250_000, 2_000],
   [Infinity, 1_000]
+]);
+export const PAY_TIERS = [
+  [40_000, 6_000],
+  [100_000, 3_000],
+  [250_000, 1_500],
+  [Infinity, 500]
 ];
-export const payFor = worth => PAY_TIERS.find(([below]) => worth < below)[1];
+export const payFor = tiered(PAY_TIERS);
 
 export const SETTINGS = {
   now: { name: 'Now', start: 110_000, pay: () => 7_000, effortRate: 18, effortCap: 600 + 400 + 300, plus: 290 },
   // What the Worker changes on its own (Rewards still earns as it does).
-  worker: { name: 'Proposed, Worker only (until Rewards takes the new caps)', start: 30_000, pay: payFor, effortRate: 18, effortCap: 600 + 400 + 300, plus: 290 },
-  v3: { name: 'Proposed, all of it', start: 30_000, pay: payFor, effortRate: 12, effortCap: 200 + 120 + 80, plus: 290 },
+  worker: { name: 'v3, Worker only (before Rewards took the new caps)', start: 30_000, pay: PAY_V3, effortRate: 18, effortCap: 600 + 400 + 300, plus: 290 },
+  v3: { name: 'v3, all of it', start: 30_000, pay: PAY_V3, effortRate: 12, effortCap: 200 + 120 + 80, plus: 290 },
   // Rewards' shop (a word boost: NT$150 for 30 minutes of ×2 word pay and a
   // cap NT$200 higher that day; protection cards and word packs) and the
   // missions' free bets (a free bet returns its winnings only: about 45% of
   // its face on a treble, FREEBET_RETURN).
-  v4: { name: 'Now: v3 with the Rewards shop and free bets', start: 30_000, pay: payFor, effortRate: 12, effortCap: 200 + 120 + 80, plus: 290, shop: true }
+  v4: { name: 'v4: v3 with the Rewards shop and free bets', start: 30_000, pay: PAY_V3, effortRate: 12, effortCap: 200 + 120 + 80, plus: 290, shop: true },
+  // v4 left everyone but the high roller richer every month (a regular
+  // bettor +NT$2.7k, a grinder +8.6k): the allowance above the first tier
+  // halves (a regular player now levels out near NT$40,000, where the full
+  // allowance stops) and Rewards' day comes down to NT$330 (words 150,
+  // games 120, missions 60), so a grinder earns a little, not a salary.
+  v5: { name: 'Now (v5): allowance 6,000/3,000/1,500/500, Rewards NT$330 a day', start: 30_000, pay: payFor, effortRate: 12, effortCap: 150 + 120 + 60, plus: 290, shop: true }
 };
 const BOOST = { price: 150, cap: 200 };
 const FREEBET_RETURN = 0.45;
@@ -89,14 +103,14 @@ const money = x => `${x < 0 ? '−' : ''}NT$${Math.round(Math.abs(x)).toLocaleSt
 if (import.meta.url === `file://${process.argv[1]}`) {
   for (const s of Object.values(SETTINGS)) {
     console.log(`\n== ${s.name}: open ${money(s.start)}, effort cap ${money(s.effortCap)} a day`);
-    console.log('who        income/mo   house take/mo   net/mo      after 12 mo   months of pay held (NT$7,000)');
+    console.log(`who        income/mo   house take/mo   net/mo   net in mo 12   after 12 mo   months of pay held (${money(PAY_TIERS[0][1])})`);
     for (const p of PEOPLE) {
       const rows = simulate(s, p);
       const first = rows[0];
       const last = rows.at(-1);
       const income = first.pay + first.effort + Math.max(0, first.market);
       const broke = rows.length < 12 || last.worth <= 0 ? ` (broke in month ${rows.findIndex(r => r.worth <= 0) + 1 || rows.length})` : '';
-      console.log(`${p.zh.padEnd(6, '　')}  ${money(income).padStart(10)}  ${money(first.take).padStart(14)}  ${money(first.flow).padStart(10)}  ${money(Math.max(0, last.worth)).padStart(12)}   ${(Math.max(0, last.worth) / 7_000).toFixed(1).padStart(5)}${broke}`);
+      console.log(`${p.zh.padEnd(6, '　')}  ${money(income).padStart(10)}  ${money(first.take).padStart(14)}  ${money(first.flow).padStart(10)}  ${money(last.flow).padStart(12)}  ${money(Math.max(0, last.worth)).padStart(12)}   ${(Math.max(0, last.worth) / PAY_TIERS[0][1]).toFixed(1).padStart(5)}${broke}`);
     }
   }
 }

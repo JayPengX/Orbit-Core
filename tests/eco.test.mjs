@@ -378,17 +378,17 @@ test('Quadra Plus yearly on top of a month already held starts next month', () =
 test('the allowance goes by worth: full to start or restart, less with plenty, never nothing', () => {
   assert.equal(payFor(0), 6_000);
   assert.equal(payFor(39_999), 6_000);
-  assert.equal(payFor(40_000), 4_000);
-  assert.equal(payFor(150_000), 2_000);
-  assert.equal(payFor(5_000_000), 1_000);
+  assert.equal(payFor(40_000), 3_000);
+  assert.equal(payFor(150_000), 1_500);
+  assert.equal(payFor(5_000_000), 500);
   // Worth counts Securities' holdings, not only cash.
   const w = { entries: [{ id: 'a', t: 1, app: 'odds', amount: 20_000 }, { id: 'eco:rebase:v3', t: 1, app: 'eco', kind: 'rebase', amount: 0 }], snap: { stock: { cash: 5_000, holdings: 300_000, t: 1 } } };
   assert.equal(worthOf(w), 325_000);
   const oct = Date.UTC(2026, 9, 3);
-  assert.equal(paydayEntries({ ...w, created: oct }, oct).find(e => e.kind === 'pay').amount, 1_000);
+  assert.equal(paydayEntries({ ...w, created: oct }, oct).find(e => e.kind === 'pay').amount, 500);
   // Back pay steps down as it lands.
   const back = paydayEntries({ entries: [{ id: 'x', t: 1, app: 'odds', amount: 36_000 }, { id: 'eco:rebase:v3', t: 1, app: 'eco', kind: 'rebase', amount: 0 }], created: oct }, Date.UTC(2027, 0, 5)).filter(e => e.kind === 'pay');
-  assert.deepEqual(back.map(e => e.amount), [6_000, 4_000, 4_000, 4_000]);
+  assert.deepEqual(back.map(e => e.amount), [6_000, 3_000, 3_000, 3_000]);
   assert.equal(PAY_TIERS.at(-1)[1] > 0, true);
 });
 

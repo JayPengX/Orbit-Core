@@ -633,3 +633,36 @@ that didn't land on live games, and text cut on phones.
   bouts kept only when on a TheSportsDB card, `notable` / `notableFight`,
   results from its write-ups, `boxingResult`, void after 5 days unknown).
   Play's basketball filter group now follows the catalogue.
+
+## Round: the economy, v5 (all repos, pushed to `main`)
+
+The owner asked to balance the economy again, leaving the opening money
+(NT$30,000) alone. `node tools/economy.mjs` showed v4 (the shop and free
+bets on top of v3) leaving everyone but the high roller richer every month:
+a regular bettor +NT$2.7k, a grinder +8.6k, a Rewards-only learner +15.5k,
+an idle account doubling in five months.
+
+- **Allowance (Worker, `PAY_TIERS` in eco.js; kit `ECONOMY.payTiers`):**
+  6,000 / 3,000 / 1,500 / 500 at < 40k / < 100k / < 250k / above (was
+  6,000 / 4,000 / 2,000 / 1,000). The first tier is unchanged, so a new or
+  broke account still gets going; past it a regular bettor is now about
+  level (−NT$0.3k a month in the model) and settles near NT$40,000.
+  Live from the first payday, 2026-10.
+- **Rewards' day (kit `ECONOMY`):** NT$330 (words 150, games 120, missions
+  60), was 400 (200 / 120 / 80). Games keep 120 so a long round still pays
+  in full. Missions pay NT$10-20 (was 15-25) and weekly goals 30-45 (was
+  40-60), so about as many fit under the lower cap. Plus still adds NT$50
+  to words (the perk line reads the cap); the boost still adds 200.
+- **Model after 12 months (v4 → v5):** casual 75k → 65k, regular 46k →
+  41k (level), investor 115k → 107k (grows by the market), grinder 111k →
+  78k (+3.5k a month), learner 182k → 166k, high roller still broke in a
+  month.
+- Text: Rewards' help (the allowance and the day's caps), its README money
+  table (was stale since v3), Play's practice-account line, the kit's reset
+  notice range and Plus perk line.
+- Left alone on purpose: the house's cuts (Play and the lottery copy Taiwan
+  Sports Lottery / Taiwan Lottery), Securities' costs (a Taiwan broker's),
+  Plus's price, the shop's prices, the overdraft rate.
+- Seen, not changed: the `plan` mission counts saving a monthly plan in
+  Securities, so re-saving one each day earns its NT$50 free bet daily
+  (worth ~NT$22 at a free bet's ~45% return).
