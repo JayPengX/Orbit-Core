@@ -6,7 +6,47 @@ All repos develop on `claude/gifted-dijkstra-dv6w8a` and are pushed to
 edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
 `npx eslint .`).
 
-## Done in this round
+## Round: v7, Rewards pays points, the only money is Quadra's (all repos, pushed to `main`)
+
+The owner asked that Rewards stop paying money: the opening money and the
+monthly allowance are the only money Quadra gives (a mechanism for the
+economy, not a payout), and every product must earn the house money
+without them (`node tools/economy.mjs`, the v7 rows and the house table).
+
+- **Rewards gives points (XP), never NT$:** words, games, missions, weekly
+  goals and the daily challenge write entries with `amount: 0` and `xp`
+  (`lib/earn.mjs`: `xpOf`, `xpToday`, `xpAllTime`, `xpText`); no daily caps.
+  Old paid entries count as points (`xpOf` falls back to the amount), so
+  streaks, weekly goals and badges carry on. The three Play/Securities
+  missions give points instead of free bets. Outbox entries still waiting
+  with an amount become points on load. The shop is the only money Rewards
+  moves (streak card 300, word points ×2 150, packs).
+- **Worker (`eco.js cleanEntry`):** drops a new `vocab` entry with a positive
+  amount or a `vocab:fb:` id; keeps `xp` (≤ 10,000) on `vocab` entries.
+  Nothing already stored changes.
+- **Allowance (v7):** 8,000 / 4,000 / 1,500 / 500 by worth (was 6,000 /
+  3,000 / 1,500 / 500), kit `ECONOMY.payTiers` = `eco.js PAY_TIERS` (tested
+  together). A regular bettor levels out near NT$32,000; casual players and
+  word learners grow slowly into the lower tiers; heavy bettors drain.
+- **Plus (v7):** NT$990 a month / 9,900 a year (was 390 / 3,900); the parlay
+  boost is no longer doubled (`PLUS.odds.boost: 1`, Play hides the Plus
+  ladder hint), the daily +10% lift covers a slip up to NT$500 (was 1,000),
+  no extra word pay, packs half price for members instead of included
+  (`PLUS.vocab.packShare`; the Worker's `REWARDS_SHOP` minimums already
+  were half). Members' old slips keep their stored `boost`. The house now
+  earns more from every kind of member than from the same non-member.
+- **Kit:** a one-time notice (`quadra.seen.v7`) for accounts made before
+  2026-10-01 Taiwan (`V7_AT`) explains the change; the statement skips
+  zero-amount entries (points, tokens); Rewards' role reads 積分、目標與說明.
+- **House per user a month, at NT$40,000, excluding the allowance** (v7
+  model): casual +565 (Plus +1,258), regular +7,871 (+7,941), high roller
+  +61,601 (+62,396), investor +2,114 (+2,211), heavy bettor +11,288
+  (+11,378), words only +383 (+1,331). Promotions stay 2-13% of the gaming
+  take for bettors.
+- Not changed: back pay for months nobody opened an app (`paydayEntries`
+  pays every missed month on return); VIP cashback; cash interest.
+
+## Done in the round before
 
 - **Sell every game, one reach, one cut (Play + Fixtures):** Play sells every
   league's games up to 14 days out (`SOLD_DAYS` in `kit/leagues.mjs`, the

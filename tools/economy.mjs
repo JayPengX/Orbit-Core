@@ -24,8 +24,9 @@ const TRADE_COST = 0.006; // Taiwan round trip: commission both ways and the sel
 
 // The allowance by what the account is worth (NT$ net worth: the pool plus
 // Securities' holdings less its loans): full to get going, less once there's
-// plenty, never nothing. v3/v4 paid 6,000 / 4,000 / 2,000 / 1,000; v5 (now,
-// eco.js) pays 6,000 / 3,000 / 1,500 / 500.
+// plenty, never nothing. v3/v4 paid 6,000 / 4,000 / 2,000 / 1,000; v5/v6
+// 6,000 / 3,000 / 1,500 / 500; v7 (now, eco.js) 8,000 / 4,000 / 1,500 / 500,
+// since the allowance is the only money coming in once Rewards stopped paying.
 const tiered = tiers => worth => tiers.find(([below]) => worth < below)[1];
 const PAY_V3 = tiered([
   [40_000, 6_000],
@@ -33,14 +34,26 @@ const PAY_V3 = tiered([
   [250_000, 2_000],
   [Infinity, 1_000]
 ]);
-export const PAY_TIERS = [
+const PAY_V5 = tiered([
   [40_000, 6_000],
   [100_000, 3_000],
+  [250_000, 1_500],
+  [Infinity, 500]
+]);
+export const PAY_TIERS = [
+  [40_000, 8_000],
+  [100_000, 4_000],
   [250_000, 1_500],
   [Infinity, 500]
 ];
 export const payFor = tiered(PAY_TIERS);
 
+// Quadra Plus (Shared-Proxy/kit/quadra.mjs, eco.js).
+export const PLUS_V6 = { fee: 390, boost: 2, lift: 0.1, liftMax: 1_000, bonusBet: 100, commission: 0.28, wordsCap: 50, packShare: 0 };
+// v7 (the kit's PLUS now): no word pay to raise, the parlay boost no longer
+// doubled, the daily lift on one slip up to NT$500, packs half price, and a
+// fee the perks can't outgrow.
+export const PLUS_V7 = { fee: 990, boost: 1, lift: 0.1, liftMax: 500, bonusBet: 100, commission: 0.28, wordsCap: 0, packShare: 0.5 };
 export const SETTINGS = {
   now: { name: 'Now', start: 110_000, pay: () => 7_000, effortRate: 18, effortCap: 600 + 400 + 300, plus: 290 },
   // What the Worker changes on its own (Rewards still earns as it does).
@@ -56,11 +69,16 @@ export const SETTINGS = {
   // halves (a regular player now levels out near NT$40,000, where the full
   // allowance stops) and Rewards' day comes down to NT$330 (words 150,
   // games 120, missions 60), so a grinder earns a little, not a salary.
-  v5: { name: 'v5: allowance 6,000/3,000/1,500/500, Rewards NT$330 a day', start: 30_000, pay: payFor, effortRate: 12, effortCap: 150 + 120 + 60, plus: 290, shop: true },
+  v5: { name: 'v5: allowance 6,000/3,000/1,500/500, Rewards NT$330 a day', start: 30_000, pay: PAY_V5, effortRate: 12, effortCap: 150 + 120 + 60, plus: 290, shop: true },
   // v5 and the business round: Plus reworked (a daily +10% winnings boost,
   // a NT$100 free bet a week, 2.8折 commission, every word pack), VIP
   // cashback on gaming stakes; monthOf has the details.
-  v6: { name: 'Now (v6): v5 with Plus reworked and VIP cashback', start: 30_000, pay: payFor, effortRate: 12, effortCap: 150 + 120 + 60, plus: 290, shop: true, vip: true, v6: true }
+  v6: { name: 'v6: v5 with Plus reworked and VIP cashback', start: 30_000, pay: PAY_V5, effortRate: 12, effortCap: 150 + 120 + 60, plus: 290, shop: true, vip: true, v6: true },
+  // v7: Rewards pays no money (points only) and its missions give no free
+  // bets; money comes only from the opening money and the allowance, which
+  // rises to keep a regular player level without the effort pay. Plus as
+  // PLUS_V7.
+  v7: { name: 'Now (v7): no Rewards pay, allowance 8,000/4,000/1,500/500, Plus NT$990', start: 30_000, pay: payFor, effortRate: 0, effortCap: 0, plus: 990, shop: true, vip: true, v6: true, noRewardsPay: true, plusCfg: PLUS_V7 }
 };
 const BOOST = { price: 150, cap: 200 };
 const FREEBET_RETURN = 0.45;
@@ -77,8 +95,7 @@ const CUT = 1.158;
 const ODDS = 1.85;
 const trebleHold = boost => 1 - ((1 / CUT) ** 3 * (1 + (ODDS ** 3 - 1) * (1 + boost))) / ODDS ** 3;
 const singleHold = lift => 1 - (1 + (ODDS - 1) * (1 + lift)) / (ODDS * CUT);
-// The kit's PLUS and VIP (Shared-Proxy/kit/quadra.mjs, eco.js).
-export const PLUS_V6 = { fee: 390, lift: 0.1, liftMax: 1_000, bonusBet: 100, commission: 0.28, wordsCap: 50 };
+// The kit's VIP (Shared-Proxy/kit/quadra.mjs, eco.js).
 export const VIP_TIERS = [
   [500_000, 0.015],
   [150_000, 0.012],
@@ -95,22 +112,27 @@ export function monthOf(settings, p, worth, member = false) {
   const tickets = (p.draw + p.scratch) * DAYS;
   const gaming = bets * ((1 - p.trebles) * HOLD.single + p.trebles * trebleHold(0.05)) + p.draw * DAYS * HOLD.draw + p.scratch * DAYS * HOLD.scratch;
   // Promotions.
-  const freebets = settings.shop ? (p.freebetsV6 ?? p.freebets ?? 0) * DAYS * FREEBET_RETURN : 0;
-  const boostDouble = member ? bets * p.trebles * (trebleHold(0.05) - trebleHold(0.1)) : 0;
-  const liftStake = member && p.slips > 0 && p.stake <= PLUS_V6.liftMax ? Math.min(1, p.slips) * DAYS * p.stake : 0;
-  const lift = liftStake * ((1 - p.trebles) * (singleHold(0) - singleHold(PLUS_V6.lift)) + p.trebles * (trebleHold(0.1) - trebleHold(0.1 + PLUS_V6.lift)));
-  const bonus = member && p.slips > 0 ? ((PLUS_V6.bonusBet * 52) / 12) * FREEBET_RETURN : 0;
+  const P = settings.plusCfg || PLUS_V6;
+  const freebets = settings.shop && !settings.noRewardsPay ? (p.freebetsV6 ?? p.freebets ?? 0) * DAYS * FREEBET_RETURN : 0;
+  const boost = member ? 0.05 * P.boost : 0.05;
+  const boostDouble = member ? bets * p.trebles * (trebleHold(0.05) - trebleHold(boost)) : 0;
+  const liftStake = member && p.slips > 0 && p.stake <= P.liftMax ? Math.min(1, p.slips) * DAYS * p.stake : 0;
+  const lift = liftStake * ((1 - p.trebles) * (singleHold(0) - singleHold(P.lift)) + p.trebles * (trebleHold(boost) - trebleHold(boost + P.lift)));
+  const bonus = member && p.slips > 0 ? ((P.bonusBet * 52) / 12) * FREEBET_RETURN : 0;
   const vip = settings.vip ? vipBack(bets + tickets) : 0;
   const promo = freebets + boostDouble + lift + bonus + vip;
   // Other revenue.
-  const commission = p.turnover * COMMISSION * (member ? PLUS_V6.commission : 1);
+  const commission = p.turnover * COMMISSION * (member ? P.commission : 1);
   const tax = p.turnover * (TRADE_COST - COMMISSION);
-  const plusFee = member ? PLUS_V6.fee : 0;
-  const boosted = settings.shop ? p.boostDays || 0 : 0;
-  const shop = settings.shop ? boosted * BOOST.price + (p.shopMonth || 0) + (member ? 0 : p.packMonth || 0) : 0;
+  const plusFee = member ? P.fee : 0;
+  // With no Rewards pay, a word boost buys points, not money: nobody is
+  // modelled buying one.
+  const boosted = settings.shop && !settings.noRewardsPay ? p.boostDays || 0 : 0;
+  const packs = (p.packMonth || 0) * (member ? P.packShare : 1);
+  const shop = settings.shop ? boosted * BOOST.price + (p.shopMonth || 0) + packs : 0;
   // The person's income.
   const pay = settings.pay(worth);
-  const wordsExtra = member ? PLUS_V6.wordsCap : 0;
+  const wordsExtra = member ? P.wordsCap : 0;
   const perDay = cap => Math.min(cap, p.effort * settings.effortRate);
   const effort = perDay(settings.effortCap + wordsExtra) * (DAYS - boosted) + perDay(settings.effortCap + wordsExtra + BOOST.cap) * boosted;
   const market = Math.max(0, worth * p.invested) * MARKET;
@@ -185,8 +207,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   }
   // The business, a month at NT$40,000: what the house keeps from each kind
   // of user, what it gives back, as a member of Plus and not.
-  const s6 = SETTINGS.v6;
-  console.log(`\n== The house, a month per user at ${money(40_000)} (v6)`);
+  const s6 = SETTINGS.v7;
+  console.log(`\n== The house, a month per user at ${money(40_000)} (v7)`);
   console.log('who          Plus   gaming take   promos (of take)   commission   Plus+shop   house net   user net');
   for (const p of PEOPLE) {
     for (const member of [false, true]) {

@@ -128,17 +128,17 @@ test('Quadra Plus: a month is a member’s when the Worker billed it; joining is
   assert.equal(kit.plusMember({ entries: [{ id: 'eco:plus:2026-10', app: 'odds', kind: 'plus' }] }, oct), false);
   assert.equal(kit.plusJoinPrice({ entries: [] }, oct), 0);
   // 22 of 31 days left.
-  assert.equal(kit.plusJoinPrice(w, oct), 280);
+  assert.equal(kit.plusJoinPrice(w, oct), 700);
 });
 
 test('the allowance: by what the account is worth, Securities holdings included', () => {
-  assert.equal(kit.paydayFor({ entries: [] }), 6_000);
-  assert.equal(kit.paydayFor({ entries: [{ id: 'a', amount: 60_000, app: 'odds' }] }), 3_000);
+  assert.equal(kit.paydayFor({ entries: [] }), 8_000);
+  assert.equal(kit.paydayFor({ entries: [{ id: 'a', amount: 60_000, app: 'odds' }] }), 4_000);
   assert.equal(kit.paydayFor({ entries: [], snap: { stock: { cash: 50_000, holdings: 500_000, t: 1 } } }), 500);
-  assert.match(kit.paydayText('zh', Date.UTC(2026, 9, 5), { entries: [] }), /NT\$6,000/);
+  assert.match(kit.paydayText('zh', Date.UTC(2026, 9, 5), { entries: [] }), /NT\$8,000/);
 });
 
-test('free bets: Rewards gives them, Play spends each once, they last a week', () => {
+test('free bets: tokens (Rewards gave them before v7) are spent once and last a week', () => {
   const t = Date.UTC(2026, 9, 1);
   const tok = (id, note, at = t) => ({ id, t: at, app: 'vocab', kind: 'freebet', amount: 0, note });
   const w = { entries: [tok('vocab:fb:a', '100'), tok('vocab:fb:b', '50', t + 1000), tok('vocab:fb:c', '7'), tok('vocab:fb:old', '100', t - 8 * 86_400_000), { id: 'odds:fb-vocab:fb:b', t, app: 'odds', kind: 'freebet', amount: 0 }] };
@@ -271,4 +271,16 @@ test('pictures: national sides get flags, players found in either name order, fi
   assert.equal(L.playerNation('Some Boxer'), 'MX');
   assert.ok(L.knowsNation('Some Boxer'));
   for (const key of ['acb', 'nbl', 'cba', 'kbl', 'kleague', 'rugbyunion', 'cricket', 'boxing']) assert.ok(L.leagueLogo(key), key);
+});
+
+test('v7: the kit and the Worker agree on the allowance and Plus; the statement skips Rewards points', async () => {
+  const eco = await import('../eco.js');
+  assert.deepEqual(kit.ECONOMY.payTiers, eco.PAY_TIERS);
+  assert.equal(kit.PLUS.fee, eco.PLUS.fee);
+  assert.equal(kit.PLUS.year, eco.PLUS.year);
+  const now = Date.UTC(2026, 9, 10);
+  const w = { entries: [{ id: 'eco:pay:2026-10', t: now - 2, app: 'eco', kind: 'pay', amount: 8_000 }, { id: 'vocab:g:1', t: now - 1, app: 'vocab', kind: 'game', amount: 0, xp: 30 }] };
+  const d = kit.accountDetails(w, 'en', now);
+  assert.deepEqual(d.recent.map(r => r.amount), [8_000]);
+  assert.equal(d.count, 1);
 });

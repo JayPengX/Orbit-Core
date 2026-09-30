@@ -81,6 +81,8 @@ const LEDGER_APPS = new Set(['odds']);
 export const WALLET_MAX_LENGTH = 900_000;
 const MAX_ENTRIES_PER_WRITE = 1000;
 const MAX_AMOUNT = 1_000_000_000;
+// Rewards' points on one entry (a batch of answers, a game, a claim).
+const MAX_XP = 10_000;
 const MAX_MERGE_SOURCES = 12;
 
 // Per IP an hour, for the calls that take a code (KV counters); calls with a
@@ -105,12 +107,13 @@ export function emptyWallet(now = Date.now()) {
 // get going or to get back in the game, half once the account is past the
 // opening money, a token once there's plenty. Worth is the pool plus
 // Securities' holdings less its loans (its snap's `holdings`). A new pass
-// opens with about five months of it. v5 (2026-10): 6,000 / 3,000 / 1,500 /
-// 500 (was 4,000 / 2,000 / 1,000 above the first tier), so a regular player
-// levels out around NT$40,000 instead of drifting up every month.
+// opens with about four months of it. v7 (2026-10): 8,000 / 4,000 / 1,500 /
+// 500 (v5 was 6,000 / 3,000 / 1,500 / 500): Rewards pays no money any more,
+// so the allowance is the only income, and a regular player levels out a
+// little under NT$40,000 instead of drifting up or down every month.
 export const PAY_TIERS = [
-  [40_000, 6_000],
-  [100_000, 3_000],
+  [40_000, 8_000],
+  [100_000, 4_000],
   [250_000, 1_500],
   [Infinity, 500]
 ];
@@ -236,13 +239,15 @@ export { WEEK };
 // of a month while the `plus` setting is on and the pool covers it; a month
 // nobody opened an app is never charged. The yearly plan (PLUS.year, about
 // two months free) pays twelve months at once and renews by the year.
-// Leaving stops renewal and keeps every month already paid.
-export const PLUS = { fee: 390, year: 3_900, bonusBet: 100 };
+// Leaving stops renewal and keeps every month already paid. v7: NT$990 (was
+// 390), so the fee covers what the perks give back for every kind of member
+// (tools/economy.mjs); a yearly plan already paid keeps its months.
+export const PLUS = { fee: 990, year: 9_900, bonusBet: 100 };
 const PLUS_ID = m => `eco:plus:${m}`;
 // A member's weekly bonus bet: a free bet token for Quadra Play, NT$PLUS.bonusBet,
 // one each Taiwan week (from Monday) the account is a member and opens an
 // app: `eco:fb:<Monday>`, kind 'freebet', amount 0, its value in the note
-// (the kit's freeBets reads it like Rewards' tokens; a week missed isn't
+// (the kit's freeBets reads it; a week missed isn't
 // paid later). Only this Worker can write it.
 export const bonusBetId = now => `eco:fb:${new Date(weekStart(now) + TPE).toISOString().slice(0, 10)}`;
 export function plusBonusEntries(wallet, now) {
@@ -301,7 +306,8 @@ const cleanCode = v =>
     .toUpperCase()
     .replace(/[\s-]/g, '');
 
-// What Quadra Rewards sells (its lib/shop.mjs): each purchase is one entry
+// What Quadra Rewards sells (its lib/shop.mjs), the only money it moves:
+// Rewards pays points, never NT$ (v7). Each purchase is one entry
 // 'vocab:shop:<item>:<key>' of kind 'shop', and a word pack's id is fixed
 // ('vocab:shop:pack:<pack>'), so it's bought once. An entry claiming one
 // must pay at least the lowest price (packs are half price for Plus), or
@@ -325,12 +331,15 @@ export function cleanEntry(e, { allowEco = false } = {}) {
   // The Worker's own ids (pay, Quadra Plus) are its alone.
   if (!allowEco && id.startsWith('eco:')) return null;
   if (id.startsWith('vocab:shop:') && !(app === 'vocab' && e.kind === 'shop' && shopPaid(id, amount))) return null;
-  // A free bet (Rewards' missions give them, Play stakes them): worth
-  // nothing in the pool itself, its value (NT$10 to 500) in the note.
-  if (id.startsWith('vocab:fb:') && !(app === 'vocab' && e.kind === 'freebet' && amount === 0 && /^[1-9]\d{0,2}0$/.test(String(e.note)) && Number(e.note) <= 500)) return null;
+  // Rewards pays no money (v7): its entries only spend (the shop) or carry
+  // points (`xp`, amount 0), and its missions no longer give free bets.
+  // Entries it paid before stay: only new ones come through here.
+  if (app === 'vocab' && (amount > 0 || id.startsWith('vocab:fb:'))) return null;
   const out = { id, t: Math.round(t), app, kind: str(e.kind, 24) || 'other', amount: Math.round(amount * 100) / 100 };
   const note = str(e.note, 80);
   if (note) out.note = note;
+  const xp = finite(e.xp);
+  if (app === 'vocab' && xp != null && xp > 0) out.xp = Math.min(MAX_XP, Math.round(xp));
   return out;
 }
 
