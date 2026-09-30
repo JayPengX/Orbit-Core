@@ -330,3 +330,21 @@ test('Plus hooks: tenure, returns since joining, the weekly free bet and renewal
   kit.plusNotices({ ...s, wallet: { ...w, entries: [...w.entries, plus('2026-11')], settings: { plus: { value: { on: false }, t: 2 } } } }, Date.UTC(2026, 10, 29, 4));
   assert.equal(localStorage.getItem('quadra.seen.renew:2026-11'), null);
 });
+
+test('avatars: level ones with the level, bought ones with points (Worker prices match), Plus one while a member; level cards', async () => {
+  const eco = await import('../eco.js');
+  const bought = kit.AVATARS.filter(a => a.xp);
+  assert.deepEqual(Object.fromEntries(bought.map(a => [a.id, a.xp])), eco.REWARDS_XP.avatar);
+  const xp = n => ({ id: `vocab:g:${n}`, t: 1, app: 'vocab', kind: 'game', amount: 0, xp: n });
+  const w = { entries: [xp(4_500), { id: 'vocab:xs:avatar:cat', t: 2, app: 'vocab', kind: 'redeem', amount: 0, note: '300' }], settings: { avatar: { value: { id: 'panda' }, t: 1 } } };
+  // 4,500 XP is level 10: the panda is his, the lion (15) isn't yet.
+  assert.ok(kit.avatarOwned(w, 'panda') && !kit.avatarOwned(w, 'lion'));
+  assert.ok(kit.avatarOwned(w, 'cat') && !kit.avatarOwned(w, 'dog'));
+  assert.ok(!kit.avatarOwned(w, 'star'));
+  assert.equal(kit.avatarOf(w).glyph, '🐼');
+  // One not owned shows nothing (the person).
+  assert.equal(kit.avatarOf({ ...w, settings: { avatar: { value: { id: 'gem' }, t: 1 } } }), null);
+  assert.deepEqual([1, 4, 5, 14, 15, 25].map(kit.levelCards), [0, 0, 1, 1, 2, 3]);
+  const p = eco.cleanPatch({ entries: [{ id: 'vocab:xs:avatar:gem', t: 1, app: 'vocab', kind: 'redeem', amount: 0, note: '300' }, { id: 'vocab:xs:avatar:dog', t: 1, app: 'vocab', kind: 'redeem', amount: 0, note: '300' }, { id: 'vocab:xs:avatar:panda', t: 1, app: 'vocab', kind: 'redeem', amount: 0, note: '9000' }] });
+  assert.deepEqual(p.entries.map(e => e.id), ['vocab:xs:avatar:dog']);
+});

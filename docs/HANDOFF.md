@@ -6,6 +6,24 @@ All repos develop on `claude/gifted-dijkstra-dv6w8a` and are pushed to
 edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
 `npx eslint .`).
 
+## Round: more for points, and tidier pop-ups (all repos, pushed to `main`)
+
+- **Avatars** (kit `AVATARS`, `avatarOwned`, `avatarOf`): the account button in
+  every app wears the one chosen (wallet setting `avatar`, `{ id }`); level
+  ones at 1, 5, 10, 15, 20, 30, 50, eight bought with points (300-5,000 XP,
+  `vocab:xs:avatar:<id>`, the Worker's `REWARDS_XP.avatar`, which also refuses
+  buying a level one), ✦ for Plus members. Not owned any more → the person.
+- **Level rewards:** a streak card at levels 5, 15, 25… (`levelCards`, added
+  to Rewards' `freezes().granted`); a level-up pop-up once per device with
+  what the level brought (`checkLevelUp`).
+- **Rewards 任務 › 等級與頭像:** the next four levels that bring something
+  and the avatar grid (wear, the level it needs, its price, or Plus); the
+  home level card opens it.
+- **Pop-ups:** the kit's `ask`/`tell` take `points` (short rows: icon, bold
+  line, quiet line); the update notice and stop-renewing dialog use them.
+  The Plus sheet shows a member's fee, months and total as three figures.
+  Money and points prices are two pills under each shop item.
+
 ## Round: v9, Securities earns a little more (realistically) and Plus keeps members (all repos, pushed to `main`)
 
 - **Why Play earns and Securities doesn't:** per investor a month (the model's

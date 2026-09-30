@@ -316,10 +316,16 @@ const cleanCode = v =>
 export const REWARDS_SHOP = { freeze: 300, boost: 150, pack: { toeic: 495, ielts: 745, biz: 995 } };
 // Points (XP) buy the same things: 'vocab:xs:<item>:<key>', kind 'redeem',
 // amount 0, the points it cost in the note, at least REWARDS_XP's.
-export const REWARDS_XP = { freeze: 600, boost: 300, pack: { toeic: 8_000, ielts: 12_000, biz: 16_000 } };
+// Avatars bought with points: the kit's AVATARS that have an `xp` price.
+export const REWARDS_XP = {
+  freeze: 600,
+  boost: 300,
+  pack: { toeic: 8_000, ielts: 12_000, biz: 16_000 },
+  avatar: { cat: 300, dog: 300, frog: 600, penguin: 600, rocket: 1_500, rainbow: 1_500, fire: 3_000, gem: 5_000 }
+};
 function xpPaid(id, e) {
   const [, , item, key] = id.split(':');
-  const least = item === 'pack' ? REWARDS_XP.pack[key] : REWARDS_XP[item];
+  const least = item === 'pack' || item === 'avatar' ? REWARDS_XP[item][key] : REWARDS_XP[item];
   const cost = Number(e.note);
   return typeof least === 'number' && e.kind === 'redeem' && Number.isInteger(cost) && cost >= least && cost <= 100_000;
 }
