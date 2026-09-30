@@ -166,3 +166,32 @@ test('token requests made together share one sign-in call to the Worker', async 
   await s.ensureToken();
   assert.equal(calls.length, 1);
 });
+
+test('notice switches follow the pass: newest wins, old device switches carried over', async () => {
+  store.clear();
+  // An older version's switches on this device.
+  store.set('quadra.notify', '1');
+  store.set('quadra.notify.kinds', JSON.stringify({ 'stock:alert': false, 'odds:slip': true }));
+  assert.deepEqual(kit.notifyPrefs(), { on: true, off: ['stock:alert'], t: 0 });
+  assert.equal(kit.kindOn('stock', 'alert'), false);
+  assert.equal(kit.kindOn('stock', 'fill'), true);
+  // The pass's copy is newer: taken.
+  assert.equal(kit.adoptNotifyPrefs({ settings: { notify: { value: { on: false, off: ['match:end'] }, t: 5 } } }), true);
+  assert.equal(kit.kindOn('stock', 'alert'), true);
+  assert.equal(kit.kindOn('match', 'end'), false);
+  assert.equal(kit.notifyPrefs().on, false);
+  // Changed here: newer than the pass's, sent up by the live app.
+  const writes = [];
+  const wallet = { settings: { notify: { value: { on: false, off: ['match:end'] }, t: 5 } } };
+  const s = { app: 'stock', active: true, wallet, write: async body => void writes.push(body), ensureToken: async () => '' };
+  kit.setKind('stock', 'margin', false);
+  await kit.syncPrefs(s);
+  assert.deepEqual(writes[0].wallet.settings.notify.value, { on: false, off: ['match:end', 'stock:margin'] });
+  // An older copy from the pass doesn't undo it.
+  assert.equal(kit.adoptNotifyPrefs(wallet), false);
+  assert.equal(kit.kindOn('stock', 'margin'), false);
+  // Not the live app: nothing written (it goes up once live).
+  kit.setKind('stock', 'margin', true);
+  await kit.syncPrefs({ ...s, active: false });
+  assert.equal(writes.length, 1);
+});

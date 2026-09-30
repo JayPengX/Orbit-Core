@@ -564,3 +564,24 @@ that didn't land on live games, and text cut on phones.
   a phone; form pills under their label; squad grouped by position, long
   names wrap; the main bout first on a fight card; line scores by Chinese
   names.
+
+## Round: notice switches follow the pass; Securities' notices
+
+- **Synced switches (kit):** system notices on/off and every kind's switch
+  are the wallet setting `notify` (`{ on, off: ['stock:alert', …] }`,
+  newest wins), so every app and device shows the same ones (home-screen
+  apps on a phone don't share storage). `notifyPrefs`, `setNotifyOn`,
+  `setKind(app, kind, on, s)`, `adoptNotifyPrefs`, `syncPrefs`; the
+  device's copy is `quadra.notify.prefs` (the old `quadra.notify` /
+  `quadra.notify.kinds` are read once and carried to the pass). A device
+  or app the phone hasn't allowed yet gets a one-tap 允許 banner
+  (`offerNotices`, once a week at most).
+- **Worker (`push.js`):** `POST /push/prefs` keeps the switches
+  (`push:prefs:<account>`); each notice keeps its `kind`, and `sendDue`
+  drops what's switched off (in any app) or everything when notices are
+  off, so a closed app's list obeys at once.
+- **Securities:** new kinds `order` (lapsed/dropped orders, skipped plans),
+  `margin` (margin call once a day, forced sales), `income` (ex-dividend,
+  dividends, coupons, interest); `fill` also covers plan buys. Toasts open
+  their tab when tapped; in-app banners (`#portfolio` …) now switch tabs
+  (`hashchange`); a pending dividend's pay day is a push while closed.

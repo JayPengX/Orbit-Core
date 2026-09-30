@@ -10,16 +10,20 @@
 //   GET  /push/key                     the Worker's public VAPID key
 //   POST /push/subscribe?qt=<session>  { sub: PushSubscription JSON, lang }
 //   POST /push/schedule?qt=<session>   { items: [notice…] } (replaces the app's list)
+//   POST /push/prefs?qt=<session>      { on, off: ['stock:alert', …] } the pass's
+//                                      notice switches (kit notifyPrefs): a kind
+//                                      turned off (or notices off) in any app is
+//                                      dropped from every app's list when due
 //   scheduled (cron, every 5 minutes)  sends what's due
 //
-// A notice: { at: ms, title, body, tag, url } and, for news that isn't known
+// A notice: { at: ms, title, body, tag, url, kind } and, for news that isn't known
 // ahead, a check the Worker makes at `at` (and again every 15 minutes until
 // it has the answer, or 8 hours have passed, or `until`):
 //   check: { espn: 'football/nfl', event: '401…' }            a game's final score
 //   check: { yahoo: '2330.TW', op: 'above'|'below', price }  a price reached
 //
 // Stored in KV (RATE_LIMIT_KV): `push:<account>:<app>` the device's
-// subscription and list, `push:due` when each list's next notice is due,
+// subscription and list, `push:prefs:<account>` the switches, `push:due` when each list's next notice is due,
 // `push:vapid` the Worker's own key pair (made on first use). One device a
 // person an app: the one that subscribed last (Quadra runs one live session
 // an account anyway).
@@ -119,6 +123,7 @@ export function cleanItems(items, now = Date.now()) {
     .slice(0, MAX_ITEMS)
     .map(x => {
       const item = { at: Math.round(x.at), title: cleanText(x.title, 120), body: cleanText(x.body, 240), tag: cleanText(x.tag, 80), url: okUrl(x.url) };
+      if (typeof x.kind === 'string' && /^[a-z]{1,16}$/.test(x.kind)) item.kind = x.kind;
       if (Number.isFinite(x.until) && x.until > x.at && x.until < now + 40 * 86_400_000) item.until = Math.round(x.until);
       const c = x.check;
       if (c?.espn && /^[a-z-]+\/[a-z0-9.-]+$/.test(c.espn) && /^\d+$/.test(String(c.event))) {
@@ -134,6 +139,13 @@ export function cleanItems(items, now = Date.now()) {
 }
 
 const recordKey = (account, app) => `push:${account}:${app}`;
+const prefsKey = account => `push:prefs:${account}`;
+export function cleanPrefs(body) {
+  const off = (Array.isArray(body?.off) ? body.off : []).filter(k => typeof k === 'string' && /^[a-z]{1,16}:[a-z]{1,16}$/.test(k)).slice(0, 64);
+  return { on: body?.on !== false, off: [...new Set(off)] };
+}
+// Whether the pass's switches let this notice through (all do without any).
+export const wanted = (prefs, app, item) => !prefs || (prefs.on !== false && !(item.kind && prefs.off?.includes(`${app}:${item.kind}`)));
 async function setDue(env, key, next) {
   const kv = env.RATE_LIMIT_KV;
   const due = (await kv.get('push:due', 'json')) || {};
@@ -166,6 +178,11 @@ export async function handlePush(request, env, headers, session, path) {
       }
     }
     return reply({ apps });
+  }
+  if (path === '/push/prefs') {
+    const prefs = cleanPrefs(body);
+    await kv.put(prefsKey(session.d), JSON.stringify(prefs), { expirationTtl: 400 * 86_400 });
+    return reply({ ok: true, ...prefs });
   }
   const key = recordKey(session.d, session.a);
   const record = (await kv.get(key, 'json')) || { items: [] };
@@ -225,6 +242,7 @@ export async function sendDue(env, now = Date.now()) {
   const due = (await kv.get('push:due', 'json')) || {};
   let sent = 0;
   let changed = false;
+  const prefsOf = {};
   for (const [key, next] of Object.entries(due)) {
     if (next > now + 60_000) continue;
     const record = await kv.get(key, 'json');
@@ -235,7 +253,13 @@ export async function sendDue(env, now = Date.now()) {
     }
     const keep = [];
     let gone = false;
+    // push:<account>:<app>
+    const [account, app] = [key.slice(5, key.lastIndexOf(':')), key.slice(key.lastIndexOf(':') + 1)];
+    if (!(account in prefsOf)) prefsOf[account] = await kv.get(prefsKey(account), 'json').catch(() => null);
+    const prefs = prefsOf[account];
     for (const item of record.items) {
+      // Switched off (in any app, on any device): never sent.
+      if (!wanted(prefs, app, item)) continue;
       if (item.at > now + 60_000 || gone) {
         keep.push(item);
         continue;

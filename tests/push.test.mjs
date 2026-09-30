@@ -70,3 +70,30 @@ test('subscribe, schedule, then the due notices go out', async () => {
   assert.deepEqual(record.items.map(x => x.title), ['tomorrow']);
   assert.equal(JSON.parse(kv.m.get('push:due'))['push:acct:match'], record.items[0].at);
 });
+
+test('a kind switched off in any app (or notices off) is never sent', async () => {
+  const kv = memoryKv();
+  const env = { RATE_LIMIT_KV: kv };
+  const post = (session, path, body) => handlePush(new Request(`https://w/${path}`, { method: 'POST', body: JSON.stringify(body) }), env, {}, session, path);
+  const stock = { d: 'acct', a: 'stock' };
+  const subKeys = { p256dh: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4', auth: 'BTBZMqHH6r4Tts7J_aSIgg' };
+  await post(stock, '/push/subscribe', { sub: { endpoint: 'https://push.example/s', keys: subKeys } });
+  const now = Date.now();
+  await post(stock, '/push/schedule', { items: [{ at: now + 10_000, title: '到價', kind: 'alert' }, { at: now + 20_000, title: '定期定額', kind: 'fill' }] });
+  assert.equal(JSON.parse(kv.m.get('push:acct:stock')).items[0].kind, 'alert');
+  // Turned off in another app (Play's account sheet).
+  await post({ d: 'acct', a: 'odds' }, '/push/prefs', { on: true, off: ['stock:alert', 'bad key'] });
+  assert.deepEqual(JSON.parse(kv.m.get('push:prefs:acct')), { on: true, off: ['stock:alert'] });
+  const sent = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init) => (sent.push({ url, init }), new Response(null, { status: 201 }));
+  try {
+    assert.equal((await sendDue(env, now)).sent, 1);
+    await post(stock, '/push/schedule', { items: [{ at: now + 10_000, title: '成交', kind: 'fill' }] });
+    await post(stock, '/push/prefs', { on: false, off: [] });
+    assert.equal((await sendDue(env, now)).sent, 0);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  assert.equal(JSON.parse(kv.m.get('push:acct:stock')).items.length, 0);
+});
