@@ -10,7 +10,7 @@ const TARGETS = [
   ['Quadra-Securities/public/lib/quadra.mjs', 'Quadra-Securities/public/quadra.css'],
   ['Quadra-Play/public/lib/quadra.mjs', 'Quadra-Play/public/quadra.css'],
   ['Quadra-Fixtures/public/lib/quadra.mjs', 'Quadra-Fixtures/public/quadra.css'],
-  ['Quadra-Rewards/public/lib/quadra.mjs', 'Quadra-Rewards/public/quadra.css'],
+  ['Quadra-Hub/public/lib/quadra.mjs', 'Quadra-Hub/public/quadra.css'],
   ['Orbit-Class/src/quadra.mjs', 'Orbit-Class/css/quadra.css']
 ];
 // The apps that show teams, leagues and drivers: the logos too, and the
@@ -19,10 +19,10 @@ const LOGOS = { 'Quadra-Play': 'Quadra-Play/public/lib/logos.mjs', 'Quadra-Fixtu
 const CATALOG = { 'Quadra-Play': 'Quadra-Play/public/lib/catalog.mjs', 'Quadra-Fixtures': 'Quadra-Fixtures/public/lib/catalog.mjs' };
 // The loading screen and first update check (boot.js), for the apps that open
 // with one.
-const BOOT = { 'Quadra-Securities': 'Quadra-Securities/public/boot.js', 'Quadra-Play': 'Quadra-Play/public/boot.js', 'Quadra-Fixtures': 'Quadra-Fixtures/public/boot.js', 'Quadra-Rewards': 'Quadra-Rewards/public/boot.js' };
+const BOOT = { 'Quadra-Securities': 'Quadra-Securities/public/boot.js', 'Quadra-Play': 'Quadra-Play/public/boot.js', 'Quadra-Fixtures': 'Quadra-Fixtures/public/boot.js', 'Quadra-Hub': 'Quadra-Hub/public/boot.js' };
 // Pictures from other sites kept on the device (sw-images.js, imported by
 // the app's service worker), for the apps that show logos and photos.
-const IMAGES = { 'Quadra-Securities': 'Quadra-Securities/public/sw-images.js', 'Quadra-Play': 'Quadra-Play/public/sw-images.js', 'Quadra-Fixtures': 'Quadra-Fixtures/public/sw-images.js', 'Quadra-Rewards': 'Quadra-Rewards/public/sw-images.js' };
+const IMAGES = { 'Quadra-Securities': 'Quadra-Securities/public/sw-images.js', 'Quadra-Play': 'Quadra-Play/public/sw-images.js', 'Quadra-Fixtures': 'Quadra-Fixtures/public/sw-images.js', 'Quadra-Hub': 'Quadra-Hub/public/sw-images.js' };
 // People's studio headshots (photos.mjs), for Fixtures.
 const PHOTOS = { 'Quadra-Fixtures': 'Quadra-Fixtures/public/lib/photos.mjs' };
 // Teams in Chinese (names.mjs), for the same two.
