@@ -143,17 +143,17 @@ export function leagueLogo(key, dark = false) {
 
 // 2026 F1 grid: each driver's team and its colour, for the driver badges.
 const F1_TEAMS = {
-  mclaren: { name: 'McLaren', color: '#ff8000', drivers: ['Norris', 'Piastri'] },
-  ferrari: { name: 'Ferrari', color: '#e8002d', drivers: ['Leclerc', 'Hamilton'] },
-  redbull: { name: 'Red Bull', color: '#3671c6', drivers: ['Verstappen', 'Hadjar'] },
-  mercedes: { name: 'Mercedes', color: '#00d2be', drivers: ['Russell', 'Antonelli'] },
-  aston: { name: 'Aston Martin', color: '#229971', drivers: ['Alonso', 'Stroll'] },
-  alpine: { name: 'Alpine', color: '#ff87bc', drivers: ['Gasly', 'Colapinto'] },
-  williams: { name: 'Williams', color: '#64c4ff', drivers: ['Albon', 'Sainz'] },
-  rb: { name: 'Racing Bulls', color: '#6692ff', drivers: ['Lawson', 'Lindblad'] },
-  haas: { name: 'Haas', color: '#9ea3a8', drivers: ['Ocon', 'Bearman'] },
-  audi: { name: 'Audi', color: '#bb0a30', drivers: ['Hulkenberg', 'Bortoleto'] },
-  cadillac: { name: 'Cadillac', color: '#c9a227', drivers: ['Perez', 'Bottas'] }
+  mclaren: { name: 'McLaren', f1: 'mclaren', zh: '麥拉倫', color: '#ff8000', drivers: ['Norris', 'Piastri'] },
+  ferrari: { name: 'Ferrari', f1: 'ferrari', zh: '法拉利', color: '#e8002d', drivers: ['Leclerc', 'Hamilton'] },
+  redbull: { name: 'Red Bull', f1: 'redbullracing', zh: '紅牛', color: '#3671c6', drivers: ['Verstappen', 'Hadjar'] },
+  mercedes: { name: 'Mercedes', f1: 'mercedes', zh: '賓士', color: '#00d2be', drivers: ['Russell', 'Antonelli'] },
+  aston: { name: 'Aston Martin', f1: 'astonmartin', zh: '奧斯頓馬丁', color: '#229971', drivers: ['Alonso', 'Stroll'] },
+  alpine: { name: 'Alpine', f1: 'alpine', zh: '雅爾派', color: '#ff87bc', drivers: ['Gasly', 'Colapinto'] },
+  williams: { name: 'Williams', f1: 'williams', zh: '威廉斯', color: '#64c4ff', drivers: ['Albon', 'Sainz'] },
+  rb: { name: 'Racing Bulls', f1: 'racingbulls', zh: 'Racing Bulls', color: '#6692ff', drivers: ['Lawson', 'Lindblad'] },
+  haas: { name: 'Haas', f1: 'haasf1team', zh: '哈斯', color: '#9ea3a8', drivers: ['Ocon', 'Bearman'] },
+  audi: { name: 'Audi', f1: 'audi', zh: '奧迪', color: '#bb0a30', drivers: ['Hulkenberg', 'Bortoleto'] },
+  cadillac: { name: 'Cadillac', f1: 'cadillac', zh: '凱迪拉克', color: '#c9a227', drivers: ['Perez', 'Bottas'] }
 };
 
 // Driver names as the lottery writes them ("G.羅素"). The ones on the
@@ -198,8 +198,10 @@ export function f1Driver(name) {
 // F1 constructors: their colour and a short name, for a badge like the drivers'.
 export function f1Constructor(name) {
   const plain = normalizeTeamName(name);
-  const team = Object.values(F1_TEAMS).find(t => plain.includes(normalizeTeamName(t.name)) || normalizeTeamName(t.name).includes(plain));
-  return { color: team?.color ?? '#8a8f98', short: (team?.name ?? name).replace(/[^A-Za-z]/g, '').slice(0, 3).toUpperCase() };
+  const team = plain ? Object.values(F1_TEAMS).find(t => plain.includes(normalizeTeamName(t.name)) || normalizeTeamName(t.name).includes(plain)) : null;
+  // Its logo (formula1.com's, white: shown on the team's colour).
+  const logo = team?.f1 ? `https://media.formula1.com/image/upload/c_fit,h_96/q_auto/v1740000000/common/f1/2026/${team.f1}/2026${team.f1}logowhite.webp` : null;
+  return { name: team?.name ?? name, zh: team?.zh ?? name, color: team?.color ?? '#8a8f98', logo, drivers: team?.drivers ?? [], short: (team?.name ?? name).replace(/[^A-Za-z]/g, '').slice(0, 3).toUpperCase() };
 }
 
 // National teams (volleyball, and any sport's national sides): a flag.
