@@ -14,10 +14,10 @@
 // The token is checked against ADMIN_TOKEN_HASH (its SHA-256; the token
 // itself is never in the repo). Clearing the hash turns this off.
 
-import { ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, PAIR_MS, ECO_LIMITS, parseWallet, poolBalance, plusMember, gen } from './eco.js';
+import { ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, PAIR_MS, ECO_LIMITS, parseWallet, poolBalance, plusMember, gen, emptyWallet } from './eco.js';
 import { KAMBI_COLLECTION } from './kambi.js';
 
-export const ADMIN_TOKEN_HASH = '';
+export const ADMIN_TOKEN_HASH = '3ddc397a447ddc56c78e228e0cb403204495804766b0230577123ded1adc422b';
 export const RETIRED_COLLECTIONS = ['orbit-schedules', 'eco-links', 'stock-study-leagues'];
 // (A function: eco.js and this file import each other.)
 const keep = () => new Set([WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, KAMBI_COLLECTION, ...Object.values(ECO_APPS).map(a => a.collection)]);
@@ -86,6 +86,38 @@ export async function handleAdmin({ env, deps, headers, request, ip, body }) {
     const exp = deps.now() + PAIR_MS;
     await deps.fsWrite(env, PAIR_COLLECTION, code, JSON.stringify({ d: hits[0].id, g: gen(wallet), exp }));
     return deps.json({ code, exp }, 200, headers);
+  }
+  // Starting an account over, at its owner's request: `reset` { passcode,
+  // keep: [apps] } leaves the pass and the kept apps' data (their settings
+  // and inbox too) and makes everything else new: a fresh wallet (the
+  // opening money comes with the next sign-in), every other app's data gone,
+  // every device signed out (so no device sends its old copy back).
+  if (body.action === 'reset') {
+    const code = String(body.passcode || '').trim().toUpperCase().replace(/[\s-]/g, '');
+    const docId = code ? await deps.sha256Hex(code) : '';
+    const w = docId ? await deps.fsGet(env, WALLET_COLLECTION, docId) : { exists: false };
+    const wallet = w.exists ? parseWallet(w.payload) : null;
+    if (!wallet) return deps.errorJson('SYNC_PASSCODE_NOT_FOUND', 404, headers, request);
+    const keep = new Set((Array.isArray(body.keep) ? body.keep : []).filter(a => ECO_APPS[a]));
+    const now = deps.now();
+    const kept = key => [...keep].some(a => key.startsWith(a) || key === `aff:${a}`);
+    const fresh = {
+      ...emptyWallet(now),
+      v2: now,
+      sec: { ...(wallet.sec || {}), gen: gen(wallet) + 1 },
+      settings: Object.fromEntries(Object.entries(wallet.settings || {}).filter(([k]) => kept(k) || k === 'lang' || k === 'notify')),
+      apps: Object.fromEntries(Object.entries(wallet.apps || {}).filter(([a]) => keep.has(a))),
+      inbox: Object.fromEntries(Object.entries(wallet.inbox || {}).filter(([a]) => keep.has(a)))
+    };
+    const gone = [];
+    for (const [app, { collection }] of Object.entries(ECO_APPS)) {
+      if (keep.has(app)) continue;
+      await deps.fsDelete(env, collection, docId);
+      gone.push(app);
+      for (const id of wallet.inbox?.[app] || []) if (id.startsWith(`${docId}-`)) await deps.fsDelete(env, INBOX_COLLECTION, id);
+    }
+    await deps.fsWrite(env, WALLET_COLLECTION, docId, JSON.stringify(fresh));
+    return deps.json({ reset: true, gone, kept: [...keep], settings: Object.keys(fresh.settings) }, 200, headers);
   }
   const plan = await planClean(env, deps);
   if (body.action === 'scan') return deps.json(summary(plan), 200, headers);
