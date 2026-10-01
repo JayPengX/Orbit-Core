@@ -115,6 +115,10 @@ async function isRateLimited(env, ip, limit) {
 
 // ==== /sports-proxy - CORS passthrough for public sports data ==============
 const ELTA_HOST = 'piceltaott-elta.cdn.hinet.net';
+// NBA.com's season schedule for Taiwan (region 32, what
+// nba.com/schedule?region=32 reads): only that file, always trimmed (trimNba).
+const NBA_HOST = 'cdn.nba.com';
+const NBA_PATH = '/static/json/staticData/scheduleLeagueV2_32.json';
 const YOUTUBE_HOST = 'www.youtube.com';
 // F1's sister series' own sites (the same platform as formula1.com): their
 // season calendar and each weekend's sessions, read from the page's data.
@@ -150,6 +154,8 @@ const SPORTS_PROXY_ALLOWED_HOSTS = [
   // ELTA's (愛爾達) sports schedule: which game each of its channels carries,
   // for Fixtures' "where to watch" (only the one list, always trimmed).
   ELTA_HOST,
+  // NBA.com's Taiwan schedule: which NBA games ELTA has, the whole season.
+  NBA_HOST,
   // A YouTube channel's feed of its latest videos (only /feeds/videos.xml,
   // always trimmed to id, title and time): Fixtures names a game as free on
   // YouTube only when the league's channel has a video of that very game.
@@ -285,6 +291,7 @@ function cachePolicyFor(url) {
     case 'clients5.google.com':
       return CACHE_TRANSLATE;
     case ELTA_HOST:
+    case NBA_HOST:
     case YOUTUBE_HOST:
     case 'www.fiaformula2.com':
     case 'www.fiaformula3.com':
@@ -342,6 +349,11 @@ function trimKambi(data) {
 // ELTA's schedule, a small fraction of it: each live program's day, start
 // and end (Unix seconds), channel, league (ELTA's English name) and title.
 const TRIM_ELTA = 'elta';
+// NBA.com's Taiwan schedule (several MB, every game's broadcasters in every
+// region's listing): ELTA's games only, { games: [{ id, start (UTC ISO),
+// home, away }] } with NBA.com's team ids, a few KB. Fixtures picks NBA.com's
+// own file the same way when it reads it directly (its lib/broadcast.mjs).
+const TRIM_NBA = 'nba';
 // An F2 / F3 / F1 Academy racing page as JSON: the season's rounds
 // ({ meetings: [{ key, url, place, name, round, dates, status }] }) or one
 // weekend's sessions ({ sessions: [{ name, short, type, start (UTC ISO),
@@ -446,6 +458,16 @@ export function trimYoutube(xml) {
   }
   return { videos };
 }
+const onElta = game => Object.values(game?.broadcasters || {}).some(list => Array.isArray(list) && list.some(b => /\bELTA\b/i.test(`${b?.broadcasterDisplay} ${b?.broadcasterAbbreviation}`)));
+export function trimNba(data) {
+  const games = [];
+  for (const day of data?.leagueSchedule?.gameDates || []) {
+    for (const g of day?.games || []) {
+      if (g?.gameDateTimeUTC && onElta(g)) games.push({ id: g.gameId, start: g.gameDateTimeUTC, home: g.homeTeam?.teamId, away: g.awayTeam?.teamId });
+    }
+  }
+  return { games };
+}
 export function trimElta(data) {
   const programs = [];
   for (const [day, list] of Object.entries(data?.calendar || {})) {
@@ -486,8 +508,9 @@ function trimPolymarketEvents(events) {
 // cache key), and gets a new one once if Yahoo turns the old one down.
 const YAHOO_CRUMB_PATHS = ['/v7/finance/quote', '/v10/finance/quoteSummary/'];
 const YAHOO_SESSION_MS = 6 * 3600 * 1000;
-// Yahoo refuses the crumb to a bot's User-Agent (HTTP 429).
-const YAHOO_BROWSER_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
+// A browser's User-Agent: Yahoo refuses the crumb to a bot's (HTTP 429), and
+// NBA.com's CDN (Akamai) turns bots away.
+const BROWSER_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
 let yahooSession = null;
 
 function needsYahooCrumb(url) {
@@ -497,7 +520,7 @@ function needsYahooCrumb(url) {
 async function getYahooSession(renew = false) {
   if (!renew && yahooSession && Date.now() - yahooSession.at < YAHOO_SESSION_MS) return yahooSession;
   const first = await fetch('https://fc.yahoo.com/', {
-    headers: { 'User-Agent': YAHOO_BROWSER_UA },
+    headers: { 'User-Agent': BROWSER_UA },
     redirect: 'manual',
     signal: AbortSignal.timeout(SPORTS_PROXY_UPSTREAM_TIMEOUT_MS)
   });
@@ -505,7 +528,7 @@ async function getYahooSession(renew = false) {
   const cookie = setCookies.map(c => c.split(';')[0]).filter(Boolean).join('; ');
   if (!cookie) throw new Error('Yahoo session unavailable');
   const res = await fetch('https://query2.finance.yahoo.com/v1/test/getcrumb', {
-    headers: { 'User-Agent': YAHOO_BROWSER_UA, Cookie: cookie },
+    headers: { 'User-Agent': BROWSER_UA, Cookie: cookie },
     signal: AbortSignal.timeout(SPORTS_PROXY_UPSTREAM_TIMEOUT_MS)
   });
   const crumb = (await res.text()).trim();
@@ -520,7 +543,7 @@ async function fetchYahooWithCrumb(upstreamUrl) {
     const url = new URL(upstreamUrl.toString());
     url.searchParams.set('crumb', session.crumb);
     const res = await fetch(url.toString(), {
-      headers: { 'User-Agent': YAHOO_BROWSER_UA, Cookie: session.cookie },
+      headers: { 'User-Agent': BROWSER_UA, Cookie: session.cookie },
       signal: AbortSignal.timeout(SPORTS_PROXY_UPSTREAM_TIMEOUT_MS)
     });
     if ((res.status !== 401 && res.status !== 403) || attempt > 0) return res;
@@ -535,7 +558,7 @@ async function translateUpstream(upstreamUrl) {
   url.searchParams.delete('q');
   return fetch(url.toString(), {
     method: 'POST',
-    headers: { 'User-Agent': YAHOO_BROWSER_UA, 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+    headers: { 'User-Agent': BROWSER_UA, 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
     body: new URLSearchParams({ q }).toString(),
     signal: AbortSignal.timeout(SPORTS_PROXY_UPSTREAM_TIMEOUT_MS)
   });
@@ -554,7 +577,7 @@ async function fetchUpstream(upstreamUrl, trim) {
       : upstreamUrl.hostname === 'clients5.google.com'
         ? await translateUpstream(upstreamUrl)
         : await fetch(upstreamUrl.toString(), {
-          headers: { 'User-Agent': SPORTS_PROXY_FETCH_USER_AGENT },
+          headers: upstreamUrl.hostname === NBA_HOST ? { 'User-Agent': BROWSER_UA, Referer: 'https://www.nba.com/' } : { 'User-Agent': SPORTS_PROXY_FETCH_USER_AGENT },
           signal: AbortSignal.timeout(SPORTS_PROXY_UPSTREAM_TIMEOUT_MS)
         });
   } catch (error) {
@@ -570,7 +593,7 @@ async function fetchUpstream(upstreamUrl, trim) {
     if (trim) {
       try {
         const parsed = JSON.parse(new TextDecoder().decode(body));
-        body = JSON.stringify(trim === TRIM_KAMBI_EVENTS ? trimKambi(parsed) : trim === TRIM_ELTA ? trimElta(parsed) : trimPolymarketEvents(parsed));
+        body = JSON.stringify(trim === TRIM_KAMBI_EVENTS ? trimKambi(parsed) : trim === TRIM_ELTA ? trimElta(parsed) : trim === TRIM_NBA ? trimNba(parsed) : trimPolymarketEvents(parsed));
       } catch {
         // Not the JSON shape expected - pass it through untouched.
       }
@@ -597,6 +620,7 @@ function cacheEntry(result, policy) {
 // Which trim (if any) applies to a URL: only the hosts each one is for.
 function trimFor(trimParam, upstreamUrl) {
   if (upstreamUrl.hostname === ELTA_HOST) return TRIM_ELTA;
+  if (upstreamUrl.hostname === NBA_HOST) return TRIM_NBA;
   if (upstreamUrl.hostname === YOUTUBE_HOST) return TRIM_YOUTUBE;
   if (FOM_HOSTS.includes(upstreamUrl.hostname)) return TRIM_FOM;
   if (upstreamUrl.hostname === F1_HOST) return TRIM_F1PAGE;
@@ -610,6 +634,7 @@ function parseTarget(target) {
     const u = new URL(target);
     if (u.hostname === 'clients5.google.com' && (u.pathname !== '/translate_a/t' || (u.searchParams.get('q') || '').length > 5000)) return null;
     if (u.hostname === ELTA_HOST && u.pathname !== ELTA_PATH) return null;
+    if (u.hostname === NBA_HOST && u.pathname !== NBA_PATH) return null;
     if (u.hostname === F1_HOST && !/^\/en\/(drivers|teams)\/[a-z-]+$/.test(u.pathname)) return null;
     if (FOM_HOSTS.includes(u.hostname) && !/^\/en\/racing\/20\d\d(\/[a-z-]+)?$/.test(u.pathname)) return null;
     if (u.hostname === YOUTUBE_HOST && (u.pathname !== YOUTUBE_FEED || !/^UC[\w-]{22}$/.test(u.searchParams.get('channel_id') || ''))) return null;
