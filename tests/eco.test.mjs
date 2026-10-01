@@ -2,8 +2,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { handleEcoRequest, mergeWallet, poolBalance, cleanPatch, emptyWallet, paydayEntries, payFor, worthOf, PAY_MONTH, REBASE, OVERDRAFT_RATE, plusJoinEntry, plusJoinEntries, plusMember, plusLapsed, HUB_XP, plusBonusEntries, bonusBetId, vipEntries, vipStakes, vipTier, welcomeEntries, VIP, tidyWallet, PAY, PLUS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, ECO_APPS, rankEntries, RANKS } from '../eco.js';
-import { planClean } from '../eco-admin.js';
+import { handleEcoRequest, mergeWallet, poolBalance, cleanPatch, emptyWallet, paydayEntries, payFor, worthOf, PAY_MONTH, REBASE, OVERDRAFT_RATE, plusJoinEntry, plusJoinEntries, plusMember, plusLapsed, plusBonusEntries, bonusBetId, vipEntries, vipStakes, vipTier, welcomeEntries, VIP, PAY, PLUS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, ECO_APPS, rankEntries, RANKS } from '../eco.js';
+import { planClean, tidyWallet } from '../eco-admin.js';
 
 function setup() {
   const store = new Map();
@@ -75,10 +75,10 @@ test('create: a new pass, signed in and live, with the opening money', async () 
 test('read and write with the session; the pass itself opens nothing', async () => {
   const t = setup();
   const acct = await newPass(t);
-  const w = await t.call('PATCH', `${t.qt(acct.token)}&app=stock`, { payload: 'gz1:abc', wallet: { entries: [{ id: 'match:1', t: 1, app: 'match', kind: 'reward', amount: 30 }], snap: { stock: { cash: -1000, t: 5 } } } });
+  const w = await t.call('PATCH', `${t.qt(acct.token)}&app=stock`, { payload: 'gz1:abc', wallet: { entries: [{ id: 'stock:1', t: 1, app: 'stock', kind: 'dividend', amount: 30 }], snap: { stock: { cash: -1000, t: 5 } } } });
   assert.equal(w.status, 200);
   assert.equal(w.data.pool, acct.pool + 30 - 1000);
-  const again = await t.call('PATCH', `${t.qt(acct.token)}&app=stock`, { wallet: { entries: [{ id: 'match:1', t: 1, app: 'match', kind: 'reward', amount: 99 }] } });
+  const again = await t.call('PATCH', `${t.qt(acct.token)}&app=stock`, { wallet: { entries: [{ id: 'stock:1', t: 1, app: 'stock', kind: 'dividend', amount: 99 }] } });
   assert.equal(again.data.pool, w.data.pool);
   const read = await t.call('GET', `${t.qt(acct.token)}&app=stock`);
   assert.equal(read.data.payload, 'gz1:abc');
@@ -88,46 +88,24 @@ test('read and write with the session; the pass itself opens nothing', async () 
   assert.equal((await t.call('GET', `?qt=${forged}`)).status, 401);
 });
 
-test("an app cannot forge the Worker's own entries", () => {
-  const p = cleanPatch({ entries: [{ id: 'x', t: 1, app: 'eco', kind: 'xfer-in', amount: 1e6 }, { id: 'y', t: 1, app: 'match', kind: 'reward', amount: 30 }] });
-  assert.deepEqual(p.entries.map(e => e.id), ['y']);
-});
-
-test("Hub purchases pay at least their price; a free card, boost or pack is dropped", () => {
-  const e = (id, amount, kind = 'shop') => ({ id, t: 1, app: 'vocab', kind, amount });
+test("an app cannot forge the Worker's own entries, and only the apps that move money write any", () => {
   const p = cleanPatch({
     entries: [
-      e('vocab:shop:freeze:a', -300), e('vocab:shop:freeze:b', 0), e('vocab:shop:boost:c', -150), e('vocab:shop:boost:d', -1),
-      e('vocab:shop:pack:toeic', -990), e('vocab:shop:pack:ielts', -1_490), e('vocab:shop:pack:biz', -500), e('vocab:shop:pack:x', -5000),
-      e('vocab:shop:freeze:e', -300, 'game'), { id: 'odds:shop:freeze:f', t: 1, app: 'odds', kind: 'shop', amount: -300 }, e('vocab:g:1', 20, 'game')
+      { id: 'x', t: 1, app: 'eco', kind: 'xfer-in', amount: 1e6 },
+      { id: 'y', t: 1, app: 'odds', kind: 'payout', amount: 30 },
+      { id: 'z', t: 1, app: 'stock', kind: 'dividend', amount: 5 },
+      { id: 'vocab:w:1', t: 1, app: 'vocab', kind: 'words', amount: 0, xp: 40 },
+      { id: 'vocab:shop:pack:toeic', t: 1, app: 'vocab', kind: 'shop', amount: -990 },
+      { id: 'match:1', t: 1, app: 'match', kind: 'reward', amount: 30 }
     ]
   });
-  // Hub's paid word packs meet the full price; game points and discounted packs are rejected.
-  assert.deepEqual(p.entries.map(x => x.id), ['vocab:shop:freeze:a', 'vocab:shop:boost:c', 'vocab:shop:pack:toeic', 'vocab:shop:pack:ielts', 'odds:shop:freeze:f']);
-});
-
-test('Hub points are for vocabulary only, never money or game rewards', () => {
-  const v = (id, amount, extra = {}) => ({ id, t: 1, app: 'vocab', kind: 'words', amount, ...extra });
-  const p = cleanPatch({
-    entries: [
-      { id: 'vocab:g:paid', t: 1, app: 'vocab', kind: 'game', amount: 20 },
-      { id: 'vocab:g:xp', t: 1, app: 'vocab', kind: 'game', amount: 0, xp: 40 },
-      { id: 'vocab:m:2026-10-01:game1', t: 1, app: 'vocab', kind: 'mission', amount: 0, xp: 10 },
-      v('vocab:w:word', 0, { xp: 40 }), v('vocab:w:big', 0, { xp: 1e9 }), v('vocab:w:bad', 0, { xp: 'x' }),
-      v('vocab:fb:1', 0, { kind: 'freebet', note: '100' }), { id: 'o', t: 1, app: 'odds', kind: 'win', amount: 50, xp: 5 }
-    ]
-  });
-  assert.deepEqual(
-    p.entries.map(x => [x.id, x.amount, x.xp]),
-    [['vocab:w:word', 0, 40], ['vocab:w:big', 0, 10_000], ['vocab:w:bad', 0, undefined], ['o', 50, undefined]]
-  );
-  const kept = mergeWallet({ ...emptyWallet(1), entries: [{ id: 'vocab:w:old', t: 1, app: 'vocab', kind: 'words', amount: 120 }] }, cleanPatch({ entries: [{ id: 'vocab:g:new', t: 2, app: 'vocab', kind: 'game', amount: 30 }] }));
-  assert.equal(poolBalance(kept), 120);
+  assert.deepEqual(p.entries.map(e => e.id), ['y', 'z']);
+  assert.equal('xp' in p.entries[0], false);
 });
 
 test('wallet merge: entries by id, newest settings and figures', () => {
   const a = mergeWallet(emptyWallet(10), { entries: [{ id: 'a', t: 2, app: 'odds', amount: 5 }], settings: { k: { value: 1, t: 1 } }, snap: { stock: { cash: 10, t: 1 } } });
-  const b = mergeWallet(a, { entries: [{ id: 'a', t: 2, app: 'odds', amount: 7 }, { id: 'b', t: 1, app: 'vocab', amount: 3 }], settings: { k: { value: 2, t: 3 } }, snap: { stock: { cash: 4, t: 0 } } });
+  const b = mergeWallet(a, { entries: [{ id: 'a', t: 2, app: 'odds', amount: 7 }, { id: 'b', t: 1, app: 'stock', amount: 3 }], settings: { k: { value: 2, t: 3 } }, snap: { stock: { cash: 4, t: 0 } } });
   assert.deepEqual(b.entries.map(e => e.id), ['b', 'a']);
   assert.equal(b.settings.k.value, 2);
   assert.equal(b.snap.stock.cash, 10);
@@ -248,13 +226,13 @@ test('merge: another pass into this one, then it is gone', async () => {
   const a = await newPass(t, 'stock');
   await t.call('PATCH', `${t.qt(a.token)}&app=stock`, { payload: 'gz1:a' });
   const b = await newPass(t, 'stock');
-  await t.call('PATCH', `${t.qt(b.token)}&app=stock`, { payload: 'gz1:b', wallet: { entries: [{ id: 'match:x', t: 1, app: 'match', kind: 'reward', amount: 40 }] } });
+  await t.call('PATCH', `${t.qt(b.token)}&app=stock`, { payload: 'gz1:b', wallet: { entries: [{ id: 'stock:x', t: 1, app: 'stock', kind: 'dividend', amount: 40 }] } });
   const aa = await t.call('POST', '', { op: 'refresh', refresh: a.refresh, app: 'stock', claim: true });
   const m = await t.call('POST', '', { op: 'merge', qt: aa.data.token, sources: [{ passcode: b.passcode }] });
   assert.equal(m.status, 200);
   assert.deepEqual(m.data.moved, { stock: 1 });
   assert.equal(m.data.wallet.inbox.stock.length, 1);
-  assert.ok(m.data.wallet.entries.some(e => e.id.endsWith(':match:x')));
+  assert.ok(m.data.wallet.entries.some(e => e.id.endsWith(':stock:x')));
   assert.equal((await t.call('POST', '', { op: 'login', passcode: b.passcode, app: 'stock' })).status, 404);
   // Old app-only codes are not a source any more.
   const legacy = await t.call('POST', '', { op: 'merge', qt: aa.data.token, sources: [{ app: 'orbit', passcode: 'ABCD2345', manager: 'x' }] });
@@ -302,71 +280,74 @@ test('clean-up: only Quadra data stays, and wallets lose retired settings', asyn
   assert.deepEqual(del, [`${INBOX_COLLECTION}/nobody-odds-X`, `${SHARE_COLLECTION}/KEYKEYKE`, `${ECO_APPS.odds.collection}/oldhash`, 'orbit-schedules/ABCD2345'].sort());
   assert.equal(plan.tidy.length, 1);
   assert.equal(plan.tidy[0].wallet.settings.oddsWeeklyLimit, undefined);
-  assert.ok(plan.tidy[0].wallet.settings['act:odds']);
+  assert.equal(plan.tidy[0].wallet.settings['act:odds'], undefined);
   // The admin op itself needs the token.
   assert.equal((await t.call('POST', '', { op: 'admin', token: 'wrong', action: 'scan' })).status, 403);
-  assert.deepEqual(tidyWallet(tidyWallet(plan.tidy[0].wallet)), plan.tidy[0].wallet);
+  const again = tidyWallet(plan.tidy[0].wallet, t.deps.now());
+  assert.deepEqual(again.wallet, plan.tidy[0].wallet);
+  assert.deepEqual(again.gone, { entries: 0, money: 0, settings: 0, looks: 0 });
 });
 
-test('Quadra Hub migration removes game XP and cosmetics without refunding prior cosmetic spends', () => {
+test('the clean retires what no app writes any more: Hub entries (their money kept), voucher markers, settings, non-members’ looks', () => {
   const at = Date.UTC(2026, 9, 1);
+  const now = Date.UTC(2026, 9, 2);
+  const vocab = (id, kind, amount, extra = {}) => ({ id, t: at, app: 'vocab', kind, amount, ...extra });
   const wallet = {
     ...emptyWallet(at),
     entries: [
-      { id: 'vocab:g:1', t: at, app: 'vocab', kind: 'game', amount: 0, xp: 900 },
-      { id: 'vocab:m:2026-10-01:game1', t: at + 1, app: 'vocab', kind: 'mission', amount: 0, xp: 10 },
-      { id: 'vocab:fb:2026-10-01:game1', t: at + 1, app: 'vocab', kind: 'freebet', amount: 0, note: '100' },
-      { id: 'vocab:w:1', t: at + 2, app: 'vocab', kind: 'words', amount: 0, xp: 400 },
-      { id: 'vocab:xs:avatar:cat', t: at + 3, app: 'vocab', kind: 'redeem', amount: 0, note: '300' },
-      { id: 'vocab:xs:frame:gold', t: at + 4, app: 'vocab', kind: 'redeem', amount: 0, note: '8000' },
-      { id: 'vocab:xs:plus:2026-10', t: at + 5, app: 'vocab', kind: 'redeem', amount: 0, note: '20000' }
+      { id: 'eco:pay:2026-10', t: at, app: 'eco', kind: 'pay', amount: 6_000 },
+      { id: 'eco:plus:2026-09', t: at, app: 'eco', kind: 'plus', amount: 0, note: 'points' },
+      { id: 'odds:stake-1', t: at, app: 'odds', kind: 'stake', amount: -500 },
+      { id: 'stock:xs-vocab:xs:fee:a', t: at, app: 'stock', kind: 'voucher', amount: 0 },
+      vocab('vocab:w:1', 'words', 0, { xp: 400 }),
+      vocab('vocab:r:old', 'reward', 240),
+      vocab('vocab:g:1', 'game', 0, { xp: 900 }),
+      vocab('vocab:m:2026-10-01:game1', 'mission', 0, { xp: 10 }),
+      vocab('vocab:shop:pack:toeic', 'shop', -990),
+      vocab('vocab:shop:freeze:a', 'shop', -300),
+      vocab('vocab:xs:bet100:b', 'redeem', 0, { note: '5000' }),
+      vocab('vocab:xp:debit:x', 'redeem', 0, { note: '300' })
     ],
     settings: {
       avatar: { value: { id: 'cat' }, t: at },
       frame: { value: { id: 'gold' }, t: at },
       'bests:vocab': { value: { puzzle: 42 }, t: at },
-      'act:stock': { value: { day: '2026-10-01' }, t: at }
+      'hub:cleanup:v1': { value: true, t: at },
+      'act:stock': { value: { day: '2026-10-01' }, t: at },
+      'aff:vocab': { value: {}, t: at },
+      'aff:odds': { value: { 'league:mlb': 1 }, t: at },
+      plus: { value: { on: false }, t: at }
     }
   };
-  const cleaned = tidyWallet(wallet);
-  assert.deepEqual(cleaned.entries.filter(e => e.kind === 'game' || e.id.startsWith('vocab:g:') || /:game1$/.test(e.id)), []);
-  assert.equal(cleaned.entries.some(e => e.id.startsWith('vocab:fb:')), false);
-  assert.ok(cleaned.entries.some(e => e.id === 'vocab:w:1'));
-  assert.equal(cleaned.entries.some(e => /^vocab:xs:(avatar|frame|plus):/.test(e.id)), false);
-  assert.equal(cleaned.entries.filter(e => e.id.startsWith('vocab:xp:debit:')).reduce((sum, e) => sum + Number(e.note), 0), 28_300);
-  assert.equal(cleaned.settings.avatar, undefined);
-  assert.equal(cleaned.settings.frame, undefined);
-  assert.equal(cleaned.settings['bests:vocab'], undefined);
-  assert.ok(cleaned.settings['act:stock']);
-  const chosenAgain = { ...cleaned, settings: { ...cleaned.settings, avatar: { value: { id: 'fox' }, t: cleaned.settings['hub:cleanup:v1'].t + 1 } } };
-  assert.equal(tidyWallet(chosenAgain).settings.avatar.value.id, 'fox');
-  const staleChoice = { ...cleaned, settings: { ...cleaned.settings, avatar: { value: { id: 'cat' }, t: at + 6 } } };
-  assert.equal(tidyWallet(staleChoice).settings.avatar, undefined);
-  assert.deepEqual(tidyWallet(cleaned), cleaned);
+  const { wallet: clean, gone } = tidyWallet(wallet, now);
+  // Every Hub entry goes; the NT$ they moved (240 paid, 1,290 spent) stays as one entry.
+  assert.deepEqual(clean.entries.map(e => e.id), ['eco:pay:2026-10', 'eco:plus:2026-09', 'odds:stake-1', 'eco:rebase:hub']);
+  assert.deepEqual(clean.entries.at(-1), { id: 'eco:rebase:hub', t: now, app: 'eco', kind: 'rebase', amount: -1_050, note: 'hub' });
+  assert.equal(poolBalance(clean), poolBalance(wallet));
+  // A Plus month bought with points is a month like any.
+  assert.equal(clean.entries[1].note, undefined);
+  assert.deepEqual(Object.keys(clean.settings).sort(), ['aff:odds', 'plus']);
+  assert.deepEqual(gone, { entries: 9, money: -1_050, settings: 4, looks: 2 });
+  // A member keeps the looks; a second clean changes nothing.
+  const member = { ...wallet, entries: [...wallet.entries, { id: 'eco:plus:2026-10', t: at, app: 'eco', kind: 'plus', amount: -490 }] };
+  assert.equal(tidyWallet(member, now).wallet.settings.avatar.value.id, 'cat');
+  assert.deepEqual(tidyWallet(clean, now).wallet, clean);
 });
 
-test('admin scan reports the Hub data it will purge before changing a wallet', async () => {
+test('admin scan reports what the clean would retire before changing a wallet', async () => {
   const t = setup();
   await newPass(t);
   const env = {};
   const [doc] = await t.deps.fsList(env, WALLET_COLLECTION);
   const wallet = JSON.parse(doc.payload);
-  const settings = { ...wallet.settings, avatar: { value: { id: 'cat' }, t: 1 }, frame: { value: { id: 'gold' }, t: 1 }, 'bests:vocab': { value: {}, t: 1 } };
-  delete settings['hub:cleanup:v1'];
-  wallet.settings = settings;
-  wallet.entries.push(
-    { id: 'vocab:g:old', t: 1, app: 'vocab', kind: 'game', amount: 0, xp: 20 },
-    { id: 'vocab:m:2026-10-01:game1', t: 2, app: 'vocab', kind: 'mission', amount: 0, xp: 10 },
-    { id: 'vocab:fb:2026-10-01:game1', t: 2, app: 'vocab', kind: 'freebet', amount: 0, note: '100' },
-    { id: 'vocab:xs:avatar:cat', t: 3, app: 'vocab', kind: 'redeem', amount: 0, note: '300' },
-    { id: 'vocab:xs:frame:gold', t: 4, app: 'vocab', kind: 'redeem', amount: 0, note: '8000' },
-    { id: 'vocab:xs:plus:2026-10', t: 5, app: 'vocab', kind: 'redeem', amount: 0, note: '20000' }
-  );
+  wallet.settings = { ...wallet.settings, avatar: { value: { id: 'cat' }, t: 1 }, 'bests:vocab': { value: {}, t: 1 } };
+  wallet.entries.push({ id: 'vocab:g:old', t: 1, app: 'vocab', kind: 'game', amount: 0, xp: 20 }, { id: 'vocab:shop:boost:a', t: 2, app: 'vocab', kind: 'shop', amount: -150 });
   await t.deps.fsWrite(env, WALLET_COLLECTION, doc.id, JSON.stringify(wallet));
   const plan = await planClean(env, t.deps);
-  assert.deepEqual(plan.hubPurge, { gameEntries: 2, legacyMissionFreebets: 1, cosmeticRedemptions: 3, cosmeticChoices: 2, gameScoreSettings: 1 });
+  assert.deepEqual(plan.retired, { entries: 2, money: -150, settings: 1, looks: 1 });
   assert.equal(plan.tidy.length, 1);
-  assert.equal(plan.tidy[0].wallet.entries.some(e => e.id === 'vocab:g:old' || e.id.startsWith('vocab:fb:')), false);
+  assert.equal(plan.tidy[0].wallet.entries.some(e => e.app === 'vocab'), false);
+  assert.equal(JSON.parse((await t.deps.fsList(env, WALLET_COLLECTION))[0].payload).entries.some(e => e.app === 'vocab'), true);
 });
 
 test('Quadra Plus: the first month free, renewal from the pool, leaving keeps the paid month', async () => {
@@ -548,32 +529,6 @@ test('welcome: a NT$200 free bet after the first paid bet, once; a write brings 
   assert.ok(w.data.wallet.entries.some(e => e.id === 'eco:fb:welcome' && e.app === 'eco'));
 });
 
-test('points buy what money does: a redemption costs at least HUB_XP, amount 0, Hub only', async () => {
-  const { HUB_XP } = await import('../eco.js');
-  const r = (id, note, extra = {}) => ({ id, t: 1, app: 'vocab', kind: 'redeem', amount: 0, note, ...extra });
-  const p = cleanPatch({
-    entries: [
-      r('vocab:xs:freeze:a', String(HUB_XP.freeze)),
-      r('vocab:xs:freeze:b', '10'),
-      r('vocab:xs:boost:c', '300'),
-      r('vocab:xs:pack:toeic', '8000'),
-      r('vocab:xs:pack:biz', '8000'),
-      r('vocab:xs:pack:x', '99999'),
-      r('vocab:xs:freeze:d', '600', { amount: -5 }),
-      r('vocab:xs:freeze:e', '600', { kind: 'shop' }),
-      r('vocab:xs:freeze:f', '600.5'),
-      { id: 'vocab:xs:freeze:g', t: 1, app: 'odds', kind: 'redeem', amount: 0, note: '600' },
-      r('vocab:xs:frame:gold', '8000'),
-      r('vocab:xs:frame:silver', '100'),
-      r('vocab:xs:frame:bronze', '100'),
-      r('vocab:xs:reroll:2026-10-02:orbit', '100'),
-      r('vocab:xs:repair:2026-10-01', '1500'),
-      r('vocab:xs:repair:2026-10-03', '100')
-    ]
-  });
-  assert.deepEqual(p.entries.map(e => e.id), ['vocab:xs:freeze:a', 'vocab:xs:boost:c', 'vocab:xs:pack:toeic', 'vocab:xs:reroll:2026-10-02:orbit', 'vocab:xs:repair:2026-10-01']);
-});
-
 test('Quadra Plus bills every month like a subscription: months away charged on return; a failed charge lapses it', () => {
   const on = { plus: { value: { on: true }, t: 1 } };
   const base = [{ id: 'eco:plus:2026-10', t: 1, app: 'eco', kind: 'plus', amount: 0, note: 'trial' }, { id: 'eco:rebase:v3', t: 1, app: 'eco', kind: 'rebase', amount: 0 }, { id: 'eco:pay:2026-10', t: 1, app: 'eco', kind: 'pay', amount: 6_000 }];
@@ -597,15 +552,6 @@ test('Quadra Plus bills every month like a subscription: months away charged on 
   const back = plusJoinEntries(rich, Date.UTC(2026, 11, 2));
   assert.ok(back[0].amount < 0);
   assert.equal(plusLapsed({ entries: [...rich.entries, ...back] }), false);
-});
-
-test('points catalogue: all accounts pay the same and Plus cannot be bought with points', () => {
-  const r = (id, note) => ({ id, t: Date.UTC(2026, 9, 5), app: 'vocab', kind: 'redeem', amount: 0, note });
-  const p = cleanPatch({ entries: [r('vocab:xs:bet100:a', '5000'), r('vocab:xs:bet500:b', '22000'), r('vocab:xs:fee:c', '4000'), r('vocab:xs:td:d', '12000'), r('vocab:xs:plus:2026-10', '20000'), r('vocab:xs:avatar:cat', '300'), r('vocab:xs:frame:gold', '8000')] });
-  assert.deepEqual(p.entries.map(e => e.id), ['vocab:xs:bet100:a', 'vocab:xs:bet500:b', 'vocab:xs:fee:c', 'vocab:xs:td:d']);
-  assert.equal(HUB_XP.plus, undefined);
-  assert.equal(HUB_XP.avatar, undefined);
-  assert.equal(HUB_XP.frame, undefined);
 });
 
 test('wealth levels: each level reached pays its reward once, from what the account is worth', () => {

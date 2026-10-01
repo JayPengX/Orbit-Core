@@ -1,5 +1,5 @@
 // ---- push.js ----
-// Quadra's notices while an app is closed (Web Push), for sports-proxy-worker.js.
+// Quadra's notices while an app is closed (Web Push), routed by worker.js.
 //
 // A phone (an iPhone above all) stops a home-screen app as soon as it's in
 // the background, so an app can't tell anyone anything itself once it's
@@ -110,7 +110,7 @@ export async function sendPush(env, sub, message) {
 
 // ---- The lists ------------------------------------------------------------------
 
-const APP_KEYS = new Set(['match', 'odds', 'stock', 'vocab', 'orbit', 'eco']);
+const APP_KEYS = new Set(['match', 'odds', 'stock', 'vocab', 'orbit']);
 const MAX_ITEMS = 60;
 const HOLD_MS = 8 * 3_600_000;
 const CHECK_EVERY = 15 * 60_000;
@@ -162,23 +162,6 @@ export async function handlePush(request, env, headers, session, path) {
   if (request.method !== 'POST') return reply({ error: { message: 'POST only' } }, 405);
   if (!session?.d || !APP_KEYS.has(session.a)) return reply({ error: { code: 'QUADRA_PASS_REQUIRED', message: 'Sign in with a Quadra Pass.' } }, 401);
   const body = await request.json().catch(() => null);
-  // Each app's state for this account: subscribed, how many notices wait,
-  // the last send's answer; `test` sends every subscribed app a notice now.
-  if (path === '/push/status' || path === '/push/test') {
-    const apps = {};
-    for (const app of APP_KEYS) {
-      const record = await kv.get(recordKey(session.d, app), 'json');
-      if (!record) continue;
-      apps[app] = { sub: record.sub ? new URL(record.sub.endpoint).host : null, items: record.items.length, next: record.items[0]?.at || null, last: record.last || null };
-      if (path === '/push/test' && record.sub) {
-        // Samples of the app's notices (to this account's own devices), or one plain test.
-        const samples = Array.isArray(body?.samples?.[app]) ? body.samples[app].slice(0, 12) : [{ title: 'Quadra', body: record.lang === 'en' ? 'Notices are working ✅' : '通知設定成功 ✅' }];
-        apps[app].test = [];
-        for (const [i, x] of samples.entries()) apps[app].test.push(await sendPush(env, record.sub, { title: cleanText(x?.title, 120), body: cleanText(x?.body, 240), tag: `test-${app}-${i}` }).catch(e => `failed ${e?.message || e}`));
-      }
-    }
-    return reply({ apps });
-  }
   if (path === '/push/prefs') {
     const prefs = cleanPrefs(body);
     await kv.put(prefsKey(session.d), JSON.stringify(prefs), { expirationTtl: 400 * 86_400 });

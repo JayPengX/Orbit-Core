@@ -1,6 +1,6 @@
 // ---- worker.js ----
 // orbit-workers-proxy: the Quadra apps' server side (Quadra Securities,
-// Quadra Play, Quadra Fixtures, Quadra Rewards and Orbit Class). Routed by
+// Quadra Play, Quadra Fixtures, Quadra Hub and Orbit Class). Routed by
 // path:
 //
 //   GET/POST/PATCH/DELETE /eco   the Quadra Pass: one account and one NT$
@@ -9,10 +9,10 @@
 //   POST  /gemini                Orbit Class's AI schedule-photo import
 //   POST  /nl-edit               Orbit Class's natural-language edits
 //   GET   /kambi                 Kambi's live scores for Quadra Play (kambi.js)
+//   GET/POST /push/…             notices while an app is closed (push.js)
 //
 // Every route but /eco's sign-in needs a Quadra Pass session (`qt=`). The
-// Quadra Pass is the only way anything is saved: the old per-app sync routes
-// (/sync, /vocab-sync, /odds-sync, /stock-sync) and /vocab-ai are gone.
+// Quadra Pass is the only way anything is saved.
 // Quadra Fixtures' /sports-proxy lives in its own Worker
 // (sports-proxy-worker.js): this one's [placement] region pin (for Gemini)
 // applies to the whole script.
@@ -91,15 +91,15 @@ function json(data, status, headers) {
 // before bilingual support existed (POST_ONLY, INVALID_JSON, etc.) - the
 // zh-TW text next to them is a later translation, not a change to English
 // callers' behavior. The codes that were already Chinese (RATE_LIMITED,
-// DAILY_QUOTA_EXCEEDED, MISSING_API_KEY, INVALID_MNEMONIC) keep their
+// DAILY_QUOTA_EXCEEDED, MISSING_API_KEY) keep their
 // original zh-TW wording byte-for-byte, with English added alongside.
 const ERROR_MESSAGES = Object.fromEntries(
   Object.keys(en).map((code) => [code, { en: en[code], 'zh-TW': zhTW[code] }])
 );
 
 // Defaults to zh-TW whenever the header is absent or doesn't clearly prefer
-// English, to preserve current behavior for existing callers (orbit/
-// orbit-vocab) that don't send this header today - only a request that
+// English, to preserve current behavior for callers that don't send this
+// header - only a request that
 // actually says English first (`en`, `en-US`, `..., en;q=...`, etc.) gets
 // English back.
 function pickLocale(request) {
@@ -817,8 +817,7 @@ async function handleGeminiRequest(request, env, headers, ip, ctx, session = nul
 //
 // Reuses GEMINI_API_KEY and GEMINI_ALLOWED_MODELS rather than needing its
 // own secret or its own model list - it's the same underlying Gemini access,
-// just a different fixed prompt/schema pair, same reasoning as /vocab-sync
-// reusing /sync's Firebase credentials instead of needing its own.
+// just a different fixed prompt/schema pair.
 
 // Deliberately tight: a real instruction ("把我週二第三節改成物理") is a
 // handful of words. Anything dramatically longer than that is not a

@@ -9,12 +9,12 @@
 //     sync accounts shared those collections);
 //   - inbox documents no wallet points at, expired device codes and share
 //     keys, share keys of the old follow-style shape;
-//   - in every wallet, settings and fields no app uses any more (tidyWallet).
+//   - in every wallet, what no app writes or reads any more (tidyWallet).
 //
 // The token is checked against ADMIN_TOKEN_HASH (its SHA-256; the token
 // itself is never in the repo). Clearing the hash turns this off.
 
-import { ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, PAIR_MS, ECO_LIMITS, parseWallet, tidyWallet, poolBalance, gen } from './eco.js';
+import { ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, PAIR_MS, ECO_LIMITS, parseWallet, poolBalance, plusMember, gen } from './eco.js';
 import { KAMBI_COLLECTION } from './kambi.js';
 
 export const ADMIN_TOKEN_HASH = '';
@@ -24,6 +24,48 @@ const keep = () => new Set([WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTIO
 // Firestore batch writes take up to 500 at a time; a call stops after this
 // many so it stays inside the Worker's limits.
 const PER_CALL = 1500;
+
+// A wallet as the apps write it now (`now`: for the looks, a Plus member's):
+//   - entries only of the apps that move money (Securities, Play) and the
+//     Worker's own. Quadra Hub (once Rewards: word points, games, missions,
+//     its shop and points catalogue) and Fixtures write none any more: theirs
+//     go, and the NT$ they moved stays in the balance as one entry,
+//     `eco:rebase:hub`, so no account's money changes;
+//   - none of Securities' markers for points-catalogue vouchers ('stock:xs-');
+//   - a Plus month bought with points is a month like any (its 'points' note
+//     goes);
+//   - no settings that nothing reads (RETIRED_SETTINGS, every app's activity
+//     counts `act:<app>` for the old missions, Hub's affinity `aff:vocab`),
+//     and an avatar or frame only on a Plus member's pass;
+//   - no fields of older versions (`links`, an entry's `peer`).
+// Returns the wallet and what went: { wallet, gone: { entries, money, settings, looks } }.
+export const RETIRED_SETTINGS = ['oddsWeeklyLimit', 'orbitFollow', 'bests:vocab', 'hub:cleanup:v1', 'aff:vocab'];
+const MONEY_APPS = new Set(['eco', 'stock', 'odds']);
+const LOOKS = ['avatar', 'frame'];
+export function tidyWallet(w, now) {
+  const { links, ...rest } = w;
+  const gone = { entries: 0, money: 0, settings: 0, looks: 0 };
+  const entries = [];
+  for (const { peer, ...e } of rest.entries) {
+    if (!MONEY_APPS.has(e.app) || e.id.startsWith('stock:xs-')) {
+      gone.entries++;
+      gone.money += e.amount;
+      continue;
+    }
+    if (e.app === 'eco' && e.kind === 'plus' && e.note === 'points') delete e.note;
+    entries.push(e);
+  }
+  gone.money = Math.round(gone.money * 100) / 100;
+  if (gone.money) entries.push({ id: 'eco:rebase:hub', t: now, app: 'eco', kind: 'rebase', amount: gone.money, note: 'hub' });
+  const member = plusMember(rest, now);
+  const settings = {};
+  for (const [k, v] of Object.entries(rest.settings || {})) {
+    if (RETIRED_SETTINGS.includes(k) || k.startsWith('act:')) gone.settings++;
+    else if (LOOKS.includes(k) && !member) gone.looks++;
+    else settings[k] = v;
+  }
+  return { wallet: { ...rest, entries, settings }, gone };
+}
 
 export async function handleAdmin({ env, deps, headers, request, ip, body }) {
   const limited = await deps.rateLimitResponse(env, ip, 'eco:admin', ECO_LIMITS.admin, headers, request);
@@ -89,7 +131,7 @@ export async function planClean(env, deps) {
   const accounts = new Set(wallets.map(w => w.id));
   const inboxIds = new Set();
   const tidy = [];
-  const hubPurge = { gameEntries: 0, legacyMissionFreebets: 0, cosmeticRedemptions: 0, cosmeticChoices: 0, gameScoreSettings: 0 };
+  const retired = { entries: 0, money: 0, settings: 0, looks: 0 };
   for (const w of wallets) {
     const wallet = parseWallet(w.payload);
     if (!wallet) {
@@ -98,22 +140,11 @@ export async function planClean(env, deps) {
       continue;
     }
     for (const ids of Object.values(wallet.inbox || {})) for (const id of ids) inboxIds.add(id);
-    const next = tidyWallet(wallet);
-    const nextIds = new Set(next.entries.map(e => e.id));
-    for (const e of wallet.entries) {
-      if (!nextIds.has(e.id)) {
-        if (e.app === 'vocab' && (e.kind === 'game' || e.id?.startsWith('vocab:g:') || /^vocab:m:\d{4}-\d{2}-\d{2}:(game1|games3|challenge)$/.test(e.id || ''))) hubPurge.gameEntries++;
-        if (e.app === 'vocab' && e.kind === 'freebet' && e.id?.startsWith('vocab:fb:')) hubPurge.legacyMissionFreebets++;
-        if (e.app === 'vocab' && /^vocab:xs:(avatar|frame|plus):/.test(e.id || '')) hubPurge.cosmeticRedemptions++;
-      }
-    }
-    const cleanupAt = Number(wallet.settings?.['hub:cleanup:v1']?.t) || 0;
-    for (const key of ['avatar', 'frame']) {
-      const choice = wallet.settings?.[key];
-      if (choice && (wallet.settings?.['hub:cleanup:v1']?.value !== true || (Number(choice.t) || 0) <= cleanupAt)) hubPurge.cosmeticChoices++;
-    }
-    if (wallet.settings?.['bests:vocab']) hubPurge.gameScoreSettings++;
-    if (JSON.stringify(next) !== JSON.stringify(wallet)) tidy.push({ id: w.id, wallet: next, updateTime: w.updateTime });
+    const { wallet: next, gone } = tidyWallet(wallet, now);
+    if (JSON.stringify(next) === JSON.stringify(wallet)) continue;
+    tidy.push({ id: w.id, wallet: next, updateTime: w.updateTime });
+    for (const k of ['entries', 'settings', 'looks']) retired[k] += gone[k];
+    retired.money = Math.round((retired.money + gone.money) * 100) / 100;
   }
   for (const name of collections) {
     if (name === WALLET_COLLECTION) continue;
@@ -139,7 +170,7 @@ export async function planClean(env, deps) {
       }
     }
   }
-  return { collections, counts, deletes, tidy, hubPurge };
+  return { collections, counts, deletes, tidy, retired };
 }
 
 function summary(plan) {
@@ -151,6 +182,8 @@ function summary(plan) {
     unknown: plan.collections.filter(c => !keep().has(c) && !RETIRED_COLLECTIONS.includes(c)),
     wouldDelete: byCollection,
     wouldTidyWallets: plan.tidy.length,
-    wouldPurgeHubData: plan.hubPurge
+    // What the tidy takes out: entries, the NT$ they moved (kept in each
+    // balance as `eco:rebase:hub`), settings, and looks of non-members.
+    wouldRetire: plan.retired
   };
 }

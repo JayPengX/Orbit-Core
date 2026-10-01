@@ -15,7 +15,8 @@
 //                 same entry sent twice counts once
 //       snap      each app's latest figures, newest wins per app (Securities'
 //                 own cash, Play's money in open bets)
-//       settings  newest wins per key (activity counts, affinities, follows)
+//       settings  newest wins per key (affinities, the Plus plan, looks,
+//                 notice switches)
 //       apps      when each app was first and last opened
 //       inbox     other passes' app data a merge brought in, per app
 //       live      which app (and session) is the live one
@@ -60,9 +61,9 @@ const CODE8 = /^[2-9A-HJ-NP-Z]{8}$/;
 // Each app's data collection.
 //   stock  Quadra Securities
 //   odds   Quadra Play
-//   match  Quadra Fixtures
-//   vocab  Quadra Hub
-//   orbit  Orbit Class, the related add-on: its class schedule
+//   match  Quadra Fixtures, a related add-on: follows and services
+//   vocab  Quadra Hub, a related add-on: word progress
+//   orbit  Orbit Class, a related add-on: its class schedule
 export const ECO_APPS = {
   stock: { collection: 'stock-study-accounts', maxPayload: 1_000_000 },
   odds: { collection: 'odds-study-accounts', maxPayload: 1_000_000 },
@@ -70,9 +71,10 @@ export const ECO_APPS = {
   match: { collection: 'match-find-settings', maxPayload: 100_000 },
   orbit: { collection: 'orbit-quadra', maxPayload: 200_000 }
 };
-// Who can write entries: the apps, and this Worker itself ('eco': pay,
-// merges). An app can't write 'eco' entries.
-const ENTRY_APPS = new Set(['stock', 'odds', 'vocab', 'match']);
+// Who can write entries: the apps that move money, and this Worker itself
+// ('eco': pay, Plus, merges). An app can't write 'eco' entries; the related
+// add-ons (Fixtures, Hub, Orbit Class) write none.
+const ENTRY_APPS = new Set(['stock', 'odds']);
 // Whose entries are rebuilt by the app from its own data: a merge doesn't
 // copy them (the app republishes its merged ledger).
 const LEDGER_APPS = new Set(['odds']);
@@ -80,8 +82,6 @@ const LEDGER_APPS = new Set(['odds']);
 export const WALLET_MAX_LENGTH = 900_000;
 const MAX_ENTRIES_PER_WRITE = 1000;
 const MAX_AMOUNT = 1_000_000_000;
-// Hub points on one entry (a batch of vocabulary answers or a claim).
-const MAX_XP = 10_000;
 const MAX_MERGE_SOURCES = 12;
 
 // Per IP an hour, for the calls that take a code (KV counters); calls with a
@@ -254,10 +254,9 @@ export { WEEK };
 // on return); a charge the pool can't cover fails and it lapses
 // (plusRenewal). The yearly plan (PLUS.year, about
 // two months free) pays twelve months at once and renews by the year.
-// Leaving stops renewal and keeps every month already paid. v8: NT$490 and
-// a NT$200 weekly bonus bet (v7 was 990 and 100): the perks' face value is
-// about three times the fee and their expected cost about the fee
-// (tools/economy.mjs); a yearly plan already paid keeps its months.
+// Leaving stops renewal and keeps every month already paid. Its perks are
+// Play's and Securities' own (the kit's PLUS), made to bring more bets and
+// trades; the one this Worker pays is the weekly bonus bet.
 export const PLUS = { fee: 490, year: 4_900, bonusBet: 200 };
 const PLUS_ID = m => `eco:plus:${m}`;
 // A member's weekly bonus bet: a free bet token for Quadra Play, NT$PLUS.bonusBet,
@@ -291,12 +290,10 @@ function yearEntries(wallet, first, now) {
 // pay), a yearly plan by the year (or by the month if the pool can't cover
 // a year). A charge the pool can't cover fails: `eco:plusfail:<month>`
 // (amount 0), and the membership lapses there until the person joins again
-// (renewal won't retry it). v10; before, a month nobody came was skipped.
-// A month bought with points (note 'points') isn't a payment: it doesn't
-// bring back a membership that lapsed.
+// (renewal won't retry it).
 export const plusLapsed = wallet => {
   const entries = wallet?.entries || [];
-  const last = entries.filter(e => e.app === 'eco' && e.id?.startsWith('eco:plus:') && e.note !== 'points').map(e => e.id.slice(9)).sort().at(-1);
+  const last = entries.filter(e => e.app === 'eco' && e.id?.startsWith('eco:plus:')).map(e => e.id.slice(9)).sort().at(-1);
   return Boolean(last) && entries.some(e => e.app === 'eco' && e.id?.startsWith('eco:plusfail:') && e.id.slice(13) > last);
 };
 function plusRenewal(wallet, now) {
@@ -351,42 +348,6 @@ const cleanCode = v =>
     .toUpperCase()
     .replace(/[\s-]/g, '');
 
-// What Quadra Hub sells (its lib/shop.mjs), the only money it moves:
-// Hub pays points, never NT$. Each purchase is one entry
-// 'vocab:shop:<item>:<key>' of kind 'shop', and a word pack's id is fixed
-// ('vocab:shop:pack:<pack>'), so it's bought once. An entry claiming one
-// must pay at least the listed price for every account, or
-// it's dropped: an app can't write itself a free card, boost or pack.
-export const HUB_SHOP = { freeze: 300, boost: 150, pack: { toeic: 990, ielts: 1_490, biz: 1_990 } };
-// Points (XP) buy the same things: 'vocab:xs:<item>:<key>', kind 'redeem',
-// amount 0, the points it cost in the note, at least HUB_XP's.
-export const HUB_XP = {
-  freeze: 600,
-  boost: 300,
-  pack: { toeic: 8_000, ielts: 12_000, biz: 16_000 },
-  // A daily mission swapped for another ('vocab:xs:reroll:<day>:<mission>').
-  reroll: 100,
-  // A missed day bought back for the streak ('vocab:xs:repair:<day>').
-  repair: 1_500,
-  // The points catalogue (the kit's CATALOG): Play free bets and Securities
-  // vouchers, at the same price for every account.
-  bet100: 5_000,
-  bet500: 22_000,
-  fee: 4_000,
-  td: 12_000
-};
-function xpPaid(id, e) {
-  const [, , item, key] = id.split(':');
-  const least = item === 'pack' ? HUB_XP.pack[key] : HUB_XP[item];
-  const cost = Number(e.note);
-  return typeof least === 'number' && e.kind === 'redeem' && Number.isInteger(cost) && cost >= least && cost <= 100_000;
-}
-function shopPaid(id, amount) {
-  const [, , item, key] = id.split(':');
-  const least = item === 'pack' ? HUB_SHOP.pack[key] : HUB_SHOP[item];
-  return typeof least === 'number' && amount <= -least;
-}
-
 // One entry as stored: anything malformed is dropped, not stored.
 export function cleanEntry(e, { allowEco = false } = {}) {
   if (!isObj(e)) return null;
@@ -398,17 +359,9 @@ export function cleanEntry(e, { allowEco = false } = {}) {
   if (!(ENTRY_APPS.has(app) || (allowEco && app === 'eco'))) return null;
   // The Worker's own ids (pay, Quadra Plus) are its alone.
   if (!allowEco && id.startsWith('eco:')) return null;
-  if (app === 'vocab' && (e.kind === 'game' || id.startsWith('vocab:g:') || /^vocab:m:\d{4}-\d{2}-\d{2}:(game1|games3|challenge)$/.test(id) || /^vocab:xs:(avatar|frame|plus):/.test(id) || id.startsWith('vocab:xp:debit:'))) return null;
-  if (id.startsWith('vocab:shop:') && !(app === 'vocab' && e.kind === 'shop' && shopPaid(id, amount))) return null;
-  // Hub pays no money: entries only spend (the shop) or carry points
-  // (`xp`, amount 0). Its retired game and mission rewards are rejected.
-  if (app === 'vocab' && (amount > 0 || id.startsWith('vocab:fb:'))) return null;
-  if (id.startsWith('vocab:xs:') && !(app === 'vocab' && amount === 0 && xpPaid(id, e))) return null;
   const out = { id, t: Math.round(t), app, kind: str(e.kind, 24) || 'other', amount: Math.round(amount * 100) / 100 };
   const note = str(e.note, 80);
   if (note) out.note = note;
-  const xp = finite(e.xp);
-  if (app === 'vocab' && xp != null && xp > 0) out.xp = Math.min(MAX_XP, Math.round(xp));
   return out;
 }
 
@@ -425,18 +378,12 @@ function cleanStamped(map, maxKeys, maxValue) {
 }
 
 // What a client may send to change the wallet.
-export function cleanPatch(patch, { allowCosmetics = false } = {}) {
+export function cleanPatch(patch) {
   if (!isObj(patch)) return { entries: [], snap: {}, settings: {} };
-  const settings = cleanStamped(patch.settings, 32, 4000);
-  delete settings['hub:cleanup:v1'];
-  if (!allowCosmetics) {
-    delete settings.avatar;
-    delete settings.frame;
-  }
   return {
     entries: (Array.isArray(patch.entries) ? patch.entries.slice(0, MAX_ENTRIES_PER_WRITE) : []).map(e => cleanEntry(e)).filter(Boolean),
     snap: cleanStamped(patch.snap, 8, 4000),
-    settings
+    settings: cleanStamped(patch.settings, 32, 4000)
   };
 }
 
@@ -445,33 +392,6 @@ const newest = (a = {}, b = {}) => {
   for (const [k, v] of Object.entries(b)) if (!out[k] || v.t >= out[k].t) out[k] = v;
   return out;
 };
-
-const HUB_CLEANUP_SETTING = 'hub:cleanup:v1';
-const retiredGameEntry = e => e.app === 'vocab' && (e.kind === 'game' || e.id?.startsWith('vocab:g:') || /^vocab:m:\d{4}-\d{2}-\d{2}:(game1|games3|challenge)$/.test(e.id || ''));
-const retiredMissionFreebet = e => e.app === 'vocab' && e.kind === 'freebet' && e.id?.startsWith('vocab:fb:');
-const retiredCosmeticEntry = e => e.app === 'vocab' && /^vocab:xs:(avatar|frame|plus):/.test(e.id || '');
-const debitId = id => {
-  let hash = 2_166_136_261;
-  for (let i = 0; i < id.length; i++) hash = Math.imul(hash ^ id.charCodeAt(i), 16_777_619);
-  return `vocab:xp:debit:${(hash >>> 0).toString(36)}`;
-};
-function cleanHubWallet(wallet) {
-  const settings = { ...(wallet.settings || {}) };
-  const firstCleanup = settings[HUB_CLEANUP_SETTING]?.value !== true;
-  const cleanupAt = finite(settings[HUB_CLEANUP_SETTING]?.t) ?? 0;
-  const entries = (wallet.entries || []).filter(e => !retiredGameEntry(e) && !retiredMissionFreebet(e) && !retiredCosmeticEntry(e));
-  if (firstCleanup) {
-    for (const e of wallet.entries || []) {
-      if (!retiredCosmeticEntry(e) || e.kind !== 'redeem' || !Number.isInteger(Number(e.note)) || Number(e.note) <= 0) continue;
-      entries.push({ id: debitId(e.id), t: e.t, app: 'vocab', kind: 'redeem', amount: 0, note: String(Number(e.note)) });
-    }
-    settings[HUB_CLEANUP_SETTING] = { value: true, t: Date.now() };
-  }
-  for (const key of ['avatar', 'frame']) if (firstCleanup || (finite(settings[key]?.t) ?? 0) <= cleanupAt) delete settings[key];
-  if (firstCleanup) delete settings['bests:vocab'];
-  entries.sort((a, b) => a.t - b.t || (a.id < b.id ? -1 : 1));
-  return { ...wallet, entries, settings };
-}
 
 // Two wallets (or a wallet and a patch) as one: entries by id (the first
 // copy kept, since an entry never changes), the rest newest-wins.
@@ -483,7 +403,7 @@ export function mergeWallet(a, b) {
   const inbox = { ...(base.inbox || {}) };
   for (const [app, ids] of Object.entries(b.inbox || {})) inbox[app] = [...new Set([...(inbox[app] || []), ...ids])];
   const created = Math.min(base.created ?? Infinity, b.created ?? Infinity);
-  return cleanHubWallet({
+  return {
     v: 1,
     created: created === Infinity ? Date.now() : created,
     entries: [...entries.values()].sort((x, y) => x.t - y.t || (x.id < y.id ? -1 : 1)),
@@ -496,7 +416,7 @@ export function mergeWallet(a, b) {
     ...(base.live ? { live: base.live } : {}),
     ...(base.sec ? { sec: base.sec } : {}),
     ...(base.merged ? { merged: base.merged } : {})
-  });
+  };
 }
 
 // The pool's NT$ right now: every entry plus each app's shared cash figure.
@@ -514,16 +434,6 @@ export function parseWallet(text) {
   return null;
 }
 
-// Settings no app reads any more and obsolete game scores: removed from the
-// Firestore wallet by the one-time Quadra Hub cleanup.
-export const RETIRED_SETTINGS = ['oddsWeeklyLimit', 'orbitFollow', 'bests:vocab'];
-export function tidyWallet(w) {
-  const { links, ...rest } = w;
-  const settings = Object.fromEntries(Object.entries(rest.settings || {}).filter(([k]) => !RETIRED_SETTINGS.includes(k)));
-  const entries = rest.entries.map(({ peer, ...e }) => e);
-  return cleanHubWallet({ ...rest, settings, entries });
-}
-
 function touchApp(wallet, app, now) {
   if (!ECO_APPS[app]) return wallet;
   const had = wallet.apps?.[app];
@@ -533,7 +443,7 @@ function touchApp(wallet, app, now) {
 // What clients see of the wallet: not the Worker's own bookkeeping.
 export function publicWallet(w) {
   if (!w) return w;
-  const { sec, links, ...rest } = w;
+  const { sec, ...rest } = w;
   return rest;
 }
 
@@ -636,7 +546,7 @@ export async function handleEcoRequest(request, env, headers, ip, deps) {
           if (!isActive(w, claims)) return (refused = 'ECO_SESSION_MOVED'), w;
           // What falls due with the write comes with it (fixed ids: never
           // twice): the welcome bonus bet right after a first bet.
-          const merged = mergeWallet(w, cleanPatch(body.wallet, { allowCosmetics: plusMember(w, now) }));
+          const merged = mergeWallet(w, cleanPatch(body.wallet));
           return touchApp(mergeWallet(merged, { entries: paydayEntries(merged, now) }), app, now);
         },
         { skipIf: () => refused }
