@@ -20,6 +20,11 @@ edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
   `account.od.since`; after OD_GRACE (2 days) Securities sells holdings for
   it (coverPlan, market orders `forced` + `cover`, which don't trigger the
   loans' repayAll). Covered, `od` goes.
+  Past the deadline it's a default: `penaltyEvent` (7% 違約金, event type
+  `penalty`), `account.defaultAt`, and `defaulted()` blocks 融資 and short
+  selling for DEFAULT_BAN (5 years). A margin call (under 130%) not met in
+  CALL_GRACE (2 days, `account.call.since`) sells every holding bought on
+  margin (`callPlan`, 斷頭); under 115% it's liquidated at once as before.
 
 - **Securities' cash for the other apps** (snap `stock.cash`) is its own NT$
   less what it owes on loans: borrowed money stays for trading, never bets
