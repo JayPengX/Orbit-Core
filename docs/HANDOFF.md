@@ -8,6 +8,60 @@ edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
 
 
 
+## Photos, F1 team pages, Taiwan-only catalogue, MotoGP and Formula E (pushed to `main`)
+
+Done:
+- **Fixtures photos** (`lib/photos.mjs`, `personPic` in `ui.js`): a person's
+  photo from the feed, ESPN's headshot by id (`espnHeadshot`: rpm, tennis,
+  golf, mma, nba, mlb…), else Wikipedia's page image (batched, checked
+  against the sport in the page's description, kept in `fx.pics.v1` on the
+  device). Flags and initials only when nothing is found. Used in standings
+  (F1 drivers no longer show flags), race orders, draws, cards, rosters,
+  lineups, leaders, injuries, follows and search.
+- **F1 team pages** (`openConstructor` in `sheets.js`): formula1.com's 2026
+  white logos on the team's colour (kit `logos.mjs` F1_TEAMS `f1` slug and
+  `zh` name; `f1Constructor` returns `logo`, `zh`, `drivers`), place,
+  points, wins, podiums, both drivers with their share, next race, each
+  weekend's finishes and points. Constructors show in Chinese.
+- Tapping: leaders, injuries and lineups open the player; players without an
+  ESPN page (table tennis, badminton, boxing) open `openPerson` (Wikipedia
+  summary and their matches).
+- **YouTube highlights** link on ended games and sessions (`highlightsUrl`:
+  a YouTube search, the league's video first). **最新新聞 removed.**
+- **Catalogue (kit `leagues.mjs`)**: `NO_TAIWAN` marks 27 leagues `off`
+  (ACB, NBL, CBA, KBL, B.League, NCAAF, Eredivisie, Primeira, Belgium,
+  Süper Lig, Saudi, Liga MX, Brasileirão, Argentina, Libertadores,
+  Sudamericana, EFL Cup, Copa del Rey, ACL, Asian Cup, friendlies, Euro,
+  Copa América, Club World Cup, rugby, cricket, snooker). Fixtures leaves
+  them out entirely; Play keeps them in LEAGUES only so open bets settle
+  (`onSale`, KAMBI_LEAGUES, EXTRA_LEAGUES and the sport groups skip them).
+  Rights were checked by web search in October 2026: re-check yearly.
+- **Formula E** (`data: 'tsdb'`, TheSportsDB league 4371, direct, CORS) and
+  **MotoGP** (`data: 'motogp'`, api.motogp.pulselive.com through the proxy,
+  host added to `sports-proxy-worker.js`) in Fixtures as race weekends
+  (`parseMotoGpEvents/Sessions/Order`, `parseTsdbRaces`; tests in
+  `tests/motorsport.test.mjs`). TheSportsDB's midnight times show as 時間待定.
+- **Where to watch** (`broadcast.mjs`): new services YouTube, SOOP,
+  Disney+, Volleyball TV, K League TV, MotoGP VideoPass. KBO free on SOOP,
+  J.League/K League on their YouTube channels, WTT and BWF TV on YouTube,
+  Formula E on Disney+ (practice on YouTube), MotoGP on 緯來, World Cup on
+  ELTA, boxing on DAZN. A row shows a free stream when ELTA names no channel;
+  the sheet links to it.
+- **Play MotoGP race winner** (last commit): Kambi's "Winner" offer for the
+  next Grand Prix (`nextKambiMotoRace`, `parseKambiMotoRace`), a board
+  under F1 (`renderMoto`, section `#moto`, sport group `motogp`), legs of
+  kind `moto` settled from MotoGP's results (`parseMotoGpRace`; void a
+  week after with no race). Not yet seen on screen: check it on a phone
+  (the proxy must be deployed with the MotoGP host first).
+
+Next:
+- Play: Formula E betting once Kambi prices it (season starts December);
+  settle from TheSportsDB results or Formula E's site.
+- Fixtures: MotoGP standings and rider pages (the API has
+  `/results/standings`; riders' photos from `/riders/<uuid>`).
+- Fixtures: Formula E results (TheSportsDB `eventresults.php`).
+- Check the ELTA.tv app opener on a real iPhone (see the section below).
+
 ## Fixtures: F1 session badges, ELTA's commentary and the app (pushed to `main`)
 
 - A race weekend's sessions (rows, picks, the sheet) carry a coloured badge:
