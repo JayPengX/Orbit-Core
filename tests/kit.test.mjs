@@ -362,3 +362,28 @@ test('signing out wipes every app’s keys on this device, keeping only its lang
   assert.equal(tabStore.size, 0);
   assert.equal(kit.storedAccount(), '');
 });
+
+test('looks for staying a member: the streak is months held in a row up to now, a gap starts it again', () => {
+  const plus = months => ({ entries: months.map(m => ({ id: `eco:plus:${m}`, app: 'eco', kind: 'plus', amount: -490 })), settings: {} });
+  const now = Date.UTC(2026, 9, 15);
+  assert.equal(kit.plusStreak(plus(['2026-08', '2026-09', '2026-10']), now), 3);
+  assert.equal(kit.plusStreak(plus(['2025-11', '2025-12', '2026-01', '2026-10']), now), 1);
+  // A year paid ahead counts as its months arrive.
+  assert.equal(kit.plusStreak(plus(['2026-10', '2026-11', '2026-12']), now), 1);
+  assert.equal(kit.plusStreak(plus(['2026-09']), now), 0);
+  // Across a new year.
+  assert.equal(kit.plusStreak(plus(['2025-12', '2026-01']), Date.UTC(2026, 0, 10)), 2);
+  const wolf = kit.AVATARS.find(a => a.id === 'wolf');
+  const fox = kit.AVATARS.find(a => a.id === 'fox');
+  const two = { ...plus(['2026-09', '2026-10']), settings: { avatar: { value: { id: 'wolf' }, t: 1 } } };
+  assert.equal(kit.lookOpen(two, fox, now), true);
+  assert.equal(kit.lookOpen(two, wolf, now), false);
+  assert.equal(kit.avatarOf(two, now), null);
+  const three = { ...plus(['2026-08', '2026-09', '2026-10']), settings: two.settings };
+  assert.equal(kit.avatarOf(three, now)?.id, 'wolf');
+  // Every look has a different id, every streak one of LOOK_STREAKS.
+  for (const list of [kit.AVATARS, kit.FRAMES]) {
+    assert.equal(new Set(list.map(x => x.id)).size, list.length);
+    for (const x of list) if (x.streak) assert.ok(kit.LOOK_STREAKS.includes(x.streak));
+  }
+});
