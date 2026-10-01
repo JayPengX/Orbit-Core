@@ -6,6 +6,41 @@ All repos develop on `claude/gifted-dijkstra-dv6w8a` and are pushed to
 edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
 `npx eslint .`).
 
+## Slower levels, more for points, confirm before buying (pushed to `main`)
+
+- **Levels** (kit `xpForLevel`): 100·(L−1)²: Lv 10 at 8,100, 20 at 36,100,
+  50 at 240,100 (about a year of daily play). **Daily soft cap**
+  (`ECONOMY.dailyXp`, Rewards `dampXp`/`capStage`): words and games give the
+  first 600 XP a day in full, the next 600 at half, then a tenth (×Plus,
+  streak and ×2 boost move the steps); missions, weekly goals and the daily
+  challenge aren't counted. Home's level card shows where today stands.
+- **Points buy more:** frames (kit `FRAMES`, setting `frame`, `q-framed
+  q-frame-<id>` on the account button; bronze Lv 10, legend Lv 40, mythic
+  Lv 50, five bought 2,000–30,000 XP), a daily mission swap (100 XP, 2 a
+  day, `vocab:xs:reroll:<day>:<mission>`, `dailyMissionIds(day, swapped)`),
+  yesterday bought back for the streak (1,500 XP, when a streak of 3+ broke
+  and no card is held, `vocab:xs:repair:<day>`, counted by `activeDaySet`).
+  The Worker's `REWARDS_XP` has `frame`, `reroll`, `repair`.
+- **Every purchase asks first** (kit `ask`): Play bets (cost and the most it
+  pays), lottery tickets, scratch cards; Securities orders, exchanges,
+  loans, monthly plans; joining Plus (kit). Rewards already did.
+- **Prices at the moment of buying:** Securities reads the quote again
+  (waits, 15 s at most; no fresh price, no order) and asks again if it
+  moved over 1% (`atFreshPrice`). Play checks the board when the bet is
+  placed: a pick closed stops it, odds that moved redraw the slip and stop
+  (the slip always shows what's bought).
+- **Free bet as a cut** (Play `placeFreeSlip`, `freeValue`): more can go on
+  top from the balance; a win pays all but the free part's stake.
+- **Words:** smart mode never asks a flash card; letters questions have no
+  sound (it made them dictation) and give the first letter (two for 8+).
+- **Fixtures 首頁 你的投注:** the day's games with open Play slips
+  (`playGameId` = the slip leg's `g`), live, with the pick under each, above
+  正在進行 (and not repeated there). Baseball's live line: count and
+  batter vs pitcher on a line each.
+- Play's 我的彩券 has no count; VIP explained as rows; Securities' margin
+  gauge labels sit either side of their ticks.
+- `tools/preview.mjs --snap '{json}'`: the wallet's snap to start with.
+
 ## Streak by missions, mastery over days, fair cash out (pushed to `main`)
 
 - **Streak = 3 daily missions** (kit `STREAK.missions`, `missionDays`,
