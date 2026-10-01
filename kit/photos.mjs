@@ -9,6 +9,9 @@
 import { CATALOG } from './catalog.mjs';
 
 const CDN = 'https://a.espncdn.com/i/headshots';
+// ESPN's headshot at the size a phone shows it (its image service: a full
+// one is about 250 KB, this about 25 KB). Any other picture as it is.
+export const smallPhoto = url => (typeof url === 'string' && url.startsWith(`${CDN}/`) ? `https://a.espncdn.com/combiner/i?img=${url.slice('https://a.espncdn.com'.length)}&w=256` : url);
 // ESPN's headshot folders by league (racing: this season's, see freshHeadshot).
 const ESPN_FOLDER = { f1: 'rpm', nba: 'nba', wnba: 'wnba', mlb: 'mlb', nfl: 'nfl', nhl: 'nhl' };
 export function espnHeadshot(league, id) {
@@ -90,7 +93,7 @@ export async function espnSearchPhoto(name, sport, fetchJson = defaultJson, chec
   const hit = items.find(i => i.type === 'player' && i.sport === SEARCH_SPORT[sport] && plain(i.displayName) === want);
   if (!hit?.id) return '';
   const folder = sport === 'basketball' && hit.league === 'wnba' ? 'wnba' : HEADSHOT_FOLDER[sport];
-  const url = `${CDN}/${folder}/players/full/${hit.id}.png`;
+  const url = smallPhoto(`${CDN}/${folder}/players/full/${hit.id}.png`);
   return (await check(url)) ? url : '';
 }
 

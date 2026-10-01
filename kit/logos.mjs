@@ -272,7 +272,8 @@ export const flagEmoji = code => (code ? String.fromCodePoint(...[...code.slice(
 // back in the same frame. A new one fades in once it has drawn, never the
 // browser's broken-picture icon. One that fails is tried again (a dropped
 // connection, a slow CDN), then gives way to the fallback; a failure is
-// remembered for ten minutes only.
+// remembered for ten minutes only. A `guess` (an address that may not exist:
+// a photo by id) isn't tried again, so the next one comes at once.
 const LOGO_SEEN_KEY = 'quadra.logos.v2';
 const SEEN_MAX = 2_000;
 const BAD_FOR_MS = 10 * 60_000;
@@ -312,7 +313,7 @@ function noteDrawn(url, img) {
   }, 500);
 }
 
-export function logoPicture(light, dark, cls, fallback) {
+export function logoPicture(light, dark, cls, fallback, { guess = false } = {}) {
   if (!light || knownBad(light)) return fallback();
   const img = document.createElement('img');
   const known = drawn.has(light) || logoSeen.has(light);
@@ -336,7 +337,7 @@ export function logoPicture(light, dark, cls, fallback) {
   let tries = 0;
   img.addEventListener('error', () => {
     img.style.opacity = '0';
-    if (tries >= RETRY_MS.length) {
+    if (tries >= (guess ? 0 : RETRY_MS.length)) {
       logoBad.set(light, Date.now());
       logoSeen.delete(light);
       if (picture.parentNode) picture.replaceWith(fallback());
