@@ -40,8 +40,12 @@ The owner's second list (all [x] unless said):
   race-by-race table's columns fixed); [x] an F1 team can be followed
   (`f1team: true`, id `f1team:<name>`; its races count as followed; in
   追蹤 with its last finishes and next session); [ ] more logos and real
-  images everywhere (not started this session; see "One image source per
-  entity" below).
+  images everywhere: teams, leagues, people and F1 teams already have
+  theirs; the broadcast services are text. Wikidata has logos for YouTube,
+  DAZN, Disney+, Apple TV, UFC Fight Pass, MotoGP; none for ELTA, Hami
+  Video, 緯來, 博斯 or MyVideo (their sites have no app icon either), so
+  those need images from the owner, or stay text. Star and tick marks
+  are gone from chips and follow buttons.
 - Play: [x] taking a pick off the slip shows at once everywhere
   (`slipChanged`, `syncPicks` by `data-bet`).
 - Orbit Class: [x] an iPad layout (sideways: dashboard and day side by
