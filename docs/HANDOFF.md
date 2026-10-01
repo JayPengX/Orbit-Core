@@ -48,17 +48,27 @@ Rewards
 - [x] Sprite directions: pixel T-rex facing right (runner.js, canvas
   360×300), racer car, rockets, chick.
 - [ ] Not yet checked game by game on screen beyond ~20 of the 104.
-- [ ] Ported open-source games: blocked by the session's permission
-  classifier ("Untrusted Code Integration") twice; the owner is granting
-  permission. Plan: `public/ported/<id>/` per game with its LICENSE, a
-  `public/ported/bridge.js` (`quadra.score(n)`, `quadra.over(n)` posting to
-  the parent, `quadra.done` blocking the game's own restart), an arcade
-  module per game using a kit.js `portedGame(api, path)` iframe that listens
-  for those messages; ARCADE list entries with max/rate set so max/rate is
-  an excellent score. Candidates checked: wayou/t-rex-runner (BSD-3; hooks
-  in gameOver, restart, distanceMeter.update), gabrielecirulli/2048 (MIT),
-  Hextris (GPL-3), iamkun/tower_game (MIT), chvin/react-tetris (Apache-2.0,
-  built in docs/).
+- [ ] Ported open-source games (owner's permission given; owner said to do
+  them LAST, after every other item). Done so far: `public/ported/bridge.js`
+  (`quadra.score/over/pad/L`), `portedStage` in games-ui.js (iframe,
+  結束並計分), `PORTED_LIST`/`addPorted` in arcade.mjs (empty: nothing
+  listed yet; an entry is [id, icon, cat, zh, en, kindZh, kindEn, excellent
+  score, minutes, page, source]). Adapted: `ported/dino` (Chromium T-rex,
+  BSD; score 1500 excellent, 2 min; centred, any tap starts) and
+  `ported/2048` (MIT; board alone scaled to fit, fresh board each round,
+  goes on past 2048; excellent ~20000, long). Next, each made to look like a
+  Rewards game (Traditional Chinese, no foreign buttons/links/stores, the
+  round's start and end through Rewards): Hextris (GPL-3), iamkun/tower_game
+  (MIT, Simplified title art), chvin/react-tetris (Apache-2.0, built
+  docs/, Simplified labels to convert), rembound Bubble Shooter and Match-3
+  (MIT), lhartikk/simple-chess-ai (Apache-2.0), jakesgordon racer and
+  breakout (MIT; racer needs `quadra.pad`), ellisonleao/clumsy-bird (GPL-3),
+  jhatzimalis/solitaire, santh0sh/minesweeper, gamelabz/html5-game-sudoku
+  (MIT). Then remove the home-made games (owner: "remove crap self made
+  games"); the plan was to keep only the word games (vocabulary is the
+  app's point) and check dailyGame, missions, badges and tests for ids.
+  Screenshot helper used: a 30-line Playwright script serving a folder at
+  390×700 with touch (recreate it; it lived in the scratchpad).
 - [ ] 財富等級 as the point of the game, a milestone of taking part, not
   Quadra's profit. Three sides: the user, Quadra (profit-minded) and "God"
   (who gives starter money, the monthly pay, level rewards).
