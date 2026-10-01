@@ -7,6 +7,7 @@
 //                          [--store 'key=value']  (a localStorage entry to start with)
 //                          [--signed-out]  (the sign-in screen, as a new device sees it)
 //                          [--entry '{json}']  (a wallet entry to add: an economy scenario)
+//                          [--snap '{json}']  (the wallet's snap to start with, e.g. Play's open slips)
 //                          [--fixture 'text-in-url=file.json']  (repeatable: that saved answer
 //                          for any upstream URL containing the text, e.g. when Yahoo rate-limits)
 //                          [--timing]  (loading speed: when the loading screen went away, how
@@ -67,6 +68,8 @@ const out = resolve(opt('out', '/tmp/quadra-preview'));
 const width = Number(opt('width', 390));
 const height = Number(opt('height', 844));
 const lang = opt('lang', 'zh');
+// --snap '{json}': the wallet's snap (each app's figures: Play's open slips for Fixtures, say).
+const snapStart = JSON.parse(opt('snap', '{}'));
 const wait = Number(opt('wait', 6000));
 const payloadFile = opt('payload', '');
 const fixtures = [];
@@ -165,7 +168,7 @@ const wallet = {
     { id: 'odds:s1', t: now - 86_400_000, app: 'odds', kind: 'stake', amount: -500 },
     ...extraEntries
   ],
-  snap: {},
+  snap: snapStart,
   settings: {},
   pins: {},
   apps: {},
