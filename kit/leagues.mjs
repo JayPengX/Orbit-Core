@@ -12,10 +12,7 @@
 //   bet     Quadra Play's key when Play sells it; `odds` where Play prices it
 //           ('espn': DraftKings through ESPN; 'kambi'), F1 has its own board
 //   espn / kambi   the paths on each source (a league can have both)
-//   play-only details: family (the kind of markets), sets (best of how
-//   many, what a set is made of), neutral, cap (matches listed), logo (ESPN
-//   league logo id), icon, badge
-//   players  sides are people (their nation's flag as the picture)
+//   play-only details: logo (ESPN league logo id), icon, badge
 
 export const SPORTS = {
   soccer: { zh: '足球', en: 'Soccer', icon: '⚽' },
@@ -23,12 +20,9 @@ export const SPORTS = {
   basketball: { zh: '籃球', en: 'Basketball', icon: '🏀' },
   football: { zh: '美式足球', en: 'Football', icon: '🏈' },
   hockey: { zh: '冰球', en: 'Hockey', icon: '🏒' },
-  racing: { zh: '賽車', en: 'Racing', icon: '🏎️' },
-  badminton: { zh: '羽球', en: 'Badminton', icon: '🏸' }
+  racing: { zh: '賽車', en: 'Racing', icon: '🏎️' }
 };
 
-// Sports played in sets (the same kind of markets in Play).
-export const SET_SPORTS = new Set(['badminton']);
 
 const espn = (sport, path, zh, en, bet, extra = {}) => ({ sport, kind: 'match', data: 'espn', espn: path, zh, en, bet, odds: bet ? 'espn' : undefined, ...extra });
 const soccer = (path, zh, en, bet, extra = {}) => espn('soccer', `soccer/${path}`, zh, en, bet, extra);
@@ -67,8 +61,6 @@ export const CATALOG = {
   nationsleague: soccer('uefa.nations', '歐國聯', 'Nations League', 'nationsleague', { cup: true, logo: 2395 }),
   // Racing
   f1: { sport: 'racing', kind: 'field', data: 'espn', espn: 'racing/f1', zh: 'F1 一級方程式', en: 'Formula 1', bet: 'f1', top: true, standings: true },
-  // Badminton, from Kambi (played in sets)
-  badminton: { sport: 'badminton', kind: 'match', data: 'kambi', kambi: 'badminton', zh: '羽球', en: 'Badminton', bet: 'badminton', odds: 'kambi', players: true, icon: '🏸', badge: 'd5xvqq1750423289', neutral: true, sets: { bestOf: 3, unit: 'points', target: 21, cap: 30 } },
   // Formula E (Disney+ from 2026-27, its practice free on YouTube; the
   // calendar from TheSportsDB, open to browsers).
   formulae: { sport: 'racing', kind: 'field', data: 'tsdb', tsdb: 4371, zh: 'Formula E 電動方程式', en: 'Formula E', icon: '⚡' },
@@ -79,7 +71,7 @@ export const CATALOG = {
 };
 
 // Play's kind of markets for a sport.
-export const familyOfSport = sport => (SET_SPORTS.has(sport) ? 'sets' : sport);
+export const familyOfSport = sport => sport;
 
 // How far ahead Play sells a game (and Fixtures shows its 投注): one reach
 // for every league and every price, a bookmaker's or the house's own (Play's

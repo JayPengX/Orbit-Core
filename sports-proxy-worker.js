@@ -132,8 +132,8 @@ const SPORTS_PROXY_ALLOWED_HOSTS = [
   'statsapi.mlb.com',
   'api.jolpi.ca',
   'gamma-api.polymarket.com',
-  // Kambi's public odds feed: Play's Asian baseball, EuroLeague, K League and
-  // badminton odds and live scores.
+  // Kambi's public odds feed: Play's Asian baseball, EuroLeague and K League
+  // odds and live scores.
   'eu-offering-api.kambicdn.com',
   // OpenF1's race control messages: Quadra Play's safety car, VSC and red
   // flag picks are settled from them.

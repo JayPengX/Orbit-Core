@@ -131,7 +131,7 @@ const SOCCER_LOGO = {
 };
 // TheSportsDB's league badges.
 const LEAGUE_BADGE = {
-  npb: 'lk85rg1575038781', kbo: 'qfr1hx1589707979', cpbl: 'c3vetj1655924198', euroleague: '7xjtuy1554397263', kleague: 'zaw2cj1628430843', badminton: 'd5xvqq1750423289'
+  npb: 'lk85rg1575038781', kbo: 'qfr1hx1589707979', cpbl: 'c3vetj1655924198', euroleague: '7xjtuy1554397263', kleague: 'zaw2cj1628430843'
 };
 // ESPN's other league logos.
 const ESPN_LEAGUE = {
@@ -253,62 +253,10 @@ export function countryFlag(name) {
 // A national team's (or a country's) code, or null: "India", "England", "South Africa Women".
 export const countryCode = name => COUNTRY_CODES[normalizeTeamName(name).replace(/\s+(women|men|u\d+|a)$/, '')] ?? null;
 
-// ---- Badminton players' nations -----------------------------------------------------
-//
-// Kambi names players without their country, so a player's picture is their
-// nation's flag: from this table (the regulars on the BWF World Tour), else
-// the country the event is filed under (Kambi's path words). ISO codes.
-const NATIONS = {
-  CN: 'Shi Yuqi|Li Shifeng|Weng Hongyang|Lu Guangzu|Wang Zhiyi|Han Yue|Chen Yufei|Gao Fangjie|Liang Weikeng|Wang Chang|Chen Qingchen|Jia Yifan|Liu Shengshu|Tan Ning|Feng Yanzhe|Huang Dongping|Jiang Zhenbang|Wei Yaxin|Zhang Shuxian|Zheng Siwei|Huang Yaqiong',
-  TW: 'Chou Tien-Chen|Chou Tien Chen|Lin Chun-Yi|Lin Chun Yi|Wang Tzu-Wei|Lee Yang|Wang Chi-Lin|Lee Jhe-Huei|Yang Po-Hsuan|Lee Chia-Hao|Tai Tzu-Ying|Tai Tzu Ying|Chiu Pin-Chian|Wang Po-Wei|Huang Yu-Kai|Lin Kuan Ting|Lee Fang-Jen|Lee Fang-Chih|Hsieh Pei-Shan|Hung En-Tzu|Lin Chih-Chun|Liu Kuang-Heng',
-  JP: 'Kodai Naraoka|Kenta Nishimoto|Koki Watanabe|Kanta Tsuneyama|Akane Yamaguchi|Nozomi Okuhara|Aya Ohori|Takuro Hoki|Yugo Kobayashi|Mayu Matsumoto|Wakana Nagahara|Nami Matsuyama|Chiharu Shida|Yuta Watanabe|Arisa Higashino|Riku Hatano|Kenya Mitsuhashi|Hiroki Midorikawa|Kyohei Yamashita|Tomoka Miyazaki|Natsuki Nidaira|Yuki Fukushima|Sayaka Hirota|Rin Iwanaga|Kie Nakanishi',
-  KR: 'An Se-young|An Se Young|Seo Seung-jae|Kim Won-ho|Kang Min-hyuk|Baek Ha-na|Lee So-hee|Kim So-yeong|Kong Hee-yong|Jeon Hyeok-jin|Kim Ga-eun|Sim Yu-jin',
-  DK: 'Viktor Axelsen|Anders Antonsen|Rasmus Gemke|Mia Blichfeldt|Kim Astrup|Anders Skaarup Rasmussen|Line Kjaersfeldt|Line Christophersen|Mathias Christiansen|Magnus Johannesen|Julie Dawall Jakobsen|Mads Christophersen|Jesper Toft|Amalie Magelund|Freja Ravn|Maiken Fruergaard|Sara Thygesen|Rasmus Kjaer|Frederik Sogaard|Mathias Thyrri',
-  ID: 'Jonatan Christie|Anthony Sinisuka Ginting|Alwi Farhan|Gregoria Mariska Tunjung|Putri Kusuma Wardani|Fajar Alfian|Muhammad Rian Ardianto|Leo Rolly Carnando|Daniel Marthin|Sabar Karyaman Gutama|Muhammad Reza Pahlevi Isfahani|Apriyani Rahayu|Siti Fadia Silva Ramadhanti|Dejan Ferdinansyah|Gloria Emanuelle Widjaja|Rinov Rivaldy|Pitha Haningtyas Mentari|Chico Aura Dwi Wardoyo|Ester Nurumi Tri Wardoyo|Komang Ayu Cahya Dewi|Febriana Dwipuji Kusuma|Amallia Cahaya Pratiwi|Lanny Tria Mayasari|Meilysa Trias Puspita Sari|Rachel Allessya Rose',
-  MY: 'Lee Zii Jia|Aaron Chia|Soh Wooi Yik|Goh Sze Fei|Nur Izzuddin|Man Wei Chong|Tee Kai Wun|Chen Tang Jie|Toh Ee Wei|Pearly Tan|Thinaah Muralitharan|Goh Soon Huat|Shevon Jemie Lai|Leong Jun Hao|Ng Tze Yong|Goh Jin Wei|Letshanaa Karupathevan|Wong Ling Ching|Kang Khai Xing|Aaron Tai',
-  TH: 'Kunlavut Vitidsarn|Kantaphon Wangcharoen|Kulkavut Vitidsarn|Ratchanok Intanon|Busanan Ongbamrungphan|Pornpawee Chochuwong|Supanida Katethong|Dechapol Puavaranukroh|Supissara Paewsampran|Jongkolphan Kititharakul|Rawinda Prajongjai|Benyapa Aimsaard|Nuntakarn Aimsaard',
-  IN: 'Satwiksairaj Rankireddy|Chirag Shetty|Lakshya Sen|H. S. Prannoy|HS Prannoy|Prannoy H. S.|P. V. Sindhu|Pusarla V. Sindhu|PV Sindhu|Kidambi Srikanth|Priyanshu Rajawat|Kiran George|Treesa Jolly|Gayatri Gopichand|Ayush Shetty|Unnati Hooda|Malvika Bansod|Anupama Upadhyaya|Tanvi Sharma',
-  HK: 'Lee Cheuk Yiu|Angus Ng Ka Long|Ng Ka Long Angus|Tang Chun Man|Tse Ying Suet',
-  SG: 'Loh Kean Yew|Terry Hee|Jessica Tan|Yeo Jia Min',
-  FR: 'Christo Popov|Toma Junior Popov|Alex Lanier|Lucas Corvee|Thom Gicquel|Delphine Delrue|Leonice Huet',
-  DE: 'Yvonne Li|Fabian Roth',
-  ES: 'Carolina Marin|Carolina Marín|Pablo Abian',
-  CA: 'Brian Yang|Victor Lai|Michelle Li',
-  US: 'Beiwen Zhang',
-  BR: 'Ygor Coelho|Juliana Viana Vieira',
-  VN: 'Nguyen Thuy Linh',
-  IE: 'Nhat Nguyen',
-  BE: 'Julien Leclercq',
-  'GB-SCT': 'Kirsty Gilmour'
-};
-const NATION_OF = new Map();
-for (const [code, names] of Object.entries(NATIONS)) for (const n of names.split('|')) NATION_OF.set(normalizeTeamName(n), code);
-const nameKey = name => normalizeTeamName(name);
-// A player's nation as an ISO code (or GB-SCT…), or null. `where`: the
-// event's group and Kambi's path words ("japan", "denmark").
-export function playerNation(name, where = []) {
-  const key = nameKey(name);
-  if (NATION_OF.has(key)) return NATION_OF.get(key);
-  // A national side.
-  const own = countryCode(name);
-  if (own) return own;
-  // Kambi's "Surname Firstname" for some: the words in either order.
-  const words = key.split(' ');
-  if (words.length === 2 && NATION_OF.has(`${words[1]} ${words[0]}`)) return NATION_OF.get(`${words[1]} ${words[0]}`);
-  for (const w of [].concat(where || [])) {
-    const k = normalizeTeamName(String(w).replace(/_/g, ' '));
-    const code = COUNTRY_CODES[k] ?? Object.entries(COUNTRY_CODES).find(([c]) => c.length > 4 && k.startsWith(`${c} `))?.[1];
-    if (code) return code;
-  }
-  return null;
-}
-
 // A round flag picture for a nation code (circle-flags, hot-linkable SVGs).
 export const flagUrl = code => (code ? `https://cdn.jsdelivr.net/gh/HatScripts/circle-flags@2.7.0/flags/${code.toLowerCase()}.svg` : null);
 // The flag emoji of a nation code (GB-ENG and the like: the UK's).
 export const flagEmoji = code => (code ? String.fromCodePoint(...[...code.slice(0, 2).toUpperCase()].map(c => 0x1f1e6 + c.charCodeAt(0) - 65)) : null);
-// A player's flag picture, or null.
-export const playerFlag = (name, where) => flagUrl(playerNation(name, where));
 
 // ---- On screen ------------------------------------------------------------------
 

@@ -1,7 +1,7 @@
 // /kambi: the last score of Kambi matches Quadra Sportsbook has bets on.
 //
-// Kambi (the odds feed behind Sportsbook's Asian baseball, basketball,
-// tennis, badminton, table tennis, volleyball and snooker) never says
+// Kambi (the odds feed behind Play's Asian baseball, EuroLeague and K
+// League) never says
 // "final" in public, and a match's live data (event/{id}/livedata.json)
 // disappears a few hours after it ends. A bet whose app isn't opened in
 // that window could never be settled. So Sportsbook registers the matches
@@ -25,8 +25,8 @@
 export const KAMBI_COLLECTION = 'kambi-results';
 // One document listing every watched match and its start, so each cron run
 // costs one read instead of listing the whole collection (the cron runs
-// every 2 minutes: short matches, table tennis's especially, end and drop
-// out of Kambi's feed within minutes, and a 10-minute cron missed them).
+// every 2 minutes: a match can drop out of Kambi's feed within minutes of
+// ending, and a 10-minute cron missed some).
 export const KAMBI_INDEX = '_index';
 const KAMBI_LIVE = id => `https://eu-offering-api.kambicdn.com/offering/v2018/ub/event/${encodeURIComponent(id)}/livedata.json?lang=en_GB&market=GB`;
 const HOUR = 3_600_000;

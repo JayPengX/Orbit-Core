@@ -1,8 +1,7 @@
 // A person's photo: only the kind sports apps show, a studio headshot. ESPN's
 // official headshot by the feed's id, or found by their name (ESPN's athlete
 // search), else TheSportsDB's cutout (a headshot on a clear background) for
-// the leagues ESPN doesn't cover (Asian baseball, K League, EuroLeague,
-// badminton). Never a page's casual picture: no face is better than a wrong
+// the leagues ESPN doesn't cover (Asian baseball, K League, EuroLeague). Never a page's casual picture: no face is better than a wrong
 // one. Both sources are open to browsers (CORS), so not through the proxy;
 // answers are kept on the device (a found photo two months, none a week).
 // The kit's copy (Shared-Proxy/kit/photos.mjs), synced into Fixtures and Play
@@ -100,7 +99,7 @@ export async function espnSearchPhoto(name, sport, fetchJson = defaultJson, chec
 // their name and sport match. Its thumbnails are often casual pictures, so
 // only the cutout counts.
 const TSDB_SEARCH = 'https://www.thesportsdb.com/api/v1/json/3/searchplayers.php?p=';
-const TSDB_SPORT = { soccer: 'Soccer', baseball: 'Baseball', basketball: 'Basketball', football: 'American Football', hockey: 'Ice Hockey', racing: 'Motorsport', badminton: 'Badminton' };
+const TSDB_SPORT = { soccer: 'Soccer', baseball: 'Baseball', basketball: 'Basketball', football: 'American Football', hockey: 'Ice Hockey', racing: 'Motorsport' };
 export async function tsdbCutout(name, sport, fetchJson = defaultJson) {
   if (!TSDB_SPORT[sport]) return '';
   const list = (await fetchJson(TSDB_SEARCH + encodeURIComponent(name)).catch(() => null))?.player || [];

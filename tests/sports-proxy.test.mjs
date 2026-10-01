@@ -41,7 +41,7 @@ test('a single request tells the browser how long it may keep the answer', async
 });
 
 test('trims apply per URL in a batch', async () => {
-  const k = 'https://eu-offering-api.kambicdn.com/offering/v2018/ub/listView/badminton/all/all/all/matches.json';
+  const k = 'https://eu-offering-api.kambicdn.com/offering/v2018/ub/listView/basketball/euroleague/all/all/matches.json';
   const res = await get(`https://proxy.test/sports-proxy?batch=1&u=${encodeURIComponent(`kambi-events!${k}`)}`);
   const { r } = await res.json();
   assert.equal(r[0].s, 200);
