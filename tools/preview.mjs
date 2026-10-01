@@ -15,6 +15,8 @@
 //                          [--latency ms]  (each of the app's own files answers this much later:
 //                          a phone's round trip to GitHub Pages, e.g. 150)
 //                          [--root dir]  (the repos from there, e.g. a stamped copy)
+//                          [--fake-yahoo]  (made-up Yahoo prices: spark and chart answers
+//                          for any symbol, for when Yahoo answers 429)
 //
 //   app   fixtures | play | securities | rewards | orbit (or the repo's folder name)
 //   hash  the page's #hash to open (a tab), one screenshot each; none: the start
@@ -64,6 +66,7 @@ const flag = name => {
   args.splice(i, 1);
   return true;
 };
+const fakeYahoo = flag('fake-yahoo');
 const out = resolve(opt('out', '/tmp/quadra-preview'));
 const width = Number(opt('width', 390));
 const height = Number(opt('height', 844));
@@ -140,7 +143,60 @@ const curl = url =>
 const cache = new Map();
 const STARTED = Date.now();
 const DEBUG = Boolean(process.env.DEBUG);
+// --fake-yahoo: plausible prices for any symbol (a seeded random walk around
+// a known level), in Yahoo's spark and chart shapes.
+const LEVELS = { '2330.TW': 1180, '0050.TW': 196, '0056.TW': 38, '2317.TW': 224, '2454.TW': 1385, '2412.TW': 128, '2882.TW': 66, 'AAPL': 238, 'NVDA': 186, 'MSFT': 512, 'TSLA': 428, 'GOOGL': 246, 'AMZN': 222, 'VOO': 612, 'VT': 136, 'QQQ': 598, '^TWII': 25800, '^GSPC': 6650, '^IXIC': 22500, '^DJI': 46300, 'BTC-USD': 112000, 'ETH-USD': 4100, 'XAU': 3850, 'GC=F': 3850, 'USDTWD=X': 30.6, 'JPYTWD=X': 0.207, 'EURTWD=X': 35.8, 'HKDTWD=X': 3.93, 'CNYTWD=X': 4.29, 'GBPTWD=X': 41.2, 'KRWTWD=X': 0.0219, 'AUDTWD=X': 20.1, 'CHFTWD=X': 38.4, 'CADTWD=X': 22.0, 'SGDTWD=X': 23.8 };
+function seeded(text) {
+  let h = 2166136261;
+  for (const c of text) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+  return () => ((h = Math.imul(h ^ (h >>> 15), 2246822507) ^ Math.imul(h ^ (h >>> 13), 3266489909)) >>> 0) / 4294967296;
+}
+function fakeSeries(symbol, n, stepS) {
+  const rand = seeded(symbol);
+  const level = LEVELS[symbol] ?? 20 + rand() * 300;
+  const vol = symbol.endsWith('=X') ? 0.002 : symbol.includes('-USD') ? 0.02 : 0.012;
+  const closes = [];
+  let p = level * (0.92 + rand() * 0.08);
+  for (let i = 0; i < n; i++) closes.push((p *= 1 + (rand() - 0.48) * vol));
+  const k = level / closes.at(-1);
+  const end = Math.floor(Date.now() / 1000);
+  return { closes: closes.map(c => +(c * k).toPrecision(6)), stamps: closes.map((_, i) => end - (n - 1 - i) * stepS) };
+}
+function fakeMeta(symbol, closes) {
+  const tw = /\.TWO?$/.test(symbol);
+  const fx = symbol.endsWith('=X');
+  const now = Date.now() / 1000;
+  const day = Math.floor((now + 8 * 3600) / 86400) * 86400 - 8 * 3600;
+  const [start, end] = tw ? [day + 3600, day + 5.5 * 3600] : [day + 13.5 * 3600, day + 20 * 3600];
+  return {
+    symbol, currency: tw || fx ? 'TWD' : 'USD', instrumentType: fx ? 'CURRENCY' : symbol.includes('-USD') ? 'CRYPTOCURRENCY' : /^(00|VOO|VT|QQQ)/.test(symbol) ? 'ETF' : 'EQUITY',
+    exchangeName: tw ? 'TAI' : 'NMS', fullExchangeName: tw ? 'Taiwan' : 'NasdaqGS', exchangeTimezoneName: tw ? 'Asia/Taipei' : 'America/New_York',
+    regularMarketPrice: closes.at(-1), chartPreviousClose: closes.at(-2) ?? closes.at(-1), previousClose: closes.at(-2) ?? closes.at(-1),
+    regularMarketDayHigh: Math.max(...closes.slice(-8)), regularMarketDayLow: Math.min(...closes.slice(-8)), fiftyTwoWeekHigh: closes.at(-1) * 1.25, fiftyTwoWeekLow: closes.at(-1) * 0.7,
+    regularMarketVolume: 12_345_678, regularMarketTime: Math.floor(now), longName: symbol, shortName: symbol,
+    currentTradingPeriod: { regular: { start, end } }
+  };
+}
+function fakeYahooAnswer(url) {
+  const u = new URL(url);
+  if (u.pathname.includes('/v7/finance/spark')) {
+    const result = (u.searchParams.get('symbols') || '').split(',').filter(Boolean).map(symbol => {
+      const { closes, stamps } = fakeSeries(symbol, 60, 300);
+      return { symbol, response: [{ meta: fakeMeta(symbol, closes), timestamp: stamps, indicators: { quote: [{ close: closes }] } }] };
+    });
+    return { status: 200, body: JSON.stringify({ spark: { result } }) };
+  }
+  if (u.pathname.includes('/v8/finance/chart/')) {
+    const symbol = decodeURIComponent(u.pathname.split('/').pop());
+    const range = u.searchParams.get('range') || '1d';
+    const [n, step] = { '1d': [78, 300], '5d': [120, 1800], '1mo': [22, 86400], '6mo': [126, 86400], ytd: [190, 86400], '1y': [250, 86400], '2y': [500, 86400], '5y': [260, 7 * 86400], max: [300, 30 * 86400] }[range] || [250, 86400];
+    const { closes, stamps } = fakeSeries(symbol, n, step);
+    return { status: 200, body: JSON.stringify({ chart: { result: [{ meta: fakeMeta(symbol, closes), timestamp: stamps, indicators: { quote: [{ close: closes, open: closes, high: closes.map(c => c * 1.004), low: closes.map(c => c * 0.996), volume: closes.map(() => 1e6) }], adjclose: [{ adjclose: closes }] }, events: {} }], error: null } }) };
+  }
+  return { status: 404, body: '' };
+}
 const upstream = url => {
+  if (fakeYahoo && url.includes('finance.yahoo.com')) return Promise.resolve(fakeYahooAnswer(url));
   const fixture = fixtures.find(([text]) => url.includes(text));
   if (fixture) return readFile(fixture[1], 'utf8').then(body => ({ status: 200, body }));
   // Asian baseball: gathered here by the Worker's own module (asia-baseball.js).
