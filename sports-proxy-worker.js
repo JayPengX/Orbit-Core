@@ -115,9 +115,6 @@ async function isRateLimited(env, ip, limit) {
 
 // ==== /sports-proxy - CORS passthrough for public sports data ==============
 const ELTA_HOST = 'piceltaott-elta.cdn.hinet.net';
-// F1's sister series' own sites (the same platform as formula1.com): their
-// season calendar and each weekend's sessions, read from the page's data.
-const FOM_HOSTS = ['www.fiaformula2.com', 'www.fiaformula3.com'];
 // formula1.com's driver and team pages: the official season, career and
 // profile figures (only /en/drivers/<slug> and /en/teams/<slug>, trimmed).
 const F1_HOST = 'www.formula1.com';
@@ -148,9 +145,6 @@ const SPORTS_PROXY_ALLOWED_HOSTS = [
   // ELTA's (愛爾達) sports schedule: which game each of its channels carries,
   // for Fixtures' "where to watch" (only the one list, always trimmed).
   ELTA_HOST,
-  // F2 and F3 (on ELTA.tv in Taiwan): only /en/racing/<year>
-  // pages, always trimmed (trimFom).
-  ...FOM_HOSTS,
   F1_HOST,
   // Not a real host: Asian baseball's schedules and scores, gathered by this
   // Worker from the leagues' own sites (asia-baseball.js).
@@ -279,8 +273,6 @@ function cachePolicyFor(url) {
     case 'clients5.google.com':
       return CACHE_TRANSLATE;
     case ELTA_HOST:
-    case 'www.fiaformula2.com':
-    case 'www.fiaformula3.com':
     case F1_HOST:
       return CACHE_STANDINGS;
     case ASIA_HOST:
@@ -335,12 +327,8 @@ function trimKambi(data) {
 // ELTA's schedule, a small fraction of it: each live program's day, start
 // and end (Unix seconds), channel, league (ELTA's English name) and title.
 const TRIM_ELTA = 'elta';
-// An F2 / F3 / F1 Academy racing page as JSON: the season's rounds
-// ({ meetings: [{ key, url, place, name, round, dates, status }] }) or one
-// weekend's sessions ({ sessions: [{ name, short, type, start (UTC ISO),
-// end, state }] }), from the data the page carries (Next.js's pushes).
-const TRIM_FOM = 'fom';
-function fomText(html) {
+// The text a Next.js page carries in its pushes (formula1.com's pages).
+function nextText(html) {
   let out = '';
   for (const m of String(html || '').matchAll(/self\.__next_f\.push\(\[1,"((?:[^"\\]|\\.)*)"\]\)/g)) {
     try {
@@ -349,63 +337,6 @@ function fomText(html) {
   }
   return out;
 }
-// The JSON array or object starting at text[i] ('[' or '{'), parsed.
-function jsonAt(text, i) {
-  const open = text[i];
-  const close = open === '[' ? ']' : '}';
-  let depth = 0;
-  let inString = false;
-  for (let k = i; k < text.length; k++) {
-    const c = text[k];
-    if (inString) {
-      if (c === '\\') k++;
-      else if (c === '"') inString = false;
-    } else if (c === '"') inString = true;
-    else if (c === open) depth++;
-    else if (c === close && --depth === 0) {
-      try {
-        return JSON.parse(text.slice(i, k + 1));
-      } catch {
-        return null;
-      }
-    }
-  }
-  return null;
-}
-const utcOf = (local, offset) => {
-  const t = Date.parse(`${local}${/^[+-]\d\d:\d\d$/.test(offset || '') ? offset : 'Z'}`);
-  return Number.isFinite(t) ? new Date(t).toISOString() : null;
-};
-export function trimFom(html, path = '', host = '') {
-  const text = fomText(html);
-  const at = text.indexOf('"meetingSessions":');
-  if (at >= 0) {
-    const list = jsonAt(text, text.indexOf('[', at)) || [];
-    return {
-      sessions: list.map(x => ({ name: x.description || x.session || '', short: x.shortName || '', type: x.sessionType || '', start: utcOf(x.startTime, x.gmtOffset), end: utcOf(x.endTime, x.gmtOffset), state: x.state || x.sessionStatus || '' })).filter(x => x.start)
-    };
-  }
-  const meetings = [];
-  const seen = new Set();
-  for (const m of text.matchAll(/\{"url":"(\/en\/racing\/20\d\d\/[a-z-]+)"[^{}]*?"meetingKey":"(\d+)"/g)) {
-    const o = jsonAt(text, m.index) || {};
-    if (seen.has(m[2]) || o.isTestEvent) continue;
-    seen.add(m[2]);
-    meetings.push({ key: m[2], url: m[1], place: o.meetingLocation || '', name: o.meetingName || '', title: o.text || '', round: Number(/\d+/.exec(o.roundText || '')?.[0]) || null, dates: o.startAndEndDateForF1RD || '', status: o.status || '' });
-  }
-  // The rest from the page's cards: ROUND n, its dates, its link.
-  const page = String(html || '');
-  for (const m of page.matchAll(/>ROUND (\d+)<\/span>/g)) {
-    const card = page.slice(m.index, m.index + 6000);
-    const url = /href="(\/en\/racing\/20\d\d\/[a-z-]+)"/.exec(card)?.[1];
-    if (!url || meetings.some(x => x.url === url)) continue;
-    const dates = /<span class="werwfW_upper">([^<]+)<\/span>/.exec(card)?.[1] || /_date">([^<]+)</.exec(card)?.[1] || '';
-    const place = new RegExp(`href="${url.replace(/[/-]/g, '\\$&')}"[^>]*>([^<]+)<`).exec(card)?.[1] || url.split('/').pop();
-    meetings.push({ key: '', url, place, name: '', title: '', round: Number(m[1]), dates: dates.toUpperCase(), status: '' });
-  }
-  meetings.sort((a, b) => (a.round || 0) - (b.round || 0));
-  return { meetings };
-}
 
 // A formula1.com driver or team page's figures, as the page shows them: its
 // grids of label and value, in order ({ grids: [[[label, value], …], …] }),
@@ -413,7 +344,7 @@ export function trimFom(html, path = '', host = '') {
 // the career's, the biography or the team's profile.
 const TRIM_F1PAGE = 'f1page';
 export function trimF1Page(html) {
-  const text = fomText(html);
+  const text = nextText(html);
   const grids = [];
   let cur = null;
   for (const m of text.matchAll(/DataGrid-module_dataGrid|"children":"([^"]{1,48})"\}\],\["\$","dd",null,\{"className":"[^"]*","children":"([^"]{0,96})"/g)) {
@@ -544,7 +475,6 @@ async function fetchUpstream(upstreamUrl, trim) {
     if (upstream.status !== 200) return { status: upstream.status, contentType, body: upstream.body };
     let body = await upstream.arrayBuffer();
     if (trim === TRIM_F1PAGE) return { status: 200, contentType: 'application/json', body: JSON.stringify(trimF1Page(new TextDecoder().decode(body))) };
-    if (trim === TRIM_FOM) return { status: 200, contentType: 'application/json', body: JSON.stringify(trimFom(new TextDecoder().decode(body), decodeURIComponent(upstreamUrl.pathname), upstreamUrl.hostname)) };
     if (trim) {
       try {
         const parsed = JSON.parse(new TextDecoder().decode(body));
@@ -575,7 +505,6 @@ function cacheEntry(result, policy) {
 // Which trim (if any) applies to a URL: only the hosts each one is for.
 function trimFor(trimParam, upstreamUrl) {
   if (upstreamUrl.hostname === ELTA_HOST) return TRIM_ELTA;
-  if (FOM_HOSTS.includes(upstreamUrl.hostname)) return TRIM_FOM;
   if (upstreamUrl.hostname === F1_HOST) return TRIM_F1PAGE;
   if (trimParam === TRIM_POLYMARKET_EVENTS && upstreamUrl.hostname === 'gamma-api.polymarket.com' && upstreamUrl.pathname === '/events') return TRIM_POLYMARKET_EVENTS;
   if (trimParam === TRIM_KAMBI_EVENTS && upstreamUrl.hostname === 'eu-offering-api.kambicdn.com') return TRIM_KAMBI_EVENTS;
@@ -588,7 +517,6 @@ function parseTarget(target) {
     if (u.hostname === 'clients5.google.com' && (u.pathname !== '/translate_a/t' || (u.searchParams.get('q') || '').length > 5000)) return null;
     if (u.hostname === ELTA_HOST && u.pathname !== ELTA_PATH) return null;
     if (u.hostname === F1_HOST && !/^\/en\/(drivers|teams)\/[a-z-]+$/.test(u.pathname)) return null;
-    if (FOM_HOSTS.includes(u.hostname) && !/^\/en\/racing\/20\d\d(\/[a-z-]+)?$/.test(u.pathname)) return null;
     return u.protocol === 'https:' && SPORTS_PROXY_ALLOWED_HOSTS.includes(u.hostname) ? u : null;
   } catch {
     return null;
