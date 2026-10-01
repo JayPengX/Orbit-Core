@@ -437,7 +437,7 @@ export function trimF1Page(html) {
   return { grids: grids.filter(g => g.length) };
 }
 
-const onElta = game => Object.values(game?.broadcasters || {}).some(list => Array.isArray(list) && list.some(b => /\bELTA\b/i.test(`${b?.broadcasterDisplay} ${b?.broadcasterAbbreviation}`)));
+const onElta = game => Object.values(game?.broadcasters || {}).some(list => Array.isArray(list) && list.some(b => /elta/i.test(`${b?.broadcasterDisplay} ${b?.broadcasterAbbreviation}`)));
 export function trimNba(data) {
   const games = [];
   for (const day of data?.leagueSchedule?.gameDates || []) {
