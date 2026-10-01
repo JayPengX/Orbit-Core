@@ -19,11 +19,30 @@ edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
   picks: `dayPlan(..., { keep })` adds them on top of the n picks (reason
   `bet`, `bet: true`, the pick on the card via `pickCard`'s `bets`), never
   pushing a pick out, never stopping the fallback or the next-day jump
-  (`ownPicks`). Day chips with open bets show 🎫 (`betDays`). There's no
+  (`ownPicks`). Day chips with bets show 🎫 (`betDays`). There's no
   separate 你的投注 list: `lib/bets.mjs` finds each leg's game by Play's id
   or, for a leg bet in play (`g` 'live'), by Play's league (`sp`) and start
   time; a league the day's read didn't bring is read for it (`loadBets`,
   `slot.betEvents`, only those games used).
+- **Every bet, finished ones and championships** (Fixtures `lib/bets.mjs`,
+  tests/bets.test.mjs; Play's snap.odds now also has `done`, slips settled
+  in the last 8 days with `st`, and futures legs carry `fk` market and `tm`
+  team): `legEvent` finds a game by id or league+start (names compared in
+  any script; two games at once and no name match → no guess), an F1 bet
+  its session (nearest within 3 h), a tennis/fight bet the tournament or
+  card running then. Settled: only what was played shows, with ✓/✗; a
+  settled championship shows nothing. `betsByEvent` keys games by
+  league:id, so one game is one card with every bet on it.
+- Championship picks (`TITLE_MARKETS`, all 18 Play markets): play-offs
+  (`seriesStakes`: game k can decide a best-of-n when someone can reach the
+  wins by then, from the series as it stands; next game exact; title round
+  'title'; AL/NL pennants ignore the World Series), later rounds as if the
+  team gets there (`placeholder` slots, `bracketOf` sides from the
+  standings' group names, `knockedOut` from `playoffRun`), knockouts
+  (`knockoutStakes`, real games only), league tables (`tableStakes`: could
+  end title hopes or settle them) and F1 (`f1Stakes`, 25/43 a weekend, +8/15
+  with a sprint). Loaded on demand by app.js `loadTitleData`; the night
+  rule keeps any event a bet points to (`betOn`).
 - Days other than today read tennis, golf, racing and fight leagues by
   ESPN's dated page (`scoreboard(k, dates)`), not the season's (19-26 MB
   for ATP, WTA, PGA: it hung the page). `sportDays` still reads seasons.
