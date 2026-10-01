@@ -308,10 +308,6 @@ body {
   }
 }
 
-/* ---- Logos (logos.mjs logoPicture): a new one fades in once drawn ---- */
-.logo-wrap img { transition: opacity 0.18s ease; }
-.logo-new img { opacity: 0; }
-
 /* ---- Buttons ---- */
 .q-btn {
   display: inline-flex;
