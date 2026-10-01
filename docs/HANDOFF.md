@@ -19,8 +19,14 @@ edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
   picks: `dayPlan(..., { keep })` adds them on top of the n picks (reason
   `bet`, `bet: true`, the pick on the card via `pickCard`'s `bets`), never
   pushing a pick out, never stopping the fallback or the next-day jump
-  (`ownPicks`). 你的投注 keeps only picks whose game isn't in the day's
-  list. Day chips with open bets show 🎫 (`betDays`).
+  (`ownPicks`). Day chips with open bets show 🎫 (`betDays`). There's no
+  separate 你的投注 list: `lib/bets.mjs` finds each leg's game by Play's id
+  or, for a leg bet in play (`g` 'live'), by Play's league (`sp`) and start
+  time; a league the day's read didn't bring is read for it (`loadBets`,
+  `slot.betEvents`, only those games used).
+- Days other than today read tennis, golf, racing and fight leagues by
+  ESPN's dated page (`scoreboard(k, dates)`), not the season's (19-26 MB
+  for ATP, WTA, PGA: it hung the page). `sportDays` still reads seasons.
 
 ## v11: a points catalogue, Plus perks reviewed, loans counted once (pushed to `main`)
 
