@@ -23,8 +23,8 @@ const BOOT = { 'Quadra-Securities': 'Quadra-Securities/public/boot.js', 'Quadra-
 // Pictures from other sites kept on the device (sw-images.js, imported by
 // the app's service worker), for the apps that show logos and photos.
 const IMAGES = { 'Quadra-Securities': 'Quadra-Securities/public/sw-images.js', 'Quadra-Play': 'Quadra-Play/public/sw-images.js', 'Quadra-Fixtures': 'Quadra-Fixtures/public/sw-images.js', 'Quadra-Hub': 'Quadra-Hub/public/sw-images.js' };
-// People's studio headshots (photos.mjs), for Fixtures.
-const PHOTOS = { 'Quadra-Fixtures': 'Quadra-Fixtures/public/lib/photos.mjs' };
+// People's studio headshots (photos.mjs), for Fixtures and Play's players.
+const PHOTOS = { 'Quadra-Fixtures': 'Quadra-Fixtures/public/lib/photos.mjs', 'Quadra-Play': 'Quadra-Play/public/lib/photos.mjs' };
 // Teams in Chinese (names.mjs), for the same two.
 const NAMES = { 'Quadra-Play': 'Quadra-Play/public/lib/names.mjs', 'Quadra-Fixtures': 'Quadra-Fixtures/public/lib/names.mjs' };
 for (const [js, css] of TARGETS) {

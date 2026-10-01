@@ -36,6 +36,15 @@ edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
   and no contests void; tennis game handicap / total games / first set / set
   score). The owner asked for them back after the purge; Fixtures still shows
   only what Taiwan can watch.
+- **The model fills every gap:** players' picks for every regular of both
+  teams (lib/players.mjs reads ESPN's rosters, through the proxy's
+  `espn-roster` trim, and each league's season list, `espn-athletes`, 1,000
+  a page; last season's added at half weight while this one is young), priced
+  by lib/propmodel.mjs at MODEL_CUT (1.25), Kambi's own pick winning where
+  both exist; ESPN headshots on every player (kit photos.mjs now synced to
+  Play too). Soccer's draw no bet and corners, tennis's first set, set score,
+  game handicap and total games (lib/tennis.mjs, from the winner's price) when
+  Kambi has none. House-priced games sell every market again (capped ticket).
 - **Live:** Kambi's in-play lists for every ESPN league on now
   (`attachKambiLive`): winner (soccer with its draw), main total and
   handicap replace the model's; an open live game reads its own markets

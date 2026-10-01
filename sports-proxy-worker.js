@@ -332,7 +332,7 @@ function trimKambi(data) {
 // player market): each offer's label, kind and outcomes (who, line, price),
 // about a fifth of Kambi's record.
 const TRIM_KAMBI_OFFERS = 'kambi-offers';
-function trimKambiOffers(data) {
+export function trimKambiOffers(data) {
   if (!data || typeof data !== 'object') return data;
   const offers = Array.isArray(data.betOffers)
     ? data.betOffers.map(o => ({
@@ -347,6 +347,45 @@ function trimKambiOffers(data) {
     : undefined;
   const events = Array.isArray(data.events) ? data.events.map(e => ({ id: e.id, homeName: e.homeName, awayName: e.awayName, start: e.start, state: e.state })) : undefined;
   return { betOffers: offers, events };
+}
+
+// Opt-in (`&trim=espn-roster`) for a team's roster (Play's players): each
+// player's id, name, position, headshot and injury, and (soccer) the
+// season's numbers, in ESPN's own shape (grouped by position or not).
+const TRIM_ESPN_ROSTER = 'espn-roster';
+export function trimEspnRoster(data) {
+  if (!data || typeof data !== 'object' || !Array.isArray(data.athletes)) return data;
+  const player = a =>
+    a && {
+      id: a.id,
+      displayName: a.displayName,
+      jersey: a.jersey,
+      position: a.position ? { abbreviation: a.position.abbreviation } : undefined,
+      headshot: a.headshot?.href ? { href: a.headshot.href } : undefined,
+      injuries: Array.isArray(a.injuries) && a.injuries.length ? a.injuries.slice(0, 1).map(i => ({ status: i.status })) : undefined,
+      statistics: a.statistics?.splits?.categories
+        ? { splits: { categories: a.statistics.splits.categories.map(c => ({ name: c.name, stats: (c.stats || []).map(x => ({ name: x.name, value: x.value })) })) } }
+        : undefined
+    };
+  const athletes = data.athletes.map(x => (Array.isArray(x?.items) ? { position: x.position, items: x.items.map(player) } : player(x)));
+  return { team: data.team ? { id: data.team.id, displayName: data.team.displayName } : undefined, athletes };
+}
+
+// Opt-in (`&trim=espn-athletes`) for a league's players' season numbers
+// (statistics/byathlete): each player's id, name, team and the numbers, the
+// category names once. A league's whole list falls from ~5 MB to ~150 KB.
+const TRIM_ESPN_ATHLETES = 'espn-athletes';
+export function trimEspnAthletes(data) {
+  if (!data || typeof data !== 'object' || !Array.isArray(data.athletes)) return data;
+  return {
+    pagination: data.pagination ? { count: data.pagination.count, pages: data.pagination.pages, page: data.pagination.page } : undefined,
+    requestedSeason: data.requestedSeason ? { year: data.requestedSeason.year, displayName: data.requestedSeason.displayName, type: { name: data.requestedSeason.type?.name } } : undefined,
+    categories: (data.categories || []).map(c => ({ name: c.name, names: c.names })),
+    athletes: data.athletes.map(x => ({
+      athlete: { id: x.athlete?.id, displayName: x.athlete?.displayName, teamId: x.athlete?.teamId, position: x.athlete?.position ? { abbreviation: x.athlete.position.abbreviation } : undefined },
+      categories: (x.categories || []).map(c => ({ name: c.name, values: c.values }))
+    }))
+  };
 }
 
 // ELTA's schedule, a small fraction of it: each live program's day, start
@@ -503,7 +542,7 @@ async function fetchUpstream(upstreamUrl, trim) {
     if (trim) {
       try {
         const parsed = JSON.parse(new TextDecoder().decode(body));
-        body = JSON.stringify(trim === TRIM_KAMBI_EVENTS ? trimKambi(parsed) : trim === TRIM_KAMBI_OFFERS ? trimKambiOffers(parsed) : trim === TRIM_ELTA ? trimElta(parsed) : trimPolymarketEvents(parsed));
+        body = JSON.stringify(trim === TRIM_KAMBI_EVENTS ? trimKambi(parsed) : trim === TRIM_KAMBI_OFFERS ? trimKambiOffers(parsed) : trim === TRIM_ESPN_ROSTER ? trimEspnRoster(parsed) : trim === TRIM_ESPN_ATHLETES ? trimEspnAthletes(parsed) : trim === TRIM_ELTA ? trimElta(parsed) : trimPolymarketEvents(parsed));
       } catch {
         // Not the JSON shape expected - pass it through untouched.
       }
@@ -533,6 +572,8 @@ function trimFor(trimParam, upstreamUrl) {
   if (upstreamUrl.hostname === F1_HOST) return TRIM_F1PAGE;
   if (trimParam === TRIM_POLYMARKET_EVENTS && upstreamUrl.hostname === 'gamma-api.polymarket.com' && upstreamUrl.pathname === '/events') return TRIM_POLYMARKET_EVENTS;
   if (trimParam === TRIM_KAMBI_EVENTS && upstreamUrl.hostname === 'eu-offering-api.kambicdn.com') return TRIM_KAMBI_EVENTS;
+  if (trimParam === TRIM_ESPN_ROSTER && upstreamUrl.hostname === 'site.api.espn.com' && upstreamUrl.pathname.endsWith('/roster')) return TRIM_ESPN_ROSTER;
+  if (trimParam === TRIM_ESPN_ATHLETES && upstreamUrl.hostname === 'site.api.espn.com' && upstreamUrl.pathname.endsWith('/statistics/byathlete')) return TRIM_ESPN_ATHLETES;
   if (trimParam === TRIM_KAMBI_OFFERS && upstreamUrl.hostname === 'eu-offering-api.kambicdn.com' && upstreamUrl.pathname.includes('/betoffer/')) return TRIM_KAMBI_OFFERS;
   return null;
 }
