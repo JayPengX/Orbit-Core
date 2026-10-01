@@ -119,14 +119,12 @@ const ELTA_HOST = 'piceltaott-elta.cdn.hinet.net';
 // nba.com/schedule?region=32 reads): only that file, always trimmed (trimNba).
 const NBA_HOST = 'cdn.nba.com';
 const NBA_PATH = '/static/json/staticData/scheduleLeagueV2_32.json';
-const YOUTUBE_HOST = 'www.youtube.com';
 // F1's sister series' own sites (the same platform as formula1.com): their
 // season calendar and each weekend's sessions, read from the page's data.
 const FOM_HOSTS = ['www.fiaformula2.com', 'www.fiaformula3.com'];
 // formula1.com's driver and team pages: the official season, career and
 // profile figures (only /en/drivers/<slug> and /en/teams/<slug>, trimmed).
 const F1_HOST = 'www.formula1.com';
-const YOUTUBE_FEED = '/feeds/videos.xml';
 const SPORTS_PROXY_FETCH_USER_AGENT = 'Quadra-Fixtures-Bot/1.0 (+https://github.com/JayPengX/Quadra-Fixtures)';
 const SPORTS_PROXY_ALLOWED_HOSTS = [
   'site.api.espn.com',
@@ -156,10 +154,6 @@ const SPORTS_PROXY_ALLOWED_HOSTS = [
   ELTA_HOST,
   // NBA.com's Taiwan schedule: which NBA games ELTA has, the whole season.
   NBA_HOST,
-  // A YouTube channel's feed of its latest videos (only /feeds/videos.xml,
-  // always trimmed to id, title and time): Fixtures names a game as free on
-  // YouTube only when the league's channel has a video of that very game.
-  YOUTUBE_HOST,
   // F2 and F3 (on ELTA.tv in Taiwan): only /en/racing/<year>
   // pages, always trimmed (trimFom).
   ...FOM_HOSTS,
@@ -292,7 +286,6 @@ function cachePolicyFor(url) {
       return CACHE_TRANSLATE;
     case ELTA_HOST:
     case NBA_HOST:
-    case YOUTUBE_HOST:
     case 'www.fiaformula2.com':
     case 'www.fiaformula3.com':
     case F1_HOST:
@@ -444,20 +437,6 @@ export function trimF1Page(html) {
   return { grids: grids.filter(g => g.length) };
 }
 
-// A channel's feed (Atom XML) as { videos: [{ id, t: title, p: published }] }.
-const TRIM_YOUTUBE = 'youtube';
-const xmlText = s => String(s || '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
-export function trimYoutube(xml) {
-  const videos = [];
-  for (const m of String(xml || '').matchAll(/<entry>([\s\S]*?)<\/entry>/g)) {
-    const e = m[1];
-    const id = /<yt:videoId>([^<]+)<\/yt:videoId>/.exec(e)?.[1];
-    const t = /<title>([^<]*)<\/title>/.exec(e)?.[1];
-    const p = /<published>([^<]+)<\/published>/.exec(e)?.[1];
-    if (id && t) videos.push({ id, t: xmlText(t), p: p || '' });
-  }
-  return { videos };
-}
 const onElta = game => Object.values(game?.broadcasters || {}).some(list => Array.isArray(list) && list.some(b => /\bELTA\b/i.test(`${b?.broadcasterDisplay} ${b?.broadcasterAbbreviation}`)));
 export function trimNba(data) {
   const games = [];
@@ -589,7 +568,6 @@ async function fetchUpstream(upstreamUrl, trim) {
     let body = await upstream.arrayBuffer();
     if (trim === TRIM_F1PAGE) return { status: 200, contentType: 'application/json', body: JSON.stringify(trimF1Page(new TextDecoder().decode(body))) };
     if (trim === TRIM_FOM) return { status: 200, contentType: 'application/json', body: JSON.stringify(trimFom(new TextDecoder().decode(body), decodeURIComponent(upstreamUrl.pathname), upstreamUrl.hostname)) };
-    if (trim === TRIM_YOUTUBE) return { status: 200, contentType: 'application/json', body: JSON.stringify(trimYoutube(new TextDecoder().decode(body))) };
     if (trim) {
       try {
         const parsed = JSON.parse(new TextDecoder().decode(body));
@@ -621,7 +599,6 @@ function cacheEntry(result, policy) {
 function trimFor(trimParam, upstreamUrl) {
   if (upstreamUrl.hostname === ELTA_HOST) return TRIM_ELTA;
   if (upstreamUrl.hostname === NBA_HOST) return TRIM_NBA;
-  if (upstreamUrl.hostname === YOUTUBE_HOST) return TRIM_YOUTUBE;
   if (FOM_HOSTS.includes(upstreamUrl.hostname)) return TRIM_FOM;
   if (upstreamUrl.hostname === F1_HOST) return TRIM_F1PAGE;
   if (trimParam === TRIM_POLYMARKET_EVENTS && upstreamUrl.hostname === 'gamma-api.polymarket.com' && upstreamUrl.pathname === '/events') return TRIM_POLYMARKET_EVENTS;
@@ -637,7 +614,6 @@ function parseTarget(target) {
     if (u.hostname === NBA_HOST && u.pathname !== NBA_PATH) return null;
     if (u.hostname === F1_HOST && !/^\/en\/(drivers|teams)\/[a-z-]+$/.test(u.pathname)) return null;
     if (FOM_HOSTS.includes(u.hostname) && !/^\/en\/racing\/20\d\d(\/[a-z-]+)?$/.test(u.pathname)) return null;
-    if (u.hostname === YOUTUBE_HOST && (u.pathname !== YOUTUBE_FEED || !/^UC[\w-]{22}$/.test(u.searchParams.get('channel_id') || ''))) return null;
     return u.protocol === 'https:' && SPORTS_PROXY_ALLOWED_HOSTS.includes(u.hostname) ? u : null;
   } catch {
     return null;

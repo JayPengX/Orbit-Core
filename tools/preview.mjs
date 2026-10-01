@@ -41,7 +41,7 @@ import { join, extname, resolve } from 'node:path';
 import { execFile } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { ASIA_HOST, asiaBaseballResponse } from '../asia-baseball.js';
-import { trimFom, trimF1Page, trimYoutube } from '../sports-proxy-worker.js';
+import { trimFom, trimF1Page } from '../sports-proxy-worker.js';
 
 const require = createRequire(import.meta.url);
 let chromium;
@@ -206,11 +206,11 @@ function fakeYahooAnswer(url) {
   return { status: 404, body: '' };
 }
 // Pages the Worker answers trimmed to JSON (F1's and its sister series'
-// sites, YouTube's feeds): trimmed here the same way.
+// sites): trimmed here the same way.
 const pageTrim = (url, r) => {
   if (r.status !== 200) return r;
   const host = new URL(url).hostname;
-  const trim = host === 'www.formula1.com' ? trimF1Page : /^www\.fiaformula[23]\.com$/.test(host) ? trimFom : host === 'www.youtube.com' ? trimYoutube : null;
+  const trim = host === 'www.formula1.com' ? trimF1Page : /^www\.fiaformula[23]\.com$/.test(host) ? trimFom : null;
   return trim ? { status: 200, body: JSON.stringify(trim(r.body, decodeURIComponent(new URL(url).pathname), host)) } : r;
 };
 const upstream = url => {
