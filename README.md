@@ -10,7 +10,7 @@ saved.
 | Quadra Securities | [Quadra-Securities](https://github.com/JayPengX/Quadra-Securities) | https://jaypengx.github.io/Quadra-Securities/ |
 | Quadra Play | [Quadra-Play](https://github.com/JayPengX/Quadra-Play) | https://jaypengx.github.io/Quadra-Play/ |
 | Quadra Fixtures | [Quadra-Fixtures](https://github.com/JayPengX/Quadra-Fixtures) | https://jaypengx.github.io/Quadra-Fixtures/ |
-| Quadra Hub | [Quadra-Rewards](https://github.com/JayPengX/Quadra-Rewards) | https://jaypengx.github.io/Quadra-Rewards/ |
+| Quadra Hub | [Quadra-Hub](https://github.com/JayPengX/Quadra-Hub) | https://jaypengx.github.io/Quadra-Hub/ |
 | Orbit Class | [Orbit-Class](https://github.com/JayPengX/Orbit-Class) | https://jaypengx.github.io/Orbit-Class/ |
 
 ## Table of Contents

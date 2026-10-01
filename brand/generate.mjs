@@ -1,6 +1,6 @@
 // Writes Quadra's icons and link preview cards into the app repos, checked
 // out next to this one (../Quadra-Securities, ../Quadra-Play,
-// ../Quadra-Fixtures, ../Quadra-Rewards (Quadra Hub), ../Orbit-Class). Needs
+// ../Quadra-Fixtures, ../Quadra-Hub, ../Orbit-Class). Needs
 // Playwright's Chromium:
 //   node brand/generate.mjs
 import { writeFile, mkdir } from 'node:fs/promises';
@@ -16,7 +16,7 @@ const OUT = {
   stock: { dir: 'Quadra-Securities/public', icons: { 'icons/apple-touch-icon.png': 180, 'icons/icon-192.png': 192, 'icons/icon-512.png': 512 }, og: 'og-image.png', ogSquare: 'og-image-square.png' },
   odds: { dir: 'Quadra-Play/public', icons: { 'icons/apple-touch-icon.png': 180, 'icons/icon-192.png': 192, 'icons/icon-512.png': 512 }, og: 'og-image.jpg', ogSquare: 'og-image-square.jpg' },
   match: { dir: 'Quadra-Fixtures/public', icons: { 'icons/apple-touch-icon.png': 180, 'icons/icon-192.png': 192, 'icons/icon-512.png': 512 }, og: 'og-image.jpg', ogSquare: 'og-image-square.jpg' },
-  vocab: { dir: 'Quadra-Rewards/public', icons: { 'icons/apple-touch-icon.png': 180, 'icons/icon-192.png': 192, 'icons/icon-512.png': 512 }, og: 'og-image.jpg', ogSquare: 'og-image-square.jpg' },
+  vocab: { dir: 'Quadra-Hub/public', icons: { 'icons/apple-touch-icon.png': 180, 'icons/icon-192.png': 192, 'icons/icon-512.png': 512 }, og: 'og-image.jpg', ogSquare: 'og-image-square.jpg' },
   orbit: { dir: 'Orbit-Class/public', icons: { 'icons/apple-touch-icon.png': 180, 'icons/icon-192.png': 192, 'icons/icon-512.png': 512, 'icons/favicon-32.png': 32, 'icons/favicon-16.png': 16 }, og: 'og-card.jpg', ogSquare: 'og-card-square.jpg' }
 };
 

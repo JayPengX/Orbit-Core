@@ -18,7 +18,7 @@
 //                          [--fake-yahoo]  (made-up Yahoo prices: spark and chart answers
 //                          for any symbol, for when Yahoo answers 429)
 //
-//   app   fixtures | play | securities | rewards | orbit (or the repo's folder name)
+//   app   fixtures | play | securities | hub | orbit (or the repo's folder name)
 //   hash  the page's #hash to open (a tab), one screenshot each; none: the start
 //
 // What it does:
@@ -115,7 +115,7 @@ const dark = flag('dark');
 const ROOT = resolve(opt('root', new URL('../../', import.meta.url).pathname));
 const [appArg, ...hashes] = args;
 
-const APPS = { fixtures: ['Quadra-Fixtures', 'match'], play: ['Quadra-Play', 'odds'], securities: ['Quadra-Securities', 'stock'], rewards: ['Quadra-Rewards', 'vocab'], orbit: ['Orbit-Class', 'orbit'] };
+const APPS = { fixtures: ['Quadra-Fixtures', 'match'], play: ['Quadra-Play', 'odds'], securities: ['Quadra-Securities', 'stock'], hub: ['Quadra-Hub', 'vocab'], orbit: ['Orbit-Class', 'orbit'] };
 const key = Object.keys(APPS).find(k => k === appArg || APPS[k][0].toLowerCase() === String(appArg).toLowerCase());
 if (!key) throw new Error(`usage: node tools/preview.mjs <${Object.keys(APPS).join('|')}> [hash…]`);
 const [repo, appId] = APPS[key];
@@ -238,7 +238,6 @@ const wallet = {
   entries: [
     { id: 'eco:start', t: now - 120 * 86_400_000, app: 'eco', kind: 'start', amount: 110000 },
     { id: 'eco:pay:1', t: now - 20 * 86_400_000, app: 'eco', kind: 'pay', amount: 7000 },
-    { id: 'vocab:r1', t: now - 2 * 86_400_000, app: 'vocab', kind: 'reward', amount: 240 },
     { id: 'odds:s1', t: now - 86_400_000, app: 'odds', kind: 'stake', amount: -500 },
     ...extraEntries
   ],

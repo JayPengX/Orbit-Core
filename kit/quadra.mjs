@@ -30,7 +30,7 @@ export const BRAND = { name: 'Quadra', pass: 'Quadra Pass' };
 export const APPS = {
   stock: { name: 'Quadra Securities', short: 'Securities', path: '/Quadra-Securities/', color: '#0d9488', role: { zh: '投資與理財', en: 'Invest and grow' } },
   odds: { name: 'Quadra Play', short: 'Play', path: '/Quadra-Play/', color: '#2563eb', role: { zh: '運彩與彩券', en: 'Sports bets and lottery' } },
-  vocab: { name: 'Quadra Hub', short: 'Hub', path: '/Quadra-Rewards/', color: '#7c3aed', related: true, role: { zh: '單字、帳戶與錢的真相', en: 'Words, your pass and the truth about money' } },
+  vocab: { name: 'Quadra Hub', short: 'Hub', path: '/Quadra-Hub/', color: '#7c3aed', related: true, role: { zh: '單字、帳戶與錢的真相', en: 'Words, your pass and the truth about money' } },
   match: { name: 'Quadra Fixtures', short: 'Fixtures', path: '/Quadra-Fixtures/', color: '#ea580c', related: true, role: { zh: '賽程與比分', en: 'Scores and schedules' } },
   orbit: { name: 'Orbit Class', short: 'Orbit Class', tile: 'Orbit', path: '/Orbit-Class/', color: '#0ea5e9', related: true, role: { zh: '課表', en: 'Class schedule' } }
 };

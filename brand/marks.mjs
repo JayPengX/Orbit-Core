@@ -6,7 +6,7 @@ export const APPS = {
   stock: { en: 'Quadra Securities', short: 'Securities', tag: 'Invest in markets worldwide with play money', tagZh: '全球股市模擬投資：真實報價、換匯與融資', from: '#2dd4bf', to: '#0f3d5c', ink: '#0f766e', tile: 0, repo: 'Quadra-Securities' },
   odds: { en: 'Quadra Play', short: 'Play', tag: 'Sports bets and the lottery, with the maths shown', tagZh: '運彩與彩券：每一注的數學都看得見', from: '#60a5fa', to: '#1e3a8a', ink: '#1d4ed8', tile: 1, repo: 'Quadra-Play' },
   match: { en: 'Quadra Fixtures', short: 'Fixtures', tag: 'Every sport, every match, every stat', tagZh: '所有運動的賽程、比分與數據', from: '#fdba74', to: '#9a3412', ink: '#c2410c', tile: 2, repo: 'Quadra-Fixtures' },
-  vocab: { en: 'Quadra Hub', short: 'Hub', tag: 'Learn words, manage your pass, see where the money goes', tagZh: '背單字、管理帳戶，看清楚錢怎麼流', from: '#c4b5fd', to: '#3b0764', ink: '#6d28d9', tile: 3, repo: 'Quadra-Rewards' },
+  vocab: { en: 'Quadra Hub', short: 'Hub', tag: 'Learn words, manage your pass, see where the money goes', tagZh: '背單字、管理帳戶，看清楚錢怎麼流', from: '#c4b5fd', to: '#3b0764', ink: '#6d28d9', tile: 3, repo: 'Quadra-Hub' },
   orbit: { en: 'Orbit Class', short: 'Orbit Class', tag: 'Your class schedule, live, with Quadra', tagZh: '即時課表，加入 Quadra', from: '#7dd3fc', to: '#0c4a6e', ink: '#0369a1', repo: 'Orbit-Class', related: true }
 };
 
