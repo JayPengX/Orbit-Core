@@ -168,7 +168,33 @@ export function paydayEntries(wallet, now) {
   out.push(...plusBonusEntries({ ...wallet, entries: [...(wallet.entries || []), ...out] }, now));
   // VIP cashback on the months before this one, and the welcome bonus bet.
   out.push(...vipEntries(wallet, now), ...welcomeEntries(wallet, now));
+  // Level rewards for wealth levels reached (after the pay that may reach one).
+  out.push(...rankEntries({ ...wallet, entries: [...(wallet.entries || []), ...out] }, now));
   return out;
+}
+
+// ---- 財富等級: wealth levels and their one-time rewards -----------------------------
+//
+// What the account is worth (the pool and Securities' holdings) puts it on a
+// level; the first time it reaches one, the economy pays that level's reward
+// once (`eco:rank:<id>`, kind 'rank'): the third kind of money the system
+// itself gives, with the opening money and the monthly pay. Falling back
+// keeps what was paid; reaching a level again pays nothing. The same table as
+// the kit's WEALTH_RANKS.
+export const RANKS = [
+  { id: 'start', min: 0, reward: 0 },
+  { id: 'saver', min: 50_000, reward: 1_000 },
+  { id: 'steady', min: 100_000, reward: 2_000 },
+  { id: 'comfort', min: 250_000, reward: 3_000 },
+  { id: 'wealthy', min: 500_000, reward: 5_000 },
+  { id: 'rich', min: 1_000_000, reward: 8_000 },
+  { id: 'multi', min: 5_000_000, reward: 15_000 },
+  { id: 'tycoon', min: 20_000_000, reward: 30_000 }
+];
+export function rankEntries(wallet, now) {
+  const have = new Set((wallet?.entries || []).map(e => e.id));
+  const worth = worthOf(wallet);
+  return RANKS.filter(r => r.reward > 0 && worth >= r.min && !have.has(`eco:rank:${r.id}`)).map(r => ({ id: `eco:rank:${r.id}`, t: now, app: 'eco', kind: 'rank', amount: r.reward, note: r.id }));
 }
 
 // ---- VIP cashback and the welcome offer ---------------------------------------------

@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { handleEcoRequest, mergeWallet, poolBalance, cleanPatch, emptyWallet, paydayEntries, payFor, worthOf, PAY_MONTH, REBASE, OVERDRAFT_RATE, plusJoinEntry, plusJoinEntries, plusMember, plusLapsed, plusPointsEntries, REWARDS_XP, plusBonusEntries, bonusBetId, vipEntries, vipStakes, vipTier, welcomeEntries, VIP, tidyWallet, PAY, PLUS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, ECO_APPS } from '../eco.js';
+import { handleEcoRequest, mergeWallet, poolBalance, cleanPatch, emptyWallet, paydayEntries, payFor, worthOf, PAY_MONTH, REBASE, OVERDRAFT_RATE, plusJoinEntry, plusJoinEntries, plusMember, plusLapsed, plusPointsEntries, REWARDS_XP, plusBonusEntries, bonusBetId, vipEntries, vipStakes, vipTier, welcomeEntries, VIP, tidyWallet, PAY, PLUS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, ECO_APPS, rankEntries, RANKS } from '../eco.js';
 import { planClean } from '../eco-admin.js';
 
 function setup() {
@@ -566,4 +566,17 @@ test('points catalogue: a member’s price is the least the Worker takes; a Plus
   assert.deepEqual(now.filter(e => e.kind === 'plus').map(e => e.id), ['eco:plus:2026-11']);
   const later = paydayEntries({ ...member, entries: [...member.entries, ...now] }, nov);
   assert.ok(!later.some(e => e.kind === 'plus'));
+});
+
+test('wealth levels: each level reached pays its reward once, from what the account is worth', () => {
+  const now = Date.UTC(2026, 9, 7, 3);
+  const at = (amount, holdings = 0, extra = []) => ({ entries: [{ id: 'eco:start', amount }, ...extra], snap: { stock: { cash: 0, holdings } } });
+  assert.deepEqual(rankEntries(at(40_000), now), []);
+  // 60,000 in cash and 50,000 in shares: worth 110,000, two levels at once.
+  assert.deepEqual(rankEntries(at(60_000, 50_000), now).map(e => [e.id, e.amount, e.kind]), [['eco:rank:saver', 1_000, 'rank'], ['eco:rank:steady', 2_000, 'rank']]);
+  // Paid already, or fallen back: nothing again.
+  assert.deepEqual(rankEntries(at(120_000, 0, [{ id: 'eco:rank:saver', amount: 1_000 }, { id: 'eco:rank:steady', amount: 2_000 }]), now), []);
+  assert.equal(RANKS.length, 8);
+  // In the payday's entries, after the pay.
+  assert.ok(paydayEntries({ entries: [{ id: 'eco:start', amount: 45_000 }, { id: 'eco:rebase:v3', t: 1, app: 'eco', kind: 'rebase', amount: 0 }] }, now).some(e => e.id === 'eco:rank:saver'));
 });

@@ -70,13 +70,24 @@ Securities
   the USD hero), 資產 (composition bar, sort, compact rows), home (account
   card, logos), and real company logos (FMP images, with misses cached).
   Long explanatory lines were removed.
-- [ ] Ultra realism sweep still to do:
-  - 融資 6-month term with 展延.
-  - 信用帳戶 opening conditions, 融資額度.
-  - 融券 rules and 當沖.
-  - Odd-lot sessions.
-  - Fee rounding.
-  - T+2 settlement everywhere.
+- [x] Taiwan's credit trading (lib/credit.mjs; tests/credit.test.mjs):
+  - 信用帳戶: 3 months open, 10 trades and turnover of half the limit in the
+    last year, proof of means (30%) above NT$500k; tiers 500k-5M, one for
+    融資 and one for 融券. Accounts made before 2026-10-02
+    (`CREDIT_RULES_AT`) count as having one at 500k (or what their turnover
+    qualifies for). The card is in 換匯・融資 › 融資.
+  - 融資 and 融券 run six months (`loanDue`, `shortDue` in replay); 展延
+    (event `extend`) in the last month; past due, `closeOutPlan` sells or
+    buys back (afterPrices).
+  - 融券: 90% deposit and the sale money held (`shortDeposit`,
+    `shortHeld`, counted in assets), 0.08% handling fee, no yearly fee.
+    Other markets' shorts are unchanged (3% fee, 150% cover).
+  - 現股當沖 sold first (`dayShort`): a year open and 10 trades; bought back
+    for the account after the close. Half tax both ways.
+  - After hours: orders 13:30-14:30 match once at 14:30 at the close
+    (`order.after`).
+  - Fees: the commission minimum applies after the discount.
+  - Every trade shows its settlement date.
 
 Play
 - [x] Four tabs (home, 賽事, 彩券, 紀錄); the slip is a sheet
@@ -112,9 +123,10 @@ Fixtures
 - [x] YouTube is named for a game only when the league's channel has that
   game's video (`tvOf` and `ytVideoFor`; channel ids in broadcast.mjs).
 - [x] F2 and F3 (their own calendars and sessions, on ELTA.tv MAX 5-8).
-- [ ] F1 Academy is not done: its site uses an older layout
-  (/Racing-Series/Calendar). GT World Challenge (free, YouTube @GTWorld)
-  is not done either.
+- [x] F1 Academy (the Worker's `trimFomLegacy`: /Racing-Series/Calendar and
+  Results?raceid=n) and GT World Challenge Europe (`trimSro`: /calendar and
+  /event/<id>/<slug>, the timetable's GMT column), both as F2's shape; F1 TV
+  and YouTube (channels in broadcast.mjs).
 - [x] F1 like the official app (lib/f1.mjs; tests/f1.test.mjs):
   - The driver sheet shows the season (position and points), Grand Prix and
     Sprint figures, career and birthplace from formula1.com.
@@ -126,9 +138,10 @@ Fixtures
     profile.
   - A finished race or sprint shows the official result (`f1Field`): team
     (tappable), time or retirement, places gained, fastest lap and points.
-- [ ] History stats for other sports: past seasons, records and past
-  winners, as the official apps show them. ESPN's career stats already show
-  in player sheets (`ov.season`).
+- [x] Past seasons: 排名 has the last five seasons (`standings(league,
+  season)`, a table league's champion on top) and team pages a 歷年戰績
+  card. Not done: past winners of playoff leagues (MLB, NBA…), which ESPN's
+  tables don't say.
 - [x] 追蹤 rewritten (checked on screen, buttons styled). It shows
   followed teams with their last-5 dots, last result and next game (ESPN
   `teamSchedule`), players as cards, then leagues.
@@ -142,18 +155,26 @@ Fixtures
   session tags and the match info rows without icons. The first-run sport
   picker still has its icons (deliberately).
 - [ ] One image source per entity (team logo vs casual picture).
-- [ ] MotoGP standings and rider pages; Formula E results.
+- [x] MotoGP standings (W, podiums, points) and rider pages (`openRider`:
+  profile, career in the class, every season); Formula E results
+  (TheSportsDB `eventresults.php`).
 
 Rewards (after Fixtures; ported games LAST)
 - [x] Games fit the phone, a 遊戲列表 button at the end, one XP rate
   (`roundXp`), and sprite directions fixed.
-- [ ] 財富等級 as the milestone of taking part. There are three sides: the
-  user, Quadra (profit-minded) and "God" (starter money, monthly pay, level
-  rewards).
-- [ ] One points shop (it is spread around now) and more purpose for
-  points.
-- [ ] Home, 單字 and 任務 improved.
-- [ ] 說明 covering every mechanism.
+- [x] 財富等級 by worth (worthOf: the pool and Securities' holdings), each
+  level paying a one-time reward from the system (eco.js `RANKS`,
+  `rankEntries` in the payday's entries, `eco:rank:<id>`; the kit's
+  `WEALTH_RANKS` mirrors it): NT$1,000 to 30,000. 任務 shows the road with
+  the rewards and 錢從哪裡來 (kit `moneySides`: the system gave, Quadra
+  took, your own result). tools/economy.mjs doesn't model the level
+  rewards yet: they're one-time and small next to the pay.
+- [x] One 積分商店 sheet (`openShop(focus)`): the catalogue, items, word
+  packs, avatars and frames; home has one card for it; 單字's unowned
+  packs and 任務's level road open it.
+- [~] Home and 任務 reworked as above; 單字 itself unchanged otherwise.
+- [x] 說明 updated for every new mechanism (credit trading, level rewards,
+  the shop, Fixtures' new pages).
 - [ ] LAST: port open-source games, integrated (Traditional Chinese, the
   round's start and end through Rewards, no foreign links).
   - In place: bridge.js, `portedStage`, and `PORTED_LIST`/`addPorted` (still
