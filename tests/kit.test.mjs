@@ -418,3 +418,27 @@ test('frames: level ones with the level, bought ones with their entry; a repaire
   w.entries.push({ id: `vocab:xs:repair:${dayOf(1)}`, t: now, app: 'vocab', kind: 'redeem', amount: 0, note: '1500' });
   assert.equal(kit.streakOf(w, now), 3);
 });
+
+test('points expire a year after the month they were earned, oldest spent first; the level never drops', () => {
+  const oct = Date.UTC(2026, 9, 10);
+  const nov = Date.UTC(2026, 10, 10);
+  const w = {
+    entries: [
+      { id: 'vocab:a', t: oct, app: 'vocab', kind: 'game', amount: 0, xp: 1_000 },
+      { id: 'vocab:b', t: nov, app: 'vocab', kind: 'game', amount: 0, xp: 500 },
+      { id: 'vocab:xs:card:1', t: nov + 1, app: 'vocab', kind: 'redeem', amount: 0, note: '600' }
+    ]
+  };
+  // The spend came out of October's lot: 400 left there, 500 in November's.
+  assert.equal(kit.xpBalance(w, nov + 2), 900);
+  assert.deepEqual(kit.xpLots(w, nov + 2).map(l => l.amount), [400, 500]);
+  // October 2026's points end with October 2027 (Taipei).
+  const octEnd = Date.UTC(2027, 10, 1) - 8 * 3_600_000;
+  assert.equal(kit.xpBalance(w, octEnd - 1), 900);
+  assert.equal(kit.xpBalance(w, octEnd), 500);
+  assert.deepEqual(kit.xpExpiring(w, octEnd - 10 * 86_400_000), { amount: 400, at: octEnd });
+  assert.equal(kit.xpExpiring(w, nov + 2), null);
+  assert.equal(kit.xpEarned(w), 1_500);
+  // Points from before v7 count from when v7 began.
+  assert.equal(kit.xpBalance({ entries: [{ id: 'vocab:old', t: Date.UTC(2025, 0, 1), app: 'vocab', kind: 'game', amount: 0, xp: 300 }] }, Date.UTC(2027, 8, 1)), 300);
+});

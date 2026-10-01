@@ -7,7 +7,7 @@ edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
 `npx eslint .`).
 
 
-## Ultra realistic, v10: a fixed salary (pushed to `main`)
+## Ultra realistic, v10: a fixed salary, savings, points that expire (pushed to `main`)
 
 - **Pay is fixed** (eco.js `PAY_MONTH`, kit `ECONOMY.monthly`): NT$6,000 on
   the 1st of every Taiwan month for every account, like a salary; back pay
@@ -18,6 +18,35 @@ edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
 - Model (`node tools/economy.mjs`, v10): a regular bettor −NT$1.9k a month,
   an investor +3.9k, a saver +5.4k; 4,000 or 5,000 broke a regular within a
   year.
+- **Securities › 換匯・融資 › 理財** (`lib/savings.mjs` has the terms;
+  account.mjs the events):
+  - **定存:** NT$10,000+, 1/3/6/9/12 months at Bank of Taiwan's posted fixed
+    rates (1.23-1.72%), events `td` and `tdend`. Early closing pays nothing
+    under a month, else 80% of the rate for the longest term held, for the
+    days held. Optional roll-over (principal at the then-posted rate,
+    interest paid out). Matured deposits are closed (dated at maturity) by
+    `matureDeposits` in `afterPrices`. In net worth (`savedTWD`), not in
+    margin assets; they leave the shared cash while locked.
+  - **借券出借:** whole lots (1,000) of settled TW stocks/ETFs not bought on
+    margin; fee 1.2% / 0.6% a year on the value when lent, the broker keeps
+    30%. Events `lend`, `recall` (with `back`, 3 business days on) and
+    `lendpay` (dated `back`, so replay pays it then). Lent shares are out of
+    `available`, so they can't be sold; contracts end by themselves after
+    180 days (`matureLending`).
+  - Interest or a fee over NT$20,000 at once: 10% withheld, 2.11% NHI
+    (`incomeTaxes`).
+  - A default breaks every deposit (bank set-off, early rate) and recalls
+    lent shares (`recallAll`); a missed margin call or liquidation recalls
+    too. The 7% penalty is charged once per overdraft now
+    (`defaultAt >= od.since`), later rounds only sell. Forced-sale plans skip
+    lent shares.
+- **Points expire** (kit `xpLots`, `xpBalance(wallet, now)`, `xpExpiring`):
+  each Taipei month's points at the end of the same month a year later,
+  oldest spent first; points from before v7 count from v7. The level
+  (`xpEarned`) never drops. Rewards' level card and the account sheet warn
+  60 days ahead.
+- One-time notice `quadra.seen.v10` (`v10Notice`) for accounts made before
+  2026-10-02 Taipei.
 ## Slower levels, more for points, confirm before buying (pushed to `main`)
 
 - **融資 as a broker does it** (Securities): no cash loans. A buy can be
