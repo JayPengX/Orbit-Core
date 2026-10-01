@@ -115,6 +115,8 @@ async function isRateLimited(env, ip, limit) {
 
 // ==== /sports-proxy - CORS passthrough for public sports data ==============
 const ELTA_HOST = 'piceltaott-elta.cdn.hinet.net';
+const YOUTUBE_HOST = 'www.youtube.com';
+const YOUTUBE_FEED = '/feeds/videos.xml';
 const SPORTS_PROXY_FETCH_USER_AGENT = 'Quadra-Fixtures-Bot/1.0 (+https://github.com/JayPengX/Quadra-Fixtures)';
 const SPORTS_PROXY_ALLOWED_HOSTS = [
   'site.api.espn.com',
@@ -145,6 +147,10 @@ const SPORTS_PROXY_ALLOWED_HOSTS = [
   // ELTA's (愛爾達) sports schedule: which game each of its channels carries,
   // for Fixtures' "where to watch" (only the one list, always trimmed).
   ELTA_HOST,
+  // A YouTube channel's feed of its latest videos (only /feeds/videos.xml,
+  // always trimmed to id, title and time): Fixtures names a game as free on
+  // YouTube only when the league's channel has a video of that very game.
+  YOUTUBE_HOST,
   // Not a real host: Asian baseball's schedules and scores, gathered by this
   // Worker from the leagues' own sites (asia-baseball.js).
   ASIA_HOST
@@ -272,6 +278,7 @@ function cachePolicyFor(url) {
     case 'clients5.google.com':
       return CACHE_TRANSLATE;
     case ELTA_HOST:
+    case YOUTUBE_HOST:
       return CACHE_STANDINGS;
     case ASIA_HOST:
       return asiaPolicy(url);
@@ -325,6 +332,20 @@ function trimKambi(data) {
 // ELTA's schedule, a small fraction of it: each live program's day, start
 // and end (Unix seconds), channel, league (ELTA's English name) and title.
 const TRIM_ELTA = 'elta';
+// A channel's feed (Atom XML) as { videos: [{ id, t: title, p: published }] }.
+const TRIM_YOUTUBE = 'youtube';
+const xmlText = s => String(s || '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+export function trimYoutube(xml) {
+  const videos = [];
+  for (const m of String(xml || '').matchAll(/<entry>([\s\S]*?)<\/entry>/g)) {
+    const e = m[1];
+    const id = /<yt:videoId>([^<]+)<\/yt:videoId>/.exec(e)?.[1];
+    const t = /<title>([^<]*)<\/title>/.exec(e)?.[1];
+    const p = /<published>([^<]+)<\/published>/.exec(e)?.[1];
+    if (id && t) videos.push({ id, t: xmlText(t), p: p || '' });
+  }
+  return { videos };
+}
 export function trimElta(data) {
   const programs = [];
   for (const [day, list] of Object.entries(data?.calendar || {})) {
@@ -443,6 +464,7 @@ async function fetchUpstream(upstreamUrl, trim) {
     const contentType = upstream.headers.get('Content-Type') || 'application/json';
     if (upstream.status !== 200) return { status: upstream.status, contentType, body: upstream.body };
     let body = await upstream.arrayBuffer();
+    if (trim === TRIM_YOUTUBE) return { status: 200, contentType: 'application/json', body: JSON.stringify(trimYoutube(new TextDecoder().decode(body))) };
     if (trim) {
       try {
         const parsed = JSON.parse(new TextDecoder().decode(body));
@@ -473,6 +495,7 @@ function cacheEntry(result, policy) {
 // Which trim (if any) applies to a URL: only the hosts each one is for.
 function trimFor(trimParam, upstreamUrl) {
   if (upstreamUrl.hostname === ELTA_HOST) return TRIM_ELTA;
+  if (upstreamUrl.hostname === YOUTUBE_HOST) return TRIM_YOUTUBE;
   if (trimParam === TRIM_POLYMARKET_EVENTS && upstreamUrl.hostname === 'gamma-api.polymarket.com' && upstreamUrl.pathname === '/events') return TRIM_POLYMARKET_EVENTS;
   if (trimParam === TRIM_KAMBI_EVENTS && upstreamUrl.hostname === 'eu-offering-api.kambicdn.com') return TRIM_KAMBI_EVENTS;
   return null;
@@ -483,6 +506,7 @@ function parseTarget(target) {
     const u = new URL(target);
     if (u.hostname === 'clients5.google.com' && (u.pathname !== '/translate_a/t' || (u.searchParams.get('q') || '').length > 5000)) return null;
     if (u.hostname === ELTA_HOST && u.pathname !== ELTA_PATH) return null;
+    if (u.hostname === YOUTUBE_HOST && (u.pathname !== YOUTUBE_FEED || !/^UC[\w-]{22}$/.test(u.searchParams.get('channel_id') || ''))) return null;
     return u.protocol === 'https:' && SPORTS_PROXY_ALLOWED_HOSTS.includes(u.hostname) ? u : null;
   } catch {
     return null;

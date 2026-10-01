@@ -69,3 +69,9 @@ test("a slow URL answers 504 at once and doesn't hold back the rest of its batch
   assert.equal(r[0].s, 200);
   assert.equal(r[1].s, 504);
 });
+
+test('a YouTube channel feed comes trimmed to its videos; nothing else on YouTube passes', async () => {
+  const { trimYoutube } = await import('../sports-proxy-worker.js');
+  const xml = `<feed><title>WTT</title><entry><yt:videoId>abc123</yt:videoId><title>Lin Yun-Ju vs Ma Long &amp; more | MS R16</title><published>2026-10-01T06:00:00+00:00</published></entry></feed>`;
+  assert.deepEqual(trimYoutube(xml), { videos: [{ id: 'abc123', t: 'Lin Yun-Ju vs Ma Long & more | MS R16', p: '2026-10-01T06:00:00+00:00' }] });
+});
