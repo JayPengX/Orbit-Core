@@ -1,6 +1,6 @@
 # Handoff: Quadra, work in progress
 
-All repos develop on a session branch (lately `claude/proxy-unfinished-work-uqde2u`) and are pushed to
+All repos develop on a session branch (lately `claude/jolly-darwin-sjklht`) and are pushed to
 `main` after every change (each deploys on push). The shared kit lives in
 `Shared-Proxy/kit/`; `node kit/sync.mjs` copies it into every app (never
 edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
@@ -8,28 +8,47 @@ edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
 
 
 
-## Round in progress: the owner's list of 2026-10-01 (branch `claude/securities-rewards-improvements-8tt0qt`)
+## Round in progress: the owner's list of 2026-10-01, and their second list (branch `claude/jolly-darwin-sjklht`)
 
 Marks: [x] done, [~] done on the branch but not on `main` yet, [ ] to do.
 Owner's working rules this round: push to `main` once a whole category is
 done (not every change); be quick without losing quality; leave the ported
 games for LAST; "when I say stop, commit everything and write the handoff".
 
-Where things stand at the stop (2026-10-01):
-- `main` has: everything for Securities, Play and the kit below; Fixtures up
-  to and including the F1 driver and team pages.
-- Only on the branch (Quadra-Fixtures, last commit): the 追蹤 tab rewrite
-  (`renderFollowing`, `formOf`, `teamFormRow` in app.js; `.tf-*`,
-  `.people-strip`, `.person-card`, `.follow-head` in styles.css). Tests pass;
-  it was NOT yet checked on screen. Check it with
-  `node tools/preview.mjs fixtures following --full --wait 12000 --payload p.json`
-  where p.json is a Fixtures payload, e.g.
-  `{"v":3,"sports":["baseball","basketball","soccer"],"leagues":["mlb","nba","epl"],"follows":[{"league":"mlb","id":"19","name":"Los Angeles Dodgers","logo":"https://a.espncdn.com/i/teamlogos/mlb/500/lad.png"},{"league":"atp","id":"3623","name":"Jannik Sinner","athlete":true}],"tv":["elta"],"audio":"en","t":1}`.
-  Add `--store quadra.seen.rebase-v3=1 --store quadra.seen.v8=1 --store quadra.seen.v10=1 --store quadra.seen.v11=1`, or the "Quadra 更新了" notice covers the page.
-  Then merge it to `main` with the rest of the Fixtures category.
-- Preview tool: `--eval "import('./sheets.js').then(m=>m.openConstructor({id:'',name:'Mercedes',en:'Mercedes'}))…"` opens
-  any sheet. preview.mjs now applies the Worker's page trims (F1, F2/F3,
-  YouTube) itself.
+Where things stand (2026-10-01, second session): everything below marked
+[x] is on `main` in every repo. What's left is marked [ ].
+
+The owner's second list (all [x] unless said):
+- All apps: [x] the loading line follows real progress (boot.js counts the
+  app's own files against last time's count on the device, then the steps
+  the app names: the kit's sign-in at 80%, Fixtures' games and picks);
+  [x] no pop-ups about updates (the v8/v10/v11/economy "what's new" notices
+  were per app on a device, so every home-screen app showed them again;
+  they're gone, and an update applies quietly, without the bar or the
+  veil); [x] an iPad gets a phone's frame (`html.q-touch` from boot.js and
+  quadra.mjs: no brand header, tabs at the bottom, the iOS top strip),
+  only a computer's browser keeps the header; (unverified) the blur at an
+  iPad's top can't be checked here: it should be gone with the phone's frame (the
+  same strip that fixed it on iPhone); ask the owner.
+- Securities: [x] logos from Wikidata (`scripts/brand-logos.mjs` writes
+  `public/lib/brands.mjs`: 247 symbols, each checked by eye on a contact
+  sheet; a fund shows its issuer's), FMP only outside Taiwan (its Taiwan
+  images were photos), a Taiwan company without a logo shows its short
+  name; [x] home: today's movers stacked on a phone; [x] the USD chart over
+  匯率 removed.
+- Fixtures: [x] F1 sheets fit a phone (tiles split "P1（133 次）", the
+  race-by-race table's columns fixed); [x] an F1 team can be followed
+  (`f1team: true`, id `f1team:<name>`; its races count as followed; in
+  追蹤 with its last finishes and next session); [ ] more logos and real
+  images everywhere (not started this session; see "One image source per
+  entity" below).
+- Play: [x] taking a pick off the slip shows at once everywhere
+  (`slipChanged`, `syncPicks` by `data-bet`).
+- Orbit Class: [x] an iPad layout (sideways: dashboard and day side by
+  side; upright: one wide column). On a computer it still shows its
+  "phone app" QR page, by design.
+- Preview tool: `--device ipad|pc`; Yahoo is fetched with a browser UA
+  (it answers 429 otherwise); images are typed by their bytes.
 
 Securities
 - [x] 修改 on a 定期定額 plan scrolls to the plan's form (`scrollToPlanForm`).
@@ -73,8 +92,7 @@ Kit
   logos.
 - [x] F1 drivers' and teams' formula1.com slugs (`page`), and Racing Bulls'
   aliases (`aka`).
-- Sync with `node kit/sync.mjs`; Quadra-Play's copies are synced but not yet
-  committed (commit them with the next Play change).
+- Sync with `node kit/sync.mjs` (every app's copy is committed).
 
 Sports proxy (Worker)
 - [x] YouTube channel feeds (`trimYoutube`).
@@ -107,19 +125,18 @@ Fixtures
 - [ ] History stats for other sports: past seasons, records and past
   winners, as the official apps show them. ESPN's career stats already show
   in player sheets (`ov.season`).
-- [~] 追蹤 rewritten (see above: needs a look on screen). It now shows
+- [x] 追蹤 rewritten (checked on screen, buttons styled). It shows
   followed teams with their last-5 dots, last result and next game (ESPN
   `teamSchedule`), players as cards, then leagues.
-- [ ] 直播 revamp. The plan: a strip of services at the top (全部 / mine /
-  each service that has something today, with counts), then 直播中, 即將開始
-  and 剛結束 filtered by the chosen service (`tvOf(e).some(b => b.svc ===
-  id)`). Drop the sport-emoji headers. Keep the ELTA guide only for 全部 or
-  ELTA.
-- [ ] Settings: today these are `openFollowEditor` and `openTvEditor`.
-  Replace them with one clean "我的設定" sheet (sports order, leagues,
-  services, commentary), without emoji or ✓ text in chips.
-- [ ] Fewer labels, pills and emoji across Fixtures (section headers still
-  carry sport emoji; the tv line uses 📺).
+- [x] 直播 by service: a strip (全部 / 我的服務 / each service with
+  counts, `state.liveSvc`), the lists filtered, no sport-emoji headers, the
+  ELTA guide only under 全部 or ELTA.
+- [x] One 我的設定 sheet (`openFollowEditor(focus)`; `openTvEditor` opens
+  it at the services): sports in order, leagues, follows, services,
+  commentary; no emoji or ✓ in chips.
+- [x] Fewer emoji: sport icons off filters and search, 📺 off the tv line,
+  session tags and the match info rows without icons. The first-run sport
+  picker still has its icons (deliberately).
 - [ ] One image source per entity (team logo vs casual picture).
 - [ ] MotoGP standings and rider pages; Formula E results.
 

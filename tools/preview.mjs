@@ -69,8 +69,17 @@ const flag = name => {
 };
 const fakeYahoo = flag('fake-yahoo');
 const out = resolve(opt('out', '/tmp/quadra-preview'));
-const width = Number(opt('width', 390));
-const height = Number(opt('height', 844));
+// --device ipad (an iPad: says Macintosh, with touch, 820×1180) or pc (a
+// computer's browser, 1440×900, no touch); the default an iPhone.
+const device = opt('device', 'iphone');
+const SIZES = { iphone: [390, 844], ipad: [820, 1180], pc: [1440, 900] };
+const UAS = {
+  iphone: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
+  ipad: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15',
+  pc: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36'
+};
+const width = Number(opt('width', (SIZES[device] || SIZES.iphone)[0]));
+const height = Number(opt('height', (SIZES[device] || SIZES.iphone)[1]));
 const lang = opt('lang', 'zh');
 // --snap '{json}': the wallet's snap (each app's figures: Play's open slips for Fixtures, say).
 const snapStart = JSON.parse(opt('snap', '{}'));
@@ -135,7 +144,7 @@ const base = `http://localhost:${server.address().port}/${repo}/`;
 // Given up after 8 s, like the Worker (SPORTS_PROXY_UPSTREAM_TIMEOUT_MS).
 const curl = url =>
   new Promise(resolve => {
-    execFile('curl', ['-s', '--compressed', '-m', '8', '-w', '\n%{http_code}', url], { maxBuffer: 64 * 1024 * 1024 }, (err, stdout) => {
+    execFile('curl', ['-s', '--compressed', '-m', '8', '-w', '\n%{http_code}', ...(/yahoo\.com/.test(url) ? ['-A', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'] : []), url], { maxBuffer: 64 * 1024 * 1024 }, (err, stdout) => {
       if (err) return resolve({ status: 502, body: '' });
       const i = stdout.lastIndexOf('\n');
       resolve({ status: Number(stdout.slice(i + 1)) || 502, body: stdout.slice(0, i) });
@@ -249,14 +258,15 @@ const context = await browser.newContext({
   serviceWorkers: 'block',
   viewport: { width, height },
   deviceScaleFactor: 2,
-  isMobile: true,
-  hasTouch: true,
+  isMobile: device !== 'pc',
+  hasTouch: device !== 'pc',
   locale: lang === 'en' ? 'en-US' : 'zh-TW',
   timezoneId: 'Asia/Taipei',
   colorScheme: dark ? 'dark' : 'light',
-  userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
+  userAgent: UAS[device] || UAS.iphone,
   ignoreHTTPSErrors: true
 });
+if (device === 'ipad') await context.addInitScript(() => Object.defineProperty(Navigator.prototype, 'maxTouchPoints', { get: () => 5 }));
 await context.addInitScript(
   ([refresh, lang, stores]) => {
     try {
@@ -307,7 +317,9 @@ await context.route(/^https:\/\/(?!orbit-workers-proxy|sports-proxy)/, async rou
     if (DEBUG) console.log('failed', url.slice(0, 140));
     return route.abort();
   }
-  const type = /\.svg/.test(url) ? 'image/svg+xml' : /\.png/.test(url) ? 'image/png' : /\.jpe?g/.test(url) ? 'image/jpeg' : /\.css|fonts\.googleapis/.test(url) ? 'text/css' : /\.m?js/.test(url) ? 'text/javascript' : 'application/octet-stream';
+  // By the bytes first (Commons serves an .svg's PNG rendering), else by the name.
+  const magic = body.subarray(0, 4).toString('hex');
+  const type = magic === '89504e47' ? 'image/png' : magic.startsWith('ffd8') ? 'image/jpeg' : /\.svg/.test(url) ? 'image/svg+xml' : /\.png/.test(url) ? 'image/png' : /\.jpe?g/.test(url) ? 'image/jpeg' : /\.css|fonts\.googleapis/.test(url) ? 'text/css' : /\.m?js/.test(url) ? 'text/javascript' : 'application/octet-stream';
   await route.fulfill({ status: 200, contentType: type, body });
 });
 
