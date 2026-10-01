@@ -322,3 +322,17 @@ test('Plus is about Play and Securities: perks that make betting and trading che
   assert.deepEqual([...new Set(perks.map(p => p[0]))], ['odds', 'stock', 'looks']);
   assert.ok(perks.every(p => p[1] && p[2]));
 });
+
+test('where the money came from: an account older than the shared wallet opened with NT$110,000 in the apps, reset to 30,000', () => {
+  // The opening money in Securities' and Play's own books (their cash), the reset, a month's pay, a Plus month.
+  const old = { entries: [{ id: 'eco:rebase:v3', app: 'eco', kind: 'rebase', amount: -80_000 }, { id: 'eco:pay:2026-10', app: 'eco', kind: 'pay', amount: 6_000 }, { id: 'eco:plus:2026-10', app: 'eco', kind: 'plus', amount: -400 }], snap: { stock: { cash: 100_000, holdings: 0 }, odds: { cash: 10_000 } } };
+  const s = kit.moneySides(old);
+  assert.equal(s.gave.start, 30_000);
+  assert.equal(s.given, 36_000);
+  assert.equal(s.took, 400);
+  assert.equal(s.worth, 35_600);
+  assert.equal(s.own, 0);
+  // A new account: the opening money is the Worker's own entry.
+  const fresh = kit.moneySides({ entries: [{ id: 'eco:start', app: 'eco', kind: 'start', amount: 30_000 }], snap: {} });
+  assert.deepEqual([fresh.gave.start, fresh.own], [30_000, 0]);
+});
