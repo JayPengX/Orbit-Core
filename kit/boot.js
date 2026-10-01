@@ -12,7 +12,8 @@
 //   anything starts. The kit's watchUpdates keeps the page current after.
 // - Offers a way out when the app never starts (an error, or 15 s): reload,
 //   or open anyway. The app says it started with window.__fxStarted (or the
-//   older __oddsStarted) and hides #loading itself (the kit does).
+//   older __oddsStarted / __stockStarted) and hides #loading itself (the kit
+//   does).
 (function () {
   var box = document.getElementById('loading');
   if (!box) return;
@@ -73,7 +74,7 @@
   };
 
   var started = function () {
-    return Boolean(window.__fxStarted || window.__oddsStarted || window.__quadraStarted);
+    return Boolean(window.__fxStarted || window.__oddsStarted || window.__stockStarted || window.__quadraStarted);
   };
   var fail = function (message) {
     if (box.hidden || !q('.q-boot-error').hidden) return;
@@ -83,7 +84,7 @@
     step.hidden = true;
   };
   // The names the apps' scripts already call.
-  window.__quadraFail = window.__fxFail = window.__oddsFail = fail;
+  window.__quadraFail = window.__fxFail = window.__oddsFail = window.__stockFail = fail;
   window.addEventListener('error', function () {
     if (!started()) fail();
   });
