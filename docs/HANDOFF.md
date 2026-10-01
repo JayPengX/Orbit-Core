@@ -27,7 +27,10 @@ vocabulary/pass features; and move avatar/frame customization to Plus. The
 current worktree also changes vocabulary question distractors. These edits
 are incomplete and have not had a complete post-change test run. Do not
 assume deleted files or behavior are fully audited. The owner explicitly
-paused this work for another agent to take over.
+paused this work for another agent to take over. The current Hub agent was
+repeatedly instructed to stop and not commit or push, but had not acknowledged
+or yielded when this handoff was written. The next agent should check the Hub
+worktree status first and preserve all local work.
 
 The worktree includes pre-existing local changes to
 `public/data/audio/Celsius.mp3`, `Fahrenheit.mp3`, and `Internet.mp3`; preserve
