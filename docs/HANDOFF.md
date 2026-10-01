@@ -8,6 +8,13 @@ edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
 
 ## Slower levels, more for points, confirm before buying (pushed to `main`)
 
+- **Securities' cash for the other apps** (snap `stock.cash`) is its own NT$
+  less what it owes on loans: borrowed money stays for trading, never bets
+  in Play or covers an overdraft. Margin itself: collateral 0.6 of stock
+  (cash none), so borrow → buy → borrow converges at 1.5× own money (2.5×
+  exposure, Taiwan's 60%). 定期定額 can be changed (修改: amount and day,
+  `state.planEdit`, saved over the plan by `setPlan`).
+
 - **Streak = 5 missions a day** (kit `STREAK.missions` 5, `bonusCounts` 2,
   `missionDays`): of the six daily ones three are in the other apps, so a
   kept day always goes through them; the bonus ones that spend money (now
