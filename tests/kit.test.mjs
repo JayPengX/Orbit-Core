@@ -366,22 +366,25 @@ test('activity: two steps in a row both count, later one newer, a new day starts
   assert.deepEqual(tomorrow.value, { day: '2026-10-06', n: { scratch: 1 } });
 });
 
-test('streak: 3 daily missions keep a day (bonus ones aside), a card covers a day; bonus, milestones, avatars', () => {
+test('streak: 5 missions keep a day (2 bonus ones at most), a card covers a day; bonus, milestones, avatars', () => {
   const now = Date.UTC(2026, 9, 20, 4);
   const day = n => now - n * 86_400_000;
   const dayOf = n => new Date(day(n) + 8 * 3_600_000).toISOString().slice(0, 10);
   const m = (n, id) => ({ id: `vocab:m:${dayOf(n)}:${id}`, t: day(n), app: 'vocab', kind: 'mission', amount: 0, xp: 10 });
-  const kept = n => ['words20', 'game1', 'quotes'].map(id => m(n, id));
+  const kept = n => ['words20', 'game1', 'quotes', 'match', 'orbit'].map(id => m(n, id));
   // Kept 1 to 8 days ago, except 4 days ago, which a card covered; nothing yet today.
   const entries = [1, 2, 3, 5, 6, 7, 8].flatMap(kept);
   entries.push({ id: `vocab:fz:${dayOf(4)}`, t: day(3), app: 'vocab', kind: 'freeze', amount: 0 });
   const w = { entries };
   assert.equal(kit.streakOf(w, now), 8);
   assert.equal(kit.longestStreakOf(w), 8);
-  // Today: two missions and the bonus ones, or a game, aren't enough; a third is.
+  // Today: two daily ones and three bonus ones (two count), or a game, make 4: not enough; a third daily one is.
   const today = [m(0, 'words20'), m(0, 'game1'), m(0, 'parlay3'), m(0, 'scratch'), m(0, 'invest'), { id: 'vocab:g:0', t: now, app: 'vocab', kind: 'game', amount: 0, xp: 50 }];
+  assert.equal(kit.missionDays({ entries: today })[dayOf(0)], 4);
   assert.equal(kit.streakOf({ entries: [...entries, ...today] }, now), 8);
   assert.equal(kit.streakOf({ entries: [...entries, ...today, m(0, 'match')] }, now), 9);
+  // Four daily ones alone aren't either.
+  assert.equal(kit.streakOf({ entries: [...entries, ...['words20', 'game1', 'quotes', 'match'].map(id => m(0, id))] }, now), 8);
   // Before the change, any practice or game kept the day.
   const old = [0, 1, 2].map(n => ({ id: `vocab:g:${n}`, t: Date.UTC(2026, 8, 30 - n, 4), app: 'vocab', kind: 'game', amount: 0 }));
   assert.equal(kit.streakOf({ entries: old }, Date.UTC(2026, 8, 30, 5)), 3);
@@ -409,7 +412,7 @@ test('frames: level ones with the level, bought ones with their entry; a repaire
   assert.equal(kit.frameOf({ ...gold, entries: [] }), null);
   // Yesterday missed, bought back: the streak runs on.
   const dayOf = n => new Date(now - n * 86_400_000 + 8 * 3_600_000).toISOString().slice(0, 10);
-  const kept = n => ['words20', 'game1', 'quotes'].map(id => ({ id: `vocab:m:${dayOf(n)}:${id}`, t: now - n * 86_400_000, app: 'vocab', kind: 'mission', amount: 0, xp: 10 }));
+  const kept = n => ['words20', 'game1', 'quotes', 'match', 'orbit'].map(id => ({ id: `vocab:m:${dayOf(n)}:${id}`, t: now - n * 86_400_000, app: 'vocab', kind: 'mission', amount: 0, xp: 10 }));
   const w = { entries: [...kept(3), ...kept(2)] };
   assert.equal(kit.streakOf(w, now), 0);
   w.entries.push({ id: `vocab:xs:repair:${dayOf(1)}`, t: now, app: 'vocab', kind: 'redeem', amount: 0, note: '1500' });

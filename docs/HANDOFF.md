@@ -8,6 +8,11 @@ edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
 
 ## Slower levels, more for points, confirm before buying (pushed to `main`)
 
+- **Streak = 5 missions a day** (kit `STREAK.missions` 5, `bonusCounts` 2,
+  `missionDays`): of the six daily ones three are in the other apps, so a
+  kept day always goes through them; the bonus ones that spend money (now
+  40–60 XP) count too, two a day at most: the easy way, never a must.
+
 - **Levels** (kit `xpForLevel`): 100·(L−1)²: Lv 10 at 8,100, 20 at 36,100,
   50 at 240,100 (about a year of daily play). **Daily soft cap**
   (`ECONOMY.dailyXp`, Rewards `dampXp`/`capStage`): words and games give the
