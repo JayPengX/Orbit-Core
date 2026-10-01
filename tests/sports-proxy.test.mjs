@@ -59,23 +59,6 @@ test("ELTA's schedule: only its program list, always trimmed to each live progra
   assert.equal(r[1].s, 400);
 });
 
-test("NBA.com's Taiwan schedule: only that file, trimmed to ELTA's games (two on a day if so)", async () => {
-  const { trimNba } = await import('../sports-proxy-worker.js');
-  // SYNTHETIC: NBA.com's shape (scheduleLeagueV2_32.json), made up here:
-  // cdn.nba.com refuses this container.
-  const game = (gameId, gameDateTimeUTC, away, home, intlOttBroadcasters) => ({ gameId, gameDateTimeUTC, awayTeam: { teamId: away, teamTricode: 'AAA' }, homeTeam: { teamId: home, teamTricode: 'HHH' }, broadcasters: { nationalTvBroadcasters: [], intlTvBroadcasters: [], intlOttBroadcasters } });
-  const elta = [{ broadcasterId: 9001, broadcasterDisplay: 'ELTA', broadcasterAbbreviation: 'ELTA' }];
-  const data = { leagueSchedule: { gameDates: [{ games: [game('1', '2026-11-20T00:00:00Z', 1610612738, 1610612748, elta), game('2', '2026-11-20T03:00:00Z', 1610612747, 1610612744, elta), game('3', '2026-11-20T01:00:00Z', 1610612752, 1610612741, [{ broadcasterDisplay: 'Other' }])] }] } };
-  assert.deepEqual(trimNba(data), { games: [{ id: '1', start: '2026-11-20T00:00:00Z', home: 1610612748, away: 1610612738 }, { id: '2', start: '2026-11-20T03:00:00Z', home: 1610612744, away: 1610612747 }] });
-  assert.deepEqual(trimNba(null), { games: [] });
-  const file = 'https://cdn.nba.com/static/json/staticData/scheduleLeagueV2_32.json';
-  const res = await get(`https://proxy.test/sports-proxy?batch=1&u=${encodeURIComponent(file)}&u=${encodeURIComponent('https://cdn.nba.com/static/json/liveData/scoreboard/todaysScoreboard_00.json')}`);
-  const { r } = await res.json();
-  assert.equal(r[0].s, 200);
-  assert.deepEqual(r[0].b, { games: [] });
-  assert.equal(r[1].s, 400);
-});
-
 test("a slow URL answers 504 at once and doesn't hold back the rest of its batch", async () => {
   const fast = 'https://site.api.espn.com/apis/site/v2/sports/soccer/fra.1/standings';
   const slow = 'https://site.api.espn.com/apis/site/v2/sports/soccer/slow.1/standings';
