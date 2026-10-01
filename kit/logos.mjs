@@ -317,8 +317,11 @@ export function logoPicture(light, dark, cls, fallback) {
   const img = document.createElement('img');
   const known = drawn.has(light) || logoSeen.has(light);
   Object.assign(img, { className: cls, alt: '', loading: known ? 'eager' : 'lazy', decoding: known ? 'sync' : 'async' });
+  // A new one stays invisible while it loads (as does any while it's tried
+  // again: never a broken-picture icon), then fades in.
+  if (!known) img.style.opacity = '0';
   const picture = document.createElement('picture');
-  picture.className = known ? 'logo-wrap' : 'logo-wrap logo-new';
+  picture.className = 'logo-wrap';
   if (dark) {
     const source = document.createElement('source');
     Object.assign(source, { srcset: dark, media: '(prefers-color-scheme: dark)' });
@@ -326,11 +329,13 @@ export function logoPicture(light, dark, cls, fallback) {
   }
   picture.append(img);
   img.addEventListener('load', () => {
-    picture.classList.remove('logo-new');
+    if (!img.naturalWidth) return;
+    if (img.style.opacity) Object.assign(img.style, { transition: 'opacity 0.18s ease', opacity: '' });
     noteDrawn(light, img);
   });
   let tries = 0;
   img.addEventListener('error', () => {
+    img.style.opacity = '0';
     if (tries >= RETRY_MS.length) {
       logoBad.set(light, Date.now());
       logoSeen.delete(light);
