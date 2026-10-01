@@ -5,10 +5,11 @@
 //
 //   sport   one of SPORTS
 //   kind    'match' two sides; 'field' a race weekend
-//   data    where Fixtures reads its schedule and scores: 'espn' (espn path),
+//   data    where its schedule and scores come from: 'espn' (espn path),
 //           'kambi' (kambi path), 'asia' (the leagues' own sites, through the
-//           sports proxy: asiaMonth below), 'tsdb' (TheSportsDB), 'fom' (F2
-//           and F3's own sites, through the proxy)
+//           sports proxy: asiaMonth below), 'fom' (F2 and F3's own sites,
+//           through the proxy). Fixtures shows only the leagues on ELTA.tv
+//           or Apple TV in Taiwan (its lib/broadcast.mjs).
 //   bet     Quadra Play's key when Play sells it; `odds` where Play prices it
 //           ('espn': DraftKings through ESPN; 'kambi'), F1 has its own board
 //   espn / kambi   the paths on each source (a league can have both)
@@ -61,9 +62,6 @@ export const CATALOG = {
   nationsleague: soccer('uefa.nations', '歐國聯', 'Nations League', 'nationsleague', { cup: true, logo: 2395 }),
   // Racing
   f1: { sport: 'racing', kind: 'field', data: 'espn', espn: 'racing/f1', zh: 'F1 一級方程式', en: 'Formula 1', bet: 'f1', top: true, standings: true },
-  // Formula E (Disney+ from 2026-27, its practice free on YouTube; the
-  // calendar from TheSportsDB, open to browsers).
-  formulae: { sport: 'racing', kind: 'field', data: 'tsdb', tsdb: 4371, zh: 'Formula E 電動方程式', en: 'Formula E', icon: '⚡' },
   // F1's feeder series, on ELTA.tv (MAX 5-8) in Taiwan: their own sites'
   // calendars and session times (through the proxy, trimmed: trimFom).
   f2: { sport: 'racing', kind: 'field', data: 'fom', fom: 'www.fiaformula2.com', zh: 'F2 二級方程式', en: 'Formula 2', icon: '🏎️' },
