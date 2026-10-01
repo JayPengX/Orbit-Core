@@ -75,3 +75,13 @@ test('a YouTube channel feed comes trimmed to its videos; nothing else on YouTub
   const xml = `<feed><title>WTT</title><entry><yt:videoId>abc123</yt:videoId><title>Lin Yun-Ju vs Ma Long &amp; more | MS R16</title><published>2026-10-01T06:00:00+00:00</published></entry></feed>`;
   assert.deepEqual(trimYoutube(xml), { videos: [{ id: 'abc123', t: 'Lin Yun-Ju vs Ma Long & more | MS R16', p: '2026-10-01T06:00:00+00:00' }] });
 });
+
+test("a formula1.com driver or team page comes trimmed to its grids of figures", async () => {
+  const { trimF1Page } = await import('../sports-proxy-worker.js');
+  const row = (k, v) => `["$","dt",null,{"className":"x","children":"${k}"}],["$","dd",null,{"className":"y","children":"${v}"}]`;
+  const grid = rows => `["$","dl",null,{"className":"DataGrid-module_dataGrid__abc","children":[${rows.map(([k, v]) => `[${row(k, v).replace(/\]$/, '')}]`).join(',')}]}]`;
+  const flight = `0:[${grid([['Season Position', '1st'], ['Season Points', '302']])},${grid([['Date of Birth', '25/08/2006']])}]`;
+  const html = `<script>self.__next_f.push([1,${JSON.stringify(flight)}])</script>`;
+  const { grids } = trimF1Page(html);
+  assert.deepEqual(grids, [[['Season Position', '1st'], ['Season Points', '302']], [['Date of Birth', '25/08/2006']]]);
+});

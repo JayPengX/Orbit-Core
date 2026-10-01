@@ -119,6 +119,9 @@ const YOUTUBE_HOST = 'www.youtube.com';
 // F1's sister series' own sites (the same platform as formula1.com): their
 // season calendar and each weekend's sessions, read from the page's data.
 const FOM_HOSTS = ['www.fiaformula2.com', 'www.fiaformula3.com', 'www.f1academy.com'];
+// formula1.com's driver and team pages: the official season, career and
+// profile figures (only /en/drivers/<slug> and /en/teams/<slug>, trimmed).
+const F1_HOST = 'www.formula1.com';
 const YOUTUBE_FEED = '/feeds/videos.xml';
 const SPORTS_PROXY_FETCH_USER_AGENT = 'Quadra-Fixtures-Bot/1.0 (+https://github.com/JayPengX/Quadra-Fixtures)';
 const SPORTS_PROXY_ALLOWED_HOSTS = [
@@ -157,6 +160,7 @@ const SPORTS_PROXY_ALLOWED_HOSTS = [
   // F2, F3 and F1 Academy (on ELTA.tv in Taiwan): only /en/racing/<year>
   // pages, always trimmed (trimFom).
   ...FOM_HOSTS,
+  F1_HOST,
   // Not a real host: Asian baseball's schedules and scores, gathered by this
   // Worker from the leagues' own sites (asia-baseball.js).
   ASIA_HOST
@@ -288,6 +292,7 @@ function cachePolicyFor(url) {
     case 'www.fiaformula2.com':
     case 'www.fiaformula3.com':
     case 'www.f1academy.com':
+    case F1_HOST:
       return CACHE_STANDINGS;
     case ASIA_HOST:
       return asiaPolicy(url);
@@ -411,6 +416,24 @@ export function trimFom(html) {
   }
   meetings.sort((a, b) => (a.round || 0) - (b.round || 0));
   return { meetings };
+}
+
+// A formula1.com driver or team page's figures, as the page shows them: its
+// grids of label and value, in order ({ grids: [[[label, value], …], …] }),
+// e.g. the season's (position, points), its Grand Prix and Sprint numbers,
+// the career's, the biography or the team's profile.
+const TRIM_F1PAGE = 'f1page';
+export function trimF1Page(html) {
+  const text = fomText(html);
+  const grids = [];
+  let cur = null;
+  for (const m of text.matchAll(/DataGrid-module_dataGrid|"children":"([^"]{1,48})"\}\],\["\$","dd",null,\{"className":"[^"]*","children":"([^"]{0,96})"/g)) {
+    if (!m[1]) {
+      cur = [];
+      grids.push(cur);
+    } else if (cur) cur.push([m[1], m[2]]);
+  }
+  return { grids: grids.filter(g => g.length) };
 }
 
 // A channel's feed (Atom XML) as { videos: [{ id, t: title, p: published }] }.
@@ -545,6 +568,7 @@ async function fetchUpstream(upstreamUrl, trim) {
     const contentType = upstream.headers.get('Content-Type') || 'application/json';
     if (upstream.status !== 200) return { status: upstream.status, contentType, body: upstream.body };
     let body = await upstream.arrayBuffer();
+    if (trim === TRIM_F1PAGE) return { status: 200, contentType: 'application/json', body: JSON.stringify(trimF1Page(new TextDecoder().decode(body))) };
     if (trim === TRIM_FOM) return { status: 200, contentType: 'application/json', body: JSON.stringify(trimFom(new TextDecoder().decode(body))) };
     if (trim === TRIM_YOUTUBE) return { status: 200, contentType: 'application/json', body: JSON.stringify(trimYoutube(new TextDecoder().decode(body))) };
     if (trim) {
@@ -579,6 +603,7 @@ function trimFor(trimParam, upstreamUrl) {
   if (upstreamUrl.hostname === ELTA_HOST) return TRIM_ELTA;
   if (upstreamUrl.hostname === YOUTUBE_HOST) return TRIM_YOUTUBE;
   if (FOM_HOSTS.includes(upstreamUrl.hostname)) return TRIM_FOM;
+  if (upstreamUrl.hostname === F1_HOST) return TRIM_F1PAGE;
   if (trimParam === TRIM_POLYMARKET_EVENTS && upstreamUrl.hostname === 'gamma-api.polymarket.com' && upstreamUrl.pathname === '/events') return TRIM_POLYMARKET_EVENTS;
   if (trimParam === TRIM_KAMBI_EVENTS && upstreamUrl.hostname === 'eu-offering-api.kambicdn.com') return TRIM_KAMBI_EVENTS;
   return null;
@@ -589,6 +614,7 @@ function parseTarget(target) {
     const u = new URL(target);
     if (u.hostname === 'clients5.google.com' && (u.pathname !== '/translate_a/t' || (u.searchParams.get('q') || '').length > 5000)) return null;
     if (u.hostname === ELTA_HOST && u.pathname !== ELTA_PATH) return null;
+    if (u.hostname === F1_HOST && !/^\/en\/(drivers|teams)\/[a-z-]+$/.test(u.pathname)) return null;
     if (FOM_HOSTS.includes(u.hostname) && !/^\/en\/racing\/20\d\d(\/[a-z-]+)?$/.test(u.pathname)) return null;
     if (u.hostname === YOUTUBE_HOST && (u.pathname !== YOUTUBE_FEED || !/^UC[\w-]{22}$/.test(u.searchParams.get('channel_id') || ''))) return null;
     return u.protocol === 'https:' && SPORTS_PROXY_ALLOWED_HOSTS.includes(u.hostname) ? u : null;
