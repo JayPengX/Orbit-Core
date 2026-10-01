@@ -8,6 +8,85 @@ edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
 
 
 
+## Round in progress: the owner's list of 2026-10-01 (branch `claude/securities-rewards-improvements-8tt0qt`)
+
+Status marks: [x] done and pushed to `main`, [ ] to do. Work top-down is not
+required; each item is independent. Images the owner attached (the official
+F1 app's driver page, Securities' 匯率 tab) were not readable in the session.
+
+Securities
+- [x] 修改 on a 定期定額 plan scrolls to the plan's form and opens it
+  (`scrollToPlanForm`, the card flashes).
+- [x] 融資 margin calls as Taiwan's brokers run them (`callState`,
+  `callDeadline`, `callNeed`, `payDown` in account.mjs; tests
+  `tests/margincall.test.mjs`): judged at the close (a dip under 130% in
+  Taiwan's session calls nothing), due at the close of the second business
+  day after, cancelled at 166% (`MARGIN_RESTORE`), met by paying cash
+  against the loans (補繳 button, `call-pay`), repaying or selling; at the
+  deadline under 130% the margin holdings are sold (orders wait for the
+  next open), between 130 and 166% nothing is sold but the call stands.
+  The 115% instant sale is gone: only under 100% (`MARGIN_LIQUIDATE` 1).
+  No new 融資 while a call stands.
+- [ ] Ultra realism for the whole app (audit: 融資 term of 6 months with
+  展延, 信用帳戶 opening conditions, 融資額度, 融券 rules, 當沖, odd-lot
+  sessions, fees rounding, settlement T+2 everywhere).
+- [ ] 統計分析 tab improved and revamped.
+- [ ] 交易明細: a filter button scrolls back to the start (keep the scroll
+  where it was); revamp the tab.
+- [ ] 匯率 tab looks bad (owner's screenshot); redesign.
+- [ ] 資產 tab looks flat; revamp.
+- [ ] Home page improved.
+- [ ] Remove descriptive lines (too long, unnecessary).
+
+Rewards
+- [ ] 財富等級 as the point of the game, a milestone of taking part, not
+  Quadra's profit. Three sides: the user, Quadra (profit-minded) and "God"
+  (who gives starter money, the monthly pay, level rewards).
+- [ ] Games fit a phone screen (now a small box at the top).
+- [ ] A way back to the games list when a game ends.
+- [ ] XP balanced across games (baseball hard, 10-20 XP; dinosaur 20 XP
+  for 20 jumps).
+- [ ] Every game's UI checked and improved (the dinosaur faces backwards).
+- [ ] UI organised (the points shop is spread everywhere).
+- [ ] More purpose for points.
+- [ ] Home page, 單字 and 任務 improved.
+- [ ] Quality games ported in (open-source games, only reading their
+  result to bridge into Quadra), replacing the weak home-made ones.
+- [ ] Better 說明: every mechanism of the Quadra economy in detail.
+
+Play
+- [ ] Home page improved.
+- [ ] Real logos and photos through Fixtures' backbone (no letter or flag
+  placeholders).
+- [ ] 紀錄 tab improved.
+- [ ] 投注單 tab merged into the others: four tabs like every app.
+
+Fixtures
+- [ ] Played games use two kinds of image for the same team (an official
+  logo and a casual picture or just letters): one source per entity.
+- [ ] 賽事 date strip: after loading it jumps forward instead of keeping the
+  chosen date in the middle.
+- [ ] The small yellow bar under an F1 driver in the team view: explain it
+  or remove it.
+- [ ] F1 driver and team pages with full results like the official F1 app:
+  DNF, sprint results; tapping a Grand Prix opens it.
+- [ ] History stats for every sport possible (past Grand Prix winners,
+  per-driver/team records…), modelled on what the official apps and sites
+  show; displayed well; every possible link clickable.
+- [ ] The page behind a detail view doesn't scroll while it's open.
+- [ ] Traditional TV channels removed: OTT services only.
+- [ ] YouTube: name the exact matches that are on it, verified.
+- [ ] F2, F3, F1 Academy, GT races (free on YouTube): anything Taiwan can
+  watch is in.
+- [ ] 直播 tab revamped: what's live, upcoming and just ended on the
+  services the person has.
+- [ ] 追蹤 tab revamped: personal and informative, not 賽事 filtered.
+- [ ] Settings revamped or replaced.
+- [ ] Fewer labels, pills and emoji: a cleaner design.
+
+From the earlier Next list (below): Fixtures MotoGP standings and rider
+pages; Formula E results; Formula E betting in Play once Kambi prices it.
+
 ## Photos, F1 team pages, Taiwan-only catalogue, MotoGP and Formula E (pushed to `main`)
 
 Done:
