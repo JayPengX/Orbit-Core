@@ -8,6 +8,42 @@ edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
 
 
 
+## Round of 2026-10-01 (third list), branch `claude/admiring-hypatia-j60tqo`
+
+All pushed to `main` unless marked.
+
+- **Purge (clean, nothing hidden):** tennis, golf, UFC, boxing, volleyball,
+  table tennis, badminton, MotoGP, F1 Academy, GT World Challenge, the WC
+  qualifiers and every league Taiwan couldn't watch (the old NO_TAIWAN list)
+  are deleted from the kit catalogue, both apps, the proxy (MotoGP host,
+  trimFomLegacy, trimSro) and the tests. No `off` flags remain. One-sport
+  passes are gone from Fixtures' broadcasters except WNBA League Pass and
+  EuroLeague TV; NHL is listed on DAZN, MLS on Apple TV. Play's whole "sets"
+  market family went with badminton. Open bets on purged leagues were not
+  refunded (the owner had none).
+- **Fixtures is an add-on** like Orbit Class (kit APPS.match `related`, not in
+  FAMILY): no 投注, no bets on cards, no 🎫, no follows/affinity shared with
+  Play, no Play pins (the wallet's `pins` is gone from eco.js), Play's
+  `#game=` link and slip snapshot for Fixtures removed. It reads only its own
+  affinity (`affinity(wallet, now, ['match'])`).
+- **Photos:** studio headshots only (kit photos.mjs: ESPN by id or name,
+  TheSportsDB cutouts); Wikipedia pictures never; device cache `fx.pics.v2`.
+  Play no longer gets photos.mjs.
+- **Fixtures UI:** team pages rebuilt (hero, key-number strip, next game,
+  賽程/戰績/陣容/排名 tabs) and available for NPB/KBO/CPBL, EuroLeague and K
+  League (built from their own season: `ownTeam` in sheets.js); player pages
+  in tabs (概況/數據/近期比賽/資料); 最新動態 as headline + short points;
+  race series in 賽事 as one card per weekend; a weekend's schedule as a
+  timeline; leagues/sports with no games from two weeks back to two months on
+  hidden (`checkActive`, `fx.active.v1`, 12 h); 我的轉播 off home; past
+  seasons (歷年戰績, season picker) removed; Chinese names for every club the
+  audit found (kit names.mjs).
+- **Securities:** TradingView symbol icons for everything
+  (`scripts/tv-logos.mjs` → `public/lib/tvlogos.mjs`; TW/HK flags from
+  flagcdn); 定期定額 修改 edits in its row.
+- Play's 紀錄 / Quadra 餘額 / home balance and Rewards' game removal were done
+  by parallel agents this round: see their commits.
+
 ## Round in progress: the owner's list of 2026-10-01, and their second list (branch `claude/jolly-darwin-sjklht`)
 
 Marks: [x] done, [~] done on the branch but not on `main` yet, [ ] to do.
