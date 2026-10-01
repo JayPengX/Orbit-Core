@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { handleEcoRequest, mergeWallet, poolBalance, cleanPatch, emptyWallet, paydayEntries, payFor, worthOf, PAY_MONTH, REBASE, OVERDRAFT_RATE, plusJoinEntry, plusJoinEntries, plusMember, plusBonusEntries, bonusBetId, vipEntries, vipStakes, vipTier, welcomeEntries, VIP, tidyWallet, PAY, PLUS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, ECO_APPS } from '../eco.js';
+import { handleEcoRequest, mergeWallet, poolBalance, cleanPatch, emptyWallet, paydayEntries, payFor, worthOf, PAY_MONTH, REBASE, OVERDRAFT_RATE, plusJoinEntry, plusJoinEntries, plusMember, plusLapsed, plusBonusEntries, bonusBetId, vipEntries, vipStakes, vipTier, welcomeEntries, VIP, tidyWallet, PAY, PLUS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, ECO_APPS } from '../eco.js';
 import { planClean } from '../eco-admin.js';
 
 function setup() {
@@ -506,4 +506,29 @@ test('points buy what money does: a redemption costs at least REWARDS_XP, amount
     ]
   });
   assert.deepEqual(p.entries.map(e => e.id), ['vocab:xs:freeze:a', 'vocab:xs:boost:c', 'vocab:xs:pack:toeic', 'vocab:xs:frame:gold', 'vocab:xs:reroll:2026-10-02:orbit', 'vocab:xs:repair:2026-10-01']);
+});
+
+test('Quadra Plus bills every month like a subscription: months away charged on return; a failed charge lapses it', () => {
+  const on = { plus: { value: { on: true }, t: 1 } };
+  const base = [{ id: 'eco:plus:2026-10', t: 1, app: 'eco', kind: 'plus', amount: 0, note: 'trial' }, { id: 'eco:rebase:v3', t: 1, app: 'eco', kind: 'rebase', amount: 0 }, { id: 'eco:pay:2026-10', t: 1, app: 'eco', kind: 'pay', amount: 6_000 }];
+  // Away November and December, back in January: three months billed after their pay.
+  const jan = Date.UTC(2027, 0, 5);
+  const due = paydayEntries({ settings: on, created: Date.UTC(2026, 9, 1), entries: base }, jan);
+  assert.deepEqual(due.filter(e => e.kind === 'plus').map(e => [e.id, e.amount]), [['eco:plus:2026-11', -PLUS.fee], ['eco:plus:2026-12', -PLUS.fee], ['eco:plus:2027-01', -PLUS.fee]]);
+  // A pool that can't cover a month: that charge fails and the rest isn't tried.
+  const broke = [...base.slice(0, 2), { id: 'x', t: 1, app: 'odds', amount: -17_700 }];
+  const w = { settings: on, created: Date.UTC(2026, 9, 1), entries: broke };
+  const nov = paydayEntries(w, Date.UTC(2026, 10, 2));
+  assert.ok(!nov.some(e => e.kind === 'plus'));
+  const fail = nov.find(e => e.kind === 'plusfail');
+  assert.equal(fail.id, 'eco:plusfail:2026-11');
+  const lapsed = { ...w, entries: [...broke, ...nov] };
+  assert.equal(plusLapsed(lapsed), true);
+  // Lapsed: no retry next month, even with money.
+  const rich = { ...lapsed, entries: [...lapsed.entries, { id: 'y', t: 2, app: 'odds', amount: 50_000 }] };
+  assert.ok(!paydayEntries(rich, Date.UTC(2026, 11, 2)).some(e => e.kind === 'plus' || e.kind === 'plusfail'));
+  // Joining again starts it over (the rest of the month at its share).
+  const back = plusJoinEntries(rich, Date.UTC(2026, 11, 2));
+  assert.ok(back[0].amount < 0);
+  assert.equal(plusLapsed({ entries: [...rich.entries, ...back] }), false);
 });

@@ -223,9 +223,10 @@ export { WEEK };
 // month). A month is a member's when the wallet holds `eco:plus:<month>`;
 // every app reads its perks from that alone. Joining is `op: 'plus'`: the
 // first time ever, the rest of the month is free; after that the rest of the
-// month costs its share of the fee. It renews on the first sign-in or read
-// of a month while the `plus` setting is on and the pool covers it; a month
-// nobody opened an app is never charged. The yearly plan (PLUS.year, about
+// month costs its share of the fee. It renews every month while the `plus`
+// setting is on, charged on the first sign-in or read (months away charged
+// on return); a charge the pool can't cover fails and it lapses
+// (plusRenewal). The yearly plan (PLUS.year, about
 // two months free) pays twelve months at once and renews by the year.
 // Leaving stops renewal and keeps every month already paid. v8: NT$490 and
 // a NT$200 weekly bonus bet (v7 was 990 and 100): the perks' face value is
@@ -259,16 +260,43 @@ function yearEntries(wallet, first, now) {
   const months = monthsFrom(first, 12).filter(m => !have.has(PLUS_ID(m)));
   return months.map((m, i) => ({ id: PLUS_ID(m), t: now, app: 'eco', kind: 'plus', amount: i ? 0 : -PLUS.year, note: 'year' }));
 }
-// Renewal for this month: a yearly member renews for another year (or, if
-// the pool can't cover a year, a month); a monthly one for a month.
+// Renewal, like any subscription: every month while it's on, whether or not
+// anyone opened an app (months missed are charged on return, after their
+// pay), a yearly plan by the year (or by the month if the pool can't cover
+// a year). A charge the pool can't cover fails: `eco:plusfail:<month>`
+// (amount 0), and the membership lapses there until the person joins again
+// (renewal won't retry it). v10; before, a month nobody came was skipped.
+export const plusLapsed = wallet => {
+  const entries = wallet?.entries || [];
+  const last = entries.filter(e => e.app === 'eco' && e.id?.startsWith('eco:plus:')).map(e => e.id.slice(9)).sort().at(-1);
+  return Boolean(last) && entries.some(e => e.app === 'eco' && e.id?.startsWith('eco:plusfail:') && e.id.slice(13) > last);
+};
 function plusRenewal(wallet, now, adding = 0) {
   const month = taipeiMonth(now);
   const entries = wallet?.entries || [];
-  if (!plusOn(wallet) || !entries.some(e => e.id?.startsWith('eco:plus:')) || entries.some(e => e.id === PLUS_ID(month))) return [];
-  const pool = poolBalance(wallet) + adding;
-  if (plusSetting(wallet).plan === 'year' && pool >= PLUS.year) return yearEntries(wallet, month, now);
-  if (pool < PLUS.fee) return [];
-  return [{ id: PLUS_ID(month), t: now, app: 'eco', kind: 'plus', amount: -PLUS.fee }];
+  if (!plusOn(wallet) || plusLapsed(wallet)) return [];
+  const have = new Set(entries.filter(e => e.app === 'eco' && e.id?.startsWith('eco:plus:')).map(e => e.id.slice(9)));
+  const last = [...have].sort().at(-1);
+  if (!last || last >= month) return [];
+  const out = [];
+  let pool = poolBalance(wallet) + adding;
+  for (let m = nextMonth(last), n = 0; m <= month && n < 120; m = nextMonth(m), n++) {
+    if (have.has(m)) continue;
+    if (plusSetting(wallet).plan === 'year' && pool >= PLUS.year) {
+      const year = yearEntries({ entries: [...entries, ...out] }, m, now);
+      out.push(...year);
+      for (const e of year) have.add(e.id.slice(9));
+      pool -= PLUS.year;
+      continue;
+    }
+    if (pool < PLUS.fee) {
+      out.push({ id: `eco:plusfail:${m}`, t: now, app: 'eco', kind: 'plusfail', amount: 0, note: String(PLUS.fee) });
+      break;
+    }
+    out.push({ id: PLUS_ID(m), t: now, app: 'eco', kind: 'plus', amount: -PLUS.fee });
+    pool -= PLUS.fee;
+  }
+  return out;
 }
 // What joining now takes. Monthly: nothing the first time ever, else the
 // rest of the month's share of the fee. Yearly: PLUS.year for twelve months,

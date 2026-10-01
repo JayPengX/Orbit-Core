@@ -45,6 +45,15 @@ edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
   oldest spent first; points from before v7 count from v7. The level
   (`xpEarned`) never drops. Rewards' level card and the account sheet warn
   60 days ahead.
+- **Plus like a real subscription:** billed every month while on, opened or
+  not (months away charged on return, after their pay; yearly by the year).
+  A charge the pool can't cover writes `eco:plusfail:<month>` (amount 0)
+  and the membership lapses (`plusLapsed`, eco.js and kit; `plusRenewing`
+  is false) until joined again; no retry. The kit notifies once
+  (`quadra.seen.plusfail`). The sheet's fine print: auto-charge, failure,
+  no refunds, 5% VAT included. Free bets (Play `FREE_MIN_ODDS` 1.5, every
+  pick; `placeFreeSlip` refuses with `freeOdds`); no cash out, 7 days, as
+  before.
 - One-time notice `quadra.seen.v10` (`v10Notice`) for accounts made before
   2026-10-02 Taipei.
 ## Slower levels, more for points, confirm before buying (pushed to `main`)
