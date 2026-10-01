@@ -266,6 +266,9 @@ function cachePolicyFor(url) {
     case 'eu-offering-api.kambicdn.com':
       // A league's matches in play (Play's live board) move by the second.
       if (url.pathname.endsWith('/in-play.json')) return CACHE_ODDS;
+      // A match's own markets: pre-match lists move like the league's (a live
+      // match's are asked for in play, at the live list's pace).
+      if (url.pathname.includes('/betoffer/')) return url.searchParams.get('live') ? CACHE_ODDS : CACHE_PREMATCH;
       return url.pathname.includes('/listView/') ? CACHE_PREMATCH : CACHE_LIVE;
     case 'query1.finance.yahoo.com':
     case 'query2.finance.yahoo.com':
@@ -322,6 +325,28 @@ function trimKambi(data) {
     events: Array.isArray(data.events) ? data.events.map(item => ({ event: event(item.event), betOffers: offers(item.betOffers), liveData: live(item.liveData) })) : undefined,
     liveEvents: Array.isArray(data.liveEvents) ? data.liveEvents.map(item => ({ event: event(item.event), liveData: live(item.liveData) })) : undefined
   };
+}
+
+// Opt-in (`&trim=kambi-offers`) for one match's full list of markets
+// (betoffer/event/<id>.json, Play's game page: every line, half, corner and
+// player market): each offer's label, kind and outcomes (who, line, price),
+// about a fifth of Kambi's record.
+const TRIM_KAMBI_OFFERS = 'kambi-offers';
+function trimKambiOffers(data) {
+  if (!data || typeof data !== 'object') return data;
+  const offers = Array.isArray(data.betOffers)
+    ? data.betOffers.map(o => ({
+        id: o.id,
+        eventId: o.eventId,
+        criterion: { englishLabel: o.criterion?.englishLabel, shortEnglishLabel: o.criterion?.shortEnglishLabel, occurrenceType: o.criterion?.occurrenceType, lifetime: o.criterion?.lifetime },
+        betOfferType: { englishName: o.betOfferType?.englishName },
+        tags: Array.isArray(o.tags) ? o.tags.filter(t => t === 'MAIN_LINE' || t === 'OFFERED_LIVE') : undefined,
+        suspended: o.suspended || undefined,
+        outcomes: (o.outcomes || []).map(x => ({ type: x.type, odds: x.odds, line: x.line, status: x.status, label: x.englishLabel, participant: x.participant, participantId: x.participantId }))
+      }))
+    : undefined;
+  const events = Array.isArray(data.events) ? data.events.map(e => ({ id: e.id, homeName: e.homeName, awayName: e.awayName, start: e.start, state: e.state })) : undefined;
+  return { betOffers: offers, events };
 }
 
 // ELTA's schedule, a small fraction of it: each live program's day, start
@@ -478,7 +503,7 @@ async function fetchUpstream(upstreamUrl, trim) {
     if (trim) {
       try {
         const parsed = JSON.parse(new TextDecoder().decode(body));
-        body = JSON.stringify(trim === TRIM_KAMBI_EVENTS ? trimKambi(parsed) : trim === TRIM_ELTA ? trimElta(parsed) : trimPolymarketEvents(parsed));
+        body = JSON.stringify(trim === TRIM_KAMBI_EVENTS ? trimKambi(parsed) : trim === TRIM_KAMBI_OFFERS ? trimKambiOffers(parsed) : trim === TRIM_ELTA ? trimElta(parsed) : trimPolymarketEvents(parsed));
       } catch {
         // Not the JSON shape expected - pass it through untouched.
       }
@@ -508,6 +533,7 @@ function trimFor(trimParam, upstreamUrl) {
   if (upstreamUrl.hostname === F1_HOST) return TRIM_F1PAGE;
   if (trimParam === TRIM_POLYMARKET_EVENTS && upstreamUrl.hostname === 'gamma-api.polymarket.com' && upstreamUrl.pathname === '/events') return TRIM_POLYMARKET_EVENTS;
   if (trimParam === TRIM_KAMBI_EVENTS && upstreamUrl.hostname === 'eu-offering-api.kambicdn.com') return TRIM_KAMBI_EVENTS;
+  if (trimParam === TRIM_KAMBI_OFFERS && upstreamUrl.hostname === 'eu-offering-api.kambicdn.com' && upstreamUrl.pathname.includes('/betoffer/')) return TRIM_KAMBI_OFFERS;
   return null;
 }
 

@@ -130,7 +130,8 @@ export function teamLogo(sport, name, dark = false) {
 // ESPN's soccer league logo ids.
 const SOCCER_LOGO = {
   epl: 23, laliga: 15, seriea: 12, bundesliga: 10, ligue1: 9, ucl: 2, uel: 2310, uecl: 20296,
-  scotland: 45, mls: 19, jleague: 2199, facup: 40, nationsleague: 2395, worldcup: 4
+  scotland: 45, mls: 19, jleague: 2199, facup: 40, nationsleague: 2395, worldcup: 4,
+  championship: 24, eredivisie: 11, ligamx: 22, brasileirao: 85
 };
 // TheSportsDB's league badges.
 const LEAGUE_BADGE = {
@@ -139,7 +140,8 @@ const LEAGUE_BADGE = {
 // ESPN's other league logos.
 const ESPN_LEAGUE = {
   mlb: 'teamlogos/leagues/500/mlb.png', nba: 'teamlogos/leagues/500/nba.png', wnba: 'teamlogos/leagues/500/wnba.png', nfl: 'teamlogos/leagues/500/nfl.png',
-  nhl: 'teamlogos/leagues/500/nhl.png', f1: 'teamlogos/leagues/500/f1.png'
+  nhl: 'teamlogos/leagues/500/nhl.png', f1: 'teamlogos/leagues/500/f1.png',
+  nbl: 'teamlogos/leagues/500/nbl.png', ufc: 'teamlogos/leagues/500/ufc.png'
 };
 // The league's own logo (light backgrounds: the apps show it on a white disc), or null.
 export function leagueLogo(key, dark = false) {

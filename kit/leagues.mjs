@@ -11,7 +11,9 @@
 //           or Apple TV in Taiwan (its lib/broadcast.mjs).
 //   bet     Quadra Play's key when Play sells it; `odds` where Play prices it
 //           ('espn': DraftKings through ESPN; 'kambi'), F1 has its own board
-//   espn / kambi   the paths on each source (a league can have both)
+//   espn / kambi   the paths on each source (a league can have both: an
+//           ESPN league with a Kambi path is priced by Kambi first, DraftKings
+//           the cross-check, and settled from ESPN)
 //   play-only details: logo (ESPN league logo id), icon, badge
 
 export const SPORTS = {
@@ -20,7 +22,9 @@ export const SPORTS = {
   basketball: { zh: '籃球', en: 'Basketball', icon: '🏀' },
   football: { zh: '美式足球', en: 'Football', icon: '🏈' },
   hockey: { zh: '冰球', en: 'Hockey', icon: '🏒' },
-  racing: { zh: '賽車', en: 'Racing', icon: '🏎️' }
+  racing: { zh: '賽車', en: 'Racing', icon: '🏎️' },
+  tennis: { zh: '網球', en: 'Tennis', icon: '🎾' },
+  mma: { zh: '綜合格鬥', en: 'MMA', icon: '🥊' }
 };
 
 
@@ -29,38 +33,50 @@ const soccer = (path, zh, en, bet, extra = {}) => espn('soccer', `soccer/${path}
 
 export const CATALOG = {
   // Baseball
-  mlb: espn('baseball', 'baseball/mlb', 'MLB 美國職棒', 'MLB', 'mlb', { top: true }),
+  mlb: espn('baseball', 'baseball/mlb', 'MLB 美國職棒', 'MLB', 'mlb', { top: true, kambi: 'baseball/mlb' }),
   npb: { sport: 'baseball', kind: 'match', data: 'asia', asia: 'npb', kambi: 'baseball/japan/npb', zh: '日本職棒', en: 'NPB', bet: 'npb', odds: 'kambi', icon: '⚾', badge: 'lk85rg1575038781' },
   kbo: { sport: 'baseball', kind: 'match', data: 'asia', asia: 'kbo', kambi: 'baseball/south_korea/kbo_league', zh: '韓國職棒', en: 'KBO', bet: 'kbo', odds: 'kambi', icon: '⚾', badge: 'qfr1hx1589707979' },
   cpbl: { sport: 'baseball', kind: 'match', data: 'asia', asia: 'cpbl', kambi: 'baseball/taiwan/chinese_professional_baseball', zh: '中華職棒', en: 'CPBL', bet: 'cpbl', odds: 'kambi', top: true, icon: '⚾', badge: 'c3vetj1655924198' },
   // Basketball
-  nba: espn('basketball', 'basketball/nba', 'NBA', 'NBA', 'nba', { top: true }),
-  wnba: espn('basketball', 'basketball/wnba', 'WNBA', 'WNBA', 'wnba'),
+  nba: espn('basketball', 'basketball/nba', 'NBA', 'NBA', 'nba', { top: true, kambi: 'basketball/nba' }),
+  wnba: espn('basketball', 'basketball/wnba', 'WNBA', 'WNBA', 'wnba', { kambi: 'basketball/wnba' }),
+  nbl: espn('basketball', 'basketball/nbl', '澳洲職籃', 'NBL', 'nbl', { kambi: 'basketball/australia/nbl' }),
   euroleague: { sport: 'basketball', kind: 'match', data: 'kambi', kambi: 'basketball/euroleague', zh: '歐洲籃球聯賽', en: 'EuroLeague', bet: 'euroleague', odds: 'kambi', icon: '🏀', badge: '7xjtuy1554397263' },
   // Football
-  nfl: espn('football', 'football/nfl', 'NFL', 'NFL', 'nfl', { top: true }),
+  nfl: espn('football', 'football/nfl', 'NFL', 'NFL', 'nfl', { top: true, kambi: 'american_football/nfl' }),
+  ncaaf: espn('football', 'football/college-football', '美國大學美式足球', 'College Football', 'ncaaf', { kambi: 'american_football/ncaaf', icon: '🏈' }),
   // Hockey
-  nhl: espn('hockey', 'hockey/nhl', 'NHL', 'NHL', 'nhl'),
+  nhl: espn('hockey', 'hockey/nhl', 'NHL', 'NHL', 'nhl', { kambi: 'ice_hockey/nhl' }),
   // Soccer
-  epl: soccer('eng.1', '英超', 'Premier League', 'epl', { top: true, logo: 23 }),
-  laliga: soccer('esp.1', '西甲', 'LaLiga', 'laliga', { top: true, logo: 15 }),
-  seriea: soccer('ita.1', '義甲', 'Serie A', 'seriea', { logo: 12 }),
-  bundesliga: soccer('ger.1', '德甲', 'Bundesliga', 'bundesliga', { logo: 10 }),
-  ligue1: soccer('fra.1', '法甲', 'Ligue 1', 'ligue1', { logo: 9 }),
-  ucl: soccer('uefa.champions', '歐冠', 'Champions League', 'ucl', { top: true, cup: true, logo: 2 }),
-  uel: soccer('uefa.europa', '歐霸', 'Europa League', 'uel', { cup: true, logo: 2310 }),
-  uecl: soccer('uefa.europa.conf', '歐協聯', 'Conference League', 'uecl', { cup: true, logo: 20296 }),
-  scotland: soccer('sco.1', '蘇超', 'Scottish Premiership', 'scotland', { logo: 45 }),
-  mls: soccer('usa.1', '美職足', 'MLS', 'mls', { logo: 19 }),
+  epl: soccer('eng.1', '英超', 'Premier League', 'epl', { top: true, logo: 23, kambi: 'football/england/premier_league' }),
+  laliga: soccer('esp.1', '西甲', 'LaLiga', 'laliga', { top: true, logo: 15, kambi: 'football/spain/la_liga' }),
+  seriea: soccer('ita.1', '義甲', 'Serie A', 'seriea', { logo: 12, kambi: 'football/italy/serie_a' }),
+  bundesliga: soccer('ger.1', '德甲', 'Bundesliga', 'bundesliga', { logo: 10, kambi: 'football/germany/bundesliga' }),
+  ligue1: soccer('fra.1', '法甲', 'Ligue 1', 'ligue1', { logo: 9, kambi: 'football/france/ligue_1' }),
+  ucl: soccer('uefa.champions', '歐冠', 'Champions League', 'ucl', { top: true, cup: true, logo: 2, kambi: 'football/champions_league' }),
+  uel: soccer('uefa.europa', '歐霸', 'Europa League', 'uel', { cup: true, logo: 2310, kambi: 'football/europa_league' }),
+  uecl: soccer('uefa.europa.conf', '歐協聯', 'Conference League', 'uecl', { cup: true, logo: 20296, kambi: 'football/conference_league' }),
+  scotland: soccer('sco.1', '蘇超', 'Scottish Premiership', 'scotland', { logo: 45, kambi: 'football/scotland/scottish_premiership' }),
+  mls: soccer('usa.1', '美職足', 'MLS', 'mls', { logo: 19, kambi: 'football/usa/mls' }),
   // Korea's K League 1: not on ESPN, Kambi's schedule and prices (three-way).
   kleague: { sport: 'soccer', kind: 'match', data: 'kambi', kambi: 'football/south_korea/k-league_1', zh: '韓國職業足球聯賽', en: 'K League 1', bet: 'kleague', odds: 'kambi', icon: '⚽' },
   jleague: soccer('jpn.1', '日職聯', 'J1 League', 'jleague', { logo: 2199 }),
-  facup: soccer('eng.fa', '英足總盃', 'FA Cup', 'facup', { cup: true, logo: 40 }),
+  championship: soccer('eng.2', '英冠', 'Championship', 'championship', { logo: 24, kambi: 'football/england/the_championship' }),
+  eredivisie: soccer('ned.1', '荷甲', 'Eredivisie', 'eredivisie', { logo: 11, kambi: 'football/netherlands/eredivisie' }),
+  ligamx: soccer('mex.1', '墨超', 'Liga MX', 'ligamx', { logo: 22, kambi: 'football/mexico/liga_mx' }),
+  brasileirao: soccer('bra.1', '巴甲', 'Brasileirão', 'brasileirao', { logo: 85, kambi: 'football/brazil/brasileirao_serie_a' }),
+  facup: soccer('eng.fa', '英足總盃', 'FA Cup', 'facup', { cup: true, logo: 40, kambi: 'football/england/fa_cup' }),
   // The big tournaments: every few years, the board fills when one is on.
   worldcup: soccer('fifa.world', '世界盃', 'FIFA World Cup', 'worldcup', { cup: true, logo: 4 }),
-  nationsleague: soccer('uefa.nations', '歐國聯', 'Nations League', 'nationsleague', { cup: true, logo: 2395 }),
+  nationsleague: soccer('uefa.nations', '歐國聯', 'Nations League', 'nationsleague', { cup: true, logo: 2395, kambi: 'football/uefa_nations_league' }),
   // Racing
   f1: { sport: 'racing', kind: 'field', data: 'espn', espn: 'racing/f1', zh: 'F1 一級方程式', en: 'Formula 1', bet: 'f1', top: true, standings: true },
+  // Tennis and UFC: one player against another. Kambi's schedule and prices
+  // (every tournament of the tour, every fight of a card), results from
+  // ESPN's scoreboards (the tour's, the card's).
+  atp: { sport: 'tennis', kind: 'match', data: 'kambi', kambi: 'tennis/atp', espn: 'tennis/atp', zh: 'ATP 男網', en: 'ATP', bet: 'atp', odds: 'kambi', icon: '🎾' },
+  wta: { sport: 'tennis', kind: 'match', data: 'kambi', kambi: 'tennis/wta', espn: 'tennis/wta', zh: 'WTA 女網', en: 'WTA', bet: 'wta', odds: 'kambi', icon: '🎾' },
+  ufc: { sport: 'mma', kind: 'match', data: 'kambi', kambi: 'ufc_mma/ufc', espn: 'mma/ufc', zh: 'UFC', en: 'UFC', bet: 'ufc', odds: 'kambi', icon: '🥊' }
 };
 
 // Play's kind of markets for a sport.
