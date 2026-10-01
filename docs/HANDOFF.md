@@ -29,11 +29,14 @@ edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
 - **Every purchase asks first** (kit `ask`): Play bets (cost and the most it
   pays), lottery tickets, scratch cards; Securities orders, exchanges,
   loans, monthly plans; joining Plus (kit). Rewards already did.
-- **Prices at the moment of buying:** Securities reads the quote again
-  (waits, 15 s at most; no fresh price, no order) and asks again if it
-  moved over 1% (`atFreshPrice`). Play checks the board when the bet is
-  placed: a pick closed stops it, odds that moved redraw the slip and stop
-  (the slip always shows what's bought).
+- **Prices at the moment of buying:** a Securities order goes in at once
+  as a 委託單 held for a fresh price (`placeOrder` `fresh` → `waitFresh`;
+  `processOrders` fills it only at a quote with `got` after it, `fetchQuotes`
+  stamps `got`); `atFreshPrice` reads the quote straight away (a few tries),
+  the usual refresh after that. Play's slip redraws with each board refresh
+  and marks odds that moved since the pick was added (`pickedOdds`, ▲/▼ and
+  the old figure); placing is one tap at the odds now, stopped only by a
+  pick closed or started.
 - **Free bet as a cut** (Play `placeFreeSlip`, `freeValue`): more can go on
   top from the balance; a win pays all but the free part's stake.
 - **Words:** smart mode never asks a flash card; letters questions have no
