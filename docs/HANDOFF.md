@@ -39,6 +39,26 @@ Securities
 - [ ] Remove descriptive lines (too long, unnecessary).
 
 Rewards
+- [x] Games fill the phone screen (arcadeView `refit`: canvases sized to
+  the space left, boards scaled and centred), a 遊戲列表 button beside
+  再玩一局 on the result card, and one XP rate for every game
+  (games.mjs `roundXp`/`roundTop`/`roundMinutes`: GAME_XPM × minutes
+  played × √(score ÷ best), up to the game's length; scores show as 分).
+  Old bests (in XP) stay as they were.
+- [x] Sprite directions: pixel T-rex facing right (runner.js, canvas
+  360×300), racer car, rockets, chick.
+- [ ] Not yet checked game by game on screen beyond ~20 of the 104.
+- [ ] Ported open-source games: blocked by the session's permission
+  classifier ("Untrusted Code Integration") twice; the owner is granting
+  permission. Plan: `public/ported/<id>/` per game with its LICENSE, a
+  `public/ported/bridge.js` (`quadra.score(n)`, `quadra.over(n)` posting to
+  the parent, `quadra.done` blocking the game's own restart), an arcade
+  module per game using a kit.js `portedGame(api, path)` iframe that listens
+  for those messages; ARCADE list entries with max/rate set so max/rate is
+  an excellent score. Candidates checked: wayou/t-rex-runner (BSD-3; hooks
+  in gameOver, restart, distanceMeter.update), gabrielecirulli/2048 (MIT),
+  Hextris (GPL-3), iamkun/tower_game (MIT), chvin/react-tetris (Apache-2.0,
+  built in docs/).
 - [ ] 財富等級 as the point of the game, a milestone of taking part, not
   Quadra's profit. Three sides: the user, Quadra (profit-minded) and "God"
   (who gives starter money, the monthly pay, level rewards).
@@ -83,6 +103,19 @@ Fixtures
 - [ ] 追蹤 tab revamped: personal and informative, not 賽事 filtered.
 - [ ] Settings revamped or replaced.
 - [ ] Fewer labels, pills and emoji: a cleaner design.
+
+Kit (asked 2026-10-01): a shared loading screen and an update system that
+keeps every open session current.
+- [ ] `kit/boot.js` written (draft, not synced or wired): draws the loading
+  screen into `<div id="loading" data-title data-cache>`, a progress line
+  (`window.__bootStep`), the failsafe (`__fxFail`/`__oddsFail` aliases,
+  15 s) and a version.json check before the app starts. To do: kit CSS for
+  `.q-boot*`, `sync.mjs` copying boot.js to each app's public/ (Orbit's
+  public/ too), each index.html's loading markup and inline script
+  replaced by it; `watchUpdates` to check every minute and on focus/online,
+  tell other tabs via BroadcastChannel('quadra-updates'), apply at once
+  unless busy (an input focused, a dialog open, the app's busy()), else
+  when free.
 
 From the earlier Next list (below): Fixtures MotoGP standings and rider
 pages; Formula E results; Formula E betting in Play once Kambi prices it.
