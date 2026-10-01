@@ -2,9 +2,10 @@
 // leagues.mjs for the apps that show teams) into every app checked out next to this repo. The apps never edit their copies: change the kit here,
 // run `node kit/sync.mjs`, commit each app.
 import { copyFile, access } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 
-const root = new URL('../../', import.meta.url).pathname;
-const kit = new URL('./', import.meta.url).pathname;
+const root = fileURLToPath(new URL('../../', import.meta.url));
+const kit = fileURLToPath(new URL('./', import.meta.url));
 const TARGETS = [
   ['Quadra-Securities/public/lib/quadra.mjs', 'Quadra-Securities/public/quadra.css'],
   ['Quadra-Play/public/lib/quadra.mjs', 'Quadra-Play/public/quadra.css'],
