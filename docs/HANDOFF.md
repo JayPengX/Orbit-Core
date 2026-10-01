@@ -175,10 +175,21 @@ Rewards (after Fixtures; ported games LAST)
 - [~] Home and 任務 reworked as above; 單字 itself unchanged otherwise.
 - [x] 說明 updated for every new mechanism (credit trading, level rewards,
   the shop, Fixtures' new pages).
-- [ ] LAST: port open-source games, integrated (Traditional Chinese, the
-  round's start and end through Rewards, no foreign links).
-  - In place: bridge.js, `portedStage`, and `PORTED_LIST`/`addPorted` (still
-    empty).
+- [~] LAST: port open-source games, integrated (Traditional Chinese, the
+  round's start and end through Rewards, no foreign links). On `main`:
+  dino (id `runner`), 2048 (`merge`, the classic one dropped from GAMES),
+  Rembound's Match-3 (`match3`), Bubble Shooter (`bubbles`, new), iamkun's
+  Tower (`stack`) and Jake Gordon's Breakout (`breakout`). A port takes the
+  id of the home-made game it replaces (daily game, missions, bests carry
+  over) and that game's arcade/<id>.js is deleted. Ported games pay up to
+  50 (120 if 10+ minutes) at their "excellent" score (PORTED_LIST rows).
+  Next: Jake Gordon's racer (`racer`; v4.final.html: no game over, so a
+  2-minute round by distance, auto-accelerate, quadra.pad ◀ ▶, no music),
+  Clumsy Bird (`flappy`, GPL), Hextris (new, GPL), simple-chess-ai (new,
+  Apache). react-tetris has no licence: skip. Dead code of replaced games
+  (classic merge's MERGE/mergeView, its STREAK entry) is still there.
+  Removing the remaining home-made games only once ports exist for them.
+  - In place: bridge.js, `portedStage`, and `PORTED_LIST`/`addPorted`.
   - Adapted already: ported/dino and ported/2048.
   - Candidates: Hextris, tower_game, react-tetris, rembound bubble/match-3,
     simple-chess-ai, jakesgordon racer/breakout, clumsy-bird, solitaire,
