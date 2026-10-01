@@ -21,8 +21,14 @@ down, restored here).
   overdraft costs), Apps. Every game, mission, shop and points spend is gone.
   Vocab (`public/lib/words.mjs`): distractors are the closest look-alikes
   (spelling, overlapping meaning, part of speech, words this person confused
-  before), recognise → produce question types as a word is learnt, Leitner
-  boxes 1/3/7/21 days with lapses, misses come back at a round's end.
+  before); smart mode lets each box take several kinds and a round goes
+  through them all; scheduling is FSRS-5 per word (stability, difficulty,
+  due at 90% recall; answer time and question kind weigh the grade); 背新字
+  shows new words as cards and a full batch unlocks a quiz on it; misses
+  come back at a round's end. The TOEIC/IELTS/Business packs are gone.
+- **錢從哪裡來** (kit `moneySides`): an account older than the shared wallet
+  has no `eco:start`; its NT$110,000 opening sat in Securities' and Play's
+  books, so with `eco:rebase:v3` present the opening counts as 110,000 − 80,000.
 - **Plus** is for Play and Securities only (kit PLUS): NT$490 / NT$4,900 a
   year; Play: NT$200 bonus bet a week, parlay boost ×1.5, better cash-out;
   Securities: commission ×0.28, smaller FX spread, lending fee cut; avatars
