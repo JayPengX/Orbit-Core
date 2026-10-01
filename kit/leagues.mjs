@@ -152,7 +152,13 @@ export const CATALOG = {
   // F1's feeder series, on ELTA.tv (MAX 5-8) in Taiwan: their own sites'
   // calendars and session times (through the proxy, trimmed: trimFom).
   f2: { sport: 'racing', kind: 'field', data: 'fom', fom: 'www.fiaformula2.com', zh: 'F2 二級方程式', en: 'Formula 2', icon: '🏎️' },
-  f3: { sport: 'racing', kind: 'field', data: 'fom', fom: 'www.fiaformula3.com', zh: 'F3 三級方程式', en: 'Formula 3', icon: '🏎️' }
+  f3: { sport: 'racing', kind: 'field', data: 'fom', fom: 'www.fiaformula3.com', zh: 'F3 三級方程式', en: 'Formula 3', icon: '🏎️' },
+  // F1 Academy: its site is the older layout (/Racing-Series/Calendar, each
+  // round's Results?raceid=n page), read the same way (trimFom).
+  f1academy: { sport: 'racing', kind: 'field', data: 'fom', fom: 'www.f1academy.com', legacy: true, zh: 'F1 Academy 女子方程式', en: 'F1 Academy', icon: '🏎️' },
+  // GT World Challenge Europe: free on YouTube (@GTWorld); its site's
+  // calendar and each event's timetable (trimSro, the same shape).
+  gtwc: { sport: 'racing', kind: 'field', data: 'fom', fom: 'www.gt-world-challenge-europe.com', sro: true, zh: 'GT 世界挑戰賽（歐洲）', en: 'GT World Challenge Europe', icon: '🏁' }
 };
 
 // Leagues no one in Taiwan can watch (no channel, no streaming service,
