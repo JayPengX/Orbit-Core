@@ -139,6 +139,9 @@ const SPORTS_PROXY_ALLOWED_HOSTS = [
   // company's description in the reader's language (Securities). Only
   // /translate_a/t; sent upstream as a POST (see fetchUpstream), kept a month.
   'clients5.google.com',
+  // MotoGP's own results API (its calendar, sessions and orders): Fixtures'
+  // MotoGP (broadcast in Taiwan on 緯來); it refuses browsers' requests.
+  'api.motogp.pulselive.com',
   // ELTA's (愛爾達) sports schedule: which game each of its channels carries,
   // for Fixtures' "where to watch" (only the one list, always trimmed).
   ELTA_HOST,

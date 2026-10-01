@@ -143,8 +143,19 @@ export const CATALOG = {
   badminton: { sport: 'badminton', kind: 'match', data: 'kambi', kambi: 'badminton', zh: '羽球', en: 'Badminton', bet: 'badminton', odds: 'kambi', players: true, icon: '🏸', badge: 'd5xvqq1750423289', neutral: true, sets: { bestOf: 3, unit: 'points', target: 21, cap: 30 } },
   tabletennis: { sport: 'tabletennis', kind: 'match', data: 'kambi', kambi: 'table_tennis', pro: PRO_TABLE_TENNIS, zh: '桌球', en: 'Table tennis', bet: 'tabletennis', odds: 'kambi', players: true, icon: '🏓', badge: 'fvesg01750422363', neutral: true, sets: { bestOf: 5, unit: 'points', target: 11 }, cap: 16 },
   volleyball: { sport: 'volleyball', kind: 'match', data: 'kambi', kambi: 'volleyball', pro: PRO_VOLLEYBALL, zh: '排球', en: 'Volleyball', bet: 'volleyball', odds: 'kambi', icon: '🏐', sets: { bestOf: 5, unit: 'points', target: 25, last: 15 }, cap: 16 },
-  snooker: { sport: 'snooker', kind: 'match', data: 'kambi', kambi: 'snooker', zh: '司諾克', en: 'Snooker', bet: 'snooker', odds: 'kambi', players: true, icon: '🎱', badge: '0gmkgj1555600537', neutral: true, sets: { bestOf: null, unit: 'frames' } }
+  snooker: { sport: 'snooker', kind: 'match', data: 'kambi', kambi: 'snooker', zh: '司諾克', en: 'Snooker', bet: 'snooker', odds: 'kambi', players: true, icon: '🎱', badge: '0gmkgj1555600537', neutral: true, sets: { bestOf: null, unit: 'frames' } },
+  // Racing Taiwan watches besides F1: Formula E (Disney+ from 2026-27, its
+  // practice free on YouTube; the calendar from TheSportsDB, open to
+  // browsers) and MotoGP (緯來; the series' own results API, through the proxy).
+  formulae: { sport: 'racing', kind: 'field', data: 'tsdb', tsdb: 4371, zh: 'Formula E 電動方程式', en: 'Formula E', icon: '⚡' },
+  motogp: { sport: 'racing', kind: 'field', data: 'motogp', zh: 'MotoGP 世界摩托車錦標賽', en: 'MotoGP', icon: '🏍️' }
 };
+
+// Leagues no one in Taiwan can watch (no channel, no streaming service,
+// nothing on YouTube; checked October 2026): off both apps' lists and Play's
+// sale, kept here so bets already placed on them still settle.
+export const NO_TAIWAN = ['acb', 'nbl', 'cba', 'kbl', 'bleague', 'ncaaf', 'eredivisie', 'primeira', 'belgium', 'superlig', 'saudi', 'ligamx', 'brasileirao', 'argentina', 'libertadores', 'sudamericana', 'leaguecup', 'copadelrey', 'acl', 'asiancup', 'friendly', 'euro', 'copaamerica', 'clubworldcup', 'rugbyunion', 'cricket', 'snooker'];
+for (const k of NO_TAIWAN) if (CATALOG[k]) CATALOG[k].off = true;
 
 // Whether Kambi's event (its group and path words) belongs on the board of
 // the league with this catalogue key or Play key: every event, but for a
