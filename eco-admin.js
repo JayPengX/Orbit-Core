@@ -17,7 +17,7 @@
 import { ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, PAIR_MS, ECO_LIMITS, parseWallet, poolBalance, plusMember, gen } from './eco.js';
 import { KAMBI_COLLECTION } from './kambi.js';
 
-export const ADMIN_TOKEN_HASH = '274508c70c1c4cf04a811cbd03e8566e898c5aef0acba2243d876fadc3a8d7f8';
+export const ADMIN_TOKEN_HASH = '';
 export const RETIRED_COLLECTIONS = ['orbit-schedules', 'eco-links', 'stock-study-leagues'];
 // (A function: eco.js and this file import each other.)
 const keep = () => new Set([WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, KAMBI_COLLECTION, ...Object.values(ECO_APPS).map(a => a.collection)]);

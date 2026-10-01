@@ -52,8 +52,10 @@ down, restored here).
   no keyboard.
 - **Play:** home's balance card without buttons that repeated the tabs (a
   crash on home from the purge round, `follow`/`habits`, fixed).
-- **Firestore:** the admin clean was run this round (token set, scan, clean,
-  token cleared); see the commit log for counts.
+- **Firestore:** cleaned on 2026-10-01 (token set, scan, clean, token
+  cleared): 3 wallets; one tidied (57 retired Rewards entries and 7 settings
+  removed, their net NT$7,648 kept as one `eco:rebase:hub` entry so the
+  balance didn't change); nothing else to delete. A second scan found none.
 
 ## Round of 2026-10-01 (third list), branch `claude/admiring-hypatia-j60tqo`
 
