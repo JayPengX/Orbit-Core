@@ -500,8 +500,14 @@ test('points buy what money does: a redemption costs at least REWARDS_XP, amount
       r('vocab:xs:freeze:d', '600', { amount: -5 }),
       r('vocab:xs:freeze:e', '600', { kind: 'shop' }),
       r('vocab:xs:freeze:f', '600.5'),
-      { id: 'vocab:xs:freeze:g', t: 1, app: 'odds', kind: 'redeem', amount: 0, note: '600' }
+      { id: 'vocab:xs:freeze:g', t: 1, app: 'odds', kind: 'redeem', amount: 0, note: '600' },
+      r('vocab:xs:frame:gold', '8000'),
+      r('vocab:xs:frame:silver', '100'),
+      r('vocab:xs:frame:bronze', '100'),
+      r('vocab:xs:reroll:2026-10-02:orbit', '100'),
+      r('vocab:xs:repair:2026-10-01', '1500'),
+      r('vocab:xs:repair:2026-10-03', '100')
     ]
   });
-  assert.deepEqual(p.entries.map(e => e.id), ['vocab:xs:freeze:a', 'vocab:xs:boost:c', 'vocab:xs:pack:toeic']);
+  assert.deepEqual(p.entries.map(e => e.id), ['vocab:xs:freeze:a', 'vocab:xs:boost:c', 'vocab:xs:pack:toeic', 'vocab:xs:frame:gold', 'vocab:xs:reroll:2026-10-02:orbit', 'vocab:xs:repair:2026-10-01']);
 });

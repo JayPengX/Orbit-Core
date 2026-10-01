@@ -321,11 +321,17 @@ export const REWARDS_XP = {
   freeze: 600,
   boost: 300,
   pack: { toeic: 8_000, ielts: 12_000, biz: 16_000 },
-  avatar: { cat: 300, dog: 300, frog: 600, penguin: 600, rocket: 1_500, rainbow: 1_500, fire: 3_000, gem: 5_000 }
+  avatar: { cat: 300, dog: 300, frog: 600, penguin: 600, rocket: 1_500, rainbow: 1_500, fire: 3_000, gem: 5_000 },
+  // The kit's FRAMES with a price.
+  frame: { silver: 2_000, jade: 4_000, gold: 8_000, neon: 15_000, aurora: 30_000 },
+  // A daily mission swapped for another ('vocab:xs:reroll:<day>:<mission>').
+  reroll: 100,
+  // A missed day bought back for the streak ('vocab:xs:repair:<day>').
+  repair: 1_500
 };
 function xpPaid(id, e) {
   const [, , item, key] = id.split(':');
-  const least = item === 'pack' || item === 'avatar' ? REWARDS_XP[item][key] : REWARDS_XP[item];
+  const least = ['pack', 'avatar', 'frame'].includes(item) ? REWARDS_XP[item][key] : REWARDS_XP[item];
   const cost = Number(e.note);
   return typeof least === 'number' && e.kind === 'redeem' && Number.isInteger(cost) && cost >= least && cost <= 100_000;
 }

@@ -286,11 +286,11 @@ test('v7: the kit and the Worker agree on the allowance and Plus; the statement 
 });
 
 test('points: earned make the level and title, spent come off what is left', () => {
-  assert.deepEqual([0, 99, 100, 999, 1_000, 4_500, 19_000, 43_500].map(x => kit.xpLevel(x).level), [1, 1, 2, 4, 5, 10, 20, 30]);
-  assert.equal(kit.xpLevel(4_500, 'en').title, 'Skilled');
-  assert.equal(kit.xpLevel(19_000).title, '達人');
+  assert.deepEqual([0, 99, 100, 899, 900, 1_600, 8_100, 36_099, 36_100, 84_100, 240_100].map(x => kit.xpLevel(x).level), [1, 1, 2, 3, 4, 5, 10, 19, 20, 30, 50]);
+  assert.equal(kit.xpLevel(8_100, 'en').title, 'Skilled');
+  assert.equal(kit.xpLevel(36_100).title, '達人');
   const l = kit.xpLevel(550);
-  assert.deepEqual([l.level, l.from, l.to, l.toNext], [3, 300, 600, 50]);
+  assert.deepEqual([l.level, l.from, l.to, l.toNext], [3, 400, 900, 350]);
   const w = { entries: [
     { id: 'vocab:g:1', t: 1, app: 'vocab', kind: 'game', amount: 0, xp: 700 },
     { id: 'vocab:w:old', t: 1, app: 'vocab', kind: 'words', amount: 300 },
@@ -336,8 +336,9 @@ test('avatars: level ones with the level, bought ones with points (Worker prices
   const bought = kit.AVATARS.filter(a => a.xp);
   assert.deepEqual(Object.fromEntries(bought.map(a => [a.id, a.xp])), eco.REWARDS_XP.avatar);
   const xp = n => ({ id: `vocab:g:${n}`, t: 1, app: 'vocab', kind: 'game', amount: 0, xp: n });
-  const w = { entries: [xp(4_500), { id: 'vocab:xs:avatar:cat', t: 2, app: 'vocab', kind: 'redeem', amount: 0, note: '300' }], settings: { avatar: { value: { id: 'panda' }, t: 1 } } };
-  // 4,500 XP is level 10: the panda is his, the lion (15) isn't yet.
+  assert.deepEqual(Object.fromEntries(kit.FRAMES.filter(f => f.xp).map(f => [f.id, f.xp])), eco.REWARDS_XP.frame);
+  const w = { entries: [xp(8_100), { id: 'vocab:xs:avatar:cat', t: 2, app: 'vocab', kind: 'redeem', amount: 0, note: '300' }], settings: { avatar: { value: { id: 'panda' }, t: 1 } } };
+  // 8,100 XP is level 10: the panda is theirs, the lion (15) isn't yet.
   assert.ok(kit.avatarOwned(w, 'panda') && !kit.avatarOwned(w, 'lion'));
   assert.ok(kit.avatarOwned(w, 'cat') && !kit.avatarOwned(w, 'dog'));
   assert.ok(!kit.avatarOwned(w, 'star'));
@@ -395,4 +396,22 @@ test('streak: 3 daily missions keep a day (bonus ones aside), a card covers a da
   assert.ok(kit.avatarOwned(broken, 'tiger'));
   // Other apps' entries don't count.
   assert.equal(kit.streakOf({ entries: [{ id: 'odds:x', t: day(1), app: 'odds', kind: 'game', amount: 0 }] }, now), 0);
+});
+
+test('frames: level ones with the level, bought ones with their entry; a repaired day keeps the streak', () => {
+  const now = Date.UTC(2026, 9, 20, 4);
+  const xp = n => ({ id: `vocab:g:${n}`, t: 1, app: 'vocab', kind: 'game', amount: 0, xp: n });
+  const lv10 = { entries: [xp(8_100)], settings: { frame: { value: { id: 'bronze' }, t: 1 } } };
+  assert.ok(kit.frameOwned(lv10, 'bronze') && !kit.frameOwned(lv10, 'legend') && !kit.frameOwned(lv10, 'gold'));
+  assert.equal(kit.frameOf(lv10).id, 'bronze');
+  const gold = { entries: [{ id: 'vocab:xs:frame:gold', t: 1, app: 'vocab', kind: 'redeem', amount: 0, note: '8000' }], settings: { frame: { value: { id: 'gold' }, t: 1 } } };
+  assert.equal(kit.frameOf(gold).id, 'gold');
+  assert.equal(kit.frameOf({ ...gold, entries: [] }), null);
+  // Yesterday missed, bought back: the streak runs on.
+  const dayOf = n => new Date(now - n * 86_400_000 + 8 * 3_600_000).toISOString().slice(0, 10);
+  const kept = n => ['words20', 'game1', 'quotes'].map(id => ({ id: `vocab:m:${dayOf(n)}:${id}`, t: now - n * 86_400_000, app: 'vocab', kind: 'mission', amount: 0, xp: 10 }));
+  const w = { entries: [...kept(3), ...kept(2)] };
+  assert.equal(kit.streakOf(w, now), 0);
+  w.entries.push({ id: `vocab:xs:repair:${dayOf(1)}`, t: now, app: 'vocab', kind: 'redeem', amount: 0, note: '1500' });
+  assert.equal(kit.streakOf(w, now), 3);
 });
