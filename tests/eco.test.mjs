@@ -338,8 +338,10 @@ test('Quadra Hub migration removes game XP and cosmetics without refunding prior
   assert.equal(cleaned.settings.frame, undefined);
   assert.equal(cleaned.settings['bests:vocab'], undefined);
   assert.ok(cleaned.settings['act:stock']);
-  const chosenAgain = { ...cleaned, settings: { ...cleaned.settings, avatar: { value: { id: 'fox' }, t: at + 5 } } };
+  const chosenAgain = { ...cleaned, settings: { ...cleaned.settings, avatar: { value: { id: 'fox' }, t: cleaned.settings['hub:cleanup:v1'].t + 1 } } };
   assert.equal(tidyWallet(chosenAgain).settings.avatar.value.id, 'fox');
+  const staleChoice = { ...cleaned, settings: { ...cleaned.settings, avatar: { value: { id: 'cat' }, t: at + 6 } } };
+  assert.equal(tidyWallet(staleChoice).settings.avatar, undefined);
   assert.deepEqual(tidyWallet(cleaned), cleaned);
 });
 

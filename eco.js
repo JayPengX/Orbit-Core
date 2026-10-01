@@ -458,15 +458,17 @@ const debitId = id => {
 function cleanHubWallet(wallet) {
   const settings = { ...(wallet.settings || {}) };
   const firstCleanup = settings[HUB_CLEANUP_SETTING]?.value !== true;
+  const cleanupAt = finite(settings[HUB_CLEANUP_SETTING]?.t) ?? 0;
   const entries = (wallet.entries || []).filter(e => !retiredGameEntry(e) && !retiredMissionFreebet(e) && !retiredCosmeticEntry(e));
   if (firstCleanup) {
-    for (const key of ['avatar', 'frame', 'bests:vocab']) delete settings[key];
     for (const e of wallet.entries || []) {
       if (!retiredCosmeticEntry(e) || e.kind !== 'redeem' || !Number.isInteger(Number(e.note)) || Number(e.note) <= 0) continue;
       entries.push({ id: debitId(e.id), t: e.t, app: 'vocab', kind: 'redeem', amount: 0, note: String(Number(e.note)) });
     }
     settings[HUB_CLEANUP_SETTING] = { value: true, t: Date.now() };
   }
+  for (const key of ['avatar', 'frame']) if (firstCleanup || (finite(settings[key]?.t) ?? 0) <= cleanupAt) delete settings[key];
+  if (firstCleanup) delete settings['bests:vocab'];
   entries.sort((a, b) => a.t - b.t || (a.id < b.id ? -1 : 1));
   return { ...wallet, entries, settings };
 }

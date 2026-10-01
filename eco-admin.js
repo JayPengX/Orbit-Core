@@ -107,8 +107,10 @@ export async function planClean(env, deps) {
         if (e.app === 'vocab' && /^vocab:xs:(avatar|frame|plus):/.test(e.id || '')) hubPurge.cosmeticRedemptions++;
       }
     }
-    if (wallet.settings?.['hub:cleanup:v1']?.value !== true) {
-      for (const key of ['avatar', 'frame']) if (wallet.settings?.[key]) hubPurge.cosmeticChoices++;
+    const cleanupAt = Number(wallet.settings?.['hub:cleanup:v1']?.t) || 0;
+    for (const key of ['avatar', 'frame']) {
+      const choice = wallet.settings?.[key];
+      if (choice && (wallet.settings?.['hub:cleanup:v1']?.value !== true || (Number(choice.t) || 0) <= cleanupAt)) hubPurge.cosmeticChoices++;
     }
     if (wallet.settings?.['bests:vocab']) hubPurge.gameScoreSettings++;
     if (JSON.stringify(next) !== JSON.stringify(wallet)) tidy.push({ id: w.id, wallet: next, updateTime: w.updateTime });
