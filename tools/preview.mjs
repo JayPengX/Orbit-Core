@@ -41,6 +41,7 @@ import { join, extname, resolve } from 'node:path';
 import { execFile } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { ASIA_HOST, asiaBaseballResponse } from '../asia-baseball.js';
+import { trimFom, trimF1Page, trimYoutube } from '../sports-proxy-worker.js';
 
 const require = createRequire(import.meta.url);
 let chromium;
@@ -195,6 +196,14 @@ function fakeYahooAnswer(url) {
   }
   return { status: 404, body: '' };
 }
+// Pages the Worker answers trimmed to JSON (F1's and its sister series'
+// sites, YouTube's feeds): trimmed here the same way.
+const pageTrim = (url, r) => {
+  if (r.status !== 200) return r;
+  const host = new URL(url).hostname;
+  const trim = host === 'www.formula1.com' ? trimF1Page : /^www\.(fiaformula[23]|f1academy)\.com$/.test(host) ? trimFom : host === 'www.youtube.com' ? trimYoutube : null;
+  return trim ? { status: 200, body: JSON.stringify(trim(r.body)) } : r;
+};
 const upstream = url => {
   if (fakeYahoo && url.includes('finance.yahoo.com')) return Promise.resolve(fakeYahooAnswer(url));
   const fixture = fixtures.find(([text]) => url.includes(text));
@@ -207,7 +216,7 @@ const upstream = url => {
   if (!cache.has(url)) {
     const t0 = Date.now();
     // DEBUG: status, size, when it was asked (ms from start) and how long it took.
-    cache.set(url, curl(url).then(r => (DEBUG && console.log(r.status, r.body.length, `@${t0 - STARTED}`, `${Date.now() - t0}ms`, url.slice(0, 140)), r)));
+    cache.set(url, curl(url).then(r => (DEBUG && console.log(r.status, r.body.length, `@${t0 - STARTED}`, `${Date.now() - t0}ms`, url.slice(0, 140)), pageTrim(url, r))));
   }
   return cache.get(url);
 };
