@@ -263,10 +263,11 @@ test('pictures: national sides get flags, names in either order', async () => {
   assert.equal(L.countryCode('England'), 'GB-ENG');
   assert.equal(L.countryFlag('Wales'), '🇬🇧');
   assert.match(L.teamBadge('kleague', 'Ulsan HD'), /thesportsdb/);
-  assert.match(L.teamLogo('nba', 'Boston Celtics'), /cdn\.nba\.com\/logos\/nba\/1610612738/);
+  assert.equal(L.teamLogo('nba', 'Boston Celtics'), 'https://cdn.nba.com/logos/nba/1610612738/primary/L/logo.svg');
+  assert.equal(L.teamLogo('nba', 'Boston Celtics', true), 'https://cdn.nba.com/logos/nba/1610612738/primary/D/logo.svg');
   assert.equal(L.teamLogo('nba', 'London Lions'), null);
-  L.rememberLogo('nba', 'Shi Yuqi', 'https://a.espncdn.com/i/teamlogos/countries/500/chn.png');
-  assert.match(L.teamLogo('nba', 'Yuqi Shi'), /chn\.png$/);
+  L.rememberLogo('mls', 'Miami Inter', 'https://a.espncdn.com/i/teamlogos/soccer/500/20232.png');
+  assert.match(L.teamLogo('mls', 'Inter Miami'), /20232\.png$/);
   for (const key of ['kleague', 'euroleague', 'npb', 'cpbl']) assert.ok(L.leagueLogo(key), key);
 });
 

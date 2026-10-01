@@ -1,4 +1,4 @@
-// Copies the shared kit (quadra.mjs, quadra.css, boot.js, and logos.mjs, names.mjs and
+// Copies the shared kit (quadra.mjs, quadra.css, boot.js, sw-images.js, and logos.mjs, names.mjs and
 // leagues.mjs for the apps that show teams) into every app checked out next to this repo. The apps never edit their copies: change the kit here,
 // run `node kit/sync.mjs`, commit each app.
 import { copyFile, access } from 'node:fs/promises';
@@ -20,6 +20,9 @@ const CATALOG = { 'Quadra-Play': 'Quadra-Play/public/lib/catalog.mjs', 'Quadra-F
 // The loading screen and first update check (boot.js), for the apps that open
 // with one.
 const BOOT = { 'Quadra-Securities': 'Quadra-Securities/public/boot.js', 'Quadra-Play': 'Quadra-Play/public/boot.js', 'Quadra-Fixtures': 'Quadra-Fixtures/public/boot.js', 'Quadra-Rewards': 'Quadra-Rewards/public/boot.js' };
+// Pictures from other sites kept on the device (sw-images.js, imported by
+// the app's service worker), for the apps that show logos and photos.
+const IMAGES = { 'Quadra-Securities': 'Quadra-Securities/public/sw-images.js', 'Quadra-Play': 'Quadra-Play/public/sw-images.js', 'Quadra-Fixtures': 'Quadra-Fixtures/public/sw-images.js', 'Quadra-Rewards': 'Quadra-Rewards/public/sw-images.js' };
 // People's studio headshots (photos.mjs), for Fixtures.
 const PHOTOS = { 'Quadra-Fixtures': 'Quadra-Fixtures/public/lib/photos.mjs' };
 // Teams in Chinese (names.mjs), for the same two.
@@ -35,6 +38,7 @@ for (const [js, css] of TARGETS) {
   await copyFile(`${kit}quadra.mjs`, `${root}${js}`).catch(e => console.log('skip', js, e.code));
   await copyFile(`${kit}quadra.css`, `${root}${css}`).catch(e => console.log('skip', css, e.code));
   if (PHOTOS[app]) await copyFile(`${kit}photos.mjs`, `${root}${PHOTOS[app]}`).catch(e => console.log('skip', PHOTOS[app], e.code));
+  if (IMAGES[app]) await copyFile(`${kit}sw-images.js`, `${root}${IMAGES[app]}`).catch(e => console.log('skip', IMAGES[app], e.code));
   if (BOOT[app]) await copyFile(`${kit}boot.js`, `${root}${BOOT[app]}`).catch(e => console.log('skip', BOOT[app], e.code));
   if (LOGOS[app]) await copyFile(`${kit}logos.mjs`, `${root}${LOGOS[app]}`).catch(e => console.log('skip', LOGOS[app], e.code));
   if (NAMES[app]) await copyFile(`${kit}names.mjs`, `${root}${NAMES[app]}`).catch(e => console.log('skip', NAMES[app], e.code));
