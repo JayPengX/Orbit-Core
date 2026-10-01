@@ -148,7 +148,11 @@ export const CATALOG = {
   // practice free on YouTube; the calendar from TheSportsDB, open to
   // browsers) and MotoGP (緯來; the series' own results API, through the proxy).
   formulae: { sport: 'racing', kind: 'field', data: 'tsdb', tsdb: 4371, zh: 'Formula E 電動方程式', en: 'Formula E', icon: '⚡' },
-  motogp: { sport: 'racing', kind: 'field', data: 'motogp', zh: 'MotoGP 世界摩托車錦標賽', en: 'MotoGP', icon: '🏍️' }
+  motogp: { sport: 'racing', kind: 'field', data: 'motogp', zh: 'MotoGP 世界摩托車錦標賽', en: 'MotoGP', icon: '🏍️' },
+  // F1's feeder series, on ELTA.tv (MAX 5-8) in Taiwan: their own sites'
+  // calendars and session times (through the proxy, trimmed: trimFom).
+  f2: { sport: 'racing', kind: 'field', data: 'fom', fom: 'www.fiaformula2.com', zh: 'F2 二級方程式', en: 'Formula 2', icon: '🏎️' },
+  f3: { sport: 'racing', kind: 'field', data: 'fom', fom: 'www.fiaformula3.com', zh: 'F3 三級方程式', en: 'Formula 3', icon: '🏎️' }
 };
 
 // Leagues no one in Taiwan can watch (no channel, no streaming service,
