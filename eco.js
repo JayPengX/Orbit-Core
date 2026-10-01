@@ -120,6 +120,27 @@ const rebaseDue = wallet => {
   // ledger): any such account has something in the pool.
   return start ? start.amount > PAY.start : !wallet?.v2 && ((wallet?.entries || []).length > 0 || Object.keys(wallet?.snap || {}).length > 0);
 };
+// The reset assumed NT$110,000. An account that opened with less (only
+// Securities' NT$100,000, or only Play's NT$10,000) came out below
+// NT$30,000: `eco:rebase:v3fix` gives the difference back, once, when
+// Securities has reported its own opening money (`snap.stock.opened`; Play's
+// is its `odds:start` entry). It never takes anything.
+const OLD_OPENING = 110_000;
+export const REBASE_FIX_ID = 'eco:rebase:v3fix';
+export function rebaseFix(wallet) {
+  const entries = wallet?.entries || [];
+  const has = id => entries.some(e => e.id === id);
+  const opened = finite(wallet?.snap?.stock?.opened);
+  if (!has(REBASE.id) || has('eco:start') || has(REBASE_FIX_ID) || opened == null) return [];
+  const play = entries.filter(e => e.id === 'odds:start').reduce((sum, e) => sum + e.amount, 0);
+  const amount = Math.round(OLD_OPENING - opened - play);
+  return amount > 0 ? [{ id: REBASE_FIX_ID, t: Date.now(), app: 'eco', kind: 'rebase', amount }] : [];
+}
+// The reset can take the cash below zero; that part of an overdraft is
+// Quadra's doing, so it costs nothing (`resetOwed`), and what was charged
+// on it before is given back once (`eco:odback:v3`, an 'od' entry).
+const resetOwed = wallet => ((wallet?.entries || []).some(e => e.id === REBASE.id) ? -REBASE.amount : 0);
+export const OD_BACK_ID = 'eco:odback:v3';
 // An overdraft (the pool below zero) costs OVERDRAFT_RATE a month, charged
 // with the month's pay on what was owed then, as `eco:od:<month>`:
 // cheaper to sell something (or borrow on margin in Securities) than to sit
@@ -149,9 +170,17 @@ export function paydayEntries(wallet, now) {
   const out = [];
   if (wallet.v2 && !have.has('eco:start')) out.push({ id: 'eco:start', t: now, app: 'eco', kind: 'start', amount: PAY.start });
   if (!have.has(REBASE.id) && rebaseDue(wallet)) out.push({ id: REBASE.id, t: now, app: 'eco', kind: 'rebase', amount: REBASE.amount });
+  out.push(...rebaseFix({ ...wallet, entries: [...(wallet.entries || []), ...out] }).map(e => ({ ...e, t: now })));
+  const free = resetOwed({ entries: [...(wallet.entries || []), ...out] });
+  if (free && !have.has(OD_BACK_ID)) {
+    // Each month's interest as it would have been without the reset's part.
+    const back = (wallet.entries || []).filter(e => e.app === 'eco' && e.kind === 'od' && e.amount < 0).reduce((sum, e) => sum - e.amount - Math.round(Math.max(0, -e.amount / OVERDRAFT_RATE - free) * OVERDRAFT_RATE), 0);
+    if (back > 0) out.push({ id: OD_BACK_ID, t: now, app: 'eco', kind: 'od', amount: back });
+  }
   const month = taipeiMonth(now);
-  // This month's overdraft interest, on what's owed before the pay.
-  const owed = -(poolBalance(wallet) + out.reduce((sum, e) => sum + e.amount, 0));
+  // This month's overdraft interest, on what's owed before the pay, less
+  // what the reset made.
+  const owed = -(poolBalance(wallet) + out.reduce((sum, e) => sum + e.amount, 0)) - free;
   if (owed >= 100 && month >= PAY_FROM_MONTH && !have.has(`eco:od:${month}`)) out.push({ id: `eco:od:${month}`, t: now, app: 'eco', kind: 'od', amount: -Math.round(owed * OVERDRAFT_RATE) });
   const made = Number.isFinite(wallet.created) ? taipeiMonth(Math.min(wallet.created, now)) : month;
   let m = made > PAY_FROM_MONTH ? made : PAY_FROM_MONTH;

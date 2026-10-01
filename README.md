@@ -96,7 +96,12 @@ account's document id.
   Quadra Hub keeps its word progress in `vocab-progress-sync` and writes no
   wallet entries.
 - **The reset** (once, `eco:rebase:v3`, −NT$80,000): every account that
-  opened on the old NT$110,000 comes down to the new NT$30,000.
+  opened on the old NT$110,000 comes down to the new NT$30,000. One that
+  opened with less (Securities' NT$100,000 alone, before Play had its own
+  NT$10,000; Securities reports its opening as `snap.stock.opened`) gets the
+  difference back once (`eco:rebase:v3fix`). The part of an overdraft the
+  reset made costs no interest, and what was charged on it came back once
+  (`eco:odback:v3`).
 - **Overdrafts are allowed:** the pool can go below zero (after the reset,
   or anything else); spending stops until it's covered, selling and cash
   outs still work, and it costs 1% a month (`eco:od:<month>`, charged with

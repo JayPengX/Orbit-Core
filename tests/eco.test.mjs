@@ -452,8 +452,8 @@ test('the reset: accounts that opened with NT$110,000 come down to NT$30,000 onc
   assert.equal(due[0].id, REBASE.id);
   assert.equal(due[0].amount, -80_000);
   assert.equal(due.find(e => e.kind === 'pay').amount, 6_000);
-  // Overdrawn when the month starts: 1% of what's owed.
-  assert.equal(due.find(e => e.kind === 'od').amount, -Math.round(70_000 * OVERDRAFT_RATE));
+  // Overdrawn only by the reset: no interest on it.
+  assert.ok(!due.some(e => e.kind === 'od'));
   // Once only.
   const after = { ...old, entries: [...old.entries, ...due] };
   assert.deepEqual(paydayEntries(after, oct), []);
@@ -565,4 +565,28 @@ test('wealth levels: each level reached pays its reward once, from what the acco
   assert.equal(RANKS.length, 8);
   // In the payday's entries, after the pay.
   assert.ok(paydayEntries({ entries: [{ id: 'eco:start', amount: 45_000 }, { id: 'eco:rebase:v3', t: 1, app: 'eco', kind: 'rebase', amount: 0 }] }, now).some(e => e.id === 'eco:rank:saver'));
+});
+
+test('the reset made right: an account that opened with less than 110,000 gets the difference once, and pays no interest on what the reset owes', async () => {
+  const { rebaseFix, REBASE_FIX_ID, OD_BACK_ID } = await import('../eco.js');
+  const oct = Date.UTC(2026, 9, 20);
+  const reset = { id: 'eco:rebase:v3', t: 1, app: 'eco', kind: 'rebase', amount: -80_000 };
+  // Securities' 100,000 only: 10,000 back, once Securities has said so.
+  assert.deepEqual(rebaseFix({ entries: [reset], snap: { stock: { cash: 0, t: 1 } } }), []);
+  assert.equal(rebaseFix({ entries: [reset], snap: { stock: { cash: 0, opened: 100_000, t: 1 } } })[0].amount, 10_000);
+  // Both apps' (110,000), a bigger start, or a new account: nothing.
+  assert.deepEqual(rebaseFix({ entries: [reset, { id: 'odds:start', t: 1, app: 'odds', kind: 'start', amount: 10_000 }], snap: { stock: { opened: 100_000, t: 1 } } }), []);
+  assert.deepEqual(rebaseFix({ entries: [reset], snap: { stock: { opened: 500_000, t: 1 } } }), []);
+  assert.deepEqual(rebaseFix({ entries: [{ id: 'eco:start', t: 1, app: 'eco', kind: 'start', amount: 30_000 }, reset], snap: { stock: { opened: 0, t: 1 } } }), []);
+  // In payday: the fix, the interest charged on the reset's part given back, no new interest on it.
+  const w = { created: oct, entries: [reset, { id: 'eco:pay:2026-10', t: 1, app: 'eco', kind: 'pay', amount: 8_000 }, { id: 'eco:od:2026-10', t: 1, app: 'eco', kind: 'od', amount: -466 }], snap: { stock: { cash: 0, opened: 100_000, t: 1 } } };
+  const out = paydayEntries(w, Date.UTC(2026, 10, 3));
+  assert.equal(out.find(e => e.id === REBASE_FIX_ID).amount, 10_000);
+  assert.equal(out.find(e => e.id === OD_BACK_ID).amount, 466);
+  assert.ok(!out.some(e => e.id === 'eco:od:2026-11'));
+  // Owing more than the reset made: interest on the rest only.
+  const deep = paydayEntries({ ...w, entries: [...w.entries, { id: 'x', t: 1, app: 'stock', amount: -100_000 }] }, Date.UTC(2026, 10, 3));
+  assert.equal(deep.find(e => e.id === 'eco:od:2026-11').amount, -Math.round((80_000 - 8_000 + 100_000 + 466 - 10_000 - 466 - 80_000) * 0.01));
+  // Given once.
+  assert.ok(!paydayEntries({ ...w, entries: [...w.entries, ...out] }, Date.UTC(2026, 10, 4)).some(e => e.id === REBASE_FIX_ID || e.id === OD_BACK_ID));
 });

@@ -323,15 +323,26 @@ test('Plus is about Play and Securities: perks that make betting and trading che
   assert.ok(perks.every(p => p[1] && p[2]));
 });
 
-test('where the money came from: an account older than the shared wallet opened with NT$110,000 in the apps, reset to 30,000', () => {
-  // The opening money in Securities' and Play's own books (their cash), the reset, a month's pay, a Plus month.
-  const old = { entries: [{ id: 'eco:rebase:v3', app: 'eco', kind: 'rebase', amount: -80_000 }, { id: 'eco:pay:2026-10', app: 'eco', kind: 'pay', amount: 6_000 }, { id: 'eco:plus:2026-10', app: 'eco', kind: 'plus', amount: -400 }], snap: { stock: { cash: 100_000, holdings: 0 }, odds: { cash: 10_000 } } };
+test('where the money came from: an account older than the shared wallet, its opening money in the apps, reset to 30,000', () => {
+  // Securities opened with 100,000 (no Play then): the reset, its fix, a month's pay, the old games' money, interest and its refund.
+  const old = {
+    entries: [
+      { id: 'eco:rebase:v3', app: 'eco', kind: 'rebase', amount: -80_000 },
+      { id: 'eco:rebase:v3fix', app: 'eco', kind: 'rebase', amount: 10_000 },
+      { id: 'eco:pay:2026-10', app: 'eco', kind: 'pay', amount: 8_000 },
+      { id: 'eco:rebase:hub', app: 'eco', kind: 'rebase', amount: 7_648, note: 'hub' },
+      { id: 'eco:od:2026-10', app: 'eco', kind: 'od', amount: -466 },
+      { id: 'eco:odback:v3', app: 'eco', kind: 'od', amount: 466 }
+    ],
+    snap: { stock: { cash: 100_000, opened: 100_000, holdings: 0 } }
+  };
   const s = kit.moneySides(old);
-  assert.equal(s.gave.start, 30_000);
-  assert.equal(s.given, 36_000);
-  assert.equal(s.took, 400);
-  assert.equal(s.worth, 35_600);
+  assert.deepEqual(s.gave, { start: 30_000, pay: 8_000, rank: 0, other: 7_648 });
+  assert.equal(s.took, 0);
   assert.equal(s.own, 0);
+  // With Play's old 10,000 too (its own entry), no fix: still 30,000.
+  const both = kit.moneySides({ entries: [{ id: 'eco:rebase:v3', app: 'eco', kind: 'rebase', amount: -80_000 }, { id: 'odds:start', app: 'odds', kind: 'start', amount: 10_000 }], snap: { stock: { cash: 100_000, opened: 100_000 } } });
+  assert.deepEqual([both.gave.start, both.own], [30_000, 0]);
   // A new account: the opening money is the Worker's own entry.
   const fresh = kit.moneySides({ entries: [{ id: 'eco:start', app: 'eco', kind: 'start', amount: 30_000 }], snap: {} });
   assert.deepEqual([fresh.gave.start, fresh.own], [30_000, 0]);
