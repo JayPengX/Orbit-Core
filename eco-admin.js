@@ -89,6 +89,7 @@ export async function planClean(env, deps) {
   const accounts = new Set(wallets.map(w => w.id));
   const inboxIds = new Set();
   const tidy = [];
+  const hubPurge = { gameEntries: 0, legacyMissionFreebets: 0, cosmeticRedemptions: 0, cosmeticChoices: 0, gameScoreSettings: 0 };
   for (const w of wallets) {
     const wallet = parseWallet(w.payload);
     if (!wallet) {
@@ -98,6 +99,18 @@ export async function planClean(env, deps) {
     }
     for (const ids of Object.values(wallet.inbox || {})) for (const id of ids) inboxIds.add(id);
     const next = tidyWallet(wallet);
+    const nextIds = new Set(next.entries.map(e => e.id));
+    for (const e of wallet.entries) {
+      if (!nextIds.has(e.id)) {
+        if (e.app === 'vocab' && (e.kind === 'game' || e.id?.startsWith('vocab:g:') || /^vocab:m:\d{4}-\d{2}-\d{2}:(game1|games3|challenge)$/.test(e.id || ''))) hubPurge.gameEntries++;
+        if (e.app === 'vocab' && e.kind === 'freebet' && e.id?.startsWith('vocab:fb:')) hubPurge.legacyMissionFreebets++;
+        if (e.app === 'vocab' && /^vocab:xs:(avatar|frame|plus):/.test(e.id || '')) hubPurge.cosmeticRedemptions++;
+      }
+    }
+    if (wallet.settings?.['hub:cleanup:v1']?.value !== true) {
+      for (const key of ['avatar', 'frame']) if (wallet.settings?.[key]) hubPurge.cosmeticChoices++;
+    }
+    if (wallet.settings?.['bests:vocab']) hubPurge.gameScoreSettings++;
     if (JSON.stringify(next) !== JSON.stringify(wallet)) tidy.push({ id: w.id, wallet: next, updateTime: w.updateTime });
   }
   for (const name of collections) {
@@ -124,7 +137,7 @@ export async function planClean(env, deps) {
       }
     }
   }
-  return { collections, counts, deletes, tidy };
+  return { collections, counts, deletes, tidy, hubPurge };
 }
 
 function summary(plan) {
@@ -135,6 +148,7 @@ function summary(plan) {
     counts: plan.counts,
     unknown: plan.collections.filter(c => !keep().has(c) && !RETIRED_COLLECTIONS.includes(c)),
     wouldDelete: byCollection,
-    wouldTidyWallets: plan.tidy.length
+    wouldTidyWallets: plan.tidy.length,
+    wouldPurgeHubData: plan.hubPurge
   };
 }

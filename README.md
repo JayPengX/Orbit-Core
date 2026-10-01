@@ -1,7 +1,7 @@
 # Shared Proxy
 
 The server side of **Quadra**: Quadra Securities, Quadra Play, Quadra
-Fixtures and Quadra Rewards, with Orbit Class beside them. One account, the
+Fixtures and Quadra Hub, with Orbit Class beside them. One account, the
 **Quadra Pass**, works in every app, and it is the only place anything is
 saved.
 
@@ -10,7 +10,7 @@ saved.
 | Quadra Securities | [Quadra-Securities](https://github.com/JayPengX/Quadra-Securities) | https://jaypengx.github.io/Quadra-Securities/ |
 | Quadra Play | [Quadra-Play](https://github.com/JayPengX/Quadra-Play) | https://jaypengx.github.io/Quadra-Play/ |
 | Quadra Fixtures | [Quadra-Fixtures](https://github.com/JayPengX/Quadra-Fixtures) | https://jaypengx.github.io/Quadra-Fixtures/ |
-| Quadra Rewards | [Quadra-Rewards](https://github.com/JayPengX/Quadra-Rewards) | https://jaypengx.github.io/Quadra-Rewards/ |
+| Quadra Hub | [Quadra-Rewards](https://github.com/JayPengX/Quadra-Rewards) | https://jaypengx.github.io/Quadra-Rewards/ |
 | Orbit Class | [Orbit-Class](https://github.com/JayPengX/Orbit-Class) | https://jaypengx.github.io/Orbit-Class/ |
 
 ## Table of Contents
@@ -65,13 +65,16 @@ account's document id.
 - **App data** in each app's collection under the same id:
   `stock-study-accounts`, `odds-study-accounts`, `match-find-settings`,
   `vocab-progress-sync`, `orbit-quadra`.
-- **Quadra Plus**, the one membership: NT$490 a Taiwan month (v8) as the entry
+- **Quadra Plus**, the one membership: NT$490 a Taiwan month as the entry
   `eco:plus:<YYYY-MM>` (only this Worker writes `eco:` ids; an app's write
   of one is dropped), renewed with the payday on the month's first sign-in
   or read while the `plus` setting is on and the pool covers it. A month no
   app is opened is never charged. Apps read membership from that entry
   alone (the kit's `plusMember`, `plusMonths`). A member also gets a
   NT$200 free bet each Taiwan week (`eco:fb:<Monday>`, `plusBonusEntries`).
+  Quadra Hub avatar and frame customization is available only while Plus is
+  active; Plus no longer boosts vocabulary points, discounts Hub purchases,
+  or grants streak cards.
   The kit tells members when it arrives and three days before a renewal
   (`plusNotices`), and the Plus sheet shows what Plus gave back this month
   and since joining (`plusReturns`, `plusTenure`).
@@ -87,13 +90,13 @@ account's document id.
   under 100,000, 1,500 under 250,000, 500 above (`PAY_TIERS`, v7). Months
   missed are paid on return, stepping down as they land. The opening money
   and the allowance are the only money Quadra gives (v7).
-- **Rewards pays no money (v7):** `cleanEntry` drops any new `vocab` entry
-  with a positive amount and any `vocab:fb:` free bet; Rewards' entries
+- **Hub pays no money:** `cleanEntry` drops any new `vocab` entry
+  with a positive amount and any `vocab:fb:` free bet; Hub entries
   carry points in `xp` (amount 0, at most 10,000 each) and its shop
-  purchases (negative amounts, at least `REWARDS_SHOP`'s prices), or the same
+  purchases (negative amounts, at least `HUB_SHOP`'s prices), or the same
   things bought with points (`vocab:xs:<item>:<key>`, kind `redeem`, amount
-  0, the points in the note, at least `REWARDS_XP`'s). What it paid before
-  stays in the wallet.
+  0, the points in the note, at the same price for every account). Avatar/frame
+  purchases and point-funded Plus are no longer accepted.
 - **The reset** (once, `eco:rebase:v3`, −NT$80,000): every account that
   opened on the old NT$110,000 comes down to the new NT$30,000.
 - **Overdrafts are allowed:** the pool can go below zero (after the reset,
@@ -128,9 +131,16 @@ Sign-in calls are limited per IP an hour (create 20, login and device codes
 counts what's in Firestore and removes anything that isn't Quadra data:
 retired collections (`orbit-schedules`, `eco-links`, `stock-study-leagues`),
 app documents with no pass behind them, orphaned inbox items, expired device
-codes and share keys, and retired wallet settings (`tidyWallet`). It runs in
-bounded batches (`clean` again until `done`). The token is checked against
-`ADMIN_TOKEN_HASH`; it's empty (off) unless a clean-up is under way.
+codes and share keys, and retired wallet settings (`tidyWallet`). The Hub
+migration also removes game-earned XP, game mission rewards, Hub-issued
+legacy free bets, game-score settings, and old cosmetic choices/purchase
+records from wallets. A generic points-debit ledger record
+preserves XP already spent on those cosmetics; vocabulary progress, vocabulary
+XP, mission history, and shared money entries remain. Active accounts migrate
+on their next `/eco` wallet update; `scan` reports exact remaining counts in
+`wouldPurgeHubData` before `clean` writes them. It runs in bounded batches
+(`clean` again until `done`). The token is checked against `ADMIN_TOKEN_HASH`;
+it's empty (off) unless a clean-up is under way.
 
 ## The shared kit and brand
 
@@ -146,8 +156,8 @@ icons and link cards from `brand/marks.mjs`.
 ## One-Time Deploy Setup
 
 You don't need to install anything to get started. This covers the main
-`orbit-workers-proxy` Worker (`/gemini`, `/nl-edit`, `/sync`, `/vocab-sync`,
-`/vocab-ai`) first, followed by the separate `sports-proxy` Worker Match
+`orbit-workers-proxy` Worker (`/eco`, `/gemini`, `/nl-edit`, `/kambi`) first,
+followed by the separate `sports-proxy` Worker Match
 Find needs, which is a second, near-identical run of the same first three
 steps against a different file.
 

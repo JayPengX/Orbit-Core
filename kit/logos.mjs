@@ -108,6 +108,9 @@ export function teamBadge(sport, name) {
 export function teamLogo(sport, name, dark = false) {
   const base = 'https://a.espncdn.com/i/teamlogos';
   const size = dark ? '500-dark' : '500';
+  if (sport === 'nba' && ['Boston Celtics', 'Boston Celtic'].includes(name)) {
+    return 'https://cdn.nba.com/logos/nba/1610612738/primary/L/logo.svg';
+  }
   if (sport === 'mlb' && MLB_ABBR[name]) return `${base}/mlb/${size}/${MLB_ABBR[name]}.png`;
   if (sport === 'nba' && NBA_ABBR[name]) return `${base}/nba/${size}/${NBA_ABBR[name]}.png`;
   if (sport === 'nfl' && NFL_ABBR[name]) return `${base}/nfl/${size}/${NFL_ABBR[name]}.png`;
@@ -298,11 +301,10 @@ export function logoPicture(light, dark, cls, fallback) {
   if (!light || knownBad(light)) return fallback();
   const img = document.createElement('img');
   const known = logoSeen.ok.has(light);
-  // A new one hidden until it has drawn (never the browser's broken-picture
-  // icon); one that's drawn before this session shows at once, so a redraw
-  // (a pick tapped, the app back on screen) doesn't blink it out.
+  // Keep the image slot stable until the current request has decoded. Even a
+  // previously successful URL can fail on a later visit or a weak connection.
   Object.assign(img, { className: cls, alt: '', loading: known ? 'eager' : 'lazy', decoding: known ? 'sync' : 'async' });
-  if (!known) img.style.visibility = 'hidden';
+  img.style.visibility = 'hidden';
   img.addEventListener('load', () => {
     img.style.visibility = '';
     noteLogo(light, true);
@@ -319,20 +321,21 @@ export function logoPicture(light, dark, cls, fallback) {
   picture.append(img);
   // A logo that fails is tried once more (a slow or dropped connection),
   // then gives way to the fallback.
-  let retried = false;
+  let retries = 0;
   img.addEventListener('error', () => {
-    if (retried || !navigator.onLine) {
+    if (!navigator.onLine || retries >= 2) {
       if (navigator.onLine) noteLogo(light, false);
       return picture.replaceWith(fallback());
     }
-    retried = true;
-    // The same address again (TheSportsDB refuses any extra ?query).
+    retries++;
+    // Retry promptly without query parameters (TheSportsDB refuses them).
     setTimeout(() => {
+      if (!picture.isConnected) return;
       const source = picture.querySelector('source');
       if (source) source.srcset = dark;
       img.removeAttribute('src');
       img.setAttribute('src', light);
-    }, 1500);
+    }, retries === 1 ? 250 : 750);
   });
   return picture;
 }

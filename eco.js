@@ -1,6 +1,6 @@
 // ---- eco.js ----
 // /eco: the Quadra Pass, one account for every Quadra app (Quadra
-// Securities, Quadra Play, Quadra Fixtures, Quadra Rewards, and Orbit Class
+// Securities, Quadra Play, Quadra Fixtures, Quadra Hub, and Orbit Class
 // beside them). Play money only.
 //
 // The pass is a 10-character code, stored only as its SHA-256 (the
@@ -61,7 +61,7 @@ const CODE8 = /^[2-9A-HJ-NP-Z]{8}$/;
 //   stock  Quadra Securities
 //   odds   Quadra Play
 //   match  Quadra Fixtures
-//   vocab  Quadra Rewards
+//   vocab  Quadra Hub
 //   orbit  Orbit Class, the related add-on: its class schedule
 export const ECO_APPS = {
   stock: { collection: 'stock-study-accounts', maxPayload: 1_000_000 },
@@ -80,7 +80,7 @@ const LEDGER_APPS = new Set(['odds']);
 export const WALLET_MAX_LENGTH = 900_000;
 const MAX_ENTRIES_PER_WRITE = 1000;
 const MAX_AMOUNT = 1_000_000_000;
-// Rewards' points on one entry (a batch of answers, a game, a claim).
+// Hub points on one entry (a batch of vocabulary answers or a claim).
 const MAX_XP = 10_000;
 const MAX_MERGE_SOURCES = 12;
 
@@ -159,9 +159,8 @@ export function paydayEntries(wallet, now) {
   for (let n = 0; m <= month && n < 120; n++, m = nextMonth(m)) {
     if (!have.has(`eco:pay:${m}`)) out.push({ id: `eco:pay:${m}`, t: now, app: 'eco', kind: 'pay', amount: payFor() });
   }
-  // Plus months bought with points, then the renewal for this month (after
-  // the pay, so the pay covers it; a month already held isn't charged).
-  out.push(...plusPointsEntries(wallet, now));
+  // The renewal follows the pay, so the pay can cover it; a month already
+  // held isn't charged.
   out.push(...plusRenewal({ ...wallet, entries: [...(wallet.entries || []), ...out] }, now));
   // A member's bonus bet for this week (after the renewal that makes them one).
   out.push(...plusBonusEntries({ ...wallet, entries: [...(wallet.entries || []), ...out] }, now));
@@ -327,31 +326,6 @@ function plusRenewal(wallet, now) {
   }
   return out;
 }
-// A month of Plus bought with points in Rewards ('vocab:xs:plus:<month>'):
-// only this Worker writes `eco:plus:<month>` (amount 0, note 'points'). As
-// the kit's catalogue allows: after a first month joined (the free one),
-// for the month it was redeemed in or the next, one a quarter, never over a
-// month already held.
-const quarterOf = m => `${m.slice(0, 4)}-Q${Math.ceil(Number(m.slice(5, 7)) / 3)}`;
-export function plusPointsEntries(wallet, now) {
-  const entries = wallet?.entries || [];
-  const held = entries.filter(e => e.app === 'eco' && e.id?.startsWith('eco:plus:'));
-  if (!held.some(e => e.note !== 'points')) return [];
-  const have = new Set(held.map(e => e.id.slice(9)));
-  const quarters = new Set(held.filter(e => e.note === 'points').map(e => quarterOf(e.id.slice(9))));
-  const out = [];
-  for (const e of entries) {
-    if (e.app !== 'vocab' || e.kind !== 'redeem' || !e.id?.startsWith('vocab:xs:plus:')) continue;
-    const m = e.id.slice(14);
-    const from = taipeiMonth(e.t);
-    if (!/^\d{4}-\d{2}$/.test(m) || (m !== from && m !== nextMonth(from)) || m > nextMonth(taipeiMonth(now)) || have.has(m) || quarters.has(quarterOf(m))) continue;
-    out.push({ id: PLUS_ID(m), t: now, app: 'eco', kind: 'plus', amount: 0, note: 'points' });
-    have.add(m);
-    quarters.add(quarterOf(m));
-  }
-  return out;
-}
-
 // What joining now takes. Monthly: nothing the first time ever, else the
 // rest of the month's share of the fee. Yearly: PLUS.year for twelve months,
 // from this month (or from next month when this one is already a member's).
@@ -377,45 +351,39 @@ const cleanCode = v =>
     .toUpperCase()
     .replace(/[\s-]/g, '');
 
-// What Quadra Rewards sells (its lib/shop.mjs), the only money it moves:
-// Rewards pays points, never NT$ (v7). Each purchase is one entry
+// What Quadra Hub sells (its lib/shop.mjs), the only money it moves:
+// Hub pays points, never NT$. Each purchase is one entry
 // 'vocab:shop:<item>:<key>' of kind 'shop', and a word pack's id is fixed
 // ('vocab:shop:pack:<pack>'), so it's bought once. An entry claiming one
-// must pay at least the lowest price (packs are half price for Plus), or
+// must pay at least the listed price for every account, or
 // it's dropped: an app can't write itself a free card, boost or pack.
-export const REWARDS_SHOP = { freeze: 300, boost: 150, pack: { toeic: 495, ielts: 745, biz: 995 } };
+export const HUB_SHOP = { freeze: 300, boost: 150, pack: { toeic: 990, ielts: 1_490, biz: 1_990 } };
 // Points (XP) buy the same things: 'vocab:xs:<item>:<key>', kind 'redeem',
-// amount 0, the points it cost in the note, at least REWARDS_XP's.
-// Avatars bought with points: the kit's AVATARS that have an `xp` price.
-export const REWARDS_XP = {
+// amount 0, the points it cost in the note, at least HUB_XP's.
+export const HUB_XP = {
   freeze: 600,
   boost: 300,
   pack: { toeic: 8_000, ielts: 12_000, biz: 16_000 },
-  avatar: { cat: 300, dog: 300, frog: 600, penguin: 600, rocket: 1_500, rainbow: 1_500, fire: 3_000, gem: 5_000 },
-  // The kit's FRAMES with a price.
-  frame: { silver: 2_000, jade: 4_000, gold: 8_000, neon: 15_000, aurora: 30_000 },
   // A daily mission swapped for another ('vocab:xs:reroll:<day>:<mission>').
   reroll: 100,
   // A missed day bought back for the streak ('vocab:xs:repair:<day>').
   repair: 1_500,
-  // The points catalogue (the kit's CATALOG), at a Plus member's price (the
-  // kit's PLUS.vocab.catalog of it): Play free bets, a Securities commission
-  // voucher and a 定存 bonus, a month of Plus (plusPointsEntries).
-  bet100: 4_500,
-  bet500: 19_800,
-  fee: 3_600,
-  td: 10_800,
-  plus: 18_000
+  // The points catalogue (the kit's CATALOG): Play free bets and Securities
+  // vouchers, at the same price for every account.
+  bet100: 5_000,
+  bet500: 22_000,
+  fee: 4_000,
+  td: 12_000
 };
 function xpPaid(id, e) {
   const [, , item, key] = id.split(':');
-  const least = ['pack', 'avatar', 'frame'].includes(item) ? REWARDS_XP[item][key] : REWARDS_XP[item];
+  const least = item === 'pack' ? HUB_XP.pack[key] : HUB_XP[item];
   const cost = Number(e.note);
   return typeof least === 'number' && e.kind === 'redeem' && Number.isInteger(cost) && cost >= least && cost <= 100_000;
 }
 function shopPaid(id, amount) {
   const [, , item, key] = id.split(':');
-  const least = item === 'pack' ? REWARDS_SHOP.pack[key] : REWARDS_SHOP[item];
+  const least = item === 'pack' ? HUB_SHOP.pack[key] : HUB_SHOP[item];
   return typeof least === 'number' && amount <= -least;
 }
 
@@ -430,10 +398,10 @@ export function cleanEntry(e, { allowEco = false } = {}) {
   if (!(ENTRY_APPS.has(app) || (allowEco && app === 'eco'))) return null;
   // The Worker's own ids (pay, Quadra Plus) are its alone.
   if (!allowEco && id.startsWith('eco:')) return null;
+  if (app === 'vocab' && (e.kind === 'game' || id.startsWith('vocab:g:') || /^vocab:m:\d{4}-\d{2}-\d{2}:(game1|games3|challenge)$/.test(id) || /^vocab:xs:(avatar|frame|plus):/.test(id) || id.startsWith('vocab:xp:debit:'))) return null;
   if (id.startsWith('vocab:shop:') && !(app === 'vocab' && e.kind === 'shop' && shopPaid(id, amount))) return null;
-  // Rewards pays no money (v7): its entries only spend (the shop) or carry
-  // points (`xp`, amount 0), and its missions no longer give free bets.
-  // Entries it paid before stay: only new ones come through here.
+  // Hub pays no money: entries only spend (the shop) or carry points
+  // (`xp`, amount 0). Its retired game and mission rewards are rejected.
   if (app === 'vocab' && (amount > 0 || id.startsWith('vocab:fb:'))) return null;
   if (id.startsWith('vocab:xs:') && !(app === 'vocab' && amount === 0 && xpPaid(id, e))) return null;
   const out = { id, t: Math.round(t), app, kind: str(e.kind, 24) || 'other', amount: Math.round(amount * 100) / 100 };
@@ -457,12 +425,18 @@ function cleanStamped(map, maxKeys, maxValue) {
 }
 
 // What a client may send to change the wallet.
-export function cleanPatch(patch) {
+export function cleanPatch(patch, { allowCosmetics = false } = {}) {
   if (!isObj(patch)) return { entries: [], snap: {}, settings: {} };
+  const settings = cleanStamped(patch.settings, 32, 4000);
+  delete settings['hub:cleanup:v1'];
+  if (!allowCosmetics) {
+    delete settings.avatar;
+    delete settings.frame;
+  }
   return {
     entries: (Array.isArray(patch.entries) ? patch.entries.slice(0, MAX_ENTRIES_PER_WRITE) : []).map(e => cleanEntry(e)).filter(Boolean),
     snap: cleanStamped(patch.snap, 8, 4000),
-    settings: cleanStamped(patch.settings, 32, 4000)
+    settings
   };
 }
 
@@ -471,6 +445,31 @@ const newest = (a = {}, b = {}) => {
   for (const [k, v] of Object.entries(b)) if (!out[k] || v.t >= out[k].t) out[k] = v;
   return out;
 };
+
+const HUB_CLEANUP_SETTING = 'hub:cleanup:v1';
+const retiredGameEntry = e => e.app === 'vocab' && (e.kind === 'game' || e.id?.startsWith('vocab:g:') || /^vocab:m:\d{4}-\d{2}-\d{2}:(game1|games3|challenge)$/.test(e.id || ''));
+const retiredMissionFreebet = e => e.app === 'vocab' && e.kind === 'freebet' && e.id?.startsWith('vocab:fb:');
+const retiredCosmeticEntry = e => e.app === 'vocab' && /^vocab:xs:(avatar|frame|plus):/.test(e.id || '');
+const debitId = id => {
+  let hash = 2_166_136_261;
+  for (let i = 0; i < id.length; i++) hash = Math.imul(hash ^ id.charCodeAt(i), 16_777_619);
+  return `vocab:xp:debit:${(hash >>> 0).toString(36)}`;
+};
+function cleanHubWallet(wallet) {
+  const settings = { ...(wallet.settings || {}) };
+  const firstCleanup = settings[HUB_CLEANUP_SETTING]?.value !== true;
+  const entries = (wallet.entries || []).filter(e => !retiredGameEntry(e) && !retiredMissionFreebet(e) && !retiredCosmeticEntry(e));
+  if (firstCleanup) {
+    for (const key of ['avatar', 'frame', 'bests:vocab']) delete settings[key];
+    for (const e of wallet.entries || []) {
+      if (!retiredCosmeticEntry(e) || e.kind !== 'redeem' || !Number.isInteger(Number(e.note)) || Number(e.note) <= 0) continue;
+      entries.push({ id: debitId(e.id), t: e.t, app: 'vocab', kind: 'redeem', amount: 0, note: String(Number(e.note)) });
+    }
+    settings[HUB_CLEANUP_SETTING] = { value: true, t: Date.now() };
+  }
+  entries.sort((a, b) => a.t - b.t || (a.id < b.id ? -1 : 1));
+  return { ...wallet, entries, settings };
+}
 
 // Two wallets (or a wallet and a patch) as one: entries by id (the first
 // copy kept, since an entry never changes), the rest newest-wins.
@@ -482,7 +481,7 @@ export function mergeWallet(a, b) {
   const inbox = { ...(base.inbox || {}) };
   for (const [app, ids] of Object.entries(b.inbox || {})) inbox[app] = [...new Set([...(inbox[app] || []), ...ids])];
   const created = Math.min(base.created ?? Infinity, b.created ?? Infinity);
-  return {
+  return cleanHubWallet({
     v: 1,
     created: created === Infinity ? Date.now() : created,
     entries: [...entries.values()].sort((x, y) => x.t - y.t || (x.id < y.id ? -1 : 1)),
@@ -495,7 +494,7 @@ export function mergeWallet(a, b) {
     ...(base.live ? { live: base.live } : {}),
     ...(base.sec ? { sec: base.sec } : {}),
     ...(base.merged ? { merged: base.merged } : {})
-  };
+  });
 }
 
 // The pool's NT$ right now: every entry plus each app's shared cash figure.
@@ -513,14 +512,14 @@ export function parseWallet(text) {
   return null;
 }
 
-// Settings no app reads any more (limits, follows) and fields from older
-// versions: dropped whenever a wallet is cleaned (eco-admin.js).
-export const RETIRED_SETTINGS = ['oddsWeeklyLimit', 'orbitFollow'];
+// Settings no app reads any more and obsolete game scores: removed from the
+// Firestore wallet by the one-time Quadra Hub cleanup.
+export const RETIRED_SETTINGS = ['oddsWeeklyLimit', 'orbitFollow', 'bests:vocab'];
 export function tidyWallet(w) {
   const { links, ...rest } = w;
   const settings = Object.fromEntries(Object.entries(rest.settings || {}).filter(([k]) => !RETIRED_SETTINGS.includes(k)));
   const entries = rest.entries.map(({ peer, ...e }) => e);
-  return { ...rest, settings, entries };
+  return cleanHubWallet({ ...rest, settings, entries });
 }
 
 function touchApp(wallet, app, now) {
@@ -635,7 +634,7 @@ export async function handleEcoRequest(request, env, headers, ip, deps) {
           if (!isActive(w, claims)) return (refused = 'ECO_SESSION_MOVED'), w;
           // What falls due with the write comes with it (fixed ids: never
           // twice): the welcome bonus bet right after a first bet.
-          const merged = mergeWallet(w, cleanPatch(body.wallet));
+          const merged = mergeWallet(w, cleanPatch(body.wallet, { allowCosmetics: plusMember(w, now) }));
           return touchApp(mergeWallet(merged, { entries: paydayEntries(merged, now) }), app, now);
         },
         { skipIf: () => refused }
