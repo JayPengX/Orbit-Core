@@ -19,6 +19,8 @@ const CATALOG = { 'Quadra-Play': 'Quadra-Play/public/lib/catalog.mjs', 'Quadra-F
 // The loading screen and first update check (boot.js), for the apps that open
 // with one.
 const BOOT = { 'Quadra-Securities': 'Quadra-Securities/public/boot.js', 'Quadra-Play': 'Quadra-Play/public/boot.js', 'Quadra-Fixtures': 'Quadra-Fixtures/public/boot.js', 'Quadra-Rewards': 'Quadra-Rewards/public/boot.js' };
+// People's photos (photos.mjs: ESPN headshots, Wikipedia), for the same two.
+const PHOTOS = { 'Quadra-Play': 'Quadra-Play/public/lib/photos.mjs', 'Quadra-Fixtures': 'Quadra-Fixtures/public/lib/photos.mjs' };
 // Teams in Chinese (names.mjs), for the same two.
 const NAMES = { 'Quadra-Play': 'Quadra-Play/public/lib/names.mjs', 'Quadra-Fixtures': 'Quadra-Fixtures/public/lib/names.mjs' };
 for (const [js, css] of TARGETS) {
@@ -31,6 +33,7 @@ for (const [js, css] of TARGETS) {
   }
   await copyFile(`${kit}quadra.mjs`, `${root}${js}`).catch(e => console.log('skip', js, e.code));
   await copyFile(`${kit}quadra.css`, `${root}${css}`).catch(e => console.log('skip', css, e.code));
+  if (PHOTOS[app]) await copyFile(`${kit}photos.mjs`, `${root}${PHOTOS[app]}`).catch(e => console.log('skip', PHOTOS[app], e.code));
   if (BOOT[app]) await copyFile(`${kit}boot.js`, `${root}${BOOT[app]}`).catch(e => console.log('skip', BOOT[app], e.code));
   if (LOGOS[app]) await copyFile(`${kit}logos.mjs`, `${root}${LOGOS[app]}`).catch(e => console.log('skip', LOGOS[app], e.code));
   if (NAMES[app]) await copyFile(`${kit}names.mjs`, `${root}${NAMES[app]}`).catch(e => console.log('skip', NAMES[app], e.code));
