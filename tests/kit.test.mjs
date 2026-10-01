@@ -1,4 +1,4 @@
-// The shared kit's pure parts: the pool, activity and the recommender.
+// The shared kit's pure parts: the pool, Plus, looks and the recommender.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -10,15 +10,6 @@ test('the pool is every entry and every app figure', () => {
   const w = { entries: [{ id: 'a', amount: 100, app: 'odds' }, { id: 'b', amount: -40, app: 'eco' }], snap: { stock: { cash: 1000, t: 1 } } };
   assert.equal(kit.poolBalance(w), 1060);
   assert.equal(kit.othersBalance(w, 'stock'), 60);
-});
-
-test('activity counts reset each Taiwan day', () => {
-  const day1 = Date.UTC(2026, 9, 1, 3);
-  let w = { settings: {} };
-  w.settings = { ...w.settings, ...kit.activityPatch(w, 'stock', 'trade', 1, day1).settings };
-  w.settings = { ...w.settings, ...kit.activityPatch(w, 'stock', 'trade', 2, day1).settings };
-  assert.deepEqual(kit.todayActivity(w, day1).stock, { trade: 3 });
-  assert.deepEqual(kit.todayActivity(w, day1 + 86_400_000), {});
 });
 
 test('recommendations follow affinity, stay diverse, and learn from dismissals', () => {
@@ -63,7 +54,7 @@ test('account details: this month in and out, latest entries first', () => {
   const w = {
     created: Date.UTC(2026, 0, 1),
     entries: [
-      { id: 'a', t: Date.UTC(2026, 8, 30), amount: 500, app: 'vocab', kind: 'reward' },
+      { id: 'a', t: Date.UTC(2026, 8, 30), amount: 500, app: 'odds', kind: 'payout' },
       { id: 'b', t: Date.UTC(2026, 9, 2), amount: 7000, app: 'eco', kind: 'pay' },
       { id: 'c', t: Date.UTC(2026, 9, 3), amount: -200, app: 'odds', kind: 'stake' }
     ]
@@ -135,13 +126,13 @@ test('the pay: fixed, whatever the account holds', () => {
   assert.equal(kit.paydayFor({ entries: [] }), 6_000);
   assert.equal(kit.paydayFor({ entries: [{ id: 'a', amount: 60_000, app: 'odds' }] }), 6_000);
   assert.equal(kit.paydayFor({ entries: [], snap: { stock: { cash: 50_000, holdings: 500_000, t: 1 } } }), 6_000);
-  assert.match(kit.paydayText('zh', Date.UTC(2026, 9, 5), { entries: [] }), /NT\$6,000/);
+  assert.match(kit.paydayText('zh', Date.UTC(2026, 9, 5)), /NT\$6,000/);
 });
 
 test('free bets: only current Quadra-issued tokens are spent once and last a week', () => {
   const t = Date.UTC(2026, 9, 1);
   const tok = (id, note, at = t, app = 'eco') => ({ id, t: at, app, kind: 'freebet', amount: 0, note });
-  const w = { entries: [tok('vocab:fb:a', '100', t, 'vocab'), tok('eco:fb:open', '200'), tok('eco:fb:used', '100'), tok('vocab:fb:old', '100', t - 8 * 86_400_000, 'vocab'), { id: 'odds:fb-eco:fb:used', t, app: 'odds', kind: 'freebet', amount: 0 }] };
+  const w = { entries: [tok('odds:fb:a', '100', t, 'odds'), tok('eco:fb:open', '200'), tok('eco:fb:used', '100'), tok('eco:fb:old', '100', t - 8 * 86_400_000), { id: 'odds:fb-eco:fb:used', t, app: 'odds', kind: 'freebet', amount: 0 }] };
   assert.deepEqual(kit.freeBets(w, t).map(x => [x.id, x.value]), [['eco:fb:open', 200]]);
   assert.deepEqual(kit.freeBets(w, t, ['eco:fb:open']), []);
   assert.deepEqual(kit.freeBets(w, t + 8 * 86_400_000), []);
@@ -231,7 +222,6 @@ test('Plus: the weekly bonus bet is a free bet; what Plus gave back this month',
   ] };
   assert.deepEqual(kit.freeBets(w, t).map(x => [x.id, x.value]), [['eco:fb:2026-10-05', 100]]);
   assert.deepEqual(kit.plusReturns(w, t), { boosts: 42, bets: 100, total: 142 });
-  assert.equal(kit.PLUS.odds.lift < 0.158, true);
   assert.match(kit.describeEntry({ app: 'odds', kind: 'plusboost', amount: 42 }), /Plus/);
 });
 
@@ -271,37 +261,16 @@ test('pictures: national sides get flags, names in either order', async () => {
   for (const key of ['kleague', 'euroleague', 'npb', 'cpbl']) assert.ok(L.leagueLogo(key), key);
 });
 
-test('v7: the kit and the Worker agree on the allowance and Plus; the statement skips Hub points', async () => {
+test('the kit and the Worker agree on the pay and Plus; the statement skips free bet tokens', async () => {
   const eco = await import('../eco.js');
   assert.equal(kit.ECONOMY.monthly, eco.PAY_MONTH);
   assert.equal(kit.PLUS.fee, eco.PLUS.fee);
   assert.equal(kit.PLUS.year, eco.PLUS.year);
   const now = Date.UTC(2026, 9, 10);
-  const w = { entries: [{ id: 'eco:pay:2026-10', t: now - 2, app: 'eco', kind: 'pay', amount: 8_000 }, { id: 'vocab:g:1', t: now - 1, app: 'vocab', kind: 'game', amount: 0, xp: 30 }] };
+  const w = { entries: [{ id: 'eco:pay:2026-10', t: now - 2, app: 'eco', kind: 'pay', amount: 8_000 }, { id: 'eco:fb:welcome', t: now - 1, app: 'eco', kind: 'freebet', amount: 0, note: '200' }] };
   const d = kit.accountDetails(w, 'en', now);
   assert.deepEqual(d.recent.map(r => r.amount), [8_000]);
   assert.equal(d.count, 1);
-});
-
-test('points: earned make the level and title, spent come off what is left', () => {
-  assert.deepEqual([0, 99, 100, 899, 900, 1_600, 8_100, 36_099, 36_100, 84_100, 240_100].map(x => kit.xpLevel(x).level), [1, 1, 2, 3, 4, 5, 10, 19, 20, 30, 50]);
-  assert.equal(kit.xpLevel(8_100, 'en').title, 'Skilled');
-  assert.equal(kit.xpLevel(36_100).title, '達人');
-  const l = kit.xpLevel(550);
-  assert.deepEqual([l.level, l.from, l.to, l.toNext], [3, 400, 900, 350]);
-  const w = { entries: [
-    { id: 'vocab:w:1', t: 1, app: 'vocab', kind: 'words', amount: 0, xp: 700 },
-    { id: 'vocab:w:old', t: 1, app: 'vocab', kind: 'words', amount: 300 },
-    { id: 'vocab:xs:freeze:a', t: 2, app: 'vocab', kind: 'redeem', amount: 0, note: '600' },
-    { id: 'vocab:shop:boost:b', t: 2, app: 'vocab', kind: 'shop', amount: -150 },
-    { id: 'odds:x', t: 2, app: 'odds', kind: 'payout', amount: 500 }
-  ] };
-  assert.deepEqual([kit.xpEarned(w), kit.xpSpent(w), kit.xpBalance(w)], [1_000, 600, 400]);
-  assert.equal(kit.xpEarned({ entries: [{ id: 'vocab:g:old', t: 1, app: 'vocab', kind: 'game', amount: 0, xp: 5_000 }] }), 0);
-  // Plus v8: worth about three times its fee at face, and no daily lift.
-  assert.equal(kit.PLUS.odds.lift, 0);
-  assert.ok((kit.PLUS.odds.bonusBet * 52) / 12 > kit.PLUS.fee);
-  assert.ok(kit.plusPerks('en').every(p => p && !/winnings, every day/.test(p[1])));
 });
 
 test('Plus hooks: tenure, returns since joining, the weekly free bet and renewal notices once each', () => {
@@ -330,163 +299,26 @@ test('Plus hooks: tenure, returns since joining, the weekly free bet and renewal
   assert.equal(localStorage.getItem('quadra.seen.renew:2026-11'), null);
 });
 
-test('avatars and frames require an active Plus membership', () => {
+test('looks: an avatar and a frame show only while the account is a Plus member', () => {
   const now = Date.UTC(2026, 9, 10);
   const member = {
     entries: [{ id: 'eco:plus:2026-10', t: now, app: 'eco', kind: 'plus', amount: -490 }],
     settings: { avatar: { value: { id: 'panda' }, t: now }, frame: { value: { id: 'gold' }, t: now } }
   };
-  assert.ok(kit.AVATARS.every(a => !('xp' in a) && !('level' in a) && !('streak' in a)));
-  assert.ok(kit.FRAMES.every(f => !('xp' in f) && !('level' in f)));
-  assert.equal(kit.avatarOwned(member, 'panda', now), true);
-  assert.equal(kit.avatarOwned(member, 'unlisted', now), false);
-  assert.equal(kit.frameOwned(member, 'gold', now), true);
   assert.equal(kit.avatarOf(member, now).glyph, '🐼');
   assert.equal(kit.frameOf(member, now).id, 'gold');
+  // Not a member (any more), or a look that isn't in the lists: none.
   const expired = Date.UTC(2026, 10, 1);
   assert.equal(kit.avatarOf(member, expired), null);
   assert.equal(kit.frameOf(member, expired), null);
-  assert.deepEqual([1, 4, 5, 14, 15, 25].map(kit.levelCards), [0, 0, 1, 1, 2, 3]);
+  assert.equal(kit.avatarOf({ ...member, settings: { avatar: { value: { id: 'unlisted' }, t: now } } }, now), null);
 });
 
-test('activity: two steps in a row both count, later one newer, a new day starts over', () => {
-  localStorage.removeItem('quadra.act.odds');
-  const now = Date.UTC(2026, 9, 5, 4);
-  const w = { settings: { 'act:odds': { value: { day: '2026-10-05', n: { bet: 2 } }, t: now - 5 } } };
-  // Both computed from the same (stale) wallet, as Play does when a parlay is placed.
-  const a = kit.activityPatch(w, 'odds', 'bet', 1, now).settings['act:odds'];
-  const b = kit.activityPatch(w, 'odds', 'parlay', 1, now).settings['act:odds'];
-  assert.deepEqual(b.value.n, { bet: 3, parlay: 1 });
-  assert.ok(b.t > a.t && a.t > now - 5);
-  // The Worker's merge keeps the newer: both counts survive.
-  const next = kit.activityPatch({ settings: { 'act:odds': b } }, 'odds', 'bet', 1, now + 1000).settings['act:odds'];
-  assert.deepEqual(next.value.n, { bet: 4, parlay: 1 });
-  const tomorrow = kit.activityPatch(w, 'odds', 'scratch', 1, now + 86_400_000).settings['act:odds'];
-  assert.deepEqual(tomorrow.value, { day: '2026-10-06', n: { scratch: 1 } });
-});
-
-test('streak: 5 missions keep a day (2 bonus ones at most), a card covers a day; bonus and milestones', () => {
-  const now = Date.UTC(2026, 9, 20, 4);
-  const day = n => now - n * 86_400_000;
-  const dayOf = n => new Date(day(n) + 8 * 3_600_000).toISOString().slice(0, 10);
-  const m = (n, id) => ({ id: `vocab:m:${dayOf(n)}:${id}`, t: day(n), app: 'vocab', kind: 'mission', amount: 0, xp: 10 });
-  const kept = n => ['words20', 'words50', 'match', 'orbit', 'invest'].map(id => m(n, id));
-  // Kept 1 to 8 days ago, except 4 days ago, which a card covered; nothing yet today.
-  const entries = [1, 2, 3, 5, 6, 7, 8].flatMap(kept);
-  entries.push({ id: `vocab:fz:${dayOf(4)}`, t: day(3), app: 'vocab', kind: 'freeze', amount: 0 });
-  const w = { entries };
-  assert.equal(kit.streakOf(w, now), 8);
-  assert.equal(kit.longestStreakOf(w), 8);
-  // Two daily missions and three bonus ones (two count) make 4; another
-  // daily mission reaches the five required.
-  const today = [m(0, 'words20'), m(0, 'words50'), m(0, 'parlay3'), m(0, 'scratch'), m(0, 'invest')];
-  assert.equal(kit.missionDays({ entries: today })[dayOf(0)], 4);
-  assert.equal(kit.streakOf({ entries: [...entries, ...today] }, now), 8);
-  assert.equal(kit.streakOf({ entries: [...entries, ...today, m(0, 'match')] }, now), 9);
-  // Four daily ones alone aren't enough either.
-  assert.equal(kit.streakOf({ entries: [...entries, ...['words20', 'words50', 'quotes', 'match'].map(id => m(0, id))] }, now), 8);
-  // Before the mission threshold, vocabulary practice kept the day.
-  const old = [0, 1, 2].map(n => ({ id: `vocab:w:${n}`, t: Date.UTC(2026, 8, 30 - n, 4), app: 'vocab', kind: 'words', amount: 0, xp: 1 }));
-  assert.equal(kit.streakOf({ entries: old }, Date.UTC(2026, 8, 30, 5)), 3);
-  const oldGames = old.map(e => ({ ...e, id: e.id.replace('vocab:w:', 'vocab:g:'), kind: 'game' }));
-  assert.equal(kit.streakOf({ entries: oldGames }, Date.UTC(2026, 8, 30, 5)), 0);
-  assert.equal(kit.streakBonus(8), 0.16);
-  assert.equal(kit.streakBonus(40), kit.STREAK.max);
-  assert.equal(kit.streakCards(8), 1);
-  // Missing yesterday ends it (the longest stays, and so does the tiger).
-  const broken = { entries: entries.filter(e => !e.id.startsWith(`vocab:m:${dayOf(1)}`)) };
-  assert.equal(kit.streakOf(broken, now), 0);
-  assert.equal(kit.longestStreakOf(broken), 7);
-  // Other apps' entries don't count.
-  assert.equal(kit.streakOf({ entries: [{ id: 'odds:x', t: day(1), app: 'odds', kind: 'game', amount: 0 }] }, now), 0);
-});
-
-test('frames: only Plus members can wear them; a repaired day keeps the streak', () => {
-  const now = Date.UTC(2026, 9, 20, 4);
-  const member = { entries: [{ id: 'eco:plus:2026-10', t: now, app: 'eco', kind: 'plus', amount: -490 }], settings: { frame: { value: { id: 'gold' }, t: now } } };
-  assert.ok(kit.frameOwned(member, 'bronze', now) && !kit.frameOwned(member, 'unknown', now));
-  assert.equal(kit.frameOf(member, now).id, 'gold');
-  assert.equal(kit.frameOf(member, Date.UTC(2026, 10, 1)), null);
-  // Yesterday missed, bought back: the streak runs on.
-  const dayOf = n => new Date(now - n * 86_400_000 + 8 * 3_600_000).toISOString().slice(0, 10);
-  const kept = n => ['words20', 'words50', 'match', 'orbit', 'invest'].map(id => ({ id: `vocab:m:${dayOf(n)}:${id}`, t: now - n * 86_400_000, app: 'vocab', kind: 'mission', amount: 0, xp: 10 }));
-  const w = { entries: [...kept(3), ...kept(2)] };
-  assert.equal(kit.streakOf(w, now), 0);
-  w.entries.push({ id: `vocab:xs:repair:${dayOf(1)}`, t: now, app: 'vocab', kind: 'redeem', amount: 0, note: '1500' });
-  assert.equal(kit.streakOf(w, now), 3);
-});
-
-test('points expire a year after the month earned, oldest spent first; retired game XP is excluded', () => {
-  const oct = Date.UTC(2026, 9, 10);
-  const nov = Date.UTC(2026, 10, 10);
-  const w = {
-    entries: [
-      { id: 'vocab:w:a', t: oct, app: 'vocab', kind: 'words', amount: 0, xp: 1_000 },
-      { id: 'vocab:w:b', t: nov, app: 'vocab', kind: 'words', amount: 0, xp: 500 },
-      { id: 'vocab:xs:card:1', t: nov + 1, app: 'vocab', kind: 'redeem', amount: 0, note: '600' }
-    ]
-  };
-  // The spend came out of October's lot: 400 left there, 500 in November's.
-  assert.equal(kit.xpBalance(w, nov + 2), 900);
-  assert.deepEqual(kit.xpLots(w, nov + 2).map(l => l.amount), [400, 500]);
-  // October 2026's points end with October 2027 (Taipei).
-  const octEnd = Date.UTC(2027, 10, 1) - 8 * 3_600_000;
-  assert.equal(kit.xpBalance(w, octEnd - 1), 900);
-  assert.equal(kit.xpBalance(w, octEnd), 500);
-  assert.deepEqual(kit.xpExpiring(w, octEnd - 10 * 86_400_000), { amount: 400, at: octEnd });
-  assert.equal(kit.xpExpiring(w, nov + 2), null);
-  assert.equal(kit.xpEarned(w), 1_500);
-  // Retired game points are not carried forward.
-  assert.equal(kit.xpBalance({ entries: [{ id: 'vocab:g:old', t: Date.UTC(2025, 0, 1), app: 'vocab', kind: 'game', amount: 0, xp: 300 }] }, Date.UTC(2027, 8, 1)), 0);
-});
-
-test('points catalogue: Worker prices are a member’s, limits a month, tokens used once and gone at their days', async () => {
-  const eco = await import('../eco.js');
-  for (const c of kit.CATALOG) assert.equal(eco.HUB_XP[c.id], kit.catalogCost(c.id), c.id);
-  const oct = Date.UTC(2026, 9, 5, 4);
-  const xp = n => ({ id: `vocab:w:${n}`, t: Date.UTC(2026, 9, 1, 4), app: 'vocab', kind: 'words', amount: 0, xp: n });
-  const trial = { id: 'eco:plus:2026-09', t: 1, app: 'eco', kind: 'plus', amount: 0, note: 'trial' };
-  let w = { entries: [xp(100_000), trial] };
-  // Free bets: NT$1,000 of face a month; each a Play token for 7 days.
-  const add = (item, key, t = oct) => {
-    const e = kit.catalogEntry(w, item, key, t);
-    assert.ok(e, `${item} ${key}`);
-    w = { ...w, entries: [...w.entries, e] };
-    return e;
-  };
-  assert.equal(add('bet500', 'a').note, '22000');
-  add('bet100', 'b');
-  add('bet100', 'c');
-  add('bet100', 'd');
-  add('bet100', 'e');
-  add('bet100', 'g');
-  assert.equal(kit.catalogLimit(w, 'bet100', oct).why, 'month');
-  assert.equal(kit.catalogEntry(w, 'bet100', 'f', oct), null);
-  assert.ok(kit.catalogLimit(w, 'bet100', Date.UTC(2026, 10, 2)).ok);
-  const bets = kit.freeBets(w, oct + 1);
-  assert.deepEqual(bets.map(b => b.value).sort((a, b) => a - b), [100, 100, 100, 100, 100, 500]);
-  assert.equal(bets[0].until, oct + 7 * 86_400_000);
-  assert.equal(kit.freeBets(w, oct + 8 * 86_400_000).length, 0);
-  // Used in Play: gone.
-  w = { ...w, entries: [...w.entries, { id: 'odds:fb-vocab:xs:bet500:a', t: oct + 2, app: 'odds', kind: 'freebet', amount: 0 }] };
-  assert.equal(kit.freeBets(w, oct + 3).length, 5);
-  // Commission vouchers: three a month, 30 days, used once in Securities.
-  add('fee', 'x');
-  add('fee', 'y');
-  add('fee', 'z');
-  assert.equal(kit.catalogLimit(w, 'fee', oct).why, 'month');
-  w = { ...w, entries: [...w.entries, { id: 'stock:xs-vocab:xs:fee:x', t: oct + 5, app: 'stock', kind: 'voucher', amount: 0 }] };
-  assert.deepEqual(kit.catalogTokens(w, 'fee', oct + 6).map(x => [x.id, x.value]), [['vocab:xs:fee:y', 100], ['vocab:xs:fee:z', 100]]);
-  assert.equal(kit.catalogTokens(w, 'fee', oct + 31 * 86_400_000).length, 0);
-  // A deposit bonus: one a month.
-  assert.equal(add('td', 't').note, '12000');
-  assert.deepEqual(kit.catalogTokens(w, 'td', oct + 1).map(x => [x.rate, x.cap]), [[0.005, 100_000]]);
-  assert.equal(kit.catalogLimit(w, 'td', oct).why, 'month');
-  // Plus membership is never redeemable with points.
-  const member = { entries: [xp(100_000), { id: 'eco:plus:2026-10', t: 1, app: 'eco', kind: 'plus', amount: -490 }] };
-  assert.equal(kit.catalogEntry(member, 'plus', '', oct), null);
-  assert.equal(kit.catalogLimit(w, 'plus', oct).why, 'item');
-  assert.equal(kit.catalogEntry(member, 'fee', 'q', oct).note, '4000');
-  // Not enough points: nothing.
-  assert.equal(kit.catalogEntry({ entries: [xp(4_000), trial] }, 'bet100', 'k', oct), null);
+test('Plus is about Play and Securities: perks that make betting and trading cheaper or bigger, and the looks', () => {
+  assert.deepEqual(Object.keys(kit.PLUS.odds).sort(), ['bonusBet', 'boost', 'cashOutKeep']);
+  assert.deepEqual(Object.keys(kit.PLUS.stock).sort(), ['commission', 'fxSpread', 'loanCut']);
+  assert.ok(kit.PLUS.odds.boost > 1);
+  const perks = kit.plusPerks('en');
+  assert.deepEqual([...new Set(perks.map(p => p[0]))], ['odds', 'stock', 'looks']);
+  assert.ok(perks.every(p => p[1] && p[2]));
 });
