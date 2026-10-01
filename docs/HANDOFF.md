@@ -6,6 +6,40 @@ All repos develop on `claude/gifted-dijkstra-dv6w8a` and are pushed to
 edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
 `npx eslint .`).
 
+## Streak by missions, mastery over days, fair cash out (pushed to `main`)
+
+- **Streak = 3 daily missions** (kit `STREAK.missions`, `missionDays`,
+  `activeDaySet`): from `STREAK.from` (2026-10-02) a day counts when 3 of
+  that day's daily missions were claimed (`vocab:m:<day>:<id>`, the bonus ids
+  in `STREAK.bonus` aside) or a card covered it; earlier days keep the old
+  rule (any practice or game). Rewards' `streakToday` drives the
+  「領取 3 個每日任務保住連續紀錄 · n/3」 line (任務 and home), the 20:00
+  notices (→ #missions) and push.
+- **Missions** (Rewards `MISSIONS`, `dailyMissionIds`): six a day from a pool,
+  same for everyone, 3 in Rewards (words20/words50, master3, hard10 = right
+  by ear/letters/dictation, perfect = a 10+ round without a miss, game1/games3,
+  challenge) and 3 elsewhere (quotes, match/matches3, orbit, tour), at most
+  one of a `group`. Nothing that's a personal choice (watchlist, follows).
+  Bonus missions (invest, parlay3, scratch, lotto) spend money: always
+  shown in their own section, never count for the streak. Fixtures' `open`
+  now counts each match once a day (`matches3`); Play's scratch card no
+  longer also counts as `lottery`.
+- **Weekly:** `days5` = days kept with missions; all four claimed → a
+  protection card (Rewards `weeklyCards`, in `freezes().granted`).
+- **Words:** a word moves up one box a day at most (`grade`), so mastery
+  comes from the record over days: known-at-first-sight → box 3 due
+  tomorrow, right then → mastered; the in-round confirm is gone. Rounds
+  take box-3 due words first. `BOX_DAYS` 0,0,1,1,5,14. Smart mode
+  (`smartType(p, random, word, used)`) picks from the kinds that suit the
+  box the one least used this round, so a round has all six (flash cards
+  weighted ×4, i.e. rarer). The voice picker (單字發音) is gone: recordings,
+  the device's best voice only as the fallback.
+- **Play cash out** (`cashOutValue(slip, chances)`): weighed by the board's
+  fair chance (`fairChance`, margin out), not 1 / odds (that gave the margin
+  back: cashing out beat holding, and small odds moves were a profit, more
+  with Plus's 2%). Untouched, it's below the held worth; no `fairChance` →
+  1 / odds less 10%.
+
 ## Missions that count, and a streak that matters (pushed to `main`)
 
 - **Lost mission steps:** each app built its `act:<app>` counts from its copy

@@ -365,22 +365,31 @@ test('activity: two steps in a row both count, later one newer, a new day starts
   assert.deepEqual(tomorrow.value, { day: '2026-10-06', n: { scratch: 1 } });
 });
 
-test('streak: any practice or game counts (points or not), a card covers a day; bonus, milestones, avatars', () => {
+test('streak: 3 daily missions keep a day (bonus ones aside), a card covers a day; bonus, milestones, avatars', () => {
   const now = Date.UTC(2026, 9, 20, 4);
   const day = n => now - n * 86_400_000;
-  const g = (n, xp = 0) => ({ id: `vocab:g:${n}`, t: day(n), app: 'vocab', kind: 'game', amount: 0, ...(xp ? { xp } : {}) });
-  // Played 1 to 8 days ago, except 4 days ago, which a card covered; nothing yet today.
-  const entries = [1, 2, 3, 5, 6, 7, 8].map(n => g(n));
-  entries.push({ id: `vocab:fz:${new Date(day(4) + 8 * 3_600_000).toISOString().slice(0, 10)}`, t: day(3), app: 'vocab', kind: 'freeze', amount: 0 });
+  const dayOf = n => new Date(day(n) + 8 * 3_600_000).toISOString().slice(0, 10);
+  const m = (n, id) => ({ id: `vocab:m:${dayOf(n)}:${id}`, t: day(n), app: 'vocab', kind: 'mission', amount: 0, xp: 10 });
+  const kept = n => ['words20', 'game1', 'quotes'].map(id => m(n, id));
+  // Kept 1 to 8 days ago, except 4 days ago, which a card covered; nothing yet today.
+  const entries = [1, 2, 3, 5, 6, 7, 8].flatMap(kept);
+  entries.push({ id: `vocab:fz:${dayOf(4)}`, t: day(3), app: 'vocab', kind: 'freeze', amount: 0 });
   const w = { entries };
   assert.equal(kit.streakOf(w, now), 8);
   assert.equal(kit.longestStreakOf(w), 8);
+  // Today: two missions and the bonus ones, or a game, aren't enough; a third is.
+  const today = [m(0, 'words20'), m(0, 'game1'), m(0, 'parlay3'), m(0, 'scratch'), m(0, 'invest'), { id: 'vocab:g:0', t: now, app: 'vocab', kind: 'game', amount: 0, xp: 50 }];
+  assert.equal(kit.streakOf({ entries: [...entries, ...today] }, now), 8);
+  assert.equal(kit.streakOf({ entries: [...entries, ...today, m(0, 'match')] }, now), 9);
+  // Before the change, any practice or game kept the day.
+  const old = [0, 1, 2].map(n => ({ id: `vocab:g:${n}`, t: Date.UTC(2026, 8, 30 - n, 4), app: 'vocab', kind: 'game', amount: 0 }));
+  assert.equal(kit.streakOf({ entries: old }, Date.UTC(2026, 8, 30, 5)), 3);
   assert.equal(kit.streakBonus(8), 0.16);
   assert.equal(kit.streakBonus(40), kit.STREAK.max);
   assert.equal(kit.streakCards(8), 1);
   assert.ok(kit.avatarOwned(w, 'tiger') && !kit.avatarOwned(w, 'eagle'));
   // Missing yesterday ends it (the longest stays, and so does the tiger).
-  const broken = { entries: entries.filter(e => e.id !== 'vocab:g:1') };
+  const broken = { entries: entries.filter(e => !e.id.startsWith(`vocab:m:${dayOf(1)}`)) };
   assert.equal(kit.streakOf(broken, now), 0);
   assert.equal(kit.longestStreakOf(broken), 7);
   assert.ok(kit.avatarOwned(broken, 'tiger'));
