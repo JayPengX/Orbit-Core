@@ -726,13 +726,11 @@ const GEMINI_RATE_LIMIT = 30;
 // Gemini calls across every caller combined, independent of source IP.
 const GEMINI_DAILY_GLOBAL_CAP = 300;
 
-// Reads either the current `files: [{mime_type, data}, ...]` body or the
-// older single-`image` one, so a client still running from a stale service
-// worker cache keeps working after this Worker is redeployed. Returns a
-// plain error string rather than throwing - every failure here is a 400
-// with that message.
+// Reads the `files: [{mime_type, data}, ...]` body. Returns a plain error
+// string rather than throwing - every failure here is a 400 with that
+// message.
 function readGeminiFiles(body) {
-  const files = Array.isArray(body?.files) ? body.files : body?.image ? [body.image] : null;
+  const files = Array.isArray(body?.files) ? body.files : null;
   if (!files || !files.length) return { error: 'Missing or invalid files' };
   if (files.length > MAX_FILES_PER_REQUEST) {
     return { error: `At most ${MAX_FILES_PER_REQUEST} files per request` };

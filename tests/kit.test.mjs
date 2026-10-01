@@ -2,8 +2,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+const storage = map => ({ getItem: k => (map.has(k) ? map.get(k) : null), setItem: (k, v) => map.set(k, String(v)), removeItem: k => map.delete(k), key: i => [...map.keys()][i] ?? null, get length() { return map.size; } });
 const store = new Map();
-globalThis.localStorage = { getItem: k => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k) };
+const tabStore = new Map();
+globalThis.localStorage = storage(store);
+globalThis.sessionStorage = storage(tabStore);
 const kit = await import('../kit/quadra.mjs');
 
 test('the pool is every entry and every app figure', () => {
@@ -158,14 +161,14 @@ test('token requests made together share one sign-in call to the Worker', async 
   assert.equal(calls.length, 1);
 });
 
-test('notice switches follow the pass: newest wins, old device switches carried over', async () => {
+test('notice switches follow the pass: newest wins', async () => {
   store.clear();
-  // An older version's switches on this device.
-  store.set('quadra.notify', '1');
-  store.set('quadra.notify.kinds', JSON.stringify({ 'stock:alert': false, 'odds:slip': true }));
-  assert.deepEqual(kit.notifyPrefs(), { on: true, off: ['stock:alert'], t: 0 });
+  // Nothing set on this device: every kind wanted.
+  assert.deepEqual(kit.notifyPrefs(), { off: [], t: 0 });
+  kit.setKind('stock', 'alert', false);
   assert.equal(kit.kindOn('stock', 'alert'), false);
   assert.equal(kit.kindOn('stock', 'fill'), true);
+  store.set('quadra.notify.prefs', JSON.stringify({ on: true, off: ['stock:alert'], t: 1 }));
   // The pass's copy is newer: taken.
   assert.equal(kit.adoptNotifyPrefs({ settings: { notify: { value: { on: false, off: ['match:end'] }, t: 5 } } }), true);
   assert.equal(kit.kindOn('stock', 'alert'), true);
@@ -346,4 +349,16 @@ test('where the money came from: an account older than the shared wallet, its op
   // A new account: the opening money is the Worker's own entry.
   const fresh = kit.moneySides({ entries: [{ id: 'eco:start', app: 'eco', kind: 'start', amount: 30_000 }], snap: {} });
   assert.deepEqual([fresh.gave.start, fresh.own], [30_000, 0]);
+});
+
+test('signing out wipes every app’s keys on this device, keeping only its language and safe area', () => {
+  store.clear();
+  for (const k of ['quadra.refresh', 'quadra.account', 'quadra.wallet', 'quadra.payload.odds', 'oddsStudy.account:abc', 'stockStudy.settings', 'classFocusData', 'quadra.notify.prefs', 'fx.day.v3']) store.set(k, 'x');
+  store.set('quadra.lang', 'en');
+  store.set('quadra.safeBottom', '{"p":34}');
+  tabStore.set('quadra.visit', '1');
+  kit.wipeDevice();
+  assert.deepEqual([...store.keys()].sort(), ['quadra.lang', 'quadra.safeBottom']);
+  assert.equal(tabStore.size, 0);
+  assert.equal(kit.storedAccount(), '');
 });

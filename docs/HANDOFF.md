@@ -445,7 +445,8 @@ Next:
   `linkOldLoans` (in `afterPrices`) ties each, once, to the buy placed
   within 5 minutes after it (a `link` event dated when made, newest first,
   capped by what's owed and the shares' cost, loans already paid off left
-  alone), so selling repays first and a margin call sees them.
+  alone), so selling repays first and a margin call sees them. (Removed
+  2026-10-01 with the owner's reset: no account has those loans now.)
 - Open question for the owner: October's overdraft interest (`eco:od:2026-10`)
   was charged on balances that double-counted loans; a refund would have
   to be a Worker entry. Not done.
@@ -1331,7 +1332,7 @@ that didn't land on live games, and text cut on phones.
   apps on a phone don't share storage). `notifyPrefs`, `setNotifyOn`,
   `setKind(app, kind, on, s)`, `adoptNotifyPrefs`, `syncPrefs`; the
   device's copy is `quadra.notify.prefs` (the old `quadra.notify` /
-  `quadra.notify.kinds` are read once and carried to the pass). A device
+  `quadra.notify.kinds` are no longer read). A device
   or app the phone hasn't allowed yet gets a one-tap 允許 banner
   (`offerNotices`, once a week at most).
 - **Worker (`push.js`):** `POST /push/prefs` keeps the switches
@@ -1475,3 +1476,29 @@ Quadra stays under 30% for anyone who plays much.
 - Not done: a featured-game odds boost for everyone (board-wide price
   changes; Plus's daily boost covers the need), tiered commission by
   volume in Securities.
+
+## 2026-10-01: sign-out wipes the device, older versions' support removed
+
+- **Sign-out wipes the device (kit `wipeDevice`):** signing out, by hand or
+  because the pass signed this device out, clears every key in this
+  storage (every app's: the account, wallet, each app's copy, its
+  settings), sessionStorage and the `quadra-data-v1` cache. Only
+  `quadra.lang` and `quadra.safeBottom` stay; the app files stay cached.
+  On a phone each home-screen app has its own storage, so it wipes the one
+  it's in.
+- **Older versions' support removed:** the kit no longer trades in a pass
+  older versions kept (`quadra.pass`, `q.oldPass`), derives the account id
+  for a refresh token without one, reads the pre-pass notice switches
+  (`quadra.notify`, `quadra.notify.kinds`) or turns batching off for a
+  proxy without batches. `boot.js` knows only `window.__fxStarted` (Play
+  and Securities set it now). Play reads only `oddsStudy.account:<pass>`
+  (not the bare pre-pass copy) and its one-off `splitOnce` repair is gone;
+  Securities drops its old device copy, `linkOldLoans`/`link` events and
+  the unused sync-code key. The Worker's Gemini route takes only `files`
+  (not the single `image`); Orbit Class reads only the `classes` array from
+  it and no longer clears the old sync-code keys.
+- **Kept on purpose:** readers of data still stored on passes (Orbit
+  Class's kept schedule: countdown `date`, a stored `proSecondary`; the
+  plain-JSON saves `codec.mjs` reads, which is also what `pack` writes
+  without CompressionStream; Play's `compactAccount`), and the 錢從哪裡來
+  handling of accounts older than the shared wallet.
