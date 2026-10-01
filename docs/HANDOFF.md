@@ -6,6 +6,18 @@ All repos develop on `claude/gifted-dijkstra-dv6w8a` and are pushed to
 edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
 `npx eslint .`).
 
+
+## Ultra realistic, v10: a fixed salary (pushed to `main`)
+
+- **Pay is fixed** (eco.js `PAY_MONTH`, kit `ECONOMY.monthly`): NT$6,000 on
+  the 1st of every Taiwan month for every account, like a salary; back pay
+  for missed months as before. v7-v9 paid 8,000 / 4,000 / 1,500 / 500 by
+  worth, which paid saving less and losing more. `payFor()`/`paydayFor()`
+  keep their names and ignore worth; `ECONOMY.payTiers`/`PAY_TIERS` are
+  gone. Text says 月薪/薪水 (“pay”) instead of 津貼.
+- Model (`node tools/economy.mjs`, v10): a regular bettor −NT$1.9k a month,
+  an investor +3.9k, a saver +5.4k; 4,000 or 5,000 broke a regular within a
+  year.
 ## Slower levels, more for points, confirm before buying (pushed to `main`)
 
 - **融資 as a broker does it** (Securities): no cash loans. A buy can be

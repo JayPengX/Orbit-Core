@@ -73,7 +73,7 @@ test('account details: this month in and out, latest entries first', () => {
   assert.equal(d.out, -200);
   assert.equal(d.count, 2);
   assert.equal(d.recent[0].amount, -200);
-  assert.match(d.recent[1].text, /Quadra · 每月津貼/);
+  assert.match(d.recent[1].text, /Quadra · 每月薪水/);
 });
 
 test('proxyJson batches requests made together and remembers answers', async () => {
@@ -131,11 +131,11 @@ test('Quadra Plus: a month is a member’s when the Worker billed it; joining is
   assert.equal(kit.plusJoinPrice(w, oct), 350);
 });
 
-test('the allowance: by what the account is worth, Securities holdings included', () => {
-  assert.equal(kit.paydayFor({ entries: [] }), 8_000);
-  assert.equal(kit.paydayFor({ entries: [{ id: 'a', amount: 60_000, app: 'odds' }] }), 4_000);
-  assert.equal(kit.paydayFor({ entries: [], snap: { stock: { cash: 50_000, holdings: 500_000, t: 1 } } }), 500);
-  assert.match(kit.paydayText('zh', Date.UTC(2026, 9, 5), { entries: [] }), /NT\$8,000/);
+test('the pay: fixed, whatever the account holds', () => {
+  assert.equal(kit.paydayFor({ entries: [] }), 6_000);
+  assert.equal(kit.paydayFor({ entries: [{ id: 'a', amount: 60_000, app: 'odds' }] }), 6_000);
+  assert.equal(kit.paydayFor({ entries: [], snap: { stock: { cash: 50_000, holdings: 500_000, t: 1 } } }), 6_000);
+  assert.match(kit.paydayText('zh', Date.UTC(2026, 9, 5), { entries: [] }), /NT\$6,000/);
 });
 
 test('free bets: tokens (Rewards gave them before v7) are spent once and last a week', () => {
@@ -275,7 +275,7 @@ test('pictures: national sides get flags, players found in either name order, fi
 
 test('v7: the kit and the Worker agree on the allowance and Plus; the statement skips Rewards points', async () => {
   const eco = await import('../eco.js');
-  assert.deepEqual(kit.ECONOMY.payTiers, eco.PAY_TIERS);
+  assert.equal(kit.ECONOMY.monthly, eco.PAY_MONTH);
   assert.equal(kit.PLUS.fee, eco.PLUS.fee);
   assert.equal(kit.PLUS.year, eco.PLUS.year);
   const now = Date.UTC(2026, 9, 10);

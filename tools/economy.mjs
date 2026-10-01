@@ -47,6 +47,7 @@ export const PAY_TIERS = [
   [Infinity, 500]
 ];
 export const payFor = tiered(PAY_TIERS);
+export const PAY_MONTH = 6_000;
 
 // Quadra Plus (Shared-Proxy/kit/quadra.mjs, eco.js).
 export const PLUS_V6 = { fee: 390, boost: 2, lift: 0.1, liftMax: 1_000, bonusBet: 100, commission: 0.28, wordsCap: 50, packShare: 0 };
@@ -86,7 +87,11 @@ export const SETTINGS = {
   // rises to keep a regular player level without the effort pay. Plus as
   // PLUS_V7.
   v7: { name: 'v7: no Rewards pay, allowance 8,000/4,000/1,500/500, Plus NT$990', start: 30_000, pay: payFor, effortRate: 0, effortCap: 0, plus: 990, shop: true, vip: true, v6: true, noRewardsPay: true, plusCfg: PLUS_V7 },
-  v8: { name: 'Now (v8): v7 with Plus at NT$490 (NT$200 weekly free bet, no daily lift)', start: 30_000, pay: payFor, effortRate: 0, effortCap: 0, plus: 490, shop: true, vip: true, v6: true, noRewardsPay: true, plusCfg: PLUS_V8 }
+  v8: { name: 'v8: v7 with Plus at NT$490 (NT$200 weekly free bet, no daily lift)', start: 30_000, pay: payFor, effortRate: 0, effortCap: 0, plus: 490, shop: true, vip: true, v6: true, noRewardsPay: true, plusCfg: PLUS_V8 },
+  // v10: a fixed NT$6,000 a month, like a salary (the tiers paid saving less
+  // and losing more). 4,000 or 5,000 broke a regular bettor within a year;
+  // at 6,000 a regular drifts down slowly and a saver or investor grows.
+  v10: { name: 'Now (v10): fixed pay NT$6,000 a month', start: 30_000, pay: () => 6_000, effortRate: 0, effortCap: 0, plus: 490, shop: true, vip: true, v6: true, noRewardsPay: true, plusCfg: PLUS_V8 }
 };
 const BOOST = { price: 150, cap: 200 };
 const FREEBET_RETURN = 0.45;
@@ -205,20 +210,20 @@ const money = x => `${x < 0 ? '−' : ''}NT$${Math.round(Math.abs(x)).toLocaleSt
 if (import.meta.url === `file://${process.argv[1]}`) {
   for (const s of Object.values(SETTINGS)) {
     console.log(`\n== ${s.name}: open ${money(s.start)}, effort cap ${money(s.effortCap)} a day`);
-    console.log(`who        income/mo   house take/mo   net/mo   net in mo 12   after 12 mo   months of pay held (${money(PAY_TIERS[0][1])})`);
+    console.log(`who        income/mo   house take/mo   net/mo   net in mo 12   after 12 mo   months of pay held (${money(PAY_MONTH)})`);
     for (const p of PEOPLE) {
       const rows = simulate(s, p);
       const first = rows[0];
       const last = rows.at(-1);
       const income = first.pay + first.effort + Math.max(0, first.market);
       const broke = rows.length < 12 || last.worth <= 0 ? ` (broke in month ${rows.findIndex(r => r.worth <= 0) + 1 || rows.length})` : '';
-      console.log(`${p.zh.padEnd(6, '　')}  ${money(income).padStart(10)}  ${money(first.take).padStart(14)}  ${money(first.flow).padStart(10)}  ${money(last.flow).padStart(12)}  ${money(Math.max(0, last.worth)).padStart(12)}   ${(Math.max(0, last.worth) / PAY_TIERS[0][1]).toFixed(1).padStart(5)}${broke}`);
+      console.log(`${p.zh.padEnd(6, '　')}  ${money(income).padStart(10)}  ${money(first.take).padStart(14)}  ${money(first.flow).padStart(10)}  ${money(last.flow).padStart(12)}  ${money(Math.max(0, last.worth)).padStart(12)}   ${(Math.max(0, last.worth) / PAY_MONTH).toFixed(1).padStart(5)}${broke}`);
     }
   }
   // The business, a month at NT$40,000: what the house keeps from each kind
   // of user, what it gives back, as a member of Plus and not.
-  const s6 = SETTINGS.v8;
-  console.log(`\n== The house, a month per user at ${money(40_000)} (v8)`);
+  const s6 = SETTINGS.v10;
+  console.log(`\n== The house, a month per user at ${money(40_000)} (v10)`);
   console.log('who          Plus   gaming take   promos (of take)   commission   Plus+shop   house net   user net');
   for (const p of PEOPLE) {
     for (const member of [false, true]) {

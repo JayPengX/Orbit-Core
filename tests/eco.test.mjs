@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { handleEcoRequest, mergeWallet, poolBalance, cleanPatch, emptyWallet, paydayEntries, payFor, worthOf, PAY_TIERS, REBASE, OVERDRAFT_RATE, plusJoinEntry, plusJoinEntries, plusMember, plusBonusEntries, bonusBetId, vipEntries, vipStakes, vipTier, welcomeEntries, VIP, tidyWallet, PAY, PLUS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, ECO_APPS } from '../eco.js';
+import { handleEcoRequest, mergeWallet, poolBalance, cleanPatch, emptyWallet, paydayEntries, payFor, worthOf, PAY_MONTH, REBASE, OVERDRAFT_RATE, plusJoinEntry, plusJoinEntries, plusMember, plusBonusEntries, bonusBetId, vipEntries, vipStakes, vipTier, welcomeEntries, VIP, tidyWallet, PAY, PLUS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, ECO_APPS } from '../eco.js';
 import { planClean } from '../eco-admin.js';
 
 function setup() {
@@ -212,7 +212,7 @@ test('payday: once a month, from the cut-over on', () => {
   const oct = Date.UTC(2026, 9, 7, 3);
   const due = paydayEntries({ entries: [] }, oct).map(e => e.id);
   assert.deepEqual(due, ['eco:pay:2026-10']);
-  assert.equal(paydayEntries({ entries: [] }, oct)[0].amount, 8_000);
+  assert.equal(paydayEntries({ entries: [] }, oct)[0].amount, 6_000);
   assert.deepEqual(paydayEntries({ entries: [...due.map(id => ({ id, amount: 6_000 })), { id: 'eco:rebase:v3', t: 1, app: 'eco', kind: 'rebase', amount: 0 }] }, oct), []);
   assert.deepEqual(paydayEntries({ entries: [] }, Date.UTC(2026, 8, 20)), []);
   // Back pay: months nobody opened an app are paid the next time.
@@ -384,21 +384,18 @@ test('Quadra Plus yearly on top of a month already held starts next month', () =
   assert.equal(e[0].amount, -PLUS.year);
 });
 
-test('the allowance goes by worth: full to start or restart, less with plenty, never nothing', () => {
-  assert.equal(payFor(0), 8_000);
-  assert.equal(payFor(39_999), 8_000);
-  assert.equal(payFor(40_000), 4_000);
-  assert.equal(payFor(150_000), 1_500);
-  assert.equal(payFor(5_000_000), 500);
-  // Worth counts Securities' holdings, not only cash.
+test('the pay is fixed, like a salary: the same however much the account holds', () => {
+  assert.equal(PAY_MONTH, 6_000);
+  assert.equal(payFor(0), 6_000);
+  assert.equal(payFor(5_000_000), 6_000);
+  // Worth still counts Securities' holdings, not only cash.
   const w = { entries: [{ id: 'a', t: 1, app: 'odds', amount: 20_000 }, { id: 'eco:rebase:v3', t: 1, app: 'eco', kind: 'rebase', amount: 0 }], snap: { stock: { cash: 5_000, holdings: 300_000, t: 1 } } };
   assert.equal(worthOf(w), 325_000);
   const oct = Date.UTC(2026, 9, 3);
-  assert.equal(paydayEntries({ ...w, created: oct }, oct).find(e => e.kind === 'pay').amount, 500);
-  // Back pay steps down as it lands.
+  assert.equal(paydayEntries({ ...w, created: oct }, oct).find(e => e.kind === 'pay').amount, 6_000);
+  // Back pay: every month in full.
   const back = paydayEntries({ entries: [{ id: 'x', t: 1, app: 'odds', amount: 36_000 }, { id: 'eco:rebase:v3', t: 1, app: 'eco', kind: 'rebase', amount: 0 }], created: oct }, Date.UTC(2027, 0, 5)).filter(e => e.kind === 'pay');
-  assert.deepEqual(back.map(e => e.amount), [8_000, 4_000, 4_000, 4_000]);
-  assert.equal(PAY_TIERS.at(-1)[1] > 0, true);
+  assert.deepEqual(back.map(e => e.amount), [6_000, 6_000, 6_000, 6_000]);
 });
 
 test('the reset: accounts that opened with NT$110,000 come down to NT$30,000 once; cash may go below zero', () => {
@@ -407,8 +404,7 @@ test('the reset: accounts that opened with NT$110,000 come down to NT$30,000 onc
   const due = paydayEntries(old, oct);
   assert.equal(due[0].id, REBASE.id);
   assert.equal(due[0].amount, -80_000);
-  // Worth after the reset: 10,000 - 80,000 + 60,000 held = -10,000: the full allowance.
-  assert.equal(due.find(e => e.kind === 'pay').amount, 8_000);
+  assert.equal(due.find(e => e.kind === 'pay').amount, 6_000);
   // Overdrawn when the month starts: 1% of what's owed.
   assert.equal(due.find(e => e.kind === 'od').amount, -Math.round(70_000 * OVERDRAFT_RATE));
   // Once only.
