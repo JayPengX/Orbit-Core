@@ -160,8 +160,10 @@ export function paydayEntries(wallet, now) {
   for (let n = 0; m <= month && n < 120; n++, m = nextMonth(m)) {
     if (!have.has(`eco:pay:${m}`)) out.push({ id: `eco:pay:${m}`, t: now, app: 'eco', kind: 'pay', amount: payFor() });
   }
-  // Quadra Plus renews for this month (after the pay, so the pay covers it).
-  out.push(...plusRenewal(wallet, now, out.reduce((sum, e) => sum + e.amount, 0)));
+  // Plus months bought with points, then the renewal for this month (after
+  // the pay, so the pay covers it; a month already held isn't charged).
+  out.push(...plusPointsEntries(wallet, now));
+  out.push(...plusRenewal({ ...wallet, entries: [...(wallet.entries || []), ...out] }, now));
   // A member's bonus bet for this week (after the renewal that makes them one).
   out.push(...plusBonusEntries({ ...wallet, entries: [...(wallet.entries || []), ...out] }, now));
   // VIP cashback on the months before this one, and the welcome bonus bet.
@@ -266,12 +268,14 @@ function yearEntries(wallet, first, now) {
 // a year). A charge the pool can't cover fails: `eco:plusfail:<month>`
 // (amount 0), and the membership lapses there until the person joins again
 // (renewal won't retry it). v10; before, a month nobody came was skipped.
+// A month bought with points (note 'points') isn't a payment: it doesn't
+// bring back a membership that lapsed.
 export const plusLapsed = wallet => {
   const entries = wallet?.entries || [];
-  const last = entries.filter(e => e.app === 'eco' && e.id?.startsWith('eco:plus:')).map(e => e.id.slice(9)).sort().at(-1);
+  const last = entries.filter(e => e.app === 'eco' && e.id?.startsWith('eco:plus:') && e.note !== 'points').map(e => e.id.slice(9)).sort().at(-1);
   return Boolean(last) && entries.some(e => e.app === 'eco' && e.id?.startsWith('eco:plusfail:') && e.id.slice(13) > last);
 };
-function plusRenewal(wallet, now, adding = 0) {
+function plusRenewal(wallet, now) {
   const month = taipeiMonth(now);
   const entries = wallet?.entries || [];
   if (!plusOn(wallet) || plusLapsed(wallet)) return [];
@@ -279,7 +283,7 @@ function plusRenewal(wallet, now, adding = 0) {
   const last = [...have].sort().at(-1);
   if (!last || last >= month) return [];
   const out = [];
-  let pool = poolBalance(wallet) + adding;
+  let pool = poolBalance(wallet);
   for (let m = nextMonth(last), n = 0; m <= month && n < 120; m = nextMonth(m), n++) {
     if (have.has(m)) continue;
     if (plusSetting(wallet).plan === 'year' && pool >= PLUS.year) {
@@ -298,6 +302,31 @@ function plusRenewal(wallet, now, adding = 0) {
   }
   return out;
 }
+// A month of Plus bought with points in Rewards ('vocab:xs:plus:<month>'):
+// only this Worker writes `eco:plus:<month>` (amount 0, note 'points'). As
+// the kit's catalogue allows: after a first month joined (the free one),
+// for the month it was redeemed in or the next, one a quarter, never over a
+// month already held.
+const quarterOf = m => `${m.slice(0, 4)}-Q${Math.ceil(Number(m.slice(5, 7)) / 3)}`;
+export function plusPointsEntries(wallet, now) {
+  const entries = wallet?.entries || [];
+  const held = entries.filter(e => e.app === 'eco' && e.id?.startsWith('eco:plus:'));
+  if (!held.some(e => e.note !== 'points')) return [];
+  const have = new Set(held.map(e => e.id.slice(9)));
+  const quarters = new Set(held.filter(e => e.note === 'points').map(e => quarterOf(e.id.slice(9))));
+  const out = [];
+  for (const e of entries) {
+    if (e.app !== 'vocab' || e.kind !== 'redeem' || !e.id?.startsWith('vocab:xs:plus:')) continue;
+    const m = e.id.slice(14);
+    const from = taipeiMonth(e.t);
+    if (!/^\d{4}-\d{2}$/.test(m) || (m !== from && m !== nextMonth(from)) || m > nextMonth(taipeiMonth(now)) || have.has(m) || quarters.has(quarterOf(m))) continue;
+    out.push({ id: PLUS_ID(m), t: now, app: 'eco', kind: 'plus', amount: 0, note: 'points' });
+    have.add(m);
+    quarters.add(quarterOf(m));
+  }
+  return out;
+}
+
 // What joining now takes. Monthly: nothing the first time ever, else the
 // rest of the month's share of the fee. Yearly: PLUS.year for twelve months,
 // from this month (or from next month when this one is already a member's).
@@ -343,7 +372,15 @@ export const REWARDS_XP = {
   // A daily mission swapped for another ('vocab:xs:reroll:<day>:<mission>').
   reroll: 100,
   // A missed day bought back for the streak ('vocab:xs:repair:<day>').
-  repair: 1_500
+  repair: 1_500,
+  // The points catalogue (the kit's CATALOG), at a Plus member's price (the
+  // kit's PLUS.vocab.catalog of it): Play free bets, a Securities commission
+  // voucher and a 定存 bonus, a month of Plus (plusPointsEntries).
+  bet100: 4_500,
+  bet500: 19_800,
+  fee: 3_600,
+  td: 10_800,
+  plus: 18_000
 };
 function xpPaid(id, e) {
   const [, , item, key] = id.split(':');

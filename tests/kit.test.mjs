@@ -442,3 +442,61 @@ test('points expire a year after the month they were earned, oldest spent first;
   // Points from before v7 count from when v7 began.
   assert.equal(kit.xpBalance({ entries: [{ id: 'vocab:old', t: Date.UTC(2025, 0, 1), app: 'vocab', kind: 'game', amount: 0, xp: 300 }] }, Date.UTC(2027, 8, 1)), 300);
 });
+
+test('points catalogue: Worker prices are a member’s, limits a month, tokens used once and gone at their days', async () => {
+  const eco = await import('../eco.js');
+  for (const c of kit.CATALOG) assert.equal(eco.REWARDS_XP[c.id], kit.catalogCost(c.id, true), c.id);
+  const oct = Date.UTC(2026, 9, 5, 4);
+  const xp = n => ({ id: `vocab:g:${n}`, t: Date.UTC(2026, 9, 1, 4), app: 'vocab', kind: 'game', amount: 0, xp: n });
+  const trial = { id: 'eco:plus:2026-09', t: 1, app: 'eco', kind: 'plus', amount: 0, note: 'trial' };
+  let w = { entries: [xp(100_000), trial] };
+  // Free bets: NT$1,000 of face a month; each a Play token for 7 days.
+  const add = (item, key, t = oct) => {
+    const e = kit.catalogEntry(w, item, key, t);
+    assert.ok(e, `${item} ${key}`);
+    w = { ...w, entries: [...w.entries, e] };
+    return e;
+  };
+  assert.equal(add('bet500', 'a').note, '22000');
+  add('bet100', 'b');
+  add('bet100', 'c');
+  add('bet100', 'd');
+  add('bet100', 'e');
+  add('bet100', 'g');
+  assert.equal(kit.catalogLimit(w, 'bet100', oct).why, 'month');
+  assert.equal(kit.catalogEntry(w, 'bet100', 'f', oct), null);
+  assert.ok(kit.catalogLimit(w, 'bet100', Date.UTC(2026, 10, 2)).ok);
+  const bets = kit.freeBets(w, oct + 1);
+  assert.deepEqual(bets.map(b => b.value).sort((a, b) => a - b), [100, 100, 100, 100, 100, 500]);
+  assert.equal(bets[0].until, oct + 7 * 86_400_000);
+  assert.equal(kit.freeBets(w, oct + 8 * 86_400_000).length, 0);
+  // Used in Play: gone.
+  w = { ...w, entries: [...w.entries, { id: 'odds:fb-vocab:xs:bet500:a', t: oct + 2, app: 'odds', kind: 'freebet', amount: 0 }] };
+  assert.equal(kit.freeBets(w, oct + 3).length, 5);
+  // Commission vouchers: three a month, 30 days, used once in Securities.
+  add('fee', 'x');
+  add('fee', 'y');
+  add('fee', 'z');
+  assert.equal(kit.catalogLimit(w, 'fee', oct).why, 'month');
+  w = { ...w, entries: [...w.entries, { id: 'stock:xs-vocab:xs:fee:x', t: oct + 5, app: 'stock', kind: 'voucher', amount: 0 }] };
+  assert.deepEqual(kit.catalogTokens(w, 'fee', oct + 6).map(x => [x.id, x.value]), [['vocab:xs:fee:y', 100], ['vocab:xs:fee:z', 100]]);
+  assert.equal(kit.catalogTokens(w, 'fee', oct + 31 * 86_400_000).length, 0);
+  // A deposit bonus: one a month.
+  assert.equal(add('td', 't').note, '12000');
+  assert.deepEqual(kit.catalogTokens(w, 'td', oct + 1).map(x => [x.rate, x.cap]), [[0.005, 100_000]]);
+  assert.equal(kit.catalogLimit(w, 'td', oct).why, 'month');
+  // A Plus month: this one (not held), one a quarter; members pay 90%.
+  const p = add('plus');
+  assert.equal(p.id, 'vocab:xs:plus:2026-10');
+  assert.equal(kit.catalogLimit(w, 'plus', oct).why, 'quarter');
+  const member = { entries: [xp(100_000), { id: 'eco:plus:2026-10', t: 1, app: 'eco', kind: 'plus', amount: -490 }] };
+  const next = kit.catalogEntry(member, 'plus', '', oct);
+  assert.deepEqual([next.id, next.note], ['vocab:xs:plus:2026-11', '18000']);
+  assert.equal(kit.catalogEntry(member, 'fee', 'q', oct).note, '3600');
+  assert.equal(kit.catalogLimit({ entries: [xp(100_000)] }, 'plus', oct).why, 'trial');
+  // Not enough points: nothing.
+  assert.equal(kit.catalogEntry({ entries: [xp(4_000), trial] }, 'bet100', 'k', oct), null);
+  // A points month doesn't end a lapse.
+  const lapsed = { entries: [trial, { id: 'eco:plusfail:2026-10', t: 1, app: 'eco', kind: 'plusfail', amount: 0 }, { id: 'eco:plus:2026-11', t: 2, app: 'eco', kind: 'plus', amount: 0, note: 'points' }] };
+  assert.equal(kit.plusLapsed(lapsed), true);
+});

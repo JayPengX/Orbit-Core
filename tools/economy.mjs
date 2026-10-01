@@ -62,6 +62,10 @@ export const PLUS_V7 = { fee: 990, boost: 1, lift: 0.1, liftMax: 500, bonusBet: 
 // streak cards a month (NT$600 at the shop's price, nothing to make) and
 // Rewards' points ×1.5 cost nothing but a shop sale.
 export const PLUS_V8 = { fee: 490, boost: 1, lift: 0, liftMax: 0, bonusBet: 200, commission: 0.28, wordsCap: 0, packShare: 0.5, cards: 2 };
+// v11 (the kit's PLUS now): word packs no longer half price, and the
+// points catalogue at 90% of the points for members; Securities adds +0.1%
+// on new deposits and a 20% lending cut (small next to the fee).
+export const PLUS_V11 = { ...PLUS_V8, packShare: 1, catalog: 0.9 };
 export const SETTINGS = {
   now: { name: 'Now', start: 110_000, pay: () => 7_000, effortRate: 18, effortCap: 600 + 400 + 300, plus: 290 },
   // What the Worker changes on its own (Rewards still earns as it does).
@@ -91,7 +95,13 @@ export const SETTINGS = {
   // v10: a fixed NT$6,000 a month, like a salary (the tiers paid saving less
   // and losing more). 4,000 or 5,000 broke a regular bettor within a year;
   // at 6,000 a regular drifts down slowly and a saver or investor grows.
-  v10: { name: 'Now (v10): fixed pay NT$6,000 a month', start: 30_000, pay: () => 6_000, effortRate: 0, effortCap: 0, plus: 490, shop: true, vip: true, v6: true, noRewardsPay: true, plusCfg: PLUS_V8 }
+  v10: { name: 'v10: fixed pay NT$6,000 a month', start: 30_000, pay: () => 6_000, effortRate: 0, effortCap: 0, plus: 490, shop: true, vip: true, v6: true, noRewardsPay: true, plusCfg: PLUS_V8 },
+  // v11: the points catalogue (the kit's CATALOG). What people turn points
+  // into (PEOPLE's cat*) is a promotion: free bets at FREEBET_RETURN of
+  // face, commission vouchers at face (each brings a trade), a deposit
+  // bonus at what it pays, and a member's Plus month from points at the fee
+  // forgone (a non-member's costs only its perks, and is how Plus sells).
+  v11: { name: 'Now (v11): v10 with the points catalogue, packs at one price', start: 30_000, pay: () => 6_000, effortRate: 0, effortCap: 0, plus: 490, shop: true, vip: true, v6: true, noRewardsPay: true, plusCfg: PLUS_V11, catalog: true }
 };
 const BOOST = { price: 150, cap: 200 };
 const FREEBET_RETURN = 0.45;
@@ -133,9 +143,11 @@ export function monthOf(settings, p, worth, member = false) {
   const lift = liftStake * ((1 - p.trebles) * (singleHold(0) - singleHold(P.lift)) + p.trebles * (trebleHold(boost) - trebleHold(boost + P.lift)));
   const bonus = member && p.slips > 0 ? ((P.bonusBet * 52) / 12) * FREEBET_RETURN : 0;
   const vip = settings.vip ? vipBack(bets + tickets) : 0;
-  const promo = freebets + boostDouble + lift + bonus + vip;
   // Other revenue.
   const commission = p.turnover * COMMISSION * (member ? P.commission : 1);
+  // A voucher takes off at most the commission there is (the rest is lost).
+  const catalog = settings.catalog ? (p.catBets || 0) * FREEBET_RETURN + Math.min(p.catVouchers || 0, commission) + (p.catTd || 0) + (member ? (P.fee * (p.catPlus || 0)) / 12 : 0) : 0;
+  const promo = freebets + boostDouble + lift + bonus + vip + catalog;
   const tax = p.turnover * (TRADE_COST - COMMISSION);
   const plusFee = member ? P.fee : 0;
   // With no Rewards pay, a word boost buys points, not money: nobody is
@@ -153,7 +165,7 @@ export function monthOf(settings, p, worth, member = false) {
   const market = Math.max(0, worth * p.invested) * MARKET;
   const house = gaming - promo + commission + plusFee + shop;
   const flow = pay + effort + market - tax - house;
-  return { gaming, freebets, boostDouble, lift, bonus, vip, promo, commission, tax, plusFee, shop, pay, effort, market, house, flow };
+  return { gaming, freebets, boostDouble, lift, bonus, vip, catalog, promo, commission, tax, plusFee, shop, pay, effort, market, house, flow };
 }
 
 // Per day unless said: bets (slips a day, stake, share that are trebles),
@@ -163,12 +175,12 @@ export function monthOf(settings, p, worth, member = false) {
 // packs), free bets claimed a day (NT$ face value).
 export const PEOPLE = [
   { key: 'casual', zh: '偶爾玩', slips: 2 / 7, stake: 300, trebles: 0, draw: 100 / 7, scratch: 0, effort: 0, invested: 0, turnover: 0 },
-  { key: 'regular', zh: '常玩', slips: 2, stake: 500, trebles: 0.5, draw: 50, scratch: 200 / 7, effort: 10, invested: 0.2, turnover: 10_000, freebets: 80, freebetsV6: 50 },
+  { key: 'regular', zh: '常玩', slips: 2, stake: 500, trebles: 0.5, draw: 50, scratch: 200 / 7, effort: 10, invested: 0.2, turnover: 10_000, freebets: 80, freebetsV6: 50, catBets: 500, catVouchers: 100 },
   { key: 'roller', zh: '大戶', slips: 4, stake: 2_000, trebles: 0.5, draw: 500, scratch: 1_000 / 7, effort: 0, invested: 0, turnover: 0, plus: true },
-  { key: 'investor', zh: '投資派', slips: 1, stake: 500, trebles: 0, draw: 0, scratch: 0, effort: 15, invested: 0.7, turnover: 50_000, plus: true },
-  { key: 'grinder', zh: '認真賺', slips: 3, stake: 500, trebles: 0.5, draw: 50, scratch: 0, effort: 60, invested: 0, turnover: 0, boostDays: 20, shopMonth: 300, freebets: 80, freebetsV6: 50 },
+  { key: 'investor', zh: '投資派', slips: 1, stake: 500, trebles: 0, draw: 0, scratch: 0, effort: 15, invested: 0.7, turnover: 50_000, plus: true, catVouchers: 300, catTd: 40, catPlus: 4 },
+  { key: 'grinder', zh: '認真賺', slips: 3, stake: 500, trebles: 0.5, draw: 50, scratch: 0, effort: 60, invested: 0, turnover: 0, boostDays: 20, shopMonth: 300, freebets: 80, freebetsV6: 50, catBets: 1_000, catPlus: 4 },
   // Rewards only: words and games most days, a boost now and then, a protection card and a pack over the year.
-  { key: 'learner', zh: '只背單字', slips: 0, stake: 0, trebles: 0, draw: 0, scratch: 0, effort: 30, invested: 0, turnover: 0, boostDays: 6, shopMonth: 300, packMonth: 990 / 12 }
+  { key: 'learner', zh: '只背單字', slips: 0, stake: 0, trebles: 0, draw: 0, scratch: 0, effort: 30, invested: 0, turnover: 0, boostDays: 6, shopMonth: 300, packMonth: 990 / 12, catPlus: 4 }
 ];
 
 export function simulate(settings, p, months = 12) {
@@ -222,8 +234,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   }
   // The business, a month at NT$40,000: what the house keeps from each kind
   // of user, what it gives back, as a member of Plus and not.
-  const s6 = SETTINGS.v10;
-  console.log(`\n== The house, a month per user at ${money(40_000)} (v10)`);
+  const s6 = SETTINGS.v11;
+  console.log(`\n== The house, a month per user at ${money(40_000)} (v11)`);
   console.log('who          Plus   gaming take   promos (of take)   commission   Plus+shop   house net   user net');
   for (const p of PEOPLE) {
     for (const member of [false, true]) {

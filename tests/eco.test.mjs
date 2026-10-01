@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { handleEcoRequest, mergeWallet, poolBalance, cleanPatch, emptyWallet, paydayEntries, payFor, worthOf, PAY_MONTH, REBASE, OVERDRAFT_RATE, plusJoinEntry, plusJoinEntries, plusMember, plusLapsed, plusBonusEntries, bonusBetId, vipEntries, vipStakes, vipTier, welcomeEntries, VIP, tidyWallet, PAY, PLUS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, ECO_APPS } from '../eco.js';
+import { handleEcoRequest, mergeWallet, poolBalance, cleanPatch, emptyWallet, paydayEntries, payFor, worthOf, PAY_MONTH, REBASE, OVERDRAFT_RATE, plusJoinEntry, plusJoinEntries, plusMember, plusLapsed, plusPointsEntries, REWARDS_XP, plusBonusEntries, bonusBetId, vipEntries, vipStakes, vipTier, welcomeEntries, VIP, tidyWallet, PAY, PLUS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, ECO_APPS } from '../eco.js';
 import { planClean } from '../eco-admin.js';
 
 function setup() {
@@ -531,4 +531,39 @@ test('Quadra Plus bills every month like a subscription: months away charged on 
   const back = plusJoinEntries(rich, Date.UTC(2026, 11, 2));
   assert.ok(back[0].amount < 0);
   assert.equal(plusLapsed({ entries: [...rich.entries, ...back] }), false);
+});
+
+test('points catalogue: a member’s price is the least the Worker takes; a Plus month for points, one a quarter, after the free one', () => {
+  const r = (id, note) => ({ id, t: Date.UTC(2026, 9, 5), app: 'vocab', kind: 'redeem', amount: 0, note });
+  const p = cleanPatch({ entries: [r('vocab:xs:bet100:a', '4500'), r('vocab:xs:bet500:b', '19000'), r('vocab:xs:fee:c', '4000'), r('vocab:xs:td:d', '10800'), r('vocab:xs:plus:2026-10', '17999')] });
+  assert.deepEqual(p.entries.map(e => e.id), ['vocab:xs:bet100:a', 'vocab:xs:fee:c', 'vocab:xs:td:d']);
+  assert.equal(REWARDS_XP.plus, 18_000);
+  const oct = Date.UTC(2026, 9, 5);
+  const plusPts = (m, t = oct) => ({ id: `vocab:xs:plus:${m}`, t, app: 'vocab', kind: 'redeem', amount: 0, note: '20000' });
+  // Never joined: the free month comes first.
+  assert.deepEqual(plusPointsEntries({ entries: [plusPts('2026-10')] }, oct), []);
+  const trial = { id: 'eco:plus:2026-09', t: 1, app: 'eco', kind: 'plus', amount: 0, note: 'trial' };
+  const got = plusPointsEntries({ entries: [trial, plusPts('2026-10')] }, oct);
+  assert.deepEqual(got.map(e => [e.id, e.amount, e.note]), [['eco:plus:2026-10', 0, 'points']]);
+  // A second one the same quarter, a month far ahead, or one already held: nothing.
+  assert.deepEqual(plusPointsEntries({ entries: [trial, ...got, plusPts('2026-11')] }, oct), []);
+  assert.deepEqual(plusPointsEntries({ entries: [trial, plusPts('2027-03')] }, oct), []);
+  assert.deepEqual(plusPointsEntries({ entries: [trial, { id: 'eco:plus:2026-10', t: 1, app: 'eco', kind: 'plus', amount: -490 }, plusPts('2026-10')] }, oct), []);
+  // Next quarter, next month's: fine (redeemed in December for January).
+  const dec = Date.UTC(2026, 11, 20);
+  assert.deepEqual(plusPointsEntries({ entries: [trial, ...got, plusPts('2027-01', dec)] }, dec).map(e => e.id), ['eco:plus:2027-01']);
+  // A points month doesn't revive a lapsed membership: renewal stays off.
+  const lapsed = [trial, { id: 'eco:plusfail:2026-10', t: 1, app: 'eco', kind: 'plusfail', amount: 0 }, { id: 'eco:pay:2026-10', t: 1, app: 'eco', kind: 'pay', amount: 50_000 }, { id: 'eco:rebase:v3', t: 1, app: 'eco', kind: 'rebase', amount: 0 }];
+  const nov = Date.UTC(2026, 10, 3);
+  const w = { settings: { plus: { value: { on: true }, t: 1 } }, created: Date.UTC(2026, 8, 1), entries: [...lapsed, plusPts('2026-11', nov)] };
+  const due = paydayEntries(w, nov);
+  assert.deepEqual(due.filter(e => e.kind === 'plus').map(e => [e.id, e.amount]), [['eco:plus:2026-11', 0]]);
+  assert.equal(plusLapsed({ entries: [...w.entries, ...due] }), true);
+  assert.ok(!paydayEntries({ ...w, entries: [...w.entries, ...due] }, Date.UTC(2026, 11, 3)).some(e => e.kind === 'plus'));
+  // A member renewing: next month paid with points isn't charged.
+  const member = { settings: { plus: { value: { on: true }, t: 1 } }, created: Date.UTC(2026, 8, 1), entries: [{ id: 'eco:plus:2026-10', t: 1, app: 'eco', kind: 'plus', amount: -490 }, { id: 'eco:pay:2026-10', t: 1, app: 'eco', kind: 'pay', amount: 50_000 }, { id: 'eco:rebase:v3', t: 1, app: 'eco', kind: 'rebase', amount: 0 }, plusPts('2026-11')] };
+  const now = paydayEntries(member, oct);
+  assert.deepEqual(now.filter(e => e.kind === 'plus').map(e => e.id), ['eco:plus:2026-11']);
+  const later = paydayEntries({ ...member, entries: [...member.entries, ...now] }, nov);
+  assert.ok(!later.some(e => e.kind === 'plus'));
 });
