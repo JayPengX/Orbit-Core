@@ -10,125 +10,139 @@ edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
 
 ## Round in progress: the owner's list of 2026-10-01 (branch `claude/securities-rewards-improvements-8tt0qt`)
 
-Status marks: [x] done and pushed to `main`, [ ] to do. Work top-down is not
-required; each item is independent. Images the owner attached (the official
-F1 app's driver page, Securities' 匯率 tab) were not readable in the session.
+Marks: [x] done, [~] done on the branch but not on `main` yet, [ ] to do.
+Owner's working rules this round: push to `main` once a whole category is
+done (not every change); be quick without losing quality; leave the ported
+games for LAST; "when I say stop, commit everything and write the handoff".
+
+Where things stand at the stop (2026-10-01):
+- `main` has: everything for Securities, Play and the kit below; Fixtures up
+  to and including the F1 driver and team pages.
+- Only on the branch (Quadra-Fixtures, last commit): the 追蹤 tab rewrite
+  (`renderFollowing`, `formOf`, `teamFormRow` in app.js; `.tf-*`,
+  `.people-strip`, `.person-card`, `.follow-head` in styles.css). Tests pass;
+  it was NOT yet checked on screen. Check it with
+  `node tools/preview.mjs fixtures following --full --wait 12000 --payload p.json`
+  where p.json is a Fixtures payload, e.g.
+  `{"v":3,"sports":["baseball","basketball","soccer"],"leagues":["mlb","nba","epl"],"follows":[{"league":"mlb","id":"19","name":"Los Angeles Dodgers","logo":"https://a.espncdn.com/i/teamlogos/mlb/500/lad.png"},{"league":"atp","id":"3623","name":"Jannik Sinner","athlete":true}],"tv":["elta"],"audio":"en","t":1}`.
+  Add `--store quadra.seen.rebase-v3=1 --store quadra.seen.v8=1 --store quadra.seen.v10=1 --store quadra.seen.v11=1`, or the "Quadra 更新了" notice covers the page.
+  Then merge it to `main` with the rest of the Fixtures category.
+- Preview tool: `--eval "import('./sheets.js').then(m=>m.openConstructor({id:'',name:'Mercedes',en:'Mercedes'}))…"` opens
+  any sheet. preview.mjs now applies the Worker's page trims (F1, F2/F3,
+  YouTube) itself.
 
 Securities
-- [x] 修改 on a 定期定額 plan scrolls to the plan's form and opens it
-  (`scrollToPlanForm`, the card flashes).
+- [x] 修改 on a 定期定額 plan scrolls to the plan's form (`scrollToPlanForm`).
 - [x] 融資 margin calls as Taiwan's brokers run them (`callState`,
-  `callDeadline`, `callNeed`, `payDown` in account.mjs; tests
-  `tests/margincall.test.mjs`): judged at the close (a dip under 130% in
-  Taiwan's session calls nothing), due at the close of the second business
-  day after, cancelled at 166% (`MARGIN_RESTORE`), met by paying cash
-  against the loans (補繳 button, `call-pay`), repaying or selling; at the
-  deadline under 130% the margin holdings are sold (orders wait for the
-  next open), between 130 and 166% nothing is sold but the call stands.
-  The 115% instant sale is gone: only under 100% (`MARGIN_LIQUIDATE` 1).
-  No new 融資 while a call stands.
-- [ ] Ultra realism for the whole app (audit: 融資 term of 6 months with
-  展延, 信用帳戶 opening conditions, 融資額度, 融券 rules, 當沖, odd-lot
-  sessions, fees rounding, settlement T+2 everywhere).
-- [ ] 統計分析 tab improved and revamped.
-- [ ] 交易明細: a filter button scrolls back to the start (keep the scroll
-  where it was); revamp the tab.
-- [ ] 匯率 tab looks bad (owner's screenshot); redesign.
-- [ ] 資產 tab looks flat; revamp.
-- [ ] Home page improved.
-- [ ] Remove descriptive lines (too long, unnecessary).
-
-Rewards
-- [x] Games fill the phone screen (arcadeView `refit`: canvases sized to
-  the space left, boards scaled and centred), a 遊戲列表 button beside
-  再玩一局 on the result card, and one XP rate for every game
-  (games.mjs `roundXp`/`roundTop`/`roundMinutes`: GAME_XPM × minutes
-  played × √(score ÷ best), up to the game's length; scores show as 分).
-  Old bests (in XP) stay as they were.
-- [x] Sprite directions: pixel T-rex facing right (runner.js, canvas
-  360×300), racer car, rockets, chick.
-- [ ] Not yet checked game by game on screen beyond ~20 of the 104.
-- [ ] Ported open-source games (owner's permission given; owner said to do
-  them LAST, after every other item). Done so far: `public/ported/bridge.js`
-  (`quadra.score/over/pad/L`), `portedStage` in games-ui.js (iframe,
-  結束並計分), `PORTED_LIST`/`addPorted` in arcade.mjs (empty: nothing
-  listed yet; an entry is [id, icon, cat, zh, en, kindZh, kindEn, excellent
-  score, minutes, page, source]). Adapted: `ported/dino` (Chromium T-rex,
-  BSD; score 1500 excellent, 2 min; centred, any tap starts) and
-  `ported/2048` (MIT; board alone scaled to fit, fresh board each round,
-  goes on past 2048; excellent ~20000, long). Next, each made to look like a
-  Rewards game (Traditional Chinese, no foreign buttons/links/stores, the
-  round's start and end through Rewards): Hextris (GPL-3), iamkun/tower_game
-  (MIT, Simplified title art), chvin/react-tetris (Apache-2.0, built
-  docs/, Simplified labels to convert), rembound Bubble Shooter and Match-3
-  (MIT), lhartikk/simple-chess-ai (Apache-2.0), jakesgordon racer and
-  breakout (MIT; racer needs `quadra.pad`), ellisonleao/clumsy-bird (GPL-3),
-  jhatzimalis/solitaire, santh0sh/minesweeper, gamelabz/html5-game-sudoku
-  (MIT). Then remove the home-made games (owner: "remove crap self made
-  games"); the plan was to keep only the word games (vocabulary is the
-  app's point) and check dailyGame, missions, badges and tests for ids.
-  Screenshot helper used: a 30-line Playwright script serving a folder at
-  390×700 with touch (recreate it; it lived in the scratchpad).
-- [ ] 財富等級 as the point of the game, a milestone of taking part, not
-  Quadra's profit. Three sides: the user, Quadra (profit-minded) and "God"
-  (who gives starter money, the monthly pay, level rewards).
-- [ ] Games fit a phone screen (now a small box at the top).
-- [ ] A way back to the games list when a game ends.
-- [ ] XP balanced across games (baseball hard, 10-20 XP; dinosaur 20 XP
-  for 20 jumps).
-- [ ] Every game's UI checked and improved (the dinosaur faces backwards).
-- [ ] UI organised (the points shop is spread everywhere).
-- [ ] More purpose for points.
-- [ ] Home page, 單字 and 任務 improved.
-- [ ] Quality games ported in (open-source games, only reading their
-  result to bridge into Quadra), replacing the weak home-made ones.
-- [ ] Better 說明: every mechanism of the Quadra economy in detail.
+  `callDeadline`, `callNeed`, `payDown` in account.mjs;
+  `tests/margincall.test.mjs`). The call is judged at the close under 130%.
+  It is due at the close of the second business day after and is cancelled
+  at 166% (`MARGIN_RESTORE`). It is met by paying cash (補繳), repaying or
+  selling. At the deadline, if still under 130%, the margin holdings are
+  sold. A forced sale happens only under 100%. No new 融資 is allowed while
+  a call stands.
+- [x] 統計分析 (`statsHtml`: 12-month P/L bars, win ring, best and worst
+  trades, by market, costs), 交易明細 (one continuous list with line icons,
+  a 30-day summary, chips that keep their scroll), 匯率 (a bank board with
+  the USD hero), 資產 (composition bar, sort, compact rows), home (account
+  card, logos), and real company logos (FMP images, with misses cached).
+  Long explanatory lines were removed.
+- [ ] Ultra realism sweep still to do:
+  - 融資 6-month term with 展延.
+  - 信用帳戶 opening conditions, 融資額度.
+  - 融券 rules and 當沖.
+  - Odd-lot sessions.
+  - Fee rounding.
+  - T+2 settlement everywhere.
 
 Play
-- [ ] Home page improved.
-- [ ] Real logos and photos through Fixtures' backbone (no letter or flag
-  placeholders).
-- [ ] 紀錄 tab improved.
-- [ ] 投注單 tab merged into the others: four tabs like every app.
+- [x] Four tabs (home, 賽事, 彩券, 紀錄); the slip is a sheet
+  (`#slip-sheet`, `openSlip`) over any tab.
+- [x] Players' photos and NFL/NHL logos come from the kit.
+- [x] 紀錄 has a summary; home has quick ways in.
+
+Kit
+- [x] `kit/boot.js`: one loading screen and an early version check.
+- [x] `watchUpdates`: checks every 60 s and on focus. Updates reach every
+  open tab through BroadcastChannel and apply at once unless the person is
+  busy.
+- [x] `keepStrips`: sideways chip, tab and date strips keep their scroll
+  across redraws in every app (the "chip problem").
+- [x] A modal sheet holds the page still behind it.
+- [x] photos.mjs (ESPN's headshot by name, then Wikipedia) and NFL/NHL
+  logos.
+- [x] F1 drivers' and teams' formula1.com slugs (`page`), and Racing Bulls'
+  aliases (`aka`).
+- Sync with `node kit/sync.mjs`; Quadra-Play's copies are synced but not yet
+  committed (commit them with the next Play change).
+
+Sports proxy (Worker)
+- [x] YouTube channel feeds (`trimYoutube`).
+- [x] F2/F3 sites (`trimFom`).
+- [x] formula1.com `/en/(drivers|teams)/<slug>` (`trimF1Page`, which gives
+  the page's DataGrids as label/value pairs).
+- Tests for each are in tests/sports-proxy.test.mjs.
 
 Fixtures
-- [ ] Played games use two kinds of image for the same team (an official
-  logo and a casual picture or just letters): one source per entity.
-- [ ] 賽事 date strip: after loading it jumps forward instead of keeping the
-  chosen date in the middle.
-- [ ] The small yellow bar under an F1 driver in the team view: explain it
-  or remove it.
-- [ ] F1 driver and team pages with full results like the official F1 app:
-  DNF, sprint results; tapping a Grand Prix opens it.
-- [ ] History stats for every sport possible (past Grand Prix winners,
-  per-driver/team records…), modelled on what the official apps and sites
-  show; displayed well; every possible link clickable.
-- [ ] The page behind a detail view doesn't scroll while it's open.
-- [ ] Traditional TV channels removed: OTT services only.
-- [ ] YouTube: name the exact matches that are on it, verified.
-- [ ] F2, F3, F1 Academy, GT races (free on YouTube): anything Taiwan can
-  watch is in.
-- [ ] 直播 tab revamped: what's live, upcoming and just ended on the
-  services the person has.
-- [ ] 追蹤 tab revamped: personal and informative, not 賽事 filtered.
-- [ ] Settings revamped or replaced.
-- [ ] Fewer labels, pills and emoji: a cleaner design.
+- [x] Date strip keeps the chosen day centred; the yellow bar is labelled
+  占車隊積分 N%; the page doesn't scroll under a sheet.
+- [x] Streaming services only (no cable or MOD).
+- [x] YouTube is named for a game only when the league's channel has that
+  game's video (`tvOf` and `ytVideoFor`; channel ids in broadcast.mjs).
+- [x] F2 and F3 (their own calendars and sessions, on ELTA.tv MAX 5-8).
+- [ ] F1 Academy is not done: its site uses an older layout
+  (/Racing-Series/Calendar). GT World Challenge (free, YouTube @GTWorld)
+  is not done either.
+- [x] F1 like the official app (lib/f1.mjs; tests/f1.test.mjs):
+  - The driver sheet shows the season (position and points), Grand Prix and
+    Sprint figures, career and birthplace from formula1.com.
+  - A race-by-race table (from Jolpica) shows the grid, finish or
+    retirement with its reason in Chinese, sprint result and points; each
+    row opens that weekend.
+  - The team sheet shows the drivers first, then Grand Prix and Sprint
+    figures, a race-by-race table for both cars, history (車隊歷史) and
+    profile.
+  - A finished race or sprint shows the official result (`f1Field`): team
+    (tappable), time or retirement, places gained, fastest lap and points.
+- [ ] History stats for other sports: past seasons, records and past
+  winners, as the official apps show them. ESPN's career stats already show
+  in player sheets (`ov.season`).
+- [~] 追蹤 rewritten (see above: needs a look on screen). It now shows
+  followed teams with their last-5 dots, last result and next game (ESPN
+  `teamSchedule`), players as cards, then leagues.
+- [ ] 直播 revamp. The plan: a strip of services at the top (全部 / mine /
+  each service that has something today, with counts), then 直播中, 即將開始
+  and 剛結束 filtered by the chosen service (`tvOf(e).some(b => b.svc ===
+  id)`). Drop the sport-emoji headers. Keep the ELTA guide only for 全部 or
+  ELTA.
+- [ ] Settings: today these are `openFollowEditor` and `openTvEditor`.
+  Replace them with one clean "我的設定" sheet (sports order, leagues,
+  services, commentary), without emoji or ✓ text in chips.
+- [ ] Fewer labels, pills and emoji across Fixtures (section headers still
+  carry sport emoji; the tv line uses 📺).
+- [ ] One image source per entity (team logo vs casual picture).
+- [ ] MotoGP standings and rider pages; Formula E results.
 
-Kit (asked 2026-10-01): a shared loading screen and an update system that
-keeps every open session current.
-- [ ] `kit/boot.js` written (draft, not synced or wired): draws the loading
-  screen into `<div id="loading" data-title data-cache>`, a progress line
-  (`window.__bootStep`), the failsafe (`__fxFail`/`__oddsFail` aliases,
-  15 s) and a version.json check before the app starts. To do: kit CSS for
-  `.q-boot*`, `sync.mjs` copying boot.js to each app's public/ (Orbit's
-  public/ too), each index.html's loading markup and inline script
-  replaced by it; `watchUpdates` to check every minute and on focus/online,
-  tell other tabs via BroadcastChannel('quadra-updates'), apply at once
-  unless busy (an input focused, a dialog open, the app's busy()), else
-  when free.
-
-From the earlier Next list (below): Fixtures MotoGP standings and rider
-pages; Formula E results; Formula E betting in Play once Kambi prices it.
+Rewards (after Fixtures; ported games LAST)
+- [x] Games fit the phone, a 遊戲列表 button at the end, one XP rate
+  (`roundXp`), and sprite directions fixed.
+- [ ] 財富等級 as the milestone of taking part. There are three sides: the
+  user, Quadra (profit-minded) and "God" (starter money, monthly pay, level
+  rewards).
+- [ ] One points shop (it is spread around now) and more purpose for
+  points.
+- [ ] Home, 單字 and 任務 improved.
+- [ ] 說明 covering every mechanism.
+- [ ] LAST: port open-source games, integrated (Traditional Chinese, the
+  round's start and end through Rewards, no foreign links).
+  - In place: bridge.js, `portedStage`, and `PORTED_LIST`/`addPorted` (still
+    empty).
+  - Adapted already: ported/dino and ported/2048.
+  - Candidates: Hextris, tower_game, react-tetris, rembound bubble/match-3,
+    simple-chess-ai, jakesgordon racer/breakout, clumsy-bird, solitaire,
+    minesweeper, sudoku.
+  - Then remove the home-made games, keeping the word games, and check
+    dailyGame, missions, badges and tests for removed ids.
 
 ## Photos, F1 team pages, Taiwan-only catalogue, MotoGP and Formula E (pushed to `main`)
 
