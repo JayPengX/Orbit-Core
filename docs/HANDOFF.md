@@ -7,6 +7,65 @@ edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
 `npx eslint .`).
 
 
+
+## NEXT (not started): Rewards gives real value, and Plus perks reviewed
+
+The owner's latest asks, in their words: "Rewards is the current weak part
+of the Quadra service, also you can evaluate perks again, add or remove",
+then "When I say weak is the features it provide". So: what Rewards' points
+can be *turned into* is thin (cosmetics, streak cards, a ×2 boost, word
+packs). Standing direction from earlier: ultra/brutally realistic, Quadra is
+profit-oriented, Rewards never pays money (v7), every purchase asks first,
+pop-ups short (kit `ask`/`tell` with `points` rows). Nothing of this round is
+coded; every repo is clean and pushed.
+
+**Proposed plan (from the last session, not yet agreed with the owner):** a
+points catalogue (積分兌換), like a card's or an airline's, turning points
+into Quadra's own products at a cost to the house below face value:
+
+| item | what | points | notes |
+|---|---|---|---|
+| `bet100` / `bet500` | Play free bet NT$100 / 500 | 5,000 / 22,000 | 7 days, every pick ≥ 1.50 (Play `FREE_MIN_ODDS`), no cash out; ~45% of face expected cost; cap NT$1,000 face a Taipei month |
+| `fee` | Securities commission voucher, up to NT$100 off one trade's commission | 4,000 | auto-applied at the next fill (`fillOrder`), unused part lost, 30 days, 3 a month |
+| `td` | 定存加碼券: +0.5% a year on one new deposit up to NT$100,000 | 12,000 | 30 days to use, 1 a month (savings.mjs / `openDeposit`) |
+| `plus` | one month of Plus | 20,000 | 1 a month; the Worker turns `vocab:xs:plus:<month>` into `eco:plus:<month>` (amount 0, note 'points') in `paydayEntries`, since only it may write `eco:` |
+
+A daily player earns roughly 20k XP a month (Lv 50 at 240,100 XP ≈ a year),
+so that's about NT$300-500 of face value a month: worth playing for, a small
+promotion cost next to the gaming take (check with `tools/economy.mjs`).
+
+How it would plug in (code read last session):
+- Entries are redemptions as now: `vocab:xs:<item>:<key>`, kind `redeem`,
+  amount 0, points in the note. The Worker's `REWARDS_XP` (eco.js ~336)
+  needs the new items (`xpPaid` reads `REWARDS_XP[item]` for unkeyed ones;
+  allow the Plus-member price as the minimum).
+- Put the catalogue's prices and limits in the kit (one `CATALOG`, like
+  `FRAMES`), shared by Rewards, Play, Securities and the Worker test.
+- Play: the kit's `freeBets` (quadra.mjs ~473) only reads `vocab:fb:` and
+  `eco:fb:` tokens of kind `freebet`; extend it to `vocab:xs:bet…` with the
+  value from the item. Play's slip already handles tokens, top-ups, min odds.
+- Securities: a global like `usePlus` (`useVouchers(list)`) and, in
+  `fillOrder` (account.mjs ~564), commission less min(commission, voucher in
+  the fill's currency via `twd`), `fill.voucher` = token id so it's spent
+  once; `openDeposit` takes a bonus token (`td.bonus`, rate + 0.005, amount
+  ≤ 100,000).
+- Rewards: a 兌換 section (shop.mjs `redeemEntry`, app.js shop area), with
+  confirms, limits and what's held/unused.
+
+**Plus perks, proposed review** (kit `PLUS`, `plusPerks` ~1642): keep the
+weekly NT$200 free bet, 2.8折 commission, half FX spread, 2% on the first
+NT$100,000, margin −1%, cash out 2%, 2 cards, points ×1.5. Remove word packs
+5折 (`PLUS.vocab.packShare` → 1; little used). Add: catalogue 9折 for
+members, 定存 +0.1% and the lending cut 20% instead of 30% (savings.mjs
+`LEND_CUT`). Update `plusPerks`, help (Rewards' help.mjs Plus lines 38/71),
+`tools/economy.mjs` PLUS settings, and the Plus sheet.
+
+Rules: push every change to `main` in every repo; `npm test` in each (Orbit
+also `npx eslint .`); edit the kit only in `Shared-Proxy/kit/` and
+`node kit/sync.mjs`; commits end with the Co-Authored-By and Claude-Session
+lines; `tools/preview.mjs <app> --store quadra.seen.v8=1 --store
+quadra.seen.v10=1` for screenshots (Yahoo often answers 429 for Securities'
+prices).
 ## Ultra realistic, v10: a fixed salary, savings, points that expire (pushed to `main`)
 
 - **Pay is fixed** (eco.js `PAY_MONTH`, kit `ECONOMY.monthly`): NT$6,000 on
