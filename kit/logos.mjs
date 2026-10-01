@@ -21,7 +21,7 @@ export function normalizeTeamName(name) {
 
 // ---- Team logos ------------------------------------------------------------------
 
-// ESPN's logo files: MLB and NBA by abbreviation, soccer clubs by ESPN id.
+// ESPN's logo files: MLB by abbreviation, soccer clubs by ESPN id.
 export const MLB_ABBR = {
   'Arizona Diamondbacks': 'ari', Athletics: 'ath', 'Oakland Athletics': 'ath', 'Atlanta Braves': 'atl', 'Baltimore Orioles': 'bal',
   'Boston Red Sox': 'bos', 'Chicago Cubs': 'chc', 'Chicago White Sox': 'chw', 'Cincinnati Reds': 'cin', 'Cleveland Guardians': 'cle',
@@ -31,14 +31,17 @@ export const MLB_ABBR = {
   'Seattle Mariners': 'sea', 'St. Louis Cardinals': 'stl', 'Tampa Bay Rays': 'tb', 'Texas Rangers': 'tex', 'Toronto Blue Jays': 'tor',
   'Washington Nationals': 'wsh'
 };
-export const NBA_ABBR = {
-  'Atlanta Hawks': 'atl', 'Boston Celtics': 'bos', 'Brooklyn Nets': 'bkn', 'Charlotte Hornets': 'cha', 'Chicago Bulls': 'chi',
-  'Cleveland Cavaliers': 'cle', 'Dallas Mavericks': 'dal', 'Denver Nuggets': 'den', 'Detroit Pistons': 'det', 'Golden State Warriors': 'gs',
-  'Houston Rockets': 'hou', 'Indiana Pacers': 'ind', 'Los Angeles Clippers': 'lac', 'LA Clippers': 'lac', 'Los Angeles Lakers': 'lal',
-  'Memphis Grizzlies': 'mem', 'Miami Heat': 'mia', 'Milwaukee Bucks': 'mil', 'Minnesota Timberwolves': 'min', 'New Orleans Pelicans': 'no',
-  'New York Knicks': 'ny', 'Oklahoma City Thunder': 'okc', 'Orlando Magic': 'orl', 'Philadelphia 76ers': 'phi', 'Phoenix Suns': 'phx',
-  'Portland Trail Blazers': 'por', 'Sacramento Kings': 'sac', 'San Antonio Spurs': 'sa', 'Toronto Raptors': 'tor', 'Utah Jazz': 'utah',
-  'Washington Wizards': 'wsh'
+// NBA.com's team ids: its own logos (cdn.nba.com), the primary marks (ESPN's
+// files are some clubs' alternates: the Celtics' shamrock, not Lucky).
+const NBA = 16106127;
+export const NBA_ID = {
+  'Atlanta Hawks': 37, 'Boston Celtics': 38, 'Brooklyn Nets': 51, 'Charlotte Hornets': 66, 'Chicago Bulls': 41,
+  'Cleveland Cavaliers': 39, 'Dallas Mavericks': 42, 'Denver Nuggets': 43, 'Detroit Pistons': 65, 'Golden State Warriors': 44,
+  'Houston Rockets': 45, 'Indiana Pacers': 54, 'Los Angeles Clippers': 46, 'LA Clippers': 46, 'Los Angeles Lakers': 47,
+  'Memphis Grizzlies': 63, 'Miami Heat': 48, 'Milwaukee Bucks': 49, 'Minnesota Timberwolves': 50, 'New Orleans Pelicans': 40,
+  'New York Knicks': 52, 'Oklahoma City Thunder': 60, 'Orlando Magic': 53, 'Philadelphia 76ers': 55, 'Phoenix Suns': 56,
+  'Portland Trail Blazers': 57, 'Sacramento Kings': 58, 'San Antonio Spurs': 59, 'Toronto Raptors': 61, 'Utah Jazz': 62,
+  'Washington Wizards': 64
 };
 export const EPL_ESPN_ID = {
   arsenal: 359, 'aston villa': 362, bournemouth: 349, brentford: 337, brighton: 331, 'brighton hove albion': 331, burnley: 379,
@@ -108,11 +111,8 @@ export function teamBadge(sport, name) {
 export function teamLogo(sport, name, dark = false) {
   const base = 'https://a.espncdn.com/i/teamlogos';
   const size = dark ? '500-dark' : '500';
-  if (sport === 'nba' && ['Boston Celtics', 'Boston Celtic'].includes(name)) {
-    return 'https://cdn.nba.com/logos/nba/1610612738/primary/L/logo.svg';
-  }
   if (sport === 'mlb' && MLB_ABBR[name]) return `${base}/mlb/${size}/${MLB_ABBR[name]}.png`;
-  if (sport === 'nba' && NBA_ABBR[name]) return `${base}/nba/${size}/${NBA_ABBR[name]}.png`;
+  if (sport === 'nba') return NBA_ID[name] ? `https://cdn.nba.com/logos/nba/${NBA}${NBA_ID[name]}/primary/${dark ? 'D' : 'L'}/logo.svg` : null;
   if (sport === 'nfl' && NFL_ABBR[name]) return `${base}/nfl/${size}/${NFL_ABBR[name]}.png`;
   if (sport === 'nhl' && NHL_ABBR[name]) return `${base}/nhl/${size}/${NHL_ABBR[name]}.png`;
   if (sport === 'epl' && EPL_ESPN_ID[normalizeTeamName(name)]) return `${base}/soccer/${size}/${EPL_ESPN_ID[normalizeTeamName(name)]}.png`;
@@ -264,35 +264,50 @@ export const flagEmoji = code => (code ? String.fromCodePoint(...[...code.slice(
 // ---- On screen ------------------------------------------------------------------
 
 // A logo with its dark-background version, or `fallback()` if it fails.
-// Logos that loaded (drawn again at once, not lazily) and ones that failed
-// (the fallback straight away, no broken picture first), remembered for
-// the session so a redraw — coming back to the app — doesn't flash them.
-const LOGO_SEEN_KEY = 'quadra.logos.v1';
-const logoSeen = (() => {
+//
+// No flashing: a picture that has drawn on this device before (remembered
+// across launches; the service worker keeps the file, sw-images.js) is shown
+// at once and decoded with the page, and every picture drawn in this page
+// stays decoded in memory, so a redraw (a tab, a refresh, a tap) puts it
+// back in the same frame. A new one fades in once it has drawn, never the
+// browser's broken-picture icon. One that fails is tried again (a dropped
+// connection, a slow CDN), then gives way to the fallback; a failure is
+// remembered for ten minutes only.
+const LOGO_SEEN_KEY = 'quadra.logos.v2';
+const SEEN_MAX = 2_000;
+const BAD_FOR_MS = 10 * 60_000;
+const RETRY_MS = [400, 1_500, 4_000];
+const store = (() => {
   try {
-    const saved = JSON.parse(sessionStorage.getItem(LOGO_SEEN_KEY) || '{}');
-    return { ok: new Set(saved.ok || []), bad: new Map(Object.entries(saved.bad && !Array.isArray(saved.bad) ? saved.bad : {})) };
+    return localStorage;
   } catch {
-    return { ok: new Set(), bad: new Map() };
+    return null;
   }
 })();
-let logoSaveTimer = 0;
-// A failure is remembered for 10 minutes only (a bad connection's, not the logo's).
-const BAD_FOR_MS = 10 * 60_000;
-const knownBad = url => Date.now() - (logoSeen.bad.get(url) ?? 0) < BAD_FOR_MS;
-function noteLogo(url, ok) {
-  if (ok ? logoSeen.ok.has(url) : knownBad(url)) return;
-  if (ok) {
-    logoSeen.ok.add(url);
-    logoSeen.bad.delete(url);
-  } else {
-    logoSeen.bad.set(url, Date.now());
-    logoSeen.ok.delete(url);
+const logoSeen = (() => {
+  try {
+    return new Set(JSON.parse(store?.getItem(LOGO_SEEN_KEY) || '[]'));
+  } catch {
+    return new Set();
   }
+})();
+const logoBad = new Map();
+// Decoded pictures of this page, kept so the browser keeps them decoded.
+const drawn = new Map();
+let logoSaveTimer = 0;
+const knownBad = url => Date.now() - (logoBad.get(url) ?? 0) < BAD_FOR_MS;
+function noteDrawn(url, img) {
+  logoBad.delete(url);
+  if (!drawn.has(url)) {
+    drawn.set(url, img);
+    if (drawn.size > 400) drawn.delete(drawn.keys().next().value);
+  }
+  if (logoSeen.has(url)) return;
+  logoSeen.add(url);
   clearTimeout(logoSaveTimer);
   logoSaveTimer = setTimeout(() => {
     try {
-      sessionStorage.setItem(LOGO_SEEN_KEY, JSON.stringify({ ok: [...logoSeen.ok].slice(-600), bad: Object.fromEntries([...logoSeen.bad].slice(-200)) }));
+      store?.setItem(LOGO_SEEN_KEY, JSON.stringify([...logoSeen].slice(-SEEN_MAX)));
     } catch {}
   }, 500);
 }
@@ -300,43 +315,39 @@ function noteLogo(url, ok) {
 export function logoPicture(light, dark, cls, fallback) {
   if (!light || knownBad(light)) return fallback();
   const img = document.createElement('img');
-  const known = logoSeen.ok.has(light);
-  // Keep the image slot stable until the current request has decoded. Even a
-  // previously successful URL can fail on a later visit or a weak connection.
+  const known = drawn.has(light) || logoSeen.has(light);
   Object.assign(img, { className: cls, alt: '', loading: known ? 'eager' : 'lazy', decoding: known ? 'sync' : 'async' });
-  img.style.visibility = 'hidden';
-  img.addEventListener('load', () => {
-    img.style.visibility = '';
-    noteLogo(light, true);
-  });
-  img.src = light;
-  if (img.complete && img.naturalWidth) img.style.visibility = '';
   const picture = document.createElement('picture');
-  picture.className = 'logo-wrap';
+  picture.className = known ? 'logo-wrap' : 'logo-wrap logo-new';
   if (dark) {
     const source = document.createElement('source');
     Object.assign(source, { srcset: dark, media: '(prefers-color-scheme: dark)' });
     picture.append(source);
   }
   picture.append(img);
-  // A logo that fails is tried once more (a slow or dropped connection),
-  // then gives way to the fallback.
-  let retries = 0;
-  img.addEventListener('error', () => {
-    if (!navigator.onLine || retries >= 2) {
-      if (navigator.onLine) noteLogo(light, false);
-      return picture.replaceWith(fallback());
-    }
-    retries++;
-    // Retry promptly without query parameters (TheSportsDB refuses them).
-    setTimeout(() => {
-      if (!picture.isConnected) return;
-      const source = picture.querySelector('source');
-      if (source) source.srcset = dark;
-      img.removeAttribute('src');
-      img.setAttribute('src', light);
-    }, retries === 1 ? 250 : 750);
+  img.addEventListener('load', () => {
+    picture.classList.remove('logo-new');
+    noteDrawn(light, img);
   });
+  let tries = 0;
+  img.addEventListener('error', () => {
+    if (tries >= RETRY_MS.length) {
+      logoBad.set(light, Date.now());
+      logoSeen.delete(light);
+      if (picture.parentNode) picture.replaceWith(fallback());
+      return;
+    }
+    const again = () => {
+      if (!picture.isConnected) return;
+      // The same address again (TheSportsDB refuses any extra ?query).
+      img.removeAttribute('src');
+      img.src = light;
+    };
+    const wait = RETRY_MS[tries++];
+    if (navigator.onLine === false) addEventListener('online', again, { once: true });
+    else setTimeout(again, wait);
+  });
+  img.src = light;
   return picture;
 }
 
