@@ -8,6 +8,20 @@ edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
 
 
 
+## Fixtures: small-hours big games, bets in the picks (pushed to `main`)
+
+- The night rule (picks are 05:00-24:00 Taipei; `inPickDay`) dropped every
+  game starting 00:00-05:00, an MLB wild-card Game 3 at 02:00 included.
+  Now `nightWorthy` (picks.mjs `bigGame`: stage post/final/playin or a
+  final/series/play-off note; a followed team's; one bet on in Play) keeps
+  it on its own calendar day, at its hour.
+- Games with open Play slips (`openBetLegs`, the wallet's snap) are in the
+  picks: `dayPlan(..., { keep })` adds them on top of the n picks (reason
+  `bet`, `bet: true`, the pick on the card via `pickCard`'s `bets`), never
+  pushing a pick out, never stopping the fallback or the next-day jump
+  (`ownPicks`). 你的投注 keeps only picks whose game isn't in the day's
+  list. Day chips with open bets show 🎫 (`betDays`).
+
 ## v11: a points catalogue, Plus perks reviewed, loans counted once (pushed to `main`)
 
 - **積分兌換** (kit `CATALOG`, `catalogCost/Limit/Entry/Tokens`,
