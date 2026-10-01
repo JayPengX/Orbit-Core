@@ -8,6 +8,26 @@ edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
 
 
 
+## Fixtures: F1 session badges, ELTA's commentary and the app (pushed to `main`)
+
+- A race weekend's sessions (rows, picks, the sheet) carry a coloured badge:
+  🏁 正賽 (accent, with a stripe on the row), ⏱️ 排位賽, ⚡ 衝刺賽, ⏱️ 衝刺排位賽.
+- `lib/broadcast.mjs`: `eltaAudio(title, ch)` reads ELTA's titles — 原音 /
+  英文解說 → 'en', 雙語 → 'dual', 副聲道現場原音 → 'venue', else 'zh';
+  `adFree` when it says 無廣告 or it's a MAX channel (540–549). D-LIVE
+  (delayed) and "Kids" showings are dropped. 980–989 are MOD's own channels
+  (no ELTA.tv page). `channelRank` sorts a game's channels: the person's
+  commentary (`prefs.audio`, 'en' by default, set in the TV sheet), then no
+  ads, so MAX 原音 → MAX 中文 → 體育台 for F1.
+- The 📺 line uses short names (MAX5台, 愛爾達2台) with an audio tag, the
+  person's kind highlighted; the sheet's card says 原音・無廣告 · time · where.
+- 觀看 on a phone opens `eltatv://live/<ch>` (ELTA's own appRedirect.js
+  mapping; its site only bounces to the app once per 12 h, which is why it
+  "sometimes" opened). Android uses an intent with the web page as fallback.
+  iOS: if the page is still visible after 1.8 s, a toast offers the web page;
+  taking it remembers "no app" for 30 days (`fx.eltaAppMiss`). Not testable
+  here on a real iPhone: check on the device.
+
 ## Fixtures: small-hours big games, bets in the picks (pushed to `main`)
 
 - The night rule (picks are 05:00-24:00 Taipei; `inPickDay`) dropped every
