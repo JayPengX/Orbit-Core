@@ -36,10 +36,9 @@ down, restored here).
   another site on the device (`quadra-images-v1`, weekly refresh). NBA logos
   are NBA.com's (`NBA_ID`; ESPN's Celtics file is the shamrock alternate).
 - **Fixtures:** only what ELTA.tv or Apple TV show in Taiwan (BROADCAST is the
-  league list; MLS on Apple TV, everything else ELTA). Every other sport in
-  ELTA's own list (Asian Games, BWF, WTT, U15, UEFA Youth League,
-  friendlies, CEV, WTCS, pool, and any new category as `elta-other`) is a
-  league built from ELTA's programs (`ELTA_LEAGUES`, espn.mjs `eltaShows`).
+  league list; MLS on Apple TV, everything else ELTA). F2 and F3 were removed
+  (catalogue, app and the Worker's F2/F3 sites); ELTA's other sports (Asian
+  Games, BWF, WTT…) were added and then taken out again at the owner's word.
   NBA.com's Taiwan schedule (cdn.nba.com refuses Cloudflare and this
   container) is fetched by the deploy workflow (`scripts/nba-elta.mjs`, also
   every 6 h by cron) into `public/nba-elta.json`: ELTA's NBA games for the
