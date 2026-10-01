@@ -11,7 +11,8 @@ All other requested app and shared-kit changes have been pushed to `main`.
 Latest task commits:
 
 - Shared-Proxy: `99cea23` Hub wallet rules, `9394be2` Windows kit-sync path
-  fix, `ed221ba` stale-device cleanup guard, `aa9fc74` this handoff.
+  fix, `ed221ba` stale-device cleanup guard, `aa9fc74` concise handoff,
+  `416cf07` takeover details, `32f89fa` agent-stop status.
 - Securities: `0c5558b`. Fixtures: `a99e2c1` and `74711f1`. Play:
   `28d66ca` and `052cfb4`. Orbit Class: `98903d8`.
 - Verified suites: Shared-Proxy 81, Securities 106, Fixtures 67, Play 148,
@@ -23,20 +24,21 @@ Latest task commits:
 `Quadra-Rewards` is on `main` at `9c09c3c`, with changes not committed or
 pushed. The in-progress local changes rename the product to Quadra Hub and
 remove game UI, game missions, XP scoring and arcade assets; retain
-vocabulary/pass features; and move avatar/frame customization to Plus. The
-current worktree also changes vocabulary question distractors. These edits
-are incomplete and have not had a complete post-change test run. Do not
-assume deleted files or behavior are fully audited. The owner explicitly
-paused this work for another agent to take over. The current Hub agent was
-repeatedly instructed to stop and not commit or push, but had not acknowledged
-or yielded when this handoff was written. The next agent should check the Hub
-worktree status first and preserve all local work.
+vocabulary/pass features; move avatar/frame customization to Plus; and add
+Quadra Truth content and more similar vocabulary distractors. Game UI/modules,
+missions and arcade assets have been deleted in the local worktree, and
+`tests/hub.test.mjs` checks removal and branding. These edits remain
+uncommitted and incomplete; a post-change `npm test` attempt exited 1. Do not
+assume deletions or behavior are fully audited. The owner said to stop and
+hand off. The Hub agent was repeatedly told to stop, but had not acknowledged
+or yielded at last check. The next agent should check `git status` first,
+preserve all local work, and rerun tests to identify the failure.
 
 The worktree includes pre-existing local changes to
 `public/data/audio/Celsius.mp3`, `Fahrenheit.mp3`, and `Internet.mp3`; preserve
 those files unless the owner says otherwise. Review `git status` before
-editing. The last known baseline was 44/44 tests before the current
-game-removal edits; that does not validate this worktree.
+editing. The earlier baseline was 44/44 tests before the current overhaul;
+that does not validate this worktree.
 
 Finish the requested vocabulary distractor improvement and Quadra Truth
 financial-education content, then audit for all retired game screens, modules,
