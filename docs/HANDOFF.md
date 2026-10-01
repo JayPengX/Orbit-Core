@@ -6,6 +6,41 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
 edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
 `npx eslint .`).
 
+## Play: Kambi first, real markets, players, new leagues, live (branch `claude/gallant-goodall-gtyxjg`, pushed to `main`)
+
+- **Prices:** an ESPN league with a `kambi` path in the catalogue (LEAGUES'
+  `book`) gets Kambi's list as its first price (`attachKambi`), DraftKings
+  (through ESPN) averaged in (`blendOutcomes`); the two more than
+  `BOOKS_APART` (0.12) apart on any outcome locks the game (`lock: 'check'`).
+  The house's own standings price (house.mjs) sells the winner only, `cap:
+  'house'`; a ticket with a capped pick costs at most `SLIP_RULES.capped`
+  (NT$1,000).
+- **A game's own markets:** opening a game (or a pick on the slip) reads
+  Kambi's `betoffer/event/<id>.json` through the proxy's new `kambi-offers`
+  trim (lib/offers.mjs). Kinds Kambi prices replace the model's (same option
+  ids, so slip picks survive); new kinds `dnb`, `corners`, `set1`,
+  `setscore`. Only markets the page settles exactly are taken (whole-game
+  lines, half lines, no Asian quarter lines; `LINES_SHOWN` 7 per kind).
+  Odd/even is gone; long shots (score, HT/FT, bands, top inning) sit under
+  更多.
+- **Players (球員):** lib/props.mjs maps Kambi's player markets to ESPN
+  box-score stats (soccer, MLB, NFL, NHL, NBA when listed); settled from the
+  game's summary (`propOutcome`); a player who didn't play (MLB: not in the
+  starting lineup) is void; a soccer tie that went to extra time voids
+  players' picks. Capped like house prices; never recommended.
+- **Soccer on 90 minutes:** `parseEspnResults` counts two halves for a final
+  after extra time or penalties (it used the extra-time score before).
+- **New leagues:** NCAAF, NBL, Championship, Eredivisie, Liga MX,
+  Brasileirão (ESPN + Kambi), ATP, WTA, UFC (Kambi's list, settled from ESPN's
+  tour and card scoreboards: `parseEspnDuel`; retirements, walkovers, draws
+  and no contests void; tennis game handicap / total games / first set / set
+  score). The owner asked for them back after the purge; Fixtures still shows
+  only what Taiwan can watch.
+- **Live:** Kambi's in-play lists for every ESPN league on now
+  (`attachKambiLive`): winner (soccer with its draw), main total and
+  handicap replace the model's; an open live game reads its own markets
+  every 20 s. NHL's regular-time 1X2 is never taken for the winner.
+
 ## Round of 2026-10-01 (fourth list), branch `claude/happy-wright-eqzr16`
 
 All on `main`. A parallel Copilot agent's round before this one was reviewed
