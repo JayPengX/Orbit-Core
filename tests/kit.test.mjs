@@ -341,7 +341,7 @@ test('where the money came from: an account older than the shared wallet, its op
   };
   const s = kit.moneySides(old);
   assert.deepEqual(s.gave, { start: 30_000, pay: 8_000, rank: 0, other: 7_648 });
-  assert.equal(s.took, 0);
+  assert.equal(s.quadra, 0);
   assert.equal(s.own, 0);
   // With Play's old 10,000 too (its own entry), no fix: still 30,000.
   const both = kit.moneySides({ entries: [{ id: 'eco:rebase:v3', app: 'eco', kind: 'rebase', amount: -80_000 }, { id: 'odds:start', app: 'odds', kind: 'start', amount: 10_000 }], snap: { stock: { cash: 100_000, opened: 100_000 } } });
@@ -349,6 +349,18 @@ test('where the money came from: an account older than the shared wallet, its op
   // A new account: the opening money is the Worker's own entry.
   const fresh = kit.moneySides({ entries: [{ id: 'eco:start', app: 'eco', kind: 'start', amount: 30_000 }], snap: {} });
   assert.deepEqual([fresh.gave.start, fresh.own], [30_000, 0]);
+  // Play: an open bet is money at stake (in the worth, on neither side); settled, it's against Quadra, either way.
+  const start = { id: 'eco:start', app: 'eco', kind: 'start', amount: 30_000 };
+  const bet = { id: 'odds:stake-a', app: 'odds', kind: 'stake', amount: -500 };
+  const placed = kit.moneySides({ entries: [start, bet], snap: {} });
+  assert.deepEqual([placed.atStake, placed.quadra, placed.own, placed.worth], [500, 0, 0, 30_000]);
+  const won = kit.moneySides({ entries: [start, bet, { id: 'odds:payout-a', app: 'odds', kind: 'payout', amount: 1_200 }], snap: {} });
+  assert.deepEqual([won.atStake, won.quadra, won.own, won.worth], [0, 700, 0, 30_700]);
+  const lost = kit.moneySides({ entries: [start, bet, { id: 'odds:payout-a', app: 'odds', kind: 'payout', amount: 0 }, { id: 'eco:plus:2026-10', app: 'eco', kind: 'plus', amount: -490 }], snap: {} });
+  assert.deepEqual([lost.quadra, lost.fees, lost.own, lost.worth], [-990, 490, 0, 29_010]);
+  // Securities' gains are the account's own.
+  const gain = kit.moneySides({ entries: [start], snap: { stock: { cash: -10_000, holdings: 12_000 } } });
+  assert.deepEqual([gain.quadra, gain.own], [0, 2_000]);
 });
 
 test('signing out wipes every app’s keys on this device, keeping only its language and safe area', () => {
