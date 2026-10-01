@@ -8,6 +8,19 @@ edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
 
 ## Slower levels, more for points, confirm before buying (pushed to `main`)
 
+- **融資 as a broker does it** (Securities): no cash loans. A buy can be
+  融資 (`placeOrder` `margin`, ticket 現股/融資): it holds only one's own part,
+  and on filling lends `collateralRate` of it (`loan:<order>` borrow event
+  with the symbol; the position's `financed`). Selling repays that share of
+  it first (`repay:<order>`, `fill.repaid`). Loan values: Taiwan 60% / OTC
+  50%, Reg T 50% elsewhere, none on A-shares, India, crypto, funds, gold,
+  currencies; government bonds 90%, corporate 70%. Interest is added to the
+  loan (never charged to cash). The loans tab only repays.
+- **Overdraft collected like 違約交割:** NT$ cash below zero starts
+  `account.od.since`; after OD_GRACE (2 days) Securities sells holdings for
+  it (coverPlan, market orders `forced` + `cover`, which don't trigger the
+  loans' repayAll). Covered, `od` goes.
+
 - **Securities' cash for the other apps** (snap `stock.cash`) is its own NT$
   less what it owes on loans: borrowed money stays for trading, never bets
   in Play or covers an overdraft. Margin itself: collateral 0.6 of stock
