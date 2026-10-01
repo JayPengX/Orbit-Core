@@ -72,9 +72,10 @@ account's document id.
   app is opened is never charged. Apps read membership from that entry
   alone (the kit's `plusMember`, `plusMonths`). A member also gets a
   NT$200 free bet each Taiwan week (`eco:fb:<Monday>`, `plusBonusEntries`).
-  Quadra Hub avatar and frame customization is available only while Plus is
-  active; Plus no longer boosts vocabulary points, discounts Hub purchases,
-  or grants streak cards.
+  Plus is for Play and Securities (the kit's `PLUS`): in Play the weekly bet,
+  a parlay boost ×1.5 and a cheaper cash-out; in Securities commission at
+  2.8折, half the FX spread and cheaper margin loans. The pass's avatar and
+  frame (set in Quadra Hub) show only while Plus is on.
   The kit tells members when it arrives and three days before a renewal
   (`plusNotices`), and the Plus sheet shows what Plus gave back this month
   and since joining (`plusReturns`, `plusTenure`).
@@ -90,13 +91,10 @@ account's document id.
   under 100,000, 1,500 under 250,000, 500 above (`PAY_TIERS`, v7). Months
   missed are paid on return, stepping down as they land. The opening money
   and the allowance are the only money Quadra gives (v7).
-- **Hub pays no money:** `cleanEntry` drops any new `vocab` entry
-  with a positive amount and any `vocab:fb:` free bet; Hub entries
-  carry points in `xp` (amount 0, at most 10,000 each) and its shop
-  purchases (negative amounts, at least `HUB_SHOP`'s prices), or the same
-  things bought with points (`vocab:xs:<item>:<key>`, kind `redeem`, amount
-  0, the points in the note, at the same price for every account). Avatar/frame
-  purchases and point-funded Plus are no longer accepted.
+- **Only money moves through entries:** `cleanEntry` takes entries of
+  Securities (`stock`) and Play (`odds`) only; `eco:` ids are this Worker's.
+  Quadra Hub keeps its word progress in `vocab-progress-sync` and writes no
+  wallet entries.
 - **The reset** (once, `eco:rebase:v3`, −NT$80,000): every account that
   opened on the old NT$110,000 comes down to the new NT$30,000.
 - **Overdrafts are allowed:** the pool can go below zero (after the reset,
@@ -131,14 +129,12 @@ Sign-in calls are limited per IP an hour (create 20, login and device codes
 counts what's in Firestore and removes anything that isn't Quadra data:
 retired collections (`orbit-schedules`, `eco-links`, `stock-study-leagues`),
 app documents with no pass behind them, orphaned inbox items, expired device
-codes and share keys, and retired wallet settings (`tidyWallet`). The Hub
-migration also removes game-earned XP, game mission rewards, Hub-issued
-legacy free bets, game-score settings, and old cosmetic choices/purchase
-records from wallets. A generic points-debit ledger record
-preserves XP already spent on those cosmetics; vocabulary progress, vocabulary
-XP, mission history, and shared money entries remain. Active accounts migrate
-on their next `/eco` wallet update; `scan` reports exact remaining counts in
-`wouldPurgeHubData` before `clean` writes them. It runs in bounded batches
+codes and share keys, and in every wallet what no app uses any more
+(`tidyWallet`): entries of retired apps (Rewards' points, games, missions
+and shop; their net NT$ kept as one `eco:rebase:hub` entry so no balance
+moves), retired settings (`RETIRED_SETTINGS`), and an avatar or frame on a
+pass without Plus. `scan` reports what `clean` would do (`wouldRetire`). It
+runs in bounded batches
 (`clean` again until `done`). The token is checked against `ADMIN_TOKEN_HASH`;
 it's empty (off) unless a clean-up is under way.
 
