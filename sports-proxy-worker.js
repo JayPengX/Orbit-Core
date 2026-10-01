@@ -118,10 +118,7 @@ const ELTA_HOST = 'piceltaott-elta.cdn.hinet.net';
 const YOUTUBE_HOST = 'www.youtube.com';
 // F1's sister series' own sites (the same platform as formula1.com): their
 // season calendar and each weekend's sessions, read from the page's data.
-const FOM_HOSTS = ['www.fiaformula2.com', 'www.fiaformula3.com', 'www.f1academy.com'];
-// GT World Challenge Europe (free on YouTube @GTWorld): its calendar and each
-// event's timetable (/calendar, /event/<id>/<slug>), trimmed like F2's.
-const SRO_HOST = 'www.gt-world-challenge-europe.com';
+const FOM_HOSTS = ['www.fiaformula2.com', 'www.fiaformula3.com'];
 // formula1.com's driver and team pages: the official season, career and
 // profile figures (only /en/drivers/<slug> and /en/teams/<slug>, trimmed).
 const F1_HOST = 'www.formula1.com';
@@ -135,8 +132,8 @@ const SPORTS_PROXY_ALLOWED_HOSTS = [
   'statsapi.mlb.com',
   'api.jolpi.ca',
   'gamma-api.polymarket.com',
-  // Kambi's public odds feed: Odds Study's tennis, badminton, table tennis,
-  // volleyball, snooker and Asian baseball/basketball odds and live scores.
+  // Kambi's public odds feed: Play's Asian baseball, EuroLeague, K League and
+  // badminton odds and live scores.
   'eu-offering-api.kambicdn.com',
   // OpenF1's race control messages: Quadra Play's safety car, VSC and red
   // flag picks are settled from them.
@@ -150,9 +147,6 @@ const SPORTS_PROXY_ALLOWED_HOSTS = [
   // company's description in the reader's language (Securities). Only
   // /translate_a/t; sent upstream as a POST (see fetchUpstream), kept a month.
   'clients5.google.com',
-  // MotoGP's own results API (its calendar, sessions and orders): Fixtures'
-  // MotoGP (broadcast in Taiwan on 緯來); it refuses browsers' requests.
-  'api.motogp.pulselive.com',
   // ELTA's (愛爾達) sports schedule: which game each of its channels carries,
   // for Fixtures' "where to watch" (only the one list, always trimmed).
   ELTA_HOST,
@@ -160,10 +154,9 @@ const SPORTS_PROXY_ALLOWED_HOSTS = [
   // always trimmed to id, title and time): Fixtures names a game as free on
   // YouTube only when the league's channel has a video of that very game.
   YOUTUBE_HOST,
-  // F2, F3 and F1 Academy (on ELTA.tv in Taiwan): only /en/racing/<year>
+  // F2 and F3 (on ELTA.tv in Taiwan): only /en/racing/<year>
   // pages, always trimmed (trimFom).
   ...FOM_HOSTS,
-  SRO_HOST,
   F1_HOST,
   // Not a real host: Asian baseball's schedules and scores, gathered by this
   // Worker from the leagues' own sites (asia-baseball.js).
@@ -295,8 +288,6 @@ function cachePolicyFor(url) {
     case YOUTUBE_HOST:
     case 'www.fiaformula2.com':
     case 'www.fiaformula3.com':
-    case 'www.f1academy.com':
-    case SRO_HOST:
     case F1_HOST:
       return CACHE_STANDINGS;
     case ASIA_HOST:
@@ -392,91 +383,7 @@ const utcOf = (local, offset) => {
   const t = Date.parse(`${local}${/^[+-]\d\d:\d\d$/.test(offset || '') ? offset : 'Z'}`);
   return Number.isFinite(t) ? new Date(t).toISOString() : null;
 };
-// F1 Academy's older pages. A round's (Results?raceid=n): its sessions from
-// the page's data, this season's only (the page carries past years' too). The
-// calendar: each card's round, dates and place, and its round page.
-const MONTH3 = s => String(s || '').slice(0, 3).toUpperCase();
-export function trimFomLegacy(html, path = '') {
-  const page = String(html || '');
-  if (path.startsWith('/Racing-Series/Results')) {
-    const sessions = [];
-    for (const m of page.matchAll(/"SessionName":"([^"]*)","SessionShortName":"([^"]*)","SessionType":"([^"]*)"[^{}]*?"SessionStartTime":"([^"]+)","SessionEndTime":"([^"]*)"[^{}]*?"SessionResultsAvailable":(true|false)/g)) {
-      const start = utcOf(m[4].slice(0, 19), m[4].slice(19));
-      if (start) sessions.push({ name: m[1], short: m[2], type: m[3], start, end: utcOf(m[5].slice(0, 19), m[5].slice(19)), state: m[6] === 'true' ? 'completed' : '' });
-    }
-    const year = sessions.reduce((y, x) => Math.max(y, Number(x.start.slice(0, 4))), 0);
-    return { sessions: sessions.filter(x => Number(x.start.slice(0, 4)) === year) };
-  }
-  const text = page
-    .replace(/href="\/Racing-Series\/Results\?raceid=(\d+)"/g, '> RACEID=$1 <')
-    .replace(/<!-- -->/g, '')
-    .replace(/<[^>]+>/g, ' | ')
-    .replace(/&amp;/g, '&')
-    .replace(/(\s*\|\s*)+/g, ' | ');
-  const meetings = [];
-  for (const m of text.matchAll(/Round (\d+) \| \/ \| (\d{1,2})(?: ([A-Za-z]+))? \| - \| (\d{1,2})(?: \| | )([A-Za-z]+)(?: \| (20\d\d))? \| ([^|]+?) \|/g)) {
-    const round = Number(m[1]);
-    if (meetings.some(x => x.round === round) || /COUNTDOWN/i.test(m[7])) continue;
-    // Each card's link comes just before its text.
-    const id = [...text.slice(Math.max(0, m.index - 3000), m.index).matchAll(/RACEID=(\d+)/g)].at(-1)?.[1] || '';
-    meetings.push({ key: id, url: id ? `/Racing-Series/Results?raceid=${id}` : '', place: m[7].trim().replace(/,$/, '').replace(/,.*$/, ''), name: '', title: '', round, dates: `${m[2]}${m[3] ? ` ${MONTH3(m[3])}` : ''} - ${m[4]} ${MONTH3(m[5])}`, status: '' });
-  }
-  meetings.sort((a, b) => a.round - b.round);
-  return { meetings };
-}
-// GT World Challenge Europe's pages, as F2's shape. The calendar: each
-// event's dates, place, round and page. An event: its timetable's sessions
-// (the GMT column, the year from the event's dates); test days aren't kept.
-const SRO_MONTHS = { January: 0, February: 1, March: 2, April: 3, May: 4, June: 5, July: 6, August: 7, September: 8, October: 9, November: 10, December: 11 };
-const sroText = html =>
-  String(html || '')
-    .replace(/<script[\s\S]*?<\/script>/g, '')
-    .replace(/<a [^>]*href="(\/event\/\d+\/[^"]+)"[^>]*>/g, ' | EVENT=$1 | ')
-    .replace(/<[^>]+>/g, ' | ')
-    .replace(/&amp;/g, '&')
-    .replace(/&([a-z])uml;/gi, (_, c) => ({ a: 'ä', o: 'ö', u: 'ü', A: 'Ä', O: 'Ö', U: 'Ü' })[c] || c)
-    .replace(/(\s*\|\s*)+/g, ' | ');
-export function trimSro(html, path = '') {
-  const text = sroText(html);
-  if (path.startsWith('/event/')) {
-    const year = Number(/\d{1,2} - \d{1,2} [A-Z][a-z]+ (20\d\d)/.exec(text)?.[1] || /(20\d\d)/.exec(text)?.[1]);
-    const at = text.indexOf('Event Timetable');
-    const sessions = [];
-    let day = null;
-    for (const m of text.slice(at).matchAll(/(?:[A-Z][a-z]+day, (\d{1,2}) ([A-Z][a-z]+))|\| ([^|]{3,60}?) \| (\d\d:\d\d) \| (\d\d:\d\d)(?= \|)/g)) {
-      if (m[1]) {
-        day = [Number(m[1]), SRO_MONTHS[m[2]]];
-        continue;
-      }
-      if (!day || day[1] == null || !year || /^(Session|Local Time|GMT)$/.test(m[3].trim())) continue;
-      const [h, min] = m[5].split(':').map(Number);
-      sessions.push({ name: m[3].trim(), short: '', type: '', start: new Date(Date.UTC(year, day[1], day[0], h, min)).toISOString(), end: null, state: '' });
-      if (sessions.length > 40) break;
-    }
-    return { sessions: sessions.filter(x => !/test|bronze|pit ?walk|autograph|parade|warm/i.test(x.name)) };
-  }
-  const meetings = [];
-  // A card's dates, place, country and round come before its "Event Info"
-  // link: "28 - 31 May 2026", "30 July 2026 - 2 August 2026", or (the cards
-  // still to come) "02 | OCT | 2026 | 04 | OCT | 2026".
-  const month = x => x.slice(0, 3).toUpperCase();
-  let from = 0;
-  for (const m of text.matchAll(/EVENT=(\/event\/(\d+)\/[^ |]+)/g)) {
-    const card = text.slice(from, m.index);
-    from = m.index + m[0].length;
-    const url = decodeURIComponent(m[1]);
-    if (/test/i.test(url) || meetings.some(x => x.url === url)) continue;
-    const a = /(\d{1,2})(?: ([A-Z][a-z]+)(?: 20\d\d)?)? - (\d{1,2}) ([A-Z][a-z]+) 20\d\d \| ([^|]+) \| [^|]+ \|(?: Round (\d+))?/.exec(card);
-    const b = !a && /(\d{1,2}) \| ([A-Z]{3}) \| 20\d\d \| (\d{1,2}) \| ([A-Z]{3}) \| 20\d\d \| ([^|]+) \| [^|]+ \|(?: Round (\d+))?/.exec(card);
-    const x = a || b;
-    if (!x) continue;
-    meetings.push({ key: m[2], url, place: x[5].trim(), name: '', title: '', round: x[6] ? Number(x[6]) : null, dates: `${Number(x[1])}${x[2] && (a ? x[2] !== x[4] : x[2] !== x[4]) ? ` ${month(x[2])}` : ''} - ${Number(x[3])} ${month(x[4])}`, status: '' });
-  }
-  return { meetings };
-}
 export function trimFom(html, path = '', host = '') {
-  if (host === SRO_HOST) return trimSro(html, path);
-  if (path.startsWith('/Racing-Series/')) return trimFomLegacy(html, path);
   const text = fomText(html);
   const at = text.indexOf('"meetingSessions":');
   if (at >= 0) {
@@ -691,7 +598,7 @@ function cacheEntry(result, policy) {
 function trimFor(trimParam, upstreamUrl) {
   if (upstreamUrl.hostname === ELTA_HOST) return TRIM_ELTA;
   if (upstreamUrl.hostname === YOUTUBE_HOST) return TRIM_YOUTUBE;
-  if (FOM_HOSTS.includes(upstreamUrl.hostname) || upstreamUrl.hostname === SRO_HOST) return TRIM_FOM;
+  if (FOM_HOSTS.includes(upstreamUrl.hostname)) return TRIM_FOM;
   if (upstreamUrl.hostname === F1_HOST) return TRIM_F1PAGE;
   if (trimParam === TRIM_POLYMARKET_EVENTS && upstreamUrl.hostname === 'gamma-api.polymarket.com' && upstreamUrl.pathname === '/events') return TRIM_POLYMARKET_EVENTS;
   if (trimParam === TRIM_KAMBI_EVENTS && upstreamUrl.hostname === 'eu-offering-api.kambicdn.com') return TRIM_KAMBI_EVENTS;
@@ -704,10 +611,7 @@ function parseTarget(target) {
     if (u.hostname === 'clients5.google.com' && (u.pathname !== '/translate_a/t' || (u.searchParams.get('q') || '').length > 5000)) return null;
     if (u.hostname === ELTA_HOST && u.pathname !== ELTA_PATH) return null;
     if (u.hostname === F1_HOST && !/^\/en\/(drivers|teams)\/[a-z-]+$/.test(u.pathname)) return null;
-    // F1 Academy's site is the older layout: its calendar and each round's page.
-    if (u.hostname === 'www.f1academy.com' && (u.pathname === '/Racing-Series/Calendar' ? u.search !== '' : u.pathname === '/Racing-Series/Results' ? !/^\?raceid=\d{1,4}$/.test(u.search) : !/^\/en\/racing\/20\d\d(\/[a-z-]+)?$/.test(u.pathname))) return null;
-    if (FOM_HOSTS.includes(u.hostname) && u.hostname !== 'www.f1academy.com' && !/^\/en\/racing\/20\d\d(\/[a-z-]+)?$/.test(u.pathname)) return null;
-    if (u.hostname === SRO_HOST && (u.search !== '' || !/^\/(calendar|event\/\d{1,5}\/[\w%-]+)$/.test(u.pathname))) return null;
+    if (FOM_HOSTS.includes(u.hostname) && !/^\/en\/racing\/20\d\d(\/[a-z-]+)?$/.test(u.pathname)) return null;
     if (u.hostname === YOUTUBE_HOST && (u.pathname !== YOUTUBE_FEED || !/^UC[\w-]{22}$/.test(u.searchParams.get('channel_id') || ''))) return null;
     return u.protocol === 'https:' && SPORTS_PROXY_ALLOWED_HOSTS.includes(u.hostname) ? u : null;
   } catch {

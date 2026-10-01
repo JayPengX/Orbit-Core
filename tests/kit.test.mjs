@@ -258,19 +258,16 @@ test('VIP in the kit: the same tiers as the Worker, this month so far', async ()
   assert.equal(kit.welcomeDue(w), false);
 });
 
-test('pictures: national sides get flags, players found in either name order, fighters learned', async () => {
+test('pictures: national sides get flags, players found in either name order', async () => {
   const L = await import('../kit/logos.mjs');
   assert.equal(L.playerNation('Sri Lanka'), 'LK');
+  assert.equal(L.playerNation('Tai Tzu-Ying'), 'TW');
   assert.equal(L.countryCode('England'), 'GB-ENG');
   assert.equal(L.countryFlag('Wales'), '🇬🇧');
   assert.match(L.teamBadge('kleague', 'Ulsan HD'), /thesportsdb/);
-  assert.match(L.teamBadge('cricket', 'West Indies'), /thesportsdb/);
-  L.rememberLogo('wta', 'Shi Han', 'https://a.espncdn.com/i/teamlogos/countries/500/chn.png');
-  assert.match(L.teamLogo('wta', 'Han Shi'), /chn\.png$/);
-  L.rememberNation('Some Boxer', 'Mexico');
-  assert.equal(L.playerNation('Some Boxer'), 'MX');
-  assert.ok(L.knowsNation('Some Boxer'));
-  for (const key of ['acb', 'nbl', 'cba', 'kbl', 'kleague', 'rugbyunion', 'cricket', 'boxing']) assert.ok(L.leagueLogo(key), key);
+  L.rememberLogo('badminton', 'Shi Yuqi', 'https://a.espncdn.com/i/teamlogos/countries/500/chn.png');
+  assert.match(L.teamLogo('badminton', 'Yuqi Shi'), /chn\.png$/);
+  for (const key of ['kleague', 'euroleague', 'badminton', 'npb', 'cpbl']) assert.ok(L.leagueLogo(key), key);
 });
 
 test('v7: the kit and the Worker agree on the allowance and Plus; the statement skips Rewards points', async () => {

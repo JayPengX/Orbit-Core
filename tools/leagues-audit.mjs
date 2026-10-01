@@ -11,7 +11,7 @@
 // DraftKings odds, or Kambi matches with a winner price. Off-season leagues
 // show 0 and a note of their next game day when the calendar has one.
 import { execFile } from 'node:child_process';
-import { CATALOG, SPORTS, kambiKept } from '../kit/leagues.mjs';
+import { CATALOG, SPORTS } from '../kit/leagues.mjs';
 import { asiaBaseballResponse } from '../asia-baseball.js';
 
 const args = process.argv.slice(2);
@@ -49,8 +49,7 @@ async function fixtures(key, l) {
   }
   if (l.data === 'kambi') {
     const data = await get(kambiList(l.kambi));
-    // The league's own events only (table tennis's, volleyball's and rugby's pro filter).
-    const events = (data?.events || []).filter(e => kambiKept(key, e.event));
+    const events = data?.events || [];
     return { n: events.length, next: events.map(e => e.event.start).sort()[0] };
   }
   if (l.kind !== 'match') {
@@ -80,7 +79,7 @@ async function play(key, l) {
   if (key === 'f1') return { sold: true, n: '(own board)' };
   if (l.odds === 'kambi') {
     const data = await get(kambiList(l.kambi));
-    const priced = (data?.events || []).filter(e => kambiKept(key, e.event) && (e.betOffers || []).some(o => o.betOfferType?.englishName === 'Match'));
+    const priced = (data?.events || []).filter(e => (e.betOffers || []).some(o => o.betOfferType?.englishName === 'Match'));
     return { sold: true, n: priced.length, next: priced.map(e => e.event.start).sort()[0] };
   }
   const dates = [0, 1, 2, 3].map(d => ymd(now + d * 86_400_000));

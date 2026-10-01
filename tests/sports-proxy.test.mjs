@@ -41,7 +41,7 @@ test('a single request tells the browser how long it may keep the answer', async
 });
 
 test('trims apply per URL in a batch', async () => {
-  const k = 'https://eu-offering-api.kambicdn.com/offering/v2018/ub/listView/snooker/all/all/all/matches.json';
+  const k = 'https://eu-offering-api.kambicdn.com/offering/v2018/ub/listView/badminton/all/all/all/matches.json';
   const res = await get(`https://proxy.test/sports-proxy?batch=1&u=${encodeURIComponent(`kambi-events!${k}`)}`);
   const { r } = await res.json();
   assert.equal(r[0].s, 200);
@@ -84,28 +84,4 @@ test("a formula1.com driver or team page comes trimmed to its grids of figures",
   const html = `<script>self.__next_f.push([1,${JSON.stringify(flight)}])</script>`;
   const { grids } = trimF1Page(html);
   assert.deepEqual(grids, [[['Season Position', '1st'], ['Season Points', '302']], [['Date of Birth', '25/08/2006']]]);
-});
-
-test("F1 Academy's older pages: the calendar's rounds with their pages, and a round's sessions this season", async () => {
-  const { trimFom } = await import('../sports-proxy-worker.js');
-  const card = (id, round, from, to, month, place) => `<a href="/Racing-Series/Results?raceid=${id}"><img/></a><div><span>Round <!-- -->${round}</span><span>/</span><span class="start-date">${from}</span><span>-</span><span class="end-date">${to}</span><span>${month}</span><div class="location">${place}</div></div>`;
-  const calendar = `<div class="event-tracker"><span>Round 5</span><span>/</span><span>22</span><span>-</span><div>25 October<!-- --> <span>2026</span></div><span>Free Practice COUNTDOWN:</span></div>${card(22, 1, '13', '15', 'March', 'Shanghai, China')}${card(27, 5, '22', '25', 'October', 'Austin, United States')}`;
-  const { meetings } = trimFom(calendar, '/Racing-Series/Calendar');
-  assert.deepEqual(meetings.map(m => [m.round, m.url, m.dates, m.place]), [[1, '/Racing-Series/Results?raceid=22', '13 - 15 MAR', 'Shanghai'], [5, '/Racing-Series/Results?raceid=27', '22 - 25 OCT', 'Austin']]);
-  const session = (name, short, start, end, done) => `{"SessionName":"${name}","SessionShortName":"${short}","SessionType":"RESULT","Laps":0,"SessionStartTime":"${start}","SessionEndTime":"${end}","SessionResultsAvailable":${done}}`;
-  const round = `<script>${session('Feature Race', 'FR', '2026-10-25T10:40:00-05:00', '2026-10-25T11:10:00-05:00', false)},${session('Race 1', 'R1', '2023-10-21T09:45:00-05:00', '2023-10-21T10:15:00-05:00', true)}</script>`;
-  const { sessions } = trimFom(round, '/Racing-Series/Results');
-  assert.deepEqual(sessions, [{ name: 'Feature Race', short: 'FR', type: 'RESULT', start: '2026-10-25T15:40:00.000Z', end: '2026-10-25T16:10:00.000Z', state: '' }]);
-});
-
-test("GT World Challenge's pages: the calendar's events in their three date styles, and an event's timetable in GMT", async () => {
-  const { trimFom } = await import('../sports-proxy-worker.js');
-  const link = (id, slug) => `<a class="btn" href="/event/${id}/${slug}">Event Info</a>`;
-  const calendar = `<div><span>28 - 31 May 2026</span><span>Monza</span><span>Italy</span><span>Round 3</span>${link(248, 'monza')}</div><div><span>30 July 2026 - 2 August 2026</span><span>Magny-Cours</span><span>France</span><span>Round 6</span>${link(251, 'magny-cours')}</div><div><span>02</span><span>OCT</span><span>2026</span><span>04</span><span>OCT</span><span>2026</span><span>Barcelona</span><span>Spain</span><span>Round 9</span><span>Sprint Cup</span>${link(254, 'barcelona')}</div>`;
-  const { meetings } = trimFom(calendar, '/calendar', 'www.gt-world-challenge-europe.com');
-  assert.deepEqual(meetings.map(m => [m.round, m.place, m.dates, m.url]), [[3, 'Monza', '28 - 31 MAY', '/event/248/monza'], [6, 'Magny-Cours', '30 JUL - 2 AUG', '/event/251/magny-cours'], [9, 'Barcelona', '2 - 4 OCT', '/event/254/barcelona']]);
-  const row = (name, local, gmt) => `<tr><td>${name}</td><td>${local}</td><td>${gmt}</td></tr>`;
-  const event = `<h1>Monza</h1><span>28 - 31 May 2026</span><h2>Event Timetable</h2><h3>Saturday, 30 May</h3><table><tr><th>Session</th><th>Local Time</th><th>GMT</th></tr>${row('Bronze Test', '08:00', '06:00')}${row('Free Practice 1', '09:00', '07:00')}</table><h3>Sunday, 31 May</h3><table>${row('Qualifying 1', '09:50', '07:50')}${row('Qualifying 2', '10:00', '08:00')}${row('Main Race', '15:30', '13:30')}</table>`;
-  const { sessions } = trimFom(event, '/event/248/monza', 'www.gt-world-challenge-europe.com');
-  assert.deepEqual(sessions.map(x => [x.name, x.start]), [['Free Practice 1', '2026-05-30T07:00:00.000Z'], ['Qualifying 1', '2026-05-31T07:50:00.000Z'], ['Qualifying 2', '2026-05-31T08:00:00.000Z'], ['Main Race', '2026-05-31T13:30:00.000Z']]);
 });

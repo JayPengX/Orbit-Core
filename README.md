@@ -60,7 +60,7 @@ account's document id.
   `409 ECO_SESSION_MOVED`.
 - **The wallet** (`eco-wallets`, JSON the Worker merges): `entries` (money
   in or out of the one NT$ pool, fixed ids so nothing counts twice),
-  `snap` (each app's latest figure), `settings`, `pins`, `apps`, `inbox`.
+  `snap` (each app's latest figure), `settings`, `apps`, `inbox`.
   Writes read-merge-write under Firestore's `updateTime` precondition.
 - **App data** in each app's collection under the same id:
   `stock-study-accounts`, `odds-study-accounts`, `match-find-settings`,

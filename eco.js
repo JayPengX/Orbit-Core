@@ -16,7 +16,6 @@
 //       snap      each app's latest figures, newest wins per app (Securities'
 //                 own cash, Play's money in open bets)
 //       settings  newest wins per key (activity counts, affinities, follows)
-//       pins      matches pinned from Play for Fixtures, newest wins
 //       apps      when each app was first and last opened
 //       inbox     other passes' app data a merge brought in, per app
 //       live      which app (and session) is the live one
@@ -91,7 +90,7 @@ export const ECO_LIMITS = { create: 20, login: 30, merge: 20, share: 30, admin: 
 export const TOKEN_LIMIT = 90;
 
 export function emptyWallet(now = Date.now()) {
-  return { v: 1, created: now, entries: [], snap: {}, settings: {}, pins: {}, apps: {}, inbox: {} };
+  return { v: 1, created: now, entries: [], snap: {}, settings: {}, apps: {}, inbox: {} };
 }
 
 // ---- One pool, one monthly pay -------------------------------------------------
@@ -445,7 +444,7 @@ export function cleanEntry(e, { allowEco = false } = {}) {
   return out;
 }
 
-// A newest-wins map (snap, settings, pins): every value an object with `t`.
+// A newest-wins map (snap, settings): every value an object with `t`.
 function cleanStamped(map, maxKeys, maxValue) {
   const out = {};
   if (!isObj(map)) return out;
@@ -459,12 +458,11 @@ function cleanStamped(map, maxKeys, maxValue) {
 
 // What a client may send to change the wallet.
 export function cleanPatch(patch) {
-  if (!isObj(patch)) return { entries: [], snap: {}, settings: {}, pins: {} };
+  if (!isObj(patch)) return { entries: [], snap: {}, settings: {} };
   return {
     entries: (Array.isArray(patch.entries) ? patch.entries.slice(0, MAX_ENTRIES_PER_WRITE) : []).map(e => cleanEntry(e)).filter(Boolean),
     snap: cleanStamped(patch.snap, 8, 4000),
-    settings: cleanStamped(patch.settings, 32, 4000),
-    pins: cleanStamped(patch.pins, 200, 2000)
+    settings: cleanStamped(patch.settings, 32, 4000)
   };
 }
 
@@ -490,7 +488,6 @@ export function mergeWallet(a, b) {
     entries: [...entries.values()].sort((x, y) => x.t - y.t || (x.id < y.id ? -1 : 1)),
     snap: newest(base.snap, b.snap),
     settings: newest(base.settings, b.settings),
-    pins: newest(base.pins, b.pins),
     apps: { ...(base.apps || {}), ...(b.apps || {}) },
     inbox,
     // The Worker's own fields: a patch never carries them.
@@ -1053,7 +1050,6 @@ async function ecoMerge(ctx) {
   // shared cash figures whose app data didn't come along, as one entry each.
   const carried = [];
   const settings = {};
-  const pins = {};
   for (const [k, src] of found.entries()) {
     const tag = `m${now.toString(36)}${k}`;
     for (const e of src.wallet.entries) if (!LEDGER_APPS.has(e.app)) carried.push(e.id.startsWith('eco:') ? e : { ...e, id: `${tag}:${e.id}`.slice(0, 96) });
@@ -1061,11 +1057,10 @@ async function ecoMerge(ctx) {
       if (!finite(s.cash) || src.data[app]) continue;
       carried.push({ id: `${tag}:snap:${app}`, t: now, app: 'eco', kind: 'merge', amount: s.cash, note: app });
     }
-    Object.assign(pins, src.wallet.pins || {});
     for (const [key, v] of Object.entries(src.wallet.settings || {})) if (!settings[key] || v.t > settings[key].t) settings[key] = v;
   }
   const mergedApps = [...new Set(found.flatMap(s => Object.keys(s.data)))];
-  const result = await updateWallet(env, deps, targetId, w => ({ ...mergeWallet(w, { entries: carried, settings, pins, inbox: inboxAdd }), merged: { t: now, apps: mergedApps } }));
+  const result = await updateWallet(env, deps, targetId, w => ({ ...mergeWallet(w, { entries: carried, settings, inbox: inboxAdd }), merged: { t: now, apps: mergedApps } }));
   for (const src of found) await deleteAccount(env, deps, src.docId);
   return json({ moved, wallet: publicWallet(result.wallet), walletTime: result.updateTime, pool: poolBalance(result.wallet) }, 200, headers);
 }

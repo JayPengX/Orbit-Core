@@ -210,7 +210,7 @@ function fakeYahooAnswer(url) {
 const pageTrim = (url, r) => {
   if (r.status !== 200) return r;
   const host = new URL(url).hostname;
-  const trim = host === 'www.formula1.com' ? trimF1Page : /^www\.(fiaformula[23]|f1academy|gt-world-challenge-europe)\.com$/.test(host) ? trimFom : host === 'www.youtube.com' ? trimYoutube : null;
+  const trim = host === 'www.formula1.com' ? trimF1Page : /^www\.fiaformula[23]\.com$/.test(host) ? trimFom : host === 'www.youtube.com' ? trimYoutube : null;
   return trim ? { status: 200, body: JSON.stringify(trim(r.body, decodeURIComponent(new URL(url).pathname), host)) } : r;
 };
 const upstream = url => {
@@ -244,7 +244,6 @@ const wallet = {
   ],
   snap: snapStart,
   settings: {},
-  pins: {},
   apps: {},
   inbox: {}
 };

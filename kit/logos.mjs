@@ -80,14 +80,7 @@ export const TEAM_BADGES = {
   cpbl: { 'CTBC Brothers': 'nbtugc1655923087', 'Fubon Guardians': 'aj83wn1655923095', 'Rakuten Monkeys': 'kk0rch1655923103', 'TSG Hawks': 'n67jn51712658044', 'Uni-President Lions': 'kehxfy1655923111', 'Wei Chuan Dragons': 'ljv5o51655923122' },
   npb: { 'Chiba Lotte Marines': 'na10tn1576008207', 'Chunichi Dragons': 'jli5jv1576009060', 'Fukuoka SoftBank Hawks': 'ampozy1576009547', 'Hanshin Tigers': 'h2jhos1576009994', 'Hiroshima Toyo Carp': 'bv50e51576010505', 'Hokkaido Nippon-Ham Fighters': 'qxgzq01576011016', 'Orix Buffaloes': '53lv6f1576011517', 'Saitama Seibu Lions': 'onmvow1576012163', 'Tohoku Rakuten Golden Eagles': 'qx24pm1576012656', 'Tokyo Yakult Swallows': 'ryyku01576013231', 'Yokohama DeNA BayStars': 'fuhqf21576013789', 'Yomiuri Giants': '0qyqs41576014298' },
   kbo: { 'Doosan Bears': '2qo9zp1740573854', 'Hanwha Eagles': '7aztmc1740573842', 'KT Wiz': 'qk8erg1589709962', 'Kia Tigers': '2z389i1648069353', 'Kiwoom Heroes': 'qcj18p1589709259', 'LG Twins': 'ajpsiq1648069368', 'Lotte Giants': 'p7q92w1742225576', 'NC Dinos': '6gwcg81589708218', 'SSG Landers': 'kii9pd1742225451', 'Samsung Lions': '5u6k511589709673' },
-  bleague: { 'Akita Northern Happinets': '87wsa61621334052', 'Altiri Chiba': '3mfjwn1759500326', 'Alvark Tokyo': 'kj4q7w1621334166', 'Chiba Jets Funabashi': '8usqds1737546623', 'Fighting Eagles Nagoya': 'b0rwjq1659455177', 'Gunma Crane Thunders': '9e5cxi1642097069', 'Hiroshima D': 'ex7l321622396493', 'Ibaraki Robots': 'nscmq91642097142', 'Kawasaki Brave Thunders': '9ahvnv1621334572', 'Kobe Storks': 'u13mbp1787663428', 'Koshigaya Alphas': 'lr8jgm1737548387', 'Kyoto Hannaryz': '229szh1621546129', 'Levanga Hokkaido': 'pw4n7h1622396675', 'Nagasaki Velca': 'dlywny1713956438', 'Nagoya Diamond Dolphins': 't8bcpf1622396582', 'Osaka Evessa': 'au25qr1621545182', 'Ryukyu Golden Kings': 'y9cedk1621346537', 'Saga Ballooners': 'nplg6o1713956383', 'SeaHorses Mikawa': '9eng811621456481', 'Sendai 89ers': 'x0nmfz1659455283', 'Shimane Susanoo Magic': 'db6kqq1621545848', 'Shinshu Brave Warriors': 'i9a85l1622396401', 'Tokyo SunRockers': 'jq3nm11586269789', 'Toyama Grouses': 'o34c4j1621346928', 'Utsunomiya Brex': 'id293x1621346227', 'Yokohama B-Corsairs': 'y6p5601723024480' },
   euroleague: { 'AS Monaco Basket': 'fl2ti01649168915', 'Anadolu Efes SK': 'uldz0d1782050729', 'BC Žalgiris': 'dn7ouv1703960565', 'Baskonia': 'p4x3o61767366090', 'Bayern München Basketball': 'z2r3eh1678017187', 'Dubai Basketball': 'fgtnti1758215967', 'FC Barcelona Basquet': '0tz26j1729097443', 'Hapoel Tel Aviv BC': 'yrrsml1767366305', 'KK Crvena zvezda': '5tlez31767366440', 'KK Partizan': 'us0e1z1767366567', 'Maccabi Tel Aviv BC': 'z0mk1l1789281457', 'Olimpia Milano': 'aurbi61790186853', 'Olympiacos BC': '4s5lug1676581220', 'Panathinaikos BC': '7cdjwz1767366987', 'Paris Basketball': '9q0d6x1726681476', 'Real Madrid Baloncesto': 'g4ev2c1522175902', 'Valencia Basket': '9qyc231536398868', 'Besiktas Basketbol': 'rx0o811667119583', 'ASVEL Lyon-Villeurbanne': 'qbaoia1602706639', 'Virtus Bologna': 'nfl8dz1786178078' },
-  // National sides without a country flag of their own.
-  cricket: { 'West Indies': '1x0a681646775209' },
-  acb: { 'Real Madrid Baloncesto': 'g4ev2c1522175902', 'FC Barcelona Basquet': '0tz26j1729097443', 'Baskonia': 'p4x3o61767366090', 'Valencia Basket': '9qyc231536398868', 'Baloncesto Málaga': 'ieeluq1778174522', 'CB 1939 Canarias': 'vpchdl1698244853', 'CB Gran Canaria': 'axb9qb1536397994', 'Joventut Badalona': 'vuqqry1425410580', 'UCAM Murcia': 'vuuwwp1471878623', 'Basket Zaragoza': 'yrames1721554095', 'Bàsquet Girona': 'lfmc951632570105', 'Basquet Manresa': 'f02ctj1684597687', 'CB Breogan': 'qzfhcs1645212147', 'BC Andorra': '4oyjtu1538210898', 'Bilbao Basket': 'v7bo1i1664476071', 'Básquet Coruña': '10iz0v1691223542', 'Força Lleida CE': 'xmypxg1786723117', 'CB Granada': 'vqz8kq1574880877', 'CB San Pablo Burgos': '60nftb1752259508' },
-  nbl: { 'Adelaide 36ers': 'zp72061755701355', 'Brisbane Bullets': 'ubzenr1545867000', 'Cairns Taipans': 'v2c1wc1550073460', 'Illawarra Hawks': 'juj7y91725980615', 'Melbourne United': 'adpuke1755702629', 'New Zealand Breakers': '83088b1725978587', 'Perth Wildcats': '7gkvnd1755701286', 'South East Melbourne Phoenix': '73xo0d1755702709', 'Sydney Kings': 'gsfe5x1550073324', 'Tasmania JackJumpers': 'xbmi6c1755702783' },
-  cba: { 'Beijing Ducks': '6y9pc61520164924', 'Beijing Royal Fighters': 'v0ugmi1700075249', 'Fujian Sturgeons': '195tkp1524998706', 'Guangdong Southern Tigers': 'he2jgc1524997963', 'Jiangsu Dragons': 'zuik5q1700075475', 'Jilin Northeast Tigers': 'ay723q1700048664', 'Liaoning Flying Leopards': 'o9hgu01700048757', 'Nanjing Monkey Kings': '2lesth1700075559', 'Ningbo Rockets': '4bwv6g1700075612', 'Qingdao Eagles': 'c34irb1700048843', 'Shandong Hi-Speed Kirin': 'iume8z1650191851', 'Shanghai Sharks': 'urfigb1700048926', 'Shanxi Loongs': 'v2mgbq1700075779', 'Shenzhen Leopards': '2l9qqi1700049148', 'Sichuan Blue Whales': 'at6j3b1700075926', 'Tianjin Pioneers': 'w4k1k11700076101', 'Xinjiang Flying Tigers': 'kmj19n1700076154', 'Zhejiang Golden Bulls': '6axmqo1700049549', 'Zhejiang Lions': '2kzvbg1700049627' },
-  kbl: { 'Anyang Jung Kwan Jang Red Boosters': 'qpqjmc1742844696', 'Busan KCC Egis': '9h9fqx1637980679', 'Changwon LG Sakers': 'hukrtk1637980666', 'Daegu KOGAS Pegasus': 'uscri01742844477', 'Goyang Sono Skygunners': 'l2qn7d1742844779', 'Seoul Samsung Thunders': 'gze7e01742844845', 'Seoul SK Knights': 'qkd9sv1593415101', 'Suwon KT Sonicboom': 'srxv0l1637980695', 'Ulsan Hyundai Mobis Phoebus': 'tbd2hd1742844034', 'Wonju DB Promy': 'ykuvm71742844633' },
   kleague: { 'Ulsan HD': '0wooic1706533767', 'Pohang Steelers': '63jst01769097748', 'Jeonbuk Hyundai Motors': '8jif3b1747853225', 'FC Seoul': '31z1zf1579473186', 'Gangwon FC': 'c4igx71579729617', 'Gimcheon Sangmu': 'g4cjyk1609536787', 'Daegu FC': 'xzjzn11579473073', 'Daejeon Hana Citizen': 'o9z6eq1589558557', 'Suwon FC': 'x39pm41589559443', 'Jeju SK': 'hna7ae1736207131', 'Gwangju FC': 'uuzr4x1579473084', 'FC Anyang': '0tens91589557588', 'Incheon United': '2no9nq1579473100', 'Bucheon FC 1995': 'mhcuwe1589557777', 'Suwon Samsung Bluewings': 'ym5u611579473171', 'Jeonnam Dragons': 'fgmush1643552285' }
 };
 // Words too common to tell clubs apart.
@@ -133,22 +126,17 @@ export function teamLogo(sport, name, dark = false) {
 
 // ESPN's soccer league logo ids.
 const SOCCER_LOGO = {
-  epl: 23, laliga: 15, seriea: 12, bundesliga: 10, ligue1: 9, ucl: 2, uel: 2310, uecl: 20296, eredivisie: 11, primeira: 14,
-  scotland: 45, belgium: 6, superlig: 18, saudi: 2488,
-  mls: 19, ligamx: 22, brasileirao: 85, argentina: 1, libertadores: 58, sudamericana: 1208, jleague: 2199,
-  facup: 40, leaguecup: 41, copadelrey: 80, nationsleague: 2395, wcqeurope: 67, acl: 2200, asiancup: 2243, friendly: 53, worldcup: 4, euro: 74, copaamerica: 83, clubworldcup: 1932
+  epl: 23, laliga: 15, seriea: 12, bundesliga: 10, ligue1: 9, ucl: 2, uel: 2310, uecl: 20296,
+  scotland: 45, mls: 19, jleague: 2199, facup: 40, nationsleague: 2395, worldcup: 4
 };
 // TheSportsDB's league badges.
 const LEAGUE_BADGE = {
-  npb: 'lk85rg1575038781', kbo: 'qfr1hx1589707979', cpbl: 'c3vetj1655924198', euroleague: '7xjtuy1554397263', bleague: 'vcx6gw1745501883',
-  wta: 'bddhun1768230678', acb: '4n3h6z1572778356', nbl: 'gvz6vb1726086476', cba: 'peygv31522257103', kbl: 'd9f3ve1642011224', kleague: 'zaw2cj1628430843',
-  rugbyunion: '1otaxh1773613283', cricket: 'zkdgid1583579197', boxing: 'j14hx41784791003', badminton: 'd5xvqq1750423289', tabletennis: 'fvesg01750422363', volleyball: 'vy2eo01625239301', snooker: '0gmkgj1555600537'
+  npb: 'lk85rg1575038781', kbo: 'qfr1hx1589707979', cpbl: 'c3vetj1655924198', euroleague: '7xjtuy1554397263', kleague: 'zaw2cj1628430843', badminton: 'd5xvqq1750423289'
 };
 // ESPN's other league logos.
 const ESPN_LEAGUE = {
   mlb: 'teamlogos/leagues/500/mlb.png', nba: 'teamlogos/leagues/500/nba.png', wnba: 'teamlogos/leagues/500/wnba.png', nfl: 'teamlogos/leagues/500/nfl.png',
-  nhl: 'teamlogos/leagues/500/nhl.png', f1: 'teamlogos/leagues/500/f1.png', ncaaf: 'espn/misc_logos/500/ncaa_football.png',
-  pga: 'teamlogos/leagues/500/pgatour.png', lpga: 'teamlogos/leagues/500/lpga.png', ufc: 'teamlogos/leagues/500/ufc.png'
+  nhl: 'teamlogos/leagues/500/nhl.png', f1: 'teamlogos/leagues/500/f1.png'
 };
 // The league's own logo (light backgrounds: the apps show it on a white disc), or null.
 export function leagueLogo(key, dark = false) {
@@ -235,7 +223,7 @@ export function f1Constructor(name) {
   return { name: team?.name ?? name, zh: team?.zh ?? name, color: team?.color ?? '#8a8f98', logo, page: team?.page || '', drivers: team?.drivers ?? [], short: (team?.name ?? name).replace(/[^A-Za-z]/g, '').slice(0, 3).toUpperCase() };
 }
 
-// National teams (volleyball, and any sport's national sides): a flag.
+// National teams: a flag.
 const COUNTRY_CODES = {
   afghanistan: 'AF', argentina: 'AR', australia: 'AU', bangladesh: 'BD', kenya: 'KE', namibia: 'NA', nepal: 'NP', oman: 'OM', pakistan: 'PK', 'sri lanka': 'LK', zimbabwe: 'ZW', scotland: 'GB-SCT', wales: 'GB-WLS', 'northern ireland': 'GB-NIR', austria: 'AT', belgium: 'BE', brazil: 'BR', bulgaria: 'BG', canada: 'CA', chile: 'CL', china: 'CN', 'chinese taipei': 'TW', taiwan: 'TW', colombia: 'CO', croatia: 'HR', cuba: 'CU', 'czech republic': 'CZ', czechia: 'CZ', denmark: 'DK', egypt: 'EG', england: 'GB-ENG', estonia: 'EE', finland: 'FI', france: 'FR', germany: 'DE', greece: 'GR', hungary: 'HU', india: 'IN', indonesia: 'ID', iran: 'IR', ireland: 'IE', israel: 'IL', italy: 'IT', japan: 'JP', kazakhstan: 'KZ', 'south korea': 'KR', korea: 'KR', latvia: 'LV', lithuania: 'LT', mexico: 'MX', montenegro: 'ME', netherlands: 'NL', 'new zealand': 'NZ', norway: 'NO', poland: 'PL', portugal: 'PT', 'puerto rico': 'PR', qatar: 'QA', romania: 'RO', russia: 'RU', serbia: 'RS', slovakia: 'SK', slovenia: 'SI', spain: 'ES', sweden: 'SE', switzerland: 'CH', thailand: 'TH', tunisia: 'TN', turkey: 'TR', turkiye: 'TR', ukraine: 'UA', usa: 'US', 'united states': 'US', uruguay: 'UY', vietnam: 'VN', 'dominican republic': 'DO', philippines: 'PH', hongkong: 'HK', 'hong kong': 'HK', singapore: 'SG', malaysia: 'MY',
   britain: 'GB', 'great britain': 'GB', 'united kingdom': 'GB', uk: 'GB', monaco: 'MC', 'south africa': 'ZA', morocco: 'MA', nigeria: 'NG', ghana: 'GH', senegal: 'SN', 'ivory coast': 'CI', 'cote d ivoire': 'CI', cameroon: 'CM', algeria: 'DZ', peru: 'PE', ecuador: 'EC', paraguay: 'PY', venezuela: 'VE', bolivia: 'BO', jamaica: 'JM', 'saudi arabia': 'SA', 'united arab emirates': 'AE', uae: 'AE', georgia: 'GE', armenia: 'AM', azerbaijan: 'AZ', belarus: 'BY', moldova: 'MD', 'bosnia herzegovina': 'BA', bosnia: 'BA', albania: 'AL', 'north macedonia': 'MK', iceland: 'IS', luxembourg: 'LU', cyprus: 'CY', malta: 'MT', 'korea republic': 'KR', 'republic of korea': 'KR', fiji: 'FJ', samoa: 'WS', tonga: 'TO', 'papua new guinea': 'PG', uzbekistan: 'UZ', mongolia: 'MN', 'costa rica': 'CR', panama: 'PA', honduras: 'HN', 'el salvador': 'SV', guatemala: 'GT', haiti: 'HT', bahamas: 'BS', 'trinidad tobago': 'TT', curacao: 'CW'
@@ -265,113 +253,43 @@ export function countryFlag(name) {
 // A national team's (or a country's) code, or null: "India", "England", "South Africa Women".
 export const countryCode = name => COUNTRY_CODES[normalizeTeamName(name).replace(/\s+(women|men|u\d+|a)$/, '')] ?? null;
 
-// ---- Players' nations (table tennis, badminton, snooker, fighters) -----------------
+// ---- Badminton players' nations -----------------------------------------------------
 //
 // Kambi names players without their country, so a player's picture is their
-// nation's flag: from this table (the regular names on the world tours), else
-// the country the event is filed under (Kambi's path: "Czech Republic > Czech
-// Liga Pro", or a domestic series' own name). ISO codes; England, Scotland,
-// Wales and Northern Ireland as GB-ENG, GB-SCT, GB-WLS, GB-NIR.
+// nation's flag: from this table (the regulars on the BWF World Tour), else
+// the country the event is filed under (Kambi's path words). ISO codes.
 const NATIONS = {
-  CN: 'Fan Zhendong|Wang Chuqin|Ma Long|Lin Shidong|Liang Jingkun|Lin Gaoyuan|Xiang Peng|Zhou Qihao|Huang Youzheng|Xue Fei|Sun Yingsha|Wang Manyu|Chen Meng|Wang Yidi|Chen Xingtong|Kuai Man|Qian Tianyi|He Zhuojia|Shi Yuqi|Li Shifeng|Weng Hongyang|Lu Guangzu|Wang Zhiyi|Han Yue|Chen Yufei|Gao Fangjie|Liang Weikeng|Wang Chang|Chen Qingchen|Jia Yifan|Liu Shengshu|Tan Ning|Feng Yanzhe|Huang Dongping|Jiang Zhenbang|Wei Yaxin|Ding Junhui|Zhao Xintong|Si Jiahui|Fan Zhengyi|Yuan Sijun|Xu Si|Wu Yize|Zhang Anda|Xiao Guodong|Pang Junxu|Lei Peifan|Zhou Yuelong|Zhang Jiankang|Lyu Haotian|Lu Ning|He Guolong|Yan Bingtao|Liang Wenbo|Li Hang|Tian Pengfei|Zhou Yuelong|Gong Chenzhi|Wang Yuchen|Long Zehuang|Ma Hailong|Bai Langning|Liu Hongyu|Zhang Anda|Chang Bingyu|Jiang Jun',
-  TW: 'Lin Yun-Ju|Lin Yun Ju|Kao Cheng-Jui|Chuang Chih-Yuan|Huang Yan-Cheng|Feng Yi-Hsin|Cheng I-Ching|Chen Szu-Yu|Chien Tung-Chuan|Chou Tien-Chen|Chou Tien Chen|Lin Chun-Yi|Lin Chun Yi|Wang Tzu-Wei|Lee Yang|Wang Chi-Lin|Lee Jhe-Huei|Yang Po-Hsuan|Lee Chia-Hao|Tai Tzu-Ying|Tai Tzu Ying|Chiu Pin-Chian|Wang Po-Wei|Huang Yu-Kai|Lin Kuan Ting|Lee Fang-Jen|Lee Fang-Chih|Hsieh Pei-Shan|Hung En-Tzu|Lin Chih-Chun|Liu Kuang-Heng',
-  JP: 'Tomokazu Harimoto|Harimoto Tomokazu|Shunsuke Togami|Sora Matsushima|Yukiya Uda|Hiroto Shinozuka|Miwa Harimoto|Mima Ito|Hina Hayata|Miu Hirano|Satsuki Odo|Honoka Hashimoto|Kodai Naraoka|Kenta Nishimoto|Koki Watanabe|Kanta Tsuneyama|Akane Yamaguchi|Nozomi Okuhara|Aya Ohori|Takuro Hoki|Yugo Kobayashi|Mayu Matsumoto|Wakana Nagahara|Nami Matsuyama|Chiharu Shida|Yuta Watanabe|Arisa Higashino|Riku Hatano|Kenya Mitsuhashi|Hiroki Midorikawa|Kyohei Yamashita|Tomoka Miyazaki|Natsuki Nidaira|Yuki Fukushima|Sayaka Hirota|Rin Iwanaga|Kie Nakanishi',
-  KR: 'Jang Woojin|Lim Jonghoon|An Jaehyun|Oh Junsung|Shin Yubin|Jeon Jihee|Lee Eunhye|Joo Cheonhui|An Se-young|An Se Young|Seo Seung-jae|Kim Won-ho|Kang Min-hyuk|Baek Ha-na|Lee So-hee|Kim So-yeong|Kong Hee-yong|Jeon Hyeok-jin|Kim Ga-eun|Sim Yu-jin',
-  DE: 'Dang Qiu|Patrick Franziska|Dimitrij Ovtcharov|Benedikt Duda|Timo Boll|Han Ying|Nina Mittelham|Sabine Winter|Annett Kaufmann|Xiaona Shan|Fabian Rath|Yvonne Li',
-  FR: 'Felix Lebrun|Félix Lebrun|Alexis Lebrun|Simon Gauzy|Jia Nan Yuan|Prithika Pavade|Christopher Popov|Toma Junod|Alex Lanier|Christo Popov|Toma Junior Popov|Lucas Corvee|Arnaud Merkle|Thom Gicquel|Delphine Delrue|Leonice Huet',
-  SE: 'Truls Moregard|Truls Möregård|Anton Kallberg|Anton Källberg|Mattias Falck|Kristian Karlsson|Linda Bergstrom',
-  BR: 'Hugo Calderano|Bruna Takahashi|Kayque Valois|Ygor Coelho|Juliana Viana Vieira',
-  EG: 'Omar Assar|Hana Goda|Dina Meshref',
-  NG: 'Quadri Aruna|Aruna Quadri',
-  IN: 'Manika Batra|Sreeja Akula|Manav Thakkar|Sharath Kamal|Harmeet Desai|Satwiksairaj Rankireddy|Chirag Shetty|Lakshya Sen|H. S. Prannoy|HS Prannoy|Prannoy H. S.|P. V. Sindhu|Pusarla V. Sindhu|PV Sindhu|Kidambi Srikanth|Priyanshu Rajawat|Kiran George|Treesa Jolly|Gayatri Gopichand|Ayush Shetty|Unnati Hooda|Malvika Bansod|Anupama Upadhyaya|Tanvi Sharma',
-  HK: 'Wong Chun Ting|Doo Hoi Kem|Lam Siu Hang|Tang Chun Man|Tse Ying Suet|Lee Cheuk Yiu|Angus Ng Ka Long|Ng Ka Long Angus',
-  SG: 'Izaac Quek|Loh Kean Yew|Terry Hee|Jessica Tan|Yeo Jia Min',
-  PT: 'Marcos Freitas|Tiago Apolonia|Jieni Shao',
-  SI: 'Darko Jorgic',
-  AT: 'Robert Gardos|Sofia Polcanova|Daniel Habesohn',
-  RO: 'Bernadette Szocs|Eduard Ionescu|Ovidiu Ionescu|Elizabeta Samara',
-  HR: 'Andrej Gacina|Tomislav Pucar',
-  PL: 'Jakub Dyjas|Natalia Bajor',
-  CZ: 'Pavel Sirucek|Hana Matelova',
-  US: 'Kanak Jha|Lily Zhang|Amy Wang|Beiwen Zhang|Rachel Chang',
-  CA: 'Eugene Wang|Michelle Yip|Brian Yang|Victor Lai|Michelle Li',
-  PR: 'Adriana Diaz',
-  DK: 'Anders Lind|Viktor Axelsen|Anders Antonsen|Rasmus Gemke|Mia Blichfeldt|Kim Astrup|Anders Skaarup Rasmussen|Line Kjaersfeldt|Line Christophersen|Mathias Christiansen|Magnus Johannesen|Julie Dawall Jakobsen|Mads Christophersen|Jesper Toft|Amalie Magelund|Freja Ravn|Maiken Fruergaard|Sara Thygesen|Rasmus Kjaer|Frederik Sogaard|Mathias Thyrri',
+  CN: 'Shi Yuqi|Li Shifeng|Weng Hongyang|Lu Guangzu|Wang Zhiyi|Han Yue|Chen Yufei|Gao Fangjie|Liang Weikeng|Wang Chang|Chen Qingchen|Jia Yifan|Liu Shengshu|Tan Ning|Feng Yanzhe|Huang Dongping|Jiang Zhenbang|Wei Yaxin|Zhang Shuxian|Zheng Siwei|Huang Yaqiong',
+  TW: 'Chou Tien-Chen|Chou Tien Chen|Lin Chun-Yi|Lin Chun Yi|Wang Tzu-Wei|Lee Yang|Wang Chi-Lin|Lee Jhe-Huei|Yang Po-Hsuan|Lee Chia-Hao|Tai Tzu-Ying|Tai Tzu Ying|Chiu Pin-Chian|Wang Po-Wei|Huang Yu-Kai|Lin Kuan Ting|Lee Fang-Jen|Lee Fang-Chih|Hsieh Pei-Shan|Hung En-Tzu|Lin Chih-Chun|Liu Kuang-Heng',
+  JP: 'Kodai Naraoka|Kenta Nishimoto|Koki Watanabe|Kanta Tsuneyama|Akane Yamaguchi|Nozomi Okuhara|Aya Ohori|Takuro Hoki|Yugo Kobayashi|Mayu Matsumoto|Wakana Nagahara|Nami Matsuyama|Chiharu Shida|Yuta Watanabe|Arisa Higashino|Riku Hatano|Kenya Mitsuhashi|Hiroki Midorikawa|Kyohei Yamashita|Tomoka Miyazaki|Natsuki Nidaira|Yuki Fukushima|Sayaka Hirota|Rin Iwanaga|Kie Nakanishi',
+  KR: 'An Se-young|An Se Young|Seo Seung-jae|Kim Won-ho|Kang Min-hyuk|Baek Ha-na|Lee So-hee|Kim So-yeong|Kong Hee-yong|Jeon Hyeok-jin|Kim Ga-eun|Sim Yu-jin',
+  DK: 'Viktor Axelsen|Anders Antonsen|Rasmus Gemke|Mia Blichfeldt|Kim Astrup|Anders Skaarup Rasmussen|Line Kjaersfeldt|Line Christophersen|Mathias Christiansen|Magnus Johannesen|Julie Dawall Jakobsen|Mads Christophersen|Jesper Toft|Amalie Magelund|Freja Ravn|Maiken Fruergaard|Sara Thygesen|Rasmus Kjaer|Frederik Sogaard|Mathias Thyrri',
   ID: 'Jonatan Christie|Anthony Sinisuka Ginting|Alwi Farhan|Gregoria Mariska Tunjung|Putri Kusuma Wardani|Fajar Alfian|Muhammad Rian Ardianto|Leo Rolly Carnando|Daniel Marthin|Sabar Karyaman Gutama|Muhammad Reza Pahlevi Isfahani|Apriyani Rahayu|Siti Fadia Silva Ramadhanti|Dejan Ferdinansyah|Gloria Emanuelle Widjaja|Rinov Rivaldy|Pitha Haningtyas Mentari|Chico Aura Dwi Wardoyo|Ester Nurumi Tri Wardoyo|Komang Ayu Cahya Dewi|Febriana Dwipuji Kusuma|Amallia Cahaya Pratiwi|Lanny Tria Mayasari|Meilysa Trias Puspita Sari|Rachel Allessya Rose',
   MY: 'Lee Zii Jia|Aaron Chia|Soh Wooi Yik|Goh Sze Fei|Nur Izzuddin|Man Wei Chong|Tee Kai Wun|Chen Tang Jie|Toh Ee Wei|Pearly Tan|Thinaah Muralitharan|Goh Soon Huat|Shevon Jemie Lai|Leong Jun Hao|Ng Tze Yong|Goh Jin Wei|Letshanaa Karupathevan|Wong Ling Ching|Kang Khai Xing|Aaron Tai',
-  TH: 'Kunlavut Vitidsarn|Kantaphon Wangcharoen|Kulkavut Vitidsarn|Ratchanok Intanon|Busanan Ongbamrungphan|Pornpawee Chochuwong|Supanida Katethong|Dechapol Puavaranukroh|Supissara Paewsampran|Jongkolphan Kititharakul|Rawinda Prajongjai|Benyapa Aimsaard|Nuntakarn Aimsaard|Thepchaiya Un-Nooh|Thepchaiya Un Nooh|Noppon Saengkham|Sunny Akani|Dechawat Poomjaeng',
-  VN: 'Nguyen Thuy Linh',
+  TH: 'Kunlavut Vitidsarn|Kantaphon Wangcharoen|Kulkavut Vitidsarn|Ratchanok Intanon|Busanan Ongbamrungphan|Pornpawee Chochuwong|Supanida Katethong|Dechapol Puavaranukroh|Supissara Paewsampran|Jongkolphan Kititharakul|Rawinda Prajongjai|Benyapa Aimsaard|Nuntakarn Aimsaard',
+  IN: 'Satwiksairaj Rankireddy|Chirag Shetty|Lakshya Sen|H. S. Prannoy|HS Prannoy|Prannoy H. S.|P. V. Sindhu|Pusarla V. Sindhu|PV Sindhu|Kidambi Srikanth|Priyanshu Rajawat|Kiran George|Treesa Jolly|Gayatri Gopichand|Ayush Shetty|Unnati Hooda|Malvika Bansod|Anupama Upadhyaya|Tanvi Sharma',
+  HK: 'Lee Cheuk Yiu|Angus Ng Ka Long|Ng Ka Long Angus|Tang Chun Man|Tse Ying Suet',
+  SG: 'Loh Kean Yew|Terry Hee|Jessica Tan|Yeo Jia Min',
+  FR: 'Christo Popov|Toma Junior Popov|Alex Lanier|Lucas Corvee|Thom Gicquel|Delphine Delrue|Leonice Huet',
+  DE: 'Yvonne Li|Fabian Roth',
   ES: 'Carolina Marin|Carolina Marín|Pablo Abian',
-  'GB-ENG': 'Liam Pitchford|Tin-Tin Ho|Ben Lane|Sean Vendy|Toby Penty|Judd Trump|Ronnie O\'Sullivan|Ronnie OSullivan|Mark Selby|Kyren Wilson|Shaun Murphy|Barry Hawkins|Ali Carter|Jack Lisowski|Tom Ford|Joe Perry|Stuart Bingham|David Gilbert|Gary Wilson|Mark Davis|Ricky Walden|Chris Wakelin|Michael Holt|Elliot Slessor|David Grace|Robert Milkins|Matthew Selt|Ben Woollaston|Martin Gould|Mark Joyce|Jimmy Robertson|Joe O\'Connor|Stan Moody|Ashley Carty|Oliver Lines|Zak Surety|Ian Burns|Louis Heathcote|Sam Craigie|Steven Hallworth|Jamie Clarke|Hammad Miah|Liam Graham|Allan Taylor|Andrew Higginson|Mitchell Mann|Jenson Kendrick',
-  'GB-SCT': 'John Higgins|Stephen Maguire|Anthony McGill|Graeme Dott|Scott Donaldson|Chris Totten|Ross Muir|Dean Young|Kirsty Gilmour',
-  'GB-WLS': 'Mark Williams|Jackson Page|Jak Jones|Ryan Day|Dominic Dale|Matthew Stevens|Jamie Jones|Michael White|Lee Walker|Liam Davies|Duane Jones',
-  'GB-NIR': 'Mark Allen|Jordan Brown',
-  IE: 'Aaron Hill|Ken Doherty|Fergal O\'Brien|Nhat Nguyen',
-  BE: 'Luca Brecel|Ben Mertens|Julien Leclercq',
-  AU: 'Neil Robertson|Ryan Thomerson',
-  IR: 'Hossein Vafaei|Hossein Vafaei Ayouri',
-  PK: 'Muhammad Asif',
-  CH: 'Alexander Ursenbacher',
-  PS: 'Mohammed Abu Alrob',
-  MT: 'Tony Drago'
+  CA: 'Brian Yang|Victor Lai|Michelle Li',
+  US: 'Beiwen Zhang',
+  BR: 'Ygor Coelho|Juliana Viana Vieira',
+  VN: 'Nguyen Thuy Linh',
+  IE: 'Nhat Nguyen',
+  BE: 'Julien Leclercq',
+  'GB-SCT': 'Kirsty Gilmour'
 };
-// The tours' regulars in tennis (Play prices tennis from Kambi, which names no country).
-const TENNIS_NATIONS = {
-  IT: 'Jannik Sinner|Lorenzo Musetti|Matteo Berrettini|Flavio Cobolli|Lorenzo Sonego|Luciano Darderi|Jasmine Paolini|Elisabetta Cocciaretto|Matteo Arnaldi',
-  ES: 'Carlos Alcaraz|Alejandro Davidovich Fokina|Pablo Carreno Busta|Jaume Munar|Paula Badosa',
-  RS: 'Novak Djokovic|Olga Danilovic',
-  DE: 'Alexander Zverev|Jan-Lennard Struff|Laura Siegemund|Tatjana Maria',
-  US: 'Taylor Fritz|Ben Shelton|Tommy Paul|Frances Tiafoe|Sebastian Korda|Brandon Nakashima|Alex Michelsen|Learner Tien|Coco Gauff|Jessica Pegula|Madison Keys|Emma Navarro|Amanda Anisimova|Danielle Collins|Sofia Kenin|McCartney Kessler|Peyton Stearns|Hailey Baptiste|Iva Jovic|Reilly Opelka|Marcos Giron',
-  AU: 'Alex de Minaur|Alexei Popyrin|Jordan Thompson|Alex Bolt|Ajla Tomljanovic|Daria Kasatkina|Kimberly Birrell',
-  GB: 'Jack Draper|Cameron Norrie|Jacob Fearnley|Emma Raducanu|Katie Boulter|Sonay Kartal',
-  NO: 'Casper Ruud',
-  GR: 'Stefanos Tsitsipas|Maria Sakkari',
-  DK: 'Holger Rune|Clara Tauson',
-  CA: 'Felix Auger-Aliassime|Denis Shapovalov|Gabriel Diallo|Leylah Fernandez|Victoria Mboko',
-  BG: 'Grigor Dimitrov',
-  CZ: 'Jiri Lehecka|Jakub Mensik|Tomas Machac|Barbora Krejcikova|Karolina Muchova|Marketa Vondrousova|Linda Noskova|Karolina Pliskova|Marie Bouzkova',
-  FR: 'Arthur Fils|Ugo Humbert|Alexandre Muller|Giovanni Mpetshi Perricard|Arthur Rinderknech|Corentin Moutet|Caroline Garcia|Varvara Gracheva|Diane Parry',
-  AR: 'Francisco Cerundolo|Tomas Martin Etcheverry|Sebastian Baez|Francisco Comesana|Solana Sierra',
-  CL: 'Alejandro Tabilo|Nicolas Jarry',
-  BR: 'Joao Fonseca|Beatriz Haddad Maia',
-  PL: 'Hubert Hurkacz|Iga Swiatek|Magda Linette',
-  KZ: 'Alexander Bublik|Elena Rybakina|Yulia Putintseva',
-  BY: 'Aryna Sabalenka|Victoria Azarenka',
-  RU: 'Daniil Medvedev|Andrey Rublev|Karen Khachanov|Roman Safiullin|Mirra Andreeva|Anna Kalinskaya|Diana Shnaider|Ekaterina Alexandrova|Liudmila Samsonova|Veronika Kudermetova|Anastasia Pavlyuchenkova|Anna Blinkova|Kamilla Rakhimova',
-  CN: 'Zheng Qinwen|Wang Xinyu|Zhang Shuai|Zhu Lin|Yuan Yue|Zhang Zhizhen|Bu Yunchaokete|Shang Juncheng|Wu Yibing|Wang Xiyu',
-  JP: 'Kei Nishikori|Yoshihito Nishioka|Naomi Osaka|Moyuka Uchijima',
-  UA: 'Elina Svitolina|Marta Kostyuk|Dayana Yastremska',
-  TN: 'Ons Jabeur',
-  LV: 'Jelena Ostapenko',
-  HR: 'Donna Vekic|Marin Cilic|Borna Coric',
-  HU: 'Fabian Marozsan|Anna Bondar',
-  NL: 'Tallon Griekspoor|Botic van de Zandschulp',
-  BE: 'Elise Mertens|Zizou Bergs|David Goffin',
-  CH: 'Belinda Bencic|Stan Wawrinka',
-  PT: 'Nuno Borges',
-  RO: 'Sorana Cirstea|Jaqueline Cristian',
-  CO: 'Camila Osorio',
-  PH: 'Alexandra Eala',
-  TW: 'Hsieh Su-Wei|Chan Hao-Ching|Tseng Chun-Hsin|Hsu Yu-Hsiou',
-  SK: 'Anna Karolina Schmiedlova|Rebecca Sramkova',
-  SI: 'Tamara Zidansek',
-  EG: 'Mayar Sherif',
-  MX: 'Renata Zarazua'
-};
-// Boxers TheSportsDB has no page for (the rest learned from it: learnFighterNations).
-const BOXER_NATIONS = { AU: 'Conor Wallace', US: 'Floyd Schofield', CA: 'Lucas Bahdi', FR: 'Christian Mbilli', TR: 'Elif Nur Turhan' };
 const NATION_OF = new Map();
-for (const [code, names] of [...Object.entries(TENNIS_NATIONS), ...Object.entries(NATIONS), ...Object.entries(BOXER_NATIONS)]) for (const n of names.split('|')) NATION_OF.set(normalizeTeamName(n), code);
-// A domestic series' own name, or Kambi's path word, to its country.
-const SERIES_NATION = { 'tt elite series': 'PL', 'setka cup': 'UA', 'liga pro': 'CZ', 'czech liga pro': 'CZ', 'tt cup': 'CZ', 'win cup': 'UA', 'pro league russia': 'RU' };
+for (const [code, names] of Object.entries(NATIONS)) for (const n of names.split('|')) NATION_OF.set(normalizeTeamName(n), code);
 const nameKey = name => normalizeTeamName(name);
-// A player's nation as an ISO code (or GB-ENG…), or null. `where`: the
-// event's group and Kambi's path words ("czech_republic", "poland").
+// A player's nation as an ISO code (or GB-SCT…), or null. `where`: the
+// event's group and Kambi's path words ("japan", "denmark").
 export function playerNation(name, where = []) {
   const key = nameKey(name);
   if (NATION_OF.has(key)) return NATION_OF.get(key);
-  if (learned().get(key)) return learned().get(key);
-  // A national side (cricket's "India", "Sri Lanka").
+  // A national side.
   const own = countryCode(name);
   if (own) return own;
   // Kambi's "Surname Firstname" for some: the words in either order.
@@ -379,36 +297,10 @@ export function playerNation(name, where = []) {
   if (words.length === 2 && NATION_OF.has(`${words[1]} ${words[0]}`)) return NATION_OF.get(`${words[1]} ${words[0]}`);
   for (const w of [].concat(where || [])) {
     const k = normalizeTeamName(String(w).replace(/_/g, ' '));
-    if (SERIES_NATION[k]) return SERIES_NATION[k];
     const code = COUNTRY_CODES[k] ?? Object.entries(COUNTRY_CODES).find(([c]) => c.length > 4 && k.startsWith(`${c} `))?.[1];
     if (code) return code;
   }
   return null;
-}
-// Nations learned from a source that names them (boxers' on TheSportsDB),
-// kept on the device: name → code, or '' for one looked up and not found
-// (asked again after a month).
-const LEARNED_KEY = 'quadra.nations.v1';
-let learnedMap = null;
-function learned() {
-  if (learnedMap) return learnedMap;
-  learnedMap = new Map();
-  try {
-    const saved = JSON.parse(globalThis.localStorage?.getItem(LEARNED_KEY) || '{}');
-    for (const [k, [code, at]] of Object.entries(saved)) if (code || Date.now() - at < 30 * 86_400_000) learnedMap.set(k, code);
-  } catch {}
-  return learnedMap;
-}
-export const knowsNation = name => learned().has(nameKey(name)) || NATION_OF.has(nameKey(name));
-export function rememberNation(name, country) {
-  const code = country ? (countryCode(country) ?? (/^[A-Z]{2}$/.test(country) ? country : '')) : '';
-  learned().set(nameKey(name), code);
-  try {
-    const saved = JSON.parse(globalThis.localStorage?.getItem(LEARNED_KEY) || '{}');
-    saved[nameKey(name)] = [code, Date.now()];
-    globalThis.localStorage?.setItem(LEARNED_KEY, JSON.stringify(saved));
-  } catch {}
-  return code;
 }
 
 // A round flag picture for a nation code (circle-flags, hot-linkable SVGs).
