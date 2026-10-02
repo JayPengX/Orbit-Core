@@ -86,9 +86,13 @@ Planned in `docs/WEATHER-PLAN.md`; the PWA's repo is `JayPengX/Orbit-Weather`
 - 我的行程 (app `lib/plan.mjs`): the first page once there's a pin. A pin
   may be `home` (one at most; where you are outside every other pin's
   hours; without one, the device's place). Each hour is taken from the
-  place the schedule says (`placeAt`), and the page is built from those
-  stitched hours: now and the next move, route advice, a graph naming the
-  places, the stays today / tomorrow / the week. Notices follow it too.
+  place the schedule says (`placeAt`); `routeForecast` makes the places'
+  forecasts one (same shape as a city's: hours with `place`, days from the
+  hours where you are, route advice), drawn by the same cards. Notices
+  follow it too.
+- Graphs (`lib/graph.mjs` `chart`): smooth area charts coloured by level,
+  one SVG per day (iPhone drops parts of one very wide SVG), a crosshair and
+  dot placed by the app (`colAt`, `colSpot`).
 - Advice for the week: each kind (`umbrella`, `sun`, `wear`, `heat`,
   `mask`, `week`) has `week: { text, days: [{ date, mark, v }] }` over the
   advice day and the 6 after; a kind today doesn't need still comes (level
