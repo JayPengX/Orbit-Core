@@ -37,17 +37,25 @@ Planned in `docs/WEATHER-PLAN.md`; the PWA's repo is `JayPengX/Orbit-Weather`
   the Worker's samples (`/weather/status?sample=<name>`, cached an hour).
 - `/weather/status?sample=forecast` is `/weather` at Taipei 101 without a
   pass (refreshed at most hourly), for checks.
-- **No sign-in, no personal setup** (the owner's call): `/weather` is open
-  to the apps' origin (30 a minute an IP; Google capped at
-  `GOOGLE_DAILY_REFRESHES` = 110 refreshes a day, then CWA alone),
-  `?auto=1` places the caller by IP (`request.cf`), `/weather/places` lists
-  the townships for the picker. No saved places, school hours or brief
-  time: advice uses a generic day (07:30–17:00).
-- **The app** (`JayPengX/Orbit-Weather`, https://jaypengx.github.io/Orbit-Weather/):
-  plain HTML / CSS / ES modules in `public/`, tests `npm test`, Pages via
-  GitHub Actions. Location never blocks: last forecast at once; the
-  device's coarse position if already allowed; else the IP estimate with a
-  「使用精確位置」 button; a township picker for denied / elsewhere.
+- **A Quadra app now** (the owner's call, replacing the earlier no-sign-in
+  version): `weather` is an `ECO_APPS` app (collection `orbit-weather`, its
+  payload `w1:` the pins and the brief time) and a kit `APPS` entry (related,
+  indigo `#6366f1`, notice kinds `brief` / `rain`); `/weather` and
+  `/weather/where` need a session (30 a minute a session); push goes through
+  the kit (`schedulePush`), the device-id route is gone.
+- `/weather` is hourly for 10 days: the near hours each refresh (4 calls),
+  hours 49–240 every 6 hours (8 more, chained page tokens);
+  `GOOGLE_DAILY_CALLS` = 450. `air.history` (the nearest site's last 48 h,
+  from `weather:aqi:hist`, written by the hourly cron) and
+  `air.forecast.days`. `/weather/where` = NLSC's TownVillagePointQuery1
+  (county / town / village), Cloudflare-cached 30 days by ~100 m.
+- The app (`JayPengX/Orbit-Weather`): kit frame (boot.js loading, watchUpdates,
+  installGate, topActions), always dark (`data-theme="dark"`); a page per place
+  (here, then pins, swiped); top (place to 里, now, high / low with 體感), UV,
+  rain and air cards with sideways graphs, advice cards, 10 days (a day's sheet
+  overlays everything), a big info card. Pins: name, place, days and hours (the
+  app opens on the pin inside them). Radar removed. `tools/preview.mjs weather`
+  shows it signed in (weather.js on the fixtures, real NLSC).
 - **Scoring** (`weather-skill.js`, plan C7): the cron at :10 each hour scores
   the 6 cells opened most lately (`weather:recent`, noted at most every 6 h
   a cell) from snapshots of their own refreshes (no extra Google calls)
@@ -56,17 +64,12 @@ Planned in `docs/WEATHER-PLAN.md`; the PWA's repo is `JayPengX/Orbit-Weather`
   a day after 3 days of scores, `weather:weights` moves (∝ 1/score, floor
   0.15, at most 0.1 a day). `GET /weather/skill`: weights and mean scores,
   no places. Never in the app.
-- **Notices without the pass** (`push.js`): `/push/subscribe|schedule?dev=<22
-  chars>` from the apps' origin = account `wdev-<id>`, app `weather`. Checks
+- **Notices** (`push.js`, app `weather`): checks
   `{ weather: { lat, lon, kind: 'brief' | 'rain' } }` run `weatherCheck`:
   the brief in one line (`briefText`), the rain alert when the next 2 hours
   reach 60% (re-checked every 15 minutes until `until`; the forecast read
   with a 1-hour freshness so it costs at most a refresh an hour).
 - `/weather` answers a one-sentence `headline` (from the numbers, no model).
-- The app: always dark; 🔔 settings (brief time, rain alert; iPhone needs
-  the home-screen app); radar card (CWA's `CV1_TW_1000.png`, loaded on open).
-- Open: the owner will say how to group the UI ("categorize like this", the
-  example didn't arrive).
 
 ## Play: Kambi first, real markets, players, new leagues, live (branch `claude/gallant-goodall-gtyxjg`, pushed to `main`)
 

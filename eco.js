@@ -64,12 +64,14 @@ const CODE8 = /^[2-9A-HJ-NP-Z]{8}$/;
 //   match  Quadra Fixtures, a related add-on: follows and services
 //   vocab  Quadra Hub, a related add-on: word progress
 //   orbit  Orbit Class, a related add-on: its class schedule
+//   weather  Orbit Weather, a related add-on: its pinned places and settings
 export const ECO_APPS = {
   stock: { collection: 'stock-study-accounts', maxPayload: 1_000_000 },
   odds: { collection: 'odds-study-accounts', maxPayload: 1_000_000 },
   vocab: { collection: 'vocab-progress-sync', maxPayload: 600_000 },
   match: { collection: 'match-find-settings', maxPayload: 100_000 },
-  orbit: { collection: 'orbit-quadra', maxPayload: 200_000 }
+  orbit: { collection: 'orbit-quadra', maxPayload: 200_000 },
+  weather: { collection: 'orbit-weather', maxPayload: 50_000 }
 };
 // Who can write entries: the apps that move money, and this Worker itself
 // ('eco': pay, Plus, merges). An app can't write 'eco' entries; the related

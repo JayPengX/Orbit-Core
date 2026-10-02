@@ -1,11 +1,14 @@
 // ---- weather.js ----
 // Orbit Weather's server side (docs/WEATHER-PLAN.md), routed by worker.js:
 //
-//   GET /weather?lat=&lon=         the blended forecast for that ~1 km cell
-//                                  (Google, CWA 中央氣象署, MOENV 環境部)
-//   GET /weather?auto=1            the same where the caller's IP says it is
-//                                  (Cloudflare's request.cf), for an app
-//                                  without location permission
+//   GET /weather?lat=&lon=&qt=     the blended forecast for that ~1 km cell
+//                                  (Google, CWA 中央氣象署, MOENV 環境部):
+//                                  hourly for 10 days, daily for 10
+//   GET /weather?auto=1&qt=        the same where the caller's IP says it is
+//                                  (Cloudflare's request.cf), until the
+//                                  device's own position is known
+//   GET /weather/where?lat=&lon=&qt=  the place to the village (縣市 / 鄉鎮市區
+//                                  / 村里), from NLSC's open point query
 //   GET /weather/places            Taiwan's townships [county, town, lat,
 //                                  lon], for the app's place picker
 //   GET /weather/status            each source's key: set, and a live call
@@ -15,10 +18,12 @@
 //                                  (SAMPLES, cached an hour): the tests'
 //                                  fixtures and tools/weather-stations.mjs.
 //
-// No sign-in (a weather app needs no account): /weather answers the apps'
-// own origin only (worker.js), 30 a minute an IP, and Google is asked at
-// most GOOGLE_DAILY_REFRESHES times a day in all (4 calls each, under the
-// key's 500-a-day quota); past that a cell is built from CWA alone.
+// Orbit Weather is a Quadra app: /weather and /weather/where need a Quadra
+// Pass session (worker.js), 30 a minute a session. Google is asked at most
+// GOOGLE_DAILY_CALLS times a day in all (under the key's 500-a-day quota):
+// a refresh is 4 calls (now, 48 hours in 2 pages, 10 days), and every 6
+// hours 8 more for hours 49–240; past the cap a cell is built without
+// Google (CWA alone, the last far hours kept).
 //
 // Keys (Worker secrets): GOOGLE_WEATHER_KEY, CWA_KEY, MOENV_KEY.
 //
@@ -49,7 +54,8 @@ export const STALE_MS = 3 * HOUR;
 export const KEEP_MS = 6 * HOUR;
 // Farther than this from every CWA station / MOENV site (abroad): Google only.
 const NEAR_KM = 30;
-export const GOOGLE_DAILY_REFRESHES = 110;
+export const GOOGLE_DAILY_CALLS = 450;
+export const FAR_MS = 6 * HOUR;
 export const DEFAULT_WEIGHTS = { pop: { google: 0.6, cwa: 0.4 }, temp: { google: 0.6, cwa: 0.4 } };
 
 export function googleUrl(env, path, lat, lon, extra = '', units = true) {
@@ -130,7 +136,7 @@ export async function getJson(fetchFn, url, env) {
 
 // ---- Google ---------------------------------------------------------------------
 
-const cond = c => (c ? { code: c.type || null, text: c.description?.text || '', icon: c.iconBaseUri || null } : null);
+const cond = c => (c ? { code: c.type || null, text: c.description?.text || '' } : null);
 const gWind = w => (w ? { dir: num(w.direction?.degrees), speed: num(w.speed?.value), gust: num(w.gust?.value) } : null);
 
 export function parseGoogleCurrent(j) {
@@ -212,12 +218,29 @@ export function parseGoogleAlerts(j) {
 
 // Current, 48 hours (24 a page at most, each page a billed call), 10 days;
 // alerts only abroad (in Taiwan CWA's warnings are the source).
-async function fetchGoogle(env, lat, lon, fetchFn, abroad) {
+// `far`: also hours 49–240 (8 more pages; the pages chain by token, so
+// they follow the first two).
+async function fetchGoogle(env, lat, lon, fetchFn, abroad, far = false) {
   const get = (path, extra, units) => getJson(fetchFn, googleUrl(env, path, lat, lon, extra, units), env);
+  const HOURS = '&hours=240&pageSize=24';
+  let farHours = null;
   const hoursP = (async () => {
-    const first = await get('forecast/hours:lookup', '&hours=48&pageSize=24');
-    const pages = [first];
-    if (first.nextPageToken) pages.push(await get('forecast/hours:lookup', `&hours=48&pageSize=24&pageToken=${encodeURIComponent(first.nextPageToken)}`));
+    const pages = [await get('forecast/hours:lookup', HOURS)];
+    if (pages[0].nextPageToken) pages.push(await get('forecast/hours:lookup', `${HOURS}&pageToken=${encodeURIComponent(pages[0].nextPageToken)}`));
+    if (far) {
+      const more = [];
+      let token = pages[pages.length - 1].nextPageToken;
+      try {
+        while (token && more.length < 8) {
+          const p = await get('forecast/hours:lookup', `${HOURS}&pageToken=${encodeURIComponent(token)}`);
+          more.push(p);
+          token = p.nextPageToken;
+        }
+      } catch (e) {
+        console.log('weather far hours failed', String(e.message || e).slice(0, 120));
+      }
+      if (more.length) farHours = more.flatMap(p => p.forecastHours || []).map(parseGoogleHour);
+    }
     return pages.flatMap(p => p.forecastHours || []);
   })();
   const [current, hours, days, alerts] = await Promise.all([
@@ -229,6 +252,7 @@ async function fetchGoogle(env, lat, lon, fetchFn, abroad) {
   return {
     current: parseGoogleCurrent(current),
     hours: hours.map(parseGoogleHour),
+    far: farHours,
     days: (days.forecastDays || []).map(parseGoogleDay),
     alerts: parseGoogleAlerts(alerts),
     tz: current.timeZone?.id || 'Asia/Taipei'
@@ -401,7 +425,12 @@ export function parseAir(sites, forecast, lat, lon, county) {
     main: best.pollutant || null,
     station: { name: best.sitename, km: r1(d) },
     at: twParse(best.publishtime),
-    forecast: { area, today: fc(twDate(now)), tomorrow: fc(twDate(now + 24 * HOUR)) }
+    forecast: {
+      area,
+      today: fc(twDate(now)),
+      tomorrow: fc(twDate(now + 24 * HOUR)),
+      days: [...new Set((forecast || []).filter(x => x.area === area).map(x => x.forecastdate))].sort().map(date => ({ date, ...fc(date) }))
+    }
   };
 }
 
@@ -438,13 +467,13 @@ async function shared(env, key, freshMs, make, now) {
   }
 }
 
-// Today's Google refreshes, counted in KV: true while under the cap (and
-// counts this one).
-export async function googleAllowed(env, now) {
+// Today's Google calls, counted in KV: true while `calls` more fit under
+// the cap (and counts them).
+export async function googleAllowed(env, now, calls = 4) {
   const key = `weather:google:${twDate(now)}`;
   const n = Number(await kvJson(env, key)) || 0;
-  if (n >= GOOGLE_DAILY_REFRESHES) return false;
-  await kvPut(env, key, n + 1, 2 * 86_400);
+  if (n + calls > GOOGLE_DAILY_CALLS) return false;
+  await kvPut(env, key, n + calls, 2 * 86_400);
   return true;
 }
 
@@ -466,6 +495,53 @@ export function townships() {
     .sort((a, b) => order.indexOf(a.county) - order.indexOf(b.county) || a.town.localeCompare(b.town, 'zh-Hant'))
     .map(t => [t.county, t.town, Math.round((t.lat / t.n) * 1e4) / 1e4, Math.round((t.lon / t.n) * 1e4) / 1e4]);
   return townsCache;
+}
+
+// MOENV's AQI sites, kept whole in KV 20 minutes (the cell build and the
+// cron's history share them).
+export const airSites = (env, fetchFn, now) =>
+  shared(env, 'weather:moenv:aqi', 20 * MIN, () => getJson(fetchFn, moenvUrl(env, 'aqx_p_432', '&limit=1000'), env).then(j => (Array.isArray(j) ? j : j.records || []).map(s => ({ sitename: s.sitename, county: s.county, aqi: s.aqi, status: s.status, pollutant: s.pollutant, pm10: s.pm10, 'pm2.5': s['pm2.5'], o3: s.o3, latitude: s.latitude, longitude: s.longitude, publishtime: s.publishtime }))), now);
+
+// Each AQI site's last 48 hours (`weather:aqi:hist`, written by the hourly
+// cron): { sites: { name: [[t, aqi, pm25], …] } }. Pure: the history with
+// this reading added.
+export function addAirReading(hist, sites, now) {
+  const out = { sites: {} };
+  // Every site's readings under 48 hours old (a site gone quiet empties out).
+  for (const [name, list] of Object.entries(hist?.sites || {})) {
+    const kept = list.filter(([x]) => now - x < 48 * HOUR);
+    if (kept.length) out.sites[name] = kept;
+  }
+  for (const s of sites || []) {
+    const t = twParse(s.publishtime);
+    const aqi = num(s.aqi);
+    if (!s.sitename || !t || aqi == null) continue;
+    const list = (out.sites[s.sitename] || []).filter(([x]) => now - x < 48 * HOUR && x !== t);
+    list.push([t, aqi, num(s['pm2.5'])]);
+    out.sites[s.sitename] = list.sort((a, b) => a[0] - b[0]);
+  }
+  return out;
+}
+
+// ---- The village: NLSC's point query -------------------------------------------------
+
+const NLSC = 'https://api.nlsc.gov.tw/other/TownVillagePointQuery1/';
+const xmlTag = (xml, tag) => (String(xml).match(new RegExp(`<${tag}>([^<]*)</${tag}>`)) || [])[1] || null;
+export function parseVillage(xml) {
+  const county = xmlTag(xml, 'ctyName');
+  return county ? { county, town: xmlTag(xml, 'townName'), village: xmlTag(xml, 'villageName') } : { county: null, town: null, village: null };
+}
+// The place at lat / lon (to ~100 m), kept in Cloudflare's cache 30 days.
+export async function whereIs(lat, lon, { fetchFn = fetch, cache = globalThis.caches?.default } = {}) {
+  const la = (Math.round(lat * 1000) / 1000).toFixed(3);
+  const lo = (Math.round(lon * 1000) / 1000).toFixed(3);
+  const key = `https://weather.cache/where/${la},${lo}`;
+  const hit = cache && (await cache.match(key).catch(() => null));
+  if (hit) return hit.json();
+  const res = await fetchFn(`${NLSC}${lo}/${la}`, { headers: { Accept: 'application/xml' } });
+  const place = parseVillage(res.ok ? await res.text() : '');
+  if (cache && (res.ok || place.county)) await cache.put(key, new Response(JSON.stringify(place), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=2592000' } })).catch(() => {});
+  return place;
 }
 
 // ---- The blend --------------------------------------------------------------------
@@ -730,24 +806,40 @@ export async function buildCell(env, lat, lon, { fetchFn = fetch, now = Date.now
     }
   };
   const inTaiwan = (nearestStation(lat, lon, 'r')?.km ?? Infinity) <= NEAR_KM;
-  const [google, cwa, aqi, aqf, warn, weights] = await Promise.all([
-    !env.GOOGLE_WEATHER_KEY ? { state: 'off', v: null } : (await googleAllowed(env, now)) ? settle('google', () => fetchGoogle(env, lat, lon, fetchFn, !inTaiwan)) : keep('google') ? { state: 'stale', ...keep('google') } : { state: 'capped', v: null },
+  // Hours 49–240: fetched every FAR_MS, kept between.
+  const farPrev = prev?.parts?.far && now - prev.parts.far.at < 2 * 86_400_000 ? prev.parts.far : null;
+  const wantFar = !farPrev || now - farPrev.at >= FAR_MS;
+  const [google, cwa, aqi, aqf, warn, weights, aqiHist] = await Promise.all([
+    !env.GOOGLE_WEATHER_KEY ? { state: 'off', v: null } : (await googleAllowed(env, now, wantFar ? 12 : 4)) ? settle('google', () => fetchGoogle(env, lat, lon, fetchFn, !inTaiwan, wantFar)) : wantFar && (await googleAllowed(env, now, 4)) ? settle('google', () => fetchGoogle(env, lat, lon, fetchFn, !inTaiwan)) : keep('google') ? { state: 'stale', ...keep('google') } : { state: 'capped', v: null },
     env.CWA_KEY && inTaiwan ? settle('cwa', () => fetchCwa(env, lat, lon, fetchFn)) : { state: inTaiwan ? 'off' : 'n/a', v: null },
-    env.MOENV_KEY && inTaiwan ? shared(env, 'weather:moenv:aqi', 20 * MIN, () => getJson(fetchFn, moenvUrl(env, 'aqx_p_432', '&limit=1000'), env).then(j => (Array.isArray(j) ? j : j.records || []).map(s => ({ sitename: s.sitename, county: s.county, aqi: s.aqi, status: s.status, pollutant: s.pollutant, pm10: s.pm10, 'pm2.5': s['pm2.5'], o3: s.o3, latitude: s.latitude, longitude: s.longitude, publishtime: s.publishtime }))), now) : null,
+    env.MOENV_KEY && inTaiwan ? airSites(env, fetchFn, now) : null,
     env.MOENV_KEY && inTaiwan ? shared(env, 'weather:moenv:aqf', 3 * HOUR, () => getJson(fetchFn, moenvUrl(env, 'aqf_p_01', '&limit=100'), env).then(j => (Array.isArray(j) ? j : j.records || []).map(f => ({ area: f.area, forecastdate: f.forecastdate, aqi: f.aqi, majorpollutant: f.majorpollutant }))), now) : null,
     env.CWA_KEY && inTaiwan ? shared(env, 'weather:cwa:warn', 30 * MIN, () => getJson(fetchFn, cwaUrl(env, 'W-C0033-001'), env), now) : null,
-    kvJson(env, 'weather:weights')
+    kvJson(env, 'weather:weights'),
+    inTaiwan ? kvJson(env, 'weather:aqi:hist') : null
   ]);
   const county = cwa.v?.county || null;
   const air = aqi?.data ? parseAir(aqi.data, aqf?.data, lat, lon, county) : null;
+  if (air) air.history = (aqiHist?.sites?.[air.station.name] || []).filter(([t]) => now - t < 48 * HOUR).map(([t, a, pm25]) => ({ t, aqi: a, pm25 }));
+  // The far hours: fresh from this refresh, else the last ones; joined after
+  // the near ones.
+  const far = google.state === 'ok' && google.v?.far?.length ? { at: now, v: google.v.far } : farPrev;
+  const googleV = google.v ? { ...google.v, far: undefined } : null;
+  if (googleV && far?.v?.length) {
+    const end = googleV.hours.length ? googleV.hours[googleV.hours.length - 1].t : now;
+    googleV.hours = [...googleV.hours, ...far.v.filter(h => h.t > end)];
+  }
   const sources = {
     google: google.state,
     cwa: cwa.state,
     moenv: aqi ? aqi.state : env.MOENV_KEY ? 'n/a' : 'off'
   };
   const partial = Object.values(sources).some(v => v === 'error' || v === 'stale');
-  const { resp, bySource } = assemble({ cell, now, google: google.v, cwa: cwa.v, air, warnings: warn?.data && county ? parseCwaWarnings(warn.data, county) : [], weights: weights || DEFAULT_WEIGHTS, partial });
-  return { at: now, resp, bySource, sources, parts: { google: google.state === 'ok' || google.state === 'stale' ? { at: google.at, v: google.v } : null, cwa: cwa.state === 'ok' || cwa.state === 'stale' ? { at: cwa.at, v: cwa.v } : null } };
+  const { resp, bySource } = assemble({ cell, now, google: googleV, cwa: cwa.v, air, warnings: warn?.data && county ? parseCwaWarnings(warn.data, county) : [], weights: weights || DEFAULT_WEIGHTS, partial });
+  // The scoring needs the next 24 hours only.
+  bySource.hours = bySource.hours.filter(h => h.t < now + 48 * HOUR);
+  const nearOnly = google.v ? { ...google.v, far: undefined } : null;
+  return { at: now, resp, bySource, sources, parts: { google: google.state === 'ok' || google.state === 'stale' ? { at: google.at, v: nearOnly } : null, cwa: cwa.state === 'ok' || cwa.state === 'stale' ? { at: cwa.at, v: cwa.v } : null, far: far || null } };
 }
 
 // The cells people opened lately (`weather:recent`, cell → when), for the
@@ -854,7 +946,7 @@ async function cachedText(env, key, ttl, make) {
 
 // ---- Route ---------------------------------------------------------------------------
 
-export async function handleWeather(request, env, headers, path, { limited = () => false, ctx = null, fetchFn = fetch, cf = request.cf } = {}) {
+export async function handleWeather(request, env, headers, path, { session = null, limited = () => false, ctx = null, fetchFn = fetch, cf = request.cf, cache } = {}) {
   const send = (data, status = 200) => new Response(typeof data === 'string' ? data : JSON.stringify(data), { status, headers: { ...headers, 'Content-Type': 'application/json; charset=utf-8' } });
   if (request.method !== 'GET') return send({ code: 'GET_ONLY' }, 405);
   const q = new URL(request.url).searchParams;
@@ -874,7 +966,16 @@ export async function handleWeather(request, env, headers, path, { limited = () 
   if (path === '/weather/places') {
     return new Response(JSON.stringify(townships()), { headers: { ...headers, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=86400' } });
   }
+  if (path === '/weather/where') {
+    if (!session) return send({ code: 'ECO_TOKEN_INVALID' }, 401);
+    if (limited()) return send({ code: 'RATE_LIMITED' }, 429);
+    const lat = Number(q.get('lat'));
+    const lon = Number(q.get('lon'));
+    if (!q.get('lat') || !q.get('lon') || !(Math.abs(lat) <= 90) || !(Math.abs(lon) <= 180)) return send({ code: 'BAD_LOCATION' }, 400);
+    return send(await whereIs(lat, lon, { fetchFn, ...(cache !== undefined ? { cache } : {}) }).catch(() => ({ county: null, town: null, village: null })));
+  }
   if (path === '/weather') {
+    if (!session) return send({ code: 'ECO_TOKEN_INVALID' }, 401);
     if (limited()) return send({ code: 'RATE_LIMITED' }, 429);
     let lat = Number(q.get('lat'));
     let lon = Number(q.get('lon'));

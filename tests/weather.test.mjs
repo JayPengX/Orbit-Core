@@ -6,9 +6,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   weatherStatus, handleWeather, scrub, cellOf, nearestStation, townIds, airArea, parseCwaTown, cwaAt, parseGoogleDay, parseGoogleHour,
-  blend, buildCell, GOOGLE_DAILY_REFRESHES, briefText, rainPhrase, weatherCheck, noteRecent, cellForecast, advise, adviceWindow, parseCwaWarnings, aqiLevel, uvLevel, num, DEFAULT_WEIGHTS
+  blend, buildCell, GOOGLE_DAILY_CALLS, parseVillage, whereIs, addAirReading, briefText, rainPhrase, weatherCheck, noteRecent, cellForecast, advise, adviceWindow, parseCwaWarnings, aqiLevel, uvLevel, num, DEFAULT_WEIGHTS
 } from '../weather.js';
 import { STATIONS } from '../weather-stations.js';
+import { upstream as fixtureUpstream } from './fixtures/weather/upstream.mjs';
 
 const fx = name => JSON.parse(readFileSync(new URL(`./fixtures/weather/${name}.json`, import.meta.url), 'utf8'));
 const NOW = Date.parse('2026-10-02T11:46:00Z');
@@ -19,39 +20,15 @@ const memKv = () => {
   return { store, get: async k => store.get(k) ?? null, put: async (k, v) => void store.set(k, v) };
 };
 
-// Every upstream the Worker calls, answered from the fixtures.
-function upstream(log = []) {
-  const hours = fx('google-hours');
-  const page2 = { forecastHours: hours.forecastHours.map(h => ({ ...h, interval: { startTime: new Date(Date.parse(h.interval.startTime) + 86_400_000).toISOString() } })) };
-  const oneStation = (file, id) => {
-    const j = fx(file);
-    return { ...j, records: { ...j.records, Station: j.records.Station.filter(s => s.StationId === id) } };
+// Every upstream the Worker calls, answered from the fixtures (with the
+// CWA key checked).
+const upstream = (log = []) => {
+  const f = fixtureUpstream(log);
+  return async (url, o) => {
+    if (url.includes('opendata.cwa.gov.tw')) assert.equal(new URL(url).searchParams.get('Authorization'), env.CWA_KEY);
+    return f(url, o);
   };
-  return async url => {
-    const u = new URL(url);
-    log.push(u.pathname + (u.searchParams.get('pageToken') ? '#2' : ''));
-    if (u.host === 'weather.googleapis.com') {
-      if (u.pathname.endsWith('currentConditions:lookup')) return answer(200, fx('google-current'));
-      if (u.pathname.endsWith('hours:lookup')) return answer(200, u.searchParams.get('pageToken') ? page2 : hours);
-      if (u.pathname.endsWith('days:lookup')) return answer(200, fx('google-days'));
-    }
-    if (u.host === 'opendata.cwa.gov.tw') {
-      const id = u.pathname.split('/').pop();
-      assert.equal(u.searchParams.get('Authorization'), env.CWA_KEY);
-      if (id === 'F-D0047-061') return answer(200, fx('cwa-town-3d'));
-      if (id === 'F-D0047-063') return answer(200, fx('cwa-town-1w'));
-      if (id === 'O-A0001-001') return answer(200, oneStation('cwa-stations', u.searchParams.get('StationId')));
-      if (id === 'O-A0003-001') return answer(200, oneStation('cwa-manned', u.searchParams.get('StationId')));
-      if (id === 'O-A0002-001') return answer(200, oneStation('cwa-rain', u.searchParams.get('StationId')));
-      if (id === 'W-C0033-001') return answer(200, fx('cwa-warn'));
-    }
-    if (u.host === 'data.moenv.gov.tw') {
-      if (u.pathname.endsWith('aqx_p_432')) return answer(200, fx('moenv-aqi'));
-      if (u.pathname.endsWith('aqf_p_01')) return answer(200, fx('moenv-aqf'));
-    }
-    return answer(404, 'no fixture for ' + url);
-  };
-}
+};
 
 test('cells round to 0.01°, about a kilometre', () => {
   assert.equal(cellOf(25.0339, 121.5645), '25.03,121.56');
@@ -112,7 +89,7 @@ test('a whole cell from the three sources', async () => {
   assert.equal(resp.partial, false);
   assert.equal(resp.cell, '25.03,121.57');
   assert.deepEqual(resp.place, { county: '臺北市', town: '信義區' });
-  assert.equal(resp.hours.length, 48);
+  assert.equal(resp.hours.length, 240, 'hourly for 10 days');
   const h = resp.hours[0];
   assert.deepEqual(bySource.hours[0].pop, { google: 20, cwa: 40 });
   assert.equal(h.pop, Math.round(0.6 * 20 + 0.4 * 40));
@@ -125,10 +102,14 @@ test('a whole cell from the three sources', async () => {
   assert.ok(resp.now.gauge && resp.now.rain1h != null);
   assert.ok(resp.air && resp.air.aqi != null && resp.air.station.km < 5);
   assert.equal(resp.air.forecast.area, '北部');
+  assert.deepEqual(resp.air.forecast.days.map(d => d.date), ['2026-10-02', '2026-10-03', '2026-10-04', '2026-10-05']);
+  assert.equal(resp.air.forecast.days[1].level, '普通');
   assert.ok(Array.isArray(resp.advice) && resp.advice.length > 0);
   assert.ok(parts.google && parts.cwa);
-  // Google: current, 2 hour pages, days; no alerts in Taiwan.
-  assert.equal(log.filter(p => p.startsWith('/v1/')).length, 4);
+  // Google: current, 10 hour pages (the far ones on a first build), days; no alerts in Taiwan.
+  assert.equal(log.filter(p => p.startsWith('/v1/')).length, 12);
+  assert.equal(JSON.parse(e.RATE_LIMIT_KV.store.get('weather:google:2026-10-02')), 12);
+  assert.ok(!JSON.stringify(resp).includes('gstatic'), 'no icon addresses');
   assert.ok(!log.some(p => p.includes('publicAlerts')));
 });
 
@@ -139,7 +120,7 @@ test('one truth: the answer names no source and carries no second opinion', asyn
   for (const word of ['google', 'cwa', 'moenv', 'By"', 'split', 'weights', 'sources']) assert.ok(!text.toLowerCase().includes(word.toLowerCase()), word);
   // The breakdown is kept for scoring, in KV only.
   const entry = JSON.parse(kv.store.get('weather:cell:25.03,121.57'));
-  assert.equal(entry.bySource.hours.length, 48);
+  assert.equal(entry.bySource.hours.length, 49, 'this hour and the next 48');
 });
 
 test('a failing source: the others answer, the last good copy is used', async () => {
@@ -150,7 +131,7 @@ test('a failing source: the others answer, the last good copy is used', async ()
   const later = await buildCell(e, 25.034, 121.565, { fetchFn: googleDown, now: NOW + 3_600_000, prev: good });
   assert.equal(later.sources.google, 'stale');
   assert.equal(later.resp.partial, true);
-  assert.equal(later.resp.hours.length, 48);
+  assert.equal(later.resp.hours.length, 240, 'the far hours kept');
   const cold = await buildCell({ ...env, RATE_LIMIT_KV: memKv() }, 25.034, 121.565, { fetchFn: googleDown, now: NOW });
   assert.equal(cold.sources.google, 'error');
   assert.ok(cold.resp.hours.length > 0, 'CWA alone still gives hours');
@@ -220,9 +201,10 @@ test('CWA warnings for the county', () => {
   assert.ok(w[0].from < w[0].to);
 });
 
-test('/weather: a place, or where the IP says; no sign-in', async () => {
+test('/weather: a Quadra Pass session, a place or where the IP says', async () => {
   const e = { ...env, RATE_LIMIT_KV: memKv() };
-  const get = (q, opts) => handleWeather(new Request('https://w.example/weather' + q), e, {}, '/weather', { fetchFn: upstream(), cf: undefined, ...opts });
+  const get = (q, opts) => handleWeather(new Request('https://w.example/weather' + q), e, {}, '/weather', { fetchFn: upstream(), cf: undefined, session: { s: 'x' }, ...opts });
+  assert.equal((await get('?lat=25.03&lon=121.56', { session: null })).status, 401);
   assert.equal((await get('?lat=x&lon=121.5')).status, 400);
   assert.equal((await get('?lat=25')).status, 400);
   assert.equal((await get('?lat=25.03&lon=121.56', { limited: () => true })).status, 429);
@@ -246,17 +228,29 @@ test('the township list for the picker', async () => {
   assert.equal(list[0][0], '宜蘭縣');
 });
 
-test('Google is asked at most GOOGLE_DAILY_REFRESHES times a day; then CWA alone', async () => {
+test('Google is asked at most GOOGLE_DAILY_CALLS times a day; far hours every 6 hours; then CWA alone', async () => {
   const kv = memKv();
-  kv.store.set('weather:google:2026-10-02', String(GOOGLE_DAILY_REFRESHES));
+  kv.store.set('weather:google:2026-10-02', String(GOOGLE_DAILY_CALLS));
   const log = [];
   const { resp, sources } = await buildCell({ ...env, RATE_LIMIT_KV: kv }, 25.034, 121.565, { fetchFn: upstream(log), now: NOW });
   assert.equal(sources.google, 'capped');
   assert.ok(!log.some(p => p.startsWith('/v1/')));
   assert.ok(resp.hours.length > 0 && resp.days.length > 0);
   const kv2 = memKv();
-  await buildCell({ ...env, RATE_LIMIT_KV: kv2 }, 25.034, 121.565, { fetchFn: upstream(), now: NOW });
-  assert.equal(kv2.store.get('weather:google:2026-10-02'), '1');
+  const first = await buildCell({ ...env, RATE_LIMIT_KV: kv2 }, 25.034, 121.565, { fetchFn: upstream(), now: NOW });
+  assert.equal(kv2.store.get('weather:google:2026-10-02'), '12');
+  const log2 = [];
+  const soon = await buildCell({ ...env, RATE_LIMIT_KV: kv2 }, 25.034, 121.565, { fetchFn: upstream(log2), now: NOW + 3_600_000, prev: first });
+  assert.equal(log2.filter(p => p.startsWith('/v1/')).length, 4, 'an hour later: near only');
+  assert.equal(soon.resp.hours.length, 240, 'the far hours carried over');
+  const log3 = [];
+  await buildCell({ ...env, RATE_LIMIT_KV: kv2 }, 25.034, 121.565, { fetchFn: upstream(log3), now: NOW + 7 * 3_600_000, prev: soon });
+  assert.equal(log3.filter(p => p.startsWith('/v1/')).length, 12, 'after 6 hours: the far ones again');
+  // Room for 4 but not 12: near only.
+  kv2.store.set('weather:google:2026-10-03', String(GOOGLE_DAILY_CALLS - 5)); // +14 h is the next Taipei day
+  const log4 = [];
+  await buildCell({ ...env, RATE_LIMIT_KV: kv2 }, 25.034, 121.565, { fetchFn: upstream(log4), now: NOW + 14 * 3_600_000, prev: soon });
+  assert.equal(log4.filter(p => p.startsWith('/v1/')).length, 4);
 });
 
 test('status says which keys are set and answer, never the keys', async () => {
@@ -334,4 +328,38 @@ test('opened cells are noted for the scoring, at most every 6 hours', async () =
   await noteRecent(e, '24.15,120.68', NOW + 3_600_000);
   assert.equal(writes, 2);
   assert.deepEqual(Object.keys(JSON.parse(kv.store.get('weather:recent'))).sort(), ['24.15,120.68', '25.03,121.57']);
+});
+
+test('the place to the village (NLSC), cached', async () => {
+  const xml = '<townVillageItem><ctyCode>63000</ctyCode><ctyName>臺北市</ctyName><townCode>63000020</townCode><townName>信義區</townName><villageCode>63000020001</villageCode><villageName>西村里</villageName></townVillageItem>';
+  assert.deepEqual(parseVillage(xml), { county: '臺北市', town: '信義區', village: '西村里' });
+  assert.deepEqual(parseVillage('<error/>'), { county: null, town: null, village: null });
+  const store = new Map();
+  const cache = { match: async k => (store.has(k) ? new Response(store.get(k)) : undefined), put: async (k, r) => void store.set(k, await r.text()) };
+  const urls = [];
+  const fetchFn = async url => (urls.push(url), { ok: true, text: async () => xml });
+  assert.deepEqual(await whereIs(25.03412, 121.56456, { fetchFn, cache }), { county: '臺北市', town: '信義區', village: '西村里' });
+  await whereIs(25.0339, 121.5649, { fetchFn, cache });
+  assert.deepEqual(urls, ['https://api.nlsc.gov.tw/other/TownVillagePointQuery1/121.565/25.034'], 'the same ~100 m: cached');
+  const e = { ...env, RATE_LIMIT_KV: memKv() };
+  const res = await handleWeather(new Request('https://w.example/weather/where?lat=25.034&lon=121.565'), e, {}, '/weather/where', { session: { s: 'x' }, fetchFn, cache });
+  assert.equal((await res.json()).village, '西村里');
+  assert.equal((await handleWeather(new Request('https://w.example/weather/where?lat=25&lon=121'), e, {}, '/weather/where', { fetchFn, cache })).status, 401);
+});
+
+test('AQI: each site\'s last 48 hours, and the nearest one\'s in the answer', async () => {
+  const sites = fx('moenv-aqi');
+  const at = Date.parse('2026-10-02T19:00:00+08:00');
+  let hist = addAirReading(null, sites, at);
+  assert.deepEqual(hist.sites['松山'][0].slice(0, 1), [at]);
+  hist = addAirReading(hist, sites, at);
+  assert.equal(hist.sites['松山'].length, 1, 'the same reading once');
+  hist = addAirReading(hist, sites.map(s => ({ ...s, publishtime: '2026/10/02 20:00:00', aqi: '50' })), at + 3_600_000);
+  assert.equal(hist.sites['松山'].length, 2);
+  assert.equal(addAirReading(hist, [], at + 50 * 3_600_000).sites['松山'], undefined, 'older than 48 hours dropped');
+  const kv = memKv();
+  kv.store.set('weather:aqi:hist', JSON.stringify(hist));
+  const { resp } = await buildCell({ ...env, RATE_LIMIT_KV: kv }, 25.034, 121.565, { fetchFn: upstream(), now: NOW + 3_600_000 });
+  assert.equal(resp.air.history.length, 2);
+  assert.deepEqual(Object.keys(resp.air.history[0]), ['t', 'aqi', 'pm25']);
 });

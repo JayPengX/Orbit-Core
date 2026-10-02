@@ -16,7 +16,7 @@
 // each, moved at most 0.1 a day, written to `weather:weights` (which every
 // /weather blend reads). Until 3 days of scores exist, the starting weights.
 
-import { HOUR, kvJson, kvPut, getJson, cwaUrl, nearestStation, parseCwaObs, parseCwaRain, twDate, DEFAULT_WEIGHTS } from './weather.js';
+import { HOUR, kvJson, kvPut, getJson, cwaUrl, nearestStation, parseCwaObs, parseCwaRain, twDate, DEFAULT_WEIGHTS, airSites, addAirReading } from './weather.js';
 
 export const SCORE_CELLS = 6;
 export const RAINED_MM = 0.5;
@@ -139,8 +139,13 @@ export function nextWeights(prev, scores, kind) {
   return Object.fromEntries(SOURCES.map(s => [s, Math.round((moved[s] / t3) * 1000) / 1000]));
 }
 
-// The cron's hour: score the recent cells; once a day, move the weights.
+// The cron's hour: each AQI site's reading kept (48 hours, for the air
+// graph), the recent cells scored; once a day, the weights moved.
 export async function weatherCron(env, { fetchFn = fetch, now = Date.now() } = {}) {
+  if (env.MOENV_KEY) {
+    const sites = await airSites(env, fetchFn, now).catch(() => null);
+    if (sites?.data) await kvPut(env, 'weather:aqi:hist', addAirReading(await kvJson(env, 'weather:aqi:hist'), sites.data, now), 3 * 86_400);
+  }
   const recent = (await kvJson(env, 'weather:recent')) || {};
   const cells = Object.entries(recent)
     .sort((a, b) => b[1] - a[1])

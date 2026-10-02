@@ -12,7 +12,7 @@
 //   GET/POST /push/…             notices while an app is closed (push.js)
 //   GET   /weather/…             Orbit Weather's blended forecast (weather.js)
 //
-// Every route but /eco's sign-in and /weather needs a Quadra Pass session (`qt=`). The
+// Every route but /eco's sign-in needs a Quadra Pass session (`qt=`). The
 // Quadra Pass is the only way anything is saved.
 // Quadra Fixtures' /sports-proxy lives in its own Worker
 // (sports-proxy-worker.js): this one's [placement] region pin (for Gemini)
@@ -1326,22 +1326,18 @@ export default {
     }
     // Web Push (push.js): here, where the Quadra Pass tokens can be read.
     if (path.startsWith('/push/')) {
-      const q = new URL(request.url).searchParams;
-      const qt = q.get('qt');
-      let session = qt ? await readToken(await tokenSecret(env), qt, 'ses') : null;
-      // Orbit Weather has no sign-in: a device pushes under its own random
-      // id, from the apps' origin, as the account `wdev-<id>`.
-      const dev = q.get('dev');
-      if (!session && dev && /^[A-Za-z0-9_-]{22,43}$/.test(dev) && isAllowedOrigin(origin)) session = { d: `wdev-${dev}`, a: 'weather', s: `wdev-${dev}` };
+      const qt = new URL(request.url).searchParams.get('qt');
+      const session = qt ? await readToken(await tokenSecret(env), qt, 'ses') : null;
       if (session && sessionLimited(`p:${session.s}`, 30)) return errorJson('RATE_LIMITED', 429, headers, request);
       return handlePush(request, env, headers, session, path);
     }
-    // Orbit Weather (weather.js): no sign-in; /weather from the apps' own
-    // origin, 30 a minute an IP (Google's spend is capped in weather.js).
+    // Orbit Weather (weather.js): a Quadra Pass session for the forecast and
+    // the place; the township list, the keys' check and the skill are open.
     if (path === '/weather' || path.startsWith('/weather/')) {
-      if (path === '/weather' && !isAllowedOrigin(origin)) return errorJson('FORBIDDEN_ORIGIN', 403, headers, request);
       if (path === '/weather/skill') return new Response(JSON.stringify(await skillReport(env)), { headers: { ...headers, 'Content-Type': 'application/json' } });
-      return handleWeather(request, env, headers, path, { ctx, limited: () => sessionLimited(`w:${ip}`, 30) });
+      const qt = new URL(request.url).searchParams.get('qt');
+      const session = qt ? await readToken(await tokenSecret(env), qt, 'ses') : null;
+      return handleWeather(request, env, headers, path, { session, ctx, limited: () => sessionLimited(`w:${session?.s}`, 30) });
     }
     return errorJson('NOT_FOUND', 404, headers, request);
   },

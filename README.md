@@ -12,6 +12,7 @@ saved.
 | Quadra Fixtures | [Quadra-Fixtures](https://github.com/JayPengX/Quadra-Fixtures) | https://jaypengx.github.io/Quadra-Fixtures/ |
 | Quadra Hub | [Quadra-Hub](https://github.com/JayPengX/Quadra-Hub) | https://jaypengx.github.io/Quadra-Hub/ |
 | Orbit Class | [Orbit-Class](https://github.com/JayPengX/Orbit-Class) | https://jaypengx.github.io/Orbit-Class/ |
+| Orbit Weather | [Orbit-Weather](https://github.com/JayPengX/Orbit-Weather) | https://jaypengx.github.io/Orbit-Weather/ |
 
 ## Table of Contents
 
@@ -33,7 +34,7 @@ saved.
   | `/eco` | The Quadra Pass (below) |
   | `/gemini`, `/nl-edit` | Orbit Class's AI schedule-photo import and natural-language edits; the Gemini key stays here |
   | `/kambi` | The last live data of Kambi matches Quadra Play has bets on (a 10-minute cron keeps it) |
-  | `/weather` | Orbit Weather's forecast for a ~1 km cell, Google, CWA and MOENV blended (`weather.js`, `docs/WEATHER-PLAN.md`); `/weather/status` checks the three keys; `/weather/skill` the scoring (`weather-skill.js`) |
+  | `/weather`, `/weather/where` | Orbit Weather's forecast for a ~1 km cell (hourly for 10 days) and the place to the village, Google, CWA and MOENV blended (`weather.js`, `docs/WEATHER-PLAN.md`); `/weather/status` checks the three keys; `/weather/skill` the scoring (`weather-skill.js`) |
 
 - **`sports-proxy`** (`sports-proxy-worker.js`, `wrangler.sports-proxy.toml`):
   `/sports-proxy`, a host-allowlisted passthrough to ESPN, the MLB Stats

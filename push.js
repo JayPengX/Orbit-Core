@@ -25,9 +25,6 @@
 //          morning brief, or a rain alert when the next 2 hours turn wet
 //          (weather.js weatherCheck)
 //
-// Orbit Weather has no sign-in: its device subscribes under its own random
-// id (`dev=`, worker.js), as the account `wdev-<id>`, app `weather`.
-//
 // Stored in KV (RATE_LIMIT_KV): `push:<account>:<app>` the device's
 // subscription and list, `push:prefs:<account>` the switches, `push:due` when each list's next notice is due,
 // `push:vapid` the Worker's own key pair (made on first use). One device a

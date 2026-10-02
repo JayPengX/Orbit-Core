@@ -61,6 +61,7 @@ test('the cron: scores the recent cells, moves the weights once a day after 3 da
   kv.store.set('weather:skill:25.03,121.57', JSON.stringify({ snaps: [], days, lastRain: now, lastTemp: now }));
   const fetchFn = async () => ({ ok: true, status: 200, text: async () => JSON.stringify({ records: { Station: [] } }) });
   const r = await weatherCron(env, { fetchFn, now });
+  assert.equal(kv.store.get('weather:aqi:hist'), undefined, 'no MOENV key: no history');
   assert.equal(r.cells, 1);
   assert.ok(r.weights.pop.cwa > DEFAULT_WEIGHTS.pop.cwa, 'CWA was better at rain');
   assert.deepEqual(r.weights.temp, { google: 0.5, cwa: 0.5 }, 'equal at temperature: toward even, a step');

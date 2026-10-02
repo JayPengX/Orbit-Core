@@ -18,7 +18,12 @@
 //                          [--fake-yahoo]  (made-up Yahoo prices: spark and chart answers
 //                          for any symbol, for when Yahoo answers 429)
 //
-//   app   fixtures | play | securities | hub | orbit (or the repo's folder name)
+//   app   fixtures | play | securities | hub | orbit | weather (or the repo's folder name)
+//
+// Orbit Weather: /weather is answered by weather.js itself on the saved
+// answers in tests/fixtures/weather (Taipei 101, 2026-10-02 evening; no keys
+// needed), /weather/where by NLSC's real point query, and the page's position
+// is Taipei 101 (--no-geo: location refused).
 //   hash  the page's #hash to open (a tab), one screenshot each; none: the start
 //
 // What it does:
@@ -42,6 +47,8 @@ import { execFile } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { ASIA_HOST, asiaBaseballResponse } from '../asia-baseball.js';
 import { trimF1Page } from '../sports-proxy-worker.js';
+import { handleWeather } from '../weather.js';
+import { upstream as weatherFixtures } from '../tests/fixtures/weather/upstream.mjs';
 
 const require = createRequire(import.meta.url);
 let chromium;
@@ -110,12 +117,13 @@ const timing = flag('timing');
 const full = flag('full');
 const signedOut = flag('signed-out');
 const dark = flag('dark');
+const noGeo = flag('no-geo');
 // --root dir: where the repos are (default: next to this one), e.g. a copy
 // stamped by scripts/stamp-version.mjs, to see a deploy's loading.
 const ROOT = resolve(opt('root', new URL('../../', import.meta.url).pathname));
 const [appArg, ...hashes] = args;
 
-const APPS = { fixtures: ['Quadra-Fixtures', 'match'], play: ['Quadra-Play', 'odds'], securities: ['Quadra-Securities', 'stock'], hub: ['Quadra-Hub', 'vocab'], orbit: ['Orbit-Class', 'orbit'] };
+const APPS = { fixtures: ['Quadra-Fixtures', 'match'], play: ['Quadra-Play', 'odds'], securities: ['Quadra-Securities', 'stock'], hub: ['Quadra-Hub', 'vocab'], orbit: ['Orbit-Class', 'orbit'], weather: ['Orbit-Weather', 'weather'] };
 const key = Object.keys(APPS).find(k => k === appArg || APPS[k][0].toLowerCase() === String(appArg).toLowerCase());
 if (!key) throw new Error(`usage: node tools/preview.mjs <${Object.keys(APPS).join('|')}> [hash…]`);
 const [repo, appId] = APPS[key];
@@ -258,6 +266,10 @@ const context = await browser.newContext({
   userAgent: UAS[device] || UAS.iphone,
   ignoreHTTPSErrors: true
 });
+if (appId === 'weather' && !noGeo) {
+  await context.grantPermissions(['geolocation']);
+  await context.setGeolocation({ latitude: 25.034, longitude: 121.565 });
+}
 if (device === 'ipad') await context.addInitScript(() => Object.defineProperty(Navigator.prototype, 'maxTouchPoints', { get: () => 5 }));
 await context.addInitScript(
   ([refresh, lang, stores]) => {
@@ -271,7 +283,22 @@ await context.addInitScript(
   },
   [signedOut ? '' : refresh, lang, stores]
 );
-await context.route('https://orbit-workers-proxy.pengzjay.workers.dev/**', async route => {
+// Orbit Weather's routes (see the top): weather.js on the fixtures, one KV
+// for the run.
+const weatherKv = new Map();
+const weatherEnv = { GOOGLE_WEATHER_KEY: 'preview', CWA_KEY: 'preview', MOENV_KEY: 'preview', RATE_LIMIT_KV: { get: async k => weatherKv.get(k) ?? null, put: async (k, v) => void weatherKv.set(k, v) } };
+const weatherFetch = weatherFixtures();
+const curlText = url => new Promise(resolve => execFile('curl', ['-s', '-m', '20', url], (err, stdout) => resolve(err ? '' : stdout)));
+await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(weather|push)/, async route => {
+  const req = route.request();
+  const u = new URL(req.url());
+  const cors = { 'Access-Control-Allow-Origin': '*' };
+  if (u.pathname.startsWith('/push')) return route.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: u.pathname === '/push/key' ? '{"key":"BJAq2pf1eAmgD3fRzfyXE5dXeDlg2qUZDyIzQ-1SHCNkWr3UQvUtaHgtZ1eQPMl00SAGgejtNE5jkRQCS2Zi6lE"}' : '{"ok":true}' });
+  const fetchFn = async url => (url.includes('api.nlsc.gov.tw') ? { ok: true, status: 200, text: async () => curlText(url) } : weatherFetch(url));
+  const res = await handleWeather(new Request(req.url()), weatherEnv, cors, u.pathname, { session: { s: 'preview' }, fetchFn, cf: { latitude: '25.0478', longitude: '121.5319', city: 'Taipei' }, cache: null });
+  await route.fulfill({ status: res.status, contentType: 'application/json', headers: cors, body: await res.text() });
+});
+await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(?!weather|push)/, async route => {
   const req = route.request();
   const body = req.postDataJSON?.() || {};
   const reply = { token: 'preview', wallet, active: true, live: { app: appId } };
