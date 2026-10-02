@@ -67,8 +67,15 @@ dry"). That disagreement is the warning that was missing today.
 
 ## To get ready before starting
 
-- [ ] Google Cloud project with billing, Weather API enabled, an API key
-      (restricted to the Weather API) → Worker secret `GOOGLE_WEATHER_KEY`.
+- [ ] Google Cloud: the project behind the existing paid Gemini key already
+      has billing, so enable "Weather API" there and make a second key
+      restricted to the Weather API only → Worker secret `GOOGLE_WEATHER_KEY`.
+      Set a daily quota cap (e.g. 500 requests) and a budget alert.
+      Cost (Google's pricing page, checked 2026-10-02): one "Weather Usage"
+      SKU, 10,000 calls a month free, then US$0.15 per 1,000. One place
+      refreshed sensibly (now every 10 min, hourly every 30 min, daily every
+      3 h) is about 6,000 calls a month; two places about 12,000, about
+      US$0.30 a month.
 - [ ] CWA open data authorization key → Worker secret `CWA_KEY`.
 - [ ] Apple Developer Program (US$99 a year): without it an app installed
       from Xcode expires after 7 days, and there's no WeatherKit, push or
