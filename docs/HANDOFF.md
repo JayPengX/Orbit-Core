@@ -6,8 +6,36 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
 edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
 `npx eslint .`).
 
-Not started: a weather PWA that blends Google's and CWA's forecasts (plus
-a `/weather` route here), planned in `docs/WEATHER-PLAN.md`.
+## Orbit Weather, phase 1: the proxy's sources (branch `claude/intelligent-euler-2ifltk`, pushed to `main`)
+
+Planned in `docs/WEATHER-PLAN.md`; the PWA's repo is `JayPengX/Orbit-Weather`
+(empty so far).
+
+- Keys: `GOOGLE_WEATHER_KEY`, `CWA_KEY`, `MOENV_KEY` are Worker secrets, all
+  three checked live (`GET /weather/status`, cached 10 minutes, keys never
+  shown). The Google key first had a "Websites" restriction (403
+  `API_KEY_HTTP_REFERRER_BLOCKED`); the owner set it to None.
+- `weather.js`: `GET /weather?lat=&lon=&qt=` (a Quadra Pass session, 30 a
+  minute) answers the plan's C4 shape for the 0.01° cell, from KV
+  (`weather:cell:<cell>`, fresh 15 minutes, up to 3 hours answered at once
+  and refreshed behind). Google: current, 48 hours in 2 pages (24 a page
+  at most, whatever `pageSize` says), 10 days; alerts only abroad (they
+  refuse `unitsSystem`). CWA: the township's 3-day and week forecast (county
+  datasets `F-D0047-0xx`, `COUNTY_IDS`), the nearest automatic / manned /
+  rain-gauge station (`StationId=`), warnings by county. MOENV: AQI sites
+  and the area forecast, kept whole in KV. Rain and temperature blended
+  0.6 Google / 0.4 CWA (`weather:weights` in KV overrides, for phase 2);
+  "now" is the station's measurement when it's within 5 km and 90 minutes.
+  Advice (plan D) computed here, thresholds in `ADVICE`.
+- The Worker is on the Free plan (10 ms CPU): CWA's national station lists
+  (~1 MB each) are never parsed live. `weather-stations.js` is the committed
+  table (1,367 stations), rebuilt by `node tools/weather-stations.mjs` from
+  the Worker's samples (`/weather/status?sample=<name>`, cached an hour).
+- `/weather/status?sample=forecast` is `/weather` at Taipei 101 without a
+  pass (refreshed at most hourly), for checks.
+- Next: phase 2 (places routes, the hourly scoring cron), then the PWA.
+  Still to hear from the owner (plan A7): home and school, school hours, the
+  brief's time.
 
 ## Play: Kambi first, real markets, players, new leagues, live (branch `claude/gallant-goodall-gtyxjg`, pushed to `main`)
 

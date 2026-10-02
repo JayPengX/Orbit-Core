@@ -1330,9 +1330,13 @@ export default {
       if (session && sessionLimited(`p:${session.s}`, 30)) return errorJson('RATE_LIMITED', 429, headers, request);
       return handlePush(request, env, headers, session, path);
     }
-    // Orbit Weather (weather.js). /weather/status needs no session: it only
-    // says whether each key works, from a 10-minute cache.
-    if (path === '/weather' || path.startsWith('/weather/')) return handleWeather(request, env, headers, path);
+    // Orbit Weather (weather.js): /weather needs a Quadra Pass session;
+    // /weather/status (the keys' check and samples, cached) doesn't.
+    if (path === '/weather' || path.startsWith('/weather/')) {
+      const qt = new URL(request.url).searchParams.get('qt');
+      const session = qt ? await readToken(await tokenSecret(env), qt, 'ses') : null;
+      return handleWeather(request, env, headers, path, { session, ctx, limited: () => sessionLimited(`w:${session.s}`, 30) });
+    }
     return errorJson('NOT_FOUND', 404, headers, request);
   },
 

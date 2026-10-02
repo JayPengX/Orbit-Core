@@ -1,9 +1,18 @@
-# Plan: a weather PWA that blends several forecasts (not started)
+# Plan: a weather PWA that blends several forecasts (phase 1 done)
 
 Written 2026-10-02 after a day the current weather app (CWA 中央氣象署 data
 only) got wrong, while Google's forecast looked closer. Nothing is built yet.
 Part A is what to do now (keys, accounts); parts B onward are the build, for
 a session to follow step by step.
+
+**Progress (2026-10-02):** A1–A5 done (the app is Orbit Weather, repo
+`JayPengX/Orbit-Weather`); phase 1 built (`weather.js`, see HANDOFF). Found
+in phase 1: Google's hourly forecast gives 24 hours a page at most, so 48 h
+is 2 billed calls (4 a refresh with current and days, ~190 a day for 2
+places hourly, ~5,800 a month: inside the free 10,000); Google's alerts refuse
+`unitsSystem`; `F-D0047-089` is by county, so townships come from the
+county datasets; the Free plan's CPU limit rules out parsing CWA's national
+station lists live, hence the committed station table.
 
 **Decided:** a PWA, not a native iPhone app (native needs Xcode and a 7-day
 re-sign on a free Apple ID, or US$99 a year, or SideStore's workarounds, for
