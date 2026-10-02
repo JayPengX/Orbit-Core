@@ -43,6 +43,7 @@
 import { STATIONS } from './weather-stations.js';
 
 export const GOOGLE = 'https://weather.googleapis.com/v1/';
+export const GOOGLE_AIR = 'https://airquality.googleapis.com/v1/';
 export const CWA = 'https://opendata.cwa.gov.tw/api/v1/rest/datastore/';
 export const MOENV = 'https://data.moenv.gov.tw/api/v2/';
 const KEYS = { google: 'GOOGLE_WEATHER_KEY', cwa: 'CWA_KEY', moenv: 'MOENV_KEY' };
@@ -127,8 +128,8 @@ export function scrub(text, env) {
   return out;
 }
 
-export async function getJson(fetchFn, url, env) {
-  const res = await fetchFn(url, { headers: { Accept: 'application/json' } });
+export async function getJson(fetchFn, url, env, body = null) {
+  const res = await fetchFn(url, body ? { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : { headers: { Accept: 'application/json' } });
   const text = await res.text();
   if (!res.ok) throw new Error(scrub(`${res.status} ${text.slice(0, 160)}`, env));
   return JSON.parse(text);
@@ -257,6 +258,77 @@ async function fetchGoogle(env, lat, lon, fetchFn, abroad, far = false) {
     alerts: parseGoogleAlerts(alerts),
     tz: current.timeZone?.id || 'Asia/Taipei'
   };
+}
+
+// ---- Google Air Quality (hourly AQI, 96 hours ahead) -----------------------------
+
+// Taiwan's own AQI (MOENV's scale, `twn_epa`), not Google's universal one,
+// so it lines up with the stations' readings.
+export const GOOGLE_AIR_HOURS = 96;
+export function googleAirBody(lat, lon, now) {
+  const start = Math.ceil(now / HOUR) * HOUR;
+  return {
+    location: { latitude: lat, longitude: lon },
+    period: { startTime: new Date(start).toISOString(), endTime: new Date(start + (GOOGLE_AIR_HOURS - 1) * HOUR).toISOString() },
+    pageSize: GOOGLE_AIR_HOURS,
+    universalAqi: false,
+    extraComputations: ['LOCAL_AQI', 'POLLUTANT_CONCENTRATION'],
+    customLocalAqis: [{ regionCode: 'tw', aqi: 'twn_epa' }],
+    languageCode: 'zh-TW'
+  };
+}
+// → [{ t, aqi, pm25 }…], the hours with a Taiwan AQI.
+export function parseGoogleAir(j) {
+  return (j?.hourlyForecasts || [])
+    .map(h => {
+      const idx = (h.indexes || []).find(x => x.code === 'twn_epa');
+      const pm = (h.pollutants || []).find(p => p.code === 'pm25');
+      return { t: Date.parse(h.dateTime), aqi: num(idx?.aqi), pm25: pm ? r1(num(pm.concentration?.value)) : null };
+    })
+    .filter(h => Number.isFinite(h.t) && h.aqi != null);
+}
+async function fetchGoogleAir(env, lat, lon, fetchFn, now) {
+  const url = `${GOOGLE_AIR}forecast:lookup?key=${encodeURIComponent(env.GOOGLE_WEATHER_KEY)}`;
+  const pages = [await getJson(fetchFn, url, env, googleAirBody(lat, lon, now))];
+  while (pages.length < 4 && pages[pages.length - 1].nextPageToken) pages.push(await getJson(fetchFn, url, env, { ...googleAirBody(lat, lon, now), pageToken: pages[pages.length - 1].nextPageToken }));
+  const hours = pages.flatMap(parseGoogleAir);
+  return hours.length ? hours : null;
+}
+
+// The air's forecast as one line: Google's hours pulled toward the nearest
+// station's reading (the difference fades over AIR_PULL_MS: the station
+// knows now best, the model knows the trend), and each day's value
+// blended with MOENV's regional forecast where it has one (Google alone
+// past it, MOENV alone without Google).
+export const AIR_PULL_MS = 12 * HOUR;
+export const AIR_WEIGHTS = { moenv: 0.5, google: 0.5 };
+export function airForecast(air, gHours, now) {
+  const out = { hours: [], days: [] };
+  const list = (gHours || []).filter(h => h.t + HOUR > now);
+  if (list.length && air?.aqi != null) {
+    const at = air.at || now;
+    const first = list.reduce((a, h) => (Math.abs(h.t - at) < Math.abs(a.t - at) ? h : a), list[0]);
+    const off = air.aqi - first.aqi;
+    out.hours = list.map(h => ({ t: h.t, aqi: Math.max(0, Math.round(h.aqi + off * Math.exp(-Math.max(0, h.t - at) / AIR_PULL_MS))), pm25: h.pm25 }));
+  } else out.hours = list.map(h => ({ t: h.t, aqi: Math.round(h.aqi), pm25: h.pm25 }));
+  // A day's value: its worst hour (as MOENV's daily forecast means it).
+  const gDay = {};
+  for (const h of out.hours) {
+    const d = twDate(h.t);
+    gDay[d] = Math.max(gDay[d] ?? 0, h.aqi);
+  }
+  const mDay = Object.fromEntries((air?.forecast?.days || []).filter(d => d.aqi != null).map(d => [d.date, d]));
+  const dates = [...new Set([...Object.keys(gDay), ...Object.keys(mDay)])].filter(d => d >= twDate(now)).sort();
+  for (const date of dates) {
+    // A partial first day (the evening left) says little of the day: MOENV's.
+    const hoursOf = out.hours.filter(h => twDate(h.t) === date).length;
+    const g = hoursOf >= 6 ? gDay[date] ?? null : null;
+    const v = blend({ moenv: mDay[date]?.aqi ?? null, google: g }, AIR_WEIGHTS);
+    if (v == null) continue;
+    const aqi = Math.round(v);
+    out.days.push({ date, aqi, level: aqiLevel(aqi), main: mDay[date]?.main || null });
+  }
+  return out;
 }
 
 // ---- CWA ------------------------------------------------------------------------
@@ -809,18 +881,40 @@ export async function buildCell(env, lat, lon, { fetchFn = fetch, now = Date.now
   // Hours 49–240: fetched every FAR_MS, kept between.
   const farPrev = prev?.parts?.far && now - prev.parts.far.at < 2 * 86_400_000 ? prev.parts.far : null;
   const wantFar = !farPrev || now - farPrev.at >= FAR_MS;
-  const [google, cwa, aqi, aqf, warn, weights, aqiHist] = await Promise.all([
+  // Google's air hours: every FAR_MS too, in Taiwan (its AQI is MOENV's
+  // scale), kept between; a key without the Air Quality API just goes without.
+  const gairPrev = prev?.parts?.gair && now - prev.parts.gair.at < 2 * 86_400_000 ? prev.parts.gair : null;
+  const gairNoted = prev?.parts?.gairOff && now - prev.parts.gairOff < 86_400_000 ? prev.parts.gairOff : null;
+  const wantGair = env.GOOGLE_WEATHER_KEY && inTaiwan && !gairNoted && (!gairPrev || now - gairPrev.at >= FAR_MS);
+  // (Counted before the weather's calls: KV's counter isn't atomic.)
+  const gairJob =
+    wantGair && (await googleAllowed(env, now, 1))
+      ? fetchGoogleAir(env, lat, lon, fetchFn, now).then(
+          v => ({ ok: true, v }),
+          e => (console.log('weather google air failed', String(e.message || e).slice(0, 160)), { ok: false, off: /\b40[03]\b/.test(String(e.message)) })
+        )
+      : null;
+  const [google, cwa, aqi, aqf, warn, weights, aqiHist, gairRes] = await Promise.all([
     !env.GOOGLE_WEATHER_KEY ? { state: 'off', v: null } : (await googleAllowed(env, now, wantFar ? 12 : 4)) ? settle('google', () => fetchGoogle(env, lat, lon, fetchFn, !inTaiwan, wantFar)) : wantFar && (await googleAllowed(env, now, 4)) ? settle('google', () => fetchGoogle(env, lat, lon, fetchFn, !inTaiwan)) : keep('google') ? { state: 'stale', ...keep('google') } : { state: 'capped', v: null },
     env.CWA_KEY && inTaiwan ? settle('cwa', () => fetchCwa(env, lat, lon, fetchFn)) : { state: inTaiwan ? 'off' : 'n/a', v: null },
     env.MOENV_KEY && inTaiwan ? airSites(env, fetchFn, now) : null,
     env.MOENV_KEY && inTaiwan ? shared(env, 'weather:moenv:aqf', 3 * HOUR, () => getJson(fetchFn, moenvUrl(env, 'aqf_p_01', '&limit=100'), env).then(j => (Array.isArray(j) ? j : j.records || []).map(f => ({ area: f.area, forecastdate: f.forecastdate, aqi: f.aqi, majorpollutant: f.majorpollutant }))), now) : null,
     env.CWA_KEY && inTaiwan ? shared(env, 'weather:cwa:warn', 30 * MIN, () => getJson(fetchFn, cwaUrl(env, 'W-C0033-001'), env), now) : null,
     kvJson(env, 'weather:weights'),
-    inTaiwan ? kvJson(env, 'weather:aqi:hist') : null
+    inTaiwan ? kvJson(env, 'weather:aqi:hist') : null,
+    gairJob
   ]);
+  const gair = gairRes?.ok && gairRes.v ? { at: now, v: gairRes.v } : gairPrev;
   const county = cwa.v?.county || null;
   const air = aqi?.data ? parseAir(aqi.data, aqf?.data, lat, lon, county) : null;
-  if (air) air.history = (aqiHist?.sites?.[air.station.name] || []).filter(([t]) => now - t < 48 * HOUR).map(([t, a, pm25]) => ({ t, aqi: a, pm25 }));
+  if (air) {
+    air.history = (aqiHist?.sites?.[air.station.name] || []).filter(([t]) => now - t < 48 * HOUR).map(([t, a, pm25]) => ({ t, aqi: a, pm25 }));
+    // The station's own reading always ends the history.
+    if (air.at && air.aqi != null && !air.history.some(h => h.t === air.at)) air.history.push({ t: air.at, aqi: air.aqi, pm25: air.pm25 });
+    const fc = airForecast(air, gair?.v, now);
+    air.hourly = fc.hours;
+    air.forecast.days = fc.days;
+  }
   // The far hours: fresh from this refresh, else the last ones; joined after
   // the near ones.
   const far = google.state === 'ok' && google.v?.far?.length ? { at: now, v: google.v.far } : farPrev;
@@ -839,7 +933,7 @@ export async function buildCell(env, lat, lon, { fetchFn = fetch, now = Date.now
   // The scoring needs the next 24 hours only.
   bySource.hours = bySource.hours.filter(h => h.t < now + 48 * HOUR);
   const nearOnly = google.v ? { ...google.v, far: undefined } : null;
-  return { at: now, resp, bySource, sources, parts: { google: google.state === 'ok' || google.state === 'stale' ? { at: google.at, v: nearOnly } : null, cwa: cwa.state === 'ok' || cwa.state === 'stale' ? { at: cwa.at, v: cwa.v } : null, far: far || null } };
+  return { at: now, resp, bySource, sources, parts: { google: google.state === 'ok' || google.state === 'stale' ? { at: google.at, v: nearOnly } : null, cwa: cwa.state === 'ok' || cwa.state === 'stale' ? { at: cwa.at, v: cwa.v } : null, far: far || null, gair: gair || null, gairOff: gairRes?.off ? now : gairNoted } };
 }
 
 // The cells people opened lately (`weather:recent`, cell → when), for the
@@ -904,7 +998,8 @@ const SAMPLES = {
   'cwa-warn': env => cwaUrl(env, 'W-C0033-001'),
   'moenv-aqi': env => moenvUrl(env, 'aqx_p_432', '&limit=1000'),
   'moenv-aqf': env => moenvUrl(env, 'aqf_p_01', '&limit=100'),
-  'moenv-uv': env => moenvUrl(env, 'uv_s_01', '&limit=100')
+  'moenv-uv': env => moenvUrl(env, 'uv_s_01', '&limit=100'),
+  'google-air': env => [`${GOOGLE_AIR}forecast:lookup?key=${encodeURIComponent(env.GOOGLE_WEATHER_KEY)}`, googleAirBody(LA, LO, Date.now())]
 };
 // Each county's township datasets, by the county they name (checks COUNTY_IDS).
 for (const county of Object.keys(COUNTY_IDS)) {
@@ -935,6 +1030,25 @@ export async function weatherStatus(env, fetchFn = fetch) {
   return { at: Date.now(), sources: Object.fromEntries(entries) };
 }
 
+// The cells opened lately, without where they are: each one's age, its
+// sources' states and the blank hours in its answer (for finding gaps).
+export async function cellsReport(env, now) {
+  const recent = (await kvJson(env, 'weather:recent')) || {};
+  const cells = [];
+  for (const cell of Object.keys(recent)) {
+    const hit = await kvJson(env, `weather:cell:${cell}`);
+    if (!hit?.resp) continue;
+    const hours = hit.resp.hours || [];
+    const blank = {};
+    hours.forEach((h, i) => {
+      for (const k of ['temp', 'feels', 'pop', 'uv', 'mm']) if (h[k] == null) (blank[k] ||= []).push(i);
+    });
+    const steps = hours.slice(1).map((h, i) => h.t - hours[i].t).filter(d => d !== HOUR).length;
+    cells.push({ ageMin: Math.round((now - hit.at) / MIN), sources: hit.sources, hours: hours.length, first: hours[0] ? new Date(hours[0].t).toISOString() : null, notHourly: steps, blank: Object.fromEntries(Object.entries(blank).map(([k, v]) => [k, `${v.length}: ${v.slice(0, 12).join(',')}`])), days: (hit.resp.days || []).length, airHourly: hit.resp.air?.hourly?.length ?? null, airHistory: hit.resp.air?.history?.length ?? null, far: hit.parts?.far ? Math.round((now - hit.parts.far.at) / MIN) : null });
+  }
+  return { at: now, googleCallsToday: Number(await kvJson(env, `weather:google:${twDate(now)}`)) || 0, cap: GOOGLE_DAILY_CALLS, cells };
+}
+
 async function cachedText(env, key, ttl, make) {
   const kv = env.RATE_LIMIT_KV;
   const hit = kv && (await kv.get(key));
@@ -956,11 +1070,14 @@ export async function handleWeather(request, env, headers, path, { session = nul
       if (!SAMPLES[sample]) return send({ code: 'NOT_FOUND', samples: Object.keys(SAMPLES) }, 404);
       return send(
         await cachedText(env, `weather:sample:${sample}`, 3600, async () => {
-          const res = await fetchFn(SAMPLES[sample](env), { headers: { Accept: 'application/json' } });
+          const made = SAMPLES[sample](env);
+          const [url, body] = Array.isArray(made) ? made : [made, null];
+          const res = await fetchFn(url, body ? { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : { headers: { Accept: 'application/json' } });
           return JSON.stringify({ status: res.status, body: scrub(await res.text(), env) });
         })
       );
     }
+    if (q.get('cells')) return send(await cellsReport(env, Date.now()));
     return send(await cachedText(env, 'weather:status', 600, async () => JSON.stringify(await weatherStatus(env, fetchFn))));
   }
   if (path === '/weather/places') {

@@ -15,13 +15,20 @@ export function upstream(log = [], { shift = 0 } = {}) {
     const j = fx(file);
     return { ...j, records: { ...j.records, Station: j.records.Station.filter(s => s.StationId === id) } };
   };
-  return async url => {
+  return async (url, init) => {
     const u = new URL(url);
-    log.push(u.pathname + (u.searchParams.get('pageToken') ? '#' + u.searchParams.get('pageToken') : ''));
+    log.push((u.host.startsWith('airquality') ? 'air:' : '') + u.pathname + (u.searchParams.get('pageToken') ? '#' + u.searchParams.get('pageToken') : ''));
     if (u.host === 'weather.googleapis.com') {
       if (u.pathname.endsWith('currentConditions:lookup')) return answer(200, { ...fx('google-current'), currentTime: move(fx('google-current').currentTime) });
       if (u.pathname.endsWith('hours:lookup')) return answer(200, page(Number((u.searchParams.get('pageToken') || 'p1').slice(1))));
       if (u.pathname.endsWith('days:lookup')) return answer(200, fx('google-days'));
+    }
+    if (u.host === 'airquality.googleapis.com' && init?.method === 'POST') {
+      // Google's air hours, from the hour the request starts at.
+      const start = Date.parse(JSON.parse(init.body).period.startTime);
+      const j = fx('google-air');
+      const t0 = Date.parse(j.hourlyForecasts[0].dateTime);
+      return answer(200, { ...j, hourlyForecasts: j.hourlyForecasts.map(h => ({ ...h, dateTime: new Date(Date.parse(h.dateTime) - t0 + start).toISOString() })) });
     }
     if (u.host === 'opendata.cwa.gov.tw') {
       const id = u.pathname.split('/').pop();

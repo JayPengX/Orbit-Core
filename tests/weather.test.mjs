@@ -5,6 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
+  airForecast, parseGoogleAir, googleAirBody,
   weatherStatus, handleWeather, scrub, cellOf, nearestStation, townIds, airArea, parseCwaTown, cwaAt, parseGoogleDay, parseGoogleHour,
   blend, buildCell, GOOGLE_DAILY_CALLS, parseVillage, whereIs, addAirReading, briefText, rainPhrase, weatherCheck, noteRecent, cellForecast, advise, adviceWindow, parseCwaWarnings, aqiLevel, uvLevel, num, DEFAULT_WEIGHTS
 } from '../weather.js';
@@ -102,13 +103,18 @@ test('a whole cell from the three sources', async () => {
   assert.ok(resp.now.gauge && resp.now.rain1h != null);
   assert.ok(resp.air && resp.air.aqi != null && resp.air.station.km < 5);
   assert.equal(resp.air.forecast.area, '北部');
-  assert.deepEqual(resp.air.forecast.days.map(d => d.date), ['2026-10-02', '2026-10-03', '2026-10-04', '2026-10-05']);
+  // MOENV's 4 days, then Google's air hours alone to 10/6; hourly to 96 hours.
+  assert.deepEqual(resp.air.forecast.days.map(d => d.date), ['2026-10-02', '2026-10-03', '2026-10-04', '2026-10-05', '2026-10-06']);
+  assert.equal(resp.air.hourly.length, 96);
+  assert.ok(resp.air.history.length >= 1, 'the station reading ends the history');
   assert.equal(resp.air.forecast.days[1].level, '普通');
   assert.ok(Array.isArray(resp.advice) && resp.advice.length > 0);
   assert.ok(parts.google && parts.cwa);
   // Google: current, 10 hour pages (the far ones on a first build), days; no alerts in Taiwan.
   assert.equal(log.filter(p => p.startsWith('/v1/')).length, 12);
-  assert.equal(JSON.parse(e.RATE_LIMIT_KV.store.get('weather:google:2026-10-02')), 12);
+  // And Google's air hours, once.
+  assert.equal(log.filter(p => p.startsWith('air:')).length, 1);
+  assert.equal(JSON.parse(e.RATE_LIMIT_KV.store.get('weather:google:2026-10-02')), 13);
   assert.ok(!JSON.stringify(resp).includes('gstatic'), 'no icon addresses');
   assert.ok(!log.some(p => p.includes('publicAlerts')));
 });
@@ -238,7 +244,7 @@ test('Google is asked at most GOOGLE_DAILY_CALLS times a day; far hours every 6 
   assert.ok(resp.hours.length > 0 && resp.days.length > 0);
   const kv2 = memKv();
   const first = await buildCell({ ...env, RATE_LIMIT_KV: kv2 }, 25.034, 121.565, { fetchFn: upstream(), now: NOW });
-  assert.equal(kv2.store.get('weather:google:2026-10-02'), '12');
+  assert.equal(kv2.store.get('weather:google:2026-10-02'), '13');
   const log2 = [];
   const soon = await buildCell({ ...env, RATE_LIMIT_KV: kv2 }, 25.034, 121.565, { fetchFn: upstream(log2), now: NOW + 3_600_000, prev: first });
   assert.equal(log2.filter(p => p.startsWith('/v1/')).length, 4, 'an hour later: near only');
@@ -362,4 +368,28 @@ test('AQI: each site\'s last 48 hours, and the nearest one\'s in the answer', as
   const { resp } = await buildCell({ ...env, RATE_LIMIT_KV: kv }, 25.034, 121.565, { fetchFn: upstream(), now: NOW + 3_600_000 });
   assert.equal(resp.air.history.length, 2);
   assert.deepEqual(Object.keys(resp.air.history[0]), ['t', 'aqi', 'pm25']);
+});
+
+test('air: Google hours pulled toward the station, days blended with MOENV, Google alone past it', () => {
+  const now = Date.parse('2026-10-02T12:00:00Z'); // 20:00 Taipei
+  const g = Array.from({ length: 60 }, (_, i) => ({ t: now + i * 3_600_000, aqi: 50, pm25: 12 }));
+  const air = { aqi: 30, at: now - 3_600_000, forecast: { days: [{ date: '2026-10-02', aqi: 40, main: 'x' }, { date: '2026-10-03', aqi: 70, main: 'y' }] } };
+  const fc = airForecast(air, g, now);
+  assert.equal(fc.hours.length, 60);
+  assert.ok(fc.hours[0].aqi < 40, 'starts near the station (30), not Google (50)');
+  assert.ok(fc.hours[59].aqi >= 48, 'fades back to Google');
+  const day = Object.fromEntries(fc.days.map(d => [d.date, d.aqi]));
+  assert.equal(day['2026-10-02'], 40, 'a 4-hour evening: MOENV alone');
+  assert.ok(day['2026-10-03'] > 50 && day['2026-10-03'] < 70, 'both: blended');
+  assert.equal(day['2026-10-04'], 50, 'Google alone');
+  // No Google: MOENV's days as they are.
+  assert.deepEqual(airForecast(air, null, now).days.map(d => d.aqi), [40, 70]);
+});
+
+test('Google air hours: Taiwan AQI only', () => {
+  const j = { hourlyForecasts: [{ dateTime: '2026-10-02T12:00:00Z', indexes: [{ code: 'uaqi', aqi: 70 }, { code: 'twn_epa', aqi: 41 }], pollutants: [{ code: 'pm25', concentration: { value: 9.84 } }] }, { dateTime: '2026-10-02T13:00:00Z', indexes: [{ code: 'uaqi', aqi: 70 }] }] };
+  assert.deepEqual(parseGoogleAir(j), [{ t: Date.parse('2026-10-02T12:00:00Z'), aqi: 41, pm25: 9.8 }]);
+  const b = googleAirBody(25, 121, Date.parse('2026-10-02T11:46:00Z'));
+  assert.equal(b.period.startTime, '2026-10-02T12:00:00.000Z');
+  assert.deepEqual(b.customLocalAqis, [{ regionCode: 'tw', aqi: 'twn_epa' }]);
 });
