@@ -107,20 +107,20 @@ test('the blend weighs the sources that have a value', () => {
 test('a whole cell from the three sources', async () => {
   const log = [];
   const e = { ...env, RATE_LIMIT_KV: memKv() };
-  const { resp, parts } = await buildCell(e, 25.034, 121.565, { fetchFn: upstream(log), now: NOW });
-  assert.deepEqual(resp.sources, { google: 'ok', cwa: 'ok', moenv: 'ok' });
+  const { resp, parts, bySource, sources } = await buildCell(e, 25.034, 121.565, { fetchFn: upstream(log), now: NOW });
+  assert.deepEqual(sources, { google: 'ok', cwa: 'ok', moenv: 'ok' });
+  assert.equal(resp.partial, false);
   assert.equal(resp.cell, '25.03,121.57');
   assert.deepEqual(resp.place, { county: '臺北市', town: '信義區' });
   assert.equal(resp.hours.length, 48);
   const h = resp.hours[0];
-  assert.equal(h.popBy.google, 20);
-  assert.equal(h.popBy.cwa, 40);
+  assert.deepEqual(bySource.hours[0].pop, { google: 20, cwa: 40 });
   assert.equal(h.pop, Math.round(0.6 * 20 + 0.4 * 40));
   assert.equal(resp.days.length, 10);
-  assert.ok(resp.days[1].popBy.cwa != null);
+  assert.ok(bySource.days[1].pop.cwa != null);
   assert.ok(resp.now.station && resp.now.station.km < 5);
   assert.equal(resp.now.temp, resp.now.station.temp, 'a station 0.4 km away, measured within the hour');
-  assert.equal(resp.now.tempBy.google, 24.3);
+  assert.equal(bySource.now.temp.google, 24.3);
   assert.ok(!resp.advice.find(x => x.kind === 'week')?.why.worst.startsWith('2026-10-02'), 'the week starts at the advice day');
   assert.ok(resp.now.gauge && resp.now.rain1h != null);
   assert.ok(resp.air && resp.air.aqi != null && resp.air.station.km < 5);
@@ -132,27 +132,39 @@ test('a whole cell from the three sources', async () => {
   assert.ok(!log.some(p => p.includes('publicAlerts')));
 });
 
+test('one truth: the answer names no source and carries no second opinion', async () => {
+  const kv = memKv();
+  const resp = await cellForecast({ ...env, RATE_LIMIT_KV: kv }, null, 25.034, 121.565, { fetchFn: upstream(), now: NOW });
+  const text = JSON.stringify(resp);
+  for (const word of ['google', 'cwa', 'moenv', 'By"', 'split', 'weights', 'sources']) assert.ok(!text.toLowerCase().includes(word.toLowerCase()), word);
+  // The breakdown is kept for scoring, in KV only.
+  const entry = JSON.parse(kv.store.get('weather:cell:25.03,121.57'));
+  assert.equal(entry.bySource.hours.length, 48);
+});
+
 test('a failing source: the others answer, the last good copy is used', async () => {
   const e = { ...env, RATE_LIMIT_KV: memKv() };
   const good = await buildCell(e, 25.034, 121.565, { fetchFn: upstream(), now: NOW });
   const ok = upstream();
   const googleDown = async url => (url.includes('googleapis') ? answer(500, 'down') : ok(url));
   const later = await buildCell(e, 25.034, 121.565, { fetchFn: googleDown, now: NOW + 3_600_000, prev: good });
-  assert.equal(later.resp.sources.google, 'stale');
+  assert.equal(later.sources.google, 'stale');
+  assert.equal(later.resp.partial, true);
   assert.equal(later.resp.hours.length, 48);
   const cold = await buildCell({ ...env, RATE_LIMIT_KV: memKv() }, 25.034, 121.565, { fetchFn: googleDown, now: NOW });
-  assert.equal(cold.resp.sources.google, 'error');
+  assert.equal(cold.sources.google, 'error');
   assert.ok(cold.resp.hours.length > 0, 'CWA alone still gives hours');
   assert.ok(cold.resp.days.length >= 5, 'and the week');
-  assert.equal(cold.resp.hours[0].popBy.google, null);
+  assert.equal(cold.bySource.hours[0].pop.google, null);
 });
 
 test('abroad: Google only, with its alerts', async () => {
   const log = [];
   const ok = upstream(log);
   const f = async url => (url.includes('publicAlerts') ? answer(200, { weatherAlerts: [] }) : ok(url));
-  const { resp } = await buildCell({ ...env, RATE_LIMIT_KV: memKv() }, 35.68, 139.76, { fetchFn: f, now: NOW });
-  assert.equal(resp.sources.cwa, 'n/a');
+  const { resp, sources } = await buildCell({ ...env, RATE_LIMIT_KV: memKv() }, 35.68, 139.76, { fetchFn: f, now: NOW });
+  assert.equal(sources.cwa, 'n/a');
+  assert.equal(resp.partial, false);
   assert.equal(resp.place, null);
   assert.equal(resp.air, null);
   assert.ok(!log.some(p => p.includes('datastore') || p.includes('api/v2')));
@@ -180,9 +192,9 @@ test('the cell cache: fresh from KV, old answered at once and refreshed behind',
 
 test('advice: umbrella, sun window, wear, mask, by the thresholds', () => {
   const at = Date.parse('2026-10-03T07:00:00+08:00');
-  const hour = (h, o) => ({ t: Date.parse(`2026-10-03T${String(h).padStart(2, '0')}:00:00+08:00`), temp: 24, feels: 24, uv: 0, pop: 10, popBy: { google: 10, cwa: 10 }, ...o });
+  const hour = (h, o) => ({ t: Date.parse(`2026-10-03T${String(h).padStart(2, '0')}:00:00+08:00`), temp: 24, feels: 24, uv: 0, pop: 10, ...o });
   const hours = Array.from({ length: 24 }, (_, h) => hour(h));
-  hours[15] = hour(15, { pop: 70, popBy: { google: 80, cwa: 55 }, feels: 33 });
+  hours[15] = hour(15, { pop: 70, feels: 33 });
   for (const h of [10, 11, 12, 13]) hours[h] = hour(h, { uv: 9, feels: 31 });
   const advice = advise({ hours, days: [], air: { aqi: 120, pm25: 40, level: '對敏感族群不健康', station: { name: '松山' } } }, at);
   const k = Object.fromEntries(advice.map(a => [a.kind, a]));
@@ -204,6 +216,7 @@ test('CWA warnings for the county', () => {
   const w = parseCwaWarnings(fx('cwa-warn'), '臺中市');
   assert.ok(w.length >= 1);
   assert.match(w[0].title, /特報$/);
+  assert.equal(w[0].source, undefined);
   assert.ok(w[0].from < w[0].to);
 });
 

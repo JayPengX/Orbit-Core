@@ -163,8 +163,15 @@ push and no synced places.
   places `[{ id, name, lat, lon }]` (at most 5), plus `school: { from:
   '07:30', to: '17:00', days: [1..5] }` and `brief: '06:30'`. KV
   `weather:places:<account>`.
-- `GET /weather/skill?qt=` → each source's recent score at the saved places
-  (for the "who's been right" card).
+- `GET /weather/skill?qt=` → each source's recent score at the saved places:
+  a check for the owner and the sessions, never shown in the app.
+
+**One truth (the owner's rule, 2026-10-02):** the backend may use as many
+sources as help, but the person sees one answer: one rain %, one
+temperature, one UV, one set of advice. No source names, no second
+opinions, no "the sources disagree". What each source said is kept only in
+the cell's KV entry (`bySource`) for the scoring (C7), which moves the
+blend's weights quietly.
 
 ### C4. `/weather` response
 
@@ -173,20 +180,23 @@ push and no synced places.
   cell: '25.03,121.56', at: <ms>, tz: 'Asia/Taipei',
   now:   { temp, feels, humidity, uv, wind: { dir, speed, gust }, pressure,
            condition: { code, text, icon }, rain1h, station: { name, km } },
-  hours: [ { t, temp, feels, uv, pop, popBy: { google, cwa }, mm, kind,
+  hours: [ { t, temp, feels, uv, pop, mm, kind,
              thunder, wind: { dir, speed, gust }, pressure, humidity, dew,
-             cloud, vis, condition } … 48 detailed, then to 240 sparse ],
-  days:  [ { date, hi, lo, feelsHi, feelsLo, uvMax, pop, popBy, mm,
+             cloud, vis, condition } … 48 ],
+  days:  [ { date, hi, lo, feelsHi, feelsLo, uvMax, pop, mm,
              day: { condition, pop }, night: { condition, pop },
              sunrise, sunset, moon: { phase, rise, set } } … 10 ],
   air:   { aqi, level, pm25, pm10, o3, main, station: { name, km }, at,
            forecast: { today, tomorrow } },
-  alerts:[ { source: 'cwa'|'google', title, text, from, to, severity } ],
+  alerts:[ { title, text, from, to, severity } ],
   advice:[ { kind: 'umbrella'|'sun'|'wear'|'mask'|…, level, text, why } ],
-  sources: { google: 'ok'|'error'|'stale', cwa: …, moenv: … },
-  weights: { pop: { google: 0.6, cwa: 0.4 }, temp: { … } }
+  partial: false   // true: a source is down or old (the page may say
+                   // "部分資料稍舊", nothing more)
 }
 ```
+
+Kept beside it in KV only (not in the answer): `bySource` (each source's
+hours, days and "now"), `sources` (each one's state).
 
 All text in zh-TW (`languageCode=zh-TW`, `unitsSystem=METRIC`); advice text
 from a small table in the page, so `en` can come later.
@@ -251,8 +261,8 @@ cell costs no extra call to them.
 - **Weights:** `w_s ∝ 1 / (score_s + ε)`, normalised, moved at most 0.1 a
   day, floor 0.15 each (so neither source is ever ignored). Until 3 days of
   scores exist, the starting weights.
-- **Disagreement:** an hour where the two rain probabilities differ by 40
-  points or more is flagged; the page shows both numbers.
+- **Disagreement:** never shown. Where sources differ the blend decides,
+  and the scoring learns which to trust more.
 
 ### C8. Morning brief and rain alert (`push.js`)
 
@@ -260,8 +270,8 @@ cell costs no extra call to them.
   `check: { weather: '<place id>' }` at the brief's time (`push.js`'s
   scheduled list, as the other apps do).
 - New check kind in `push.js`: at `at`, read `/weather` for that place
-  (cache), and write the notice: "今天 15:00 後降雨 70%（Google 80 / 氣象署
-  50），最高 31°，UV 10–14 點很強，空氣普通". Its `kind: 'brief'`, so the
+  (cache), and write the notice: "今天 15:00 後降雨 70%，最高 31°，UV
+  10–14 點很強，空氣普通" (one number each, no sources). Its `kind: 'brief'`, so the
   pass's notice switches can turn it off.
 - Optional rain alert, `kind: 'rain'`: the hourly cron, during school hours,
   if the next 2 hours' blended rain probability crosses 60% where it was under
@@ -301,8 +311,8 @@ Optional later: one plain sentence from Gemini through the existing
 ### E2. Screen, top to bottom
 
 1. **Today card:** place (or "目前位置"), now temperature and feels-like, the
-   advice chips (umbrella, sunscreen with its window, wear, mask), a
-   disagreement note if any, the alerts.
+   advice chips (umbrella, sunscreen with its window, wear, mask), the
+   alerts.
 2. **The curve (the main thing):** next 24 h, swipe to 48: temperature and
    feels-like lines, UV as a coloured band under them (green → violet by
    level), rain probability bars along the bottom with mm on tap; now marked;
@@ -315,7 +325,6 @@ Optional later: one plain sentence from Gemini through the existing
    hour, moon phase.
 6. **Extras (folded):** 累積雨量 today, pressure trend, wind with a compass,
    humidity, dew point, visibility, cloud cover.
-7. **Who's been right:** the skill card (section C7), small, at the bottom.
 
 Look: a Liquid-Glass-like style in CSS (`backdrop-filter: blur()`,
 translucent layers, soft highlights) over a background gradient that follows
@@ -352,8 +361,8 @@ rain alert and the scoring use the saved places.
 3. **PWA, first screen:** sign-in, location flow, today card, the curve,
    days, air. Installed on the phone.
 4. **Morning brief and rain alert** (C8).
-5. **Polish:** advice tuning from real mornings, sun & moon, extras, the
-   skill card, optional Gemini sentence, optional radar picture.
+5. **Polish:** advice tuning from real mornings, sun & moon, extras,
+   optional Gemini sentence, optional radar picture.
 
 ---
 

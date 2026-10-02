@@ -18,8 +18,13 @@
 // committed (weather-stations.js) and only the nearest stations are asked
 // for. Each cell is kept in KV (`weather:cell:<lat>,<lon>`) 15 minutes;
 // older but under 3 hours it's answered at once and refreshed in the
-// background. A source failing doesn't fail the answer: `sources` says
-// which, and its last good copy is used while under 6 hours old.
+// background. A source failing doesn't fail the answer: its last good copy
+// is used while under 6 hours old (`partial` says something is missing).
+//
+// One truth: the app gets one value for each thing (rain %, temperature,
+// UV…), the blend. What each source said is kept only in the cell's KV
+// entry (`bySource`), for the scoring that moves the blend's weights; it is
+// never in the answer.
 
 import { STATIONS } from './weather-stations.js';
 
@@ -187,7 +192,6 @@ export function parseGoogleDay(d) {
 
 export function parseGoogleAlerts(j) {
   return (j?.weatherAlerts || []).map(a => ({
-    source: 'google',
     title: a.alertTitle?.text || a.eventType || '',
     text: a.description || '',
     from: a.startTime ? Date.parse(a.startTime) : null,
@@ -321,7 +325,7 @@ export function parseCwaWarnings(j, county) {
     if (tai(loc.locationName) !== tai(county)) continue;
     for (const h of loc.hazardConditions?.hazards || []) {
       const title = `${h.info?.phenomena || ''}${h.info?.significance || ''}`;
-      out.push({ source: 'cwa', title, text: '', from: twParse(h.validTime?.startTime), to: twParse(h.validTime?.endTime), severity: h.info?.significance || null });
+      out.push({ title, text: '', from: twParse(h.validTime?.startTime), to: twParse(h.validTime?.endTime), severity: h.info?.significance || null });
     }
   }
   return out;
@@ -439,9 +443,9 @@ export function blend(values, weights) {
   return wSum ? sum / wSum : null;
 }
 
-export const SPLIT_POP = 40;
-
-export function assemble({ cell, now, google, cwa, air, warnings, weights = DEFAULT_WEIGHTS, sources }) {
+// → { resp: the one-truth answer, bySource: each source's values (KV only) }.
+export function assemble({ cell, now, google, cwa, air, warnings, weights = DEFAULT_WEIGHTS, partial = false }) {
+  const bySource = { hours: [], days: [], now: null };
   const fc = cwa?.forecast;
   const gHours = google?.hours || [];
   // The timeline: Google's 48 hours, or CWA's own points if Google failed.
@@ -457,12 +461,10 @@ export function assemble({ cell, now, google, cwa, air, warnings, weights = DEFA
       ...g,
       temp: r1(blend(tempBy, weights.temp)),
       feels: r1(blend({ google: g.feels ?? null, cwa: cFeels }, weights.temp)),
-      pop: pop == null ? null : Math.round(pop),
-      popBy,
-      tempBy
+      pop: pop == null ? null : Math.round(pop)
     };
     if (out.humidity == null) out.humidity = cwaAt(fc?.humidity, g.t);
-    if (popBy.google != null && popBy.cwa != null && Math.abs(popBy.google - popBy.cwa) >= SPLIT_POP) out.split = true;
+    bySource.hours.push({ t: g.t, pop: popBy, temp: tempBy });
     return out;
   });
 
@@ -472,35 +474,31 @@ export function assemble({ cell, now, google, cwa, air, warnings, weights = DEFA
     const cPop = c ? Math.max(c.popDay ?? -1, c.popNight ?? -1) : -1;
     const popBy = { google: d.pop, cwa: cPop >= 0 ? cPop : null };
     const pop = blend(popBy, weights.pop);
+    bySource.days.push({ date: d.date, pop: popBy, hi: { google: d.hi, cwa: c?.hi ?? null }, lo: { google: d.lo, cwa: c?.lo ?? null }, uv: { google: d.uvMax, cwa: c?.uv ?? null } });
     return {
       ...d,
       hi: r1(blend({ google: d.hi, cwa: c?.hi ?? null }, weights.temp)),
       lo: r1(blend({ google: d.lo, cwa: c?.lo ?? null }, weights.temp)),
       feelsHi: r1(blend({ google: d.feelsHi, cwa: c?.feelsHi ?? null }, weights.temp)),
       feelsLo: r1(blend({ google: d.feelsLo, cwa: c?.feelsLo ?? null }, weights.temp)),
-      pop: pop == null ? null : Math.round(pop),
-      popBy,
-      hiBy: { google: d.hi, cwa: c?.hi ?? null },
-      uvBy: { google: d.uvMax, cwa: c?.uv ?? null },
-      cwaText: c?.text || null
+      pop: pop == null ? null : Math.round(pop)
     };
   });
   // Google missing: CWA's week alone.
   if (!days.length) {
     for (const c of Object.values(cDays).sort((a, b) => a.date.localeCompare(b.date))) {
       const p = Math.max(c.popDay ?? -1, c.popNight ?? -1);
-      days.push({ date: c.date, hi: c.hi, lo: c.lo, feelsHi: c.feelsHi, feelsLo: c.feelsLo, uvMax: c.uv, pop: p >= 0 ? p : null, popBy: { google: null, cwa: p >= 0 ? p : null }, day: { condition: { code: null, text: c.text || '', icon: null } }, cwaText: c.text });
+      days.push({ date: c.date, hi: c.hi, lo: c.lo, feelsHi: c.feelsHi, feelsLo: c.feelsLo, uvMax: c.uv, pop: p >= 0 ? p : null, day: { condition: { code: null, text: c.text || '', icon: null } } });
     }
   }
 
   const g = google?.current;
   const st = cwa?.station;
   // Measured beats forecast: a station this close and this recent gives
-  // "now" (Google's own guess stays in tempBy).
+  // "now".
   const measured = st && st.temp != null && st.km <= 5 && now - st.at < 90 * MIN ? st.temp : null;
   const now_ = {
     temp: measured ?? g?.temp ?? st?.temp ?? null,
-    tempBy: { google: g?.temp ?? null, station: st?.temp ?? null },
     feels: g?.feels ?? null,
     humidity: g?.humidity ?? st?.humidity ?? null,
     uv: g?.uv ?? cwa?.uvStation?.uv ?? null,
@@ -517,6 +515,7 @@ export function assemble({ cell, now, google, cwa, air, warnings, weights = DEFA
     gauge: cwa?.gauge ? { name: cwa.gauge.name, km: cwa.gauge.km, at: cwa.gauge.at } : null
   };
 
+  bySource.now = { temp: { google: g?.temp ?? null, station: st?.temp ?? null } };
   const resp = {
     cell,
     at: now,
@@ -527,11 +526,10 @@ export function assemble({ cell, now, google, cwa, air, warnings, weights = DEFA
     days,
     air: air || null,
     alerts: [...(warnings || []), ...(google?.alerts || [])].filter(a => !a.to || a.to > now),
-    sources,
-    weights
+    partial
   };
   resp.advice = advise(resp, now);
-  return resp;
+  return { resp, bySource };
 }
 
 // ---- Advice (plan section D; thresholds in one table) ---------------------------
@@ -564,8 +562,8 @@ export function advise(resp, now, w = ADVICE.window) {
   const out = [];
   if (hrs.length) {
     const wet = hrs.reduce((a, h) => ((h.pop ?? -1) > (a.pop ?? -1) ? h : a), hrs[0]);
-    if (wet.pop >= ADVICE.umbrella) out.push({ kind: 'umbrella', level: 'yes', text: `帶傘：${twClock(wet.t)} 降雨機率 ${wet.pop}%`, why: { pop: wet.pop, at: wet.t, by: wet.popBy } });
-    else if (wet.pop >= ADVICE.umbrellaMaybe) out.push({ kind: 'umbrella', level: 'maybe', text: `可帶摺疊傘：${twClock(wet.t)} 降雨機率 ${wet.pop}%`, why: { pop: wet.pop, at: wet.t, by: wet.popBy } });
+    if (wet.pop >= ADVICE.umbrella) out.push({ kind: 'umbrella', level: 'yes', text: `帶傘：${twClock(wet.t)} 降雨機率 ${wet.pop}%`, why: { pop: wet.pop, at: wet.t } });
+    else if (wet.pop >= ADVICE.umbrellaMaybe) out.push({ kind: 'umbrella', level: 'maybe', text: `可帶摺疊傘：${twClock(wet.t)} 降雨機率 ${wet.pop}%`, why: { pop: wet.pop, at: wet.t } });
 
     const sunny = hrs.filter(h => h.uv != null && h.uv >= ADVICE.sunUv);
     if (sunny.length) {
@@ -632,15 +630,18 @@ export async function buildCell(env, lat, lon, { fetchFn = fetch, now = Date.now
     cwa: cwa.state,
     moenv: aqi ? aqi.state : env.MOENV_KEY ? 'n/a' : 'off'
   };
-  const resp = assemble({ cell, now, google: google.v, cwa: cwa.v, air, warnings: warn?.data && county ? parseCwaWarnings(warn.data, county) : [], weights: weights || DEFAULT_WEIGHTS, sources });
-  return { at: now, resp, parts: { google: google.state === 'ok' || google.state === 'stale' ? { at: google.at, v: google.v } : null, cwa: cwa.state === 'ok' || cwa.state === 'stale' ? { at: cwa.at, v: cwa.v } : null } };
+  const partial = Object.values(sources).some(v => v === 'error' || v === 'stale');
+  const { resp, bySource } = assemble({ cell, now, google: google.v, cwa: cwa.v, air, warnings: warn?.data && county ? parseCwaWarnings(warn.data, county) : [], weights: weights || DEFAULT_WEIGHTS, partial });
+  return { at: now, resp, bySource, sources, parts: { google: google.state === 'ok' || google.state === 'stale' ? { at: google.at, v: google.v } : null, cwa: cwa.state === 'ok' || cwa.state === 'stale' ? { at: cwa.at, v: cwa.v } : null } };
 }
 
 // The cell from KV, fresh or refreshed (in the background when it's merely
 // old). `freshMs` longer for the open status sample.
 export async function cellForecast(env, ctx, lat, lon, { fetchFn = fetch, now = Date.now(), freshMs = FRESH_MS } = {}) {
   const key = `weather:cell:${cellOf(lat, lon)}`;
-  const hit = await kvJson(env, key);
+  // (An entry from before one truth, without `bySource`, is not used.)
+  const found = await kvJson(env, key);
+  const hit = found?.bySource ? found : null;
   const refresh = async () => {
     const entry = await buildCell(env, lat, lon, { fetchFn, now, prev: hit });
     await kvPut(env, key, entry, KEEP_MS / 1000);

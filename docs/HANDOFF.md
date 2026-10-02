@@ -27,6 +27,10 @@ Planned in `docs/WEATHER-PLAN.md`; the PWA's repo is `JayPengX/Orbit-Weather`
   0.6 Google / 0.4 CWA (`weather:weights` in KV overrides, for phase 2);
   "now" is the station's measurement when it's within 5 km and 90 minutes.
   Advice (plan D) computed here, thresholds in `ADVICE`.
+- **One truth** (the owner's rule): the answer has one value for each thing
+  and names no source; each source's values stay in the cell's KV entry
+  (`bySource`) for the scoring. A test fails if a source's name or a
+  per-source field reaches the answer.
 - The Worker is on the Free plan (10 ms CPU): CWA's national station lists
   (~1 MB each) are never parsed live. `weather-stations.js` is the committed
   table (1,367 stations), rebuilt by `node tools/weather-stations.mjs` from
