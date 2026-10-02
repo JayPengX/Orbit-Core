@@ -44,6 +44,8 @@ export function upstream(log = [], { shift = 0, failPages = [] } = {}) {
     }
     if (u.host === 'data.moenv.gov.tw') {
       if (u.pathname.endsWith('aqx_p_432')) return answer(200, fx('moenv-aqi'));
+      // The history saved is 松山's (the site nearest Taipei 101).
+      if (u.pathname.endsWith('aqx_p_488')) return answer(200, (u.searchParams.get('filters') || '').endsWith(',松山') ? fx('moenv-aqi-hist') : []);
       if (u.pathname.endsWith('aqf_p_01')) return answer(200, fx('moenv-aqf'));
     }
     return answer(404, 'no fixture for ' + url);

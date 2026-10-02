@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  airForecast, parseGoogleAir, googleAirBody,
+  airForecast, parseGoogleAir, googleAirBody, parseAirHistory,
   weatherStatus, handleWeather, scrub, cellOf, nearestStation, townIds, airArea, parseCwaTown, cwaAt, parseGoogleDay, parseGoogleHour,
   blend, buildCell, GOOGLE_DAILY_CALLS, parseVillage, whereIs, addAirReading, briefText, rainPhrase, weatherCheck, noteRecent, cellForecast, advise, adviceWindow, parseCwaWarnings, aqiLevel, uvLevel, num, DEFAULT_WEIGHTS
 } from '../weather.js';
@@ -186,8 +186,8 @@ test('advice: umbrella, sun window, wear, mask, by the thresholds', () => {
   const advice = advise({ hours, days: [], air: { aqi: 120, pm25: 40, level: '對敏感族群不健康', station: { name: '松山' } } }, at);
   const k = Object.fromEntries(advice.map(a => [a.kind, a]));
   assert.equal(k.umbrella.level, 'yes');
-  assert.match(k.umbrella.text, /15:00 降雨機率 70%/);
-  assert.match(k.sun.text, /10:00–14:00 UV 9（過量）/);
+  assert.equal(k.umbrella.text, '帶傘：15時 70% 會下雨');
+  assert.equal(k.sun.text, '防曬：10–14時 UV 9 過量');
   assert.equal(k.wear.level, 'sleeves');
   assert.equal(k.wear.why.layers, true);
   assert.ok(k.mask);
@@ -366,8 +366,14 @@ test('AQI: each site\'s last 48 hours, and the nearest one\'s in the answer', as
   const kv = memKv();
   kv.store.set('weather:aqi:hist', JSON.stringify(hist));
   const { resp } = await buildCell({ ...env, RATE_LIMIT_KV: kv }, 25.034, 121.565, { fetchFn: upstream(), now: NOW + 3_600_000 });
-  assert.equal(resp.air.history.length, 2);
-  assert.deepEqual(Object.keys(resp.air.history[0]), ['t', 'aqi', 'pm25']);
+  // MOENV's own history (48 hours at once), the cron's newer reading after it.
+  const h = resp.air.history;
+  assert.ok(h.length >= 45, `${h.length} hours`);
+  assert.ok(h.every((x, i) => !i || h[i - 1].t < x.t), 'oldest first, no repeats');
+  assert.deepEqual(h[h.length - 1], { t: at + 3_600_000, aqi: 50, pm25: 7 });
+  assert.equal(h.find(x => x.t === Date.parse('2026-10-01T18:00:00+08:00')).aqi, 87);
+  assert.deepEqual(Object.keys(h[0]), ['t', 'aqi', 'pm25']);
+  assert.deepEqual(parseAirHistory([{ datacreationdate: '2026-10-02 21:00', aqi: '36', 'pm2.5': '12' }, { datacreationdate: '', aqi: '1' }]), [[Date.parse('2026-10-02T21:00:00+08:00'), 36, 12]]);
 });
 
 test('air: Google hours pulled toward the station, days blended with MOENV, Google alone past it', () => {
@@ -438,4 +444,29 @@ test('far hours: a failing page is tried again, a partial set kept and asked aga
   const once = async (url, init) => (url.includes('pageToken=p4') && !n++ ? { ok: false, status: 503, text: async () => 'x' } : flaky(url, init));
   const ok = await buildCell({ ...env, RATE_LIMIT_KV: memKv() }, 25.034, 121.565, { fetchFn: once, now: NOW });
   assert.equal(ok.resp.hours.length, 240);
+});
+
+test('advice for daily life: commute, the best hours outside, laundry, the window, sleep, the car', () => {
+  const at = Date.parse('2026-10-03T06:30:00+08:00');
+  const hour = (d, h, o) => ({ t: Date.parse(`${d}T${String(h).padStart(2, '0')}:00:00+08:00`), temp: 24, feels: 24, uv: 2, pop: 10, humidity: 70, ...o });
+  const hours = [...Array.from({ length: 24 }, (_, h) => hour('2026-10-03', h)), ...Array.from({ length: 24 }, (_, h) => hour('2026-10-04', h, { feels: 29 }))];
+  hours[18] = hour('2026-10-03', 18, { pop: 65 });
+  for (const h of [10, 11, 12, 13, 14]) hours[h] = hour('2026-10-03', h, { feels: 33, uv: 9 });
+  const day = (date, o) => ({ date, hi: 28, lo: 23, pop: 10, uvMax: 5, day: { condition: { code: 'PARTLY_CLOUDY' } }, ...o });
+  const days = [day('2026-10-03', { pop: 65 }), day('2026-10-04'), day('2026-10-05'), day('2026-10-06'), day('2026-10-07')];
+  const k = Object.fromEntries(advise({ hours, days, air: { aqi: 30, level: '良好' } }, at).map(a => [a.kind, a]));
+  assert.equal(k.commute.text, '通勤：早上乾爽，傍晚 65% 會下雨');
+  assert.equal(k.commute.level, 'yes');
+  assert.match(k.outdoor.text, /^戶外：(6|7|8|9|15|16)–\d+時最好（24°，雨 10%）$/);
+  assert.ok(!/1[0-4]–/.test(k.outdoor.text), 'not in the hot hours');
+  assert.equal(k.laundry.text, '曬衣：明天最適合');
+  assert.equal(k.laundry.week.days[0].mark, 'bad');
+  assert.equal(k.window.text, '開窗：空氣好，適合通風');
+  assert.equal(k.sleep.text, '睡覺：今晚 28°，悶熱，開冷氣', 'tonight: 23–5 時, into the 4th');
+  assert.equal(k.carwash.text, '洗車：3 天內不太會下雨');
+  // Bad air: close the window; rain ahead: no car wash.
+  const k2 = Object.fromEntries(advise({ hours, days: days.map(d => ({ ...d, pop: 60 })), air: { aqi: 130, level: '對敏感族群不健康' } }, at).map(a => [a.kind, a]));
+  assert.equal(k2.window.text, '開窗：空氣不佳，先關窗');
+  assert.ok(!k2.carwash);
+  assert.equal(k2.laundry.text, '曬衣：這週都不太適合，用烘乾');
 });
