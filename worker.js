@@ -10,6 +10,7 @@
 //   POST  /nl-edit               Orbit Class's natural-language edits
 //   GET   /kambi                 Kambi's live scores for Quadra Play (kambi.js)
 //   GET/POST /push/…             notices while an app is closed (push.js)
+//   GET   /weather/…             Orbit Weather's blended forecast (weather.js)
 //
 // Every route but /eco's sign-in needs a Quadra Pass session (`qt=`). The
 // Quadra Pass is the only way anything is saved.
@@ -23,6 +24,7 @@ import { handleEcoRequest } from './eco.js';
 import { readToken, tokenSecret, sessionLimited } from './quadra-token.js';
 import { handleKambiRequest, refreshKambiWatch, fetchKambiLive } from './kambi.js';
 import { handlePush, sendDue } from './push.js';
+import { handleWeather } from './weather.js';
 
 const ALLOWED_ORIGINS = ['https://jaypengx.github.io'];
 
@@ -1328,6 +1330,9 @@ export default {
       if (session && sessionLimited(`p:${session.s}`, 30)) return errorJson('RATE_LIMITED', 429, headers, request);
       return handlePush(request, env, headers, session, path);
     }
+    // Orbit Weather (weather.js). /weather/status needs no session: it only
+    // says whether each key works, from a 10-minute cache.
+    if (path === '/weather' || path.startsWith('/weather/')) return handleWeather(request, env, headers, path);
     return errorJson('NOT_FOUND', 404, headers, request);
   },
 

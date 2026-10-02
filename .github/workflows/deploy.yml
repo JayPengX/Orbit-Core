@@ -15,6 +15,7 @@ on:
       - 'quadra-token.js'
       - 'push.js'
       - 'eco-admin.js'
+      - 'weather.js'
   workflow_dispatch:
 
 jobs:
