@@ -6,8 +6,8 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
 edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
 `npx eslint .`).
 
-Not started: a weather app that blends Google's and CWA's forecasts (native
-iPhone app + a `/weather` route here), planned in `docs/WEATHER-PLAN.md`.
+Not started: a weather PWA that blends Google's and CWA's forecasts (plus
+a `/weather` route here), planned in `docs/WEATHER-PLAN.md`.
 
 ## Play: Kambi first, real markets, players, new leagues, live (branch `claude/gallant-goodall-gtyxjg`, pushed to `main`)
 
