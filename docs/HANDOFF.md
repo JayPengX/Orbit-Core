@@ -71,6 +71,10 @@ Planned in `docs/WEATHER-PLAN.md`; the PWA's repo is `JayPengX/Orbit-Weather`
   API" for it in Google Cloud (and adds it to the key's API restrictions);
   until then the Worker asks once a day a cell and uses MOENV alone
   (`/weather/status?sample=google-air` shows the answer).
+- The app's page is a plain column of blocks (`.wx-page > *`), not grid or
+  flex: iPhone Safari squeezed the top card (a clipping item in a scrolling
+  grid) to a strip. Settings (⚙︎) order the cards and hide some; the pass
+  payload carries `cards` and `hidden` (the newer copy wins).
 - Advice for the week: each kind (`umbrella`, `sun`, `wear`, `heat`,
   `mask`, `week`) has `week: { text, days: [{ date, mark, v }] }` over the
   advice day and the 6 after; a kind today doesn't need still comes (level
