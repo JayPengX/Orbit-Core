@@ -1,102 +1,111 @@
-# Plan: a weather app that blends several forecasts (not started)
+# Plan: a weather PWA that blends several forecasts (not started)
 
 Written 2026-10-02 after a day the current weather app (CWA 中央氣象署 data
 only) got wrong, while Google's forecast looked closer. Nothing here is built
-yet; this is the plan to come back to once the tools and accounts are ready.
+yet; this is the plan to come back to once the keys are ready.
 
-## The idea
+**Decided:** a PWA, not a native iPhone app. Native means Xcode, a 7-day
+re-sign on a free Apple ID (or US$99 a year, or SideStore's workarounds) for
+widgets alone, which isn't worth it for how the owner uses weather: one look
+before school each day, sometimes the week ahead, mainly for rain and the
+temperature / UV curve (when to avoid sunburn). Everything clever lives in
+the proxy, so a small native widget can still be added later if ever wanted.
 
-Don't swap one source for another: every source is wrong on some days. The
-proxy reads several, scores each against what really happened near the
-owner's places, and the app shows a blend that leans on whoever has been right
-lately, and says so when the sources disagree ("Google: rain at 15:00, CWA:
-dry"). That disagreement is the warning that was missing today.
+## What the app shows
+
+| # | What | Main source | Second source / check |
+|---|------|-------------|------------------------|
+| 1 | 紫外線 UV index, hourly, and today's peak window | Google Weather (hourly `uvIndex`) | CWA's measured UV at the nearest station |
+| 2 | 溫度 / 體感溫度, hourly curve, daily high / low | Google (temperature, feels-like, heat index) | CWA township forecast (溫度, 體感溫度) |
+| 3 | 空氣品質 AQI, PM2.5, the main pollutant | 環境部 MOENV open data (real stations, free) | Google Air Quality API (only if MOENV's nearest station is far) |
+| 4 | Forecast in as much detail as possible, rain probability above all | Google: hourly up to 240 h (rain probability, amount, type, thunderstorm probability), 10 days | CWA township forecast (3-hourly 降雨機率), CWA warnings |
+| 5 | Fun: sunrise, sunset, day length, golden hour, moon phase | Google's daily forecast, or computed in the page (no call at all) | — |
+| 6 | Extras, folded away: 累積雨量, 氣壓, 風向 / 風速 / gusts, humidity, dew point, visibility, cloud cover | Google hourly | CWA stations' measured rain, wind, pressure |
+
+Not included: satellite / radar. Too much work for too little precision. If
+ever wanted, the cheap version is CWA's latest radar composite image shown as
+a picture.
 
 ## Proxy side (Shared-Proxy, a new `weather.js` routed by `worker.js` like `push.js`)
 
-- `GET /weather?lat=&lon=`: reads every source at once, returns one shape
-  (now, hourly, daily, alerts, plus each source's own numbers):
-  - **Google Weather API** (Google Maps Platform): current conditions, hourly
-    up to 240 h, daily up to 10 days, public alerts. Google's own models, the
-    data behind Google Search's weather. Needs an API key and a Google Cloud
-    billing account; there is a monthly free allowance, and one person's use
-    behind the cache should stay inside it (check current pricing). The key
-    is a Worker secret (`GOOGLE_WEATHER_KEY`), never in the app.
-  - **CWA open data** (opendata.cwa.gov.tw): township forecasts, the nearest
-    station's real readings, warnings. Still the authority for typhoons and
-    heavy-rain warnings in Taiwan. Needs a CWA authorization key (secret).
-  - **Optional:** Open-Meteo (free; ECMWF, JMA and other models), and Apple
-    WeatherKit (free up to a large monthly quota with a developer membership;
-    read by the app itself or through its REST API).
+- `GET /weather?lat=&lon=`: reads every source at once and returns one shape:
+  `now`, `hours[]`, `days[]`, `air`, `sun`, `alerts[]`, plus each source's
+  own numbers for the rain probability and temperature (so the page can show
+  disagreement).
 - **Cache by grid cell:** coordinates rounded to about 1 km, kept in KV about
-  10 minutes, so the app, widgets and watch never multiply calls, and the
-  proxy never stores an exact location.
+  10–15 minutes (MOENV and CWA stations update hourly). The proxy never
+  stores an exact location.
 - **Skill scoring (the point of the whole thing):** a cron saves each
   source's forecast for the owner's places, then checks it against the
-  nearest CWA station's readings. Scored per source and per kind: rain yes/no
-  and its timing, temperature, wind. The blend weighs sources by recent
-  score.
-- **Rain alerts:** a cron looks at the next 2 hours for the owner's places and
-  pushes when rain is coming. Web Push already lives in `push.js`; a native
-  app needs APNs instead (an ES256-signed JWT from a `.p8` key, WebCrypto
-  only, same approach as the VAPID code).
+  nearest CWA station's readings: rain yes / no and its timing, temperature.
+  The blend weighs sources by their recent score, and the page can say
+  "Google has been right about rain here 8 of the last 10 days".
+- **Disagreement is shown, not hidden:** "Google: rain from 15:00 (70%),
+  CWA: 30%". That's the warning that was missing that day.
+- **Morning brief (Web Push, already in `push.js`):** at a set time before
+  school, one notice: rain chance and when, the high, the UV peak window, AQI
+  if bad. A new check kind in `push.js` (e.g. `check: { weather: <place> }`)
+  builds the text when it's due. Optional rain alert if the next 2 hours turn
+  wet.
 
-## Phone side (native iPhone app, SwiftUI, built in Xcode on the Mac at home)
+## Recommendations (rules first, AI optional)
 
-- **App:** iOS 26 Liquid Glass panels over a background that follows the
-  weather; now, hourly, 10 days; a "sources agree / disagree" mark.
-- **Widgets:** home screen and lock screen (WidgetKit). Widgets get a limited
-  number of refreshes a day, so the proxy does the work and a widget only
-  reads the result.
-- **Live Activity:** "rain in 25 min" on the Dynamic Island and lock screen.
-- **Later:** Apple Watch complication, a Control Center control, App Intents
-  / Siri ("will it rain on my way home?").
-- Its own new repo (not a Quadra PWA, no kit). Claude in a cloud session can
-  write the Swift but can't run Xcode (Linux); Claude Code on the Mac can
-  build and run the simulator itself.
+Simple rules on the blended data, each with the reason shown:
+- **Umbrella:** rain probability over a threshold during the hours the owner
+  is out (school hours by default).
+- **Sunscreen / hat:** UV 3 or more, with the window ("UV high 10:00–14:00").
+- **What to wear:** by feels-like temperature, and the swing between morning
+  and afternoon.
+- **Mask:** AQI or PM2.5 over a threshold.
+- **Week view:** best and worst days (dry, mild, low UV), laundry day.
+- Optional later: one plain-language summary sentence written by Gemini
+  through the existing `/gemini` route, from the numbers, never instead of
+  them.
+
+## The PWA
+
+- A new repo on GitHub Pages, deployed on push to `main` like the Quadra apps.
+- One screen first: today's summary card (the recommendations), the
+  temperature + feels-like + UV curve with rain probability bars underneath,
+  then the next days, then the folded extras. Sun and moon as a small arc.
+- Liquid-Glass-like look in CSS (blur, translucency) over a background that
+  follows the weather and time of day.
+- Location while open, plus saved places (home, school) for the cron and the
+  morning brief; works offline from the last forecast.
 
 ## Phases
 
-1. **Prove it (1–2 days, no app):** `/weather` with Google + CWA side by side,
-   and the skill logging. Let it run 1–2 weeks at the real places (home,
-   work, the commute) and read who was right, and for what kind of weather.
-   All doable from a cloud session.
-2. **First app:** main screen, home and lock screen widgets, Liquid Glass.
-3. **Rain alerts:** next-2-hours check, APNs push, Live Activity.
-4. **Extras:** Watch, Control Center, Siri.
+1. **Proxy + scoring:** `/weather` with Google, CWA and MOENV, the cache, and
+   the skill logging. Let the scoring run 1–2 weeks at the real places.
+2. **PWA, first screen:** summary card, the curve chart, days, extras.
+3. **Morning brief and rain alert** through `push.js`.
+4. **Polish:** recommendation tuning, the sun / moon toy, optional Gemini
+   summary, optional radar image.
 
 ## To get ready before starting
 
 - [ ] Google Cloud: the project behind the existing paid Gemini key already
       has billing, so enable "Weather API" there and make a second key
-      restricted to the Weather API only → Worker secret `GOOGLE_WEATHER_KEY`.
-      Set a daily quota cap (e.g. 500 requests) and a budget alert.
-      Cost (Google's pricing page, checked 2026-10-02): one "Weather Usage"
-      SKU, 10,000 calls a month free, then US$0.15 per 1,000. One place
-      refreshed sensibly (now every 10 min, hourly every 30 min, daily every
-      3 h) is about 6,000 calls a month; two places about 12,000, about
-      US$0.30 a month.
-- [ ] CWA open data authorization key → Worker secret `CWA_KEY`.
-- [ ] Apple Developer Program (US$99 a year) is optional. Start free: a
-      free Apple ID in Xcode installs the app on the owner's own iPhone, and
-      the app, widgets and Liquid Glass all work; it just stops opening after
-      7 days until it's installed again (Xcode, or AltStore / SideStore
-      re-signing over Wi-Fi from the Mac). Free has no APNs, WeatherKit or
-      TestFlight, so rain alerts go through the Web Push already in
-      `push.js` (a small home-screen page subscribed to it), and widgets
-      read the proxy directly. Pay only if the weekly reinstall gets old or
-      native alerts / Live Activities pushed from the server are wanted.
-- [ ] Xcode (with the iOS 26 SDK) on the Mac; Claude Code there too if the
-      Mac should build and test on its own.
-- [ ] For phase 3: an APNs auth key (`.p8`), its key id and team id → Worker
-      secrets.
+      restricted to it → Worker secret `GOOGLE_WEATHER_KEY`. Set a daily
+      quota cap (e.g. 500 requests) and a budget alert. Cost (Google's
+      pricing page, checked 2026-10-02): "Weather Usage" 10,000 calls a month
+      free, then US$0.15 per 1,000; with the cache and one person this stays
+      free or close to it. (Air Quality API, only if used: 10,000 free, then
+      US$4 per 1,000, so MOENV first.)
+- [ ] CWA open data authorization key (opendata.cwa.gov.tw, free) → Worker
+      secret `CWA_KEY`.
+- [ ] MOENV open data API key (data.moenv.gov.tw, free) → Worker secret
+      `MOENV_KEY`.
+- [ ] The saved places (rough areas are enough) and the time of the morning
+      brief.
 
 ## Open questions
 
-1. What went wrong that day: rain arrived when "dry" was forecast, the
-   temperature, or the timing? That decides whether the first work is the
-   next 0–2 hours (nowcast) or the daily forecast.
+1. What went wrong that day: rain when "dry" was forecast, the temperature,
+   or the timing? Decides what the scoring weighs first.
 2. Where is the current weather app's code? Its CWA parsing could be reused.
-3. Which places should the scoring follow (rough areas are enough)?
-4. Note: the Worker is pinned near `gcp:us-east4` (for Gemini), so CWA calls
-   travel from Virginia; fine behind the cache, but worth a check in phase 1.
+3. Part of the Quadra family (shared kit, Quadra pass sign-in) or standalone?
+4. A name for it.
+5. Note: the Worker is pinned near `gcp:us-east4` (for Gemini), so CWA and
+   MOENV calls travel from Virginia; fine behind the cache, but worth a check
+   in phase 1.
