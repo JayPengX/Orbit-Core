@@ -907,21 +907,21 @@ export function lifeAdvice(out, resp, now, win) {
     const b = day[best + 1] && day[best + 1].t - a.t === HOUR ? day[best + 1] : a;
     const feels = Math.round(((a.feels ?? a.temp) + (b.feels ?? b.temp)) / 2);
     const good = cost(a) < 60;
-    out.push({ kind: 'outdoor', level: good ? 'good' : 'none', text: `戶外：${good ? '' : '都不太理想，'}${hourIn(a.t, tz)}–${hourIn(b.t, tz) + 1}時最好（${feels}°，雨 ${Math.max(a.pop, b.pop)}%）`, why: { from: a.t, to: b.t + HOUR } });
+    out.push({ kind: 'outdoor', level: good ? 'good' : 'none', text: `戶外：${hourIn(a.t, tz)}–${hourIn(b.t, tz) + 1}時${good ? '最好' : '還可以'}，${feels}°`, why: { from: a.t, to: b.t + HOUR } });
   }
   // Laundry: the first dry day (rain under 20%, not overcast) this week.
   const week = (resp.days || []).filter(d => d.date >= win.date).slice(0, 7);
   const dry = d => d.pop != null && d.pop < 20 && !/^CLOUDY|RAIN|SHOWER|THUNDER|DRIZZLE/.test(d.day?.condition?.code || '');
   if (week.length) {
     const first = week.find(dry);
-    out.push({ kind: 'laundry', level: first?.date === win.date ? 'good' : first ? 'later' : 'none', text: `曬衣：${first ? `${dayWord(first.date, now)}${first.date === win.date ? '適合' : '最適合'}` : '這週都不太適合，用烘乾'}`, why: { date: first?.date || null } });
+    out.push({ kind: 'laundry', level: first?.date === win.date ? 'good' : first ? 'later' : 'none', text: `曬衣：${first ? `${dayWord(first.date, now)}${first.date === win.date ? '可以' : '最好'}` : '這週用烘乾'}`, why: { date: first?.date || null } });
   }
   // The window: air good and no rain now, or air bad.
   const air = resp.air;
   const h0 = resp.hours.find(h => h.t + HOUR > now);
   if (air?.aqi != null) {
-    if (air.aqi <= 50 && (h0?.pop ?? 0) < 30) out.push({ kind: 'window', level: 'good', text: '開窗：空氣好，適合通風', why: { aqi: air.aqi } });
-    else if (air.aqi > ADVICE.mask.aqi) out.push({ kind: 'window', level: 'bad', text: '開窗：空氣不佳，先關窗', why: { aqi: air.aqi } });
+    if (air.aqi <= 50 && (h0?.pop ?? 0) < 30) out.push({ kind: 'window', level: 'good', text: '開窗：空氣好，可通風', why: { aqi: air.aqi } });
+    else if (air.aqi > ADVICE.mask.aqi) out.push({ kind: 'window', level: 'bad', text: '開窗：空氣差，關窗', why: { aqi: air.aqi } });
   }
   // Sleep: tonight 23–5 (or the night now, before 6).
   const night = twHour(now) < 6 ? twDate(now - 24 * HOUR) : twDate(now);
@@ -930,12 +930,12 @@ export function lifeAdvice(out, resp, now, win) {
   if (nf.length) {
     const v = Math.round(nf.reduce((a, b) => a + b, 0) / nf.length);
     const humid = sleepHours.some(h => h.humidity >= 90);
-    const how = v >= 28 ? '悶熱，開冷氣' : v >= 25 ? (humid ? '偏悶，開除濕或冷氣' : '開電扇') : v >= 20 ? '舒適' : v >= 16 ? '偏涼，蓋薄被' : '冷，蓋厚被';
+    const how = v >= 28 ? '開冷氣' : v >= 25 ? (humid ? '開除濕' : '開電扇') : v >= 20 ? '舒適' : v >= 16 ? '蓋薄被' : '蓋厚被';
     out.push({ kind: 'sleep', level: v >= 28 ? 'hot' : v < 16 ? 'cold' : 'none', text: `睡覺：今晚 ${v}°，${how}`, why: { feels: v } });
   }
   // Washing the car: the next 3 days dry.
   const next3 = (resp.days || []).filter(d => d.date > twDate(now)).slice(0, 3);
-  if (next3.length === 3 && next3.every(d => d.pop != null && d.pop < 30) && (h0?.pop ?? 0) < 30) out.push({ kind: 'carwash', level: 'good', text: '洗車：3 天內不太會下雨', why: {} });
+  if (next3.length === 3 && next3.every(d => d.pop != null && d.pop < 30) && (h0?.pop ?? 0) < 30) out.push({ kind: 'carwash', level: 'good', text: '洗車：3 天不下雨', why: {} });
 }
 
 const wd = date => `週${'日一二三四五六'[new Date(date + 'T12:00:00Z').getUTCDay()]}`;

@@ -457,16 +457,16 @@ test('advice for daily life: commute, the best hours outside, laundry, the windo
   const k = Object.fromEntries(advise({ hours, days, air: { aqi: 30, level: '良好' } }, at).map(a => [a.kind, a]));
   assert.equal(k.commute.text, '通勤：早上乾爽，傍晚 65% 會下雨');
   assert.equal(k.commute.level, 'yes');
-  assert.match(k.outdoor.text, /^戶外：(6|7|8|9|15|16)–\d+時最好（24°，雨 10%）$/);
+  assert.match(k.outdoor.text, /^戶外：(6|7|8|9|15|16)–\d+時最好，24°$/);
   assert.ok(!/1[0-4]–/.test(k.outdoor.text), 'not in the hot hours');
-  assert.equal(k.laundry.text, '曬衣：明天最適合');
+  assert.equal(k.laundry.text, '曬衣：明天最好');
   assert.equal(k.laundry.week.days[0].mark, 'bad');
-  assert.equal(k.window.text, '開窗：空氣好，適合通風');
-  assert.equal(k.sleep.text, '睡覺：今晚 28°，悶熱，開冷氣', 'tonight: 23–5 時, into the 4th');
-  assert.equal(k.carwash.text, '洗車：3 天內不太會下雨');
+  assert.equal(k.window.text, '開窗：空氣好，可通風');
+  assert.equal(k.sleep.text, '睡覺：今晚 28°，開冷氣', 'tonight: 23–5 時, into the 4th');
+  assert.equal(k.carwash.text, '洗車：3 天不下雨');
   // Bad air: close the window; rain ahead: no car wash.
   const k2 = Object.fromEntries(advise({ hours, days: days.map(d => ({ ...d, pop: 60 })), air: { aqi: 130, level: '對敏感族群不健康' } }, at).map(a => [a.kind, a]));
-  assert.equal(k2.window.text, '開窗：空氣不佳，先關窗');
+  assert.equal(k2.window.text, '開窗：空氣差，關窗');
   assert.ok(!k2.carwash);
-  assert.equal(k2.laundry.text, '曬衣：這週都不太適合，用烘乾');
+  assert.equal(k2.laundry.text, '曬衣：這週用烘乾');
 });

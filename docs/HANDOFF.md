@@ -75,6 +75,14 @@ Planned in `docs/WEATHER-PLAN.md`; the PWA's repo is `JayPengX/Orbit-Weather`
   flex: iPhone Safari squeezed the top card (a clipping item in a scrolling
   grid) to a strip. Settings (⚙︎) order the cards and hide some; the pass
   payload carries `cards` and `hidden` (the newer copy wins).
+- Air history at once: the nearest site's last 48 hours from MOENV's
+  `aqx_p_488` (`filters=sitename,EQ,<name>&sort=datacreationdate desc`,
+  KV `weather:aqi:site:<name>`, 50 minutes), merged with the cron's.
+- Advice for daily life (`lifeAdvice`): `commute` (7–9 / 17–19 rain),
+  `outdoor` (the best 2 hours, 6–19), `laundry` (first dry day; week marks),
+  `window` (AQI ≤ 50 and dry / AQI > 100), `sleep` (tonight 23–5 feels),
+  `carwash` (3 dry days). The app shows the day's tiles and one week table
+  (rain, laundry, UV, wear, heat, air × 7 days, ★ the best day).
 - Advice for the week: each kind (`umbrella`, `sun`, `wear`, `heat`,
   `mask`, `week`) has `week: { text, days: [{ date, mark, v }] }` over the
   advice day and the 6 after; a kind today doesn't need still comes (level
