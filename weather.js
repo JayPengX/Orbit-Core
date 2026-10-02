@@ -767,7 +767,7 @@ export function briefText(resp, now) {
   if (rain) parts.push(rain);
   const d = resp.days?.find(x => x.date === twDate(now)) || resp.days?.[0];
   if (d?.hi != null) parts.push(`最高 ${Math.round(d.hi)}°${d.lo != null ? ` / 最低 ${Math.round(d.lo)}°` : ''}`);
-  const sun = resp.advice?.find(a => a.kind === 'sun');
+  const sun = resp.advice?.find(a => a.kind === 'sun' && a.level !== 'none');
   if (sun) parts.push(`UV ${hourIn(sun.why.from, tz)}–${hourIn(sun.why.to, tz)} 點${sun.level}`);
   if (resp.air?.level) parts.push(`空氣${resp.air.level}`);
   const wear = resp.advice?.find(a => a.kind === 'wear');
@@ -856,8 +856,89 @@ export function advise(resp, now, w = ADVICE.window) {
     const score = d => d.pop + (d.uvMax ?? 0) * 3 + Math.abs(d.hi - 25) * 2;
     const sorted = [...week].sort((a, b) => score(a) - score(b));
     const laundry = week.find(d => d.pop < 20 && /CLEAR|SUNNY|PARTLY/.test(d.day?.condition?.code || ''));
-    const md = date => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}（週${'日一二三四五六'[new Date(date + 'T12:00:00Z').getUTCDay()]}）`;
+    const md = date => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}（${wd(date)}）`;
     out.push({ kind: 'week', level: 'info', text: `本週最佳：${md(sorted[0].date)}；最差：${md(sorted[sorted.length - 1].date)}${laundry ? `；適合曬衣：${md(laundry.date)}` : ''}`, why: { best: sorted[0].date, worst: sorted[sorted.length - 1].date, laundry: laundry?.date || null } });
+    const plan = out[out.length - 1];
+    plan.week = { text: '', days: week.map(d => ({ date: d.date, mark: d.date === sorted[0].date ? 'good' : d.date === sorted[sorted.length - 1].date ? 'bad' : d.date === laundry?.date ? 'yes' : null, v: d.date === sorted[0].date ? '最佳' : d.date === sorted[sorted.length - 1].date ? '最差' : d.date === laundry?.date ? '曬衣' : '' })) };
+  }
+  return weekAdvice(out, resp, win);
+}
+
+const wd = date => `週${'日一二三四五六'[new Date(date + 'T12:00:00Z').getUTCDay()]}`;
+const listDays = dates => dates.map(wd).join('、');
+const WEAR_SHORT = { coat: '外套', jacket: '薄外套', sleeves: '長袖', light: '短袖' };
+const wearOf = d => {
+  // The day's feel when people are out: a third of the way from low to high.
+  const lo = d.feelsLo ?? d.lo;
+  const hi = d.feelsHi ?? d.hi;
+  if (lo == null || hi == null) return null;
+  const v = lo + (hi - lo) / 3;
+  const [, code, label] = ADVICE.wear.find(([max]) => v < max);
+  return { code, label };
+};
+
+// Each piece of advice for the coming 7 days too (`week`: a sentence and a
+// mark for each day), and an entry for a kind today doesn't need when the
+// week does.
+export function weekAdvice(out, resp, win) {
+  const days = (resp.days || []).filter(d => d.date >= win.date).slice(0, 7);
+  if (days.length < 3) return out;
+  const get = kind => out.find(a => a.kind === kind);
+  const add = (kind, today, week, why = {}) => {
+    let a = get(kind);
+    if (!a) {
+      if (!week.notable) return;
+      a = { kind, level: 'none', text: today, why };
+      out.push(a);
+    }
+    a.week = { text: week.text, days: week.days };
+  };
+
+  const wet = days.filter(d => d.pop >= ADVICE.umbrella).map(d => d.date);
+  const damp = days.filter(d => d.pop >= ADVICE.umbrellaMaybe && d.pop < ADVICE.umbrella).map(d => d.date);
+  add('umbrella', '帶傘：不太會下雨', {
+    notable: wet.length + damp.length > 0,
+    text: wet.length ? `${listDays(wet)}要帶傘${damp.length ? `；${listDays(damp)}可能有雨` : ''}` : damp.length ? `${listDays(damp)}可能有雨，備摺疊傘` : '這一週都不太會下雨',
+    days: days.map(d => ({ date: d.date, mark: d.pop >= ADVICE.umbrella ? 'yes' : d.pop >= ADVICE.umbrellaMaybe ? 'maybe' : null, v: d.pop != null ? `${d.pop}%` : '' }))
+  });
+
+  const strong = days.filter(d => d.uvMax >= 6);
+  const top = days.reduce((a, d) => ((d.uvMax ?? -1) > (a?.uvMax ?? -1) ? d : a), null);
+  add('sun', '防曬：紫外線不強', {
+    notable: strong.length > 0,
+    text: top?.uvMax >= ADVICE.sunUv ? `${wd(top.date)}最強（UV ${top.uvMax} ${uvLevel(top.uvMax)}）${strong.length ? `，${strong.length} 天紫外線高，外出防曬` : ''}` : '這一週紫外線都不強',
+    days: days.map(d => ({ date: d.date, mark: d.uvMax >= 8 ? 'bad' : d.uvMax >= 6 ? 'yes' : d.uvMax >= ADVICE.sunUv ? 'maybe' : null, v: d.uvMax != null ? String(d.uvMax) : '' }))
+  });
+
+  const wears = days.map(wearOf);
+  const firstWear = wears.find(Boolean);
+  const change = firstWear ? days.findIndex((d, i) => wears[i] && wears[i].code !== firstWear.code) : -1;
+  const lo = Math.min(...days.map(d => d.lo ?? Infinity));
+  const hi = Math.max(...days.map(d => d.hi ?? -Infinity));
+  const order = ADVICE.wear.map(([, code]) => code);
+  add('wear', '', {
+    notable: false,
+    text: `這週 ${Math.round(lo)}–${Math.round(hi)}°${change > 0 ? `，${wd(days[change].date)}起${order.indexOf(wears[change].code) < order.indexOf(firstWear.code) ? '轉涼' : '轉熱'}，${wears[change].label}` : ''}`,
+    days: days.map((d, i) => ({ date: d.date, mark: wears[i] ? wears[i].code : null, v: wears[i] ? WEAR_SHORT[wears[i].code] : '' }))
+  });
+
+  const hot = days.filter(d => (d.feelsHi ?? d.hi) >= ADVICE.heatFeels).map(d => d.date);
+  add('heat', '炎熱：不會太熱', {
+    notable: hot.length > 0,
+    text: hot.length ? `${listDays(hot)}體感超過 ${ADVICE.heatFeels}°，多喝水` : '這一週沒有酷熱的日子',
+    days: days.map(d => ({ date: d.date, mark: (d.feelsHi ?? d.hi) >= ADVICE.heatFeels ? 'bad' : null, v: d.feelsHi != null ? `${Math.round(d.feelsHi)}°` : '' }))
+  });
+
+  const air = (resp.air?.forecast?.days || []).filter(d => d.date >= win.date && d.aqi != null);
+  if (air.length) {
+    const bad = air.filter(d => d.aqi > ADVICE.mask.aqi).map(d => d.date);
+    const fair = air.filter(d => d.aqi > 50 && d.aqi <= ADVICE.mask.aqi).map(d => d.date);
+    const byDate = Object.fromEntries(air.map(d => [d.date, d]));
+    add('mask', '口罩：空氣還可以', {
+      notable: bad.length > 0,
+      text: bad.length ? `${listDays(bad)}空氣差，戴口罩` : fair.length ? `${listDays(fair)}空氣普通，敏感的人留意` : '預報的幾天空氣都良好',
+      days: days.map(d => ({ date: d.date, mark: byDate[d.date] ? (byDate[d.date].aqi > ADVICE.mask.aqi ? 'bad' : byDate[d.date].aqi > 50 ? 'maybe' : 'good') : null, v: byDate[d.date] ? String(byDate[d.date].aqi) : '' }))
+    });
   }
   return out;
 }

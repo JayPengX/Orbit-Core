@@ -56,6 +56,25 @@ Planned in `docs/WEATHER-PLAN.md`; the PWA's repo is `JayPengX/Orbit-Weather`
   overlays everything), a big info card. Pins: name, place, days and hours (the
   app opens on the pin inside them). Radar removed. `tools/preview.mjs weather`
   shows it signed in (weather.js on the fixtures, real NLSC).
+- Graphs are rows of small elements (`.tl` / `.tl-col` in the app's
+  `lib/graph.mjs`), not one long SVG: iPhone Safari dropped parts of the
+  6,000-px-wide SVGs while scrolling (the owner saw "empty hours"; the
+  Worker's answers had none, checked with `/weather/status?cells=1`, which
+  lists the recent cells' blank hours and sources without their places).
+  UV shows daylight hours only; a date chip follows each graph's swipe.
+- Air as far as it goes: Google's Air Quality API (`forecast:lookup`, POST,
+  Taiwan's AQI `twn_epa`, 96 hours, 1 call every 6 h a cell) pulled toward
+  the station's reading (fading over 12 h) and blended day by day with
+  MOENV's 3-day area forecast (0.5 / 0.5; Google alone past it, MOENV alone
+  without Google) → `air.hourly`, `air.forecast.days`. **The key is refused
+  (403 `API_KEY_SERVICE_BLOCKED`)** until the owner enables "Air Quality
+  API" for it in Google Cloud (and adds it to the key's API restrictions);
+  until then the Worker asks once a day a cell and uses MOENV alone
+  (`/weather/status?sample=google-air` shows the answer).
+- Advice for the week: each kind (`umbrella`, `sun`, `wear`, `heat`,
+  `mask`, `week`) has `week: { text, days: [{ date, mark, v }] }` over the
+  advice day and the 6 after; a kind today doesn't need still comes (level
+  `none`) when the week does.
 - **Scoring** (`weather-skill.js`, plan C7): the cron at :10 each hour scores
   the 6 cells opened most lately (`weather:recent`, noted at most every 6 h
   a cell) from snapshots of their own refreshes (no extra Google calls)

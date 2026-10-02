@@ -393,3 +393,30 @@ test('Google air hours: Taiwan AQI only', () => {
   assert.equal(b.period.startTime, '2026-10-02T12:00:00.000Z');
   assert.deepEqual(b.customLocalAqis, [{ regionCode: 'tw', aqi: 'twn_epa' }]);
 });
+
+test('advice for the week: each kind with a sentence and a mark a day', () => {
+  const at = Date.parse('2026-10-03T07:00:00+08:00');
+  const hours = Array.from({ length: 24 }, (_, h) => ({ t: Date.parse(`2026-10-03T${String(h).padStart(2, '0')}:00:00+08:00`), temp: 26, feels: 27, uv: 0, pop: 10 }));
+  const day = (date, o) => ({ date, hi: 30, lo: 24, feelsHi: 31, feelsLo: 25, pop: 10, uvMax: 5, day: { condition: { code: 'CLOUDY' } }, ...o });
+  const days = [
+    day('2026-10-03'),
+    day('2026-10-04', { pop: 60 }),
+    day('2026-10-05', { pop: 35, uvMax: 9 }),
+    day('2026-10-06', { hi: 22, lo: 16, feelsHi: 21, feelsLo: 14 }),
+    day('2026-10-07', { feelsHi: 36 }),
+    day('2026-10-08'),
+    day('2026-10-09'),
+    day('2026-10-10')
+  ];
+  const air = { aqi: 40, forecast: { days: [{ date: '2026-10-03', aqi: 45 }, { date: '2026-10-04', aqi: 120 }] } };
+  const k = Object.fromEntries(advise({ hours, days, air }, at).map(a => [a.kind, a]));
+  assert.equal(k.umbrella.week.text, '週日要帶傘；週一可能有雨');
+  assert.equal(k.umbrella.level, 'none', 'nothing today, the week still says');
+  assert.equal(k.umbrella.week.days.length, 7);
+  assert.deepEqual(k.umbrella.week.days.slice(0, 3).map(d => d.mark), [null, 'yes', 'maybe']);
+  assert.match(k.sun.week.text, /週一最強（UV 9 過量）/);
+  assert.match(k.wear.week.text, /週二起轉涼，薄外套/);
+  assert.equal(k.heat.week.text, '週三體感超過 34°，多喝水');
+  assert.equal(k.mask.week.text, '週日空氣差，戴口罩');
+  assert.ok(k.week.week.days.some(d => d.mark === 'good'));
+});
