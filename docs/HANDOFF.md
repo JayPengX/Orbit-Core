@@ -83,6 +83,12 @@ Planned in `docs/WEATHER-PLAN.md`; the PWA's repo is `JayPengX/Orbit-Weather`
   `window` (AQI ≤ 50 and dry / AQI > 100), `sleep` (tonight 23–5 feels),
   `carwash` (3 dry days). The app shows the day's tiles and one week table
   (rain, laundry, UV, wear, heat, air × 7 days, ★ the best day).
+- 我的行程 (app `lib/plan.mjs`): the first page once there's a pin. A pin
+  may be `home` (one at most; where you are outside every other pin's
+  hours; without one, the device's place). Each hour is taken from the
+  place the schedule says (`placeAt`), and the page is built from those
+  stitched hours: now and the next move, route advice, a graph naming the
+  places, the stays today / tomorrow / the week. Notices follow it too.
 - Advice for the week: each kind (`umbrella`, `sun`, `wear`, `heat`,
   `mask`, `week`) has `week: { text, days: [{ date, mark, v }] }` over the
   advice day and the 6 after; a kind today doesn't need still comes (level
