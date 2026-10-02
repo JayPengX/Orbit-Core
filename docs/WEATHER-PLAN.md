@@ -72,6 +72,19 @@ Simple rules on the blended data, each with the reason shown:
   follows the weather and time of day.
 - Location while open, plus saved places (home, school) for the cron and the
   morning brief; works offline from the last forecast.
+- **Opening fast:** a home-screen web app can ask for location (HTTPS; iOS
+  may ask again now and then, less with Safari Websites location set to
+  "While Using"). On open:
+  1. Show the last forecast from storage at once.
+  2. At the same time ask for a coarse position (`enableHighAccuracy:
+     false`, `maximumAge` about 15 minutes, `timeout` about 5 s): Wi-Fi /
+     cell location comes back in about a second; weather needs no GPS.
+  3. Round it to the same ~1 km cell the proxy caches by. Same cell and the
+     stored forecast still fresh: no fetch at all. Otherwise fetch
+     `/weather` for the cell (usually a KV hit at the proxy) and swap it in.
+  4. Denied or timed out: use the nearest saved place, and say so.
+  No location in the background (a web app can't), which is why the brief
+  and the scoring use the saved places.
 
 ## Phases
 
