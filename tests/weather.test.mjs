@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   weatherStatus, handleWeather, scrub, cellOf, nearestStation, townIds, airArea, parseCwaTown, cwaAt, parseGoogleDay, parseGoogleHour,
-  blend, buildCell, cellForecast, advise, adviceWindow, parseCwaWarnings, aqiLevel, uvLevel, num, DEFAULT_WEIGHTS
+  blend, buildCell, GOOGLE_DAILY_REFRESHES, cellForecast, advise, adviceWindow, parseCwaWarnings, aqiLevel, uvLevel, num, DEFAULT_WEIGHTS
 } from '../weather.js';
 import { STATIONS } from '../weather-stations.js';
 
@@ -220,15 +220,43 @@ test('CWA warnings for the county', () => {
   assert.ok(w[0].from < w[0].to);
 });
 
-test('/weather needs a session and a place', async () => {
+test('/weather: a place, or where the IP says; no sign-in', async () => {
   const e = { ...env, RATE_LIMIT_KV: memKv() };
-  const get = (q, opts) => handleWeather(new Request('https://w.example/weather' + q), e, {}, '/weather', { fetchFn: upstream(), ...opts });
-  assert.equal((await get('?lat=25&lon=121.5')).status, 401);
-  assert.equal((await get('?lat=x&lon=121.5', { session: { s: 'a' } })).status, 400);
-  assert.equal((await get('?lat=25.03&lon=121.56', { session: { s: 'a' }, limited: () => true })).status, 429);
-  const res = await get('?lat=25.034&lon=121.565', { session: { s: 'a' } });
+  const get = (q, opts) => handleWeather(new Request('https://w.example/weather' + q), e, {}, '/weather', { fetchFn: upstream(), cf: undefined, ...opts });
+  assert.equal((await get('?lat=x&lon=121.5')).status, 400);
+  assert.equal((await get('?lat=25')).status, 400);
+  assert.equal((await get('?lat=25.03&lon=121.56', { limited: () => true })).status, 429);
+  const res = await get('?lat=25.034&lon=121.565');
   assert.equal(res.status, 200);
-  assert.equal((await res.json()).place.town, '信義區');
+  const j = await res.json();
+  assert.equal(j.place.town, '信義區');
+  assert.deepEqual(j.located, { by: 'device' });
+  const byIp = await (await get('?auto=1', { cf: { latitude: '25.0340', longitude: '121.5650', city: 'Taipei' } })).json();
+  assert.deepEqual(byIp.located, { by: 'ip', city: 'Taipei' });
+  assert.equal(byIp.place.town, '信義區');
+  assert.equal((await get('?auto=1', { cf: {} })).status, 404);
+});
+
+test('the township list for the picker', async () => {
+  const res = await handleWeather(new Request('https://w.example/weather/places'), env, {}, '/weather/places');
+  const list = await res.json();
+  assert.ok(list.length > 300);
+  const xinyi = list.find(([c, t]) => c === '臺北市' && t === '信義區');
+  assert.ok(xinyi && Math.abs(xinyi[2] - 25.03) < 0.05);
+  assert.equal(list[0][0], '宜蘭縣');
+});
+
+test('Google is asked at most GOOGLE_DAILY_REFRESHES times a day; then CWA alone', async () => {
+  const kv = memKv();
+  kv.store.set('weather:google:2026-10-02', String(GOOGLE_DAILY_REFRESHES));
+  const log = [];
+  const { resp, sources } = await buildCell({ ...env, RATE_LIMIT_KV: kv }, 25.034, 121.565, { fetchFn: upstream(log), now: NOW });
+  assert.equal(sources.google, 'capped');
+  assert.ok(!log.some(p => p.startsWith('/v1/')));
+  assert.ok(resp.hours.length > 0 && resp.days.length > 0);
+  const kv2 = memKv();
+  await buildCell({ ...env, RATE_LIMIT_KV: kv2 }, 25.034, 121.565, { fetchFn: upstream(), now: NOW });
+  assert.equal(kv2.store.get('weather:google:2026-10-02'), '1');
 });
 
 test('status says which keys are set and answer, never the keys', async () => {

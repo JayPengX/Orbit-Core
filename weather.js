@@ -1,15 +1,24 @@
 // ---- weather.js ----
 // Orbit Weather's server side (docs/WEATHER-PLAN.md), routed by worker.js:
 //
-//   GET /weather?lat=&lon=&qt=     the blended forecast for that ~1 km cell
+//   GET /weather?lat=&lon=         the blended forecast for that ~1 km cell
 //                                  (Google, CWA 中央氣象署, MOENV 環境部)
+//   GET /weather?auto=1            the same where the caller's IP says it is
+//                                  (Cloudflare's request.cf), for an app
+//                                  without location permission
+//   GET /weather/places            Taiwan's townships [county, town, lat,
+//                                  lon], for the app's place picker
 //   GET /weather/status            each source's key: set, and a live call
 //                                  answering (cached 10 minutes; no key is
 //                                  ever shown)
 //   GET /weather/status?sample=<n> one source's real answer at Taipei 101
 //                                  (SAMPLES, cached an hour): the tests'
 //                                  fixtures and tools/weather-stations.mjs.
-//                                  `forecast` is /weather itself there.
+//
+// No sign-in (a weather app needs no account): /weather answers the apps'
+// own origin only (worker.js), 30 a minute an IP, and Google is asked at
+// most GOOGLE_DAILY_REFRESHES times a day in all (4 calls each, under the
+// key's 500-a-day quota); past that a cell is built from CWA alone.
 //
 // Keys (Worker secrets): GOOGLE_WEATHER_KEY, CWA_KEY, MOENV_KEY.
 //
@@ -40,6 +49,7 @@ export const STALE_MS = 3 * HOUR;
 export const KEEP_MS = 6 * HOUR;
 // Farther than this from every CWA station / MOENV site (abroad): Google only.
 const NEAR_KM = 30;
+export const GOOGLE_DAILY_REFRESHES = 110;
 export const DEFAULT_WEIGHTS = { pop: { google: 0.6, cwa: 0.4 }, temp: { google: 0.6, cwa: 0.4 } };
 
 export function googleUrl(env, path, lat, lon, extra = '', units = true) {
@@ -428,6 +438,36 @@ async function shared(env, key, freshMs, make, now) {
   }
 }
 
+// Today's Google refreshes, counted in KV: true while under the cap (and
+// counts this one).
+export async function googleAllowed(env, now) {
+  const key = `weather:google:${twDate(now)}`;
+  const n = Number(await kvJson(env, key)) || 0;
+  if (n >= GOOGLE_DAILY_REFRESHES) return false;
+  await kvPut(env, key, n + 1, 2 * 86_400);
+  return true;
+}
+
+// Each township's middle (its stations' mean), for the place picker.
+let townsCache = null;
+export function townships() {
+  if (townsCache) return townsCache;
+  const by = new Map();
+  for (const [, , lat, lon, county, town] of STATIONS) {
+    const k = `${county}|${town}`;
+    const t = by.get(k) || { county, town, lat: 0, lon: 0, n: 0 };
+    t.lat += lat;
+    t.lon += lon;
+    t.n++;
+    by.set(k, t);
+  }
+  const order = Object.keys(COUNTY_IDS);
+  townsCache = [...by.values()]
+    .sort((a, b) => order.indexOf(a.county) - order.indexOf(b.county) || a.town.localeCompare(b.town, 'zh-Hant'))
+    .map(t => [t.county, t.town, Math.round((t.lat / t.n) * 1e4) / 1e4, Math.round((t.lon / t.n) * 1e4) / 1e4]);
+  return townsCache;
+}
+
 // ---- The blend --------------------------------------------------------------------
 
 // Σ w_s × v_s over the sources that have a value, normalised.
@@ -616,11 +656,11 @@ export async function buildCell(env, lat, lon, { fetchFn = fetch, now = Date.now
   };
   const inTaiwan = (nearestStation(lat, lon, 'r')?.km ?? Infinity) <= NEAR_KM;
   const [google, cwa, aqi, aqf, warn, weights] = await Promise.all([
-    env.GOOGLE_WEATHER_KEY ? settle('google', () => fetchGoogle(env, lat, lon, fetchFn, !inTaiwan)) : { state: 'off', v: null },
+    !env.GOOGLE_WEATHER_KEY ? { state: 'off', v: null } : (await googleAllowed(env, now)) ? settle('google', () => fetchGoogle(env, lat, lon, fetchFn, !inTaiwan)) : keep('google') ? { state: 'stale', ...keep('google') } : { state: 'capped', v: null },
     env.CWA_KEY && inTaiwan ? settle('cwa', () => fetchCwa(env, lat, lon, fetchFn)) : { state: inTaiwan ? 'off' : 'n/a', v: null },
     env.MOENV_KEY && inTaiwan ? shared(env, 'weather:moenv:aqi', 20 * MIN, () => getJson(fetchFn, moenvUrl(env, 'aqx_p_432', '&limit=1000'), env).then(j => (Array.isArray(j) ? j : j.records || []).map(s => ({ sitename: s.sitename, county: s.county, aqi: s.aqi, status: s.status, pollutant: s.pollutant, pm10: s.pm10, 'pm2.5': s['pm2.5'], o3: s.o3, latitude: s.latitude, longitude: s.longitude, publishtime: s.publishtime }))), now) : null,
     env.MOENV_KEY && inTaiwan ? shared(env, 'weather:moenv:aqf', 3 * HOUR, () => getJson(fetchFn, moenvUrl(env, 'aqf_p_01', '&limit=100'), env).then(j => (Array.isArray(j) ? j : j.records || []).map(f => ({ area: f.area, forecastdate: f.forecastdate, aqi: f.aqi, majorpollutant: f.majorpollutant }))), now) : null,
-    env.CWA_KEY && inTaiwan ? shared(env, 'weather:cwa:warn', 15 * MIN, () => getJson(fetchFn, cwaUrl(env, 'W-C0033-001'), env), now) : null,
+    env.CWA_KEY && inTaiwan ? shared(env, 'weather:cwa:warn', 30 * MIN, () => getJson(fetchFn, cwaUrl(env, 'W-C0033-001'), env), now) : null,
     kvJson(env, 'weather:weights')
   ]);
   const county = cwa.v?.county || null;
@@ -649,12 +689,10 @@ export async function cellForecast(env, ctx, lat, lon, { fetchFn = fetch, now = 
   };
   if (hit && now - hit.at < freshMs) return { ...hit.resp, cached: true };
   if (hit && now - hit.at < STALE_MS) {
-    const lock = `weather:lock:${cellOf(lat, lon)}`;
-    if (!(await kvJson(env, lock))) {
-      await kvPut(env, lock, 1, 60);
-      const job = refresh().catch(e => console.log('weather refresh failed', String(e.message || e)));
-      if (ctx?.waitUntil) ctx.waitUntil(job);
-    }
+    // (No lock: KV's free tier has 1,000 writes a day, and two refreshes
+    // of one cell at once are harmless.)
+    const job = refresh().catch(e => console.log('weather refresh failed', String(e.message || e)));
+    if (ctx?.waitUntil) ctx.waitUntil(job);
     return { ...hit.resp, cached: true, refreshing: true };
   }
   return (await refresh()).resp;
@@ -727,19 +765,14 @@ async function cachedText(env, key, ttl, make) {
 
 // ---- Route ---------------------------------------------------------------------------
 
-export async function handleWeather(request, env, headers, path, { session = null, limited = () => false, ctx = null, fetchFn = fetch } = {}) {
+export async function handleWeather(request, env, headers, path, { limited = () => false, ctx = null, fetchFn = fetch, cf = request.cf } = {}) {
   const send = (data, status = 200) => new Response(typeof data === 'string' ? data : JSON.stringify(data), { status, headers: { ...headers, 'Content-Type': 'application/json; charset=utf-8' } });
   if (request.method !== 'GET') return send({ code: 'GET_ONLY' }, 405);
   const q = new URL(request.url).searchParams;
   if (path === '/weather/status') {
     const sample = q.get('sample');
-    if (sample === 'forecast') {
-      // /weather itself at Taipei 101, open, so a check needs no pass:
-      // refreshed at most hourly (at most ~100 Google calls a day).
-      return send(await cellForecast(env, ctx, TAIPEI.lat, TAIPEI.lon, { fetchFn, freshMs: HOUR }));
-    }
     if (sample) {
-      if (!SAMPLES[sample]) return send({ code: 'NOT_FOUND', samples: ['forecast', ...Object.keys(SAMPLES)] }, 404);
+      if (!SAMPLES[sample]) return send({ code: 'NOT_FOUND', samples: Object.keys(SAMPLES) }, 404);
       return send(
         await cachedText(env, `weather:sample:${sample}`, 3600, async () => {
           const res = await fetchFn(SAMPLES[sample](env), { headers: { Accept: 'application/json' } });
@@ -749,13 +782,23 @@ export async function handleWeather(request, env, headers, path, { session = nul
     }
     return send(await cachedText(env, 'weather:status', 600, async () => JSON.stringify(await weatherStatus(env, fetchFn))));
   }
+  if (path === '/weather/places') {
+    return new Response(JSON.stringify(townships()), { headers: { ...headers, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=86400' } });
+  }
   if (path === '/weather') {
-    if (!session) return send({ code: 'ECO_TOKEN_INVALID' }, 401);
     if (limited()) return send({ code: 'RATE_LIMITED' }, 429);
-    const lat = Number(q.get('lat'));
-    const lon = Number(q.get('lon'));
-    if (!q.get('lat') || !q.get('lon') || !(Math.abs(lat) <= 90) || !(Math.abs(lon) <= 180)) return send({ code: 'BAD_LOCATION' }, 400);
-    return send(await cellForecast(env, ctx, lat, lon, { fetchFn }));
+    let lat = Number(q.get('lat'));
+    let lon = Number(q.get('lon'));
+    let located = { by: 'device' };
+    if (q.get('auto')) {
+      // Where the IP says: a city's middle, good enough for a first look.
+      lat = Number(cf?.latitude);
+      lon = Number(cf?.longitude);
+      if (!cf?.latitude || !cf?.longitude) return send({ code: 'NO_LOCATION' }, 404);
+      located = { by: 'ip', city: cf.city || null };
+    } else if (!q.get('lat') || !q.get('lon')) return send({ code: 'BAD_LOCATION' }, 400);
+    if (!(Math.abs(lat) <= 90) || !(Math.abs(lon) <= 180)) return send({ code: 'BAD_LOCATION' }, 400);
+    return send({ ...(await cellForecast(env, ctx, lat, lon, { fetchFn })), located, lat: Math.round(lat * 100) / 100, lon: Math.round(lon * 100) / 100 });
   }
   return send({ code: 'NOT_FOUND' }, 404);
 }
