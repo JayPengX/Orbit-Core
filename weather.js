@@ -884,10 +884,10 @@ export function advise(resp, now, w = ADVICE.window) {
 const hoursIn = (resp, date, from, to, now) => resp.hours.filter(h => twDate(h.t) === date && twHour(h.t) >= from && twHour(h.t) < to && h.t + HOUR > now);
 const dayWord = (date, now) => (date === twDate(now) ? '今天' : date === twDate(now + 24 * HOUR) ? '明天' : wd(date));
 const maxPop = list => list.reduce((a, h) => Math.max(a, h.pop ?? 0), 0);
-// A day's best 2 hours to run (5–20時): { date, from, feels, pop, cost }.
+// A day's best 2 hours to run (6–20時; earlier is dark): { date, from, feels, pop, cost }.
 export const RUN_OK = 45;
 export function bestRun(resp, date, now, aqiBad = 0) {
-  const hs = hoursIn(resp, date, 5, 21, now).filter(h => h.pop != null && (h.feels ?? h.temp) != null);
+  const hs = hoursIn(resp, date, 6, 21, now).filter(h => h.pop != null && (h.feels ?? h.temp) != null);
   const cost = h => {
     const f = h.feels ?? h.temp;
     return h.pop * 1.2 + Math.max(0, f - 24) * 6 + Math.max(0, 16 - f) * 4 + Math.max(0, (h.uv ?? 0) - 5) * 8 + ((h.thunder ?? 0) >= 40 ? 30 : 0) + aqiBad;
@@ -913,7 +913,7 @@ export function lifeAdvice(out, resp, now, win) {
     const text = parts.every(p => p.endsWith('乾爽')) ? (parts.length > 1 ? '早晚都乾爽' : parts[0]) : parts.join('，');
     out.push({ kind: 'commute', level: wet >= ADVICE.umbrella ? 'yes' : wet >= ADVICE.umbrellaMaybe ? 'maybe' : 'none', text: `通勤：${text}`, why: { am: maxPop(am), pm: maxPop(pm) } });
   }
-  // Running: the best 2 hours (5–20時) of today and tomorrow — dry, not
+  // Running: the best 2 hours (6–20時) of today and tomorrow — dry, not
   // hot (16–24° feels best), low UV, no thunder, the air fine.
   const aqiBad = (resp.air?.aqi ?? 0) > ADVICE.mask.aqi ? 40 : 0;
   const tomorrow = twDate(Date.parse(`${win.date}T12:00:00+08:00`) + 24 * HOUR);

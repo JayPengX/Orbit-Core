@@ -90,9 +90,19 @@ Planned in `docs/WEATHER-PLAN.md`; the PWA's repo is `JayPengX/Orbit-Weather`
   forecasts one (same shape as a city's: hours with `place`, days from the
   hours where you are, route advice), drawn by the same cards. Notices
   follow it too.
-- Graphs (`lib/graph.mjs` `chart`): smooth area charts coloured by level,
-  one SVG per day (iPhone drops parts of one very wide SVG), a crosshair and
-  dot placed by the app (`colAt`, `colSpot`).
+- Graphs (`lib/graph.mjs` `chart`): smooth area charts (bars for days)
+  coloured by level, fitted to the card's width — no sideways scrolling
+  inside the swiping pager; the cards' tabs pick the range (rain 24 h /
+  48 h / 10 days, UV the next daylight day / the one after / 10 days; the
+  choice kept on the device). Dragging on a graph moves the crosshair
+  (`touch-action: pan-y`). Air: now and MOENV's forecast days, no history.
+- 我的行程 shows advice, rain, UV and the days only (what matters on the
+  move); its advice is the route's plus the daytime place's run / thunder /
+  wind / fog / temperature.
+- More advice (`lifeAdvice`): `run` (best 2 hours 6–20時 today and
+  tomorrow, a time a day in the week), `laundry` (every dry day, drying
+  hours), `weekend`, `humid`, `temp` (lows dropping / rising ≥ 4°), `wind`
+  (gusts ≥ 50 km/h), `thunder` (≥ 40%), `fog` (≤ 1 km).
 - Advice for the week: each kind (`umbrella`, `sun`, `wear`, `heat`,
   `mask`, `week`) has `week: { text, days: [{ date, mark, v }] }` over the
   advice day and the 6 after; a kind today doesn't need still comes (level
