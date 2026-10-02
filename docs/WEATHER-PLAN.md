@@ -77,9 +77,15 @@ dry"). That disagreement is the warning that was missing today.
       3 h) is about 6,000 calls a month; two places about 12,000, about
       US$0.30 a month.
 - [ ] CWA open data authorization key → Worker secret `CWA_KEY`.
-- [ ] Apple Developer Program (US$99 a year): without it an app installed
-      from Xcode expires after 7 days, and there's no WeatherKit, push or
-      TestFlight. Not needed for phase 1.
+- [ ] Apple Developer Program (US$99 a year) is optional. Start free: a
+      free Apple ID in Xcode installs the app on the owner's own iPhone, and
+      the app, widgets and Liquid Glass all work; it just stops opening after
+      7 days until it's installed again (Xcode, or AltStore / SideStore
+      re-signing over Wi-Fi from the Mac). Free has no APNs, WeatherKit or
+      TestFlight, so rain alerts go through the Web Push already in
+      `push.js` (a small home-screen page subscribed to it), and widgets
+      read the proxy directly. Pay only if the weekly reinstall gets old or
+      native alerts / Live Activities pushed from the server are wanted.
 - [ ] Xcode (with the iOS 26 SDK) on the Mac; Claude Code there too if the
       Mac should build and test on its own.
 - [ ] For phase 3: an APNs auth key (`.p8`), its key id and team id → Worker
