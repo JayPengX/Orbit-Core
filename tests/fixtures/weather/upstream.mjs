@@ -7,7 +7,7 @@ export const fx = name => JSON.parse(readFileSync(new URL(`./${name}.json`, impo
 export const FIXTURE_NOW = Date.parse('2026-10-02T11:46:00Z');
 const answer = (status, body) => ({ ok: status < 400, status, text: async () => (typeof body === 'string' ? body : JSON.stringify(body)) });
 
-export function upstream(log = [], { shift = 0 } = {}) {
+export function upstream(log = [], { shift = 0, failPages = [] } = {}) {
   const hours = fx('google-hours');
   const move = t => new Date(Date.parse(t) + shift).toISOString();
   const page = n => ({ forecastHours: hours.forecastHours.map(h => ({ ...h, interval: { startTime: move(new Date(Date.parse(h.interval.startTime) + (n - 1) * 86_400_000).toISOString()) } })), nextPageToken: n < 10 ? `p${n + 1}` : '' });
@@ -20,7 +20,10 @@ export function upstream(log = [], { shift = 0 } = {}) {
     log.push((u.host.startsWith('airquality') ? 'air:' : '') + u.pathname + (u.searchParams.get('pageToken') ? '#' + u.searchParams.get('pageToken') : ''));
     if (u.host === 'weather.googleapis.com') {
       if (u.pathname.endsWith('currentConditions:lookup')) return answer(200, { ...fx('google-current'), currentTime: move(fx('google-current').currentTime) });
-      if (u.pathname.endsWith('hours:lookup')) return answer(200, page(Number((u.searchParams.get('pageToken') || 'p1').slice(1))));
+      if (u.pathname.endsWith('hours:lookup')) {
+        const n = Number((u.searchParams.get('pageToken') || 'p1').slice(1));
+        return failPages.includes(n) ? answer(503, 'unavailable') : answer(200, page(n));
+      }
       if (u.pathname.endsWith('days:lookup')) return answer(200, fx('google-days'));
     }
     if (u.host === 'airquality.googleapis.com' && init?.method === 'POST') {

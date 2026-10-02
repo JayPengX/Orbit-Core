@@ -23,8 +23,8 @@ const memKv = () => {
 
 // Every upstream the Worker calls, answered from the fixtures (with the
 // CWA key checked).
-const upstream = (log = []) => {
-  const f = fixtureUpstream(log);
+const upstream = (log = [], opts) => {
+  const f = fixtureUpstream(log, opts);
   return async (url, o) => {
     if (url.includes('opendata.cwa.gov.tw')) assert.equal(new URL(url).searchParams.get('Authorization'), env.CWA_KEY);
     return f(url, o);
@@ -419,4 +419,23 @@ test('advice for the week: each kind with a sentence and a mark a day', () => {
   assert.equal(k.heat.week.text, '週三體感超過 34°，多喝水');
   assert.equal(k.mask.week.text, '週日空氣差，戴口罩');
   assert.ok(k.week.week.days.some(d => d.mark === 'good'));
+});
+
+test('far hours: a failing page is tried again, a partial set kept and asked again in 30 minutes', async () => {
+  const kv = memKv();
+  const first = await buildCell({ ...env, RATE_LIMIT_KV: kv }, 25.034, 121.565, { fetchFn: upstream([], { failPages: [6] }), now: NOW });
+  assert.equal(first.parts.far.partial, true);
+  assert.match(first.parts.far.error, /page 6/);
+  assert.equal(first.resp.hours.length, 120, '5 pages of 24');
+  const log = [];
+  const later = await buildCell({ ...env, RATE_LIMIT_KV: kv }, 25.034, 121.565, { fetchFn: upstream(log), now: NOW + 31 * 60_000, prev: first });
+  assert.ok(log.some(p => p.endsWith('#p10')), 'asked again after 30 minutes');
+  assert.equal(later.resp.hours.length, 240);
+  assert.ok(!later.parts.far.partial);
+  // A failing page once: the retry gets it.
+  let n = 0;
+  const flaky = upstream();
+  const once = async (url, init) => (url.includes('pageToken=p4') && !n++ ? { ok: false, status: 503, text: async () => 'x' } : flaky(url, init));
+  const ok = await buildCell({ ...env, RATE_LIMIT_KV: memKv() }, 25.034, 121.565, { fetchFn: once, now: NOW });
+  assert.equal(ok.resp.hours.length, 240);
 });

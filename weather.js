@@ -57,6 +57,7 @@ export const KEEP_MS = 6 * HOUR;
 const NEAR_KM = 30;
 export const GOOGLE_DAILY_CALLS = 450;
 export const FAR_MS = 6 * HOUR;
+export const FAR_RETRY_MS = 30 * MIN;
 export const DEFAULT_WEIGHTS = { pop: { google: 0.6, cwa: 0.4 }, temp: { google: 0.6, cwa: 0.4 } };
 
 export function googleUrl(env, path, lat, lon, extra = '', units = true) {
@@ -225,6 +226,7 @@ async function fetchGoogle(env, lat, lon, fetchFn, abroad, far = false) {
   const get = (path, extra, units) => getJson(fetchFn, googleUrl(env, path, lat, lon, extra, units), env);
   const HOURS = '&hours=240&pageSize=24';
   let farHours = null;
+  let farError = null;
   const hoursP = (async () => {
     const pages = [await get('forecast/hours:lookup', HOURS)];
     if (pages[0].nextPageToken) pages.push(await get('forecast/hours:lookup', `${HOURS}&pageToken=${encodeURIComponent(pages[0].nextPageToken)}`));
@@ -233,12 +235,15 @@ async function fetchGoogle(env, lat, lon, fetchFn, abroad, far = false) {
       let token = pages[pages.length - 1].nextPageToken;
       try {
         while (token && more.length < 8) {
-          const p = await get('forecast/hours:lookup', `${HOURS}&pageToken=${encodeURIComponent(token)}`);
+          const url = `${HOURS}&pageToken=${encodeURIComponent(token)}`;
+          // One more try for a page that fails (a hiccup shouldn't cost the days after it).
+          const p = await get('forecast/hours:lookup', url).catch(() => get('forecast/hours:lookup', url));
           more.push(p);
           token = p.nextPageToken;
         }
       } catch (e) {
-        console.log('weather far hours failed', String(e.message || e).slice(0, 120));
+        farError = `page ${more.length + 3}: ${String(e.message || e).slice(0, 160)}`;
+        console.log('weather far hours failed', farError);
       }
       if (more.length) farHours = more.flatMap(p => p.forecastHours || []).map(parseGoogleHour);
     }
@@ -254,6 +259,7 @@ async function fetchGoogle(env, lat, lon, fetchFn, abroad, far = false) {
     current: parseGoogleCurrent(current),
     hours: hours.map(parseGoogleHour),
     far: farHours,
+    farError,
     days: (days.forecastDays || []).map(parseGoogleDay),
     alerts: parseGoogleAlerts(alerts),
     tz: current.timeZone?.id || 'Asia/Taipei'
@@ -961,7 +967,7 @@ export async function buildCell(env, lat, lon, { fetchFn = fetch, now = Date.now
   const inTaiwan = (nearestStation(lat, lon, 'r')?.km ?? Infinity) <= NEAR_KM;
   // Hours 49–240: fetched every FAR_MS, kept between.
   const farPrev = prev?.parts?.far && now - prev.parts.far.at < 2 * 86_400_000 ? prev.parts.far : null;
-  const wantFar = !farPrev || now - farPrev.at >= FAR_MS;
+  const wantFar = !farPrev || now - farPrev.at >= (farPrev.partial ? FAR_RETRY_MS : FAR_MS);
   // Google's air hours: every FAR_MS too, in Taiwan (its AQI is MOENV's
   // scale), kept between; a key without the Air Quality API just goes without.
   const gairPrev = prev?.parts?.gair && now - prev.parts.gair.at < 2 * 86_400_000 ? prev.parts.gair : null;
@@ -998,7 +1004,11 @@ export async function buildCell(env, lat, lon, { fetchFn = fetch, now = Date.now
   }
   // The far hours: fresh from this refresh, else the last ones; joined after
   // the near ones.
-  const far = google.state === 'ok' && google.v?.far?.length ? { at: now, v: google.v.far } : farPrev;
+  // A partial set (a page failed) is kept only if it reaches further than
+  // the last one, and asked again after FAR_RETRY_MS rather than FAR_MS.
+  const got = google.state === 'ok' && google.v?.far?.length ? { at: now, v: google.v.far, ...(google.v.farError ? { partial: true, error: google.v.farError } : {}) } : null;
+  const reach = x => (x?.v?.length ? x.v[x.v.length - 1].t : 0);
+  const far = got && (!got.partial || reach(got) >= reach(farPrev)) ? got : farPrev ? { ...farPrev, ...(google.v?.farError ? { error: google.v.farError } : {}) } : got;
   const googleV = google.v ? { ...google.v, far: undefined } : null;
   if (googleV && far?.v?.length) {
     const end = googleV.hours.length ? googleV.hours[googleV.hours.length - 1].t : now;
@@ -1125,7 +1135,7 @@ export async function cellsReport(env, now) {
       for (const k of ['temp', 'feels', 'pop', 'uv', 'mm']) if (h[k] == null) (blank[k] ||= []).push(i);
     });
     const steps = hours.slice(1).map((h, i) => h.t - hours[i].t).filter(d => d !== HOUR).length;
-    cells.push({ ageMin: Math.round((now - hit.at) / MIN), sources: hit.sources, hours: hours.length, first: hours[0] ? new Date(hours[0].t).toISOString() : null, notHourly: steps, blank: Object.fromEntries(Object.entries(blank).map(([k, v]) => [k, `${v.length}: ${v.slice(0, 12).join(',')}`])), days: (hit.resp.days || []).length, airHourly: hit.resp.air?.hourly?.length ?? null, airHistory: hit.resp.air?.history?.length ?? null, far: hit.parts?.far ? Math.round((now - hit.parts.far.at) / MIN) : null });
+    cells.push({ ageMin: Math.round((now - hit.at) / MIN), sources: hit.sources, hours: hours.length, first: hours[0] ? new Date(hours[0].t).toISOString() : null, notHourly: steps, blank: Object.fromEntries(Object.entries(blank).map(([k, v]) => [k, `${v.length}: ${v.slice(0, 12).join(',')}`])), days: (hit.resp.days || []).length, airHourly: hit.resp.air?.hourly?.length ?? null, airHistory: hit.resp.air?.history?.length ?? null, far: hit.parts?.far ? Math.round((now - hit.parts.far.at) / MIN) : null, farHours: hit.parts?.far?.v?.length ?? null, farPartial: Boolean(hit.parts?.far?.partial), farError: hit.parts?.far?.error || null, last: hours.length ? new Date(hours[hours.length - 1].t).toISOString() : null });
   }
   return { at: now, googleCallsToday: Number(await kvJson(env, `weather:google:${twDate(now)}`)) || 0, cap: GOOGLE_DAILY_CALLS, cells };
 }
