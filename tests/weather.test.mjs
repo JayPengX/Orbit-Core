@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   weatherStatus, handleWeather, scrub, cellOf, nearestStation, townIds, airArea, parseCwaTown, cwaAt, parseGoogleDay, parseGoogleHour,
-  blend, buildCell, GOOGLE_DAILY_REFRESHES, cellForecast, advise, adviceWindow, parseCwaWarnings, aqiLevel, uvLevel, num, DEFAULT_WEIGHTS
+  blend, buildCell, GOOGLE_DAILY_REFRESHES, briefText, rainPhrase, weatherCheck, noteRecent, cellForecast, advise, adviceWindow, parseCwaWarnings, aqiLevel, uvLevel, num, DEFAULT_WEIGHTS
 } from '../weather.js';
 import { STATIONS } from '../weather-stations.js';
 
@@ -287,4 +287,51 @@ test('samples are a fixed list, cached in KV', async () => {
 
 test('default weights start Google 0.6, CWA 0.4', () => {
   assert.deepEqual(DEFAULT_WEIGHTS.pop, { google: 0.6, cwa: 0.4 });
+});
+
+test('one sentence and the morning brief, from the numbers', async () => {
+  const { resp } = await buildCell({ ...env, RATE_LIMIT_KV: memKv() }, 25.034, 121.565, { fetchFn: upstream(), now: NOW });
+  assert.match(resp.headline, /^現在陰，/);
+  assert.match(resp.headline, /明天最高 \d+°、最低 \d+°。$/, 'evening: tomorrow');
+  const morning = NOW + 11 * 3_600_000; // 06:46 the next day
+  const b = briefText(resp, morning);
+  assert.match(b.title, /^信義區 今天天氣$/);
+  assert.match(b.body, /最高 \d+° \/ 最低 \d+°/);
+  for (const w of ['Google', 'google', 'CWA', '氣象署']) assert.ok(!b.body.includes(w) && !resp.headline.includes(w));
+  const t = h => Date.parse('2026-10-03T00:00:00+08:00') + h * 3_600_000;
+  assert.equal(rainPhrase([{ t: t(8), pop: 10 }, { t: t(15), pop: 70 }], t(8)), '15 點起可能下雨（70%）');
+  assert.equal(rainPhrase([{ t: t(8), pop: 10 }, { t: t(10), pop: 35 }], t(8)), '10 點前後有機會下雨（35%）');
+  assert.equal(rainPhrase([{ t: t(8), pop: 10 }], t(8)), '未來 12 小時不太會下雨');
+  assert.equal(rainPhrase([{ t: t(8), pop: 80 }], t(8) + 600_000), '正在或即將下雨（80%）');
+});
+
+test('the rain alert answers only when the next 2 hours turn wet', async () => {
+  const kv = memKv();
+  const e = { ...env, RATE_LIMIT_KV: kv };
+  // Tomorrow 13:00 is 41% blended in the fixtures: 12:30 → no alert.
+  const at = Date.parse('2026-10-03T12:30:00+08:00');
+  await cellForecast(e, null, 25.034, 121.565, { fetchFn: upstream(), now: at - 10 * 60_000 });
+  assert.equal(await weatherCheck(e, { lat: 25.034, lon: 121.565, kind: 'rain' }, { fetchFn: upstream(), now: at }), null);
+  // The same with a wet hour.
+  const entry = JSON.parse(kv.store.get('weather:cell:25.03,121.57'));
+  entry.resp.hours.find(h => h.t === Date.parse('2026-10-03T13:00:00+08:00')).pop = 75;
+  kv.store.set('weather:cell:25.03,121.57', JSON.stringify(entry));
+  const alert = await weatherCheck(e, { lat: 25.034, lon: 121.565, kind: 'rain' }, { fetchFn: upstream(), now: at });
+  assert.equal(alert.title, '☂️ 快下雨了');
+  assert.match(alert.body, /^信義區 13:00 前後降雨機率 75%/);
+  const brief = await weatherCheck(e, { lat: 25.034, lon: 121.565, kind: 'brief' }, { fetchFn: upstream(), now: at });
+  assert.match(brief.title, /今天天氣/);
+});
+
+test('opened cells are noted for the scoring, at most every 6 hours', async () => {
+  const kv = memKv();
+  const e = { ...env, RATE_LIMIT_KV: kv };
+  let writes = 0;
+  const put = kv.put;
+  kv.put = async (k, v) => (k === 'weather:recent' && writes++, put(k, v));
+  await noteRecent(e, '25.03,121.57', NOW);
+  await noteRecent(e, '25.03,121.57', NOW + 3_600_000);
+  await noteRecent(e, '24.15,120.68', NOW + 3_600_000);
+  assert.equal(writes, 2);
+  assert.deepEqual(Object.keys(JSON.parse(kv.store.get('weather:recent'))).sort(), ['24.15,120.68', '25.03,121.57']);
 });

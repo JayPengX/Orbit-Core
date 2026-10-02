@@ -17,6 +17,7 @@ on:
       - 'eco-admin.js'
       - 'weather.js'
       - 'weather-stations.js'
+      - 'weather-skill.js'
   workflow_dispatch:
 
 jobs:

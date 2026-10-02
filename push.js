@@ -21,6 +21,12 @@
 // it has the answer, or 8 hours have passed, or `until`):
 //   check: { espn: 'football/nfl', event: '401…' }            a game's final score
 //   check: { yahoo: '2330.TW', op: 'above'|'below', price }  a price reached
+//   check: { weather: { lat, lon, kind: 'brief'|'rain' } }   Orbit Weather's
+//          morning brief, or a rain alert when the next 2 hours turn wet
+//          (weather.js weatherCheck)
+//
+// Orbit Weather has no sign-in: its device subscribes under its own random
+// id (`dev=`, worker.js), as the account `wdev-<id>`, app `weather`.
 //
 // Stored in KV (RATE_LIMIT_KV): `push:<account>:<app>` the device's
 // subscription and list, `push:prefs:<account>` the switches, `push:due` when each list's next notice is due,
@@ -30,6 +36,8 @@
 //
 // The message is encrypted for the device (RFC 8291, aes128gcm) and signed
 // for the push service (RFC 8292, VAPID): WebCrypto only, no library.
+
+import { weatherCheck } from './weather.js';
 
 const enc = new TextEncoder();
 const b64u = bytes => {
@@ -110,7 +118,7 @@ export async function sendPush(env, sub, message) {
 
 // ---- The lists ------------------------------------------------------------------
 
-const APP_KEYS = new Set(['match', 'odds', 'stock', 'vocab', 'orbit']);
+const APP_KEYS = new Set(['match', 'odds', 'stock', 'vocab', 'orbit', 'weather']);
 const MAX_ITEMS = 60;
 const HOLD_MS = 8 * 3_600_000;
 const CHECK_EVERY = 15 * 60_000;
@@ -131,6 +139,8 @@ export function cleanItems(items, now = Date.now()) {
         // The names the app shows (the Worker adds the score and who won).
         if (Array.isArray(c.names) && c.names.length === 2) item.check.names = c.names.map(n => cleanText(n, 40));
       }
+      const w = c?.weather;
+      if (w && Math.abs(w.lat) <= 90 && Math.abs(w.lon) <= 180 && ['brief', 'rain'].includes(w.kind)) item.check = { weather: { lat: Math.round(w.lat * 1e4) / 1e4, lon: Math.round(w.lon * 1e4) / 1e4, kind: w.kind } };
       if (c?.yahoo && /^[\w.^=-]{1,20}$/.test(c.yahoo) && ['above', 'below'].includes(c.op) && Number.isFinite(c.price)) item.check = { yahoo: c.yahoo, op: c.op, price: c.price };
       return item;
     })
@@ -184,7 +194,8 @@ export async function handlePush(request, env, headers, session, path) {
 
 // ---- Checks: news the Worker finds out itself --------------------------------
 
-async function runCheck(check, lang) {
+async function runCheck(check, lang, env) {
+  if (check.weather) return weatherCheck(env, check.weather);
   if (check.espn) {
     const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${check.espn}/summary?event=${check.event}`);
     if (!res.ok) return null;
@@ -249,7 +260,7 @@ export async function sendDue(env, now = Date.now()) {
       }
       let message = { title: item.title, body: item.body, tag: item.tag, url: item.url };
       if (item.check) {
-        const found = await runCheck(item.check, record.lang).catch(() => null);
+        const found = await runCheck(item.check, record.lang, env).catch(() => null);
         if (!found) {
           if (now < (item.until || item.firstAt || item.at) + (item.until ? 0 : HOLD_MS)) keep.push({ ...item, firstAt: item.firstAt || item.at, at: now + CHECK_EVERY });
           continue;

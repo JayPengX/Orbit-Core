@@ -25,6 +25,7 @@ import { readToken, tokenSecret, sessionLimited } from './quadra-token.js';
 import { handleKambiRequest, refreshKambiWatch, fetchKambiLive } from './kambi.js';
 import { handlePush, sendDue } from './push.js';
 import { handleWeather } from './weather.js';
+import { weatherCron, skillReport } from './weather-skill.js';
 
 const ALLOWED_ORIGINS = ['https://jaypengx.github.io'];
 
@@ -1325,8 +1326,13 @@ export default {
     }
     // Web Push (push.js): here, where the Quadra Pass tokens can be read.
     if (path.startsWith('/push/')) {
-      const qt = new URL(request.url).searchParams.get('qt');
-      const session = qt ? await readToken(await tokenSecret(env), qt, 'ses') : null;
+      const q = new URL(request.url).searchParams;
+      const qt = q.get('qt');
+      let session = qt ? await readToken(await tokenSecret(env), qt, 'ses') : null;
+      // Orbit Weather has no sign-in: a device pushes under its own random
+      // id, from the apps' origin, as the account `wdev-<id>`.
+      const dev = q.get('dev');
+      if (!session && dev && /^[A-Za-z0-9_-]{22,43}$/.test(dev) && isAllowedOrigin(origin)) session = { d: `wdev-${dev}`, a: 'weather', s: `wdev-${dev}` };
       if (session && sessionLimited(`p:${session.s}`, 30)) return errorJson('RATE_LIMITED', 429, headers, request);
       return handlePush(request, env, headers, session, path);
     }
@@ -1334,6 +1340,7 @@ export default {
     // origin, 30 a minute an IP (Google's spend is capped in weather.js).
     if (path === '/weather' || path.startsWith('/weather/')) {
       if (path === '/weather' && !isAllowedOrigin(origin)) return errorJson('FORBIDDEN_ORIGIN', 403, headers, request);
+      if (path === '/weather/skill') return new Response(JSON.stringify(await skillReport(env)), { headers: { ...headers, 'Content-Type': 'application/json' } });
       return handleWeather(request, env, headers, path, { ctx, limited: () => sessionLimited(`w:${ip}`, 30) });
     }
     return errorJson('NOT_FOUND', 404, headers, request);
@@ -1344,6 +1351,8 @@ export default {
   // (kambi.js).
   async scheduled(event, env, ctx) {
     ctx.waitUntil(sendDue(env).then(r => r.sent && console.log('push sent', JSON.stringify(r))));
+    // Orbit Weather's scoring, once an hour (weather-skill.js).
+    if (new Date(event.scheduledTime || Date.now()).getUTCMinutes() === 10) ctx.waitUntil(weatherCron(env).then(r => console.log('weather skill', JSON.stringify(r))).catch(e => console.log('weather skill failed', String(e))));
     if (!env.FIREBASE_PROJECT_ID || !env.FIREBASE_CLIENT_EMAIL || !env.FIREBASE_PRIVATE_KEY) return;
     ctx.waitUntil(refreshKambiWatch(env, KAMBI_DEPS).then(r => console.log('kambi watch', JSON.stringify(r))));
   }

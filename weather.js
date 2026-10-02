@@ -42,8 +42,8 @@ export const CWA = 'https://opendata.cwa.gov.tw/api/v1/rest/datastore/';
 export const MOENV = 'https://data.moenv.gov.tw/api/v2/';
 const KEYS = { google: 'GOOGLE_WEATHER_KEY', cwa: 'CWA_KEY', moenv: 'MOENV_KEY' };
 const TAIPEI = { lat: 25.034, lon: 121.565 };
-const MIN = 60_000;
-const HOUR = 60 * MIN;
+export const MIN = 60_000;
+export const HOUR = 60 * MIN;
 export const FRESH_MS = 15 * MIN;
 export const STALE_MS = 3 * HOUR;
 export const KEEP_MS = 6 * HOUR;
@@ -121,7 +121,7 @@ export function scrub(text, env) {
   return out;
 }
 
-async function getJson(fetchFn, url, env) {
+export async function getJson(fetchFn, url, env) {
   const res = await fetchFn(url, { headers: { Accept: 'application/json' } });
   const text = await res.text();
   if (!res.ok) throw new Error(scrub(`${res.status} ${text.slice(0, 160)}`, env));
@@ -407,7 +407,7 @@ export function parseAir(sites, forecast, lat, lon, county) {
 
 // ---- KV --------------------------------------------------------------------------
 
-async function kvJson(env, key) {
+export async function kvJson(env, key) {
   try {
     const v = env.RATE_LIMIT_KV && (await env.RATE_LIMIT_KV.get(key));
     return v ? JSON.parse(v) : null;
@@ -415,7 +415,7 @@ async function kvJson(env, key) {
     return null;
   }
 }
-async function kvPut(env, key, value, ttlS) {
+export async function kvPut(env, key, value, ttlS) {
   try {
     if (env.RATE_LIMIT_KV) await env.RATE_LIMIT_KV.put(key, JSON.stringify(value), { expirationTtl: ttlS });
   } catch {}
@@ -569,7 +569,81 @@ export function assemble({ cell, now, google, cwa, air, warnings, weights = DEFA
     partial
   };
   resp.advice = advise(resp, now);
+  resp.headline = headline(resp, now);
   return { resp, bySource };
+}
+
+// ---- One sentence (the numbers, said plainly; no model, no cost) ---------------
+
+// "HH:MM" where the forecast is.
+export function clockIn(ms, tz = 'Asia/Taipei') {
+  try {
+    return new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(ms));
+  } catch {
+    return twClock(ms);
+  }
+}
+const hourIn = (ms, tz) => Number(clockIn(ms, tz).slice(0, 2));
+
+// The next hours' rain, said once: when it starts and how likely, or that
+// it stays dry.
+export function rainPhrase(hours, now, span = 12, tz) {
+  const next = (hours || []).filter(h => h.t + HOUR > now && h.t < now + span * HOUR && h.pop != null);
+  if (!next.length) return null;
+  const first = next.find(h => h.pop >= 50);
+  const top = next.reduce((a, h) => (h.pop > a.pop ? h : a), next[0]);
+  if (first) return first.t <= now ? `正在或即將下雨（${first.pop}%）` : `${hourIn(first.t, tz)} 點起可能下雨（${Math.max(first.pop, top.pop)}%）`;
+  if (top.pop >= 30) return `${hourIn(top.t, tz)} 點前後有機會下雨（${top.pop}%）`;
+  return `未來 ${span} 小時不太會下雨`;
+}
+
+export function headline(resp, now) {
+  const tz = resp.tz;
+  const parts = [];
+  const c = resp.now?.condition?.text;
+  if (c) parts.push(`現在${c}`);
+  const rain = rainPhrase(resp.hours, now, 12, tz);
+  if (rain) parts.push(rain);
+  const evening = hourIn(now, tz) >= 18;
+  const date = evening ? twDate(now + 24 * HOUR) : twDate(now);
+  const d = resp.days?.find(x => x.date === date);
+  if (d?.hi != null) parts.push(`${evening ? '明天' : '今天'}最高 ${Math.round(d.hi)}°${d.lo != null ? `、最低 ${Math.round(d.lo)}°` : ''}`);
+  return parts.length ? parts.join('，') + '。' : '';
+}
+
+// The morning brief (push.js, check { weather }): today, in one line.
+export function briefText(resp, now) {
+  const tz = resp.tz;
+  const parts = [];
+  const rain = rainPhrase(resp.hours, now, 14, tz);
+  if (rain) parts.push(rain);
+  const d = resp.days?.find(x => x.date === twDate(now)) || resp.days?.[0];
+  if (d?.hi != null) parts.push(`最高 ${Math.round(d.hi)}°${d.lo != null ? ` / 最低 ${Math.round(d.lo)}°` : ''}`);
+  const sun = resp.advice?.find(a => a.kind === 'sun');
+  if (sun) parts.push(`UV ${hourIn(sun.why.from, tz)}–${hourIn(sun.why.to, tz)} 點${sun.level}`);
+  if (resp.air?.level) parts.push(`空氣${resp.air.level}`);
+  const wear = resp.advice?.find(a => a.kind === 'wear');
+  if (wear) parts.push(wear.text.replace(/^穿著：/, ''));
+  const place = resp.place?.town || '';
+  return { title: `${place ? place + ' ' : ''}今天天氣`, body: parts.join('，') };
+}
+
+// A notice's check (push.js): { weather: { lat, lon, kind: 'brief' | 'rain' } }.
+// 'brief' answers at once; 'rain' answers only when the next 2 hours reach
+// RAIN_ALERT (else null: push.js asks again in 15 minutes, until `until`).
+export const RAIN_ALERT = 60;
+export async function weatherCheck(env, w, { fetchFn = fetch, now = Date.now() } = {}) {
+  const jobs = [];
+  const resp = await cellForecast(env, { waitUntil: p => jobs.push(p) }, w.lat, w.lon, { fetchFn, now, freshMs: HOUR });
+  if (w.kind === 'brief') {
+    await Promise.all(jobs);
+    return briefText(resp, now);
+  }
+  const soon = (resp.hours || []).filter(h => h.t + HOUR > now && h.t < now + 2 * HOUR && h.pop != null);
+  const wet = soon.find(h => h.pop >= RAIN_ALERT);
+  await Promise.all(jobs);
+  if (!wet) return null;
+  return { title: '☂️ 快下雨了', body: `${resp.place?.town ? resp.place.town + ' ' : ''}${clockIn(Math.max(wet.t, now), resp.tz)} 前後降雨機率 ${wet.pop}%，出門記得帶傘。` };
 }
 
 // ---- Advice (plan section D; thresholds in one table) ---------------------------
@@ -602,15 +676,15 @@ export function advise(resp, now, w = ADVICE.window) {
   const out = [];
   if (hrs.length) {
     const wet = hrs.reduce((a, h) => ((h.pop ?? -1) > (a.pop ?? -1) ? h : a), hrs[0]);
-    if (wet.pop >= ADVICE.umbrella) out.push({ kind: 'umbrella', level: 'yes', text: `帶傘：${twClock(wet.t)} 降雨機率 ${wet.pop}%`, why: { pop: wet.pop, at: wet.t } });
-    else if (wet.pop >= ADVICE.umbrellaMaybe) out.push({ kind: 'umbrella', level: 'maybe', text: `可帶摺疊傘：${twClock(wet.t)} 降雨機率 ${wet.pop}%`, why: { pop: wet.pop, at: wet.t } });
+    if (wet.pop >= ADVICE.umbrella) out.push({ kind: 'umbrella', level: 'yes', text: `帶傘：${clockIn(wet.t, resp.tz)} 降雨機率 ${wet.pop}%`, why: { pop: wet.pop, at: wet.t } });
+    else if (wet.pop >= ADVICE.umbrellaMaybe) out.push({ kind: 'umbrella', level: 'maybe', text: `可帶摺疊傘：${clockIn(wet.t, resp.tz)} 降雨機率 ${wet.pop}%`, why: { pop: wet.pop, at: wet.t } });
 
     const sunny = hrs.filter(h => h.uv != null && h.uv >= ADVICE.sunUv);
     if (sunny.length) {
       const peak = Math.max(...sunny.map(h => h.uv));
       const from = sunny[0].t;
       const to = sunny[sunny.length - 1].t + HOUR;
-      out.push({ kind: 'sun', level: uvLevel(peak), text: `防曬：${twClock(from)}–${twClock(to)} UV ${peak}（${uvLevel(peak)}）`, why: { uv: peak, from, to } });
+      out.push({ kind: 'sun', level: uvLevel(peak), text: `防曬：${clockIn(from, resp.tz)}–${clockIn(to, resp.tz)} UV ${peak}（${uvLevel(peak)}）`, why: { uv: peak, from, to } });
     }
 
     const feels = hrs.map(h => h.feels ?? h.temp).filter(v => v != null);
@@ -676,6 +750,19 @@ export async function buildCell(env, lat, lon, { fetchFn = fetch, now = Date.now
   return { at: now, resp, bySource, sources, parts: { google: google.state === 'ok' || google.state === 'stale' ? { at: google.at, v: google.v } : null, cwa: cwa.state === 'ok' || cwa.state === 'stale' ? { at: cwa.at, v: cwa.v } : null } };
 }
 
+// The cells people opened lately (`weather:recent`, cell → when), for the
+// scoring (weather-skill.js): written at most every 6 hours a cell.
+export async function noteRecent(env, cell, now) {
+  const r = (await kvJson(env, 'weather:recent')) || {};
+  if (r[cell] && now - r[cell] < 6 * HOUR) return;
+  r[cell] = now;
+  const keep = Object.entries(r)
+    .filter(([, t]) => now - t < 3 * 86_400_000)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 20);
+  await kvPut(env, 'weather:recent', Object.fromEntries(keep), 4 * 86_400);
+}
+
 // The cell from KV, fresh or refreshed (in the background when it's merely
 // old). `freshMs` longer for the open status sample.
 export async function cellForecast(env, ctx, lat, lon, { fetchFn = fetch, now = Date.now(), freshMs = FRESH_MS } = {}) {
@@ -686,6 +773,7 @@ export async function cellForecast(env, ctx, lat, lon, { fetchFn = fetch, now = 
   const refresh = async () => {
     const entry = await buildCell(env, lat, lon, { fetchFn, now, prev: hit });
     await kvPut(env, key, entry, KEEP_MS / 1000);
+    await noteRecent(env, cellOf(lat, lon), now);
     return entry;
   };
   if (hit && now - hit.at < freshMs) return { ...hit.resp, cached: true };
