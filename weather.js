@@ -634,7 +634,8 @@ export function advise(resp, now, w = ADVICE.window) {
     const score = d => d.pop + (d.uvMax ?? 0) * 3 + Math.abs(d.hi - 25) * 2;
     const sorted = [...week].sort((a, b) => score(a) - score(b));
     const laundry = week.find(d => d.pop < 20 && /CLEAR|SUNNY|PARTLY/.test(d.day?.condition?.code || ''));
-    out.push({ kind: 'week', level: 'info', text: `本週最佳：${sorted[0].date.slice(5)}；最差：${sorted[sorted.length - 1].date.slice(5)}${laundry ? `；曬衣：${laundry.date.slice(5)}` : ''}`, why: { best: sorted[0].date, worst: sorted[sorted.length - 1].date, laundry: laundry?.date || null } });
+    const md = date => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}（週${'日一二三四五六'[new Date(date + 'T12:00:00Z').getUTCDay()]}）`;
+    out.push({ kind: 'week', level: 'info', text: `本週最佳：${md(sorted[0].date)}；最差：${md(sorted[sorted.length - 1].date)}${laundry ? `；適合曬衣：${md(laundry.date)}` : ''}`, why: { best: sorted[0].date, worst: sorted[sorted.length - 1].date, laundry: laundry?.date || null } });
   }
   return out;
 }

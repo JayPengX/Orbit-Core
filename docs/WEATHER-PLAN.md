@@ -1,9 +1,15 @@
-# Plan: a weather PWA that blends several forecasts (phase 1 done)
+# Plan: a weather PWA that blends several forecasts (proxy and app built)
 
 Written 2026-10-02 after a day the current weather app (CWA 中央氣象署 data
 only) got wrong, while Google's forecast looked closer. Nothing is built yet.
 Part A is what to do now (keys, accounts); parts B onward are the build, for
 a session to follow step by step.
+
+**Owner's calls (2026-10-02):** one truth on screen (see C3); no sign-in
+and nothing personal (no saved places, school hours or brief time): the app
+works for wherever it's opened, location permission or not (see HANDOFF).
+Where this plan still says Quadra Pass, saved places or school window, read
+it in that light.
 
 **Progress (2026-10-02):** A1–A5 done (the app is Orbit Weather, repo
 `JayPengX/Orbit-Weather`); phase 1 built (`weather.js`, see HANDOFF). Found

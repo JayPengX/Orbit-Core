@@ -37,9 +37,20 @@ Planned in `docs/WEATHER-PLAN.md`; the PWA's repo is `JayPengX/Orbit-Weather`
   the Worker's samples (`/weather/status?sample=<name>`, cached an hour).
 - `/weather/status?sample=forecast` is `/weather` at Taipei 101 without a
   pass (refreshed at most hourly), for checks.
-- Next: phase 2 (places routes, the hourly scoring cron), then the PWA.
-  Still to hear from the owner (plan A7): home and school, school hours, the
-  brief's time.
+- **No sign-in, no personal setup** (the owner's call): `/weather` is open
+  to the apps' origin (30 a minute an IP; Google capped at
+  `GOOGLE_DAILY_REFRESHES` = 110 refreshes a day, then CWA alone),
+  `?auto=1` places the caller by IP (`request.cf`), `/weather/places` lists
+  the townships for the picker. No saved places, school hours or brief
+  time: advice uses a generic day (07:30–17:00).
+- **The app** (`JayPengX/Orbit-Weather`, https://jaypengx.github.io/Orbit-Weather/):
+  plain HTML / CSS / ES modules in `public/`, tests `npm test`, Pages via
+  GitHub Actions. Location never blocks: last forecast at once; the
+  device's coarse position if already allowed; else the IP estimate with a
+  「使用精確位置」 button; a township picker for denied / elsewhere.
+- Next: the scoring (plan C7) over the cells people actually open (no saved
+  places), which moves `weather:weights`; then the morning brief and rain
+  alert (C8) would need push, i.e. the pass or a push subscription without it.
 
 ## Play: Kambi first, real markets, players, new leagues, live (branch `claude/gallant-goodall-gtyxjg`, pushed to `main`)
 
