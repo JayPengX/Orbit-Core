@@ -26,14 +26,14 @@ saved.
 ## The two Workers
 
 - **`orbit-workers-proxy`** (`worker.js`, `eco.js`, `eco-admin.js`,
-  `kambi.js`, `quadra-token.js`, `weather.js`, `weather-stations.js`, `wrangler.toml`):
+  `kambi.js`, `quadra-token.js`, `weather.js`, `weather-stations.js`, `weather-skill.js`, `wrangler.toml`):
 
   | Route | What |
   | --- | --- |
   | `/eco` | The Quadra Pass (below) |
   | `/gemini`, `/nl-edit` | Orbit Class's AI schedule-photo import and natural-language edits; the Gemini key stays here |
   | `/kambi` | The last live data of Kambi matches Quadra Play has bets on (a 10-minute cron keeps it) |
-  | `/weather` | Orbit Weather's forecast for a ~1 km cell, Google, CWA and MOENV blended (`weather.js`, `docs/WEATHER-PLAN.md`); `/weather/status` checks the three keys |
+  | `/weather` | Orbit Weather's forecast for a ~1 km cell, Google, CWA and MOENV blended (`weather.js`, `docs/WEATHER-PLAN.md`); `/weather/status` checks the three keys; `/weather/skill` the scoring (`weather-skill.js`) |
 
 - **`sports-proxy`** (`sports-proxy-worker.js`, `wrangler.sports-proxy.toml`):
   `/sports-proxy`, a host-allowlisted passthrough to ESPN, the MLB Stats

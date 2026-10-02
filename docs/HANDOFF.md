@@ -48,9 +48,25 @@ Planned in `docs/WEATHER-PLAN.md`; the PWA's repo is `JayPengX/Orbit-Weather`
   GitHub Actions. Location never blocks: last forecast at once; the
   device's coarse position if already allowed; else the IP estimate with a
   「使用精確位置」 button; a township picker for denied / elsewhere.
-- Next: the scoring (plan C7) over the cells people actually open (no saved
-  places), which moves `weather:weights`; then the morning brief and rain
-  alert (C8) would need push, i.e. the pass or a push subscription without it.
+- **Scoring** (`weather-skill.js`, plan C7): the cron at :10 each hour scores
+  the 6 cells opened most lately (`weather:recent`, noted at most every 6 h
+  a cell) from snapshots of their own refreshes (no extra Google calls)
+  against the nearest CWA rain gauge (≥ 0.5 mm: rained; Brier) and station
+  (absolute error), 0–6 h / 6–24 h, 14 days in `weather:skill:<cell>`. Once
+  a day after 3 days of scores, `weather:weights` moves (∝ 1/score, floor
+  0.15, at most 0.1 a day). `GET /weather/skill`: weights and mean scores,
+  no places. Never in the app.
+- **Notices without the pass** (`push.js`): `/push/subscribe|schedule?dev=<22
+  chars>` from the apps' origin = account `wdev-<id>`, app `weather`. Checks
+  `{ weather: { lat, lon, kind: 'brief' | 'rain' } }` run `weatherCheck`:
+  the brief in one line (`briefText`), the rain alert when the next 2 hours
+  reach 60% (re-checked every 15 minutes until `until`; the forecast read
+  with a 1-hour freshness so it costs at most a refresh an hour).
+- `/weather` answers a one-sentence `headline` (from the numbers, no model).
+- The app: always dark; 🔔 settings (brief time, rain alert; iPhone needs
+  the home-screen app); radar card (CWA's `CV1_TW_1000.png`, loaded on open).
+- Open: the owner will say how to group the UI ("categorize like this", the
+  example didn't arrive).
 
 ## Play: Kambi first, real markets, players, new leagues, live (branch `claude/gallant-goodall-gtyxjg`, pushed to `main`)
 

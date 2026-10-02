@@ -1,4 +1,4 @@
-# Plan: a weather PWA that blends several forecasts (proxy and app built)
+# Plan: a weather PWA that blends several forecasts (built: phases 1–5)
 
 Written 2026-10-02 after a day the current weather app (CWA 中央氣象署 data
 only) got wrong, while Google's forecast looked closer. Nothing is built yet.
