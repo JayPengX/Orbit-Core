@@ -1090,6 +1090,8 @@ const SAMPLES = {
   'moenv-aqi': env => moenvUrl(env, 'aqx_p_432', '&limit=1000'),
   'moenv-aqf': env => moenvUrl(env, 'aqf_p_01', '&limit=100'),
   'moenv-uv': env => moenvUrl(env, 'uv_s_01', '&limit=100'),
+  'moenv-aqi-hist': env => moenvUrl(env, 'aqx_p_488', `&limit=60&filters=${encodeURIComponent('sitename,EQ,松山')}&sort=${encodeURIComponent('datacreationdate desc')}`),
+  'moenv-aqi-hist-plain': env => moenvUrl(env, 'aqx_p_488', '&limit=3'),
   'google-air': env => [`${GOOGLE_AIR}forecast:lookup?key=${encodeURIComponent(env.GOOGLE_WEATHER_KEY)}`, googleAirBody(LA, LO, Date.now())]
 };
 // Each county's township datasets, by the county they name (checks COUNTY_IDS).
