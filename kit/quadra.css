@@ -866,6 +866,8 @@ dialog.q-moved::backdrop {
 .q-sheet {
   width: min(460px, 100vw);
   max-height: min(88vh, 900px);
+  /* What's visible beside Safari's toolbar (vh is the screen without it). */
+  max-height: min(88dvh, 900px);
   margin: auto auto 0;
   padding: 0 18px calc(18px + env(safe-area-inset-bottom));
   border: 0;

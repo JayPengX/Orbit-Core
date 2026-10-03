@@ -60,14 +60,15 @@ import { handleTransit } from '../transit.js';
 import { upstream as transitFixtures } from '../tests/fixtures/transit/upstream.mjs';
 
 const require = createRequire(import.meta.url);
-let chromium;
-for (const p of ['playwright', '/opt/node22/lib/node_modules/playwright']) {
+// The container's global one, or a Mac's in ~/.local/opt/playwright.
+let playwright;
+for (const p of ['playwright', '/opt/node22/lib/node_modules/playwright', `${process.env.HOME}/.local/opt/playwright/node_modules/playwright`]) {
   try {
-    ({ chromium } = require(p));
+    playwright = require(p);
     break;
   } catch {}
 }
-if (!chromium) throw new Error('Playwright not found');
+if (!playwright) throw new Error('Playwright not found');
 
 const args = process.argv.slice(2);
 const opt = (name, fallback) => {
@@ -84,6 +85,9 @@ const flag = name => {
   return true;
 };
 const fakeYahoo = flag('fake-yahoo');
+// --webkit: Safari's engine instead of Chromium (on a Mac, close to the
+// iPhone's Safari; what most of the apps' people use).
+const engine = flag('webkit') ? 'webkit' : 'chromium';
 const out = resolve(opt('out', '/tmp/quadra-preview'));
 // --device ipad (an iPad: says Macintosh, with touch, 820×1180) or pc (a
 // computer's browser, 1440×900, no touch); the default an iPhone.
@@ -137,7 +141,10 @@ const APPS = { sports: ['Orbit-Sports', 'match'], play: ['Quadra-Play', 'odds'],
 const ALIAS = { fixtures: 'sports', hub: 'words' };
 const key = Object.keys(APPS).find(k => k === (ALIAS[appArg] || appArg) || APPS[k][0].toLowerCase() === String(appArg).toLowerCase());
 if (!key) throw new Error(`usage: node tools/preview.mjs <${Object.keys(APPS).join('|')}> [hash…]`);
-const [repo, appId] = APPS[key];
+const [renamed, appId] = APPS[key];
+// A clone made before the rename keeps the old folder name.
+const OLD = { 'Orbit-Sports': 'Quadra-Fixtures', 'Orbit-Words': 'Quadra-Hub' };
+const repo = existsSync(join(ROOT, renamed)) || !OLD[renamed] ? renamed : OLD[renamed];
 const dir = key === 'orbit' ? join(ROOT, repo, 'dist') : join(ROOT, repo, 'public');
 if (!existsSync(dir)) throw new Error(`${dir} missing${key === 'orbit' ? ' (run npm run build in Orbit-Class)' : ''}`);
 
@@ -158,7 +165,7 @@ const server = createServer(async (req, res) => {
   }
 });
 await new Promise(r => server.listen(0, r));
-const base = `http://localhost:${server.address().port}/${repo}/`;
+const base = `http://localhost:${server.address().port}/${renamed}/`;
 
 // ---- Upstream data, straight from the source ----
 // Given up after 8 s, like the Worker (SPORTS_PROXY_UPSTREAM_TIMEOUT_MS).
@@ -266,7 +273,7 @@ const payload = payloadFile ? await readFile(payloadFile, 'utf8') : null;
 const b64 = s => Buffer.from(s).toString('base64url');
 const refresh = `${b64(JSON.stringify({ d: '0123456789abcdef0123456789abcdef' }))}.preview`;
 
-const browser = await chromium.launch();
+const browser = await playwright[engine].launch();
 const context = await browser.newContext({
   // No service workers: their fetches would miss the routes below.
   serviceWorkers: 'block',
@@ -405,7 +412,7 @@ for (const hash of hashes.length ? hashes : ['']) {
     await page.waitForTimeout(4000);
   }
   for (const js of evals) console.log('eval:', JSON.stringify(await page.evaluate(js).catch(e => `error ${e.message}`)));
-  const file = join(out, `${key}-${hash || 'start'}${clicks.length ? '-clicked' : ''}${dark ? '-dark' : ''}.png`);
+  const file = join(out, `${key}-${hash || 'start'}${clicks.length ? '-clicked' : ''}${dark ? '-dark' : ''}${engine === 'webkit' ? '-webkit' : ''}.png`);
   await page.screenshot({ path: file, fullPage: full });
   // Anything wider than the screen (a sideways scroll on a phone).
   const wide = await page.evaluate(() => {
