@@ -24,6 +24,10 @@
 //   check: { weather: { lat, lon, kind: 'brief'|'rain' } }   Orbit Weather's
 //          morning brief, or a rain alert when the next 2 hours turn wet
 //          (weather.js weatherCheck)
+//   check: { bus: { path, route, dir, min } }  Orbit Transit's 到站提醒: the bus
+//          (RouteUID, direction) is `min` minutes from the stop, by TDX's live
+//          estimates at that stop (`path`, the app's own TDX ask, through the
+//          shared cache); asked again every run (each 2 minutes), not each 15
 //
 // Stored in KV (RATE_LIMIT_KV): `push:<account>:<app>` the device's
 // subscription and list, `push:prefs:<account>` the switches, `push:due` when each list's next notice is due,
@@ -35,6 +39,7 @@
 // for the push service (RFC 8292, VAPID): WebCrypto only, no library.
 
 import { weatherCheck } from './weather.js';
+import { tdxGet, tdxRequest } from './transit.js';
 
 const enc = new TextEncoder();
 const b64u = bytes => {
@@ -115,10 +120,14 @@ export async function sendPush(env, sub, message) {
 
 // ---- The lists ------------------------------------------------------------------
 
-const APP_KEYS = new Set(['match', 'odds', 'stock', 'vocab', 'orbit', 'weather']);
+const APP_KEYS = new Set(['match', 'odds', 'stock', 'vocab', 'orbit', 'weather', 'transit']);
 const MAX_ITEMS = 60;
 const HOLD_MS = 8 * 3_600_000;
 const CHECK_EVERY = 15 * 60_000;
+// A bus comes in minutes: every run (the cron's 2 minutes).
+const BUS_EVERY = 60_000;
+// Runs are 2 minutes apart: told up to a minute early rather than late.
+const BUS_EARLY = 60;
 const cleanText = (x, n) => String(x ?? '').slice(0, n);
 const okUrl = u => (typeof u === 'string' && /^https:\/\/jaypengx\.github\.io\//.test(u) ? u : '');
 
@@ -138,6 +147,9 @@ export function cleanItems(items, now = Date.now()) {
       }
       const w = c?.weather;
       if (w && Math.abs(w.lat) <= 90 && Math.abs(w.lon) <= 180 && ['brief', 'rain'].includes(w.kind)) item.check = { weather: { lat: Math.round(w.lat * 1e4) / 1e4, lon: Math.round(w.lon * 1e4) / 1e4, kind: w.kind } };
+      const b = c?.bus;
+      if (b && typeof b.path === 'string' && /^advanced\/v2\/Bus\/EstimatedTimeOfArrival\/[^?]*\/PassThrough\/Station\//.test(b.path) && tdxRequest(b.path) && /^[A-Z]{3}[\w-]{1,20}$/.test(String(b.route)) && [0, 1, 2].includes(Number(b.dir)) && Number(b.min) >= 1 && Number(b.min) <= 30)
+        item.check = { bus: { path: b.path, route: String(b.route), dir: Number(b.dir), min: Number(b.min) } };
       if (c?.yahoo && /^[\w.^=-]{1,20}$/.test(c.yahoo) && ['above', 'below'].includes(c.op) && Number.isFinite(c.price)) item.check = { yahoo: c.yahoo, op: c.op, price: c.price };
       return item;
     })
@@ -193,6 +205,23 @@ export async function handlePush(request, env, headers, session, path) {
 
 async function runCheck(check, lang, env) {
   if (check.weather) return weatherCheck(env, check.weather);
+  if (check.bus) {
+    const got = await tdxGet(env, check.bus.path);
+    if (got.status !== 200) return null;
+    const j = JSON.parse(got.body);
+    // TDX's v2 answers are a list, or an object holding it (the app's rows()).
+    const rows = Array.isArray(j) ? j : (j && typeof j === 'object' && Object.values(j).find(Array.isArray)) || [];
+    const secs = rows
+      .filter(r => r.RouteUID === check.bus.route && Number(r.Direction) === check.bus.dir && Number(r.StopStatus || 0) === 0 && r.EstimateTime != null)
+      .map(r => Number(r.EstimateTime))
+      .filter(Number.isFinite);
+    if (!secs.length) return null;
+    const sec = Math.min(...secs);
+    if (sec > check.bus.min * 60 + BUS_EARLY) return null;
+    const m = Math.round(sec / 60);
+    const result = m <= 1 ? (lang === 'en' ? 'arriving now' : '進站中') : lang === 'en' ? `${m} min away` : `約 ${m} 分鐘到站`;
+    return { body: result, result };
+  }
   if (check.espn) {
     const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${check.espn}/summary?event=${check.event}`);
     if (!res.ok) return null;
@@ -259,7 +288,7 @@ export async function sendDue(env, now = Date.now()) {
       if (item.check) {
         const found = await runCheck(item.check, record.lang, env).catch(() => null);
         if (!found) {
-          if (now < (item.until || item.firstAt || item.at) + (item.until ? 0 : HOLD_MS)) keep.push({ ...item, firstAt: item.firstAt || item.at, at: now + CHECK_EVERY });
+          if (now < (item.until || item.firstAt || item.at) + (item.until ? 0 : HOLD_MS)) keep.push({ ...item, firstAt: item.firstAt || item.at, at: now + (item.check.bus ? BUS_EVERY : CHECK_EVERY) });
           continue;
         }
         message = { ...message, title: found.title || item.title, body: (item.body || found.body || '').replace('{result}', found.result || '') };

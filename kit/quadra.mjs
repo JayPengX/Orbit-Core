@@ -1934,7 +1934,8 @@ export const NOTICE_KINDS = {
   weather: [
     ['brief', '早晨天氣', 'Morning weather', '每天早上一句話：降雨、溫度、紫外線、空氣。', 'Each morning in one line: rain, temperature, UV, air.'],
     ['rain', '降雨提醒', 'Rain alert', '白天 2 小時內可能下雨時，一天最多一次。', 'When rain is likely within 2 hours, once a day at most.']
-  ]
+  ],
+  transit: [['bus', '到站提醒', 'Bus alert', '你設定的公車快到站時，手機鎖著也會通知。', 'When a bus you set an alert for is nearly at your stop, even with the phone locked.']]
 };
 
 // The switches belong to the pass, not the device: the wallet setting

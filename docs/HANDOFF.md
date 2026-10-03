@@ -7,6 +7,25 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
 `npx eslint .`).
 
 
+## On the owner's Mac: Safari, and Transit's bus alerts by push (2026-10-04)
+
+- **The owner works on a Mac now** (repos in `~/Documents/GitHub`, Orbit
+  Words and Sports still in their old `Quadra-Hub` / `Quadra-Fixtures`
+  folders). Node 22 and gh are in `~/.local`, Playwright (WebKit, Chromium)
+  in `~/.local/opt/playwright`; `tools/preview.mjs --webkit` screenshots in
+  Safari's engine. Xcode (the iOS Simulator) isn't installed yet.
+- **A Mac's disk ignores case:** Orbit Words had `Celsius.mp3` beside
+  `celsius.mp3` (a clone there showed them changed). Gone, with a test.
+- **Safari:** bottom sheets use `dvh` beside `vh` (vh is the screen without
+  Safari's toolbar, so a sheet's top went under it). An iPhone has no
+  `navigator.vibrate`: Transit's buzz is a chime there (`lib/buzz.mjs`).
+- **Transit's 到站提醒 by push:** they were only checked inside the app (every
+  20 s), which an iPhone stops when it's locked. Now the app hands them to
+  the Worker too (`schedulePush`, kind `bus`), `push.js` takes `transit` and
+  a `check.bus` (the stop's TDX ask, the route and way, the minutes), asked
+  again every cron run (2 min) and sent up to a minute early. Setting an
+  alert turns notices on for the pass unless they were turned off.
+
 ## The rebrand: Quadra and Orbit, the kit served from one place (branch `claude/jolly-archimedes-99qqv7`)
 
 - **Two families.** Quadra is where the money is: Quadra Securities, Quadra

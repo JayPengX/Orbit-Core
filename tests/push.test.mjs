@@ -97,3 +97,50 @@ test('a kind switched off in any app (or notices off) is never sent', async () =
   }
   assert.equal(JSON.parse(kv.m.get('push:acct:stock')).items.length, 0);
 });
+
+test('Orbit Transit’s bus alert: checked each run until the bus is that close, then sent once', async () => {
+  const path = 'advanced/v2/Bus/EstimatedTimeOfArrival/City/Hsinchu/PassThrough/Station/1234?$select=RouteUID,Direction,EstimateTime,StopStatus';
+  const bus = { path, route: 'HSZ0058', dir: 0, min: 5 };
+  const now = Date.now();
+  // Only a station's arrivals, a sane route and minutes.
+  const clean = cleanItems(
+    [
+      { at: now, until: now + 7_200_000, title: '5608 快到了', check: { bus } },
+      { at: now, title: 'any TDX ask', check: { bus: { ...bus, path: 'basic/v2/Bus/Route/City/Hsinchu' } } },
+      { at: now, title: 'an hour', check: { bus: { ...bus, min: 60 } } }
+    ],
+    now
+  );
+  assert.deepEqual(clean.map(x => Boolean(x.check)), [true, false, false]);
+  assert.deepEqual(clean[0].check, { bus });
+
+  const kv = memoryKv();
+  const env = { RATE_LIMIT_KV: kv, TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 'secret', TDX_PER_MIN: '100' };
+  const session = { d: 'acct', a: 'transit' };
+  const post = (p, body) => handlePush(new Request(`https://w/${p}`, { method: 'POST', body: JSON.stringify(body) }), env, {}, session, p);
+  const subKeys = { p256dh: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4', auth: 'BTBZMqHH6r4Tts7J_aSIgg' };
+  assert.equal((await post('/push/subscribe', { sub: { endpoint: 'https://push.example/t', keys: subKeys } })).status, 200, 'Transit may push');
+  await post('/push/schedule', { items: [{ at: now, until: now + 7_200_000, title: '5608 快到了', body: '{result}（竹東高中）', check: { bus } }] });
+
+  let sec = 600;
+  const sent = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    if (String(url).includes('openid-connect/token')) return Response.json({ access_token: 'T', expires_in: 86400 });
+    if (String(url).startsWith('https://tdx.')) return Response.json([{ RouteUID: 'HSZ0058', Direction: 1, EstimateTime: 60, StopStatus: 0 }, { RouteUID: 'HSZ0058', Direction: 0, EstimateTime: sec, StopStatus: 0 }]);
+    sent.push({ url, init });
+    return new Response(null, { status: 201 });
+  };
+  try {
+    assert.equal((await sendDue(env, now)).sent, 0, '10 minutes away: not yet');
+    const again = JSON.parse(kv.m.get('push:acct:transit')).items[0];
+    assert.ok(again.at - now <= 60_000, 'asked again on the next run, not in 15 minutes');
+    sec = 330; // within 5 minutes, give or take the run's 2
+    assert.equal((await sendDue(env, again.at)).sent, 1);
+    assert.equal((await sendDue(env, again.at + 120_000)).sent, 0, 'once');
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  assert.equal(sent.length, 1);
+  assert.equal(JSON.parse(kv.m.get('push:acct:transit')).items.length, 0);
+});
