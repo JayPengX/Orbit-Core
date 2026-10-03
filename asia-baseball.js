@@ -1,7 +1,7 @@
 // Asian baseball's schedules and scores from the leagues' own sites, as one
-// shape for Quadra Fixtures and Play. Kambi (Play's odds feed) only lists a
+// shape for Orbit Sports and Play. Kambi (Play's odds feed) only lists a
 // game a day or so ahead and drops it after, and ESPN doesn't carry these
-// leagues, so without this Fixtures had "no recent games" mid-season.
+// leagues, so without this Orbit Sports had "no recent games" mid-season.
 //
 //   NPB   npb.jp's monthly schedule page (HTML)
 //   KBO   koreabaseball.com's monthly schedule list (a POST answered in JSON rows)
@@ -13,7 +13,7 @@
 //     awayScore, state: 'pre' | 'in' | 'post' | 'void', venue }] }
 // `start` is UTC. A game "in" is one past its start and not yet marked over.
 
-import { parseTsdbDay, TSDB_DAY, TSDB_CPBL } from './kit/leagues.mjs';
+import { parseTsdbDay, TSDB_DAY, TSDB_CPBL } from './kit/catalog.mjs';
 
 export const ASIA_HOST = 'asia-baseball.quadra';
 export const ASIA_LEAGUES = ['npb', 'kbo', 'cpbl'];
@@ -172,7 +172,7 @@ export function parseCpbl(list, now = Date.now()) {
 
 // ---- Fetching ----------------------------------------------------------------------
 
-const UA = 'Mozilla/5.0 (compatible; Quadra-Fixtures/1.0; +https://github.com/JayPengX/Quadra-Fixtures)';
+const UA = 'Mozilla/5.0 (compatible; Orbit-Sports/1.0; +https://github.com/JayPengX/Orbit-Sports)';
 const TIMEOUT = 10_000;
 
 async function fetchNpb(year, month) {
@@ -260,7 +260,7 @@ async function fetchCpblTsdb(year, month, { from = Date.UTC(year, month - 1, 1),
 }
 // CPBL's own list, and TheSportsDB's days after its last game: CPBL's list
 // can stop short of the month (October's games were missing from it while
-// the season still had a week to go, so Fixtures showed no schedule).
+// the season still had a week to go, so Orbit Sports showed no schedule).
 async function cpbl(year, month, now = Date.now()) {
   let ownError = '';
   const own = await fetchCpbl(year, month).catch(error => ((ownError = String(error.message || error)), null));

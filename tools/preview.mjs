@@ -18,7 +18,7 @@
 //                          [--fake-yahoo]  (made-up Yahoo prices: spark and chart answers
 //                          for any symbol, for when Yahoo answers 429)
 //
-//   app   fixtures | play | securities | hub | orbit | weather | transit (or the repo's folder name)
+//   app   sports | play | securities | words | orbit | weather | transit (or the repo's folder name)
 //
 // Orbit Transit: /transit is answered by transit.js itself on made-up TDX
 // answers around 新竹車站 (tests/fixtures/transit; until the TDX key is set no
@@ -33,6 +33,7 @@
 //
 // What it does:
 //   - serves the app's public/ (Orbit Class: its built dist/ after `npm run build`)
+//     and the kit at /Shared-Proxy/kit/, as Pages does
 //     on localhost;
 //   - opens it in Chromium (Playwright, preinstalled in the Claude Code cloud
 //     container) as an iPhone-sized page already signed in: the Worker's /eco
@@ -96,7 +97,7 @@ const UAS = {
 const width = Number(opt('width', (SIZES[device] || SIZES.iphone)[0]));
 const height = Number(opt('height', (SIZES[device] || SIZES.iphone)[1]));
 const lang = opt('lang', 'zh');
-// --snap '{json}': the wallet's snap (each app's figures: Play's open slips for Fixtures, say).
+// --snap '{json}': the wallet's snap (each app's figures: Play's open slips for Orbit Sports, say).
 const snapStart = JSON.parse(opt('snap', '{}'));
 const wait = Number(opt('wait', 6000));
 const payloadFile = opt('payload', '');
@@ -131,8 +132,10 @@ const noGeo = flag('no-geo');
 const ROOT = resolve(opt('root', new URL('../../', import.meta.url).pathname));
 const [appArg, ...hashes] = args;
 
-const APPS = { fixtures: ['Quadra-Fixtures', 'match'], play: ['Quadra-Play', 'odds'], securities: ['Quadra-Securities', 'stock'], hub: ['Quadra-Hub', 'vocab'], orbit: ['Orbit-Class', 'orbit'], weather: ['Orbit-Weather', 'weather'], transit: ['Orbit-Transit', 'transit'] };
-const key = Object.keys(APPS).find(k => k === appArg || APPS[k][0].toLowerCase() === String(appArg).toLowerCase());
+const APPS = { sports: ['Orbit-Sports', 'match'], play: ['Quadra-Play', 'odds'], securities: ['Quadra-Securities', 'stock'], words: ['Orbit-Words', 'vocab'], orbit: ['Orbit-Class', 'orbit'], weather: ['Orbit-Weather', 'weather'], transit: ['Orbit-Transit', 'transit'] };
+// The old names still work.
+const ALIAS = { fixtures: 'sports', hub: 'words' };
+const key = Object.keys(APPS).find(k => k === (ALIAS[appArg] || appArg) || APPS[k][0].toLowerCase() === String(appArg).toLowerCase());
 if (!key) throw new Error(`usage: node tools/preview.mjs <${Object.keys(APPS).join('|')}> [hash…]`);
 const [repo, appId] = APPS[key];
 const dir = key === 'orbit' ? join(ROOT, repo, 'dist') : join(ROOT, repo, 'public');
@@ -142,7 +145,8 @@ if (!existsSync(dir)) throw new Error(`${dir} missing${key === 'orbit' ? ' (run 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.mp3': 'audio/mpeg', '.webmanifest': 'application/manifest+json' };
 const server = createServer(async (req, res) => {
   const path = decodeURIComponent(new URL(req.url, 'http://x').pathname);
-  let file = join(dir, path.replace(/^\/[^/]+\//, '/'));
+  // The kit, as the apps load it from Shared-Proxy's Pages (kit/loader.html).
+  let file = path.startsWith('/Shared-Proxy/kit/') ? join(ROOT, path) : join(dir, path.replace(/^\/[^/]+\//, '/'));
   if (latency) await new Promise(r => setTimeout(r, latency));
   try {
     if ((await stat(file)).isDirectory()) file = join(file, 'index.html');

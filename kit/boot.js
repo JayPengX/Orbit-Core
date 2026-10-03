@@ -35,7 +35,7 @@
   box.innerHTML =
     '<div class="q-boot-box">' +
     '<img class="q-boot-logo" alt="" width="72" height="72">' +
-    '<p class="q-boot-brand">QUADRA</p>' +
+    '<p class="q-boot-brand">' + (/^Orbit/.test(title) ? 'ORBIT' : 'QUADRA') + '</p>' +
     '<p class="q-boot-title"></p>' +
     '<div class="q-boot-bar" aria-hidden="true"><i></i></div>' +
     '<p class="q-boot-step"></p>' +

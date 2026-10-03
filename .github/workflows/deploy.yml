@@ -8,6 +8,7 @@ on:
       - 'wrangler.toml'
       - 'sports-proxy-worker.js'
       - 'asia-baseball.js'
+      - 'kit/catalog.mjs'
       - 'f1-live.js'
       - 'wrangler.sports-proxy.toml'
       - 'locales/**'

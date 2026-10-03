@@ -1,17 +1,17 @@
-// Every league in the shared catalogue (kit/leagues.mjs), checked against its
-// real sources: what Quadra Fixtures would list (schedule and scores) and what
+// Every league in the shared catalogue (kit/catalog.mjs), checked against its
+// real sources: what Orbit Sports would list (schedule and scores) and what
 // Quadra Play could price, today. One line per league; a league with nothing
 // in either is flagged, so "every sport works" is checked rather than assumed.
 //
 //   node tools/leagues-audit.mjs [--sport soccer] [--json]
 //
-// Fixtures: ESPN's scoreboard (the whole year for races, tours and cards; the
+// Orbit Sports: ESPN's scoreboard (the whole year for races, tours and cards; the
 // season calendar's next game day otherwise), Kambi's list, or the Asian
 // baseball months (asia-baseball.js, run here). Play: ESPN events carrying
 // DraftKings odds, or Kambi matches with a winner price. Off-season leagues
 // show 0 and a note of their next game day when the calendar has one.
 import { execFile } from 'node:child_process';
-import { CATALOG, SPORTS } from '../kit/leagues.mjs';
+import { CATALOG, SPORTS } from '../kit/catalog.mjs';
 import { asiaBaseballResponse } from '../asia-baseball.js';
 
 const args = process.argv.slice(2);

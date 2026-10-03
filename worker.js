@@ -1,6 +1,6 @@
 // ---- worker.js ----
 // orbit-workers-proxy: the Quadra apps' server side (Quadra Securities,
-// Quadra Play, Quadra Fixtures, Quadra Hub and Orbit Class). Routed by
+// Quadra Play, Orbit Sports, Orbit Words and Orbit Class). Routed by
 // path:
 //
 //   GET/POST/PATCH/DELETE /eco   the Quadra Pass: one account and one NT$
@@ -15,7 +15,7 @@
 //
 // Every route but /eco's sign-in needs a Quadra Pass session (`qt=`). The
 // Quadra Pass is the only way anything is saved.
-// Quadra Fixtures' /sports-proxy lives in its own Worker
+// Orbit Sports' /sports-proxy lives in its own Worker
 // (sports-proxy-worker.js): this one's [placement] region pin (Taiwan's,
 // gcp:asia-east1) applies to the whole script.
 

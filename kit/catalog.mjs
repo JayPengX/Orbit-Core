@@ -1,13 +1,13 @@
-// Every sport and league Quadra covers, once, for Fixtures and Play alike
+// Every sport and league Quadra covers, once, for Orbit Sports and Play alike
 // (copied into both by kit/sync.mjs; never edit an app's copy). Each app
-// builds its own view of it (Fixtures' lib/leagues.mjs, Play's lib/teams.mjs),
+// builds its own view of it (Orbit Sports' lib/leagues.mjs, Play's lib/teams.mjs),
 // so a league added or fixed here reaches both.
 //
 //   sport   one of SPORTS
 //   kind    'match' two sides; 'field' a race weekend
 //   data    where its schedule and scores come from: 'espn' (espn path),
 //           'kambi' (kambi path), 'asia' (the leagues' own sites, through the
-//           sports proxy: asiaMonth below). Fixtures shows only the leagues on ELTA.tv
+//           sports proxy: asiaMonth below). Orbit Sports shows only the leagues on ELTA.tv
 //           or Apple TV in Taiwan (its lib/broadcast.mjs).
 //   bet     Quadra Play's key when Play sells it; `odds` where Play prices it
 //           ('espn': DraftKings through ESPN; 'kambi'), F1 has its own board
@@ -82,7 +82,7 @@ export const CATALOG = {
 // Play's kind of markets for a sport.
 export const familyOfSport = sport => sport;
 
-// How far ahead Play sells a game (and Fixtures shows its 投注): one reach
+// How far ahead Play sells a game (and Orbit Sports shows its 投注): one reach
 // for every league and every price, a bookmaker's or the house's own (Play's
 // house.mjs). Two weeks: the next two soccer matchweeks (an international
 // break between), two football weeks, two weeks of daily sports, while a

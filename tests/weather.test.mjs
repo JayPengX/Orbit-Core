@@ -259,6 +259,22 @@ test('Google is asked at most GOOGLE_DAILY_CALLS times a day; far hours every 6 
   assert.equal(log4.filter(p => p.startsWith('/v1/')).length, 4);
 });
 
+test('between Google\'s 30-minute forecast refreshes, only its current conditions are asked again', async () => {
+  const kv = memKv();
+  const first = await buildCell({ ...env, RATE_LIMIT_KV: kv }, 25.034, 121.565, { fetchFn: upstream(), now: NOW });
+  const log = [];
+  const quarter = await buildCell({ ...env, RATE_LIMIT_KV: kv }, 25.034, 121.565, { fetchFn: upstream(log), now: NOW + 16 * 60_000, prev: first });
+  assert.deepEqual(log.filter(p => p.startsWith('/v1/')).map(p => p.split('/').pop()), ['currentConditions:lookup'], '1 call, not 4');
+  assert.equal(kv.store.get('weather:google:2026-10-02'), '14');
+  assert.equal(quarter.sources.google, 'ok');
+  assert.equal(quarter.resp.hours.length, 240, 'the forecast kept');
+  assert.equal(quarter.parts.google.fcAt, NOW, 'the forecast\'s own time kept');
+  assert.equal(quarter.parts.google.at, NOW + 16 * 60_000);
+  const log2 = [];
+  await buildCell({ ...env, RATE_LIMIT_KV: kv }, 25.034, 121.565, { fetchFn: upstream(log2), now: NOW + 31 * 60_000, prev: quarter });
+  assert.equal(log2.filter(p => p.startsWith('/v1/')).length, 4, 'past 30 minutes: the forecast again');
+});
+
 test('status says which keys are set and answer, never the keys', async () => {
   const fetchFn = async url => (url.includes('googleapis') ? answer(200, { temperature: { degrees: 28 } }) : answer(401, `bad key CWA-SECRET-0000 in ${url}`));
   const r = await weatherStatus({ ...env, MOENV_KEY: '' }, fetchFn);

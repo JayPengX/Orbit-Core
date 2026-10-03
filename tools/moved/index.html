@@ -1,0 +1,15 @@
+<!doctype html>
+<!-- An app that moved (Quadra-Hub → Orbit-Words, Quadra-Fixtures →
+     Orbit-Sports): published as the old repo's page (with sw.js beside it),
+     it sends people to the new address with what followed the # (a tab, a
+     guide, a sign-in handed over), and the old offline copy retires. -->
+<html lang="zh-Hant"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Moved</title>
+<script>
+  var MOVED = { 'Quadra-Hub': 'Orbit-Words', 'Quadra-Fixtures': 'Orbit-Sports' };
+  var to = MOVED[location.pathname.split('/')[1]];
+  if (to) location.replace('/' + to + '/' + location.hash);
+</script>
+<style>body{font:16px/1.5 system-ui,sans-serif;display:grid;place-items:center;min-height:90vh;margin:0;color:#0f172a}a{color:#4f46e5}</style>
+</head><body><p>已搬家 · This app has moved: <a href="/Shared-Proxy/">all apps</a></p></body></html>

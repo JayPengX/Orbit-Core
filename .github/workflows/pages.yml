@@ -1,0 +1,60 @@
+# The shared kit (kit/) and the family's home page (site/) on GitHub Pages,
+# at https://jaypengx.github.io/Shared-Proxy/: every app loads the kit from
+# here (kit/loader.html), so a change to the kit is this one push.
+# One-time setup: repo Settings -> Pages -> Source: GitHub Actions.
+name: Kit to Pages
+
+on:
+  push:
+    branches: ['main']
+    paths:
+      - 'kit/**'
+      - 'site/**'
+      - 'brand/**'
+      - 'package.json'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: 'pages'
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run tests
+        run: npm test
+      - name: Build the site (the kit stamped with this version)
+        run: |
+          mkdir -p _site
+          if [ -d site ]; then cp -r site/. _site/; fi
+          node kit/stamp.mjs _site ${{ github.sha }}
+      - uses: actions/configure-pages@v5
+        with:
+          # Turns Pages on (Source: GitHub Actions) the first time, if the
+          # token may; otherwise Settings -> Pages -> Source: GitHub Actions.
+          enablement: true
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: '_site'
+
+  deploy:
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

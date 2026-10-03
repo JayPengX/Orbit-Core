@@ -4,10 +4,10 @@
 // the leagues ESPN doesn't cover (Asian baseball, K League, EuroLeague). Never a page's casual picture: no face is better than a wrong
 // one. Both sources are open to browsers (CORS), so not through the proxy;
 // answers are kept on the device (a found photo two months, none a week).
-// The kit's copy (Shared-Proxy/kit/photos.mjs), synced into Fixtures and Play
+// The kit's copy (Shared-Proxy/kit/photos.mjs), synced into Orbit Sports and Play
 // as lib/photos.mjs: never edit an app's copy.
-import { CATALOG } from './catalog.mjs';
-import { logoPicture } from './logos.mjs';
+import { CATALOG } from '#kit/catalog.mjs';
+import { logoPicture } from '#kit/logos.mjs';
 
 const CDN = 'https://a.espncdn.com/i/headshots';
 // ESPN's headshot at the size a phone shows it (its image service: a full
@@ -147,7 +147,7 @@ export function findPhoto(name, league) {
 }
 
 // ---- A person's picture on the page -------------------------------------------------------
-// The same in every app (Fixtures' rosters and players, Play's players'
+// The same in every app (Orbit Sports' rosters and players, Play's players'
 // markets): each of `urls` in turn (the feed's own pictures), then one found
 // before on this device, then `guess` (ESPN's headshot by id: given up at
 // its first miss, not retried, since many players have none). When all of

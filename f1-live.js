@@ -1,5 +1,5 @@
 // F1's own live timing (the feed F1's app and timing screen read), for
-// Fixtures' live board: the session's part and clock, the track's flag, the
+// Orbit Sports' live board: the session's part and clock, the track's flag, the
 // race's lap and each car's place, laps, gaps, tyres and whether it's in the
 // pits or out. ESPN's copy of a live session is minutes behind and its gaps
 // stand still, and OpenF1 closes to everyone while a session runs.

@@ -1,10 +1,10 @@
-// Teams in Chinese, as Taiwan writes them, for Fixtures and Play alike
+// Teams in Chinese, as Taiwan writes them, for Orbit Sports and Play alike
 // (copied into both by kit/sync.mjs as lib/names.mjs; never edit an app's
 // copy). The American leagues are city + nickname (the lottery writes both,
 // "匹茲堡海盜"; a row has room for the nickname, "海盜"); clubs elsewhere one
 // name, whatever competition they play in. Also how ELTA's schedule is
 // matched to games (its titles use these names).
-import { normalizeTeamName } from './logos.mjs';
+import { normalizeTeamName } from '#kit/logos.mjs';
 
 // [city, nickname] by ESPN's (and the lottery's) English name.
 const US = {
@@ -86,7 +86,7 @@ const CLUBS = {
   celtic: '塞爾提克', rangers: '流浪者', galatasaray: '加拉塔薩雷', fenerbahce: '費內巴切', besiktas: '貝西克塔斯', olympiacos: '奧林匹亞科斯', 'slavia prague': '布拉格斯拉夫', 'sk slavia praha': '布拉格斯拉夫', 'sparta prague': '布拉格斯巴達',
   'red bull salzburg': '薩爾斯堡', salzburg: '薩爾斯堡', 'shakhtar donetsk': '頓內次克礦工', 'dinamo zagreb': '札格瑞布迪納摩', 'young boys': '伯恩年輕人', copenhagen: '哥本哈根', 'bodo glimt': '博德閃耀', qarabag: '卡拉巴赫',
   'union st gilloise': '聖吉羅斯聯合', 'union saint gilloise': '聖吉羅斯聯合', 'red star belgrade': '貝爾格勒紅星', 'crvena zvezda': '貝爾格勒紅星', 'viking': '維京人', 'pafos': '帕福斯', 'kairat almaty': '凱拉特',
-  // Added 2026-10: every club in the leagues Fixtures covers (Spain, Italy, Germany, France, Europe's cups, Scotland, MLS, J1, the FA Cup's)
+  // Added 2026-10: every club in the leagues Orbit Sports covers (Spain, Italy, Germany, France, Europe's cups, Scotland, MLS, J1, the FA Cup's)
   deportivo: '拉科魯尼亞', 'deportivo la coruna': '拉科魯尼亞', malaga: '馬拉加', 'racing santander': '桑坦德競技', frosinone: '弗洛西諾內',
   'hamburg sv': '漢堡', 'paderborn 07': '帕德博恩', paderborn: '帕德博恩', 'sv elversberg': '埃爾弗斯貝格', 'schalke 04': '沙爾克 04', schalke: '沙爾克 04',
   'aj auxerre': '歐塞爾', 'le havre ac': '勒哈佛', 'le havre': '勒哈佛', 'le mans': '勒芒', troyes: '特魯瓦',
@@ -114,7 +114,7 @@ const ASIA_SHORT = { '統一7-ELEVEn獅': '統一獅', '橫濱DeNA海灣之星':
 
 const SOCCER = new Set(['soccer']);
 // A team in Chinese: { full, short }, or null when there's no Chinese name.
-// `key` is the league (Play's key; Fixtures' own is the same), `sport` its sport.
+// `key` is the league (Play's key; Orbit Sports' own is the same), `sport` its sport.
 export function teamNameZh(key, name, sport = '') {
   if (!name) return null;
   const n = normalizeTeamName(name);
