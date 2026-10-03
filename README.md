@@ -13,6 +13,7 @@ saved.
 | Quadra Hub | [Quadra-Hub](https://github.com/JayPengX/Quadra-Hub) | https://jaypengx.github.io/Quadra-Hub/ |
 | Orbit Class | [Orbit-Class](https://github.com/JayPengX/Orbit-Class) | https://jaypengx.github.io/Orbit-Class/ |
 | Orbit Weather | [Orbit-Weather](https://github.com/JayPengX/Orbit-Weather) | https://jaypengx.github.io/Orbit-Weather/ |
+| Orbit Transit | [Orbit-Transit](https://github.com/JayPengX/Orbit-Transit) | https://jaypengx.github.io/Orbit-Transit/ |
 
 ## Table of Contents
 
@@ -27,14 +28,15 @@ saved.
 ## The two Workers
 
 - **`orbit-workers-proxy`** (`worker.js`, `eco.js`, `eco-admin.js`,
-  `kambi.js`, `quadra-token.js`, `weather.js`, `weather-stations.js`, `weather-skill.js`, `wrangler.toml`):
+  `kambi.js`, `quadra-token.js`, `weather.js`, `weather-stations.js`, `weather-skill.js`, `transit.js`, `wrangler.toml`):
 
   | Route | What |
   | --- | --- |
   | `/eco` | The Quadra Pass (below) |
   | `/gemini`, `/nl-edit` | Orbit Class's AI schedule-photo import and natural-language edits; the Gemini key stays here |
   | `/kambi` | The last live data of Kambi matches Quadra Play has bets on (a 10-minute cron keeps it) |
-  | `/weather`, `/weather/where` | Orbit Weather's forecast for a ~1 km cell (hourly for 10 days) and the place to the village, Google, CWA and MOENV blended (`weather.js`, `docs/WEATHER-PLAN.md`); `/weather/status` checks the three keys; `/weather/skill` the scoring (`weather-skill.js`) |
+  | `/transit/…` | Orbit Transit (`transit.js`, tests in `tests/transit.test.mjs`): `/transit/tdx?p=<path>` TDX's data from an allowlist (`TDX_RULES`), shared through the edge cache for as long as it stays true (live 20–50 s, timetables 6 h, stations a day; a stale copy while refreshing or when TDX is busy); `/transit/config` the map (Google's with the browser key under the month's cap, else NLSC); `/transit/search`, `/transit/place` Google Places (New) (OpenStreetMap past the cap); `/transit/route` Google's transit routes and TDX's planner in one shape; `/transit/status` (open) the month's use against `CAPS` |
+| `/weather`, `/weather/where` | Orbit Weather's forecast for a ~1 km cell (hourly for 10 days) and the place to the village, Google, CWA and MOENV blended (`weather.js`, `docs/WEATHER-PLAN.md`); `/weather/status` checks the three keys; `/weather/skill` the scoring (`weather-skill.js`) |
 
 - **`sports-proxy`** (`sports-proxy-worker.js`, `wrangler.sports-proxy.toml`):
   `/sports-proxy`, a host-allowlisted passthrough to ESPN, the MLB Stats

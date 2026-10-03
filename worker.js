@@ -11,6 +11,7 @@
 //   GET   /kambi                 Kambi's live scores for Quadra Play (kambi.js)
 //   GET/POST /push/…             notices while an app is closed (push.js)
 //   GET   /weather/…             Orbit Weather's blended forecast (weather.js)
+//   GET   /transit/…             Orbit Transit's map, places, routes and TDX data (transit.js)
 //
 // Every route but /eco's sign-in needs a Quadra Pass session (`qt=`). The
 // Quadra Pass is the only way anything is saved.
@@ -26,6 +27,7 @@ import { handleKambiRequest, refreshKambiWatch, fetchKambiLive } from './kambi.j
 import { handlePush, sendDue } from './push.js';
 import { handleWeather } from './weather.js';
 import { weatherCron, skillReport } from './weather-skill.js';
+import { handleTransit } from './transit.js';
 
 const ALLOWED_ORIGINS = ['https://jaypengx.github.io'];
 
@@ -49,7 +51,7 @@ function corsHeaders(origin, colo) {
     'Access-Control-Allow-Origin': isAllowedOrigin(origin) ? origin : 'null',
     'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Expose-Headers': 'X-Worker-Colo',
+    'Access-Control-Expose-Headers': 'X-Worker-Colo, X-Transit-Cache, X-Transit-Age',
     // Browsers keep a preflight this long (Chrome caps it at 2 hours): the
     // apps' JSON writes don't each cost a second Worker request.
     'Access-Control-Max-Age': '86400',
@@ -1338,6 +1340,13 @@ export default {
       const qt = new URL(request.url).searchParams.get('qt');
       const session = qt ? await readToken(await tokenSecret(env), qt, 'ses') : null;
       return handleWeather(request, env, headers, path, { session, ctx, limited: () => sessionLimited(`w:${session?.s}`, 30) });
+    }
+    // Orbit Transit (transit.js): a Quadra Pass session for everything but
+    // the usage page.
+    if (path === '/transit' || path.startsWith('/transit/')) {
+      const qt = new URL(request.url).searchParams.get('qt');
+      const session = qt ? await readToken(await tokenSecret(env), qt, 'ses') : null;
+      return handleTransit(request, env, headers, path, { session, ctx, limited: () => sessionLimited(`t:${session?.s}`, 90) });
     }
     return errorJson('NOT_FOUND', 404, headers, request);
   },

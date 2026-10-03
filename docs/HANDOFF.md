@@ -6,6 +6,86 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
 edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
 `npx eslint .`).
 
+## Orbit Transit, phase 1 (branch `claude/orbit-transit-web-app-e5vwsh`, pushed to `main`)
+
+The owner's ask: a transit app for Taiwan (they live in 新竹). A map home
+(Google, the most detail) with YouBike (regular and 電輔車), every bus stop,
+台鐵 / 高鐵 / metro stations; search, pins, tap and go; multi-plan routes with
+"strong YouBike ideas"; 公車 groups (named, ordered, swiped) with arrivals;
+火車 with smart transfers (支線, 台鐵 ↔ 高鐵); 捷運 maps with a station's live
+board. Quadra Pass sign-in; Chinese; always dark. App repo
+`JayPengX/Orbit-Transit` (README there lists the files).
+
+- **Data:** TDX (tdx.transportdata.tw) for everything transit; it refuses
+  calls without a key (`401 Valid API Key Required`). Its free plan (基礎) is
+  3 points a month (1,500 calls or 150 MB a point) and **5 calls a minute
+  per key**; 銅級 is NT$200 a month for 200 points and 5 a second. The owner
+  registered (or is registering) for a key; which plan was left open (asked;
+  the answer was "I live in hsinchu": every city's live buses must work, so
+  nothing is Taipei-only). On the free plan live data refreshes slowly: the
+  Worker paces itself (`TDX_PER_MIN`, default 5) and serves the last copy
+  when TDX is busy.
+- **Google** (the owner's choice, with "monthly free tries so we never run
+  out" and "all web kind of thing hosted on our proxy"): every billed call
+  goes through `/transit` and counts against `CAPS` (KV `transit:use:<month>`,
+  Pacific-time month, flushed in batches of 10 or every 2 minutes): Dynamic
+  Maps 9,000 (a map load = `/transit/config`), Autocomplete 9,000, Place
+  Details Essentials 9,000 (position, address), Place Details Pro 4,500 (a
+  tapped place's name), Compute Routes Essentials (transit) 9,000. Past a cap:
+  NLSC's map (Leaflet), OpenStreetMap's search, no Google plans. The Maps
+  JavaScript API itself must load in the browser (Google serves its tiles),
+  so the browser key comes from `/transit/config`, only to signed-in apps.
+  **The hard stop is Google Cloud's quotas** (the Worker's count is
+  approximate): the owner should set per-day quotas on Maps JavaScript API
+  (300 map loads), Places API (New) (300 autocomplete, 300 details) and
+  Routes API (300) in Google Cloud → APIs & Services → each API → Quotas.
+- **Still needed from the owner** (nothing works live until then):
+  1. Worker secrets (Cloudflare → orbit-workers-proxy → Settings →
+     Variables and Secrets, type Secret): `TDX_CLIENT_ID`,
+     `TDX_CLIENT_SECRET`; `GOOGLE_MAPS_BROWSER_KEY` (a new key: Application
+     restriction "Websites" `https://jaypengx.github.io/*`, API restriction
+     Maps JavaScript API only). Places API (New) and Routes API enabled on
+     the project; they use `GOOGLE_MAPS_KEY`, or `GOOGLE_WEATHER_KEY` when
+     that isn't set (its API restrictions must then include them).
+     Optional var `TDX_PER_MIN` = 300 on 銅級.
+  2. Orbit-Transit repo → Settings → Pages → Source: GitHub Actions (the
+     workflow deploys `public/` on push to `main`).
+  3. Then check `GET /transit/status` (keys true, use counts).
+- **Unverified until the key is in:** every TDX path and field is from TDX's
+  own OpenAPI documents (fetched 2026-10-03: basic v2 bus / rail / bike, v3
+  rail, advanced bus / bike / rail, MaaS), but no live answer has been seen.
+  TDX's planner (`maas/routing`) documents its parameters but not its
+  sections' shape: `parseTdxRoutes` reads HERE's public-transit shape
+  loosely; look at a real answer first thing. The made-up fixtures for the
+  preview (`tests/fixtures/transit/upstream.mjs`) follow the documented
+  shapes.
+- **The train router** (`Orbit-Transit/public/lib/rail.mjs`): the day's
+  whole 台鐵 (v3 `DailyTrainTimetable/TrainDate`) and 高鐵 (v2
+  `DailyTimetable/TrainDate`) timetables (2 TDX calls a day, shared) as
+  connections; Connection Scan for the earliest arrival, run again after
+  each first departure, dominated options dropped; changes cost 3–5 min (by
+  station class; 高鐵 4), walks link stations of different railways within
+  900 m (六家 ↔ 高鐵新竹, 新烏日 ↔ 台中, 沙崙 ↔ 台南, 新左營 ↔ 左營, 豐富 ↔
+  苗栗, the shared halls of 南港 / 台北 / 板橋). Metro isn't in it yet (the
+  map's planner covers metro trips).
+- **YouBike plans** (`plan.mjs`): all the way (≤ 12 km; 電輔車 from 2 km),
+  bike to the first train/metro instead of a bus or a 600 m+ walk (same
+  train, leave later), bike from the last one (there sooner); live bikes and
+  docks from TDX NearBy (a ~500 m grid so asks share). Riding 230 m/min
+  (電輔 300) ×1.25 for streets, a minute to take and a minute to return.
+- **Metro maps** (`metro.mjs`): stations where they are; lines drawn by
+  TDX's StationOfRoute (each operating route continuous, so 蘆洲 branches
+  at 大橋頭), StationOfLine with jump-splitting as the fallback. Dots and
+  names are counter-scaled (CSS translate + scale(1/zoom)): one size on
+  screen at any zoom.
+- **Pass data** (`orbit-transit`, `t1:` JSON, 100 KB): groups (12 × 16
+  stops), places (20), recent trips and train searches, layers; the newer
+  copy wins.
+- **Kit:** `APPS.transit` (green `#22c55e`, related); `kit/sync.mjs`
+  targets Orbit-Transit. Only Orbit-Weather and Orbit-Transit were checked
+  out this session; the other apps get the new `APPS` entry at their next
+  sync.
+
 ## Orbit Weather, phase 1: the proxy's sources (branch `claude/intelligent-euler-2ifltk`, pushed to `main`)
 
 Planned in `docs/WEATHER-PLAN.md`; the PWA's repo is `JayPengX/Orbit-Weather`

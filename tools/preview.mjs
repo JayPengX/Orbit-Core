@@ -18,7 +18,12 @@
 //                          [--fake-yahoo]  (made-up Yahoo prices: spark and chart answers
 //                          for any symbol, for when Yahoo answers 429)
 //
-//   app   fixtures | play | securities | hub | orbit | weather (or the repo's folder name)
+//   app   fixtures | play | securities | hub | orbit | weather | transit (or the repo's folder name)
+//
+// Orbit Transit: /transit is answered by transit.js itself on made-up TDX
+// answers around 新竹車站 (tests/fixtures/transit; until the TDX key is set no
+// real one can be saved) with no Google key, so the map is NLSC's (real
+// tiles) and search is OpenStreetMap's (real); the position is beside 新竹車站.
 //
 // Orbit Weather: /weather is answered by weather.js itself on the saved
 // answers in tests/fixtures/weather (Taipei 101, 2026-10-02 evening; no keys
@@ -49,6 +54,8 @@ import { ASIA_HOST, asiaBaseballResponse } from '../asia-baseball.js';
 import { trimF1Page } from '../sports-proxy-worker.js';
 import { handleWeather } from '../weather.js';
 import { upstream as weatherFixtures } from '../tests/fixtures/weather/upstream.mjs';
+import { handleTransit } from '../transit.js';
+import { upstream as transitFixtures } from '../tests/fixtures/transit/upstream.mjs';
 
 const require = createRequire(import.meta.url);
 let chromium;
@@ -123,7 +130,7 @@ const noGeo = flag('no-geo');
 const ROOT = resolve(opt('root', new URL('../../', import.meta.url).pathname));
 const [appArg, ...hashes] = args;
 
-const APPS = { fixtures: ['Quadra-Fixtures', 'match'], play: ['Quadra-Play', 'odds'], securities: ['Quadra-Securities', 'stock'], hub: ['Quadra-Hub', 'vocab'], orbit: ['Orbit-Class', 'orbit'], weather: ['Orbit-Weather', 'weather'] };
+const APPS = { fixtures: ['Quadra-Fixtures', 'match'], play: ['Quadra-Play', 'odds'], securities: ['Quadra-Securities', 'stock'], hub: ['Quadra-Hub', 'vocab'], orbit: ['Orbit-Class', 'orbit'], weather: ['Orbit-Weather', 'weather'], transit: ['Orbit-Transit', 'transit'] };
 const key = Object.keys(APPS).find(k => k === appArg || APPS[k][0].toLowerCase() === String(appArg).toLowerCase());
 if (!key) throw new Error(`usage: node tools/preview.mjs <${Object.keys(APPS).join('|')}> [hash…]`);
 const [repo, appId] = APPS[key];
@@ -270,6 +277,10 @@ if (appId === 'weather' && !noGeo) {
   await context.grantPermissions(['geolocation']);
   await context.setGeolocation({ latitude: 25.034, longitude: 121.565 });
 }
+if (appId === 'transit' && !noGeo) {
+  await context.grantPermissions(['geolocation']);
+  await context.setGeolocation({ latitude: 24.8026, longitude: 120.9702, accuracy: 20 });
+}
 if (device === 'ipad') await context.addInitScript(() => Object.defineProperty(Navigator.prototype, 'maxTouchPoints', { get: () => 5 }));
 await context.addInitScript(
   ([refresh, lang, stores]) => {
@@ -298,7 +309,18 @@ await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(we
   const res = await handleWeather(new Request(req.url()), weatherEnv, cors, u.pathname, { session: { s: 'preview' }, fetchFn, cf: { latitude: '25.0478', longitude: '121.5319', city: 'Taipei' }, cache: null });
   await route.fulfill({ status: res.status, contentType: 'application/json', headers: cors, body: await res.text() });
 });
-await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(?!weather|push)/, async route => {
+// Orbit Transit's routes (see the top): transit.js on the made-up TDX answers.
+const transitEnv = { TDX_CLIENT_ID: 'preview', TDX_CLIENT_SECRET: 'preview', TDX_PER_MIN: '10000', RATE_LIMIT_KV: { get: async k => weatherKv.get(k) ?? null, put: async (k, v) => void weatherKv.set(k, v) } };
+const transitFetch = transitFixtures();
+await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/transit/, async route => {
+  const req = route.request();
+  const u = new URL(req.url());
+  const cors = { 'Access-Control-Allow-Origin': '*' };
+  const fetchFn = async (url, init) => (url.includes('nominatim.openstreetmap.org') ? { ok: true, status: 200, json: async () => JSON.parse((await curlText(url)) || '[]') } : transitFetch(url, init));
+  const res = await handleTransit(new Request(req.url()), transitEnv, cors, u.pathname, { session: { s: 'preview' }, fetchFn, cache: null });
+  await route.fulfill({ status: res.status, contentType: 'application/json', headers: cors, body: await res.text() });
+});
+await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(?!weather|push|transit)/, async route => {
   const req = route.request();
   const body = req.postDataJSON?.() || {};
   const reply = { token: 'preview', wallet, active: true, live: { app: appId } };

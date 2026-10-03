@@ -12,7 +12,8 @@ const TARGETS = [
   ['Quadra-Fixtures/public/lib/quadra.mjs', 'Quadra-Fixtures/public/quadra.css'],
   ['Quadra-Hub/public/lib/quadra.mjs', 'Quadra-Hub/public/quadra.css'],
   ['Orbit-Class/src/quadra.mjs', 'Orbit-Class/css/quadra.css'],
-  ['Orbit-Weather/public/lib/quadra.mjs', 'Orbit-Weather/public/quadra.css']
+  ['Orbit-Weather/public/lib/quadra.mjs', 'Orbit-Weather/public/quadra.css'],
+  ['Orbit-Transit/public/lib/quadra.mjs', 'Orbit-Transit/public/quadra.css']
 ];
 // The apps that show teams, leagues and drivers: the logos too, and the
 // sports and leagues catalogue (leagues.mjs, copied as catalog.mjs).
@@ -20,7 +21,7 @@ const LOGOS = { 'Quadra-Play': 'Quadra-Play/public/lib/logos.mjs', 'Quadra-Fixtu
 const CATALOG = { 'Quadra-Play': 'Quadra-Play/public/lib/catalog.mjs', 'Quadra-Fixtures': 'Quadra-Fixtures/public/lib/catalog.mjs' };
 // The loading screen and first update check (boot.js), for the apps that open
 // with one.
-const BOOT = { 'Quadra-Securities': 'Quadra-Securities/public/boot.js', 'Quadra-Play': 'Quadra-Play/public/boot.js', 'Quadra-Fixtures': 'Quadra-Fixtures/public/boot.js', 'Quadra-Hub': 'Quadra-Hub/public/boot.js', 'Orbit-Weather': 'Orbit-Weather/public/boot.js' };
+const BOOT = { 'Quadra-Securities': 'Quadra-Securities/public/boot.js', 'Quadra-Play': 'Quadra-Play/public/boot.js', 'Quadra-Fixtures': 'Quadra-Fixtures/public/boot.js', 'Quadra-Hub': 'Quadra-Hub/public/boot.js', 'Orbit-Weather': 'Orbit-Weather/public/boot.js', 'Orbit-Transit': 'Orbit-Transit/public/boot.js' };
 // Pictures from other sites kept on the device (sw-images.js, imported by
 // the app's service worker), for the apps that show logos and photos.
 const IMAGES = { 'Quadra-Securities': 'Quadra-Securities/public/sw-images.js', 'Quadra-Play': 'Quadra-Play/public/sw-images.js', 'Quadra-Fixtures': 'Quadra-Fixtures/public/sw-images.js', 'Quadra-Hub': 'Quadra-Hub/public/sw-images.js' };
