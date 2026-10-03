@@ -172,7 +172,7 @@ export function parseCpbl(list, now = Date.now()) {
 
 // ---- Fetching ----------------------------------------------------------------------
 
-const UA = 'Mozilla/5.0 (compatible; Quadra-Fixtures/1.0; +https://github.com/JayPengX/Quadra-Fixtures)';
+const UA = 'Mozilla/5.0 (compatible; Orbit-Sports/1.0; +https://github.com/JayPengX/Orbit-Sports)';
 const TIMEOUT = 10_000;
 
 async function fetchNpb(year, month) {

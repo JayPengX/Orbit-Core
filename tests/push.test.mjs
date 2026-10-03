@@ -28,7 +28,7 @@ test('notice lists keep only sane items, in time order', () => {
   const list = cleanItems(
     [
       { at: now + 3_600_000, title: 'later', url: 'https://evil.example/' },
-      { at: now + 60_000, title: 'soon', url: 'https://jaypengx.github.io/Quadra-Fixtures/#home' },
+      { at: now + 60_000, title: 'soon', url: 'https://jaypengx.github.io/Orbit-Sports/#home' },
       { at: now - 86_400_000, title: 'old' },
       { at: now + 120_000, check: { espn: 'football/nfl', event: '401' } },
       { at: now + 120_000, check: { yahoo: '2330.TW', op: 'above', price: 1200 }, title: '台積電' },

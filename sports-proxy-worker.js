@@ -120,7 +120,7 @@ const ELTA_HOST = 'piceltaott-elta.cdn.hinet.net';
 // formula1.com's driver and team pages: the official season, career and
 // profile figures (only /en/drivers/<slug> and /en/teams/<slug>, trimmed).
 const F1_HOST = 'www.formula1.com';
-const SPORTS_PROXY_FETCH_USER_AGENT = 'Quadra-Fixtures-Bot/1.0 (+https://github.com/JayPengX/Quadra-Fixtures)';
+const SPORTS_PROXY_FETCH_USER_AGENT = 'Orbit-Sports-Bot/1.0 (+https://github.com/JayPengX/Orbit-Sports)';
 const SPORTS_PROXY_ALLOWED_HOSTS = [
   'site.api.espn.com',
   // Per-fixture odds (Match Find's pre-game line for games already in

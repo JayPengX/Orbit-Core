@@ -28,11 +28,10 @@ export const BRANDS = {
   match: { family: 'orbit', name: 'Orbit Sports', short: 'Sports', repo: 'Orbit-Sports', was: 'Quadra-Fixtures', from: '#fdba74', to: '#9a3412', ink: '#c2410c', color: '#ea580c', role: { zh: '賽程與比分', en: 'Scores and schedules' }, tag: { zh: '所有運動的賽程、比分與數據', en: 'Every sport, every match, every stat' } },
   vocab: { family: 'orbit', name: 'Orbit Words', short: 'Words', repo: 'Orbit-Words', was: 'Quadra-Hub', from: '#f9a8d4', to: '#831843', ink: '#be185d', color: '#db2777', role: { zh: '英文單字', en: 'English words' }, tag: { zh: '背得住的英文單字：大考 6000 字，真人發音', en: 'English words that stay with you' } }
 };
-// Orbit Sports and Orbit Words were Quadra Fixtures and Quadra Hub: their
-// repos move to the new names by hand (GitHub, Settings -> Rename). Until
-// then the apps link to the old paths (`was`); set RENAMED once both are
-// renamed and every app follows, with one push of the kit.
-export const RENAMED = false;
+// Orbit Sports and Orbit Words were Quadra Fixtures and Quadra Hub; their
+// repos were renamed on 2026-10-03, so RENAMED is on and every app links to
+// the new addresses. `was` is the old one (tools/moved/ can forward it).
+export const RENAMED = true;
 export const SITE_URL = 'https://jaypengx.github.io';
 export const pathOf = id => {
   const b = BRANDS[id];

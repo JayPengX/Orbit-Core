@@ -13,8 +13,8 @@ anything is saved.
 | Orbit Class | [Orbit-Class](https://github.com/JayPengX/Orbit-Class) | https://jaypengx.github.io/Orbit-Class/ |
 | Orbit Weather | [Orbit-Weather](https://github.com/JayPengX/Orbit-Weather) | https://jaypengx.github.io/Orbit-Weather/ |
 | Orbit Transit | [Orbit-Transit](https://github.com/JayPengX/Orbit-Transit) | https://jaypengx.github.io/Orbit-Transit/ |
-| Orbit Sports (was Quadra Fixtures) | [Quadra-Fixtures](https://github.com/JayPengX/Quadra-Fixtures), to be renamed Orbit-Sports | https://jaypengx.github.io/Quadra-Fixtures/ |
-| Orbit Words (was Quadra Hub) | [Quadra-Hub](https://github.com/JayPengX/Quadra-Hub), to be renamed Orbit-Words | https://jaypengx.github.io/Quadra-Hub/ |
+| Orbit Sports (was Quadra Fixtures) | [Orbit-Sports](https://github.com/JayPengX/Orbit-Sports) | https://jaypengx.github.io/Orbit-Sports/ |
+| Orbit Words (was Quadra Hub) | [Orbit-Words](https://github.com/JayPengX/Orbit-Words) | https://jaypengx.github.io/Orbit-Words/ |
 | The kit, the marks, the family's page | this repo's Pages | https://jaypengx.github.io/Shared-Proxy/ |
 
 ## Table of Contents
@@ -185,18 +185,18 @@ and chat apps; `x.jpg` 1200×600 for X; `story.jpg` 1080×1920 for stories),
 the `<!-- brand -->` block of its page and its manifest; and `site/` (the
 family's page, the families' and the Pass's marks and cards).
 
-### Renaming Quadra-Fixtures and Quadra-Hub
+### The renamed repos
 
-1. On GitHub, rename `Quadra-Fixtures` to `Orbit-Sports` and `Quadra-Hub` to
-   `Orbit-Words` (Settings → General → Repository name). Pages moves with
-   the repo (re-run its deploy if the new address 404s).
-2. Set `RENAMED = true` in `kit/brand.mjs` and push here: every app's links
-   follow at once. The pages' share tags already use the new addresses.
-3. Old addresses (home-screen icons, shared links) stop working: for each,
-   a new repo with the old name serving `tools/moved/index.html` (with its
-   `sw.js`) sends people on and clears the old offline copy.
-4. Local clones: `git remote set-url origin …/Orbit-Sports.git`; rename the
-   folders, then `node kit/link.mjs`.
+`Quadra-Fixtures` is `Orbit-Sports` and `Quadra-Hub` is `Orbit-Words`
+(renamed 2026-10-03; `RENAMED` in `kit/brand.mjs` is on, so every app links
+to the new addresses). Their old addresses no longer answer: a home-screen
+icon or a shared link from before the rename lands on a 404. To forward
+them, make a repo with the old name (`Quadra-Fixtures`, `Quadra-Hub`) whose
+Pages serves `tools/moved/index.html` and `tools/moved/sw.js` (Settings →
+Pages → Deploy from a branch, root): it sends people on, keeping what
+followed the `#`, and retires the old offline copy. (A repo with the old
+name ends GitHub's redirect of the old git URL; local clones should use the
+new URLs.)
 
 ## One-Time Deploy Setup
 
@@ -485,7 +485,7 @@ secrets reach another's.
   dashboard; consumes `/gemini`, `/nl-edit`, and `/sync`.
 - [Orbit Vocab](https://github.com/JayPengX/Quadra-Words) — vocabulary
   trainer; consumes `/vocab-sync` and `/vocab-ai`.
-- [Match Find](https://github.com/JayPengX/Quadra-Fixtures) — sports
+- [Orbit Sports](https://github.com/JayPengX/Orbit-Sports) — sports
   recommendation site; consumes `/sports-proxy` only.
 - [Odds Study](https://github.com/JayPengX/Quadra-Sportsbook) — educational page
   on Taiwan Sports Lottery odds math; consumes `/sports-proxy` (ESPN
