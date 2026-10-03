@@ -1840,3 +1840,34 @@ Quadra stays under 30% for anyone who plays much.
   plain-JSON saves `codec.mjs` reads, which is also what `pack` writes
   without CompressionStream; Play's `compactAccount`), and the 錢從哪裡來
   handling of accounts older than the shared wallet.
+
+## 2026-10-03: Orbit Weather — today from the top, kept fresh, its own pictures, smoother
+
+- **The top opens today:** the whole top of a page (now, high/low, the
+  sentence) is a button (`role="button"`, Enter/space too) opening today's
+  day sheet; its foot says 「更新於 …」 and 「今天詳情 ›」.
+- **Kept fresh (researched):** Google's current conditions change every 15
+  minutes and its hourly/daily forecast every 30 (its Weather API FAQ); CWA's
+  township forecasts every 6 hours and station readings hourly; MOENV's AQI
+  hourly and its air forecast 3 times a day. So: the proxy keeps a cell 15
+  minutes but asks Google's forecast only every 30 (`GOOGLE_FC_MS`; a rebuild
+  in between asks its current conditions alone, 1 call not 4, `fcAt` keeps
+  the forecast's time) — more refreshes fit under the 450-a-day cap. The app
+  judges a copy by when the proxy made it (`f.at`, `dataAge`), not when it
+  arrived: an old copy the proxy answered while refreshing (`refreshing`) is
+  asked again 20 s later (`RETRY_MS`, once), nothing twice within 2 minutes
+  (`RECHECK_MS`). While the app is on screen a minute tick moves the
+  「更新於」 times, redraws on the hour, and asks again once the page's
+  forecast is 15 minutes old. The page shows a small spinner while it asks.
+- **Its own pictures, no emoji:** `lib/icons.mjs` — colour weather pictures
+  by kind (`conditionKind` in format.mjs; gradients once per page,
+  `ICON_DEFS`), line glyphs for advice, info, chips, headings, the moon drawn
+  in its phase. `conditionIcon` (emoji) stays for notices only. A test fails
+  if an emoji reaches a page.
+- **Smoother:** the next 24 hours under the top (8 columns every 3 hours,
+  fitted, the temperatures a gentle curve; a column opens its day); advice
+  sorted warnings first, four shown, the rest behind 「更多建議」; the sky
+  behind the top moves (rain falling, stars, drifting cloud, a storm's
+  flash; off with reduced motion); sheets slide up and down, pull the
+  handle down to close, swipe sideways in a day's sheet for the next day;
+  rows press; the instruction lines (「點一下看圖」…) gone.

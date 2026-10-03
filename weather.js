@@ -21,8 +21,9 @@
 // Orbit Weather is a Quadra app: /weather and /weather/where need a Quadra
 // Pass session (worker.js), 30 a minute a session. Google is asked at most
 // GOOGLE_DAILY_CALLS times a day in all (under the key's 500-a-day quota):
-// a refresh is 4 calls (now, 48 hours in 2 pages, 10 days), and every 6
-// hours 8 more for hours 49–240; past the cap a cell is built without
+// a refresh is 4 calls (now, 48 hours in 2 pages, 10 days), but only 1 (now)
+// while the forecast is under 30 minutes old (Google's own forecast refresh,
+// GOOGLE_FC_MS), and every 6 hours 8 more for hours 49–240; past the cap a cell is built without
 // Google (CWA alone, the last far hours kept).
 //
 // Keys (Worker secrets): GOOGLE_WEATHER_KEY, CWA_KEY, MOENV_KEY.
@@ -57,6 +58,10 @@ export const KEEP_MS = 6 * HOUR;
 const NEAR_KM = 30;
 export const GOOGLE_DAILY_CALLS = 450;
 export const FAR_MS = 6 * HOUR;
+// Google's forecast hours and days change every 30 minutes, its current
+// conditions every 15 (its FAQ): a cell rebuilt in between (FRESH_MS) asks
+// for the current conditions only (1 call, not 4) and keeps the forecast.
+export const GOOGLE_FC_MS = 30 * MIN;
 export const FAR_RETRY_MS = 30 * MIN;
 export const DEFAULT_WEIGHTS = { pop: { google: 0.6, cwa: 0.4 }, temp: { google: 0.6, cwa: 0.4 } };
 
@@ -264,6 +269,12 @@ async function fetchGoogle(env, lat, lon, fetchFn, abroad, far = false) {
     alerts: parseGoogleAlerts(alerts),
     tz: current.timeZone?.id || 'Asia/Taipei'
   };
+}
+
+// Google's current conditions alone (between forecast refreshes).
+async function fetchGoogleNow(env, lat, lon, fetchFn) {
+  const current = await getJson(fetchFn, googleUrl(env, 'currentConditions:lookup', lat, lon, ''), env);
+  return { current: parseGoogleCurrent(current), tz: current.timeZone?.id || 'Asia/Taipei' };
 }
 
 // ---- Google Air Quality (hourly AQI, 96 hours ahead) -----------------------------
@@ -1116,8 +1127,14 @@ export async function buildCell(env, lat, lon, { fetchFn = fetch, now = Date.now
           e => (console.log('weather google air failed', String(e.message || e).slice(0, 160)), { ok: false, off: /\b40[03]\b/.test(String(e.message)) })
         )
       : null;
+  // Google's forecast from under GOOGLE_FC_MS ago: only its current conditions again.
+  const gFc = prev?.parts?.google?.v && now - (prev.parts.google.fcAt ?? prev.parts.google.at) < GOOGLE_FC_MS ? prev.parts.google : null;
+  const googleNowOnly = async () => {
+    const r = await settle('google', async () => ({ ...gFc.v, ...(await fetchGoogleNow(env, lat, lon, fetchFn)) }));
+    return { ...r, fcAt: gFc.fcAt ?? gFc.at };
+  };
   const [google, cwa, aqi, aqf, warn, weights, aqiHist, gairRes] = await Promise.all([
-    !env.GOOGLE_WEATHER_KEY ? { state: 'off', v: null } : (await googleAllowed(env, now, wantFar ? 12 : 4)) ? settle('google', () => fetchGoogle(env, lat, lon, fetchFn, !inTaiwan, wantFar)) : wantFar && (await googleAllowed(env, now, 4)) ? settle('google', () => fetchGoogle(env, lat, lon, fetchFn, !inTaiwan)) : keep('google') ? { state: 'stale', ...keep('google') } : { state: 'capped', v: null },
+    !env.GOOGLE_WEATHER_KEY ? { state: 'off', v: null } : gFc && !wantFar ? ((await googleAllowed(env, now, 1)) ? googleNowOnly() : { state: 'ok', ...gFc }) : (await googleAllowed(env, now, wantFar ? 12 : 4)) ? settle('google', () => fetchGoogle(env, lat, lon, fetchFn, !inTaiwan, wantFar)) : wantFar && (await googleAllowed(env, now, 4)) ? settle('google', () => fetchGoogle(env, lat, lon, fetchFn, !inTaiwan)) : keep('google') ? { state: 'stale', ...keep('google') } : { state: 'capped', v: null },
     env.CWA_KEY && inTaiwan ? settle('cwa', () => fetchCwa(env, lat, lon, fetchFn)) : { state: inTaiwan ? 'off' : 'n/a', v: null },
     env.MOENV_KEY && inTaiwan ? airSites(env, fetchFn, now) : null,
     env.MOENV_KEY && inTaiwan ? shared(env, 'weather:moenv:aqf', 3 * HOUR, () => getJson(fetchFn, moenvUrl(env, 'aqf_p_01', '&limit=100'), env).then(j => (Array.isArray(j) ? j : j.records || []).map(f => ({ area: f.area, forecastdate: f.forecastdate, aqi: f.aqi, majorpollutant: f.majorpollutant }))), now) : null,
@@ -1159,7 +1176,7 @@ export async function buildCell(env, lat, lon, { fetchFn = fetch, now = Date.now
   // The scoring needs the next 24 hours only.
   bySource.hours = bySource.hours.filter(h => h.t < now + 48 * HOUR);
   const nearOnly = google.v ? { ...google.v, far: undefined } : null;
-  return { at: now, resp, bySource, sources, parts: { google: google.state === 'ok' || google.state === 'stale' ? { at: google.at, v: nearOnly } : null, cwa: cwa.state === 'ok' || cwa.state === 'stale' ? { at: cwa.at, v: cwa.v } : null, far: far || null, gair: gair || null, gairOff: gairRes?.off ? now : gairNoted } };
+  return { at: now, resp, bySource, sources, parts: { google: google.state === 'ok' || google.state === 'stale' ? { at: google.at, fcAt: google.fcAt ?? google.at, v: nearOnly } : null, cwa: cwa.state === 'ok' || cwa.state === 'stale' ? { at: cwa.at, v: cwa.v } : null, far: far || null, gair: gair || null, gairOff: gairRes?.off ? now : gairNoted } };
 }
 
 // The cells people opened lately (`weather:recent`, cell → when), for the
