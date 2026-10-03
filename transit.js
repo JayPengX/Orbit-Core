@@ -659,20 +659,24 @@ async function routes(env, q, { fetchFn, ctx, now, cache }) {
     );
   } else sources.google = googleKey(env) ? 'cap' : 'nokey';
   if (env.TDX_CLIENT_ID) {
-    const params = new URLSearchParams({ origin: `${from.lat},${from.lon}`, destination: `${to.lat},${to.lon}`, gc: '1.0', top: '5', transit: '3,4,5,6,7,8,9', transfer_time: '0,60', first_mile_mode: '0', first_mile_time: '15', last_mile_mode: '0', last_mile_time: '15' });
-    params.set(by === 'arrive' ? 'arrival' : 'depart', twIso(at + (by === 'arrive' ? 0 : MIN)));
-    jobs.push(
-      (async () => {
-        if (!paced(env, now)) return ((sources.tdx = 'busy'), []);
-        if (!(await myTurn(env))) return ((sources.tdx = 'busy'), []);
+    // Twice: walking to and from the stops, and by 共享單車 (YouBike) for the
+    // first and last mile (TDX's mode 3), which reaches the express buses and
+    // stations a walk doesn't (the owner: bike to 快捷8號, bike from 竹東).
+    const ask = (key, mile, minutes) => {
+      const params = new URLSearchParams({ origin: `${from.lat},${from.lon}`, destination: `${to.lat},${to.lon}`, gc: '1.0', top: '5', transit: '3,4,5,6,7,8,9', transfer_time: '0,60', first_mile_mode: mile, first_mile_time: minutes, last_mile_mode: mile, last_mile_time: minutes });
+      params.set(by === 'arrive' ? 'arrival' : 'depart', twIso(at + (by === 'arrive' ? 0 : MIN)));
+      return (async () => {
+        if (!paced(env, now)) return ((sources[key] = 'busy'), []);
+        if (!(await myTurn(env))) return ((sources[key] = 'busy'), []);
         const token = await tdxAccess(env, fetchFn, now);
-        if (!token) return ((sources.tdx = 'nokey'), []);
+        if (!token) return ((sources[key] = 'nokey'), []);
         const r = await fetchFn(`${TDX_BASE}maas/routing?${params}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } });
         await tally(env, 'tdx', 1, now, ctx);
-        sources.tdx = r.ok ? 'ok' : `http ${r.status}`;
-        return r.ok ? parseTdxRoutes(await r.json()) : [];
-      })().catch(() => ((sources.tdx = 'error'), []))
-    );
+        sources[key] = r.ok ? 'ok' : `http ${r.status}`;
+        return r.ok ? parseTdxRoutes(await r.json()).map(p => ({ ...p, src: key === 'tdx' ? 'tdx' : 'tdx-bike' })) : [];
+      })().catch(() => ((sources[key] = 'error'), []));
+    };
+    jobs.push(ask('tdx', '0', '15'), ask('tdxBike', '3', '20'));
   } else sources.tdx = 'nokey';
   const all = (await Promise.all(jobs)).flat();
   const seen = new Set();

@@ -344,6 +344,8 @@ test('route plans: both sources, the same ride once, fastest first, shared for 5
       const u = new URL(url);
       assert.equal(u.searchParams.get('origin'), '24.8,120.97');
       assert.equal(u.searchParams.get('gc'), '1.0');
+      // Asked walking (0) and by YouBike (3); the bike answer here is the same rides.
+      assert.ok(['0', '3'].includes(u.searchParams.get('first_mile_mode')));
       // The same ride as Google's, and a slower bus.
       return json({ data: { routes: [
         { sections: [{ type: 'transit', transport: { mode: 'regionalTrain', shortName: '區間車', name: '西部幹線' }, departure: { time: '2026-10-03T09:10:00+08:00', place: { name: '新竹' } }, arrival: { time: '2026-10-03T09:20:00+08:00', place: { name: '竹北' } } }] },
@@ -354,7 +356,7 @@ test('route plans: both sources, the same ride once, fastest first, shared for 5
   };
   const ask = () => handleTransit(new Request(`https://w/transit/route?from=24.8,120.97&to=24.84,121.012&at=${NOW}`), env, {}, '/transit/route', { session: { s: 'S' }, fetchFn, now: NOW, cache });
   const out = await (await ask()).json();
-  assert.deepEqual(out.sources, { google: 'ok', tdx: 'ok' });
+  assert.deepEqual(out.sources, { google: 'ok', tdx: 'ok', tdxBike: 'ok' });
   // The train is one plan (TDX's copy has no walks, so it arrives first).
   assert.equal(out.plans.length, 2);
   assert.equal(out.plans[0].src, 'tdx');
@@ -362,7 +364,7 @@ test('route plans: both sources, the same ride once, fastest first, shared for 5
   const again = await (await ask()).json();
   assert.equal(again.cached, true);
   assert.equal(google, 1);
-  assert.equal(tdx, 1);
+  assert.equal(tdx, 2);
   const bad = await handleTransit(new Request('https://w/transit/route?from=35,139&to=24.8,120.9'), env, {}, '/transit/route', { session: { s: 'S' }, fetchFn, now: NOW, cache });
   assert.equal(bad.status, 400);
 });
