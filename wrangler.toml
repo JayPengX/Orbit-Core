@@ -78,6 +78,9 @@ region = "gcp:us-east4"
 # dashboard without needing "reveal secret".
 [vars]
 FIREBASE_PROJECT_ID = "orbit-project-76897"
+# Orbit Transit (transit.js): TDX calls a minute this Worker allows itself.
+# The owner is on a paid TDX plan (5 a second at least): 4 a second.
+TDX_PER_MIN = "240"
 
 # GEMINI_API_KEY (for /gemini, /nl-edit, /vocab-ai) and
 # FIREBASE_CLIENT_EMAIL / FIREBASE_PRIVATE_KEY (for /sync and /vocab-sync,
