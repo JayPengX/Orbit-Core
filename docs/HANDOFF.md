@@ -6,6 +6,52 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
 edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
 `npx eslint .`).
 
+## Orbit Transit, round 2 (branch `claude/practical-allen-y0jnq2`, pushed to `main`)
+
+The owner's 22-point list. Done:
+
+- **Worker placement:** `wrangler.toml` `[placement] region = "gcp:asia-east1"`
+  (was `gcp:us-east4` for Gemini): seen live `cf-placement: remote-TPE`
+  (`X-Worker-Colo` is the ingress colo, not where it ran). Gemini's region
+  is the owner's separate session.
+- **Kit:** everything inside `.q-gate` is `border-box` (the install steps
+  scrolled 8 px sideways in Transit and Weather). Orbit-Weather's synced copy
+  is committed locally in this session but its push to `main` was refused
+  (that repo wasn't in the session's scope): sync it next time.
+- **Proxy `/transit/route`:** `modes=` (bus, tra, hsr, metro, bike) →
+  Google `allowedTravelModes` and TDX `transit` codes, learned live with
+  `status?sample=maas&transit=`: **5 = every bus, 3,4 together = 台鐵+高鐵
+  (4 alone refused, 3 alone empty), 6–9 = metro (only beside 3,4)**; no bike →
+  no `tdxBike` ask. Up to 16 plans back (the app ranks). TDX calls time out
+  at 12 s, a 5xx asked once more.
+- **Why 新竹縣體育場 → 竹東高中 looked bad:** the planners *do* find the
+  owner's routes by day (TDX's YouBike first mile: bike → 文興嘉豐 → 快捷8號支
+  → 竹東火車站 → bike; bike → 喜來登 → 5700; bike → 千甲 → 內灣線), but the
+  app sorted by arrival only, so 5615 → 新竹市 → 5608 detours led. 快捷8號
+  runs 9 times a day (last 18:30 from 竹北) and 5700 7 (last 15:00): at
+  night they can't appear. Now `plan.mjs` `score()`: minutes to arrival + 7
+  per change (10 bus→bus) + walking past 6 min + riding + detour
+  ((path/direct − 1.2) × 45) + heading away + fare/12 (TPASS-covered = 0) +
+  missed train; top 4 with different main lines are 推薦; waits > 90 min
+  half way dropped. Checked on saved real answers (Mon 07:30/11:30/16:00).
+- **App:** `planner.mjs` (one pipeline for 地圖 and 交通), `live.mjs` (TDX
+  N1 at a plan's stops re-times its buses; `busLink` = direct bus between two
+  places, used for train → bus egress), `nav.mjs` (navigation: GPS, live bus
+  ETA, buzz before the stop, Google Maps deep link per walk/bike step: no
+  billed call), tabs 地圖 / 交通 (`tab-go`) / 查時刻 (`tab-times` + `tab-train`)
+  / 我的 (`tab-me`, metro map on `createMap`). Pass data adds `saved` (trips:
+  from null = here, time, by, days, back), `pins` (train connections / train
+  numbers), `prefs` (modes, bike30, tpass). `tpass.mjs`: 桃竹竹苗 1200, 桃竹竹
+  799, 竹竹苗 699, 竹竹 288 (YouBike first 30 min), 基北北桃, 中彰投苗, 南高屏.
+- **Metro live data:** TDX's TRTC LiveBoard lists only trains about to
+  arrive (29 rows city-wide), so most stations had none: the timetable now
+  shows beside it. TMRT has neither live nor timetable on TDX.
+- **Not done / next:** navigation cost note (owner asked): Routes API
+  bike/walk paths would be Compute Routes Essentials, 10,000 free a month
+  then US$5 / 1,000 (shared with the transit cap); Navigation SDK is
+  Android/iOS only; chosen: free deep links. Recurring-trip notifications
+  (push) weren't built.
+
 ## Orbit Transit, phase 1 (branch `claude/orbit-transit-web-app-e5vwsh`, pushed to `main`)
 
 The owner's ask: a transit app for Taiwan (they live in 新竹). A map home
@@ -161,6 +207,15 @@ board. Quadra Pass sign-in; Chinese; always dark. App repo
   F1's feed, `f1Brief`, filled in place every 10 s). The F1 board uses the
   result's own rows (`f1Row`) and comes first in its sheet while a session
   runs; the NBA panel uses the batter / pitcher layout.
+- **Playoffs for every league** (`lib/playoffs.mjs`, `playoffData` in
+  app.js): each league's format (MLB, NBA, MLS, 歐冠 / 歐霸 / 歐協聯,
+  歐國聯, 英足總盃, 世界盃); real games while they're on, the first round
+  predicted from the table while the season's on (seeds; the cups' league
+  phase 9-24; League A's groups), last season's when this one hasn't begun
+  (`seasonInfo` in espn.mjs gives the phase; NBA = last season now). Rounds
+  dated from their games (ESPN's TBD games too), a cup's calendar stages, or
+  about 3 days after a regular season's last day. Shown as the swiped map
+  (the owner preferred it to round tabs), opening on the round that's on.
 - **Brackets** (賽事 → 季後賽 / 淘汰賽): `lib/bracket.mjs` from games with
   `round` (espn.mjs `knockoutRound`): MLB, NBA, MLS (the days around now,
   75 back) and every cup (its season's games). Ties by round and sides,

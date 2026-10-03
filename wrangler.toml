@@ -58,18 +58,22 @@ compatibility_date = "2025-01-01"
 #
 # `region` instead pins the target explicitly: Cloudflare runs the Worker in
 # whichever of its own data centers has the lowest latency to the NAMED
-# cloud region below, rather than empirically guessing from traffic. Chosen
-# to match `us-east4` (Ashburn, Virginia) specifically because that's the
-# exact region live-tested (15/15 successful /nl-edit calls, see git log)
-# against this same Gemini API - a known-good target, not a guess. Available
-# on every Workers plan (this is not an Enterprise-only feature - that would
-# be Cloudflare's separate "Regional Services", a compliance/data-residency
-# product covering broad jurisdictions, not a fit for "avoid this one
-# specific blocked place"). Dashboard-only deploys (no wrangler) only expose
-# the "Smart" toggle, not a region field - deploying via Wrangler/CI (see the
-# CLI path above) is what actually applies this.
+# cloud region below, rather than empirically guessing from traffic.
+# Available on every Workers plan; dashboard-only deploys only expose the
+# "Smart" toggle, so Wrangler/CI (see the CLI path above) is what applies it.
+#
+# It was `gcp:us-east4` (Ashburn, Virginia), the region live-tested against
+# Gemini. But this Worker is no longer mostly Gemini: Orbit Transit's TDX
+# calls (several per plan, all to Taipei), Orbit Weather's CWA calls and the
+# Quadra Pass all crossed the Pacific twice from there, and a slow TDX
+# answer is what showed in Orbit Transit as "暫時無法取得資料". Now
+# `gcp:asia-east1` (Changhua, Taiwan): it runs in Taipei (seen live:
+# the response header `cf-placement: remote-TPE`; X-Worker-Colo is the colo
+# the request came in through, not where the Worker ran). Taiwan is a Gemini-supported location; if a
+# "User location is not supported" ever comes back, it's handled on the
+# Gemini side (its own Worker or route), not by moving every app away.
 [placement]
-region = "gcp:us-east4"
+region = "gcp:asia-east1"
 
 # Only needed for /sync and /vocab-sync (see worker.js's handleSyncRequest).
 # Not a secret on its own - it's already public today in the no-proxy

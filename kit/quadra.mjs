@@ -505,8 +505,9 @@ export function clearData() {
 // the wallet, each app's copy and its own settings; a home-screen app on a
 // phone has storage of its own), this tab's too, and the kept data. Only
 // how the device itself is set up stays: its language and its screen's
-// safe area (the app files stay cached, so the sign-in screen opens offline).
-const DEVICE_KEYS = new Set(['quadra.lang', 'quadra.safeBottom']);
+// safe area, and the kit's version (the app files stay cached, so the
+// sign-in screen opens offline).
+const DEVICE_KEYS = new Set(['quadra.lang', 'quadra.safeBottom', 'quadra.kit']);
 export function wipeDevice() {
   for (const store of [globalThis.localStorage, globalThis.sessionStorage]) {
     try {
@@ -656,6 +657,10 @@ function statusStrip() {
 if (typeof document !== 'undefined') document.body ? statusStrip() : document.addEventListener('DOMContentLoaded', statusStrip);
 
 export function quadraSession(app, { lang = detectLang(), heartbeat = 60_000 } = {}) {
+  // Every app notes the kit's newest version for its next opening, also
+  // the apps that don't watch for updates (watchUpdates puts it in place
+  // at once).
+  if (typeof document !== 'undefined') setTimeout(() => kitLatest(), 4000);
   const made = makeSession(app, { lang, heartbeat });
   dataSession = made;
   return made;
@@ -2291,6 +2296,30 @@ export function phoneOnlyGate(app, { lang = detectLang(), qr = '' } = {}) {
 // unless the person is in the middle of something: busy() (a round, an
 // order), typing in a field, or a sheet open. Then a bar offers it and it
 // happens the moment they're done (checked every 2 s) or the page is hidden.
+// The kit, loaded from one place for every app (kit/loader.html), has its
+// own version. kitLatest() notes the newest one for the next page load
+// (quadra.kit, which the loader reads) and says whether this page runs an
+// older one: 'kit:<version>', or null when it's current. The first version
+// seen on a device is only noted: that page already runs the latest.
+const KIT = () => globalThis.QUADRA_KIT;
+async function kitLatest() {
+  const kit = KIT();
+  if (!kit?.base) return null;
+  try {
+    const res = await fetch(`${kit.base}version.json?t=${Date.now()}`, { cache: 'no-store' });
+    const latest = res.ok ? (await res.json())?.version : null;
+    if (!latest || latest === kit.version) return null;
+    localStorage.setItem('quadra.kit', latest);
+    if (!kit.version) {
+      kit.version = latest;
+      return null;
+    }
+    return `kit:${latest}`;
+  } catch {
+    return null;
+  }
+}
+
 export function watchUpdates({ current, key, cachePrefix, busy = () => false, every = 30_000 } = {}) {
   if (!current || current === 'dev') return;
   let checking = false;
@@ -2313,6 +2342,9 @@ export function watchUpdates({ current, key, cachePrefix, busy = () => false, ev
     if (n >= 4 || (n && Date.now() - Number(at) < 20_000)) return;
     sessionStorage.setItem(flag, `${latest}|${n + 1}|${Date.now()}`);
     rememberPlace();
+    // Only the kit changed: the same page again, its loader now on the new
+    // kit (the app's own files are still current).
+    if (latest.startsWith('kit:')) return location.reload();
     if (globalThis.caches && cachePrefix) for (const name of await caches.keys()) if (name.startsWith(cachePrefix)) await caches.delete(name);
     const reg = await navigator.serviceWorker?.getRegistration?.(location.pathname);
     await reg?.update?.().catch(() => {});
@@ -2333,9 +2365,10 @@ export function watchUpdates({ current, key, cachePrefix, busy = () => false, ev
     if (checking || pending) return;
     checking = true;
     try {
-      const res = await fetch(`./version.json?t=${Date.now()}`, { cache: 'no-store' });
-      const latest = res.ok ? (await res.json())?.version : null;
-      if (!latest || latest === current) return;
+      const [res, kitNew] = await Promise.all([fetch(`./version.json?t=${Date.now()}`, { cache: 'no-store' }), kitLatest()]);
+      const appNew = res.ok ? (await res.json())?.version : null;
+      const latest = appNew && appNew !== current ? appNew : kitNew;
+      if (!latest) return;
       channel?.postMessage({ update: key || location.pathname });
       if (occupied()) offer(latest);
       else await apply(latest);

@@ -241,6 +241,7 @@ async function myTurn(env) {
 }
 
 const inflight = new Map();
+const timeout = ms => (typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(ms) : undefined);
 
 // One TDX answer, from the shared cache when it's fresh enough.
 // → { status, body (text), age (ms), state: 'hit' | 'miss' | 'stale' | 'busy' | 'error' }
@@ -266,8 +267,11 @@ export async function tdxGet(env, raw, { fetchFn = fetch, cache = globalThis.cac
       // Another isolate may share the second: a 429 waits a moment and asks again (twice).
       for (let tries = 0; ; tries++) {
         if (!(await myTurn(env))) return { status: 429, state: 'busy' };
-        res = await fetchFn(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Accept-Encoding': 'br, gzip' } });
+        // TDX sometimes hangs or answers 5xx for a moment: 12 s at most, and
+        // one more try (the app said 暫時無法取得資料 for these).
+        res = await fetchFn(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Accept-Encoding': 'br, gzip' }, signal: timeout(12_000) }).catch(err => ({ ok: false, status: 504, text: async () => String(err?.name || err) }));
         await tally(env, 'tdx', 1, now, ctx);
+        if (res.status >= 500 && tries < 1) continue;
         if (res.status !== 429 || tries >= 2 || !Number(env.TDX_PER_SEC)) break;
         turn.next = Math.max(turn.next, Date.now() + 1100);
       }
@@ -438,7 +442,35 @@ export const GOOGLE_ROUTE_FIELDS = [
   'routes.legs.steps.transitDetails'
 ].join(',');
 
-export function googleRouteBody(from, to, { at = null, by = 'depart', prefer = '' } = {}) {
+// The ways of moving a trip may use (the app's 交通偏好): bus, tra, hsr, metro, bike.
+export const MODES = ['bus', 'tra', 'hsr', 'metro', 'bike'];
+export function parseModes(raw) {
+  if (!raw) return new Set(MODES);
+  const set = new Set(String(raw).split(',').filter(m => MODES.includes(m)));
+  return set.size ? set : new Set(MODES);
+}
+// Google's names for them (TRAIN is 台鐵 and 高鐵 both; RAIL would be every rail).
+export function googleModes(modes) {
+  const out = [];
+  if (modes.has('bus')) out.push('BUS');
+  if (modes.has('tra') || modes.has('hsr')) out.push('TRAIN');
+  if (modes.has('metro')) out.push('SUBWAY', 'LIGHT_RAIL');
+  return out;
+}
+
+// TDX's planner's transit codes, learned by asking (status?sample=maas&transit=):
+// 5 is every bus; 3 and 4 together are 台鐵 and 高鐵 (4 alone is refused, 3
+// alone finds nothing); 6–9 add the metros (only beside 3,4). The app drops
+// what it doesn't want from the rest.
+export function tdxTransit(modes) {
+  const codes = [];
+  if (modes.has('tra') || modes.has('hsr') || modes.has('metro')) codes.push(3, 4);
+  if (modes.has('bus')) codes.push(5);
+  if (modes.has('metro')) codes.push(6, 7, 8, 9);
+  return codes.join(',');
+}
+
+export function googleRouteBody(from, to, { at = null, by = 'depart', prefer = '', modes = null } = {}) {
   const body = {
     origin: { location: { latLng: { latitude: from.lat, longitude: from.lon } } },
     destination: { location: { latLng: { latitude: to.lat, longitude: to.lon } } },
@@ -451,6 +483,8 @@ export function googleRouteBody(from, to, { at = null, by = 'depart', prefer = '
   if (at) body[by === 'arrive' ? 'arrivalTime' : 'departureTime'] = new Date(at).toISOString();
   if (prefer === 'walk') body.transitPreferences = { routingPreference: 'LESS_WALKING' };
   if (prefer === 'transfers') body.transitPreferences = { routingPreference: 'FEWER_TRANSFERS' };
+  const allowed = modes ? googleModes(modes) : [];
+  if (allowed.length && allowed.length < 4) body.transitPreferences = { ...body.transitPreferences, allowedTravelModes: allowed };
   return body;
 }
 
@@ -637,21 +671,25 @@ async function routes(env, q, { fetchFn, ctx, now, cache }) {
   const to = ll(q.get('to'));
   if (!from || !to) return [{ code: 'BAD_LOCATION' }, 400];
   const by = q.get('by') === 'arrive' ? 'arrive' : 'depart';
+  const modes = parseModes(q.get('modes'));
+  const modeKey = MODES.filter(m => modes.has(m)).join('');
   const atRaw = Number(q.get('at'));
   const at = Number.isFinite(atRaw) && atRaw > now - 5 * MIN ? Math.max(atRaw, now) : now;
   // Plans for the same ~100 m and 5 minutes are shared.
   const round = v => v.toFixed(3);
   const slot = Math.floor(at / (5 * MIN));
-  const cacheKey = new Request(`https://transit-cache.quadra/route/${round(from.lat)},${round(from.lon)}/${round(to.lat)},${round(to.lon)}/${by}/${slot}`);
+  const cacheKey = new Request(`https://transit-cache.quadra/route/${round(from.lat)},${round(from.lon)}/${round(to.lat)},${round(to.lon)}/${by}/${slot}/${modeKey}`);
   try {
     const hit = cache && (await cache.match(cacheKey));
     if (hit) return [{ ...(await hit.json()), cached: true }, 200];
   } catch {}
   const sources = {};
   const jobs = [];
-  if (googleKey(env) && (await spend(env, 'routes', 1, now, ctx))) {
+  const railOrBus = modes.has('bus') || modes.has('tra') || modes.has('hsr') || modes.has('metro');
+  if (!railOrBus) sources.google = 'off';
+  else if (googleKey(env) && (await spend(env, 'routes', 1, now, ctx))) {
     jobs.push(
-      fetchFn(ROUTES, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': googleKey(env), 'X-Goog-FieldMask': GOOGLE_ROUTE_FIELDS }, body: JSON.stringify(googleRouteBody(from, to, { at: by === 'arrive' || at > now + MIN ? at : null, by })) })
+      fetchFn(ROUTES, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': googleKey(env), 'X-Goog-FieldMask': GOOGLE_ROUTE_FIELDS }, body: JSON.stringify(googleRouteBody(from, to, { at: by === 'arrive' || at > now + MIN ? at : null, by, modes })), signal: timeout(15_000) })
         .then(async r => {
           sources.google = r.ok ? 'ok' : `http ${r.status}`;
           return r.ok ? parseGoogleRoutes(await r.json(), at) : [];
@@ -664,20 +702,21 @@ async function routes(env, q, { fetchFn, ctx, now, cache }) {
     // first and last mile (TDX's mode 3), which reaches the express buses and
     // stations a walk doesn't (the owner: bike to 快捷8號, bike from 竹東).
     const ask = (key, mile, minutes) => {
-      const params = new URLSearchParams({ origin: `${from.lat},${from.lon}`, destination: `${to.lat},${to.lon}`, gc: '1.0', top: '5', transit: '3,4,5,6,7,8,9', transfer_time: '0,60', first_mile_mode: mile, first_mile_time: minutes, last_mile_mode: mile, last_mile_time: minutes });
+      const params = new URLSearchParams({ origin: `${from.lat},${from.lon}`, destination: `${to.lat},${to.lon}`, gc: '1.0', top: '5', transit: tdxTransit(modes), transfer_time: '0,60', first_mile_mode: mile, first_mile_time: minutes, last_mile_mode: mile, last_mile_time: minutes });
       params.set(by === 'arrive' ? 'arrival' : 'depart', twIso(at + (by === 'arrive' ? 0 : MIN)));
       return (async () => {
         if (!paced(env, now)) return ((sources[key] = 'busy'), []);
         if (!(await myTurn(env))) return ((sources[key] = 'busy'), []);
         const token = await tdxAccess(env, fetchFn, now);
         if (!token) return ((sources[key] = 'nokey'), []);
-        const r = await fetchFn(`${TDX_BASE}maas/routing?${params}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } });
+        const r = await fetchFn(`${TDX_BASE}maas/routing?${params}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, signal: timeout(15_000) });
         await tally(env, 'tdx', 1, now, ctx);
         sources[key] = r.ok ? 'ok' : `http ${r.status}`;
         return r.ok ? parseTdxRoutes(await r.json()).map(p => ({ ...p, src: key === 'tdx' ? 'tdx' : 'tdx-bike' })) : [];
       })().catch(() => ((sources[key] = 'error'), []));
     };
-    jobs.push(ask('tdx', '0', '15'), ask('tdxBike', '3', '20'));
+    if (railOrBus) jobs.push(ask('tdx', '0', '15'));
+    if (railOrBus && modes.has('bike')) jobs.push(ask('tdxBike', '3', '20'));
   } else sources.tdx = 'nokey';
   const all = (await Promise.all(jobs)).flat();
   const seen = new Set();
@@ -690,7 +729,8 @@ async function routes(env, q, { fetchFn, ctx, now, cache }) {
       seen.add(s);
       return true;
     })
-    .slice(0, 8);
+    // The app ranks them (by what's practical, not only the soonest there): it gets them all.
+    .slice(0, 16);
   const out = { from, to, at, by, plans, sources };
   if (cache && plans.length) {
     const put = cache.put(cacheKey, new Response(JSON.stringify(out), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=300' } })).catch(() => {});
@@ -728,7 +768,7 @@ async function statusSample(env, name, deps) {
     const got = await tdxGet(env, SAMPLES[name], deps);
     return { name, status: got.status, state: got.state, body: cut(got.body) };
   }
-  const key = new Request(`https://transit-cache.quadra/sample/${name}`);
+  const key = new Request(`https://transit-cache.quadra/sample/${name}${deps.transit ? `?transit=${encodeURIComponent(deps.transit)}` : ''}`);
   // fresh=1: ask again now (after a key's settings changed).
   const hit = !deps.fresh && deps.cache && (await deps.cache.match(key).catch(() => null));
   if (hit) return { ...(await hit.json()), cached: true };
@@ -738,7 +778,9 @@ async function statusSample(env, name, deps) {
     if (!token) return { name, status: 503, body: 'no TDX key' };
     // maas-local: across Hsinchu (新竹車站 → 竹北 光明六路), where buses do the work.
     const to = name === 'maas' ? TO : { lat: 24.839, lon: 121.008 };
-    const params = new URLSearchParams({ origin: `${AT.lat},${AT.lon}`, destination: `${to.lat},${to.lon}`, gc: '1.0', top: '5', transit: '3,4,5,6,7,8,9', transfer_time: '0,60', first_mile_mode: '0', first_mile_time: '15', last_mile_mode: '0', last_mile_time: '15' });
+    // transit=: which of TDX's transit codes to allow (to learn what each one is).
+    const codes = /^[0-9](,[0-9]){0,9}$/.test(deps.transit || '') ? deps.transit : '3,4,5,6,7,8,9';
+    const params = new URLSearchParams({ origin: `${AT.lat},${AT.lon}`, destination: `${to.lat},${to.lon}`, gc: '1.0', top: '5', transit: codes, transfer_time: '0,60', first_mile_mode: '0', first_mile_time: '15', last_mile_mode: '0', last_mile_time: '15' });
     const r = await fetchOf(deps)(`${TDX_BASE}maas/routing?${params}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } });
     await tally(env, 'tdx', 1, deps.now, deps.ctx);
     const text = await r.text();
@@ -776,7 +818,7 @@ export async function handleTransit(request, env, headers, path, { session = nul
   const deps = { fetchFn, ctx, now, cache };
   if (path === '/transit/status') {
     const sample = q.get('sample');
-    if (sample) return send(await statusSample(env, sample, { ...deps, fresh: q.get('fresh') === '1' }));
+    if (sample) return send(await statusSample(env, sample, { ...deps, fresh: q.get('fresh') === '1', transit: q.get('transit') || '' }));
     return send({ month: billingMonth(now), used: await usage(env, now), caps: CAPS, keys: { tdx: Boolean(env.TDX_CLIENT_ID && env.TDX_CLIENT_SECRET), mapsBrowser: Boolean(env.GOOGLE_MAPS_BROWSER_KEY), google: Boolean(googleKey(env)) }, tdxPerMin: Number(env.TDX_PER_MIN) || 5 });
   }
   if (!session) return send({ code: 'ECO_TOKEN_INVALID' }, 401);

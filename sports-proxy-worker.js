@@ -5,8 +5,9 @@
 // match list client-side.
 //
 // Deployed as its own Worker (wrangler.sports-proxy.toml), separate from
-// worker.js, for one reason: worker.js's wrangler.toml pins [placement] to
-// region "gcp:us-east4" (Virginia), which Gemini needs, and [placement] is a
+// worker.js, for one reason: worker.js's wrangler.toml pinned [placement] to
+// region "gcp:us-east4" (Virginia) for Gemini (now "gcp:asia-east1",
+// Taiwan), and [placement] is a
 // whole-script setting. While /sports-proxy lived there, every Match Find
 // request - from a mostly Taiwan-based audience - went through a Virginia
 // isolate (confirmed live: `X-Worker-Colo: IAD`), adding a transpacific
