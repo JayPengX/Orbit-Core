@@ -6,6 +6,19 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
 edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
 `npx eslint .`).
 
+## Fixtures: the date strip's freeze and jump, every F1 session (pushed to `main`)
+
+- The date strip (`dateStrip`) grows only on the person's own scrolling
+  (`range.held`, set by touch / pointer / wheel): a sport's few days (賽車)
+  barely overflow, so each centring grew, refilled and re-centred it, and
+  iPhone Safari never stopped (the freeze after 我的球隊 → 賽車).
+- A repaint keeps a scrolled strip where it was (`range.left`, applied by
+  `centerChosen`); picking a day or a filter centres it again.
+- F1: practice (FP1–3) is listed like the other sessions (picks rank it
+  0.5 lower); ELTA's programs match a session by its name (第1節, 排位賽…)
+  within 3 hours; every F1 session counts as on ELTA (`every` in
+  BROADCAST, its 2026-2029 rights), its channel once the list names it.
+
 ## Orbit Weather, phase 1: the proxy's sources (branch `claude/intelligent-euler-2ifltk`, pushed to `main`)
 
 Planned in `docs/WEATHER-PLAN.md`; the PWA's repo is `JayPengX/Orbit-Weather`
