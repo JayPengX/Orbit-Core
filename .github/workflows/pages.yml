@@ -40,6 +40,10 @@ jobs:
           if [ -d site ]; then cp -r site/. _site/; fi
           node kit/stamp.mjs _site ${{ github.sha }}
       - uses: actions/configure-pages@v5
+        with:
+          # Turns Pages on (Source: GitHub Actions) the first time, if the
+          # token may; otherwise Settings -> Pages -> Source: GitHub Actions.
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: '_site'
