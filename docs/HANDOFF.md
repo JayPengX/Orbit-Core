@@ -31,6 +31,19 @@ board. Quadra Pass sign-in; Chinese; always dark. App repo
   server key's API restrictions must include Routes API (owner's action).
   公路客運 stations (UID `THB…`) carry the city's `LocationCityCode`, but
   only `InterCity` knows them: `stationEta` goes by the UID's prefix.
+  Later the same day (the owner: "暫時無法取得資料" everywhere): TDX's paid
+  plan refuses past **5 calls a second** (`429 API rate limit exceeded`) and
+  an app opening fires ~20; the Worker then shut TDX off for 30 s. Now
+  `TDX_PER_SEC` = 4 queues calls (up to 8 s) and asks a 429 again. A failed
+  TDX answer now carries `upstream` and `why`. TDX's planner times have no
+  zone (Taiwan's; they were read as UTC, 8 h late). `/transit/route` asks
+  TDX twice: walking, and with YouBike first / last mile
+  (`first_mile_mode=3`, source `tdxBike`), which finds the owner's own
+  pattern (bike → 快捷8號 → bike). TRA `ODFare` lists each pair twice, the
+  short way and round the island (862 km): take the shortest. 快捷8號 is
+  新竹縣's (`HSQ`), not 新竹市's. Testing live: `POST /eco {op:'create',
+  app:'transit'}` gives a throwaway pass whose `token` works as `qt`
+  (delete it after with `DELETE /eco?qt=`).
 - **Data:** TDX (tdx.transportdata.tw) for everything transit; it refuses
   calls without a key (`401 Valid API Key Required`). Its free plan (基礎) is
   3 points a month (1,500 calls or 150 MB a point) and **5 calls a minute
