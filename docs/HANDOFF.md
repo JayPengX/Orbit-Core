@@ -96,6 +96,12 @@ Planned in `docs/WEATHER-PLAN.md`; the PWA's repo is `JayPengX/Orbit-Weather`
   48 h / 10 days, UV the next daylight day / the one after / 10 days; the
   choice kept on the device). Dragging on a graph moves the crosshair
   (`touch-action: pan-y`). Air: now and MOENV's forecast days, no history.
+- The page shows rain / UV / air as small cards (`metrics`: the value, a
+  line, a sentence); a tap opens the big graph in a sheet (tabs, read-out,
+  drag). The crosshair is HTML moved by transform, once a frame. The place
+  chips update in place and a tap jumps (no smooth scroll: Safari's snapping
+  fights it); a page is redrawn only when its data changes. Old layouts'
+  `uv` / `rain` / `air` become `metrics`.
 - 我的行程 shows advice, rain, UV and the days only (what matters on the
   move); its advice is the route's plus the daytime place's run / thunder /
   wind / fog / temperature.
