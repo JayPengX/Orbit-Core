@@ -142,6 +142,19 @@ board. Quadra Pass sign-in; Chinese; always dark. App repo
 - **NBA live:** each side's top scorer and team fouls from the 15 s summary,
   the last plays; 過程 lists every play (`feed`). **Soccer:** a 球員 tab from
   the lineups' own numbers.
+- **Live, one look:** every sport's card has a two-line live line like
+  baseball's (NBA: each side's points leader with faces, from the
+  scoreboard's `leaders`; soccer: the latest goal; F1: the top three from
+  F1's feed, `f1Brief`, filled in place every 10 s). The F1 board uses the
+  result's own rows (`f1Row`) and comes first in its sheet while a session
+  runs; the NBA panel uses the batter / pitcher layout.
+- **Brackets** (賽事 → 季後賽 / 淘汰賽): `lib/bracket.mjs` from games with
+  `round` (espn.mjs `knockoutRound`): MLB, NBA, MLS (the days around now,
+  75 back) and every cup (its season's games). Ties by round and sides,
+  series wins / aggregate / score, who went through, each tie beside the
+  one it feeds, 待定 places. Dummy data for screenshots: preview's
+  `--fixture 'basketball/nba/scoreboard=file.json'` (a whole postseason in
+  one answer, dates shifted).
 - **CPBL:** cpbl.com.tw's live box (`/box/getlive`, POST with the page's
   token) would give the count, batter and box, but its CDN answers 308 to
   the POST from here, and on 2026-10-03 the Worker's CPBL schedule failed
