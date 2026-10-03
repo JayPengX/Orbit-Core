@@ -4,7 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  tdxRequest, tdxGet, tdxAccess, resetTdxToken, resetPace, resetMeter, spend, usage, flushUse, billingMonth, CAPS,
+  tdxRequest, tdxGet, tdxAccess, resetTdxToken, resetPace, resetTurns, resetMeter, spend, usage, flushUse, billingMonth, CAPS,
   parseGoogleRoutes, parseAutocomplete, parseNominatim, parsePlace, parseTdxRoutes, planSig, googleRouteBody, handleTransit, GOOGLE_ROUTE_FIELDS
 } from '../transit.js';
 
@@ -28,6 +28,7 @@ const json = (body, status = 200) => new Response(JSON.stringify(body), { status
 const fresh = () => {
   resetTdxToken();
   resetPace();
+  resetTurns();
   resetMeter();
 };
 
@@ -97,6 +98,26 @@ test('TDX answers are shared: fresh from the cache, stale while refreshing, the 
   assert.equal(JSON.parse(d.body).code, 'TDX_BUSY');
   const e = await tdxGet(env, path, { fetchFn, cache, now: NOW + 70_000 + 5 * 60_000 });
   assert.equal(e.status, 200);
+});
+
+test('on a paid plan TDX calls wait their turn (a second’s worth at a time) and a 429 is asked again', async () => {
+  fresh();
+  const env = { TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 'secret', RATE_LIMIT_KV: memKv(), TDX_PER_MIN: '240', TDX_PER_SEC: '20' };
+  const times = [];
+  let refused = 0;
+  const fetchFn = async url => {
+    if (url.includes('token')) return json({ access_token: 'T', expires_in: 86400 });
+    times.push(Date.now());
+    // TDX refuses the first ask of one path (another isolate took the second).
+    if (url.includes('Taipei') && !refused++) return json({ message: 'API rate limit exceeded' }, 429);
+    return json([]);
+  };
+  const cities = ['Hsinchu', 'HsinchuCounty', 'Taipei', 'Taichung', 'Tainan', 'Kaohsiung'];
+  const got = await Promise.all(cities.map(c => tdxGet(env, `basic/v2/Bike/Station/City/${c}`, { fetchFn, cache: memCache(), now: NOW })));
+  assert.deepEqual(got.map(g => g.status), cities.map(() => 200), 'every one answered, none busy');
+  assert.equal(times.length, 7, 'Taipei asked twice');
+  const sorted = times.slice().sort((a, b) => a - b);
+  for (let i = 1; i < sorted.length; i++) assert.ok(sorted[i] - sorted[i - 1] >= 40, 'spaced 50 ms apart');
 });
 
 test('no TDX key: a clear answer, nothing fetched', async () => {

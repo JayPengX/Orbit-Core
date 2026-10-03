@@ -220,6 +220,24 @@ function paced(env, now) {
   return true;
 }
 
+// TDX's paid plans count calls a second (5 on 銅級; past it: 429 "API rate
+// limit exceeded"), and an app opening fires twenty at once. With
+// TDX_PER_SEC set, calls here wait their turn, spaced evenly, instead of
+// failing; a turn more than 8 s away is "busy".
+const turn = { next: 0 };
+export const resetTurns = () => (turn.next = 0);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function myTurn(env) {
+  const perSec = Number(env.TDX_PER_SEC) || 0;
+  if (!perSec) return true;
+  const t = Date.now();
+  const at = Math.max(t, turn.next);
+  if (at - t > 8000) return false;
+  turn.next = at + Math.ceil(1000 / perSec);
+  if (at > t) await sleep(at - t);
+  return true;
+}
+
 const inflight = new Map();
 
 // One TDX answer, from the shared cache when it's fresh enough.
@@ -242,9 +260,17 @@ export async function tdxGet(env, raw, { fetchFn = fetch, cache = globalThis.cac
       if (!paced(env, now)) return { status: 429, state: 'busy' };
       const token = await tdxAccess(env, fetchFn, now);
       if (!token) return { status: 503, state: 'nokey' };
-      const res = await fetchFn(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Accept-Encoding': 'br, gzip' } });
-      await tally(env, 'tdx', 1, now, ctx);
-      if (res.status === 429) pace.until = now + 30_000;
+      let res;
+      // Another isolate may share the second: a 429 waits a moment and asks again (twice).
+      for (let tries = 0; ; tries++) {
+        if (!(await myTurn(env))) return { status: 429, state: 'busy' };
+        res = await fetchFn(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Accept-Encoding': 'br, gzip' } });
+        await tally(env, 'tdx', 1, now, ctx);
+        if (res.status !== 429 || tries >= 2 || !Number(env.TDX_PER_SEC)) break;
+        turn.next = Math.max(turn.next, Date.now() + 1100);
+      }
+      // On the free plan (no TDX_PER_SEC) a 429 means the minute is spent.
+      if (res.status === 429 && !Number(env.TDX_PER_SEC)) pace.until = now + 30_000;
       if (res.status === 401) resetTdxToken();
       if (!res.ok) return { status: res.status, state: 'error', why: (await res.text().catch(() => '')).slice(0, 160) };
       const body = await res.text();
@@ -636,6 +662,7 @@ async function routes(env, q, { fetchFn, ctx, now, cache }) {
     jobs.push(
       (async () => {
         if (!paced(env, now)) return ((sources.tdx = 'busy'), []);
+        if (!(await myTurn(env))) return ((sources.tdx = 'busy'), []);
         const token = await tdxAccess(env, fetchFn, now);
         if (!token) return ((sources.tdx = 'nokey'), []);
         const r = await fetchFn(`${TDX_BASE}maas/routing?${params}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } });
