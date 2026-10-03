@@ -26,6 +26,7 @@
 // KV limit applies.
 import { readToken, sessionLimited } from './quadra-token.js';
 import { ASIA_HOST, asiaBaseballResponse, asiaTarget } from './asia-baseball.js';
+import { F1_LIVE_HOST, f1LiveResponse } from './f1-live.js';
 
 const ALLOWED_ORIGINS = ['https://jaypengx.github.io'];
 
@@ -148,7 +149,9 @@ const SPORTS_PROXY_ALLOWED_HOSTS = [
   F1_HOST,
   // Not a real host: Asian baseball's schedules and scores, gathered by this
   // Worker from the leagues' own sites (asia-baseball.js).
-  ASIA_HOST
+  ASIA_HOST,
+  // Not a real host either: F1's own live timing, one snapshot (f1-live.js).
+  F1_LIVE_HOST
 ];
 const SPORTS_PROXY_RATE_LIMIT = 600;
 const ELTA_PATH = '/production/json/program_list/sports_live_program_list.json';
@@ -182,6 +185,8 @@ const CACHE_LIVE = { tier: 'live', fresh: 10 * SECOND, stale: 0 };
 // since the poll interval is longer than any short fresh window, every
 // poll then got the PREVIOUS poll's odds - always one tick behind.)
 const CACHE_ODDS = { tier: 'odds', fresh: 10 * SECOND, stale: 0 };
+// F1's live timing: a few seconds, shared by everyone watching.
+const CACHE_F1_LIVE = { tier: 'f1-live', fresh: 4 * SECOND, stale: 0 };
 const CACHE_SCHEDULE = { tier: 'schedule', fresh: 10 * MINUTE, stale: DAY };
 const CACHE_SEASON = { tier: 'season', fresh: 3 * MINUTE, stale: 30 * MINUTE };
 const CACHE_STANDINGS = { tier: 'standings', fresh: 30 * MINUTE, stale: DAY };
@@ -281,6 +286,8 @@ function cachePolicyFor(url) {
       return CACHE_STANDINGS;
     case ASIA_HOST:
       return asiaPolicy(url);
+    case F1_LIVE_HOST:
+      return CACHE_F1_LIVE;
     default:
       return CACHE_LIVE;
   }
@@ -524,6 +531,8 @@ async function fetchUpstream(upstreamUrl, trim) {
   try {
     upstream = upstreamUrl.hostname === ASIA_HOST
       ? await asiaBaseballResponse(upstreamUrl)
+      : upstreamUrl.hostname === F1_LIVE_HOST
+      ? await f1LiveResponse(upstreamUrl)
       : needsYahooCrumb(upstreamUrl)
       ? await fetchYahooWithCrumb(upstreamUrl)
       : upstreamUrl.hostname === 'clients5.google.com'
