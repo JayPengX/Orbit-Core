@@ -338,6 +338,22 @@ export function parseNominatim(list) {
     .filter(p => p.name && p.lat != null && p.lon != null);
 }
 
+// The near ones that carry the whole name first (nearest first), then
+// Google's order; each place once.
+const squash = s => String(s || '').replace(/\s+/g, '').replace(/台/g, '臺').toLowerCase();
+const distM = (a, b, c, d) => {
+  const R = 6371000;
+  const r = x => (x * Math.PI) / 180;
+  const h = Math.sin(r(c - a) / 2) ** 2 + Math.cos(r(a)) * Math.cos(r(c)) * Math.sin(r(d - b) / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+};
+export function nearFirst(items, near, text) {
+  const t = squash(text);
+  const close = [...near, ...items].filter(i => i.dist != null && i.dist <= 15_000 && squash(i.name).includes(t)).sort((a, b) => a.dist - b.dist);
+  const seen = new Set();
+  return [...close, ...items].filter(i => !seen.has(i.id) && seen.add(i.id)).slice(0, 8);
+}
+
 async function search(env, q, { fetchFn, ctx, now, cache }) {
   const text = String(q.get('q') || '').trim().slice(0, 80);
   if (!text) return { items: [] };
@@ -347,9 +363,24 @@ async function search(env, q, { fetchFn, ctx, now, cache }) {
   if (googleKey(env) && (await spend(env, 'autocomplete', 1, now, ctx))) {
     const body = { input: text, languageCode: 'zh-TW', regionCode: 'tw', includedRegionCodes: ['tw'], ...(session ? { sessionToken: session } : {}) };
     if (lat != null && lon != null && inTaiwan(lat, lon)) Object.assign(body, { origin: { latitude: lat, longitude: lon }, locationBias: { circle: { center: { latitude: lat, longitude: lon }, radius: 30_000 } } });
+    const ask = async b => {
+      const res = await fetchFn(`${PLACES}places:autocomplete`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': googleKey(env) }, body: JSON.stringify(b) });
+      return res.ok ? parseAutocomplete(await res.json()) : null;
+    };
     try {
-      const res = await fetchFn(`${PLACES}places:autocomplete`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': googleKey(env) }, body: JSON.stringify(body) });
-      if (res.ok) return { items: parseAutocomplete(await res.json()), by: 'google' };
+      const items = await ask(body);
+      if (items) {
+        // A chain's name (錢都) answered with a branch far away while one is
+        // near: asked again inside 15 km, the near ones that carry the whole
+        // name go first, nearest first.
+        const far = !items.length || items.every(i => i.dist == null || i.dist > 15_000);
+        if (far && body.origin && text.length >= 2 && (await spend(env, 'autocomplete', 1, now, ctx))) {
+          const { locationBias, ...rest } = body;
+          const near = await ask({ ...rest, locationRestriction: { circle: { center: locationBias.circle.center, radius: 15_000 } } }).catch(() => null);
+          return { items: nearFirst(items, near || [], text), by: 'google' };
+        }
+        return { items: nearFirst(items, [], text), by: 'google' };
+      }
     } catch {}
   }
   // OpenStreetMap's search (Nominatim: a second a request at most, so cached a day).
@@ -359,7 +390,7 @@ async function search(env, q, { fetchFn, ctx, now, cache }) {
   const key = new Request(`https://transit-cache.quadra/osm?${params}`);
   try {
     const hit = cache && (await cache.match(key));
-    if (hit) return { items: parseNominatim(await hit.json()), by: 'osm' };
+    if (hit) return { items: nearFirst(parseNominatim(await hit.json()).map(i => ({ ...i, dist: lat != null && lon != null ? Math.round(distM(lat, lon, i.lat, i.lon)) : null })), [], text), by: 'osm' };
     const res = await fetchFn(url, { headers: { 'User-Agent': 'OrbitTransit/1.0 (https://jaypengx.github.io/Orbit-Transit/)', Accept: 'application/json' } });
     if (!res.ok) return { items: [], by: 'osm' };
     const list = await res.json();
@@ -367,7 +398,8 @@ async function search(env, q, { fetchFn, ctx, now, cache }) {
       const put = cache.put(key, new Response(JSON.stringify(list), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=86400' } })).catch(() => {});
       if (ctx?.waitUntil) ctx.waitUntil(put);
     }
-    return { items: parseNominatim(list), by: 'osm' };
+    const items = parseNominatim(list).map(i => ({ ...i, dist: lat != null && lon != null ? Math.round(distM(lat, lon, i.lat, i.lon)) : null }));
+    return { items: nearFirst(items, [], text), by: 'osm' };
   } catch {
     return { items: [], by: 'osm' };
   }
