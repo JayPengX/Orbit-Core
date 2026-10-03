@@ -51,6 +51,7 @@ import { join, extname, resolve } from 'node:path';
 import { execFile } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { ASIA_HOST, asiaBaseballResponse } from '../asia-baseball.js';
+import { F1_LIVE_HOST, f1LiveResponse } from '../f1-live.js';
 import { trimF1Page } from '../sports-proxy-worker.js';
 import { handleWeather } from '../weather.js';
 import { upstream as weatherFixtures } from '../tests/fixtures/weather/upstream.mjs';
@@ -227,6 +228,8 @@ const upstream = url => {
   const fixture = fixtures.find(([text]) => url.includes(text));
   if (fixture) return readFile(fixture[1], 'utf8').then(body => ({ status: 200, body }));
   // Asian baseball: gathered here by the Worker's own module (asia-baseball.js).
+  // F1's live timing: a fresh snapshot each time (run with NODE_USE_ENV_PROXY=1 behind a proxy).
+  if (url.startsWith(`https://${F1_LIVE_HOST}/`)) return f1LiveResponse(new URL(url)).then(async r => ({ status: r.status, body: await r.text() }));
   if (url.startsWith(`https://${ASIA_HOST}/`)) {
     if (!cache.has(url)) cache.set(url, asiaBaseballResponse(new URL(url)).then(async r => ({ status: r.status, body: await r.text() })));
     return cache.get(url);
