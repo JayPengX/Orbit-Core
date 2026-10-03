@@ -438,7 +438,8 @@ export function parseGoogleRoutes(j, now = Date.now()) {
         legs.push({
           mode: G_MODES[line.vehicle?.type] || 'rail',
           name: line.name || line.nameShort || '',
-          short: line.nameShort || '',
+          // Rail lines' short names come in English (Local Train) beside a Chinese name (區間車).
+          short: /[\u4e00-\u9fff]/.test(line.name || '') && /^[A-Za-z][A-Za-z .-]*$/.test(line.nameShort || '') ? '' : line.nameShort || '',
           color: line.color || '',
           text: line.textColor || '',
           vehicle: line.vehicle?.name?.text || '',
