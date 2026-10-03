@@ -458,6 +458,18 @@ export function googleModes(modes) {
   return out;
 }
 
+// TDX's planner's transit codes, learned by asking (status?sample=maas&transit=):
+// 5 is every bus; 3 and 4 together are 台鐵 and 高鐵 (4 alone is refused, 3
+// alone finds nothing); 6–9 add the metros (only beside 3,4). The app drops
+// what it doesn't want from the rest.
+export function tdxTransit(modes) {
+  const codes = [];
+  if (modes.has('tra') || modes.has('hsr') || modes.has('metro')) codes.push(3, 4);
+  if (modes.has('bus')) codes.push(5);
+  if (modes.has('metro')) codes.push(6, 7, 8, 9);
+  return codes.join(',');
+}
+
 export function googleRouteBody(from, to, { at = null, by = 'depart', prefer = '', modes = null } = {}) {
   const body = {
     origin: { location: { latLng: { latitude: from.lat, longitude: from.lon } } },
@@ -690,7 +702,7 @@ async function routes(env, q, { fetchFn, ctx, now, cache }) {
     // first and last mile (TDX's mode 3), which reaches the express buses and
     // stations a walk doesn't (the owner: bike to 快捷8號, bike from 竹東).
     const ask = (key, mile, minutes) => {
-      const params = new URLSearchParams({ origin: `${from.lat},${from.lon}`, destination: `${to.lat},${to.lon}`, gc: '1.0', top: '5', transit: '3,4,5,6,7,8,9', transfer_time: '0,60', first_mile_mode: mile, first_mile_time: minutes, last_mile_mode: mile, last_mile_time: minutes });
+      const params = new URLSearchParams({ origin: `${from.lat},${from.lon}`, destination: `${to.lat},${to.lon}`, gc: '1.0', top: '5', transit: tdxTransit(modes), transfer_time: '0,60', first_mile_mode: mile, first_mile_time: minutes, last_mile_mode: mile, last_mile_time: minutes });
       params.set(by === 'arrive' ? 'arrival' : 'depart', twIso(at + (by === 'arrive' ? 0 : MIN)));
       return (async () => {
         if (!paced(env, now)) return ((sources[key] = 'busy'), []);

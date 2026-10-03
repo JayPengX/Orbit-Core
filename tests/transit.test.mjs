@@ -380,6 +380,7 @@ test('a trip’s ways of moving: Google told which, TDX’s bike plan only with 
   const env = { RATE_LIMIT_KV: memKv(), GOOGLE_MAPS_KEY: 'k', TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 's', TDX_PER_MIN: '300' };
   const bodies = [];
   const miles = [];
+  const codes = [];
   const fetchFn = async (url, init) => {
     if (url.includes('token')) return json({ access_token: 'T', expires_in: 86400 });
     if (url.startsWith('https://routes.googleapis.com')) {
@@ -388,6 +389,7 @@ test('a trip’s ways of moving: Google told which, TDX’s bike plan only with 
     }
     if (url.includes('/maas/routing')) {
       miles.push(new URL(url).searchParams.get('first_mile_mode'));
+      codes.push(new URL(url).searchParams.get('transit'));
       return json({ data: { routes: [] } });
     }
     assert.fail(`unexpected ${url}`);
@@ -396,6 +398,7 @@ test('a trip’s ways of moving: Google told which, TDX’s bike plan only with 
   const out = await (await ask('tra,hsr,metro')).json();
   assert.deepEqual(bodies[0].transitPreferences.allowedTravelModes, ['TRAIN', 'SUBWAY', 'LIGHT_RAIL']);
   assert.deepEqual(miles, ['0']);
+  assert.deepEqual(codes, ['3,4,6,7,8,9']);
   assert.equal(out.sources.tdxBike, undefined);
   await ask('');
   assert.equal(bodies[1].transitPreferences, undefined);
