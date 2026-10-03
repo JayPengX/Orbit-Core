@@ -146,6 +146,8 @@ export const TDX_RULES = [
   { re: /^basic\/v3\/Rail\/TRA\/DailyTrainTimetable\/(TrainDate\/\d{4}-\d{2}-\d{2}|OD\/\d+\/to\/\d+\/\d{4}-\d{2}-\d{2})$/, fresh: 6 * HOUR, stale: DAY, tier: 'timetable' },
   { re: /^basic\/v2\/Rail\/THSR\/DailyTimetable\/(TrainDate\/\d{4}-\d{2}-\d{2}|OD\/\d+\/to\/\d+\/\d{4}-\d{2}-\d{2})$/, fresh: 6 * HOUR, stale: DAY, tier: 'timetable' },
   { re: /^basic\/v2\/Rail\/Metro\/(StationTimeTable|Frequency|S2STravelTime)\/[A-Z]+$/, fresh: DAY, stale: 7 * DAY, tier: 'timetable' },
+  // A bus route's timetable (departures from its first stop, or its headways).
+  { re: /^basic\/v2\/Bus\/Schedule\/(City\/[A-Za-z]+\/[^/]+|InterCity\/[^/]+)$/, fresh: 6 * HOUR, stale: 7 * DAY, tier: 'timetable' },
   // What changes rarely: routes, stops, stations, lines, fares.
   { re: /^basic\/v2\/Bus\/(Route|StopOfRoute)\/(City\/[A-Za-z]+(\/[^/]+)?|InterCity(\/[^/]+)?)$/, fresh: DAY, stale: 7 * DAY, tier: 'static' },
   { re: /^advanced\/v2\/Bus\/(Station|Stop|Route)\/NearBy$/, fresh: DAY, stale: 7 * DAY, tier: 'static' },
