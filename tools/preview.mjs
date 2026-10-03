@@ -127,6 +127,13 @@ const evals = [];
 for (let c; (c = opt('eval', null)); ) evals.push(c);
 const latency = Number(opt('latency', 0));
 const timing = flag('timing');
+// --requests: every call the page makes beyond its own files (the Worker, the
+// proxy, maps, fonts), with its method and, for a POST, its op: what an app
+// costs each time it opens.
+const requests = flag('requests');
+// --reopen: each page opened twice in the same browser (its storage kept):
+// the second is how an app opens on a phone that has used it before.
+const reopen = flag('reopen');
 const full = flag('full');
 const signedOut = flag('signed-out');
 const dark = flag('dark');
@@ -380,7 +387,7 @@ await context.route(/^https:\/\/(?!orbit-workers-proxy|sports-proxy)/, async rou
 
 await mkdir(out, { recursive: true });
 const errors = [];
-for (const hash of hashes.length ? hashes : ['']) {
+for (const hash of (hashes.length ? hashes : ['']).flatMap(h => (reopen ? [h, h] : [h]))) {
   // A page of its own for each (a hash change alone doesn't reload).
   const page = await context.newPage();
   page.on('console', m => m.type() === 'error' && errors.push(m.text()));
@@ -388,6 +395,23 @@ for (const hash of hashes.length ? hashes : ['']) {
   const started = Date.now();
   const own = [];
   page.on('request', r => r.url().startsWith(base) && own.push({ url: r.url().slice(base.length) || '/', at: Date.now() - started }));
+  // Each call: when it was asked, how long its answer took (or that it failed).
+  const calls = [];
+  if (requests) {
+    const at = new Map();
+    page.on('request', r => {
+      if (r.url().startsWith(base) || r.url().startsWith('data:')) return;
+      let op = '';
+      try {
+        op = JSON.parse(r.postData() || '{}').op || '';
+      } catch {}
+      const call = { t: Date.now() - started, text: `${r.method().padEnd(4)} ${r.url().replace(/([?&](qt|token)=)[^&]+/g, '$1…').slice(0, 4000)}${op ? `  op=${op}` : ''}`, took: '…' };
+      at.set(r, call);
+      calls.push(call);
+    });
+    page.on('requestfinished', r => at.has(r) && (at.get(r).took = `${Date.now() - started - at.get(r).t} ms`));
+    page.on('requestfailed', r => at.has(r) && (at.get(r).took = 'failed'));
+  }
   await page.goto(`${base}${hash ? `#${hash}` : ''}`);
   if (timing) {
     const shown = await page
@@ -411,6 +435,7 @@ for (const hash of hashes.length ? hashes : ['']) {
     await page.fill(sel, text).catch(e => errors.push(`type ${sel}: ${e.message.split('\n')[0]}`));
     await page.waitForTimeout(4000);
   }
+  if (requests) console.log(`requests ${key}${hash ? `#${hash}` : ''} (${calls.length}):\n${calls.map(c => `${String(c.t).padStart(6)} ms  +${c.took.padEnd(8)} ${c.text}`).join('\n')}`);
   for (const js of evals) console.log('eval:', JSON.stringify(await page.evaluate(js).catch(e => `error ${e.message}`)));
   const file = join(out, `${key}-${hash || 'start'}${clicks.length ? '-clicked' : ''}${dark ? '-dark' : ''}${engine === 'webkit' ? '-webkit' : ''}.png`);
   await page.screenshot({ path: file, fullPage: full });

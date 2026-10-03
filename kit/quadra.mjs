@@ -593,10 +593,14 @@ export async function translate(text, to = 'zh-TW', from = 'auto') {
   }
 }
 
+// A list that failed (after the kit's own second try) is failed for a little
+// while too: as long as it would have been kept, a minute at most, so the
+// parts of a page that want it don't each ask a source that's down again.
+const FAILED_HOLD_MS = 60_000;
 export function proxyJson(url, { ttl = 60_000, trim = '', persist: keep = true, timeout = 20_000 } = {}) {
   const key = dataKey(url, trim);
   const hit = memory.get(key);
-  if (hit && Date.now() - hit.at < ttl) return hit.promise;
+  if (hit && Date.now() - hit.at < (hit.failed ? Math.min(ttl, FAILED_HOLD_MS) : ttl)) return hit.promise;
   const promise = (async () => {
     if (keep) {
       const saved = await persisted(key);
@@ -608,8 +612,9 @@ export function proxyJson(url, { ttl = 60_000, trim = '', persist: keep = true, 
     if (keep) setTimeout(() => persist(key, typeof got === 'string' ? got : JSON.stringify(got)), 0);
     return data;
   })();
-  memory.set(key, { at: Date.now(), promise });
-  promise.catch(() => memory.delete(key));
+  const entry = { at: Date.now(), promise, failed: false };
+  memory.set(key, entry);
+  promise.catch(() => memory.get(key) === entry && Object.assign(entry, { at: Date.now(), failed: true }));
   if (memory.size > 500) memory.delete(memory.keys().next().value);
   return promise;
 }
