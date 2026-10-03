@@ -42,6 +42,43 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
 - **Renaming** (by hand, README "Renaming Quadra-Fixtures and Quadra-Hub"):
   rename the repos, set `RENAMED = true` in `kit/brand.mjs`, push here;
   `tools/moved/` is the stub for the old addresses.
+## Orbit Transit, round 4 (branch `claude/practical-allen-y0jnq2`, pushed to `main`)
+
+- **TPASS rules** (`tpass.mjs`): 台鐵's 太魯閣, 普悠瑪 and EMU3000 (type
+  codes 1, 2, 11) and 高鐵 are never on the pass. A trip with both ends in
+  your pass's cities keeps only plans the pass takes (`rank`'s `keep`,
+  falling back to everything when nothing's left); our rail router and
+  查時刻's search look only at those trains then (查時刻 says so). Fares
+  show 「TPASS 涵蓋」 per leg.
+- **Fewer changes**: `bikeToRail`/`bikeFromRail` take `at` (a ride index):
+  by YouBike to the bus after a change, or off the first one and on by
+  bike; changes cost 14 (bus→bus) / 9 minutes in `score`.
+- **每 30 分鐘換車**: the planner adds the whole city's stations at both
+  ends (`cityBikes`), so `swapRides` finds one where the cut falls (the
+  ~5 km grid of points used to miss it).
+- **Streets**: walks and YouBike rides of an opened plan (and walking to a
+  stop) are drawn by FOSSGIS's OSRM (`routing.openstreetmap.de`,
+  `roadPath` in api.mjs, CORS open, light use only, kept per session).
+- **Trips**: `alt: [{ days, time, back }]` (days with their own times,
+  each day once; an empty time uses the usual); `tripNow` finds the next
+  day the trip runs (Sunday → Monday's) at that day's time.
+- **交通** has no 附近 any more; ★ unpins a stop or a train there; 查時刻's
+  pins toggle.
+- **Map**: nearest YouBike stations along the bottom; bus stops one per
+  name within 90 m (`stopGroups`; the card asks each and says 往 …); 走過去 /
+  騎 YouBike to a stop, navigated at once; 到站提醒 (`alerts.mjs`: checked
+  every 20 s while the app runs, a notification once, kept 2 h); search
+  shows your places and 最近 (deletable), stations nearest first; the
+  proxy's `/transit/search` puts a chain's near branches first
+  (`nearFirst`: asked again inside 15 km when Google's are all far).
+- **捷運路網圖** sits at z-index 60 (the sticky header covered its city
+  buttons); opens on the system you're within 10 km of, else your last.
+- **Tickets** (`tickets.mjs`): no operator offers a link that fills its
+  form or opens its app at a train, so 訂票 opens the booking site and
+  copies 「高鐵 613 次 · 10/05 07:30 · 新竹 → 台北」.
+- Preview: the kit now loads from `../Shared-Proxy/kit/`, so a local
+  server must serve `/Orbit-Transit/` and `/Shared-Proxy/` side by side.
+
 ## Orbit Transit, round 2 (branch `claude/practical-allen-y0jnq2`, pushed to `main`)
 
 The owner's 22-point list. Done:
