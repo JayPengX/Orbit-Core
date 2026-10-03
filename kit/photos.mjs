@@ -7,6 +7,7 @@
 // The kit's copy (Shared-Proxy/kit/photos.mjs), synced into Fixtures and Play
 // as lib/photos.mjs: never edit an app's copy.
 import { CATALOG } from './catalog.mjs';
+import { logoPicture } from './logos.mjs';
 
 const CDN = 'https://a.espncdn.com/i/headshots';
 // ESPN's headshot at the size a phone shows it (its image service: a full
@@ -143,4 +144,29 @@ export function findPhoto(name, league) {
     );
   }
   return asked.get(key);
+}
+
+// ---- A person's picture on the page -------------------------------------------------------
+// The same in every app (Fixtures' rosters and players, Play's players'
+// markets): each of `urls` in turn (the feed's own pictures), then one found
+// before on this device, then `guess` (ESPN's headshot by id: given up at
+// its first miss, not retried, since many players have none). When all of
+// them fail, `fallback()` (initials, a flag, a badge) stands in, and a search
+// by name (findPhoto) puts the face in when it comes. Every try goes through
+// logoPicture (retries, never a broken picture, drawn at once when seen
+// before), so a redraw never makes a face blink or vanish.
+export function personPhoto(name, league, { urls = [], guess = null, cls = '', fallback }) {
+  const known = knownPhoto(name, sportOf(league));
+  const guessed = smallPhoto(guess);
+  const list = [...new Set([...urls, known, guess].map(smallPhoto).filter(Boolean))];
+  const last = () => {
+    const stand = fallback();
+    if (known === undefined && name)
+      findPhoto(name, league).then(url => {
+        if (url && stand.isConnected) stand.replaceWith(logoPicture(url, null, `${cls} photo${isCutout(url) ? ' cutout' : ''}`, () => fallback()));
+      });
+    return stand;
+  };
+  const chain = i => (i >= list.length ? last() : logoPicture(list[i], null, `${cls}${isCutout(list[i]) ? ' photo cutout' : ''}`, () => chain(i + 1), { guess: list[i] === guessed }));
+  return chain(0);
 }
