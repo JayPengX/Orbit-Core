@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   tdxRequest, tdxGet, tdxAccess, resetTdxToken, resetPace, resetTurns, resetMeter, spend, usage, flushUse, billingMonth, CAPS,
-  parseGoogleRoutes, parseAutocomplete, parseNominatim, parsePlace, parseTdxRoutes, planSig, googleRouteBody, handleTransit, GOOGLE_ROUTE_FIELDS
+  parseGoogleRoutes, parseAutocomplete, nearFirst, parseNominatim, parsePlace, parseTdxRoutes, planSig, googleRouteBody, handleTransit, GOOGLE_ROUTE_FIELDS
 } from '../transit.js';
 
 const NOW = Date.parse('2026-10-03T01:00:00Z');
@@ -193,7 +193,7 @@ test('search: Google’s suggestions, OpenStreetMap’s past the cap', async () 
   await kv.put(`transit:use:${billingMonth(NOW)}`, JSON.stringify({ autocomplete: CAPS.autocomplete }));
   out = await (await ask()).json();
   assert.equal(out.by, 'osm');
-  assert.deepEqual(out.items[0], { id: 'osm:n42', name: '新竹車站', sub: '中華路二段 東區 新竹市', lat: 24.8016, lon: 120.9716 });
+  assert.deepEqual(out.items[0], { id: 'osm:n42', name: '新竹車站', sub: '中華路二段 東區 新竹市', lat: 24.8016, lon: 120.9716, dist: 240 });
   assert.match(seen.at(-1), /nominatim\.openstreetmap\.org\/search\?.*countrycodes=tw/);
 });
 
@@ -421,4 +421,11 @@ test('a TDX answer that fails with a 5xx is asked once more', async () => {
   const got = await tdxGet(env, 'basic/v2/Bike/Station/City/Hsinchu', { fetchFn, now: NOW, cache: memCache() });
   assert.equal(got.status, 200);
   assert.equal(n, 2);
+});
+
+test('place search: the near branch of a chain first, nearest first', () => {
+  const far = [{ id: 'a', name: '錢都日式涮涮鍋 桃園店', dist: 45000 }, { id: 'b', name: '錢都 中壢店', dist: 38000 }];
+  const near = [{ id: 'c', name: '錢都 竹北光明店', dist: 2100 }, { id: 'd', name: '錢都 新竹店', dist: 9000 }, { id: 'e', name: '金錢豹', dist: 900 }];
+  assert.deepEqual(nearFirst(far, near, '錢都').map(i => i.id), ['c', 'd', 'a', 'b']);
+  assert.deepEqual(nearFirst([{ id: 'x', name: '台北車站', dist: 70000 }], [], '台北車站').map(i => i.id), ['x']);
 });
