@@ -80,3 +80,9 @@ test('the brand: Quadra is where the money is, Orbit the everyday tools; ids nev
   for (const id of [...Object.keys(kit.APPS), 'pass']) for (const shape of ['rounded', 'square', 'maskable']) assert.match(brand.appIcon(id, { shape }), /^<svg [^>]*viewBox="0 0 512 512"/);
   assert.match(kit.helpUrl('stock', 'orders'), /^\/Quadra-Securities\/#help=stock:orders$/);
 });
+
+test('the family page (site/index.html) links where the kit does: regenerate it after a rename', () => {
+  const page = readFileSync(new URL('../site/index.html', import.meta.url), 'utf8');
+  const links = [...page.matchAll(/class="app" href="([^"]+)"/g)].map(m => m[1]).sort();
+  assert.deepEqual(links, Object.values(kit.APPS).map(a => a.path).sort());
+});
