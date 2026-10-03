@@ -694,7 +694,8 @@ async function statusSample(env, name, deps) {
     return { name, status: got.status, state: got.state, body: cut(got.body) };
   }
   const key = new Request(`https://transit-cache.quadra/sample/${name}`);
-  const hit = deps.cache && (await deps.cache.match(key).catch(() => null));
+  // fresh=1: ask again now (after a key's settings changed).
+  const hit = !deps.fresh && deps.cache && (await deps.cache.match(key).catch(() => null));
   if (hit) return { ...(await hit.json()), cached: true };
   let out;
   if (name === 'maas' || name === 'maas-local') {
@@ -740,7 +741,7 @@ export async function handleTransit(request, env, headers, path, { session = nul
   const deps = { fetchFn, ctx, now, cache };
   if (path === '/transit/status') {
     const sample = q.get('sample');
-    if (sample) return send(await statusSample(env, sample, deps));
+    if (sample) return send(await statusSample(env, sample, { ...deps, fresh: q.get('fresh') === '1' }));
     return send({ month: billingMonth(now), used: await usage(env, now), caps: CAPS, keys: { tdx: Boolean(env.TDX_CLIENT_ID && env.TDX_CLIENT_SECRET), mapsBrowser: Boolean(env.GOOGLE_MAPS_BROWSER_KEY), google: Boolean(googleKey(env)) }, tdxPerMin: Number(env.TDX_PER_MIN) || 5 });
   }
   if (!session) return send({ code: 'ECO_TOKEN_INVALID' }, 401);
