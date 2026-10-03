@@ -207,6 +207,15 @@ board. Quadra Pass sign-in; Chinese; always dark. App repo
   F1's feed, `f1Brief`, filled in place every 10 s). The F1 board uses the
   result's own rows (`f1Row`) and comes first in its sheet while a session
   runs; the NBA panel uses the batter / pitcher layout.
+- **Playoffs for every league** (`lib/playoffs.mjs`, `playoffData` in
+  app.js): each league's format (MLB, NBA, MLS, 歐冠 / 歐霸 / 歐協聯,
+  歐國聯, 英足總盃, 世界盃); real games while they're on, the first round
+  predicted from the table while the season's on (seeds; the cups' league
+  phase 9-24; League A's groups), last season's when this one hasn't begun
+  (`seasonInfo` in espn.mjs gives the phase; NBA = last season now). Rounds
+  dated from their games (ESPN's TBD games too), a cup's calendar stages, or
+  about 3 days after a regular season's last day. Shown as the swiped map
+  (the owner preferred it to round tabs), opening on the round that's on.
 - **Brackets** (賽事 → 季後賽 / 淘汰賽): `lib/bracket.mjs` from games with
   `round` (espn.mjs `knockoutRound`): MLB, NBA, MLS (the days around now,
   75 back) and every cup (its season's games). Ties by round and sides,
