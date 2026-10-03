@@ -418,8 +418,9 @@ const G_MODES = {
   FERRY: 'ferry', CABLE_CAR: 'gondola', GONDOLA_LIFT: 'gondola', FUNICULAR: 'gondola'
 };
 const secs = s => (typeof s === 'string' ? Number(s.replace(/s$/, '')) || 0 : Number(s) || 0);
+// A time without a zone (TDX's planner: "2026-10-03T17:22:00") is Taiwan's.
 const ms = t => {
-  const v = t ? Date.parse(t) : NaN;
+  const v = t ? Date.parse(/(Z|[+-]\d\d:?\d\d)$/.test(t) ? t : `${t}+08:00`) : NaN;
   return Number.isFinite(v) ? v : null;
 };
 const pt = (name, ll) => ({ name: name || '', lat: num(ll?.latitude ?? ll?.lat), lon: num(ll?.longitude ?? ll?.lng ?? ll?.lon) });

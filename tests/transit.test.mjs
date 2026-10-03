@@ -324,6 +324,7 @@ test('TDX’s planner is read loosely: sections as a list or an object, missing 
     }
   });
   assert.deepEqual(live[0].legs.map(l => l.mode), ['tra']);
+  assert.equal(live[0].dep, Date.parse('2026-10-03T17:22:00+08:00'), 'TDX’s zoneless times are Taiwan’s');
   assert.ok(live[0].legs[0].dist > 30_000);
 });
 
