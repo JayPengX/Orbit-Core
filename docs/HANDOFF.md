@@ -94,8 +94,8 @@ board. Quadra Pass sign-in; Chinese; always dark. App repo
   iPhone Safari never stopped (the freeze after 我的球隊 → 賽車).
 - A repaint keeps a scrolled strip where it was (`range.left`, applied by
   `centerChosen`); picking a day or a filter centres it again.
-- F1: practice (FP1–3) is listed like the other sessions (picks rank it
-  0.5 lower); ELTA's programs match a session by its name (第1節, 排位賽…)
+- F1: practice (FP1–3) is listed in 賽事 and the race sheet, never on
+  首頁 (`practice` in app.js: picks, live block, a sport's days); ELTA's programs match a session by its name (第1節, 排位賽…)
   within 3 hours; every F1 session counts as on ELTA (`every` in
   BROADCAST, its 2026-2029 rights), its channel once the list names it.
 - 賽事 places a race weekend by all its sessions. The race sheet's
