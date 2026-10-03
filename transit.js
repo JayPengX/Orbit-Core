@@ -523,7 +523,25 @@ const T_MODES = {
   highSpeedTrain: 'hsr', intercityTrain: 'tra', interRegionalTrain: 'tra', regionalTrain: 'tra', cityTrain: 'tra', train: 'tra',
   subway: 'metro', monorail: 'metro', lightRail: 'lightrail', tram: 'lightrail',
   bus: 'bus', privateBus: 'bus', busRapid: 'bus', coach: 'bus',
-  ferry: 'ferry', aerial: 'gondola', inclined: 'gondola', cableCar: 'gondola'
+  ferry: 'ferry', aerial: 'gondola', inclined: 'gondola', cableCar: 'gondola',
+  // TDX's own words (seen live): cycle, TRA, YOXI (a taxi), and the operators' codes.
+  cycle: 'bike', drive: 'car', car: 'car', taxi: 'car', YOXI: 'car',
+  TRA: 'tra', THSR: 'hsr', HSR: 'hsr', MRT: 'metro', METRO: 'metro', Metro: 'metro',
+  TRTC: 'metro', KRTC: 'metro', TYMC: 'metro', TMRT: 'metro', NTMC: 'metro',
+  KLRT: 'lightrail', NTALRT: 'lightrail', LRT: 'lightrail',
+  BUS: 'bus', Bus: 'bus', CityBus: 'bus', InterCityBus: 'bus', THB: 'bus',
+  FERRY: 'ferry', Ferry: 'ferry', AIR: 'plane'
+};
+const tdxMode = (s, t) => {
+  for (const k of [t.mode, t.type, t.category]) if (k && T_MODES[k]) return T_MODES[k];
+  const all = `${t.mode || ''} ${t.type || ''} ${t.category || ''} ${s.type || ''}`;
+  if (s.type === 'pedestrian' || /walk|pedestrian/i.test(all)) return 'walk';
+  if (/bike|bicycle|cycle/i.test(all)) return 'bike';
+  if (/bus/i.test(all)) return 'bus';
+  if (/drive|car|taxi/i.test(all)) return 'car';
+  if (/thsr|hsr|high/i.test(all)) return 'hsr';
+  if (/metro|mrt|subway/i.test(all)) return 'metro';
+  return s.type === 'transit' ? 'tra' : 'walk';
 };
 // A section without its length: the straight line between its ends, ×1.3 for the streets.
 function roughMeters(a, b) {
@@ -541,7 +559,7 @@ export function parseTdxRoutes(j) {
     const sections = Array.isArray(r.sections) ? r.sections : Object.values(r.sections || {});
     const legs = sections.map(s => {
       const t = s.transport || {};
-      const mode = T_MODES[t.mode] || (s.type === 'pedestrian' ? 'walk' : /bike|bicycle/i.test(`${t.mode || s.type}`) ? 'bike' : t.mode ? 'rail' : 'walk');
+      const mode = tdxMode(s, t);
       const dep = ms(s.departure?.time);
       const arr = ms(s.arrival?.time);
       return {
@@ -563,8 +581,10 @@ export function parseTdxRoutes(j) {
         fmt: 'f'
       };
     });
-    if (!legs.length) continue;
-    plans.push(finishPlan({ src: 'tdx', legs, fare: num(r.total_price ?? r.price ?? r.fare) }));
+    // TDX pads a trip with zero-length cycle / taxi stubs at its ends: those are no legs.
+    const real = legs.filter(l => !(l.mode !== 'walk' && !/^(tra|hsr|metro|lightrail|bus|ferry|gondola|plane)$/.test(l.mode) && l.dist < 60 && l.dur < 120));
+    if (!real.length) continue;
+    plans.push(finishPlan({ src: 'tdx', legs: real, fare: num(r.total_price ?? r.price ?? r.fare) }));
   }
   return plans;
 }
@@ -677,10 +697,12 @@ async function statusSample(env, name, deps) {
   const hit = deps.cache && (await deps.cache.match(key).catch(() => null));
   if (hit) return { ...(await hit.json()), cached: true };
   let out;
-  if (name === 'maas') {
+  if (name === 'maas' || name === 'maas-local') {
     const token = await tdxAccess(env, deps.fetchFn, deps.now);
     if (!token) return { name, status: 503, body: 'no TDX key' };
-    const params = new URLSearchParams({ origin: `${AT.lat},${AT.lon}`, destination: `${TO.lat},${TO.lon}`, gc: '1.0', top: '2', transit: '3,4,5,6,7,8,9', transfer_time: '0,60' });
+    // maas-local: across Hsinchu (新竹車站 → 竹北 光明六路), where buses do the work.
+    const to = name === 'maas' ? TO : { lat: 24.839, lon: 121.008 };
+    const params = new URLSearchParams({ origin: `${AT.lat},${AT.lon}`, destination: `${to.lat},${to.lon}`, gc: '1.0', top: '5', transit: '3,4,5,6,7,8,9', transfer_time: '0,60', first_mile_mode: '0', first_mile_time: '15', last_mile_mode: '0', last_mile_time: '15' });
     const r = await fetchOf(deps)(`${TDX_BASE}maas/routing?${params}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } });
     await tally(env, 'tdx', 1, deps.now, deps.ctx);
     const text = await r.text();
@@ -688,7 +710,12 @@ async function statusSample(env, name, deps) {
     try {
       parsed = parseTdxRoutes(JSON.parse(text)).map(p => ({ dur: p.dur, legs: p.legs.map(l => `${l.mode}:${l.short || l.name}:${l.from.name}>${l.to.name}`) }));
     } catch {}
-    out = { name, status: r.status, body: cut(text), parsed };
+    let shape = null;
+    try {
+      // What each section says it is: the parser's modes come from these.
+      shape = (JSON.parse(text)?.data?.routes || []).map(rt => (rt.sections || []).map(x => [x.type, x.transport?.mode, x.transport?.type, x.transport?.category, x.transport?.name, x.travelSummary?.length, x.travelSummary?.duration].join('|')));
+    } catch {}
+    out = { name, status: r.status, body: cut(text), shape, parsed };
   } else if (name === 'google-route') {
     if (!googleKey(env) || !(await spend(env, 'routes', 1, deps.now, deps.ctx))) return { name, status: 503, body: 'no key or cap' };
     const r = await fetchOf(deps)(ROUTES, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': googleKey(env), 'X-Goog-FieldMask': GOOGLE_ROUTE_FIELDS }, body: JSON.stringify(googleRouteBody(AT, TO)) });
@@ -698,7 +725,7 @@ async function statusSample(env, name, deps) {
       parsed = parseGoogleRoutes(JSON.parse(text), deps.now).map(p => ({ dur: p.dur, legs: p.legs.map(l => `${l.mode}:${l.short || l.name}:${l.from.name}>${l.to.name}`) }));
     } catch {}
     out = { name, status: r.status, body: cut(scrubKey(text, env)), parsed };
-  } else return { code: 'NOT_FOUND', samples: [...Object.keys(SAMPLES), 'maas', 'google-route'] };
+  } else return { code: 'NOT_FOUND', samples: [...Object.keys(SAMPLES), 'maas', 'maas-local', 'google-route'] };
   if (deps.cache) await deps.cache.put(key, new Response(JSON.stringify(out), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=3600' } })).catch(() => {});
   return out;
 }

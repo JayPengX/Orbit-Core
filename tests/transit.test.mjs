@@ -287,6 +287,23 @@ test('TDX’s planner is read loosely: sections as a list or an object, missing 
   assert.equal(plans[0].dur, Math.round((Date.parse('2022-06-28T22:30:00+08:00') - Date.parse('2022-06-28T21:56:50+08:00')) / 1000));
   assert.equal(plans[1].legs[0].dur, 600);
   assert.deepEqual(parseTdxRoutes({}), []);
+  // As TDX answers live: modes in its own words, zero-length cycle / taxi stubs at the ends.
+  const at = (t, lat, lng, name) => ({ time: t, place: { name, location: { lat, lng } } });
+  const live = parseTdxRoutes({
+    data: {
+      routes: [
+        {
+          sections: [
+            { type: 'cycle', transport: { mode: 'cycle' }, travelSummary: { duration: 0, length: 1.5 }, departure: at('2026-10-03T17:22:00', 24.8016, 120.9716), arrival: at('2026-10-03T17:22:00', 24.8016, 120.9716, '新竹') },
+            { type: 'transit', transport: { mode: 'TRA', name: '高雄-七堵', headsign: '七堵' }, travelSummary: { duration: 4260, length: 0 }, departure: at('2026-10-03T17:22:00', 24.8016, 120.9716, '新竹'), arrival: at('2026-10-03T18:33:00', 25.0478, 121.5171, '臺北') },
+            { type: 'drive', transport: { mode: 'YOXI' }, travelSummary: { duration: 1, length: 16 }, departure: at('2026-10-03T18:33:00', 25.0478, 121.5171, '臺北'), arrival: at('2026-10-03T18:33:01', 25.0477, 121.517) }
+          ]
+        }
+      ]
+    }
+  });
+  assert.deepEqual(live[0].legs.map(l => l.mode), ['tra']);
+  assert.ok(live[0].legs[0].dist > 30_000);
 });
 
 test('route plans: both sources, the same ride once, fastest first, shared for 5 minutes', async () => {
