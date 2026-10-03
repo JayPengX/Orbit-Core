@@ -16,8 +16,8 @@
 // Every route but /eco's sign-in needs a Quadra Pass session (`qt=`). The
 // Quadra Pass is the only way anything is saved.
 // Quadra Fixtures' /sports-proxy lives in its own Worker
-// (sports-proxy-worker.js): this one's [placement] region pin (for Gemini)
-// applies to the whole script.
+// (sports-proxy-worker.js): this one's [placement] region pin (Taiwan's,
+// gcp:asia-east1) applies to the whole script.
 
 import en from './locales/en.js';
 import zhTW from './locales/zh-TW.js';

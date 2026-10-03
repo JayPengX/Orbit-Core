@@ -194,17 +194,14 @@ That's it — once `GEMINI_API_KEY` is set, all three AI routes work. Nothing
 else to configure per-route.
 
 **`[placement]` matters here.** `wrangler.toml` pins
-`[placement] region = "gcp:us-east4"` rather than leaving Cloudflare's
-default "Smart Placement" in charge. This was a real, live-tested fix, not a
-guess: Smart Placement's latency heuristic consistently ran this Worker's
-Gemini-facing routes out of Cloudflare's Hong Kong colo (a very reasonable
-"closest to Google's Asia-Pacific presence" pick for traffic that's mostly
-Taiwan-based) — except Google's Gemini API refuses all traffic from Hong
-Kong and mainland China outright, by policy, not as an occasional bad-luck
-colo. `region` instead pins the Worker to whichever real datacenter has the
-lowest latency to `us-east4` (Ashburn, VA) — a target confirmed live against
-this same API (15/15 successful calls). This setting only takes effect via
-Wrangler/CI (see
+`[placement] region = "gcp:asia-east1"` (Changhua, Taiwan) rather than leaving
+Cloudflare's default "Smart Placement" in charge. Smart Placement ran this
+Worker out of Hong Kong, which Google's Gemini API refuses outright. It was
+then pinned to `gcp:us-east4` (Virginia) for Gemini's sake, but that sent
+every TDX, CWA and Quadra Pass call across the Pacific twice; the Worker's
+traffic is mostly Taiwan's, so it now runs next to Taiwan (Taiwan is a
+Gemini-supported location). This setting only takes effect via Wrangler/CI
+(see
 [Optional: Auto-Deploy via GitHub Actions](#optional-auto-deploy-via-github-actions)
 below) — the Cloudflare dashboard's own "Settings → Placement" only exposes
 the Smart toggle, not a `region` field.
@@ -230,8 +227,8 @@ one as `/gemini`/`/sync`/etc.:
    below), a *different* URL from the `orbit-workers-proxy` Worker the other
    five routes live on.
 
-Why separate: `wrangler.toml`'s `[placement] region = "gcp:us-east4"` pin
-(needed for `/gemini`/`/vocab-ai` — see the section above) is a
+Why separate: `wrangler.toml`'s `[placement] region` pin (it was
+`gcp:us-east4`, for `/gemini`/`/vocab-ai` — see the section above) is a
 whole-*script* setting, not a per-route one. Sharing one Worker meant
 `/sports-proxy` was being forced through that same Virginia isolate too,
 even though nothing it calls (ESPN, the MLB Stats API, Jolpica, Polymarket)
