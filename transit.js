@@ -644,6 +644,64 @@ async function routes(env, q, { fetchFn, ctx, now, cache }) {
   return [out, 200];
 }
 
+// ---- Checks --------------------------------------------------------------------------------
+//
+// /transit/status?sample=<name>: one small, fixed ask each (a few rows, around
+// 新竹車站), cached like any other (TDX's by its rule, the planners' an hour),
+// to see TDX's and Google's real answers without a session. Never an
+// arbitrary path: only these.
+const AT = { lat: 24.8016, lon: 120.9716 }; // 新竹車站
+const TO = { lat: 25.0478, lon: 121.517 }; // 台北車站
+export const SAMPLES = {
+  'bike-station': `basic/v2/Bike/Station/City/Hsinchu?$top=2`,
+  'bike-live': `basic/v2/Bike/Availability/City/Hsinchu?$top=2`,
+  'bike-near': `advanced/v2/Bike/Availability/NearBy?$spatialFilter=nearby(${AT.lat},${AT.lon},300)&$top=2`,
+  'bus-near': `advanced/v2/Bus/Station/NearBy?$spatialFilter=nearby(${AT.lat},${AT.lon},200)&$top=2`,
+  'bus-eta': `advanced/v2/Bus/EstimatedTimeOfArrival/NearBy?$spatialFilter=nearby(${AT.lat},${AT.lon},150)&$top=3`,
+  'bus-route': `basic/v2/Bus/Route/City/Hsinchu?$top=2&$select=RouteUID,RouteName,DepartureStopNameZh,DestinationStopNameZh`,
+  'tra-station': `basic/v3/Rail/TRA/Station?$top=2`,
+  'tra-live': `basic/v3/Rail/TRA/StationLiveBoard/Station/1210?$top=2`,
+  'hsr-station': `basic/v2/Rail/THSR/Station?$top=2`,
+  'metro-route': `basic/v2/Rail/Metro/StationOfRoute/TRTC?$top=1`,
+  'metro-live': `basic/v2/Rail/Metro/LiveBoard/TRTC?$top=2`
+};
+async function statusSample(env, name, deps) {
+  const cut = text => String(text || '').slice(0, 6000);
+  if (SAMPLES[name]) {
+    const got = await tdxGet(env, SAMPLES[name], deps);
+    return { name, status: got.status, state: got.state, body: cut(got.body) };
+  }
+  const key = new Request(`https://transit-cache.quadra/sample/${name}`);
+  const hit = deps.cache && (await deps.cache.match(key).catch(() => null));
+  if (hit) return { ...(await hit.json()), cached: true };
+  let out;
+  if (name === 'maas') {
+    const token = await tdxAccess(env, deps.fetchFn, deps.now);
+    if (!token) return { name, status: 503, body: 'no TDX key' };
+    const params = new URLSearchParams({ origin: `${AT.lat},${AT.lon}`, destination: `${TO.lat},${TO.lon}`, gc: '1.0', top: '2', transit: '3,4,5,6,7,8,9', transfer_time: '0,60' });
+    const r = await deps.fetchFn(`${TDX_BASE}maas/routing?${params}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } });
+    await tally(env, 'tdx', 1, deps.now, deps.ctx);
+    const text = await r.text();
+    let parsed = null;
+    try {
+      parsed = parseTdxRoutes(JSON.parse(text)).map(p => ({ dur: p.dur, legs: p.legs.map(l => `${l.mode}:${l.short || l.name}:${l.from.name}>${l.to.name}`) }));
+    } catch {}
+    out = { name, status: r.status, body: cut(text), parsed };
+  } else if (name === 'google-route') {
+    if (!googleKey(env) || !(await spend(env, 'routes', 1, deps.now, deps.ctx))) return { name, status: 503, body: 'no key or cap' };
+    const r = await deps.fetchFn(ROUTES, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': googleKey(env), 'X-Goog-FieldMask': GOOGLE_ROUTE_FIELDS }, body: JSON.stringify(googleRouteBody(AT, TO)) });
+    const text = await r.text();
+    let parsed = null;
+    try {
+      parsed = parseGoogleRoutes(JSON.parse(text), deps.now).map(p => ({ dur: p.dur, legs: p.legs.map(l => `${l.mode}:${l.short || l.name}:${l.from.name}>${l.to.name}`) }));
+    } catch {}
+    out = { name, status: r.status, body: cut(scrubKey(text, env)), parsed };
+  } else return { code: 'NOT_FOUND', samples: [...Object.keys(SAMPLES), 'maas', 'google-route'] };
+  if (deps.cache) await deps.cache.put(key, new Response(JSON.stringify(out), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=3600' } })).catch(() => {});
+  return out;
+}
+const scrubKey = (text, env) => [env.GOOGLE_MAPS_KEY, env.GOOGLE_WEATHER_KEY, env.GOOGLE_MAPS_BROWSER_KEY].filter(Boolean).reduce((t, k) => t.split(k).join('[key]'), text);
+
 // ---- Route --------------------------------------------------------------------------------
 
 export async function handleTransit(request, env, headers, path, { session = null, limited = () => false, ctx = null, fetchFn = fetch, cache = globalThis.caches?.default, now = Date.now() } = {}) {
@@ -652,6 +710,8 @@ export async function handleTransit(request, env, headers, path, { session = nul
   const q = new URL(request.url).searchParams;
   const deps = { fetchFn, ctx, now, cache };
   if (path === '/transit/status') {
+    const sample = q.get('sample');
+    if (sample) return send(await statusSample(env, sample, deps));
     return send({ month: billingMonth(now), used: await usage(env, now), caps: CAPS, keys: { tdx: Boolean(env.TDX_CLIENT_ID && env.TDX_CLIENT_SECRET), mapsBrowser: Boolean(env.GOOGLE_MAPS_BROWSER_KEY), google: Boolean(googleKey(env)) }, tdxPerMin: Number(env.TDX_PER_MIN) || 5 });
   }
   if (!session) return send({ code: 'ECO_TOKEN_INVALID' }, 401);
