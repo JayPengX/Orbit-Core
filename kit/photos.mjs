@@ -6,8 +6,8 @@
 // answers are kept on the device (a found photo two months, none a week).
 // The kit's copy (Shared-Proxy/kit/photos.mjs), synced into Fixtures and Play
 // as lib/photos.mjs: never edit an app's copy.
-import { CATALOG } from './catalog.mjs';
-import { logoPicture } from './logos.mjs';
+import { CATALOG } from '#kit/catalog.mjs';
+import { logoPicture } from '#kit/logos.mjs';
 
 const CDN = 'https://a.espncdn.com/i/headshots';
 // ESPN's headshot at the size a phone shows it (its image service: a full

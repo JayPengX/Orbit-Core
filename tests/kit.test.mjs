@@ -191,7 +191,7 @@ test('notice switches follow the pass: newest wins', async () => {
 });
 
 test('CPBL: a month the proxy can\'t fill comes from TheSportsDB\'s day lists on the device', async () => {
-  const { asiaMonth, tsdbDays } = await import('../kit/leagues.mjs');
+  const { asiaMonth, tsdbDays } = await import('../kit/catalog.mjs');
   const now = Date.parse('2026-09-30T04:00:00Z');
   assert.equal(tsdbDays('2026-10', now).length, 14);
   assert.equal(tsdbDays('2026-08', now).length, 0);

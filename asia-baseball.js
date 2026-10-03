@@ -13,7 +13,7 @@
 //     awayScore, state: 'pre' | 'in' | 'post' | 'void', venue }] }
 // `start` is UTC. A game "in" is one past its start and not yet marked over.
 
-import { parseTsdbDay, TSDB_DAY, TSDB_CPBL } from './kit/leagues.mjs';
+import { parseTsdbDay, TSDB_DAY, TSDB_CPBL } from './kit/catalog.mjs';
 
 export const ASIA_HOST = 'asia-baseball.quadra';
 export const ASIA_LEAGUES = ['npb', 'kbo', 'cpbl'];
