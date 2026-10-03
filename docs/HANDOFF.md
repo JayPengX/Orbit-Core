@@ -18,6 +18,14 @@ edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
   0.5 lower); ELTA's programs match a session by its name (第1節, 排位賽…)
   within 3 hours; every F1 session counts as on ELTA (`every` in
   BROADCAST, its 2026-2029 rights), its channel once the list names it.
+- 賽事 places a race weekend by all its sessions. The race sheet's
+  qualifying shows best lap, gap to pole (last part only) and Q1/Q2 out
+  (`qualiRows`, Jolpica's qualifying, else ESPN's); sprint qualifying from
+  ESPN core's per-car statistics (`espnQualifying`, 22 calls, 6 h cache:
+  Jolpica has none). OpenF1 refuses everyone during a live session, so it
+  isn't used.
+- Small-hours big games (00–05, `nightOnly`) are only among 更多推薦, never
+  今日推薦; a followed team's still can be.
 
 ## Orbit Weather, phase 1: the proxy's sources (branch `claude/intelligent-euler-2ifltk`, pushed to `main`)
 
