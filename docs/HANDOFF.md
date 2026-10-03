@@ -102,6 +102,11 @@ Planned in `docs/WEATHER-PLAN.md`; the PWA's repo is `JayPengX/Orbit-Weather`
   chips update in place and a tap jumps (no smooth scroll: Safari's snapping
   fights it); a page is redrawn only when its data changes. Old layouts'
   `uv` / `rain` / `air` become `metrics`.
+- A day's sheet (tap a day): the day's summary, then big charts (temperature
+  with feels-like and the high / low; rain and UV under it, same hours), the
+  read-out following a finger and back to the summary when it lifts; then
+  that day's own advice (`dayTips` in cards.mjs, from its hours). The week
+  table is gone from the page. Crosshairs show only while touched.
 - 我的行程 shows advice, rain, UV and the days only (what matters on the
   move); its advice is the route's plus the daytime place's run / thunder /
   wind / fog / temperature.
