@@ -67,8 +67,9 @@ compatibility_date = "2025-01-01"
 # calls (several per plan, all to Taipei), Orbit Weather's CWA calls and the
 # Quadra Pass all crossed the Pacific twice from there, and a slow TDX
 # answer is what showed in Orbit Transit as "暫時無法取得資料". Now
-# `gcp:asia-east1` (Changhua, Taiwan): the colo nearest it is Taipei's
-# (check X-Worker-Colo: TPE). Taiwan is a Gemini-supported location; if a
+# `gcp:asia-east1` (Changhua, Taiwan): it runs in Taipei (seen live:
+# the response header `cf-placement: remote-TPE`; X-Worker-Colo is the colo
+# the request came in through, not where the Worker ran). Taiwan is a Gemini-supported location; if a
 # "User location is not supported" ever comes back, it's handled on the
 # Gemini side (its own Worker or route), not by moving every app away.
 [placement]

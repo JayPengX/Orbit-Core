@@ -374,3 +374,48 @@ test('autocomplete and OpenStreetMap parsing drop what can’t be used', () => {
   assert.deepEqual(parseAutocomplete({ suggestions: [{ queryPrediction: {} }, { placePrediction: { place: 'places/XYZ12345', text: { text: '城隍廟' } } }] }), [{ id: 'XYZ12345', name: '城隍廟', sub: '', dist: null, types: [] }]);
   assert.deepEqual(parseNominatim([{ name: 'x' }]), []);
 });
+
+test('a trip’s ways of moving: Google told which, TDX’s bike plan only with bikes, cached apart', async () => {
+  fresh();
+  const env = { RATE_LIMIT_KV: memKv(), GOOGLE_MAPS_KEY: 'k', TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 's', TDX_PER_MIN: '300' };
+  const bodies = [];
+  const miles = [];
+  const fetchFn = async (url, init) => {
+    if (url.includes('token')) return json({ access_token: 'T', expires_in: 86400 });
+    if (url.startsWith('https://routes.googleapis.com')) {
+      bodies.push(JSON.parse(init.body));
+      return json({ routes: [] });
+    }
+    if (url.includes('/maas/routing')) {
+      miles.push(new URL(url).searchParams.get('first_mile_mode'));
+      return json({ data: { routes: [] } });
+    }
+    assert.fail(`unexpected ${url}`);
+  };
+  const ask = modes => handleTransit(new Request(`https://w/transit/route?from=24.8,120.97&to=24.84,121.012&at=${NOW}${modes ? `&modes=${modes}` : ''}`), env, {}, '/transit/route', { session: { s: 'S' }, fetchFn, now: NOW, cache: memCache() });
+  const out = await (await ask('tra,hsr,metro')).json();
+  assert.deepEqual(bodies[0].transitPreferences.allowedTravelModes, ['TRAIN', 'SUBWAY', 'LIGHT_RAIL']);
+  assert.deepEqual(miles, ['0']);
+  assert.equal(out.sources.tdxBike, undefined);
+  await ask('');
+  assert.equal(bodies[1].transitPreferences, undefined);
+  assert.deepEqual(miles.slice(1).sort(), ['0', '3']);
+  // Bikes only: no planner at all.
+  const bike = await (await ask('bike')).json();
+  assert.equal(bike.sources.google, 'off');
+  assert.equal(bodies.length, 2);
+});
+
+test('a TDX answer that fails with a 5xx is asked once more', async () => {
+  fresh();
+  const env = { RATE_LIMIT_KV: memKv(), TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 's', TDX_PER_MIN: '300' };
+  let n = 0;
+  const fetchFn = async url => {
+    if (url.includes('token')) return json({ access_token: 'T', expires_in: 86400 });
+    n++;
+    return n === 1 ? new Response('busy', { status: 503 }) : json([{ StationUID: 'A' }]);
+  };
+  const got = await tdxGet(env, 'basic/v2/Bike/Station/City/Hsinchu', { fetchFn, now: NOW, cache: memCache() });
+  assert.equal(got.status, 200);
+  assert.equal(n, 2);
+});
