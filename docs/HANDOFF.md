@@ -16,6 +16,21 @@ The owner's ask: a transit app for Taiwan (they live in 新竹). A map home
 board. Quadra Pass sign-in; Chinese; always dark. App repo
 `JayPengX/Orbit-Transit` (README there lists the files).
 
+- **Live since 2026-10-03** (keys in, owner on a paid TDX plan; Google's
+  billing has a NT$150 budget): `TDX_PER_MIN` = 240 (`wrangler.toml`; the old
+  default 5 was why YouBike and most cards said 暫時無法存取資料).
+  `GET /transit/status?sample=<name>` shows one real answer (TDX samples
+  through the shared cache; `maas`, `maas-local`, `google-route` cached an
+  hour). Seen live: TDX's planner sections are `type` pedestrian / transit /
+  cycle / drive, `transport.mode` in its own words (`TRA`, `HighwayBus`,
+  `cycle`, `YOXI` = taxi), with zero-length cycle / taxi stubs at the ends
+  (dropped). It returns few plans (2 across 新竹 → 竹北, buses only), so the
+  app adds 台鐵 / 高鐵 plans from its own router (`railPlans`, plan.mjs) and
+  shows every plan (no domination filter: the owner wants them all).
+  **Google's `computeRoutes` answers 403 API_KEY_SERVICE_BLOCKED**: the
+  server key's API restrictions must include Routes API (owner's action).
+  公路客運 stations (UID `THB…`) carry the city's `LocationCityCode`, but
+  only `InterCity` knows them: `stationEta` goes by the UID's prefix.
 - **Data:** TDX (tdx.transportdata.tw) for everything transit; it refuses
   calls without a key (`401 Valid API Key Required`). Its free plan (基礎) is
   3 points a month (1,500 calls or 150 MB a point) and **5 calls a minute
