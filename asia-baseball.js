@@ -1,7 +1,7 @@
 // Asian baseball's schedules and scores from the leagues' own sites, as one
-// shape for Quadra Fixtures and Play. Kambi (Play's odds feed) only lists a
+// shape for Orbit Sports and Play. Kambi (Play's odds feed) only lists a
 // game a day or so ahead and drops it after, and ESPN doesn't carry these
-// leagues, so without this Fixtures had "no recent games" mid-season.
+// leagues, so without this Orbit Sports had "no recent games" mid-season.
 //
 //   NPB   npb.jp's monthly schedule page (HTML)
 //   KBO   koreabaseball.com's monthly schedule list (a POST answered in JSON rows)
@@ -260,7 +260,7 @@ async function fetchCpblTsdb(year, month, { from = Date.UTC(year, month - 1, 1),
 }
 // CPBL's own list, and TheSportsDB's days after its last game: CPBL's list
 // can stop short of the month (October's games were missing from it while
-// the season still had a week to go, so Fixtures showed no schedule).
+// the season still had a week to go, so Orbit Sports showed no schedule).
 async function cpbl(year, month, now = Date.now()) {
   let ownError = '';
   const own = await fetchCpbl(year, month).catch(error => ((ownError = String(error.message || error)), null));

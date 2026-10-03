@@ -96,7 +96,7 @@ const UAS = {
 const width = Number(opt('width', (SIZES[device] || SIZES.iphone)[0]));
 const height = Number(opt('height', (SIZES[device] || SIZES.iphone)[1]));
 const lang = opt('lang', 'zh');
-// --snap '{json}': the wallet's snap (each app's figures: Play's open slips for Fixtures, say).
+// --snap '{json}': the wallet's snap (each app's figures: Play's open slips for Orbit Sports, say).
 const snapStart = JSON.parse(opt('snap', '{}'));
 const wait = Number(opt('wait', 6000));
 const payloadFile = opt('payload', '');

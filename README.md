@@ -1,19 +1,21 @@
 # Shared Proxy
 
-The server side of **Quadra**: Quadra Securities, Quadra Play, Quadra
-Fixtures and Quadra Hub, with Orbit Class beside them. One account, the
-**Quadra Pass**, works in every app, and it is the only place anything is
-saved.
+The server side of two families of apps, and the kit and brand they share.
+**Quadra** is where the money is: Quadra Securities and Quadra Play. **Orbit**
+is the everyday tools: Orbit Class, Weather, Transit, Sports and Words. One
+account, the **Quadra Pass**, works in every app, and it is the only place
+anything is saved.
 
 | App | Repo | Live |
 | --- | --- | --- |
 | Quadra Securities | [Quadra-Securities](https://github.com/JayPengX/Quadra-Securities) | https://jaypengx.github.io/Quadra-Securities/ |
 | Quadra Play | [Quadra-Play](https://github.com/JayPengX/Quadra-Play) | https://jaypengx.github.io/Quadra-Play/ |
-| Quadra Fixtures | [Quadra-Fixtures](https://github.com/JayPengX/Quadra-Fixtures) | https://jaypengx.github.io/Quadra-Fixtures/ |
-| Quadra Hub | [Quadra-Hub](https://github.com/JayPengX/Quadra-Hub) | https://jaypengx.github.io/Quadra-Hub/ |
 | Orbit Class | [Orbit-Class](https://github.com/JayPengX/Orbit-Class) | https://jaypengx.github.io/Orbit-Class/ |
 | Orbit Weather | [Orbit-Weather](https://github.com/JayPengX/Orbit-Weather) | https://jaypengx.github.io/Orbit-Weather/ |
 | Orbit Transit | [Orbit-Transit](https://github.com/JayPengX/Orbit-Transit) | https://jaypengx.github.io/Orbit-Transit/ |
+| Orbit Sports (was Quadra Fixtures) | [Quadra-Fixtures](https://github.com/JayPengX/Quadra-Fixtures), to be renamed Orbit-Sports | https://jaypengx.github.io/Quadra-Fixtures/ |
+| Orbit Words (was Quadra Hub) | [Quadra-Hub](https://github.com/JayPengX/Quadra-Hub), to be renamed Orbit-Words | https://jaypengx.github.io/Quadra-Hub/ |
+| The kit, the marks, the family's page | this repo's Pages | https://jaypengx.github.io/Shared-Proxy/ |
 
 ## Table of Contents
 
@@ -79,7 +81,7 @@ account's document id.
   Plus is for Play and Securities (the kit's `PLUS`): in Play the weekly bet,
   a parlay boost ×1.5 and a cheaper cash-out; in Securities commission at
   2.8折, half the FX spread and cheaper margin loans. The pass's avatar and
-  frame (set in Quadra Hub) show only while Plus is on.
+  frame (set in the Quadra Pass sheet) show only while Plus is on.
   The kit tells members when it arrives and three days before a renewal
   (`plusNotices`), and the Plus sheet shows what Plus gave back this month
   and since joining (`plusReturns`, `plusTenure`).
@@ -97,7 +99,7 @@ account's document id.
   and the allowance are the only money Quadra gives (v7).
 - **Only money moves through entries:** `cleanEntry` takes entries of
   Securities (`stock`) and Play (`odds`) only; `eco:` ids are this Worker's.
-  Quadra Hub keeps its word progress in `vocab-progress-sync` and writes no
+  Orbit Words keeps its word progress in `vocab-progress-sync` and writes no
   wallet entries.
 - **The reset** (once, `eco:rebase:v3`, −NT$80,000): every account that
   opened on the old NT$110,000 comes down to the new NT$30,000. One that
@@ -149,14 +151,52 @@ it's empty (off) unless a clean-up is under way.
 
 ## The shared kit and brand
 
-`kit/quadra.mjs` and `kit/quadra.css` are every app's shared account code
-and look: the sign-in screen (pass or device code), the one-time new-pass
-screen, the account sheet (Add a device, sign out elsewhere, change the
-pass, notifications), the one-app-at-a-time notice, notifications (an
-in-app banner, system notices when allowed), the recommendation engine,
-help links and the tab bar. `node kit/sync.mjs` copies them into every app
-(never edit an app's copy). `brand/generate.mjs [app…]` draws every app's
-icons and link cards from `brand/marks.mjs`.
+`kit/` is what every app shares: `quadra.mjs` and `quadra.css` (the sign-in,
+the one-app-at-a-time session, notices, the recommender, the tab bar),
+`pass.mjs` (the Quadra Pass sheet behind every account button: Pass, Plus,
+真相, App, 說明, with `truth.mjs` and `help.mjs`), `boot.js` (the loading
+screen), `brand.mjs`, and for the sports apps `logos.mjs`, `names.mjs`,
+`photos.mjs`, `catalog.mjs`.
+
+**It is served, not copied.** `.github/workflows/pages.yml` deploys `kit/`
+(stamped by `kit/stamp.mjs`, with `kit/version.json`) and `site/` to this
+repo's Pages on every push that touches them. Each app's page carries only
+`kit/loader.html`'s two snippets: an import map for `#kit/…` at the version
+the device last saw (`quadra.kit`), the stylesheet, and `boot.js`. The kit
+notes a newer version on every opening, and `watchUpdates` puts it in place
+like a deploy of the app. The apps' service workers keep the kit's files
+like their own, so they open offline. So a kit change is one push here.
+
+- `node kit/apps.mjs`: points apps at the served kit (done once; run it
+  again only if `loader.html` changes, it refreshes each page's snippets).
+- `node kit/link.mjs`: links the apps checked out next to this repo
+  (`<app>/.kit`) for their tests; their CI checks this repo out instead.
+- A kit change must keep working with every app's current code: add, don't
+  rename or remove, what apps import.
+
+**The brand** is `kit/brand.mjs`: the two families, every app's name, colours,
+lines and mark (Quadra: a square tile with a gold corner; Orbit: a planet,
+its ring and a moon), and `RENAMED`, the switch for the two repos that move
+(see below). `node brand/generate.mjs [id…|site]` (Playwright's Chromium)
+writes every app's icons (favicon, home screen, Android's maskable), its
+share cards (`share/og.jpg` 1200×630 for Facebook, LINE, Messenger,
+Discord, Slack, Telegram and iMessage; `square.jpg` 1200×1200 for WhatsApp
+and chat apps; `x.jpg` 1200×600 for X; `story.jpg` 1080×1920 for stories),
+the `<!-- brand -->` block of its page and its manifest; and `site/` (the
+family's page, the families' and the Pass's marks and cards).
+
+### Renaming Quadra-Fixtures and Quadra-Hub
+
+1. On GitHub, rename `Quadra-Fixtures` to `Orbit-Sports` and `Quadra-Hub` to
+   `Orbit-Words` (Settings → General → Repository name). Pages moves with
+   the repo (re-run its deploy if the new address 404s).
+2. Set `RENAMED = true` in `kit/brand.mjs` and push here: every app's links
+   follow at once. The pages' share tags already use the new addresses.
+3. Old addresses (home-screen icons, shared links) stop working: for each,
+   a new repo with the old name serving `tools/moved/index.html` (with its
+   `sw.js`) sends people on and clears the old offline copy.
+4. Local clones: `git remote set-url origin …/Orbit-Sports.git`; rename the
+   folders, then `node kit/link.mjs`.
 
 ## One-Time Deploy Setup
 

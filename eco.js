@@ -1,6 +1,6 @@
 // ---- eco.js ----
 // /eco: the Quadra Pass, one account for every Quadra app (Quadra
-// Securities, Quadra Play, Quadra Fixtures, Quadra Hub, and Orbit Class
+// Securities, Quadra Play, Orbit Sports, Orbit Words, and Orbit Class
 // beside them). Play money only.
 //
 // The pass is a 10-character code, stored only as its SHA-256 (the
@@ -61,8 +61,8 @@ const CODE8 = /^[2-9A-HJ-NP-Z]{8}$/;
 // Each app's data collection.
 //   stock  Quadra Securities
 //   odds   Quadra Play
-//   match  Quadra Fixtures, a related add-on: follows and services
-//   vocab  Quadra Hub, a related add-on: word progress
+//   match  Orbit Sports, a related add-on: follows and services
+//   vocab  Orbit Words, a related add-on: word progress
 //   orbit  Orbit Class, a related add-on: its class schedule
 //   weather  Orbit Weather, a related add-on: its pinned places and settings
 //   transit  Orbit Transit, a related add-on: its bus groups, places and settings
@@ -77,7 +77,7 @@ export const ECO_APPS = {
 };
 // Who can write entries: the apps that move money, and this Worker itself
 // ('eco': pay, Plus, merges). An app can't write 'eco' entries; the related
-// add-ons (Fixtures, Hub, Orbit Class) write none.
+// add-ons (Orbit Sports, Hub, Orbit Class) write none.
 const ENTRY_APPS = new Set(['stock', 'odds']);
 // Whose entries are rebuilt by the app from its own data: a merge doesn't
 // copy them (the app republishes its merged ledger).

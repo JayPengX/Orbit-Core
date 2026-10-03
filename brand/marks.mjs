@@ -47,9 +47,11 @@ export const FORMATS = {
 const b64 = svg => `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
 const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
 
-// Whose card: an app id, 'pass', or a family ('quadra', 'orbit').
+// Whose card: an app id, 'pass', or a family ('family:quadra',
+// 'family:orbit'; Orbit Class's own id is 'orbit').
 function subject(id) {
-  if (FAMILIES[id]) {
+  if (id.startsWith('family:')) {
+    id = id.slice(7);
     const f = FAMILIES[id];
     const apps = Object.entries(BRANDS).filter(([, b]) => b.family === id);
     return { family: id, name: f.name, icon: familyMark(id), from: f.from, to: f.to, tag: f.tag, url: 'jaypengx.github.io/Shared-Proxy', apps };

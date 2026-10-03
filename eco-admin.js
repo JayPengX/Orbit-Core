@@ -27,8 +27,8 @@ const PER_CALL = 1500;
 
 // A wallet as the apps write it now (`now`: for the looks, a Plus member's):
 //   - entries only of the apps that move money (Securities, Play) and the
-//     Worker's own. Quadra Hub (once Rewards: word points, games, missions,
-//     its shop and points catalogue) and Fixtures write none any more: theirs
+//     Worker's own. Orbit Words (once Rewards: word points, games, missions,
+//     its shop and points catalogue) and Orbit Sports write none any more: theirs
 //     go, and the NT$ they moved stays in the balance as one entry,
 //     `eco:rebase:hub`, so no account's money changes;
 //   - none of Securities' markers for points-catalogue vouchers ('stock:xs-');

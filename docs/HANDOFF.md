@@ -2,10 +2,46 @@
 
 All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and are pushed to
 `main` after every change (each deploys on push). The shared kit lives in
-`Shared-Proxy/kit/`; `node kit/sync.mjs` copies it into every app (never
-edit an app's copy). Tests: `npm test` in each repo (Orbit Class also
+`Shared-Proxy/kit/` and is served to every app from Shared-Proxy's Pages
+(see the rebrand below). Tests: `npm test` in each repo (Orbit Class also
 `npx eslint .`).
 
+
+## The rebrand: Quadra and Orbit, the kit served from one place (branch `claude/jolly-archimedes-99qqv7`)
+
+- **Two families.** Quadra is where the money is: Quadra Securities, Quadra
+  Play and the Quadra Pass. Orbit is the everyday tools: Orbit Class,
+  Weather, Transit, **Orbit Sports** (was Quadra Fixtures) and **Orbit Words**
+  (was Quadra Hub). Ids, storage keys, payload collections and cache names
+  don't change (`match`, `vocab`, `quadra-hub-…`), nor the manifests' `id`.
+- **The brand is `kit/brand.mjs`**: names, colours, lines, marks (Quadra: a
+  square tile with a gold corner, the family mark four tiles with the fourth
+  gold; Orbit: a planet, ring and moon). `brand/generate.mjs` writes every
+  icon (maskable too), four share cards per app (og 1200×630, square
+  1200×1200, X 1200×600, story 1080×1920; fonts cut to the card's characters
+  and inlined, since Chromium here can't reach Google Fonts itself), each
+  page's `<!-- brand -->` block, the manifests, and `site/` (the family's
+  page, marks and cards). The old `og-image*`/`og-card*` files are gone.
+- **The Quadra Pass sheet (`kit/pass.mjs`)** is Hub's Pass, Plus, Truth, Apps
+  and Help, in every app: the account button opens it (`accountSheet`, now
+  async), the ? opens its 說明 on this app (`openHelp`), `#help=<app>:<topic>`
+  on any app's address opens it there (`helpUrl` points at the app itself).
+  `truth.mjs` and `help.mjs` moved into the kit with their tests
+  (`tests/pass.test.mjs`); help covers Weather and Transit now.
+- **Orbit Words** only teaches words: tabs 今天 / 練習 / 進度 (`#words`
+  still opens 今天), rose instead of violet; it no longer writes wallet
+  settings (looks are worn from the Pass sheet).
+- **The kit is served, not copied** (see README, "The shared kit and
+  brand"): Pages deploys `kit/` and `site/`; each app's page has
+  `kit/loader.html`'s snippets; modules import `#kit/…` (package.json
+  imports → `.kit`, a link here, a checkout in CI). `kit/sync.mjs` is
+  retired; `kit/apps.mjs` did the switch. **Needs Shared-Proxy's Pages on
+  (Settings → Pages → Source: GitHub Actions)**; until
+  https://jaypengx.github.io/Shared-Proxy/kit/version.json answers, the apps'
+  switch must not reach `main` (they'd load no kit).
+- **Renaming** (by hand, README "Renaming Quadra-Fixtures and Quadra-Hub"):
+  rename the repos, set `RENAMED = true` in `kit/brand.mjs`, push here;
+  `tools/moved/` is the stub for the old addresses.
 ## Orbit Transit, round 2 (branch `claude/practical-allen-y0jnq2`, pushed to `main`)
 
 The owner's 22-point list. Done:

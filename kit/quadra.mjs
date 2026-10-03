@@ -1,14 +1,18 @@
-// Quadra: what every Quadra app shares. The canonical copy lives in
-// Shared-Proxy/kit/; `node kit/sync.mjs` copies it into each app (never edit
-// an app's copy by hand).
+// The kit: what every app shares, Quadra's and Orbit's. It lives in
+// Shared-Proxy/kit/ and is served from Shared-Proxy's GitHub Pages; every
+// app loads it from there (kit/loader.html), so one push changes it for all.
 //
-//   Quadra Securities   stock   the financial powerhouse: where money lives and grows
-//   Quadra Play         odds    a place to play: sports betting and the lottery
-//   Quadra Fixtures     match   a related add-on: scores, schedules and stats
-//   Quadra Hub          vocab   a related add-on: vocabulary, the pass, and how the money works
-//   Orbit Class         orbit   a related add-on: the class schedule
-//   Orbit Weather       weather a related add-on: one forecast, pinned places
-//   Orbit Transit       transit a related add-on: the map, buses, trains and metros
+//   Quadra Securities   stock   where money lives and grows
+//   Quadra Play         odds    sports betting and the lottery
+//   Orbit Class         orbit   the class schedule
+//   Orbit Weather       weather one forecast, pinned places
+//   Orbit Transit       transit the map, buses, trains and metros
+//   Orbit Sports        match   scores, schedules and stats (was Quadra Fixtures)
+//   Orbit Words         vocab   English words (was Quadra Hub)
+//
+// The names, colours and marks are brand.mjs's. The Quadra Pass (the
+// account, Plus, the truth about the money, every app and its guide) is the
+// sheet behind every app's account button (pass.mjs).
 //
 // One account works everywhere: the Quadra Pass, a 10-character code for
 // Shared-Proxy's /eco. It is required: every app opens on a sign-in screen
@@ -23,21 +27,19 @@
 // one left behind stops refreshing and shows where Quadra is open, with a
 // button to continue there. Links between the apps carry the sign-in along.
 
+import { BRANDS, FAMILIES, pathOf, appIcon, familyMark } from './brand.mjs';
+
 export const ECO_URL = 'https://orbit-workers-proxy.pengzjay.workers.dev/eco';
 export const PROXY_URL = 'https://sports-proxy.pengzjay.workers.dev/sports-proxy';
 export const SITE = 'https://jaypengx.github.io';
 export const BRAND = { name: 'Quadra', pass: 'Quadra Pass' };
+export { BRANDS, FAMILIES, appIcon, familyMark };
 
-// `related`: an add-on outside the money pool (Fixtures, Hub, Orbit Class, Orbit Weather, Orbit Transit).
-export const APPS = {
-  stock: { name: 'Quadra Securities', short: 'Securities', path: '/Quadra-Securities/', color: '#0d9488', role: { zh: '投資與理財', en: 'Invest and grow' } },
-  odds: { name: 'Quadra Play', short: 'Play', path: '/Quadra-Play/', color: '#2563eb', role: { zh: '運彩與彩券', en: 'Sports bets and lottery' } },
-  vocab: { name: 'Quadra Hub', short: 'Hub', path: '/Quadra-Hub/', color: '#7c3aed', related: true, role: { zh: '單字、帳戶與錢的真相', en: 'Words, your pass and the truth about money' } },
-  match: { name: 'Quadra Fixtures', short: 'Fixtures', path: '/Quadra-Fixtures/', color: '#ea580c', related: true, role: { zh: '賽程與比分', en: 'Scores and schedules' } },
-  orbit: { name: 'Orbit Class', short: 'Orbit Class', tile: 'Orbit', path: '/Orbit-Class/', color: '#0ea5e9', related: true, role: { zh: '課表', en: 'Class schedule' } },
-  weather: { name: 'Orbit Weather', short: 'Orbit Weather', tile: 'Weather', path: '/Orbit-Weather/', color: '#6366f1', related: true, role: { zh: '天氣', en: 'Weather' } },
-  transit: { name: 'Orbit Transit', short: 'Orbit Transit', tile: 'Transit', path: '/Orbit-Transit/', color: '#22c55e', related: true, role: { zh: '大眾運輸', en: 'Public transport' } }
-};
+// Every app, by the id it stores under. `related`: an Orbit app, outside the
+// money pool.
+export const APPS = Object.fromEntries(
+  Object.entries(BRANDS).map(([id, b]) => [id, { name: b.name, short: b.short, family: b.family, path: pathOf(id), color: b.color, related: b.family === 'orbit', role: b.role }])
+);
 export const appName = app => APPS[app]?.name || app;
 
 // ---- The economy -------------------------------------------------------------------
@@ -177,7 +179,7 @@ export const plusUntil = wallet => [...plusMonths(wallet)].sort().at(-1) ?? null
 //
 // The account button in every app can wear an avatar (the wallet setting
 // `avatar`: { id }) and a frame around it (`frame`: { id }), chosen in
-// Quadra Hub. They're Plus's: shown only while the account is a member, and
+// the Quadra Pass sheet (Plus). They’re Plus’s: shown only while the account is a member, and
 // back as they were if it joins again. Some are for staying a member:
 // `streak` is how many Taiwan months in a row (this one included) the
 // account must have held Plus. A month missed starts the count again, and a
@@ -662,6 +664,10 @@ export function quadraSession(app, { lang = detectLang(), heartbeat = 60_000 } =
   // at once).
   if (typeof document !== 'undefined') setTimeout(() => kitLatest(), 4000);
   const made = makeSession(app, { lang, heartbeat });
+  // A link to a guide (#help=<app>:<topic>, helpUrl) opens the Quadra Pass
+  // sheet on it, once the app's first screen is up.
+  const help = typeof location !== 'undefined' && /(?:^|[#&])help=([a-z]+)(?::([a-z0-9]+))?/.exec(location.hash);
+  if (help && typeof document !== 'undefined') setTimeout(() => !document.querySelector('dialog[open]') && openHelp(made, help[1], help[2] || null), 800);
   dataSession = made;
   return made;
 }
@@ -1054,7 +1060,7 @@ export function affinityPatch(app, now = Date.now()) {
 }
 // Everything known: this device's maps and every app's synced map (the
 // larger of the two per key), key -> weight. `apps`: only those apps' maps
-// (Fixtures, an add-on, reads its own).
+// (Orbit Sports, an add-on, reads its own).
 export function affinity(wallet, now = Date.now(), apps = Object.keys(APPS)) {
   const out = {};
   const add = (k, v) => (out[k] = Math.max(out[k] || 0, v));
@@ -1119,9 +1125,10 @@ function hash01(text) {
   return ((h >>> 0) % 1000) / 1000;
 }
 
-// ---- Help: every app's guide lives in Quadra Hub -----------------------------------------
+// ---- Help: every app's guide, in the Quadra Pass sheet (help.mjs) ------------------------
 
-export const helpUrl = (app, topic = '') => appUrl('vocab', `help=${app}${topic ? `:${topic}` : ''}`);
+// An app's guide: that app, opening the sheet on it (#help=<app>:<topic>).
+export const helpUrl = (app, topic = '') => appUrl(app, `help=${app}${topic ? `:${topic}` : ''}`);
 
 // ---- Screens -----------------------------------------------------------------------------
 
@@ -1244,9 +1251,9 @@ function signInGate(s) {
     const gate = node('dialog', { class: 'q-gate', 'aria-modal': 'true', style: `--q-accent:${a.color}` }, [
       node('div', { class: 'q-gate-box' }, [
         node('img', { class: 'q-gate-icon', src: './favicon.svg', alt: '', width: '72', height: '72' }),
-        node('p', { class: 'q-gate-brand', text: a.related ? (en ? 'WITH QUADRA' : 'QUADRA 相關服務') : 'QUADRA' }),
+        node('p', { class: 'q-gate-brand', text: a.family === 'orbit' ? 'ORBIT' : 'QUADRA' }),
         node('h1', { class: 'q-gate-title', text: a.name }),
-        node('p', { class: 'q-gate-lede', text: en ? 'Sign in with your Quadra Pass: one account for every Quadra app.' : '用 Quadra Pass 登入：所有 Quadra App 共用一個帳戶。' }),
+        node('p', { class: 'q-gate-lede', text: en ? 'Sign in with your Quadra Pass: one account for every Quadra and Orbit app.' : '用 Quadra Pass 登入：所有 Quadra 和 Orbit 的 App 共用一個帳戶。' }),
         form,
         node('div', { class: 'q-gate-or', text: en ? 'New to Quadra?' : '第一次使用？' }),
         make,
@@ -1459,7 +1466,7 @@ export function plusPerks(lang = 'zh') {
     ['stock', en ? `Commission ${pct(1 - PLUS.stock.commission)} off` : `證券手續費 ${Math.round(PLUS.stock.commission * 100) / 10} 折`, en ? 'Every market, every order' : '所有市場、每一筆委託'],
     ['stock', en ? 'FX at half the spread' : '換匯點差減半', en ? 'Every currency' : '所有幣別'],
     ['stock', en ? `Margin ${pct(PLUS.stock.loanCut)} cheaper` : `融資利率少 ${pct(PLUS.stock.loanCut)}`, en ? 'On every new loan, every currency' : '每筆新借款、所有幣別'],
-    ['looks', en ? 'Your avatar and frame' : '自訂頭像與頭像框', en ? 'Chosen in Quadra Hub, shown in every app while you’re a member; stay 3, 6 or 12 months in a row for the rarest' : '在 Quadra Hub 挑選，會員期間所有 App 都看得到；連續訂閱 3、6、12 個月解鎖限定款']
+    ['looks', en ? 'Your avatar and frame' : '自訂頭像與頭像框', en ? 'Chosen in the Quadra Pass, shown in every app while you’re a member; stay 3, 6 or 12 months in a row for the rarest' : '在 Quadra Pass 挑選，會員期間所有 App 都看得到；連續訂閱 3、6、12 個月解鎖限定款']
   ];
 }
 // What Plus gave back, at face value, from the wallet: the weekly bonus
@@ -1693,14 +1700,22 @@ export function openPlus(s) {
   return dialog;
 }
 
-export function accountSheet(s, { extra = null } = {}) {
+// The Quadra Pass sheet, in every app (the account button, the ? of
+// topActions, #help= links): Pass (this account), Plus, 真相 (how the money
+// moves), App (every app) and 說明 (every app's guide). Loaded when first
+// opened (pass.mjs). tab: 'pass' | 'plus' | 'truth' | 'apps' | 'help';
+// help: { app, topic } for the guide to open on.
+export async function accountSheet(s, { extra = null, tab = 'pass', help = null } = {}) {
+  const { openPass } = await import('./pass.mjs');
+  return openPass(s, { extra, tab, help });
+}
+export const openHelp = (s, app = s.app, topic = null) => accountSheet(s, { tab: 'help', help: { app, topic } });
+
+// The Pass tab: the account, its devices, notices and security. close()
+// closes the sheet (before a new pass is shown over everything).
+export function passAccount(s, { extra = null, close = () => {} } = {}) {
   const en = s.lang === 'en';
   const T = (zh, e) => (en ? e : zh);
-  const dialog = node('dialog', { class: 'q-sheet' });
-  const close = () => {
-    dialog.close();
-    dialog.remove();
-  };
   const note = node('p', { class: 'q-sheet-note', role: 'status' });
   const act = (label, fn, cls = 'q-row-btn') =>
     node('button', {
@@ -1719,24 +1734,6 @@ export function accountSheet(s, { extra = null } = {}) {
         }
       }
     });
-  const tiles = node(
-    'div',
-    { class: 'q-apps' },
-    Object.entries(APPS).map(([id, a]) =>
-      node(
-        'a',
-        {
-          class: `q-app${id === s.app ? ' here' : ''}${a.related ? ' related' : ''}`,
-          href: appUrl(id),
-          onclick: e => {
-            e.preventDefault();
-            if (id !== s.app) s.go(id);
-          }
-        },
-        [node('img', { src: `${a.path}favicon.svg`, alt: '' }), node('span', { text: a.tile || a.short })]
-      )
-    )
-  );
   // A device code, shown with its countdown.
   const device = node('div', { class: 'q-device', hidden: true });
   let tick = 0;
@@ -1757,18 +1754,11 @@ export function accountSheet(s, { extra = null } = {}) {
     paint();
     tick = setInterval(paint, 15_000);
   };
-  dialog.append(
-    node('div', { class: 'q-sheet-head' }, [node('h2', { text: BRAND.pass }), node('button', { class: 'q-close', type: 'button', 'aria-label': T('關閉', 'Close'), text: '×', onclick: close })]),
+  const nodes = [
     detailsCard(s),
-    plusCard(s),
-    node('h3', { class: 'q-sheet-h', text: T('Quadra 的 App', 'Quadra apps') }),
-    tiles,
     ...(extra ? [extra] : []),
     node('h3', { class: 'q-sheet-h', text: T('裝置', 'Devices') }),
-    node('div', { class: 'q-rows' }, [
-      act(T('新增裝置（取得裝置代碼）', 'Add a device (get a device code)'), async () => showCode(await s.deviceCode())),
-      device
-    ]),
+    node('div', { class: 'q-rows' }, [act(T('新增裝置（取得裝置代碼）', 'Add a device (get a device code)'), async () => showCode(await s.deviceCode())), device]),
     node('h3', { class: 'q-sheet-h', text: T('通知', 'Notifications') }),
     ...notifyRows(s, note),
     node('h3', { class: 'q-sheet-h', text: T('帳戶安全', 'Security') }),
@@ -1786,8 +1776,6 @@ export function accountSheet(s, { extra = null } = {}) {
         close();
         await showNewPass(s, passcode);
       }),
-      node('a', { class: 'q-row-btn', href: helpUrl(s.app), text: T(`${APPS[s.app].short} 使用說明`, `${APPS[s.app].short} guide`) }),
-      s.app === 'vocab' ? null : act(T('在 Quadra Hub 管理帳戶與頭像', 'Manage your pass and looks in Quadra Hub'), () => s.go('vocab', 'pass')),
       act(
         T('在這台裝置登出', 'Sign out on this device'),
         async () => {
@@ -1797,24 +1785,12 @@ export function accountSheet(s, { extra = null } = {}) {
         },
         'q-row-btn danger'
       )
-    ].filter(Boolean)),
+    ]),
     node('p', { class: 'q-sheet-sub', text: T('忘記通行碼？在已登入的裝置按「更換通行碼」。', 'Forgot your pass? Choose “Change my pass” on a signed-in device.') }),
     note
-  );
-  document.body.append(dialog);
-  dialog.addEventListener('close', () => {
-    clearInterval(tick);
-    dialog.remove();
-  });
-  dialog.addEventListener('click', e => e.target === dialog && close());
-  dialog.showModal();
-  return dialog;
+  ];
+  return { nodes, stop: () => clearInterval(tick) };
 }
-
-// A new pass, shown once: it can't be shown again, so it waits until it has
-// been typed back (its last five characters), which also proves it was
-// copied right. A modal <dialog>, so it sits above every other sheet and
-// dialog and nothing behind it can be tapped.
 export function showNewPass(s, passcode) {
   const en = s.lang === 'en';
   const T = (zh, e) => (en ? e : zh);
@@ -2226,7 +2202,7 @@ export function installGate(app, lang = detectLang()) {
   const gate = node('dialog', { class: 'q-gate q-install', 'aria-modal': 'true', style: `--q-accent:${APPS[app].color}` }, [
     node('div', { class: 'q-gate-box' }, [
       node('img', { class: 'q-gate-icon', src: './favicon.svg', alt: '', width: '72', height: '72' }),
-      node('p', { class: 'q-gate-brand', text: 'QUADRA' }),
+      node('p', { class: 'q-gate-brand', text: APPS[app].family === 'orbit' ? 'ORBIT' : 'QUADRA' }),
       node('h1', { class: 'q-gate-title', text: en ? `Add ${name} to your home screen` : `把 ${name} 加入主畫面` }),
       node(
         'ol',
@@ -2265,7 +2241,7 @@ export function phoneOnlyGate(app, { lang = detectLang(), qr = '' } = {}) {
   const gate = node('dialog', { class: 'q-gate q-phone-only', 'aria-modal': 'true', style: `--q-accent:${APPS[app].color}` }, [
     node('div', { class: 'q-gate-box' }, [
       node('img', { class: 'q-gate-icon', src: './favicon.svg', alt: '', width: '72', height: '72' }),
-      node('p', { class: 'q-gate-brand', text: 'QUADRA' }),
+      node('p', { class: 'q-gate-brand', text: APPS[app].family === 'orbit' ? 'ORBIT' : 'QUADRA' }),
       node('h1', { class: 'q-gate-title', text: en ? `${name} is made for your phone` : `${name} 是手機 App` }),
       node('p', { class: 'q-gate-lede', text: en ? 'It lives in your pocket, beside your day. Open it on your phone:' : '課表跟著你一整天，所以只在手機上使用。用手機打開：' }),
       qrBox,
@@ -2627,14 +2603,14 @@ export function tabBar({ tabs, onSelect, hash = id => `#${id}`, nav = document.g
 
 // topActions(s, { help, refresh, extra }): the top-right of every app, in
 // #top-actions: 說明 · 重新整理 (apps with live data) · the account.
-//   help(): opens the help (default: this app's guide in Quadra Hub).
+//   help(): opens the help (default: this app's guide in the Quadra Pass sheet).
 //   refresh(): reloads the app's data; the button (id="refresh") spins while
 //     it's disabled, so apps set refresh.disabled while loading.
 export function topActions(s, { help = null, refresh = null, extra = null, into = document.getElementById('top-actions') } = {}) {
   const en = s.lang === 'en';
   const helpBtn = node('button', { class: 'q-icon-btn', id: 'help-button', type: 'button', 'aria-label': en ? 'Help' : '說明', title: en ? 'Help' : '說明' });
   helpBtn.innerHTML = icon('help');
-  helpBtn.addEventListener('click', () => (help ? help() : s.go('vocab', `help=${s.app}`)));
+  helpBtn.addEventListener('click', () => (help ? help() : openHelp(s)));
   let refreshBtn = null;
   if (refresh) {
     refreshBtn = node('button', { class: 'q-icon-btn q-refresh', id: 'refresh', type: 'button', 'aria-label': en ? 'Refresh' : '重新整理', title: en ? 'Refresh' : '重新整理' });

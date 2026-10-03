@@ -145,7 +145,7 @@ const SPORTS_PROXY_ALLOWED_HOSTS = [
   // /translate_a/t; sent upstream as a POST (see fetchUpstream), kept a month.
   'clients5.google.com',
   // ELTA's (愛爾達) sports schedule: which game each of its channels carries,
-  // for Fixtures' "where to watch" (only the one list, always trimmed).
+  // for Orbit Sports' "where to watch" (only the one list, always trimmed).
   ELTA_HOST,
   F1_HOST,
   // Not a real host: Asian baseball's schedules and scores, gathered by this
