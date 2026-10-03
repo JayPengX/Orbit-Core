@@ -102,6 +102,18 @@ export function upstream() {
       return ok(st[5].map((r, i) => ({ StopUID: `${st[0]}-${r}`, RouteUID: `HSZ${r}`, RouteName: N(r), Direction: i % 2, EstimateTime: i === 3 ? null : [45, 260, 620, null, 1380][i] ?? 900, StopStatus: i === 3 ? 1 : 0, NextBusTime: i === 3 ? tw(now + 25 * 60_000) : null, Estimates: [{ EstimateTime: 1500 + i * 120 }] })));
     }
     if (/Bus\/Route\/City/.test(p)) return ok([['藍1', '新竹火車站', '竹北'], ['2', '新竹火車站', '關東橋'], ['20', '新竹火車站', '南寮'], ['81', '新竹火車站', '香山'], ['182', '新竹火車站', '交大'], ['15', '新竹火車站', '新莊'], ['綠1', '新竹轉運站', '南寮']].map(([n, a, b]) => ({ RouteUID: `HSZ${n}`, RouteID: n, RouteName: N(n), DepartureStopNameZh: a, DestinationStopNameZh: b, BusRouteType: 11 })));
+    // A route's timetable: weekdays every 20 minutes 06:00–22:00, weekends every 40 from 07:00 to 21:00.
+    if (/Bus\/Schedule/.test(p)) {
+      const names = ['新竹火車站', '東門市場', '中央路口', '巨城購物中心', '民族路口', '新竹高中', '竹北火車站'];
+      const days = on => Object.fromEntries(['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((d, i) => [d, on(i) ? 1 : 0]));
+      const at = m => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+      const trips = (dir, from, to, every, on) => {
+        const out = [];
+        for (let m = from; m <= to; m += every) out.push({ TripID: `${dir}-${m}`, ServiceDay: days(on), StopTimes: (dir ? [...names].reverse() : names).map((n, i) => ({ StopSequence: i + 1, StopUID: `HSZS${dir}${i}`, StopName: N(n), ArrivalTime: at(m + i * 4), DepartureTime: at(m + i * 4) })) });
+        return out;
+      };
+      return ok([0, 1].map(dir => ({ RouteUID: 'HSZ藍1', RouteName: N('藍1'), SubRouteUID: `HSZ藍1${dir}`, Direction: dir, Timetables: [...trips(dir, 360, 1320, 20, d => d >= 1 && d <= 5), ...trips(dir, 420, 1260, 40, d => d === 0 || d === 6)] })));
+    }
     if (/Bus\/StopOfRoute/.test(p)) {
       const names = ['新竹火車站', '東門市場', '中央路口', '巨城購物中心', '民族路口', '新竹高中', '竹北火車站'];
       return ok([0, 1].map(dir => ({ RouteUID: 'HSZ藍1', RouteName: N('藍1'), SubRouteUID: `HSZ藍1${dir}`, SubRouteName: N('藍1'), Direction: dir, Stops: (dir ? [...names].reverse() : names).map((n, i) => ({ StopUID: `HSZS${dir}${i}`, StopID: `${dir}${i}`, StopName: N(n), StopSequence: i + 1, StopPosition: P(24.802 + i * 0.006, 120.972 + i * 0.006), StationID: `${10001 + i}` })) })));
