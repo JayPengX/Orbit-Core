@@ -246,7 +246,7 @@ export async function tdxGet(env, raw, { fetchFn = fetch, cache = globalThis.cac
       await tally(env, 'tdx', 1, now, ctx);
       if (res.status === 429) pace.until = now + 30_000;
       if (res.status === 401) resetTdxToken();
-      if (!res.ok) return { status: res.status, state: 'error' };
+      if (!res.ok) return { status: res.status, state: 'error', why: (await res.text().catch(() => '')).slice(0, 160) };
       const body = await res.text();
       if (cache) {
         const put = cache.put(key, new Response(body, { headers: { 'Content-Type': 'application/json; charset=utf-8', 'X-Fetched-At': String(now), 'Cache-Control': `public, max-age=${Math.ceil(req.rule.stale / 1000)}` } })).catch(() => {});
@@ -267,14 +267,14 @@ export async function tdxGet(env, raw, { fetchFn = fetch, cache = globalThis.cac
   let got;
   try {
     got = await refresh();
-  } catch {
-    got = { status: 502, state: 'error' };
+  } catch (err) {
+    got = { status: 502, state: 'error', why: String(err?.message || err).slice(0, 120) };
   }
   if (got.status === 200) return got;
   // TDX busy or failing: the last copy, however old the cache still has it.
   if (hit) return { status: 200, body: await hit.text(), age, state: 'stale' };
   const code = got.state === 'nokey' ? 'TDX_NO_KEY' : got.state === 'busy' || got.status === 429 ? 'TDX_BUSY' : 'TDX_FAILED';
-  return { status: got.state === 'nokey' ? 503 : got.status === 429 || got.state === 'busy' ? 429 : 502, body: JSON.stringify({ code }), state: got.state || 'error' };
+  return { status: got.state === 'nokey' ? 503 : got.status === 429 || got.state === 'busy' ? 429 : 502, body: JSON.stringify({ code, upstream: got.status, why: got.why || '' }), state: got.state || 'error' };
 }
 
 // ---- Google: places -------------------------------------------------------------------
