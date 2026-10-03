@@ -122,6 +122,31 @@ board. Quadra Pass sign-in; Chinese; always dark. App repo
 - Small-hours big games (00–05, `nightOnly`) are only among 更多推薦, never
   今日推薦; a followed team's still can be.
 
+## Fixtures: live F1 timing, title times, NBA and soccer live (pushed to `main`)
+
+- **F1 live board** from F1's own live timing: `f1-live.js` here (served as
+  `https://f1-live.quadra/now.json`, 4 s shared cache) opens
+  livetiming.formula1.com/signalrcore without a login over server-sent
+  events (negotiate, stream, handshake, Subscribe), takes the first answer
+  (the whole state) and trims it. Fixtures' race sheet draws it every 5 s in
+  place (`f1LiveBoard`): part and time left, flag, race control's latest,
+  each car's place, tyre, best lap / gap or gap / interval, pits, knocked
+  out, the qualifying cut line. ESPN's live copy lags minutes and its gaps
+  stand still; OpenF1 refuses everyone during a session; F1's static files
+  only come after it. Locally: `NODE_USE_ENV_PROXY=1
+  NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt node tools/preview.mjs …`.
+- **Title sequence times:** F1 sessions are shown at the time ELTA (Sky's
+  coverage of the international feed) plays F1's theme: `TITLES_BEFORE` in
+  Fixtures' espn.mjs (race 10 min early, sprint 5, the rest 4; estimates,
+  F1 publishes none), the official time kept as `official`.
+- **NBA live:** each side's top scorer and team fouls from the 15 s summary,
+  the last plays; 過程 lists every play (`feed`). **Soccer:** a 球員 tab from
+  the lineups' own numbers.
+- **CPBL:** cpbl.com.tw's live box (`/box/getlive`, POST with the page's
+  token) would give the count, batter and box, but its CDN answers 308 to
+  the POST from here, and on 2026-10-03 the Worker's CPBL schedule failed
+  (`cpbl page 404; tsdb 429`): open.
+
 ## Orbit Weather, phase 1: the proxy's sources (branch `claude/intelligent-euler-2ifltk`, pushed to `main`)
 
 Planned in `docs/WEATHER-PLAN.md`; the PWA's repo is `JayPengX/Orbit-Weather`
