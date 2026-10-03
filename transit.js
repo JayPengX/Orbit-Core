@@ -665,6 +665,8 @@ export const SAMPLES = {
   'metro-route': `basic/v2/Rail/Metro/StationOfRoute/TRTC?$top=1`,
   'metro-live': `basic/v2/Rail/Metro/LiveBoard/TRTC?$top=2`
 };
+// fetch called as a method of another object throws in Workers (Illegal invocation).
+const fetchOf = deps => (...a) => (0, deps.fetchFn)(...a);
 async function statusSample(env, name, deps) {
   const cut = text => String(text || '').slice(0, 6000);
   if (SAMPLES[name]) {
@@ -679,7 +681,7 @@ async function statusSample(env, name, deps) {
     const token = await tdxAccess(env, deps.fetchFn, deps.now);
     if (!token) return { name, status: 503, body: 'no TDX key' };
     const params = new URLSearchParams({ origin: `${AT.lat},${AT.lon}`, destination: `${TO.lat},${TO.lon}`, gc: '1.0', top: '2', transit: '3,4,5,6,7,8,9', transfer_time: '0,60' });
-    const r = await deps.fetchFn(`${TDX_BASE}maas/routing?${params}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } });
+    const r = await fetchOf(deps)(`${TDX_BASE}maas/routing?${params}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } });
     await tally(env, 'tdx', 1, deps.now, deps.ctx);
     const text = await r.text();
     let parsed = null;
@@ -689,7 +691,7 @@ async function statusSample(env, name, deps) {
     out = { name, status: r.status, body: cut(text), parsed };
   } else if (name === 'google-route') {
     if (!googleKey(env) || !(await spend(env, 'routes', 1, deps.now, deps.ctx))) return { name, status: 503, body: 'no key or cap' };
-    const r = await deps.fetchFn(ROUTES, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': googleKey(env), 'X-Goog-FieldMask': GOOGLE_ROUTE_FIELDS }, body: JSON.stringify(googleRouteBody(AT, TO)) });
+    const r = await fetchOf(deps)(ROUTES, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': googleKey(env), 'X-Goog-FieldMask': GOOGLE_ROUTE_FIELDS }, body: JSON.stringify(googleRouteBody(AT, TO)) });
     const text = await r.text();
     let parsed = null;
     try {
