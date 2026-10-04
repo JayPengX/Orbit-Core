@@ -1342,11 +1342,17 @@ export default {
       return handleWeather(request, env, headers, path, { session, ctx, limited: () => sessionLimited(`w:${session?.s}`, 30) });
     }
     // Orbit Transit (transit.js): a Quadra Pass session for everything but
-    // the usage page.
+    // the usage page. Or a local dev page (http://localhost:<port>: the
+    // preview's --live, testing on today's real buses and trains): transit
+    // data only, no account, 60 asks a minute an address; Google's paid asks
+    // stay under transit.js's monthly caps either way. TRANSIT_DEV = "off"
+    // (wrangler.toml [vars]) closes it.
     if (path === '/transit' || path.startsWith('/transit/')) {
       const qt = new URL(request.url).searchParams.get('qt');
-      const session = qt ? await readToken(await tokenSecret(env), qt, 'ses') : null;
-      return handleTransit(request, env, headers, path, { session, ctx, limited: () => sessionLimited(`t:${session?.s}`, 90) });
+      const signed = qt ? await readToken(await tokenSecret(env), qt, 'ses') : null;
+      const dev = !signed && env.TRANSIT_DEV !== 'off' && /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin);
+      const session = signed || (dev ? { s: 'dev', dev: true } : null);
+      return handleTransit(request, env, headers, path, { session, ctx, limited: () => sessionLimited(dev ? `t:dev:${ip}` : `t:${session?.s}`, dev ? 60 : 90) });
     }
     return errorJson('NOT_FOUND', 404, headers, request);
   },

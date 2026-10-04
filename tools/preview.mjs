@@ -142,6 +142,10 @@ const freezes = flag('freezes');
 // (the iOS Simulator's Safari: http://localhost:8123/<repo>/). The page's
 // calls to the Workers come back here (its fetch is pointed at /__ext).
 const serve = flag('serve');
+// --live (Orbit Transit): the page asks the real proxy for transit data,
+// today's real buses, trains and bikes (the Worker lets a localhost page in
+// without an account: worker.js, TRANSIT_DEV), still with the made-up account.
+const live = flag('live');
 const port = Number(opt('port', 8123));
 const inits = [];
 const extRoutes = [];
@@ -182,7 +186,7 @@ async function external(req, res) {
     abort: () => res.writeHead(502).end()
   });
 }
-const pointFetch = `(()=>{const f=window.fetch;window.fetch=(i,o={})=>{const u=typeof i==='string'?i:i.url;return /^https:\\/\\/(orbit-workers-proxy|sports-proxy)\\.pengzjay\\.workers\\.dev\\//.test(u)?f('/__ext?u='+encodeURIComponent(u),{method:o.method||i.method||'GET',body:o.body,headers:o.headers}):f(i,o)}})();`;
+const pointFetch = `(()=>{const f=window.fetch;window.fetch=(i,o={})=>{const u=typeof i==='string'?i:i.url;return /^https:\\/\\/(orbit-workers-proxy|sports-proxy)\\.pengzjay\\.workers\\.dev\\//.test(u)${live ? "&&!/orbit-workers-proxy\\.pengzjay\\.workers\\.dev\\/transit/.test(u)" : ''}?f('/__ext?u='+encodeURIComponent(u),{method:o.method||i.method||'GET',body:o.body,headers:o.headers}):f(i,o)}})();`;
 const server = createServer(async (req, res) => {
   const path = decodeURIComponent(new URL(req.url, 'http://x').pathname);
   if (serve && path === '/__ext') return external(req, res).catch(() => res.end());
@@ -392,7 +396,7 @@ const realTransit = Boolean(dotEnv.TDX_CLIENT_ID && dotEnv.TDX_CLIENT_SECRET);
 const transitEnv = { ...(realTransit ? dotEnv : { TDX_CLIENT_ID: 'preview', TDX_CLIENT_SECRET: 'preview' }), TDX_PER_MIN: '10000', RATE_LIMIT_KV: { get: async k => weatherKv.get(k) ?? null, put: async (k, v) => void weatherKv.set(k, v) } };
 const transitFetch = realTransit ? (url, init) => fetch(url, init) : transitFixtures();
 if (realTransit) console.log('Orbit Transit: real TDX' + (dotEnv.GOOGLE_MAPS_KEY ? ' and Google' : '') + ' (keys from .env)');
-await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/transit/, async route => {
+if (!live) await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/transit/, async route => {
   const req = route.request();
   const u = new URL(req.url());
   const cors = { 'Access-Control-Allow-Origin': '*' };

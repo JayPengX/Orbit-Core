@@ -87,6 +87,9 @@ FIREBASE_PROJECT_ID = "orbit-project-76897"
 TDX_PER_MIN = "240"
 # …and a second: calls wait their turn, 4 a second (TDX refuses past 5).
 TDX_PER_SEC = "4"
+# A local dev page (the preview's --live) may ask for transit data without a
+# Quadra Pass, rate-limited (worker.js). "off" closes it.
+TRANSIT_DEV = "on"
 
 # GEMINI_API_KEY (for /gemini, /nl-edit, /vocab-ai) and
 # FIREBASE_CLIENT_EMAIL / FIREBASE_PRIVATE_KEY (for /sync and /vocab-sync,
