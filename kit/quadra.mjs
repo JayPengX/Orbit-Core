@@ -666,6 +666,9 @@ export function haptic() {
     label.remove();
   } catch {}
 }
+// Also as a global: an app that calls it this way still opens on a device
+// whose kit is an older one (an import of a name the old kit lacks would not).
+if (typeof globalThis !== 'undefined') globalThis.quadraHaptic = haptic;
 
 // A sheet swiped down from its top closes, as on iOS (a phone's bottom
 // sheets, dialog.q-sheet): it follows the finger and closes past 120 px or a
