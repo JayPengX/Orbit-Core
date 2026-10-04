@@ -2381,3 +2381,24 @@ button:active:not(:disabled):not(.q-switch),
 [role='button']:active {
   opacity: 0.62;
 }
+
+/* 除錯紀錄: its buttons under the switch, and a small red dot at the top while recording. */
+.q-rec-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 2px 14px 12px;
+}
+html.q-rec body::after {
+  content: '';
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 4px);
+  left: 50%;
+  z-index: 2147483647;
+  width: 7px;
+  height: 7px;
+  margin-left: -3.5px;
+  border-radius: 50%;
+  background: #ff3b30;
+  pointer-events: none;
+}

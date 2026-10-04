@@ -1855,6 +1855,8 @@ export function passAccount(s, { extra = null, close = () => {} } = {}) {
     node('div', { class: 'q-rows' }, [act(T('新增裝置（取得裝置代碼）', 'Add a device (get a device code)'), async () => showCode(await s.deviceCode())), device]),
     node('h3', { class: 'q-sheet-h', text: T('通知', 'Notifications') }),
     ...notifyRows(s, note),
+    node('h3', { class: 'q-sheet-h', text: T('除錯紀錄', 'Debug log') }),
+    recRows(s, note),
     node('h3', { class: 'q-sheet-h', text: T('帳戶安全', 'Security') }),
     node('div', { class: 'q-rows' }, [
       act(T('登出其他所有裝置', 'Sign out every other device'), async () => {
@@ -2727,4 +2729,139 @@ export function fitNumbers(nodes) {
     const base = parseFloat(getComputedStyle(el).fontSize);
     el.style.fontSize = `${Math.max(base * 0.6, (base * box) / el.scrollWidth - 0.5)}px`;
   }
+}
+
+// ---- 除錯紀錄: what an app did, for its maker to replay ---------------------------------------
+//
+// Each app notes what it worked something out from (rec(kind, data): Orbit
+// Transit a trip's plans and the bikes round them, before they're ranked).
+// The last of each kind is always kept, in memory only, so 複製 right after
+// something looks wrong has it, with nothing switched on first. With 記錄
+// on (Quadra Pass → 除錯紀錄; it stays on until switched off), every one is
+// kept on this device, with the app's errors and the screens opened, up to
+// about 2 MB, oldest gone first. Nothing leaves the device unless copied or
+// shared, and never the pass, a token or a key (left out by name).
+const REC_KEY = 'quadra.rec';
+const REC_ON = 'quadra.recOn';
+const REC_MAX = 2_000_000;
+const recLast = new Map();
+let recSaving = 0;
+const secret = /^(pass|passcode|token|secret|auth|authorization|password|apikey|api_key)$/i;
+const recClean = x => JSON.parse(JSON.stringify(x ?? null, (k, v) => (secret.test(k) ? undefined : v)));
+export const recOn = () => {
+  try {
+    return localStorage.getItem(REC_ON) === '1';
+  } catch {
+    return false;
+  }
+};
+function recRead() {
+  try {
+    return JSON.parse(localStorage.getItem(REC_KEY) || '[]');
+  } catch {
+    return [];
+  }
+}
+function recPush(entry) {
+  const list = recRead();
+  list.push(entry);
+  let text = JSON.stringify(list);
+  while (text.length > REC_MAX && list.length > 1) {
+    list.splice(0, Math.max(1, Math.ceil(list.length / 10)));
+    text = JSON.stringify(list);
+  }
+  try {
+    localStorage.setItem(REC_KEY, text);
+  } catch {}
+}
+export function rec(kind, data) {
+  let clean;
+  try {
+    clean = recClean(data);
+  } catch {
+    return;
+  }
+  const entry = { at: Date.now(), kind, data: clean };
+  recLast.set(kind, entry);
+  if (recOn()) recPush(entry);
+}
+export function setRecOn(on) {
+  try {
+    if (on) localStorage.setItem(REC_ON, '1');
+    else localStorage.removeItem(REC_ON);
+  } catch {}
+  recMark();
+}
+export const recClear = () => {
+  recLast.clear();
+  try {
+    localStorage.removeItem(REC_KEY);
+  } catch {}
+};
+export const recCount = () => recRead().length + [...recLast.values()].length;
+// Everything to send: where and what, the last of each kind, and the log.
+export function recDump(app = dataSession?.app || '') {
+  const log = recRead();
+  return JSON.stringify(
+    {
+      app,
+      at: new Date().toISOString(),
+      kit: globalThis.QUADRA_KIT?.version || '',
+      page: typeof location !== 'undefined' ? location.pathname + location.hash : '',
+      ua: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+      installed: typeof matchMedia !== 'undefined' && matchMedia('(display-mode: standalone)').matches,
+      screen: typeof innerWidth !== 'undefined' ? `${innerWidth}x${innerHeight}@${devicePixelRatio}` : '',
+      last: Object.fromEntries([...recLast].filter(([, e]) => !log.some(x => x.at === e.at && x.kind === e.kind))),
+      log
+    },
+    null,
+    1
+  );
+}
+// While recording: the app's errors, and which screen (#hash) it was on.
+function recMark() {
+  if (typeof document === 'undefined') return;
+  document.documentElement.classList.toggle('q-rec', recOn());
+}
+if (typeof window !== 'undefined') {
+  window.addEventListener('error', e => recOn() && rec('error', { message: e.message, at: `${e.filename || ''}:${e.lineno || 0}:${e.colno || 0}`, stack: String(e.error?.stack || '').slice(0, 1500) }));
+  window.addEventListener('unhandledrejection', e => recOn() && rec('error', { message: String(e.reason?.message || e.reason), stack: String(e.reason?.stack || '').slice(0, 1500) }));
+  window.addEventListener('hashchange', () => recOn() && rec('screen', { hash: location.hash }));
+  if (document.documentElement) recMark();
+}
+function recRows(s, note) {
+  const en = s.lang === 'en';
+  const T = (zh, e) => (en ? e : zh);
+  const sub = node('small', { class: 'q-notice-sub' });
+  const paint = () => (sub.textContent = recOn() ? T(`記錄中・${recRead().length} 筆`, `Recording · ${recRead().length}`) : T('關閉：只留每件事的最後一次', 'Off: only the last of each kept'));
+  paint();
+  const send = async how => {
+    const text = recDump(s.app);
+    if (how === 'share' && navigator.share) {
+      const file = new File([text], `${s.app}-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '')}.json`, { type: 'application/json' });
+      if (navigator.canShare?.({ files: [file] })) return navigator.share({ files: [file] }).catch(() => {});
+    }
+    await navigator.clipboard.writeText(text);
+    note.textContent = T(`已複製（${Math.round(text.length / 1024)} KB）`, `Copied (${Math.round(text.length / 1024)} KB)`);
+  };
+  const btn = (label, fn) => node('button', { class: 'q-chip', type: 'button', text: label, onclick: () => fn().catch(() => (note.textContent = T('沒辦法複製', 'Couldn’t copy'))) });
+  return node('div', { class: 'q-rows' }, [
+    node('div', { class: 'q-notice-row master' }, [
+      node('span', { class: 'q-notice-icon', 'aria-hidden': 'true', text: '🐞' }),
+      node('div', { class: 'q-notice-text' }, [node('strong', { text: T('記錄操作過程', 'Record what the app does') }), sub]),
+      toggle(recOn(), T('記錄操作過程', 'Record'), on => {
+        setRecOn(on);
+        paint();
+      })
+    ]),
+    node('div', { class: 'q-rec-acts' }, [
+      btn(T('複製紀錄', 'Copy'), () => send('copy')),
+      btn(T('分享檔案', 'Share file'), () => send('share')),
+      btn(T('清除', 'Clear'), async () => {
+        recClear();
+        paint();
+        note.textContent = T('已清除', 'Cleared');
+      })
+    ])
+  ]);
 }
