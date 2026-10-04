@@ -2356,3 +2356,21 @@ dialog {
     animation: none;
   }
 }
+
+/* Controls behave like iOS's: a long press on a button, a tab or a chip
+   doesn't select its words or open Safari's menu (real links still do), and
+   a pressed button dims for the moment it's held. */
+button,
+[role='button'],
+[role='tab'],
+[role='switch'],
+.q-chip {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+button:active:not(:disabled):not(.q-switch),
+[role='button']:active {
+  opacity: 0.62;
+}
