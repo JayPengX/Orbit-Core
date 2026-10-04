@@ -375,9 +375,23 @@ await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(we
   const res = await handleWeather(new Request(req.url()), weatherEnv, cors, u.pathname, { session: { s: 'preview' }, fetchFn, cf: { latitude: '25.0478', longitude: '121.5319', city: 'Taipei' }, cache: null });
   await route.fulfill({ status: res.status, contentType: 'application/json', headers: cors, body: await res.text() });
 });
-// Orbit Transit's routes (see the top): transit.js on the made-up TDX answers.
-const transitEnv = { TDX_CLIENT_ID: 'preview', TDX_CLIENT_SECRET: 'preview', TDX_PER_MIN: '10000', RATE_LIMIT_KV: { get: async k => weatherKv.get(k) ?? null, put: async (k, v) => void weatherKv.set(k, v) } };
-const transitFetch = transitFixtures();
+// Orbit Transit's routes (see the top): transit.js on the made-up TDX answers;
+// or, with the real keys in Shared-Proxy/.env (git-ignored; TDX_CLIENT_ID,
+// TDX_CLIENT_SECRET, optionally GOOGLE_MAPS_KEY), on the real TDX and Google:
+// today's buses, bikes and trains, still with the made-up account.
+const dotEnv = existsSync(new URL('../.env', import.meta.url))
+  ? Object.fromEntries(
+      (await readFile(new URL('../.env', import.meta.url), 'utf8'))
+        .split('\n')
+        .map(l => /^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/.exec(l))
+        .filter(Boolean)
+        .map(m => [m[1], m[2].replace(/^(['"])(.*)\1$/, '$2')])
+    )
+  : {};
+const realTransit = Boolean(dotEnv.TDX_CLIENT_ID && dotEnv.TDX_CLIENT_SECRET);
+const transitEnv = { ...(realTransit ? dotEnv : { TDX_CLIENT_ID: 'preview', TDX_CLIENT_SECRET: 'preview' }), TDX_PER_MIN: '10000', RATE_LIMIT_KV: { get: async k => weatherKv.get(k) ?? null, put: async (k, v) => void weatherKv.set(k, v) } };
+const transitFetch = realTransit ? (url, init) => fetch(url, init) : transitFixtures();
+if (realTransit) console.log('Orbit Transit: real TDX' + (dotEnv.GOOGLE_MAPS_KEY ? ' and Google' : '') + ' (keys from .env)');
 await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/transit/, async route => {
   const req = route.request();
   const u = new URL(req.url());
