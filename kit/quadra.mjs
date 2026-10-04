@@ -648,6 +648,25 @@ function noZoom() {
 }
 noZoom();
 
+// A tap felt, as iOS's own controls do: Safari (iOS 18 on) gives a native
+// switch a haptic tick when it's tapped, so a hidden one is tapped. Only
+// during a tap (a gesture), and nothing where there's no such switch.
+export function haptic() {
+  if (typeof document === 'undefined' || !document.body) return;
+  try {
+    const label = document.createElement('label');
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.setAttribute('switch', '');
+    label.style.display = 'none';
+    label.setAttribute('aria-hidden', 'true');
+    label.append(input);
+    document.body.append(label);
+    label.click();
+    label.remove();
+  } catch {}
+}
+
 // A sheet swiped down from its top closes, as on iOS (a phone's bottom
 // sheets, dialog.q-sheet): it follows the finger and closes past 120 px or a
 // quick flick, else springs back. Not from a field or a sideways list, and
@@ -699,6 +718,7 @@ function sheetSwipe() {
     s.classList.add('q-settle');
     const gone = dy > 120 || (dy > 40 && dy / Math.max(1, Date.now() - t0) > 0.6);
     s.style.transform = gone ? 'translateY(100%)' : '';
+    if (gone) haptic();
     setTimeout(() => {
       if (gone) s.close();
       s.classList.remove('q-settle');
@@ -2109,6 +2129,7 @@ function offerNotices(s) {
 function toggle(on, label, onchange) {
   const b = node('button', { class: 'q-switch', type: 'button', role: 'switch', 'aria-checked': String(on), 'aria-label': label });
   b.addEventListener('click', async () => {
+    haptic();
     const next = b.getAttribute('aria-checked') !== 'true';
     const ok = await onchange(next);
     if (ok !== false) b.setAttribute('aria-checked', String(next));
@@ -2608,7 +2629,7 @@ export function tabBar({ tabs, onSelect, hash = id => `#${id}`, nav = document.g
     const b = node('button', { class: 'q-tab', id: `tab-${tab.id}`, type: 'button', role: 'tab', 'data-tab': tab.id, 'aria-controls': `panel-${tab.id}`, 'aria-selected': 'false', tabindex: '-1' });
     b.innerHTML = `<span class="q-tab-icon">${icon(tab.icon)}<b class="q-tab-badge" hidden></b></span><span class="q-tab-label"></span>`;
     b.querySelector('.q-tab-label').textContent = tab.label;
-    b.addEventListener('click', () => (tab.id === current ? again(tab.id) : onSelect(tab.id, { again: false })));
+    b.addEventListener('click', () => (haptic(), tab.id === current ? again(tab.id) : onSelect(tab.id, { again: false })));
     buttons.set(tab.id, b);
   }
   nav.replaceChildren(...buttons.values());

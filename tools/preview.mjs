@@ -134,6 +134,9 @@ const requests = flag('requests');
 // --reopen: each page opened twice in the same browser (its storage kept):
 // the second is how an app opens on a phone that has used it before.
 const reopen = flag('reopen');
+// --freezes: every stretch over 100 ms the page couldn't answer a tap (its
+// main thread busy), from the moment it starts: [when, how long] in ms.
+const freezes = flag('freezes');
 // --serve [--port 8123]: no browser of its own; the app is served signed in
 // with the same made-up account and answers, for another browser to open
 // (the iOS Simulator's Safari: http://localhost:8123/<repo>/). The page's
@@ -331,6 +334,19 @@ if (appId === 'transit' && !noGeo) {
   await context.grantPermissions(['geolocation']);
   await context.setGeolocation({ latitude: 24.8026, longitude: 120.9702, accuracy: 20 });
 }
+if (freezes)
+  await context.addInitScript(() => {
+    const t0 = performance.now();
+    let last = t0;
+    globalThis.__freezes = [];
+    const tick = () => {
+      const now = performance.now();
+      if (now - last > 100) globalThis.__freezes.push([Math.round(last - t0), Math.round(now - last)]);
+      last = now;
+      setTimeout(tick, 0);
+    };
+    setTimeout(tick, 0);
+  });
 if (device === 'ipad') await context.addInitScript(() => Object.defineProperty(Navigator.prototype, 'maxTouchPoints', { get: () => 5 }));
 await context.addInitScript(
   ([refresh, lang, stores]) => {
@@ -469,6 +485,7 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => (reopen ? [h, h]
     await page.waitForTimeout(4000);
   }
   if (requests) console.log(`requests ${key}${hash ? `#${hash}` : ''} (${calls.length}):\n${calls.map(c => `${String(c.t).padStart(6)} ms  +${c.took.padEnd(8)} ${c.text}`).join('\n')}`);
+  if (freezes) console.log(`freezes ${key}${hash ? `#${hash}` : ''}: ${JSON.stringify(await page.evaluate(() => globalThis.__freezes || []))}`);
   for (const js of evals) console.log('eval:', JSON.stringify(await page.evaluate(js).catch(e => `error ${e.message}`)));
   const file = join(out, `${key}-${hash || 'start'}${clicks.length ? '-clicked' : ''}${dark ? '-dark' : ''}${engine === 'webkit' ? '-webkit' : ''}.png`);
   await page.screenshot({ path: file, fullPage: full });
