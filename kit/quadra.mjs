@@ -648,6 +648,68 @@ function noZoom() {
 }
 noZoom();
 
+// A sheet swiped down from its top closes, as on iOS (a phone's bottom
+// sheets, dialog.q-sheet): it follows the finger and closes past 120 px or a
+// quick flick, else springs back. Not from a field or a sideways list, and
+// not while the sheet is scrolled (that finger scrolls it).
+function sheetSwipe() {
+  if (typeof document === 'undefined' || document.__quadraSheetSwipe) return;
+  document.__quadraSheetSwipe = true;
+  let sheet = null;
+  let y0 = 0;
+  let x0 = 0;
+  let t0 = 0;
+  let dy = 0;
+  let dragging = false;
+  document.addEventListener(
+    'touchstart',
+    e => {
+      const s = e.target.closest?.('dialog.q-sheet[open]');
+      sheet = null;
+      if (!s || e.touches.length !== 1 || innerWidth >= 720 || s.scrollTop > 0) return;
+      if (e.target.closest('input, textarea, select, [contenteditable], .q-chips, .ot-scroll-chips, .leaflet-container')) return;
+      sheet = s;
+      [x0, y0, t0, dy, dragging] = [e.touches[0].clientX, e.touches[0].clientY, Date.now(), 0, false];
+    },
+    { passive: true }
+  );
+  document.addEventListener(
+    'touchmove',
+    e => {
+      if (!sheet) return;
+      const y = e.touches[0].clientY - y0;
+      const x = e.touches[0].clientX - x0;
+      if (!dragging) {
+        // Up, or sideways: not a swipe down (the sheet scrolls, the list slides).
+        if (y < -4 || Math.abs(x) > Math.abs(y) + 4) return void (sheet = null);
+        if (y < 8) return;
+        dragging = true;
+      }
+      dy = Math.max(0, y);
+      sheet.style.transform = `translateY(${dy}px)`;
+      if (e.cancelable) e.preventDefault();
+    },
+    { passive: false }
+  );
+  const end = () => {
+    const s = sheet;
+    sheet = null;
+    if (!s || !dragging) return;
+    dragging = false;
+    s.classList.add('q-settle');
+    const gone = dy > 120 || (dy > 40 && dy / Math.max(1, Date.now() - t0) > 0.6);
+    s.style.transform = gone ? 'translateY(100%)' : '';
+    setTimeout(() => {
+      if (gone) s.close();
+      s.classList.remove('q-settle');
+      s.style.transform = '';
+    }, 300);
+  };
+  document.addEventListener('touchend', end);
+  document.addEventListener('touchcancel', end);
+}
+sheetSwipe();
+
 // A phone or a tablet: html.q-touch, so a tablet gets a phone's frame (no
 // brand header, the tabs at the bottom; quadra.css). boot.js sets it earlier
 // in the apps that load it.
@@ -663,7 +725,11 @@ function statusStrip() {
 }
 if (typeof document !== 'undefined') document.body ? statusStrip() : document.addEventListener('DOMContentLoaded', statusStrip);
 
-export function quadraSession(app, { lang = detectLang(), heartbeat = 60_000 } = {}) {
+// The heartbeat (another device's changes, whether this app is still the live
+// one) every 2 minutes: a read of the pass each time; back on screen it's
+// asked at once anyway (wake), and a write from an app no longer live is
+// refused by the Worker whatever the beat.
+export function quadraSession(app, { lang = detectLang(), heartbeat = 120_000 } = {}) {
   // Every app notes the kit's newest version for its next opening, also
   // the apps that don't watch for updates (watchUpdates puts it in place
   // at once).
