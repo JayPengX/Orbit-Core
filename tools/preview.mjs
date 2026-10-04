@@ -134,6 +134,14 @@ const requests = flag('requests');
 // --reopen: each page opened twice in the same browser (its storage kept):
 // the second is how an app opens on a phone that has used it before.
 const reopen = flag('reopen');
+// --serve [--port 8123]: no browser of its own; the app is served signed in
+// with the same made-up account and answers, for another browser to open
+// (the iOS Simulator's Safari: http://localhost:8123/<repo>/). The page's
+// calls to the Workers come back here (its fetch is pointed at /__ext).
+const serve = flag('serve');
+const port = Number(opt('port', 8123));
+const inits = [];
+const extRoutes = [];
 const full = flag('full');
 const signedOut = flag('signed-out');
 const dark = flag('dark');
@@ -157,21 +165,41 @@ if (!existsSync(dir)) throw new Error(`${dir} missing${key === 'orbit' ? ' (run 
 
 // ---- A static server for the app ----
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.mp3': 'audio/mpeg', '.webmanifest': 'application/manifest+json' };
+// --serve: the Workers' answers (the routes below, called as Playwright would).
+async function external(req, res) {
+  const u = new URL(req.url, 'http://x').searchParams.get('u') || '';
+  const chunks = [];
+  for await (const c of req) chunks.push(c);
+  const body = Buffer.concat(chunks).toString();
+  const hit = extRoutes.find(([p]) => (p instanceof RegExp ? p.test(u) : u.startsWith(p.replace(/\*+$/, ''))));
+  if (!hit) return res.writeHead(404).end();
+  await hit[1]({
+    request: () => ({ url: () => u, method: () => req.method, postData: () => body, postDataJSON: () => JSON.parse(body || 'null') }),
+    fulfill: ({ status = 200, contentType = 'application/json', headers = {}, body: out = '' }) => res.writeHead(status, { 'Content-Type': contentType, ...headers }).end(out),
+    abort: () => res.writeHead(502).end()
+  });
+}
+const pointFetch = `(()=>{const f=window.fetch;window.fetch=(i,o={})=>{const u=typeof i==='string'?i:i.url;return /^https:\\/\\/(orbit-workers-proxy|sports-proxy)\\.pengzjay\\.workers\\.dev\\//.test(u)?f('/__ext?u='+encodeURIComponent(u),{method:o.method||i.method||'GET',body:o.body,headers:o.headers}):f(i,o)}})();`;
 const server = createServer(async (req, res) => {
   const path = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+  if (serve && path === '/__ext') return external(req, res).catch(() => res.end());
+  // Served: no service worker (it would keep the page from these answers).
+  if (serve && path.endsWith('/sw.js')) return res.writeHead(404).end();
   // The kit, as the apps load it from Shared-Proxy's Pages (kit/loader.html).
   let file = path.startsWith('/Shared-Proxy/kit/') ? join(ROOT, path) : join(dir, path.replace(/^\/[^/]+\//, '/'));
   if (latency) await new Promise(r => setTimeout(r, latency));
   try {
     if ((await stat(file)).isDirectory()) file = join(file, 'index.html');
-    res.writeHead(200, { 'Content-Type': TYPES[extname(file)] || 'application/octet-stream' });
-    res.end(await readFile(file));
+    res.writeHead(200, { 'Content-Type': TYPES[extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-store' });
+    const data = await readFile(file);
+    // Served: the made-up sign-in and the fetch pointed here, before anything else runs.
+    res.end(serve && file.endsWith('.html') ? String(data).replace('<head>', `<head><script>${inits.join(';')};${pointFetch}</script>`) : data);
   } catch {
     res.writeHead(404);
     res.end('not found');
   }
 });
-await new Promise(r => server.listen(0, r));
+await new Promise(r => server.listen(serve ? port : 0, r));
 const base = `http://localhost:${server.address().port}/${renamed}/`;
 
 // ---- Upstream data, straight from the source ----
@@ -280,8 +308,9 @@ const payload = payloadFile ? await readFile(payloadFile, 'utf8') : null;
 const b64 = s => Buffer.from(s).toString('base64url');
 const refresh = `${b64(JSON.stringify({ d: '0123456789abcdef0123456789abcdef' }))}.preview`;
 
-const browser = await playwright[engine].launch();
-const context = await browser.newContext({
+const browser = serve ? null : await playwright[engine].launch();
+const stub = { grantPermissions: async () => {}, setGeolocation: async () => {}, addInitScript: async (fn, arg) => void inits.push(`(${fn})(${JSON.stringify(arg)})`), route: async (p, h) => void extRoutes.push([p, h]) };
+const context = serve ? stub : await browser.newContext({
   // No service workers: their fetches would miss the routes below.
   serviceWorkers: 'block',
   viewport: { width, height },
@@ -385,6 +414,10 @@ await context.route(/^https:\/\/(?!orbit-workers-proxy|sports-proxy)/, async rou
   await route.fulfill({ status: 200, contentType: type, body });
 });
 
+if (serve) {
+  console.log(`serving ${repo}, signed in with a made-up account: ${base}  (Ctrl-C to stop)`);
+  await new Promise(() => {});
+}
 await mkdir(out, { recursive: true });
 const errors = [];
 for (const hash of (hashes.length ? hashes : ['']).flatMap(h => (reopen ? [h, h] : [h]))) {
