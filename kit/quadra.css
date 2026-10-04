@@ -64,11 +64,13 @@
     --q-glass: rgba(30, 31, 36, 0.72);
     --q-glass-edge: rgba(255, 255, 255, 0.12);
     --q-glass-pick: rgba(255, 255, 255, 0.13);
+    --q-sheet: #15171d;
     --q-accent-wash: color-mix(in srgb, var(--q-accent) 18%, transparent);
   }
 }
 :root[data-theme='dark'] {
   --q-page: #0a0b0f;
+  --q-sheet: #15171d;
   --q-surface: #14161c;
   --q-surface-2: #191c24;
   --q-sunken: #0f1116;
@@ -872,8 +874,12 @@ dialog.q-moved::backdrop {
 }
 
 /* ---- Sheets ---- */
+/* iOS's sheet: the screen's full width (not the browser's dialog margins,
+   which leave the page showing down both sides), and in the dark a shade
+   lighter than the page, as iOS lifts what's on top. */
 .q-sheet {
   width: min(460px, 100vw);
+  max-width: none;
   max-height: min(88vh, 900px);
   /* What's visible beside Safari's toolbar (vh is the screen without it). */
   max-height: min(88dvh, 900px);
@@ -881,7 +887,8 @@ dialog.q-moved::backdrop {
   padding: 0 18px calc(18px + env(safe-area-inset-bottom));
   border: 0;
   border-radius: 24px 24px 0 0;
-  background: var(--q-page);
+  background: var(--q-sheet, var(--q-page));
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.25);
   color: var(--q-text);
   font-family: var(--q-font);
   box-sizing: border-box;
@@ -906,7 +913,7 @@ dialog.q-moved::backdrop {
   gap: 12px;
   margin: 0 -18px 6px;
   padding: 16px 18px 10px;
-  background: var(--q-page);
+  background: var(--q-sheet, var(--q-page));
 }
 .q-sheet-head h2 {
   margin: 0;
