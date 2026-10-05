@@ -8,6 +8,7 @@
 // as lib/photos.mjs: never edit an app's copy.
 import { CATALOG } from '#kit/catalog.mjs';
 import { logoPicture, f1Driver, f1Constructor } from '#kit/logos.mjs';
+import * as kit from '#kit/quadra.mjs';
 
 const CDN = 'https://a.espncdn.com/i/headshots';
 // ESPN's headshot at the size a phone shows it (its image service: a full
@@ -34,6 +35,29 @@ const plain = s =>
     .replace(/\b(jr|sr|ii|iii)\b\.?/g, '')
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
+
+// ---- A league's own photos -----------------------------------------------------------
+// ESPN's headshots can be a season old (a player traded in the summer still in
+// his old team's shirt); a league's own site has this season's. Its players
+// come from the nightly packs (Shared-Data's sports/<league>/photos.json,
+// [[name, id]…]), read once; a player found there gets that photo first.
+const OWN_PHOTO = { nba: id => `https://cdn.nba.com/headshots/nba/latest/260x190/${id}.png` };
+const ownLists = {};
+function ownList(league) {
+  if (!ownLists[league]) {
+    ownLists[league] = { map: null };
+    kit.packJson?.(`sports/${league}/photos.json`, { ttl: 12 * 3_600_000 })
+      .then(d => (ownLists[league].map = new Map((d?.players || []).map(([n, id]) => [plain(n), id]))))
+      .catch(() => {});
+  }
+  return ownLists[league].map;
+}
+if (typeof window !== 'undefined') for (const league of Object.keys(OWN_PHOTO)) ownList(league);
+export function ownPhoto(name, league) {
+  if (!OWN_PHOTO[league] || !name) return null;
+  const id = ownList(league)?.get(plain(name));
+  return id ? OWN_PHOTO[league](id) : null;
+}
 
 // ---- The device's copy ----------------------------------------------------------------
 // v2: v1 held Wikipedia's pictures, which aren't kept any more.
@@ -158,7 +182,7 @@ export function findPhoto(name, league) {
 export function personPhoto(name, league, { urls = [], guess = null, cls = '', fallback }) {
   const known = knownPhoto(name, sportOf(league));
   const guessed = smallPhoto(guess);
-  const list = [...new Set([...urls, known, guess].map(smallPhoto).filter(Boolean))];
+  const list = [...new Set([ownPhoto(name, league), ...urls, known, guess].map(smallPhoto).filter(Boolean))];
   const last = () => {
     const stand = fallback();
     if (known === undefined && name)
