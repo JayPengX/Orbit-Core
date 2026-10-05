@@ -480,7 +480,7 @@ if (live) {
     u.searchParams.delete('qt');
     return route.continue({ url: u.toString() });
   });
-  context.on('response', async res => {
+  context.on?.('response', async res => {
     if (!res.url().startsWith('https://sports-proxy.pengzjay.workers.dev/')) return;
     const u = new URL(res.url());
     const asked = u.searchParams.has('batch') ? u.searchParams.getAll('u') : [u.searchParams.get('url')];
