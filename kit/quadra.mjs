@@ -613,7 +613,23 @@ const FAILED_HOLD_MS = 60_000;
 // A failed or stale read asked again after this.
 const RETRY_MS = 15_000;
 export function proxyJson(url, { ttl = 60_000, trim = '', persist: keep = true, timeout = 20_000 } = {}) {
-  const key = dataKey(url, trim);
+  return keptJson(url, dataKey(url, trim), { ttl, keep }, () => enqueue(url, trim, timeout));
+}
+// The nightly packs (Transit-Data on GitHub Pages, built at midnight Taiwan
+// time): what doesn't change in a day (a league's season, sports/<league>/
+// <year>.json) read from there, never through the proxy. Kept and failed
+// like proxyJson's; a pack not there (not built yet) is a failure (404) the
+// app reads another way.
+export const PACKS_URL = 'https://jaypengx.github.io/Transit-Data/';
+export function packJson(path, { ttl = 3 * 3_600_000, timeout = 30_000 } = {}) {
+  const url = `${PACKS_URL}${path}`;
+  return keptJson(url, dataKey(url, ''), { ttl, keep: true }, async () => {
+    const res = await fetch(url, { signal: AbortSignal.timeout(timeout) });
+    if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
+    return res.text();
+  });
+}
+function keptJson(url, key, { ttl, keep }, read) {
   const hit = memory.get(key);
   if (hit && Date.now() - hit.at < (hit.failed ? Math.min(ttl, hit.hold) : hit.stale ? Math.min(ttl, RETRY_MS) : ttl)) return hit.promise;
   let entry;
@@ -622,7 +638,7 @@ export function proxyJson(url, { ttl = 60_000, trim = '', persist: keep = true, 
     if (saved && Date.now() - saved.at < ttl) return saved.data;
     let got;
     try {
-      got = await enqueue(url, trim, timeout);
+      got = await read();
     } catch (error) {
       // A fresh read failed: the copy this device has (of any age) is the
       // answer, and it's asked again soon. A league that read fine an hour
