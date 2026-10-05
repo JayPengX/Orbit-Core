@@ -81,6 +81,13 @@ bug waiting in the rest.
 - **News that happens once is told once** (a game's final score, a price
   reached): the Worker remembers what it told, whatever an app that's
   behind schedules again.
+- **Test on the real proxy too** (`tools/preview.mjs <app> --live`: the
+  Workers' dev doors let a localhost page in without a pass; every failed or
+  slow item is printed). The made-up answers can't show the proxy's own
+  cache, limits and crashes.
+- **A Worker call has 50 fetches**, a batch's items all share them, and one
+  item that throws is that item's failure, never the batch's. An old copy is
+  what's answered when a fresh read fails, not instead of reading.
 - **A burst never breaks the rest.** Read what a view needs, not every day
   of a season (a playoff bracket reads back a week at a time); an answer
   of "too many" is never asked again at once.
