@@ -1,13 +1,10 @@
 name: Deploy Cloudflare Worker
 
 on:
-  # Run workflow: after a secret's added (ECO_TOKEN_SECRET), to put it on the Workers.
-  workflow_dispatch:
   push:
     branches: ['main']
     paths:
       - 'worker.js'
-      - 'quadra-token.js'
       - 'kit/brand.mjs'
       - 'wrangler.toml'
       - 'sports-proxy-worker.js'
