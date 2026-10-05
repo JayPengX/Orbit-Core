@@ -120,3 +120,11 @@ test("a game's own page (box score, plays) is live: never a copy older than a re
   assert.equal(res.headers.get('X-Sports-Proxy-Cache-Tier'), 'live');
   assert.match(res.headers.get('Cache-Control'), /max-age=10\b/);
 });
+
+test("a team's injuries (its roster read for them) are minutes old at most, its plain roster a table's half hour", async () => {
+  const base = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/20/roster';
+  const hurt = await get(`https://proxy.test/sports-proxy?url=${encodeURIComponent(`${base}?enable=injuries`)}&trim=espn-roster`);
+  assert.equal(hurt.headers.get('X-Sports-Proxy-Cache-Tier'), 'team-schedule');
+  const plain = await get(`https://proxy.test/sports-proxy?url=${encodeURIComponent(base)}`);
+  assert.equal(plain.headers.get('X-Sports-Proxy-Cache-Tier'), 'standings');
+});

@@ -210,6 +210,8 @@ function cachePolicyFor(url) {
       // sheet open on a game in play reads it every 15 s and was getting a
       // copy up to half an hour old. A finished one comes from the mirror.
       if (url.pathname.endsWith('/summary')) return CACHE_LIVE;
+      // A team's injuries on game day (Sports' game sheet reads its roster for them): minutes.
+      if (url.pathname.endsWith('/roster') && url.searchParams.get('enable') === 'injuries') return CACHE_TEAM_SCHEDULE;
       return url.pathname.endsWith('/scoreboard') ? scoreboardPolicy(url) : url.pathname.endsWith('/schedule') ? CACHE_TEAM_SCHEDULE : CACHE_STANDINGS;
     case 'sports.core.api.espn.com':
       return CACHE_PREGAME_LINE;
