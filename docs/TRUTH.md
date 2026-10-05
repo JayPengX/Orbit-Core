@@ -90,7 +90,9 @@ bug waiting in the rest.
   what's answered when a fresh read fails, not instead of reading.
 - **A burst never breaks the rest.** Read what a view needs, not every day
   of a season (a playoff bracket reads back a week at a time); an answer
-  of "too many" is never asked again at once.
+  of "too many" is never asked again at once. Clicking through every view
+  fast is normal use: `--live` prints the busiest minute of asks, and it
+  must sit well under a session's limit (600).
 - Live data is trusted only where it makes sense: a bus's tracker counts
   only near a scheduled trip, and a thin prediction market counts only as far
   as it's traded and tells the options apart.
