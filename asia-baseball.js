@@ -241,6 +241,18 @@ const TSDB = TSDB_DAY;
 // to a month of days) went over, failing every one; TheSportsDB also turns a
 // burst away. A day over (two back) is kept a week at the edge, not 10 minutes.
 const TSDB_DAYS = 16;
+// `work` on each item, `n` at a time; the answers in the items' order.
+async function inTurns(items, n, work) {
+  const out = new Array(items.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => {
+    while (next < items.length) {
+      const i = next++;
+      out[i] = await work(items[i]);
+    }
+  }));
+  return out;
+}
 async function fetchCpblTsdb(year, month, { from = Date.UTC(year, month - 1, 1), now = Date.now() } = {}) {
   let days = [];
   const last = Math.min(Date.UTC(year, month, 0), now + 14 * 24 * HOUR);
@@ -251,8 +263,12 @@ async function fetchCpblTsdb(year, month, { from = Date.UTC(year, month - 1, 1),
   // (reason kept): never an empty month served and cached as if the league
   // had no games (TheSportsDB can refuse this Worker's requests).
   const failures = [];
-  const lists = await Promise.all(
-    days.map(d =>
+  // Four at a time: a Worker call keeps only six connections open, and the
+  // rest of a batch needs some ("Response closed due to connection limit").
+  const lists = await inTurns(
+    days,
+    4,
+    d =>
       fetch(`${TSDB}?d=${d}&l=${TSDB_CPBL}`, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(TIMEOUT), cf: { cacheTtl: d < over ? 7 * 86_400 : 600, cacheEverything: true } })
         .then(r => {
           if (!r.ok) throw new Error(`tsdb ${r.status}`);
@@ -260,7 +276,6 @@ async function fetchCpblTsdb(year, month, { from = Date.UTC(year, month - 1, 1),
         })
         .then(parseTsdbDay)
         .catch(error => (failures.push(String(error.message || error)), []))
-    )
   );
   if (days.length && failures.length === days.length) throw new Error(`${failures[0]} (every day)`);
   return lists.flat();

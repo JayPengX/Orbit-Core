@@ -377,6 +377,9 @@ export function raceName(name, lang = 'zh') {
   if (!m) return text;
   const place = m[1].toLowerCase();
   const hit = GP.find(([key]) => place.includes(key));
-  if (hit) return lang === 'en' ? `${hit[2]} GP` : `${hit[1]}站`;
+  // A race held away from home ("Bahrain Grand Prix in Malaysia", 2026): where, said.
+  const away = /\b(?:Grand Prix|GP)\s+in\s+([\p{L} ]+?)\s*$/iu.exec(text)?.[1];
+  const where = away ? countryName(away, lang) || away : '';
+  if (hit) return lang === 'en' ? `${hit[2]} GP${where ? ` (${where})` : ''}` : `${hit[1]}站${where ? `（${where}）` : ''}`;
   return `${m[1].split(/\s+/).at(-1)} GP`;
 }
