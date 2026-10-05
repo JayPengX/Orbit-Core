@@ -82,7 +82,7 @@ bug waiting in the rest.
   reached): the Worker remembers what it told, whatever an app that's
   behind schedules again.
 - **What doesn't change in a day comes from the nightly packs**, never
-  through the proxy: a league's season (`Transit-Data`'s `sports/<league>/
+  through the proxy: a league's season (`Shared-Data`'s `sports/<league>/
   <year>.json`, built at midnight, read with the kit's `packJson`), the bus
   timetables. The proxy is for what's live. A 6 MB answer through a Worker
   is a bug: a few at once run it out of memory and every request on it

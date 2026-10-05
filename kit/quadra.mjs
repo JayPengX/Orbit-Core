@@ -615,12 +615,12 @@ const RETRY_MS = 15_000;
 export function proxyJson(url, { ttl = 60_000, trim = '', persist: keep = true, timeout = 20_000 } = {}) {
   return keptJson(url, dataKey(url, trim), { ttl, keep }, () => enqueue(url, trim, timeout));
 }
-// The nightly packs (Transit-Data on GitHub Pages, built at midnight Taiwan
+// The nightly packs (Shared-Data on GitHub Pages, built at midnight Taiwan
 // time): what doesn't change in a day (a league's season, sports/<league>/
 // <year>.json) read from there, never through the proxy. Kept and failed
 // like proxyJson's; a pack not there (not built yet) is a failure (404) the
 // app reads another way.
-export const PACKS_URL = 'https://jaypengx.github.io/Transit-Data/';
+export const PACKS_URL = 'https://jaypengx.github.io/Shared-Data/';
 export function packJson(path, { ttl = 3 * 3_600_000, timeout = 30_000 } = {}) {
   const url = `${PACKS_URL}${path}`;
   return keptJson(url, dataKey(url, ''), { ttl, keep: true }, async () => {

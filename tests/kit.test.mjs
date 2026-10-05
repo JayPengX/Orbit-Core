@@ -117,7 +117,7 @@ test('packJson reads a nightly pack from GitHub Pages, not the proxy; a pack not
   const asked = [];
   globalThis.fetch = async url => (asked.push(String(url)), String(url).endsWith('nba/2026.json') ? new Response('{"events":[1,2]}', { status: 200 }) : new Response('nope', { status: 404 }));
   assert.deepEqual((await kit.packJson('sports/nba/2026.json')).events, [1, 2]);
-  assert.equal(asked[0], 'https://jaypengx.github.io/Transit-Data/sports/nba/2026.json');
+  assert.equal(asked[0], 'https://jaypengx.github.io/Shared-Data/sports/nba/2026.json');
   await assert.rejects(kit.packJson('sports/nope/2026.json'), e => e.status === 404);
 });
 
