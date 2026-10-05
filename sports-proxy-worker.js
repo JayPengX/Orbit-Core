@@ -156,7 +156,7 @@ const SPORTS_PROXY_ALLOWED_HOSTS = [
 ];
 const SPORTS_PROXY_RATE_LIMIT = 600;
 const ELTA_PATH = '/production/json/program_list/sports_live_program_list.json';
-// Per signed-in session, a minute, in memory (cache hits included). Looking
+// Per signed-in session and app, a minute, in memory (cache hits included). Looking
 // through every league in Sports, with a few followed, asks about 350 a
 // minute (the preview tool's --live prints the busiest minute).
 const SESSION_RATE_LIMIT = 600;
@@ -691,7 +691,11 @@ async function checkSession(env, requestParams, headers, weight = 1, request = n
   }
   const session = await readToken(env.ECO_TOKEN_SECRET, requestParams.get('qt') || '', 'ses');
   if (!session) return { error: json({ error: { code: 'QUADRA_PASS_REQUIRED', message: 'Sign in with a Quadra Pass.' } }, 401, headers) };
-  for (let i = 0; i < weight; i++) if (sessionLimited(session.s, SESSION_RATE_LIMIT)) return { error: json({ error: { message: 'Too many requests, please try again later.' } }, 429, headers) };
+  // Counted for each app apart (the kit says which: Sports, Play and
+  // Securities share this proxy, and one left running in the background
+  // never uses up another's minute).
+  const app = /^[a-z]{2,12}$/.test(requestParams.get('app') || '') ? requestParams.get('app') : '-';
+  for (let i = 0; i < weight; i++) if (sessionLimited(`${app}:${session.s}`, SESSION_RATE_LIMIT)) return { error: json({ error: { message: 'Too many requests, please try again later.' } }, 429, headers) };
   return { session };
 }
 

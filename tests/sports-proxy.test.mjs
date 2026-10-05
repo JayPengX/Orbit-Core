@@ -93,3 +93,14 @@ test('an old copy is answered when its fresh read is slow, and a source turning 
   assert.equal(r[0].b.old, true);
   assert.equal(r[1].s, 502);
 });
+
+test("each app's asks are counted apart: one app's busy minute never stops another's", async () => {
+  const { signToken } = await import('../quadra-token.js');
+  const env = { ECO_TOKEN_SECRET: 'test-secret' };
+  const qt = await signToken('test-secret', { k: 'ses', d: 'd1', s: 'apps-test', e: Date.now() + 3_600_000 });
+  const ask = app => worker.fetch(new Request(`https://proxy.test/sports-proxy?batch=1&u=${encodeURIComponent('https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/standings')}&app=${app}&qt=${qt}`, { headers: { Origin: 'https://jaypengx.github.io' } }), env, ctx);
+  let last;
+  for (let i = 0; i < 601 && (last = await ask('quotes')).status === 200; i++);
+  assert.equal(last.status, 429, 'Securities past its minute');
+  assert.equal((await ask('fixtures')).status, 200, 'Sports still reads');
+});

@@ -528,7 +528,10 @@ async function dataToken() {
   if (!s) return '';
   return s.ensureToken().catch(() => s.token || '');
 }
-const proxyAddress = (url, trim, token) => `${PROXY_URL}?url=${encodeURIComponent(url)}${trim ? `&trim=${trim}` : ''}${token ? `&qt=${encodeURIComponent(token)}` : ''}`;
+// Which app asks: the proxy counts each app's asks apart (Securities' quotes
+// left running never use up Sports' minute).
+const appParam = () => (dataSession?.app ? `&app=${dataSession.app}` : '');
+const proxyAddress = (url, trim, token) => `${PROXY_URL}?url=${encodeURIComponent(url)}${trim ? `&trim=${trim}` : ''}${appParam()}${token ? `&qt=${encodeURIComponent(token)}` : ''}`;
 async function fetchOne(url, trim, timeout) {
   const token = await dataToken();
   for (let attempt = 0; ; attempt++) {
@@ -565,7 +568,7 @@ async function flush() {
   try {
     const token = await dataToken();
     const u = items.map(i => `&u=${encodeURIComponent(i.trim ? `${i.trim}!${i.url}` : i.url)}`).join('');
-    const res = await fetch(`${PROXY_URL}?batch=1${u}${token ? `&qt=${encodeURIComponent(token)}` : ''}`, { signal: AbortSignal.timeout(Math.max(...items.map(i => i.timeout))) });
+    const res = await fetch(`${PROXY_URL}?batch=1${u}${appParam()}${token ? `&qt=${encodeURIComponent(token)}` : ''}`, { signal: AbortSignal.timeout(Math.max(...items.map(i => i.timeout))) });
     if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
     const { r } = await res.json();
     items.forEach((item, i) => {
@@ -775,6 +778,7 @@ export function quadraSession(app, { lang = detectLang(), heartbeat = 120_000 } 
   // sheet on it, once the app's first screen is up.
   const help = typeof location !== 'undefined' && /(?:^|[#&])help=([a-z]+)(?::([a-z0-9]+))?/.exec(location.hash);
   if (help && typeof document !== 'undefined') setTimeout(() => !document.querySelector('dialog[open]') && openHelp(made, help[1], help[2] || null), 800);
+  made.app ??= app;
   dataSession = made;
   return made;
 }
@@ -955,7 +959,7 @@ function makeSession(app, { lang, heartbeat }) {
   s.merge = passes => withToken(qt => call('POST', '', { op: 'merge', qt, sources: passes.map(passcode => ({ passcode })) })).then(absorb);
   s.op = (op, body = {}) => withToken(qt => call('POST', '', { op, qt, ...body }));
   // The data proxy, signed in.
-  s.proxy = (url, extra = '') => `${PROXY_URL}?url=${encodeURIComponent(url)}${extra}${token ? `&qt=${encodeURIComponent(token)}` : ''}`;
+  s.proxy = (url, extra = '') => `${PROXY_URL}?url=${encodeURIComponent(url)}${extra}&app=${app}${token ? `&qt=${encodeURIComponent(token)}` : ''}`;
   s.ensureToken = async () => {
     await freshToken();
     return token;

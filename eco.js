@@ -89,7 +89,7 @@ const MAX_AMOUNT = 1_000_000_000;
 const MAX_MERGE_SOURCES = 12;
 
 // Per IP an hour, for the calls that take a code (KV counters); calls with a
-// session are counted per session in memory (TOKEN_LIMIT a minute).
+// session are counted per session and app in memory (TOKEN_LIMIT a minute).
 export const ECO_LIMITS = { create: 20, login: 30, merge: 20, share: 30, admin: 30 };
 export const TOKEN_LIMIT = 90;
 
@@ -533,7 +533,7 @@ export async function handleEcoRequest(request, env, headers, ip, deps) {
     // Everything else needs a session.
     const claims = await readToken(secret, url.searchParams.get('qt'), 'ses', deps.now());
     if (!claims) return errorJson('ECO_TOKEN_INVALID', 401, headers, request);
-    if (sessionLimited(claims.s, TOKEN_LIMIT, 60_000, deps.now())) return errorJson('RATE_LIMITED', 429, headers, request);
+    if (sessionLimited(`${app}:${claims.s}`, TOKEN_LIMIT, 60_000, deps.now())) return errorJson('RATE_LIMITED', 429, headers, request);
     const docId = claims.d;
 
     if (request.method === 'GET') {
