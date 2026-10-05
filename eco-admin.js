@@ -14,7 +14,7 @@
 // The token is checked against ADMIN_TOKEN_HASH (its SHA-256; the token
 // itself is never in the repo). Clearing the hash turns this off.
 
-import { ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, PAIR_MS, ECO_LIMITS, parseWallet, poolBalance, plusMember, gen, emptyWallet } from './eco.js';
+import { newPasscode, updateWallet, ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, PAIR_MS, ECO_LIMITS, parseWallet, poolBalance, plusMember, gen, emptyWallet } from './eco.js';
 import { KAMBI_COLLECTION } from './kambi.js';
 
 export const ADMIN_TOKEN_HASH = '';
@@ -70,7 +70,25 @@ export function tidyWallet(w, now) {
 export async function handleAdmin({ env, deps, headers, request, ip, body }) {
   const limited = await deps.rateLimitResponse(env, ip, 'eco:admin', ECO_LIMITS.admin, headers, request);
   if (limited) return limited;
-  if (!ADMIN_TOKEN_HASH || typeof body.token !== 'string' || (await deps.sha256Hex(body.token)) !== ADMIN_TOKEN_HASH) return deps.errorJson('FORBIDDEN', 403, headers, request);
+  // The owner's token: ADMIN_TOKEN_HASH (its SHA-256, in this file) or the
+  // Worker's secret ECO_ADMIN_TOKEN (set by tools/issue-passes.mjs).
+  const token = typeof body.token === 'string' ? body.token : '';
+  const hash = token.length >= 32 ? await deps.sha256Hex(token) : '';
+  const owner = hash && ((ADMIN_TOKEN_HASH && hash === ADMIN_TOKEN_HASH) || (env.ECO_ADMIN_TOKEN && hash === (await deps.sha256Hex(env.ECO_ADMIN_TOKEN))));
+  if (!owner) return deps.errorJson('FORBIDDEN', 403, headers, request);
+  // Passes to hand out: `issue` { count } makes up to 100 new ones (no one
+  // signed in on them yet) and answers their codes, once.
+  if (body.action === 'issue') {
+    const count = Math.max(1, Math.min(100, Math.floor(Number(body.count) || 0)));
+    const now = deps.now();
+    const passes = [];
+    for (let i = 0; i < count; i++) {
+      const { passcode, docId } = await newPasscode(env, deps);
+      await updateWallet(env, deps, docId, w => ({ ...w, v2: now }), { create: true });
+      passes.push(passcode);
+    }
+    return deps.json({ passes }, 200, headers);
+  }
   if (!deps.fsList || !deps.fsCollections || !deps.fsBatch) return deps.errorJson('ECO_UNKNOWN_OP', 400, headers, request);
   // Getting an account back whose pass was lost: `wallets` lists every pass
   // (a short reference, when it was made and last used, balance, entries),

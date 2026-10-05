@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<meta name="robots" content="noindex,nofollow" />
+<title>Quadra 管理</title>
+<link rel="stylesheet" href="../kit/quadra.css" />
+<style>
+  :root { --q-accent: #2563eb; }
+  body { margin: 0; background: var(--q-page); color: var(--q-text); font-family: var(--q-font); }
+  main { width: min(640px, 100%); margin: 0 auto; padding: calc(var(--q-top, 0px) + 20px) 16px 60px; box-sizing: border-box; }
+  h1 { font-size: 28px; margin: 6px 2px 4px; }
+  .kicker { color: var(--q-accent); font-weight: 700; font-size: 14px; margin: 0 2px; }
+  .lede { color: var(--q-muted); margin: 4px 2px 20px; line-height: 1.5; }
+  h2 { font-size: 20px; margin: 26px 2px 10px; }
+  .card { border: 1px solid var(--q-border); border-radius: var(--q-radius); background: var(--q-surface); box-shadow: var(--q-shadow-sm); padding: 16px 18px; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  input { font: inherit; font-size: 16px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--q-border); background: var(--q-surface-2); color: var(--q-text); min-width: 0; }
+  input[type='number'] { width: 110px; }
+  .grow { flex: 1 1 220px; }
+  button { font: inherit; font-size: 15px; font-weight: 700; padding: 12px 18px; border-radius: 12px; border: 1px solid var(--q-border); background: var(--q-surface); color: var(--q-text); cursor: pointer; }
+  button.primary { background: var(--q-accent); border-color: var(--q-accent); color: #fff; }
+  button:disabled { opacity: 0.5; }
+  .muted { color: var(--q-muted); font-size: 14px; }
+  .error { color: var(--q-bad); font-weight: 600; min-height: 1.2em; margin: 8px 0 0; }
+  .passes { margin: 14px 0 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; font-variant-numeric: tabular-nums; }
+  .passes li { padding: 8px 10px; border-radius: 10px; background: var(--q-surface-2); font-family: ui-monospace, SFMono-Regular, monospace; font-size: 14px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 9px 6px; border-bottom: 1px solid var(--q-divider); }
+  th { color: var(--q-muted); font-weight: 600; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; background: var(--q-sunken); color: var(--q-muted); }
+  .tag.on { background: color-mix(in srgb, var(--q-good) 16%, transparent); color: var(--q-good); }
+  .code { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 26px; font-weight: 800; letter-spacing: 0.12em; margin: 10px 0 4px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <p class="kicker">QUADRA</p>
+  <h1>管理</h1>
+  <p class="lede">發放 Quadra Pass、看每個帳戶、幫人找回帳戶。只有持有管理金鑰的人能用。</p>
+
+  <section id="gate" class="card">
+    <h2 style="margin-top:0">管理金鑰</h2>
+    <p class="muted">打開桌面上的「Quadra 管理金鑰.txt」，複製裡面那一行貼在這裡。這台裝置會記住它。</p>
+    <div class="row"><input id="key" class="grow" type="password" autocomplete="off" placeholder="貼上管理金鑰" /><button id="enter" class="primary">進入</button></div>
+    <p id="gate-error" class="error"></p>
+  </section>
+
+  <div id="panel" hidden>
+    <h2>發放 Quadra Pass</h2>
+    <div class="card">
+      <p class="muted">每一組都是全新的 Quadra Pass，誰先用它登入就是誰的。發出去之前先複製或下載保存：這裡只顯示這一次。</p>
+      <div class="row"><input id="count" type="number" min="1" max="500" value="10" /><span class="muted">組</span><button id="issue" class="primary">發放</button></div>
+      <p id="issue-error" class="error"></p>
+      <div id="issued" hidden>
+        <div class="row"><strong id="issued-n"></strong><button id="copy">全部複製</button><button id="download">下載清單</button></div>
+        <ol id="passes" class="passes"></ol>
+      </div>
+    </div>
+
+    <h2>帳戶</h2>
+    <div class="card">
+      <div class="row"><span id="wallets-sum" class="muted">點「重新整理」看所有帳戶。</span><button id="load" style="margin-left:auto">重新整理</button></div>
+      <p id="wallets-error" class="error"></p>
+      <div style="overflow-x:auto"><table id="wallets" hidden><thead><tr><th>代號</th><th>狀態</th><th>建立</th><th>最後使用</th><th>餘額</th></tr></thead><tbody></tbody></table></div>
+    </div>
+
+    <h2>找回帳戶</h2>
+    <div class="card">
+      <p class="muted">有人弄丟了 Quadra Pass：在上面的列表找到他的帳戶代號，貼在這裡，產生一組 10 分鐘有效的裝置代碼給他登入，再請他在帳戶裡設定新的 Pass。</p>
+      <div class="row"><input id="ref" class="grow" autocomplete="off" placeholder="帳戶代號（至少 6 碼）" /><button id="recover" class="primary">產生裝置代碼</button></div>
+      <p id="recover-error" class="error"></p>
+      <div id="recovered" hidden><div id="device-code" class="code"></div><p id="device-exp" class="muted"></p></div>
+    </div>
+
+    <p style="margin-top:28px"><button id="forget">在這台裝置登出管理</button></p>
+  </div>
+</main>
+<script type="module">
+const ECO_URL = 'https://orbit-workers-proxy.pengzjay.workers.dev/eco';
+const KEY = 'quadra.admin';
+const $ = id => document.getElementById(id);
+const store = { get: () => { try { return localStorage.getItem(KEY) || ''; } catch { return ''; } }, set: v => { try { v ? localStorage.setItem(KEY, v) : localStorage.removeItem(KEY); } catch {} } };
+let token = store.get();
+
+const WHY = { FORBIDDEN: '管理金鑰不對（或還沒部署好，等一分鐘再試）。', ECO_PAIR_NOT_FOUND: '找不到這個帳戶代號（或對到不只一個，多貼幾碼）。', RATE_LIMITED: '太頻繁了，等一下再試。' };
+async function admin(action, extra = {}) {
+  const res = await fetch(ECO_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'admin', token, action, ...extra }) });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const code = data?.error?.code || data?.code || data?.error || `HTTP ${res.status}`;
+    throw new Error(WHY[code] || `出錯了：${code}`);
+  }
+  return data;
+}
+const fmt = iso => (iso ? new Date(iso).toLocaleString('zh-TW', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—');
+const pretty = p => `${p.slice(0, 5)}-${p.slice(5)}`;
+
+function open() {
+  $('gate').hidden = true;
+  $('panel').hidden = false;
+}
+$('enter').onclick = async () => {
+  token = $('key').value.trim();
+  $('gate-error').textContent = '';
+  try {
+    await admin('wallets');
+    store.set(token);
+    open();
+    loadWallets();
+  } catch (e) {
+    $('gate-error').textContent = e.message;
+  }
+};
+$('forget').onclick = () => {
+  store.set('');
+  location.reload();
+};
+
+let lastPasses = [];
+$('issue').onclick = async () => {
+  const want = Math.max(1, Math.min(500, Math.floor(Number($('count').value) || 0)));
+  $('issue').disabled = true;
+  $('issue-error').textContent = '';
+  lastPasses = [];
+  try {
+    while (lastPasses.length < want) {
+      const { passes } = await admin('issue', { count: Math.min(100, want - lastPasses.length) });
+      lastPasses.push(...passes);
+      $('issue').textContent = `發放中… ${lastPasses.length} / ${want}`;
+    }
+  } catch (e) {
+    $('issue-error').textContent = e.message;
+  }
+  $('issue').disabled = false;
+  $('issue').textContent = '發放';
+  if (lastPasses.length) {
+    $('issued').hidden = false;
+    $('issued-n').textContent = `這次發放了 ${lastPasses.length} 組`;
+    $('passes').replaceChildren(...lastPasses.map(p => Object.assign(document.createElement('li'), { textContent: pretty(p) })));
+    loadWallets();
+  }
+};
+const listText = () => `Quadra Pass（${new Date().toLocaleString('zh-TW')}）\n\n` + lastPasses.map((p, i) => `${i + 1}. ${pretty(p)}`).join('\n') + '\n';
+$('copy').onclick = async () => {
+  try {
+    await navigator.clipboard.writeText(listText());
+    $('copy').textContent = '已複製';
+    setTimeout(() => ($('copy').textContent = '全部複製'), 1500);
+  } catch {}
+};
+$('download').onclick = () => {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([listText()], { type: 'text/plain' }));
+  a.download = `Quadra Pass ${new Date().toISOString().slice(0, 10)}.txt`;
+  a.click();
+};
+
+async function loadWallets() {
+  $('wallets-error').textContent = '';
+  try {
+    const { wallets } = await admin('wallets');
+    wallets.sort((a, b) => String(b.created || '').localeCompare(String(a.created || '')));
+    const used = wallets.filter(w => w.lastUsed).length;
+    $('wallets-sum').textContent = `共 ${wallets.length} 個帳戶 · ${used} 個用過 · ${wallets.length - used} 個還沒人用`;
+    $('wallets').hidden = false;
+    $('wallets').tBodies[0].replaceChildren(
+      ...wallets.map(w => {
+        const tr = document.createElement('tr');
+        const tag = Object.assign(document.createElement('span'), { className: `tag${w.lastUsed ? ' on' : ''}`, textContent: w.lastUsed ? '使用中' : '未使用' });
+        for (const cell of [w.ref, tag, fmt(w.created), fmt(w.lastUsed), w.balance == null ? '—' : `NT$${Number(w.balance).toLocaleString()}`]) {
+          const td = document.createElement('td');
+          td.append(cell);
+          tr.append(td);
+        }
+        return tr;
+      })
+    );
+  } catch (e) {
+    $('wallets-error').textContent = e.message;
+  }
+}
+$('load').onclick = loadWallets;
+
+$('recover').onclick = async () => {
+  $('recover-error').textContent = '';
+  $('recovered').hidden = true;
+  try {
+    const { code, exp } = await admin('device-code', { wallet: $('ref').value.trim() });
+    $('device-code').textContent = code;
+    $('device-exp').textContent = `${new Date(exp).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })} 前有效：請他在任何 App 的登入畫面輸入這組代碼。`;
+    $('recovered').hidden = false;
+  } catch (e) {
+    $('recover-error').textContent = e.message;
+  }
+};
+
+if (token) {
+  open();
+  loadWallets();
+}
+</script>
+</body>
+</html>

@@ -1350,6 +1350,7 @@ function passInput(label) {
 }
 const ERR = {
   SYNC_PASSCODE_NOT_FOUND: ['找不到這組通行碼。', 'No Quadra Pass has this code.'],
+  ECO_CREATE_CLOSED: ['Quadra Pass 由擁有者發放，請向分享給你的人索取。', 'Quadra Passes are handed out by their owner: ask the person who shared Quadra with you.'],
   ECO_PAIR_NOT_FOUND: ['這組裝置代碼無效或已過期（10 分鐘內、只能用一次）。', 'That device code isn’t valid or has expired (10 minutes, once).'],
   RATE_LIMITED: ['嘗試太多次，請稍後再試。', 'Too many tries. Please wait a little.'],
   ECO_PLUS_FUNDS: ['Quadra 餘額不足以支付本月會費。', 'Your Quadra balance doesn’t cover this month’s fee.'],
@@ -1407,8 +1408,7 @@ function signInGate(s) {
     const input = passInput(BRAND.pass);
     const error = node('p', { class: 'q-gate-error', role: 'alert' });
     const enter = node('button', { class: 'q-btn primary block', type: 'submit', text: en ? 'Sign in' : '登入' });
-    const make = node('button', { class: 'q-btn block', type: 'button', text: en ? 'Create a new Quadra Pass' : '建立新的 Quadra Pass' });
-    const busy = on => [enter, make, input].forEach(b => (b.disabled = on));
+    const busy = on => [enter, input].forEach(b => (b.disabled = on));
     const done = async task => {
       busy(true);
       error.textContent = '';
@@ -1435,11 +1435,6 @@ function signInGate(s) {
       },
       [node('label', { class: 'q-gate-label', text: en ? 'Your Quadra Pass or a device code' : 'Quadra Pass 或裝置代碼' }), input, error, enter]
     );
-    make.addEventListener('click', () => done(async () => {
-      const res = await s.create();
-      await showNewPass(s, res.passcode);
-      return res;
-    }));
     const gate = node('dialog', { class: 'q-gate', 'aria-modal': 'true', style: `--q-accent:${a.color}` }, [
       node('div', { class: 'q-gate-box' }, [
         node('img', { class: 'q-gate-icon', src: './favicon.svg', alt: '', width: '72', height: '72' }),
@@ -1447,8 +1442,7 @@ function signInGate(s) {
         node('h1', { class: 'q-gate-title', text: a.name }),
         node('p', { class: 'q-gate-lede', text: en ? 'Sign in with your Quadra Pass: one account for every Quadra and Orbit app.' : '用 Quadra Pass 登入：所有 Quadra 和 Orbit 的 App 共用一個帳戶。' }),
         form,
-        node('div', { class: 'q-gate-or', text: en ? 'New to Quadra?' : '第一次使用？' }),
-        make,
+        node('p', { class: 'q-gate-note', text: en ? 'No Quadra Pass yet? Ask the person who shared Quadra with you for one.' : '還沒有 Quadra Pass？請向分享 Quadra 給你的人索取。' }),
         node('p', { class: 'q-gate-note', text: en ? 'Signed in on another device? Its Account sheet gives a device code for this one.' : '已在其他裝置登入？在那裡的「帳戶」取得裝置代碼，就能在這裡登入。' })
       ])
     ]);

@@ -29,6 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       HAS_TOKEN_SECRET: ${{ secrets.ECO_TOKEN_SECRET != '' }}
+      HAS_ADMIN_TOKEN: ${{ secrets.ECO_ADMIN_TOKEN != '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -69,3 +70,12 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           ECO_TOKEN_SECRET: ${{ secrets.ECO_TOKEN_SECRET }}
+      # The owner's admin token (tools/issue-passes.mjs makes it and keeps it
+      # on the owner's computer): handing out passes, /eco op 'admin'.
+      - name: Owner's admin token on the eco Worker
+        if: ${{ env.HAS_ADMIN_TOKEN == 'true' }}
+        run: printf '%s' "$ECO_ADMIN_TOKEN" | npx --yes wrangler@4 secret put ECO_ADMIN_TOKEN
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          ECO_ADMIN_TOKEN: ${{ secrets.ECO_ADMIN_TOKEN }}

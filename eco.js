@@ -666,8 +666,12 @@ async function limited(ctx, feature) {
   return ctx.deps.rateLimitResponse(ctx.env, ctx.ip, `eco:${feature}`, ECO_LIMITS[feature], ctx.headers, ctx.request);
 }
 
+// Passes are handed out by the owner (eco-admin.js, `issue`), not made by
+// anyone who opens an app: a new pass here only where ECO_OPEN_SIGNUP is on
+// (the tests).
 async function ecoCreate(ctx) {
   const { env, deps, headers, request, app } = ctx;
+  if (env.ECO_OPEN_SIGNUP !== 'on') return deps.errorJson('ECO_CREATE_CLOSED', 403, headers, request);
   const hit = await limited(ctx, 'create');
   if (hit) return hit;
   if (!ECO_APPS[app]) return deps.errorJson('ECO_UNKNOWN_APP', 400, headers, request);
@@ -919,7 +923,7 @@ export async function deleteAccount(env, deps, docId) {
   await deps.fsDelete(env, WALLET_COLLECTION, docId);
 }
 
-async function newPasscode(env, deps) {
+export async function newPasscode(env, deps) {
   // A fresh passcode that's already taken is astronomically unlikely (32^10),
   // but checked all the same.
   for (let i = 0; i < 4; i++) {

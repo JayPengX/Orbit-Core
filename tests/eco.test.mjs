@@ -48,10 +48,10 @@ function setup() {
     },
     now: () => (clock += 1000)
   };
-  const env = { FIREBASE_PROJECT_ID: 'p', FIREBASE_CLIENT_EMAIL: 'e', FIREBASE_PRIVATE_KEY: 'k' };
+  const env = { FIREBASE_PROJECT_ID: 'p', FIREBASE_CLIENT_EMAIL: 'e', FIREBASE_PRIVATE_KEY: 'k', ECO_OPEN_SIGNUP: 'on', ECO_ADMIN_TOKEN: 'o'.repeat(40) };
   const call = (method, query = '', body) => handleEcoRequest({ method, url: `https://w/eco${query}`, body }, env, {}, '1.1.1.1', deps);
   const qt = token => `?qt=${encodeURIComponent(token)}`;
-  return { store, deps, call, qt, advance: ms => (clock += ms) };
+  return { store, deps, env, call, qt, advance: ms => (clock += ms) };
 }
 
 async function newPass(t, app = 'stock') {
@@ -601,4 +601,23 @@ test('setting ECO_TOKEN_SECRET signs nobody out: tokens signed the old way (from
   assert.ok(await readToken(secret, old, 'ref'), 'an old sign-in still reads');
   assert.ok(await readToken(secret, await signToken(secret, { k: 'ref', e: Date.now() + 60_000 }), 'ref'));
   assert.equal(await readToken('other', old, 'ref'), null);
+});
+
+test('passes are handed out by the owner: no one makes one from an app; the owner issues them in a batch', async () => {
+  const t = setup();
+  t.env.ECO_OPEN_SIGNUP = '';
+  const closed = await t.call('POST', '', { op: 'create', app: 'stock' });
+  assert.equal(closed.status, 403);
+  assert.match(JSON.stringify(closed.data), /ECO_CREATE_CLOSED/);
+  const refused = await t.call('POST', '', { op: 'admin', token: 'x'.repeat(40), action: 'issue', count: 3 });
+  assert.equal(refused.status, 403);
+  const issued = await t.call('POST', '', { op: 'admin', token: 'o'.repeat(40), action: 'issue', count: 3 });
+  assert.equal(issued.status, 200);
+  assert.equal(issued.data.passes.length, 3);
+  assert.equal(new Set(issued.data.passes).size, 3);
+  for (const code of issued.data.passes) {
+    assert.match(code, /^[2-9A-HJ-NP-Z]{10}$/);
+    const signed = await t.call('POST', '', { op: 'login', passcode: code, app: 'stock' });
+    assert.equal(signed.status, 200, 'an issued pass signs in');
+  }
 });
