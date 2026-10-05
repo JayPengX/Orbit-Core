@@ -147,6 +147,13 @@ bug waiting in the rest.
   that is.
 - Respect the safe areas. Nothing sits under the status bar or the home
   indicator, and nothing is hidden behind frosted glass.
+- **The top edge stays sharp on iPhone (iOS 26's edge blur).** The kit
+  adds a solid fixed strip under the status bar (.q-statusbar) to every
+  app that loads quadra.mjs; iOS skips its blur only when a hit test at
+  the top centre lands in a fixed, full-width box with a background. So
+  never give that strip (or anything an app puts there) pointer-events:
+  none, never remove it, and pad the page's top with var(--q-top). A new
+  app gets this for free by loading the kit.
 - One look across the family: the kit's tab bar, sheets that swipe down,
   haptics on taps, dark where the app is dark (Weather and Transit), and
   Orbit Class's Liquid Glass kept close to iOS's own: light at the rim and

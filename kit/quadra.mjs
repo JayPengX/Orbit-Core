@@ -841,7 +841,12 @@ function statusStrip() {
   bar.setAttribute('aria-hidden', 'true');
   document.body.prepend(bar);
 }
-if (typeof document !== 'undefined') document.body ? statusStrip() : document.addEventListener('DOMContentLoaded', statusStrip);
+// Back at once if an app redraws its body (innerHTML) and takes it away.
+function keepStatusStrip() {
+  statusStrip();
+  if (typeof MutationObserver === 'function') new MutationObserver(statusStrip).observe(document.body, { childList: true });
+}
+if (typeof document !== 'undefined') document.body ? keepStatusStrip() : document.addEventListener('DOMContentLoaded', keepStatusStrip);
 
 // The heartbeat (another device's changes, whether this app is still the live
 // one) every 2 minutes: a read of the pass each time; back on screen it's

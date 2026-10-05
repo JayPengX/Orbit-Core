@@ -130,8 +130,10 @@ body {
    quadra.mjs). Since iOS 26 an installed web app gets a "Liquid Glass" blur
    laid over its top edge, whatever the status bar style; iOS skips it only
    when a real fixed box with a background, over 10px tall and the page's
-   full width, covers that edge (a ::before doesn't count). An app can
-   colour it with --q-status-bg. */
+   full width, covers that edge (a ::before doesn't count). iOS finds that
+   box by hit-testing the top centre of the screen, so the strip must take
+   touches: with pointer-events:none the test went through it to the page
+   and every app was blurred again. An app can colour it with --q-status-bg. */
 :root {
   --q-top: env(safe-area-inset-top, 0px);
 }
@@ -150,7 +152,6 @@ body {
   z-index: 2147482000;
   height: var(--q-top);
   background: var(--q-status-bg, var(--q-page));
-  pointer-events: none;
 }
 .num,
 .q-num {
