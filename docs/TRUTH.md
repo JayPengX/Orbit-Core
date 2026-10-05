@@ -81,6 +81,17 @@ bug waiting in the rest.
 - **News that happens once is told once** (a game's final score, a price
   reached): the Worker remembers what it told, whatever an app that's
   behind schedules again.
+- **What doesn't change in a day comes from the nightly packs**, never
+  through the proxy: a league's season (`Transit-Data`'s `sports/<league>/
+  <year>.json`, built at midnight, read with the kit's `packJson`), the bus
+  timetables. The proxy is for what's live. A 6 MB answer through a Worker
+  is a bug: a few at once run it out of memory and every request on it
+  fails together.
+- **A failed read answers the copy the device has** (of any age) and is
+  asked again soon; only with nothing kept is it a failure.
+- **Limits are each app's**, never shared by the family: Sports, Play and
+  Securities share the data proxy, and one left open in the background never
+  uses up another's minute (the kit says which app asks).
 - **Test on the real proxy too** (`tools/preview.mjs <app> --live`: the
   Workers' dev doors let a localhost page in without a pass; every failed or
   slow item is printed). The made-up answers can't show the proxy's own
