@@ -157,9 +157,12 @@ const shuffle = flag('shuffle');
 // (the iOS Simulator's Safari: http://localhost:8123/<repo>/). The page's
 // calls to the Workers come back here (its fetch is pointed at /__ext).
 const serve = flag('serve');
-// --live (Orbit Transit): the page asks the real proxy for transit data,
-// today's real buses, trains and bikes (the Worker lets a localhost page in
-// without an account: worker.js, TRANSIT_DEV), still with the made-up account.
+// --live: the page asks the real proxies (the Workers let a localhost page
+// without a pass in: worker.js TRANSIT_DEV, sports-proxy-worker.js
+// SPORTS_DEV), still with the made-up account. Orbit Transit: today's real
+// buses, trains and bikes. The data proxy: its real cache, limits and
+// failures (asked without the made-up token), each batch item that failed
+// or was slow printed.
 const live = flag('live');
 const port = Number(opt('port', 8123));
 const inits = [];
@@ -468,7 +471,24 @@ await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(?!
   if (body.op === 'pair-create') Object.assign(reply, { code: 'ABCD2345', exp: Date.now() + 600_000 });
   await route.fulfill({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(reply) });
 });
-await context.route('https://sports-proxy.pengzjay.workers.dev/**', async route => {
+if (live) {
+  await context.route('https://sports-proxy.pengzjay.workers.dev/**', route => {
+    const u = new URL(route.request().url());
+    u.searchParams.delete('qt');
+    return route.continue({ url: u.toString() });
+  });
+  context.on('response', async res => {
+    if (!res.url().startsWith('https://sports-proxy.pengzjay.workers.dev/')) return;
+    const u = new URL(res.url());
+    const asked = u.searchParams.has('batch') ? u.searchParams.getAll('u') : [u.searchParams.get('url')];
+    const short = x => String(x).replace(/^https:\/\/site\.api\.espn\.com\/apis\/(site\/v2|v2|common\/v3)\/sports\//, 'espn:').slice(0, 110);
+    if (!res.ok()) return console.log(`live: ${res.status()} ${asked.length} asked (${short(asked[0])}…)`);
+    if (!u.searchParams.has('batch')) return;
+    const { r = [] } = await res.json().catch(() => ({}));
+    r.forEach((x, i) => (x.s !== 200 || x.ms > 2500) && console.log(`live: ${x.s} ${x.ms ?? '?'} ms ${x.c || ''} ${x.e || ''} ${short(asked[i])}`));
+  });
+}
+if (!live) await context.route('https://sports-proxy.pengzjay.workers.dev/**', async route => {
   const u = new URL(route.request().url());
   const cors = { 'Access-Control-Allow-Origin': '*' };
   if (u.searchParams.has('batch')) {

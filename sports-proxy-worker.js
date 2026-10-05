@@ -191,6 +191,7 @@ const CACHE_F1_LIVE = { tier: 'f1-live', fresh: 4 * SECOND, stale: 0 };
 const CACHE_SCHEDULE = { tier: 'schedule', fresh: 10 * MINUTE, stale: DAY };
 const CACHE_SEASON = { tier: 'season', fresh: 3 * MINUTE, stale: 30 * MINUTE };
 const CACHE_STANDINGS = { tier: 'standings', fresh: 30 * MINUTE, stale: DAY };
+const CACHE_TEAM_SCHEDULE = { tier: 'team-schedule', fresh: 3 * MINUTE, stale: DAY };
 // ESPN core odds is only ever asked for a game's PRE-game line, which
 // can't change once the game has started.
 const CACHE_PREGAME_LINE = { tier: 'pregame-line', fresh: HOUR, stale: DAY };
@@ -260,7 +261,8 @@ function scoreboardPolicy(url) {
 function cachePolicyFor(url) {
   switch (url.hostname) {
     case 'site.api.espn.com':
-      return url.pathname.endsWith('/scoreboard') ? scoreboardPolicy(url) : CACHE_STANDINGS;
+      // A team's schedule has its games' scores: minutes, not a table's half hour.
+      return url.pathname.endsWith('/scoreboard') ? scoreboardPolicy(url) : url.pathname.endsWith('/schedule') ? CACHE_TEAM_SCHEDULE : CACHE_STANDINGS;
     case 'sports.core.api.espn.com':
       return CACHE_PREGAME_LINE;
     case 'statsapi.mlb.com':
@@ -619,7 +621,23 @@ async function resolveOne(upstreamUrl, trim, ctx) {
     // so they're simply treated as fresh until the cache drops them.
     const ageSeconds = Number.isFinite(storedAt) && storedAt > 0 ? (Date.now() - storedAt) / 1000 : 0;
     const isFresh = ageSeconds <= policy.fresh;
-    if (isFresh || ageSeconds <= policy.fresh + policy.stale) {
+    // Served while it's read again behind it only when it's barely past its
+    // time (as long again as it's fresh, a minute at least). Older, it's read
+    // now and the old copy is only what's answered if that fails: with few
+    // viewers, the first ask after a while is nearly every ask, and it was
+    // getting a copy up to a day old (a game over shown not begun).
+    const barely = ageSeconds <= policy.fresh + Math.min(policy.stale, Math.max(policy.fresh, 60));
+    if (!isFresh && !barely && ageSeconds <= policy.fresh + policy.stale) {
+      const result = await fetchUpstream(upstreamUrl, trim);
+      if (result.status === 200) {
+        if (cached.body?.cancel) cached.body.cancel().catch(() => {});
+        ctx.waitUntil(cache.put(cacheKey, cacheEntry(result, policy)));
+        return { ...result, cache: 'MISS', age: 0, policy };
+      }
+      if (result.body?.cancel) result.body.cancel().catch(() => {});
+      return { status: cached.status, contentType: cached.headers.get('Content-Type') || 'application/json', body: cached.body, cache: 'STALE', age: Math.round(ageSeconds), policy };
+    }
+    if (isFresh || barely) {
       if (!isFresh && !refreshesInFlight.has(cacheKey.url)) {
         refreshesInFlight.add(cacheKey.url);
         ctx.waitUntil(
