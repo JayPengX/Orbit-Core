@@ -26,6 +26,7 @@
 // ECO_TOKEN_SECRET is set on this Worker the gate is off and the old per-IP
 // KV limit applies.
 import { readToken, sessionLimited } from './quadra-token.js';
+import { BRANDS } from './kit/brand.mjs';
 import { ASIA_HOST, asiaBaseballResponse, asiaTarget } from './asia-baseball.js';
 import { F1_LIVE_HOST, f1LiveResponse } from './f1-live.js';
 
@@ -51,68 +52,6 @@ function json(data, status, headers) {
     status,
     headers: { ...headers, 'Content-Type': 'application/json' }
   });
-}
-
-// ---- Rate limiting (Workers KV, one counter per IP+hour) -------------------
-// Same mechanism as worker.js's own isRateLimited - see that file for the
-// full reasoning on why KV-with-in-memory-fallback and why batched writes.
-// Only one feature lives in this Worker, so there's no need for the
-// `feature` key worker.js's version uses to keep several routes' counters
-// independent.
-const RATE_WINDOW_MS = 60 * 60 * 1000;
-const RATE_WINDOW_SECONDS = RATE_WINDOW_MS / 1000;
-const KV_FLUSH_INTERVAL_MS = 60 * 1000;
-const pendingCounters = new Map();
-
-async function flushPendingCounter(kv, key, pending) {
-  const total = pending.base + pending.delta;
-  pending.base = total;
-  pending.delta = 0;
-  pending.lastFlushAt = Date.now();
-  await kv.put(key, String(total), { expirationTtl: RATE_WINDOW_SECONDS + 60 });
-}
-
-async function isRateLimitedKV(kv, bucketKey, limit) {
-  const windowBucket = Math.floor(Date.now() / RATE_WINDOW_MS);
-  let pending = pendingCounters.get(bucketKey);
-  if (pending && pending.windowBucket !== windowBucket) {
-    if (pending.delta > 0) {
-      await flushPendingCounter(kv, `rl:${bucketKey}:${pending.windowBucket}`, pending).catch(() => {});
-    }
-    pending = null;
-  }
-  if (!pending) {
-    const stored = Number((await kv.get(`rl:${bucketKey}:${windowBucket}`)) || '0');
-    pending = { windowBucket, base: stored, delta: 0, lastFlushAt: Date.now() };
-    pendingCounters.set(bucketKey, pending);
-  }
-  if (pending.base + pending.delta >= limit) return true;
-  pending.delta += 1;
-  if (Date.now() - pending.lastFlushAt >= KV_FLUSH_INTERVAL_MS) {
-    await flushPendingCounter(kv, `rl:${bucketKey}:${windowBucket}`, pending);
-  }
-  return false;
-}
-
-const requestLog = new Map();
-function isRateLimitedInMemory(bucketKey, limit) {
-  const now = Date.now();
-  const timestamps = (requestLog.get(bucketKey) || []).filter(time => now - time < RATE_WINDOW_MS);
-  const limited = timestamps.length >= limit;
-  timestamps.push(now);
-  requestLog.set(bucketKey, timestamps);
-  return limited;
-}
-
-async function isRateLimited(env, ip, limit) {
-  if (env.RATE_LIMIT_KV) {
-    try {
-      return { limited: await isRateLimitedKV(env.RATE_LIMIT_KV, ip, limit), backend: 'kv' };
-    } catch (error) {
-      return { limited: isRateLimitedInMemory(ip, limit), backend: `kv-error:${(error && error.message) || error}` };
-    }
-  }
-  return { limited: isRateLimitedInMemory(ip, limit), backend: 'memory-no-binding' };
 }
 
 // ==== /sports-proxy - CORS passthrough for public sports data ==============
@@ -154,7 +93,6 @@ const SPORTS_PROXY_ALLOWED_HOSTS = [
   // Not a real host either: F1's own live timing, one snapshot (f1-live.js).
   F1_LIVE_HOST
 ];
-const SPORTS_PROXY_RATE_LIMIT = 600;
 const ELTA_PATH = '/production/json/program_list/sports_live_program_list.json';
 // Per signed-in session and app, a minute, in memory (cache hits included). Looking
 // through every league in Sports, with a few followed, asks about 350 a
@@ -683,21 +621,25 @@ const browserMaxAge = policy => Math.min(policy.fresh, 600);
 // read without a Quadra Pass, a session's limit for each app at an address. SPORTS_DEV = "off"
 // (wrangler.sports-proxy.toml [vars]) closes it.
 const DEV_ORIGIN = /^http:\/\/(localhost|127\.0\.0\.1):\d+$/;
+// Which app asks (the kit says): each app's asks are counted apart, so one
+// left running in the background never uses up another's minute. Only the
+// family's apps (any other name counts as one).
+const appOf = requestParams => (Object.hasOwn(BRANDS, requestParams.get('app') || '') ? requestParams.get('app') : '-');
+const tooMany = headers => json({ error: { message: 'Too many requests, please try again later.' } }, 429, headers);
 async function checkSession(env, requestParams, headers, weight = 1, request = null, ip = '') {
-  if (!env.ECO_TOKEN_SECRET) return { session: null };
-  if (!requestParams.get('qt') && env.SPORTS_DEV !== 'off' && DEV_ORIGIN.test(request?.headers.get('Origin') || '')) {
-    // (The same limit as a signed-in session's, each app apart, so a test sees what the owner's phone does.)
-    const app = /^[a-z]{2,12}$/.test(requestParams.get('app') || '') ? requestParams.get('app') : '-';
-    for (let i = 0; i < weight; i++) if (sessionLimited(`dev:${app}:${ip}`, SESSION_RATE_LIMIT)) return { error: json({ error: { message: 'Too many requests, please try again later.' } }, 429, headers) };
-    return { session: { s: `dev:${ip}`, dev: true } };
+  const app = appOf(requestParams);
+  // No pass to check (the gate off: no ECO_TOKEN_SECRET), or the dev door:
+  // the same limit as a signed-in session's, for each app at an address, a
+  // minute, in memory (an hour's count in KV, shared by every app, was used
+  // up by one look through Sports, and each server saw its own count).
+  const dev = !requestParams.get('qt') && env.SPORTS_DEV !== 'off' && DEV_ORIGIN.test(request?.headers.get('Origin') || '');
+  if (!env.ECO_TOKEN_SECRET || dev) {
+    for (let i = 0; i < weight; i++) if (sessionLimited(`ip:${app}:${ip}`, SESSION_RATE_LIMIT)) return { error: tooMany(headers) };
+    return { session: { s: `ip:${ip}`, dev, open: !env.ECO_TOKEN_SECRET } };
   }
   const session = await readToken(env.ECO_TOKEN_SECRET, requestParams.get('qt') || '', 'ses');
   if (!session) return { error: json({ error: { code: 'QUADRA_PASS_REQUIRED', message: 'Sign in with a Quadra Pass.' } }, 401, headers) };
-  // Counted for each app apart (the kit says which: Sports, Play and
-  // Securities share this proxy, and one left running in the background
-  // never uses up another's minute).
-  const app = /^[a-z]{2,12}$/.test(requestParams.get('app') || '') ? requestParams.get('app') : '-';
-  for (let i = 0; i < weight; i++) if (sessionLimited(`${app}:${session.s}`, SESSION_RATE_LIMIT)) return { error: json({ error: { message: 'Too many requests, please try again later.' } }, 429, headers) };
+  for (let i = 0; i < weight; i++) if (sessionLimited(`${app}:${session.s}`, SESSION_RATE_LIMIT)) return { error: tooMany(headers) };
   return { session };
 }
 
@@ -716,10 +658,6 @@ async function handleBatch(request, env, headers, ip, ctx, requestParams) {
   if (!items.length) return json({ error: { message: 'Missing u' } }, 400, headers);
   const gate = await checkSession(env, requestParams, headers, items.length, request, ip);
   if (gate.error) return gate.error;
-  if (!gate.session) {
-    const rl = await isRateLimited(env, ip, SPORTS_PROXY_RATE_LIMIT);
-    if (rl.limited) return json({ error: { message: 'Too many requests, please try again later.' } }, 429, headers);
-  }
   const results = await Promise.all(
     items.map(item => {
       const work = batchItem(item, ctx);
@@ -791,11 +729,8 @@ async function handleSportsProxyRequest(request, env, headers, ip, ctx) {
   const trim = trimFor(requestParams.get('trim'), upstreamUrl);
   headers['X-Sports-Proxy-Cache-Tier'] = cachePolicyFor(upstreamUrl).tier;
 
-  // The rate-limit check (a KV read, only without a session) and the
-  // lookup run concurrently.
-  const [rateLimit, result] = await Promise.all([gate.session ? { limited: false, backend: 'session' } : isRateLimited(env, ip, SPORTS_PROXY_RATE_LIMIT), resolveOne(upstreamUrl, trim, ctx)]);
-  headers['X-RateLimit-Backend'] = rateLimit.backend;
-  if (rateLimit.limited) return json({ error: { message: 'Too many requests, please try again later.' } }, 429, headers);
+  const result = await resolveOne(upstreamUrl, trim, ctx);
+  headers['X-RateLimit-Backend'] = gate.session.open ? 'open' : 'session';
   if (result.fetchError) return json({ error: { message: result.fetchError.message || 'Upstream request failed' } }, 502, headers);
   if (result.status !== 200) return new Response(result.body, { status: result.status, headers: { ...headers, 'Content-Type': result.contentType } });
   return new Response(result.body, {

@@ -100,7 +100,16 @@ test("each app's asks are counted apart: one app's busy minute never stops anoth
   const qt = await signToken('test-secret', { k: 'ses', d: 'd1', s: 'apps-test', e: Date.now() + 3_600_000 });
   const ask = app => worker.fetch(new Request(`https://proxy.test/sports-proxy?batch=1&u=${encodeURIComponent('https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/standings')}&app=${app}&qt=${qt}`, { headers: { Origin: 'https://jaypengx.github.io' } }), env, ctx);
   let last;
-  for (let i = 0; i < 601 && (last = await ask('quotes')).status === 200; i++);
+  for (let i = 0; i < 601 && (last = await ask('odds')).status === 200; i++);
   assert.equal(last.status, 429, 'Securities past its minute');
-  assert.equal((await ask('fixtures')).status, 200, 'Sports still reads');
+  assert.equal((await ask('match')).status, 200, 'Sports still reads');
+});
+
+test("without a pass to check, each app at an address has a session's minute (never an hour's count shared by every app)", async () => {
+  const ask = app => worker.fetch(new Request(`https://proxy.test/sports-proxy?batch=1&u=${encodeURIComponent('https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/standings')}&app=${app}`, { headers: { Origin: 'https://jaypengx.github.io', 'CF-Connecting-IP': '203.0.113.9' } }), {}, ctx);
+  let last;
+  for (let i = 0; i < 601 && (last = await ask('stock')).status === 200; i++);
+  assert.equal(last.status, 429, 'Securities past its minute');
+  assert.equal((await ask('match')).status, 200, 'Sports still reads');
+  assert.equal((await ask('made-up')).status, 200, 'any other name is one more app, once');
 });
