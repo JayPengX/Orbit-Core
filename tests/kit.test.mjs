@@ -97,6 +97,22 @@ test('proxyJson batches requests made together and remembers answers', async () 
   assert.ok(!calls[1].includes('batch=1'));
 });
 
+test("a failed read answers the copy the device has, of any age (a league never turns into 'no data' for a refused minute)", async () => {
+  const kept = new Map();
+  const had = globalThis.caches;
+  globalThis.caches = { open: async () => ({ match: async k => kept.get(k)?.clone() || null, put: async (k, r) => void kept.set(k, r), keys: async () => [], delete: async () => true }) };
+  let up = true;
+  globalThis.fetch = async url => (up ? new Response(JSON.stringify({ n: 1, url: String(url) }), { status: 200 }) : new Response('{}', { status: 502 }));
+  const u = 'https://x.test/kept';
+  assert.equal((await kit.proxyJson(u, { ttl: 1 })).n, 1);
+  await new Promise(r => setTimeout(r, 20));
+  up = false;
+  await new Promise(r => setTimeout(r, 5));
+  assert.equal((await kit.proxyJson(u, { ttl: 1 })).n, 1, 'the old copy');
+  await assert.rejects(kit.proxyJson('https://x.test/never', { ttl: 1 }), 'nothing kept: a failure');
+  globalThis.caches = had;
+});
+
 test('a device keeps its sign-in and the account id, never the pass', () => {
   store.clear();
   assert.equal(kit.storedAccount(), '');

@@ -610,27 +610,44 @@ export async function translate(text, to = 'zh-TW', from = 'auto') {
 // while too: as long as it would have been kept, a minute at most, so the
 // parts of a page that want it don't each ask a source that's down again.
 const FAILED_HOLD_MS = 60_000;
+// A failed or stale read asked again after this.
+const RETRY_MS = 15_000;
 export function proxyJson(url, { ttl = 60_000, trim = '', persist: keep = true, timeout = 20_000 } = {}) {
   const key = dataKey(url, trim);
   const hit = memory.get(key);
-  if (hit && Date.now() - hit.at < (hit.failed ? Math.min(ttl, FAILED_HOLD_MS) : ttl)) return hit.promise;
+  if (hit && Date.now() - hit.at < (hit.failed ? Math.min(ttl, hit.hold) : hit.stale ? Math.min(ttl, RETRY_MS) : ttl)) return hit.promise;
+  let entry;
   const promise = (async () => {
-    if (keep) {
-      const saved = await persisted(key);
-      if (saved && Date.now() - saved.at < ttl) return saved.data;
+    const saved = keep ? await persisted(key) : null;
+    if (saved && Date.now() - saved.at < ttl) return saved.data;
+    let got;
+    try {
+      got = await enqueue(url, trim, timeout);
+    } catch (error) {
+      // A fresh read failed: the copy this device has (of any age) is the
+      // answer, and it's asked again soon. A league that read fine an hour
+      // ago never turns into "no data" for a refused minute.
+      if (!saved) throw error;
+      recFail(url, error);
+      entry.stale = true;
+      return saved.data;
     }
-    const got = await enqueue(url, trim, timeout);
     const data = typeof got === 'string' ? JSON.parse(got) : got;
     // Kept on the device off the critical path.
     if (keep) setTimeout(() => persist(key, typeof got === 'string' ? got : JSON.stringify(got)), 0);
     return data;
   })();
-  const entry = { at: Date.now(), promise, failed: false };
+  entry = { at: Date.now(), promise, failed: false, stale: false };
   memory.set(key, entry);
-  promise.catch(error => {
-    recFail(url, error);
-    if (memory.get(key) === entry) Object.assign(entry, { at: Date.now(), failed: true });
-  });
+  promise.then(
+    () => entry.stale && Object.assign(entry, { at: Date.now() }),
+    error => {
+      recFail(url, error);
+      // Too many asks or signed out: a minute. Anything else (a slow or
+      // failed source): asked again soon.
+      if (memory.get(key) === entry) Object.assign(entry, { at: Date.now(), failed: true, hold: error?.status === 429 || error?.status === 401 ? FAILED_HOLD_MS : RETRY_MS });
+    }
+  );
   if (memory.size > 500) memory.delete(memory.keys().next().value);
   return promise;
 }
