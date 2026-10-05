@@ -290,16 +290,23 @@ test('Plus hooks: tenure, returns since joining, the weekly free bet and renewal
   assert.deepEqual([r.bets, r.total], [200, 200]);
   assert.equal(kit.plusReturns(w, now, { all: true }).total, 200);
   const s = { wallet: w, lang: 'zh', app: 'odds' };
-  kit.plusNotices(s, now);
-  assert.equal(localStorage.getItem('quadra.seen.fb'), 'eco:fb:2026-10-26');
-  assert.equal(localStorage.getItem('quadra.seen.renew:2026-10'), '1');
+  // Said once for the whole pass: marked on the device and on the pass.
+  const wrote = [];
+  kit.plusNotices({ ...s, write: x => (wrote.push(x), Promise.resolve()) }, now);
+  assert.equal(localStorage.getItem('quadra.seen:eco:fb:2026-10-26'), '1');
+  assert.equal(localStorage.getItem('quadra.seen:plus-renew:2026-10'), '1');
+  assert.deepEqual(wrote.at(-1).wallet.settings.seen.value, ['eco:fb:2026-10-26', 'plus-renew:2026-10']);
+  // Another app (its own storage) on a pass that already said it: nothing.
+  localStorage.removeItem('quadra.seen:eco:fb:2026-10-26');
+  assert.equal(kit.sayOnce({ wallet: { settings: { seen: { value: ['eco:fb:2026-10-26'], t: 1 } } } }, 'eco:fb:2026-10-26'), false);
+  assert.equal(kit.sayOnce({ wallet: { settings: { seen: { value: ['x:1'], t: 1 } } } }, 'x:1'), false);
+  assert.equal(kit.sayOnce({ wallet: { settings: {} } }, 'x:2'), true);
   // Ten days earlier: no renewal reminder yet.
   kit.plusNotices(s, Date.UTC(2026, 9, 20, 4));
-  assert.equal(localStorage.getItem('quadra.seen.renew:2026-10'), '1');
-  assert.equal(localStorage.getItem('quadra.seen.renew:2026-09'), null);
+  assert.equal(localStorage.getItem('quadra.seen:plus-renew:2026-09'), null);
   // Not renewing: no reminder next month.
   kit.plusNotices({ ...s, wallet: { ...w, entries: [...w.entries, plus('2026-11')], settings: { plus: { value: { on: false }, t: 2 } } } }, Date.UTC(2026, 10, 29, 4));
-  assert.equal(localStorage.getItem('quadra.seen.renew:2026-11'), null);
+  assert.equal(localStorage.getItem('quadra.seen:plus-renew:2026-11'), null);
 });
 
 test('looks: an avatar and a frame show only while the account is a Plus member', () => {

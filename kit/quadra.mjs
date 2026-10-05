@@ -1585,6 +1585,21 @@ export const plusTenure = (wallet, now = Date.now()) => [...plusMonths(wallet)].
 // notify): the week's bonus bet when it arrives, and, in the last three
 // Taiwan days before a renewal, what it will charge and what it gave back,
 // with where to stop it (the free month included, so nobody is surprised).
+// A notice said once for the whole pass, not once per app: home-screen apps
+// each have storage of their own, so this device's mark alone let every app
+// say it again. The ids already said ride on the pass (settings.seen, the
+// last 40) as well as on the device; true the first time, then false.
+const saidHere = [];
+export function sayOnce(s, id) {
+  const held = s?.wallet?.settings?.seen?.value;
+  const said = [...new Set([...(Array.isArray(held) ? held : []), ...saidHere])];
+  if (readStore(`quadra.seen:${id}`) || said.includes(id)) return false;
+  writeStore(`quadra.seen:${id}`, '1');
+  // (Two in a row, before the pass answers the first: both go up.)
+  saidHere.push(id);
+  s?.write?.({ wallet: { settings: { seen: { value: [...said, id].slice(-40), t: Date.now() } } } }).catch(() => null);
+  return true;
+}
 export function plusNotices(s, now = Date.now()) {
   const w = s.wallet;
   if (!w) return;
@@ -1592,14 +1607,12 @@ export function plusNotices(s, now = Date.now()) {
   const T = (zh, e) => (en ? e : zh);
   // A renewal the balance couldn't cover: said once.
   const failed = (w.entries || []).filter(e => e.app === 'eco' && e.id?.startsWith('eco:plusfail:')).at(-1);
-  if (failed && plusLapsed(w) && readStore('quadra.seen.plusfail') !== failed.id) {
-    writeStore('quadra.seen.plusfail', failed.id);
+  if (failed && plusLapsed(w) && readStore('quadra.seen.plusfail') !== failed.id && sayOnce(s, failed.id)) {
     notify(s, { title: T('✦ Plus 扣款失敗，會員已停止', '✦ Plus payment failed; membership stopped'), body: T(`餘額不足 ${money(PLUS.fee)}。補足後到 Plus 重新加入。`, `Your balance didn’t cover ${money(PLUS.fee)}. Join again from Plus once it does.`), tag: failed.id, kind: 'plus' });
   }
   if (!plusMember(w, now)) return;
   const week = (w.entries || []).find(e => e.app === 'eco' && e.id === `eco:fb:${taipeiDay(weekMonday(now))}`);
-  if (week && readStore('quadra.seen.fb') !== week.id) {
-    writeStore('quadra.seen.fb', week.id);
+  if (week && readStore('quadra.seen.fb') !== week.id && sayOnce(s, week.id)) {
     notify(s, { title: T(`✦ 本週 ${money(freeBetValue(week))} 免費投注到了`, `✦ Your ${money(freeBetValue(week))} free bet is here`), body: T('在 Play 的投注單上點一下就能用，7 天內有效。', 'Tap it on a slip in Play; it lasts 7 days.'), tag: week.id, kind: 'plus' });
   }
   const month = plusMonth(now);
@@ -1609,8 +1622,7 @@ export function plusNotices(s, now = Date.now()) {
   // A yearly plan renews after its last paid month; a monthly one every month.
   const due = plusRenewing(w) && daysLeft <= 3 && (!yearly || plusUntil(w) === month);
   const key = `quadra.seen.renew:${month}`;
-  if (!due || readStore(key)) return;
-  writeStore(key, '1');
+  if (!due || readStore(key) || !sayOnce(s, `plus-renew:${month}`)) return;
   const fee = yearly ? PLUS.year : PLUS.fee;
   const back = plusReturns(w, now);
   const trial = (w.entries || []).some(e => e.id === `eco:plus:${month}` && e.note === 'trial');

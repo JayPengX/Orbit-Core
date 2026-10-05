@@ -428,6 +428,7 @@ await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(we
   const req = route.request();
   const u = new URL(req.url());
   const cors = { 'Access-Control-Allow-Origin': '*' };
+  if (flakyNow.on && Math.random() < flaky && !u.pathname.startsWith('/push')) return (flakyNow.failed++, route.fulfill({ status: 502, contentType: 'application/json', headers: cors, body: '{}' }));
   if (u.pathname.startsWith('/push')) return route.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: u.pathname === '/push/key' ? '{"key":"BJAq2pf1eAmgD3fRzfyXE5dXeDlg2qUZDyIzQ-1SHCNkWr3UQvUtaHgtZ1eQPMl00SAGgejtNE5jkRQCS2Zi6lE"}' : '{"ok":true}' });
   const fetchFn = async (url, init) => (url.includes('api.nlsc.gov.tw') ? { ok: true, status: 200, text: async () => curlText(url) } : weatherFetch(url, init));
   const res = await handleWeather(new Request(req.url()), weatherEnv, cors, u.pathname, { session: { s: 'preview' }, fetchFn, cf: { latitude: '25.0478', longitude: '121.5319', city: 'Taipei' }, cache: null });
@@ -454,6 +455,7 @@ if (!live) await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.worker
   const req = route.request();
   const u = new URL(req.url());
   const cors = { 'Access-Control-Allow-Origin': '*' };
+  if (flakyNow.on && Math.random() < flaky && !u.pathname.startsWith('/push')) return (flakyNow.failed++, route.fulfill({ status: 502, contentType: 'application/json', headers: cors, body: '{}' }));
   const fetchFn = async (url, init) => (url.includes('nominatim.openstreetmap.org') ? { ok: true, status: 200, json: async () => JSON.parse((await curlText(url)) || '[]') } : transitFetch(url, init));
   const res = await handleTransit(new Request(req.url()), transitEnv, cors, u.pathname, { session: { s: 'preview' }, fetchFn, cache: null });
   await route.fulfill({ status: res.status, contentType: 'application/json', headers: cors, body: await res.text() });
