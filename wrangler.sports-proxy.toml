@@ -21,3 +21,8 @@ compatibility_date = "2025-01-01"
 binding = "RATE_LIMIT_KV"
 id = "8b24d75fbe0a4a69aef0f35cb7a8d847"
 
+
+# A local dev page (the preview tool) may read without a Quadra Pass,
+# rate-limited (sports-proxy-worker.js checkSession). "off" closes it.
+[vars]
+SPORTS_DEV = "on"

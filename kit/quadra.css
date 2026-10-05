@@ -2389,7 +2389,7 @@ button:active:not(:disabled):not(.q-switch),
   gap: 8px;
   padding: 2px 14px 12px;
 }
-html.q-rec body::after {
+html.q-recording body::after {
   content: '';
   position: fixed;
   top: calc(env(safe-area-inset-top) + 4px);

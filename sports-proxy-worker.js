@@ -642,8 +642,17 @@ async function resolveOne(upstreamUrl, trim, ctx) {
 // minutes. Live data only a few seconds.
 const browserMaxAge = policy => Math.min(policy.fresh, 600);
 
-async function checkSession(env, requestParams, headers, weight = 1) {
+// The dev door (as worker.js's for transit): a page served from localhost
+// (the preview tool testing on the real proxy, its cache and its limits) may
+// read without a Quadra Pass, 600 asks a minute an address. SPORTS_DEV = "off"
+// (wrangler.sports-proxy.toml [vars]) closes it.
+const DEV_ORIGIN = /^http:\/\/(localhost|127\.0\.0\.1):\d+$/;
+async function checkSession(env, requestParams, headers, weight = 1, request = null, ip = '') {
   if (!env.ECO_TOKEN_SECRET) return { session: null };
+  if (!requestParams.get('qt') && env.SPORTS_DEV !== 'off' && DEV_ORIGIN.test(request?.headers.get('Origin') || '')) {
+    for (let i = 0; i < weight; i++) if (sessionLimited(`dev:${ip}`, 600)) return { error: json({ error: { message: 'Too many requests, please try again later.' } }, 429, headers) };
+    return { session: { s: `dev:${ip}`, dev: true } };
+  }
   const session = await readToken(env.ECO_TOKEN_SECRET, requestParams.get('qt') || '', 'ses');
   if (!session) return { error: json({ error: { code: 'QUADRA_PASS_REQUIRED', message: 'Sign in with a Quadra Pass.' } }, 401, headers) };
   for (let i = 0; i < weight; i++) if (sessionLimited(session.s, SESSION_RATE_LIMIT)) return { error: json({ error: { message: 'Too many requests, please try again later.' } }, 429, headers) };
@@ -663,7 +672,7 @@ const BATCH_ITEM_WAIT_MS = 3_000;
 async function handleBatch(request, env, headers, ip, ctx, requestParams) {
   const items = requestParams.getAll('u').slice(0, BATCH_MAX);
   if (!items.length) return json({ error: { message: 'Missing u' } }, 400, headers);
-  const gate = await checkSession(env, requestParams, headers, items.length);
+  const gate = await checkSession(env, requestParams, headers, items.length, request, ip);
   if (gate.error) return gate.error;
   if (!gate.session) {
     const rl = await isRateLimited(env, ip, SPORTS_PROXY_RATE_LIMIT);
@@ -685,13 +694,14 @@ async function batchItem(item, ctx) {
   const [trimParam, target] = bang > 0 && !item.slice(0, bang).includes(':') ? [item.slice(0, bang), item.slice(bang + 1)] : [null, item];
   const upstreamUrl = parseTarget(target);
   if (!upstreamUrl) return '{"s":400}';
+  const t0 = Date.now();
   const r = await resolveOne(upstreamUrl, trimFor(trimParam, upstreamUrl), ctx).catch(error => ({ fetchError: error }));
   if (r.fetchError || r.status !== 200 || !/json|javascript/i.test(r.contentType || '')) {
     if (r.body?.cancel) r.body.cancel().catch(() => {});
-    return `{"s":${r.fetchError ? 502 : r.status === 200 ? 415 : r.status}}`;
+    return `{"s":${r.fetchError ? 502 : r.status === 200 ? 415 : r.status},"ms":${Date.now() - t0}${r.fetchError ? `,"e":${JSON.stringify(String(r.fetchError?.name || r.fetchError).slice(0, 40))}` : ''}}`;
   }
   const text = r.body instanceof ArrayBuffer ? new TextDecoder().decode(r.body) : await new Response(r.body).text();
-  return `{"s":200,"a":${r.age},"b":${text}}`;
+  return `{"s":200,"a":${r.age},"c":"${r.cache}","ms":${Date.now() - t0},"b":${text}}`;
 }
 
 async function handleSportsProxyRequest(request, env, headers, ip, ctx) {
@@ -704,7 +714,7 @@ async function handleSportsProxyRequest(request, env, headers, ip, ctx) {
   if (!upstreamUrl) return json({ error: { message: target ? 'Host not allowed' : 'Missing or invalid url' } }, 400, headers);
 
   // The Quadra Pass gate (see the top of this file).
-  const gate = await checkSession(env, requestParams, headers);
+  const gate = await checkSession(env, requestParams, headers, 1, request, ip);
   if (gate.error) return gate.error;
   const trim = trimFor(requestParams.get('trim'), upstreamUrl);
   headers['X-Sports-Proxy-Cache-Tier'] = cachePolicyFor(upstreamUrl).tier;

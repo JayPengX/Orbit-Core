@@ -2783,16 +2783,27 @@ export const recOn = () => {
     return false;
   }
 };
-function recRead() {
+function recSaved() {
   try {
     return JSON.parse(localStorage.getItem(REC_KEY) || '[]');
   } catch {
     return [];
   }
 }
+const recRead = () => [...recSaved(), ...recPending];
+// Written a second after the last entry, all at once: rewriting up to 2 MB at
+// every entry (a burst of failed reads) would freeze the page.
+let recPending = [];
+let recTimer = 0;
 function recPush(entry) {
-  const list = recRead();
-  list.push(entry);
+  recPending.push(entry);
+  if (!recTimer) recTimer = setTimeout(recFlush, 1000);
+}
+function recFlush() {
+  recTimer = 0;
+  if (!recPending.length) return;
+  const list = recSaved();
+  list.push(...recPending.splice(0));
   let text = JSON.stringify(list);
   while (text.length > REC_MAX && list.length > 1) {
     list.splice(0, Math.max(1, Math.ceil(list.length / 10)));
@@ -2822,6 +2833,7 @@ export function setRecOn(on) {
 }
 export const recClear = () => {
   recLast.clear();
+  recPending = [];
   try {
     localStorage.removeItem(REC_KEY);
   } catch {}
@@ -2849,7 +2861,7 @@ export function recDump(app = dataSession?.app || '') {
 // While recording: the app's errors, and which screen (#hash) it was on.
 function recMark() {
   if (typeof document === 'undefined') return;
-  document.documentElement.classList.toggle('q-rec', recOn());
+  document.documentElement.classList.toggle('q-recording', recOn());
 }
 if (typeof window !== 'undefined') {
   window.addEventListener('error', e => recOn() && rec('error', { message: e.message, at: `${e.filename || ''}:${e.lineno || 0}:${e.colno || 0}`, stack: String(e.error?.stack || '').slice(0, 1500) }));
