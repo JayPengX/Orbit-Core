@@ -113,3 +113,10 @@ test("without a pass to check, each app at an address has a session's minute (ne
   assert.equal((await ask('match')).status, 200, 'Sports still reads');
   assert.equal((await ask('made-up')).status, 200, 'any other name is one more app, once');
 });
+
+test("a game's own page (box score, plays) is live: never a copy older than a refresh", async () => {
+  const res = await get(`https://proxy.test/sports-proxy?url=${encodeURIComponent('https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=401')}`);
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get('X-Sports-Proxy-Cache-Tier'), 'live');
+  assert.match(res.headers.get('Cache-Control'), /max-age=10\b/);
+});

@@ -206,6 +206,10 @@ function cachePolicyFor(url) {
   switch (url.hostname) {
     case 'site.api.espn.com':
       // A team's schedule has its games' scores: minutes, not a table's half hour.
+      // A game's own page (box score, plays) is live while it's on: a game
+      // sheet open on a game in play reads it every 15 s and was getting a
+      // copy up to half an hour old. A finished one comes from the mirror.
+      if (url.pathname.endsWith('/summary')) return CACHE_LIVE;
       return url.pathname.endsWith('/scoreboard') ? scoreboardPolicy(url) : url.pathname.endsWith('/schedule') ? CACHE_TEAM_SCHEDULE : CACHE_STANDINGS;
     case 'sports.core.api.espn.com':
       return CACHE_PREGAME_LINE;
