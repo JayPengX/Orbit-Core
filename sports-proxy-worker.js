@@ -727,7 +727,31 @@ async function handleBatch(request, env, headers, ip, ctx, requestParams) {
       return Promise.race([work.finally(() => clearTimeout(timer)), late]);
     })
   );
-  return new Response(`{"r":[${results.join(',')}]}`, { status: 200, headers: { ...headers, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+  // Written out as the bytes came (never decoded, never joined into one
+  // string): a season's page is 6 MB, and copies of a few of them at once
+  // ran a Worker out of memory, failing every batch on it together.
+  const enc = new TextEncoder();
+  const { readable, writable } = new TransformStream();
+  const w = writable.getWriter();
+  const pump = (async () => {
+      await w.write(enc.encode('{"r":['));
+      for (let i = 0; i < results.length; i++) {
+        const x = results[i];
+        if (i) await w.write(enc.encode(','));
+        if (typeof x === 'string') await w.write(enc.encode(x));
+        else {
+          await w.write(enc.encode(x.head));
+          if (typeof x.body === 'string') await w.write(enc.encode(x.body));
+          else if (x.body instanceof ArrayBuffer) await w.write(new Uint8Array(x.body));
+          else if (x.body) for await (const chunk of x.body) await w.write(chunk);
+          await w.write(enc.encode('}'));
+        }
+      }
+      await w.write(enc.encode(']}'));
+      await w.close();
+    })().catch(error => w.abort(error).catch(() => {}));
+  ctx?.waitUntil?.(pump);
+  return new Response(readable, { status: 200, headers: { ...headers, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
 }
 // One item that throws is that item's failure (its error said), never the
 // whole batch's: the rest of a first paint (MLB, NBA, the Premier League)
@@ -746,8 +770,8 @@ async function batchItemOf(item, ctx) {
     // its failure, not the ask's: answered as one (the app asks again).
     return `{"s":${r.fetchError || r.status === 403 || r.status === 429 ? 502 : r.status === 200 ? 415 : r.status},"ms":${Date.now() - t0}${r.fetchError ? `,"e":${JSON.stringify(String(r.fetchError?.name || r.fetchError).slice(0, 40))}` : ''}}`;
   }
-  const text = r.body instanceof ArrayBuffer ? new TextDecoder().decode(r.body) : await new Response(r.body).text();
-  return `{"s":200,"a":${r.age},"c":"${r.cache}","ms":${Date.now() - t0},"b":${text}}`;
+  // (Its bytes as they are: handleBatch writes them out.)
+  return { head: `{"s":200,"a":${r.age},"c":"${r.cache}","ms":${Date.now() - t0},"b":`, body: r.body };
 }
 
 async function handleSportsProxyRequest(request, env, headers, ip, ctx) {
