@@ -707,7 +707,11 @@ async function handleBatch(request, env, headers, ip, ctx, requestParams) {
   );
   return new Response(`{"r":[${results.join(',')}]}`, { status: 200, headers: { ...headers, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
 }
-async function batchItem(item, ctx) {
+// One item that throws is that item's failure (its error said), never the
+// whole batch's: the rest of a first paint (MLB, NBA, the Premier League)
+// came down with one month of CPBL.
+const batchItem = (item, ctx) => batchItemOf(item, ctx).catch(error => `{"s":500,"e":${JSON.stringify(String(error?.message || error).slice(0, 120))}}`);
+async function batchItemOf(item, ctx) {
   const bang = item.indexOf('!');
   const [trimParam, target] = bang > 0 && !item.slice(0, bang).includes(':') ? [item.slice(0, bang), item.slice(bang + 1)] : [null, item];
   const upstreamUrl = parseTarget(target);
@@ -768,7 +772,9 @@ export default {
     const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
     const path = new URL(request.url).pathname.replace(/\/+$/, '');
 
-    if (path === '/sports-proxy') return handleSportsProxyRequest(request, env, headers, ip, ctx);
+    // A crash still answers with CORS (the app sees a failure it can try
+    // again, not a blocked request) and says what it was.
+    if (path === '/sports-proxy') return handleSportsProxyRequest(request, env, headers, ip, ctx).catch(error => json({ error: { message: String(error?.message || error).slice(0, 200) } }, 500, headers));
     return json({ error: { message: 'Not found' } }, 404, headers);
   },
 };
