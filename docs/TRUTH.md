@@ -93,7 +93,7 @@ bug waiting in the rest.
 - **Quadra Passes are handed out by the owner**, never made in an app: the
   sign-in screen has no "create", and /eco `create` is closed (ECO_OPEN_SIGNUP
   only in tests). The owner issues them on the admin page
-  (https://jaypengx.github.io/Shared-Proxy/admin/, with the admin key in their
+  (https://jaypengx.github.io/Shared-Proxy/admin/, site/admin/, with the admin key in their
   Desktop's "Quadra 管理金鑰.txt", the Worker's secret ECO_ADMIN_TOKEN) or
   with tools/issue-passes.mjs. Claude never uses that key.
 - **Any read can be mirrored**: Shared-Data's `mirror.mjs` stores, each
