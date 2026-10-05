@@ -155,7 +155,7 @@ export function leagueLogo(key, dark = false) {
 }
 
 // 2026 F1 grid: each driver's team and its colour, for the driver badges.
-const F1_TEAMS = {
+export const F1_TEAMS = {
   mclaren: { name: 'McLaren', page: 'mclaren', f1: 'mclaren', zh: '麥拉倫', color: '#ff8000', drivers: ['Norris', 'Piastri'] },
   ferrari: { name: 'Ferrari', page: 'ferrari', f1: 'ferrari', zh: '法拉利', color: '#e8002d', drivers: ['Leclerc', 'Hamilton'] },
   redbull: { name: 'Red Bull', page: 'red-bull-racing', f1: 'redbullracing', zh: '紅牛', color: '#3671c6', drivers: ['Verstappen', 'Hadjar'] },
@@ -200,7 +200,7 @@ const F1_ZH = {
 
 // Each driver's page on formula1.com (/en/drivers/<slug>): the official
 // season, career and biography figures (Orbit Sports' driver sheet).
-const F1_PAGE = {
+export const F1_PAGE = {
   Russell: 'george-russell', Antonelli: 'kimi-antonelli', Leclerc: 'charles-leclerc', Piastri: 'oscar-piastri', Verstappen: 'max-verstappen',
   Hamilton: 'lewis-hamilton', Norris: 'lando-norris', Hadjar: 'isack-hadjar', Gasly: 'pierre-gasly', Sainz: 'carlos-sainz',
   Colapinto: 'franco-colapinto', Stroll: 'lance-stroll', Perez: 'sergio-perez', Alonso: 'fernando-alonso', Albon: 'alexander-albon',

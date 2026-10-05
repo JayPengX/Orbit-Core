@@ -618,7 +618,7 @@ const FAILED_HOLD_MS = 60_000;
 // A failed or stale read asked again after this.
 const RETRY_MS = 15_000;
 export function proxyJson(url, { ttl = 60_000, trim = '', persist: keep = true, timeout = 20_000 } = {}) {
-  return keptJson(url, dataKey(url, trim), { ttl, keep }, () => enqueue(url, trim, timeout));
+  return keptJson(url, dataKey(url, trim), { ttl, keep }, async () => (await mirrored(url, trim)) ?? enqueue(url, trim, timeout));
 }
 // The nightly packs (Shared-Data on GitHub Pages, built at midnight Taiwan
 // time): what doesn't change in a day (a league's season, sports/<league>/
@@ -633,6 +633,47 @@ export function packJson(path, { ttl = 3 * 3_600_000, timeout = 30_000 } = {}) {
     if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
     return res.text();
   });
+}
+// The nightly copies of what the proxy would answer (Shared-Data's mirror/):
+// what can't change before a set time (a team's page until its next game, a
+// finished game's box score, a past month) is built each night and read
+// from GitHub Pages, not the proxy. mirror/index.json says which reads it
+// holds ({ built, until, match: [patterns of '<trim>!<url>'] }); each copy
+// is { until, data }, good until then. A read the mirror doesn't hold, or
+// holds no longer, is the proxy's (and isn't looked for again this session).
+export const MIRROR_HOSTS = new Set(['site.api.espn.com', 'sports.core.api.espn.com', 'api.jolpi.ca', 'www.formula1.com', 'asia-baseball.quadra']);
+export function mirrorPath(url, trim = '') {
+  const u = new URL(url);
+  const q = u.search.length > 1 ? `/${encodeURIComponent(u.search.slice(1)).replace(/%/g, '~')}` : '';
+  return `mirror/${trim || '_'}/${u.hostname}${u.pathname.replace(/\/+$/, '')}${q}.json`;
+}
+let mirrorIndex = null;
+const mirrorGone = new Set();
+function readMirrorIndex() {
+  if (!mirrorIndex || Date.now() - mirrorIndex.at > 30 * 60_000) {
+    const p = packJson('mirror/index.json', { ttl: 30 * 60_000, timeout: 8_000 })
+      .then(x => ({ until: Number(x?.until) || 0, match: (x?.match || []).map(m => new RegExp(m)) }))
+      .catch(() => null);
+    mirrorIndex = { at: Date.now(), p };
+  }
+  return mirrorIndex.p;
+}
+async function mirrored(url, trim) {
+  let host = '';
+  try {
+    host = new URL(url).hostname;
+  } catch {}
+  const key = `${trim}!${url}`;
+  if (!MIRROR_HOSTS.has(host) || mirrorGone.has(key)) return null;
+  const index = await readMirrorIndex();
+  if (!index || Date.now() >= index.until || !index.match.some(re => re.test(key))) return null;
+  try {
+    const res = await fetch(`${PACKS_URL}${mirrorPath(url, trim)}`, { signal: AbortSignal.timeout(8_000) });
+    const got = res.ok ? await res.json() : null;
+    if (got && Date.now() < Math.min(Number(got.until) || 0, index.until)) return got.data;
+  } catch {}
+  mirrorGone.add(key);
+  return null;
 }
 function keptJson(url, key, { ttl, keep }, read) {
   const hit = memory.get(key);

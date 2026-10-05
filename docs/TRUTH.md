@@ -90,6 +90,14 @@ bug waiting in the rest.
   timetables. The proxy is for what's live. A 6 MB answer through a Worker
   is a bug: a few at once run it out of memory and every request on it
   fails together.
+- **Any read can be mirrored**: Shared-Data's `mirror.mjs` stores, each
+  night, the reads the apps would ask the proxy for that can't change
+  before a known time (a team's page until its next game, a finished box
+  score, a past month, last season), each with that time; the kit's
+  `proxyJson` answers from the mirror while it's good and asks the proxy
+  otherwise, with no change in the app. A new read the apps make that's
+  slow-changing goes in `mirror.mjs` at the same URL; its slimming drops
+  only what no app's parser reads.
 - **A failed read answers the copy the device has** (of any age) and is
   asked again soon; only with nothing kept is it a failure.
 - **Limits are each app's**, never shared by the family: Sports, Play and

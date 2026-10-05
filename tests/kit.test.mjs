@@ -121,6 +121,33 @@ test('packJson reads a nightly pack from GitHub Pages, not the proxy; a pack not
   await assert.rejects(kit.packJson('sports/nope/2026.json'), e => e.status === 404);
 });
 
+test("a read the nightly mirror holds comes from GitHub Pages until its time, then from the proxy; one it doesn't hold, from the proxy", async () => {
+  const asked = [];
+  const now = Date.now();
+  const roster = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/13/roster';
+  const day = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20261005&limit=200';
+  const files = {
+    'mirror/index.json': { built: now, until: now + 86_400_000, match: ['^espn-roster!|^!https://site\\.api\\.espn\\.com/apis/site/v2/sports/[^?]+/(teams/\\d+/roster|scoreboard\\?dates=\\d{8}&limit=200)$'] },
+    [kit.mirrorPath(roster)]: { until: now + 3_600_000, data: { from: 'mirror' } },
+    [kit.mirrorPath(day)]: { until: now - 1, data: { from: 'old mirror' } }
+  };
+  assert.equal(kit.mirrorPath(day), 'mirror/_/site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard/dates~3D20261005~26limit~3D200.json');
+  globalThis.fetch = async url => {
+    asked.push(String(url));
+    const path = String(url).replace(kit.PACKS_URL, '');
+    if (String(url).startsWith(kit.PACKS_URL)) return files[path] ? new Response(JSON.stringify(files[path]), { status: 200 }) : new Response('nope', { status: 404 });
+    return new Response(JSON.stringify({ from: 'proxy' }), { status: 200 });
+  };
+  assert.equal((await kit.proxyJson(roster, { persist: false })).from, 'mirror');
+  assert.ok(!asked.some(u => u.startsWith(kit.PROXY_URL)), 'the proxy never asked');
+  assert.equal((await kit.proxyJson(day, { persist: false })).from, 'proxy', 'past its time: the proxy');
+  assert.equal((await kit.proxyJson(`${roster.replace('13', '14')}`, { persist: false, trim: 'espn-roster' })).from, 'proxy', 'held by pattern, not built: the proxy');
+  assert.equal((await kit.proxyJson('https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard', { persist: false })).from, 'proxy', 'not held');
+  const n = asked.length;
+  await kit.proxyJson(day, { persist: false, ttl: 0 });
+  assert.equal(asked.slice(n).filter(u => u.startsWith(kit.PACKS_URL)).length, 0, 'not looked for again');
+});
+
 test('a device keeps its sign-in and the account id, never the pass', () => {
   store.clear();
   assert.equal(kit.storedAccount(), '');
