@@ -1688,7 +1688,8 @@ dialog.q-newpass::backdrop { background: var(--q-page); }
   position: fixed;
   z-index: 2147483000;
   left: 50%;
-  top: calc(env(safe-area-inset-top, 0px) + 10px);
+  /* Clear of the status bar's strip (and iOS's blur over it), never touching it. */
+  top: calc(var(--q-top) + 14px);
   transform: translateX(-50%);
   width: min(420px, calc(100vw - 24px));
   display: flex;

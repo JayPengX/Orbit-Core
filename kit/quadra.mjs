@@ -2317,6 +2317,13 @@ export async function notify(s, { title, body = '', tag = '', hash = '', kind = 
   const key = `${s.app}:${tag || title}`;
   if (tag && shown.has(key)) return;
   if (tag) shown.add(key);
+  // One the Worker sends this device as a phone notice too (schedulePush, push
+  // on here): that one comes, so no banner on top of it.
+  if (tag && notifyOn() && readStore(`quadra.push.sub.${s.app}`)) {
+    try {
+      if (JSON.parse(readStore(`quadra.push.list.${s.app}`) || '[]').some(x => x.tag === key)) return;
+    } catch {}
+  }
   if (typeof document !== 'undefined' && document.visibilityState === 'visible') return queueBanner(s, { title, body, hash });
   if (!notifyOn()) return;
   const options = { body, tag: key, icon: './icons/icon-192.png', badge: './icons/icon-192.png', data: { url: `${APPS[s.app].path}${hash ? `#${hash}` : ''}` } };
