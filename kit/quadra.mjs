@@ -537,7 +537,8 @@ async function fetchOne(url, trim, timeout) {
       if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
       return await res.text();
     } catch (error) {
-      if (attempt >= 1 || (error.status >= 400 && error.status < 500 && error.status !== 429)) throw error;
+      // Too many asks (429) is never asked again at once: that only keeps the limit hit.
+      if (attempt >= 1 || (error.status >= 400 && error.status < 500)) throw error;
       await new Promise(r => setTimeout(r, 700));
     }
   }
@@ -565,18 +566,27 @@ async function flush() {
     const token = await dataToken();
     const u = items.map(i => `&u=${encodeURIComponent(i.trim ? `${i.trim}!${i.url}` : i.url)}`).join('');
     const res = await fetch(`${PROXY_URL}?batch=1${u}${token ? `&qt=${encodeURIComponent(token)}` : ''}`, { signal: AbortSignal.timeout(Math.max(...items.map(i => i.timeout))) });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
     const { r } = await res.json();
     items.forEach((item, i) => {
       const got = r?.[i];
       if (got?.s === 200) item.resolve(got.b);
-      else if (got?.s >= 500 || got?.s === 429 || !got) one(item);
+      else if (got?.s >= 500 || !got) one(item);
       else item.reject(Object.assign(new Error(`HTTP ${got.s}`), { status: got.s }));
     });
-  } catch {
-    items.forEach(one);
+  } catch (error) {
+    // Over the limit: each asked again alone would only count against it more.
+    if (error?.status === 429 || error?.status === 401) items.forEach(item => item.reject(error));
+    else items.forEach(one);
   }
 }
+// A read that failed, in the 除錯紀錄 (where, and why; never the token).
+const recFail = (url, error) => {
+  try {
+    const u = new URL(url);
+    rec('proxy-fail', { url: u.hostname === 'clients5.google.com' ? u.hostname : `${u.hostname}${u.pathname}${u.search}`.slice(0, 200), status: error?.status || 0, error: String(error?.name || error?.message || error).slice(0, 60) });
+  } catch {}
+};
 
 // A text in another language (English company descriptions for a Chinese
 // reader…), through the proxy's translate route, kept a month everywhere.
@@ -614,7 +624,10 @@ export function proxyJson(url, { ttl = 60_000, trim = '', persist: keep = true, 
   })();
   const entry = { at: Date.now(), promise, failed: false };
   memory.set(key, entry);
-  promise.catch(() => memory.get(key) === entry && Object.assign(entry, { at: Date.now(), failed: true }));
+  promise.catch(error => {
+    recFail(url, error);
+    if (memory.get(key) === entry) Object.assign(entry, { at: Date.now(), failed: true });
+  });
   if (memory.size > 500) memory.delete(memory.keys().next().value);
   return promise;
 }

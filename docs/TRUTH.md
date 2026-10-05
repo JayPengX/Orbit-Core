@@ -74,6 +74,16 @@ bug waiting in the rest.
   minute). Read what's needed when it's needed. Keep built plans and boards
   on the phone and refresh only what's live (bus times, live scores). Poll
   only while it matters, and push from the Worker instead of polling.
+- **An app left open is an app opened for hours.** An iPhone keeps a
+  home-screen app alive in the background: anything read once per session
+  (a team's schedule) is read again while the app is open, and the newest
+  live copy of a thing (a game's score) wins over an older list's.
+- **News that happens once is told once** (a game's final score, a price
+  reached): the Worker remembers what it told, whatever an app that's
+  behind schedules again.
+- **A burst never breaks the rest.** Read what a view needs, not every day
+  of a season (a playoff bracket reads back a week at a time); an answer
+  of "too many" is never asked again at once.
 - Live data is trusted only where it makes sense: a bus's tracker counts
   only near a scheduled trip, and a thin prediction market counts only as far
   as it's traded and tells the options apart.

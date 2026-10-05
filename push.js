@@ -157,6 +157,9 @@ export function cleanItems(items, now = Date.now()) {
     .sort((a, b) => a.at - b.at);
 }
 
+// A notice of news that happens once: told once (by its tag), for 2 days.
+const TOLD_MS = 2 * 86_400_000;
+const onceOnly = x => Boolean(x.tag && (x.check?.espn || x.check?.yahoo));
 const recordKey = (account, app) => `push:${account}:${app}`;
 const prefsKey = account => `push:prefs:${account}`;
 export function cleanPrefs(body) {
@@ -194,7 +197,11 @@ export async function handlePush(request, env, headers, session, path) {
     record.sub = { endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth } };
     record.lang = body.lang === 'en' ? 'en' : 'zh';
   } else if (path === '/push/schedule') {
-    record.items = cleanItems(body?.items);
+    // News that happens once (a game's final score, a price reached) and was
+    // told already isn't taken again: an app whose copy of the game is behind
+    // ('on' still) would have it sent at every open.
+    const told = record.told || {};
+    record.items = cleanItems(body?.items).filter(x => !(onceOnly(x) && told[x.tag]));
   } else return reply({ error: { message: 'Not found' } }, 404);
   await kv.put(key, JSON.stringify(record), { expirationTtl: 60 * 86_400 });
   await setDue(env, key, record.sub && record.items.length ? record.items[0].at : 0);
@@ -295,6 +302,7 @@ export async function sendDue(env, now = Date.now()) {
       }
       const r = await sendPush(env, record.sub, message).catch(e => `failed ${e?.message || e}`);
       record.last = { at: now, r };
+      if (r === 'sent' && onceOnly(item)) record.told = { ...Object.fromEntries(Object.entries(record.told || {}).filter(([, at]) => at > now - TOLD_MS)), [item.tag]: now };
       if (r === 'gone') gone = true;
       else if (r === 'sent') sent++;
     }

@@ -144,3 +144,30 @@ test('Orbit Transit’s bus alert: checked each run until the bus is that close,
   assert.equal(sent.length, 1);
   assert.equal(JSON.parse(kv.m.get('push:acct:transit')).items.length, 0);
 });
+
+test("a game's final score is told once, however often the app schedules it again", async () => {
+  const kv = memoryKv();
+  const env = { RATE_LIMIT_KV: kv };
+  const post = (session, path, body) => handlePush(new Request(`https://w/${path}`, { method: 'POST', body: JSON.stringify(body) }), env, {}, session, path);
+  const match = { d: 'acct', a: 'match' };
+  const subKeys = { p256dh: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4', auth: 'BTBZMqHH6r4Tts7J_aSIgg' };
+  await post(match, '/push/subscribe', { sub: { endpoint: 'https://push.example/s', keys: subKeys } });
+  const now = Date.now();
+  // The app still has the game on: the final's check, a minute from now.
+  const end = () => ({ items: [{ at: Date.now() + 60_000, title: '勇士 vs 快艇', body: 'NBA · {result}', tag: 'end:nba:401918010', kind: 'end', check: { espn: 'basketball/nba', event: '401918010' } }] });
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async url =>
+    String(url).includes('espn.com')
+      ? new Response(JSON.stringify({ header: { competitions: [{ status: { type: { state: 'post', completed: true } }, competitors: [{ homeAway: 'away', score: '96', team: { shortDisplayName: '勇士' } }, { homeAway: 'home', score: '111', winner: true, team: { shortDisplayName: '快艇' } }] }] } }), { status: 200 })
+      : new Response(null, { status: 201 });
+  try {
+    await post(match, '/push/schedule', end());
+    assert.equal((await sendDue(env, now + 120_000)).sent, 1);
+    // Opened again, its copy still 'on': scheduled again, never sent again.
+    await post(match, '/push/schedule', end());
+    assert.equal(JSON.parse(kv.m.get('push:acct:match')).items.length, 0);
+    assert.equal((await sendDue(env, now + 240_000)).sent, 0);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
