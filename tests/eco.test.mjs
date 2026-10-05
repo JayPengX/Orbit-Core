@@ -590,3 +590,15 @@ test('the reset made right: an account that opened with less than 110,000 gets t
   // Given once.
   assert.ok(!paydayEntries({ ...w, entries: [...w.entries, ...out] }, Date.UTC(2026, 10, 4)).some(e => e.id === REBASE_FIX_ID || e.id === OD_BACK_ID));
 });
+
+test('setting ECO_TOKEN_SECRET signs nobody out: tokens signed the old way (from the Firebase key) still read', async () => {
+  const { tokenSecret, signToken, readToken } = await import('../quadra-token.js');
+  const before = { FIREBASE_PRIVATE_KEY: 'k' };
+  const old = await signToken(await tokenSecret(before), { k: 'ref', d: 'd', s: 's', e: Date.now() + 60_000 });
+  const after = { FIREBASE_PRIVATE_KEY: 'k', ECO_TOKEN_SECRET: 'new-secret' };
+  const secret = await tokenSecret(after);
+  assert.equal(secret, 'new-secret');
+  assert.ok(await readToken(secret, old, 'ref'), 'an old sign-in still reads');
+  assert.ok(await readToken(secret, await signToken(secret, { k: 'ref', e: Date.now() + 60_000 }), 'ref'));
+  assert.equal(await readToken('other', old, 'ref'), null);
+});

@@ -37,11 +37,17 @@ function unb64url(text) {
   return Uint8Array.from(s, c => c.charCodeAt(0));
 }
 
+// The secret tokens are signed with: ECO_TOKEN_SECRET once it's set (both
+// Workers have it, so the data proxy checks passes too), else one made from
+// the Firebase key (this Worker's only). When ECO_TOKEN_SECRET is first set,
+// tokens signed the old way still read until they run out (a pass's sign-in
+// lasts 60 days): nobody is signed out by the change.
+const earlier = new Map();
 export async function tokenSecret(env) {
-  if (env.ECO_TOKEN_SECRET) return env.ECO_TOKEN_SECRET;
-  if (!env.FIREBASE_PRIVATE_KEY) return '';
-  const digest = await crypto.subtle.digest('SHA-256', enc.encode(`quadra-token:${env.FIREBASE_PRIVATE_KEY}`));
-  return b64url(new Uint8Array(digest));
+  const derived = env.FIREBASE_PRIVATE_KEY ? b64url(new Uint8Array(await crypto.subtle.digest('SHA-256', enc.encode(`quadra-token:${env.FIREBASE_PRIVATE_KEY}`)))) : '';
+  if (!env.ECO_TOKEN_SECRET) return derived;
+  if (derived && derived !== env.ECO_TOKEN_SECRET) earlier.set(env.ECO_TOKEN_SECRET, derived);
+  return env.ECO_TOKEN_SECRET;
 }
 
 async function hmacKey(secret) {
@@ -61,7 +67,8 @@ export async function readToken(secret, token, kind, now = Date.now()) {
   const [body, sig] = token.split('.');
   if (!body || !sig) return null;
   try {
-    const ok = await crypto.subtle.verify('HMAC', await hmacKey(secret), unb64url(sig), enc.encode(body));
+    const signedWith = async key => crypto.subtle.verify('HMAC', await hmacKey(key), unb64url(sig), enc.encode(body));
+    const ok = (await signedWith(secret)) || (earlier.has(secret) && (await signedWith(earlier.get(secret))));
     if (!ok) return null;
     const claims = JSON.parse(new TextDecoder().decode(unb64url(body)));
     if (!claims || claims.k !== kind || !(claims.e > now)) return null;
