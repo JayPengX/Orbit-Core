@@ -34,7 +34,10 @@ is wrong, not the rule. When the owner adds a rule, it goes here.
   handed over, and never create accounts. Localhost dev doors in the Worker
   (TRANSIT_DEV and the like) are the way to test against real data.
 - Real credentials never go in a local `.env` or a repo; keys live as
-  GitHub or Cloudflare secrets the owner adds.
+  GitHub or Cloudflare secrets the owner adds. A secret that's only a
+  random string of our own (ECO_TOKEN_SECRET) may be made and stored by
+  Claude when the owner says so: generated straight into `gh secret set`,
+  never printed or saved.
 - Logs and captures that hold places (home, school) stay in git-ignored
   folders (`Orbit-Transit/captures/`), never in a public repo.
 

@@ -523,20 +523,26 @@ export function wipeDevice() {
 // The last copy kept on this device, of any age: { at, data } or null.
 export const peekJson = (url, { trim = '' } = {}) => persisted(dataKey(url, trim));
 
-async function dataToken() {
+async function dataToken(renew = false) {
   const s = dataSession;
   if (!s) return '';
-  return s.ensureToken().catch(() => s.token || '');
+  return s.ensureToken({ renew }).catch(() => s.token || '');
+}
+// A proxy ask with this app's token: turned away for it (401: a token signed
+// before the proxy's secret changed, or run out), asked once more with a new one.
+async function signedFetch(address, init) {
+  const withToken = t => fetch(`${address}${t ? `&qt=${encodeURIComponent(t)}` : ''}`, init);
+  const res = await withToken(await dataToken());
+  return res.status === 401 && dataSession ? withToken(await dataToken(true)) : res;
 }
 // Which app asks: the proxy counts each app's asks apart (Securities' quotes
 // left running never use up Sports' minute).
 const appParam = () => (dataSession?.app ? `&app=${dataSession.app}` : '');
-const proxyAddress = (url, trim, token) => `${PROXY_URL}?url=${encodeURIComponent(url)}${trim ? `&trim=${trim}` : ''}${appParam()}${token ? `&qt=${encodeURIComponent(token)}` : ''}`;
+const proxyAddress = (url, trim) => `${PROXY_URL}?url=${encodeURIComponent(url)}${trim ? `&trim=${trim}` : ''}${appParam()}`;
 async function fetchOne(url, trim, timeout) {
-  const token = await dataToken();
   for (let attempt = 0; ; attempt++) {
     try {
-      const res = await fetch(proxyAddress(url, trim, token), { signal: AbortSignal.timeout(timeout) });
+      const res = await signedFetch(proxyAddress(url, trim), { signal: AbortSignal.timeout(timeout) });
       if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
       return await res.text();
     } catch (error) {
@@ -566,9 +572,8 @@ async function flush() {
   const one = item => fetchOne(item.url, item.trim, item.timeout).then(item.resolve, item.reject);
   if (items.length === 1) return void items.forEach(one);
   try {
-    const token = await dataToken();
     const u = items.map(i => `&u=${encodeURIComponent(i.trim ? `${i.trim}!${i.url}` : i.url)}`).join('');
-    const res = await fetch(`${PROXY_URL}?batch=1${u}${appParam()}${token ? `&qt=${encodeURIComponent(token)}` : ''}`, { signal: AbortSignal.timeout(Math.max(...items.map(i => i.timeout))) });
+    const res = await signedFetch(`${PROXY_URL}?batch=1${u}${appParam()}`, { signal: AbortSignal.timeout(Math.max(...items.map(i => i.timeout))) });
     if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
     const { r } = await res.json();
     items.forEach((item, i) => {
@@ -993,7 +998,9 @@ function makeSession(app, { lang, heartbeat }) {
   s.op = (op, body = {}) => withToken(qt => call('POST', '', { op, qt, ...body }));
   // The data proxy, signed in.
   s.proxy = (url, extra = '') => `${PROXY_URL}?url=${encodeURIComponent(url)}${extra}&app=${app}${token ? `&qt=${encodeURIComponent(token)}` : ''}`;
-  s.ensureToken = async () => {
+  // (`renew`: a new one now, whatever the age of this one: the proxy turned it away.)
+  s.ensureToken = async ({ renew = false } = {}) => {
+    if (renew) tokenAt = 0;
     await freshToken();
     return token;
   };

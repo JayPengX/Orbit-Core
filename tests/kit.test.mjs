@@ -185,6 +185,24 @@ test('token requests made together share one sign-in call to the Worker', async 
   assert.equal(calls.length, 1);
 });
 
+test('the data proxy turning a token away (its secret changed) gets a new one at once, and the ask again', async () => {
+  store.clear();
+  const claims = Buffer.from(JSON.stringify({ k: 'ref', d: 'abcdef0123456789abcdef', s: 'S', g: 0, e: 9e15 })).toString('base64url');
+  store.set('quadra.refresh', `${claims}.sig`);
+  let n = 0;
+  const asked = [];
+  globalThis.fetch = async (url, init = {}) => {
+    if (init.method === 'POST') return new Response(JSON.stringify({ token: `tok${++n}`, wallet: { entries: [] }, active: true }), { status: 200 });
+    asked.push(new URL(url).searchParams.get('qt'));
+    // The first token it sees was signed before the secret changed.
+    return asked.length === 1 ? new Response('{}', { status: 401 }) : new Response('{"ok":1}', { status: 200 });
+  };
+  kit.quadraSession('match', { heartbeat: 1e9 });
+  assert.equal((await kit.proxyJson('https://x.test/renew', { persist: false })).ok, 1);
+  assert.equal(asked.length, 2);
+  assert.notEqual(asked[0], asked[1], 'asked again with a new token');
+});
+
 test('notice switches follow the pass: newest wins', async () => {
   store.clear();
   // Nothing set on this device: every kind wanted.
