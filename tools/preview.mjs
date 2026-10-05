@@ -471,6 +471,9 @@ await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(?!
   if (body.op === 'pair-create') Object.assign(reply, { code: 'ABCD2345', exp: Date.now() + 600_000 });
   await route.fulfill({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(reply) });
 });
+// Every item asked of the proxy (its time): the busiest minute is printed at
+// the end, against a signed-in session's limit (the dev door's is higher).
+const liveAsks = [];
 if (live) {
   await context.route('https://sports-proxy.pengzjay.workers.dev/**', route => {
     const u = new URL(route.request().url());
@@ -481,6 +484,7 @@ if (live) {
     if (!res.url().startsWith('https://sports-proxy.pengzjay.workers.dev/')) return;
     const u = new URL(res.url());
     const asked = u.searchParams.has('batch') ? u.searchParams.getAll('u') : [u.searchParams.get('url')];
+    liveAsks.push(...asked.map(() => Date.now()));
     const short = x => String(x).replace(/^https:\/\/site\.api\.espn\.com\/apis\/(site\/v2|v2|common\/v3)\/sports\//, 'espn:').slice(0, 110);
     if (!res.ok()) return console.log(`live: ${res.status()} ${asked.length} asked (${short(asked[0])}…)`);
     if (!u.searchParams.has('batch')) return;
@@ -627,5 +631,9 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => (reopen ? [h, h]
   await page.close();
 }
 if (errors.length) console.log('console errors:\n ', [...new Set(errors)].slice(0, 20).join('\n  '));
+if (live && liveAsks.length) {
+  const peak = Math.max(...liveAsks.map(t => liveAsks.filter(x => x >= t && x < t + 60_000).length));
+  console.log(`live: ${liveAsks.length} items asked, ${peak} in the busiest minute${peak > 600 ? ' (over a session’s 600)' : ''}`);
+}
 await browser.close();
 server.close();

@@ -7,6 +7,7 @@ globalThis.caches = { default: { match: async req => store.get(req.url)?.clone()
 const upstreamCalls = [];
 globalThis.fetch = async url => {
   upstreamCalls.push(String(url));
+  if (String(url).includes('refuse')) return new Response('no', { status: 403 });
   if (String(url).includes('fail')) return new Response('nope', { status: 500 });
   if (String(url).includes('slow')) await new Promise(r => setTimeout(r, 3_500));
   return new Response(JSON.stringify({ from: String(url) }), { status: 200, headers: { 'Content-Type': 'application/json' } });
@@ -78,4 +79,17 @@ test("a formula1.com driver or team page comes trimmed to its grids of figures",
   const html = `<script>self.__next_f.push([1,${JSON.stringify(flight)}])</script>`;
   const { grids } = trimF1Page(html);
   assert.deepEqual(grids, [[['Season Position', '1st'], ['Season Points', '302']], [['Date of Birth', '25/08/2006']]]);
+});
+
+test('an old copy is answered when its fresh read is slow, and a source turning the proxy away is a failure to ask again', async () => {
+  const url = 'https://site.api.espn.com/apis/site/v2/sports/basketball/slow/teams/9/schedule';
+  store.set(url, new Response(JSON.stringify({ old: true }), { headers: { 'Content-Type': 'application/json', 'X-Sports-Proxy-Stored-At': String(Date.now() - 2 * 3600_000) } }));
+  const refused = 'https://site.api.espn.com/apis/site/v2/sports/basketball/refuse/scoreboard';
+  const t0 = Date.now();
+  const { r } = await (await get(`https://proxy.test/sports-proxy?batch=1&u=${encodeURIComponent(url)}&u=${encodeURIComponent(refused)}`)).json();
+  assert.ok(Date.now() - t0 < 2_800);
+  assert.equal(r[0].s, 200);
+  assert.equal(r[0].c, 'STALE');
+  assert.equal(r[0].b.old, true);
+  assert.equal(r[1].s, 502);
 });

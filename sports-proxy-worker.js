@@ -156,8 +156,10 @@ const SPORTS_PROXY_ALLOWED_HOSTS = [
 ];
 const SPORTS_PROXY_RATE_LIMIT = 600;
 const ELTA_PATH = '/production/json/program_list/sports_live_program_list.json';
-// Per signed-in session, a minute, in memory (cache hits included).
-const SESSION_RATE_LIMIT = 240;
+// Per signed-in session, a minute, in memory (cache hits included). Looking
+// through every league in Sports, with a few followed, asks about 350 a
+// minute (the preview tool's --live prints the busiest minute).
+const SESSION_RATE_LIMIT = 600;
 const SPORTS_PROXY_UPSTREAM_TIMEOUT_MS = 8_000;
 
 // ---- Shared cache lifetimes ------------------------------------------------
@@ -609,6 +611,9 @@ function parseTarget(target) {
 
 // One upstream URL through the shared cache: { status, contentType, body,
 // cache, age } or { fetchError }. `body` is a stream or an ArrayBuffer.
+// How long an old copy's fresh read is waited for before the old copy is
+// answered (a batch's item waits 3 s in all).
+const FRESH_WAIT_MS = 2_000;
 async function resolveOne(upstreamUrl, trim, ctx) {
   const policy = cachePolicyFor(upstreamUrl);
   const cache = caches.default;
@@ -618,28 +623,37 @@ async function resolveOne(upstreamUrl, trim, ctx) {
   const cacheKeyUrl = new URL(upstreamUrl.toString());
   if (trim) cacheKeyUrl.searchParams.set('__sports_proxy_trim', trim);
   const cacheKey = new Request(cacheKeyUrl.toString());
-  const cached = await cache.match(cacheKey);
+  const match = await cache.match(cacheKey);
+  // Read at once, never held open: a Worker call keeps six connections, and
+  // a cached answer left unread while its item reads upstream (CPBL's month:
+  // a page and a dozen days) was closed under it ("Response closed due to
+  // connection limit"), failing the item.
+  const cached = match && { status: match.status, contentType: match.headers.get('Content-Type') || 'application/json', storedAt: Number(match.headers.get('X-Sports-Proxy-Stored-At')), body: await match.arrayBuffer() };
   if (cached) {
-    const storedAt = Number(cached.headers.get('X-Sports-Proxy-Stored-At'));
+    const storedAt = cached.storedAt;
     // Entries from before this header existed carry the old 20s lifetime,
     // so they're simply treated as fresh until the cache drops them.
     const ageSeconds = Number.isFinite(storedAt) && storedAt > 0 ? (Date.now() - storedAt) / 1000 : 0;
     const isFresh = ageSeconds <= policy.fresh;
+    const old = cache => ({ status: cached.status, contentType: cached.contentType, body: cached.body, cache, age: Math.round(ageSeconds), policy });
     // Served while it's read again behind it only when it's barely past its
     // time (as long again as it's fresh, a minute at least). Older, it's read
-    // now and the old copy is only what's answered if that fails: with few
-    // viewers, the first ask after a while is nearly every ask, and it was
-    // getting a copy up to a day old (a game over shown not begun).
+    // now and the old copy is only what's answered if that fails or is slow
+    // (FRESH_WAIT_MS; the read goes on into the cache): with few viewers, the
+    // first ask after a while is nearly every ask, and it was getting a copy
+    // up to a day old (a game over shown not begun).
     const barely = ageSeconds <= policy.fresh + Math.min(policy.stale, Math.max(policy.fresh, 60));
     if (!isFresh && !barely && ageSeconds <= policy.fresh + policy.stale) {
-      const result = await fetchUpstream(upstreamUrl, trim);
-      if (result.status === 200) {
-        if (cached.body?.cancel) cached.body.cancel().catch(() => {});
-        ctx.waitUntil(cache.put(cacheKey, cacheEntry(result, policy)));
-        return { ...result, cache: 'MISS', age: 0, policy };
-      }
-      if (result.body?.cancel) result.body.cancel().catch(() => {});
-      return { status: cached.status, contentType: cached.headers.get('Content-Type') || 'application/json', body: cached.body, cache: 'STALE', age: Math.round(ageSeconds), policy };
+      const reading = fetchUpstream(upstreamUrl, trim).then(result => {
+        if (result.status === 200) return cache.put(cacheKey, cacheEntry(result, policy)).then(() => result, () => result);
+        if (result.body?.cancel) result.body.cancel().catch(() => {});
+        return result;
+      });
+      ctx.waitUntil(reading.catch(() => {}));
+      let timer;
+      const result = await Promise.race([reading, new Promise(resolve => (timer = setTimeout(() => resolve(null), FRESH_WAIT_MS)))]).finally(() => clearTimeout(timer));
+      if (result?.status === 200) return { ...result, cache: 'MISS', age: 0, policy };
+      return old('STALE');
     }
     if (isFresh || barely) {
       if (!isFresh && !refreshesInFlight.has(cacheKey.url)) {
@@ -651,7 +665,7 @@ async function resolveOne(upstreamUrl, trim, ctx) {
             .finally(() => refreshesInFlight.delete(cacheKey.url))
         );
       }
-      return { status: cached.status, contentType: cached.headers.get('Content-Type') || 'application/json', body: cached.body, cache: isFresh ? 'HIT' : 'STALE', age: Math.round(ageSeconds), policy };
+      return old(isFresh ? 'HIT' : 'STALE');
     }
   }
   const result = await fetchUpstream(upstreamUrl, trim);
@@ -724,7 +738,9 @@ async function batchItemOf(item, ctx) {
   const r = await resolveOne(upstreamUrl, trimFor(trimParam, upstreamUrl), ctx).catch(error => ({ fetchError: error }));
   if (r.fetchError || r.status !== 200 || !/json|javascript/i.test(r.contentType || '')) {
     if (r.body?.cancel) r.body.cancel().catch(() => {});
-    return `{"s":${r.fetchError ? 502 : r.status === 200 ? 415 : r.status},"ms":${Date.now() - t0}${r.fetchError ? `,"e":${JSON.stringify(String(r.fetchError?.name || r.fetchError).slice(0, 40))}` : ''}}`;
+    // A source turning the proxy away for a while (ESPN's 403 in a burst) is
+    // its failure, not the ask's: answered as one (the app asks again).
+    return `{"s":${r.fetchError || r.status === 403 || r.status === 429 ? 502 : r.status === 200 ? 415 : r.status},"ms":${Date.now() - t0}${r.fetchError ? `,"e":${JSON.stringify(String(r.fetchError?.name || r.fetchError).slice(0, 40))}` : ''}}`;
   }
   const text = r.body instanceof ArrayBuffer ? new TextDecoder().decode(r.body) : await new Response(r.body).text();
   return `{"s":200,"a":${r.age},"c":"${r.cache}","ms":${Date.now() - t0},"b":${text}}`;
