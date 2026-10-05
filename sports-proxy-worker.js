@@ -680,13 +680,15 @@ const browserMaxAge = policy => Math.min(policy.fresh, 600);
 
 // The dev door (as worker.js's for transit): a page served from localhost
 // (the preview tool testing on the real proxy, its cache and its limits) may
-// read without a Quadra Pass, 600 asks a minute an address. SPORTS_DEV = "off"
+// read without a Quadra Pass, a session's limit for each app at an address. SPORTS_DEV = "off"
 // (wrangler.sports-proxy.toml [vars]) closes it.
 const DEV_ORIGIN = /^http:\/\/(localhost|127\.0\.0\.1):\d+$/;
 async function checkSession(env, requestParams, headers, weight = 1, request = null, ip = '') {
   if (!env.ECO_TOKEN_SECRET) return { session: null };
   if (!requestParams.get('qt') && env.SPORTS_DEV !== 'off' && DEV_ORIGIN.test(request?.headers.get('Origin') || '')) {
-    for (let i = 0; i < weight; i++) if (sessionLimited(`dev:${ip}`, 600)) return { error: json({ error: { message: 'Too many requests, please try again later.' } }, 429, headers) };
+    // (The same limit as a signed-in session's, each app apart, so a test sees what the owner's phone does.)
+    const app = /^[a-z]{2,12}$/.test(requestParams.get('app') || '') ? requestParams.get('app') : '-';
+    for (let i = 0; i < weight; i++) if (sessionLimited(`dev:${app}:${ip}`, SESSION_RATE_LIMIT)) return { error: json({ error: { message: 'Too many requests, please try again later.' } }, 429, headers) };
     return { session: { s: `dev:${ip}`, dev: true } };
   }
   const session = await readToken(env.ECO_TOKEN_SECRET, requestParams.get('qt') || '', 'ses');
