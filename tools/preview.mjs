@@ -46,7 +46,8 @@
 //
 // Needs Playwright (global in the container: /opt/node22/lib/node_modules).
 import { createServer } from 'node:http';
-import { readFile, stat, mkdir } from 'node:fs/promises';
+import { readFile, stat, mkdir, mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { existsSync } from 'node:fs';
 import { join, extname, resolve } from 'node:path';
 import { execFile } from 'node:child_process';
@@ -133,10 +134,24 @@ const timing = flag('timing');
 const requests = flag('requests');
 // --reopen: each page opened twice in the same browser (its storage kept):
 // the second is how an app opens on a phone that has used it before.
-const reopen = flag('reopen');
+// --upgrade <date|ref>: an installed app updated. The first opening is the
+// app (and the kit) as they were then (git, each repo's last commit before
+// a date like '2026-10-03 12:00', or a commit), the second the current one,
+// in the same browser: what was saved on the device then is what the new
+// version opens on. Implies --reopen.
+const upgrade = opt('upgrade', '');
+// --flaky <share>: that share of upstream answers fails (502) during the
+// first opening (every opening without --reopen / --upgrade): a phone on a
+// poor connection. Whatever the app saved from a failed read shows on the next.
+const flaky = Number(opt('flaky', 0));
+const reopen = flag('reopen') || Boolean(upgrade);
 // --freezes: every stretch over 100 ms the page couldn't answer a tap (its
 // main thread busy), from the moment it starts: [when, how long] in ms.
 const freezes = flag('freezes');
+// --shuffle: what the page shows the moment the loading screen goes, against
+// what it shows at the end of --wait: anything that moved, came or went
+// after it lifted (a reshuffle the person sees). By each card's first line.
+const shuffle = flag('shuffle');
 // --serve [--port 8123]: no browser of its own; the app is served signed in
 // with the same made-up account and answers, for another browser to open
 // (the iOS Simulator's Safari: http://localhost:8123/<repo>/). The page's
@@ -156,6 +171,25 @@ const noGeo = flag('no-geo');
 // --root dir: where the repos are (default: next to this one), e.g. a copy
 // stamped by scripts/stamp-version.mjs, to see a deploy's loading.
 const ROOT = resolve(opt('root', new URL('../../', import.meta.url).pathname));
+// The repos as they were at --upgrade's date or ref, copied out of git.
+async function snapshotRoot(when, repos) {
+  const to = await mkdtemp(join(tmpdir(), 'quadra-upgrade-'));
+  for (const [name, paths] of repos) {
+    const src = join(ROOT, name);
+    if (!existsSync(src)) continue;
+    const git = (...a) => new Promise((ok, no) => execFile('git', ['-C', src, ...a], { maxBuffer: 256 * 1024 * 1024, encoding: 'buffer' }, (e, out) => (e ? no(e) : ok(out))));
+    const sha = /^[0-9a-f]{7,40}$/.test(when) ? when : String(await git('rev-list', '-1', `--before=${when}`, 'HEAD')).trim();
+    if (!sha) throw new Error(`${name}: nothing before ${when}`);
+    await mkdir(join(to, name), { recursive: true });
+    const tar = await git('archive', sha, ...paths);
+    await new Promise((ok, no) => {
+      const c = execFile('tar', ['-x', '-C', join(to, name)], e => (e ? no(e) : ok()));
+      c.stdin.end(tar);
+    });
+    console.log(`upgrade: ${name} as of ${sha.slice(0, 7)} (${String(await git('log', '-1', '--format=%ci %s', sha)).trim().slice(0, 90)})`);
+  }
+  return to;
+}
 const [appArg, ...hashes] = args;
 
 const APPS = { sports: ['Orbit-Sports', 'match'], play: ['Quadra-Play', 'odds'], securities: ['Quadra-Securities', 'stock'], words: ['Orbit-Words', 'vocab'], orbit: ['Orbit-Class', 'orbit'], weather: ['Orbit-Weather', 'weather'], transit: ['Orbit-Transit', 'transit'] };
@@ -169,6 +203,10 @@ const OLD = { 'Orbit-Sports': 'Quadra-Fixtures', 'Orbit-Words': 'Quadra-Hub' };
 const repo = existsSync(join(ROOT, renamed)) || !OLD[renamed] ? renamed : OLD[renamed];
 const dir = key === 'orbit' ? join(ROOT, repo, 'dist') : join(ROOT, repo, 'public');
 if (!existsSync(dir)) throw new Error(`${dir} missing${key === 'orbit' ? ' (run npm run build in Orbit-Class)' : ''}`);
+
+// What's served: the current repos, or --upgrade's old ones for the first opening.
+const served = { root: ROOT, dir };
+const oldRoot = upgrade ? await snapshotRoot(upgrade, [[repo, [key === 'orbit' ? 'dist' : 'public']], ['Shared-Proxy', ['kit']]]) : null;
 
 // ---- A static server for the app ----
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.mp3': 'audio/mpeg', '.webmanifest': 'application/manifest+json' };
@@ -193,7 +231,7 @@ const server = createServer(async (req, res) => {
   // Served: no service worker (it would keep the page from these answers).
   if (serve && path.endsWith('/sw.js')) return res.writeHead(404).end();
   // The kit, as the apps load it from Shared-Proxy's Pages (kit/loader.html).
-  let file = path.startsWith('/Shared-Proxy/kit/') ? join(ROOT, path) : join(dir, path.replace(/^\/[^/]+\//, '/'));
+  let file = path.startsWith('/Shared-Proxy/kit/') ? join(served.root, path) : join(served.dir, path.replace(/^\/[^/]+\//, '/'));
   if (latency) await new Promise(r => setTimeout(r, latency));
   try {
     if ((await stat(file)).isDirectory()) file = join(file, 'index.html');
@@ -276,7 +314,9 @@ function fakeYahooAnswer(url) {
 }
 // formula1.com's pages the Worker answers trimmed to JSON: trimmed here the same way.
 const pageTrim = (url, r) => (r.status === 200 && new URL(url).hostname === 'www.formula1.com' ? { status: 200, body: JSON.stringify(trimF1Page(r.body)) } : r);
+const flakyNow = { on: false, failed: 0 };
 const upstream = url => {
+  if (flakyNow.on && Math.random() < flaky) return (flakyNow.failed++, Promise.resolve({ status: 502, body: '' }));
   if (fakeYahoo && url.includes('finance.yahoo.com')) return Promise.resolve(fakeYahooAnswer(url));
   const fixture = fixtures.find(([text]) => url.includes(text));
   if (fixture) return readFile(fixture[1], 'utf8').then(body => ({ status: 200, body }));
@@ -350,6 +390,20 @@ if (freezes)
       setTimeout(tick, 0);
     };
     setTimeout(tick, 0);
+  });
+if (shuffle)
+  await context.addInitScript(() => {
+    globalThis.__cards = () =>
+      [...document.querySelectorAll('main section, [id^="panel-"]:not([hidden]) .q-card, [id^="panel-"]:not([hidden]) article')]
+        .filter(el => el.offsetParent && el.getBoundingClientRect().top < innerHeight * 3)
+        .map(el => (el.innerText || '').split('\n').map(x => x.trim()).filter(Boolean).slice(0, 3).join(' · ').slice(0, 60));
+    const watch = setInterval(() => {
+      const box = document.getElementById('loading');
+      if (box && box.hidden) {
+        clearInterval(watch);
+        globalThis.__atOpen = { t: Math.round(performance.now()), cards: globalThis.__cards() };
+      }
+    }, 30);
   });
 if (device === 'ipad') await context.addInitScript(() => Object.defineProperty(Navigator.prototype, 'maxTouchPoints', { get: () => 5 }));
 await context.addInitScript(
@@ -454,7 +508,12 @@ if (serve) {
 }
 await mkdir(out, { recursive: true });
 const errors = [];
+let opening = 0;
 for (const hash of (hashes.length ? hashes : ['']).flatMap(h => (reopen ? [h, h] : [h]))) {
+  const first = opening++ % (reopen ? 2 : 1) === 0;
+  Object.assign(served, first && oldRoot ? { root: oldRoot, dir: join(oldRoot, repo, key === 'orbit' ? 'dist' : 'public') } : { root: ROOT, dir });
+  flakyNow.on = Boolean(flaky) && (first || !reopen);
+  if (reopen) console.log(first ? `first opening${oldRoot ? ` (the app as of ${upgrade})` : ''}${flaky ? `, ${Math.round(flaky * 100)}% of answers failing` : ''}` : 'second opening (storage kept)');
   // A page of its own for each (a hash change alone doesn't reload).
   const page = await context.newPage();
   page.on('console', m => m.type() === 'error' && errors.push(m.text()));
@@ -503,9 +562,17 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => (reopen ? [h, h]
     await page.waitForTimeout(4000);
   }
   if (requests) console.log(`requests ${key}${hash ? `#${hash}` : ''} (${calls.length}):\n${calls.map(c => `${String(c.t).padStart(6)} ms  +${c.took.padEnd(8)} ${c.text}`).join('\n')}`);
+  if (shuffle) {
+    const { open, now } = await page.evaluate(() => ({ open: globalThis.__atOpen, now: globalThis.__cards() }));
+    if (!open) console.log('shuffle: the loading screen never went');
+    else {
+      const moved = open.cards.length !== now.length || open.cards.some((c, i) => c !== now[i]);
+      console.log(moved ? `shuffle: changed after the loading screen went (at ${open.t} ms):\n  then: ${open.cards.slice(0, 8).join('\n        ')}\n  now:  ${now.slice(0, 8).join('\n        ')}` : `shuffle: none (opened at ${open.t} ms)`);
+    }
+  }
   if (freezes) console.log(`freezes ${key}${hash ? `#${hash}` : ''}: ${JSON.stringify(await page.evaluate(() => globalThis.__freezes || []))}`);
   for (const js of evals) console.log('eval:', JSON.stringify(await page.evaluate(js).catch(e => `error ${e.message}`)));
-  const file = join(out, `${key}-${hash || 'start'}${clicks.length ? '-clicked' : ''}${dark ? '-dark' : ''}${engine === 'webkit' ? '-webkit' : ''}.png`);
+  const file = join(out, `${key}-${hash || 'start'}${reopen ? (first ? '-1' : '-2') : ''}${clicks.length ? '-clicked' : ''}${dark ? '-dark' : ''}${engine === 'webkit' ? '-webkit' : ''}.png`);
   await page.screenshot({ path: file, fullPage: full });
   // Anything wider than the screen (a sideways scroll on a phone).
   const wide = await page.evaluate(() => {
@@ -532,6 +599,8 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => (reopen ? [h, h]
     scrollTo(before, scrollY);
     return moved ? `${document.documentElement.scrollWidth}px wide, scrolls ${moved}px sideways` : '';
   });
+  if (flakyNow.on) console.log(`  ${flakyNow.failed} answers failed on purpose`);
+  flakyNow.failed = 0;
   console.log(file, wide.length ? `| wider than the screen: ${wide.join(', ')}` : '', sideways ? `| PAGE ${sideways}` : '');
   await page.close();
 }
