@@ -2402,3 +2402,12 @@ html.q-rec body::after {
   background: #ff3b30;
   pointer-events: none;
 }
+
+/* ---- F1 pictures (photos.mjs driverPic, teamPic): a face, or the team's
+   colour with initials; a team's white logo on its colour. The app's own
+   class sets the size. */
+.q-person { width: 34px; height: 34px; flex: none; border-radius: 50%; object-fit: cover; object-position: top; background: var(--q-sunken, rgba(127, 127, 127, 0.15)); }
+.q-driver-badge { display: inline-grid; place-items: center; background: var(--team, #8a8f98); color: #fff; font-weight: 800; font-size: 0.72rem; letter-spacing: 0.02em; text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35); }
+.q-team-disc { width: 34px; height: 34px; flex: none; display: inline-grid; place-items: center; border-radius: 50%; overflow: hidden; background: var(--team, #8a8f98); color: #fff; font-size: 0.62rem; font-weight: 800; }
+.q-team-disc .logo-wrap { display: contents; }
+.q-team-disc-img { width: 72%; height: 72%; object-fit: contain; }

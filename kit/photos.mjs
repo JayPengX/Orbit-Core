@@ -7,7 +7,7 @@
 // The kit's copy (Shared-Proxy/kit/photos.mjs), synced into Orbit Sports and Play
 // as lib/photos.mjs: never edit an app's copy.
 import { CATALOG } from '#kit/catalog.mjs';
-import { logoPicture } from '#kit/logos.mjs';
+import { logoPicture, f1Driver, f1Constructor } from '#kit/logos.mjs';
 
 const CDN = 'https://a.espncdn.com/i/headshots';
 // ESPN's headshot at the size a phone shows it (its image service: a full
@@ -169,4 +169,31 @@ export function personPhoto(name, league, { urls = [], guess = null, cls = '', f
   };
   const chain = i => (i >= list.length ? last() : logoPicture(list[i], null, `${cls}${isCutout(list[i]) ? ' photo cutout' : ''}`, () => chain(i + 1), { guess: list[i] === guessed }));
   return chain(0);
+}
+
+// ---- F1: a driver's face, a team's logo (every app the same) ---------------------
+// A driver: their headshot (personPhoto's way: one found before, a search by
+// name), their team's colour with their initials until then or when there's
+// none. `cls` sizes it (the app's own class beside the kit's q-person).
+const initialsOf = name => String(name || '').split(/\s+/).filter(w => w && !/^(jr|sr)\.?$/i.test(w)).map(w => w[0]).slice(0, 2).join('').toUpperCase() || '?';
+const badgeEl = (cls, color, text) => {
+  const b = document.createElement('span');
+  b.className = cls;
+  b.style.setProperty('--team', color);
+  b.setAttribute('aria-hidden', 'true');
+  b.textContent = text;
+  return b;
+};
+export function driverPic(name, { cls = '', urls = [] } = {}) {
+  const d = f1Driver(name);
+  return personPhoto(name, 'f1', { urls, cls: `q-person q-driver ${cls}`.trim(), fallback: () => badgeEl(`q-person q-driver-badge ${cls}`.trim(), d.color, initialsOf(name)) });
+}
+// A team: formula1.com's white logo on the team's colour, its short name when
+// the logo can't be had.
+export function teamPic(name, { cls = '' } = {}) {
+  const c = f1Constructor(name);
+  const disc = badgeEl(`q-team-disc ${cls}`.trim(), c.color, '');
+  if (c.logo) disc.append(logoPicture(c.logo, null, 'q-team-disc-img', () => document.createTextNode(c.short)));
+  else disc.textContent = c.short;
+  return disc;
 }
