@@ -218,14 +218,18 @@ const CACHE_TRANSLATE = { tier: 'translate', fresh: 30 * DAY, stale: 30 * DAY };
 
 // Asian baseball by month: this month and next change with every score (a
 // minute); a past month only with a late fix.
-const CACHE_ASIA_NOW = { tier: 'asia-now', fresh: MINUTE, stale: MINUTE };
+// This month's: read again after 2 minutes (each read is a page and a few
+// day lists), the last good copy answered for 6 hours if a read fails.
+const CACHE_ASIA_NOW = { tier: 'asia-now', fresh: 2 * MINUTE, stale: 6 * HOUR };
+// A month over: its results don't change.
+const CACHE_ASIA_PAST = { tier: 'asia-past', fresh: 12 * HOUR, stale: 7 * DAY };
 function asiaPolicy(url) {
   const target = asiaTarget(url);
   if (!target) return CACHE_LIVE;
   const now = new Date();
   const months = target.year * 12 + target.month - (now.getUTCFullYear() * 12 + now.getUTCMonth() + 1);
   // Last month too on the 1st (a game the evening before, Asian time).
-  return months >= 0 || (months === -1 && now.getUTCDate() <= 1) ? CACHE_ASIA_NOW : CACHE_STANDINGS;
+  return months >= 0 || (months === -1 && now.getUTCDate() <= 2) ? CACHE_ASIA_NOW : CACHE_ASIA_PAST;
 }
 
 function yahooPolicy(url) {

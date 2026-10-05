@@ -236,17 +236,24 @@ const TSDB = TSDB_DAY;
 
 // The days of the month from `from` up to two weeks ahead, each day's list
 // kept 10 minutes at Cloudflare's edge (TheSportsDB's free key is rate-limited).
+// At most TSDB_DAYS of them, the nearest to now first: a Worker call may make
+// 50 fetches in all, and a batch asking for three months (each a page and up
+// to a month of days) went over, failing every one; TheSportsDB also turns a
+// burst away. A day over (two back) is kept a week at the edge, not 10 minutes.
+const TSDB_DAYS = 16;
 async function fetchCpblTsdb(year, month, { from = Date.UTC(year, month - 1, 1), now = Date.now() } = {}) {
-  const days = [];
+  let days = [];
   const last = Math.min(Date.UTC(year, month, 0), now + 14 * 24 * HOUR);
   for (let t = Math.floor(from / (24 * HOUR)) * 24 * HOUR; t <= last; t += 24 * HOUR) days.push(new Date(t).toISOString().slice(0, 10));
+  days = days.sort((a, b) => Math.abs(Date.parse(a) - now) - Math.abs(Date.parse(b) - now)).slice(0, TSDB_DAYS);
+  const over = new Date(now - 2 * 24 * HOUR).toISOString().slice(0, 10);
   // A day that fails counts as empty, but every day failing is a failure
   // (reason kept): never an empty month served and cached as if the league
   // had no games (TheSportsDB can refuse this Worker's requests).
   const failures = [];
   const lists = await Promise.all(
     days.map(d =>
-      fetch(`${TSDB}?d=${d}&l=${TSDB_CPBL}`, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(TIMEOUT), cf: { cacheTtl: 600, cacheEverything: true } })
+      fetch(`${TSDB}?d=${d}&l=${TSDB_CPBL}`, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(TIMEOUT), cf: { cacheTtl: d < over ? 7 * 86_400 : 600, cacheEverything: true } })
         .then(r => {
           if (!r.ok) throw new Error(`tsdb ${r.status}`);
           return r.json();
