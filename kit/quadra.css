@@ -2348,9 +2348,13 @@ dialog {
 }
 
 /* iOS's sheets: a grabber at the top, up from the bottom on iOS's curve, down
-   again with a swipe (quadra.mjs sheetSwipe). */
+   again with a swipe (quadra.mjs sheetSwipe). The grabber stays at the top
+   and over the sticky .q-sheet-head (it was half under the head's fill). */
 .q-sheet::before {
   content: '';
+  position: sticky;
+  top: 7px;
+  z-index: 2;
   display: block;
   width: 36px;
   height: 5px;
