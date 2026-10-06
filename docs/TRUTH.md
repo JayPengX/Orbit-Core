@@ -17,7 +17,15 @@ is wrong, not the rule. When the owner adds a rule, it goes here.
     --upgrade <date>`): the old version's storage, the new version's code;
   - **on a poor connection** (`--flaky 0.5`), then reopened (`--reopen`):
     whatever a failed read left on the phone shows on the second open;
-  - **for movement after the loading screen** (`--shuffle`).
+  - **for movement after the loading screen** (`--shuffle`);
+  - **live on the iOS Simulator**, iPhone Safari itself and the closest
+    thing to the owner's phone (Claude's simulator tool attaches, opens
+    URLs, screenshots, taps and swipes): `node tools/preview.mjs <app>
+    --serve --port 8123`, then `xcrun simctl openurl booted
+    http://localhost:8123/<Repo>/?fresh=N`, a new `fresh` each time
+    (Simulator Safari keeps the old kit). Reach for it for anything that
+    moves, scrolls, blurs or sits at the screen's edges, where WebKit in
+    the preview tool can differ from the real thing.
 - **Be efficient.** Do the work; skip the narration. Batch small fixes
   into one push per app.
 - **Rules are general, never special cases.** "Smart" means a rule that

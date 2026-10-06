@@ -555,7 +555,7 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => (reopen ? [h, h]
   // A page of its own for each (a hash change alone doesn't reload).
   const page = await context.newPage();
   page.on('console', m => m.type() === 'error' && errors.push(m.text()));
-  page.on('pageerror', e => errors.push(String(e)));
+  page.on('pageerror', e => errors.push(String(e.stack || e)));
   const started = Date.now();
   const own = [];
   page.on('request', r => r.url().startsWith(base) && own.push({ url: r.url().slice(base.length) || '/', at: Date.now() - started }));
