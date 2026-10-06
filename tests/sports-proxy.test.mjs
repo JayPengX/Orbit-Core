@@ -155,3 +155,13 @@ test("Polymarket's games trimmed: each game's own event, its moneyline markets a
   assert.deepEqual(got[0].teams, [{ name: 'Fulham FC', abbreviation: 'ful', alias: 'Fulham' }]);
   assert.deepEqual(got[0].markets, [{ question: 'Will Fulham FC win?', groupItemTitle: 'Will Fulham FC win?', outcomes: '["Yes","No"]', clobTokenIds: '["1","2"]' }]);
 });
+
+test("Polymarket's F1 race winner kept: each driver's market and how much it's traded", async () => {
+  const { trimPolymarketGames } = await import('../sports-proxy-worker.js');
+  const got = trimPolymarketGames([
+    { slug: 'f1-bahrain-grand-prix-winner-2026-10-04', title: 'Bahrain Grand Prix: Driver Winner', startTime: '2026-10-04T07:00:00Z', markets: [{ sportsMarketType: 'f1_race_winner', question: 'Will Max Verstappen win?', groupItemTitle: 'Max Verstappen', outcomes: '["Yes","No"]', clobTokenIds: '["1","2"]', volume: '229815.5', description: 'long' }] },
+    { slug: 'f1-bahrain-grand-prix-driver-podium-2026-10-04', markets: [] }
+  ]);
+  assert.equal(got.length, 1);
+  assert.deepEqual(got[0].markets, [{ question: 'Will Max Verstappen win?', groupItemTitle: 'Max Verstappen', outcomes: '["Yes","No"]', clobTokenIds: '["1","2"]', volume: 229815.5 }]);
+});

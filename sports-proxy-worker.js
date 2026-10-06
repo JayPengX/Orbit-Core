@@ -408,18 +408,20 @@ export function trimElta(data) {
 }
 
 const GAME_SLUG = /^[a-z0-9]+-[a-z0-9]+-[a-z0-9]+-\d{4}-\d{2}-\d{2}$/;
+// An F1 race's (or sprint's) winner: a yes-or-no market for each driver, with how much it's traded.
+const RACE_SLUG = /^f1-[a-z0-9-]+-winner-\d{4}-\d{2}-\d{2}$/;
 export function trimPolymarketGames(events) {
   if (!Array.isArray(events)) return events;
   return events
-    .filter(event => GAME_SLUG.test(event?.slug || ''))
+    .filter(event => GAME_SLUG.test(event?.slug || '') || RACE_SLUG.test(event?.slug || ''))
     .map(event => ({
       slug: event.slug,
       title: event.title,
       startTime: event.startTime,
       teams: Array.isArray(event.teams) ? event.teams.map(t => ({ name: t.name, abbreviation: t.abbreviation, alias: t.alias })) : [],
       markets: (event.markets || [])
-        .filter(m => m.sportsMarketType === 'moneyline')
-        .map(m => ({ question: m.question, groupItemTitle: m.groupItemTitle, outcomes: m.outcomes, clobTokenIds: m.clobTokenIds }))
+        .filter(m => m.sportsMarketType === 'moneyline' || m.sportsMarketType === 'f1_race_winner')
+        .map(m => ({ question: m.question, groupItemTitle: m.groupItemTitle, outcomes: m.outcomes, clobTokenIds: m.clobTokenIds, ...(m.sportsMarketType === 'f1_race_winner' ? { volume: Number(m.volume) || 0 } : {}) }))
     }));
 }
 function trimPolymarketEvents(events) {
