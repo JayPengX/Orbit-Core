@@ -7,8 +7,8 @@
 //   GET /weather?auto=1&qt=        the same where the caller's IP says it is
 //                                  (Cloudflare's request.cf), until the
 //                                  device's own position is known
-//   GET /weather/where?lat=&lon=&qt=  the place to the village (縣市 / 鄉鎮市區
-//                                  / 村里), from NLSC's open point query
+//   GET /weather/where?lat=&lon=&qt=  the place (縣市 / 鄉鎮市區), from NLSC's
+//                                  open point query
 //   GET /weather/places            Taiwan's townships [county, town, lat,
 //                                  lon], for the app's place picker
 //   GET /weather/status            each source's key: set, and a live call
@@ -620,13 +620,13 @@ export function parseAirHistory(j) {
     .sort((a, b) => a[0] - b[0]);
 }
 
-// ---- The village: NLSC's point query -------------------------------------------------
+// ---- The place: NLSC's point query (縣市 and 鄉鎮市區; the 村里 isn't used) -------------------------------------------------
 
 const NLSC = 'https://api.nlsc.gov.tw/other/TownVillagePointQuery1/';
 const xmlTag = (xml, tag) => (String(xml).match(new RegExp(`<${tag}>([^<]*)</${tag}>`)) || [])[1] || null;
 export function parseVillage(xml) {
   const county = xmlTag(xml, 'ctyName');
-  return county ? { county, town: xmlTag(xml, 'townName'), village: xmlTag(xml, 'villageName') } : { county: null, town: null, village: null };
+  return county ? { county, town: xmlTag(xml, 'townName') } : { county: null, town: null };
 }
 // The place at lat / lon (to ~100 m), kept in Cloudflare's cache 30 days.
 export async function whereIs(lat, lon, { fetchFn = fetch, cache = globalThis.caches?.default } = {}) {
@@ -656,6 +656,11 @@ export function blend(values, weights) {
   return wSum ? sum / wSum : null;
 }
 
+// A rain chance as Taiwan reads one: in steps of 10 (CWA's own), so a blend
+// of two sources (Google's 5% and CWA's 0%) reads 0%, not 3%. Every card,
+// graph, tip and notice takes this one number.
+export const popStep = v => (v == null || !Number.isFinite(Number(v)) ? null : Math.max(0, Math.min(100, Math.round(Number(v) / 10) * 10)));
+
 // → { resp: the one-truth answer, bySource: each source's values (KV only) }.
 export function assemble({ cell, now, google, cwa, air, warnings, weights = DEFAULT_WEIGHTS, partial = false }) {
   const bySource = { hours: [], days: [], now: null };
@@ -674,7 +679,7 @@ export function assemble({ cell, now, google, cwa, air, warnings, weights = DEFA
       ...g,
       temp: r1(blend(tempBy, weights.temp)),
       feels: r1(blend({ google: g.feels ?? null, cwa: cFeels }, weights.temp)),
-      pop: pop == null ? null : Math.round(pop)
+      pop: popStep(pop)
     };
     if (out.humidity == null) out.humidity = cwaAt(fc?.humidity, g.t);
     bySource.hours.push({ t: g.t, pop: popBy, temp: tempBy });
@@ -694,14 +699,17 @@ export function assemble({ cell, now, google, cwa, air, warnings, weights = DEFA
       lo: r1(blend({ google: d.lo, cwa: c?.lo ?? null }, weights.temp)),
       feelsHi: r1(blend({ google: d.feelsHi, cwa: c?.feelsHi ?? null }, weights.temp)),
       feelsLo: r1(blend({ google: d.feelsLo, cwa: c?.feelsLo ?? null }, weights.temp)),
-      pop: pop == null ? null : Math.round(pop)
+      pop: popStep(pop),
+      // (The day's and the night's halves, Google's alone: in the same steps.)
+      ...(d.day ? { day: { ...d.day, pop: popStep(d.day.pop) } } : {}),
+      ...(d.night ? { night: { ...d.night, pop: popStep(d.night.pop) } } : {})
     };
   });
   // Google missing: CWA's week alone.
   if (!days.length) {
     for (const c of Object.values(cDays).sort((a, b) => a.date.localeCompare(b.date))) {
       const p = Math.max(c.popDay ?? -1, c.popNight ?? -1);
-      days.push({ date: c.date, hi: c.hi, lo: c.lo, feelsHi: c.feelsHi, feelsLo: c.feelsLo, uvMax: c.uv, pop: p >= 0 ? p : null, day: { condition: { code: null, text: c.text || '', icon: null } } });
+      days.push({ date: c.date, hi: c.hi, lo: c.lo, feelsHi: c.feelsHi, feelsLo: c.feelsLo, uvMax: c.uv, pop: p >= 0 ? popStep(p) : null, day: { condition: { code: null, text: c.text || '', icon: null } } });
     }
   }
 
@@ -1334,7 +1342,7 @@ export async function handleWeather(request, env, headers, path, { session = nul
     const lat = Number(q.get('lat'));
     const lon = Number(q.get('lon'));
     if (!q.get('lat') || !q.get('lon') || !(Math.abs(lat) <= 90) || !(Math.abs(lon) <= 180)) return send({ code: 'BAD_LOCATION' }, 400);
-    return send(await whereIs(lat, lon, { fetchFn, ...(cache !== undefined ? { cache } : {}) }).catch(() => ({ county: null, town: null, village: null })));
+    return send(await whereIs(lat, lon, { fetchFn, ...(cache !== undefined ? { cache } : {}) }).catch(() => ({ county: null, town: null })));
   }
   if (path === '/weather') {
     if (!session) return send({ code: 'ECO_TOKEN_INVALID' }, 401);

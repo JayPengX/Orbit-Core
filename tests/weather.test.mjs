@@ -8,7 +8,7 @@ import {
   airForecast, parseGoogleAir, googleAirBody, parseAirHistory,
   weatherStatus, handleWeather, scrub, cellOf, nearestStation, townIds, airArea, parseCwaTown, cwaAt, parseGoogleDay, parseGoogleHour,
   blend, buildCell, GOOGLE_DAILY_CALLS, parseVillage, whereIs, addAirReading, briefText, rainPhrase, weatherCheck, noteRecent, cellForecast, advise, adviceWindow, parseCwaWarnings, aqiLevel, uvLevel, num, DEFAULT_WEIGHTS
-} from '../weather.js';
+, popStep } from '../weather.js';
 import { STATIONS } from '../weather-stations.js';
 import { upstream as fixtureUpstream } from './fixtures/weather/upstream.mjs';
 
@@ -93,7 +93,8 @@ test('a whole cell from the three sources', async () => {
   assert.equal(resp.hours.length, 240, 'hourly for 10 days');
   const h = resp.hours[0];
   assert.deepEqual(bySource.hours[0].pop, { google: 20, cwa: 40 });
-  assert.equal(h.pop, Math.round(0.6 * 20 + 0.4 * 40));
+  assert.equal(h.pop, 30, 'the blend (28) in steps of 10, as Taiwan reads a rain chance');
+  assert.ok(resp.hours.every(x => x.pop == null || x.pop % 10 === 0) && resp.days.every(d => d.pop == null || d.pop % 10 === 0), 'every hour and day in steps of 10');
   assert.equal(resp.days.length, 10);
   assert.ok(bySource.days[1].pop.cwa != null);
   assert.ok(resp.now.station && resp.now.station.km < 5);
@@ -352,20 +353,20 @@ test('opened cells are noted for the scoring, at most every 6 hours', async () =
   assert.deepEqual(Object.keys(JSON.parse(kv.store.get('weather:recent'))).sort(), ['24.15,120.68', '25.03,121.57']);
 });
 
-test('the place to the village (NLSC), cached', async () => {
+test('the place to the township (NLSC), cached; no 村里', async () => {
   const xml = '<townVillageItem><ctyCode>63000</ctyCode><ctyName>臺北市</ctyName><townCode>63000020</townCode><townName>信義區</townName><villageCode>63000020001</villageCode><villageName>西村里</villageName></townVillageItem>';
-  assert.deepEqual(parseVillage(xml), { county: '臺北市', town: '信義區', village: '西村里' });
-  assert.deepEqual(parseVillage('<error/>'), { county: null, town: null, village: null });
+  assert.deepEqual(parseVillage(xml), { county: '臺北市', town: '信義區' });
+  assert.deepEqual(parseVillage('<error/>'), { county: null, town: null });
   const store = new Map();
   const cache = { match: async k => (store.has(k) ? new Response(store.get(k)) : undefined), put: async (k, r) => void store.set(k, await r.text()) };
   const urls = [];
   const fetchFn = async url => (urls.push(url), { ok: true, text: async () => xml });
-  assert.deepEqual(await whereIs(25.03412, 121.56456, { fetchFn, cache }), { county: '臺北市', town: '信義區', village: '西村里' });
+  assert.deepEqual(await whereIs(25.03412, 121.56456, { fetchFn, cache }), { county: '臺北市', town: '信義區' });
   await whereIs(25.0339, 121.5649, { fetchFn, cache });
   assert.deepEqual(urls, ['https://api.nlsc.gov.tw/other/TownVillagePointQuery1/121.565/25.034'], 'the same ~100 m: cached');
   const e = { ...env, RATE_LIMIT_KV: memKv() };
   const res = await handleWeather(new Request('https://w.example/weather/where?lat=25.034&lon=121.565'), e, {}, '/weather/where', { session: { s: 'x' }, fetchFn, cache });
-  assert.equal((await res.json()).village, '西村里');
+  assert.equal((await res.json()).village, undefined);
   assert.equal((await handleWeather(new Request('https://w.example/weather/where?lat=25&lon=121'), e, {}, '/weather/where', { fetchFn, cache })).status, 401);
 });
 
@@ -499,4 +500,10 @@ test('advice: damp, a drop in the lows, strong wind, thunder, fog', () => {
   assert.equal(k.wind.text, '強風：15時陣風 62 km/h，收好陽台');
   assert.equal(k.thunder.text, '雷雨：15–17時可能打雷，避開戶外');
   assert.equal(k.fog.text, '起霧：7時能見度 0.8 公里，開車小心');
+});
+
+test("a rain chance in steps of 10: Google's 5% and CWA's 0% read 0%, not 3%", () => {
+  assert.deepEqual([0, 3, 4, 5, 14, 15, 28, 96, 100].map(popStep), [0, 0, 0, 10, 10, 20, 30, 100, 100]);
+  assert.equal(popStep(null), null);
+  assert.equal(popStep(undefined), null);
 });
