@@ -1755,11 +1755,16 @@ export function plusCard(s, { compact = false } = {}) {
   const untilText = until ? `${until.slice(0, 4)}/${Number(until.slice(5))}` : '';
   const back = member ? plusReturns(s.wallet).total : 0;
   const pct = x => `${Math.round(x * 100)}%`;
-  const pitch = member
-    ? back > 0
-      ? T(`本月會員回饋 ${money(back)}`, `Plus gave you ${money(back)} this month`)
-      : T(`每週 ${money(PLUS.odds.bonusBet)} 免費投注 · 證券手續費 ${Math.round(PLUS.stock.commission * 100) / 10} 折`, `${money(PLUS.odds.bonusBet)} free bet weekly · ${pct(1 - PLUS.stock.commission)} off commission`)
-    : T(`每週 ${money(PLUS.odds.bonusBet)} 免費投注 · 串關加成 ×${PLUS.odds.boost} · 證券手續費 ${Math.round(PLUS.stock.commission * 100) / 10} 折`, `${money(PLUS.odds.bonusBet)} free bet weekly · parlay boost ×${PLUS.odds.boost} · ${pct(1 - PLUS.stock.commission)} off commission`);
+  // The perks as tiles (a figure over a word or two), never a sentence that wraps;
+  // a member with this month's return sees that instead.
+  const perks = [
+    [money(PLUS.odds.bonusBet), T('每週免費投注', 'free bet weekly')],
+    member ? null : [`×${PLUS.odds.boost}`, T('串關加成', 'parlay boost')],
+    [T(`${Math.round(PLUS.stock.commission * 100) / 10} 折`, pct(1 - PLUS.stock.commission)), T('證券手續費', 'off commission')]
+  ].filter(Boolean);
+  const pitch = member && back > 0
+    ? node('span', { class: 'q-plus-pitch', text: T(`本月會員回饋 ${money(back)}`, `Plus gave you ${money(back)} this month`) })
+    : node('span', { class: 'q-plus-perks' }, perks.map(([v, k]) => node('span', { class: 'q-plus-perk' }, [node('strong', { text: v }), node('small', { text: k })])));
   const status = member
     ? plusPlan(s.wallet) === 'year'
       ? T(`年繳會員 · 有效至 ${untilText}`, `Yearly member · through ${untilText}`)
@@ -1771,7 +1776,7 @@ export function plusCard(s, { compact = false } = {}) {
       : T(`年繳 ${money(PLUS.year)}，省下兩個月`, `${money(PLUS.year)} a year: two months free`);
   return node('button', { class: `q-plus-card${member ? ' member' : ''}${compact ? ' compact' : ''}`, type: 'button', onclick: () => openPlus(s) }, [
     node('span', { class: 'q-plus-top' }, [plusGlyph(), node('span', { class: 'q-plus-word', text: 'QUADRA PLUS' }), node('span', { class: 'q-plus-go', text: member ? T('管理', 'Manage') : price === 0 ? T('免費試用', 'Try free') : T('加入', 'Join') })]),
-    compact ? null : node('span', { class: 'q-plus-pitch', text: pitch }),
+    compact ? null : pitch,
     node('span', { class: 'q-plus-status', text: status })
   ].filter(Boolean));
 }

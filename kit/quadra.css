@@ -1931,6 +1931,37 @@ html:not([data-q-keys]) :is(:focus-visible, :focus):not(input, textarea, select)
   font-weight: 650;
   line-height: 1.35;
 }
+.q-plus-perks {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+.q-plus-perk {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 9px 10px;
+  border-radius: 12px;
+  background: rgba(245, 241, 232, 0.07);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--q-plus-gold) 22%, transparent);
+}
+.q-plus-perk strong {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--q-plus-gold);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.q-plus-perk small {
+  font-size: 11.5px;
+  color: rgba(245, 241, 232, 0.72);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .q-plus-status {
   font-size: 12.5px;
   color: rgba(245, 241, 232, 0.66);
