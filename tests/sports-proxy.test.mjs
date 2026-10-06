@@ -160,8 +160,11 @@ test("Polymarket's F1 race winner kept: each driver's market and how much it's t
   const { trimPolymarketGames } = await import('../sports-proxy-worker.js');
   const got = trimPolymarketGames([
     { slug: 'f1-bahrain-grand-prix-winner-2026-10-04', title: 'Bahrain Grand Prix: Driver Winner', startTime: '2026-10-04T07:00:00Z', markets: [{ sportsMarketType: 'f1_race_winner', question: 'Will Max Verstappen win?', groupItemTitle: 'Max Verstappen', outcomes: '["Yes","No"]', clobTokenIds: '["1","2"]', volume: '229815.5', description: 'long' }] },
-    { slug: 'f1-bahrain-grand-prix-driver-podium-2026-10-04', markets: [] }
+    { slug: 'f1-bahrain-grand-prix-driver-podium-2026-10-04', markets: [] },
+    // An older race's: its markets carry no type.
+    { slug: 'f1-spanish-grand-prix-winner-2026-09-13', markets: [{ question: 'Will Lando Norris win?', groupItemTitle: 'Lando Norris', outcomes: '["Yes","No"]', clobTokenIds: '["3","4"]', volume: '1000' }] }
   ]);
-  assert.equal(got.length, 1);
+  assert.equal(got.length, 2);
+  assert.equal(got[1].markets[0].groupItemTitle, 'Lando Norris');
   assert.deepEqual(got[0].markets, [{ question: 'Will Max Verstappen win?', groupItemTitle: 'Max Verstappen', outcomes: '["Yes","No"]', clobTokenIds: '["1","2"]', volume: 229815.5 }]);
 });
