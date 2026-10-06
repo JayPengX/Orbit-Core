@@ -1606,14 +1606,22 @@ dialog.q-moved::backdrop {
   overflow-wrap: anywhere;
 }
 .q-rec-foot {
+  /* One row: the price and its change side by side, never the change under
+     the price (a wide price shrinks to fit instead, fitNumbers). */
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 4px 8px;
+  gap: 8px;
   margin-top: 2px;
 }
+.q-rec-foot > :not(.q-rec-big) {
+  flex: none;
+}
 .q-rec-big {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: 18px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
