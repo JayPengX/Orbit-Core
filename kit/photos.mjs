@@ -64,8 +64,10 @@ export function ownPhoto(name, league) {
 }
 
 // ---- The device's copy ----------------------------------------------------------------
-// v2: v1 held Wikipedia's pictures, which aren't kept any more.
-const STORE = 'fx.pics.v2';
+// v3: v2 kept "none" for a lookup that had failed (TheSportsDB's limit hit
+// while browsing): those players stayed faceless for a week. v1 held
+// Wikipedia's pictures, which aren't kept any more.
+const STORE = 'fx.pics.v3';
 const FOUND_MS = 60 * 86_400_000;
 const NONE_MS = 7 * 86_400_000;
 let cache = null;
@@ -73,6 +75,7 @@ function load() {
   if (cache) return cache;
   try {
     globalThis.localStorage?.removeItem('fx.pics.v1');
+    globalThis.localStorage?.removeItem('fx.pics.v2');
     cache = JSON.parse(globalThis.localStorage?.getItem(STORE) || '{}') || {};
   } catch {
     cache = {};
@@ -117,7 +120,8 @@ const SEARCH_SPORT = { racing: 'racing', soccer: 'soccer', basketball: 'basketba
 const HEADSHOT_FOLDER = { racing: 'rpm', soccer: 'soccer', basketball: 'nba', baseball: 'mlb', football: 'nfl', hockey: 'nhl' };
 export async function espnSearchPhoto(name, sport, fetchJson = defaultJson, check = loads) {
   if (!SEARCH_SPORT[sport]) return '';
-  const items = (await fetchJson(ESPN_SEARCH + encodeURIComponent(name)).catch(() => null))?.items || [];
+  // (A failed search throws: findPhoto keeps nothing, and asks again later.)
+  const items = (await fetchJson(ESPN_SEARCH + encodeURIComponent(name)))?.items || [];
   const want = plain(name);
   const hit = items.find(i => i.type === 'player' && i.sport === SEARCH_SPORT[sport] && plain(i.displayName) === want);
   if (!hit?.id) return '';
@@ -132,9 +136,33 @@ export async function espnSearchPhoto(name, sport, fetchJson = defaultJson, chec
 // only the cutout counts.
 const TSDB_SEARCH = 'https://www.thesportsdb.com/api/v1/json/3/searchplayers.php?p=';
 const TSDB_SPORT = { soccer: 'Soccer', baseball: 'Baseball', basketball: 'Basketball', football: 'American Football', hockey: 'Ice Hockey', racing: 'Motorsport' };
-export async function tsdbCutout(name, sport, fetchJson = defaultJson) {
+// Its free key takes about 30 searches a minute: they go one at a time, 2.1 s
+// apart, so a roster opened (or a few teams flicked through) never hits the
+// limit; one that does pauses the queue a minute. A failed search throws.
+// (Exported so the tests can run it without the waits.)
+export const TSDB_PACE = { gap: 2100, pause: 60_000 };
+let tsdbQueue = Promise.resolve();
+let tsdbNext = 0;
+const tsdbTurn = () => {
+  const turn = tsdbQueue.then(async () => {
+    const wait = tsdbNext - Date.now();
+    if (wait > 0) await new Promise(r => setTimeout(r, wait));
+    tsdbNext = Date.now() + TSDB_PACE.gap;
+  });
+  tsdbQueue = turn.catch(() => {});
+  return turn;
+};
+export async function tsdbCutout(name, sport, fetchJson = defaultJson, { paced = fetchJson === defaultJson } = {}) {
   if (!TSDB_SPORT[sport]) return '';
-  const list = (await fetchJson(TSDB_SEARCH + encodeURIComponent(name)).catch(() => null))?.player || [];
+  if (paced) await tsdbTurn();
+  let data;
+  try {
+    data = await fetchJson(TSDB_SEARCH + encodeURIComponent(name));
+  } catch (error) {
+    if (paced && /^429$/.test(error?.message)) tsdbNext = Date.now() + TSDB_PACE.pause;
+    throw error;
+  }
+  const list = data?.player || [];
   const want = plain(name);
   const hit = list.find(p => p.strSport === TSDB_SPORT[sport] && plain(p.strPlayer) === want && p.strCutout);
   return hit ? hit.strCutout : '';
@@ -165,7 +193,9 @@ export function findPhoto(name, league) {
           remember(key, url);
           return url;
         } catch {
-          // A failed request isn't remembered (asked again next time).
+          // A failed request isn't remembered: asked again the next time the
+          // face is drawn (not only next session).
+          asked.delete(key);
           return '';
         }
       })()

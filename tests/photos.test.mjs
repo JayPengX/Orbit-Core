@@ -20,3 +20,20 @@ test("a Premier League player's photo is the league's own, on its older path whe
   assert.equal(ownPhoto('Erling Haaland', 'epl'), 'https://resources.premierleague.com/premierleague25/photos/players/110x140/223094.png');
   assert.equal(ownPhoto('Joe Gomez', 'epl'), 'https://resources.premierleague.com/premierleague/photos/players/250x250/p171287.png');
 });
+
+test("a lookup TheSportsDB refused (its limit) isn't kept as 'no photo': asked again, the face comes", async () => {
+  const { findPhoto, knownPhoto, TSDB_PACE } = await import('../kit/photos.mjs');
+  Object.assign(TSDB_PACE, { gap: 0, pause: 0 });
+  let limited = true;
+  globalThis.fetch = async url => {
+    const u = String(url);
+    if (u.includes('site.web.api.espn.com')) return new Response(JSON.stringify({ items: [] }), { status: 200 });
+    if (u.includes('thesportsdb.com')) return limited ? new Response('', { status: 429 }) : new Response(JSON.stringify({ player: [{ strPlayer: 'Kevin Ciubotaru', strSport: 'Soccer', strCutout: 'https://r2.thesportsdb.com/images/media/player/cutout/k.png' }] }), { status: 200 });
+    return new Response('', { status: 404 });
+  };
+  assert.equal(await findPhoto('Kevin Ciubotaru', 'scotland'), '');
+  assert.equal(knownPhoto('Kevin Ciubotaru', 'soccer'), undefined, 'nothing kept for a failed lookup');
+  limited = false;
+  assert.equal(await findPhoto('Kevin Ciubotaru', 'scotland'), 'https://r2.thesportsdb.com/images/media/player/cutout/k.png');
+  assert.equal(knownPhoto('Kevin Ciubotaru', 'soccer'), 'https://r2.thesportsdb.com/images/media/player/cutout/k.png');
+});
