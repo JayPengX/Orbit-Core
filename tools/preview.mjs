@@ -227,7 +227,13 @@ async function external(req, res) {
   await hit[1]({
     request: () => ({ url: () => u, method: () => req.method, postData: () => body, postDataJSON: () => JSON.parse(body || 'null') }),
     fulfill: ({ status = 200, contentType = 'application/json', headers = {}, body: out = '' }) => res.writeHead(status, { 'Content-Type': contentType, ...headers }).end(out),
-    abort: () => res.writeHead(502).end()
+    abort: () => res.writeHead(502).end(),
+    // --live: the call goes on to the Worker through its dev door (a localhost
+    // origin), as a browser's would (without this, every answer came back empty).
+    continue: async ({ url = u } = {}) => {
+      const r = await fetch(url, { method: req.method, headers: { Origin: `http://localhost:${port}`, ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: req.method === 'GET' || req.method === 'HEAD' ? undefined : body });
+      res.writeHead(r.status, { 'Content-Type': r.headers.get('content-type') || 'application/json' }).end(Buffer.from(await r.arrayBuffer()));
+    }
   });
 }
 const pointFetch = `(()=>{const f=window.fetch;window.fetch=(i,o={})=>{const u=typeof i==='string'?i:i.url;return /^https:\\/\\/(orbit-workers-proxy|sports-proxy)\\.pengzjay\\.workers\\.dev\\//.test(u)${live ? "&&!/orbit-workers-proxy\\.pengzjay\\.workers\\.dev\\/transit/.test(u)" : ''}?f('/__ext?u='+encodeURIComponent(u),{method:o.method||i.method||'GET',body:o.body,headers:o.headers}):f(i,o)}})();`;
