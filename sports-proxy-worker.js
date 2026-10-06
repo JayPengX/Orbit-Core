@@ -68,6 +68,9 @@ const SPORTS_PROXY_ALLOWED_HOSTS = [
   'statsapi.mlb.com',
   'api.jolpi.ca',
   'gamma-api.polymarket.com',
+  // Polymarket's price history of one market (only /prices-history): Orbit
+  // Sports' win probability line where ESPN draws none (soccer, MLB live, CPBL).
+  'clob.polymarket.com',
   // Kambi's public odds feed: Play's Asian baseball, EuroLeague and K League
   // odds and live scores.
   'eu-offering-api.kambicdn.com',
@@ -216,9 +219,15 @@ function cachePolicyFor(url) {
     case 'sports.core.api.espn.com':
       return CACHE_PREGAME_LINE;
     case 'statsapi.mlb.com':
+      // A day's games with their linescore (Sports' live count, runners,
+      // batter and pitcher when ESPN's feed leaves them out): live.
+      if (url.pathname === '/api/v1/schedule' && /linescore/.test(url.searchParams.get('hydrate') || '')) return CACHE_LIVE;
+      return CACHE_STANDINGS;
     case 'api.jolpi.ca':
       return CACHE_STANDINGS;
     case 'api.openf1.org':
+      return CACHE_ODDS;
+    case 'clob.polymarket.com':
       return CACHE_ODDS;
     case 'gamma-api.polymarket.com':
       return url.pathname === '/public-search' ? CACHE_FUTURES : CACHE_ODDS;
@@ -264,6 +273,12 @@ const refreshesInFlight = new Set();
 // place this Worker does real CPU work) - and the cached copy is the
 // trimmed one, so that work happens at most once per TTL per colo.
 const TRIM_POLYMARKET_EVENTS = 'polymarket-events';
+// Opt-in (`&trim=polymarket-games`) for Gamma's /events of a league's days:
+// only each game's own event (not its props, corners or "more markets") and
+// only its moneyline markets with their token ids, for Orbit Sports' win
+// probability (lib/polymarket.mjs there). One day of the Premier League is
+// ~2.8MB raw, ~10KB trimmed.
+const TRIM_POLYMARKET_GAMES = 'polymarket-games';
 // Opt-in (`&trim=kambi-events`) trimming for Kambi's list views and live
 // feed: only the fields Odds Study reads (lib/kambi.mjs), a small fraction
 // of each event's full record.
@@ -392,6 +407,21 @@ export function trimElta(data) {
   return { programs };
 }
 
+const GAME_SLUG = /^[a-z0-9]+-[a-z0-9]+-[a-z0-9]+-\d{4}-\d{2}-\d{2}$/;
+export function trimPolymarketGames(events) {
+  if (!Array.isArray(events)) return events;
+  return events
+    .filter(event => GAME_SLUG.test(event?.slug || ''))
+    .map(event => ({
+      slug: event.slug,
+      title: event.title,
+      startTime: event.startTime,
+      teams: Array.isArray(event.teams) ? event.teams.map(t => ({ name: t.name, abbreviation: t.abbreviation, alias: t.alias })) : [],
+      markets: (event.markets || [])
+        .filter(m => m.sportsMarketType === 'moneyline')
+        .map(m => ({ question: m.question, groupItemTitle: m.groupItemTitle, outcomes: m.outcomes, clobTokenIds: m.clobTokenIds }))
+    }));
+}
 function trimPolymarketEvents(events) {
   if (!Array.isArray(events)) return events;
   return events.map(event => ({
@@ -505,7 +535,7 @@ async function fetchUpstream(upstreamUrl, trim) {
     if (trim) {
       try {
         const parsed = JSON.parse(new TextDecoder().decode(body));
-        body = JSON.stringify(trim === TRIM_KAMBI_EVENTS ? trimKambi(parsed) : trim === TRIM_KAMBI_OFFERS ? trimKambiOffers(parsed) : trim === TRIM_ESPN_ROSTER ? trimEspnRoster(parsed) : trim === TRIM_ESPN_ATHLETES ? trimEspnAthletes(parsed) : trim === TRIM_ELTA ? trimElta(parsed) : trimPolymarketEvents(parsed));
+        body = JSON.stringify(trim === TRIM_KAMBI_EVENTS ? trimKambi(parsed) : trim === TRIM_KAMBI_OFFERS ? trimKambiOffers(parsed) : trim === TRIM_ESPN_ROSTER ? trimEspnRoster(parsed) : trim === TRIM_ESPN_ATHLETES ? trimEspnAthletes(parsed) : trim === TRIM_ELTA ? trimElta(parsed) : trim === TRIM_POLYMARKET_GAMES ? trimPolymarketGames(parsed) : trimPolymarketEvents(parsed));
       } catch {
         // Not the JSON shape expected - pass it through untouched.
       }
@@ -534,6 +564,7 @@ function trimFor(trimParam, upstreamUrl) {
   if (upstreamUrl.hostname === ELTA_HOST) return TRIM_ELTA;
   if (upstreamUrl.hostname === F1_HOST) return TRIM_F1PAGE;
   if (trimParam === TRIM_POLYMARKET_EVENTS && upstreamUrl.hostname === 'gamma-api.polymarket.com' && upstreamUrl.pathname === '/events') return TRIM_POLYMARKET_EVENTS;
+  if (trimParam === TRIM_POLYMARKET_GAMES && upstreamUrl.hostname === 'gamma-api.polymarket.com' && upstreamUrl.pathname === '/events') return TRIM_POLYMARKET_GAMES;
   if (trimParam === TRIM_KAMBI_EVENTS && upstreamUrl.hostname === 'eu-offering-api.kambicdn.com') return TRIM_KAMBI_EVENTS;
   if (trimParam === TRIM_ESPN_ROSTER && upstreamUrl.hostname === 'site.api.espn.com' && upstreamUrl.pathname.endsWith('/roster')) return TRIM_ESPN_ROSTER;
   if (trimParam === TRIM_ESPN_ATHLETES && upstreamUrl.hostname === 'site.api.espn.com' && upstreamUrl.pathname.endsWith('/statistics/byathlete')) return TRIM_ESPN_ATHLETES;
@@ -546,6 +577,7 @@ function parseTarget(target) {
     const u = new URL(target);
     if (u.hostname === 'clients5.google.com' && (u.pathname !== '/translate_a/t' || (u.searchParams.get('q') || '').length > 5000)) return null;
     if (u.hostname === ELTA_HOST && u.pathname !== ELTA_PATH) return null;
+    if (u.hostname === 'clob.polymarket.com' && u.pathname !== '/prices-history') return null;
     if (u.hostname === F1_HOST && !/^\/en\/(drivers|teams)\/[a-z-]+$/.test(u.pathname)) return null;
     return u.protocol === 'https:' && SPORTS_PROXY_ALLOWED_HOSTS.includes(u.hostname) ? u : null;
   } catch {

@@ -128,3 +128,30 @@ test("a team's injuries (its roster read for them) are minutes old at most, its 
   const plain = await get(`https://proxy.test/sports-proxy?url=${encodeURIComponent(base)}`);
   assert.equal(plain.headers.get('X-Sports-Proxy-Cache-Tier'), 'standings');
 });
+
+test("MLB's day of games with their linescore is live (Sports' count when ESPN's is empty); its other answers a table's half hour", async () => {
+  const live = await get(`https://proxy.test/sports-proxy?url=${encodeURIComponent('https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-10-05&hydrate=linescore,previousPlay')}`);
+  assert.equal(live.headers.get('X-Sports-Proxy-Cache-Tier'), 'live');
+  const plain = await get(`https://proxy.test/sports-proxy?url=${encodeURIComponent('https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-10-05')}`);
+  assert.equal(plain.headers.get('X-Sports-Proxy-Cache-Tier'), 'standings');
+});
+
+test("Polymarket's price history: only /prices-history, at the odds' pace", async () => {
+  const ok = await get(`https://proxy.test/sports-proxy?url=${encodeURIComponent('https://clob.polymarket.com/prices-history?market=1&startTs=1&fidelity=1')}`);
+  assert.equal(ok.status, 200);
+  assert.equal(ok.headers.get('X-Sports-Proxy-Cache-Tier'), 'odds');
+  const other = await get(`https://proxy.test/sports-proxy?url=${encodeURIComponent('https://clob.polymarket.com/order')}`);
+  assert.equal(other.status, 400);
+});
+
+test("Polymarket's games trimmed: each game's own event, its moneyline markets and token ids", async () => {
+  const { trimPolymarketGames } = await import('../sports-proxy-worker.js');
+  const market = (type, q) => ({ sportsMarketType: type, question: q, groupItemTitle: q, outcomes: '["Yes","No"]', clobTokenIds: '["1","2"]', description: 'long' });
+  const got = trimPolymarketGames([
+    { slug: 'epl-ful-mun-2026-09-20', title: 'Fulham FC vs. Manchester United FC', startTime: '2026-09-20T15:30:00Z', teams: [{ name: 'Fulham FC', abbreviation: 'ful', alias: 'Fulham', logo: 'x' }], markets: [market('moneyline', 'Will Fulham FC win?'), market('totals', 'O/U 2.5')] },
+    { slug: 'epl-ful-mun-2026-09-20-more-markets', markets: [market('moneyline', 'x')] }
+  ]);
+  assert.equal(got.length, 1);
+  assert.deepEqual(got[0].teams, [{ name: 'Fulham FC', abbreviation: 'ful', alias: 'Fulham' }]);
+  assert.deepEqual(got[0].markets, [{ question: 'Will Fulham FC win?', groupItemTitle: 'Will Fulham FC win?', outcomes: '["Yes","No"]', clobTokenIds: '["1","2"]' }]);
+});
