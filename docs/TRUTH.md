@@ -153,7 +153,11 @@ bug waiting in the rest.
   the top centre lands in a fixed, full-width box with a background. So
   never give that strip (or anything an app puts there) pointer-events:
   none, never remove it, and pad the page's top with var(--q-top). A new
-  app gets this for free by loading the kit.
+  app gets this for free by loading the kit. The status bar style is
+  `default` (an app that follows light and dark, a theme-color for each)
+  or `black` (a dark app), never `black-translucent`: a page under a
+  see-through status bar is what iOS blurs (Orbit Class had it until
+  2026-10-06).
 - One look across the family: the kit's tab bar, sheets that swipe down,
   haptics on taps, dark where the app is dark (Weather and Transit), and
   Orbit Class's Liquid Glass kept close to iOS's own: light at the rim and
