@@ -29,9 +29,10 @@ test("F1 live: the safety car and flags so far, for the race chart's bands", asy
       Messages: [
         { Utc: '2026-10-04T08:52:16', Lap: 9, Category: 'SafetyCar', Message: 'SAFETY CAR DEPLOYED' },
         { Utc: '2026-10-04T08:53:00', Lap: 9, Category: 'Other', Message: 'CAR 44 TIME DELETED' },
+        { Utc: '2026-10-04T08:53:10', Lap: 9, Category: 'Other', Message: 'CAR 77 (BOT) STOPPED AT TURN 14' },
         { Utc: '2026-10-04T08:58:50', Lap: 12, Category: 'SafetyCar', Message: 'SAFETY CAR IN THIS LAP' }
       ]
     }
   });
-  assert.deepEqual(r.control.map(m => [m.lap, m.message]), [[9, 'SAFETY CAR DEPLOYED'], [12, 'SAFETY CAR IN THIS LAP']]);
+  assert.deepEqual(r.control.map(m => [m.lap, m.message]), [[9, 'SAFETY CAR DEPLOYED'], [9, 'CAR 77 (BOT) STOPPED AT TURN 14'], [12, 'SAFETY CAR IN THIS LAP']]);
 });
