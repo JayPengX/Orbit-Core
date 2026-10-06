@@ -281,9 +281,12 @@ export const HELP = {
         'Orbit 的背單字 App：大考中心高中英文 6,000 字，每個字都有真人發音，記憶模型替你安排什麼時候複習。'
       ]],
       ['tabs', '每個分頁', [
-        '「今天」：今天的目標、連續天數、等級、今日單字和最常忘的字，一鍵開始這一輪。',
-        '「練習」：選級別和學習方式，開始一輪，或先背新字再測驗。',
-        '「進度」：每個級別學到哪裡、精熟幾個字、最常忘的字。'
+        '「今天」：今天的目標、連續天數、等級，該複習和還沒學的字數，一鍵開始這一輪；背新字、上次答錯的字用卡片看一遍，還有今日單字。',
+        '「練習」：選級別、學習方式和發音的語速，開始一輪。',
+        '「複習」：答錯、該複習、學習中、收藏的字分開列，可以搜尋和排序；「卡片複習」一張一張翻（點一下翻面、左右滑換張），看完再測驗這批字，測驗才會更新記憶模型。',
+        '「單字」：6,000 字全部列出，照級別、新字／學習中／精熟／收藏篩選，英文或中文都能搜尋。',
+        '「進度」：各級別學到哪裡、正確率和每題花的時間、最近 14 天、接下來幾天要複習多少、記憶模型怎麼配合你，還有最常忘的字。',
+        '點任何一個字都會打開它的卡片：完整意思、記憶小撇步、你搞混過和常被搞混的字、你拼錯的樣子、作答紀錄和現在還記得的機率；按 ☆ 收藏，或按「我會了」不再考。'
       ]],
       ['words', '背單字', [
         '大考中心高中英文參考詞彙第 1 到 6 級，共 6,170 字，每個字都有真人發音錄音（Microsoft Jenny）。每一輪 10、20 或 30 個字，混合該複習的字和新字；答錯的字會在這一輪最後再問一次。「背新字」一張一張看新字（發音、意思），背滿一批（一輪的字數）就考這批字，考完之後照記憶模型排複習。',
@@ -304,9 +307,12 @@ export const HELP = {
         'Orbit’s app for English words: the 6,000-word high-school list, every word recorded, and a memory model that decides when each comes back.'
       ]],
       ['tabs', 'The tabs', [
-        'Today: the day’s goal, your streak and level, the word of the day and the words you forget most, a round one tap away.',
-        'Practice: pick levels and a way to learn, and start a round, or study new words first and take a quiz on them.',
-        'Progress: how far you are in each level, words mastered and the words you forget most.'
+        'Today: the day’s goal, your streak and level, what’s due and not yet learnt with a round one tap away, new words to study, last time’s misses as flash cards, and the word of the day.',
+        'Practice: pick levels, a way to learn and the speed of the sound, and start a round.',
+        'Review: missed, due, learning and saved words, each searchable and sortable. Flash cards: flip (tap) and swipe through them, then test the deck; only the test updates the memory model.',
+        'Words: all 6,000 words by level and state (new, learning, mastered, saved), searched in English or Chinese.',
+        'Progress: each level, your accuracy and time per answer, the last 14 days, the reviews coming, how the memory model fits you, and the words you forget most.',
+        'Tap any word for its sheet: the whole meaning, a way to remember it, words it’s mixed up with, how you misspelt it, your record and the chance you still know it; ☆ saves it, “I know it” puts it away.'
       ]],
       ['words', 'Words', [
         'The high-school English reference list, levels 1 to 6: 6,170 words, each recorded (Microsoft’s Jenny voice). A round is 10, 20 or 30 words, reviews and new ones mixed; a missed word comes back once at the end of the round. Study new words shows them card by card (sound and meaning); a full batch (a round’s size) unlocks a quiz on just those words, and from then on they’re scheduled like the rest.',
