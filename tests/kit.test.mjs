@@ -259,6 +259,47 @@ test('notice switches follow the pass: newest wins', async () => {
   assert.equal(writes.length, 1);
 });
 
+test('a notice the Worker already sent as a phone notice is not shown again when the app opens later', async () => {
+  store.clear();
+  const saved = { fetch: globalThis.fetch, Notification: globalThis.Notification, navigator: Object.getOwnPropertyDescriptor(globalThis, 'navigator'), document: globalThis.document };
+  const shown = [];
+  globalThis.Notification = { permission: 'granted' };
+  Object.defineProperty(globalThis, 'navigator', {
+    configurable: true,
+    value: {
+      language: 'zh-TW',
+      serviceWorker: {
+        ready: Promise.resolve({ pushManager: { getSubscription: async () => ({ endpoint: 'https://push.example/1', options: {}, toJSON: () => ({}) }) } }),
+        getRegistration: async () => ({ showNotification: async title => void shown.push(title) })
+      }
+    }
+  });
+  globalThis.document = { visibilityState: 'hidden' };
+  globalThis.fetch = async url => ({ ok: true, json: async () => (String(url).endsWith('/key') ? { key: 'AAAA' } : { ok: true }) });
+  try {
+    kit.setNotifyOn(true);
+    const s = { app: 'orbit', lang: 'zh', ensureToken: async () => 'token' };
+    const now = Date.now();
+    // 10:00: the 10:10 class's notice is on the Worker's list.
+    await kit.schedulePush(s, [{ at: now - 60_000, title: '社會 10 分鐘後上課', tag: 'class:a', kind: 'class' }, { at: now + 3_600_000, title: '民主', tag: 'class:b', kind: 'class' }]);
+    // Ten minutes on: a new list without it (its time has passed)…
+    await kit.schedulePush(s, [{ at: now + 3_600_000, title: '民主', tag: 'class:b', kind: 'class' }]);
+    // …and the app, opened in that break, would announce it: the phone already did.
+    await kit.notify(s, { title: '社會 5 分鐘後上課', tag: 'class:a', kind: 'class' });
+    // One on the list still to come: the Worker sends it.
+    await kit.notify(s, { title: '民主', tag: 'class:b', kind: 'class' });
+    assert.deepEqual(shown, []);
+    // One the Worker never had: shown here.
+    await kit.notify(s, { title: '別的', tag: 'class:c', kind: 'class' });
+    assert.deepEqual(shown, ['別的']);
+  } finally {
+    globalThis.fetch = saved.fetch;
+    globalThis.Notification = saved.Notification;
+    if (saved.navigator) Object.defineProperty(globalThis, 'navigator', saved.navigator);
+    globalThis.document = saved.document;
+  }
+});
+
 test('CPBL: a month the proxy can\'t fill comes from TheSportsDB\'s day lists on the device', async () => {
   const { asiaMonth, tsdbDays } = await import('../kit/catalog.mjs');
   const now = Date.parse('2026-09-30T04:00:00Z');

@@ -7,6 +7,7 @@
 //                          [--store 'key=value']  (a localStorage entry to start with)
 //                          [--signed-out]  (the sign-in screen, as a new device sees it)
 //                          [--entry '{json}']  (a wallet entry to add: an economy scenario)
+//                          [--clock 2026-10-06T10:05]  (the page's clock, Taipei time)
 //                          [--snap '{json}']  (the wallet's snap to start with, e.g. Play's open slips)
 //                          [--fixture 'text-in-url=file.json']  (repeatable: that saved answer
 //                          for any upstream URL containing the text, e.g. when Yahoo rate-limits)
@@ -171,6 +172,8 @@ const full = flag('full');
 const signedOut = flag('signed-out');
 const dark = flag('dark');
 const noGeo = flag('no-geo');
+// --clock '2026-10-06T10:05': the page's clock starts then (Taipei time) and runs on.
+const clock = opt('clock', '');
 // --root dir: where the repos are (default: next to this one), e.g. a copy
 // stamped by scripts/stamp-version.mjs, to see a deploy's loading.
 const ROOT = resolve(opt('root', new URL('../../', import.meta.url).pathname));
@@ -373,6 +376,7 @@ const context = serve ? stub : await browser.newContext({
   userAgent: UAS[device] || UAS.iphone,
   ignoreHTTPSErrors: true
 });
+if (clock && !serve) await context.clock.install({ time: new Date(`${clock}+08:00`) }).then(() => context.clock.resume());
 if (appId === 'weather' && !noGeo) {
   await context.grantPermissions(['geolocation']);
   await context.setGeolocation({ latitude: 25.034, longitude: 121.565 });
@@ -402,7 +406,9 @@ if (shuffle)
         .map(el => (el.innerText || '').split('\n').map(x => x.trim()).filter(Boolean).slice(0, 3).join(' · ').slice(0, 60));
     const watch = setInterval(() => {
       const box = document.getElementById('loading');
-      if (box && box.hidden) {
+      // Orbit Class: its booting class instead of a loading box.
+      const classOpen = !box && document.body && !document.body.classList.contains('orbit-booting') && document.querySelector('.cx-hero');
+      if ((box && box.hidden) || classOpen) {
         clearInterval(watch);
         globalThis.__atOpen = { t: Math.round(performance.now()), cards: globalThis.__cards() };
       }

@@ -2108,7 +2108,35 @@ export async function schedulePush(s, items) {
   const text = JSON.stringify(list);
   if (readStore(storeKey) === text && readStore(`quadra.push.sub.${s.app}`)) return;
   if (!(await enablePush(s))) return;
-  if (await pushPost(s, 'schedule', { items: list })) writeStore(storeKey, text);
+  const before = readStore(storeKey);
+  if (await pushPost(s, 'schedule', { items: list })) {
+    keepPushed(s.app, before);
+    writeStore(storeKey, text);
+  }
+}
+// What the Worker had on the list and whose time has come was sent as a
+// phone notice: remembered (two days) when the list is replaced, so the app
+// doesn't show it again as a banner once its item is off the new list (a
+// class's notice, then the app opened later in the same break).
+const PUSHED_MS = 2 * 86_400_000;
+function keepPushed(app, listText) {
+  const now = Date.now();
+  let kept = {};
+  try {
+    kept = JSON.parse(readStore(`quadra.push.sent.${app}`) || '{}') || {};
+    for (const x of JSON.parse(listText || '[]')) if (x?.tag && x.at <= now) kept[x.tag] = x.at;
+  } catch {}
+  writeStore(`quadra.push.sent.${app}`, JSON.stringify(Object.fromEntries(Object.entries(kept).filter(([, at]) => at > now - PUSHED_MS))));
+}
+function pushedHere(app, key) {
+  try {
+    const now = Date.now();
+    if (JSON.parse(readStore(`quadra.push.list.${app}`) || '[]').some(x => x.tag === key)) return true;
+    const at = JSON.parse(readStore(`quadra.push.sent.${app}`) || '{}')[key];
+    return Number.isFinite(at) && at > now - PUSHED_MS;
+  } catch {
+    return false;
+  }
 }
 
 // Every kind of notice, by app: what it is and when it comes. Each can be
@@ -2316,13 +2344,9 @@ export async function notify(s, { title, body = '', tag = '', hash = '', kind = 
   const key = `${s.app}:${tag || title}`;
   if (tag && shown.has(key)) return;
   if (tag) shown.add(key);
-  // One the Worker sends this device as a phone notice too (schedulePush, push
-  // on here): that one comes, so no banner on top of it.
-  if (tag && notifyOn() && readStore(`quadra.push.sub.${s.app}`)) {
-    try {
-      if (JSON.parse(readStore(`quadra.push.list.${s.app}`) || '[]').some(x => x.tag === key)) return;
-    } catch {}
-  }
+  // One the Worker sends (or already sent) this device as a phone notice
+  // (schedulePush, push on here): no banner on top of it.
+  if (tag && notifyOn() && readStore(`quadra.push.sub.${s.app}`) && pushedHere(s.app, key)) return;
   if (typeof document !== 'undefined' && document.visibilityState === 'visible') return queueBanner(s, { title, body, hash });
   if (!notifyOn()) return;
   const options = { body, tag: key, icon: './icons/icon-192.png', badge: './icons/icon-192.png', data: { url: `${APPS[s.app].path}${hash ? `#${hash}` : ''}` } };
