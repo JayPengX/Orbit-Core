@@ -14,7 +14,8 @@
 // The token is checked against ADMIN_TOKEN_HASH (its SHA-256; the token
 // itself is never in the repo). Clearing the hash turns this off.
 
-import { newPasscode, updateWallet, ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, PAIR_MS, ECO_LIMITS, parseWallet, poolBalance, plusMember, gen, emptyWallet } from './eco.js';
+import { newPasscode, updateWallet, deleteAccount, ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, PAIR_MS, ECO_LIMITS, parseWallet, poolBalance, plusMember, plusLapsed, taipeiMonth, gen, emptyWallet } from './eco.js';
+import { sendPush } from './push.js';
 import { KAMBI_COLLECTION } from './kambi.js';
 
 export const ADMIN_TOKEN_HASH = '';
@@ -95,6 +96,17 @@ export async function handleAdmin({ env, deps, headers, request, ip, body }) {
   // `device-code` { wallet: reference } makes a one-time device code for it
   // (10 minutes), so its owner signs in and sets a new pass.
   if (body.action === 'wallets') return deps.json({ wallets: await walletList(env, deps) }, 200, headers);
+  // The panel's other views and tools (adminTools below): an overview,
+  // one account in full, money and Plus by hand, signing an account out,
+  // a never-used pass removed, notices, the sources' health.
+  if (ADMIN_TOOLS[body.action]) {
+    try {
+      const out = await ADMIN_TOOLS[body.action]({ env, deps, body });
+      return out.error ? deps.errorJson(out.error, out.status || 400, headers, request) : deps.json(out, 200, headers);
+    } catch (error) {
+      return deps.errorJson(error?.message === 'wallet busy, try again' ? 'ECO_BUSY' : 'ADMIN_FAILED', 500, headers, request);
+    }
+  }
   if (body.action === 'device-code') {
     const ref = typeof body.wallet === 'string' ? body.wallet : '';
     const hits = ref.length >= 6 ? (await deps.fsList(env, WALLET_COLLECTION, 300)).filter(w => w.id.startsWith(ref)) : [];
@@ -154,6 +166,7 @@ export async function handleAdmin({ env, deps, headers, request, ip, body }) {
 
 async function walletList(env, deps) {
   const wallets = await deps.fsList(env, WALLET_COLLECTION, 300);
+  const now = deps.now();
   return wallets.map(w => {
     const wallet = parseWallet(w.payload);
     const last = Math.max(0, ...Object.values(wallet?.apps || {}).map(a => a.last || 0));
@@ -165,6 +178,7 @@ async function walletList(env, deps) {
       entries: wallet?.entries?.length || 0,
       balance: wallet ? poolBalance(wallet) : null,
       gen: wallet ? gen(wallet) : null,
+      plus: wallet ? plusMember(wallet, now) : false,
       updateTime: w.updateTime
     };
   });
@@ -237,3 +251,203 @@ function summary(plan) {
     wouldRetire: plan.retired
   };
 }
+
+// ---- The panel's tools ----------------------------------------------------------------
+//
+// Every one answers { …data } or { error, status }. An account is named by
+// the start of its reference (the first 6+ characters of its id, as the
+// panel's table shows it): exactly one must match.
+const DAY = 86_400_000;
+const MAX_GRANT = 1_000_000;
+const appsOf = w => Object.entries(w?.apps || {}).map(([app, a]) => ({ app, first: a.first || null, last: a.last || null }));
+const lastUsed = w => Math.max(0, ...appsOf(w).map(a => a.last || 0));
+async function findWallet(env, deps, ref) {
+  const r = String(ref || '').trim();
+  if (r.length < 6) return null;
+  const hits = (await deps.fsList(env, WALLET_COLLECTION, 300)).filter(w => w.id.startsWith(r));
+  if (hits.length !== 1) return null;
+  const wallet = parseWallet(hits[0].payload);
+  return wallet ? { id: hits[0].id, wallet, updateTime: hits[0].updateTime } : null;
+}
+const notFound = { error: 'ECO_PAIR_NOT_FOUND', status: 404 };
+// Push records in KV: push:<account>:<app> ({ sub, items, last, told }).
+async function pushRecords(env, prefix = 'push:') {
+  const kv = env.RATE_LIMIT_KV;
+  if (!kv?.list) return [];
+  const out = [];
+  let cursor;
+  for (let i = 0; i < 10; i++) {
+    const page = await kv.list({ prefix, cursor });
+    for (const k of page.keys) {
+      const rest = k.name.slice(5);
+      if (k.name === 'push:due' || rest.startsWith('prefs:')) continue;
+      const cut = rest.lastIndexOf(':');
+      out.push({ key: k.name, account: rest.slice(0, cut), app: rest.slice(cut + 1) });
+    }
+    if (page.list_complete || !page.cursor) break;
+    cursor = page.cursor;
+  }
+  return out;
+}
+// The sources the apps lean on, each asked once (public reads only, no keys).
+const HEALTH = [
+  ['ESPN', 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard'],
+  ['Kambi', 'https://eu-offering-api.kambicdn.com/offering/v2018/ub/listView/formula_1/all/all/all/competitions.json?lang=en_GB&market=GB'],
+  ['Polymarket', 'https://gamma-api.polymarket.com/events?limit=1&closed=false'],
+  ['OpenF1', 'https://api.openf1.org/v1/sessions?session_key=latest'],
+  ['NLSC 地點', 'https://api.nlsc.gov.tw/other/TownVillagePointQuery1/121.5645/25.0341'],
+  ['Shared-Data', 'https://jaypengx.github.io/Shared-Data/sports/nba/days.json'],
+  ['台灣彩券', 'https://api.taiwanlottery.com/TLCAPIWeB/Lottery/LatestResult']
+];
+
+export const ADMIN_TOOLS = {
+  // The whole pass at a glance: accounts, who's active, Plus, the money, each
+  // app's users, the last 14 days' sign-ups and last uses.
+  async overview({ env, deps }) {
+    const now = deps.now();
+    const list = (await deps.fsList(env, WALLET_COLLECTION, 300)).map(w => ({ id: w.id, w: parseWallet(w.payload) })).filter(x => x.w);
+    const active = ms => list.filter(x => now - lastUsed(x.w) < ms).length;
+    const apps = {};
+    for (const x of list)
+      for (const a of appsOf(x.w)) {
+        apps[a.app] ||= { users: 0, week: 0 };
+        apps[a.app].users++;
+        if (now - (a.last || 0) < 7 * DAY) apps[a.app].week++;
+      }
+    const flows = {};
+    for (const x of list)
+      for (const e of x.w.entries)
+        if (now - (e.t || 0) < 7 * DAY && e.amount) {
+          const k = `${e.app}:${e.kind}`;
+          flows[k] ||= { in: 0, out: 0, n: 0 };
+          flows[k][e.amount > 0 ? 'in' : 'out'] += Math.abs(e.amount);
+          flows[k].n++;
+        }
+    const day = t => new Date(t + 8 * 3_600_000).toISOString().slice(0, 10);
+    const days = Array.from({ length: 14 }, (_, i) => day(now - (13 - i) * DAY));
+    const byDay = f => days.map(d => list.filter(x => f(x.w) && day(f(x.w)) === d).length);
+    const balances = list.map(x => poolBalance(x.w));
+    return {
+      at: now,
+      accounts: list.length,
+      used: list.filter(x => lastUsed(x.w)).length,
+      active: { day: active(DAY), week: active(7 * DAY), month: active(30 * DAY) },
+      newWeek: list.filter(x => now - (x.w.created || 0) < 7 * DAY).length,
+      plus: list.filter(x => plusMember(x.w, now)).length,
+      money: { total: Math.round(balances.reduce((a, b) => a + b, 0)), overdrawn: balances.filter(b => b < 0).length, top: Math.round(Math.max(0, ...balances)) },
+      apps,
+      flows,
+      days,
+      signups: byDay(w => w.created || 0),
+      lastSeen: byDay(lastUsed)
+    };
+  },
+  // One account in full: its apps, money, Plus, settings, the last records, its notices.
+  async wallet({ env, deps, body }) {
+    const hit = await findWallet(env, deps, body.wallet);
+    if (!hit) return notFound;
+    const { id, wallet } = hit;
+    const now = deps.now();
+    const pushes = (await pushRecords(env, `push:${id}:`).catch(() => [])).map(r => r.app);
+    const plusMonths = wallet.entries.filter(e => e.app === 'eco' && e.id?.startsWith('eco:plus:')).map(e => e.id.slice(9)).sort();
+    return {
+      ref: id.slice(0, 8),
+      created: wallet.created || null,
+      lastUsed: lastUsed(wallet) || null,
+      gen: gen(wallet),
+      balance: poolBalance(wallet),
+      apps: appsOf(wallet),
+      plus: { member: plusMember(wallet, now), renewing: wallet.settings?.plus?.value?.on === true, plan: wallet.settings?.plus?.value?.plan || null, lapsed: plusLapsed(wallet), months: plusMonths.slice(-24) },
+      entries: wallet.entries.length,
+      recent: [...wallet.entries].sort((a, b) => (b.t || 0) - (a.t || 0)).slice(0, 60).map(e => ({ t: e.t, app: e.app, kind: e.kind, amount: e.amount, note: e.note || '' })),
+      snaps: Object.fromEntries(Object.entries(wallet.snap || {}).map(([k, v]) => [k, typeof v?.cash === 'number' ? v.cash : null])),
+      settings: Object.keys(wallet.settings || {}).sort(),
+      inbox: Object.fromEntries(Object.entries(wallet.inbox || {}).map(([k, v]) => [k, v.length])),
+      pushes
+    };
+  },
+  // Money by hand (a correction, a prize): an 'eco' entry, kind 'admin', with its reason.
+  async grant({ env, deps, body }) {
+    const amount = Math.round(Number(body.amount) * 100) / 100;
+    const note = String(body.note || '').trim().slice(0, 60);
+    if (!Number.isFinite(amount) || !amount || Math.abs(amount) > MAX_GRANT || !note) return { error: 'ADMIN_BAD_AMOUNT', status: 400 };
+    const hit = await findWallet(env, deps, body.wallet);
+    if (!hit) return notFound;
+    const now = deps.now();
+    const entry = { id: `eco:admin:${now}`, t: now, app: 'eco', kind: 'admin', amount, note };
+    const res = await updateWallet(env, deps, hit.id, w => ({ ...w, entries: [...w.entries, entry] }));
+    return { ok: true, entry, balance: poolBalance(res.wallet) };
+  },
+  // Plus by hand: `months` free months from this one (any already held kept);
+  // `stop`: no renewal (what's paid runs out).
+  async plus({ env, deps, body }) {
+    const hit = await findWallet(env, deps, body.wallet);
+    if (!hit) return notFound;
+    const now = deps.now();
+    if (body.stop) {
+      const res = await updateWallet(env, deps, hit.id, w => ({ ...w, settings: { ...(w.settings || {}), plus: { value: { ...(w.settings?.plus?.value || {}), on: false, t: now }, t: now } } }));
+      return { ok: true, renewing: false, member: plusMember(res.wallet, now) };
+    }
+    const n = Math.max(1, Math.min(12, Math.floor(Number(body.months) || 0)));
+    const res = await updateWallet(env, deps, hit.id, w => {
+      const have = new Set(w.entries.map(e => e.id));
+      const add = [];
+      for (let m = taipeiMonth(now), i = 0; i < n; i++) {
+        if (!have.has(`eco:plus:${m}`)) add.push({ id: `eco:plus:${m}`, t: now, app: 'eco', kind: 'plus', amount: 0, note: 'gift' });
+        const [y, mo] = m.split('-').map(Number);
+        m = mo === 12 ? `${y + 1}-01` : `${y}-${String(mo + 1).padStart(2, '0')}`;
+      }
+      return add.length ? { ...w, entries: [...w.entries, ...add] } : w;
+    });
+    return { ok: true, member: plusMember(res.wallet, now) };
+  },
+  // Every device signed out (the pass still works: they sign in again).
+  async signout({ env, deps, body }) {
+    const hit = await findWallet(env, deps, body.wallet);
+    if (!hit) return notFound;
+    const res = await updateWallet(env, deps, hit.id, w => ({ ...w, sec: { ...(w.sec || {}), gen: gen(w) + 1 }, live: null }));
+    return { ok: true, gen: gen(res.wallet) };
+  },
+  // A pass handed out and never used, taken back (its code stops working).
+  async remove({ env, deps, body }) {
+    const hit = await findWallet(env, deps, body.wallet);
+    if (!hit) return notFound;
+    if (lastUsed(hit.wallet) || hit.wallet.entries.some(e => e.app !== 'eco' || e.kind !== 'start')) return { error: 'ADMIN_IN_USE', status: 409 };
+    await deleteAccount(env, deps, hit.id);
+    return { ok: true };
+  },
+  // Notices: who's subscribed, per app, and what's waiting to be sent.
+  async pushes({ env }) {
+    const records = await pushRecords(env);
+    const kv = env.RATE_LIMIT_KV;
+    const due = kv ? (await kv.get('push:due', 'json')) || {} : {};
+    const apps = {};
+    for (const r of records) apps[r.app] = (apps[r.app] || 0) + 1;
+    const next = Object.values(due).filter(Number.isFinite).sort((a, b) => a - b);
+    return { records: records.length, accounts: new Set(records.map(r => r.account)).size, apps, due: next.length, next: next[0] || null };
+  },
+  // A test notice to one account's device for one app.
+  async 'push-test'({ env, deps, body }) {
+    const hit = await findWallet(env, deps, body.wallet);
+    if (!hit) return notFound;
+    const app = String(body.app || '');
+    const record = env.RATE_LIMIT_KV ? await env.RATE_LIMIT_KV.get(`push:${hit.id}:${app}`, 'json') : null;
+    if (!record?.sub) return { error: 'ADMIN_NO_PUSH', status: 404 };
+    const r = await sendPush(env, record.sub, { title: 'Quadra 測試通知', body: '這是管理頁送出的測試通知，收到代表通知正常。', tag: `test:${deps.now()}` });
+    return { ok: r === 'sent', result: String(r) };
+  },
+  // The sources the apps read, each asked once: answered, how fast.
+  async health() {
+    const one = async ([name, url]) => {
+      const t = Date.now();
+      try {
+        const res = await fetch(url, { headers: { 'User-Agent': 'curl/8.4.0' }, signal: AbortSignal.timeout(8000) });
+        await res.arrayBuffer();
+        return { name, ok: res.ok, status: res.status, ms: Date.now() - t };
+      } catch (e) {
+        return { name, ok: false, status: 0, ms: Date.now() - t, error: String(e?.name || e) };
+      }
+    };
+    return { at: Date.now(), checks: await Promise.all(HEALTH.map(one)) };
+  }
+};

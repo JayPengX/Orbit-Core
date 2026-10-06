@@ -103,7 +103,8 @@ export function moneySides(wallet) {
       if (e.kind === 'start' || e.kind === 'grant' || e.id.startsWith(RESET_ID)) gave.start += a;
       else if (e.kind === 'pay') gave.pay += a;
       else if (e.kind === 'rank') gave.rank += a;
-      else if (e.kind === 'rebase' || e.kind === 'vip') gave.other += a;
+      // (A correction or prize from the admin page: money Quadra gave, either way.)
+      else if (e.kind === 'rebase' || e.kind === 'vip' || e.kind === 'admin') gave.other += a;
       else if (e.kind === 'plus' || e.kind === 'od') fees -= a;
     } else if (e.app === 'odds') {
       if (e.kind === 'start') gave.start += a;

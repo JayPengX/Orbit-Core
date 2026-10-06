@@ -9,29 +9,87 @@
 <style>
   :root { --q-accent: #2563eb; }
   body { margin: 0; background: var(--q-page); color: var(--q-text); font-family: var(--q-font); }
-  main { width: min(640px, 100%); margin: 0 auto; padding: calc(var(--q-top, 0px) + 20px) 16px 60px; box-sizing: border-box; }
+  main { width: min(980px, 100%); margin: 0 auto; padding: calc(var(--q-top, 0px) + 20px) 16px 80px; box-sizing: border-box; }
   h1 { font-size: 28px; margin: 6px 2px 4px; }
   .kicker { color: var(--q-accent); font-weight: 700; font-size: 14px; margin: 0 2px; }
-  .lede { color: var(--q-muted); margin: 4px 2px 20px; line-height: 1.5; }
-  h2 { font-size: 20px; margin: 26px 2px 10px; }
+  .lede { color: var(--q-muted); margin: 4px 2px 16px; line-height: 1.5; }
+  h2 { font-size: 20px; margin: 24px 2px 10px; }
+  h3 { font-size: 16px; margin: 18px 0 8px; }
   .card { border: 1px solid var(--q-border); border-radius: var(--q-radius); background: var(--q-surface); box-shadow: var(--q-shadow-sm); padding: 16px 18px; }
+  .card + .card { margin-top: 12px; }
   .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-  input { font: inherit; font-size: 16px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--q-border); background: var(--q-surface-2); color: var(--q-text); min-width: 0; }
-  input[type='number'] { width: 110px; }
-  .grow { flex: 1 1 220px; }
-  button { font: inherit; font-size: 15px; font-weight: 700; padding: 12px 18px; border-radius: 12px; border: 1px solid var(--q-border); background: var(--q-surface); color: var(--q-text); cursor: pointer; }
+  .spread { justify-content: space-between; }
+  input, select { font: inherit; font-size: 16px; padding: 11px 13px; border-radius: 12px; border: 1px solid var(--q-border); background: var(--q-surface-2); color: var(--q-text); min-width: 0; }
+  input[type='number'] { width: 120px; }
+  .grow { flex: 1 1 200px; }
+  button { font: inherit; font-size: 15px; font-weight: 700; padding: 11px 16px; border-radius: 12px; border: 1px solid var(--q-border); background: var(--q-surface); color: var(--q-text); cursor: pointer; white-space: nowrap; }
   button.primary { background: var(--q-accent); border-color: var(--q-accent); color: #fff; }
-  button:disabled { opacity: 0.5; }
+  button.danger { color: var(--q-bad); border-color: color-mix(in srgb, var(--q-bad) 45%, var(--q-border)); }
+  button.small { padding: 7px 12px; font-size: 13.5px; border-radius: 10px; }
+  button:disabled { opacity: 0.5; cursor: default; }
   .muted { color: var(--q-muted); font-size: 14px; }
   .error { color: var(--q-bad); font-weight: 600; min-height: 1.2em; margin: 8px 0 0; }
-  .passes { margin: 14px 0 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; font-variant-numeric: tabular-nums; }
-  .passes li { padding: 8px 10px; border-radius: 10px; background: var(--q-surface-2); font-family: ui-monospace, SFMono-Regular, monospace; font-size: 14px; }
+  .ok { color: var(--q-good); font-weight: 600; margin: 8px 0 0; }
+  .nowrap { white-space: nowrap; }
+  .num { font-variant-numeric: tabular-nums; }
+  /* Views */
+  .tabs { position: sticky; top: 0; z-index: 2; display: flex; gap: 4px; padding: 4px; margin: 8px 0 4px; border-radius: 999px; background: var(--q-fill, var(--q-surface-2)); overflow-x: auto; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tabs button { flex: 1 0 auto; border: 0; background: none; border-radius: 999px; padding: 9px 16px; color: var(--q-text-2); }
+  .tabs button[aria-pressed='true'] { background: var(--q-surface); color: var(--q-accent); box-shadow: var(--q-shadow-sm); }
+  /* Figures */
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .tile { padding: 12px 14px; border-radius: 14px; background: var(--q-surface-2); min-width: 0; }
+  .tile small { display: block; color: var(--q-muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tile strong { display: block; font-size: 24px; font-weight: 800; margin-top: 2px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tile em { display: block; font-style: normal; color: var(--q-muted); font-size: 12px; margin-top: 2px; white-space: nowrap; }
+  .chart { width: 100%; height: auto; display: block; }
+  .legend { display: flex; gap: 14px; font-size: 13px; color: var(--q-muted); margin-top: 6px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+  /* Tables */
+  .tablewrap { overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
-  th, td { text-align: left; padding: 9px 6px; border-bottom: 1px solid var(--q-divider); }
+  th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--q-divider); white-space: nowrap; }
   th { color: var(--q-muted); font-weight: 600; }
+  th[data-sort] { cursor: pointer; user-select: none; }
+  th[data-sort]::after { content: ''; margin-left: 4px; }
+  th[aria-sort='ascending']::after { content: '▲'; font-size: 10px; }
+  th[aria-sort='descending']::after { content: '▼'; font-size: 10px; }
+  td.right, th.right { text-align: right; }
+  tbody tr.tap { cursor: pointer; }
+  tbody tr.tap:hover { background: var(--q-surface-2); }
   .tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; background: var(--q-sunken); color: var(--q-muted); }
   .tag.on { background: color-mix(in srgb, var(--q-good) 16%, transparent); color: var(--q-good); }
+  .tag.plus { background: color-mix(in srgb, #d4a017 22%, transparent); color: #b8860b; }
+  .tag.bad { background: color-mix(in srgb, var(--q-bad) 14%, transparent); color: var(--q-bad); }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chips button { padding: 7px 12px; font-size: 13.5px; border-radius: 999px; }
+  .chips button[aria-pressed='true'] { background: var(--q-accent); border-color: var(--q-accent); color: #fff; }
+  .pos { color: var(--q-good); }
+  .neg { color: var(--q-bad); }
   .code { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 26px; font-weight: 800; letter-spacing: 0.12em; margin: 10px 0 4px; }
+  .passes { margin: 14px 0 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+  .passes li { padding: 8px 10px; border-radius: 10px; background: var(--q-surface-2); font-family: ui-monospace, SFMono-Regular, monospace; font-size: 14px; }
+  .checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .checks li { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: var(--q-surface-2); }
+  .checks .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--q-good); flex: none; }
+  .checks .dot.bad { background: var(--q-bad); }
+  .checks .dot.slow { background: #d4a017; }
+  .checks span:nth-child(2) { flex: 1; font-weight: 600; }
+  /* The account sheet */
+  dialog.sheet { width: min(720px, 100vw); max-height: 92vh; margin: auto auto 0; border: 0; padding: 0; border-radius: 22px 22px 0 0; background: var(--q-page); color: var(--q-text); box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.3); }
+  @media (min-width: 760px) { dialog.sheet { margin: auto; border-radius: 22px; } }
+  dialog.sheet::backdrop { background: rgba(0, 0, 0, 0.45); }
+  .sheet-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 18px; background: var(--q-page); border-bottom: 1px solid var(--q-divider); }
+  .sheet-head h2 { margin: 0; font-size: 19px; }
+  .sheet-body { padding: 4px 18px 28px; }
+  .kv { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; font-size: 14px; }
+  .kv dt { color: var(--q-muted); }
+  .kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+  .actions { display: grid; gap: 12px; }
+  .action { padding: 14px; border-radius: 14px; background: var(--q-surface); border: 1px solid var(--q-border); }
+  .action h3 { margin: 0 0 4px; font-size: 15px; }
+  .action p.muted { margin: 0 0 10px; }
   [hidden] { display: none !important; }
 </style>
 </head>
@@ -39,7 +97,7 @@
 <main>
   <p class="kicker">QUADRA</p>
   <h1>管理</h1>
-  <p class="lede">發放 Quadra Pass、看每個帳戶、幫人找回帳戶。只有持有管理金鑰的人能用。</p>
+  <p class="lede">帳戶、Quadra Pass、Plus、通知、資料來源和資料整理，都在這裡。只有持有管理金鑰的人能用。</p>
 
   <section id="gate" class="card">
     <h2 style="margin-top:0">管理金鑰</h2>
@@ -49,43 +107,127 @@
   </section>
 
   <div id="panel" hidden>
-    <h2>發放 Quadra Pass</h2>
-    <div class="card">
-      <p class="muted">每一組都是全新的 Quadra Pass，誰先用它登入就是誰的。發出去之前先複製或下載保存：這裡只顯示這一次。</p>
-      <div class="row"><input id="count" type="number" min="1" max="500" value="10" /><span class="muted">組</span><button id="issue" class="primary">發放</button></div>
-      <p id="issue-error" class="error"></p>
-      <div id="issued" hidden>
-        <div class="row"><strong id="issued-n"></strong><button id="copy">全部複製</button><button id="download">下載清單</button></div>
-        <ol id="passes" class="passes"></ol>
+    <nav class="tabs" id="tabs">
+      <button data-view="overview" aria-pressed="true">總覽</button>
+      <button data-view="accounts" aria-pressed="false">帳戶</button>
+      <button data-view="issue" aria-pressed="false">發放 Pass</button>
+      <button data-view="ops" aria-pressed="false">通知與來源</button>
+      <button data-view="clean" aria-pressed="false">資料整理</button>
+    </nav>
+
+    <!-- 總覽 -->
+    <section data-pane="overview">
+      <div class="row spread"><h2>總覽</h2><button id="ov-load" class="small">重新整理</button></div>
+      <p id="ov-error" class="error"></p>
+      <div id="ov" hidden>
+        <div class="tiles" id="ov-tiles"></div>
+        <div class="card" style="margin-top:12px">
+          <div class="row spread"><strong>最近 14 天</strong><span class="legend"><span><i style="background:var(--q-accent)"></i>新帳戶</span><span><i style="background:#16a34a"></i>最後使用</span></span></div>
+          <svg id="ov-chart" class="chart" viewBox="0 0 700 200" role="img" aria-label="最近 14 天的新帳戶和最後使用"></svg>
+        </div>
+        <h3>各 App</h3>
+        <div class="card tablewrap"><table id="ov-apps"><thead><tr><th>App</th><th class="right">用過的帳戶</th><th class="right">這週用過</th></tr></thead><tbody></tbody></table></div>
+        <h3>這週的錢（各 App · 種類）</h3>
+        <div class="card tablewrap"><table id="ov-flows"><thead><tr><th>來源</th><th class="right">筆數</th><th class="right">進</th><th class="right">出</th><th class="right">淨額</th></tr></thead><tbody></tbody></table></div>
       </div>
-    </div>
+    </section>
 
-    <h2>帳戶</h2>
-    <div class="card">
-      <div class="row"><span id="wallets-sum" class="muted">點「重新整理」看所有帳戶。</span><button id="load" style="margin-left:auto">重新整理</button></div>
-      <p id="wallets-error" class="error"></p>
-      <div style="overflow-x:auto"><table id="wallets" hidden><thead><tr><th>代號</th><th>狀態</th><th>建立</th><th>最後使用</th><th>餘額</th></tr></thead><tbody></tbody></table></div>
-    </div>
+    <!-- 帳戶 -->
+    <section data-pane="accounts" hidden>
+      <div class="row spread"><h2>帳戶</h2><div class="row"><button id="csv" class="small">下載 CSV</button><button id="load" class="small">重新整理</button></div></div>
+      <div class="card">
+        <div class="row"><input id="search" class="grow" type="search" placeholder="搜尋帳戶代號或 App" autocomplete="off" /></div>
+        <div class="chips" id="filters" style="margin-top:10px">
+          <button data-filter="all" aria-pressed="true">全部</button>
+          <button data-filter="used" aria-pressed="false">使用中</button>
+          <button data-filter="unused" aria-pressed="false">未使用</button>
+          <button data-filter="plus" aria-pressed="false">Plus</button>
+          <button data-filter="neg" aria-pressed="false">透支</button>
+          <button data-filter="idle" aria-pressed="false">30 天沒用</button>
+        </div>
+        <p id="wallets-sum" class="muted" style="margin:10px 0 0">載入中…</p>
+        <p id="wallets-error" class="error"></p>
+        <div class="tablewrap"><table id="wallets" hidden><thead><tr>
+          <th data-sort="ref">代號</th><th data-sort="state">狀態</th><th data-sort="apps">App</th><th data-sort="created">建立</th><th data-sort="lastUsed">最後使用</th><th data-sort="balance" class="right">餘額</th>
+        </tr></thead><tbody></tbody></table></div>
+        <p class="muted" style="margin:10px 0 0">點一列打開帳戶：看明細、調整金額、送 Plus、登出所有裝置、產生找回代碼、重置。</p>
+      </div>
+    </section>
 
-    <h2>找回帳戶</h2>
-    <div class="card">
-      <p class="muted">有人弄丟了 Quadra Pass：在上面的列表找到他的帳戶代號，貼在這裡，產生一組 10 分鐘有效的裝置代碼給他登入，再請他在帳戶裡設定新的 Pass。</p>
-      <div class="row"><input id="ref" class="grow" autocomplete="off" placeholder="帳戶代號（至少 6 碼）" /><button id="recover" class="primary">產生裝置代碼</button></div>
-      <p id="recover-error" class="error"></p>
-      <div id="recovered" hidden><div id="device-code" class="code"></div><p id="device-exp" class="muted"></p></div>
-    </div>
+    <!-- 發放 -->
+    <section data-pane="issue" hidden>
+      <h2>發放 Quadra Pass</h2>
+      <div class="card">
+        <p class="muted">每一組都是全新的 Quadra Pass，誰先用它登入就是誰的。發出去之前先複製或下載保存：這裡只顯示這一次。</p>
+        <div class="row"><input id="count" type="number" min="1" max="500" value="10" /><span class="muted">組</span><button id="issue" class="primary">發放</button></div>
+        <p id="issue-error" class="error"></p>
+        <div id="issued" hidden>
+          <div class="row"><strong id="issued-n"></strong><button id="copy" class="small">全部複製</button><button id="download" class="small">下載清單</button></div>
+          <ol id="passes" class="passes"></ol>
+        </div>
+      </div>
+      <h2>找回帳戶</h2>
+      <div class="card">
+        <p class="muted">有人弄丟了 Quadra Pass：在「帳戶」找到他的帳戶代號貼在這裡（或直接打開那個帳戶），產生一組 10 分鐘有效的裝置代碼給他登入，再請他在帳戶裡設定新的 Pass。</p>
+        <div class="row"><input id="ref" class="grow" autocomplete="off" placeholder="帳戶代號（至少 6 碼）" /><button id="recover" class="primary">產生裝置代碼</button></div>
+        <p id="recover-error" class="error"></p>
+        <div id="recovered" hidden><div id="device-code" class="code"></div><p id="device-exp" class="muted"></p></div>
+      </div>
+    </section>
+
+    <!-- 通知與來源 -->
+    <section data-pane="ops" hidden>
+      <div class="row spread"><h2>通知</h2><button id="push-load" class="small">重新整理</button></div>
+      <p id="push-error" class="error"></p>
+      <div class="tiles" id="push-tiles"></div>
+      <div class="card tablewrap" style="margin-top:12px"><table id="push-apps"><thead><tr><th>App</th><th class="right">訂閱通知的帳戶</th></tr></thead><tbody></tbody></table></div>
+      <div class="row spread"><h2>資料來源</h2><button id="health-load" class="small">檢查</button></div>
+      <p class="muted">每個 App 讀的公開來源各問一次：有沒有回應、多快。</p>
+      <p id="health-error" class="error"></p>
+      <ul id="health" class="checks"></ul>
+    </section>
+
+    <!-- 資料整理 -->
+    <section data-pane="clean" hidden>
+      <h2>資料整理</h2>
+      <div class="card">
+        <p class="muted">只留 Quadra 的資料：Quadra Pass 之前的舊集合、沒有帳戶的 App 資料、沒人指向的收件匣、過期的代碼，以及錢包裡沒有 App 再讀的東西。先「掃描」看會動到什麼，再「整理」。</p>
+        <div class="row"><button id="scan">掃描</button><button id="clean" class="danger" disabled>整理</button></div>
+        <p id="clean-error" class="error"></p>
+        <p id="clean-ok" class="ok"></p>
+        <div id="scan-out" hidden class="tablewrap" style="margin-top:12px"><table><thead><tr><th>集合</th><th class="right">文件</th><th class="right">會刪除</th></tr></thead><tbody></tbody></table><p id="scan-more" class="muted"></p></div>
+      </div>
+    </section>
 
     <p style="margin-top:28px"><button id="forget">在這台裝置登出管理</button></p>
   </div>
 </main>
+
+<dialog id="acct" class="sheet" aria-labelledby="acct-title">
+  <div class="sheet-head"><h2 id="acct-title">帳戶</h2><button id="acct-close" class="small" aria-label="關閉">關閉</button></div>
+  <div class="sheet-body" id="acct-body"></div>
+</dialog>
+
 <script type="module">
 const ECO_URL = 'https://orbit-workers-proxy.pengzjay.workers.dev/eco';
 const KEY = 'quadra.admin';
 const $ = id => document.getElementById(id);
 const store = { get: () => { try { return localStorage.getItem(KEY) || ''; } catch { return ''; } }, set: v => { try { v ? localStorage.setItem(KEY, v) : localStorage.removeItem(KEY); } catch {} } };
 let token = store.get();
+const APPS = { stock: 'Quadra 證券', odds: 'Quadra Play', match: 'Orbit Sports', vocab: 'Orbit Words', orbit: 'Orbit Class', weather: 'Orbit Weather', transit: 'Orbit Transit' };
+const appName = a => APPS[a] || a;
 
-const WHY = { FORBIDDEN: '管理金鑰不對（或還沒部署好，等一分鐘再試）。', ECO_PAIR_NOT_FOUND: '找不到這個帳戶代號（或對到不只一個，多貼幾碼）。', RATE_LIMITED: '太頻繁了，等一下再試。' };
+const WHY = {
+  FORBIDDEN: '管理金鑰不對（或還沒部署好，等一分鐘再試）。',
+  ECO_PAIR_NOT_FOUND: '找不到這個帳戶代號（或對到不只一個，多貼幾碼）。',
+  SYNC_PASSCODE_NOT_FOUND: '找不到這組 Quadra Pass。',
+  RATE_LIMITED: '太頻繁了，等一下再試。',
+  ADMIN_BAD_AMOUNT: '金額要是非零的數字（±1,000,000 以內），而且要寫原因。',
+  ADMIN_IN_USE: '這個帳戶用過了，不能收回；要清空請用「重置」。',
+  ADMIN_NO_PUSH: '這個帳戶在這個 App 沒有訂閱通知。',
+  ECO_BUSY: '帳戶正在被寫入，再試一次。',
+  ADMIN_FAILED: '伺服器出錯了，再試一次。'
+};
 async function admin(action, extra = {}) {
   const res = await fetch(ECO_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'admin', token, action, ...extra }) });
   const data = await res.json().catch(() => ({}));
@@ -95,12 +237,36 @@ async function admin(action, extra = {}) {
   }
   return data;
 }
-const fmt = iso => (iso ? new Date(iso).toLocaleString('zh-TW', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—');
+const el = (tag, props = {}, kids = []) => {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) if (v != null) k === 'text' ? (n.textContent = v) : k === 'class' ? (n.className = v) : k.startsWith('on') ? (n[k] = v) : n.setAttribute(k, v);
+  for (const c of [].concat(kids)) if (c != null) n.append(c);
+  return n;
+};
+const fmt = t => (t ? new Date(t).toLocaleString('zh-TW', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) : '—');
+const fmtDay = t => (t ? new Date(t).toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric' }) : '—');
+const money = v => (v == null ? '—' : `${v < 0 ? '−' : ''}NT$${Math.abs(Math.round(v)).toLocaleString()}`);
+const ago = t => {
+  if (!t) return '從未';
+  const m = Math.round((Date.now() - t) / 60000);
+  return m < 60 ? `${Math.max(1, m)} 分鐘前` : m < 1440 ? `${Math.round(m / 60)} 小時前` : `${Math.round(m / 1440)} 天前`;
+};
+const until = t => {
+  const m = Math.round((t - Date.now()) / 60000);
+  return m <= 0 ? '即將送出' : m < 60 ? `${m} 分鐘後` : m < 1440 ? `${Math.round(m / 60)} 小時後` : `${Math.round(m / 1440)} 天後`;
+};
 const pretty = p => `${p.slice(0, 5)}-${p.slice(5)}`;
+const busy = async (btn, fn) => {
+  const was = btn.textContent;
+  btn.disabled = true;
+  try { return await fn(); } finally { btn.disabled = false; btn.textContent = was; }
+};
 
+// ---- Gate ----
 function open() {
   $('gate').hidden = true;
   $('panel').hidden = false;
+  show('overview');
 }
 $('enter').onclick = async () => {
   token = $('key').value.trim();
@@ -109,16 +275,290 @@ $('enter').onclick = async () => {
     await admin('wallets');
     store.set(token);
     open();
-    loadWallets();
   } catch (e) {
     $('gate-error').textContent = e.message;
   }
 };
+$('key').addEventListener('keydown', e => e.key === 'Enter' && $('enter').click());
 $('forget').onclick = () => {
   store.set('');
   location.reload();
 };
 
+// ---- Views ----
+const loaded = new Set();
+function show(view) {
+  for (const b of $('tabs').querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.view === view));
+  for (const s of document.querySelectorAll('[data-pane]')) s.hidden = s.dataset.pane !== view;
+  if (!loaded.has(view)) {
+    loaded.add(view);
+    ({ overview: loadOverview, accounts: loadWallets, ops: () => (loadPushes(), loadHealth()) })[view]?.();
+  }
+}
+$('tabs').onclick = e => e.target.dataset.view && show(e.target.dataset.view);
+
+// ---- 總覽 ----
+const tile = (label, value, sub = '') => el('div', { class: 'tile' }, [el('small', { text: label }), el('strong', { text: value }), sub ? el('em', { text: sub }) : null]);
+async function loadOverview() {
+  $('ov-error').textContent = '';
+  try {
+    const o = await admin('overview');
+    $('ov').hidden = false;
+    $('ov-tiles').replaceChildren(
+      tile('帳戶', o.accounts.toLocaleString(), `${o.used} 個用過`),
+      tile('今天使用', o.active.day.toLocaleString(), `7 天 ${o.active.week} · 30 天 ${o.active.month}`),
+      tile('這週新帳戶', o.newWeek.toLocaleString()),
+      tile('Plus 會員', o.plus.toLocaleString(), o.used ? `${Math.round((o.plus / o.used) * 100)}% 的使用者` : ''),
+      tile('流通中的錢', money(o.money.total), `最多 ${money(o.money.top)}`),
+      tile('透支帳戶', o.money.overdrawn.toLocaleString())
+    );
+    drawChart(o);
+    $('ov-apps').tBodies[0].replaceChildren(...Object.entries(o.apps).sort((a, b) => b[1].users - a[1].users).map(([a, v]) => el('tr', {}, [el('td', { text: appName(a) }), el('td', { class: 'right', text: v.users }), el('td', { class: 'right', text: v.week })])));
+    const flows = Object.entries(o.flows).sort((a, b) => b[1].in + b[1].out - (a[1].in + a[1].out));
+    $('ov-flows').tBodies[0].replaceChildren(
+      ...(flows.length
+        ? flows.map(([k, v]) => {
+            const [a, kind] = k.split(':');
+            const net = v.in - v.out;
+            return el('tr', {}, [el('td', { text: `${a === 'eco' ? 'Quadra' : appName(a)} · ${kind}` }), el('td', { class: 'right', text: v.n }), el('td', { class: 'right pos', text: money(v.in) }), el('td', { class: 'right neg', text: money(v.out) }), el('td', { class: `right ${net >= 0 ? 'pos' : 'neg'}`, text: money(net) })]);
+          })
+        : [el('tr', {}, [el('td', { colspan: '5', class: 'muted', text: '這週沒有金流。' })])])
+    );
+  } catch (e) {
+    $('ov-error').textContent = e.message;
+  }
+}
+function drawChart(o) {
+  const svg = $('ov-chart');
+  const W = 700, H = 200, pad = 26, n = o.days.length;
+  const max = Math.max(1, ...o.signups, ...o.lastSeen);
+  const bw = (W - pad * 2) / n;
+  const y = v => H - 30 - (v / max) * (H - 62);
+  let out = `<line x1="${pad}" x2="${W - pad}" y1="${H - 30}" y2="${H - 30}" stroke="currentColor" stroke-opacity=".15"/>`;
+  o.days.forEach((d, i) => {
+    const x = pad + i * bw;
+    const a = o.signups[i], b = o.lastSeen[i];
+    out += `<rect x="${x + bw * 0.14}" y="${y(a)}" width="${bw * 0.34}" height="${H - 30 - y(a)}" rx="3" fill="var(--q-accent)"><title>${d} 新帳戶 ${a}</title></rect>`;
+    out += `<rect x="${x + bw * 0.52}" y="${y(b)}" width="${bw * 0.34}" height="${H - 30 - y(b)}" rx="3" fill="#16a34a"><title>${d} 最後使用 ${b}</title></rect>`;
+    if (i % 2 === 0 || i === n - 1) out += `<text x="${x + bw / 2}" y="${H - 6}" text-anchor="middle" font-size="18" fill="currentColor" fill-opacity=".6">${Number(d.slice(5, 7))}/${Number(d.slice(8))}</text>`;
+  });
+  out += `<text x="${pad}" y="18" font-size="18" fill="currentColor" fill-opacity=".6">最多 ${max}</text>`;
+  svg.innerHTML = out;
+}
+$('ov-load').onclick = () => busy($('ov-load'), loadOverview);
+
+// ---- 帳戶 ----
+let wallets = [];
+let filter = 'all';
+let sortKey = 'lastUsed';
+let sortDir = -1;
+const stateOf = w => (w.plus ? 'Plus' : w.lastUsed ? '使用中' : '未使用');
+const keyOf = (w, k) => (k === 'state' ? stateOf(w) : k === 'apps' ? w.apps.length : k === 'created' || k === 'lastUsed' ? Date.parse(w[k] || 0) || 0 : w[k] ?? '');
+const FILTERS = {
+  all: () => true,
+  used: w => w.lastUsed,
+  unused: w => !w.lastUsed,
+  plus: w => w.plus,
+  neg: w => w.balance < 0,
+  idle: w => w.lastUsed && Date.now() - Date.parse(w.lastUsed) > 30 * 86_400_000
+};
+function drawWallets() {
+  const q = $('search').value.trim().toLowerCase();
+  const rows = wallets
+    .filter(FILTERS[filter])
+    .filter(w => !q || w.ref.toLowerCase().includes(q) || w.apps.some(a => a.includes(q) || appName(a).toLowerCase().includes(q)))
+    .sort((a, b) => {
+      const x = keyOf(a, sortKey), y = keyOf(b, sortKey);
+      return (x > y ? 1 : x < y ? -1 : 0) * sortDir;
+    });
+  const used = wallets.filter(w => w.lastUsed).length;
+  $('wallets-sum').textContent = `共 ${wallets.length} 個帳戶 · ${used} 個用過 · ${wallets.length - used} 個還沒人用 · 顯示 ${rows.length} 個`;
+  $('wallets').hidden = false;
+  for (const th of $('wallets').tHead.querySelectorAll('th[data-sort]')) th.setAttribute('aria-sort', th.dataset.sort === sortKey ? (sortDir > 0 ? 'ascending' : 'descending') : 'none');
+  $('wallets').tBodies[0].replaceChildren(
+    ...rows.map(w =>
+      el('tr', { class: 'tap', onclick: () => openAccount(w.ref) }, [
+        el('td', { class: 'num', text: w.ref }),
+        el('td', {}, [el('span', { class: `tag${w.plus ? ' plus' : w.lastUsed ? ' on' : ''}`, text: stateOf(w) })]),
+        el('td', { text: w.apps.length ? w.apps.map(appName).join('、') : '—' }),
+        el('td', { text: fmtDay(w.created) }),
+        el('td', { text: ago(w.lastUsed ? Date.parse(w.lastUsed) : 0) }),
+        el('td', { class: `right ${w.balance < 0 ? 'neg' : ''}`, text: money(w.balance) })
+      ])
+    )
+  );
+}
+async function loadWallets() {
+  $('wallets-error').textContent = '';
+  try {
+    wallets = (await admin('wallets')).wallets;
+    drawWallets();
+  } catch (e) {
+    $('wallets-error').textContent = e.message;
+  }
+}
+$('load').onclick = () => busy($('load'), loadWallets);
+$('search').oninput = drawWallets;
+$('filters').onclick = e => {
+  if (!e.target.dataset.filter) return;
+  filter = e.target.dataset.filter;
+  for (const b of $('filters').querySelectorAll('button')) b.setAttribute('aria-pressed', String(b === e.target));
+  drawWallets();
+};
+$('wallets').tHead.onclick = e => {
+  const k = e.target.dataset.sort;
+  if (!k) return;
+  sortDir = k === sortKey ? -sortDir : k === 'ref' || k === 'state' ? 1 : -1;
+  sortKey = k;
+  drawWallets();
+};
+$('csv').onclick = () => {
+  const head = ['代號', '狀態', 'App', '建立', '最後使用', '餘額', '紀錄筆數'];
+  const rows = wallets.map(w => [w.ref, stateOf(w), w.apps.map(appName).join(' / '), w.created || '', w.lastUsed || '', w.balance ?? '', w.entries]);
+  const text = '﻿' + [head, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+  const a = el('a', { href: URL.createObjectURL(new Blob([text], { type: 'text/csv' })), download: `Quadra 帳戶 ${new Date().toISOString().slice(0, 10)}.csv` });
+  a.click();
+};
+
+// ---- 一個帳戶 ----
+const dialog = $('acct');
+$('acct-close').onclick = () => dialog.close();
+dialog.addEventListener('click', e => e.target === dialog && dialog.close());
+async function openAccount(ref) {
+  $('acct-title').textContent = `帳戶 ${ref}`;
+  $('acct-body').replaceChildren(el('p', { class: 'muted', text: '載入中…' }));
+  if (!dialog.open) dialog.showModal();
+  try {
+    drawAccount(await admin('wallet', { wallet: ref }));
+  } catch (e) {
+    $('acct-body').replaceChildren(el('p', { class: 'error', text: e.message }));
+  }
+}
+function action(title, text, controls, run) {
+  const err = el('p', { class: 'error' });
+  const ok = el('p', { class: 'ok' });
+  const box = el('div', { class: 'action' }, [el('h3', { text: title }), text ? el('p', { class: 'muted', text }) : null, el('div', { class: 'row' }, controls), err, ok]);
+  box.run = async (btn, ...args) => {
+    err.textContent = ok.textContent = '';
+    await busy(btn, async () => {
+      try {
+        ok.textContent = (await run(...args)) || '完成';
+      } catch (e) {
+        err.textContent = e.message;
+      }
+    });
+  };
+  return box;
+}
+function drawAccount(a) {
+  const plusText = a.plus.member ? `會員${a.plus.renewing ? ' · 自動續訂' : ' · 不續訂'}${a.plus.plan ? `（${a.plus.plan === 'year' ? '年繳' : '月繳'}）` : ''}` : a.plus.lapsed ? '已失效（扣款失敗）' : '不是會員';
+  const facts = el('dl', { class: 'kv' }, [
+    ['餘額', money(a.balance)],
+    ['建立', fmt(a.created)],
+    ['最後使用', `${fmt(a.lastUsed)}（${ago(a.lastUsed)}）`],
+    ['Plus', plusText],
+    ['Plus 月份', a.plus.months.length ? a.plus.months.slice(-6).join('、') : '—'],
+    ['App', a.apps.length ? a.apps.map(x => `${appName(x.app)}（${ago(x.last)}）`).join('、') : '還沒用過'],
+    ['通知', a.pushes.length ? a.pushes.map(appName).join('、') : '沒有訂閱'],
+    ['登入世代', String(a.gen)],
+    ['紀錄', `${a.entries} 筆`],
+    ['設定', a.settings.length ? a.settings.join('、') : '—']
+  ].flatMap(([k, v]) => [el('dt', { text: k }), el('dd', { text: v })]));
+
+  const reload = () => openAccount(a.ref);
+  // Money by hand.
+  const amt = el('input', { type: 'number', step: '1', placeholder: '金額（負數為扣款）', style: 'flex:1 1 170px' });
+  const note = el('input', { class: 'grow', placeholder: '原因（必填，帳戶紀錄看得到）', maxlength: '60' });
+  const grantBtn = el('button', { class: 'primary', text: '入帳' });
+  const grant = action('調整金額', '更正、補償或獎金：寫進帳戶紀錄，正數加錢、負數扣錢。', [amt, note, grantBtn], async () => {
+    const v = Number(amt.value);
+    if (!confirm(`${v >= 0 ? '加' : '扣'} ${money(Math.abs(v))} 給帳戶 ${a.ref}？\n原因：${note.value}`)) return '已取消';
+    const r = await admin('grant', { wallet: a.ref, amount: v, note: note.value });
+    setTimeout(reload, 900);
+    return `已入帳，餘額 ${money(r.balance)}`;
+  });
+  grantBtn.onclick = () => grant.run(grantBtn);
+  // Plus.
+  const months = el('select', {}, [1, 2, 3, 6, 12].map(n => el('option', { value: String(n), text: `${n} 個月` })));
+  const giveBtn = el('button', { class: 'primary', text: '送 Plus' });
+  const stopBtn = el('button', { text: '停止續訂' });
+  const plus = action('Plus', '送免費的月份（從這個月起，已有的月份不重複），或停止自動續訂（已付的月份照常）。', [months, giveBtn, stopBtn], async kind => {
+    const r = kind === 'stop' ? await admin('plus', { wallet: a.ref, stop: true }) : await admin('plus', { wallet: a.ref, months: Number(months.value) });
+    setTimeout(reload, 900);
+    return kind === 'stop' ? '已停止續訂' : r.member ? '已送出，現在是會員' : '已送出';
+  });
+  giveBtn.onclick = () => plus.run(giveBtn, 'give');
+  stopBtn.onclick = () => plus.run(stopBtn, 'stop');
+  // Signing out.
+  const outBtn = el('button', { text: '登出所有裝置' });
+  const signout = action('登出所有裝置', 'Pass 還能用：每台裝置要重新登入。手機遺失或 Pass 外流時用。', [outBtn], async () => {
+    if (!confirm(`登出帳戶 ${a.ref} 的所有裝置？`)) return '已取消';
+    await admin('signout', { wallet: a.ref });
+    return '已登出所有裝置';
+  });
+  outBtn.onclick = () => signout.run(outBtn);
+  // A device code.
+  const codeBtn = el('button', { text: '產生裝置代碼' });
+  const codeOut = el('div', { class: 'code' });
+  const recover = action('找回帳戶', '10 分鐘有效：他在任何 App 的登入畫面輸入，再到帳戶設定新的 Pass。', [codeBtn], async () => {
+    const r = await admin('device-code', { wallet: a.ref });
+    codeOut.textContent = r.code;
+    return `${new Date(r.exp).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false })} 前有效`;
+  });
+  recover.append(codeOut);
+  codeBtn.onclick = () => recover.run(codeBtn);
+  // A test notice.
+  const pushApp = el('select', {}, a.pushes.map(x => el('option', { value: x, text: appName(x) })));
+  const pushBtn = el('button', { text: '送測試通知' });
+  const pushTest = a.pushes.length
+    ? action('測試通知', '送一則測試通知到這個帳戶訂閱的裝置。', [pushApp, pushBtn], async () => {
+        const r = await admin('push-test', { wallet: a.ref, app: pushApp.value });
+        return r.ok ? '已送出' : `沒送到（${r.result}）`;
+      })
+    : null;
+  if (pushTest) pushBtn.onclick = () => pushTest.run(pushBtn);
+  // Reset, at its owner's request.
+  const pass = el('input', { class: 'grow', placeholder: '他的 Quadra Pass（重置需要本人的 Pass）', autocomplete: 'off' });
+  const keepBoxes = Object.entries(APPS).map(([k, n]) => el('label', { class: 'row', style: 'gap:6px' }, [el('input', { type: 'checkbox', value: k }), el('span', { text: `保留 ${n}` })]));
+  const resetBtn = el('button', { class: 'danger', text: '重置帳戶' });
+  const reset = action('重置帳戶', '本人要求時：保留 Pass 和勾選的 App 資料，其他全部重來（新的錢包、其他 App 的資料刪除、所有裝置登出）。無法復原。', [pass, resetBtn], async () => {
+    const keep = keepBoxes.map(l => l.querySelector('input')).filter(i => i.checked).map(i => i.value);
+    if (!confirm(`重置帳戶 ${a.ref}？保留：${keep.length ? keep.map(appName).join('、') : '無'}。無法復原。`)) return '已取消';
+    const r = await admin('reset', { passcode: pass.value, keep });
+    setTimeout(reload, 900);
+    return `已重置，刪除了 ${r.gone.map(appName).join('、') || '無'}`;
+  });
+  reset.insertBefore(el('div', { class: 'chips', style: 'margin-bottom:10px' }, keepBoxes), reset.querySelector('.row'));
+  resetBtn.onclick = () => reset.run(resetBtn);
+  // Taking an unused pass back.
+  const removeBtn = el('button', { class: 'danger', text: '收回這組 Pass' });
+  const remove = !a.lastUsed
+    ? action('收回未使用的 Pass', '還沒人用過：收回後這組 Pass 就不能登入。', [removeBtn], async () => {
+        if (!confirm(`收回帳戶 ${a.ref}？這組 Pass 會失效。`)) return '已取消';
+        await admin('remove', { wallet: a.ref });
+        setTimeout(() => (dialog.close(), loadWallets()), 700);
+        return '已收回';
+      })
+    : null;
+  if (remove) removeBtn.onclick = () => remove.run(removeBtn);
+
+  const records = el('div', { class: 'tablewrap' }, [
+    el('table', {}, [
+      el('thead', {}, [el('tr', {}, ['時間', '來源', '種類', '金額', '備註'].map((h, i) => el('th', { class: i === 3 ? 'right' : null, text: h })))]),
+      el('tbody', {}, a.recent.length ? a.recent.map(e => el('tr', {}, [el('td', { text: fmt(e.t) }), el('td', { text: e.app === 'eco' ? 'Quadra' : appName(e.app) }), el('td', { text: e.kind }), el('td', { class: `right ${e.amount > 0 ? 'pos' : e.amount < 0 ? 'neg' : ''}`, text: e.amount ? money(e.amount) : '—' }), el('td', { text: e.note })])) : [el('tr', {}, [el('td', { colspan: '5', class: 'muted', text: '沒有紀錄。' })])])
+    ])
+  ]);
+  $('acct-body').replaceChildren(
+    el('h3', { text: '帳戶' }),
+    facts,
+    el('h3', { text: '操作' }),
+    el('div', { class: 'actions' }, [grant, plus, signout, recover, pushTest, remove, reset].filter(Boolean)),
+    el('h3', { text: `最近的紀錄（${a.recent.length} / ${a.entries}）` }),
+    records
+  );
+}
+
+// ---- 發放 ----
 let lastPasses = [];
 $('issue').onclick = async () => {
   const want = Math.max(1, Math.min(500, Math.floor(Number($('count').value) || 0)));
@@ -139,8 +579,9 @@ $('issue').onclick = async () => {
   if (lastPasses.length) {
     $('issued').hidden = false;
     $('issued-n').textContent = `這次發放了 ${lastPasses.length} 組`;
-    $('passes').replaceChildren(...lastPasses.map(p => Object.assign(document.createElement('li'), { textContent: pretty(p) })));
-    loadWallets();
+    $('passes').replaceChildren(...lastPasses.map(p => el('li', { text: pretty(p) })));
+    loaded.delete('accounts');
+    loaded.delete('overview');
   }
 };
 const listText = () => `Quadra Pass（${new Date().toLocaleString('zh-TW')}）\n\n` + lastPasses.map((p, i) => `${i + 1}. ${pretty(p)}`).join('\n') + '\n';
@@ -151,56 +592,86 @@ $('copy').onclick = async () => {
     setTimeout(() => ($('copy').textContent = '全部複製'), 1500);
   } catch {}
 };
-$('download').onclick = () => {
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([listText()], { type: 'text/plain' }));
-  a.download = `Quadra Pass ${new Date().toISOString().slice(0, 10)}.txt`;
-  a.click();
-};
-
-async function loadWallets() {
-  $('wallets-error').textContent = '';
-  try {
-    const { wallets } = await admin('wallets');
-    wallets.sort((a, b) => String(b.created || '').localeCompare(String(a.created || '')));
-    const used = wallets.filter(w => w.lastUsed).length;
-    $('wallets-sum').textContent = `共 ${wallets.length} 個帳戶 · ${used} 個用過 · ${wallets.length - used} 個還沒人用`;
-    $('wallets').hidden = false;
-    $('wallets').tBodies[0].replaceChildren(
-      ...wallets.map(w => {
-        const tr = document.createElement('tr');
-        const tag = Object.assign(document.createElement('span'), { className: `tag${w.lastUsed ? ' on' : ''}`, textContent: w.lastUsed ? '使用中' : '未使用' });
-        for (const cell of [w.ref, tag, fmt(w.created), fmt(w.lastUsed), w.balance == null ? '—' : `NT$${Number(w.balance).toLocaleString()}`]) {
-          const td = document.createElement('td');
-          td.append(cell);
-          tr.append(td);
-        }
-        return tr;
-      })
-    );
-  } catch (e) {
-    $('wallets-error').textContent = e.message;
-  }
-}
-$('load').onclick = loadWallets;
-
+$('download').onclick = () => el('a', { href: URL.createObjectURL(new Blob([listText()], { type: 'text/plain' })), download: `Quadra Pass ${new Date().toISOString().slice(0, 10)}.txt` }).click();
 $('recover').onclick = async () => {
   $('recover-error').textContent = '';
   $('recovered').hidden = true;
   try {
     const { code, exp } = await admin('device-code', { wallet: $('ref').value.trim() });
     $('device-code').textContent = code;
-    $('device-exp').textContent = `${new Date(exp).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })} 前有效：請他在任何 App 的登入畫面輸入這組代碼。`;
+    $('device-exp').textContent = `${new Date(exp).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false })} 前有效：請他在任何 App 的登入畫面輸入這組代碼。`;
     $('recovered').hidden = false;
   } catch (e) {
     $('recover-error').textContent = e.message;
   }
 };
 
-if (token) {
-  open();
-  loadWallets();
+// ---- 通知與來源 ----
+async function loadPushes() {
+  $('push-error').textContent = '';
+  try {
+    const p = await admin('pushes');
+    $('push-tiles').replaceChildren(tile('訂閱通知的帳戶', p.accounts.toLocaleString(), `${p.records} 個訂閱`), tile('排程中', p.due.toLocaleString(), p.next ? `下一則 ${until(p.next)}` : '沒有'));
+    $('push-apps').tBodies[0].replaceChildren(...Object.entries(p.apps).sort((a, b) => b[1] - a[1]).map(([a, n]) => el('tr', {}, [el('td', { text: appName(a) }), el('td', { class: 'right', text: n })])));
+  } catch (e) {
+    $('push-error').textContent = e.message;
+  }
 }
+async function loadHealth() {
+  $('health-error').textContent = '';
+  $('health').replaceChildren(el('li', {}, [el('span', { class: 'muted', text: '檢查中…' })]));
+  try {
+    const h = await admin('health');
+    $('health').replaceChildren(
+      ...h.checks.map(c =>
+        el('li', {}, [el('span', { class: `dot${!c.ok ? ' bad' : c.ms > 2500 ? ' slow' : ''}` }), el('span', { text: c.name }), el('span', { class: 'muted num', text: c.ok ? `${c.ms} ms` : `失敗 ${c.status || c.error || ''}` })])
+      )
+    );
+  } catch (e) {
+    $('health').replaceChildren();
+    $('health-error').textContent = e.message;
+  }
+}
+$('push-load').onclick = () => busy($('push-load'), loadPushes);
+$('health-load').onclick = () => busy($('health-load'), loadHealth);
+
+// ---- 資料整理 ----
+$('scan').onclick = () =>
+  busy($('scan'), async () => {
+    $('clean-error').textContent = $('clean-ok').textContent = '';
+    try {
+      const s = await admin('scan');
+      const names = [...new Set([...Object.keys(s.counts), ...Object.keys(s.wouldDelete)])].sort();
+      $('scan-out').hidden = false;
+      $('scan-out').querySelector('tbody').replaceChildren(...names.map(n => el('tr', {}, [el('td', { text: n }), el('td', { class: 'right', text: s.counts[n] ?? '—' }), el('td', { class: `right ${s.wouldDelete[n] ? 'neg' : ''}`, text: s.wouldDelete[n] || 0 })])));
+      const del = Object.values(s.wouldDelete).reduce((a, b) => a + b, 0);
+      $('scan-more').textContent = `會刪除 ${del} 份文件、整理 ${s.wouldTidyWallets} 個錢包（移除 ${s.wouldRetire.entries} 筆舊紀錄、${s.wouldRetire.settings} 個舊設定）。${s.unknown.length ? `不認得的集合（不會動）：${s.unknown.join('、')}` : ''}`;
+      $('clean').disabled = !(del || s.wouldTidyWallets);
+    } catch (e) {
+      $('clean-error').textContent = e.message;
+    }
+  });
+$('clean').onclick = () =>
+  busy($('clean'), async () => {
+    if (!confirm('照掃描的結果整理？刪除的文件無法復原。')) return;
+    $('clean-error').textContent = $('clean-ok').textContent = '';
+    let deleted = 0, tidied = 0;
+    try {
+      for (let i = 0; i < 20; i++) {
+        const r = await admin('clean');
+        deleted += r.deleted;
+        tidied += r.tidied;
+        $('clean-ok').textContent = `整理中… 刪除 ${deleted}、整理 ${tidied}，還剩 ${r.left}`;
+        if (r.done) break;
+      }
+      $('clean-ok').textContent = `完成：刪除 ${deleted} 份文件、整理 ${tidied} 個錢包。`;
+      $('clean').disabled = true;
+    } catch (e) {
+      $('clean-error').textContent = e.message;
+    }
+  });
+
+if (token) open();
 </script>
 </body>
 </html>

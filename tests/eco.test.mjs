@@ -621,3 +621,46 @@ test('passes are handed out by the owner: no one makes one from an app; the owne
     assert.equal(signed.status, 200, 'an issued pass signs in');
   }
 });
+
+test('the admin panel: an overview, an account in full, money and Plus by hand, sign-out, an unused pass taken back', async () => {
+  const t = setup();
+  const admin = (action, extra = {}) => t.call('POST', '', { op: 'admin', token: 'o'.repeat(40), action, ...extra });
+  const acct = await newPass(t);
+  const unused = (await admin('issue', { count: 1 })).data.passes[0];
+  const wallets = (await admin('wallets')).data.wallets;
+  const ref = wallets.find(w => w.lastUsed).ref;
+  const idle = wallets.find(w => !w.lastUsed).ref;
+  // The overview.
+  const ov = await admin('overview');
+  assert.equal(ov.status, 200);
+  assert.equal(ov.data.accounts, 2);
+  assert.equal(ov.data.used, 1);
+  assert.equal(ov.data.active.day, 1);
+  assert.equal(ov.data.days.length, 14);
+  assert.equal(ov.data.money.total, acct.pool);
+  // One account.
+  const one = await admin('wallet', { wallet: ref });
+  assert.equal(one.status, 200);
+  assert.equal(one.data.balance, acct.pool);
+  assert.ok(one.data.apps.some(a => a.app === 'stock'));
+  assert.equal((await admin('wallet', { wallet: 'zz' })).status, 404, 'a reference too short names nobody');
+  // Money by hand: needs a reason; lands as an 'eco' entry.
+  assert.equal((await admin('grant', { wallet: ref, amount: 500 })).status, 400);
+  const g = await admin('grant', { wallet: ref, amount: 500, note: '比賽獎金' });
+  assert.equal(g.status, 200);
+  assert.equal(g.data.balance, acct.pool + 500);
+  assert.equal((await admin('grant', { wallet: ref, amount: -200, note: '更正' })).data.balance, acct.pool + 300);
+  // Plus: three free months, then no renewal.
+  const p = await admin('plus', { wallet: ref, months: 3 });
+  assert.equal(p.data.member, true);
+  assert.equal((await admin('wallet', { wallet: ref })).data.plus.months.length, 3);
+  assert.equal((await admin('plus', { wallet: ref, stop: true })).data.renewing, false);
+  // Every device signed out: the session stops working.
+  assert.equal((await t.call('GET', `${t.qt(acct.token)}&app=stock`)).status, 200);
+  assert.equal((await admin('signout', { wallet: ref })).status, 200);
+  assert.equal((await t.call('GET', `${t.qt(acct.token)}&app=stock`)).status, 401);
+  // A pass in use can't be taken back; a never-used one can, and stops working.
+  assert.equal((await admin('remove', { wallet: ref })).status, 409);
+  assert.equal((await admin('remove', { wallet: idle })).status, 200);
+  assert.equal((await t.call('POST', '', { op: 'login', passcode: unused, app: 'stock' })).status, 404);
+});
