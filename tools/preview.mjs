@@ -5,6 +5,7 @@
 //                          [--full] [--lang zh|en] [--dark] [--wait ms] [--click selector]
 //                          [--type 'selector=text']  (fills a field after the clicks)
 //                          [--store 'key=value']  (a localStorage entry to start with)
+//                          [--geo lat,lon]  (where the phone is; Transit's default 新竹車站)
 //                          [--signed-out]  (the sign-in screen, as a new device sees it)
 //                          [--entry '{json}']  (a wallet entry to add: an economy scenario)
 //                          [--clock 2026-10-06T10:05]  (the page's clock, Taipei time)
@@ -172,6 +173,8 @@ const full = flag('full');
 const signedOut = flag('signed-out');
 const dark = flag('dark');
 const noGeo = flag('no-geo');
+// --geo lat,lon: where the phone is (Transit's default: 新竹車站).
+const geoAt = opt('geo')?.split(',').map(Number);
 // --clock '2026-10-06T10:05': the page's clock starts then (Taipei time) and runs on.
 const clock = opt('clock', '');
 // --root dir: where the repos are (default: next to this one), e.g. a copy
@@ -389,7 +392,7 @@ if (appId === 'weather' && !noGeo) {
 }
 if (appId === 'transit' && !noGeo) {
   await context.grantPermissions(['geolocation']);
-  await context.setGeolocation({ latitude: 24.8026, longitude: 120.9702, accuracy: 20 });
+  await context.setGeolocation(geoAt?.length === 2 ? { latitude: geoAt[0], longitude: geoAt[1], accuracy: 20 } : { latitude: 24.8026, longitude: 120.9702, accuracy: 20 });
 }
 if (freezes)
   await context.addInitScript(() => {
