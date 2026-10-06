@@ -54,6 +54,19 @@ is wrong, not the rule. When the owner adds a rule, it goes here.
 - Never sign in to the live services with a pass, token or key, even one
   handed over, and never create accounts. Localhost dev doors in the Worker
   (TRANSIT_DEV and the like) are the way to test against real data.
+- **The dev door is one of Claude's own tools: use it.** The deployed
+  Workers answer any request with an `Origin: http://localhost:<port>`
+  header and no pass (a session limit per address), so any upstream the
+  proxy reads can be read from a terminal, the owner's Mac included, where
+  some (Polymarket) are blocked on the network:
+  `curl -H 'Origin: http://localhost:8123'
+  'https://sports-proxy.pengzjay.workers.dev/sports-proxy?url=<encoded
+  upstream>&app=<an app id in kit/brand.mjs: odds, stock…>'` (`?batch=1`
+  as the kit asks), and Orbit Transit's at
+  `https://orbit-workers-proxy.pengzjay.workers.dev/transit/…` (Weather has
+  no door: its saved fixtures). `tools/preview.mjs --live` sends a page's calls through
+  it; a script reading upstream data (Polymarket's prices, ESPN, TDX) can
+  too. Reach for it before saying a source can't be read.
 - Real credentials never go in a local `.env` or a repo; keys live as
   GitHub or Cloudflare secrets the owner adds. A secret that's only a
   random string of our own (ECO_TOKEN_SECRET) may be made and stored by
