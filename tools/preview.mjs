@@ -623,6 +623,37 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => (reopen ? [h, h]
         return `${el.tagName.toLowerCase()}.${[...el.classList].join('.')} [${Math.round(r.left)}–${Math.round(r.right)}]`;
       });
   });
+  // Text that broke onto a second row (TRUTH §6): a short label whose words
+  // split over lines, or a row of chips that wrapped. Some rows are made to
+  // wrap (a list of tags): read each one against the screenshot.
+  const wraps = await page.evaluate(() => {
+    const seen = el => {
+      const r = el.getBoundingClientRect();
+      return r.width && r.height && r.bottom > 0 && r.top < innerHeight * 6 && getComputedStyle(el).visibility !== 'hidden';
+    };
+    const name = el => `${el.tagName.toLowerCase()}${[...el.classList].map(c => `.${c}`).join('')}`;
+    const lines = el => {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      return new Set([...range.getClientRects()].filter(r => r.width > 1).map(r => Math.round(r.top / 4))).size;
+    };
+    const out = [];
+    for (const el of document.querySelectorAll('body *')) {
+      if (!seen(el) || el.closest('[hidden], svg')) continue;
+      const kids = [...el.children].filter(k => getComputedStyle(k).position !== 'absolute' && k.getBoundingClientRect().width);
+      const text = el.textContent.trim();
+      // A short label in lines of its own.
+      if (!el.children.length && text && text.length <= 24 && getComputedStyle(el).display !== 'block' && lines(el) > 1) out.push(`${name(el)} "${text}"`);
+      // A row of things that wrapped.
+      const cs = getComputedStyle(el);
+      if (cs.display.includes('flex') && cs.flexDirection === 'row' && cs.flexWrap === 'wrap' && kids.length > 1 && kids.length <= 12) {
+        const tops = new Set(kids.map(k => Math.round(k.getBoundingClientRect().top / 6)));
+        if (tops.size > 1) out.push(`${name(el)} (${tops.size} rows: "${text.slice(0, 40)}")`);
+      }
+    }
+    return [...new Set(out)].slice(0, 25);
+  });
+  if (wraps.length) console.log(`wraps:\n  ${wraps.join('\n  ')}`);
   // Whether the page itself moves sideways (what a finger feels).
   const sideways = await page.evaluate(() => {
     const before = scrollX;
