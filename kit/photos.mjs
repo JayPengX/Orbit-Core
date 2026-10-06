@@ -24,7 +24,7 @@ export function espnHeadshot(league, id) {
 // A picture that is a flag, not a face (ESPN's country flags, the kit's).
 export const isFlag = url => typeof url === 'string' && /\/flags?\/|flagcdn|countries\/500|\/i\/teamlogos\/countries\//i.test(url);
 // A studio cutout (transparent background): shown on a tinted disc.
-export const isCutout = url => typeof url === 'string' && /thesportsdb\.com\/images\/media\/player\/cutout\//.test(url);
+export const isCutout = url => typeof url === 'string' && /thesportsdb\.com\/images\/media\/player\/cutout\/|resources\.premierleague\.com\/premierleague\d*\/photos\/players\//.test(url);
 
 const sportOf = league => CATALOG[league]?.sport || league || '';
 const plain = s =>
@@ -38,16 +38,20 @@ const plain = s =>
 
 // ---- A league's own photos -----------------------------------------------------------
 // ESPN's headshots can be a season old (a player traded in the summer still in
-// his old team's shirt); a league's own site has this season's. Its players
-// come from the nightly packs (Shared-Data's sports/<league>/photos.json,
-// [[name, id]…]), read once; a player found there gets that photo first.
-const OWN_PHOTO = { nba: id => `https://cdn.nba.com/headshots/nba/latest/260x190/${id}.png` };
+// his old team's shirt), and it has none for footballers; a league's own site
+// has this season's. Its players come from the nightly packs (Shared-Data's
+// sports/<league>/photos.json, [[name, id, 'o'?]…]: 'o' a photo on the
+// league's older path), read once; a player found there gets that photo first.
+const OWN_PHOTO = {
+  nba: id => `https://cdn.nba.com/headshots/nba/latest/260x190/${id}.png`,
+  epl: (id, old) => (old ? `https://resources.premierleague.com/premierleague/photos/players/250x250/p${id}.png` : `https://resources.premierleague.com/premierleague25/photos/players/110x140/${id}.png`)
+};
 const ownLists = {};
 function ownList(league) {
   if (!ownLists[league]) {
     ownLists[league] = { map: null };
     kit.packJson?.(`sports/${league}/photos.json`, { ttl: 12 * 3_600_000 })
-      .then(d => (ownLists[league].map = new Map((d?.players || []).map(([n, id]) => [plain(n), id]))))
+      .then(d => (ownLists[league].map = new Map((d?.players || []).map(([n, id, where]) => [plain(n), [id, where === 'o']]))))
       .catch(() => {});
   }
   return ownLists[league].map;
@@ -55,8 +59,8 @@ function ownList(league) {
 if (typeof window !== 'undefined') for (const league of Object.keys(OWN_PHOTO)) ownList(league);
 export function ownPhoto(name, league) {
   if (!OWN_PHOTO[league] || !name) return null;
-  const id = ownList(league)?.get(plain(name));
-  return id ? OWN_PHOTO[league](id) : null;
+  const hit = ownList(league)?.get(plain(name));
+  return hit ? OWN_PHOTO[league](...hit) : null;
 }
 
 // ---- The device's copy ----------------------------------------------------------------

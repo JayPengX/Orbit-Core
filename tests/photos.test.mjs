@@ -11,3 +11,12 @@ test("an NBA player's photo is NBA.com's (this season's team) when the nightly l
   assert.equal(ownPhoto('Someone Else', 'nba'), null);
   assert.equal(ownPhoto('LeBron James', 'mlb'), null, 'only leagues with their own photos');
 });
+
+test("a Premier League player's photo is the league's own, on its older path when the list says so", async () => {
+  globalThis.fetch = async url => (String(url).endsWith('sports/epl/photos.json') ? new Response(JSON.stringify({ players: [['Erling Haaland', 223094], ['Joe Gomez', 171287, 'o']] }), { status: 200 }) : new Response('', { status: 404 }));
+  const { ownPhoto } = await import('../kit/photos.mjs');
+  ownPhoto('Erling Haaland', 'epl');
+  await new Promise(r => setTimeout(r, 20));
+  assert.equal(ownPhoto('Erling Haaland', 'epl'), 'https://resources.premierleague.com/premierleague25/photos/players/110x140/223094.png');
+  assert.equal(ownPhoto('Joe Gomez', 'epl'), 'https://resources.premierleague.com/premierleague/photos/players/250x250/p171287.png');
+});
