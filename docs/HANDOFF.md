@@ -7,6 +7,22 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
 `npx eslint .`).
 
 
+## Orbit Class, third pass (2026-10-06, pushed to `main`)
+
+- The card is `heroView` (src/schedule-calc.js, tested): on a break or in
+  the morning the class coming is the card; the foot is two designed lines.
+  今天 lists what's left first, 已上完 below. 工具's grid: `shortNames`.
+- Double notice fixed in the kit: `schedulePush` remembers what the Worker
+  already sent (`quadra.push.sent.<app>`, two days), and Class banners a
+  class only in its notice's own minute.
+- The top blur: Class was the one app on `black-translucent`; now `default`
+  with a theme-color for light and dark (TRUTH §6). Unverified on a phone:
+  iOS may keep the old style until the app is removed and added again.
+- Not checked here: WebKit (none in the container). Pre-existing, seen with
+  `--shuffle`: a device with nothing saved opens on the default schedule
+  and swaps when the pass answers (the second opening is clean).
+- preview.mjs `--clock 2026-10-06T10:05` sets the page's time.
+
 ## On the owner's Mac: Safari, and Transit's bus alerts by push (2026-10-04)
 
 - **The owner works on a Mac now** (repos in `~/Documents/GitHub`, Orbit
