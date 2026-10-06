@@ -68,7 +68,7 @@ function page(html, app) {
     throw new Error(`${app}: no place for kit:${name}`);
   };
   swap('head', HEAD, /<link rel="stylesheet" href="(?:\.\/)?(?:css\/)?quadra\.css[^"]*" ?\/?>/);
-  if (app !== 'Orbit-Class') swap('boot', BOOT, /<script src="\.\/boot\.js"><\/script>/);
+  swap('boot', BOOT, /<script src="\.\/boot\.js"><\/script>/);
   return html;
 }
 
