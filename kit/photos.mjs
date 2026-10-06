@@ -24,7 +24,7 @@ export function espnHeadshot(league, id) {
 // A picture that is a flag, not a face (ESPN's country flags, the kit's).
 export const isFlag = url => typeof url === 'string' && /\/flags?\/|flagcdn|countries\/500|\/i\/teamlogos\/countries\//i.test(url);
 // A studio cutout (transparent background): shown on a tinted disc.
-export const isCutout = url => typeof url === 'string' && /thesportsdb\.com\/images\/media\/player\/cutout\/|resources\.premierleague\.com\/premierleague\d*\/photos\/players\//.test(url);
+export const isCutout = url => typeof url === 'string' && /thesportsdb\.com\/images\/media\/player\/cutout\/|images\.fotmob\.com\/image_resources\/playerimages\/|resources\.premierleague\.com\/premierleague\d*\/photos\/players\//.test(url);
 
 const sportOf = league => CATALOG[league]?.sport || league || '';
 const plain = s =>
@@ -32,6 +32,8 @@ const plain = s =>
     .normalize('NFKD')
     .replace(/[̀-ͯ]/g, '')
     .toLowerCase()
+    // The letters NFKD doesn't take apart (Rønnow, ESPN's Ronnow).
+    .replace(/[øœæßđðłıþ]/g, c => ({ ø: 'o', œ: 'oe', æ: 'ae', ß: 'ss', đ: 'd', ð: 'd', ł: 'l', ı: 'i', þ: 'th' })[c])
     .replace(/\b(jr|sr|ii|iii)\b\.?/g, '')
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
@@ -61,6 +63,36 @@ export function ownPhoto(name, league) {
   if (!OWN_PHOTO[league] || !name) return null;
   const hit = ownList(league)?.get(plain(name));
   return hit ? OWN_PHOTO[league](...hit) : null;
+}
+
+// Every football league's and cup's faces, from FotMob (Shared-Data's
+// sports/<league>/faces.json, [[name, id]…]: each club's squad now, a studio
+// cutout each): after the league's own photo, before a search by name. A
+// league's list is read the first time one of its players is drawn (not all
+// of them up front: there are twenty), so faceFor waits for it.
+const FACE = id => `https://images.fotmob.com/image_resources/playerimages/${id}.png`;
+const faceLists = {};
+function faceList(league) {
+  if (sportOf(league) !== 'soccer') return null;
+  if (!faceLists[league]) {
+    faceLists[league] = { map: null, ready: null };
+    faceLists[league].ready = (kit.packJson?.(`sports/${league}/faces.json`, { ttl: 12 * 3_600_000 }) || Promise.resolve(null))
+      .then(d => (faceLists[league].map = new Map((d?.players || []).map(([n, id]) => [plain(n), id]))))
+      // A failed read isn't "no faces": read again when a player is next drawn.
+      .catch(() => void delete faceLists[league]);
+  }
+  return faceLists[league];
+}
+const faceIn = (list, name) => {
+  const id = name && list?.map?.get(plain(name));
+  return id ? FACE(id) : null;
+};
+export const facePhoto = (name, league) => faceIn(name && faceList(league), name);
+export async function faceFor(name, league) {
+  const list = name && faceList(league);
+  if (!list) return null;
+  await list.ready;
+  return faceIn(list, name);
 }
 
 // ---- The device's copy ----------------------------------------------------------------
@@ -216,12 +248,29 @@ export function findPhoto(name, league) {
 export function personPhoto(name, league, { urls = [], guess = null, cls = '', fallback }) {
   const known = knownPhoto(name, sportOf(league));
   const guessed = smallPhoto(guess);
-  const list = [...new Set([ownPhoto(name, league), ...urls, known, guess].map(smallPhoto).filter(Boolean))];
-  const last = () => {
-    const stand = fallback();
+  const face = facePhoto(name, league);
+  const list = [...new Set([ownPhoto(name, league), face, ...urls, known, guess].map(smallPhoto).filter(Boolean))];
+  const found = url => logoPicture(url, null, `${cls} photo${isCutout(url) ? ' cutout' : ''}`, () => fallback());
+  const search = stand => {
     if (known === undefined && name)
       findPhoto(name, league).then(url => {
-        if (url && stand.isConnected) stand.replaceWith(logoPicture(url, null, `${cls} photo${isCutout(url) ? ' cutout' : ''}`, () => fallback()));
+        if (url && stand.isConnected) stand.replaceWith(found(url));
+      });
+  };
+  const last = () => {
+    const stand = fallback();
+    // The league's faces not read yet: once they are, theirs (a search only without one).
+    if (face || !faceList(league)?.ready || faceList(league).map) search(stand);
+    else
+      faceFor(name, league).then(url => {
+        if (!url || list.includes(url)) return search(stand);
+        if (!stand.isConnected) return;
+        const pic = logoPicture(url, null, `${cls} photo cutout`, () => {
+          const again = fallback();
+          search(again);
+          return again;
+        });
+        stand.replaceWith(pic);
       });
     return stand;
   };

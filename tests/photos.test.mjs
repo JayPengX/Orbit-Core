@@ -37,3 +37,21 @@ test("a lookup TheSportsDB refused (its limit) isn't kept as 'no photo': asked a
   assert.equal(await findPhoto('Kevin Ciubotaru', 'scotland'), 'https://r2.thesportsdb.com/images/media/player/cutout/k.png');
   assert.equal(knownPhoto('Kevin Ciubotaru', 'soccer'), 'https://r2.thesportsdb.com/images/media/player/cutout/k.png');
 });
+
+test("a footballer's face is FotMob's from the league's nightly list, by name in any spelling; a failed read is read again", async () => {
+  let up = false;
+  globalThis.fetch = async url => {
+    if (!String(url).endsWith('sports/bundesliga/faces.json')) return new Response('', { status: 404 });
+    return up ? new Response(JSON.stringify({ players: [['Frederik Rønnow', 191414], ['Evan NDicka', 659413]] }), { status: 200 }) : new Response('', { status: 503 });
+  };
+  const { facePhoto, faceFor } = await import('../kit/photos.mjs');
+  assert.equal(await faceFor('Frederik Ronnow', 'bundesliga'), null, 'the list could not be read');
+  up = true;
+  const now = Date.now;
+  Date.now = () => now() + 10 * 60_000; // past the kit's wait after a failed read
+  assert.equal(await faceFor('Frederik Ronnow', 'bundesliga'), 'https://images.fotmob.com/image_resources/playerimages/191414.png');
+  assert.equal(facePhoto('Evan Ndicka', 'bundesliga'), 'https://images.fotmob.com/image_resources/playerimages/659413.png');
+  assert.equal(facePhoto('Someone Else', 'bundesliga'), null);
+  assert.equal(await faceFor('LeBron James', 'nba'), null, 'football only');
+  Date.now = now;
+});

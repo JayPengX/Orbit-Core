@@ -581,8 +581,12 @@ All pushed to `main` unless marked.
   Play, no Play pins (the wallet's `pins` is gone from eco.js), Play's
   `#game=` link and slip snapshot for Fixtures removed. It reads only its own
   affinity (`affinity(wallet, now, ['match'])`).
-- **Photos:** studio headshots only (kit photos.mjs: ESPN by id or name,
-  TheSportsDB cutouts); Wikipedia pictures never; device cache `fx.pics.v2`.
+- **Photos:** studio headshots only (kit photos.mjs: the league's own list
+  (NBA.com, the Premier League), then FotMob's cutouts for every football
+  league and cup (Shared-Data `sports/<league>/faces.json`, built nightly by
+  mirror.mjs `fotmobPhotos`, gently: ~500 asks, 3 at a time), the feed's,
+  ESPN by id or name, TheSportsDB cutouts); Wikipedia pictures never; device
+  cache `fx.pics.v3` (a refused lookup isn't kept as "none").
   Play no longer gets photos.mjs.
 - **Fixtures UI:** team pages rebuilt (hero, key-number strip, next game,
   賽程/戰績/陣容/排名 tabs) and available for NPB/KBO/CPBL, EuroLeague and K
