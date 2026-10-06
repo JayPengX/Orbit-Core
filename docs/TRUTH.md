@@ -234,7 +234,10 @@ bug waiting in the rest.
 - **Transit:** how the owner really travels (memory: transit-commute-
   logic). Every real choice is shown, with each route's departures on one
   card. Official names, times and live data are preferred. Navigation
-  resumes after the app is swiped away and tells the lock screen.
+  resumes after the app is swiped away and tells the lock screen. It never
+  takes the app over: the tabs stay, it shrinks to a bar to do something
+  else, and the trip can change on the way (another stop to get off at, a
+  new plan from here, another place).
 - **Sports:** a followed league is never hidden by a failed read. Picks
   are what a viewer in Taiwan would watch, at hours they're awake.
 - **Play:** the house never loses on its own prices. The odds are its own
