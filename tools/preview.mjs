@@ -6,6 +6,7 @@
 //                          [--type 'selector=text']  (fills a field after the clicks)
 //                          [--store 'key=value']  (a localStorage entry to start with)
 //                          [--geo lat,lon]  (where the phone is; Transit's default 新竹車站)
+//                          [--geo-path 'lat,lon;…' --geo-every ms]  (the phone moving, during --wait)
 //                          [--signed-out]  (the sign-in screen, as a new device sees it)
 //                          [--entry '{json}']  (a wallet entry to add: an economy scenario)
 //                          [--clock 2026-10-06T10:05]  (the page's clock, Taipei time)
@@ -175,6 +176,10 @@ const dark = flag('dark');
 const noGeo = flag('no-geo');
 // --geo lat,lon: where the phone is (Transit's default: 新竹車站).
 const geoAt = opt('geo')?.split(',').map(Number);
+// --geo-path 'lat,lon;lat,lon;…' [--geo-every ms]: the phone moves along those points during --wait
+// (Transit's navigation on board: its own pace from where it's been), one every --geo-every (default 2000).
+const geoPath = (opt('geo-path') || '').split(';').filter(Boolean).map(x => x.split(',').map(Number));
+const geoEvery = Number(opt('geo-every', 2000));
 // --clock '2026-10-06T10:05': the page's clock starts then (Taipei time) and runs on.
 const clock = opt('clock', '');
 // --root dir: where the repos are (default: next to this one), e.g. a copy
@@ -593,7 +598,16 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => (reopen ? [h, h]
     console.log(`timing ${key}${hash ? `#${hash}` : ''}: loading screen gone after ${shown == null ? 'over 60 s' : `${shown} ms`}, first paint ${paint == null ? '?' : `${Math.round(paint)} ms`}, ${own.length} own files in ~${waves} waves (last asked at ${own.at(-1)?.at ?? 0} ms)`);
     if (DEBUG) for (const r of own) console.log(`  ${String(r.at).padStart(6)} ms  ${r.url.slice(0, 100)}`);
   }
-  await page.waitForTimeout(wait);
+  if (geoPath.length) {
+    // (The clock moved on with it: each step is geoEvery of real time, so the page's pace is real.)
+    const until = Date.now() + wait;
+    for (const [lat, lon] of geoPath) {
+      if (Date.now() >= until) break;
+      await context.setGeolocation({ latitude: lat, longitude: lon, accuracy: 15 });
+      await page.waitForTimeout(Math.min(geoEvery, Math.max(0, until - Date.now())));
+    }
+    if (Date.now() < until) await page.waitForTimeout(until - Date.now());
+  } else await page.waitForTimeout(wait);
   for (const sel of clicks) {
     await page.click(sel).catch(e => errors.push(`click ${sel}: ${e.message.split('\n')[0]}`));
     await page.waitForTimeout(2500);
