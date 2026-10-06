@@ -125,6 +125,16 @@ bug waiting in the rest.
   otherwise, with no change in the app. A new read the apps make that's
   slow-changing goes in `mirror.mjs` at the same URL; its slimming drops
   only what no app's parser reads.
+- **Sports data: Shared-Data first.** Any new or changed sports read (a
+  league's season, a team's or player's page, a finished game's box score
+  or win probability line, last season's playoffs) is weighed against
+  Shared-Data before it goes through the proxy: a season pack, the mirror
+  or a pack of its own (as `winprob/`) built at night, read once by
+  everyone. Shared-Data keeps only what an app can still show (its
+  league's season now; before the next regular season, the last playoffs
+  and numbers), carries what can't change from the published site instead
+  of reading it again, and reads only for the leagues each app shows. The
+  proxy is for what moves: a game on now, a price before kickoff.
 - **A failed read answers the copy the device has** (of any age) and is
   asked again soon; only with nothing kept is it a failure.
 - **Limits are each app's**, never shared by the family: Sports, Play and
