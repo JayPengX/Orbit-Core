@@ -2515,7 +2515,7 @@ html.q-recording body::after {
 /* Buttons: capsules. The default is iOS's grey "tinted" button, the primary
    the app's colour; both give a little under a finger. */
 .q-btn {
-  border: 0;
+  border: 1px solid transparent;
   border-radius: 999px;
   background: var(--q-fill);
   font-weight: 600;
@@ -2530,7 +2530,7 @@ html.q-recording body::after {
   transition-duration: 0.1s;
 }
 .q-chip {
-  border: 0;
+  border: 1px solid transparent;
   background: var(--q-fill);
   color: var(--q-text);
   font-weight: 600;
