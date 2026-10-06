@@ -206,6 +206,13 @@ bug waiting in the rest.
   haptics on taps, dark where the app is dark (Weather and Transit), and
   Orbit Class's Liquid Glass kept close to iOS's own: light at the rim and
   no outline rings.
+- **Every app looks like a native iOS 26 app, from the kit.** iOS's system
+  colours (grouped grey page, white cells; true black and #1c1c1e in the
+  dark), one glass material for what floats (`--q-glass`, `--q-glass-rim`:
+  the top-right buttons grouped in one capsule, the tab bar, alerts,
+  banners), capsule buttons and chips, sheets floating with deep corners,
+  and presses that give with iOS's spring. An app uses these tokens and
+  q- components rather than drawing its own outlines and shadows.
 - Pictures for everything that has one: a person's face, a team's logo, a
   league's mark, a country's flag. Initials are only a stand-in until the
   picture comes.
