@@ -169,34 +169,35 @@ export const F1_TEAMS = {
   cadillac: { name: 'Cadillac', page: 'cadillac', f1: 'cadillac', zh: '凱迪拉克', color: '#c9a227', drivers: ['Perez', 'Bottas'] }
 };
 
-// Driver names as the lottery writes them ("G.羅素"). The ones on the
-// 2026 Azerbaijan GP board are the lottery's own; the rest follow the usual
-// Taiwanese transliteration.
+// Driver names as Taiwan's broadcasts and press say them: the surname alone
+// (羅素, 安東內利), no initial (only two drivers with one surname would need it).
 const F1_ZH = {
-  Russell: 'G.羅素',
-  Antonelli: 'AK.安東內利',
-  Leclerc: 'C.勒克萊爾',
-  Piastri: 'O.皮亞斯特里',
-  Verstappen: 'M.維斯塔潘',
-  Hamilton: 'L.漢米爾頓',
-  Norris: 'L.諾里斯',
-  Hadjar: 'I.哈賈爾',
-  Gasly: 'P.蓋斯利',
-  Sainz: 'C.塞恩斯',
-  Colapinto: 'F.科拉平托',
-  Stroll: 'L.斯托羅爾',
-  Perez: 'S.培瑞茲',
-  Alonso: 'F.阿隆索',
-  Albon: 'A.艾爾朋',
-  Lawson: 'L.勞森',
-  Lindblad: 'A.林德布拉德',
-  Ocon: 'E.歐康',
-  Bearman: 'O.貝爾曼',
-  Hulkenberg: 'N.霍肯伯格',
-  Bortoleto: 'G.博托萊托',
-  Bottas: 'V.博塔斯',
-  Tsunoda: 'Y.角田裕毅'
+  Russell: '羅素',
+  Antonelli: '安東內利',
+  Leclerc: '勒克萊爾',
+  Piastri: '皮亞斯特里',
+  Verstappen: '維斯塔潘',
+  Hamilton: '漢米爾頓',
+  Norris: '諾里斯',
+  Hadjar: '哈賈爾',
+  Gasly: '蓋斯利',
+  Sainz: '塞恩斯',
+  Colapinto: '科拉平托',
+  Stroll: '斯托羅爾',
+  Perez: '培瑞茲',
+  Alonso: '阿隆索',
+  Albon: '艾爾朋',
+  Lawson: '勞森',
+  Lindblad: '林德布拉德',
+  Ocon: '歐康',
+  Bearman: '貝爾曼',
+  Hulkenberg: '霍肯伯格',
+  Bortoleto: '博托萊托',
+  Bottas: '博塔斯',
+  Tsunoda: '角田裕毅'
 };
+// The whole list by surname (a notice the Worker writes uses it on ESPN's names).
+export const F1_NAMES_ZH = Object.freeze({ ...F1_ZH });
 
 // Each driver's page on formula1.com (/en/drivers/<slug>): the official
 // season, career and biography figures (Orbit Sports' driver sheet).

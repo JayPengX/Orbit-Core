@@ -2,7 +2,7 @@
 // notice lists the Worker keeps.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { encryptPush, cleanItems, sendDue, handlePush } from '../push.js';
+import { encryptPush, cleanItems, sendDue, handlePush, runCheck } from '../push.js';
 
 const unb64u = t => Buffer.from(t, 'base64url');
 async function pairFrom(priv, pub) {
@@ -197,6 +197,20 @@ test("a race's final: the winner and the podium from the day's board, once it's 
     state = 'post';
     assert.equal((await sendDue(env, now + 120_000 + 16 * 60_000)).sent, 1);
     assert.match(asked[0], /racing\/f1\/scoreboard\?dates=20261011/);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+test("a race's podium in the app's own names for the drivers", async () => {
+  const check = cleanItems([{ at: Date.now() + 60_000, title: 't', check: { espn: 'racing/f1', event: '600', session: 'Race', day: '20261011', zh: { Antonelli: '安東內利', Russell: '羅素', Hulkenberg: '霍肯伯格', 'bad<': 'x' } } }])[0].check;
+  assert.deepEqual(Object.keys(check.zh), ['Antonelli', 'Russell', 'Hulkenberg']);
+  const realFetch = globalThis.fetch;
+  const d = (name, short, order) => ({ order, athlete: { displayName: name, shortName: short } });
+  globalThis.fetch = async () => new Response(JSON.stringify({ events: [{ id: '600', competitions: [{ type: { abbreviation: 'Race' }, status: { type: { state: 'post' } }, competitors: [d('Kimi Antonelli', 'K. Antonelli', 1), d('Nico Hülkenberg', 'N. Hülkenberg', 2), d('Lando Norris', 'L. Norris', 3)] }] }] }), { status: 200 });
+  try {
+    assert.equal((await runCheck(check, 'zh', {})).result, '安東內利奪冠 · 頒獎台：安東內利、霍肯伯格、L. Norris');
+    assert.equal((await runCheck(check, 'en', {})).result, 'K. Antonelli wins · podium: K. Antonelli, N. Hülkenberg, L. Norris');
   } finally {
     globalThis.fetch = realFetch;
   }
