@@ -144,6 +144,8 @@ export function cleanItems(items, now = Date.now()) {
         item.check = { espn: c.espn, event: String(c.event) };
         // The names the app shows (the Worker adds the score and who won).
         if (Array.isArray(c.names) && c.names.length === 2) item.check.names = c.names.map(n => cleanText(n, 40));
+        // A race (racing's weekend event, one of its sessions, read from that day's board).
+        if (/^racing\//.test(c.espn) && ['Race', 'SR'].includes(c.session) && /^\d{8}$/.test(String(c.day))) item.check = { espn: c.espn, event: String(c.event), session: c.session, day: String(c.day) };
       }
       const w = c?.weather;
       if (w && Math.abs(w.lat) <= 90 && Math.abs(w.lon) <= 180 && ['brief', 'rain'].includes(w.kind)) item.check = { weather: { lat: Math.round(w.lat * 1e4) / 1e4, lon: Math.round(w.lon * 1e4) / 1e4, kind: w.kind } };
@@ -227,6 +229,18 @@ async function runCheck(check, lang, env) {
     if (sec > check.bus.min * 60 + BUS_EARLY) return null;
     const m = Math.round(sec / 60);
     const result = m <= 1 ? (lang === 'en' ? 'arriving now' : '進站中') : lang === 'en' ? `${m} min away` : `約 ${m} 分鐘到站`;
+    return { body: result, result };
+  }
+  if (check.espn && check.session) {
+    // A race: ESPN has no summary for a weekend; its day's board has each session and its order.
+    const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${check.espn}/scoreboard?dates=${check.day}`);
+    if (!res.ok) return null;
+    const ev = (await res.json())?.events?.find(e => String(e.id) === check.event);
+    const comp = ev?.competitions?.find(c => c?.type?.abbreviation === check.session);
+    if (comp?.status?.type?.state !== 'post') return null;
+    const top = [...(comp.competitors || [])].sort((x, y) => (x.order ?? 99) - (y.order ?? 99)).slice(0, 3).map(c => c?.athlete?.shortName || c?.athlete?.displayName || '').filter(Boolean);
+    if (!top.length) return null;
+    const result = lang === 'en' ? `${top[0]} wins${top.length > 1 ? ` · podium: ${top.join(', ')}` : ''}` : `${top[0]} 奪冠${top.length > 1 ? ` · 頒獎台：${top.join('、')}` : ''}`;
     return { body: result, result };
   }
   if (check.espn) {

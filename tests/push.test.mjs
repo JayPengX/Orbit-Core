@@ -171,3 +171,33 @@ test("a game's final score is told once, however often the app schedules it agai
     globalThis.fetch = realFetch;
   }
 });
+
+test("a race's final: the winner and the podium from the day's board, once it's over", async () => {
+  const m = new Map();
+  const kv = { m, get: async (k, t) => (m.has(k) ? (t === 'json' ? JSON.parse(m.get(k)) : m.get(k)) : null), put: async (k, v) => void m.set(k, v), delete: async k => void m.delete(k) };
+  const env = { RATE_LIMIT_KV: kv };
+  const post = (session, path, body) => handlePush(new Request(`https://w/${path}`, { method: 'POST', body: JSON.stringify(body) }), env, {}, session, path);
+  const match = { d: 'acct', a: 'match' };
+  await post(match, '/push/subscribe', { sub: { endpoint: 'https://push.example/s', keys: { p256dh: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4', auth: 'BTBZMqHH6r4Tts7J_aSIgg' } } });
+  const item = { at: Date.now() + 60_000, title: '新加坡站 · 正賽', body: 'F1 · {result}', tag: 'end:f1:600', kind: 'end', check: { espn: 'racing/f1', event: '600', session: 'Race', day: '20261011' } };
+  assert.deepEqual(cleanItems([item])[0].check, { espn: 'racing/f1', event: '600', session: 'Race', day: '20261011' });
+  let state = 'in';
+  const asked = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async url => {
+    if (!String(url).includes('espn.com')) return new Response(null, { status: 201 });
+    asked.push(String(url));
+    const driver = (n, order) => ({ order, athlete: { shortName: n } });
+    return new Response(JSON.stringify({ events: [{ id: '600', competitions: [{ type: { abbreviation: 'Qual' }, status: { type: { state: 'post' } }, competitors: [driver('G. Russell', 1)] }, { type: { abbreviation: 'Race' }, status: { type: { state } }, competitors: [driver('L. Norris', 3), driver('K. Antonelli', 1), driver('G. Russell', 2)] }] }] }), { status: 200 });
+  };
+  try {
+    await post(match, '/push/schedule', { items: [item] });
+    const now = Date.now();
+    assert.equal((await sendDue(env, now + 120_000)).sent, 0);
+    state = 'post';
+    assert.equal((await sendDue(env, now + 120_000 + 16 * 60_000)).sent, 1);
+    assert.match(asked[0], /racing\/f1\/scoreboard\?dates=20261011/);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
