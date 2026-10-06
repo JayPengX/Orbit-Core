@@ -25,6 +25,27 @@ is wrong, not the rule. When the owner adds a rule, it goes here.
   liquidity), not a hard-coded exception for the place the owner tested.
   When one destination exposes a flaw, test many random trips (Transit's
   batch harness), not just that one.
+- **A change to how anything is recommended (Transit's plans, Sports'
+  picks, Play's odds) goes through these steps, in order:**
+  1. **See it live first.** Run the owner's exact case on today's real
+     data through the app's own code (Transit: `node scripts/live.mjs
+     <from> <to>`, the proxy's dev door) and get the wrong answer on
+     screen. No fix for a bug that hasn't been seen.
+  2. **Find the rule that made it,** not the place. Say why it went wrong
+     in words (the same train boarded a station up the line counted as
+     leaving later), and fix that rule wherever it's used.
+  3. **A test that fails without the fix** and passes with it, on the
+     small made-up network in the tests. Then `npm test`.
+  4. **The owner's case again, live:** the wrong answer gone, and what
+     shows instead is what a person would take.
+  5. **The whole batch, old code against new, at the same moment**
+     (`node scripts/live.mjs --against HEAD`, or the commit before). Read
+     every trip that changed: each must be the fix showing up elsewhere
+     or the live data moving (a bus a minute off). Any other change is a
+     quirk the fix made: fix it before pushing. When a kind of trip the
+     batch doesn't cover was involved, add one like it.
+  6. **Say what moved** in the commit: the case, the rule, and how many
+     batch trips changed and why.
 - The owner tests on their iPhone and sends lists. If they mention an
   attachment that isn't there, ask before starting.
 
