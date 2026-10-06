@@ -73,7 +73,7 @@ export function trimF1Live(r, now = Date.now()) {
     message: rcm ? { text: rcm.Message || '', at: rcm.Utc || '' } : null,
     // The safety car, the virtual one and the flags so far (Orbit Sports' race chart shades them), and what sent them out (a car stopped, a collision).
     control: list(r?.RaceControlMessages?.Messages)
-      .filter(m => m.Category === 'SafetyCar' || /SAFETY CAR|VSC|STOPPED|CRASH|BARRIER|GRAVEL|INCIDENT INVOLVING/i.test(m.Message || '') || m.Flag === 'RED' || (m.Flag === 'GREEN' && /RESUME|TRACK CLEAR/i.test(m.Message || '')))
+      .filter(m => m.Category === 'SafetyCar' || /SAFETY CAR|VSC|STOPPED|CRASH|BARRIER|GRAVEL|INCIDENT INVOLVING|\bRED FLAG\b|TRACK CLEAR/i.test(m.Message || '') || m.Flag === 'RED' || (m.Flag === 'GREEN' && /RESUME|TRACK CLEAR/i.test(m.Message || '')))
       .slice(-30)
       .map(m => ({ at: m.Utc || '', lap: Number(m.Lap) || 0, category: m.Category || '', flag: m.Flag || '', message: m.Message || '' })),
     cars
