@@ -21,3 +21,17 @@ test("F1's live timing, trimmed: the part, the clock as of now, the flag and eac
   // Six out after Q1.
   assert.equal(r.cars.filter(c => c.out).length, 6);
 });
+
+test("F1 live: the safety car and flags so far, for the race chart's bands", async () => {
+  const { trimF1Live } = await import('../f1-live.js');
+  const r = trimF1Live({
+    RaceControlMessages: {
+      Messages: [
+        { Utc: '2026-10-04T08:52:16', Lap: 9, Category: 'SafetyCar', Message: 'SAFETY CAR DEPLOYED' },
+        { Utc: '2026-10-04T08:53:00', Lap: 9, Category: 'Other', Message: 'CAR 44 TIME DELETED' },
+        { Utc: '2026-10-04T08:58:50', Lap: 12, Category: 'SafetyCar', Message: 'SAFETY CAR IN THIS LAP' }
+      ]
+    }
+  });
+  assert.deepEqual(r.control.map(m => [m.lap, m.message]), [[9, 'SAFETY CAR DEPLOYED'], [12, 'SAFETY CAR IN THIS LAP']]);
+});

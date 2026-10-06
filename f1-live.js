@@ -71,6 +71,11 @@ export function trimF1Live(r, now = Date.now()) {
     track: { status: String(r?.TrackStatus?.Status || ''), message: r?.TrackStatus?.Message || '' },
     lap: r?.LapCount ? { now: Number(r.LapCount.CurrentLap) || 0, of: Number(r.LapCount.TotalLaps) || 0 } : null,
     message: rcm ? { text: rcm.Message || '', at: rcm.Utc || '' } : null,
+    // The safety car, the virtual one and the flags so far (Orbit Sports' race chart shades them).
+    control: list(r?.RaceControlMessages?.Messages)
+      .filter(m => m.Category === 'SafetyCar' || /SAFETY CAR/i.test(m.Message || '') || m.Flag === 'RED' || (m.Flag === 'GREEN' && /RESUME|TRACK CLEAR/i.test(m.Message || '')))
+      .slice(-30)
+      .map(m => ({ at: m.Utc || '', lap: Number(m.Lap) || 0, category: m.Category || '', flag: m.Flag || '', message: m.Message || '' })),
     cars
   };
 }
