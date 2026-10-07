@@ -539,16 +539,49 @@ export async function kvPut(env, key, value, ttlS) {
   } catch {}
 }
 
-// A national list kept whole in KV (MOENV's AQI sites and forecast, CWA's
+// ---- Kept answers: Cloudflare's cache first, KV at most hourly ----------------------
+//
+// What the Worker keeps for itself (cells, national lists, the status page)
+// goes in the Cache API, which has no daily caps. KV, whose free tier allows
+// 1,000 writes a day, gets a copy at most once an hour (`kvAt`), for the
+// skill cron (weather-skill.js), which reads cells from KV, and for a cache
+// that was emptied. Without a Cache API (tests) everything is written to KV.
+const edge = () => globalThis.caches?.default ?? null;
+const edgeKey = key => `https://weather.kept/${encodeURIComponent(key)}`;
+export const KV_EVERY_MS = HOUR;
+export async function keptJson(env, key) {
+  const c = edge();
+  if (c) {
+    try {
+      const r = await c.match(edgeKey(key));
+      if (r) return await r.json();
+    } catch {}
+  }
+  return kvJson(env, key);
+}
+// `entry.at` is when it was made; `prev` the copy it replaces.
+export async function keepJson(env, key, entry, ttlS, prev = null) {
+  const c = edge();
+  const due = !c || !prev?.kvAt || entry.at - prev.kvAt >= KV_EVERY_MS;
+  const out = { ...entry, kvAt: due ? entry.at : prev.kvAt };
+  if (c) {
+    try {
+      await c.put(edgeKey(key), new Response(JSON.stringify(out), { headers: { 'Content-Type': 'application/json', 'Cache-Control': `max-age=${Math.max(60, Math.floor(ttlS))}` } }));
+    } catch {}
+  }
+  if (due) await kvPut(env, key, out, ttlS);
+  return out;
+}
+
+// A national list kept whole (MOENV's AQI sites and forecast, CWA's
 // warnings): fresh for `freshMs`, the last good copy used while under
 // KEEP_MS if the source fails.
 async function shared(env, key, freshMs, make, now) {
-  const hit = await kvJson(env, key);
+  const hit = await keptJson(env, key);
   if (hit && now - hit.at < freshMs) return { ...hit, state: 'ok' };
   try {
     const data = await make();
-    const entry = { at: now, data };
-    await kvPut(env, key, entry, KEEP_MS / 1000);
+    const entry = await keepJson(env, key, { at: now, data }, KEEP_MS / 1000, hit);
     return { ...entry, state: 'ok' };
   } catch (e) {
     if (hit && now - hit.at < KEEP_MS) return { ...hit, state: 'stale' };
@@ -1205,18 +1238,16 @@ export async function noteRecent(env, cell, now) {
 export async function cellForecast(env, ctx, lat, lon, { fetchFn = fetch, now = Date.now(), freshMs = FRESH_MS } = {}) {
   const key = `weather:cell:${cellOf(lat, lon)}`;
   // (An entry from before one truth, without `bySource`, is not used.)
-  const found = await kvJson(env, key);
+  const found = await keptJson(env, key);
   const hit = found?.bySource ? found : null;
   const refresh = async () => {
-    const entry = await buildCell(env, lat, lon, { fetchFn, now, prev: hit });
-    await kvPut(env, key, entry, KEEP_MS / 1000);
+    const entry = await keepJson(env, key, await buildCell(env, lat, lon, { fetchFn, now, prev: hit }), KEEP_MS / 1000, found);
     await noteRecent(env, cellOf(lat, lon), now);
     return entry;
   };
   if (hit && now - hit.at < freshMs) return { ...hit.resp, cached: true };
   if (hit && now - hit.at < STALE_MS) {
-    // (No lock: KV's free tier has 1,000 writes a day, and two refreshes
-    // of one cell at once are harmless.)
+    // (No lock: two refreshes of one cell at once are harmless.)
     const job = refresh().catch(e => console.log('weather refresh failed', String(e.message || e)));
     if (ctx?.waitUntil) ctx.waitUntil(job);
     return { ...hit.resp, cached: true, refreshing: true };
@@ -1289,7 +1320,7 @@ export async function cellsReport(env, now) {
   const recent = (await kvJson(env, 'weather:recent')) || {};
   const cells = [];
   for (const cell of Object.keys(recent)) {
-    const hit = await kvJson(env, `weather:cell:${cell}`);
+    const hit = await keptJson(env, `weather:cell:${cell}`);
     if (!hit?.resp) continue;
     const hours = hit.resp.hours || [];
     const blank = {};
@@ -1302,7 +1333,16 @@ export async function cellsReport(env, now) {
   return { at: now, googleCallsToday: Number(await kvJson(env, `weather:google:${twDate(now)}`)) || 0, cap: GOOGLE_DAILY_CALLS, cells };
 }
 
+// The status page and its samples: Cloudflare's cache only (KV without one).
 async function cachedText(env, key, ttl, make) {
+  const c = edge();
+  if (c) {
+    const hit = await c.match(edgeKey(key)).catch(() => null);
+    if (hit) return hit.text();
+    const text = await make();
+    await c.put(edgeKey(key), new Response(text, { headers: { 'Cache-Control': `max-age=${ttl}` } })).catch(() => {});
+    return text;
+  }
   const kv = env.RATE_LIMIT_KV;
   const hit = kv && (await kv.get(key));
   if (hit) return hit;

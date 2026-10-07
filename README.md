@@ -328,12 +328,8 @@ A cache hit doesn't count against
 `SPORTS_PROXY_RATE_LIMIT` at all (see `handleSportsProxyRequest`'s own
 comment for why this exists — without it, Match Find's own near-term +
 full-window refresh tiers alone already exceeded this route's per-IP rate
-limit). The optional `RATE_LIMIT_KV` binding (see
-[Optional: Auto-Deploy via GitHub Actions](#optional-auto-deploy-via-github-actions)
-below) can safely be the same KV namespace as `orbit-workers-proxy`'s own —
-this Worker's rate-limit keys are IP-only, with no `feature` prefix to
-collide with the other Worker's `gemini:`/`sync:`/`vocab-sync:`/`vocab-ai:`
-keys.
+limit). This Worker has no KV binding: it counts each Quadra Pass session
+(or, with the gate off, each IP) in memory.
 
 ### The Quadra Pass store (Firestore)
 
@@ -362,9 +358,10 @@ Both share one Firebase project and one service-account credential:
 4. (Optional but recommended) Workers & Pages → KV → Create namespace (any
    name) → back on this Worker's Settings → Bindings → Add → KV Namespace →
    variable name `RATE_LIMIT_KV` → pick the namespace you just created →
-   redeploy (a Binding change needs a fresh "Deploy" to take effect). Both
-   sync routes (and every AI route) share this one binding with per-feature
-   key prefixes, so there's never any cross-feature interference.
+   redeploy (a Binding change needs a fresh "Deploy" to take effect). It
+   holds push subscriptions, Orbit Transit's and Orbit Weather's Google
+   counts and an hourly copy of each weather cell; rate limits are counted
+   in memory, never in KV.
 5. Back in the Firebase Console's "Rules" tab, paste:
    ```
    rules_version = '2';

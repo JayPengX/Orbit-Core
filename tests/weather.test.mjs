@@ -8,7 +8,7 @@ import {
   airForecast, parseGoogleAir, googleAirBody, parseAirHistory,
   weatherStatus, handleWeather, scrub, cellOf, nearestStation, townIds, airArea, parseCwaTown, cwaAt, parseGoogleDay, parseGoogleHour,
   blend, buildCell, GOOGLE_DAILY_CALLS, parseVillage, whereIs, addAirReading, briefText, rainPhrase, weatherCheck, noteRecent, cellForecast, advise, adviceWindow, parseCwaWarnings, aqiLevel, uvLevel, num, DEFAULT_WEIGHTS
-, popStep } from '../weather.js';
+, popStep, keepJson, keptJson, KV_EVERY_MS } from '../weather.js';
 import { STATIONS } from '../weather-stations.js';
 import { upstream as fixtureUpstream } from './fixtures/weather/upstream.mjs';
 
@@ -506,4 +506,25 @@ test("a rain chance in steps of 10: Google's 5% and CWA's 0% read 0%, not 3%", (
   assert.deepEqual([0, 3, 4, 5, 14, 15, 28, 96, 100].map(popStep), [0, 0, 0, 10, 10, 20, 30, 100, 100]);
   assert.equal(popStep(null), null);
   assert.equal(popStep(undefined), null);
+});
+
+test("kept answers go to Cloudflare's cache, and to KV at most hourly", async () => {
+  const store = new Map();
+  globalThis.caches = { default: { match: async k => (store.has(k) ? new Response(store.get(k)) : undefined), put: async (k, r) => void store.set(k, await r.text()) } };
+  try {
+    const kv = memKv();
+    const e = { ...env, RATE_LIMIT_KV: kv };
+    const first = await keepJson(e, 'weather:cell:x', { at: NOW, v: 1 }, 3600, null);
+    assert.equal(first.kvAt, NOW);
+    assert.equal(JSON.parse(kv.store.get('weather:cell:x')).v, 1);
+    const second = await keepJson(e, 'weather:cell:x', { at: NOW + 15 * 60_000, v: 2 }, 3600, first);
+    assert.equal(JSON.parse(kv.store.get('weather:cell:x')).v, 1, 'KV not written again within the hour');
+    assert.equal((await keptJson(e, 'weather:cell:x')).v, 2, 'the cache has the new one');
+    await keepJson(e, 'weather:cell:x', { at: NOW + KV_EVERY_MS, v: 3 }, 3600, second);
+    assert.equal(JSON.parse(kv.store.get('weather:cell:x')).v, 3, 'an hour on: KV again');
+    store.clear();
+    assert.equal((await keptJson(e, 'weather:cell:x')).v, 3, 'an emptied cache falls back to KV');
+  } finally {
+    delete globalThis.caches;
+  }
 });

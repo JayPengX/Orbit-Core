@@ -138,158 +138,54 @@ function readJsonBody(request) {
   return request.json().catch(() => INVALID_BODY);
 }
 
-// ---- Shared rate limiting (Workers KV, one counter per feature+IP+hour) ----
+// ---- Shared rate limiting (in memory, never KV) ----
 //
-// Real, cross-request rate limiting via Workers KV (env.RATE_LIMIT_KV - see
-// README, an optional but recommended one-time binding), shared across
-// every edge location - unlike a plain in-memory Map (kept below as
-// isRateLimitedInMemory, used only as a fallback if the KV binding is
-// missing or a KV call errors): Workers run many isolates in parallel
-// across Cloudflare's edge, so an in-memory counter resets per isolate and
-// a distributed burst of requests can blow straight through it. KV is
-// still not a hard security boundary on its own (an abuser can spread
-// requests across enough source IPs to dodge a per-IP counter), but it
-// closes the specific gap of "just send enough requests to outrun a single
-// isolate's memory." The real, unconditional backstop underneath both is
-// Cloudflare's own free-plan daily request cap.
+// Counted in each isolate's memory, one counter per feature and IP an hour.
+// It used to be counted in Workers KV so every isolate saw the same count,
+// but that cost a KV write per busy minute per IP and kept running the
+// account into KV's free-tier daily caps (1,000 writes, 100,000 reads),
+// which emailed the owner and broke every feature that stores in KV.
+// The guard that matters is the Quadra Pass: the routes worth abusing need
+// one, and those count per session (quadra-token.js sessionLimited).
+// Under that, a per-isolate count still stops a single client's flood, and
+// Cloudflare's own daily request cap is the backstop.
 const RATE_WINDOW_MS = 60 * 60 * 1000;
-const RATE_WINDOW_SECONDS = RATE_WINDOW_MS / 1000;
-
-// Workers KV's free-tier daily caps are wildly asymmetric - 100,000
-// reads/day but only 1,000 writes/day, per account, shared by every
-// namespace. The original version of this function called kv.put() on
-// every single request that wasn't already over its limit - one write just
-// to increment the same counter by one - so a single feature under
-// ordinary traffic (SYNC_READ_RATE_LIMIT alone allows 6000 requests/hour
-// per IP) could burn through the *entire account's* daily write budget in
-// minutes, at which point every kv.put() anywhere in this Worker starts
-// throwing and every feature silently falls back to isRateLimitedInMemory
-// (see the catch in isRateLimited below) - a noisy neighbor on one path
-// degrading rate-limit accuracy on all the others.
-//
-// The fix batches increments per isolate instead of persisting each one to
-// KV individually: the authoritative count is read from KV once per window
-// (a read, not a write), and further increments in this isolate accumulate
-// in memory (pendingCounters) and are flushed as a single write no more
-// than once every KV_FLUSH_INTERVAL_MS. The limit check below still runs
-// against base+delta on every request, so enforcement stays effectively
-// real-time for whichever isolate is actually handling that traffic; only
-// *persisting* the count for other isolates to see is throttled, and it is
-// still flushed at least once when a window rolls over so a burst's tail
-// is never silently lost.
-const KV_FLUSH_INTERVAL_MS = 60 * 1000;
-const pendingCounters = new Map();
-
-async function flushPendingCounter(kv, key, pending, windowSeconds = RATE_WINDOW_SECONDS) {
-  const total = pending.base + pending.delta;
-  pending.base = total;
-  pending.delta = 0;
-  pending.lastFlushAt = Date.now();
-  // expirationTtl a little past the window so a key never outlives its own
-  // bucket by much, instead of accumulating in the namespace forever.
-  await kv.put(key, String(total), { expirationTtl: windowSeconds + 60 });
-}
-
-// `windowMs` defaults to the per-IP hourly window every existing call site
-// already relies on; isDailyGlobalCapped below passes a full day instead,
-// reusing this exact same batched-counter machinery for a completely
-// different shape of limit (see that function's own comment).
-async function isRateLimitedKV(kv, bucketKey, limit, windowMs = RATE_WINDOW_MS) {
-  const windowSeconds = windowMs / 1000;
-  const windowBucket = Math.floor(Date.now() / windowMs);
-  let pending = pendingCounters.get(bucketKey);
-  if (pending && pending.windowBucket !== windowBucket) {
-    // The previous window just ended - flush its final tally so other
-    // isolates aren't left permanently blind to this isolate's last few
-    // increments (best-effort: a failure here just means that window's
-    // very last increments are invisible elsewhere, no worse than what the
-    // old per-request behavior already tolerated between accounts).
-    if (pending.delta > 0) {
-      await flushPendingCounter(kv, `rl:${bucketKey}:${pending.windowBucket}`, pending, windowSeconds).catch(
-        () => {}
-      );
-    }
-    pending = null;
-  }
-  if (!pending) {
-    const stored = Number((await kv.get(`rl:${bucketKey}:${windowBucket}`)) || '0');
-    pending = { windowBucket, base: stored, delta: 0, lastFlushAt: Date.now() };
-    pendingCounters.set(bucketKey, pending);
-  }
-  if (pending.base + pending.delta >= limit) return true;
-  pending.delta += 1;
-  if (Date.now() - pending.lastFlushAt >= KV_FLUSH_INTERVAL_MS) {
-    await flushPendingCounter(kv, `rl:${bucketKey}:${windowBucket}`, pending, windowSeconds);
-  }
-  return false;
-}
+const DAY_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 const requestLog = new Map();
-function isRateLimitedInMemory(bucketKey, limit, windowMs = RATE_WINDOW_MS) {
-  const now = Date.now();
-  const timestamps = (requestLog.get(bucketKey) || []).filter(time => now - time < windowMs);
-  const limited = timestamps.length >= limit;
-  timestamps.push(now);
-  requestLog.set(bucketKey, timestamps);
-  return limited;
+function isRateLimitedInMemory(bucketKey, limit, windowMs = RATE_WINDOW_MS, now = Date.now()) {
+  const bucket = Math.floor(now / windowMs);
+  const c = requestLog.get(bucketKey);
+  if (!c || c.bucket !== bucket) {
+    if (requestLog.size > 20000) requestLog.clear();
+    requestLog.set(bucketKey, { bucket, n: 1 });
+    return 1 > limit;
+  }
+  c.n++;
+  return c.n > limit;
 }
 
 // `feature` keys the counter (e.g. 'gemini', 'sync:read', 'sync:write') so
-// every call site's limit is tracked completely independently of every
-// other's - see the top-of-file comment for why that separation matters.
-// Returns { limited, backend } rather than a plain boolean so the caller
-// can surface `backend` as a diagnostic response header - there's no way
-// to inspect a live Worker's internal state otherwise (no log access from
-// outside the Cloudflare dashboard), and "is the binding even wired up"
-// has turned out to need a real, checkable answer more than once.
-//
-// `windowMs` is optional (defaults to the per-IP hourly window) so this
-// same function/bucket machinery can also serve isDailyGlobalCapped's
-// completely different shape of limit below - one shared, already-tested
-// counter implementation instead of a second one.
-async function isRateLimited(env, ip, feature, limit, windowMs = RATE_WINDOW_MS) {
-  const bucketKey = `${feature}:${ip}`;
-  if (env.RATE_LIMIT_KV) {
-    try {
-      return { limited: await isRateLimitedKV(env.RATE_LIMIT_KV, bucketKey, limit, windowMs), backend: 'kv' };
-    } catch (error) {
-      return {
-        limited: isRateLimitedInMemory(bucketKey, limit, windowMs),
-        backend: `kv-error:${(error && error.message) || error}`
-      };
-    }
-  }
-  return { limited: isRateLimitedInMemory(bucketKey, limit, windowMs), backend: 'memory-no-binding' };
+// every call site's limit is tracked apart from every other's.
+function isRateLimited(env, ip, feature, limit, windowMs = RATE_WINDOW_MS) {
+  return isRateLimitedInMemory(`${feature}:${ip}`, limit, windowMs);
 }
 
 // Charges one request against `feature`'s per-IP hourly counter and returns
-// the 429 response to send if it's over `limit`, else null. Also sets
-// X-RateLimit-Backend on every response - diagnostic only (no IPs, no
-// counts, just which code path ran), so "is the KV binding even wired up"
-// can be checked with one curl instead of needing dashboard log access.
+// the 429 response to send if it's over `limit`, else null.
+// X-RateLimit-Backend says which limiter ran (diagnostic only).
 async function rateLimitResponse(env, ip, feature, limit, headers, request) {
-  const { limited, backend } = await isRateLimited(env, ip, feature, limit);
-  headers['X-RateLimit-Backend'] = backend;
-  return limited ? errorJson('RATE_LIMITED', 429, headers, request) : null;
+  headers['X-RateLimit-Backend'] = 'memory';
+  return isRateLimited(env, ip, feature, limit) ? errorJson('RATE_LIMITED', 429, headers, request) : null;
 }
 
-const DAY_WINDOW_MS = 24 * 60 * 60 * 1000;
-
-// A hard ceiling on TOTAL calls to a real, billed Gemini route across EVERY
-// caller combined - not per-IP like isRateLimited above, which a caller
-// spread across enough source IPs (or behind enough proxies) can still
-// outrun. Added once real billing was active on this account's
-// GEMINI_API_KEY (see the origin gate below for the other half of this
-// defense). This is the actual financial
-// backstop: whatever else fails to keep an abuser out, this Worker will
-// stop making real upstream Gemini calls once this many have happened
-// today for this feature, full stop, no matter how many different IPs or
-// spoofed headers the calls came from. Reuses isRateLimited's exact same
-// batched-KV-counter machinery via a fixed pseudo-IP ('global') and a full
-// day's window instead of an hour's - see that function's own comment.
+// A ceiling on TOTAL calls to a billed Gemini route a day across every
+// caller, not per IP. It is counted per isolate, so the true ceiling is
+// this many per running isolate (a handful, with the Worker placed in one
+// region). The origin gate below and Google's own billing cap on the
+// key are the other halves.
 async function isDailyGlobalCapped(env, feature, limit) {
-  const result = await isRateLimited(env, 'global', `daily-cap:${feature}`, limit, DAY_WINDOW_MS);
-  return result.limited;
+  return isRateLimited(env, 'global', `daily-cap:${feature}`, limit, DAY_WINDOW_MS);
 }
 
 // ---- Origin gate for every route that calls the real, billed Gemini API ---

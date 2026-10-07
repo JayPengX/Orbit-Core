@@ -85,12 +85,14 @@ export async function usage(env, now = Date.now()) {
   return out;
 }
 // True (and counted) while `sku` has room for `n` more this month.
-export async function spend(env, sku, n = 1, now = Date.now(), ctx = null) {
+// A count only (`tally`) waits 30 minutes before it's written: it is for the
+// status page, and writing TDX's every 10 calls ran KV out of writes.
+export async function spend(env, sku, n = 1, now = Date.now(), ctx = null, { countOnly = false } = {}) {
   const used = await usage(env, now);
   if (CAPS[sku] != null && used[sku] + n > CAPS[sku]) return false;
   meter.pending[sku] = (meter.pending[sku] || 0) + n;
-  const gathered = Object.values(meter.pending).reduce((a, b) => a + b, 0);
-  if (gathered >= 10 || now - meter.flushedAt > 2 * MIN) {
+  const gathered = Object.entries(meter.pending).reduce((a, [k, v]) => a + (CAPS[k] != null ? v : 0), 0);
+  if (countOnly ? now - meter.flushedAt > 30 * MIN : gathered >= 10 || now - meter.flushedAt > 2 * MIN) {
     const p = flushUse(env, now);
     if (ctx?.waitUntil) ctx.waitUntil(p);
     else await p;
@@ -98,7 +100,7 @@ export async function spend(env, sku, n = 1, now = Date.now(), ctx = null) {
   return true;
 }
 // Counted only (TDX calls, for the status page): no cap.
-export const tally = (env, key, n = 1, now = Date.now(), ctx = null) => spend(env, key, n, now, ctx);
+export const tally = (env, key, n = 1, now = Date.now(), ctx = null) => spend(env, key, n, now, ctx, { countOnly: true });
 export async function flushUse(env, now = Date.now()) {
   const pending = meter.pending;
   if (!Object.keys(pending).length) return;

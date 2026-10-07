@@ -15,16 +15,15 @@
 // route calls has Gemini's region restriction, so this Worker has no
 // [placement] block and runs near the caller.
 //
-// The CORS helpers and KV rate limiter below are a trimmed copy of
+// The CORS helpers below are a trimmed copy of
 // worker.js's. It imports one file, quadra-token.js, to check Quadra Pass
 // session tokens (deployed with Wrangler, which bundles it).
 //
 // A Quadra Pass is required: every request carries `qt=<session token>`
 // (from Shared-Proxy's /eco), checked here with the shared ECO_TOKEN_SECRET.
 // A request with a valid token is counted per session in this isolate's
-// memory, never in KV, so ordinary use costs no KV operations at all. Until
-// ECO_TOKEN_SECRET is set on this Worker the gate is off and the old per-IP
-// KV limit applies.
+// memory, never in KV (this Worker has no KV at all). Until ECO_TOKEN_SECRET
+// is set on this Worker the gate is off and each IP is counted the same way.
 import { readToken, sessionLimited } from './quadra-token.js';
 import { BRANDS } from './kit/brand.mjs';
 import { ASIA_HOST, asiaBaseballResponse, asiaTarget } from './asia-baseball.js';
