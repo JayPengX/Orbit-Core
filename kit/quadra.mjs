@@ -891,10 +891,31 @@ function statusStrip() {
   bar.setAttribute('aria-hidden', 'true');
   document.body.prepend(bar);
 }
+// The phone paints its own status bar above the page in the theme colour (or
+// black), so the theme colour is the strip's: one colour from the top of the
+// screen down to the page, never a black band with a seam under it. Kept in
+// step with light and dark and with an app recolouring the strip.
+function syncThemeColor() {
+  const bar = document.querySelector('.q-statusbar');
+  if (!bar || typeof getComputedStyle !== 'function') return;
+  const colour = getComputedStyle(bar).backgroundColor;
+  if (!colour || /^rgba\(.*,\s*0\)$|^transparent$/.test(colour)) return;
+  const metas = [...document.querySelectorAll('meta[name="theme-color"]')];
+  const meta = metas[0] || document.head.appendChild(Object.assign(document.createElement('meta'), { name: 'theme-color' }));
+  metas.slice(1).forEach(m => m.remove());
+  meta.removeAttribute('media');
+  if (meta.content !== colour) meta.content = colour;
+}
 // Back at once if an app redraws its body (innerHTML) and takes it away.
 function keepStatusStrip() {
   statusStrip();
-  if (typeof MutationObserver === 'function') new MutationObserver(statusStrip).observe(document.body, { childList: true });
+  syncThemeColor();
+  if (typeof MutationObserver === 'function') {
+    new MutationObserver(() => { statusStrip(); syncThemeColor(); }).observe(document.body, { childList: true, attributes: true, attributeFilter: ['style', 'class', 'data-theme', 'data-sky'] });
+    new MutationObserver(syncThemeColor).observe(document.documentElement, { attributes: true, attributeFilter: ['style', 'class', 'data-theme'] });
+  }
+  globalThis.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change', syncThemeColor);
+  globalThis.addEventListener?.('load', syncThemeColor);
 }
 if (typeof document !== 'undefined') document.body ? keepStatusStrip() : document.addEventListener('DOMContentLoaded', keepStatusStrip);
 

@@ -210,6 +210,12 @@ bug waiting in the rest.
   or `black` (a dark app), never `black-translucent`: a page under a
   see-through status bar is what iOS blurs (Orbit Class had it until
   2026-10-06).
+- **One colour from the top of the screen down.** The phone paints its
+  status bar above the page (black, or the theme colour), so the theme
+  colour, the manifest's colours and the strip are the page's own
+  (#000000 dark, #f2f2f7 light, the kit's --q-page); the kit keeps the
+  theme colour equal to the strip as the app runs. A different shade is a
+  black band with a seam under it (2026-10-07).
 - One look across the family: the kit's tab bar, sheets that swipe down,
   haptics on taps, dark where the app is dark (Weather and Transit), and
   Orbit Class's Liquid Glass kept close to iOS's own: light at the rim and

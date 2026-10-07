@@ -807,7 +807,7 @@ export function rainPhrase(hours, now, span = 12, tz) {
   const first = next.find(h => h.pop >= 50);
   const top = next.reduce((a, h) => (h.pop > a.pop ? h : a), next[0]);
   if (first) return first.t <= now ? `正在或即將下雨（${first.pop}%）` : `${hourIn(first.t, tz)} 點起可能下雨（${Math.max(first.pop, top.pop)}%）`;
-  if (top.pop >= 30) return `${hourIn(top.t, tz)} 點前後有機會下雨（${top.pop}%）`;
+  if (top.pop >= 30) return `${hourIn(top.t, tz)} 點前後 ${top.pop}% 會下雨`;
   return `未來 ${span} 小時不太會下雨`;
 }
 
@@ -908,13 +908,13 @@ export function advise(resp, now, w = ADVICE.window) {
       const low = Math.min(...feels);
       const [, code, label] = ADVICE.wear.find(([max]) => start < max);
       const layers = top - low >= ADVICE.layersSwing;
-      out.push({ kind: 'wear', level: code, text: `穿著：${label}${layers ? '，早晚加一件' : ''}`, why: { feels: start, high: top, low, layers } });
+      out.push({ kind: 'wear', level: code, text: `穿著：${label}${layers ? '，早晚加件' : ''}`, why: { feels: start, high: top, low, layers } });
       if (top >= ADVICE.heatFeels) out.push({ kind: 'heat', level: 'hot', text: `炎熱：體感 ${Math.round(top)}°，多喝水`, why: { feels: top } });
     }
   }
   const air = resp.air;
   if (air && ((air.aqi ?? 0) > ADVICE.mask.aqi || (air.pm25 ?? 0) > ADVICE.mask.pm25)) {
-    out.push({ kind: 'mask', level: air.level, text: `口罩：空氣${air.level}（${air.aqi}）`, why: { aqi: air.aqi, pm25: air.pm25, station: air.station?.name } });
+    out.push({ kind: 'mask', level: air.level, text: `口罩：空氣${air.aqi > 150 ? '很差' : '不佳'}，AQI ${air.aqi}`, why: { aqi: air.aqi, pm25: air.pm25, station: air.station?.name } });
   }
   // The week: best and worst of the next 7 days, a day for laundry.
   const week = resp.days.filter(d => d.date >= win.date).slice(0, 7).filter(d => d.pop != null && d.hi != null);
@@ -959,7 +959,7 @@ export function lifeAdvice(out, resp, now, win) {
   const am = hoursIn(resp, win.date, 7, 9, now);
   const pm = hoursIn(resp, win.date, 17, 19, now);
   if (am.length || pm.length) {
-    const say = (name, list) => (!list.length ? '' : maxPop(list) >= ADVICE.umbrellaMaybe ? `${name} ${maxPop(list)}% 會下雨` : `${name}乾爽`);
+    const say = (name, list) => (!list.length ? '' : maxPop(list) >= ADVICE.umbrellaMaybe ? `${name} ${maxPop(list)}%` : `${name}乾爽`);
     const parts = [say('早上', am), say('傍晚', pm)].filter(Boolean);
     const wet = Math.max(maxPop(am), maxPop(pm));
     const text = parts.every(p => p.endsWith('乾爽')) ? (parts.length > 1 ? '早晚都乾爽' : parts[0]) : parts.join('，');
@@ -974,9 +974,10 @@ export function lifeAdvice(out, resp, now, win) {
   const runTomorrow = bestRun(resp, today === win.date ? tomorrow : win.date, now, aqiBad);
   const runs = [runToday, runTomorrow].filter(Boolean);
   if (runs.length) {
-    const say = r => `${dayWord(r.date, now)} ${r.from}–${r.from + 2}時（${r.feels}°${r.pop >= 20 ? `，雨 ${r.pop}%` : ''}）`;
+    // One line: the first good two hours, else the least bad (its level says so).
+    const say = r => `${dayWord(r.date, now)} ${r.from}–${r.from + 2}時 ${r.feels}°`;
     const good = runs.filter(r => r.cost < RUN_OK);
-    const text = good.length ? good.map(say).join('；') : `都不太理想，${say(runs.reduce((a, r) => (r.cost < a.cost ? r : a), runs[0]))}還可以`;
+    const text = say(good[0] || runs.reduce((a, r) => (r.cost < a.cost ? r : a), runs[0]));
     out.push({ kind: 'run', level: good.length ? 'good' : 'none', text: `跑步：${text}`, why: { runs } });
   }
   // Laundry: every dry day this week (rain under 20%, not overcast), and
@@ -988,8 +989,8 @@ export function lifeAdvice(out, resp, now, win) {
     const first = good[0];
     // Its driest hours: 9–16時, sunniest and least humid.
     const hrs = first ? hoursIn(resp, first.date, 9, 16, now).filter(h => h.pop != null && h.pop < 20) : [];
-    const span = hrs.length >= 2 ? `（${twHour(hrs[0].t)}–${twHour(hrs[hrs.length - 1].t) + 1}時）` : '';
-    out.push({ kind: 'laundry', level: first?.date === win.date ? 'good' : first ? 'later' : 'none', text: `曬衣：${good.length ? `${good.slice(0, 4).map(d => dayWord(d.date, now)).join('、')}${span}` : '這週用烘乾'}`, why: { date: first?.date || null, dates: good.map(d => d.date) } });
+    const span = hrs.length >= 2 ? ` ${twHour(hrs[0].t)}–${twHour(hrs[hrs.length - 1].t) + 1}時` : good.length > 1 ? `起 ${good.length} 天` : '';
+    out.push({ kind: 'laundry', level: first?.date === win.date ? 'good' : first ? 'later' : 'none', text: `曬衣：${good.length ? `${dayWord(first.date, now)}${span}` : '這週用烘乾'}`, why: { date: first?.date || null, dates: good.map(d => d.date) } });
   }
   // The weekend ahead (within the week): which day is better.
   const weekend = week.filter(d => [0, 6].includes(new Date(d.date + 'T12:00:00Z').getUTCDay()));
@@ -997,7 +998,7 @@ export function lifeAdvice(out, resp, now, win) {
     const score = d => (d.pop ?? 0) + Math.abs((d.hi ?? 25) - 26) * 3 + Math.max(0, (d.uvMax ?? 0) - 7) * 4;
     const best = weekend.reduce((a, d) => (score(d) < score(a) ? d : a), weekend[0]);
     const wet = weekend.every(d => d.pop >= ADVICE.umbrella);
-    out.push({ kind: 'weekend', level: wet ? 'yes' : 'good', text: `週末：${wet ? '兩天都可能下雨，排室內' : `${wd(best.date)}較好（${Math.round(best.hi)}°，雨 ${best.pop}%）`}`, why: { date: best.date } });
+    out.push({ kind: 'weekend', level: wet ? 'yes' : 'good', text: `週末：${wet ? '兩天都可能下雨' : `${wd(best.date)}較好，${Math.round(best.hi)}°`}`, why: { date: best.date } });
   }
   // Damp: the next day's humidity.
   const next24 = resp.hours.filter(h => h.t + HOUR > now && h.t < now + 24 * HOUR);
@@ -1011,18 +1012,18 @@ export function lifeAdvice(out, resp, now, win) {
   const dNext = (resp.days || []).find(d => d.date === twDate(now + 24 * HOUR));
   if (dToday?.lo != null && dNext?.lo != null) {
     const diff = Math.round(dNext.lo - dToday.lo);
-    if (diff <= -4) out.push({ kind: 'temp', level: 'yes', text: `降溫：明早 ${Math.round(dNext.lo)}°，比今天低 ${-diff}°`, why: { diff } });
-    else if (diff >= 4) out.push({ kind: 'temp', level: 'none', text: `回暖：明早 ${Math.round(dNext.lo)}°，比今天高 ${diff}°`, why: { diff } });
+    if (diff <= -4) out.push({ kind: 'temp', level: 'yes', text: `降溫：明早 ${Math.round(dNext.lo)}°，低 ${-diff}°`, why: { diff } });
+    else if (diff >= 4) out.push({ kind: 'temp', level: 'none', text: `回暖：明早 ${Math.round(dNext.lo)}°，高 ${diff}°`, why: { diff } });
   }
   // Wind: gusts in the next day.
   const gust = next24.reduce((a, h) => ((h.wind?.gust ?? 0) > (a?.wind?.gust ?? 0) ? h : a), null);
-  if (gust?.wind?.gust >= 50) out.push({ kind: 'wind', level: 'yes', text: `強風：${twHour(gust.t)}時陣風 ${Math.round(gust.wind.gust)} km/h，收好陽台`, why: { gust: gust.wind.gust } });
+  if (gust?.wind?.gust >= 50) out.push({ kind: 'wind', level: 'yes', text: `強風：${twHour(gust.t)}時陣風 ${Math.round(gust.wind.gust)} km/h`, why: { gust: gust.wind.gust } });
   // Thunder in the advice day's hours.
   const storm = hoursIn(resp, win.date, 6, 22, now).filter(h => h.thunder >= 40);
-  if (storm.length) out.push({ kind: 'thunder', level: 'yes', text: `雷雨：${twHour(storm[0].t)}–${twHour(storm[storm.length - 1].t) + 1}時可能打雷，避開戶外`, why: { from: storm[0].t } });
+  if (storm.length) out.push({ kind: 'thunder', level: 'yes', text: `雷雨：${twHour(storm[0].t)}–${twHour(storm[storm.length - 1].t) + 1}時可能打雷`, why: { from: storm[0].t } });
   // Fog: the next day's visibility under 1 km.
   const fog = next24.find(h => h.vis != null && h.vis <= 1);
-  if (fog) out.push({ kind: 'fog', level: 'yes', text: `起霧：${twHour(fog.t)}時能見度 ${fog.vis} 公里，開車小心`, why: { vis: fog.vis } });
+  if (fog) out.push({ kind: 'fog', level: 'yes', text: `起霧：${twHour(fog.t)}時能見度 ${fog.vis} 公里`, why: { vis: fog.vis } });
   // The window: air good and no rain now, or air bad.
   const air = resp.air;
   const h0 = resp.hours.find(h => h.t + HOUR > now);

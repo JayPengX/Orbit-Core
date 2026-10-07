@@ -317,7 +317,7 @@ test('one sentence and the morning brief, from the numbers', async () => {
   for (const w of ['Google', 'google', 'CWA', '氣象署']) assert.ok(!b.body.includes(w) && !resp.headline.includes(w));
   const t = h => Date.parse('2026-10-03T00:00:00+08:00') + h * 3_600_000;
   assert.equal(rainPhrase([{ t: t(8), pop: 10 }, { t: t(15), pop: 70 }], t(8)), '15 點起可能下雨（70%）');
-  assert.equal(rainPhrase([{ t: t(8), pop: 10 }, { t: t(10), pop: 35 }], t(8)), '10 點前後有機會下雨（35%）');
+  assert.equal(rainPhrase([{ t: t(8), pop: 10 }, { t: t(10), pop: 35 }], t(8)), '10 點前後 35% 會下雨');
   assert.equal(rainPhrase([{ t: t(8), pop: 10 }], t(8)), '未來 12 小時不太會下雨');
   assert.equal(rainPhrase([{ t: t(8), pop: 80 }], t(8) + 600_000), '正在或即將下雨（80%）');
 });
@@ -468,13 +468,13 @@ test('advice for daily life: commute, the best hours outside, laundry, the windo
   const day = (date, o) => ({ date, hi: 28, lo: 23, pop: 10, uvMax: 5, day: { condition: { code: 'PARTLY_CLOUDY' } }, ...o });
   const days = [day('2026-10-03', { pop: 65 }), day('2026-10-04'), day('2026-10-05'), day('2026-10-06'), day('2026-10-07')];
   const k = Object.fromEntries(advise({ hours, days, air: { aqi: 30, level: '良好' } }, at).map(a => [a.kind, a]));
-  assert.equal(k.commute.text, '通勤：早上乾爽，傍晚 65% 會下雨');
+  assert.equal(k.commute.text, '通勤：早上乾爽，傍晚 65%');
   assert.equal(k.commute.level, 'yes');
-  assert.match(k.run.text, /^跑步：今天 (5|6|7|8|15|16|17|18)–\d+時（24°）；明天 \d+–\d+時/);
+  assert.match(k.run.text, /^跑步：今天 (5|6|7|8|15|16|17|18)–\d+時 24°$/);
   assert.ok(!/今天 1[0-4]–/.test(k.run.text), 'not in the hot hours');
   assert.equal(k.run.week.days[0].v.endsWith('時'), true);
-  assert.equal(k.laundry.text, '曬衣：明天、10/5、10/6、10/7（9–16時）'.replace('10/5', '週一').replace('10/6', '週二').replace('10/7', '週三'));
-  assert.equal(k.weekend.text, '週末：週日較好（28°，雨 10%）');
+  assert.equal(k.laundry.text, '曬衣：明天 9–16時');
+  assert.equal(k.weekend.text, '週末：週日較好，28°');
   assert.equal(k.laundry.week.days[0].mark, 'bad');
   assert.equal(k.window.text, '開窗：空氣好，可通風');
   assert.equal(k.sleep.text, '睡覺：今晚 28°，開冷氣', 'tonight: 23–5 時, into the 4th');
@@ -496,10 +496,10 @@ test('advice: damp, a drop in the lows, strong wind, thunder, fog', () => {
   const days = [{ date: '2026-10-03', hi: 28, lo: 22, pop: 10 }, { date: '2026-10-04', hi: 22, lo: 16, pop: 10 }];
   const k = Object.fromEntries(advise({ hours, days, air: null }, at).map(a => [a.kind, a]));
   assert.equal(k.humid.text, '除濕：濕度 92%，衣物易潮');
-  assert.equal(k.temp.text, '降溫：明早 16°，比今天低 6°');
-  assert.equal(k.wind.text, '強風：15時陣風 62 km/h，收好陽台');
-  assert.equal(k.thunder.text, '雷雨：15–17時可能打雷，避開戶外');
-  assert.equal(k.fog.text, '起霧：7時能見度 0.8 公里，開車小心');
+  assert.equal(k.temp.text, '降溫：明早 16°，低 6°');
+  assert.equal(k.wind.text, '強風：15時陣風 62 km/h');
+  assert.equal(k.thunder.text, '雷雨：15–17時可能打雷');
+  assert.equal(k.fog.text, '起霧：7時能見度 0.8 公里');
 });
 
 test("a rain chance in steps of 10: Google's 5% and CWA's 0% read 0%, not 3%", () => {
