@@ -49,7 +49,6 @@ test('affinity decays: last month counts for less than today', () => {
 test('pass codes', () => {
   assert.equal(kit.cleanCode('abcde-23456'), 'ABCDE23456');
   assert.equal(kit.formatPass('ABCDE23456'), 'ABCDE-23456');
-  assert.ok(kit.isPass('ABCDE-23456'));
 });
 
 test('account details: this month in and out, latest entries first', () => {

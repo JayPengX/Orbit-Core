@@ -349,7 +349,6 @@ export function cleanCode(text) {
     .toUpperCase()
     .replace(/[\s-]/g, '');
 }
-export const isPass = code => PASS_PATTERN.test(cleanCode(code));
 export const formatPass = code => (code && code.length === 10 ? `${code.slice(0, 5)}-${code.slice(5)}` : code && code.length === 8 ? `${code.slice(0, 4)}-${code.slice(4)}` : code || '');
 
 // ---- Storage -------------------------------------------------------------------------
@@ -1185,7 +1184,6 @@ export function othersBalance(wallet, app) {
     .reduce((sum, [, s]) => sum + cash(s), 0);
   return Math.round((entries + snaps) * 100) / 100;
 }
-export const entriesNotFrom = (wallet, app) => (wallet?.entries || []).filter(e => e.app !== app).sort((a, b) => b.t - a.t);
 
 const KIND = {
   start: ['開戶金', 'Opening money'],
@@ -2979,7 +2977,6 @@ export const recClear = () => {
     localStorage.removeItem(REC_KEY);
   } catch {}
 };
-export const recCount = () => recRead().length + [...recLast.values()].length;
 // Everything to send: where and what, the last of each kind, and the log.
 export function recDump(app = dataSession?.app || '') {
   const log = recRead();
