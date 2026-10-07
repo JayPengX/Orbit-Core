@@ -92,3 +92,39 @@ test("the prompt: the page's lines as what the reader already sees, Google's hea
   assert.match(p, /\[0\] 2026-10-07 \(Reuters\) Man City appeal/);
   assert.match(latestPrompt({ kind: 'match', name: 'A vs B', league: 'epl', stories: [], state: 'post' }), /The match is over/);
 });
+
+test('the last card comes back at once (no news read) while the facts are the same; the news looked at again behind it every half hour', async () => {
+  const realNow = Date.now;
+  let t = now;
+  Date.now = () => t;
+  try {
+    let reads = 0;
+    let asked = 0;
+    let headline = 'H1';
+    const fetchFn = async url => {
+      if (String(url).includes('generativelanguage')) {
+        asked++;
+        return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ story: -1, headline: `卡 ${asked}` }) }] } }] }), { status: 200 });
+      }
+      reads++;
+      return new Response(JSON.stringify({ articles: [art(headline, 1, [{ type: 'athlete', athleteId: 7 }])] }), { status: 200 });
+    };
+    const behind = [];
+    const opts = { session: { s: 'x' }, limited: () => false, cache: memCache(), fetchFn, log: () => {}, waitUntil: p => behind.push(p) };
+    const post = () => new Request('https://w/latest', { method: 'POST', body: JSON.stringify({ league: 'nba', kind: 'player', id: '7', name: 'A B', facts: ['f'] }) });
+    assert.equal((await (await handleLatest(post(), env, {}, opts)).json()).headline, '卡 1');
+    const first = reads;
+    assert.equal((await (await handleLatest(post(), env, {}, opts)).json()).headline, '卡 1');
+    assert.equal(reads, first, 'the same facts within half an hour: no news read');
+    assert.equal(behind.length, 0);
+    // Half an hour on, new news: the old card at once, the new one written behind it for the next opening.
+    t += 31 * 60_000;
+    headline = 'H2';
+    assert.equal((await (await handleLatest(post(), env, {}, opts)).json()).headline, '卡 1');
+    await Promise.all(behind);
+    assert.equal(asked, 2);
+    assert.equal((await (await handleLatest(post(), env, {}, opts)).json()).headline, '卡 2');
+  } finally {
+    Date.now = realNow;
+  }
+});

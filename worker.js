@@ -1220,7 +1220,7 @@ export default {
     if (path === '/latest') {
       const qt = new URL(request.url).searchParams.get('qt');
       const session = qt ? await readToken(await tokenSecret(env), qt, 'ses') : null;
-      return handleLatest(request, env, headers, { session, limited: () => sessionLimited(`l:${session?.s}`, 60) });
+      return handleLatest(request, env, headers, { session, limited: () => sessionLimited(`l:${session?.s}`, 60), waitUntil: p => ctx.waitUntil(p) });
     }
     if (path === '/kambi') {
       // A Quadra Pass session only, counted per session in memory.

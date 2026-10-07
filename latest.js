@@ -27,6 +27,8 @@ export const LATEST_MODEL = 'gemini-3.5-flash-lite';
 export const LATEST_DAILY_CAP = 2000;
 const FRESH_MS = 3 * 86_400_000;
 const WEEK_MS = 7 * 86_400_000;
+// How often the news behind a kept card is looked at again (behind the answer).
+const RECHECK_MS = 30 * 60_000;
 const ESPN = 'https://site.api.espn.com/apis/site/v2/sports';
 // Bumped when the prompt changes, so cards written by the old one are written again.
 const PROMPT_VERSION = 2;
@@ -146,7 +148,7 @@ async function dayCount(cache, add = 0) {
   return n + add;
 }
 
-export async function handleLatest(request, env, headers, { session, limited, cache = globalThis.caches?.default, fetchFn = fetch, log = console.log } = {}) {
+export async function handleLatest(request, env, headers, { session, limited, cache = globalThis.caches?.default, fetchFn = fetch, log = console.log, waitUntil = p => p } = {}) {
   if (!session) return json({ error: 'ECO_TOKEN_INVALID' }, headers, 401);
   if (limited()) return json({ error: 'RATE_LIMITED' }, headers, 429);
   const url = new URL(request.url);
@@ -177,29 +179,46 @@ export async function handleLatest(request, env, headers, { session, limited, ca
   const digits = x => q(x).replace(/\D/g, '');
   const team = kind === 'team' ? (/^\d+$/.test(id) ? id : '') : digits('team');
   const team2 = kind === 'match' ? digits('team2') : '';
-  const read = (u, ttl = 300, as = 'json') => fetchFn(u, { signal: AbortSignal.timeout(8000), cf: { cacheTtl: ttl, cacheEverything: true } }).then(r => (r.ok ? r[as]() : null)).catch(() => null);
-  // Google's feed, read once an hour at most (so the card is asked again at most hourly, and only when the news changed).
-  const google = name ? read(newsQuery({ kind, name, home, away, sport: info.sport }), 3600, 'text') : null;
-  const feeds = espn ? await Promise.all([read(`${ESPN}/${espn}/news?limit=50`), team ? read(`${ESPN}/${espn}/news?limit=50&team=${team}`) : null, team2 ? read(`${ESPN}/${espn}/news?limit=50&team=${team2}`) : null]) : [];
-  const espnStories =
-    kind === 'match'
-      ? [...storiesAbout(feeds, { kind: 'team', id: team }), ...storiesAbout(feeds, { kind: 'team', id: team2 })].filter((x, i, all) => all.findIndex(y => y.id === x.id) === i).slice(0, 6)
-      : storiesAbout(feeds, { kind, id, name });
-  // A player's headlines have their surname in them (or their whole name, in Chinese).
-  const must = kind === 'player' ? (/[㐀-鿿]/.test(name) ? [name] : [name.split(/\s+/).filter(w => !/^(jr\.?|sr\.?|ii|iii)$/i.test(w)).pop() || name]) : [];
-  const papers = googleNews(await google, { must }).slice(0, 12);
-  const stories = sameStoryOnce([...espnStories, ...papers]).sort((x, y) => y.at - x.at).slice(0, 14);
-  if (!stories.length && !facts.length) return json({ none: true }, headers);
+  const read = (u, ttl = 300, as = 'json', ms = 8000) => fetchFn(u, { signal: AbortSignal.timeout(ms), cf: { cacheTtl: ttl, cacheEverything: true } }).then(r => (r.ok ? r[as]() : null)).catch(() => null);
 
-  // Kept by exactly what it's written from (the facts, the stories): Gemini is
-  // asked again only when that changes, never just because a day passed.
-  const keyUrl = `https://latest.cache/v${PROMPT_VERSION}/${league}/${kind}/${encodeURIComponent(id)}/${hashOf([state, ...facts, ...stories.map(x => x.id)].join('\n'))}`;
-  const kept = cache ? await cache.match(new Request(keyUrl)) : null;
-  if (kept) return json(await kept.json(), headers);
-  if (!inFlight.has(keyUrl)) inFlight.set(keyUrl, ask().finally(() => inFlight.delete(keyUrl)));
-  const out = await inFlight.get(keyUrl);
-  return json(out, headers);
-  async function ask() {
+  // Fast: the last card written for them, while the page's facts are the
+  // same, comes back at once (no news read, no Gemini waited on). The news
+  // is looked at again behind it, at most every half hour, and a new card,
+  // if the news changed, is the one the next opening gets.
+  const factsHash = hashOf([state, ...facts].join('\n'));
+  const lastReq = new Request(`https://latest.cache/v${PROMPT_VERSION}/last/${league}/${kind}/${encodeURIComponent(id)}`);
+  const keepLast = card => cache?.put(lastReq, new Response(JSON.stringify({ facts: factsHash, card, checked: Date.now() }), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'max-age=2592000' } }));
+  const last = cache ? await cache.match(lastReq).then(r => r?.json()).catch(() => null) : null;
+  if (last?.card && last.facts === factsHash) {
+    if (!(Date.now() - last.checked < RECHECK_MS)) waitUntil(Promise.resolve(keepLast(last.card)).then(write).catch(() => {}));
+    return json(last.card, headers);
+  }
+  return json(await write(), headers);
+
+  // The news read, the card found by what it's written from, else Gemini asked.
+  async function write() {
+    // Google's feed, read once an hour at most (and never waited on long: it's the extra, ESPN's the base).
+    const google = name ? read(newsQuery({ kind, name, home, away, sport: info.sport }), 3600, 'text', 3000) : null;
+    const feeds = espn ? await Promise.all([read(`${ESPN}/${espn}/news?limit=50`), team ? read(`${ESPN}/${espn}/news?limit=50&team=${team}`) : null, team2 ? read(`${ESPN}/${espn}/news?limit=50&team=${team2}`) : null]) : [];
+    const espnStories =
+      kind === 'match'
+        ? [...storiesAbout(feeds, { kind: 'team', id: team }), ...storiesAbout(feeds, { kind: 'team', id: team2 })].filter((x, i, all) => all.findIndex(y => y.id === x.id) === i).slice(0, 6)
+        : storiesAbout(feeds, { kind, id, name });
+    // A player's headlines have their surname in them (or their whole name, in Chinese).
+    const must = kind === 'player' ? (/[㐀-鿿]/.test(name) ? [name] : [name.split(/\s+/).filter(w => !/^(jr\.?|sr\.?|ii|iii)$/i.test(w)).pop() || name]) : [];
+    const papers = googleNews(await google, { must }).slice(0, 12);
+    const stories = sameStoryOnce([...espnStories, ...papers]).sort((x, y) => y.at - x.at).slice(0, 14);
+    if (!stories.length && !facts.length) return { none: true };
+
+    // Kept by exactly what it's written from (the facts, the stories): Gemini is
+    // asked again only when that changes, never just because a day passed.
+    const keyUrl = `https://latest.cache/v${PROMPT_VERSION}/${league}/${kind}/${encodeURIComponent(id)}/${hashOf([state, ...facts, ...stories.map(x => x.id)].join('\n'))}`;
+    const kept = cache ? await cache.match(new Request(keyUrl)) : null;
+    const out = kept ? await kept.json() : await (inFlight.get(keyUrl) || inFlight.set(keyUrl, ask(keyUrl, stories).finally(() => inFlight.delete(keyUrl))).get(keyUrl));
+    if (out?.headline) await keepLast(out);
+    return out;
+  }
+  async function ask(keyUrl, stories) {
     if ((await dayCount(cache)) >= LATEST_DAILY_CAP) return { capped: true };
     await dayCount(cache, 1);
 

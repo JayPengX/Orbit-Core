@@ -45,6 +45,12 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
   that's the takeaway, not a label. With no news about them, one insight the
   page doesn't spell out. While it's written, the card's shape; without it
   (English, a game on, Gemini failed) ESPN's story or note, else no card.
+  Speed: the last card written for them comes back at once while the
+  page's facts are the same (no news read, no Gemini waited on); the news
+  is looked at again behind the answer (`ctx.waitUntil`) at most every 30
+  minutes, and a new card, if it changed, is what the next opening gets.
+  Google's feed is never waited on more than 3 s. Only new facts (a game
+  played) make an opening wait for Gemini.
   Kept by exactly what it's written from (a hash of the facts and the
   stories, 30 days; `PROMPT_VERSION` in the key, bumped when the prompt
   changes), so the same card is never asked twice. The daily cap (2,000)
