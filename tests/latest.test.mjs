@@ -56,3 +56,39 @@ test('Gemini asked once per newest story, kept for everyone; none without storie
     Date.now = realNow;
   }
 });
+
+test("Google News: the week's headlines with their surname, no how-to-watch or odds, the paper's name apart", async () => {
+  const { googleNews } = await import('../latest.js');
+  const item = (title, source, hoursAgo, guid) => `<item><title>${title} - ${source}</title><link>https://news.google.com/x</link><guid isPermaLink="false">${guid}</guid><pubDate>${new Date(now - hoursAgo * 3_600_000).toUTCString()}</pubDate><source url="https://x">${source}</source></item>`;
+  const xml = `<rss><channel>${[
+    item('Liam Scales makes Ireland return after sitting out Israel clash', 'Yahoo Sports', 5, 'a'),
+    item('Portugal sail into Nations League last 8, Greece frustrate Germany', 'Daily Sabah', 6, 'b'),
+    item('Ireland vs Austria Lineups, Live Stream, TV Channels: Scales starts', 'AOL.com', 7, 'c'),
+    item('Irish media wrong to slate Celtic star Liam Scales &amp; the stats', 'Yahoo', 30, 'd'),
+    item('Scales signs new deal', 'BBC', 24 * 9, 'e')
+  ].join('')}</channel></rss>`;
+  assert.deepEqual(googleNews(xml, { must: ['Scales'] }, now), [
+    { id: 'a', at: now - 5 * 3_600_000, headline: 'Liam Scales makes Ireland return after sitting out Israel clash', source: 'Yahoo Sports' },
+    { id: 'd', at: now - 30 * 3_600_000, headline: 'Irish media wrong to slate Celtic star Liam Scales & the stats', source: 'Yahoo' }
+  ]);
+  assert.equal(googleNews(xml, {}, now).length, 3, 'a team: every headline Google found (but how-to-watch)');
+});
+
+test("what's asked of Google News: the quoted name; a team with its sport; a match's two sides; Chinese in Taiwan's edition", async () => {
+  const { newsQuery, sameStoryOnce } = await import('../latest.js');
+  const q = u => new URL(u).searchParams.get('q');
+  assert.equal(q(newsQuery({ kind: 'player', name: 'Max Verstappen' })), '"Max Verstappen" when:7d');
+  assert.equal(q(newsQuery({ kind: 'team', name: 'Manchester City', sport: 'soccer' })), '"Manchester City" football when:7d');
+  assert.equal(q(newsQuery({ kind: 'match', name: 'x', away: 'Leeds United', home: 'Arsenal' })), '"Leeds United" "Arsenal" when:7d');
+  assert.match(newsQuery({ kind: 'player', name: '林安可' }), /hl=zh-TW/);
+  assert.deepEqual(sameStoryOnce([{ headline: 'Man City appeal Premier League financial ruling' }, { headline: 'Man City appeal Premier League financial ruling, sources say' }, { headline: 'Haaland to leave' }]).map(x => x.headline), ['Man City appeal Premier League financial ruling', 'Haaland to leave']);
+});
+
+test("the prompt: the page's lines as what the reader already sees, Google's headlines as the news", async () => {
+  const { latestPrompt } = await import('../latest.js');
+  const p = latestPrompt({ kind: 'team', name: 'Manchester City', zh: '曼城', league: 'epl', facts: ['曼城：5勝1和1敗，英超第 2 名'], stories: [{ at: now, source: 'Reuters', headline: 'Man City appeal Premier League financial ruling' }] });
+  assert.match(p, /On the page:\n- 曼城：5勝1和1敗/);
+  assert.match(p, /Reading the page's numbers back is a failure/);
+  assert.match(p, /\[0\] 2026-10-07 \(Reuters\) Man City appeal/);
+  assert.match(latestPrompt({ kind: 'match', name: 'A vs B', league: 'epl', stories: [], state: 'post' }), /The match is over/);
+});

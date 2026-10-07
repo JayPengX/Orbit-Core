@@ -31,16 +31,25 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
   `Orbit-Sports/public/lib/espn.mjs`); or ESPN's note on them when newer.
   No link to the article. F1 names go through `lib/f1names.mjs` first.
 - **最新動態 by Gemini, everywhere:** every player, driver, team, F1 team
-  and match has one. The sheet sends its own facts (Chinese lines: form,
-  standing, next game; a match's records, places, form, injuries, win
-  chance, result, goals, leaders) to the Worker's `/latest` (`latest.js`),
-  which adds ESPN's recent stories, and `gemini-3.5-flash-lite` writes the card:
-  a story that matters, else the situation now, a match's preview or recap.
-  The facts card shows at once and Gemini's replaces it. Kept by exactly
-  what it's written from (a hash of the facts and the stories, 30 days), so
-  the same card is never asked twice; a game on gets no Gemini (its facts
-  change each minute). The daily cap (2,000) only guards against a bug.
-  Each ask logs `gemini_usage` with `feature: latest` in the Workers logs.
+  and match has one, in Chinese. The sheet sends its own facts (Chinese
+  lines: form, standing, next game; a match's records, places, form,
+  injuries, win chance, result, goals, leaders) to the Worker's `/latest`
+  (`latest.js`). The Worker adds ESPN's tagged stories (3 days) and Google
+  News's headlines about them (7 days, RSS, read at most hourly; a player's
+  must have the surname; no how-to-watch, odds, lineups). Google's are what
+  make it worth having: the court case, the knee, the contract talk ESPN
+  never tags. The owner's rule: the card must never read back the numbers
+  the page already shows. So the prompt calls the facts "On the page", tells
+  `gemini-3.5-flash-lite` to write the storyline and why it matters (a
+  match: the stakes before, what the result means after), with a headline
+  that's the takeaway, not a label. With no news about them, one insight the
+  page doesn't spell out. While it's written, the card's shape; without it
+  (English, a game on, Gemini failed) ESPN's story or note, else no card.
+  Kept by exactly what it's written from (a hash of the facts and the
+  stories, 30 days; `PROMPT_VERSION` in the key, bumped when the prompt
+  changes), so the same card is never asked twice. The daily cap (2,000)
+  only guards against a bug. Each ask is about 2,500 tokens in, 250 out
+  (about US$0.0004). Each ask logs `gemini_usage` with `feature: latest`.
 - **排名 before the first game:** last season's final table under a 上季
   banner (app.js `tableOf`, `standings(league, { season })`).
 - **Translations:** text with Chinese in it (a name put in first) was sent
