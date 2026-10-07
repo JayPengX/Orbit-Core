@@ -212,6 +212,8 @@ function cachePolicyFor(url) {
       // sheet open on a game in play reads it every 15 s and was getting a
       // copy up to half an hour old. A finished one comes from the mirror.
       if (url.pathname.endsWith('/summary')) return CACHE_LIVE;
+      // News: minutes (a penalty or an injury is told the day it happens).
+      if (url.pathname.endsWith('/news')) return CACHE_TEAM_SCHEDULE;
       // A team's injuries on game day (Sports' game sheet reads its roster for them): minutes.
       if (url.pathname.endsWith('/roster') && url.searchParams.get('enable') === 'injuries') return CACHE_TEAM_SCHEDULE;
       return url.pathname.endsWith('/scoreboard') ? scoreboardPolicy(url) : url.pathname.endsWith('/schedule') ? CACHE_TEAM_SCHEDULE : CACHE_STANDINGS;
@@ -344,6 +346,28 @@ export function trimEspnRoster(data) {
     };
   const athletes = data.athletes.map(x => (Array.isArray(x?.items) ? { position: x.position, items: x.items.map(player) } : player(x)));
   return { team: data.team ? { id: data.team.id, displayName: data.team.displayName } : undefined, athletes };
+}
+
+// Opt-in (`&trim=espn-news`) for a league's or a team's news (Sports' news
+// on a team, a player, a driver): each story's headline, summary, time, one
+// picture, its link and who it's about, in ESPN's own shape. ~210 KB of 50
+// stories falls to ~40 KB.
+const TRIM_ESPN_NEWS = 'espn-news';
+export function trimEspnNews(data) {
+  if (!data || typeof data !== 'object' || !Array.isArray(data.articles)) return data;
+  return {
+    articles: data.articles.map(a => ({
+      id: a.id,
+      type: a.type,
+      headline: a.headline,
+      description: a.description,
+      published: a.published,
+      premium: a.premium || undefined,
+      images: a.images?.[0]?.url ? [{ url: a.images[0].url }] : undefined,
+      links: a.links?.web?.href ? { web: { href: a.links.web.href } } : undefined,
+      categories: (a.categories || []).filter(c => c.type === 'athlete' || c.type === 'team').map(c => ({ type: c.type, athleteId: c.athleteId ?? c.athlete?.id, teamId: c.teamId ?? c.team?.id, description: c.description }))
+    }))
+  };
 }
 
 // Opt-in (`&trim=espn-athletes`) for a league's players' season numbers
@@ -540,7 +564,7 @@ async function fetchUpstream(upstreamUrl, trim) {
     if (trim) {
       try {
         const parsed = JSON.parse(new TextDecoder().decode(body));
-        body = JSON.stringify(trim === TRIM_KAMBI_EVENTS ? trimKambi(parsed) : trim === TRIM_KAMBI_OFFERS ? trimKambiOffers(parsed) : trim === TRIM_ESPN_ROSTER ? trimEspnRoster(parsed) : trim === TRIM_ESPN_ATHLETES ? trimEspnAthletes(parsed) : trim === TRIM_ELTA ? trimElta(parsed) : trim === TRIM_POLYMARKET_GAMES ? trimPolymarketGames(parsed) : trimPolymarketEvents(parsed));
+        body = JSON.stringify(trim === TRIM_KAMBI_EVENTS ? trimKambi(parsed) : trim === TRIM_KAMBI_OFFERS ? trimKambiOffers(parsed) : trim === TRIM_ESPN_ROSTER ? trimEspnRoster(parsed) : trim === TRIM_ESPN_ATHLETES ? trimEspnAthletes(parsed) : trim === TRIM_ESPN_NEWS ? trimEspnNews(parsed) : trim === TRIM_ELTA ? trimElta(parsed) : trim === TRIM_POLYMARKET_GAMES ? trimPolymarketGames(parsed) : trimPolymarketEvents(parsed));
       } catch {
         // Not the JSON shape expected - pass it through untouched.
       }
@@ -573,6 +597,7 @@ function trimFor(trimParam, upstreamUrl) {
   if (trimParam === TRIM_KAMBI_EVENTS && upstreamUrl.hostname === 'eu-offering-api.kambicdn.com') return TRIM_KAMBI_EVENTS;
   if (trimParam === TRIM_ESPN_ROSTER && upstreamUrl.hostname === 'site.api.espn.com' && upstreamUrl.pathname.endsWith('/roster')) return TRIM_ESPN_ROSTER;
   if (trimParam === TRIM_ESPN_ATHLETES && upstreamUrl.hostname === 'site.api.espn.com' && upstreamUrl.pathname.endsWith('/statistics/byathlete')) return TRIM_ESPN_ATHLETES;
+  if (trimParam === TRIM_ESPN_NEWS && upstreamUrl.hostname === 'site.api.espn.com' && upstreamUrl.pathname.endsWith('/news')) return TRIM_ESPN_NEWS;
   if (trimParam === TRIM_KAMBI_OFFERS && upstreamUrl.hostname === 'eu-offering-api.kambicdn.com' && upstreamUrl.pathname.includes('/betoffer/')) return TRIM_KAMBI_OFFERS;
   return null;
 }

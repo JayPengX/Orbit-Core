@@ -168,3 +168,11 @@ test("Polymarket's F1 race winner kept: each driver's market and how much it's t
   assert.equal(got[1].markets[0].groupItemTitle, 'Lando Norris');
   assert.deepEqual(got[0].markets, [{ question: 'Will Max Verstappen win?', groupItemTitle: 'Max Verstappen', outcomes: '["Yes","No"]', clobTokenIds: '["1","2"]', volume: 229815.5 }]);
 });
+
+test('news trimmed to what a story card shows, its people kept', async () => {
+  const { trimEspnNews } = await import('../sports-proxy-worker.js');
+  const raw = { header: 'x', articles: [{ id: 1, nowId: 'n', type: 'HeadlineNews', headline: 'Russell to start from the back', description: 'Grid penalty.', published: '2026-10-06T10:38:08Z', byline: 'b', images: [{ url: 'https://a/1.jpg', caption: 'c' }, { url: 'https://a/2.jpg' }], links: { web: { href: 'https://espn/1' }, api: {} }, categories: [{ type: 'athlete', athleteId: 5503, description: 'George Russell', id: 9 }, { type: 'league', description: 'Formula One' }, { type: 'team', teamId: 13, description: 'Lakers' }] }] };
+  const t = trimEspnNews(raw);
+  assert.deepEqual(t.articles[0], { id: 1, type: 'HeadlineNews', headline: 'Russell to start from the back', description: 'Grid penalty.', published: '2026-10-06T10:38:08Z', premium: undefined, images: [{ url: 'https://a/1.jpg' }], links: { web: { href: 'https://espn/1' } }, categories: [{ type: 'athlete', athleteId: 5503, teamId: undefined, description: 'George Russell' }, { type: 'team', athleteId: undefined, teamId: 13, description: 'Lakers' }] });
+  assert.equal(trimEspnNews({ nope: 1 }).nope, 1, 'not news: as it was');
+});
