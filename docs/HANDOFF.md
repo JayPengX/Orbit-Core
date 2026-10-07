@@ -30,6 +30,14 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
   odds, predictions, fantasy, preview or video piece (`storyAbout` in
   `Orbit-Sports/public/lib/espn.mjs`); or ESPN's note on them when newer.
   No link to the article. F1 names go through `lib/f1names.mjs` first.
+- **最新動態 by Gemini:** the Worker's `/latest` (`latest.js`) reads ESPN's
+  stories about a player, driver, team or F1 team (three days, tagged with
+  them), and `gemini-3.5-flash-lite` picks the one that matters and writes it in
+  Chinese. Kept by the newest story's id, so it's asked again only when a new
+  story comes, once for everyone; at most 400 asks a day (the owner pays from a
+  small balance: about NT$1 a day at most). Past the cap, or on a failure, the
+  app draws the rule-based card. Each ask logs `gemini_usage` with
+  `feature: latest` (Workers logs) for the real token counts.
 - **排名 before the first game:** last season's final table under a 上季
   banner (app.js `tableOf`, `standings(league, { season })`).
 - **Translations:** text with Chinese in it (a name put in first) was sent
