@@ -176,3 +176,12 @@ test('news trimmed to what a story card shows, its people kept', async () => {
   assert.deepEqual(t.articles[0], { id: 1, type: 'HeadlineNews', headline: 'Russell to start from the back', description: 'Grid penalty.', published: '2026-10-06T10:38:08Z', premium: undefined, images: [{ url: 'https://a/1.jpg' }], links: { web: { href: 'https://espn/1' } }, categories: [{ type: 'athlete', athleteId: 5503, teamId: undefined, description: 'George Russell' }, { type: 'team', athleteId: undefined, teamId: 13, description: 'Lakers' }] });
   assert.equal(trimEspnNews({ nope: 1 }).nope, 1, 'not news: as it was');
 });
+
+test("an empty translation (Google busy) is a failure, not kept a month", async () => {
+  const { emptyTranslation } = await import('../sports-proxy-worker.js');
+  assert.equal(emptyTranslation('[[""]]'), true);
+  assert.equal(emptyTranslation('[["  ","en"]]'), true);
+  assert.equal(emptyTranslation('not json'), true);
+  assert.equal(emptyTranslation('[["羅素：巴林大獎賽又是一次失敗","en"]]'), false);
+  assert.equal(emptyTranslation('["週日的比賽"]'), false);
+});

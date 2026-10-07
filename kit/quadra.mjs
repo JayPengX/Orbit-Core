@@ -600,16 +600,24 @@ const recFail = (url, error) => {
 // A text in another language (English company descriptions for a Chinese
 // reader…), through the proxy's translate route, kept a month everywhere.
 // to: 'zh-TW' | 'en' | …; resolves to the original text if it can't.
+// A text with Chinese already in it (a name put in before translating) is
+// English to translate: Google's guess calls it Chinese and hands it back as
+// it was. An empty answer (Google busy; older copies kept one) is asked again
+// as English, a read of its own.
 export async function translate(text, to = 'zh-TW', from = 'auto') {
   const q = String(text || '').slice(0, 4500);
   if (!q.trim()) return q;
-  try {
-    const got = await proxyJson(`https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=${from}&tl=${to}&q=${encodeURIComponent(q)}`, { ttl: 30 * 86_400_000 });
-    const out = Array.isArray(got) ? (Array.isArray(got[0]) ? got[0][0] : got[0]) : null;
-    return typeof out === 'string' && out.trim() ? out : q;
-  } catch {
-    return q;
-  }
+  const ask = async sl => {
+    try {
+      const got = await proxyJson(`https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=${sl}&tl=${to}&q=${encodeURIComponent(q)}`, { ttl: 30 * 86_400_000 });
+      const out = Array.isArray(got) ? (Array.isArray(got[0]) ? got[0][0] : got[0]) : null;
+      return typeof out === 'string' && out.trim() ? out : '';
+    } catch {
+      return '';
+    }
+  };
+  const sl = from === 'auto' && to.startsWith('zh') && /[A-Za-z]/.test(q) && /[\u3400-\u9fff]/.test(q) ? 'en' : from;
+  return (await ask(sl)) || (sl !== 'en' && to !== 'en' ? await ask('en') : '') || q;
 }
 
 // A list that failed (after the kit's own second try) is failed for a little

@@ -24,7 +24,7 @@ export function espnHeadshot(league, id) {
 // A picture that is a flag, not a face (ESPN's country flags, the kit's).
 export const isFlag = url => typeof url === 'string' && /\/flags?\/|flagcdn|countries\/500|\/i\/teamlogos\/countries\//i.test(url);
 // A studio cutout (transparent background): shown on a tinted disc.
-export const isCutout = url => typeof url === 'string' && /thesportsdb\.com\/images\/media\/player\/cutout\/|images\.fotmob\.com\/image_resources\/playerimages\/|resources\.premierleague\.com\/premierleague\d*\/photos\/players\//.test(url);
+export const isCutout = url => typeof url === 'string' && /thesportsdb\.com\/images\/media\/player\/cutout\/|images\.fotmob\.com\/image_resources\/playerimages\/|resources\.premierleague\.com\/premierleague\d*\/photos\/players\/|assets\.laliga\.com\/squad\/|assets\.bundesliga\.com\/player\/|media-sdp\.legaseriea\.it|ligue1\.image\/players\//.test(url);
 
 const sportOf = league => CATALOG[league]?.sport || league || '';
 const plain = s =>
@@ -41,28 +41,44 @@ const plain = s =>
 // ---- A league's own photos -----------------------------------------------------------
 // ESPN's headshots can be a season old (a player traded in the summer still in
 // his old team's shirt), and it has none for footballers; a league's own site
-// has this season's. Its players come from the nightly packs (Shared-Data's
-// sports/<league>/photos.json, [[name, id, 'o'?]…]: 'o' a photo on the
-// league's older path), read once; a player found there gets that photo first.
+// has this season's, a studio half-body. Its players come from the nightly
+// packs (Shared-Data's sports/<league>/photos.json), read once: NBA.com's and
+// the Premier League's as [name, id, 'o'?] ('o' a photo on the league's older
+// path); LaLiga's, the Bundesliga's, Serie A's and Ligue 1's as [name, url].
+// A player found there gets that photo first.
 const OWN_PHOTO = {
   nba: id => `https://cdn.nba.com/headshots/nba/latest/260x190/${id}.png`,
   epl: (id, old) => (old ? `https://resources.premierleague.com/premierleague/photos/players/250x250/p${id}.png` : `https://resources.premierleague.com/premierleague25/photos/players/110x140/${id}.png`)
 };
+// Football's lists, each looked in for any footballer (a cup's players are
+// its clubs' leagues'; a player who moved this summer is under his new one).
+const SOCCER_OWN = ['epl', 'laliga', 'bundesliga', 'seriea', 'ligue1'];
 const ownLists = {};
 function ownList(league) {
   if (!ownLists[league]) {
-    ownLists[league] = { map: null };
-    kit.packJson?.(`sports/${league}/photos.json`, { ttl: 12 * 3_600_000 })
-      .then(d => (ownLists[league].map = new Map((d?.players || []).map(([n, id, where]) => [plain(n), [id, where === 'o']]))))
-      .catch(() => {});
+    ownLists[league] = { map: null, ready: null };
+    ownLists[league].ready = (kit.packJson?.(`sports/${league}/photos.json`, { ttl: 12 * 3_600_000 }) || Promise.resolve(null))
+      .then(d => (ownLists[league].map = new Map((d?.players || []).map(([n, id, where]) => [plain(n), /^https:/.test(String(id)) ? String(id) : OWN_PHOTO[league]?.(id, where === 'o')]).filter(([, url]) => url))))
+      // A failed read: asked again when a player is next drawn.
+      .catch(() => void delete ownLists[league]);
   }
-  return ownLists[league].map;
+  return ownLists[league];
 }
-if (typeof window !== 'undefined') for (const league of Object.keys(OWN_PHOTO)) ownList(league);
+const ownFor = league => (OWN_PHOTO[league] && league !== 'epl' ? [league] : sportOf(league) === 'soccer' ? [...new Set([league, ...SOCCER_OWN].filter(l => SOCCER_OWN.includes(l)))] : []);
+if (typeof window !== 'undefined') ownList('nba');
+// The lists a player's league looks in, read (a promise when one isn't yet).
+function ownReady(league) {
+  const lists = ownFor(league).map(ownList);
+  return lists.every(l => l.map) ? null : Promise.all(lists.map(l => l.ready));
+}
 export function ownPhoto(name, league) {
-  if (!OWN_PHOTO[league] || !name) return null;
-  const hit = ownList(league)?.get(plain(name));
-  return hit ? OWN_PHOTO[league](...hit) : null;
+  if (!name) return null;
+  const k = plain(name);
+  for (const l of ownFor(league)) {
+    const url = ownList(l).map?.get(k);
+    if (url) return url;
+  }
+  return null;
 }
 
 // Every football league's and cup's faces, from FotMob (Shared-Data's
@@ -250,16 +266,19 @@ export function personPhoto(name, league, opts) {
   // The league's faces still being read (the first of its players drawn
   // this session): its stand-in until they are, then the picture.
   const faces = name && !waited ? faceList(league) : null;
-  if (faces && !faces.map) {
+  const own = name && !waited ? ownReady(league) : null;
+  if ((faces && !faces.map) || own) {
     const stand = fallback();
     const swap = (tries = 0) => (stand.isConnected ? stand.replaceWith(personPhoto(name, league, { ...opts, waited: true })) : tries < 20 && requestAnimationFrame(() => swap(tries + 1)));
-    faces.ready.then(() => swap());
+    Promise.all([faces?.ready, own]).then(() => swap(), () => swap());
     return stand;
   }
   const known = knownPhoto(name, sportOf(league));
   const guessed = smallPhoto(guess);
   const face = facePhoto(name, league);
-  const list = [...new Set([ownPhoto(name, league), face, ...urls, known, guess].map(smallPhoto).filter(Boolean))];
+  // The league's own studio photo, the feed's, one found before, ESPN's by id;
+  // FotMob's face (a head in a circle, not the half-body the rest are) last.
+  const list = [...new Set([ownPhoto(name, league), ...urls, known, guess, face].map(smallPhoto).filter(Boolean))];
   const found = url => logoPicture(url, null, `${cls} photo${isCutout(url) ? ' cutout' : ''}`, () => fallback());
   const search = stand => {
     if (known === undefined && name)

@@ -521,6 +521,17 @@ async function fetchYahooWithCrumb(upstreamUrl) {
   }
 }
 
+// A translate answer with no text in it.
+export function emptyTranslation(text) {
+  try {
+    const got = JSON.parse(text);
+    const out = Array.isArray(got) ? (Array.isArray(got[0]) ? got[0][0] : got[0]) : null;
+    return typeof out !== 'string' || !out.trim();
+  } catch {
+    return true;
+  }
+}
+
 // The translate endpoint: the text goes in a POST body (a GET mixes in
 // simplified characters for zh-TW, and long texts don't fit an address).
 async function translateUpstream(upstreamUrl) {
@@ -560,6 +571,9 @@ async function fetchUpstream(upstreamUrl, trim) {
     const contentType = upstream.headers.get('Content-Type') || 'application/json';
     if (upstream.status !== 200) return { status: upstream.status, contentType, body: upstream.body };
     let body = await upstream.arrayBuffer();
+    // Google sometimes answers a translation with nothing ([[""]], when it's
+    // busy): a failure, not kept (it was, a month, and the line stayed English).
+    if (upstreamUrl.hostname === 'clients5.google.com' && emptyTranslation(new TextDecoder().decode(body))) return { status: 502, contentType, body: '' };
     if (trim === TRIM_F1PAGE) return { status: 200, contentType: 'application/json', body: JSON.stringify(trimF1Page(new TextDecoder().decode(body))) };
     if (trim) {
       try {

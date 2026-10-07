@@ -13,7 +13,16 @@ test("an NBA player's photo is NBA.com's (this season's team) when the nightly l
 });
 
 test("a Premier League player's photo is the league's own, on its older path when the list says so", async () => {
-  globalThis.fetch = async url => (String(url).endsWith('sports/epl/photos.json') ? new Response(JSON.stringify({ players: [['Erling Haaland', 223094], ['Joe Gomez', 171287, 'o']] }), { status: 200 }) : new Response('', { status: 404 }));
+  // Football's lists are read together (any footballer looks in all of them): the next test's too.
+  const lists = {
+    epl: [['Erling Haaland', 223094], ['Joe Gomez', 171287, 'o']],
+    laliga: [['Pedri', 'https://assets.laliga.com/squad/2026/t178/p1/256x278/p1.png']],
+    bundesliga: [['Harry Kane', 'https://assets.bundesliga.com/player/dfl-obj-kane.png?fit=256,256']]
+  };
+  globalThis.fetch = async url => {
+    const m = /sports\/([a-z0-9]+)\/photos\.json$/.exec(String(url));
+    return m && lists[m[1]] ? new Response(JSON.stringify({ players: lists[m[1]] }), { status: 200 }) : new Response('', { status: 404 });
+  };
   const { ownPhoto } = await import('../kit/photos.mjs');
   ownPhoto('Erling Haaland', 'epl');
   await new Promise(r => setTimeout(r, 20));
@@ -54,4 +63,13 @@ test("a footballer's face is FotMob's from the league's nightly list, by name in
   assert.equal(facePhoto('Someone Else', 'bundesliga'), null);
   assert.equal(await faceFor('LeBron James', 'nba'), null, 'football only');
   Date.now = now;
+});
+
+test("a footballer's photo is a league's own studio one, whichever league's list has them (a cup's players, a summer's move)", async () => {
+  const { ownPhoto, isCutout } = await import('../kit/photos.mjs');
+  assert.equal(ownPhoto('Pedri', 'ucl'), 'https://assets.laliga.com/squad/2026/t178/p1/256x278/p1.png');
+  assert.equal(ownPhoto('Harry Kane', 'laliga'), 'https://assets.bundesliga.com/player/dfl-obj-kane.png?fit=256,256');
+  assert.equal(ownPhoto('Pedri', 'nba'), null, 'only football looks in football lists');
+  assert.ok(isCutout('https://assets.laliga.com/squad/2026/t178/p1/256x278/p1.png'));
+  assert.ok(isCutout('https://wsrv.nl/?url=https%3A%2F%2Fmedia-sdp.legaseriea.it%2Fx.webp&w=256'));
 });
