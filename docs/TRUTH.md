@@ -209,7 +209,14 @@ bug waiting in the rest.
   `default` (an app that follows light and dark, a theme-color for each)
   or `black` (a dark app), never `black-translucent`: a page under a
   see-through status bar is what iOS blurs (Orbit Class had it until
-  2026-10-06).
+  2026-10-06). **The one exception is a full-screen map** (Transit's map
+  tab, the owner's call 2026-10-07): the map runs up under the status bar
+  as in Maps, so Transit is `black-translucent`, its strip see-through on
+  the map tab only (iOS's edge blur over a map is the native look) and
+  solid on every other tab; installed, its page is the whole screen
+  (`html` 100% plus the top inset), or the fixed tab bar sat a status
+  bar's height up. iOS reads the style when the app is added: a phone
+  sees a change of it only after removing the app and adding it again.
 - **One colour from the top of the screen down.** The phone paints its
   status bar above the page (black, or the theme colour), so the theme
   colour, the manifest's colours and the strip are the page's own
