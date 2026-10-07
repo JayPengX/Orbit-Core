@@ -326,7 +326,8 @@ export function logoPicture(light, dark, cls, fallback, { guess = false } = {}) 
   if (!known) img.style.opacity = '0';
   const picture = document.createElement('picture');
   picture.className = 'logo-wrap';
-  if (dark) {
+  // The dark-screen version only if it hasn't failed before (ESPN has none for some: Falkirk's 500-dark is a 404).
+  if (dark && !knownBad(dark)) {
     const source = document.createElement('source');
     Object.assign(source, { srcset: dark, media: '(prefers-color-scheme: dark)' });
     picture.append(source);
@@ -340,6 +341,15 @@ export function logoPicture(light, dark, cls, fallback, { guess = false } = {}) 
   let tries = 0;
   img.addEventListener('error', () => {
     img.style.opacity = '0';
+    // The dark-screen version missing: the ordinary one instead, at once (never the initial).
+    const source = picture.querySelector('source');
+    if (source && img.currentSrc && img.currentSrc === new URL(dark, location.href).href) {
+      logoBad.set(dark, Date.now());
+      source.remove();
+      img.removeAttribute('src');
+      img.src = light;
+      return;
+    }
     if (tries >= (guess ? 0 : RETRY_MS.length)) {
       logoBad.set(light, Date.now());
       logoSeen.delete(light);
