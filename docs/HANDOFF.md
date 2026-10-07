@@ -7,6 +7,30 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
 `npx eslint .`).
 
 
+## KV off the limits, a stronger admin, news in Sports, F1 prices (2026-10-07, pushed to `main`)
+
+- **KV:** the owner kept getting Cloudflare's KV free-tier emails. Rate limits
+  are now counted in memory only (worker.js; the Quadra Pass is the guard,
+  live header `x-ratelimit-backend: memory`). Orbit Weather keeps cells,
+  national lists and its status in the Cache API with a KV copy at most hourly
+  (weather.js keepJson/keptJson; the skill cron reads KV). Transit's TDX
+  counts flush every 30 minutes. Push lists, due times and switches are
+  written only when they change. The sports proxy has no KV binding.
+- **Admin** (`site/admin`, eco-admin.js ADMIN_TOOLS): delete any account (the
+  full 8-character reference typed to confirm; wallet, app data, inbox, share
+  keys, device codes, push records), find an account by its Pass, undo a
+  record, clear one app's data, export an account as JSON, broadcast a notice
+  to an app's subscribers, and usage (Google and TDX against their caps).
+  The admin route allows 600 calls an hour.
+- **Sports news:** ESPN's stories on team, player, driver and F1-team sheets
+  (a 新聞 tab; a story of the last 3 days leads as 最新消息), translated, with
+  F1 drivers named by the app's own Chinese names. Proxy trim `espn-news`.
+- **Play F1:** Kambi's race is the Grand Prix, never its practice or
+  qualifying event. A Polymarket quote with $1,000 traded and a tight book is
+  "firm": it is the driver's chance at its ask, over Kambi and older trades.
+  Everyone else keeps the highest chance any source gives. Singapore 2026:
+  Russell (back of the grid) 27.78.
+
 ## Orbit Class, third pass (2026-10-06, pushed to `main`)
 
 - The card is `heroView` (src/schedule-calc.js, tested): on a break or in
