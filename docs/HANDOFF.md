@@ -16,10 +16,14 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
   Serie A's squad pages, Ligue 1's club summaries (`ma-api.ligue1.fr`).
   These go to `sports/<league>/photos.json` as `[name, url]`. Serie A's
   1024 px pictures are made 256 px by wsrv.nl. ESPN's short names are matched to the leagues' legal ones club by club (`clubFits`): on the day Serie A 88 of 93, the Bundesliga 54 of 57, Ligue 1 46 of 54 (the rest youngsters with no league photo). The kit
-  (`kit/photos.mjs`) looks in all five football lists for any footballer
+  (`kit/photos.mjs`) looks in all the football lists for any footballer
   (cups, transfers), then the feed's and ESPN's pictures, and FotMob's
-  face last. Not covered yet: MLS (its roster pictures load in the browser
-  only), and the smaller leagues (FotMob, then TheSportsDB).
+  face last. MLS has its own list too (its content API). Everyone no league list has
+  (Scotland, the European cups' other clubs, the FA Cup's lower leagues,
+  national teams) gets TheSportsDB's studio cutout: Shared-Data looks up 450
+  a night at its pace and keeps them (`sports/cutouts/photos.json`), so the
+  list fills over a few nights. Celtic's and UEFA's own pictures were
+  looked at: match photos and tight head crops, so not used.
 - **News:** a team's, player's, driver's or F1 team's newest story (three
   days) is a 最新動態 card like ESPN's player notes: the headline, then
   short points. Every F1 driver and team goes by the app's Chinese name
