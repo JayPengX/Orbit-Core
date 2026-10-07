@@ -74,10 +74,14 @@ function ownReady(league) {
 export function ownPhoto(name, league) {
   if (!name) return null;
   const k = plain(name);
-  for (const l of ownFor(league)) {
-    const url = ownList(l).map?.get(k);
-    if (url) return url;
-  }
+  // A two-word name the other way round too (ESPN's Kim Min-Jae is the Bundesliga's Min-Jae Kim).
+  const w = k.split(' ');
+  const keys = w.length === 3 && /^[a-z]+$/.test(w[0]) ? [k, `${w[1]} ${w[2]} ${w[0]}`] : w.length === 2 ? [k, `${w[1]} ${w[0]}`] : [k];
+  for (const key of keys)
+    for (const l of ownFor(league)) {
+      const url = ownList(l).map?.get(key);
+      if (url) return url;
+    }
   return null;
 }
 

@@ -17,7 +17,7 @@ test("a Premier League player's photo is the league's own, on its older path whe
   const lists = {
     epl: [['Erling Haaland', 223094], ['Joe Gomez', 171287, 'o']],
     laliga: [['Pedri', 'https://assets.laliga.com/squad/2026/t178/p1/256x278/p1.png']],
-    bundesliga: [['Harry Kane', 'https://assets.bundesliga.com/player/dfl-obj-kane.png?fit=256,256']]
+    bundesliga: [['Harry Kane', 'https://assets.bundesliga.com/player/dfl-obj-kane.png?fit=256,256'], ['Min-Jae Kim', 'https://assets.bundesliga.com/player/dfl-obj-kim.png?fit=256,256']]
   };
   globalThis.fetch = async url => {
     const m = /sports\/([a-z0-9]+)\/photos\.json$/.exec(String(url));
@@ -69,6 +69,7 @@ test("a footballer's photo is a league's own studio one, whichever league's list
   const { ownPhoto, isCutout } = await import('../kit/photos.mjs');
   assert.equal(ownPhoto('Pedri', 'ucl'), 'https://assets.laliga.com/squad/2026/t178/p1/256x278/p1.png');
   assert.equal(ownPhoto('Harry Kane', 'laliga'), 'https://assets.bundesliga.com/player/dfl-obj-kane.png?fit=256,256');
+  assert.equal(ownPhoto('Kim Min-Jae', 'bundesliga'), 'https://assets.bundesliga.com/player/dfl-obj-kim.png?fit=256,256', 'a name in the other order');
   assert.equal(ownPhoto('Pedri', 'nba'), null, 'only football looks in football lists');
   assert.ok(isCutout('https://assets.laliga.com/squad/2026/t178/p1/256x278/p1.png'));
   assert.ok(isCutout('https://wsrv.nl/?url=https%3A%2F%2Fmedia-sdp.legaseriea.it%2Fx.webp&w=256'));
