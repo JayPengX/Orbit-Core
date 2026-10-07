@@ -185,3 +185,14 @@ test("an empty translation (Google busy) is a failure, not kept a month", async 
   assert.equal(emptyTranslation('[["羅素：巴林大獎賽又是一次失敗","en"]]'), false);
   assert.equal(emptyTranslation('["週日的比賽"]'), false);
 });
+
+test("ELTA.tv's season video pages only, trimmed to their episodes", async () => {
+  const { trimEltaVod } = await import('../sports-proxy-worker.js');
+  const item = (id, title) => `<div class="sportDivImg" data-episode="${id}"> <a href="https://eltaott.tv/sports/play/1/2150/${id}"> <img class="lazy" src="x.jpg" alt="${title}" title="${title}"> </a></div>`;
+  const html = `<html>${item('73061', '10/6 美聯分區賽G2 白襪 VS 守護者')}${item('73061', '10/6 美聯分區賽G2 白襪 VS 守護者')}${item('73060', '10/6 洋基 VS 光芒 &amp; more')}</html>`;
+  assert.deepEqual(trimEltaVod(html).episodes, [{ id: '73061', title: '10/6 美聯分區賽G2 白襪 VS 守護者' }, { id: '73060', title: '10/6 洋基 VS 光芒 & more' }]);
+  const status = async u => (await (await get(`https://proxy.test/sports-proxy?batch=1&u=${encodeURIComponent(u)}`)).json()).r[0].s;
+  assert.equal(await status('https://eltaott.tv/member/center'), 400);
+  assert.equal(await status('https://eltaott.tv/sports/play/1/2150?x=1'), 400);
+  assert.equal(await status('https://eltaott.tv/sports/play/1/2150/73061'), 400);
+});

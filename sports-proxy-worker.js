@@ -58,6 +58,10 @@ const ELTA_HOST = 'piceltaott-elta.cdn.hinet.net';
 // formula1.com's driver and team pages: the official season, career and
 // profile figures (only /en/drivers/<slug> and /en/teams/<slug>, trimmed).
 const F1_HOST = 'www.formula1.com';
+// ELTA.tv's sports videos: a league's season of whole games (/sports/play/1/<n>),
+// for a finished game's replay once ELTA's 48 hours of 回看 are over (only
+// those pages, trimmed to their episodes).
+const ELTA_VOD_HOST = 'eltaott.tv';
 const SPORTS_PROXY_FETCH_USER_AGENT = 'Orbit-Sports-Bot/1.0 (+https://github.com/JayPengX/Orbit-Sports)';
 const SPORTS_PROXY_ALLOWED_HOSTS = [
   'site.api.espn.com',
@@ -88,6 +92,7 @@ const SPORTS_PROXY_ALLOWED_HOSTS = [
   // ELTA's (愛爾達) sports schedule: which game each of its channels carries,
   // for Orbit Sports' "where to watch" (only the one list, always trimmed).
   ELTA_HOST,
+  ELTA_VOD_HOST,
   F1_HOST,
   // Not a real host: Asian baseball's schedules and scores, gathered by this
   // Worker from the leagues' own sites (asia-baseball.js).
@@ -245,6 +250,7 @@ function cachePolicyFor(url) {
     case 'clients5.google.com':
       return CACHE_TRANSLATE;
     case ELTA_HOST:
+    case ELTA_VOD_HOST:
     case F1_HOST:
       return CACHE_STANDINGS;
     case ASIA_HOST:
@@ -399,6 +405,21 @@ function nextText(html) {
     } catch {}
   }
   return out;
+}
+
+// An ELTA.tv sports video page's episodes, newest first, as it lists them:
+// { episodes: [{ id, title }] } ("10/6 美聯分區賽G2 白襪 VS 守護者").
+const TRIM_ELTA_VOD = 'eltavod';
+export function trimEltaVod(html) {
+  const seen = new Set();
+  const episodes = [];
+  for (const m of String(html || '').matchAll(/data-episode="(\d+)"[\s\S]{0,600}?\btitle="([^"]{1,160})"/g)) {
+    if (seen.has(m[1])) continue;
+    seen.add(m[1]);
+    episodes.push({ id: m[1], title: m[2].replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#0?39;/g, "'").trim() });
+    if (episodes.length >= 120) break;
+  }
+  return { episodes };
 }
 
 // A formula1.com driver or team page's figures, as the page shows them: its
@@ -574,6 +595,7 @@ async function fetchUpstream(upstreamUrl, trim) {
     // Google sometimes answers a translation with nothing ([[""]], when it's
     // busy): a failure, not kept (it was, a month, and the line stayed English).
     if (upstreamUrl.hostname === 'clients5.google.com' && emptyTranslation(new TextDecoder().decode(body))) return { status: 502, contentType, body: '' };
+    if (trim === TRIM_ELTA_VOD) return { status: 200, contentType: 'application/json', body: JSON.stringify(trimEltaVod(new TextDecoder().decode(body))) };
     if (trim === TRIM_F1PAGE) return { status: 200, contentType: 'application/json', body: JSON.stringify(trimF1Page(new TextDecoder().decode(body))) };
     if (trim) {
       try {
@@ -606,6 +628,7 @@ function cacheEntry(result, policy) {
 function trimFor(trimParam, upstreamUrl) {
   if (upstreamUrl.hostname === ELTA_HOST) return TRIM_ELTA;
   if (upstreamUrl.hostname === F1_HOST) return TRIM_F1PAGE;
+  if (upstreamUrl.hostname === ELTA_VOD_HOST) return TRIM_ELTA_VOD;
   if (trimParam === TRIM_POLYMARKET_EVENTS && upstreamUrl.hostname === 'gamma-api.polymarket.com' && upstreamUrl.pathname === '/events') return TRIM_POLYMARKET_EVENTS;
   if (trimParam === TRIM_POLYMARKET_GAMES && upstreamUrl.hostname === 'gamma-api.polymarket.com' && upstreamUrl.pathname === '/events') return TRIM_POLYMARKET_GAMES;
   if (trimParam === TRIM_KAMBI_EVENTS && upstreamUrl.hostname === 'eu-offering-api.kambicdn.com') return TRIM_KAMBI_EVENTS;
@@ -622,6 +645,7 @@ function parseTarget(target) {
     if (u.hostname === 'clients5.google.com' && (u.pathname !== '/translate_a/t' || (u.searchParams.get('q') || '').length > 5000)) return null;
     if (u.hostname === ELTA_HOST && u.pathname !== ELTA_PATH) return null;
     if (u.hostname === 'clob.polymarket.com' && u.pathname !== '/prices-history') return null;
+    if (u.hostname === ELTA_VOD_HOST && (!/^\/sports\/play\/1\/\d{1,6}$/.test(u.pathname) || u.search)) return null;
     if (u.hostname === F1_HOST && !/^\/en\/(drivers|teams)\/[a-z-]+$/.test(u.pathname)) return null;
     return u.protocol === 'https:' && SPORTS_PROXY_ALLOWED_HOSTS.includes(u.hostname) ? u : null;
   } catch {
