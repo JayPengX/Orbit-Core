@@ -31,8 +31,6 @@ const WEEK_MS = 7 * 86_400_000;
 const RECHECK_MS = 30 * 60_000;
 const ESPN = 'https://site.api.espn.com/apis/site/v2/sports';
 const ESPN_ARTICLE = 'https://content.core.api.espn.com/v1/sports/news';
-// Bumped when the prompt changes, so answers written by the old one are written again.
-const PROMPT_VERSION = 4;
 
 // The asks under way in this isolate, by key (the same ask twice at once: one call).
 const inFlight = new Map();
@@ -160,6 +158,9 @@ async function dayCount(cache, add = 0) {
   if (add) await cache.put(key, new Response(String(n + add), { headers: { 'Cache-Control': 'max-age=2592000' } }));
   return n + add;
 }
+// What every kept answer is filed under: the prompt, its schema and the
+// model, hashed, so any change to them is new answers at once (nothing to bump).
+const PROMPT_VERSION = hashOf(latestPrompt.toString() + JSON.stringify(SCHEMA) + LATEST_MODEL);
 const KEEP = { 'Content-Type': 'application/json', 'Cache-Control': 'max-age=2592000' };
 
 export async function handleLatest(request, env, headers, { session, limited, cache = globalThis.caches?.default, fetchFn = fetch, log = console.log, waitUntil = p => p } = {}) {

@@ -47,8 +47,11 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
   one is fetched for next time. The Worker answers from the entity's last
   answer while what was sent is unchanged and re-checks the news behind it
   (`ctx.waitUntil`) at most every 30 minutes. Answers are kept by a hash
-  of exactly what they were written from (30 days; `PROMPT_VERSION` in the
-  key), so Gemini never sees the same input twice. English mode or Gemini
+  of exactly what they were written from (30 days; `PROMPT_VERSION`, a
+  hash of the prompt, schema and model, in the key: any change to them is
+  fresh answers at once), so Gemini never sees the same input twice. The
+  phone's kept answers carry the app's build stamp: a new deploy forgets
+  them. English mode or Gemini
   down: ESPN's own note or story, translated. The daily cap (2,000) only
   guards against a bug; each ask logs `gemini_usage` (`feature: latest`).
 - **排名 before the first game:** last season's final table under a 上季
