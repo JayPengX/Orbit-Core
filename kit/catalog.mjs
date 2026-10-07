@@ -124,7 +124,7 @@ export async function asiaMonth(getJson, league, ym, { now = Date.now(), fetchJs
 // day). Clubs as the proxy names them (asia-baseball.js).
 export const TSDB_DAY = 'https://www.thesportsdb.com/api/v1/json/3/eventsday.php';
 export const TSDB_CPBL = '5111';
-const CPBL_CLUBS = [
+export const CPBL_CLUBS = [
   ['CTBC Brothers', '中信兄弟'],
   ['Uni-President Lions', '統一7-ELEVEn獅'],
   ['Rakuten Monkeys', '樂天桃猿'],
