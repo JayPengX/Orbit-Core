@@ -125,10 +125,35 @@ export function teamNameZh(key, name, sport = '') {
     return zh ? { full: zh, short: ASIA_SHORT[zh] || zh } : null;
   }
   if (SOCCER.has(sport) || !sport) {
-    const zh = CLUBS[n];
+    // As written, else without its joining words (ESPN's "Atlético de Madrid" is Atlético Madrid).
+    const zh = CLUBS[n] || CLUBS[bare(n)];
     if (zh) return { full: zh, short: zh };
   }
   return null;
+}
+const bare = n => n.replace(/\b(de|del|da|do|di|la|le|les|of|the)\b/g, ' ').replace(/\s+/g, ' ').trim();
+// The teams whose Chinese name has the words typed ("皇家" → Real Madrid,
+// Real Sociedad…): [{ name, zh }], the English name to look them up by.
+// A Chinese search finds teams by their Chinese names, not by a machine
+// translation of the words (皇家 would be "Royal"). Whole names first.
+export function teamsByZh(query, most = 6) {
+  const q = String(query || '').replace(/\s+/g, '');
+  if (!/[\u3400-\u9fff]/.test(q)) return [];
+  const out = new Map();
+  const add = (name, zh) => {
+    const z = String(zh).replace(/\s+/g, '');
+    if (z.includes(q) && !out.has(z + '|' + name)) out.set(z + '|' + name, { name, zh, whole: z === q });
+  };
+  for (const table of Object.values(US)) for (const [name, [city, nick]] of Object.entries(table)) add(name, `${city}${nick}`);
+  for (const [name, zh] of Object.entries(CLUBS)) add(name, zh);
+  for (const [name, zh] of Object.entries(ASIA)) add(name, zh);
+  // One English name a team (a club written several ways: the first).
+  const seen = new Set();
+  return [...out.values()]
+    .sort((a, b) => b.whole - a.whole)
+    .filter(x => !seen.has(x.zh) && seen.add(x.zh))
+    .slice(0, most)
+    .map(({ name, zh }) => ({ name, zh }));
 }
 // Play's form: the full name (the lottery's), or the name as it came.
 export const teamZh = (key, name, sport = '') => teamNameZh(key, name, sport)?.full ?? name;

@@ -515,3 +515,12 @@ test('looks for staying a member: the streak is months held in a row up to now, 
     for (const x of list) if (x.streak) assert.ok(kit.LOOK_STREAKS.includes(x.streak));
   }
 });
+
+test("names: a club with joining words in its name (Atlético de Madrid), and teams found by their Chinese names (皇家 → Real Madrid)", async () => {
+  const { teamNameZh, teamsByZh } = await import('../kit/names.mjs');
+  assert.equal(teamNameZh('ucl', 'Atlético de Madrid', 'soccer')?.full, '馬德里競技');
+  const found = teamsByZh('皇家');
+  assert.ok(found.some(x => x.name === 'real madrid' && x.zh === '皇家馬德里'));
+  assert.deepEqual(teamsByZh('皇家馬德里')[0], { name: 'real madrid', zh: '皇家馬德里' });
+  assert.deepEqual(teamsByZh('Madrid'), []);
+});
