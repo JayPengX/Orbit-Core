@@ -30,32 +30,27 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
   odds, predictions, fantasy, preview or video piece (`storyAbout` in
   `Orbit-Sports/public/lib/espn.mjs`); or ESPN's note on them when newer.
   No link to the article. F1 names go through `lib/f1names.mjs` first.
-- **最新動態 by Gemini, everywhere:** every player, driver, team, F1 team
-  and match has one, in Chinese. The sheet sends its own facts (Chinese
-  lines: form, standing, next game; a match's records, places, form,
-  injuries, win chance, result, goals, leaders) to the Worker's `/latest`
-  (`latest.js`). The Worker adds ESPN's tagged stories (3 days) and Google
-  News's headlines about them (7 days, RSS, read at most hourly; a player's
-  must have the surname; no how-to-watch, odds, lineups). Google's are what
-  make it worth having: the court case, the knee, the contract talk ESPN
-  never tags. The owner's rule: the card must never read back the numbers
-  the page already shows. So the prompt calls the facts "On the page", tells
-  `gemini-3.5-flash-lite` to write the storyline and why it matters (a
-  match: the stakes before, what the result means after), with a headline
-  that's the takeaway, not a label. With no news about them, one insight the
-  page doesn't spell out. While it's written, the card's shape; without it
-  (English, a game on, Gemini failed) ESPN's story or note, else no card.
-  Speed: the last card written for them comes back at once while the
-  page's facts are the same (no news read, no Gemini waited on); the news
-  is looked at again behind the answer (`ctx.waitUntil`) at most every 30
-  minutes, and a new card, if it changed, is what the next opening gets.
-  Google's feed is never waited on more than 3 s. Only new facts (a game
-  played) make an opening wait for Gemini.
-  Kept by exactly what it's written from (a hash of the facts and the
-  stories, 30 days; `PROMPT_VERSION` in the key, bumped when the prompt
-  changes), so the same card is never asked twice. The daily cap (2,000)
-  only guards against a bug. Each ask is about 2,500 tokens in, 250 out
-  (about US$0.0004). Each ask logs `gemini_usage` with `feature: latest`.
+- **最新動態: real news only (owner's call, after "it just reads the
+  numbers back").** Players, drivers and teams; no match cards (a match's
+  page already shows everything). The sheet sends who they are plus what
+  people wrote lately (ESPN's injury report within 30 days, RotoWire's note
+  within 14) to `/latest` (`latest.js`). The Worker reads ESPN's tagged
+  stories (3 days; the newest two in full from ESPN's free content API)
+  and Google News headlines (7 days, hourly; a player's must have the
+  surname; highlights, how-to-watch, odds dropped). Nothing there and no
+  report: `{none}` with no Gemini. Otherwise `gemini-3.5-flash-lite`
+  decides whether anything is real news (injury, case, transfer,
+  milestone...) and writes a takeaway headline plus up to two points, or
+  skips (`{none}`, kept too). No card on a quiet day.
+  Fast and cheap: the phone keeps each answer 30 minutes (`fx.latest.v1`),
+  so reopening asks nothing; older, the kept one shows at once and a fresh
+  one is fetched for next time. The Worker answers from the entity's last
+  answer while what was sent is unchanged and re-checks the news behind it
+  (`ctx.waitUntil`) at most every 30 minutes. Answers are kept by a hash
+  of exactly what they were written from (30 days; `PROMPT_VERSION` in the
+  key), so Gemini never sees the same input twice. English mode or Gemini
+  down: ESPN's own note or story, translated. The daily cap (2,000) only
+  guards against a bug; each ask logs `gemini_usage` (`feature: latest`).
 - **排名 before the first game:** last season's final table under a 上季
   banner (app.js `tableOf`, `standings(league, { season })`).
 - **Translations:** text with Chinese in it (a name put in first) was sent

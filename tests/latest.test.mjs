@@ -1,7 +1,7 @@
 // Orbit Sports' 最新動態 by Gemini (latest.js).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { storiesAbout, handleLatest, LATEST_DAILY_CAP } from '../latest.js';
+import { storiesAbout, handleLatest, LATEST_DAILY_CAP, newsQuery, sameStoryOnce, latestPrompt, articleText } from '../latest.js';
 
 const now = Date.parse('2026-10-07T06:00:00Z');
 const art = (id, hoursAgo, cats, extra = {}) => ({ id, headline: `H${id}`, description: `D${id}`, published: new Date(now - hoursAgo * 3_600_000).toISOString(), categories: cats, ...extra });
@@ -12,50 +12,6 @@ test("only the last three days' stories tagged with them, no videos, newest firs
   assert.deepEqual(storiesAbout([feed], { kind: 'team', id: '13' }, now).map(s => s.id), ['3']);
 });
 
-function memCache() {
-  const m = new Map();
-  return { match: async r => (m.has(r.url) ? new Response(m.get(r.url)) : undefined), put: async (r, res) => void m.set(r.url, await res.text()), m };
-}
-const req = q => new Request(`https://w/latest?${q}`);
-const env = { GEMINI_API_KEY: 'k' };
-
-test('Gemini asked once per newest story, kept for everyone; none without stories; capped past the day\'s budget', async () => {
-  const realNow = Date.now;
-  Date.now = () => now;
-  try {
-    let asked = 0;
-    const fetchFn = async url => {
-      if (String(url).includes('generativelanguage')) {
-        asked++;
-        return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ story: 0, headline: '詹姆斯缺席揭幕戰', points: ['他將缺席。'] }) }] } }] }), { status: 200 });
-      }
-      return new Response(JSON.stringify(feed), { status: 200 });
-    };
-    const cache = memCache();
-    const opts = { session: { s: 'x' }, limited: () => false, cache, fetchFn, log: () => {} };
-    const a = await (await handleLatest(req('league=nba&kind=player&id=1966&team=13&name=LeBron%20James'), env, {}, opts)).json();
-    assert.deepEqual(a, { at: now - 5 * 3_600_000, from: 'story', headline: '詹姆斯缺席揭幕戰', points: ['他將缺席。'] });
-    await handleLatest(req('league=nba&kind=player&id=1966&team=13'), env, {}, opts);
-    assert.equal(asked, 1, 'kept: the second opening asks nobody');
-    assert.deepEqual(await (await handleLatest(req('league=nba&kind=player&id=9999'), env, {}, opts)).json(), { none: true });
-    assert.equal(asked, 1, 'no stories and no facts, no Gemini');
-    // A quiet player: written from the sheet's facts (a POST), once a day.
-    const post = facts => new Request('https://w/latest', { method: 'POST', body: JSON.stringify({ league: 'nba', kind: 'player', id: '9999', facts }) });
-    await handleLatest(post(['近 5 場場均 30 分']), env, {}, opts);
-    await handleLatest(post(['近 5 場場均 30 分']), env, {}, opts);
-    assert.equal(asked, 2, 'the same facts: asked once, ever');
-    // The same ask twice at once: one call.
-    await Promise.all([handleLatest(post(['同時 A']), env, {}, opts), handleLatest(post(['同時 A']), env, {}, opts)]);
-    assert.equal(asked, 3, 'at once: one call');
-    await handleLatest(post(['近 5 場場均 31 分']), env, {}, opts);
-    assert.equal(asked, 4, 'new facts: asked again');
-    cache.m.set(`https://latest.count/${new Date(now + 8 * 3_600_000).toISOString().slice(0, 10)}`, String(LATEST_DAILY_CAP));
-    assert.deepEqual(await (await handleLatest(req('league=nba&kind=team&id=13'), env, {}, opts)).json(), { capped: true });
-    assert.equal((await handleLatest(req('league=nba&kind=team&id=13'), env, {}, { ...opts, session: null })).status, 401);
-  } finally {
-    Date.now = realNow;
-  }
-});
 
 test("Google News: the week's headlines with their surname, no how-to-watch or odds, the paper's name apart", async () => {
   const { googleNews } = await import('../latest.js');
@@ -74,57 +30,132 @@ test("Google News: the week's headlines with their surname, no how-to-watch or o
   assert.equal(googleNews(xml, {}, now).length, 3, 'a team: every headline Google found (but how-to-watch)');
 });
 
-test("what's asked of Google News: the quoted name; a team with its sport; a match's two sides; Chinese in Taiwan's edition", async () => {
-  const { newsQuery, sameStoryOnce } = await import('../latest.js');
-  const q = u => new URL(u).searchParams.get('q');
-  assert.equal(q(newsQuery({ kind: 'player', name: 'Max Verstappen' })), '"Max Verstappen" when:7d');
-  assert.equal(q(newsQuery({ kind: 'team', name: 'Manchester City', sport: 'soccer' })), '"Manchester City" football when:7d');
-  assert.equal(q(newsQuery({ kind: 'match', name: 'x', away: 'Leeds United', home: 'Arsenal' })), '"Leeds United" "Arsenal" when:7d');
-  assert.match(newsQuery({ kind: 'player', name: '林安可' }), /hl=zh-TW/);
-  assert.deepEqual(sameStoryOnce([{ headline: 'Man City appeal Premier League financial ruling' }, { headline: 'Man City appeal Premier League financial ruling, sources say' }, { headline: 'Haaland to leave' }]).map(x => x.headline), ['Man City appeal Premier League financial ruling', 'Haaland to leave']);
-});
+function memCache() {
+  const m = new Map();
+  return { match: async r => (m.has(r.url) ? new Response(m.get(r.url)) : undefined), put: async (r, res) => void m.set(r.url, await res.text()), m };
+}
+const env = { GEMINI_API_KEY: 'k' };
+const post = body => new Request('https://w/latest', { method: 'POST', body: JSON.stringify({ league: 'nba', kind: 'player', name: 'Stephen Curry', ...body }) });
+// A world: ESPN's feed (`feed`), Google's (`rss`), ESPN's articles, and Gemini answering `reply`.
+function world({ feed = { articles: [] }, rss = '', reply = { skip: false, story: 0, headline: '卡', points: ['一'] } } = {}) {
+  const seen = { gemini: 0, articles: 0, reads: 0, prompts: [] };
+  const fetchFn = async (url, init) => {
+    url = String(url);
+    if (url.includes('generativelanguage')) {
+      seen.gemini++;
+      seen.prompts.push(JSON.parse(init.body).contents[0].parts[0].text);
+      return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(typeof reply === 'function' ? reply(seen.gemini) : reply) }] } }] }), { status: 200 });
+    }
+    seen.reads++;
+    if (url.includes('content.core')) return (seen.articles++, new Response(JSON.stringify({ headlines: [{ story: '<p>Curry said the knee <b>feels strong</b>.</p>' }] }), { status: 200 }));
+    if (url.includes('news.google')) return new Response(rss, { status: 200 });
+    return new Response(JSON.stringify(feed), { status: 200 });
+  };
+  return { seen, opts: { session: { s: 'x' }, limited: () => false, cache: memCache(), fetchFn, log: () => {} } };
+}
+const withNow = async fn => {
+  const real = Date.now;
+  Date.now = () => now;
+  try {
+    await fn();
+  } finally {
+    Date.now = real;
+  }
+};
 
-test("the prompt: the page's lines as what the reader already sees, Google's headlines as the news", async () => {
-  const { latestPrompt } = await import('../latest.js');
-  const p = latestPrompt({ kind: 'team', name: 'Manchester City', zh: '曼城', league: 'epl', facts: ['曼城：5勝1和1敗，英超第 2 名'], stories: [{ at: now, source: 'Reuters', headline: 'Man City appeal Premier League financial ruling' }] });
-  assert.match(p, /On the page:\n- 曼城：5勝1和1敗/);
-  assert.match(p, /Reading the page's numbers back is a failure/);
-  assert.match(p, /\[0\] 2026-10-07 \(Reuters\) Man City appeal/);
-  assert.match(latestPrompt({ kind: 'match', name: 'A vs B', league: 'epl', stories: [], state: 'post' }), /The match is over/);
-});
+test('no news and no report: no card, and Gemini never asked', () =>
+  withNow(async () => {
+    const { seen, opts } = world();
+    assert.deepEqual(await (await handleLatest(post({ id: '3975', facts: ['勇士・控球後衛'] }), env, {}, opts)).json(), { none: true });
+    assert.equal(seen.gemini, 0);
+    const reads = seen.reads;
+    assert.deepEqual(await (await handleLatest(post({ id: '3975', facts: ['勇士・控球後衛'] }), env, {}, opts)).json(), { none: true });
+    assert.equal(seen.reads, reads, 'the second opening: straight from the kept answer, no news read');
+  }));
 
-test('the last card comes back at once (no news read) while the facts are the same; the news looked at again behind it every half hour', async () => {
-  const realNow = Date.now;
+test('a story: ESPN\'s article read in full, the card written once and kept for everyone', () =>
+  withNow(async () => {
+    const { seen, opts } = world({ feed: { articles: [art(50121620, 5, [{ type: 'athlete', athleteId: 3975 }])] } });
+    const a = await (await handleLatest(post({ id: '3975' }), env, {}, opts)).json();
+    assert.deepEqual(a, { at: now - 5 * 3_600_000, headline: '卡', points: ['一'] });
+    assert.equal(seen.articles, 1);
+    assert.match(seen.prompts[0], /\[0\] 2026-10-07 H50121620\nCurry said the knee feels strong\./);
+    await handleLatest(post({ id: '3975' }), env, {}, { ...opts, cache: opts.cache });
+    assert.equal(seen.gemini, 1);
+  }));
+
+test('Gemini finds nothing real: none, kept (not asked again for the same news)', () =>
+  withNow(async () => {
+    const { seen, opts } = world({ feed: { articles: [art(1, 5, [{ type: 'athlete', athleteId: 3975 }])] }, reply: { skip: true } });
+    assert.deepEqual(await (await handleLatest(post({ id: '3975' }), env, {}, opts)).json(), { none: true });
+    // Another device, the same news (the last answer gone): the kept skip, no second ask.
+    opts.cache.m.forEach((_, k) => k.includes('/last/') && opts.cache.m.delete(k));
+    assert.deepEqual(await (await handleLatest(post({ id: '3975' }), env, {}, opts)).json(), { none: true });
+    assert.equal(seen.gemini, 1);
+  }));
+
+test('a report alone (an injury) is enough to ask; a new report asks again; at once, one call', () =>
+  withNow(async () => {
+    const { seen, opts } = world({ reply: { skip: false, story: -1, headline: '柯瑞限時出賽', points: [] } });
+    const ask = report => handleLatest(post({ id: '3975', report }), env, {}, opts).then(r => r.json());
+    const [a, b] = await Promise.all([ask(['傷病：Day-To-Day']), ask(['傷病：Day-To-Day'])]);
+    assert.equal(a.headline, '柯瑞限時出賽');
+    assert.deepEqual(a, b);
+    assert.equal(seen.gemini, 1);
+    assert.match(seen.prompts[0], /Report \(written by people, recent\):\n- 傷病：Day-To-Day/);
+    await ask(['傷病：Out']);
+    assert.equal(seen.gemini, 2);
+  }));
+
+test('the last answer at once; the news looked at again behind it every half hour, a new card for the next opening', async () => {
+  const real = Date.now;
   let t = now;
   Date.now = () => t;
   try {
-    let reads = 0;
-    let asked = 0;
-    let headline = 'H1';
-    const fetchFn = async url => {
-      if (String(url).includes('generativelanguage')) {
-        asked++;
-        return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ story: -1, headline: `卡 ${asked}` }) }] } }] }), { status: 200 });
-      }
-      reads++;
-      return new Response(JSON.stringify({ articles: [art(headline, 1, [{ type: 'athlete', athleteId: 7 }])] }), { status: 200 });
-    };
+    let n = 1;
+    const feedNow = () => ({ articles: [art(n, 1, [{ type: 'athlete', athleteId: 7 }])] });
+    const { seen, opts } = world({ reply: k => ({ skip: false, story: 0, headline: `卡 ${k}` }) });
+    const fetchFn = opts.fetchFn;
+    opts.fetchFn = async (url, init) => (String(url).includes('/news?') ? new Response(JSON.stringify(feedNow()), { status: 200 }) : fetchFn(url, init));
     const behind = [];
-    const opts = { session: { s: 'x' }, limited: () => false, cache: memCache(), fetchFn, log: () => {}, waitUntil: p => behind.push(p) };
-    const post = () => new Request('https://w/latest', { method: 'POST', body: JSON.stringify({ league: 'nba', kind: 'player', id: '7', name: 'A B', facts: ['f'] }) });
-    assert.equal((await (await handleLatest(post(), env, {}, opts)).json()).headline, '卡 1');
-    const first = reads;
-    assert.equal((await (await handleLatest(post(), env, {}, opts)).json()).headline, '卡 1');
-    assert.equal(reads, first, 'the same facts within half an hour: no news read');
-    assert.equal(behind.length, 0);
-    // Half an hour on, new news: the old card at once, the new one written behind it for the next opening.
+    opts.waitUntil = p => behind.push(p);
+    const open = () => handleLatest(post({ id: '7', name: 'A B' }), env, {}, opts).then(r => r.json());
+    assert.equal((await open()).headline, '卡 1');
+    assert.equal((await open()).headline, '卡 1');
+    assert.equal(behind.length, 0, 'within half an hour: not even looked at');
     t += 31 * 60_000;
-    headline = 'H2';
-    assert.equal((await (await handleLatest(post(), env, {}, opts)).json()).headline, '卡 1');
+    n = 2;
+    assert.equal((await open()).headline, '卡 1');
     await Promise.all(behind);
-    assert.equal(asked, 2);
-    assert.equal((await (await handleLatest(post(), env, {}, opts)).json()).headline, '卡 2');
+    assert.equal(seen.gemini, 2);
+    assert.equal((await open()).headline, '卡 2');
   } finally {
-    Date.now = realNow;
+    Date.now = real;
   }
+});
+
+test('no match cards; capped past the day\'s budget; a session needed', () =>
+  withNow(async () => {
+    const { seen, opts } = world({ feed: { articles: [art(1, 5, [{ type: 'team', teamId: 9 }])] } });
+    assert.deepEqual(await (await handleLatest(post({ kind: 'match', id: '401' }), env, {}, opts)).json(), { none: true });
+    opts.cache.m.set(`https://latest.count/${new Date(now + 8 * 3_600_000).toISOString().slice(0, 10)}`, String(LATEST_DAILY_CAP));
+    assert.deepEqual(await (await handleLatest(post({ kind: 'team', id: '9', name: 'Golden State Warriors' }), env, {}, opts)).json(), { capped: true });
+    assert.equal(seen.gemini, 0);
+    assert.equal((await handleLatest(post({ id: '9' }), env, {}, { ...opts, session: null })).status, 401);
+  }));
+
+test("what's asked of Google News; the same story once; ESPN's article as plain text", () => {
+  const q = u => new URL(u).searchParams.get('q');
+  assert.equal(q(newsQuery({ kind: 'player', name: 'Max Verstappen' })), '"Max Verstappen" when:7d');
+  assert.equal(q(newsQuery({ kind: 'team', name: 'Manchester City', sport: 'soccer' })), '"Manchester City" football when:7d');
+  assert.match(newsQuery({ kind: 'player', name: '林安可' }), /hl=zh-TW/);
+  assert.deepEqual(sameStoryOnce([{ headline: 'Man City appeal Premier League financial ruling' }, { headline: 'Man City appeal Premier League financial ruling, sources say' }, { headline: 'Haaland to leave' }]).map(x => x.headline), ['Man City appeal Premier League financial ruling', 'Haaland to leave']);
+  assert.equal(articleText({ headlines: [{ story: '<p>One&nbsp;two.</p><aside>ad</aside><p>Three</p>' }] }), 'One two. Three');
+});
+
+test('the prompt: real news or skip, never the numbers', () => {
+  const p = latestPrompt({ kind: 'team', name: 'Manchester City', zh: '曼城', league: 'epl', facts: ['英超'], stories: [{ at: now, source: 'Reuters', headline: 'Man City appeal Premier League financial ruling' }] });
+  assert.match(p, /set skip = true/);
+  assert.match(p, /\[0\] 2026-10-07 \(Reuters\) Man City appeal/);
+  assert.match(p, /Report: none\./);
 });
