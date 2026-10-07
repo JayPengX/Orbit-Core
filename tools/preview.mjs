@@ -57,7 +57,7 @@ import { execFile } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { ASIA_HOST, asiaBaseballResponse } from '../asia-baseball.js';
 import { F1_LIVE_HOST, f1LiveResponse } from '../f1-live.js';
-import { trimF1Page, trimEltaVod } from '../sports-proxy-worker.js';
+import { trimF1Page, trimEltaVod, trimYtSearch, trimYtVideo } from '../sports-proxy-worker.js';
 import { handleWeather } from '../weather.js';
 import { upstream as weatherFixtures } from '../tests/fixtures/weather/upstream.mjs';
 import { handleTransit } from '../transit.js';
@@ -271,7 +271,7 @@ const base = `http://localhost:${server.address().port}/${renamed}/`;
 // Given up after 8 s, like the Worker (SPORTS_PROXY_UPSTREAM_TIMEOUT_MS).
 const curl = url =>
   new Promise(resolve => {
-    execFile('curl', ['-s', '--compressed', '-m', '8', '-w', '\n%{http_code}', ...(/yahoo\.com/.test(url) ? ['-A', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'] : []), url], { maxBuffer: 64 * 1024 * 1024 }, (err, stdout) => {
+    execFile('curl', ['-s', '--compressed', '-m', '8', '-w', '\n%{http_code}', ...(/yahoo\.com/.test(url) ? ['-A', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'] : []), ...(/^https:\/\/www\.youtube\.com\//.test(url) ? ['-A', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36', '-H', 'Accept-Language: en-US,en;q=0.9', '-b', 'SOCS=CAI; CONSENT=YES+'] : []), url], { maxBuffer: 64 * 1024 * 1024 }, (err, stdout) => {
       if (err) return resolve({ status: 502, body: '' });
       const i = stdout.lastIndexOf('\n');
       resolve({ status: Number(stdout.slice(i + 1)) || 502, body: stdout.slice(0, i) });
@@ -333,12 +333,16 @@ function fakeYahooAnswer(url) {
   return { status: 404, body: '' };
 }
 // The pages the Worker answers trimmed to JSON (formula1.com's, ELTA.tv's
-// season videos): trimmed here the same way.
+// season videos, YouTube's search and video pages): trimmed here the same way.
 const pageTrim = (url, r) => {
   if (r.status !== 200) return r;
   const host = new URL(url).hostname;
   if (host === 'www.formula1.com') return { status: 200, body: JSON.stringify(trimF1Page(r.body)) };
   if (host === 'eltaott.tv') return { status: 200, body: JSON.stringify(trimEltaVod(r.body)) };
+  if (host === 'www.youtube.com') {
+    const out = (new URL(url).pathname === '/watch' ? trimYtVideo : trimYtSearch)(r.body);
+    return out ? { status: 200, body: JSON.stringify(out) } : { status: 502, body: '' };
+  }
   return r;
 };
 const flakyNow = { on: false, failed: 0 };
