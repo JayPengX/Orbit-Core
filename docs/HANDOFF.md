@@ -15,7 +15,7 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
   night: LaLiga's API (the public key its site sends), the Bundesliga's and
   Serie A's squad pages, Ligue 1's club summaries (`ma-api.ligue1.fr`).
   These go to `sports/<league>/photos.json` as `[name, url]`. Serie A's
-  1024 px pictures are made 256 px by wsrv.nl. The kit
+  1024 px pictures are made 256 px by wsrv.nl. ESPN's short names are matched to the leagues' legal ones club by club (`clubFits`): on the day Serie A 88 of 93, the Bundesliga 54 of 57, Ligue 1 46 of 54 (the rest youngsters with no league photo). The kit
   (`kit/photos.mjs`) looks in all five football lists for any footballer
   (cups, transfers), then the feed's and ESPN's pictures, and FotMob's
   face last. Not covered yet: MLS (its roster pictures load in the browser
