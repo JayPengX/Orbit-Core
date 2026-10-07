@@ -196,3 +196,23 @@ test("ELTA.tv's season video pages only, trimmed to their episodes", async () =>
   assert.equal(await status('https://eltaott.tv/sports/play/1/2150?x=1'), 400);
   assert.equal(await status('https://eltaott.tv/sports/play/1/2150/73061'), 400);
 });
+
+test("YouTube: a search and a video's page only, trimmed; a page without its data is a failure", async () => {
+  const { trimYtSearch, trimYtVideo } = await import('../sports-proxy-worker.js');
+  const v = (id, title, channel, verified) => ({ videoRenderer: { videoId: id, title: { runs: [{ text: title }] }, ownerText: { runs: [{ text: channel, navigationEndpoint: { browseEndpoint: { browseId: `UC${channel}` } } }] }, ownerBadges: verified ? [{ metadataBadgeRenderer: { style: 'BADGE_STYLE_TYPE_VERIFIED' } }] : [], publishedTimeText: { simpleText: '10h ago' }, lengthText: { simpleText: '20:12' } } });
+  const data = { contents: { list: [v('mmrHD8KXtLs', 'BREWERS vs. PADRES: NLDS Full Game 3 Highlights {x} "y"', 'MLB', true), v('mmrHD8KXtLs', 'again', 'MLB', true), v('E4mj0ShxuLE', 'EVERY PLAY', 'Fan', false)] } };
+  const html = `<html><script>var ytInitialData = ${JSON.stringify(data)};</script><script>var other = {};</script></html>`;
+  assert.deepEqual(trimYtSearch(html).videos, [
+    { id: 'mmrHD8KXtLs', title: 'BREWERS vs. PADRES: NLDS Full Game 3 Highlights {x} "y"', channel: 'MLB', channelId: 'UCMLB', verified: true, age: '10h ago', length: '20:12' },
+    { id: 'E4mj0ShxuLE', title: 'EVERY PLAY', channel: 'Fan', channelId: 'UCFan', verified: false, age: '10h ago', length: '20:12' }
+  ]);
+  assert.equal(trimYtSearch('<html>Before you continue to YouTube</html>'), null);
+  const player = { videoDetails: { videoId: 'EpwxwKDoXXU', title: 'LAKERS at WARRIORS', author: 'NBA', channelId: 'UCnba' }, playabilityStatus: { status: 'UNPLAYABLE' }, microformat: { playerMicroformatRenderer: { publishDate: '2026-10-06T21:54:21-07:00', availableCountries: ['US', 'CA'] } } };
+  assert.deepEqual(trimYtVideo(`<script>var ytInitialPlayerResponse = ${JSON.stringify(player)};var meta = 1;</script>`), { id: 'EpwxwKDoXXU', title: 'LAKERS at WARRIORS', channel: 'NBA', channelId: 'UCnba', published: '2026-10-06T21:54:21-07:00', tw: false, playable: 'UNPLAYABLE' });
+  assert.equal(trimYtVideo('<html></html>'), null);
+  const status = async u => (await (await get(`https://proxy.test/sports-proxy?batch=1&u=${encodeURIComponent(u)}`)).json()).r[0].s;
+  assert.equal(await status('https://www.youtube.com/feed/history'), 400);
+  assert.equal(await status('https://www.youtube.com/results?search_query=x&sp=EgIQAQ'), 400);
+  assert.equal(await status('https://www.youtube.com/watch?v=EpwxwKDoXXU&list=x'), 400);
+  assert.equal(await status('https://www.youtube.com/watch?v=short'), 400);
+});

@@ -62,6 +62,10 @@ const F1_HOST = 'www.formula1.com';
 // for a finished game's replay once ELTA's 48 hours of 回看 are over (only
 // those pages, trimmed to their episodes).
 const ELTA_VOD_HOST = 'eltaott.tv';
+// YouTube's search and a video's page: a finished game's highlights, the
+// official video itself (Orbit Sports' highlights row), only those two pages,
+// each trimmed to a few fields.
+const YT_HOST = 'www.youtube.com';
 const SPORTS_PROXY_FETCH_USER_AGENT = 'Orbit-Sports-Bot/1.0 (+https://github.com/JayPengX/Orbit-Sports)';
 const SPORTS_PROXY_ALLOWED_HOSTS = [
   'site.api.espn.com',
@@ -94,6 +98,7 @@ const SPORTS_PROXY_ALLOWED_HOSTS = [
   ELTA_HOST,
   ELTA_VOD_HOST,
   F1_HOST,
+  YT_HOST,
   // Not a real host: Asian baseball's schedules and scores, gathered by this
   // Worker from the leagues' own sites (asia-baseball.js).
   ASIA_HOST,
@@ -162,6 +167,10 @@ const CACHE_SEARCH = { tier: 'search', fresh: DAY, stale: 7 * DAY };
 const CACHE_FUNDAMENTALS = { tier: 'fundamentals', fresh: HOUR, stale: DAY };
 const CACHE_NEWS = { tier: 'news', fresh: 30 * MINUTE, stale: DAY };
 const CACHE_TRANSLATE = { tier: 'translate', fresh: 30 * DAY, stale: 30 * DAY };
+// YouTube: a game's highlights go up within hours of it ending (a search
+// read again after 20 minutes); a video's page (where it plays) for a week.
+const CACHE_YT_SEARCH = { tier: 'yt-search', fresh: 20 * MINUTE, stale: 6 * HOUR };
+const CACHE_YT_VIDEO = { tier: 'yt-video', fresh: 7 * DAY, stale: 7 * DAY };
 
 // Asian baseball by month: this month and next change with every score (a
 // minute); a past month only with a late fix.
@@ -253,6 +262,8 @@ function cachePolicyFor(url) {
     case ELTA_VOD_HOST:
     case F1_HOST:
       return CACHE_STANDINGS;
+    case YT_HOST:
+      return url.pathname === '/watch' ? CACHE_YT_VIDEO : CACHE_YT_SEARCH;
     case ASIA_HOST:
       return asiaPolicy(url);
     case F1_LIVE_HOST:
@@ -422,6 +433,88 @@ export function trimEltaVod(html) {
   return { episodes };
 }
 
+// YouTube's pages carry their data as one JSON object in a script
+// (`var ytInitialData = {…};`): that object, or null.
+function ytObject(html, name) {
+  const text = String(html || '');
+  const at = text.search(new RegExp(`(?:var |window\\[")${name}"?\\]?\\s*=\\s*\\{`));
+  if (at < 0) return null;
+  const start = text.indexOf('{', at);
+  // The object ends where its braces close (strings skipped).
+  let depth = 0;
+  let quote = '';
+  for (let i = start; i < text.length; i++) {
+    const c = text[i];
+    if (quote) {
+      if (c === '\\') i++;
+      else if (c === quote) quote = '';
+    } else if (c === '"') quote = c;
+    else if (c === '{') depth++;
+    else if (c === '}' && --depth === 0) {
+      try {
+        return JSON.parse(text.slice(start, i + 1));
+      } catch {
+        return null;
+      }
+    }
+  }
+  return null;
+}
+function* ytFind(node, key, depth = 0) {
+  if (!node || typeof node !== 'object' || depth > 40) return;
+  if (Array.isArray(node)) {
+    for (const x of node) yield* ytFind(x, key, depth + 1);
+    return;
+  }
+  if (key in node) yield node[key];
+  for (const v of Object.values(node)) if (v && typeof v === 'object') yield* ytFind(v, key, depth + 1);
+}
+const ytText = t => (t?.simpleText ?? (t?.runs || []).map(r => r.text || '').join('')) || '';
+// A search's videos, in YouTube's order: { videos: [{ id, title, channel,
+// channelId, verified, age ('11h ago'), length ('9:52') }] }; null when the
+// page has none of its data (a consent or robot page: a failure, not kept).
+const TRIM_YT_SEARCH = 'ytsearch';
+export function trimYtSearch(html) {
+  const data = ytObject(html, 'ytInitialData');
+  if (!data) return null;
+  const videos = [];
+  for (const v of ytFind(data, 'videoRenderer')) {
+    if (!v?.videoId || videos.some(x => x.id === v.videoId)) continue;
+    const owner = v.ownerText?.runs?.[0] || v.longBylineText?.runs?.[0] || {};
+    const badges = (v.ownerBadges || []).map(b => b.metadataBadgeRenderer?.style || '');
+    videos.push({
+      id: v.videoId,
+      title: ytText(v.title).slice(0, 200),
+      channel: owner.text || '',
+      channelId: owner.navigationEndpoint?.browseEndpoint?.browseId || '',
+      verified: badges.some(b => /VERIFIED/.test(b)),
+      age: ytText(v.publishedTimeText),
+      length: ytText(v.lengthText)
+    });
+    if (videos.length >= 20) break;
+  }
+  return { videos };
+}
+// A video's page: whether it plays in Taiwan (its list of countries; null
+// when the page doesn't say), when it went up, its channel. Null without
+// the page's data.
+const TRIM_YT_VIDEO = 'ytvideo';
+export function trimYtVideo(html) {
+  const p = ytObject(html, 'ytInitialPlayerResponse');
+  if (!p) return null;
+  const mf = p.microformat?.playerMicroformatRenderer || {};
+  const countries = Array.isArray(mf.availableCountries) ? mf.availableCountries : null;
+  return {
+    id: p.videoDetails?.videoId || '',
+    title: String(p.videoDetails?.title || '').slice(0, 200),
+    channel: p.videoDetails?.author || '',
+    channelId: p.videoDetails?.channelId || '',
+    published: mf.publishDate || mf.uploadDate || '',
+    tw: countries ? countries.includes('TW') : null,
+    playable: p.playabilityStatus?.status || ''
+  };
+}
+
 // A formula1.com driver or team page's figures, as the page shows them: its
 // grids of label and value, in order ({ grids: [[[label, value], …], …] }),
 // e.g. the season's (position, points), its Grand Prix and Sprint numbers,
@@ -583,7 +676,8 @@ async function fetchUpstream(upstreamUrl, trim) {
       : upstreamUrl.hostname === 'clients5.google.com'
         ? await translateUpstream(upstreamUrl)
         : await fetch(upstreamUrl.toString(), {
-          headers: { 'User-Agent': SPORTS_PROXY_FETCH_USER_AGENT },
+          // YouTube in English, past its cookie notice, as a browser sees it.
+          headers: upstreamUrl.hostname === YT_HOST ? { 'User-Agent': BROWSER_UA, 'Accept-Language': 'en-US,en;q=0.9', Cookie: 'SOCS=CAI; CONSENT=YES+' } : { 'User-Agent': SPORTS_PROXY_FETCH_USER_AGENT },
           signal: AbortSignal.timeout(SPORTS_PROXY_UPSTREAM_TIMEOUT_MS)
         });
   } catch (error) {
@@ -597,6 +691,10 @@ async function fetchUpstream(upstreamUrl, trim) {
     // busy): a failure, not kept (it was, a month, and the line stayed English).
     if (upstreamUrl.hostname === 'clients5.google.com' && emptyTranslation(new TextDecoder().decode(body))) return { status: 502, contentType, body: '' };
     if (trim === TRIM_ELTA_VOD) return { status: 200, contentType: 'application/json', body: JSON.stringify(trimEltaVod(new TextDecoder().decode(body))) };
+    if (trim === TRIM_YT_SEARCH || trim === TRIM_YT_VIDEO) {
+      const out = (trim === TRIM_YT_SEARCH ? trimYtSearch : trimYtVideo)(new TextDecoder().decode(body));
+      return out ? { status: 200, contentType: 'application/json', body: JSON.stringify(out) } : { status: 502, contentType: 'application/json', body: '' };
+    }
     if (trim === TRIM_F1PAGE) return { status: 200, contentType: 'application/json', body: JSON.stringify(trimF1Page(new TextDecoder().decode(body))) };
     if (trim) {
       try {
@@ -630,6 +728,7 @@ function trimFor(trimParam, upstreamUrl) {
   if (upstreamUrl.hostname === ELTA_HOST) return TRIM_ELTA;
   if (upstreamUrl.hostname === F1_HOST) return TRIM_F1PAGE;
   if (upstreamUrl.hostname === ELTA_VOD_HOST) return TRIM_ELTA_VOD;
+  if (upstreamUrl.hostname === YT_HOST) return upstreamUrl.pathname === '/watch' ? TRIM_YT_VIDEO : TRIM_YT_SEARCH;
   if (trimParam === TRIM_POLYMARKET_EVENTS && upstreamUrl.hostname === 'gamma-api.polymarket.com' && upstreamUrl.pathname === '/events') return TRIM_POLYMARKET_EVENTS;
   if (trimParam === TRIM_POLYMARKET_GAMES && upstreamUrl.hostname === 'gamma-api.polymarket.com' && upstreamUrl.pathname === '/events') return TRIM_POLYMARKET_GAMES;
   if (trimParam === TRIM_KAMBI_EVENTS && upstreamUrl.hostname === 'eu-offering-api.kambicdn.com') return TRIM_KAMBI_EVENTS;
@@ -647,6 +746,8 @@ function parseTarget(target) {
     if (u.hostname === ELTA_HOST && u.pathname !== ELTA_PATH) return null;
     if (u.hostname === 'clob.polymarket.com' && u.pathname !== '/prices-history') return null;
     if (u.hostname === ELTA_VOD_HOST && (!/^\/sports\/play\/1\/\d{1,6}$/.test(u.pathname) || u.search)) return null;
+    // A search (its words, in English as seen from Taiwan) or a video's page, nothing else.
+    if (u.hostname === YT_HOST && !(u.pathname === '/results' ? [...u.searchParams.keys()].every(k => ['search_query', 'hl', 'gl'].includes(k)) && (u.searchParams.get('search_query') || '').length > 0 && (u.searchParams.get('search_query') || '').length <= 200 : u.pathname === '/watch' && [...u.searchParams.keys()].join() === 'v' && /^[\w-]{11}$/.test(u.searchParams.get('v')))) return null;
     if (u.hostname === F1_HOST && !/^\/en\/(drivers|teams)\/[a-z-]+$/.test(u.pathname)) return null;
     return u.protocol === 'https:' && SPORTS_PROXY_ALLOWED_HOSTS.includes(u.hostname) ? u : null;
   } catch {
