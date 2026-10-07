@@ -178,6 +178,7 @@ export const wanted = (prefs, app, item) => !prefs || (prefs.on !== false && !(i
 async function setDue(env, key, next) {
   const kv = env.RATE_LIMIT_KV;
   const due = (await kv.get('push:due', 'json')) || {};
+  if ((due[key] || 0) === (next || 0)) return;
   if (next) due[key] = next;
   else delete due[key];
   await kv.put('push:due', JSON.stringify(due));
@@ -193,11 +194,13 @@ export async function handlePush(request, env, headers, session, path) {
   const body = await request.json().catch(() => null);
   if (path === '/push/prefs') {
     const prefs = cleanPrefs(body);
-    await kv.put(prefsKey(session.d), JSON.stringify(prefs), { expirationTtl: 400 * 86_400 });
+    // (Unchanged switches aren't written again: KV's free tier has 1,000 writes a day.)
+    if ((await kv.get(prefsKey(session.d))) !== JSON.stringify(prefs)) await kv.put(prefsKey(session.d), JSON.stringify(prefs), { expirationTtl: 400 * 86_400 });
     return reply({ ok: true, ...prefs });
   }
   const key = recordKey(session.d, session.a);
   const record = (await kv.get(key, 'json')) || { items: [] };
+  const was = JSON.stringify(record);
   if (path === '/push/subscribe') {
     const sub = body?.sub;
     if (!sub?.endpoint || !/^https:\/\//.test(sub.endpoint) || !sub.keys?.p256dh || !sub.keys?.auth) return reply({ error: { message: 'Bad subscription' } }, 400);
@@ -210,7 +213,13 @@ export async function handlePush(request, env, headers, session, path) {
     const told = record.told || {};
     record.items = cleanItems(body?.items).filter(x => !(onceOnly(x) && told[x.tag]));
   } else return reply({ error: { message: 'Not found' } }, 404);
-  await kv.put(key, JSON.stringify(record), { expirationTtl: 60 * 86_400 });
+  // Each open sends the app's list again; written only when it changed (or
+  // once a month, so the 60-day expiry never takes a quiet one).
+  const now = Date.now();
+  if (JSON.stringify(record) !== was || !(now - (record.kept || 0) < 30 * 86_400_000)) {
+    record.kept = now;
+    await kv.put(key, JSON.stringify(record), { expirationTtl: 60 * 86_400 });
+  }
   await setDue(env, key, record.sub && record.items.length ? record.items[0].at : 0);
   return reply({ ok: true, n: record.items.length });
 }

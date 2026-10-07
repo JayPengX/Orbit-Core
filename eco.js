@@ -90,7 +90,9 @@ const MAX_MERGE_SOURCES = 12;
 
 // Per IP an hour, for the calls that take a code (KV counters); calls with a
 // session are counted per session and app in memory (TOKEN_LIMIT a minute).
-export const ECO_LIMITS = { create: 20, login: 30, merge: 20, share: 30, admin: 30 };
+// (admin: the owner's panel, whose token is 32+ random characters; its tools
+// call several times a view.)
+export const ECO_LIMITS = { create: 20, login: 30, merge: 20, share: 30, admin: 600 };
 export const TOKEN_LIMIT = 90;
 
 export function emptyWallet(now = Date.now()) {

@@ -17,6 +17,8 @@
 import { newPasscode, updateWallet, deleteAccount, ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, PAIR_MS, ECO_LIMITS, parseWallet, poolBalance, plusMember, plusLapsed, taipeiMonth, gen, emptyWallet } from './eco.js';
 import { sendPush } from './push.js';
 import { KAMBI_COLLECTION } from './kambi.js';
+import { usage as transitUsage, CAPS as TRANSIT_CAPS } from './transit.js';
+import { twDate, GOOGLE_DAILY_CALLS } from './weather.js';
 
 export const ADMIN_TOKEN_HASH = '';
 export const RETIRED_COLLECTIONS = ['orbit-schedules', 'eco-links', 'stock-study-leagues'];
@@ -359,7 +361,7 @@ export const ADMIN_TOOLS = {
       apps: appsOf(wallet),
       plus: { member: plusMember(wallet, now), renewing: wallet.settings?.plus?.value?.on === true, plan: wallet.settings?.plus?.value?.plan || null, lapsed: plusLapsed(wallet), months: plusMonths.slice(-24) },
       entries: wallet.entries.length,
-      recent: [...wallet.entries].sort((a, b) => (b.t || 0) - (a.t || 0)).slice(0, 60).map(e => ({ t: e.t, app: e.app, kind: e.kind, amount: e.amount, note: e.note || '' })),
+      recent: [...wallet.entries].sort((a, b) => (b.t || 0) - (a.t || 0)).slice(0, 200).map(e => ({ id: e.id, t: e.t, app: e.app, kind: e.kind, amount: e.amount, note: e.note || '', undone: wallet.entries.some(x => x.id === `eco:undo:${e.id}`) })),
       snaps: Object.fromEntries(Object.entries(wallet.snap || {}).map(([k, v]) => [k, typeof v?.cash === 'number' ? v.cash : null])),
       settings: Object.keys(wallet.settings || {}).sort(),
       inbox: Object.fromEntries(Object.entries(wallet.inbox || {}).map(([k, v]) => [k, v.length])),
@@ -435,6 +437,135 @@ export const ADMIN_TOOLS = {
     if (!record?.sub) return { error: 'ADMIN_NO_PUSH', status: 404 };
     const r = await sendPush(env, record.sub, { title: 'Quadra 測試通知', body: '這是管理頁送出的測試通知，收到代表通知正常。', tag: `test:${deps.now()}` });
     return { ok: r === 'sent', result: String(r) };
+  },
+  // An account gone for good, used or not, at its owner's request or the
+  // owner's call: its wallet, every app's data, its inbox, the share keys it
+  // made, device codes for it, and its notices (push records, switches, the
+  // due list). `confirm` must be the account's full 8-character reference.
+  async delete({ env, deps, body }) {
+    const hit = await findWallet(env, deps, body.wallet);
+    if (!hit) return notFound;
+    if (String(body.confirm || '').trim() !== hit.id.slice(0, 8)) return { error: 'ADMIN_CONFIRM', status: 400 };
+    const balance = poolBalance(hit.wallet);
+    await deleteAccount(env, deps, hit.id);
+    let shares = 0;
+    for (const name of [SHARE_COLLECTION, PAIR_COLLECTION]) {
+      for (const d of await deps.fsList(env, name, 300).catch(() => [])) {
+        let v = null;
+        try {
+          v = JSON.parse(d.payload);
+        } catch {}
+        if (v && (v.owner === hit.id || v.d === hit.id)) {
+          await deps.fsDelete(env, name, d.id);
+          shares++;
+        }
+      }
+    }
+    const kv = env.RATE_LIMIT_KV;
+    let pushes = 0;
+    if (kv) {
+      const records = await pushRecords(env, `push:${hit.id}:`).catch(() => []);
+      for (const r of records) await kv.delete(r.key);
+      pushes = records.length;
+      await kv.delete(`push:prefs:${hit.id}`).catch(() => {});
+      const due = (await kv.get('push:due', 'json').catch(() => null)) || {};
+      const left = Object.fromEntries(Object.entries(due).filter(([k]) => !k.startsWith(`push:${hit.id}:`)));
+      if (Object.keys(left).length !== Object.keys(due).length) await kv.put('push:due', JSON.stringify(left));
+    }
+    return { ok: true, ref: hit.id.slice(0, 8), balance, apps: appsOf(hit.wallet).map(a => a.app), shares, pushes };
+  },
+  // The account behind a Quadra Pass someone read out (its reference).
+  async find({ env, deps, body }) {
+    const code = String(body.passcode || '').trim().toUpperCase().replace(/[\s-]/g, '');
+    if (code.length < 6) return { error: 'SYNC_PASSCODE_NOT_FOUND', status: 404 };
+    const doc = await deps.fsGet(env, WALLET_COLLECTION, await deps.sha256Hex(code));
+    if (!doc.exists) return { error: 'SYNC_PASSCODE_NOT_FOUND', status: 404 };
+    return { ref: (await deps.sha256Hex(code)).slice(0, 8) };
+  },
+  // One record undone: an 'admin' entry of the opposite amount, once.
+  async undo({ env, deps, body }) {
+    const hit = await findWallet(env, deps, body.wallet);
+    if (!hit) return notFound;
+    const target = hit.wallet.entries.find(e => e.id === body.entry);
+    if (!target || !target.amount) return { error: 'ADMIN_NO_ENTRY', status: 404 };
+    const id = `eco:undo:${target.id}`;
+    if (hit.wallet.entries.some(e => e.id === id)) return { error: 'ADMIN_DONE_ALREADY', status: 409 };
+    const now = deps.now();
+    const entry = { id, t: now, app: 'eco', kind: 'admin', amount: -target.amount, note: `撤銷 ${target.app}:${target.kind}`.slice(0, 60) };
+    const res = await updateWallet(env, deps, hit.id, w => (w.entries.some(e => e.id === id) ? w : { ...w, entries: [...w.entries, entry] }));
+    return { ok: true, entry, balance: poolBalance(res.wallet) };
+  },
+  // One app's data for an account gone (its inbox too), every device signed
+  // out so none sends its old copy back. The wallet and its money stay.
+  async 'clear-app'({ env, deps, body }) {
+    const app = String(body.app || '');
+    if (!ECO_APPS[app]) return { error: 'ADMIN_NO_APP', status: 400 };
+    const hit = await findWallet(env, deps, body.wallet);
+    if (!hit) return notFound;
+    for (const id of hit.wallet.inbox?.[app] || []) if (id.startsWith(`${hit.id}-`)) await deps.fsDelete(env, INBOX_COLLECTION, id);
+    await deps.fsDelete(env, ECO_APPS[app].collection, hit.id);
+    const res = await updateWallet(env, deps, hit.id, w => {
+      const apps = { ...(w.apps || {}) };
+      const inbox = { ...(w.inbox || {}) };
+      delete apps[app];
+      delete inbox[app];
+      const settings = Object.fromEntries(Object.entries(w.settings || {}).filter(([k]) => !k.startsWith(app) && k !== `aff:${app}`));
+      return { ...w, apps, inbox, settings, sec: { ...(w.sec || {}), gen: gen(w) + 1 }, live: null };
+    });
+    return { ok: true, apps: appsOf(res.wallet).map(a => a.app) };
+  },
+  // Everything stored for an account, as it's stored (a copy to keep or to
+  // hand its owner): the wallet and each app's document.
+  async export({ env, deps, body }) {
+    const hit = await findWallet(env, deps, body.wallet);
+    if (!hit) return notFound;
+    const apps = {};
+    for (const [app, { collection }] of Object.entries(ECO_APPS)) {
+      const d = await deps.fsGet(env, collection, hit.id);
+      if (!d.exists) continue;
+      try {
+        apps[app] = JSON.parse(d.payload);
+      } catch {
+        apps[app] = d.payload;
+      }
+    }
+    return { ref: hit.id.slice(0, 8), at: deps.now(), wallet: hit.wallet, apps };
+  },
+  // A notice to everyone subscribed in an app (or every app): a news item
+  // or a heads-up. Answers how many it reached.
+  async broadcast({ env, deps, body }) {
+    const title = String(body.title || '').trim().slice(0, 60);
+    const text = String(body.body || '').trim().slice(0, 200);
+    const app = String(body.app || 'all');
+    if (!title || !text) return { error: 'ADMIN_BAD_NOTICE', status: 400 };
+    const kv = env.RATE_LIMIT_KV;
+    if (!kv) return { error: 'ADMIN_NO_PUSH', status: 404 };
+    const records = (await pushRecords(env)).filter(r => app === 'all' || r.app === app).slice(0, 500);
+    const out = { sent: 0, failed: 0, gone: 0 };
+    const tag = `admin:${deps.now()}`;
+    for (let i = 0; i < records.length; i += 20)
+      await Promise.all(
+        records.slice(i, i + 20).map(async r => {
+          const rec = await kv.get(r.key, 'json').catch(() => null);
+          if (!rec?.sub) return;
+          const res = String(await sendPush(env, rec.sub, { title, body: text, tag }).catch(e => String(e?.message || e)));
+          out[res === 'sent' ? 'sent' : res === 'gone' ? 'gone' : 'failed']++;
+          if (res === 'gone') await kv.delete(r.key).catch(() => {});
+        })
+      );
+    return { ok: true, asked: records.length, ...out };
+  },
+  // What the Worker uses of what it's allowed: Google (Transit's month,
+  // Weather's day) and TDX calls this month.
+  async usage({ env, deps }) {
+    const now = deps.now();
+    const transit = await transitUsage(env, now).catch(() => ({}));
+    const weatherCalls = env.RATE_LIMIT_KV ? Number(await env.RATE_LIMIT_KV.get(`weather:google:${twDate(now)}`).catch(() => 0)) || 0 : null;
+    return {
+      at: now,
+      transit: Object.fromEntries(Object.entries(transit).map(([k, n]) => [k, { used: n, cap: TRANSIT_CAPS[k] ?? null }])),
+      weather: { googleToday: weatherCalls, cap: GOOGLE_DAILY_CALLS }
+    };
   },
   // The sources the apps read, each asked once: answered, how fast.
   async health() {

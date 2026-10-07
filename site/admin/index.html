@@ -111,7 +111,7 @@
       <button data-view="overview" aria-pressed="true">總覽</button>
       <button data-view="accounts" aria-pressed="false">帳戶</button>
       <button data-view="issue" aria-pressed="false">發放 Pass</button>
-      <button data-view="ops" aria-pressed="false">通知與來源</button>
+      <button data-view="ops" aria-pressed="false">通知、用量與來源</button>
       <button data-view="clean" aria-pressed="false">資料整理</button>
     </nav>
 
@@ -137,6 +137,8 @@
       <div class="row spread"><h2>帳戶</h2><div class="row"><button id="csv" class="small">下載 CSV</button><button id="load" class="small">重新整理</button></div></div>
       <div class="card">
         <div class="row"><input id="search" class="grow" type="search" placeholder="搜尋帳戶代號或 App" autocomplete="off" /></div>
+        <div class="row" style="margin-top:10px"><input id="find-pass" class="grow" autocomplete="off" placeholder="用 Quadra Pass 找帳戶（他念給你的那組）" /><button id="find" class="small">找</button></div>
+        <p id="find-error" class="error"></p>
         <div class="chips" id="filters" style="margin-top:10px">
           <button data-filter="all" aria-pressed="true">全部</button>
           <button data-filter="used" aria-pressed="false">使用中</button>
@@ -150,7 +152,7 @@
         <div class="tablewrap"><table id="wallets" hidden><thead><tr>
           <th data-sort="ref">代號</th><th data-sort="state">狀態</th><th data-sort="apps">App</th><th data-sort="created">建立</th><th data-sort="lastUsed">最後使用</th><th data-sort="balance" class="right">餘額</th>
         </tr></thead><tbody></tbody></table></div>
-        <p class="muted" style="margin:10px 0 0">點一列打開帳戶：看明細、調整金額、送 Plus、登出所有裝置、產生找回代碼、重置。</p>
+        <p class="muted" style="margin:10px 0 0">點一列打開帳戶：看明細、調整金額、撤銷紀錄、送 Plus、登出所有裝置、產生找回代碼、清除某個 App 的資料、匯出、重置或刪除。</p>
       </div>
     </section>
 
@@ -181,6 +183,18 @@
       <p id="push-error" class="error"></p>
       <div class="tiles" id="push-tiles"></div>
       <div class="card tablewrap" style="margin-top:12px"><table id="push-apps"><thead><tr><th>App</th><th class="right">訂閱通知的帳戶</th></tr></thead><tbody></tbody></table></div>
+      <h2>廣播通知</h2>
+      <div class="card">
+        <p class="muted">送一則通知給某個 App（或所有 App）訂閱通知的每個人：公告、維修、活動。一次最多 500 台裝置。</p>
+        <div class="row"><select id="bc-app"></select><input id="bc-title" class="grow" maxlength="60" placeholder="標題" /></div>
+        <div class="row" style="margin-top:10px"><input id="bc-body" class="grow" maxlength="200" placeholder="內容" /><button id="bc-send" class="primary">送出</button></div>
+        <p id="bc-error" class="error"></p>
+        <p id="bc-ok" class="ok"></p>
+      </div>
+      <div class="row spread"><h2>用量</h2><button id="use-load" class="small">重新整理</button></div>
+      <p class="muted">Worker 用掉多少額度：Google（Orbit Transit 的這個月、Orbit Weather 的今天）和 TDX。</p>
+      <p id="use-error" class="error"></p>
+      <div class="tiles" id="use-tiles"></div>
       <div class="row spread"><h2>資料來源</h2><button id="health-load" class="small">檢查</button></div>
       <p class="muted">每個 App 讀的公開來源各問一次：有沒有回應、多快。</p>
       <p id="health-error" class="error"></p>
@@ -225,6 +239,11 @@ const WHY = {
   ADMIN_BAD_AMOUNT: '金額要是非零的數字（±1,000,000 以內），而且要寫原因。',
   ADMIN_IN_USE: '這個帳戶用過了，不能收回；要清空請用「重置」。',
   ADMIN_NO_PUSH: '這個帳戶在這個 App 沒有訂閱通知。',
+  ADMIN_CONFIRM: '要刪除，請完整輸入這個帳戶的 8 碼代號。',
+  ADMIN_NO_ENTRY: '找不到這筆紀錄（或它沒有金額）。',
+  ADMIN_DONE_ALREADY: '這筆已經撤銷過了。',
+  ADMIN_NO_APP: '選一個 App。',
+  ADMIN_BAD_NOTICE: '通知要有標題和內容。',
   ECO_BUSY: '帳戶正在被寫入，再試一次。',
   ADMIN_FAILED: '伺服器出錯了，再試一次。'
 };
@@ -292,7 +311,7 @@ function show(view) {
   for (const s of document.querySelectorAll('[data-pane]')) s.hidden = s.dataset.pane !== view;
   if (!loaded.has(view)) {
     loaded.add(view);
-    ({ overview: loadOverview, accounts: loadWallets, ops: () => (loadPushes(), loadHealth()) })[view]?.();
+    ({ overview: loadOverview, accounts: loadWallets, ops: () => (loadPushes(), loadUsage(), loadHealth()) })[view]?.();
   }
 }
 $('tabs').onclick = e => e.target.dataset.view && show(e.target.dataset.view);
@@ -420,6 +439,19 @@ $('csv').onclick = () => {
   a.click();
 };
 
+$('find').onclick = () =>
+  busy($('find'), async () => {
+    $('find-error').textContent = '';
+    try {
+      const { ref } = await admin('find', { passcode: $('find-pass').value });
+      $('find-pass').value = '';
+      openAccount(ref);
+    } catch (e) {
+      $('find-error').textContent = e.message;
+    }
+  });
+$('find-pass').addEventListener('keydown', e => e.key === 'Enter' && $('find').click());
+
 // ---- 一個帳戶 ----
 const dialog = $('acct');
 $('acct-close').onclick = () => dialog.close();
@@ -542,17 +574,63 @@ function drawAccount(a) {
     : null;
   if (remove) removeBtn.onclick = () => remove.run(removeBtn);
 
+  // One app's data cleared.
+  const clearApp = el('select', {}, a.apps.map(x => el('option', { value: x.app, text: appName(x.app) })));
+  const clearBtn = el('button', { class: 'danger', text: '清除這個 App 的資料' });
+  const clear = a.apps.length
+    ? action('清除某個 App 的資料', '只刪這個 App 的資料（和它的收件匣），錢包和其他 App 不動；所有裝置登出，免得舊資料被傳回來。無法復原。', [clearApp, clearBtn], async () => {
+        if (!confirm(`清除帳戶 ${a.ref} 在 ${appName(clearApp.value)} 的資料？無法復原。`)) return '已取消';
+        await admin('clear-app', { wallet: a.ref, app: clearApp.value });
+        setTimeout(reload, 900);
+        return '已清除';
+      })
+    : null;
+  if (clear) clearBtn.onclick = () => clear.run(clearBtn);
+  // An export.
+  const exportBtn = el('button', { text: '下載帳戶資料' });
+  const exporter = action('匯出', '錢包和每個 App 的資料，原樣存成一個 JSON 檔（備份，或本人要求時給他）。', [exportBtn], async () => {
+    const r = await admin('export', { wallet: a.ref });
+    el('a', { href: URL.createObjectURL(new Blob([JSON.stringify(r, null, 2)], { type: 'application/json' })), download: `Quadra 帳戶 ${a.ref} ${new Date().toISOString().slice(0, 10)}.json` }).click();
+    return '已下載';
+  });
+  exportBtn.onclick = () => exporter.run(exportBtn);
+  // Deleting the account.
+  const confirmRef = el('input', { class: 'grow', autocomplete: 'off', placeholder: `輸入 ${a.ref} 確認` });
+  const delBtn = el('button', { class: 'danger', text: '刪除帳戶' });
+  const del = action('刪除帳戶', '整個帳戶永久刪除：Pass 失效、錢包和所有 App 的資料、收件匣、分享碼、裝置代碼和通知訂閱都刪掉。無法復原，建議先匯出。', [confirmRef, delBtn], async () => {
+    if (!confirm(`永久刪除帳戶 ${a.ref}（餘額 ${money(a.balance)}）？無法復原。`)) return '已取消';
+    const r = await admin('delete', { wallet: a.ref, confirm: confirmRef.value.trim() });
+    setTimeout(() => (dialog.close(), loadWallets(), loaded.delete('overview')), 900);
+    return `已刪除帳戶 ${r.ref}${r.pushes ? `、${r.pushes} 個通知訂閱` : ''}${r.shares ? `、${r.shares} 個分享碼` : ''}`;
+  });
+  delBtn.onclick = () => del.run(delBtn);
+  // A record undone.
+  const undo = async (e, btn) => {
+    if (!confirm(`撤銷這筆 ${money(e.amount)}（${e.app}:${e.kind}）？會記一筆相反金額的更正。`)) return;
+    await busy(btn, async () => {
+      try {
+        await admin('undo', { wallet: a.ref, entry: e.id });
+        reload();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+  };
   const records = el('div', { class: 'tablewrap' }, [
     el('table', {}, [
-      el('thead', {}, [el('tr', {}, ['時間', '來源', '種類', '金額', '備註'].map((h, i) => el('th', { class: i === 3 ? 'right' : null, text: h })))]),
-      el('tbody', {}, a.recent.length ? a.recent.map(e => el('tr', {}, [el('td', { text: fmt(e.t) }), el('td', { text: e.app === 'eco' ? 'Quadra' : appName(e.app) }), el('td', { text: e.kind }), el('td', { class: `right ${e.amount > 0 ? 'pos' : e.amount < 0 ? 'neg' : ''}`, text: e.amount ? money(e.amount) : '—' }), el('td', { text: e.note })])) : [el('tr', {}, [el('td', { colspan: '5', class: 'muted', text: '沒有紀錄。' })])])
+      el('thead', {}, [el('tr', {}, ['時間', '來源', '種類', '金額', '備註', ''].map((h, i) => el('th', { class: i === 3 ? 'right' : null, text: h })))]),
+      el('tbody', {}, a.recent.length ? a.recent.map(e => {
+        const btn = e.amount && !e.undone && !e.id?.startsWith('eco:undo:') ? el('button', { class: 'small', text: '撤銷' }) : null;
+        if (btn) btn.onclick = () => undo(e, btn);
+        return el('tr', {}, [el('td', { text: fmt(e.t) }), el('td', { text: e.app === 'eco' ? 'Quadra' : appName(e.app) }), el('td', { text: e.kind }), el('td', { class: `right ${e.amount > 0 ? 'pos' : e.amount < 0 ? 'neg' : ''}`, text: e.amount ? money(e.amount) : '—' }), el('td', { text: e.note }), el('td', {}, [e.undone ? el('span', { class: 'tag', text: '已撤銷' }) : btn])]);
+      }) : [el('tr', {}, [el('td', { colspan: '6', class: 'muted', text: '沒有紀錄。' })])])
     ])
   ]);
   $('acct-body').replaceChildren(
     el('h3', { text: '帳戶' }),
     facts,
     el('h3', { text: '操作' }),
-    el('div', { class: 'actions' }, [grant, plus, signout, recover, pushTest, remove, reset].filter(Boolean)),
+    el('div', { class: 'actions' }, [grant, plus, signout, recover, pushTest, exporter, clear, remove, reset, del].filter(Boolean)),
     el('h3', { text: `最近的紀錄（${a.recent.length} / ${a.entries}）` }),
     records
   );
@@ -617,6 +695,34 @@ async function loadPushes() {
     $('push-error').textContent = e.message;
   }
 }
+$('bc-app').replaceChildren(el('option', { value: 'all', text: '所有 App' }), ...Object.entries(APPS).map(([k, n]) => el('option', { value: k, text: n })));
+$('bc-send').onclick = () =>
+  busy($('bc-send'), async () => {
+    $('bc-error').textContent = $('bc-ok').textContent = '';
+    const app = $('bc-app').value;
+    if (!confirm(`送「${$('bc-title').value}」給${app === 'all' ? '所有 App' : appName(app)}訂閱通知的每個人？`)) return;
+    try {
+      const r = await admin('broadcast', { app, title: $('bc-title').value, body: $('bc-body').value });
+      $('bc-ok').textContent = `送到 ${r.sent} 台裝置${r.failed ? `，${r.failed} 台失敗` : ''}${r.gone ? `，${r.gone} 台已取消訂閱（已移除）` : ''}。`;
+    } catch (e) {
+      $('bc-error').textContent = e.message;
+    }
+  });
+const SKU = { autocomplete: '地點搜尋', detailsPro: '地點詳細', tdx: 'TDX 呼叫' };
+async function loadUsage() {
+  $('use-error').textContent = '';
+  try {
+    const u = await admin('usage');
+    const share = (n, cap) => (cap ? `${Math.round((n / cap) * 100)}% · 上限 ${cap.toLocaleString()}` : '只計數');
+    $('use-tiles').replaceChildren(
+      tile('天氣 Google（今天）', u.weather.googleToday == null ? '—' : u.weather.googleToday.toLocaleString(), share(u.weather.googleToday || 0, u.weather.cap)),
+      ...Object.entries(u.transit).map(([k, v]) => tile(`交通 ${SKU[k] || k}（本月）`, v.used.toLocaleString(), share(v.used, v.cap)))
+    );
+  } catch (e) {
+    $('use-error').textContent = e.message;
+  }
+}
+$('use-load').onclick = () => busy($('use-load'), loadUsage);
 async function loadHealth() {
   $('health-error').textContent = '';
   $('health').replaceChildren(el('li', {}, [el('span', { class: 'muted', text: '檢查中…' })]));

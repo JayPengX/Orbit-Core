@@ -664,3 +664,48 @@ test('the admin panel: an overview, an account in full, money and Plus by hand, 
   assert.equal((await admin('remove', { wallet: idle })).status, 200);
   assert.equal((await t.call('POST', '', { op: 'login', passcode: unused, app: 'stock' })).status, 404);
 });
+
+test('the admin panel: an account found by its pass, a record undone, one app cleared, an export, an account deleted', async () => {
+  const t = setup();
+  const admin = (action, extra = {}) => t.call('POST', '', { op: 'admin', token: 'o'.repeat(40), action, ...extra });
+  const acct = await newPass(t);
+  const other = await newPass(t, 'odds');
+  await t.call('PATCH', `${t.qt(acct.token)}&app=stock`, { payload: 'gz1:abc', wallet: { entries: [{ id: 'stock:1', t: 1, app: 'stock', kind: 'dividend', amount: 30 }] } });
+  // Found by the pass someone reads out (dashes and lower case all right).
+  const found = await admin('find', { passcode: `${acct.passcode.slice(0, 5).toLowerCase()}-${acct.passcode.slice(5)}` });
+  assert.equal(found.status, 200);
+  const ref = found.data.ref;
+  assert.equal(ref.length, 8);
+  assert.equal((await admin('find', { passcode: 'ZZZZZZZZZZ' })).status, 404);
+  // A record undone, once.
+  const before = (await admin('wallet', { wallet: ref })).data;
+  const div = before.recent.find(e => e.id === 'stock:1');
+  assert.ok(div && !div.undone);
+  const u = await admin('undo', { wallet: ref, entry: 'stock:1' });
+  assert.equal(u.status, 200);
+  assert.equal(u.data.balance, before.balance - 30);
+  assert.equal((await admin('undo', { wallet: ref, entry: 'stock:1' })).status, 409, 'not twice');
+  assert.ok((await admin('wallet', { wallet: ref })).data.recent.find(e => e.id === 'stock:1').undone);
+  // An export: the wallet and each app's document.
+  const ex = await admin('export', { wallet: ref });
+  assert.equal(ex.status, 200);
+  assert.ok(ex.data.wallet.entries.length && 'stock' in ex.data.apps);
+  // One app cleared: its data gone, the money stays, devices signed out.
+  const c = await admin('clear-app', { wallet: ref, app: 'stock' });
+  assert.equal(c.status, 200);
+  assert.ok(!c.data.apps.includes('stock'));
+  assert.equal((await admin('wallet', { wallet: ref })).data.balance, before.balance - 30);
+  assert.equal((await t.call('GET', `${t.qt(acct.token)}&app=stock`)).status, 401, 'signed out');
+  // Deleted: needs the full reference typed; then everything of it is gone.
+  assert.equal((await admin('delete', { wallet: ref })).status, 400);
+  assert.equal((await admin('delete', { wallet: ref, confirm: ref.slice(0, 6) })).status, 400);
+  const fullId = [...t.store.keys()].find(k => k.startsWith(`${WALLET_COLLECTION}/${ref}`)).split('/')[1];
+  t.store.set(`${SHARE_COLLECTION}/k1`, { payload: JSON.stringify({ owner: fullId, exp: Date.now() + 1e9 }), updateTime: 'x' });
+  const d = await admin('delete', { wallet: ref, confirm: ref });
+  assert.equal(d.status, 200);
+  assert.equal(d.data.shares, 1);
+  assert.ok(![...t.store.keys()].some(k => k.includes(fullId)), 'nothing of it left');
+  assert.equal((await t.call('POST', '', { op: 'login', passcode: acct.passcode, app: 'stock' })).status, 404, 'its pass opens nothing');
+  assert.equal((await admin('wallets')).data.wallets.length, 1, 'the other account untouched');
+  assert.ok(other.token);
+});
