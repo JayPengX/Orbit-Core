@@ -212,9 +212,9 @@ bug waiting in the rest.
   2026-10-06). Not even a map: Transit tried
   `black-translucent` for its map on 2026-10-07, and iOS blurred the
   map's top with a clear strip, a half-clear one, and even under a solid
-  one (a band below it). Transit stays `black`, its map tab's strip solid
-  in the map's own grey (#2a282b), so the phone's status bar takes that
-  colour and the map starts sharp right under it. iOS reads the status
+  one (a band below it). Transit stays `black`, its strip solid black
+  on the map tab too (the owner's choice over the map's grey), and the
+  map starts sharp right under it. iOS reads the status
   bar style when the app is added: a phone sees a change of it only after
   removing the app and adding it again.
 - **One colour from the top of the screen down.** The phone paints its
