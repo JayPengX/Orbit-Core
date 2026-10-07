@@ -487,7 +487,10 @@ await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(?!
   const req = route.request();
   const body = req.postDataJSON?.() || {};
   const reply = { token: 'preview', wallet, active: true, live: { app: appId } };
-  if (req.method() === 'POST' && (body.op === 'refresh' || body.op === 'login' || body.op === 'redeem')) Object.assign(reply, { payload, inbox: [] });
+  // The app's data, as the Worker gives it: on a sign-in, and on a read
+  // that names the app ('' when nothing is saved).
+  if (req.method() === 'POST' && (body.op === 'refresh' || body.op === 'login' || body.op === 'redeem')) Object.assign(reply, { payload: payload ?? '', inbox: [] });
+  if (req.method() === 'GET' && new URL(req.url()).searchParams.get('app')) Object.assign(reply, { payload: payload ?? '', inbox: [] });
   if (body.op === 'pair-create') Object.assign(reply, { code: 'ABCD2345', exp: Date.now() + 600_000 });
   await route.fulfill({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(reply) });
 });
