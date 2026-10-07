@@ -30,14 +30,17 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
   odds, predictions, fantasy, preview or video piece (`storyAbout` in
   `Orbit-Sports/public/lib/espn.mjs`); or ESPN's note on them when newer.
   No link to the article. F1 names go through `lib/f1names.mjs` first.
-- **最新動態 by Gemini:** the Worker's `/latest` (`latest.js`) reads ESPN's
-  stories about a player, driver, team or F1 team (three days, tagged with
-  them), and `gemini-3.5-flash-lite` picks the one that matters and writes it in
-  Chinese. Kept by the newest story's id, so it's asked again only when a new
-  story comes, once for everyone; at most 400 asks a day (the owner pays from a
-  small balance: about NT$1 a day at most). Past the cap, or on a failure, the
-  app draws the rule-based card. Each ask logs `gemini_usage` with
-  `feature: latest` (Workers logs) for the real token counts.
+- **最新動態 by Gemini, everywhere:** every player, driver, team, F1 team
+  and match has one. The sheet sends its own facts (Chinese lines: form,
+  standing, next game; a match's records, places, form, injuries, win
+  chance, result, goals, leaders) to the Worker's `/latest` (`latest.js`),
+  which adds ESPN's recent stories, and `gemini-3.5-flash-lite` writes the card:
+  a story that matters, else the situation now, a match's preview or recap.
+  The facts card shows at once and Gemini's replaces it. Kept by exactly
+  what it's written from (a hash of the facts and the stories, 30 days), so
+  the same card is never asked twice; a game on gets no Gemini (its facts
+  change each minute). The daily cap (2,000) only guards against a bug.
+  Each ask logs `gemini_usage` with `feature: latest` in the Workers logs.
 - **排名 before the first game:** last season's final table under a 上季
   banner (app.js `tableOf`, `standings(league, { season })`).
 - **Translations:** text with Chinese in it (a name put in first) was sent

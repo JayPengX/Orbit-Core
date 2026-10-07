@@ -538,9 +538,11 @@ async function signedFetch(address, init) {
 }
 // One of the Worker's own routes (Orbit Sports' /latest), signed with the
 // app's session; null when it can't be had.
-export async function workerJson(path, query, { timeout = 8000 } = {}) {
+// `body`: sent as a POST (text/plain: no preflight).
+export async function workerJson(path, query, { timeout = 8000, body = null } = {}) {
   try {
-    const res = await signedFetch(`${ECO_URL.replace(/\/eco$/, path)}?${query}`, { signal: AbortSignal.timeout(timeout) });
+    const init = body == null ? {} : { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body };
+    const res = await signedFetch(`${ECO_URL.replace(/\/eco$/, path)}?${query || 'v=1'}`, { ...init, signal: AbortSignal.timeout(timeout) });
     return res.ok ? await res.json() : null;
   } catch {
     return null;
