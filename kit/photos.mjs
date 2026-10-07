@@ -245,7 +245,17 @@ export function findPhoto(name, league) {
 // by name (findPhoto) puts the face in when it comes. Every try goes through
 // logoPicture (retries, never a broken picture, drawn at once when seen
 // before), so a redraw never makes a face blink or vanish.
-export function personPhoto(name, league, { urls = [], guess = null, cls = '', fallback }) {
+export function personPhoto(name, league, opts) {
+  const { urls = [], guess = null, cls = '', fallback, waited = false } = opts;
+  // The league's faces still being read (the first of its players drawn
+  // this session): its stand-in until they are, then the picture.
+  const faces = name && !waited ? faceList(league) : null;
+  if (faces && !faces.map) {
+    const stand = fallback();
+    const swap = (tries = 0) => (stand.isConnected ? stand.replaceWith(personPhoto(name, league, { ...opts, waited: true })) : tries < 20 && requestAnimationFrame(() => swap(tries + 1)));
+    faces.ready.then(() => swap());
+    return stand;
+  }
   const known = knownPhoto(name, sportOf(league));
   const guessed = smallPhoto(guess);
   const face = facePhoto(name, league);
