@@ -7,6 +7,29 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
 `npx eslint .`).
 
 
+## Footballers' official photos, news like a player's note, translations (2026-10-07, pushed to `main`)
+
+- **Photos:** footballers outside the Premier League showed FotMob's faces (a
+  head in a circle), not the studio half-body every other player has. Now
+  Shared-Data's `official-photos.mjs` reads each league's own site each
+  night: LaLiga's API (the public key its site sends), the Bundesliga's and
+  Serie A's squad pages, Ligue 1's club summaries (`ma-api.ligue1.fr`).
+  These go to `sports/<league>/photos.json` as `[name, url]`. Serie A's
+  1024 px pictures are made 256 px by wsrv.nl. The kit
+  (`kit/photos.mjs`) looks in all five football lists for any footballer
+  (cups, transfers), then the feed's and ESPN's pictures, and FotMob's
+  face last. Not covered yet: MLS (its roster pictures load in the browser
+  only), and the smaller leagues (FotMob, then TheSportsDB).
+- **News:** a team's, player's, driver's or F1 team's newest story (three
+  days) is a 最新動態 card like ESPN's player notes: the headline, then
+  short points. Every F1 driver and team goes by the app's Chinese name
+  before translating (`Orbit-Sports/public/lib/f1names.mjs`).
+- **Translations:** text with Chinese in it (a name put in first) was sent
+  with Google's language guess, which called it Chinese and gave it back in
+  English. It's sent as English now, and news always is. Google's empty
+  answers (`[[""]]`) used to be kept a month by the Worker and the device.
+  Now they're a failure (`emptyTranslation`), asked again as English.
+
 ## KV off the limits, a stronger admin, news in Sports, F1 prices (2026-10-07, pushed to `main`)
 
 - **KV:** the owner kept getting Cloudflare's KV free-tier emails. Rate limits
