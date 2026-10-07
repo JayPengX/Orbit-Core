@@ -37,14 +37,17 @@ test("a lookup TheSportsDB refused (its limit) isn't kept as 'no photo': asked a
   globalThis.fetch = async url => {
     const u = String(url);
     if (u.includes('site.web.api.espn.com')) return new Response(JSON.stringify({ items: [] }), { status: 200 });
-    if (u.includes('thesportsdb.com')) return limited ? new Response('', { status: 429 }) : new Response(JSON.stringify({ player: [{ strPlayer: 'Kevin Ciubotaru', strSport: 'Soccer', strCutout: 'https://r2.thesportsdb.com/images/media/player/cutout/k.png' }] }), { status: 200 });
+    if (u.includes('thesportsdb.com')) return limited ? new Response('', { status: 429 }) : new Response(JSON.stringify({ player: [{ strPlayer: 'Kevin Ciubotaru', strSport: 'Baseball', strCutout: 'https://r2.thesportsdb.com/images/media/player/cutout/k.png' }] }), { status: 200 });
     return new Response('', { status: 404 });
   };
-  assert.equal(await findPhoto('Kevin Ciubotaru', 'scotland'), '');
-  assert.equal(knownPhoto('Kevin Ciubotaru', 'soccer'), undefined, 'nothing kept for a failed lookup');
+  assert.equal(await findPhoto('Kevin Ciubotaru', 'cpbl'), '');
+  assert.equal(knownPhoto('Kevin Ciubotaru', 'baseball'), undefined, 'nothing kept for a failed lookup');
   limited = false;
-  assert.equal(await findPhoto('Kevin Ciubotaru', 'scotland'), 'https://r2.thesportsdb.com/images/media/player/cutout/k.png');
-  assert.equal(knownPhoto('Kevin Ciubotaru', 'soccer'), 'https://r2.thesportsdb.com/images/media/player/cutout/k.png');
+  assert.equal(await findPhoto('Kevin Ciubotaru', 'cpbl'), 'https://r2.thesportsdb.com/images/media/player/cutout/k.png');
+  assert.equal(knownPhoto('Kevin Ciubotaru', 'baseball'), 'https://r2.thesportsdb.com/images/media/player/cutout/k.png');
+  // A footballer isn't searched on the phone (the nightly cutouts list has them).
+  limited = false;
+  assert.equal(await findPhoto('Kevin Ciubotaru Jr', 'scotland'), '');
 });
 
 test("a footballer's face is FotMob's from the league's nightly list, by name in any spelling; a failed read is read again", async () => {
@@ -73,4 +76,10 @@ test("a footballer's photo is a league's own studio one, whichever league's list
   assert.equal(ownPhoto('Pedri', 'nba'), null, 'only football looks in football lists');
   assert.ok(isCutout('https://assets.laliga.com/squad/2026/t178/p1/256x278/p1.png'));
   assert.ok(isCutout('https://wsrv.nl/?url=https%3A%2F%2Fmedia-sdp.legaseriea.it%2Fx.webp&w=256'));
+});
+
+test("TheSportsDB's cutouts are drawn at its small size (about 50 KB, not 250)", async () => {
+  const { smallPhoto } = await import('../kit/photos.mjs');
+  assert.equal(smallPhoto('https://r2.thesportsdb.com/images/media/player/cutout/u953kk1763669460.png'), 'https://r2.thesportsdb.com/images/media/player/cutout/u953kk1763669460.png/small');
+  assert.equal(smallPhoto('https://r2.thesportsdb.com/images/media/player/cutout/u953kk1763669460.png/small'), 'https://r2.thesportsdb.com/images/media/player/cutout/u953kk1763669460.png/small');
 });

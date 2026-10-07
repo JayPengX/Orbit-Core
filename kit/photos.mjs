@@ -13,7 +13,12 @@ import * as kit from '#kit/quadra.mjs';
 const CDN = 'https://a.espncdn.com/i/headshots';
 // ESPN's headshot at the size a phone shows it (its image service: a full
 // one is about 250 KB, this about 25 KB). Any other picture as it is.
-export const smallPhoto = url => (typeof url === 'string' && url.startsWith(`${CDN}/`) ? `https://a.espncdn.com/combiner/i?img=${url.slice('https://a.espncdn.com'.length)}&w=256` : url);
+// TheSportsDB's cutouts the same way: its /small (about 50 KB; the full one is about 250 KB).
+export const smallPhoto = url =>
+  typeof url !== 'string' ? url
+  : url.startsWith(`${CDN}/`) ? `https://a.espncdn.com/combiner/i?img=${url.slice('https://a.espncdn.com'.length)}&w=256`
+  : /^https:\/\/r2\.thesportsdb\.com\/images\/media\/player\/cutout\/[^/]+\.png$/.test(url) ? `${url}/small`
+  : url;
 // ESPN's headshot folders by league (racing: this season's, see freshHeadshot).
 const ESPN_FOLDER = { f1: 'rpm', nba: 'nba', wnba: 'wnba', mlb: 'mlb', nfl: 'nfl', nhl: 'nhl' };
 export function espnHeadshot(league, id) {
@@ -229,7 +234,7 @@ async function defaultJson(url) {
 }
 
 // A person's photo by name (a promise of a URL, or '' for none): ESPN's
-// official headshot, else TheSportsDB's cutout. Asked once a name.
+// official headshot, else (not football) TheSportsDB's cutout. Asked once a name.
 const asked = new Map();
 export function findPhoto(name, league) {
   const sport = sportOf(league);
@@ -243,7 +248,10 @@ export function findPhoto(name, league) {
       key,
       (async () => {
         try {
-          const url = (await espnSearchPhoto(n, sport)) || (await tsdbCutout(n, sport));
+          // A footballer's TheSportsDB cutout comes from the nightly list
+          // (cutouts), not a search here: at its 30 a minute, a squad's faces
+          // came one every 2 s. Other sports (CPBL, Asian baseball) still search.
+          const url = (await espnSearchPhoto(n, sport)) || (sport === 'soccer' ? '' : await tsdbCutout(n, sport));
           remember(key, url);
           return url;
         } catch {
