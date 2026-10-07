@@ -31,7 +31,7 @@ const WEEK_MS = 7 * 86_400_000;
 const RECHECK_MS = 30 * 60_000;
 const ESPN = 'https://site.api.espn.com/apis/site/v2/sports';
 // Bumped when the prompt changes, so cards written by the old one are written again.
-const PROMPT_VERSION = 2;
+const PROMPT_VERSION = 3;
 
 // The asks under way in this isolate, by key (the same ask twice at once: one call).
 const inFlight = new Map();
@@ -120,6 +120,7 @@ export function latestPrompt({ kind, name, zh, league, stories, facts = [], stat
     `You write the "最新動態" (latest) card for ${who} in a Taiwanese sports app.`,
     `The reader already sees, on the same page, everything under "On the page" (records, standings, results, stats, the schedule). The card must tell them what the page can't. Reading the page's numbers back is a failure.`,
     task,
+    `Only what is current matters. A line marked 上季 is last season's: never describe it as their form now, and leave it out unless the news compares with it. News older than a newer headline on the same thing is overtaken. An injury, a rest or a limit on their minutes in the injury report (傷病) is the storyline when it is recent, unless the news has something bigger; say what it is, how long, and what it means for the next game.`,
     'Ignore: how to watch, lineups, odds, betting, fantasy, predictions, lifestyle and property, pieces mainly about someone else, news a newer headline overtook.',
     `Use a number from the page only when it explains the story (e.g. 連三場不勝，帥位壓力更大). With no storyline about them in the news, set story = -1 and give one insight the page doesn't spell out, worked out from the page: a trend in the last games against the season, a streak, what the next game decides. Not a summary of the numbers.`,
     `headline: the takeaway in one line, under 24 characters; never a label (「${call}近況」 is wrong; 「${call}膝傷無礙，揭幕戰可望先發」 is the kind). points: up to three short sentences, each adding something new, never repeating the headline.`,
