@@ -24,7 +24,7 @@ export function espnHeadshot(league, id) {
 // A picture that is a flag, not a face (ESPN's country flags, the kit's).
 export const isFlag = url => typeof url === 'string' && /\/flags?\/|flagcdn|countries\/500|\/i\/teamlogos\/countries\//i.test(url);
 // A studio cutout (transparent background): shown on a tinted disc.
-export const isCutout = url => typeof url === 'string' && /thesportsdb\.com\/images\/media\/player\/cutout\/|images\.fotmob\.com\/image_resources\/playerimages\/|resources\.premierleague\.com\/premierleague\d*\/photos\/players\/|assets\.laliga\.com\/squad\/|assets\.bundesliga\.com\/player\/|media-sdp\.legaseriea\.it|ligue1\.image\/players\//.test(url);
+export const isCutout = url => typeof url === 'string' && /thesportsdb\.com\/images\/media\/player\/cutout\/|images\.fotmob\.com\/image_resources\/playerimages\/|resources\.premierleague\.com\/premierleague\d*\/photos\/players\/|assets\.laliga\.com\/squad\/|assets\.bundesliga\.com\/player\/|media-sdp\.legaseriea\.it|ligue1\.image\/players\/|images\.mlssoccer\.com\/image\/private\/[^/]+\/mls\//.test(url);
 
 const sportOf = league => CATALOG[league]?.sport || league || '';
 const plain = s =>
@@ -51,8 +51,10 @@ const OWN_PHOTO = {
   epl: (id, old) => (old ? `https://resources.premierleague.com/premierleague/photos/players/250x250/p${id}.png` : `https://resources.premierleague.com/premierleague25/photos/players/110x140/${id}.png`)
 };
 // Football's lists, each looked in for any footballer (a cup's players are
-// its clubs' leagues'; a player who moved this summer is under his new one).
-const SOCCER_OWN = ['epl', 'laliga', 'bundesliga', 'seriea', 'ligue1'];
+// its clubs' leagues'; a player who moved this summer is under his new one):
+// the leagues' own, then TheSportsDB's studio cutouts for everyone else
+// (Scotland, the cups' other clubs, national teams), gathered each night.
+const SOCCER_OWN = ['epl', 'laliga', 'bundesliga', 'seriea', 'ligue1', 'mls', 'cutouts'];
 const ownLists = {};
 function ownList(league) {
   if (!ownLists[league]) {
