@@ -19,7 +19,9 @@
 // behind it at most every half hour. Each answer is kept by exactly what it
 // was written from (Cloudflare's cache, 30 days), so Gemini is never asked
 // the same thing twice, by anyone; a skip is kept too. The same ask twice at
-// once is one call. LATEST_DAILY_CAP guards against a bug (a loop), never
+// once is one call. With ?stream=1 the answer comes as lines: { writing:
+// true } first when Gemini is asked (the app shows the card's shape only
+// then), then the answer. LATEST_DAILY_CAP guards against a bug (a loop), never
 // reached by use: past it, { capped: true }.
 import { CATALOG } from './kit/catalog.mjs';
 
@@ -197,14 +199,27 @@ export async function handleLatest(request, env, headers, { session, limited, ca
   const keepLast = answer => cache?.put(lastReq, new Response(JSON.stringify({ sent: sentHash, answer, checked: Date.now() }), { headers: KEEP }));
   const last = cache ? await cache.match(lastReq).then(r => r?.json()).catch(() => null) : null;
   if (last?.answer && last.sent === sentHash) {
-    if (!(Date.now() - last.checked < RECHECK_MS)) waitUntil(Promise.resolve(keepLast(last.answer)).then(write).catch(() => {}));
+    if (!(Date.now() - last.checked < RECHECK_MS)) waitUntil(Promise.resolve(keepLast(last.answer)).then(() => write()).catch(() => {}));
     return json(last.answer, headers);
   }
-  return json(await write(), headers);
+  if (url.searchParams.get('stream') !== '1') return json(await write(), headers);
+  // Streamed (?stream=1): a line { writing: true } the moment Gemini is
+  // asked, then the answer, so the app shows the card's shape only when a
+  // card is being written, never on its way to nothing.
+  const { readable, writable } = new TransformStream();
+  const writer = writable.getWriter();
+  const line = o => writer.write(new TextEncoder().encode(`${JSON.stringify(o)}\n`)).catch(() => {});
+  waitUntil(
+    write(() => line({ writing: true }))
+      .catch(() => ({ failed: true }))
+      .then(out => line(out))
+      .finally(() => writer.close().catch(() => {}))
+  );
+  return new Response(readable, { headers: { ...headers, 'Content-Type': 'application/x-ndjson', 'Cache-Control': 'no-store' } });
 
   // The news read; nothing there and no report: none (no Gemini). Else the
-  // answer kept for exactly this, or Gemini asked.
-  async function write() {
+  // answer kept for exactly this, or Gemini asked (`writing` told first).
+  async function write(writing = () => {}) {
     const google = name ? read(newsQuery({ kind, name, sport: info.sport }), 3600, 'text', 3000) : null;
     const feeds = info.espn ? await Promise.all([read(`${ESPN}/${info.espn}/news?limit=50`), team ? read(`${ESPN}/${info.espn}/news?limit=50&team=${team}`) : null]) : [];
     const espnStories = storiesAbout(feeds, { kind, id, name });
@@ -217,6 +232,7 @@ export async function handleLatest(request, env, headers, { session, limited, ca
     else {
       const keyUrl = `https://latest.cache/v${PROMPT_VERSION}/${league}/${kind}/${encodeURIComponent(id)}/${hashOf([...facts, '|', ...report, '|', ...stories.map(x => x.id)].join('\n'))}`;
       const kept = cache ? await cache.match(new Request(keyUrl)) : null;
+      if (!kept) writing();
       out = kept ? await kept.json() : await (inFlight.get(keyUrl) || inFlight.set(keyUrl, ask(keyUrl, stories).finally(() => inFlight.delete(keyUrl))).get(keyUrl));
     }
     if (out?.headline || out?.none) await keepLast(out);

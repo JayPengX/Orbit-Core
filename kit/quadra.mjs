@@ -547,6 +547,36 @@ export async function workerJson(path, query, { timeout = 8000, body = null } = 
     return null;
   }
 }
+// The same, for an answer that comes in lines (JSON, one a line): each one
+// to `onLine` as it arrives, the last one returned (null on a failure).
+export async function workerLines(path, query, { timeout = 8000, body = null, onLine = () => {} } = {}) {
+  try {
+    const init = body == null ? {} : { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body };
+    const res = await signedFetch(`${ECO_URL.replace(/\/eco$/, path)}?${query || 'v=1'}`, { ...init, signal: AbortSignal.timeout(timeout) });
+    if (!res.ok) return null;
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let rest = '';
+    let last = null;
+    const take = text => {
+      const x = JSON.parse(text);
+      last = x;
+      onLine(x);
+    };
+    for (;;) {
+      const { done, value } = await reader.read();
+      rest += decoder.decode(value || new Uint8Array(), { stream: !done });
+      const parts = rest.split('\n');
+      rest = parts.pop();
+      for (const part of parts) if (part.trim()) take(part);
+      if (done) break;
+    }
+    if (rest.trim()) take(rest);
+    return last;
+  } catch {
+    return null;
+  }
+}
 // Which app asks: the proxy counts each app's asks apart (Securities' quotes
 // left running never use up Sports' minute).
 const appParam = () => (dataSession?.app ? `&app=${dataSession.app}` : '');

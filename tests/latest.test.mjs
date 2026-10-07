@@ -159,3 +159,17 @@ test('the prompt: real news or skip, never the numbers', () => {
   assert.match(p, /\[0\] 2026-10-07 \(Reuters\) Man City appeal/);
   assert.match(p, /Report: none\./);
 });
+
+test('streamed: "writing" only when Gemini is asked, then the answer; nothing to write, just none', () =>
+  withNow(async () => {
+    const linesOf = async res => (await res.text()).trim().split('\n').map(x => JSON.parse(x));
+    const streamed = body => new Request('https://w/latest?stream=1', { method: 'POST', body: JSON.stringify({ league: 'nba', kind: 'player', name: 'Stephen Curry', ...body }) });
+    const quiet = world();
+    assert.deepEqual(await linesOf(await handleLatest(streamed({ id: '3975' }), env, {}, quiet.opts)), [{ none: true }]);
+    const news = world({ feed: { articles: [art(5, 5, [{ type: 'athlete', athleteId: 3975 }])] } });
+    const res = await handleLatest(streamed({ id: '3975' }), env, {}, news.opts);
+    assert.equal(res.headers.get('Content-Type'), 'application/x-ndjson');
+    assert.deepEqual(await linesOf(res), [{ writing: true }, { at: now - 5 * 3_600_000, headline: '卡', points: ['一'] }]);
+    // Written before: the answer at once, no "writing".
+    assert.deepEqual(await linesOf(await handleLatest(streamed({ id: '3975' }), env, {}, news.opts)), [{ at: now - 5 * 3_600_000, headline: '卡', points: ['一'] }]);
+  }));
