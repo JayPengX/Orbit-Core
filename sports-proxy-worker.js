@@ -394,7 +394,7 @@ export function trimEspnAthletes(data) {
 }
 
 // ELTA's schedule, a small fraction of it: each live program's day, start
-// and end (Unix seconds), channel, league (ELTA's English name) and title.
+// and end (Unix seconds), channel, league (ELTA's English name and its Chinese one) and title.
 const TRIM_ELTA = 'elta';
 // The text a Next.js page carries in its pushes (formula1.com's pages).
 function nextText(html) {
@@ -445,7 +445,8 @@ export function trimElta(data) {
   for (const [day, list] of Object.entries(data?.calendar || {})) {
     for (const p of Array.isArray(list) ? list : []) {
       if (!p || !p.start_time) continue;
-      programs.push({ d: day, s: p.start_time, e: p.end_time, ch: p.channel_number, g: p.game_type_en || p.game_type || '', t: p.program_desc || '' });
+      // Its league by both of ELTA's names (z: the Chinese one; the English one changes: UCL became "UEFA Champions League").
+      programs.push({ d: day, s: p.start_time, e: p.end_time, ch: p.channel_number, g: p.game_type_en || p.game_type || '', z: p.game_type || '', t: p.program_desc || '' });
     }
   }
   return { programs };
