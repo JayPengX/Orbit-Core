@@ -1575,6 +1575,9 @@ dialog.q-moved::backdrop {
 .q-rec {
   position: relative;
   display: grid;
+  /* One column the card's width: never as wide as its widest piece (a
+     200px sparkline made the price row run past the card's edge). */
+  grid-template-columns: minmax(0, 1fr);
   align-content: start;
   gap: 6px;
   min-width: 0;
@@ -1617,11 +1620,13 @@ dialog.q-moved::backdrop {
   color: var(--q-muted);
   font-size: 13px;
   line-height: 1.35;
-  /* Two lines rather than a name cut off mid-word. */
+  /* Two lines rather than a name cut off mid-word; a line breaks between
+     words (· parts), never inside 加密貨幣. */
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  word-break: keep-all;
   overflow-wrap: anywhere;
 }
 .q-rec-foot {
