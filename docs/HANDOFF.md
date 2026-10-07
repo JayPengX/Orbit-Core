@@ -24,10 +24,14 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
   a night at its pace and keeps them (`sports/cutouts/photos.json`), so the
   list fills over a few nights. Celtic's and UEFA's own pictures were
   looked at: match photos and tight head crops, so not used.
-- **News:** a team's, player's, driver's or F1 team's newest story (three
-  days) is a 最新動態 card like ESPN's player notes: the headline, then
-  short points. Every F1 driver and team goes by the app's Chinese name
-  before translating (`Orbit-Sports/public/lib/f1names.mjs`).
+- **News:** not a news app (owner's words). No 新聞 tab, no team news. A
+  player's or driver's sheet leads with 最新動態: ESPN's newest story from
+  three days, only if it names them in the headline and isn't a schedule,
+  odds, predictions, fantasy, preview or video piece (`storyAbout` in
+  `Orbit-Sports/public/lib/espn.mjs`); or ESPN's note on them when newer.
+  No link to the article. F1 names go through `lib/f1names.mjs` first.
+- **排名 before the first game:** last season's final table under a 上季
+  banner (app.js `tableOf`, `standings(league, { season })`).
 - **Translations:** text with Chinese in it (a name put in first) was sent
   with Google's language guess, which called it Chinese and gave it back in
   English. It's sent as English now, and news always is. Google's empty
