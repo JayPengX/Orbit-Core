@@ -57,7 +57,7 @@ import { execFile } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { ASIA_HOST, asiaBaseballResponse } from '../asia-baseball.js';
 import { F1_LIVE_HOST, f1LiveResponse } from '../f1-live.js';
-import { trimF1Page } from '../sports-proxy-worker.js';
+import { trimF1Page, trimEltaVod } from '../sports-proxy-worker.js';
 import { handleWeather } from '../weather.js';
 import { upstream as weatherFixtures } from '../tests/fixtures/weather/upstream.mjs';
 import { handleTransit } from '../transit.js';
@@ -332,8 +332,15 @@ function fakeYahooAnswer(url) {
   }
   return { status: 404, body: '' };
 }
-// formula1.com's pages the Worker answers trimmed to JSON: trimmed here the same way.
-const pageTrim = (url, r) => (r.status === 200 && new URL(url).hostname === 'www.formula1.com' ? { status: 200, body: JSON.stringify(trimF1Page(r.body)) } : r);
+// The pages the Worker answers trimmed to JSON (formula1.com's, ELTA.tv's
+// season videos): trimmed here the same way.
+const pageTrim = (url, r) => {
+  if (r.status !== 200) return r;
+  const host = new URL(url).hostname;
+  if (host === 'www.formula1.com') return { status: 200, body: JSON.stringify(trimF1Page(r.body)) };
+  if (host === 'eltaott.tv') return { status: 200, body: JSON.stringify(trimEltaVod(r.body)) };
+  return r;
+};
 const flakyNow = { on: false, failed: 0 };
 const upstream = url => {
   if (flakyNow.on && Math.random() < flaky) return (flakyNow.failed++, Promise.resolve({ status: 502, body: '' }));
