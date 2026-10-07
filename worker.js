@@ -11,6 +11,7 @@
 //   GET   /kambi                 Kambi's live scores for Quadra Play (kambi.js)
 //   GET/POST /push/…             notices while an app is closed (push.js)
 //   GET   /weather/…             Orbit Weather's blended forecast (weather.js)
+//   GET   /latest                Orbit Sports' 最新動態, Gemini on ESPN's stories (latest.js)
 //   GET   /transit/…             Orbit Transit's map, places, routes and TDX data (transit.js)
 //
 // Every route but /eco's sign-in needs a Quadra Pass session (`qt=`). The
@@ -28,6 +29,7 @@ import { handlePush, sendDue } from './push.js';
 import { handleWeather } from './weather.js';
 import { weatherCron, skillReport } from './weather-skill.js';
 import { handleTransit } from './transit.js';
+import { handleLatest } from './latest.js';
 
 const ALLOWED_ORIGINS = ['https://jaypengx.github.io'];
 
@@ -1214,6 +1216,12 @@ export default {
       return path === '/gemini' ? handleGeminiRequest(request, env, headers, ip, ctx, session) : handleNlEditRequest(request, env, headers, ip, ctx, session);
     }
     if (path === '/eco') return handleEcoRequest(request, env, headers, ip, ECO_DEPS);
+    // Orbit Sports' 最新動態 (latest.js): Gemini on ESPN's stories, a Quadra Pass session, a daily cap.
+    if (path === '/latest') {
+      const qt = new URL(request.url).searchParams.get('qt');
+      const session = qt ? await readToken(await tokenSecret(env), qt, 'ses') : null;
+      return handleLatest(request, env, headers, { session, limited: () => sessionLimited(`l:${session?.s}`, 60) });
+    }
     if (path === '/kambi') {
       // A Quadra Pass session only, counted per session in memory.
       const qt = new URL(request.url).searchParams.get('qt');

@@ -536,6 +536,16 @@ async function signedFetch(address, init) {
   const res = await withToken(await dataToken());
   return res.status === 401 && dataSession ? withToken(await dataToken(true)) : res;
 }
+// One of the Worker's own routes (Orbit Sports' /latest), signed with the
+// app's session; null when it can't be had.
+export async function workerJson(path, query, { timeout = 8000 } = {}) {
+  try {
+    const res = await signedFetch(`${ECO_URL.replace(/\/eco$/, path)}?${query}`, { signal: AbortSignal.timeout(timeout) });
+    return res.ok ? await res.json() : null;
+  } catch {
+    return null;
+  }
+}
 // Which app asks: the proxy counts each app's asks apart (Securities' quotes
 // left running never use up Sports' minute).
 const appParam = () => (dataSession?.app ? `&app=${dataSession.app}` : '');
