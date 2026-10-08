@@ -367,7 +367,8 @@ test('pictures: national sides get flags, names in either order', async () => {
   assert.match(L.teamBadge('kleague', 'Ulsan HD'), /thesportsdb/);
   assert.equal(L.teamLogo('nba', 'Boston Celtics'), 'https://cdn.nba.com/logos/nba/1610612738/primary/L/logo.svg');
   assert.equal(L.teamLogo('nba', 'Boston Celtics', true), 'https://cdn.nba.com/logos/nba/1610612738/primary/D/logo.svg');
-  assert.equal(L.teamLogo('nba', 'London Lions'), null);
+  assert.match(L.teamLogo('nba', 'London Lions'), /London_Lions_logo/, 'a preseason guest: its own (NBA_GUESTS)');
+  assert.equal(L.teamLogo('nba', 'Somebody Else'), null);
   L.rememberLogo('mls', 'Miami Inter', 'https://a.espncdn.com/i/teamlogos/soccer/500/20232.png');
   assert.match(L.teamLogo('mls', 'Inter Miami'), /20232\.png$/);
   for (const key of ['kleague', 'euroleague', 'npb', 'cpbl']) assert.ok(L.leagueLogo(key), key);
