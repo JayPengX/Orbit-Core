@@ -699,6 +699,11 @@ export function mirrorPath(url, trim = '') {
 }
 let mirrorIndex = null;
 const mirrorGone = new Set();
+// A read the app knows has moved on since the night (a playoff day's "TBD"
+// once a series is won): the proxy's from now on this session, never the copy.
+export function unmirror(url, trim = '') {
+  mirrorGone.add(`${trim}!${url}`);
+}
 function readMirrorIndex() {
   if (!mirrorIndex || Date.now() - mirrorIndex.at > 30 * 60_000) {
     const p = packJson('mirror/index.json', { ttl: 30 * 60_000, timeout: 8_000 })
