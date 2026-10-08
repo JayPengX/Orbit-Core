@@ -209,7 +209,7 @@ async function cpblPage(at) {
   let url = at;
   let page;
   for (let hop = 0; hop < 6; hop++) {
-    page = await fetch(url, { headers: { 'User-Agent': BROWSER_UA, Cookie: cookie() }, redirect: 'manual', signal: AbortSignal.timeout(TIMEOUT) });
+    page = await fetch(url, { headers: { 'User-Agent': BROWSER_UA, Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', 'Accept-Language': 'zh-TW,zh;q=0.9,en;q=0.8', Cookie: cookie() }, redirect: 'manual', signal: AbortSignal.timeout(TIMEOUT) });
     keep(page);
     const next = page.status >= 300 && page.status < 400 && page.headers.get('Location');
     if (!next) break;
