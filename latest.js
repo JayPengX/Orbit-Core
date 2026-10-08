@@ -63,7 +63,8 @@ export function storiesAbout(feeds, { kind, id, name = '' }, now = Date.now()) {
       const key = String(a.id ?? a.headline);
       if (!tagged || seen.has(key)) continue;
       seen.add(key);
-      out.push({ id: key, at, headline: String(a.headline).slice(0, 300), summary: String(a.description || '').slice(0, 600) });
+      const link = a.links?.web?.href || a.links?.mobile?.href || '';
+      out.push({ id: key, at, headline: String(a.headline).slice(0, 300), summary: String(a.description || '').slice(0, 600), ...(/^https:\/\//.test(link) ? { url: link } : {}) });
     }
   return out.sort((x, y) => y.at - x.at).slice(0, 10);
 }
@@ -85,7 +86,8 @@ export function googleNews(xml, { must = [] } = {}, now = Date.now()) {
     if (!headline || !(now - at < WEEK_MS)) continue;
     if (words.length && !words.some(w => plainText(headline).includes(w))) continue;
     if (/\b(how to watch|live stream|where to watch|tv channel|lineups?\b|odds|betting|picks?\b|prediction|fantasy|parlay|highlights?|full game|and-1|mic'd up)/i.test(headline)) continue;
-    out.push({ id: tag('guid') || headline, at, headline: headline.slice(0, 300), source: source.slice(0, 60) });
+    const link = tag('link');
+    out.push({ id: tag('guid') || headline, at, headline: headline.slice(0, 300), source: source.slice(0, 60), ...(/^https:\/\//.test(link) ? { url: link } : {}) });
   }
   return out.sort((x, y) => y.at - x.at);
 }
@@ -132,8 +134,9 @@ export function latestPrompt({ kind, name, zh, league, stories, facts = [], repo
     `Real news, about ${name} themselves: an injury, a rest or a limit on minutes; a suspension; a legal or disciplinary case; a transfer, a contract or a rumour with substance; a coach's decision or a role change; a milestone or a record; pressure or criticism; a quote that reveals something. Several items on one thing are one story: combine them.`,
     'Not news: highlights, how to watch, lineups, odds, fantasy, previews, plain game reports, stats and results (the page shows them), lifestyle, pieces mainly about someone else, anything a newer item overtook, anything from last season.',
     'If nothing qualifies, set skip = true and leave the rest empty. Otherwise skip = false and story = the index of the newest news item used (-1 when it comes only from the report).',
-    `headline: the takeaway, under 24 characters, never a label (「${call}近況」 is wrong; 「${call}膝傷無礙，揭幕戰可望先發」 is the kind). points: one or two short sentences, each adding something new: the context and what it means next. Never list numbers back.`,
-    `Write in Traditional Chinese as used in Taiwan (never simplified). ${zh ? `Call them ${zh}.` : `Keep their name in English (${name}), as the app shows it.`} Other people's names may stay in English. Use only what is given: never invent facts, numbers, quotes or dates. A rumour is told as a rumour (傳出、據報).`,
+    `headline: the takeaway, under 24 characters besides the names, never a label (「${call}近況」 is wrong; 「{{${name}}}膝傷無礙，揭幕戰可望先發」 is the kind). points: one or two short sentences, each adding something new: the context and what it means next. Never list numbers back.`,
+    `Write in Traditional Chinese as used in Taiwan (never simplified). Every person's name, in the headline and the points, is written in double braces with their full name in English as the news has it, e.g. {{${name}}} or {{Ange Postecoglou}} (the app shows each one as that person); never a person's name outside the braces. Teams and countries are written in Chinese, without braces. Use only what is given: never invent facts, numbers, quotes or dates. A rumour is told as a rumour (傳出、據報).`,
+    'topic: what the news is: injury (hurt, out, doubtful), return (back from injury or a ban), suspension, legal, transfer, contract, rumour, role (a coach\'s decision, a role or lineup change), milestone (a record, an award), criticism, quote, or other.',
     '',
     facts.length ? `Who they are:\n${facts.map(f => `- ${f}`).join('\n')}` : '',
     report.length ? `Report (written by people, recent):\n${report.map(f => `- ${f}`).join('\n')}` : 'Report: none.',
@@ -147,7 +150,7 @@ export function latestPrompt({ kind, name, zh, league, stories, facts = [], repo
 
 const SCHEMA = {
   type: 'OBJECT',
-  properties: { skip: { type: 'BOOLEAN' }, story: { type: 'INTEGER' }, headline: { type: 'STRING' }, points: { type: 'ARRAY', items: { type: 'STRING' } } },
+  properties: { skip: { type: 'BOOLEAN' }, story: { type: 'INTEGER' }, topic: { type: 'STRING', enum: ['injury', 'return', 'suspension', 'legal', 'transfer', 'contract', 'rumour', 'role', 'milestone', 'criticism', 'quote', 'other'] }, headline: { type: 'STRING' }, points: { type: 'ARRAY', items: { type: 'STRING' } } },
   required: ['skip']
 };
 
@@ -272,7 +275,10 @@ export async function handleLatest(request, env, headers, { session, limited, ca
     // Gemini failed: nothing kept, the app draws ESPN's own word if it has it.
     if (!answer || (!answer.skip && !answer.headline)) return { failed: true };
     const st = stories[answer.story];
-    const out = answer.skip ? { none: true } : { at: st ? st.at : Date.now(), headline: String(answer.headline).slice(0, 80), points: (answer.points || []).map(p => String(p).slice(0, 160)).filter(Boolean).slice(0, 2) };
+    // (Names in braces, {{Micky van de Ven}}: the app shows each as that person.)
+    const out = answer.skip
+      ? { none: true }
+      : { at: st ? st.at : Date.now(), headline: String(answer.headline).slice(0, 120), points: (answer.points || []).map(p => String(p).slice(0, 220)).filter(Boolean).slice(0, 2), ...(answer.topic ? { topic: String(answer.topic) } : {}), ...(st?.url ? { url: st.url, source: st.source || 'ESPN' } : {}) };
     if (cache) await cache.put(new Request(keyUrl), new Response(JSON.stringify(out), { headers: KEEP }));
     return out;
   }

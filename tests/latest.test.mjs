@@ -24,8 +24,8 @@ test("Google News: the week's headlines with their surname, no how-to-watch or o
     item('Scales signs new deal', 'BBC', 24 * 9, 'e')
   ].join('')}</channel></rss>`;
   assert.deepEqual(googleNews(xml, { must: ['Scales'] }, now), [
-    { id: 'a', at: now - 5 * 3_600_000, headline: 'Liam Scales makes Ireland return after sitting out Israel clash', source: 'Yahoo Sports' },
-    { id: 'd', at: now - 30 * 3_600_000, headline: 'Irish media wrong to slate Celtic star Liam Scales & the stats', source: 'Yahoo' }
+    { id: 'a', at: now - 5 * 3_600_000, headline: 'Liam Scales makes Ireland return after sitting out Israel clash', source: 'Yahoo Sports', url: 'https://news.google.com/x' },
+    { id: 'd', at: now - 30 * 3_600_000, headline: 'Irish media wrong to slate Celtic star Liam Scales & the stats', source: 'Yahoo', url: 'https://news.google.com/x' }
   ]);
   assert.equal(googleNews(xml, {}, now).length, 3, 'a team: every headline Google found (but how-to-watch)');
 });
