@@ -198,23 +198,41 @@ async function fetchKbo(year, month) {
   return parseKbo(await res.json(), year);
 }
 
+// CPBL's site turns a bot's user agent away (a 404) and sends a new reader
+// round its cookie check a few times: a browser's user agent, the redirects
+// followed by hand with the cookies kept. -> { page, html, cookie }.
+const BROWSER_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15';
+async function cpblPage(at) {
+  const jar = new Map();
+  const keep = res => (res.headers.getSetCookie?.() || [res.headers.get('Set-Cookie') || '']).map(c => c.split(';')[0]).filter(c => c.includes('=')).forEach(c => jar.set(c.slice(0, c.indexOf('=')), c));
+  const cookie = () => [...jar.values()].join('; ');
+  let url = at;
+  let page;
+  for (let hop = 0; hop < 6; hop++) {
+    page = await fetch(url, { headers: { 'User-Agent': BROWSER_UA, Cookie: cookie() }, redirect: 'manual', signal: AbortSignal.timeout(TIMEOUT) });
+    keep(page);
+    const next = page.status >= 300 && page.status < 400 && page.headers.get('Location');
+    if (!next) break;
+    url = new URL(next, url).href;
+  }
+  return { page, html: page.ok ? await page.text() : '', cookie: cookie() };
+}
+
 async function fetchCpbl(year, month) {
-  const page = await fetch('https://cpbl.com.tw/schedule', { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(TIMEOUT) });
+  const { page, html, cookie: cookies } = await cpblPage('https://www.cpbl.com.tw/schedule');
   if (!page.ok) throw new Error(`cpbl page ${page.status}`);
-  const html = await page.text();
   const token = /url: '\/schedule\/getgamedatas'[\s\S]{0,400}?RequestVerificationToken: '([^']+)'/.exec(html)?.[1];
-  const cookies = (page.headers.getSetCookie?.() || [page.headers.get('Set-Cookie') || '']).map(c => c.split(';')[0]).filter(Boolean).join('; ');
   if (!token) throw new Error('cpbl token');
-  const res = await fetch('https://cpbl.com.tw/schedule/getgamedatas', {
+  const res = await fetch('https://www.cpbl.com.tw/schedule/getgamedatas', {
     method: 'POST',
     headers: {
-      'User-Agent': UA,
+      'User-Agent': BROWSER_UA,
       'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
       'X-Requested-With': 'XMLHttpRequest',
       RequestVerificationToken: token,
       Cookie: cookies,
-      Referer: 'https://cpbl.com.tw/schedule',
-      Origin: 'https://cpbl.com.tw'
+      Referer: 'https://www.cpbl.com.tw/schedule',
+      Origin: 'https://www.cpbl.com.tw'
     },
     body: `calendar=${year}%2F01%2F01&location=&kindCode=A`,
     signal: AbortSignal.timeout(TIMEOUT)
@@ -304,6 +322,109 @@ export function mergeCpbl(own, extra) {
 
 const FETCHERS = { npb: fetchNpb, kbo: fetchKbo, cpbl };
 
+// ---- A CPBL game's box score (the league's own: its box page's getlive) -----------
+//
+// `/cpbl/box/<year>-<gameSno>.json` (a regular season game) ->
+//   { year, sno, state: 'pre' | 'in' | 'post', status, away: { zh, score,
+//     lines: [runs an inning], hits, errors }, home, batting: [{ side, id,
+//     name, no, order, pos, starter, ab, r, h, rbi, d2, d3, hr, bb, ibb, hbp,
+//     k, sb, cs, sh, sf, gidp, lob }], pitching: [{ side, id, name, no, role,
+//     decision: 'W' | 'L' | 'S' | 'H' | '', outs, bf, pc, st, h, hr, bb, hbp, k,
+//     wp, bk, r, er, top }], plays: [{ inning, half, order, batter, pitcher,
+//     text, result, away, home, scoring, outs }] } (each at-bat's last pitch).
+export function cpblBoxTarget(url) {
+  const m = /^\/cpbl\/box\/(\d{4})-(\d{1,4})\.json$/.exec(url.pathname);
+  return m ? { year: Number(m[1]), sno: Number(m[2]) } : null;
+}
+const sideOfType = t => (String(t) === '2' ? 'home' : 'away');
+const parseJson = t => {
+  try {
+    return t ? JSON.parse(t) : null;
+  } catch {
+    return null;
+  }
+};
+export function parseCpblBox(data, year, sno) {
+  const detail = parseJson(data?.CurtGameDetailJson) || {};
+  const board = parseJson(data?.ScoreboardJson) || [];
+  const log = parseJson(data?.LiveLogJson) || [];
+  const bats = parseJson(data?.BattingJson) || [];
+  const arms = parseJson(data?.PitchingJson) || [];
+  // GameStatus: 1 on, 2 on (between innings), 8 suspended, 3 over; else to come.
+  const code = Number(detail.GameStatus);
+  const state = code === 3 ? 'post' : code === 1 || code === 2 || code === 8 ? 'in' : 'pre';
+  const side = key => {
+    const rows = board.filter(x => sideOfType(x.VisitingHomeType) === key).sort((a, b) => a.InningSeq - b.InningSeq);
+    const lines = [];
+    for (const x of rows) lines[Number(x.InningSeq) - 1] = String(Number(x.ScoreCnt) || 0);
+    return {
+      zh: key === 'home' ? detail.HomeTeamName || '' : detail.VisitingTeamName || '',
+      score: Number(key === 'home' ? detail.HomeTotalScore : detail.VisitingTotalScore) || 0,
+      lines: Array.from(lines, v => v ?? ''),
+      hits: rows.reduce((n, x) => n + (Number(x.HittingCnt) || 0), 0),
+      errors: rows.reduce((n, x) => n + (Number(x.ErrorCnt) || 0), 0)
+    };
+  };
+  // Each batter's place in the order and position: from the play-by-play (the box lists don't say).
+  const where = new Map();
+  for (const x of log) if (x.HitterAcnt && !where.has(x.HitterAcnt)) where.set(x.HitterAcnt, { order: Number(x.HitterLineup) || 99, pos: x.DefendStationCode || '' });
+  const n = v => Number(v) || 0;
+  const batting = bats
+    .map((x, i) => ({
+      side: sideOfType(x.VisitingHomeType), id: String(x.HitterAcnt || ''), name: x.HitterName || '', no: x.HitterUniformNo || '',
+      order: where.get(x.HitterAcnt)?.order ?? 99, pos: where.get(x.HitterAcnt)?.pos || '', starter: x.RoleType === '先發', seq: i,
+      ab: n(x.HitCnt), r: n(x.ScoreCnt), h: n(x.HittingCnt), rbi: n(x.RunBattedINCnt), d2: n(x.TwoBaseHitCnt), d3: n(x.ThreeBaseHitCnt), hr: n(x.HomeRunCnt),
+      bb: n(x.BasesONBallsCnt), ibb: n(x.IntentionalBasesONBallsCnt), hbp: n(x.HitBYPitchCnt), k: n(x.StrikeOutCnt), sb: n(x.StealBaseOKCnt), cs: n(x.StealBaseFailCnt),
+      sh: n(x.SacrificeHitCnt), sf: n(x.SacrificeFlyCnt), gidp: n(x.DoublePlayBatCnt), lob: n(x.Lobs)
+    }))
+    .sort((a, b) => a.side.localeCompare(b.side) || a.order - b.order || b.starter - a.starter || a.seq - b.seq)
+    .map(({ seq, ...x }) => x);
+  const decision = x => (x.GameResult === '勝' ? 'W' : x.GameResult === '敗' ? 'L' : x.IsSaveOK === '1' ? 'S' : n(x.ReliefPointCnt) > 0 ? 'H' : '');
+  const pitching = arms.map(x => ({
+    side: sideOfType(x.VisitingHomeType), id: String(x.PitcherAcnt || ''), name: x.PitcherName || '', no: x.PitcherUniformNo || '', role: x.RoleType || '', decision: decision(x),
+    outs: n(x.InningPitchedCnt) * 3 + n(x.InningPitchedDiv3Cnt), bf: n(x.PlateAppearances), pc: n(x.PitchCnt), st: n(x.StrikeCnt), h: n(x.HittingCnt), hr: n(x.HomeRunCnt),
+    bb: n(x.BasesONBallsCnt), hbp: n(x.HitBYPitchCnt), k: n(x.StrikeOutCnt), wp: n(x.WildPitchCnt), bk: n(x.BalkCnt), r: n(x.RunCnt), er: n(x.EarnedRunCnt), top: n(x.GameHigherSpeedPitch)
+  }));
+  // Each at-bat's last pitch (the log is a row a pitch, in the game's order): what came of it.
+  // The score after each: the runs its words say came home (a home run's batter too),
+  // the league's own score where it's ahead (its rows sometimes lag a play: an RBI
+  // single at 0-0 not marked as scoring).
+  const plays = [];
+  const run = { away: 0, home: 0 };
+  log.forEach((x, i) => {
+    const next = log[i + 1];
+    const text = String(x.Content || '').trim();
+    if (!x.HitterAcnt || !text || text === '比賽結束') return;
+    if (next && next.HitterAcnt === x.HitterAcnt && next.InningSeq === x.InningSeq && next.VisitingHomeType === x.VisitingHomeType && String(next.Content || '').trim() !== '比賽結束') return;
+    const bat = sideOfType(x.VisitingHomeType);
+    const runs = (text.match(/回本壘得分/g) || []).length + (x.BattingActionName === '全打' ? 1 : 0);
+    const before = run[bat];
+    run[bat] += runs;
+    run.away = Math.max(run.away, n(x.VisitingScore));
+    run.home = Math.max(run.home, n(x.HomeScore));
+    plays.push({ inning: n(x.InningSeq), half: bat === 'away' ? 'top' : 'bottom', order: n(x.HitterLineup), batter: x.HitterName || '', batterId: String(x.HitterAcnt), pitcher: x.PitcherName || '', text, result: x.BattingActionName || '', away: run.away, home: run.home, scoring: runs > 0 || x.IsScoreCnt === '1' || run[bat] > before, outs: n(x.OutCnt) });
+  });
+  return { year, sno, state, status: detail.GameStatusChi || '', away: side('away'), home: side('home'), batting, pitching, plays };
+}
+async function fetchCpblBox(year, sno) {
+  const at = `https://www.cpbl.com.tw/box?year=${year}&kindCode=A&gameSno=${sno}`;
+  const { page, html, cookie } = await cpblPage(at);
+  if (!page.ok) throw new Error(`cpbl box page ${page.status}`);
+  const token = /name="__RequestVerificationToken" type="hidden" value="([^"]+)"/.exec(html)?.[1];
+  const cookies = cookie;
+  if (!token) throw new Error('cpbl box token');
+  const res = await fetch('https://www.cpbl.com.tw/box/getlive', {
+    method: 'POST',
+    headers: { 'User-Agent': BROWSER_UA, 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', 'X-Requested-With': 'XMLHttpRequest', Cookie: cookies, Referer: at, Origin: 'https://www.cpbl.com.tw' },
+    body: `__RequestVerificationToken=${encodeURIComponent(token)}&GameSno=${sno}&KindCode=A&Year=${year}&PrevOrNext=&PresentStatus=`,
+    signal: AbortSignal.timeout(TIMEOUT)
+  });
+  if (!res.ok) throw new Error(`cpbl box ${res.status}`);
+  const data = await res.json();
+  if (!data?.Success) throw new Error('cpbl box answer');
+  return parseCpblBox(data, year, sno);
+}
+
 // `/<league>/<YYYY-MM>.json` -> { league, month } or null.
 export function asiaTarget(url) {
   const m = /^\/(npb|kbo|cpbl)\/(\d{4})-(\d{2})\.json$/.exec(url.pathname);
@@ -314,6 +435,14 @@ export function asiaTarget(url) {
 
 // The month's games as a Response (JSON), or an error Response.
 export async function asiaBaseballResponse(url) {
+  const box = cpblBoxTarget(url);
+  if (box) {
+    try {
+      return new Response(JSON.stringify(await fetchCpblBox(box.year, box.sno)), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    } catch (error) {
+      return new Response(JSON.stringify({ error: String(error.message || error) }), { status: 502, headers: { 'Content-Type': 'application/json' } });
+    }
+  }
   const target = asiaTarget(url);
   if (!target) return new Response('{"error":"unknown"}', { status: 404, headers: { 'Content-Type': 'application/json' } });
   try {

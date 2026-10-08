@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { parseNpb, parseKbo, parseCpbl, parseTsdbDay, asiaTarget, mergeCpbl } from '../asia-baseball.js';
+import { parseNpb, parseKbo, parseCpbl, parseTsdbDay, asiaTarget, mergeCpbl, parseCpblBox, cpblBoxTarget } from '../asia-baseball.js';
 
 const fixture = name => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8');
 const now = Date.parse('2026-09-29T12:00:00Z');
@@ -70,4 +70,35 @@ test('CPBL: every source refusing is an error, never an empty month', async () =
   } finally {
     globalThis.fetch = real;
   }
+});
+
+test("CPBL's box score: its page's getlive answer as the app's box (sides, batters in order, pitchers' decisions, each at-bat's last pitch)", () => {
+  assert.deepEqual(cpblBoxTarget(new URL('https://asia-baseball.quadra/cpbl/box/2026-290.json')), { year: 2026, sno: 290 });
+  assert.equal(cpblBoxTarget(new URL('https://asia-baseball.quadra/cpbl/2026-08.json')), null);
+  const j = x => JSON.stringify(x);
+  const data = {
+    CurtGameDetailJson: j({ GameStatus: 3, GameStatusChi: '比賽結束', VisitingTeamName: '台鋼雄鷹', HomeTeamName: '富邦悍將', VisitingTotalScore: 1, HomeTotalScore: 2 }),
+    ScoreboardJson: j([
+      { VisitingHomeType: '2', InningSeq: 2, ScoreCnt: 2, HittingCnt: 2, ErrorCnt: 0 },
+      { VisitingHomeType: '1', InningSeq: 1, ScoreCnt: 1, HittingCnt: 1, ErrorCnt: 1 },
+      { VisitingHomeType: '2', InningSeq: 1, ScoreCnt: 0, HittingCnt: 0, ErrorCnt: 0 }
+    ]),
+    BattingJson: j([
+      { VisitingHomeType: '1', HitterAcnt: 'b', HitterName: '乙', RoleType: '先發', HitCnt: 3, HittingCnt: 1 },
+      { VisitingHomeType: '1', HitterAcnt: 'a', HitterName: '甲', RoleType: '先發', HitCnt: 4, HittingCnt: 2 }
+    ]),
+    PitchingJson: j([{ VisitingHomeType: '2', PitcherAcnt: 'p', PitcherName: '丙', RoleType: '先發', GameResult: '勝', InningPitchedCnt: 6, InningPitchedDiv3Cnt: 1, PitchCnt: 90, StrikeCnt: 60 }]),
+    LiveLogJson: j([
+      { InningSeq: 1, VisitingHomeType: '1', HitterAcnt: 'a', HitterLineup: 1, DefendStationCode: 'CF', HitterName: '甲', Content: '壞球。', BattingActionName: '一安' },
+      { InningSeq: 1, VisitingHomeType: '1', HitterAcnt: 'a', HitterLineup: 1, DefendStationCode: 'CF', HitterName: '甲', Content: '擊出一壘安打。', BattingActionName: '一安', VisitingScore: 0, HomeScore: 0 },
+      { InningSeq: 1, VisitingHomeType: '1', HitterAcnt: 'b', HitterLineup: 2, DefendStationCode: 'SS', HitterName: '乙', Content: '擊出二壘安打，一壘跑者甲回本壘得分。', BattingActionName: '二安', IsScoreCnt: '1', VisitingScore: 1, HomeScore: 0 },
+      { InningSeq: 9, VisitingHomeType: '1', HitterAcnt: 'b', Content: '比賽結束' }
+    ])
+  };
+  const box = parseCpblBox(data, 2026, 290);
+  assert.equal(box.state, 'post');
+  assert.deepEqual([box.away.lines, box.home.lines, box.away.errors], [['1'], ['0', '2'], 1]);
+  assert.deepEqual(box.batting.map(b => [b.name, b.order, b.pos, b.ab, b.h]), [['甲', 1, 'CF', 4, 2], ['乙', 2, 'SS', 3, 1]]);
+  assert.deepEqual([box.pitching[0].decision, box.pitching[0].outs], ['W', 19]);
+  assert.deepEqual(box.plays.map(p => [p.batter, p.result, p.scoring]), [['甲', '一安', false], ['乙', '二安', true]]);
 });

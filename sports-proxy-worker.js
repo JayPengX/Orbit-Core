@@ -26,7 +26,7 @@
 // is set on this Worker the gate is off and each IP is counted the same way.
 import { readToken, sessionLimited } from './quadra-token.js';
 import { BRANDS } from './kit/brand.mjs';
-import { ASIA_HOST, asiaBaseballResponse, asiaTarget } from './asia-baseball.js';
+import { ASIA_HOST, asiaBaseballResponse, asiaTarget, cpblBoxTarget } from './asia-baseball.js';
 import { F1_LIVE_HOST, f1LiveResponse } from './f1-live.js';
 
 const ALLOWED_ORIGINS = ['https://jaypengx.github.io'];
@@ -179,7 +179,10 @@ const CACHE_YT_VIDEO = { tier: 'yt-video', fresh: 7 * DAY, stale: 7 * DAY };
 const CACHE_ASIA_NOW = { tier: 'asia-now', fresh: 2 * MINUTE, stale: 6 * HOUR };
 // A month over: its results don't change.
 const CACHE_ASIA_PAST = { tier: 'asia-past', fresh: 12 * HOUR, stale: 7 * DAY };
+// A CPBL game's box score: a game on changes with every pitch (its 15
+// seconds, as a scoreboard's); one over is kept as long as a month over.
 function asiaPolicy(url) {
+  if (cpblBoxTarget(url)) return CACHE_LIVE;
   const target = asiaTarget(url);
   if (!target) return CACHE_LIVE;
   const now = new Date();
