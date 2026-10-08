@@ -208,3 +208,19 @@ test('streamed: "writing" only when Gemini is asked, then the answer; nothing to
     // Written before: the answer at once, no "writing".
     assert.deepEqual(await linesOf(await handleLatest(streamed({ id: '3975' }), env, {}, news.opts)), [{ at: now - 5 * 3_600_000, headline: '卡', points: ['一'] }]);
   }));
+
+test("a change to the prompt: the old answer at once, the new one written behind it", () =>
+  withNow(async () => {
+    const { seen, opts } = world({ feed: { articles: [art(1, 5, [{ type: 'athlete', athleteId: 3975 }])] } });
+    const behind = [];
+    opts.waitUntil = p => behind.push(p);
+    assert.equal((await (await handleLatest(post({ id: '3975' }), env, {}, opts)).json()).headline, '卡');
+    const key = [...opts.cache.m.keys()].find(k => k.includes('/last/'));
+    const kept = JSON.parse(opts.cache.m.get(key));
+    opts.cache.m.set(key, JSON.stringify({ ...kept, v: 'an-older-prompt', answer: { headline: '舊卡' } }));
+    for (const k of [...opts.cache.m.keys()]) if (!k.includes('/last/') && !k.includes('latest.count')) opts.cache.m.delete(k);
+    assert.equal((await (await handleLatest(post({ id: '3975' }), env, {}, opts)).json()).headline, '舊卡', 'no wait');
+    await Promise.all(behind);
+    assert.equal(seen.gemini, 2, 'the new prompt asked behind it');
+    assert.equal(JSON.parse(opts.cache.m.get(key)).answer.headline, '卡');
+  }));

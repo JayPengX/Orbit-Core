@@ -241,11 +241,13 @@ export async function handleLatest(request, env, headers, { session, limited, ca
   // Fast: the last answer for them (a card or none) at once while what the
   // app sent is the same; the news looked at again behind it every half hour.
   const sentHash = hashOf([...facts, '|', ...report].join('\n'));
-  const lastReq = new Request(`https://latest.cache/v${PROMPT_VERSION}/last/${league}/${kind}/${encodeURIComponent(id)}`);
-  const keepLast = answer => cache?.put(lastReq, new Response(JSON.stringify({ sent: sentHash, answer, checked: Date.now() }), { headers: KEEP }));
+  // (Kept across a change to the prompt: the old one's answer at once, the
+  // new one written behind it, so a change never makes every card slow.)
+  const lastReq = new Request(`https://latest.cache/last/${league}/${kind}/${encodeURIComponent(id)}`);
+  const keepLast = (answer, v = PROMPT_VERSION) => cache?.put(lastReq, new Response(JSON.stringify({ v, sent: sentHash, answer, checked: Date.now() }), { headers: KEEP }));
   const last = cache ? await cache.match(lastReq).then(r => r?.json()).catch(() => null) : null;
   if (last?.answer && last.sent === sentHash) {
-    if (!(Date.now() - last.checked < RECHECK_MS)) waitUntil(Promise.resolve(keepLast(last.answer)).then(() => write()).catch(() => {}));
+    if (last.v !== PROMPT_VERSION || !(Date.now() - last.checked < RECHECK_MS)) waitUntil(Promise.resolve(keepLast(last.answer, last.v)).then(() => write()).catch(() => {}));
     return json(last.answer, headers);
   }
   if (url.searchParams.get('stream') !== '1') return json(await write(), headers);
