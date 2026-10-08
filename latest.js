@@ -30,6 +30,8 @@
 import { CATALOG } from './kit/catalog.mjs';
 
 export const LATEST_MODEL = 'gemini-3.5-flash-lite';
+// The models the dev door may try instead (worker.js's GEMINI_ALLOWED_MODELS).
+const TRY_MODELS = ['gemini-3.5-flash-lite', 'gemini-3.7-flash'];
 export const LATEST_DAILY_CAP = 2000;
 // The localhost dev door's own Gemini asks a day (worker.js), apart from the app's.
 export const LATEST_DEV_DAILY_CAP = 150;
@@ -262,6 +264,9 @@ export async function handleLatest(request, env, headers, { session, limited, ca
   const last = cache ? await cache.match(lastReq).then(r => r?.json()).catch(() => null) : null;
   // The dev door's ?debug=1: the stories the answer was written from, alongside it (never kept).
   const debug = !!session.dev && url.searchParams.get('debug') === '1';
+  // ...and ?model= another of TRY_MODELS, to compare on the same news (nothing kept).
+  const model = debug && TRY_MODELS.includes(url.searchParams.get('model')) ? url.searchParams.get('model') : LATEST_MODEL;
+  const trying = model !== LATEST_MODEL;
   if (last?.answer && last.sent === sentHash && !debug) {
     if (last.v !== PROMPT_VERSION || !(Date.now() - last.checked < RECHECK_MS)) waitUntil(Promise.resolve(keepLast(last.answer, last.v)).then(() => write()).catch(() => {}));
     return json(last.answer, headers);
@@ -301,15 +306,15 @@ export async function handleLatest(request, env, headers, { session, limited, ca
     let out;
     if (!stories.length && !report.length) out = { none: true };
     else {
-      const keyUrl = `https://latest.cache/v${PROMPT_VERSION}/${league}/${kind}/${encodeURIComponent(id)}/${hashOf([...facts, '|', ...report, '|', ...stories.map(x => x.id)].join('\n'))}`;
-      const kept = cache ? await cache.match(new Request(keyUrl)) : null;
+      const keyUrl = `https://latest.cache/v${PROMPT_VERSION}/${trying ? `${model}/` : ''}${league}/${kind}/${encodeURIComponent(id)}/${hashOf([...facts, '|', ...report, '|', ...stories.map(x => x.id)].join('\n'))}`;
+      const kept = cache && !trying ? await cache.match(new Request(keyUrl)) : null;
       if (!kept) writing();
       out = kept ? await kept.json() : await (inFlight.get(keyUrl) || inFlight.set(keyUrl, ask(keyUrl, stories).finally(() => inFlight.delete(keyUrl))).get(keyUrl));
     }
     // (Written without Google, late: looked at again in a minute, by when it's in.)
-    if (out?.headline || out?.none) await keepLast(out, PROMPT_VERSION, late ? Date.now() - RECHECK_MS + 60_000 : Date.now());
+    if (!trying && (out?.headline || out?.none)) await keepLast(out, PROMPT_VERSION, late ? Date.now() - RECHECK_MS + 60_000 : Date.now());
     const probe = debug && name ? await (async t => fetchFn(newsQuery({ kind, name, sport: info.sport }), { signal: AbortSignal.timeout(8000), cf: { cacheTtl: 3600, cacheEverything: true } }).then(async r => `${r.status} ${r.redirected ? `→${r.url.slice(0, 60)} ` : ''}${r.headers.get('content-type')} cf:${r.headers.get('cf-cache-status')} ${Date.now() - t}ms ${(await r.text()).length}b`).catch(e => `${e.name} ${Date.now() - t}ms`))(Date.now()) : '';
-    return debug ? { ...out, debug: { google: late ? 'late' : !!googleText, probe, stories: stories.map(st => `${new Date(st.at).toISOString().slice(5, 10)} ${st.source || 'ESPN'} | ${st.headline}`) } } : out;
+    return debug ? { ...out, debug: { google: late ? 'late' : !!googleText, probe, model, stories: stories.map(st => `${new Date(st.at).toISOString().slice(5, 10)} ${st.source || 'ESPN'} | ${st.headline}`) } } : out;
   }
 
   async function ask(keyUrl, stories) {
@@ -328,7 +333,7 @@ export async function handleLatest(request, env, headers, { session, limited, ca
     );
     let answer = null;
     try {
-      const res = await fetchFn(`https://generativelanguage.googleapis.com/v1beta/models/${LATEST_MODEL}:generateContent?key=${env.GEMINI_API_KEY}`, {
+      const res = await fetchFn(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${env.GEMINI_API_KEY}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -339,7 +344,7 @@ export async function handleLatest(request, env, headers, { session, limited, ca
       });
       const data = res.ok ? await res.json() : null;
       const u = data?.usageMetadata || {};
-      log(JSON.stringify({ event: 'gemini_usage', feature: 'latest', model: LATEST_MODEL, prompt: u.promptTokenCount ?? 0, output: u.candidatesTokenCount ?? 0, total: u.totalTokenCount ?? 0 }));
+      log(JSON.stringify({ event: 'gemini_usage', feature: 'latest', model, prompt: u.promptTokenCount ?? 0, output: u.candidatesTokenCount ?? 0, total: u.totalTokenCount ?? 0 }));
       answer = JSON.parse(data?.candidates?.[0]?.content?.parts?.[0]?.text || 'null');
     } catch {
       answer = null;
@@ -348,7 +353,7 @@ export async function handleLatest(request, env, headers, { session, limited, ca
     if (!answer || (!answer.skip && !answer.headline)) return { failed: true };
     // (Names in braces, {{Micky van de Ven}}: the app shows each as that person.)
     const out = answer.skip ? { none: true } : cardOf(answer, stories);
-    if (cache) await cache.put(new Request(keyUrl), new Response(JSON.stringify(out), { headers: KEEP }));
+    if (cache && !trying) await cache.put(new Request(keyUrl), new Response(JSON.stringify(out), { headers: KEEP }));
     return out;
   }
 }
