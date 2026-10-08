@@ -32,7 +32,7 @@ import { CATALOG } from './kit/catalog.mjs';
 export const LATEST_MODEL = 'gemini-3.5-flash-lite';
 export const LATEST_DAILY_CAP = 2000;
 // The localhost dev door's own Gemini asks a day (worker.js), apart from the app's.
-export const LATEST_DEV_DAILY_CAP = 60;
+export const LATEST_DEV_DAILY_CAP = 150;
 const FRESH_MS = 3 * 86_400_000;
 const WEEK_MS = 7 * 86_400_000;
 // How often the news behind a kept answer is looked at again (behind the answer).

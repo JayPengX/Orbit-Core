@@ -73,7 +73,7 @@ is wrong, not the rule. When the owner adds a rule, it goes here.
   as the kit asks), and Orbit Transit's at
   `https://orbit-workers-proxy.pengzjay.workers.dev/transit/…`, and Sports'
   最新動態 at `…/latest?stream=1` (POST the app's body; Gemini for real, so
-  60 asks a day of its own, LATEST_DEV_DAILY_CAP) (Weather has
+  150 asks a day of its own, LATEST_DEV_DAILY_CAP) (Weather has
   no door: its saved fixtures). `tools/preview.mjs --live` sends a page's calls through
   it; a script reading upstream data (Polymarket's prices, ESPN, TDX) can
   too. Reach for it before saying a source can't be read.
