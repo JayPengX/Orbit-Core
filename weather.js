@@ -1292,8 +1292,13 @@ export async function cellForecast(env, ctx, lat, lon, { fetchFn = fetch, now = 
     return { ...hit.resp, cached: true };
   }
   if (hit && now - hit.at < STALE_MS) {
+    // A refresh, given FRESH_WAIT_MS (a kept cell's is a few calls at once,
+    // usually done in a second or two): its answer if it's in by then, else
+    // the old copy, said to be refreshing (the page asks again in seconds).
     // (No lock: two refreshes of one cell at once are harmless.)
-    const job = refresh().catch(e => console.log('weather refresh failed', String(e.message || e)));
+    const job = refresh().catch(e => (console.log('weather refresh failed', String(e.message || e)), null));
+    const done = await Promise.race([job, new Promise(r => setTimeout(r, FRESH_WAIT_MS, null))]);
+    if (done?.resp) return done.resp;
     if (ctx?.waitUntil) ctx.waitUntil(job);
     return { ...hit.resp, cached: true, refreshing: true };
   }
@@ -1303,6 +1308,8 @@ export async function cellForecast(env, ctx, lat, lon, { fetchFn = fetch, now = 
   finish(entry);
   return { ...entry.resp, refreshing: true, more: true };
 }
+// How long an old copy's refresh is waited on before the copy is the answer.
+export const FRESH_WAIT_MS = 2500;
 // How long a quick entry's finishing job gets before it's started again.
 export const QUICK_FINISH_MS = 45_000;
 

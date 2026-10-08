@@ -4,7 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  tdxRequest, tdxGet, tdxAccess, resetTdxToken, resetPace, resetTurns, resetMeter, spend, usage, flushUse, billingMonth, CAPS,
+  tdxRequest, tdxGet, SLOW_MS, tdxAccess, resetTdxToken, resetPace, resetTurns, resetMeter, spend, usage, flushUse, billingMonth, CAPS,
   parseGoogleRoutes, parseAutocomplete, nearFirst, parseNominatim, parsePlace, parseTdxRoutes, planSig, googleRouteBody, handleTransit, GOOGLE_ROUTE_FIELDS
 } from '../transit.js';
 
@@ -98,6 +98,36 @@ test('TDX answers are shared: fresh from the cache, stale while refreshing, the 
   assert.equal(JSON.parse(d.body).code, 'TDX_BUSY');
   const e = await tdxGet(env, path, { fetchFn, cache, now: NOW + 70_000 + 5 * 60_000 });
   assert.equal(e.status, 200);
+});
+
+test('TDX slow past a copy’s stale time: that copy after SLOW_MS (its age said), TDX’s answer kept for the next ask', async () => {
+  fresh();
+  const env = { TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 'secret', RATE_LIMIT_KV: memKv(), TDX_PER_MIN: '240' };
+  const cache = memCache();
+  let n = 0;
+  let hang = false;
+  const fetchFn = async url => {
+    if (url.includes('token')) return json({ access_token: 'T', expires_in: 86400 });
+    n++;
+    if (hang) await new Promise(r => setTimeout(r, SLOW_MS + 1500));
+    return json([{ StopUID: 'S1', EstimateTime: 60 * n }]);
+  };
+  const path = 'basic/v2/Bus/EstimatedTimeOfArrival/City/Taipei';
+  await tdxGet(env, path, { fetchFn, cache, now: NOW });
+  hang = true;
+  const waits = [];
+  const t0 = Date.now();
+  // 3 minutes on: past its stale minute, still kept (a live copy 10 minutes).
+  const old = await tdxGet(env, path, { fetchFn, cache, now: NOW + 3 * 60_000, ctx: { waitUntil: p => waits.push(p) } });
+  assert.ok(Date.now() - t0 < SLOW_MS + 800, 'answered after SLOW_MS, not when TDX did');
+  assert.equal(old.state, 'stale');
+  assert.equal(old.age, 3 * 60_000);
+  assert.equal(JSON.parse(old.body)[0].EstimateTime, 60);
+  // (The refresh, then the cache write it hands to waitUntil.)
+  for (let i = 0; i < 3; i++) await Promise.all(waits);
+  const next = await tdxGet(env, path, { fetchFn, cache, now: NOW + 3 * 60_000 + 1000 });
+  assert.equal(next.state, 'hit');
+  assert.equal(JSON.parse(next.body)[0].EstimateTime, 120);
 });
 
 test('on a paid plan TDX calls wait their turn (a second’s worth at a time) and a 429 is asked again', async () => {

@@ -243,6 +243,11 @@ async function myTurn(env) {
 }
 
 const inflight = new Map();
+// How long TDX gets when an older copy is there to answer with instead.
+export const SLOW_MS = 3000;
+// How long a copy stays in the cache: its stale time, a live one 10 minutes
+// (only ever an answer when TDX is slow or failing, with its age).
+const keptFor = rule => Math.max(rule.stale, rule.tier === 'live' ? 10 * MIN : 0);
 const timeout = ms => (typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(ms) : undefined);
 
 // One TDX answer, from the shared cache when it's fresh enough.
@@ -283,7 +288,7 @@ export async function tdxGet(env, raw, { fetchFn = fetch, cache = globalThis.cac
       if (!res.ok) return { status: res.status, state: 'error', why: (await res.text().catch(() => '')).slice(0, 160) };
       const body = await res.text();
       if (cache) {
-        const put = cache.put(key, new Response(body, { headers: { 'Content-Type': 'application/json; charset=utf-8', 'X-Fetched-At': String(now), 'Cache-Control': `public, max-age=${Math.ceil(req.rule.stale / 1000)}` } })).catch(() => {});
+        const put = cache.put(key, new Response(body, { headers: { 'Content-Type': 'application/json; charset=utf-8', 'X-Fetched-At': String(now), 'Cache-Control': `public, max-age=${Math.ceil(keptFor(req.rule) / 1000)}` } })).catch(() => {});
         if (ctx?.waitUntil) ctx.waitUntil(put);
         else await put;
       }
@@ -300,7 +305,19 @@ export async function tdxGet(env, raw, { fetchFn = fetch, cache = globalThis.cac
   }
   let got;
   try {
-    got = await refresh();
+    // Past its stale time, a copy still kept (a live one up to 10 minutes):
+    // TDX given SLOW_MS, then that copy (with its age) and TDX's answer
+    // kept for the next ask. A slow TDX used to hold a card 12 s and more.
+    const job = refresh();
+    if (hit) {
+      const late = Symbol('late');
+      got = await Promise.race([job, sleep(SLOW_MS).then(() => late)]);
+      if (got === late) {
+        const p = job.catch(() => {});
+        if (ctx?.waitUntil) ctx.waitUntil(p);
+        return { status: 200, body: await hit.text(), age, state: 'stale' };
+      }
+    } else got = await job;
   } catch (err) {
     got = { status: 502, state: 'error', why: String(err?.message || err).slice(0, 120) };
   }

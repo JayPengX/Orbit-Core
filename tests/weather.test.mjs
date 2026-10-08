@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import {
   airForecast, parseGoogleAir, googleAirBody, parseAirHistory,
   weatherStatus, handleWeather, scrub, cellOf, nearestStation, townIds, airArea, parseCwaTown, cwaAt, parseGoogleDay, parseGoogleHour,
-  blend, buildCell, GOOGLE_DAILY_CALLS, parseVillage, whereIs, addAirReading, briefText, rainPhrase, weatherCheck, noteRecent, cellForecast, advise, adviceWindow, parseCwaWarnings, aqiLevel, uvLevel, num, DEFAULT_WEIGHTS
+  blend, buildCell, GOOGLE_DAILY_CALLS, parseVillage, whereIs, addAirReading, briefText, rainPhrase, weatherCheck, noteRecent, cellForecast, FRESH_WAIT_MS, advise, adviceWindow, parseCwaWarnings, aqiLevel, uvLevel, num, DEFAULT_WEIGHTS
 , popStep, keepJson, keptJson, KV_EVERY_MS } from '../weather.js';
 import { STATIONS } from '../weather-stations.js';
 import { upstream as fixtureUpstream } from './fixtures/weather/upstream.mjs';
@@ -160,12 +160,13 @@ test('abroad: Google only, with its alerts', async () => {
   assert.ok(!log.some(p => p.includes('datastore') || p.includes('api/v2')));
 });
 
-test('the cell cache: fresh from KV, old answered at once and refreshed behind', async () => {
+test('the cell cache: fresh from KV; an old one refreshed, its answer if in within FRESH_WAIT_MS, else the old copy and the refresh behind', async () => {
   const kv = memKv();
   const e = { ...env, RATE_LIMIT_KV: kv };
   let calls = 0;
+  let slow = 0;
   const ok = upstream();
-  const f = async url => (calls++, ok(url));
+  const f = async url => (calls++, slow && (await new Promise(r => setTimeout(r, slow))), ok(url));
   const first = [];
   await cellForecast(e, { waitUntil: p => first.push(p) }, 25.034, 121.565, { fetchFn: f, now: NOW });
   await Promise.all(first);
@@ -173,13 +174,21 @@ test('the cell cache: fresh from KV, old answered at once and refreshed behind',
   const again = await cellForecast(e, null, 25.034, 121.565, { fetchFn: f, now: NOW + 10 * 60_000 });
   assert.equal(calls, n);
   assert.equal(again.cached, true);
-  const waits = [];
-  const old = await cellForecast(e, { waitUntil: p => waits.push(p) }, 25.034, 121.565, { fetchFn: f, now: NOW + 60 * 60_000 });
-  assert.equal(old.refreshing, true);
-  assert.ok(old.at >= NOW && old.at < NOW + 60_000, 'the copy made then');
-  await Promise.all(waits);
+  // An hour on, the sources quick: the new answer itself.
+  const fresh = await cellForecast(e, { waitUntil: () => {} }, 25.034, 121.565, { fetchFn: f, now: NOW + 60 * 60_000 });
+  assert.ok(!fresh.refreshing && !fresh.cached);
+  assert.equal(fresh.at, NOW + 60 * 60_000);
   assert.ok(calls > n);
-  assert.equal(JSON.parse(kv.store.get('weather:cell:25.03,121.57')).at, NOW + 60 * 60_000);
+  // Two hours on, the sources slow: the copy it has after FRESH_WAIT_MS, the refresh behind.
+  slow = FRESH_WAIT_MS + 500;
+  const waits = [];
+  const t0 = Date.now();
+  const old = await cellForecast(e, { waitUntil: p => waits.push(p) }, 25.034, 121.565, { fetchFn: f, now: NOW + 120 * 60_000 });
+  assert.ok(Date.now() - t0 < FRESH_WAIT_MS + 400);
+  assert.equal(old.refreshing, true);
+  assert.equal(old.at, NOW + 60 * 60_000);
+  await Promise.all(waits);
+  assert.equal(JSON.parse(kv.store.get('weather:cell:25.03,121.57')).at, NOW + 120 * 60_000);
 });
 
 test('a cell nobody has: the near answer at once, the far hours and air forecast behind it', async () => {
