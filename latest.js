@@ -10,8 +10,11 @@
 // report: no card, and no Gemini. Otherwise Gemini (the cheapest model)
 // decides if any of it is real news (an injury, a case, a transfer, a
 // milestone...; not highlights, previews, game reports or numbers the page
-// shows) and writes it: a takeaway headline and up to two points of why it
-// matters, in Traditional Chinese; or skip, and no card. No match cards: a
+// shows), weighs it (big: it changes the coming games, or it's big anyway,
+// a court case, a trade, a coach sacked; minor: routine, a staff contract)
+// and writes the card: the biggest story, not the newest, as a takeaway
+// headline and up to two points of why it matters, and up to two more
+// stories in a line each, in Traditional Chinese; or skip, and no card. No match cards: a
 // match's page already shows everything Gemini could say.
 //
 // Fast and cheap: the last answer for them (a card or none) comes back at
@@ -27,6 +30,8 @@ import { CATALOG } from './kit/catalog.mjs';
 
 export const LATEST_MODEL = 'gemini-3.5-flash-lite';
 export const LATEST_DAILY_CAP = 2000;
+// The localhost dev door's own Gemini asks a day (worker.js), apart from the app's.
+export const LATEST_DEV_DAILY_CAP = 60;
 const FRESH_MS = 3 * 86_400_000;
 const WEEK_MS = 7 * 86_400_000;
 // How often the news behind a kept answer is looked at again (behind the answer).
@@ -131,12 +136,15 @@ export function latestPrompt({ kind, name, zh, league, stories, facts = [], repo
   const call = zh || name;
   return [
     `You decide whether ${who} has real news right now, and if so write the "最新動態" (latest) card in a Taiwanese sports app.`,
-    `Real news, about ${name} themselves: an injury, a rest or a limit on minutes; a suspension; a legal or disciplinary case; a transfer, a contract or a rumour with substance; a coach's decision or a role change; a milestone or a record; pressure or criticism; a quote that reveals something. Several items on one thing are one story: combine them.`,
+    `Real news, about ${name} themselves: an injury, a rest or a limit on minutes; a suspension; a grid penalty; a legal or disciplinary case; a transfer, a trade, a contract or a rumour with substance; a coach hired, sacked or deciding something, a role change; a milestone or a record; pressure or criticism; a quote that reveals something. Several items on one thing are one story: combine them.`,
     'Not news: highlights, how to watch, lineups, odds, fantasy, previews, plain game reports, stats and results (the page shows them), lifestyle, pieces mainly about someone else, anything a newer item overtook, anything from last season.',
-    'If nothing qualifies, set skip = true and leave the rest empty. Otherwise skip = false and story = the index of the newest news item used (-1 when it comes only from the report).',
+    'If nothing qualifies, set skip = true and leave the rest empty. Otherwise skip = false.',
+    'Weigh each story by how much a fan should know it, not by how new it is. big: it changes the coming games (out, doubtful, back, suspended, rested; an F1 start from the back or the pit lane), or it is big whatever the games (a court or league case, a transfer or trade done, a coach sacked or hired, a star wanting out, a record, a major award). normal: matters to fans who follow closely (a role or lineup change, a rumour with substance, a star\'s new contract, sharp criticism). minor: routine (a contract extension for a coach or a squad player, a quote, a small milestone).',
+    'The card leads with the biggest story (equally big: the newest). weight = its weight; story = the index of the newest news item used for it (-1 when it comes only from the report); topic = what it is.',
     `headline: the takeaway, under 24 characters besides the names, never a label (「${call}近況」 is wrong; 「{{${name}}}膝傷無礙，揭幕戰可望先發」 is the kind). points: one or two short sentences, each adding something new: the context and what it means next. Never list numbers back.`,
-    `Write in Traditional Chinese as used in Taiwan (never simplified). Every person's name, in the headline and the points, is written in double braces with their full name in English as the news has it, e.g. {{${name}}} or {{Ange Postecoglou}} (the app shows each one as that person); never a person's name outside the braces. Teams and countries are written in Chinese, without braces. Use only what is given: never invent facts, numbers, quotes or dates. A rumour is told as a rumour (傳出、據報).`,
-    'topic: what the news is: injury (hurt, out, doubtful), return (back from injury or a ban), suspension, legal, transfer, contract, rumour, role (a coach\'s decision, a role or lineup change), milestone (a record, an award), criticism, quote, or other.',
+    'more: up to two other stories, never the lead\'s again, biggest first, only if they are real news too: line = one sentence, under 36 characters besides the names; story and topic as for the lead. None: an empty list.',
+    `Write in Traditional Chinese as used in Taiwan (never simplified). Every person's name, in the headline, the points and the lines, is written in double braces with their full name in English as the news has it, e.g. {{${name}}} or {{Ange Postecoglou}} (the app shows each one as that person); never a person's name outside the braces. Teams and countries are written in Chinese, without braces. Use only what is given: never invent facts, numbers, quotes or dates. A rumour is told as a rumour (傳出、據報).`,
+    'topic: injury (hurt, out, doubtful), return (back from injury or a ban), suspension, grid (a grid penalty or a start from the back), legal, transfer (a move or a trade), contract, rumour, coach (hired, sacked, under pressure), role (a coach\'s decision, a role or lineup change), milestone (a record, an award), criticism, quote, or other.',
     '',
     facts.length ? `Who they are:\n${facts.map(f => `- ${f}`).join('\n')}` : '',
     report.length ? `Report (written by people, recent):\n${report.map(f => `- ${f}`).join('\n')}` : 'Report: none.',
@@ -148,17 +156,27 @@ export function latestPrompt({ kind, name, zh, league, stories, facts = [], repo
     .join('\n');
 }
 
+export const TOPICS = ['injury', 'return', 'suspension', 'grid', 'legal', 'transfer', 'contract', 'rumour', 'coach', 'role', 'milestone', 'criticism', 'quote', 'other'];
+export const WEIGHTS = ['big', 'normal', 'minor'];
 const SCHEMA = {
   type: 'OBJECT',
-  properties: { skip: { type: 'BOOLEAN' }, story: { type: 'INTEGER' }, topic: { type: 'STRING', enum: ['injury', 'return', 'suspension', 'legal', 'transfer', 'contract', 'rumour', 'role', 'milestone', 'criticism', 'quote', 'other'] }, headline: { type: 'STRING' }, points: { type: 'ARRAY', items: { type: 'STRING' } } },
+  properties: {
+    skip: { type: 'BOOLEAN' },
+    weight: { type: 'STRING', enum: WEIGHTS },
+    story: { type: 'INTEGER' },
+    topic: { type: 'STRING', enum: TOPICS },
+    headline: { type: 'STRING' },
+    points: { type: 'ARRAY', items: { type: 'STRING' } },
+    more: { type: 'ARRAY', items: { type: 'OBJECT', properties: { story: { type: 'INTEGER' }, topic: { type: 'STRING', enum: TOPICS }, line: { type: 'STRING' } }, required: ['line'] } }
+  },
   required: ['skip']
 };
 
 // The day's count of asks, in Cloudflare's cache (close enough: a few
 // isolates may each add one at once; the cap is a budget, not a contract).
-async function dayCount(cache, add = 0) {
+async function dayCount(cache, add = 0, dev = false) {
   if (!cache) return 0;
-  const key = new Request(`https://latest.count/${taipeiDay()}`);
+  const key = new Request(`https://latest.count/${dev ? 'dev/' : ''}${taipeiDay()}`);
   const n = Number(await (await cache.match(key))?.text()) || 0;
   if (add) await cache.put(key, new Response(String(n + add), { headers: { 'Cache-Control': 'max-age=2592000' } }));
   return n + add;
@@ -167,6 +185,29 @@ async function dayCount(cache, add = 0) {
 // model, hashed, so any change to them is new answers at once (nothing to bump).
 const PROMPT_VERSION = hashOf(latestPrompt.toString() + JSON.stringify(SCHEMA) + LATEST_MODEL);
 const KEEP = { 'Content-Type': 'application/json', 'Cache-Control': 'max-age=2592000' };
+
+// Gemini's answer as the card: the lead (its weight, its topic, its story's
+// day and link) and up to two other stories in a line each, never the lead's
+// story again. Exported for the tests.
+export function cardOf(answer, stories, now = Date.now()) {
+  const st = stories[answer.story];
+  const topic = t => (TOPICS.includes(t) ? { topic: t } : {});
+  const link = x => (x?.url ? { url: x.url, source: x.source || 'ESPN' } : {});
+  const seen = new Set([answer.story]);
+  const more = (Array.isArray(answer.more) ? answer.more : [])
+    .filter(m => m?.line && String(m.line).trim() && !(m.story >= 0 && seen.has(m.story)) && (seen.add(m.story), true))
+    .slice(0, 2)
+    .map(m => ({ line: String(m.line).trim().slice(0, 120), ...topic(m.topic), ...(stories[m.story] ? { at: stories[m.story].at } : {}), ...link(stories[m.story]) }));
+  return {
+    at: st ? st.at : now,
+    headline: String(answer.headline).slice(0, 120),
+    points: (answer.points || []).map(p => String(p).slice(0, 220)).filter(Boolean).slice(0, 2),
+    ...(WEIGHTS.includes(answer.weight) ? { weight: answer.weight } : {}),
+    ...topic(answer.topic),
+    ...link(st),
+    ...(more.length ? { more } : {})
+  };
+}
 
 export async function handleLatest(request, env, headers, { session, limited, cache = globalThis.caches?.default, fetchFn = fetch, log = console.log, waitUntil = p => p } = {}) {
   if (!session) return json({ error: 'ECO_TOKEN_INVALID' }, headers, 401);
@@ -243,8 +284,10 @@ export async function handleLatest(request, env, headers, { session, limited, ca
   }
 
   async function ask(keyUrl, stories) {
-    if ((await dayCount(cache)) >= LATEST_DAILY_CAP) return { capped: true };
+    const dev = !!session.dev;
+    if ((await dayCount(cache)) >= LATEST_DAILY_CAP || (dev && (await dayCount(cache, 0, true)) >= LATEST_DEV_DAILY_CAP)) return { capped: true };
     await dayCount(cache, 1);
+    if (dev) await dayCount(cache, 1, true);
     // ESPN's two newest stories in full (the why is in the text, not the headline).
     await Promise.all(
       stories
@@ -261,7 +304,7 @@ export async function handleLatest(request, env, headers, { session, limited, ca
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ role: 'user', parts: [{ text: latestPrompt({ kind, name, zh, league, stories, facts, report }) }] }],
-          generationConfig: { temperature: 0.3, maxOutputTokens: 400, responseMimeType: 'application/json', responseSchema: SCHEMA }
+          generationConfig: { temperature: 0.3, maxOutputTokens: 700, responseMimeType: 'application/json', responseSchema: SCHEMA }
         }),
         signal: AbortSignal.timeout(15000)
       });
@@ -274,11 +317,8 @@ export async function handleLatest(request, env, headers, { session, limited, ca
     }
     // Gemini failed: nothing kept, the app draws ESPN's own word if it has it.
     if (!answer || (!answer.skip && !answer.headline)) return { failed: true };
-    const st = stories[answer.story];
     // (Names in braces, {{Micky van de Ven}}: the app shows each as that person.)
-    const out = answer.skip
-      ? { none: true }
-      : { at: st ? st.at : Date.now(), headline: String(answer.headline).slice(0, 120), points: (answer.points || []).map(p => String(p).slice(0, 220)).filter(Boolean).slice(0, 2), ...(answer.topic ? { topic: String(answer.topic) } : {}), ...(st?.url ? { url: st.url, source: st.source || 'ESPN' } : {}) };
+    const out = answer.skip ? { none: true } : cardOf(answer, stories);
     if (cache) await cache.put(new Request(keyUrl), new Response(JSON.stringify(out), { headers: KEEP }));
     return out;
   }

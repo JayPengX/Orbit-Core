@@ -1217,10 +1217,16 @@ export default {
     }
     if (path === '/eco') return handleEcoRequest(request, env, headers, ip, ECO_DEPS);
     // Orbit Sports' 最新動態 (latest.js): Gemini on ESPN's stories, a Quadra Pass session, a daily cap.
+    // Or a local dev page (http://localhost:<port>: the preview, checking
+    // cards on today's real news): no account, 10 asks a minute an address,
+    // and its own small daily cap of Gemini asks (LATEST_DEV_DAILY_CAP).
+    // LATEST_DEV = "off" (wrangler.toml [vars]) closes it.
     if (path === '/latest') {
       const qt = new URL(request.url).searchParams.get('qt');
-      const session = qt ? await readToken(await tokenSecret(env), qt, 'ses') : null;
-      return handleLatest(request, env, headers, { session, limited: () => sessionLimited(`l:${session?.s}`, 60), waitUntil: p => ctx.waitUntil(p) });
+      const signed = qt ? await readToken(await tokenSecret(env), qt, 'ses') : null;
+      const dev = !signed && env.LATEST_DEV !== 'off' && /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin);
+      const session = signed || (dev ? { s: 'dev', dev: true } : null);
+      return handleLatest(request, env, headers, { session, limited: () => sessionLimited(dev ? `l:dev:${ip}` : `l:${session?.s}`, dev ? 10 : 60), waitUntil: p => ctx.waitUntil(p) });
     }
     if (path === '/kambi') {
       // A Quadra Pass session only, counted per session in memory.

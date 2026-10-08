@@ -1,7 +1,7 @@
 // Orbit Sports' 最新動態 by Gemini (latest.js).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { storiesAbout, handleLatest, LATEST_DAILY_CAP, newsQuery, sameStoryOnce, latestPrompt, articleText } from '../latest.js';
+import { storiesAbout, handleLatest, LATEST_DAILY_CAP, LATEST_DEV_DAILY_CAP, newsQuery, sameStoryOnce, latestPrompt, articleText, cardOf } from '../latest.js';
 
 const now = Date.parse('2026-10-07T06:00:00Z');
 const art = (id, hoursAgo, cats, extra = {}) => ({ id, headline: `H${id}`, description: `D${id}`, published: new Date(now - hoursAgo * 3_600_000).toISOString(), categories: cats, ...extra });
@@ -144,6 +144,16 @@ test('no match cards; capped past the day\'s budget; a session needed', () =>
     assert.equal((await handleLatest(post({ id: '9' }), env, {}, { ...opts, session: null })).status, 401);
   }));
 
+test("the dev door: its own day's cap, the app's untouched", () =>
+  withNow(async () => {
+    const { seen, opts } = world({ feed: { articles: [art(1, 5, [{ type: 'team', teamId: 9 }])] } });
+    const day = new Date(now + 8 * 3_600_000).toISOString().slice(0, 10);
+    opts.cache.m.set(`https://latest.count/dev/${day}`, String(LATEST_DEV_DAILY_CAP));
+    assert.deepEqual(await (await handleLatest(post({ kind: 'team', id: '9', name: 'Golden State Warriors' }), env, {}, { ...opts, session: { s: 'dev', dev: true } })).json(), { capped: true });
+    assert.equal(seen.gemini, 0);
+    assert.equal((await (await handleLatest(post({ kind: 'team', id: '9', name: 'Golden State Warriors' }), env, {}, opts)).json()).headline, '卡', 'a signed-in session still asks');
+  }));
+
 test("what's asked of Google News; the same story once; ESPN's article as plain text", () => {
   const q = u => new URL(u).searchParams.get('q');
   assert.equal(q(newsQuery({ kind: 'player', name: 'Max Verstappen' })), '"Max Verstappen" when:7d');
@@ -158,6 +168,29 @@ test('the prompt: real news or skip, never the numbers', () => {
   assert.match(p, /set skip = true/);
   assert.match(p, /\[0\] 2026-10-07 \(Reuters\) Man City appeal/);
   assert.match(p, /Report: none\./);
+  assert.match(p, /not by how new it is/, 'the biggest story leads, not the newest');
+  assert.match(p, /a court or league case/, 'big news needn\'t be about the next game');
+});
+
+test("the card: the lead's weight, topic and link; up to two more stories, never the lead's again", () => {
+  const stories = [
+    { at: now - 3_600_000, headline: 'Arteta signs new deal', url: 'https://a', source: 'BBC' },
+    { at: now - 30 * 3_600_000, headline: 'Saka out of derby', url: 'https://b', source: 'ESPN' },
+    { at: now - 40 * 3_600_000, headline: 'Rice milestone' }
+  ];
+  const card = cardOf({ skip: false, weight: 'big', story: 1, topic: 'injury', headline: '{{Bukayo Saka}}缺陣', points: ['一'], more: [{ story: 1, line: '重複' }, { story: 0, topic: 'contract', line: '{{Mikel Arteta}}續約四年' }, { story: 2, topic: 'nope', line: '里程碑' }, { story: -1, line: '多的' }] }, stories, now);
+  assert.equal(card.headline, '{{Bukayo Saka}}缺陣');
+  assert.equal(card.weight, 'big');
+  assert.equal(card.topic, 'injury');
+  assert.equal(card.at, now - 30 * 3_600_000, "the lead's own day, not the newest story's");
+  assert.equal(card.url, 'https://b');
+  assert.deepEqual(card.more, [
+    { line: '{{Mikel Arteta}}續約四年', topic: 'contract', at: now - 3_600_000, url: 'https://a', source: 'BBC' },
+    { line: '里程碑', at: now - 40 * 3_600_000 }
+  ]);
+  const plain = cardOf({ skip: false, weight: 'huge', story: 0, headline: 'x', more: [] }, stories, now);
+  assert.equal(plain.weight, undefined);
+  assert.equal(plain.more, undefined);
 });
 
 test('streamed: "writing" only when Gemini is asked, then the answer; nothing to write, just none', () =>
