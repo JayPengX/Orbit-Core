@@ -2708,8 +2708,12 @@ if (typeof document !== 'undefined' && typeof location !== 'undefined') {
 // the app redraws them: a redraw replaces the strip with a new one at the
 // start, which threw the person back to the first chip after every tap. The
 // kit notes where each strip was scrolled (by the nearest element with an
-// id, its class and its place among its likes) and, after any redraw, puts a
-// fresh strip back there, unless the app placed it itself; a newly chosen
+// id, its class and its place among its likes) by the item first in view
+// (its text, and how far into view), and after any redraw puts a fresh
+// strip back at that same item, unless the app placed it itself. A strip
+// redrawn with other items (a sport's season days in place of the month,
+// another league's rounds) has no such item and is left where the app put
+// it: a pixel offset carried over landed months away. A newly chosen
 // chip (aria-pressed / aria-selected / .active / .on) is brought into view,
 // the one the person scrolled away from never pulled back. Every app,
 // every strip, nothing to call.
@@ -2731,7 +2735,13 @@ function keepStrips() {
     const sig = signature(el);
     // The chip chosen then too: the same one still chosen after a redraw is
     // never pulled back into view (the person scrolled away from it).
-    kept.set(sig.key, { ...sig, left: el.scrollLeft, pick: el.querySelector(chosen)?.textContent ?? null });
+    kept.set(sig.key, { ...sig, ...anchorOf(el), pick: el.querySelector(chosen)?.textContent ?? null });
+  };
+  // The item first in view: its text and how far it sits from the strip's left edge.
+  const anchorOf = el => {
+    const box = el.getBoundingClientRect();
+    const item = [...el.children].find(c => c.getBoundingClientRect().right > box.left + 1);
+    return item ? { text: item.textContent, at: item.getBoundingClientRect().left - box.left } : { text: null, at: 0 };
   };
   document.addEventListener('scroll', e => note(e.target), true);
   // A tap on a chip counts as where the strip was, even never scrolled.
@@ -2748,7 +2758,9 @@ function keepStrips() {
       const el = [...h.querySelectorAll(k.tag)].filter(x => classOf(x) === k.cls)[k.index];
       if (!el || !sideways(el) || el.scrollLeft !== 0 || el.__quadraKept === k) continue;
       el.__quadraKept = k;
-      el.scrollLeft = k.left;
+      const item = k.text == null ? null : [...el.children].find(c => c.textContent === k.text);
+      if (!item) continue;
+      el.scrollLeft += item.getBoundingClientRect().left - el.getBoundingClientRect().left - k.at;
       const pick = el.querySelector(chosen);
       if (pick && pick.textContent !== k.pick) {
         const a = pick.getBoundingClientRect();
