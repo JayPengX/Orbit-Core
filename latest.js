@@ -257,7 +257,9 @@ export async function handleLatest(request, env, headers, { session, limited, ca
   const lastReq = new Request(`https://latest.cache/last/${league}/${kind}/${encodeURIComponent(id)}`);
   const keepLast = (answer, v = PROMPT_VERSION) => cache?.put(lastReq, new Response(JSON.stringify({ v, sent: sentHash, answer, checked: Date.now() }), { headers: KEEP }));
   const last = cache ? await cache.match(lastReq).then(r => r?.json()).catch(() => null) : null;
-  if (last?.answer && last.sent === sentHash) {
+  // The dev door's ?debug=1: the stories the answer was written from, alongside it (never kept).
+  const debug = !!session.dev && url.searchParams.get('debug') === '1';
+  if (last?.answer && last.sent === sentHash && !debug) {
     if (last.v !== PROMPT_VERSION || !(Date.now() - last.checked < RECHECK_MS)) waitUntil(Promise.resolve(keepLast(last.answer, last.v)).then(() => write()).catch(() => {}));
     return json(last.answer, headers);
   }
@@ -295,7 +297,7 @@ export async function handleLatest(request, env, headers, { session, limited, ca
       out = kept ? await kept.json() : await (inFlight.get(keyUrl) || inFlight.set(keyUrl, ask(keyUrl, stories).finally(() => inFlight.delete(keyUrl))).get(keyUrl));
     }
     if (out?.headline || out?.none) await keepLast(out);
-    return out;
+    return debug ? { ...out, debug: { google: !!(await google), stories: stories.map(st => `${new Date(st.at).toISOString().slice(5, 10)} ${st.source || 'ESPN'} | ${st.headline}`) } } : out;
   }
 
   async function ask(keyUrl, stories) {
