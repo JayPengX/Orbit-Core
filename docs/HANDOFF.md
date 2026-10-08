@@ -43,36 +43,25 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
   a night at its pace and keeps them (`sports/cutouts/photos.json`), so the
   list fills over a few nights. Celtic's and UEFA's own pictures were
   looked at: match photos and tight head crops, so not used.
-- **News:** not a news app (owner's words). No 新聞 tab, no team news. A
-  player's or driver's sheet leads with 最新動態: ESPN's newest story from
-  three days, only if it names them in the headline and isn't a schedule,
-  odds, predictions, fantasy, preview or video piece (`storyAbout` in
-  `Orbit-Sports/public/lib/espn.mjs`); or ESPN's note on them when newer.
-  No link to the article. F1 names go through `lib/f1names.mjs` first.
-- **最新動態: real news only (owner's call, after "it just reads the
-  numbers back").** Players, drivers and teams; no match cards (a match's
-  page already shows everything). The sheet sends who they are plus what
-  people wrote lately (ESPN's injury report within 30 days, RotoWire's note
-  within 14) to `/latest` (`latest.js`). The Worker reads ESPN's tagged
-  stories (3 days; the newest two in full from ESPN's free content API)
-  and Google News headlines (7 days, hourly; a player's must have the
-  surname; highlights, how-to-watch, odds dropped). Nothing there and no
-  report: `{none}` with no Gemini. Otherwise `gemini-3.5-flash-lite`
-  decides whether anything is real news (injury, case, transfer,
-  milestone...) and writes a takeaway headline plus up to two points, or
-  skips (`{none}`, kept too). No card on a quiet day.
-  Fast and cheap: the phone keeps each answer 30 minutes (`fx.latest.v1`),
-  so reopening asks nothing; older, the kept one shows at once and a fresh
-  one is fetched for next time. The Worker answers from the entity's last
-  answer while what was sent is unchanged and re-checks the news behind it
-  (`ctx.waitUntil`) at most every 30 minutes. Answers are kept by a hash
-  of exactly what they were written from (30 days; `PROMPT_VERSION`, a
-  hash of the prompt, schema and model, in the key: any change to them is
-  fresh answers at once), so Gemini never sees the same input twice. The
-  phone's kept answers carry the app's build stamp: a new deploy forgets
-  them. English mode or Gemini
-  down: ESPN's own note or story, translated. The daily cap (2,000) only
-  guards against a bug; each ask logs `gemini_usage` (`feature: latest`).
+- **No news, no Gemini (owner's call, 2026-10-09: "it's shit").** 最新動態
+  and `latest.js` (Gemini on ESPN's and Google News's stories) are gone,
+  and with them the RotoWire note card and the 3-day ESPN story card. In
+  their place, the **injury report**, live from ESPN: a league's whole
+  report in one read (`site.api.espn.com/…/<league>/injuries`, ten
+  minutes; `leagueInjuries` in `Orbit-Sports/public/lib/espn.mjs`) on a
+  team's page (傷兵報告: status chip, what, when back), the athlete's own
+  on a player's page (傷病報告, with the reporter's word, translated).
+  Checked 2026-10-09: NBA (101 players), WNBA, NFL (800), NHL, MLB have
+  one; NBL, college football (3) next to none; **ESPN keeps none for any
+  soccer league** (league, team roster and core API all empty). Soccer
+  options found: FPL's bootstrap-static (EPL only, `news` and
+  `chance_of_playing_next_round`, 1.6 MB: would need a trim), FotMob's
+  `/api/data/teams?id=` (every league, `squad…injured`/`injury.expectedReturn`
+  and `overview.lastLineupStats.unavailable`, no key, 700 KB, its own team
+  ids), Transfermarkt's per-league injury page (HTML); Sofascore 403s.
+- **賽事幹事 in Chinese:** race control's messages are FIA set phrases,
+  told by rule (`lib/racecontrol.mjs`), each car a driver chip that opens
+  them; a message with unknown words stays English, cars still chips.
 - **排名 before the first game:** last season's final table under a 上季
   banner (app.js `tableOf`, `standings(league, { season })`).
 - **Translations:** text with Chinese in it (a name put in first) was sent
@@ -694,7 +683,7 @@ All pushed to `main` unless marked.
 - **Fixtures UI:** team pages rebuilt (hero, key-number strip, next game,
   賽程/戰績/陣容/排名 tabs) and available for NPB/KBO/CPBL, EuroLeague and K
   League (built from their own season: `ownTeam` in sheets.js); player pages
-  in tabs (概況/數據/近期比賽/資料); 最新動態 as headline + short points;
+  in tabs (概況/數據/近期比賽/資料);
   race series in 賽事 as one card per weekend; a weekend's schedule as a
   timeline; leagues/sports with no games from two weeks back to two months on
   hidden (`checkActive`, `fx.active.v1`, 12 h); 我的轉播 off home; past

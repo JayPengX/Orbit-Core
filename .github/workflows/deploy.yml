@@ -22,7 +22,6 @@ on:
       - 'weather-stations.js'
       - 'weather-skill.js'
       - 'transit.js'
-      - 'latest.js'
   workflow_dispatch:
 
 jobs:

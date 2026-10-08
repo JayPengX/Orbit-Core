@@ -535,7 +535,7 @@ async function signedFetch(address, init) {
   const res = await withToken(await dataToken());
   return res.status === 401 && dataSession ? withToken(await dataToken(true)) : res;
 }
-// One of the Worker's own routes (Orbit Sports' /latest), signed with the
+// One of the Worker's own routes, signed with the
 // app's session; null when it can't be had.
 // `body`: sent as a POST (text/plain: no preflight).
 export async function workerJson(path, query, { timeout = 8000, body = null } = {}) {
