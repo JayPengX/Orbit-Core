@@ -37,6 +37,9 @@ const FRESH_MS = 3 * 86_400_000;
 const WEEK_MS = 7 * 86_400_000;
 // How often the news behind a kept answer is looked at again (behind the answer).
 const RECHECK_MS = 30 * 60_000;
+// How long an answer waits for Google News (behind it, it's fetched to the end).
+const GOOGLE_WAIT_MS = 3500;
+const LATE = Symbol('late');
 const ESPN = 'https://site.api.espn.com/apis/site/v2/sports';
 const ESPN_ARTICLE = 'https://content.core.api.espn.com/v1/sports/news';
 
@@ -147,10 +150,10 @@ export function latestPrompt({ kind, name, zh, league, stories, facts = [], repo
   const who = kind === 'team' ? `the team ${name}` : `the ${league === 'f1' ? 'F1 driver' : 'player'} ${name}`;
   const call = zh || name;
   return [
-    `You decide whether ${who} has a news flash (快訊) right now, and if so write the "最新動態" card in a Taiwanese sports app. A flash is a hard fact a fan would want to be told and doesn't know from the scores: most days there is none, and then there is no card, which is better than a weak one.`,
-    `A flash, about ${name} themselves: any injury or health news (out, doubtful, limited, held out, back; a knock, a reported or a chronic condition), always, unless a newer item clears it; they are suspended or rested; an F1 grid penalty, a start from the back or the pit lane; a ruling, a charge or a ban in a court or league case; a transfer or trade done, or one reported as agreed or in advanced talks; a coach sacked, hired or resigning; a new contract or a refusal of one; a star asking to leave; a record broken; a major award.`,
+    `You decide whether ${who} has a news flash (快訊) right now, and if so write the "最新動態" card in a Taiwanese sports app. A flash is a hard fact a fan would want to be told and doesn't know from the scores; when there is none there is no card, which is better than a weak one.`,
+    `A flash, about ${name} themselves: any injury or health news (out, doubtful, limited, held out, back; a knock, a reported or a chronic condition), always, unless a newer item clears it or their season is over; a plan to rest them or limit their minutes or games; they are suspended or rested; an F1 grid penalty, a start from the back or the pit lane; a ruling, a charge or a ban in a court or league case; a transfer or trade done, or one reported as agreed or in advanced talks; a coach sacked, hired or resigning; a new contract or a refusal of one; a star asking to leave; a record broken; a major award.`,
     'Never a flash, however new: quotes, interviews, opinions and feelings; a reaction on its own (its subject may be the flash); talk of pressure, form or someone\'s future; previews, a team aiming to bounce back, what a game means; game reports, results, series scores, standings, title-race maths or chances (the page shows them); analysis, rankings and features; highlights, how to watch, lineups, odds, fantasy; lifestyle; pieces mainly about someone else; anything a newer item overtook; anything from last season.',
-    'If no flash, set skip = true and leave the rest empty. Otherwise skip = false.',
+    'The report is written by people who follow them: an injury, a rest or a workload item in it is a flash (what it says that is new: the condition, the plan, the games missed). If no flash, set skip = true and leave the rest empty. Otherwise skip = false.',
     'Several items on one thing are one story, the thing that happened: a verdict and the reactions, explainers and visits after it are the verdict, told with what is new. A big one (a ruling, a trade, a coach sacked) stays a flash for the week: when items this week are reactions to a ruling, an explainer of it or a visit after it, the ruling is the flash (曼城財務違規案被判有罪), and the reactions only tell what is new. The headline names the thing itself (曼城財務違規成立，已提上訴), never the reaction. weight: big when it changes the coming games or is big whatever the games (an injury to a regular, a grid drop, a ruling, a trade done, a coach sacked); otherwise normal. The card leads with the biggest flash (equally big: the newest). story = the index of the newest news item used for it (-1 when it comes only from the report); topic = what it is.',
     `headline: the takeaway, under 24 characters besides the names, never a label (「${call}近況」 is wrong; 「{{${name}}}膝傷無礙，揭幕戰可望先發」 is the kind). points: one or two short sentences of fact, each adding something new (how long, since when, who replaces them, what happens next), never an opinion or a feeling. Never list numbers back.`,
     'more: up to two other stories, never the lead\'s again, biggest first, only if they are flashes about them by the same rules (never a story mainly about someone else, a former player, a broadcaster): line = one sentence, under 36 characters besides the names; story and topic as for the lead. None: an empty list.',
@@ -255,7 +258,7 @@ export async function handleLatest(request, env, headers, { session, limited, ca
   // (Kept across a change to the prompt: the old one's answer at once, the
   // new one written behind it, so a change never makes every card slow.)
   const lastReq = new Request(`https://latest.cache/last/${league}/${kind}/${encodeURIComponent(id)}`);
-  const keepLast = (answer, v = PROMPT_VERSION) => cache?.put(lastReq, new Response(JSON.stringify({ v, sent: sentHash, answer, checked: Date.now() }), { headers: KEEP }));
+  const keepLast = (answer, v = PROMPT_VERSION, checked = Date.now()) => cache?.put(lastReq, new Response(JSON.stringify({ v, sent: sentHash, answer, checked }), { headers: KEEP }));
   const last = cache ? await cache.match(lastReq).then(r => r?.json()).catch(() => null) : null;
   // The dev door's ?debug=1: the stories the answer was written from, alongside it (never kept).
   const debug = !!session.dev && url.searchParams.get('debug') === '1';
@@ -281,12 +284,19 @@ export async function handleLatest(request, env, headers, { session, limited, ca
   // The news read; nothing there and no report: none (no Gemini). Else the
   // answer kept for exactly this, or Gemini asked (`writing` told first).
   async function write(writing = () => {}) {
-    const google = name ? read(newsQuery({ kind, name, sport: info.sport }), 3600, 'text', 3000) : null;
+    // Google News is slow from Cloudflare (3 to 10 seconds cold, an hour in
+    // its cache after): fetched to the end behind the answer, so it's in the
+    // cache next time; the answer waits for it GOOGLE_WAIT_MS at most.
+    const googleAll = name ? read(newsQuery({ kind, name, sport: info.sport }), 3600, 'text', 12_000) : null;
+    if (googleAll) waitUntil(googleAll);
+    const google = googleAll && Promise.race([googleAll, new Promise(r => setTimeout(() => r(LATE), GOOGLE_WAIT_MS))]);
     const feeds = info.espn ? await Promise.all([read(`${ESPN}/${info.espn}/news?limit=50`), team ? read(`${ESPN}/${info.espn}/news?limit=50&team=${team}`) : null]) : [];
     const espnStories = storiesAbout(feeds, { kind, id, name });
     // A player's headlines have their surname in them (or their whole name, in Chinese).
     const must = kind === 'player' ? (/[㐀-鿿]/.test(name) ? [name] : [name.split(/\s+/).filter(w => !/^(jr\.?|sr\.?|ii|iii)$/i.test(w)).pop() || name]) : [];
-    const papers = papersFor(googleNews(await google, { must }));
+    const googleText = await google;
+    const late = googleText === LATE;
+    const papers = papersFor(googleNews(late ? '' : googleText, { must }));
     const stories = sameStoryOnce([...espnStories, ...papers]).sort((x, y) => y.at - x.at).slice(0, 18);
     let out;
     if (!stories.length && !report.length) out = { none: true };
@@ -296,9 +306,10 @@ export async function handleLatest(request, env, headers, { session, limited, ca
       if (!kept) writing();
       out = kept ? await kept.json() : await (inFlight.get(keyUrl) || inFlight.set(keyUrl, ask(keyUrl, stories).finally(() => inFlight.delete(keyUrl))).get(keyUrl));
     }
-    if (out?.headline || out?.none) await keepLast(out);
+    // (Written without Google, late: looked at again in a minute, by when it's in.)
+    if (out?.headline || out?.none) await keepLast(out, PROMPT_VERSION, late ? Date.now() - RECHECK_MS + 60_000 : Date.now());
     const probe = debug && name ? await (async t => fetchFn(newsQuery({ kind, name, sport: info.sport }), { signal: AbortSignal.timeout(8000), cf: { cacheTtl: 3600, cacheEverything: true } }).then(async r => `${r.status} ${r.redirected ? `→${r.url.slice(0, 60)} ` : ''}${r.headers.get('content-type')} cf:${r.headers.get('cf-cache-status')} ${Date.now() - t}ms ${(await r.text()).length}b`).catch(e => `${e.name} ${Date.now() - t}ms`))(Date.now()) : '';
-    return debug ? { ...out, debug: { google: !!(await google), probe, stories: stories.map(st => `${new Date(st.at).toISOString().slice(5, 10)} ${st.source || 'ESPN'} | ${st.headline}`) } } : out;
+    return debug ? { ...out, debug: { google: late ? 'late' : !!googleText, probe, stories: stories.map(st => `${new Date(st.at).toISOString().slice(5, 10)} ${st.source || 'ESPN'} | ${st.headline}`) } } : out;
   }
 
   async function ask(keyUrl, stories) {

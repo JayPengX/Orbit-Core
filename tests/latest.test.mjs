@@ -121,8 +121,9 @@ test('the last answer at once; the news looked at again behind it every half hou
     opts.waitUntil = p => behind.push(p);
     const open = () => handleLatest(post({ id: '7', name: 'A B' }), env, {}, opts).then(r => r.json());
     assert.equal((await open()).headline, '卡 1');
+    const first = behind.length; // (Google News, fetched to the end behind the first)
     assert.equal((await open()).headline, '卡 1');
-    assert.equal(behind.length, 0, 'within half an hour: not even looked at');
+    assert.equal(behind.length, first, 'within half an hour: not even looked at');
     t += 31 * 60_000;
     n = 2;
     assert.equal((await open()).headline, '卡 1');
@@ -231,4 +232,27 @@ test("Google's week: the injury report from days back beats the newest talk", ()
   const picked = papersFor([...talk, item('LeBron James reportedly dealing with chronic arthritis in his left foot', 3)], 14);
   assert.equal(picked.length, 14);
   assert.equal(picked[0].headline, 'LeBron James reportedly dealing with chronic arthritis in his left foot');
+});
+
+test("Google News late: the answer doesn't wait, and it's looked at again in a minute", async () => {
+  const real = Date.now;
+  let t = now;
+  Date.now = () => t;
+  try {
+    const { seen, opts } = world({ feed: { articles: [art(1, 5, [{ type: 'athlete', athleteId: 3975 }])] } });
+    const fetchFn = opts.fetchFn;
+    opts.fetchFn = (url, init) => (String(url).includes('news.google') ? new Promise(() => {}) : fetchFn(url, init));
+    const behind = [];
+    opts.waitUntil = p => behind.push(p);
+    const started = real();
+    assert.equal((await (await handleLatest(post({ id: '3975' }), env, {}, opts)).json()).headline, '卡');
+    assert.ok(real() - started < 5000, 'waited GOOGLE_WAIT_MS at most');
+    const n = behind.length;
+    t += 61_000;
+    await handleLatest(post({ id: '3975' }), env, {}, opts);
+    assert.ok(behind.length > n, 'a minute on: looked at again');
+    assert.equal(seen.gemini, 1);
+  } finally {
+    Date.now = real;
+  }
 });
