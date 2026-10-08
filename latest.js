@@ -10,9 +10,10 @@
 // report: no card, and no Gemini. Otherwise Gemini (the cheapest model)
 // decides if any of it is real news (an injury, a case, a transfer, a
 // milestone...; not highlights, previews, game reports or numbers the page
-// shows), weighs it (big: it changes the coming games, or it's big anyway,
-// a court case, a trade, a coach sacked; minor: routine, a staff contract)
-// and writes the card: the biggest story, not the newest, as a takeaway
+// shows): a news flash (快訊), a hard fact like a grid penalty, an injury, a
+// ruling, a trade; never quotes, reactions, previews or recaps. It weighs it
+// (big: it changes the coming games, or it's big anyway) and writes the
+// card: the biggest flash, not the newest, as a takeaway
 // headline and up to two points of why it matters, and up to two more
 // stories in a line each, in Traditional Chinese; or skip, and no card. No match cards: a
 // match's page already shows everything Gemini could say.
@@ -135,16 +136,15 @@ export function latestPrompt({ kind, name, zh, league, stories, facts = [], repo
   const who = kind === 'team' ? `the team ${name}` : `the ${league === 'f1' ? 'F1 driver' : 'player'} ${name}`;
   const call = zh || name;
   return [
-    `You decide whether ${who} has real news right now, and if so write the "最新動態" (latest) card in a Taiwanese sports app.`,
-    `Real news, about ${name} themselves: an injury, a rest or a limit on minutes; a suspension; a grid penalty; a legal or disciplinary case; a transfer, a trade, a contract or a rumour with substance; a coach hired, sacked or deciding something, a role change; a milestone or a record; pressure or criticism; a quote that reveals something. Several items on one thing are one story: combine them.`,
-    'Not news: highlights, how to watch, lineups, odds, fantasy, previews, plain game reports, stats and results (the page shows them), lifestyle, pieces mainly about someone else, anything a newer item overtook, anything from last season.',
-    'If nothing qualifies, set skip = true and leave the rest empty. Otherwise skip = false.',
-    'Weigh each story by how much a fan should know it, not by how new it is. big (rare: most weeks have none): it changes the coming games (out, doubtful, back, suspended, rested; an F1 start from the back or the pit lane), or it is big whatever the games (a ruling or a charge in a court or league case, a transfer or trade done, a coach sacked or hired, a star wanting out, a record, a major award). normal: matters to fans who follow closely (a role or lineup change, a rumour with substance, a coach\'s or a star\'s new contract, a coach under pressure, sharp criticism). minor: routine (a squad player\'s contract, a visit, a quote, a small milestone). A quote, a reaction, a visit or talk of pressure is never big.',
-    'A story is the thing that happened, not the pieces about it: a verdict and the reactions, explainers and visits after it are one story, the verdict, told with what is new; the headline names the thing itself (曼城財務違規成立，已提上訴; 洋基遭橫掃出局), the reactions go in the points. The card leads with the biggest story (equally big: the newest). weight = its weight; story = the index of the newest news item used for it (-1 when it comes only from the report); topic = what it is.',
-    `headline: the takeaway, under 24 characters besides the names, never a label (「${call}近況」 is wrong; 「{{${name}}}膝傷無礙，揭幕戰可望先發」 is the kind). points: one or two short sentences, each adding something new: the context and what it means next. Never list numbers back.`,
-    'more: up to two other stories, never the lead\'s again, biggest first, only if they are real news about them by the same rules (never a story mainly about someone else, a former player, a broadcaster): line = one sentence, under 36 characters besides the names; story and topic as for the lead. None: an empty list.',
+    `You decide whether ${who} has a news flash (快訊) right now, and if so write the "最新動態" card in a Taiwanese sports app. A flash is a hard fact a fan would want to be told and doesn't know from the scores: most days there is none, and then there is no card, which is better than a weak one.`,
+    `A flash, about ${name} themselves: they are out, doubtful, back, suspended, rested or limited for coming games; an F1 grid penalty, a start from the back or the pit lane; a ruling, a charge or a ban in a court or league case; a transfer or trade done, or one reported as agreed or in advanced talks; a coach sacked, hired or resigning; a new contract or a refusal of one; a star asking to leave; a record broken; a major award.`,
+    'Never a flash, however new: quotes, interviews, opinions and feelings; reactions; talk of pressure, form or someone\'s future; previews, a team aiming to bounce back, what a game means; game reports, results, series scores, standings, title-race maths or chances (the page shows them); analysis, rankings and features; highlights, how to watch, lineups, odds, fantasy; lifestyle; pieces mainly about someone else; anything a newer item overtook; anything from last season.',
+    'If no flash, set skip = true and leave the rest empty. Otherwise skip = false.',
+    'Several items on one thing are one story, the thing that happened: a verdict and the reactions, explainers and visits after it are the verdict, told with what is new. The headline names the thing itself (曼城財務違規成立，已提上訴), never the reaction. weight: big when it changes the coming games or is big whatever the games (an injury to a regular, a grid drop, a ruling, a trade done, a coach sacked); otherwise normal. The card leads with the biggest flash (equally big: the newest). story = the index of the newest news item used for it (-1 when it comes only from the report); topic = what it is.',
+    `headline: the takeaway, under 24 characters besides the names, never a label (「${call}近況」 is wrong; 「{{${name}}}膝傷無礙，揭幕戰可望先發」 is the kind). points: one or two short sentences of fact, each adding something new (how long, since when, who replaces them, what happens next), never an opinion or a feeling. Never list numbers back.`,
+    'more: up to two other stories, never the lead\'s again, biggest first, only if they are flashes about them by the same rules (never a story mainly about someone else, a former player, a broadcaster): line = one sentence, under 36 characters besides the names; story and topic as for the lead. None: an empty list.',
     `Write in Traditional Chinese as used in Taiwan (never simplified). Every person's name, in the headline, the points and the lines, is written in double braces with their full name in English as the news has it, e.g. {{${name}}} or {{Ange Postecoglou}} (the app shows each one as that person); never a person's name outside the braces, nor in Chinese ({{Christian Horner}}, not 霍納). Teams and countries are written in Chinese, without braces. Every other word in Chinese (pit lane, paddock, playoffs: 維修區、季後賽), but team and league abbreviations everyone uses (NBA, F1). Use only what is given: never invent facts, numbers, quotes or dates. A rumour is told as a rumour (傳出、據報).`,
-    'topic: injury (hurt, out, doubtful), return (back from injury or a ban), suspension, grid (a grid penalty or a start from the back), legal, transfer (a move or a trade), contract, rumour, coach (hired, sacked, under pressure), role (a coach\'s decision, a role or lineup change), milestone (a record, an award), criticism, quote, or other.',
+    'topic: injury (hurt, out, doubtful), return (back from injury or a ban), suspension, grid (a grid penalty or a start from the back), legal, transfer (a move or a trade), contract, rumour (a move reported, not done), coach (hired, sacked, resigning), role (a coach\'s decision, a role or lineup change), milestone (a record, an award), or other.',
     '',
     facts.length ? `Who they are:\n${facts.map(f => `- ${f}`).join('\n')}` : '',
     report.length ? `Report (written by people, recent):\n${report.map(f => `- ${f}`).join('\n')}` : 'Report: none.',
@@ -156,8 +156,8 @@ export function latestPrompt({ kind, name, zh, league, stories, facts = [], repo
     .join('\n');
 }
 
-export const TOPICS = ['injury', 'return', 'suspension', 'grid', 'legal', 'transfer', 'contract', 'rumour', 'coach', 'role', 'milestone', 'criticism', 'quote', 'other'];
-export const WEIGHTS = ['big', 'normal', 'minor'];
+export const TOPICS = ['injury', 'return', 'suspension', 'grid', 'legal', 'transfer', 'contract', 'rumour', 'coach', 'role', 'milestone', 'other'];
+export const WEIGHTS = ['big', 'normal'];
 const SCHEMA = {
   type: 'OBJECT',
   properties: {

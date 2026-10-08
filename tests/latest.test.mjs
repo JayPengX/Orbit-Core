@@ -168,8 +168,10 @@ test('the prompt: real news or skip, never the numbers', () => {
   assert.match(p, /set skip = true/);
   assert.match(p, /\[0\] 2026-10-07 \(Reuters\) Man City appeal/);
   assert.match(p, /Report: none\./);
-  assert.match(p, /not by how new it is/, 'the biggest story leads, not the newest');
-  assert.match(p, /a court or league case/, 'big news needn\'t be about the next game');
+  assert.match(p, /news flash/);
+  assert.match(p, /Never a flash, however new: quotes/, 'no quotes, previews or recaps');
+  assert.match(p, /leads with the biggest flash/, 'the biggest story leads, not the newest');
+  assert.match(p, /a ruling, a charge or a ban/, 'big news needn\'t be about the next game');
 });
 
 test("the card: the lead's weight, topic and link; up to two more stories, never the lead's again", () => {
