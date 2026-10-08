@@ -22,7 +22,9 @@ const US = {
     'Houston Rockets': ['休士頓', '火箭'], 'Indiana Pacers': ['印第安納', '溜馬'], 'LA Clippers': ['洛杉磯', '快艇'], 'Los Angeles Clippers': ['洛杉磯', '快艇'], 'Los Angeles Lakers': ['洛杉磯', '湖人'],
     'Memphis Grizzlies': ['曼菲斯', '灰熊'], 'Miami Heat': ['邁阿密', '熱火'], 'Milwaukee Bucks': ['密爾瓦基', '公鹿'], 'Minnesota Timberwolves': ['明尼蘇達', '灰狼'], 'New Orleans Pelicans': ['紐奧良', '鵜鶘'],
     'New York Knicks': ['紐約', '尼克'], 'Oklahoma City Thunder': ['奧克拉荷馬', '雷霆'], 'Orlando Magic': ['奧蘭多', '魔術'], 'Philadelphia 76ers': ['費城', '76 人'], 'Phoenix Suns': ['鳳凰城', '太陽'],
-    'Portland Trail Blazers': ['波特蘭', '拓荒者'], 'Sacramento Kings': ['沙加緬度', '國王'], 'San Antonio Spurs': ['聖安東尼奧', '馬刺'], 'Toronto Raptors': ['多倫多', '暴龍'], 'Utah Jazz': ['猶他', '爵士'], 'Washington Wizards': ['華盛頓', '巫師']
+    'Portland Trail Blazers': ['波特蘭', '拓荒者'], 'Sacramento Kings': ['沙加緬度', '國王'], 'San Antonio Spurs': ['聖安東尼奧', '馬刺'], 'Toronto Raptors': ['多倫多', '暴龍'], 'Utah Jazz': ['猶他', '爵士'], 'Washington Wizards': ['華盛頓', '巫師'],
+    // A preseason guest from outside the league (2026-10: the Trail Blazers').
+    'London Lions': ['倫敦', '雄獅']
   },
   wnba: {
     'Atlanta Dream': ['亞特蘭大', '夢想'], 'Chicago Sky': ['芝加哥', '天空'], 'Connecticut Sun': ['康乃狄克', '太陽'], 'Dallas Wings': ['達拉斯', '飛翼'], 'Golden State Valkyries': ['金州', '女武神'],

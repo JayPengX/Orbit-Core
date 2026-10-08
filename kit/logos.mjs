@@ -22,6 +22,11 @@ export function normalizeTeamName(name) {
 // ---- Team logos ------------------------------------------------------------------
 
 // ESPN's logo files: MLB by abbreviation, soccer clubs by ESPN id.
+// A preseason guest from outside the NBA (ESPN has no logo for it): its
+// own, from its Wikipedia page.
+export const NBA_GUESTS = {
+  'London Lions': 'https://upload.wikimedia.org/wikipedia/en/c/cd/London_Lions_logo_%282025%29.png'
+};
 export const MLB_ABBR = {
   'Arizona Diamondbacks': 'ari', Athletics: 'ath', 'Oakland Athletics': 'ath', 'Atlanta Braves': 'atl', 'Baltimore Orioles': 'bal',
   'Boston Red Sox': 'bos', 'Chicago Cubs': 'chc', 'Chicago White Sox': 'chw', 'Cincinnati Reds': 'cin', 'Cleveland Guardians': 'cle',
@@ -112,7 +117,7 @@ export function teamLogo(sport, name, dark = false) {
   const base = 'https://a.espncdn.com/i/teamlogos';
   const size = dark ? '500-dark' : '500';
   if (sport === 'mlb' && MLB_ABBR[name]) return `${base}/mlb/${size}/${MLB_ABBR[name]}.png`;
-  if (sport === 'nba') return NBA_ID[name] ? `https://cdn.nba.com/logos/nba/${NBA}${NBA_ID[name]}/primary/${dark ? 'D' : 'L'}/logo.svg` : null;
+  if (sport === 'nba') return NBA_ID[name] ? `https://cdn.nba.com/logos/nba/${NBA}${NBA_ID[name]}/primary/${dark ? 'D' : 'L'}/logo.svg` : NBA_GUESTS[name] || null;
   if (sport === 'nfl' && NFL_ABBR[name]) return `${base}/nfl/${size}/${NFL_ABBR[name]}.png`;
   if (sport === 'nhl' && NHL_ABBR[name]) return `${base}/nhl/${size}/${NHL_ABBR[name]}.png`;
   if (sport === 'epl' && EPL_ESPN_ID[normalizeTeamName(name)]) return `${base}/soccer/${size}/${EPL_ESPN_ID[normalizeTeamName(name)]}.png`;
