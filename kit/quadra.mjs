@@ -2702,8 +2702,9 @@ if (typeof document !== 'undefined' && typeof location !== 'undefined') {
 // start, which threw the person back to the first chip after every tap. The
 // kit notes where each strip was scrolled (by the nearest element with an
 // id, its class and its place among its likes) and, after any redraw, puts a
-// fresh strip back there, unless the app placed it itself; the chosen chip
-// (aria-pressed / aria-selected / .active / .on) is kept in view. Every app,
+// fresh strip back there, unless the app placed it itself; a newly chosen
+// chip (aria-pressed / aria-selected / .active / .on) is brought into view,
+// the one the person scrolled away from never pulled back. Every app,
 // every strip, nothing to call.
 function keepStrips() {
   if (typeof document === 'undefined' || typeof MutationObserver === 'undefined' || globalThis.__quadraStrips) return;
@@ -2721,7 +2722,9 @@ function keepStrips() {
   const note = el => {
     if (!sideways(el)) return;
     const sig = signature(el);
-    kept.set(sig.key, { ...sig, left: el.scrollLeft });
+    // The chip chosen then too: the same one still chosen after a redraw is
+    // never pulled back into view (the person scrolled away from it).
+    kept.set(sig.key, { ...sig, left: el.scrollLeft, pick: el.querySelector(chosen)?.textContent ?? null });
   };
   document.addEventListener('scroll', e => note(e.target), true);
   // A tap on a chip counts as where the strip was, even never scrolled.
@@ -2740,7 +2743,7 @@ function keepStrips() {
       el.__quadraKept = k;
       el.scrollLeft = k.left;
       const pick = el.querySelector(chosen);
-      if (pick) {
+      if (pick && pick.textContent !== k.pick) {
         const a = pick.getBoundingClientRect();
         const b = el.getBoundingClientRect();
         if (a.left < b.left || a.right > b.right) el.scrollLeft += a.left < b.left ? a.left - b.left - 12 : a.right - b.right + 12;
