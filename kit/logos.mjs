@@ -174,8 +174,11 @@ export const F1_TEAMS = {
   cadillac: { name: 'Cadillac', page: 'cadillac', f1: 'cadillac', zh: '凱迪拉克', color: '#c9a227', drivers: ['Perez', 'Bottas'] }
 };
 
-// Driver names as Taiwan's broadcasts and press say them: the surname alone
-// (羅素, 安東內利), no initial (only two drivers with one surname would need it).
+// Driver names as Taiwan's broadcasts and press say them (羅素, 安東內利).
+// Not shown any more: the apps name drivers in English, as every other
+// sport's players (the owner's call, 2026-10). Kept for reading back what
+// was saved in Chinese (a Play ticket's "羅素") and for older copies of the
+// apps that import it.
 const F1_ZH = {
   Russell: '羅素',
   Antonelli: '安東內利',
@@ -214,9 +217,11 @@ export const F1_PAGE = {
   Bortoleto: 'gabriel-bortoleto', Bottas: 'valtteri-bottas'
 };
 // { team, color, zh, page, surname } for a driver's full name ("Carlos Sainz Jr."), or a neutral badge.
+// `zh` is the name as given, in English: a driver is named as every
+// other sport's players are (George Russell, not 羅素), in either language.
 export function f1Driver(name) {
   const plain = (name || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
-  const zh = Object.entries(F1_ZH).find(([d]) => new RegExp(`\\b${d}\\b`, 'i').test(plain))?.[1] ?? name;
+  const zh = name;
   const surname = Object.keys(F1_PAGE).find(d => new RegExp(`\\b${d}\\b`, 'i').test(plain)) || '';
   const page = F1_PAGE[surname] || '';
   for (const team of Object.values(F1_TEAMS)) {

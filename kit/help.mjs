@@ -230,18 +230,18 @@ export const HELP = {
         'Quadra 的運動資料中心：所有運動的比分、賽程、排名、球隊和球員，每場比賽的詳細數據，還有依你追蹤的運動排好的推薦。Play 有開賣的比賽有「到 Play 下注」。'
       ]],
       ['tabs', '每個分頁', [
-        '「首頁」：選一天（前三天到下週），當天每場比賽依你的喜好排好：先是不撞時間的精選，再來是其他比賽；可以只看追蹤的、你的球隊或某個運動。',
-        '「賽事」：依運動和聯賽找比賽，打開就在離現在最近的比賽日；季後賽、季前賽、盃賽可以篩選。賽車、高爾夫、網球、格鬥顯示整季賽程。',
-        '「直播」：現在進行中的比賽，和三小時內開打的。',
-        '「追蹤」：你的運動、聯賽、球隊和選手的比賽、結果和排名。',
+        '「首頁」：今天看什麼。正在進行的比賽在最上面，接著是依你的喜好排好、不撞時間的推薦，再來是其他比賽；可以選一天（前三天到下週），或只看你的球隊、某個運動。',
+        '「賽事」：依運動和聯賽找比賽，打開就在離現在最近的比賽日；還有排名、季後賽對戰表，和搜尋聯賽、球隊、球員。F1 顯示整季每一站。',
+        '「轉播」：什麼時候、在哪一台。正在轉播的比賽（點「觀看」直接開愛爾達或 Apple TV），你追蹤的球隊、選手和比賽接下來 7 天的轉播，接下來 24 小時的其他比賽，和愛爾達完整轉播表。',
+        '「追蹤」：你的球隊和選手現在怎麼樣：排名、近五場、上一場和下一場；單獨追蹤的比賽也在這裡。',
         '右上角：說明、重新整理和你的 Quadra Pass；再點一次目前的分頁會回到頂端。'
       ]],
       ['follow', '追蹤', [
-        '依喜好順序追蹤運動（第一個最優先），再選每種運動的聯賽，都在「我的設定」；球隊在比賽或球隊頁按「+ 追蹤」，網球、高爾夫、F1、MotoGP、UFC 的選手在選手頁追蹤，F1 車隊在車隊頁追蹤（有它車手的比賽都算你的）。「追蹤」分頁列出每隊上一場、下一場和近五場，選手和聯賽在後面。追蹤的球隊開賽和完賽會通知你；Play 的推薦也用你的追蹤。',
-        '「直播」分頁上方可以只看某個轉播服務的比賽；排名可以看過去五季（聯賽冠軍標在最上面），球隊頁有歷年戰績；MotoGP 有車手積分榜和車手頁（生涯和每一季），Formula E 有完賽名次，F1 Academy 和 GT 世界挑戰賽有賽程和各節時間。'
+        '依喜好順序選運動和聯賽（第一個最優先），在首頁的「我的設定」；球隊在比賽或球隊頁按「+ 追蹤」，F1 車手和車隊在他們的頁面追蹤，單一場比賽或一站 F1 在比賽頁追蹤。追蹤的球隊開賽和完賽會通知你；Play 的推薦也用你的追蹤。',
+        '球隊和選手頁有「最新動態」：只放傷病、禁賽、發車處罰、轉會、判決這類確定的消息，沒有就不顯示。'
       ]],
       ['watch', '台灣轉播', [
-        '比賽頁和推薦卡片會列出台灣可以收看的頻道與平台（愛爾達、緯來、DAZN、博斯、各聯盟的官方訂閱…），在「我的設定」選你有的服務。YouTube 只在聯盟頻道真的有那場比賽的影片時才列出（GT 世界挑戰賽全部免費直播）。轉播權會變動，以各平台公告為準。'
+        'Orbit Sports 只列在台灣看得到的聯賽：愛爾達 ELTA.tv 和 Apple TV（MLS）。每場比賽標出頻道和語言（英文原音、中文、雙語），比賽進行中有「觀看」。轉播權會變動，以各平台公告為準。'
       ]],
       ['play', '到 Play 下注', [
         'Play 有開賣的比賽，旁邊有「投注」（進行中是「場中」）小按鈕，比賽頁有「到 Play 下注」：一點就到 Play 的那場比賽，已經登入。'
@@ -255,17 +255,18 @@ export const HELP = {
         'Quadra’s sports data centre: every sport’s scores, schedules, tables, teams and players, each match’s details, and picks ranked by what you follow. Matches Play sells have Bet in Play.'
       ]],
       ['tabs', 'The tabs', [
-        'Home: pick a day (three days back to a week ahead): every match of it, ranked for you, a no-clash plan first, then the rest; narrow it to what you follow, your teams or one sport.',
-        'Matches: by sport and league, opening on the game day nearest to now; filter playoffs, preseason or cups. Racing, golf, tennis and fighting show the whole season.',
-        'Live: everything in progress now, and what starts in the next three hours.',
-        'Following: your sports, leagues, teams and players: their games, results and tables.',
+        'Home: what to watch. Games on now at the top, then a no-clash plan ranked for you, then the rest; pick a day (three back to a week ahead), or only your teams or one sport.',
+        'Matches: by sport and league, opening on the game day nearest to now; tables, playoff brackets, and search for leagues, teams and players. F1 shows its whole season.',
+        'On TV: when and where. What’s on now (Watch opens ELTA.tv or Apple TV), your teams’, players’ and matches’ games on TV in the next 7 days, everything else in the next 24 hours, and ELTA’s full guide.',
+        'Following: how your teams and players are doing: their place, form, last and next game; matches you follow one by one too.',
         'Top right: help, refresh and your Quadra Pass; tap the open tab again to go back to its top.'
       ]],
       ['follow', 'Following', [
-        'Follow sports in order of priority (the first counts most), then leagues in each; follow teams with “+ Follow” on a match or team page, and tennis, golf, F1 and UFC players on their page. A followed team’s start and final score come as notices, and Play’s picks use your follows too.'
+        'Pick sports and leagues in order of priority (the first counts most) under My settings on Home; follow teams with “+ Follow” on a match or team page, F1 drivers and teams on their page, and one match or F1 weekend on its page. A followed team’s start and final score come as notices, and Play’s picks use your follows too.',
+        'Team and player pages have Latest: only hard news (injuries, bans, grid penalties, transfers, rulings), and nothing when there’s none.'
       ]],
       ['watch', 'Watching in Taiwan', [
-        'Match pages and pick cards list where to watch in Taiwan (ELTA, Videoland, DAZN, Sportcast, league passes…). Rights change; each service’s own listings are the final word.'
+        'Orbit Sports lists the leagues you can watch in Taiwan: ELTA.tv, and Apple TV for MLS. Each game shows its channel and commentary (English, Chinese, dual), and Watch while it’s on. Rights change; each service’s own listings are the final word.'
       ]],
       ['play', 'Betting in Play', [
         'Games Play sells have a small Bet chip (Live while in play), and a game page has “Bet in Play”: one tap opens that game in Play, signed in.'

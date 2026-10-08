@@ -7,6 +7,25 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
 `npx eslint .`).
 
 
+## Sports' four tabs by question; F1 drivers in English (2026-10-08, pushed to `main`)
+
+- **One question per tab** (a game showed in up to five places before):
+  首頁 *what to watch* (live, the picks, the rest), 賽事 *a league*
+  (schedule, table, bracket, search), 轉播 (was 直播) *when and where*:
+  what's on now with 觀看, 你的轉播 (followed teams', players' and
+  matches' games on TV for 7 days, moved from 追蹤; no practice
+  sessions), the next 24 hours' others, 剛結束, ELTA's full guide as one
+  button (its next hours were the same games again), and 追蹤 *how
+  they're doing* (the matches followed on their own, team and player
+  cards; 你的聯賽 dropped: 賽事 lists followed leagues first). Hash
+  `#live` stays (notices land there). Help (kit `help.mjs`) rewritten.
+- **F1 drivers in English everywhere** (the owner's call: players of
+  every other sport are in English): the kit's `f1Driver().zh` is the
+  name as given; `F1_NAMES_ZH` is kept for reading old Play tickets
+  ("羅素" → George Russell) and older app copies. An F1 story's line is
+  translated with its drivers held as ⟦0⟧… and put back
+  (`namedZh(text) → { text, back }`); teams stay Chinese (賓士).
+
 ## Footballers' official photos, news like a player's note, translations (2026-10-07, pushed to `main`)
 
 - **Photos:** footballers outside the Premier League showed FotMob's faces (a
@@ -79,7 +98,7 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
   The admin route allows 600 calls an hour.
 - **Sports news:** ESPN's stories on team, player, driver and F1-team sheets
   (a 新聞 tab; a story of the last 3 days leads as 最新消息), translated, with
-  F1 drivers named by the app's own Chinese names. Proxy trim `espn-news`.
+  F1 drivers kept in English (since 2026-10-08; was the app's Chinese names). Proxy trim `espn-news`.
 - **Play F1:** Kambi's race is the Grand Prix, never its practice or
   qualifying event. A Polymarket quote with $1,000 traded and a tight book is
   "firm": it is the driver's chance at its ask, over Kambi and older trades.
