@@ -107,6 +107,17 @@ export function newsQuery({ kind, name = '', sport = '' }) {
   return `https://news.google.com/rss/search?q=${encodeURIComponent(`${text} when:7d`)}&${zh ? 'hl=zh-TW&gl=TW&ceid=TW:zh-Hant' : 'hl=en-US&gl=US&ceid=US:en'}`;
 }
 
+// A headline that sounds like a flash (an injury, a rest, a move, a ruling…):
+// a star's week on Google is 80-odd items, mostly talk, and the injury
+// report a few days back is lost under the newest ten.
+const HARD = /\b(injur|hurt|ruled out|won.?t play|will not play|to miss|misses|sidelined|limited|doubtful|questionable|day-to-day|out for|out indefinitely|surgery|torn|tear|strain|sprain|fractur|broken|arthritis|sciatica|knee|ankle|foot|hamstring|calf|groin|shoulder|elbow|back spasm|concussion|illness|rest(s|ed)?\b|load management|return(s|ed|ing)? from|activated|injured list|\bIL\b|suspen|banned|\bban\b|fined|penalt|grid|pit lane|traded|trade[sd]? (for|to)|sign(s|ed)|contract|extension|released|waived|sacked|fired|appointed|hired|resign|verdict|guilty|charged|appeal|court|arrest|record|award|mvp)/i;
+// Google's items for the card: the flash-like ones of the week first (deduped), then the newest.
+export function papersFor(items, n = 14) {
+  const all = sameStoryOnce(items);
+  const hard = all.filter(st => HARD.test(st.headline)).slice(0, Math.ceil(n * 0.6));
+  return [...hard, ...all.filter(st => !hard.includes(st))].slice(0, n);
+}
+
 // The same story twice (ESPN's and a paper's, or two papers'): once.
 export function sameStoryOnce(stories) {
   const seen = new Set();
@@ -273,8 +284,8 @@ export async function handleLatest(request, env, headers, { session, limited, ca
     const espnStories = storiesAbout(feeds, { kind, id, name });
     // A player's headlines have their surname in them (or their whole name, in Chinese).
     const must = kind === 'player' ? (/[㐀-鿿]/.test(name) ? [name] : [name.split(/\s+/).filter(w => !/^(jr\.?|sr\.?|ii|iii)$/i.test(w)).pop() || name]) : [];
-    const papers = googleNews(await google, { must }).slice(0, 10);
-    const stories = sameStoryOnce([...espnStories, ...papers]).sort((x, y) => y.at - x.at).slice(0, 12);
+    const papers = papersFor(googleNews(await google, { must }));
+    const stories = sameStoryOnce([...espnStories, ...papers]).sort((x, y) => y.at - x.at).slice(0, 18);
     let out;
     if (!stories.length && !report.length) out = { none: true };
     else {

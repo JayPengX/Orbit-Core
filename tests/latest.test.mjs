@@ -1,7 +1,7 @@
 // Orbit Sports' 最新動態 by Gemini (latest.js).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { storiesAbout, handleLatest, LATEST_DAILY_CAP, LATEST_DEV_DAILY_CAP, newsQuery, sameStoryOnce, latestPrompt, articleText, cardOf } from '../latest.js';
+import { storiesAbout, handleLatest, LATEST_DAILY_CAP, LATEST_DEV_DAILY_CAP, newsQuery, sameStoryOnce, latestPrompt, articleText, cardOf, papersFor } from '../latest.js';
 
 const now = Date.parse('2026-10-07T06:00:00Z');
 const art = (id, hoursAgo, cats, extra = {}) => ({ id, headline: `H${id}`, description: `D${id}`, published: new Date(now - hoursAgo * 3_600_000).toISOString(), categories: cats, ...extra });
@@ -224,3 +224,11 @@ test("a change to the prompt: the old answer at once, the new one written behind
     assert.equal(seen.gemini, 2, 'the new prompt asked behind it');
     assert.equal(JSON.parse(opts.cache.m.get(key)).answer.headline, '卡');
   }));
+
+test("Google's week: the injury report from days back beats the newest talk", () => {
+  const item = (h, d) => ({ id: h, headline: h, at: now - d * 86_400_000 });
+  const talk = Array.from({ length: 20 }, (_, i) => item(`Pundit ${i} says something about LeBron James`, 0.1));
+  const picked = papersFor([...talk, item('LeBron James reportedly dealing with chronic arthritis in his left foot', 3)], 14);
+  assert.equal(picked.length, 14);
+  assert.equal(picked[0].headline, 'LeBron James reportedly dealing with chronic arthritis in his left foot');
+});
