@@ -667,8 +667,10 @@ export async function translate(text, to = 'zh-TW', from = 'auto') {
 const FAILED_HOLD_MS = 60_000;
 // A failed or stale read asked again after this.
 const RETRY_MS = 15_000;
-export function proxyJson(url, { ttl = 60_000, trim = '', persist: keep = true, timeout = 20_000 } = {}) {
-  return keptJson(url, dataKey(url, trim), { ttl, keep }, async () => (await mirrored(url, trim)) ?? enqueue(url, trim, timeout));
+// `mirror: false`: this one read from the proxy, never the nightly copy (an
+// app that knows the copy has moved on: mirrorBuilt says when it was built).
+export function proxyJson(url, { ttl = 60_000, trim = '', persist: keep = true, timeout = 20_000, mirror = true } = {}) {
+  return keptJson(url, dataKey(url, trim), { ttl, keep }, async () => (mirror ? await mirrored(url, trim) : null) ?? enqueue(url, trim, timeout));
 }
 // The nightly packs (Shared-Data on GitHub Pages, built at midnight Taiwan
 // time): what doesn't change in a day (a league's season, sports/<league>/
@@ -699,15 +701,20 @@ export function mirrorPath(url, trim = '') {
 }
 let mirrorIndex = null;
 const mirrorGone = new Set();
-// A read the app knows has moved on since the night (a playoff day's "TBD"
-// once a series is won): the proxy's from now on this session, never the copy.
+// When the nightly copies in use were built (ms), or 0 when there are none:
+// what happened after it (a playoff game over) the copies don't have.
+export async function mirrorBuilt() {
+  return (await readMirrorIndex())?.built || 0;
+}
+// (Kept for apps that still call it: the read is the proxy's for the session.
+// Prefer proxyJson(url, { mirror: false }) for one read, conditionally.)
 export function unmirror(url, trim = '') {
   mirrorGone.add(`${trim}!${url}`);
 }
 function readMirrorIndex() {
   if (!mirrorIndex || Date.now() - mirrorIndex.at > 30 * 60_000) {
     const p = packJson('mirror/index.json', { ttl: 30 * 60_000, timeout: 8_000 })
-      .then(x => ({ until: Number(x?.until) || 0, match: (x?.match || []).map(m => new RegExp(m)) }))
+      .then(x => ({ built: Number(x?.built) || 0, until: Number(x?.until) || 0, match: (x?.match || []).map(m => new RegExp(m)) }))
       .catch(() => null);
     mirrorIndex = { at: Date.now(), p };
   }
