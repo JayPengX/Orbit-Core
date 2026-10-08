@@ -173,6 +173,7 @@ test('the prompt: real news or skip, never the numbers', () => {
   assert.match(p, /Never a flash, however new: quotes/, 'no quotes, previews or recaps');
   assert.match(p, /leads with the biggest flash/, 'the biggest story leads, not the newest');
   assert.match(p, /for the race to come only/, 'a grid penalty for a race already run is over');
+  assert.match(p, /curiosities and side stories, a court case included/, 'a stolen old car is no flash');
   assert.match(p, /a ruling, a charge or a ban/, 'big news needn\'t be about the next game');
 });
 
