@@ -7,7 +7,7 @@
 // last three days, no videos; the newest two read in full, free from ESPN's
 // content API) and Google News's headlines about them (the last week: the
 // court case, the contract talk ESPN never tags). Nothing there and no
-// report: no card, and no Gemini. Otherwise Gemini (the cheapest model)
+// report: no card, and no Gemini. Otherwise Gemini (3.7 flash, thinking low)
 // decides if any of it is real news (an injury, a case, a transfer, a
 // milestone...; not highlights, previews, game reports or numbers the page
 // shows): a news flash (快訊), a hard fact like a grid penalty, an injury, a
@@ -29,7 +29,9 @@
 // reached by use: past it, { capped: true }.
 import { CATALOG } from './kit/catalog.mjs';
 
-export const LATEST_MODEL = 'gemini-3.5-flash-lite';
+// (3.7 flash, thinking low: flash lite, cheaper, skipped LeBron's arthritis
+// and Curry's rest on the same news, and mixed up 季前 and 季後.)
+export const LATEST_MODEL = 'gemini-3.7-flash';
 // The models the dev door may try instead (worker.js's GEMINI_ALLOWED_MODELS).
 const TRY_MODELS = ['gemini-3.5-flash-lite', 'gemini-3.7-flash'];
 export const LATEST_DAILY_CAP = 2000;
@@ -185,7 +187,7 @@ const SCHEMA = {
     points: { type: 'ARRAY', items: { type: 'STRING' } },
     more: { type: 'ARRAY', items: { type: 'OBJECT', properties: { story: { type: 'INTEGER' }, topic: { type: 'STRING', enum: TOPICS }, line: { type: 'STRING' } }, required: ['story', 'topic', 'line'] } }
   },
-  // (All of them: Gemini's cheapest model leaves out what it may.)
+  // (All of them: a model leaves out what it may.)
   required: ['skip', 'weight', 'story', 'topic', 'headline', 'points', 'more'],
   propertyOrdering: ['skip', 'weight', 'story', 'topic', 'headline', 'points', 'more']
 };
@@ -252,6 +254,14 @@ export async function handleLatest(request, env, headers, { session, limited, ca
   const facts = lines(body.facts, 6, 200);
   const report = lines(body.report, 3, 400);
   const team = kind === 'team' ? (/^\d+$/.test(id) ? id : '') : q('team').replace(/\D/g, '');
+  const googleRead = async u => {
+    const key = new Request(`https://latest.cache/google/${hashOf(u)}`);
+    const kept = cache ? await cache.match(key).catch(() => null) : null;
+    if (kept) return kept.text();
+    const text = await fetchFn(u, { signal: AbortSignal.timeout(10_000) }).then(r => (r.ok ? r.text() : null)).catch(() => null);
+    if (text && cache) await cache.put(key, new Response(text, { headers: { 'Cache-Control': 'max-age=3600' } })).catch(() => {});
+    return text;
+  };
   const read = (u, ttl = 300, as = 'json', ms = 8000) => fetchFn(u, { signal: AbortSignal.timeout(ms), cf: { cacheTtl: ttl, cacheEverything: true } }).then(r => (r.ok ? r[as]() : null)).catch(() => null);
 
   // Fast: the last answer for them (a card or none) at once while what the
@@ -289,10 +299,11 @@ export async function handleLatest(request, env, headers, { session, limited, ca
   // The news read; nothing there and no report: none (no Gemini). Else the
   // answer kept for exactly this, or Gemini asked (`writing` told first).
   async function write(writing = () => {}) {
-    // Google News is slow from Cloudflare (3 to 10 seconds cold, an hour in
-    // its cache after): fetched to the end behind the answer, so it's in the
-    // cache next time; the answer waits for it GOOGLE_WAIT_MS at most.
-    const googleAll = name ? read(newsQuery({ kind, name, sport: info.sport }), 3600, 'text', 12_000) : null;
+    // Google News: asked plainly (through Cloudflare's own cache, cf
+    // cacheEverything, it answers 503 after 7 seconds; plainly, 200 in under
+    // one) and kept an hour in ours. Fetched to the end behind the answer;
+    // the answer waits for it GOOGLE_WAIT_MS at most.
+    const googleAll = name ? googleRead(newsQuery({ kind, name, sport: info.sport })) : null;
     if (googleAll) waitUntil(googleAll);
     const google = googleAll && Promise.race([googleAll, new Promise(r => setTimeout(() => r(LATE), GOOGLE_WAIT_MS))]);
     const feeds = info.espn ? await Promise.all([read(`${ESPN}/${info.espn}/news?limit=50`), team ? read(`${ESPN}/${info.espn}/news?limit=50&team=${team}`) : null]) : [];
@@ -339,7 +350,7 @@ export async function handleLatest(request, env, headers, { session, limited, ca
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ role: 'user', parts: [{ text: latestPrompt({ kind, name, zh, league, stories, facts, report }) }] }],
-          generationConfig: { temperature: 0.3, maxOutputTokens: trying ? 4000 : 700, responseMimeType: 'application/json', responseSchema: SCHEMA, ...(trying ? { thinkingConfig: { thinkingLevel: 'low' } } : {}) }
+          generationConfig: { temperature: 0.3, maxOutputTokens: /lite/.test(model) ? 700 : 4000, responseMimeType: 'application/json', responseSchema: SCHEMA, ...(/lite/.test(model) ? {} : { thinkingConfig: { thinkingLevel: 'low' } }) }
         }),
         signal: AbortSignal.timeout(15000)
       });
