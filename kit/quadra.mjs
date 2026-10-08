@@ -2584,15 +2584,17 @@ export function phoneOnlyGate(app, { lang = detectLang(), qr = '' } = {}) {
   return true;
 }
 
-// Keeps every open Quadra page on the latest deploy. version.json is read
-// when the page opens (boot.js has already loaded a newer deploy before the
-// app started), every `every` ms, whenever the page comes back into view or
-// online, and as soon as any other open Quadra page (any app, same site) has
-// found an update: they tell each other through a BroadcastChannel. A newer
-// deploy is put in place at once (a short veil, the place on the page kept),
-// unless the person is in the middle of something: busy() (a round, an
-// order), typing in a field, or a sheet open. Then a bar offers it and it
-// happens the moment they're done (checked every 2 s) or the page is hidden.
+// Keeps every open Quadra page on the latest deploy, at once, whatever the
+// person is doing (the owner's rule: an update never waits for a sheet to
+// close or a relaunch). version.json is read as soon as the kit loads (this
+// module starts the watch itself from the page's build-version, before the
+// app's own start has finished), every `every` ms, whenever the page comes
+// back into view, gets focus or comes online, and as soon as any other open
+// Quadra page has found an update (a BroadcastChannel). A newer deploy is put
+// in place straight away: the place on the page kept (rememberPlace), the old
+// cached files dropped, the new page loaded. A reload that came back on the
+// old page (GitHub's CDN a moment behind the deploy) is tried again a few
+// seconds later, not left for the next launch.
 // The kit, loaded from one place for every app (kit/loader.html), has its
 // own version. kitLatest() notes the newest one for the next page load
 // (quadra.kit, which the loader reads) and says whether this page runs an
@@ -2617,26 +2619,28 @@ async function kitLatest() {
   }
 }
 
-export function watchUpdates({ current, key, cachePrefix, busy = () => false, every = 30_000 } = {}) {
-  if (!current || current === 'dev') return;
+let watching = null;
+// `busy` is no longer waited on (kept so the apps' calls stay valid).
+export function watchUpdates({ current, key, cachePrefix, every = 15_000 } = {}) {
+  if (!current || current === 'dev' || typeof document === 'undefined') return;
+  // Started already (by the kit itself, or an earlier call): one watch a page.
+  if (watching) return;
+  watching = { current, key, cachePrefix };
   let checking = false;
-  let pending = null;
-  let waiter = 0;
+  let retry = 0;
   const channel = globalThis.BroadcastChannel ? new BroadcastChannel('quadra-updates') : null;
-  const occupied = () => {
-    if (busy()) return true;
-    const a = document.activeElement;
-    if (a && (a.isContentEditable || (/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && !/^(button|checkbox|radio|range)$/i.test(a.type || '')))) return true;
-    return Boolean(document.querySelector('dialog[open]:not(.q-passive)'));
-  };
   async function apply(latest) {
-    // A reload that came back on the old page (GitHub's CDN still had it a
-    // moment after the deploy) tries again, 20 s apart, up to 4 times in
-    // the session, instead of waiting for the app to be closed and opened.
+    // The same deploy tried again at most 6 times in the session, 5 s apart.
     const flag = `${key || 'quadra'}.reloadedTo`;
     const [was, tries = 0, at = 0] = String(sessionStorage.getItem(flag) || '').split('|');
     const n = was === latest ? Number(tries) || 0 : 0;
-    if (n >= 4 || (n && Date.now() - Number(at) < 20_000)) return;
+    if (n >= 6) return;
+    const wait = n ? 5_000 - (Date.now() - Number(at)) : 0;
+    if (wait > 0) {
+      clearTimeout(retry);
+      retry = setTimeout(check, wait + 50);
+      return;
+    }
     sessionStorage.setItem(flag, `${latest}|${n + 1}|${Date.now()}`);
     rememberPlace();
     // Only the kit changed: the same page again, its loader now on the new
@@ -2647,19 +2651,8 @@ export function watchUpdates({ current, key, cachePrefix, busy = () => false, ev
     await reg?.update?.().catch(() => {});
     location.replace(`${location.pathname}?v=${encodeURIComponent(latest)}${location.hash}`);
   }
-  function offer(latest) {
-    // Quietly: no bar, no notice; it applies once the person is free.
-    pending = latest;
-    if (!waiter)
-      waiter = setInterval(() => {
-        if (!occupied()) {
-          clearInterval(waiter);
-          apply(pending).catch(() => {});
-        }
-      }, 2000);
-  }
   async function check() {
-    if (checking || pending) return;
+    if (checking) return;
     checking = true;
     try {
       const [res, kitNew] = await Promise.all([fetch(`./version.json?t=${Date.now()}`, { cache: 'no-store' }), kitLatest()]);
@@ -2667,8 +2660,7 @@ export function watchUpdates({ current, key, cachePrefix, busy = () => false, ev
       const latest = appNew && appNew !== current ? appNew : kitNew;
       if (!latest) return;
       channel?.postMessage({ update: key || location.pathname });
-      if (occupied()) offer(latest);
-      else await apply(latest);
+      await apply(latest);
     } catch {
     } finally {
       checking = false;
@@ -2676,15 +2668,33 @@ export function watchUpdates({ current, key, cachePrefix, busy = () => false, ev
   }
   check();
   channel?.addEventListener('message', () => check());
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') {
-      if (pending) apply(pending).catch(() => {});
-    } else check();
-  });
+  document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && check());
   globalThis.addEventListener?.('focus', () => check());
   globalThis.addEventListener?.('online', () => check());
-  globalThis.addEventListener?.('pageshow', event => event.persisted && check());
+  globalThis.addEventListener?.('pageshow', () => check());
   setInterval(check, every);
+}
+// Every app's page starts the watch as the kit loads: its build-version and
+// its cached files' prefix (the loading screen's data-cache), the same ones
+// it passes to watchUpdates later (that call then finds it running).
+if (typeof document !== 'undefined' && typeof location !== 'undefined') {
+  const current = document.querySelector('meta[name="build-version"]')?.content;
+  const cachePrefix = document.getElementById('loading')?.getAttribute('data-cache') || '';
+  if (current) watchUpdates({ current, key: `quadra.page:${location.pathname}`, cachePrefix });
+  // Back from an update's reload: the scroll put back once the app lifts its loading screen, in every app.
+  const box = document.getElementById('loading');
+  let placed = false;
+  try {
+    placed = Boolean(sessionStorage.getItem('quadra.place'));
+  } catch {}
+  if (box && placed && typeof MutationObserver !== 'undefined') {
+    const seen = new MutationObserver(() => {
+      if (!box.hidden) return;
+      seen.disconnect();
+      restorePlace();
+    });
+    seen.observe(box, { attributes: true, attributeFilter: ['hidden'] });
+  }
 }
 
 // Strips that scroll sideways (chips, tabs, dates) keep their place when

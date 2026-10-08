@@ -180,6 +180,14 @@ bug waiting in the rest.
 ## 5. Opening fast, and never moving
 
 - **Open on what the device already has**, then refresh behind it.
+- **A new deploy is in place at once, whatever the person is doing**
+  (2026-10-08): no waiting for a sheet to close, typing to end, or a second
+  launch. The kit starts watching as it loads (boot.js checks the app's and
+  the kit's version.json together on open, one reload for both; then every
+  15 s, on coming back, focus and online), keeps the scroll and tab across
+  the reload, and tries again within seconds when the CDN is behind. Every
+  app needs a `build-version` meta, a `version.json` per deploy, and a
+  service worker that never keeps version.json.
 - **The loading screen lifts once, onto the finished first screen.** Nothing
   reshuffles, pops in or jumps right after it. If the fresh data isn't
   there within a few seconds, open on the saved copy and swap values in

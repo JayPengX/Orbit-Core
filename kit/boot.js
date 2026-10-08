@@ -6,10 +6,11 @@
 // - Draws the loading screen into #loading (logo, the app's name from
 //   data-title, a progress line and what it's doing), so every app opens
 //   the same way.
-// - Checks version.json while the app's files load: a newer deploy than
-//   this page (meta build-version) is loaded straight away, its old cached
-//   files dropped (data-cache, the service worker's cache prefix), before
-//   anything starts. The kit's watchUpdates keeps the page current after.
+// - Checks version.json (the app's and the kit's) while the app's files
+//   load: a newer deploy than this page (meta build-version) or a newer kit
+//   is loaded straight away in one reload, its old cached files dropped
+//   (data-cache, the service worker's cache prefix), before anything starts.
+//   The kit's watchUpdates keeps the page current after.
 // - When the app fails to start (an error: an installed app whose cached
 //   page mixed an old version's files with a new one's), mends itself once
 //   in ten minutes: its cached files dropped, the latest deploy loaded from
@@ -172,28 +173,52 @@
     if (!started()) fail();
   }, 15000);
 
-  // A newer deploy than this page: load it now, before the app starts.
+  // A newer deploy than this page (or a newer kit): load it now, before the
+  // app starts, both in one reload (the kit's version noted for the loader,
+  // quadra.kit). A reload that came back on the old page (the CDN a moment
+  // behind) is tried again, up to 3 times a session.
   var meta = document.querySelector('meta[name="build-version"]');
   var current = meta && meta.content;
   if (!current || current === 'dev' || !window.fetch) return;
   var ctl = window.AbortController ? new AbortController() : null;
   setTimeout(function () {
     if (ctl) ctl.abort();
-  }, 3000);
-  fetch('./version.json?t=' + Date.now(), { cache: 'no-store', signal: ctl && ctl.signal })
-    .then(function (r) {
-      return r.ok ? r.json() : null;
-    })
-    .then(function (v) {
-      var latest = v && v.version;
-      if (!latest || latest === current) return;
-      var flag = 'quadra.bootTo:' + location.pathname;
-      if (sessionStorage.getItem(flag) === latest) return;
-      sessionStorage.setItem(flag, latest);
-      window.__bootUpdating = true;
-      dropCache(function () {
-        location.replace(location.pathname + '?v=' + encodeURIComponent(latest) + location.hash);
+  }, 6000);
+  var kit = window.QUADRA_KIT || {};
+  var read = function (url) {
+    return fetch(url + '?t=' + Date.now(), { cache: 'no-store', signal: ctl && ctl.signal })
+      .then(function (r) {
+        return r.ok ? r.json() : null;
+      })
+      .then(function (v) {
+        return (v && v.version) || null;
+      })
+      .catch(function () {
+        return null;
       });
-    })
-    .catch(function () {});
+  };
+  Promise.all([read('./version.json'), kit.base ? read(kit.base + 'version.json') : null]).then(function (got) {
+    var latest = got[0];
+    var kitLatest = got[1];
+    var appNew = latest && latest !== current;
+    // A kit newer than this page's (the first one seen on a device is only noted: it's what loaded).
+    var kitNew = kitLatest && kit.version && kitLatest !== kit.version;
+    if (kitLatest && kitLatest !== kit.version) {
+      try {
+        localStorage.setItem('quadra.kit', kitLatest);
+      } catch (e) {}
+    }
+    if ((!appNew && !kitNew) || window.__fxStarted) return;
+    var flag = 'quadra.bootTo:' + location.pathname;
+    var want = (appNew ? latest : current) + '|' + (kitLatest || '');
+    var was = String(sessionStorage.getItem(flag) || '').split('#');
+    var tries = was[0] === want ? Number(was[1]) || 0 : 0;
+    if (tries >= 3) return;
+    sessionStorage.setItem(flag, want + '#' + (tries + 1));
+    window.__bootUpdating = true;
+    dropCache(function () {
+      if (appNew) location.replace(location.pathname + '?v=' + encodeURIComponent(latest) + (tries ? '&r=' + tries : '') + location.hash);
+      else location.reload();
+    });
+  });
 })();
