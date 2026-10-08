@@ -238,7 +238,7 @@ export const HELP = {
       ]],
       ['follow', '追蹤', [
         '依喜好順序選運動和聯賽（第一個最優先），在首頁的「我的設定」；球隊在比賽或球隊頁按「+ 追蹤」，F1 車手和車隊在他們的頁面追蹤，單一場比賽或一站 F1 在比賽頁追蹤。追蹤的球隊開賽和完賽會通知你；Play 的推薦也用你的追蹤。',
-        '球隊和選手頁有傷兵報告（NBA、WNBA、NFL、NHL、MLB，ESPN 即時更新）：誰受傷、狀態、預計何時回歸。F1 比賽中的賽事幹事訊息會翻成中文，點車手可看他的頁面。'
+        '球隊頁有傷兵報告（NBA、WNBA、NFL、NHL、MLB，ESPN 即時更新）：誰受傷、狀態、預計何時回歸。F1 比賽中的賽事幹事訊息會翻成中文，點車手可看他的頁面。'
       ]],
       ['watch', '台灣轉播', [
         'Orbit Sports 只列在台灣看得到的聯賽：愛爾達 ELTA.tv 和 Apple TV（MLS）。每場比賽標出頻道和語言（英文原音、中文、雙語），比賽進行中有「觀看」。轉播權會變動，以各平台公告為準。'
@@ -263,7 +263,7 @@ export const HELP = {
       ]],
       ['follow', 'Following', [
         'Pick sports and leagues in order of priority (the first counts most) under My settings on Home; follow teams with “+ Follow” on a match or team page, F1 drivers and teams on their page, and one match or F1 weekend on its page. A followed team’s start and final score come as notices, and Play’s picks use your follows too.',
-        'Team and player pages have the injury report (NBA, WNBA, NFL, NHL, MLB, live from ESPN): who’s hurt, their status and when they’re due back. In a live F1 session, tap a driver in a race control message to open them.'
+        'Team pages have the injury report (NBA, WNBA, NFL, NHL, MLB, live from ESPN): who’s hurt, their status and when they’re due back. In a live F1 session, tap a driver in a race control message to open them.'
       ]],
       ['watch', 'Watching in Taiwan', [
         'Orbit Sports lists the leagues you can watch in Taiwan: ELTA.tv, and Apple TV for MLS. Each game shows its channel and commentary (English, Chinese, dual), and Watch while it’s on. Rights change; each service’s own listings are the final word.'

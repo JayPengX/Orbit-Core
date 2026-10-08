@@ -49,8 +49,8 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
   their place, the **injury report**, live from ESPN: a league's whole
   report in one read (`site.api.espn.com/…/<league>/injuries`, ten
   minutes; `leagueInjuries` in `Orbit-Sports/public/lib/espn.mjs`) on a
-  team's page (傷兵報告: status chip, what, when back), the athlete's own
-  on a player's page (傷病報告, with the reporter's word, translated).
+  team's page (傷兵報告: status chip, what, when back). A player's page
+  keeps only its 🩹 tag (owner's call: no long report text there).
   Checked 2026-10-09: NBA (101 players), WNBA, NFL (800), NHL, MLB have
   one; NBL, college football (3) next to none; **ESPN keeps none for any
   soccer league** (league, team roster and core API all empty). Soccer
