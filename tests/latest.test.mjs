@@ -7,6 +7,9 @@ const now = Date.parse('2026-10-07T06:00:00Z');
 const art = (id, hoursAgo, cats, extra = {}) => ({ id, headline: `H${id}`, description: `D${id}`, published: new Date(now - hoursAgo * 3_600_000).toISOString(), categories: cats, ...extra });
 const feed = { articles: [art(1, 5, [{ type: 'athlete', athleteId: 1966 }]), art(2, 100, [{ type: 'athlete', athleteId: 1966 }]), art(3, 2, [{ type: 'team', teamId: 13 }]), art(4, 1, [{ type: 'athlete', athleteId: 1966 }], { type: 'Media' })] };
 
+// An answer without the prompt version it carries (`v`).
+const noV = a => { const { v, ...rest } = a || {}; return rest; };
+
 test("only the last three days' stories tagged with them, no videos, newest first", () => {
   assert.deepEqual(storiesAbout([feed, feed], { kind: 'player', id: '1966' }, now).map(s => s.id), ['1']);
   assert.deepEqual(storiesAbout([feed], { kind: 'team', id: '13' }, now).map(s => s.id), ['3']);
@@ -66,10 +69,10 @@ const withNow = async fn => {
 test('no news and no report: no card, and Gemini never asked', () =>
   withNow(async () => {
     const { seen, opts } = world();
-    assert.deepEqual(await (await handleLatest(post({ id: '3975', facts: ['勇士・控球後衛'] }), env, {}, opts)).json(), { none: true });
+    assert.deepEqual(await (await handleLatest(post({ id: '3975', facts: ['勇士・控球後衛'] }), env, {}, opts)).json().then(noV), { none: true });
     assert.equal(seen.gemini, 0);
     const reads = seen.reads;
-    assert.deepEqual(await (await handleLatest(post({ id: '3975', facts: ['勇士・控球後衛'] }), env, {}, opts)).json(), { none: true });
+    assert.deepEqual(await (await handleLatest(post({ id: '3975', facts: ['勇士・控球後衛'] }), env, {}, opts)).json().then(noV), { none: true });
     assert.equal(seen.reads, reads, 'the second opening: straight from the kept answer, no news read');
   }));
 
@@ -77,7 +80,7 @@ test('a story: ESPN\'s article read in full, the card written once and kept for 
   withNow(async () => {
     const { seen, opts } = world({ feed: { articles: [art(50121620, 5, [{ type: 'athlete', athleteId: 3975 }])] } });
     const a = await (await handleLatest(post({ id: '3975' }), env, {}, opts)).json();
-    assert.deepEqual(a, { at: now - 5 * 3_600_000, headline: '卡', points: ['一'] });
+    assert.deepEqual(noV(a), { at: now - 5 * 3_600_000, headline: '卡', points: ['一'] });
     assert.equal(seen.articles, 1);
     assert.match(seen.prompts[0], /\[0\] 2026-10-07 H50121620\nCurry said the knee feels strong\./);
     await handleLatest(post({ id: '3975' }), env, {}, { ...opts, cache: opts.cache });
@@ -87,10 +90,10 @@ test('a story: ESPN\'s article read in full, the card written once and kept for 
 test('Gemini finds nothing real: none, kept (not asked again for the same news)', () =>
   withNow(async () => {
     const { seen, opts } = world({ feed: { articles: [art(1, 5, [{ type: 'athlete', athleteId: 3975 }])] }, reply: { skip: true } });
-    assert.deepEqual(await (await handleLatest(post({ id: '3975' }), env, {}, opts)).json(), { none: true });
+    assert.deepEqual(await (await handleLatest(post({ id: '3975' }), env, {}, opts)).json().then(noV), { none: true });
     // Another device, the same news (the last answer gone): the kept skip, no second ask.
     opts.cache.m.forEach((_, k) => k.includes('/last/') && opts.cache.m.delete(k));
-    assert.deepEqual(await (await handleLatest(post({ id: '3975' }), env, {}, opts)).json(), { none: true });
+    assert.deepEqual(await (await handleLatest(post({ id: '3975' }), env, {}, opts)).json().then(noV), { none: true });
     assert.equal(seen.gemini, 1);
   }));
 
@@ -138,7 +141,7 @@ test('the last answer at once; the news looked at again behind it every half hou
 test('no match cards; capped past the day\'s budget; a session needed', () =>
   withNow(async () => {
     const { seen, opts } = world({ feed: { articles: [art(1, 5, [{ type: 'team', teamId: 9 }])] } });
-    assert.deepEqual(await (await handleLatest(post({ kind: 'match', id: '401' }), env, {}, opts)).json(), { none: true });
+    assert.deepEqual(await (await handleLatest(post({ kind: 'match', id: '401' }), env, {}, opts)).json().then(noV), { none: true });
     opts.cache.m.set(`https://latest.count/${new Date(now + 8 * 3_600_000).toISOString().slice(0, 10)}`, String(LATEST_DAILY_CAP));
     assert.deepEqual(await (await handleLatest(post({ kind: 'team', id: '9', name: 'Golden State Warriors' }), env, {}, opts)).json(), { capped: true });
     assert.equal(seen.gemini, 0);
@@ -203,30 +206,31 @@ test('streamed: "writing" only when Gemini is asked, then the answer; nothing to
     const linesOf = async res => (await res.text()).trim().split('\n').map(x => JSON.parse(x));
     const streamed = body => new Request('https://w/latest?stream=1', { method: 'POST', body: JSON.stringify({ league: 'nba', kind: 'player', name: 'Stephen Curry', ...body }) });
     const quiet = world();
-    assert.deepEqual(await linesOf(await handleLatest(streamed({ id: '3975' }), env, {}, quiet.opts)), [{ none: true }]);
+    assert.deepEqual(await linesOf(await handleLatest(streamed({ id: '3975' }), env, {}, quiet.opts)).then(l => l.map(noV)), [{ none: true }]);
     const news = world({ feed: { articles: [art(5, 5, [{ type: 'athlete', athleteId: 3975 }])] } });
     const res = await handleLatest(streamed({ id: '3975' }), env, {}, news.opts);
     assert.equal(res.headers.get('Content-Type'), 'application/x-ndjson');
-    assert.deepEqual(await linesOf(res), [{ writing: true }, { at: now - 5 * 3_600_000, headline: '卡', points: ['一'] }]);
+    assert.deepEqual((await linesOf(res)).map(x => (x.writing ? x : noV(x))), [{ writing: true }, { at: now - 5 * 3_600_000, headline: '卡', points: ['一'] }]);
     // Written before: the answer at once, no "writing".
-    assert.deepEqual(await linesOf(await handleLatest(streamed({ id: '3975' }), env, {}, news.opts)), [{ at: now - 5 * 3_600_000, headline: '卡', points: ['一'] }]);
+    assert.deepEqual((await linesOf(await handleLatest(streamed({ id: "3975" }), env, {}, news.opts))).map(noV), [{ at: now - 5 * 3_600_000, headline: '卡', points: ['一'] }]);
   }));
 
-test("a change to the prompt: the old answer at once, the new one written behind it", () =>
+test("a change to the prompt: every card written anew before it's shown, never the old prompt's", () =>
   withNow(async () => {
     const { seen, opts } = world({ feed: { articles: [art(1, 5, [{ type: 'athlete', athleteId: 3975 }])] } });
-    const behind = [];
-    opts.waitUntil = p => behind.push(p);
-    assert.equal((await (await handleLatest(post({ id: '3975' }), env, {}, opts)).json()).headline, '卡');
+    const first = await (await handleLatest(post({ id: '3975' }), env, {}, opts)).json();
+    assert.equal(first.headline, '卡');
+    assert.ok(first.v, 'each answer says its prompt');
     const key = [...opts.cache.m.keys()].find(k => k.includes('/last/'));
     const kept = JSON.parse(opts.cache.m.get(key));
     opts.cache.m.set(key, JSON.stringify({ ...kept, v: 'an-older-prompt', answer: { headline: '舊卡' } }));
     for (const k of [...opts.cache.m.keys()]) if (!k.includes('/last/') && !k.includes('latest.count')) opts.cache.m.delete(k);
-    assert.equal((await (await handleLatest(post({ id: '3975' }), env, {}, opts)).json()).headline, '舊卡', 'no wait');
-    await Promise.all(behind);
-    assert.equal(seen.gemini, 2, 'the new prompt asked behind it');
-    assert.equal(JSON.parse(opts.cache.m.get(key)).answer.headline, '卡');
+    const again = await (await handleLatest(post({ id: '3975' }), env, {}, opts)).json();
+    assert.equal(again.headline, '卡', 'the old prompt\'s card never shown');
+    assert.equal(again.v, first.v);
+    assert.equal(seen.gemini, 2, 'written anew');
   }));
+
 
 test("Google's week: the injury report from days back beats the newest talk", () => {
   const item = (h, d) => ({ id: h, headline: h, at: now - d * 86_400_000 });

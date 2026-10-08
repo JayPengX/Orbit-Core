@@ -267,8 +267,9 @@ export async function handleLatest(request, env, headers, { session, limited, ca
   // Fast: the last answer for them (a card or none) at once while what the
   // app sent is the same; the news looked at again behind it every half hour.
   const sentHash = hashOf([...facts, '|', ...report].join('\n'));
-  // (Kept across a change to the prompt: the old one's answer at once, the
-  // new one written behind it, so a change never makes every card slow.)
+  // (Only the prompt's own: after a change to it every card is written anew
+  // before it's shown, never the old prompt's card again. Each answer says
+  // its prompt, `v`, so the app drops the cards it kept from before.)
   const lastReq = new Request(`https://latest.cache/last/${league}/${kind}/${encodeURIComponent(id)}`);
   const keepLast = (answer, v = PROMPT_VERSION, checked = Date.now()) => cache?.put(lastReq, new Response(JSON.stringify({ v, sent: sentHash, answer, checked }), { headers: KEEP }));
   const last = cache ? await cache.match(lastReq).then(r => r?.json()).catch(() => null) : null;
@@ -277,11 +278,12 @@ export async function handleLatest(request, env, headers, { session, limited, ca
   // ...and ?model= another of TRY_MODELS, to compare on the same news (nothing kept).
   const model = debug && TRY_MODELS.includes(url.searchParams.get('model')) ? url.searchParams.get('model') : LATEST_MODEL;
   const trying = model !== LATEST_MODEL;
-  if (last?.answer && last.sent === sentHash && !debug) {
-    if (last.v !== PROMPT_VERSION || !(Date.now() - last.checked < RECHECK_MS)) waitUntil(Promise.resolve(keepLast(last.answer, last.v)).then(() => write()).catch(() => {}));
-    return json(last.answer, headers);
+  const said = a => (a && typeof a === 'object' && (a.headline || a.none) ? { ...a, v: PROMPT_VERSION } : a);
+  if (last?.answer && last.sent === sentHash && last.v === PROMPT_VERSION && !debug) {
+    if (!(Date.now() - last.checked < RECHECK_MS)) waitUntil(Promise.resolve(keepLast(last.answer, last.v)).then(() => write()).catch(() => {}));
+    return json(said(last.answer), headers);
   }
-  if (url.searchParams.get('stream') !== '1') return json(await write(), headers);
+  if (url.searchParams.get('stream') !== '1') return json(said(await write()), headers);
   // Streamed (?stream=1): a line { writing: true } the moment Gemini is
   // asked, then the answer, so the app shows the card's shape only when a
   // card is being written, never on its way to nothing.
@@ -291,7 +293,7 @@ export async function handleLatest(request, env, headers, { session, limited, ca
   waitUntil(
     write(() => line({ writing: true }))
       .catch(() => ({ failed: true }))
-      .then(out => line(out))
+      .then(out => line(said(out)))
       .finally(() => writer.close().catch(() => {}))
   );
   return new Response(readable, { headers: { ...headers, 'Content-Type': 'application/x-ndjson', 'Cache-Control': 'no-store' } });
