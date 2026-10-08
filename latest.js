@@ -314,7 +314,7 @@ export async function handleLatest(request, env, headers, { session, limited, ca
     // (Written without Google, late: looked at again in a minute, by when it's in.)
     if (!trying && (out?.headline || out?.none)) await keepLast(out, PROMPT_VERSION, late ? Date.now() - RECHECK_MS + 60_000 : Date.now());
     const probe = debug && name ? await (async t => fetchFn(newsQuery({ kind, name, sport: info.sport }), { signal: AbortSignal.timeout(8000), cf: { cacheTtl: 3600, cacheEverything: true } }).then(async r => `${r.status} ${r.redirected ? `→${r.url.slice(0, 60)} ` : ''}${r.headers.get('content-type')} cf:${r.headers.get('cf-cache-status')} ${Date.now() - t}ms ${(await r.text()).length}b`).catch(e => `${e.name} ${Date.now() - t}ms`))(Date.now()) : '';
-    return debug ? { ...out, debug: { google: late ? 'late' : !!googleText, probe, model, stories: stories.map(st => `${new Date(st.at).toISOString().slice(5, 10)} ${st.source || 'ESPN'} | ${st.headline}`) } } : out;
+    return debug ? { ...out, debug: { google: late ? `late, then ${await (async t => googleAll.then(x => `${x ? x.length : 'null'} after ${Date.now() - t}ms more`))(Date.now())}` : !!googleText, probe, model, stories: stories.map(st => `${new Date(st.at).toISOString().slice(5, 10)} ${st.source || 'ESPN'} | ${st.headline}`) } } : out;
   }
 
   async function ask(keyUrl, stories) {
@@ -338,7 +338,7 @@ export async function handleLatest(request, env, headers, { session, limited, ca
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ role: 'user', parts: [{ text: latestPrompt({ kind, name, zh, league, stories, facts, report }) }] }],
-          generationConfig: { temperature: 0.3, maxOutputTokens: 700, responseMimeType: 'application/json', responseSchema: SCHEMA }
+          generationConfig: { temperature: 0.3, maxOutputTokens: trying ? 4000 : 700, responseMimeType: 'application/json', responseSchema: SCHEMA, ...(trying ? { thinkingConfig: { thinkingLevel: 'low' } } : {}) }
         }),
         signal: AbortSignal.timeout(15000)
       });
