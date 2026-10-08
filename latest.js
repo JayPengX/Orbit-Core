@@ -297,7 +297,7 @@ export async function handleLatest(request, env, headers, { session, limited, ca
       out = kept ? await kept.json() : await (inFlight.get(keyUrl) || inFlight.set(keyUrl, ask(keyUrl, stories).finally(() => inFlight.delete(keyUrl))).get(keyUrl));
     }
     if (out?.headline || out?.none) await keepLast(out);
-    const probe = debug && name ? await (async t => fetchFn(newsQuery({ kind, name, sport: info.sport }), { signal: AbortSignal.timeout(8000) }).then(async r => `${r.status} ${Date.now() - t}ms ${(await r.text()).length}b`).catch(e => `${e.name} ${Date.now() - t}ms`))(Date.now()) : '';
+    const probe = debug && name ? await (async t => fetchFn(newsQuery({ kind, name, sport: info.sport }), { signal: AbortSignal.timeout(8000), cf: { cacheTtl: 3600, cacheEverything: true } }).then(async r => `${r.status} ${r.redirected ? `→${r.url.slice(0, 60)} ` : ''}${r.headers.get('content-type')} cf:${r.headers.get('cf-cache-status')} ${Date.now() - t}ms ${(await r.text()).length}b`).catch(e => `${e.name} ${Date.now() - t}ms`))(Date.now()) : '';
     return debug ? { ...out, debug: { google: !!(await google), probe, stories: stories.map(st => `${new Date(st.at).toISOString().slice(5, 10)} ${st.source || 'ESPN'} | ${st.headline}`) } } : out;
   }
 
