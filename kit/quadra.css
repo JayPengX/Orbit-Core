@@ -2268,8 +2268,11 @@ dialog {
 .q-pass .truth-hero { display: grid; gap: 6px; margin-top: 6px; padding: 16px 18px; border-radius: 20px; background: linear-gradient(135deg, var(--accent-wash), var(--q-surface) 75%); border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent); }
 .q-pass .truth-hero strong { font-size: 19px; font-weight: 800; }
 .q-pass .truth-hero p { font-size: 14px; line-height: 1.65; color: var(--q-text-2); }
+/* (Its own layout, whatever an app's own .facts is: Orbit Sports' is a two-column grid.) */
+.q-pass .facts { display: block; grid-template-columns: none; gap: 0; margin: 0; padding: 0; list-style: none; font-size: inherit; color: inherit; }
 .q-pass .facts .t-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 11px 14px; border-top: 1px solid var(--q-divider, var(--q-border)); }
 .q-pass .facts .t-row:first-child { border-top: 0; }
+.q-pass .t-label { display: grid; gap: 2px; min-width: 0; }
 .q-pass .t-label strong { font-size: 14px; }
 .q-pass .t-label small { font-size: 12px; line-height: 1.45; }
 .q-pass .t-value { font-size: 16px; white-space: nowrap; }
