@@ -122,7 +122,9 @@ test('a whole cell from the three sources', async () => {
 
 test('one truth: the answer names no source and carries no second opinion', async () => {
   const kv = memKv();
-  const resp = await cellForecast({ ...env, RATE_LIMIT_KV: kv }, null, 25.034, 121.565, { fetchFn: upstream(), now: NOW });
+  const waits = [];
+  const resp = await cellForecast({ ...env, RATE_LIMIT_KV: kv }, { waitUntil: p => waits.push(p) }, 25.034, 121.565, { fetchFn: upstream(), now: NOW });
+  await Promise.all(waits);
   const text = JSON.stringify(resp);
   for (const word of ['google', 'cwa', 'moenv', 'By"', 'split', 'weights', 'sources']) assert.ok(!text.toLowerCase().includes(word.toLowerCase()), word);
   // The breakdown is kept for scoring, in KV only.
@@ -164,7 +166,9 @@ test('the cell cache: fresh from KV, old answered at once and refreshed behind',
   let calls = 0;
   const ok = upstream();
   const f = async url => (calls++, ok(url));
-  await cellForecast(e, null, 25.034, 121.565, { fetchFn: f, now: NOW });
+  const first = [];
+  await cellForecast(e, { waitUntil: p => first.push(p) }, 25.034, 121.565, { fetchFn: f, now: NOW });
+  await Promise.all(first);
   const n = calls;
   const again = await cellForecast(e, null, 25.034, 121.565, { fetchFn: f, now: NOW + 10 * 60_000 });
   assert.equal(calls, n);
@@ -172,10 +176,40 @@ test('the cell cache: fresh from KV, old answered at once and refreshed behind',
   const waits = [];
   const old = await cellForecast(e, { waitUntil: p => waits.push(p) }, 25.034, 121.565, { fetchFn: f, now: NOW + 60 * 60_000 });
   assert.equal(old.refreshing, true);
-  assert.equal(old.at, NOW);
+  assert.ok(old.at >= NOW && old.at < NOW + 60_000, 'the copy made then');
   await Promise.all(waits);
   assert.ok(calls > n);
   assert.equal(JSON.parse(kv.store.get('weather:cell:25.03,121.57')).at, NOW + 60 * 60_000);
+});
+
+test('a cell nobody has: the near answer at once, the far hours and air forecast behind it', async () => {
+  const kv = memKv();
+  const e = { ...env, RATE_LIMIT_KV: kv };
+  const log = [];
+  const ok = upstream();
+  const f = async (url, init) => (log.push(String(url)), ok(url, init));
+  const waits = [];
+  const quick = await cellForecast(e, { waitUntil: p => waits.push(p) }, 25.034, 121.565, { fetchFn: f, now: NOW });
+  const google = () => log.filter(u => u.includes('weather.googleapis.com')).length;
+  const air = () => log.filter(u => u.includes('airquality.googleapis.com')).length;
+  // Current, two hour pages, the days: the answer, with the rest to come.
+  assert.equal(google(), 4);
+  assert.equal(air(), 0);
+  assert.equal(quick.more, true);
+  assert.equal(quick.refreshing, true);
+  assert.ok(quick.hours.length >= 47 && quick.days.length === 10 && quick.now.temp != null);
+  // Asked again before it's whole: the quick copy, still said to be coming, nothing fetched for it.
+  const mid = await cellForecast(e, null, 25.034, 121.565, { fetchFn: async () => assert.fail('fetched'), now: NOW + 1000 });
+  assert.equal(mid.more, true);
+  await Promise.all(waits);
+  // The far hours: the two near pages again for the chain, then 8; Google's air once.
+  assert.equal(google(), 14);
+  assert.equal(air(), 1);
+  const whole = await cellForecast(e, null, 25.034, 121.565, { fetchFn: async () => assert.fail('fetched'), now: NOW + 30_000 });
+  assert.ok(!whole.more && !whole.refreshing);
+  assert.ok(whole.hours.length > quick.hours.length + 100, 'hours to day 10');
+  assert.equal(whole.air.hourly.length, 96);
+  assert.ok(!JSON.parse(kv.store.get('weather:cell:25.03,121.57')).quick, 'KV has the whole one');
 });
 
 test('advice: umbrella, sun window, wear, mask, by the thresholds', () => {

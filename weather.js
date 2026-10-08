@@ -223,35 +223,50 @@ export function parseGoogleAlerts(j) {
   }));
 }
 
+// Google's hours, 24 a page: the first two (48 hours), then the rest by
+// the chain of page tokens (hours 49–240, 8 more pages, one after another).
+const HOURS = '&hours=240&pageSize=24';
+async function nearPages(get) {
+  const pages = [await get('forecast/hours:lookup', HOURS)];
+  if (pages[0].nextPageToken) pages.push(await get('forecast/hours:lookup', `${HOURS}&pageToken=${encodeURIComponent(pages[0].nextPageToken)}`));
+  return pages;
+}
+async function farPages(get, token) {
+  const more = [];
+  let farError = null;
+  try {
+    while (token && more.length < 8) {
+      const url = `${HOURS}&pageToken=${encodeURIComponent(token)}`;
+      // One more try for a page that fails (a hiccup shouldn't cost the days after it).
+      const p = await get('forecast/hours:lookup', url).catch(() => get('forecast/hours:lookup', url));
+      more.push(p);
+      token = p.nextPageToken;
+    }
+  } catch (e) {
+    farError = `page ${more.length + 3}: ${String(e.message || e).slice(0, 160)}`;
+    console.log('weather far hours failed', farError);
+  }
+  return { far: more.length ? more.flatMap(p => p.forecastHours || []).map(parseGoogleHour) : null, farError };
+}
+// Hours 49–240 alone, after a quick answer had the rest (10 calls: the two
+// near pages again for the token, then the far ones).
+async function fetchGoogleFar(env, lat, lon, fetchFn) {
+  const get = (path, extra) => getJson(fetchFn, googleUrl(env, path, lat, lon, extra), env);
+  const pages = await nearPages(get);
+  return farPages(get, pages[pages.length - 1].nextPageToken);
+}
+
 // Current, 48 hours (24 a page at most, each page a billed call), 10 days;
 // alerts only abroad (in Taiwan CWA's warnings are the source).
 // `far`: also hours 49–240 (8 more pages; the pages chain by token, so
 // they follow the first two).
 async function fetchGoogle(env, lat, lon, fetchFn, abroad, far = false) {
   const get = (path, extra, units) => getJson(fetchFn, googleUrl(env, path, lat, lon, extra, units), env);
-  const HOURS = '&hours=240&pageSize=24';
   let farHours = null;
   let farError = null;
   const hoursP = (async () => {
-    const pages = [await get('forecast/hours:lookup', HOURS)];
-    if (pages[0].nextPageToken) pages.push(await get('forecast/hours:lookup', `${HOURS}&pageToken=${encodeURIComponent(pages[0].nextPageToken)}`));
-    if (far) {
-      const more = [];
-      let token = pages[pages.length - 1].nextPageToken;
-      try {
-        while (token && more.length < 8) {
-          const url = `${HOURS}&pageToken=${encodeURIComponent(token)}`;
-          // One more try for a page that fails (a hiccup shouldn't cost the days after it).
-          const p = await get('forecast/hours:lookup', url).catch(() => get('forecast/hours:lookup', url));
-          more.push(p);
-          token = p.nextPageToken;
-        }
-      } catch (e) {
-        farError = `page ${more.length + 3}: ${String(e.message || e).slice(0, 160)}`;
-        console.log('weather far hours failed', farError);
-      }
-      if (more.length) farHours = more.flatMap(p => p.forecastHours || []).map(parseGoogleHour);
-    }
+    const pages = await nearPages(get);
+    if (far) ({ far: farHours, farError } = await farPages(get, pages[pages.length - 1].nextPageToken));
     return pages.flatMap(p => p.forecastHours || []);
   })();
   const [current, hours, days, alerts] = await Promise.all([
@@ -562,7 +577,8 @@ export async function keptJson(env, key) {
 // `entry.at` is when it was made; `prev` the copy it replaces.
 export async function keepJson(env, key, entry, ttlS, prev = null) {
   const c = edge();
-  const due = !c || !prev?.kvAt || entry.at - prev.kvAt >= KV_EVERY_MS;
+  // (A quick entry is replaced in KV too as soon as it's whole: another place's edge reads KV.)
+  const due = !c || !prev?.kvAt || prev.quick || entry.at - prev.kvAt >= KV_EVERY_MS;
   const out = { ...entry, kvAt: due ? entry.at : prev.kvAt };
   if (c) {
     try {
@@ -1139,7 +1155,11 @@ export function weekAdvice(out, resp, win) {
 
 // ---- One cell, end to end ------------------------------------------------------------
 
-export async function buildCell(env, lat, lon, { fetchFn = fetch, now = Date.now(), prev = null } = {}) {
+// `quick`: someone is waiting on this cell (none kept, or kept too long):
+// what takes long (Google's hours 49–240, ten pages one after another, and
+// its air forecast) is left to the next build, the last of them used
+// meanwhile; the entry says so (`quick`) and cellForecast builds it whole behind the answer.
+export async function buildCell(env, lat, lon, { fetchFn = fetch, now = Date.now(), prev = null, quick = false } = {}) {
   const cell = cellOf(lat, lon);
   const keep = part => (prev?.parts?.[part] && now - prev.parts[part].at < KEEP_MS ? prev.parts[part] : null);
   const settle = async (part, make) => {
@@ -1155,12 +1175,15 @@ export async function buildCell(env, lat, lon, { fetchFn = fetch, now = Date.now
   const inTaiwan = (nearestStation(lat, lon, 'r')?.km ?? Infinity) <= NEAR_KM;
   // Hours 49–240: fetched every FAR_MS, kept between.
   const farPrev = prev?.parts?.far && now - prev.parts.far.at < 2 * 86_400_000 ? prev.parts.far : null;
-  const wantFar = !farPrev || now - farPrev.at >= (farPrev.partial ? FAR_RETRY_MS : FAR_MS);
+  const farDue = !farPrev || now - farPrev.at >= (farPrev.partial ? FAR_RETRY_MS : FAR_MS);
+  const wantFar = farDue && !quick;
   // Google's air hours: every FAR_MS too, in Taiwan (its AQI is MOENV's
   // scale), kept between; a key without the Air Quality API just goes without.
   const gairPrev = prev?.parts?.gair && now - prev.parts.gair.at < 2 * 86_400_000 ? prev.parts.gair : null;
   const gairNoted = prev?.parts?.gairOff && now - prev.parts.gairOff < 86_400_000 ? prev.parts.gairOff : null;
-  const wantGair = env.GOOGLE_WEATHER_KEY && inTaiwan && !gairNoted && (!gairPrev || now - gairPrev.at >= FAR_MS);
+  const gairDue = env.GOOGLE_WEATHER_KEY && inTaiwan && !gairNoted && (!gairPrev || now - gairPrev.at >= FAR_MS);
+  const wantGair = gairDue && !quick;
+  const deferred = quick && (farDue || gairDue);
   // (Counted before the weather's calls: KV's counter isn't atomic.)
   const gairJob =
     wantGair && (await googleAllowed(env, now, 1))
@@ -1175,8 +1198,14 @@ export async function buildCell(env, lat, lon, { fetchFn = fetch, now = Date.now
     const r = await settle('google', async () => ({ ...gFc.v, ...(await fetchGoogleNow(env, lat, lon, fetchFn)) }));
     return { ...r, fcAt: gFc.fcAt ?? gFc.at };
   };
+  // The far hours due just after a quick build: those pages alone (its near ones are minutes old).
+  const farOnly = async () => {
+    const r = await settle('google', async () => ({ ...gFc.v, ...(await fetchGoogleFar(env, lat, lon, fetchFn)) }));
+    return r.state === 'ok' ? { ...r, at: gFc.at, fcAt: gFc.fcAt ?? gFc.at } : { state: 'ok', ...gFc };
+  };
+  const justBuilt = gFc && prev?.quick && now - prev.at < GOOGLE_FC_MS;
   const [google, cwa, aqi, aqf, warn, weights, aqiHist, gairRes] = await Promise.all([
-    !env.GOOGLE_WEATHER_KEY ? { state: 'off', v: null } : gFc && !wantFar ? ((await googleAllowed(env, now, 1)) ? googleNowOnly() : { state: 'ok', ...gFc }) : (await googleAllowed(env, now, wantFar ? 12 : 4)) ? settle('google', () => fetchGoogle(env, lat, lon, fetchFn, !inTaiwan, wantFar)) : wantFar && (await googleAllowed(env, now, 4)) ? settle('google', () => fetchGoogle(env, lat, lon, fetchFn, !inTaiwan)) : keep('google') ? { state: 'stale', ...keep('google') } : { state: 'capped', v: null },
+    !env.GOOGLE_WEATHER_KEY ? { state: 'off', v: null } : justBuilt && wantFar ? ((await googleAllowed(env, now, 10)) ? farOnly() : { state: 'ok', ...gFc }) : gFc && !wantFar ? ((await googleAllowed(env, now, 1)) ? googleNowOnly() : { state: 'ok', ...gFc }) : (await googleAllowed(env, now, wantFar ? 12 : 4)) ? settle('google', () => fetchGoogle(env, lat, lon, fetchFn, !inTaiwan, wantFar)) : wantFar && (await googleAllowed(env, now, 4)) ? settle('google', () => fetchGoogle(env, lat, lon, fetchFn, !inTaiwan)) : keep('google') ? { state: 'stale', ...keep('google') } : { state: 'capped', v: null },
     env.CWA_KEY && inTaiwan ? settle('cwa', () => fetchCwa(env, lat, lon, fetchFn)) : { state: inTaiwan ? 'off' : 'n/a', v: null },
     env.MOENV_KEY && inTaiwan ? airSites(env, fetchFn, now) : null,
     env.MOENV_KEY && inTaiwan ? shared(env, 'weather:moenv:aqf', 3 * HOUR, () => getJson(fetchFn, moenvUrl(env, 'aqf_p_01', '&limit=100'), env).then(j => (Array.isArray(j) ? j : j.records || []).map(f => ({ area: f.area, forecastdate: f.forecastdate, aqi: f.aqi, majorpollutant: f.majorpollutant }))), now) : null,
@@ -1218,7 +1247,7 @@ export async function buildCell(env, lat, lon, { fetchFn = fetch, now = Date.now
   // The scoring needs the next 24 hours only.
   bySource.hours = bySource.hours.filter(h => h.t < now + 48 * HOUR);
   const nearOnly = google.v ? { ...google.v, far: undefined } : null;
-  return { at: now, resp, bySource, sources, parts: { google: google.state === 'ok' || google.state === 'stale' ? { at: google.at, fcAt: google.fcAt ?? google.at, v: nearOnly } : null, cwa: cwa.state === 'ok' || cwa.state === 'stale' ? { at: cwa.at, v: cwa.v } : null, far: far || null, gair: gair || null, gairOff: gairRes?.off ? now : gairNoted } };
+  return { at: now, ...(deferred ? { quick: true } : {}), resp, bySource, sources, parts: { google: google.state === 'ok' || google.state === 'stale' ? { at: google.at, fcAt: google.fcAt ?? google.at, v: nearOnly } : null, cwa: cwa.state === 'ok' || cwa.state === 'stale' ? { at: cwa.at, v: cwa.v } : null, far: far || null, gair: gair || null, gairOff: gairRes?.off ? now : gairNoted } };
 }
 
 // The cells people opened lately (`weather:recent`, cell → when), for the
@@ -1241,20 +1270,41 @@ export async function cellForecast(env, ctx, lat, lon, { fetchFn = fetch, now = 
   // (An entry from before one truth, without `bySource`, is not used.)
   const found = await keptJson(env, key);
   const hit = found?.bySource ? found : null;
-  const refresh = async () => {
-    const entry = await keepJson(env, key, await buildCell(env, lat, lon, { fetchFn, now, prev: hit }), KEEP_MS / 1000, found);
-    await noteRecent(env, cellOf(lat, lon), now);
+  const refresh = async (prev = hit, kept = found, quick = false, at = now) => {
+    const entry = await keepJson(env, key, await buildCell(env, lat, lon, { fetchFn, now: at, prev, quick }), KEEP_MS / 1000, kept);
+    await noteRecent(env, cellOf(lat, lon), at);
     return entry;
   };
-  if (hit && now - hit.at < freshMs) return { ...hit.resp, cached: true };
+  // A quick entry made whole behind the answer (the far hours, the air forecast).
+  // (On the request's clock, moved on by the time since: the whole answer is newer than the quick one.)
+  const t0 = Date.now();
+  const finish = entry => {
+    const job = refresh(entry, entry, false, now + (Date.now() - t0)).catch(e => console.log('weather finish failed', String(e.message || e)));
+    if (ctx?.waitUntil) ctx.waitUntil(job);
+  };
+  if (hit && now - hit.at < freshMs) {
+    // Still being made whole: said so, so the page asks again shortly (and
+    // the job again if it never landed).
+    if (hit.quick) {
+      if (now - hit.at > QUICK_FINISH_MS) finish(hit);
+      return { ...hit.resp, cached: true, refreshing: true, more: true };
+    }
+    return { ...hit.resp, cached: true };
+  }
   if (hit && now - hit.at < STALE_MS) {
     // (No lock: two refreshes of one cell at once are harmless.)
     const job = refresh().catch(e => console.log('weather refresh failed', String(e.message || e)));
     if (ctx?.waitUntil) ctx.waitUntil(job);
     return { ...hit.resp, cached: true, refreshing: true };
   }
-  return (await refresh()).resp;
+  // Someone waiting: the quick answer now, the rest behind it.
+  const entry = await refresh(hit, found, true);
+  if (!entry.quick) return entry.resp;
+  finish(entry);
+  return { ...entry.resp, refreshing: true, more: true };
 }
+// How long a quick entry's finishing job gets before it's started again.
+export const QUICK_FINISH_MS = 45_000;
 
 // ---- Status and samples ----------------------------------------------------------------
 

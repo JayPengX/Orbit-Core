@@ -454,7 +454,12 @@ Planned in `docs/WEATHER-PLAN.md`; the PWA's repo is `JayPengX/Orbit-Weather`
   the kit (`schedulePush`), the device-id route is gone.
 - `/weather` is hourly for 10 days: the near hours each refresh (4 calls),
   hours 49–240 every 6 hours (8 more, chained page tokens);
-  `GOOGLE_DAILY_CALLS` = 450. `air.history` (the nearest site's last 48 h,
+  `GOOGLE_DAILY_CALLS` = 450. Someone waiting on a cell (none kept, or kept
+  over 3 hours) gets a quick build first (`quick`: now, 48 hours, the 10
+  days, CWA, the stations; the last far hours and Google air if any), answered
+  with `more: true`; the far hours (10 calls) and Google's air finish behind
+  it (`waitUntil`, restarted after `QUICK_FINISH_MS`), and the page asks again
+  every 4 s (`MORE_MS`, 5 times at most) until `more` is gone. `air.history` (the nearest site's last 48 h,
   from `weather:aqi:hist`, written by the hourly cron) and
   `air.forecast.days`. `/weather/where` = NLSC's TownVillagePointQuery1
   (county / town / village), Cloudflare-cached 30 days by ~100 m.
