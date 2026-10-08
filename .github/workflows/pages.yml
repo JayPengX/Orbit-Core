@@ -9,6 +9,8 @@ on:
     branches: ['main']
     paths:
       - 'kit/**'
+      # (A test fixed after a failed run publishes the kit that run held back.)
+      - 'tests/**'
       - 'site/**'
       - 'brand/**'
       - 'package.json'
