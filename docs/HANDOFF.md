@@ -8,6 +8,32 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
 
 
 
+## The owner's follow-ups of 2026-10-10 evening (pushed to `main`)
+
+- **Live on the minute (Sports):** `espn.mjs` `feedStarted` / `feedStatus` /
+  `dueToStart`: F1's own feed saying a session has started (or ended) wins
+  over ESPN's copy, on the cards, the day and the weekend sheet; the sheet
+  re-reads every 15 s from a session's start (it had waited for ESPN to say
+  one was on). 比分 re-reads for a game due to start. A CPBL game past its
+  start is on at once on the device (its list is kept 2 minutes).
+- **F1 results before jolpica (Sports):** a sprint, race or qualifying over
+  with no jolpica rows yet is drawn from F1's archive (`/session.json`, the
+  live board's shape, 冠軍 for the winner), never cached over jolpica's.
+- **CPBL's play-offs (proxy, kit, Sports):** CPBL's lists of kind E (季後挑戰賽)
+  and C (台灣大賽) read from September; TheSportsDB's round 0 is a play-off
+  game (`playoff: true`). Sports' `cpblPlayoffs` names each by pairing and
+  number (the first pairing the challenge, the next the Taiwan Series) as
+  its stage; no series score (the challenge can start with a win given). A
+  play-off box score is `/cpbl/box/<year>-E<n>.json`.
+- **Transit stops' sides:** `bus.mjs` `stopSides` groups a stop's signs by
+  bearing (≤45° one side), each side its own marker and card from zoom 17;
+  further out one card with each side's buses under its way.
+- **Play's speed:** opens on the saved board after 2 s (was 6; reopen 2.7 s
+  like Sports), the saved board good 3 days minus games started, swapped
+  once when today's is whole; standings asked for with each league's games.
+  A cold open (no saved board) is still ~10 s: the live strip needs every
+  league's games first. `fitNumbers` steps down until the text really fits.
+
 ## The owner's list of 2026-10-10 (33 items, all repos, pushed to `main`)
 
 - **MLB playoffs (Sports, Play):** the nightly copy stays; MLB's own
