@@ -2886,3 +2886,63 @@ html.q-recording body::after {
 .q-recent[open] summary::after {
   transform: rotate(45deg);
 }
+
+/* ---- Upright only (2026-10-10): a phone on its side, the page turned back
+   against it (quadra.mjs uprightTurn), so it stays upright on the glass.
+   The page's box is the upright screen's; what floats in the top layer
+   (sheets, alerts) is turned the same way. ---- */
+html[data-q-turn='-90'],
+html[data-q-turn='90'] {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: var(--q-turn-w);
+  height: var(--q-turn-h);
+  overflow-x: hidden;
+  overflow-y: auto;
+  transform-origin: 0 0;
+}
+html[data-q-turn='-90'] {
+  transform: translateY(var(--q-turn-w)) rotate(-90deg);
+}
+html[data-q-turn='90'] {
+  transform: translateX(var(--q-turn-h)) rotate(90deg);
+}
+html[data-q-turn] body {
+  min-height: var(--q-turn-h);
+}
+/* The notch is at the phone's top, now a side of the landscape screen: its inset there. */
+html[data-q-turn='-90'] {
+  --q-top: max(env(safe-area-inset-left), 20px);
+}
+html[data-q-turn='90'] {
+  --q-top: max(env(safe-area-inset-right), 20px);
+}
+/* Sheets at the upright screen's foot, alerts in its middle. */
+html[data-q-turn] dialog[open] {
+  position: fixed;
+  inset: auto;
+  top: 0;
+  left: 0;
+  margin: 0;
+  transform-origin: 0 0;
+}
+html[data-q-turn] dialog.q-sheet[open] {
+  width: min(460px, calc(var(--q-turn-w) - 12px));
+  max-height: calc(var(--q-turn-h) * 0.88);
+}
+html[data-q-turn='-90'] dialog.q-sheet[open] {
+  transform: translateY(var(--q-turn-w)) rotate(-90deg) translate(calc((var(--q-turn-w) - 100%) / 2), calc(var(--q-turn-h) - 100% - 6px));
+}
+html[data-q-turn='90'] dialog.q-sheet[open] {
+  transform: translateX(var(--q-turn-h)) rotate(90deg) translate(calc((var(--q-turn-w) - 100%) / 2), calc(var(--q-turn-h) - 100% - 6px));
+}
+html[data-q-turn='-90'] dialog[open]:not(.q-sheet) {
+  transform: translateY(var(--q-turn-w)) rotate(-90deg) translate(calc((var(--q-turn-w) - 100%) / 2), calc((var(--q-turn-h) - 100%) / 2));
+}
+html[data-q-turn='90'] dialog[open]:not(.q-sheet) {
+  transform: translateX(var(--q-turn-h)) rotate(90deg) translate(calc((var(--q-turn-w) - 100%) / 2), calc((var(--q-turn-h) - 100%) / 2));
+}
+html[data-q-turn] dialog[open] {
+  animation: none;
+}

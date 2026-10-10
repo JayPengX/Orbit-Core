@@ -127,6 +127,8 @@ async function writeManifest(id, place) {
     name: b.name,
     short_name: b.short,
     description: html.match(/<meta name="description" content="([^"]*)"/)?.[1] || b.tag.zh,
+    // Upright only: every layout is drawn for a phone held upright (the owner, 2026-10-10).
+    orientation: 'portrait',
     icons: [
       { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
       { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },

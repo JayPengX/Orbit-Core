@@ -7,6 +7,42 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
 `npx eslint .`).
 
 
+
+## The owner's list of 2026-10-10 (33 items, all repos, pushed to `main`)
+
+- **MLB playoffs (Sports, Play):** the nightly copy stays; MLB's own
+  postseason list (`kit/postseason.mjs`, statsapi, one ~60 KB read for all
+  of October, minutes fresh through the proxy) goes on top of every day:
+  each playoff game's time or 待定, 如需, and a game MLB no longer lists
+  (its series over) gone. Day pages and team schedules; Play sells a game
+  MLB made sure.
+- **Taiwan's holidays** (`kit/holidays.mjs`, the DGPA calendar, 2026–27):
+  Class shows no classes and sends no class notices on one; Weather's and
+  Transit's weekdays-only pins and trips skip it.
+- **Upright only:** manifests `orientation: portrait`, and the kit turns
+  the page back against a sideways phone (TRUTH §6).
+- **F1:** a practice drawn with its best laps and gaps, live and after
+  (F1's archive through `f1-live.js` `/session.json`); a session over by
+  F1's feed ends at once; standings move only once a sprint or race is
+  over; stopped cars greyed like retired ones; "LAP DELETED" in Chinese;
+  the live board as a timing tower.
+- **Sports:** 今日推薦開賽 notices (a kind of its own), no 「第一場」, a
+  lone pick card spans the iPad's width.
+- **Play:** the account card counts lottery tickets with bets, says 未結算
+  until something's decided; preseason props at a preseason's minutes;
+  the parlay boost in money; the bought-lottery sheet rebuilt; live picks
+  green or red, no highlight box; short team names on cut lines.
+- **Securities:** the stock sheet is a kit sheet (swipes down); the cash
+  card's rate with what it earns. **Class:** sheets swipe down from
+  anywhere, not just the handle.
+- **Transit:** Google's bus stops hidden, ours on both sides of the
+  street; a tapped stop centred above its card; the plans compact; a
+  rarely-run route (5615) offers its next buses; a later bus picked isn't
+  "趕不上"; one destination mark; stops on a trip (加一站, and from the
+  nav menu, which now says what 換一條路 and 改目的地 each do); 結束 asks
+  first. **Weather:** no warning banner; the page's shape while loading,
+  the forecast coming in.
+
 ## Sports' four tabs by question; F1 drivers in English (2026-10-08, pushed to `main`)
 
 - **One question per tab** (a game showed in up to five places before):

@@ -205,6 +205,12 @@ bug waiting in the rest.
   that order.
 - **Nothing wider than the screen.** The preview tool flags any element
   that is.
+- **Upright only** (2026-10-10). Every screen is drawn for a phone held
+  upright: the manifests say `orientation: portrait`, and since iOS can't
+  lock a web app, the kit turns the page back against a phone on its side
+  (`html[data-q-turn]`, quadra.mjs uprightTurn): it stays upright on the
+  glass, as a portrait-only app does. Sheets and alerts (the top layer)
+  are turned with it. A tablet turns as it likes.
 - Respect the safe areas. Nothing sits under the status bar or the home
   indicator, and nothing is hidden behind frosted glass.
 - **The top edge stays sharp on iPhone (iOS 26's edge blur).** The kit

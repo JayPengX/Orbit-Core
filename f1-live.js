@@ -45,8 +45,9 @@ export function trimF1Live(r, now = Date.now()) {
         pos: Number(l.Position) || 99,
         best: list(l.BestLapTimes)[part - 1]?.Value || l.BestLapTime?.Value || '',
         last: l.LastLapTime?.Value || '',
-        gap: typeof l.GapToLeader === 'string' ? l.GapToLeader : stats.TimeDiffToFastest || '',
-        interval: l.IntervalToPositionAhead?.Value ?? stats.TimeDifftoPositionAhead ?? '',
+        // (A practice gives its gaps on the line itself, not per part: none showed.)
+        gap: typeof l.GapToLeader === 'string' ? l.GapToLeader : stats.TimeDiffToFastest || l.TimeDiffToFastest || '',
+        interval: l.IntervalToPositionAhead?.Value ?? stats.TimeDifftoPositionAhead ?? l.TimeDiffToPositionAhead ?? '',
         laps: Number(l.NumberOfLaps) || 0,
         pits: Number(l.NumberOfPitStops) || 0,
         inPit: Boolean(l.InPit),
@@ -125,8 +126,50 @@ async function snapshot() {
   }
 }
 
+// A finished session from F1's own archive (livetiming.formula1.com/static,
+// open, its final state a few minutes after the flag): the same trim as the
+// live board, so a practice that's over still shows each car's best lap
+// (ESPN has only the order). `start`: the session's start (UTC, ISO); the
+// year's index says which session that is.
+const ARCHIVE = 'https://livetiming.formula1.com/static/';
+const archiveJson = async path => {
+  const res = await fetch(`${ARCHIVE}${path}`, { signal: AbortSignal.timeout(TIMEOUT) });
+  if (!res.ok) throw new Error(`archive ${res.status}`);
+  return JSON.parse((await res.text()).replace(/^\uFEFF/, ''));
+};
+// The index's session starting at `start` ({ Path, … }), or null.
+export function archivedSession(index, start) {
+  const at = Date.parse(start);
+  for (const m of index?.Meetings || [])
+    for (const s of m.Sessions || []) {
+      if (!s.Path || !s.StartDate) continue;
+      const [h, mm] = String(s.GmtOffset || '0:0').split(':').map(Number);
+      const t = Date.parse(`${s.StartDate}Z`) - ((h || 0) * 60 + (mm || 0)) * 60_000;
+      if (Math.abs(t - at) < 20 * 60_000) return s;
+    }
+  return null;
+}
+async function archived(start) {
+  if (!Number.isFinite(Date.parse(start))) throw new Error('start');
+  const year = new Date(start).getUTCFullYear();
+  const s = archivedSession(await archiveJson(`${year}/Index.json`), start);
+  if (!s) throw new Error('not archived');
+  const names = ['SessionInfo', 'SessionStatus', 'TimingData', 'TimingAppData', 'DriverList', 'RaceControlMessages'];
+  const parts = await Promise.all(names.map(n => archiveJson(`${s.Path}${n}.json`).catch(() => null)));
+  const r = Object.fromEntries(names.map((n, i) => [n, parts[i]]));
+  if (!r.TimingData?.Lines) throw new Error('no timing');
+  return { ...trimF1Live(r), final: true };
+}
+
 export async function f1LiveResponse(url) {
   const json = (body, status) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+  if (url.pathname === '/session.json') {
+    try {
+      return json(await archived(url.searchParams.get('start') || ''), 200);
+    } catch (error) {
+      return json({ error: String(error.message || error) }, 502);
+    }
+  }
   if (url.pathname !== '/now.json') return json({ error: 'unknown' }, 404);
   try {
     return json(trimF1Live(await snapshot()), 200);

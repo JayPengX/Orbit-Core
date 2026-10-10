@@ -273,6 +273,8 @@ function cachePolicyFor(url) {
     case ASIA_HOST:
       return asiaPolicy(url);
     case F1_LIVE_HOST:
+      // A finished session from F1's archive (f1-live.js /session.json): it doesn't change.
+      if (url.pathname === '/session.json') return CACHE_STANDINGS;
       return CACHE_F1_LIVE;
     default:
       return CACHE_LIVE;

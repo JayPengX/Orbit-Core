@@ -903,6 +903,32 @@ function statusStrip() {
   bar.setAttribute('aria-hidden', 'true');
   document.body.prepend(bar);
 }
+// A phone turned sideways: every app's screens are drawn for a phone held
+// upright (the owner, 2026-10-10), and iOS can't lock a web app's
+// orientation, so the page turns back against the phone: it stays upright
+// on the glass as if the phone hadn't turned (quadra.css html[data-q-turn]).
+// Only a phone (its short side 520 px or less); a tablet turns as it likes.
+function uprightTurn() {
+  if (typeof document === 'undefined' || document.documentElement.dataset.qTurnOn) return;
+  const root = document.documentElement;
+  root.dataset.qTurnOn = '1';
+  const set = () => {
+    const w = globalThis.innerWidth;
+    const h = globalThis.innerHeight;
+    const phone = root.classList.contains('q-touch') && Math.min(w, h) <= 520;
+    const angle = Number(globalThis.screen?.orientation?.angle ?? globalThis.orientation ?? 90);
+    // Turned left (90): the page a quarter back to the right, and the other way round.
+    const turn = phone && w > h ? (angle === 270 || angle === -90 ? '90' : '-90') : '';
+    if (turn) {
+      root.style.setProperty('--q-turn-w', `${h}px`);
+      root.style.setProperty('--q-turn-h', `${w}px`);
+    }
+    if ((root.dataset.qTurn || '') !== turn) root.dataset.qTurn = turn;
+  };
+  set();
+  globalThis.addEventListener?.('resize', set);
+  globalThis.screen?.orientation?.addEventListener?.('change', set);
+}
 // The phone paints its own status bar above the page in the theme colour (or
 // black), so the theme colour is the strip's: one colour from the top of the
 // screen down to the page, never a black band with a seam under it. Kept in
@@ -921,6 +947,7 @@ function syncThemeColor() {
 // Back at once if an app redraws its body (innerHTML) and takes it away.
 function keepStatusStrip() {
   statusStrip();
+  uprightTurn();
   syncThemeColor();
   if (typeof MutationObserver === 'function') {
     new MutationObserver(() => { statusStrip(); syncThemeColor(); }).observe(document.body, { childList: true, attributes: true, attributeFilter: ['style', 'class', 'data-theme', 'data-sky'] });
@@ -2233,7 +2260,8 @@ function pushedHere(app, key) {
 export const NOTICE_KINDS = {
   match: [
     ['start', '比賽開打', 'A game starts', '你追蹤的球隊比賽開始時。', 'When a team you follow starts a game.'],
-    ['end', '比賽結束', 'Final score', '你追蹤的球隊比賽結束，附上比分。', 'When a team you follow finishes a game, with the score.']
+    ['end', '比賽結束', 'Final score', '你追蹤的球隊比賽結束，附上比分。', 'When a team you follow finishes a game, with the score.'],
+    ['pick', '今日推薦開賽', 'Today’s picks start', '今日推薦的每一場開始時（不含更多推薦）。', 'When each of today’s picks starts (not the further suggestions).']
   ],
   odds: [
     ['slip', '投注單結算', 'Slip settled', '投注單的比賽全部結束、算好派彩時。', 'When every game on a slip is over and it’s paid.'],
