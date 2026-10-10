@@ -8,6 +8,39 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
 
 
 
+## The owner's list of 2026-10-11 (40 items, pushed to `main`)
+
+- **Sports:** CPBL's 0 (TheSportsDB leaves a scoreless side empty), no
+  CPBL win chart, CPBL's 季後賽 (`cpblSeeds`, the challenge's given win in
+  its series, the Taiwan Series waiting). F1: one row design for every list
+  (`f1Row`, team colour, F1's names), a qualifying not over between parts
+  (`feedOver`/`feedBreak`, no early cut line), the last live reading until
+  the official numbers come (`keptTiming` keeps a finished one 2 days),
+  數據 beside the order (tyre stints, best sectors, speed trap: f1-live.js
+  now trims `stints`, `grid`, `sectors`, `speed`, `pb` from TimingStats),
+  clocks as the feed last said them, race control's turn incidents. Football
+  過程 is the whole commentary (`commentary`, `soccerLineZh`), own goals the
+  team's they counted for, goals a timeline with faces, 上半/下半. 數據 in the
+  teams' colours and a broadcast's order. 轉播 drawn once its lists are in.
+  Notices: the title the news; a start kept 10 min on the list.
+- **Push Worker:** every sent notice remembered by tag and time (`toldKey`):
+  an open app re-sending its list at a start no longer drops it. Weather
+  notices `{title}` / `{place}`.
+- **Kit:** `f1live.mjs` (dynamic import): Play settles F1 picks the moment
+  F1's feed says a session is over and shows their place live.
+- **Play:** slips as verdict + legs (parlay-aware), home row as the slip,
+  account card merged, cash out greedy as a sportsbook (`LEG_CUT` 4%/6%,
+  3% keep, reasons when paused), editing a slip (cash out into a new slip
+  at today's odds, one save), locks rebalanced (`shadeLong`, ≤1.03 / ≥30,
+  限 bands narrower), F1 two-way markets at the two-way cut, a league-tier
+  cut (`TIER_CUT`), late qualifying keeps 排位賽第一 on sale (`waitsUntil`),
+  drawn lock icon, game sheet waits for its lists, 場中焦點 from the last
+  live read (`play.live.v1`).
+- **Words:** checks by meaning with 不認識 (no cloze), types by training
+  stage, retry the other way round, levels' monotone prior, how each miss
+  happened (`h`) shown in 複習 and on flash cards.
+- **Weather:** asks for the position unprompted once (`orbit-weather.geo.asked`); 定位 on the page after.
+
 ## The owner's follow-ups of 2026-10-10 evening (pushed to `main`)
 
 - **Live on the minute (Sports):** `espn.mjs` `feedStarted` / `feedStatus` /
