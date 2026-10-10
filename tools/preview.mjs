@@ -699,8 +699,12 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => (reopen ? [h, h]
       // A row of things that wrapped.
       const cs = getComputedStyle(el);
       if (cs.display.includes('flex') && cs.flexDirection === 'row' && cs.flexWrap === 'wrap' && kids.length > 1 && kids.length <= 12) {
-        const tops = new Set(kids.map(k => Math.round(k.getBoundingClientRect().top / 6)));
-        if (tops.size > 1) out.push(`${name(el)} (${tops.size} rows: "${text.slice(0, 40)}")`);
+        // A new row starts where a thing begins below the last row's middle (a few pixels apart is one row).
+        const boxes = kids.map(k => k.getBoundingClientRect()).sort((x, y) => x.top - y.top);
+        let rowsSeen = 1;
+        let bottom = boxes[0].top + boxes[0].height / 2;
+        for (const r of boxes.slice(1)) if (r.top > bottom) (rowsSeen++, (bottom = r.top + r.height / 2));
+        if (rowsSeen > 1) out.push(`${name(el)} (${rowsSeen} rows: "${text.slice(0, 40)}")`);
       }
     }
     return [...new Set(out)].slice(0, 25);
