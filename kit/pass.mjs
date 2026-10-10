@@ -74,7 +74,7 @@ export const STRINGS = {
     edgeBoostSub: '加成只加在獎金上，抽成卻每關相乘；Plus 會員 {plus}',
     yourBets: '你的投注回收率',
     yourBetsSub: '投注 {staked}，拿回 {won}',
-    edgeFoot: '串關關數越多，莊家留得越多：所以 App 會用「加成」和「精選串關」推你多串幾關。中獎超過 {free} 還要扣 {tax} 的稅；提前兌現再扣 {keep}（Plus {plus}）。',
+    edgeFoot: '串關關數越多，莊家留得越多：所以 App 會用「加成」和「精選串關」推你多串幾關。中獎超過 {free} 還要扣 {tax} 的稅；提前兌現時，每個還沒結果的選項先扣 {cut} 的莊家差價，整張再扣 {keep}（Plus {plus}）：串越多關、越早兌現，拿得越少。',
     edgeSub: '每個賠率裡都藏著抽成：機率加起來超過 100%，多出來的就是莊家的。下面是每下注 NT$100，長期平均會被留下多少。',
     lotteryTitle: '彩券和刮刮樂',
     lotteryDraw: '電腦彩券（威力彩、大樂透、539…）',
@@ -257,7 +257,7 @@ export const STRINGS = {
     edgeBoostSub: 'The boost adds to the winnings; the cut multiplies with every pick. Plus members: {plus}',
     yourBets: 'What your bets paid back',
     yourBetsSub: 'Staked {staked}, back {won}',
-    edgeFoot: 'The more picks on a parlay, the more the house keeps, which is why the app pushes boosts and featured parlays. Winnings over {free} lose {tax} in tax; cash out keeps {keep} more ({plus} with Plus).',
+    edgeFoot: 'The more picks on a parlay, the more the house keeps, which is why the app pushes boosts and featured parlays. Winnings over {free} lose {tax} in tax; cash out takes {cut} off each undecided pick’s chance, then keeps {keep} of the slip ({plus} with Plus): the more picks still to play, the less it pays.',
     edgeSub: 'Every price hides a cut: the chances behind the odds add up to more than 100%, and the extra is the house’s. Here’s what it keeps of every NT$100 staked, on average, over time.',
     lotteryTitle: 'Lottery and scratch cards',
     lotteryDraw: 'Number draws (Super Lotto, Lotto 6/49, 539…)',
@@ -618,7 +618,7 @@ function renderTruth(box, { t, state }) {
           row(t('edgeBoost', { n: parlay.legs }), pct(boostedKeep(parlay.legs, parlay.odds)), t('edgeBoostSub', { plus: pct(boostedKeep(parlay.legs, parlay.odds, plusBoost)) })),
           r.staked > 0 ? row(t('yourBets'), r.betBack == null ? '—' : pct(r.betBack), t('yourBetsSub', { staked: money(r.staked), won: money(r.won) }), r.won >= r.staked ? 'up' : 'down') : null
         ],
-        t('edgeFoot', { tax: pct(PLAY.tax), free: money(PLAY.taxFree), keep: pct(PLAY.cashOutKeep, 0), plus: pct(PLUS.odds.cashOutKeep, 0) })
+        t('edgeFoot', { tax: pct(PLAY.tax), free: money(PLAY.taxFree), keep: pct(PLAY.cashOutKeep, 0), plus: pct(PLUS.odds.cashOutKeep, 0), cut: `${pct(PLAY.cashOutLegCut.pre, 0)}–${pct(PLAY.cashOutLegCut.live, 0)}` })
       ),
       { sub: t('edgeSub') }
     ),
