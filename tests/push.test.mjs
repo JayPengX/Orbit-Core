@@ -215,3 +215,28 @@ test("a race's podium in the app's own names for the drivers", async () => {
     globalThis.fetch = realFetch;
   }
 });
+
+test('a pick starting is sent once, even when the open app sends its list again just after the start', async () => {
+  const kv = memoryKv();
+  const env = { RATE_LIMIT_KV: kv };
+  const post = (session, path, body) => handlePush(new Request(`https://w/${path}`, { method: 'POST', body: JSON.stringify(body) }), env, {}, session, path);
+  const match = { d: 'acct', a: 'match' };
+  const subKeys = { p256dh: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4', auth: 'BTBZMqHH6r4Tts7J_aSIgg' };
+  await post(match, '/push/subscribe', { sub: { endpoint: 'https://push.example/s', keys: subKeys } });
+  const start = Date.now() - 30_000;
+  const pick = at => ({ items: [{ at, title: '新加坡站 排位賽 開始', body: 'F1 · MAX5台', tag: 'match:pick:f1:600~Qual', kind: 'pick' }] });
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(null, { status: 201 });
+  try {
+    // The app open at the start: its list sent again with the start just passed, the item still on it.
+    await post(match, '/push/schedule', pick(start));
+    assert.equal((await sendDue(env, Date.now())).sent, 1);
+    await post(match, '/push/schedule', pick(start));
+    assert.equal(JSON.parse(kv.m.get('push:acct:match')).items.length, 0, 'told already');
+    // Tomorrow's of the same tag is another notice.
+    await post(match, '/push/schedule', pick(start + 86_400_000));
+    assert.equal(JSON.parse(kv.m.get('push:acct:match')).items.length, 1);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});

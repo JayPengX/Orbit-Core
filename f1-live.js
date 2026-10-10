@@ -13,7 +13,7 @@
 
 export const F1_LIVE_HOST = 'f1-live.quadra';
 const BASE = 'https://livetiming.formula1.com/signalrcore';
-const TOPICS = ['SessionInfo', 'SessionStatus', 'TrackStatus', 'LapCount', 'ExtrapolatedClock', 'DriverList', 'TimingData', 'TimingAppData', 'RaceControlMessages'];
+const TOPICS = ['SessionInfo', 'SessionStatus', 'TrackStatus', 'LapCount', 'ExtrapolatedClock', 'DriverList', 'TimingData', 'TimingAppData', 'TimingStats', 'RaceControlMessages'];
 const RS = '\x1e';
 const TIMEOUT = 8_000;
 
@@ -26,6 +26,7 @@ export function trimF1Live(r, now = Date.now()) {
   const info = r?.SessionInfo || {};
   const td = r?.TimingData || {};
   const app = r?.TimingAppData?.Lines || {};
+  const ts = r?.TimingStats?.Lines || {};
   const drivers = r?.DriverList || {};
   const clock = r?.ExtrapolatedClock || {};
   const part = Number(td.SessionPart) || 0;
@@ -57,7 +58,13 @@ export function trimF1Live(r, now = Date.now()) {
         out: Boolean(l.KnockedOut),
         tyre: stint?.Compound || '',
         tyreLaps: Number(stint?.TotalLaps) || 0,
-        tyreNew: stint?.New === 'true'
+        tyreNew: stint?.New === 'true',
+        // Orbit Sports' 數據: every stint (compound, laps), the grid slot, the best sectors and the speed trap's best (each with its place).
+        stints: list(app[no]?.Stints).map(x => ({ c: x.Compound || '', laps: Number(x.TotalLaps) || 0, new: x.New === 'true' })),
+        grid: Number(app[no]?.GridPos) || 0,
+        sectors: list(ts[no]?.BestSectors).map(x => ({ v: x?.Value || '', p: Number(x?.Position) || 0 })),
+        speed: { v: Number(ts[no]?.BestSpeeds?.ST?.Value) || 0, p: Number(ts[no]?.BestSpeeds?.ST?.Position) || 0 },
+        pb: ts[no]?.PersonalBestLapTime?.Value ? { v: ts[no].PersonalBestLapTime.Value, lap: Number(ts[no].PersonalBestLapTime.Lap) || 0, p: Number(ts[no].PersonalBestLapTime.Position) || 0 } : null
       };
     })
     .sort((a, b) => a.pos - b.pos);
@@ -154,7 +161,7 @@ async function archived(start) {
   const year = new Date(start).getUTCFullYear();
   const s = archivedSession(await archiveJson(`${year}/Index.json`), start);
   if (!s) throw new Error('not archived');
-  const names = ['SessionInfo', 'SessionStatus', 'TimingData', 'TimingAppData', 'DriverList', 'RaceControlMessages'];
+  const names = ['SessionInfo', 'SessionStatus', 'TimingData', 'TimingAppData', 'TimingStats', 'DriverList', 'RaceControlMessages'];
   const parts = await Promise.all(names.map(n => archiveJson(`${s.Path}${n}.json`).catch(() => null)));
   const r = Object.fromEntries(names.map((n, i) => [n, parts[i]]));
   if (!r.TimingData?.Lines) throw new Error('no timing');

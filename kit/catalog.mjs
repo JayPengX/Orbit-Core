@@ -141,8 +141,11 @@ export function parseTsdbDay(data, now = Date.now()) {
   return (data?.events || []).map(e => {
     const start = new Date(`${String(e.strTimestamp || `${e.dateEvent}T${e.strTime || '10:35:00'}`).replace(/Z?$/, 'Z')}`).toISOString();
     const status = String(e.strStatus || '').toUpperCase();
-    const homeScore = tsdbNum(e.intHomeScore);
-    const awayScore = tsdbNum(e.intAwayScore);
+    // A side held scoreless is left empty (Brothers None, Lions 1, final):
+    // once either side has a score, the other's is 0.
+    let homeScore = tsdbNum(e.intHomeScore);
+    let awayScore = tsdbNum(e.intAwayScore);
+    if ((homeScore == null) !== (awayScore == null)) (homeScore ??= 0), (awayScore ??= 0);
     const t = Date.parse(start);
     const state = /^(POST|PPD|CANC|ABD|AWD)/.test(status)
       ? 'void'

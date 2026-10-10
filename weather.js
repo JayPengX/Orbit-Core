@@ -842,20 +842,21 @@ export function headline(resp, now) {
 }
 
 // The morning brief (push.js, check { weather }): today, in one line.
+// The title the day's high and low (the app's own name for the place before
+// them, "{title}": 家 今天天氣 31° / 25°), the line under it the rest.
 export function briefText(resp, now) {
   const tz = resp.tz;
   const parts = [];
   const rain = rainPhrase(resp.hours, now, 14, tz);
   if (rain) parts.push(rain);
   const d = resp.days?.find(x => x.date === twDate(now)) || resp.days?.[0];
-  if (d?.hi != null) parts.push(`最高 ${Math.round(d.hi)}°${d.lo != null ? ` / 最低 ${Math.round(d.lo)}°` : ''}`);
+  const temps = d?.hi != null ? `${Math.round(d.hi)}°${d.lo != null ? ` / ${Math.round(d.lo)}°` : ''}` : '';
   const sun = resp.advice?.find(a => a.kind === 'sun' && a.level !== 'none');
   if (sun) parts.push(`UV ${hourIn(sun.why.from, tz)}–${hourIn(sun.why.to, tz)} 點${sun.level}`);
   if (resp.air?.level) parts.push(`空氣${resp.air.level}`);
   const wear = resp.advice?.find(a => a.kind === 'wear');
   if (wear) parts.push(wear.text.replace(/^穿著：/, ''));
-  const place = resp.place?.town || '';
-  return { title: `${place ? place + ' ' : ''}今天天氣`, body: parts.join('，') };
+  return { title: `{title}${temps ? ` ${temps}` : ''}`, body: parts.join('，'), place: resp.place?.town || '' };
 }
 
 // A notice's check (push.js): { weather: { lat, lon, kind: 'brief' | 'rain' } }.
@@ -873,7 +874,7 @@ export async function weatherCheck(env, w, { fetchFn = fetch, now = Date.now() }
   const wet = soon.find(h => h.pop >= RAIN_ALERT);
   await Promise.all(jobs);
   if (!wet) return null;
-  return { title: '☂️ 快下雨了', body: `${resp.place?.town ? resp.place.town + ' ' : ''}${clockIn(Math.max(wet.t, now), resp.tz)} 前後降雨機率 ${wet.pop}%，出門記得帶傘。` };
+  return { title: `{title} · ${clockIn(Math.max(wet.t, now), resp.tz)}`, body: `降雨機率 ${wet.pop}%，出門記得帶傘`, place: resp.place?.town || '' };
 }
 
 // ---- Advice (plan section D; thresholds in one table) ---------------------------

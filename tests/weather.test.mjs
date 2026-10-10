@@ -355,8 +355,9 @@ test('one sentence and the morning brief, from the numbers', async () => {
   assert.match(resp.headline, /明天最高 \d+°、最低 \d+°。$/, 'evening: tomorrow');
   const morning = NOW + 11 * 3_600_000; // 06:46 the next day
   const b = briefText(resp, morning);
-  assert.match(b.title, /^信義區 今天天氣$/);
-  assert.match(b.body, /最高 \d+° \/ 最低 \d+°/);
+  // The app's own name for the place, then the day's high and low; the rest under it.
+  assert.match(b.title, /^\{title\} \d+° \/ \d+°$/);
+  assert.equal(b.place, '信義區');
   for (const w of ['Google', 'google', 'CWA', '氣象署']) assert.ok(!b.body.includes(w) && !resp.headline.includes(w));
   const t = h => Date.parse('2026-10-03T00:00:00+08:00') + h * 3_600_000;
   assert.equal(rainPhrase([{ t: t(8), pop: 10 }, { t: t(15), pop: 70 }], t(8)), '15 點起可能下雨（70%）');
@@ -377,10 +378,10 @@ test('the rain alert answers only when the next 2 hours turn wet', async () => {
   entry.resp.hours.find(h => h.t === Date.parse('2026-10-03T13:00:00+08:00')).pop = 75;
   kv.store.set('weather:cell:25.03,121.57', JSON.stringify(entry));
   const alert = await weatherCheck(e, { lat: 25.034, lon: 121.565, kind: 'rain' }, { fetchFn: upstream(), now: at });
-  assert.equal(alert.title, '☂️ 快下雨了');
-  assert.match(alert.body, /^信義區 13:00 前後降雨機率 75%/);
+  assert.equal(alert.title, '{title} · 13:00');
+  assert.match(alert.body, /^降雨機率 75%/);
   const brief = await weatherCheck(e, { lat: 25.034, lon: 121.565, kind: 'brief' }, { fetchFn: upstream(), now: at });
-  assert.match(brief.title, /今天天氣/);
+  assert.match(brief.title, /^\{title\} \d+°/);
 });
 
 test('opened cells are noted for the scoring, at most every 6 hours', async () => {

@@ -114,3 +114,11 @@ test('CPBL play-offs: its own lists by kind (E the challenge, C the Taiwan Serie
   assert.deepEqual(tsdb.map(g => g.playoff), [true, undefined]);
   assert.deepEqual(cpblBoxTarget(new URL('https://asia-baseball.quadra/cpbl/box/2026-E2.json')), { year: 2026, sno: 2, kind: 'E' });
 });
+
+test('TheSportsDB leaves a scoreless side empty: it is 0 once the other side has a score', () => {
+  const [g] = parseTsdbDay({ events: [{ idEvent: '1', strTimestamp: '2026-10-10T09:05:00', strHomeTeam: 'Uni-President Lions', strAwayTeam: 'CTBC Brothers', intHomeScore: '1', intAwayScore: null, strStatus: 'FT', intRound: '0' }] }, Date.parse('2026-10-10T14:00:00Z'));
+  assert.equal(g.awayScore, 0);
+  assert.equal(g.homeScore, 1);
+  const [pre] = parseTsdbDay({ events: [{ idEvent: '2', strTimestamp: '2026-10-11T09:05:00', strHomeTeam: 'Uni-President Lions', strAwayTeam: 'CTBC Brothers', intHomeScore: null, intAwayScore: null, strStatus: 'NS' }] }, Date.parse('2026-10-10T14:00:00Z'));
+  assert.equal(pre.awayScore, null);
+});

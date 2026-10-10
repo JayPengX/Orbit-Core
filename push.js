@@ -167,6 +167,11 @@ export function cleanItems(items, now = Date.now()) {
 // A notice of news that happens once: told once (by its tag), for 2 days.
 const TOLD_MS = 2 * 86_400_000;
 const onceOnly = x => Boolean(x.tag && (x.check?.espn || x.check?.yahoo));
+// What a sent notice is remembered by: news by its tag alone; anything else
+// by its tag and time (a game's start, a class at 10:00), so an app sending
+// its list again in the minutes after a start (its item still on it, not
+// yet run) has it sent once, and a tomorrow with the same tag still is.
+export const toldKey = x => (onceOnly(x) ? x.tag : `${x.tag}@${x.at}`);
 const recordKey = (account, app) => `push:${account}:${app}`;
 const prefsKey = account => `push:prefs:${account}`;
 export function cleanPrefs(body) {
@@ -211,7 +216,7 @@ export async function handlePush(request, env, headers, session, path) {
     // told already isn't taken again: an app whose copy of the game is behind
     // ('on' still) would have it sent at every open.
     const told = record.told || {};
-    record.items = cleanItems(body?.items).filter(x => !(onceOnly(x) && told[x.tag]));
+    record.items = cleanItems(body?.items).filter(x => !(x.tag && told[toldKey(x)]));
   } else return reply({ error: { message: 'Not found' } }, 404);
   // Each open sends the app's list again; written only when it changed (or
   // once a month, so the 60-day expiry never takes a quiet one).
@@ -333,11 +338,14 @@ export async function sendDue(env, now = Date.now()) {
           if (now < (item.until || item.firstAt || item.at) + (item.until ? 0 : HOLD_MS)) keep.push({ ...item, firstAt: item.firstAt || item.at, at: now + (item.check.bus ? BUS_EVERY : CHECK_EVERY) });
           continue;
         }
-        message = { ...message, title: found.title || item.title, body: (item.body || found.body || '').replace('{result}', found.result || '') };
+        // (A check's title can hold the app's own: "{title} 31° / 25°" keeps "家 今天天氣".)
+        // ("{place}" in the app's title: where it is, for a notice about wherever the phone is.)
+        const own = String(item.title || '').replace('{place}', found.place ? `${found.place} ` : '');
+        message = { ...message, title: found.title ? found.title.replace('{title}', own) : own, body: (item.body || found.body || '').replace('{result}', found.result || '') };
       }
       const r = await sendPush(env, record.sub, message).catch(e => `failed ${e?.message || e}`);
       record.last = { at: now, r };
-      if (r === 'sent' && onceOnly(item)) record.told = { ...Object.fromEntries(Object.entries(record.told || {}).filter(([, at]) => at > now - TOLD_MS)), [item.tag]: now };
+      if (r === 'sent' && item.tag) record.told = { ...Object.fromEntries(Object.entries(record.told || {}).filter(([, at]) => at > now - TOLD_MS)), [toldKey(item)]: now };
       if (r === 'gone') gone = true;
       else if (r === 'sent') sent++;
     }
