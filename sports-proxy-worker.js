@@ -240,6 +240,9 @@ function cachePolicyFor(url) {
       // A day's games with their linescore (Sports' live count, runners,
       // batter and pitcher when ESPN's feed leaves them out): live.
       if (url.pathname === '/api/v1/schedule' && /linescore/.test(url.searchParams.get('hydrate') || '')) return CACHE_LIVE;
+      // The postseason still to come (kit/postseason.mjs): a time set or a
+      // game dropped as soon as a game ends, so minutes.
+      if (url.pathname === '/api/v1/schedule' && url.searchParams.get('gameType')) return CACHE_TEAM_SCHEDULE;
       return CACHE_STANDINGS;
     case 'api.jolpi.ca':
       return CACHE_STANDINGS;
