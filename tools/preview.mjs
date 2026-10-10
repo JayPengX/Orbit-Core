@@ -655,7 +655,7 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => (reopen ? [h, h]
       for (const x of [d, ...d.querySelectorAll('*')]) if (/auto|scroll/.test(getComputedStyle(x).overflowY)) Object.assign(x.style, { maxHeight: 'none', height: 'auto', overflow: 'visible' });
       d.style.cssText += ';position:absolute!important;inset:0 0 auto 0!important;max-height:none!important;height:auto!important;transform:none!important;margin:0 auto!important';
     }, shotSel);
-    await page.setViewportSize({ width: page.viewportSize().width, height: Math.min(16000, await page.evaluate(sel => document.querySelector(sel)?.scrollHeight || 800, shotSel)) });
+    await page.setViewportSize({ width: page.viewportSize().width, height: Math.max(page.viewportSize().height, Math.min(16000, await page.evaluate(sel => document.querySelector(sel)?.scrollHeight || 800, shotSel))) });
     await page.locator(shotSel).first().screenshot({ path: file.replace(/\.png$/, '-shot.png') }).catch(e => errors.push(`shot: ${e.message.split('\n')[0]}`));
   }
   // Anything wider than the screen (a sideways scroll on a phone).
@@ -715,7 +715,7 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => (reopen ? [h, h]
   const cuts = await page.evaluate(() => {
     const out = [];
     for (const el of document.querySelectorAll('body *')) {
-      if (el.closest('[hidden], svg') || !el.textContent.trim()) continue;
+      if (el.closest('[hidden], svg, .leaflet-container, .maplibregl-map') || !el.textContent.trim()) continue;
       const r = el.getBoundingClientRect();
       if (!r.width || r.bottom < 0 || r.top > innerHeight * 6) continue;
       const cs = getComputedStyle(el);
