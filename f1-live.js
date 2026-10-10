@@ -21,6 +21,24 @@ const TIMEOUT = 8_000;
 const seconds = t => String(t || '').split(':').reduce((n, x) => n * 60 + Number(x || 0), 0) || 0;
 const list = x => (Array.isArray(x) ? x : x && typeof x === 'object' ? Object.values(x) : []);
 
+// Each set of tyres a car ran: its compound, the laps on it here (TotalLaps
+// is the set's age: less the age it was fitted at), new or used. A stint
+// the feed splits without a change of tyres (TyresNotChanged: a red flag,
+// the laps to the grid) is the same set: one stint, not a stop.
+export function stintsOf(raw) {
+  const out = [];
+  for (const x of list(raw)) {
+    const total = Number(x?.TotalLaps) || 0;
+    const prev = out.at(-1);
+    if (prev && x?.TyresNotChanged === '1') {
+      prev.total = total;
+      continue;
+    }
+    out.push({ c: x?.Compound || '', start: Number(x?.StartLaps) || 0, total, new: x?.New === 'true' });
+  }
+  return out.map(x => ({ c: x.c, laps: Math.max(0, x.total - x.start), new: x.new }));
+}
+
 // The feed's state, trimmed to what the board shows.
 export function trimF1Live(r, now = Date.now()) {
   const info = r?.SessionInfo || {};
@@ -60,7 +78,7 @@ export function trimF1Live(r, now = Date.now()) {
         tyreLaps: Number(stint?.TotalLaps) || 0,
         tyreNew: stint?.New === 'true',
         // Orbit Sports' 數據: every stint (compound, laps), the grid slot, the best sectors and the speed trap's best (each with its place).
-        stints: list(app[no]?.Stints).map(x => ({ c: x.Compound || '', laps: Number(x.TotalLaps) || 0, new: x.New === 'true' })),
+        stints: stintsOf(app[no]?.Stints),
         grid: Number(app[no]?.GridPos) || 0,
         sectors: list(ts[no]?.BestSectors).map(x => ({ v: x?.Value || '', p: Number(x?.Position) || 0 })),
         speed: { v: Number(ts[no]?.BestSpeeds?.ST?.Value) || 0, p: Number(ts[no]?.BestSpeeds?.ST?.Position) || 0 },

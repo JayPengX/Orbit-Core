@@ -41,7 +41,7 @@ test("each car's stints, grid, best sectors and speed trap, for Orbit Sports' æ•
   const { trimF1Live } = await import('../f1-live.js');
   const r = trimF1Live({
     TimingData: { Lines: { 1: { Position: '1', NumberOfLaps: 30, BestLapTimes: [{ Value: '1:32.775' }, { Value: '1:31.895' }, {}] } } },
-    TimingAppData: { Lines: { 1: { GridPos: '3', Stints: [{ Compound: 'MEDIUM', TotalLaps: 18, New: 'true' }, { Compound: 'HARD', TotalLaps: 12, New: 'true' }] } } },
+    TimingAppData: { Lines: { 1: { GridPos: '3', Stints: [{ Compound: 'MEDIUM', TotalLaps: 18, StartLaps: 0, New: 'true' }, { Compound: 'HARD', TotalLaps: 12, StartLaps: 0, New: 'true' }] } } },
     TimingStats: { Lines: { 1: { BestSectors: [{ Value: '25.216', Position: 5 }], BestSpeeds: { ST: { Value: '345', Position: 3 }, I1: { Value: '307', Position: 10 } }, PersonalBestLapTime: { Value: '1:39.970', Lap: 22, Position: 7 } } } },
     DriverList: { 1: { FirstName: 'Max', LastName: 'Verstappen' } }
   });
@@ -54,4 +54,13 @@ test("each car's stints, grid, best sectors and speed trap, for Orbit Sports' æ•
   assert.deepEqual(c.speeds.i1, { v: 307, p: 10 });
   assert.deepEqual(c.speeds.fl, { v: 0, p: 0 });
   assert.deepEqual(c.parts, ['1:32.775', '1:31.895', '']);
+});
+
+test("a stint split without a change of tyres is one stint; its laps are the set's laps here", async () => {
+  const { stintsOf } = await import('../f1-live.js');
+  // Singapore's sprint: four stints on the feed, one set of intermediates (TyresNotChanged), 20 laps.
+  const raw = [{ Compound: 'INTERMEDIATE', New: 'true', TyresNotChanged: '0', TotalLaps: 2, StartLaps: 0 }, { Compound: 'INTERMEDIATE', New: 'false', TyresNotChanged: '1', TotalLaps: 3, StartLaps: 2 }, { Compound: 'INTERMEDIATE', New: 'false', TyresNotChanged: '1', TotalLaps: 20, StartLaps: 4 }];
+  assert.deepEqual(stintsOf(raw), [{ c: 'INTERMEDIATE', laps: 20, new: true }]);
+  // A used set fitted at 3 laps old and run 12: 12 here.
+  assert.deepEqual(stintsOf([{ Compound: 'SOFT', New: 'false', TotalLaps: 15, StartLaps: 3 }]), [{ c: 'SOFT', laps: 12, new: false }]);
 });

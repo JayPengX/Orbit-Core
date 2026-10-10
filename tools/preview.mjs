@@ -127,6 +127,8 @@ for (let c; (c = opt('store', null)); ) stores.push([c.slice(0, c.indexOf('=')),
 const extraEntries = [];
 for (let c; (c = opt('entry', null)); ) extraEntries.push({ t: Date.now(), ...JSON.parse(c) });
 // --eval 'js': an expression run on the page after the clicks; its result is printed.
+// --shot selector: also a picture of that element alone, whole (a sheet that scrolls inside), as <file>-shot.png.
+const shotSel = opt('shot', null);
 const evals = [];
 for (let c; (c = opt('eval', null)); ) evals.push(c);
 const latency = Number(opt('latency', 0));
@@ -623,7 +625,9 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => (reopen ? [h, h]
     if (Date.now() < until) await page.waitForTimeout(until - Date.now());
   } else await page.waitForTimeout(wait);
   for (const sel of clicks) {
-    await page.click(sel).catch(e => errors.push(`click ${sel}: ${e.message.split('\n')[0]}`));
+    // ('js:<code>': run on the page instead, e.g. a click on something the tab bar covers.)
+    if (sel.startsWith('js:')) await page.evaluate(sel.slice(3)).catch(e => errors.push(`click ${sel}: ${e.message.split('\n')[0]}`));
+    else await page.click(sel).catch(e => errors.push(`click ${sel}: ${e.message.split('\n')[0]}`));
     await page.waitForTimeout(2500);
   }
   for (const [sel, text] of typings) {
@@ -643,6 +647,17 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => (reopen ? [h, h]
   for (const js of evals) console.log('eval:', JSON.stringify(await page.evaluate(js).catch(e => `error ${e.message}`)));
   const file = join(out, `${key}-${hash || 'start'}${reopen ? (first ? '-1' : '-2') : ''}${clicks.length ? '-clicked' : ''}${dark ? '-dark' : ''}${engine === 'webkit' ? '-webkit' : ''}.png`);
   await page.screenshot({ path: file, fullPage: full });
+  if (shotSel) {
+    // The element at its whole height: its scrollers opened up, laid over the page's top.
+    await page.evaluate(sel => {
+      const d = document.querySelector(sel);
+      if (!d) return;
+      for (const x of [d, ...d.querySelectorAll('*')]) if (/auto|scroll/.test(getComputedStyle(x).overflowY)) Object.assign(x.style, { maxHeight: 'none', height: 'auto', overflow: 'visible' });
+      d.style.cssText += ';position:absolute!important;inset:0 0 auto 0!important;max-height:none!important;height:auto!important;transform:none!important;margin:0 auto!important';
+    }, shotSel);
+    await page.setViewportSize({ width: page.viewportSize().width, height: Math.min(16000, await page.evaluate(sel => document.querySelector(sel)?.scrollHeight || 800, shotSel)) });
+    await page.locator(shotSel).first().screenshot({ path: file.replace(/\.png$/, '-shot.png') }).catch(e => errors.push(`shot: ${e.message.split('\n')[0]}`));
+  }
   // Anything wider than the screen (a sideways scroll on a phone).
   const wide = await page.evaluate(() => {
     const clipped = el => {
