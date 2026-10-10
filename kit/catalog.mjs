@@ -157,7 +157,9 @@ export function parseTsdbDay(data, now = Date.now()) {
               : homeScore != null && awayScore != null
                 ? 'post'
                 : 'pre';
-    return { id: `cpbl-tsdb-${e.idEvent}`, start, home: tsdbClub(e.strHomeTeam), away: tsdbClub(e.strAwayTeam), homeScore, awayScore, state, venue: e.strVenue || '' };
+    // A play-off game: round 0 (the regular season's are its rounds, 1 on).
+    const round = tsdbNum(e.intRound);
+    return { id: `cpbl-tsdb-${e.idEvent}`, start, home: tsdbClub(e.strHomeTeam), away: tsdbClub(e.strAwayTeam), homeScore, awayScore, state, venue: e.strVenue || '', ...(round === 0 ? { playoff: true } : {}) };
   });
 }
 // The month's days (Taiwan's calendar) from two weeks back to two weeks ahead.

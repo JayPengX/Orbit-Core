@@ -148,9 +148,12 @@ export function parseKbo(data, year, now = Date.now()) {
 
 // GameResult: '' not played, '0' played, '2' played (a tie or called), '1'
 // postponed (the game is listed again on its new date).
+// KindCode: A the regular season, E the play-off challenge (季後挑戰賽), C
+// the Taiwan Series (台灣大賽); a play-off game says which (`playoff`).
+const CPBL_PLAYOFF = { E: 'challenge', C: 'final' };
 export function parseCpbl(list, now = Date.now()) {
   return (list || [])
-    .filter(g => g.KindCode === 'A' || !g.KindCode)
+    .filter(g => g.KindCode === 'A' || !g.KindCode || CPBL_PLAYOFF[g.KindCode])
     .map(g => {
       const [date, clock] = String(g.PreExeDate || g.GameDateTimeS || g.GameDate).split('T');
       const [y, m, d] = date.split('-').map(Number);
@@ -158,14 +161,16 @@ export function parseCpbl(list, now = Date.now()) {
       const start = utc(y, m, d, hh, mm, 8);
       const result = String(g.GameResult ?? '');
       return {
-        id: `cpbl-${g.Year}-${g.GameSno}-${start.slice(0, 10)}`,
+        // (A play-off game's number is its kind's own: E3, the challenge's third.)
+        id: `cpbl-${g.Year}-${CPBL_PLAYOFF[g.KindCode] ? g.KindCode : ''}${g.GameSno}-${start.slice(0, 10)}`,
         start,
         home: team(CPBL_TEAMS, g.HomeTeamName),
         away: team(CPBL_TEAMS, g.VisitingTeamName),
         homeScore: result === '' && now < Date.parse(start) ? null : num(g.HomeScore),
         awayScore: result === '' && now < Date.parse(start) ? null : num(g.VisitingScore),
         state: result === '1' ? 'void' : stateOf({ start, over: result === '0' || result === '2', scored: result !== '', now }),
-        venue: g.FieldAbbe || ''
+        venue: g.FieldAbbe || '',
+        ...(CPBL_PLAYOFF[g.KindCode] ? { playoff: CPBL_PLAYOFF[g.KindCode] } : {})
       };
     });
 }
@@ -223,25 +228,30 @@ async function fetchCpbl(year, month) {
   if (!page.ok) throw new Error(`cpbl page ${page.status}`);
   const token = /url: '\/schedule\/getgamedatas'[\s\S]{0,400}?RequestVerificationToken: '([^']+)'/.exec(html)?.[1];
   if (!token) throw new Error('cpbl token');
-  const res = await fetch('https://www.cpbl.com.tw/schedule/getgamedatas', {
-    method: 'POST',
-    headers: {
-      'User-Agent': BROWSER_UA,
-      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-      'X-Requested-With': 'XMLHttpRequest',
-      RequestVerificationToken: token,
-      Cookie: cookies,
-      Referer: 'https://www.cpbl.com.tw/schedule',
-      Origin: 'https://www.cpbl.com.tw'
-    },
-    body: `calendar=${year}%2F01%2F01&location=&kindCode=A`,
-    signal: AbortSignal.timeout(TIMEOUT)
-  });
-  if (!res.ok) throw new Error(`cpbl ${res.status}`);
-  const data = await res.json();
-  if (!data?.Success) throw new Error('cpbl answer');
+  // The regular season's list, and the play-offs' (each its own kind) from October.
+  const kind = async code => {
+    const res = await fetch('https://www.cpbl.com.tw/schedule/getgamedatas', {
+      method: 'POST',
+      headers: {
+        'User-Agent': BROWSER_UA,
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'X-Requested-With': 'XMLHttpRequest',
+        RequestVerificationToken: token,
+        Cookie: cookies,
+        Referer: 'https://www.cpbl.com.tw/schedule',
+        Origin: 'https://www.cpbl.com.tw'
+      },
+      body: `calendar=${year}%2F01%2F01&location=&kindCode=${code}`,
+      signal: AbortSignal.timeout(TIMEOUT)
+    });
+    if (!res.ok) throw new Error(`cpbl ${res.status}`);
+    const data = await res.json();
+    if (!data?.Success) throw new Error('cpbl answer');
+    return JSON.parse(data.GameDatas || '[]');
+  };
+  const [regular, ...playoffs] = await Promise.all([kind('A'), ...(month >= 9 ? ['E', 'C'].map(code => kind(code).catch(() => [])) : [])]);
   const prefix = `${year}-${String(month).padStart(2, '0')}`;
-  return parseCpbl(JSON.parse(data.GameDatas || '[]')).filter(g => g.start.slice(0, 7) === prefix || new Date(Date.parse(g.start) + 8 * HOUR).toISOString().slice(0, 7) === prefix);
+  return parseCpbl([...regular, ...playoffs.flat()]).filter(g => g.start.slice(0, 7) === prefix || new Date(Date.parse(g.start) + 8 * HOUR).toISOString().slice(0, 7) === prefix);
 }
 
 // CPBL's site turns some networks away: TheSportsDB's day lists instead (its
@@ -332,9 +342,10 @@ const FETCHERS = { npb: fetchNpb, kbo: fetchKbo, cpbl };
 //     decision: 'W' | 'L' | 'S' | 'H' | '', outs, bf, pc, st, h, hr, bb, hbp, k,
 //     wp, bk, r, er, top }], plays: [{ inning, half, order, batter, pitcher,
 //     text, result, away, home, scoring, outs }] } (each at-bat's last pitch).
+// (`<year>-E3`: a play-off game, its kind and number.)
 export function cpblBoxTarget(url) {
-  const m = /^\/cpbl\/box\/(\d{4})-(\d{1,4})\.json$/.exec(url.pathname);
-  return m ? { year: Number(m[1]), sno: Number(m[2]) } : null;
+  const m = /^\/cpbl\/box\/(\d{4})-([CE]?)(\d{1,4})\.json$/.exec(url.pathname);
+  return m ? { year: Number(m[1]), sno: Number(m[3]), kind: m[2] || 'A' } : null;
 }
 const sideOfType = t => (String(t) === '2' ? 'home' : 'away');
 const parseJson = t => {
@@ -406,8 +417,8 @@ export function parseCpblBox(data, year, sno) {
   });
   return { year, sno, state, status: detail.GameStatusChi || '', away: side('away'), home: side('home'), batting, pitching, plays };
 }
-async function fetchCpblBox(year, sno) {
-  const at = `https://www.cpbl.com.tw/box?year=${year}&kindCode=A&gameSno=${sno}`;
+async function fetchCpblBox(year, sno, kind = 'A') {
+  const at = `https://www.cpbl.com.tw/box?year=${year}&kindCode=${kind}&gameSno=${sno}`;
   const { page, html, cookie } = await cpblPage(at);
   if (!page.ok) throw new Error(`cpbl box page ${page.status}`);
   const token = /name="__RequestVerificationToken" type="hidden" value="([^"]+)"/.exec(html)?.[1];
@@ -416,7 +427,7 @@ async function fetchCpblBox(year, sno) {
   const res = await fetch('https://www.cpbl.com.tw/box/getlive', {
     method: 'POST',
     headers: { 'User-Agent': BROWSER_UA, 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', 'X-Requested-With': 'XMLHttpRequest', Cookie: cookies, Referer: at, Origin: 'https://www.cpbl.com.tw' },
-    body: `__RequestVerificationToken=${encodeURIComponent(token)}&GameSno=${sno}&KindCode=A&Year=${year}&PrevOrNext=&PresentStatus=`,
+    body: `__RequestVerificationToken=${encodeURIComponent(token)}&GameSno=${sno}&KindCode=${kind}&Year=${year}&PrevOrNext=&PresentStatus=`,
     signal: AbortSignal.timeout(TIMEOUT)
   });
   if (!res.ok) throw new Error(`cpbl box ${res.status}`);
@@ -438,7 +449,7 @@ export async function asiaBaseballResponse(url) {
   const box = cpblBoxTarget(url);
   if (box) {
     try {
-      return new Response(JSON.stringify(await fetchCpblBox(box.year, box.sno)), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify(await fetchCpblBox(box.year, box.sno, box.kind)), { status: 200, headers: { 'Content-Type': 'application/json' } });
     } catch (error) {
       return new Response(JSON.stringify({ error: String(error.message || error) }), { status: 502, headers: { 'Content-Type': 'application/json' } });
     }

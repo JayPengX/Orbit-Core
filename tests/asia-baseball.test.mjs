@@ -73,7 +73,7 @@ test('CPBL: every source refusing is an error, never an empty month', async () =
 });
 
 test("CPBL's box score: its page's getlive answer as the app's box (sides, batters in order, pitchers' decisions, each at-bat's last pitch)", () => {
-  assert.deepEqual(cpblBoxTarget(new URL('https://asia-baseball.quadra/cpbl/box/2026-290.json')), { year: 2026, sno: 290 });
+  assert.deepEqual(cpblBoxTarget(new URL('https://asia-baseball.quadra/cpbl/box/2026-290.json')), { year: 2026, sno: 290, kind: 'A' });
   assert.equal(cpblBoxTarget(new URL('https://asia-baseball.quadra/cpbl/2026-08.json')), null);
   const j = x => JSON.stringify(x);
   const data = {
@@ -101,4 +101,16 @@ test("CPBL's box score: its page's getlive answer as the app's box (sides, batte
   assert.deepEqual(box.batting.map(b => [b.name, b.order, b.pos, b.ab, b.h]), [['甲', 1, 'CF', 4, 2], ['乙', 2, 'SS', 3, 1]]);
   assert.deepEqual([box.pitching[0].decision, box.pitching[0].outs], ['W', 19]);
   assert.deepEqual(box.plays.map(p => [p.batter, p.result, p.scoring]), [['甲', '一安', false], ['乙', '二安', true]]);
+});
+
+test('CPBL play-offs: its own lists by kind (E the challenge, C the Taiwan Series), TheSportsDB by round 0; a play-off box read by its kind', () => {
+  const own = parseCpbl([
+    { KindCode: 'A', Year: 2026, GameSno: 360, GameDate: '2026-10-05T00:00:00', GameDateTimeS: '2026-10-05T18:35:00', HomeTeamName: '中信兄弟', VisitingTeamName: '統一7-ELEVEn獅', GameResult: '0', HomeScore: 1, VisitingScore: 2 },
+    { KindCode: 'E', Year: 2026, GameSno: 2, GameDate: '2026-10-10T00:00:00', GameDateTimeS: '2026-10-10T17:05:00', HomeTeamName: '統一7-ELEVEn獅', VisitingTeamName: '中信兄弟', GameResult: '', HomeScore: 0, VisitingScore: 0 },
+    { KindCode: 'B', Year: 2026, GameSno: 1, GameDate: '2026-07-10T00:00:00', HomeTeamName: '中信兄弟', VisitingTeamName: '味全龍', GameResult: '0' }
+  ], Date.parse('2026-10-10T08:00:00Z'));
+  assert.deepEqual(own.map(g => [g.id, g.playoff]), [['cpbl-2026-360-2026-10-05', undefined], ['cpbl-2026-E2-2026-10-10', 'challenge']]);
+  const tsdb = parseTsdbDay({ events: [{ idEvent: '1', strTimestamp: '2026-10-09T09:05:00', strHomeTeam: 'CTBC Brothers', strAwayTeam: 'Uni-President Lions', intRound: '0', strStatus: 'FT', intHomeScore: '4', intAwayScore: '1' }, { idEvent: '2', strTimestamp: '2026-10-01T09:05:00', strHomeTeam: 'TSG Hawks', strAwayTeam: 'Rakuten Monkeys', intRound: '21', strStatus: 'FT', intHomeScore: '1', intAwayScore: '2' }] });
+  assert.deepEqual(tsdb.map(g => g.playoff), [true, undefined]);
+  assert.deepEqual(cpblBoxTarget(new URL('https://asia-baseball.quadra/cpbl/box/2026-E2.json')), { year: 2026, sno: 2, kind: 'E' });
 });
