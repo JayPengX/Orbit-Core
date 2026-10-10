@@ -24,9 +24,7 @@ export const SPORTS = {
   basketball: { zh: '籃球', en: 'Basketball', icon: '🏀' },
   football: { zh: '美式足球', en: 'Football', icon: '🏈' },
   hockey: { zh: '冰球', en: 'Hockey', icon: '🏒' },
-  racing: { zh: '賽車', en: 'Racing', icon: '🏎️' },
-  tennis: { zh: '網球', en: 'Tennis', icon: '🎾' },
-  mma: { zh: '綜合格鬥', en: 'MMA', icon: '🥊' }
+  racing: { zh: '賽車', en: 'Racing', icon: '🏎️' }
 };
 
 
@@ -72,13 +70,7 @@ export const CATALOG = {
   worldcup: soccer('fifa.world', '世界盃', 'FIFA World Cup', 'worldcup', { cup: true, logo: 4, standings: true }),
   nationsleague: soccer('uefa.nations', '歐國聯', 'Nations League', 'nationsleague', { cup: true, logo: 2395, kambi: 'football/uefa_nations_league', standings: true }),
   // Racing
-  f1: { sport: 'racing', kind: 'field', data: 'espn', espn: 'racing/f1', zh: 'F1 一級方程式', en: 'Formula 1', bet: 'f1', top: true, standings: true },
-  // Tennis and UFC: one player against another. Kambi's schedule and prices
-  // (every tournament of the tour, every fight of a card), results from
-  // ESPN's scoreboards (the tour's, the card's).
-  atp: { sport: 'tennis', kind: 'match', data: 'kambi', kambi: 'tennis/atp', espn: 'tennis/atp', zh: 'ATP 男網', en: 'ATP', bet: 'atp', odds: 'kambi', icon: '🎾' },
-  wta: { sport: 'tennis', kind: 'match', data: 'kambi', kambi: 'tennis/wta', espn: 'tennis/wta', zh: 'WTA 女網', en: 'WTA', bet: 'wta', odds: 'kambi', icon: '🎾' },
-  ufc: { sport: 'mma', kind: 'match', data: 'kambi', kambi: 'ufc_mma/ufc', espn: 'mma/ufc', zh: 'UFC', en: 'UFC', bet: 'ufc', odds: 'kambi', icon: '🥊' }
+  f1: { sport: 'racing', kind: 'field', data: 'espn', espn: 'racing/f1', zh: 'F1 一級方程式', en: 'Formula 1', bet: 'f1', top: true, standings: true }
 };
 
 // Play's kind of markets for a sport.

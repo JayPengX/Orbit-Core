@@ -146,7 +146,7 @@ const LEAGUE_BADGE = {
 const ESPN_LEAGUE = {
   mlb: 'teamlogos/leagues/500/mlb.png', nba: 'teamlogos/leagues/500/nba.png', wnba: 'teamlogos/leagues/500/wnba.png', nfl: 'teamlogos/leagues/500/nfl.png',
   nhl: 'teamlogos/leagues/500/nhl.png', f1: 'teamlogos/leagues/500/f1.png',
-  nbl: 'teamlogos/leagues/500/nbl.png', ufc: 'teamlogos/leagues/500/ufc.png'
+  nbl: 'teamlogos/leagues/500/nbl.png'
 };
 // The league's own logo (light backgrounds: the apps show it on a white disc), or null.
 export function leagueLogo(key, dark = false) {
@@ -154,7 +154,7 @@ export function leagueLogo(key, dark = false) {
   // the "Premier League" wordmark.
   if (key === 'epl') return 'https://a.espncdn.com/combiner/i?img=/i/leaguelogos/soccer/500/23.png&w=128&h=80&scale=crop&location=origin';
   if (ESPN_LEAGUE[key]) return `https://a.espncdn.com/i/${dark ? ESPN_LEAGUE[key].replace('/500/', '/500-dark/') : ESPN_LEAGUE[key]}`;
-  // TheSportsDB's badge (ATP's is white on white: its emoji instead).
+  // TheSportsDB's badge.
   if (LEAGUE_BADGE[key]) return `${SPORTSDB}/league/badge/${LEAGUE_BADGE[key]}.png/small`;
   return SOCCER_LOGO[key] ? `https://a.espncdn.com/i/leaguelogos/soccer/500/${SOCCER_LOGO[key]}.png` : null;
 }
