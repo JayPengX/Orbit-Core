@@ -40,9 +40,9 @@ test("F1 live: the safety car and flags so far, for the race chart's bands", asy
 test("each car's stints, grid, best sectors and speed trap, for Orbit Sports' 數據", async () => {
   const { trimF1Live } = await import('../f1-live.js');
   const r = trimF1Live({
-    TimingData: { Lines: { 1: { Position: '1', NumberOfLaps: 30 } } },
+    TimingData: { Lines: { 1: { Position: '1', NumberOfLaps: 30, BestLapTimes: [{ Value: '1:32.775' }, { Value: '1:31.895' }, {}] } } },
     TimingAppData: { Lines: { 1: { GridPos: '3', Stints: [{ Compound: 'MEDIUM', TotalLaps: 18, New: 'true' }, { Compound: 'HARD', TotalLaps: 12, New: 'true' }] } } },
-    TimingStats: { Lines: { 1: { BestSectors: [{ Value: '25.216', Position: 5 }], BestSpeeds: { ST: { Value: '345', Position: 3 } }, PersonalBestLapTime: { Value: '1:39.970', Lap: 22, Position: 7 } } } },
+    TimingStats: { Lines: { 1: { BestSectors: [{ Value: '25.216', Position: 5 }], BestSpeeds: { ST: { Value: '345', Position: 3 }, I1: { Value: '307', Position: 10 } }, PersonalBestLapTime: { Value: '1:39.970', Lap: 22, Position: 7 } } } },
     DriverList: { 1: { FirstName: 'Max', LastName: 'Verstappen' } }
   });
   const [c] = r.cars;
@@ -51,4 +51,7 @@ test("each car's stints, grid, best sectors and speed trap, for Orbit Sports' �
   assert.deepEqual(c.sectors, [{ v: '25.216', p: 5 }]);
   assert.deepEqual(c.speed, { v: 345, p: 3 });
   assert.deepEqual(c.pb, { v: '1:39.970', lap: 22, p: 7 });
+  assert.deepEqual(c.speeds.i1, { v: 307, p: 10 });
+  assert.deepEqual(c.speeds.fl, { v: 0, p: 0 });
+  assert.deepEqual(c.parts, ['1:32.775', '1:31.895', '']);
 });

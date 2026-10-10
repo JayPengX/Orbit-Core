@@ -203,6 +203,20 @@ bug waiting in the rest.
   half-cut words, no label falling under its number. Shorten the words,
   shrink the number (`fitNumbers`), or use one line with an ellipsis, in
   that order.
+- **An ellipsis or a clipped edge counts as a wrap** (the owner,
+  2026-10-11: "H. Çalha…", "常看 · 洛杉磯…", a misspelling cut mid-word,
+  "中信兄弟 / 統一獅" falling to a second row). A name, a score, a
+  misspelling or anything the row is *for* is shown whole: lay the row out
+  for its longest real content (two lines designed in, a smaller line, the
+  less useful part dropped), never let it run out and get cut. An ellipsis
+  is only for a free-text tail nobody needs (a headline, a note).
+- **Design it once, check it once.** Every new or changed piece of UI is
+  checked at 375 px wide with the longest real data the feed gives (the
+  longest player name, a Chinese team name, a two-digit score, both
+  locales) before it's called done, so no fix needs a second request. Use
+  judgement on what a row is for and what a native iOS app would show;
+  don't add a header, pill or line that says nothing (a "排位 最終成績"
+  bar over the results it names).
 - **Nothing wider than the screen.** The preview tool flags any element
   that is.
 - **Upright only** (2026-10-10). Every screen is drawn for a phone held

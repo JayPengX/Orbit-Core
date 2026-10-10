@@ -691,6 +691,23 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => (reopen ? [h, h]
     return [...new Set(out)].slice(0, 25);
   });
   if (wraps.length) console.log(`wraps:\n  ${wraps.join('\n  ')}`);
+  // Text cut short (TRUTH §6: an ellipsis or a clipped edge counts as a
+  // wrap): an element whose own text runs past its box, ellipsis or clipped.
+  const cuts = await page.evaluate(() => {
+    const out = [];
+    for (const el of document.querySelectorAll('body *')) {
+      if (el.closest('[hidden], svg') || !el.textContent.trim()) continue;
+      const r = el.getBoundingClientRect();
+      if (!r.width || r.bottom < 0 || r.top > innerHeight * 6) continue;
+      const cs = getComputedStyle(el);
+      if (cs.visibility === 'hidden' || !/hidden|clip/.test(cs.overflowX) || cs.display === 'none') continue;
+      // Only text this element holds itself (a scroller's children aren't cut).
+      if (![...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()) && el.children.length > 2) continue;
+      if (el.scrollWidth > el.clientWidth + 1) out.push(`${el.tagName.toLowerCase()}${[...el.classList].map(c => `.${c}`).join('')} "${el.textContent.trim().slice(0, 40)}" (${el.scrollWidth}>${el.clientWidth})`);
+    }
+    return [...new Set(out)].slice(0, 25);
+  });
+  if (cuts.length) console.log(`cut:\n  ${cuts.join('\n  ')}`);
   // Whether the page itself moves sideways (what a finger feels).
   const sideways = await page.evaluate(() => {
     const before = scrollX;

@@ -64,6 +64,10 @@ export function trimF1Live(r, now = Date.now()) {
         grid: Number(app[no]?.GridPos) || 0,
         sectors: list(ts[no]?.BestSectors).map(x => ({ v: x?.Value || '', p: Number(x?.Position) || 0 })),
         speed: { v: Number(ts[no]?.BestSpeeds?.ST?.Value) || 0, p: Number(ts[no]?.BestSpeeds?.ST?.Position) || 0 },
+        // Every speed trap's best (the two intermediates, the finish line, the trap), each with its place.
+        speeds: Object.fromEntries(['I1', 'I2', 'FL', 'ST'].map(k => [k.toLowerCase(), { v: Number(ts[no]?.BestSpeeds?.[k]?.Value) || 0, p: Number(ts[no]?.BestSpeeds?.[k]?.Position) || 0 }])),
+        // A qualifying's best lap in each part (Q1, Q2, Q3), '' for a part not run.
+        parts: list(l.BestLapTimes).map(x => x?.Value || ''),
         pb: ts[no]?.PersonalBestLapTime?.Value ? { v: ts[no].PersonalBestLapTime.Value, lap: Number(ts[no].PersonalBestLapTime.Lap) || 0, p: Number(ts[no].PersonalBestLapTime.Position) || 0 } : null
       };
     })
