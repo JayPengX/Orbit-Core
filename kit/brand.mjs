@@ -121,9 +121,16 @@ export const DEV = {
   f1Board: { def: 4, min: 2, max: 60, unit: 's', group: 'f1', zh: 'F1 即時看板', en: 'F1 live board', note: '賽事頁打開進行中的一節（F1 的來源每 4 秒一次）' },
   f1Laps: { def: 15, min: 5, max: 120, unit: 's', group: 'f1', zh: 'F1 每圈資料', en: 'F1 laps', note: '數據的車手比較與圈速' },
   playLive: { def: 5, min: 3, max: 120, unit: 's', group: 'play', zh: 'Play 即時比分與兌現', en: 'Play live scores', note: 'Quadra Play 有比賽進行中的注單、即時盤' },
+  // Orbit Transit (TDX, measured 2026-10-11 by its own update times): bus
+  // arrivals and the metro's board change every 30 s, trains' every 20-30,
+  // YouBike every 60. Kept a third of that on the Worker, read as often.
+  tdxLive: { def: 10, min: 5, max: 60, unit: 's', group: 'transit', zh: 'Worker 保留即時交通資料', en: 'Worker keeps live TDX', note: '公車到站、捷運與台鐵看板（TDX 每 30 秒更新）' },
+  tdxBike: { def: 30, min: 10, max: 120, unit: 's', group: 'transit', zh: 'Worker 保留 YouBike', en: 'Worker keeps YouBike', note: 'TDX 每 60 秒更新' },
+  transitLive: { def: 10, min: 5, max: 120, unit: 's', group: 'transit', zh: '交通卡片重新讀取', en: 'Transit cards refresh', note: '公車、捷運、台鐵、行程中' },
+  transitBike: { def: 30, min: 15, max: 300, unit: 's', group: 'transit', zh: 'YouBike 重新讀取', en: 'YouBike refresh', note: '地圖上附近的車位' },
   mirror: { def: true, group: 'data', zh: '使用每晚的資料副本', en: 'Use the nightly copies', note: '關掉：所有 App 都直接問代理（除錯用）' }
 };
-export const DEV_GROUPS = { proxy: '代理（sports-proxy）', sports: 'Orbit Sports', f1: 'F1', play: 'Quadra Play', data: '資料' };
+export const DEV_GROUPS = { proxy: '代理（sports-proxy）', sports: 'Orbit Sports', f1: 'F1', play: 'Quadra Play', transit: 'Orbit Transit（TDX）', data: '資料' };
 
 // Settings as stored: each known key, in range, else its default.
 export function cleanDev(x = {}) {

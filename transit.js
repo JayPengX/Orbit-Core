@@ -8,8 +8,8 @@
 //                         counted as one map load) while this month is under
 //                         its cap, else Taiwan's NLSC map (free, no key)
 //   GET /transit/tdx      a TDX API path from the allowlist (TDX_RULES), cached
-//                         for as long as that data stays true (live 25 s,
-//                         timetables 6 h, stations a day), shared by everyone
+//                         for as long as that data stays true (live: the
+//                         admin panel's 開發, 10 s; timetables 6 h; stations a day), shared
 //   GET /transit/search   places by name: Google's autocomplete, or
 //                         OpenStreetMap's search past the cap
 //   GET /transit/place    one place's position and name (Google Place Details)
@@ -29,6 +29,8 @@
 // plan's 1,000 KV writes a day aren't spent on counting): the hard stop is
 // Google Cloud's per-day quotas, which the owner sets on each API (see
 // docs/HANDOFF.md, Orbit Transit).
+
+import { cleanDev } from './kit/devconfig.mjs';
 
 export const TDX_BASE = 'https://tdx.transportdata.tw/api/';
 export const TDX_AUTH = 'https://tdx.transportdata.tw/auth/realms/TDXConnect/protocol/openid-connect/token';
@@ -242,6 +244,26 @@ async function myTurn(env) {
   return true;
 }
 
+// The developer settings (the admin panel's 開發): how long a live answer is
+// fresh here. GET /config's copy in this colo's cache, looked at once a
+// minute; none there (no app has asked lately), the defaults.
+const devT = { at: 0, v: cleanDev() };
+async function devNow() {
+  if (Date.now() - devT.at < 60_000) return devT.v;
+  devT.at = Date.now();
+  try {
+    const hit = await globalThis.caches?.default?.match(new Request('https://orbit-config.quadra/dev'));
+    if (hit) devT.v = cleanDev(await hit.json());
+  } catch {}
+  return devT.v;
+}
+// A rule's fresh time now: a live one's from the settings (YouBike its own), the rest as written.
+export async function freshOf(rule) {
+  if (rule.tier !== 'live' || /THSR/.test(rule.re.source)) return rule.fresh;
+  const d = await devNow();
+  return (/Bike/.test(rule.re.source) ? d.tdxBike : d.tdxLive) * 1000;
+}
+
 const inflight = new Map();
 // How long TDX gets when an older copy is there to answer with instead.
 export const SLOW_MS = 3000;
@@ -263,7 +285,7 @@ export async function tdxGet(env, raw, { fetchFn = fetch, cache = globalThis.cac
   } catch {}
   const at = hit ? Number(hit.headers.get('X-Fetched-At')) || 0 : 0;
   const age = now - at;
-  if (hit && age < req.rule.fresh) return { status: 200, body: await hit.text(), age, state: 'hit' };
+  if (hit && age < (await freshOf(req.rule))) return { status: 200, body: await hit.text(), age, state: 'hit' };
   const refresh = async () => {
     if (inflight.has(url)) return inflight.get(url);
     const p = (async () => {
