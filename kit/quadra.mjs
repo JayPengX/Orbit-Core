@@ -762,15 +762,29 @@ export async function mirrorBuilt() {
 export function unmirror(url, trim = '') {
   mirrorGone.add(`${trim}!${url}`);
 }
+const parseMirrorIndex = x => ({ built: Number(x?.built) || 0, until: Number(x?.until) || 0, match: (x?.match || []).map(m => new RegExp(m)) });
+// The last index this device kept, whatever its age: which copies to ask
+// for alongside a new index, rather than a round trip after it (the copies
+// the index then doesn't hold are thrown away).
+let mirrorHint = null;
 function readMirrorIndex() {
   if (!mirrorIndex || Date.now() - mirrorIndex.at > 30 * 60_000) {
-    const p = packJson('mirror/index.json', { ttl: 30 * 60_000, timeout: 8_000 })
-      .then(x => ({ built: Number(x?.built) || 0, until: Number(x?.until) || 0, match: (x?.match || []).map(m => new RegExp(m)) }))
+    mirrorHint ??= persisted(dataKey(`${PACKS_URL}mirror/index.json`, ''))
+      .then(saved => (saved?.data ? parseMirrorIndex(saved.data) : null))
       .catch(() => null);
-    mirrorIndex = { at: Date.now(), p };
+    const p = packJson('mirror/index.json', { ttl: 30 * 60_000, timeout: 8_000 })
+      .then(parseMirrorIndex)
+      .catch(() => null);
+    const entry = { at: Date.now(), p, done: false };
+    p.then(() => (entry.done = true));
+    mirrorIndex = entry;
   }
   return mirrorIndex.p;
 }
+const mirrorCopy = (url, trim) =>
+  fetch(`${PACKS_URL}${mirrorPath(url, trim)}`, { signal: AbortSignal.timeout(8_000) })
+    .then(res => (res.ok ? res.json() : null))
+    .catch(() => null);
 async function mirrored(url, trim) {
   let host = '';
   try {
@@ -779,13 +793,16 @@ async function mirrored(url, trim) {
   const key = `${trim}!${url}`;
   // (開發's switch off: every read the proxy's, for checking it.)
   if (!MIRROR_HOSTS.has(host) || mirrorGone.has(key) || dev('mirror') === false) return null;
-  const index = await readMirrorIndex();
+  const indexIn = readMirrorIndex();
+  let early = null;
+  if (!mirrorIndex.done) {
+    const hint = await mirrorHint;
+    if (hint && hint.match.some(re => re.test(key))) early = mirrorCopy(url, trim);
+  }
+  const index = await indexIn;
   if (!index || Date.now() >= index.until || !index.match.some(re => re.test(key))) return null;
-  try {
-    const res = await fetch(`${PACKS_URL}${mirrorPath(url, trim)}`, { signal: AbortSignal.timeout(8_000) });
-    const got = res.ok ? await res.json() : null;
-    if (got && Date.now() < Math.min(Number(got.until) || 0, index.until)) return got.data;
-  } catch {}
+  const got = await (early || mirrorCopy(url, trim));
+  if (got && Date.now() < Math.min(Number(got.until) || 0, index.until)) return got.data;
   mirrorGone.add(key);
   return null;
 }
