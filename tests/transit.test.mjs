@@ -418,6 +418,16 @@ test('route plans: both sources, the same ride once, fastest first, shared for 5
   assert.equal(again.cached, true);
   assert.equal(google, 1);
   assert.equal(tdx, 2);
+  // One planner alone (the app asks for Google's and TDX's apart, showing Google's at once).
+  const only = async src => (await handleTransit(new Request(`https://w/transit/route?from=24.8,120.97&to=24.84,121.012&at=${NOW}&src=${src}`), env, {}, '/transit/route', { session: { s: 'S' }, fetchFn, now: NOW, cache })).json();
+  const g = await only('google');
+  assert.deepEqual(Object.keys(g.sources.ms), ['google']);
+  assert.equal(google, 2);
+  assert.equal(tdx, 2);
+  const t = await only('tdx');
+  assert.deepEqual(Object.keys(t.sources.ms).sort(), ['tdx', 'tdxBike']);
+  assert.equal(google, 2);
+  assert.equal(tdx, 4);
   const bad = await handleTransit(new Request('https://w/transit/route?from=35,139&to=24.8,120.9'), env, {}, '/transit/route', { session: { s: 'S' }, fetchFn, now: NOW, cache });
   assert.equal(bad.status, 400);
 });
