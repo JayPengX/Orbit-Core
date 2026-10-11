@@ -2015,7 +2015,7 @@ export function plusCard(s, { compact = false } = {}) {
   // The perks as tiles (a figure over a word or two), never a sentence that wraps;
   // a member with this month's return sees that instead.
   const perks = [
-    [money(PLUS.odds.bonusBet), T('每週免費投注', 'free bet weekly')],
+    [money(PLUS.odds.bonusBet), T('每週免費投注', 'free a week')],
     member ? null : [`×${PLUS.odds.boost}`, T('串關加成', 'parlay boost')],
     [T(`${Math.round(PLUS.stock.commission * 100) / 10} 折`, pct(1 - PLUS.stock.commission)), T('證券手續費', 'off commission')]
   ].filter(Boolean);
