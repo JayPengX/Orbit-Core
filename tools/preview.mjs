@@ -114,6 +114,8 @@ for (let f = opt('fixture', ''); f; f = opt('fixture', '')) {
   const i = f.indexOf('=');
   fixtures.push([f.slice(0, i), resolve(f.slice(i + 1))]);
 }
+// --clock ISO: the page's time starts then (and runs on): a live session made up with --fixture, say.
+const clockAt = opt('clock', '');
 const clicks = [];
 for (let c; (c = opt('click', null)); ) clicks.push(c);
 // --type 'selector=text': types into a field after the clicks (repeatable).
@@ -578,6 +580,7 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => (reopen ? [h, h]
   if (reopen) console.log(first ? `first opening${oldRoot ? ` (the app as of ${upgrade})` : ''}${flaky ? `, ${Math.round(flaky * 100)}% of answers failing` : ''}` : 'second opening (storage kept)');
   // A page of its own for each (a hash change alone doesn't reload).
   const page = await context.newPage();
+  if (clockAt) await page.clock.install({ time: new Date(clockAt) });
   page.on('console', m => m.type() === 'error' && errors.push(m.text()));
   page.on('pageerror', e => errors.push(String(e.stack || e)));
   const started = Date.now();
