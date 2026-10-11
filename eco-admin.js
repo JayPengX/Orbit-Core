@@ -21,17 +21,52 @@ import { usage as transitUsage, CAPS as TRANSIT_CAPS, TDX_POINTS, tdxPoints, tdx
 import { twDate, GOOGLE_DAILY_CALLS } from './weather.js';
 import { cleanDev } from './kit/devconfig.mjs';
 import { sidesOf, addSides, LEDGER } from './money.js';
+import { plan as capacityPlan, usersFrom } from './capacity.js';
 
 // The developer settings (kit/devconfig.mjs), one document; GET /config
 // answers them to everyone (worker.js), the panel's 開發 changes them.
 export const CONFIG_COLLECTION = 'quadra-config';
-export async function readDev(env, deps) {
+// Stored: the settings in use, the owner's own (`base`: what they saved;
+// the same unless capacity.js slowed the live ones for more people) and
+// the last adjustment (`auto`). GET /config answers only the ones in use.
+async function readDevDoc(env, deps) {
   const d = await deps.fsGet(env, CONFIG_COLLECTION, 'dev').catch(() => ({ exists: false }));
   let raw = {};
   try {
     raw = d.exists ? JSON.parse(d.payload) : {};
   } catch {}
-  return { ...cleanDev(raw), at: Number(raw.at) || 0 };
+  const now = { ...cleanDev(raw), at: Number(raw.at) || 0 };
+  return { now, base: raw.base ? cleanDev(raw.base) : cleanDev(raw), auto: raw.auto || null };
+}
+export async function readDev(env, deps) {
+  return (await readDevDoc(env, deps)).now;
+}
+// What's needed for capacity.js: people from the wallets, the metered use.
+async function capacityNow(env, deps, base, inUse = base) {
+  const now = deps.now();
+  const list = (await deps.fsList(env, WALLET_COLLECTION, 300)).map(w => parseWallet(w.payload)).filter(Boolean);
+  const users = usersFrom(list, now, lastUsed, appsOf);
+  const usage = await ADMIN_TOOLS.usage({ env, deps }).catch(() => ({}));
+  return capacityPlan({ users, base, inUse, usage, now });
+}
+async function writeDev(env, deps, base, p) {
+  const applied = base.autoScale && p ? cleanDev(p.applied) : base;
+  const next = { ...applied, at: deps.now(), base, auto: p ? { at: p.at, scale: p.scale, over: p.over, week: p.users.week, expected: p.users.expected, on: !!base.autoScale } : null };
+  await deps.fsWrite(env, CONFIG_COLLECTION, 'dev', JSON.stringify(next));
+  // GET /config's minute in the cache let go here (this colo's), so the change is read at once.
+  if (typeof caches !== 'undefined') await caches.default.delete(new Request('https://orbit-config.quadra/dev')).catch(() => {});
+  return next;
+}
+// The cron's check (worker.js, every 6 hours): with 依人數自動調整 on, the
+// live refreshes follow the people expected; written only when they change.
+export async function capacityCron(env, deps) {
+  const doc = await readDevDoc(env, deps);
+  if (!doc.base.autoScale) return { off: true };
+  const p = await capacityNow(env, deps, doc.base, doc.now);
+  const next = cleanDev(p.applied);
+  const same = Object.keys(next).every(k => next[k] === doc.now[k]);
+  if (!same) await writeDev(env, deps, doc.base, p);
+  return { scale: p.scale, week: p.users.week, expected: p.users.expected, changed: !same };
 }
 
 export const ADMIN_TOKEN_HASH = '';
@@ -671,15 +706,21 @@ export const ADMIN_TOOLS = {
     return next;
   },
   // The developer settings: as they are, and saved (each in range).
+  // (The owner's own numbers to edit, `base`; the ones in use beside them.)
   async config({ env, deps }) {
-    return readDev(env, deps);
+    const doc = await readDevDoc(env, deps);
+    return { ...doc.base, at: doc.now.at, now: doc.now, auto: doc.auto };
   },
   async 'config-set'({ env, deps, body }) {
-    const next = { ...cleanDev(body.config || {}), at: deps.now() };
-    await deps.fsWrite(env, CONFIG_COLLECTION, 'dev', JSON.stringify(next));
-    // GET /config's minute in the cache let go here (this colo's), so the change is read at once.
-    if (typeof caches !== 'undefined') await caches.default.delete(new Request('https://orbit-config.quadra/dev')).catch(() => {});
-    return next;
+    const base = cleanDev(body.config || {});
+    const p = base.autoScale ? await capacityNow(env, deps, base).catch(() => null) : null;
+    const next = await writeDev(env, deps, base, p);
+    return { ...base, at: next.at, now: { ...cleanDev(next), at: next.at }, auto: next.auto };
+  },
+  // People and the free plans (capacity.js): the panel's 容量.
+  async capacity({ env, deps }) {
+    const doc = await readDevDoc(env, deps);
+    return capacityNow(env, deps, doc.base, doc.now);
   },
   // Quadra's money as a whole (money.js): what the system gave, what Quadra
   // earned and what players made, by market, live accounts and deleted ones.

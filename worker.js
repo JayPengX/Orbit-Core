@@ -28,7 +28,7 @@ import { handlePush, sendDue } from './push.js';
 import { handleWeather } from './weather.js';
 import { weatherCron, skillReport } from './weather-skill.js';
 import { handleTransit, tally } from './transit.js';
-import { readDev } from './eco-admin.js';
+import { readDev, capacityCron } from './eco-admin.js';
 
 const ALLOWED_ORIGINS = ['https://jaypengx.github.io'];
 
@@ -1281,6 +1281,9 @@ export default {
     // Orbit Weather's scoring, once an hour (weather-skill.js).
     if (new Date(event.scheduledTime || Date.now()).getUTCMinutes() === 10) ctx.waitUntil(weatherCron(env).then(r => console.log('weather skill', JSON.stringify(r))).catch(e => console.log('weather skill failed', String(e))));
     if (!env.FIREBASE_PROJECT_ID || !env.FIREBASE_CLIENT_EMAIL || !env.FIREBASE_PRIVATE_KEY) return;
+    // The live refreshes by how many people there are (capacity.js), every 6 hours.
+    const at = new Date(event.scheduledTime || Date.now());
+    if (at.getUTCMinutes() === 20 && at.getUTCHours() % 6 === 0) ctx.waitUntil(capacityCron(env, ECO_DEPS).then(r => console.log('capacity', JSON.stringify(r))).catch(e => console.log('capacity failed', String(e))));
     ctx.waitUntil(refreshKambiWatch(env, KAMBI_DEPS).then(r => console.log('kambi watch', JSON.stringify(r))));
   }
 };

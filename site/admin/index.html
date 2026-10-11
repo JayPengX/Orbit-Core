@@ -78,6 +78,11 @@
   .flow .bar i.neg { background: var(--q-bad); }
   .flow li.sum { border-top: 2px solid var(--q-divider); }
   .flow li.sum .nm, .flow li.sum .v { font-weight: 800; }
+  .flow.stack .nm small { display: block; margin: 2px 0 0; white-space: nowrap; overflow: hidden; }
+  #cap .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .flow .bar i.warn { background: var(--q-warn, #c77700); }
+  .flow .v.warn { color: var(--q-warn, #c77700); }
+  .set strong .using { display: block; font-weight: 500; font-size: 12px; color: var(--q-accent); margin-top: 2px; }
   .eq { font-size: 13px; color: var(--q-muted); line-height: 1.6; margin: 10px 0 0; }
   .neg { color: var(--q-bad); }
   .code { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 26px; font-weight: 800; letter-spacing: 0.12em; margin: 10px 0 4px; }
@@ -309,6 +314,13 @@
         <strong>現在的延遲（比賽進行中，比 ESPN 晚多久）</strong>
         <div class="lag" id="dev-lag"></div>
         <p class="muted" style="margin:10px 0 0">ESPN 本身大約每 10 秒更新一次（實測，繞過它的快取也不會更快），這部分改不了；後面全是我們的：代理保留的秒數，加上 App 多久問一次。</p>
+      </div>
+      <div class="card" id="cap">
+        <div class="row spread"><strong>容量：人數和免費額度</strong><button id="cap-load" class="small">重新估算</button></div>
+        <p id="cap-error" class="error"></p>
+        <div class="tiles" id="cap-tiles"></div>
+        <ul class="flow stack" id="cap-plans" style="margin-top:8px"></ul>
+        <p class="muted" id="cap-note" style="margin:8px 0 0"></p>
       </div>
       <div id="dev-sets"></div>
       <div class="savebar"><span id="dev-state" class="muted">載入中…</span><div class="row"><button id="dev-defaults" class="small">全部恢復預設</button><button id="dev-save" class="primary" disabled>儲存</button></div></div>
@@ -1042,6 +1054,7 @@ $('clean').onclick = () =>
 // ---- 開發 ----
 let devSaved = null;
 let devDraft = null;
+let devNow = null;
 const UNIT = { s: '秒', h: '小時' };
 function drawDev() {
   const groups = Object.entries(DEV_GROUPS).map(([g, title]) => {
@@ -1054,8 +1067,9 @@ function drawDev() {
         control = el('input', { type: 'number', min: String(d.min), max: String(d.max), step: '1', value: String(devDraft[k]), 'aria-label': d.zh });
         control.onchange = () => { devDraft = cleanDev({ ...devDraft, [k]: control.value }); drawDev(); };
       }
+      const using = devNow && typeof d.def !== 'boolean' && devNow[k] !== devSaved[k] ? devNow[k] : null;
       return el('div', { class: `set${changed ? ' changed' : ''}` }, [
-        el('strong', { text: d.zh }),
+        el('strong', {}, [d.zh, using != null ? el('small', { class: 'using', text: `使用中 ${using} ${UNIT[d.unit] || d.unit}（自動）` }) : null]),
         el('div', { class: 'val' }, [control, typeof d.def === 'boolean' ? null : el('span', { text: UNIT[d.unit] || d.unit })]),
         el('p', {}, [document.createTextNode(d.note || ''), el('span', { class: 'def', text: `預設 ${typeof d.def === 'boolean' ? (d.def ? '開' : '關') : `${d.def} ${UNIT[d.unit] || d.unit}`}` })])
       ]);
@@ -1080,13 +1094,52 @@ async function loadDev() {
   try {
     const got = await admin('config');
     devSaved = { ...cleanDev(got), at: got.at || 0 };
+    devNow = got.now ? cleanDev(got.now) : null;
     devDraft = cleanDev(devSaved);
     drawDev();
+    loadCapacity();
   } catch (e) {
     $('dev-error').textContent = e.message;
   }
 }
 $('dev-load').onclick = () => busy($('dev-load'), loadDev);
+// ---- 容量 (capacity.js) ----
+const n0 = v => Math.round(v || 0).toLocaleString();
+const SKU_ZH = { maps: '地圖載入', autocomplete: '地點搜尋', details: '地點位置', detailsPro: '地點名稱', routes: '路線規劃' };
+async function loadCapacity() {
+  $('cap-error').textContent = '';
+  try {
+    const p = await admin('capacity');
+    const u = p.users;
+    const cf = p.cf;
+    $('cap-tiles').replaceChildren(
+      tile('本週活躍', `${u.week} 人`, `今天 ${u.day} · 本月 ${u.month}`),
+      tile('30 天後預估', `${u.expected} 人`, `近兩週新開 ${u.newWeek + u.newPrev} 個`),
+      tile('Cloudflare 每天', n0(cf.now.total), `額度 ${n0(cf.plan)}（估）`),
+      tile('撐得住', cf.holds == null ? '—' : `${n0(cf.holds)} 人`, '每週活躍，照你的設定')
+    );
+    const rows = [];
+    const row = (name, used, cap, sub) => {
+      const share = cap ? used / cap : 0;
+      return el('li', {}, [
+        el('span', { class: 'nm' }, [name, sub ? el('small', { text: sub }) : null]),
+        el('span', { class: `v ${share > 1 ? 'neg' : share > 0.8 ? 'warn' : 'pos'}`, text: cap ? `${Math.round(share * 100)}%` : '—' }),
+        el('span', { class: 'bar' }, [el('i', { class: share > 1 ? 'neg' : share > 0.8 ? 'warn' : '', style: `width:${Math.max(1.5, Math.min(100, share * 100))}%` })])
+      ]);
+    };
+    rows.push(row('Cloudflare', p.cf.expected.total, cf.budget, `30 天後每天 ${n0(p.cf.expected.total)} / ${n0(cf.budget)}`));
+    for (const [k, m] of Object.entries(p.maps || {})) rows.push(row(`Google ${SKU_ZH[k] || k}`, m.expected, m.cap, `30 天後 ${n0(m.expected)} / ${n0(m.cap)}${m.holds ? ` · 撐 ${m.holds} 人` : ''}`));
+    if (p.weather) rows.push(row('Google 天氣', p.weather.today, p.weather.cap, `今天 ${n0(p.weather.today)} / ${n0(p.weather.cap)} · 看地點`));
+    if (p.tdx?.plan) rows.push(row('TDX 點數', p.tdx.month, p.tdx.plan, `本月 ${(p.tdx.month || 0).toFixed(1)} / ${p.tdx.plan}${p.tdx.guard?.why ? ' · 已放慢' : ''}`));
+    $('cap-plans').replaceChildren(...rows);
+    const on = devSaved?.autoScale;
+    const slow = p.scale == null ? '最慢也不夠：要減少即時功能或升級 Cloudflare' : p.scale > 1 ? `即時更新要放慢 ×${p.scale}` : '不用放慢';
+    $('cap-note').textContent = `30 天後 ${u.expected} 人：${slow}。${on ? '「依人數自動調整」開著，每 6 小時照這個套用（下面的數字是你的設定，也是最快的）。' : p.scale > 1 || p.scale == null ? '打開下面的「依人數自動調整」就會自動套用。' : ''}Cloudflare 的用量是估算（看幾分鐘即時畫面 × 多久問一次），其餘是實際計數。${fmt(p.at)} 估算。`;
+  } catch (e) {
+    $('cap-error').textContent = e.message;
+  }
+}
+$('cap-load').onclick = () => busy($('cap-load'), loadCapacity);
 $('dev-defaults').onclick = () => { devDraft = cleanDev(); drawDev(); };
 $('dev-save').onclick = () =>
   busy($('dev-save'), async () => {
@@ -1094,6 +1147,7 @@ $('dev-save').onclick = () =>
     try {
       const got = await admin('config-set', { config: devDraft });
       devSaved = { ...cleanDev(got), at: got.at || Date.now() };
+      devNow = got.now ? cleanDev(got.now) : null;
       devDraft = cleanDev(devSaved);
       drawDev();
       $('dev-ok').textContent = '已儲存：代理一分鐘內、App 幾分鐘內（或重新打開時）套用。';

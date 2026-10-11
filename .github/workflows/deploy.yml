@@ -19,6 +19,7 @@ on:
       - 'push.js'
       - 'eco-admin.js'
       - 'money.js'
+      - 'capacity.js'
       - 'weather.js'
       - 'weather-stations.js'
       - 'weather-skill.js'
