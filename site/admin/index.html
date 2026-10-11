@@ -1072,14 +1072,25 @@ const LINKS = [
 $('links').replaceChildren(...LINKS.map(([n, href]) => el('a', { href, target: '_blank', rel: 'noopener', text: n })));
 
 // ---- Google 帳單 ----
-// Google's list prices (USD), editable: the Maps platform's SKUs past each
-// one's free monthly use (per 1,000), Gemini per million tokens. Estimates.
+// Google's list prices (USD), editable (checked 2026-10-11 against
+// developers.google.com/maps/billing-and-pricing/pricing and
+// ai.google.dev/gemini-api/docs/pricing):
+// - Maps platform, each SKU free to its monthly cap, then per 1,000:
+//   Dynamic Maps 10,000 then $7; Autocomplete Requests 10,000 then $2.83
+//   (free altogether in a session that ends in Place Details, as Transit's
+//   do: counted every request here, on the safe side); Place Details
+//   Essentials 10,000 then $5, Pro 5,000 then $17; Compute Routes Essentials
+//   10,000 then $5; Weather (every call alike) 10,000 then $0.15.
+// - Gemini per million tokens, the paid tier (a project with billing has no
+//   free tier): 3.5 Flash-Lite $0.30 in, $0.03 cached, $2.50 out (thinking
+//   is output); 3.7 Flash isn't on the page: its neighbours 3.6 / 3.8 Flash,
+//   $0.75, $0.075, $3.75 to the end of 2026 (double from 2027-01-01).
 const BILL_DEFAULTS = {
   rate: 32,
   prices: {
     maps: { free: 10000, per: 7 }, autocomplete: { free: 10000, per: 2.83 }, details: { free: 10000, per: 5 }, detailsPro: { free: 5000, per: 17 }, routes: { free: 10000, per: 5 },
     weather: { free: 10000, per: 0.15 },
-    'gemini-3.5-flash-lite': { in: 0.1, cached: 0.025, out: 0.4 }, 'gemini-3.7-flash': { in: 0.3, cached: 0.075, out: 2.5 }
+    'gemini-3.5-flash-lite': { in: 0.3, cached: 0.03, out: 2.5 }, 'gemini-3.7-flash': { in: 0.75, cached: 0.075, out: 3.75 }
   }
 };
 const BILL_NAMES = { maps: '地圖載入（Transit）', autocomplete: '地點搜尋', details: '地點詳細', detailsPro: '地點名稱（Pro）', routes: '路線規劃', weather: '天氣 API' };
@@ -1087,7 +1098,8 @@ let bill = null;
 const ntd = v => `NT$${(Math.round(v * 10) / 10).toLocaleString()}`;
 function billPrices() {
   const p = { ...BILL_DEFAULTS.prices, ...(bill?.saved?.prices || {}) };
-  for (const m of Object.keys(bill?.gemini || {})) p[m] ||= { in: 0.3, cached: 0.075, out: 2.5 };
+  // A model not priced here: as a Flash (the dearer guess).
+  for (const m of Object.keys(bill?.gemini || {})) p[m] ||= { in: 0.75, cached: 0.075, out: 3.75 };
   return p;
 }
 function billCosts() {
@@ -1097,6 +1109,7 @@ function billCosts() {
   for (const [k, n] of Object.entries(bill.maps)) rows.push({ k, name: BILL_NAMES[k] || k, used: n.toLocaleString(), free: p[k]?.free, ntd: Math.max(0, n - (p[k]?.free || 0)) * (p[k]?.per || 0) / 1000 * rate });
   const w = Object.values(bill.weather).reduce((a, b) => a + b, 0);
   rows.push({ k: 'weather', name: BILL_NAMES.weather, used: w.toLocaleString(), free: p.weather.free, ntd: Math.max(0, w - p.weather.free) * p.weather.per / 1000 * rate });
+  // (Weather's days were kept 2 days until 2026-10-11: October's count is its last days only.)
   for (const [m, days] of Object.entries(bill.gemini)) {
     const t = Object.values(days).reduce((a, d) => ({ in: a.in + d.in, cached: a.cached + d.cached, out: a.out + d.out }), { in: 0, cached: 0, out: 0 });
     const q = p[m];
