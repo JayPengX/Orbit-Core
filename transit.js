@@ -168,7 +168,7 @@ export const TDX_RULES = [
   { re: /^basic\/v2\/Bus\/(Route|StopOfRoute)\/(City\/[A-Za-z]+(\/[^/]+)?|InterCity(\/[^/]+)?)$/, fresh: DAY, stale: 7 * DAY, tier: 'static' },
   // The lines' shapes, buses' and rails' (Shared-Data's nightly shape packs, tried through the dev door).
   { re: /^basic\/v2\/Bus\/Shape\/(City\/[A-Za-z]+(\/[^/]+)?|InterCity(\/[^/]+)?)$/, fresh: DAY, stale: 7 * DAY, tier: 'static' },
-  { re: /^basic\/v2\/Rail\/(TRA|THSR|Metro\/[A-Z]+)\/Shape$/, fresh: DAY, stale: 7 * DAY, tier: 'static' },
+  { re: /^basic\/v2\/Rail\/((TRA|THSR)\/Shape|Metro\/Shape\/[A-Z]+)$/, fresh: DAY, stale: 7 * DAY, tier: 'static' },
   { re: /^advanced\/v2\/Bus\/(Station|Stop|Route)\/NearBy$/, fresh: DAY, stale: 7 * DAY, tier: 'static' },
   { re: /^advanced\/v2\/Bus\/(Route|StopOfRoute)\/(City\/[A-Za-z]+|InterCity)\/PassThrough\/Station\/[^/]+$/, fresh: DAY, stale: 7 * DAY, tier: 'static' },
   { re: /^basic\/v2\/Bike\/Station\/City\/[A-Za-z]+$/, fresh: DAY, stale: 7 * DAY, tier: 'static' },
