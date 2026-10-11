@@ -111,7 +111,7 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
   Class shows no classes and sends no class notices on one; Weather's and
   Transit's weekdays-only pins and trips skip it.
 - **Upright only:** manifests `orientation: portrait`, and the kit turns
-  the page back against a sideways phone (TRUTH §6).
+  the page back against a sideways phone (TRUTH §10).
 - **F1:** a practice drawn with its best laps and gaps, live and after
   (F1's archive through `f1-live.js` `/session.json`); a session over by
   F1's feed ends at once; standings move only once a sprint or race is
@@ -230,7 +230,7 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
   already sent (`quadra.push.sent.<app>`, two days), and Class banners a
   class only in its notice's own minute.
 - The top blur: Class was the one app on `black-translucent`; now `default`
-  with a theme-color for light and dark (TRUTH §6). Unverified on a phone:
+  with a theme-color for light and dark (TRUTH §10). Unverified on a phone:
   iOS may keep the old style until the app is removed and added again.
 - Not checked here: WebKit (none in the container). Pre-existing, seen with
   `--shuffle`: a device with nothing saved opens on the default schedule
