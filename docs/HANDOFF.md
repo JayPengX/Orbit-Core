@@ -8,6 +8,38 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
 
 
 
+## The owner's second list of 2026-10-11 (pushed to `main`)
+
+- **Admin:** 金流 (money.js: every account's 真相 summed, the system's net,
+  Quadra's take by sport and fee, players' markets; a deleted account's worth
+  back to the system, `quadra-config/ledger`); 容量 in 開發 (capacity.js:
+  people this week and in 30 days, each free plan against them, and
+  依人數自動調整 slowing the live refreshes together, checked every 6 hours,
+  the owner's numbers the floor).
+- **Kit:** pressed only when pressed (every `:active` becomes
+  `[data-q-press]` on a touch device, set after 90 ms or on a tap, never while
+  scrolling); postseason's If Necessary games 待定 until the game before is over.
+- **Play:** 不計入 crossed out in red; 勝分差 a row per team; 雙重機會 主勝或和;
+  the markets keep their tallest height while a game is open.
+- **Securities:** 今日 only while a market held trades (週五 on a weekend);
+  NT$ prices with two decimals; the movers named for their day.
+- **Weather:** an old forecast says so (更新中 · 2 小時前的資料, faded), one over
+  6 hours isn't shown before the new one.
+- **Sports:** one session state for home and the sheet (`sessionStatus`);
+  F1 數據 compare rebuilt (leader once, gaps right, key, every lap of a past
+  session, two tyres a row), practice long runs and each tyre's best lap;
+  live rows' 觀看 in the left column; Apple TV each MLS game's own page
+  (Shared-Data watch.json `apple`) and 重播; 先發陣容 (lib/lineups.mjs: ESPN
+  core rosters' starters for NBA/WNBA/NHL, MLB's probables and orders); this
+  season's game log with preseason; `onAir` for home and 直播; 台灣轉播 lines
+  short, 預計 at ELTA's slot.
+- **Transit:** rides along their lines (Shared-Data shapes.mjs packs,
+  lib/shapes.mjs network ways; trains stop by stop where TDX's shape has
+  gaps); plan rows wrap, never cut; a picked place stays put; a trip shows
+  only its own bikes; a station empty or full while navigating: the ride
+  moved to one within 500 m; search topped up by Text Search; Google's plans
+  shown before TDX's (`src`), first plans about twice as fast on long trips.
+
 ## The owner's list of 2026-10-11 (40 items, pushed to `main`)
 
 - **Sports:** CPBL's 0 (TheSportsDB leaves a scoreless side empty), no
