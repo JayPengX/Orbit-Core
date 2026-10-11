@@ -45,6 +45,7 @@
 //   POST   /eco { op: 'share-redeem', qt, key }       a copy of that schedule
 //   POST   /eco { op: 'admin', token, action }        the store's clean-up
 
+import { retire } from './money.js';
 import { tokenSecret, signToken, readToken, seal, unseal, sessionLimited, SESSION_MS, REFRESH_MS, HANDOFF_MS } from './quadra-token.js';
 import { handleAdmin } from './eco-admin.js';
 
@@ -608,7 +609,7 @@ export async function handleEcoRequest(request, env, headers, ip, deps) {
       await deps.fsDelete(env, ECO_APPS[app].collection, docId);
       return json({ deleted: true }, 200, headers);
     }
-    await deleteAccount(env, deps, docId);
+    await deleteAccount(env, deps, docId, { retire: true });
     return json({ deleted: true }, 200, headers);
   } catch (error) {
     return upstreamFailed(error, headers);
@@ -917,9 +918,12 @@ export async function updateWallet(env, deps, docId, change, { create = false, s
   throw new Error('wallet busy, try again');
 }
 
-export async function deleteAccount(env, deps, docId) {
+// `retire`: deleted for good (not moved to another pass by a merge or a new
+// passcode), so its money goes back to the system's books (money.js).
+export async function deleteAccount(env, deps, docId, { retire: gone = false } = {}) {
   const doc = await deps.fsGet(env, WALLET_COLLECTION, docId);
   const wallet = doc.exists ? parseWallet(doc.payload) : null;
+  if (gone && wallet) await retire(env, deps, wallet).catch(() => {});
   for (const ids of Object.values(wallet?.inbox || {})) for (const id of ids) await deps.fsDelete(env, INBOX_COLLECTION, id);
   for (const { collection } of Object.values(ECO_APPS)) await deps.fsDelete(env, collection, docId);
   await deps.fsDelete(env, WALLET_COLLECTION, docId);
