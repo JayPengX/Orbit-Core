@@ -19,11 +19,24 @@ import { sendPush } from './push.js';
 import { KAMBI_COLLECTION } from './kambi.js';
 import { usage as transitUsage, CAPS as TRANSIT_CAPS } from './transit.js';
 import { twDate, GOOGLE_DAILY_CALLS } from './weather.js';
+import { cleanDev } from './kit/devconfig.mjs';
+
+// The developer settings (kit/devconfig.mjs), one document; GET /config
+// answers them to everyone (worker.js), the panel's 開發 changes them.
+export const CONFIG_COLLECTION = 'quadra-config';
+export async function readDev(env, deps) {
+  const d = await deps.fsGet(env, CONFIG_COLLECTION, 'dev').catch(() => ({ exists: false }));
+  let raw = {};
+  try {
+    raw = d.exists ? JSON.parse(d.payload) : {};
+  } catch {}
+  return { ...cleanDev(raw), at: Number(raw.at) || 0 };
+}
 
 export const ADMIN_TOKEN_HASH = '';
 export const RETIRED_COLLECTIONS = ['orbit-schedules', 'eco-links', 'stock-study-leagues'];
 // (A function: eco.js and this file import each other.)
-const keep = () => new Set([WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, KAMBI_COLLECTION, ...Object.values(ECO_APPS).map(a => a.collection)]);
+const keep = () => new Set([WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, KAMBI_COLLECTION, CONFIG_COLLECTION, ...Object.values(ECO_APPS).map(a => a.collection)]);
 // Firestore batch writes take up to 500 at a time; a call stops after this
 // many so it stays inside the Worker's limits.
 const PER_CALL = 1500;
@@ -568,6 +581,17 @@ export const ADMIN_TOOLS = {
     };
   },
   // The sources the apps read, each asked once: answered, how fast.
+  // The developer settings: as they are, and saved (each in range).
+  async config({ env, deps }) {
+    return readDev(env, deps);
+  },
+  async 'config-set'({ env, deps, body }) {
+    const next = { ...cleanDev(body.config || {}), at: deps.now() };
+    await deps.fsWrite(env, CONFIG_COLLECTION, 'dev', JSON.stringify(next));
+    // GET /config's minute in the cache let go here (this colo's), so the change is read at once.
+    if (typeof caches !== 'undefined') await caches.default.delete(new Request('https://orbit-config.quadra/dev')).catch(() => {});
+    return next;
+  },
   async health() {
     const one = async ([name, url]) => {
       const t = Date.now();

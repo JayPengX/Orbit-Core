@@ -100,3 +100,42 @@ export function familyMark(family, { shape = 'rounded', plain = false } = {}) {
 }
 
 export const familyOf = id => FAMILIES[of(id)?.family] || FAMILIES.quadra;
+
+// The developer settings (the admin panel's 開發): how fast live data is
+// read again, by the apps and by the sports proxy, and the switches. Kept
+// on the Worker (POST /eco admin 'config-set', GET /config for everyone);
+// each app and the proxy read them, a missing or bad value its default.
+//
+// The defaults chase the sources' own speed, the worst case cut too: ESPN
+// changes a live game about every 10 seconds and asking past its CDN gains
+// nothing (2026-10-11: live games polled each second, plain and cache-busted,
+// the plain one at most a second behind), so what's ours is kept small:
+// the proxy 2 s, the phone 2 s, an open game read every 3 s (at most ~5 s
+// behind ESPN). F1's feed is a fresh connection each read: every 4 s.
+export const DEV = {
+  proxyLive: { def: 2, min: 0, max: 60, unit: 's', group: 'proxy', zh: '代理保留即時資料', en: 'Proxy keeps live data', note: '越短越即時；0 = 跟著來源（ESPN 說可以保留多久的一半，2–5 秒）' },
+  proxyFinalH: { def: 24, min: 1, max: 72, unit: 'h', group: 'proxy', zh: '代理保留已結束的比賽', en: 'Proxy keeps a game over', note: '比賽結束、整天都結束後，第一個人讀到就給所有人用這麼久' },
+  sportsGame: { def: 3, min: 2, max: 120, unit: 's', group: 'sports', zh: '比賽頁重新讀取', en: 'Game sheet refresh', note: 'Orbit Sports 打開一場進行中的比賽時' },
+  sportsList: { def: 5, min: 3, max: 120, unit: 's', group: 'sports', zh: '列表重新讀取', en: 'Lists refresh', note: '首頁、轉播、追蹤有比賽進行中時' },
+  f1Feed: { def: 10, min: 4, max: 120, unit: 's', group: 'f1', zh: 'F1 即時計時（全 App）', en: 'F1 live timing, app-wide', note: '首頁卡片和誰在場上' },
+  f1Board: { def: 4, min: 2, max: 60, unit: 's', group: 'f1', zh: 'F1 即時看板', en: 'F1 live board', note: '賽事頁打開進行中的一節（F1 的來源每 4 秒一次）' },
+  f1Laps: { def: 15, min: 5, max: 120, unit: 's', group: 'f1', zh: 'F1 每圈資料', en: 'F1 laps', note: '數據的車手比較與圈速' },
+  playLive: { def: 5, min: 3, max: 120, unit: 's', group: 'play', zh: 'Play 即時比分與兌現', en: 'Play live scores', note: 'Quadra Play 有比賽進行中的注單、即時盤' },
+  mirror: { def: true, group: 'data', zh: '使用每晚的資料副本', en: 'Use the nightly copies', note: '關掉：所有 App 都直接問代理（除錯用）' }
+};
+export const DEV_GROUPS = { proxy: '代理（sports-proxy）', sports: 'Orbit Sports', f1: 'F1', play: 'Quadra Play', data: '資料' };
+
+// Settings as stored: each known key, in range, else its default.
+export function cleanDev(x = {}) {
+  const out = {};
+  for (const [k, s] of Object.entries(DEV)) {
+    const v = x?.[k];
+    if (typeof s.def === 'boolean') out[k] = typeof v === 'boolean' ? v : s.def;
+    else {
+      const n = Number(v);
+      out[k] = Number.isFinite(n) && v !== '' && v != null ? Math.min(s.max, Math.max(s.min, Math.round(n))) : s.def;
+    }
+  }
+  return out;
+}
+
