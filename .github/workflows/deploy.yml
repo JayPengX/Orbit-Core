@@ -22,6 +22,7 @@ on:
       - 'weather-stations.js'
       - 'weather-skill.js'
       - 'transit.js'
+      - 'kit/devconfig.mjs'
   workflow_dispatch:
 
 jobs:

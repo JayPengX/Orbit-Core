@@ -28,9 +28,60 @@
 // button to continue there. Links between the apps carry the sign-in along.
 
 import { BRANDS, FAMILIES, pathOf, appIcon, familyMark } from './brand.mjs';
+import { DEV, cleanDev } from './brand.mjs';
 
 export const ECO_URL = 'https://orbit-workers-proxy.pengzjay.workers.dev/eco';
 export const PROXY_URL = 'https://sports-proxy.pengzjay.workers.dev/sports-proxy';
+
+// The developer settings (devconfig.mjs, the admin panel's 開發): how often
+// live data is read again, the switches. The device's copy at once, the
+// Worker's read every five minutes behind it (a change reaches an open app
+// within minutes, a reopened one at once).
+const DEV_URL = 'https://orbit-workers-proxy.pengzjay.workers.dev/config';
+const DEV_KEY = 'quadra.dev';
+let devNow = (() => {
+  try {
+    return cleanDev(JSON.parse(localStorage.getItem(DEV_KEY) || '{}'));
+  } catch {
+    return cleanDev();
+  }
+})();
+let devReadAt = 0;
+export const dev = key => devNow[key] ?? DEV[key]?.def;
+export function readDev() {
+  if (typeof window === 'undefined' || Date.now() - devReadAt < 5 * 60_000) return;
+  devReadAt = Date.now();
+  fetch(DEV_URL, { signal: AbortSignal.timeout(8_000) })
+    .then(r => (r.ok ? r.json() : null))
+    .then(x => {
+      if (!x) return;
+      devNow = cleanDev(x);
+      try {
+        localStorage.setItem(DEV_KEY, JSON.stringify(devNow));
+      } catch {}
+    })
+    .catch(() => {});
+}
+readDev();
+// fn again every dev(key) seconds, the setting read at each beat (a change
+// applies at the next one). Answers a stop.
+export function everyDev(key, fn) {
+  let timer = 0;
+  let stopped = false;
+  const beat = () => {
+    timer = setTimeout(() => {
+      if (stopped) return;
+      readDev();
+      try {
+        fn();
+      } finally {
+        beat();
+      }
+    }, Math.max(1, dev(key)) * 1000);
+  };
+  beat();
+  return () => ((stopped = true), clearTimeout(timer));
+}
 export const SITE = 'https://jaypengx.github.io';
 export const BRAND = { name: 'Quadra', pass: 'Quadra Pass' };
 export { BRANDS, FAMILIES, appIcon, familyMark };
@@ -726,7 +777,8 @@ async function mirrored(url, trim) {
     host = new URL(url).hostname;
   } catch {}
   const key = `${trim}!${url}`;
-  if (!MIRROR_HOSTS.has(host) || mirrorGone.has(key)) return null;
+  // (開發's switch off: every read the proxy's, for checking it.)
+  if (!MIRROR_HOSTS.has(host) || mirrorGone.has(key) || dev('mirror') === false) return null;
   const index = await readMirrorIndex();
   if (!index || Date.now() >= index.until || !index.match.some(re => re.test(key))) return null;
   try {

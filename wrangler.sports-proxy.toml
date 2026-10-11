@@ -20,3 +20,10 @@ compatibility_date = "2025-01-01"
 # rate-limited (sports-proxy-worker.js checkSession). "off" closes it.
 [vars]
 SPORTS_DEV = "on"
+
+# The main Worker, called directly (a workers.dev address can't be fetched
+# from another Worker): the developer settings (GET /config) the cache times
+# here follow.
+[[services]]
+binding = "ORBIT"
+service = "orbit-workers-proxy"

@@ -28,6 +28,7 @@ import { handlePush, sendDue } from './push.js';
 import { handleWeather } from './weather.js';
 import { weatherCron, skillReport } from './weather-skill.js';
 import { handleTransit } from './transit.js';
+import { readDev } from './eco-admin.js';
 
 const ALLOWED_ORIGINS = ['https://jaypengx.github.io'];
 
@@ -1214,6 +1215,16 @@ export default {
       return path === '/gemini' ? handleGeminiRequest(request, env, headers, ip, ctx, session) : handleNlEditRequest(request, env, headers, ip, ctx, session);
     }
     if (path === '/eco') return handleEcoRequest(request, env, headers, ip, ECO_DEPS);
+    // The developer settings (kit/devconfig.mjs), for every app and the
+    // sports proxy: kept a minute in Cloudflare's cache (one read of the
+    // store a minute, however many ask).
+    if (path === '/config' && request.method === 'GET') {
+      const key = new Request('https://orbit-config.quadra/dev');
+      const hit = await caches.default.match(key);
+      const body = hit ? await hit.text() : JSON.stringify(await readDev(env, ECO_DEPS));
+      if (!hit) ctx.waitUntil(caches.default.put(key, new Response(body, { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=60' } })));
+      return new Response(body, { headers: { ...headers, 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=60' } });
+    }
     if (path === '/kambi') {
       // A Quadra Pass session only, counted per session in memory.
       const qt = new URL(request.url).searchParams.get('qt');

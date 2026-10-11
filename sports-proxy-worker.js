@@ -28,6 +28,7 @@ import { readToken, sessionLimited } from './quadra-token.js';
 import { BRANDS } from './kit/brand.mjs';
 import { ASIA_HOST, asiaBaseballResponse, asiaTarget, cpblBoxTarget } from './asia-baseball.js';
 import { F1_LIVE_HOST, f1LiveResponse } from './f1-live.js';
+import { cleanDev } from './kit/devconfig.mjs';
 
 const ALLOWED_ORIGINS = ['https://jaypengx.github.io'];
 
@@ -135,6 +136,31 @@ const CACHE_LIVE = { tier: 'live', fresh: 10 * SECOND, stale: 0 };
 // change, so the first read after the final serves everyone for a day (it
 // was read from ESPN every 10 seconds of viewing until the night's mirror).
 const CACHE_FINAL = { tier: 'final', fresh: DAY, stale: 0 };
+
+// The developer settings (kit/devconfig.mjs, the admin panel's 開發), read
+// from the main Worker (its service binding ORBIT) at most once a minute:
+// how long a live answer and a game over are kept here.
+let dev = cleanDev();
+let devAt = 0;
+function refreshDev(env, ctx) {
+  if (!env?.ORBIT || Date.now() - devAt < 60_000) return;
+  devAt = Date.now();
+  ctx.waitUntil(
+    env.ORBIT.fetch('https://orbit-workers-proxy/config')
+      .then(r => (r.ok ? r.json() : null))
+      .then(x => x && (dev = cleanDev(x)))
+      .catch(() => {})
+  );
+}
+// How long an answer is fresh here, by the settings: a game over its hours;
+// a live one (tier 'live') the seconds set, or with 0 half what the source
+// says it may be kept (ESPN's max-age: 4 to 10 s), 2 to 5 s.
+export function freshFor(policy, result, settings = dev) {
+  if (result?.final) return settings.proxyFinalH * 3600;
+  if (policy.tier !== 'live') return policy.fresh;
+  if (settings.proxyLive > 0) return settings.proxyLive;
+  return result?.maxAge > 0 ? Math.min(5, Math.max(2, Math.round(result.maxAge / 2))) : policy.fresh;
+}
 // Polymarket's pages mix every open market for a league, today's games
 // included, and Match Find's live-odds poll asks for them every 30s - so
 // they follow the same strict rule as live scores. (An earlier version
@@ -719,7 +745,8 @@ async function fetchUpstream(upstreamUrl, trim) {
         // Not the JSON shape expected - pass it through untouched.
       }
     }
-    return { status: 200, contentType, body, final: settled(upstreamUrl, body) };
+    const maxAge = Number(/max-age=(\d+)/.exec(upstream.headers.get('Cache-Control') || '')?.[1]) || 0;
+    return { status: 200, contentType, body, final: settled(upstreamUrl, body), maxAge };
   } catch (error) {
     return { fetchError: error };
   }
@@ -745,14 +772,17 @@ export function settled(url, body) {
 
 function cacheEntry(result, policy) {
   const p = result.final ? CACHE_FINAL : policy;
+  const fresh = freshFor(policy, result);
   return new Response(result.body, {
     status: 200,
     headers: {
       'Content-Type': result.contentType,
       // The cache itself keeps the entry for the whole fresh + stale span;
       // X-Sports-Proxy-Stored-At is what decides which of the two it's in.
-      'Cache-Control': `public, max-age=${p.fresh + p.stale}`,
+      'Cache-Control': `public, max-age=${fresh + p.stale}`,
       'X-Sports-Proxy-Stored-At': String(Date.now()),
+      // How long it's fresh (the settings, the source's own max-age), read back on the next ask.
+      'X-Sports-Proxy-Fresh': String(fresh),
       // Over for good (settled): kept a day, whatever its address's policy.
       ...(result.final ? { 'X-Sports-Proxy-Final': '1' } : {})
     }
@@ -814,6 +844,8 @@ async function resolveOne(upstreamUrl, trim, ctx) {
   if (cached) {
     // A copy over for good is fresh a day (CACHE_FINAL), not its address's seconds.
     if (match.headers.get('X-Sports-Proxy-Final') === '1') policy = CACHE_FINAL;
+    const kept = Number(match.headers.get('X-Sports-Proxy-Fresh'));
+    if (kept > 0) policy = { ...policy, fresh: kept };
     const storedAt = cached.storedAt;
     // Entries from before this header existed carry the old 20s lifetime,
     // so they're simply treated as fresh until the cache drops them.
@@ -1003,6 +1035,7 @@ export default {
 
     const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
     const path = new URL(request.url).pathname.replace(/\/+$/, '');
+    refreshDev(env, ctx);
 
     // A crash still answers with CORS (the app sees a failure it can try
     // again, not a blocked request) and says what it was.
