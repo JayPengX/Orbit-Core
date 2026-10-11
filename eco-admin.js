@@ -592,6 +592,56 @@ export const ADMIN_TOOLS = {
     };
   },
   // The sources the apps read, each asked once: answered, how fast.
+  // Google's bill, estimated: what was used this month of each billed
+  // service (Maps' SKUs, the Weather API by day, Gemini's tokens by day and
+  // model), and the balance the owner last entered, with its prices and the
+  // month's estimate at that moment (the panel works out what's been spent
+  // since). Google has no API for a prepaid balance: entered by hand.
+  async billing({ env, deps }) {
+    const now = deps.now();
+    const used = await transitUsage(env, now).catch(() => ({}));
+    const tw = new Date(now + 8 * 3_600_000);
+    const month = tw.toISOString().slice(0, 7);
+    const weather = {};
+    if (env.RATE_LIMIT_KV)
+      await Promise.all(
+        Array.from({ length: tw.getUTCDate() }, (_, i) => `${month}-${String(i + 1).padStart(2, '0')}`).map(async d => {
+          const n = Number(await env.RATE_LIMIT_KV.get(`weather:google:${d}`).catch(() => 0)) || 0;
+          if (n) weather[d] = n;
+        })
+      );
+    const gemini = {};
+    for (const [k, n] of Object.entries(used)) {
+      const m = /^gem:(.+):(in|cached|out):(\d{4}-\d{2}-\d{2})$/.exec(k);
+      if (m) ((gemini[m[1]] ||= {})[m[3]] ||= { in: 0, cached: 0, out: 0 })[m[2]] += n;
+    }
+    const maps = Object.fromEntries(Object.entries(TRANSIT_CAPS).map(([k]) => [k, used[k] || 0]));
+    const doc = await deps.fsGet(env, CONFIG_COLLECTION, 'billing').catch(() => ({ exists: false }));
+    // Until a balance is saved in the panel: the owner's NT$132 of 2026-10-11,
+    // counted against the whole of October so far (base 0: on the safe side).
+    let saved = { balance: 132, at: Date.parse('2026-10-11T05:00:00Z'), month: '2026-10', base: 0, rate: 32, prices: {}, seeded: true };
+    try {
+      if (doc.exists) saved = JSON.parse(doc.payload);
+    } catch {}
+    return { at: now, month, maps, weather, gemini, saved };
+  },
+  async 'billing-set'({ env, deps, body }) {
+    const b = body.billing || {};
+    const balance = Number(b.balance);
+    if (!Number.isFinite(balance) || balance < 0 || balance > 1e7) return { error: 'ADMIN_BAD_AMOUNT' };
+    const num = (x, max) => Math.min(max, Math.max(0, Number(x) || 0));
+    const next = {
+      balance,
+      at: deps.now(),
+      month: String(b.month || '').slice(0, 7),
+      // The month's estimated cost (NT$) when it was entered: spent since = the estimate now less this.
+      base: num(b.base, 1e7),
+      rate: num(b.rate, 1000) || 32,
+      prices: Object.fromEntries(Object.entries(b.prices || {}).slice(0, 40).map(([k, v]) => [String(k).slice(0, 60), { free: num(v?.free, 1e9), per: num(v?.per, 1e6), in: num(v?.in, 1e4), out: num(v?.out, 1e4), cached: num(v?.cached, 1e4) }]))
+    };
+    await deps.fsWrite(env, CONFIG_COLLECTION, 'billing', JSON.stringify(next));
+    return next;
+  },
   // The developer settings: as they are, and saved (each in range).
   async config({ env, deps }) {
     return readDev(env, deps);

@@ -27,7 +27,7 @@ import { handleKambiRequest, refreshKambiWatch, fetchKambiLive } from './kambi.j
 import { handlePush, sendDue } from './push.js';
 import { handleWeather } from './weather.js';
 import { weatherCron, skillReport } from './weather-skill.js';
-import { handleTransit } from './transit.js';
+import { handleTransit, tally } from './transit.js';
 import { readDev } from './eco-admin.js';
 
 const ALLOWED_ORIGINS = ['https://jaypengx.github.io'];
@@ -551,7 +551,7 @@ async function proxyGeminiRequest(model, parts, schema, env, headers, ctx, featu
     if (upstream.ok && body && ctx) {
       const [toClient, toLog] = body.tee();
       body = toClient;
-      ctx.waitUntil(logGeminiUsage(toLog, feature, model));
+      ctx.waitUntil(logGeminiUsage(toLog, feature, model, env, ctx));
     }
     return new Response(body, {
       status: upstream.status,
@@ -569,9 +569,18 @@ async function proxyGeminiRequest(model, parts, schema, env, headers, ctx, featu
 // is already streaming (see proxyGeminiRequest), so it adds no latency; see
 // it with `wrangler tail` or the Cloudflare dashboard's Workers logs. Only
 // counts are logged - never the prompt, the schedule, or the reply text.
-async function logGeminiUsage(stream, feature, model) {
+async function logGeminiUsage(stream, feature, model, env = null, ctx = null) {
   try {
     const usage = JSON.parse(await new Response(stream).text()).usageMetadata || {};
+    // Counted too (the admin panel's Google 帳單): by Taiwan's day and the
+    // model, tokens read (less those from the cache), from the cache, and
+    // written (thinking is billed as output).
+    if (env) {
+      const day = new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 10);
+      const cached = usage.cachedContentTokenCount ?? 0;
+      const counts = { in: Math.max(0, (usage.promptTokenCount ?? 0) - cached), cached, out: (usage.candidatesTokenCount ?? 0) + (usage.thoughtsTokenCount ?? 0) };
+      for (const [k, n] of Object.entries(counts)) if (n) await tally(env, `gem:${model}:${k}:${day}`, n, Date.now(), ctx);
+    }
     console.log(
       JSON.stringify({
         event: 'gemini_usage',
