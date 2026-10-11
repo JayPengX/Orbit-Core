@@ -43,3 +43,21 @@ test("F1's archive: a session found by its start; a practice's gaps from the lin
   const b = trimF1Live({ TimingData: { Lines: { 63: { Position: '1', BestLapTime: { Value: '1:32.274' } }, 16: { Position: '2', BestLapTime: { Value: '1:32.472' }, TimeDiffToFastest: '+0.198', TimeDiffToPositionAhead: '+0.198' } } }, DriverList: {} });
   assert.deepEqual(b.cars.map(c => [c.no, c.best, c.gap]), [['63', '1:32.274', ''], ['16', '1:32.472', '+0.198']]);
 });
+
+test("MLB's If Necessary games: 待定 until the game before them in their series is over", async () => {
+  const { mlbPostseason } = await import('../kit/postseason.mjs');
+  const t = (id, name) => ({ team: { id, name } });
+  const g = (pk, n, date, nec, state = 'Preview', away = t(158, 'Milwaukee Brewers'), home = t(119, 'Los Angeles Dodgers')) => ({ gamePk: pk, gameType: 'L', description: `NLCS Game ${n}`, seriesGameNumber: n, gamesInSeries: 7, officialDate: date.slice(0, 10), gameDate: date, ifNecessary: nec ? 'Y' : 'N', status: { abstractGameState: state, startTimeTBD: false }, teams: { away, home } });
+  const data = { dates: [{ games: [g(1, 4, '2026-10-16T01:00:00Z', false), g(2, 5, '2026-10-17T01:00:00Z', true), g(3, 6, '2026-10-19T00:00:00Z', true, 'Preview', t(119, 'Los Angeles Dodgers'), t(158, 'Milwaukee Brewers'))] }] };
+  const [g4, g5, g6] = mlbPostseason(data);
+  assert.equal(g4.timeTbd, false);
+  assert.equal(g5.timeTbd, true);
+  assert.equal(g5.day, '2026-10-17');
+  assert.equal(g6.timeTbd, true);
+  // Game 4 over: game 5 is needed, its hour MLB's.
+  data.dates[0].games[0].status.abstractGameState = 'Final';
+  const [, g5b, g6b] = mlbPostseason(data);
+  assert.equal(g5b.timeTbd, false);
+  assert.equal(g5b.start, '2026-10-17T01:00:00Z');
+  assert.equal(g6b.timeTbd, true);
+});
