@@ -64,3 +64,19 @@ test("a stint split without a change of tyres is one stint; its laps are the set
   // A used set fitted at 3 laps old and run 12: 12 here.
   assert.deepEqual(stintsOf([{ Compound: 'SOFT', New: 'false', TotalLaps: 15, StartLaps: 3 }]), [{ c: 'SOFT', laps: 12, new: false }]);
 });
+
+test('lapsOf: each car\'s laps from the timing stream, gap, place and pit laps', async () => {
+  const { lapsOf } = await import('../f1-live.js');
+  const line = (t, o) => `${t}${JSON.stringify({ Lines: o })}`;
+  const text = [
+    line('00:00:01.000', { 1: { Position: '1' }, 4: { Position: '2' } }),
+    line('00:01:40.000', { 1: { NumberOfLaps: 2, LastLapTime: { Value: '1:40.500' }, GapToLeader: 'LAP 2' } }),
+    line('00:01:41.000', { 4: { GapToLeader: '+1.200', NumberOfLaps: 2 } }),
+    line('00:01:41.100', { 4: { LastLapTime: { Value: '1:41.000' } } }),
+    line('00:02:50.000', { 4: { InPit: true } }),
+    line('00:03:21.000', { 4: { NumberOfLaps: 3, LastLapTime: { Value: '1:59.900' }, GapToLeader: '1L' } })
+  ].join('\n');
+  const laps = lapsOf(text);
+  assert.deepEqual(laps['1'], [[2, 100500, 0, 1, 0]]);
+  assert.deepEqual(laps['4'], [[2, 101000, 1.2, 2, 0], [3, 119900, null, 2, 1]]);
+});

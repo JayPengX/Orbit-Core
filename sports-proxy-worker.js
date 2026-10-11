@@ -140,6 +140,7 @@ const CACHE_LIVE = { tier: 'live', fresh: 10 * SECOND, stale: 0 };
 const CACHE_ODDS = { tier: 'odds', fresh: 10 * SECOND, stale: 0 };
 // F1's live timing: a few seconds, shared by everyone watching.
 const CACHE_F1_LIVE = { tier: 'f1-live', fresh: 4 * SECOND, stale: 0 };
+const CACHE_F1_LAPS = { tier: 'f1-live', fresh: 15 * SECOND, stale: 0 };
 const CACHE_SCHEDULE = { tier: 'schedule', fresh: 10 * MINUTE, stale: DAY };
 const CACHE_SEASON = { tier: 'season', fresh: 3 * MINUTE, stale: 30 * MINUTE };
 const CACHE_STANDINGS = { tier: 'standings', fresh: 30 * MINUTE, stale: DAY };
@@ -274,7 +275,9 @@ function cachePolicyFor(url) {
       return asiaPolicy(url);
     case F1_LIVE_HOST:
       // A finished session from F1's archive (f1-live.js /session.json): it doesn't change.
-      if (url.pathname === '/session.json') return CACHE_STANDINGS;
+      if (url.pathname === '/session.json' || url.pathname === '/circuit.json') return CACHE_STANDINGS;
+      // Every car's laps: while a session runs, read again each 15 seconds (over: ?final=1, kept).
+      if (url.pathname === '/laps.json') return url.searchParams.get('final') ? CACHE_STANDINGS : CACHE_F1_LAPS;
       return CACHE_F1_LIVE;
     default:
       return CACHE_LIVE;

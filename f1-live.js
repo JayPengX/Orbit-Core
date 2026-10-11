@@ -13,7 +13,7 @@
 
 export const F1_LIVE_HOST = 'f1-live.quadra';
 const BASE = 'https://livetiming.formula1.com/signalrcore';
-const TOPICS = ['SessionInfo', 'SessionStatus', 'TrackStatus', 'LapCount', 'ExtrapolatedClock', 'DriverList', 'TimingData', 'TimingAppData', 'TimingStats', 'RaceControlMessages'];
+const TOPICS = ['SessionInfo', 'SessionStatus', 'TrackStatus', 'LapCount', 'ExtrapolatedClock', 'DriverList', 'TimingData', 'TimingAppData', 'TimingStats', 'RaceControlMessages', 'WeatherData', 'Position.z'];
 const RS = '\x1e';
 const TIMEOUT = 8_000;
 
@@ -49,6 +49,7 @@ export function trimF1Live(r, now = Date.now()) {
   const clock = r?.ExtrapolatedClock || {};
   const part = Number(td.SessionPart) || 0;
   // The time left as of now while it runs.
+  const where = list(r?.Position?.Position).at(-1)?.Entries || {};
   const left = seconds(clock.Remaining) - (clock.Extrapolating && clock.Utc ? (now - Date.parse(clock.Utc)) / 1000 : 0);
   const cars = Object.entries(td.Lines || {})
     .map(([no, l]) => {
@@ -86,6 +87,8 @@ export function trimF1Live(r, now = Date.now()) {
         speeds: Object.fromEntries(['I1', 'I2', 'FL', 'ST'].map(k => [k.toLowerCase(), { v: Number(ts[no]?.BestSpeeds?.[k]?.Value) || 0, p: Number(ts[no]?.BestSpeeds?.[k]?.Position) || 0 }])),
         // A qualifying's best lap in each part (Q1, Q2, Q3), '' for a part not run.
         parts: list(l.BestLapTimes).map(x => x?.Value || ''),
+        // Where the car is on the track now (Position.z, F1's own x/y; the circuit's map is in the same space).
+        at: where[no] && where[no].Status !== 'OffTrack' ? [where[no].X, where[no].Y] : null,
         pb: ts[no]?.PersonalBestLapTime?.Value ? { v: ts[no].PersonalBestLapTime.Value, lap: Number(ts[no].PersonalBestLapTime.Lap) || 0, p: Number(ts[no].PersonalBestLapTime.Position) || 0 } : null
       };
     })
@@ -93,7 +96,8 @@ export function trimF1Live(r, now = Date.now()) {
   const rcm = list(r?.RaceControlMessages?.Messages).at(-1);
   return {
     at: now,
-    session: { key: info.Key || 0, type: info.Type || '', name: info.Name || '', start: info.StartDate || '', gmt: info.GmtOffset || '', status: r?.SessionStatus?.Status || info.SessionStatus || '' },
+    session: { key: info.Key || 0, type: info.Type || '', name: info.Name || '', start: info.StartDate || '', gmt: info.GmtOffset || '', status: r?.SessionStatus?.Status || info.SessionStatus || '', circuit: info.Meeting?.Circuit?.Key || 0 },
+    weather: r?.WeatherData ? { air: Number(r.WeatherData.AirTemp) || 0, track: Number(r.WeatherData.TrackTemp) || 0, rain: r.WeatherData.Rainfall === '1' || Number(r.WeatherData.Rainfall) > 0, wind: Number(r.WeatherData.WindSpeed) || 0, humidity: Number(r.WeatherData.Humidity) || 0 } : null,
     meeting: info.Meeting?.Name || '',
     part,
     entries: list(td.NoEntries).map(Number),
@@ -196,6 +200,75 @@ async function archived(start) {
   return { ...trimF1Live(r), final: true };
 }
 
+// Position.z: base64 of deflated JSON ({ Position: [{ Timestamp, Entries }] }).
+export async function inflate(b64) {
+  if (typeof b64 !== 'string' || !b64) return null;
+  const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+  return JSON.parse(await new Response(stream).text());
+}
+
+// Every car's laps from F1's timing stream (TimingData.jsonStream: each
+// change as it came, written as the session runs): [lap, time, gap to the
+// leader, place, pit] at each line crossed. Lap 1 has no time (F1 gives
+// none from the grid). Only the lines that can say any of it are parsed.
+export function lapsOf(text) {
+  const n = {}, gap = {}, pos = {}, pit = {}, out = {};
+  for (const line of String(text).replace(/^\uFEFF/, '').split('\n')) {
+    const i = line.indexOf('{');
+    if (i < 0 || !/LastLapTime|NumberOfLaps|GapToLeader|Position|InPit|PitOut/.test(line)) continue;
+    let m;
+    try {
+      m = JSON.parse(line.slice(i));
+    } catch {
+      continue;
+    }
+    for (const [no, l] of Object.entries(m.Lines || {})) {
+      if (!l || typeof l !== 'object') continue;
+      if (l.NumberOfLaps != null) n[no] = Number(l.NumberOfLaps) || 0;
+      if (typeof l.GapToLeader === 'string') gap[no] = l.GapToLeader;
+      if (l.Position != null) pos[no] = Number(l.Position) || 0;
+      if (l.InPit === true || l.PitOut === true) pit[no] = true;
+      const v = l.LastLapTime?.Value;
+      if (v && n[no]) {
+        const laps = (out[no] ||= []);
+        if (laps.at(-1)?.[0] === n[no]) continue;
+        // (The leader's gap is "LAP 20": 0; a lapped car's "1L": null.)
+        const g = pos[no] === 1 ? 0 : /^\+?\d+(\.\d+)?$/.test(gap[no] || '') ? Number(gap[no].replace('+', '')) : null;
+        laps.push([n[no], Math.round(lapMs(v)), g, pos[no] || 0, pit[no] ? 1 : 0]);
+        pit[no] = false;
+      }
+    }
+  }
+  return out;
+}
+const lapMs = t => String(t || '').split(':').reduce((ms, x) => ms * 60 + Number(x || 0), 0) * 1000 || 0;
+
+async function laps(start) {
+  if (!Number.isFinite(Date.parse(start))) throw new Error('start');
+  const s = archivedSession(await archiveJson(`${new Date(start).getUTCFullYear()}/Index.json`), start);
+  if (!s) throw new Error('not archived');
+  const res = await fetch(`${ARCHIVE}${s.Path}TimingData.jsonStream`, { signal: AbortSignal.timeout(TIMEOUT) });
+  if (!res.ok) throw new Error(`stream ${res.status}`);
+  return { at: Date.now(), cars: lapsOf(await res.text()) };
+}
+
+// A circuit's outline (MultiViewer's map, F1's own coordinates), its corners
+// and what a stop in the pits costs there.
+async function circuit(key, year) {
+  const res = await fetch(`https://api.multiviewer.app/api/v1/circuits/${Number(key)}/${Number(year)}`, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(TIMEOUT) });
+  if (!res.ok) throw new Error(`circuit ${res.status}`);
+  const c = await res.json();
+  return {
+    name: c.circuitName || '',
+    rotation: Number(c.rotation) || 0,
+    x: c.x || [],
+    y: c.y || [],
+    corners: (c.corners || []).map(k => ({ n: k.number, x: Math.round(k.trackPosition?.x || 0), y: Math.round(k.trackPosition?.y || 0) })),
+    pitLoss: { normal: Number(c.pitLoss?.normal) || 0, sc: Number(c.pitLoss?.sc) || 0, vsc: Number(c.pitLoss?.vsc) || 0 }
+  };
+}
+
 export async function f1LiveResponse(url) {
   const json = (body, status) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
   if (url.pathname === '/session.json') {
@@ -205,9 +278,18 @@ export async function f1LiveResponse(url) {
       return json({ error: String(error.message || error) }, 502);
     }
   }
+  if (url.pathname === '/laps.json' || url.pathname === '/circuit.json') {
+    try {
+      return json(url.pathname === '/laps.json' ? await laps(url.searchParams.get('start') || '') : await circuit(url.searchParams.get('key'), url.searchParams.get('year')), 200);
+    } catch (error) {
+      return json({ error: String(error.message || error) }, 502);
+    }
+  }
   if (url.pathname !== '/now.json') return json({ error: 'unknown' }, 404);
   try {
-    return json(trimF1Live(await snapshot()), 200);
+    const raw = await snapshot();
+    raw.Position = await inflate(raw['Position.z']).catch(() => null);
+    return json(trimF1Live(raw), 200);
   } catch (error) {
     return json({ error: String(error.message || error) }, 502);
   }
