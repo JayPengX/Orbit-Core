@@ -947,6 +947,85 @@ sheetSwipe();
 // in the apps that load it.
 if (typeof document !== 'undefined' && isPhoneOrTablet()) document.documentElement.classList.add('q-touch');
 
+// Pressed only when pressed (the owner, 2026-10-11): iPhone Safari puts
+// :active on whatever a finger lands on, so scrolling a list greyed every
+// card it passed. On a phone or tablet every :active in every sheet (the
+// kit's and the app's, the same origin) becomes [data-q-press], and that is
+// set as iOS does it: after the finger has rested a moment, or briefly on a
+// quick tap, and never once it moves or the page scrolls (pointercancel).
+export const PRESS_DELAY = 90;
+export const pressSelector = sel => sel.replace(/:active\b/g, '[data-q-press]');
+function pressOnlyWhenPressed() {
+  if (typeof document === 'undefined' || document.__quadraPress || !document.documentElement.classList.contains('q-touch')) return;
+  document.__quadraPress = true;
+  const done = new WeakSet();
+  let sheets = -1;
+  const fixRules = rules => {
+    for (const r of rules || []) {
+      if (r.selectorText?.includes(':active')) r.selectorText = pressSelector(r.selectorText);
+      else if (r.cssRules) fixRules(r.cssRules);
+    }
+  };
+  const fixSheets = () => {
+    if (document.styleSheets.length === sheets) return;
+    sheets = document.styleSheets.length;
+    for (const s of document.styleSheets) {
+      if (done.has(s)) continue;
+      try {
+        fixRules(s.cssRules);
+        done.add(s);
+      } catch {
+        // (Still loading: asked again at the next press.)
+        sheets = -1;
+      }
+    }
+  };
+  fixSheets();
+  addEventListener('load', fixSheets);
+  document.addEventListener('DOMContentLoaded', fixSheets);
+  let held = [];
+  let timer = 0;
+  let start = null;
+  let target = null;
+  const clear = () => {
+    clearTimeout(timer);
+    timer = 0;
+    target = null;
+    for (const n of held) n.removeAttribute('data-q-press');
+    held = [];
+  };
+  const mark = el => {
+    for (let n = el; n && n.nodeType === 1 && n !== document.body; n = n.parentElement) {
+      n.setAttribute('data-q-press', '');
+      held.push(n);
+    }
+  };
+  document.addEventListener('pointerdown', e => {
+    clear();
+    fixSheets();
+    if (!e.isPrimary || !(e.target instanceof Element)) return;
+    target = e.target;
+    start = { x: e.clientX, y: e.clientY };
+    if (e.pointerType !== 'touch') return mark(target);
+    timer = setTimeout(() => ((timer = 0), target && mark(target)), PRESS_DELAY);
+  }, true);
+  document.addEventListener('pointermove', e => {
+    if (target && start && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 10) clear();
+  }, true);
+  document.addEventListener('pointerup', () => {
+    // A tap quicker than the delay still shows it was pressed, for a moment.
+    if (timer && target) {
+      const t = target;
+      clear();
+      mark(t);
+      setTimeout(clear, 120);
+    } else setTimeout(clear, 0);
+  }, true);
+  document.addEventListener('pointercancel', clear, true);
+  document.addEventListener('scroll', () => held.length || timer ? clear() : 0, { capture: true, passive: true });
+}
+pressOnlyWhenPressed();
+
 // The solid strip under the phone's status bar (see .q-statusbar in quadra.css).
 function statusStrip() {
   if (typeof document === 'undefined' || !document.body || document.querySelector('.q-statusbar')) return;
