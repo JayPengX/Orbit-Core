@@ -32,11 +32,15 @@ test("TDX's points and the guard: a month's 200 last, slower never off", async (
   assert.equal(p.today, 1 + 2.5);
   // 2,000 counted before the days were: at the 25% advanced seen since.
   assert.ok(Math.abs(p.month - (3.5 + 2000 * (0.25 / 200 + 0.75 / 1500))) < 1e-9);
-  // A fair day of what's left: 3.5 of ~9.4 points today is under 60%.
+  // Never in the way while the rest of the month is covered at the owner's pace.
   assert.equal(tdxGuard(p, now).advanced, 1);
-  // 60 used by the 11th: a fair day is about 7 points.
-  assert.equal(tdxGuard({ month: 60, today: 5 }, now).advanced, 2);
-  assert.equal(tdxGuard({ month: 60, today: 8 }, now).advanced, 4);
-  assert.equal(tdxGuard({ month: 60, today: 12 }, now).advanced, 8);
+  // 55 used over 10 days (5.5 a day): 20 days more need 110. A heavy day of 30: 115 left, still fine.
+  assert.equal(tdxGuard({ month: 85, today: 30 }, now).advanced, 1);
+  // 40 today: 105 left, 5 short of the 110 (under 10%): 2x; then 4x, 8x.
+  assert.equal(tdxGuard({ month: 95, today: 40 }, now).advanced, 2);
+  assert.equal(tdxGuard({ month: 115, today: 60 }, now).advanced, 4);
+  assert.equal(tdxGuard({ month: 150, today: 95 }, now).advanced, 8);
+  // Quiet days leave more: 5 used by the 11th, a 100-point day is fine.
+  assert.equal(tdxGuard({ month: 105, today: 100 }, now).advanced, 1);
   assert.deepEqual(tdxGuard({ month: 192, today: 1 }, now), { advanced: 30, basic: 3, why: 'month' });
 });

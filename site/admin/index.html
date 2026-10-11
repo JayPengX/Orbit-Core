@@ -145,6 +145,13 @@
   .links a:hover { background: var(--q-sunken); }
   .twocol { display: grid; gap: 12px; }
   @media (min-width: 760px) { .twocol { grid-template-columns: 1fr 1fr; align-items: start; } }
+  .prices { display: grid; gap: 8px; margin-top: 10px; }
+  .price { display: grid; gap: 6px; padding: 10px 12px; border-radius: 12px; background: var(--q-surface-2); }
+  .price strong { font-size: 14px; }
+  .price .boxes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .price label { display: grid; gap: 3px; min-width: 0; }
+  .price label small { color: var(--q-muted); font-size: 11.5px; white-space: nowrap; }
+  .price input { width: 100%; box-sizing: border-box; padding: 8px 10px; font-size: 15px; text-align: right; }
   [hidden] { display: none !important; }
 </style>
 </head>
@@ -248,6 +255,19 @@
         <div class="row" style="margin-top:10px"><input id="bc-body" class="grow" maxlength="200" placeholder="內容" /><button id="bc-send" class="primary">送出</button></div>
         <p id="bc-error" class="error"></p>
         <p id="bc-ok" class="ok"></p>
+      </div>
+      <div class="row spread"><h2>Google 帳單</h2><button id="bill-load" class="small">重新整理</button></div>
+      <p class="muted">Gemini、地圖、地點搜尋、路線、天氣：本月用了多少、估計花多少，和你輸入的餘額還剩多少。Google 沒有提供預付餘額的 API，所以餘額要手動輸入（每次加值後再輸入一次）；花費是依下面的價格估算，以 Google Cloud 帳單為準。</p>
+      <p id="bill-error" class="error"></p>
+      <div class="card">
+        <div class="tiles" id="bill-tiles"></div>
+        <div class="tablewrap" style="margin-top:12px"><table id="bill-rows"><thead><tr><th>服務</th><th class="right">本月 / 免費</th><th class="right">估計</th></tr></thead><tbody></tbody></table></div>
+        <div class="row" style="margin-top:14px"><input id="bill-balance" type="number" min="0" step="1" placeholder="現在的餘額（NT$）" style="flex:1 1 180px" /><button id="bill-save" class="primary">儲存餘額（從現在起算）</button></div>
+        <p id="bill-ok" class="ok"></p>
+        <details style="margin-top:10px"><summary class="muted" style="cursor:pointer">價格（美元；超過免費額度後每 1,000 次、Gemini 每 100 萬 token）與匯率</summary>
+          <div id="bill-prices" class="prices"></div>
+          <div class="row" style="margin-top:10px"><span class="muted">1 USD =</span><input id="bill-rate" type="number" min="1" step="0.1" style="width:90px" /><span class="muted">NT$</span><button id="bill-prices-save" class="small">儲存價格</button></div>
+        </details>
       </div>
       <div class="row spread"><h2>用量</h2><button id="use-load" class="small">重新整理</button></div>
       <p class="muted">Worker 用掉多少額度：Google（Orbit Transit 的這個月、Orbit Weather 的今天）和 TDX。</p>
@@ -409,7 +429,7 @@ function show(view) {
   for (const s of document.querySelectorAll('[data-pane]')) s.hidden = s.dataset.pane !== view;
   if (!loaded.has(view)) {
     loaded.add(view);
-    ({ overview: loadOverview, accounts: loadWallets, dev: loadDev, data: loadData, ops: () => (loadPushes(), loadUsage(), loadHealth()) })[view]?.();
+    ({ overview: loadOverview, accounts: loadWallets, dev: loadDev, data: loadData, ops: () => (loadPushes(), loadBilling(), loadUsage(), loadHealth()) })[view]?.();
   }
 }
 $('tabs').onclick = e => e.target.dataset.view && show(e.target.dataset.view);
@@ -839,7 +859,7 @@ function drawTdx(t, now) {
     tile('照這速度月底', `${pts(projected)} 點`, projected > plan ? '會超過！調慢 開發 的交通設定' : `${Math.round((projected / plan) * 100)}% 的額度`),
     tile('今天', `${pts(today.points)} 點`, `基本 ${today.basic.toLocaleString()} · 進階 ${today.advanced.toLocaleString()}`),
     tile('每天平均', `${pts(avg)} 點`, `可用 ${pts(plan / monthDays)} 點 / 天`),
-    tile('節流', t.guard?.advanced > 1 ? `進階 ×${t.guard.advanced}` : '沒有', t.guard?.why === 'month' ? '本月點數剩不到 5%：進階最多 5 分鐘一次' : t.guard?.why === 'day' ? `今天已用公平份額的 ${Math.round(t.guard.ratio * 100)}%` : '今天的用量在份額內')
+    tile('節流', t.guard?.advanced > 1 ? `進階 ×${t.guard.advanced}` : '沒有', t.guard?.why === 'month' ? '本月點數剩不到 5%：進階最多 5 分鐘一次' : t.guard?.why === 'day' ? `今天用到了月底要的點數，差 ${Math.abs(t.guard.room).toFixed(1)} 點` : t.guard?.room != null ? `月底前還多 ${t.guard.room.toFixed(1)} 點可用` : '')
   );
   // The last 14 days, a bar each (the line: a day's share of the plan).
   const last = [...days].reverse().slice(-14);
@@ -857,7 +877,7 @@ function drawTdx(t, now) {
       ? days.map(([d, v]) => el('tr', {}, [el('td', { text: d }), el('td', { class: 'right', text: v.basic.toLocaleString() }), el('td', { class: 'right', text: v.advanced.toLocaleString() }), el('td', { class: `right ${v.points > plan / monthDays ? 'neg' : ''}`, text: pts(v.points) })]))
       : [el('tr', {}, [el('td', { colspan: '4', class: 'muted', text: '從今天開始逐日記錄。' })])])
   );
-  $('tdx-note').textContent = `本月共 ${t.total.toLocaleString()} 次呼叫（逐日分類從 2026/10/11 開始，之前的依之後的進階比例估算）。點數依 TDX 的扣點規則估算，以 TDX 會員中心為準。今天用得比公平份額（剩下的點數平均到月底）多時，Worker 會自動把進階資料保留得更久，月底前不會用完。`;
+  $('tdx-note').textContent = `本月共 ${t.total.toLocaleString()} 次呼叫（逐日分類從 2026/10/11 開始，之前的依之後的進階比例估算）。點數依 TDX 的扣點規則估算，以 TDX 會員中心為準。只有當今天用到「剩下的點數不夠你照平常的速度用到月底」時，Worker 才會把進階資料保留得更久（沒用的日子會留給之後）；月底前不會用完。`;
 }
 async function loadHealth() {
   $('health-error').textContent = '';
@@ -1050,6 +1070,112 @@ const LINKS = [
   ['Cloudflare Workers', 'https://dash.cloudflare.com/?to=/:account/workers-and-pages'], ['Firebase', 'https://console.firebase.google.com/'], ['GitHub', 'https://github.com/JayPengX?tab=repositories']
 ];
 $('links').replaceChildren(...LINKS.map(([n, href]) => el('a', { href, target: '_blank', rel: 'noopener', text: n })));
+
+// ---- Google 帳單 ----
+// Google's list prices (USD), editable: the Maps platform's SKUs past each
+// one's free monthly use (per 1,000), Gemini per million tokens. Estimates.
+const BILL_DEFAULTS = {
+  rate: 32,
+  prices: {
+    maps: { free: 10000, per: 7 }, autocomplete: { free: 10000, per: 2.83 }, details: { free: 10000, per: 5 }, detailsPro: { free: 5000, per: 17 }, routes: { free: 10000, per: 5 },
+    weather: { free: 10000, per: 0.15 },
+    'gemini-3.5-flash-lite': { in: 0.1, cached: 0.025, out: 0.4 }, 'gemini-3.7-flash': { in: 0.3, cached: 0.075, out: 2.5 }
+  }
+};
+const BILL_NAMES = { maps: '地圖載入（Transit）', autocomplete: '地點搜尋', details: '地點詳細', detailsPro: '地點名稱（Pro）', routes: '路線規劃', weather: '天氣 API' };
+let bill = null;
+const ntd = v => `NT$${(Math.round(v * 10) / 10).toLocaleString()}`;
+function billPrices() {
+  const p = { ...BILL_DEFAULTS.prices, ...(bill?.saved?.prices || {}) };
+  for (const m of Object.keys(bill?.gemini || {})) p[m] ||= { in: 0.3, cached: 0.075, out: 2.5 };
+  return p;
+}
+function billCosts() {
+  const p = billPrices();
+  const rate = bill.saved?.rate || BILL_DEFAULTS.rate;
+  const rows = [];
+  for (const [k, n] of Object.entries(bill.maps)) rows.push({ k, name: BILL_NAMES[k] || k, used: n.toLocaleString(), free: p[k]?.free, ntd: Math.max(0, n - (p[k]?.free || 0)) * (p[k]?.per || 0) / 1000 * rate });
+  const w = Object.values(bill.weather).reduce((a, b) => a + b, 0);
+  rows.push({ k: 'weather', name: BILL_NAMES.weather, used: w.toLocaleString(), free: p.weather.free, ntd: Math.max(0, w - p.weather.free) * p.weather.per / 1000 * rate });
+  for (const [m, days] of Object.entries(bill.gemini)) {
+    const t = Object.values(days).reduce((a, d) => ({ in: a.in + d.in, cached: a.cached + d.cached, out: a.out + d.out }), { in: 0, cached: 0, out: 0 });
+    const q = p[m];
+    rows.push({ k: m, name: `Gemini ${m.replace(/^gemini-/, '')}`, used: `${Math.round((t.in + t.cached + t.out) / 1000).toLocaleString()}k token`, free: null, ntd: ((t.in * q.in + t.cached * q.cached + t.out * q.out) / 1e6) * rate });
+  }
+  return { rows, total: rows.reduce((a, r) => a + r.ntd, 0), rate };
+}
+function drawBilling() {
+  const { rows, total, rate } = billCosts();
+  const sv = bill.saved;
+  const since = sv ? (sv.month === bill.month ? total - (sv.base || 0) : total) : 0;
+  const left = sv ? sv.balance - since : null;
+  $('bill-tiles').replaceChildren(
+    tile('估計餘額', left == null ? '—' : ntd(left), sv ? `${ntd(sv.balance)} · ${ago(sv.at)}輸入` : '先輸入現在的餘額'),
+    tile('輸入後花了', sv ? ntd(Math.max(0, since)) : '—', sv && sv.month !== bill.month ? '跨月：只算這個月的' : ''),
+    tile('本月估計', ntd(total), `1 USD = NT$${rate}`)
+  );
+  $('bill-rows').tBodies[0].replaceChildren(...rows.map(r => el('tr', {}, [el('td', { text: r.name }), el('td', { class: 'right' }, [document.createTextNode(r.used), r.free == null ? null : el('span', { class: 'muted', text: ` / ${(r.free / 1000).toLocaleString()}k` })]), el('td', { class: `right ${r.ntd > 0 ? 'neg' : ''}`, text: ntd(r.ntd) })])));
+  const p = billPrices();
+  // Each service a row: its name, then its prices as labelled boxes (a table of six columns ran off a phone).
+  const box = (k, f, label) => el('label', {}, [el('small', { text: label }), el('input', { type: 'number', min: '0', step: 'any', value: p[k]?.[f] ?? '', 'data-k': k, 'data-f': f })]);
+  $('bill-prices').replaceChildren(
+    ...Object.keys(p).map(k => {
+      const gem = 'in' in p[k];
+      return el('div', { class: 'price' }, [el('strong', { text: BILL_NAMES[k] || `Gemini ${k.replace(/^gemini-/, '')}` }), el('div', { class: 'boxes' }, gem ? [box(k, 'in', '輸入 $/1M'), box(k, 'cached', '快取 $/1M'), box(k, 'out', '輸出 $/1M')] : [box(k, 'free', '免費 / 月'), box(k, 'per', '$ / 1,000 次')])]);
+    })
+  );
+  $('bill-rate').value = String(rate);
+}
+async function loadBilling() {
+  $('bill-error').textContent = '';
+  try {
+    bill = await admin('billing');
+    drawBilling();
+  } catch (e) {
+    $('bill-error').textContent = e.message;
+  }
+}
+const readPrices = () => {
+  const p = billPrices();
+  for (const i of $('bill-prices').querySelectorAll('input')) (p[i.dataset.k] = { ...p[i.dataset.k] })[i.dataset.f] = Number(i.value) || 0;
+  return p;
+};
+// A new balance counts from now (the month's estimate now its base); new
+// prices keep what's been spent since as it was (the base moved with them).
+async function saveBilling(balance, keepSince) {
+  const since = keepSince && bill.saved?.month === bill.month ? billCosts().total - (bill.saved.base || 0) : 0;
+  const prices = readPrices();
+  const rate = Number($('bill-rate').value) || BILL_DEFAULTS.rate;
+  bill.saved = { ...(bill.saved || {}), prices, rate };
+  const { total } = billCosts();
+  bill.saved = await admin('billing-set', { billing: { balance, month: bill.month, base: total - since, rate, prices } });
+  drawBilling();
+}
+$('bill-load').onclick = () => busy($('bill-load'), loadBilling);
+$('bill-save').onclick = () =>
+  busy($('bill-save'), async () => {
+    $('bill-error').textContent = $('bill-ok').textContent = '';
+    const v = Number($('bill-balance').value);
+    if (!$('bill-balance').value || !(v >= 0)) return ($('bill-error').textContent = '輸入現在的餘額（NT$）。');
+    try {
+      await saveBilling(v, false);
+      $('bill-balance').value = '';
+      $('bill-ok').textContent = `已儲存：從現在起，餘額 ${ntd(v)} 扣掉之後的估計花費。`;
+    } catch (e) {
+      $('bill-error').textContent = e.message;
+    }
+  });
+$('bill-prices-save').onclick = () =>
+  busy($('bill-prices-save'), async () => {
+    $('bill-error').textContent = $('bill-ok').textContent = '';
+    if (!bill.saved) return ($('bill-error').textContent = '先輸入一次餘額，價格會一起存。');
+    try {
+      await saveBilling(bill.saved.balance, true);
+      $('bill-ok').textContent = '價格已儲存。';
+    } catch (e) {
+      $('bill-error').textContent = e.message;
+    }
+  });
 
 if (token) open();
 </script>

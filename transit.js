@@ -288,20 +288,26 @@ export function tdxPoints(used, now = Date.now()) {
   const month = b / TDX_POINTS.basic + a / TDX_POINTS.advanced + before * (share / TDX_POINTS.advanced + (1 - share) / TDX_POINTS.basic);
   return { month, today: todayPts };
 }
-// The guard (the owner navigates by it: the month's 200 points must last):
-// how many times longer TDX's live answers are kept, by how today's spending
-// stands against a fair day of what's left. Under 60% of it: as set; then
-// 2x, 4x, 8x; the month's last 5%: 30x (an advanced answer every 5 min at
-// most) and basic ones 3x. Slower, never off.
+// The guard (the owner navigates by it: the month's 200 points must last,
+// and a day it's needed must never be cut short): nothing at all while what
+// would be left can still carry the rest of the month at the owner's own
+// pace (the days so far, a point a day at least; a day not used leaves more
+// for the rest). Only a day eating into that keeps live TDX longer: 2x when
+// up to 10% short of it, 4x to 25%, 8x past; the month's last 5% of points:
+// an advanced answer every 5 minutes at most (30x), basic ones 3x. Slower,
+// never off.
 export function tdxGuard({ month, today }, now = Date.now()) {
   const tw = new Date(now + 8 * HOUR);
+  const day = tw.getUTCDate();
   const monthDays = new Date(Date.UTC(tw.getUTCFullYear(), tw.getUTCMonth() + 1, 0)).getUTCDate();
   const left = TDX_POINTS.month - month;
   if (left <= TDX_POINTS.month * 0.05) return { advanced: 30, basic: 3, why: 'month' };
-  const fair = (left + today) / (monthDays - tw.getUTCDate() + 1);
-  const r = today / fair;
-  const advanced = r < 0.6 ? 1 : r < 1 ? 2 : r < 1.5 ? 4 : 8;
-  return { advanced, basic: 1, why: advanced > 1 ? 'day' : '', fair, ratio: r };
+  const pace = Math.max(1, day > 1 ? (month - today) / (day - 1) : 0);
+  const need = pace * (monthDays - day);
+  const room = left - need;
+  if (room >= 0) return { advanced: 1, basic: 1, why: '', room, pace };
+  const short = -room / Math.max(need, 1);
+  return { advanced: short < 0.1 ? 2 : short < 0.25 ? 4 : 8, basic: 1, why: 'day', room, pace };
 }
 // A rule's fresh time now: a live one's from the settings (YouBike its own),
 // stretched by the guard for its kind; the rest as written.
