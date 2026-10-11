@@ -18,6 +18,7 @@ on:
       - 'quadra-token.js'
       - 'push.js'
       - 'eco-admin.js'
+      - 'money.js'
       - 'weather.js'
       - 'weather-stations.js'
       - 'weather-skill.js'

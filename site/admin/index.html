@@ -67,6 +67,18 @@
   .chips button { padding: 7px 12px; font-size: 13.5px; border-radius: 999px; }
   .chips button[aria-pressed='true'] { background: var(--q-accent); border-color: var(--q-accent); color: #fff; }
   .pos { color: var(--q-good); }
+  .flow { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  .flow li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; align-items: center; padding: 9px 0; border-top: 1px solid var(--q-divider); }
+  .flow li:first-child { border-top: 0; }
+  .flow .nm { font-weight: 600; min-width: 0; }
+  .flow .nm small { font-weight: 400; color: var(--q-muted); font-size: 12px; margin-left: 6px; }
+  .flow .v { font-variant-numeric: tabular-nums; font-weight: 700; text-align: right; }
+  .flow .bar { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: var(--q-surface-2); overflow: hidden; }
+  .flow .bar i { display: block; height: 100%; border-radius: 3px; background: var(--q-good); }
+  .flow .bar i.neg { background: var(--q-bad); }
+  .flow li.sum { border-top: 2px solid var(--q-divider); }
+  .flow li.sum .nm, .flow li.sum .v { font-weight: 800; }
+  .eq { font-size: 13px; color: var(--q-muted); line-height: 1.6; margin: 10px 0 0; }
   .neg { color: var(--q-bad); }
   .code { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 26px; font-weight: 800; letter-spacing: 0.12em; margin: 10px 0 4px; }
   .passes { margin: 14px 0 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
@@ -174,6 +186,7 @@
       <button data-view="overview" aria-pressed="true"><span class="ic">◎</span>總覽</button>
       <button data-view="accounts" aria-pressed="false"><span class="ic">◉</span>帳戶</button>
       <button data-view="issue" aria-pressed="false"><span class="ic">✦</span>發放 Pass</button>
+      <button data-view="money" aria-pressed="false"><span class="ic">¤</span>金流</button>
       <button data-view="dev" aria-pressed="false"><span class="ic">⚙︎</span>開發</button>
       <button data-view="data" aria-pressed="false"><span class="ic">⇅</span>資料與部署</button>
       <button data-view="ops" aria-pressed="false"><span class="ic">◔</span>通知與用量</button>
@@ -319,6 +332,26 @@
       <div class="links" id="links"></div>
     </section>
 
+    <!-- 金流 -->
+    <section data-pane="money" hidden>
+      <div class="row spread"><h2>金流</h2><button id="mo-load" class="small">重新整理</button></div>
+      <p class="muted">所有帳戶的「真相」加起來，分三方：系統（發錢，刪除的帳戶把剩下的錢還回來）、Quadra（莊家和費用賺的）、市場（玩家投資賺賠的）。三方加起來就是現在流通的錢。</p>
+      <p id="mo-error" class="error"></p>
+      <div id="mo" hidden>
+        <div class="tiles" id="mo-tiles"></div>
+        <p class="eq" id="mo-eq"></p>
+        <div class="twocol" style="margin-top:6px">
+          <div><h3>三方對帳</h3><div class="card"><ul class="flow" id="mo-where"></ul></div></div>
+          <div><h3>系統</h3><div class="card"><ul class="flow" id="mo-given"></ul></div></div>
+        </div>
+        <div class="twocol">
+          <div><h3>Quadra：莊家和費用賺的</h3><div class="card"><ul class="flow" id="mo-quadra"></ul></div></div>
+          <div><h3>市場：玩家投資賺的</h3><div class="card"><ul class="flow" id="mo-own"></ul></div></div>
+        </div>
+        <p class="muted" id="mo-note"></p>
+      </div>
+    </section>
+
     <!-- 資料整理 -->
     <section data-pane="clean" hidden>
       <h2>資料整理</h2>
@@ -431,7 +464,7 @@ function show(view) {
   for (const s of document.querySelectorAll('[data-pane]')) s.hidden = s.dataset.pane !== view;
   if (!loaded.has(view)) {
     loaded.add(view);
-    ({ overview: loadOverview, accounts: loadWallets, dev: loadDev, data: loadData, ops: () => (loadPushes(), loadBilling(), loadUsage(), loadHealth()) })[view]?.();
+    ({ overview: loadOverview, money: loadMoney, accounts: loadWallets, dev: loadDev, data: loadData, ops: () => (loadPushes(), loadBilling(), loadUsage(), loadHealth()) })[view]?.();
   }
 }
 $('tabs').onclick = e => e.target.dataset.view && show(e.target.dataset.view);
@@ -803,6 +836,72 @@ $('recover').onclick = async () => {
     $('recover-error').textContent = e.message;
   }
 };
+
+// ---- 金流 ----
+const SPORT_NAMES = {"npb":"日職","kbo":"韓職","cpbl":"中職","euroleague":"歐洲籃球聯賽","kleague":"韓國職業足球聯賽","worldcup":"世界盃","facup":"英足總盃","nfl":"NFL","wnba":"WNBA","nhl":"NHL","laliga":"西甲","seriea":"義甲","bundesliga":"德甲","ligue1":"法甲","ucl":"歐冠","uel":"歐霸","mls":"美職足","jleague":"日職聯","nbl":"澳洲職籃","ncaaf":"美國大學美足","championship":"英冠","eredivisie":"荷甲","ligamx":"墨超","brasileirao":"巴甲","scotland":"蘇超","uecl":"歐協聯","nationsleague":"歐國聯","mlb":"MLB","epl":"英超","f1":"F1","nba":"NBA","mixed":"跨運動串關","other":"舊注單（沒有選項）","lottery":"彩券","scratch":"刮刮樂"};
+const MARKET_NAMES = {"TW":"台股","US":"美股","JP":"日股","HK":"港股","CN":"陸股","KR":"韓股","UK":"英股","FR":"法股","DE":"德股","NL":"荷股","IT":"義股","ES":"西股","CH":"瑞士股","DK":"丹麥股","CA":"加股","AU":"澳股","SG":"星股","IN":"印度股","CRYPTO":"加密貨幣","METAL":"黃金存摺","BOND":"公債","FX":"外匯","INTL":"其他市場"};
+// Big sums in 萬 so a tile never cuts them short.
+const big = v => (v == null ? '—' : Math.abs(v) >= 1e5 ? `${v < 0 ? '−' : ''}NT$${(Math.abs(v) / 1e4).toLocaleString(undefined, { maximumFractionDigits: Math.abs(v) >= 1e6 ? 0 : 1 })}萬` : money(v));
+const signed = v => (v > 0 ? `+${money(v)}` : money(v));
+function sumSides(a = {}, b = {}) {
+  const out = { ...a };
+  for (const [k, v] of Object.entries(b || {})) {
+    if (typeof v === 'number') out[k] = (out[k] || 0) + v;
+    else if (v && typeof v === 'object') out[k] = sumSides(out[k] || {}, v);
+  }
+  return out;
+}
+// Rows of [name, value, sub?]: a bar each against the largest, a total row.
+function flow(id, rows, { total, sign = true } = {}) {
+  const max = Math.max(1, ...rows.map(r => Math.abs(r[1])));
+  $(id).replaceChildren(
+    ...rows.map(([name, v, sub]) =>
+      el('li', {}, [
+        el('span', { class: 'nm' }, [name, sub ? el('small', { text: sub }) : null]),
+        el('span', { class: `v ${sign ? (v > 0 ? 'pos' : v < 0 ? 'neg' : '') : ''}`, text: sign ? signed(v) : money(v) }),
+        el('span', { class: 'bar' }, [el('i', { class: sign && v < 0 ? 'neg' : '', style: `width:${Math.max(1.5, (Math.abs(v) / max) * 100)}%` })])
+      ])
+    ),
+    ...(total ? [el('li', { class: 'sum' }, [el('span', { class: 'nm', text: total[0] }), el('span', { class: `v ${sign ? (total[1] > 0 ? 'pos' : total[1] < 0 ? 'neg' : '') : ''}`, text: sign ? signed(total[1]) : money(total[1]) })])] : [])
+  );
+}
+// By market, largest first, and what isn't sorted yet so the rows add up.
+function byMarket(map, whole, names, rest) {
+  const rows = Object.entries(map || {}).filter(([, v]) => v).map(([k, v]) => [names[k] || k, v]).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+  const left = whole - rows.reduce((a, r) => a + r[1], 0);
+  if (Math.round(left)) rows.push([rest[0], left, rest[1]]);
+  return rows;
+}
+async function loadMoney() {
+  $('mo-error').textContent = '';
+  try {
+    const m = await admin('money');
+    const live = m.live || {};
+    const gone = m.retired || {};
+    const all = sumSides(live, gone);
+    const n = (o, k) => o?.[k] || 0;
+    $('mo').hidden = false;
+    // System: what it issued, less what deleted accounts paid back (their
+    // worth when deleted; an overdrawn one's debt the system eats).
+    const net = n(all, 'given') - n(gone, 'worth');
+    $('mo-tiles').replaceChildren(
+      tile('系統淨發出', big(net), gone.accounts ? `還回 ${big(n(gone, 'worth'))}` : `${n(live, 'accounts')} 個帳戶`),
+      tile('Quadra 賺', big(n(all, 'quadra')), n(all, 'quadra') >= 0 ? '莊家和費用淨收' : '玩家從 Play 贏走'),
+      tile('市場', big(n(all, 'own')), n(all, 'own') >= 0 ? '玩家投資淨賺' : '玩家投資淨賠'),
+      tile('流通中', big(n(live, 'worth')), n(live, 'atStake') ? `下注中 ${big(n(live, 'atStake'))}` : '現有帳戶的身價')
+    );
+    $('mo-eq').textContent = `系統淨發出 ${big(net)} − Quadra 賺 ${big(n(all, 'quadra'))} ${n(all, 'own') < 0 ? '−' : '+'} 市場 ${big(Math.abs(n(all, 'own')))} = 流通中 ${big(n(live, 'worth'))}`;
+    const g = all.gave || {};
+    flow('mo-given', [['開戶金', n(g, 'start')], ['月薪', n(g, 'pay')], ['財富等級獎勵', n(g, 'rank')], ['其他', n(g, 'other'), 'VIP 回饋、補發'], ['刪除的帳戶還回', -n(gone, 'worth'), `${n(gone, 'accounts')} 個`]].filter(r => r[1]), { total: ['淨發出', net] });
+    flow('mo-where', [['系統淨發出', net], ['Quadra 賺走', -n(all, 'quadra')], ['市場', n(all, 'own')]], { total: ['流通中', n(live, 'worth')] });
+    flow('mo-quadra', [...byMarket(all.playBy, n(all, 'play'), SPORT_NAMES, ['Play 未分類', '還沒同步的帳戶']), ...[['Plus 月費', n(all.fees, 'plus')], ['透支利息', n(all.fees, 'od')]].filter(r => r[1])], { total: ['合計', n(all, 'quadra')] });
+    flow('mo-own', byMarket(all.stockBy, n(all, 'own'), MARKET_NAMES, ['其他', '股利、利息、匯兌']), { total: ['合計', n(all, 'own')] });
+    $('mo-note').textContent = `帳戶刪除時，剩下的錢還給系統（透支的帳戶，欠的由系統吸收）；它讓 Quadra 賺的和在市場賺賠的照樣留在帳上。Quadra 這邊玩家輸的是正數、贏走的是負數；未結算的注單不算。各市場由 Play 和 Securities 打開時回報，還沒打開過新版的帳戶算在「未分類／其他」。刪除的帳戶${gone.since ? `從 ${fmtDay(gone.since)} 起` : '從現在起'}記錄。${fmt(m.at)} 更新。`;
+  } catch (e) {
+    $('mo-error').textContent = e.message;
+  }
+}
+$('mo-load').onclick = () => busy($('mo-load'), loadMoney);
 
 // ---- 通知與來源 ----
 async function loadPushes() {

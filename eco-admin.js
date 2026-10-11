@@ -20,6 +20,7 @@ import { KAMBI_COLLECTION } from './kambi.js';
 import { usage as transitUsage, CAPS as TRANSIT_CAPS, TDX_POINTS, tdxPoints, tdxGuard } from './transit.js';
 import { twDate, GOOGLE_DAILY_CALLS } from './weather.js';
 import { cleanDev } from './kit/devconfig.mjs';
+import { sidesOf, addSides, LEDGER } from './money.js';
 
 // The developer settings (kit/devconfig.mjs), one document; GET /config
 // answers them to everyone (worker.js), the panel's 開發 changes them.
@@ -445,7 +446,7 @@ export const ADMIN_TOOLS = {
     const hit = await findWallet(env, deps, body.wallet);
     if (!hit) return notFound;
     if (lastUsed(hit.wallet) || hit.wallet.entries.some(e => e.app !== 'eco' || e.kind !== 'start')) return { error: 'ADMIN_IN_USE', status: 409 };
-    await deleteAccount(env, deps, hit.id);
+    await deleteAccount(env, deps, hit.id, { retire: true });
     return { ok: true };
   },
   // Notices: who's subscribed, per app, and what's waiting to be sent.
@@ -487,7 +488,7 @@ export const ADMIN_TOOLS = {
     if (!hit) return notFound;
     if (String(body.confirm || '').trim() !== hit.id.slice(0, 8)) return { error: 'ADMIN_CONFIRM', status: 400 };
     const balance = poolBalance(hit.wallet);
-    await deleteAccount(env, deps, hit.id);
+    await deleteAccount(env, deps, hit.id, { retire: true });
     let shares = 0;
     for (const name of [SHARE_COLLECTION, PAIR_COLLECTION]) {
       for (const d of await deps.fsList(env, name, 300).catch(() => [])) {
@@ -679,6 +680,19 @@ export const ADMIN_TOOLS = {
     // GET /config's minute in the cache let go here (this colo's), so the change is read at once.
     if (typeof caches !== 'undefined') await caches.default.delete(new Request('https://orbit-config.quadra/dev')).catch(() => {});
     return next;
+  },
+  // Quadra's money as a whole (money.js): what the system gave, what Quadra
+  // earned and what players made, by market, live accounts and deleted ones.
+  async money({ env, deps }) {
+    const wallets = (await deps.fsList(env, WALLET_COLLECTION, 300)).map(w => parseWallet(w.payload)).filter(Boolean);
+    let live = {};
+    for (const w of wallets) live = addSides(live, sidesOf(w));
+    const doc = await deps.fsGet(env, ...LEDGER).catch(() => ({ exists: false }));
+    let retired = null;
+    try {
+      retired = doc.exists ? JSON.parse(doc.payload) : null;
+    } catch {}
+    return { at: deps.now(), live, retired };
   },
   async health() {
     const one = async ([name, url, use]) => {
