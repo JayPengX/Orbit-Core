@@ -396,9 +396,13 @@ const payload = payloadFile ? await readFile(payloadFile, 'utf8') : null;
 const b64 = s => Buffer.from(s).toString('base64url');
 const refresh = `${b64(JSON.stringify({ d: '0123456789abcdef0123456789abcdef' }))}.preview`;
 
-const browser = serve ? null : await playwright[engine].launch();
+// WebKit's private session drops Cache Storage on a reload (the apps' kept
+// data: a second opening read everything again, which Safari never does),
+// so --reopen there runs in a profile of its own, thrown away after.
+const persistent = engine === 'webkit' && reopen && !serve;
+const browser = serve || persistent ? null : await playwright[engine].launch();
 const stub = { grantPermissions: async () => {}, setGeolocation: async () => {}, addInitScript: async (fn, arg) => void inits.push(`(${fn})(${JSON.stringify(arg)})`), route: async (p, h) => void extRoutes.push([p, h]) };
-const context = serve ? stub : await browser.newContext({
+const contextOptions = {
   // No service workers: their fetches would miss the routes below.
   serviceWorkers: 'block',
   viewport: { width, height },
@@ -410,7 +414,8 @@ const context = serve ? stub : await browser.newContext({
   colorScheme: dark ? 'dark' : 'light',
   userAgent: UAS[device] || UAS.iphone,
   ignoreHTTPSErrors: true
-});
+};
+const context = serve ? stub : persistent ? await playwright[engine].launchPersistentContext(await mkdtemp(join(tmpdir(), 'quadra-webkit-')), contextOptions) : await browser.newContext(contextOptions);
 if (clock && !serve) await context.clock.install({ time: new Date(`${clock}+08:00`) }).then(() => context.clock.resume());
 if (appId === 'weather' && !noGeo) {
   await context.grantPermissions(['geolocation']);
@@ -754,5 +759,5 @@ if (live && liveAsks.length) {
   const peak = Math.max(...liveAsks.map(t => liveAsks.filter(x => x >= t && x < t + 60_000).length));
   console.log(`live: ${liveAsks.length} items asked, ${peak} in the busiest minute${peak > 600 ? ' (over a session’s 600)' : ''}`);
 }
-await browser.close();
+await (browser || context).close();
 server.close();
