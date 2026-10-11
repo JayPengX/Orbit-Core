@@ -13,7 +13,7 @@
 
 export const F1_LIVE_HOST = 'f1-live.quadra';
 const BASE = 'https://livetiming.formula1.com/signalrcore';
-const TOPICS = ['SessionInfo', 'SessionStatus', 'TrackStatus', 'LapCount', 'ExtrapolatedClock', 'DriverList', 'TimingData', 'TimingAppData', 'TimingStats', 'RaceControlMessages', 'WeatherData', 'Position.z'];
+const TOPICS = ['SessionInfo', 'SessionStatus', 'TrackStatus', 'LapCount', 'ExtrapolatedClock', 'DriverList', 'TimingData', 'TimingAppData', 'TimingStats', 'RaceControlMessages', 'WeatherData', 'Position.z', 'LapSeries', 'PitStopSeries'];
 const RS = '\x1e';
 const TIMEOUT = 8_000;
 
@@ -105,6 +105,15 @@ export function trimF1Live(r, now = Date.now()) {
     track: { status: String(r?.TrackStatus?.Status || ''), message: r?.TrackStatus?.Message || '' },
     lap: r?.LapCount ? { now: Number(r.LapCount.CurrentLap) || 0, of: Number(r.LapCount.TotalLaps) || 0 } : null,
     message: rcm ? { text: rcm.Message || '', at: rcm.Utc || '' } : null,
+    // Each car's place on every lap since the start, and its stops (Orbit Sports' 車手比較).
+    places: placesOf(r?.LapSeries),
+    stops: stopsOf(r?.PitStopSeries),
+    // Race control's last words, newest first (the blue flags left out: a race has hundreds, each to one car being lapped).
+    messages: list(r?.RaceControlMessages?.Messages)
+      .filter(m => m?.Message && !/^WAVED BLUE FLAG/.test(m.Message))
+      .slice(-8)
+      .reverse()
+      .map(m => ({ text: m.Message, at: m.Utc || '', lap: Number(m.Lap) || 0, flag: m.Flag || '', category: m.Category || '' })),
     // The safety car, the virtual one and the flags so far (Orbit Sports' race chart shades them), and what sent them out (a car stopped, a collision).
     control: list(r?.RaceControlMessages?.Messages)
       .filter(m => m.Category === 'SafetyCar' || /SAFETY CAR|VSC|STOPPED|CRASH|BARRIER|GRAVEL|INCIDENT INVOLVING|\bRED FLAG\b|TRACK CLEAR/i.test(m.Message || '') || m.Flag === 'RED' || (m.Flag === 'GREEN' && /RESUME|TRACK CLEAR/i.test(m.Message || '')))
@@ -115,7 +124,7 @@ export function trimF1Live(r, now = Date.now()) {
 }
 
 // One snapshot of the feed's state (its SignalR answer to Subscribe).
-async function snapshot() {
+async function snapshot(topics = TOPICS) {
   const neg = await fetch(`${BASE}/negotiate?negotiateVersion=1`, { method: 'POST', signal: AbortSignal.timeout(TIMEOUT) });
   if (!neg.ok) throw new Error(`negotiate ${neg.status}`);
   const { connectionToken } = await neg.json();
@@ -129,7 +138,7 @@ async function snapshot() {
     if (!stream.ok || !stream.body) throw new Error(`stream ${stream.status}`);
     const send = body => fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain', Cookie: cookie }, body, signal: abort.signal });
     await send(`{"protocol":"json","version":1}${RS}`);
-    await send(`${JSON.stringify({ type: 1, target: 'Subscribe', arguments: [TOPICS], invocationId: '0' })}${RS}`);
+    await send(`${JSON.stringify({ type: 1, target: 'Subscribe', arguments: [topics], invocationId: '0' })}${RS}`);
     const reader = stream.body.getReader();
     const decoder = new TextDecoder();
     let text = '';
@@ -244,13 +253,159 @@ export function lapsOf(text) {
 }
 const lapMs = t => String(t || '').split(':').reduce((ms, x) => ms * 60 + Number(x || 0), 0) * 1000 || 0;
 
-async function laps(start) {
+// A session's start in UTC (the index and SessionInfo give it local, with the offset).
+export function sessionStartUtc(s) {
+  if (!s?.StartDate) return '';
+  const [h, mm] = String(s.GmtOffset || '0:0').split(':').map(Number);
+  const sign = String(s.GmtOffset || '').startsWith('-') ? -1 : 1;
+  const t = Date.parse(`${String(s.StartDate).replace(/Z$/, '')}Z`) - sign * ((Math.abs(h) || 0) * 60 + (mm || 0)) * 60_000;
+  return Number.isFinite(t) ? new Date(t).toISOString() : '';
+}
+// The index's session starting at `start`, archived or not ({ s, meeting }), or null.
+export function indexedSession(index, start) {
+  const at = Date.parse(start);
+  for (const m of index?.Meetings || [])
+    for (const s of m.Sessions || []) if (s.StartDate && Math.abs(Date.parse(sessionStartUtc(s)) - at) < 20 * 60_000) return s;
+  return null;
+}
+// The session running now: started (or about to), not archived yet (F1
+// writes its path in the index minutes after the flag), at most 4 hours in.
+export function liveSession(index, now = Date.now()) {
+  for (const m of index?.Meetings || [])
+    for (const s of m.Sessions || []) {
+      const t = Date.parse(sessionStartUtc(s));
+      if (!s.Path && t - 10 * 60_000 <= now && now <= t + 4 * 3_600_000) return s;
+    }
+  return null;
+}
+
+// ---- Every lap while a session runs ---------------------------------------
+// F1's archive has a session's laps only once it's over, and the feed says
+// only each car's last lap (OpenF1 closes while a session runs), so a phone
+// opened at lap 30 had nothing before it. Each minute while a session runs
+// (the sports proxy's cron: sampleLive) each car's last lap is kept, with
+// the feed's place for every car on every lap since the start (LapSeries)
+// and its stops (PitStopSeries): a lap takes over a minute, so none is
+// missed. laps.json serves it until the archive has the session.
+const SAMPLE_TOPICS = ['SessionInfo', 'TimingData', 'LapSeries', 'PitStopSeries'];
+// Each car's place on every lap ({ no: [place…] }, lap 0 the grid).
+export function placesOf(raw) {
+  const out = {};
+  for (const [no, x] of Object.entries(raw || {})) out[no] = list(x?.LapPosition).map(Number);
+  return out;
+}
+// Each car's stops ({ no: [[lap, stop s, pit lane s]…] }).
+export function stopsOf(raw) {
+  const out = {};
+  for (const [no, xs] of Object.entries(raw?.PitTimes || {}))
+    out[no] = list(xs)
+      .map(x => x?.PitStop || x)
+      .map(p => [Number(p?.Lap) || 0, Number(p?.PitStopTime) || 0, Number(p?.PitLaneTime) || 0])
+      .filter(p => p[0]);
+  return out;
+}
+// One minute's look: each car's last lap, [lap, ms, gap, place, pit].
+export function lapSample(raw) {
+  const cars = {};
+  for (const [no, l] of Object.entries(raw?.TimingData?.Lines || {})) {
+    const n = Number(l?.NumberOfLaps) || 0;
+    const ms = Math.round(lapMs(l?.LastLapTime?.Value));
+    if (!n || !ms) continue;
+    const pos = Number(l.Position) || 0;
+    const gap = pos === 1 ? 0 : /^\+?\d+(\.\d+)?$/.test(l.GapToLeader || '') ? Number(l.GapToLeader.replace('+', '')) : null;
+    cars[no] = [n, ms, gap, pos, l.InPit || l.PitOut ? 1 : 0];
+  }
+  return { cars, places: placesOf(raw?.LapSeries), stops: stopsOf(raw?.PitStopSeries) };
+}
+// The log with a look added: a car's lap kept once (the first look at it), the places and stops as the feed has them now.
+export function addSample(log, sample, now = Date.now()) {
+  const out = { at: now, cars: { ...(log?.cars || {}) }, places: log?.places || {}, stops: log?.stops || {} };
+  for (const [no, lap] of Object.entries(sample?.cars || {})) {
+    const laps = out.cars[no] || [];
+    if (!laps.some(x => x[0] === lap[0])) out.cars[no] = [...laps, lap].sort((a, b) => a[0] - b[0]);
+  }
+  if (Object.keys(sample?.places || {}).length) out.places = sample.places;
+  if (Object.keys(sample?.stops || {}).length) out.stops = sample.stops;
+  return out;
+}
+
+// The year's index, kept five minutes in this colo (the cron asks each minute).
+async function indexOf(year) {
+  const url = `${ARCHIVE}${year}/Index.json`;
+  const cache = globalThis.caches?.default;
+  const hit = cache ? await cache.match(url).catch(() => null) : null;
+  if (hit) return hit.json();
+  const index = await archiveJson(`${year}/Index.json`);
+  if (cache) await cache.put(url, new Response(JSON.stringify(index), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'max-age=300' } })).catch(() => {});
+  return index;
+}
+
+// The cron's minute: nothing unless a session runs; then one look, kept.
+export async function sampleLive(log, now = Date.now()) {
+  if (!log) return 'no log';
+  const s = liveSession(await indexOf(new Date(now).getUTCFullYear()), now);
+  if (!s) return 'idle';
+  const raw = await snapshot(SAMPLE_TOPICS);
+  // (The feed on another session than the index's, between two: not kept.)
+  const key = sessionStartUtc(s);
+  if (raw.SessionInfo?.StartDate && Math.abs(Date.parse(sessionStartUtc(raw.SessionInfo)) - Date.parse(key)) > 20 * 60_000) return 'other session';
+  const sample = lapSample(raw);
+  await log.add(key, sample);
+  return `${s.Name}: ${Object.keys(sample.cars).length} cars`;
+}
+
+// The log kept in a Durable Object (one for every session: a session's log
+// under its start), the sports proxy's F1_LOG.
+export class F1Log {
+  constructor(state) {
+    this.storage = state.storage;
+  }
+  async fetch(request) {
+    const url = new URL(request.url);
+    const key = url.searchParams.get('key') || '';
+    if (!key) return new Response('key', { status: 400 });
+    if (request.method === 'POST') {
+      const log = addSample(await this.storage.get(key), await request.json());
+      await this.storage.put(key, log);
+      // A fortnight's sessions kept.
+      for (const k of (await this.storage.list()).keys()) if (Date.parse(k) < Date.now() - 14 * 86_400_000) await this.storage.delete(k);
+      return new Response('ok');
+    }
+    return new Response(JSON.stringify((await this.storage.get(key)) || null), { headers: { 'Content-Type': 'application/json' } });
+  }
+}
+export function doLog(ns) {
+  if (!ns) return null;
+  const stub = () => ns.get(ns.idFromName('f1'));
+  return {
+    get: key => stub().fetch(`https://f1-log/?key=${encodeURIComponent(key)}`).then(r => (r.ok ? r.json() : null)),
+    add: (key, sample) => stub().fetch(`https://f1-log/?key=${encodeURIComponent(key)}`, { method: 'POST', body: JSON.stringify(sample) }).then(r => r.text())
+  };
+}
+// A log in memory (the preview tool).
+export function memoryLog() {
+  const m = new Map();
+  return { get: async key => m.get(key) || null, add: async (key, sample) => void m.set(key, addSample(m.get(key), sample)) };
+}
+
+// Every car's laps: once over, from F1's archive (the timing stream, exact
+// at each line); while it runs, the log. `{ at, cars, places, stops, live }`.
+async function laps(start, log) {
   if (!Number.isFinite(Date.parse(start))) throw new Error('start');
-  const s = archivedSession(await archiveJson(`${new Date(start).getUTCFullYear()}/Index.json`), start);
-  if (!s) throw new Error('not archived');
-  const res = await fetch(`${ARCHIVE}${s.Path}TimingData.jsonStream`, { signal: AbortSignal.timeout(TIMEOUT) });
+  const s = indexedSession(await indexOf(new Date(start).getUTCFullYear()), start);
+  if (!s) throw new Error('not in the index');
+  if (!s.Path) {
+    const kept = log ? await log.get(sessionStartUtc(s)) : null;
+    if (!kept) throw new Error('not archived');
+    return { ...kept, live: true };
+  }
+  const [res, places, stops] = await Promise.all([
+    fetch(`${ARCHIVE}${s.Path}TimingData.jsonStream`, { signal: AbortSignal.timeout(TIMEOUT) }),
+    archiveJson(`${s.Path}LapSeries.json`).catch(() => null),
+    archiveJson(`${s.Path}PitStopSeries.json`).catch(() => null)
+  ]);
   if (!res.ok) throw new Error(`stream ${res.status}`);
-  return { at: Date.now(), cars: lapsOf(await res.text()) };
+  return { at: Date.now(), cars: lapsOf(await res.text()), places: placesOf(places), stops: stopsOf(stops) };
 }
 
 // A circuit's outline (MultiViewer's map, F1's own coordinates), its corners
@@ -269,7 +424,7 @@ async function circuit(key, year) {
   };
 }
 
-export async function f1LiveResponse(url) {
+export async function f1LiveResponse(url, { log = null } = {}) {
   const json = (body, status) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
   if (url.pathname === '/session.json') {
     try {
@@ -280,7 +435,7 @@ export async function f1LiveResponse(url) {
   }
   if (url.pathname === '/laps.json' || url.pathname === '/circuit.json') {
     try {
-      return json(url.pathname === '/laps.json' ? await laps(url.searchParams.get('start') || '') : await circuit(url.searchParams.get('key'), url.searchParams.get('year')), 200);
+      return json(url.pathname === '/laps.json' ? await laps(url.searchParams.get('start') || '', url.searchParams.get('final') ? null : log) : await circuit(url.searchParams.get('key'), url.searchParams.get('year')), 200);
     } catch (error) {
       return json({ error: String(error.message || error) }, 502);
     }

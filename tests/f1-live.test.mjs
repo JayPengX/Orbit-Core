@@ -80,3 +80,52 @@ test('lapsOf: each car\'s laps from the timing stream, gap, place and pit laps',
   assert.deepEqual(laps['1'], [[2, 100500, 0, 1, 0]]);
   assert.deepEqual(laps['4'], [[2, 101000, 1.2, 2, 0], [3, 119900, null, 2, 1]]);
 });
+
+test('a session that runs: started, not archived yet, at most 4 hours in; its start in UTC', async () => {
+  const { liveSession, sessionStartUtc, indexedSession } = await import('../f1-live.js');
+  const index = { Meetings: [{ Sessions: [
+    { Name: 'Qualifying', StartDate: '2026-10-10T21:00:00', GmtOffset: '08:00:00', Path: '2026/x/q/' },
+    { Name: 'Race', StartDate: '2026-10-11T20:00:00', GmtOffset: '08:00:00' }
+  ] }] };
+  assert.equal(sessionStartUtc(index.Meetings[0].Sessions[1]), '2026-10-11T12:00:00.000Z');
+  assert.equal(sessionStartUtc({ StartDate: '2026-10-25T13:00:00', GmtOffset: '-05:00:00' }), '2026-10-25T18:00:00.000Z');
+  assert.equal(liveSession(index, Date.parse('2026-10-11T12:40:00Z'))?.Name, 'Race');
+  assert.equal(liveSession(index, Date.parse('2026-10-11T11:00:00Z')), null);
+  assert.equal(liveSession(index, Date.parse('2026-10-11T16:30:00Z')), null);
+  // The qualifying's archived: not live, though its index entry is found.
+  assert.equal(liveSession(index, Date.parse('2026-10-10T13:30:00Z')), null);
+  assert.equal(indexedSession(index, '2026-10-11T12:05:00Z')?.Name, 'Race');
+});
+
+test('each minute\'s look keeps every car\'s last lap once, the places and stops as the feed has them', async () => {
+  const { lapSample, addSample, memoryLog, f1LiveResponse } = await import('../f1-live.js');
+  const look = laps => ({
+    TimingData: { Lines: { 1: { NumberOfLaps: laps, LastLapTime: { Value: '1:37.500' }, Position: '1', GapToLeader: 'LAP 20' }, 16: { NumberOfLaps: laps, LastLapTime: { Value: '1:38.000' }, Position: '2', GapToLeader: '+6.035', InPit: laps === 21 } } },
+    LapSeries: { 1: { LapPosition: ['1', '1', '1'] }, 16: { LapPosition: ['2', '2', '2'] } },
+    PitStopSeries: { PitTimes: { 16: [{ PitStop: { Lap: '21', PitStopTime: '2.4', PitLaneTime: '24.1' } }] } }
+  });
+  let log = addSample(null, lapSample(look(20)));
+  log = addSample(log, lapSample(look(20)));
+  log = addSample(log, lapSample(look(21)));
+  assert.deepEqual(log.cars['16'], [[20, 98000, 6.035, 2, 0], [21, 98000, 6.035, 2, 1]]);
+  assert.deepEqual(log.cars['1'].map(x => x[2]), [0, 0]);
+  assert.deepEqual(log.places['16'], [2, 2, 2]);
+  assert.deepEqual(log.stops['16'], [[21, 2.4, 24.1]]);
+  // A look without the places (a short answer) keeps the last ones.
+  assert.deepEqual(addSample(log, { cars: {}, places: {}, stops: {} }).places['16'], [2, 2, 2]);
+  const mem = memoryLog();
+  await mem.add('k', lapSample(look(20)));
+  assert.equal((await mem.get('k')).cars['1'].length, 1);
+  assert.equal((await f1LiveResponse(new URL('https://f1-live.quadra/laps.json?start=nope'))).status, 502);
+});
+
+test('the Durable Object keeps a session\'s log under its start and a fortnight of them', async () => {
+  const { F1Log } = await import('../f1-live.js');
+  const m = new Map([['2020-01-01T00:00:00.000Z', {}]]);
+  const storage = { get: async k => m.get(k), put: async (k, v) => void m.set(k, v), list: async () => new Map(m), delete: async k => m.delete(k) };
+  const o = new F1Log({ storage });
+  const key = encodeURIComponent(new Date().toISOString());
+  assert.equal(await (await o.fetch(new Request(`https://f1-log/?key=${key}`, { method: 'POST', body: JSON.stringify({ cars: { 1: [3, 90000, 0, 1, 0] } }) }))).text(), 'ok');
+  assert.deepEqual((await (await o.fetch(new Request(`https://f1-log/?key=${key}`))).json()).cars['1'], [[3, 90000, 0, 1, 0]]);
+  assert.equal(m.has('2020-01-01T00:00:00.000Z'), false);
+});

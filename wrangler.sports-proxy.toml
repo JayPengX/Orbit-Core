@@ -13,7 +13,8 @@ compatibility_date = "2025-01-01"
 # request's isolate at whichever colo received it, i.e. near the caller.
 
 # No KV binding: this Worker counts requests per Quadra Pass session in
-# memory (quadra-token.js sessionLimited) and keeps nothing in KV.
+# memory (quadra-token.js sessionLimited) and keeps nothing in KV (the F1
+# lap log, below, is a Durable Object).
 
 
 # A local dev page (the preview tool) may read without a Quadra Pass,
@@ -27,3 +28,17 @@ SPORTS_DEV = "on"
 [[services]]
 binding = "ORBIT"
 service = "orbit-workers-proxy"
+
+# Every lap of an F1 session while it runs (f1-live.js: F1's archive has
+# them only after the flag): a minute's look kept in a Durable Object
+# (SQLite, on the free plan), from Thursday to Monday, UTC.
+[[durable_objects.bindings]]
+name = "F1_LOG"
+class_name = "F1Log"
+
+[[migrations]]
+tag = "f1-log-1"
+new_sqlite_classes = ["F1Log"]
+
+[triggers]
+crons = ["* * * * SUN,MON,THU,FRI,SAT"]

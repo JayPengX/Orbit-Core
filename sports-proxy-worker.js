@@ -27,7 +27,9 @@
 import { readToken, sessionLimited } from './quadra-token.js';
 import { BRANDS } from './kit/brand.mjs';
 import { ASIA_HOST, asiaBaseballResponse, asiaTarget, cpblBoxTarget } from './asia-baseball.js';
-import { F1_LIVE_HOST, f1LiveResponse } from './f1-live.js';
+import { F1_LIVE_HOST, f1LiveResponse, doLog, sampleLive } from './f1-live.js';
+// The Durable Object the laps of a session that's on are kept in (f1-live.js).
+export { F1Log } from './f1-live.js';
 import { cleanDev } from './kit/devconfig.mjs';
 
 const ALLOWED_ORIGINS = ['https://jaypengx.github.io'];
@@ -708,13 +710,15 @@ async function translateUpstream(upstreamUrl) {
 // Fetches `upstreamUrl`, applies the optional trim, and saves a 200 into the
 // shared cache. Resolves to { status, contentType, body } or
 // { fetchError }. Never throws.
+// The F1 lap log (env.F1_LOG), set by the first request this isolate serves.
+let f1Log = null;
 async function fetchUpstream(upstreamUrl, trim) {
   let upstream;
   try {
     upstream = upstreamUrl.hostname === ASIA_HOST
       ? await asiaBaseballResponse(upstreamUrl)
       : upstreamUrl.hostname === F1_LIVE_HOST
-      ? await f1LiveResponse(upstreamUrl)
+      ? await f1LiveResponse(upstreamUrl, { log: f1Log })
       : needsYahooCrumb(upstreamUrl)
       ? await fetchYahooWithCrumb(upstreamUrl)
       : upstreamUrl.hostname === 'clients5.google.com'
@@ -1039,10 +1043,22 @@ export default {
     const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
     const path = new URL(request.url).pathname.replace(/\/+$/, '');
     refreshDev(env, ctx);
+    f1Log ||= doLog(env.F1_LOG);
 
     // A crash still answers with CORS (the app sees a failure it can try
     // again, not a blocked request) and says what it was.
     if (path === '/sports-proxy') return handleSportsProxyRequest(request, env, headers, ip, ctx).catch(error => json({ error: { message: String(error?.message || error).slice(0, 200) } }, 500, headers));
     return json({ error: { message: 'Not found' } }, 404, headers);
   },
+  // Each minute from Thursday to Monday (UTC: every F1 weekend's sessions):
+  // while an F1 session runs, every car's last lap kept (f1-live.js
+  // sampleLive), so a phone opened late still has every lap; otherwise one
+  // look at the index, cached, and nothing more.
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(
+      sampleLive(doLog(env.F1_LOG), event.scheduledTime || Date.now())
+        .then(r => r !== 'idle' && console.log('f1 laps', r))
+        .catch(e => console.log('f1 laps failed', String(e?.message || e)))
+    );
+  }
 };
