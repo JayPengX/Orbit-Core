@@ -843,7 +843,10 @@ async function routes(env, q, { fetchFn, ctx, now, cache }) {
   // Plans for the same ~100 m and 5 minutes are shared.
   const round = v => v.toFixed(3);
   const slot = Math.floor(at / (5 * MIN));
-  const cacheKey = new Request(`https://transit-cache.quadra/route/${round(from.lat)},${round(from.lon)}/${round(to.lat)},${round(to.lon)}/${by}/${slot}/${modeKey}`);
+  // `src`: one planner's plans alone (google, or tdx: TDX's two), so the app
+  // shows Google's (a tenth of a second) without waiting for TDX's (seconds).
+  const src = ['google', 'tdx'].includes(q.get('src')) ? q.get('src') : '';
+  const cacheKey = new Request(`https://transit-cache.quadra/route/${round(from.lat)},${round(from.lon)}/${round(to.lat)},${round(to.lon)}/${by}/${slot}/${modeKey}${src ? `/${src}` : ''}`);
   try {
     const hit = cache && (await cache.match(cacheKey));
     if (hit) return [{ ...(await hit.json()), cached: true }, 200];
@@ -857,7 +860,9 @@ async function routes(env, q, { fetchFn, ctx, now, cache }) {
   };
   const jobs = [];
   const railOrBus = modes.has('bus') || modes.has('tra') || modes.has('hsr') || modes.has('metro');
-  if (!railOrBus) sources.google = 'off';
+  if (src === 'tdx') {
+    // (TDX's alone.)
+  } else if (!railOrBus) sources.google = 'off';
   else if (googleKey(env) && (await spend(env, 'routes', 1, now, ctx))) {
     jobs.push(timed('google',
       fetchFn(ROUTES, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': googleKey(env), 'X-Goog-FieldMask': GOOGLE_ROUTE_FIELDS }, body: JSON.stringify(googleRouteBody(from, to, { at: by === 'arrive' || at > now + MIN ? at : null, by, modes })), signal: timeout(15_000) })
@@ -868,7 +873,9 @@ async function routes(env, q, { fetchFn, ctx, now, cache }) {
         .catch(() => ((sources.google = 'error'), []))
     ));
   } else sources.google = googleKey(env) ? 'cap' : 'nokey';
-  if (env.TDX_CLIENT_ID) {
+  if (src === 'google') {
+    // (Google's alone.)
+  } else if (env.TDX_CLIENT_ID) {
     // Twice: walking to and from the stops, and by 共享單車 (YouBike) for the
     // first and last mile (TDX's mode 3), which reaches the express buses and
     // stations a walk doesn't (the owner: bike to 快捷8號, bike from 竹東).
