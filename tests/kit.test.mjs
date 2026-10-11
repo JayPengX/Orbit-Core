@@ -525,3 +525,11 @@ test("names: a club with joining words in its name (Atlético de Madrid), and te
   assert.deepEqual(teamsByZh('皇家馬德里')[0], { name: 'real madrid', zh: '皇家馬德里' });
   assert.deepEqual(teamsByZh('Madrid'), []);
 });
+
+test('pressSelector: every :active a press the kit sets, not one iOS puts on a scrolling finger', async () => {
+  const kit = await import('../kit/quadra.mjs');
+  assert.equal(kit.pressSelector('.card:active, .q-tab:active .q-tab-icon'), '.card[data-q-press], .q-tab[data-q-press] .q-tab-icon');
+  assert.equal(kit.pressSelector('button:active:not(:disabled)'), 'button[data-q-press]:not(:disabled)');
+  assert.equal(kit.pressSelector('.q-switch:active::after'), '.q-switch[data-q-press]::after');
+  assert.equal(kit.pressSelector('.a:hover'), '.a:hover');
+});
