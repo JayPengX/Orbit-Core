@@ -81,6 +81,8 @@ export function trimF1Live(r, now = Date.now()) {
         // Orbit Sports' 數據: every stint (compound, laps), the grid slot, the best sectors and the speed trap's best (each with its place).
         stints: stintsOf(app[no]?.Stints),
         grid: Number(app[no]?.GridPos) || 0,
+        // Its last lap's three sectors (as each comes; the one not done yet empty).
+        lastSectors: list(l.Sectors).map(x => x?.Value || ''),
         sectors: list(ts[no]?.BestSectors).map(x => ({ v: x?.Value || '', p: Number(x?.Position) || 0 })),
         speed: { v: Number(ts[no]?.BestSpeeds?.ST?.Value) || 0, p: Number(ts[no]?.BestSpeeds?.ST?.Position) || 0 },
         // Every speed trap's best (the two intermediates, the finish line, the trap), each with its place.
@@ -97,6 +99,10 @@ export function trimF1Live(r, now = Date.now()) {
           while (done < segs.length && segs[done]?.Status) done++;
           return segs.length ? [done, segs.length] : null;
         })(),
+        // Each mini-sector's colour this lap, as F1's timing screen has it
+        // (0 not yet, 2048 yellow, 2049 green: its own best, 2051 purple:
+        // the session's best, 2064 the pit lane).
+        segStatus: list(l.Sectors).flatMap(x => list(x?.Segments)).map(x => Number(x?.Status) || 0),
         // Where the car is on the track now (Position.z, F1's own x/y; the circuit's map is in the same space).
         at: where[no] && where[no].Status !== 'OffTrack' ? [where[no].X, where[no].Y] : null,
         pb: ts[no]?.PersonalBestLapTime?.Value ? { v: ts[no].PersonalBestLapTime.Value, lap: Number(ts[no].PersonalBestLapTime.Lap) || 0, p: Number(ts[no].PersonalBestLapTime.Position) || 0 } : null
@@ -110,6 +116,8 @@ export function trimF1Live(r, now = Date.now()) {
     weather: r?.WeatherData ? { air: Number(r.WeatherData.AirTemp) || 0, track: Number(r.WeatherData.TrackTemp) || 0, rain: r.WeatherData.Rainfall === '1' || Number(r.WeatherData.Rainfall) > 0, wind: Number(r.WeatherData.WindSpeed) || 0, humidity: Number(r.WeatherData.Humidity) || 0 } : null,
     meeting: info.Meeting?.Name || '',
     part,
+    // How many mini-sectors each of the three sectors has (the same for every car): where the sector lines go on the map.
+    sectorSegs: list(Object.values(td.Lines || {})[0]?.Sectors).map(x => list(x?.Segments).length),
     entries: list(td.NoEntries).map(Number),
     clock: { left: Math.max(0, Math.round(left)), running: Boolean(clock.Extrapolating) },
     track: { status: String(r?.TrackStatus?.Status || ''), message: r?.TrackStatus?.Message || '' },
@@ -431,6 +439,8 @@ async function circuit(key, year) {
     y: c.y || [],
     // The track's points where each mini-sector starts (some circuits), so a car placed by its mini-sectors sits on the right one.
     mini: Array.isArray(c.miniSectorsIndexes) ? c.miniSectorsIndexes.map(Number) : [],
+    // How far into a lap (ms) each point was on the lap the outline was drawn from (some circuits): a share of a lap's time to its point.
+    times: Array.isArray(c.trackPositionTime) ? c.trackPositionTime.map(Number) : [],
     corners: (c.corners || []).map(k => ({ n: k.number, x: Math.round(k.trackPosition?.x || 0), y: Math.round(k.trackPosition?.y || 0) })),
     pitLoss: { normal: Number(c.pitLoss?.normal) || 0, sc: Number(c.pitLoss?.sc) || 0, vsc: Number(c.pitLoss?.vsc) || 0 }
   };
