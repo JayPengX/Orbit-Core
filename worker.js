@@ -1258,6 +1258,21 @@ export default {
   // (kambi.js).
   async scheduled(event, env, ctx) {
     ctx.waitUntil(sendDue(env).then(r => r.sent && console.log('push sent', JSON.stringify(r))));
+    // Shared-Data's night, asked for on time (16:22 UTC, just after midnight
+    // in Taiwan): GitHub's own schedule starts it 4-5 hours late. Needs the
+    // secret GH_DISPATCH_TOKEN (a fine-grained token, Shared-Data's Actions:
+    // write); without it the schedule's late night stands.
+    const at = new Date(event.scheduledTime || Date.now());
+    if (env.GH_DISPATCH_TOKEN && at.getUTCHours() === 16 && at.getUTCMinutes() === 22)
+      ctx.waitUntil(
+        fetch('https://api.github.com/repos/JayPengX/Shared-Data/actions/workflows/build.yml/dispatches', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${env.GH_DISPATCH_TOKEN}`, Accept: 'application/vnd.github+json', 'User-Agent': 'quadra-cron', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ref: 'main', inputs: { part: 'everything' } })
+        })
+          .then(r => console.log('shared-data night', r.status))
+          .catch(e => console.log('shared-data night failed', String(e)))
+      );
     // Orbit Weather's scoring, once an hour (weather-skill.js).
     if (new Date(event.scheduledTime || Date.now()).getUTCMinutes() === 10) ctx.waitUntil(weatherCron(env).then(r => console.log('weather skill', JSON.stringify(r))).catch(e => console.log('weather skill failed', String(e))));
     if (!env.FIREBASE_PROJECT_ID || !env.FIREBASE_CLIENT_EMAIL || !env.FIREBASE_PRIVATE_KEY) return;
