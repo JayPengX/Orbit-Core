@@ -227,6 +227,27 @@ test('search: Google’s suggestions, OpenStreetMap’s past the cap', async () 
   assert.match(seen.at(-1), /nominatim\.openstreetmap\.org\/search\?.*countrycodes=tw/);
 });
 
+test('search: a narrow answer (under 3 suggestions) topped up by Text Search, each place once, with its position', async () => {
+  fresh();
+  const env = { RATE_LIMIT_KV: memKv(), GOOGLE_MAPS_KEY: 'k' };
+  let texts = 0;
+  const fetchFn = async (url, o) => {
+    if (url.includes('places:autocomplete')) return json({ suggestions: [{ placePrediction: { placeId: 'A1', structuredFormat: { mainText: { text: 'LaLaport南港' }, secondaryText: { text: '南港區' } }, distanceMeters: 71000 } }] });
+    if (url.includes('places:searchText')) {
+      texts++;
+      assert.equal(JSON.parse(o.body).textQuery, 'lalaport 南港');
+      assert.match(o.headers['X-Goog-FieldMask'], /places\.location/);
+      return json({ places: [{ id: 'A1', displayName: { text: 'LaLaport南港' }, formattedAddress: '115台灣台北市南港區經貿二路131號', location: { latitude: 25.0553, longitude: 121.6176 } }, { id: 'B2', displayName: { text: 'Mitsui Shopping Park LaLaport 南港' }, formattedAddress: '115台灣台北市南港區經貿二路131號', location: { latitude: 25.0556, longitude: 121.6172 } }] });
+    }
+    return json([]);
+  };
+  const out = await (await handleTransit(new Request('https://w/transit/search?q=lalaport%20%E5%8D%97%E6%B8%AF&lat=24.8&lon=120.97'), env, {}, '/transit/search', { session: { s: 'S' }, fetchFn, now: NOW, cache: memCache() })).json();
+  assert.equal(texts, 1);
+  assert.deepEqual(out.items.map(i => i.id), ['A1', 'B2']);
+  assert.equal(out.items[1].sub, '台北市南港區經貿二路131號');
+  assert.equal(out.items[1].lat, 25.0556);
+});
+
 test('a place: Essentials fields unless the name is asked for', async () => {
   fresh();
   const env = { RATE_LIMIT_KV: memKv(), GOOGLE_MAPS_KEY: 'k' };

@@ -943,7 +943,7 @@ $('bc-send').onclick = () =>
       $('bc-error').textContent = e.message;
     }
   });
-const SKU = { autocomplete: '地點搜尋', detailsPro: '地點詳細', tdx: 'TDX 呼叫' };
+const SKU = { autocomplete: '地點搜尋', detailsPro: '地點詳細', textSearch: '搜尋補充', tdx: 'TDX 呼叫' };
 async function loadUsage() {
   $('use-error').textContent = '';
   try {
@@ -1105,7 +1105,7 @@ async function loadDev() {
 $('dev-load').onclick = () => busy($('dev-load'), loadDev);
 // ---- 容量 (capacity.js) ----
 const n0 = v => Math.round(v || 0).toLocaleString();
-const SKU_ZH = { maps: '地圖載入', autocomplete: '地點搜尋', details: '地點位置', detailsPro: '地點名稱', routes: '路線規劃' };
+const SKU_ZH = { maps: '地圖載入', autocomplete: '地點搜尋', details: '地點位置', detailsPro: '地點名稱', textSearch: '搜尋補充', routes: '路線規劃' };
 async function loadCapacity() {
   $('cap-error').textContent = '';
   try {
@@ -1248,12 +1248,12 @@ $('links').replaceChildren(...LINKS.map(([n, href]) => el('a', { href, target: '
 const BILL_DEFAULTS = {
   rate: 32,
   prices: {
-    maps: { free: 10000, per: 7 }, autocomplete: { free: 10000, per: 2.83 }, details: { free: 10000, per: 5 }, detailsPro: { free: 5000, per: 17 }, routes: { free: 10000, per: 5 },
+    maps: { free: 10000, per: 7 }, autocomplete: { free: 10000, per: 2.83 }, details: { free: 10000, per: 5 }, detailsPro: { free: 5000, per: 17 }, textSearch: { free: 5000, per: 32 }, routes: { free: 10000, per: 5 },
     weather: { free: 10000, per: 0.15 },
     'gemini-3.5-flash-lite': { in: 0.3, cached: 0.03, out: 2.5 }, 'gemini-3.7-flash': { in: 0.75, cached: 0.075, out: 3.75 }
   }
 };
-const BILL_NAMES = { maps: '地圖載入（Transit）', autocomplete: '地點搜尋', details: '地點詳細', detailsPro: '地點名稱（Pro）', routes: '路線規劃', weather: '天氣 API' };
+const BILL_NAMES = { maps: '地圖載入（Transit）', autocomplete: '地點搜尋', details: '地點詳細', detailsPro: '地點名稱（Pro）', textSearch: '地點搜尋（補充）', routes: '路線規劃', weather: '天氣 API' };
 let bill = null;
 const ntd = v => `NT$${(Math.round(v * 10) / 10).toLocaleString()}`;
 function billPrices() {

@@ -37,6 +37,7 @@ export const TDX_AUTH = 'https://tdx.transportdata.tw/auth/realms/TDXConnect/pro
 export const PLACES = 'https://places.googleapis.com/v1/';
 export const ROUTES = 'https://routes.googleapis.com/directions/v2:computeRoutes';
 export const NOMINATIM = 'https://nominatim.openstreetmap.org/search';
+export const TEXT_SEARCH = 'https://places.googleapis.com/v1/places:searchText';
 
 const MIN = 60_000;
 const HOUR = 60 * MIN;
@@ -49,6 +50,7 @@ export const CAPS = {
   autocomplete: 9_000, // Autocomplete Requests, Essentials 10,000
   details: 9_000, // Place Details Essentials (position, address), 10,000
   detailsPro: 4_500, // Place Details Pro (a place's name), 5,000
+  textSearch: 4_500, // Text Search Pro (a search's places with their names and positions), 5,000
   routes: 9_000 // Compute Routes Essentials (transit), 10,000
 };
 
@@ -429,6 +431,19 @@ export function parseAutocomplete(j) {
     .filter(p => p.id && p.name);
 }
 
+// Text Search's places ({ places: [{ id, displayName, formattedAddress, location }] }),
+// their address short (no postcode, no 台灣), each with its position (no details asked after).
+export function parseTextSearch(j, lat = null, lon = null) {
+  return (j?.places || [])
+    .map(p => {
+      const plat = num(p.location?.latitude);
+      const plon = num(p.location?.longitude);
+      const sub = String(p.formattedAddress || '').replace(/^\d{3,6}/, '').replace(/^(臺灣|台灣)/, '').trim();
+      return { id: p.id || '', name: p.displayName?.text || '', sub, lat: plat, lon: plon, dist: lat != null && plat != null ? Math.round(distM(lat, lon, plat, plon)) : null, types: (p.types || []).slice(0, 4) };
+    })
+    .filter(p => p.id && p.name && p.lat != null);
+}
+
 export function parseNominatim(list) {
   return (Array.isArray(list) ? list : [])
     .map(p => {
@@ -463,12 +478,30 @@ async function search(env, q, { fetchFn, ctx, now, cache }) {
   if (googleKey(env) && (await spend(env, 'autocomplete', 1, now, ctx))) {
     const body = { input: text, languageCode: 'zh-TW', regionCode: 'tw', includedRegionCodes: ['tw'], ...(session ? { sessionToken: session } : {}) };
     if (lat != null && lon != null && inTaiwan(lat, lon)) Object.assign(body, { origin: { latitude: lat, longitude: lon }, locationBias: { circle: { center: { latitude: lat, longitude: lon }, radius: 30_000 } } });
+    // (Asked once more on a failure before OpenStreetMap: its search is far weaker in Taiwan.)
     const ask = async b => {
-      const res = await fetchFn(`${PLACES}places:autocomplete`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': googleKey(env) }, body: JSON.stringify(b) });
-      return res.ok ? parseAutocomplete(await res.json()) : null;
+      for (let k = 0; k < 2; k++) {
+        const res = await fetchFn(`${PLACES}places:autocomplete`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': googleKey(env) }, body: JSON.stringify(b) }).catch(() => null);
+        if (res?.ok) return parseAutocomplete(await res.json());
+        if (res && res.status < 500 && res.status !== 429) return null;
+      }
+      return null;
+    };
+    // Autocomplete gives five at most, and one or two for a half-typed or
+    // mixed name: Text Search's places (fuzzier, with their positions) added
+    // then, under its own cap.
+    const more = async (items, origin) => {
+      if (items.length >= 3 || text.length < 2 || !(await spend(env, 'textSearch', 1, now, ctx))) return items;
+      const tb = { textQuery: text, languageCode: 'zh-TW', regionCode: 'tw', pageSize: 8, ...(origin ? { locationBias: { circle: { center: origin, radius: 50_000 } } } : {}) };
+      const res = await fetchFn(TEXT_SEARCH, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': googleKey(env), 'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.types' }, body: JSON.stringify(tb) }).catch(() => null);
+      if (!res?.ok) return items;
+      const found = parseTextSearch(await res.json(), lat, lon).filter(p => inTaiwan(p.lat, p.lon));
+      const seen = new Set(items.map(i => i.id));
+      return [...items, ...found.filter(p => !seen.has(p.id))];
     };
     try {
-      const items = await ask(body);
+      const first = await ask(body);
+      const items = first && (await more(first, body.origin));
       if (items) {
         // A chain's name (錢都) answered with a branch far away while one is
         // near: asked again inside 15 km, the near ones that carry the whole
