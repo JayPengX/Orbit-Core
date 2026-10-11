@@ -178,6 +178,9 @@ const CACHE_TEAM_SCHEDULE = { tier: 'team-schedule', fresh: 3 * MINUTE, stale: D
 // ESPN core odds is only ever asked for a game's PRE-game line, which
 // can't change once the game has started.
 const CACHE_PREGAME_LINE = { tier: 'pregame-line', fresh: HOUR, stale: DAY };
+// A side's roster for one game (ESPN core): its starters are marked as the
+// team announces them, half an hour before an NBA tip-off (Sports' 先發陣容).
+const CACHE_LINEUP = { tier: 'lineup', fresh: MINUTE, stale: 10 * MINUTE };
 // Pre-match odds from Kambi's list views move slowly (minutes, not seconds),
 // and every viewer asks for the same few leagues: one upstream fetch every 2
 // minutes per colo, a slightly older copy while it refreshes.
@@ -266,7 +269,7 @@ function cachePolicyFor(url) {
       if (url.pathname.endsWith('/roster') && url.searchParams.get('enable') === 'injuries') return CACHE_TEAM_SCHEDULE;
       return url.pathname.endsWith('/scoreboard') ? scoreboardPolicy(url) : url.pathname.endsWith('/schedule') ? CACHE_TEAM_SCHEDULE : CACHE_STANDINGS;
     case 'sports.core.api.espn.com':
-      return CACHE_PREGAME_LINE;
+      return /\/competitors\/\d+\/roster$/.test(url.pathname) ? CACHE_LINEUP : CACHE_PREGAME_LINE;
     case 'statsapi.mlb.com':
       // A day's games with their linescore (Sports' live count, runners,
       // batter and pitcher when ESPN's feed leaves them out): live.
