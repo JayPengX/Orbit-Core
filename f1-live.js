@@ -87,6 +87,16 @@ export function trimF1Live(r, now = Date.now()) {
         speeds: Object.fromEntries(['I1', 'I2', 'FL', 'ST'].map(k => [k.toLowerCase(), { v: Number(ts[no]?.BestSpeeds?.[k]?.Value) || 0, p: Number(ts[no]?.BestSpeeds?.[k]?.Position) || 0 }])),
         // A qualifying's best lap in each part (Q1, Q2, Q3), '' for a part not run.
         parts: list(l.BestLapTimes).map(x => x?.Value || ''),
+        // How far round its lap: the mini-sectors passed of all (each timing
+        // point's status set as the car passes it, cleared at the line).
+        // F1's feed stopped giving the cars' x/y (Position.z) to everyone in
+        // 2026: the map places each car by this instead.
+        seg: (() => {
+          const segs = list(l.Sectors).flatMap(x => list(x?.Segments));
+          let done = 0;
+          while (done < segs.length && segs[done]?.Status) done++;
+          return segs.length ? [done, segs.length] : null;
+        })(),
         // Where the car is on the track now (Position.z, F1's own x/y; the circuit's map is in the same space).
         at: where[no] && where[no].Status !== 'OffTrack' ? [where[no].X, where[no].Y] : null,
         pb: ts[no]?.PersonalBestLapTime?.Value ? { v: ts[no].PersonalBestLapTime.Value, lap: Number(ts[no].PersonalBestLapTime.Lap) || 0, p: Number(ts[no].PersonalBestLapTime.Position) || 0 } : null
@@ -419,6 +429,8 @@ async function circuit(key, year) {
     rotation: Number(c.rotation) || 0,
     x: c.x || [],
     y: c.y || [],
+    // The track's points where each mini-sector starts (some circuits), so a car placed by its mini-sectors sits on the right one.
+    mini: Array.isArray(c.miniSectorsIndexes) ? c.miniSectorsIndexes.map(Number) : [],
     corners: (c.corners || []).map(k => ({ n: k.number, x: Math.round(k.trackPosition?.x || 0), y: Math.round(k.trackPosition?.y || 0) })),
     pitLoss: { normal: Number(c.pitLoss?.normal) || 0, sc: Number(c.pitLoss?.sc) || 0, vsc: Number(c.pitLoss?.vsc) || 0 }
   };
