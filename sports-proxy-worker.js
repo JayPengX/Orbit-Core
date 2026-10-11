@@ -131,6 +131,10 @@ const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 // Live scores and odds: 10 s, so a 15-second refresh never gets a copy a whole beat old.
 const CACHE_LIVE = { tier: 'live', fresh: 10 * SECOND, stale: 0 };
+// A game over (its box score), or a day whose every game is over: it won't
+// change, so the first read after the final serves everyone for a day (it
+// was read from ESPN every 10 seconds of viewing until the night's mirror).
+const CACHE_FINAL = { tier: 'final', fresh: DAY, stale: 0 };
 // Polymarket's pages mix every open market for a league, today's games
 // included, and Match Find's live-odds poll asks for them every 30s - so
 // they follow the same strict rule as live scores. (An earlier version
@@ -715,21 +719,42 @@ async function fetchUpstream(upstreamUrl, trim) {
         // Not the JSON shape expected - pass it through untouched.
       }
     }
-    return { status: 200, contentType, body };
+    return { status: 200, contentType, body, final: settled(upstreamUrl, body) };
   } catch (error) {
     return { fetchError: error };
   }
 }
 
+// Whether ESPN's answer is over for good: a game's summary with its game
+// completed, or one day's scoreboard (dates=YYYYMMDD; "today" moves on to the
+// next day's games) with games, every one of them over.
+export function settled(url, body) {
+  if (url.hostname !== 'site.api.espn.com') return false;
+  try {
+    if (url.pathname.endsWith('/summary')) {
+      const text = typeof body === 'string' ? body : new TextDecoder().decode(body);
+      return JSON.parse(text)?.header?.competitions?.[0]?.status?.type?.completed === true;
+    }
+    if (url.pathname.endsWith('/scoreboard') && /^\d{8}$/.test(url.searchParams.get('dates') || '')) {
+      const events = JSON.parse(typeof body === 'string' ? body : new TextDecoder().decode(body))?.events || [];
+      return events.length > 0 && events.every(e => (e?.status?.type ?? e?.competitions?.[0]?.status?.type)?.completed === true);
+    }
+  } catch {}
+  return false;
+}
+
 function cacheEntry(result, policy) {
+  const p = result.final ? CACHE_FINAL : policy;
   return new Response(result.body, {
     status: 200,
     headers: {
       'Content-Type': result.contentType,
       // The cache itself keeps the entry for the whole fresh + stale span;
       // X-Sports-Proxy-Stored-At is what decides which of the two it's in.
-      'Cache-Control': `public, max-age=${policy.fresh + policy.stale}`,
-      'X-Sports-Proxy-Stored-At': String(Date.now())
+      'Cache-Control': `public, max-age=${p.fresh + p.stale}`,
+      'X-Sports-Proxy-Stored-At': String(Date.now()),
+      // Over for good (settled): kept a day, whatever its address's policy.
+      ...(result.final ? { 'X-Sports-Proxy-Final': '1' } : {})
     }
   });
 }
@@ -772,7 +797,7 @@ function parseTarget(target) {
 // answered (a batch's item waits 3 s in all).
 const FRESH_WAIT_MS = 2_000;
 async function resolveOne(upstreamUrl, trim, ctx) {
-  const policy = cachePolicyFor(upstreamUrl);
+  let policy = cachePolicyFor(upstreamUrl);
   const cache = caches.default;
   // A trimmed response is cached under its own key (a marker param on the
   // cache key only - never sent upstream), so it can't be served to a
@@ -787,6 +812,8 @@ async function resolveOne(upstreamUrl, trim, ctx) {
   // connection limit"), failing the item.
   const cached = match && { status: match.status, contentType: match.headers.get('Content-Type') || 'application/json', storedAt: Number(match.headers.get('X-Sports-Proxy-Stored-At')), body: await match.arrayBuffer() };
   if (cached) {
+    // A copy over for good is fresh a day (CACHE_FINAL), not its address's seconds.
+    if (match.headers.get('X-Sports-Proxy-Final') === '1') policy = CACHE_FINAL;
     const storedAt = cached.storedAt;
     // Entries from before this header existed carry the old 20s lifetime,
     // so they're simply treated as fresh until the cache drops them.
@@ -809,7 +836,7 @@ async function resolveOne(upstreamUrl, trim, ctx) {
       ctx.waitUntil(reading.catch(() => {}));
       let timer;
       const result = await Promise.race([reading, new Promise(resolve => (timer = setTimeout(() => resolve(null), FRESH_WAIT_MS)))]).finally(() => clearTimeout(timer));
-      if (result?.status === 200) return { ...result, cache: 'MISS', age: 0, policy };
+      if (result?.status === 200) return { ...result, cache: 'MISS', age: 0, policy: result.final ? CACHE_FINAL : policy };
       return old('STALE');
     }
     if (isFresh || barely) {
@@ -827,7 +854,7 @@ async function resolveOne(upstreamUrl, trim, ctx) {
   }
   const result = await fetchUpstream(upstreamUrl, trim);
   if (result.status === 200) ctx.waitUntil(cache.put(cacheKey, cacheEntry(result, policy)));
-  return { ...result, cache: 'MISS', age: 0, policy };
+  return { ...result, cache: 'MISS', age: 0, policy: result.final ? CACHE_FINAL : policy };
 }
 
 // How long the browser may keep an answer itself (its own copy, by the
@@ -949,6 +976,7 @@ async function handleSportsProxyRequest(request, env, headers, ip, ctx) {
   headers['X-Sports-Proxy-Cache-Tier'] = cachePolicyFor(upstreamUrl).tier;
 
   const result = await resolveOne(upstreamUrl, trim, ctx);
+  if (result.policy) headers['X-Sports-Proxy-Cache-Tier'] = result.policy.tier;
   headers['X-RateLimit-Backend'] = gate.session.open ? 'open' : 'session';
   if (result.fetchError) return json({ error: { message: result.fetchError.message || 'Upstream request failed' } }, 502, headers);
   if (result.status !== 200) return new Response(result.body, { status: result.status, headers: { ...headers, 'Content-Type': result.contentType } });
