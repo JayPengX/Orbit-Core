@@ -23,3 +23,20 @@ test("the proxy's live cache: the seconds set, or half the source's max-age, and
   assert.equal(freshFor(live, { final: true }, settings), 12 * 3600);
   assert.equal(freshFor({ tier: 'standings', fresh: 1800 }, { maxAge: 10 }, settings), 1800, 'only live answers follow');
 });
+
+test("TDX's points and the guard: a month's 200 last, slower never off", async () => {
+  const { tdxPoints, tdxGuard } = await import('../transit.js');
+  const now = Date.parse('2026-10-11T04:00:00Z'); // 12:00 in Taiwan, the 11th
+  const used = { tdx: 4000, 'tdx:b:2026-10-11': 1500, 'tdx:a:2026-10-11': 500 };
+  const p = tdxPoints(used, now);
+  assert.equal(p.today, 1 + 2.5);
+  // 2,000 counted before the days were: at the 25% advanced seen since.
+  assert.ok(Math.abs(p.month - (3.5 + 2000 * (0.25 / 200 + 0.75 / 1500))) < 1e-9);
+  // A fair day of what's left: 3.5 of ~9.4 points today is under 60%.
+  assert.equal(tdxGuard(p, now).advanced, 1);
+  // 60 used by the 11th: a fair day is about 7 points.
+  assert.equal(tdxGuard({ month: 60, today: 5 }, now).advanced, 2);
+  assert.equal(tdxGuard({ month: 60, today: 8 }, now).advanced, 4);
+  assert.equal(tdxGuard({ month: 60, today: 12 }, now).advanced, 8);
+  assert.deepEqual(tdxGuard({ month: 192, today: 1 }, now), { advanced: 30, basic: 3, why: 'month' });
+});

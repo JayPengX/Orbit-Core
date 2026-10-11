@@ -87,14 +87,15 @@ export async function usage(env, now = Date.now()) {
   return out;
 }
 // True (and counted) while `sku` has room for `n` more this month.
-// A count only (`tally`) waits 30 minutes before it's written: it is for the
-// status page, and writing TDX's every 10 calls ran KV out of writes.
+// A count only (`tally`) waits 10 minutes before it's written: it is for the
+// status page and TDX's points, and writing TDX's every 10 calls ran KV out
+// of writes (a write each 10 minutes an isolate: under 150 a day).
 export async function spend(env, sku, n = 1, now = Date.now(), ctx = null, { countOnly = false } = {}) {
   const used = await usage(env, now);
   if (CAPS[sku] != null && used[sku] + n > CAPS[sku]) return false;
   meter.pending[sku] = (meter.pending[sku] || 0) + n;
   const gathered = Object.entries(meter.pending).reduce((a, [k, v]) => a + (CAPS[k] != null ? v : 0), 0);
-  if (countOnly ? now - meter.flushedAt > 30 * MIN : gathered >= 10 || now - meter.flushedAt > 2 * MIN) {
+  if (countOnly ? now - meter.flushedAt > 10 * MIN : gathered >= 10 || now - meter.flushedAt > 2 * MIN) {
     const p = flushUse(env, now);
     if (ctx?.waitUntil) ctx.waitUntil(p);
     else await p;
@@ -103,6 +104,17 @@ export async function spend(env, sku, n = 1, now = Date.now(), ctx = null, { cou
 }
 // Counted only (TDX calls, for the status page): no cap.
 export const tally = (env, key, n = 1, now = Date.now(), ctx = null) => spend(env, key, n, now, ctx, { countOnly: true });
+// TDX's plan is points: 200 a month, a point per 1,500 basic calls
+// (basic/…) or per 200 advanced ones (advanced/…, the planner maas/…).
+// Each call counted by kind and Taiwan's day, beside the month's total:
+// `tdx:b:2026-10-11`, `tdx:a:2026-10-11` (the admin panel's 用量).
+export const TDX_POINTS = { month: 200, basic: 1500, advanced: 200 };
+export const tdxKind = path => (String(path).startsWith('basic/') ? 'b' : 'a');
+const twDay = now => new Date(now + 8 * HOUR).toISOString().slice(0, 10);
+export async function tallyTdx(env, path, now = Date.now(), ctx = null) {
+  await tally(env, 'tdx', 1, now, ctx);
+  await tally(env, `tdx:${tdxKind(path)}:${twDay(now)}`, 1, now, ctx);
+}
 export async function flushUse(env, now = Date.now()) {
   const pending = meter.pending;
   if (!Object.keys(pending).length) return;
@@ -257,11 +269,49 @@ async function devNow() {
   } catch {}
   return devT.v;
 }
-// A rule's fresh time now: a live one's from the settings (YouBike its own), the rest as written.
-export async function freshOf(rule) {
+// TDX's month in points (TDX_POINTS) from the counts: each day's by kind;
+// calls from before the days were counted (2026-10-11), at the share of
+// advanced ones seen since (half when none yet).
+export function tdxPoints(used, now = Date.now()) {
+  const today = twDay(now);
+  let b = 0, a = 0, todayPts = 0;
+  for (const [k, n] of Object.entries(used || {})) {
+    const m = /^tdx:([ab]):(\d{4}-\d{2}-\d{2})$/.exec(k);
+    if (!m) continue;
+    const p = n / (m[1] === 'b' ? TDX_POINTS.basic : TDX_POINTS.advanced);
+    if (m[1] === 'b') b += n;
+    else a += n;
+    if (m[2] === today) todayPts += p;
+  }
+  const before = Math.max(0, (used?.tdx || 0) - b - a);
+  const share = a + b ? a / (a + b) : 0.5;
+  const month = b / TDX_POINTS.basic + a / TDX_POINTS.advanced + before * (share / TDX_POINTS.advanced + (1 - share) / TDX_POINTS.basic);
+  return { month, today: todayPts };
+}
+// The guard (the owner navigates by it: the month's 200 points must last):
+// how many times longer TDX's live answers are kept, by how today's spending
+// stands against a fair day of what's left. Under 60% of it: as set; then
+// 2x, 4x, 8x; the month's last 5%: 30x (an advanced answer every 5 min at
+// most) and basic ones 3x. Slower, never off.
+export function tdxGuard({ month, today }, now = Date.now()) {
+  const tw = new Date(now + 8 * HOUR);
+  const monthDays = new Date(Date.UTC(tw.getUTCFullYear(), tw.getUTCMonth() + 1, 0)).getUTCDate();
+  const left = TDX_POINTS.month - month;
+  if (left <= TDX_POINTS.month * 0.05) return { advanced: 30, basic: 3, why: 'month' };
+  const fair = (left + today) / (monthDays - tw.getUTCDate() + 1);
+  const r = today / fair;
+  const advanced = r < 0.6 ? 1 : r < 1 ? 2 : r < 1.5 ? 4 : 8;
+  return { advanced, basic: 1, why: advanced > 1 ? 'day' : '', fair, ratio: r };
+}
+// A rule's fresh time now: a live one's from the settings (YouBike its own),
+// stretched by the guard for its kind; the rest as written.
+export async function freshOf(rule, env = null, path = '', now = Date.now()) {
   if (rule.tier !== 'live' || /THSR/.test(rule.re.source)) return rule.fresh;
   const d = await devNow();
-  return (/Bike/.test(rule.re.source) ? d.tdxBike : d.tdxLive) * 1000;
+  const base = (/Bike/.test(rule.re.source) ? d.tdxBike : d.tdxLive) * 1000;
+  if (!env) return base;
+  const g = tdxGuard(tdxPoints(await usage(env, now).catch(() => ({})), now), now);
+  return base * (tdxKind(path) === 'b' ? g.basic : g.advanced);
 }
 
 const inflight = new Map();
@@ -285,7 +335,7 @@ export async function tdxGet(env, raw, { fetchFn = fetch, cache = globalThis.cac
   } catch {}
   const at = hit ? Number(hit.headers.get('X-Fetched-At')) || 0 : 0;
   const age = now - at;
-  if (hit && age < (await freshOf(req.rule))) return { status: 200, body: await hit.text(), age, state: 'hit' };
+  if (hit && age < (await freshOf(req.rule, env, req.path, now))) return { status: 200, body: await hit.text(), age, state: 'hit' };
   const refresh = async () => {
     if (inflight.has(url)) return inflight.get(url);
     const p = (async () => {
@@ -299,7 +349,7 @@ export async function tdxGet(env, raw, { fetchFn = fetch, cache = globalThis.cac
         // TDX sometimes hangs or answers 5xx for a moment: 12 s at most, and
         // one more try (the app said 暫時無法取得資料 for these).
         res = await fetchFn(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Accept-Encoding': 'br, gzip' }, signal: timeout(12_000) }).catch(err => ({ ok: false, status: 504, text: async () => String(err?.name || err) }));
-        await tally(env, 'tdx', 1, now, ctx);
+        await tallyTdx(env, req.path, now, ctx);
         if (res.status >= 500 && tries < 1) continue;
         if (res.status !== 429 || tries >= 2 || !Number(env.TDX_PER_SEC)) break;
         turn.next = Math.max(turn.next, Date.now() + 1100);
@@ -783,7 +833,7 @@ async function routes(env, q, { fetchFn, ctx, now, cache }) {
         const token = await tdxAccess(env, fetchFn, now);
         if (!token) return ((sources[key] = 'nokey'), []);
         const r = await fetchFn(`${TDX_BASE}maas/routing?${params}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, signal: timeout(15_000) });
-        await tally(env, 'tdx', 1, now, ctx);
+        await tallyTdx(env, 'maas/routing', now, ctx);
         sources[key] = r.ok ? 'ok' : `http ${r.status}`;
         return r.ok ? parseTdxRoutes(await r.json()).map(p => ({ ...p, src: key === 'tdx' ? 'tdx' : 'tdx-bike' })) : [];
       })().catch(() => ((sources[key] = 'error'), []));
@@ -855,7 +905,7 @@ async function statusSample(env, name, deps) {
     const codes = /^[0-9](,[0-9]){0,9}$/.test(deps.transit || '') ? deps.transit : '3,4,5,6,7,8,9';
     const params = new URLSearchParams({ origin: `${AT.lat},${AT.lon}`, destination: `${to.lat},${to.lon}`, gc: '1.0', top: '5', transit: codes, transfer_time: '0,60', first_mile_mode: '0', first_mile_time: '15', last_mile_mode: '0', last_mile_time: '15' });
     const r = await fetchOf(deps)(`${TDX_BASE}maas/routing?${params}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } });
-    await tally(env, 'tdx', 1, deps.now, deps.ctx);
+    await tallyTdx(env, 'maas/routing', deps.now, deps.ctx);
     const text = await r.text();
     let parsed = null;
     try {

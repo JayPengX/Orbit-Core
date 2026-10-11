@@ -17,7 +17,7 @@
 import { newPasscode, updateWallet, deleteAccount, ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, PAIR_MS, ECO_LIMITS, parseWallet, poolBalance, plusMember, plusLapsed, taipeiMonth, gen, emptyWallet } from './eco.js';
 import { sendPush } from './push.js';
 import { KAMBI_COLLECTION } from './kambi.js';
-import { usage as transitUsage, CAPS as TRANSIT_CAPS } from './transit.js';
+import { usage as transitUsage, CAPS as TRANSIT_CAPS, TDX_POINTS, tdxPoints, tdxGuard } from './transit.js';
 import { twDate, GOOGLE_DAILY_CALLS } from './weather.js';
 import { cleanDev } from './kit/devconfig.mjs';
 
@@ -574,9 +574,20 @@ export const ADMIN_TOOLS = {
     const now = deps.now();
     const transit = await transitUsage(env, now).catch(() => ({}));
     const weatherCalls = env.RATE_LIMIT_KV ? Number(await env.RATE_LIMIT_KV.get(`weather:google:${twDate(now)}`).catch(() => 0)) || 0 : null;
+    // TDX by Taiwan's day ({ day: { basic, advanced, points } }), the month's points beside its plan.
+    const days = {};
+    for (const [k, n] of Object.entries(transit)) {
+      const m = /^tdx:([ab]):(\d{4}-\d{2}-\d{2})$/.exec(k);
+      if (!m) continue;
+      const d = (days[m[2]] ||= { basic: 0, advanced: 0 });
+      d[m[1] === 'b' ? 'basic' : 'advanced'] += n;
+    }
+    for (const d of Object.values(days)) d.points = d.basic / TDX_POINTS.basic + d.advanced / TDX_POINTS.advanced;
+    const pts = tdxPoints(transit, now);
     return {
       at: now,
-      transit: Object.fromEntries(Object.entries(transit).map(([k, n]) => [k, { used: n, cap: TRANSIT_CAPS[k] ?? null }])),
+      tdx: { days, points: pts.month, today: pts.today, guard: tdxGuard(pts, now), plan: TDX_POINTS, total: transit.tdx || 0 },
+      transit: Object.fromEntries(Object.entries(transit).filter(([k]) => !k.startsWith('tdx:')).map(([k, n]) => [k, { used: n, cap: TRANSIT_CAPS[k] ?? null }])),
       weather: { googleToday: weatherCalls, cap: GOOGLE_DAILY_CALLS }
     };
   },
