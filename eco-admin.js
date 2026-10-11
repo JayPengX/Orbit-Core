@@ -169,6 +169,7 @@ export async function handleAdmin({ env, deps, headers, request, ip, body }) {
   if (body.action !== 'clean') return deps.errorJson('ECO_UNKNOWN_OP', 400, headers, request);
   let budget = PER_CALL;
   const done = { deleted: 0, tidied: 0 };
+  await dropPushes(env, plan.kvDeletes);
   const deletes = plan.deletes.slice(0, budget);
   for (let i = 0; i < deletes.length; i += 500) await deps.fsBatch(env, deletes.slice(i, i + 500).map(([c, id]) => ({ delete: [c, id] })));
   done.deleted = deletes.length;
@@ -176,6 +177,7 @@ export async function handleAdmin({ env, deps, headers, request, ip, body }) {
   const tidy = plan.tidy.slice(0, Math.max(0, budget));
   for (let i = 0; i < tidy.length; i += 200) await deps.fsBatch(env, tidy.slice(i, i + 200).map(t => ({ update: [WALLET_COLLECTION, t.id, JSON.stringify(t.wallet)], updateTime: t.updateTime })));
   done.tidied = tidy.length;
+  done.pushes = plan.kvDeletes.length;
   return deps.json({ ...done, left: plan.deletes.length - done.deleted + plan.tidy.length - done.tidied, done: plan.deletes.length === done.deleted && plan.tidy.length === done.tidied }, 200, headers);
 }
 
@@ -249,12 +251,26 @@ export async function planClean(env, deps) {
       }
     }
   }
-  return { collections, counts, deletes, tidy, retired };
+  // Notice subscriptions (KV) of accounts that are gone.
+  const pushes = await pushRecords(env).catch(() => []);
+  counts[PUSH_KV] = pushes.length;
+  const kvDeletes = pushes.filter(r => !accounts.has(r.account)).map(r => r.key);
+  return { collections, counts, deletes, kvDeletes, tidy, retired };
+}
+const PUSH_KV = '通知訂閱（KV）';
+async function dropPushes(env, keys) {
+  const kv = env.RATE_LIMIT_KV;
+  if (!kv || !keys.length) return;
+  for (const k of keys) await kv.delete(k);
+  const due = (await kv.get('push:due', 'json').catch(() => null)) || {};
+  const left = Object.fromEntries(Object.entries(due).filter(([k]) => !keys.includes(k)));
+  if (Object.keys(left).length !== Object.keys(due).length) await kv.put('push:due', JSON.stringify(left));
 }
 
 function summary(plan) {
   const byCollection = {};
   for (const [c] of plan.deletes) byCollection[c] = (byCollection[c] || 0) + 1;
+  if (plan.kvDeletes?.length) byCollection[PUSH_KV] = plan.kvDeletes.length;
   return {
     collections: plan.collections,
     counts: plan.counts,
@@ -304,15 +320,16 @@ async function pushRecords(env, prefix = 'push:') {
   }
   return out;
 }
-// The sources the apps lean on, each asked once (public reads only, no keys).
+// The sources the apps lean on, each asked once (public reads only, no keys),
+// with what each one feeds.
 const HEALTH = [
-  ['ESPN', 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard'],
-  ['Kambi', 'https://eu-offering-api.kambicdn.com/offering/v2018/ub/listView/formula_1/all/all/all/competitions.json?lang=en_GB&market=GB'],
-  ['Polymarket', 'https://gamma-api.polymarket.com/events?limit=1&closed=false'],
-  ['OpenF1', 'https://api.openf1.org/v1/sessions?session_key=latest'],
-  ['NLSC 地點', 'https://api.nlsc.gov.tw/other/TownVillagePointQuery1/121.5645/25.0341'],
-  ['Shared-Data', 'https://jaypengx.github.io/Shared-Data/sports/nba/days.json'],
-  ['台灣彩券', 'https://api.taiwanlottery.com/TLCAPIWeB/Lottery/LatestResult']
+  ['ESPN', 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard', 'Sports、Play：比分、賽程、球員'],
+  ['Kambi', 'https://eu-offering-api.kambicdn.com/offering/v2018/ub/listView/formula_1/all/all/all/competitions.json?lang=en_GB&market=GB', 'Play、Sports：賠率'],
+  ['Polymarket', 'https://gamma-api.polymarket.com/events?limit=1&closed=false', 'Play、Sports：預測市場機率'],
+  ['OpenF1', 'https://api.openf1.org/v1/sessions?session_key=latest', 'Sports、Play：F1 賽段、勝率'],
+  ['NLSC 地點', 'https://api.nlsc.gov.tw/other/TownVillagePointQuery1/121.5645/25.0341', 'Weather、Transit：所在的鄉鎮'],
+  ['Shared-Data', 'https://jaypengx.github.io/Shared-Data/sports/nba/days.json', '所有 App：每晚建好的資料'],
+  ['台灣彩券', 'https://api.taiwanlottery.com/TLCAPIWeB/Lottery/LatestResult', 'Play 彩券：開獎號碼、對獎']
 ];
 
 export const ADMIN_TOOLS = {
@@ -432,14 +449,24 @@ export const ADMIN_TOOLS = {
     return { ok: true };
   },
   // Notices: who's subscribed, per app, and what's waiting to be sent.
-  async pushes({ env }) {
+  async pushes({ env, deps }) {
     const records = await pushRecords(env);
     const kv = env.RATE_LIMIT_KV;
     const due = kv ? (await kv.get('push:due', 'json')) || {} : {};
+    // A subscription outlives an account removed some other way (it keeps
+    // 60 days in KV): those are shown apart and 整理 takes them.
+    const accounts = new Set((await deps.fsList(env, WALLET_COLLECTION, 300)).map(w => w.id));
+    const live = records.filter(r => accounts.has(r.account));
     const apps = {};
-    for (const r of records) apps[r.app] = (apps[r.app] || 0) + 1;
+    for (const r of live) apps[r.app] = (apps[r.app] || 0) + 1;
     const next = Object.values(due).filter(Number.isFinite).sort((a, b) => a - b);
-    return { records: records.length, accounts: new Set(records.map(r => r.account)).size, apps, due: next.length, next: next[0] || null };
+    const list = await Promise.all(
+      records.slice(0, 50).map(async r => {
+        const v = kv ? await kv.get(r.key, 'json').catch(() => null) : null;
+        return { ref: r.account.slice(0, 8), app: r.app, exists: accounts.has(r.account), items: v?.items?.length || 0, last: v?.last || null };
+      })
+    );
+    return { records: live.length, accounts: new Set(live.map(r => r.account)).size, orphans: records.length - live.length, apps, list, due: next.length, next: next[0] || null };
   },
   // A test notice to one account's device for one app.
   async 'push-test'({ env, deps, body }) {
@@ -654,14 +681,14 @@ export const ADMIN_TOOLS = {
     return next;
   },
   async health() {
-    const one = async ([name, url]) => {
+    const one = async ([name, url, use]) => {
       const t = Date.now();
       try {
         const res = await fetch(url, { headers: { 'User-Agent': 'curl/8.4.0' }, signal: AbortSignal.timeout(8000) });
         await res.arrayBuffer();
-        return { name, ok: res.ok, status: res.status, ms: Date.now() - t };
+        return { name, use, ok: res.ok, status: res.status, ms: Date.now() - t };
       } catch (e) {
-        return { name, ok: false, status: 0, ms: Date.now() - t, error: String(e?.name || e) };
+        return { name, use, ok: false, status: 0, ms: Date.now() - t, error: String(e?.name || e) };
       }
     };
     return { at: Date.now(), checks: await Promise.all(HEALTH.map(one)) };
