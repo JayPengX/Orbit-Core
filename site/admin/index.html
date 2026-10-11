@@ -76,7 +76,8 @@
   .checks .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--q-good); flex: none; }
   .checks .dot.bad { background: var(--q-bad); }
   .checks .dot.slow { background: #d4a017; }
-  .checks span:nth-child(2) { flex: 1; font-weight: 600; }
+  .checks span:nth-child(2) { flex: 1; font-weight: 600; min-width: 0; }
+  .checks small { display: block; font-weight: 400; font-size: 12px; color: var(--q-muted); }
   /* The account sheet */
   dialog.sheet { width: min(720px, 100vw); max-height: 92vh; margin: auto auto 0; border: 0; padding: 0; border-radius: 22px 22px 0 0; background: var(--q-page); color: var(--q-text); box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.3); }
   @media (min-width: 760px) { dialog.sheet { margin: auto; border-radius: 22px; } }
@@ -248,6 +249,7 @@
       <p id="push-error" class="error"></p>
       <div class="tiles" id="push-tiles"></div>
       <div class="card tablewrap" style="margin-top:12px"><table id="push-apps"><thead><tr><th>App</th><th class="right">訂閱通知的帳戶</th></tr></thead><tbody></tbody></table></div>
+      <div class="card tablewrap" style="margin-top:12px"><table id="push-list"><thead><tr><th>帳戶</th><th>App</th><th class="right">最後送出</th></tr></thead><tbody></tbody></table><p id="push-note" class="muted"></p></div>
       <h2>廣播通知</h2>
       <div class="card">
         <p class="muted">送一則通知給某個 App（或所有 App）訂閱通知的每個人：公告、維修、活動。一次最多 500 台裝置。</p>
@@ -321,7 +323,7 @@
     <section data-pane="clean" hidden>
       <h2>資料整理</h2>
       <div class="card">
-        <p class="muted">只留 Quadra 的資料：Quadra Pass 之前的舊集合、沒有帳戶的 App 資料、沒人指向的收件匣、過期的代碼，以及錢包裡沒有 App 再讀的東西。先「掃描」看會動到什麼，再「整理」。</p>
+        <p class="muted">只留 Quadra 的資料：Quadra Pass 之前的舊集合、沒有帳戶的 App 資料、沒人指向的收件匣、過期的代碼、帳戶已刪除的通知訂閱，以及錢包裡沒有 App 再讀的東西。先「掃描」看會動到什麼，再「整理」。</p>
         <div class="row"><button id="scan">掃描</button><button id="clean" class="danger" disabled>整理</button></div>
         <p id="clean-error" class="error"></p>
         <p id="clean-ok" class="ok"></p>
@@ -809,6 +811,10 @@ async function loadPushes() {
     const p = await admin('pushes');
     $('push-tiles').replaceChildren(tile('訂閱通知的帳戶', p.accounts.toLocaleString(), `${p.records} 個訂閱`), tile('排程中', p.due.toLocaleString(), p.next ? `下一則 ${until(p.next)}` : '沒有'));
     $('push-apps').tBodies[0].replaceChildren(...Object.entries(p.apps).sort((a, b) => b[1] - a[1]).map(([a, n]) => el('tr', {}, [el('td', { text: appName(a) }), el('td', { class: 'right', text: n })])));
+    $('push-list').tBodies[0].replaceChildren(
+      ...(p.list || []).sort((a, b) => b.exists - a.exists).map(r => el('tr', {}, [el('td', { class: r.exists ? 'num' : 'num neg', text: r.exists ? r.ref : `${r.ref} 已刪除` }), el('td', { text: appName(r.app) }), el('td', { class: 'right muted', text: r.last?.at ? ago(r.last.at) : '還沒有' })]))
+    );
+    $('push-note').textContent = p.orphans ? `${p.orphans} 個訂閱屬於已經不存在的帳戶，不算在上面；到「資料整理」掃描、整理就會移除。` : '每個帳戶在每個 App 只留最後訂閱的那台裝置。';
   } catch (e) {
     $('push-error').textContent = e.message;
   }
@@ -886,7 +892,7 @@ async function loadHealth() {
     const h = await admin('health');
     $('health').replaceChildren(
       ...h.checks.map(c =>
-        el('li', {}, [el('span', { class: `dot${!c.ok ? ' bad' : c.ms > 2500 ? ' slow' : ''}` }), el('span', { text: c.name }), el('span', { class: 'muted num', text: c.ok ? `${c.ms} ms` : `失敗 ${c.status || c.error || ''}` })])
+        el('li', {}, [el('span', { class: `dot${!c.ok ? ' bad' : c.ms > 2500 ? ' slow' : ''}` }), el('span', {}, [c.name, ...(c.use ? [el('small', { text: c.use })] : [])]), el('span', { class: 'muted num', text: c.ok ? `${c.ms} ms` : `失敗 ${c.status || c.error || ''}` })])
       )
     );
   } catch (e) {
@@ -917,16 +923,17 @@ $('clean').onclick = () =>
   busy($('clean'), async () => {
     if (!confirm('照掃描的結果整理？刪除的文件無法復原。')) return;
     $('clean-error').textContent = $('clean-ok').textContent = '';
-    let deleted = 0, tidied = 0;
+    let deleted = 0, tidied = 0, pushes = 0;
     try {
       for (let i = 0; i < 20; i++) {
         const r = await admin('clean');
         deleted += r.deleted;
         tidied += r.tidied;
+        pushes += r.pushes || 0;
         $('clean-ok').textContent = `整理中… 刪除 ${deleted}、整理 ${tidied}，還剩 ${r.left}`;
         if (r.done) break;
       }
-      $('clean-ok').textContent = `完成：刪除 ${deleted} 份文件、整理 ${tidied} 個錢包。`;
+      $('clean-ok').textContent = `完成：刪除 ${deleted} 份文件${pushes ? `、${pushes} 個通知訂閱` : ''}、整理 ${tidied} 個錢包。`;
       $('clean').disabled = true;
     } catch (e) {
       $('clean-error').textContent = e.message;
