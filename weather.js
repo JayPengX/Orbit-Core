@@ -611,7 +611,8 @@ export async function googleAllowed(env, now, calls = 4) {
   const key = `weather:google:${twDate(now)}`;
   const n = Number(await kvJson(env, key)) || 0;
   if (n + calls > GOOGLE_DAILY_CALLS) return false;
-  await kvPut(env, key, n + calls, 2 * 86_400);
+  // Kept 40 days: the admin panel's Google 帳單 adds a month of them (Weather is billed past 10,000 a month).
+  await kvPut(env, key, n + calls, 40 * 86_400);
   return true;
 }
 
