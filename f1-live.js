@@ -184,9 +184,15 @@ async function archived(start) {
   const s = archivedSession(await archiveJson(`${year}/Index.json`), start);
   if (!s) throw new Error('not archived');
   const names = ['SessionInfo', 'SessionStatus', 'TimingData', 'TimingAppData', 'TimingStats', 'DriverList', 'RaceControlMessages'];
-  const parts = await Promise.all(names.map(n => archiveJson(`${s.Path}${n}.json`).catch(() => null)));
+  const read = n => archiveJson(`${s.Path}${n}.json`).catch(() => null);
+  const parts = await Promise.all(names.map(read));
   const r = Object.fromEntries(names.map((n, i) => [n, parts[i]]));
+  // What 數據 is drawn from: a file not read (slow, or not up yet just after
+  // the flag) is asked again, and still missing the whole answer fails
+  // (a 502 isn't kept: an answer without tyres or speeds was, for a day).
+  for (const n of ['TimingData', 'TimingAppData', 'TimingStats']) if (!r[n]) r[n] = await read(n);
   if (!r.TimingData?.Lines) throw new Error('no timing');
+  if (!r.TimingAppData?.Lines || !r.TimingStats?.Lines) throw new Error('archive incomplete');
   return { ...trimF1Live(r), final: true };
 }
 
