@@ -65,8 +65,26 @@ export function mlbPostseason(data) {
         state: st.abstractGameState === 'Final' ? 'post' : st.abstractGameState === 'Live' ? 'in' : 'pre'
       });
     }
+  // An "If Necessary" game's hour isn't set until it's needed (the owner,
+  // 2026-10-11: LCS G5–G7 are 待定 on MLB.com while MLB's list carries a
+  // made-up hour for them, startTimeTBD false; ELTA's slots differ): 待定
+  // until the game before it in its series is over, its day still MLB's.
+  for (const g of out) {
+    if (!g.maybe || g.timeTbd || g.state !== 'pre' || g.game < 2) continue;
+    const before = out.find(x => x !== g && x.round === g.round && x.game === g.game - 1 && sameSeries(x, g));
+    if (before && before.state === 'post') continue;
+    g.timeTbd = true;
+    g.start = untimed(g.day);
+  }
   return out;
 }
+// Two games of one series: the same round and the same sides as far as both know them.
+const sameSeries = (a, b) => {
+  const x = [a.home, a.away].filter(Boolean).map(t => t.id);
+  const y = [b.home, b.away].filter(Boolean).map(t => t.id);
+  const [few, more] = x.length <= y.length ? [x, y] : [y, x];
+  return few.every(id => more.includes(id));
+};
 
 // The MLB game of an app's game: the same round and game number, and the
 // same sides as far as both know them (two series in one round: the ALDS's).
