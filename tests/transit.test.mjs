@@ -408,7 +408,8 @@ test('route plans: both sources, the same ride once, fastest first, shared for 5
   };
   const ask = () => handleTransit(new Request(`https://w/transit/route?from=24.8,120.97&to=24.84,121.012&at=${NOW}`), env, {}, '/transit/route', { session: { s: 'S' }, fetchFn, now: NOW, cache });
   const out = await (await ask()).json();
-  assert.deepEqual(out.sources, { google: 'ok', tdx: 'ok', tdxBike: 'ok' });
+  assert.deepEqual({ ...out.sources, ms: undefined }, { google: 'ok', tdx: 'ok', tdxBike: 'ok', ms: undefined });
+  assert.deepEqual(Object.keys(out.sources.ms).sort(), ['google', 'tdx', 'tdxBike']);
   // The train is one plan (TDX's copy has no walks, so it arrives first).
   assert.equal(out.plans.length, 2);
   assert.equal(out.plans[0].src, 'tdx');

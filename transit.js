@@ -849,18 +849,24 @@ async function routes(env, q, { fetchFn, ctx, now, cache }) {
     if (hit) return [{ ...(await hit.json()), cached: true }, 200];
   } catch {}
   const sources = {};
+  // How long each planner took (ms), for the app's 除錯紀錄 and for seeing which one a slow plan waited on.
+  const took = {};
+  const timed = (key, job) => {
+    const t = Date.now();
+    return job.finally(() => (took[key] = Date.now() - t));
+  };
   const jobs = [];
   const railOrBus = modes.has('bus') || modes.has('tra') || modes.has('hsr') || modes.has('metro');
   if (!railOrBus) sources.google = 'off';
   else if (googleKey(env) && (await spend(env, 'routes', 1, now, ctx))) {
-    jobs.push(
+    jobs.push(timed('google',
       fetchFn(ROUTES, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': googleKey(env), 'X-Goog-FieldMask': GOOGLE_ROUTE_FIELDS }, body: JSON.stringify(googleRouteBody(from, to, { at: by === 'arrive' || at > now + MIN ? at : null, by, modes })), signal: timeout(15_000) })
         .then(async r => {
           sources.google = r.ok ? 'ok' : `http ${r.status}`;
           return r.ok ? parseGoogleRoutes(await r.json(), at) : [];
         })
         .catch(() => ((sources.google = 'error'), []))
-    );
+    ));
   } else sources.google = googleKey(env) ? 'cap' : 'nokey';
   if (env.TDX_CLIENT_ID) {
     // Twice: walking to and from the stops, and by 共享單車 (YouBike) for the
@@ -880,8 +886,8 @@ async function routes(env, q, { fetchFn, ctx, now, cache }) {
         return r.ok ? parseTdxRoutes(await r.json()).map(p => ({ ...p, src: key === 'tdx' ? 'tdx' : 'tdx-bike' })) : [];
       })().catch(() => ((sources[key] = 'error'), []));
     };
-    if (railOrBus) jobs.push(ask('tdx', '0', '15'));
-    if (railOrBus && modes.has('bike')) jobs.push(ask('tdxBike', '3', '20'));
+    if (railOrBus) jobs.push(timed('tdx', ask('tdx', '0', '15')));
+    if (railOrBus && modes.has('bike')) jobs.push(timed('tdxBike', ask('tdxBike', '3', '20')));
   } else sources.tdx = 'nokey';
   const all = (await Promise.all(jobs)).flat();
   const seen = new Set();
@@ -896,7 +902,7 @@ async function routes(env, q, { fetchFn, ctx, now, cache }) {
     })
     // The app ranks them (by what's practical, not only the soonest there): it gets them all.
     .slice(0, 16);
-  const out = { from, to, at, by, plans, sources };
+  const out = { from, to, at, by, plans, sources: { ...sources, ms: took } };
   if (cache && plans.length) {
     const put = cache.put(cacheKey, new Response(JSON.stringify(out), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=300' } })).catch(() => {});
     if (ctx?.waitUntil) ctx.waitUntil(put);
