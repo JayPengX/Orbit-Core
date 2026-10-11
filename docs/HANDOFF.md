@@ -2257,3 +2257,23 @@ Quadra stays under 30% for anyone who plays much.
   flash; off with reduced motion); sheets slide up and down, pull the
   handle down to close, swipe sideways in a day's sheet for the next day;
   rows press; the instruction lines (「點一下看圖」…) gone.
+
+## F1 數據 live, 2026-10-11 (Singapore GP, during the race)
+
+- **Every lap, live:** F1's archive gives a session's laps only after the
+  flag (OpenF1 is paid while a session runs), so the sports proxy now has a
+  cron each minute Thu–Mon UTC (`wrangler.sports-proxy.toml`) that, while
+  `liveSession` finds a session started and not archived, samples each car's
+  last lap into the `F1Log` Durable Object (SQLite, free plan). `laps.json`
+  serves that log until the archive has the session. About 1,000 cron
+  requests a day on those days; one look at the cached index when nothing runs.
+- `now.json` and the archive's laps also carry `places` (LapSeries: every
+  car's place on every lap from the grid) and `stops` (PitStopSeries); the
+  snapshot carries race control's last 8 messages (`messages`, no blue flags).
+- Race control in Chinese (`Quadra-Fixtures/public/lib/racecontrol.mjs`) is
+  rule-based by FIA's sentence shapes; its test reads one of each shape of
+  every 2025–26 message (`tests/fixtures/racecontrol-2025-2026.json`): add
+  new ones there when F1 writes something new.
+- The compare card (`f1LapCompare`) is one table, a column a driver; the
+  gap chart is counted back from the gap now by lap times (`gapsBetween`),
+  since the minute looks read the gaps mid-lap.
