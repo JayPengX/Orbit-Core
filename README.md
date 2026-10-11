@@ -756,13 +756,13 @@ pushing a change, find its row and check every place it names.
 | --- | --- |
 | `kit/catalog.mjs` (a league) | Orbit Sports `lib/leagues.mjs` and `lib/broadcast.mjs` (shown only if on ELTA or Apple TV); Play's `lib/teams.mjs`; Shared-Data `sports.mjs` and `mirror.mjs` (which leagues are built); `tools/leagues-audit.mjs` |
 | `kit/logos.mjs`, `names.mjs`, `photos.mjs` | Both Sports and Play; Shared-Data `official-photos.mjs` (the lists `photos.mjs` reads); `sw-images.js` |
-| `proxyJson`, `packJson`, the mirror | Every app's first paint; Shared-Data `mirror.mjs` (`mirrorPath` must match); the failure hold (TRUTH §4) |
+| `proxyJson`, `packJson`, the mirror | Every app's first paint; Shared-Data `mirror.mjs` (`mirrorPath` must match); the failure hold (TRUTH §7) |
 | A trim in `sports-proxy-worker.js` | Every parser that reads it (Sports, Play), Shared-Data `mirror.mjs` (its copy is trimmed the same way) |
 | A cache tier or `DEV` default | `capacity.js`'s estimates, Shared-Data's `watch.mjs` (dev door), the admin panel |
 | `f1-live.js` (`trimF1Live`, laps) | Orbit Sports (`lib/f1.mjs`, `sheets.js`: live board, 數據, track map, race chance, standings at the flag); Quadra Play (F1 settling, `kit/f1live.mjs`); `tests/f1-live.test.mjs` |
 | `asia-baseball.js` | Sports (CPBL/NPB/KBO lists, box scores), Play (Kambi + these for settling), Shared-Data `cpbl.mjs` and `mirror.mjs` |
 | `eco.js` money rules | The kit's tables (`PLUS`, `VIP`, `WEALTH_RANKS`, `PAY`: the same numbers), `truth.mjs`, `tools/economy.mjs`, `help.mjs`'s money topics, Play and Securities |
 | `push.js` checks | The apps that schedule them: Sports (finals), Securities (prices), Weather (brief, rain), Transit (到站提醒); the kit's `NOTICE_KINDS` |
-| `quadra.css` or the frame | Every app at 375 px, light and dark, WebKit; the status-bar strip rule (TRUTH §6) |
+| `quadra.css` or the frame | Every app at 375 px, light and dark, WebKit; the status-bar strip rule (TRUTH §10) |
 | `brand.mjs` | `node brand/generate.mjs`, every app's icons and manifest; `RENAMED` links |
 | A table's or result's meaning (sports) | Orbit Sports: `title.mjs` `liveTable`/`roundCounted`, `freshStandings`, the home's race cards; Play's settling |
