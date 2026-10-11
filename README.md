@@ -1,499 +1,768 @@
-# Shared Proxy
+# Shared-Proxy
 
-The server side of two families of apps, and the kit and brand they share.
-**Quadra** is where the money is: Quadra Securities and Quadra Play. **Orbit**
-is the everyday tools: Orbit Class, Weather, Transit, Sports and Words. One
-account, the **Quadra Pass**, works in every app, and it is the only place
-anything is saved.
+The server side, the shared kit and the brand of two families of apps.
 
-| App | Repo | Live |
-| --- | --- | --- |
-| Quadra Securities | [Quadra-Securities](https://github.com/JayPengX/Quadra-Securities) | https://jaypengx.github.io/Quadra-Securities/ |
-| Quadra Play | [Quadra-Play](https://github.com/JayPengX/Quadra-Play) | https://jaypengx.github.io/Quadra-Play/ |
-| Orbit Class | [Orbit-Class](https://github.com/JayPengX/Orbit-Class) | https://jaypengx.github.io/Orbit-Class/ |
-| Orbit Weather | [Orbit-Weather](https://github.com/JayPengX/Orbit-Weather) | https://jaypengx.github.io/Orbit-Weather/ |
-| Orbit Transit | [Orbit-Transit](https://github.com/JayPengX/Orbit-Transit) | https://jaypengx.github.io/Orbit-Transit/ |
-| Orbit Sports (was Quadra Fixtures) | [Orbit-Sports](https://github.com/JayPengX/Orbit-Sports) | https://jaypengx.github.io/Orbit-Sports/ |
-| Orbit Words (was Quadra Hub) | [Orbit-Words](https://github.com/JayPengX/Orbit-Words) | https://jaypengx.github.io/Orbit-Words/ |
-| The kit, the marks, the family's page | this repo's Pages | https://jaypengx.github.io/Shared-Proxy/ |
+- **Quadra** is where the money is: **Quadra Securities** (stocks, funds,
+  FX, play money) and **Quadra Play** (sports betting and the lottery).
+- **Orbit** is the everyday tools: **Orbit Class** (the class schedule),
+  **Orbit Weather**, **Orbit Transit**, **Orbit Sports** and **Orbit Words**.
+- One account, the **Quadra Pass**, works in every app. It is the only place
+  anything is saved, and the only key to the data proxy.
 
-## Table of Contents
+This repo holds:
 
-- [The two Workers](#the-two-workers)
-- [The Quadra Pass (`/eco`)](#the-quadra-pass-eco)
-- [Keeping the store clean](#keeping-the-store-clean)
-- [The shared kit and brand](#the-shared-kit-and-brand)
-- [One-Time Deploy Setup](#one-time-deploy-setup)
-- [Optional: Auto-Deploy via GitHub Actions](#optional-auto-deploy-via-github-actions)
-- [Why One Worker for Most Routes, But Two Overall](#why-one-worker-for-most-routes-but-two-overall)
+1. **Two Cloudflare Workers**:
+   - `orbit-workers-proxy`: the Pass and the Orbit apps' routes;
+   - `sports-proxy`: the live data proxy.
+2. **The kit** (`kit/`): one copy of everything more than one app needs,
+   served from this repo's GitHub Pages and loaded by every app.
+3. **The brand** (`kit/brand.mjs`, `brand/`): every name, colour, mark,
+   icon and share card.
+4. **The family's page and the admin page** (`site/`).
+5. **The tools** (`tools/`): the preview harness, ESPN probes, the economy
+   model and pass issuing.
+6. **The rules**: `docs/TRUTH.md` (the owner's standing rules: read first)
+   and `docs/HANDOFF.md` (running notes on every app).
 
-## The two Workers
+Everything about how the family works lives here or in
+[Shared-Data](https://github.com/JayPengX/Shared-Data) (the nightly data
+packs). The apps are static sites on GitHub Pages; none has a server of its
+own.
 
-- **`orbit-workers-proxy`** (`worker.js`, `eco.js`, `eco-admin.js`,
-  `kambi.js`, `quadra-token.js`, `weather.js`, `weather-stations.js`, `weather-skill.js`, `transit.js`, `wrangler.toml`):
-
-  | Route | What |
-  | --- | --- |
-  | `/eco` | The Quadra Pass (below) |
-  | `/gemini`, `/nl-edit` | Orbit Class's AI schedule-photo import and natural-language edits; the Gemini key stays here |
-  | `/kambi` | The last live data of Kambi matches Quadra Play has bets on (a 10-minute cron keeps it) |
-  | `/transit/…` | Orbit Transit (`transit.js`, tests in `tests/transit.test.mjs`): `/transit/tdx?p=<path>` TDX's data from an allowlist (`TDX_RULES`), shared through the edge cache for as long as it stays true (live 20–50 s, timetables 6 h, stations a day; a stale copy while refreshing or when TDX is busy); `/transit/config` the map (Google's with the browser key under the month's cap, else NLSC); `/transit/search`, `/transit/place` Google Places (New) (OpenStreetMap past the cap); `/transit/route` Google's transit routes and TDX's planner in one shape; `/transit/status` (open) the month's use against `CAPS` |
-| `/weather`, `/weather/where` | Orbit Weather's forecast for a ~1 km cell (hourly for 10 days) and the place to the village, Google, CWA and MOENV blended (`weather.js`, `docs/WEATHER-PLAN.md`); `/weather/status` checks the three keys; `/weather/skill` the scoring (`weather-skill.js`) |
-
-- **`sports-proxy`** (`sports-proxy-worker.js`, `wrangler.sports-proxy.toml`):
-  `/sports-proxy`, a host-allowlisted passthrough to ESPN, the MLB Stats
-  API, Jolpica, Polymarket, Kambi and Yahoo Finance, with trimming and edge
-  caching per source (see the file's comments).
-
-Every route but signing in needs a Quadra Pass session (`qt=`), counted per
-session in memory; only the sign-in calls and the daily cap on billed Gemini
-calls use KV. The old per-app sync routes (`/sync`, `/vocab-sync`,
-`/odds-sync`, `/stock-sync`) and `/vocab-ai` are gone.
-
-## The Quadra Pass (`/eco`)
-
-`eco.js` (tests in `tests/eco.test.mjs`, `npm test`). A pass is a random
-10-character code (32^10), stored only as its SHA-256, which is the
-account's document id.
-
-- **Devices never keep the pass.** Signing in (with the pass, or a device
-  code) gives the device a refresh token (60 days, renewed each use) and the
-  app a 20-minute session token (`quadra-token.js`, HMAC with
-  `ECO_TOKEN_SECRET`, or one derived from `FIREBASE_PRIVATE_KEY` until
-  that's set). The pass is shown once when it's made or changed.
-- **One app at a time**: the session that signed in or claimed last is the
-  live one (`wallet.live`); a write from any other answers
-  `409 ECO_SESSION_MOVED`.
-- **The wallet** (`eco-wallets`, JSON the Worker merges): `entries` (money
-  in or out of the one NT$ pool, fixed ids so nothing counts twice),
-  `snap` (each app's latest figure), `settings`, `apps`, `inbox`.
-  Writes read-merge-write under Firestore's `updateTime` precondition.
-- **App data** in each app's collection under the same id:
-  `stock-study-accounts`, `odds-study-accounts`, `match-find-settings`,
-  `vocab-progress-sync`, `orbit-quadra`.
-- **Quadra Plus**, the one membership: NT$490 a Taiwan month as the entry
-  `eco:plus:<YYYY-MM>` (only this Worker writes `eco:` ids; an app's write
-  of one is dropped), renewed with the payday on the month's first sign-in
-  or read while the `plus` setting is on and the pool covers it. A month no
-  app is opened is never charged. Apps read membership from that entry
-  alone (the kit's `plusMember`, `plusMonths`). A member also gets a
-  NT$200 free bet each Taiwan week (`eco:fb:<Monday>`, `plusBonusEntries`).
-  Plus is for Play and Securities (the kit's `PLUS`): in Play the weekly bet,
-  a parlay boost ×1.5 and a cheaper cash-out; in Securities commission at
-  2.8折, half the FX spread and cheaper margin loans. The pass's avatar and
-  frame (set in the Quadra Pass sheet) show only while Plus is on.
-  The kit tells members when it arrives and three days before a renewal
-  (`plusNotices`), and the Plus sheet shows what Plus gave back this month
-  and since joining (`plusReturns`, `plusTenure`).
-- **VIP cashback:** once a Taiwan month is over, its gaming stakes in Play
-  (bets, lottery, scratch; less refunds) pay back 0.5-1.5% by tier
-  (`VIP`, `vipEntries`: `eco:vip:<month>`, from 2026-10).
-- **Welcome:** after the first paid bet in Play, a NT$200 free bet
-  (`eco:fb:welcome`, `welcomeEntries`). Reads, sign-ins and writes all add
-  what's due (fixed ids, so never twice).
-- **The allowance** on any sign-in or read: NT$30,000 to open a new pass,
-  then each Taiwan month an amount by what the account is worth (the pool
-  plus Securities' `snap.stock.holdings`): NT$8,000 under NT$40,000, 4,000
-  under 100,000, 1,500 under 250,000, 500 above (`PAY_TIERS`, v7). Months
-  missed are paid on return, stepping down as they land. The opening money
-  and the allowance are the only money Quadra gives (v7).
-- **Only money moves through entries:** `cleanEntry` takes entries of
-  Securities (`stock`) and Play (`odds`) only; `eco:` ids are this Worker's.
-  Orbit Words keeps its word progress in `vocab-progress-sync` and writes no
-  wallet entries.
-- **The reset** (once, `eco:rebase:v3`, −NT$80,000): every account that
-  opened on the old NT$110,000 comes down to the new NT$30,000. One that
-  opened with less (Securities' NT$100,000 alone, before Play had its own
-  NT$10,000; Securities reports its opening as `snap.stock.opened`) gets the
-  difference back once (`eco:rebase:v3fix`). The part of an overdraft the
-  reset made costs no interest, and what was charged on it came back once
-  (`eco:odback:v3`).
-- **Overdrafts are allowed:** the pool can go below zero (after the reset,
-  or anything else); spending stops until it's covered, selling and cash
-  outs still work, and it costs 1% a month (`eco:od:<month>`, charged with
-  the allowance). Securities has 賣出補足, the fewest sales that cover it. The numbers come
-  from `tools/economy.mjs` (`node tools/economy.mjs` prints each kind of
-  user's month under the current and the old settings).
-
-| Call | What |
-| --- | --- |
-| `POST { op: 'create', app }` | A new pass, signed in (the pass comes back this once) |
-| `POST { op: 'login', passcode, app }` | Sign in on this device |
-| `POST { op: 'refresh', refresh, app, claim?, data?, inbox? }` | A session (and a renewed refresh token); `claim` makes this app live |
-| `GET /eco?qt=T[&app=A][&inbox=1]` | The wallet, pool and app A's data |
-| `PATCH /eco?qt=T&app=A` `{ payload?, wallet? }` | App A's data and/or a wallet change (live session only) |
-| `DELETE /eco?qt=T[&app=A][&inbox=ID]` | The account, one app's data, or one inbox item |
-| `POST { op: 'pair-create', qt }` / `{ op: 'pair-redeem', code, app }` | A device code (8 characters, 10 minutes, once) and signing in with it |
-| `POST { op: 'handoff', qt }` / `{ op: 'redeem', handoff, app }` | A sealed sign-in (3 minutes) for a link to another app; home-screen apps don't share storage |
-| `POST { op: 'plus', qt, on, plan }` | Quadra Plus: join (`on: true`; `plan: 'month'`: the first month ever free, later the rest of the month's share of NT$490; `plan: 'year'`: NT$4,900 for twelve months at once) or stop renewing (`on: false`; paid months stay). Live app only |
-| `POST { op: 'signout-all', qt }` | Every other device signed out; this one comes back signed in |
-| `POST { op: 'rotate', qt }` | A new pass for the same account; the old one stops working, every other device is signed out |
-| `POST { op: 'merge', qt, sources: [{ passcode }] }` | Other passes into this one (their data, or its inbox; their money), then deleted |
-| `POST { op: 'share-create', qt }` / `{ op: 'share-redeem', qt, key }` | Orbit Class: a key (8 characters, a day) that gives another pass a copy of the schedule |
-
-Sign-in calls are limited per IP an hour (create 20, login and device codes
-30, merges 20).
-
-## Keeping the store clean
-
-`eco-admin.js`: `POST /eco { op: 'admin', token, action: 'scan' | 'clean' }`
-counts what's in Firestore and removes anything that isn't Quadra data:
-retired collections (`orbit-schedules`, `eco-links`, `stock-study-leagues`),
-app documents with no pass behind them, orphaned inbox items, expired device
-codes and share keys, and in every wallet what no app uses any more
-(`tidyWallet`): entries of retired apps (Rewards' points, games, missions
-and shop; their net NT$ kept as one `eco:rebase:hub` entry so no balance
-moves), retired settings (`RETIRED_SETTINGS`), and an avatar or frame on a
-pass without Plus. `scan` reports what `clean` would do (`wouldRetire`). It
-runs in bounded batches
-(`clean` again until `done`). The token is checked against `ADMIN_TOKEN_HASH`;
-it's empty (off) unless a clean-up is under way.
-
-## The shared kit and brand
-
-`kit/` is what every app shares: `quadra.mjs` and `quadra.css` (the sign-in,
-the one-app-at-a-time session, notices, the recommender, the tab bar),
-`pass.mjs` (the Quadra Pass sheet behind every account button: Pass, Plus,
-真相, App, 說明, with `truth.mjs` and `help.mjs`), `boot.js` (the loading
-screen), `brand.mjs`, and for the sports apps `logos.mjs`, `names.mjs`,
-`photos.mjs`, `catalog.mjs`.
-
-**It is served, not copied.** `.github/workflows/pages.yml` deploys `kit/`
-(stamped by `kit/stamp.mjs`, with `kit/version.json`) and `site/` to this
-repo's Pages on every push that touches them. Each app's page carries only
-`kit/loader.html`'s two snippets: an import map for `#kit/…` at the version
-the device last saw (`quadra.kit`), the stylesheet, and `boot.js`. The kit
-notes a newer version on every opening, and `watchUpdates` puts it in place
-like a deploy of the app. The apps' service workers keep the kit's files
-like their own, so they open offline. So a kit change is one push here.
-
-- `node kit/apps.mjs`: points apps at the served kit (done once; run it
-  again only if `loader.html` changes, it refreshes each page's snippets).
-- `node kit/link.mjs`: links the apps checked out next to this repo
-  (`<app>/.kit`) for their tests; their CI checks this repo out instead.
-- A kit change must keep working with every app's current code: add, don't
-  rename or remove, what apps import.
-
-**The brand** is `kit/brand.mjs`: the two families, every app's name, colours,
-lines and mark (Quadra: a square tile with a gold corner; Orbit: a planet,
-its ring and a moon), and `RENAMED`, the switch for the two repos that move
-(see below). `node brand/generate.mjs [id…|site]` (Playwright's Chromium)
-writes every app's icons (favicon, home screen, Android's maskable), its
-share cards (`share/og.jpg` 1200×630 for Facebook, LINE, Messenger,
-Discord, Slack, Telegram and iMessage; `square.jpg` 1200×1200 for WhatsApp
-and chat apps; `x.jpg` 1200×600 for X; `story.jpg` 1080×1920 for stories),
-the `<!-- brand -->` block of its page and its manifest; and `site/` (the
-family's page, the families' and the Pass's marks and cards).
-
-### The renamed repos
-
-`Quadra-Fixtures` is `Orbit-Sports` and `Quadra-Hub` is `Orbit-Words`
-(renamed 2026-10-03; `RENAMED` in `kit/brand.mjs` is on, so every app links
-to the new addresses). Their old addresses no longer answer: a home-screen
-icon or a shared link from before the rename lands on a 404. To forward
-them, make a repo with the old name (`Quadra-Fixtures`, `Quadra-Hub`) whose
-Pages serves `tools/moved/index.html` and `tools/moved/sw.js` (Settings →
-Pages → Deploy from a branch, root): it sends people on, keeping what
-followed the `#`, and retires the old offline copy. (A repo with the old
-name ends GitHub's redirect of the old git URL; local clones should use the
-new URLs.)
-
-## One-Time Deploy Setup
-
-You don't need to install anything to get started. This covers the main
-`orbit-workers-proxy` Worker (`/eco`, `/gemini`, `/nl-edit`, `/kambi`) first,
-followed by the separate `sports-proxy` Worker Match
-Find needs, which is a second, near-identical run of the same first three
-steps against a different file.
-
-### `orbit-workers-proxy`: initial deploy
-
-1. Sign up for a free [Cloudflare account](https://dash.cloudflare.com/sign-up)
-   (email only, no credit card).
-2. Workers & Pages → Create → Create Worker, give it a name → Deploy.
-3. "Edit code" → paste the entire contents of `worker.js`, then add two more
-   files next to it, `locales/en.js` and `locales/zh-TW.js`, with those
-   files' contents (`worker.js` imports them) → Save and Deploy.
-4. Copy the Worker's URL (`https://<name>.<subdomain>.workers.dev`) — **no
-   path suffix**. Every consuming app appends its own hardcoded path
-   (`/gemini`, `/sync`, `/vocab-ai`, etc.) — see
-   [Wiring Up a Consuming App](#wiring-up-a-consuming-app) below.
-
-That alone gives you a live Worker with every route returning "not
-configured" until you add the secrets each feature needs.
-
-### AI features (`/gemini`, `/nl-edit`)
-
-All three share one secret:
-
-- Worker Settings → Variables and Secrets → add `GEMINI_API_KEY`
-  ([get one here](https://aistudio.google.com/apikey)), type **Secret** →
-  Save and Deploy.
-
-That's it — once `GEMINI_API_KEY` is set, all three AI routes work. Nothing
-else to configure per-route.
-
-**`[placement]` matters here.** `wrangler.toml` pins
-`[placement] region = "gcp:asia-east1"` (Changhua, Taiwan) rather than leaving
-Cloudflare's default "Smart Placement" in charge. Smart Placement ran this
-Worker out of Hong Kong, which Google's Gemini API refuses outright. It was
-then pinned to `gcp:us-east4` (Virginia) for Gemini's sake, but that sent
-every TDX, CWA and Quadra Pass call across the Pacific twice; the Worker's
-traffic is mostly Taiwan's, so it now runs next to Taiwan (Taiwan is a
-Gemini-supported location). This setting only takes effect via Wrangler/CI
-(see
-[Optional: Auto-Deploy via GitHub Actions](#optional-auto-deploy-via-github-actions)
-below) — the Cloudflare dashboard's own "Settings → Placement" only exposes
-the Smart toggle, not a `region` field.
-
-Every response (including a Gemini "location not supported" error) carries
-an `X-Worker-Colo` header naming the actual colo that handled it (an IATA
-airport code, e.g. `IAD` = Virginia, `HKG` = Hong Kong) — useful for
-confirming this is actually taking effect, or diagnosing a future report of
-the same error.
-
-### Live data (`/sports-proxy`) — a separate Worker
-
-This one is deployed **from a different file** (`sports-proxy-worker.js` +
-`wrangler.sports-proxy.toml`) as its **own Worker**, not pasted into the same
-one as `/gemini`/`/sync`/etc.:
-
-1. Workers & Pages → Create → Create Worker, give it its own name (e.g.
-   `sports-proxy`) → Deploy.
-2. "Edit code" → paste the entire contents of `sports-proxy-worker.js` →
-   Save and Deploy.
-3. Copy this Worker's own URL — this is the one Match Find's and Odds
-   Study's `PROXY_URL` points at (see [Wiring Up a Consuming App](#wiring-up-a-consuming-app)
-   below), a *different* URL from the `orbit-workers-proxy` Worker the other
-   five routes live on.
-
-Why separate: `wrangler.toml`'s `[placement] region` pin (it was
-`gcp:us-east4`, for `/gemini`/`/vocab-ai` — see the section above) is a
-whole-*script* setting, not a per-route one. Sharing one Worker meant
-`/sports-proxy` was being forced through that same Virginia isolate too,
-even though nothing it calls (ESPN, the MLB Stats API, Jolpica, Polymarket)
-has Gemini's region restriction — confirmed live via the `X-Worker-Colo`
-response header returning `IAD` for a plain `/sports-proxy` request. For
-Match Find's actual Taiwan-based audience, that meant every one of its
-dozens of near-term/full-window/live-poll requests per refresh paid a full
-Taiwan↔Virginia round trip for no reason, and was a real, live-confirmed
-contributor to reports of the site going blank for 10+ seconds on first load
-and refreshes taking 10-20+ seconds. Deploying this route as its own Worker
-with no `[placement]` override lets Cloudflare's own default apply — run
-near whichever colo actually received the request, i.e. near the real
-caller.
-
-Nothing to configure — this route needs no secret at all, it's a
-host-allowlisted passthrough to public, keyless sports APIs (see
-`SPORTS_PROXY_ALLOWED_HOSTS` in `sports-proxy-worker.js`). It's live the
-moment this Worker is deployed. Every successful upstream response is cached
-in Cloudflare's shared edge cache (per data center), keyed by the upstream
-URL — so every viewer asking for the same URL shares one upstream fetch.
-How long a copy lasts depends on how fast that data changes (see
-`cachePolicyFor`):
-
-| Tier | What | Fresh for | Then served instantly while refreshing, for up to |
+| App | Kit id | Repo | Live |
 | --- | --- | --- | --- |
-| `live` | Scoreboards covering yesterday–tomorrow (UTC), live polls | 20s | — (never served expired) |
-| `odds` | Polymarket `/events` pages | 20s | — (never served expired; the live-odds poll needs every tick fresh) |
-| `schedule` | Scoreboards for days ≥2 away | 10 min | 1 day |
-| `standings` | ESPN/MLB/Jolpica standings | 30 min | 1 day |
-| `pregame-line` | ESPN core per-game odds | 1 hour | 1 day |
-| `quotes` | Yahoo Finance quotes and charts over 1 or 5 days | 30s | — (never served expired: orders fill at these prices) |
-| `history` | Yahoo Finance charts of a month and longer | 30 min | 1 day |
-| `search` | Yahoo Finance symbol search | 1 day | 7 days |
+| Quadra Securities | `stock` | [Quadra-Securities](https://github.com/JayPengX/Quadra-Securities) | https://jaypengx.github.io/Quadra-Securities/ |
+| Quadra Play | `odds` | [Quadra-Play](https://github.com/JayPengX/Quadra-Play) | https://jaypengx.github.io/Quadra-Play/ |
+| Orbit Class | `orbit` | [Orbit-Class](https://github.com/JayPengX/Orbit-Class) | https://jaypengx.github.io/Orbit-Class/ |
+| Orbit Weather | `weather` | [Orbit-Weather](https://github.com/JayPengX/Orbit-Weather) | https://jaypengx.github.io/Orbit-Weather/ |
+| Orbit Transit | `transit` | [Orbit-Transit](https://github.com/JayPengX/Orbit-Transit) | https://jaypengx.github.io/Orbit-Transit/ |
+| Orbit Sports (was Quadra Fixtures) | `match` | [Orbit-Sports](https://github.com/JayPengX/Orbit-Sports) (local folder `Quadra-Fixtures`) | https://jaypengx.github.io/Orbit-Sports/ |
+| Orbit Words (was Quadra Hub) | `vocab` | [Orbit-Words](https://github.com/JayPengX/Orbit-Words) (local folder `Quadra-Hub`) | https://jaypengx.github.io/Orbit-Words/ |
+| The kit, the marks, the family's page, admin | — | this repo's Pages | https://jaypengx.github.io/Shared-Proxy/ |
+| The nightly data packs | — | [Shared-Data](https://github.com/JayPengX/Shared-Data) | https://jaypengx.github.io/Shared-Data/ |
 
-The `X-Sports-Proxy-Cache` response header is `HIT`, `STALE` (served
-while refreshing in the background) or `MISS`, `X-Sports-Proxy-Cache-Tier`
-names the tier, and `X-Sports-Proxy-Age` gives a cached copy's age in
-seconds.
+## Contents
 
-**Trimmed Polymarket pages.** Adding `&trim=polymarket-events` to a
-Gamma `/events` URL returns each event and market with only the fields
-Match Find reads (`trimPolymarketEvents`) — a 100-event MLB page goes from
-~11.5MB to ~0.45MB. It's opt-in so the client can fall back to the plain
-passthrough if the trim (the one place this Worker parses JSON) ever
-fails; the trimmed copy is cached under its own key, so the two never mix.
-
-**Why the match list isn't built here.** Match Find's prebuilt
-first-screen snapshot is built by a GitHub Action in that repo
-(`.github/workflows/snapshot.yml`), not by this Worker: one build makes
-~85 upstream requests and parses megabytes of JSON, well past the Workers
-Free plan's 50-subrequest and 10ms-CPU limits per invocation. A batch
-endpoint here (many URLs per request) was also tried and dropped: sending
-~80 upstream requests at the same instant made ESPN occasionally stall one
-for 7-8 seconds, holding up the whole response.
-
-A cache hit doesn't count against
-`SPORTS_PROXY_RATE_LIMIT` at all (see `handleSportsProxyRequest`'s own
-comment for why this exists — without it, Match Find's own near-term +
-full-window refresh tiers alone already exceeded this route's per-IP rate
-limit). This Worker has no KV binding: it counts each Quadra Pass session
-(or, with the gate off, each IP) in memory.
-
-### The Quadra Pass store (Firestore)
-
-Both share one Firebase project and one service-account credential:
-
-1. Create a project at the [Firebase Console](https://console.firebase.google.com/)
-   and enable Firestore.
-2. Project Settings → Service accounts → Generate new private key → download
-   the JSON. Treat this like a password — it grants full read/write access
-   to the whole Firestore project, bypassing Firestore Security Rules
-   entirely (that's the point — see below). If your Firebase project is
-   managed under a school/work Google Workspace account and this button is
-   greyed out, try the same key from
-   [Google Cloud Console](https://console.cloud.google.com/) → IAM & Admin →
-   Service Accounts → the `firebase-adminsdk-...` account → Keys → Add Key →
-   Create new key → JSON. If that's blocked too, that Google account can't
-   generate a key at all — use a personal Google account's own Firebase
-   project instead.
-3. Worker Settings → Variables and Secrets, add:
-   - `FIREBASE_PROJECT_ID` (plain variable) — the Firebase project's ID.
-   - `FIREBASE_CLIENT_EMAIL` (Secret) — the downloaded JSON's `client_email`.
-   - `FIREBASE_PRIVATE_KEY` (Secret) — the downloaded JSON's `private_key`.
-     Paste the real line breaks (the PEM content itself), not the JSON
-     string's literal `\n` escapes — both are accepted, but this is the
-     easiest step to get wrong.
-4. (Optional but recommended) Workers & Pages → KV → Create namespace (any
-   name) → back on this Worker's Settings → Bindings → Add → KV Namespace →
-   variable name `RATE_LIMIT_KV` → pick the namespace you just created →
-   redeploy (a Binding change needs a fresh "Deploy" to take effect). It
-   holds push subscriptions, Orbit Transit's and Orbit Weather's Google
-   counts and an hourly copy of each weather cell; rate limits are counted
-   in memory, never in KV.
-5. Back in the Firebase Console's "Rules" tab, paste:
-   ```
-   rules_version = '2';
-   service cloud.firestore {
-     match /databases/{database}/documents {
-       match /{document=**} {
-         allow read, write: if false;
-       }
-     }
-   }
-   ```
-   The service account's access already bypasses Firestore Security Rules
-   (same as the Admin SDK) — this rule only closes the *other* door: direct,
-   unauthenticated client access to Firestore. That's the actual point of
-   this whole Worker for the sync routes — not one more check on top of an
-   open database, but removing the open database entirely. The wildcard
-   covers every collection (`orbit-schedules`, `vocab-progress-sync`,
-   `odds-study-accounts`, `stock-study-accounts`) so
-   adding a third sync consumer later never needs this rule touched again.
-
-Once this is done, `/eco` is live.
-
-## Optional: Auto-Deploy via GitHub Actions
-
-Without this, updating either Worker means manually re-pasting its file into
-the Cloudflare dashboard every time. With it, a push to `main` deploys both
-automatically (`.github/workflows/deploy.yml` runs two Wrangler deploy
-steps, one per `wrangler*.toml` — triggered by changes to `worker.js`,
-`wrangler.toml`, `sports-proxy-worker.js`, or `wrangler.sports-proxy.toml`;
-also runnable manually from the Actions tab):
-
-1. [Cloudflare Dashboard](https://dash.cloudflare.com/) → account menu (top
-   right) → My Profile → API Tokens → Create Token → **Edit Cloudflare
-   Workers** template → Create. Copy the token (shown once).
-2. This repo's Settings → Secrets and variables → Actions → **Secrets**, add
-   `CLOUDFLARE_API_TOKEN` with that token.
-3. Same page, add another Secret: `CLOUDFLARE_ACCOUNT_ID`, from the
-   Cloudflare Dashboard's sidebar (or its URL).
-4. **Important**: `wrangler deploy` pushes a `wrangler*.toml`'s `[vars]` and
-   `[[kv_namespaces]]` as that Worker's *entire* config, replacing whatever's
-   live — it does not merge with dashboard-made changes. Before relying on
-   this workflow, make sure both `wrangler.toml` and
-   `wrangler.sports-proxy.toml` in this repo already match what's live (the
-   real `FIREBASE_PROJECT_ID`, and the real KV namespace id(s) if you're
-   using `RATE_LIMIT_KV`), or the first automated deploy will silently
-   overwrite them with placeholders. Secrets themselves (`GEMINI_API_KEY`,
-   `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`) are never touched by
-   `wrangler deploy` — they aren't stored in this repo at all, and
-   `/sports-proxy` doesn't use any.
-5. The same token deploys both Workers — the "Edit Cloudflare Workers"
-   template grants `Workers Scripts:Edit` account-wide, not scoped to one
-   script, so it can create the `sports-proxy` Worker the first time this
-   runs just as readily as it updates the existing `orbit-workers-proxy`
-   one.
-
-You can also deploy from the command line instead of setting up CI — see the
-comment block at the top of `wrangler.toml` (for `orbit-workers-proxy`) or
-`wrangler.sports-proxy.toml` (for `sports-proxy`) for the exact `wrangler`
-CLI commands (login, deploy with `-c <file>`, `secret put` for each secret,
-KV namespace creation).
-
-## Wiring Up a Consuming App
-
-Every consumer takes exactly one setting: the Worker's base URL, **with no
-path suffix** — each app's own frontend code appends its own hardcoded path.
-
-| Repo | Where the URL goes | Env var |
-| --- | --- | --- |
-| Orbit | GitHub Settings → Secrets and variables → Actions → **Variables** | `PROXY_URL` (built into the client bundle by Vite — see `src/proxy-config.js`) |
-| Orbit Vocab | GitHub Settings → Secrets and variables → Actions → **Variables** | `PROXY_URL` (substituted into `sync.js`/`vocab-ai.js` at build time — see `.github/workflows/pages.yml`) |
-| Match Find | Hardcoded directly as the `PROXY_URL` constant in `public/app.js` | None — there's no build step left to inject a build-time variable from (its whole match list is fetched/scored live in the browser — see that repo's `public/lib/match-builder.mjs`), so this is a plain source-code constant instead |
-| Odds Study | Hardcoded as the `PROXY_URL` constant in `public/lib/sources.mjs` | None — a static site with no build step, same as Match Find |
-| Stock Study | Hardcoded as `PROXY_URL` in `public/lib/quotes.mjs` (and `SYNC_URL` in `public/lib/sync.mjs`) | None — a static site with no build step |
-
-Orbit and Orbit Vocab deliberately use a GitHub Actions **Variable**, not a
-Secret — this value ends up in each site's public client bundle either way
-(a static site has no server to keep it hidden behind), so there's nothing
-gained by treating it as one. Match Find's own hardcoded constant is the
-same non-secret value, just written directly into source since it has no
-build-time substitution step to use instead. Orbit and Orbit Vocab point at
-the `orbit-workers-proxy` Worker's URL (their features live there); Match
-Find points only at the separate `sports-proxy` Worker (see
-[One-Time Deploy Setup](#one-time-deploy-setup) above for why it's a
-different deployment) — it has no Gemini-backed route of its own on
-`orbit-workers-proxy` anymore (see [Removed routes](#removed-routes) above
-for the full history of its now-removed `/match-recommend` route). Odds
-Study likewise points only at the `sports-proxy` Worker.
-
-Leaving `PROXY_URL` unset in Orbit/Orbit Vocab/Match Find is fine either
-way: that app's AI/sync features are simply unavailable, and everything else
-about it works normally. Odds Study is the exception: every odds number it
-shows comes through `/sports-proxy`, so without it the page has no data.
-
-## Why One Worker for Most Routes, But Two Overall
-
-Cloudflare's Workers Free plan's daily request cap (100,000/day) is
-per-*account*, not per-Worker, so splitting `/gemini`/`/nl-edit`/`/sync`/
-`/vocab-sync`/`/vocab-ai` into separate Workers would never have bought any
-of the apps extra headroom — it would only have meant several KV
-bindings, several sets of secrets, and several things to keep deployed
-instead of one. Those five stay combined for exactly that operational
-convenience.
-
-`/sports-proxy` is the one deliberate exception, split out into its own
-`sports-proxy` Worker — not for a quota reason, but because it's the one
-route that must NOT share the other five's `[placement]` region pin (see
-"Match Find live data" in
-[One-Time Deploy Setup](#one-time-deploy-setup) above). The routes still
-fully isolate their own trust boundaries and quotas from each other either
-way (see the route table above, `isRateLimited` in `worker.js`, and its own
-copy in `sports-proxy-worker.js`); combining most of them was purely an
-operational convenience, never a reason to let one route's traffic or
-secrets reach another's.
-
-## Related Projects
-
-- [Orbit Class](https://github.com/JayPengX/Orbit-Class) — class schedule
-  dashboard; consumes `/gemini`, `/nl-edit`, and `/sync`.
-- [Orbit Vocab](https://github.com/JayPengX/Quadra-Words) — vocabulary
-  trainer; consumes `/vocab-sync` and `/vocab-ai`.
-- [Orbit Sports](https://github.com/JayPengX/Orbit-Sports) — sports
-  recommendation site; consumes `/sports-proxy` only.
-- [Odds Study](https://github.com/JayPengX/Quadra-Sportsbook) — educational page
-  on Taiwan Sports Lottery odds math; consumes `/sports-proxy` (ESPN
-  and Polymarket's Gamma API) and `/odds-sync`. It reads a subset of the fields
-  `trimPolymarketEvents` keeps, so dropping a field there can break it too.
-- [Stock Study](https://github.com/JayPengX/Quadra-Securities) — play-money
-  brokerage simulator; consumes `/sports-proxy` (Yahoo Finance) and
-  `/stock-sync`.
+- [1. The whole system at a glance](#1-the-whole-system-at-a-glance)
+- [2. The data layers: where every number comes from](#2-the-data-layers-where-every-number-comes-from)
+- [3. `orbit-workers-proxy`](#3-orbit-workers-proxy)
+- [4. `sports-proxy`](#4-sports-proxy)
+- [5. The Quadra Pass (`/eco`)](#5-the-quadra-pass-eco)
+- [6. The economy](#6-the-economy)
+- [7. Notices while an app is closed (`/push`)](#7-notices-while-an-app-is-closed-push)
+- [8. The developer settings and capacity](#8-the-developer-settings-and-capacity)
+- [9. The kit](#9-the-kit)
+- [10. The brand and the renamed repos](#10-the-brand-and-the-renamed-repos)
+- [11. Deploying and secrets](#11-deploying-and-secrets)
+- [12. Tools](#12-tools)
+- [13. Tests](#13-tests)
+- [14. What depends on what: the change checklist](#14-what-depends-on-what-the-change-checklist)
 
 ---
 
-This repo has no user-facing site of its own — it exists purely so five
-independent static sites can each have one line of server-side capability
-without any of them needing to run, or pay for, a server.
+## 1. The whole system at a glance
+
+```
+                         ┌───────────────────────────── phones (home-screen apps, iPhone Safari) ─────────────────────────────┐
+                         │  Securities · Play · Class · Weather · Transit · Sports · Words                                     │
+                         │  each: its own static files + the kit (#kit/… import map, from Shared-Proxy's Pages)                │
+                         │  device memory  →  Cache Storage (proxyJson persist)  →  localStorage copies (versioned keys)        │
+                         └───────┬─────────────────────────┬────────────────────────────────┬──────────────────────────────────┘
+                                 │ packJson / mirror        │ proxyJson (batched, qt=)        │ /eco /push /weather /transit /gemini
+                                 ▼                          ▼                                 ▼
+          Shared-Data (GitHub Pages, built       sports-proxy Worker                   orbit-workers-proxy Worker
+          by GitHub Actions, nightly + every     (no placement pin: runs near          (placement gcp:asia-east1, Taiwan)
+          3 h): season packs, mirror/, watch,    the caller)                           /eco  → Firestore (wallets, app data)
+          winprob, cpbl standings, photos,       allowlisted hosts + synthetic hosts   /push → KV (subscriptions, lists) + cron
+          bus packs, shapes, where.json          (asia-baseball.quadra, f1-live.quadra) /weather → Google, CWA, MOENV, KV cells
+                                                 edge cache per tier, trims, batch     /transit → TDX, Google Maps/Places/Routes
+                                                 F1Log Durable Object + 1-min cron     /kambi → Kambi + Firestore + cron
+                                                 ↓                                     /gemini, /nl-edit → Gemini
+                                                 ESPN · MLB · Jolpica · OpenF1 ·       /config → the developer settings
+                                                 Polymarket · Kambi · Yahoo Finance ·   (service binding ORBIT from sports-proxy)
+                                                 ELTA · formula1.com · YouTube ·
+                                                 Google translate · F1 live timing ·
+                                                 npb.jp / koreabaseball.com / cpbl.com.tw
+```
+
+Three rules hold everywhere (from `docs/TRUTH.md`):
+
+- **A failed read is a failure, never "nothing there".** It is thrown,
+  counted, retried and never saved. Only a complete, successful read is kept
+  on a device.
+- **What doesn't change in a day comes from Shared-Data**, never through
+  the proxy. The proxy is for what moves (a live score, a price before
+  kickoff).
+- **A kit change must keep every app's current code working.** Add things;
+  never rename or remove what apps import. A new export is used through the
+  module object with a fallback (`kit.newThing?.()`), because a phone may
+  still run an older kit.
+
+## 2. The data layers: where every number comes from
+
+A read by any app (through the kit's `proxyJson(url, { ttl, trim, persist,
+mirror })`) goes down these layers until one answers.
+
+| # | Layer | Where | What it holds | How long |
+| --- | --- | --- | --- | --- |
+| 1 | **Memory** | the page | every answer of this session | the call's `ttl` |
+| 2 | **Device cache** | Cache Storage (`persist`, the default) | the last answer of each URL; `peekJson(url)` gives it at any age so a screen paints at once | younger than `ttl`: used without asking anyone |
+| 3 | **Failure hold** | the page | a URL that just failed (after one retry) | as long as it would have been kept, a minute at most, so a source that is down isn't asked again by every part of a page |
+| 4 | **The mirror** | Shared-Data `mirror/` (GitHub Pages) | the reads that can't change before a known moment, each `{ until, data }`; `mirror/index.json` lists which reads it holds (`match`: `'<trim>!<url>'` patterns) | until its `until` (the next game, the next build), never past the next build plus 6 hours |
+| 5 | **The packs** | Shared-Data, read with `packJson` | a league's whole season (`sports/<league>/<year>.json`), CPBL's tables, past win-probability lines, watch links, photo lists, bus packs | until the next build; a pack that isn't there (404) is a failure the app reads another way |
+| 6 | **The edge cache** | the sports-proxy's colo cache | every successful upstream answer, shared by everyone who asks the same URL | by tier (§4.4): live 2 s by default, a finished game 24 h, standings 30 min, … |
+| 7 | **The upstream** | ESPN, Kambi, Yahoo, … | the truth now | — |
+
+On top of the layers, **apps put live knowledge over slower copies.** This
+is what keeps a table or a page right in the minutes or hours before the
+official copy catches up:
+
+- **A game over, before ESPN's table counts it.** Orbit Sports'
+  `lib/title.mjs liveTable` adds finished (and running) games that a table
+  hasn't counted yet, by games played. Every table in the app goes through
+  it: 賽事's 排名, the game sheet's table, a team's page, a driver's page
+  and a constructor's page (`freshStandings` in its `sheets.js`).
+- **F1, at the flag.** The kit's `f1live.mjs` and Orbit Sports'
+  `lib/f1.mjs` read F1's own timing (§4.6). The app knows a session is over
+  the moment F1's feed says so (`feedEnded`, kept on the device for two
+  days). Its finishing order then counts in the championship
+  (`settleScoring`), long before ESPN's scoreboard marks the race over.
+  Quadra Play settles F1 bets the same way.
+- **MLB's postseason** (`kit/postseason.mjs`): MLB's own single answer for
+  every playoff game's time, 待定 and 如需. ESPN's day pages lag.
+- **Asian baseball** (`asia-baseball.quadra`): the leagues' own sites,
+  because ESPN doesn't carry them and Kambi only lists a game a day ahead.
+
+Failure rules across the layers:
+
+- A failed read answers the copy the device has, of any age, and is asked
+  again soon. Only with nothing kept is it a failure on screen.
+- Saved copies carry a version in their key (`fx.day.v4`, `ot.trips.v1`).
+  When their meaning changes, the key is bumped and the old one removed.
+- A batch item that fails is that item's failure, never the batch's.
+
+## 3. `orbit-workers-proxy`
+
+Files: `worker.js` (the router, CORS, Gemini routes, cron), `eco.js`,
+`eco-admin.js`, `money.js`, `capacity.js`, `push.js`, `quadra-token.js`,
+`kambi.js`, `weather.js`, `weather-stations.js`, `weather-skill.js`,
+`transit.js`, `locales/`, `wrangler.toml`.
+
+Its placement is pinned to `gcp:asia-east1` (Changhua, Taiwan). Most of its
+traffic is Taiwan's (TDX, CWA, the Pass), Taiwan is a Gemini-supported
+location, and Smart Placement once ran it from Hong Kong, which Gemini
+refuses. Every response carries `X-Worker-Colo` (the IATA code of the colo
+that ran it).
+
+| Route | File | What |
+| --- | --- | --- |
+| `GET/POST/PATCH/DELETE /eco` | `eco.js`, `eco-admin.js` | The Quadra Pass (§5); `op: 'admin'` is the owner's panel |
+| `GET /config` | `worker.js` | The developer settings in use (§8), to everyone, cached a minute |
+| `POST /gemini` | `worker.js` | Orbit Class's AI import of a timetable photo |
+| `POST /nl-edit` | `worker.js` | Orbit Class's edits in plain language ("move Tuesday's maths to room 302") |
+| `GET/POST /kambi` | `kambi.js` | The last live data of Kambi matches Quadra Play has bets on (§3.1) |
+| `GET/POST /push/…` | `push.js` | Notices while an app is closed (§7) |
+| `GET /weather…` | `weather.js`, `weather-skill.js` | Orbit Weather (§3.2) |
+| `GET /transit/…` | `transit.js` | Orbit Transit (§3.3) |
+
+**The gate.** Every route except signing in needs a Quadra Pass session
+(`qt=`). Sessions are counted per session and app in memory
+(`TOKEN_LIMIT`, 90 a minute for `/eco`). Only the sign-in calls (per IP an
+hour: create 20, login 30, merge 20, share 30) and the daily cap on billed
+Gemini calls use KV.
+
+**Dev doors.** A request with `Origin: http://localhost:<port>` and no pass
+gets a dev session on `/transit` (`TRANSIT_DEV`, 300 a minute per address).
+That is how tests and scripts read real data without a pass. Weather has no
+door: it uses its saved fixtures.
+
+**The cron** (`*/2 * * * *`):
+
+- push notices that are due, every run;
+- Kambi's watched matches, every run;
+- the weather scoring, hourly at :10;
+- the capacity check, every 6 hours at :20.
+
+### 3.1 `/kambi`
+
+Kambi (Play's odds feed for Asian baseball, EuroLeague and K League) never
+says "final" in public, and a match's live data disappears hours after it
+ends. A bet whose app isn't opened in that window could never be settled.
+
+- `POST /kambi { events: [{ id, start }] }`: Play registers the matches its
+  open bets are on.
+- The cron keeps each one's latest `livedata.json` in Firestore. It reads
+  the least recently checked first, within the subrequest budget, and marks
+  an entry `gone` once Kambi drops it. A match is watched from its start
+  until the 3-day refund window ends, and kept a day beyond.
+- `GET /kambi?ids=1,2,3` answers `{ results: { id: { live, seen, gone,
+  checked, done } } }`. Play settles from this copy the same way it does
+  from Kambi's live one.
+
+### 3.2 `/weather`
+
+Orbit Weather's server (`docs/WEATHER-PLAN.md` is the design).
+
+- `GET /weather?lat=&lon=` (or `?auto=1`, placed by the caller's IP): one
+  blended forecast for a cell of about 1 km, hourly for 10 days and daily
+  for 10. It blends Google Weather, CWA (中央氣象署: the nearest automatic,
+  manned and rain-gauge stations from the committed `weather-stations.js`)
+  and MOENV (環境部: air quality, UV). Farther than any station (abroad), it
+  uses Google only.
+- `GET /weather/where`: the 縣市 and 鄉鎮市區, from NLSC's point query.
+- `GET /weather/places`: every township, for the place picker.
+- `GET /weather/status` (`?sample=<n>`): each key set and answering;
+  `sample` gives one source's real answer at Taipei 101 (the tests'
+  fixtures).
+- `GET /weather/skill`: the scoring report.
+
+**Caching.** A cell is kept in KV 15 minutes. One older but under 3 hours
+is answered at once and refreshed behind. A source that fails is replaced
+by its last good copy under 6 hours old, and `partial` says so.
+
+**Google's budget.** Google is asked at most `GOOGLE_DAILY_CALLS` a day,
+under its key's 500. A refresh costs:
+- 4 calls (now, 48 hours in 2 pages, 10 days);
+- only 1 while the forecast is under 30 minutes old;
+- 8 more every 6 hours for hours 49–240.
+
+Past the cap a cell is built from CWA alone.
+
+**One truth.** The app gets one value per quantity. What each source said
+is kept only in the cell's KV entry (`bySource`), for the scoring.
+`weather-skill.js` runs hourly over the cells opened lately:
+- it scores each source's forecast against the nearest rain gauge (Brier
+  score) and station (absolute error), by lead time;
+- it keeps 14 days of daily sums;
+- it moves the blend's weights at most 0.1 a day, each at least 0.15
+  (`weather:weights`).
+
+### 3.3 `/transit`
+
+Orbit Transit's server (`transit.js`).
+
+| Path | What |
+| --- | --- |
+| `/transit/config` | The map: Google's (the browser key, counted as one map load) while the month is under its cap, else Taiwan's NLSC map |
+| `/transit/tdx?p=<path>` | A TDX API path from the allowlist (`TDX_RULES`), cached as long as it stays true (live arrivals the 開發 setting `tdxLive`, 10 s; YouBike `tdxBike`, 30 s; timetables 6 h; stations a day), shared by everyone; a stale copy while refreshing or when TDX is busy |
+| `/transit/search` | Places by name: Google's autocomplete, OpenStreetMap's past the cap |
+| `/transit/place` | One place's position and name (Google Place Details) |
+| `/transit/route` | Plans from A to B: Google's transit routes and TDX's planner, in one shape (the app adds YouBike plans itself) |
+| `/transit/status` | Open: this month's use against each cap, which keys are set (never a key) |
+
+Google's free monthly use per SKU (10,000 Essentials, 5,000 Pro) is counted
+in KV, flushed in batches to spare KV's 1,000 writes a day. It is counted
+on Google's billing month, Pacific time. The hard stop is the per-day quota
+the owner sets on each API in Google Cloud. TDX calls are paced by
+`TDX_PER_MIN` (the free plan allows 5 a minute, 銅級 300).
+
+## 4. `sports-proxy`
+
+Files: `sports-proxy-worker.js`, `asia-baseball.js`, `f1-live.js`,
+`quadra-token.js` (bundled by Wrangler), `wrangler.sports-proxy.toml`.
+
+### 4.1 Why it's its own Worker
+
+`[placement]` is a whole-script setting. While this route lived in
+`orbit-workers-proxy`, every sports read from Taiwan went through Virginia
+(`X-Worker-Colo: IAD`). It has no placement block, so it runs near the
+caller.
+
+### 4.2 What it may read
+
+`/sports-proxy?url=<encoded upstream>&app=<kit id>&qt=<session>` passes an
+upstream through, if its host is on `SPORTS_PROXY_ALLOWED_HOSTS`:
+
+| Host | For |
+| --- | --- |
+| `site.api.espn.com` | Scoreboards, summaries, teams, rosters, standings, athletes, news (Sports, Play) |
+| `sports.core.api.espn.com` | Per-game odds (the pre-game line), game rosters (starters), athletes |
+| `statsapi.mlb.com` | MLB's box scores, live feed, postseason (`kit/postseason.mjs`) |
+| `api.jolpi.ca` | F1 results, qualifying, sprints (Jolpica, the Ergast successor) |
+| `api.openf1.org` | F1 race control messages (Play settles SC, VSC and red-flag picks) |
+| `gamma-api.polymarket.com` | Polymarket events and markets (Play's prices, Sports' chances) |
+| `clob.polymarket.com` | Only `/prices-history`: a market's price line (Sports' win probability where ESPN has none) |
+| `eu-offering-api.kambicdn.com` | Kambi's odds and live scores (Play's Asian baseball, EuroLeague, K League) |
+| `query1/query2.finance.yahoo.com` | Quotes, charts, search, fundamentals, news (Securities) |
+| `clients5.google.com` | Only `/translate_a/t` (≤ 5,000 chars), sent upstream as a POST, kept a month: a company's description in the reader's language |
+| `piceltaott-elta.cdn.hinet.net` | ELTA's live program list (which channel carries which game), always trimmed |
+| `eltaott.tv` | ELTA.tv's season pages (whether a game's whole video is there) |
+| `www.formula1.com` | Drivers' and teams' official pages, trimmed to their grids |
+| `www.youtube.com` | A search and a video page, trimmed (a game's official highlights) |
+| `asia-baseball.quadra` | Not a real host: `asia-baseball.js` gathers NPB, KBO and CPBL from npb.jp, koreabaseball.com and cpbl.com.tw (§4.5) |
+| `f1-live.quadra` | Not a real host: `f1-live.js`, F1's own live timing (§4.6) |
+
+**Trims** (`&trim=`) return only what an app reads, each cached under its
+own key:
+
+| Trim | What |
+| --- | --- |
+| `polymarket-events`, `polymarket-games` | A league's events and markets (a 100-event page goes from ~11.5 MB to ~0.45 MB) |
+| `kambi-events`, `kambi-offers` | Kambi's lists |
+| `espn-roster`, `espn-news`, `espn-athletes` | ESPN's heavy pages |
+| `elta`, `eltavod` | ELTA's program list and season pages |
+| `ytsearch`, `ytvideo` | YouTube |
+| (F1 page) | formula1.com's grids |
+
+**Batches.** `?batch=1&u=<url>&u=<url>…` (each optionally
+`<trim>!<url>`) answers many reads in one request. The kit sends up to 12
+reads made within milliseconds of each other as one batch, because the
+plan bills per request and a first paint asks for a dozen lists.
+- An item not answered within about 3 s is answered as a failure, so one
+  slow upstream never holds the rest.
+- An item that throws answers `{"s":500,"e":…}` for itself alone.
+- A Worker call has 50 fetches, shared by the batch's items.
+
+### 4.3 The gate and the limits
+
+A valid Quadra Pass session token (`qt`, checked with `ECO_TOKEN_SECRET`)
+is required. Reads are counted per session and per app in memory, 600 a
+minute (`SESSION_RATE_LIMIT`). Each app counts apart (`app=`), so
+Securities left open never uses up Sports' minute. A cache hit counts too.
+
+**The dev door.** A request with `Origin: http://localhost:<port>` and no
+`qt` is let in (unless `SPORTS_DEV=off`), counted per address:
+
+```bash
+curl -H 'Origin: http://localhost:8123' 'https://sports-proxy.pengzjay.workers.dev/sports-proxy?url=<encoded>&app=match'
+```
+
+Scripts, `tools/preview.mjs --live` and Shared-Data's `watch.mjs` use it.
+
+### 4.4 The shared edge cache
+
+Every successful answer is kept in the colo's cache by the upstream URL
+(and trim), one fetch shared by everyone. `fresh`: served as is. `stale`:
+served at once while it refreshes in the background.
+
+| Tier | What | Fresh | Stale |
+| --- | --- | --- | --- |
+| `live` | Scoreboards and summaries within a day of today | the 開發 setting `proxyLive` (2 s; 0 = half ESPN's own max-age, 2–5 s) | never |
+| `final` | A game over, or a day whose every game is over | `proxyFinalH` (24 h) | never |
+| `odds` | Polymarket events, live odds | 10 s | never |
+| `f1-live` | F1's live snapshot / laps | 4 s / 15 s (`?final=1` laps: as standings) | never |
+| `schedule` | Scoreboards 2+ days away | 10 min | 1 day |
+| `season` | A whole year (a race series', a tour's) | 3 min | 30 min |
+| `standings` | Standings tables | 30 min | 1 day |
+| `team-schedule` | A team's games | 3 min | 1 day |
+| `pregame-line` | ESPN core per-game odds | 1 h | 1 day |
+| `lineup` | A game's roster (starters marked) | 1 min | 10 min |
+| `prematch` | Kambi's pre-match lists | 2 min | 10 min |
+| `futures` | Championship markets | 10 min | 1 day |
+| `quotes` | Yahoo quotes and charts of 1–5 days | 30 s | never (orders fill at these prices) |
+| `history` | Charts of a month and longer | 30 min | 1 day |
+| `search` | Yahoo symbol search | 1 day | 7 days |
+| `fundamentals` | A company's numbers | 1 h | 1 day |
+| `news` | Search with news | 30 min | 1 day |
+| `translate` | Google translate | 30 days | 30 days |
+| `yt-search` / `yt-video` | YouTube | 20 min / 7 days | 6 h / 7 days |
+| `asia-now` / `asia-past` | Asian baseball this month / a month over | 2 min / 12 h | 6 h / 7 days |
+
+Headers: `X-Sports-Proxy-Cache` (`HIT`, `STALE`, `MISS`),
+`X-Sports-Proxy-Cache-Tier`, `X-Sports-Proxy-Age`, and
+`X-Sports-Proxy-Final` on a finished game.
+
+The developer settings (§8) are read from the main Worker through the
+service binding `ORBIT` at most once a minute.
+
+### 4.5 Asian baseball (`asia-baseball.js`)
+
+`https://asia-baseball.quadra/<league>/<YYYY-MM>.json` answers
+`{ league, month, games: [{ id, start (UTC), home: { en, zh }, away,
+homeScore, awayScore, state: 'pre'|'in'|'post'|'void', venue }] }`.
+- **NPB** comes from npb.jp's monthly schedule page (HTML).
+- **KBO** comes from koreabaseball.com's monthly list (a POST answered in
+  JSON rows).
+- **CPBL** comes from cpbl.com.tw's season list (a POST with the page's
+  anti-forgery token), plus each game's box score (`cpblBoxTarget`).
+
+Each club's source name maps to the logo tables' English and Taiwan's
+Chinese. On the 1st of a month, last month is read too.
+
+### 4.6 F1 live timing (`f1-live.js`)
+
+ESPN's copy of a live session is minutes behind with frozen gaps, and
+OpenF1 closes to everyone while a session runs. This reads F1's own feed
+(SignalR at `livetiming.formula1.com/signalrcore`, open over server-sent
+events). It negotiates, subscribes, takes the first full state, and closes.
+
+| Path | What |
+| --- | --- |
+| `/now.json` | The session now (`trimF1Live`): info, `meeting` (the Grand Prix's name), status, part and clock, track flag, lap, race control's last 8 messages (each with its lap, blue flags dropped), weather, each car (place, laps, best, last, gap, interval, pits, in/out of the pits, retired, stopped, tyre and age and stints, grid, sectors and best sectors, speeds, qualifying parts, `seg` mini-sectors passed this lap and `segStatus` their colours), `places` per lap, `stops` |
+| `/session.json?start=` | A session over, from F1's archive, in the same shape (`final: true`) |
+| `/laps.json?start=[&final=1]` | Every car's laps `{ cars: { no: [[lap, ms, gap, place, pit]…] }, places, stops, live }`: the archive's once it has the session; before that, the lap log |
+| `/circuit.json?key=&year=` | The circuit's outline (MultiViewer's): x/y, corners, rotation, `mini` (mini-sector indexes), `times` (time per outline point) |
+
+**The lap log.** F1's archive has a session only an hour or more after it
+ends, and the live feed has only the current lap. So the Durable Object
+`F1Log` (SQLite, free plan) keeps every car's laps:
+- a cron runs every minute Thursday to Monday UTC
+  (`* * * * SUN,MON,THU,FRI,SAT`);
+- while `liveSession(index)` finds a session started and not archived, it
+  takes one look a minute (`sampleLive`);
+- it keeps a fortnight of sessions.
+
+`laps.json` serves the log (`live: true`) until the archive has the
+session. `?final=1` asks only for the archive. Orbit Sports falls back to
+the log until it's there, and asks again each minute.
+
+## 5. The Quadra Pass (`/eco`)
+
+`eco.js` (tests in `tests/eco.test.mjs`).
+
+**The pass.**
+- A pass is a random 10-character code (32¹⁰), stored only as its SHA-256,
+  which is the account's document id.
+- It is typed only to sign in and shown once when made or rotated.
+- **Passes are handed out by the owner**, on the admin page
+  (`site/admin/`) or with `tools/issue-passes.mjs`. `op: 'create'` is
+  closed outside tests (`ECO_OPEN_SIGNUP`).
+
+**Signing in.**
+- **Devices never keep the pass.** Signing in gives the device a refresh
+  token (60 days, renewed each use) and the app a short session token
+  (`quadra-token.js`).
+- Tokens are `<base64url JSON>.<HMAC-SHA256>` under `ECO_TOKEN_SECRET`.
+  Before that secret is set, the key is derived from `FIREBASE_PRIVATE_KEY`.
+  A token's body is `{ k: 'ses'|'ref', d: account, a: app, s: session,
+  g: generation, e: expiry }`.
+- **One app at a time.** The session that signed in or claimed last is the
+  live one (`wallet.live`). A write from any other answers
+  `409 ECO_SESSION_MOVED`. The app left behind stops refreshing and shows
+  "Quadra is open in …" with a button to continue there.
+
+**The store.**
+- **The wallet** (`eco-wallets`, JSON the Worker merges itself,
+  `mergeWallet`):
+
+  | Part | What |
+  | --- | --- |
+  | `entries` | Money in or out of the one NT$ pool, each with a fixed id, so the same entry sent twice counts once |
+  | `snap` | Each app's latest figures, the newest per app wins |
+  | `settings` | Newest wins per key: affinities, the Plus plan, looks, notice switches, the notices already said (`seen`) |
+  | `apps` | When each app was first and last opened |
+  | `inbox` | Other passes' app data a merge brought in |
+  | `live` | The live app and session |
+  | `sec` | The token generation (bumped to sign every device out) |
+
+  Writes are read-merge-write under Firestore's `updateTime` precondition.
+- **Each app's own data** sits in its collection under the same id:
+
+  | App | Collection |
+  | --- | --- |
+  | `stock` | `stock-study-accounts` |
+  | `odds` | `odds-study-accounts` |
+  | `vocab` | `vocab-progress-sync` |
+  | `match` | `match-find-settings` |
+  | `orbit` | `orbit-quadra` |
+  | `weather` | `orbit-weather` |
+  | `transit` | `orbit-transit` |
+
+- **Only Securities and Play write money entries** (`ENTRY_APPS`). `eco:`
+  ids are this Worker's alone; an app's write of one is dropped.
+
+| Call | What |
+| --- | --- |
+| `POST { op: 'login', passcode, app }` | Sign in on this device |
+| `POST { op: 'refresh', refresh, app, claim?, data?, inbox? }` | A session (and a renewed refresh token); `claim` makes this app live |
+| `GET /eco?qt=T[&app=A][&inbox=1]` | The wallet, the pool and app A's data; `active` says whether this session is the live one (a fresh `token` comes back while it is) |
+| `PATCH /eco?qt=T&app=A { payload?, wallet? }` | App A's data and/or a wallet change (live session only) |
+| `DELETE /eco?qt=T[&app=A][&inbox=ID]` | The account, one app's data, or one inbox item |
+| `POST { op: 'pair-create', qt }` / `{ op: 'pair-redeem', code, app }` | A device code (8 characters, 10 minutes, once) and signing in with it |
+| `POST { op: 'handoff', qt }` / `{ op: 'redeem', handoff, app }` | A sealed sign-in (3 minutes) for a link to another app (`#qh=`); home-screen apps don't share storage |
+| `POST { op: 'plus', qt, on, plan }` | Join Quadra Plus (`plan: 'month'` or `'year'`) or stop renewing (live app only) |
+| `POST { op: 'signout-all', qt }` | Every other device signed out |
+| `POST { op: 'rotate', qt }` | A new pass for the same account; the old one stops, every other device is signed out |
+| `POST { op: 'merge', qt, sources: [{ passcode }] }` | Other passes into this one (up to 12): their data (or inbox) and money, then deleted |
+| `POST { op: 'share-create', qt }` / `{ op: 'share-redeem', qt, key }` | Orbit Class: a key (8 characters, a day) that gives another pass a copy of the schedule |
+| `POST { op: 'admin', token, action }` | The owner's panel (`eco-admin.js`): `scan`/`clean` (below), `config-set` (§8), issuing passes, the money report (`money.js`) |
+
+**Keeping the store clean** (`eco-admin.js`). `scan` counts and `clean`
+removes, in bounded batches (run again until `done`):
+- retired collections (`orbit-schedules`, `eco-links`,
+  `stock-study-leagues`);
+- app documents with no pass behind them;
+- orphaned inbox items;
+- expired device codes and share keys;
+- in every wallet, what no app uses (`tidyWallet`): retired apps'
+  entries (their net kept as `eco:rebase:hub`), retired settings, and
+  looks on a pass without Plus.
+
+The token is checked against `ADMIN_TOKEN_HASH`; empty means off.
+
+**The money report** (`money.js`, the admin page) shows three sides over
+every account:
+- **given**: opening money, pay, wealth-level rewards, VIP, grants, rebases;
+- **quadra**: Play's settled bets from the house's side, plus Plus fees and
+  overdraft interest;
+- **own**: Securities and the rest.
+
+Each is split by market (`snap.odds.pl` per sport, `snap.stock.pl` per
+stock market). Deleted accounts' sides are kept in `quadra-config/ledger`.
+
+## 6. The economy
+
+The model is `tools/economy.mjs`; the numbers live in `eco.js` and the
+kit's `quadra.mjs` (the same tables in both).
+
+| What | Rule | Entry id |
+| --- | --- | --- |
+| Opening money | NT$30,000 for a new pass | `eco:start` |
+| Monthly pay | NT$6,000 on the 1st of every Taiwan month, the same for everyone (v10, 2026-10); months away paid on return | `eco:pay:<YYYY-MM>` |
+| 財富等級 rewards | Once per level, the first time the account's worth (pool + Securities' holdings) reaches it: 50k → 1,000; 100k → 2,000; 250k → 3,000; 500k → 5,000; 1M → 8,000; 5M → 15,000; 20M → 30,000 | `eco:rank:<id>` |
+| Quadra Plus | NT$490 a Taiwan month or NT$4,900 a year; the first month ever free; then the rest of the month's share to join; renews on the month's first sign-in or read while on; a charge the pool can't cover lapses it | `eco:plus:<YYYY-MM>`, `eco:plusfail:<YYYY-MM>` |
+| Plus's weekly bet | A NT$200 free bet each Taiwan week a member opens an app | `eco:fb:<Monday>` |
+| Welcome | A NT$200 free bet after the first paid bet in Play | `eco:fb:welcome` |
+| VIP cashback | A Taiwan month's gaming stakes (bets, lottery, scratch, less refunds) pay back next month: ≥10k 0.5% (bronze), ≥50k 0.8% (silver), ≥150k 1.2% (gold), ≥500k 1.5% (black); from 2026-10 | `eco:vip:<YYYY-MM>` |
+| Overdraft | The pool may go below zero; spending stops, selling and cash-outs work; 1% a month | `eco:od:<YYYY-MM>` |
+| The reset | Accounts opened on the old NT$110,000 came down to 30,000 once; less than that got the difference back; interest on the reset's overdraft refunded | `eco:rebase:v3`, `eco:rebase:v3fix`, `eco:odback:v3` |
+
+**What Plus gives.**
+- **Play** (`PLUS.odds`): the weekly free bet, the parlay boost ×1.5, and
+  cash-out keeps 2% instead of 5%.
+- **Securities** (`PLUS.stock`): commission at 2.8折 (×0.28), half the FX
+  spread, and margin loans 1 point a year cheaper.
+- **Looks**: an avatar and a frame on the account button, some only after a
+  run of months in a row.
+
+Every perk makes play cheaper or bigger, so Plus earns the house more than
+it costs.
+
+**Free bets** (`FREEBET`): a token of value only. Only the winnings come
+back, the stake never does. They need odds of 1.50 or longer, last 7 days,
+and are marked spent with `odds:fb-<token id>`.
+
+## 7. Notices while an app is closed (`/push`)
+
+`push.js`. An iPhone stops a home-screen app in the background, so each app
+hands the Worker its coming notices, and the Worker sends them through the
+browser's push service.
+
+| Call | What |
+| --- | --- |
+| `GET /push/key` | The Worker's public VAPID key |
+| `POST /push/subscribe?qt=` | `{ sub, lang }` this device's subscription |
+| `POST /push/schedule?qt=` | `{ items: [notice…] }` replaces this app's list |
+| `POST /push/prefs?qt=` | `{ on, off: ['stock:alert', …] }` the pass's switches; a kind off in any app is dropped from every app's list |
+
+A notice is `{ at, title, body, tag, url, kind }`. It may carry a check the
+Worker makes at `at`, and again every 15 minutes until it has the answer,
+8 hours pass, or `until`:
+
+- `{ espn: 'football/nfl', event }`: a game's final score;
+- `{ yahoo: '2330.TW', op: 'above'|'below', price }`: a price reached;
+- `{ weather: { lat, lon, kind: 'brief'|'rain' } }`: the morning brief, or
+  rain in the next 2 hours;
+- `{ bus: { path, route, dir, min } }`: Transit's 到站提醒, checked every
+  run (2 minutes) against TDX's live estimates.
+
+The message is encrypted with RFC 8291 (aes128gcm) and signed with RFC 8292
+(VAPID), WebCrypto only.
+
+KV keys:
+- `push:<account>:<app>` (subscription and list);
+- `push:prefs:<account>`;
+- `push:due`;
+- `push:vapid`.
+
+There is one device per person per app (the last to subscribe). **News that
+happens once is told once:** the Worker remembers what it sent.
+
+## 8. The developer settings and capacity
+
+`kit/brand.mjs DEV` is the one table, and `kit/devconfig.mjs` re-exports
+it for the Workers. The settings are stored on the main Worker
+(`op: 'admin'`, `config-set`) and served by `GET /config`. Apps read the
+device's copy at once and the Worker's every five minutes.
+
+| Key | Default | What |
+| --- | --- | --- |
+| `proxyLive` | 2 s | How long the sports proxy keeps a live answer (0 = half ESPN's max-age) |
+| `proxyFinalH` | 24 h | How long a game over is kept |
+| `sportsGame` | 3 s | Orbit Sports: an open live game sheet's refresh |
+| `sportsList` | 5 s | Orbit Sports: lists (首頁, 轉播, 追蹤, 賽事) while a game is on |
+| `f1Feed` | 10 s | F1 live timing for the whole app (home cards) |
+| `f1Board` | 4 s | An open F1 live board |
+| `f1Laps` | 15 s | F1 laps (數據's comparison) |
+| `playLive` | 5 s | Quadra Play live scores and cash-out |
+| `tdxLive` | 10 s | The Worker keeps live TDX (arrivals, boards) |
+| `tdxBike` | 30 s | The Worker keeps YouBike |
+| `transitLive` | 10 s | Transit cards' refresh |
+| `transitBike` | 30 s | YouBike on the map |
+| `autoScale` | off | 依人數自動調整 (below) |
+| `mirror` | on | Use the nightly copies (off: every app asks the proxy, for debugging) |
+
+`kit.everyDev(key, fn)` runs `fn` every `dev(key)` seconds, reading the
+setting at each beat.
+
+**Capacity** (`capacity.js`, the admin panel's 容量). Cloudflare's free plan
+gives 100,000 requests a day for the whole account. Requests a day are
+roughly people × minutes watching ÷ refresh interval.
+- **The count.** It counts people (active today, this week, this month, per
+  app, and expected in 30 days from new passes). It estimates the requests
+  per app.
+- **The other budgets.** It shows how many people TDX, Google Maps and
+  Google Weather hold.
+- **The slowdown.** With `autoScale` on, every 6 hours it slows the live
+  refreshes by one factor when the expected people would run past the
+  plan. It never goes past a setting's own maximum, and returns to the
+  owner's numbers (`base`) when there's room.
+
+## 9. The kit
+
+`kit/` is served, never copied.
+- **Publishing.** `.github/workflows/pages.yml` stamps it (`kit/stamp.mjs`:
+  `?v=<version>` on kit-only relative imports, `kit/version.json`) and
+  publishes it with `site/` on every push that touches `kit/`, `tests/`,
+  `site/` or `brand/`.
+- **Loading.** Each app's page carries only `kit/loader.html`'s two
+  snippets: an import map for `#kit/…` at the version the device last saw
+  (`quadra.kit`), the stylesheet, and `boot.js`.
+- **Updating.** The kit notes a newer version on every opening, and
+  `watchUpdates` puts it in place like a deploy of the app.
+- **Tools.** `node kit/apps.mjs` points the apps at it (refreshing the
+  snippets between the `kit:head` / `kit:boot` markers). `node
+  kit/link.mjs` links checked-out apps (`<app>/.kit`) for their tests; CI
+  checks this repo out instead.
+
+### 9.1 `quadra.mjs`: the core (every app)
+
+| Area | What |
+| --- | --- |
+| **Apps and language** | `APPS` (from brand), `detectLocale`, Taiwan days (`taipeiDay`) |
+| **The economy** | `PAY`, `WEALTH_RANKS`, `worthOf`, `moneySides` (given / quadra / own, the Pass's 真相), the pool (`poolBalance`, `overdraft`; an app's own part left out) |
+| **Plus** | `PLUS`, `plusMember`, `plusMonths`, `plusLapsed`, `plusRenewing`, `plusPlan`, `plusUntil`, `plusJoinPrice`, `plusReturns`, `plusTenure`, `plusNotices`; Looks (`avatar`, `frame`, streaks) |
+| **VIP and free bets** | `VIP`, the month's stakes, tier and cashback; `WELCOME`; `FREEBET`, the unspent tokens |
+| **Storage** | The device keeps a refresh token and the account's id, never the pass; each app's own data copy for a cold start (small ones); signing out removes every app's keys on the origin, keeping only the device's language, safe area and kit version |
+| **Data** | `proxyJson` (batched, remembered, device-cached, failures held, mirror consulted), `peekJson`, `packJson` (Shared-Data), `mirrorBuilt`, `workerJson`/lines (the Worker's routes signed), `translate` (through the proxy, kept a month; Chinese-in-English handled) |
+| **The session** | `quadraSession(app)`: `start()` (the sign-in gate, then live), `on('wallet'|'active'|'signedout')`, `read`, `write` (live only), `proxy(url)`; a heartbeat every 2 minutes and on wake; `#qh=` hand-offs; another app taking over pauses this one |
+| **iPhone behaviour** | No pinch zoom; haptic ticks on taps; sheets swipe down to close (past 120 px or a flick); `html.q-touch`; `:active` only after a rest (`data-q-press`, never while scrolling); the solid status-bar strip (`.q-statusbar`, never `pointer-events: none`); `uprightTurn` (a phone on its side stays upright); the theme colour kept equal to the strip; tab bar clear of the home indicator |
+| **Recommendations** | Affinity weights per key (`team:mlb:LAD`, `sym:2330.TW`…) decaying with a half-life, synced to the wallet (`aff:<app>`); `rank(items, { n })`: quality × (1 + affinity) + exploration, then maximal marginal relevance, dismissed items pushed down |
+| **Screens** | The sign-in screen (no "create"), the install screen, "in use elsewhere": top-layer modal dialogs nothing can cover; `ask`/`tell` (never `alert`/`confirm`) |
+| **The Pass sheet** | `accountSheet` opens `pass.mjs` (Pass, Plus, 真相, App, 說明) |
+| **Notices** | `notify` (banner on screen, system notice off it), `NOTICE_KINDS` per app with a switch each, `notifyPrefs` on the pass, `schedulePush`, `sayOnce` (once per pass, `settings.seen`), batched banners |
+| **The shell** | `installGate` (home screen only on phones; a QR page on computers for phone-only apps); `watchUpdates` (version.json on load, every 15 s, on focus, visibility and online, and from other open pages over BroadcastChannel; a newer app or kit loads at once, the scroll and tab kept by `rememberPlace`/`restorePlace`, retried when the CDN lags); `kitLatest`; strips that scroll sideways keep their place across redraws |
+| **The frame** | `tabBar` (each tab keeps its place; tapping the open tab scrolls up, again resets), `topActions` (說明 · 重新整理 · the account), `icon`, `fitNumbers` (a number too wide shrinks, to 60%) |
+| **The developer settings** | `dev(key)`, `everyDev(key, fn)` |
+| **除錯紀錄** | `rec(kind, data)`: the last of each kind in memory; with 記錄 on, a log on the device (2 MB, never a pass or token) to copy |
+
+### 9.2 The other kit modules
+
+| Module | Used by | What |
+| --- | --- | --- |
+| `quadra.css` | all | iOS 26's look: system colours, one glass material (`--q-glass`), capsule buttons and chips, sheets, the tab bar, `--q-top`/safe areas, the turned page |
+| `boot.js` | all (synced as `public/boot.js`) | The loading screen; checks the app's and the kit's version.json before the app starts (one reload for both); mends an installed app whose cache mixed versions (once in ten minutes); a way out after 15 s |
+| `brand.mjs` | all, `brand/generate.mjs` | The families, names, colours, lines, marks, repos, `RENAMED`, `DEV` |
+| `pass.mjs` | all | The Quadra Pass sheet |
+| `help.mjs` | all | Every app's guide: what / tabs / particulars / money (`#help=<app>:<topic>`) |
+| `truth.mjs` | all | 真相: the house's real numbers (overround 1.158, the parlay take, cash-out, free bets' worth, tax over NT$5,000, scratch and draw paybacks) and the account's record |
+| `catalog.mjs` | Sports, Play | Every sport and league: `sport`, `kind` (`match`/`field`), `data` (`espn`/`kambi`/`asia`), `bet` (Play's key), `odds`, paths, `standings` |
+| `logos.mjs` | Sports, Play | Team, league, F1 driver and constructor logos and colours (ESPN, NBA.com, TheSportsDB, flags) |
+| `names.mjs` | Sports, Play | Teams in Taiwan's Chinese ([city, nickname] for US leagues); ELTA's titles are matched with them |
+| `photos.mjs` | Sports, Play | A person's studio headshot: ESPN by id or name, the leagues' official photo lists (Shared-Data), TheSportsDB cutouts; never a casual picture; kept two months (none a week) |
+| `sw-images.js` | all service workers | Other sites' pictures in one shared cache, served at once, checked again after a week |
+| `f1live.mjs` | Sports, Play | Which session a feed reading is, whether it's over (qualifying only after its last part), the order as an outcome |
+| `postseason.mjs` | Sports, Play | MLB's postseason from MLB itself |
+| `holidays.mjs` | Class, Weather, Transit | Taiwan's days off and 補班 days |
+| `devconfig.mjs` | Workers | The `DEV` table for the Workers |
+| `stamp.mjs`, `apps.mjs`, `link.mjs`, `loader.html` | build | Publishing and wiring the kit |
+
+## 10. The brand and the renamed repos
+
+`kit/brand.mjs` defines every app's id, name, colours, line, mark (Quadra:
+a square tile with a gold corner; Orbit: a planet, its ring and a moon) and
+repo.
+
+`node brand/generate.mjs [id…|site]` (Playwright's Chromium) writes, for
+each app:
+- the icons: favicon, home screen, Android maskable;
+- the share cards: `share/og.jpg` 1200×630, `square.jpg` 1200×1200,
+  `x.jpg` 1200×600, `story.jpg` 1080×1920;
+- the page's `<!-- brand -->` block and the manifest;
+- and `site/` (the family's page and marks).
+
+**The renamed repos.** `Quadra-Fixtures` is `Orbit-Sports` and `Quadra-Hub`
+is `Orbit-Words` (2026-10-03; `RENAMED` is on, so every app links to the
+new addresses). The old addresses don't answer. To forward them, a repo
+with the old name can serve `tools/moved/index.html` and
+`tools/moved/sw.js`: it sends people on, keeping the `#`, and retires the
+old offline copy.
+
+## 11. Deploying and secrets
+
+**`main` deploys.**
+- `.github/workflows/deploy.yml` runs `wrangler deploy` for both Workers
+  (`wrangler.toml`, `wrangler.sports-proxy.toml`).
+- `pages.yml` publishes the kit and `site/`.
+- Push validated changes straight to `main` after `npm test` passes.
+
+`wrangler deploy` pushes a toml's `[vars]`, KV, Durable Object and trigger
+config as the Worker's whole config. Secrets are never in the repo; they
+are set with `wrangler secret put` or the dashboard.
+
+| Worker | Secret / binding | For |
+| --- | --- | --- |
+| both | `ECO_TOKEN_SECRET` | Signing and checking session tokens |
+| orbit-workers-proxy | `FIREBASE_PROJECT_ID` (var), `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY` | Firestore (the Pass, Kambi's watch, config) |
+| orbit-workers-proxy | `RATE_LIMIT_KV` (KV) | Push lists and keys, Transit's Google meter and TDX token, Weather's daily count, cells and scores; sign-in limits |
+| orbit-workers-proxy | `GEMINI_API_KEY` | `/gemini`, `/nl-edit` |
+| orbit-workers-proxy | `TDX_CLIENT_ID`, `TDX_CLIENT_SECRET`, `GOOGLE_MAPS_BROWSER_KEY`, `GOOGLE_MAPS_KEY` | Transit |
+| orbit-workers-proxy | `GOOGLE_WEATHER_KEY`, `CWA_KEY`, `MOENV_KEY` | Weather |
+| orbit-workers-proxy | `ADMIN_TOKEN_HASH`, `ECO_ADMIN_TOKEN` | The admin panel (the owner's key; Claude never uses it) |
+| sports-proxy | `F1_LOG` (Durable Object `F1Log`, migration `f1-log-1`), cron `* * * * SUN,MON,THU,FRI,SAT` | The F1 lap log |
+| sports-proxy | `ORBIT` (service binding) | The developer settings from `/config` |
+
+Firestore's rules deny all client access (`allow read, write: if false`).
+Only the Worker's service account reads and writes.
+
+## 12. Tools
+
+See `tools/README.md` for every flag.
+
+| Tool | What |
+| --- | --- |
+| `node tools/preview.mjs <app> [hash…]` | The app on an iPhone-sized page, signed in with a made-up wallet, real data. Flags: `--webkit`, `--dark`, `--lang en`, `--full`, `--upgrade <date>` (an installed app updated), `--flaky <share>`, `--reopen`, `--shuffle` (movement after loading), `--live` (through the real Workers' dev doors, the busiest minute printed), `--serve --port 8123` (for the iOS Simulator), `--requests`, `--timing`, `--clock ISO`, `--fixture host/path=file`. It prints console errors, anything wider than the screen, `wraps:` and `cut:` |
+| `node tools/leagues-audit.mjs` | Every catalogue league against its sources today |
+| `node tools/economy.mjs` | The economy on paper, old settings against new |
+| `node tools/espn.mjs <path> [query]` | The shape of an ESPN answer |
+| `node tools/issue-passes.mjs` | Issue passes (the owner) |
+| `node tools/weather-stations.mjs` | Rebuild `weather-stations.js` |
+| `tools/word-audio.py` | Orbit Words' audio |
+
+## 13. Tests
+
+`npm test` (node:test):
+
+| File | What it covers |
+| --- | --- |
+| `eco.test.mjs`, `pass.test.mjs` | The Pass, merges, Plus, VIP, pay, rebases |
+| `money.test.mjs` | The money report |
+| `push.test.mjs` | Push encryption, lists, checks |
+| `sports-proxy.test.mjs`, `final-cache.test.mjs` | Allowlist, trims, batches, cache tiers, the final tier |
+| `f1-live.test.mjs`, `f1live-kit.test.mjs` | F1's feed trim, sessions, the lap log, `kit/f1live.mjs` |
+| `asia-baseball.test.mjs` | NPB, KBO, CPBL parsing |
+| `kambi.test.mjs` | The Kambi watch |
+| `transit.test.mjs` | TDX rules, caps, routes |
+| `weather.test.mjs`, `weather-skill.test.mjs` | The blend and the scoring |
+| `capacity.test.mjs`, `devconfig.test.mjs` | Capacity and settings |
+| `kit.test.mjs`, `kit-css.test.mjs`, `kit-calendar.test.mjs`, `photos.test.mjs` | The kit |
+
+## 14. What depends on what: the change checklist
+
+The family is large enough that a fix in one place misses another. Before
+pushing a change, find its row and check every place it names.
+
+| If you change… | Also check |
+| --- | --- |
+| `kit/catalog.mjs` (a league) | Orbit Sports `lib/leagues.mjs` and `lib/broadcast.mjs` (shown only if on ELTA or Apple TV); Play's `lib/teams.mjs`; Shared-Data `sports.mjs` and `mirror.mjs` (which leagues are built); `tools/leagues-audit.mjs` |
+| `kit/logos.mjs`, `names.mjs`, `photos.mjs` | Both Sports and Play; Shared-Data `official-photos.mjs` (the lists `photos.mjs` reads); `sw-images.js` |
+| `proxyJson`, `packJson`, the mirror | Every app's first paint; Shared-Data `mirror.mjs` (`mirrorPath` must match); the failure hold (TRUTH §4) |
+| A trim in `sports-proxy-worker.js` | Every parser that reads it (Sports, Play), Shared-Data `mirror.mjs` (its copy is trimmed the same way) |
+| A cache tier or `DEV` default | `capacity.js`'s estimates, Shared-Data's `watch.mjs` (dev door), the admin panel |
+| `f1-live.js` (`trimF1Live`, laps) | Orbit Sports (`lib/f1.mjs`, `sheets.js`: live board, 數據, track map, race chance, standings at the flag); Quadra Play (F1 settling, `kit/f1live.mjs`); `tests/f1-live.test.mjs` |
+| `asia-baseball.js` | Sports (CPBL/NPB/KBO lists, box scores), Play (Kambi + these for settling), Shared-Data `cpbl.mjs` and `mirror.mjs` |
+| `eco.js` money rules | The kit's tables (`PLUS`, `VIP`, `WEALTH_RANKS`, `PAY`: the same numbers), `truth.mjs`, `tools/economy.mjs`, `help.mjs`'s money topics, Play and Securities |
+| `push.js` checks | The apps that schedule them: Sports (finals), Securities (prices), Weather (brief, rain), Transit (到站提醒); the kit's `NOTICE_KINDS` |
+| `quadra.css` or the frame | Every app at 375 px, light and dark, WebKit; the status-bar strip rule (TRUTH §6) |
+| `brand.mjs` | `node brand/generate.mjs`, every app's icons and manifest; `RENAMED` links |
+| A table's or result's meaning (sports) | Orbit Sports: `title.mjs` `liveTable`/`roundCounted`, `freshStandings`, the home's race cards; Play's settling |
