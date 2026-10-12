@@ -17,6 +17,7 @@ on:
       - 'kambi.js'
       - 'settle.js'
       - 'price.js'
+      - 'lotto.js'
       - 'kit/**'
       - 'quadra-token.js'
       - 'push.js'

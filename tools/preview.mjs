@@ -516,6 +516,18 @@ await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(?!
   // today's real data with the Worker's own check (price.js); nothing settled.
   if (new URL(req.url()).pathname === '/play') {
     let reply = req.method() === 'GET' ? { settled: {} } : { ok: true };
+    // The lottery as lotto.js sells it (its draw, its prize), on no store.
+    if (body.op === 'tickets') {
+      const { buyTicket } = await import('../kit/play-lottery.mjs');
+      const bottomless = { v: 1, created: '', ledger: [{ id: 'x', amount: 1e12 }], slips: [], tickets: [] };
+      const sold = (body.tickets || []).map(x => buyTicket(bottomless, x, new Date()));
+      reply = sold.some(r => r.error) ? { refused: { problem: sold.find(r => r.error).error } } : { tickets: sold.map(r => r.ticket) };
+    }
+    if (body.op === 'scratch') {
+      const { CARDS, drawPrize } = await import('../kit/play-scratch.mjs');
+      reply = { ticket: { id: body.id, t: new Date().toISOString(), game: `scratch:${body.card}`, card: body.card, cost: CARDS[body.card].price, prize: drawPrize(body.card), seed: Math.floor(Math.random() * 2 ** 31), status: 'open' } };
+    }
+    if (body.op === 'reveal') reply = { prize: 0 };
     // (Cash out: taken at the value asked; the Worker checks it against its own.)
     if (body.op === 'cashout') reply = { cashedOut: Math.floor(body.value) };
     if (body.op === 'place') {

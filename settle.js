@@ -44,6 +44,7 @@
 import { readOutcomes, legResult, applyResults, finalOf, familyOf, LEAGUES } from './kit/settle.mjs';
 import { updateWallet, WALLET_COLLECTION, parseWallet, poolBalance } from './eco.js';
 import { checkSlip, useReads, cashOutQuote, cashOutOk } from './price.js';
+import { handleLotto } from './lotto.js';
 import { watchKambi, KAMBI_COLLECTION } from './kambi.js';
 
 export const OPEN_COLLECTION = 'odds-open';
@@ -213,6 +214,9 @@ export async function handlePlay(request, env, headers, session, deps) {
     const body = await deps.readJsonBody(request);
     if (body === deps.INVALID_BODY || !body || typeof body !== 'object') return errorJson('INVALID_JSON', 400, headers, request);
     const now = deps.now();
+    // The lottery and scratch cards (lotto.js).
+    const lotto = await handleLotto(body, env, account, deps, now, PLACE_SINCE);
+    if (lotto) return json(lotto, 200, headers);
     if (body.op === 'place') {
       // Placed here (the lock-down): every slip checked (price.js), its stake
       // taken from the wallet and the slip watched, all or none.
