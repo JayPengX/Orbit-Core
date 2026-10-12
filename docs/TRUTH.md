@@ -724,3 +724,7 @@ What was decided, so it isn't undone. Newer calls win.
   computed once); Shared-Data keeps Orbit Sports' leagues' whole season (every result, box
   score, link and number, the playoffs too) until the next regular season
   begins, then wipes it whole; its builds add on top of what's built.
+  Quadra Play's slips are settled on the proxy (the Worker reads a game
+  once when it should be over, for every slip on it, pays the wallet and
+  sends the real notice); live stats are separate, read by the phone only
+  while shown.

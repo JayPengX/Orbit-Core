@@ -145,7 +145,7 @@ Failure rules across the layers:
 
 Files: `worker.js` (the router, CORS, Gemini routes, cron), `eco.js`,
 `eco-admin.js`, `money.js`, `capacity.js`, `push.js`, `quadra-token.js`,
-`kambi.js`, `weather.js`, `weather-stations.js`, `weather-skill.js`,
+`kambi.js`, `settle.js`, `weather.js`, `weather-stations.js`, `weather-skill.js`,
 `transit.js`, `locales/`, `wrangler.toml`.
 
 Its placement is pinned to `gcp:asia-east1` (Changhua, Taiwan). Most of its
@@ -161,6 +161,7 @@ that ran it).
 | `POST /gemini` | `worker.js` | Orbit Class's AI import of a timetable photo |
 | `POST /nl-edit` | `worker.js` | Orbit Class's edits in plain language ("move Tuesday's maths to room 302") |
 | `GET/POST /kambi` | `kambi.js` | The last live data of Kambi matches Quadra Play has bets on (§3.1) |
+| `GET/POST /play` | `settle.js` | Quadra Play's slips settled when their games end (§3.1) |
 | `GET/POST /push/…` | `push.js` | Notices while an app is closed (§7) |
 | `GET /weather…` | `weather.js`, `weather-skill.js` | Orbit Weather (§3.2) |
 | `GET /transit/…` | `transit.js` | Orbit Transit (§3.3) |
@@ -176,14 +177,17 @@ gets a dev session on `/transit` (`TRANSIT_DEV`, 300 a minute per address).
 That is how tests and scripts read real data without a pass. Weather has no
 door: it uses its saved fixtures.
 
-**The cron** (`*/2 * * * *`):
+**The cron** (`*/2 * * * *`, the even minutes):
 
 - push notices that are due, every run;
 - Kambi's watched matches, every run;
 - the weather scoring, hourly at :10;
 - the capacity check, every 6 hours at :20.
 
-### 3.1 `/kambi`
+**The odd minutes** (`1-59/2 * * * *`, `SETTLE_CRON`, an invocation of its
+own: its own 50 fetches and CPU): Quadra Play's slips that are due (§3.1).
+
+### 3.1 `/kambi` and `/play`
 
 Kambi (Play's odds feed for Asian baseball, EuroLeague and K League) never
 says "final" in public, and a match's live data disappears hours after it
@@ -198,6 +202,36 @@ ends. A bet whose app isn't opened in that window could never be settled.
 - `GET /kambi?ids=1,2,3` answers `{ results: { id: { live, seen, gone,
   checked, done } } }`. Play settles from this copy the same way it does
   from Kambi's live one.
+
+**`/play` (`settle.js`): Quadra Play's slips settled here** (the owner,
+2026-10-12), whether or not Play is opened. A Play session only.
+
+- `POST /play { op: 'open', slips }`: Play hands over each open slip (its
+  picks, sizes, stake; `cleanSlip` keeps what settling needs, 20 picks and
+  24 KB at most). Kept in Firestore `odds-open/<account>_<slip>` with an
+  index (`odds-open/_index`: each slip's next look, one read a run). Kambi
+  matches on it are watched (`kambi.js watchKambi`).
+- The odd-minute cron (`settleCron`): up to 6 due slips a run, every
+  undecided pick whose game has begun read together (the kit's
+  `readOutcomes`: one read of a game for every slip on it; the Asian
+  leagues' months and F1's archive read in this Worker, as the sports
+  proxy serves them), each pick decided (`legResult`, void three days
+  after a start with no result), the slip settled as Play does
+  (`applyResults`). Not over: what's decided kept, looked at again in 15
+  minutes (a championship every 6 hours). First due: the soonest undecided
+  game's start plus its kind's usual length (`GAME_HOURS`) and 10 minutes.
+- Settled (up to 3 a run): the slip's document taken from `open` to
+  `settling` (updateTime precondition); the wallet paid `odds:payout-<slip>`
+  (and `odds:plus-<slip>`), only when it holds the slip's stake and no
+  payout yet: Play's ledger ids, so it's never paid twice; the record kept
+  in `odds-settled/<account>`; the won / lost notice sent (`push.js
+  notifyNow`, if the phone takes Play's slip notices).
+- `GET /play`: `{ settled: { slipId: { results, finals, settled, payout,
+  at } } }` (a parlay's picks as they're decided, too). `POST { op: 'ack',
+  ids }`: applied by Play, forgotten.
+- `POST { op: 'cashout', id }`: the slip taken from `open` to `cashed`
+  first (the same precondition), `{ ok }`; settled first, `{ settled:
+  record }` and Play applies that instead.
 
 ### 3.2 `/weather`
 

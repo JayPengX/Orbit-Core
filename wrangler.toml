@@ -119,5 +119,6 @@ id = "8b24d75fbe0a4a69aef0f35cb7a8d847"
 enabled = true
 
 # /kambi cron (kambi.js): Kambi matches with open Quadra Play bets, every 2 minutes (one index read when nothing is on).
+# The odd minutes: Quadra Play's slips settled (settle.js, worker.js SETTLE_CRON), an invocation of its own.
 [triggers]
-crons = ["*/2 * * * *"]
+crons = ["*/2 * * * *", "1-59/2 * * * *"]
