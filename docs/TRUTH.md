@@ -333,8 +333,8 @@ On top of them, **apps put live knowledge over slower copies** (§8).
   race's full result, its box score, its watch links, win probability,
   tables, and every player's and team's numbers, the regular season and
   the playoffs alike. It is wiped, all of it at once, only when the next
-  season's regular season has begun (a regular-season game played; its
-  preseason doesn't count). A run that can't tell which season it is
+  season has begun: a game of it played, its preseason's included (the
+  owner's change, 2026-10-12: the gap between seasons is long). A run that can't tell which season it is
   wipes nothing. Each build adds what's new on top of what's built, never
   reads a finished thing again, and reads only for the leagues each app
   shows.
@@ -722,8 +722,8 @@ What was decided, so it isn't undone. Newer calls win.
   end notes on screen; the READMEs document every feature; the apps open
   faster (Weather's location first, Sports' TV lists kept, Play's prices
   computed once); Shared-Data keeps Orbit Sports' leagues' whole season (every result, box
-  score, link and number, the playoffs too) until the next regular season
-  begins, then wipes it whole; its builds add on top of what's built.
+  score, link and number, the playoffs too) until the next season's first
+  game (preseason included, changed the same evening), then wipes it whole; its builds add on top of what's built.
   Quadra Play's slips are settled on the proxy (the Worker reads a game
   once when it should be over, for every slip on it, pays the wallet and
   sends the real notice); live stats are separate, read by the phone only

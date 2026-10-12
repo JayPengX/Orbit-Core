@@ -10,6 +10,45 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
 
 
 
+## Transit: the owner's navigation and planning list of 2026-10-12 evening (pushed to `main`)
+
+1. A tap on the map while navigating closed the trip's card (its way went
+   off the map) and a second tap dropped a pin card over it: taps, marker
+   taps and Google's places open nothing while navigating (a tap pauses the
+   map's following like a drag).
+2. The whole trip shown while navigating: every step in its colours (the
+   one you're on boldest, behind you faint), the rest of the trip from you
+   kept in view (was: the street around you at the step's scale); every
+   step chip whole at the bottom (wrapping; was a sideways row cut at the
+   edge). The pace line shortened so it never cuts (「早到 5 分」).
+3. and 5. Steps move on by where you are (`nav.mjs tripAt`): the next
+   step's way under you catches an end a fix skipped; on a bus or train
+   once its first stop is behind you; a train's station counts within
+   250 m. Started (or reopened) half way, it begins at your step.
+4. 竹東高中 → 成功九街 (the owner's trip at 16:35, replayed):
+   - the router boarded the 六家 train 1758 at 新莊 (the first stop it could
+     be reached, riding 1831 past 竹中 and back): a change is now made at the
+     first station where the next train already calls (`rail.mjs earliest`);
+   - "1831 to 竹中 and ride" was dropped as "the same train" as "1831 to
+     千甲 and ride": the same train left a kilometre or more apart is now two
+     ways (`sameWay`);
+   - the owner's calls in the same round: **no bridge penalty** (rivers are
+     only the way round to a bridge, in the ride's time); **no live YouBike
+     counts in planning** (stations by place; every station is 2.0, 電輔車
+     anywhere; navigation offers 「這站沒車／還車站沒位，換附近的站」 as a tap,
+     never moving the ride by itself); rides' road length no longer counts
+     the way to a bridge twice (OSRM: 竹中 → 綠41公園 5.3 km, ours was 6.1);
+   - new set-aside rules: over the river on the bike before/after a train
+     when a train over it is within 15 min (新竹站 → 成功九街: 竹北 train or
+     快捷9號, not 千甲 + 經國大橋); the same train stayed on for nothing (on to
+     千甲 when off at 竹中 is home first; on to 北新竹 or 新竹 and back up to 竹北
+     when the 六家線 is home first); "beaten" only by the same rides
+     (北新竹 → 竹北 no longer beats 竹中 → 六家); a folded plan folds nothing.
+   - Result: 竹東高中 ★ 1831 → 竹中 → 1758 → 六家; 新竹站 ★ 竹北 train, 快捷9號.
+   Batch (21 trips, old against new): 17 changed, read one by one (Orbit-Transit bd91642).
+- **Ranking rewritten (pushed):** shown-or-folded by comparisons on bother, never a total a point lower; folded ways fold nothing; the owner's verdicts as real-trip tests (`tests/verdicts/`, `scripts/verdict.mjs`), checked again with buses a few minutes off. Add every trip the owner judges. Also: a picked time is per trip; buses caught from when you set out (catchBus); 改搭別班 and missed-it in navigation; a bus between stops on the route sheet.
+- **To be there by a time (pushed):** 成功九街 → 竹東高中 by 08:00 showed two buses only. Now also the 六家線 to 竹中 and on to 竹東 (our trains searched from two hours before the time; the planners leave it out) and riding it all on two bikes (timed to get in by then; never folded as far behind; 每 30 分鐘換車 always on for a TPASS with YouBike). The same last train from another first one is folded (竹北 and a change at 北新竹 for the 1804). Verdict `chenggong-zhudonghs-arrive0800`; `scripts/verdict.mjs --arrive ISO --tpass id`.
+
 ## The owner's second list of 2026-10-11 (pushed to `main`)
 
 - **Admin:** 金流 (money.js: every account's 真相 summed, the system's net,
