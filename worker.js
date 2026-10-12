@@ -24,7 +24,10 @@ import zhTW from './locales/zh-TW.js';
 import { handleEcoRequest } from './eco.js';
 import { readToken, tokenSecret, sessionLimited } from './quadra-token.js';
 import { handleKambiRequest, refreshKambiWatch, fetchKambiLive } from './kambi.js';
-import { handlePush, sendDue } from './push.js';
+import { handlePush, sendDue, notifyNow } from './push.js';
+import { handlePlay, settleCron } from './settle.js';
+import { asiaBaseballResponse, ASIA_HOST } from './asia-baseball.js';
+import { f1LiveResponse, F1_LIVE_HOST } from './f1-live.js';
 import { handleWeather } from './weather.js';
 import { weatherCron, skillReport } from './weather-skill.js';
 import { handleTransit, tally } from './transit.js';
@@ -1199,7 +1202,24 @@ const ECO_DEPS = {
 // /kambi (kambi.js): the same plumbing, and Kambi's live data.
 const KAMBI_DEPS = { ...ECO_DEPS, fsList: firestoreList, fetchLive: fetchKambiLive };
 
+// /play (settle.js): the sources read directly (the Asian leagues' months
+// and F1's archive in this Worker, as the sports proxy serves them), and the
+// notice through push.js.
+async function readSource(url) {
+  try {
+    const u = new URL(url);
+    const res = u.hostname === ASIA_HOST ? await asiaBaseballResponse(u) : u.hostname === F1_LIVE_HOST ? (u.pathname === '/session.json' ? await f1LiveResponse(u) : null) : await fetch(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(8000) });
+    return res?.ok ? await res.json() : null;
+  } catch {
+    return null;
+  }
+}
+const playDeps = env => ({ ...ECO_DEPS, read: readSource, notify: (account, make) => notifyNow(env, account, 'odds', 'slip', make) });
+
 // ==== Routing ================================================================
+
+// wrangler.toml's second cron.
+const SETTLE_CRON = '1-59/2 * * * *';
 
 export default {
   async fetch(request, env, ctx) {
@@ -1242,6 +1262,13 @@ export default {
       const deps = { ...KAMBI_DEPS, rateLimitResponse: async () => (sessionLimited(`k:${session.s}`, 60) ? errorJson('RATE_LIMITED', 429, headers, request) : null) };
       return handleKambiRequest(request, env, headers, ip, deps);
     }
+    // Quadra Play's slips settled here (settle.js): a Quadra Pass session of Play's.
+    if (path === '/play') {
+      const qt = new URL(request.url).searchParams.get('qt');
+      const session = qt ? await readToken(await tokenSecret(env), qt, 'ses') : null;
+      if (session && sessionLimited(`pl:${session.s}`, 30)) return errorJson('RATE_LIMITED', 429, headers, request);
+      return handlePlay(request, env, headers, session, playDeps(env));
+    }
     // Web Push (push.js): here, where the Quadra Pass tokens can be read.
     if (path.startsWith('/push/')) {
       const qt = new URL(request.url).searchParams.get('qt');
@@ -1277,6 +1304,12 @@ export default {
   // and the latest score of each Kambi match Quadra Sportsbook has bets on
   // (kambi.js).
   async scheduled(event, env, ctx) {
+    // Odd minutes: Quadra Play's slips whose games should be over (settle.js),
+    // in an invocation of its own (its own 50 fetches and CPU).
+    if (event.cron === SETTLE_CRON) {
+      if (env.FIREBASE_PROJECT_ID && env.FIREBASE_CLIENT_EMAIL && env.FIREBASE_PRIVATE_KEY) ctx.waitUntil(settleCron(env, playDeps(env)).then(r => r.looked && console.log('play settle', JSON.stringify(r))).catch(e => console.log('play settle failed', String(e))));
+      return;
+    }
     ctx.waitUntil(sendDue(env).then(r => r.sent && console.log('push sent', JSON.stringify(r))));
     // Orbit Weather's scoring, once an hour (weather-skill.js).
     if (new Date(event.scheduledTime || Date.now()).getUTCMinutes() === 10) ctx.waitUntil(weatherCron(env).then(r => console.log('weather skill', JSON.stringify(r))).catch(e => console.log('weather skill failed', String(e))));

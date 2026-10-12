@@ -81,31 +81,38 @@ export async function handleKambiRequest(request, env, headers, ip, deps) {
       if (limited) return limited;
       const body = await deps.readJsonBody(request);
       if (body === deps.INVALID_BODY || !Array.isArray(body?.events)) return errorJson('INVALID_JSON', 400, headers, request);
-      const now = deps.now();
-      const events = body.events
-        .filter(e => validId(e?.id) && Number.isFinite(Date.parse(e?.start)))
-        .filter(e => Date.parse(e.start) > now - WATCH_FOR && Date.parse(e.start) < now + 2 * DAY)
-        .slice(0, MAX_IDS);
-      let added = 0;
-      if (events.length) await addToIndex(env, deps, events);
-      await Promise.all(
-        events.map(async e => {
-          const entry = { id: String(e.id), start: new Date(e.start).toISOString(), live: null, seen: 0, gone: false, checked: 0, done: false };
-          try {
-            // Only if it isn't watched yet: an existing entry keeps its score.
-            await deps.fsWrite(env, KAMBI_COLLECTION, entry.id, JSON.stringify(entry), { exists: false });
-            added++;
-          } catch (error) {
-            if (!error.precondition) throw error;
-          }
-        })
-      );
-      return json({ watching: events.length, added }, 200, headers);
+      const { watching, added } = await watchKambi(env, deps, body.events);
+      return json({ watching, added }, 200, headers);
     }
     return errorJson('SYNC_METHOD_NOT_ALLOWED', 405, headers, request);
   } catch (error) {
     return upstreamFailed(error, headers, request);
   }
+}
+
+// Watches these matches ([{ id, start }]): Play's POST, and the Worker's
+// own settling (settle.js) when a slip on a Kambi match is registered.
+export async function watchKambi(env, deps, list) {
+  const now = deps.now();
+  const events = (Array.isArray(list) ? list : [])
+    .filter(e => validId(e?.id) && Number.isFinite(Date.parse(e?.start)))
+    .filter(e => Date.parse(e.start) > now - WATCH_FOR && Date.parse(e.start) < now + 2 * DAY)
+    .slice(0, MAX_IDS);
+  let added = 0;
+  if (events.length) await addToIndex(env, deps, events);
+  await Promise.all(
+    events.map(async e => {
+      const entry = { id: String(e.id), start: new Date(e.start).toISOString(), live: null, seen: 0, gone: false, checked: 0, done: false };
+      try {
+        // Only if it isn't watched yet: an existing entry keeps its score.
+        await deps.fsWrite(env, KAMBI_COLLECTION, entry.id, JSON.stringify(entry), { exists: false });
+        added++;
+      } catch (error) {
+        if (!error.precondition) throw error;
+      }
+    })
+  );
+  return { watching: events.length, added };
 }
 
 async function readIndex(env, deps) {

@@ -363,3 +363,19 @@ export async function sendDue(env, now = Date.now()) {
   if (changed) await kv.put('push:due', JSON.stringify(due));
   return { sent };
 }
+
+// News the Worker learns itself, told at once to the account's device for
+// `app` (a settled slip, settle.js): `make(lang)` the message. Nothing kept
+// (KV's writes are few), unless the device has unsubscribed.
+export async function notifyNow(env, account, app, kind, make) {
+  const kv = env.RATE_LIMIT_KV;
+  if (!kv) return 'off';
+  const key = recordKey(account, app);
+  const record = await kv.get(key, 'json');
+  if (!record?.sub) return 'none';
+  const prefs = await kv.get(prefsKey(account), 'json').catch(() => null);
+  if (!wanted(prefs, app, { kind })) return 'off';
+  const r = await sendPush(env, record.sub, make(record.lang));
+  if (r === 'gone') await kv.delete(key);
+  return r;
+}
