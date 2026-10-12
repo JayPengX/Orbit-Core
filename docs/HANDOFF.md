@@ -46,12 +46,7 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
      (北新竹 → 竹北 no longer beats 竹中 → 六家); a folded plan folds nothing.
    - Result: 竹東高中 ★ 1831 → 竹中 → 1758 → 六家; 新竹站 ★ 竹北 train, 快捷9號.
    Batch (21 trips, old against new): 17 changed, read one by one (Orbit-Transit bd91642).
-- **Next (the owner said yes):** rewrite the ranking as comparisons a
-  person makes ("about the same ride and changes → home sooner wins"; small
-  things never flip a choice) instead of a sum of points with rules on top,
-  with the owner's verdicts as must-pass cases (today's: 竹中 → 六家 over
-  北新竹 → 竹北 and over the 新莊 detour from 竹東高中; 竹北 train or bus from
-  新竹站; never a bridge ride after a train that could cross).
+- **Ranking rewritten (pushed):** shown-or-folded by comparisons on bother, never a total a point lower; folded ways fold nothing; the owner's verdicts as real-trip tests (`tests/verdicts/`, `scripts/verdict.mjs`), checked again with buses a few minutes off. Add every trip the owner judges. Also: a picked time is per trip; buses caught from when you set out (catchBus); 改搭別班 and missed-it in navigation; a bus between stops on the route sheet.
 
 ## The owner's second list of 2026-10-11 (pushed to `main`)
 
