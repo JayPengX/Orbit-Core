@@ -21,6 +21,11 @@ board, the stops coming in made the top card taller and you ended under it);
 now each draw compares the cards' heights and the map fits again when they
 change (`nav.mjs` → `cards` → `tab-map navView`). Checked in the preview at
 375 px: open and both folded, you between the cards each time.
+- **A slip:** the English 說明 line had a straight apostrophe ("card's") in a
+  single-quoted string: `kit/help.mjs` didn't load (the Pass sheet's `pass.mjs`
+  imports it, in every app). Pushed in c3c5101 with the test run's one failure
+  unread; fixed 46 s later (8597428). Run `npm test` and read it before every
+  kit push; write ’ in the 說明's English.
 
 ## Transit: a stop added on board keeps the ride (2026-10-13, pushed to `main`)
 
