@@ -241,7 +241,13 @@ export async function runCheck(check, lang, env) {
     const rows = Array.isArray(j) ? j : (j && typeof j === 'object' && Object.values(j).find(Array.isArray)) || [];
     const secs = rows
       .filter(r => r.RouteUID === check.bus.route && Number(r.Direction) === check.bus.dir && Number(r.StopStatus || 0) === 0 && r.EstimateTime != null)
-      .map(r => Number(r.EstimateTime))
+      // (From when TDX made the estimate, its DataTime, not from now: an
+      // estimate about a minute old said a bus a minute further off.)
+      .map(r => {
+        const made = Date.parse(r.DataTime || '');
+        const age = Number.isFinite(made) ? Math.min(300, Math.max(0, (Date.now() - made) / 1000)) : 0;
+        return Math.max(0, Number(r.EstimateTime) - age);
+      })
       .filter(Number.isFinite);
     if (!secs.length) return null;
     const sec = Math.min(...secs);
