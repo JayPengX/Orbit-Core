@@ -10,6 +10,23 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
 
 
 
+## Transit: navigation's map by stage, the line under the step whole (2026-10-13, pushed to `main`)
+
+From the owner's screenshot (on the bike to 陽明交通大學(六家校區)):
+- The line under the step ("文興嘉興路口 06:43 到站・早…") was cut with an
+  ellipsis: it now goes on to a second line between its parts (`・`), never
+  cut (TRUTH §10).
+- The map kept the whole rest of the trip in view at every step, too far out
+  on a walk or a short ride; it now shows the stage you're at (`nav.mjs
+  stageView`): walking or riding, you and the rest of that step to where the
+  next starts (never under ~400 m across); waiting, the stop and where the
+  ride goes; on board, the rest of the ride to your stop. The kit's 說明 says so.
+- `scripts/navstate.mjs wenxing` previews the owner's trip. Checked in the
+  preview at 375 px in Chromium (no WebKit in the cloud box): the line whole on
+  two lines, the bike stage close up, waiting and on board framed to the ride.
+  Not yet on a phone. (The screenshot, 06:31, still showed 成功國中: it was
+  taken before the station fix below went out at 06:45.)
+
 ## Transit: the YouBike station behind you (2026-10-13, pushed to `main`)
 
 The owner: 成功九街 → 竹東高中, the ride to the bus at 文興嘉興路口 started at
