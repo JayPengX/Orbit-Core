@@ -10,6 +10,12 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
 
 
 
+## Transit: waiting for the bus, the street itself (2026-10-13, pushed to `main`)
+
+The owner: the stop's close-up wasn't close enough to see which side of the
+road the stop is on. Waiting, `stageView` now frames ~100 m across (was ~400),
+wider only to have you in it too. Checked in the preview at 文興嘉興路口.
+
 ## Transit: navigation's cards fold for more map (2026-10-13, pushed to `main`)
 
 The owner: the map between the two cards was too small. Each card has a grip
