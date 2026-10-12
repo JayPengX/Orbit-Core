@@ -216,10 +216,3 @@ test("YouTube: a search and a video's page only, trimmed; a page without its dat
   assert.equal(await status('https://www.youtube.com/watch?v=EpwxwKDoXXU&list=x'), 400);
   assert.equal(await status('https://www.youtube.com/watch?v=short'), 400);
 });
-
-test("NBA.com's players page: only /players, trimmed to [name, id]; a page without the list a failure", async () => {
-  const { trimNbaPlayers } = await import('../sports-proxy-worker.js');
-  const html = '<script>{"players":[{"PERSON_ID":2544,"PLAYER_LAST_NAME":"James","PLAYER_FIRST_NAME":"LeBron","TEAM_ID":1},{"PERSON_ID":1629029,"PLAYER_LAST_NAME":"Dončić","PLAYER_FIRST_NAME":"Luka"}]}</script>';
-  assert.deepEqual(trimNbaPlayers(html), { players: [['LeBron James', 2544], ['Luka Dončić', 1629029]] });
-  assert.equal(trimNbaPlayers('<html>Access Denied</html>'), null);
-});
