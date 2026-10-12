@@ -10,6 +10,15 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
 
 
 
+## Transit: 「好像已經下車了？」 on board, on the route (2026-10-13, pushed to `main`)
+
+The owner, on the 快捷8號支 by 高鐵新竹站, was asked if they'd got off. Cause:
+"off the ride" was measured from the straight lines between its stops, and
+the route loops round 高鐵新竹站 on roads 250 m and more from them; two fixes
+were enough to ask. Now it's the nearer of those lines and the ride's road as
+drawn on the map (`navlive.mjs offRide`), and it asks only after 45 s off.
+Test on a made-up loop; not yet checked on a phone.
+
 ## Transit: navigation, the owner's second note of 2026-10-13 (pushed to `main`)
 
 1. Waiting for the bus: the map stays close up on you and the stop (not out
