@@ -488,7 +488,16 @@ function ytObject(html, name) {
   const at = text.search(new RegExp(`(?:var |window\\[")${name}"?\\]?\\s*=\\s*\\{`));
   if (at < 0) return null;
   const start = text.indexOf('{', at);
-  // The object ends where its braces close (strings skipped).
+  // Its script ends right after it (`…};</script>`): parsed whole there, no
+  // walking a megabyte of page a character at a time (2026-10-12: that
+  // walk, two searches at once, put the Worker over Cloudflare's limits, 1102).
+  const end = text.indexOf(';</script>', start);
+  if (end > start) {
+    try {
+      return JSON.parse(text.slice(start, end));
+    } catch {}
+  }
+  // Otherwise: where its braces close (strings skipped).
   let depth = 0;
   let quote = '';
   for (let i = start; i < text.length; i++) {
