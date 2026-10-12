@@ -930,6 +930,9 @@ function sheetSwipe() {
       if (!dragging) {
         // Up, or sideways: not a swipe down (the sheet scrolls, the list slides).
         if (y < -4 || Math.abs(x) > Math.abs(y) + 4) return void (sheet = null);
+        // Downward from the first move on, the finger is the sheet's: left
+        // alone below 8 px, Safari began scrolling the page behind with it.
+        if (y > 0 && y >= Math.abs(x) && e.cancelable) e.preventDefault();
         if (y < 8) return;
         dragging = true;
       }
