@@ -164,22 +164,28 @@ test('a game never found is void three days after its start', async () => {
   assert.equal(doc(WALLET_COLLECTION, ACCOUNT).entries.find(e => e.id === 'odds:payout-slipwin01').amount, 100);
 });
 
-test('cash out and settling never both happen', async () => {
+test('cash out: the value checked against the house\'s, paid by the Worker; never with settling', async () => {
   const now = { t: Date.parse('2026-10-10T21:00:00Z') };
   const { store, deps, doc } = setup(now);
   wallet(store, [{ id: 'odds:stake-slipwin01', t: 1, app: 'odds', kind: 'stake', amount: -100 }, { id: 'odds:stake-slipwin02', t: 1, app: 'odds', kind: 'stake', amount: -100 }]);
   await post(deps, { op: 'open', slips: [slip('slipwin01', [leg('home')]), slip('slipwin02', [leg('home')])] });
-  // Cashed out before the end: never settled.
-  assert.deepEqual((await post(deps, { op: 'cashout', id: 'slipwin01' })).body, { ok: true });
+  deps.cashOutQuote = async () => ({ value: 120, reason: '' });
+  // More than the house's value now: refused, with the house's.
+  assert.deepEqual((await post(deps, { op: 'cashout', id: 'slipwin01', value: 150 })).body, { refused: { problem: 'moved', value: 120, reason: '' } });
+  // At it: cashed out, paid once by the Worker, never settled after.
+  const r = await post(deps, { op: 'cashout', id: 'slipwin01', value: 120 });
+  assert.equal(r.body.cashedOut, 120);
+  const paid = doc(WALLET_COLLECTION, ACCOUNT).entries.filter(e => e.id === 'odds:payout-slipwin01');
+  assert.deepEqual(paid.map(e => [e.kind, e.amount]), [['cashout', 120]]);
+  assert.equal(doc(SETTLED_COLLECTION, ACCOUNT).slips.slipwin01.cashedOut, true);
   now.t = Date.parse(START) + 4 * 3_600_000;
   await settleCron(env, deps);
-  assert.ok(!doc(WALLET_COLLECTION, ACCOUNT).entries.some(e => e.id === 'odds:payout-slipwin01'));
-  assert.equal(doc(SETTLED_COLLECTION, ACCOUNT).slips.slipwin01, undefined);
+  assert.equal(doc(WALLET_COLLECTION, ACCOUNT).entries.filter(e => e.id === 'odds:payout-slipwin01').length, 1);
   // Settled first: the cash out gets the result instead.
-  const late = await post(deps, { op: 'cashout', id: 'slipwin02' });
+  const late = await post(deps, { op: 'cashout', id: 'slipwin02', value: 120 });
   assert.equal(late.body.settled.payout, 180);
-  // A slip never registered (an older Play): cash out goes ahead.
-  assert.deepEqual((await post(deps, { op: 'cashout', id: 'neverseen1' })).body, { ok: true });
+  // A slip the Worker never watched: no cash out.
+  assert.equal((await post(deps, { op: 'cashout', id: 'neverseen1', value: 50 })).body.refused.problem, 'unknown');
 });
 
 test('only a Play session, and only sane slips', async () => {

@@ -25,7 +25,8 @@
 // result instead).
 //
 //   POST /play?qt=T { op: 'open', slips: [slip…] }   watch these slips
-//   POST /play?qt=T { op: 'cashout', id }            { ok } or { settled: record }
+//   POST /play?qt=T { op: 'cashout', id, value }     { cashedOut, wallet } or { settled: record }
+//                      or { refused: { problem: 'moved', value } } (the house's value now, null: paused)
 //   POST /play?qt=T { op: 'ack', ids }               records Play has applied
 //   GET  /play?qt=T                                  { settled: { id: record } }
 //   POST /play?qt=T { op: 'place', slips: [slip…] }  { placed: [id…], wallet } or
@@ -42,7 +43,7 @@
 
 import { readOutcomes, legResult, applyResults, finalOf, familyOf, LEAGUES } from './kit/settle.mjs';
 import { updateWallet, WALLET_COLLECTION, parseWallet, poolBalance } from './eco.js';
-import { checkSlip, useReads } from './price.js';
+import { checkSlip, useReads, cashOutQuote, cashOutOk } from './price.js';
 import { watchKambi, KAMBI_COLLECTION } from './kambi.js';
 
 export const OPEN_COLLECTION = 'odds-open';
@@ -252,28 +253,38 @@ export async function handlePlay(request, env, headers, session, deps) {
       return json({ watching: slips.length, added }, 200, headers);
     }
     if (body.op === 'cashout') {
+      // Cashed out here: the value checked against the house's own now
+      // (price.js cashOutQuote), the slip taken from 'open' (never settled
+      // too), the payout written by the Worker (the ledger's id, kind
+      // 'cashout'). Settled first: its result stands.
       const id = String(body.id || '');
+      const asked = Math.floor(Number(body.value));
       if (!SLIP_ID.test(id)) return errorJson('INVALID_JSON', 400, headers, request);
       const key = keyOf(account, id);
       for (let attempt = 0; attempt < 3; attempt++) {
         const doc = await deps.fsGet(env, OPEN_COLLECTION, key);
         const open = doc.exists ? parse(doc.payload) : null;
         if (!open || open.state !== 'open') {
-          // Settled (or being settled) first: its result stands.
           const records = await deps.fsGet(env, SETTLED_COLLECTION, account);
           const record = (records.exists && parse(records.payload)?.slips?.[id]) || null;
           if (record?.settled || open?.state === 'settling') return json({ settled: record || { settled: true, pending: true } }, 200, headers);
-          return json({ ok: true }, 200, headers);
+          return json({ refused: { problem: 'unknown' } }, 200, headers);
         }
+        const wdoc = await deps.fsGet(env, WALLET_COLLECTION, account);
+        const wallet = wdoc.exists ? parseWallet(wdoc.payload) : null;
+        const quote = await (deps.cashOutQuote || cashOutQuote)(open.slip, wallet, deps.prices, new Date(now));
+        if (!cashOutOk(asked, quote.value)) return json({ refused: { problem: 'moved', value: quote.value, reason: quote.reason || '' } }, 200, headers);
         try {
-          await deps.fsWrite(env, OPEN_COLLECTION, key, JSON.stringify({ ...open, state: 'cashed', at: now }), { updateTime: doc.updateTime });
+          await deps.fsWrite(env, OPEN_COLLECTION, key, JSON.stringify({ ...open, state: 'cashed', at: now, value: asked }), { updateTime: doc.updateTime });
         } catch (error) {
           if (error.precondition) continue;
           throw error;
         }
+        const paid = await updateWallet(env, deps, account, w => (w.entries.some(e => e.id === `odds:payout-${id}`) ? w : { ...w, entries: [...w.entries, { id: `odds:payout-${id}`, t: now, app: 'odds', kind: 'cashout', amount: asked }] }));
+        await changeRecords(env, deps, account, records => ({ ...records, [id]: { ...recordOf(open.slip, now), settled: true, cashedOut: true, payout: asked } }));
         await deps.fsDelete(env, OPEN_COLLECTION, key).catch(() => {});
         await changeIndex(env, deps, index => (key in index.due ? { ...index, due: Object.fromEntries(Object.entries(index.due).filter(([k]) => k !== key)) } : index)).catch(() => {});
-        return json({ ok: true }, 200, headers);
+        return json({ cashedOut: asked, wallet: paid?.wallet }, 200, headers);
       }
       return errorJson('RATE_LIMITED', 429, headers, request);
     }
