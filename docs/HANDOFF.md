@@ -10,6 +10,12 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
 
 
 
+## Transit: done steps can't be tapped (2026-10-13, pushed to `main`)
+
+The owner tapped a faded (done) step chip and was taken back to it, the map
+too. The chips behind you are now disabled (no `data-nav-go`, `pointer-events:
+none`, and `go` refuses a step behind you). Checked in the preview.
+
 ## Transit: waiting for the bus, the street itself (2026-10-13, pushed to `main`)
 
 The owner: the stop's close-up wasn't close enough to see which side of the
