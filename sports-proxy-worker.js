@@ -497,7 +497,11 @@ function ytObject(html, name) {
       return JSON.parse(text.slice(start, end));
     } catch {}
   }
-  // Otherwise: where its braces close (strings skipped).
+  return objectAt(text, start);
+}
+// The JSON object starting at `start` ('{'), parsed where its braces close
+// (strings skipped); null when it doesn't parse.
+function objectAt(text, start) {
   let depth = 0;
   let quote = '';
   for (let i = start; i < text.length; i++) {
@@ -517,6 +521,23 @@ function ytObject(html, name) {
   }
   return null;
 }
+// A search page's first videos (each `"videoRenderer":{…}`, in the page's
+// order), each parsed alone: a few kilobytes each, not the megabyte of
+// ytInitialData whole (the Worker's CPU: sustained searches still met
+// Cloudflare's limit, 1102, with the whole object parsed). Null without
+// ytInitialData (a consent or robot page).
+function ytVideoRenderers(html, most = 40) {
+  const text = String(html || '');
+  const from = text.search(/(?:var |window\[")ytInitialData"?\]?\s*=\s*\{/);
+  if (from < 0) return null;
+  const key = '"videoRenderer":{';
+  const out = [];
+  for (let at = text.indexOf(key, from); at >= 0 && out.length < most; at = text.indexOf(key, at + key.length)) {
+    const v = objectAt(text, at + key.length - 1);
+    if (v) out.push(v);
+  }
+  return out;
+}
 function* ytFind(node, key, depth = 0) {
   if (!node || typeof node !== 'object' || depth > 40) return;
   if (Array.isArray(node)) {
@@ -532,10 +553,16 @@ const ytText = t => (t?.simpleText ?? (t?.runs || []).map(r => r.text || '').joi
 // page has none of its data (a consent or robot page: a failure, not kept).
 const TRIM_YT_SEARCH = 'ytsearch';
 export function trimYtSearch(html) {
-  const data = ytObject(html, 'ytInitialData');
-  if (!data) return null;
+  let found = ytVideoRenderers(html);
+  if (!found) return null;
+  // (None found that way: the whole object, as it was read before.)
+  if (!found.length) {
+    const data = ytObject(html, 'ytInitialData');
+    if (!data) return null;
+    found = ytFind(data, 'videoRenderer');
+  }
   const videos = [];
-  for (const v of ytFind(data, 'videoRenderer')) {
+  for (const v of found) {
     if (!v?.videoId || videos.some(x => x.id === v.videoId)) continue;
     const owner = v.ownerText?.runs?.[0] || v.longBylineText?.runs?.[0] || {};
     const badges = (v.ownerBadges || []).map(b => b.metadataBadgeRenderer?.style || '');
