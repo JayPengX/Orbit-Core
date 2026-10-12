@@ -3,11 +3,11 @@
 // games end (settle.js). Pure: a pick's result from its game's outcome, and
 // a slip paid once every pick is decided (the ledger's fixed ids,
 // 'payout-<slip>', so the phone and the Worker can never pay it twice).
-import { CATALOG, familyOfSport, asiaMonth, asiaMonthOf } from './catalog.mjs';
-import { f1Driver, normalizeTeamName } from './logos.mjs';
-import { f1Outcome } from './f1live.mjs';
-import { settleSlip } from './play-odds.mjs';
-import { propResult, propOutcome } from './play-props.mjs';
+import { CATALOG, familyOfSport, asiaMonth, asiaMonthOf } from '#kit/catalog.mjs';
+import { f1Driver, normalizeTeamName } from '#kit/logos.mjs';
+import { f1Outcome } from '#kit/f1live.mjs';
+import { settleSlip } from '#kit/play-odds.mjs';
+import { propResult, propOutcome } from '#kit/play-props.mjs';
 
 // Every league Play sells, from the shared catalogue: its kind of markets
 // (family) and where its games and odds come from: an ESPN `path` (its
