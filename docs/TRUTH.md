@@ -327,10 +327,15 @@ On top of them, **apps put live knowledge over slower copies** (§8).
   or win probability line, last season's playoffs) is weighed against
   Shared-Data before it goes through the proxy: a season pack, the mirror
   or a pack of its own (as `winprob/`) built at night, read once by
-  everyone. Shared-Data keeps only what an app can still show (its
-  league's season now; before the next regular season, the last playoffs
-  and numbers), carries what can't change from the published site instead
-  of reading it again, and reads only for the leagues each app shows.
+  everyone. Shared-Data keeps a league's season whole: every game's and
+  race's full result, its box score, its watch links, win probability,
+  tables, and every player's and team's numbers, the regular season and
+  the playoffs alike. It is wiped, all of it at once, only when the next
+  season's regular season has begun (a regular-season game played; its
+  preseason doesn't count). A run that can't tell which season it is
+  wipes nothing. Each build adds what's new on top of what's built, never
+  reads a finished thing again, and reads only for the leagues each app
+  shows.
 - **Save the proxy, the APIs and Firebase quota.** Use the kit's
   `proxyJson` (batched, cached in memory and on the device, failures held a
   minute). Read what's needed when it's needed. Keep built plans and boards
@@ -714,4 +719,6 @@ What was decided, so it isn't undone. Newer calls win.
 - 2026-10-12: results count at once on every page with a table; no back
   end notes on screen; the READMEs document every feature; the apps open
   faster (Weather's location first, Sports' TV lists kept, Play's prices
-  computed once).
+  computed once); Shared-Data keeps a whole season (every result, box
+  score, link and number, the playoffs too) until the next regular season
+  begins, then wipes it whole; its builds add on top of what's built.
