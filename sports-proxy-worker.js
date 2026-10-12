@@ -69,6 +69,10 @@ const ELTA_VOD_HOST = 'eltaott.tv';
 // official video itself (Orbit Sports' highlights row), only those two pages,
 // each trimmed to a few fields.
 const YT_HOST = 'www.youtube.com';
+// NBA.com's list of players (only /players, trimmed to [name, id]): Shared-Data's
+// nightly NBA photos (sports/nba/photos.json), NBA.com refusing GitHub's
+// runners since 2026-10-08 (403).
+const NBA_HOST = 'www.nba.com';
 const SPORTS_PROXY_FETCH_USER_AGENT = 'Orbit-Sports-Bot/1.0 (+https://github.com/JayPengX/Orbit-Sports)';
 const SPORTS_PROXY_ALLOWED_HOSTS = [
   'site.api.espn.com',
@@ -101,6 +105,7 @@ const SPORTS_PROXY_ALLOWED_HOSTS = [
   ELTA_HOST,
   ELTA_VOD_HOST,
   F1_HOST,
+  NBA_HOST,
   YT_HOST,
   // Not a real host: Asian baseball's schedules and scores, gathered by this
   // Worker from the leagues' own sites (asia-baseball.js).
@@ -303,6 +308,7 @@ function cachePolicyFor(url) {
     case ELTA_HOST:
     case ELTA_VOD_HOST:
     case F1_HOST:
+    case NBA_HOST:
       return CACHE_STANDINGS;
     case YT_HOST:
       return url.pathname === '/watch' ? CACHE_YT_VIDEO : CACHE_YT_SEARCH;
@@ -579,6 +585,13 @@ export function trimYtSearch(html) {
   }
   return { videos };
 }
+// NBA.com's players page: { players: [[name, id]] } (its list as the page
+// carries it), null when it has none (a refusal page: a failure, not kept).
+const TRIM_NBA_PLAYERS = 'nbaplayers';
+export function trimNbaPlayers(html) {
+  const players = [...String(html || '').matchAll(/"PERSON_ID":(\d+),"PLAYER_LAST_NAME":"([^"]*)","PLAYER_FIRST_NAME":"([^"]*)"/g)].map(([, id, last, first]) => [`${first} ${last}`.trim(), Number(id)]);
+  return players.length ? { players } : null;
+}
 // A video's page: whether it plays in Taiwan (its list of countries; null
 // when the page doesn't say), when it went up, its channel. Null without
 // the page's data.
@@ -763,7 +776,7 @@ async function fetchUpstream(upstreamUrl, trim) {
         ? await translateUpstream(upstreamUrl)
         : await fetch(upstreamUrl.toString(), {
           // YouTube in English, past its cookie notice, as a browser sees it.
-          headers: upstreamUrl.hostname === YT_HOST ? { 'User-Agent': BROWSER_UA, 'Accept-Language': 'en-US,en;q=0.9', Cookie: 'SOCS=CAI; CONSENT=YES+' } : { 'User-Agent': SPORTS_PROXY_FETCH_USER_AGENT },
+          headers: upstreamUrl.hostname === YT_HOST ? { 'User-Agent': BROWSER_UA, 'Accept-Language': 'en-US,en;q=0.9', Cookie: 'SOCS=CAI; CONSENT=YES+' } : upstreamUrl.hostname === NBA_HOST ? { 'User-Agent': BROWSER_UA, Accept: 'text/html', 'Accept-Language': 'en-US,en;q=0.9' } : { 'User-Agent': SPORTS_PROXY_FETCH_USER_AGENT },
           signal: AbortSignal.timeout(SPORTS_PROXY_UPSTREAM_TIMEOUT_MS)
         });
   } catch (error) {
@@ -779,6 +792,10 @@ async function fetchUpstream(upstreamUrl, trim) {
     if (trim === TRIM_ELTA_VOD) return { status: 200, contentType: 'application/json', body: JSON.stringify(trimEltaVod(new TextDecoder().decode(body))) };
     if (trim === TRIM_YT_SEARCH || trim === TRIM_YT_VIDEO) {
       const out = (trim === TRIM_YT_SEARCH ? trimYtSearch : trimYtVideo)(new TextDecoder().decode(body));
+      return out ? { status: 200, contentType: 'application/json', body: JSON.stringify(out) } : { status: 502, contentType: 'application/json', body: '' };
+    }
+    if (trim === TRIM_NBA_PLAYERS) {
+      const out = trimNbaPlayers(new TextDecoder().decode(body));
       return out ? { status: 200, contentType: 'application/json', body: JSON.stringify(out) } : { status: 502, contentType: 'application/json', body: '' };
     }
     if (trim === TRIM_F1PAGE) return { status: 200, contentType: 'application/json', body: JSON.stringify(trimF1Page(new TextDecoder().decode(body))) };
@@ -838,6 +855,7 @@ function cacheEntry(result, policy) {
 function trimFor(trimParam, upstreamUrl) {
   if (upstreamUrl.hostname === ELTA_HOST) return TRIM_ELTA;
   if (upstreamUrl.hostname === F1_HOST) return TRIM_F1PAGE;
+  if (upstreamUrl.hostname === NBA_HOST) return TRIM_NBA_PLAYERS;
   if (upstreamUrl.hostname === ELTA_VOD_HOST) return TRIM_ELTA_VOD;
   if (upstreamUrl.hostname === YT_HOST) return upstreamUrl.pathname === '/watch' ? TRIM_YT_VIDEO : TRIM_YT_SEARCH;
   if (trimParam === TRIM_POLYMARKET_EVENTS && upstreamUrl.hostname === 'gamma-api.polymarket.com' && upstreamUrl.pathname === '/events') return TRIM_POLYMARKET_EVENTS;
@@ -860,6 +878,7 @@ function parseTarget(target) {
     // A search (its words, in English as seen from Taiwan) or a video's page, nothing else.
     if (u.hostname === YT_HOST && !(u.pathname === '/results' ? [...u.searchParams.keys()].every(k => ['search_query', 'hl', 'gl'].includes(k)) && (u.searchParams.get('search_query') || '').length > 0 && (u.searchParams.get('search_query') || '').length <= 200 : u.pathname === '/watch' && [...u.searchParams.keys()].join() === 'v' && /^[\w-]{11}$/.test(u.searchParams.get('v')))) return null;
     if (u.hostname === F1_HOST && !/^\/en\/(drivers|teams)\/[a-z-]+$/.test(u.pathname)) return null;
+    if (u.hostname === NBA_HOST && (u.pathname !== '/players' || u.search)) return null;
     return u.protocol === 'https:' && SPORTS_PROXY_ALLOWED_HOSTS.includes(u.hostname) ? u : null;
   } catch {
     return null;
