@@ -728,3 +728,9 @@ What was decided, so it isn't undone. Newer calls win.
   once when it should be over, for every slip on it, pays the wallet and
   sends the real notice); live stats are separate, read by the phone only
   while shown.
+  The money is the proxy's to add (later the same day): the phone prices
+  Play's board, the Worker checks every bet's price and is the only one
+  paying anything into the pass (bets, cash out, lottery, scratch cards);
+  Securities' orders are filled and its cash counted by the Worker. Pricing
+  the whole board on the proxy was measured and dropped (the free plan's
+  10 ms a call; no paid plan).
