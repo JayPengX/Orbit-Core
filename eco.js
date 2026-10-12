@@ -413,6 +413,23 @@ function cleanStamped(map, maxKeys, maxValue) {
   return out;
 }
 
+// The lock-down (the owner, 2026-10-12): no app adds money to the pool; this
+// Worker does (Play's payouts, cash outs and prizes: settle.js, lotto.js).
+// An app's entries are what it spends (0 or less). The one exception: a Play
+// slip from before the lock-down whose picks every device lost, refunded once
+// (its stake back, refundLost), as long as the Worker never paid it.
+export const LOCK_SINCE = Date.parse('2026-10-12T09:00:00Z');
+export function appEntries(entries, wallet) {
+  const have = new Map((wallet?.entries || []).map(e => [e.id, e]));
+  return entries.filter(e => {
+    if (e.amount <= 0) return true;
+    if (e.app !== 'odds' || e.kind !== 'refund') return false;
+    const slip = /^odds:refund-(.+)$/.exec(e.id)?.[1];
+    const stake = slip ? have.get(`odds:stake-${slip}`) : null;
+    return Boolean(stake && stake.t < LOCK_SINCE && Math.abs(e.amount + stake.amount) < 0.01 && !have.has(`odds:payout-${slip}`));
+  });
+}
+
 // What a client may send to change the wallet.
 export function cleanPatch(patch) {
   if (!isObj(patch)) return { entries: [], snap: {}, settings: {} };
@@ -582,7 +599,8 @@ export async function handleEcoRequest(request, env, headers, ip, deps) {
           if (!isActive(w, claims)) return (refused = 'ECO_SESSION_MOVED'), w;
           // What falls due with the write comes with it (fixed ids: never
           // twice): the welcome bonus bet right after a first bet.
-          const merged = mergeWallet(w, cleanPatch(body.wallet));
+          const patch = cleanPatch(body.wallet);
+          const merged = mergeWallet(w, { ...patch, entries: appEntries(patch.entries, w) });
           return touchApp(mergeWallet(merged, { entries: paydayEntries(merged, now) }), app, now);
         },
         { skipIf: () => refused }
