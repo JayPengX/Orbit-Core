@@ -10,6 +10,26 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
 
 
 
+## Transit: the YouBike station behind you (2026-10-13, pushed to `main`)
+
+The owner: 成功九街 → 竹東高中, the ride to the bus at 文興嘉興路口 started at
+成功國中, not 綠41公園 ("more smooth"). Cause: the station was picked by walk
+plus ride time only, so from the north half of 成功九街 (成功國中 ~90 m behind,
+綠41公園 ~220 m on the way) going back past the door was ~50 s "quicker".
+Now (`plan.mjs bestStation`) a station behind you counts the ground walked
+out and ridden back as lost twice at walking pace, and a walk past 5 minutes
+is slow going as in the score (`slowWalk`, one rule for both): 綠41公園 from
+the whole street but its west end at 成功國中's door; the ride to 六家 too;
+竹東街上 keeps its 2-minute station (a first try sent it on an 8-minute walk).
+Also: the 快捷8號支 way that ends by bike (off at 台北榮總) walked 16 minutes
+to 文興嘉興路口 while a bike to the stop was there: a change gone at the end
+now also gets the bike to the first bus (`withBikes`). Verdict
+`chenggong-zhudonghs-0645`; the trip is in `live.mjs`'s batch (成功九街北).
+Batch (22 trips, old against new): the station moves on the same rule (新竹站
+→ 清大 from 新竹轉運站, on the way; 巨城 left at SOGO, before it; 成功九街北),
+竹東站 → 縣體育場 by bike to the 快捷8號支 at 竹東 and on by bike from
+文興嘉興路口 (3 min sooner); the rest live data (each re-run alone).
+
 ## Transit: the owner's navigation and planning list of 2026-10-12 evening (pushed to `main`)
 
 1. A tap on the map while navigating closed the trip's card (its way went
