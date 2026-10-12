@@ -10,6 +10,18 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
 
 
 
+## Transit: navigation's cards fold for more map (2026-10-13, pushed to `main`)
+
+The owner: the map between the two cards was too small. Each card has a grip
+(the plan card's look): a tap, or a swipe (top up, bottom down), folds it;
+folded, the top is its step and the line under it, the bottom the arrival
+row, ⋯ and 結束; kept on the device (`ot.nav.fold`). Found on the way: the map
+was fitted before the cards were drawn and not again until you moved (on
+board, the stops coming in made the top card taller and you ended under it);
+now each draw compares the cards' heights and the map fits again when they
+change (`nav.mjs` → `cards` → `tab-map navView`). Checked in the preview at
+375 px: open and both folded, you between the cards each time.
+
 ## Transit: a stop added on board keeps the ride (2026-10-13, pushed to `main`)
 
 The owner: 先去別的地方 while navigating started a new plan from here, no use
