@@ -120,16 +120,15 @@ test('never paid twice: Play paid it first, or the run is repeated', async () =>
   assert.equal(doc(WALLET_COLLECTION, ACCOUNT).entries.filter(e => e.id.startsWith('odds:payout')).length, 1);
 });
 
-test('nothing is paid for a slip the wallet has no stake for', async () => {
+test('a slip with no stake in the wallet is never watched, so never paid', async () => {
   const now = { t: Date.parse(START) + 4 * 3_600_000 };
   const { store, deps, doc } = setup(now);
   wallet(store, []);
-  await post(deps, { op: 'open', slips: [slip('slipwin01', [leg('home')])] });
+  assert.equal((await post(deps, { op: 'open', slips: [slip('slipwin01', [leg('home')])] })).body.added, 0);
   now.t += 3_600_000;
   await settleCron(env, deps);
   assert.equal(doc(WALLET_COLLECTION, ACCOUNT).entries.length, 0);
-  // Play still gets the result (and pays it from its own ledger).
-  assert.deepEqual(doc(SETTLED_COLLECTION, ACCOUNT).slips.slipwin01.results, ['won']);
+  assert.equal(doc(SETTLED_COLLECTION, ACCOUNT), null);
 });
 
 test('a game not over is looked at again later; a parlay with a pick lost settles at once', async () => {
@@ -197,4 +196,46 @@ test('a slip is looked at when its soonest undecided game should be over', () =>
   const s = slip('slipwin01', [leg('home'), { ...leg('home'), sport: 'epl', start: '2026-10-11T14:00:00Z' }]);
   assert.equal(nextLook(s, now), Date.parse(START) + 3.3 * 3_600_000 + 10 * 60_000);
   assert.equal(nextLook({ ...s, legs: [{ ...s.legs[0], result: 'won' }, s.legs[1]] }, now), Date.parse('2026-10-11T14:00:00Z') + 2.1 * 3_600_000 + 10 * 60_000);
+});
+
+test('a slip is placed through the Worker: checked, its stake taken, watched; all or none', async () => {
+  const now = { t: Date.parse('2026-10-13T20:00:00Z') };
+  const { store, deps, doc } = setup(now);
+  wallet(store, [{ id: 'eco:start', t: 1, app: 'eco', kind: 'start', amount: 1000 }]);
+  const checked = [];
+  deps.checkSlip = async slip => (checked.push(slip.id), slip.id === 'badprice01' ? { problem: 'moved', moved: [{ id: slip.legs[0].id, odds: 1.7 }] } : { ok: true });
+  const later = { ...leg('home'), start: '2026-10-14T23:10:00Z' };
+  const r = await post(deps, { op: 'place', slips: [slip('slipwin01', [later]), slip('slipwin02', [later])] });
+  assert.deepEqual(r.body.placed, ['slipwin01', 'slipwin02']);
+  const w = doc(WALLET_COLLECTION, ACCOUNT);
+  assert.equal(w.entries.filter(e => e.kind === 'stake').reduce((s, e) => s + e.amount, 0), -200);
+  assert.ok(doc(OPEN_COLLECTION, `${ACCOUNT}_slipwin01`));
+  // Placed again: refused, nothing taken twice.
+  assert.equal((await post(deps, { op: 'place', slips: [slip('slipwin01', [later])] })).body.refused.problem, 'placed');
+  // A price better than the house's: the house's price back, nothing taken.
+  const bad = await post(deps, { op: 'place', slips: [slip('slipwin03', [later]), slip('badprice01', [later])] });
+  assert.equal(bad.body.refused.problem, 'moved');
+  assert.equal(bad.body.refused.moved[0].odds, 1.7);
+  assert.ok(!doc(WALLET_COLLECTION, ACCOUNT).entries.some(e => e.id === 'odds:stake-slipwin03'));
+  assert.equal(doc(OPEN_COLLECTION, `${ACCOUNT}_slipwin03`), null);
+  // More than the pool holds: refused.
+  assert.equal((await post(deps, { op: 'place', slips: [slip('bigslip001', [later], { stake: 5000, cost: 5000 })] })).body.refused.problem, 'funds');
+});
+
+test('a slip staked after the lock-down is never watched by op open (only placed ones are)', async () => {
+  const now = { t: Date.parse('2026-10-13T20:00:00Z') };
+  const { store, deps, doc } = setup(now);
+  wallet(store, [{ id: 'odds:stake-sneaky0001', t: now.t, app: 'odds', kind: 'stake', amount: -100 }]);
+  const r = await post(deps, { op: 'open', slips: [slip('sneaky0001', [leg('home')])] });
+  assert.equal(r.body.added, 0);
+  assert.equal(doc(OPEN_COLLECTION, `${ACCOUNT}_sneaky0001`), null);
+});
+
+test('the dev door checks a slip\'s prices and places nothing; without it, no pass, no answer', async () => {
+  const { deps, doc } = setup({ t: Date.parse('2026-10-13T20:00:00Z') });
+  deps.checkSlip = async () => ({ ok: true });
+  const ask = d => handlePlay({ method: 'POST', body: { op: 'check', slips: [slip('slipwin01', [leg('home')])] } }, env, {}, null, d);
+  assert.deepEqual((await ask({ ...deps, dev: true })).body, { checked: [{ ok: true }] });
+  assert.equal(doc(OPEN_COLLECTION, OPEN_INDEX), null);
+  assert.equal((await ask(deps)).status, 401);
 });

@@ -22,7 +22,7 @@
 import en from './locales/en.js';
 import zhTW from './locales/zh-TW.js';
 import { handleEcoRequest } from './eco.js';
-import { readToken, tokenSecret, sessionLimited } from './quadra-token.js';
+import { readToken, tokenSecret, signToken, sessionLimited } from './quadra-token.js';
 import { handleKambiRequest, refreshKambiWatch, fetchKambiLive } from './kambi.js';
 import { handlePush, sendDue, notifyNow } from './push.js';
 import { handlePlay, settleCron } from './settle.js';
@@ -1214,7 +1214,30 @@ async function readSource(url) {
     return null;
   }
 }
-const playDeps = env => ({ ...ECO_DEPS, read: readSource, notify: (account, make) => notifyNow(env, account, 'odds', 'slip', make) });
+// A placed slip's prices are read as Play reads them: through the sports
+// proxy (its cache and trims; the SPORTS binding, with a short session of
+// this Worker's own), the nightly packs from Shared-Data's Pages.
+let priceToken = { value: '', until: 0 };
+async function sportsToken(env) {
+  if (priceToken.until > Date.now() + 60_000) return priceToken.value;
+  const until = Date.now() + 10 * 60_000;
+  priceToken = { value: await signToken(await tokenSecret(env), { k: 'ses', s: 'worker:price', a: 'odds', d: 'worker', g: 0, e: until }), until };
+  return priceToken.value;
+}
+const priceReads = env => ({
+  read: async (url, trim = '') => {
+    const ask = `https://sports-proxy.pengzjay.workers.dev/sports-proxy?url=${encodeURIComponent(url)}&app=odds${trim ? `&trim=${encodeURIComponent(trim)}` : ''}&qt=${encodeURIComponent(await sportsToken(env))}`;
+    const res = await (env.SPORTS ? env.SPORTS.fetch(ask) : fetch(ask));
+    if (!res.ok) throw new Error(`proxy ${res.status}`);
+    return res.json();
+  },
+  pack: async path => {
+    const res = await fetch(`https://jaypengx.github.io/Shared-Data/${path}`, { signal: AbortSignal.timeout(15_000) });
+    if (!res.ok) throw new Error(`pack ${res.status}`);
+    return res.json();
+  }
+});
+const playDeps = env => ({ ...ECO_DEPS, read: readSource, prices: priceReads(env), notify: (account, make) => notifyNow(env, account, 'odds', 'slip', make) });
 
 // ==== Routing ================================================================
 
@@ -1267,7 +1290,10 @@ export default {
       const qt = new URL(request.url).searchParams.get('qt');
       const session = qt ? await readToken(await tokenSecret(env), qt, 'ses') : null;
       if (session && sessionLimited(`pl:${session.s}`, 30)) return errorJson('RATE_LIMITED', 429, headers, request);
-      return handlePlay(request, env, headers, session, playDeps(env));
+      // The dev door: a localhost page may have a slip's prices checked (nothing placed), 10 a minute an address.
+      const dev = !session && /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin);
+      if (dev && sessionLimited(`pl:dev:${ip}`, 10)) return errorJson('RATE_LIMITED', 429, headers, request);
+      return handlePlay(request, env, headers, session, { ...playDeps(env), dev });
     }
     // Web Push (push.js): here, where the Quadra Pass tokens can be read.
     if (path.startsWith('/push/')) {
