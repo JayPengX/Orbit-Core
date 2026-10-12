@@ -2277,3 +2277,15 @@ Quadra stays under 30% for anyone who plays much.
 - The compare card (`f1LapCompare`) is one table, a column a driver; the
   gap chart is counted back from the gap now by lap times (`gapsBetween`),
   since the minute looks read the gaps mid-lap.
+
+## 今日推薦's finals, 2026-10-12
+
+- **A notice for each pick's final score** (Orbit Sports, kit kind
+  `match:pickend`, 今日推薦賽果, its own switch): the same Worker check as a
+  followed team's `end`, the body "{result} · league · 今日推薦", the tag
+  `end:<league>:<id>`, so a followed team's game that's also a pick is said
+  once. It's sent for the day's picks as they stood before anything started
+  (`ownWas` in `renderHome`), not the list now, because a pick on now (or
+  about to start) has left 今日推薦 for 正在進行. They're kept on the device
+  for the day (`fx.picked.v1`). An open app says it at once
+  (`noticeChanges`).

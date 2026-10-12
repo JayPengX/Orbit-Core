@@ -2409,7 +2409,8 @@ export const NOTICE_KINDS = {
   match: [
     ['start', '比賽開打', 'A game starts', '你追蹤的球隊比賽開始時。', 'When a team you follow starts a game.'],
     ['end', '比賽結束', 'Final score', '你追蹤的球隊比賽結束，附上比分。', 'When a team you follow finishes a game, with the score.'],
-    ['pick', '今日推薦開賽', 'Today’s picks start', '今日推薦的每一場開始時（不含更多推薦）。', 'When each of today’s picks starts (not the further suggestions).']
+    ['pick', '今日推薦開賽', 'Today’s picks start', '今日推薦的每一場開始時（不含更多推薦）。', 'When each of today’s picks starts (not the further suggestions).'],
+    ['pickend', '今日推薦賽果', 'Today’s picks: final', '今日推薦的每一場結束，附上比分。', 'When each of today’s picks ends, with the score.']
   ],
   odds: [
     ['slip', '投注單結算', 'Slip settled', '投注單的比賽全部結束、算好派彩時。', 'When every game on a slip is over and it’s paid.'],
