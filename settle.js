@@ -28,6 +28,10 @@
 //   POST /play?qt=T { op: 'cashout', id }            { ok } or { settled: record }
 //   POST /play?qt=T { op: 'ack', ids }               records Play has applied
 //   GET  /play?qt=T                                  { settled: { id: record } }
+//   POST /play?qt=T { op: 'place', slips: [slip…] }  { placed: [id…], wallet } or
+//                      { refused: { slip, problem, moved: [{ id, odds }] } } (price.js)
+//   POST /play { op: 'check', slips } from localhost (the dev door): the
+//                      prices checked, nothing placed
 //
 // A record: { results: [won|lost|void|null per pick], finals: [score|null],
 // settled: bool, payout, at }.
@@ -37,7 +41,8 @@
 // (a source's JSON, or null), and `notify(account, message)` (push.js).
 
 import { readOutcomes, legResult, applyResults, finalOf, familyOf, LEAGUES } from './kit/settle.mjs';
-import { updateWallet } from './eco.js';
+import { updateWallet, WALLET_COLLECTION, parseWallet, poolBalance } from './eco.js';
+import { checkSlip } from './price.js';
 import { watchKambi, KAMBI_COLLECTION } from './kambi.js';
 
 export const OPEN_COLLECTION = 'odds-open';
@@ -55,6 +60,9 @@ const AGAIN = 15 * MIN;
 const FUTURE_AGAIN = 6 * HOUR;
 // A game never found this long after its start: its picks are void.
 export const VOID_AFTER = 3 * DAY;
+// From here on a slip is placed through the Worker (op 'place', its price
+// checked); one staked before is only watched (op 'open').
+export const PLACE_SINCE = Date.parse('2026-10-12T09:00:00Z');
 // A cron run (its own invocation, 50 fetches): this many slips looked at,
 // this many settled.
 export const RUN_LOOK = 6;
@@ -183,6 +191,14 @@ const recordOf = (slip, at) => ({
 export async function handlePlay(request, env, headers, session, deps) {
   const { json, errorJson, upstreamFailed } = deps;
   if (!env.FIREBASE_PROJECT_ID || !env.FIREBASE_CLIENT_EMAIL || !env.FIREBASE_PRIVATE_KEY) return errorJson('MISSING_FIREBASE_CONFIG', 500, headers, request);
+  // The dev door (a localhost page, no pass): a slip's prices checked, nothing placed.
+  if (!session && deps.dev && request.method === 'POST') {
+    const body = await deps.readJsonBody(request);
+    if (body?.op !== 'check' || !Array.isArray(body.slips)) return errorJson('ECO_TOKEN_INVALID', 401, headers, request);
+    const out = [];
+    for (const slip of body.slips.slice(0, 5).map(cleanSlip)) out.push(slip ? await (deps.checkSlip || checkSlip)(slip, { entries: [] }, deps.prices, new Date(deps.now())) : { problem: 'shape' });
+    return json({ checked: out }, 200, headers);
+  }
   if (!session?.d || !ACCOUNT.test(session.d) || session.a !== 'odds') return errorJson('ECO_TOKEN_INVALID', 401, headers, request);
   const account = session.d;
   try {
@@ -194,24 +210,43 @@ export async function handlePlay(request, env, headers, session, deps) {
     const body = await deps.readJsonBody(request);
     if (body === deps.INVALID_BODY || !body || typeof body !== 'object') return errorJson('INVALID_JSON', 400, headers, request);
     const now = deps.now();
-    if (body.op === 'open') {
-      const slips = (Array.isArray(body.slips) ? body.slips : []).slice(0, MAX_SLIPS).map(cleanSlip).filter(Boolean);
-      const added = {};
-      const kambi = [];
-      for (const slip of slips) {
-        try {
-          await deps.fsWrite(env, OPEN_COLLECTION, keyOf(account, slip.id), JSON.stringify({ account, state: 'open', slip, t: now }), { exists: false });
-          added[keyOf(account, slip.id)] = nextLook(slip, now, 0);
-          for (const leg of slip.legs) if (LEAGUES[leg.sport]?.kambi && leg.kambiId && leg.start) kambi.push({ id: leg.kambiId, start: leg.start });
-        } catch (error) {
-          // Watched already.
-          if (!error.precondition) throw error;
-        }
+    if (body.op === 'place') {
+      // Placed here (the lock-down): every slip checked (price.js), its stake
+      // taken from the wallet and the slip watched, all or none.
+      const slips = (Array.isArray(body.slips) ? body.slips : []).slice(0, MAX_SLIPS);
+      const clean = slips.map(cleanSlip);
+      if (!clean.length || clean.some(x => !x)) return json({ refused: { problem: 'shape' } }, 200, headers);
+      const doc = await deps.fsGet(env, WALLET_COLLECTION, account);
+      const wallet = doc.exists ? parseWallet(doc.payload) : null;
+      if (!wallet) return errorJson('ECO_SIGNED_OUT', 401, headers, request);
+      const have = new Set(wallet.entries.map(e => e.id));
+      if (clean.some(x => have.has(`odds:stake-${x.id}`))) return json({ refused: { problem: 'placed' } }, 200, headers);
+      for (const slip of clean) {
+        const r = await (deps.checkSlip || checkSlip)(slip, wallet, deps.prices, new Date(now));
+        if (!r.ok) return json({ refused: { slip: slip.id, ...r } }, 200, headers);
       }
-      if (Object.keys(added).length) await changeIndex(env, deps, index => ({ ...index, due: { ...index.due, ...added } }));
-      // Kambi's matches kept after Kambi drops them (kambi.js), so they can be settled.
-      if (kambi.length) await watchKambi(env, deps, kambi).catch(() => {});
-      return json({ watching: slips.length, added: Object.keys(added).length }, 200, headers);
+      const cost = clean.reduce((sum, x) => sum + x.cost, 0);
+      if (cost > poolBalance(wallet) + 0.005) return json({ refused: { problem: 'funds' } }, 200, headers);
+      const entries = clean.flatMap(x => [{ id: `odds:stake-${x.id}`, t: now, app: 'odds', kind: 'stake', amount: -x.cost }, ...(x.free ? [{ id: `odds:fb-${x.free}`, t: now, app: 'odds', kind: 'freebet', amount: 0 }] : [])]);
+      const paid = await updateWallet(env, deps, account, w => {
+        const ids = new Set(w.entries.map(e => e.id));
+        if (entries.some(e => ids.has(e.id)) || cost > poolBalance(w) + 0.005) return w;
+        return { ...w, entries: [...w.entries, ...entries] };
+      });
+      const took = paid && entries.every(e => paid.wallet.entries.some(x => x.id === e.id && x.t === now));
+      if (!took) return json({ refused: { problem: 'funds' } }, 200, headers);
+      await watchSlips(env, deps, account, clean, now);
+      return json({ placed: clean.map(x => x.id), wallet: paid.wallet }, 200, headers);
+    }
+    if (body.op === 'open') {
+      // Slips placed before the lock-down (their stake in the wallet from
+      // before PLACE_SINCE): watched to be settled. Newer ones are placed.
+      const doc = await deps.fsGet(env, WALLET_COLLECTION, account);
+      const wallet = doc.exists ? parseWallet(doc.payload) : null;
+      const before = new Set((wallet?.entries || []).filter(e => e.app === 'odds' && e.kind === 'stake' && e.t < PLACE_SINCE).map(e => e.id.slice('odds:stake-'.length)));
+      const slips = (Array.isArray(body.slips) ? body.slips : []).slice(0, MAX_SLIPS).map(cleanSlip).filter(x => x && before.has(x.id));
+      const added = await watchSlips(env, deps, account, slips, now);
+      return json({ watching: slips.length, added }, 200, headers);
     }
     if (body.op === 'cashout') {
       const id = String(body.id || '');
@@ -248,6 +283,26 @@ export async function handlePlay(request, env, headers, session, deps) {
   } catch (error) {
     return upstreamFailed(error, headers, request);
   }
+}
+
+// Slips watched to be settled (their documents and the index), and their
+// Kambi matches kept after Kambi drops them (kambi.js). How many were new.
+async function watchSlips(env, deps, account, slips, now) {
+  const added = {};
+  const kambi = [];
+  for (const slip of slips) {
+    try {
+      await deps.fsWrite(env, OPEN_COLLECTION, keyOf(account, slip.id), JSON.stringify({ account, state: 'open', slip, t: now }), { exists: false });
+      added[keyOf(account, slip.id)] = nextLook(slip, now, 0);
+      for (const leg of slip.legs) if (LEAGUES[leg.sport]?.kambi && leg.kambiId && leg.start) kambi.push({ id: leg.kambiId, start: leg.start });
+    } catch (error) {
+      // Watched already.
+      if (!error.precondition) throw error;
+    }
+  }
+  if (Object.keys(added).length) await changeIndex(env, deps, index => ({ ...index, due: { ...index.due, ...added } }));
+  if (kambi.length) await watchKambi(env, deps, kambi).catch(() => {});
+  return Object.keys(added).length;
 }
 
 // ---- The cron ------------------------------------------------------------------

@@ -108,6 +108,12 @@ TRANSIT_DEV = "on"
 # hourly copy of each cell (weather.js, weather-skill.js). Not rate limits:
 # those are in memory (worker.js), and caches are in Cloudflare's cache, so
 # the free tier's 1,000 writes a day stay far off.
+# The sports proxy, for reading a placed Quadra Play slip's prices as Play
+# does (settle.js / price.js): its cache and trims.
+[[services]]
+binding = "SPORTS"
+service = "sports-proxy"
+
 [[kv_namespaces]]
 binding = "RATE_LIMIT_KV"
 id = "8b24d75fbe0a4a69aef0f35cb7a8d847"
