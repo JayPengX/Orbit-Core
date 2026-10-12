@@ -10,6 +10,29 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
 
 
 
+## Transit: navigation, the owner's second note of 2026-10-13 (pushed to `main`)
+
+1. Waiting for the bus: the map stays close up on you and the stop (not out
+   to where the ride goes) until the ride has you on board.
+2. The bus countdown jumped back to 4 minutes on each refresh. Cause: an
+   estimate was counted from when it reached the phone, but TDX makes one
+   about a minute (Hsinchu County: "389 s" unchanged for over a minute, its
+   `DataTime` 70 s old when read) and the proxy keeps it 25–60 s. Now every
+   estimate counts from its `DataTime` (`util.mjs etaAge`: the navigation
+   countdown via `live.mjs liveTimes`, stops' rows via `bus.mjs etaOf`, and
+   the Worker's bus alerts in `push.js`); the ETA asks now `$select` it. Bus
+   positions weren't needed for this; the countdown runs on, moved only when
+   TDX's estimate itself moves.
+3. A saved trip tapped in 交通 while navigating put its plan card over the
+   navigation card: `showPlan` now shrinks navigation to its bar first (as a
+   new search did already). Seen in the preview, old and new.
+4. Back in the app after a while, the map zoomed out to the whole island: a
+   fit made before the page had its size (or with the cards taller than the
+   map) has no room and zooms out fully. `map.mjs fit` now skips a fit with no
+   room (returns false), navigation tries again in a moment, and does the
+   stage's fit again 350 ms after coming back. Not reproducible in the
+   preview; ask the owner whether it still happens.
+
 ## Transit: navigation's map by stage, the line under the step whole (2026-10-13, pushed to `main`)
 
 From the owner's screenshot (on the bike to 陽明交通大學(六家校區)):
