@@ -465,16 +465,18 @@ function nextText(html) {
 }
 
 // An ELTA.tv sports video page's episodes, newest first, as it lists them:
-// { episodes: [{ id, title }] } ("10/6 美聯分區賽G2 白襪 VS 守護者").
+// { episodes: [{ id, title }] } ("10/6 美聯分區賽G2 白襪 VS 守護者"). The
+// newest 120 here (a season's page lists ~2,000: Shared-Data's watch.mjs
+// reads it whole, `limit` Infinity, and keeps each game's for the season).
 const TRIM_ELTA_VOD = 'eltavod';
-export function trimEltaVod(html) {
+export function trimEltaVod(html, limit = 120) {
   const seen = new Set();
   const episodes = [];
   for (const m of String(html || '').matchAll(/data-episode="(\d+)"[\s\S]{0,600}?\btitle="([^"]{1,160})"/g)) {
     if (seen.has(m[1])) continue;
     seen.add(m[1]);
     episodes.push({ id: m[1], title: m[2].replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#0?39;/g, "'").trim() });
-    if (episodes.length >= 120) break;
+    if (episodes.length >= limit) break;
   }
   return { episodes };
 }
