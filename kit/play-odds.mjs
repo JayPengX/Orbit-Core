@@ -1,5 +1,5 @@
 // Quadra Play's odds, in the shared kit: Play and the Worker's settling (settle.mjs) use this one copy.
-import { minLegsProblem, BASE_CUT } from './play-rules.mjs';
+import { minLegsProblem, BASE_CUT } from '#kit/play-rules.mjs';
 // Pure odds math, shared by the browser page and scripts/build-data.mjs.
 
 // A game's winner: lottery implied chance ~= fair chance x K, the lottery's
