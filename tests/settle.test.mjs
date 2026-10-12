@@ -239,3 +239,13 @@ test('the dev door checks a slip\'s prices and places nothing; without it, no pa
   assert.equal(doc(OPEN_COLLECTION, OPEN_INDEX), null);
   assert.equal((await ask(deps)).status, 401);
 });
+
+test('a slip as Play hands it over keeps what the price check reads (its mode, sizes, stake, boost, free bet)', async () => {
+  const { cleanSlip: clean } = await import('../settle.js');
+  const s = clean({ ...slip('parlay001', [leg('home'), { ...leg('away'), id: 'x|ml|away', gameId: 'g2' }], { mode: 'parlay', sizes: [2], boost: 1.5, free: 'eco:fb:welcome', freeValue: 200 }) });
+  assert.equal(s.mode, 'parlay');
+  assert.deepEqual(s.sizes, [2]);
+  assert.equal(s.boost, 1.5);
+  assert.equal(s.free, 'eco:fb:welcome');
+  assert.equal(s.freeValue, 200);
+});
