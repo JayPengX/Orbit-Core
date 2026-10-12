@@ -516,6 +516,8 @@ await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(?!
   // today's real data with the Worker's own check (price.js); nothing settled.
   if (new URL(req.url()).pathname === '/play') {
     let reply = req.method() === 'GET' ? { settled: {} } : { ok: true };
+    // (Cash out: taken at the value asked; the Worker checks it against its own.)
+    if (body.op === 'cashout') reply = { cashedOut: Math.floor(body.value) };
     if (body.op === 'place') {
       const { checkSlip, useReads } = await import('../price.js');
       const { cleanSlip } = await import('../settle.js');

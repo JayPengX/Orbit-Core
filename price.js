@@ -18,6 +18,7 @@ import { boardBets, futureBets, liveBets } from './kit/play-bets.mjs';
 import { comboCount, slipSizes, slipErrors } from './kit/play-odds.mjs';
 import { LIVE_MIN_LIQUIDITY } from './kit/play-live.mjs';
 import { plusMember, PLUS, freeBets } from './kit/plus.mjs';
+import { cashOutState, CASHOUT_KEEP } from './kit/play-cashout.mjs';
 
 // How much better than the house's a price may be: rounding to the cent,
 // and a board read a moment before this one.
@@ -119,3 +120,40 @@ export async function checkSlip(slip, wallet, deps, now = new Date(), reads = nu
   if (errors.length) return { problem: errors[0] };
   return { ok: true };
 }
+
+// ---- Cash out ------------------------------------------------------------------
+//
+// A slip's cash-out value worked out here as Play does (play-cashout.mjs
+// cashOutState), with each undecided pick's chance from the house's board
+// now: its own bet before its game, the same market on the live board once
+// it's under way (Play's currentBet), the richer of the two reads.
+const FALLBACK_MARGIN = 0.1;
+const lineOf = b => b.totalLine ?? b.runLine ?? b.teamLine ?? null;
+async function houseChance(leg, now, once) {
+  const t = now.getTime();
+  if (leg.kind === 'future' || !leg.start || Date.parse(leg.start) > t) {
+    const h = await housePick(leg, now, once);
+    return h.bet ? { p: h.bet.fairChance > 0 && h.bet.fairChance < 1 ? h.bet.fairChance : (1 / h.odds) * (1 - FALLBACK_MARGIN), live: false } : null;
+  }
+  const data = await once(`live:${leg.sport}`, () => src.loadLive(now, LIVE_MIN_LIQUIDITY, { also: [leg.sport] }));
+  const board = liveBets(data);
+  const game = board.games.find(g => g.sport === leg.sport && g.away.en === leg.away && g.home.en === leg.home);
+  if (!game) return null;
+  const offers = game.kambiId ? await once(`offers:live:${game.kambiId}`, () => src.loadGameOffers(game, { live: true }).catch(() => null)) : null;
+  const same = b => b.gameId === game.id && b.kind === leg.kind && b.side === leg.side && (leg.kind === 'ml' || lineOf(b) === leg.line) && (leg.kind !== 'teamtotal' || b.team === leg.team);
+  const bets = [board.bets.find(same), offers ? liveBets(data, { offersOf: g => (g.id === game.id ? offers : null) }).bets.find(same) : null].filter(usable);
+  if (!bets.length) return null;
+  const p = Math.max(...bets.map(b => (b.fairChance > 0 && b.fairChance < 1 ? b.fairChance : (1 / b.estOdds) * (1 - FALLBACK_MARGIN))));
+  return { p, live: true };
+}
+
+// { value, reason } as Play shows it (value null: paused), for this slip now.
+export async function cashOutQuote(slip, wallet, deps, now = new Date(), reads = null) {
+  if (slip.free) return { value: null, reason: 'free' };
+  const once = reads ?? useReads(deps);
+  const keep = plusMember(wallet, now.getTime()) ? PLUS.odds.cashOutKeep : CASHOUT_KEEP;
+  const chances = await Promise.all(slip.legs.map(leg => (leg.result ? null : houseChance(leg, now, once).catch(() => null))));
+  return cashOutState({ ...slip, status: 'open' }, chances, { keep });
+}
+// A value asked for is the house's or less (live prices move by the second: 2%).
+export const cashOutOk = (asked, house) => house != null && asked >= 1 && asked <= house * 1.02 + 1;
