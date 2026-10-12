@@ -27,7 +27,7 @@ export const priceOk = (asked, house) => asked <= house * (1 + PRICE_SLACK) + 0.
 export const FREE_MIN_ODDS = 1.5;
 
 // The reads of one check: each URL once, through the deps.
-function useReads(deps) {
+export function useReads(deps) {
   const memo = new Map();
   const once = (key, f) => {
     if (!memo.has(key)) memo.set(key, Promise.resolve().then(f));
@@ -84,7 +84,8 @@ export async function housePick(leg, now, once) {
 
 // A slip as Play sends it to be placed: its shape and money first, then
 // every pick's price. { ok: true } or { problem, moved?: [{ id, odds }] }.
-export async function checkSlip(slip, wallet, deps, now = new Date()) {
+export async function checkSlip(slip, wallet, deps, now = new Date(), reads = null) {
+  const once = reads ?? useReads(deps);
   const legs = slip.legs;
   const n = legs.length;
   if (new Set(legs.map(l => l.id)).size !== n) return { problem: 'legs' };
@@ -96,7 +97,6 @@ export async function checkSlip(slip, wallet, deps, now = new Date()) {
   if (slip.mode === 'single' ? boost : boost > (plusMember(wallet, now.getTime()) ? PLUS.odds.boost : 1)) return { problem: 'boost' };
   // The money: every combination at the stake; a free bet's token unspent
   // and worth what it says, its odds long enough, the rest from the balance.
-  const once = useReads(deps);
   const checked = await Promise.all(legs.map(leg => housePick(leg, now, once).catch(() => ({ unread: true }))));
   if (checked.some(c => c.unread)) return { problem: 'unread' };
   const moved = [];

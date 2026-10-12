@@ -512,6 +512,25 @@ if (!live) await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.worker
 await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(?!weather|push|transit)/, async route => {
   const req = route.request();
   const body = req.postDataJSON?.() || {};
+  // Quadra Play's slips (settle.js): placing checks every pick's price on
+  // today's real data with the Worker's own check (price.js); nothing settled.
+  if (new URL(req.url()).pathname === '/play') {
+    let reply = req.method() === 'GET' ? { settled: {} } : { ok: true };
+    if (body.op === 'place') {
+      const { checkSlip, useReads } = await import('../price.js');
+      const { cleanSlip } = await import('../settle.js');
+      const reads = { read: async url => { const x = await upstream(url); if (x.status !== 200) throw new Error(String(x.status)); return JSON.parse(x.body); }, pack: async path => JSON.parse((await curlText(`https://jaypengx.github.io/Shared-Data/${path}`)) || 'null') };
+      const once = useReads(reads);
+      const slips = (body.slips || []).map(cleanSlip);
+      reply = { placed: slips.map(x => x?.id) };
+      for (const slip of slips) {
+        const r = slip ? await checkSlip(slip, wallet, reads, new Date(), once) : { problem: 'shape' };
+        if (!r.ok) (reply = { refused: { slip: slip?.id, ...r } }), console.log('play place refused', JSON.stringify(r));
+        if (!r.ok) break;
+      }
+    }
+    return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(reply) });
+  }
   const reply = { token: 'preview', wallet, active: true, live: { app: appId } };
   // The app's data, as the Worker gives it: on a sign-in, and on a read
   // that names the app ('' when nothing is saved).
