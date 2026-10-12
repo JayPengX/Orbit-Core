@@ -26,6 +26,7 @@ import { readToken, tokenSecret, signToken, sessionLimited } from './quadra-toke
 import { handleKambiRequest, refreshKambiWatch, fetchKambiLive } from './kambi.js';
 import { handlePush, sendDue, notifyNow } from './push.js';
 import { handlePlay, settleCron } from './settle.js';
+import { lottoCron } from './lotto.js';
 import { asiaBaseballResponse, ASIA_HOST } from './asia-baseball.js';
 import { f1LiveResponse, F1_LIVE_HOST } from './f1-live.js';
 import { handleWeather } from './weather.js';
@@ -1333,7 +1334,12 @@ export default {
     // Odd minutes: Quadra Play's slips whose games should be over (settle.js),
     // in an invocation of its own (its own 50 fetches and CPU).
     if (event.cron === SETTLE_CRON) {
-      if (env.FIREBASE_PROJECT_ID && env.FIREBASE_CLIENT_EMAIL && env.FIREBASE_PRIVATE_KEY) ctx.waitUntil(settleCron(env, playDeps(env)).then(r => r.looked && console.log('play settle', JSON.stringify(r))).catch(e => console.log('play settle failed', String(e))));
+      // (Every fourth minute the lottery's tickets instead, lotto.js: each run its own 50 fetches.)
+      const tickets = new Date(event.scheduledTime || Date.now()).getUTCMinutes() % 4 === 3;
+      if (env.FIREBASE_PROJECT_ID && env.FIREBASE_CLIENT_EMAIL && env.FIREBASE_PRIVATE_KEY)
+        ctx.waitUntil(
+          (tickets ? lottoCron(env, playDeps(env)).then(r => r.settled && console.log('play tickets', JSON.stringify(r))) : settleCron(env, playDeps(env)).then(r => r.looked && console.log('play settle', JSON.stringify(r)))).catch(e => console.log('play cron failed', String(e)))
+        );
       return;
     }
     ctx.waitUntil(sendDue(env).then(r => r.sent && console.log('push sent', JSON.stringify(r))));
