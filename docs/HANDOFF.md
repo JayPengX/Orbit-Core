@@ -10,6 +10,36 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
 
 
 
+## Transit: the owner's list of 2026-10-13 morning, five items (pushed to `main`)
+
+1. **編輯行程 while navigating** (⋯; replaces 先去別的地方 and 改目的地): the
+   places still to go, each changed with a tap or taken off with ×, a stop
+   added first or last. A change to where you're heading first re-routes (on
+   a bus or train staying on it, `onBoardTo`); one to the places after it only
+   changes the list (`navRetarget`, now saved). Checked in the preview (a
+   later stop taken off on the 5608).
+2. **Stayed on past your stop**: navigation took you as off (near the stop)
+   but you go on along the ride's way 300 m and more past it, within 6
+   minutes: back on it, off at the next stop, the rest from there
+   (`state.passed`, tab-map `stayedOn`). Not checkable in the preview (no
+   live movement along a real route): ask the owner.
+3. **Stops on the line**, navigating: every ride's stops are loaded when it
+   starts (`navStops`) and drawn as dots, where you get off ringed; the metro
+   now has stops too (`metro.mjs metroStops`: its line's stations between the
+   two ends, either way). Checked live in the preview: 區間 1806 新竹 → 竹東 (7)
+   and the 5608 (27).
+4. **常用行程**: a trip saved from where you were had no start (planned from
+   wherever you are, no way back): now that spot is kept, named after a place
+   of yours within 300 m; 編輯行程 (saved trips) has rows to change either end
+   (start can still be 目前位置). The way back once you're in the far end's
+   part (its last 30%, nearer it): at 竹東 station on 成功九街 → 竹東高中. From
+   the trip's own start except within 800 m of it. **The owner's own trip may
+   have been saved with no start: set it to 成功九街 in 我的 → 行程.**
+5. **Navigation ended on coming back**: it ended at 5 minutes past the
+   planned arrival (`savedNav`, `onShow`), and a resumed ride past it opened as
+   a plan (`showPlan` asked `canNav`). Now kept 90 minutes past (it ends by
+   itself when you get there), and a resumed ride always navigates.
+
 ## Transit: done steps can't be tapped (2026-10-13, pushed to `main`)
 
 The owner tapped a faded (done) step chip and was taken back to it, the map
