@@ -10,6 +10,20 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
 
 
 
+## Transit: a stop added on board keeps the ride (2026-10-13, pushed to `main`)
+
+The owner: 先去別的地方 while navigating started a new plan from here, no use
+on a bus. Now, on a bus or train, 先去別的地方 and 改目的地 change the trip in
+place (`tab-map.mjs onBoardTo`): off at the ride's stop nearest the new place
+or the one you had, whichever gets there sooner (each planned with
+`restFrom`), the rest from there (`nav.mjs navChangeOff` / `navRest`), the
+destination and the places after it updated (`navRetarget`; once there, on to
+the old destination as with any stop). Walking, riding or waiting: still the
+ways from here. Checked in the preview (5608, its stops not known there: kept
+on it to 竹東站, then to 清大, 竹東高中 next). A first try called a helper
+that only exists in nav.mjs (caught in the preview; files checked for
+undefined names with eslint's no-undef).
+
 ## Transit: 「好像已經下車了？」 on board, on the route (2026-10-13, pushed to `main`)
 
 The owner, on the 快捷8號支 by 高鐵新竹站, was asked if they'd got off. Cause:
