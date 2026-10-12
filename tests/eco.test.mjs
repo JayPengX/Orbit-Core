@@ -75,10 +75,10 @@ test('create: a new pass, signed in and live, with the opening money', async () 
 test('read and write with the session; the pass itself opens nothing', async () => {
   const t = setup();
   const acct = await newPass(t);
-  const w = await t.call('PATCH', `${t.qt(acct.token)}&app=stock`, { payload: 'gz1:abc', wallet: { entries: [{ id: 'stock:1', t: 1, app: 'stock', kind: 'dividend', amount: 30 }], snap: { stock: { cash: -1000, t: 5 } } } });
+  const w = await t.call('PATCH', `${t.qt(acct.token)}&app=stock`, { payload: 'gz1:abc', wallet: { entries: [{ id: 'stock:1', t: 1, app: 'stock', kind: 'fee', amount: -30 }], snap: { stock: { cash: -1000, t: 5 } } } });
   assert.equal(w.status, 200);
-  assert.equal(w.data.pool, acct.pool + 30 - 1000);
-  const again = await t.call('PATCH', `${t.qt(acct.token)}&app=stock`, { wallet: { entries: [{ id: 'stock:1', t: 1, app: 'stock', kind: 'dividend', amount: 99 }] } });
+  assert.equal(w.data.pool, acct.pool - 30 - 1000);
+  const again = await t.call('PATCH', `${t.qt(acct.token)}&app=stock`, { wallet: { entries: [{ id: 'stock:1', t: 1, app: 'stock', kind: 'fee', amount: -99 }] } });
   assert.equal(again.data.pool, w.data.pool);
   const read = await t.call('GET', `${t.qt(acct.token)}&app=stock`);
   assert.equal(read.data.payload, 'gz1:abc');
@@ -226,7 +226,7 @@ test('merge: another pass into this one, then it is gone', async () => {
   const a = await newPass(t, 'stock');
   await t.call('PATCH', `${t.qt(a.token)}&app=stock`, { payload: 'gz1:a' });
   const b = await newPass(t, 'stock');
-  await t.call('PATCH', `${t.qt(b.token)}&app=stock`, { payload: 'gz1:b', wallet: { entries: [{ id: 'stock:x', t: 1, app: 'stock', kind: 'dividend', amount: 40 }] } });
+  await t.call('PATCH', `${t.qt(b.token)}&app=stock`, { payload: 'gz1:b', wallet: { entries: [{ id: 'stock:x', t: 1, app: 'stock', kind: 'fee', amount: -40 }] } });
   const aa = await t.call('POST', '', { op: 'refresh', refresh: a.refresh, app: 'stock', claim: true });
   const m = await t.call('POST', '', { op: 'merge', qt: aa.data.token, sources: [{ passcode: b.passcode }] });
   assert.equal(m.status, 200);
@@ -670,7 +670,7 @@ test('the admin panel: an account found by its pass, a record undone, one app cl
   const admin = (action, extra = {}) => t.call('POST', '', { op: 'admin', token: 'o'.repeat(40), action, ...extra });
   const acct = await newPass(t);
   const other = await newPass(t, 'odds');
-  await t.call('PATCH', `${t.qt(acct.token)}&app=stock`, { payload: 'gz1:abc', wallet: { entries: [{ id: 'stock:1', t: 1, app: 'stock', kind: 'dividend', amount: 30 }] } });
+  await t.call('PATCH', `${t.qt(acct.token)}&app=stock`, { payload: 'gz1:abc', wallet: { entries: [{ id: 'stock:1', t: 1, app: 'stock', kind: 'fee', amount: -30 }] } });
   // Found by the pass someone reads out (dashes and lower case all right).
   const found = await admin('find', { passcode: `${acct.passcode.slice(0, 5).toLowerCase()}-${acct.passcode.slice(5)}` });
   assert.equal(found.status, 200);
@@ -683,7 +683,7 @@ test('the admin panel: an account found by its pass, a record undone, one app cl
   assert.ok(div && !div.undone);
   const u = await admin('undo', { wallet: ref, entry: 'stock:1' });
   assert.equal(u.status, 200);
-  assert.equal(u.data.balance, before.balance - 30);
+  assert.equal(u.data.balance, before.balance + 30);
   assert.equal((await admin('undo', { wallet: ref, entry: 'stock:1' })).status, 409, 'not twice');
   assert.ok((await admin('wallet', { wallet: ref })).data.recent.find(e => e.id === 'stock:1').undone);
   // An export: the wallet and each app's document.
@@ -694,7 +694,7 @@ test('the admin panel: an account found by its pass, a record undone, one app cl
   const c = await admin('clear-app', { wallet: ref, app: 'stock' });
   assert.equal(c.status, 200);
   assert.ok(!c.data.apps.includes('stock'));
-  assert.equal((await admin('wallet', { wallet: ref })).data.balance, before.balance - 30);
+  assert.equal((await admin('wallet', { wallet: ref })).data.balance, before.balance + 30);
   assert.equal((await t.call('GET', `${t.qt(acct.token)}&app=stock`)).status, 401, 'signed out');
   // Deleted: needs the full reference typed; then everything of it is gone.
   assert.equal((await admin('delete', { wallet: ref })).status, 400);
@@ -708,4 +708,26 @@ test('the admin panel: an account found by its pass, a record undone, one app cl
   assert.equal((await t.call('POST', '', { op: 'login', passcode: acct.passcode, app: 'stock' })).status, 404, 'its pass opens nothing');
   assert.equal((await admin('wallets')).data.wallets.length, 1, 'the other account untouched');
   assert.ok(other.token);
+});
+
+test('the lock-down: an app adds no money to the pool (the Worker does); a slip from before refunded once, only its stake', async () => {
+  const t = setup();
+  const acct = await newPass(t, 'odds');
+  const send = entries => t.call('PATCH', `${t.qt(acct.token)}&app=odds`, { wallet: { entries } });
+  const before = Date.parse('2026-10-10T00:00:00Z');
+  const w = await send([
+    { id: 'odds:payout-forged', t: 2, app: 'odds', kind: 'payout', amount: 1_000_000 },
+    { id: 'odds:prize-forged', t: 2, app: 'odds', kind: 'prize', amount: 50_000 },
+    { id: 'odds:stake-old', t: before, app: 'odds', kind: 'stake', amount: -300 },
+    { id: 'odds:stake-new', t: Date.parse('2026-10-13T00:00:00Z'), app: 'odds', kind: 'stake', amount: -300 }
+  ]);
+  assert.equal(w.status, 200);
+  assert.equal(w.data.pool, acct.pool - 600);
+  // The old slip's stake back, once, at its stake; never more, never a newer slip's.
+  const r = await send([
+    { id: 'odds:refund-old', t: 3, app: 'odds', kind: 'refund', amount: 300 },
+    { id: 'odds:refund-new', t: 3, app: 'odds', kind: 'refund', amount: 300 }
+  ]);
+  assert.equal(r.data.pool, acct.pool - 300);
+  assert.equal((await send([{ id: 'odds:refund-old', t: 4, app: 'odds', kind: 'refund', amount: 9_000 }])).data.pool, acct.pool - 300);
 });

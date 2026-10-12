@@ -42,7 +42,7 @@
 // (a source's JSON, or null), and `notify(account, message)` (push.js).
 
 import { readOutcomes, legResult, applyResults, finalOf, familyOf, LEAGUES } from './kit/settle.mjs';
-import { updateWallet, WALLET_COLLECTION, parseWallet, poolBalance } from './eco.js';
+import { updateWallet, WALLET_COLLECTION, parseWallet, poolBalance, LOCK_SINCE } from './eco.js';
 import { checkSlip, useReads, cashOutQuote, cashOutOk } from './price.js';
 import { handleLotto } from './lotto.js';
 import { watchKambi, KAMBI_COLLECTION } from './kambi.js';
@@ -64,7 +64,7 @@ const FUTURE_AGAIN = 6 * HOUR;
 export const VOID_AFTER = 3 * DAY;
 // From here on a slip is placed through the Worker (op 'place', its price
 // checked); one staked before is only watched (op 'open').
-export const PLACE_SINCE = Date.parse('2026-10-12T09:00:00Z');
+export const PLACE_SINCE = LOCK_SINCE;
 // A cron run (its own invocation, 50 fetches): this many slips looked at,
 // this many settled.
 export const RUN_LOOK = 6;
