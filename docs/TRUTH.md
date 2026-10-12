@@ -34,8 +34,8 @@ file is how to work on them.
 
 - **One person runs the whole family** and works across every repo in
   `~/Documents/GitHub` (Orbit-Class, Orbit-Transit, Orbit-Weather,
-  Quadra-Fixtures = Orbit Sports, Quadra-Hub = Orbit Words, Quadra-Play,
-  Quadra-Securities, Shared-Data, Shared-Proxy). A request that names no
+  Orbit-Sports (was Quadra Fixtures), Orbit-Words (was Quadra Hub),
+  Quadra-Play, Quadra-Securities, Shared-Data, Shared-Proxy). A request that names no
   repo means whichever the context says, often several.
 - **They use the apps on their iPhone, installed on the home screen, in
   Safari's engine**, every day, and send what they find: a list (9, 22, 33,

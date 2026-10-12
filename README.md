@@ -36,8 +36,8 @@ own.
 | Orbit Class | `orbit` | [Orbit-Class](https://github.com/JayPengX/Orbit-Class) | https://jaypengx.github.io/Orbit-Class/ |
 | Orbit Weather | `weather` | [Orbit-Weather](https://github.com/JayPengX/Orbit-Weather) | https://jaypengx.github.io/Orbit-Weather/ |
 | Orbit Transit | `transit` | [Orbit-Transit](https://github.com/JayPengX/Orbit-Transit) | https://jaypengx.github.io/Orbit-Transit/ |
-| Orbit Sports (was Quadra Fixtures) | `match` | [Orbit-Sports](https://github.com/JayPengX/Orbit-Sports) (local folder `Quadra-Fixtures`) | https://jaypengx.github.io/Orbit-Sports/ |
-| Orbit Words (was Quadra Hub) | `vocab` | [Orbit-Words](https://github.com/JayPengX/Orbit-Words) (local folder `Quadra-Hub`) | https://jaypengx.github.io/Orbit-Words/ |
+| Orbit Sports (was Quadra Fixtures) | `match` | [Orbit-Sports](https://github.com/JayPengX/Orbit-Sports) | https://jaypengx.github.io/Orbit-Sports/ |
+| Orbit Words (was Quadra Hub) | `vocab` | [Orbit-Words](https://github.com/JayPengX/Orbit-Words) | https://jaypengx.github.io/Orbit-Words/ |
 | The kit, the marks, the family's page, admin | — | this repo's Pages | https://jaypengx.github.io/Shared-Proxy/ |
 | The nightly data packs | — | [Shared-Data](https://github.com/JayPengX/Shared-Data) | https://jaypengx.github.io/Shared-Data/ |
 

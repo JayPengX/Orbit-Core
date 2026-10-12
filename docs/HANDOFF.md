@@ -239,9 +239,9 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
 
 ## On the owner's Mac: Safari, and Transit's bus alerts by push (2026-10-04)
 
-- **The owner works on a Mac now** (repos in `~/Documents/GitHub`, Orbit
-  Words and Sports still in their old `Quadra-Hub` / `Quadra-Fixtures`
-  folders). Node 22 and gh are in `~/.local`, Playwright (WebKit, Chromium)
+- **The owner works on a Mac now** (repos in `~/Documents/GitHub`; Orbit
+  Words and Sports were in their old `Quadra-Hub` / `Quadra-Fixtures`
+  folders until 2026-10-12, now `Orbit-Words` / `Orbit-Sports`). Node 22 and gh are in `~/.local`, Playwright (WebKit, Chromium)
   in `~/.local/opt/playwright`; `tools/preview.mjs --webkit` screenshots in
   Safari's engine. Xcode (the iOS Simulator) isn't installed yet.
 - **A Mac's disk ignores case:** Orbit Words had `Celsius.mp3` beside
