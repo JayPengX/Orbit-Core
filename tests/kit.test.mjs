@@ -533,3 +533,11 @@ test('pressSelector: every :active a press the kit sets, not one iOS puts on a s
   assert.equal(kit.pressSelector('.q-switch:active::after'), '.q-switch[data-q-press]::after');
   assert.equal(kit.pressSelector('.a:hover'), '.a:hover');
 });
+
+test("the mirror's gzipped copies unpacked, a plain one (or one the browser unpacked) read as it is", async () => {
+  const { gzJson } = await import('../kit/quadra.mjs');
+  const { gzipSync } = await import('node:zlib');
+  const data = { until: 1, data: { events: ['洋基', 1] } };
+  assert.deepEqual(await gzJson(new Response(gzipSync(JSON.stringify(data)))), data);
+  assert.deepEqual(await gzJson(new Response(JSON.stringify(data))), data);
+});

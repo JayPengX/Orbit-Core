@@ -744,6 +744,9 @@ export function packJson(path, { ttl = 3 * 3_600_000, timeout = 30_000 } = {}) {
 // holds ({ built, until, match: [patterns of '<trim>!<url>'] }); each copy
 // is { until, data }, good until then. A read the mirror doesn't hold, or
 // holds no longer, is the proxy's (and isn't looked for again this session).
+// With `gz: 1` in the index each copy is gzipped (<path>.gz: a season's box
+// scores in a twelfth of the room, under Pages' 1 GB), unpacked here; a
+// browser that can't (no DecompressionStream: iOS before 16.4) asks the proxy.
 export const MIRROR_HOSTS = new Set(['site.api.espn.com', 'sports.core.api.espn.com', 'api.jolpi.ca', 'www.formula1.com', 'asia-baseball.quadra']);
 export function mirrorPath(url, trim = '') {
   const u = new URL(url);
@@ -762,7 +765,16 @@ export async function mirrorBuilt() {
 export function unmirror(url, trim = '') {
   mirrorGone.add(`${trim}!${url}`);
 }
-const parseMirrorIndex = x => ({ built: Number(x?.built) || 0, until: Number(x?.until) || 0, match: (x?.match || []).map(m => new RegExp(m)) });
+const parseMirrorIndex = x => ({ built: Number(x?.built) || 0, until: Number(x?.until) || 0, gz: Boolean(x?.gz), match: (x?.match || []).map(m => new RegExp(m)) });
+// A file's JSON, gzipped or not (by its first bytes: whether Pages sent it
+// with Content-Encoding, the browser unpacking it, or as a plain .gz).
+export async function gzJson(res) {
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  if (bytes[0] !== 0x1f || bytes[1] !== 0x8b) return JSON.parse(new TextDecoder().decode(bytes));
+  const out = new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip')));
+  return JSON.parse(await out.text());
+}
+const canGunzip = () => typeof DecompressionStream === 'function';
 // The last index this device kept, whatever its age: which copies to ask
 // for alongside a new index, rather than a round trip after it (the copies
 // the index then doesn't hold are thrown away).
@@ -781,9 +793,9 @@ function readMirrorIndex() {
   }
   return mirrorIndex.p;
 }
-const mirrorCopy = (url, trim) =>
-  fetch(`${PACKS_URL}${mirrorPath(url, trim)}`, { signal: AbortSignal.timeout(8_000) })
-    .then(res => (res.ok ? res.json() : null))
+const mirrorCopy = (url, trim, gz) =>
+  fetch(`${PACKS_URL}${mirrorPath(url, trim)}${gz ? '.gz' : ''}`, { signal: AbortSignal.timeout(8_000) })
+    .then(res => (res.ok ? gzJson(res) : null))
     .catch(() => null);
 async function mirrored(url, trim) {
   let host = '';
@@ -797,11 +809,12 @@ async function mirrored(url, trim) {
   let early = null;
   if (!mirrorIndex.done) {
     const hint = await mirrorHint;
-    if (hint && hint.match.some(re => re.test(key))) early = mirrorCopy(url, trim);
+    if (hint && hint.match.some(re => re.test(key)) && (!hint.gz || canGunzip())) early = mirrorCopy(url, trim, hint.gz);
   }
   const index = await indexIn;
-  if (!index || Date.now() >= index.until || !index.match.some(re => re.test(key))) return null;
-  const got = await (early || mirrorCopy(url, trim));
+  if (!index || Date.now() >= index.until || !index.match.some(re => re.test(key)) || (index.gz && !canGunzip())) return null;
+  // (A hint of the other kind, the index changed overnight: asked again.)
+  const got = await (early && Boolean(mirrorHint && (await mirrorHint)?.gz) === index.gz ? early : mirrorCopy(url, trim, index.gz));
   if (got && Date.now() < Math.min(Number(got.until) || 0, index.until)) return got.data;
   mirrorGone.add(key);
   return null;
