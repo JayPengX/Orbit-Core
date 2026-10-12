@@ -760,6 +760,20 @@ export async function loadOdds(now = new Date(), onProgress) {
   const [mlbDk, mlbPm, eplDk, eplPm, f1, nbaPm, f1Espn, f1Kambi] = results.map(r => (r.status === 'fulfilled' ? r.value : []));
   // MotoGP is no longer sold (open bets still settle from its results).
   const moto = null;
+  const race = await f1Race(f1, f1Espn, f1Kambi, now);
+  return {
+    loadedAt: now.toISOString(),
+    games: lotteryGames(mergeGames([...mlbDk, ...eplDk], [...parsePolymarketMlb(mlbPm, now), ...parsePolymarketEpl(eplPm, now)], { scheduled: new Set([results[0].status === 'fulfilled' && 'mlb', results[2].status === 'fulfilled' && 'epl'].filter(Boolean)) }), now),
+    f1: race,
+    moto,
+    futures: [...parseFutures(mlbPm, 'mlb'), ...parseFutures(eplPm, 'epl'), ...(nbaInSeason(now) ? parseFutures(nbaPm, 'nba') : [])]
+  };
+}
+
+// The next race's board from Polymarket's F1 events, ESPN's season (its
+// qualifying time and form) and Kambi's F1 list (its own board when
+// Polymarket hasn't opened the race): null when neither prices it.
+export async function f1Race(f1, f1Espn, f1Kambi, now = new Date()) {
   let race = parseF1RaceWinner(f1, now);
   // Kambi's board for the same race (or the next one when Polymarket hasn't opened it).
   const kambiRace = nextKambiF1Race(f1Kambi, now);
@@ -786,13 +800,17 @@ export async function loadOdds(now = new Date(), onProgress) {
       race.qualifyingWaits = Boolean(waiting);
     }
   }
-  return {
-    loadedAt: now.toISOString(),
-    games: lotteryGames(mergeGames([...mlbDk, ...eplDk], [...parsePolymarketMlb(mlbPm, now), ...parsePolymarketEpl(eplPm, now)], { scheduled: new Set([results[0].status === 'fulfilled' && 'mlb', results[2].status === 'fulfilled' && 'epl'].filter(Boolean)) }), now),
-    f1: race,
-    moto,
-    futures: [...parseFutures(mlbPm, 'mlb'), ...parseFutures(eplPm, 'epl'), ...(nbaInSeason(now) ? parseFutures(nbaPm, 'nba') : [])]
-  };
+  return race;
+}
+
+// The next race's board read on its own (the Worker checking an F1 pick).
+export async function loadF1Race(now = new Date()) {
+  const [f1, f1Espn, f1Kambi] = await Promise.all([
+    fetchPolymarketEvents(POLYMARKET_TAG.f1).catch(() => []),
+    (reader.packJson ? reader.packJson(`sports/f1/${now.getUTCFullYear()}.json`) : Promise.reject(new Error('no packs'))).catch(() => getJson(`${ESPN}/racing/f1/scoreboard?dates=${now.getUTCFullYear()}`)).catch(() => []),
+    getJson(KAMBI_F1_LIST).catch(() => [])
+  ]);
+  return f1Race(f1, f1Espn, f1Kambi, now);
 }
 
 // One game's own markets and players' markets from Kambi (offers.mjs), for
@@ -948,8 +966,9 @@ function liveEspnPages(key, now) {
 }
 const dedupe = games => [...new Map(games.map(g => [g.espnId, g])).values()];
 
-export async function loadLive(now = new Date(), minLiquidity = 5000) {
-  const leagues = liveLeagues(now);
+export async function loadLive(now = new Date(), minLiquidity = 5000, { also = [] } = {}) {
+  // (`also`: a league known to have a game on, which this page's reads may not have seen.)
+  const leagues = [...new Set([...liveLeagues(now), ...also.filter(key => ESPN_PATH[key]).filter(key => !KAMBI_LEAGUES.includes(key))])];
   const [espn, kambi, books] = await Promise.all([
     Promise.all(leagues.map(key => liveEspnPages(key, now).then(pages => dedupe(pages.flatMap(d => parseEspnLive(d, key)))).catch(() => []))),
     Promise.all(KAMBI_LEAGUES.map(key => getJson(kambiUrl(LEAGUES[key].kambi, 'in-play'), 'kambi-events').then(d => parseKambiInPlay(d, key)).catch(() => []))),
@@ -1039,23 +1058,44 @@ export function pricedByKambi(game, kambiGames) {
 // read, so one slow league never holds back the rest; resolves to them all.
 export async function loadExtraLeagues(now = new Date(), onPart) {
   const part = promise =>
-    promise.then(games => {
-      const listed = lotteryGames(games, now);
+    promise.then(listed => {
       onPart?.(listed);
       return listed;
     });
-  const espn = EXTRA_LEAGUES.map(key => part(fetchLeague(key, now).then(games => mergeGames(games, []))));
-  const kambi = KAMBI_LEAGUES.map(key =>
-    part(
-      Promise.allSettled([fetchKambiLeague(key, now, getJson), fetchSchedule(key, now)]).then(async ([p, s]) => {
-        const priced = p.status === 'fulfilled' ? p.value : [];
-        const scheduled = mergeGames((s.status === 'fulfilled' ? s.value : []).filter(g => !pricedByKambi(g, priced)), []);
-        return [...priced, ...scheduled];
-      })
-    )
-  );
-  const results = await Promise.allSettled([...espn, ...kambi]);
+  const results = await Promise.allSettled([...EXTRA_LEAGUES, ...KAMBI_LEAGUES].map(key => part(extraLeague(key, now))));
   return results.flatMap(r => (r.status === 'fulfilled' ? r.value : []));
+}
+// One of those leagues' games on the board.
+async function extraLeague(key, now) {
+  if (!KAMBI_LEAGUES.includes(key)) return lotteryGames(mergeGames(await fetchLeague(key, now), []), now);
+  const [p, s] = await Promise.allSettled([fetchKambiLeague(key, now, getJson), fetchSchedule(key, now)]);
+  const priced = p.status === 'fulfilled' ? p.value : [];
+  const scheduled = mergeGames((s.status === 'fulfilled' ? s.value : []).filter(g => !pricedByKambi(g, priced)), []);
+  return lotteryGames([...priced, ...scheduled], now);
+}
+
+// One league's games on the board, as loadOdds and loadExtraLeagues list
+// them (the Worker checking a pick reads only its league).
+export async function loadLeague(key, now = new Date()) {
+  if (key !== 'mlb' && key !== 'epl') return extraLeague(key, now);
+  const [dk, pm] = await Promise.allSettled([fetchMonths(key, LEAGUES[key].path, now), fetchPolymarketEvents(POLYMARKET_TAG[key], 'polymarket-events')]);
+  if (dk.status === 'rejected' && pm.status === 'rejected') throw dk.reason;
+  const pmGames = pm.status === 'fulfilled' ? (key === 'mlb' ? parsePolymarketMlb : parsePolymarketEpl)(pm.value, now) : [];
+  return lotteryGames(mergeGames(dk.status === 'fulfilled' ? dk.value : [], pmGames, { scheduled: new Set(dk.status === 'fulfilled' ? [key] : []) }), now);
+}
+
+// One championship market (a pick's `market`), as loadOdds and
+// loadExtraFutures read it; null when it isn't on sale.
+export async function loadFuture(key, now = new Date()) {
+  const tagged = FUTURES.find(f => f.key === key);
+  if (tagged) {
+    if (tagged.sport === 'nba' && !nbaInSeason(now)) return null;
+    return parseFutures(await fetchPolymarketEvents(POLYMARKET_TAG[tagged.sport], 'polymarket-events'), tagged.sport, [tagged])[0] ?? null;
+  }
+  const extra = EXTRA_FUTURES.find(f => f.key === key);
+  if (!extra) return null;
+  const d = await getJson(`${GAMMA}/public-search?q=${encodeURIComponent(extra.query)}&limit_per_type=8&events_status=active`);
+  return parseFutures(d?.events || [], extra.sport, [extra])[0] ?? null;
 }
 
 // A league's clubs, logos and nicknames from ESPN's team list (for the
