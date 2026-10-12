@@ -1,6 +1,6 @@
 # Handoff: Quadra, work in progress
 
-> **2026-10-12:** Shared-Data's season archive (one catch-up build) and Quadra Play's move to the proxy (stage 1 done): `docs/HANDOFF-2026-10-12.md`.
+> **2026-10-12:** Shared-Data's season archive (one catch-up build) and Quadra Play's move to the proxy (stages 1–3 done: the Worker settles slips; the odds calculation's move waits on the owner's choice): `docs/HANDOFF-2026-10-12.md`.
 
 All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and are pushed to
 `main` after every change (each deploys on push). The shared kit lives in
