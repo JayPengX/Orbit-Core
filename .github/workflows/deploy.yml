@@ -18,6 +18,7 @@ on:
       - 'settle.js'
       - 'price.js'
       - 'lotto.js'
+      - 'stock-check.js'
       - 'kit/**'
       - 'quadra-token.js'
       - 'push.js'

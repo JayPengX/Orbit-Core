@@ -154,7 +154,9 @@ export const OD_BACK_ID = 'eco:odback:v3';
 // on it.
 export const OVERDRAFT_RATE = 0.01;
 const finiteOr0 = v => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
-export const worthOf = wallet => poolBalance(wallet) + finiteOr0(wallet?.snap?.stock?.holdings);
+// (Securities' holdings at what was paid for them, the Worker's count: a
+// figure a phone sends can't raise a rank.)
+export const worthOf = wallet => poolBalance(wallet) + finiteOr0(wallet?.snap?.stock?.held);
 export const payFor = () => PAY.month;
 export const PAY_FROM_MONTH = '2026-10';
 const TPE = 8 * 3_600_000;
@@ -430,6 +432,17 @@ export function appEntries(entries, wallet) {
   });
 }
 
+// An app's figures (snap): its own key only. Securities' cash and holdings'
+// cost are the Worker's (stock-check.js `stock`, from the save that came
+// with them), never a phone's; without a checked save they stay as they were.
+export function appSnap(snap, app, wallet, stock, now = Date.now()) {
+  const own = snap?.[app];
+  if (app !== 'stock') return own ? { [app]: Object.fromEntries(Object.entries(own).filter(([k]) => k !== 'cash' && k !== 'held')) } : {};
+  const had = wallet?.snap?.stock || {};
+  if (stock) return { stock: { ...had, ...(own || {}), cash: stock.cash, held: stock.held, t: Math.max(now, own?.t || 0, (had.t || 0) + 1) } };
+  return own ? { stock: { ...own, cash: had.cash ?? 0, held: had.held ?? 0 } } : {};
+}
+
 // What a client may send to change the wallet.
 export function cleanPatch(patch) {
   if (!isObj(patch)) return { entries: [], snap: {}, settings: {} };
@@ -475,7 +488,8 @@ export function mergeWallet(a, b) {
 // The pool's NT$ right now: every entry plus each app's shared cash figure.
 export function poolBalance(wallet) {
   const entries = (wallet?.entries || []).reduce((sum, e) => sum + e.amount, 0);
-  const snaps = Object.values(wallet?.snap || {}).reduce((sum, s) => sum + (finite(s.cash) ?? 0), 0);
+  // (Only Securities' cash counts: the Worker's own figure, stock-check.js.)
+  const snaps = finite(wallet?.snap?.stock?.cash) ?? 0;
   return Math.round((entries + snaps) * 100) / 100;
 }
 
@@ -587,6 +601,8 @@ export async function handleEcoRequest(request, env, headers, ip, deps) {
       }
       const now = deps.now();
       let refused = null;
+      // Securities' save: its money counted by the Worker (stock-check.js).
+      const stock = app === 'stock' && hasPayload && deps.checkStock ? await deps.checkStock(env, docId, body.payload, (await deps.fsGet(env, WALLET_COLLECTION, docId).then(d => (d.exists ? parseWallet(d.payload) : null)))).catch(() => null) : null;
       const result = await updateWallet(
         env,
         deps,
@@ -600,7 +616,7 @@ export async function handleEcoRequest(request, env, headers, ip, deps) {
           // What falls due with the write comes with it (fixed ids: never
           // twice): the welcome bonus bet right after a first bet.
           const patch = cleanPatch(body.wallet);
-          const merged = mergeWallet(w, { ...patch, entries: appEntries(patch.entries, w) });
+          const merged = mergeWallet(w, { ...patch, entries: appEntries(patch.entries, w), snap: appSnap(patch.snap, app, w, stock, now) });
           return touchApp(mergeWallet(merged, { entries: paydayEntries(merged, now) }), app, now);
         },
         { skipIf: () => refused }

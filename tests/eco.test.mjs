@@ -77,7 +77,8 @@ test('read and write with the session; the pass itself opens nothing', async () 
   const acct = await newPass(t);
   const w = await t.call('PATCH', `${t.qt(acct.token)}&app=stock`, { payload: 'gz1:abc', wallet: { entries: [{ id: 'stock:1', t: 1, app: 'stock', kind: 'fee', amount: -30 }], snap: { stock: { cash: -1000, t: 5 } } } });
   assert.equal(w.status, 200);
-  assert.equal(w.data.pool, acct.pool - 30 - 1000);
+  // (Securities' cash is the Worker's count, never the figure a phone sends.)
+  assert.equal(w.data.pool, acct.pool - 30);
   const again = await t.call('PATCH', `${t.qt(acct.token)}&app=stock`, { wallet: { entries: [{ id: 'stock:1', t: 1, app: 'stock', kind: 'fee', amount: -99 }] } });
   assert.equal(again.data.pool, w.data.pool);
   const read = await t.call('GET', `${t.qt(acct.token)}&app=stock`);
@@ -436,7 +437,7 @@ test('the pay is fixed, like a salary: the same however much the account holds',
   assert.equal(payFor(0), 6_000);
   assert.equal(payFor(5_000_000), 6_000);
   // Worth still counts Securities' holdings, not only cash.
-  const w = { entries: [{ id: 'a', t: 1, app: 'odds', amount: 20_000 }, { id: 'eco:rebase:v3', t: 1, app: 'eco', kind: 'rebase', amount: 0 }], snap: { stock: { cash: 5_000, holdings: 300_000, t: 1 } } };
+  const w = { entries: [{ id: 'a', t: 1, app: 'odds', amount: 20_000 }, { id: 'eco:rebase:v3', t: 1, app: 'eco', kind: 'rebase', amount: 0 }], snap: { stock: { cash: 5_000, held: 300_000, t: 1 } } };
   assert.equal(worthOf(w), 325_000);
   const oct = Date.UTC(2026, 9, 3);
   assert.equal(paydayEntries({ ...w, created: oct }, oct).find(e => e.kind === 'pay').amount, 6_000);
@@ -447,7 +448,7 @@ test('the pay is fixed, like a salary: the same however much the account holds',
 
 test('the reset: accounts that opened with NT$110,000 come down to NT$30,000 once; cash may go below zero', () => {
   const oct = Date.UTC(2026, 9, 3);
-  const old = { v2: 1, entries: [{ id: 'eco:start', t: 1, app: 'eco', kind: 'start', amount: 110_000 }, { id: 'odds:stake-1', t: 2, app: 'odds', kind: 'stake', amount: -100_000 }], snap: { stock: { cash: 0, holdings: 60_000, t: 1 } } };
+  const old = { v2: 1, entries: [{ id: 'eco:start', t: 1, app: 'eco', kind: 'start', amount: 110_000 }, { id: 'odds:stake-1', t: 2, app: 'odds', kind: 'stake', amount: -100_000 }], snap: { stock: { cash: 0, held: 60_000, t: 1 } } };
   const due = paydayEntries(old, oct);
   assert.equal(due[0].id, REBASE.id);
   assert.equal(due[0].amount, -80_000);
@@ -556,7 +557,7 @@ test('Quadra Plus bills every month like a subscription: months away charged on 
 
 test('wealth levels: each level reached pays its reward once, from what the account is worth', () => {
   const now = Date.UTC(2026, 9, 7, 3);
-  const at = (amount, holdings = 0, extra = []) => ({ entries: [{ id: 'eco:start', amount }, ...extra], snap: { stock: { cash: 0, holdings } } });
+  const at = (amount, holdings = 0, extra = []) => ({ entries: [{ id: 'eco:start', amount }, ...extra], snap: { stock: { cash: 0, held: holdings } } });
   assert.deepEqual(rankEntries(at(40_000), now), []);
   // 60,000 in cash and 50,000 in shares: worth 110,000, two levels at once.
   assert.deepEqual(rankEntries(at(60_000, 50_000), now).map(e => [e.id, e.amount, e.kind]), [['eco:rank:saver', 1_000, 'rank'], ['eco:rank:steady', 2_000, 'rank']]);
