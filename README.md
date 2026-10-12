@@ -161,7 +161,7 @@ that ran it).
 | `POST /gemini` | `worker.js` | Orbit Class's AI import of a timetable photo |
 | `POST /nl-edit` | `worker.js` | Orbit Class's edits in plain language ("move Tuesday's maths to room 302") |
 | `GET/POST /kambi` | `kambi.js` | The last live data of Kambi matches Quadra Play has bets on (§3.1) |
-| `GET/POST /play` | `settle.js` | Quadra Play's slips settled when their games end (§3.1) |
+| `GET/POST /play` | `settle.js`, `price.js`, `lotto.js` | Quadra Play's slips placed (prices checked), cashed out, settled and paid; its lottery tickets and scratch cards sold and paid (§3.1) |
 | `GET/POST /push/…` | `push.js` | Notices while an app is closed (§7) |
 | `GET /weather…` | `weather.js`, `weather-skill.js` | Orbit Weather (§3.2) |
 | `GET /transit/…` | `transit.js` | Orbit Transit (§3.3) |
@@ -229,9 +229,28 @@ ends. A bet whose app isn't opened in that window could never be settled.
 - `GET /play`: `{ settled: { slipId: { results, finals, settled, payout,
   at } } }` (a parlay's picks as they're decided, too). `POST { op: 'ack',
   ids }`: applied by Play, forgotten.
-- `POST { op: 'cashout', id }`: the slip taken from `open` to `cashed`
-  first (the same precondition), `{ ok }`; settled first, `{ settled:
-  record }` and Play applies that instead.
+- `POST { op: 'place', slips }`: every pick priced again with Play's own
+  code (price.js: the kit's play-sources and play-bets, read through the
+  sports proxy's SPORTS binding with a session this Worker signs), refused
+  when better than the house's price now (1% and a cent of slack), started,
+  or off the board; the slip's money checked (combinations, boost, free bet,
+  rules, the pool); then the stake taken (odds:stake-<slip>) and the slip
+  watched. `op: 'check'` from a localhost page: the check alone.
+- `POST { op: 'cashout', id, value }`: the value checked against the house's
+  own (price.js cashOutQuote), the slip taken from `open` (never settled
+  too), the Worker pays odds:payout-<slip> (kind cashout).
+- Lottery (lotto.js): `op: 'tickets'` sold by the Worker's clock, settled
+  from Taiwan Lottery's draws by the cron (every fourth odd minute), paid
+  odds:prize-<id>; `op: 'scratch'` a card's prize drawn here, `op: 'reveal'`
+  pays it; `op: 'tickets-open'` takes over tickets from before the lock-down.
+
+**The lock-down (2026-10-12): the proxy is the only one adding money.**
+`eco.js appEntries`: an app's wallet entries are spending only (≤ 0; one
+exception, a pre-lock-down Play slip's refund). `appSnap`: an app sends only
+its own snap, and Securities' cash and holdings' cost are this Worker's
+(`stock-check.js`: Securities' account replayed with the kit's stock-* on each
+save, every new cash-adding event checked against Yahoo or its rate);
+`poolBalance` counts only that cash, ranks only that cost.
 
 ### 3.2 `/weather`
 
