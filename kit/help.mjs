@@ -404,7 +404,7 @@ export const HELP = {
       ]],
       ['tabs', 'The tabs', [
         'Map: find a place, plan a trip ranked by the buses’ real times, and be guided along it.',
-        'Navigating, the map draws the whole trip and shows the step you’re at: close up on a walk, a bike or waiting at the stop, to where you get off once on board; it moves to the next step by itself (started half way too). Tap the countdown to take another departure; miss one and it moves to the next. A YouBike station empty or full when you get there: one tap moves you to one nearby. Tap a card's grip (or swipe it) to fold it for more map.',
+        'Navigating, the map draws the whole trip and shows the step you’re at: close up on a walk, a bike or waiting at the stop, to where you get off once on board; it moves to the next step by itself (started half way too). Tap the countdown to take another departure; miss one and it moves to the next. A YouBike station empty or full when you get there: one tap moves you to one nearby. Tap a card’s grip (or swipe it) to fold it for more map.',
         'Transit: nearby stops with every bus due, routes and timetables.',
         'Times: trains, high-speed rail and metros, with fares.',
         'Me: saved and recurring trips, TPASS and the ways you like to travel.'
