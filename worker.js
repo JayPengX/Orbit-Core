@@ -21,7 +21,8 @@
 
 import en from './locales/en.js';
 import zhTW from './locales/zh-TW.js';
-import { handleEcoRequest } from './eco.js';
+import { handleEcoRequest, LOCK_SINCE } from './eco.js';
+import { checkStock } from './stock-check.js';
 import { readToken, tokenSecret, signToken, sessionLimited } from './quadra-token.js';
 import { handleKambiRequest, refreshKambiWatch, fetchKambiLive } from './kambi.js';
 import { handlePush, sendDue, notifyNow } from './push.js';
@@ -1197,7 +1198,9 @@ const ECO_DEPS = {
   fsBatch: firestoreBatch,
   sha256Hex,
   generateCode,
-  now: () => Date.now()
+  now: () => Date.now(),
+  // Securities' money counted here (stock-check.js), its market data read as the apps read it.
+  checkStock: (env, docId, payload, wallet) => checkStock(env, docId, payload, wallet, { read: url => priceReads(env).read(url), fsGet: firestoreGet, fsWrite: firestoreWrite }, LOCK_SINCE)
 };
 
 // /kambi (kambi.js): the same plumbing, and Kambi's live data.
