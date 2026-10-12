@@ -391,7 +391,7 @@ export const HELP = {
       ]],
       ['tabs', '每個分頁', [
         '「地圖」：找地點、規劃路線，照公車實際到站時間排出最好走的方案，一路導航。',
-        '導航時地圖上是整趟路線；你到了哪一段，就自動跳到哪一段（中途才開始也一樣）。點倒數可以改搭別班，沒趕上會自動換下一班。YouBike 站到了沒車或沒位，按一下改到附近的站。',
+        '導航時地圖上畫出整趟路線，畫面停在你走到的那一段：走路、騎車拉近看，等車和坐車看到下車的地方；你到了哪一段，就自動跳到哪一段（中途才開始也一樣）。點倒數可以改搭別班，沒趕上會自動換下一班。YouBike 站到了沒車或沒位，按一下改到附近的站。',
         '「交通」：附近站牌和每班公車的到站、路線和時刻表。',
         '「查時刻」：火車、高鐵和捷運的時刻與票價。',
         '「我的」：常用和固定的行程、TPASS 和交通方式的偏好。'
@@ -404,7 +404,7 @@ export const HELP = {
       ]],
       ['tabs', 'The tabs', [
         'Map: find a place, plan a trip ranked by the buses’ real times, and be guided along it.',
-        'Navigating, the map shows the whole trip; it moves to the step you’re at by itself (started half way too). Tap the countdown to take another departure; miss one and it moves to the next. A YouBike station empty or full when you get there: one tap moves you to one nearby.',
+        'Navigating, the map draws the whole trip and shows the step you’re at: close up on a walk or a bike, to where you get off on a bus or train; it moves to the next step by itself (started half way too). Tap the countdown to take another departure; miss one and it moves to the next. A YouBike station empty or full when you get there: one tap moves you to one nearby.',
         'Transit: nearby stops with every bus due, routes and timetables.',
         'Times: trains, high-speed rail and metros, with fares.',
         'Me: saved and recurring trips, TPASS and the ways you like to travel.'
