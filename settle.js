@@ -92,6 +92,7 @@ export function cleanSlip(slip) {
     id: String(slip.id),
     t: String(slip.t || ''),
     status: 'open',
+    mode: ['single', 'parlay', 'system'].includes(slip.mode) ? slip.mode : 'single',
     sizes: slip.sizes.map(Number),
     stake: Number(slip.stake),
     cost: Number(slip.cost),
