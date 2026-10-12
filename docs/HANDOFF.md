@@ -47,6 +47,7 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
    - Result: 竹東高中 ★ 1831 → 竹中 → 1758 → 六家; 新竹站 ★ 竹北 train, 快捷9號.
    Batch (21 trips, old against new): 17 changed, read one by one (Orbit-Transit bd91642).
 - **Ranking rewritten (pushed):** shown-or-folded by comparisons on bother, never a total a point lower; folded ways fold nothing; the owner's verdicts as real-trip tests (`tests/verdicts/`, `scripts/verdict.mjs`), checked again with buses a few minutes off. Add every trip the owner judges. Also: a picked time is per trip; buses caught from when you set out (catchBus); 改搭別班 and missed-it in navigation; a bus between stops on the route sheet.
+- **To be there by a time (pushed):** 成功九街 → 竹東高中 by 08:00 showed two buses only. Now also the 六家線 to 竹中 and on to 竹東 (our trains searched from two hours before the time; the planners leave it out) and riding it all on two bikes (timed to get in by then; never folded as far behind; 每 30 分鐘換車 always on for a TPASS with YouBike). The same last train from another first one is folded (竹北 and a change at 北新竹 for the 1804). Verdict `chenggong-zhudonghs-arrive0800`; `scripts/verdict.mjs --arrive ISO --tpass id`.
 
 ## The owner's second list of 2026-10-11 (pushed to `main`)
 
