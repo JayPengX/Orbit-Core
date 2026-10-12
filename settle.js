@@ -42,7 +42,7 @@
 
 import { readOutcomes, legResult, applyResults, finalOf, familyOf, LEAGUES } from './kit/settle.mjs';
 import { updateWallet, WALLET_COLLECTION, parseWallet, poolBalance } from './eco.js';
-import { checkSlip } from './price.js';
+import { checkSlip, useReads } from './price.js';
 import { watchKambi, KAMBI_COLLECTION } from './kambi.js';
 
 export const OPEN_COLLECTION = 'odds-open';
@@ -197,7 +197,8 @@ export async function handlePlay(request, env, headers, session, deps) {
     const body = await deps.readJsonBody(request);
     if (body?.op !== 'check' || !Array.isArray(body.slips)) return errorJson('ECO_TOKEN_INVALID', 401, headers, request);
     const out = [];
-    for (const slip of body.slips.slice(0, 5).map(cleanSlip)) out.push(slip ? await (deps.checkSlip || checkSlip)(slip, { entries: [] }, deps.prices, new Date(deps.now())) : { problem: 'shape' });
+    const once = deps.prices ? useReads(deps.prices) : null;
+    for (const slip of body.slips.slice(0, 5).map(cleanSlip)) out.push(slip ? await (deps.checkSlip || checkSlip)(slip, { entries: [] }, deps.prices, new Date(deps.now()), once) : { problem: 'shape' });
     return json({ checked: out }, 200, headers);
   }
   if (!session?.d || !ACCOUNT.test(session.d) || session.a !== 'odds') return errorJson('ECO_TOKEN_INVALID', 401, headers, request);
@@ -222,8 +223,9 @@ export async function handlePlay(request, env, headers, session, deps) {
       if (!wallet) return errorJson('ECO_SIGNED_OUT', 401, headers, request);
       const have = new Set(wallet.entries.map(e => e.id));
       if (clean.some(x => have.has(`odds:stake-${x.id}`))) return json({ refused: { problem: 'placed' } }, 200, headers);
+      const once = deps.prices ? useReads(deps.prices) : null;
       for (const slip of clean) {
-        const r = await (deps.checkSlip || checkSlip)(slip, wallet, deps.prices, new Date(now));
+        const r = await (deps.checkSlip || checkSlip)(slip, wallet, deps.prices, new Date(now), once);
         if (!r.ok) return json({ refused: { slip: slip.id, ...r } }, 200, headers);
       }
       const cost = clean.reduce((sum, x) => sum + x.cost, 0);
