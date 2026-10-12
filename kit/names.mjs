@@ -11,7 +11,7 @@ const US = {
   mlb: {
     'Arizona Diamondbacks': ['亞歷桑那', '響尾蛇'], Athletics: ['', '運動家'], 'Oakland Athletics': ['奧克蘭', '運動家'], 'Atlanta Braves': ['亞特蘭大', '勇士'], 'Baltimore Orioles': ['巴爾的摩', '金鶯'],
     'Boston Red Sox': ['波士頓', '紅襪'], 'Chicago Cubs': ['芝加哥', '小熊'], 'Chicago White Sox': ['芝加哥', '白襪'], 'Cincinnati Reds': ['辛辛那堤', '紅人'], 'Cleveland Guardians': ['克里夫蘭', '守護者'],
-    'Colorado Rockies': ['科羅拉多', '落磯'], 'Detroit Tigers': ['底特律', '老虎'], 'Houston Astros': ['休士頓', '太空人'], 'Kansas City Royals': ['堪薩斯', '皇家'], 'Los Angeles Angels': ['洛杉磯', '天使'],
+    'Colorado Rockies': ['科羅拉多', '洛磯'], 'Detroit Tigers': ['底特律', '老虎'], 'Houston Astros': ['休士頓', '太空人'], 'Kansas City Royals': ['堪薩斯', '皇家'], 'Los Angeles Angels': ['洛杉磯', '天使'],
     'Los Angeles Dodgers': ['洛杉磯', '道奇'], 'Miami Marlins': ['邁阿密', '馬林魚'], 'Milwaukee Brewers': ['密爾瓦基', '釀酒人'], 'Minnesota Twins': ['明尼蘇達', '雙城'], 'New York Mets': ['紐約', '大都會'],
     'New York Yankees': ['紐約', '洋基'], 'Philadelphia Phillies': ['費城', '費城人'], 'Pittsburgh Pirates': ['匹茲堡', '海盜'], 'San Diego Padres': ['聖地牙哥', '教士'], 'San Francisco Giants': ['舊金山', '巨人'],
     'Seattle Mariners': ['西雅圖', '水手'], 'St. Louis Cardinals': ['聖路易', '紅雀'], 'Tampa Bay Rays': ['坦帕灣', '光芒'], 'Texas Rangers': ['德州', '遊騎兵'], 'Toronto Blue Jays': ['多倫多', '藍鳥'], 'Washington Nationals': ['華盛頓', '國民']
