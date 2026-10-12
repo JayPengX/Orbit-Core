@@ -327,7 +327,9 @@ On top of them, **apps put live knowledge over slower copies** (§8).
   or win probability line, last season's playoffs) is weighed against
   Shared-Data before it goes through the proxy: a season pack, the mirror
   or a pack of its own (as `winprob/`) built at night, read once by
-  everyone. Shared-Data keeps a league's season whole: every game's and
+  everyone. Shared-Data keeps Orbit Sports' leagues' seasons whole (Quadra
+  Play needs only the last days' results: it settles slips, which are kept
+  on the phone for good): every game's and
   race's full result, its box score, its watch links, win probability,
   tables, and every player's and team's numbers, the regular season and
   the playoffs alike. It is wiped, all of it at once, only when the next
@@ -719,6 +721,6 @@ What was decided, so it isn't undone. Newer calls win.
 - 2026-10-12: results count at once on every page with a table; no back
   end notes on screen; the READMEs document every feature; the apps open
   faster (Weather's location first, Sports' TV lists kept, Play's prices
-  computed once); Shared-Data keeps a whole season (every result, box
+  computed once); Shared-Data keeps Orbit Sports' leagues' whole season (every result, box
   score, link and number, the playoffs too) until the next regular season
   begins, then wipes it whole; its builds add on top of what's built.
