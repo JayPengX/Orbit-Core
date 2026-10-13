@@ -32,48 +32,18 @@ name = "orbit-workers-proxy"
 main = "worker.js"
 compatibility_date = "2025-01-01"
 
-# Without this, Cloudflare runs each request's Worker isolate at whichever
-# edge colo is nearest the calling browser, so /gemini's one outbound fetch
-# (to generativelanguage.googleapis.com) also originates from that colo's
-# egress IP. Some of Cloudflare's colos geolocate to countries/territories
-# Google's Gemini API refuses outright ("User location is not supported for
-# the API use", a plain 400 - see AIVisionProcessor.callGemini's handling of
-# it in src/gemini-ocr.js), so a user whose traffic happens to route through
-# one of those colos hits this error even though their own real location is
-# fully supported.
-#
-# This used to be `mode = "smart"` instead, which asks Cloudflare to place
-# the isolate near wherever the Worker's own subrequests actually go, based
-# on observed traffic patterns - and for this app's actual traffic (heavily
-# Taiwan-based), that consistently converged on Cloudflare's Hong Kong colo
-# (confirmed via the X-Worker-Colo response header - see worker.js's
-# corsHeaders): Hong Kong is one of Cloudflare's biggest Asia-Pacific hubs,
-# so it's a very plausible "closest to Google's Asia-Pacific presence" pick -
-# except Google's Gemini API is not available in Hong Kong or mainland China
-# AT ALL, by explicit policy, not as one blocked colo among many. Smart
-# Placement's latency-only heuristic has no way to know that, so it kept
-# landing on the one colo guaranteed to fail every time, and a client-side
-# retry against the same Worker deployment couldn't route around it either
-# (retrying doesn't change which colo Smart Placement judges "optimal").
-#
-# `region` instead pins the target explicitly: Cloudflare runs the Worker in
-# whichever of its own data centers has the lowest latency to the NAMED
-# cloud region below, rather than empirically guessing from traffic.
-# Available on every Workers plan; dashboard-only deploys only expose the
-# "Smart" toggle, so Wrangler/CI (see the CLI path above) is what applies it.
-#
-# It was `gcp:us-east4` (Ashburn, Virginia), the region live-tested against
-# Gemini. But this Worker is no longer mostly Gemini: Orbit Transit's TDX
-# calls (several per plan, all to Taipei), Orbit Weather's CWA calls and the
-# Quadra Pass all crossed the Pacific twice from there, and a slow TDX
-# answer is what showed in Orbit Transit as "暫時無法取得資料". Now
-# `gcp:asia-east1` (Changhua, Taiwan): it runs in Taipei (seen live:
-# the response header `cf-placement: remote-TPE`; X-Worker-Colo is the colo
-# the request came in through, not where the Worker ran). Taiwan is a Gemini-supported location; if a
-# "User location is not supported" ever comes back, it's handled on the
-# Gemini side (its own Worker or route), not by moving every app away.
-[placement]
-region = "gcp:asia-east1"
+# No [placement]: the proxy runs at the colo each request comes in through,
+# near the caller. It was pinned to Taiwan (gcp:asia-east1) for Gemini (which
+# refuses Hong Kong, where Smart Placement and some callers' colos land) and
+# for TDX and CWA; pinned whole, Yahoo turned most of its reads away
+# (2026-10-14: Taiwan's placement 11 of 16 refused, no placement 0 of 8), and
+# every Securities price and fill goes through Yahoo. So Gemini alone goes
+# through a relay pinned to Taiwan (gemini-relay.js, the service binding
+# GEMINI_RELAY below), as Cloudflare advises for one part that must run
+# somewhere.
+[[services]]
+binding = "GEMINI_RELAY"
+service = "gemini-relay"
 
 # Only needed for /sync and /vocab-sync (see worker.js's handleSyncRequest).
 # Not a secret on its own - it's already public today in the no-proxy

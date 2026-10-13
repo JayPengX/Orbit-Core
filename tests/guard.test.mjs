@@ -167,7 +167,7 @@ test('R2: writes Class A, reads Class B, deletes free, anything unknown counted 
 });
 
 test('every Worker\'s entry exports only handlers and classes (anything else stops the Worker from starting)', async () => {
-  for (const entry of ['../worker.js', '../guard-worker.js', '../sports-forward.js']) {
+  for (const entry of ['../worker.js', '../guard-worker.js', '../sports-forward.js', '../gemini-relay.js']) {
     const m = await import(entry);
     for (const [k, v] of Object.entries(m)) assert.ok(typeof v === 'function' || (k === 'default' && typeof v === 'object'), `${entry} exports ${k}`);
   }

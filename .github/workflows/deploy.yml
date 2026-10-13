@@ -10,6 +10,8 @@ on:
       - 'sports.js'
       - 'sports-forward.js'
       - 'http.js'
+      - 'gemini-relay.js'
+      - 'wrangler.gemini.toml'
       - 'data.js'
       - 'doc-store.js'
       - '.github/workflows/deploy.yml'
@@ -74,6 +76,14 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      # Gemini's relay, pinned to Taiwan (gemini-relay.js): before the proxy that binds it.
+      - name: Deploy gemini-relay
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --config wrangler.gemini.toml
+          wranglerVersion: '4'
       - name: Deploy orbit-workers-proxy (the proxy, every route)
         uses: cloudflare/wrangler-action@v3
         with:

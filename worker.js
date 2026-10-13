@@ -326,6 +326,9 @@ Regardless of documentKind:
 // single- and multi-file live runs.
 const GEMINI_ALLOWED_MODELS = ['gemini-3.5-flash-lite', 'gemini-3.7-flash'];
 
+// Gemini from Taiwan: through the relay (gemini-relay.js, pinned there) when
+// bound; this Worker runs near each caller, which Gemini may refuse (Hong Kong).
+const geminiFetch = (env, url, init) => (env.GEMINI_RELAY ? env.GEMINI_RELAY.fetch(`https://gemini-relay/?to=${encodeURIComponent(url)}`, init) : fetch(url, init));
 function geminiUrl(model, env) {
   return `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${env.GEMINI_API_KEY}`;
 }
@@ -521,7 +524,7 @@ function buildGenerationConfig(model, schema) {
 // request before a single byte reaches the browser.
 async function proxyGeminiRequest(model, parts, schema, env, headers, ctx, feature) {
   try {
-    const upstream = await fetch(geminiUrl(model, env), {
+    const upstream = await geminiFetch(env, geminiUrl(model, env), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
