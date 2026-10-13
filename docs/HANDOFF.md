@@ -19,6 +19,10 @@ plain text. `pregameLineups` now matches each name to the team's ESPN roster
 live box score already did. Live: 435 of 440 over five days (the rest off
 their roster since), today 22 of 22; a tap opened Steven Kwan's page.
 Checked in Chromium at 375 px (no WebKit in this container).
+Then (same day) soccer checked: its 陣容 tab (XI, formation, bench, posted
+about an hour before kick-off) already opens every player (Liverpool v Man
+City: 40 of 40). MLB-to-ESPN name matching made one rule everywhere
+(`mlb.mjs personKey`: the batting orders, live box score, diamond, game log).
 
 ## Securities' orders filled by the proxy (2026-10-14, pushed to `main`)
 
