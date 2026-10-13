@@ -19,6 +19,14 @@ colour (`tab-map bikeReturns`; a swap every 30 minutes, returned and rented
 at one station, marked once). Tested; not seen on screen (the preview's
 made-up network planned no bike trip): ask the owner.
 
+Then (the owner): a mark is to show exactly where the station is, as a bus
+stop's does. Both stations (take and return) are now the map's own YouBike
+marker, its tip on the station, its bikes and ⚡ (`planBikes`, from the plan's
+own stations), in place of the round mark; the trip view's live bike layer
+for its ends is gone (the plan layer has them, navigating too). Seen in the
+preview on a trip to 東區 (both stations, tips on them); navigation draws the
+same plan layer (not started in the preview).
+
 ## Transit: pinned places on the map (2026-10-13, pushed to `main`)
 
 The owner asked to see their pinned places on the map. Each one (家, 學校…)
