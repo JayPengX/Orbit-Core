@@ -343,10 +343,19 @@ On top of them, **apps put live knowledge over slower copies** (§8).
   minute). Read what's needed when it's needed. Keep built plans and boards
   on the phone and refresh only what's live (bus times, live scores). Poll
   only while it matters, and push from the Worker instead of polling.
-- **Stay on the free tiers, and show the bill.** Cloudflare's free plan
-  (100k requests a day, 10 ms CPU a call, KV's daily writes: rate limits
-  are counted in memory, not KV, since the owner got the free-tier emails,
-  2026-10-07), Google's monthly free calls with the Worker's own caps
+- **Never a penny past Cloudflare's $5 plan** (the owner, 2026-10-13: on
+  Workers Paid, "I don't want to pay a penny more"). Its included amounts a
+  month: 10M requests, 30M CPU ms, KV 10M reads, 1M writes, 1M deletes,
+  1M lists and 1 GB, Durable Objects 1M requests and 5 GB, Workers Logs 20M
+  events. Cloudflare has no spending cap, so `guard.js` (Worker
+  `quota-guard`) reads the account's real use every five minutes and takes
+  both proxies off the air at 90% of any of them until the next period;
+  each toml caps an invocation's CPU (`[limits]`) and samples its logs
+  (`head_sampling_rate`). A new Cloudflare product (R2, D1, Queues, …) is
+  added to `guard.js`'s `PLAN` in the same change, or not used. Rate limits
+  stay in memory, not KV (since the free-tier emails, 2026-10-07).
+- **Stay on the free tiers elsewhere, and show the bill.** Google's monthly
+  free calls with the Worker's own caps
   (past a cap: NLSC's map, OpenStreetMap's search, no Google plans), TDX's
   points. Every billed call shows in the admin page's cost panels (金流,
   容量, Google's bill at Google's prices, TDX by day). A new paid call is
@@ -745,3 +754,8 @@ What was decided, so it isn't undone. Newer calls win.
   The loading screen lifts only onto everything ready (Transit's map: the
   tiles, what's in view, the strip in its order), and opening may not get
   slower for it.
+  Cloudflare on Workers Paid ($5 a month), never a penny more: the guard
+  (`guard.js`) stops both proxies before any included amount runs out,
+  until the next period. The two proxies stay two Workers: placement is
+  still a whole Worker's on every plan (sports near the caller, the rest
+  in Taiwan), and calls between them cost nothing.

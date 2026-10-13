@@ -129,9 +129,9 @@ export const DEV = {
   transitLive: { def: 10, min: 5, max: 120, unit: 's', group: 'transit', zh: '交通卡片重新讀取', en: 'Transit cards refresh', note: '公車、捷運、台鐵、行程中' },
   transitBike: { def: 30, min: 15, max: 300, unit: 's', group: 'transit', zh: 'YouBike 重新讀取', en: 'YouBike refresh', note: '地圖上附近的車位' },
   // capacity.js: the live refreshes above slowed together when the people
-  // expected in 30 days would run past Cloudflare's free plan (checked every
+  // expected in 30 days would run past Cloudflare's $5 plan (checked every
   // 6 hours); the numbers above stay the owner's own, the floor.
-  autoScale: { def: false, group: 'scale', zh: '依人數自動調整', en: 'Scale with people', note: '人數預估會超過 Cloudflare 免費額度時，上面的即時更新一起放慢（每 6 小時檢查）；有空間就回到上面的設定' },
+  autoScale: { def: false, group: 'scale', zh: '依人數自動調整', en: 'Scale with people', note: '人數預估會超過 Cloudflare $5 方案的額度時，上面的即時更新一起放慢（每 6 小時檢查）；有空間就回到上面的設定' },
   mirror: { def: true, group: 'data', zh: '使用每晚的資料副本', en: 'Use the nightly copies', note: '關掉：所有 App 都直接問代理（除錯用）' }
 };
 export const DEV_GROUPS = { proxy: '代理（sports-proxy）', sports: 'Orbit Sports', f1: 'F1', play: 'Quadra Play', transit: 'Orbit Transit（TDX）', scale: '容量', data: '資料' };

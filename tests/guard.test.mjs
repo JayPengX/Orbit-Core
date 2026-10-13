@@ -1,0 +1,158 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { period, chunks, judge, guardRun, PLAN, STATE_KEY, BLIND_MS, WORKERS } from '../guard.js';
+
+const DAY = 86_400_000;
+const T = s => Date.parse(s);
+
+test('period: from the renewal day, counted from the day before; a 31st in a short month is its last day', () => {
+  const p = period(T('2026-10-20T05:00:00Z'), 13);
+  assert.equal(p.start, T('2026-10-13T00:00:00Z'));
+  assert.equal(p.end, T('2026-11-13T00:00:00Z'));
+  assert.equal(p.from, T('2026-10-12T00:00:00Z'));
+  assert.equal(period(T('2026-10-05T00:00:00Z'), 13).start, T('2026-09-13T00:00:00Z'));
+  assert.equal(period(T('2027-01-02T00:00:00Z'), 13).start, T('2026-12-13T00:00:00Z'));
+  assert.equal(period(T('2026-02-28T12:00:00Z'), 31).start, T('2026-02-28T00:00:00Z'));
+  assert.equal(period(T('2026-02-28T12:00:00Z'), 31).end, T('2026-03-31T00:00:00Z'));
+});
+
+test('chunks: a period in pieces of a week at most, end to end', () => {
+  const c = chunks(0, 20 * DAY);
+  assert.deepEqual(c, [[0, 7 * DAY], [7 * DAY, 14 * DAY], [14 * DAY, 20 * DAY]]);
+});
+
+test('judge: any count at 90% of the plan is over', () => {
+  assert.deepEqual(judge({ requests: 8_999_999 }).over, []);
+  assert.deepEqual(judge({ requests: 9_000_000 }).over, ['requests']);
+  const j = judge({ requests: 1e6, cpuMs: 28e6, kvWrite: 950_000 });
+  assert.deepEqual(j.over.sort(), ['cpuMs', 'kvWrite']);
+  assert.equal(j.top, 'kvWrite');
+});
+
+// A fake Cloudflare: analytics answering `use`, the Workers' addresses and crons.
+function fakeCf(use, { cpuField = true, fail = false } = {}) {
+  const workers = Object.fromEntries(WORKERS.map(w => [w, { on: true, crons: w === 'sports-proxy' ? ['* * * * SUN'] : ['*/2 * * * *', '1-59/2 * * * *'] }]));
+  const calls = [];
+  let first = true;
+  const fetcher = async (url, init = {}) => {
+    calls.push(`${init.method || 'GET'} ${url.replace(/^.*\/client\/v4/, '')}`);
+    const json = b => ({ ok: true, status: 200, json: async () => b });
+    if (url.endsWith('/graphql')) {
+      if (fail) return { ok: false, status: 500, json: async () => ({}) };
+      const q = JSON.parse(init.body).query;
+      if (!cpuField && q.includes('cpuTimeUs')) return json({ errors: [{ message: 'unknown field "cpuTimeUs"' }] });
+      if (q.includes('kvStorage')) return json({ data: { viewer: { accounts: [{ ks: [{ max: { byteCount: use.kvBytes || 0 }, dimensions: { date: '2026-10-20' } }], ds: [] }] } } });
+      // Everything in the first week's piece.
+      const piece = first ? use : {};
+      first = false;
+      return json({
+        data: {
+          viewer: {
+            accounts: [
+              {
+                w: [{ sum: { requests: piece.requests || 0, cpuTimeUs: (piece.cpuMs || 0) * 1000 }, quantiles: { cpuTimeP99: 5000 }, dimensions: { scriptName: 'sports-proxy' } }],
+                kv: [{ sum: { requests: piece.kvWrite || 0 }, dimensions: { actionType: 'write' } }],
+                d: [{ sum: { requests: piece.doRequests || 0 } }]
+              }
+            ]
+          }
+        }
+      });
+    }
+    const m = /scripts\/([^/]+)\/(subdomain|schedules)$/.exec(url);
+    const w = workers[m[1]];
+    const method = init.method || 'GET';
+    if (m[2] === 'subdomain') {
+      if (method === 'DELETE') w.on = false;
+      if (method === 'POST') w.on = JSON.parse(init.body).enabled;
+      return json({ success: true, result: { enabled: w.on } });
+    }
+    if (method === 'PUT') w.crons = JSON.parse(init.body).map(s => s.cron);
+    return json({ success: true, result: { schedules: w.crons.map(cron => ({ cron })) } });
+  };
+  return { fetcher, workers, calls };
+}
+function fakeKv() {
+  const m = new Map();
+  return { m, get: async k => m.get(k) ?? null, put: async (k, v) => void m.set(k, v) };
+}
+const env = { CF_GUARD_TOKEN: 't', CF_ACCOUNT_ID: 'a', PERIOD_DAY: '13', RATE_LIMIT_KV: null };
+
+test('under the plan: nothing stopped, the bill kept for the panel', async () => {
+  const cf = fakeCf({ requests: 2_000_000, cpuMs: 4_000_000, kvWrite: 20_000 });
+  const kv = fakeKv();
+  const s = await guardRun(env, { fetcher: cf.fetcher, kv, now: T('2026-10-20T00:00:00Z') });
+  assert.equal(s.stopped, undefined);
+  assert.equal(s.use.requests, 2_000_000);
+  assert.equal(s.use.cpuMs, 4_000_000);
+  assert.ok(cf.workers['sports-proxy'].on);
+  assert.ok(JSON.parse(kv.m.get(STATE_KEY)).armed);
+});
+
+test('at 90% of a count: both proxies off the air, crons kept; back on when the next period starts', async () => {
+  const cf = fakeCf({ requests: 9_100_000 });
+  const kv = fakeKv();
+  const s = await guardRun(env, { fetcher: cf.fetcher, kv, now: T('2026-10-30T00:00:00Z') });
+  assert.deepEqual(s.stopped.why, ['requests']);
+  for (const w of WORKERS) {
+    assert.equal(cf.workers[w].on, false);
+    assert.deepEqual(cf.workers[w].crons, []);
+  }
+  // A deploy turns sports-proxy's address back on: off again the next run.
+  cf.workers['sports-proxy'].on = true;
+  cf.workers['sports-proxy'].crons = ['* * * * SUN'];
+  const cf2 = fakeCf({ requests: 9_200_000 });
+  cf2.workers['sports-proxy'] = cf.workers['sports-proxy'];
+  cf2.workers['orbit-workers-proxy'] = cf.workers['orbit-workers-proxy'];
+  await guardRun(env, { fetcher: cf2.fetcher, kv, now: T('2026-10-30T00:05:00Z') });
+  assert.equal(cf.workers['sports-proxy'].on, false);
+  // The new period: the counts start again, the addresses and crons come back.
+  const cf3 = fakeCf({ requests: 1000 });
+  cf3.workers['sports-proxy'] = cf.workers['sports-proxy'];
+  cf3.workers['orbit-workers-proxy'] = cf.workers['orbit-workers-proxy'];
+  const back = await guardRun(env, { fetcher: cf3.fetcher, kv, now: T('2026-11-13T00:05:00Z') });
+  assert.equal(back.stopped, null);
+  assert.ok(cf.workers['sports-proxy'].on && cf.workers['orbit-workers-proxy'].on);
+  assert.deepEqual(cf.workers['orbit-workers-proxy'].crons, ['*/2 * * * *', '1-59/2 * * * *']);
+  assert.deepEqual(cf.workers['sports-proxy'].crons, ['* * * * SUN']);
+});
+
+test('still over in the same period: stays stopped', async () => {
+  const cf = fakeCf({ cpuMs: 27_500_000 });
+  const kv = fakeKv();
+  await guardRun(env, { fetcher: cf.fetcher, kv, now: T('2026-10-30T00:00:00Z') });
+  const s = await guardRun(env, { fetcher: fakeCf({ cpuMs: 27_600_000 }).fetcher, kv, now: T('2026-11-01T00:00:00Z') });
+  assert.ok(s.stopped);
+});
+
+test('no cpuTimeUs in the API: CPU from each Worker\'s 99th percentile (more, never less)', async () => {
+  const cf = fakeCf({ requests: 1_000_000 }, { cpuField: false });
+  const s = await guardRun(env, { fetcher: cf.fetcher, kv: fakeKv(), now: T('2026-10-20T00:00:00Z') });
+  assert.equal(s.cpuWay, 'p99');
+  assert.equal(s.use.cpuMs, 5_000_000);
+});
+
+test('unarmed (no token): says so, touches nothing', async () => {
+  const cf = fakeCf({ requests: 9_900_000 });
+  const s = await guardRun({ PERIOD_DAY: '13' }, { fetcher: cf.fetcher, kv: fakeKv(), now: T('2026-10-20T00:00:00Z') });
+  assert.equal(s.armed, false);
+  assert.match(s.error, /CF_GUARD_TOKEN/);
+  assert.equal(cf.calls.length, 0);
+});
+
+test('the bill unreadable for 6 hours while armed: stopped (never watched blind)', async () => {
+  const kv = fakeKv();
+  const cf = fakeCf({}, { fail: true });
+  const t0 = T('2026-10-20T00:00:00Z');
+  let s = await guardRun(env, { fetcher: cf.fetcher, kv, now: t0 });
+  assert.ok(!s.stopped);
+  s = await guardRun(env, { fetcher: cf.fetcher, kv, now: t0 + BLIND_MS - 60_000 });
+  assert.ok(!s.stopped);
+  s = await guardRun(env, { fetcher: cf.fetcher, kv, now: t0 + BLIND_MS + 60_000 });
+  assert.deepEqual(s.stopped.why, ['blind']);
+  assert.equal(cf.workers['sports-proxy'].on, false);
+});
+
+test('the plan\'s amounts are the $5 plan\'s (developers.cloudflare.com, 2026-10-13)', () => {
+  assert.deepEqual(PLAN, { requests: 10e6, cpuMs: 30e6, kvRead: 10e6, kvWrite: 1e6, kvDelete: 1e6, kvList: 1e6, kvBytes: 1e9, doRequests: 1e6, doBytes: 5e9 });
+});
