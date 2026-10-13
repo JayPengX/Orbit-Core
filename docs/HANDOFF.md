@@ -2537,3 +2537,9 @@ Quadra stays under 30% for anyone who plays much.
   graph's height so a tab change doesn't move the sheet; the 「深色＝雨量」
   note only when there's an amount; air's header no longer wraps (its level
   under the number; 「最差 …」 dropped, the graph shows it).
+- **The sheets' ranges by day** (the owner: "today, 48 and 10 days is kind
+  of weird"): every sheet's tabs are 今天 / 明天 / the days. 今天 is now to
+  midnight; from 18:00 it's 今晚 and runs on to 07:00 (the night and the
+  way out in the morning). Rain lost 24 h / 48 h; air gained hourly 今天 and
+  明天 from `air.hourly` (Google's hours pulled to the station), 每天 its old
+  bars; without hours air shows the days alone. UV kept its daylight days.
