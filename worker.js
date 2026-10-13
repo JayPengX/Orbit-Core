@@ -14,6 +14,7 @@
 //   GET   /transit/…             Orbit Transit's map, places, routes and TDX data (transit.js)
 //   GET/POST /play               Quadra Play's slips placed, cashed out and settled (settle.js)
 //   GET   /sports-proxy          the data proxy for Sports, Play and Securities (sports.js)
+//   GET   /data/…                the family's data in R2: packs, the mirror, bus packs (data.js)
 //   GET   /config                the developer settings
 //
 // The crons (scheduled, below): notices, Kambi, the weather's scoring and
@@ -40,6 +41,8 @@ import { handleTransit, tally } from './transit.js';
 import { readDev, capacityCron } from './eco-admin.js';
 import { handleSports, sportsCron, useDevSettings } from './sports.js';
 import { isAllowedOrigin, corsHeaders, json } from './http.js';
+import { handleData } from './data.js';
+import { STATE_KEY as GUARD_STATE } from './guard.js';
 // The F1 lap log's Durable Object (f1-live.js), bound as F1_LOG.
 export { F1Log } from './f1-live.js';
 
@@ -1262,6 +1265,14 @@ export default {
     // The data proxy for Sports, Play and Securities (sports.js): its own
     // session gate and per-app limits.
     if (path === '/sports-proxy') return handleSports(request, env, ctx, headers, ip);
+    // The bill's guard (guard.js), as it last read the bill: armed or not,
+    // each count's share of the $5 plan, stopped or not. No key or token.
+    if (path === '/guard' && request.method === 'GET') {
+      const g = JSON.parse((await env.RATE_LIMIT_KV?.get(GUARD_STATE).catch(() => null)) || 'null');
+      return json(g ? { at: g.at, armed: g.armed, error: g.error || null, cpuWay: g.cpuWay || null, stopAt: g.stopAt, share: g.share || null, stopped: g.stopped ? { at: g.stopped.at, why: g.stopped.why } : null, period: g.period || null } : { ran: false }, 200, headers);
+    }
+    // The family's data, kept in R2 (data.js): packs, the mirror, bus packs.
+    if (path.startsWith('/data/')) return handleData(request, env, ctx, headers, ip, path);
     // The developer settings (kit/devconfig.mjs), for every app and the
     // sports proxy: kept a minute in Cloudflare's cache (one read of the
     // store a minute, however many ask).

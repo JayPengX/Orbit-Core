@@ -41,7 +41,7 @@ function fakeCf(use, { cpuField = true, fail = false } = {}) {
       if (fail) return { ok: false, status: 500, json: async () => ({}) };
       const q = JSON.parse(init.body).query;
       if (!cpuField && q.includes('cpuTimeUs')) return json({ errors: [{ message: 'unknown field "cpuTimeUs"' }] });
-      if (q.includes('kvStorage')) return json({ data: { viewer: { accounts: [{ ks: [{ max: { byteCount: use.kvBytes || 0 }, dimensions: { date: '2026-10-20' } }], ds: [] }] } } });
+      if (q.includes('kvStorage')) return json({ data: { viewer: { accounts: [{ ks: [{ max: { byteCount: use.kvBytes || 0 }, dimensions: { date: '2026-10-20' } }], ds: [], rs: [{ max: { payloadSize: use.r2Bytes || 0, metadataSize: 0 }, dimensions: { bucketName: 'quadra-data', datetime: '2026-10-20T00:00:00Z' } }, { max: { payloadSize: 1, metadataSize: 0 }, dimensions: { bucketName: 'quadra-data', datetime: '2026-10-19T00:00:00Z' } }] }] } } });
       // Everything in the first week's piece.
       const piece = first ? use : {};
       first = false;
@@ -52,7 +52,13 @@ function fakeCf(use, { cpuField = true, fail = false } = {}) {
               {
                 w: [{ sum: { requests: piece.requests || 0, cpuTimeUs: (piece.cpuMs || 0) * 1000 }, quantiles: { cpuTimeP99: 5000 }, dimensions: { scriptName: 'sports-proxy' } }],
                 kv: [{ sum: { requests: piece.kvWrite || 0 }, dimensions: { actionType: 'write' } }],
-                d: [{ sum: { requests: piece.doRequests || 0 } }]
+                d: [{ sum: { requests: piece.doRequests || 0 } }],
+                r2: [
+                  { sum: { requests: piece.r2Put || 0 }, dimensions: { actionType: 'PutObject' } },
+                  { sum: { requests: piece.r2Get || 0 }, dimensions: { actionType: 'GetObject' } },
+                  { sum: { requests: 5 }, dimensions: { actionType: 'DeleteObject' } },
+                  { sum: { requests: piece.r2Odd || 0 }, dimensions: { actionType: 'SomethingNew' } }
+                ]
               }
             ]
           }
@@ -154,5 +160,14 @@ test('the bill unreadable for 6 hours while armed: stopped (never watched blind)
 });
 
 test('the plan\'s amounts are the $5 plan\'s (developers.cloudflare.com, 2026-10-13)', () => {
-  assert.deepEqual(PLAN, { requests: 10e6, cpuMs: 30e6, kvRead: 10e6, kvWrite: 1e6, kvDelete: 1e6, kvList: 1e6, kvBytes: 1e9, doRequests: 1e6, doBytes: 5e9 });
+  assert.deepEqual(PLAN, { requests: 10e6, cpuMs: 30e6, kvRead: 10e6, kvWrite: 1e6, kvDelete: 1e6, kvList: 1e6, kvBytes: 1e9, doRequests: 1e6, doBytes: 5e9, r2ClassA: 1e6, r2ClassB: 10e6, r2Bytes: 10e9 });
+});
+
+test('R2: writes Class A, reads Class B, deletes free, anything unknown counted as Class A; the bucket\'s latest size', async () => {
+  const cf = fakeCf({ r2Put: 800_000, r2Get: 3_000_000, r2Odd: 150_000, r2Bytes: 2_000_000_000 });
+  const s = await guardRun(env, { fetcher: cf.fetcher, kv: fakeKv(), now: T('2026-10-20T00:00:00Z') });
+  assert.equal(s.use.r2ClassA, 950_000);
+  assert.equal(s.use.r2ClassB, 3_000_000);
+  assert.equal(s.use.r2Bytes, 2_000_000_000);
+  assert.deepEqual(s.stopped.why, ['r2ClassA']);
 });
