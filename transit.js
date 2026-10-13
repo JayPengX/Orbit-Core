@@ -441,7 +441,7 @@ export function parseTextSearch(j, lat = null, lon = null) {
       const plat = num(p.location?.latitude);
       const plon = num(p.location?.longitude);
       const sub = String(p.formattedAddress || '').replace(/^\d{3,6}/, '').replace(/^(臺灣|台灣)/, '').trim();
-      return { id: p.id || '', name: p.displayName?.text || '', sub, lat: plat, lon: plon, dist: lat != null && plat != null ? Math.round(distM(lat, lon, plat, plon)) : null, types: (p.types || []).slice(0, 4) };
+      return { id: p.id || '', name: p.displayName?.text || '', sub, lat: plat, lon: plon, dist: lat != null && plat != null ? Math.round(distM(lat, lon, plat, plon)) : null, types: (p.types || []).slice(0, 8) };
     })
     .filter(p => p.id && p.name && p.lat != null);
 }
@@ -471,9 +471,33 @@ const NEAR_M = 25_000;
 // Search's, Google's own spelling of the name: 八分雲集 → 八方雲集) before
 // anything else, and a branch in another city left out while one's near;
 // then the rest (an address, a place with no position). 15 at most.
-export function nearFirst(items, near, text) {
+// A place and its parts (LaLaport and its cinema, its car parks, a shop in
+// it): when the words typed are in each one's name, they're within 400 m of
+// a whole place by Google's own type (a mall, a station, an airport…), and
+// each is plainly a part (its type a car park, a cinema, a shop…, or the
+// whole place's name in its own: 台北車站 M3出口), only the whole place. Nothing folds without one: two branches of a chain
+// stay two. A part only by its distance (no position: Autocomplete's) folds
+// when its distance from you is within 400 m of the whole place's.
+const WHOLE = new Set(['shopping_mall', 'department_store', 'airport', 'train_station', 'subway_station', 'university', 'hospital', 'stadium', 'amusement_park', 'zoo', 'museum']);
+// What sits in a whole place (a car park, a cinema, a shop, somewhere to eat): a place of its own beside one (新竹轉運站 by 新竹車站) is none of these.
+const PART = new Set(['parking', 'parking_lot', 'parking_garage', 'movie_theater', 'restaurant', 'cafe', 'bakery', 'food_court', 'fast_food_restaurant', 'store', 'supermarket', 'atm', 'bank', 'electric_vehicle_charging_station', 'gym', 'beauty_salon', 'hair_salon', 'pharmacy', 'drugstore', 'bar', 'book_store']);
+const isPart = types => (types || []).some(x => PART.has(x) || /_store$|_restaurant$|_shop$/.test(x));
+export function folded(list, text) {
   const t = squash(text);
-  const all = [...near, ...items];
+  const named = i => t.length >= 2 && squash(i.name).includes(t);
+  const wholes = list.filter(i => named(i) && i.lat != null && (i.types || []).some(x => WHOLE.has(x)));
+  if (!wholes.length) return list;
+  const partOf = i =>
+    named(i) &&
+    !wholes.some(w => w.id === i.id) &&
+    wholes.some(w => (i.lat != null ? distM(w.lat, w.lon, i.lat, i.lon) <= 400 : i.dist != null && w.dist != null && Math.abs(i.dist - w.dist) <= 400) && (isPart(i.types) || squash(i.name).includes(squash(w.name))));
+  return list.filter(i => !partOf(i));
+}
+export function nearFirst(found, near, text) {
+  const t = squash(text);
+  const all = folded([...near, ...found], text);
+  const items = found.filter(i => all.includes(i));
+  near = near.filter(i => all.includes(i));
   const close = all.filter(i => i.dist != null && i.dist <= NEAR_M).sort((a, b) => a.dist - b.dist);
   // (A name typed whole, found near: those first among the near ones.)
   const whole = close.filter(i => squash(i.name).includes(t));
