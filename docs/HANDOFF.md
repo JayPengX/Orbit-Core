@@ -41,6 +41,15 @@ in metres: moved with the pace, 竹東's verdict, 竹東信義立體停車場 no
 8 minutes on, flipped). One made-up test moved (470 m, not 400, for "only
 just" at the new pace). Verdicts unchanged. Not run: the live batch.
 
+Then (the owner, a walk from home to 成功國中's station): the strip 6 分 ·
+510 公尺, the trip 3 分 · 210 公尺, its line round the block. The trip was
+TDX's: its walk came with a line but no length (the proxy's straight guess,
+×1.3) and a time to match the guess. A planner's walk now takes its line's
+length when that's clearly longer, and the time to walk it (`walksByLine`,
+before `tidy`; first walk out earlier, last in later, one between rides
+within the gap). Tested (the owner's block); not seen on screen (the preview
+has no TDX planner).
+
 ## Transit: the YouBike return station on the map, navigating (2026-10-13, pushed to `main`)
 
 The owner, riding 臺鐵竹中車站 → 綠41公園: no mark where the bike goes back.
