@@ -389,6 +389,11 @@ On top of them, **apps put live knowledge over slower copies** (§8).
   of "too many" is never asked again at once. Clicking through every view
   fast is normal use: `--live` prints the busiest minute of asks, and it
   must sit well under a session's limit (600).
+- **No new Cron Triggers.** The ones added on 2026-10-13 were registered
+  and never run (a fault Cloudflare's forums report that year). Work that
+  runs on a clock goes on the proxy's two crons (the even and odd
+  minutes, `worker.js scheduled`, by the minute) or a Durable Object's
+  alarm (the guard's clock).
 - **The Worker's CPU is small**: a 1 MB national list is never parsed on a
   request; a table built from it by a tool is committed instead
   (`weather-stations.js`).
