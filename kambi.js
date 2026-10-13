@@ -22,6 +22,8 @@
 // An entry: { id, start, live (Kambi's liveData object, or null), seen (when
 // it was last read), gone (Kambi no longer has it), checked, done }.
 
+import { storeReady } from './doc-store.js';
+
 export const KAMBI_COLLECTION = 'kambi-results';
 // One document listing every watched match and its start, so each cron run
 // costs one read instead of listing the whole collection (the cron runs
@@ -61,7 +63,7 @@ const parse = payload => {
 
 export async function handleKambiRequest(request, env, headers, ip, deps) {
   const { json, errorJson, upstreamFailed } = deps;
-  if (!env.FIREBASE_PROJECT_ID || !env.FIREBASE_CLIENT_EMAIL || !env.FIREBASE_PRIVATE_KEY) return errorJson('MISSING_FIREBASE_CONFIG', 500, headers, request);
+  if (!storeReady(env)) return errorJson('MISSING_FIREBASE_CONFIG', 500, headers, request);
   try {
     if (request.method === 'GET') {
       const limited = await deps.rateLimitResponse(env, ip, 'kambi:read', LIMITS.read, headers, request);

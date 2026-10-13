@@ -41,6 +41,7 @@
 // readJsonBody, INVALID_BODY, fsGet, fsWrite, fsDelete, now }, plus `read(url)`
 // (a source's JSON, or null), and `notify(account, message)` (push.js).
 
+import { storeReady } from './doc-store.js';
 import { readOutcomes, legResult, applyResults, finalOf, familyOf, LEAGUES } from './kit/settle.mjs';
 import { updateWallet, WALLET_COLLECTION, parseWallet, poolBalance, LOCK_SINCE } from './eco.js';
 import { checkSlip, useReads, cashOutQuote, cashOutOk } from './price.js';
@@ -196,7 +197,7 @@ const recordOf = (slip, at) => ({
 
 export async function handlePlay(request, env, headers, session, deps) {
   const { json, errorJson, upstreamFailed } = deps;
-  if (!env.FIREBASE_PROJECT_ID || !env.FIREBASE_CLIENT_EMAIL || !env.FIREBASE_PRIVATE_KEY) return errorJson('MISSING_FIREBASE_CONFIG', 500, headers, request);
+  if (!storeReady(env)) return errorJson('MISSING_FIREBASE_CONFIG', 500, headers, request);
   // The dev door (a localhost page, no pass): a slip's prices checked, nothing placed.
   if (!session && deps.dev && request.method === 'POST') {
     const body = await deps.readJsonBody(request);

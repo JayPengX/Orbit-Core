@@ -45,7 +45,7 @@ import { isAllowedOrigin, corsHeaders, json } from './http.js';
 import { handleData } from './data.js';
 import { handleStock } from './stock-fill.js';
 import { runBuilders, SLOTS as BUILD_SLOTS } from './builders/run.js';
-import { docStore, copyToD1, compareStores, backupToR2 } from './doc-store.js';
+import { docStore, copyToD1, compareStores, backupToR2, storeReady } from './doc-store.js';
 import { gzip } from './builders/store.js';
 import { STATE_KEY as GUARD_STATE } from './guard.js';
 // The F1 lap log's Durable Object (f1-live.js), bound as F1_LOG.
@@ -1402,7 +1402,7 @@ export default {
     if (event.cron === SETTLE_CRON) {
       // (Every fourth minute the lottery's tickets instead, lotto.js: each run its own fetches.)
       const tickets = new Date(event.scheduledTime || Date.now()).getUTCMinutes() % 4 === 3;
-      if (env.FIREBASE_PROJECT_ID && env.FIREBASE_CLIENT_EMAIL && env.FIREBASE_PRIVATE_KEY)
+      if (storeReady(env))
         ctx.waitUntil(
           (tickets ? lottoCron(env, playDeps(env)).then(r => r.settled && console.log('play tickets', JSON.stringify(r))) : settleCron(env, playDeps(env)).then(r => r.looked && console.log('play settle', JSON.stringify(r)))).catch(e => console.log('play cron failed', String(e)))
         );
@@ -1411,7 +1411,7 @@ export default {
     ctx.waitUntil(sendDue(env).then(r => r.sent && console.log('push sent', JSON.stringify(r))));
     // Orbit Weather's scoring, once an hour (weather-skill.js).
     if (new Date(event.scheduledTime || Date.now()).getUTCMinutes() === 10) ctx.waitUntil(weatherCron(env).then(r => console.log('weather skill', JSON.stringify(r))).catch(e => console.log('weather skill failed', String(e))));
-    if (!env.FIREBASE_PROJECT_ID || !env.FIREBASE_CLIENT_EMAIL || !env.FIREBASE_PRIVATE_KEY) return;
+    if (!storeReady(env)) return;
     // The store's move (doc-store.js): while dual, Firestore's documents copied
     // into D1 once (what D1 has from a write since stays: it's newer), then
     // all of Firestore backed up into R2 once (private/, never served).

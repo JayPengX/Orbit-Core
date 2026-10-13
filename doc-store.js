@@ -89,6 +89,10 @@ export function d1Store(raw) {
   };
 }
 
+// Whether the store can be used: D1 bound in 'd1' mode, else Firebase's
+// service account set.
+export const storeReady = env => (env.STORE_MODE === 'd1' ? Boolean(env.STORE) : Boolean(env.FIREBASE_PROJECT_ID && env.FIREBASE_CLIENT_EMAIL && env.FIREBASE_PRIVATE_KEY));
+
 // The calls worker.js hands on, by the mode. `fs`: Firestore's
 // ({ get, write, list, collections, batch, delete }, each (env, …)).
 export function docStore(fs) {

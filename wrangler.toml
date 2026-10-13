@@ -65,7 +65,9 @@ TRANSIT_DEV = "on"
 SPORTS_DEV = "on"
 # The Pass's store (doc-store.js): "firestore", "dual" (Firestore the truth,
 # every write copied to D1, the cron copying the rest), then "d1".
-STORE_MODE = "dual"
+# D1 alone since 2026-10-14: all 15 documents copied and compared clean,
+# Firestore's last copy in R2 (private/firestore-backup.jsonl.gz).
+STORE_MODE = "d1"
 
 # GEMINI_API_KEY (for /gemini, /nl-edit, /vocab-ai) and
 # FIREBASE_CLIENT_EMAIL / FIREBASE_PRIVATE_KEY (for /sync and /vocab-sync,
