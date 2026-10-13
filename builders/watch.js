@@ -30,7 +30,7 @@ import { CATALOG, asiaMonthOf, asiaMonthUrl } from '../kit/catalog.mjs';
 import { teamNameZh } from '../kit/names.mjs';
 import * as HL from '../kit/sports-highlights.mjs';
 import { BROADCAST, eltaVodsOf, eltaVodUrl, eltaEpisode, eltaSessionEpisode, parseEltaIndex, eltaPages } from '../kit/sports-broadcast.mjs';
-import { mirrorPath } from '../kit/quadra.mjs';
+import { mirrorPath } from '../kit/mirror.mjs';
 import { trimEltaVod } from '../sports.js';
 import { asiaBaseballResponse } from '../asia-baseball.js';
 import { keeps, keptFrom, seasonBegun, seasonState, yearSeason } from './season.js';

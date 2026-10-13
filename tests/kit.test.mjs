@@ -120,31 +120,23 @@ test('packJson reads a pack from the family\'s data (/data/, R2), not the data p
   await assert.rejects(kit.packJson('sports/nope/2026.json'), e => e.status === 404);
 });
 
-test("a read the nightly mirror holds comes from GitHub Pages until its time, then from the proxy; one it doesn't hold, from the proxy", async () => {
+test("every read goes to the proxy in the batch (the proxy answers a held read from the nightly mirror); one the app knows is behind asks the source on its own (mirror=0)", async () => {
   const asked = [];
-  const now = Date.now();
-  const roster = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/13/roster';
-  const day = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20261005&limit=200';
-  const files = {
-    'mirror/index.json': { built: now, until: now + 86_400_000, match: ['^espn-roster!|^!https://site\\.api\\.espn\\.com/apis/site/v2/sports/[^?]+/(teams/\\d+/roster|scoreboard\\?dates=\\d{8}&limit=200)$'] },
-    [kit.mirrorPath(roster)]: { until: now + 3_600_000, data: { from: 'mirror' } },
-    [kit.mirrorPath(day)]: { until: now - 1, data: { from: 'old mirror' } }
-  };
-  assert.equal(kit.mirrorPath(day), 'mirror/_/site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard/dates~3D20261005~26limit~3D200.json');
   globalThis.fetch = async url => {
     asked.push(String(url));
-    const path = String(url).replace(kit.PACKS_URL, '');
-    if (String(url).startsWith(kit.PACKS_URL)) return files[path] ? new Response(JSON.stringify(files[path]), { status: 200 }) : new Response('nope', { status: 404 });
-    return new Response(JSON.stringify({ from: 'proxy' }), { status: 200 });
+    const u = new URL(String(url));
+    if (u.searchParams.has('batch')) return new Response(JSON.stringify({ r: u.searchParams.getAll('u').map(() => ({ s: 200, b: { from: 'batch' } })) }), { status: 200 });
+    return new Response(JSON.stringify({ from: 'one' }), { status: 200 });
   };
-  assert.equal((await kit.proxyJson(roster, { persist: false })).from, 'mirror');
-  assert.ok(!asked.some(u => u.startsWith(kit.PROXY_URL)), 'the proxy never asked');
-  assert.equal((await kit.proxyJson(day, { persist: false })).from, 'proxy', 'past its time: the proxy');
-  assert.equal((await kit.proxyJson(`${roster.replace('13', '14')}`, { persist: false, trim: 'espn-roster' })).from, 'proxy', 'held by pattern, not built: the proxy');
-  assert.equal((await kit.proxyJson('https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard', { persist: false })).from, 'proxy', 'not held');
-  const n = asked.length;
-  await kit.proxyJson(day, { persist: false, ttl: 0 });
-  assert.equal(asked.slice(n).filter(u => u.startsWith(kit.PACKS_URL)).length, 0, 'not looked for again');
+  const roster = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/21/roster';
+  const day = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20261006&limit=200';
+  const [a, b] = await Promise.all([kit.proxyJson(roster, { persist: false }), kit.proxyJson(day, { persist: false })]);
+  assert.deepEqual([a.from, b.from], ['batch', 'batch']);
+  assert.ok(!asked.some(u => u.startsWith(kit.PACKS_URL)), 'no copy fetched by the phone');
+  assert.equal(asked.filter(u => u.includes('batch=1')).length, 1, 'one request for both');
+  const fresh = await kit.proxyJson(`${day}&x=1`, { persist: false, mirror: false });
+  assert.equal(fresh.from, 'one');
+  assert.ok(asked.at(-1).includes('&mirror=0'));
 });
 
 test('a device keeps its sign-in and the account id, never the pass', () => {
@@ -532,14 +524,6 @@ test('pressSelector: every :active a press the kit sets, not one iOS puts on a s
   assert.equal(kit.pressSelector('button:active:not(:disabled)'), 'button[data-q-press]:not(:disabled)');
   assert.equal(kit.pressSelector('.q-switch:active::after'), '.q-switch[data-q-press]::after');
   assert.equal(kit.pressSelector('.a:hover'), '.a:hover');
-});
-
-test("the mirror's gzipped copies unpacked, a plain one (or one the browser unpacked) read as it is", async () => {
-  const { gzJson } = await import('../kit/quadra.mjs');
-  const { gzipSync } = await import('node:zlib');
-  const data = { until: 1, data: { events: ['洋基', 1] } };
-  assert.deepEqual(await gzJson(new Response(gzipSync(JSON.stringify(data)))), data);
-  assert.deepEqual(await gzJson(new Response(JSON.stringify(data))), data);
 });
 
 test('a pack a phone kept before the move (under the Pages address) is still its copy: opened at once, nothing asked', async () => {

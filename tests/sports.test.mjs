@@ -223,3 +223,29 @@ test('one proxy: /sports-proxy answers with the Worker\'s CORS (its cache header
   assert.match(res.headers.get('Access-Control-Expose-Headers') || '', /X-Sports-Proxy-Cache/);
   assert.equal(res.headers.get('Access-Control-Allow-Origin'), 'https://jaypengx.github.io');
 });
+
+// (Last: the mirror's bucket is the module's from here on.)
+test('a read the nightly mirror holds is answered from its copy (in a batch too), kept in the edge cache, the source never asked; past its time, or mirror=0, the source', async () => {
+  const { r2Store, memoryBucket } = await import('../builders/store.js');
+  const { mirrorPath } = await import('../kit/mirror.mjs');
+  const bucket = memoryBucket();
+  const s = r2Store(bucket);
+  const held = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/13/roster';
+  const old = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/14/roster';
+  await s.put('mirror/index.json', { match: ['^!https://site\\.api\\.espn\\.com/apis/site/v2/sports/[^?]+/teams/\\d+/roster$'] });
+  await s.put(`${mirrorPath(held)}.gz`, { until: Date.now() + 3_600_000, data: { from: 'mirror' } });
+  await s.put(`${mirrorPath(old)}.gz`, { until: Date.now() - 1, data: { from: 'old mirror' } });
+  const env = { DATA: bucket };
+  const ask = url => worker.fetch(new Request(url, { headers: { Origin: 'https://jaypengx.github.io' } }), env, ctx);
+  const before = upstreamCalls.length;
+  const one = await ask(`https://proxy.test/sports-proxy?url=${encodeURIComponent(held)}&app=match`);
+  assert.deepEqual(await one.json(), { from: 'mirror' });
+  assert.equal(one.headers.get('X-Sports-Proxy-Cache'), 'MIRROR');
+  assert.equal(upstreamCalls.length, before, 'the source never asked');
+  const batch = await (await ask(`https://proxy.test/sports-proxy?batch=1&u=${encodeURIComponent(held)}&u=${encodeURIComponent(old)}&app=match`)).json();
+  assert.deepEqual(batch.r[0].b, { from: 'mirror' });
+  assert.equal(batch.r[1].b.from, old, 'past its time: the source');
+  store.clear();
+  const opted = await ask(`https://proxy.test/sports-proxy?url=${encodeURIComponent(held)}&app=match&mirror=0`);
+  assert.equal((await opted.json()).from, held);
+});
