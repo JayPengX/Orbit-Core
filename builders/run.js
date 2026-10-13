@@ -7,11 +7,13 @@
 import { r2Store } from './store.js';
 import { runWatch } from './watch.js';
 import { runWinprob } from './winprob.js';
+import { runCpbl, CPBL_HOUR } from './cpbl.js';
 
 // The paths each moved builder owns in R2 (prefixes).
 export const MOVED = {
   watch: ['sports/watch.json', 'sports/watch/', 'sports/elta-pages.json'],
-  winprob: ['winprob/']
+  winprob: ['winprob/'],
+  cpbl: ['sports/cpbl/standings.json']
 };
 // Win probability once a day, after the night's season packs are in R2
 // (Shared-Data's night build, ~20:00-21:30 UTC, until that moves here too).
@@ -34,6 +36,12 @@ export async function runBuilders(env, { proxy, now = Date.now(), log = console.
       done.winprob = await runWinprob({ store, proxy, now });
     } catch (e) {
       done.winprob = { failed: String(e?.message || e).slice(0, 200) };
+    }
+  if (new Date(now).getUTCHours() === CPBL_HOUR)
+    try {
+      done.cpbl = await runCpbl({ store, now });
+    } catch (e) {
+      done.cpbl = { failed: String(e?.message || e).slice(0, 200) };
     }
   done.store = store.stats;
   log('builders', JSON.stringify(done));
