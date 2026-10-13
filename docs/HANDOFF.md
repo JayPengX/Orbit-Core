@@ -10,6 +10,28 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
 
 
 
+## Transit: pinned places on the map (2026-10-13, pushed to `main`)
+
+The owner asked to see their pinned places on the map. Each one (家, 學校…)
+is now a marker at every zoom: its icon in a white-ringed disc and its name
+(`tab-map placeMarker`, layer `places`, drawn with the chips so a change in
+我的 shows at once; hidden while navigating, like the other layers). A tap
+opens the place's card (路線, 已釘選), the marker itself selected; its chip
+selects it too. Help text and README updated. Checked in the preview
+(Chromium at 375 px: WebKit isn't installed in this container): both pins
+drawn, a tap opens 家's card.
+
+## Transit: pinned places on the map (2026-10-13, pushed to `main`)
+
+The owner asked to see their pinned places on the map. Each one (家, 學校…)
+is now a marker at every zoom: its icon in a white-ringed disc and its name
+(`tab-map placeMarker`, layer `places`, drawn with the chips so a change in
+我的 shows at once; hidden while navigating, like the other layers). A tap
+opens the place's card (路線, 已釘選), the marker itself selected; its chip
+selects it too. Help text and README updated. Checked in the preview
+(Chromium at 375 px: WebKit isn't installed in this container): both pins
+drawn, a tap opens 家's card. Not yet seen on a phone.
+
 ## Transit: the owner's list of 2026-10-13 morning, five items (pushed to `main`)
 
 1. **編輯行程 while navigating** (⋯; replaces 先去別的地方 and 改目的地): the
