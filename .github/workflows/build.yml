@@ -1,0 +1,28 @@
+# A builder's job run now (by hand): the family's data (builders/run.js),
+# through the proxy's POST /data/build with the push secret. For checking a
+# builder without waiting for its minute or its hour.
+name: Run a builder
+on:
+  workflow_dispatch:
+    inputs:
+      job:
+        description: The job
+        type: choice
+        options: [watch, watch-full, drain, cutouts, buses, asia, cpbl, sports, photos, winprob]
+        default: watch
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Run it
+        run: |
+          case "$JOB" in
+            watch-full) q='job=watch&full=1' ;;
+            watch|drain|cutouts|buses) q="job=$JOB" ;;
+            *) q="only=$JOB" ;;
+          esac
+          curl -sS --max-time 900 -X POST -H "Authorization: Bearer $DATA_PUSH_SECRET" "https://orbit-workers-proxy.pengzjay.workers.dev/data/build?$q"; echo
+        env:
+          JOB: ${{ inputs.job }}
+          DATA_PUSH_SECRET: ${{ secrets.DATA_PUSH_SECRET }}

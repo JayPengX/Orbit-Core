@@ -36,8 +36,8 @@ export const WINPROB_HOUR = 23;
 export const SLOTS = { 16: 'watch', 18: 'drain', 20: 'cutouts', 22: 'daily', 24: 'buses' };
 
 // `proxy(url, trim)`: a read through the data proxy's route (its trims and edge cache), its JSON or null.
-export async function runBuilders(env, { proxy, now = Date.now(), job = SLOTS[new Date(now).getUTCMinutes()], log = console.log } = {}) {
-  if (!env.DATA || !job) return { off: env.DATA ? 'no job this minute' : 'no data bucket' };
+export async function runBuilders(env, { proxy, now = Date.now(), job = SLOTS[new Date(now).getUTCMinutes()], full, only, log = console.log } = {}) {
+  if (!env.DATA || (!job && !only)) return { off: env.DATA ? 'no job this minute' : 'no data bucket' };
   const store = r2Store(env.DATA);
   const hour = new Date(now).getUTCHours();
   const done = {};
@@ -48,11 +48,17 @@ export async function runBuilders(env, { proxy, now = Date.now(), job = SLOTS[ne
       done[name] = { failed: String(e?.message || e).slice(0, 200) };
     }
   };
-  if (job === 'watch') await step('watch', () => runWatch({ store, proxy, now, until: now + 8 * 60_000 }));
+  if (job === 'watch') await step('watch', () => runWatch({ store, proxy, now, until: now + 8 * 60_000, full }));
   // The move from Shared-Data: every listed file into R2 (once; a few minutes a run).
   if (job === 'drain' && env.RATE_LIMIT_KV) await step('drain', () => runDrain({ store, kv: env.RATE_LIMIT_KV, now, until: Date.now() + 5 * 60_000 }));
   if (job === 'cutouts') await step('cutouts', () => runCutouts({ store, now }));
   if (job === 'buses') await step('buses', () => runBuses({ store, env, now, until: now + 6 * 60_000 }));
+  // (By hand, POST /data/build: one of the daily ones now.)
+  if (only === 'asia') await step('asia', () => runAsia({ store, now }));
+  if (only === 'cpbl') await step('cpbl', () => runCpbl({ store, now }));
+  if (only === 'sports') await step('sports', () => runSports({ store, now }));
+  if (only === 'photos') await step('photos', () => runPhotos({ store, proxy, now }));
+  if (only === 'winprob') await step('winprob', () => runWinprob({ store, proxy, now }));
   if (job === 'daily') {
     if (hour === ASIA_HOUR) await step('asia', () => runAsia({ store, now }));
     if (hour === CPBL_HOUR) await step('cpbl', () => runCpbl({ store, now }));
