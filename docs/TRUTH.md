@@ -35,7 +35,7 @@ file is how to work on them.
 - **One person runs the whole family** and works across every repo in
   `~/Documents/GitHub` (Orbit-Class, Orbit-Transit, Orbit-Weather,
   Orbit-Sports (was Quadra Fixtures), Orbit-Words (was Quadra Hub),
-  Quadra-Play, Quadra-Securities, Shared-Data, Shared-Proxy). A request that names no
+  Quadra-Play, Quadra-Securities, Shared-Proxy; Shared-Data retired 2026-10-13). A request that names no
   repo means whichever the context says, often several.
 - **They use the apps on their iPhone, installed on the home screen, in
   Safari's engine**, every day, and send what they find: a list (9, 22, 33,
@@ -275,12 +275,13 @@ a good copy; Shared-Proxy's README has the details:
    than its `ttl` is used without asking anyone);
 3. the failure hold (a source that just failed isn't asked again by every
    part of a page);
-4. Shared-Data's mirror (`mirror/index.json`: the reads that can't change
-   before a known moment, each good until then);
-5. Shared-Data's packs (`packJson`: a league's season, the bus timetables,
-   photos, watch links, win-probability lines);
-6. the sports proxy's edge cache, by tier (live seconds, a finished game a
-   day, tables half an hour);
+4. the family's data in R2 (the proxy's `/data/`, read with `packJson`: a
+   league's season, the bus timetables, photos, watch links,
+   win-probability lines; built by the proxy's cron, `builders/`);
+5. the data proxy's edge cache in Taiwan, by tier (live seconds, a finished
+   game a day, tables half an hour);
+6. R2's kept reads (a read over for good, kept the first time anyone reads
+   it: a finished game, a day or month of them);
 7. the upstream.
 
 On top of them, **apps put live knowledge over slower copies** (§8).
@@ -308,36 +309,42 @@ On top of them, **apps put live knowledge over slower copies** (§8).
   pass** (wallet settings), not only in localStorage. Each installed app
   has storage of its own. The kit's `sayOnce` says a notice once for the
   whole pass.
-- **What doesn't change in a day comes from the nightly packs**, never
-  through the proxy: a league's season (`Shared-Data`'s `sports/<league>/
-  <year>.json`, built at midnight, read with the kit's `packJson`), the bus
-  timetables and shapes. The proxy is for what's live. A 6 MB answer
-  through a Worker is a bug: a few at once run it out of memory and every
-  request on it fails together.
-- **Any read can be mirrored**: Shared-Data's `mirror.mjs` stores, each
-  night, the reads the apps would ask the proxy for that can't change
-  before a known time (a team's page until its next game, a finished box
-  score, a past month, last season), each with that time; the kit's
-  `proxyJson` answers from the mirror while it's good and asks the proxy
-  otherwise, with no change in the app. A new slow-changing read goes in
-  `mirror.mjs` at the same URL; its slimming drops only what no app's
-  parser reads.
-- **Sports data: Shared-Data first.** Any new or changed sports read (a
-  league's season, a team's or player's page, a finished game's box score
-  or win probability line, last season's playoffs) is weighed against
-  Shared-Data before it goes through the proxy: a season pack, the mirror
-  or a pack of its own (as `winprob/`) built at night, read once by
-  everyone. Shared-Data keeps Orbit Sports' leagues' seasons whole (Quadra
-  Play needs only the last days' results: it settles slips, which are kept
-  on the phone for good): every game's and
-  race's full result, its box score, its watch links, win probability,
-  tables, and every player's and team's numbers, the regular season and
-  the playoffs alike. It is wiped, all of it at once, only when the next
-  season has begun: a game of it played, its preseason's included (the
-  owner's change, 2026-10-12: the gap between seasons is long). A run that can't tell which season it is
-  wipes nothing. Each build adds what's new on top of what's built, never
-  reads a finished thing again, and reads only for the leagues each app
-  shows.
+- **What doesn't change in a day comes from the family's data**, never
+  through the data proxy's sources: a league's season
+  (`sports/<league>/<year>.json`, built at midnight Taiwan, read with the
+  kit's `packJson`), the bus timetables and shapes, photos, watch links,
+  win probability. It lives in R2 and is built by the proxy's own cron
+  (`builders/`, each as often as its data changes and no more). The data
+  proxy is for what's live. A 6 MB answer through a Worker is a bug: a few
+  at once run it out of memory and every request on it fails together.
+- **Read on demand** (the owner, 2026-10-13: "some can be read per user
+  request"): what's over for good (a finished game's box score, a day or a
+  month of games all over, a past Asian month) is never built ahead: the
+  data proxy keeps it in R2 the first time anyone reads it and answers from
+  there for good, the source asked once, ever. A new read that settles goes
+  in `sports.js` `settleable` / `settledData`; a slow-changing one that
+  doesn't is served from the edge cache by its tier. Nothing is prefetched
+  that nobody opens.
+- **Sports data: the family's data first.** Any new or changed sports read
+  (a league's season, a finished game's box score or win probability line,
+  last season's playoffs) is weighed against R2 before it goes to a
+  source: a pack a builder makes (as `winprob/`), or a read kept on demand.
+  Orbit Sports' leagues' seasons are kept whole (Quadra Play needs only the
+  last days' results: it settles slips, kept on the phone for good): every
+  game's and race's result (kept as it's read), its watch links, win
+  probability, tables, and every player's and team's numbers, the regular
+  season and the playoffs alike. A season is wiped, all of it at once, only
+  when the next season has begun: a game of it played, its preseason's
+  included (the owner's change, 2026-10-12: the gap between seasons is
+  long), all but last season's playoff bracket and final tables, wiped when
+  the new regular season begins. Next season's schedule is built from the
+  day after this season's last possible day. Orbit Sports' date strips and
+  📅 reach only the kept days to the season's last possible day
+  (`sports/bounds.json`), so the proxy isn't asked for days with nothing
+  kept. ELTA's season pages are found by their titles, nothing coded per
+  year. A run that can't tell which season it is wipes nothing. Each build
+  adds what's new on top of what's built, never reads a finished thing
+  again, and reads only for the leagues each app shows.
 - **Save the proxy, the APIs and Firebase quota.** Use the kit's
   `proxyJson` (batched, cached in memory and on the device, failures held a
   minute). Read what's needed when it's needed. Keep built plans and boards
@@ -759,4 +766,10 @@ What was decided, so it isn't undone. Newer calls win.
   until the next period. One proxy for everything (the owner, the same
   day): the data proxy is a route of `orbit-workers-proxy` (`sports.js`),
   in Taiwan with the rest; `sports-proxy`'s address only forwards to it
-  until every phone has the new kit.
+  until every phone has the new kit. Everything on Cloudflare while the
+  plan is paid, and ultra efficient (the owner, the same day): Shared-Data
+  moved into R2 (copied as built, no source read again) and its builders
+  into the proxy's cron (`builders/`), each lean (only what's new, only as
+  often as it changes, written only when it changed); the nightly mirror
+  replaced by reading on demand; Shared-Data retired. Firebase moves to
+  Cloudflare next (D1), then is abandoned.

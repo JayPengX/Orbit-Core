@@ -10,6 +10,44 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
 
 
 
+## Shared-Data onto Cloudflare: R2, the builders in the proxy, read on demand (2026-10-13/14, pushed to `main`)
+
+The owner: move Shared-Data to Cloudflare (keeping the $5 plan), copy the
+existing files rather than reading them again, ultra efficient, "some can be
+read per user request", and remove the repo.
+- **R2** (`quadra-data`, Asia-Pacific; the owner turned R2 on): `/data/<path>`
+  (`data.js`: edge cache in Taiwan → R2 → Shared-Data's Pages copy while
+  moving). The last GitHub build copied in as it was (Shared-Data's
+  `r2sync.mjs`, run "r2": the Pages artifact, no source read). The kit's
+  `packJson` and Transit's packs read `/data/` (phones' saved copies kept:
+  the kit keys under the old Pages address, Transit by name).
+- **Read on demand** (`sports.js`): a read over for good (a completed game,
+  a day or month all completed, a past Asian month) kept in R2 the first time
+  anyone reads it, served from there for good. The nightly mirror (37,000
+  copies rewritten each night: ~1.1M R2 writes a month, past R2's free 1M)
+  isn't ported. Mirror reads go through the proxy's batches (`fromMirror`),
+  not a request each.
+- **The builders** in the proxy's hourly cron (`builders/run.js`, §4.7 of
+  the README): watch (hourly light, daily full), winprob (daily, Polymarket
+  through the proxy's trimmed cache), CPBL tables and whole months (TheSportsDB
+  day by day: cpbl.com.tw answers no server, Taiwan's included), season packs
+  (only unsettled months), photo lists (four a day in turn), cutouts (20 an
+  hour), buses (a city a week, TDX in small pages for the Worker's memory).
+  Orbit Sports' broadcast, highlights and win probability moved into the kit
+  (`kit/sports-*.mjs`) so the builders run the app's own code.
+- **The guard** counts R2 too (10 GB, 1M Class A, 10M Class B; unknown
+  operations as Class A). Fixed on the way: its cron never ran (every proxy
+  push redeployed it: `deploy-guard.yml` now, only its own files); its entry
+  exported constants (`guard-worker.js`). `tail.yml` reads any Worker's logs.
+- **Shared-Data**: everything removed but the bus builders' workflow, then
+  that too once the copy's confirmed; the repo's deletion waits on the
+  owner's yes (it can't be undone; its Pages site goes with it).
+- Phones: highlights searched on the phone only in a game's first hours
+  (the hourly pack has the rest); one connection, not two.
+- Checked: npm test (Shared-Proxy 287, Shared-Data 5), dry runs, live: the
+  merged route, `/data/` answering, the F1 log. Not yet seen: the first
+  hourly builders' run on Cloudflare (16:17 UTC), the guard's first reading.
+
 ## One proxy for everything (2026-10-13, pushed to `main`)
 
 The owner: "one proxy for all … organize it so it's not two independent
