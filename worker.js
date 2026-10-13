@@ -19,7 +19,7 @@
 //
 // The crons (scheduled, below): notices, Kambi, the weather's scoring and
 // capacity on the even minutes; Play's slips and lottery on the odd ones; F1's
-// laps each minute Thursday to Monday. Every route but /eco's sign-in needs a
+// laps each minute Thursday to Monday; the family's data hourly (builders/). Every route but /eco's sign-in needs a
 // Quadra Pass session (`qt=`); CORS and JSON answers come from http.js. It
 // runs in Taiwan ([placement], wrangler.toml), where the people and most
 // sources are. The Quadra Pass is the only way anything is saved.
@@ -42,6 +42,7 @@ import { readDev, capacityCron } from './eco-admin.js';
 import { handleSports, sportsCron, useDevSettings } from './sports.js';
 import { isAllowedOrigin, corsHeaders, json } from './http.js';
 import { handleData } from './data.js';
+import { runBuilders } from './builders/run.js';
 import { STATE_KEY as GUARD_STATE } from './guard.js';
 // The F1 lap log's Durable Object (f1-live.js), bound as F1_LOG.
 export { F1Log } from './f1-live.js';
@@ -1194,12 +1195,15 @@ async function readSource(url) {
 // A placed slip's prices are read as Play reads them: through the sports
 // proxy (its cache and trims; this Worker's own route, with a short session
 // of its own), the nightly packs from Shared-Data's Pages.
-let priceToken = { value: '', until: 0 };
-async function sportsToken(env) {
-  if (priceToken.until > Date.now() + 60_000) return priceToken.value;
+// (One short session of this Worker's own per app it reads for.)
+const workerTokens = new Map();
+async function sportsToken(env, app = 'odds') {
+  const had = workerTokens.get(app);
+  if (had && had.until > Date.now() + 60_000) return had.value;
   const until = Date.now() + 10 * 60_000;
-  priceToken = { value: await signToken(await tokenSecret(env), { k: 'ses', s: 'worker:price', a: 'odds', d: 'worker', g: 0, e: until }), until };
-  return priceToken.value;
+  const value = await signToken(await tokenSecret(env), { k: 'ses', s: `worker:${app}`, a: app, d: 'worker', g: 0, e: until });
+  workerTokens.set(app, { value, until });
+  return value;
 }
 // (The sports proxy is this Worker's own route: called in place, its cache
 // writes kept within this call.)
@@ -1218,6 +1222,12 @@ const priceReads = env => ({
     return res.json();
   }
 });
+// The builders' reads through the data proxy's route, as Orbit Sports' (its trims, its cache).
+const builderProxy = env => async url => {
+  const ask = `https://orbit-workers-proxy.quadra/sports-proxy?url=${encodeURIComponent(url)}&app=match&qt=${encodeURIComponent(await sportsToken(env, 'match'))}`;
+  const res = await handleSports(new Request(ask), env, inPlace, {}, 'worker');
+  return res.ok ? res.json() : null;
+};
 const playDeps = env => ({ ...ECO_DEPS, read: readSource, prices: priceReads(env), notify: (account, make) => notifyNow(env, account, 'odds', 'slip', make) });
 
 // ==== Routing ================================================================
@@ -1226,6 +1236,8 @@ const playDeps = env => ({ ...ECO_DEPS, read: readSource, prices: priceReads(env
 const SETTLE_CRON = '1-59/2 * * * *';
 // …and its third: the F1 lap log, each minute Thursday to Monday (UTC).
 const F1_CRON = '* * * * SUN,MON,THU,FRI,SAT';
+// …and its fourth: the family's data built (builders/run.js), hourly at :17.
+const BUILD_CRON = '17 * * * *';
 
 // The developer settings as GET /config answers them: kept a minute in
 // Cloudflare's cache (one read of the store a minute, however many ask).
@@ -1336,6 +1348,8 @@ export default {
   async scheduled(event, env, ctx) {
     // F1's laps while a session runs (sports.js, f1-live.js).
     if (event.cron === F1_CRON) return ctx.waitUntil(sportsCron(env, event.scheduledTime || Date.now()));
+    // The family's data (builders/): watch links, and the rest as they move from Shared-Data.
+    if (event.cron === BUILD_CRON) return ctx.waitUntil(runBuilders(env, { proxy: builderProxy(env), now: event.scheduledTime || Date.now() }).catch(e => console.log('builders failed', String(e))));
     // Odd minutes: Quadra Play's slips whose games should be over (settle.js),
     // in an invocation of its own (its own 50 fetches and CPU).
     if (event.cron === SETTLE_CRON) {

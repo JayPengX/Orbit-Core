@@ -146,6 +146,8 @@ class_name = "F1Log"
 tag = "f1-log-main"
 new_sqlite_classes = ["F1Log"]
 
-# The F1 lap log (the third): each minute Thursday to Monday, UTC.
+# The F1 lap log (the third): each minute Thursday to Monday, UTC. The
+# family's data (the fourth, builders/run.js): hourly at :17 (an hourly
+# cron may run 15 minutes of CPU).
 [triggers]
-crons = ["*/2 * * * *", "1-59/2 * * * *", "* * * * SUN,MON,THU,FRI,SAT"]
+crons = ["*/2 * * * *", "1-59/2 * * * *", "* * * * SUN,MON,THU,FRI,SAT", "17 * * * *"]

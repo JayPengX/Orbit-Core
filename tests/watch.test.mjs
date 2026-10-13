@@ -1,0 +1,142 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+const { espnGames } = await import('../builders/watch.js');
+
+test("a scoreboard's games over, as the app's highlights picking reads them; a race weekend's sessions each its own", () => {
+  const team = (id, name, short, score, homeAway) => ({ homeAway, team: { id, displayName: name, shortDisplayName: short }, score });
+  const data = {
+    events: [
+      { id: '1', date: '2026-10-07T00:08Z', competitions: [{ status: { type: { state: 'post', name: 'STATUS_FINAL' } }, notes: [{ headline: 'NLDS - Game 3' }], series: { type: 'playoff', summary: 'MIL leads 2-1' }, competitors: [team('25', 'San Diego Padres', 'Padres', '4', 'home'), team('8', 'Milwaukee Brewers', 'Brewers', '3', 'away')] }] },
+      { id: '2', date: '2026-10-08T00:08Z', competitions: [{ status: { type: { state: 'pre' } }, competitors: [team('1', 'A', 'A', '', 'home'), team('2', 'B', 'B', '', 'away')] }] },
+      { id: '3', date: '2026-10-06T00:08Z', competitions: [{ status: { type: { state: 'post', name: 'STATUS_POSTPONED' } }, competitors: [team('1', 'A', 'A', '', 'home'), team('2', 'B', 'B', '', 'away')] }] }
+    ]
+  };
+  const [g, ...rest] = espnGames(data, 'mlb');
+  assert.equal(rest.length, 0);
+  assert.deepEqual(g, { id: '1', league: 'mlb', kind: 'match', start: '2026-10-07T00:08Z', status: { state: 'post' }, home: { id: '25', en: 'San Diego Padres', name: 'San Diego Padres', short: 'Padres', score: '4' }, away: { id: '8', en: 'Milwaukee Brewers', name: 'Milwaukee Brewers', short: 'Brewers', score: '3' }, note: 'NLDS - Game 3', series: { summary: 'MIL leads 2-1' } });
+  const f1 = espnGames({ events: [{ id: '600060990', name: 'Gulf Air Bahrain Grand Prix', competitions: [{ type: { abbreviation: 'Qual' }, date: '2026-10-03T08:00Z', status: { type: { state: 'post' } } }, { type: { abbreviation: 'Race' }, date: '2026-10-04T07:00Z', status: { type: { state: 'pre' } } }] }] }, 'f1');
+  assert.deepEqual(f1.map(x => [x.id, x.sessionKey]), [['600060990~Qual', 'Qual']]);
+});
+
+test("Apple TV's MLS games: each with its page, kick-off and clubs, matched to ESPN's by kick-off and a club's code", async () => {
+  const { appleEvents, appleMatch } = await import('../builders/watch.js');
+  const lockup = (id, title, extra) => ({ type: 'SportingEvent', title, segue: { destination: { id }, url: `https://tv.apple.com/tw/sporting-event/x/${id}?ctx_brand=tvs.sbd.7000` }, ...extra });
+  const page = {
+    shelves: [
+      { items: [lockup('umc.cse.a', '紐約紅牛 vs 聖地亞哥', { primaryMetadata: ['MLS', { isoDatetime: '2026-10-10T23:30:00.000Z' }], competitors: [{ abbreviation: 'RBNY' }, { abbreviation: 'SD' }] })] },
+      // Listed again with nothing: kept as first known; a show isn't a game.
+      { items: [lockup('umc.cse.a', '紐約 vs 聖地亞哥', {}), lockup('umc.cse.s', 'MLS 360', {}), lockup('umc.cse.b', '聖路易斯 vs 洛杉磯銀河', { badge: { isoDatetime: '2026-10-11T22:30:00.000Z' }, competitors: [{ abbreviation: 'STL' }, { abbreviation: 'LA' }] })] },
+      // A game's own page: no link to itself, its id in its metrics.
+      { $kind: 'SuperheroLockup', type: 'SportingEvent', title: 'LAFC vs 溫哥華', impressionMetrics: { id: { id: 'umc.cse.c' } }, primaryMetadata: [{ isoDatetime: '2026-10-11T02:30:00.000Z' }], competitors: [{ abbreviation: 'LAFC' }, { abbreviation: 'VAN' }] }
+    ]
+  };
+  const ev = appleEvents(page);
+  assert.deepEqual([...ev.keys()].sort(), ['umc.cse.a', 'umc.cse.b', 'umc.cse.c']);
+  assert.equal(ev.get('umc.cse.a').url, 'https://tv.apple.com/tw/sporting-event/x/umc.cse.a');
+  assert.deepEqual(ev.get('umc.cse.a').teams, ['RBNY', 'SD']);
+  // ESPN's NY is Apple's RBNY: one club's code and the kick-off are enough.
+  assert.equal(appleMatch({ start: '2026-10-10T23:30Z', teams: ['NY', 'SD'] }, ev.values()).id, 'umc.cse.a');
+  // Apple dates a game from its show, half an hour early.
+  assert.equal(appleMatch({ start: '2026-10-11T23:00Z', teams: ['STL', 'LA'] }, ev.values()).id, 'umc.cse.b');
+  assert.equal(appleMatch({ start: '2026-10-12T23:00Z', teams: ['STL', 'LA'] }, ev.values()), null);
+  assert.equal(appleMatch({ start: '2026-10-10T23:30Z', teams: ['ATL', 'CIN'] }, ev.values()), null);
+});
+
+test("a game's ELTA.tv episodes for the season's archive: its 原音 cut and ELTA's own, on its day in Taiwan; the season kept, last season's playoffs before the next", async () => {
+  const { eltaOf, keeps } = await import('../builders/watch.js');
+  const e = { id: '9', league: 'mlb', kind: 'match', start: '2026-10-01T01:08Z', status: { state: 'post' }, home: { en: 'Houston Astros' }, away: { en: 'Chicago White Sox' } };
+  const sides = [['太空人'], ['白襪']];
+  const eps = [
+    { id: '72745', title: '10/1 美聯外卡G2 白襪VS太空人' },
+    { id: '72743', title: '10/1 白襪 VS 太空人 美聯外卡賽G2 (原音)' },
+    { id: '72700', title: '9/30 白襪 VS 太空人 美聯外卡賽G1 (原音)' },
+    { id: '72800', title: '10/2 白襪 VS 太空人 精華' }
+  ];
+  assert.deepEqual(eltaOf(eps, e, sides, 2150), { v: 2150, eps: [['72743', '10/1 白襪 VS 太空人 美聯外卡賽G2 (原音)'], ['72745', '10/1 美聯外卡G2 白襪VS太空人']] });
+  assert.equal(eltaOf(eps.slice(2), e, sides, 2150), null);
+  // The owner's rule: a season whole until the next one's first game (its preseason's too).
+  const { seasonBegun } = await import('../builders/watch.js');
+  const season = { start: Date.parse('2026-09-30T00:00Z'), year: 2027 };
+  const ev = (date, type, slug) => ({ date, season: { year: 2027, type, slug } });
+  const now = Date.parse('2026-10-12T00:00Z');
+  assert.equal(seasonBegun([ev('2026-10-03T00:00Z', 1, 'preseason'), ev('2026-10-21T00:00Z', 2, 'regular-season')], 2027, now), true, 'a preseason game played');
+  assert.equal(seasonBegun([ev('2026-10-21T00:00Z', 2, 'regular-season')], 2027, now), false, 'nothing played yet');
+  const pre = { ...season, begun: false };
+  assert.equal(keeps(pre, Date.parse('2026-04-15T00:00Z')), true, "last season's regular season kept until the new one's first game");
+  assert.equal(keeps(pre, Date.parse('2026-06-15T00:00Z')), true, 'its playoffs too');
+  const on = { ...season, begun: true };
+  assert.equal(keeps(on, Date.parse('2026-06-15T00:00Z')), false, 'let go once a game of the new season is played');
+  assert.equal(keeps(on, Date.parse('2026-10-01T00:00Z')), true);
+});
+
+test("recheck: once, every football game's highlights looked for again", async () => {
+  const { recheck, CHECKED } = await import('../builders/watch.js');
+  const store = () => new Map([
+    ['mls', new Map([['a', { t: 1, hl: { id: 'X' }, miss: 1 }], ['c', { t: 3, hl: { id: 'Y' } }]])],
+    ['mlb', new Map([['d', { t: 4, hl: { id: 'Z' } }], ['e', { t: 5, miss: 2 }]])]
+  ]);
+  const soccer = key => key === 'mls';
+  const s1 = store();
+  assert.equal(recheck(s1, CHECKED, soccer), 0);
+  // 2: the leagues in innings, quarters or periods (MLB's inning cut, 2026-10-13).
+  const s2 = store();
+  assert.equal(recheck(s2, 2, soccer), 1);
+  assert.equal(s2.get('mls').get('c').hl.id, 'Y');
+  assert.equal(s2.get('mlb').get('d').hl, undefined);
+  assert.equal(s2.get('mlb').get('e').miss, 2);
+  const s15 = store();
+  assert.equal(recheck(s15, 1, soccer), 3);
+  const s0 = store();
+  assert.equal(recheck(s0, 0, soccer), 3);
+  assert.deepEqual([...s0.get('mls').values()], [{ t: 1 }, { t: 3 }]);
+  assert.deepEqual(s0.get('mlb').get('d'), { t: 4 });
+  assert.equal(s0.get('mlb').get('e').miss, 2);
+});
+
+test("shareOut: a video on two games is the one begun last before it went up; the other never gets it again", async () => {
+  const { shared, shareOut } = await import('../builders/watch.js');
+  const H = 3_600_000;
+  const store = new Map([['mlb', new Map([['g1', { t: 10 * H, hl: { id: 'V' } }], ['g2', { t: 16 * H, hl: { id: 'V' } }], ['g3', { t: 20 * H, hl: { id: 'W' } }]])]]);
+  const list = shared(store).get('V');
+  assert.equal(shared(store).size, 1);
+  // Up at 14:00, before the second game: the first's.
+  assert.equal(shareOut(store, 'V', list, 14 * H), 1);
+  assert.equal(store.get('mlb').get('g1').hl.id, 'V');
+  assert.deepEqual(store.get('mlb').get('g2'), { t: 16 * H, not: ['V'] });
+  // Its time unknown: both looked for again, neither told.
+  const s2 = new Map([['mls', new Map([['a', { t: 1, hl: { id: 'X' } }], ['b', { t: 2, hl: { id: 'X' } }]])]]);
+  assert.equal(shareOut(s2, 'X', shared(s2).get('X'), NaN), 2);
+  assert.deepEqual([...s2.get('mls').values()], [{ t: 1 }, { t: 2 }]);
+});
+
+test('a run on R2: the recent pack written, the season\'s archive kept as it was when nothing new is found, no source refused twice', async () => {
+  const { runWatch } = await import('../builders/watch.js');
+  const { r2Store, memoryBucket } = await import('../builders/store.js');
+  const now = Date.parse('2026-10-13T12:00:00Z');
+  const t = Date.parse('2026-09-20T01:00:00Z');
+  const store = r2Store(
+    memoryBucket({
+      'sports/watch/index.json': { built: 'x', checked: 3, leagues: { mlb: { months: ['2026-09'], kept: 1 } } },
+      'sports/watch/mlb/2026-09.json': { games: { 'mlb:1:': { t, hl: { id: 'abc' } } } },
+      'sports/watch.json': { built: 'x', games: {} }
+    })
+  );
+  const asked = [];
+  const get = async url => (asked.push(String(url)), new Response('', { status: 404 }));
+  // (Asia's months read by asia-baseball.js with the global fetch: refused too, no network.)
+  const real = globalThis.fetch;
+  globalThis.fetch = get;
+  let r;
+  try {
+    r = await runWatch({ store, proxy: async () => null, get, now, until: now, sleep: async () => {} });
+  } finally {
+    globalThis.fetch = real;
+  }
+  assert.equal(r.recent, 0);
+  const pack = await store.json('sports/watch.json');
+  assert.equal(pack.built, new Date(now).toISOString());
+  const month = await store.json('sports/watch/mlb/2026-09.json');
+  assert.deepEqual(month.games['mlb:1:'], { t, hl: { id: 'abc' } });
+  assert.ok(asked.length > 0);
+});
