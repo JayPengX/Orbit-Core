@@ -31,7 +31,7 @@ import { BRANDS, FAMILIES, pathOf, appIcon, familyMark } from './brand.mjs';
 import { DEV, cleanDev } from './brand.mjs';
 
 export const ECO_URL = 'https://orbit-workers-proxy.pengzjay.workers.dev/eco';
-export const PROXY_URL = 'https://sports-proxy.pengzjay.workers.dev/sports-proxy';
+export const PROXY_URL = 'https://orbit-workers-proxy.pengzjay.workers.dev/sports-proxy';
 
 // The developer settings (devconfig.mjs, the admin panel's 開發): how often
 // live data is read again, the switches. The device's copy at once, the

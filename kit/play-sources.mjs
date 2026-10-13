@@ -18,7 +18,7 @@ import { parseAsiaSchedule } from '#kit/play-schedules.mjs';
 import { offersUrl, parseOffers } from '#kit/play-offers.mjs';
 import { loadGamePlayers } from '#kit/play-players.mjs';
 
-export const PROXY_URL = 'https://sports-proxy.pengzjay.workers.dev';
+export const PROXY_URL = 'https://orbit-workers-proxy.pengzjay.workers.dev';
 // Reading results and the parsers both the phone and the Worker's settling
 // use: the shared kit's (settle.mjs), one copy.
 import { yyyymmdd, parseJsonArray, futureTeamName, sameGame, sameSide, parseOpenF1Flags, parseEspnResults, parseEspnRace, parseEspnPole, parseFutureResult, teamCorners, asiaResult, kambiUnresolvable, kambiInPlay, readOutcomes, F1_FLAG_KINDS } from '#kit/settle.mjs';
