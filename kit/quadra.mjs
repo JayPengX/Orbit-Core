@@ -666,11 +666,9 @@ export async function translate(text, to = 'zh-TW', from = 'auto') {
 const FAILED_HOLD_MS = 60_000;
 // A failed or stale read asked again after this.
 const RETRY_MS = 15_000;
-// The nightly mirror is the proxy's to answer from (sports.js fromMirror: a
-// read it holds comes from its copy, in the batch like any other).
-// `mirror: false`: this one read from the source, never the nightly copy (an
-// app that knows the copy has moved on: mirrorBuilt says when it was built),
-// asked on its own.
+// A read over for good is answered from what the proxy keeps (sports.js),
+// in the batch like any other. `mirror: false`: this one from its source,
+// never a kept copy, asked on its own.
 export function proxyJson(url, { ttl = 60_000, trim = '', persist: keep = true, timeout = 20_000, mirror = true } = {}) {
   return keptJson(url, dataKey(url, trim), { ttl, keep }, () => (mirror && !mirrorGone.has(`${trim}!${url}`) ? enqueue(url, trim, timeout) : fetchOne(url, trim, timeout, '&mirror=0')));
 }
@@ -691,14 +689,7 @@ export function packJson(path, { ttl = 3 * 3_600_000, timeout = 30_000 } = {}) {
     return res.text();
   });
 }
-// The nightly mirror (the family's data, mirror/…): copies of the reads
-// that can't change before a known time, answered by the proxy itself
-// (sports.js) when a read comes in. mirror/index.json says when it was
-// built: what happened after it (a playoff game over) the copies don't have.
-export async function mirrorBuilt() {
-  return Number((await packJson('mirror/index.json', { ttl: 30 * 60_000, timeout: 8_000 }).catch(() => null))?.built) || 0;
-}
-// A read the app knows the copy of is behind: the source's for the session.
+// A read that must come from its source, never a kept copy: the session's.
 const mirrorGone = new Set();
 export function unmirror(url, trim = '') {
   mirrorGone.add(`${trim}!${url}`);

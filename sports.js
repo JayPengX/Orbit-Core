@@ -19,7 +19,7 @@ import { ASIA_HOST, asiaBaseballResponse, asiaTarget, cpblBoxTarget } from './as
 import { F1_LIVE_HOST, f1LiveResponse, doLog, sampleLive } from './f1-live.js';
 import { cleanDev } from './kit/devconfig.mjs';
 import { json } from './http.js';
-import { MIRROR_HOSTS, mirrorPath } from './kit/mirror.mjs';
+import { mirrorPath } from './kit/mirror.mjs';
 
 // ==== /sports-proxy - CORS passthrough for public sports data ==============
 const ELTA_HOST = 'piceltaott-elta.cdn.hinet.net';
@@ -857,46 +857,8 @@ function parseTarget(target) {
 // How long an old copy's fresh read is waited for before the old copy is
 // answered (a batch's item waits 3 s in all).
 const FRESH_WAIT_MS = 2_000;
-// The nightly mirror (the family's data, R2 mirror/…, built at night): a
-// read it holds and is still good (its `until`) is answered from the copy,
-// not the source, and kept in the edge cache until then. So a phone's
-// mirrored reads travel in its batches like any other (they were a request
-// each to the copies), and a source is asked only for what can have changed.
-// `mirror=0` on a read, or the 開發 switch off: the source's.
+// The family's data (R2), set by each request (env.DATA).
 let dataBucket = null;
-let mirrorIdx = { at: 0, p: null };
-function mirrorIndex() {
-  if (Date.now() - mirrorIdx.at > 5 * 60_000 || !mirrorIdx.p) {
-    const bucket = dataBucket;
-    mirrorIdx = {
-      at: Date.now(),
-      p: bucket
-        .get('mirror/index.json')
-        .then(o => (o ? o.json() : null))
-        .then(x => (x ? { until: Number(x.until) || 0, match: (x.match || []).map(m => new RegExp(m)) } : null))
-        .catch(() => null)
-    };
-  }
-  return mirrorIdx.p;
-}
-export async function fromMirror(upstreamUrl, trim, now = Date.now()) {
-  if (!dataBucket || dev.mirror === false || !MIRROR_HOSTS.has(upstreamUrl.hostname)) return null;
-  const index = await mirrorIndex();
-  const url = upstreamUrl.toString();
-  // (The whole mirror is good only until its next build plus some hours: a build that failed never leaves it trusted.)
-  if (!index || (index.until && now >= index.until) || !index.match.some(re => re.test(`${trim || ''}!${url}`))) return null;
-  const obj = await dataBucket.get(`${mirrorPath(url, trim)}.gz`).catch(() => null);
-  if (!obj) return null;
-  try {
-    const raw = new Uint8Array(await obj.arrayBuffer());
-    const bytes = raw[0] === 0x1f && raw[1] === 0x8b ? new Uint8Array(await new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()) : raw;
-    const copy = JSON.parse(new TextDecoder().decode(bytes));
-    const until = Math.min(copy?.until || 0, index.until || Infinity);
-    return until > now ? { until, body: JSON.stringify(copy.data) } : null;
-  } catch {
-    return null;
-  }
-}
 
 // Kept on first read (the family's data, R2): a read over for good (a game
 // completed, a day or month of them, a past Asian month) is kept the first
@@ -999,14 +961,6 @@ async function resolveOne(upstreamUrl, trim, ctx, { mirror = true } = {}) {
     const result = { status: 200, contentType: 'application/json', body: kept, final: true };
     ctx.waitUntil(cache.put(cacheKey, cacheEntry(result, CACHE_FINAL)));
     return { ...result, cache: 'KEPT', age: 0, policy: CACHE_FINAL };
-  }
-  const held = mirror && !keepKey ? await fromMirror(upstreamUrl, trim) : null;
-  if (held) {
-    // Kept here until it could change (a day at most), as the nightly copy says.
-    const mp = { tier: 'mirror', fresh: Math.max(60, Math.min(86_400, Math.floor((held.until - Date.now()) / 1000))), stale: 0 };
-    const result = { status: 200, contentType: 'application/json', body: held.body };
-    ctx.waitUntil(cache.put(cacheKey, cacheEntry(result, mp)));
-    return { ...result, cache: 'MIRROR', age: 0, policy: mp };
   }
   const result = await fetchUpstream(upstreamUrl, trim);
   if (result.status === 200) {
