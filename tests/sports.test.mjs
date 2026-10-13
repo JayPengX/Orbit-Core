@@ -259,3 +259,21 @@ test('a game over is kept in R2 the first time anyone reads it; after that it co
     globalThis.fetch = real;
   }
 });
+
+test('Yahoo: a host that turns the proxy away (429) is asked of its twin', async () => {
+  const real = globalThis.fetch;
+  const asked = [];
+  globalThis.fetch = async url => {
+    asked.push(new URL(String(url)).hostname);
+    return String(url).includes('query1.') ? new Response('Too Many Requests', { status: 429 }) : new Response(JSON.stringify({ spark: { result: [] } }), { status: 200 });
+  };
+  try {
+    store.clear();
+    const u = 'https://query1.finance.yahoo.com/v7/finance/spark?symbols=ZZZZ&range=1d&interval=5m';
+    const res = await worker.fetch(new Request(`https://proxy.test/sports-proxy?url=${encodeURIComponent(u)}&app=stock`, { headers: { Origin: 'https://jaypengx.github.io' } }), {}, ctx);
+    assert.equal(res.status, 200);
+    assert.deepEqual(asked, ['query1.finance.yahoo.com', 'query2.finance.yahoo.com']);
+  } finally {
+    globalThis.fetch = real;
+  }
+});

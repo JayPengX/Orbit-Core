@@ -720,6 +720,7 @@ async function translateUpstream(upstreamUrl) {
 // { fetchError }. Never throws.
 // The F1 lap log (env.F1_LOG), set by the first request this isolate serves.
 let f1Log = null;
+const YAHOO_HOSTS = new Set(['query1.finance.yahoo.com', 'query2.finance.yahoo.com']);
 async function fetchUpstream(upstreamUrl, trim) {
   let upstream;
   try {
@@ -736,6 +737,14 @@ async function fetchUpstream(upstreamUrl, trim) {
           headers: upstreamUrl.hostname === YT_HOST ? { 'User-Agent': BROWSER_UA, 'Accept-Language': 'en-US,en;q=0.9', Cookie: 'SOCS=CAI; CONSENT=YES+' } : { 'User-Agent': SPORTS_PROXY_FETCH_USER_AGENT },
           signal: AbortSignal.timeout(SPORTS_PROXY_UPSTREAM_TIMEOUT_MS)
         });
+    // Yahoo's two hosts serve the same: one that turns this Worker away
+    // (429: Yahoo limits an address, and the proxy's is shared, in Taiwan)
+    // is asked of the other (2026-10-14: query1 refused, query2 answered).
+    if (upstream.status === 429 && YAHOO_HOSTS.has(upstreamUrl.hostname)) {
+      const other = new URL(upstreamUrl.toString());
+      other.hostname = upstreamUrl.hostname === 'query1.finance.yahoo.com' ? 'query2.finance.yahoo.com' : 'query1.finance.yahoo.com';
+      upstream = needsYahooCrumb(other) ? await fetchYahooWithCrumb(other) : await fetch(other.toString(), { headers: { 'User-Agent': SPORTS_PROXY_FETCH_USER_AGENT }, signal: AbortSignal.timeout(SPORTS_PROXY_UPSTREAM_TIMEOUT_MS) });
+    }
   } catch (error) {
     return { fetchError: error };
   }
