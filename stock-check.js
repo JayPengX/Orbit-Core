@@ -5,8 +5,10 @@
 // does, the Worker replays the account with Securities' own code (the kit's
 // stock-account) and checks every event that adds cash against the market
 // before it counts:
-//   fill      its price within the market's own range at that moment (Yahoo's
-//             5-minute bars, 1% slack), its money the price times the shares
+//   fill      one this Worker issued (stock-fill.js, from 2026-10-14) at its
+//             own quote and moment; else its price within the market's own
+//             range at that moment (Yahoo's 5-minute bars, 1% slack); its
+//             money the price times the shares
 //   div       the dividend Yahoo lists for that ex-date, on no more shares
 //             than were held then; a bond's coupon within its own rate
 //   fx        the rate within the day's range for that pair (1% slack)
@@ -25,6 +27,7 @@ import { replay, ownCash } from './kit/stock-account.mjs';
 import { unpack } from './kit/stock-codec.mjs';
 import { BONDS } from './kit/stock-bonds.mjs';
 import { CASH_RATE } from './kit/stock-markets.mjs';
+import { issuedFills } from './stock-fill.js';
 
 export const VERIFIED_COLLECTION = 'stock-verified';
 const YAHOO = 'https://query1.finance.yahoo.com';
@@ -66,13 +69,16 @@ const bondOf = symbol => BONDS[symbol] || Object.values(BONDS).find(b => b.id ==
 // One event checked: 'ok', 'bad' (left out for good) or 'later' (the data
 // to check it isn't there now). `account`: the account with only the events
 // counted so far, for what was held when.
-export async function checkEvent(e, account, wallet, read) {
+export async function checkEvent(e, account, wallet, read, issued = {}) {
   switch (e.type) {
     case 'fill': {
       const gross = e.price * e.qty;
       // The money is the price times the shares, the fees only taking from it.
       if (!(e.qty > 0) || !(e.price > 0)) return 'bad';
       if (e.side === 'sell' ? e.total > gross * (1 + SLACK) + 1 : e.total < gross * (1 - SLACK) - 1) return 'bad';
+      // Filled by this Worker (stock-fill.js): its own quote and moment, taken as they are.
+      const mine = issued[e.orderId];
+      if (mine) return Math.abs(mine.quote - e.quote) <= 1e-9 * Math.max(1, Math.abs(mine.quote)) && Math.abs(mine.t - e.t) <= 1000 ? 'ok' : 'bad';
       if (e.market === 'BOND' || e.kind === 'govbond') {
         const bond = bondOf(e.symbol);
         return bond && e.price <= (bond.face || 100) * 1.3 + 1 ? 'ok' : 'bad';
@@ -168,6 +174,8 @@ export async function checkStock(env, docId, payload, wallet, deps, lockSince, n
   const ok = new Set(kept.ok);
   const bad = new Set(kept.bad);
   const first = !doc.exists;
+  // The fills this Worker issued (stock-fill.js).
+  const issued = await issuedFills(env, docId, deps.fsGet);
   // In time order, each checked against the account as counted so far.
   const events = [...account.events].sort((a, b) => a.t - b.t || (a.id < b.id ? -1 : 1));
   const counted = { ...account, events: [] };
@@ -178,10 +186,10 @@ export async function checkStock(env, docId, payload, wallet, deps, lockSince, n
     // The account as it was before the lock-down: taken as it was.
     if (!verdict && first && e.t < lockSince) verdict = 'ok';
     // (A pool deposit follows the wallet: always looked at again.)
-    if (e.type === 'deposit' && e.pool) verdict = await checkEvent(e, counted, wallet, deps.read).catch(() => 'later');
+    if (e.type === 'deposit' && e.pool) verdict = await checkEvent(e, counted, wallet, deps.read, issued).catch(() => 'later');
     if (!verdict && checked < 40) {
       checked++;
-      verdict = await checkEvent(e, counted, wallet, deps.read).catch(() => 'later');
+      verdict = await checkEvent(e, counted, wallet, deps.read, issued).catch(() => 'later');
     }
     if (verdict === 'ok') {
       if (!(e.type === 'deposit' && e.pool)) ok.add(e.id);

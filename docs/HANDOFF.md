@@ -10,6 +10,26 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
 
 
 
+## Securities' orders filled by the proxy (2026-10-14, pushed to `main`)
+
+The owner: "Play settles and fills by proxy, so Securities should follow".
+- `kit/stock-quotes.mjs`: Securities' `quotes.mjs` whole, its reader handed
+  in (`useQuotesReader`); the app's file re-exports it with the kit's
+  proxyJson.
+- `stock-fill.js` (`POST /stock { op: 'fill', orders }`, a Securities
+  session): the Worker's own fresh quote, the kit's `triggerPrice`; fills
+  kept in `stock-fills/<account>` and answered the same when asked again.
+- `stock-check.js`: a fill the Worker issued is taken as it is (its quote and
+  moment must match); others as before.
+- The app: every order placed waiting (`fresh`), `askFills` after each
+  refresh (one ask at a time, 3 s apart), `applyFills` in `afterPrices`;
+  an older kit falls back to filling on the phone.
+- Play's board stays priced on the phone (the owner asked whether it costs
+  per opening: no, the board's CPU is per pricing round, not per opening;
+  no decision to move it).
+- Checked: tests (`stock-fill.test.mjs`: the decision on a fake Yahoo
+  answer, the route, the check, `applyFills`), Securities' 104.
+
 ## New crons that never fire; R2 filled as it's read; the guard's clock (2026-10-13 evening, pushed to `main`)
 
 - **Cloudflare never dispatched the Cron Triggers added today** (the

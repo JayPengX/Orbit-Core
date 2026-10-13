@@ -776,5 +776,7 @@ What was decided, so it isn't undone. Newer calls win.
   moved into R2 (copied as built, no source read again) and its builders
   into the proxy's cron (`builders/`), each lean (only what's new, only as
   often as it changes, written only when it changed); the nightly mirror
-  replaced by reading on demand; Shared-Data retired. Firebase moves to
-  Cloudflare next (D1), then is abandoned.
+  replaced by reading on demand; Shared-Data retired (archived). Firebase
+  moves to Cloudflare next (D1), then is abandoned.
+- 2026-10-14: Securities' orders filled by the proxy at its own quote, as
+  Play's bets are placed and settled there (`stock-fill.js`).

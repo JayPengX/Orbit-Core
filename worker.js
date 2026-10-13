@@ -13,6 +13,7 @@
 //   GET   /weather/…             Orbit Weather's blended forecast (weather.js)
 //   GET   /transit/…             Orbit Transit's map, places, routes and TDX data (transit.js)
 //   GET/POST /play               Quadra Play's slips placed, cashed out and settled (settle.js)
+//   POST  /stock                 Quadra Securities' orders filled at the proxy's own quote (stock-fill.js)
 //   GET   /sports-proxy          the data proxy for Sports, Play and Securities (sports.js)
 //   GET   /data/…                the family's data in R2: packs, the mirror, bus packs (data.js)
 //   GET   /config                the developer settings
@@ -42,6 +43,7 @@ import { readDev, capacityCron } from './eco-admin.js';
 import { handleSports, sportsCron, useDevSettings } from './sports.js';
 import { isAllowedOrigin, corsHeaders, json } from './http.js';
 import { handleData } from './data.js';
+import { handleStock } from './stock-fill.js';
 import { runBuilders, SLOTS as BUILD_SLOTS } from './builders/run.js';
 import { docStore, copyToD1, compareStores } from './doc-store.js';
 import { STATE_KEY as GUARD_STATE } from './guard.js';
@@ -1226,6 +1228,13 @@ const priceReads = env => ({
     return res.json();
   }
 });
+// Securities' quotes read as the phone reads them: the data proxy's route in place (its cache).
+const stockReads = env => async url => {
+  const ask = `https://orbit-workers-proxy.quadra/sports-proxy?url=${encodeURIComponent(url)}&app=stock&qt=${encodeURIComponent(await sportsToken(env, 'stock'))}`;
+  const res = await handleSports(new Request(ask), env, inPlace, {}, 'worker');
+  if (!res.ok) throw new Error(`proxy ${res.status}`);
+  return res.json();
+};
 // The builders' reads through the data proxy's route, as Orbit Sports' (its trims, its cache).
 const builderProxy = env => async (url, trim = '') => {
   const ask = `https://orbit-workers-proxy.quadra/sports-proxy?url=${encodeURIComponent(url)}&app=match${trim ? `&trim=${encodeURIComponent(trim)}` : ''}&qt=${encodeURIComponent(await sportsToken(env, 'match'))}`;
@@ -1325,6 +1334,13 @@ export default {
       return handleKambiRequest(request, env, headers, ip, deps);
     }
     // Quadra Play's slips settled here (settle.js): a Quadra Pass session of Play's.
+    // Quadra Securities' orders filled here (stock-fill.js): a Securities session.
+    if (path === '/stock') {
+      const qt = new URL(request.url).searchParams.get('qt');
+      const session = qt ? await readToken(await tokenSecret(env), qt, 'ses') : null;
+      if (session && sessionLimited(`st:${session.s}`, 30)) return errorJson('RATE_LIMITED', 429, headers, request);
+      return handleStock(request, env, headers, session, { json, errorJson, fsGet: DOCS.get, fsWrite: DOCS.write, now: () => Date.now(), read: url => stockReads(env)(url) });
+    }
     if (path === '/play') {
       const qt = new URL(request.url).searchParams.get('qt');
       const session = qt ? await readToken(await tokenSecret(env), qt, 'ses') : null;

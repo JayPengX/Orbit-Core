@@ -765,6 +765,26 @@ export function processOrders(account, quotes, rates, now = Date.now()) {
   return { account: next, filled, rejected };
 }
 
+// The proxy's fills (the owner, 2026-10-14: Securities' orders filled by the
+// proxy, as Play's bets are): { orderId: { quote, t } } from its own fresh
+// quote (Shared-Proxy stock-fill.js), each applied to its open order at
+// that price and moment; the account's own rules (cash, shares, the
+// spread, costs) as fillOrder has them. Orders it hasn't filled stay open.
+export function applyFills(account, fills, rates, now = Date.now()) {
+  let next = account;
+  const filled = [];
+  const rejected = [];
+  for (const order of account.orders.filter(o => o.status === 'open' && fills?.[o.id]).sort(byTime)) {
+    if (!rates?.[order.currency]) continue;
+    const f = fills[order.id];
+    const r = fillOrder(next, order, f.quote, rates, Math.max(now, f.t), f.t);
+    next = r.account;
+    if (r.fill) filled.push(r.fill);
+    else rejected.push(r.order);
+  }
+  return { account: next, filled, rejected };
+}
+
 // When an order waiting while the page was closed would have filled: the
 // first price bar after it was placed that reaches its price (bars:
 // [{ t, o, h, l, c }], oldest first). A gap through the price fills at the
