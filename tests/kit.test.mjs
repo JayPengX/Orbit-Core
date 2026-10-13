@@ -112,11 +112,11 @@ test("a failed read answers the copy the device has, of any age (a league never 
   globalThis.caches = had;
 });
 
-test('packJson reads a nightly pack from GitHub Pages, not the proxy; a pack not there is a failure', async () => {
+test('packJson reads a pack from the family\'s data (/data/, R2), not the data proxy; a pack not there is a failure', async () => {
   const asked = [];
   globalThis.fetch = async url => (asked.push(String(url)), String(url).endsWith('nba/2026.json') ? new Response('{"events":[1,2]}', { status: 200 }) : new Response('nope', { status: 404 }));
   assert.deepEqual((await kit.packJson('sports/nba/2026.json')).events, [1, 2]);
-  assert.equal(asked[0], 'https://jaypengx.github.io/Shared-Data/sports/nba/2026.json');
+  assert.equal(asked[0], 'https://orbit-workers-proxy.pengzjay.workers.dev/data/sports/nba/2026.json');
   await assert.rejects(kit.packJson('sports/nope/2026.json'), e => e.status === 404);
 });
 
@@ -540,4 +540,20 @@ test("the mirror's gzipped copies unpacked, a plain one (or one the browser unpa
   const data = { until: 1, data: { events: ['洋基', 1] } };
   assert.deepEqual(await gzJson(new Response(gzipSync(JSON.stringify(data)))), data);
   assert.deepEqual(await gzJson(new Response(JSON.stringify(data))), data);
+});
+
+test('a pack a phone kept before the move (under the Pages address) is still its copy: opened at once, nothing asked', async () => {
+  const had = globalThis.caches;
+  const kept = new Map();
+  const oldKey = `https://quadra.data/${encodeURIComponent('https://jaypengx.github.io/Shared-Data/sports/mlb/2026.json')}`;
+  kept.set(oldKey, new Response('{"events":["kept"]}', { headers: { 'x-at': String(Date.now()) } }));
+  globalThis.caches = { open: async () => ({ match: async k => kept.get(typeof k === 'string' ? k : k.url)?.clone() || null, put: async () => {}, keys: async () => [], delete: async () => true }) };
+  const asked = [];
+  globalThis.fetch = async url => (asked.push(String(url)), new Response('{"events":["fresh"]}'));
+  try {
+    assert.deepEqual((await kit.packJson('sports/mlb/2026.json')).events, ['kept']);
+    assert.equal(asked.length, 0);
+  } finally {
+    globalThis.caches = had;
+  }
 });
