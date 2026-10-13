@@ -10,6 +10,15 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
 
 
 
+## Transit: the YouBike return station on the map, navigating (2026-10-13, pushed to `main`)
+
+The owner, riding 臺鐵竹中車站 → 綠41公園: no mark where the bike goes back.
+Navigating turns the map's bike stations off, and the way marked only each
+ride's start. Now a bike ride's end is marked too, a bike in the ride's
+colour (`tab-map bikeReturns`; a swap every 30 minutes, returned and rented
+at one station, marked once). Tested; not seen on screen (the preview's
+made-up network planned no bike trip): ask the owner.
+
 ## Transit: pinned places on the map (2026-10-13, pushed to `main`)
 
 The owner asked to see their pinned places on the map. Each one (家, 學校…)
