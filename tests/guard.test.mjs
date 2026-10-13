@@ -180,3 +180,17 @@ test('a count the API won\'t read loses that count alone (reported), never the b
   assert.equal(s.error, null);
   assert.deepEqual(s.stopped.why, ['requests']);
 });
+
+test('the guard\'s clock: a wake starts it once; each alarm runs the guard and sets the next on a five-minute mark', async () => {
+  const { GuardClock } = await import('../guard-worker.js');
+  let alarm = null;
+  const state = { storage: { getAlarm: async () => alarm, setAlarm: async t => void (alarm = t) } };
+  const kv = fakeKv();
+  const clock = new GuardClock(state, { RATE_LIMIT_KV: kv, PERIOD_DAY: '13' });
+  assert.equal(await (await clock.fetch()).text(), 'started');
+  assert.equal(await (await clock.fetch()).text(), 'running', 'woken again: nothing doubled');
+  await clock.alarm();
+  assert.equal(alarm % (5 * 60_000), 0);
+  assert.ok(alarm > Date.now());
+  assert.equal(JSON.parse(kv.m.get(STATE_KEY)).armed, false, 'the guard ran (unarmed here)');
+});

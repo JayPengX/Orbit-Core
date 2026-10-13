@@ -33,5 +33,15 @@ cpu_ms = 1000
 [observability]
 enabled = true
 
+# Its clock: a Durable Object's alarm every five minutes (guard-worker.js
+# GuardClock): the cron below was registered and never ran (2026-10-13).
+[[durable_objects.bindings]]
+name = "CLOCK"
+class_name = "GuardClock"
+
+[[migrations]]
+tag = "clock-1"
+new_sqlite_classes = ["GuardClock"]
+
 [triggers]
 crons = ["*/5 * * * *"]
