@@ -49,8 +49,12 @@ Each one states its before and after numbers.
 - [x] Fixed: the guard didn't start (its entry file exported constants).
 - [x] Fixed: every proxy push redeployed the guard and re-registered its
       cron, so it never ran. It now deploys only when its own files change.
-- [ ] Confirm the first real reading at `/guard`. Its cron hasn't fired
-      yet; investigating with live logs.
+- [x] Found why the guard never ran: Cloudflare registered its new cron
+      but never fires it (a known 2026 fault with new crons, paid accounts
+      too). Its clock is now a Durable Object alarm every 5 minutes; the
+      proxy's working cron wakes it.
+- [x] The guard's first real reading: armed, every count read (0.3% of
+      requests, 1.2% of CPU, 2.9% of R2 writes so far)
 - [ ] You: check the plan renews on the 13th, and add a $5.01 budget alert.
 
 ## 2. One proxy (done)
@@ -68,8 +72,12 @@ Each one states its before and after numbers.
       reads a month.
 - [x] `/data/…` route (`data.js`): edge cache, then R2, then Pages while
       moving.
-- [ ] **Copy the last build's whole site into R2 as-is**, asking no source
-      again (`r2sync.mjs`, the run named "r2"). Still running.
+- [x] The bulk copy ran past GitHub's 3-hour limit (it was working through
+      the 37,000 mirror copies). Replaced by a **lazy move**: any file R2
+      lacks is taken from Shared-Data's Pages once and kept, for phones and
+      builders alike.
+- [ ] **Drain**: every file Shared-Data's indexes list is moved into R2, a
+      few minutes each hourly run, until done (`builders/drain.js`)
 - [x] The kit's `packJson`, and Transit's bus packs, shapes and where.json,
       read from `/data/`. Phones keep their saved copies.
 - [x] Mirror reads answered inside the data proxy (in a phone's batch).
@@ -90,8 +98,11 @@ Each one states its before and after numbers.
   - [x] buses: a city weekly, TDX read in small pages to fit the Worker's
         memory
 - [x] Docs and TRUTH updated
-- [ ] See the first hourly builders' run on Cloudflare (16:17 UTC)
-- [ ] Confirm the copy finished, then switch off Shared-Data's last workflow
+- [x] Found the builders' new hourly cron never fired either: they now run
+      from the working even-minute cron at :16, and F1's lap log from both
+      crons.
+- [ ] See the first builders' run (20:16 UTC)
+- [x] Shared-Data's last workflow switched off (the proxy builds the buses)
 - [ ] **You:** OK to delete the Shared-Data repo (can't be undone)
 - [ ] Remove the Pages fallback in `data.js` once the repo's gone
 

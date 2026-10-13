@@ -10,6 +10,33 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
 
 
 
+## New crons that never fire; R2 filled as it's read; the guard's clock (2026-10-13 evening, pushed to `main`)
+
+- **Cloudflare never dispatched the Cron Triggers added today** (the
+  guard's `*/5`, the builders' `17 * * * *`, F1's minute): `/schedules`
+  listed them, `tail.yml` saw no invocation in hours; the proxy's two older
+  crons (even and odd minutes) ran all along. A known fault this year on
+  Cloudflare's forums, paid accounts too; redeploying doesn't help. So:
+  the guard's clock is a Durable Object alarm (`guard-worker.js`
+  `GuardClock`, every 5 minutes, woken by the proxy's even cron every ten
+  through the `GUARD` service binding); the builders run at :16 on the
+  even cron, F1's lap log every minute of an F1 weekend on both. **Don't
+  add Cron Triggers**: use the two that run, or an alarm.
+- **The guard's first reading** (19:51 UTC): armed, every count read
+  (cpuTimeUs accepted, nothing partial): 0.33% of requests, 1.2% of CPU,
+  2.9% of R2's writes (the copy), 0.7% of R2's room.
+- **The bulk copy didn't finish** (GitHub's 3 hours, in the mirror's 37,000
+  files). Replaced: any file R2 lacks is taken from Shared-Data's Pages
+  once and kept (`builders/store.js fromPages`), for `/data/`, the builders
+  and the kept reads; `builders/drain.js` moves every file the indexes list,
+  a few minutes a builders' run, until done (`data:drained` in KV). The
+  mirror's copies of finished games aren't moved (read again once, if
+  opened). **Shared-Data's repo and Pages must stay until the drain says
+  `all`** (`/guard`'s neighbour: KV `data:drained`).
+- Shared-Data's workflow disabled (`gh workflow enable build.yml -R
+  JayPengX/Shared-Data` undoes it).
+- D1 (the Pass's store): waits on the owner's D1 · Edit on the deploy token.
+
 ## Shared-Data onto Cloudflare: R2, the builders in the proxy, read on demand (2026-10-13/14, pushed to `main`)
 
 The owner: move Shared-Data to Cloudflare (keeping the $5 plan), copy the
