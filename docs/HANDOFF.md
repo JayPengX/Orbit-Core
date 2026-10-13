@@ -29,6 +29,16 @@ beyond 25 km left out while one's near (a chain: its name before the
 branch), then the rest. Tested on the owner's case with made-up answers;
 not seen with Google here (no key).
 
+Then (the owner): LaLaport should be LaLaport, not its cinema or car parks,
+reliably. `folded`: results carrying the words typed, within 400 m of a
+whole place by Google's own type (mall, department store, station, airport,
+university, hospital, stadium, amusement park, zoo, museum), that are
+plainly its parts (a car park, cinema, shop, somewhere to eat… by type, or
+the whole place's name in theirs) fold into it. Nothing folds without a
+whole place (two 八方雲集 stay two), a shop asked by its own name stays
+(鼎泰豐 LaLaport), and a place of its own beside one stays (新竹轉運站 by
+新竹車站). Tested on those cases; not seen with Google here.
+
 ## Transit: one walk everywhere, Google's; the loading screen onto a finished map (2026-10-13, pushed to `main`)
 
 The owner: the planner's 210 m to 成功國中 was right (Google says 210);

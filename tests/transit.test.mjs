@@ -493,6 +493,39 @@ test('place search: the near branches of a chain first, nearest first; the same 
   assert.deepEqual(nearFirst([{ id: 'x', name: '台北車站', dist: 70000 }], [], '台北車站').map(i => i.id), ['x']);
 });
 
+test('place search: LaLaport is LaLaport, not its cinema, its car parks or a shop in it; two branches of a chain stay two; a shop asked by name stays', async () => {
+  const { folded } = await import('../transit.js');
+  const at = (id, name, lat, lon, types, dist = null) => ({ id, name, lat, lon, types, dist });
+  // LaLaport 台中 and what's in it or beside it; LaLaport 南港, far.
+  const mall = at('m', 'Mitsui Shopping Park LaLaport 台中', 24.1385, 120.6885, ['shopping_mall', 'point_of_interest']);
+  const list = [
+    mall,
+    at('p1', 'LaLaport台中 P1停車場', 24.1392, 120.6879, ['parking']),
+    at('c', '威秀影城 台中LaLaport影城', 24.1383, 120.6888, ['movie_theater']),
+    at('r', '鼎泰豐 LaLaport台中店', 24.1386, 120.6884, ['restaurant']),
+    at('n', 'Mitsui Shopping Park LaLaport 南港', 25.0556, 121.6172, ['shopping_mall']),
+    { id: 'p2', name: 'LaLaport 台中 東側停車場', sub: '台中市東區', dist: 1520, types: ['parking'] },
+    { id: 'm', name: 'Mitsui Shopping Park LaLaport 台中', sub: '台中市東區', dist: 1400, types: ['shopping_mall'] }
+  ].map(i => (i.lat != null ? { ...i, dist: Math.round(Math.hypot(i.lat - 24.15, i.lon - 120.68) * 111_000) } : i));
+  list[0].dist = 1400;
+  assert.deepEqual(folded(list, 'lalaport').map(i => i.id), ['m', 'n', 'm'], 'the two malls (and the mall’s own other copy); its parts gone');
+  // A shop asked by its own name: the mall doesn't carry those words, nothing folds.
+  assert.deepEqual(folded(list, '鼎泰豐 lalaport').map(i => i.id), list.map(i => i.id));
+  // 新竹 by 新竹車站: 新竹轉運站 is a place of its own (a bus station), it stays; the station's car park and an exit fold.
+  const hc = [
+    at('st', '新竹車站', 24.8016, 120.9716, ['train_station', 'transit_station']),
+    at('bt', '新竹轉運站', 24.8027, 120.9733, ['bus_station', 'transit_station']),
+    at('pk', '新竹車站前站停車場', 24.8020, 120.9712, ['parking']),
+    at('ex', '新竹車站 後站出口', 24.8008, 120.9711, ['transit_station'])
+  ];
+  assert.deepEqual(folded(hc, '新竹').map(i => i.id), ['st', 'bt']);
+  // A chain's branches side by side (no whole place among them): both stay.
+  const two = [at('a', '八方雲集 竹北成功店', 24.818, 121.015, ['restaurant']), at('b', '八方雲集 竹北光明店', 24.819, 121.016, ['restaurant'])];
+  assert.deepEqual(folded(two, '八方雲集').map(i => i.id), ['a', 'b']);
+  // Through the search: LaLaport 台中 once (南港, the same chain 140 km off, left out while 台中's near).
+  assert.deepEqual(nearFirst([list[6], list[5]], list.slice(0, 5), 'LaLaport').map(i => i.id), ['m']);
+});
+
 test("place search, a chain typed with a typo from 成功九街 (八分雲集): every 八方雲集 near you, nearest first, none from another city while one's near; an address still there", async () => {
   fresh();
   const env = { GOOGLE_MAPS_KEY: 'k', RATE_LIMIT_KV: memKv() };
