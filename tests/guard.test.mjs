@@ -171,3 +171,10 @@ test('R2: writes Class A, reads Class B, deletes free, anything unknown counted 
   assert.equal(s.use.r2Bytes, 2_000_000_000);
   assert.deepEqual(s.stopped.why, ['r2ClassA']);
 });
+
+test('every Worker\'s entry exports only handlers and classes (anything else stops the Worker from starting)', async () => {
+  for (const entry of ['../worker.js', '../guard-worker.js', '../sports-forward.js']) {
+    const m = await import(entry);
+    for (const [k, v] of Object.entries(m)) assert.ok(typeof v === 'function' || (k === 'default' && typeof v === 'object'), `${entry} exports ${k}`);
+  }
+});

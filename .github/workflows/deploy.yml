@@ -35,6 +35,7 @@ on:
       - 'transit.js'
       - 'kit/devconfig.mjs'
       - 'guard.js'
+      - 'guard-worker.js'
       - 'wrangler.guard.toml'
   workflow_dispatch:
 
