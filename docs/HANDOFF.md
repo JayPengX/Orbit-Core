@@ -2499,3 +2499,11 @@ Quadra stays under 30% for anyone who plays much.
   2 s, 7 times (was 2.5 s, then 4 s, 5 times); the proxy waits up to 4 s for
   a cell's refresh before answering with the old copy (`FRESH_WAIT_MS`, was
   2.5 s), so a slower refresh still comes back in the first answer.
+- **The UV, rain and air sheets too** (the owner: "do the same"): one
+  `chart` for every graph, the day sheet's rain and UV included (no second
+  drawing of the same thing). The scale in the right gutter (`PLOT_W`),
+  labels anchored inward; UV a level-coloured line, its fill faded by a
+  mask; rain a bar an hour (no bar at 0), and dry hours 「不會下雨」 at the
+  graph's height so a tab change doesn't move the sheet; the 「深色＝雨量」
+  note only when there's an amount; air's header no longer wraps (its level
+  under the number; 「最差 …」 dropped, the graph shows it).
