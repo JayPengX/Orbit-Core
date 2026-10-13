@@ -260,6 +260,9 @@ const server = createServer(async (req, res) => {
   if (serve && path === '/__ext') return external(req, res).catch(() => res.end());
   // Served: no service worker (it would keep the page from these answers).
   if (serve && path.endsWith('/sw.js')) return res.writeHead(404).end();
+  // The kit's version.json is stamped only on Pages (kit/stamp.mjs): here
+  // one the kit takes as the first it's seen (only noted, no reload).
+  if (path === '/Shared-Proxy/kit/version.json') return res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }).end('{"version":"local"}');
   // The kit, as the apps load it from Shared-Proxy's Pages (kit/loader.html).
   let file = path.startsWith('/Shared-Proxy/kit/') ? join(served.root, path) : join(served.dir, path.replace(/^\/[^/]+\//, '/'));
   if (latency) await new Promise(r => setTimeout(r, latency));
@@ -649,6 +652,8 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => (reopen ? [h, h]
   if (clockAt) await page.clock.install({ time: new Date(clockAt) });
   page.on('console', m => m.type() === 'error' && errors.push(m.text()));
   page.on('pageerror', e => errors.push(String(e.stack || e)));
+  // (A failed resource by its address: the console only says "404".)
+  page.on('response', r => r.status() >= 400 && errors.push(`${r.status()} ${r.url().replace(/([?&](qt|u)=)[^&]+/g, '$1…').slice(0, 160)}`));
   const started = Date.now();
   const own = [];
   page.on('request', r => r.url().startsWith(base) && own.push({ url: r.url().slice(base.length) || '/', at: Date.now() - started }));
