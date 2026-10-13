@@ -491,3 +491,52 @@ test('place search: the near branch of a chain first, nearest first', () => {
   assert.deepEqual(nearFirst(far, near, '錢都').map(i => i.id), ['c', 'd', 'a', 'b']);
   assert.deepEqual(nearFirst([{ id: 'x', name: '台北車站', dist: 70000 }], [], '台北車站').map(i => i.id), ['x']);
 });
+
+test("walks by Google's streets: five in one matrix call, each kept a month; with its line, one route; past the month's cap, none (the app's router then)", async () => {
+  fresh();
+  const env = { GOOGLE_MAPS_KEY: 'k', RATE_LIMIT_KV: memKv() };
+  const cache = memCache();
+  let matrix = 0;
+  let route = 0;
+  const fetchFn = async (url, opts) => {
+    const body = JSON.parse(opts.body);
+    assert.equal(body.travelMode, 'WALK');
+    if (String(url).includes('computeRouteMatrix')) {
+      matrix++;
+      assert.match(opts.headers['X-Goog-FieldMask'], /distanceMeters/);
+      // (成功九街 to 成功國中's station by its lane, 210 m; one with no way on foot.)
+      return json(body.destinations.map((d, i) => (d.waypoint.location.latLng.latitude === 24.9 ? { originIndex: 0, destinationIndex: i, condition: 'ROUTE_NOT_FOUND' } : { originIndex: 0, destinationIndex: i, condition: 'ROUTE_EXISTS', distanceMeters: 210 + i, duration: `${150 + i}s` })));
+    }
+    if (String(url).includes('computeRoutes')) {
+      route++;
+      return json({ routes: [{ distanceMeters: 210, duration: '150s', polyline: { encodedPolyline: 'abc' } }] });
+    }
+    assert.fail(`unexpected ${url}`);
+  };
+  const ask = qs => handleTransit(new Request(`https://w/transit/walk?${qs}`), env, {}, '/transit/walk', { session: { s: 'S' }, fetchFn, now: NOW, cache }).then(r => r.json());
+  const five = 'from=24.8177,121.0163&to=24.81872,121.01597;24.8162,121.0171;24.9,121.0;24.8129,121.0233;24.81,121.02';
+  const a = await ask(five);
+  assert.equal(a.src, 'google');
+  assert.deepEqual(a.walks.map(w => w && w.dist), [210, 211, null, 213, 214]);
+  assert.equal(a.walks[0].dur, 150);
+  assert.equal(matrix, 1, 'one call for all five');
+  // Again: from the month's copy, only the one with no way asked again.
+  const b = await ask(five);
+  assert.deepEqual(b.walks.map(w => w && w.dist), [210, 211, null, 213, 214]);
+  assert.equal(matrix, 2);
+  assert.equal((await usage(env, NOW)).matrix, 6, 'an element each');
+  // One walk with its line.
+  const c = await ask('from=24.8177,121.0163&to=24.81872,121.01597&line=1');
+  assert.deepEqual(c.walks[0], { dist: 210, dur: 150, poly: 'abc' });
+  await ask('from=24.8177,121.0163&to=24.81872,121.01597&line=1');
+  assert.equal(route, 1);
+  // Past the month's cap: nothing asked.
+  fresh();
+  const full = { ...env, RATE_LIMIT_KV: memKv() };
+  await full.RATE_LIMIT_KV.put(`transit:use:${billingMonth(NOW)}`, JSON.stringify({ matrix: CAPS.matrix }));
+  const d = await handleTransit(new Request('https://w/transit/walk?from=24.8177,121.0163&to=24.82,121.02'), full, {}, '/transit/walk', { session: { s: 'S' }, fetchFn, now: NOW, cache: memCache() }).then(r => r.json());
+  assert.deepEqual(d, { walks: [null], src: 'cap' });
+  assert.equal(matrix, 2);
+  // Outside Taiwan, or none: refused.
+  assert.equal((await handleTransit(new Request('https://w/transit/walk?from=35,139&to=24.8,120.9'), env, {}, '/transit/walk', { session: { s: 'S' }, fetchFn, now: NOW, cache })).status, 400);
+});

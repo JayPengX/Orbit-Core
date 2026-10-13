@@ -10,6 +10,32 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
 
 
 
+## Transit: one walk everywhere, Google's; the loading screen onto a finished map (2026-10-13, pushed to `main`)
+
+The owner: the planner's 210 m to 成功國中 was right (Google says 210);
+OpenStreetMap's router went round the block (485). So the last change
+(a planner's walk by its line, `walksByLine`) was taken out the same round,
+and every walk is one walk, Google's: Shared-Proxy `/transit/walk` (the
+route matrix, an element each, `matrix` cap 9,000; with `line=1` Compute
+Routes, the `routes` cap; each walk kept a month in the Worker's cache),
+OpenStreetMap's router past the cap. The app (`api.mjs walksTo`, kept on
+the phone) for the strip, a card's 距離 and 走過去, the walk it starts, a
+trip's own walks and a walk-only trip from where you are; from where it
+was last asked until you're 20 m on, so all agree; the strip not asked while
+hidden. Not seen with Google here (the preview has no key: OpenStreetMap's).
+
+The strip reshuffled on every open (straight-line order, then the streets'),
+and things came in after the loading screen. Now the map tab's `ready` holds
+it (app.mjs, 4 s at most): a fresh fix (1.5 s), the tiles (1.5 s), what's in
+view and the strip, drawn once in its order. Measured in the preview at 120
+ms latency (`--shuffle` now sees Transit's markers and strip): before, the
+loading screen went at 1.4 s onto an empty map; now nothing moves after it,
+at 2.6–3.0 s, of which the tiles ~1.3 s (one NLSC tile takes 0.8–1.1 s to
+reach this container; a phone in Taiwan ~0.1–0.2 s). Sped up: the map's
+library asked by the page itself (0.3 s, was 1.4 s), its tiles' servers
+connected at once, the layers asked beside the tiles, no 台北車站 tiles on a
+first open. Not measured on a phone: ask the owner how it opens.
+
 ## Transit: YouBike from a station with a bike; walks by the streets (2026-10-13, pushed to `main`)
 
 The owner: a trip starting with the bike shouldn't send you to a station

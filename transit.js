@@ -36,6 +36,7 @@ export const TDX_BASE = 'https://tdx.transportdata.tw/api/';
 export const TDX_AUTH = 'https://tdx.transportdata.tw/auth/realms/TDXConnect/protocol/openid-connect/token';
 export const PLACES = 'https://places.googleapis.com/v1/';
 export const ROUTES = 'https://routes.googleapis.com/directions/v2:computeRoutes';
+export const MATRIX = 'https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix';
 export const NOMINATIM = 'https://nominatim.openstreetmap.org/search';
 export const TEXT_SEARCH = 'https://places.googleapis.com/v1/places:searchText';
 
@@ -51,7 +52,8 @@ export const CAPS = {
   details: 9_000, // Place Details Essentials (position, address), 10,000
   detailsPro: 4_500, // Place Details Pro (a place's name), 5,000
   textSearch: 4_500, // Text Search Pro (a search's places with their names and positions), 5,000
-  routes: 9_000 // Compute Routes Essentials (transit), 10,000
+  routes: 9_000, // Compute Routes Essentials (transit, and a walk with its line), 10,000
+  matrix: 9_000 // Compute Route Matrix Essentials (walks, an element each), 10,000
 };
 
 // Google bills by the calendar month on Pacific time: counted the same way
@@ -989,6 +991,73 @@ const scrubKey = (text, env) => [env.GOOGLE_MAPS_KEY, env.GOOGLE_WEATHER_KEY, en
 
 // ---- Route --------------------------------------------------------------------------------
 
+// ---- Walks ----------------------------------------------------------------------------
+//
+// Walking from a spot to up to five others, by Google (it knows the lanes
+// and short cuts OpenStreetMap's router doesn't: 210 m from 成功九街 to 成功國中's
+// YouBike, not 485 round the block): its route matrix, an element each, or
+// with `line=1` one walk with its line (Compute Routes). Each walk kept a
+// month (streets don't move), so a walk asked once is never paid for again.
+//   ?from=lat,lon&to=lat,lon;lat,lon…  → { walks: [{ dist, dur, poly? } | null], src }
+const WALK_KEEP_S = 30 * 86_400;
+async function walks(env, q, { fetchFn, ctx, now, cache }) {
+  const ll = s => {
+    const m = /^(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)$/.exec(s || '');
+    return m && inTaiwan(Number(m[1]), Number(m[2])) ? { lat: Number(m[1]), lon: Number(m[2]) } : null;
+  };
+  const from = ll(q.get('from'));
+  const tos = String(q.get('to') || '').split(';').filter(Boolean).slice(0, 5).map(ll);
+  if (!from || !tos.length || tos.some(t => !t)) return [{ code: 'BAD_LOCATION' }, 400];
+  const line = q.get('line') === '1' && tos.length === 1;
+  const p5 = v => v.toFixed(5);
+  const keyOf = t => new Request(`https://transit-cache.quadra/walk/${p5(from.lat)},${p5(from.lon)}/${p5(t.lat)},${p5(t.lon)}${line ? '/line' : ''}`);
+  const out = await Promise.all(tos.map(async t => {
+    try {
+      const hit = cache && (await cache.match(keyOf(t)));
+      return hit ? await hit.json() : null;
+    } catch {
+      return null;
+    }
+  }));
+  const todo = tos.map((t, i) => (out[i] ? -1 : i)).filter(i => i >= 0);
+  let src = 'cached';
+  if (todo.length) {
+    const sku = line ? 'routes' : 'matrix';
+    if (!googleKey(env)) src = 'nokey';
+    else if (!(await spend(env, sku, todo.length, now, ctx))) src = 'cap';
+    else {
+      const pt = p => ({ location: { latLng: { latitude: p.lat, longitude: p.lon } } });
+      const secs = d => Number(String(d || '').replace('s', '')) || 0;
+      try {
+        if (line) {
+          const r = await fetchFn(ROUTES, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': googleKey(env), 'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline' }, body: JSON.stringify({ origin: pt(from), destination: pt(tos[0]), travelMode: 'WALK', languageCode: 'zh-TW', regionCode: 'tw', units: 'METRIC' }), signal: timeout(8000) });
+          const j = r.ok ? await r.json() : null;
+          const w = j?.routes?.[0];
+          if (w) out[0] = { dist: Number(w.distanceMeters) || 0, dur: secs(w.duration), poly: w.polyline?.encodedPolyline || '' };
+          src = r.ok ? 'google' : `http ${r.status}`;
+        } else {
+          const r = await fetchFn(MATRIX, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': googleKey(env), 'X-Goog-FieldMask': 'originIndex,destinationIndex,distanceMeters,duration,condition' }, body: JSON.stringify({ origins: [{ waypoint: pt(from) }], destinations: todo.map(i => ({ waypoint: pt(tos[i]) })), travelMode: 'WALK', languageCode: 'zh-TW', regionCode: 'tw', units: 'METRIC' }), signal: timeout(8000) });
+          const j = r.ok ? await r.json() : null;
+          for (const el of Array.isArray(j) ? j : []) {
+            const i = todo[el.destinationIndex || 0];
+            if (i != null && el.condition === 'ROUTE_EXISTS') out[i] = { dist: Number(el.distanceMeters) || 0, dur: secs(el.duration) };
+          }
+          src = r.ok ? 'google' : `http ${r.status}`;
+        }
+      } catch {
+        src = 'error';
+      }
+      for (const i of todo) {
+        if (!out[i] || !cache) continue;
+        const put = cache.put(keyOf(tos[i]), new Response(JSON.stringify(out[i]), { headers: { 'Content-Type': 'application/json', 'Cache-Control': `max-age=${WALK_KEEP_S}` } })).catch(() => {});
+        if (ctx?.waitUntil) ctx.waitUntil(put);
+        else await put;
+      }
+    }
+  }
+  return [{ walks: out, src }, 200];
+}
+
 export async function handleTransit(request, env, headers, path, { session = null, limited = () => false, ctx = null, fetchFn = fetch, cache = globalThis.caches?.default, now = Date.now() } = {}) {
   const send = (data, status = 200, extra = {}) => new Response(typeof data === 'string' ? data : JSON.stringify(data), { status, headers: { ...headers, 'Content-Type': 'application/json; charset=utf-8', ...extra } });
   if (request.method !== 'GET') return send({ code: 'GET_ONLY' }, 405);
@@ -1018,6 +1087,10 @@ export async function handleTransit(request, env, headers, path, { session = nul
   }
   if (path === '/transit/route') {
     const [body, status] = await routes(env, q, deps);
+    return send(body, status);
+  }
+  if (path === '/transit/walk') {
+    const [body, status] = await walks(env, q, deps);
     return send(body, status);
   }
   return send({ code: 'NOT_FOUND' }, 404);

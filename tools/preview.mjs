@@ -440,10 +440,24 @@ if (freezes)
   });
 if (shuffle)
   await context.addInitScript(() => {
-    globalThis.__cards = () =>
-      [...document.querySelectorAll('main section, [id^="panel-"]:not([hidden]) .q-card, [id^="panel-"]:not([hidden]) article')]
+    // (Transit's map too: its markers in view, by kind, and the strip of YouBike stations along its bottom.)
+    const marks = () => {
+      const n = {};
+      for (const el of document.querySelectorAll('.ot-mk')) {
+        const r = el.getBoundingClientRect();
+        if (r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth) {
+          const k = el.className.replace(/leaflet\S*|ot-mk|is-sel/g, '').trim().split(/\s+/)[0] || 'mk';
+          n[k] = (n[k] || 0) + 1;
+        }
+      }
+      return Object.keys(n).length ? [`map: ${Object.entries(n).sort().map(([k, v]) => `${k} ${v}`).join(', ')}`] : [];
+    };
+    globalThis.__cards = () => [
+      ...[...document.querySelectorAll('main section, [id^="panel-"]:not([hidden]) .q-card, [id^="panel-"]:not([hidden]) article, #near-bikes:not([hidden]) .ot-nb')]
         .filter(el => el.offsetParent && el.getBoundingClientRect().top < innerHeight * 3)
-        .map(el => (el.innerText || '').split('\n').map(x => x.trim()).filter(Boolean).slice(0, 3).join(' · ').slice(0, 60));
+        .map(el => (el.innerText || '').split('\n').map(x => x.trim()).filter(Boolean).slice(0, 3).join(' · ').slice(0, 60)),
+      ...marks()
+    ];
     const watch = setInterval(() => {
       const box = document.getElementById('loading');
       // Orbit Class: its booting class instead of a loading box.
