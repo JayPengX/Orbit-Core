@@ -1,60 +1,24 @@
-// ---- sports-proxy-worker.js ----
-// /sports-proxy - a thin, host-allowlisted CORS passthrough to ESPN's/the
-// MLB Stats API's/the Jolpica F1 API's/Polymarket's Gamma API's own public
-// JSON, so Match Find's own browser can fetch and score its whole live
-// match list client-side.
-//
-// Deployed as its own Worker (wrangler.sports-proxy.toml), separate from
-// worker.js, for one reason: worker.js's wrangler.toml pinned [placement] to
-// region "gcp:us-east4" (Virginia) for Gemini (now "gcp:asia-east1",
-// Taiwan), and [placement] is a
-// whole-script setting. While /sports-proxy lived there, every Match Find
-// request - from a mostly Taiwan-based audience - went through a Virginia
-// isolate (confirmed live: `X-Worker-Colo: IAD`), adding a transpacific
-// round trip to each of the dozens of requests per refresh. Nothing this
-// route calls has Gemini's region restriction, so this Worker has no
-// [placement] block and runs near the caller.
-//
-// The CORS helpers below are a trimmed copy of
-// worker.js's. It imports one file, quadra-token.js, to check Quadra Pass
-// session tokens (deployed with Wrangler, which bundles it).
+// ---- sports.js: /sports-proxy, the data proxy ----
+// One of the Worker's routes (worker.js routes it, beside /eco, /transit,
+// /weather…): a host-allowlisted pass-through to the public sources Orbit
+// Sports, Quadra Play and Quadra Securities read (ESPN, MLB, Jolpica,
+// Polymarket, Kambi, Yahoo, ELTA, YouTube, formula1.com, F1's live timing,
+// the Asian leagues), with the shared edge cache by tier, trims and batches.
+// It and the F1 lap log's cron (sportsCron) run in the same Worker as the
+// rest, in Taiwan ([placement]); the owner, 2026-10-13: one proxy. The old
+// address (sports-proxy.pengzjay.workers.dev) only forwards here
+// (sports-forward.js) for phones still on an older kit.
 //
 // A Quadra Pass is required: every request carries `qt=<session token>`
-// (from Shared-Proxy's /eco), checked here with the shared ECO_TOKEN_SECRET.
-// A request with a valid token is counted per session in this isolate's
-// memory, never in KV (this Worker has no KV at all). Until ECO_TOKEN_SECRET
-// is set on this Worker the gate is off and each IP is counted the same way.
+// (from /eco), checked with ECO_TOKEN_SECRET and counted per session and app
+// in this isolate's memory, never in KV. A localhost page without one is let
+// in by the dev door (SPORTS_DEV).
 import { readToken, sessionLimited } from './quadra-token.js';
 import { BRANDS } from './kit/brand.mjs';
 import { ASIA_HOST, asiaBaseballResponse, asiaTarget, cpblBoxTarget } from './asia-baseball.js';
 import { F1_LIVE_HOST, f1LiveResponse, doLog, sampleLive } from './f1-live.js';
-// The Durable Object the laps of a session that's on are kept in (f1-live.js).
-export { F1Log } from './f1-live.js';
 import { cleanDev } from './kit/devconfig.mjs';
-
-const ALLOWED_ORIGINS = ['https://jaypengx.github.io'];
-
-function isAllowedOrigin(origin) {
-  return ALLOWED_ORIGINS.includes(origin) || /^http:\/\/localhost:\d+$/.test(origin || '');
-}
-
-function corsHeaders(origin, colo) {
-  return {
-    'Access-Control-Allow-Origin': isAllowedOrigin(origin) ? origin : 'null',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Expose-Headers': 'X-Worker-Colo, X-Sports-Proxy-Cache, X-Sports-Proxy-Cache-Tier, X-Sports-Proxy-Age',
-    'X-Worker-Colo': colo || 'unknown',
-    Vary: 'Origin'
-  };
-}
-
-function json(data, status, headers) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { ...headers, 'Content-Type': 'application/json' }
-  });
-}
+import { json } from './http.js';
 
 // ==== /sports-proxy - CORS passthrough for public sports data ==============
 const ELTA_HOST = 'piceltaott-elta.cdn.hinet.net';
@@ -140,16 +104,21 @@ const CACHE_LIVE = { tier: 'live', fresh: 10 * SECOND, stale: 0 };
 const CACHE_FINAL = { tier: 'final', fresh: DAY, stale: 0 };
 
 // The developer settings (kit/devconfig.mjs, the admin panel's 開發), read
-// from the main Worker (its service binding ORBIT) at most once a minute:
-// how long a live answer and a game over are kept here.
+// at most once a minute through worker.js's reader (`useDevSettings`, the
+// one GET /config answers from): how long a live answer and a game over are
+// kept here.
 let dev = cleanDev();
 let devAt = 0;
+let devReader = null;
+export function useDevSettings(fn) {
+  devReader = fn;
+}
 function refreshDev(env, ctx) {
-  if (!env?.ORBIT || Date.now() - devAt < 60_000) return;
+  if (!devReader || Date.now() - devAt < 60_000) return;
   devAt = Date.now();
   ctx.waitUntil(
-    env.ORBIT.fetch('https://orbit-workers-proxy/config')
-      .then(r => (r.ok ? r.json() : null))
+    Promise.resolve()
+      .then(() => devReader(env, ctx))
       .then(x => x && (dev = cleanDev(x)))
       .catch(() => {})
   );
@@ -1069,34 +1038,23 @@ async function handleSportsProxyRequest(request, env, headers, ip, ctx) {
   });
 }
 
-// ==== Routing ================================================================
+// ==== The route and the F1 cron (worker.js) =================================
 
-export default {
-  async fetch(request, env, ctx) {
-    const origin = request.headers.get('Origin') || '';
-    const headers = corsHeaders(origin, request.cf?.colo);
+// /sports-proxy, with the Worker's CORS headers. A crash still answers with
+// them (the app sees a failure it can try again, not a blocked request) and
+// says what it was.
+export function handleSports(request, env, ctx, headers, ip) {
+  refreshDev(env, ctx);
+  f1Log ||= doLog(env.F1_LOG);
+  return handleSportsProxyRequest(request, env, headers, ip, ctx).catch(error => json({ error: { message: String(error?.message || error).slice(0, 200) } }, 500, headers));
+}
 
-    if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
-
-    const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
-    const path = new URL(request.url).pathname.replace(/\/+$/, '');
-    refreshDev(env, ctx);
-    f1Log ||= doLog(env.F1_LOG);
-
-    // A crash still answers with CORS (the app sees a failure it can try
-    // again, not a blocked request) and says what it was.
-    if (path === '/sports-proxy') return handleSportsProxyRequest(request, env, headers, ip, ctx).catch(error => json({ error: { message: String(error?.message || error).slice(0, 200) } }, 500, headers));
-    return json({ error: { message: 'Not found' } }, 404, headers);
-  },
-  // Each minute from Thursday to Monday (UTC: every F1 weekend's sessions):
-  // while an F1 session runs, every car's last lap kept (f1-live.js
-  // sampleLive), so a phone opened late still has every lap; otherwise one
-  // look at the index, cached, and nothing more.
-  async scheduled(event, env, ctx) {
-    ctx.waitUntil(
-      sampleLive(doLog(env.F1_LOG), event.scheduledTime || Date.now())
-        .then(r => r !== 'idle' && console.log('f1 laps', r))
-        .catch(e => console.log('f1 laps failed', String(e?.message || e)))
-    );
-  }
-};
+// Each minute from Thursday to Monday (UTC: every F1 weekend's sessions):
+// while an F1 session runs, every car's last lap kept (f1-live.js
+// sampleLive), so a phone opened late still has every lap; otherwise one
+// look at the index, cached, and nothing more.
+export function sportsCron(env, at) {
+  return sampleLive(doLog(env.F1_LOG), at)
+    .then(r => r !== 'idle' && console.log('f1 laps', r))
+    .catch(e => console.log('f1 laps failed', String(e?.message || e)));
+}

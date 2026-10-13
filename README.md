@@ -11,10 +11,11 @@ The server side, the shared kit and the brand of two families of apps.
 
 This repo holds:
 
-1. **Three Cloudflare Workers** (on Workers Paid, $5 a month, never more):
-   - `orbit-workers-proxy`: the Pass and the Orbit apps' routes;
-   - `sports-proxy`: the live data proxy;
-   - `quota-guard`: the hard stop on the bill (§8.1).
+1. **The proxy**, one Cloudflare Worker (`orbit-workers-proxy`) for every
+   app's server side: the Pass, the data proxy, Play's settling, Transit,
+   Weather, notices; with `quota-guard`, the hard stop on the bill (§8.1),
+   on Workers Paid ($5 a month, never more). `sports-proxy` is the old
+   data proxy's address, now only forwarding to it (§4.1).
 2. **The kit** (`kit/`): one copy of everything more than one app needs,
    served from this repo's GitHub Pages and loaded by every app.
 3. **The brand** (`kit/brand.mjs`, `brand/`): every name, colour, mark,
@@ -46,8 +47,8 @@ own.
 
 - [1. The whole system at a glance](#1-the-whole-system-at-a-glance)
 - [2. The data layers: where every number comes from](#2-the-data-layers-where-every-number-comes-from)
-- [3. `orbit-workers-proxy`](#3-orbit-workers-proxy)
-- [4. `sports-proxy`](#4-sports-proxy)
+- [3. The proxy (`orbit-workers-proxy`)](#3-the-proxy-orbit-workers-proxy)
+- [4. The data proxy (`/sports-proxy`)](#4-the-data-proxy-sports-proxy)
 - [5. The Quadra Pass (`/eco`)](#5-the-quadra-pass-eco)
 - [6. The economy](#6-the-economy)
 - [7. Notices while an app is closed (`/push`)](#7-notices-while-an-app-is-closed-push)
@@ -69,21 +70,19 @@ own.
                          │  each: its own static files + the kit (#kit/… import map, from Shared-Proxy's Pages)                │
                          │  device memory  →  Cache Storage (proxyJson persist)  →  localStorage copies (versioned keys)        │
                          └───────┬─────────────────────────┬────────────────────────────────┬──────────────────────────────────┘
-                                 │ packJson / mirror        │ proxyJson (batched, qt=)        │ /eco /push /weather /transit /gemini
-                                 ▼                          ▼                                 ▼
-          Shared-Data (GitHub Pages, built       sports-proxy Worker                   orbit-workers-proxy Worker
-          by GitHub Actions, nightly + every     (no placement pin: runs near          (placement gcp:asia-east1, Taiwan)
-          3 h): season packs, mirror/, watch,    the caller)                           /eco  → Firestore (wallets, app data)
-          winprob, cpbl standings, photos,       allowlisted hosts + synthetic hosts   /push → KV (subscriptions, lists) + cron
-          bus packs, shapes, where.json          (asia-baseball.quadra, f1-live.quadra) /weather → Google, CWA, MOENV, KV cells
-                                                 edge cache per tier, trims, batch     /transit → TDX, Google Maps/Places/Routes
-                                                 F1Log Durable Object + 1-min cron     /kambi → Kambi + Firestore + cron
-                                                 ↓                                     /gemini, /nl-edit → Gemini
-                                                 ESPN · MLB · Jolpica · OpenF1 ·       /config → the developer settings
-                                                 Polymarket · Kambi · Yahoo Finance ·   (service binding ORBIT from sports-proxy)
-                                                 ELTA · formula1.com · YouTube ·
-                                                 Google translate · F1 live timing ·
-                                                 npb.jp / koreabaseball.com / cpbl.com.tw
+                                 │ packJson / mirror        │ every call, signed (qt=): proxyJson batched, /eco /play /push /weather /transit /gemini
+                                 ▼                          ▼
+          Shared-Data (GitHub Pages, built       the proxy: orbit-workers-proxy Worker (placement gcp:asia-east1, Taiwan)
+          by GitHub Actions, nightly + every       /sports-proxy → ESPN · MLB · Jolpica · OpenF1 · Polymarket · Kambi · Yahoo ·
+          3 h): season packs, mirror/, watch,                      ELTA · formula1.com · YouTube · Google translate ·
+          winprob, cpbl standings, photos,                         F1 live timing (f1-live.quadra) · the Asian leagues
+          bus packs, shapes, where.json                            (asia-baseball.quadra); edge cache by tier, trims, batches
+                                                 /eco   → Firestore (wallets, app data)      /play → settling, prices, lottery + cron
+                                                 /push  → KV (subscriptions, lists) + cron   /kambi → Kambi + Firestore + cron
+                                                 /weather → Google, CWA, MOENV, KV cells     /transit → TDX, Google Maps/Places/Routes
+                                                 /gemini, /nl-edit → Gemini                  /config → the developer settings
+                                                 F1Log Durable Object + its minute cron
+          quota-guard Worker: reads the bill every 5 min, stops the proxy at 90% of the $5 plan (§8.1)
 ```
 
 Three rules hold everywhere (from `docs/TRUTH.md`):
@@ -111,7 +110,7 @@ mirror })`) goes down these layers until one answers.
 | 3 | **Failure hold** | the page | a URL that just failed (after one retry) | as long as it would have been kept, a minute at most, so a source that is down isn't asked again by every part of a page |
 | 4 | **The mirror** | Shared-Data `mirror/` (GitHub Pages) | the reads that can't change before a known moment, each `{ until, data }` (gzipped, `<mirrorPath>.gz`, when the index says `gz: 1`: the kit's `gzJson` unpacks it; without `DecompressionStream`, iOS before 16.4, the proxy's); `mirror/index.json` lists which reads it holds (`match`: `'<trim>!<url>'` patterns). While a new index is on its way, the copies the device's last index holds (`mirrorHint`) are asked alongside it, not a round trip after it; any the new index doesn't hold are thrown away | until its `until` (the next game, the next build), never past the next build plus 6 hours |
 | 5 | **The packs** | Shared-Data, read with `packJson` | a league's whole season (`sports/<league>/<year>.json`), CPBL's tables, past win-probability lines, watch links, photo lists, bus packs | until the next build; a pack that isn't there (404) is a failure the app reads another way |
-| 6 | **The edge cache** | the sports-proxy's colo cache | every successful upstream answer, shared by everyone who asks the same URL | by tier (§4.4): live 2 s by default, a finished game 24 h, standings 30 min, … |
+| 6 | **The edge cache** | the proxy's cache in Taiwan | every successful upstream answer, shared by everyone who asks the same URL | by tier (§4.4): live 2 s by default, a finished game 24 h, standings 30 min, … |
 | 7 | **The upstream** | ESPN, Kambi, Yahoo, … | the truth now | — |
 
 On top of the layers, **apps put live knowledge over slower copies.** This
@@ -142,18 +141,20 @@ Failure rules across the layers:
   When their meaning changes, the key is bumped and the old one removed.
 - A batch item that fails is that item's failure, never the batch's.
 
-## 3. `orbit-workers-proxy`
+## 3. The proxy (`orbit-workers-proxy`)
 
-Files: `worker.js` (the router, CORS, Gemini routes, cron), `eco.js`,
-`eco-admin.js`, `money.js`, `capacity.js`, `push.js`, `quadra-token.js`,
-`kambi.js`, `settle.js`, `weather.js`, `weather-stations.js`, `weather-skill.js`,
-`transit.js`, `locales/`, `wrangler.toml`.
+One Worker, one router (`worker.js`), each route's work in its own file:
+`http.js` (CORS and JSON answers for every route), `eco.js`, `eco-admin.js`,
+`money.js`, `capacity.js`, `push.js`, `quadra-token.js`, `kambi.js`,
+`settle.js`, `price.js`, `lotto.js`, `stock-check.js`, `sports.js`,
+`asia-baseball.js`, `f1-live.js`, `weather.js`, `weather-stations.js`,
+`weather-skill.js`, `transit.js`, `locales/`, `wrangler.toml`.
 
-Its placement is pinned to `gcp:asia-east1` (Changhua, Taiwan). Most of its
-traffic is Taiwan's (TDX, CWA, the Pass), Taiwan is a Gemini-supported
-location, and Smart Placement once ran it from Hong Kong, which Gemini
-refuses. Every response carries `X-Worker-Colo` (the IATA code of the colo
-that ran it).
+Its placement is pinned to `gcp:asia-east1` (Changhua, Taiwan). Its people
+and most of its sources are Taiwan's (TDX, CWA, the Pass), Taiwan is a
+Gemini-supported location, and Smart Placement once ran it from Hong Kong,
+which Gemini refuses. Every response carries `X-Worker-Colo` (the IATA code
+of the colo the request came in through).
 
 | Route | File | What |
 | --- | --- | --- |
@@ -166,6 +167,7 @@ that ran it).
 | `GET/POST /push/…` | `push.js` | Notices while an app is closed (§7) |
 | `GET /weather…` | `weather.js`, `weather-skill.js` | Orbit Weather (§3.2) |
 | `GET /transit/…` | `transit.js` | Orbit Transit (§3.3) |
+| `GET /sports-proxy` | `sports.js` | The data proxy for Sports, Play and Securities (§4) |
 
 **The gate.** Every route except signing in needs a Quadra Pass session
 (`qt=`). Sessions are counted per session and app in memory
@@ -310,17 +312,27 @@ on Google's billing month, Pacific time. The hard stop is the per-day quota
 the owner sets on each API in Google Cloud. TDX calls are paced by
 `TDX_PER_MIN` (the free plan allows 5 a minute, 銅級 300).
 
-## 4. `sports-proxy`
+## 4. The data proxy (`/sports-proxy`)
 
-Files: `sports-proxy-worker.js`, `asia-baseball.js`, `f1-live.js`,
-`quadra-token.js` (bundled by Wrangler), `wrangler.sports-proxy.toml`.
+Files: `sports.js` (the route, `handleSports`, and the F1 lap log's cron,
+`sportsCron`), `asia-baseball.js`, `f1-live.js`. A route of the proxy like
+any other: the same router, CORS (`http.js`), sessions and crons.
 
-### 4.1 Why it's its own Worker
+### 4.1 One proxy (2026-10-13)
 
-`[placement]` is a whole-script setting. While this route lived in
-`orbit-workers-proxy`, every sports read from Taiwan went through Virginia
-(`X-Worker-Colo: IAD`). It has no placement block, so it runs near the
-caller.
+It was a Worker of its own (`sports-proxy`) while the proxy was pinned to
+Virginia for Gemini: `[placement]` is a whole Worker's, and every sports
+read from Taiwan crossed the Pacific. With the proxy in Taiwan, where the
+people are, it moved in (the owner: one proxy for everything). One address
+means one connection for a phone instead of two, one edge cache in Taiwan
+shared by everyone, and the developer settings read in place.
+
+The old address, `sports-proxy.pengzjay.workers.dev`, is a forwarder
+(`sports-forward.js`, `wrangler.sports-proxy.toml`: a service binding to
+the proxy, not a billed second request) for phones still on a kit from
+before the move. **Remove it** (the file, its toml, its deploy step and
+`guard.js`'s `WORKERS` entry) once its Workers Logs show no requests for a
+week.
 
 ### 4.2 What it may read
 
@@ -378,7 +390,7 @@ Securities left open never uses up Sports' minute. A cache hit counts too.
 `qt` is let in (unless `SPORTS_DEV=off`), counted per address:
 
 ```bash
-curl -H 'Origin: http://localhost:8123' 'https://sports-proxy.pengzjay.workers.dev/sports-proxy?url=<encoded>&app=match'
+curl -H 'Origin: http://localhost:8123' 'https://orbit-workers-proxy.pengzjay.workers.dev/sports-proxy?url=<encoded>&app=match'
 ```
 
 Scripts, `tools/preview.mjs --live` and Shared-Data's `watch.mjs` use it.
@@ -416,8 +428,8 @@ Headers: `X-Sports-Proxy-Cache` (`HIT`, `STALE`, `MISS`),
 `X-Sports-Proxy-Cache-Tier`, `X-Sports-Proxy-Age`, and
 `X-Sports-Proxy-Final` on a finished game.
 
-The developer settings (§8) are read from the main Worker through the
-service binding `ORBIT` at most once a minute.
+The developer settings (§8) are read in place at most once a minute, from
+the same cached copy `GET /config` answers (`useDevSettings`).
 
 ### 4.5 Asian baseball (`asia-baseball.js`)
 
@@ -809,8 +821,8 @@ are set with `wrangler secret put` or the dashboard.
 | orbit-workers-proxy | `TDX_CLIENT_ID`, `TDX_CLIENT_SECRET`, `GOOGLE_MAPS_BROWSER_KEY`, `GOOGLE_MAPS_KEY` | Transit |
 | orbit-workers-proxy | `GOOGLE_WEATHER_KEY`, `CWA_KEY`, `MOENV_KEY` | Weather |
 | orbit-workers-proxy | `ADMIN_TOKEN_HASH`, `ECO_ADMIN_TOKEN` | The admin panel (the owner's key; Claude never uses it) |
-| sports-proxy | `F1_LOG` (Durable Object `F1Log`, migration `f1-log-1`), cron `* * * * SUN,MON,THU,FRI,SAT` | The F1 lap log |
-| sports-proxy | `ORBIT` (service binding) | The developer settings from `/config` |
+| orbit-workers-proxy | `F1_LOG` (Durable Object `F1Log`, migration `f1-log-main`), cron `* * * * SUN,MON,THU,FRI,SAT` | The F1 lap log |
+| sports-proxy (the forwarder) | `ORBIT` (service binding) | Every request handed to the proxy |
 | quota-guard | `CF_GUARD_TOKEN` (from the repo secret), `CF_ACCOUNT_ID` (from `CLOUDFLARE_ACCOUNT_ID`), `RATE_LIMIT_KV`, cron `*/5 * * * *` | Reading the bill, stopping the proxies (§8.1) |
 
 **Arming the guard (the owner, once).**
@@ -853,7 +865,7 @@ See `tools/README.md` for every flag.
 | `eco.test.mjs`, `pass.test.mjs` | The Pass, merges, Plus, VIP, pay, rebases |
 | `money.test.mjs` | The money report |
 | `push.test.mjs` | Push encryption, lists, checks |
-| `sports-proxy.test.mjs`, `final-cache.test.mjs` | Allowlist, trims, batches, cache tiers, the final tier |
+| `sports.test.mjs`, `final-cache.test.mjs` | The data proxy through the router: allowlist, trims, batches, cache tiers, the final tier |
 | `f1-live.test.mjs`, `f1live-kit.test.mjs` | F1's feed trim, sessions, the lap log, `kit/f1live.mjs` |
 | `asia-baseball.test.mjs` | NPB, KBO, CPBL parsing |
 | `kambi.test.mjs` | The Kambi watch |
@@ -873,7 +885,7 @@ pushing a change, find its row and check every place it names.
 | `kit/catalog.mjs` (a league) | Orbit Sports `lib/leagues.mjs` and `lib/broadcast.mjs` (shown only if on ELTA or Apple TV); Play's `lib/teams.mjs`; Shared-Data `sports.mjs` and `mirror.mjs` (which leagues are built); `tools/leagues-audit.mjs` |
 | `kit/logos.mjs`, `names.mjs`, `photos.mjs` | Both Sports and Play; Shared-Data `official-photos.mjs` (the lists `photos.mjs` reads); `sw-images.js` |
 | `proxyJson`, `packJson`, the mirror | Every app's first paint; Shared-Data `mirror.mjs` (`mirrorPath` must match); the failure hold (TRUTH §7) |
-| A trim in `sports-proxy-worker.js` | Every parser that reads it (Sports, Play), Shared-Data `mirror.mjs` (its copy is trimmed the same way) |
+| A trim in `sports.js` | Every parser that reads it (Sports, Play), Shared-Data `mirror.mjs` (its copy is trimmed the same way) |
 | A Cloudflare product used, a cron added, a toml's `[limits]` or logs | `guard.js` `PLAN` (every billed count), §8.1, TRUTH §7 |
 | A cache tier or `DEV` default | `capacity.js`'s estimates, Shared-Data's `watch.mjs` (dev door), the admin panel |
 | `f1-live.js` (`trimF1Live`, laps) | Orbit Sports (`lib/f1.mjs`, `sheets.js`: live board, 數據, track map, race chance, standings at the flag); Quadra Play (F1 settling, `kit/f1live.mjs`); `tests/f1-live.test.mjs` |

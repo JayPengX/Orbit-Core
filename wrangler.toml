@@ -90,6 +90,9 @@ TDX_PER_SEC = "4"
 # A local dev page (the preview's --live) may ask for transit data without a
 # Quadra Pass, rate-limited (worker.js). "off" closes it.
 TRANSIT_DEV = "on"
+# The sports proxy's dev door (sports.js checkSession): a local
+# page may read without a Quadra Pass, rate-limited. "off" closes it.
+SPORTS_DEV = "on"
 
 # GEMINI_API_KEY (for /gemini, /nl-edit, /vocab-ai) and
 # FIREBASE_CLIENT_EMAIL / FIREBASE_PRIVATE_KEY (for /sync and /vocab-sync,
@@ -108,11 +111,6 @@ TRANSIT_DEV = "on"
 # hourly copy of each cell (weather.js, weather-skill.js). Not rate limits:
 # those are in memory (worker.js), and caches are in Cloudflare's cache, so
 # the free tier's 1,000 writes a day stay far off.
-# The sports proxy, for reading a placed Quadra Play slip's prices as Play
-# does (settle.js / price.js): its cache and trims.
-[[services]]
-binding = "SPORTS"
-service = "sports-proxy"
 
 [[kv_namespaces]]
 binding = "RATE_LIMIT_KV"
@@ -136,5 +134,18 @@ cpu_ms = 3000
 
 # /kambi cron (kambi.js): Kambi matches with open Quadra Play bets, every 2 minutes (one index read when nothing is on).
 # The odd minutes: Quadra Play's slips settled (settle.js, worker.js SETTLE_CRON), an invocation of its own.
+# Every lap of an F1 session while it runs (f1-live.js: F1's archive has
+# them only after the flag): a minute's look kept in a Durable Object. It
+# moved here with the sports proxy (2026-10-13); the old Worker's log of past
+# sessions wasn't carried (F1's archive has every finished session).
+[[durable_objects.bindings]]
+name = "F1_LOG"
+class_name = "F1Log"
+
+[[migrations]]
+tag = "f1-log-main"
+new_sqlite_classes = ["F1Log"]
+
+# The F1 lap log (the third): each minute Thursday to Monday, UTC.
 [triggers]
-crons = ["*/2 * * * *", "1-59/2 * * * *"]
+crons = ["*/2 * * * *", "1-59/2 * * * *", "* * * * SUN,MON,THU,FRI,SAT"]

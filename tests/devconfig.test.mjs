@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DEV, cleanDev } from '../kit/devconfig.mjs';
-import { freshFor } from '../sports-proxy-worker.js';
+import { freshFor } from '../sports.js';
 
 test('developer settings: each in range, a bad or missing one its default', () => {
   const d = cleanDev({ sportsGame: 1, sportsList: '30', f1Board: 'x', mirror: 'no', extra: 5 });

@@ -1,55 +1,38 @@
-# Deploys sports-proxy-worker.js as its OWN Cloudflare Worker, separate
-# from wrangler.toml's "orbit-workers-proxy" - see sports-proxy-worker.js's
-# top comment for why it can't share that Worker's [placement] region pin.
+# The old sports proxy's address, now only a forwarder (sports-forward.js):
+# the main Worker (wrangler.toml, "orbit-workers-proxy") serves /sports-proxy
+# itself since 2026-10-13 (the owner: one proxy). Kept for phones still on a
+# kit from before the move; removed once every device has moved on.
 #
 # CI deploys this on every push to main (see .github/workflows/deploy.yml).
 # Manual deploy:
 #   npx wrangler deploy -c wrangler.sports-proxy.toml
 name = "sports-proxy"
-main = "sports-proxy-worker.js"
+main = "sports-forward.js"
 compatibility_date = "2025-01-01"
 
-# Deliberately no [placement] block: Cloudflare's default runs each
-# request's isolate at whichever colo received it, i.e. near the caller.
-
-# No KV binding: this Worker counts requests per Quadra Pass session in
-# memory (quadra-token.js sessionLimited) and keeps nothing in KV (the F1
-# lap log, below, is a Durable Object).
-
-
-# A local dev page (the preview tool) may read without a Quadra Pass,
-# rate-limited (sports-proxy-worker.js checkSession). "off" closes it.
-[vars]
-SPORTS_DEV = "on"
-
 # The main Worker, called directly (a workers.dev address can't be fetched
-# from another Worker): the developer settings (GET /config) the cache times
-# here follow.
+# from another Worker; a call over a service binding isn't a billed request).
 [[services]]
 binding = "ORBIT"
 service = "orbit-workers-proxy"
 
-# Every lap of an F1 session while it runs (f1-live.js: F1's archive has
-# them only after the flag): a minute's look kept in a Durable Object
-# (SQLite, on the free plan), from Thursday to Monday, UTC.
-[[durable_objects.bindings]]
-name = "F1_LOG"
-class_name = "F1Log"
-
+# The F1 lap log moved to the main Worker: this one's class is deleted (its
+# fortnight of past sessions isn't needed: F1's archive has them).
 [[migrations]]
 tag = "f1-log-1"
 new_sqlite_classes = ["F1Log"]
 
-[triggers]
-crons = ["* * * * SUN,MON,THU,FRI,SAT"]
+[[migrations]]
+tag = "f1-log-2"
+deleted_classes = ["F1Log"]
 
-# Workers Logs: the busiest Worker, so 5% of invocations (the $5 plan includes
-# 20M events a month; guard.js).
+# No crons: the F1 lap log's minute runs on the main Worker.
+[triggers]
+crons = []
+
 [observability]
 enabled = true
 head_sampling_rate = 0.05
 
-# A cap per invocation against a runaway (the $5 plan allows 30 s, billed past
-# 30M ms a month): Polymarket's 11.7 MB page parsed uncached is the heaviest.
 [limits]
-cpu_ms = 1000
+cpu_ms = 100

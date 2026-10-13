@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { settled } from '../sports-proxy-worker.js';
+import { settled } from '../sports.js';
 
 const u = x => new URL(x);
 const game = (state, completed) => JSON.stringify({ header: { competitions: [{ status: { type: { state, completed } } }] } });

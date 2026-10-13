@@ -57,7 +57,7 @@ import { execFile } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { ASIA_HOST, asiaBaseballResponse } from '../asia-baseball.js';
 import { F1_LIVE_HOST, f1LiveResponse, memoryLog, sampleLive } from '../f1-live.js';
-import { trimF1Page, trimEltaVod, trimYtSearch, trimYtVideo } from '../sports-proxy-worker.js';
+import { trimF1Page, trimEltaVod, trimYtSearch, trimYtVideo } from '../sports.js';
 import { handleWeather } from '../weather.js';
 import { upstream as weatherFixtures } from '../tests/fixtures/weather/upstream.mjs';
 // The F1 lap log the sports proxy's cron keeps (f1-live.js), here in
@@ -171,7 +171,7 @@ const shuffle = flag('shuffle');
 // calls to the Workers come back here (its fetch is pointed at /__ext).
 const serve = flag('serve');
 // --live: the page asks the real proxies (the Workers let a localhost page
-// without a pass in: worker.js TRANSIT_DEV, sports-proxy-worker.js
+// without a pass in: worker.js TRANSIT_DEV, sports.js
 // SPORTS_DEV), still with the made-up account. Orbit Transit: today's real
 // buses, trains and bikes. The data proxy: its real cache, limits and
 // failures (asked without the made-up token), each batch item that failed
@@ -523,7 +523,7 @@ if (!live) await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.worker
   const res = await handleTransit(new Request(req.url()), transitEnv, cors, u.pathname, { session: { s: 'preview' }, fetchFn, cache: null });
   await route.fulfill({ status: res.status, contentType: 'application/json', headers: cors, body: await res.text() });
 });
-await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(?!weather|push|transit)/, async route => {
+await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(?!weather|push|transit|sports-proxy)/, async route => {
   const req = route.request();
   const body = req.postDataJSON?.() || {};
   // Quadra Play's slips (settle.js): placing checks every pick's price on
@@ -567,17 +567,19 @@ await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(?!
   if (body.op === 'pair-create') Object.assign(reply, { code: 'ABCD2345', exp: Date.now() + 600_000 });
   await route.fulfill({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(reply) });
 });
+// The sports proxy: the main Worker's /sports-proxy, and the old address (a forwarder).
+const SPORTS = /^https:\/\/(sports-proxy\.pengzjay\.workers\.dev|orbit-workers-proxy\.pengzjay\.workers\.dev\/sports-proxy)/;
 // Every item asked of the proxy (its time): the busiest minute is printed at
 // the end, against a signed-in session's limit (the dev door's is higher).
 const liveAsks = [];
 if (live) {
-  await context.route('https://sports-proxy.pengzjay.workers.dev/**', route => {
+  await context.route(SPORTS, route => {
     const u = new URL(route.request().url());
     u.searchParams.delete('qt');
     return route.continue({ url: u.toString() });
   });
   context.on?.('response', async res => {
-    if (!res.url().startsWith('https://sports-proxy.pengzjay.workers.dev/')) return;
+    if (!SPORTS.test(res.url())) return;
     const u = new URL(res.url());
     const asked = u.searchParams.has('batch') ? u.searchParams.getAll('u') : [u.searchParams.get('url')];
     liveAsks.push(...asked.map(() => Date.now()));
@@ -588,7 +590,7 @@ if (live) {
     r.forEach((x, i) => (x.s !== 200 || x.ms > 2500) && console.log(`live: ${x.s} ${x.ms ?? '?'} ms ${x.c || ''} ${x.e || ''} ${short(asked[i])}`));
   });
 }
-if (!live) await context.route('https://sports-proxy.pengzjay.workers.dev/**', async route => {
+if (!live) await context.route(SPORTS, async route => {
   const u = new URL(route.request().url());
   const cors = { 'Access-Control-Allow-Origin': '*' };
   if (u.searchParams.has('batch')) {

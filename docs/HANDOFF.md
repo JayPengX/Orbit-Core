@@ -10,6 +10,33 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
 
 
 
+## One proxy for everything (2026-10-13, pushed to `main`)
+
+The owner: "one proxy for all … organize it so it's not two independent
+things in one proxy". The data proxy was its own Worker only because the
+main one was pinned to Virginia for Gemini; pinned to Taiwan now, where the
+people are, it moved in as a route like the others:
+- `sports.js` (was `sports-proxy-worker.js`): `handleSports` (the route) and
+  `sportsCron` (the F1 lap log's minute), routed by `worker.js` beside
+  /eco, /play, /transit, /weather; `http.js` holds the CORS and JSON answers
+  every route uses (the sports copy of them is gone); the developer settings
+  read in place from `/config`'s cached copy (`useDevSettings`), no service
+  binding; Play's price check calls the route in place (no SPORTS binding).
+- `wrangler.toml`: the F1Log Durable Object (new class, `f1-log-main`; the
+  old Worker's fortnight of laps not carried: F1's archive has those
+  sessions), the minute cron Thursday–Monday, `SPORTS_DEV`.
+- `sports-proxy` is now `sports-forward.js`: hands every request to the
+  proxy over a service binding, for phones on a kit from before the move;
+  its class deleted (`f1-log-2`), no crons. **Remove it** once its Workers
+  Logs show no requests for a week (README §4.1 lists what goes with it).
+- The kit (`PROXY_URL` in `quadra.mjs`, `play-sources.mjs`), Securities'
+  `quotes.mjs`, Shared-Data's `watch.mjs`/`asia.mjs` (and its imports of
+  `sports.js`) point at `orbit-workers-proxy…/sports-proxy`; the apps'
+  second preconnect is gone (one connection, not two). Phones' saved copies
+  are keyed by the source's URL, so nothing opens cold.
+- Pushed in order: the Worker, checked live through the dev door, then the
+  kit and apps.
+
 ## Cloudflare on the $5 plan, with a hard stop on the bill (2026-10-13, pushed to `main`)
 
 The owner moved Cloudflare to Workers Paid ($5) and asked for a hard limit:
@@ -29,10 +56,7 @@ email; checked in its billing docs), so:
 - `capacity.js`: the day's budget is the plan's (290,000: 9M over 31 days),
   not the free plan's 100,000. The admin page's 容量 shows the real bill per
   count, so far and at this pace, and whether the proxies are stopped.
-- Merging the two proxies (the owner asked): not possible, still. Placement
-  is set per Worker on every plan (Cloudflare's placement docs), and sports
-  must run near the caller while the rest runs in Taiwan; calls between
-  them cost nothing (service bindings aren't billed requests).
+- Merging the two proxies (the owner asked): done the same day, above.
 - Checked: 10 new tests (`tests/guard.test.mjs`), `npm test` 234/234,
   `wrangler deploy --dry-run` of all three tomls. **Not yet armed**: needs
   the owner's `CF_GUARD_TOKEN` (README §11, four steps); until then it
