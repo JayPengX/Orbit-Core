@@ -8,7 +8,7 @@ on:
       job:
         description: The job
         type: choice
-        options: [watch, watch-full, drain, cutouts, buses, asia, cpbl, sports, photos, winprob]
+        options: [watch, watch-full, cutouts, buses, asia, cpbl, sports, photos, winprob]
         default: watch
 jobs:
   run:
@@ -19,7 +19,7 @@ jobs:
         run: |
           case "$JOB" in
             watch-full) q='job=watch&full=1' ;;
-            watch|drain|cutouts|buses) q="job=$JOB" ;;
+            watch|cutouts|buses) q="job=$JOB" ;;
             *) q="only=$JOB" ;;
           esac
           curl -sS --max-time 900 -X POST -H "Authorization: Bearer $DATA_PUSH_SECRET" "https://orbit-workers-proxy.pengzjay.workers.dev/data/build?$q"; echo

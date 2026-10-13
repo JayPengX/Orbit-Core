@@ -1299,7 +1299,7 @@ export default {
       return json({ mode: env.STORE_MODE, copied, compare: await compareStores(env, FS) }, 200, headers);
     }
     // A builder's job now (builders/run.js), by hand: Bearer DATA_PUSH_SECRET
-    // (Shared-Proxy's build.yml). ?job=watch|drain|cutouts|buses, or
+    // (Shared-Proxy's build.yml). ?job=watch|cutouts|buses, or
     // ?only=asia|cpbl|sports|photos|winprob; &full=1 a full watch run.
     if (path === '/data/build' && request.method === 'POST') {
       if (!env.DATA_PUSH_SECRET || request.headers.get('Authorization') !== `Bearer ${env.DATA_PUSH_SECRET}`) return errorJson('FORBIDDEN_ORIGIN', 403, headers, request);

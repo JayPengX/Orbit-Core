@@ -22,21 +22,7 @@ const isGz = b => b[0] === 0x1f && b[1] === 0x8b;
 const TYPES = { json: 'application/json', gz: 'application/gzip' };
 const typeOf = path => TYPES[/\.([a-z]+)$/.exec(path)?.[1]] || 'application/octet-stream';
 
-// Shared-Data's last site on GitHub Pages: a file R2 doesn't hold yet is
-// taken from there once and kept in R2 (the move without a bulk copy: nothing
-// read again from any source). Goes with Shared-Data.
-export const PAGES = 'https://jaypengx.github.io/Shared-Data/';
-export async function fromPages(bucket, path, get = (...a) => fetch(...a)) {
-  const res = await get(`${PAGES}${path}`, { signal: AbortSignal.timeout(20_000) }).catch(() => null);
-  if (!res?.ok) return null;
-  const raw = new Uint8Array(await res.arrayBuffer());
-  const meant = raw[0] === 0x1f && raw[1] === 0x8b ? await gunzip(raw) : raw;
-  const sum = await sha256(meant);
-  await bucket.put(path, raw, { httpMetadata: { contentType: typeOf(path) }, customMetadata: { sha256: sum, from: 'pages' } });
-  return { raw, meant, sum };
-}
-
-export function r2Store(bucket, { pages = true, get = (...a) => fetch(...a) } = {}) {
+export function r2Store(bucket) {
   const stats = { read: 0, written: 0, same: 0, deleted: 0 };
   // What this run read or wrote, by path: its sum, so writing the same back
   // asks R2 nothing at all.
@@ -47,13 +33,7 @@ export function r2Store(bucket, { pages = true, get = (...a) => fetch(...a) } = 
     async bytes(path) {
       const obj = await bucket.get(path);
       stats.read++;
-      if (!obj) {
-        const moved = pages ? await fromPages(bucket, path, get) : null;
-        if (!moved) return null;
-        stats.moved = (stats.moved || 0) + 1;
-        known.set(path, moved.sum);
-        return moved.meant;
-      }
+      if (!obj) return null;
       const raw = new Uint8Array(await obj.arrayBuffer());
       const b = isGz(raw) ? await gunzip(raw) : raw;
       if (obj.customMetadata?.sha256) known.set(path, obj.customMetadata.sha256);

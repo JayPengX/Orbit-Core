@@ -7,9 +7,7 @@
 // is paid), carried over as built, nothing read from its sources again.
 //
 //   GET  /data/<path>        a file: the edge cache in Taiwan first (one R2
-//                            read serves everyone for a few minutes), then R2;
-//                            while a file isn't in R2 yet, Shared-Data's Pages
-//                            copy (the move's bridge: goes with the repo)
+//                            read serves everyone for a few minutes), then R2
 //   POST /data/push          files written or deleted (a builder's output),
 //                            Bearer DATA_PUSH_SECRET; the body is frames of
 //                            [u32 path length][path][u32 size][bytes], a
@@ -24,9 +22,8 @@
 
 import { json } from './http.js';
 import { sessionLimited } from './quadra-token.js';
-import { sha256, gunzip, fromPages } from './builders/store.js';
+import { sha256, gunzip } from './builders/store.js';
 
-export const PAGES = 'https://jaypengx.github.io/Shared-Data/';
 const TYPES = { json: 'application/json', gz: 'application/gzip', txt: 'text/plain; charset=utf-8', html: 'text/html; charset=utf-8' };
 const typeOf = path => TYPES[/\.([a-z]+)$/.exec(path)?.[1]] || 'application/octet-stream';
 // How long a phone and the edge keep a file: an index a few minutes (a new
@@ -51,21 +48,9 @@ async function readFile(env, ctx, path, request) {
   const cache = typeof caches !== 'undefined' ? caches.default : null;
   const hit = cache && (await cache.match(key));
   if (hit) return hit;
-  let res = null;
   const obj = env.DATA ? await env.DATA.get(path) : null;
-  if (obj) {
-    res = new Response(obj.body, { headers: { 'Content-Type': typeOf(path), ETag: obj.httpEtag, 'Cache-Control': `public, max-age=${maxAge(path)}` } });
-  } else {
-    // Not moved yet: Pages' copy, kept in R2 from now on (until Shared-Data is gone).
-    const moved = env.DATA ? await fromPages(env.DATA, path).catch(() => null) : null;
-    if (moved) res = new Response(moved.raw, { headers: { 'Content-Type': typeOf(path), 'Cache-Control': `public, max-age=${maxAge(path)}` } });
-    else {
-      const up = await fetch(`${PAGES}${path}`, { signal: AbortSignal.timeout(15_000) }).catch(() => null);
-      if (!up) return new Response('', { status: 502 });
-      if (!up.ok) return new Response('', { status: up.status === 404 ? 404 : 502 });
-      res = new Response(up.body, { headers: { 'Content-Type': typeOf(path), 'Cache-Control': `public, max-age=${maxAge(path)}` } });
-    }
-  }
+  if (!obj) return new Response('', { status: 404 });
+  const res = new Response(obj.body, { headers: { 'Content-Type': typeOf(path), ETag: obj.httpEtag, 'Cache-Control': `public, max-age=${maxAge(path)}` } });
   if (cache) ctx.waitUntil(cache.put(key, res.clone()));
   return res;
 }

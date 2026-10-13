@@ -478,10 +478,10 @@ the log until it's there, and asks again each minute.
 
 Everything that doesn't change in a day, built by this Worker into R2
 (bucket `quadra-data`, Asia-Pacific; binding `DATA`) and served at
-`/data/<path>` (`data.js`: the edge cache in Taiwan, then R2; reads public,
-900 a minute an address). Shared-Data built it on GitHub until 2026-10-13;
-its last site was copied into R2 as it was (no source read again), and its
-builders moved here (the owner: everything on Cloudflare, ultra efficient).
+`/data/<path>` (`data.js`: the edge cache in Taiwan, then R2, else 404; reads public,
+900 a minute an address). Shared-Data built it on GitHub until 2026-10-13 (archived); its files
+moved into R2 as they were (no source read again), and its builders moved
+here (the owner: everything on Cloudflare, ultra efficient).
 
 **The builders** (`builders/run.js`, at :16 on the proxy's even-minute cron:
 Cron Triggers added on 2026-10-13 were never dispatched; 30 s of CPU a run). Each as often as its data changes, and lean:
@@ -498,10 +498,11 @@ Cron Triggers added on 2026-10-13 were never dispatched; 30 s of CPU a run). Eac
 | 20 | `watch.js` (full) | the season's archive whole, `sports/elta-pages.json` | the season scan once a day; older highlights for 10 minutes |
 | 23 | `winprob.js` | `winprob/…` | a game kept is never read again; Polymarket's 11 MB pages through the proxy's trimmed cache |
 
-**Moving in**: a file R2 lacks is taken from Shared-Data's Pages once and
-kept (`store.js fromPages`; `/data/` and the kept reads too), and
-`builders/drain.js` moves every file the indexes list, a run at a time,
-until done (KV `data:drained`); Shared-Data's Pages stays until then.
+**Moved in** (2026-10-13): Shared-Data's files went into R2 as they were
+read, then every file its indexes listed (no source read again); the
+repo is archived and its Pages site off. The nightly mirror's copies of
+finished games weren't moved: the data proxy reads a game from its source
+once, if anyone opens it.
 
 **`builders/store.js`**: R2 as files: a file is written only when its
 content changed (each keeps its SHA-256 in R2's metadata; what a run read
@@ -934,7 +935,7 @@ See `tools/README.md` for every flag.
 | `transit.test.mjs` | TDX rules, caps, routes |
 | `weather.test.mjs`, `weather-skill.test.mjs` | The blend and the scoring |
 | `capacity.test.mjs`, `devconfig.test.mjs` | Capacity and settings |
-| `data.test.mjs`, `store.test.mjs` | `/data/` (push, list, read, the Pages bridge), the builders' R2 store |
+| `data.test.mjs`, `store.test.mjs` | `/data/` (push, list, read), the builders' R2 store |
 | `watch.test.mjs`, `builders-*.test.mjs`, `official-photos.test.mjs`, `cpbl.test.mjs` | The builders: watch links (light and full runs), win probability, season packs, CPBL, photos, buses, each on an in-memory R2 |
 | `guard.test.mjs` | The hard stop: the period, the plan's amounts, stopping and starting both proxies, a deploy undone, blind and unarmed |
 | `kit.test.mjs`, `kit-css.test.mjs`, `kit-calendar.test.mjs`, `photos.test.mjs` | The kit |
