@@ -25,7 +25,20 @@ export const SCHEMA = 'CREATE TABLE IF NOT EXISTS docs (coll TEXT NOT NULL, id T
 export const stamp = (now = Date.now()) => `${new Date(now).toISOString().slice(0, 23)}${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}Z`;
 const precondition = msg => Object.assign(new Error(msg), { precondition: true });
 
-export function d1Store(db) {
+// The table, made once an isolate (one cheap query; the deploy needn't run SQL).
+const ready = new WeakMap();
+const tableOf = db => {
+  if (!ready.has(db)) ready.set(db, db.prepare(SCHEMA).run().catch(e => (ready.delete(db), Promise.reject(e))));
+  return ready.get(db);
+};
+export function d1Store(raw) {
+  // Every query waits on the table being there.
+  const db = { prepare: sql => {
+    const st = { args: [] };
+    const go = fn => tableOf(raw).then(() => fn(raw.prepare(sql).bind(...st.args)));
+    const self = { bind: (...a) => ((st.args = a), self), first: () => go(q => q.first()), run: () => go(q => q.run()), all: () => go(q => q.all()) };
+    return self;
+  } };
   return {
     async get(collection, id) {
       const row = await db.prepare('SELECT payload, updated FROM docs WHERE coll = ? AND id = ?').bind(collection, id).first();

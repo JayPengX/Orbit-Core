@@ -61,14 +61,14 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       # The Pass's store on Cloudflare (D1 quadra-store, doc-store.js): made
-      # once, its table set, and bound to the proxy with its id.
+      # once and bound to the proxy with its id (the Worker makes its table).
+      # The deploy token needs Account · D1 · Edit (README §11).
       - name: The store database
         continue-on-error: true
         run: |
           id=$(npx --yes wrangler@4 d1 list --json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const d=JSON.parse(s).find(x=>x.name==="quadra-store");console.log(d?d.uuid:"")}catch{console.log("")}})')
           if [ -z "$id" ]; then npx --yes wrangler@4 d1 create quadra-store --location apac; id=$(npx --yes wrangler@4 d1 list --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const d=JSON.parse(s).find(x=>x.name==="quadra-store");console.log(d?d.uuid:"")})'); fi
           [ -n "$id" ] || exit 1
-          npx --yes wrangler@4 d1 execute quadra-store --remote --command "$(node -e "import('./doc-store.js').then(m=>console.log(m.SCHEMA))")"
           printf '\n[[d1_databases]]\nbinding = "STORE"\ndatabase_name = "quadra-store"\ndatabase_id = "%s"\n' "$id" >> wrangler.toml
           echo "quadra-store bound as STORE ($id)"
         env:
