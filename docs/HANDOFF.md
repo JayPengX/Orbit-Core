@@ -10,6 +10,25 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
 
 
 
+## Transit: Apple Maps for a walk or a ride; search a chain nearest first (2026-10-13, pushed to `main`)
+
+The owner: Apple Maps beside Google for a walk or a ride, chosen in 我的 →
+交通偏好 → 導航 App (`prefs.maps`, `nav.mjs mapsLink / appleMapsLink`:
+maps.apple.com/directions, walking or cycling; Google's travelmode walking or
+bicycling). Never for a bus or train (the owner: the app's own plan; a link
+carries only the destination, so Google or Apple would plan their own): ⋯'s
+用 Google 地圖導航 (the whole trip by transit) removed. Not tried on a phone:
+Apple's directions URL needs a recent iOS.
+
+Search: 八分雲集 from 成功九街 gave 八方雲集 in other cities and not every one
+near. Autocomplete (five at most) now beside Text Search (20, relevant, near
+you first, a typo still found; kept a day for the same words within ~1 km,
+the textSearch cap), ranked by `nearFirst`: every place within 25 km
+nearest first (the name typed whole first), the same chain's branches
+beyond 25 km left out while one's near (a chain: its name before the
+branch), then the rest. Tested on the owner's case with made-up answers;
+not seen with Google here (no key).
+
 ## Transit: one walk everywhere, Google's; the loading screen onto a finished map (2026-10-13, pushed to `main`)
 
 The owner: the planner's 210 m to 成功國中 was right (Google says 210);

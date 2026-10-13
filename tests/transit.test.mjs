@@ -485,11 +485,48 @@ test('a TDX answer that fails with a 5xx is asked once more', async () => {
   assert.equal(n, 2);
 });
 
-test('place search: the near branch of a chain first, nearest first', () => {
+test('place search: the near branches of a chain first, nearest first; the same chain far away left out while one is near', () => {
   const far = [{ id: 'a', name: '錢都日式涮涮鍋 桃園店', dist: 45000 }, { id: 'b', name: '錢都 中壢店', dist: 38000 }];
   const near = [{ id: 'c', name: '錢都 竹北光明店', dist: 2100 }, { id: 'd', name: '錢都 新竹店', dist: 9000 }, { id: 'e', name: '金錢豹', dist: 900 }];
-  assert.deepEqual(nearFirst(far, near, '錢都').map(i => i.id), ['c', 'd', 'a', 'b']);
+  // (The name typed whole first among the near; 中壢店 gone, 錢都 being near; 涮涮鍋 another name.)
+  assert.deepEqual(nearFirst(far, near, '錢都').map(i => i.id), ['c', 'd', 'e', 'a']);
   assert.deepEqual(nearFirst([{ id: 'x', name: '台北車站', dist: 70000 }], [], '台北車站').map(i => i.id), ['x']);
+});
+
+test("place search, a chain typed with a typo from 成功九街 (八分雲集): every 八方雲集 near you, nearest first, none from another city while one's near; an address still there", async () => {
+  fresh();
+  const env = { GOOGLE_MAPS_KEY: 'k', RATE_LIMIT_KV: memKv() };
+  const cache = memCache();
+  let text = 0;
+  const at = (id, name, lat, lon) => ({ id, displayName: { text: name }, formattedAddress: '302新竹縣竹北市', location: { latitude: lat, longitude: lon } });
+  const fetchFn = async (url, opts) => {
+    const body = JSON.parse(opts.body);
+    if (String(url).includes('autocomplete')) {
+      assert.equal(body.input, '八分雲集');
+      // Autocomplete: two far branches (台北, 台中), and a road by that name.
+      return json({ suggestions: [
+        { placePrediction: { placeId: 'tp', structuredFormat: { mainText: { text: '八方雲集 台北南京店' }, secondaryText: { text: '台北市' } }, distanceMeters: 70_000 } },
+        { placePrediction: { placeId: 'tc', structuredFormat: { mainText: { text: '八方雲集(台中公益店)' }, secondaryText: { text: '台中市' } }, distanceMeters: 90_000 } },
+        { placePrediction: { placeId: 'rd', structuredFormat: { mainText: { text: '八分路' }, secondaryText: { text: '某縣' } }, distanceMeters: 120_000 } }
+      ] });
+    }
+    if (String(url).includes('searchText')) {
+      text++;
+      assert.equal(body.pageSize, 20);
+      assert.equal(body.locationBias.circle.radius, 10_000);
+      // Text Search, near you (Google's spelling): four branches, one far.
+      return json({ places: [at('b3', '八方雲集 新竹光復店', 24.7960, 120.9960), at('b1', '八方雲集(竹北成功店)', 24.8180, 121.0150), at('b2', '八方雲集 竹北光明店', 24.8300, 121.0050), at('tp', '八方雲集 台北南京店', 25.0520, 121.5440)] });
+    }
+    assert.fail(`unexpected ${url}`);
+  };
+  const ask = () => handleTransit(new Request('https://w/transit/search?q=八分雲集&lat=24.81774&lon=121.0163'), env, {}, '/transit/search', { session: { s: 'S' }, fetchFn, now: NOW, cache }).then(r => r.json());
+  const out = await ask();
+  assert.equal(out.by, 'google');
+  assert.deepEqual(out.items.map(i => i.id), ['b1', 'b2', 'b3', 'rd'], 'near branches nearest first, the far ones gone, the road kept');
+  assert.ok(out.items[0].dist < out.items[1].dist && out.items[1].dist < out.items[2].dist);
+  // The same words near the same spot: Text Search's answer kept (a day).
+  await ask();
+  assert.equal(text, 1);
 });
 
 test("walks by Google's streets: five in one matrix call, each kept a month; with its line, one route; past the month's cap, none (the app's router then)", async () => {

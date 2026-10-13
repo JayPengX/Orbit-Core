@@ -464,11 +464,23 @@ const distM = (a, b, c, d) => {
   const h = Math.sin(r(c - a) / 2) ** 2 + Math.cos(r(a)) * Math.cos(r(c)) * Math.sin(r(d - b) / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(h));
 };
+// A chain's name before its branch: 八方雲集(竹北成功店), 八方雲集 新竹店 → 八方雲集.
+const stem = name => squash(String(name || '').split(/[\s(（\-－·・]/)[0]);
+const NEAR_M = 25_000;
+// The places found, nearest first: every branch of a chain near you (Text
+// Search's, Google's own spelling of the name: 八分雲集 → 八方雲集) before
+// anything else, and a branch in another city left out while one's near;
+// then the rest (an address, a place with no position). 15 at most.
 export function nearFirst(items, near, text) {
   const t = squash(text);
-  const close = [...near, ...items].filter(i => i.dist != null && i.dist <= 15_000 && squash(i.name).includes(t)).sort((a, b) => a.dist - b.dist);
+  const all = [...near, ...items];
+  const close = all.filter(i => i.dist != null && i.dist <= NEAR_M).sort((a, b) => a.dist - b.dist);
+  // (A name typed whole, found near: those first among the near ones.)
+  const whole = close.filter(i => squash(i.name).includes(t));
+  const chains = new Set(close.map(i => stem(i.name)).filter(Boolean));
+  const rest = [...items, ...near].filter(i => !(i.dist != null && i.dist > NEAR_M && chains.has(stem(i.name))));
   const seen = new Set();
-  return [...close, ...items].filter(i => !seen.has(i.id) && seen.add(i.id)).slice(0, 8);
+  return [...whole, ...close, ...rest].filter(i => !seen.has(i.id) && seen.add(i.id)).slice(0, 15);
 }
 
 async function search(env, q, { fetchFn, ctx, now, cache }) {
@@ -489,33 +501,31 @@ async function search(env, q, { fetchFn, ctx, now, cache }) {
       }
       return null;
     };
-    // Autocomplete gives five at most, and one or two for a half-typed or
-    // mixed name: Text Search's places (fuzzier, with their positions) added
-    // then, under its own cap.
-    const more = async (items, origin) => {
-      if (items.length >= 3 || text.length < 2 || !(await spend(env, 'textSearch', 1, now, ctx))) return items;
-      const tb = { textQuery: text, languageCode: 'zh-TW', regionCode: 'tw', pageSize: 8, ...(origin ? { locationBias: { circle: { center: origin, radius: 50_000 } } } : {}) };
+    // Autocomplete gives five at most, and for a chain (八方雲集) branches
+    // anywhere: Text Search's places beside it (up to 20, near you first,
+    // fuzzier: a typo still finds the name), under its own cap, kept a day
+    // for the same words within ~1 km.
+    const near = async origin => {
+      if (text.length < 2) return [];
+      const key = new Request(`https://transit-cache.quadra/text/${encodeURIComponent(squash(text))}/${origin ? `${origin.latitude.toFixed(2)},${origin.longitude.toFixed(2)}` : 'tw'}`);
+      try {
+        const hit = cache && (await cache.match(key));
+        if (hit) return parseTextSearch(await hit.json(), lat, lon).filter(p => inTaiwan(p.lat, p.lon));
+      } catch {}
+      if (!(await spend(env, 'textSearch', 1, now, ctx))) return [];
+      const tb = { textQuery: text, languageCode: 'zh-TW', regionCode: 'tw', pageSize: 20, ...(origin ? { locationBias: { circle: { center: origin, radius: 10_000 } } } : {}) };
       const res = await fetchFn(TEXT_SEARCH, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': googleKey(env), 'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.types' }, body: JSON.stringify(tb) }).catch(() => null);
-      if (!res?.ok) return items;
-      const found = parseTextSearch(await res.json(), lat, lon).filter(p => inTaiwan(p.lat, p.lon));
-      const seen = new Set(items.map(i => i.id));
-      return [...items, ...found.filter(p => !seen.has(p.id))];
+      if (!res?.ok) return [];
+      const j = await res.json();
+      if (cache) {
+        const put = cache.put(key, new Response(JSON.stringify(j), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=86400' } })).catch(() => {});
+        if (ctx?.waitUntil) ctx.waitUntil(put);
+      }
+      return parseTextSearch(j, lat, lon).filter(p => inTaiwan(p.lat, p.lon));
     };
     try {
-      const first = await ask(body);
-      const items = first && (await more(first, body.origin));
-      if (items) {
-        // A chain's name (錢都) answered with a branch far away while one is
-        // near: asked again inside 15 km, the near ones that carry the whole
-        // name go first, nearest first.
-        const far = !items.length || items.every(i => i.dist == null || i.dist > 15_000);
-        if (far && body.origin && text.length >= 2 && (await spend(env, 'autocomplete', 1, now, ctx))) {
-          const { locationBias, ...rest } = body;
-          const near = await ask({ ...rest, locationRestriction: { circle: { center: locationBias.circle.center, radius: 15_000 } } }).catch(() => null);
-          return { items: nearFirst(items, near || [], text), by: 'google' };
-        }
-        return { items: nearFirst(items, [], text), by: 'google' };
-      }
+      const [items, found] = await Promise.all([ask(body), near(body.origin).catch(() => [])]);
+      if (items || found.length) return { items: nearFirst(items || [], found, text), by: 'google' };
     } catch {}
   }
   // OpenStreetMap's search (Nominatim: a second a request at most, so cached a day).
