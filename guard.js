@@ -11,6 +11,8 @@
 //   - each one's crons are emptied (a cron run is a billed request too),
 //     the schedules kept in KV and put back with the address when the new
 //     period starts.
+// R2 is only ever reached through the proxy (data.js; no S3 token exists),
+// so stopping it stops R2's use too.
 // While stopped it looks again every run, so a deploy that turned the address
 // back on is turned off again within five minutes (and deploy.yml does it at
 // once). The apps' own pages (GitHub Pages) and the nightly packs stay up:
@@ -20,7 +22,9 @@
 // pricing, read 2026-10-13): 10M requests and 30M CPU ms a month; KV 10M
 // reads, 1M writes, 1M deletes, 1M lists, 1 GB stored; Durable Objects 1M
 // requests, 400,000 GB-s, 25B rows read, 50M rows written, 5 GB stored;
-// Workers Logs 20M events (kept under it by the tomls' head_sampling_rate,
+// R2 (its own allowance, not the plan's, read 2026-10-13: 10 GB stored,
+// 1M Class A and 10M Class B operations a month); Workers Logs 20M events
+// (kept under it by the tomls' head_sampling_rate,
 // not counted here: analytics has no count of them). A Durable Object's
 // duration and rows aren't counted either: the one there is (F1Log, one
 // object) can't reach them in a month even running all of it (31 d × 128 MB
@@ -43,7 +47,10 @@ export const PLAN = {
   kvList: 1_000_000,
   kvBytes: 1_000_000_000,
   doRequests: 1_000_000,
-  doBytes: 5_000_000_000
+  doBytes: 5_000_000_000,
+  r2ClassA: 1_000_000,
+  r2ClassB: 10_000_000,
+  r2Bytes: 10_000_000_000
 };
 export const PLAN_ZH = {
   requests: 'Workers 請求',
@@ -54,8 +61,15 @@ export const PLAN_ZH = {
   kvList: 'KV 列出',
   kvBytes: 'KV 儲存（位元組）',
   doRequests: 'Durable Objects 請求',
-  doBytes: 'Durable Objects 儲存（位元組）'
+  doBytes: 'Durable Objects 儲存（位元組）',
+  r2ClassA: 'R2 寫入（A 類）',
+  r2ClassB: 'R2 讀取（B 類）',
+  r2Bytes: 'R2 儲存（位元組）'
 };
+// R2's operations by class (developers.cloudflare.com/r2/pricing): reads
+// are Class B, deletes free, anything else counted as Class A (the dearer).
+export const R2_CLASS_B = new Set(['HeadBucket', 'HeadObject', 'GetObject', 'UsageSummary', 'GetBucketEncryption', 'GetBucketLocation', 'GetBucketCors', 'GetBucketLifecycleConfiguration']);
+export const R2_FREE = new Set(['DeleteObject', 'DeleteBucket', 'AbortMultipartUpload']);
 export const STOP_AT = 0.9;
 export const WORKERS = ['orbit-workers-proxy', 'sports-proxy'];
 export const STATE_KEY = 'guard:state';
@@ -96,8 +110,10 @@ const USE_Q = cpu => `query($a: string!, $s: Time!, $e: Time!, $ds: Date!, $de: 
   w: workersInvocationsAdaptive(limit: 10000, filter: { datetime_geq: $s, datetime_leq: $e }) { sum { requests${cpu ? ' cpuTimeUs' : ''} } ${cpu ? '' : 'quantiles { cpuTimeP99 } '}dimensions { scriptName } }
   kv: kvOperationsAdaptiveGroups(limit: 10000, filter: { date_geq: $ds, date_leq: $de }) { sum { requests } dimensions { actionType } }
   d: durableObjectsInvocationsAdaptiveGroups(limit: 10000, filter: { date_geq: $ds, date_leq: $de }) { sum { requests } }
+  r2: r2OperationsAdaptiveGroups(limit: 10000, filter: { datetime_geq: $s, datetime_leq: $e }) { sum { requests } dimensions { actionType } }
 } } }`;
-const STORE_Q = `query($a: string!, $ds: Date!, $de: Date!) { viewer { accounts(filter: { accountTag: $a }) {
+const STORE_Q = `query($a: string!, $ds: Date!, $de: Date!, $s: Time!, $e: Time!) { viewer { accounts(filter: { accountTag: $a }) {
+  rs: r2StorageAdaptiveGroups(limit: 10000, filter: { datetime_geq: $s, datetime_leq: $e }, orderBy: [datetime_DESC]) { max { payloadSize metadataSize } dimensions { bucketName datetime } }
   ks: kvStorageAdaptiveGroups(limit: 10000, filter: { date_geq: $ds, date_leq: $de }) { max { byteCount } dimensions { date } }
   ds: durableObjectsStorageGroups(limit: 10000, filter: { date_geq: $ds, date_leq: $de }) { max { storedBytes } dimensions { date } }
 } } }`;
@@ -126,7 +142,7 @@ async function graphql(env, fetcher, query, variables) {
 export async function readUse(env, fetcher, now) {
   const day = Number(env.PERIOD_DAY) || 1;
   const p = period(now, day);
-  const use = { requests: 0, cpuMs: 0, kvRead: 0, kvWrite: 0, kvDelete: 0, kvList: 0, kvBytes: 0, doRequests: 0, doBytes: 0 };
+  const use = { requests: 0, cpuMs: 0, kvRead: 0, kvWrite: 0, kvDelete: 0, kvList: 0, kvBytes: 0, doRequests: 0, doBytes: 0, r2ClassA: 0, r2ClassB: 0, r2Bytes: 0 };
   let cpuWay = 'sum';
   for (const [s, e] of chunks(p.from, now + 60_000)) {
     const vars = { a: env.CF_ACCOUNT_ID, s: isoTime(s), e: isoTime(e), ds: isoDay(s), de: isoDay(e - 1) };
@@ -148,15 +164,27 @@ export async function readUse(env, fetcher, now) {
       if (k) use[k] += r.sum?.requests || 0;
     }
     for (const r of acc.d || []) use.doRequests += r.sum?.requests || 0;
+    for (const r of acc.r2 || []) {
+      const t = r.dimensions?.actionType;
+      if (R2_FREE.has(t)) continue;
+      use[R2_CLASS_B.has(t) ? 'r2ClassB' : 'r2ClassA'] += r.sum?.requests || 0;
+    }
   }
   // What's stored now: the latest day's (summed over namespaces and objects).
-  const st = await graphql(env, fetcher, STORE_Q, { a: env.CF_ACCOUNT_ID, ds: isoDay(now - 2 * DAY), de: isoDay(now) });
+  const st = await graphql(env, fetcher, STORE_Q, { a: env.CF_ACCOUNT_ID, ds: isoDay(now - 2 * DAY), de: isoDay(now), s: isoTime(now - 2 * DAY), e: isoTime(now) });
   const latest = (rows, f) => {
     const last = rows.reduce((m, r) => (r.dimensions?.date > m ? r.dimensions.date : m), '');
     return rows.filter(r => r.dimensions?.date === last).reduce((n, r) => n + (r.max?.[f] || 0), 0);
   };
   use.kvBytes = latest(st.ks || [], 'byteCount');
   use.doBytes = latest(st.ds || [], 'storedBytes');
+  // Each bucket's latest size (data and metadata).
+  const seen = new Set();
+  for (const r of st.rs || []) {
+    if (seen.has(r.dimensions?.bucketName)) continue;
+    seen.add(r.dimensions?.bucketName);
+    use.r2Bytes += (r.max?.payloadSize || 0) + (r.max?.metadataSize || 0);
+  }
   use.cpuMs = Math.round(use.cpuMs);
   return { use, period: p, cpuWay };
 }

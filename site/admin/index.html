@@ -1134,7 +1134,7 @@ async function loadCapacity() {
     if (p.tdx?.plan) rows.push(row('TDX 點數', p.tdx.month, p.tdx.plan, `本月 ${(p.tdx.month || 0).toFixed(1)} / ${p.tdx.plan}${p.tdx.guard?.why ? ' · 已放慢' : ''}`));
     // The month's real Cloudflare bill (guard.js): each count of the $5 plan, so far and at this pace.
     const g = p.guard;
-    const BILL_ZH = { requests: 'Workers 請求', cpuMs: 'Workers CPU', kvRead: 'KV 讀取', kvWrite: 'KV 寫入', kvDelete: 'KV 刪除', kvList: 'KV 列出', kvBytes: 'KV 儲存', doRequests: 'Durable Objects 請求', doBytes: 'Durable Objects 儲存' };
+    const BILL_ZH = { requests: 'Workers 請求', cpuMs: 'Workers CPU', kvRead: 'KV 讀取', kvWrite: 'KV 寫入', kvDelete: 'KV 刪除', kvList: 'KV 列出', kvBytes: 'KV 儲存', doRequests: 'Durable Objects 請求', doBytes: 'Durable Objects 儲存', r2ClassA: 'R2 寫入', r2ClassB: 'R2 讀取', r2Bytes: 'R2 儲存' };
     const big = (k, v) => (/Bytes$/.test(k) ? `${(v / 1e9).toFixed(2)} GB` : k === 'cpuMs' ? `${n0(v / 1000)} 秒` : n0(v));
     if (g?.use)
       for (const k of Object.keys(BILL_ZH)) {

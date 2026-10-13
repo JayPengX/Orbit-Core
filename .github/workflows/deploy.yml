@@ -10,6 +10,8 @@ on:
       - 'sports.js'
       - 'sports-forward.js'
       - 'http.js'
+      - 'data.js'
+      - '.github/workflows/deploy.yml'
       - 'asia-baseball.js'
       - 'kit/catalog.mjs'
       - 'f1-live.js'
@@ -43,14 +45,20 @@ jobs:
       HAS_TOKEN_SECRET: ${{ secrets.ECO_TOKEN_SECRET != '' }}
       HAS_ADMIN_TOKEN: ${{ secrets.ECO_ADMIN_TOKEN != '' }}
       HAS_GUARD_TOKEN: ${{ secrets.CF_GUARD_TOKEN != '' }}
+      HAS_PUSH_SECRET: ${{ secrets.DATA_PUSH_SECRET != '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      # The family's data (R2 bucket quadra-data, in Asia-Pacific): made once,
-      # before the proxy that binds it is deployed (data.js).
+      # The family's data (R2 bucket quadra-data, in Asia-Pacific; data.js):
+      # made once, and bound to the proxy when it's there. R2 has to be
+      # turned on once in the dashboard (README §11); until then the proxy
+      # deploys without it and /data/ answers from Shared-Data's Pages.
       - name: The data bucket
+        continue-on-error: true
         run: |
-          if npx --yes wrangler@4 r2 bucket list 2>&1 | grep -q 'name:\s*quadra-data'; then echo "quadra-data is there"; else npx --yes wrangler@4 r2 bucket create quadra-data --location apac; fi
+          if ! npx --yes wrangler@4 r2 bucket list 2>/dev/null | grep -qE 'name:\s*quadra-data'; then npx --yes wrangler@4 r2 bucket create quadra-data --location apac; fi
+          printf '\n[[r2_buckets]]\nbinding = "DATA"\nbucket_name = "quadra-data"\n' >> wrangler.toml
+          echo "quadra-data bound as DATA"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -89,6 +97,15 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           ECO_TOKEN_SECRET: ${{ secrets.ECO_TOKEN_SECRET }}
+      # The builders' key to write the family's data (data.js /data/push; the
+      # same secret is Shared-Data's).
+      - name: The data push secret on the proxy
+        if: ${{ env.HAS_PUSH_SECRET == 'true' }}
+        run: printf '%s' "$DATA_PUSH_SECRET" | npx --yes wrangler@4 secret put DATA_PUSH_SECRET
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DATA_PUSH_SECRET: ${{ secrets.DATA_PUSH_SECRET }}
       # The owner's admin token (tools/issue-passes.mjs makes it and keeps it
       # on the owner's computer): handing out passes, /eco op 'admin'.
       - name: Owner's admin token on the eco Worker
