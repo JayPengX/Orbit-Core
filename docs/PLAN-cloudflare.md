@@ -76,8 +76,8 @@ Each one states its before and after numbers.
       the 37,000 mirror copies). Replaced by a **lazy move**: any file R2
       lacks is taken from Shared-Data's Pages once and kept, for phones and
       builders alike.
-- [ ] **Drain**: every file Shared-Data's indexes list is moved into R2, a
-      few minutes each hourly run, until done (`builders/drain.js`)
+- [x] **Drain** done: all 426 listed files in R2; the Pages bridge and the
+      drain removed afterwards
 - [x] The kit's `packJson`, and Transit's bus packs, shapes and where.json,
       read from `/data/`. Phones keep their saved copies.
 - [x] Mirror reads answered inside the data proxy (in a phone's batch).
@@ -101,10 +101,15 @@ Each one states its before and after numbers.
 - [x] Found the builders' new hourly cron never fired either: they now run
       from the working even-minute cron at :16, and F1's lap log from both
       crons.
-- [ ] See the first builders' run (20:16 UTC)
+- [x] The first combined run hit the 30-second CPU limit. Each builder now
+      gets its own minute, and ELTA matching is capped (10 tries a game,
+      1,500 a run). Every builder checked by hand (`Run a builder`
+      workflow): watch in full, season packs (26 leagues), CPBL, win
+      probability, CPBL's month, photos, buses, cutouts.
 - [x] Shared-Data's last workflow switched off (the proxy builds the buses)
-- [ ] **You:** OK to delete the Shared-Data repo (can't be undone)
-- [ ] Remove the Pages fallback in `data.js` once the repo's gone
+- [x] Shared-Data **archived** (your choice), its Pages site off
+- [x] Pages fallback and the nightly mirror's last code removed (proxy,
+      kit, Orbit Sports)
 
 ## 4. Firebase (Firestore) → D1, then Firebase abandoned
 - [x] The guard counts D1 (rows read and written, storage); each count is
@@ -131,8 +136,9 @@ Each one states its before and after numbers.
 - [ ] Fill Securities' orders on the Worker (left open 2026-10-12).
 - [ ] Weather: check whether parsing CWA's national lists on the Worker helps.
 - [ ] Bring READMEs, TRUTH, HANDOFF and help text up to date.
-- [ ] Loose ends from today's preview: a 404 on Sports' first screen, and
-      `replay-icon` flagged wider than the screen.
+- [x] Loose ends from today's preview: the 404 was the preview's own
+      missing `kit/version.json` (fixed in the tool), and the replay icon now
+      sits on-screen at no opacity.
 
 ## Verification
 - `npm test` in every repo touched; `wrangler deploy --dry-run` for each
