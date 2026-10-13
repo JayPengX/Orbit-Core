@@ -3,7 +3,9 @@
 // read here and, where the data proxy has a trim or a cache, through its
 // route in place. Each runs as often as its data changes, and no more:
 //
-//   every hour   watch links (light: what's new), a few cutouts
+//   every hour   watch links (light: what's new), a few cutouts, the bus
+//                packs a few cities at a time once a city's is a week old
+//                (one read of index.json when none is)
 //   15 UTC       CPBL's tables and its month whole (23:00 in Taiwan, after the night's games)
 //   16 UTC       the season packs (midnight in Taiwan)
 //   18 UTC       a few photo lists in turn (each about weekly)
@@ -12,8 +14,7 @@
 //
 // What a finished game is (its box score, a day or month of them) isn't
 // built at all: the data proxy keeps it the first time anyone reads it
-// (sports.js). Shared-Data (GitHub) builds only the buses now (its r2sync.mjs
-// sends nothing else).
+// (sports.js). Nothing is built on GitHub any more (Shared-Data retired).
 
 import { r2Store } from './store.js';
 import { runWatch } from './watch.js';
@@ -22,6 +23,7 @@ import { runCpbl, CPBL_HOUR } from './cpbl.js';
 import { runAsia, ASIA_HOUR } from './asia.js';
 import { runSports, SPORTS_HOUR } from './sports.js';
 import { runPhotos, runCutouts, PHOTOS_HOUR } from './photos.js';
+import { runBuses } from './buses.js';
 
 export const WINPROB_HOUR = 23;
 
@@ -45,6 +47,7 @@ export async function runBuilders(env, { proxy, now = Date.now(), log = console.
   await step('watch', () => runWatch({ store, proxy, now, until: now + 10 * 60_000 }));
   if (hour === WINPROB_HOUR) await step('winprob', () => runWinprob({ store, proxy, now }));
   await step('cutouts', () => runCutouts({ store, now }));
+  await step('buses', () => runBuses({ store, env, now, until: now + 6 * 60_000 }));
   done.store = store.stats;
   log('builders', JSON.stringify(done));
   return done;
