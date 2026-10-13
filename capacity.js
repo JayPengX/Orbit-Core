@@ -1,9 +1,11 @@
-// How many people use Quadra and Orbit, and whether the free plans the
-// family runs on hold at that many: the admin panel's 容量 (開發), and the
-// Worker's own adjustment when 依人數自動調整 is on.
+// How many people use Quadra and Orbit, and whether the plans the family
+// runs on hold at that many: the admin panel's 容量 (開發), and the Worker's
+// own adjustment when 依人數自動調整 is on.
 //
-// The budget that grows with every person is Cloudflare's Workers Free plan
-// (100,000 requests a day for the whole account: both Workers, every app):
+// The budget that grows with every person is Cloudflare's Workers Paid plan
+// ($5: 10M requests a month for the whole account, both Workers and every
+// app; guard.js stops both proxies at 90% of it, so nothing is ever billed
+// past the $5):
 // each phone asks again every few seconds while something is live, so the
 // requests a day are people × how long they watch ÷ how often they ask.
 // The live refresh settings (kit/brand.mjs DEV) are what can give: when the
@@ -20,8 +22,9 @@
 import { DEV } from './kit/brand.mjs';
 
 const DAY = 86_400_000;
-// The plan, and what's left for the rest (opening pages, the crons, Weather).
-export const CF_DAY = 100_000;
+// The plan a day: guard.js's stop (90% of 10M a month) over a 31-day month;
+// and the share left after the rest (opening pages, the crons, Weather).
+export const CF_DAY = 290_000;
 export const CF_SHARE = 0.8;
 // What one person who used an app that day does in it, in minutes on a
 // screen that refreshes itself (a guess the measurements below correct as

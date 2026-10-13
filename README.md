@@ -11,9 +11,10 @@ The server side, the shared kit and the brand of two families of apps.
 
 This repo holds:
 
-1. **Two Cloudflare Workers**:
+1. **Three Cloudflare Workers** (on Workers Paid, $5 a month, never more):
    - `orbit-workers-proxy`: the Pass and the Orbit apps' routes;
-   - `sports-proxy`: the live data proxy.
+   - `sports-proxy`: the live data proxy;
+   - `quota-guard`: the hard stop on the bill (§8.1).
 2. **The kit** (`kit/`): one copy of everything more than one app needs,
    served from this repo's GitHub Pages and loaded by every app.
 3. **The brand** (`kit/brand.mjs`, `brand/`): every name, colour, mark,
@@ -648,8 +649,9 @@ device's copy at once and the Worker's every five minutes.
 `kit.everyDev(key, fn)` runs `fn` every `dev(key)` seconds, reading the
 setting at each beat.
 
-**Capacity** (`capacity.js`, the admin panel's 容量). Cloudflare's free plan
-gives 100,000 requests a day for the whole account. Requests a day are
+**Capacity** (`capacity.js`, the admin panel's 容量). Cloudflare's $5 plan
+includes 10M requests a month for the whole account; the guard (§8.1) stops
+at 90%, so the model's day is 290,000 (9M over 31 days). Requests a day are
 roughly people × minutes watching ÷ refresh interval.
 - **The count.** It counts people (active today, this week, this month, per
   app, and expected in 30 days from new passes). It estimates the requests
@@ -659,7 +661,51 @@ roughly people × minutes watching ÷ refresh interval.
 - **The slowdown.** With `autoScale` on, every 6 hours it slows the live
   refreshes by one factor when the expected people would run past the
   plan. It never goes past a setting's own maximum, and returns to the
-  owner's numbers (`base`) when there's room.
+  owner's numbers (`base`) when there's room. With it off, growth runs into
+  the guard's stop instead.
+
+### 8.1 The hard stop on the bill (`guard.js`, Worker `quota-guard`)
+
+Cloudflare has no spending cap (its budget alerts only send an email), and
+past the $5 plan's included amounts everything is billed. So `quota-guard`
+(its own cron, every five minutes; no address) reads the account's use this
+billing period from Cloudflare's GraphQL analytics and compares it with
+the plan (`PLAN`, from developers.cloudflare.com/workers/platform/pricing,
+read 2026-10-13):
+
+| Count | Included a month | Stops at (90%) |
+| --- | --- | --- |
+| Workers requests (both proxies, crons, the guard) | 10,000,000 | 9,000,000 |
+| Workers CPU | 30,000,000 ms | 27,000,000 ms |
+| KV reads / writes / deletes / lists | 10M / 1M / 1M / 1M | 90% of each |
+| KV stored | 1 GB | 0.9 GB |
+| Durable Objects requests / stored | 1M / 5 GB | 90% of each |
+
+At 90% of any one, both proxies go off the air: their workers.dev
+addresses are turned off (a request that never reaches a Worker isn't
+billed) and their crons emptied (kept in KV). Every run while stopped turns
+them off again (a deploy turns them on; `deploy.yml`'s last step does it at
+once). When the next period starts they come back with their crons. The
+apps' pages and the nightly packs stay up and open on what the phone has.
+
+- **What's not counted, and why it's safe**: Workers Logs (20M events
+  included; each toml's `head_sampling_rate`, 0.25 and 0.05, keeps even the
+  plan's whole 10M requests far under it), a Durable Object's duration and
+  rows (one F1Log object can't reach 400,000 GB-s in a month).
+- **Estimates**: analytics' adaptive datasets are sampled, so the stop is
+  at 90%, and the period is counted from the day before it starts
+  (`PERIOD_DAY`, the plan's renewal day, in `wrangler.guard.toml`). CPU is
+  each invocation's own (`cpuTimeUs`), or requests × the 99th percentile if
+  the API lacks it.
+- **Blind**: armed but unable to read the bill for 6 hours, it stops too.
+- **Unarmed**: without `CF_GUARD_TOKEN` it watches nothing and says so.
+- **Each invocation's CPU** is capped in its toml (`[limits] cpu_ms`:
+  3,000 the main Worker, 1,000 the sports proxy and the guard; the plan
+  allows 30 s) against a runaway.
+- **The panel**: 容量 shows each count, this period and at this pace, and
+  whether the proxies are stopped (`guard:state` in KV).
+- **A new Cloudflare product** (R2, D1, Queues, …) goes in `PLAN` with its
+  included amounts in the same change, or isn't used.
 
 ## 9. The kit
 
@@ -744,8 +790,9 @@ old offline copy.
 ## 11. Deploying and secrets
 
 **`main` deploys.**
-- `.github/workflows/deploy.yml` runs `wrangler deploy` for both Workers
-  (`wrangler.toml`, `wrangler.sports-proxy.toml`).
+- `.github/workflows/deploy.yml` runs `wrangler deploy` for the three
+  Workers (`wrangler.toml`, `wrangler.sports-proxy.toml`,
+  `wrangler.guard.toml`), then keeps the guard's stop if it's on.
 - `pages.yml` publishes the kit and `site/`.
 - Push validated changes straight to `main` after `npm test` passes.
 
@@ -764,6 +811,21 @@ are set with `wrangler secret put` or the dashboard.
 | orbit-workers-proxy | `ADMIN_TOKEN_HASH`, `ECO_ADMIN_TOKEN` | The admin panel (the owner's key; Claude never uses it) |
 | sports-proxy | `F1_LOG` (Durable Object `F1Log`, migration `f1-log-1`), cron `* * * * SUN,MON,THU,FRI,SAT` | The F1 lap log |
 | sports-proxy | `ORBIT` (service binding) | The developer settings from `/config` |
+| quota-guard | `CF_GUARD_TOKEN` (from the repo secret), `CF_ACCOUNT_ID` (from `CLOUDFLARE_ACCOUNT_ID`), `RATE_LIMIT_KV`, cron `*/5 * * * *` | Reading the bill, stopping the proxies (§8.1) |
+
+**Arming the guard (the owner, once).**
+1. Cloudflare dashboard → My Profile → API Tokens → Create Token → Custom
+   token. Name it `quota-guard`. Permissions: **Account · Account
+   Analytics · Read** and **Account · Workers Scripts · Edit**. Account
+   resources: your account. Create, and copy the token.
+2. GitHub → JayPengX/Shared-Proxy → Settings → Secrets and variables →
+   Actions → New repository secret: name `CF_GUARD_TOKEN`, the token as
+   the value.
+3. Actions → Deploy Cloudflare Worker → Run workflow. Within five minutes
+   the admin page's 容量 shows the period's use.
+4. Cloudflare dashboard → Manage Account → Billing: check the plan renews
+   on the 13th (`PERIOD_DAY` in `wrangler.guard.toml`; tell Claude if not).
+   Billable Usage → a budget alert at $5.01 as a second warning.
 
 Firestore's rules deny all client access (`allow read, write: if false`).
 Only the Worker's service account reads and writes.
@@ -798,6 +860,7 @@ See `tools/README.md` for every flag.
 | `transit.test.mjs` | TDX rules, caps, routes |
 | `weather.test.mjs`, `weather-skill.test.mjs` | The blend and the scoring |
 | `capacity.test.mjs`, `devconfig.test.mjs` | Capacity and settings |
+| `guard.test.mjs` | The hard stop: the period, the plan's amounts, stopping and starting both proxies, a deploy undone, blind and unarmed |
 | `kit.test.mjs`, `kit-css.test.mjs`, `kit-calendar.test.mjs`, `photos.test.mjs` | The kit |
 
 ## 14. What depends on what: the change checklist
@@ -811,6 +874,7 @@ pushing a change, find its row and check every place it names.
 | `kit/logos.mjs`, `names.mjs`, `photos.mjs` | Both Sports and Play; Shared-Data `official-photos.mjs` (the lists `photos.mjs` reads); `sw-images.js` |
 | `proxyJson`, `packJson`, the mirror | Every app's first paint; Shared-Data `mirror.mjs` (`mirrorPath` must match); the failure hold (TRUTH §7) |
 | A trim in `sports-proxy-worker.js` | Every parser that reads it (Sports, Play), Shared-Data `mirror.mjs` (its copy is trimmed the same way) |
+| A Cloudflare product used, a cron added, a toml's `[limits]` or logs | `guard.js` `PLAN` (every billed count), §8.1, TRUTH §7 |
 | A cache tier or `DEV` default | `capacity.js`'s estimates, Shared-Data's `watch.mjs` (dev door), the admin panel |
 | `f1-live.js` (`trimF1Live`, laps) | Orbit Sports (`lib/f1.mjs`, `sheets.js`: live board, 數據, track map, race chance, standings at the flag); Quadra Play (F1 settling, `kit/f1live.mjs`); `tests/f1-live.test.mjs` |
 | `asia-baseball.js` | Sports (CPBL/NPB/KBO lists, box scores), Play (Kambi + these for settling), Shared-Data `cpbl.mjs` and `mirror.mjs` |

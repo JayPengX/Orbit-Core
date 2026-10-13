@@ -123,6 +123,16 @@ id = "8b24d75fbe0a4a69aef0f35cb7a8d847"
 # `wrangler tail`.
 [observability]
 enabled = true
+# Workers Logs: the $5 plan includes 20M events a month, then bills. A quarter
+# of invocations logged keeps even the plan's whole 10M requests (each a log
+# and a line or two) far under it (guard.js).
+head_sampling_rate = 0.25
+
+# The $5 plan lets an invocation run 30 s of CPU, billed past 30M ms a month:
+# a cap per invocation against a runaway (the free plan's was 10 ms; Play's
+# price check and the crons use far less than this).
+[limits]
+cpu_ms = 3000
 
 # /kambi cron (kambi.js): Kambi matches with open Quadra Play bets, every 2 minutes (one index read when nothing is on).
 # The odd minutes: Quadra Play's slips settled (settle.js, worker.js SETTLE_CRON), an invocation of its own.

@@ -42,3 +42,14 @@ new_sqlite_classes = ["F1Log"]
 
 [triggers]
 crons = ["* * * * SUN,MON,THU,FRI,SAT"]
+
+# Workers Logs: the busiest Worker, so 5% of invocations (the $5 plan includes
+# 20M events a month; guard.js).
+[observability]
+enabled = true
+head_sampling_rate = 0.05
+
+# A cap per invocation against a runaway (the $5 plan allows 30 s, billed past
+# 30M ms a month): Polymarket's 11.7 MB page parsed uncached is the heaviest.
+[limits]
+cpu_ms = 1000

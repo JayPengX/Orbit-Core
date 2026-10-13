@@ -10,6 +10,39 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
 
 
 
+## Cloudflare on the $5 plan, with a hard stop on the bill (2026-10-13, pushed to `main`)
+
+The owner moved Cloudflare to Workers Paid ($5) and asked for a hard limit:
+"not a penny more". Cloudflare has no spending cap (budget alerts only
+email; checked in its billing docs), so:
+- **`guard.js`, Worker `quota-guard`** (`wrangler.guard.toml`, cron every
+  5 min, no address): reads the period's use from Cloudflare's GraphQL
+  analytics (Workers requests and CPU, KV reads/writes/deletes/lists and
+  storage, Durable Objects requests and storage) and at 90% of any of the
+  plan's included amounts turns both proxies' workers.dev addresses off and
+  empties their crons, until the next period (then puts both back). Blind
+  6 h while armed: stops too. `deploy.yml` deploys it and re-applies a stop
+  after any deploy.
+- Each toml: `[limits] cpu_ms` (3,000 main, 1,000 sports and guard) and
+  Workers Logs sampling (0.25 main, 0.05 sports: the logs' 20M events can't
+  be reached even at the plan's 10M requests).
+- `capacity.js`: the day's budget is the plan's (290,000: 9M over 31 days),
+  not the free plan's 100,000. The admin page's 容量 shows the real bill per
+  count, so far and at this pace, and whether the proxies are stopped.
+- Merging the two proxies (the owner asked): not possible, still. Placement
+  is set per Worker on every plan (Cloudflare's placement docs), and sports
+  must run near the caller while the rest runs in Taiwan; calls between
+  them cost nothing (service bindings aren't billed requests).
+- Checked: 10 new tests (`tests/guard.test.mjs`), `npm test` 234/234,
+  `wrangler deploy --dry-run` of all three tomls. **Not yet armed**: needs
+  the owner's `CF_GUARD_TOKEN` (README §11, four steps); until then it
+  says "unarmed" on 容量 and nothing stops a bill. The GraphQL field
+  `cpuTimeUs` is unconfirmed in Cloudflare's docs: the guard falls back to
+  requests × P99 CPU (an overcount) if the API refuses it; check 容量's CPU
+  line after arming.
+- Workers Logs moves to "Cloudflare Observability pricing" on 2026-12-01:
+  look again then.
+
 ## Transit: YouBike by the walk there on the streets (2026-10-13, pushed to `main`)
 
 The owner, by 新竹縣體育場: the plan walked them 670 m to 成功國中 and back

@@ -316,11 +316,12 @@
         <p class="muted" style="margin:10px 0 0">ESPN 本身大約每 10 秒更新一次（實測，繞過它的快取也不會更快），這部分改不了；後面全是我們的：代理保留的秒數，加上 App 多久問一次。</p>
       </div>
       <div class="card" id="cap">
-        <div class="row spread"><strong>容量：人數和免費額度</strong><button id="cap-load" class="small">重新估算</button></div>
+        <div class="row spread"><strong>容量：人數和額度</strong><button id="cap-load" class="small">重新估算</button></div>
         <p id="cap-error" class="error"></p>
         <div class="tiles" id="cap-tiles"></div>
         <ul class="flow stack" id="cap-plans" style="margin-top:8px"></ul>
         <p class="muted" id="cap-note" style="margin:8px 0 0"></p>
+        <p class="muted" id="cap-bill" style="margin:8px 0 0"></p>
       </div>
       <div id="dev-sets"></div>
       <div class="savebar"><span id="dev-state" class="muted">載入中…</span><div class="row"><button id="dev-defaults" class="small">全部恢復預設</button><button id="dev-save" class="primary" disabled>儲存</button></div></div>
@@ -1131,10 +1132,28 @@ async function loadCapacity() {
     for (const [k, m] of Object.entries(p.maps || {})) rows.push(row(`Google ${SKU_ZH[k] || k}`, m.expected, m.cap, `30 天後 ${n0(m.expected)} / ${n0(m.cap)}${m.holds ? ` · 撐 ${m.holds} 人` : ''}`));
     if (p.weather) rows.push(row('Google 天氣', p.weather.today, p.weather.cap, `今天 ${n0(p.weather.today)} / ${n0(p.weather.cap)} · 看地點`));
     if (p.tdx?.plan) rows.push(row('TDX 點數', p.tdx.month, p.tdx.plan, `本月 ${(p.tdx.month || 0).toFixed(1)} / ${p.tdx.plan}${p.tdx.guard?.why ? ' · 已放慢' : ''}`));
+    // The month's real Cloudflare bill (guard.js): each count of the $5 plan, so far and at this pace.
+    const g = p.guard;
+    const BILL_ZH = { requests: 'Workers 請求', cpuMs: 'Workers CPU', kvRead: 'KV 讀取', kvWrite: 'KV 寫入', kvDelete: 'KV 刪除', kvList: 'KV 列出', kvBytes: 'KV 儲存', doRequests: 'Durable Objects 請求', doBytes: 'Durable Objects 儲存' };
+    const big = (k, v) => (/Bytes$/.test(k) ? `${(v / 1e9).toFixed(2)} GB` : k === 'cpuMs' ? `${n0(v / 1000)} 秒` : n0(v));
+    if (g?.use)
+      for (const k of Object.keys(BILL_ZH)) {
+        const cap = g.plan[k] * g.stopAt;
+        rows.push(row(`Cloudflare ${BILL_ZH[k]}`, g.use[k], cap, `本期 ${big(k, g.use[k])} / ${big(k, cap)}${/Bytes$/.test(k) ? '' : ` · 照這速度 ${big(k, g.projected?.[k] || 0)}`}`));
+      }
+    $('cap-bill').textContent = !g
+      ? 'Cloudflare 帳單保護還沒跑過（quota-guard 部署後五分鐘內）。'
+      : !g.armed
+        ? 'Cloudflare 帳單保護還沒啟動：GitHub 的 Shared-Proxy 需要 CF_GUARD_TOKEN（見 README §11）。沒有它，超過 $5 的用量會計費。'
+        : g.stopped
+          ? `兩個代理已經停了（${fmt(g.stopped.at)}，${g.stopped.why.map(k => BILL_ZH[k] || '讀不到用量').join('、')}到 ${Math.round(g.stopAt * 100)}%），下個帳單週期開始時自動恢復，不會多付一毛。`
+          : g.error
+            ? `Cloudflare 用量讀取失敗：${g.error}（連續 6 小時讀不到就先停兩個代理）。`
+            : `$5 方案：任何一項到 ${Math.round(g.stopAt * 100)}% 就停兩個代理到下個週期，不會多付。本期 ${fmt(g.period.start)} 起，${fmt(g.at)} 讀取。`;
     $('cap-plans').replaceChildren(...rows);
     const on = devSaved?.autoScale;
-    const slow = p.scale == null ? '最慢也不夠：要減少即時功能或升級 Cloudflare' : p.scale > 1 ? `即時更新要放慢 ×${p.scale}` : '不用放慢';
-    $('cap-note').textContent = `30 天後 ${u.expected} 人：${slow}。${on ? '「依人數自動調整」開著，每 6 小時照這個套用（下面的數字是你的設定，也是最快的）。' : p.scale > 1 || p.scale == null ? '打開下面的「依人數自動調整」就會自動套用。' : ''}Cloudflare 的用量是估算（看幾分鐘即時畫面 × 多久問一次），其餘是實際計數。${fmt(p.at)} 估算。`;
+    const slow = p.scale == null ? '最慢也不夠：要減少即時功能，否則會碰到 $5 方案的上限而停' : p.scale > 1 ? `即時更新要放慢 ×${p.scale}` : '不用放慢';
+    $('cap-note').textContent = `30 天後 ${u.expected} 人：${slow}。${on ? '「依人數自動調整」開著，每 6 小時照這個套用（下面的數字是你的設定，也是最快的）。' : p.scale > 1 || p.scale == null ? '打開下面的「依人數自動調整」就會自動套用。' : ''}Cloudflare 每天是估算（看幾分鐘即時畫面 × 多久問一次），下面本期的是 Cloudflare 的實際用量。${fmt(p.at)} 估算。`;
   } catch (e) {
     $('cap-error').textContent = e.message;
   }

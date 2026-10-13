@@ -22,6 +22,7 @@ import { twDate, GOOGLE_DAILY_CALLS } from './weather.js';
 import { cleanDev } from './kit/devconfig.mjs';
 import { sidesOf, addSides, LEDGER } from './money.js';
 import { plan as capacityPlan, usersFrom } from './capacity.js';
+import { STATE_KEY as GUARD_STATE } from './guard.js';
 
 // The developer settings (kit/devconfig.mjs), one document; GET /config
 // answers them to everyone (worker.js), the panel's 開發 changes them.
@@ -47,7 +48,9 @@ async function capacityNow(env, deps, base, inUse = base) {
   const list = (await deps.fsList(env, WALLET_COLLECTION, 300)).map(w => parseWallet(w.payload)).filter(Boolean);
   const users = usersFrom(list, now, lastUsed, appsOf);
   const usage = await ADMIN_TOOLS.usage({ env, deps }).catch(() => ({}));
-  return capacityPlan({ users, base, inUse, usage, now });
+  // The month's real Cloudflare bill so far, as the guard last read it (guard.js).
+  const guard = env.RATE_LIMIT_KV ? JSON.parse((await env.RATE_LIMIT_KV.get(GUARD_STATE).catch(() => null)) || 'null') : null;
+  return { ...capacityPlan({ users, base, inUse, usage, now }), guard: guard && { at: guard.at, armed: guard.armed, error: guard.error, stopAt: guard.stopAt, plan: guard.plan, use: guard.use, share: guard.share, projected: guard.projected, period: guard.period, cpuWay: guard.cpuWay, stopped: guard.stopped ? { at: guard.stopped.at, why: guard.stopped.why } : null } };
 }
 async function writeDev(env, deps, base, p) {
   const applied = base.autoScale && p ? cleanDev(p.applied) : base;
@@ -717,7 +720,7 @@ export const ADMIN_TOOLS = {
     const next = await writeDev(env, deps, base, p);
     return { ...base, at: next.at, now: { ...cleanDev(next), at: next.at }, auto: next.auto };
   },
-  // People and the free plans (capacity.js): the panel's 容量.
+  // People and the plans (capacity.js), and the bill (guard.js): the panel's 容量.
   async capacity({ env, deps }) {
     const doc = await readDevDoc(env, deps);
     return capacityNow(env, deps, doc.base, doc.now);
