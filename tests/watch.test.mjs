@@ -162,3 +162,21 @@ test('an hourly run reads only the last two US days from ESPN and the months its
   assert.ok(!asked.some(u => u.includes('eltaott.tv')), 'nothing waiting for ELTA: ELTA not read');
   assert.equal(new Date(Date.UTC(2026, 9, 13, FULL_HOUR)).getUTCHours(), 20);
 });
+
+test('win probability on R2: a game kept is never read again, Polymarket only through the proxy, a month let go goes', async () => {
+  const { runWinprob } = await import('../builders/winprob.js');
+  const { r2Store, memoryBucket } = await import('../builders/store.js');
+  const now = Date.parse('2026-10-13T23:17:00Z');
+  const store = r2Store(memoryBucket({ 'winprob/index.json': { leagues: { epl: { months: ['2026-09'] } } }, 'winprob/epl/2026-09.json': { games: { k1: { t: Date.parse('2026-09-20T14:00:00Z'), none: 'polymarket' } } } }));
+  const proxied = [];
+  const asked = [];
+  const real = globalThis.fetch;
+  globalThis.fetch = async url => (asked.push(String(url)), new Response('', { status: 404 }));
+  try {
+    await runWinprob({ store, proxy: async url => (proxied.push(url), null), get: globalThis.fetch, now, sleep: async () => {} });
+  } finally {
+    globalThis.fetch = real;
+  }
+  assert.ok(!asked.some(u => u.includes('polymarket.com')), 'Polymarket never read whole here');
+  assert.deepEqual((await store.json('winprob/epl/2026-09.json')).games.k1.none, 'polymarket');
+});
