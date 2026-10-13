@@ -201,7 +201,7 @@ ends. A bet whose app isn't opened in that window could never be settled.
 - `POST /kambi { events: [{ id, start }] }`: Play registers the matches its
   open bets are on.
 - The cron keeps each one's latest `livedata.json` in Firestore. It reads
-  the least recently checked first, within the subrequest budget, and marks
+  the least recently checked first (150 a run), and marks
   an entry `gone` once Kambi drops it. A match is watched from its start
   until the 3-day refund window ends, and kept a day beyond.
 - `GET /kambi?ids=1,2,3` answers `{ results: { id: { live, seen, gone,
@@ -216,7 +216,7 @@ ends. A bet whose app isn't opened in that window could never be settled.
   24 KB at most). Kept in Firestore `odds-open/<account>_<slip>` with an
   index (`odds-open/_index`: each slip's next look, one read a run). Kambi
   matches on it are watched (`kambi.js watchKambi`).
-- The odd-minute cron (`settleCron`): up to 6 due slips a run, every
+- The odd-minute cron (`settleCron`): up to 60 due slips a run, every
   undecided pick whose game has begun read together (the kit's
   `readOutcomes`: one read of a game for every slip on it; the Asian
   leagues' months and F1's archive read in this Worker, as the sports
@@ -225,7 +225,7 @@ ends. A bet whose app isn't opened in that window could never be settled.
   (`applyResults`). Not over: what's decided kept, looked at again in 15
   minutes (a championship every 6 hours). First due: the soonest undecided
   game's start plus its kind's usual length (`GAME_HOURS`) and 10 minutes.
-- Settled (up to 3 a run): the slip's document taken from `open` to
+- Settled (up to 30 a run): the slip's document taken from `open` to
   `settling` (updateTime precondition); the wallet paid `odds:payout-<slip>`
   (and `odds:plus-<slip>`), only when it holds the slip's stake and no
   payout yet: Play's ledger ids, so it's never paid twice; the record kept

@@ -35,9 +35,10 @@ const DAY = 24 * HOUR;
 // refund in Sportsbook), and its entry kept a day beyond.
 const WATCH_FOR = 3 * DAY;
 const KEEP_FOR = 4 * DAY;
-// At most this many Kambi reads per cron run (a Worker's subrequest budget),
-// the least recently checked first.
-export const CRON_BATCH = 20;
+// At most this many Kambi reads per cron run (the least recently checked
+// first): every watched match each run, as many as Play's open bets have
+// (the free plan's 50 fetches a run set it at 20).
+export const CRON_BATCH = 150;
 const MAX_IDS = 30;
 // Per IP, in the Worker's rate-limit window (as eco.js's ECO_LIMITS).
 const LIMITS = { read: 1200, write: 600 };
