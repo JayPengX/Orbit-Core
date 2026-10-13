@@ -1,0 +1,89 @@
+# Plan: everything on Cloudflare's $5 plan, never a penny more
+
+## Context
+Cloudflare moved to Workers Paid ($5/month) on 2026-10-13. The goals:
+- use what the plan allows, behind a hard stop at $5;
+- one proxy for everything;
+- move Shared-Data and Firebase onto Cloudflare;
+- then review every repo against the new baseline.
+
+Cloudflare has no spending cap of its own, so a guard Worker enforces it.
+Every item is pushed to `main` when done and checked live.
+`Shared-Proxy/docs/PLAN-cloudflare.md` holds the same list in the repo.
+
+## 1. Hard stop on the bill (`Shared-Proxy/guard.js`, `guard-worker.js`)
+- [x] `quota-guard` Worker reads the period's use every 5 minutes. At 90% of
+      any included amount, it turns the proxy's address and crons off until
+      the next period.
+- [x] Per-invocation CPU caps and log sampling in each toml; 容量 on the
+      admin page shows the bill.
+- [x] Your `CF_GUARD_TOKEN` added and loaded into the guard.
+- [x] Fixed: the guard didn't start (its entry file exported constants);
+      the fix is deploying now.
+- [ ] Confirm the first real reading at `/guard`: the token reads the bill
+      and the CPU field is accepted.
+- [ ] You: check the plan renews on the 13th, and add a $5.01 budget alert.
+
+## 2. One proxy (done)
+- [x] `/sports-proxy` is a route of `orbit-workers-proxy` (`sports.js`):
+      one router and one set of CORS code (`http.js`). F1's lap log and its
+      cron moved in.
+- [x] Kit, apps and Shared-Data use the one address. Checked live: one
+      shared cache in Taipei.
+- [ ] Remove the `sports-proxy` forwarder after a quiet week in its logs.
+
+## 3. Shared-Data → R2, then the repo removed
+- [x] R2 switched on; bucket `quadra-data` (Asia-Pacific) created and bound.
+- [x] The guard counts R2's own allowance: 10 GB stored, 1M writes and 10M
+      reads a month.
+- [x] `/data/…` route (`data.js`): edge cache, then R2, then Pages while
+      moving. Builders write through `/data/push` and `/data/_list`.
+- [ ] **Copy the last build's whole site into R2 as-is**, asking no source
+      again (`Shared-Data/r2sync.mjs`, the run named "r2"). Running now.
+- [ ] Every Shared-Data build syncs only what changed into R2.
+- [ ] Switch the kit's `packJson` and mirror reads, and Transit's bus packs,
+      shapes and where.json, to `/data/`. Phones keep their saved copies
+      (keys unchanged). The change is written and tested, not yet pushed.
+- [ ] Serve mirror reads inside the data proxy, so they join a phone's
+      batched requests.
+- [ ] Move the builders into the proxy's crons one at a time, each checked
+      against GitHub's output first:
+      `watch` → `winprob` → `cpbl` → `sports` + `season` → `mirror` →
+      `asia` → photos (`official-photos`, `cutouts`) → buses (`build`,
+      `shapes`, `where`).
+- [ ] Remove the Pages fallback, then archive and delete Shared-Data; update
+      docs and TRUTH.
+
+## 4. Firebase (Firestore) → D1, then Firebase abandoned
+- [ ] The guard counts D1 first: rows read, rows written, storage.
+- [ ] Put the store's functions in `worker.js` (`firestoreGet/Write/List/
+      Batch/Delete/Collections`) behind one interface: D1 underneath,
+      Firestore only for the move.
+- [ ] Copy every document (wallets, each app's data, Play's slips, config,
+      the ledger) to D1 and compare them one by one; write to both briefly.
+- [ ] Read and write from D1 only. Keep a final export of every Firestore
+      document in R2 as the backup.
+- [ ] **Abandon Firebase**: remove all Firestore code, the
+      `FIREBASE_*` secrets and vars, Firestore's rules and the docs on it.
+      You then delete the Firebase project (steps written out for you).
+
+## 5. Review every repo against the new baseline
+- [ ] Remove workarounds the free plan forced: the 10 ms CPU limit, the
+      50-fetch budgets (Kambi watch, settling 6 slips a run, Asian months),
+      and KV write rationing.
+- [ ] Price Play's whole board on the proxy, as you asked before. The CPU
+      limit used to block it.
+- [ ] Fill Securities' orders on the Worker (left open 2026-10-12).
+- [ ] Weather: check whether parsing CWA's national lists on the Worker helps.
+- [ ] Bring READMEs, TRUTH, HANDOFF and help text up to date.
+- [ ] Loose ends from today's preview: a 404 on Sports' first screen, and
+      `replay-icon` flagged wider than the screen.
+
+## Verification
+- `npm test` in every repo touched; `wrangler deploy --dry-run` for each
+  toml.
+- Live checks through the dev door: `/guard`, `/data/<file>` returned from R2
+  (not Pages), `/sports-proxy`.
+- `tools/preview.mjs <app> --webkit --live` at 375 px for Sports, Play and
+  Transit after each switch.
+- R2 holds the same number of files as the last build after the copy.

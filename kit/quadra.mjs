@@ -669,15 +669,18 @@ const RETRY_MS = 15_000;
 export function proxyJson(url, { ttl = 60_000, trim = '', persist: keep = true, timeout = 20_000, mirror = true } = {}) {
   return keptJson(url, dataKey(url, trim), { ttl, keep }, async () => (mirror ? await mirrored(url, trim) : null) ?? enqueue(url, trim, timeout));
 }
-// The nightly packs (Shared-Data on GitHub Pages, built at midnight Taiwan
-// time): what doesn't change in a day (a league's season, sports/<league>/
-// <year>.json) read from there, never through the proxy. Kept and failed
-// like proxyJson's; a pack not there (not built yet) is a failure (404) the
-// app reads another way.
-export const PACKS_URL = 'https://jaypengx.github.io/Shared-Data/';
+// The family's data (the proxy's /data/, kept in R2 on Cloudflare; built at
+// night and through the day): what doesn't change in a day (a league's
+// season, sports/<league>/<year>.json), read from there, never through the
+// data proxy's sources. Kept and failed like proxyJson's; a pack not there
+// (not built yet) is a failure (404) the app reads another way. Saved on the
+// device under the address the packs had on GitHub Pages (PACKS_KEY), so
+// what a phone kept before the move is still its copy.
+export const PACKS_URL = 'https://orbit-workers-proxy.pengzjay.workers.dev/data/';
+const PACKS_KEY = 'https://jaypengx.github.io/Shared-Data/';
 export function packJson(path, { ttl = 3 * 3_600_000, timeout = 30_000 } = {}) {
   const url = `${PACKS_URL}${path}`;
-  return keptJson(url, dataKey(url, ''), { ttl, keep: true }, async () => {
+  return keptJson(url, dataKey(`${PACKS_KEY}${path}`, ''), { ttl, keep: true }, async () => {
     const res = await fetch(url, { signal: AbortSignal.timeout(timeout) });
     if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
     return res.text();
@@ -727,7 +730,7 @@ const canGunzip = () => typeof DecompressionStream === 'function';
 let mirrorHint = null;
 function readMirrorIndex() {
   if (!mirrorIndex || Date.now() - mirrorIndex.at > 30 * 60_000) {
-    mirrorHint ??= persisted(dataKey(`${PACKS_URL}mirror/index.json`, ''))
+    mirrorHint ??= persisted(dataKey(`${PACKS_KEY}mirror/index.json`, ''))
       .then(saved => (saved?.data ? parseMirrorIndex(saved.data) : null))
       .catch(() => null);
     const p = packJson('mirror/index.json', { ttl: 30 * 60_000, timeout: 8_000 })
