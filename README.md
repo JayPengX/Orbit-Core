@@ -483,8 +483,8 @@ Everything that doesn't change in a day, built by this Worker into R2
 its last site was copied into R2 as it was (no source read again), and its
 builders moved here (the owner: everything on Cloudflare, ultra efficient).
 
-**The builders** (`builders/run.js`, the cron `17 * * * *`; an hourly cron
-may run 15 minutes of CPU). Each as often as its data changes, and lean:
+**The builders** (`builders/run.js`, at :16 on the proxy's even-minute cron:
+Cron Triggers added on 2026-10-13 were never dispatched; 30 s of CPU a run). Each as often as its data changes, and lean:
 
 | When (UTC) | Builder | Writes | Lean because |
 | --- | --- | --- | --- |
@@ -497,6 +497,11 @@ may run 15 minutes of CPU). Each as often as its data changes, and lean:
 | 18 | `photos.js` | `sports/<league>/photos.json`, `faces.json`, `sports/cutouts/pending.json` | four lists a day in turn (each about weekly); ESPN's squads through the proxy's cache |
 | 20 | `watch.js` (full) | the season's archive whole, `sports/elta-pages.json` | the season scan once a day; older highlights for 10 minutes |
 | 23 | `winprob.js` | `winprob/…` | a game kept is never read again; Polymarket's 11 MB pages through the proxy's trimmed cache |
+
+**Moving in**: a file R2 lacks is taken from Shared-Data's Pages once and
+kept (`store.js fromPages`; `/data/` and the kept reads too), and
+`builders/drain.js` moves every file the indexes list, a run at a time,
+until done (KV `data:drained`); Shared-Data's Pages stays until then.
 
 **`builders/store.js`**: R2 as files: a file is written only when its
 content changed (each keeps its SHA-256 in R2's metadata; what a run read
@@ -724,7 +729,7 @@ roughly people × minutes watching ÷ refresh interval.
 
 Cloudflare has no spending cap (its budget alerts only send an email), and
 past the $5 plan's included amounts everything is billed. So `quota-guard`
-(its own cron, every five minutes; no address) reads the account's use this
+(its own clock, a Durable Object's alarm every five minutes; no address) reads the account's use this
 billing period from Cloudflare's GraphQL analytics and compares it with
 the plan (`PLAN`, from developers.cloudflare.com/workers/platform/pricing,
 read 2026-10-13):
@@ -872,7 +877,7 @@ are set with `wrangler secret put` or the dashboard.
 | orbit-workers-proxy | `ADMIN_TOKEN_HASH`, `ECO_ADMIN_TOKEN` | The admin panel (the owner's key; Claude never uses it) |
 | orbit-workers-proxy | `F1_LOG` (Durable Object `F1Log`, migration `f1-log-main`), cron `* * * * SUN,MON,THU,FRI,SAT` | The F1 lap log |
 | sports-proxy (the forwarder) | `ORBIT` (service binding) | Every request handed to the proxy |
-| quota-guard | `CF_GUARD_TOKEN` (from the repo secret), `CF_ACCOUNT_ID` (from `CLOUDFLARE_ACCOUNT_ID`), `RATE_LIMIT_KV`, cron `*/5 * * * *` | Reading the bill, stopping the proxies (§8.1) |
+| quota-guard | `CF_GUARD_TOKEN` (from the repo secret), `CF_ACCOUNT_ID` (from `CLOUDFLARE_ACCOUNT_ID`), `RATE_LIMIT_KV`, `CLOCK` (Durable Object `GuardClock`: its alarm every 5 minutes; the proxy wakes it through `GUARD`) | Reading the bill, stopping the proxy (§8.1) |
 | orbit-workers-proxy | `DATA` (R2 `quadra-data`, made and bound by `deploy.yml` once R2 is on), `DATA_PUSH_SECRET` (from the repo secret) | The family's data (§4.7) |
 
 **The Pass's store on D1 (the owner, once).** The deploy token
