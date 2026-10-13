@@ -17,6 +17,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
+      - name: Every Worker in the account and its crons; the account's plans
+        run: |
+          api="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID"
+          for w in $(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$api/workers/scripts" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);console.log((j.result||[]).map(x=>x.id).join(" "));if(!j.success)console.error(JSON.stringify(j.errors))})'); do
+            printf '%s: ' "$w"; curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$api/workers/scripts/$w/schedules" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);console.log((j.result?.schedules||[]).map(x=>x.cron).join(" | ")||"none")})'
+          done
+          echo "== subscriptions"; curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$api/subscriptions" | head -c 1500; echo
+          echo "== workers account settings"; curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$api/workers/account-settings" | head -c 600; echo
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       - name: Each Worker's crons and address, as Cloudflare has them
         run: |
           for w in quota-guard orbit-workers-proxy sports-proxy; do
