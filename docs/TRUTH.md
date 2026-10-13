@@ -739,3 +739,4 @@ What was decided, so it isn't undone. Newer calls win.
   later on, and where it goes back, stay by place; a full one is a tap,
   navigating). Walking distances to YouBike and on a trip are the streets',
   not the straight line's.
+  Walking is planned at 5 km/h (83 m a minute, Google's pace; was 4.5).

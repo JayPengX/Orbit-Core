@@ -34,6 +34,13 @@ seen in the preview: 新竹火車站(後站) 8 分 · 570 公尺 on all three. T
 is still 75 m a minute (4.5 km/h, `WALK_M_MIN`; Google's is nearer 5 km/h):
 asked the owner.
 
+The owner: Google's pace, then. `WALK_M_MIN` 83 (5 km/h) everywhere it's
+used (planning, navigation's times, the strip and cards, a change between
+stations, `rail.mjs`); the slow-going penalty stays past 375 m (it was fitted
+in metres: moved with the pace, 竹東's verdict, 竹東信義立體停車場 not 客運竹東站
+8 minutes on, flipped). One made-up test moved (470 m, not 400, for "only
+just" at the new pace). Verdicts unchanged. Not run: the live batch.
+
 ## Transit: the YouBike return station on the map, navigating (2026-10-13, pushed to `main`)
 
 The owner, riding 臺鐵竹中車站 → 綠41公園: no mark where the bike goes back.
