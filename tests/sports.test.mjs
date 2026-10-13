@@ -277,3 +277,11 @@ test('Yahoo: a host that turns the proxy away (429) is asked of its twin', async
     globalThis.fetch = real;
   }
 });
+
+test('a batch answers up to 24 reads (a first paint, about 28, in two requests), no more', async () => {
+  const u = n => `https://site.api.espn.com/apis/site/v2/sports/soccer/x${n}.1/scoreboard`;
+  const many = Array.from({ length: 30 }, (_, i) => `&u=${encodeURIComponent(u(i))}`).join('');
+  const { r } = await (await get(`https://proxy.test/sports-proxy?batch=1${many}`)).json();
+  assert.equal(r.length, 24);
+  assert.ok(r.every((x, i) => x.s === 200 && x.b.from === u(i)));
+});

@@ -1111,8 +1111,10 @@ Planned in `docs/WEATHER-PLAN.md`; the PWA's repo is `JayPengX/Orbit-Weather`
   and names no source; each source's values stay in the cell's KV entry
   (`bySource`) for the scoring. A test fails if a source's name or a
   per-source field reaches the answer.
-- The Worker is on the Free plan (10 ms CPU): CWA's national station lists
-  (~1 MB each) are never parsed live. `weather-stations.js` is the committed
+- CWA's national station lists (~1 MB each) are never parsed live: the
+  free plan's 10 ms of CPU forbade it, and on the $5 plan it would only
+  spend the month's CPU on a table that changes a few times a year
+  (checked 2026-10-14). `weather-stations.js` is the committed
   table (1,367 stations), rebuilt by `node tools/weather-stations.mjs` from
   the Worker's samples (`/weather/status?sample=<name>`, cached an hour).
 - `/weather/status?sample=forecast` is `/weather` at Taipei 101 without a

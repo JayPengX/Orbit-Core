@@ -25,8 +25,8 @@
 // TDX_PER_MIN: TDX calls a minute this Worker allows itself (the free plan
 // allows 5, 銅級 300).
 //
-// The caps are this Worker's own count (KV, flushed in batches so the free
-// plan's 1,000 KV writes a day aren't spent on counting): the hard stop is
+// The caps are this Worker's own count (KV, flushed in batches so KV's
+// million writes a month aren't spent on counting): the hard stop is
 // Google Cloud's per-day quotas, which the owner sets on each API (see
 // docs/HANDOFF.md, Orbit Transit).
 

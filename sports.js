@@ -1017,8 +1017,10 @@ async function checkSession(env, requestParams, headers, weight = 1, request = n
 // answered as one JSON document { r: [{ s: status, b: body } …] } in the
 // same order. One Worker request instead of many - the Workers plan bills
 // per request, and a page's first paint asks for a dozen lists at once.
-// Every URL still goes through the shared cache on its own.
-const BATCH_MAX = 12;
+// Every URL still goes through the shared cache on its own. 24: a first
+// paint asks for about 28 lists at once (12, the free plan's 50 fetches a
+// call, sent them as three requests; the $5 plan allows 10,000).
+const BATCH_MAX = 24;
 // One slow upstream mustn't hold back the rest of its batch: an item not
 // answered within this answers 504 (the app asks for it again on its own),
 // while its fetch goes on in the background into the shared cache.
