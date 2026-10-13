@@ -27,6 +27,13 @@ first (新竹火車站(後站) 200 m → 570 m round the tracks; seen in the pre
 a trip's walks we add take the router's length, and its 步行 with them
 (the router was already asked, for the line).
 
+Then (the owner): the walk didn't match: the strip by the streets, the
+station's card (距離, 走過去 · N 分) still the straight line. Now one walk
+for all (`walkFrom`: the strip, a card's 距離 and 走過去, the walk it starts);
+seen in the preview: 新竹火車站(後站) 8 分 · 570 公尺 on all three. The pace
+is still 75 m a minute (4.5 km/h, `WALK_M_MIN`; Google's is nearer 5 km/h):
+asked the owner.
+
 ## Transit: the YouBike return station on the map, navigating (2026-10-13, pushed to `main`)
 
 The owner, riding 臺鐵竹中車站 → 綠41公園: no mark where the bike goes back.
