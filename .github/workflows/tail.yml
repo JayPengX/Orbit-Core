@@ -1,0 +1,26 @@
+# A Worker's live logs for a few minutes (Run workflow, by hand): what a cron
+# or a request printed, without signing in to Cloudflare. Read-only.
+name: Tail a Worker
+on:
+  workflow_dispatch:
+    inputs:
+      worker:
+        description: Which Worker
+        type: choice
+        options: [quota-guard, orbit-workers-proxy, sports-proxy]
+        default: quota-guard
+      minutes:
+        description: How long to listen (1-15)
+        default: '6'
+jobs:
+  tail:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Listen
+        run: timeout "$(( ${MINUTES:-6} * 60 ))" npx --yes wrangler@4 tail "$WORKER" --format pretty || true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WORKER: ${{ inputs.worker }}
+          MINUTES: ${{ inputs.minutes }}
