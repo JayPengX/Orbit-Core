@@ -26,10 +26,11 @@ This repo holds:
 6. **The rules**: `docs/TRUTH.md` (the owner's standing rules: read first)
    and `docs/HANDOFF.md` (running notes on every app).
 
-Everything about how the family works lives here or in
-[Shared-Data](https://github.com/JayPengX/Shared-Data) (the nightly data
-packs). The apps are static sites on GitHub Pages; none has a server of its
-own.
+Everything about how the family works lives here. The family's data (the
+season packs, bus packs, watch links, photos…) lives in Cloudflare R2,
+built by this proxy's own cron (§4.7); Shared-Data, which built it on
+GitHub, is retired (2026-10-13). The apps are static sites on GitHub Pages;
+none has a server of its own.
 
 | App | Kit id | Repo | Live |
 | --- | --- | --- | --- |
@@ -41,14 +42,14 @@ own.
 | Orbit Sports (was Quadra Fixtures) | `match` | [Orbit-Sports](https://github.com/JayPengX/Orbit-Sports) | https://jaypengx.github.io/Orbit-Sports/ |
 | Orbit Words (was Quadra Hub) | `vocab` | [Orbit-Words](https://github.com/JayPengX/Orbit-Words) | https://jaypengx.github.io/Orbit-Words/ |
 | The kit, the marks, the family's page, admin | — | this repo's Pages | https://jaypengx.github.io/Shared-Proxy/ |
-| The nightly data packs | — | [Shared-Data](https://github.com/JayPengX/Shared-Data) | https://jaypengx.github.io/Shared-Data/ |
+| The family's data (R2) | — | this repo (`data.js`, `builders/`) | https://orbit-workers-proxy.pengzjay.workers.dev/data/ |
 
 ## Contents
 
 - [1. The whole system at a glance](#1-the-whole-system-at-a-glance)
 - [2. The data layers: where every number comes from](#2-the-data-layers-where-every-number-comes-from)
 - [3. The proxy (`orbit-workers-proxy`)](#3-the-proxy-orbit-workers-proxy)
-- [4. The data proxy (`/sports-proxy`)](#4-the-data-proxy-sports-proxy)
+- [4. The data proxy (`/sports-proxy`), the family's data (§4.7)](#4-the-data-proxy-sports-proxy)
 - [5. The Quadra Pass (`/eco`)](#5-the-quadra-pass-eco)
 - [6. The economy](#6-the-economy)
 - [7. Notices while an app is closed (`/push`)](#7-notices-while-an-app-is-closed-push)
@@ -70,13 +71,13 @@ own.
                          │  each: its own static files + the kit (#kit/… import map, from Shared-Proxy's Pages)                │
                          │  device memory  →  Cache Storage (proxyJson persist)  →  localStorage copies (versioned keys)        │
                          └───────┬─────────────────────────┬────────────────────────────────┬──────────────────────────────────┘
-                                 │ packJson / mirror        │ every call, signed (qt=): proxyJson batched, /eco /play /push /weather /transit /gemini
+                                 │ packJson (/data/)        │ every call, signed (qt=): proxyJson batched, /eco /play /push /weather /transit /gemini
                                  ▼                          ▼
-          Shared-Data (GitHub Pages, built       the proxy: orbit-workers-proxy Worker (placement gcp:asia-east1, Taiwan)
-          by GitHub Actions, nightly + every       /sports-proxy → ESPN · MLB · Jolpica · OpenF1 · Polymarket · Kambi · Yahoo ·
-          3 h): season packs, mirror/, watch,                      ELTA · formula1.com · YouTube · Google translate ·
-          winprob, cpbl standings, photos,                         F1 live timing (f1-live.quadra) · the Asian leagues
-          bus packs, shapes, where.json                            (asia-baseball.quadra); edge cache by tier, trims, batches
+          the family's data (R2 quadra-data,     the proxy: orbit-workers-proxy Worker (placement gcp:asia-east1, Taiwan)
+          /data/: built by builders/ hourly,       /sports-proxy → ESPN · MLB · Jolpica · OpenF1 · Polymarket · Kambi · Yahoo ·
+          season packs, watch, winprob,                            ELTA · formula1.com · YouTube · Google translate ·
+          cpbl, photos, bus packs, shapes,                         F1 live timing (f1-live.quadra) · the Asian leagues
+          where.json; reads kept on demand)                        (asia-baseball.quadra); edge cache by tier, trims, batches
                                                  /eco   → Firestore (wallets, app data)      /play → settling, prices, lottery + cron
                                                  /push  → KV (subscriptions, lists) + cron   /kambi → Kambi + Firestore + cron
                                                  /weather → Google, CWA, MOENV, KV cells     /transit → TDX, Google Maps/Places/Routes
@@ -90,9 +91,10 @@ Three rules hold everywhere (from `docs/TRUTH.md`):
 - **A failed read is a failure, never "nothing there".** It is thrown,
   counted, retried and never saved. Only a complete, successful read is kept
   on a device.
-- **What doesn't change in a day comes from Shared-Data**, never through
-  the proxy. The proxy is for what moves (a live score, a price before
-  kickoff).
+- **What doesn't change in a day comes from the family's data** (R2,
+  `/data/`), never from a source through the proxy; what's over for good is
+  kept the first time anyone reads it. The data proxy is for what moves (a
+  live score, a price before kickoff).
 - **A kit change must keep every app's current code working.** Add things;
   never rename or remove what apps import. A new export is used through the
   module object with a fallback (`kit.newThing?.()`), because a phone may
@@ -108,9 +110,9 @@ mirror })`) goes down these layers until one answers.
 | 1 | **Memory** | the page | every answer of this session | the call's `ttl` |
 | 2 | **Device cache** | Cache Storage (`persist`, the default) | the last answer of each URL; `peekJson(url)` gives it at any age so a screen paints at once | younger than `ttl`: used without asking anyone |
 | 3 | **Failure hold** | the page | a URL that just failed (after one retry) | as long as it would have been kept, a minute at most, so a source that is down isn't asked again by every part of a page |
-| 4 | **The mirror** | R2 `mirror/` (the family's data), answered by the data proxy itself (`sports.js` `fromMirror`) | the reads that can't change before a known moment, each `{ until, data }` gzipped; `mirror/index.json` says which reads it holds (`match`: `'<trim>!<url>'` patterns) and until when the whole is trusted. A phone's read goes in its batch like any other; the proxy answers a held one from the copy and keeps it in the edge cache until its `until`. `mirror: false` (or `unmirror`): the source's, asked on its own (`&mirror=0`) | until its `until`, never past the index's |
-| 5 | **The packs** | R2 (the proxy's `/data/`), read with `packJson` | a league's whole season (`sports/<league>/<year>.json`), CPBL's tables, past win-probability lines, watch links, photo lists, bus packs | until the next build; a pack that isn't there (404) is a failure the app reads another way |
-| 6 | **The edge cache** | the proxy's cache in Taiwan | every successful upstream answer, shared by everyone who asks the same URL | by tier (§4.4): live 2 s by default, a finished game 24 h, standings 30 min, … |
+| 4 | **The family's data** | R2 (`quadra-data`), the proxy's `/data/` (`data.js`), read with `packJson` | a league's whole season (`sports/<league>/<year>.json`), its days and bounds, CPBL's tables and months, past win-probability lines, watch links, photo lists, bus packs, shapes, where.json: built by the proxy's cron (§4.7) | until it's rebuilt (the edge keeps a file 2–10 min) |
+| 5 | **The edge cache** | the proxy's cache in Taiwan (one place: the proxy runs there) | every successful upstream answer, shared by everyone who asks the same URL | by tier (§4.4): live 2 s by default, a finished game 24 h, standings 30 min, … |
+| 6 | **Kept on demand** | R2 `mirror/` (`sports.js` `settleable`, `readKept`, `keep`) | a read over for good (a finished game's summary, a day or month of ESPN games all completed, a past Asian month), kept the first time anyone reads it, ESPN's slimmed; the nightly mirror's old copies count too | for good (wiped with its season) |
 | 7 | **The upstream** | ESPN, Kambi, Yahoo, … | the truth now | — |
 
 On top of the layers, **apps put live knowledge over slower copies.** This
@@ -393,7 +395,7 @@ Securities left open never uses up Sports' minute. A cache hit counts too.
 curl -H 'Origin: http://localhost:8123' 'https://orbit-workers-proxy.pengzjay.workers.dev/sports-proxy?url=<encoded>&app=match'
 ```
 
-Scripts, `tools/preview.mjs --live` and Shared-Data's `watch.mjs` use it.
+Scripts and `tools/preview.mjs --live` use it.
 
 ### 4.4 The shared edge cache
 
@@ -471,6 +473,48 @@ ends, and the live feed has only the current lap. So the Durable Object
 `laps.json` serves the log (`live: true`) until the archive has the
 session. `?final=1` asks only for the archive. Orbit Sports falls back to
 the log until it's there, and asks again each minute.
+
+### 4.7 The family's data: R2 and the builders (`data.js`, `builders/`)
+
+Everything that doesn't change in a day, built by this Worker into R2
+(bucket `quadra-data`, Asia-Pacific; binding `DATA`) and served at
+`/data/<path>` (`data.js`: the edge cache in Taiwan, then R2; reads public,
+900 a minute an address). Shared-Data built it on GitHub until 2026-10-13;
+its last site was copied into R2 as it was (no source read again), and its
+builders moved here (the owner: everything on Cloudflare, ultra efficient).
+
+**The builders** (`builders/run.js`, the cron `17 * * * *`; an hourly cron
+may run 15 minutes of CPU). Each as often as its data changes, and lean:
+
+| When (UTC) | Builder | Writes | Lean because |
+| --- | --- | --- | --- |
+| every hour | `watch.js` (light) | `sports/watch.json`, the archive's touched months | ESPN's last two US days only; recent games waiting in `sports/watch/_pending.json`; ELTA only for games waiting for it |
+| every hour | `photos.js` `runCutouts` | `sports/cutouts/…` | 20 names an hour at TheSportsDB's pace |
+| every hour | `buses.js` | `bus/…`, `shape/…`, `where.json`, `index.json` | a city only when its pack is a week old (one read of `index.json` otherwise); TDX a small page at a time, made compact as it comes; twice a second |
+| 15 | `asia.js` | CPBL's month whole (`mirror/_/asia-baseball.quadra/cpbl/<ym>.json.gz`) | the month now only; kept until its next game begins |
+| 15 | `cpbl.js` | `sports/cpbl/standings.json` | two reads |
+| 16 | `sports.js` | `sports/<league>/<year>.json`, `days.json`, `index.json`, `bounds.json` | only months not yet over read from ESPN; one league at a time |
+| 18 | `photos.js` | `sports/<league>/photos.json`, `faces.json`, `sports/cutouts/pending.json` | four lists a day in turn (each about weekly); ESPN's squads through the proxy's cache |
+| 20 | `watch.js` (full) | the season's archive whole, `sports/elta-pages.json` | the season scan once a day; older highlights for 10 minutes |
+| 23 | `winprob.js` | `winprob/…` | a game kept is never read again; Polymarket's 11 MB pages through the proxy's trimmed cache |
+
+**`builders/store.js`**: R2 as files: a file is written only when its
+content changed (each keeps its SHA-256 in R2's metadata; what a run read
+it knows without asking), `.gz` packed and unpacked. R2's own allowance
+(10 GB, 1M writes, 10M reads a month) is watched by the guard (§8.1).
+
+**Read on demand, not built** (`sports.js`): what's over for good (a
+finished game's summary, a day or month of ESPN games all completed, a past
+Asian month) is kept in R2 the first time anyone reads it, and answered
+from there for good (`X-Sports-Proxy-Cache: KEPT`). The nightly mirror
+(every game's box score, every day and month, players' pages, built whether
+anyone opened them) is gone: what can change comes through the edge cache
+by its tier.
+
+**Writing from outside** (`/data/push`, `/data/_list`, Bearer
+`DATA_PUSH_SECRET`): frames of `[u32 path length][path][u32 size][bytes]`
+(a size of `0xFFFFFFFF` deletes), for a one-off copy; nothing uses it
+regularly now.
 
 ## 5. The Quadra Pass (`/eco`)
 
@@ -656,7 +700,7 @@ device's copy at once and the Worker's every five minutes.
 | `transitLive` | 10 s | Transit cards' refresh |
 | `transitBike` | 30 s | YouBike on the map |
 | `autoScale` | off | 依人數自動調整 (below) |
-| `mirror` | on | Use the nightly copies (off: every app asks the proxy, for debugging) |
+| `mirror` | on | Answer from R2's copies (the mirror, reads kept on demand); off: every read from its source, for debugging |
 
 `kit.everyDev(key, fn)` runs `fn` every `dev(key)` seconds, reading the
 setting at each beat.
@@ -745,7 +789,7 @@ apps' pages and the nightly packs stay up and open on what the phone has.
 | **Plus** | `PLUS`, `plusMember`, `plusMonths`, `plusLapsed`, `plusRenewing`, `plusPlan`, `plusUntil`, `plusJoinPrice`, `plusReturns`, `plusTenure`, `plusNotices`; Looks (`avatar`, `frame`, streaks) |
 | **VIP and free bets** | `VIP`, the month's stakes, tier and cashback; `WELCOME`; `FREEBET`, the unspent tokens |
 | **Storage** | The device keeps a refresh token and the account's id, never the pass; each app's own data copy for a cold start (small ones); signing out removes every app's keys on the origin, keeping only the device's language, safe area and kit version |
-| **Data** | `proxyJson` (batched, remembered, device-cached, failures held, mirror consulted), `peekJson`, `packJson` (Shared-Data), `mirrorBuilt`, `workerJson`/lines (the Worker's routes signed), `translate` (through the proxy, kept a month; Chinese-in-English handled) |
+| **Data** | `proxyJson` (batched, remembered, device-cached, failures held; the proxy answers a held read from the mirror or R2), `peekJson`, `packJson` (the family's data, `/data/`), `mirrorBuilt`, `workerJson`/lines (the Worker's routes signed), `translate` (through the proxy, kept a month; Chinese-in-English handled) |
 | **The session** | `quadraSession(app)`: `start()` (the sign-in gate, then live), `on('wallet'|'active'|'signedout')`, `read`, `write` (live only), `proxy(url)`; a heartbeat every 2 minutes and on wake; `#qh=` hand-offs; another app taking over pauses this one |
 | **iPhone behaviour** | No pinch zoom; haptic ticks on taps; sheets swipe down to close (past 120 px or a flick); `html.q-touch`; `:active` only after a rest (`data-q-press`, never while scrolling); the solid status-bar strip (`.q-statusbar`, never `pointer-events: none`); `uprightTurn` (a phone on its side stays upright); the theme colour kept equal to the strip; tab bar clear of the home indicator |
 | **Recommendations** | Affinity weights per key (`team:mlb:LAD`, `sym:2330.TW`…) decaying with a half-life, synced to the wallet (`aff:<app>`); `rank(items, { n })`: quality × (1 + affinity) + exploration, then maximal marginal relevance, dismissed items pushed down |
@@ -770,7 +814,7 @@ apps' pages and the nightly packs stay up and open on what the phone has.
 | `catalog.mjs` | Sports, Play | Every sport and league: `sport`, `kind` (`match`/`field`), `data` (`espn`/`kambi`/`asia`), `bet` (Play's key), `odds`, paths, `standings` |
 | `logos.mjs` | Sports, Play | Team, league, F1 driver and constructor logos and colours (ESPN, NBA.com, TheSportsDB, flags) |
 | `names.mjs` | Sports, Play | Teams in Taiwan's Chinese ([city, nickname] for US leagues); ELTA's titles are matched with them |
-| `photos.mjs` | Sports, Play | A person's studio headshot: ESPN by id or name, the leagues' official photo lists (Shared-Data), TheSportsDB cutouts; never a casual picture; kept two months (none a week) |
+| `photos.mjs` | Sports, Play | A person's studio headshot: ESPN by id or name, the leagues' official photo lists (`builders/photos.js`), TheSportsDB cutouts; never a casual picture; kept two months (none a week) |
 | `sw-images.js` | all service workers | Other sites' pictures in one shared cache, served at once, checked again after a week |
 | `f1live.mjs` | Sports, Play | Which session a feed reading is, whether it's over (qualifying only after its last part), the order as an outcome |
 | `postseason.mjs` | Sports, Play | MLB's postseason from MLB itself |
@@ -806,6 +850,11 @@ old offline copy.
   Workers (`wrangler.toml`, `wrangler.sports-proxy.toml`,
   `wrangler.guard.toml`), then keeps the guard's stop if it's on.
 - `pages.yml` publishes the kit and `site/`.
+- `deploy-guard.yml` deploys `quota-guard`, only when its own files change
+  (a deploy registers its cron again: deployed with every push, it never
+  ran).
+- `tail.yml` (by hand): each Worker's crons and address as Cloudflare has
+  them, and a Worker's live logs for a few minutes.
 - Push validated changes straight to `main` after `npm test` passes.
 
 `wrangler deploy` pushes a toml's `[vars]`, KV, Durable Object and trigger
@@ -824,6 +873,7 @@ are set with `wrangler secret put` or the dashboard.
 | orbit-workers-proxy | `F1_LOG` (Durable Object `F1Log`, migration `f1-log-main`), cron `* * * * SUN,MON,THU,FRI,SAT` | The F1 lap log |
 | sports-proxy (the forwarder) | `ORBIT` (service binding) | Every request handed to the proxy |
 | quota-guard | `CF_GUARD_TOKEN` (from the repo secret), `CF_ACCOUNT_ID` (from `CLOUDFLARE_ACCOUNT_ID`), `RATE_LIMIT_KV`, cron `*/5 * * * *` | Reading the bill, stopping the proxies (§8.1) |
+| orbit-workers-proxy | `DATA` (R2 `quadra-data`, made and bound by `deploy.yml` once R2 is on), `DATA_PUSH_SECRET` (from the repo secret) | The family's data (§4.7) |
 
 **Arming the guard (the owner, once).**
 1. Cloudflare dashboard → My Profile → API Tokens → Create Token → Custom
@@ -865,13 +915,15 @@ See `tools/README.md` for every flag.
 | `eco.test.mjs`, `pass.test.mjs` | The Pass, merges, Plus, VIP, pay, rebases |
 | `money.test.mjs` | The money report |
 | `push.test.mjs` | Push encryption, lists, checks |
-| `sports.test.mjs`, `final-cache.test.mjs` | The data proxy through the router: allowlist, trims, batches, cache tiers, the final tier |
+| `sports.test.mjs`, `final-cache.test.mjs` | The data proxy through the router: allowlist, trims, batches, cache tiers, the final tier, the mirror answered in place, reads kept on demand |
 | `f1-live.test.mjs`, `f1live-kit.test.mjs` | F1's feed trim, sessions, the lap log, `kit/f1live.mjs` |
 | `asia-baseball.test.mjs` | NPB, KBO, CPBL parsing |
 | `kambi.test.mjs` | The Kambi watch |
 | `transit.test.mjs` | TDX rules, caps, routes |
 | `weather.test.mjs`, `weather-skill.test.mjs` | The blend and the scoring |
 | `capacity.test.mjs`, `devconfig.test.mjs` | Capacity and settings |
+| `data.test.mjs`, `store.test.mjs` | `/data/` (push, list, read, the Pages bridge), the builders' R2 store |
+| `watch.test.mjs`, `builders-*.test.mjs`, `official-photos.test.mjs`, `cpbl.test.mjs` | The builders: watch links (light and full runs), win probability, season packs, CPBL, photos, buses, each on an in-memory R2 |
 | `guard.test.mjs` | The hard stop: the period, the plan's amounts, stopping and starting both proxies, a deploy undone, blind and unarmed |
 | `kit.test.mjs`, `kit-css.test.mjs`, `kit-calendar.test.mjs`, `photos.test.mjs` | The kit |
 
@@ -882,14 +934,15 @@ pushing a change, find its row and check every place it names.
 
 | If you change… | Also check |
 | --- | --- |
-| `kit/catalog.mjs` (a league) | Orbit Sports `lib/leagues.mjs` and `lib/broadcast.mjs` (shown only if on ELTA or Apple TV); Play's `lib/teams.mjs`; Shared-Data `sports.mjs` and `mirror.mjs` (which leagues are built); `tools/leagues-audit.mjs` |
-| `kit/logos.mjs`, `names.mjs`, `photos.mjs` | Both Sports and Play; Shared-Data `official-photos.mjs` (the lists `photos.mjs` reads); `sw-images.js` |
-| `proxyJson`, `packJson`, the mirror | Every app's first paint; Shared-Data `mirror.mjs` (`mirrorPath` must match); the failure hold (TRUTH §7) |
-| A trim in `sports.js` | Every parser that reads it (Sports, Play), Shared-Data `mirror.mjs` (its copy is trimmed the same way) |
+| `kit/catalog.mjs` (a league) | Orbit Sports `lib/leagues.mjs` and `lib/broadcast.mjs` (shown only if on ELTA or Apple TV); Play's `lib/teams.mjs`; `builders/sports.js`, `builders/watch.js`, `builders/winprob.js` (which leagues are built); `tools/leagues-audit.mjs` |
+| `kit/logos.mjs`, `names.mjs`, `photos.mjs` | Both Sports and Play; `builders/photos.js`, `builders/official-photos.js` (the lists `photos.mjs` reads); `sw-images.js` |
+| `proxyJson`, `packJson`, the mirror | Every app's first paint; `sports.js` (`fromMirror`, `settleable`, `readKept`: `kit/mirror.mjs`'s `mirrorPath`), `data.js`; the failure hold (TRUTH §7) |
+| A trim in `sports.js` | Every parser that reads it (Sports, Play), the builders that read through it (`builders/watch.js`, `winprob.js`, `photos.js`) |
+| A builder (`builders/`) | `run.js`'s hours (one invocation's 15 minutes), TRUTH §7, the app that reads its file |
 | A Cloudflare product used, a cron added, a toml's `[limits]` or logs | `guard.js` `PLAN` (every billed count), §8.1, TRUTH §7 |
-| A cache tier or `DEV` default | `capacity.js`'s estimates, Shared-Data's `watch.mjs` (dev door), the admin panel |
+| A cache tier or `DEV` default | `capacity.js`'s estimates, the admin panel |
 | `f1-live.js` (`trimF1Live`, laps) | Orbit Sports (`lib/f1.mjs`, `sheets.js`: live board, 數據, track map, race chance, standings at the flag); Quadra Play (F1 settling, `kit/f1live.mjs`); `tests/f1-live.test.mjs` |
-| `asia-baseball.js` | Sports (CPBL/NPB/KBO lists, box scores), Play (Kambi + these for settling), Shared-Data `cpbl.mjs` and `mirror.mjs` |
+| `asia-baseball.js` | Sports (CPBL/NPB/KBO lists, box scores), Play (Kambi + these for settling), `builders/asia.js`, `builders/cpbl.js`, `builders/sports.js` (`asiaBounds`) |
 | `eco.js` money rules | The kit's tables (`PLUS`, `VIP`, `WEALTH_RANKS`, `PAY`: the same numbers), `truth.mjs`, `tools/economy.mjs`, `help.mjs`'s money topics, Play and Securities |
 | `push.js` checks | The apps that schedule them: Sports (finals), Securities (prices), Weather (brief, rain), Transit (到站提醒); the kit's `NOTICE_KINDS` |
 | `quadra.css` or the frame | Every app at 375 px, light and dark, WebKit; the status-bar strip rule (TRUTH §10) |
