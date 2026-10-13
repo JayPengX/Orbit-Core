@@ -734,3 +734,8 @@ What was decided, so it isn't undone. Newer calls win.
   Securities' orders are filled and its cash counted by the Worker. Pricing
   the whole board on the proxy was measured and dropped (the free plan's
   10 ms a call; no paid plan).
+- 2026-10-13: Transit's YouBike is planned by place, except where a trip
+  starts with the bike: never at a station with no bike as you plan (a bike
+  later on, and where it goes back, stay by place; a full one is a tap,
+  navigating). Walking distances to YouBike and on a trip are the streets',
+  not the straight line's.
