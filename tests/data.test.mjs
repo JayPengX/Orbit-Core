@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { frame, frames, cleanPath, PAGES } from '../data.js';
+import { frame, frames, cleanPath } from '../data.js';
 
 const worker = (await import('../worker.js')).default;
 const ctx = { waitUntil() {}, passThroughOnException() {} };
@@ -77,23 +77,8 @@ test('push: only with the secret; files written and deleted; then read, with the
   assert.deepEqual(listed.files.map(f => f[0]), ['sports/index.json']);
 });
 
-test('a file not moved yet: Shared-Data\'s Pages copy; not there either: 404', async () => {
-  const real = globalThis.fetch;
-  const asked = [];
-  globalThis.fetch = async url => {
-    asked.push(String(url));
-    return String(url).endsWith('bus/Hsinchu.json') ? new Response('{"v":2}', { status: 200 }) : new Response('', { status: 404 });
-  };
-  try {
-    const env = { DATA: fakeR2() };
-    const res = await ask('/data/bus/Hsinchu.json', {}, env);
-    assert.equal(res.status, 200);
-    assert.deepEqual(await res.json(), { v: 2 });
-    assert.equal(asked[0], `${PAGES}bus/Hsinchu.json`);
-    assert.equal((await ask('/data/bus/Nowhere.json', {}, env)).status, 404);
-  } finally {
-    globalThis.fetch = real;
-  }
+test('a file R2 doesn\'t hold: 404', async () => {
+  assert.equal((await ask('/data/bus/Nowhere.json', {}, { DATA: fakeR2() })).status, 404);
 });
 
 test('no bucket yet: pushing says so (the builder carries on), reading is Pages\'', async () => {

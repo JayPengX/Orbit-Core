@@ -31,8 +31,14 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
   and the kept reads; `builders/drain.js` moves every file the indexes list,
   a few minutes a builders' run, until done (`data:drained` in KV). The
   mirror's copies of finished games aren't moved (read again once, if
-  opened). **Shared-Data's repo and Pages must stay until the drain says
-  `all`** (`/guard`'s neighbour: KV `data:drained`).
+  opened). The drain finished the same evening (426 files, all in R2);
+  the bridge and the drain were then removed, Shared-Data archived (the
+  owner's choice over deleting) and its Pages switched off.
+- Every builder checked by hand (Run a builder workflow, `POST
+  /data/build`): watch in full (4,508 season games, 665 older highlights
+  found, 8.5 min, under the CPU limit once each job had its own run),
+  season packs (26 leagues), CPBL, win probability, CPBL's month, photos,
+  buses, cutouts.
 - Shared-Data's workflow disabled (`gh workflow enable build.yml -R
   JayPengX/Shared-Data` undoes it).
 - D1 (the Pass's store): waits on the owner's D1 · Edit on the deploy token.

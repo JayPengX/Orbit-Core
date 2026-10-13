@@ -20,7 +20,6 @@ import { F1_LIVE_HOST, f1LiveResponse, doLog, sampleLive } from './f1-live.js';
 import { cleanDev } from './kit/devconfig.mjs';
 import { json } from './http.js';
 import { MIRROR_HOSTS, mirrorPath } from './kit/mirror.mjs';
-import { fromPages } from './builders/store.js';
 
 // ==== /sports-proxy - CORS passthrough for public sports data ==============
 const ELTA_HOST = 'piceltaott-elta.cdn.hinet.net';
@@ -919,11 +918,9 @@ const gz = async bytes => new Uint8Array(await new Response(new Blob([bytes]).st
 const gunzipped = async raw => (raw[0] === 0x1f && raw[1] === 0x8b ? new Uint8Array(await new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()) : raw);
 async function readKept(key, url) {
   const obj = await dataBucket.get(key).catch(() => null);
-  // (Not in R2 yet: the nightly mirror's copy on Shared-Data's Pages, kept in R2 from now on.)
-  const moved = obj ? null : await fromPages(dataBucket, key).catch(() => null);
-  if (!obj && !moved) return null;
+  if (!obj) return null;
   try {
-    const copy = JSON.parse(new TextDecoder().decode(moved ? moved.meant : await gunzipped(new Uint8Array(await obj.arrayBuffer()))));
+    const copy = JSON.parse(new TextDecoder().decode(await gunzipped(new Uint8Array(await obj.arrayBuffer()))));
     // (The nightly mirror's copies carry a day's `until`; one that's over for good is kept for good.)
     return copy?.until > Date.now() || settledData(url, copy?.data) ? JSON.stringify(copy.data) : null;
   } catch {
