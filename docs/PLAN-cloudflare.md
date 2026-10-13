@@ -46,8 +46,9 @@ Each one states its before and after numbers.
 - [x] Per-invocation CPU caps and log sampling in each toml; 容量 on the
       admin page shows the bill.
 - [x] Your `CF_GUARD_TOKEN` added and loaded into the guard.
-- [x] Fixed: the guard didn't start (its entry file exported constants);
-      the fix is deploying now.
+- [x] Fixed: the guard didn't start (its entry file exported constants).
+- [x] Fixed: every proxy push redeployed the guard and re-registered its
+      cron, so it never ran. It now deploys only when its own files change.
 - [ ] Confirm the first real reading at `/guard`: the token reads the bill
       and the CPU field is accepted.
 - [ ] You: check the plan renews on the 13th, and add a $5.01 budget alert.
@@ -67,13 +68,10 @@ Each one states its before and after numbers.
 - [x] `/data/…` route (`data.js`): edge cache, then R2, then Pages while
       moving. Builders write through `/data/push` and `/data/_list`.
 - [ ] **Copy the last build's whole site into R2 as-is**, asking no source
-      again (`Shared-Data/r2sync.mjs`, the run named "r2"). Running now.
+      again (`Shared-Data/r2sync.mjs`, the run named "r2"). Running.
 - [ ] Every Shared-Data build syncs only what changed into R2.
-- [ ] Switch the kit's `packJson` and mirror reads, and Transit's bus packs,
-      shapes and where.json, to `/data/`. Phones keep their saved copies
-      (keys unchanged). The change is written and tested, not yet pushed.
-- [ ] Serve mirror reads inside the data proxy, so they join a phone's
-      batched requests.
+- [x] The kit's `packJson`, and Transit's bus packs, shapes and
+      where.json, read from `/data/`. Phones keep their saved copies.
 - [ ] Move the builders into the proxy's crons one at a time, each checked
       against GitHub's output first:
       `watch` → `winprob` → `cpbl` → `sports` + `season` → `mirror` →

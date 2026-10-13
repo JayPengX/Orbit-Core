@@ -771,18 +771,34 @@ async function fetchUpstream(upstreamUrl, trim) {
 // completed, or one day's scoreboard (dates=YYYYMMDD; "today" moves on to the
 // next day's games) with games, every one of them over.
 export function settled(url, body) {
-  if (url.hostname !== 'site.api.espn.com') return false;
+  if (!settleable(url)) return false;
   try {
-    if (url.pathname.endsWith('/summary')) {
-      const text = typeof body === 'string' ? body : new TextDecoder().decode(body);
-      return JSON.parse(text)?.header?.competitions?.[0]?.status?.type?.completed === true;
-    }
-    if (url.pathname.endsWith('/scoreboard') && /^\d{8}$/.test(url.searchParams.get('dates') || '')) {
-      const events = JSON.parse(typeof body === 'string' ? body : new TextDecoder().decode(body))?.events || [];
-      return events.length > 0 && events.every(e => (e?.status?.type ?? e?.competitions?.[0]?.status?.type)?.completed === true);
-    }
-  } catch {}
-  return false;
+    return settledData(url, JSON.parse(typeof body === 'string' ? body : new TextDecoder().decode(body)));
+  } catch {
+    return false;
+  }
+}
+// The reads that can be over for good: a game's summary, a day's or a
+// month's scoreboard (ESPN), a month of Asia's baseball.
+export function settleable(url) {
+  if (url.hostname === 'site.api.espn.com') return url.pathname.endsWith('/summary') || (url.pathname.endsWith('/scoreboard') && /^\d{6}(\d{2})?$/.test(url.searchParams.get('dates') || ''));
+  return url.hostname === ASIA_HOST && /\/\d{4}-\d{2}\.json$/.test(url.pathname);
+}
+// …and whether this answer of one is: the game completed; every game of the
+// day or month completed (a month's last day passed); every game of an Asian
+// month over, called off or six hours past a start it never had.
+export function settledData(url, data, now = Date.now()) {
+  if (url.hostname === ASIA_HOST) {
+    const [y, m] = (/(\d{4})-(\d{2})\.json$/.exec(url.pathname) || []).slice(1).map(Number);
+    if (!y || Date.UTC(y, m, 1) > now) return false;
+    const games = data?.games || [];
+    return games.length > 0 && games.every(g => g.state === 'post' || g.state === 'void' || (g.state === 'pre' && Date.parse(g.start) < now - 6 * 3_600_000));
+  }
+  if (url.pathname.endsWith('/summary')) return data?.header?.competitions?.[0]?.status?.type?.completed === true;
+  const dates = url.searchParams.get('dates') || '';
+  if (dates.length === 6 && Date.UTC(+dates.slice(0, 4), +dates.slice(4, 6), 2) > now) return false;
+  const events = data?.events || [];
+  return events.length > 0 && events.every(e => (e?.status?.type ?? e?.competitions?.[0]?.status?.type)?.completed === true);
 }
 
 function cacheEntry(result, policy) {
@@ -882,6 +898,43 @@ export async function fromMirror(upstreamUrl, trim, now = Date.now()) {
   }
 }
 
+// Kept on first read (the family's data, R2): a read over for good (a game
+// completed, a day or month of them, a past Asian month) is kept the first
+// time anyone reads it, and every later read, from anywhere, once the edge's
+// copy has gone, is answered from it: the source asked once, ever. What
+// nobody opens is never fetched (the nightly mirror read every game of the
+// season, opened or not). Kept as the mirror kept them ({ until, data }
+// gzipped at its mirrorPath, ESPN's slimmed of what no app reads).
+export const FOREVER = 8.64e15;
+const DROP = new Set(['links', 'news', 'videos', 'article', 'articles', 'ticketsInfo', 'quicklinks', 'playerSwitcher', 'guid', 'alternateIds', 'geoBroadcasts', 'fantasy', 'headlines', '$ref', 'college', 'birthCountry', 'experience', 'lastUpdated', 'parent', 'contracts', 'draft']);
+export function slimEspn(x) {
+  if (Array.isArray(x)) return x.map(slimEspn);
+  if (!x || typeof x !== 'object') return x;
+  const out = {};
+  for (const [k, v] of Object.entries(x)) if (!DROP.has(k)) out[k] = k === 'logos' && Array.isArray(v) ? v.slice(0, 1).map(l => ({ href: l?.href })) : slimEspn(v);
+  return out;
+}
+const gz = async bytes => new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer());
+const gunzipped = async raw => (raw[0] === 0x1f && raw[1] === 0x8b ? new Uint8Array(await new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()) : raw);
+async function readKept(key, url) {
+  const obj = await dataBucket.get(key).catch(() => null);
+  if (!obj) return null;
+  try {
+    const copy = JSON.parse(new TextDecoder().decode(await gunzipped(new Uint8Array(await obj.arrayBuffer()))));
+    // (The nightly mirror's copies carry a day's `until`; one that's over for good is kept for good.)
+    return copy?.until > Date.now() || settledData(url, copy?.data) ? JSON.stringify(copy.data) : null;
+  } catch {
+    return null;
+  }
+}
+async function keep(key, url, body) {
+  try {
+    const data = JSON.parse(typeof body === 'string' ? body : new TextDecoder().decode(body));
+    const text = JSON.stringify({ until: FOREVER, data: url.hostname === 'site.api.espn.com' ? slimEspn(data) : data });
+    await dataBucket.put(key, await gz(new TextEncoder().encode(text)), { httpMetadata: { contentType: 'application/gzip' } });
+  } catch {}
+}
+
 async function resolveOne(upstreamUrl, trim, ctx, { mirror = true } = {}) {
   let policy = cachePolicyFor(upstreamUrl);
   const cache = caches.default;
@@ -940,7 +993,14 @@ async function resolveOne(upstreamUrl, trim, ctx, { mirror = true } = {}) {
       return old(isFresh ? 'HIT' : 'STALE');
     }
   }
-  const held = mirror ? await fromMirror(upstreamUrl, trim) : null;
+  const keepKey = mirror && dataBucket && dev.mirror !== false && settleable(upstreamUrl) ? `${mirrorPath(upstreamUrl.toString(), trim)}.gz` : null;
+  const kept = keepKey ? await readKept(keepKey, upstreamUrl) : null;
+  if (kept) {
+    const result = { status: 200, contentType: 'application/json', body: kept, final: true };
+    ctx.waitUntil(cache.put(cacheKey, cacheEntry(result, CACHE_FINAL)));
+    return { ...result, cache: 'KEPT', age: 0, policy: CACHE_FINAL };
+  }
+  const held = mirror && !keepKey ? await fromMirror(upstreamUrl, trim) : null;
   if (held) {
     // Kept here until it could change (a day at most), as the nightly copy says.
     const mp = { tier: 'mirror', fresh: Math.max(60, Math.min(86_400, Math.floor((held.until - Date.now()) / 1000))), stale: 0 };
@@ -949,7 +1009,12 @@ async function resolveOne(upstreamUrl, trim, ctx, { mirror = true } = {}) {
     return { ...result, cache: 'MIRROR', age: 0, policy: mp };
   }
   const result = await fetchUpstream(upstreamUrl, trim);
-  if (result.status === 200) ctx.waitUntil(cache.put(cacheKey, cacheEntry(result, policy)));
+  if (result.status === 200) {
+    // (The body is read once: the edge's copy and R2's from the same bytes.)
+    if (result.body && typeof result.body !== 'string' && !(result.body instanceof ArrayBuffer) && !ArrayBuffer.isView(result.body)) result.body = await new Response(result.body).arrayBuffer();
+    ctx.waitUntil(cache.put(cacheKey, cacheEntry(result, policy)));
+    if (keepKey && result.final) ctx.waitUntil(keep(keepKey, upstreamUrl, result.body));
+  }
   return { ...result, cache: 'MISS', age: 0, policy: result.final ? CACHE_FINAL : policy };
 }
 
@@ -1096,7 +1161,7 @@ async function handleSportsProxyRequest(request, env, headers, ip, ctx) {
 export function handleSports(request, env, ctx, headers, ip) {
   refreshDev(env, ctx);
   f1Log ||= doLog(env.F1_LOG);
-  dataBucket ||= env.DATA || null;
+  dataBucket = env.DATA || null;
   return handleSportsProxyRequest(request, env, headers, ip, ctx).catch(error => json({ error: { message: String(error?.message || error).slice(0, 200) } }, 500, headers));
 }
 

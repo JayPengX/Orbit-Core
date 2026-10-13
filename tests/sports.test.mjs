@@ -249,3 +249,38 @@ test('a read the nightly mirror holds is answered from its copy (in a batch too)
   const opted = await ask(`https://proxy.test/sports-proxy?url=${encodeURIComponent(held)}&app=match&mirror=0`);
   assert.equal((await opted.json()).from, held);
 });
+
+test('a game over is kept in R2 the first time anyone reads it; after that it comes from there, the source never asked again; a game on is never kept', async () => {
+  const { memoryBucket } = await import('../builders/store.js');
+  const bucket = memoryBucket();
+  const env = { DATA: bucket };
+  const ask = url => worker.fetch(new Request(url, { headers: { Origin: 'https://jaypengx.github.io' } }), env, ctx);
+  const real = globalThis.fetch;
+  const asked = [];
+  globalThis.fetch = async url => {
+    asked.push(String(url));
+    const done = String(url).includes('event=900');
+    return new Response(JSON.stringify({ header: { competitions: [{ status: { type: { completed: done } } }] }, news: ['dropped'], boxscore: { teams: [] } }), { status: 200 });
+  };
+  try {
+    const over = 'https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/summary?event=900';
+    const on = 'https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/summary?event=901';
+    const first = await (await ask(`https://proxy.test/sports-proxy?url=${encodeURIComponent(over)}&app=match`)).json();
+    assert.ok(first.boxscore);
+    await new Promise(r => setTimeout(r, 20));
+    assert.equal([...bucket.m.keys()].filter(k => k.includes('event~3D900')).length, 1, 'kept');
+    await ask(`https://proxy.test/sports-proxy?url=${encodeURIComponent(on)}&app=match`);
+    await new Promise(r => setTimeout(r, 20));
+    assert.equal([...bucket.m.keys()].filter(k => k.includes('event~3D901')).length, 0, 'a game on: not kept');
+    store.clear();
+    const n = asked.length;
+    const again = await ask(`https://proxy.test/sports-proxy?url=${encodeURIComponent(over)}&app=match`);
+    assert.equal(again.headers.get('X-Sports-Proxy-Cache'), 'KEPT');
+    const body = await again.json();
+    assert.ok(body.boxscore);
+    assert.equal(body.news, undefined, 'slimmed of what no app reads');
+    assert.equal(asked.length, n, 'the source never asked again');
+  } finally {
+    globalThis.fetch = real;
+  }
+});
