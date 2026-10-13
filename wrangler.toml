@@ -93,6 +93,9 @@ TRANSIT_DEV = "on"
 # The sports proxy's dev door (sports.js checkSession): a local
 # page may read without a Quadra Pass, rate-limited. "off" closes it.
 SPORTS_DEV = "on"
+# The Pass's store (doc-store.js): "firestore", "dual" (Firestore the truth,
+# every write copied to D1, the cron copying the rest), then "d1".
+STORE_MODE = "dual"
 
 # GEMINI_API_KEY (for /gemini, /nl-edit, /vocab-ai) and
 # FIREBASE_CLIENT_EMAIL / FIREBASE_PRIVATE_KEY (for /sync and /vocab-sync,

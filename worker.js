@@ -43,6 +43,7 @@ import { handleSports, sportsCron, useDevSettings } from './sports.js';
 import { isAllowedOrigin, corsHeaders, json } from './http.js';
 import { handleData } from './data.js';
 import { runBuilders } from './builders/run.js';
+import { docStore, copyToD1, compareStores } from './doc-store.js';
 import { STATE_KEY as GUARD_STATE } from './guard.js';
 // The F1 lap log's Durable Object (f1-live.js), bound as F1_LOG.
 export { F1Log } from './f1-live.js';
@@ -1157,6 +1158,9 @@ async function firestoreDelete(env, collection, code) {
 }
 
 // ---- /eco: the Quadra Pass (see eco.js) ------------------------------------
+// The Pass's store (doc-store.js): Firestore, D1, or both while moving (STORE_MODE).
+const FS = { get: firestoreGet, write: firestoreWrite, list: firestoreList, collections: firestoreCollections, batch: firestoreBatch, delete: firestoreDelete };
+const DOCS = docStore(FS);
 const ECO_DEPS = {
   json,
   errorJson,
@@ -1164,21 +1168,21 @@ const ECO_DEPS = {
   readJsonBody,
   INVALID_BODY,
   rateLimitResponse,
-  fsGet: firestoreGet,
-  fsWrite: firestoreWrite,
-  fsDelete: firestoreDelete,
-  fsList: firestoreList,
-  fsCollections: firestoreCollections,
-  fsBatch: firestoreBatch,
+  fsGet: DOCS.get,
+  fsWrite: DOCS.write,
+  fsDelete: DOCS.delete,
+  fsList: DOCS.list,
+  fsCollections: DOCS.collections,
+  fsBatch: DOCS.batch,
   sha256Hex,
   generateCode,
   now: () => Date.now(),
   // Securities' money counted here (stock-check.js), its market data read as the apps read it.
-  checkStock: (env, docId, payload, wallet) => checkStock(env, docId, payload, wallet, { read: url => priceReads(env).read(url), fsGet: firestoreGet, fsWrite: firestoreWrite }, LOCK_SINCE)
+  checkStock: (env, docId, payload, wallet) => checkStock(env, docId, payload, wallet, { read: url => priceReads(env).read(url), fsGet: DOCS.get, fsWrite: DOCS.write }, LOCK_SINCE)
 };
 
 // /kambi (kambi.js): the same plumbing, and Kambi's live data.
-const KAMBI_DEPS = { ...ECO_DEPS, fsList: firestoreList, fetchLive: fetchKambiLive };
+const KAMBI_DEPS = { ...ECO_DEPS, fsList: DOCS.list, fetchLive: fetchKambiLive };
 
 // /play (settle.js): the sources read directly (the Asian leagues' months
 // and F1's archive in this Worker, as the sports proxy serves them), and the
@@ -1282,7 +1286,15 @@ export default {
     // each count's share of the $5 plan, stopped or not. No key or token.
     if (path === '/guard' && request.method === 'GET') {
       const g = JSON.parse((await env.RATE_LIMIT_KV?.get(GUARD_STATE).catch(() => null)) || 'null');
-      return json(g ? { at: g.at, armed: g.armed, error: g.error || null, cpuWay: g.cpuWay || null, stopAt: g.stopAt, share: g.share || null, stopped: g.stopped ? { at: g.stopped.at, why: g.stopped.why } : null, period: g.period || null } : { ran: false }, 200, headers);
+      return json(g ? { at: g.at, armed: g.armed, error: g.error || null, partial: g.partial || null, cpuWay: g.cpuWay || null, stopAt: g.stopAt, share: g.share || null, stopped: g.stopped ? { at: g.stopped.at, why: g.stopped.why } : null, period: g.period || null } : { ran: false }, 200, headers);
+    }
+    // The Pass's store's move to D1 (doc-store.js): how the two compare,
+    // counts only (no document), from a localhost page (the dev door).
+    if (path === '/store/check' && request.method === 'GET') {
+      if (!/^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin) || sessionLimited(`store:${ip}`, 2)) return errorJson('FORBIDDEN_ORIGIN', 403, headers, request);
+      if (!env.STORE) return json({ mode: env.STORE_MODE || 'firestore', d1: false }, 200, headers);
+      const copied = JSON.parse((await env.RATE_LIMIT_KV?.get('store:copied').catch(() => null)) || 'null');
+      return json({ mode: env.STORE_MODE, copied, compare: await compareStores(env, FS) }, 200, headers);
     }
     // The family's data, kept in R2 (data.js): packs, the mirror, bus packs.
     if (path.startsWith('/data/')) return handleData(request, env, ctx, headers, ip, path);
@@ -1365,6 +1377,14 @@ export default {
     // Orbit Weather's scoring, once an hour (weather-skill.js).
     if (new Date(event.scheduledTime || Date.now()).getUTCMinutes() === 10) ctx.waitUntil(weatherCron(env).then(r => console.log('weather skill', JSON.stringify(r))).catch(e => console.log('weather skill failed', String(e))));
     if (!env.FIREBASE_PROJECT_ID || !env.FIREBASE_CLIENT_EMAIL || !env.FIREBASE_PRIVATE_KEY) return;
+    // The store's move (doc-store.js): while dual, Firestore's documents copied
+    // into D1 once (what D1 has from a write since stays: it's newer).
+    if (env.STORE && env.STORE_MODE === 'dual' && env.RATE_LIMIT_KV && !(await env.RATE_LIMIT_KV.get('store:copied')))
+      ctx.waitUntil(
+        copyToD1(env, FS)
+          .then(r => env.RATE_LIMIT_KV.put('store:copied', JSON.stringify({ at: Date.now(), ...r })).then(() => console.log('store copied', JSON.stringify(r))))
+          .catch(e => console.log('store copy failed', String(e)))
+      );
     // The live refreshes by how many people there are (capacity.js), every 6 hours.
     const at = new Date(event.scheduledTime || Date.now());
     if (at.getUTCMinutes() === 20 && at.getUTCHours() % 6 === 0) ctx.waitUntil(capacityCron(env, ECO_DEPS).then(r => console.log('capacity', JSON.stringify(r))).catch(e => console.log('capacity failed', String(e))));

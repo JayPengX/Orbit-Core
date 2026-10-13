@@ -1134,7 +1134,7 @@ async function loadCapacity() {
     if (p.tdx?.plan) rows.push(row('TDX 點數', p.tdx.month, p.tdx.plan, `本月 ${(p.tdx.month || 0).toFixed(1)} / ${p.tdx.plan}${p.tdx.guard?.why ? ' · 已放慢' : ''}`));
     // The month's real Cloudflare bill (guard.js): each count of the $5 plan, so far and at this pace.
     const g = p.guard;
-    const BILL_ZH = { requests: 'Workers 請求', cpuMs: 'Workers CPU', kvRead: 'KV 讀取', kvWrite: 'KV 寫入', kvDelete: 'KV 刪除', kvList: 'KV 列出', kvBytes: 'KV 儲存', doRequests: 'Durable Objects 請求', doBytes: 'Durable Objects 儲存', r2ClassA: 'R2 寫入', r2ClassB: 'R2 讀取', r2Bytes: 'R2 儲存' };
+    const BILL_ZH = { requests: 'Workers 請求', cpuMs: 'Workers CPU', kvRead: 'KV 讀取', kvWrite: 'KV 寫入', kvDelete: 'KV 刪除', kvList: 'KV 列出', kvBytes: 'KV 儲存', doRequests: 'Durable Objects 請求', doBytes: 'Durable Objects 儲存', r2ClassA: 'R2 寫入', r2ClassB: 'R2 讀取', r2Bytes: 'R2 儲存', d1RowsRead: 'D1 讀取', d1RowsWritten: 'D1 寫入', d1Bytes: 'D1 儲存' };
     const big = (k, v) => (/Bytes$/.test(k) ? `${(v / 1e9).toFixed(2)} GB` : k === 'cpuMs' ? `${n0(v / 1000)} 秒` : n0(v));
     if (g?.use)
       for (const k of Object.keys(BILL_ZH)) {
@@ -1146,10 +1146,10 @@ async function loadCapacity() {
       : !g.armed
         ? 'Cloudflare 帳單保護還沒啟動：GitHub 的 Shared-Proxy 需要 CF_GUARD_TOKEN（見 README §11）。沒有它，超過 $5 的用量會計費。'
         : g.stopped
-          ? `兩個代理已經停了（${fmt(g.stopped.at)}，${g.stopped.why.map(k => BILL_ZH[k] || '讀不到用量').join('、')}到 ${Math.round(g.stopAt * 100)}%），下個帳單週期開始時自動恢復，不會多付一毛。`
+          ? `代理已經停了（${fmt(g.stopped.at)}，${g.stopped.why.map(k => BILL_ZH[k] || '讀不到用量').join('、')}到 ${Math.round(g.stopAt * 100)}%），下個帳單週期開始時自動恢復，不會多付一毛。`
           : g.error
             ? `Cloudflare 用量讀取失敗：${g.error}（連續 6 小時讀不到就先停兩個代理）。`
-            : `$5 方案：任何一項到 ${Math.round(g.stopAt * 100)}% 就停兩個代理到下個週期，不會多付。本期 ${fmt(g.period.start)} 起，${fmt(g.at)} 讀取。`;
+            : `$5 方案：任何一項到 ${Math.round(g.stopAt * 100)}% 就停代理到下個週期，不會多付。本期 ${fmt(g.period.start)} 起，${fmt(g.at)} 讀取。${g.partial && Object.keys(g.partial).length ? `（這幾項讀不到：${Object.keys(g.partial).join('、')}）` : ''}`;
     $('cap-plans').replaceChildren(...rows);
     const on = devSaved?.autoScale;
     const slow = p.scale == null ? '最慢也不夠：要減少即時功能，否則會碰到 $5 方案的上限而停' : p.scale > 1 ? `即時更新要放慢 ×${p.scale}` : '不用放慢';
