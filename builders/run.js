@@ -6,13 +6,18 @@
 
 import { r2Store } from './store.js';
 import { runWatch } from './watch.js';
+import { runWinprob } from './winprob.js';
 
 // The paths each moved builder owns in R2 (prefixes).
 export const MOVED = {
-  watch: ['sports/watch.json', 'sports/watch/', 'sports/elta-pages.json']
+  watch: ['sports/watch.json', 'sports/watch/', 'sports/elta-pages.json'],
+  winprob: ['winprob/']
 };
+// Win probability once a day, after the night's season packs are in R2
+// (Shared-Data's night build, ~20:00-21:30 UTC, until that moves here too).
+export const WINPROB_HOUR = 23;
 
-// `proxy(url, trim)`: a read through the data proxy's route, its JSON or null.
+// `proxy(url, trim)`: a read through the data proxy's route (its trims and edge cache), its JSON or null.
 export async function runBuilders(env, { proxy, now = Date.now(), log = console.log } = {}) {
   if (!env.DATA) return { off: 'no data bucket' };
   const store = r2Store(env.DATA);
@@ -24,6 +29,12 @@ export async function runBuilders(env, { proxy, now = Date.now(), log = console.
   } catch (e) {
     done.watch = { failed: String(e?.message || e).slice(0, 200) };
   }
+  if (new Date(now).getUTCHours() === WINPROB_HOUR)
+    try {
+      done.winprob = await runWinprob({ store, proxy, now });
+    } catch (e) {
+      done.winprob = { failed: String(e?.message || e).slice(0, 200) };
+    }
   done.store = store.stats;
   log('builders', JSON.stringify(done));
   return done;

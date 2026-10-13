@@ -1223,8 +1223,8 @@ const priceReads = env => ({
   }
 });
 // The builders' reads through the data proxy's route, as Orbit Sports' (its trims, its cache).
-const builderProxy = env => async url => {
-  const ask = `https://orbit-workers-proxy.quadra/sports-proxy?url=${encodeURIComponent(url)}&app=match&qt=${encodeURIComponent(await sportsToken(env, 'match'))}`;
+const builderProxy = env => async (url, trim = '') => {
+  const ask = `https://orbit-workers-proxy.quadra/sports-proxy?url=${encodeURIComponent(url)}&app=match${trim ? `&trim=${encodeURIComponent(trim)}` : ''}&qt=${encodeURIComponent(await sportsToken(env, 'match'))}`;
   const res = await handleSports(new Request(ask), env, inPlace, {}, 'worker');
   return res.ok ? res.json() : null;
 };
