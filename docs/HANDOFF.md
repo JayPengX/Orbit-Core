@@ -2473,3 +2473,29 @@ Quadra stays under 30% for anyone who plays much.
   about to start) has left 今日推薦 for 正在進行. They're kept on the device
   for the day (`fx.picked.v1`). An open app says it at once
   (`noticeChanges`).
+
+## Weather's day sheet redrawn, updates sooner, 2026-10-13
+
+- **The owner:** the day sheet "real ugly, we need to step up" (screenshot:
+  today 10/13, 學校 → 家, 31°/24°, dry, UV 7, AQI 138), and "speed up
+  weather app updating time".
+- **Day sheet** (`Orbit-Weather/public/lib/graph.mjs` `dayCharts`): one frame
+  for all three charts, the plot 310 of 340 wide (`DAY_PW`) and the scale in
+  a gutter on its right, so no number sits on a line (31°'s label had covered
+  the 32° mark, 最低 24 was cut at the edge). Temperature's line and fill are
+  coloured by the temperature (cold blue → hot red), the fill fading down;
+  feels-like a thin dashed grey under it. 最高 / 最低 sit on their dots with
+  a halo, anchored inward at the edges. Rain is a bar an hour (the amount
+  darker inside); a dry day (under 10%, no amount) has no chart, only
+  「不會下雨」 or 「最高 5%」 in its header (was a big empty chart with a flat
+  line at 0). UV is its level-coloured line, peak marked, scale 3 / 6 / 11.
+  The crosshair reads the plot's width (`data-pw` in `colAt` / `colSpot`).
+  The summary's four columns are as wide as their words (對敏感族群不健康 ran
+  off the card). Checked in Chromium at 375 px on a hot dry day, a wet
+  24-hour day and a cool day; WebKit isn't in this container, not yet seen
+  on a phone.
+- **Updating:** an answer the proxy is still finishing (`more`) or an old
+  copy it's refreshing (`refreshing`) is asked again after 1.2 s, then every
+  2 s, 7 times (was 2.5 s, then 4 s, 5 times); the proxy waits up to 4 s for
+  a cell's refresh before answering with the old copy (`FRESH_WAIT_MS`, was
+  2.5 s), so a slower refresh still comes back in the first answer.
