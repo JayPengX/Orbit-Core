@@ -25,8 +25,9 @@ export const TICKET_COLLECTION = 'odds-tickets';
 export const TICKET_INDEX = '_index';
 const MAX_TICKETS = 50;
 const TICKET_ID = /^[a-z0-9]{8,32}$/;
-// Tickets settled a run at most (each a draw read and two writes).
-export const RUN_TICKETS = 6;
+// Tickets settled a run at most (each a draw read and two writes; the free
+// plan's 50 fetches set it at 6).
+export const RUN_TICKETS = 40;
 // A draw not out this long after its time: looked at again in 10 minutes.
 const AGAIN = 10 * 60_000;
 

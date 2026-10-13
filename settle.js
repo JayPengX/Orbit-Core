@@ -65,10 +65,13 @@ export const VOID_AFTER = 3 * DAY;
 // From here on a slip is placed through the Worker (op 'place', its price
 // checked); one staked before is only watched (op 'open').
 export const PLACE_SINCE = LOCK_SINCE;
-// A cron run (its own invocation, 50 fetches): this many slips looked at,
-// this many settled.
-export const RUN_LOOK = 6;
-export const RUN_SETTLE = 3;
+// A cron run (its own invocation: on the $5 plan 10,000 fetches and 30 s of
+// CPU, the free plan's 50 and 10 ms set these at 6 and 3): this many slips
+// looked at, this many settled. A game read once settles every slip on it,
+// so a busy night's slips are paid within minutes of their games, not
+// hours of runs.
+export const RUN_LOOK = 60;
+export const RUN_SETTLE = 30;
 const MAX_SLIPS = 40;
 const MAX_LEGS = 20;
 const MAX_SLIP_BYTES = 24_000;
