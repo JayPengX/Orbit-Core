@@ -459,8 +459,8 @@ export function randomId() {
 //     `ttl` is used without asking the proxy at all, and peekJson(url) gives
 //     the last copy of any age for painting at once while a fresh one loads;
 //   - requests made within a few milliseconds of each other go to the proxy
-//     as one batch (`?batch=1&u=…`, up to 12): the Worker plan bills per
-//     request, and a first paint asks for a dozen lists at once. A batch
+//     as one batch (`?batch=1&u=…`, up to 24): the Worker plan bills per
+//     request, and a first paint asks for about 28 lists at once. A batch
 //     that fails is asked again one by one.
 //
 // The session token comes from the app's quadraSession (the last one made).
@@ -593,8 +593,8 @@ async function fetchOne(url, trim, timeout, extra = '') {
     }
   }
 }
-// The batch queue.
-const BATCH_MAX = 12;
+// The batch queue (the proxy answers 24 at most; one it didn't is asked alone).
+const BATCH_MAX = 24;
 let queue = [];
 let flushTimer = 0;
 function enqueue(url, trim, timeout) {
