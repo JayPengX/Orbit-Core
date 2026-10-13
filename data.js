@@ -16,6 +16,9 @@
 //                            cursor }), the same secret: a builder sends only
 //                            what changed
 //
+// `private/` (the store's backups) is never served: only a builder's
+// _list sees it.
+//
 // Reads are public, as Pages' were (a phone reads a pack before it's signed
 // in), counted per address in memory. R2's own allowance (10 GB, 1M writes,
 // 10M reads a month) is watched by guard.js like the rest of the bill.
@@ -151,7 +154,7 @@ export async function handleData(request, env, ctx, headers, ip, path) {
   if (request.method !== 'GET' && request.method !== 'HEAD') return json({ error: { message: 'GET only' } }, 405, headers);
   if (sessionLimited(`data:${ip}`, READS_PER_MIN)) return json({ error: { message: 'Too many requests' } }, 429, headers);
   const file = cleanPath(rest);
-  if (!file) return json({ error: { message: 'Not found' } }, 404, headers);
+  if (!file || file.startsWith('private/')) return json({ error: { message: 'Not found' } }, 404, headers);
   const res = await readFile(env, ctx, file, request);
   const out = new Response(request.method === 'HEAD' ? null : res.body, res);
   for (const [k, v] of Object.entries(headers)) out.headers.set(k, v);

@@ -85,3 +85,10 @@ test('no bucket yet: pushing says so (the builder carries on), reading is Pages\
   const res = await ask('/data/push', { method: 'POST', body: new Blob([]), headers: { Authorization: 'Bearer s' } }, { DATA_PUSH_SECRET: 's' });
   assert.equal(res.status, 503);
 });
+
+test('private/ (the store\'s backup) is never served', async () => {
+  const DATA = fakeR2();
+  await DATA.put('private/firestore-backup.jsonl.gz', enc('secret'));
+  assert.equal((await ask('/data/private/firestore-backup.jsonl.gz', {}, { DATA })).status, 404);
+  assert.equal((await ask('/data/private%2Ffirestore-backup.jsonl.gz', {}, { DATA })).status, 404);
+});
