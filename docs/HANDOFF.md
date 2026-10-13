@@ -10,6 +10,36 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
 
 
 
+## Transit: pinned places on the map (2026-10-13, pushed to `main`)
+
+The owner asked to see their pinned places on the map. Each one (家, 學校…)
+is now a marker at every zoom: its icon in a white-ringed disc and its name
+(`tab-map placeMarker`, layer `places`, drawn with the chips so a change in
+我的 shows at once; hidden while navigating, like the other layers). A tap
+opens the place's card (路線, 已釘選), the marker itself selected; its chip
+selects it too. Help text and README updated. Checked in the preview
+(Chromium at 375 px: WebKit isn't installed in this container): both pins
+drawn, a tap opens 家's card.
+
+## Transit: pinned places on the map (2026-10-13, pushed to `main`)
+
+The owner asked to see their pinned places on the map. Each one (家, 學校…)
+is now a marker at every zoom: its icon in a white-ringed disc and its name
+(`tab-map placeMarker`, layer `places`, drawn with the chips so a change in
+我的 shows at once; hidden while navigating, like the other layers). A tap
+opens the place's card (路線, 已釘選), the marker itself selected; its chip
+selects it too. Help text and README updated. Checked in the preview
+(Chromium at 375 px: WebKit isn't installed in this container): both pins
+drawn, a tap opens 家's card. Not yet seen on a phone.
+
+Then (the owner): a place pinned from one of Google's showed twice on Google's
+map. Google's map can't hide one place (only whole kinds), so the owner chose
+to cover it: the pin is at Google's own spot for the place (its details'
+lat/lon) and the name is now on a solid label tucked under the disc, over
+Google's name beside its icon. Google places its label left, right or below
+by itself, so some may still show: not checkable here (the preview has no
+Google key, NLSC only); ask the owner how it looks.
+
 ## Transit: the owner's list of 2026-10-13 morning, five items (pushed to `main`)
 
 1. **編輯行程 while navigating** (⋯; replaces 先去別的地方 and 改目的地): the
