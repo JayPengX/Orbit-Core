@@ -131,9 +131,17 @@ Each one states its before and after numbers.
 - [ ] Remove workarounds the free plan forced: the 10 ms CPU limit, the
       50-fetch budgets (Kambi watch, settling 6 slips a run, Asian months),
       and KV write rationing.
-- [ ] Price Play's whole board on the proxy, as you asked before. The CPU
-      limit used to block it.
-- [ ] Fill Securities' orders on the Worker (left open 2026-10-12).
+- [x] Play's board stays priced on the phone (it costs nothing per
+      opening; repricing every round on the proxy would spend 1–3% of the
+      month's CPU for no change you'd see). Yours to reopen.
+- [x] Securities' orders filled by the proxy (`/stock`, `stock-fill.js`),
+      as Play's bets are settled by it; the saved account takes those fills
+      as they are.
+- [x] Yahoo's 429s: the proxy unpinned (Yahoo refused Taiwan's servers),
+      Gemini alone goes through a small Taiwan-pinned relay; 10 of 10 reads OK.
+- [ ] You: try Orbit Class's photo import once (Gemini through the relay).
+- [x] A cut price in Securities' 為你推薦 (fitted before the font loaded):
+      Securities and Play now fit again once fonts load.
 - [ ] Weather: check whether parsing CWA's national lists on the Worker helps.
 - [ ] Bring READMEs, TRUTH, HANDOFF and help text up to date.
 - [x] Loose ends from today's preview: the 404 was the preview's own
