@@ -20,6 +20,13 @@ carries only the destination, so Google or Apple would plan their own): ⋯'s
 用 Google 地圖導航 (the whole trip by transit) removed. Not tried on a phone:
 Apple's directions URL needs a recent iOS.
 
+Then (the owner): Google's walking started navigating at once (cycling
+showed the route first): `dir_action=navigate` dropped, both open to look
+over. And a walk looked ahead to started from where you were: a step that
+isn't the one you've reached (`state.reached`), or a plan's, now starts at
+its own start (Google `origin`, Apple `source`). Checked in the preview: the
+step you're at has no origin; a bike step ahead starts at its station.
+
 Search: 八分雲集 from 成功九街 gave 八方雲集 in other cities and not every one
 near. Autocomplete (five at most) now beside Text Search (20, relevant, near
 you first, a typo still found; kept a day for the same words within ~1 km,
