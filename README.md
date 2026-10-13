@@ -165,6 +165,7 @@ of the colo the request came in through).
 | `POST /gemini` | `worker.js` | Orbit Class's AI import of a timetable photo |
 | `POST /nl-edit` | `worker.js` | Orbit Class's edits in plain language ("move Tuesday's maths to room 302") |
 | `GET/POST /kambi` | `kambi.js` | The last live data of Kambi matches Quadra Play has bets on (§3.1) |
+| `POST /stock` | `stock-fill.js` | Quadra Securities' orders filled at the proxy's own quote (§3.1) |
 | `GET/POST /play` | `settle.js`, `price.js`, `lotto.js` | Quadra Play's slips placed (prices checked), cashed out, settled and paid; its lottery tickets and scratch cards sold and paid (§3.1) |
 | `GET/POST /push/…` | `push.js` | Notices while an app is closed (§7) |
 | `GET /weather…` | `weather.js`, `weather-skill.js` | Orbit Weather (§3.2) |
@@ -256,6 +257,16 @@ its own snap, and Securities' cash and holdings' cost are this Worker's
 (`stock-check.js`: Securities' account replayed with the kit's stock-* on each
 save, every new cash-adding event checked against Yahoo or its rate);
 `poolBalance` counts only that cash, ranks only that cost.
+
+**Securities' orders filled here** (`stock-fill.js`, `POST /stock { op:
+'fill', orders }`; the owner, 2026-10-14, as Play's bets are): the phone
+places an order (it holds its cash or shares and waits), asks here for its
+open orders after each refresh, and this Worker reads its own fresh quote
+(the kit's `stock-quotes.mjs` through the data proxy's route) and decides
+each with the kit's `triggerPrice`. A fill is kept (`stock-fills/<account>`:
+its quote and moment) and answered; the phone applies exactly that
+(`applyFills`), and `stock-check.js` takes a fill it issued as it is (any
+other: checked against the price bars as before, or never counted).
 
 ### 3.2 `/weather`
 
