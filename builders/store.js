@@ -24,6 +24,9 @@ const typeOf = path => TYPES[/\.([a-z]+)$/.exec(path)?.[1]] || 'application/octe
 
 export function r2Store(bucket) {
   const stats = { read: 0, written: 0, same: 0, deleted: 0 };
+  // What this run read or wrote, by path: its sum, so writing the same back
+  // asks R2 nothing at all.
+  const known = new Map();
   const store = {
     stats,
     // A file's bytes (unpacked when gzipped), or null when there's none.
@@ -31,8 +34,10 @@ export function r2Store(bucket) {
       const obj = await bucket.get(path);
       stats.read++;
       if (!obj) return null;
-      const b = new Uint8Array(await obj.arrayBuffer());
-      return isGz(b) ? gunzip(b) : b;
+      const raw = new Uint8Array(await obj.arrayBuffer());
+      const b = isGz(raw) ? await gunzip(raw) : raw;
+      if (obj.customMetadata?.sha256) known.set(path, obj.customMetadata.sha256);
+      return b;
     },
     async json(path) {
       const b = await store.bytes(path);
@@ -44,9 +49,10 @@ export function r2Store(bucket) {
       if (path.endsWith('.gz') && !isGz(b)) b = await gzip(b);
       // (The sum of what's meant, not of gzip's bytes, which carry a time.)
       const sum = await sha256(path.endsWith('.gz') ? await gunzip(b) : b);
-      const head = await bucket.head(path);
-      if (head?.customMetadata?.sha256 === sum) return stats.same++, false;
+      const was = known.has(path) ? known.get(path) : (await bucket.head(path))?.customMetadata?.sha256;
+      if (was === sum) return stats.same++, false;
       await bucket.put(path, b, { httpMetadata: { contentType: typeOf(path) }, customMetadata: { sha256: sum } });
+      known.set(path, sum);
       stats.written++;
       return true;
     },

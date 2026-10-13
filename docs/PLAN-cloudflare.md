@@ -11,6 +11,34 @@ Cloudflare has no spending cap of its own, so a guard Worker enforces it.
 Every item is pushed to `main` when done and checked live.
 `Shared-Proxy/docs/PLAN-cloudflare.md` holds the same list in the repo.
 
+## 0. Ultra efficient, everywhere (applies to every item below)
+Every change spends as little as possible of each budget: proxy requests,
+CPU ms, subrequests, R2 reads and writes, KV, and the sources' own limits.
+Each one states its before and after numbers.
+- [ ] **Phones: fewest requests per opening.** Mirror reads join the data
+      proxy's batches. `/data/` files carry long cache lifetimes and ETags:
+      a copy that can't change before its `until` is cached until then, and
+      a phone gets a 304 instead of the file again. Measured with
+      `preview.mjs --requests`.
+- [ ] **Builders: no repeated work.**
+      - Read a source only when its answer can have changed. Recent days come
+        from the nightly season packs; ESPN is asked only for today and
+        yesterday.
+      - Read ELTA's season pages only for games still missing a replay, at
+        most once a day per game after its first days.
+      - Write to R2 only when the content changed (done). Load only the
+        archive months a run touches.
+- [ ] **Edge cache first.** Every `/data/` and `/sports-proxy` answer is
+      served from Cloudflare's cache in Taipei when it can be, before R2 or a
+      source.
+- [ ] **Cron cadence matched to how often the data changes.** The guard,
+      builders, Kambi and settling run only as often as their data moves, and
+      skip a run with nothing to do in one cheap read.
+- [ ] **CPU.** Parse big pages once, keep built results, never re-parse what
+      didn't change.
+- [ ] **A cost line in every commit and in HANDOFF**: requests, CPU, R2
+      and KV operations, before and after.
+
 ## 1. Hard stop on the bill (`Shared-Proxy/guard.js`, `guard-worker.js`)
 - [x] `quota-guard` Worker reads the period's use every 5 minutes. At 90% of
       any included amount, it turns the proxy's address and crons off until
