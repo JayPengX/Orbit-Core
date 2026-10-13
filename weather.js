@@ -1311,7 +1311,7 @@ export async function cellForecast(env, ctx, lat, lon, { fetchFn = fetch, now = 
   return { ...entry.resp, refreshing: true, more: true };
 }
 // How long an old copy's refresh is waited on before the copy is the answer.
-export const FRESH_WAIT_MS = 2500;
+export const FRESH_WAIT_MS = 4000;
 // How long a quick entry's finishing job gets before it's started again.
 export const QUICK_FINISH_MS = 45_000;
 
