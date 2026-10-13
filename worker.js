@@ -1238,10 +1238,12 @@ const playDeps = env => ({ ...ECO_DEPS, read: readSource, prices: priceReads(env
 
 // wrangler.toml's second cron.
 const SETTLE_CRON = '1-59/2 * * * *';
-// …and its third: the F1 lap log, each minute Thursday to Monday (UTC).
-const F1_CRON = '* * * * SUN,MON,THU,FRI,SAT';
-// …and its fourth: the family's data built (builders/run.js), hourly at :17.
-const BUILD_CRON = '17 * * * *';
+// F1's lap log each minute Thursday to Monday (UTC), on both crons; the
+// family's data built hourly on the even minute :16 (builders/run.js); the
+// bill's guard woken every ten minutes. (Crons of their own were registered
+// on 2026-10-13 and never run.)
+const F1_DAYS = new Set([0, 1, 4, 5, 6]);
+const BUILD_MINUTE = 16;
 
 // The developer settings as GET /config answers them: kept a minute in
 // Cloudflare's cache (one read of the store a minute, however many ask).
@@ -1358,10 +1360,13 @@ export default {
   // and the latest score of each Kambi match Quadra Sportsbook has bets on
   // (kambi.js).
   async scheduled(event, env, ctx) {
-    // F1's laps while a session runs (sports.js, f1-live.js).
-    if (event.cron === F1_CRON) return ctx.waitUntil(sportsCron(env, event.scheduledTime || Date.now()));
-    // The family's data (builders/): watch links, and the rest as they move from Shared-Data.
-    if (event.cron === BUILD_CRON) return ctx.waitUntil(runBuilders(env, { proxy: builderProxy(env), now: event.scheduledTime || Date.now() }).catch(e => console.log('builders failed', String(e))));
+    const tick = new Date(event.scheduledTime || Date.now());
+    // F1's laps while a session runs (sports.js, f1-live.js): every minute of an F1 weekend.
+    if (F1_DAYS.has(tick.getUTCDay())) ctx.waitUntil(sportsCron(env, tick.getTime()));
+    // The family's data (builders/), once an hour.
+    if (event.cron !== SETTLE_CRON && tick.getUTCMinutes() === BUILD_MINUTE) ctx.waitUntil(runBuilders(env, { proxy: builderProxy(env), now: tick.getTime() }).catch(e => console.log('builders failed', String(e))));
+    // The bill's guard: its clock woken (started if it isn't).
+    if (event.cron !== SETTLE_CRON && tick.getUTCMinutes() % 10 === 0 && env.GUARD) ctx.waitUntil(env.GUARD.fetch('https://quota-guard/tick').catch(() => {}));
     // Odd minutes: Quadra Play's slips whose games should be over (settle.js),
     // in an invocation of its own (its own 50 fetches and CPU).
     if (event.cron === SETTLE_CRON) {

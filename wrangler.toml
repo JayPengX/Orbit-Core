@@ -129,11 +129,11 @@ enabled = true
 # and a line or two) far under it (guard.js).
 head_sampling_rate = 0.25
 
-# The $5 plan lets an invocation run 30 s of CPU, billed past 30M ms a month:
-# a cap per invocation against a runaway (the free plan's was 10 ms; Play's
-# price check and the crons use far less than this).
+# The $5 plan lets an invocation run 30 s of CPU, billed past 30M ms a month
+# (the guard watches the month): the builders' runs (a night's season packs,
+# a city's bus timetables) need seconds; a request uses milliseconds.
 [limits]
-cpu_ms = 3000
+cpu_ms = 30000
 
 # /kambi cron (kambi.js): Kambi matches with open Quadra Play bets, every 2 minutes (one index read when nothing is on).
 # The odd minutes: Quadra Play's slips settled (settle.js, worker.js SETTLE_CRON), an invocation of its own.
@@ -149,8 +149,16 @@ class_name = "F1Log"
 tag = "f1-log-main"
 new_sqlite_classes = ["F1Log"]
 
-# The F1 lap log (the third): each minute Thursday to Monday, UTC. The
-# family's data (the fourth, builders/run.js): hourly at :17 (an hourly
-# cron may run 15 minutes of CPU).
+# Two crons, the even minutes and the odd: every minute between them. New
+# crons added on 2026-10-13 (F1's minute, the builders' hour, the guard's
+# five) were registered and never run (a known fault of new crons that
+# year), so F1's lap log runs on both and the builders on the even minute
+# at :16 (worker.js scheduled).
 [triggers]
-crons = ["*/2 * * * *", "1-59/2 * * * *", "* * * * SUN,MON,THU,FRI,SAT", "17 * * * *"]
+crons = ["*/2 * * * *", "1-59/2 * * * *"]
+
+# The bill's guard (quota-guard): woken every ten minutes (its clock is a
+# Durable Object's alarm; this only starts it again should it stop).
+[[services]]
+binding = "GUARD"
+service = "quota-guard"
