@@ -34,9 +34,6 @@ on:
       - 'weather-skill.js'
       - 'transit.js'
       - 'kit/devconfig.mjs'
-      - 'guard.js'
-      - 'guard-worker.js'
-      - 'wrangler.guard.toml'
   workflow_dispatch:
 
 jobs:
@@ -45,7 +42,6 @@ jobs:
     env:
       HAS_TOKEN_SECRET: ${{ secrets.ECO_TOKEN_SECRET != '' }}
       HAS_ADMIN_TOKEN: ${{ secrets.ECO_ADMIN_TOKEN != '' }}
-      HAS_GUARD_TOKEN: ${{ secrets.CF_GUARD_TOKEN != '' }}
       HAS_PUSH_SECRET: ${{ secrets.DATA_PUSH_SECRET != '' }}
     steps:
       - name: Checkout
@@ -116,24 +112,6 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           ECO_ADMIN_TOKEN: ${{ secrets.ECO_ADMIN_TOKEN }}
-      # The hard stop on the bill (guard.js, wrangler.guard.toml): its own
-      # Worker and cron, armed once the repo has CF_GUARD_TOKEN.
-      - name: Deploy quota-guard (the hard stop on the bill)
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy --config wrangler.guard.toml
-          wranglerVersion: '4'
-      - name: The guard's token and account
-        if: ${{ env.HAS_GUARD_TOKEN == 'true' }}
-        run: |
-          printf '%s' "$CF_GUARD_TOKEN" | npx --yes wrangler@4 secret put CF_GUARD_TOKEN --config wrangler.guard.toml
-          printf '%s' "$CLOUDFLARE_ACCOUNT_ID" | npx --yes wrangler@4 secret put CF_ACCOUNT_ID --config wrangler.guard.toml
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CF_GUARD_TOKEN: ${{ secrets.CF_GUARD_TOKEN }}
       # A deploy turns a Worker's workers.dev address and crons back on: while
       # the guard has the proxies stopped (the plan's amounts nearly used),
       # they go off again now, not at the guard's next run.
