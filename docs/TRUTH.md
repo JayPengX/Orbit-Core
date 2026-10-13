@@ -740,3 +740,8 @@ What was decided, so it isn't undone. Newer calls win.
   navigating). Walking distances to YouBike and on a trip are the streets',
   not the straight line's.
   Walking is planned at 5 km/h (83 m a minute, Google's pace; was 4.5).
+  One walk says the same everywhere it's shown (the strip, a card, the
+  walk itself, a trip), and it's Google's (OpenStreetMap misses lanes).
+  The loading screen lifts only onto everything ready (Transit's map: the
+  tiles, what's in view, the strip in its order), and opening may not get
+  slower for it.
