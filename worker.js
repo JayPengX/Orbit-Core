@@ -45,7 +45,8 @@ import { isAllowedOrigin, corsHeaders, json } from './http.js';
 import { handleData } from './data.js';
 import { handleStock } from './stock-fill.js';
 import { runBuilders, SLOTS as BUILD_SLOTS } from './builders/run.js';
-import { docStore, copyToD1, compareStores } from './doc-store.js';
+import { docStore, copyToD1, compareStores, backupToR2 } from './doc-store.js';
+import { gzip } from './builders/store.js';
 import { STATE_KEY as GUARD_STATE } from './guard.js';
 // The F1 lap log's Durable Object (f1-live.js), bound as F1_LOG.
 export { F1Log } from './f1-live.js';
@@ -1308,7 +1309,8 @@ export default {
       if (!/^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin) || sessionLimited(`store:${ip}`, 2)) return errorJson('FORBIDDEN_ORIGIN', 403, headers, request);
       if (!env.STORE) return json({ mode: env.STORE_MODE || 'firestore', d1: false }, 200, headers);
       const copied = JSON.parse((await env.RATE_LIMIT_KV?.get('store:copied').catch(() => null)) || 'null');
-      return json({ mode: env.STORE_MODE, copied, compare: await compareStores(env, FS) }, 200, headers);
+      const backup = JSON.parse((await env.RATE_LIMIT_KV?.get('store:backup').catch(() => null)) || 'null');
+      return json({ mode: env.STORE_MODE, copied, backup, compare: env.STORE_MODE === 'd1' ? null : await compareStores(env, FS) }, 200, headers);
     }
     // A builder's job now (builders/run.js), by hand: Bearer DATA_PUSH_SECRET
     // (Shared-Proxy's build.yml). ?job=watch|cutouts|buses, or
@@ -1411,13 +1413,17 @@ export default {
     if (new Date(event.scheduledTime || Date.now()).getUTCMinutes() === 10) ctx.waitUntil(weatherCron(env).then(r => console.log('weather skill', JSON.stringify(r))).catch(e => console.log('weather skill failed', String(e))));
     if (!env.FIREBASE_PROJECT_ID || !env.FIREBASE_CLIENT_EMAIL || !env.FIREBASE_PRIVATE_KEY) return;
     // The store's move (doc-store.js): while dual, Firestore's documents copied
-    // into D1 once (what D1 has from a write since stays: it's newer).
-    if (env.STORE && env.STORE_MODE === 'dual' && env.RATE_LIMIT_KV && !(await env.RATE_LIMIT_KV.get('store:copied')))
+    // into D1 once (what D1 has from a write since stays: it's newer), then
+    // all of Firestore backed up into R2 once (private/, never served).
+    if (env.STORE && env.STORE_MODE === 'dual' && env.RATE_LIMIT_KV && !(await env.RATE_LIMIT_KV.get('store:backup'))) {
+      const copied = await env.RATE_LIMIT_KV.get('store:copied');
       ctx.waitUntil(
-        copyToD1(env, FS)
-          .then(r => env.RATE_LIMIT_KV.put('store:copied', JSON.stringify({ at: Date.now(), ...r })).then(() => console.log('store copied', JSON.stringify(r))))
-          .catch(e => console.log('store copy failed', String(e)))
+        (copied
+          ? env.DATA && backupToR2(env, FS, { gzip }).then(r => env.RATE_LIMIT_KV.put('store:backup', JSON.stringify({ at: Date.now(), ...r })).then(() => console.log('store backed up', JSON.stringify(r))))
+          : copyToD1(env, FS).then(r => env.RATE_LIMIT_KV.put('store:copied', JSON.stringify({ at: Date.now(), ...r })).then(() => console.log('store copied', JSON.stringify(r))))
+        ).catch(e => console.log('store move failed', String(e)))
       );
+    }
     // The live refreshes by how many people there are (capacity.js), every 6 hours.
     const at = new Date(event.scheduledTime || Date.now());
     if (at.getUTCMinutes() === 20 && at.getUTCHours() % 6 === 0) ctx.waitUntil(capacityCron(env, ECO_DEPS).then(r => console.log('capacity', JSON.stringify(r))).catch(e => console.log('capacity failed', String(e))));

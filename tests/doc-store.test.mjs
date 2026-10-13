@@ -2,7 +2,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
-import { d1Store, docStore, copyToD1, compareStores, SCHEMA } from '../doc-store.js';
+import { d1Store, docStore, copyToD1, compareStores, backupToR2, BACKUP_PATH, SCHEMA } from '../doc-store.js';
+import { gzip, gunzip } from '../builders/store.js';
 
 // D1's API over node:sqlite.
 function fakeD1() {
@@ -83,4 +84,19 @@ test('moving: dual writes Firestore then D1 (the same updateTime); the copy brin
   assert.equal(read.payload, 'before the move');
   await store.write(env, 'eco-wallets', 'old', 'on D1', { updateTime: read.updateTime });
   assert.equal(fs.m.get('eco-wallets\nold').payload, 'before the move', 'Firestore untouched once D1 has it');
+});
+
+test('the backup: every Firestore document into R2 under private/, gzipped, read back whole', async () => {
+  const fs = fakeFs();
+  await fs.write({}, 'eco-wallets', 'a', '{"cash":1}');
+  await fs.write({}, 'odds-open', 'b', '{"slip":2}');
+  const put = new Map();
+  const env = { DATA: { put: async (k, bytes, o) => void put.set(k, { bytes, o }) } };
+  const r = await backupToR2(env, fs, { gzip });
+  assert.equal(r.docs, 2);
+  assert.ok(BACKUP_PATH.startsWith('private/'));
+  const lines = new TextDecoder().decode(await gunzip(put.get(BACKUP_PATH).bytes)).split('\n').map(l => JSON.parse(l));
+  assert.deepEqual(lines.map(l => [l.coll, l.id, l.payload]), [['eco-wallets', 'a', '{"cash":1}'], ['odds-open', 'b', '{"slip":2}']]);
+  assert.ok(lines.every(l => l.updated));
+  assert.equal(put.get(BACKUP_PATH).o.customMetadata.docs, '2');
 });

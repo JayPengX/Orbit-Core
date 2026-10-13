@@ -172,3 +172,15 @@ export async function compareStores(env, fs) {
   }
   return out;
 }
+
+// Firestore's last copy before it goes: every document ({ coll, id,
+// payload, updated } lines), gzipped into R2 under private/ (never served by
+// /data/). Kept for good, in case anything is ever found missing in D1.
+export const BACKUP_PATH = 'private/firestore-backup.jsonl.gz';
+export async function backupToR2(env, fs, { gzip }) {
+  const lines = [];
+  for (const c of await fs.collections(env)) for (const d of await fs.list(env, c, 300)) lines.push(JSON.stringify({ coll: c, id: d.id, payload: d.payload, updated: d.updateTime }));
+  const bytes = await gzip(new TextEncoder().encode(lines.join('\n')));
+  await env.DATA.put(BACKUP_PATH, bytes, { customMetadata: { docs: String(lines.length), at: new Date().toISOString() } });
+  return { path: BACKUP_PATH, docs: lines.length, bytes: bytes.length };
+}
