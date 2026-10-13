@@ -3,7 +3,8 @@
 // read here and, where the data proxy has a trim or a cache, through its
 // route in place. Each runs as often as its data changes, and no more:
 //
-//   every hour   watch links (light: what's new), a few cutouts, the bus
+//   every hour   (until done) Shared-Data's files moved into R2 (drain.js);
+//                watch links (light: what's new), a few cutouts, the bus
 //                packs a few cities at a time once a city's is a week old
 //                (one read of index.json when none is)
 //   15 UTC       CPBL's tables and its month whole (23:00 in Taiwan, after the night's games)
@@ -24,6 +25,7 @@ import { runAsia, ASIA_HOUR } from './asia.js';
 import { runSports, SPORTS_HOUR } from './sports.js';
 import { runPhotos, runCutouts, PHOTOS_HOUR } from './photos.js';
 import { runBuses } from './buses.js';
+import { runDrain } from './drain.js';
 
 export const WINPROB_HOUR = 23;
 
@@ -40,6 +42,8 @@ export async function runBuilders(env, { proxy, now = Date.now(), log = console.
       done[name] = { failed: String(e?.message || e).slice(0, 200) };
     }
   };
+  // The move from Shared-Data: every listed file into R2 first (once; a few minutes a run).
+  if (env.RATE_LIMIT_KV) await step('drain', () => runDrain({ store, kv: env.RATE_LIMIT_KV, now, until: Date.now() + 5 * 60_000 }));
   if (hour === ASIA_HOUR) await step('asia', () => runAsia({ store, now }));
   if (hour === CPBL_HOUR) await step('cpbl', () => runCpbl({ store, now }));
   if (hour === SPORTS_HOUR) await step('sports', () => runSports({ store, now }));

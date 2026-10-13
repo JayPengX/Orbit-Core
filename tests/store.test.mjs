@@ -35,3 +35,21 @@ test('a file R2 lacks is taken from Shared-Data\'s Pages once and kept in R2; ne
   assert.equal(await s.json('nope.json'), null);
   assert.equal(await s.put('sports/watch/index.json', { checked: 3 }), false, 'the same content: nothing written');
 });
+
+test('the drain: every file the indexes list moved from Pages into R2, a run at a time, then done', async () => {
+  const { runDrain, drainList } = await import('../builders/drain.js');
+  const pages = { 'sports/index.json': { leagues: { mlb: { years: { 2026: {} } } } }, 'sports/mlb/2026.json': { events: [] }, 'sports/mlb/days.json': { days: [] }, 'index.json': { cities: { Hsinchu: {} } }, 'bus/Hsinchu.json': { v: 1 } };
+  const get = async url => {
+    const p = String(url).replace('https://jaypengx.github.io/Shared-Data/', '');
+    return pages[p] ? new Response(JSON.stringify(pages[p])) : new Response('', { status: 404 });
+  };
+  const bucket = memoryBucket();
+  const s = r2Store(bucket, { get });
+  const kv = { m: new Map(), get: async k => kv.m.get(k) ?? null, put: async (k, v) => void kv.m.set(k, v) };
+  const list = await drainList(s, Date.parse('2026-10-13T00:00:00Z'));
+  assert.ok(list.includes('sports/mlb/2026.json') && list.includes('bus/Hsinchu.json') && list.includes('sports/mlb/days.json'));
+  const r = await runDrain({ store: r2Store(bucket, { get }), kv, now: Date.parse('2026-10-13T00:00:00Z'), until: Infinity });
+  assert.equal(r.all, true);
+  for (const p of Object.keys(pages)) assert.ok(bucket.m.has(p), p);
+  assert.deepEqual(await runDrain({ store: s, kv }), { all: true });
+});
