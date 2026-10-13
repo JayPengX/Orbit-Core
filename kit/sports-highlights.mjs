@@ -352,14 +352,18 @@ export async function findHighlights(e, read, now = Date.now()) {
   if (v) keep(e, short(v));
   return v ? short(v) : null;
 }
-// Recent games over that the pack doesn't have yet (it's built every few
-// hours): looked up one at a time in the background, so a sheet opened
-// later has its video at once. Each game asked once a session.
+// Recent games over that the pack doesn't have yet: looked up one at a time
+// in the background, so a sheet opened later has its video at once. Each
+// game asked once a session, and only until two hours after it (five from its
+// start): the pack is built every hour (the proxy's builders/watch.js), so
+// later the pack has it and a phone's own search would only spend the
+// proxy's requests.
+export const PREFETCH_MS = 5 * 3_600_000;
 const asked = new Set();
 let queue = Promise.resolve();
 export function prefetchHighlights(events, read, now = Date.now()) {
   for (const e of events || []) {
-    if (e?.status?.state !== 'post' || e.status.void || now - Date.parse(e.start) > 36 * 3_600_000) continue;
+    if (e?.status?.state !== 'post' || e.status.void || now - Date.parse(e.start) > PREFETCH_MS) continue;
     const key = watchKey(e);
     if (asked.has(key) || knownHighlights(e)) continue;
     asked.add(key);

@@ -24,6 +24,7 @@
 
 import { json } from './http.js';
 import { sessionLimited } from './quadra-token.js';
+import { sha256, gunzip } from './builders/store.js';
 
 export const PAGES = 'https://jaypengx.github.io/Shared-Data/';
 const TYPES = { json: 'application/json', gz: 'application/gzip', txt: 'text/plain; charset=utf-8', html: 'text/html; charset=utf-8' };
@@ -131,7 +132,9 @@ async function push(request, env, ctx, headers) {
       await env.DATA.delete(path);
       gone++;
     } else {
-      await env.DATA.put(path, f.bytes, { httpMetadata: { contentType: typeOf(path) } });
+      // (Its sum as builders/store.js keeps it: a builder writing the same leaves it.)
+      const meant = f.bytes[0] === 0x1f && f.bytes[1] === 0x8b ? await gunzip(f.bytes) : f.bytes;
+      await env.DATA.put(path, f.bytes, { httpMetadata: { contentType: typeOf(path) }, customMetadata: { sha256: await sha256(meant) } });
       put++;
     }
     purge.push(path);

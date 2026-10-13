@@ -177,13 +177,23 @@ export function eltaOf(episodes, e, sides, vod) {
   return eps.length ? { v: vod, eps } : null;
 }
 
-// ---- The run ---------------------------------------------------------------------------
+// ---- The run ----------------------------------------------------------------------------
+//
+// Two kinds of run, so an hour costs only what's new:
+//   - every hour (light): the last two US days' games from ESPN and the few
+//     recent games still waiting for their highlights or ELTA's replay
+//     (sports/watch/_pending.json); only the archive months they touch are
+//     read and written;
+//   - once a day (full, the 20:00 UTC run, or when there's no pending list):
+//     the season packs' last ten days and every kept season's games, ELTA
+//     for every game still without it, older games' highlights while the
+//     run's time lasts, the archive written whole (a season let go goes).
 //
 // `store`: builders/store.js. `proxy(url)`: a read through the data proxy's
-// route (YouTube's trims), resolving to its JSON or null. `get(url, init)`:
-// a plain fetch. `now`; `until`: when to stop looking for older games'
-// highlights (the rest is quick). Returns what it did.
-export async function runWatch({ store, proxy, get = fetch, now = Date.now(), until = now + 10 * 60_000, sleep = sleepFor }) {
+// route (YouTube's trims), its JSON or null. `get(url, init)`: a plain
+// fetch. `until`: when to stop looking for older games' highlights.
+export const FULL_HOUR = 20;
+export async function runWatch({ store, proxy, get = fetch, now = Date.now(), until = now + 10 * 60_000, sleep = sleepFor, full: fullAsked } = {}) {
   const json = async url => {
     for (let attempt = 0; ; attempt++) {
       try {
@@ -204,11 +214,11 @@ export async function runWatch({ store, proxy, get = fetch, now = Date.now(), un
   };
   const packs = new Map();
   const seasonPack = (key, y) => (packs.has(`${key}/${y}`) ? packs.get(`${key}/${y}`) : packs.set(`${key}/${y}`, store.json(`sports/${key}/${y}.json`).catch(() => null)).get(`${key}/${y}`));
+  const year = new Date(now).getUTCFullYear();
   const seasonOf = async (key, l) => {
     if (l.data === 'asia') return yearSeason(await asiaMonth(asiaMonthOf(now)), now);
-    const y = new Date(now).getUTCFullYear();
     const events = [];
-    for (const year of [y - 1, y, y + 1]) events.push(...((await seasonPack(key, year))?.events || []));
+    for (const y of [year - 1, year, year + 1]) events.push(...((await seasonPack(key, y))?.events || []));
     return seasonState(await json(`${SITE}/${l.espn}/scoreboard`).catch(() => null), events, now);
   };
   const seasonGames = async (key, l, season) => {
@@ -218,15 +228,14 @@ export async function runWatch({ store, proxy, get = fetch, now = Date.now(), un
       return asiaGames((await Promise.all(months.map(asiaMonth))).flat());
     }
     const out = [];
-    const y = new Date(now).getUTCFullYear();
-    for (const year of [y - 1, y, y + 1]) {
-      const pack = await seasonPack(key, year);
+    for (const y of [year - 1, year, year + 1]) {
+      const pack = await seasonPack(key, y);
       const post = new Map((pack?.events || []).map(ev => [String(ev.id), ev.season?.type === 3 || /post|playoff|play-in/i.test(ev.season?.slug || '')]));
       for (const g of espnGames(pack, key)) out.push({ ...g, post: post.get(g.id.split('~')[0]) || false });
     }
     return out.filter(g => Date.parse(g.start) < now && keeps(season, Date.parse(g.start)));
   };
-  // ELTA.tv's sports index and a season page whole (straight from ELTA; the proxy's keeps the newest 120).
+  // ELTA.tv: a page's text, straight from ELTA (a season page whole; the proxy's keeps its newest 120).
   const eltaText = async url => {
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
@@ -240,19 +249,24 @@ export async function runWatch({ store, proxy, get = fetch, now = Date.now(), un
   const eltaSeason = async vod => {
     const html = await eltaText(eltaVodUrl(vod));
     const eps = html ? trimEltaVod(html, Infinity).episodes : [];
-    return eps.length ? eps : ((await proxy(eltaVodUrl(vod)).catch(() => null))?.episodes || []);
+    return eps.length ? eps : (await proxy(eltaVodUrl(vod)).catch(() => null))?.episodes || [];
   };
   const read = url => proxy(url);
-
   const leagues = Object.keys(BROADCAST).filter(k => CATALOG[k]);
+  const has = x => typeof x?.elta === 'object';
   const old = (await store.json('sports/watch.json'))?.games || {};
-  // Every recent game over: ESPN's leagues day by day (US days, from ten days back), CPBL's from its months.
-  const days = Array.from({ length: Math.ceil(KEEP / DAY) + 1 }, (_, i) => usDate(now - i * DAY));
+  const pending = await store.json(`${ARCHIVE}/_pending.json`);
+  const full = fullAsked ?? (!pending || new Date(now).getUTCHours() === FULL_HOUR);
+
+  // The recent games over: ESPN for the last two US days; the rest of ten
+  // days from the season packs (full) or the pending list (hourly).
+  const days = [usDate(now), usDate(now - DAY)];
   const games = [];
   for (const key of leagues) {
     const l = CATALOG[key];
     if (l.data === 'asia') {
-      games.push(...asiaGames((await Promise.all([...new Set([now, now - KEEP].map(asiaMonthOf))].map(asiaMonth))).flat()));
+      const months = full ? [...new Set([now, now - KEEP].map(asiaMonthOf))] : [asiaMonthOf(now)];
+      games.push(...asiaGames((await Promise.all(months.map(asiaMonth))).flat()));
       continue;
     }
     if (l.data !== 'espn' || !l.espn) continue;
@@ -260,31 +274,49 @@ export async function runWatch({ store, proxy, get = fetch, now = Date.now(), un
       games.push(...espnGames(await json(`${SITE}/${l.espn}/scoreboard`).catch(() => null), key));
       continue;
     }
-    for (const d of days) games.push(...espnGames(await json(`${SITE}/${l.espn}/scoreboard?dates=${d}`).catch(() => null), key));
+    const fresh = [];
+    for (const d of days) fresh.push(...espnGames(await json(`${SITE}/${l.espn}/scoreboard?dates=${d}`).catch(() => null), key));
+    const ids = new Set(fresh.map(g => g.id));
+    if (full) for (const y of [year - 1, year]) games.push(...espnGames(await seasonPack(key, y), key).filter(g => !ids.has(g.id) && now - Date.parse(g.start) < KEEP));
+    games.push(...fresh);
   }
-  const recent = games.filter(e => now - Date.parse(e.start) < KEEP && Date.parse(e.start) < now);
+  if (!full) for (const g of pending?.games || []) if (!games.some(x => x.league === g.league && x.id === g.id)) games.push(g);
+  const recent = [...new Map(games.filter(e => now - Date.parse(e.start) < KEEP && Date.parse(e.start) < now).map(e => [HL.watchKey(e), e])).values()];
   const out = {};
   for (const e of recent) {
     const k = HL.watchKey(e);
     if (old[k]) out[k] = old[k];
   }
-  // The archive as it is.
+
+  // The archive: every month (full), else the months the recent games are in.
   const index = await store.json(`${ARCHIVE}/index.json`);
   const archive = new Map();
-  for (const [key, { months = [] } = {}] of Object.entries(index?.leagues || {})) {
-    const list = new Map();
-    for (const m of months) for (const [k, v] of Object.entries((await store.json(`${ARCHIVE}/${key}/${m}.json`))?.games || {})) list.set(k, v);
-    archive.set(key, list);
+  const loaded = new Set();
+  const loadMonth = async (key, m) => {
+    if (loaded.has(`${key}/${m}`) || !index?.leagues?.[key]?.months?.includes(m)) return;
+    loaded.add(`${key}/${m}`);
+    if (!archive.has(key)) archive.set(key, new Map());
+    for (const [k, v] of Object.entries((await store.json(`${ARCHIVE}/${key}/${m}.json`))?.games || {})) archive.get(key).set(k, v);
+  };
+  if (full) for (const [key, { months = [] } = {}] of Object.entries(index?.leagues || {})) for (const m of months) await loadMonth(key, m);
+  else for (const e of recent) await loadMonth(e.league, monthOf(Date.parse(e.start)));
+  const stored = e => archive.get(e.league)?.get(HL.watchKey(e));
+  const touched = new Set();
+  const keep = (e, v) => {
+    if (!archive.has(e.league)) archive.set(e.league, new Map());
+    archive.get(e.league).set(HL.watchKey(e), { ...stored(e), t: Date.parse(e.start), ...v });
+    touched.add(`${e.league}/${monthOf(Date.parse(e.start))}`);
+  };
+  if (full) {
+    if ((index?.checked || 0) < CHECKED) for (const k of Object.keys(out)) if (TIMED.has(k.split(':')[0])) delete out[k].hl;
+    recheck(archive, index?.checked || 0, key => CATALOG[key]?.sport === 'soccer');
+    for (const [id, list] of shared(archive)) shareOut(archive, id, list, Date.parse((await read(`${HL.YT}/watch?v=${id}`).catch(() => null))?.published || ''));
   }
-  // A rule fixed since: the recent pack's highlights of those leagues looked for again too.
-  if ((index?.checked || 0) < CHECKED) for (const k of Object.keys(out)) if (TIMED.has(k.split(':')[0])) delete out[k].hl;
-  recheck(archive, index?.checked || 0, key => CATALOG[key]?.sport === 'soccer');
-  for (const [id, list] of shared(archive)) shareOut(archive, id, list, Date.parse((await read(`${HL.YT}/watch?v=${id}`).catch(() => null))?.published || ''));
 
   // Highlights: each recent game not yet found, four days at most after it (one search at a time: the proxy's pace).
   let found = 0;
   let failed = 0;
-  const todo = recent.filter(e => !out[HL.watchKey(e)]?.hl && now - Date.parse(e.start) < HL_DAYS);
+  const todo = recent.filter(e => !out[HL.watchKey(e)]?.hl && !stored(e)?.hl && now - Date.parse(e.start) < HL_DAYS);
   for (const e of todo) {
     try {
       const v = await HL.findHighlights(e, read, now);
@@ -295,36 +327,43 @@ export async function runWatch({ store, proxy, get = fetch, now = Date.now(), un
     }
   }
 
-  // The season's games, league by league.
+  // The kept seasons' games (full only).
   const seasons = new Map();
   const season = [];
-  for (const key of leagues) {
-    const l = CATALOG[key];
-    if (!(l.data === 'asia' || (l.data === 'espn' && l.espn))) continue;
-    const s = await seasonOf(key, l);
-    seasons.set(key, s);
-    season.push(...(await seasonGames(key, l, s).catch(() => [])));
-  }
-  const stored = e => archive.get(e.league)?.get(HL.watchKey(e));
-  const keep = (e, v) => {
-    if (!archive.has(e.league)) archive.set(e.league, new Map());
-    archive.get(e.league).set(HL.watchKey(e), { ...stored(e), t: Date.parse(e.start), ...v });
-  };
+  if (full)
+    for (const key of leagues) {
+      const l = CATALOG[key];
+      if (!(l.data === 'asia' || (l.data === 'espn' && l.espn))) continue;
+      const s = await seasonOf(key, l);
+      seasons.set(key, s);
+      season.push(...(await seasonGames(key, l, s).catch(() => [])));
+    }
 
-  // ELTA's whole game: each season page read once, every game not yet found matched as the app does.
-  const pagesIndex = await eltaText('https://eltaott.tv/sports').then(t => (t ? parseEltaIndex(t) : []));
-  const eltaSeasons = pagesIndex.length ? eltaPages(pagesIndex) : null;
-  if (pagesIndex.length) await store.put('sports/elta-pages.json', { built: new Date(now).toISOString(), pages: pagesIndex });
-  const pages = new Map();
-  let elta = 0;
+  // ELTA's whole game: a game without it looked for every hour while it's
+  // three days old (most go up within a day); older ones in the daily run.
+  // The season pages are read only for games looked for, each once a run.
   const all = [...new Map([...season, ...recent].map(e => [HL.watchKey(e), e])).values()];
-  for (const e of all) {
+  const wanted = all.filter(e => {
     const k = HL.watchKey(e);
-    const has = x => typeof x?.elta === 'object';
     if (has(out[k]) || has(stored(e))) {
       if (!has(out[k]) && out[k]) out[k].elta = stored(e).elta;
-      continue;
+      return false;
     }
+    return full || now - Date.parse(e.start) < 3 * DAY;
+  });
+  let eltaSeasons = null;
+  if (wanted.length) {
+    const pagesIndex = await eltaText('https://eltaott.tv/sports').then(t => (t ? parseEltaIndex(t) : []));
+    if (pagesIndex.length) {
+      eltaSeasons = eltaPages(pagesIndex);
+      // (Dated by the day, so a run with the same pages writes nothing.)
+      await store.put('sports/elta-pages.json', { built: new Date(now).toISOString().slice(0, 10), pages: pagesIndex });
+    }
+  }
+  const pages = new Map();
+  let elta = 0;
+  for (const e of wanted) {
+    const k = HL.watchKey(e);
     const sides = zhSides(e);
     let hit = null;
     for (const vod of eltaVodsOf(e, sides[0], eltaSeasons)) {
@@ -338,100 +377,123 @@ export async function runWatch({ store, proxy, get = fetch, now = Date.now(), un
     keep(e, { elta: hit });
   }
 
-  // Older games' highlights, the newest first, while the run's time lasts.
+  // Older games' highlights, the newest first, while the run's time lasts (full only).
   let back = 0;
-  const older = season
-    .filter(e => now - Date.parse(e.start) >= HL_DAYS && !out[HL.watchKey(e)]?.hl && !stored(e)?.hl && (stored(e)?.miss || 0) < MISSES)
-    .sort((a, b) => Date.parse(b.start) - Date.parse(a.start));
-  for (const e of older) {
-    if (Date.now() >= until) break;
-    let v;
-    try {
-      v = await HL.findHighlights(e, read, now);
-    } catch {
-      failed++;
-      await sleep(5000);
-      continue;
+  if (full) {
+    const older = season
+      .filter(e => now - Date.parse(e.start) >= HL_DAYS && !out[HL.watchKey(e)]?.hl && !stored(e)?.hl && (stored(e)?.miss || 0) < MISSES)
+      .sort((a, b) => Date.parse(b.start) - Date.parse(a.start));
+    for (const e of older) {
+      if (Date.now() >= until) break;
+      let v;
+      try {
+        v = await HL.findHighlights(e, read, now);
+      } catch {
+        failed++;
+        await sleep(5000);
+        continue;
+      }
+      if (v && stored(e)?.not?.includes(v.id)) v = null;
+      keep(e, v ? { hl: v } : { miss: (stored(e)?.miss || 0) + 1 });
+      if (v) back++;
     }
-    if (v && stored(e)?.not?.includes(v.id)) v = null;
-    keep(e, v ? { hl: v } : { miss: (stored(e)?.miss || 0) + 1 });
-    if (v) back++;
   }
 
-  // Apple TV's page of each MLS game (kept as the games are: ten days, or to come).
+  // Apple TV's page of each MLS game: once a day (its list changes slowly), kept as the games are.
   for (const [k, v] of Object.entries(old)) if (v.apple && !out[k] && now - (v.at || 0) < KEEP) out[k] = v;
   let apple = { listed: 0, matched: 0 };
-  try {
-    const appleData = async url => {
-      for (let attempt = 0; attempt < 3; attempt++) {
-        try {
-          const res = await within(30_000, signal => get(url, { headers: { 'User-Agent': SAFARI, 'Accept-Language': 'zh-TW' }, signal }));
-          if (res.ok) {
-            const m = /<script type="application\/json" id="serialized-server-data">([\s\S]*?)<\/script>/.exec(await res.text());
-            return m ? JSON.parse(m[1]) : null;
-          }
-          if (res.status === 404) return null;
-        } catch {}
-        await sleep(1500 * (attempt + 1));
-      }
-      return null;
-    };
-    const data = await appleData(APPLE_MLS);
-    if (data) {
-      const events = appleEvents(data);
-      let readPages = 0;
-      for (const x of events.values()) {
-        if ((x.start && x.teams) || !x.url || readPages >= 60) continue;
-        readPages++;
-        const page = await appleData(x.url);
-        if (page) appleEvents(page, new Map([[x.id, x]])).forEach((v, id) => id === x.id && events.set(id, v));
-      }
-      let matched = 0;
-      for (let i = -1; i <= 7; i++) {
-        const day = await json(`${SITE}/soccer/usa.1/scoreboard?dates=${usDate(now + i * DAY)}`).catch(() => null);
-        for (const ev of day?.events || []) {
-          const c = ev.competitions?.[0];
-          const teams = (c?.competitors || []).map(x => x.team?.abbreviation).filter(Boolean);
-          if (teams.length !== 2) continue;
-          const g = { id: String(ev.id), league: 'mls', kind: 'match', start: ev.date, teams };
-          const hit = appleMatch(g, events.values());
-          if (!hit?.url) continue;
-          const k = HL.watchKey(g);
-          out[k] = { ...out[k], apple: hit.url, at: Date.parse(g.start) };
-          matched++;
+  if (full)
+    try {
+      const appleData = async url => {
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            const res = await within(30_000, signal => get(url, { headers: { 'User-Agent': SAFARI, 'Accept-Language': 'zh-TW' }, signal }));
+            if (res.ok) {
+              const m = /<script type="application\/json" id="serialized-server-data">([\s\S]*?)<\/script>/.exec(await res.text());
+              return m ? JSON.parse(m[1]) : null;
+            }
+            if (res.status === 404) return null;
+          } catch {}
+          await sleep(1500 * (attempt + 1));
         }
+        return null;
+      };
+      const data = await appleData(APPLE_MLS);
+      if (data) {
+        const events = appleEvents(data);
+        let readPages = 0;
+        for (const x of events.values()) {
+          if ((x.start && x.teams) || !x.url || readPages >= 60) continue;
+          readPages++;
+          const page = await appleData(x.url);
+          if (page) appleEvents(page, new Map([[x.id, x]])).forEach((v, id) => id === x.id && events.set(id, v));
+        }
+        let matched = 0;
+        for (let i = -1; i <= 7; i++) {
+          const day = await json(`${SITE}/soccer/usa.1/scoreboard?dates=${usDate(now + i * DAY)}`).catch(() => null);
+          for (const ev of day?.events || []) {
+            const c = ev.competitions?.[0];
+            const teams = (c?.competitors || []).map(x => x.team?.abbreviation).filter(Boolean);
+            if (teams.length !== 2) continue;
+            const g = { id: String(ev.id), league: 'mls', kind: 'match', start: ev.date, teams };
+            const hit = appleMatch(g, events.values());
+            if (!hit?.url) continue;
+            const k = HL.watchKey(g);
+            out[k] = { ...out[k], apple: hit.url, at: Date.parse(g.start) };
+            matched++;
+          }
+        }
+        apple = { listed: events.size, matched };
       }
-      apple = { listed: events.size, matched };
-    }
-  } catch {}
+    } catch {}
 
-  const built = new Date(now).toISOString();
-  await store.put('sports/watch.json', { built, games: out });
-  // The season's: the recent pack's links in, each league's kept season, a month a file.
+  // The recent pack: written when it changed (`built` by the day: the same games, the same file).
+  await store.put('sports/watch.json', { built: new Date(now).toISOString().slice(0, 10), games: out });
   for (const e of all) {
     const v = out[HL.watchKey(e)];
-    if (v?.hl || v?.elta) keep(e, { ...(v.hl ? { hl: v.hl } : {}), ...(v.elta ? { elta: v.elta } : {}) });
+    if ((v?.hl && !stored(e)?.hl) || (has(v) && !has(stored(e)))) keep(e, { ...(v.hl ? { hl: v.hl } : {}), ...(has(v) ? { elta: v.elta } : {}) });
   }
-  const files = {};
-  const archiveIndex = { built, checked: CHECKED, leagues: {} };
-  let kept = 0;
-  for (const [key, list] of archive) {
+  // What's still waiting: recent games without highlights (four days) or ELTA (three).
+  const waiting = recent.filter(e => (!out[HL.watchKey(e)]?.hl && now - Date.parse(e.start) < HL_DAYS) || (!has(out[HL.watchKey(e)]) && !has(stored(e)) && now - Date.parse(e.start) < 3 * DAY));
+  const pendingFile = { games: waiting.map(({ id, league, kind, start, status, home, away, note, series, sessionKey, name, enName, official }) => ({ id, league, kind, start, status, home, away, note, series, sessionKey, name, enName, official })) };
+
+  // The archive: whole in the full run (a season let go goes), else the months touched.
+  const monthFile = (key, m) => {
     const s = seasons.get(key);
-    const months = new Map();
-    for (const [k, v] of list) {
-      // Let go: a season whose next one has begun.
-      if (s && !keeps(s, v.t)) continue;
-      const m = monthOf(v.t);
-      if (!months.has(m)) months.set(m, {});
-      months.get(m)[k] = v;
-      kept++;
+    const list = {};
+    for (const [k, v] of archive.get(key) || []) if (monthOf(v.t) === m && (!s || keeps(s, v.t))) list[k] = v;
+    return list;
+  };
+  let kept = 0;
+  if (full && (index || archive.size)) {
+    const files = {};
+    const archiveIndex = { built: new Date(now).toISOString().slice(0, 10), checked: CHECKED, leagues: {} };
+    for (const key of archive.keys()) {
+      const months = [...new Set([...archive.get(key).values()].map(v => monthOf(v.t)))].sort();
+      for (const m of months) {
+        const list = monthFile(key, m);
+        if (!Object.keys(list).length) continue;
+        files[`${ARCHIVE}/${key}/${m}.json`] = { games: list };
+        (archiveIndex.leagues[key] ||= { months: [], kept: 0 }).months.push(m);
+        archiveIndex.leagues[key].kept += Object.keys(list).length;
+        kept += Object.keys(list).length;
+      }
     }
-    if (!months.size) continue;
-    for (const [m, monthGames] of months) files[`${ARCHIVE}/${key}/${m}.json`] = { games: monthGames };
-    archiveIndex.leagues[key] = { months: [...months.keys()].sort(), kept: [...months.values()].reduce((n, x) => n + Object.keys(x).length, 0) };
+    files[`${ARCHIVE}/index.json`] = archiveIndex;
+    files[`${ARCHIVE}/_pending.json`] = pendingFile;
+    await store.replace(`${ARCHIVE}/`, files);
+  } else {
+    const idx = index || { built: '', checked: CHECKED, leagues: {} };
+    let grew = false;
+    for (const t of touched) {
+      const [key, m] = t.split('/');
+      const list = monthFile(key, m);
+      await store.put(`${ARCHIVE}/${key}/${m}.json`, { games: list });
+      const l = (idx.leagues[key] ||= { months: [], kept: 0 });
+      if (!l.months.includes(m)) (l.months = [...l.months, m].sort()), (grew = true);
+    }
+    if (grew) await store.put(`${ARCHIVE}/index.json`, idx);
+    await store.put(`${ARCHIVE}/_pending.json`, pendingFile);
   }
-  files[`${ARCHIVE}/index.json`] = archiveIndex;
-  // (Nothing of the archive read: never written over with less.)
-  if (index || kept) await store.replace(`${ARCHIVE}/`, files);
-  return { recent: recent.length, kept: Object.keys(out).length, found, looked: todo.length, failed, elta, season: kept, back, apple };
+  return { full, recent: recent.length, kept: Object.keys(out).length, found, looked: todo.length, failed, elta, eltaLooked: wanted.length, season: kept, back, apple };
 }

@@ -135,8 +135,30 @@ test('a run on R2: the recent pack written, the season\'s archive kept as it was
   }
   assert.equal(r.recent, 0);
   const pack = await store.json('sports/watch.json');
-  assert.equal(pack.built, new Date(now).toISOString());
+  assert.equal(pack.built, '2026-10-13', 'dated by the day: the same games, the same file, nothing written');
   const month = await store.json('sports/watch/mlb/2026-09.json');
   assert.deepEqual(month.games['mlb:1:'], { t, hl: { id: 'abc' } });
   assert.ok(asked.length > 0);
+});
+
+test('an hourly run reads only the last two US days from ESPN and the months its games are in; a full run is the daily one', async () => {
+  const { runWatch, FULL_HOUR } = await import('../builders/watch.js');
+  const { r2Store, memoryBucket } = await import('../builders/store.js');
+  const now = Date.parse('2026-10-13T12:00:00Z');
+  const store = r2Store(memoryBucket({ 'sports/watch/index.json': { checked: 3, leagues: { mlb: { months: ['2026-04', '2026-10'] } } }, 'sports/watch/_pending.json': { games: [] }, 'sports/watch.json': { games: {} } }));
+  const asked = [];
+  const get = async url => (asked.push(String(url)), new Response('', { status: 404 }));
+  const real = globalThis.fetch;
+  globalThis.fetch = get;
+  let r;
+  try {
+    r = await runWatch({ store, proxy: async () => null, get, now, until: now, sleep: async () => {} });
+  } finally {
+    globalThis.fetch = real;
+  }
+  assert.equal(r.full, false);
+  const days = asked.filter(u => /scoreboard\?dates=\d{8}$/.test(u)).map(u => u.slice(-8));
+  assert.deepEqual([...new Set(days)].sort(), ['20261012', '20261013']);
+  assert.ok(!asked.some(u => u.includes('eltaott.tv')), 'nothing waiting for ELTA: ELTA not read');
+  assert.equal(new Date(Date.UTC(2026, 9, 13, FULL_HOUR)).getUTCHours(), 20);
 });
