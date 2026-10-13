@@ -41,6 +41,10 @@ const DAY = 86_400_000;
 const KEEP = 10 * DAY;
 const HL_DAYS = 4 * DAY;
 const MISSES = 2;
+// Days an older game is looked for on ELTA before it's given up (ELTA puts a
+// season's videos up within a week or two, or never: its small sides).
+export const ELTA_TRIES = 10;
+export const ELTA_A_RUN = 1500;
 const ARCHIVE = 'sports/watch';
 const sleepFor = ms => new Promise(r => setTimeout(r, ms));
 const monthOf = ms => new Date(ms).toISOString().slice(0, 7);
@@ -349,8 +353,11 @@ export async function runWatch({ store, proxy, get = fetch, now = Date.now(), un
       if (!has(out[k]) && out[k]) out[k].elta = stored(e).elta;
       return false;
     }
-    return full || now - Date.parse(e.start) < 3 * DAY;
+    // (Looked for on ELTA_TRIES days and never found: never looked for again.)
+    return (full && (stored(e)?.ea || 0) < ELTA_TRIES) || now - Date.parse(e.start) < 3 * DAY;
   });
+  // (Newest first, at most ELTA_A_RUN: a run's CPU is 30 s; the rest the next days.)
+  wanted.sort((a, b) => Date.parse(b.start) - Date.parse(a.start)).splice(ELTA_A_RUN);
   let eltaSeasons = null;
   if (wanted.length) {
     const pagesIndex = await eltaText('https://eltaott.tv/sports').then(t => (t ? parseEltaIndex(t) : []));
@@ -370,7 +377,11 @@ export async function runWatch({ store, proxy, get = fetch, now = Date.now(), un
       if (!pages.has(vod)) pages.set(vod, await eltaSeason(vod));
       if ((hit = eltaOf(pages.get(vod), e, sides, vod))) break;
     }
-    if (!hit) continue;
+    if (!hit) {
+      // A game over three days without it: a day's try counted (ELTA puts up most within days).
+      if (full && now - Date.parse(e.start) >= 3 * DAY) keep(e, { ea: (stored(e)?.ea || 0) + 1 });
+      continue;
+    }
     elta++;
     if (out[k]) out[k].elta = hit;
     else if (now - Date.parse(e.start) < KEEP) out[k] = { elta: hit };
