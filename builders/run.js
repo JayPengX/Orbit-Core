@@ -1,48 +1,50 @@
-// The family's data built by the proxy (worker.js's builders cron, hourly):
-// each builder (builders/*.js) on R2 (builders/store.js), its sources read
-// here and, where the data proxy has a trim (YouTube), through its route in
-// place. What Shared-Data built on GitHub moves here one builder at a time;
-// MOVED is what it no longer touches (Shared-Data's r2sync.mjs skips them).
+// The family's data built by the proxy (worker.js's builders cron, hourly at
+// :17): each builder (builders/*.js) on R2 (builders/store.js), its sources
+// read here and, where the data proxy has a trim or a cache, through its
+// route in place. Each runs as often as its data changes, and no more:
+//
+//   every hour   watch links (light: what's new), a few cutouts
+//   15 UTC       CPBL's tables and its month whole (23:00 in Taiwan, after the night's games)
+//   16 UTC       the season packs (midnight in Taiwan)
+//   18 UTC       a few photo lists in turn (each about weekly)
+//   20 UTC       watch links in full (the season, older highlights, Apple TV)
+//   23 UTC       win probability (after the packs)
+//
+// What a finished game is (its box score, a day or month of them) isn't
+// built at all: the data proxy keeps it the first time anyone reads it
+// (sports.js). Shared-Data (GitHub) builds only the buses now (its r2sync.mjs
+// sends nothing else).
 
 import { r2Store } from './store.js';
 import { runWatch } from './watch.js';
 import { runWinprob } from './winprob.js';
 import { runCpbl, CPBL_HOUR } from './cpbl.js';
+import { runAsia, ASIA_HOUR } from './asia.js';
+import { runSports, SPORTS_HOUR } from './sports.js';
+import { runPhotos, runCutouts, PHOTOS_HOUR } from './photos.js';
 
-// The paths each moved builder owns in R2 (prefixes).
-export const MOVED = {
-  watch: ['sports/watch.json', 'sports/watch/', 'sports/elta-pages.json'],
-  winprob: ['winprob/'],
-  cpbl: ['sports/cpbl/standings.json']
-};
-// Win probability once a day, after the night's season packs are in R2
-// (Shared-Data's night build, ~20:00-21:30 UTC, until that moves here too).
 export const WINPROB_HOUR = 23;
 
 // `proxy(url, trim)`: a read through the data proxy's route (its trims and edge cache), its JSON or null.
 export async function runBuilders(env, { proxy, now = Date.now(), log = console.log } = {}) {
   if (!env.DATA) return { off: 'no data bucket' };
   const store = r2Store(env.DATA);
+  const hour = new Date(now).getUTCHours();
   const done = {};
-  // Every hour: watch links (YouTube's highlights within the hour of a game,
-  // ELTA's replays, Apple TV's MLS pages); older games' highlights for 10 minutes.
-  try {
-    done.watch = await runWatch({ store, proxy, now, until: now + 10 * 60_000 });
-  } catch (e) {
-    done.watch = { failed: String(e?.message || e).slice(0, 200) };
-  }
-  if (new Date(now).getUTCHours() === WINPROB_HOUR)
+  const step = async (name, fn) => {
     try {
-      done.winprob = await runWinprob({ store, proxy, now });
+      done[name] = await fn();
     } catch (e) {
-      done.winprob = { failed: String(e?.message || e).slice(0, 200) };
+      done[name] = { failed: String(e?.message || e).slice(0, 200) };
     }
-  if (new Date(now).getUTCHours() === CPBL_HOUR)
-    try {
-      done.cpbl = await runCpbl({ store, now });
-    } catch (e) {
-      done.cpbl = { failed: String(e?.message || e).slice(0, 200) };
-    }
+  };
+  if (hour === ASIA_HOUR) await step('asia', () => runAsia({ store, now }));
+  if (hour === CPBL_HOUR) await step('cpbl', () => runCpbl({ store, now }));
+  if (hour === SPORTS_HOUR) await step('sports', () => runSports({ store, now }));
+  if (hour === PHOTOS_HOUR) await step('photos', () => runPhotos({ store, proxy, now }));
+  await step('watch', () => runWatch({ store, proxy, now, until: now + 10 * 60_000 }));
+  if (hour === WINPROB_HOUR) await step('winprob', () => runWinprob({ store, proxy, now }));
+  await step('cutouts', () => runCutouts({ store, now }));
   done.store = store.stats;
   log('builders', JSON.stringify(done));
   return done;
