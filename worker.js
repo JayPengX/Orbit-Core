@@ -1298,6 +1298,15 @@ export default {
       const copied = JSON.parse((await env.RATE_LIMIT_KV?.get('store:copied').catch(() => null)) || 'null');
       return json({ mode: env.STORE_MODE, copied, compare: await compareStores(env, FS) }, 200, headers);
     }
+    // A builder's job now (builders/run.js), by hand: Bearer DATA_PUSH_SECRET
+    // (Shared-Proxy's build.yml). ?job=watch|drain|cutouts|buses, or
+    // ?only=asia|cpbl|sports|photos|winprob; &full=1 a full watch run.
+    if (path === '/data/build' && request.method === 'POST') {
+      if (!env.DATA_PUSH_SECRET || request.headers.get('Authorization') !== `Bearer ${env.DATA_PUSH_SECRET}`) return errorJson('FORBIDDEN_ORIGIN', 403, headers, request);
+      const q = new URL(request.url).searchParams;
+      const r = await runBuilders(env, { proxy: builderProxy(env), job: q.get('job') || undefined, only: q.get('only') || undefined, full: q.get('full') === '1' ? true : undefined, now: Date.now() });
+      return json(r, 200, headers);
+    }
     // The family's data, kept in R2 (data.js): packs, the mirror, bus packs.
     if (path.startsWith('/data/')) return handleData(request, env, ctx, headers, ip, path);
     // The developer settings (kit/devconfig.mjs), for every app and the
