@@ -875,6 +875,13 @@ are set with `wrangler secret put` or the dashboard.
 | quota-guard | `CF_GUARD_TOKEN` (from the repo secret), `CF_ACCOUNT_ID` (from `CLOUDFLARE_ACCOUNT_ID`), `RATE_LIMIT_KV`, cron `*/5 * * * *` | Reading the bill, stopping the proxies (§8.1) |
 | orbit-workers-proxy | `DATA` (R2 `quadra-data`, made and bound by `deploy.yml` once R2 is on), `DATA_PUSH_SECRET` (from the repo secret) | The family's data (§4.7) |
 
+**The Pass's store on D1 (the owner, once).** The deploy token
+(`CLOUDFLARE_API_TOKEN`, GitHub's secret) needs to make the D1 database:
+Cloudflare dashboard → My Profile → API Tokens → the token the deploys use →
+Edit → add **Account · D1 · Edit** → Continue → Update token. Then Actions →
+Deploy Cloudflare Worker → Run workflow: the deploy makes `quadra-store`,
+binds it, and the proxy copies the Pass into it (dual mode).
+
 **Arming the guard (the owner, once).**
 1. Cloudflare dashboard → My Profile → API Tokens → Create Token → Custom
    token. Name it `quota-guard`. Permissions: **Account · Account
