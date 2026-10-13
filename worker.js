@@ -1211,8 +1211,9 @@ const priceReads = env => ({
     if (!res.ok) throw new Error(`proxy ${res.status}`);
     return res.json();
   },
+  // The family's data, read in place (data.js: R2, else Pages while moving).
   pack: async path => {
-    const res = await fetch(`https://jaypengx.github.io/Shared-Data/${path}`, { signal: AbortSignal.timeout(15_000) });
+    const res = await handleData(new Request(`https://orbit-workers-proxy.quadra/data/${path}`), env, inPlace, {}, 'worker', `/data/${path}`);
     if (!res.ok) throw new Error(`pack ${res.status}`);
     return res.json();
   }

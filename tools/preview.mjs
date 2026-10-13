@@ -523,7 +523,7 @@ if (!live) await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.worker
   const res = await handleTransit(new Request(req.url()), transitEnv, cors, u.pathname, { session: { s: 'preview' }, fetchFn, cache: null });
   await route.fulfill({ status: res.status, contentType: 'application/json', headers: cors, body: await res.text() });
 });
-await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(?!weather|push|transit|sports-proxy)/, async route => {
+await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(?!weather|push|transit|sports-proxy|data\/)/, async route => {
   const req = route.request();
   const body = req.postDataJSON?.() || {};
   // Quadra Play's slips (settle.js): placing checks every pick's price on
@@ -547,7 +547,7 @@ await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(?!
     if (body.op === 'place') {
       const { checkSlip, useReads } = await import('../price.js');
       const { cleanSlip } = await import('../settle.js');
-      const reads = { read: async url => { const x = await upstream(url); if (x.status !== 200) throw new Error(String(x.status)); return JSON.parse(x.body); }, pack: async path => JSON.parse((await curlText(`https://jaypengx.github.io/Shared-Data/${path}`)) || 'null') };
+      const reads = { read: async url => { const x = await upstream(url); if (x.status !== 200) throw new Error(String(x.status)); return JSON.parse(x.body); }, pack: async path => JSON.parse((await curlText(`https://orbit-workers-proxy.pengzjay.workers.dev/data/${path}`)) || 'null') };
       const once = useReads(reads);
       const slips = (body.slips || []).map(cleanSlip);
       reply = { placed: slips.map(x => x?.id) };
@@ -624,6 +624,12 @@ await context.route(/^https:\/\/(?!orbit-workers-proxy|sports-proxy)/, async rou
   const magic = body.subarray(0, 4).toString('hex');
   const type = magic === '89504e47' ? 'image/png' : magic.startsWith('ffd8') ? 'image/jpeg' : /\.svg/.test(url) ? 'image/svg+xml' : /\.png/.test(url) ? 'image/png' : /\.jpe?g/.test(url) ? 'image/jpeg' : /\.css|fonts\.googleapis/.test(url) ? 'text/css' : /\.m?js/.test(url) ? 'text/javascript' : 'application/octet-stream';
   await route.fulfill({ status: 200, contentType: type, body });
+});
+// The family's data (the proxy's /data/, R2): the real files, as a phone reads them.
+await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/data\//, async route => {
+  const body = await curlBin(route.request().url());
+  if (!body) return route.fulfill({ status: 404, headers: { 'Access-Control-Allow-Origin': '*' }, body: '' });
+  await route.fulfill({ status: 200, contentType: /\.gz$/.test(route.request().url()) ? 'application/gzip' : 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body });
 });
 
 if (serve) {
