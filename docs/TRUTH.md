@@ -381,9 +381,10 @@ On top of them, **apps put live knowledge over slower copies** (§8).
 - **Limits are each app's**, never shared by the family: Sports, Play and
   Securities share the data proxy, and one left open in the background
   never uses up another's minute (the kit says which app asks).
-- **A Worker call has 50 fetches**, a batch's items all share them, and one
+- **A Worker call has 10,000 fetches** (the $5 plan; 50 before), a batch's
+  24 items all share them and six connections, and one
   item that throws is that item's failure, never the batch's. A slow item
-  answers 504 at 3 s so it can't hold eleven others.
+  answers 504 at 3 s so it can't hold the others.
 - **A burst never breaks the rest.** Read what a view needs, not every day
   of a season (a playoff bracket reads back a week at a time); an answer
   of "too many" is never asked again at once. Clicking through every view

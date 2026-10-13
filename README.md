@@ -191,7 +191,7 @@ door: it uses its saved fixtures.
 - the capacity check, every 6 hours at :20.
 
 **The odd minutes** (`1-59/2 * * * *`, `SETTLE_CRON`, an invocation of its
-own: its own 50 fetches and CPU): Quadra Play's slips that are due (§3.1).
+own: its own fetches and CPU): Quadra Play's slips that are due (§3.1).
 
 ### 3.1 `/kambi` and `/play`
 
@@ -384,13 +384,14 @@ own key:
 | (F1 page) | formula1.com's grids |
 
 **Batches.** `?batch=1&u=<url>&u=<url>…` (each optionally
-`<trim>!<url>`) answers many reads in one request. The kit sends up to 12
+`<trim>!<url>`) answers many reads in one request. The kit sends up to 24
 reads made within milliseconds of each other as one batch, because the
-plan bills per request and a first paint asks for a dozen lists.
+plan bills per request and a first paint asks for about 28 lists.
 - An item not answered within about 3 s is answered as a failure, so one
   slow upstream never holds the rest.
 - An item that throws answers `{"s":500,"e":…}` for itself alone.
-- A Worker call has 50 fetches, shared by the batch's items.
+- A Worker call has 10,000 fetches (the $5 plan), shared by the batch's
+  items; six connections are open at once.
 
 ### 4.3 The gate and the limits
 
@@ -474,7 +475,7 @@ events). It negotiates, subscribes, takes the first full state, and closes.
 
 **The lap log.** F1's archive has a session only an hour or more after it
 ends, and the live feed has only the current lap. So the Durable Object
-`F1Log` (SQLite, free plan) keeps every car's laps:
+`F1Log` (SQLite) keeps every car's laps:
 - a cron runs every minute Thursday to Monday UTC
   (`* * * * SUN,MON,THU,FRI,SAT`);
 - while `liveSession(index)` finds a session started and not archived, it

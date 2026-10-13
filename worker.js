@@ -1396,9 +1396,9 @@ export default {
     // The bill's guard: its clock woken (started if it isn't).
     if (event.cron !== SETTLE_CRON && tick.getUTCMinutes() % 10 === 0 && env.GUARD) ctx.waitUntil(env.GUARD.fetch('https://quota-guard/tick').catch(() => {}));
     // Odd minutes: Quadra Play's slips whose games should be over (settle.js),
-    // in an invocation of its own (its own 50 fetches and CPU).
+    // in an invocation of its own (its own fetches and CPU).
     if (event.cron === SETTLE_CRON) {
-      // (Every fourth minute the lottery's tickets instead, lotto.js: each run its own 50 fetches.)
+      // (Every fourth minute the lottery's tickets instead, lotto.js: each run its own fetches.)
       const tickets = new Date(event.scheduledTime || Date.now()).getUTCMinutes() % 4 === 3;
       if (env.FIREBASE_PROJECT_ID && env.FIREBASE_CLIENT_EMAIL && env.FIREBASE_PRIVATE_KEY)
         ctx.waitUntil(

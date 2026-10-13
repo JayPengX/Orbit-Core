@@ -264,10 +264,10 @@ const TSDB = TSDB_DAY;
 
 // The days of the month from `from` up to two weeks ahead, each day's list
 // kept 10 minutes at Cloudflare's edge (TheSportsDB's free key is rate-limited).
-// At most TSDB_DAYS of them, the nearest to now first: a Worker call may make
-// 50 fetches in all, and a batch asking for three months (each a page and up
-// to a month of days) went over, failing every one; TheSportsDB also turns a
-// burst away. A day over (two back) is kept a week at the edge, not 10 minutes.
+// At most TSDB_DAYS of them, the nearest to now first: TheSportsDB's free
+// key turns a burst away, and a batch asks for three months at once (on the
+// free plan its 50 fetches a call set this too; the $5 plan's 10,000 don't,
+// and two days back to two weeks ahead, all CPBL's own list ever lacks, fit). A day over (two back) is kept a week at the edge, not 10 minutes.
 const TSDB_DAYS = 16;
 // `work` on each item, `n` at a time; the answers in the items' order.
 async function inTurns(items, n, work) {
