@@ -367,7 +367,7 @@ const HEALTH = [
   ['Polymarket', 'https://gamma-api.polymarket.com/events?limit=1&closed=false', 'Play、Sports：預測市場機率'],
   ['OpenF1', 'https://api.openf1.org/v1/sessions?session_key=latest', 'Sports、Play：F1 賽段、勝率'],
   ['NLSC 地點', 'https://api.nlsc.gov.tw/other/TownVillagePointQuery1/121.5645/25.0341', 'Weather、Transit：所在的鄉鎮'],
-  ['Shared-Data', 'https://jaypengx.github.io/Shared-Data/sports/nba/days.json', '所有 App：每晚建好的資料'],
+  ['資料（R2）', 'https://orbit-workers-proxy.pengzjay.workers.dev/data/sports/nba/days.json', '所有 App：每晚建好的資料'],
   ['台灣彩券', 'https://api.taiwanlottery.com/TLCAPIWeB/Lottery/LatestResult', 'Play 彩券：開獎號碼、對獎']
 ];
 
