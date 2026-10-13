@@ -10,6 +10,29 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
 
 
 
+## Transit: YouBike by the walk there on the streets (2026-10-13, pushed to `main`)
+
+The owner, by 新竹縣體育場: the plan walked them 670 m to 成功國中 and back
+(its walk said 4′, the straight line's guess). Stations were chosen by the
+straight line; the stadium's block is in the way. Now the planner asks the
+walks from each end to its five nearest stations before choosing
+(`planner streetWalks`, `plan.mjs useStreetWalks`), and the walks it builds
+take them. With real walks alone it took 光明九路停車場 (511 m) to save some
+riding (the owner's 竹東 rule): in a station's choice a walk past 5 minutes
+now counts double. Live: 新竹縣體育場 151 m, 成功國中 489, 光明九路 511.
+
+A walk is now the shorter of Google's and OpenStreetMap's (`api walksTo`;
+OpenStreetMap's table, one ask, its snapping metres added back): a router
+misses paths, never makes one up (Google 210 to 成功國中 where OSM went 485;
+OSM 419 into 縣體育場 where Google went 748 to an entrance). OSM's free
+server sometimes stalls (8 s): then Google's, kept, so walks still agree.
+
+Batch (22 trips, the code before against this, at one moment): every trip
+into 縣體育場 walks 5′ at the end (3′ was the straight line into the grounds);
+竹中站 → 巨城 leaves the bike at 遠東巨城 (SOGO before); 高鐵新竹 → 清大 one
+plan 走2′ → 走6′ (both routers miss the indoor walkway to 六家's YouBike:
+624 m); the rest a minute's walk either way. Verdicts unchanged.
+
 ## Transit: Apple Maps for a walk or a ride; search a chain nearest first (2026-10-13, pushed to `main`)
 
 The owner: Apple Maps beside Google for a walk or a ride, chosen in 我的 →
