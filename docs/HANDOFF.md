@@ -10,6 +10,16 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
 
 
 
+## Sports: MLB's batting orders and probable pitchers tappable (2026-10-14, pushed to `main`)
+
+The owner: 打序 / 先發 players weren't clickable. MLB's own list (where the
+batting orders come from) names no ESPN player, so `lineupCard` drew them as
+plain text. `pregameLineups` now matches each name to the team's ESPN roster
+(`lineups.mjs byRosterName`, a Jr. on one side only still matches), as the
+live box score already did. Live: 435 of 440 over five days (the rest off
+their roster since), today 22 of 22; a tap opened Steven Kwan's page.
+Checked in Chromium at 375 px (no WebKit in this container).
+
 ## Securities' orders filled by the proxy (2026-10-14, pushed to `main`)
 
 The owner: "Play settles and fills by proxy, so Securities should follow".
