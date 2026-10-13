@@ -49,8 +49,8 @@ Each one states its before and after numbers.
 - [x] Fixed: the guard didn't start (its entry file exported constants).
 - [x] Fixed: every proxy push redeployed the guard and re-registered its
       cron, so it never ran. It now deploys only when its own files change.
-- [ ] Confirm the first real reading at `/guard`: the token reads the bill
-      and the CPU field is accepted.
+- [ ] Confirm the first real reading at `/guard`. Its cron hasn't fired
+      yet; investigating with live logs.
 - [ ] You: check the plan renews on the 13th, and add a $5.01 budget alert.
 
 ## 2. One proxy (done)
@@ -61,32 +61,50 @@ Each one states its before and after numbers.
       shared cache in Taipei.
 - [ ] Remove the `sports-proxy` forwarder after a quiet week in its logs.
 
-## 3. Shared-Data → R2, then the repo removed
-- [x] R2 switched on; bucket `quadra-data` (Asia-Pacific) created and bound.
+## 3. Shared-Data → Cloudflare, then the repo removed
+- [x] R2 switched on (you); bucket `quadra-data` (Asia-Pacific) created and
+      bound.
 - [x] The guard counts R2's own allowance: 10 GB stored, 1M writes and 10M
       reads a month.
 - [x] `/data/…` route (`data.js`): edge cache, then R2, then Pages while
-      moving. Builders write through `/data/push` and `/data/_list`.
+      moving.
 - [ ] **Copy the last build's whole site into R2 as-is**, asking no source
-      again (`Shared-Data/r2sync.mjs`, the run named "r2"). Running.
-- [ ] Every Shared-Data build syncs only what changed into R2.
-- [x] The kit's `packJson`, and Transit's bus packs, shapes and
-      where.json, read from `/data/`. Phones keep their saved copies.
-- [ ] Move the builders into the proxy's crons one at a time, each checked
-      against GitHub's output first:
-      `watch` → `winprob` → `cpbl` → `sports` + `season` → `mirror` →
-      `asia` → photos (`official-photos`, `cutouts`) → buses (`build`,
-      `shapes`, `where`).
-- [ ] Remove the Pages fallback, then archive and delete Shared-Data; update
-      docs and TRUTH.
+      again (`r2sync.mjs`, the run named "r2"). Still running.
+- [x] The kit's `packJson`, and Transit's bus packs, shapes and where.json,
+      read from `/data/`. Phones keep their saved copies.
+- [x] Mirror reads answered inside the data proxy (in a phone's batch).
+- [x] **Read on demand**: a finished game, a day or month all over, or a
+      past Asian month is kept in R2 the first time anyone reads it, then
+      served from there. Nothing gets prefetched that nobody opens.
+- [x] Every builder now runs in the proxy's hourly cron, each lean:
+  - [x] `watch`: hourly light run, daily full run
+  - [x] `winprob`: daily; Polymarket via the proxy's trimmed cache
+  - [x] `cpbl`: daily at 23:17 Taiwan
+  - [x] `sports` (season packs): nightly; only unsettled months read
+  - [x] `mirror`: not ported. Finished games are kept on first read; the
+        rest comes through the edge cache
+  - [x] `asia`: CPBL's whole months, the current one daily (cpbl.com.tw
+        refuses servers, Taiwan's included)
+  - [x] photos: four lists a day in turn, cutouts 20 an hour; NBA stays as
+        is (your call)
+  - [x] buses: a city weekly, TDX read in small pages to fit the Worker's
+        memory
+- [x] Docs and TRUTH updated
+- [ ] See the first hourly builders' run on Cloudflare (16:17 UTC)
+- [ ] Confirm the copy finished, then switch off Shared-Data's last workflow
+- [ ] **You:** OK to delete the Shared-Data repo (can't be undone)
+- [ ] Remove the Pages fallback in `data.js` once the repo's gone
 
 ## 4. Firebase (Firestore) → D1, then Firebase abandoned
-- [ ] The guard counts D1 first: rows read, rows written, storage.
-- [ ] Put the store's functions in `worker.js` (`firestoreGet/Write/List/
-      Batch/Delete/Collections`) behind one interface: D1 underneath,
-      Firestore only for the move.
-- [ ] Copy every document (wallets, each app's data, Play's slips, config,
-      the ledger) to D1 and compare them one by one; write to both briefly.
+- [x] The guard counts D1 (rows read and written, storage); each count is
+      now its own query, so one the API won't read can't blind the guard.
+- [x] Every store call goes through `doc-store.js` (D1 table, conditional
+      writes as Firestore's), tested on real SQLite.
+- [x] Dual mode on: Firestore stays in charge, every write is copied to D1,
+      and the cron copies the rest once.
+- [ ] **You:** add **Account · D1 · Edit** to the deploy token, then rerun the
+      deploy (README §11); until then the proxy stays on Firestore alone
+- [ ] Copy every document and compare them one by one (`/store/check`)
 - [ ] Read and write from D1 only. Keep a final export of every Firestore
       document in R2 as the backup.
 - [ ] **Abandon Firebase**: remove all Firestore code, the

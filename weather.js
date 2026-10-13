@@ -28,10 +28,11 @@
 //
 // Keys (Worker secrets): GOOGLE_WEATHER_KEY, CWA_KEY, MOENV_KEY.
 //
-// The Worker is on Cloudflare's Free plan (10 ms of CPU a request), so it
-// never parses CWA's national lists (~1 MB each): the station table is
-// committed (weather-stations.js) and only the nearest stations are asked
-// for. Each cell is kept in KV (`weather:cell:<lat>,<lon>`) 15 minutes;
+// The Worker never parses CWA's national lists (~1 MB each) on a request
+// (the free plan's 10 ms of CPU forbade it; on the $5 plan it would only
+// spend the month's CPU): the station table is committed
+// (weather-stations.js, `node tools/weather-stations.mjs`) and only the
+// nearest stations are asked for. Each cell is kept in KV (`weather:cell:<lat>,<lon>`) 15 minutes;
 // older but under 3 hours it's answered at once and refreshed in the
 // background. A source failing doesn't fail the answer: its last good copy
 // is used while under 6 hours old (`partial` says something is missing).
@@ -557,8 +558,9 @@ export async function kvPut(env, key, value, ttlS) {
 // ---- Kept answers: Cloudflare's cache first, KV at most hourly ----------------------
 //
 // What the Worker keeps for itself (cells, national lists, the status page)
-// goes in the Cache API, which has no daily caps. KV, whose free tier allows
-// 1,000 writes a day, gets a copy at most once an hour (`kvAt`), for the
+// goes in the Cache API, which costs nothing per write. KV (1M writes a
+// month on the $5 plan, billed past it) gets a copy at most once an hour
+// (`kvAt`), for the
 // skill cron (weather-skill.js), which reads cells from KV, and for a cache
 // that was emptied. Without a Cache API (tests) everything is written to KV.
 const edge = () => globalThis.caches?.default ?? null;

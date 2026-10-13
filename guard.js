@@ -50,7 +50,10 @@ export const PLAN = {
   doBytes: 5_000_000_000,
   r2ClassA: 1_000_000,
   r2ClassB: 10_000_000,
-  r2Bytes: 10_000_000_000
+  r2Bytes: 10_000_000_000,
+  d1RowsRead: 25_000_000_000,
+  d1RowsWritten: 50_000_000,
+  d1Bytes: 5_000_000_000
 };
 export const PLAN_ZH = {
   requests: 'Workers 請求',
@@ -64,7 +67,10 @@ export const PLAN_ZH = {
   doBytes: 'Durable Objects 儲存（位元組）',
   r2ClassA: 'R2 寫入（A 類）',
   r2ClassB: 'R2 讀取（B 類）',
-  r2Bytes: 'R2 儲存（位元組）'
+  r2Bytes: 'R2 儲存（位元組）',
+  d1RowsRead: 'D1 讀取列數',
+  d1RowsWritten: 'D1 寫入列數',
+  d1Bytes: 'D1 儲存（位元組）'
 };
 // R2's operations by class (developers.cloudflare.com/r2/pricing): reads
 // are Class B, deletes free, anything else counted as Class A (the dearer).
@@ -106,17 +112,25 @@ export function chunks(from, to, n = 7) {
 const isoDay = t => new Date(t).toISOString().slice(0, 10);
 const isoTime = t => new Date(t).toISOString().replace(/\.\d{3}Z$/, 'Z');
 
-const USE_Q = cpu => `query($a: string!, $s: Time!, $e: Time!, $ds: Date!, $de: Date!) { viewer { accounts(filter: { accountTag: $a }) {
+// Each count is its own query, so a field the API doesn't know (its schema
+// shifts) loses that count alone, never the bill: only the Workers'
+// requests and CPU are needed to watch it at all (`core`); the rest, when
+// unread, are reported (state.partial) and the stop still guards the rest.
+const WORKERS_Q = cpu => `query($a: string!, $s: Time!, $e: Time!) { viewer { accounts(filter: { accountTag: $a }) {
   w: workersInvocationsAdaptive(limit: 10000, filter: { datetime_geq: $s, datetime_leq: $e }) { sum { requests${cpu ? ' cpuTimeUs' : ''} } ${cpu ? '' : 'quantiles { cpuTimeP99 } '}dimensions { scriptName } }
-  kv: kvOperationsAdaptiveGroups(limit: 10000, filter: { date_geq: $ds, date_leq: $de }) { sum { requests } dimensions { actionType } }
-  d: durableObjectsInvocationsAdaptiveGroups(limit: 10000, filter: { date_geq: $ds, date_leq: $de }) { sum { requests } }
-  r2: r2OperationsAdaptiveGroups(limit: 10000, filter: { datetime_geq: $s, datetime_leq: $e }) { sum { requests } dimensions { actionType } }
 } } }`;
-const STORE_Q = `query($a: string!, $ds: Date!, $de: Date!, $s: Time!, $e: Time!) { viewer { accounts(filter: { accountTag: $a }) {
-  rs: r2StorageAdaptiveGroups(limit: 10000, filter: { datetime_geq: $s, datetime_leq: $e }, orderBy: [datetime_DESC]) { max { payloadSize metadataSize } dimensions { bucketName datetime } }
-  ks: kvStorageAdaptiveGroups(limit: 10000, filter: { date_geq: $ds, date_leq: $de }) { max { byteCount } dimensions { date } }
-  ds: durableObjectsStorageGroups(limit: 10000, filter: { date_geq: $ds, date_leq: $de }) { max { storedBytes } dimensions { date } }
-} } }`;
+const PART_Q = {
+  kv: `query($a: string!, $ds: Date!, $de: Date!) { viewer { accounts(filter: { accountTag: $a }) { x: kvOperationsAdaptiveGroups(limit: 10000, filter: { date_geq: $ds, date_leq: $de }) { sum { requests } dimensions { actionType } } } } }`,
+  do: `query($a: string!, $ds: Date!, $de: Date!) { viewer { accounts(filter: { accountTag: $a }) { x: durableObjectsInvocationsAdaptiveGroups(limit: 10000, filter: { date_geq: $ds, date_leq: $de }) { sum { requests } } } } }`,
+  r2: `query($a: string!, $s: Time!, $e: Time!) { viewer { accounts(filter: { accountTag: $a }) { x: r2OperationsAdaptiveGroups(limit: 10000, filter: { datetime_geq: $s, datetime_leq: $e }) { sum { requests } dimensions { actionType } } } } }`,
+  d1: `query($a: string!, $ds: Date!, $de: Date!) { viewer { accounts(filter: { accountTag: $a }) { x: d1AnalyticsAdaptiveGroups(limit: 10000, filter: { date_geq: $ds, date_leq: $de }) { sum { rowsRead rowsWritten } } } } }`
+};
+const STORE_Q = {
+  kv: `query($a: string!, $ds: Date!, $de: Date!) { viewer { accounts(filter: { accountTag: $a }) { x: kvStorageAdaptiveGroups(limit: 10000, filter: { date_geq: $ds, date_leq: $de }) { max { byteCount } dimensions { date } } } } }`,
+  do: `query($a: string!, $ds: Date!, $de: Date!) { viewer { accounts(filter: { accountTag: $a }) { x: durableObjectsStorageGroups(limit: 10000, filter: { date_geq: $ds, date_leq: $de }) { max { storedBytes } dimensions { date } } } } }`,
+  r2: `query($a: string!, $s: Time!, $e: Time!) { viewer { accounts(filter: { accountTag: $a }) { x: r2StorageAdaptiveGroups(limit: 10000, filter: { datetime_geq: $s, datetime_leq: $e }, orderBy: [datetime_DESC]) { max { payloadSize metadataSize } dimensions { bucketName datetime } } } } }`,
+  d1: `query($a: string!, $ds: Date!, $de: Date!) { viewer { accounts(filter: { accountTag: $a }) { x: d1StorageAdaptiveGroups(limit: 10000, filter: { date_geq: $ds, date_leq: $de }) { max { databaseSizeBytes } dimensions { date databaseId } } } } }`
+};
 
 async function graphql(env, fetcher, query, variables) {
   const res = await fetcher(`${API}/graphql`, {
@@ -138,55 +152,78 @@ async function graphql(env, fetcher, query, variables) {
 
 // The period's use, every count the plan bills that analytics has. CPU
 // is the sum of each invocation's own (`cpuTimeUs`); where the API lacks it,
-// each day's requests × that day's 99th-percentile CPU (more than it was).
+// each Worker's requests × its 99th-percentile CPU (more than it was).
 export async function readUse(env, fetcher, now) {
   const day = Number(env.PERIOD_DAY) || 1;
   const p = period(now, day);
-  const use = { requests: 0, cpuMs: 0, kvRead: 0, kvWrite: 0, kvDelete: 0, kvList: 0, kvBytes: 0, doRequests: 0, doBytes: 0, r2ClassA: 0, r2ClassB: 0, r2Bytes: 0 };
+  const use = { requests: 0, cpuMs: 0, kvRead: 0, kvWrite: 0, kvDelete: 0, kvList: 0, kvBytes: 0, doRequests: 0, doBytes: 0, r2ClassA: 0, r2ClassB: 0, r2Bytes: 0, d1RowsRead: 0, d1RowsWritten: 0, d1Bytes: 0 };
+  const partial = {};
   let cpuWay = 'sum';
+  const add = {
+    kv: rows => {
+      for (const r of rows) {
+        const k = { read: 'kvRead', write: 'kvWrite', delete: 'kvDelete', list: 'kvList' }[r.dimensions?.actionType];
+        if (k) use[k] += r.sum?.requests || 0;
+      }
+    },
+    do: rows => rows.forEach(r => (use.doRequests += r.sum?.requests || 0)),
+    r2: rows => {
+      for (const r of rows) {
+        const t = r.dimensions?.actionType;
+        if (!R2_FREE.has(t)) use[R2_CLASS_B.has(t) ? 'r2ClassB' : 'r2ClassA'] += r.sum?.requests || 0;
+      }
+    },
+    d1: rows => rows.forEach(r => ((use.d1RowsRead += r.sum?.rowsRead || 0), (use.d1RowsWritten += r.sum?.rowsWritten || 0)))
+  };
   for (const [s, e] of chunks(p.from, now + 60_000)) {
     const vars = { a: env.CF_ACCOUNT_ID, s: isoTime(s), e: isoTime(e), ds: isoDay(s), de: isoDay(e - 1) };
+    // The core: unread, the bill can't be watched (the run's error).
     let acc;
     try {
-      acc = await graphql(env, fetcher, USE_Q(cpuWay === 'sum'), vars);
+      acc = await graphql(env, fetcher, WORKERS_Q(cpuWay === 'sum'), vars);
     } catch (err) {
       if (!err.fields || cpuWay !== 'sum') throw err;
       cpuWay = 'p99';
-      acc = await graphql(env, fetcher, USE_Q(false), vars);
+      acc = await graphql(env, fetcher, WORKERS_Q(false), vars);
     }
     for (const r of acc.w || []) {
       const n = r.sum?.requests || 0;
       use.requests += n;
       use.cpuMs += cpuWay === 'sum' ? (r.sum?.cpuTimeUs || 0) / 1000 : (n * (r.quantiles?.cpuTimeP99 || 0)) / 1000;
     }
-    for (const r of acc.kv || []) {
-      const k = { read: 'kvRead', write: 'kvWrite', delete: 'kvDelete', list: 'kvList' }[r.dimensions?.actionType];
-      if (k) use[k] += r.sum?.requests || 0;
-    }
-    for (const r of acc.d || []) use.doRequests += r.sum?.requests || 0;
-    for (const r of acc.r2 || []) {
-      const t = r.dimensions?.actionType;
-      if (R2_FREE.has(t)) continue;
-      use[R2_CLASS_B.has(t) ? 'r2ClassB' : 'r2ClassA'] += r.sum?.requests || 0;
+    for (const [name, q] of Object.entries(PART_Q)) {
+      if (partial[name]) continue;
+      try {
+        add[name]((await graphql(env, fetcher, q, vars)).x || []);
+      } catch (err) {
+        partial[name] = String(err.message || err).slice(0, 160);
+      }
     }
   }
-  // What's stored now: the latest day's (summed over namespaces and objects).
-  const st = await graphql(env, fetcher, STORE_Q, { a: env.CF_ACCOUNT_ID, ds: isoDay(now - 2 * DAY), de: isoDay(now), s: isoTime(now - 2 * DAY), e: isoTime(now) });
-  const latest = (rows, f) => {
-    const last = rows.reduce((m, r) => (r.dimensions?.date > m ? r.dimensions.date : m), '');
-    return rows.filter(r => r.dimensions?.date === last).reduce((n, r) => n + (r.max?.[f] || 0), 0);
+  // What's stored now: each kind's latest (summed over its namespaces, objects, buckets, databases).
+  const sv = { a: env.CF_ACCOUNT_ID, ds: isoDay(now - 2 * DAY), de: isoDay(now), s: isoTime(now - 2 * DAY), e: isoTime(now) };
+  const latest = (rows, f, by = 'date') => {
+    const seen = new Map();
+    for (const r of rows) {
+      const key = by === 'date' ? '' : r.dimensions?.bucketName || r.dimensions?.databaseId || '';
+      const at = r.dimensions?.date || r.dimensions?.datetime || '';
+      if (!seen.has(key) || at > seen.get(key).at) seen.set(key, { at, rows: [] });
+      if (seen.get(key).at === at) seen.get(key).rows.push(r);
+    }
+    let n = 0;
+    for (const { rows: list } of seen.values()) for (const r of list) n += [].concat(f).reduce((m, k) => m + (r.max?.[k] || 0), 0);
+    return n;
   };
-  use.kvBytes = latest(st.ks || [], 'byteCount');
-  use.doBytes = latest(st.ds || [], 'storedBytes');
-  // Each bucket's latest size (data and metadata).
-  const seen = new Set();
-  for (const r of st.rs || []) {
-    if (seen.has(r.dimensions?.bucketName)) continue;
-    seen.add(r.dimensions?.bucketName);
-    use.r2Bytes += (r.max?.payloadSize || 0) + (r.max?.metadataSize || 0);
+  const stored = { kv: ['kvBytes', 'byteCount', 'date'], do: ['doBytes', 'storedBytes', 'date'], r2: ['r2Bytes', ['payloadSize', 'metadataSize'], 'bucket'], d1: ['d1Bytes', 'databaseSizeBytes', 'db'] };
+  for (const [name, [k, f, by]] of Object.entries(stored)) {
+    try {
+      use[k] = latest((await graphql(env, fetcher, STORE_Q[name], sv)).x || [], f, by);
+    } catch (err) {
+      partial[`${name}Bytes`] = String(err.message || err).slice(0, 160);
+    }
   }
   use.cpuMs = Math.round(use.cpuMs);
-  return { use, period: p, cpuWay };
+  return { use, period: p, cpuWay, partial };
 }
 
 // Each count's share of the plan, the largest, and what's over the stop.
@@ -247,9 +284,9 @@ export async function guardRun(env, { fetcher = fetch, now = Date.now(), kv = en
     state.error = 'CF_GUARD_TOKEN / CF_ACCOUNT_ID not set: not watching the bill';
   } else {
     try {
-      const { use, period: p, cpuWay } = await readUse(env, fetcher, now);
+      const { use, period: p, cpuWay, partial } = await readUse(env, fetcher, now);
       const j = judge(use, stopAt);
-      Object.assign(state, { use, period: p, cpuWay, share: j.share, top: j.top, projected: projected(use, p, now), error: null, blindSince: null });
+      Object.assign(state, { use, period: p, cpuWay, partial, share: j.share, top: j.top, projected: projected(use, p, now), error: null, blindSince: null });
       if (j.over.length && !prev.stopped) state.stopped = { at: now, why: j.over, periodStart: p.start, saved: {} };
       else if (prev.stopped && p.start > prev.stopped.periodStart && !j.over.length) state.restart = true;
     } catch (e) {

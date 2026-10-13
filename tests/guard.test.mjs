@@ -30,10 +30,10 @@ test('judge: any count at 90% of the plan is over', () => {
 });
 
 // A fake Cloudflare: analytics answering `use`, the Workers' addresses and crons.
-function fakeCf(use, { cpuField = true, fail = false } = {}) {
+function fakeCf(use, { cpuField = true, fail = false, d1Fail = false } = {}) {
+  const seen = new Set();
   const workers = Object.fromEntries(WORKERS.map(w => [w, { on: true, crons: w === 'sports-proxy' ? ['* * * * SUN'] : ['*/2 * * * *', '1-59/2 * * * *'] }]));
   const calls = [];
-  let first = true;
   const fetcher = async (url, init = {}) => {
     calls.push(`${init.method || 'GET'} ${url.replace(/^.*\/client\/v4/, '')}`);
     const json = b => ({ ok: true, status: 200, json: async () => b });
@@ -41,29 +41,23 @@ function fakeCf(use, { cpuField = true, fail = false } = {}) {
       if (fail) return { ok: false, status: 500, json: async () => ({}) };
       const q = JSON.parse(init.body).query;
       if (!cpuField && q.includes('cpuTimeUs')) return json({ errors: [{ message: 'unknown field "cpuTimeUs"' }] });
-      if (q.includes('kvStorage')) return json({ data: { viewer: { accounts: [{ ks: [{ max: { byteCount: use.kvBytes || 0 }, dimensions: { date: '2026-10-20' } }], ds: [], rs: [{ max: { payloadSize: use.r2Bytes || 0, metadataSize: 0 }, dimensions: { bucketName: 'quadra-data', datetime: '2026-10-20T00:00:00Z' } }, { max: { payloadSize: 1, metadataSize: 0 }, dimensions: { bucketName: 'quadra-data', datetime: '2026-10-19T00:00:00Z' } }] }] } } });
-      // Everything in the first week's piece.
-      const piece = first ? use : {};
-      first = false;
-      return json({
-        data: {
-          viewer: {
-            accounts: [
-              {
-                w: [{ sum: { requests: piece.requests || 0, cpuTimeUs: (piece.cpuMs || 0) * 1000 }, quantiles: { cpuTimeP99: 5000 }, dimensions: { scriptName: 'sports-proxy' } }],
-                kv: [{ sum: { requests: piece.kvWrite || 0 }, dimensions: { actionType: 'write' } }],
-                d: [{ sum: { requests: piece.doRequests || 0 } }],
-                r2: [
-                  { sum: { requests: piece.r2Put || 0 }, dimensions: { actionType: 'PutObject' } },
-                  { sum: { requests: piece.r2Get || 0 }, dimensions: { actionType: 'GetObject' } },
-                  { sum: { requests: 5 }, dimensions: { actionType: 'DeleteObject' } },
-                  { sum: { requests: piece.r2Odd || 0 }, dimensions: { actionType: 'SomethingNew' } }
-                ]
-              }
-            ]
-          }
-        }
-      });
+      const acc = x => json({ data: { viewer: { accounts: [x] } } });
+      // (Every count in the first week's piece.)
+      const once = kind => (seen.has(kind) ? {} : (seen.add(kind), use));
+      if (q.includes('workersInvocationsAdaptive')) {
+        const piece = once('w');
+        return acc({ w: [{ sum: { requests: piece.requests || 0, cpuTimeUs: (piece.cpuMs || 0) * 1000 }, quantiles: { cpuTimeP99: 5000 }, dimensions: { scriptName: 'sports-proxy' } }] });
+      }
+      if (q.includes('kvOperationsAdaptiveGroups')) return acc({ x: [{ sum: { requests: once('kv').kvWrite || 0 }, dimensions: { actionType: 'write' } }] });
+      if (q.includes('durableObjectsInvocationsAdaptiveGroups')) return acc({ x: [{ sum: { requests: once('do').doRequests || 0 } }] });
+      if (q.includes('r2OperationsAdaptiveGroups')) {
+        const piece = once('r2');
+        return acc({ x: [{ sum: { requests: piece.r2Put || 0 }, dimensions: { actionType: 'PutObject' } }, { sum: { requests: piece.r2Get || 0 }, dimensions: { actionType: 'GetObject' } }, { sum: { requests: 5 }, dimensions: { actionType: 'DeleteObject' } }, { sum: { requests: piece.r2Odd || 0 }, dimensions: { actionType: 'SomethingNew' } }] });
+      }
+      if (q.includes('d1AnalyticsAdaptiveGroups')) return d1Fail ? json({ errors: [{ message: 'unknown field "rowsRead"' }] }) : acc({ x: [{ sum: { rowsRead: 0, rowsWritten: once('d1').d1RowsWritten || 0 } }] });
+      if (q.includes('kvStorageAdaptiveGroups')) return acc({ x: [{ max: { byteCount: use.kvBytes || 0 }, dimensions: { date: '2026-10-20' } }] });
+      if (q.includes('r2StorageAdaptiveGroups')) return acc({ x: [{ max: { payloadSize: use.r2Bytes || 0, metadataSize: 0 }, dimensions: { bucketName: 'quadra-data', datetime: '2026-10-20T00:00:00Z' } }, { max: { payloadSize: 1, metadataSize: 0 }, dimensions: { bucketName: 'quadra-data', datetime: '2026-10-19T00:00:00Z' } }] });
+      return acc({ x: [] });
     }
     const m = /scripts\/([^/]+)\/(subdomain|schedules)$/.exec(url);
     const w = workers[m[1]];
@@ -160,7 +154,7 @@ test('the bill unreadable for 6 hours while armed: stopped (never watched blind)
 });
 
 test('the plan\'s amounts are the $5 plan\'s (developers.cloudflare.com, 2026-10-13)', () => {
-  assert.deepEqual(PLAN, { requests: 10e6, cpuMs: 30e6, kvRead: 10e6, kvWrite: 1e6, kvDelete: 1e6, kvList: 1e6, kvBytes: 1e9, doRequests: 1e6, doBytes: 5e9, r2ClassA: 1e6, r2ClassB: 10e6, r2Bytes: 10e9 });
+  assert.deepEqual(PLAN, { requests: 10e6, cpuMs: 30e6, kvRead: 10e6, kvWrite: 1e6, kvDelete: 1e6, kvList: 1e6, kvBytes: 1e9, doRequests: 1e6, doBytes: 5e9, r2ClassA: 1e6, r2ClassB: 10e6, r2Bytes: 10e9, d1RowsRead: 25e9, d1RowsWritten: 50e6, d1Bytes: 5e9 });
 });
 
 test('R2: writes Class A, reads Class B, deletes free, anything unknown counted as Class A; the bucket\'s latest size', async () => {
@@ -177,4 +171,12 @@ test('every Worker\'s entry exports only handlers and classes (anything else sto
     const m = await import(entry);
     for (const [k, v] of Object.entries(m)) assert.ok(typeof v === 'function' || (k === 'default' && typeof v === 'object'), `${entry} exports ${k}`);
   }
+});
+
+test('a count the API won\'t read loses that count alone (reported), never the bill; the rest still stops the proxy', async () => {
+  const cf = fakeCf({ requests: 9_500_000, d1RowsWritten: 1 }, { d1Fail: true });
+  const s = await guardRun(env, { fetcher: cf.fetcher, kv: fakeKv(), now: T('2026-10-20T00:00:00Z') });
+  assert.match(s.partial.d1, /rowsRead/);
+  assert.equal(s.error, null);
+  assert.deepEqual(s.stopped.why, ['requests']);
 });
