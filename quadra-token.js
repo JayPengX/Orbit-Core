@@ -1,6 +1,6 @@
 // ---- quadra-token.js ----
 // Signed Quadra Pass tokens, shared by both Workers (worker.js's /eco signs
-// them, sports-proxy-worker.js only checks them).
+// them, sports.js only checks them).
 //
 // A token is `<body>.<sig>`: body is base64url JSON, sig its HMAC-SHA256
 // under the token secret. Nothing in a token is secret (it names the

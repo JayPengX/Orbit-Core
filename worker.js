@@ -1,7 +1,7 @@
 // ---- worker.js ----
-// orbit-workers-proxy: the Quadra apps' server side (Quadra Securities,
-// Quadra Play, Orbit Sports, Orbit Words and Orbit Class). Routed by
-// path:
+// orbit-workers-proxy: the one proxy, every app's server side (Quadra
+// Securities and Play, Orbit Sports, Transit, Weather, Words and Class).
+// Routed by path, each route's work in its own file:
 //
 //   GET/POST/PATCH/DELETE /eco   the Quadra Pass: one account and one NT$
 //                                money pool for every Quadra app, and each
@@ -12,12 +12,16 @@
 //   GET/POST /push/…             notices while an app is closed (push.js)
 //   GET   /weather/…             Orbit Weather's blended forecast (weather.js)
 //   GET   /transit/…             Orbit Transit's map, places, routes and TDX data (transit.js)
+//   GET/POST /play               Quadra Play's slips placed, cashed out and settled (settle.js)
+//   GET   /sports-proxy          the data proxy for Sports, Play and Securities (sports.js)
+//   GET   /config                the developer settings
 //
-// Every route but /eco's sign-in needs a Quadra Pass session (`qt=`). The
-// Quadra Pass is the only way anything is saved.
-// Orbit Sports' /sports-proxy lives in its own Worker
-// (sports-proxy-worker.js): this one's [placement] region pin (Taiwan's,
-// gcp:asia-east1) applies to the whole script.
+// The crons (scheduled, below): notices, Kambi, the weather's scoring and
+// capacity on the even minutes; Play's slips and lottery on the odd ones; F1's
+// laps each minute Thursday to Monday. Every route but /eco's sign-in needs a
+// Quadra Pass session (`qt=`); CORS and JSON answers come from http.js. It
+// runs in Taiwan ([placement], wrangler.toml), where the people and most
+// sources are. The Quadra Pass is the only way anything is saved.
 
 import en from './locales/en.js';
 import zhTW from './locales/zh-TW.js';
@@ -34,44 +38,10 @@ import { handleWeather } from './weather.js';
 import { weatherCron, skillReport } from './weather-skill.js';
 import { handleTransit, tally } from './transit.js';
 import { readDev, capacityCron } from './eco-admin.js';
-
-const ALLOWED_ORIGINS = ['https://jaypengx.github.io'];
-
-function isAllowedOrigin(origin) {
-  return ALLOWED_ORIGINS.includes(origin) || /^http:\/\/localhost:\d+$/.test(origin || '');
-}
-
-// X-Worker-Colo carries the IATA code of the Cloudflare colo that actually
-// executed this request (request.cf.colo) on every response, successful or
-// not. Diagnostic only - this is what confirmed wrangler.toml's old
-// [placement] mode = "smart" was consistently landing this Worker's traffic
-// on Hong Kong (a colo Google's Gemini API refuses outright, unlike a
-// merely-unlucky one - see that file's own comment on why [placement] now
-// pins to an explicit region instead), and stays useful for the same reason
-// going forward: ties a future "User location is not supported" report to a
-// specific colo instead of leaving it a guess. Needs to be both set AND
-// exposed - CORS hides all response headers from browser JS by default
-// unless explicitly listed here.
-function corsHeaders(origin, colo) {
-  return {
-    'Access-Control-Allow-Origin': isAllowedOrigin(origin) ? origin : 'null',
-    'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Expose-Headers': 'X-Worker-Colo, X-Transit-Cache, X-Transit-Age',
-    // Browsers keep a preflight this long (Chrome caps it at 2 hours): the
-    // apps' JSON writes don't each cost a second Worker request.
-    'Access-Control-Max-Age': '86400',
-    'X-Worker-Colo': colo || 'unknown',
-    Vary: 'Origin'
-  };
-}
-
-function json(data, status, headers) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { ...headers, 'Content-Type': 'application/json' }
-  });
-}
+import { handleSports, sportsCron, useDevSettings } from './sports.js';
+import { isAllowedOrigin, corsHeaders, json } from './http.js';
+// The F1 lap log's Durable Object (f1-live.js), bound as F1_LOG.
+export { F1Log } from './f1-live.js';
 
 // ---- Bilingual error responses ----------------------------------------
 //
@@ -1219,8 +1189,8 @@ async function readSource(url) {
   }
 }
 // A placed slip's prices are read as Play reads them: through the sports
-// proxy (its cache and trims; the SPORTS binding, with a short session of
-// this Worker's own), the nightly packs from Shared-Data's Pages.
+// proxy (its cache and trims; this Worker's own route, with a short session
+// of its own), the nightly packs from Shared-Data's Pages.
 let priceToken = { value: '', until: 0 };
 async function sportsToken(env) {
   if (priceToken.until > Date.now() + 60_000) return priceToken.value;
@@ -1228,10 +1198,13 @@ async function sportsToken(env) {
   priceToken = { value: await signToken(await tokenSecret(env), { k: 'ses', s: 'worker:price', a: 'odds', d: 'worker', g: 0, e: until }), until };
   return priceToken.value;
 }
+// (The sports proxy is this Worker's own route: called in place, its cache
+// writes kept within this call.)
+const inPlace = { waitUntil: p => p?.catch?.(() => {}), passThroughOnException() {} };
 const priceReads = env => ({
   read: async (url, trim = '') => {
-    const ask = `https://sports-proxy.pengzjay.workers.dev/sports-proxy?url=${encodeURIComponent(url)}&app=odds${trim ? `&trim=${encodeURIComponent(trim)}` : ''}&qt=${encodeURIComponent(await sportsToken(env))}`;
-    const res = await (env.SPORTS ? env.SPORTS.fetch(ask) : fetch(ask));
+    const ask = `https://orbit-workers-proxy.quadra/sports-proxy?url=${encodeURIComponent(url)}&app=odds${trim ? `&trim=${encodeURIComponent(trim)}` : ''}&qt=${encodeURIComponent(await sportsToken(env))}`;
+    const res = await handleSports(new Request(ask), env, inPlace, {}, 'worker');
     if (!res.ok) throw new Error(`proxy ${res.status}`);
     return res.json();
   },
@@ -1247,6 +1220,21 @@ const playDeps = env => ({ ...ECO_DEPS, read: readSource, prices: priceReads(env
 
 // wrangler.toml's second cron.
 const SETTLE_CRON = '1-59/2 * * * *';
+// …and its third: the F1 lap log, each minute Thursday to Monday (UTC).
+const F1_CRON = '* * * * SUN,MON,THU,FRI,SAT';
+
+// The developer settings as GET /config answers them: kept a minute in
+// Cloudflare's cache (one read of the store a minute, however many ask).
+async function devBody(env, ctx) {
+  const key = new Request('https://orbit-config.quadra/dev');
+  const hit = await caches.default.match(key);
+  if (hit) return hit.text();
+  const body = JSON.stringify(await readDev(env, ECO_DEPS));
+  ctx.waitUntil(caches.default.put(key, new Response(body, { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=60' } })));
+  return body;
+}
+// …which the sports proxy's cache times follow (sports.js), read at most once a minute.
+useDevSettings((env, ctx) => devBody(env, ctx).then(JSON.parse));
 
 export default {
   async fetch(request, env, ctx) {
@@ -1271,14 +1259,14 @@ export default {
       return path === '/gemini' ? handleGeminiRequest(request, env, headers, ip, ctx, session) : handleNlEditRequest(request, env, headers, ip, ctx, session);
     }
     if (path === '/eco') return handleEcoRequest(request, env, headers, ip, ECO_DEPS);
+    // The data proxy for Sports, Play and Securities (sports.js): its own
+    // session gate and per-app limits.
+    if (path === '/sports-proxy') return handleSports(request, env, ctx, headers, ip);
     // The developer settings (kit/devconfig.mjs), for every app and the
     // sports proxy: kept a minute in Cloudflare's cache (one read of the
     // store a minute, however many ask).
     if (path === '/config' && request.method === 'GET') {
-      const key = new Request('https://orbit-config.quadra/dev');
-      const hit = await caches.default.match(key);
-      const body = hit ? await hit.text() : JSON.stringify(await readDev(env, ECO_DEPS));
-      if (!hit) ctx.waitUntil(caches.default.put(key, new Response(body, { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=60' } })));
+      const body = await devBody(env, ctx);
       return new Response(body, { headers: { ...headers, 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=60' } });
     }
     if (path === '/kambi') {
@@ -1334,6 +1322,8 @@ export default {
   // and the latest score of each Kambi match Quadra Sportsbook has bets on
   // (kambi.js).
   async scheduled(event, env, ctx) {
+    // F1's laps while a session runs (sports.js, f1-live.js).
+    if (event.cron === F1_CRON) return ctx.waitUntil(sportsCron(env, event.scheduledTime || Date.now()));
     // Odd minutes: Quadra Play's slips whose games should be over (settle.js),
     // in an invocation of its own (its own 50 fetches and CPU).
     if (event.cron === SETTLE_CRON) {

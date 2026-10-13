@@ -206,10 +206,10 @@ picks, Play's odds and 為你推薦) goes through these steps, in order:
   and no pass (a session's limit per address), so any upstream the proxy
   reads can be read from a terminal, the owner's Mac included, where some
   (Polymarket) are blocked on the network: `curl -H 'Origin:
-  http://localhost:8123' 'https://sports-proxy.pengzjay.workers.dev/
+  http://localhost:8123' 'https://orbit-workers-proxy.pengzjay.workers.dev/
   sports-proxy?url=<encoded upstream>&app=<an app id in kit/brand.mjs:
   odds, stock…>'` (`?batch=1` as the kit asks), and Orbit Transit's at
-  `https://orbit-workers-proxy.pengzjay.workers.dev/transit/…`. Weather
+  `/transit/…` on the same address. Weather
   has no door (its saved fixtures; `/weather/status?sample=forecast`).
   `tools/preview.mjs --live` sends a page's calls through it. Reach for it
   before saying a source can't be read.
@@ -349,7 +349,7 @@ On top of them, **apps put live knowledge over slower copies** (§8).
   1M lists and 1 GB, Durable Objects 1M requests and 5 GB, Workers Logs 20M
   events. Cloudflare has no spending cap, so `guard.js` (Worker
   `quota-guard`) reads the account's real use every five minutes and takes
-  both proxies off the air at 90% of any of them until the next period;
+  the proxy off the air at 90% of any of them until the next period;
   each toml caps an invocation's CPU (`[limits]`) and samples its logs
   (`head_sampling_rate`). A new Cloudflare product (R2, D1, Queues, …) is
   added to `guard.js`'s `PLAN` in the same change, or not used. Rate limits
@@ -755,7 +755,8 @@ What was decided, so it isn't undone. Newer calls win.
   tiles, what's in view, the strip in its order), and opening may not get
   slower for it.
   Cloudflare on Workers Paid ($5 a month), never a penny more: the guard
-  (`guard.js`) stops both proxies before any included amount runs out,
-  until the next period. The two proxies stay two Workers: placement is
-  still a whole Worker's on every plan (sports near the caller, the rest
-  in Taiwan), and calls between them cost nothing.
+  (`guard.js`) stops the proxy before any included amount runs out,
+  until the next period. One proxy for everything (the owner, the same
+  day): the data proxy is a route of `orbit-workers-proxy` (`sports.js`),
+  in Taiwan with the rest; `sports-proxy`'s address only forwards to it
+  until every phone has the new kit.

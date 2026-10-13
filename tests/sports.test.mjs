@@ -12,7 +12,7 @@ globalThis.fetch = async url => {
   if (String(url).includes('slow')) await new Promise(r => setTimeout(r, 3_500));
   return new Response(JSON.stringify({ from: String(url) }), { status: 200, headers: { 'Content-Type': 'application/json' } });
 };
-const worker = (await import('../sports-proxy-worker.js')).default;
+const worker = (await import('../worker.js')).default;
 const ctx = { waitUntil: p => p };
 const get = url => worker.fetch(new Request(url, { headers: { Origin: 'https://jaypengx.github.io' } }), {}, ctx);
 
@@ -50,7 +50,7 @@ test('trims apply per URL in a batch', async () => {
 });
 
 test("ELTA's schedule: only its program list, always trimmed to each live program's time, channel, league and title", async () => {
-  const { trimElta } = await import('../sports-proxy-worker.js');
+  const { trimElta } = await import('../sports.js');
   const out = trimElta({ game_type: [{ name: 'NBA' }], calendar: { '2026-10-09': [{ program_sn: 1, channel_number: 101, channel_icon: 'x.svg', start_time: 1791545400, end_time: 1791554400, game_icon: 'y.jpg', game_type: 'NBA', game_type_en: 'NBA', program_desc: '火箭 VS 獨行俠 10/9 熱身賽中國賽 LIVE' }] } });
   assert.deepEqual(out, { programs: [{ d: '2026-10-09', s: 1791545400, e: 1791554400, ch: 101, g: 'NBA', z: 'NBA', t: '火箭 VS 獨行俠 10/9 熱身賽中國賽 LIVE' }] });
   const list = 'https://piceltaott-elta.cdn.hinet.net/production/json/program_list/sports_live_program_list.json';
@@ -72,7 +72,7 @@ test("a slow URL answers 504 at once and doesn't hold back the rest of its batch
 });
 
 test("a formula1.com driver or team page comes trimmed to its grids of figures", async () => {
-  const { trimF1Page } = await import('../sports-proxy-worker.js');
+  const { trimF1Page } = await import('../sports.js');
   const row = (k, v) => `["$","dt",null,{"className":"x","children":"${k}"}],["$","dd",null,{"className":"y","children":"${v}"}]`;
   const grid = rows => `["$","dl",null,{"className":"DataGrid-module_dataGrid__abc","children":[${rows.map(([k, v]) => `[${row(k, v).replace(/\]$/, '')}]`).join(',')}]}]`;
   const flight = `0:[${grid([['Season Position', '1st'], ['Season Points', '302']])},${grid([['Date of Birth', '25/08/2006']])}]`;
@@ -145,7 +145,7 @@ test("Polymarket's price history: only /prices-history, at the odds' pace", asyn
 });
 
 test("Polymarket's games trimmed: each game's own event, its moneyline markets and token ids", async () => {
-  const { trimPolymarketGames } = await import('../sports-proxy-worker.js');
+  const { trimPolymarketGames } = await import('../sports.js');
   const market = (type, q) => ({ sportsMarketType: type, question: q, groupItemTitle: q, outcomes: '["Yes","No"]', clobTokenIds: '["1","2"]', description: 'long' });
   const got = trimPolymarketGames([
     { slug: 'epl-ful-mun-2026-09-20', title: 'Fulham FC vs. Manchester United FC', startTime: '2026-09-20T15:30:00Z', teams: [{ name: 'Fulham FC', abbreviation: 'ful', alias: 'Fulham', logo: 'x' }], markets: [market('moneyline', 'Will Fulham FC win?'), market('totals', 'O/U 2.5')] },
@@ -157,7 +157,7 @@ test("Polymarket's games trimmed: each game's own event, its moneyline markets a
 });
 
 test("Polymarket's F1 race winner kept: each driver's market and how much it's traded", async () => {
-  const { trimPolymarketGames } = await import('../sports-proxy-worker.js');
+  const { trimPolymarketGames } = await import('../sports.js');
   const got = trimPolymarketGames([
     { slug: 'f1-bahrain-grand-prix-winner-2026-10-04', title: 'Bahrain Grand Prix: Driver Winner', startTime: '2026-10-04T07:00:00Z', markets: [{ sportsMarketType: 'f1_race_winner', question: 'Will Max Verstappen win?', groupItemTitle: 'Max Verstappen', outcomes: '["Yes","No"]', clobTokenIds: '["1","2"]', volume: '229815.5', description: 'long' }] },
     { slug: 'f1-bahrain-grand-prix-driver-podium-2026-10-04', markets: [] },
@@ -170,7 +170,7 @@ test("Polymarket's F1 race winner kept: each driver's market and how much it's t
 });
 
 test('news trimmed to what a story card shows, its people kept', async () => {
-  const { trimEspnNews } = await import('../sports-proxy-worker.js');
+  const { trimEspnNews } = await import('../sports.js');
   const raw = { header: 'x', articles: [{ id: 1, nowId: 'n', type: 'HeadlineNews', headline: 'Russell to start from the back', description: 'Grid penalty.', published: '2026-10-06T10:38:08Z', byline: 'b', images: [{ url: 'https://a/1.jpg', caption: 'c' }, { url: 'https://a/2.jpg' }], links: { web: { href: 'https://espn/1' }, api: {} }, categories: [{ type: 'athlete', athleteId: 5503, description: 'George Russell', id: 9 }, { type: 'league', description: 'Formula One' }, { type: 'team', teamId: 13, description: 'Lakers' }] }] };
   const t = trimEspnNews(raw);
   assert.deepEqual(t.articles[0], { id: 1, type: 'HeadlineNews', headline: 'Russell to start from the back', description: 'Grid penalty.', published: '2026-10-06T10:38:08Z', premium: undefined, images: [{ url: 'https://a/1.jpg' }], links: { web: { href: 'https://espn/1' } }, categories: [{ type: 'athlete', athleteId: 5503, teamId: undefined, description: 'George Russell' }, { type: 'team', athleteId: undefined, teamId: 13, description: 'Lakers' }] });
@@ -178,7 +178,7 @@ test('news trimmed to what a story card shows, its people kept', async () => {
 });
 
 test("an empty translation (Google busy) is a failure, not kept a month", async () => {
-  const { emptyTranslation } = await import('../sports-proxy-worker.js');
+  const { emptyTranslation } = await import('../sports.js');
   assert.equal(emptyTranslation('[[""]]'), true);
   assert.equal(emptyTranslation('[["  ","en"]]'), true);
   assert.equal(emptyTranslation('not json'), true);
@@ -187,7 +187,7 @@ test("an empty translation (Google busy) is a failure, not kept a month", async 
 });
 
 test("ELTA.tv's season video pages only, trimmed to their episodes", async () => {
-  const { trimEltaVod } = await import('../sports-proxy-worker.js');
+  const { trimEltaVod } = await import('../sports.js');
   const item = (id, title) => `<div class="sportDivImg" data-episode="${id}"> <a href="https://eltaott.tv/sports/play/1/2150/${id}"> <img class="lazy" src="x.jpg" alt="${title}" title="${title}"> </a></div>`;
   const html = `<html>${item('73061', '10/6 美聯分區賽G2 白襪 VS 守護者')}${item('73061', '10/6 美聯分區賽G2 白襪 VS 守護者')}${item('73060', '10/6 洋基 VS 光芒 &amp; more')}</html>`;
   assert.deepEqual(trimEltaVod(html).episodes, [{ id: '73061', title: '10/6 美聯分區賽G2 白襪 VS 守護者' }, { id: '73060', title: '10/6 洋基 VS 光芒 & more' }]);
@@ -198,7 +198,7 @@ test("ELTA.tv's season video pages only, trimmed to their episodes", async () =>
 });
 
 test("YouTube: a search and a video's page only, trimmed; a page without its data is a failure", async () => {
-  const { trimYtSearch, trimYtVideo } = await import('../sports-proxy-worker.js');
+  const { trimYtSearch, trimYtVideo } = await import('../sports.js');
   const v = (id, title, channel, verified) => ({ videoRenderer: { videoId: id, title: { runs: [{ text: title }] }, ownerText: { runs: [{ text: channel, navigationEndpoint: { browseEndpoint: { browseId: `UC${channel}` } } }] }, ownerBadges: verified ? [{ metadataBadgeRenderer: { style: 'BADGE_STYLE_TYPE_VERIFIED' } }] : [], publishedTimeText: { simpleText: '10h ago' }, lengthText: { simpleText: '20:12' } } });
   const data = { contents: { list: [v('mmrHD8KXtLs', 'BREWERS vs. PADRES: NLDS Full Game 3 Highlights {x} "y"', 'MLB', true), v('mmrHD8KXtLs', 'again', 'MLB', true), v('E4mj0ShxuLE', 'EVERY PLAY', 'Fan', false)] } };
   const html = `<html><script>var ytInitialData = ${JSON.stringify(data)};</script><script>var other = {};</script></html>`;
@@ -215,4 +215,11 @@ test("YouTube: a search and a video's page only, trimmed; a page without its dat
   assert.equal(await status('https://www.youtube.com/results?search_query=x&sp=EgIQAQ'), 400);
   assert.equal(await status('https://www.youtube.com/watch?v=EpwxwKDoXXU&list=x'), 400);
   assert.equal(await status('https://www.youtube.com/watch?v=short'), 400);
+});
+
+test('one proxy: /sports-proxy answers with the Worker\'s CORS (its cache headers readable) and refuses a host off the list', async () => {
+  const res = await worker.fetch(new Request(`https://orbit-workers-proxy.test/sports-proxy?url=${encodeURIComponent('https://evil.example/x')}&app=match`, { headers: { Origin: 'https://jaypengx.github.io' } }), {}, ctx);
+  assert.ok(res.status >= 400 && res.status < 500);
+  assert.match(res.headers.get('Access-Control-Expose-Headers') || '', /X-Sports-Proxy-Cache/);
+  assert.equal(res.headers.get('Access-Control-Allow-Origin'), 'https://jaypengx.github.io');
 });

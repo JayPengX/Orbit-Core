@@ -7,7 +7,9 @@ on:
       - 'worker.js'
       - 'kit/brand.mjs'
       - 'wrangler.toml'
-      - 'sports-proxy-worker.js'
+      - 'sports.js'
+      - 'sports-forward.js'
+      - 'http.js'
       - 'asia-baseball.js'
       - 'kit/catalog.mjs'
       - 'f1-live.js'
@@ -44,7 +46,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Deploy orbit-workers-proxy (eco/gemini/nl-edit/kambi)
+      - name: Deploy orbit-workers-proxy (the proxy: every route)
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -60,23 +62,21 @@ jobs:
           # so a future change to that default can't silently break this
           # again the same way.
           wranglerVersion: '4'
-      - name: Deploy sports-proxy (Match Find's own route, no region pin - see wrangler.sports-proxy.toml)
+      - name: Deploy sports-proxy (the old address, forwarding to the proxy)
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy --config wrangler.sports-proxy.toml
           wranglerVersion: '4'
-      # The Quadra Pass token secret, the same on both Workers (see
-      # quadra-token.js): /eco signs session tokens with it and
-      # /sports-proxy checks them. Only when the repo has the secret
+      # The Quadra Pass token secret (see quadra-token.js): /eco signs
+      # session tokens with it and every route checks them. Only when the repo has the secret
       # ECO_TOKEN_SECRET (any long random string); until then the proxy's
       # Quadra Pass gate is simply off.
-      - name: Quadra Pass token secret on both Workers
+      - name: Quadra Pass token secret on the proxy
         if: ${{ env.HAS_TOKEN_SECRET == 'true' }}
         run: |
           printf '%s' "$ECO_TOKEN_SECRET" | npx --yes wrangler@4 secret put ECO_TOKEN_SECRET
-          printf '%s' "$ECO_TOKEN_SECRET" | npx --yes wrangler@4 secret put ECO_TOKEN_SECRET --config wrangler.sports-proxy.toml
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
