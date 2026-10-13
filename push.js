@@ -199,7 +199,7 @@ export async function handlePush(request, env, headers, session, path) {
   const body = await request.json().catch(() => null);
   if (path === '/push/prefs') {
     const prefs = cleanPrefs(body);
-    // (Unchanged switches aren't written again: KV's free tier has 1,000 writes a day.)
+    // (Unchanged switches aren't written again: every KV write counts against the month's million.)
     if ((await kv.get(prefsKey(session.d))) !== JSON.stringify(prefs)) await kv.put(prefsKey(session.d), JSON.stringify(prefs), { expirationTtl: 400 * 86_400 });
     return reply({ ok: true, ...prefs });
   }

@@ -22,3 +22,16 @@ test('store: a folder replaced whole, what isn\'t in it goes', async () => {
   await s.replace('sports/watch/', { 'sports/watch/mlb/2026-09.json': { games: {} }, 'sports/watch/index.json': { built: 1 } });
   assert.deepEqual((await s.list('sports/')).sort(), ['sports/other.json', 'sports/watch/index.json', 'sports/watch/mlb/2026-09.json']);
 });
+
+test('a file R2 lacks is taken from Shared-Data\'s Pages once and kept in R2; never asked of Pages again; one Pages lacks too is none', async () => {
+  const bucket = memoryBucket();
+  const asked = [];
+  const get = async url => (asked.push(url), String(url).endsWith('sports/watch/index.json') ? new Response('{"checked":3}') : new Response('', { status: 404 }));
+  const s = r2Store(bucket, { get });
+  assert.deepEqual(await s.json('sports/watch/index.json'), { checked: 3 });
+  assert.ok(bucket.m.has('sports/watch/index.json'), 'kept in R2');
+  assert.deepEqual(await r2Store(bucket, { get }).json('sports/watch/index.json'), { checked: 3 });
+  assert.equal(asked.length, 1, 'Pages asked once');
+  assert.equal(await s.json('nope.json'), null);
+  assert.equal(await s.put('sports/watch/index.json', { checked: 3 }), false, 'the same content: nothing written');
+});

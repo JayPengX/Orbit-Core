@@ -258,6 +258,7 @@ test('a game over is kept in R2 the first time anyone reads it; after that it co
   const real = globalThis.fetch;
   const asked = [];
   globalThis.fetch = async url => {
+    if (String(url).startsWith('https://jaypengx.github.io/')) return new Response('', { status: 404 });
     asked.push(String(url));
     const done = String(url).includes('event=900');
     return new Response(JSON.stringify({ header: { competitions: [{ status: { type: { completed: done } } }] }, news: ['dropped'], boxscore: { teams: [] } }), { status: 200 });

@@ -17,8 +17,9 @@ in phase 1: Google's hourly forecast gives 24 hours a page at most, so 48 h
 is 2 billed calls (4 a refresh with current and days, ~190 a day for 2
 places hourly, ~5,800 a month: inside the free 10,000); Google's alerts refuse
 `unitsSystem`; `F-D0047-089` is by county, so townships come from the
-county datasets; the Free plan's CPU limit rules out parsing CWA's national
-station lists live, hence the committed station table.
+county datasets; parsing CWA's national station lists live was ruled out by
+the free plan's CPU limit and would only spend CPU now, hence the committed
+station table.
 
 **Decided:** a PWA, not a native iPhone app (native needs Xcode and a 7-day
 re-sign on a free Apple ID, or US$99 a year, or SideStore's workarounds, for

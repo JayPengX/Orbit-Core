@@ -24,7 +24,7 @@
 
 import { json } from './http.js';
 import { sessionLimited } from './quadra-token.js';
-import { sha256, gunzip } from './builders/store.js';
+import { sha256, gunzip, fromPages } from './builders/store.js';
 
 export const PAGES = 'https://jaypengx.github.io/Shared-Data/';
 const TYPES = { json: 'application/json', gz: 'application/gzip', txt: 'text/plain; charset=utf-8', html: 'text/html; charset=utf-8' };
@@ -56,11 +56,15 @@ async function readFile(env, ctx, path, request) {
   if (obj) {
     res = new Response(obj.body, { headers: { 'Content-Type': typeOf(path), ETag: obj.httpEtag, 'Cache-Control': `public, max-age=${maxAge(path)}` } });
   } else {
-    // Not moved yet: Pages' copy (until Shared-Data is gone).
-    const up = await fetch(`${PAGES}${path}`, { signal: AbortSignal.timeout(15_000) }).catch(() => null);
-    if (!up) return new Response('', { status: 502 });
-    if (!up.ok) return new Response('', { status: up.status === 404 ? 404 : 502 });
-    res = new Response(up.body, { headers: { 'Content-Type': typeOf(path), 'Cache-Control': `public, max-age=${maxAge(path)}` } });
+    // Not moved yet: Pages' copy, kept in R2 from now on (until Shared-Data is gone).
+    const moved = env.DATA ? await fromPages(env.DATA, path).catch(() => null) : null;
+    if (moved) res = new Response(moved.raw, { headers: { 'Content-Type': typeOf(path), 'Cache-Control': `public, max-age=${maxAge(path)}` } });
+    else {
+      const up = await fetch(`${PAGES}${path}`, { signal: AbortSignal.timeout(15_000) }).catch(() => null);
+      if (!up) return new Response('', { status: 502 });
+      if (!up.ok) return new Response('', { status: up.status === 404 ? 404 : 502 });
+      res = new Response(up.body, { headers: { 'Content-Type': typeOf(path), 'Cache-Control': `public, max-age=${maxAge(path)}` } });
+    }
   }
   if (cache) ctx.waitUntil(cache.put(key, res.clone()));
   return res;
