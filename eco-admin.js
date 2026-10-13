@@ -50,7 +50,7 @@ async function capacityNow(env, deps, base, inUse = base) {
   const usage = await ADMIN_TOOLS.usage({ env, deps }).catch(() => ({}));
   // The month's real Cloudflare bill so far, as the guard last read it (guard.js).
   const guard = env.RATE_LIMIT_KV ? JSON.parse((await env.RATE_LIMIT_KV.get(GUARD_STATE).catch(() => null)) || 'null') : null;
-  return { ...capacityPlan({ users, base, inUse, usage, now }), guard: guard && { at: guard.at, armed: guard.armed, error: guard.error, stopAt: guard.stopAt, plan: guard.plan, use: guard.use, share: guard.share, projected: guard.projected, period: guard.period, cpuWay: guard.cpuWay, stopped: guard.stopped ? { at: guard.stopped.at, why: guard.stopped.why } : null } };
+  return { ...capacityPlan({ users, base, inUse, usage, now }), guard: guard && { at: guard.at, armed: guard.armed, error: guard.error, stopAt: guard.stopAt, plan: guard.plan, use: guard.use, share: guard.share, projected: guard.projected, period: guard.period, cpuWay: guard.cpuWay, partial: guard.partial, stopped: guard.stopped ? { at: guard.stopped.at, why: guard.stopped.why } : null } };
 }
 async function writeDev(env, deps, base, p) {
   const applied = base.autoScale && p ? cleanDev(p.applied) : base;
