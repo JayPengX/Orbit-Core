@@ -31,7 +31,7 @@ Then (the owner): where you take one, its bikes; where it goes back, its
 docks; a swap both. Each station's marker now says what you need there,
 labelled (then the owner: no Chinese on the marker, it's ugly; so the bikes
 as the map's own, 🚲 5 ⚡2, the docks a blue parking P, P 19, a swap P 19 |
-🚲 5; seen in the preview; then: the blue P too loud, so it's outlined in the marker's own ink, like its bike) (`planBikeMarker`), coloured by
+🚲 5; seen in the preview; then: the blue P too loud, so it's outlined in the marker's own ink, like its bike; then: the letter sat off-centre in its box (a font's glyph), so it's an icon, `ui.mjs dock`, drawn centred) (`planBikeMarker`), coloured by
 the scarcer of the two (no docks to return to: grey), from the city's live
 bikes once they're in (the plan's own counts first). Seen in the preview
 (借 6 ⚡2, 還 22); a swap needs a ride over 30 minutes, not reached there
