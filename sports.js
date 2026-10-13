@@ -19,6 +19,7 @@ import { ASIA_HOST, asiaBaseballResponse, asiaTarget, cpblBoxTarget } from './as
 import { F1_LIVE_HOST, f1LiveResponse, doLog, sampleLive } from './f1-live.js';
 import { cleanDev } from './kit/devconfig.mjs';
 import { json } from './http.js';
+import { MIRROR_HOSTS, mirrorPath } from './kit/mirror.mjs';
 
 // ==== /sports-proxy - CORS passthrough for public sports data ==============
 const ELTA_HOST = 'piceltaott-elta.cdn.hinet.net';
@@ -840,7 +841,48 @@ function parseTarget(target) {
 // How long an old copy's fresh read is waited for before the old copy is
 // answered (a batch's item waits 3 s in all).
 const FRESH_WAIT_MS = 2_000;
-async function resolveOne(upstreamUrl, trim, ctx) {
+// The nightly mirror (the family's data, R2 mirror/…, built at night): a
+// read it holds and is still good (its `until`) is answered from the copy,
+// not the source, and kept in the edge cache until then. So a phone's
+// mirrored reads travel in its batches like any other (they were a request
+// each to the copies), and a source is asked only for what can have changed.
+// `mirror=0` on a read, or the 開發 switch off: the source's.
+let dataBucket = null;
+let mirrorIdx = { at: 0, p: null };
+function mirrorIndex() {
+  if (Date.now() - mirrorIdx.at > 5 * 60_000 || !mirrorIdx.p) {
+    const bucket = dataBucket;
+    mirrorIdx = {
+      at: Date.now(),
+      p: bucket
+        .get('mirror/index.json')
+        .then(o => (o ? o.json() : null))
+        .then(x => (x ? { until: Number(x.until) || 0, match: (x.match || []).map(m => new RegExp(m)) } : null))
+        .catch(() => null)
+    };
+  }
+  return mirrorIdx.p;
+}
+export async function fromMirror(upstreamUrl, trim, now = Date.now()) {
+  if (!dataBucket || dev.mirror === false || !MIRROR_HOSTS.has(upstreamUrl.hostname)) return null;
+  const index = await mirrorIndex();
+  const url = upstreamUrl.toString();
+  // (The whole mirror is good only until its next build plus some hours: a build that failed never leaves it trusted.)
+  if (!index || (index.until && now >= index.until) || !index.match.some(re => re.test(`${trim || ''}!${url}`))) return null;
+  const obj = await dataBucket.get(`${mirrorPath(url, trim)}.gz`).catch(() => null);
+  if (!obj) return null;
+  try {
+    const raw = new Uint8Array(await obj.arrayBuffer());
+    const bytes = raw[0] === 0x1f && raw[1] === 0x8b ? new Uint8Array(await new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()) : raw;
+    const copy = JSON.parse(new TextDecoder().decode(bytes));
+    const until = Math.min(copy?.until || 0, index.until || Infinity);
+    return until > now ? { until, body: JSON.stringify(copy.data) } : null;
+  } catch {
+    return null;
+  }
+}
+
+async function resolveOne(upstreamUrl, trim, ctx, { mirror = true } = {}) {
   let policy = cachePolicyFor(upstreamUrl);
   const cache = caches.default;
   // A trimmed response is cached under its own key (a marker param on the
@@ -897,6 +939,14 @@ async function resolveOne(upstreamUrl, trim, ctx) {
       }
       return old(isFresh ? 'HIT' : 'STALE');
     }
+  }
+  const held = mirror ? await fromMirror(upstreamUrl, trim) : null;
+  if (held) {
+    // Kept here until it could change (a day at most), as the nightly copy says.
+    const mp = { tier: 'mirror', fresh: Math.max(60, Math.min(86_400, Math.floor((held.until - Date.now()) / 1000))), stale: 0 };
+    const result = { status: 200, contentType: 'application/json', body: held.body };
+    ctx.waitUntil(cache.put(cacheKey, cacheEntry(result, mp)));
+    return { ...result, cache: 'MIRROR', age: 0, policy: mp };
   }
   const result = await fetchUpstream(upstreamUrl, trim);
   if (result.status === 200) ctx.waitUntil(cache.put(cacheKey, cacheEntry(result, policy)));
@@ -1021,7 +1071,7 @@ async function handleSportsProxyRequest(request, env, headers, ip, ctx) {
   const trim = trimFor(requestParams.get('trim'), upstreamUrl);
   headers['X-Sports-Proxy-Cache-Tier'] = cachePolicyFor(upstreamUrl).tier;
 
-  const result = await resolveOne(upstreamUrl, trim, ctx);
+  const result = await resolveOne(upstreamUrl, trim, ctx, { mirror: requestParams.get('mirror') !== '0' });
   if (result.policy) headers['X-Sports-Proxy-Cache-Tier'] = result.policy.tier;
   headers['X-RateLimit-Backend'] = gate.session.open ? 'open' : 'session';
   if (result.fetchError) return json({ error: { message: result.fetchError.message || 'Upstream request failed' } }, 502, headers);
@@ -1046,6 +1096,7 @@ async function handleSportsProxyRequest(request, env, headers, ip, ctx) {
 export function handleSports(request, env, ctx, headers, ip) {
   refreshDev(env, ctx);
   f1Log ||= doLog(env.F1_LOG);
+  dataBucket ||= env.DATA || null;
   return handleSportsProxyRequest(request, env, headers, ip, ctx).catch(error => json({ error: { message: String(error?.message || error).slice(0, 200) } }, 500, headers));
 }
 

@@ -83,7 +83,7 @@ export function r2Store(bucket) {
 // A bucket in memory, R2's shape (tests, and a builder run in Node).
 export function memoryBucket(init = {}) {
   const m = new Map(Object.entries(init).map(([k, v]) => [k, { b: v instanceof Uint8Array ? v : enc.encode(typeof v === 'string' ? v : JSON.stringify(v)), meta: {} }]));
-  const obj = (k, v) => ({ key: k, size: v.b.length, customMetadata: v.meta, arrayBuffer: async () => v.b.slice().buffer, etag: '' });
+  const obj = (k, v) => ({ key: k, size: v.b.length, customMetadata: v.meta, arrayBuffer: async () => v.b.slice().buffer, text: async () => dec.decode(v.b), json: async () => JSON.parse(dec.decode(v.b)), etag: '' });
   return {
     m,
     async get(k) {

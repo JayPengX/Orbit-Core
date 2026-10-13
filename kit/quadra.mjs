@@ -27,6 +27,8 @@
 // one left behind stops refreshing and shows where Quadra is open, with a
 // button to continue there. Links between the apps carry the sign-in along.
 
+// The mirror's addresses (kit/mirror.mjs), for the builders and older callers.
+export { MIRROR_HOSTS, mirrorPath } from './mirror.mjs';
 import { BRANDS, FAMILIES, pathOf, appIcon, familyMark } from './brand.mjs';
 import { DEV, cleanDev } from './brand.mjs';
 
@@ -578,10 +580,10 @@ export async function workerLines(path, query, { timeout = 8000, body = null, on
 // left running never use up Sports' minute).
 const appParam = () => (dataSession?.app ? `&app=${dataSession.app}` : '');
 const proxyAddress = (url, trim) => `${PROXY_URL}?url=${encodeURIComponent(url)}${trim ? `&trim=${trim}` : ''}${appParam()}`;
-async function fetchOne(url, trim, timeout) {
+async function fetchOne(url, trim, timeout, extra = '') {
   for (let attempt = 0; ; attempt++) {
     try {
-      const res = await signedFetch(proxyAddress(url, trim), { signal: AbortSignal.timeout(timeout) });
+      const res = await signedFetch(`${proxyAddress(url, trim)}${extra}`, { signal: AbortSignal.timeout(timeout) });
       if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
       return await res.text();
     } catch (error) {
@@ -664,10 +666,13 @@ export async function translate(text, to = 'zh-TW', from = 'auto') {
 const FAILED_HOLD_MS = 60_000;
 // A failed or stale read asked again after this.
 const RETRY_MS = 15_000;
-// `mirror: false`: this one read from the proxy, never the nightly copy (an
-// app that knows the copy has moved on: mirrorBuilt says when it was built).
+// The nightly mirror is the proxy's to answer from (sports.js fromMirror: a
+// read it holds comes from its copy, in the batch like any other).
+// `mirror: false`: this one read from the source, never the nightly copy (an
+// app that knows the copy has moved on: mirrorBuilt says when it was built),
+// asked on its own.
 export function proxyJson(url, { ttl = 60_000, trim = '', persist: keep = true, timeout = 20_000, mirror = true } = {}) {
-  return keptJson(url, dataKey(url, trim), { ttl, keep }, async () => (mirror ? await mirrored(url, trim) : null) ?? enqueue(url, trim, timeout));
+  return keptJson(url, dataKey(url, trim), { ttl, keep }, () => (mirror && !mirrorGone.has(`${trim}!${url}`) ? enqueue(url, trim, timeout) : fetchOne(url, trim, timeout, '&mirror=0')));
 }
 // The family's data (the proxy's /data/, kept in R2 on Cloudflare; built at
 // night and through the day): what doesn't change in a day (a league's
@@ -686,87 +691,17 @@ export function packJson(path, { ttl = 3 * 3_600_000, timeout = 30_000 } = {}) {
     return res.text();
   });
 }
-// The nightly copies of what the proxy would answer (Shared-Data's mirror/):
-// what can't change before a set time (a team's page until its next game, a
-// finished game's box score, a past month) is built each night and read
-// from GitHub Pages, not the proxy. mirror/index.json says which reads it
-// holds ({ built, until, match: [patterns of '<trim>!<url>'] }); each copy
-// is { until, data }, good until then. A read the mirror doesn't hold, or
-// holds no longer, is the proxy's (and isn't looked for again this session).
-// With `gz: 1` in the index each copy is gzipped (<path>.gz: a season's box
-// scores in a twelfth of the room, under Pages' 1 GB), unpacked here; a
-// browser that can't (no DecompressionStream: iOS before 16.4) asks the proxy.
-export const MIRROR_HOSTS = new Set(['site.api.espn.com', 'sports.core.api.espn.com', 'api.jolpi.ca', 'www.formula1.com', 'asia-baseball.quadra']);
-export function mirrorPath(url, trim = '') {
-  const u = new URL(url);
-  const q = u.search.length > 1 ? `/${encodeURIComponent(u.search.slice(1)).replace(/%/g, '~')}` : '';
-  return `mirror/${trim || '_'}/${u.hostname}${u.pathname.replace(/\/+$/, '')}${q}.json`;
-}
-let mirrorIndex = null;
-const mirrorGone = new Set();
-// When the nightly copies in use were built (ms), or 0 when there are none:
-// what happened after it (a playoff game over) the copies don't have.
+// The nightly mirror (the family's data, mirror/…): copies of the reads
+// that can't change before a known time, answered by the proxy itself
+// (sports.js) when a read comes in. mirror/index.json says when it was
+// built: what happened after it (a playoff game over) the copies don't have.
 export async function mirrorBuilt() {
-  return (await readMirrorIndex())?.built || 0;
+  return Number((await packJson('mirror/index.json', { ttl: 30 * 60_000, timeout: 8_000 }).catch(() => null))?.built) || 0;
 }
-// (Kept for apps that still call it: the read is the proxy's for the session.
-// Prefer proxyJson(url, { mirror: false }) for one read, conditionally.)
+// A read the app knows the copy of is behind: the source's for the session.
+const mirrorGone = new Set();
 export function unmirror(url, trim = '') {
   mirrorGone.add(`${trim}!${url}`);
-}
-const parseMirrorIndex = x => ({ built: Number(x?.built) || 0, until: Number(x?.until) || 0, gz: Boolean(x?.gz), match: (x?.match || []).map(m => new RegExp(m)) });
-// A file's JSON, gzipped or not (by its first bytes: whether Pages sent it
-// with Content-Encoding, the browser unpacking it, or as a plain .gz).
-export async function gzJson(res) {
-  const bytes = new Uint8Array(await res.arrayBuffer());
-  if (bytes[0] !== 0x1f || bytes[1] !== 0x8b) return JSON.parse(new TextDecoder().decode(bytes));
-  const out = new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip')));
-  return JSON.parse(await out.text());
-}
-const canGunzip = () => typeof DecompressionStream === 'function';
-// The last index this device kept, whatever its age: which copies to ask
-// for alongside a new index, rather than a round trip after it (the copies
-// the index then doesn't hold are thrown away).
-let mirrorHint = null;
-function readMirrorIndex() {
-  if (!mirrorIndex || Date.now() - mirrorIndex.at > 30 * 60_000) {
-    mirrorHint ??= persisted(dataKey(`${PACKS_KEY}mirror/index.json`, ''))
-      .then(saved => (saved?.data ? parseMirrorIndex(saved.data) : null))
-      .catch(() => null);
-    const p = packJson('mirror/index.json', { ttl: 30 * 60_000, timeout: 8_000 })
-      .then(parseMirrorIndex)
-      .catch(() => null);
-    const entry = { at: Date.now(), p, done: false };
-    p.then(() => (entry.done = true));
-    mirrorIndex = entry;
-  }
-  return mirrorIndex.p;
-}
-const mirrorCopy = (url, trim, gz) =>
-  fetch(`${PACKS_URL}${mirrorPath(url, trim)}${gz ? '.gz' : ''}`, { signal: AbortSignal.timeout(8_000) })
-    .then(res => (res.ok ? gzJson(res) : null))
-    .catch(() => null);
-async function mirrored(url, trim) {
-  let host = '';
-  try {
-    host = new URL(url).hostname;
-  } catch {}
-  const key = `${trim}!${url}`;
-  // (開發's switch off: every read the proxy's, for checking it.)
-  if (!MIRROR_HOSTS.has(host) || mirrorGone.has(key) || dev('mirror') === false) return null;
-  const indexIn = readMirrorIndex();
-  let early = null;
-  if (!mirrorIndex.done) {
-    const hint = await mirrorHint;
-    if (hint && hint.match.some(re => re.test(key)) && (!hint.gz || canGunzip())) early = mirrorCopy(url, trim, hint.gz);
-  }
-  const index = await indexIn;
-  if (!index || Date.now() >= index.until || !index.match.some(re => re.test(key)) || (index.gz && !canGunzip())) return null;
-  // (A hint of the other kind, the index changed overnight: asked again.)
-  const got = await (early && Boolean(mirrorHint && (await mirrorHint)?.gz) === index.gz ? early : mirrorCopy(url, trim, index.gz));
-  if (got && Date.now() < Math.min(Number(got.until) || 0, index.until)) return got.data;
-  mirrorGone.add(key);
-  return null;
 }
 function keptJson(url, key, { ttl, keep }, read) {
   const hit = memory.get(key);
