@@ -198,6 +198,14 @@ The owner tapped a faded (done) step chip and was taken back to it, the map
 too. The chips behind you are now disabled (no `data-nav-go`, `pointer-events:
 none`, and `go` refuses a step behind you). Checked in the preview.
 
+
+Then (the owner, the same evening): tapping a step ahead locked every step
+before it. The lock is now by how far the trip has got by itself
+(`state.reached`: where you are, an arrival, getting off, staying on, the
+start; kept when it's opened again), never by a tap: a step only looked
+ahead past stays tappable. Checked in the preview on an eight-step trip:
+a tap to 4 leaves 0–3 tappable, back to 2 works; walked to the end of the
+first step, 0 locks.
 ## Transit: waiting for the bus, the street itself (2026-10-13, pushed to `main`)
 
 The owner: the stop's close-up wasn't close enough to see which side of the
