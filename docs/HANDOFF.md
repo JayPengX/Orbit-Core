@@ -10,6 +10,23 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
 
 
 
+## Transit: YouBike from a station with a bike; walks by the streets (2026-10-13, pushed to `main`)
+
+The owner: a trip starting with the bike shouldn't send you to a station
+empty as you plan (first asked for every rent, then taken back: only a trip
+that starts with it, the counts change by the time a later one comes;
+nothing else moves by itself). `rentNear({ first })` from `bikeOnly`,
+`bikeToRail`, a planner's first bike and 騎 YouBike on a card; off a train,
+`bikeFromRail`, still by place (yesterday's call otherwise stands: TRUTH
+§15). The verdicts unchanged. Not run: the live batch (`live.mjs --against`),
+stopped by the owner.
+
+And walking distances by the streets: the strip of nearest stations asks
+OpenStreetMap's foot router (free) for each of the five, nearest that way
+first (新竹火車站(後站) 200 m → 570 m round the tracks; seen in the preview);
+a trip's walks we add take the router's length, and its 步行 with them
+(the router was already asked, for the line).
+
 ## Transit: the YouBike return station on the map, navigating (2026-10-13, pushed to `main`)
 
 The owner, riding 臺鐵竹中車站 → 綠41公園: no mark where the bike goes back.
