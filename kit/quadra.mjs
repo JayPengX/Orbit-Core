@@ -785,16 +785,25 @@ export function haptic() {
 if (typeof globalThis !== 'undefined') globalThis.quadraHaptic = haptic;
 
 // A sheet closing slides to the foot as its dimming fades, as iOS's (its ✕,
-// a tap outside, a swipe): quicker the faster a finger let it go (`speed`,
-// px/ms), a third of a second at most. A wide screen's (it popped in) and
-// one asked for no motion just close.
+// a tap outside, a swipe): it leaves at the finger's own speed (`speed`,
+// px/ms) and eases out to the foot over 0.38 to 0.5 s (a ✕ 0.45 s from an
+// even start), the way UIKit's
+// sheet does (a flick had been gone in a sixth of a second, the ✕'s in a
+// quarter: too quick for iOS). A wide screen's (it popped in) and one asked
+// for no motion just close.
 export function closeSheet(d, speed = 0) {
   if (!d?.open || d.classList.contains('q-leaving')) return;
   if (innerWidth >= 720 || globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return d.close();
-  const rest = Math.max(0, innerHeight - d.getBoundingClientRect().top);
-  const ms = Math.round(Math.min(300, Math.max(160, speed > 0 ? rest / speed : 300)));
+  const rest = Math.max(1, innerHeight - d.getBoundingClientRect().top);
+  const ms = speed > 0 ? Math.round(Math.min(500, Math.max(380, 380 + rest / 8 - speed * 60))) : 450;
+  // The curve starts as fast as the finger moved (its first handle's slope is
+  // the speed, in the curve's units); without a finger, an even start (iOS's
+  // ✕ doesn't throw the sheet: half the way gone in a tenth of a second read as too quick).
+  const slope = speed > 0 ? (speed * ms) / rest : 0;
+  const ease = speed > 0 ? `cubic-bezier(0.25, ${Math.min(1, Math.max(0.05, slope * 0.25)).toFixed(3)}, 0.3, 1)` : 'cubic-bezier(0.3, 0.3, 0.2, 1)';
   d.classList.remove('q-settle', 'q-dragging');
   d.style.setProperty('--q-leave', `${ms}ms`);
+  d.style.setProperty('--q-leave-ease', ease);
   d.classList.add('q-leaving');
   d.style.transform = 'translateY(110%)';
   let done = false;
@@ -804,6 +813,7 @@ export function closeSheet(d, speed = 0) {
     d.close();
     d.classList.remove('q-leaving');
     d.style.transform = '';
+    d.style.removeProperty('--q-leave-ease');
   };
   d.addEventListener('transitionend', e => e.target === d && e.propertyName === 'transform' && shut());
   setTimeout(shut, ms + 60);

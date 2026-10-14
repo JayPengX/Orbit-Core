@@ -157,7 +157,17 @@ const upgrade = opt('upgrade', '');
 // first opening (every opening without --reopen / --upgrade): a phone on a
 // poor connection. Whatever the app saved from a failed read shows on the next.
 const flaky = Number(opt('flaky', 0));
-const reopen = flag('reopen') || Boolean(upgrade);
+// --net offline | slow[:ms]: the second opening (implies --reopen) with no
+// connection at all (as a phone in airplane mode: navigator.onLine false,
+// every request failing) or a poor one (every request that reaches the
+// network, the app's own files the service worker doesn't keep included,
+// answered that much later; 8000 ms by default). The service worker runs
+// (it's what opens an app offline), so the first opening fills it.
+const net = opt('net', '');
+const netSlow = /^slow/.test(net) ? Number(net.split(':')[1]) || 8000 : 0;
+if (net && net !== 'offline' && !netSlow) throw new Error('--net offline | slow[:ms]');
+const netNow = { offline: false, slow: 0 };
+const reopen = flag('reopen') || Boolean(upgrade) || Boolean(net);
 // --freezes: every stretch over 100 ms the page couldn't answer a tap (its
 // main thread busy), from the moment it starts: [when, how long] in ms.
 const freezes = flag('freezes');
@@ -406,8 +416,9 @@ const persistent = engine === 'webkit' && reopen && !serve;
 const browser = serve || persistent ? null : await playwright[engine].launch();
 const stub = { grantPermissions: async () => {}, setGeolocation: async () => {}, addInitScript: async (fn, arg) => void inits.push(`(${fn})(${JSON.stringify(arg)})`), route: async (p, h) => void extRoutes.push([p, h]) };
 const contextOptions = {
-  // No service workers: their fetches would miss the routes below.
-  serviceWorkers: 'block',
+  // No service workers: their fetches would miss the routes below (with
+  // --net they run: an app opens offline on what its worker kept).
+  serviceWorkers: net ? 'allow' : 'block',
   viewport: { width, height },
   deviceScaleFactor: 2,
   isMobile: device !== 'pc',
@@ -634,6 +645,13 @@ await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/dat
   if (!body) return route.fulfill({ status: 404, headers: { 'Access-Control-Allow-Origin': '*' }, body: '' });
   await route.fulfill({ status: 200, contentType: /\.gz$/.test(route.request().url()) ? 'application/gzip' : 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body });
 });
+// --net: registered last, so it runs first: the connection that's off or slow.
+if (net && !serve)
+  await context.route('**/*', async route => {
+    if (netNow.offline) return route.abort('internetdisconnected');
+    if (netNow.slow) await new Promise(r => setTimeout(r, netNow.slow));
+    return route.fallback();
+  });
 
 if (serve) {
   console.log(`serving ${repo}, signed in with a made-up account: ${base}  (Ctrl-C to stop)`);
@@ -646,7 +664,9 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => (reopen ? [h, h]
   const first = opening++ % (reopen ? 2 : 1) === 0;
   Object.assign(served, first && oldRoot ? { root: oldRoot, dir: join(oldRoot, repo, key === 'orbit' ? 'dist' : 'public') } : { root: ROOT, dir });
   flakyNow.on = Boolean(flaky) && (first || !reopen);
-  if (reopen) console.log(first ? `first opening${oldRoot ? ` (the app as of ${upgrade})` : ''}${flaky ? `, ${Math.round(flaky * 100)}% of answers failing` : ''}` : 'second opening (storage kept)');
+  Object.assign(netNow, { offline: !first && net === 'offline', slow: first ? 0 : netSlow });
+  if (net && !serve) await context.setOffline(netNow.offline);
+  if (reopen) console.log(first ? `first opening${oldRoot ? ` (the app as of ${upgrade})` : ''}${flaky ? `, ${Math.round(flaky * 100)}% of answers failing` : ''}` : `second opening (storage kept)${netNow.offline ? ', offline' : netNow.slow ? `, every request ${netNow.slow} ms late` : ''}`);
   // A page of its own for each (a hash change alone doesn't reload).
   const page = await context.newPage();
   if (clockAt) await page.clock.install({ time: new Date(clockAt) });
@@ -674,7 +694,17 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => (reopen ? [h, h]
     page.on('requestfinished', r => at.has(r) && (at.get(r).took = `${Date.now() - started - at.get(r).t} ms`));
     page.on('requestfailed', r => at.has(r) && (at.get(r).took = 'failed'));
   }
-  await page.goto(`${base}${hash ? `#${hash}` : ''}`);
+  const went = await page.goto(`${base}${hash ? `#${hash}` : ''}`).then(() => '', e => e.message.split('\n')[0]);
+  if (went) console.log(`net: the page didn't open (${went})`);
+  if (net && !first && !went) {
+    // When the loading screen went (a person stuck behind it is the bug), and what the page says.
+    const shown = await page
+      .waitForFunction(() => { const b = document.getElementById('loading'); return b ? b.hidden : !document.body.classList.contains('orbit-booting'); }, null, { timeout: 30_000, polling: 50 })
+      .then(() => `${Date.now() - started} ms`)
+      .catch(() => 'over 30 s');
+    const said = await page.evaluate(() => [...document.querySelectorAll('#loading:not([hidden]) p, .q-net, .q-toast, [role=status], [role=alert]')].map(e => e.innerText?.trim()).filter(Boolean).join(' | ').slice(0, 300)).catch(() => '');
+    console.log(`net ${net}: loading screen gone after ${shown}${said ? `; says: ${said}` : ''}`);
+  }
   if (timing) {
     const shown = await page
       .waitForFunction(() => document.getElementById('loading')?.hidden, null, { timeout: 60_000, polling: 50 })
