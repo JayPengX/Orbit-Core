@@ -185,6 +185,7 @@
     --q-glass-pick: rgba(255, 255, 255, 0.12);
     --q-dim: rgba(0, 0, 0, 0.48);
     --q-sheet: var(--q-grouped-2);
+    --q-sheet-cell: var(--q-grouped-3);
     --q-text-2: rgba(235, 235, 245, 0.86);
     --q-divider: rgba(84, 84, 88, 0.55);
     --q-good: #30d158;
@@ -238,6 +239,7 @@
   --q-glass-pick: rgba(255, 255, 255, 0.12);
   --q-dim: rgba(0, 0, 0, 0.48);
   --q-sheet: var(--q-grouped-2);
+  --q-sheet-cell: var(--q-grouped-3);
   --q-text-2: rgba(235, 235, 245, 0.86);
   --q-divider: rgba(84, 84, 88, 0.55);
   --q-good: #30d158;
@@ -1120,7 +1122,9 @@ button,
 /* ---- Sheets: up from the foot on a spring, floating inside the screen's
    edges with its deep corners, a grabber, a centred title between glass
    circles; dragged down to close (quadra.mjs sheetSwipe) ---- */
+/* (Inside a sheet, its cells are a shade lifted from it, as iOS's are.) */
 .q-sheet {
+  --q-surface: var(--q-sheet-cell, var(--q-grouped-2));
   width: min(520px, calc(100vw - 16px));
   max-width: none;
   max-height: min(calc(100dvh - var(--q-top) - 16px), 900px);
@@ -1164,6 +1168,23 @@ button,
 }
 .q-sheet.q-settle {
   transition: transform var(--q-dur-snappy) var(--q-spring-snappy);
+}
+/* Closing (an app adds .q-closing, then closes it a moment later). */
+.q-sheet.q-closing {
+  animation: q-sheet-down 0.26s var(--q-ease) forwards;
+}
+.q-sheet.q-closing::backdrop {
+  animation: q-fade-out 0.26s ease forwards;
+}
+@keyframes q-sheet-down {
+  to {
+    transform: translateY(110%);
+  }
+}
+@keyframes q-fade-out {
+  to {
+    opacity: 0;
+  }
 }
 @keyframes q-sheet-up {
   from {
@@ -2061,6 +2082,7 @@ input[type='checkbox'][switch] {
     transition: none;
   }
   .q-sheet[open],
+  .q-sheet.q-closing,
   .q-ask,
   .q-banner,
   .q-toast,
