@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { handlePlay, settleCron, nextLook, cleanSlip, OPEN_COLLECTION, SETTLED_COLLECTION, OPEN_INDEX } from '../settle.js';
+import { handlePlay, settleCron, nextLook, cleanSlip, watchSlips, OPEN_COLLECTION, SETTLED_COLLECTION, OPEN_INDEX } from '../settle.js';
 import { WALLET_COLLECTION } from '../eco.js';
 
 const ACCOUNT = 'a'.repeat(64);
@@ -64,6 +64,11 @@ function setup(now, { final = true } = {}) {
 const leg = (side, odds = 1.8) => ({ id: `mlb|cubs-reds|ml|${side}`, kind: 'ml', side, sport: 'mlb', away: 'Chicago Cubs', home: 'Cincinnati Reds', start: START, odds, gameId: 'g1', shortLabel: side === 'home' ? '紅人' : '小熊', result: null });
 const slip = (id, legs, extra = {}) => ({ id, t: '2026-10-10T20:00:00Z', mode: 'single', sizes: [legs.length], stake: 100, cost: 100, legs, status: 'open', ...extra });
 const post = (deps, body) => handlePlay({ method: 'POST', body }, env, {}, session, deps);
+// Watched as a placed slip is (settle.js watchSlips).
+const watch = async (deps, slips) => {
+  const clean = slips.map(cleanSlip).filter(Boolean);
+  return { body: { watching: clean.length, added: await watchSlips(env, deps, ACCOUNT, clean, deps.now()) } };
+};
 function wallet(store, entries) {
   store.set(`${WALLET_COLLECTION}/${ACCOUNT}`, { payload: JSON.stringify({ v: 1, created: 0, entries, snap: {}, settings: {}, apps: {}, inbox: {} }), updateTime: 'w0' });
 }
@@ -72,10 +77,10 @@ test('a slip is settled when its game is over: paid once, kept for Play, told', 
   const now = { t: Date.parse('2026-10-10T21:00:00Z') };
   const { store, deps, reads, sent, doc } = setup(now);
   wallet(store, [{ id: 'odds:stake-slipwin01', t: 1, app: 'odds', kind: 'stake', amount: -100 }, { id: 'odds:stake-sliplost1', t: 1, app: 'odds', kind: 'stake', amount: -100 }]);
-  const r = await post(deps, { op: 'open', slips: [slip('slipwin01', [leg('home')]), slip('sliplost1', [leg('away')]), { id: 'bad' }] });
+  const r = await watch(deps, [slip('slipwin01', [leg('home')]), slip('sliplost1', [leg('away')]), { id: 'bad' }]);
   assert.deepEqual(r.body, { watching: 2, added: 2 });
   // Registered again: nothing new.
-  assert.equal((await post(deps, { op: 'open', slips: [slip('slipwin01', [leg('home')])] })).body.added, 0);
+  assert.equal((await watch(deps, [slip('slipwin01', [leg('home')])])).body.added, 0);
   // Before the game should be over: nothing read.
   assert.equal((await settleCron(env, deps)).looked, 0);
   assert.equal(reads.length, 0);
@@ -113,29 +118,28 @@ test('never paid twice: Play paid it first, or the run is repeated', async () =>
   const now = { t: Date.parse('2026-10-10T21:00:00Z') };
   const { store, deps, doc } = setup(now);
   wallet(store, [{ id: 'odds:stake-slipwin01', t: 1, app: 'odds', kind: 'stake', amount: -100 }, { id: 'odds:payout-slipwin01', t: 2, app: 'odds', kind: 'payout', amount: 180 }]);
-  await post(deps, { op: 'open', slips: [slip('slipwin01', [leg('home')])] });
+  await watch(deps, [slip('slipwin01', [leg('home')])]);
   now.t = Date.parse(START) + 4 * 3_600_000;
   await settleCron(env, deps);
   await settleCron(env, deps);
   assert.equal(doc(WALLET_COLLECTION, ACCOUNT).entries.filter(e => e.id.startsWith('odds:payout')).length, 1);
 });
 
-test('a slip with no stake in the wallet is never watched, so never paid', async () => {
+test('a slip with no stake in the wallet is never paid', async () => {
   const now = { t: Date.parse(START) + 4 * 3_600_000 };
   const { store, deps, doc } = setup(now);
   wallet(store, []);
-  assert.equal((await post(deps, { op: 'open', slips: [slip('slipwin01', [leg('home')])] })).body.added, 0);
+  await watch(deps, [slip('slipwin01', [leg('home')])]);
   now.t += 3_600_000;
   await settleCron(env, deps);
   assert.equal(doc(WALLET_COLLECTION, ACCOUNT).entries.length, 0);
-  assert.equal(doc(SETTLED_COLLECTION, ACCOUNT), null);
 });
 
 test('a game not over is looked at again later; a parlay with a pick lost settles at once', async () => {
   const now = { t: Date.parse('2026-10-10T21:00:00Z') };
   const { store, deps, doc } = setup(now, { final: false });
   wallet(store, [{ id: 'odds:stake-slipwin01', t: 1, app: 'odds', kind: 'stake', amount: -100 }]);
-  await post(deps, { op: 'open', slips: [slip('slipwin01', [leg('home')])] });
+  await watch(deps, [slip('slipwin01', [leg('home')])]);
   now.t = Date.parse(START) + 4 * 3_600_000;
   const run = await settleCron(env, deps);
   assert.equal(run.settled, 0);
@@ -144,7 +148,7 @@ test('a game not over is looked at again later; a parlay with a pick lost settle
   const s2 = setup(now);
   wallet(s2.store, [{ id: 'odds:stake-parlay001', t: 1, app: 'odds', kind: 'stake', amount: -100 }]);
   const later = { ...leg('home'), id: 'nba|x|ml|home', sport: 'nba', away: 'A', home: 'B', start: '2026-10-12T00:00:00Z', gameId: 'g2' };
-  await post(s2.deps, { op: 'open', slips: [slip('parlay001', [leg('away'), later], { mode: 'parlay', sizes: [2] })] });
+  await watch(s2.deps, [slip('parlay001', [leg('away'), later], { mode: 'parlay', sizes: [2] })]);
   await settleCron(env, s2.deps);
   assert.deepEqual(s2.doc(SETTLED_COLLECTION, ACCOUNT).slips.parlay001.results, ['lost', null]);
   assert.equal(s2.doc(SETTLED_COLLECTION, ACCOUNT).slips.parlay001.settled, true);
@@ -155,7 +159,7 @@ test('a game never found is void three days after its start', async () => {
   const { store, deps, doc } = setup(now);
   deps.read = async () => ({ events: [] });
   wallet(store, [{ id: 'odds:stake-slipwin01', t: 1, app: 'odds', kind: 'stake', amount: -100 }]);
-  await post(deps, { op: 'open', slips: [slip('slipwin01', [leg('home')])] });
+  await watch(deps, [slip('slipwin01', [leg('home')])]);
   await settleCron(env, deps);
   assert.equal(doc(SETTLED_COLLECTION, ACCOUNT), null);
   now.t = Date.parse(START) + 3 * 86_400_000 + 3_600_000;
@@ -168,7 +172,7 @@ test('cash out: the value checked against the house\'s, paid by the Worker; neve
   const now = { t: Date.parse('2026-10-10T21:00:00Z') };
   const { store, deps, doc } = setup(now);
   wallet(store, [{ id: 'odds:stake-slipwin01', t: 1, app: 'odds', kind: 'stake', amount: -100 }, { id: 'odds:stake-slipwin02', t: 1, app: 'odds', kind: 'stake', amount: -100 }]);
-  await post(deps, { op: 'open', slips: [slip('slipwin01', [leg('home')]), slip('slipwin02', [leg('home')])] });
+  await watch(deps, [slip('slipwin01', [leg('home')]), slip('slipwin02', [leg('home')])]);
   deps.cashOutQuote = async () => ({ value: 120, reason: '' });
   // More than the house's value now: refused, with the house's.
   assert.deepEqual((await post(deps, { op: 'cashout', id: 'slipwin01', value: 150 })).body, { refused: { problem: 'moved', value: 120, reason: '' } });
@@ -228,10 +232,10 @@ test('a slip is placed through the Worker: checked, its stake taken, watched; al
   assert.equal((await post(deps, { op: 'place', slips: [slip('bigslip001', [later], { stake: 5000, cost: 5000 })] })).body.refused.problem, 'funds');
 });
 
-test('a slip staked after the lock-down is never watched by op open (only placed ones are)', async () => {
+test('op open watches nothing any more, a stake from before the lock-down or not (only placed slips are watched)', async () => {
   const now = { t: Date.parse('2026-10-13T20:00:00Z') };
   const { store, deps, doc } = setup(now);
-  wallet(store, [{ id: 'odds:stake-sneaky0001', t: now.t, app: 'odds', kind: 'stake', amount: -100 }]);
+  wallet(store, [{ id: 'odds:stake-sneaky0001', t: 1, app: 'odds', kind: 'stake', amount: -100 }]);
   const r = await post(deps, { op: 'open', slips: [slip('sneaky0001', [leg('home')])] });
   assert.equal(r.body.added, 0);
   assert.equal(doc(OPEN_COLLECTION, `${ACCOUNT}_sneaky0001`), null);
@@ -254,4 +258,34 @@ test('a slip as Play hands it over keeps what the price check reads (its mode, s
   assert.equal(s.boost, 1.5);
   assert.equal(s.free, 'eco:fb:welcome');
   assert.equal(s.freeValue, 200);
+});
+
+test('a placed slip keeps the house\'s own bets: a pick sent with another line or side settles as priced', async () => {
+  const { keptLeg } = await import('../price.js');
+  // The house's bet: Reds to win at 1.8. The phone sends its id at that
+  // price, but as an "over 0.5 runs" pick (a sure thing at 1.8).
+  const house = { id: 'mlb|cubs-reds|ml|home', gameId: 'g1', kind: 'ml', side: 'home', sport: 'mlb', start: START, estOdds: 1.8, label: 'Reds', game: { away: { en: 'Chicago Cubs' }, home: { en: 'Cincinnati Reds' } } };
+  const forged = { ...leg('home'), kind: 'total', side: 'over', line: 0.5, label: 'Reds', logo: 'x.png' };
+  const kept = keptLeg(forged, house);
+  assert.equal(kept.kind, 'ml');
+  assert.equal(kept.side, 'home');
+  assert.equal(kept.line, null);
+  assert.equal(kept.odds, 1.8);
+  assert.equal(kept.home, 'Cincinnati Reds');
+  assert.equal(kept.logo, 'x.png');
+});
+
+test('a live pick is priced again after the delay, on fresh reads: moved by then, nothing is placed', async () => {
+  const now = { t: Date.parse('2026-10-13T20:00:00Z') };
+  const { store, deps, doc } = setup(now);
+  wallet(store, [{ id: 'eco:start', t: 1, app: 'eco', kind: 'start', amount: 1000 }]);
+  const calls = [];
+  deps.livePrices = { read: async () => null };
+  deps.liveDelayMs = 1;
+  deps.checkSlip = async (s, w, prices) => (calls.push(prices === deps.livePrices ? 'fresh' : 'first'), prices === deps.livePrices ? { problem: 'moved', moved: [{ id: s.legs[0].id, odds: 1.2 }] } : { ok: true });
+  const live = { ...leg('home'), live: true };
+  const r = await post(deps, { op: 'place', slips: [slip('liveslip01', [live])] });
+  assert.deepEqual(calls, ['first', 'fresh']);
+  assert.equal(r.body.refused.problem, 'moved');
+  assert.ok(!doc(WALLET_COLLECTION, ACCOUNT).entries.some(e => e.id === 'odds:stake-liveslip01'));
 });

@@ -906,7 +906,7 @@ async function keep(key, url, body) {
   } catch {}
 }
 
-async function resolveOne(upstreamUrl, trim, ctx, { mirror = true } = {}) {
+async function resolveOne(upstreamUrl, trim, ctx, { mirror = true, within } = {}) {
   let policy = cachePolicyFor(upstreamUrl);
   const cache = caches.default;
   // A trimmed response is cached under its own key (a marker param on the
@@ -920,7 +920,9 @@ async function resolveOne(upstreamUrl, trim, ctx, { mirror = true } = {}) {
   // a cached answer left unread while its item reads upstream (CPBL's month:
   // a page and a dozen days) was closed under it ("Response closed due to
   // connection limit"), failing the item.
-  const cached = match && { status: match.status, contentType: match.headers.get('Content-Type') || 'application/json', storedAt: Number(match.headers.get('X-Sports-Proxy-Stored-At')), body: await match.arrayBuffer() };
+  let cached = match && { status: match.status, contentType: match.headers.get('Content-Type') || 'application/json', storedAt: Number(match.headers.get('X-Sports-Proxy-Stored-At')), body: await match.arrayBuffer() };
+  // This Worker's own check of a live bet (price.js): only a copy this many seconds old.
+  if (cached && within != null && !(Date.now() - cached.storedAt <= within * 1000)) cached = null;
   if (cached) {
     // A copy over for good is fresh a day (CACHE_FINAL), not its address's seconds.
     if (match.headers.get('X-Sports-Proxy-Final') === '1') policy = CACHE_FINAL;
@@ -1103,7 +1105,9 @@ async function handleSportsProxyRequest(request, env, headers, ip, ctx) {
   const trim = trimFor(requestParams.get('trim'), upstreamUrl);
   headers['X-Sports-Proxy-Cache-Tier'] = cachePolicyFor(upstreamUrl).tier;
 
-  const result = await resolveOne(upstreamUrl, trim, ctx, { mirror: requestParams.get('mirror') !== '0' });
+  // (`within`: this Worker's own reads only, a live bet checked on a copy that young.)
+  const within = ip === 'worker' && requestParams.has('within') ? Math.max(0, Number(requestParams.get('within')) || 0) : undefined;
+  const result = await resolveOne(upstreamUrl, trim, ctx, { mirror: requestParams.get('mirror') !== '0', within });
   if (result.policy) headers['X-Sports-Proxy-Cache-Tier'] = result.policy.tier;
   headers['X-RateLimit-Backend'] = gate.session.open ? 'open' : 'session';
   if (result.fetchError) return json({ error: { message: result.fetchError.message || 'Upstream request failed' } }, 502, headers);

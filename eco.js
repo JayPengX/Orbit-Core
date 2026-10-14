@@ -433,16 +433,26 @@ export function appEntries(entries, wallet) {
   });
 }
 
-// An app's figures (snap): its own key only. Securities' cash and holdings'
-// cost are the Worker's (stock-check.js `stock`, from the save that came
-// with them), never a phone's; without a checked save they stay as they were.
+// An app's figures (snap): its own key only. Securities' cash, holdings'
+// cost and opening money are the Worker's (stock-check.js `stock`, from the
+// save that came with them), never a phone's; without a checked save they
+// stay as they were.
+const WORKER_FIGURES = new Set(['cash', 'held', 'opened']);
+const phoneFigures = own => Object.fromEntries(Object.entries(own || {}).filter(([k]) => !WORKER_FIGURES.has(k)));
 export function appSnap(snap, app, wallet, stock, now = Date.now()) {
   const own = snap?.[app];
-  if (app !== 'stock') return own ? { [app]: Object.fromEntries(Object.entries(own).filter(([k]) => k !== 'cash' && k !== 'held')) } : {};
+  if (app !== 'stock') return own ? { [app]: phoneFigures(own) } : {};
   const had = wallet?.snap?.stock || {};
-  if (stock) return { stock: { ...had, ...(own || {}), cash: stock.cash, held: stock.held, t: Math.max(now, own?.t || 0, (had.t || 0) + 1) } };
-  return own ? { stock: { ...own, cash: had.cash ?? 0, held: had.held ?? 0 } } : {};
+  const kept = { cash: had.cash ?? 0, held: had.held ?? 0, ...(had.opened != null ? { opened: had.opened } : {}) };
+  if (stock) return { stock: { ...had, ...phoneFigures(own), cash: stock.cash, held: stock.held, ...(stock.opened != null ? { opened: stock.opened } : {}), t: Math.max(now, own?.t || 0, (had.t || 0) + 1) } };
+  return own ? { stock: { ...phoneFigures(own), ...kept } } : {};
 }
+// An app's new entries dated by this Worker (a phone's clock can't put an
+// entry before the lock-down); one already in the wallet keeps its own.
+export const stamped = (entries, wallet, now) => {
+  const have = new Set((wallet?.entries || []).map(e => e.id));
+  return entries.map(e => (have.has(e.id) ? e : { ...e, t: now }));
+};
 
 // What a client may send to change the wallet.
 export function cleanPatch(patch) {
@@ -617,7 +627,7 @@ export async function handleEcoRequest(request, env, headers, ip, deps) {
           // What falls due with the write comes with it (fixed ids: never
           // twice): the welcome bonus bet right after a first bet.
           const patch = cleanPatch(body.wallet);
-          const merged = mergeWallet(w, { ...patch, entries: appEntries(patch.entries, w), snap: appSnap(patch.snap, app, w, stock, now) });
+          const merged = mergeWallet(w, { ...patch, entries: stamped(appEntries(patch.entries, w), w, now), snap: appSnap(patch.snap, app, w, stock, now) });
           return touchApp(mergeWallet(merged, { entries: paydayEntries(merged, now) }), app, now);
         },
         { skipIf: () => refused }
@@ -1043,7 +1053,8 @@ async function ecoMerge(ctx) {
     const tag = `m${now.toString(36)}${k}`;
     for (const e of src.wallet.entries) if (!LEDGER_APPS.has(e.app)) carried.push(e.id.startsWith('eco:') ? e : { ...e, id: `${tag}:${e.id}`.slice(0, 96) });
     for (const [app, s] of Object.entries(src.wallet.snap || {})) {
-      if (!finite(s.cash) || src.data[app]) continue;
+      // (Securities' cash is the Worker's own count; no other app's figure is money.)
+      if (app !== 'stock' || !finite(s.cash) || src.data[app]) continue;
       carried.push({ id: `${tag}:snap:${app}`, t: now, app: 'eco', kind: 'merge', amount: s.cash, note: app });
     }
     for (const [key, v] of Object.entries(src.wallet.settings || {})) if (!settings[key] || v.t > settings[key].t) settings[key] = v;

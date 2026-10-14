@@ -24,7 +24,6 @@
 // sees the other's state (a cash out finds the slip settled and is given its
 // result instead).
 //
-//   POST /play?qt=T { op: 'open', slips: [slip…] }   watch these slips
 //   POST /play?qt=T { op: 'cashout', id, value }     { cashedOut, wallet } or { settled: record }
 //                      or { refused: { problem: 'moved', value } } (the house's value now, null: paused)
 //   POST /play?qt=T { op: 'ack', ids }               records Play has applied
@@ -66,6 +65,8 @@ export const VOID_AFTER = 3 * DAY;
 // From here on a slip is placed through the Worker (op 'place', its price
 // checked); one staked before is only watched (op 'open').
 export const PLACE_SINCE = LOCK_SINCE;
+// How long a live pick waits before it's priced again and placed.
+export const LIVE_DELAY_MS = 5_000;
 // A cron run (its own invocation: on the $5 plan 10,000 fetches and 30 s of
 // CPU, the free plan's 50 and 10 ms set these at 6 and 3): this many slips
 // looked at, this many settled. A game read once settles every slip on it,
@@ -219,7 +220,7 @@ export async function handlePlay(request, env, headers, session, deps) {
     if (body === deps.INVALID_BODY || !body || typeof body !== 'object') return errorJson('INVALID_JSON', 400, headers, request);
     const now = deps.now();
     // The lottery and scratch cards (lotto.js).
-    const lotto = await handleLotto(body, env, account, deps, now, PLACE_SINCE);
+    const lotto = await handleLotto(body, env, account, deps, now);
     if (lotto) return json(lotto, 200, headers);
     if (body.op === 'place') {
       // Placed here (the lock-down): every slip checked (price.js), its stake
@@ -236,6 +237,21 @@ export async function handlePlay(request, env, headers, session, deps) {
       for (const slip of clean) {
         const r = await (deps.checkSlip || checkSlip)(slip, wallet, deps.prices, new Date(now), once);
         if (!r.ok) return json({ refused: { slip: slip.id, ...r } }, 200, headers);
+        // Its picks as the house priced them (price.js keptLeg).
+        if (r.legs) slip.legs = r.legs;
+      }
+      // A live pick waits LIVE_DELAY_MS, as a sportsbook's in-play bets do,
+      // and is priced again on the live board as it is then (never a cached
+      // copy older than 2 seconds): a goal seen before the board moved can't
+      // be bet on.
+      const live = clean.filter(x => x.legs.some(l => l.live));
+      if (live.length && deps.livePrices) {
+        await new Promise(r => setTimeout(r, deps.liveDelayMs ?? LIVE_DELAY_MS));
+        const fresh = useReads(deps.livePrices);
+        for (const slip of live) {
+          const r = await (deps.checkSlip || checkSlip)(slip, wallet, deps.livePrices, new Date(deps.now()), fresh);
+          if (!r.ok) return json({ refused: { slip: slip.id, ...r } }, 200, headers);
+        }
       }
       const cost = clean.reduce((sum, x) => sum + x.cost, 0);
       if (cost > poolBalance(wallet) + 0.005) return json({ refused: { problem: 'funds' } }, 200, headers);
@@ -250,16 +266,10 @@ export async function handlePlay(request, env, headers, session, deps) {
       await watchSlips(env, deps, account, clean, now);
       return json({ placed: clean.map(x => x.id), wallet: paid.wallet }, 200, headers);
     }
-    if (body.op === 'open') {
-      // Slips placed before the lock-down (their stake in the wallet from
-      // before PLACE_SINCE): watched to be settled. Newer ones are placed.
-      const doc = await deps.fsGet(env, WALLET_COLLECTION, account);
-      const wallet = doc.exists ? parseWallet(doc.payload) : null;
-      const before = new Set((wallet?.entries || []).filter(e => e.app === 'odds' && e.kind === 'stake' && e.t < PLACE_SINCE).map(e => e.id.slice('odds:stake-'.length)));
-      const slips = (Array.isArray(body.slips) ? body.slips : []).slice(0, MAX_SLIPS).map(cleanSlip).filter(x => x && before.has(x.id));
-      const added = await watchSlips(env, deps, account, slips, now);
-      return json({ watching: slips.length, added }, 200, headers);
-    }
+    // Slips placed before the lock-down were handed over once each (op
+    // 'open'); none was left waiting when it closed (2026-10-14: a slip handed
+    // over could name any picks, so it pays nothing now).
+    if (body.op === 'open') return json({ watching: 0, added: 0 }, 200, headers);
     if (body.op === 'cashout') {
       // Cashed out here: the value checked against the house's own now
       // (price.js cashOutQuote), the slip taken from 'open' (never settled
@@ -309,7 +319,7 @@ export async function handlePlay(request, env, headers, session, deps) {
 
 // Slips watched to be settled (their documents and the index), and their
 // Kambi matches kept after Kambi drops them (kambi.js). How many were new.
-async function watchSlips(env, deps, account, slips, now) {
+export async function watchSlips(env, deps, account, slips, now) {
   const added = {};
   const kambi = [];
   for (const slip of slips) {

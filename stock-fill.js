@@ -2,64 +2,144 @@
 // The owner, 2026-10-14: Securities' orders are filled by the proxy, as
 // Play's bets are placed and settled by it. The phone places an order (the
 // kit's placeOrder: it holds its cash or shares and waits); then it asks
-// here for its open orders, and this Worker reads its own fresh quote
+// here for its open orders, and this Worker decides each with the kit's own
+// rule (triggerPrice: a market order now, a limit or stop once its price is
+// met, the market's hours, odd lots, after-hours) on its own fresh quote
 // (Yahoo, through the data proxy's route in place: the kit's stock-quotes
-// with this Worker's reader) and decides each with the kit's own rule
-// (triggerPrice: a market order now, a limit or stop once its price is
-// met, the market's hours, odd lots, after-hours). What fills is kept here
-// (`stock-fills/<account>`: each order's quote and moment) and answered;
-// the phone applies exactly that (the kit's applyFills: the spread, costs,
-// cash and shares as the account has them). When the account is saved,
-// stock-check.js takes a fill this Worker issued as it is; any other fill
-// is checked against the market's price bars as before (or never counts).
+// with this Worker's reader). The phone applies exactly that (the kit's
+// applyFills: the spread, costs, cash and shares as the account has them).
 //
-//   POST /stock { op: 'fill', orders: [order…] }  (a Securities session)
-//     → { fills: { orderId: { quote, t } } }
+// Nothing about an order is the phone's to change once it's here (the
+// money lock-down, 2026-10-14): the first time this Worker sees an order it
+// keeps its terms (symbol, side, quantity, type, limit, stop) and the
+// moment it saw it, which stands for when it was placed (a phone can't date
+// an order into the past to catch a price that already happened). An order
+// that waited across a session the phone wasn't open for is filled from the
+// price bars since then (the kit's backfillPrice, once a session). What
+// fills is kept with those terms and the NT$ rate of its currency
+// (`stock-fills/<account>`); stock-check.js counts a fill only when it
+// matches one issued here.
+//
+// A monthly plan (定期定額) is kept the same way: its terms (symbol, day,
+// amount) and the moment first seen; each month's buy that falls due after
+// that is filled here at the first price on or after its day (the price
+// bars' open) and that moment's NT$ rate, as the order `plan:<id>:<month>`.
+//
+//   POST /stock { op: 'fill', orders: [order…], plans: [plan…] }  (a Securities session)
+//     → { fills: { orderId: { quote, t, twd } } }
 //
 // deps: { fsGet, fsWrite, read(url) -> JSON (the data proxy's route), now }.
 
-import { fetchQuotes, useQuotesReader } from './kit/stock-quotes.mjs';
-import { triggerPrice } from './kit/stock-account.mjs';
+import { fetchQuotes, fetchBars, fxSymbol, useQuotesReader } from './kit/stock-quotes.mjs';
+import { triggerPrice, backfillPrice, planRuns, planOrderId } from './kit/stock-account.mjs';
 
 export const FILLS_COLLECTION = 'stock-fills';
 const MAX_ORDERS = 40;
-// What's kept of the fills issued: the newest this many, this long.
+// What's kept of the fills issued: the newest this many, this long; an
+// order waiting is kept as long as a good-till-cancelled one lasts.
 const KEEP = 400;
 const KEEP_MS = 60 * 86_400_000;
+const OPEN_MS = 35 * 86_400_000;
 const ID = /^[A-Za-z0-9:_-]{4,64}$/;
 const SYMBOL = /^[A-Za-z0-9.^=\-&]{1,24}$/;
+const CURRENCY = /^[A-Z]{3}$/;
 
 // An order as the phone hands it: what deciding it needs, nothing else.
 export function cleanOrder(o) {
   if (!o || !ID.test(String(o.id)) || !SYMBOL.test(String(o.symbol))) return null;
   if (o.side !== 'buy' && o.side !== 'sell') return null;
   if (!['market', 'limit', 'stop'].includes(o.type)) return null;
-  const n = x => (Number.isFinite(Number(x)) ? Number(x) : undefined);
-  return { id: String(o.id), symbol: String(o.symbol), side: o.side, type: o.type, qty: n(o.qty), limit: n(o.limit), stop: n(o.stop), t: n(o.t), after: n(o.after), market: String(o.market || ''), kind: String(o.kind || '') };
+  const n = x => (x != null && Number.isFinite(Number(x)) ? Number(x) : undefined);
+  if (!(n(o.qty) > 0)) return null;
+  const currency = CURRENCY.test(String(o.currency)) ? String(o.currency) : undefined;
+  return { id: String(o.id), symbol: String(o.symbol), side: o.side, type: o.type, qty: n(o.qty), limit: n(o.limit), stop: n(o.stop), t: n(o.t), after: n(o.after), expires: n(o.expires), market: String(o.market || ''), kind: String(o.kind || ''), currency };
 }
 
-// The orders' fills now: { orderId: { quote, t } } for those whose price is met.
-export async function decideFills(orders, { read, now = Date.now() }) {
-  useQuotesReader(url => read(url));
-  const symbols = [...new Set(orders.map(o => o.symbol))];
-  const quotes = await fetchQuotes(symbols);
-  const fills = {};
-  for (const o of orders) {
-    const q = quotes.get(o.symbol);
-    const price = q ? triggerPrice(o, q, now) : null;
-    if (Number.isFinite(price) && price > 0) fills[o.id] = { quote: price, t: now };
-  }
-  return fills;
+// The kept document: { v: 2, fills: { id: fill }, open: { id: terms },
+// plans: { id: [terms…] } } (before v2, the fills alone).
+export function readBook(doc) {
+  let raw = null;
+  try {
+    raw = doc?.exists ? JSON.parse(doc.payload) : null;
+  } catch {}
+  if (raw?.v === 2) return { v: 2, fills: raw.fills || {}, open: raw.open || {}, plans: raw.plans || {} };
+  return { v: 2, fills: raw && typeof raw === 'object' ? raw : {}, open: {}, plans: {} };
 }
-
 // The fills issued for an account (stock-check.js reads them).
 export async function issuedFills(env, account, fsGet) {
-  const doc = await fsGet(env, FILLS_COLLECTION, account).catch(() => null);
-  try {
-    return doc?.exists ? JSON.parse(doc.payload) : {};
-  } catch {
-    return {};
+  return readBook(await fsGet(env, FILLS_COLLECTION, account).catch(() => null)).fills;
+}
+
+// A plan as the phone hands it (on ones only).
+export function cleanPlan(p) {
+  if (!p || !ID.test(String(p.id)) || !SYMBOL.test(String(p.symbol)) || p.on === false) return null;
+  const day = Math.round(Number(p.day));
+  const amount = Math.round(Number(p.amount));
+  if (!(day >= 1 && day <= 28) || !(amount > 0 && amount <= 1_000_000_000)) return null;
+  return { id: String(p.id), symbol: String(p.symbol), day, amount, currency: CURRENCY.test(String(p.currency)) ? String(p.currency) : undefined, market: String(p.market || ''), kind: String(p.kind || '') };
+}
+// The plan's terms in force at a moment: the latest version seen by then.
+export const planAt = (versions, t) => [...(versions || [])].reverse().find(v => v.seen <= t) || null;
+
+// Each kept plan's months due now and not filled: filled at the first bar
+// on or after the day (its open), at that moment's NT$ rate.
+async function planFills(book, now) {
+  const out = {};
+  for (const [id, versions] of Object.entries(book.plans)) {
+    const v = versions.at(-1);
+    const due = planRuns({ on: true, since: versions[0].seen, day: v.day }, now)
+      .map(run => ({ ...run, terms: planAt(versions, run.t), oid: planOrderId({ id }, run.month) }))
+      .filter(r => r.terms && !book.fills[r.oid]);
+    if (!due.length) continue;
+    const bars = await fetchBars(v.symbol, due[0].t - 86_400_000).catch(() => []);
+    const cur = v.currency;
+    const fx = cur && cur !== 'TWD' ? await fetchBars(fxSymbol(cur), due[0].t - 5 * 86_400_000).catch(() => []) : [];
+    for (const run of due) {
+      const bar = bars.find(b => b.t >= run.t && b.o > 0);
+      if (!bar) break;
+      let twd = !cur || cur === 'TWD' ? 1 : null;
+      for (const b of fx) if (b.t <= bar.t && b.c > 0) twd = b.c;
+      if (!(twd > 0)) continue;
+      out[run.oid] = { quote: bar.o, t: bar.t, twd, s: run.terms.symbol, side: 'buy', k: 'market', amt: run.terms.amount, plan: id };
+    }
   }
+  return out;
+}
+
+// An order's terms as first seen: `t` the moment this Worker saw it.
+const termsOf = (o, now) => ({ symbol: o.symbol, side: o.side, type: o.type, qty: o.qty, limit: o.limit, stop: o.stop, after: o.after, expires: o.expires, market: o.market, kind: o.kind, currency: o.currency, t: now });
+
+// The orders' fills now: { orderId: { quote, t, twd } } for those whose price
+// is met (now, or in a session since the order was seen that the phone
+// wasn't open for). `orders`: each with its kept terms (t: when first seen,
+// bf: when its bars were last looked at).
+export async function decideFills(orders, { read, now = Date.now() }) {
+  useQuotesReader(url => read(url));
+  const currencies = [...new Set(orders.map(o => o.currency).filter(c => c && c !== 'TWD'))];
+  const symbols = [...new Set([...orders.map(o => o.symbol), ...currencies.map(fxSymbol)])];
+  const quotes = await fetchQuotes(symbols);
+  const twdOf = c => (!c ? undefined : c === 'TWD' ? 1 : quotes.get(fxSymbol(c))?.price);
+  const fills = {};
+  const looked = {};
+  for (const o of orders) {
+    const q = quotes.get(o.symbol);
+    const twd = twdOf(o.currency);
+    // (Past its end, only what met its price before then.)
+    const price = q && !(o.expires && now >= o.expires) ? triggerPrice(o, q, now) : null;
+    if (Number.isFinite(price) && price > 0) {
+      fills[o.id] = { quote: price, t: now, ...(twd > 0 ? { twd } : {}) };
+      continue;
+    }
+    // Waited across a session the phone wasn't open for: that session's bars,
+    // once per session.
+    const start = q?.session?.start;
+    if (!(start > o.t) || (o.bf || 0) >= start || o.after) continue;
+    looked[o.id] = now;
+    const bars = await fetchBars(o.symbol, o.t).catch(() => []);
+    const hit = backfillPrice(o, bars.filter(b => b.t < start));
+    if (hit && hit.price > 0) fills[o.id] = { quote: hit.price, t: Math.max(o.t, hit.t), ...(twd > 0 ? { twd } : {}) };
+  }
+  return { fills, looked };
 }
 
 export async function handleStock(request, env, headers, session, deps) {
@@ -74,19 +154,51 @@ export async function handleStock(request, env, headers, session, deps) {
   }
   if (body?.op !== 'fill') return json({ error: { message: 'Unknown op' } }, 400, headers);
   const orders = (Array.isArray(body.orders) ? body.orders : []).slice(0, MAX_ORDERS).map(cleanOrder).filter(Boolean);
-  if (!orders.length) return json({ fills: {} }, 200, headers);
+  const plans = (Array.isArray(body.plans) ? body.plans : []).slice(0, 20).map(cleanPlan).filter(Boolean);
+  if (!orders.length && !plans.length) return json({ fills: {} }, 200, headers);
   const now = deps.now();
-  // An order filled before keeps that fill (asked again, the same answer).
-  const had = await issuedFills(env, session.d, deps.fsGet);
-  const fresh = await decideFills(orders.filter(o => !had[o.id]), { read: deps.read, now }).catch(() => ({}));
-  const fills = Object.fromEntries(orders.filter(o => had[o.id]).map(o => [o.id, had[o.id]]));
-  Object.assign(fills, fresh);
-  if (Object.keys(fresh).length) {
-    const all = Object.entries({ ...had, ...fresh })
+  const book = readBook(await deps.fsGet(env, FILLS_COLLECTION, session.d));
+  let changed = false;
+  // A plan first seen, or its terms changed: this version from now.
+  for (const p of plans) {
+    const versions = book.plans[p.id] || [];
+    const last = versions.at(-1);
+    if (last && last.symbol === p.symbol && last.day === p.day && last.amount === p.amount) continue;
+    book.plans[p.id] = [...versions, { symbol: p.symbol, day: p.day, amount: p.amount, currency: p.currency, market: p.market, kind: p.kind, seen: now }].slice(-12);
+    changed = true;
+  }
+  if (plans.length) {
+    useQuotesReader(url => deps.read(url));
+    const due = await planFills({ ...book, plans: Object.fromEntries(plans.map(p => [p.id, book.plans[p.id]])) }, now).catch(() => ({}));
+    for (const [id, f] of Object.entries(due)) (book.fills[id] = f), (changed = true);
+  }
+  // First seen now: its terms kept as they are.
+  for (const o of orders)
+    if (!book.fills[o.id] && !book.open[o.id]) {
+      book.open[o.id] = termsOf(o, now);
+      changed = true;
+    }
+  const waiting = orders.filter(o => !book.fills[o.id] && book.open[o.id]).map(o => ({ id: o.id, ...book.open[o.id] }));
+  const { fills: fresh, looked } = waiting.length ? await decideFills(waiting, { read: deps.read, now }).catch(() => ({ fills: {}, looked: {} })) : { fills: {}, looked: {} };
+  for (const [id, at] of Object.entries(looked)) if (book.open[id]) (book.open[id].bf = at), (changed = true);
+  for (const [id, f] of Object.entries(fresh)) {
+    const o = book.open[id];
+    book.fills[id] = { ...f, s: o.symbol, side: o.side, q: o.qty, k: o.type, ...(o.limit != null ? { l: o.limit } : {}), ...(o.stop != null ? { st: o.stop } : {}), seen: o.t };
+    delete book.open[id];
+    changed = true;
+  }
+  const answerOf = f => ({ quote: f.quote, t: f.t, ...(f.twd ? { twd: f.twd } : {}) });
+  const answer = Object.fromEntries(orders.filter(o => book.fills[o.id]).map(o => [o.id, answerOf(book.fills[o.id])]));
+  // The plans' months filled (asked for or not).
+  const asked = new Set(plans.map(p => p.id));
+  for (const [id, f] of Object.entries(book.fills)) if (f.plan && asked.has(f.plan)) answer[id] = answerOf(f);
+  if (changed) {
+    const fills = Object.entries(book.fills)
       .filter(([, f]) => now - f.t < KEEP_MS)
       .sort((a, b) => b[1].t - a[1].t)
       .slice(0, KEEP);
-    await deps.fsWrite(env, FILLS_COLLECTION, session.d, JSON.stringify(Object.fromEntries(all)));
+    const open = Object.entries(book.open).filter(([, o]) => now - o.t < OPEN_MS).slice(-KEEP);
+    await deps.fsWrite(env, FILLS_COLLECTION, session.d, JSON.stringify({ v: 2, fills: Object.fromEntries(fills), open: Object.fromEntries(open), plans: book.plans }));
   }
-  return json({ fills }, 200, headers);
+  return json({ fills: answer }, 200, headers);
 }

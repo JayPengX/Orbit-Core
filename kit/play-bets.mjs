@@ -285,3 +285,36 @@ export function liveBets(data, { offersOf = () => null } = {}) {
   }
   return { games, bets: withHouseRules(bets) };
 }
+
+// ---- A pick as a slip keeps it ----------------------------------------------
+//
+// What a slip keeps of a bet (Play's legRecord, less its price and picture):
+// everything settling reads (kit/settle.mjs legResult, readOutcomes) and the
+// names it shows. The proxy builds a placed slip's picks from its own bets
+// with this (price.js), so a pick settles on the bet that was priced, never
+// on terms a phone sent (the money lock-down, 2026-10-14).
+export function legOf(bet) {
+  return {
+    id: bet.id,
+    gameId: bet.gameId ?? undefined,
+    market: bet.gameId ? bet.market ?? bet.kind : undefined,
+    kind: bet.kind,
+    sport: bet.sport,
+    label: bet.label,
+    shortLabel: bet.shortLabel,
+    matchup: bet.matchup,
+    start: bet.start ?? null,
+    fairChance: bet.fairChance,
+    side: bet.side ?? null,
+    line: bet.totalLine ?? bet.runLine ?? bet.teamLine ?? bet.runN ?? null,
+    inning: bet.inning ?? null,
+    away: bet.game?.away.en ?? null,
+    home: bet.game?.home.en ?? null,
+    driver: bet.driverEn ?? null,
+    eventSlug: bet.eventSlug ?? null,
+    live: bet.live ? true : undefined,
+    kambiId: bet.game?.kambiId ?? undefined,
+    ...(bet.settle ?? {}),
+    team: bet.kind === 'future' ? bet.teamEn : bet.settle?.team ?? bet.team ?? null
+  };
+}

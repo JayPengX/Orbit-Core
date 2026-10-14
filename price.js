@@ -14,7 +14,7 @@
 //
 // deps: { read(url, trim) -> JSON (throws on failure), pack(path) -> JSON }.
 import * as src from './kit/play-sources.mjs';
-import { boardBets, futureBets, liveBets } from './kit/play-bets.mjs';
+import { boardBets, futureBets, liveBets, legOf } from './kit/play-bets.mjs';
 import { comboCount, slipSizes, slipErrors } from './kit/play-odds.mjs';
 import { LIVE_MIN_LIQUIDITY } from './kit/play-live.mjs';
 import { plusMember, PLUS, freeBets } from './kit/plus.mjs';
@@ -118,7 +118,14 @@ export async function checkSlip(slip, wallet, deps, now = new Date(), reads = nu
   // (A free bet's stake is its token's value and the top-up: not the stake unit's.)
   const errors = slipErrors({ mode: slip.mode, legs: house, sizes: slip.sizes, stake: slip.stake }).filter(e => !(slip.free && (e === 'stakeUnit' || e === 'ticketMin')));
   if (errors.length) return { problem: errors[0] };
-  return { ok: true };
+  // The picks as the slip keeps them: the house's own bets (what settling
+  // reads), at the price asked; only the names and pictures the phone's.
+  return { ok: true, legs: legs.map((leg, i) => keptLeg(leg, checked[i].bet)) };
+}
+const text = (v, max) => (typeof v === 'string' && v ? v.slice(0, max) : undefined);
+export function keptLeg(leg, bet) {
+  const own = legOf(bet);
+  return { ...own, label: own.label ?? text(leg.label, 160), shortLabel: own.shortLabel ?? text(leg.shortLabel, 80), matchup: own.matchup ?? text(leg.matchup, 160), odds: Number(leg.odds), ...(text(leg.logo, 400) ? { logo: text(leg.logo, 400) } : {}) };
 }
 
 // ---- Cash out ------------------------------------------------------------------
