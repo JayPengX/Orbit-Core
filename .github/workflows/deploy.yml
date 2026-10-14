@@ -12,12 +12,13 @@ on:
       - 'locales/**'
       - 'wrangler.toml'
       - 'wrangler.gemini.toml'
-      - 'wrangler.sports-proxy.toml'
       - '.github/workflows/deploy.yml'
-  # Once a year on 6 December: the step below takes the Firebase key off
-  # (sign-ins it signed ran out on 2026-12-05) even if nothing was pushed.
+  # On 20 October (the old sports-proxy deleted) and 6 December (the
+  # Firebase key off: sign-ins it signed ran out on 2026-12-05), even if
+  # nothing was pushed.
   schedule:
     - cron: '17 3 6 12 *'
+    - cron: '17 3 20 10 *'
   workflow_dispatch:
 
 jobs:
@@ -81,13 +82,22 @@ jobs:
           # so a future change to that default can't silently break this
           # again the same way.
           wranglerVersion: '4'
-      - name: Deploy sports-proxy (the old address, forwarding to the proxy)
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy --config wrangler.sports-proxy.toml
-          wranglerVersion: '4'
+      # The old address (sports-proxy.pengzjay.workers.dev, a forwarder to the
+      # proxy since the move on 2026-10-13): no code calls it, and a phone on
+      # an older kit takes the new one at its next opening; 10 minutes of its
+      # logs on 2026-10-14 had no request. Its code is gone from the repo; the
+      # Worker itself goes after a quiet week, from 2026-10-20 (the workflow
+      # also runs that day). guard.js treats it gone as nothing to stop.
+      - name: The old sports-proxy Worker deleted
+        continue-on-error: true
+        run: |
+          [ "$(date -u +%Y%m%d)" -ge 20261020 ] || { echo "kept until 2026-10-20"; exit 0; }
+          code=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/sports-proxy/settings")
+          [ "$code" = "200" ] || { echo "already gone ($code)"; exit 0; }
+          npx --yes wrangler@4 delete --name sports-proxy --force && echo "sports-proxy deleted"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       # The Quadra Pass token secret (see quadra-token.js): /eco signs
       # session tokens with it and every route checks them. Only when the repo has the secret
       # ECO_TOKEN_SECRET (any long random string); until then the proxy's
@@ -147,6 +157,7 @@ jobs:
           [ "$stopped" = "yes" ] || exit 0
           api="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts"
           for w in orbit-workers-proxy sports-proxy; do
+            # (sports-proxy deleted from 2026-10-20: its calls fail, nothing to stop.)
             curl -fsS -X DELETE -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$api/$w/subdomain" >/dev/null && echo "$w address off"
             curl -fsS -X PUT -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H 'Content-Type: application/json' -d '[]' "$api/$w/schedules" >/dev/null && echo "$w crons off"
           done

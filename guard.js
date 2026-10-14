@@ -77,6 +77,9 @@ export const PLAN_ZH = {
 export const R2_CLASS_B = new Set(['HeadBucket', 'HeadObject', 'GetObject', 'UsageSummary', 'GetBucketEncryption', 'GetBucketLocation', 'GetBucketCors', 'GetBucketLifecycleConfiguration']);
 export const R2_FREE = new Set(['DeleteObject', 'DeleteBucket', 'AbortMultipartUpload']);
 export const STOP_AT = 0.9;
+// (sports-proxy, the old forwarder, is deleted from 2026-10-20: a 404 for it is
+// nothing to stop or start. Stopped with the proxy until then: it reaches the
+// proxy through a service binding, not its address.)
 export const WORKERS = ['orbit-workers-proxy', 'sports-proxy'];
 export const STATE_KEY = 'guard:state';
 // Unreadable this long while armed: stopped too (a bill can't be watched blind).
@@ -251,7 +254,7 @@ async function cf(env, fetcher, method, path, body) {
     body: body === undefined ? undefined : JSON.stringify(body)
   });
   const j = await res.json().catch(() => ({}));
-  if (!res.ok || j.success === false) throw new Error(`${method} ${path}: ${res.status} ${(j.errors || []).map(e => e.message).join('; ')}`.slice(0, 300));
+  if (!res.ok || j.success === false) throw Object.assign(new Error(`${method} ${path}: ${res.status} ${(j.errors || []).map(e => e.message).join('; ')}`.slice(0, 300)), { status: res.status });
   return j.result;
 }
 
@@ -302,7 +305,8 @@ export async function guardRun(env, { fetcher = fetch, now = Date.now(), kv = en
         await startWorker(env, fetcher, name, prev.stopped.saved);
         acts.push(`${name} on`);
       } catch (e) {
-        acts.push(`${name} on failed: ${e.message}`);
+        // A Worker that's gone (the old sports-proxy, deleted) has nothing to start.
+        if (e.status !== 404) acts.push(`${name} on failed: ${e.message}`);
       }
     if (!acts.some(a => a.includes('failed'))) state.stopped = null;
     delete state.restart;
@@ -314,7 +318,7 @@ export async function guardRun(env, { fetcher = fetch, now = Date.now(), kv = en
         const r = await stopWorker(env, fetcher, name, saved);
         if (r.addressWasOn || r.crons) acts.push(`${name} off`);
       } catch (e) {
-        acts.push(`${name} off failed: ${e.message}`);
+        if (e.status !== 404) acts.push(`${name} off failed: ${e.message}`);
       }
     state.stopped = { ...state.stopped, saved };
   }
