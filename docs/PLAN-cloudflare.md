@@ -166,6 +166,8 @@ Each one states its before and after numbers.
 - [x] The month paced: 60/80/90% projected slows live refreshes ×2/×4/×8,
       parks builders, trims reads (`guard.js`, `pace.js`)
 - [x] Phone alerts at 50/75/90%, a new pace, a stop (`ops.js`)
+- [ ] **You:** the steps in `docs/OWNER-STEPS.md` (alerts, the Cloudflare
+      email alert, the renewal day, Shared-Data, Firebase, the old token)
 - [ ] **You:** admin panel → 系統 → 警示通知: your pass → 設定 → 測試
 - [x] Every cron job's heartbeat in D1; admin 系統 pane (bill, pace, jobs,
       Gemini check, builders by hand, R2, D1, secrets, deploys)
