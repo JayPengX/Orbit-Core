@@ -10,6 +10,42 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
 
 
 
+## The month paced; alerts; 系統 in the admin panel; secrets trimmed (2026-10-14, pushed to `main`)
+
+- **Pacing** (`guard.js` → `guard:pace` → `pace.js`): projected 60/80/90% of
+  any rate count (three days counted at least) sets pace 1/2/3: GET
+  /config's live refreshes ×2/×4/×8, builders parked (at 1 only watch, asia,
+  cpbl, sports run), Weather's scoring off from 1, each session's reads ×½
+  from 2 and ×¼ at 3. Down only 10 points under a mark. The stop at 90% used
+  is unchanged.
+- **Alerts** (`ops.js tellOwner`, every ten minutes on the even cron): a
+  higher alert (50/75/90%), a stop or a new pace → a notice to the account
+  set in 系統 (`quadra-config/ops`), on its first app with notices on;
+  `guard:told` keeps what was said. Not set yet: the owner enters their
+  pass in 系統 → 警示通知.
+- **Heartbeats**: every cron job (`f1`, `build:*`, `alerts`, `settle`,
+  `lottery`, `notices`, `weather-skill`, `capacity`, `kambi`) upserts a row
+  in D1 `beats` (ok, ms, note, failures in a row).
+- **Checks**: `/ops?check=gemini|system` (Bearer `DATA_PUSH_SECRET`), run by
+  `build.yml`. First live Gemini check: `gemini-3.5-flash-lite` through the
+  Taiwan relay, 200, "OK", 1.8 s, 52 tokens.
+- **Admin 系統** (was the dead Shared-Data pane): six tiles (protection,
+  pace, top count, projected, alert, period), the alert account and a test
+  notice, heartbeats, Gemini's check and each builder by hand, R2 folders
+  (listed at most hourly), D1 collections, secrets and bindings set or not,
+  deploys, links. Checked at 375px in WebKit with the live report.
+- **Secrets**: `CLOUDFLARE_ACCOUNT_ID` (GitHub) and `CF_ACCOUNT_ID` (guard)
+  gone: workflows and the guard find the account from their token.
+  `MATCH_FIND_DISPATCH_TOKEN` (a GitHub token, dead) off the proxy; the owner
+  revokes it at GitHub. `PROXY_URL` variables gone from Orbit Class, Sports
+  and Words (Class's address is now `src/proxy-config.js`'s default).
+  `Audit secrets` workflow lists each Worker's secret names. README §11 has
+  every secret by kind.
+- **Store**: a new version stamp never equals the one it replaces (a rare
+  collision let a stale write through; the flaky store test found it).
+- Cost: one D1 row a cron run (~100k a month of 50M), one KV read every ten
+  minutes, the pace read once a minute an isolate.
+
 ## Firebase gone: the Pass's store on D1; the free plan's last limits out (2026-10-14, pushed to `main`)
 
 - **D1** (`quadra-store`, APAC, binding `STORE`): made by the deploy once the

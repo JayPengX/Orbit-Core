@@ -753,13 +753,38 @@ read 2026-10-13):
 
 | Count | Included a month | Stops at (90%) |
 | --- | --- | --- |
-| Workers requests (both proxies, crons, the guard) | 10,000,000 | 9,000,000 |
+| Workers requests (the proxy, its relay, crons, the guard) | 10,000,000 | 9,000,000 |
 | Workers CPU | 30,000,000 ms | 27,000,000 ms |
 | KV reads / writes / deletes / lists | 10M / 1M / 1M / 1M | 90% of each |
 | KV stored | 1 GB | 0.9 GB |
 | Durable Objects requests / stored | 1M / 5 GB | 90% of each |
+| R2 writes (Class A) / reads (Class B) / stored | 1M / 10M / 10 GB | 90% of each |
+| D1 rows read / written / stored | 25B / 50M / 5 GB | 90% of each |
 
-At 90% of any one, both proxies go off the air: their workers.dev
+**Pacing first** (the owner, 2026-10-14: "pace it out greatly"). Before any
+stop, the guard projects each count to the period's end (the first three
+days counted as three) and sets a pace (`guard:pace` in KV, written only
+when it changes), which the proxy follows (`pace.js`):
+
+| Projected | Pace | What slows |
+| --- | --- | --- |
+| under 60% | 0 | nothing: as configured |
+| 60% | 1 | live refreshes ×2 (GET /config, which every app and the data proxy read); the builders that can wait (photos, cutouts, buses, win probability) and Weather's hourly scoring parked |
+| 80% | 2 | ×4; every builder parked; each session's reads a minute halved |
+| 90% | 3 | ×8; reads quartered |
+
+A pace goes up at once and down only 10 points under its mark. A builder
+run by hand (the admin panel, `build.yml`) runs at any pace.
+
+**Alerts.** The guard records the highest of 50%, 75%, 90% any count has
+reached this period. Every ten minutes the proxy's cron compares it, the
+pace and whether the proxy is stopped with what the owner was last told
+(`guard:told`) and sends a notice to the account set in the admin panel's
+系統 (`quadra-config/ops`), on the first of its apps with notices on
+(`ops.js`). Cloudflare's own budget alert is the owner's to add (it only
+emails; §11).
+
+At 90% of any one, the proxy goes off the air: its workers.dev
 addresses are turned off (a request that never reaches a Worker isn't
 billed) and their crons emptied (kept in KV). Every run while stopped turns
 them off again (a deploy turns them on; `deploy.yml`'s last step does it at
@@ -778,10 +803,13 @@ apps' pages and the nightly packs stay up and open on what the phone has.
 - **Blind**: armed but unable to read the bill for 6 hours, it stops too.
 - **Unarmed**: without `CF_GUARD_TOKEN` it watches nothing and says so.
 - **Each invocation's CPU** is capped in its toml (`[limits] cpu_ms`:
-  3,000 the main Worker, 1,000 the sports proxy and the guard; the plan
-  allows 30 s) against a runaway.
-- **The panel**: 容量 shows each count, this period and at this pace, and
-  whether the proxies are stopped (`guard:state` in KV).
+  30,000 the proxy, whose builders need it; 1,000 the guard and the Gemini
+  relay) against a runaway.
+- **The panel**: 容量 shows each count, this period and at this pace; 系統
+  the pace, the alerts, every cron job's heartbeat (`beats` in D1), R2's
+  folders, D1's collections and which secrets are set (`ops.js`).
+- **The account** is the guard token's own (asked once, kept in the state):
+  no account-ID secret.
 - **A new Cloudflare product** (R2, D1, Queues, …) goes in `PLAN` with its
   included amounts in the same change, or isn't used.
 
@@ -878,25 +906,46 @@ old offline copy.
   ran).
 - `tail.yml` (by hand): each Worker's crons and address as Cloudflare has
   them, and a Worker's live logs for a few minutes.
+- `build.yml` (by hand): a builder now, or a check (`gemini-check`: one
+  tiny Gemini call through the relay; `system`: the 系統 report).
+- `audit.yml` (by hand): each Worker's secret names.
 - Push validated changes straight to `main` after `npm test` passes.
 
 `wrangler deploy` pushes a toml's `[vars]`, KV, Durable Object and trigger
-config as the Worker's whole config. Secrets are never in the repo; they
-are set with `wrangler secret put` or the dashboard.
+config as the Worker's whole config. **Only what must stay secret is a
+secret**; anything public (the proxy's address, the account ID, KV and D1
+ids, model names) is in the code or a toml, never a variable. The
+`Audit secrets` workflow lists each Worker's secret names (never values);
+the admin panel's 系統 shows which are set.
 
-| Worker | Secret / binding | For |
+**GitHub (Shared-Proxy's repo secrets; no other repo has any):**
+
+| Secret | Kind | For |
 | --- | --- | --- |
-| both | `ECO_TOKEN_SECRET` | Signing and checking session tokens |
-| orbit-workers-proxy | `STORE` (D1 `quadra-store`, APAC, made and bound by `deploy.yml`) | The Pass's store: wallets, each app's data, Play's slips, Kambi's watch, config (`doc-store.js`) |
-| orbit-workers-proxy | `FIREBASE_PRIVATE_KEY` (until 2026-12-06, then `deploy.yml` removes it) | Only checking sign-ins made before `ECO_TOKEN_SECRET` |
-| orbit-workers-proxy | `RATE_LIMIT_KV` (KV) | Push lists and keys, Transit's Google meter and TDX token, Weather's daily count, cells and scores; sign-in limits |
-| orbit-workers-proxy | `GEMINI_API_KEY` | `/gemini`, `/nl-edit` |
-| orbit-workers-proxy | `TDX_CLIENT_ID`, `TDX_CLIENT_SECRET`, `GOOGLE_MAPS_BROWSER_KEY`, `GOOGLE_MAPS_KEY` | Transit |
-| orbit-workers-proxy | `GOOGLE_WEATHER_KEY`, `CWA_KEY`, `MOENV_KEY` | Weather |
-| orbit-workers-proxy | `ADMIN_TOKEN_HASH`, `ECO_ADMIN_TOKEN` | The admin panel (the owner's key; Claude never uses it) |
-| orbit-workers-proxy | `F1_LOG` (Durable Object `F1Log`, migration `f1-log-main`), cron `* * * * SUN,MON,THU,FRI,SAT` | The F1 lap log |
-| quota-guard | `CF_GUARD_TOKEN` (from the repo secret), `CF_ACCOUNT_ID` (from `CLOUDFLARE_ACCOUNT_ID`), `RATE_LIMIT_KV`, `CLOCK` (Durable Object `GuardClock`: its alarm every 5 minutes; the proxy wakes it through `GUARD`) | Reading the bill, stopping the proxy (§8.1) |
-| orbit-workers-proxy | `DATA` (R2 `quadra-data`, made and bound by `deploy.yml` once R2 is on), `DATA_PUSH_SECRET` (from the repo secret) | The family's data (§4.7) |
+| `CLOUDFLARE_API_TOKEN` | Cloudflare token (an Account API Token: Workers Scripts, KV, R2, D1 · Edit; Account Settings · Read) | Every deploy; the workflows find the account from it |
+| `CF_GUARD_TOKEN` | Cloudflare token (Account Analytics · Read, Workers Scripts · Edit) | The guard reading the bill and stopping the proxy; kept apart from the deploy token (least power for a running Worker) |
+| `DATA_PUSH_SECRET` | Our own random key | The proxy's own door for the repo: `/data/build`, `/data/push`, `/ops` (`build.yml`) |
+| `ECO_TOKEN_SECRET` | Our own random key | Copied onto the proxy: signing the Pass's sign-ins |
+| `ECO_ADMIN_TOKEN` | The owner's admin key | Copied onto the proxy: the admin panel (Claude never uses it) |
+
+**Cloudflare (each Worker's secrets):**
+
+| Worker | Secret | Kind | For |
+| --- | --- | --- | --- |
+| orbit-workers-proxy | `ECO_TOKEN_SECRET`, `ECO_ADMIN_TOKEN`, `DATA_PUSH_SECRET` | Ours (from GitHub, each deploy) | Sign-ins, the admin panel, the repo's door |
+| orbit-workers-proxy | `GEMINI_API_KEY`, `GOOGLE_MAPS_KEY`, `GOOGLE_MAPS_BROWSER_KEY`, `GOOGLE_WEATHER_KEY` | Google | Orbit Class's AI; Transit; Weather |
+| orbit-workers-proxy | `CWA_KEY`, `MOENV_KEY`, `TDX_CLIENT_ID`, `TDX_CLIENT_SECRET` | Taiwan's open data | Weather; Transit |
+| orbit-workers-proxy | `FIREBASE_PRIVATE_KEY` | Retiring (`deploy.yml` removes it on 2026-12-06) | Only checking sign-ins made before `ECO_TOKEN_SECRET` |
+| quota-guard | `CF_GUARD_TOKEN` | Cloudflare (from GitHub, its deploy) | §8.1 |
+| gemini-relay | none | | |
+
+**Bindings** (in the tomls, not secrets): the proxy's `STORE` (D1
+`quadra-store`, made and bound by `deploy.yml`), `DATA` (R2 `quadra-data`,
+the same), `RATE_LIMIT_KV` (KV: notices, Transit's meter and TDX token,
+Weather's cells and scores, the guard's state and pace), `F1_LOG` (Durable
+Object `F1Log`), `GEMINI_RELAY` and `GUARD` (service bindings); the guard's
+`RATE_LIMIT_KV` and `CLOCK` (Durable Object `GuardClock`, its alarm every 5
+minutes). `ADMIN_TOKEN_HASH` (a SHA-256, in `eco-admin.js`) is code.
 
 **The Pass's store: D1.** The deploy token (`CLOUDFLARE_API_TOKEN`) is an
 Account API Token (Cloudflare → Manage Account → Account API Tokens) with
@@ -907,7 +956,7 @@ is in R2 at `private/firestore-backup.jsonl.gz` (never served by `/data/`;
 one JSON line a document). `/store/check` (from a localhost page) gives
 each collection's count.
 
-**Arming the guard (the owner, once).**
+**Arming the guard (the owner, once; done 2026-10-13).**
 1. Cloudflare dashboard → My Profile → API Tokens → Create Token → Custom
    token. Name it `quota-guard`. Permissions: **Account · Account
    Analytics · Read** and **Account · Workers Scripts · Edit**. Account
@@ -919,7 +968,12 @@ each collection's count.
    the admin page's 容量 shows the period's use.
 4. Cloudflare dashboard → Manage Account → Billing: check the plan renews
    on the 13th (`PERIOD_DAY` in `wrangler.guard.toml`; tell Claude if not).
-   Billable Usage → a budget alert at $5.01 as a second warning.
+5. Cloudflare dashboard → Notifications → Add → **Usage Based Billing** (or
+   Billing → Billable Usage → budget alert): an email at $5.01, a second
+   warning beside the guard's own notices (§8.1). Cloudflare can't cap a
+   bill itself; the guard's stop is what does.
+6. The admin panel → 系統 → 警示通知: your pass, 設定, then 測試: the
+   guard's notices come to your phone.
 
 Only the proxy reads and writes the store: D1 has no client access.
 
@@ -955,7 +1009,9 @@ See `tools/README.md` for every flag.
 | `capacity.test.mjs`, `devconfig.test.mjs` | Capacity and settings |
 | `data.test.mjs`, `store.test.mjs` | `/data/` (push, list, read), the builders' R2 store |
 | `watch.test.mjs`, `builders-*.test.mjs`, `official-photos.test.mjs`, `cpbl.test.mjs` | The builders: watch links (light and full runs), win probability, season packs, CPBL, photos, buses, each on an in-memory R2 |
-| `guard.test.mjs` | The hard stop: the period, the plan's amounts, stopping and starting both proxies, a deploy undone, blind and unarmed |
+| `guard.test.mjs` | The hard stop: the period, the plan's amounts, stopping and starting the proxy, a deploy undone, a Worker gone, blind and unarmed; pacing and alerts; the account from the token |
+| `pace.test.mjs` | The proxy following the pace: read once a minute, builders parked |
+| `ops.test.mjs` | Heartbeats (on SQLite), the bill's news and the owner's notice, the system report (secrets set or not, never a value) |
 | `kit.test.mjs`, `kit-css.test.mjs`, `kit-calendar.test.mjs`, `photos.test.mjs` | The kit |
 
 ## 14. What depends on what: the change checklist
