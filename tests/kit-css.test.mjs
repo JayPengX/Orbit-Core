@@ -21,7 +21,7 @@ test("a recommendation's price and its change stay on one row", () => {
   assert.match(rule('.q-rec-foot > :not(.q-rec-big)'), /flex:\s*none/, 'the change keeps its size');
 });
 
-// iOS 26's look for the family: glass that floats (the top-right buttons, the
+// iOS 27's look for the family: glass that floats (the top-right buttons, the
 // tab bar) is lit at the rim, never outlined; and both themes define it.
 test('floating glass has a lit rim and no outline ring, in light and dark', () => {
   for (const sel of ['.q-icon-btn', '.q-actions:has(> :nth-child(2))', '.q-touch .q-tabbar.q-tabbar', '.q-ask', '.q-banner']) {
@@ -32,7 +32,7 @@ test('floating glass has a lit rim and no outline ring, in light and dark', () =
     if (border) assert.match(border, /border:\s*0/, `${sel} has no outline`);
   }
   const dark = css.slice(css.indexOf(":root[data-theme='dark']"));
-  for (const token of ['--q-glass:', '--q-glass-strong:', '--q-glass-rim:', '--q-fill:']) {
+  for (const token of ['--q-glass:', '--q-glass-strong:', '--q-glass-rim:', '--q-fill-3:', '--q-label:', '--q-grouped-2:']) {
     assert.ok(css.indexOf(token) < css.indexOf('@media (prefers-color-scheme: dark)'), `${token} light`);
     assert.ok(dark.slice(0, dark.indexOf('}')).includes(token), `${token} dark`);
   }
