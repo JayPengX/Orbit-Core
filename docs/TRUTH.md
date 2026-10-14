@@ -218,6 +218,12 @@ picks, Play's odds and 為你推薦) goes through these steps, in order:
   random string of our own (ECO_TOKEN_SECRET) may be made and stored by
   Claude when the owner says so: generated straight into `gh secret set`,
   never printed or saved. Never commit anyone's pass, code or device code.
+- **Only what must stay secret is a secret** (the owner, 2026-10-14: as few
+  variables as possible). Anything public (the proxy's address, the
+  Cloudflare account ID, ids, model names) lives in the code or a toml,
+  never in a GitHub variable or secret. Each token keeps the least power
+  its job needs (the deploy token and the guard's stay two). The list is
+  README §11; the admin panel's 系統 shows which are set.
 - **Quadra Passes are handed out by the owner**, never made in an app: the
   sign-in screen has no "create", and /eco `create` is closed
   (ECO_OPEN_SIGNUP only in tests). The owner issues them on the admin page
@@ -784,3 +790,10 @@ What was decided, so it isn't undone. Newer calls win.
   secrets removed. The owner deletes the Firebase project.
 - 2026-10-14: Securities' orders filled by the proxy at its own quote, as
   Play's bets are placed and settled there (`stock-fill.js`).
+- 2026-10-14: the month is paced, not only stopped ("pace it out
+  greatly"): the guard projects each count and slows the live refreshes,
+  parks the builders and trims each session's reads from 60% projected
+  (`guard.js`, `pace.js`); the owner's phone is told at 50/75/90%, at a new
+  pace and at a stop (`ops.js`, the account set in the admin panel); every
+  cron job leaves a heartbeat the admin panel's 系統 shows. Public settings
+  out of secrets and variables (the account ID, the proxy's address).
