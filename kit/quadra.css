@@ -1236,27 +1236,15 @@ button,
   transition: none;
   will-change: transform;
 }
-/* Closing (quadra.mjs closeSheet): down to the foot at the finger's own speed, the dimming fading. */
+/* Closing (quadra.mjs closeSheet): down to the foot from the finger's own speed, easing out, the dimming fading with it. */
 .q-sheet.q-leaving {
   animation: none;
-  transition: transform var(--q-leave, 0.3s) cubic-bezier(0.2, 0.7, 0.3, 1);
+  transition: transform var(--q-leave, 0.45s) var(--q-leave-ease, cubic-bezier(0.3, 0.3, 0.2, 1));
   will-change: transform;
   pointer-events: none;
 }
 .q-sheet.q-leaving::backdrop {
-  animation: q-fade-out 0.3s ease forwards;
-}
-/* Closing (an app adds .q-closing, then closes it a moment later). */
-.q-sheet.q-closing {
-  animation: q-sheet-down 0.26s var(--q-ease) forwards;
-}
-.q-sheet.q-closing::backdrop {
-  animation: q-fade-out 0.26s ease forwards;
-}
-@keyframes q-sheet-down {
-  to {
-    transform: translateY(110%);
-  }
+  animation: q-fade-out var(--q-leave, 0.45s) ease forwards;
 }
 @keyframes q-fade-out {
   to {
@@ -2206,7 +2194,6 @@ input[type='checkbox'][switch] {
     transition: none;
   }
   .q-sheet[open],
-  .q-sheet.q-closing,
   .q-ask,
   .q-banner,
   .q-toast,
