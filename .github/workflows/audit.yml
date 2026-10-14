@@ -1,0 +1,20 @@
+# Each Worker's secret names (never values) and the account's Workers, by
+# hand (Run workflow): what's set where, for the README's secrets table.
+# Read-only.
+name: Audit secrets
+on:
+  workflow_dispatch:
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Secret names per Worker
+        run: |
+          cd "$RUNNER_TEMP"
+          for w in orbit-workers-proxy gemini-relay quota-guard sports-proxy; do
+            echo "== $w"
+            npx --yes wrangler@4 secret list --name "$w" 2>&1 | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.parse(s.slice(s.indexOf("["))).map(x=>x.name).join(" ")||"(none)")}catch{console.log(s.split("\n").filter(l=>/ERROR|not found|Authentication/i.test(l)).join(" ").slice(0,200)||"(unreadable)")}})'
+          done
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
