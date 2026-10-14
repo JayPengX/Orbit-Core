@@ -2896,11 +2896,20 @@ function keepStrips() {
   const kept = new Map();
   const host = el => el.parentElement?.closest('[id]') || document.body;
   const classOf = el => (typeof el.className === 'string' ? el.className.trim().split(/\s+/).filter(c => !/^(is-|on$|active$|open$|stuck$)/.test(c)).sort().join('.') : '');
+  // Its likes found by the browser's own class match (a tag alone was every
+  // div in the page, its classes split and sorted, on every redraw: 30–50 ms
+  // a tap on a Mac, more on a phone), then the exact classes compared.
+  const likes = (h, tag, cls) => [...h.querySelectorAll(cls ? `${tag}.${cls.split('.').map(c => CSS.escape(c)).join('.')}` : tag)].filter(x => classOf(x) === cls);
+  // (Worked out once for a strip: a scroll asks for it at every frame.)
+  const sigs = new WeakMap();
   const signature = el => {
+    if (sigs.has(el)) return sigs.get(el);
     const h = host(el);
     const cls = classOf(el);
-    const peers = [...h.querySelectorAll(el.tagName)].filter(x => classOf(x) === cls);
-    return { key: `${h.id || 'body'}|${el.tagName}|${cls}|${peers.indexOf(el)}`, hostId: h.id || '', tag: el.tagName, cls, index: peers.indexOf(el) };
+    const index = likes(h, el.tagName, cls).indexOf(el);
+    const sig = { key: `${h.id || 'body'}|${el.tagName}|${cls}|${index}`, hostId: h.id || '', tag: el.tagName, cls, index };
+    sigs.set(el, sig);
+    return sig;
   };
   const sideways = el => el instanceof Element && el.scrollWidth > el.clientWidth + 2;
   const note = el => {
@@ -2908,7 +2917,7 @@ function keepStrips() {
     const sig = signature(el);
     // The chip chosen then too: the same one still chosen after a redraw is
     // never pulled back into view (the person scrolled away from it).
-    kept.set(sig.key, { ...sig, ...anchorOf(el), pick: el.querySelector(chosen)?.textContent ?? null });
+    kept.set(sig.key, { ...sig, ...anchorOf(el), pick: el.querySelector(chosen)?.textContent ?? null, el });
   };
   // The item first in view: its text and how far it sits from the strip's left edge.
   const anchorOf = el => {
@@ -2926,11 +2935,15 @@ function keepStrips() {
   const restore = () => {
     queued = false;
     for (const k of kept.values()) {
+      // The strip still in the page: not redrawn, nothing to do (and nothing measured).
+      if (k.el?.isConnected) continue;
       const h = k.hostId ? document.getElementById(k.hostId) : document.body;
       if (!h) continue;
-      const el = [...h.querySelectorAll(k.tag)].filter(x => classOf(x) === k.cls)[k.index];
-      if (!el || !sideways(el) || el.scrollLeft !== 0 || el.__quadraKept === k) continue;
+      const el = likes(h, k.tag, k.cls)[k.index];
+      if (!el || el.__quadraKept === k || !sideways(el)) continue;
       el.__quadraKept = k;
+      k.el = el;
+      if (el.scrollLeft !== 0) continue;
       const item = k.text == null ? null : [...el.children].find(c => c.textContent === k.text);
       if (!item) continue;
       el.scrollLeft += item.getBoundingClientRect().left - el.getBoundingClientRect().left - k.at;
