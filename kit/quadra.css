@@ -571,6 +571,11 @@ button,
   background: var(--q-accent);
   color: var(--q-accent-ink);
 }
+/* A button that stays on (a toggle): the app's colour, filled. */
+.q-btn[aria-pressed='true'] {
+  background: var(--q-accent);
+  color: var(--q-accent-ink);
+}
 .q-btn.tinted {
   background: var(--q-accent-wash);
   color: var(--q-accent);
@@ -1119,6 +1124,48 @@ button,
   opacity: 0;
 }
 
+/* ---- The tab bar's accessory: a glass bar just above it (iOS 26's bottom
+   accessory, as Music's player): what's in progress, a tap away ---- */
+.q-accessory {
+  position: fixed;
+  z-index: 59;
+  left: 50%;
+  bottom: calc(var(--q-nav) + 8px);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: min(calc(100vw - 2 * max(16px, env(safe-area-inset-left))), 560px);
+  min-height: 56px;
+  margin: 0;
+  padding: 8px 8px 8px 10px;
+  border: 0;
+  border-radius: 28px;
+  background: var(--q-glass);
+  -webkit-backdrop-filter: var(--q-glass-blur);
+  backdrop-filter: var(--q-glass-blur);
+  box-shadow: var(--q-glass-rim), var(--q-glass-drop);
+  color: var(--q-label);
+  font: inherit;
+  text-align: left;
+  box-sizing: border-box;
+  transform: translateX(-50%);
+  cursor: pointer;
+  animation: q-accessory-in var(--q-dur-bouncy) var(--q-spring-bouncy);
+  transition: transform var(--q-dur-snappy) var(--q-spring-snappy);
+}
+.q-accessory[hidden] {
+  display: none;
+}
+.q-accessory:is(:active, [data-q-press]) {
+  transform: translateX(-50%) scale(0.98);
+}
+@keyframes q-accessory-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 18px) scale(0.96);
+  }
+}
+
 /* ---- Sheets: up from the foot on a spring, floating inside the screen's
    edges with its deep corners, a grabber, a centred title between glass
    circles; dragged down to close (quadra.mjs sheetSwipe) ---- */
@@ -1214,33 +1261,38 @@ button,
   position: sticky;
   top: 0;
   z-index: 2;
-  display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 12px;
   margin: 0 calc(-1 * var(--q-margin)) 8px;
-  padding: 16px 12px 10px;
+  padding: 16px var(--q-margin) 10px;
   background: linear-gradient(var(--q-sheet) 70%, color-mix(in srgb, var(--q-sheet) 0%, transparent));
 }
 .q-sheet-head h2 {
-  grid-column: 2;
   margin: 0;
+  min-width: 0;
   overflow: hidden;
   font: var(--q-t-headline);
   letter-spacing: -0.025em;
-  text-align: center;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.q-sheet-head > :first-child:not(h2) {
+/* A head that is a title and its buttons: the title centred between them, as iOS's. */
+.q-sheet-head:has(> h2) {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  gap: 8px;
+  padding-inline: 12px;
+}
+.q-sheet-head:has(> h2) > h2 {
+  grid-column: 2;
+  text-align: center;
+}
+.q-sheet-head:has(> h2) > :not(h2):first-child {
   grid-column: 1;
 }
-.q-sheet-head .q-close {
-  grid-column: 3;
-  justify-self: end;
-}
-.q-sheet-head > h2:first-child + .q-close,
-.q-sheet-head > :last-child:not(h2):not(.q-close) {
+.q-sheet-head:has(> h2) > :not(h2):last-child {
   grid-column: 3;
   justify-self: end;
 }
@@ -1565,7 +1617,7 @@ button,
   transform: scale(0.95);
   transition-duration: 0.12s;
 }
-.q-chip:is([aria-pressed='true'], [aria-selected='true']) {
+.q-chip:is([aria-pressed='true'], [aria-selected='true'], .on) {
   background: var(--q-label);
   color: var(--q-grouped-2);
 }
@@ -2128,6 +2180,7 @@ input[type='checkbox'][switch] {
   .q-banner,
   .q-toast,
   .q-menu,
+  .q-accessory,
   .q-skel {
     animation: none;
   }
