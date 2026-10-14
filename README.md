@@ -14,8 +14,9 @@ This repo holds:
 1. **The proxy**, one Cloudflare Worker (`orbit-workers-proxy`) for every
    app's server side: the Pass, the data proxy, Play's settling, Transit,
    Weather, notices; with `quota-guard`, the hard stop on the bill (§8.1),
-   on Workers Paid ($5 a month, never more). `sports-proxy` is the old
-   data proxy's address, now only forwarding to it (§4.1).
+   on Workers Paid ($5 a month, never more); `gemini-relay`, pinned to
+   Taiwan, for Gemini alone. (`sports-proxy`, the old data proxy's address,
+   is retired: §4.1.)
 2. **The kit** (`kit/`): one copy of everything more than one app needs,
    served from this repo's GitHub Pages and loaded by every app.
 3. **The brand** (`kit/brand.mjs`, `brand/`): every name, colour, mark,
@@ -340,12 +341,10 @@ people are, it moved in (the owner: one proxy for everything). One address
 means one connection for a phone instead of two, one edge cache in Taiwan
 shared by everyone, and the developer settings read in place.
 
-The old address, `sports-proxy.pengzjay.workers.dev`, is a forwarder
-(`sports-forward.js`, `wrangler.sports-proxy.toml`: a service binding to
-the proxy, not a billed second request) for phones still on a kit from
-before the move. **Remove it** (the file, its toml, its deploy step and
-`guard.js`'s `WORKERS` entry) once its Workers Logs show no requests for a
-week.
+The old address, `sports-proxy.pengzjay.workers.dev`, was a forwarder to
+the proxy for phones on a kit from before the move. Its code is gone;
+`deploy.yml` deletes the Worker from 2026-10-20 (a quiet week after the
+move), and `guard.js` treats it gone as nothing to stop.
 
 ### 4.2 What it may read
 
@@ -869,9 +868,10 @@ old offline copy.
 ## 11. Deploying and secrets
 
 **`main` deploys.**
-- `.github/workflows/deploy.yml` runs `wrangler deploy` for the three
-  Workers (`wrangler.toml`, `wrangler.sports-proxy.toml`,
-  `wrangler.guard.toml`), then keeps the guard's stop if it's on.
+- `.github/workflows/deploy.yml` runs `wrangler deploy` for `gemini-relay`
+  (`wrangler.gemini.toml`) and the proxy (`wrangler.toml`), takes retired
+  secrets and Workers off (Firebase's, the old `sports-proxy`), then keeps
+  the guard's stop if it's on.
 - `pages.yml` publishes the kit and `site/`.
 - `deploy-guard.yml` deploys `quota-guard`, only when its own files change
   (a deploy registers its cron again: deployed with every push, it never
@@ -895,7 +895,6 @@ are set with `wrangler secret put` or the dashboard.
 | orbit-workers-proxy | `GOOGLE_WEATHER_KEY`, `CWA_KEY`, `MOENV_KEY` | Weather |
 | orbit-workers-proxy | `ADMIN_TOKEN_HASH`, `ECO_ADMIN_TOKEN` | The admin panel (the owner's key; Claude never uses it) |
 | orbit-workers-proxy | `F1_LOG` (Durable Object `F1Log`, migration `f1-log-main`), cron `* * * * SUN,MON,THU,FRI,SAT` | The F1 lap log |
-| sports-proxy (the forwarder) | `ORBIT` (service binding) | Every request handed to the proxy |
 | quota-guard | `CF_GUARD_TOKEN` (from the repo secret), `CF_ACCOUNT_ID` (from `CLOUDFLARE_ACCOUNT_ID`), `RATE_LIMIT_KV`, `CLOCK` (Durable Object `GuardClock`: its alarm every 5 minutes; the proxy wakes it through `GUARD`) | Reading the bill, stopping the proxy (§8.1) |
 | orbit-workers-proxy | `DATA` (R2 `quadra-data`, made and bound by `deploy.yml` once R2 is on), `DATA_PUSH_SECRET` (from the repo secret) | The family's data (§4.7) |
 

@@ -5,9 +5,8 @@
 // Polymarket, Kambi, Yahoo, ELTA, YouTube, formula1.com, F1's live timing,
 // the Asian leagues), with the shared edge cache by tier, trims and batches.
 // It and the F1 lap log's cron (sportsCron) run in the same Worker as the
-// rest, in Taiwan ([placement]); the owner, 2026-10-13: one proxy. The old
-// address (sports-proxy.pengzjay.workers.dev) only forwards here
-// (sports-forward.js) for phones still on an older kit.
+// rest (the owner, 2026-10-13: one proxy). The old address
+// (sports-proxy.pengzjay.workers.dev) is retired (deploy.yml).
 //
 // A Quadra Pass is required: every request carries `qt=<session token>`
 // (from /eco), checked with ECO_TOKEN_SECRET and counted per session and app
@@ -989,7 +988,7 @@ const browserMaxAge = policy => Math.min(policy.fresh, 600);
 // The dev door (as worker.js's for transit): a page served from localhost
 // (the preview tool testing on the real proxy, its cache and its limits) may
 // read without a Quadra Pass, a session's limit for each app at an address. SPORTS_DEV = "off"
-// (wrangler.sports-proxy.toml [vars]) closes it.
+// (wrangler.toml [vars]) closes it.
 const DEV_ORIGIN = /^http:\/\/(localhost|127\.0\.0\.1):\d+$/;
 // Which app asks (the kit says): each app's asks are counted apart, so one
 // left running in the background never uses up another's minute. Only the

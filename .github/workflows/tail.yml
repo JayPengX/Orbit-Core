@@ -7,7 +7,7 @@ on:
       worker:
         description: Which Worker
         type: choice
-        options: [quota-guard, orbit-workers-proxy, sports-proxy]
+        options: [quota-guard, orbit-workers-proxy, gemini-relay]
         default: quota-guard
       minutes:
         description: How long to listen (1-15)
@@ -30,7 +30,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       - name: Each Worker's crons and address, as Cloudflare has them
         run: |
-          for w in quota-guard orbit-workers-proxy sports-proxy; do
+          for w in quota-guard orbit-workers-proxy gemini-relay; do
             echo "== $w"
             curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/$w/schedules" | head -c 600; echo
             curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/$w/subdomain" | head -c 300; echo

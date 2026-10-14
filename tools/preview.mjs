@@ -570,8 +570,8 @@ await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(?!
   if (body.op === 'pair-create') Object.assign(reply, { code: 'ABCD2345', exp: Date.now() + 600_000 });
   await route.fulfill({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(reply) });
 });
-// The sports proxy: the main Worker's /sports-proxy, and the old address (a forwarder).
-const SPORTS = /^https:\/\/(sports-proxy\.pengzjay\.workers\.dev|orbit-workers-proxy\.pengzjay\.workers\.dev\/sports-proxy)/;
+// The sports proxy: the main Worker's /sports-proxy.
+const SPORTS = /^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/sports-proxy/;
 // Every item asked of the proxy (its time): the busiest minute is printed at
 // the end, against a signed-in session's limit (the dev door's is higher).
 const liveAsks = [];

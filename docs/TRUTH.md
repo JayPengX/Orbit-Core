@@ -771,8 +771,8 @@ What was decided, so it isn't undone. Newer calls win.
   (`guard.js`) stops the proxy before any included amount runs out,
   until the next period. One proxy for everything (the owner, the same
   day): the data proxy is a route of `orbit-workers-proxy` (`sports.js`),
-  in Taiwan with the rest; `sports-proxy`'s address only forwards to it
-  until every phone has the new kit. Everything on Cloudflare while the
+  with the rest; `sports-proxy`'s address forwarded to it until every
+  phone had the new kit (retired 2026-10-20). Everything on Cloudflare while the
   plan is paid, and ultra efficient (the owner, the same day): Shared-Data
   moved into R2 (copied as built, no source read again) and its builders
   into the proxy's cron (`builders/`), each lean (only what's new, only as

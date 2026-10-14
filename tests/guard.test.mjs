@@ -61,6 +61,7 @@ function fakeCf(use, { cpuField = true, fail = false, d1Fail = false } = {}) {
     }
     const m = /scripts\/([^/]+)\/(subdomain|schedules)$/.exec(url);
     const w = workers[m[1]];
+    if (!w) return { ok: false, status: 404, json: async () => ({ success: false, errors: [{ message: 'This Worker does not exist on your account.' }] }) };
     const method = init.method || 'GET';
     if (m[2] === 'subdomain') {
       if (method === 'DELETE') w.on = false;
@@ -167,7 +168,7 @@ test('R2: writes Class A, reads Class B, deletes free, anything unknown counted 
 });
 
 test('every Worker\'s entry exports only handlers and classes (anything else stops the Worker from starting)', async () => {
-  for (const entry of ['../worker.js', '../guard-worker.js', '../sports-forward.js', '../gemini-relay.js']) {
+  for (const entry of ['../worker.js', '../guard-worker.js', '../gemini-relay.js']) {
     const m = await import(entry);
     for (const [k, v] of Object.entries(m)) assert.ok(typeof v === 'function' || (k === 'default' && typeof v === 'object'), `${entry} exports ${k}`);
   }
@@ -193,4 +194,19 @@ test('the guard\'s clock: a wake starts it once; each alarm runs the guard and s
   assert.equal(alarm % (5 * 60_000), 0);
   assert.ok(alarm > Date.now());
   assert.equal(JSON.parse(kv.m.get(STATE_KEY)).armed, false, 'the guard ran (unarmed here)');
+});
+
+test('a Worker that is gone (the old sports-proxy, deleted) never keeps the proxy stopped', async () => {
+  const cf = fakeCf({ requests: 9_100_000 });
+  delete cf.workers['sports-proxy'];
+  const kv = fakeKv();
+  const s = await guardRun(env, { fetcher: cf.fetcher, kv, now: T('2026-10-30T00:00:00Z') });
+  assert.equal(cf.workers['orbit-workers-proxy'].on, false);
+  assert.ok(!s.acts.some(a => a.includes('failed')));
+  const cf2 = fakeCf({ requests: 1000 });
+  delete cf2.workers['sports-proxy'];
+  cf2.workers['orbit-workers-proxy'] = cf.workers['orbit-workers-proxy'];
+  const back = await guardRun(env, { fetcher: cf2.fetcher, kv, now: T('2026-11-13T00:05:00Z') });
+  assert.equal(back.stopped, null);
+  assert.ok(cf.workers['orbit-workers-proxy'].on);
 });
