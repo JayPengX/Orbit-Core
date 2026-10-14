@@ -1,5 +1,5 @@
 // ---- weather.js ----
-// Orbit Weather's server side (docs/WEATHER-PLAN.md), routed by worker.js:
+// Orbit Weather's server side (README §3.2), routed by worker.js:
 //
 //   GET /weather?lat=&lon=&qt=     the blended forecast for that ~1 km cell
 //                                  (Google, CWA 中央氣象署, MOENV 環境部):

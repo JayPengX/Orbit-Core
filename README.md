@@ -24,8 +24,9 @@ This repo holds:
 4. **The family's page and the admin page** (`site/`).
 5. **The tools** (`tools/`): the preview harness, ESPN probes, the economy
    model and pass issuing.
-6. **The rules**: `docs/TRUTH.md` (the owner's standing rules: read first)
-   and `docs/HANDOFF.md` (running notes on every app).
+6. **The rules and the state**: `docs/TRUTH.md` (the owner's standing
+   rules: read first), `docs/HANDOFF.md` (the state now: what's where,
+   what's open) and `docs/OWNER-STEPS.md` (what only the owner can do).
 
 Everything about how the family works lives here. The family's data (the
 season packs, bus packs, watch links, photos…) lives in Cloudflare R2,
@@ -213,11 +214,12 @@ ends. A bet whose app isn't opened in that window could never be settled.
 **`/play` (`settle.js`): Quadra Play's slips settled here** (the owner,
 2026-10-12), whether or not Play is opened. A Play session only.
 
-- `POST /play { op: 'open', slips }`: Play hands over each open slip (its
-  picks, sizes, stake; `cleanSlip` keeps what settling needs, 20 picks and
-  24 KB at most). Kept in the store `odds-open/<account>_<slip>` with an
-  index (`odds-open/_index`: each slip's next look, one read a run). Kambi
-  matches on it are watched (`kambi.js watchKambi`).
+- A slip is watched once it's placed (`op: 'place'` below): kept in the
+  store `odds-open/<account>_<slip>` with an index (`odds-open/_index`: each
+  slip's next look, one read a run); Kambi matches on it are watched
+  (`kambi.js watchKambi`). (`op: 'open'`, the hand-over of slips from before
+  the lock-down, closed on 2026-10-14: a slip handed over could name any
+  picks; the Audit workflow counted none left.)
 - The odd-minute cron (`settleCron`): up to 60 due slips a run, every
   undecided pick whose game has begun read together (the kit's
   `readOutcomes`: one read of a game for every slip on it; the Asian
@@ -242,36 +244,54 @@ ends. A bet whose app isn't opened in that window could never be settled.
   when better than the house's price now (1% and a cent of slack), started,
   or off the board; the slip's money checked (combinations, boost, free bet,
   rules, the pool); then the stake taken (odds:stake-<slip>) and the slip
-  watched. `op: 'check'` from a localhost page: the check alone.
+  watched, its picks the house's own bets (`price.js keptLeg`, the kit's
+  `legOf`): settled on what was priced, never on terms a phone sent. A live
+  pick waits 5 s (`LIVE_DELAY_MS`) and is priced again on reads no older
+  than 2 s (the sports proxy's `within`, this Worker's own reads only).
+  `op: 'check'` from a localhost page: the check alone.
 - `POST { op: 'cashout', id, value }`: the value checked against the house's
   own (price.js cashOutQuote), the slip taken from `open` (never settled
   too), the Worker pays odds:payout-<slip> (kind cashout).
 - Lottery (lotto.js): `op: 'tickets'` sold by the Worker's clock, settled
   from Taiwan Lottery's draws by the cron (every fourth odd minute), paid
   odds:prize-<id>; `op: 'scratch'` a card's prize drawn here, `op: 'reveal'`
-  pays it; `op: 'tickets-open'` takes over tickets from before the lock-down.
+  pays it. (`op: 'tickets-open'` closed on 2026-10-14, as `open`.)
 
-**The lock-down (2026-10-12): the proxy is the only one adding money.**
-`eco.js appEntries`: an app's wallet entries are spending only (≤ 0; one
-exception, a pre-lock-down Play slip's refund). `appSnap`: an app sends only
-its own snap, and Securities' cash and holdings' cost are this Worker's
-(`stock-check.js`: Securities' account replayed with the kit's stock-* on each
-save, every new cash-adding event checked against Yahoo or its rate);
-`poolBalance` counts only that cash, ranks only that cost.
+**The lock-down (2026-10-12; exploit-proof 2026-10-14): the proxy is the
+only one adding money.** `eco.js appEntries`: an app's wallet entries are
+spending only (≤ 0; one exception, a pre-lock-down Play slip's refund),
+dated by this Worker (`stamped`: a phone's clock can't put one before the
+lock-down). `appSnap`: an app sends only its own snap, and Securities' cash,
+holdings' cost and opening money are this Worker's (`stock-check.js`:
+Securities' account replayed with the kit's stock-* on each save; duplicate
+ids once; a fill only as `stock-fill.js` issued it, matched exactly and once,
+or else at the worst price traded since its moment; a purchase only with the
+cash, a short sale only with worth behind it; an exchange at most the
+market's rate at its moment less the narrowest spread, or the worst since
+when saved late; interest no more than earned; a dividend in the stock's own
+currency, once; a split once; a loan as its fill says; an open order's hold
+never adding money). The cash the pool counts is what the account can spend:
+loans and short sales' proceeds come off it (to nothing at most; the rest off
+the holdings' cost). `poolBalance` counts only that cash, ranks only that
+cost.
 
 **Securities' orders filled here** (`stock-fill.js`, `POST /stock { op:
-'fill', orders }`; the owner, 2026-10-14, as Play's bets are): the phone
-places an order (it holds its cash or shares and waits), asks here for its
-open orders after each refresh, and this Worker reads its own fresh quote
+'fill', orders, plans }`; the owner, 2026-10-14, as Play's bets are): the
+phone places an order (it holds its cash or shares and waits), asks here for
+its open orders after each refresh, and this Worker reads its own fresh quote
 (the kit's `stock-quotes.mjs` through the data proxy's route) and decides
-each with the kit's `triggerPrice`. A fill is kept (`stock-fills/<account>`:
-its quote and moment) and answered; the phone applies exactly that
-(`applyFills`), and `stock-check.js` takes a fill it issued as it is (any
-other: checked against the price bars as before, or never counted).
+each with the kit's `triggerPrice`. The first time it sees an order it keeps
+its terms and that moment (`stock-fills/<account>` `open`): the phone can't
+date an order back or change it later. One that waited across a session the
+phone wasn't open for is filled from the bars since (the kit's
+`backfillPrice`, once a session); a monthly plan seen before its day is
+filled at the first bar on or after it (`plans`, `plan:<id>:<month>`). A fill
+is kept with its terms and NT$ rate and answered; the phone applies exactly
+that (`applyFills`).
 
 ### 3.2 `/weather`
 
-Orbit Weather's server (`docs/WEATHER-PLAN.md` is the design).
+Orbit Weather's server (its design: Orbit-Weather's README).
 
 - `GET /weather?lat=&lon=` (or `?auto=1`, placed by the caller's IP): one
   blended forecast for a cell of about 1 km, hourly for 10 days and daily
@@ -298,7 +318,16 @@ under its key's 500. A refresh costs:
 
 Past the cap a cell is built from CWA alone.
 
-**One truth.** The app gets one value per quantity. What each source said
+**Sources.** Google Weather (`currentConditions`, `forecast/hours` 240 h,
+`forecast/days` 10 days, `publicAlerts` abroad); CWA (the township forecast
+`F-D0047-*`, the nearest automatic and manned stations `O-A0001-001` /
+`O-A0003-001`, rain gauges `O-A0002-001`, warnings `W-C0033-001`); MOENV
+(AQI `aqx_p_432`, its history `aqx_p_488`). The national lists are read once
+per update and shared in KV, so a new cell costs no extra call to them.
+
+**One truth.** The app gets one value per quantity: a weighted mean of the
+sources covering each hour (rain probability, temperature, feels-like;
+`DEFAULT_WEIGHTS` Google 0.6, CWA 0.4 until scored). What each source said
 is kept only in the cell's KV entry (`bySource`), for the scoring.
 `weather-skill.js` runs hourly over the cells opened lately:
 - it scores each source's forecast against the nearest rain gauge (Brier
@@ -321,10 +350,10 @@ Orbit Transit's server (`transit.js`).
 | `/transit/status` | Open: this month's use against each cap, which keys are set (never a key) |
 
 Google's free monthly use per SKU (10,000 Essentials, 5,000 Pro) is counted
-in KV, flushed in batches to spare KV's 1,000 writes a day. It is counted
+in KV, flushed in batches (a write a batch, not a call). It is counted
 on Google's billing month, Pacific time. The hard stop is the per-day quota
 the owner sets on each API in Google Cloud. TDX calls are paced by
-`TDX_PER_MIN` (the free plan allows 5 a minute, 銅級 300).
+`TDX_PER_MIN` (TDX's free tier allows 5 a minute, 銅級 300).
 
 ## 4. The data proxy (`/sports-proxy`)
 
