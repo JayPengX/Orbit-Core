@@ -857,6 +857,53 @@ function sheetSwipe() {
 }
 sheetSwipe();
 
+// Every segmented control on the page (.q-seg, the kit's), however an app
+// draws it (a builder, an HTML string redrawn whole): its options counted,
+// the chosen one found (aria-pressed / aria-selected), and its thumb slid
+// there from where that control's thumb last was (a control is known by
+// its options' words), so a redraw still moves like iOS's.
+function segThumbs() {
+  if (typeof document === 'undefined' || typeof MutationObserver === 'undefined' || document.__quadraSegs) return;
+  document.__quadraSegs = true;
+  const last = new Map();
+  const keyOf = seg => seg.dataset.key || [...seg.children].map(b => b.textContent.trim()).join('|');
+  const fit = seg => {
+    const kids = [...seg.children].filter(b => !b.hidden);
+    if (!kids.length) return;
+    const i = Math.max(0, kids.findIndex(b => b.getAttribute('aria-pressed') === 'true' || b.getAttribute('aria-selected') === 'true'));
+    seg.style.setProperty('--q-seg-n', String(kids.length));
+    if (seg.dataset.to != null) return;
+    const key = keyOf(seg);
+    const was = last.get(key);
+    last.set(key, i);
+    const now = seg.style.getPropertyValue('--q-seg-i');
+    if (now === String(i)) return;
+    if (was != null && was !== i && !now && seg.isConnected) {
+      seg.style.setProperty('--q-seg-i', String(was));
+      requestAnimationFrame(() => requestAnimationFrame(() => seg.style.setProperty('--q-seg-i', String(i))));
+    } else seg.style.setProperty('--q-seg-i', String(i));
+  };
+  const scan = root => {
+    if (root.nodeType !== 1) return;
+    if (root.classList.contains('q-seg')) fit(root);
+    root.querySelectorAll?.('.q-seg').forEach(fit);
+  };
+  const start = () => {
+    scan(document.body);
+    new MutationObserver(list => {
+      for (const m of list) {
+        if (m.type === 'attributes') {
+          const seg = m.target.parentElement;
+          if (seg?.classList.contains('q-seg')) fit(seg);
+        } else m.addedNodes.forEach(scan);
+      }
+    }).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['aria-pressed', 'aria-selected'] });
+  };
+  if (document.body) start();
+  else document.addEventListener('DOMContentLoaded', start, { once: true });
+}
+segThumbs();
+
 // A phone or a tablet: html.q-touch, so a tablet gets a phone's frame (no
 // brand header, the tabs at the bottom; quadra.css). boot.js sets it earlier
 // in the apps that load it.
