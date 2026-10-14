@@ -817,14 +817,21 @@ function sheetSwipe() {
       const x = e.touches[0].clientX - x0;
       if (!dragging) {
         // Up, or sideways: not a swipe down (the sheet scrolls, the list slides).
-        if (y < -4 || Math.abs(x) > Math.abs(y) + 4) return void (sheet = null);
+        if (Math.abs(x) > Math.abs(y) + 4) return void (sheet = null);
+        if (y < -4) {
+          // (A sheet with more to show scrolls up; one that fits gives a little.)
+          if (sheet.scrollHeight > sheet.clientHeight + 1) return void (sheet = null);
+          dragging = true;
+          return;
+        }
         // Downward from the first move on, the finger is the sheet's: left
         // alone below 8 px, Safari began scrolling the page behind with it.
         if (y > 0 && y >= Math.abs(x) && e.cancelable) e.preventDefault();
         if (y < 8) return;
         dragging = true;
       }
-      dy = Math.max(0, y);
+      // Down with the finger; pulled up, it gives a little and no more (iOS's rubber band).
+      dy = y >= 0 ? y : -Math.sqrt(-y) * 2.2;
       sheet.style.transform = `translateY(${dy}px)`;
       if (e.cancelable) e.preventDefault();
     },
@@ -837,7 +844,7 @@ function sheetSwipe() {
     dragging = false;
     s.classList.add('q-settle');
     const gone = dy > 120 || (dy > 40 && dy / Math.max(1, Date.now() - t0) > 0.6);
-    s.style.transform = gone ? 'translateY(100%)' : '';
+    s.style.transform = gone ? 'translateY(110%)' : '';
     if (gone) haptic();
     setTimeout(() => {
       if (gone) s.close();
@@ -2961,6 +2968,30 @@ export function tabBar({ tabs, onSelect, hash = id => `#${id}`, nav = document.g
     buttons.set(tab.id, b);
   }
   nav.replaceChildren(...buttons.values());
+  // The chosen tab's pill (the bar's ::before) slides to it on a spring:
+  // its place and width as CSS variables, set without a slide the first time.
+  const pill = (still = false) => {
+    const b = buttons.get(current);
+    if (!b || b.hidden || !b.offsetWidth) return;
+    if (still) nav.style.setProperty('transition', 'none');
+    nav.style.setProperty('--q-tab-x', `${b.offsetLeft}px`);
+    nav.style.setProperty('--q-tab-w', `${b.offsetWidth}px`);
+    if (still) requestAnimationFrame(() => requestAnimationFrame(() => nav.style.removeProperty('transition')));
+  };
+  if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => pill(true)).observe(nav);
+  // Scrolling down, the bar draws in to its icons; back up (or at the top), its labels again.
+  let lastY = globalThis.scrollY || 0;
+  globalThis.addEventListener?.(
+    'scroll',
+    () => {
+      const y = globalThis.scrollY || 0;
+      const root = document.documentElement;
+      if (y < 40 || y < lastY - 6) root.classList.remove('q-tabs-small');
+      else if (y > lastY + 6 && !reducedMotion()) root.classList.add('q-tabs-small');
+      if (Math.abs(y - lastY) > 6) lastY = y;
+    },
+    { passive: true }
+  );
   nav.addEventListener('keydown', event => {
     const shown = [...buttons].filter(([, b]) => !b.hidden).map(([id]) => id);
     const i = shown.indexOf(current);
@@ -2980,6 +3011,7 @@ export function tabBar({ tabs, onSelect, hash = id => `#${id}`, nav = document.g
       const first = current == null;
       if (changed && !first) places[current] = globalThis.scrollY || 0;
       current = id;
+      requestAnimationFrame(() => pill(first));
       for (const [tid, b] of buttons) {
         const on = tid === id;
         b.setAttribute('aria-selected', String(on));
@@ -3017,6 +3049,8 @@ export function tabBar({ tabs, onSelect, hash = id => `#${id}`, nav = document.g
     hide(id, hidden = true) {
       const b = buttons.get(id);
       if (b) b.hidden = Boolean(hidden);
+      nav.style.setProperty('--q-tabs', String([...buttons.values()].filter(x => !x.hidden).length));
+      requestAnimationFrame(() => pill(true));
     }
   };
   return api;

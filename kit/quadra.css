@@ -1,113 +1,268 @@
-/* Quadra: what every Quadra app shares on screen. The canonical copy lives in
-   Shared-Proxy/kit/ (`node kit/sync.mjs` copies it into each app).
-
-   One quiet, premium design system: neutral surfaces, one accent per app
-   (--q-accent, set by the app), generous spacing, and numbers that never
-   wrap or get cut off. Light and dark. Apps build on these tokens and the
-   q- components; they don't restyle them. */
+/* ==== Quadra UI: iOS 27, for every app in the family ====
+   The canonical copy lives in Shared-Proxy/kit/ and every app loads it from
+   Shared-Proxy's Pages. What iOS 27 draws, drawn the same: its system
+   colours (the iOS 26 palette), grouped backgrounds and cells, label and
+   fill greys, hairline separators, Liquid Glass on whatever floats (the tab
+   bar, the top buttons, sheets, alerts, menus, banners), the San Francisco
+   type scale, capsule controls, deep concentric corners, and springs for
+   every movement (SwiftUI's smooth, snappy and bouncy, as CSS linear()).
+   Apps build on these tokens and the q- components (kit/ui.mjs makes the
+   ones that move); they don't restyle them. */
 :root {
   --quadra-stock: #0d9488;
   --quadra-odds: #2563eb;
   --quadra-match: #ea580c;
   --quadra-vocab: #7c3aed;
   --quadra-orbit: #0ea5e9;
-  --q-font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', 'Segoe UI', system-ui, sans-serif;
+  /* San Francisco (and PingFang for Chinese) on Apple's devices; the
+     nearest system face elsewhere. Rounded for big numbers. */
+  --q-font: -apple-system, BlinkMacSystemFont, system-ui, 'SF Pro Text', 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', 'Segoe UI', sans-serif;
+  --q-font-rounded: ui-rounded, 'SF Pro Rounded', var(--q-font);
+  --q-font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
   --quadra-font: var(--q-font);
-  --quadra-radius: 18px;
-  /* iOS's own system colours: grouped background, white cells, its greys,
-     separators and fills, so the apps sit beside Settings and Mail. */
-  --q-page: #f2f2f7;
-  --q-surface: #ffffff;
-  --q-surface-2: #f7f7fa;
-  --q-sunken: #ececf0;
-  --q-text: #0b0b0f;
-  --q-text-2: #3c3c43;
-  --q-muted: #6e6e73;
-  --q-border: rgba(60, 60, 67, 0.09);
-  --q-divider: rgba(60, 60, 67, 0.13);
-  --q-good: #248a3d;
-  --q-bad: #e5332a;
-  --q-warn: #b86a00;
-  --q-shadow-sm: 0 1px 1.5px rgba(0, 0, 0, 0.03);
-  --q-shadow: 0 1px 2px rgba(0, 0, 0, 0.03), 0 10px 30px -14px rgba(0, 0, 0, 0.12);
-  --q-radius: 22px;
-  --q-radius-sm: 14px;
-  --q-bar: rgba(249, 249, 251, 0.82);
-  /* Liquid Glass: a thin tinted fill over a strong blur, lit at the rim (a
-     bright top edge, a dimmer bottom one), never an outline ring. */
-  --q-glass: rgba(255, 255, 255, 0.58);
-  --q-glass-strong: rgba(255, 255, 255, 0.78);
-  --q-glass-blur: blur(24px) saturate(1.9) brightness(1.04);
-  --q-glass-rim: inset 0 1px 0.5px rgba(255, 255, 255, 0.95), inset 0 -1px 0.5px rgba(255, 255, 255, 0.45), inset 1px 0 1px -0.5px rgba(255, 255, 255, 0.6), inset -1px 0 1px -0.5px rgba(255, 255, 255, 0.6), inset 0 0 0 0.5px rgba(0, 0, 0, 0.04), inset 0 0 14px rgba(255, 255, 255, 0.35);
-  --q-glass-drop: 0 1px 2px rgba(0, 0, 0, 0.06), 0 8px 28px rgba(0, 0, 0, 0.1);
+
+  /* The iOS 26/27 palette, light. */
+  --q-red: #ff383c;
+  --q-orange: #ff8d28;
+  --q-yellow: #ffcc00;
+  --q-green: #34c759;
+  --q-mint: #00c8b3;
+  --q-teal: #00c3d0;
+  --q-cyan: #00c0e8;
+  --q-blue: #0088ff;
+  --q-indigo: #6155f5;
+  --q-purple: #cb30e0;
+  --q-pink: #ff2d55;
+  --q-brown: #ac7f5e;
+  --q-gray: #8e8e93;
+  --q-gray-2: #aeaeb2;
+  --q-gray-3: #c7c7cc;
+  --q-gray-4: #d1d1d6;
+  --q-gray-5: #e5e5ea;
+  --q-gray-6: #f2f2f7;
+
+  /* Labels, fills, backgrounds, separators: iOS's semantic colours. */
+  --q-label: #000000;
+  --q-label-2: rgba(60, 60, 67, 0.6);
+  --q-label-3: rgba(60, 60, 67, 0.3);
+  --q-label-4: rgba(60, 60, 67, 0.18);
+  --q-fill-1: rgba(120, 120, 128, 0.2);
+  --q-fill-2: rgba(120, 120, 128, 0.16);
+  --q-fill-3: rgba(118, 118, 128, 0.12);
+  --q-fill-4: rgba(116, 116, 128, 0.08);
+  --q-bg: #ffffff;
+  --q-bg-2: #f2f2f7;
+  --q-bg-3: #ffffff;
+  --q-grouped: #f2f2f7;
+  --q-grouped-2: #ffffff;
+  --q-grouped-3: #f2f2f7;
+  --q-sep: rgba(60, 60, 67, 0.29);
+  --q-sep-opaque: #c6c6c8;
+  --q-elevated: #ffffff;
+
+  /* Liquid Glass: a clear tinted fill over a strong blur, lit at the rim
+     (a bright top edge, a dimmer bottom one), a soft drop beneath; never an
+     outline ring. `regular` for bars and buttons, `clear` over media,
+     `thick` for alerts and menus that hold text. */
+  --q-glass: rgba(250, 250, 252, 0.72);
+  --q-glass-clear: rgba(255, 255, 255, 0.28);
+  --q-glass-strong: rgba(250, 250, 252, 0.84);
+  --q-glass-blur: blur(20px) saturate(2.2) brightness(1.05);
+  --q-glass-rim: inset 0 1px 0.5px rgba(255, 255, 255, 0.95), inset 0 -0.5px 0.5px rgba(255, 255, 255, 0.5), inset 1px 0 1px -0.5px rgba(255, 255, 255, 0.7), inset -1px 0 1px -0.5px rgba(255, 255, 255, 0.7), inset 0 0 0 0.5px rgba(0, 0, 0, 0.05), inset 0 0 16px rgba(255, 255, 255, 0.4);
+  --q-glass-drop: 0 0.5px 1px rgba(0, 0, 0, 0.05), 0 6px 22px rgba(0, 0, 0, 0.1);
   --q-glass-edge: rgba(0, 0, 0, 0.06);
   --q-glass-pick: rgba(120, 120, 128, 0.16);
-  --q-fill: rgba(120, 120, 128, 0.12);
-  --q-spring: cubic-bezier(0.34, 1.42, 0.5, 1);
+  --q-dim: rgba(0, 0, 0, 0.26);
+
+  /* Shapes: concentric corners, deep where the screen's are. */
+  --q-r-card: 26px;
+  --q-r-cell: 12px;
+  --q-r-sheet: 38px;
+  --q-r-alert: 34px;
+  --q-r-icon: 8px;
+  --q-margin: 16px;
+  --q-row: 52px;
+  --q-hairline: 0.5px;
+
+  /* Type: iOS's sizes (large text at the default setting). */
+  --q-t-large: 700 34px/41px var(--q-font);
+  --q-t-title1: 700 28px/34px var(--q-font);
+  --q-t-title2: 700 22px/28px var(--q-font);
+  --q-t-title3: 600 20px/25px var(--q-font);
+  --q-t-headline: 600 17px/22px var(--q-font);
+  --q-t-body: 400 17px/22px var(--q-font);
+  --q-t-callout: 400 16px/21px var(--q-font);
+  --q-t-subhead: 400 15px/20px var(--q-font);
+  --q-t-footnote: 400 13px/18px var(--q-font);
+  --q-t-caption: 400 12px/16px var(--q-font);
+  --q-t-caption2: 400 11px/13px var(--q-font);
+
+  /* Movement: SwiftUI's springs (response, bounce), sampled as linear(). */
+  --q-spring-smooth: linear(0, 0.0204, 0.0708, 0.1387, 0.2155, 0.2951, 0.3734, 0.448, 0.5173, 0.5805, 0.6375, 0.6882, 0.7329, 0.772, 0.806, 0.8354, 0.8607, 0.8824, 0.901, 0.9167, 0.9301, 0.9415, 0.951, 0.9591, 0.9659, 0.9716, 0.9763, 0.9803, 0.9837, 0.9864, 0.9888, 0.9907, 0.9923, 0.9936, 0.9947, 0.9956, 0.9964, 0.997, 0.9976, 0.998, 1);
+  --q-spring-snappy: linear(0, 0.019, 0.0674, 0.135, 0.2135, 0.297, 0.3809, 0.4622, 0.5386, 0.609, 0.6725, 0.729, 0.7785, 0.8212, 0.8577, 0.8885, 0.9142, 0.9353, 0.9525, 0.9663, 0.9773, 0.9858, 0.9923, 0.9971, 1.0007, 1.0031, 1.0047, 1.0057, 1.0062, 1.0063, 1.0061, 1.0058, 1.0054, 1.0049, 1.0044, 1.0038, 1.0033, 1.0028, 1.0024, 1.002, 1);
+  --q-spring-bouncy: linear(0, 0.0242, 0.0865, 0.1734, 0.2742, 0.3803, 0.4854, 0.5849, 0.6758, 0.7564, 0.8258, 0.8839, 0.9311, 0.9685, 0.9969, 1.0175, 1.0316, 1.0404, 1.0448, 1.046, 1.0447, 1.0417, 1.0377, 1.033, 1.0281, 1.0233, 1.0188, 1.0146, 1.0109, 1.0078, 1.0052, 1.003, 1.0013, 1.0001, 0.9991, 0.9985, 0.9981, 0.9979, 0.9979, 0.998, 1);
+  --q-dur-smooth: 0.69s;
+  --q-dur-snappy: 0.46s;
+  --q-dur-bouncy: 0.74s;
+  --q-dur-quick: 0.25s;
+  --q-spring: var(--q-spring-snappy);
   --q-ease: cubic-bezier(0.32, 0.72, 0, 1);
-  --q-gap: 16px;
+
+  /* The names the apps were built on, now iOS's own. */
+  --q-page: var(--q-grouped);
+  --q-surface: var(--q-grouped-2);
+  --q-surface-2: var(--q-grouped-3);
+  --q-sunken: var(--q-fill-3);
+  --q-sheet: var(--q-grouped);
+  --q-text: var(--q-label);
+  --q-text-2: rgba(60, 60, 67, 0.85);
+  --q-muted: var(--q-label-2);
+  --q-border: transparent;
+  --q-divider: rgba(60, 60, 67, 0.2);
+  --q-good: #248a3d;
+  --q-bad: #e5272c;
+  --q-warn: #c25e00;
+  --q-shadow-sm: none;
+  --q-shadow: 0 1px 2px rgba(0, 0, 0, 0.03), 0 8px 24px -12px rgba(0, 0, 0, 0.1);
+  --q-radius: var(--q-r-card);
+  --q-radius-sm: 16px;
+  --quadra-radius: var(--q-r-card);
+  --q-bar: var(--q-glass);
+  --q-fill: var(--q-fill-3);
+  --q-gap: var(--q-margin);
   color-scheme: light dark;
 }
 /* The app's colour: a default at no specificity, so each app's own
    :root { --q-accent } wins whichever stylesheet loads last. */
 :where(:root) {
-  --q-accent: #007aff;
+  --q-accent: var(--q-blue);
   --q-accent-ink: #ffffff;
-  --q-accent-wash: color-mix(in srgb, var(--q-accent) 10%, transparent);
+  --q-accent-wash: color-mix(in srgb, var(--q-accent) 12%, transparent);
 }
+/* Dark: iOS's dark palette, black grouped background, lifted cells. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --q-page: #000000;
-    --q-surface: #1c1c1e;
-    --q-surface-2: #232326;
-    --q-sunken: #2c2c2e;
-    --q-text: #f5f5f7;
-    --q-text-2: #d1d1d6;
-    --q-muted: #8e8e93;
-    --q-border: rgba(255, 255, 255, 0.07);
-    --q-divider: rgba(84, 84, 88, 0.45);
-    --q-good: #30d158;
-    --q-bad: #ff453a;
-    --q-warn: #ff9f0a;
-    --q-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-    --q-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 14px 34px -14px rgba(0, 0, 0, 0.65);
-    --q-bar: rgba(22, 22, 24, 0.82);
-    --q-glass: rgba(44, 44, 48, 0.52);
-    --q-glass-strong: rgba(44, 44, 48, 0.74);
-    --q-glass-rim: inset 0 1px 0.5px rgba(255, 255, 255, 0.3), inset 0 -1px 0.5px rgba(255, 255, 255, 0.1), inset 1px 0 1px -0.5px rgba(255, 255, 255, 0.16), inset -1px 0 1px -0.5px rgba(255, 255, 255, 0.16), inset 0 0 0 0.5px rgba(255, 255, 255, 0.06), inset 0 0 14px rgba(255, 255, 255, 0.04);
-    --q-glass-drop: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 28px rgba(0, 0, 0, 0.4);
+    --q-red: #ff4245;
+    --q-orange: #ff9230;
+    --q-yellow: #ffd600;
+    --q-green: #30d158;
+    --q-mint: #00dac3;
+    --q-teal: #00d2e0;
+    --q-cyan: #3cd3fe;
+    --q-blue: #0091ff;
+    --q-indigo: #6d7cff;
+    --q-purple: #db34f2;
+    --q-pink: #ff375f;
+    --q-brown: #b78a66;
+    --q-gray-2: #636366;
+    --q-gray-3: #48484a;
+    --q-gray-4: #3a3a3c;
+    --q-gray-5: #2c2c2e;
+    --q-gray-6: #1c1c1e;
+    --q-label: #ffffff;
+    --q-label-2: rgba(235, 235, 245, 0.6);
+    --q-label-3: rgba(235, 235, 245, 0.3);
+    --q-label-4: rgba(235, 235, 245, 0.16);
+    --q-fill-1: rgba(120, 120, 128, 0.36);
+    --q-fill-2: rgba(120, 120, 128, 0.32);
+    --q-fill-3: rgba(118, 118, 128, 0.24);
+    --q-fill-4: rgba(118, 118, 128, 0.18);
+    --q-bg: #000000;
+    --q-bg-2: #1c1c1e;
+    --q-bg-3: #2c2c2e;
+    --q-grouped: #000000;
+    --q-grouped-2: #1c1c1e;
+    --q-grouped-3: #2c2c2e;
+    --q-sep: rgba(84, 84, 88, 0.65);
+    --q-sep-opaque: #38383a;
+    --q-elevated: #1c1c1e;
+    --q-glass: rgba(34, 34, 37, 0.7);
+    --q-glass-clear: rgba(30, 30, 32, 0.24);
+    --q-glass-strong: rgba(40, 40, 43, 0.8);
+    --q-glass-rim: inset 0 1px 0.5px rgba(255, 255, 255, 0.28), inset 0 -0.5px 0.5px rgba(255, 255, 255, 0.08), inset 1px 0 1px -0.5px rgba(255, 255, 255, 0.14), inset -1px 0 1px -0.5px rgba(255, 255, 255, 0.14), inset 0 0 0 0.5px rgba(255, 255, 255, 0.07), inset 0 0 16px rgba(255, 255, 255, 0.04);
+    --q-glass-drop: 0 0.5px 1px rgba(0, 0, 0, 0.3), 0 6px 22px rgba(0, 0, 0, 0.42);
     --q-glass-edge: rgba(255, 255, 255, 0.1);
-    --q-glass-pick: rgba(120, 120, 128, 0.32);
-    --q-fill: rgba(120, 120, 128, 0.24);
-    --q-sheet: #1c1c1e;
-    --q-accent-wash: color-mix(in srgb, var(--q-accent) 18%, transparent);
+    --q-glass-pick: rgba(255, 255, 255, 0.12);
+    --q-dim: rgba(0, 0, 0, 0.48);
+    --q-sheet: var(--q-grouped-2);
+    --q-text-2: rgba(235, 235, 245, 0.86);
+    --q-divider: rgba(84, 84, 88, 0.55);
+    --q-good: #30d158;
+    --q-bad: #ff4245;
+    --q-warn: #ff9230;
+    --q-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 10px 28px -12px rgba(0, 0, 0, 0.6);
+    --q-accent-wash: color-mix(in srgb, var(--q-accent) 20%, transparent);
   }
 }
 :root[data-theme='dark'] {
-  --q-page: #000000;
-  --q-surface: #1c1c1e;
-  --q-surface-2: #232326;
-  --q-sunken: #2c2c2e;
-  --q-text: #f5f5f7;
-  --q-text-2: #d1d1d6;
-  --q-muted: #8e8e93;
-  --q-border: rgba(255, 255, 255, 0.07);
-  --q-divider: rgba(84, 84, 88, 0.45);
-  --q-good: #30d158;
-  --q-bad: #ff453a;
-  --q-warn: #ff9f0a;
-  --q-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --q-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 14px 34px -14px rgba(0, 0, 0, 0.65);
-  --q-bar: rgba(22, 22, 24, 0.82);
-  --q-glass: rgba(44, 44, 48, 0.52);
-  --q-glass-strong: rgba(44, 44, 48, 0.74);
-  --q-glass-rim: inset 0 1px 0.5px rgba(255, 255, 255, 0.3), inset 0 -1px 0.5px rgba(255, 255, 255, 0.1), inset 1px 0 1px -0.5px rgba(255, 255, 255, 0.16), inset -1px 0 1px -0.5px rgba(255, 255, 255, 0.16), inset 0 0 0 0.5px rgba(255, 255, 255, 0.06), inset 0 0 14px rgba(255, 255, 255, 0.04);
-  --q-glass-drop: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 28px rgba(0, 0, 0, 0.4);
+  --q-red: #ff4245;
+  --q-orange: #ff9230;
+  --q-yellow: #ffd600;
+  --q-green: #30d158;
+  --q-mint: #00dac3;
+  --q-teal: #00d2e0;
+  --q-cyan: #3cd3fe;
+  --q-blue: #0091ff;
+  --q-indigo: #6d7cff;
+  --q-purple: #db34f2;
+  --q-pink: #ff375f;
+  --q-brown: #b78a66;
+  --q-gray-2: #636366;
+  --q-gray-3: #48484a;
+  --q-gray-4: #3a3a3c;
+  --q-gray-5: #2c2c2e;
+  --q-gray-6: #1c1c1e;
+  --q-label: #ffffff;
+  --q-label-2: rgba(235, 235, 245, 0.6);
+  --q-label-3: rgba(235, 235, 245, 0.3);
+  --q-label-4: rgba(235, 235, 245, 0.16);
+  --q-fill-1: rgba(120, 120, 128, 0.36);
+  --q-fill-2: rgba(120, 120, 128, 0.32);
+  --q-fill-3: rgba(118, 118, 128, 0.24);
+  --q-fill-4: rgba(118, 118, 128, 0.18);
+  --q-bg: #000000;
+  --q-bg-2: #1c1c1e;
+  --q-bg-3: #2c2c2e;
+  --q-grouped: #000000;
+  --q-grouped-2: #1c1c1e;
+  --q-grouped-3: #2c2c2e;
+  --q-sep: rgba(84, 84, 88, 0.65);
+  --q-sep-opaque: #38383a;
+  --q-elevated: #1c1c1e;
+  --q-glass: rgba(34, 34, 37, 0.7);
+  --q-glass-clear: rgba(30, 30, 32, 0.24);
+  --q-glass-strong: rgba(40, 40, 43, 0.8);
+  --q-glass-rim: inset 0 1px 0.5px rgba(255, 255, 255, 0.28), inset 0 -0.5px 0.5px rgba(255, 255, 255, 0.08), inset 1px 0 1px -0.5px rgba(255, 255, 255, 0.14), inset -1px 0 1px -0.5px rgba(255, 255, 255, 0.14), inset 0 0 0 0.5px rgba(255, 255, 255, 0.07), inset 0 0 16px rgba(255, 255, 255, 0.04);
+  --q-glass-drop: 0 0.5px 1px rgba(0, 0, 0, 0.3), 0 6px 22px rgba(0, 0, 0, 0.42);
   --q-glass-edge: rgba(255, 255, 255, 0.1);
-  --q-glass-pick: rgba(120, 120, 128, 0.32);
-  --q-fill: rgba(120, 120, 128, 0.24);
-  --q-sheet: #1c1c1e;
-  --q-accent-wash: color-mix(in srgb, var(--q-accent) 18%, transparent);
+  --q-glass-pick: rgba(255, 255, 255, 0.12);
+  --q-dim: rgba(0, 0, 0, 0.48);
+  --q-sheet: var(--q-grouped-2);
+  --q-text-2: rgba(235, 235, 245, 0.86);
+  --q-divider: rgba(84, 84, 88, 0.55);
+  --q-good: #30d158;
+  --q-bad: #ff4245;
+  --q-warn: #ff9230;
+  --q-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 10px 28px -12px rgba(0, 0, 0, 0.6);
+  --q-accent-wash: color-mix(in srgb, var(--q-accent) 20%, transparent);
+}
+
+/* The page: San Francisco, smoothed as iOS draws it, on the grouped background. */
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: 'kern';
+}
+body {
+  background-color: var(--q-page);
+  color: var(--q-text);
+}
+::selection {
+  background: color-mix(in srgb, var(--q-accent) 28%, transparent);
+}
+:where(a) {
+  color: var(--q-accent);
 }
 
 /* Text never cut off or wrapped mid-number; inputs 16px so iOS never zooms.
@@ -339,45 +494,1592 @@ body {
   }
 }
 
-/* ---- Buttons ---- */
+/* ==== Components: iOS 27's controls, the same in every app ==== */
+
+/* ---- Type: iOS's text styles, for any element ---- */
+.q-large-title { font: var(--q-t-large); letter-spacing: 0.01em; }
+.q-title1 { font: var(--q-t-title1); letter-spacing: 0.01em; }
+.q-title2 { font: var(--q-t-title2); letter-spacing: -0.01em; }
+.q-title3 { font: var(--q-t-title3); letter-spacing: -0.015em; }
+.q-headline { font: var(--q-t-headline); letter-spacing: -0.025em; }
+.q-body { font: var(--q-t-body); letter-spacing: -0.025em; }
+.q-callout { font: var(--q-t-callout); letter-spacing: -0.02em; }
+.q-subhead { font: var(--q-t-subhead); letter-spacing: -0.015em; }
+.q-footnote { font: var(--q-t-footnote); letter-spacing: -0.005em; }
+.q-caption { font: var(--q-t-caption); }
+.q-caption2 { font: var(--q-t-caption2); letter-spacing: 0.005em; }
+.q-label-2 { color: var(--q-label-2); }
+.q-label-3 { color: var(--q-label-3); }
+.q-rounded { font-family: var(--q-font-rounded); }
+
+/* ---- Liquid Glass, for anything that floats ---- */
+.q-glass {
+  background: var(--q-glass);
+  -webkit-backdrop-filter: var(--q-glass-blur);
+  backdrop-filter: var(--q-glass-blur);
+  box-shadow: var(--q-glass-rim), var(--q-glass-drop);
+}
+.q-glass-clear {
+  background: var(--q-glass-clear);
+  -webkit-backdrop-filter: blur(8px) saturate(1.8) brightness(1.08);
+  backdrop-filter: blur(8px) saturate(1.8) brightness(1.08);
+  box-shadow: var(--q-glass-rim), var(--q-glass-drop);
+}
+
+/* ---- A control under a finger: iOS's give (kit/quadra.mjs sets
+   [data-q-press] the moment a touch lands, before :active would) ---- */
+button,
+[role='button'],
+[role='tab'],
+[role='switch'],
+.q-chip {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ---- Buttons: capsules. Grey by default (iOS's .bordered), the app's
+   colour filled for the one that matters (.primary, iOS's .borderedProminent),
+   tinted, glass, plain; small (32), regular (44), large (50). ---- */
 .q-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  min-height: 46px;
-  padding: 0 18px;
-  border: 1px solid var(--q-border);
-  border-radius: 14px;
-  background: var(--q-surface);
-  color: var(--q-text);
-  font: 650 15px/1.2 var(--q-font);
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--q-fill-2);
+  color: var(--q-accent);
+  font: 600 17px/1.2 var(--q-font);
+  letter-spacing: -0.02em;
   white-space: nowrap;
+  text-decoration: none;
   cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  transition: transform 0.08s ease, background 0.15s ease;
+  transition: transform var(--q-dur-snappy) var(--q-spring-snappy), background-color 0.2s, opacity 0.2s, color 0.2s;
 }
-.q-btn:active {
-  transform: scale(0.98);
+.q-btn:is(:active, [data-q-press]):not(:disabled) {
+  transform: scale(0.96);
+  transition-duration: 0.12s;
+  opacity: 0.85;
 }
 .q-btn.primary {
-  border-color: transparent;
   background: var(--q-accent);
   color: var(--q-accent-ink);
 }
+.q-btn.tinted {
+  background: var(--q-accent-wash);
+  color: var(--q-accent);
+}
+.q-btn.glass {
+  background: var(--q-glass-strong);
+  -webkit-backdrop-filter: var(--q-glass-blur);
+  backdrop-filter: var(--q-glass-blur);
+  box-shadow: var(--q-glass-rim), var(--q-glass-drop);
+  color: var(--q-label);
+}
+.q-btn.plain,
+.q-btn.ghost {
+  background: none;
+  padding: 0 8px;
+}
+.q-btn.danger {
+  background: var(--q-red);
+  color: #ffffff;
+}
+.q-btn.danger.tinted {
+  background: color-mix(in srgb, var(--q-red) 14%, transparent);
+  color: var(--q-red);
+}
 .q-btn.small {
-  min-height: 34px;
-  padding: 0 12px;
-  border-radius: 10px;
-  font-size: 13px;
+  min-height: 32px;
+  padding: 0 14px;
+  font-size: 15px;
+}
+.q-btn.large {
+  min-height: 50px;
+  padding: 0 24px;
 }
 .q-btn.block {
   width: 100%;
 }
 .q-btn:disabled {
-  opacity: 0.55;
+  opacity: 0.4;
   cursor: default;
 }
+.q-btn svg {
+  width: 1.1em;
+  height: 1.1em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ---- Glass circles: the top buttons, a sheet's close; grouped into one
+   capsule when there are several (iOS 26's toolbar groups) ---- */
+.q-icon-btn,
+.q-close {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--q-glass-strong);
+  -webkit-backdrop-filter: var(--q-glass-blur);
+  backdrop-filter: var(--q-glass-blur);
+  box-shadow: var(--q-glass-rim), var(--q-glass-drop);
+  color: var(--q-label);
+  font: 500 22px/1 var(--q-font);
+  cursor: pointer;
+  transition: transform var(--q-dur-bouncy) var(--q-spring-bouncy), background-color 0.2s;
+}
+.q-icon-btn svg {
+  width: 21px;
+  height: 21px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+/* (Glass swells under a finger, as iOS 26's does.) */
+.q-icon-btn:is(:active, [data-q-press]):not(:disabled),
+.q-close:is(:active, [data-q-press]) {
+  transform: scale(1.12);
+  transition-duration: 0.14s;
+}
+.q-icon-btn:disabled {
+  opacity: 0.4;
+}
+.q-close {
+  width: 36px;
+  height: 36px;
+  font-size: 20px;
+  color: var(--q-label-2);
+  background: var(--q-fill-3);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+.q-refresh:disabled {
+  opacity: 1;
+}
+.q-refresh:disabled svg {
+  animation: q-turn 0.9s linear infinite;
+}
+@keyframes q-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.q-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+.q-actions:has(> :nth-child(2)) {
+  gap: 0;
+  padding: 0 2px;
+  border-radius: 999px;
+  background: var(--q-glass-strong);
+  -webkit-backdrop-filter: var(--q-glass-blur);
+  backdrop-filter: var(--q-glass-blur);
+  box-shadow: var(--q-glass-rim), var(--q-glass-drop);
+}
+.q-actions:has(> :nth-child(2)) > .q-icon-btn,
+.q-actions:has(> :nth-child(2)) > .q-account:not(.q-framed) {
+  width: 42px;
+  background: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+.q-actions:has(> :nth-child(2)) > .q-account.q-framed {
+  width: 34px;
+  height: 34px;
+  margin: 0 4px;
+}
+.q-actions:has(> :nth-child(2)) .q-account-dot {
+  right: 5px;
+  bottom: 5px;
+}
+@media (hover: hover) {
+  .q-icon-btn:hover {
+    background: var(--q-fill-2);
+  }
+}
+
+/* ---- The app frame: the top line and its buttons; the tabs ---- */
+:root {
+  --q-page-max: 1120px;
+  --q-nav: 0px;
+}
+.q-appbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  padding-top: var(--q-top);
+  background: var(--q-glass);
+  -webkit-backdrop-filter: var(--q-glass-blur);
+  backdrop-filter: var(--q-glass-blur);
+  box-shadow: inset 0 -0.5px 0 var(--q-sep);
+}
+@media (display-mode: standalone) {
+  .q-appbar {
+    background: var(--q-page);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+.q-appbar-inner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: var(--q-page-max);
+  margin: 0 auto;
+  padding: 8px max(16px, env(safe-area-inset-right)) 8px max(16px, env(safe-area-inset-left));
+}
+.q-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.q-brand-logo {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border-radius: 9px;
+}
+.q-brand-text {
+  min-width: 0;
+}
+.q-brand h1 {
+  margin: 0;
+  font: var(--q-t-headline);
+  white-space: nowrap;
+}
+.q-status {
+  margin: 0;
+  overflow: hidden;
+  color: var(--q-label-2);
+  font: 500 13px/18px var(--q-font);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.q-status:empty {
+  display: none;
+}
+
+/* The tabs on a computer: a segmented control in the bar. */
+.q-tabbar {
+  position: relative;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--q-fill-3);
+}
+.q-tab {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 16px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--q-label);
+  font: 500 14px/1.2 var(--q-font);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.2s, background-color 0.25s;
+}
+.q-tab[hidden] {
+  display: none;
+}
+.q-tab-icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+.q-tab svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.q-tab[aria-selected='true'] {
+  background: var(--q-grouped-2);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 3px 8px rgba(0, 0, 0, 0.06);
+  color: var(--q-label);
+  font-weight: 600;
+}
+.q-tab-badge {
+  position: absolute;
+  top: -6px;
+  left: calc(100% - 7px);
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--q-red);
+  color: #ffffff;
+  font: 600 11px/18px var(--q-font);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  white-space: nowrap;
+}
+.q-tab-badge.warn {
+  background: var(--q-orange);
+}
+.q-tab-badge.accent {
+  background: var(--q-accent);
+  color: var(--q-accent-ink);
+}
+.q-tab-badge.dot {
+  top: -2px;
+  left: calc(100% - 3px);
+  min-width: 0;
+  width: 10px;
+  height: 10px;
+  padding: 0;
+}
+
+/* A phone or a tablet (a narrow window, or html.q-touch from the device):
+   the top line is the status and the glass buttons, and the tabs a capsule
+   of glass floating over the page's foot, the chosen tab lit by a softer
+   pill that slides between them (kit/quadra.mjs tabBar sets --q-tab-x and
+   --q-tab-w), shrinking to its icons while the page scrolls down. What
+   scrolls beneath fades towards the edge (iOS's scroll edge effect). */
+@media (max-width: 720px) {
+  :root {
+    --q-bar-gap: max(calc(env(safe-area-inset-bottom) - 14px), calc(var(--q-safe-bottom, 0px) - 14px), 12px);
+    --q-nav: calc(62px + var(--q-bar-gap));
+  }
+}
+:root.q-touch {
+  --q-bar-gap: max(calc(env(safe-area-inset-bottom) - 14px), calc(var(--q-safe-bottom, 0px) - 14px), 12px);
+  --q-nav: calc(62px + var(--q-bar-gap));
+}
+@media (max-width: 720px) {
+  .q-appbar {
+    position: static;
+    background: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: none;
+  }
+  .q-appbar-inner {
+    gap: 10px;
+    min-height: 44px;
+    padding: 6px max(16px, env(safe-area-inset-right)) 4px max(16px, env(safe-area-inset-left));
+  }
+  .q-brand-logo,
+  .q-brand h1 {
+    display: none;
+  }
+}
+.q-touch .q-appbar {
+  position: static;
+  background: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+.q-touch .q-appbar-inner {
+  gap: 10px;
+  min-height: 44px;
+  padding: 6px max(16px, env(safe-area-inset-right)) 4px max(16px, env(safe-area-inset-left));
+}
+.q-touch .q-brand-logo,
+.q-touch .q-brand h1 {
+  display: none;
+}
+@media (max-width: 720px) {
+  .q-tabbar.q-tabbar {
+    position: fixed;
+    z-index: 60;
+    left: 50%;
+    bottom: var(--q-bar-gap);
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    gap: 0;
+    width: min(calc(100vw - 2 * max(16px, env(safe-area-inset-left))), calc(var(--q-tabs, 4) * 92px));
+    margin: 0;
+    padding: 4px;
+    border-radius: 999px;
+    background: var(--q-glass);
+    -webkit-backdrop-filter: var(--q-glass-blur);
+    backdrop-filter: var(--q-glass-blur);
+    box-shadow: var(--q-glass-rim), var(--q-glass-drop);
+    transform: translateX(-50%);
+    transition: transform var(--q-dur-smooth) var(--q-spring-smooth), padding var(--q-dur-smooth) var(--q-spring-smooth);
+  }
+  .q-tabbar.q-tabbar::before {
+    content: '';
+    position: absolute;
+    z-index: 0;
+    top: 4px;
+    bottom: 4px;
+    left: 0;
+    width: var(--q-tab-w, 0px);
+    border-radius: 999px;
+    background: var(--q-glass-pick);
+    transform: translateX(var(--q-tab-x, 0px));
+    transition: transform var(--q-dur-snappy) var(--q-spring-snappy), width var(--q-dur-snappy) var(--q-spring-snappy);
+    pointer-events: none;
+  }
+  .q-tabbar.q-tabbar::after {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    left: 50%;
+    bottom: calc(-1 * var(--q-bar-gap));
+    width: 100vw;
+    height: calc(100% + var(--q-bar-gap) + 30px);
+    transform: translateX(-50%);
+    background: linear-gradient(to top, color-mix(in srgb, var(--q-page) 82%, transparent), color-mix(in srgb, var(--q-page) 40%, transparent) 55%, transparent);
+    pointer-events: none;
+  }
+  .q-tabbar .q-tab {
+    flex-direction: column;
+    justify-content: center;
+    gap: 1px;
+    min-width: 0;
+    min-height: 54px;
+    padding: 5px 2px 6px;
+    background: none;
+    box-shadow: none;
+    color: var(--q-label);
+    font: 500 10px/12px var(--q-font);
+    transition: color 0.2s, min-height var(--q-dur-smooth) var(--q-spring-smooth);
+  }
+  .q-tabbar .q-tab-icon {
+    height: 28px;
+    transition: transform var(--q-dur-bouncy) var(--q-spring-bouncy);
+  }
+  .q-tabbar .q-tab svg {
+    width: 25px;
+    height: 25px;
+    stroke-width: 1.8;
+  }
+  .q-tabbar .q-tab-label {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: opacity 0.2s, height var(--q-dur-smooth) var(--q-spring-smooth);
+  }
+  .q-tabbar .q-tab[aria-selected='true'] {
+    background: none;
+    box-shadow: none;
+    color: var(--q-accent);
+    font-weight: 600;
+  }
+  .q-tabbar .q-tab[aria-selected='true'] svg {
+    stroke-width: 2.2;
+  }
+  .q-tabbar .q-tab:is(:active, [data-q-press]) .q-tab-icon {
+    transform: scale(1.14);
+    transition-duration: 0.14s;
+  }
+  .q-tabbar .q-tab-badge {
+    top: -2px;
+    left: calc(50% + 6px);
+  }
+  .q-tabbar .q-tab-badge.dot {
+    top: 1px;
+    left: calc(50% + 10px);
+  }
+  /* Scrolling down: the bar draws in to its icons (quadra.mjs sets .q-tabs-small). */
+  .q-tabs-small .q-tabbar .q-tab {
+    min-height: 44px;
+  }
+  .q-tabs-small .q-tabbar .q-tab-label {
+    height: 0;
+    opacity: 0;
+  }
+}
+.q-touch .q-tabbar.q-tabbar {
+  position: fixed;
+  z-index: 60;
+  left: 50%;
+  bottom: var(--q-bar-gap);
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 0;
+  width: min(calc(100vw - 2 * max(16px, env(safe-area-inset-left))), calc(var(--q-tabs, 4) * 92px));
+  margin: 0;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--q-glass);
+  -webkit-backdrop-filter: var(--q-glass-blur);
+  backdrop-filter: var(--q-glass-blur);
+  box-shadow: var(--q-glass-rim), var(--q-glass-drop);
+  transform: translateX(-50%);
+}
+.q-touch .q-tabbar.q-tabbar::before {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  top: 4px;
+  bottom: 4px;
+  left: 0;
+  width: var(--q-tab-w, 0px);
+  border-radius: 999px;
+  background: var(--q-glass-pick);
+  transform: translateX(var(--q-tab-x, 0px));
+  transition: transform var(--q-dur-snappy) var(--q-spring-snappy), width var(--q-dur-snappy) var(--q-spring-snappy);
+  pointer-events: none;
+}
+.q-touch .q-tabbar.q-tabbar::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  left: 50%;
+  bottom: calc(-1 * var(--q-bar-gap));
+  width: 100vw;
+  height: calc(100% + var(--q-bar-gap) + 30px);
+  transform: translateX(-50%);
+  background: linear-gradient(to top, color-mix(in srgb, var(--q-page) 82%, transparent), color-mix(in srgb, var(--q-page) 40%, transparent) 55%, transparent);
+  pointer-events: none;
+}
+.q-touch .q-tabbar .q-tab {
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  min-width: 0;
+  min-height: 54px;
+  padding: 5px 2px 6px;
+  background: none;
+  box-shadow: none;
+  color: var(--q-label);
+  font: 500 10px/12px var(--q-font);
+  transition: color 0.2s, min-height var(--q-dur-smooth) var(--q-spring-smooth);
+}
+.q-touch .q-tabbar .q-tab-icon {
+  height: 28px;
+  transition: transform var(--q-dur-bouncy) var(--q-spring-bouncy);
+}
+.q-touch .q-tabbar .q-tab svg {
+  width: 25px;
+  height: 25px;
+  stroke-width: 1.8;
+}
+.q-touch .q-tabbar .q-tab-label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: opacity 0.2s, height var(--q-dur-smooth) var(--q-spring-smooth);
+}
+.q-touch .q-tabbar .q-tab[aria-selected='true'] {
+  background: none;
+  box-shadow: none;
+  color: var(--q-accent);
+  font-weight: 600;
+}
+.q-touch .q-tabbar .q-tab[aria-selected='true'] svg {
+  stroke-width: 2.2;
+}
+.q-touch .q-tabbar .q-tab:is(:active, [data-q-press]) .q-tab-icon {
+  transform: scale(1.14);
+  transition-duration: 0.14s;
+}
+.q-touch .q-tabbar .q-tab-badge {
+  top: -2px;
+  left: calc(50% + 6px);
+}
+.q-touch .q-tabbar .q-tab-badge.dot {
+  top: 1px;
+  left: calc(50% + 10px);
+}
+.q-touch.q-tabs-small .q-tabbar .q-tab {
+  min-height: 44px;
+}
+.q-touch.q-tabs-small .q-tabbar .q-tab-label {
+  height: 0;
+  opacity: 0;
+}
+
+/* ---- Sheets: up from the foot on a spring, floating inside the screen's
+   edges with its deep corners, a grabber, a centred title between glass
+   circles; dragged down to close (quadra.mjs sheetSwipe) ---- */
+.q-sheet {
+  width: min(520px, calc(100vw - 16px));
+  max-width: none;
+  max-height: min(calc(100dvh - var(--q-top) - 16px), 900px);
+  margin: auto auto 8px;
+  padding: 0 var(--q-margin) calc(16px + max(env(safe-area-inset-bottom) - 8px, 0px));
+  border: 0;
+  border-radius: var(--q-r-sheet);
+  background: var(--q-sheet);
+  box-shadow: 0 -1px 0 rgba(255, 255, 255, 0.04), 0 18px 60px rgba(0, 0, 0, 0.22);
+  color: var(--q-text);
+  font-family: var(--q-font);
+  box-sizing: border-box;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+@media (min-width: 720px) {
+  .q-sheet {
+    margin: auto;
+  }
+}
+.q-sheet::backdrop {
+  background: var(--q-dim);
+}
+.q-sheet::before {
+  content: '';
+  position: sticky;
+  top: 6px;
+  z-index: 3;
+  display: block;
+  width: 36px;
+  height: 5px;
+  margin: 6px auto -11px;
+  border-radius: 3px;
+  background: var(--q-label-3);
+}
+.q-sheet[open] {
+  animation: q-sheet-up var(--q-dur-smooth) var(--q-spring-smooth);
+}
+.q-sheet[open]::backdrop {
+  animation: q-fade-in 0.3s ease-out;
+}
+.q-sheet.q-settle {
+  transition: transform var(--q-dur-snappy) var(--q-spring-snappy);
+}
+@keyframes q-sheet-up {
+  from {
+    transform: translateY(105%);
+  }
+}
+@keyframes q-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (min-width: 720px) {
+  .q-sheet::before {
+    display: none;
+  }
+  .q-sheet[open] {
+    animation: q-pop-in var(--q-dur-snappy) var(--q-spring-snappy);
+  }
+}
+@keyframes q-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+}
+.q-sheet-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 8px;
+  margin: 0 calc(-1 * var(--q-margin)) 8px;
+  padding: 16px 12px 10px;
+  background: linear-gradient(var(--q-sheet) 70%, color-mix(in srgb, var(--q-sheet) 0%, transparent));
+}
+.q-sheet-head h2 {
+  grid-column: 2;
+  margin: 0;
+  overflow: hidden;
+  font: var(--q-t-headline);
+  letter-spacing: -0.025em;
+  text-align: center;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.q-sheet-head > :first-child:not(h2) {
+  grid-column: 1;
+}
+.q-sheet-head .q-close {
+  grid-column: 3;
+  justify-self: end;
+}
+.q-sheet-head > h2:first-child + .q-close,
+.q-sheet-head > :last-child:not(h2):not(.q-close) {
+  grid-column: 3;
+  justify-self: end;
+}
+.q-sheet-h {
+  margin: 24px 16px 7px;
+  color: var(--q-label-2);
+  font: var(--q-t-footnote);
+  letter-spacing: 0;
+  text-transform: none;
+}
+.q-sheet-sub,
+.q-sheet-note {
+  margin: 8px 16px 0;
+  color: var(--q-label-2);
+  font: var(--q-t-footnote);
+}
+.q-sheet-note:empty {
+  display: none;
+}
+
+/* ---- Alerts (ask / tell): a glass slab, centred, capsule buttons ---- */
+.q-ask {
+  width: min(320px, calc(100vw - 48px));
+  margin: auto;
+  padding: 22px 18px 16px;
+  border: 0;
+  border-radius: var(--q-r-alert);
+  background: var(--q-glass-strong);
+  -webkit-backdrop-filter: blur(30px) saturate(2);
+  backdrop-filter: blur(30px) saturate(2);
+  box-shadow: var(--q-glass-rim), 0 24px 70px rgba(0, 0, 0, 0.24);
+  color: var(--q-text);
+  font-family: var(--q-font);
+  text-align: center;
+  box-sizing: border-box;
+  animation: q-alert-in var(--q-dur-snappy) var(--q-spring-snappy);
+}
+.q-ask.out {
+  opacity: 0;
+  transform: scale(0.94);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.q-ask::backdrop {
+  background: var(--q-dim);
+  animation: q-fade-in 0.25s ease-out;
+}
+@keyframes q-alert-in {
+  from {
+    opacity: 0;
+    transform: scale(1.12);
+  }
+}
+.q-ask-icon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 10px;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  background: var(--q-fill-3);
+  font-size: 28px;
+}
+.q-ask.danger .q-ask-icon {
+  background: color-mix(in srgb, var(--q-red) 16%, transparent);
+}
+.q-ask-title {
+  margin: 0;
+  font: var(--q-t-headline);
+  letter-spacing: -0.025em;
+}
+.q-ask-body {
+  margin: 6px 0 0;
+  color: var(--q-text-2);
+  font: var(--q-t-subhead);
+}
+.q-ask-points {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+.q-ask-points li {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: var(--q-fill-3);
+}
+.q-ask-mark {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--q-grouped-2);
+  font-size: 17px;
+  font-weight: 700;
+}
+.q-ask-points strong {
+  display: block;
+  font: 600 15px/20px var(--q-font);
+}
+.q-ask-points small {
+  display: block;
+  margin-top: 2px;
+  color: var(--q-label-2);
+  font: var(--q-t-footnote);
+}
+.q-ask-actions {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 10px;
+  margin-top: 20px;
+}
+.q-ask-actions .q-btn {
+  min-height: 48px;
+  padding: 0 12px;
+}
+.q-ask-actions .q-btn:not(.primary):not(.danger) {
+  color: var(--q-label);
+}
+
+/* ---- Lists: inset grouped, as Settings draws them. .q-rows / .q-list a
+   white cell, .q-row-btn / .q-cell a row (an icon, a title and its line, a
+   value, a chevron), hairlines inset from the text ---- */
+.q-rows,
+.q-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--q-r-card);
+  background: var(--q-surface);
+  list-style: none;
+}
+.q-row-btn,
+.q-cell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: var(--q-row);
+  padding: 8px 16px;
+  border: 0;
+  background: none;
+  color: var(--q-text);
+  font: var(--q-t-body);
+  letter-spacing: -0.025em;
+  text-align: left;
+  text-decoration: none;
+  box-sizing: border-box;
+  cursor: pointer;
+  transition: background-color 0.25s;
+}
+.q-cell {
+  cursor: default;
+}
+:is(button, a).q-cell {
+  cursor: pointer;
+}
+:is(.q-row-btn, .q-cell) + :is(.q-row-btn, .q-cell)::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: var(--q-sep-left, 16px);
+  right: 0;
+  height: var(--q-hairline);
+  background: var(--q-sep);
+}
+.q-cell:has(> .q-cell-icon) + .q-cell::before,
+.q-cell + .q-cell:has(> .q-cell-icon)::before {
+  left: 58px;
+}
+:is(button, a).q-cell:is(:active, [data-q-press]),
+.q-row-btn:is(:active, [data-q-press]):not(:disabled) {
+  background: var(--q-fill-4);
+  transition-duration: 0s;
+}
+.q-row-btn.danger,
+.q-cell.danger {
+  color: var(--q-red);
+}
+.q-row-btn:disabled {
+  opacity: 0.4;
+}
+.q-cell-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border-radius: var(--q-r-icon);
+  background: var(--q-cell-tint, var(--q-accent));
+  color: #ffffff;
+  font-size: 17px;
+}
+.q-cell-icon svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+.q-cell-text {
+  display: grid;
+  gap: 1px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.q-cell-text small {
+  color: var(--q-label-2);
+  font: var(--q-t-subhead);
+}
+.q-cell-value {
+  flex: none;
+  color: var(--q-label-2);
+  font: var(--q-t-body);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.q-cell.chevron::after,
+.q-row-btn.chevron::after {
+  content: '';
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin: 0 3px 0 -2px;
+  border-top: 2px solid var(--q-label-3);
+  border-right: 2px solid var(--q-label-3);
+  border-radius: 1px;
+  transform: rotate(45deg);
+}
+.q-list-head {
+  margin: 24px 16px 7px;
+  color: var(--q-label-2);
+  font: var(--q-t-footnote);
+}
+.q-list-head.big {
+  margin: 28px 0 10px;
+  color: var(--q-label);
+  font: var(--q-t-title3);
+  letter-spacing: -0.015em;
+}
+.q-list-foot {
+  margin: 7px 16px 0;
+  color: var(--q-label-2);
+  font: var(--q-t-footnote);
+}
+
+/* ---- Sections and cards on the page ---- */
+.q-section {
+  margin: 28px 0 0;
+}
+.q-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 10px;
+}
+.q-section-head h2 {
+  margin: 0;
+  overflow: hidden;
+  font: var(--q-t-title3);
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.q-section-head a,
+.q-section-head button {
+  flex: none;
+  border: 0;
+  background: none;
+  color: var(--q-accent);
+  font: 400 17px/1 var(--q-font);
+  text-decoration: none;
+  cursor: pointer;
+}
+.q-card {
+  border: 0;
+  border-radius: var(--q-r-card);
+  background: var(--q-surface);
+  box-shadow: none;
+}
+
+/* ---- Chips: capsules, the chosen one filled with the label's colour ---- */
+.q-chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 2px 0 4px;
+}
+.q-chips::-webkit-scrollbar {
+  display: none;
+}
+.q-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--q-fill-3);
+  color: var(--q-label);
+  font: 500 15px/1 var(--q-font);
+  letter-spacing: -0.015em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.25s, color 0.25s, transform var(--q-dur-snappy) var(--q-spring-snappy);
+}
+.q-chip:is(:active, [data-q-press]) {
+  transform: scale(0.95);
+  transition-duration: 0.12s;
+}
+.q-chip:is([aria-pressed='true'], [aria-selected='true']) {
+  background: var(--q-label);
+  color: var(--q-grouped-2);
+}
+
+/* ---- Segmented control: a capsule track, a raised thumb that slides on a
+   spring (kit/ui.mjs segmented sets --q-seg-i and --q-seg-n) ---- */
+.q-seg {
+  position: relative;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  padding: 2px;
+  border-radius: 999px;
+  background: var(--q-fill-3);
+  isolation: isolate;
+}
+.q-seg::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  top: 2px;
+  bottom: 2px;
+  left: 2px;
+  width: calc((100% - 4px) / var(--q-seg-n, 2));
+  border-radius: 999px;
+  background: var(--q-elevated);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12), 0 3px 1px rgba(0, 0, 0, 0.04), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+  transform: translateX(calc(100% * var(--q-seg-i, 0)));
+  transition: transform var(--q-dur-snappy) var(--q-spring-snappy);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .q-seg::before {
+    background: #5b5b5f;
+  }
+}
+:root[data-theme='dark'] .q-seg::before {
+  background: #5b5b5f;
+}
+.q-seg > button {
+  min-width: 0;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--q-label);
+  font: 500 14px/1.2 var(--q-font);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: transform var(--q-dur-snappy) var(--q-spring-snappy);
+}
+.q-seg > button[aria-pressed='true'],
+.q-seg > button[aria-selected='true'] {
+  font-weight: 600;
+}
+.q-seg > button:is(:active, [data-q-press]) {
+  transform: scale(0.94);
+}
+.q-seg.big > button {
+  min-height: 40px;
+  font-size: 15px;
+}
+
+/* ---- Switches: iOS 26's wide capsule; the native one where Safari draws it ---- */
+.q-switch {
+  position: relative;
+  flex: 0 0 auto;
+  width: 64px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--q-fill-1);
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+.q-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 38px;
+  height: 24px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.14), 0 0.5px 1px rgba(0, 0, 0, 0.08);
+  transition: transform var(--q-dur-bouncy) var(--q-spring-bouncy), width var(--q-dur-snappy) var(--q-spring-snappy);
+}
+.q-switch:is(:active, [data-q-press])::after {
+  width: 44px;
+}
+.q-switch[aria-checked='true'] {
+  background: var(--q-green);
+}
+.q-switch[aria-checked='true']::after {
+  transform: translateX(22px);
+}
+.q-switch[aria-checked='true']:is(:active, [data-q-press])::after {
+  transform: translateX(16px);
+}
+.q-switch:focus-visible {
+  outline: 2px solid var(--q-accent);
+  outline-offset: 2px;
+}
+input[type='checkbox'][switch] {
+  accent-color: var(--q-green);
+}
+
+/* ---- Search: a filled capsule, a magnifier, a clear button ---- */
+.q-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 12px 0 38px;
+  border-radius: 999px;
+  background: var(--q-fill-3);
+}
+.q-search::before {
+  content: '';
+  position: absolute;
+  left: 13px;
+  width: 18px;
+  height: 18px;
+  background: var(--q-label-2);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round'%3E%3Ccircle cx='10.5' cy='10.5' r='6.5'/%3E%3Cpath d='m15.5 15.5 5 5'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round'%3E%3Ccircle cx='10.5' cy='10.5' r='6.5'/%3E%3Cpath d='m15.5 15.5 5 5'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.q-search input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: none;
+  color: var(--q-label);
+  font: 400 17px/1 var(--q-font);
+  -webkit-appearance: none;
+  appearance: none;
+}
+.q-search input::placeholder {
+  color: var(--q-label-2);
+}
+.q-search input::-webkit-search-cancel-button {
+  display: none;
+}
+.q-search-clear {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--q-label-3);
+  color: var(--q-grouped-2);
+  font: 700 12px/1 var(--q-font);
+  cursor: pointer;
+}
+.q-search:not(:has(input:placeholder-shown)) .q-search-clear {
+  display: grid;
+}
+.q-search:has(input:placeholder-shown) .q-search-clear {
+  display: none;
+}
+/* A text field in a list or a form: filled, no ring. */
+.q-field {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--q-r-cell);
+  background: var(--q-fill-3);
+  color: var(--q-label);
+  font: 400 17px/1.2 var(--q-font);
+  box-sizing: border-box;
+  outline: 0;
+  transition: box-shadow 0.2s;
+}
+.q-field:focus {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--q-accent) 55%, transparent);
+}
+
+/* ---- Banners (in-app notices): an iOS notification, down from the top ---- */
+.q-banner {
+  position: fixed;
+  z-index: 2147483000;
+  left: 50%;
+  top: calc(var(--q-top) + 8px);
+  transform: translateX(-50%);
+  width: min(420px, calc(100vw - 16px));
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 0;
+  border-radius: 26px;
+  background: var(--q-glass-strong);
+  -webkit-backdrop-filter: blur(30px) saturate(2);
+  backdrop-filter: blur(30px) saturate(2);
+  box-shadow: var(--q-glass-rim), 0 12px 36px -10px rgba(0, 0, 0, 0.3);
+  color: var(--q-text);
+  cursor: pointer;
+  animation: q-banner-in var(--q-dur-bouncy) var(--q-spring-bouncy);
+}
+.q-banner.out {
+  opacity: 0;
+  transform: translate(-50%, -24px) scale(0.96);
+  transition: opacity 0.25s ease, transform var(--q-dur-snappy) var(--q-spring-snappy);
+}
+.q-banner img {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  flex: 0 0 auto;
+}
+.q-banner div {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+.q-banner strong {
+  font: 600 15px/20px var(--q-font);
+  letter-spacing: -0.015em;
+}
+.q-banner span {
+  color: var(--q-text-2);
+  font: var(--q-t-subhead);
+}
+.q-banner.open {
+  flex-wrap: wrap;
+  align-items: flex-start;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+.q-banner-more {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  margin: 4px 0 0;
+  padding: 8px 0 0;
+  border-top: var(--q-hairline) solid var(--q-sep);
+  list-style: none;
+}
+.q-banner-more li {
+  display: grid;
+  gap: 1px;
+}
+.q-banner-more strong {
+  font-size: 13px;
+}
+@keyframes q-banner-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -110%);
+  }
+}
+.q-banner-ask {
+  cursor: default;
+}
+.q-banner-ask > div {
+  flex: 1 1 auto;
+}
+.q-banner-go {
+  flex: 0 0 auto;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--q-accent);
+  color: var(--q-accent-ink);
+  font: 600 15px/1 var(--q-font);
+  cursor: pointer;
+}
+.q-banner-x {
+  flex: 0 0 auto;
+  padding: 4px;
+  border: 0;
+  background: none;
+  color: var(--q-label-2);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* ---- A toast: a glass capsule over the tab bar, gone in a moment ---- */
+.q-toast {
+  position: fixed;
+  z-index: 2147482900;
+  left: 50%;
+  bottom: calc(var(--q-nav, 0px) + 12px);
+  max-width: calc(100vw - 32px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 18px;
+  border-radius: 999px;
+  background: var(--q-glass-strong);
+  -webkit-backdrop-filter: blur(30px) saturate(2);
+  backdrop-filter: blur(30px) saturate(2);
+  box-shadow: var(--q-glass-rim), var(--q-glass-drop);
+  color: var(--q-label);
+  font: 600 15px/20px var(--q-font);
+  white-space: nowrap;
+  transform: translateX(-50%);
+  animation: q-toast-in var(--q-dur-bouncy) var(--q-spring-bouncy);
+}
+.q-toast.out {
+  opacity: 0;
+  transform: translate(-50%, 16px) scale(0.94);
+  transition: opacity 0.2s, transform 0.3s var(--q-ease);
+}
+.q-toast.bad {
+  color: var(--q-red);
+}
+@keyframes q-toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 24px) scale(0.9);
+  }
+}
+
+/* ---- Nothing here yet: iOS's ContentUnavailableView ---- */
+.q-empty {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 48px 24px;
+  text-align: center;
+}
+.q-empty-icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: 10px;
+  border-radius: 50%;
+  background: var(--q-gray);
+  color: #ffffff;
+  font-size: 28px;
+}
+.q-empty strong {
+  font: var(--q-t-title3);
+  font-weight: 700;
+}
+.q-empty p {
+  margin: 0;
+  max-width: 300px;
+  color: var(--q-label-2);
+  font: var(--q-t-subhead);
+}
+.q-empty .q-btn {
+  margin-top: 14px;
+}
+
+/* ---- Loading in place: a quiet shimmer where content will be ---- */
+.q-skel {
+  border-radius: 10px;
+  background: linear-gradient(100deg, var(--q-fill-3) 30%, var(--q-fill-4) 50%, var(--q-fill-3) 70%) 0 0 / 300% 100%;
+  animation: q-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes q-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+
+/* ---- A count or a mark on something ---- */
+.q-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--q-red);
+  color: #ffffff;
+  font: 600 12px/20px var(--q-font);
+  font-variant-numeric: tabular-nums;
+  box-sizing: border-box;
+}
+.q-badge.tint {
+  background: var(--q-accent-wash);
+  color: var(--q-accent);
+}
+.q-badge.gray {
+  background: var(--q-fill-2);
+  color: var(--q-label-2);
+}
+
+/* ---- Progress: a thin capsule bar ---- */
+.q-progress {
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--q-fill-2);
+}
+.q-progress > i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--q-accent);
+  transform-origin: left;
+  transition: width var(--q-dur-smooth) var(--q-spring-smooth), transform var(--q-dur-smooth) var(--q-spring-smooth);
+}
+
+/* ---- Menus: glass that grows out of the button it came from (ui.mjs menu) ---- */
+.q-menu {
+  position: fixed;
+  z-index: 2147482800;
+  min-width: 230px;
+  max-width: calc(100vw - 32px);
+  margin: 0;
+  padding: 6px;
+  border: 0;
+  border-radius: 24px;
+  background: var(--q-glass-strong);
+  -webkit-backdrop-filter: blur(30px) saturate(2);
+  backdrop-filter: blur(30px) saturate(2);
+  box-shadow: var(--q-glass-rim), 0 16px 48px rgba(0, 0, 0, 0.22);
+  color: var(--q-label);
+  transform-origin: var(--q-menu-origin, top right);
+  animation: q-menu-in var(--q-dur-snappy) var(--q-spring-snappy);
+}
+.q-menu.out {
+  opacity: 0;
+  transform: scale(0.7);
+  transition: opacity 0.18s, transform 0.22s var(--q-ease);
+}
+@keyframes q-menu-in {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+}
+.q-menu button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 14px;
+  background: none;
+  color: inherit;
+  font: var(--q-t-body);
+  letter-spacing: -0.025em;
+  text-align: left;
+  cursor: pointer;
+}
+.q-menu button:is(:active, [data-q-press], :hover) {
+  background: var(--q-fill-3);
+}
+.q-menu button.danger {
+  color: var(--q-red);
+}
+.q-menu hr {
+  height: 0;
+  margin: 4px 10px;
+  border: 0;
+  border-top: var(--q-hairline) solid var(--q-sep);
+}
+
+/* ---- Moving between views: the page cross-fades (View Transitions) ---- */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.28s;
+  animation-timing-function: var(--q-ease);
+}
+::view-transition-old(q-view) {
+  animation: q-view-out 0.22s var(--q-ease) both;
+}
+::view-transition-new(q-view) {
+  animation: q-view-in var(--q-dur-smooth) var(--q-spring-smooth) both;
+}
+@keyframes q-view-out {
+  to {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+}
+@keyframes q-view-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* ---- Less movement when asked: no springs, no slides ---- */
+@media (prefers-reduced-motion: reduce) {
+  .q-btn,
+  .q-icon-btn,
+  .q-close,
+  .q-chip,
+  .q-seg::before,
+  .q-seg > button,
+  .q-switch::after,
+  .q-tabbar.q-tabbar,
+  .q-tabbar.q-tabbar::before,
+  .q-tabbar .q-tab,
+  .q-tabbar .q-tab-icon,
+  .q-tabbar .q-tab-label,
+  .q-progress > i {
+    transition: none;
+  }
+  .q-sheet[open],
+  .q-ask,
+  .q-banner,
+  .q-toast,
+  .q-menu,
+  .q-skel {
+    animation: none;
+  }
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none;
+  }
+}
+
+/* A plain button of an app's own, pressed: it dims for the moment it's held
+   (the kit's own controls give in their own way above). */
+:where(button, [role='button']):active:not(:disabled):not([class*='q-']) {
+  opacity: 0.6;
+}
+
 
 /* ---- Sign-in (and install) screen ---- */
 .q-signing-in body > *:not(.q-gate):not(dialog) {
@@ -779,197 +2481,6 @@ dialog.q-moved::backdrop {
   white-space: nowrap;
 }
 
-/* ---- Dialogs (ask / tell): Quadra's own confirm and alert ---- */
-.q-ask {
-  width: min(360px, calc(100vw - 32px));
-  margin: auto;
-  padding: 22px 20px 18px;
-  border: 1px solid var(--q-border);
-  border-radius: 24px;
-  background: var(--q-page);
-  color: var(--q-text);
-  font-family: var(--q-font);
-  text-align: center;
-  box-shadow: 0 24px 60px rgba(8, 10, 14, 0.28);
-  box-sizing: border-box;
-  animation: q-ask-in 0.16s ease-out;
-}
-.q-ask.out {
-  opacity: 0;
-  transform: scale(0.97);
-  transition: opacity 0.14s ease, transform 0.14s ease;
-}
-.q-ask::backdrop {
-  background: rgba(8, 10, 14, 0.5);
-  -webkit-backdrop-filter: blur(3px);
-  backdrop-filter: blur(3px);
-}
-@keyframes q-ask-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px) scale(0.97);
-  }
-}
-.q-ask-icon {
-  width: 52px;
-  height: 52px;
-  margin: 0 auto 10px;
-  display: grid;
-  place-items: center;
-  border-radius: 16px;
-  background: var(--q-sunken);
-  font-size: 26px;
-}
-.q-ask.danger .q-ask-icon {
-  background: color-mix(in srgb, var(--q-bad) 14%, var(--q-surface));
-}
-.q-ask-title {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 800;
-  line-height: 1.3;
-}
-.q-ask-body {
-  margin: 8px 0 0;
-  color: var(--q-text-2, var(--q-muted));
-  font-size: 14.5px;
-  line-height: 1.55;
-}
-/* A dialog's short points: a mark, a bold line, a quiet one. */
-.q-ask-points {
-  display: grid;
-  gap: 8px;
-  margin: 16px 0 0;
-  padding: 0;
-  list-style: none;
-  text-align: left;
-}
-.q-ask-points li {
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
-  align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: 14px;
-  background: var(--q-sunken);
-}
-.q-ask-mark {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  background: var(--q-surface);
-  font-size: 17px;
-  font-weight: 800;
-}
-.q-ask-points strong {
-  display: block;
-  font-size: 14.5px;
-  line-height: 1.3;
-}
-.q-ask-points small {
-  display: block;
-  margin-top: 2px;
-  color: var(--q-text-2, var(--q-muted));
-  font-size: 12.5px;
-  line-height: 1.35;
-}
-.q-ask-actions {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: 1fr;
-  gap: 10px;
-  margin-top: 20px;
-}
-.q-btn.danger {
-  border-color: transparent;
-  background: var(--q-bad);
-  color: #fff;
-}
-@media (prefers-reduced-motion: reduce) {
-  .q-ask {
-    animation: none;
-  }
-}
-
-/* ---- Sheets ---- */
-/* iOS's sheet: the screen's full width (not the browser's dialog margins,
-   which leave the page showing down both sides), and in the dark a shade
-   lighter than the page, as iOS lifts what's on top. */
-.q-sheet {
-  width: min(460px, 100vw);
-  max-width: none;
-  max-height: min(88vh, 900px);
-  /* What's visible beside Safari's toolbar (vh is the screen without it). */
-  max-height: min(88dvh, 900px);
-  margin: auto auto 0;
-  padding: 0 18px calc(18px + env(safe-area-inset-bottom));
-  border: 0;
-  border-radius: 24px 24px 0 0;
-  background: var(--q-sheet, var(--q-page));
-  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.25);
-  color: var(--q-text);
-  font-family: var(--q-font);
-  box-sizing: border-box;
-  overflow-y: auto;
-}
-@media (min-width: 720px) {
-  .q-sheet {
-    margin: auto;
-    border-radius: 24px;
-  }
-}
-.q-sheet::backdrop {
-  background: rgba(8, 10, 14, 0.45);
-}
-.q-sheet-head {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 0 -18px 6px;
-  padding: 16px 18px 10px;
-  background: var(--q-sheet, var(--q-page));
-}
-.q-sheet-head h2 {
-  margin: 0;
-  font-size: 19px;
-  font-weight: 800;
-}
-.q-close {
-  width: 34px;
-  height: 34px;
-  flex: none;
-  border: 0;
-  border-radius: 50%;
-  background: var(--q-sunken);
-  color: var(--q-text-2);
-  font-size: 20px;
-  line-height: 1;
-  cursor: pointer;
-}
-.q-sheet-h {
-  margin: 20px 0 8px;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--q-muted);
-}
-.q-sheet-sub,
-.q-sheet-note {
-  margin: 8px 0 0;
-  color: var(--q-muted);
-  font-size: 13px;
-  line-height: 1.55;
-}
-.q-sheet-note:empty {
-  display: none;
-}
 .q-balance {
   display: grid;
   gap: 2px;
@@ -1037,518 +2548,6 @@ dialog.q-moved::backdrop {
 .q-app.here {
   background: var(--q-accent-wash);
   color: var(--q-accent);
-}
-.q-rows {
-  display: grid;
-  overflow: hidden;
-  border: 1px solid var(--q-border);
-  border-radius: 16px;
-  background: var(--q-surface);
-}
-.q-row-btn {
-  display: flex;
-  align-items: center;
-  min-height: 50px;
-  padding: 0 16px;
-  border: 0;
-  border-top: 1px solid var(--q-divider);
-  background: none;
-  color: var(--q-text);
-  font: 550 15px/1.3 var(--q-font);
-  text-align: left;
-  text-decoration: none;
-  cursor: pointer;
-}
-.q-row-btn:first-child {
-  border-top: 0;
-}
-.q-row-btn.danger {
-  color: var(--q-bad);
-}
-.q-row-btn:disabled {
-  opacity: 0.5;
-}
-
-/* ---- The app frame: header, top-right buttons and tab bar, the same in every
-   app (tabBar / topActions in quadra.mjs). A wide screen: one sticky bar with
-   the tabs as a segmented control. A phone: the status line and the buttons at
-   the top of the page, the tabs fixed at the bottom. ---- */
-:root {
-  --q-page-max: 1120px;
-  --q-nav: 0px;
-}
-.q-appbar {
-  position: sticky;
-  top: 0;
-  z-index: 50;
-  padding-top: var(--q-top);
-  border-bottom: 1px solid var(--q-border);
-  background: var(--q-bar);
-  -webkit-backdrop-filter: saturate(1.6) blur(16px);
-  backdrop-filter: saturate(1.6) blur(16px);
-}
-@media (display-mode: standalone) {
-  .q-appbar {
-    background: var(--q-page);
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-  }
-}
-.q-appbar-inner {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  max-width: var(--q-page-max);
-  margin: 0 auto;
-  padding: 8px max(16px, env(safe-area-inset-right)) 8px max(16px, env(safe-area-inset-left));
-}
-.q-brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex: 1 1 auto;
-  min-width: 0;
-}
-.q-brand-logo {
-  width: 34px;
-  height: 34px;
-  flex: none;
-  border-radius: 10px;
-  box-shadow: var(--q-shadow-sm);
-}
-.q-brand-text {
-  min-width: 0;
-}
-.q-brand h1 {
-  margin: 0;
-  font: 800 17px/1.2 var(--q-font);
-  letter-spacing: -0.01em;
-  white-space: nowrap;
-}
-.q-status {
-  margin: 0;
-  overflow: hidden;
-  color: var(--q-muted);
-  font: 500 12px/1.35 var(--q-font);
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-.q-status:empty {
-  display: none;
-}
-.q-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: none;
-}
-.q-icon-btn {
-  display: inline-grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  flex: none;
-  padding: 0;
-  border: 1px solid var(--q-border);
-  border-radius: 50%;
-  background: var(--q-surface);
-  color: var(--q-text-2);
-  box-shadow: var(--q-shadow-sm);
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-.q-icon-btn svg {
-  width: 19px;
-  height: 19px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-.q-icon-btn:active {
-  transform: scale(0.94);
-}
-.q-refresh:disabled {
-  opacity: 1;
-}
-.q-refresh:disabled svg {
-  animation: q-spin 0.9s linear infinite;
-}
-@keyframes q-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-@media (hover: hover) {
-  .q-icon-btn:hover {
-    background: var(--q-accent-wash);
-    color: var(--q-accent);
-  }
-}
-
-/* The tabs, wide screen: a segmented control in the bar. */
-.q-tabbar {
-  display: flex;
-  gap: 2px;
-  padding: 3px;
-  border-radius: 14px;
-  background: var(--q-sunken);
-}
-.q-tab {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 7px 14px;
-  border: 0;
-  border-radius: 11px;
-  background: none;
-  color: var(--q-text-2);
-  font: 650 14px/1.2 var(--q-font);
-  white-space: nowrap;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-  -webkit-tap-highlight-color: transparent;
-}
-.q-tab[hidden] {
-  display: none;
-}
-.q-tab-icon {
-  position: relative;
-  display: grid;
-  place-items: center;
-}
-.q-tab svg {
-  width: 18px;
-  height: 18px;
-  flex: none;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-@media (hover: hover) {
-  .q-tab:hover {
-    color: var(--q-text);
-  }
-}
-.q-tab[aria-selected='true'] {
-  background: var(--q-surface);
-  color: var(--q-accent);
-  box-shadow: var(--q-shadow-sm);
-}
-.q-tab-badge {
-  position: absolute;
-  top: -7px;
-  left: calc(100% - 6px);
-  min-width: 17px;
-  height: 17px;
-  padding: 0 5px;
-  border-radius: 9px;
-  background: var(--q-bad);
-  box-shadow: 0 0 0 2px var(--q-sunken);
-  color: #fff;
-  font: 800 10.5px/17px var(--q-font);
-  font-variant-numeric: tabular-nums;
-  text-align: center;
-  white-space: nowrap;
-}
-.q-tab-badge.warn {
-  background: var(--q-warn);
-}
-.q-tab-badge.accent {
-  background: var(--q-accent);
-  color: var(--q-accent-ink);
-}
-.q-tab-badge.dot {
-  top: -2px;
-  left: calc(100% - 3px);
-  min-width: 0;
-  width: 9px;
-  height: 9px;
-  padding: 0;
-}
-
-/* A phone: the header is the status and the buttons; the tabs at the bottom. */
-@media (max-width: 720px) {
-  :root {
-    --q-nav: calc(58px + max(env(safe-area-inset-bottom), var(--q-safe-bottom, 0px)));
-  }
-  /* Not sticky and no backdrop filter: a filter would make the header the
-     fixed tab bar's containing block. */
-  .q-appbar {
-    position: static;
-    border: 0;
-    background: none;
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-  }
-  .q-appbar-inner {
-    gap: 10px;
-    min-height: 36px;
-    padding: 6px max(16px, env(safe-area-inset-right)) 4px max(16px, env(safe-area-inset-left));
-  }
-  .q-brand-logo,
-  .q-brand h1 {
-    display: none;
-  }
-  .q-status {
-    font-size: 12.5px;
-  }
-  .q-tabbar.q-tabbar {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 60;
-    display: grid;
-    grid-auto-columns: minmax(0, 1fr);
-    grid-auto-flow: column;
-    gap: 0;
-    margin: 0;
-    padding: 5px max(6px, env(safe-area-inset-right)) max(env(safe-area-inset-bottom), var(--q-safe-bottom, 0px)) max(6px, env(safe-area-inset-left));
-    border-top: 1px solid var(--q-border);
-    border-radius: 0;
-    background: var(--q-bar);
-    -webkit-backdrop-filter: saturate(1.6) blur(18px);
-    backdrop-filter: saturate(1.6) blur(18px);
-  }
-  .q-tabbar .q-tab {
-    flex-direction: column;
-    justify-content: center;
-    gap: 3px;
-    min-width: 0;
-    min-height: 52px;
-    padding: 4px 2px 6px;
-    border-radius: 0;
-    background: none;
-    box-shadow: none;
-    color: var(--q-muted);
-    font: 600 10.5px/1.15 var(--q-font);
-  }
-  .q-tabbar .q-tab-icon {
-    width: 56px;
-    height: 30px;
-    border-radius: 15px;
-    transition: background 0.2s, transform 0.12s;
-  }
-  .q-tabbar .q-tab svg {
-    width: 23px;
-    height: 23px;
-    stroke-width: 1.9;
-  }
-  .q-tabbar .q-tab-label {
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .q-tabbar .q-tab[aria-selected='true'] {
-    background: none;
-    box-shadow: none;
-    color: var(--q-accent);
-    font-weight: 750;
-  }
-  .q-tabbar .q-tab[aria-selected='true'] .q-tab-icon {
-    background: var(--q-accent-wash);
-  }
-  .q-tabbar .q-tab[aria-selected='true'] svg {
-    stroke-width: 2.2;
-  }
-  .q-tabbar .q-tab:active .q-tab-icon {
-    transform: scale(0.92);
-  }
-  .q-tabbar .q-tab-badge {
-    top: 0;
-    left: calc(50% + 5px);
-    box-shadow: 0 0 0 2px var(--q-page);
-  }
-  .q-tabbar .q-tab-badge.dot {
-    top: 3px;
-    left: calc(50% + 9px);
-  }
-}
-
-/* A phone or a tablet (html.q-touch, set by boot.js and quadra.mjs from the
-   device, whatever its width): the same frame as a phone, so an iPad has no
-   brand header either; only a computer's browser keeps it. On a wide tablet
-   the tabs stay a comfortable width in the middle of the bar. */
-:root.q-touch {
-  --q-nav: calc(58px + max(env(safe-area-inset-bottom), var(--q-safe-bottom, 0px)));
-}
-.q-touch .q-appbar {
-  position: static;
-  border: 0;
-  background: none;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-}
-.q-touch .q-appbar-inner {
-  gap: 10px;
-  min-height: 36px;
-  padding: 6px max(16px, env(safe-area-inset-right)) 4px max(16px, env(safe-area-inset-left));
-}
-.q-touch .q-brand-logo,
-.q-touch .q-brand h1 {
-  display: none;
-}
-.q-touch .q-status {
-  font-size: 12.5px;
-}
-.q-touch .q-tabbar.q-tabbar {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 60;
-  display: grid;
-  grid-auto-columns: minmax(0, 1fr);
-  grid-auto-flow: column;
-  gap: 0;
-  margin: 0;
-  padding: 5px max(6px, env(safe-area-inset-right)) max(env(safe-area-inset-bottom), var(--q-safe-bottom, 0px)) max(6px, env(safe-area-inset-left));
-  border-top: 1px solid var(--q-border);
-  border-radius: 0;
-  background: var(--q-bar);
-  -webkit-backdrop-filter: saturate(1.6) blur(18px);
-  backdrop-filter: saturate(1.6) blur(18px);
-}
-.q-touch .q-tabbar .q-tab {
-  flex-direction: column;
-  justify-content: center;
-  gap: 3px;
-  min-width: 0;
-  min-height: 52px;
-  padding: 4px 2px 6px;
-  border-radius: 0;
-  background: none;
-  box-shadow: none;
-  color: var(--q-muted);
-  font: 600 10.5px/1.15 var(--q-font);
-}
-.q-touch .q-tabbar .q-tab-icon {
-  width: 56px;
-  height: 30px;
-  border-radius: 15px;
-  transition: background 0.2s, transform 0.12s;
-}
-.q-touch .q-tabbar .q-tab svg {
-  width: 23px;
-  height: 23px;
-  stroke-width: 1.9;
-}
-.q-touch .q-tabbar .q-tab-label {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.q-touch .q-tabbar .q-tab[aria-selected='true'] {
-  background: none;
-  box-shadow: none;
-  color: var(--q-accent);
-  font-weight: 750;
-}
-.q-touch .q-tabbar .q-tab[aria-selected='true'] .q-tab-icon {
-  background: var(--q-accent-wash);
-}
-.q-touch .q-tabbar .q-tab[aria-selected='true'] svg {
-  stroke-width: 2.2;
-}
-.q-touch .q-tabbar .q-tab:active .q-tab-icon {
-  transform: scale(0.92);
-}
-.q-touch .q-tabbar .q-tab-badge {
-  top: 0;
-  left: calc(50% + 5px);
-  box-shadow: 0 0 0 2px var(--q-page);
-}
-.q-touch .q-tabbar .q-tab-badge.dot {
-  top: 3px;
-  left: calc(50% + 9px);
-}
-@media (min-width: 721px) {
-  .q-touch .q-tabbar.q-tabbar {
-    padding-left: max(6px, calc((100% - 680px) / 2));
-    padding-right: max(6px, calc((100% - 680px) / 2));
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .q-tab,
-  .q-tabbar .q-tab-icon {
-    transition: none;
-  }
-  .q-refresh:disabled svg {
-    animation-duration: 3s;
-  }
-}
-
-/* ---- Shared page pieces ---- */
-.q-section {
-  margin: 26px 0 0;
-}
-.q-section-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 0 0 10px;
-}
-.q-section-head h2 {
-  margin: 0;
-  font-size: 19px;
-  font-weight: 800;
-  letter-spacing: -0.01em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.q-section-head a,
-.q-section-head button {
-  flex: none;
-  border: 0;
-  background: none;
-  color: var(--q-accent);
-  font: 650 14px/1 var(--q-font);
-  text-decoration: none;
-  cursor: pointer;
-}
-.q-card {
-  border: 1px solid var(--q-border);
-  border-radius: var(--q-radius);
-  background: var(--q-surface);
-  box-shadow: var(--q-shadow-sm);
-}
-.q-chips {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  padding: 2px 0 4px;
-}
-.q-chips::-webkit-scrollbar {
-  display: none;
-}
-.q-chip {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 34px;
-  padding: 0 14px;
-  border: 1px solid var(--q-border);
-  border-radius: 999px;
-  background: var(--q-surface);
-  color: var(--q-text-2);
-  font: 600 13.5px/1 var(--q-font);
-  white-space: nowrap;
-  cursor: pointer;
-}
-.q-chip[aria-pressed='true'] {
-  border-color: transparent;
-  background: var(--q-text);
-  color: var(--q-page);
 }
 
 /* ---- For you: recommendation cards, a row that scrolls sideways ---- */
@@ -1717,40 +2716,6 @@ dialog.q-newpass::backdrop { background: var(--q-page); }
   color: var(--q-text-2);
 }
 .q-check input { width: 20px; height: 20px; margin-top: 1px; accent-color: var(--q-accent); flex: 0 0 auto; }
-.q-banner {
-  position: fixed;
-  z-index: 2147483000;
-  left: 50%;
-  /* Clear of the status bar's strip (and iOS's blur over it), never touching it. */
-  top: calc(var(--q-top) + 14px);
-  transform: translateX(-50%);
-  width: min(420px, calc(100vw - 24px));
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  border-radius: 16px;
-  background: var(--q-surface);
-  color: var(--q-text);
-  border: 1px solid var(--q-border);
-  box-shadow: 0 18px 40px -16px rgba(14, 17, 22, 0.35);
-  cursor: pointer;
-  animation: q-banner-in 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.2);
-}
-.q-banner.out { opacity: 0; transform: translate(-50%, -12px); transition: 0.22s ease; }
-.q-banner img { width: 34px; height: 34px; border-radius: 9px; flex: 0 0 auto; }
-.q-banner div { display: grid; gap: 2px; min-width: 0; }
-.q-banner strong { font-size: 14px; font-weight: 800; }
-.q-banner span { font-size: 13px; color: var(--q-text-2); line-height: 1.35; }
-.q-banner.open { flex-wrap: wrap; align-items: flex-start; max-height: 70vh; overflow-y: auto; }
-.q-banner-more { list-style: none; margin: 4px 0 0; padding: 8px 0 0; border-top: 1px solid var(--q-border); width: 100%; display: grid; gap: 8px; }
-.q-banner-more li { display: grid; gap: 1px; }
-.q-banner-more strong { font-size: 13px; }
-@keyframes q-banner-in { from { opacity: 0; transform: translate(-50%, -16px); } }
-.q-banner-ask { cursor: default; }
-.q-banner-ask > div { flex: 1 1 auto; }
-.q-banner-go { flex: 0 0 auto; border: 0; border-radius: 999px; padding: 8px 14px; background: var(--q-accent); color: #fff; font: 700 13px/1 var(--q-font); cursor: pointer; }
-.q-banner-x { flex: 0 0 auto; border: 0; background: none; color: var(--q-muted); font-size: 20px; line-height: 1; padding: 4px; cursor: pointer; }
 
 /* ---- Notification settings (account sheet) ---- */
 .q-notice-note {
@@ -1800,48 +2765,6 @@ dialog.q-newpass::backdrop { background: var(--q-page); }
 .q-notice-sub {
   font: 400 12.5px/1.4 var(--q-font);
   color: var(--q-muted);
-}
-.q-switch {
-  position: relative;
-  flex: 0 0 auto;
-  /* iOS's own switch: 51 × 31, a 27 px knob, its green. */
-  width: 51px;
-  height: 31px;
-  padding: 0;
-  border: 0;
-  border-radius: 999px;
-  background: rgba(120, 120, 128, 0.16);
-  cursor: pointer;
-  transition: background 0.25s ease;
-  -webkit-tap-highlight-color: transparent;
-}
-.q-switch::after {
-  content: '';
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 27px;
-  height: 27px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15), 0 3px 1px rgba(0, 0, 0, 0.06);
-  transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1), width 0.2s;
-}
-.q-switch:active::after {
-  width: 33px;
-}
-.q-switch[aria-checked='true'] {
-  background: #34c759;
-}
-.q-switch[aria-checked='true']::after {
-  transform: translateX(20px);
-}
-.q-switch[aria-checked='true']:active::after {
-  transform: translateX(14px);
-}
-.q-switch:focus-visible {
-  outline: 2px solid var(--q-accent);
-  outline-offset: 2px;
 }
 
 /* The payday line under the balance in the account sheet. */
@@ -2315,144 +3238,6 @@ dialog {
 .q-pass .side-total > span small { display: block; font-size: 12px; font-weight: 600; }
 .q-pass-tabs .q-chip { padding: 0 13px; flex: none; }
 
-/* iOS's tab bar (iOS 26 on): a capsule of glass floating over the page, the
-   selected tab lit by a softer pill (not a coloured pill round its icon). */
-@media (max-width: 720px) {
-  :root {
-    --q-nav: calc(66px + var(--q-bar-gap));
-  --q-bar-gap: max(calc(env(safe-area-inset-bottom) - 12px), calc(var(--q-safe-bottom, 0px) - 12px), 10px);
-}
-.q-tabbar.q-tabbar {
-  left: max(14px, env(safe-area-inset-left));
-  right: max(14px, env(safe-area-inset-right));
-  bottom: var(--q-bar-gap);
-  max-width: 520px;
-  margin: 0 auto;
-  padding: 4px;
-  border: 0.5px solid var(--q-glass-edge);
-  border-radius: 30px;
-  background: var(--q-glass);
-  -webkit-backdrop-filter: saturate(1.8) blur(22px);
-  backdrop-filter: saturate(1.8) blur(22px);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16), inset 0 0.5px 0 rgba(255, 255, 255, 0.3);
-}
-.q-tabbar .q-tab {
-  min-height: 50px;
-  padding: 4px 2px 5px;
-  border-radius: 26px;
-  transition: background 0.2s;
-}
-.q-tabbar .q-tab-icon,
-.q-tabbar .q-tab[aria-selected='true'] .q-tab-icon {
-  width: auto;
-  height: 26px;
-  background: none;
-}
-.q-tabbar .q-tab[aria-selected='true'] {
-  background: var(--q-glass-pick);
-}
-}
-:root.q-touch {
-  --q-nav: calc(66px + var(--q-bar-gap));
-  --q-bar-gap: max(calc(env(safe-area-inset-bottom) - 12px), calc(var(--q-safe-bottom, 0px) - 12px), 10px);
-}
-.q-touch .q-tabbar.q-tabbar {
-  left: max(14px, env(safe-area-inset-left));
-  right: max(14px, env(safe-area-inset-right));
-  bottom: var(--q-bar-gap);
-  max-width: 520px;
-  margin: 0 auto;
-  padding: 4px;
-  border: 0.5px solid var(--q-glass-edge);
-  border-radius: 30px;
-  background: var(--q-glass);
-  -webkit-backdrop-filter: saturate(1.8) blur(22px);
-  backdrop-filter: saturate(1.8) blur(22px);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16), inset 0 0.5px 0 rgba(255, 255, 255, 0.3);
-}
-.q-touch .q-tabbar .q-tab {
-  min-height: 50px;
-  padding: 4px 2px 5px;
-  border-radius: 26px;
-  transition: background 0.2s;
-}
-.q-touch .q-tabbar .q-tab-icon,
-.q-touch .q-tabbar .q-tab[aria-selected='true'] .q-tab-icon {
-  width: auto;
-  height: 26px;
-  background: none;
-}
-.q-touch .q-tabbar .q-tab[aria-selected='true'] {
-  background: var(--q-glass-pick);
-}
-
-/* iOS's sheets: a grabber at the top, up from the bottom on iOS's curve, down
-   again with a swipe (quadra.mjs sheetSwipe). The grabber stays at the top
-   and over the sticky .q-sheet-head (it was half under the head's fill). */
-.q-sheet::before {
-  content: '';
-  position: sticky;
-  top: 7px;
-  z-index: 2;
-  display: block;
-  width: 36px;
-  height: 5px;
-  margin: 7px auto -3px;
-  border-radius: 3px;
-  background: var(--q-muted);
-  opacity: 0.45;
-}
-.q-sheet[open] {
-  animation: q-sheet-up 0.42s cubic-bezier(0.32, 0.72, 0, 1);
-}
-.q-sheet[open]::backdrop {
-  animation: q-fade-in 0.3s ease-out;
-}
-.q-sheet.q-settle {
-  transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
-}
-@keyframes q-sheet-up {
-  from {
-    transform: translateY(100%);
-  }
-}
-@keyframes q-fade-in {
-  from {
-    opacity: 0;
-  }
-}
-@media (min-width: 720px) {
-  .q-sheet::before {
-    display: none;
-  }
-  .q-sheet[open] {
-    animation: q-fade-in 0.2s ease-out;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .q-sheet[open],
-  .q-sheet[open]::backdrop {
-    animation: none;
-  }
-}
-
-/* Controls behave like iOS's: a long press on a button, a tab or a chip
-   doesn't select its words or open Safari's menu (real links still do), and
-   a pressed button dims for the moment it's held. */
-button,
-[role='button'],
-[role='tab'],
-[role='switch'],
-.q-chip {
-  -webkit-user-select: none;
-  user-select: none;
-  -webkit-touch-callout: none;
-  -webkit-tap-highlight-color: transparent;
-}
-button:active:not(:disabled):not(.q-switch),
-[role='button']:active {
-  opacity: 0.62;
-}
 
 /* 除錯紀錄: its buttons under the switch, and a small red dot at the top while recording. */
 .q-rec-acts {
@@ -2484,383 +3269,6 @@ html.q-recording body::after {
 .q-team-disc .logo-wrap { display: contents; }
 .q-team-disc-img { width: 72%; height: 72%; object-fit: contain; }
 
-/* ---- iOS 26: the family's controls as iOS draws its own ----
-   One material (Liquid Glass: --q-glass over --q-glass-blur, lit by
-   --q-glass-rim, no outline ring) on what floats: the top-right buttons, the
-   tab bar, banners, alerts. Capsules for buttons and chips, larger concentric
-   corners on sheets and lists, and controls that give under a finger with
-   iOS's spring. Apps keep their own colours; they get this by loading the kit. */
-.q-glass {
-  background: var(--q-glass);
-  -webkit-backdrop-filter: var(--q-glass-blur);
-  backdrop-filter: var(--q-glass-blur);
-  box-shadow: var(--q-glass-rim), var(--q-glass-drop);
-}
-
-/* The top-right buttons: one glass capsule holding them, as iOS groups a
-   toolbar's buttons; a lone icon button elsewhere is a glass circle. */
-.q-icon-btn,
-.q-account:not(.q-framed) {
-  border: 0;
-  background: var(--q-glass-strong);
-  -webkit-backdrop-filter: var(--q-glass-blur);
-  backdrop-filter: var(--q-glass-blur);
-  box-shadow: var(--q-glass-rim), 0 1px 2px rgba(0, 0, 0, 0.05), 0 4px 14px rgba(0, 0, 0, 0.07);
-  transition: transform 0.35s var(--q-spring), background 0.2s;
-}
-.q-icon-btn {
-  width: 38px;
-  height: 38px;
-  color: var(--q-text);
-}
-.q-icon-btn:active:not(:disabled),
-.q-account:active {
-  opacity: 1;
-  transform: scale(1.12);
-  transition-duration: 0.12s;
-}
-.q-icon-btn:disabled {
-  opacity: 0.4;
-}
-.q-actions:has(> :nth-child(2)) {
-  gap: 0;
-  padding: 2px;
-  border-radius: 999px;
-  background: var(--q-glass-strong);
-  -webkit-backdrop-filter: var(--q-glass-blur);
-  backdrop-filter: var(--q-glass-blur);
-  box-shadow: var(--q-glass-rim), 0 1px 2px rgba(0, 0, 0, 0.05), 0 4px 14px rgba(0, 0, 0, 0.07);
-}
-.q-actions:has(> :nth-child(2)) > .q-icon-btn,
-.q-actions:has(> :nth-child(2)) > .q-account:not(.q-framed) {
-  width: 40px;
-  height: 38px;
-  background: none;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-  box-shadow: none;
-}
-.q-actions:has(> :nth-child(2)) > .q-account.q-framed {
-  width: 34px;
-  height: 34px;
-  margin: 0 2px;
-}
-.q-actions:has(> :nth-child(2)) .q-account-dot {
-  right: 4px;
-  bottom: 3px;
-}
-@media (hover: hover) {
-  .q-actions .q-icon-btn:hover {
-    background: var(--q-fill);
-  }
-}
-
-/* Buttons: capsules. The default is iOS's grey "tinted" button, the primary
-   the app's colour; both give a little under a finger. */
-.q-btn {
-  border: 1px solid transparent;
-  border-radius: 999px;
-  background: var(--q-fill);
-  font-weight: 600;
-  transition: transform 0.35s var(--q-spring), background 0.15s, opacity 0.15s;
-}
-.q-btn.small {
-  border-radius: 999px;
-}
-.q-btn:active:not(:disabled) {
-  opacity: 0.8;
-  transform: scale(0.97);
-  transition-duration: 0.1s;
-}
-.q-chip {
-  border: 1px solid transparent;
-  background: var(--q-fill);
-  color: var(--q-text);
-  font-weight: 600;
-}
-.q-chip[aria-pressed='true'] {
-  background: var(--q-text);
-  color: var(--q-page);
-}
-
-/* The tab bar: a capsule of glass, the chosen tab a softer pill that slides
-   between them on iOS's curve. */
-.q-tabbar.q-tabbar {
-  border: 0;
-  border-radius: 999px;
-}
-@media (max-width: 720px) {
-  .q-tabbar.q-tabbar {
-    padding: 4px;
-    background: var(--q-glass);
-    -webkit-backdrop-filter: var(--q-glass-blur);
-    backdrop-filter: var(--q-glass-blur);
-    box-shadow: var(--q-glass-rim), var(--q-glass-drop);
-  }
-  .q-tabbar .q-tab {
-    border-radius: 999px;
-    font-weight: 600;
-    font-size: 10.5px;
-    transition: background 0.3s var(--q-ease), color 0.2s;
-  }
-  .q-tabbar .q-tab:active {
-    opacity: 1;
-  }
-  .q-tabbar .q-tab:active .q-tab-icon {
-    transform: scale(1.12);
-    transition: transform 0.12s;
-  }
-  .q-tabbar .q-tab-icon {
-    transition: transform 0.4s var(--q-spring);
-  }
-  .q-tabbar .q-tab[aria-selected='true'] {
-    font-weight: 650;
-  }
-}
-.q-touch .q-tabbar.q-tabbar {
-  padding: 4px;
-  background: var(--q-glass);
-  -webkit-backdrop-filter: var(--q-glass-blur);
-  backdrop-filter: var(--q-glass-blur);
-  box-shadow: var(--q-glass-rim), var(--q-glass-drop);
-}
-.q-touch .q-tabbar .q-tab {
-  border-radius: 999px;
-  font-weight: 600;
-  font-size: 10.5px;
-  transition: background 0.3s var(--q-ease), color 0.2s;
-}
-.q-touch .q-tabbar .q-tab:active {
-  opacity: 1;
-}
-.q-touch .q-tabbar .q-tab:active .q-tab-icon {
-  transform: scale(1.12);
-  transition: transform 0.12s;
-}
-.q-touch .q-tabbar .q-tab-icon {
-  transition: transform 0.4s var(--q-spring);
-}
-.q-touch .q-tabbar .q-tab[aria-selected='true'] {
-  font-weight: 650;
-}
-/* What scrolls under the floating tab bar fades out towards the screen's
-   edge (iOS's scroll edge effect), so the bar never sits on busy content. */
-@media (max-width: 720px) {
-  .q-tabbar.q-tabbar::before {
-    content: '';
-    position: absolute;
-    z-index: -1;
-    left: 50%;
-    bottom: calc(-1 * var(--q-bar-gap));
-    width: 100vw;
-    height: calc(100% + var(--q-bar-gap) + 26px);
-    transform: translateX(-50%);
-    background: linear-gradient(to top, color-mix(in srgb, var(--q-page) 78%, transparent), color-mix(in srgb, var(--q-page) 40%, transparent) 55%, transparent);
-    pointer-events: none;
-  }
-}
-.q-touch .q-tabbar.q-tabbar::before {
-  content: '';
-  position: absolute;
-  z-index: -1;
-  left: 50%;
-  bottom: calc(-1 * var(--q-bar-gap));
-  width: 100vw;
-  height: calc(100% + var(--q-bar-gap) + 26px);
-  transform: translateX(-50%);
-  background: linear-gradient(to top, color-mix(in srgb, var(--q-page) 78%, transparent), color-mix(in srgb, var(--q-page) 40%, transparent) 55%, transparent);
-  pointer-events: none;
-}
-/* The wide screen's segmented control: a capsule too. */
-.q-tab {
-  border-radius: 999px;
-}
-
-/* Sheets float above the bottom edge with iOS 26's deep, concentric corners;
-   their close button is a glass circle. */
-@media (max-width: 719px) {
-  .q-sheet {
-    width: calc(100vw - 12px);
-    margin-bottom: 6px;
-    padding-bottom: calc(18px + max(env(safe-area-inset-bottom) - 6px, 0px));
-    border-radius: 34px;
-  }
-}
-.q-sheet {
-  box-shadow: 0 -2px 40px rgba(0, 0, 0, 0.18);
-}
-@media (min-width: 720px) {
-  .q-sheet {
-    border-radius: 34px;
-  }
-}
-.q-sheet::backdrop {
-  background: rgba(0, 0, 0, 0.32);
-}
-.q-sheet-head {
-  padding-top: 14px;
-}
-.q-sheet-head h2 {
-  font-size: 20px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-}
-.q-close {
-  width: 36px;
-  height: 36px;
-  background: var(--q-fill);
-  color: var(--q-text);
-  font-size: 22px;
-  font-weight: 500;
-  transition: transform 0.35s var(--q-spring);
-}
-.q-close:active {
-  opacity: 1;
-  transform: scale(1.12);
-  transition-duration: 0.12s;
-}
-.q-sheet-h {
-  margin: 22px 16px 7px;
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-/* Grouped lists: no outline, iOS's corners, separators inset from the left. */
-.q-rows,
-.q-recent,
-.q-plus-perks {
-  border: 0;
-  border-radius: var(--q-radius);
-}
-.q-row-btn {
-  position: relative;
-  min-height: 52px;
-  border-top: 0;
-  font-weight: 500;
-  font-size: 16px;
-}
-.q-row-btn + .q-row-btn::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 16px;
-  right: 0;
-  height: 0.5px;
-  background: var(--q-divider);
-}
-.q-row-btn:active:not(:disabled) {
-  opacity: 1;
-  background: var(--q-fill);
-}
-
-/* Cards: a white cell on the grouped page, no ring. */
-.q-card,
-.q-rec {
-  border-color: transparent;
-}
-.q-section-head h2 {
-  font-size: 21px;
-  font-weight: 700;
-  letter-spacing: -0.015em;
-}
-
-/* Alerts: a glass slab with capsule buttons. */
-.q-ask {
-  border: 0;
-  border-radius: 34px;
-  padding: 24px 20px 18px;
-  background: var(--q-glass-strong);
-  -webkit-backdrop-filter: var(--q-glass-blur);
-  backdrop-filter: var(--q-glass-blur);
-  box-shadow: var(--q-glass-rim), 0 24px 60px rgba(0, 0, 0, 0.22);
-  animation: q-ask-in 0.38s var(--q-spring);
-}
-.q-ask::backdrop {
-  background: rgba(0, 0, 0, 0.28);
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-}
-.q-ask-title {
-  font-size: 18px;
-  font-weight: 700;
-}
-.q-ask-points li {
-  background: var(--q-fill);
-}
-.q-ask-actions .q-btn {
-  min-height: 48px;
-}
-@keyframes q-ask-in {
-  from {
-    opacity: 0;
-    transform: scale(1.08);
-  }
-}
-
-/* In-app notices: an iOS notification, glass and rounded. */
-.q-banner {
-  border: 0;
-  border-radius: 24px;
-  background: var(--q-glass-strong);
-  -webkit-backdrop-filter: var(--q-glass-blur);
-  backdrop-filter: var(--q-glass-blur);
-  box-shadow: var(--q-glass-rim), 0 12px 36px -10px rgba(0, 0, 0, 0.28);
-}
-.q-banner img {
-  border-radius: 10px;
-}
-
-/* The sign-in and install screens' boxes: cells, no ring. */
-.q-gate-form,
-.q-steps,
-.q-pass-code,
-.q-moved-box {
-  border: 0;
-  border-radius: 26px;
-}
-.q-pass-input {
-  border: 0;
-  background: var(--q-fill);
-}
-
-/* iOS 26's switch: wider, a capsule knob that stretches while held. */
-.q-switch {
-  width: 63px;
-  height: 28px;
-  background: rgba(120, 120, 128, 0.2);
-}
-.q-switch::after {
-  width: 37px;
-  height: 24px;
-  border-radius: 999px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.14), 0 0.5px 1px rgba(0, 0, 0, 0.08);
-  transition: transform 0.35s var(--q-spring), width 0.25s var(--q-ease);
-}
-.q-switch:active::after {
-  width: 43px;
-}
-.q-switch[aria-checked='true']::after {
-  transform: translateX(22px);
-}
-.q-switch[aria-checked='true']:active::after {
-  transform: translateX(16px);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .q-icon-btn,
-  .q-account,
-  .q-btn,
-  .q-close,
-  .q-tabbar .q-tab-icon,
-  .q-switch::after {
-    transition: none;
-  }
-  .q-ask {
-    animation: none;
-  }
-}
 /* A disclosure row: iOS's chevron on the right, not the browser's triangle. */
 .q-recent summary {
   display: flex;
