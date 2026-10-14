@@ -72,6 +72,21 @@ test that tries it (`tests/stock-check.test.mjs`, `settle.test.mjs`,
 closed; the Audit workflow counted no slip left waiting (six old tickets
 with no prize entry, most likely lost ones).
 
+## The look: iOS 27 from the kit (2026-10-14)
+
+`kit/quadra.css` is the one design system (README §9.2) and `kit/ui.mjs`
+the moving pieces. Every app was moved onto it: Weather (its forms as iOS
+lists, the kit's switch, search, segmented ranges and sheets), Words,
+Securities, Play (chips, segmented controls, buttons, search; the slip bar
+is the tab bar's glass accessory), Sports (four options or fewer a
+segmented control, more a row of chips), Transit, Class (tokens, buttons,
+sheets' corners, switch) and Passion Beats (the kit's tokens); the family
+page and the admin panel too. What stays each app's own is what's truly
+its own (Weather's skies and charts, Transit's map, Sports' pitch and
+court, Play's tickets, Class's layered editor). Checked at 375 px in WebKit,
+light and dark, and in the iOS 27 simulator's Safari (the install screen;
+signing in there needs the owner's pass).
+
 ## Workflows (Shared-Proxy, by hand from Actions)
 
 - **Run a builder or a check** (`build.yml`): any builder now, a tiny
@@ -89,6 +104,10 @@ with no prize entry, most likely lost ones).
 - **Scheduled, nothing to do:** 2026-10-20 the old `sports-proxy` Worker is
   deleted; 2026-12-06 `FIREBASE_PRIVATE_KEY` comes off the proxy (sign-ins
   it signed ran out 2026-12-05).
+- **Sports:** a game is over the moment the rules say so (`overByRule`)
+  and 比賽資訊 says when it ended; the resting starters' rings and a
+  rookie's college headshot (Castro) fixed. The rings were checked by CSS
+  only: the game had ended when they could be looked at live.
 - **Not yet seen on a phone:** the proxy's back-fills and plan buys in
   Securities (tested, and the page checked at 375 px in WebKit), a live
   bet's 5-second wait in Play.
