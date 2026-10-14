@@ -234,3 +234,25 @@ export function countTo(el, to, { from = Number(el.dataset.value) || 0, format =
   };
   requestAnimationFrame(step);
 }
+
+// A segmented control drawn as HTML (an app that redraws a card whole):
+// its thumb starts where it was (`from`) and slides to the choice the next
+// frame. segHtml([[id, label]…], on, { from, attr: id => attrs }) and, after
+// the HTML is in the page, settleSegs().
+export function segHtml(list, on, { from = on, attr = () => '', esc = s => String(s).replace(/[&<>"]/g, c => `&#${c.charCodeAt(0)};`) } = {}) {
+  const i = Math.max(0, list.findIndex(([k]) => k === on));
+  const j = Math.max(0, list.findIndex(([k]) => k === from));
+  return `<div class="q-seg" role="tablist" style="--q-seg-n:${list.length};--q-seg-i:${j}" data-to="${i}">${list.map(([k, name]) => `<button type="button" role="tab" aria-selected="${k === on}" ${attr(k)}>${esc(name)}</button>`).join('')}</div>`;
+}
+export function settleSegs(root = document) {
+  const segs = [...root.querySelectorAll('.q-seg[data-to]')];
+  if (!segs.length) return;
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => {
+      for (const s of segs) {
+        s.style.setProperty('--q-seg-i', s.dataset.to);
+        delete s.dataset.to;
+      }
+    })
+  );
+}
