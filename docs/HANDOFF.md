@@ -46,12 +46,14 @@ fails to load).
   tells the owner's phone at 50/75/90% (once the owner sets the alert
   account: OWNER-STEPS 1). `/guard` shows it; the admin panel's 系統 shows
   it with every cron job's heartbeat, R2 and D1, secrets and bindings.
-- **Use** (the guard's reading, 2026-10-14 ~11:00 Taiwan, 1.1 days into
-  the period): requests 0.35%, CPU 1.4%, KV and Durable Objects under
-  0.2%, D1 nothing to speak of, R2 writes 2.9% (most of it the move of
-  Shared-Data's files and the first days' kept reads; steady, a kept read
-  is one write per finished game or day the first time anyone opens it).
-  See "Open" for where the CPU goes.
+- **Use** (the guard, an hour of 2026-10-14 03:40 → a month): requests
+  about 4%, R2 writes about 10% (kept reads: one per finished game or day
+  the first time anyone opens it; the builders write only what changed),
+  KV, Durable Objects and D1 under 1%. CPU about 10% steady: measured with
+  `tail.yml` (`cpu`), ordinary requests and crons ~2,500 ms an hour, the
+  builders' and Weather's scoring window (:10–:24) ~1,200 ms; an hour of
+  heavy testing (preview `--live`, the system report) read 12,700 ms.
+  Nothing near a pace mark (60% projected).
 
 ## Quadra's money (impossible to exploit, 2026-10-14)
 
