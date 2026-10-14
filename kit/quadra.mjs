@@ -904,6 +904,21 @@ function segThumbs() {
 }
 segThumbs();
 
+// A search field's ✕ (.q-search-clear, the kit's): the field emptied as if
+// typed away (its own input event, so the app's search runs), and kept for typing.
+if (typeof document !== 'undefined' && !document.__quadraSearchClear) {
+  document.__quadraSearchClear = true;
+  document.addEventListener('click', e => {
+    const x = e.target.closest?.('.q-search-clear');
+    const input = x?.closest('.q-search')?.querySelector('input');
+    if (!input) return;
+    e.preventDefault();
+    input.value = '';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.focus();
+  });
+}
+
 // A phone or a tablet: html.q-touch, so a tablet gets a phone's frame (no
 // brand header, the tabs at the bottom; quadra.css). boot.js sets it earlier
 // in the apps that load it.
