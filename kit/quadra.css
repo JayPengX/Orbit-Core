@@ -1604,6 +1604,47 @@ button,
 :root[data-theme='dark'] .q-seg::before {
   background: #5b5b5f;
 }
+/* (The count and the choice read from the page itself, so a redraw that
+   drops the inline variables, an app's own DOM diff, still places it.) */
+.q-seg:has(> :nth-child(2):last-child) {
+  --q-seg-n: 2;
+}
+.q-seg:has(> :nth-child(3):last-child) {
+  --q-seg-n: 3;
+}
+.q-seg:has(> :nth-child(4):last-child) {
+  --q-seg-n: 4;
+}
+.q-seg:has(> :nth-child(5):last-child) {
+  --q-seg-n: 5;
+}
+.q-seg:has(> :nth-child(6):last-child) {
+  --q-seg-n: 6;
+}
+.q-seg:has(> :nth-child(7):last-child) {
+  --q-seg-n: 7;
+}
+.q-seg:has(> :nth-child(1):is([aria-pressed='true'], [aria-selected='true'])) {
+  --q-seg-i: 0;
+}
+.q-seg:has(> :nth-child(2):is([aria-pressed='true'], [aria-selected='true'])) {
+  --q-seg-i: 1;
+}
+.q-seg:has(> :nth-child(3):is([aria-pressed='true'], [aria-selected='true'])) {
+  --q-seg-i: 2;
+}
+.q-seg:has(> :nth-child(4):is([aria-pressed='true'], [aria-selected='true'])) {
+  --q-seg-i: 3;
+}
+.q-seg:has(> :nth-child(5):is([aria-pressed='true'], [aria-selected='true'])) {
+  --q-seg-i: 4;
+}
+.q-seg:has(> :nth-child(6):is([aria-pressed='true'], [aria-selected='true'])) {
+  --q-seg-i: 5;
+}
+.q-seg:has(> :nth-child(7):is([aria-pressed='true'], [aria-selected='true'])) {
+  --q-seg-i: 6;
+}
 .q-seg > button {
   min-width: 0;
   min-height: 32px;
