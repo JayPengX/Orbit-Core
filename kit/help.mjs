@@ -392,8 +392,8 @@ export const HELP = {
       ['tabs', '每個分頁', [
         '「地圖」：找地點（連鎖店從離你最近的分店排起）、規劃路線，照公車實際到站時間排出最好走的方案，一路導航。釘選的地點（家、公司⋯）也標在地圖上，點一下就能規劃去那裡。',
         '導航時地圖上畫出整趟路線，畫面停在你走到的那一段：走路、騎車和等車時拉近看，坐上車看到下車的地方；你到了哪一段，就自動跳到哪一段（中途才開始也一樣）。點倒數可以改搭別班，沒趕上會自動換下一班。YouBike 站到了沒車或沒位，按一下改到附近的站。上下兩張卡片點中間的短條（或往上、往下滑）可以收合，地圖就大一點。⋯ 裡的「編輯行程」可以加一站、拿掉一站或改目的地；坐在車上改，會讓你繼續坐，只換下車站。',
-        '「交通」：附近站牌和每班公車的到站、路線和時刻表。',
-        '「查時刻」：火車、高鐵和捷運的時刻與票價。',
+        '「交通」：常用和釘選的行程接下來怎麼走，釘選的公車、火車和地點；每條公車都寫著下一班什麼時候到（沒有車在路上時，是時刻表的下一班）。',
+        '「查時刻」：火車、高鐵的時刻與票價；公車用號碼或站名找，每條路線都寫著離你最近那一站的下一班。',
         '「我的」：常用和固定的行程、TPASS、交通方式的偏好，和導航時走路、騎車那一段要交給 Google 地圖還是 Apple 地圖。'
       ]],
       ['money', '錢怎麼算', ['Orbit Transit 不用錢；票價只是參考。']]
@@ -405,8 +405,8 @@ export const HELP = {
       ['tabs', 'The tabs', [
         'Map: find a place (a chain’s branches nearest you first), plan a trip ranked by the buses’ real times, and be guided along it. Your pinned places (home, work…) are on the map too; tap one to plan a trip there.',
         'Navigating, the map draws the whole trip and shows the step you’re at: close up on a walk, a bike or waiting at the stop, to where you get off once on board; it moves to the next step by itself (started half way too). Tap the countdown to take another departure; miss one and it moves to the next. A YouBike station empty or full when you get there: one tap moves you to one nearby. Tap a card’s grip (or swipe it) to fold it for more map. ⋯ → 編輯行程 adds a stop, takes one off or changes where you’re going; on a bus or train you stay on it and only where you get off changes.',
-        'Transit: nearby stops with every bus due, routes and timetables.',
-        'Times: trains, high-speed rail and metros, with fares.',
+        'Transit: your saved and pinned trips’ next ways to go, and your pinned buses, trains and places; every bus says when its next one comes (the timetable’s next when none is on its way).',
+        'Times: trains and high-speed rail, with fares; buses by number or stop name, each route with its next bus at its stop nearest you.',
         'Me: saved and recurring trips, TPASS, the ways you like to travel, and whether a walk or a ride is handed to Google Maps or Apple Maps.'
       ]],
       ['money', 'Money', ['Orbit Transit is free; fares are a guide.']]
