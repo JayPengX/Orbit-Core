@@ -243,12 +243,17 @@ export function segHtml(list, on, { from = on, attr = () => '', esc = s => Strin
   return `<div class="q-seg" role="tablist" style="--q-seg-n:${list.length};--q-seg-i:${j}" data-to="${i}">${list.map(([k, name]) => `<button type="button" role="tab" aria-selected="${k === on}" ${attr(k)}>${esc(name)}</button>`).join('')}</div>`;
 }
 export function settleSegs(root = document) {
-  const segs = [...root.querySelectorAll('.q-seg[data-to]')];
+  // Each one's target read now: two calls in one redraw (an app settling
+  // each of its controls) both hold a control, and the second, reading it
+  // after the first had cleared it, set --q-seg-i to "undefined" (no place:
+  // the thumb stuck on the first option whatever was picked).
+  const segs = [...root.querySelectorAll('.q-seg[data-to]')].map(s => [s, s.dataset.to]);
   if (!segs.length) return;
   requestAnimationFrame(() =>
     requestAnimationFrame(() => {
-      for (const s of segs) {
-        s.style.setProperty('--q-seg-i', s.dataset.to);
+      for (const [s, to] of segs) {
+        if (s.dataset.to !== to) continue;
+        s.style.setProperty('--q-seg-i', to);
         delete s.dataset.to;
       }
     })
