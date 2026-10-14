@@ -4,8 +4,8 @@ Steps only you can do: they need your accounts, or they delete something for
 good. Each one says why, where to click, and how to tell it worked. They're
 independent, so do them in any order. About 15 minutes in all.
 
-Tick each box when it's done (or tell Claude, and it will update this file
-and the plan).
+Tick each box when it's done (or tell Claude, and it will update this
+file).
 
 ---
 

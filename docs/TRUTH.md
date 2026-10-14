@@ -6,8 +6,7 @@ the Pass) and Orbit (Class, Weather, Transit, Sports, Words). Every repo's
 is wrong, not the rule. When the owner adds a rule, it goes here, dated.
 
 These rules come from the owner's own words and from what 2,700 commits
-across the family (2026-08-26 on) and `docs/HANDOFF.md` show they kept
-asking for. Where a rule has a date, it's when the owner made that call;
+across the family (2026-08-26 on) show they kept asking for. Where a rule has a date, it's when the owner made that call;
 the latest call wins over an older one, and §15 lists the calls so none is
 undone by accident. What each app does in detail is in its README; this
 file is how to work on them.
@@ -113,9 +112,15 @@ file is how to work on them.
   cause in brackets when it helps: "Sports opens faster (a reopen 2.5 s →
   1.0 s): the TV lists open on the device's copy…". Numbers when there are
   numbers. No internal jargon in the first clause.
-- **Record each round in `docs/HANDOFF.md`**: the owner's list by date,
-  what was done (and pushed), what's left and why. "When I say stop,
-  commit everything and write the handoff" (2026-10-01).
+- **Few docs, each current** (the owner, 2026-10-14: "keep minimal docs").
+  Per repo a README (the map) and `CLAUDE.md` (the pointer here); in
+  Shared-Proxy also this file, `docs/HANDOFF.md` (the state now: what's
+  where, what's open and why, rewritten as it changes, never a log), and
+  `docs/OWNER-STEPS.md` (what only the owner can do). The history is the
+  git log: each round's list and what was done go in its commits. A plan
+  that's built is folded into the READMEs and deleted. "When I say stop,
+  commit everything and write the handoff" (2026-10-01): the handoff is
+  the state and what's left.
 - **The README is the map.** Each repo's README documents every feature
   and what depends on what, in detail (2026-10-12). A change that adds,
   removes or moves a feature updates the README in the same push.
@@ -130,8 +135,7 @@ file is how to work on them.
 - **Be efficient.** Do the work; skip the narration. Batch small fixes
   into one push per app.
 - **Other agents' work is reviewed, not trusted.** A parallel agent's round
-  (2026-10-01) was largely redone; it had also cut HANDOFF.md, which was
-  restored. Never shorten the handoff's history to make room.
+  (2026-10-01) was largely redone.
 
 ## 3. Testing like the owner uses the apps
 
@@ -359,8 +363,9 @@ On top of them, **apps put live knowledge over slower copies** (§8).
 - **Never a penny past Cloudflare's $5 plan** (the owner, 2026-10-13: on
   Workers Paid, "I don't want to pay a penny more"). Its included amounts a
   month: 10M requests, 30M CPU ms, KV 10M reads, 1M writes, 1M deletes,
-  1M lists and 1 GB, Durable Objects 1M requests and 5 GB, Workers Logs 20M
-  events. Cloudflare has no spending cap, so `guard.js` (Worker
+  1M lists and 1 GB, Durable Objects 1M requests and 5 GB, R2 1M writes
+  (Class A), 10M reads (Class B) and 10 GB, D1 25B rows read, 50M written
+  and 5 GB, Workers Logs 20M events. Cloudflare has no spending cap, so `guard.js` (Worker
   `quota-guard`) reads the account's real use every five minutes and takes
   the proxy off the air at 90% of any of them until the next period;
   each toml caps an invocation's CPU (`[limits]`) and samples its logs
@@ -653,7 +658,7 @@ On top of them, **apps put live knowledge over slower copies** (§8).
 - **The model decides**: `node tools/economy.mjs` runs each kind of person
   (casual, regular bettor, high roller, investor, heavy bettor, words
   only) over a year; any change to a price, a perk, a cut or a payout is
-  run there first and its numbers go in the commit and HANDOFF. A regular
+  run there first and its numbers go in the commit. A regular
   bettor stays about level; nobody but the market makes an account richer
   for free.
 - **The house never loses on its own prices**: the cuts are what Taiwan
@@ -670,6 +675,15 @@ On top of them, **apps put live knowledge over slower copies** (§8).
 - **Money is exact across apps**: one pool, Securities' borrowed money never
   spendable in Play, nothing counted twice; a double count in the owner's
   own account (2026-10-01) was fixed and the refund left to them.
+- **Impossible to exploit** (the owner, 2026-10-14). Only the proxy adds
+  money, and only on its own terms: a bet settles on the house's own bet as
+  priced (never the terms a phone sent), a live bet is priced again after a
+  delay, a Securities fill counts only as the proxy issued it (its order's
+  terms and moment as first seen, once), anything found on a phone counts at
+  the worst figure the market allows since its moment, a phone's dates and
+  figures never add money (entries dated by the Worker; Securities' cash,
+  cost and opening money the Worker's), and money owed (loans, short sales)
+  never reaches the pool. Every hole closed gets a test that tries it.
 
 ## 14. Each app's yardsticks
 
@@ -797,3 +811,11 @@ What was decided, so it isn't undone. Newer calls win.
   pace and at a stop (`ops.js`, the account set in the admin panel); every
   cron job leaves a heartbeat the admin panel's 系統 shows. Public settings
   out of secrets and variables (the account ID, the proxy's address).
+- 2026-10-14: Quadra's money impossible to exploit (§13): every hole a phone
+  could use to mint money closed and tested (Securities' fills, exchanges,
+  interest, dividends, splits, loans and short sales; Play's picks, live
+  bets and the pre-lock hand-overs; the wallet's dates and figures).
+- 2026-10-14: minimal docs (§2): a README and `CLAUDE.md` per repo; in
+  Shared-Proxy this file, `docs/HANDOFF.md` (the state now) and
+  `docs/OWNER-STEPS.md`; the history is the git log. The plans that were
+  built (Cloudflare, Weather) and the old handoffs folded in and deleted.

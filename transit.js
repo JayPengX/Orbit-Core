@@ -22,13 +22,13 @@
 // API 金鑰); GOOGLE_MAPS_BROWSER_KEY (Maps JavaScript API only, restricted to
 // https://jaypengx.github.io/*); GOOGLE_MAPS_KEY (Places API (New) and Routes
 // API; GOOGLE_WEATHER_KEY is used when it isn't set). Optional var
-// TDX_PER_MIN: TDX calls a minute this Worker allows itself (the free plan
-// allows 5, 銅級 300).
+// TDX_PER_MIN: TDX calls a minute this Worker allows itself (TDX's free
+// tier allows 5, 銅級 300).
 //
 // The caps are this Worker's own count (KV, flushed in batches so KV's
 // million writes a month aren't spent on counting): the hard stop is
-// Google Cloud's per-day quotas, which the owner sets on each API (see
-// docs/HANDOFF.md, Orbit Transit).
+// Google Cloud's per-day quotas, which the owner sets on each API (the
+// README, §3.3).
 
 import { cleanDev } from './kit/devconfig.mjs';
 

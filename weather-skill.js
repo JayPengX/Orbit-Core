@@ -1,5 +1,5 @@
 // ---- weather-skill.js ----
-// Who's been right (docs/WEATHER-PLAN.md C7), so the one answer leans on the
+// Who's been right (README §3.2), so the one answer leans on the
 // better source. Never shown in the app; it only moves the blend's weights.
 //
 // Hourly (worker.js's cron), for the cells people opened lately
