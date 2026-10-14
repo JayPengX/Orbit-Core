@@ -94,7 +94,7 @@
   .checks .dot.bad { background: var(--q-bad); }
   .checks .dot.slow { background: #d4a017; }
   .checks span:nth-child(2) { flex: 1; font-weight: 600; min-width: 0; }
-  .checks small { display: block; font-weight: 400; font-size: 12px; color: var(--q-muted); }
+  .checks small { display: block; font-weight: 400; font-size: 12px; color: var(--q-muted); overflow-wrap: anywhere; }
   /* The account sheet */
   dialog.sheet { width: min(720px, 100vw); max-height: 92vh; margin: auto auto 0; border: 0; padding: 0; border-radius: 22px 22px 0 0; background: var(--q-page); color: var(--q-text); box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.3); }
   @media (min-width: 760px) { dialog.sheet { margin: auto; border-radius: 22px; } }
@@ -193,7 +193,7 @@
       <button data-view="issue" aria-pressed="false"><span class="ic">✦</span>發放 Pass</button>
       <button data-view="money" aria-pressed="false"><span class="ic">¤</span>金流</button>
       <button data-view="dev" aria-pressed="false"><span class="ic">⚙︎</span>開發</button>
-      <button data-view="data" aria-pressed="false"><span class="ic">⇅</span>資料與部署</button>
+      <button data-view="data" aria-pressed="false"><span class="ic">⇅</span>系統</button>
       <button data-view="ops" aria-pressed="false"><span class="ic">◔</span>通知與用量</button>
       <button data-view="clean" aria-pressed="false"><span class="ic">✕</span>資料整理</button>
     </nav>
@@ -328,17 +328,29 @@
       <p id="dev-ok" class="ok"></p>
     </section>
 
-    <!-- 資料與部署 -->
+    <!-- 系統 -->
     <section data-pane="data" hidden>
-      <div class="pane-head"><div><h2>每晚的資料（Shared-Data）</h2><p class="muted">每晚的副本：建立時間、還能用多久、讀不到的會在白天重試。</p></div><button id="data-load" class="small">重新整理</button></div>
-      <p id="data-error" class="error"></p>
-      <div class="tiles" id="data-tiles"></div>
-      <div class="twocol" style="margin-top:12px">
-        <div class="card"><div class="row spread"><strong>各類副本</strong><span class="muted" id="data-kinds-sum"></span></div><div class="tablewrap"><table id="data-kinds"><thead><tr><th>種類</th><th class="right">檔案</th><th class="right">大小</th></tr></thead><tbody></tbody></table></div></div>
-        <div class="card"><div class="row spread"><strong>讀不到、等重試的</strong><span class="muted" id="data-unread-sum"></span></div><ul class="runs" id="data-unread"></ul></div>
+      <div class="pane-head"><div><h2>帳單與節流</h2><p class="muted">Cloudflare $5 方案：照本期速度推估整個月，推估到 60%、80%、90% 就一步步放慢；任何一項真的用到 90% 就停代理到下個週期，不會多付一毛。</p></div><button id="sys-load" class="small">重新整理</button></div>
+      <p id="sys-error" class="error"></p>
+      <div class="tiles" id="sys-tiles"></div>
+      <p class="muted" id="sys-pace" style="margin:10px 0 0"></p>
+      <div class="card" style="margin-top:12px">
+        <strong>警示通知</strong>
+        <p class="muted" id="alert-note" style="margin:6px 0 10px"></p>
+        <div class="row"><input id="alert-pass" placeholder="你的 Quadra Pass" autocomplete="off" spellcheck="false" style="flex:1 1 0;min-width:0" /><button id="alert-save" class="small" style="flex:none">設定</button><button id="alert-test" class="small" style="flex:none">測試</button></div>
+        <p id="alert-ok" class="ok"></p>
       </div>
-      <div class="pane-head"><div><h2>建置</h2><p class="muted">Shared-Data 的 Build：每晚一次（GitHub 會晚幾小時開始），白天每 3 小時一次。</p></div><a class="button small" id="build-run" href="https://github.com/JayPengX/Shared-Data/actions/workflows/build.yml" target="_blank" rel="noopener">在 GitHub 手動執行 ↗</a></div>
-      <ul class="runs" id="builds"></ul>
+      <div class="pane-head"><div><h2>排程工作</h2><p class="muted">每個排程工作最近一次跑的時間、結果、花多久。黃色是比平常晚。</p></div></div>
+      <ul class="checks" id="beats"></ul>
+      <div class="pane-head"><div><h2>檢查與建置</h2><p class="muted">Gemini：經台灣中繼送一個很小的請求。建置：不管節流，現在跑一次。</p></div></div>
+      <div class="row" id="sys-actions"></div>
+      <p class="muted" id="sys-out" style="overflow-wrap:anywhere"></p>
+      <div class="twocol" style="margin-top:12px">
+        <div class="card"><div class="row spread"><strong>R2 資料</strong><span class="muted" id="r2-sum"></span></div><ul class="checks" id="r2" style="margin-top:8px"></ul></div>
+        <div class="card"><div class="row spread"><strong>D1 資料庫</strong><span class="muted" id="d1-sum"></span></div><ul class="checks" id="d1" style="margin-top:8px"></ul></div>
+      </div>
+      <div class="pane-head"><div><h2>金鑰與綁定</h2><p class="muted">只看有沒有設定，看不到內容。公開的設定（網址、帳號 ID）不放金鑰。</p></div></div>
+      <ul class="checks" id="secrets"></ul>
       <div class="pane-head"><div><h2>部署</h2><p class="muted">每個 repo 最近一次部署。</p></div></div>
       <ul class="runs" id="deploys"></ul>
       <div class="pane-head"><div><h2>連結</h2></div></div>
@@ -477,7 +489,7 @@ function show(view) {
   for (const s of document.querySelectorAll('[data-pane]')) s.hidden = s.dataset.pane !== view;
   if (!loaded.has(view)) {
     loaded.add(view);
-    ({ overview: loadOverview, money: loadMoney, accounts: loadWallets, dev: loadDev, data: loadData, ops: () => (loadPushes(), loadBilling(), loadUsage(), loadHealth()) })[view]?.();
+    ({ overview: loadOverview, money: loadMoney, accounts: loadWallets, dev: loadDev, data: () => loadSystem(), ops: () => (loadPushes(), loadBilling(), loadUsage(), loadHealth()) })[view]?.();
   }
 }
 $('tabs').onclick = e => e.target.dataset.view && show(e.target.dataset.view);
@@ -1175,11 +1187,9 @@ $('dev-save').onclick = () =>
     }
   });
 
-// ---- 資料與部署 ----
-const DATA = 'https://jaypengx.github.io/Shared-Data/';
+// ---- 系統 (ops.js) ----
 const GH = 'https://api.github.com/repos/JayPengX/';
-const REPOS = [['Shared-Proxy', 'Workers 與共用套件'], ['Shared-Data', '每晚的資料'], ['Orbit-Sports', 'Orbit Sports'], ['Quadra-Play', 'Quadra Play'], ['Quadra-Securities', 'Quadra 證券'], ['Orbit-Words', 'Orbit Words'], ['Orbit-Class', 'Orbit Class'], ['Orbit-Weather', 'Orbit Weather'], ['Orbit-Transit', 'Orbit Transit']];
-const KIND = { days: '每日比分', months: '每月賽程', games: '已結束的比賽', tables: '排名', teams: '球隊列表', team: '球隊頁', squads: '陣容', numbers: '球員數據', players: '球員頁', f1: 'F1', asia: '亞洲棒球' };
+const REPOS = [['Shared-Proxy', 'Workers 與共用套件'], ['Orbit-Sports', 'Orbit Sports'], ['Quadra-Play', 'Quadra Play'], ['Quadra-Securities', 'Quadra 證券'], ['Orbit-Words', 'Orbit Words'], ['Orbit-Class', 'Orbit Class'], ['Orbit-Weather', 'Orbit Weather'], ['Orbit-Transit', 'Orbit Transit']];
 const getJ = async (url, ms = 8000) => { const r = await fetch(url, { signal: AbortSignal.timeout(ms), cache: 'no-store' }); if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); };
 // GitHub's open API: 60 reads an hour from here, kept two minutes.
 async function gh(path) {
@@ -1189,52 +1199,83 @@ async function gh(path) {
   try { sessionStorage.setItem(k, JSON.stringify({ at: Date.now(), d })); } catch {}
   return d;
 }
-const mb = n => `${(n / 1e6).toFixed(n < 1e7 ? 1 : 0)} MB`;
+const mb = n => (n >= 1e9 ? `${(n / 1e9).toFixed(2)} GB` : `${(n / 1e6).toFixed(n < 1e7 ? 1 : 0)} MB`);
+const pct = v => `${v >= 0.1 ? Math.round(v * 100) : (v * 100).toFixed(1)}%`;
 const runDot = r => (r.status !== 'completed' ? 'run' : r.conclusion === 'success' ? '' : r.conclusion === 'cancelled' || r.conclusion === 'skipped' ? 'off' : 'bad');
 const runWord = r => (r.status !== 'completed' ? '進行中' : { success: '成功', failure: '失敗', cancelled: '取消', skipped: '略過' }[r.conclusion] || r.conclusion);
 const mins = r => (r.status === 'completed' ? `${Math.max(1, Math.round((Date.parse(r.updated_at) - Date.parse(r.run_started_at || r.created_at)) / 60000))} 分鐘` : '');
 const runRow = (r, label) => el('li', {}, [el('span', { class: `dot ${runDot(r)}` }), el('a', { href: r.html_url, target: '_blank', rel: 'noopener', text: label || r.display_title }), el('small', { text: [runWord(r), mins(r), ago(Date.parse(r.created_at))].filter(Boolean).join(' · ') })]);
-async function loadData() {
-  $('data-error').textContent = '';
-  const fail = (box, e) => box.replaceChildren(el('li', {}, [el('span', { class: 'dot bad' }), el('span', { text: '讀不到' }), el('small', { text: e.message })]));
-  // The nightly copies.
+const BILL_NAME = { requests: 'Workers 請求', cpuMs: 'Workers CPU', kvRead: 'KV 讀取', kvWrite: 'KV 寫入', kvDelete: 'KV 刪除', kvList: 'KV 列出', kvBytes: 'KV 儲存', doRequests: 'Durable Objects 請求', doBytes: 'Durable Objects 儲存', r2ClassA: 'R2 寫入', r2ClassB: 'R2 讀取', r2Bytes: 'R2 儲存', d1RowsRead: 'D1 讀取', d1RowsWritten: 'D1 寫入', d1Bytes: 'D1 儲存' };
+const PACE_WORD = ['照設定', '放慢 ×2，可以等的建置暫停', '放慢 ×4，建置全停，每個人讀取減半', '放慢 ×8，讀取剩四分之一'];
+// Each job: its name, and how long between runs before it's late.
+const JOBS = { kambi: ['Kambi 比分', 10], notices: ['通知', 10], settle: ['Play 結算', 15], lottery: ['彩券開獎', 15], alerts: ['帳單警示', 30], f1: ['F1 圈速（週四到週一）', 10], 'weather-skill': ['天氣評分（每小時）', 120], capacity: ['容量（每 6 小時）', 420], 'build:watch': ['建置：精華連結（每小時）', 120], 'build:cutouts': ['建置：去背照片（每小時）', 120], 'build:buses': ['建置：公車（每小時）', 120], 'build:daily': ['建置：每日（賽程、CPBL、照片、勝率）', 120] };
+const SECRET_GROUPS = [
+  ['登入與管理', ['ECO_TOKEN_SECRET', 'ECO_ADMIN_TOKEN', 'DATA_PUSH_SECRET']],
+  ['Google', ['GEMINI_API_KEY', 'GOOGLE_MAPS_KEY', 'GOOGLE_MAPS_BROWSER_KEY', 'GOOGLE_WEATHER_KEY']],
+  ['台灣的開放資料', ['CWA_KEY', 'MOENV_KEY', 'TDX_CLIENT_ID', 'TDX_CLIENT_SECRET']],
+  ['退場中（12/6 自動移除）', ['FIREBASE_PRIVATE_KEY']]
+];
+const BIND_WORD = { STORE: 'D1 資料庫（Pass、Play、設定）', DATA: 'R2 資料（quadra-data）', RATE_LIMIT_KV: 'KV（通知、帳單狀態、快取）', F1_LOG: 'F1 圈速紀錄（Durable Object）', GEMINI_RELAY: 'Gemini 台灣中繼', GUARD: '帳單保護（quota-guard）' };
+// A job's note (its result, JSON) as words: "watched 0 · sent 2"; an error as it is.
+const noteText = note => {
   try {
-    const [mi, unread, packs] = await Promise.all([getJ(DATA + 'mirror/index.json'), getJ(DATA + 'mirror/unread.json').catch(() => null), getJ(DATA + 'index.json').catch(() => null)]);
-    const c = mi.counts || {};
-    const left = mi.until - Date.now();
-    $('data-tiles').replaceChildren(
-      tile('副本建立', ago(mi.built), fmt(mi.built)),
-      tile('還能用', left > 0 ? `${Math.round(left / 3600000)} 小時` : '已過期', fmt(mi.until)),
-      tile('副本', (c.written || 0).toLocaleString(), mb(c.bytes || 0)),
-      tile('讀取 / 失敗', `${(c.asked || 0).toLocaleString()} / ${c.failed || 0}`, c.carried ? `沿用 ${c.carried.toLocaleString()} 份` : ''),
-      tile('等重試', unread ? String(unread.items.length) : '—', unread?.at ? `上次 ${ago(unread.at)}` : '今晚開始記錄'),
-      tile('公車資料', packs?.built ? ago(Date.parse(packs.built)) : '—', packs?.built ? '每週一重建' : '')
-    );
-    const kinds = Object.entries(c.kinds || {}).sort((a, b) => b[1].bytes - a[1].bytes);
-    $('data-kinds-sum').textContent = `${kinds.length} 類`;
-    $('data-kinds').tBodies[0].replaceChildren(...kinds.map(([k, v]) => el('tr', {}, [el('td', { text: KIND[k] || k }), el('td', { class: 'right', text: v.files.toLocaleString() }), el('td', { class: 'right', text: mb(v.bytes) })])));
-    const items = unread?.items || [];
-    $('data-unread-sum').textContent = items.length ? `${items.length} 筆` : '';
-    $('data-unread').replaceChildren(
-      ...(items.length
-        ? items.slice(0, 30).map(x => el('li', {}, [el('span', { class: 'dot run' }), el('span', { class: 'muted', style: 'overflow-wrap:anywhere;font-size:12.5px', text: x.url.replace(/^https:\/\/[^/]+/, '') }), el('small', { text: `第 ${x.tries} 次` })]))
-        : [el('li', {}, [el('span', { class: 'dot' }), el('span', { text: '沒有：每一份都讀到了' }), el('small', { text: '' })])])
-    );
-  } catch (e) {
-    $('data-error').textContent = `Shared-Data 讀不到：${e.message}`;
+    const flat = (o, pre = '') => Object.entries(o).flatMap(([k, v]) => (v && typeof v === 'object' ? (Array.isArray(v) ? [`${pre}${k} ${v.length}`] : flat(v, `${k} `)) : [`${pre}${k} ${v}`]));
+    const j = JSON.parse(note);
+    return j && typeof j === 'object' ? flat(j).slice(0, 6).join(' · ') : String(j);
+  } catch {
+    return String(note || '');
   }
-  // The builds and each repo's deploys.
+};
+const checkRow = (dot, name, sub, right) => el('li', {}, [el('span', { class: `dot${dot ? ` ${dot}` : ''}` }), el('span', {}, [name, sub ? el('small', { text: sub }) : null]), right ? el('span', { class: 'muted num', text: right }) : null]);
+async function loadSystem() {
+  $('sys-error').textContent = '';
   try {
-    const runs = (await gh('Shared-Data/actions/workflows/build.yml/runs?per_page=10')).workflow_runs || [];
-    $('builds').replaceChildren(...runs.map(r => runRow(r, `${r.display_title.replace(/^Build ?/, '') || 'Build'} · ${r.event === 'schedule' ? '排程' : '手動'}`)));
+    const r = await admin('system');
+    const g = r.guard;
+    const top = g?.top;
+    $('sys-tiles').replaceChildren(
+      tile('帳單保護', !g ? '還沒跑過' : g.stopped ? '已停代理' : g.armed ? '運作中' : '沒啟動', g?.at ? `${ago(g.at)} 讀取` : ''),
+      tile('節流', `${r.pace.pace} 級`, r.pace.pace ? `從 ${fmt(r.pace.since)}` : '照設定'),
+      tile('用得最多', top ? pct(g.share[top]) : '—', top ? BILL_NAME[top] || top : ''),
+      tile('推估到月底', g?.paceTop != null ? pct(g.paceTop) : '—', '最高的一項'),
+      tile('警示', g ? ['沒有', '過 50%', '過 75%', '過 90%'][g.alert || 0] : '—', r.told?.at ? `上次通知 ${ago(r.told.at)}` : '還沒通知過'),
+      tile('本期', g?.period ? `${fmtDay(g.period.start)} 起` : '—', g?.period ? `到 ${fmtDay(g.period.end)}，每月 13 日續約` : '')
+    );
+    $('sys-pace').textContent = `現在：${PACE_WORD[r.pace.pace] || ''}。${g?.error ? ` 讀取失敗：${g.error}` : ''}`;
+    $('alert-note').textContent = r.alertAccount ? `警示送到帳戶 ${r.alertAccount}（它第一個開了通知的 App）：用量過 50%、75%、90%，節流改變，或代理停了。` : '還沒設定：輸入你的 Quadra Pass，用量過 50%、75%、90%、節流改變或代理停了，就會通知你開了通知的 App。';
+    const now = Date.now();
+    const beats = Array.isArray(r.beats) ? r.beats : [];
+    const known = Object.keys(JOBS);
+    beats.sort((a, b) => (known.indexOf(a.job) + 1 || 99) - (known.indexOf(b.job) + 1 || 99));
+    $('beats').replaceChildren(
+      ...(beats.length
+        ? beats.map(b => {
+            const [name, late] = JOBS[b.job] || [b.job, 120];
+            const old = now - b.at > late * 60_000;
+            return checkRow(!b.ok ? 'bad' : old ? 'slow' : '', name, `${ago(b.at)}${b.ok ? '' : ` · 連續失敗 ${b.fails} 次${b.okAt ? `，上次成功 ${ago(b.okAt)}` : ''}`}${b.note ? ` · ${noteText(b.note).slice(0, 120)}` : ''}`, b.ms >= 1000 ? `${(b.ms / 1000).toFixed(1)} 秒` : `${b.ms} ms`);
+          })
+        : [checkRow('slow', '還沒有紀錄', '排程跑過之後就會出現')])
+    );
+    const folders = Object.entries(r.data?.folders || {}).sort((a, b) => b[1].bytes - a[1].bytes);
+    const files = folders.reduce((n, [, f]) => n + f.files, 0);
+    $('r2-sum').textContent = r.data?.error ? '讀不到' : `${files.toLocaleString()}${r.data?.more ? '+' : ''} 個檔案`;
+    $('r2').replaceChildren(...folders.map(([k, f]) => checkRow('', k === '(top)' ? '最上層' : `${k}/`, f.newest ? `最新 ${ago(f.newest)}` : '', `${f.files.toLocaleString()} · ${mb(f.bytes)}`)));
+    const colls = Object.entries(r.store && !r.store.error ? r.store : {}).sort((a, b) => b[1] - a[1]);
+    $('d1-sum').textContent = r.store?.error ? '讀不到' : `${colls.reduce((n, [, v]) => n + v, 0)} 份文件`;
+    $('d1').replaceChildren(...colls.map(([k, v]) => checkRow('', k, '', v.toLocaleString())));
+    $('secrets').replaceChildren(
+      ...SECRET_GROUPS.flatMap(([group, names]) => names.map(n => checkRow(r.secrets[n] ? '' : 'bad', n, group, r.secrets[n] ? '已設定' : '沒設定'))),
+      ...Object.entries(r.bindings).map(([n, on]) => checkRow(on ? '' : 'bad', n, BIND_WORD[n] || '綁定', on ? '已綁定' : '沒綁定')),
+      checkRow('', 'GitHub：Shared-Proxy', 'CLOUDFLARE_API_TOKEN（部署）、CF_GUARD_TOKEN（帳單保護）、DATA_PUSH_SECRET、ECO_TOKEN_SECRET、ECO_ADMIN_TOKEN', '5 個')
+    );
   } catch (e) {
-    fail($('builds'), e);
+    $('sys-error').textContent = e.message;
   }
   const rows = await Promise.all(
     REPOS.map(async ([repo, name]) => {
       try {
-        const r = ((await gh(`${repo}/actions/runs?per_page=1`)).workflow_runs || [])[0];
-        return r ? runRow(r, `${name} · ${r.name}`) : el('li', {}, [el('span', { class: 'dot off' }), el('span', { text: name }), el('small', { text: '沒有紀錄' })]);
+        const run = ((await gh(`${repo}/actions/runs?per_page=1`)).workflow_runs || [])[0];
+        return run ? runRow(run, `${name} · ${run.name}`) : el('li', {}, [el('span', { class: 'dot off' }), el('span', { text: name }), el('small', { text: '沒有紀錄' })]);
       } catch (e) {
         return el('li', {}, [el('span', { class: 'dot off' }), el('span', { text: name }), el('small', { text: e.message })]);
       }
@@ -1242,11 +1283,55 @@ async function loadData() {
   );
   $('deploys').replaceChildren(...rows);
 }
-$('data-load').onclick = () => busy($('data-load'), () => { for (let i = sessionStorage.length - 1; i >= 0; i--) { const k = sessionStorage.key(i); if (k?.startsWith('quadra.admin.gh:')) sessionStorage.removeItem(k); } return loadData(); });
+$('sys-load').onclick = () => busy($('sys-load'), () => { for (let i = sessionStorage.length - 1; i >= 0; i--) { const k = sessionStorage.key(i); if (k?.startsWith('quadra.admin.gh:')) sessionStorage.removeItem(k); } return loadSystem(); });
+$('alert-save').onclick = () =>
+  busy($('alert-save'), async () => {
+    $('alert-ok').textContent = $('sys-error').textContent = '';
+    try {
+      const passcode = $('alert-pass').value.trim();
+      const r = await admin('alerts-set', { passcode });
+      $('alert-pass').value = '';
+      $('alert-ok').textContent = r.alertAccount ? `已設定：帳戶 ${r.alertAccount}` : '已取消警示通知';
+      loadSystem();
+    } catch (e) {
+      $('sys-error').textContent = e.message;
+    }
+  });
+$('alert-test').onclick = () =>
+  busy($('alert-test'), async () => {
+    $('alert-ok').textContent = $('sys-error').textContent = '';
+    try {
+      const r = await admin('alert-test');
+      $('alert-ok').textContent = { sent: '已送出：看看手機', none: '這個帳戶沒有開通知的 App', off: '這個帳戶把通知關了' }[r.told] || `沒送出：${r.told}`;
+    } catch (e) {
+      $('sys-error').textContent = e.message;
+    }
+  });
+// Checks and builders by hand.
+const ACTIONS = [['Gemini 檢查', 'gemini-check'], ['精華連結', 'build:watch'], ['精華（完整）', 'build:watch-full'], ['賽程', 'build:sports'], ['CPBL', 'build:cpbl'], ['亞洲棒球', 'build:asia'], ['勝率', 'build:winprob'], ['照片', 'build:photos'], ['去背', 'build:cutouts'], ['公車', 'build:buses']];
+$('sys-actions').replaceChildren(
+  ...ACTIONS.map(([label, what]) => {
+    const b = el('button', { class: 'small', text: label });
+    b.onclick = () =>
+      busy(b, async () => {
+        $('sys-out').textContent = `${label}：進行中…`;
+        try {
+          const r = what === 'gemini-check' ? await admin('gemini-check') : await admin('build', { job: what.slice(6) });
+          $('sys-out').textContent =
+            what === 'gemini-check'
+              ? r.ok ? `Gemini 正常：${r.model}，經${r.via === 'direct' ? '直連' : '台灣中繼'}，${r.ms} ms，回覆「${r.reply}」，${r.tokens} tokens。` : `Gemini 失敗：${r.status || ''} ${r.error || ''}`
+              : `${label}：${JSON.stringify(r).slice(0, 300)}`;
+        } catch (e) {
+          $('sys-out').textContent = `${label}失敗：${e.message}`;
+        }
+      });
+    return b;
+  })
+);
 const LINKS = [
   ['Orbit Sports', '/Orbit-Sports/'], ['Quadra Play', '/Quadra-Play/'], ['Quadra 證券', '/Quadra-Securities/'], ['Orbit Words', '/Orbit-Words/'], ['Orbit Class', '/Orbit-Class/'], ['Orbit Weather', '/Orbit-Weather/'], ['Orbit Transit', '/Orbit-Transit/'],
-  ['Shared-Data 索引', DATA + 'mirror/index.json'], ['Shared-Data Actions', 'https://github.com/JayPengX/Shared-Data/actions'], ['Shared-Proxy Actions', 'https://github.com/JayPengX/Shared-Proxy/actions'],
-  ['Cloudflare Workers', 'https://dash.cloudflare.com/?to=/:account/workers-and-pages'], ['Cloudflare D1', 'https://dash.cloudflare.com/?to=/:account/workers/d1'], ['GitHub', 'https://github.com/JayPengX?tab=repositories']
+  ['Shared-Proxy Actions', 'https://github.com/JayPengX/Shared-Proxy/actions'],
+  ['Cloudflare Workers', 'https://dash.cloudflare.com/?to=/:account/workers-and-pages'], ['Cloudflare D1', 'https://dash.cloudflare.com/?to=/:account/workers/d1'], ['Cloudflare R2', 'https://dash.cloudflare.com/?to=/:account/r2/overview'], ['Cloudflare 帳單', 'https://dash.cloudflare.com/?to=/:account/billing'], ['Cloudflare 通知', 'https://dash.cloudflare.com/?to=/:account/notifications'], ['GitHub', 'https://github.com/JayPengX?tab=repositories']
 ];
 $('links').replaceChildren(...LINKS.map(([n, href]) => el('a', { href, target: '_blank', rel: 'noopener', text: n })));
 
