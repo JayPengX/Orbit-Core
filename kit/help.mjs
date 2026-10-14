@@ -336,8 +336,8 @@ export const HELP = {
         'Orbit 的課表 App。打開就知道現在是哪一節、還剩幾分鐘、下一節是什麼。課表存在 Quadra Pass，登入的每台裝置都一樣。'
       ]],
       ['tabs', '畫面', [
-        '主畫面：目前這一節、倒數和下一節；下面是今天的全部課程，點一節看詳細資料。',
-        '設定面板：新增或修改課表，也可以拍課表照片讓 AI 匯入，或用一句話請 AI 修改；外觀和備份也在這裡。'
+        '主畫面：目前這一節、倒數和下一節；下面是今天的全部課程，點一節看詳細資料（一週哪幾天、第幾節上這門課）。今天的課上完了，就換成下一個上課日的課。',
+        '設定面板：新增或修改課表，也可以拍課表照片讓 AI 匯入，或用一句話請 AI 修改；外觀和備份也在這裡。倒數活動打開「結束後自動刪除」，活動過了就自己刪掉。'
       ]],
       ['share', '分享課表', [
         '課表只有建立它的 Quadra Pass 能編輯。要分享時按「產生分享金鑰」（24 小時內有效），對方在自己的 Orbit Class 輸入就得到一份自己的副本。'
@@ -351,8 +351,8 @@ export const HELP = {
         'Orbit’s class schedule app: open it to see the period now, the minutes left and what’s next. The schedule lives on your Quadra Pass, the same on every device you sign in on.'
       ]],
       ['tabs', 'The screens', [
-        'The main screen: the current period, its countdown and the next; below, the whole day, each period tappable for details.',
-        'The settings panel: add or change the schedule, import it from a photo with AI or change it in a sentence; appearance and backups too.'
+        'The main screen: the current period, its countdown and the next; below, the whole day, each period tappable for details (which days and periods it meets). Once today’s classes are over, it shows the next school day’s.',
+        'The settings panel: add or change the schedule, import it from a photo with AI or change it in a sentence; appearance and backups too. In 倒數活動, “Delete when over” clears a countdown once it has passed.'
       ]],
       ['share', 'Sharing a schedule', [
         'Only the Quadra Pass that made a schedule edits it. To share it, make a share key (valid 24 hours): entering it in their own Orbit Class gives a classmate their own copy.'
