@@ -1125,6 +1125,18 @@ function makeSession(app, { lang, heartbeat }) {
   const emit = (name, value) => (listeners[name] || []).forEach(fn => fn(value));
   let token = '';
   let tokenAt = 0;
+  // The session's token kept on this device with its time (each app's own:
+  // the apps share one origin), so a cold start's first data call goes out
+  // with it rather than after a sign-in round trip (every opening of a
+  // home-screen app iOS had closed waited on one: Weather's forecast a second
+  // or more later). Taken only for the account signed in here and well inside
+  // its 20 minutes (quadra-token.js SESSION_MS); the refresh token beside it
+  // is the stronger key already. Gone with the account (signedOut, wipeDevice).
+  const tokenKey = `quadra.token:${app}`;
+  try {
+    const kept = JSON.parse(readStore(tokenKey) || 'null');
+    if (kept?.t && kept.account && kept.account === storedAccount() && Date.now() - kept.at < 12 * 60_000) [token, tokenAt] = [kept.t, kept.at];
+  } catch {}
   let active = false;
   let live = null;
   let wallet = cachedWallet();
@@ -1183,6 +1195,7 @@ function makeSession(app, { lang, heartbeat }) {
     if (data.token) {
       token = data.token;
       tokenAt = Date.now();
+      writeStore(tokenKey, JSON.stringify({ t: token, at: tokenAt, account: storedAccount() }));
     }
     if (data.wallet) setWallet(data.wallet);
     if (typeof data.payload === 'string') cachePayload(app, storedAccount(), data.payload);
@@ -1207,6 +1220,9 @@ function makeSession(app, { lang, heartbeat }) {
   }
   // A usable token: the one held, the sign-in already on its way, or a new one.
   async function freshToken() {
+    // One in hand and young: used as it is, not held for a refresh under way
+    // (the sign-in's, at every opening).
+    if (token && Date.now() - tokenAt <= 15 * 60_000) return;
     if (refreshing) await refreshing.catch(() => {});
     if (!token || Date.now() - tokenAt > 15 * 60_000) await (refreshing || refresh({ claim: false }));
   }
@@ -1225,7 +1241,7 @@ function makeSession(app, { lang, heartbeat }) {
     // An account was signed in here: everything of it goes. (Never signed
     // in, a token asked for by a data fetch: nothing to wipe.)
     if (had) wipeDevice();
-    else for (const k of [KEY.refresh, KEY.account, KEY.wallet, payloadKey(app)]) writeStore(k, null);
+    else for (const k of [KEY.refresh, KEY.account, KEY.wallet, payloadKey(app), tokenKey]) writeStore(k, null);
     token = '';
     wallet = null;
     active = false;

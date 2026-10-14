@@ -203,6 +203,36 @@ test('token requests made together share one sign-in call to the Worker', async 
   assert.equal(calls.length, 1);
 });
 
+test("a cold start uses its app's own kept token while it's young and the account's, without waiting on the sign-in", async () => {
+  const claims = Buffer.from(JSON.stringify({ k: 'ref', d: 'abcdef0123456789abcdef', s: 'S', g: 0, e: 9e15 })).toString('base64url');
+  const calls = [];
+  globalThis.fetch = async (url, init = {}) => {
+    calls.push(JSON.parse(init.body || '{}').op);
+    await new Promise(r => setTimeout(r, 30));
+    return new Response(JSON.stringify({ token: 'new', wallet: { entries: [] }, active: true }), { status: 200 });
+  };
+  const fresh = (app, kept) => {
+    store.clear();
+    store.set('quadra.refresh', `${claims}.sig`);
+    store.set('quadra.account', 'abcdef0123456789');
+    if (kept) store.set(`quadra.token:${kept.app || app}`, JSON.stringify({ t: 'kept', at: Date.now() - (kept.ago || 0), account: kept.account || 'abcdef0123456789' }));
+    calls.length = 0;
+    return kit.quadraSession(app, { heartbeat: 1e9 });
+  };
+  // Young, this account's: used at once, no call to the Worker; a new one, once made, kept in its place.
+  let s = fresh('vocab', { ago: 5 * 60_000 });
+  assert.equal(await s.ensureToken(), 'kept');
+  assert.deepEqual(calls, []);
+  assert.equal(await s.ensureToken({ renew: true }), 'new');
+  assert.equal(JSON.parse(store.get('quadra.token:vocab')).t, 'new', 'the new one kept');
+  // Another account's, too old, or another app's: a sign-in first.
+  for (const [app, kept] of [['weather', { account: 'ffffffffffffffff' }], ['transit', { ago: 13 * 60_000 }], ['orbit', { app: 'odds' }]]) {
+    s = fresh(app, kept);
+    assert.equal(await s.ensureToken(), 'new', app);
+    assert.equal(calls[0], 'refresh', app);
+  }
+});
+
 test('the data proxy turning a token away (its secret changed) gets a new one at once, and the ask again', async () => {
   store.clear();
   const claims = Buffer.from(JSON.stringify({ k: 'ref', d: 'abcdef0123456789abcdef', s: 'S', g: 0, e: 9e15 })).toString('base64url');
