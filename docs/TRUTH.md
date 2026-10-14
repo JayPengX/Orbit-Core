@@ -596,19 +596,25 @@ On top of them, **apps put live knowledge over slower copies** (§8).
 - **Emoji only as standalone icons**, never in titles or chips; no ✓ or ★
   in chips, no sport emoji over lists. Weather draws its own pictures (a
   test fails if an emoji reaches the page).
-- **Every app looks like a native iOS 26 app, from the kit.** iOS's system
-  colours (grouped grey page, white cells; true black and #1c1c1e in the
-  dark), one glass material for what floats (`--q-glass`, `--q-glass-rim`:
-  the top-right buttons grouped in one capsule, the tab bar, alerts,
-  banners), capsule buttons and chips, sheets floating with deep corners,
-  and presses that give with iOS's spring. An app uses these tokens and
-  q- components rather than drawing its own outlines and shadows. Glass is
-  Apple's, checked against the real thing, never generic glassmorphism.
-- One look across the family: the kit's tab bar, sheets that swipe down,
-  haptics on taps, dark where the app is dark (Weather and Transit), and
-  Orbit Class's Liquid Glass kept close to iOS's own: light at the rim and
-  no outline rings. The loading screen is plain (the page's colour, the
-  app's mark), never a gradient.
+- **Every app looks and moves like a native iOS 27 app, from the kit**
+  (the owner, 2026-10-14: "super iOS/Safari (iOS 27)… scrap everything if
+  necessary… the UI kit used in all repos, not custom UI unless it's truly
+  custom"). The kit (`quadra.css`, `ui.mjs`) is the one design system:
+  iOS's system colours and semantic greys (grouped page, cells; black and
+  #1c1c1e in the dark), Liquid Glass on whatever floats (the tab bar and its
+  accessory, the top buttons in one capsule, alerts, menus, banners,
+  toasts), San Francisco's text styles, capsule buttons and chips, a
+  segmented control whose thumb slides, iOS 26's switch, the search
+  capsule, inset-grouped lists, sheets floating inside the screen's edges
+  with deep corners and a centred title, and SwiftUI's springs for every
+  movement. An app uses these and draws its own only for what is truly its
+  own (a pitch, a map, a chart, a ticket); never a copy of a control the
+  kit has. Glass is Apple's, checked against the real thing (the iOS 27
+  simulator on the owner's Mac), never generic glassmorphism.
+- One look across the family: dark where the app is dark (Weather and
+  Transit), Orbit Class's and Passion Beats' pages on the kit's tokens too.
+  The loading screen is plain (the page's colour, the app's mark), never a
+  gradient.
 - **Numbers read like a broker's or a sportsbook's**: NT$ with separators,
   prices without cents from 1,000 up, two decimals where Taiwan's quotes
   have them, a percentage chip beside its number, one red for a loss.
@@ -819,3 +825,10 @@ What was decided, so it isn't undone. Newer calls win.
   Shared-Proxy this file, `docs/HANDOFF.md` (the state now) and
   `docs/OWNER-STEPS.md`; the history is the git log. The plans that were
   built (Cloudflare, Weather) and the old handoffs folded in and deleted.
+- 2026-10-14: iOS 27 for every app (§11): the kit rebuilt as one design
+  system (tokens, glass, springs, controls, `kit/ui.mjs`) and every app's
+  own copies of its controls replaced by the kit's.
+- 2026-10-14: a game is over the moment the rules say so (Sports
+  `overByRule`: an NBA 4th over with the scores apart, MLB's home side
+  ahead in the middle of the 9th…), not when ESPN marks it minutes later;
+  比賽資訊 says when it ended.
