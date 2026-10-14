@@ -1,5 +1,6 @@
 # A Worker's live logs for a few minutes (Run workflow, by hand): what a cron
-# or a request printed, without signing in to Cloudflare. Read-only.
+# or a request printed, without signing in to Cloudflare; or (cpu) where its
+# CPU goes, by route and cron. Read-only.
 name: Tail a Worker
 on:
   workflow_dispatch:
@@ -12,6 +13,10 @@ on:
       minutes:
         description: How long to listen (1-15)
         default: '6'
+      cpu:
+        description: Instead of the logs, each route's and cron's count and CPU (ms) summed
+        type: boolean
+        default: false
 jobs:
   tail:
     runs-on: ubuntu-latest
@@ -45,8 +50,21 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       - name: Listen
-        run: timeout "$(( ${MINUTES:-6} * 60 ))" npx --yes wrangler@4 tail "$WORKER" --format pretty || true
+        run: |
+          if [ "$CPU" != "true" ]; then timeout "$(( ${MINUTES:-6} * 60 ))" npx --yes wrangler@4 tail "$WORKER" --format pretty || true; exit 0; fi
+          (timeout "$(( ${MINUTES:-6} * 60 ))" npx --yes wrangler@4 tail "$WORKER" --format json || true) | node -e '
+            const by = {}; let buf = "";
+            const add = e => {
+              const r = e.event?.request, c = e.event?.cron;
+              const u = r ? new URL(r.url) : null;
+              const key = c ? `cron ${c}` : u ? `${r.method} ${u.pathname}${u.pathname === "/sports-proxy" ? (u.searchParams.has("batch") ? " batch" : " " + (u.searchParams.get("url") || "").split("/")[2]) : ""}` : (e.eventType || "other");
+              const k = (by[key] ||= { n: 0, cpu: 0, wall: 0 });
+              k.n++; k.cpu += e.cpuTime || 0; k.wall += e.wallTime || 0;
+            };
+            process.stdin.on("data", d => { buf += d; let i; while ((i = buf.indexOf("\n}\n")) >= 0) { const one = buf.slice(0, i + 2); buf = buf.slice(i + 3); try { add(JSON.parse(one)); } catch {} } });
+            process.stdin.on("end", () => { try { add(JSON.parse(buf)); } catch {} const rows = Object.entries(by).sort((a, b) => b[1].cpu - a[1].cpu); const all = rows.reduce((s, [, v]) => s + v.cpu, 0); console.log("cpu ms in all:", all); for (const [k, v] of rows) console.log(String(v.cpu).padStart(8), String(v.n).padStart(6), String(Math.round(v.wall)).padStart(9), k); });'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           WORKER: ${{ inputs.worker }}
           MINUTES: ${{ inputs.minutes }}
+          CPU: ${{ inputs.cpu }}
