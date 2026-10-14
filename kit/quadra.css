@@ -1285,7 +1285,8 @@ button,
   gap: 12px;
   margin: 0 calc(-1 * var(--q-margin)) 8px;
   padding: 16px var(--q-margin) 10px;
-  background: linear-gradient(var(--q-sheet) 70%, color-mix(in srgb, var(--q-sheet) 0%, transparent));
+  /* Solid, as iOS's sheet bar: a fade at its foot let the cards scrolling under it show through as part of the head. */
+  background: var(--q-sheet);
 }
 .q-sheet-head h2 {
   margin: 0;
