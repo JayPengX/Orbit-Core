@@ -9,16 +9,13 @@
 //   POST /play { op: 'scratch', id, card }   a card bought, its prize drawn
 //        here: { ticket, wallet }
 //   POST /play { op: 'reveal', id }          scratched: its prize paid
-//   POST /play { op: 'tickets-open', tickets }  tickets bought before the
-//        lock-down (their cost in the wallet from before PLACE_SINCE),
-//        watched to be paid
 //   cron (with the slips): drawn tickets settled from Taiwan Lottery's results
 //
 // A ticket's prize goes into the wallet as `odds:prize-<id>`, Play's ledger's
 // own id: Play settles the ticket on screen from the same draw and the same
 // tables, so the same amount, never twice.
 import { GAMES, buyTicket, settleTicket, drawFor } from './kit/play-lottery.mjs';
-import { CARDS, drawPrize, tiersOf } from './kit/play-scratch.mjs';
+import { CARDS, drawPrize } from './kit/play-scratch.mjs';
 import { updateWallet, WALLET_COLLECTION, parseWallet, poolBalance } from './eco.js';
 
 export const TICKET_COLLECTION = 'odds-tickets';
@@ -90,7 +87,7 @@ async function watch(env, deps, account, tickets, now) {
 }
 
 // The /play ops above (null: not one of them).
-export async function handleLotto(body, env, account, deps, now, PLACE_SINCE) {
+export async function handleLotto(body, env, account, deps, now) {
   if (body.op === 'tickets') {
     const asked = (Array.isArray(body.tickets) ? body.tickets : []).slice(0, MAX_TICKETS);
     const tickets = [];
@@ -128,19 +125,9 @@ export async function handleLotto(body, env, account, deps, now, PLACE_SINCE) {
     await deps.fsDelete(env, TICKET_COLLECTION, key);
     return { prize, ...(result ? { wallet: result.wallet } : {}) };
   }
-  if (body.op === 'tickets-open') {
-    // Bought before the lock-down: their cost in the wallet from before it.
-    const wallet = await readWallet(env, deps, account);
-    const before = new Set((wallet?.entries || []).filter(e => e.app === 'odds' && e.kind === 'lottery' && e.t < PLACE_SINCE).map(e => e.id.slice('odds:lotto-'.length)));
-    const tickets = (Array.isArray(body.tickets) ? body.tickets : [])
-      .slice(0, MAX_TICKETS)
-      .filter(x => x && x.status === 'open' && TICKET_ID.test(String(x.id)) && before.has(String(x.id)) && (GAMES[x.game] ? x.draw?.at > 0 : CARDS[x.card]))
-      // (A card's prize one of its own tiers, or nothing.)
-      .filter(x => !x.card || [0, ...tiersOf(x.card).map(t => t.prize)].includes(Number(x.prize)))
-      .map(x => (x.card ? { id: x.id, t: x.t, game: x.game, card: x.card, cost: x.cost, prize: Number(x.prize) || 0, seed: x.seed, status: 'open' } : { id: x.id, t: x.t, game: x.game, draw: x.draw, sel: x.sel, bets: x.bets, multiple: x.multiple, cost: x.cost, status: 'open' }));
-    await watch(env, deps, account, tickets, now);
-    return { watching: tickets.length };
-  }
+  // Tickets bought before the lock-down were handed over once each; closed
+  // 2026-10-14 (a ticket handed over could name its own numbers or prize).
+  if (body.op === 'tickets-open') return { watching: 0 };
   return null;
 }
 

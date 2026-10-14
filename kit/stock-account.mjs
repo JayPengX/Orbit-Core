@@ -766,7 +766,7 @@ export function processOrders(account, quotes, rates, now = Date.now()) {
 }
 
 // The proxy's fills (the owner, 2026-10-14: Securities' orders filled by the
-// proxy, as Play's bets are): { orderId: { quote, t } } from its own fresh
+// proxy, as Play's bets are): { orderId: { quote, t, twd } } from its own fresh
 // quote (Shared-Proxy stock-fill.js), each applied to its open order at
 // that price and moment; the account's own rules (cash, shares, the
 // spread, costs) as fillOrder has them. Orders it hasn't filled stay open.
@@ -775,9 +775,11 @@ export function applyFills(account, fills, rates, now = Date.now()) {
   const filled = [];
   const rejected = [];
   for (const order of account.orders.filter(o => o.status === 'open' && fills?.[o.id]).sort(byTime)) {
-    if (!rates?.[order.currency]) continue;
     const f = fills[order.id];
-    const r = fillOrder(next, order, f.quote, rates, Math.max(now, f.t), f.t);
+    // The proxy's NT$ rate for its currency, where it gave one.
+    const at = f.twd > 0 ? { ...rates, [order.currency]: f.twd } : rates;
+    if (!at?.[order.currency]) continue;
+    const r = fillOrder(next, order, f.quote, at, Math.max(now, f.t), f.t);
     next = r.account;
     if (r.fill) filled.push(r.fill);
     else rejected.push(r.order);

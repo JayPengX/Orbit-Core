@@ -1050,9 +1050,10 @@ async function sportsToken(env, app = 'odds') {
 // (The sports proxy is this Worker's own route: called in place, its cache
 // writes kept within this call.)
 const inPlace = { waitUntil: p => p?.catch?.(() => {}), passThroughOnException() {} };
-const priceReads = env => ({
+// (`within`: every read on a copy at most that many seconds old; a live bet's second look.)
+const priceReads = (env, within) => ({
   read: async (url, trim = '') => {
-    const ask = `https://orbit-workers-proxy.quadra/sports-proxy?url=${encodeURIComponent(url)}&app=odds${trim ? `&trim=${encodeURIComponent(trim)}` : ''}&qt=${encodeURIComponent(await sportsToken(env))}`;
+    const ask = `https://orbit-workers-proxy.quadra/sports-proxy?url=${encodeURIComponent(url)}&app=odds${trim ? `&trim=${encodeURIComponent(trim)}` : ''}${within != null ? `&within=${within}` : ''}&qt=${encodeURIComponent(await sportsToken(env))}`;
     const res = await handleSports(new Request(ask), env, inPlace, {}, 'worker');
     if (!res.ok) throw new Error(`proxy ${res.status}`);
     return res.json();
@@ -1077,7 +1078,7 @@ const builderProxy = env => async (url, trim = '') => {
   const res = await handleSports(new Request(ask), env, inPlace, {}, 'worker');
   return res.ok ? res.json() : null;
 };
-const playDeps = env => ({ ...ECO_DEPS, read: readSource, prices: priceReads(env), notify: (account, make) => notifyNow(env, account, 'odds', 'slip', make) });
+const playDeps = env => ({ ...ECO_DEPS, read: readSource, prices: priceReads(env), livePrices: priceReads(env, 2), notify: (account, make) => notifyNow(env, account, 'odds', 'slip', make) });
 
 // ==== Routing ================================================================
 

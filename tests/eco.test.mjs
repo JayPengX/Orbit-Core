@@ -713,7 +713,10 @@ test('the admin panel: an account found by its pass, a record undone, one app cl
 
 test('the lock-down: an app adds no money to the pool (the Worker does); a slip from before refunded once, only its stake', async () => {
   const t = setup();
+  // (The clock after the lock-down.)
+  t.advance(Date.parse('2026-10-13T00:00:00Z') - 1_700_000_000_000);
   const acct = await newPass(t, 'odds');
+  acct.docId = await t.deps.sha256Hex(acct.passcode);
   const send = entries => t.call('PATCH', `${t.qt(acct.token)}&app=odds`, { wallet: { entries } });
   const before = Date.parse('2026-10-10T00:00:00Z');
   const w = await send([
@@ -724,11 +727,20 @@ test('the lock-down: an app adds no money to the pool (the Worker does); a slip 
   ]);
   assert.equal(w.status, 200);
   assert.equal(w.data.pool, acct.pool - 600);
-  // The old slip's stake back, once, at its stake; never more, never a newer slip's.
+  // The phone's date isn't the entry's: dated before the lock-down, it's still new.
+  assert.ok(w.data.wallet.entries.filter(e => e.id.startsWith('odds:stake-')).every(e => e.t > before));
+  const r0 = await send([{ id: 'odds:refund-old', t: 3, app: 'odds', kind: 'refund', amount: 300 }]);
+  assert.equal(r0.data.pool, acct.pool - 600);
+  // A stake really in the wallet from before: its stake back, once, at its
+  // stake; never more, never a newer slip's.
+  const doc = t.store.get(`eco-wallets/${acct.docId}`);
+  const wallet = JSON.parse(doc.payload);
+  wallet.entries.push({ id: 'odds:stake-older', t: before, app: 'odds', kind: 'stake', amount: -300 });
+  t.store.set(`eco-wallets/${acct.docId}`, { ...doc, payload: JSON.stringify(wallet) });
   const r = await send([
-    { id: 'odds:refund-old', t: 3, app: 'odds', kind: 'refund', amount: 300 },
+    { id: 'odds:refund-older', t: 3, app: 'odds', kind: 'refund', amount: 300 },
     { id: 'odds:refund-new', t: 3, app: 'odds', kind: 'refund', amount: 300 }
   ]);
-  assert.equal(r.data.pool, acct.pool - 300);
-  assert.equal((await send([{ id: 'odds:refund-old', t: 4, app: 'odds', kind: 'refund', amount: 9_000 }])).data.pool, acct.pool - 300);
+  assert.equal(r.data.pool, acct.pool - 600);
+  assert.equal((await send([{ id: 'odds:refund-older', t: 4, app: 'odds', kind: 'refund', amount: 9_000 }])).data.pool, acct.pool - 600);
 });
