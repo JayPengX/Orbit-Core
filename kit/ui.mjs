@@ -91,10 +91,8 @@ export function sheet({ title = '', body = [], onClose = () => {}, cls = '', lea
   let done = false;
   const shut = () => {
     if (done) return;
-    if (reduced()) return d.close();
-    d.classList.add('q-settle');
-    d.style.transform = 'translateY(110%)';
-    setTimeout(() => d.close(), 260);
+    // (quadra.mjs's closeSheet: the slide down, every app's sheets alike.)
+    (globalThis.quadraCloseSheet || (x => x.close()))(d);
   };
   d.addEventListener('close', () => {
     if (done) return;
