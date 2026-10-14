@@ -30,6 +30,11 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
 - **Deploys:** `deploy.yml` ran only for listed files and missed
   `builders/**` and `stock-fill.js`; it now runs for any root module,
   `builders/`, `kit/`, `locales/` and the tomls.
+- **The old `sports-proxy`:** no code calls it and 10 minutes of its logs
+  had no request; its forwarder and toml are gone, and `deploy.yml` deletes
+  the Worker from 2026-10-20 (`wrangler delete sports-proxy`, run outside the
+  checkout; the workflow is also scheduled that day). `guard.js` treats a
+  404 for a Worker as nothing to stop or start.
 - **Batches of 24** (proxy `BATCH_MAX`, kit's): Sports' opening went from 8
   batched requests to 5; a live 24-read batch answered all 200 in 2.2 s.
 - **Free-plan reasons** rewritten where they were stale (Asian days, Transit's

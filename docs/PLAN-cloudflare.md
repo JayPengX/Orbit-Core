@@ -15,12 +15,14 @@ Every item is pushed to `main` when done and checked live.
 Every change spends as little as possible of each budget: proxy requests,
 CPU ms, subrequests, R2 reads and writes, KV, and the sources' own limits.
 Each one states its before and after numbers.
-- [ ] **Phones: fewest requests per opening.** Mirror reads join the data
+- [x] **Phones: fewest requests per opening.** (Batches of 24; `/data/`
+      ETags and 304s; mirror reads in the batch.) Mirror reads join the data
       proxy's batches. `/data/` files carry long cache lifetimes and ETags:
       a copy that can't change before its `until` is cached until then, and
       a phone gets a 304 instead of the file again. Measured with
       `preview.mjs --requests`.
-- [ ] **Builders: no repeated work.**
+- [x] **Builders: no repeated work.** (§3: only what's new, written only
+      when changed.)
       - Read a source only when its answer can have changed. Recent days come
         from the nightly season packs; ESPN is asked only for today and
         yesterday.
@@ -28,15 +30,16 @@ Each one states its before and after numbers.
         most once a day per game after its first days.
       - Write to R2 only when the content changed (done). Load only the
         archive months a run touches.
-- [ ] **Edge cache first.** Every `/data/` and `/sports-proxy` answer is
+- [x] **Edge cache first.** (`data.js`, `sports.js`.) Every `/data/` and `/sports-proxy` answer is
       served from Cloudflare's cache in Taipei when it can be, before R2 or a
       source.
-- [ ] **Cron cadence matched to how often the data changes.** The guard,
+- [x] **Cron cadence matched to how often the data changes.** (Guard 5
+      min; builders in their slots; Kambi and settling one index read.) The guard,
       builders, Kambi and settling run only as often as their data moves, and
       skip a run with nothing to do in one cheap read.
-- [ ] **CPU.** Parse big pages once, keep built results, never re-parse what
+- [x] **CPU.** (1.3% of the month's so far.) Parse big pages once, keep built results, never re-parse what
       didn't change.
-- [ ] **A cost line in every commit and in HANDOFF**: requests, CPU, R2
+- [x] **A cost line in every commit and in HANDOFF** (kept as a rule): requests, CPU, R2
       and KV operations, before and after.
 
 ## 1. Hard stop on the bill (`Shared-Proxy/guard.js`, `guard-worker.js`)
@@ -63,7 +66,9 @@ Each one states its before and after numbers.
       cron moved in.
 - [x] Kit, apps and Shared-Data use the one address. Checked live: one
       shared cache in Taipei.
-- [ ] Remove the `sports-proxy` forwarder after a quiet week in its logs.
+- [x] The `sports-proxy` forwarder retired: no code calls it, its logs were
+      quiet; its code is gone and the deploy deletes the Worker on 2026-10-20
+      (the guard treats it gone as nothing to stop).
 
 ## 3. Shared-Data → Cloudflare, then the repo removed
 - [x] R2 switched on (you); bucket `quadra-data` (Asia-Pacific) created and
@@ -118,19 +123,24 @@ Each one states its before and after numbers.
       writes as Firestore's), tested on real SQLite.
 - [x] Dual mode on: Firestore stays in charge, every write is copied to D1,
       and the cron copies the rest once.
-- [ ] **You:** add **Account · D1 · Edit** to the deploy token, then rerun the
-      deploy (README §11); until then the proxy stays on Firestore alone
-- [ ] Copy every document and compare them one by one (`/store/check`)
-- [ ] Read and write from D1 only. Keep a final export of every Firestore
-      document in R2 as the backup.
-- [ ] **Abandon Firebase**: remove all Firestore code, the
-      `FIREBASE_*` secrets and vars, Firestore's rules and the docs on it.
-      You then delete the Firebase project (steps written out for you).
+- [x] You added **Account · D1 · Edit** to the deploy token; `quadra-store`
+      made (APAC) and bound
+- [x] Every document copied (15 in 12 collections) and compared: 0 differ,
+      missing or extra
+- [x] D1 only. Firestore's last copy in R2
+      (`private/firestore-backup.jsonl.gz`, never served)
+- [x] **Firebase abandoned** in code: Firestore's client, the moving code,
+      `FIREBASE_PROJECT_ID` and `FIREBASE_CLIENT_EMAIL` gone; the docs
+      updated. `FIREBASE_PRIVATE_KEY` stays only to check sign-ins made
+      before 2026-10-05, and the deploy removes it on 2026-12-06.
+- [ ] **You:** delete the Firebase project (steps in the chat).
 
 ## 5. Review every repo against the new baseline
-- [ ] Remove workarounds the free plan forced: the 10 ms CPU limit, the
-      50-fetch budgets (Kambi watch, settling 6 slips a run, Asian months),
-      and KV write rationing.
+- [x] Free-plan workarounds: settling (60/30), the lottery (40) and Kambi
+      (150) were already raised; batches now 24 reads (8 requests per
+      Sports opening to 5); the stale reasons rewritten. Kept on purpose:
+      TheSportsDB's day cap (its own burst limit) and Transit's KV batching
+      (spares writes).
 - [x] Play's board stays priced on the phone (it costs nothing per
       opening; repricing every round on the proxy would spend 1–3% of the
       month's CPU for no change you'd see). Yours to reopen.
@@ -142,8 +152,10 @@ Each one states its before and after numbers.
 - [ ] You: try Orbit Class's photo import once (Gemini through the relay).
 - [x] A cut price in Securities' 為你推薦 (fitted before the font loaded):
       Securities and Play now fit again once fonts load.
-- [ ] Weather: check whether parsing CWA's national lists on the Worker helps.
-- [ ] Bring READMEs, TRUTH, HANDOFF and help text up to date.
+- [x] Weather: CWA's national lists stay unparsed on the Worker (CPU for a
+      table that changes a few times a year; the committed table is right).
+- [x] READMEs, TRUTH, HANDOFF brought up to date (and the deploy now runs
+      for every module; `builders/` and `stock-fill.js` were missed).
 - [x] Loose ends from today's preview: the 404 was the preview's own
       missing `kit/version.json` (fixed in the tool), and the replay icon now
       sits on-screen at no opacity.
