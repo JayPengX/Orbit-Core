@@ -1192,6 +1192,16 @@ button,
     margin: auto;
   }
 }
+/* A full-height sheet (iOS's large detent, .q-full): on a phone it meets the
+   screen's sides and foot, as iOS 26's does at full height, not floating 8 px
+   in with the page behind showing down its sides. */
+@media (max-width: 719px) {
+  dialog.q-sheet.q-full {
+    width: 100vw;
+    margin: auto 0 0;
+    border-radius: var(--q-r-sheet) var(--q-r-sheet) 0 0;
+  }
+}
 .q-sheet::backdrop {
   background: var(--q-dim);
 }
