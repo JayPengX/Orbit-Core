@@ -63,7 +63,7 @@ const parse = payload => {
 
 export async function handleKambiRequest(request, env, headers, ip, deps) {
   const { json, errorJson, upstreamFailed } = deps;
-  if (!storeReady(env)) return errorJson('MISSING_FIREBASE_CONFIG', 500, headers, request);
+  if (!storeReady(env)) return errorJson('MISSING_STORE', 500, headers, request);
   try {
     if (request.method === 'GET') {
       const limited = await deps.rateLimitResponse(env, ip, 'kambi:read', LIMITS.read, headers, request);

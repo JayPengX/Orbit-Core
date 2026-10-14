@@ -10,6 +10,37 @@ All repos develop on a session branch (lately `claude/happy-wright-eqzr16`) and 
 
 
 
+## Firebase gone: the Pass's store on D1; the free plan's last limits out (2026-10-14, pushed to `main`)
+
+- **D1** (`quadra-store`, APAC, binding `STORE`): made by the deploy once the
+  deploy token (an Account API Token) had **Account · D1 · Edit**. The cron
+  copied every Firestore document (15 in 12 collections), compared clean (0
+  differ, missing or extra), then wrote Firestore's last copy to R2
+  (`private/firestore-backup.jsonl.gz`, 66 KB, never served by `/data/`).
+  Then D1 alone, and Firestore's client (Google's OAuth, the REST calls),
+  `STORE_MODE`, the moving code and `FIREBASE_PROJECT_ID` removed.
+  `doc-store.js` is D1 only; the "Firebase configured" checks are
+  `storeReady` (D1 bound); the error `MISSING_STORE`.
+- **Secrets:** `deploy.yml` takes `FIREBASE_CLIENT_EMAIL` (and any
+  `FIREBASE_PROJECT_ID`) off the proxy; `FIREBASE_PRIVATE_KEY` stays until
+  2026-12-06 only to check sign-ins signed before `ECO_TOKEN_SECRET`
+  (2026-10-05, 60 days), then the same step removes it (the workflow also
+  runs on 6 December for that). The Firebase project can be deleted now:
+  nothing reads it.
+- **Deploys:** `deploy.yml` ran only for listed files and missed
+  `builders/**` and `stock-fill.js`; it now runs for any root module,
+  `builders/`, `kit/`, `locales/` and the tomls.
+- **Batches of 24** (proxy `BATCH_MAX`, kit's): Sports' opening went from 8
+  batched requests to 5; a live 24-read batch answered all 200 in 2.2 s.
+- **Free-plan reasons** rewritten where they were stale (Asian days, Transit's
+  KV batching, the settle cron's fetches); Weather's CWA lists stay unparsed
+  on the Worker (CPU for a table that changes a few times a year).
+- **Big numbers** (Securities, Play): fitted again once fonts load; a price
+  fitted before the font came was cut (為你推薦's 1,443,000).
+- Cost: D1 rows replace Firestore calls (a few thousand a day against 25B
+  read / 50M written a month); about 3 fewer proxy requests per Sports
+  opening.
+
 ## Sports: MLB's batting orders and probable pitchers tappable (2026-10-14, pushed to `main`)
 
 The owner: 打序 / 先發 players weren't clickable. MLB's own list (where the

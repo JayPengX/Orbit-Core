@@ -5,7 +5,7 @@ import { lottoCron, TICKET_COLLECTION } from '../lotto.js';
 import { WALLET_COLLECTION } from '../eco.js';
 
 const ACCOUNT = 'b'.repeat(64);
-const env = { FIREBASE_PROJECT_ID: 'p', FIREBASE_CLIENT_EMAIL: 'e', FIREBASE_PRIVATE_KEY: 'k' };
+const env = { STORE: {} };
 const session = { d: ACCOUNT, s: 'sid', a: 'odds' };
 function setup(now, entries) {
   const store = new Map();

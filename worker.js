@@ -45,8 +45,7 @@ import { isAllowedOrigin, corsHeaders, json } from './http.js';
 import { handleData } from './data.js';
 import { handleStock } from './stock-fill.js';
 import { runBuilders, SLOTS as BUILD_SLOTS } from './builders/run.js';
-import { docStore, copyToD1, compareStores, backupToR2, storeReady } from './doc-store.js';
-import { gzip } from './builders/store.js';
+import { docStore, storeReady } from './doc-store.js';
 import { STATE_KEY as GUARD_STATE } from './guard.js';
 // The F1 lap log's Durable Object (f1-live.js), bound as F1_LOG.
 export { F1Log } from './f1-live.js';
@@ -949,12 +948,10 @@ async function handleNlEditRequest(request, env, headers, ip, ctx, session = nul
   );
 }
 
-// ==== Firestore (the Quadra Pass's store) =====================================
+// ==== The Quadra Pass's store: D1 (doc-store.js) =============================
 //
-// One Firebase service account, held here as secrets (FIREBASE_PROJECT_ID,
-// FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY): Firestore's own rules deny
-// every client, so this Worker is the only way in. Every document has one
-// string field, `payload`.
+// Every document has one string field, `payload`; only this Worker reads or
+// writes it.
 
 const CODE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
 // A random code (passes, session ids, keys): never 0, 1, O or I.
@@ -973,200 +970,9 @@ async function sha256Hex(text) {
     .join('');
 }
 
-function base64UrlFromBytes(bytes) {
-  let binary = '';
-  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-function base64UrlFromString(str) {
-  return base64UrlFromBytes(new TextEncoder().encode(str));
-}
-function pemToDer(pem) {
-  const b64 = pem
-    .trim()
-    .replace(/-----BEGIN PRIVATE KEY-----/, '')
-    .replace(/-----END PRIVATE KEY-----/, '')
-    // Handles pasting the key straight out of the downloaded JSON's
-    // `private_key` string value, literal backslash-n escapes and all,
-    // instead of the JSON-decoded value with real line breaks - a common
-    // copy-paste artifact since Cloudflare's secret box is a single text
-    // field either way. Order matters: this must run before the generic
-    // whitespace strip below, since a *real* newline is already whitespace
-    // but a literal `\n` (backslash then the letter n) is two ordinary,
-    // non-whitespace characters that would otherwise survive into the
-    // base64 string and corrupt it.
-    .replace(/\\n/g, '')
-    .replace(/\s+/g, '');
-  const binary = atob(b64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes.buffer;
-}
-
-// Cached per-isolate (module scope) so a burst of requests on the same
-// isolate reuses one access token instead of round-tripping to Google's
-// OAuth endpoint on every single Firestore call - the token is valid for an
-// hour, refetched a little early rather than right at expiry.
-let cachedFirebaseToken = null;
-async function getFirebaseAccessToken(env) {
-  const now = Math.floor(Date.now() / 1000);
-  if (cachedFirebaseToken && cachedFirebaseToken.expiry > now + 60) {
-    return cachedFirebaseToken.token;
-  }
-
-  const header = { alg: 'RS256', typ: 'JWT' };
-  const claim = {
-    iss: env.FIREBASE_CLIENT_EMAIL,
-    scope: 'https://www.googleapis.com/auth/datastore',
-    aud: 'https://oauth2.googleapis.com/token',
-    iat: now,
-    exp: now + 3600
-  };
-  const unsigned = `${base64UrlFromString(JSON.stringify(header))}.${base64UrlFromString(JSON.stringify(claim))}`;
-  const key = await crypto.subtle.importKey(
-    'pkcs8',
-    pemToDer(env.FIREBASE_PRIVATE_KEY),
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-  const signature = await crypto.subtle.sign(
-    'RSASSA-PKCS1-v1_5',
-    key,
-    new TextEncoder().encode(unsigned)
-  );
-  const jwt = `${unsigned}.${base64UrlFromBytes(new Uint8Array(signature))}`;
-
-  const response = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `grant_type=${encodeURIComponent('urn:ietf:params:oauth:grant-type:jwt-bearer')}&assertion=${encodeURIComponent(jwt)}`
-  });
-  if (!response.ok) {
-    throw new Error(`Google OAuth token exchange failed: ${await response.text()}`);
-  }
-  const data = await response.json();
-  cachedFirebaseToken = { token: data.access_token, expiry: now + (data.expires_in || 3600) };
-  return cachedFirebaseToken.token;
-}
-
-function firestoreDocUrl(env, collection, code) {
-  return `${firestoreBase(env)}/${encodeURIComponent(collection)}/${encodeURIComponent(code)}`;
-}
-function firestoreBase(env) {
-  return `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(env.FIREBASE_PROJECT_ID)}/databases/(default)/documents`;
-}
-async function firestoreErrorMessage(response) {
-  const errorJson = await response.json().catch(() => ({}));
-  return errorJson.error?.message || response.statusText || `HTTP ${response.status}`;
-}
-
-async function firestoreGet(env, collection, code) {
-  const token = await getFirebaseAccessToken(env);
-  const response = await fetch(firestoreDocUrl(env, collection, code), {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-  if (response.status === 404) return { exists: false, updateTime: '', payload: '' };
-  if (!response.ok) throw new Error(await firestoreErrorMessage(response));
-  const doc = await response.json();
-  return { exists: true, updateTime: doc.updateTime || '', payload: doc.fields?.payload?.stringValue || '' };
-}
-
-// /eco's writes (see eco.js): the single `payload` field, optionally only if the document is still as it was read
-// (`{ updateTime }`) or doesn't exist yet (`{ exists: false }`). A write that
-// lost that race throws an error marked `precondition`, and eco.js reads
-// and merges again.
-async function firestoreWrite(env, collection, code, payload, precondition) {
-  const token = await getFirebaseAccessToken(env);
-  let query = 'updateMask.fieldPaths=payload';
-  if (precondition?.updateTime) query += `&currentDocument.updateTime=${encodeURIComponent(precondition.updateTime)}`;
-  else if (precondition?.exists === false) query += '&currentDocument.exists=false';
-  const response = await fetch(`${firestoreDocUrl(env, collection, code)}?${query}`, {
-    method: 'PATCH',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fields: { payload: { stringValue: payload } } })
-  });
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
-    const error = new Error(body.error?.message || response.statusText || `HTTP ${response.status}`);
-    const status = body.error?.status || '';
-    if (precondition && (status === 'FAILED_PRECONDITION' || status === 'ALREADY_EXISTS' || status === 'NOT_FOUND' || response.status === 409)) error.precondition = true;
-    throw error;
-  }
-  const doc = await response.json();
-  return { updateTime: doc.updateTime || '' };
-}
-
-// Every document of a collection: [{ id, payload, updateTime }], a page at
-// a time (`limit`: stop after that many).
-// `idsOnly`: names without the payloads (a mask on a field no document has).
-async function firestoreList(env, collection, pageSize = 300, { limit = Infinity, idsOnly = false } = {}) {
-  const token = await getFirebaseAccessToken(env);
-  const out = [];
-  let pageToken = '';
-  do {
-    const response = await fetch(`${firestoreBase(env)}/${encodeURIComponent(collection)}?pageSize=${pageSize}${idsOnly ? '&mask.fieldPaths=_none' : ''}${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    if (!response.ok) throw new Error(await firestoreErrorMessage(response));
-    const data = await response.json();
-    for (const doc of data.documents || []) out.push({ id: decodeURIComponent(doc.name.split('/').pop()), payload: doc.fields?.payload?.stringValue || '', updateTime: doc.updateTime || '' });
-    pageToken = data.nextPageToken || '';
-  } while (pageToken && out.length < limit);
-  return out;
-}
-
-// The collections that exist (for the store's clean-up, eco-admin.js).
-async function firestoreCollections(env) {
-  const token = await getFirebaseAccessToken(env);
-  const response = await fetch(`${firestoreBase(env)}:listCollectionIds`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ pageSize: 100 })
-  });
-  if (!response.ok) throw new Error(await firestoreErrorMessage(response));
-  return (await response.json()).collectionIds || [];
-}
-
-// Up to 500 writes in one request: { delete: [collection, id] } or
-// { update: [collection, id, payload], updateTime? } (only if unchanged).
-// Each write stands alone: one that fails doesn't stop the rest.
-async function firestoreBatch(env, writes) {
-  const token = await getFirebaseAccessToken(env);
-  const name = (c, id) => `projects/${env.FIREBASE_PROJECT_ID}/databases/(default)/documents/${c}/${id}`;
-  const response = await fetch(`${firestoreBase(env)}:batchWrite`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      writes: writes.map(w =>
-        w.delete
-          ? { delete: name(...w.delete) }
-          : {
-              update: { name: name(w.update[0], w.update[1]), fields: { payload: { stringValue: w.update[2] } } },
-              updateMask: { fieldPaths: ['payload'] },
-              ...(w.updateTime ? { currentDocument: { updateTime: w.updateTime } } : {})
-            }
-      )
-    })
-  });
-  if (!response.ok) throw new Error(await firestoreErrorMessage(response));
-  return response.json();
-}
-
-// Deletes a document; one already gone counts as deleted.
-async function firestoreDelete(env, collection, code) {
-  const token = await getFirebaseAccessToken(env);
-  const response = await fetch(firestoreDocUrl(env, collection, code), {
-    method: 'DELETE',
-    headers: { Authorization: `Bearer ${token}` }
-  });
-  if (!response.ok && response.status !== 404) throw new Error(await firestoreErrorMessage(response));
-}
-
 // ---- /eco: the Quadra Pass (see eco.js) ------------------------------------
-// The Pass's store (doc-store.js): Firestore, D1, or both while moving (STORE_MODE).
-const FS = { get: firestoreGet, write: firestoreWrite, list: firestoreList, collections: firestoreCollections, batch: firestoreBatch, delete: firestoreDelete };
-const DOCS = docStore(FS);
+// The Pass's store (doc-store.js): D1.
+const DOCS = docStore();
 const ECO_DEPS = {
   json,
   errorJson,
@@ -1303,14 +1109,12 @@ export default {
       const g = JSON.parse((await env.RATE_LIMIT_KV?.get(GUARD_STATE).catch(() => null)) || 'null');
       return json(g ? { at: g.at, armed: g.armed, error: g.error || null, partial: g.partial || null, cpuWay: g.cpuWay || null, stopAt: g.stopAt, share: g.share || null, stopped: g.stopped ? { at: g.stopped.at, why: g.stopped.why } : null, period: g.period || null } : { ran: false }, 200, headers);
     }
-    // The Pass's store's move to D1 (doc-store.js): how the two compare,
-    // counts only (no document), from a localhost page (the dev door).
+    // The Pass's store (doc-store.js): each collection's count (no
+    // document), from a localhost page (the dev door).
     if (path === '/store/check' && request.method === 'GET') {
       if (!/^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin) || sessionLimited(`store:${ip}`, 2)) return errorJson('FORBIDDEN_ORIGIN', 403, headers, request);
-      if (!env.STORE) return json({ mode: env.STORE_MODE || 'firestore', d1: false }, 200, headers);
-      const copied = JSON.parse((await env.RATE_LIMIT_KV?.get('store:copied').catch(() => null)) || 'null');
-      const backup = JSON.parse((await env.RATE_LIMIT_KV?.get('store:backup').catch(() => null)) || 'null');
-      return json({ mode: env.STORE_MODE, copied, backup, compare: env.STORE_MODE === 'd1' ? null : await compareStores(env, FS) }, 200, headers);
+      if (!env.STORE) return json({ d1: false }, 200, headers);
+      return json({ d1: true, collections: await DOCS.count(env) }, 200, headers);
     }
     // A builder's job now (builders/run.js), by hand: Bearer DATA_PUSH_SECRET
     // (Shared-Proxy's build.yml). ?job=watch|cutouts|buses, or
@@ -1412,18 +1216,6 @@ export default {
     // Orbit Weather's scoring, once an hour (weather-skill.js).
     if (new Date(event.scheduledTime || Date.now()).getUTCMinutes() === 10) ctx.waitUntil(weatherCron(env).then(r => console.log('weather skill', JSON.stringify(r))).catch(e => console.log('weather skill failed', String(e))));
     if (!storeReady(env)) return;
-    // The store's move (doc-store.js): while dual, Firestore's documents copied
-    // into D1 once (what D1 has from a write since stays: it's newer), then
-    // all of Firestore backed up into R2 once (private/, never served).
-    if (env.STORE && env.STORE_MODE === 'dual' && env.RATE_LIMIT_KV && !(await env.RATE_LIMIT_KV.get('store:backup'))) {
-      const copied = await env.RATE_LIMIT_KV.get('store:copied');
-      ctx.waitUntil(
-        (copied
-          ? env.DATA && backupToR2(env, FS, { gzip }).then(r => env.RATE_LIMIT_KV.put('store:backup', JSON.stringify({ at: Date.now(), ...r })).then(() => console.log('store backed up', JSON.stringify(r))))
-          : copyToD1(env, FS).then(r => env.RATE_LIMIT_KV.put('store:copied', JSON.stringify({ at: Date.now(), ...r })).then(() => console.log('store copied', JSON.stringify(r))))
-        ).catch(e => console.log('store move failed', String(e)))
-      );
-    }
     // The live refreshes by how many people there are (capacity.js), every 6 hours.
     const at = new Date(event.scheduledTime || Date.now());
     if (at.getUTCMinutes() === 20 && at.getUTCHours() % 6 === 0) ctx.waitUntil(capacityCron(env, ECO_DEPS).then(r => console.log('capacity', JSON.stringify(r))).catch(e => console.log('capacity failed', String(e))));

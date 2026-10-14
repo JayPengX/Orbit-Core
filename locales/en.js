@@ -15,7 +15,7 @@ export default {
   MISSING_CONTEXT: 'Missing or invalid context',
   CONTEXT_TOO_LARGE: 'Context too large',
   SYNC_METHOD_NOT_ALLOWED: 'GET, POST, PATCH or DELETE only',
-  MISSING_FIREBASE_CONFIG: 'The worker has not configured its Firebase service account.',
+  MISSING_STORE: 'The worker has no store (D1) bound.',
   INVALID_PASSCODE: 'Invalid passcode',
   MISSING_PAYLOAD: 'Missing or invalid payload',
   SYNC_PASSCODE_NOT_FOUND: 'This sync passcode was not found.',

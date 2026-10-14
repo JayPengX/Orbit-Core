@@ -1246,7 +1246,7 @@ $('data-load').onclick = () => busy($('data-load'), () => { for (let i = session
 const LINKS = [
   ['Orbit Sports', '/Orbit-Sports/'], ['Quadra Play', '/Quadra-Play/'], ['Quadra 證券', '/Quadra-Securities/'], ['Orbit Words', '/Orbit-Words/'], ['Orbit Class', '/Orbit-Class/'], ['Orbit Weather', '/Orbit-Weather/'], ['Orbit Transit', '/Orbit-Transit/'],
   ['Shared-Data 索引', DATA + 'mirror/index.json'], ['Shared-Data Actions', 'https://github.com/JayPengX/Shared-Data/actions'], ['Shared-Proxy Actions', 'https://github.com/JayPengX/Shared-Proxy/actions'],
-  ['Cloudflare Workers', 'https://dash.cloudflare.com/?to=/:account/workers-and-pages'], ['Firebase', 'https://console.firebase.google.com/'], ['GitHub', 'https://github.com/JayPengX?tab=repositories']
+  ['Cloudflare Workers', 'https://dash.cloudflare.com/?to=/:account/workers-and-pages'], ['Cloudflare D1', 'https://dash.cloudflare.com/?to=/:account/workers/d1'], ['GitHub', 'https://github.com/JayPengX?tab=repositories']
 ];
 $('links').replaceChildren(...LINKS.map(([n, href]) => el('a', { href, target: '_blank', rel: 'noopener', text: n })));
 

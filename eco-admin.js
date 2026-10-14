@@ -76,8 +76,8 @@ export const ADMIN_TOKEN_HASH = '';
 export const RETIRED_COLLECTIONS = ['orbit-schedules', 'eco-links', 'stock-study-leagues'];
 // (A function: eco.js and this file import each other.)
 const keep = () => new Set([WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, KAMBI_COLLECTION, CONFIG_COLLECTION, ...Object.values(ECO_APPS).map(a => a.collection)]);
-// Firestore batch writes take up to 500 at a time; a call stops after this
-// many so it stays inside the Worker's limits.
+// The store's batches go 500 at a time; a call stops after this many so it
+// stays inside the Worker's limits.
 const PER_CALL = 1500;
 
 // A wallet as the apps write it now (`now`: for the looks, a Plus member's):

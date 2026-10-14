@@ -41,7 +41,10 @@ function unb64url(text) {
 // Workers have it, so the data proxy checks passes too), else one made from
 // the Firebase key (this Worker's only). When ECO_TOKEN_SECRET is first set,
 // tokens signed the old way still read until they run out (a pass's sign-in
-// lasts 60 days): nobody is signed out by the change.
+// lasts 60 days): nobody is signed out by the change. ECO_TOKEN_SECRET was
+// set on 2026-10-05, so the last of those ran out on 2026-12-04; Firebase
+// itself is gone (the store is D1), and deploy.yml takes FIREBASE_PRIVATE_KEY
+// off on 2026-12-06, after which `derived` is empty and only the secret signs.
 const earlier = new Map();
 export async function tokenSecret(env) {
   const derived = env.FIREBASE_PRIVATE_KEY ? b64url(new Uint8Array(await crypto.subtle.digest('SHA-256', enc.encode(`quadra-token:${env.FIREBASE_PRIVATE_KEY}`)))) : '';

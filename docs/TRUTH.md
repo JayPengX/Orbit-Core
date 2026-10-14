@@ -345,7 +345,7 @@ On top of them, **apps put live knowledge over slower copies** (§8).
   year. A run that can't tell which season it is wipes nothing. Each build
   adds what's new on top of what's built, never reads a finished thing
   again, and reads only for the leagues each app shows.
-- **Save the proxy, the APIs and Firebase quota.** Use the kit's
+- **Save the proxy, the APIs and the store's rows.** Use the kit's
   `proxyJson` (batched, cached in memory and on the device, failures held a
   minute). Read what's needed when it's needed. Keep built plans and boards
   on the phone and refresh only what's live (bus times, live scores). Poll
@@ -779,5 +779,8 @@ What was decided, so it isn't undone. Newer calls win.
   often as it changes, written only when it changed); the nightly mirror
   replaced by reading on demand; Shared-Data retired (archived). Firebase
   moves to Cloudflare next (D1), then is abandoned.
+- 2026-10-14: the Pass's store is D1 alone (`doc-store.js`); Firestore
+  copied, compared clean, backed up into R2 (`private/`), and its code and
+  secrets removed. The owner deletes the Firebase project.
 - 2026-10-14: Securities' orders filled by the proxy at its own quote, as
   Play's bets are placed and settled there (`stock-fill.js`).
