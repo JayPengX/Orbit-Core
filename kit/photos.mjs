@@ -10,8 +10,8 @@ import { CATALOG } from '#kit/catalog.mjs';
 import { logoPicture, f1Driver, f1Constructor } from '#kit/logos.mjs';
 import * as kit from '#kit/quadra.mjs';
 
-import { CDN, smallPhoto, espnHeadshot } from './photo-urls.mjs';
-export { smallPhoto, espnHeadshot };
+import { CDN, smallPhoto, espnHeadshot, espnCollegeHeadshot } from './photo-urls.mjs';
+export { smallPhoto, espnHeadshot, espnCollegeHeadshot };
 
 // A picture that is a flag, not a face (ESPN's country flags, the kit's).
 export const isFlag = url => typeof url === 'string' && /\/flags?\/|flagcdn|countries\/500|\/i\/teamlogos\/countries\//i.test(url);
@@ -263,7 +263,8 @@ export function findPhoto(name, league) {
 // logoPicture (retries, never a broken picture, drawn at once when seen
 // before), so a redraw never makes a face blink or vanish.
 export function personPhoto(name, league, opts) {
-  const { urls = [], guess = null, cls = '', fallback, waited = false } = opts;
+  // (`later`: pictures tried after the guess, before FotMob's face: a college headshot.)
+  const { urls = [], guess = null, later = [], cls = '', fallback, waited = false } = opts;
   // The league's faces still being read (the first of its players drawn
   // this session): its stand-in until they are, then the picture.
   const faces = name && !waited ? faceList(league) : null;
@@ -279,7 +280,8 @@ export function personPhoto(name, league, opts) {
   const face = facePhoto(name, league);
   // The league's own studio photo, the feed's, one found before, ESPN's by id;
   // FotMob's face (a head in a circle, not the half-body the rest are) last.
-  const list = [...new Set([ownPhoto(name, league), ...urls, known, guess, face].map(smallPhoto).filter(Boolean))];
+  const list = [...new Set([ownPhoto(name, league), ...urls, known, guess, ...later, face].map(smallPhoto).filter(Boolean))];
+  const guesses = new Set([guessed, ...later.map(smallPhoto)].filter(Boolean));
   const found = url => logoPicture(url, null, `${cls} photo${isCutout(url) ? ' cutout' : ''}`, () => fallback());
   const search = stand => {
     if (known === undefined && name)
@@ -304,7 +306,7 @@ export function personPhoto(name, league, opts) {
       });
     return stand;
   };
-  const chain = i => (i >= list.length ? last() : logoPicture(list[i], null, `${cls}${isCutout(list[i]) ? ' photo cutout' : ''}`, () => chain(i + 1), { guess: list[i] === guessed }));
+  const chain = i => (i >= list.length ? last() : logoPicture(list[i], null, `${cls}${isCutout(list[i]) ? ' photo cutout' : ''}`, () => chain(i + 1), { guess: guesses.has(list[i]) }));
   return chain(0);
 }
 
