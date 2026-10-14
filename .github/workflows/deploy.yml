@@ -3,40 +3,21 @@ name: Deploy Cloudflare Worker
 on:
   push:
     branches: ['main']
+    # Everything the Workers run (any root module: worker.js imports most of
+    # them, and a missing one here meant a change never deployed).
     paths:
-      - 'worker.js'
-      - 'kit/brand.mjs'
-      - 'wrangler.toml'
-      - 'sports.js'
-      - 'sports-forward.js'
-      - 'http.js'
-      - 'gemini-relay.js'
-      - 'wrangler.gemini.toml'
-      - 'data.js'
-      - 'doc-store.js'
-      - '.github/workflows/deploy.yml'
-      - 'asia-baseball.js'
-      - 'kit/catalog.mjs'
-      - 'f1-live.js'
-      - 'wrangler.sports-proxy.toml'
-      - 'locales/**'
-      - 'eco.js'
-      - 'kambi.js'
-      - 'settle.js'
-      - 'price.js'
-      - 'lotto.js'
-      - 'stock-check.js'
+      - '*.js'
+      - 'builders/**'
       - 'kit/**'
-      - 'quadra-token.js'
-      - 'push.js'
-      - 'eco-admin.js'
-      - 'money.js'
-      - 'capacity.js'
-      - 'weather.js'
-      - 'weather-stations.js'
-      - 'weather-skill.js'
-      - 'transit.js'
-      - 'kit/devconfig.mjs'
+      - 'locales/**'
+      - 'wrangler.toml'
+      - 'wrangler.gemini.toml'
+      - 'wrangler.sports-proxy.toml'
+      - '.github/workflows/deploy.yml'
+  # Once a year on 6 December: the step below takes the Firebase key off
+  # (sign-ins it signed ran out on 2026-12-05) even if nothing was pushed.
+  schedule:
+    - cron: '17 3 6 12 *'
   workflow_dispatch:
 
 jobs:
@@ -137,6 +118,22 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           ECO_ADMIN_TOKEN: ${{ secrets.ECO_ADMIN_TOKEN }}
+      # Firebase is gone (the store is D1, doc-store.js): its service
+      # account's secrets taken off the proxy. FIREBASE_PRIVATE_KEY stays until
+      # 2026-12-05: sign-ins made before ECO_TOKEN_SECRET (2026-10-05, 60 days)
+      # were signed with a key made from it (quadra-token.js).
+      - name: Firebase's secrets off the proxy
+        continue-on-error: true
+        run: |
+          have=$(npx --yes wrangler@4 secret list --name orbit-workers-proxy 2>/dev/null || true)
+          gone="FIREBASE_CLIENT_EMAIL FIREBASE_PROJECT_ID"
+          [ "$(date -u +%Y%m%d)" -ge 20261206 ] && gone="$gone FIREBASE_PRIVATE_KEY"
+          for s in $gone; do
+            if printf '%s' "$have" | grep -q "\"$s\""; then echo y | npx --yes wrangler@4 secret delete "$s" --name orbit-workers-proxy && echo "$s removed"; fi
+          done
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       # A deploy turns a Worker's workers.dev address and crons back on: while
       # the guard has the proxies stopped (the plan's amounts nearly used),
       # they go off again now, not at the guard's next run.

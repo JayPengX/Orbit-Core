@@ -25,7 +25,7 @@ function setup(now, live = {}) {
   };
   return { store, deps };
 }
-const env = { FIREBASE_PROJECT_ID: 'p', FIREBASE_CLIENT_EMAIL: 'e', FIREBASE_PRIVATE_KEY: 'k' };
+const env = { STORE: {} };
 const req = (method, url, body) => ({ method, url: `https://w.test/kambi${url}`, body });
 const entry = (store, id) => JSON.parse(store.get(id));
 

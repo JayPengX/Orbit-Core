@@ -2,8 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
-import { d1Store, docStore, copyToD1, compareStores, backupToR2, BACKUP_PATH, SCHEMA } from '../doc-store.js';
-import { gzip, gunzip } from '../builders/store.js';
+import { d1Store, docStore, storeReady, SCHEMA } from '../doc-store.js';
 
 // D1's API over node:sqlite.
 function fakeD1() {
@@ -24,28 +23,6 @@ function fakeD1() {
   };
 }
 // Firestore, in memory, its shape (updateTime per write).
-function fakeFs() {
-  const m = new Map();
-  let t = 0;
-  const key = (c, id) => `${c}\n${id}`;
-  return {
-    m,
-    get: async (env, c, id) => (m.has(key(c, id)) ? { exists: true, ...m.get(key(c, id)) } : { exists: false, updateTime: '', payload: '' }),
-    write: async (env, c, id, payload, pre) => {
-      const had = m.get(key(c, id));
-      if (pre?.updateTime && had?.updateTime !== pre.updateTime) throw Object.assign(new Error('pre'), { precondition: true });
-      if (pre?.exists === false && had) throw Object.assign(new Error('pre'), { precondition: true });
-      const updateTime = `2026-10-13T00:00:00.${String(++t).padStart(6, '0')}Z`;
-      m.set(key(c, id), { payload, updateTime });
-      return { updateTime };
-    },
-    list: async (env, c) => [...m].filter(([k]) => k.startsWith(`${c}\n`)).map(([k, v]) => ({ id: k.split('\n')[1], ...v })),
-    collections: async () => [...new Set([...m.keys()].map(k => k.split('\n')[0]))],
-    batch: async (env, writes) => ({ status: writes.map(() => ({})), writeResults: [] }),
-    delete: async (env, c, id) => void m.delete(key(c, id))
-  };
-}
-
 test('D1: a write only if it is still what was read; a create only if new; a race lost says so', async () => {
   const s = d1Store(fakeD1());
   assert.deepEqual(await s.get('eco-wallets', 'a'), { exists: false, updateTime: '', payload: '' });
@@ -66,37 +43,16 @@ test('D1: a write only if it is still what was read; a create only if new; a rac
   assert.equal((await s.get('eco-wallets', 'b')).exists, false);
 });
 
-test('moving: dual writes Firestore then D1 (the same updateTime); the copy brings the rest without overwriting; the comparison is clean; D1 alone after', async () => {
-  const fs = fakeFs();
-  const env = { STORE: fakeD1(), STORE_MODE: 'firestore' };
-  const store = docStore(fs);
-  await store.write(env, 'eco-wallets', 'old', 'before the move');
-  env.STORE_MODE = 'dual';
-  const w = await store.write(env, 'eco-wallets', 'new', 'while moving');
-  assert.equal((await d1Store(env.STORE).get('eco-wallets', 'new')).updateTime, w.updateTime);
-  assert.equal((await store.get(env, 'eco-wallets', 'old')).payload, 'before the move', 'reads are Firestore\'s');
-  const copy = await copyToD1(env, fs);
-  assert.deepEqual(copy, { collections: 1, docs: 2, copied: 1 });
-  assert.deepEqual(await compareStores(env, fs), { collections: { 'eco-wallets': { firestore: 2, differ: 0, missing: 0, extra: 0 } }, differ: 0, missing: 0, extra: 0 });
-  // The race a Pass write makes, on D1 now: what it read is what D1 has.
-  env.STORE_MODE = 'd1';
-  const read = await store.get(env, 'eco-wallets', 'old');
-  assert.equal(read.payload, 'before the move');
-  await store.write(env, 'eco-wallets', 'old', 'on D1', { updateTime: read.updateTime });
-  assert.equal(fs.m.get('eco-wallets\nold').payload, 'before the move', 'Firestore untouched once D1 has it');
-});
-
-test('the backup: every Firestore document into R2 under private/, gzipped, read back whole', async () => {
-  const fs = fakeFs();
-  await fs.write({}, 'eco-wallets', 'a', '{"cash":1}');
-  await fs.write({}, 'odds-open', 'b', '{"slip":2}');
-  const put = new Map();
-  const env = { DATA: { put: async (k, bytes, o) => void put.set(k, { bytes, o }) } };
-  const r = await backupToR2(env, fs, { gzip });
-  assert.equal(r.docs, 2);
-  assert.ok(BACKUP_PATH.startsWith('private/'));
-  const lines = new TextDecoder().decode(await gunzip(put.get(BACKUP_PATH).bytes)).split('\n').map(l => JSON.parse(l));
-  assert.deepEqual(lines.map(l => [l.coll, l.id, l.payload]), [['eco-wallets', 'a', '{"cash":1}'], ['odds-open', 'b', '{"slip":2}']]);
-  assert.ok(lines.every(l => l.updated));
-  assert.equal(put.get(BACKUP_PATH).o.customMetadata.docs, '2');
+test('the store: every call (env, …) on D1; batches each write on its own; counts by collection; ready only with D1 bound', async () => {
+  const env = { STORE: fakeD1() };
+  const store = docStore();
+  const w = await store.write(env, 'eco-wallets', 'a', 'one');
+  await store.write(env, 'odds-open', 'b', 'two');
+  const r = await store.batch(env, [{ update: ['eco-wallets', 'a', 'three'], updateTime: w.updateTime }, { update: ['eco-wallets', 'a', 'four'], updateTime: w.updateTime }, { delete: ['odds-open', 'b'] }]);
+  assert.deepEqual(r.status.map(x => x.code || 0), [0, 9, 0]);
+  assert.equal((await store.get(env, 'eco-wallets', 'a')).payload, 'three');
+  assert.deepEqual(await store.count(env), { 'eco-wallets': 1 });
+  assert.deepEqual((await store.list(env, 'eco-wallets')).map(d => d.id), ['a']);
+  assert.ok(storeReady(env));
+  assert.ok(!storeReady({}));
 });

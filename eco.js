@@ -549,7 +549,7 @@ const OPS = {
 export async function handleEcoRequest(request, env, headers, ip, deps) {
   const { json, errorJson, upstreamFailed } = deps;
   if (!['GET', 'POST', 'PATCH', 'DELETE'].includes(request.method)) return errorJson('SYNC_METHOD_NOT_ALLOWED', 405, headers, request);
-  if (!storeReady(env)) return errorJson('MISSING_FIREBASE_CONFIG', 500, headers, request);
+  if (!storeReady(env)) return errorJson('MISSING_STORE', 500, headers, request);
 
   const url = new URL(request.url);
   const app = url.searchParams.get('app') || '';

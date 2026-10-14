@@ -73,13 +73,13 @@ none has a server of its own.
                          └───────┬─────────────────────────┬────────────────────────────────┬──────────────────────────────────┘
                                  │ packJson (/data/)        │ every call, signed (qt=): proxyJson batched, /eco /play /push /weather /transit /gemini
                                  ▼                          ▼
-          the family's data (R2 quadra-data,     the proxy: orbit-workers-proxy Worker (placement gcp:asia-east1, Taiwan)
+          the family's data (R2 quadra-data,     the proxy: orbit-workers-proxy Worker (no placement; Gemini via gemini-relay, Taiwan)
           /data/: built by builders/ hourly,       /sports-proxy → ESPN · MLB · Jolpica · OpenF1 · Polymarket · Kambi · Yahoo ·
           season packs, watch, winprob,                            ELTA · formula1.com · YouTube · Google translate ·
           cpbl, photos, bus packs, shapes,                         F1 live timing (f1-live.quadra) · the Asian leagues
           where.json; reads kept on demand)                        (asia-baseball.quadra); edge cache by tier, trims, batches
-                                                 /eco   → Firestore (wallets, app data)      /play → settling, prices, lottery + cron
-                                                 /push  → KV (subscriptions, lists) + cron   /kambi → Kambi + Firestore + cron
+                                                 /eco   → D1 (wallets, app data)             /play → settling, prices, lottery + cron
+                                                 /push  → KV (subscriptions, lists) + cron   /kambi → Kambi + D1 + cron
                                                  /weather → Google, CWA, MOENV, KV cells     /transit → TDX, Google Maps/Places/Routes
                                                  /gemini, /nl-edit → Gemini                  /config → the developer settings
                                                  F1Log Durable Object + its minute cron
@@ -201,7 +201,7 @@ ends. A bet whose app isn't opened in that window could never be settled.
 
 - `POST /kambi { events: [{ id, start }] }`: Play registers the matches its
   open bets are on.
-- The cron keeps each one's latest `livedata.json` in Firestore. It reads
+- The cron keeps each one's latest `livedata.json` in the store (D1). It reads
   the least recently checked first (150 a run), and marks
   an entry `gone` once Kambi drops it. A match is watched from its start
   until the 3-day refund window ends, and kept a day beyond.
@@ -214,7 +214,7 @@ ends. A bet whose app isn't opened in that window could never be settled.
 
 - `POST /play { op: 'open', slips }`: Play hands over each open slip (its
   picks, sizes, stake; `cleanSlip` keeps what settling needs, 20 picks and
-  24 KB at most). Kept in Firestore `odds-open/<account>_<slip>` with an
+  24 KB at most). Kept in the store `odds-open/<account>_<slip>` with an
   index (`odds-open/_index`: each slip's next look, one read a run). Kambi
   matches on it are watched (`kambi.js watchKambi`).
 - The odd-minute cron (`settleCron`): up to 60 due slips a run, every
@@ -534,6 +534,8 @@ by its tier.
 (a size of `0xFFFFFFFF` deletes), for a one-off copy; nothing uses it
 regularly now.
 
+**`private/`** is never served by `/data/` (Firestore's last copy, §11).
+
 ## 5. The Quadra Pass (`/eco`)
 
 `eco.js` (tests in `tests/eco.test.mjs`).
@@ -551,7 +553,9 @@ regularly now.
   token (60 days, renewed each use) and the app a short session token
   (`quadra-token.js`).
 - Tokens are `<base64url JSON>.<HMAC-SHA256>` under `ECO_TOKEN_SECRET`.
-  Before that secret is set, the key is derived from `FIREBASE_PRIVATE_KEY`.
+  Sign-ins made before that secret (2026-10-05) were signed with a key made
+  from `FIREBASE_PRIVATE_KEY`; they ran out by 2026-12-05, and `deploy.yml`
+  takes that secret off on 2026-12-06.
   A token's body is `{ k: 'ses'|'ref', d: account, a: app, s: session,
   g: generation, e: expiry }`.
 - **One app at a time.** The session that signed in or claimed last is the
@@ -573,7 +577,8 @@ regularly now.
   | `live` | The live app and session |
   | `sec` | The token generation (bumped to sign every device out) |
 
-  Writes are read-merge-write under Firestore's `updateTime` precondition.
+  Writes are read-merge-write under the document's `updated` version (a
+  write only if it's still what was read; `doc-store.js`).
 - **Each app's own data** sits in its collection under the same id:
 
   | App | Collection |
@@ -882,7 +887,8 @@ are set with `wrangler secret put` or the dashboard.
 | Worker | Secret / binding | For |
 | --- | --- | --- |
 | both | `ECO_TOKEN_SECRET` | Signing and checking session tokens |
-| orbit-workers-proxy | `FIREBASE_PROJECT_ID` (var), `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY` | Firestore (the Pass, Kambi's watch, config) |
+| orbit-workers-proxy | `STORE` (D1 `quadra-store`, APAC, made and bound by `deploy.yml`) | The Pass's store: wallets, each app's data, Play's slips, Kambi's watch, config (`doc-store.js`) |
+| orbit-workers-proxy | `FIREBASE_PRIVATE_KEY` (until 2026-12-06, then `deploy.yml` removes it) | Only checking sign-ins made before `ECO_TOKEN_SECRET` |
 | orbit-workers-proxy | `RATE_LIMIT_KV` (KV) | Push lists and keys, Transit's Google meter and TDX token, Weather's daily count, cells and scores; sign-in limits |
 | orbit-workers-proxy | `GEMINI_API_KEY` | `/gemini`, `/nl-edit` |
 | orbit-workers-proxy | `TDX_CLIENT_ID`, `TDX_CLIENT_SECRET`, `GOOGLE_MAPS_BROWSER_KEY`, `GOOGLE_MAPS_KEY` | Transit |
@@ -893,12 +899,14 @@ are set with `wrangler secret put` or the dashboard.
 | quota-guard | `CF_GUARD_TOKEN` (from the repo secret), `CF_ACCOUNT_ID` (from `CLOUDFLARE_ACCOUNT_ID`), `RATE_LIMIT_KV`, `CLOCK` (Durable Object `GuardClock`: its alarm every 5 minutes; the proxy wakes it through `GUARD`) | Reading the bill, stopping the proxy (§8.1) |
 | orbit-workers-proxy | `DATA` (R2 `quadra-data`, made and bound by `deploy.yml` once R2 is on), `DATA_PUSH_SECRET` (from the repo secret) | The family's data (§4.7) |
 
-**The Pass's store on D1 (the owner, once).** The deploy token
-(`CLOUDFLARE_API_TOKEN`, GitHub's secret) needs to make the D1 database:
-Cloudflare dashboard → My Profile → API Tokens → the token the deploys use →
-Edit → add **Account · D1 · Edit** → Continue → Update token. Then Actions →
-Deploy Cloudflare Worker → Run workflow: the deploy makes `quadra-store`,
-binds it, and the proxy copies the Pass into it (dual mode).
+**The Pass's store: D1.** The deploy token (`CLOUDFLARE_API_TOKEN`) is an
+Account API Token (Cloudflare → Manage Account → Account API Tokens) with
+**Account · D1 · Edit** among its permissions; the deploy makes
+`quadra-store` and binds it. Firebase's Firestore held the store until
+2026-10-14: every document was copied and compared clean, and its last copy
+is in R2 at `private/firestore-backup.jsonl.gz` (never served by `/data/`;
+one JSON line a document). `/store/check` (from a localhost page) gives
+each collection's count.
 
 **Arming the guard (the owner, once).**
 1. Cloudflare dashboard → My Profile → API Tokens → Create Token → Custom
@@ -914,8 +922,7 @@ binds it, and the proxy copies the Pass into it (dual mode).
    on the 13th (`PERIOD_DAY` in `wrangler.guard.toml`; tell Claude if not).
    Billable Usage → a budget alert at $5.01 as a second warning.
 
-Firestore's rules deny all client access (`allow read, write: if false`).
-Only the Worker's service account reads and writes.
+Only the proxy reads and writes the store: D1 has no client access.
 
 ## 12. Tools
 

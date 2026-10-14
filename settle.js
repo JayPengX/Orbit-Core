@@ -197,7 +197,7 @@ const recordOf = (slip, at) => ({
 
 export async function handlePlay(request, env, headers, session, deps) {
   const { json, errorJson, upstreamFailed } = deps;
-  if (!storeReady(env)) return errorJson('MISSING_FIREBASE_CONFIG', 500, headers, request);
+  if (!storeReady(env)) return errorJson('MISSING_STORE', 500, headers, request);
   // The dev door (a localhost page, no pass): a slip's prices checked, nothing placed.
   if (!session && deps.dev && request.method === 'POST') {
     const body = await deps.readJsonBody(request);

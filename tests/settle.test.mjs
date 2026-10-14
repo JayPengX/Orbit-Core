@@ -5,7 +5,7 @@ import { WALLET_COLLECTION } from '../eco.js';
 
 const ACCOUNT = 'a'.repeat(64);
 const START = '2026-10-10T23:10:00Z';
-const env = { FIREBASE_PROJECT_ID: 'p', FIREBASE_CLIENT_EMAIL: 'e', FIREBASE_PRIVATE_KEY: 'k' };
+const env = { STORE: {} };
 const session = { d: ACCOUNT, s: 'sid', a: 'odds' };
 
 // An in-memory Firestore (updateTime preconditions as Firestore keeps them),

@@ -6,8 +6,7 @@
 #   npx wrangler login
 #   npx wrangler deploy
 #   npx wrangler secret put GEMINI_API_KEY
-#   npx wrangler secret put FIREBASE_CLIENT_EMAIL
-#   npx wrangler secret put FIREBASE_PRIVATE_KEY
+#   npx wrangler secret put ECO_TOKEN_SECRET
 #   npx wrangler kv namespace create RATE_LIMIT_KV
 #     (then uncomment the [[kv_namespaces]] block below with the printed id)
 #
@@ -17,8 +16,8 @@
 # `wrangler deploy` pushes THIS FILE's [vars]/[[kv_namespaces]] as the
 # worker's whole config, replacing whatever's live on Cloudflare - it does
 # not merge with dashboard-made changes. Before ever relying on that
-# workflow, fill in the real values below (FIREBASE_PROJECT_ID, and the
-# kv_namespaces block if you use RATE_LIMIT_KV) to match what's already
+# workflow, fill in the real values below (the kv_namespaces block if you
+# use RATE_LIMIT_KV) to match what's already
 # live, or the first automated deploy will overwrite them with the
 # placeholders below. Secrets (GEMINI_API_KEY etc., set via `wrangler
 # secret put` or the dashboard) are stored separately and are NOT touched
@@ -45,13 +44,7 @@ compatibility_date = "2025-01-01"
 binding = "GEMINI_RELAY"
 service = "gemini-relay"
 
-# Only needed for /sync and /vocab-sync (see worker.js's handleSyncRequest).
-# Not a secret on its own - it's already public today in the no-proxy
-# fallback path (VITE_ORBIT_SYNC_PROJECT_ID ships inside the client JS
-# bundle) - kept as a plain var here so it's easy to see/change in the
-# dashboard without needing "reveal secret".
 [vars]
-FIREBASE_PROJECT_ID = "orbit-project-76897"
 # Orbit Transit (transit.js): TDX calls a minute this Worker allows itself.
 # The owner is on a paid TDX plan (5 a second at least): 4 a second.
 TDX_PER_MIN = "240"
@@ -63,29 +56,21 @@ TRANSIT_DEV = "on"
 # The sports proxy's dev door (sports.js checkSession): a local
 # page may read without a Quadra Pass, rate-limited. "off" closes it.
 SPORTS_DEV = "on"
-# The Pass's store (doc-store.js): "firestore", "dual" (Firestore the truth,
-# every write copied to D1, the cron copying the rest), then "d1".
-# D1 alone since 2026-10-14: all 15 documents copied and compared clean,
-# Firestore's last copy in R2 (private/firestore-backup.jsonl.gz).
-STORE_MODE = "d1"
 
-# GEMINI_API_KEY (for /gemini, /nl-edit, /vocab-ai) and
-# FIREBASE_CLIENT_EMAIL / FIREBASE_PRIVATE_KEY (for /sync and /vocab-sync,
-# from Firebase Console -> Project Settings -> Service accounts -> Generate
-# new private key) are set as Secrets, not [vars] - see the CLI
-# commands above, or the dashboard's Settings -> Variables and Secrets.
-# Treat the Firebase service-account key like a password: it grants full
-# read/write access to that Firebase project, bypassing Firestore Security
-# Rules entirely (that's the whole point - see worker.js's /sync
-# comment). Either feature works independently of the other being
-# configured - see worker.js's top-of-file comment.
+# GEMINI_API_KEY (for /gemini, /nl-edit, /vocab-ai) and ECO_TOKEN_SECRET
+# (the Pass's sign-ins) are Secrets, not [vars] - see the CLI commands
+# above, or the dashboard's Settings -> Variables and Secrets. The Pass's
+# store is D1 (doc-store.js; the [[d1_databases]] binding STORE is added by
+# deploy.yml). FIREBASE_PRIVATE_KEY stays a secret only until 2026-12-05:
+# sign-ins made before ECO_TOKEN_SECRET (2026-10-05, 60 days) were signed
+# with a key made from it (quadra-token.js); deploy.yml removes it then.
 
 # Workers KV: what has to outlive an isolate and be seen by the crons:
 # push subscriptions (push.js), Orbit Transit's monthly Google meter and TDX
 # token (transit.js), Orbit Weather's daily Google count, its scoring and an
 # hourly copy of each cell (weather.js, weather-skill.js). Not rate limits:
 # those are in memory (worker.js), and caches are in Cloudflare's cache, so
-# the free tier's 1,000 writes a day stay far off.
+# the plan's million writes a month stay far off.
 
 [[kv_namespaces]]
 binding = "RATE_LIMIT_KV"

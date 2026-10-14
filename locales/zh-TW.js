@@ -16,7 +16,7 @@ export default {
   MISSING_CONTEXT: '缺少或無效的情境資料。',
   CONTEXT_TOO_LARGE: '情境資料過大。',
   SYNC_METHOD_NOT_ALLOWED: '僅支援 GET、POST、PATCH 或 DELETE 方法。',
-  MISSING_FIREBASE_CONFIG: 'Worker 尚未設定 Firebase 服務帳戶。',
+  MISSING_STORE: 'Worker 尚未綁定資料庫（D1）。',
   INVALID_PASSCODE: '無效的密碼。',
   MISSING_PAYLOAD: '缺少或無效的內容資料。',
   SYNC_PASSCODE_NOT_FOUND: '找不到這組同步密碼。',
