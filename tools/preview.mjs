@@ -749,6 +749,20 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => (reopen ? [h, h]
         return `${el.tagName.toLowerCase()}.${[...el.classList].join('.')} [${Math.round(r.left)}–${Math.round(r.right)}]`;
       });
   });
+  // A scroller that also moves sideways: a sheet or a page a finger can push
+  // left and right (a bar 2 px wider than its sheet). Rows made to scroll
+  // sideways (chips) scroll only that way and aren't these.
+  const slides = await page.evaluate(() =>
+    [...document.querySelectorAll('body *')]
+      .filter(el => {
+        const cs = getComputedStyle(el);
+        const row = cs.display.includes('flex') && cs.flexDirection === 'row' && cs.flexWrap === 'nowrap';
+        return !row && /auto|scroll/.test(cs.overflowX) && /auto|scroll/.test(cs.overflowY) && el.clientWidth && el.scrollWidth > el.clientWidth + 1 && !el.closest('[hidden]');
+      })
+      .slice(0, 6)
+      .map(el => `${el.tagName.toLowerCase()}${[...el.classList].map(c => `.${c}`).join('')} (${el.scrollWidth}>${el.clientWidth})`)
+  );
+  if (slides.length) console.log(`scrolls sideways:\n  ${slides.join('\n  ')}`);
   // Text that broke onto a second row (TRUTH §10): a short label whose words
   // split over lines, or a row of chips that wrapped. Some rows are made to
   // wrap (a list of tags): read each one against the screenshot.
