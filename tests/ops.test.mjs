@@ -23,7 +23,8 @@ test('heartbeats: one row a job; a failure counted in a row until it works again
   assert.equal(k.fails, 2);
   assert.equal(k.okAt, null);
   assert.ok(rows.find(r => r.job === 'settle').ok);
-  await beat(env, 'kambi', async () => ({ checked: 1 }), now);
+  // A count of failures that is 0 is a clean run.
+  await beat(env, 'kambi', async () => ({ watch: { checked: 1, failed: 0 } }), now);
   rows = await beats(env);
   assert.equal(rows.find(r => r.job === 'kambi').fails, 0);
   assert.ok(rows.find(r => r.job === 'kambi').okAt);

@@ -42,8 +42,9 @@ const noteOf = r => {
     return '';
   }
 };
-// A failed step inside a job that otherwise ran (a builder's `{ failed }`).
-const failedIn = r => !!r && typeof r === 'object' && Object.values(r).some(v => v && typeof v === 'object' && 'failed' in v);
+// A failed step inside a job that otherwise ran (a builder's `{ failed:
+// reason }`; a count of `failed: 0` is a step that ran clean).
+const failedIn = r => !!r && typeof r === 'object' && Object.values(r).some(v => v && typeof v === 'object' && (Array.isArray(v.failed) ? v.failed.length > 0 : Boolean(v.failed)));
 
 // `fn` run and its heartbeat kept; its result (or its error) passed on.
 export async function beat(env, job, fn, now = () => Date.now()) {
