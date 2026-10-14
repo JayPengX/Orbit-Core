@@ -2691,6 +2691,23 @@ function banner(s, { title, body, hash, more = [] }) {
 
 // ---- Shell: installed-only on phones, and always the newest version ------------------------
 
+// Whether to ask the phone where it is now: iOS is asked unprompted once
+// per app (`key`, the app's own note that it asked), never at every open,
+// return or tick; a phone that would ask again (iOS's 允許一次, 下次詢問, a
+// grant that lapsed) is left alone and the app uses the last place it
+// kept, until the person taps to locate (`force`). 'yes' | 'no' | 'denied'.
+// (Transit asked at every open and every minute; Weather once.)
+export async function mayLocate(key, { force = false } = {}) {
+  let state = 'unknown';
+  try {
+    state = (await navigator.permissions?.query({ name: 'geolocation' }))?.state || 'unknown';
+  } catch {}
+  if (state === 'denied') return 'denied';
+  if (state === 'granted') return 'yes';
+  if (!force && readStore(key) === '1') return 'no';
+  writeStore(key, '1');
+  return 'yes';
+}
 export function isStandalone() {
   return Boolean(globalThis.matchMedia?.('(display-mode: standalone)').matches || globalThis.matchMedia?.('(display-mode: fullscreen)').matches || globalThis.navigator?.standalone);
 }
