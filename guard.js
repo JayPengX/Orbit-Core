@@ -392,7 +392,7 @@ export async function guardRun(env, { fetcher = fetch, now = Date.now(), kv = en
     state.paceSince = now;
     await kv.put(PACE_KEY, JSON.stringify({ pace: state.pace || 0, ...PACES[state.pace || 0], at: now, top: state.paceTop }));
   }
-  const changed = acts.length || !!prev.stopped !== !!state.stopped || prev.error !== state.error || prev.armed !== armed || (state.pace || 0) !== (prev.pace || 0) || (state.alert || 0) !== (prev.alert || 0);
+  const changed = acts.length || !!prev.stopped !== !!state.stopped || prev.error !== state.error || prev.armed !== armed || (state.pace || 0) !== (prev.pace || 0) || (state.alert || 0) !== (prev.alert || 0) || state.account !== prev.account || prev.pace === undefined;
   if (changed || !prev.at || now - (prev.saved || 0) >= 3_600_000) {
     state.saved = now;
     await kv.put(STATE_KEY, JSON.stringify(state));
