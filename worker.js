@@ -1036,7 +1036,7 @@ async function readSource(url) {
 }
 // A placed slip's prices are read as Play reads them: through the sports
 // proxy (its cache and trims; this Worker's own route, with a short session
-// of its own), the nightly packs from Shared-Data's Pages.
+// of its own), the season packs from R2 (/data/).
 // (One short session of this Worker's own per app it reads for.)
 const workerTokens = new Map();
 async function sportsToken(env, app = 'odds') {

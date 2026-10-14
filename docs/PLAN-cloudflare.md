@@ -58,7 +58,8 @@ Each one states its before and after numbers.
       proxy's working cron wakes it.
 - [x] The guard's first real reading: armed, every count read (0.3% of
       requests, 1.2% of CPU, 2.9% of R2 writes so far)
-- [ ] You: check the plan renews on the 13th, and add a $5.01 budget alert.
+- [ ] You: check the plan renews on the 13th, and add a $5.01 budget alert
+      (Cloudflare → Notifications → Usage Based Billing).
 
 ## 2. One proxy (done)
 - [x] `/sports-proxy` is a route of `orbit-workers-proxy` (`sports.js`):
@@ -149,7 +150,8 @@ Each one states its before and after numbers.
       as they are.
 - [x] Yahoo's 429s: the proxy unpinned (Yahoo refused Taiwan's servers),
       Gemini alone goes through a small Taiwan-pinned relay; 10 of 10 reads OK.
-- [ ] You: try Orbit Class's photo import once (Gemini through the relay).
+- [x] Gemini through the relay checked live (`build.yml` gemini-check: 200,
+      "OK", 1.8 s).
 - [x] A cut price in Securities' 為你推薦 (fitted before the font loaded):
       Securities and Play now fit again once fonts load.
 - [x] Weather: CWA's national lists stay unparsed on the Worker (CPU for a
@@ -159,6 +161,20 @@ Each one states its before and after numbers.
 - [x] Loose ends from today's preview: the 404 was the preview's own
       missing `kit/version.json` (fixed in the tool), and the replay icon now
       sits on-screen at no opacity.
+
+## 6. Pacing, alerts, monitoring, secrets (2026-10-14)
+- [x] The month paced: 60/80/90% projected slows live refreshes ×2/×4/×8,
+      parks builders, trims reads (`guard.js`, `pace.js`)
+- [x] Phone alerts at 50/75/90%, a new pace, a stop (`ops.js`)
+- [ ] **You:** admin panel → 系統 → 警示通知: your pass → 設定 → 測試
+- [x] Every cron job's heartbeat in D1; admin 系統 pane (bill, pace, jobs,
+      Gemini check, builders by hand, R2, D1, secrets, deploys)
+- [x] Secrets: account ID found from each token (`CLOUDFLARE_ACCOUNT_ID`,
+      `CF_ACCOUNT_ID` gone); `MATCH_FIND_DISPATCH_TOKEN` off the proxy;
+      `PROXY_URL` variables gone (3 repos); README §11 by kind
+- [ ] **You:** revoke the old Match Find dispatch token at GitHub
+- [ ] **You:** delete Shared-Data (`gh repo delete JayPengX/Shared-Data`)
+- [ ] **You:** delete the Firebase project `orbit-project-76897`
 
 ## Verification
 - `npm test` in every repo touched; `wrangler deploy --dry-run` for each
