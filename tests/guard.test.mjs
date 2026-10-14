@@ -238,6 +238,7 @@ test('the account is the token\'s own (asked once, kept); the pace is written fo
   assert.equal(s.pace, 3);
   assert.equal(JSON.parse(kv.m.get('guard:pace')).slow, 8);
   assert.equal(cf.calls.filter(c => c.endsWith('/accounts')).length, 1);
+  assert.equal(JSON.parse(kv.m.get(STATE_KEY)).account, 'acct-1', 'kept at once, not asked again each run');
   kv.m.delete('guard:pace');
   const again = await guardRun(bare, { fetcher: fakeCf({ requests: 2_000_000 }).fetcher, kv, now: T('2026-10-18T00:05:00Z') });
   assert.equal(again.pace, 3);
