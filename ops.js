@@ -155,6 +155,16 @@ export async function dataFolders(bucket, { pages = 30 } = {}) {
   } while (cursor && ++n < pages);
   return { folders: out, more: !!cursor };
 }
+// (Listing is R2's dearer kind of operation: kept an hour in the edge cache.)
+async function foldersKept(env) {
+  const cache = typeof caches !== 'undefined' ? caches.default : null;
+  const key = new Request('https://ops.quadra/data-folders');
+  const hit = cache && (await cache.match(key));
+  if (hit) return hit.json();
+  const out = { ...(await dataFolders(env.DATA)), at: Date.now() };
+  if (cache) await cache.put(key, new Response(JSON.stringify(out), { headers: { 'Cache-Control': 'public, max-age=3600' } }));
+  return out;
+}
 export async function systemReport(env, deps) {
   const kv = env.RATE_LIMIT_KV;
   const g = kv ? JSON.parse((await kv.get(GUARD_STATE).catch(() => null)) || 'null') : null;
@@ -163,7 +173,7 @@ export async function systemReport(env, deps) {
     paceOf(env),
     beats(env).catch(e => ({ error: String(e?.message || e) })),
     deps.count ? deps.count(env).catch(e => ({ error: String(e?.message || e) })) : null,
-    env.DATA ? dataFolders(env.DATA).catch(e => ({ error: String(e?.message || e) })) : null,
+    env.DATA ? foldersKept(env).catch(e => ({ error: String(e?.message || e) })) : null,
     alertAccount(env, deps)
   ]);
   return {
