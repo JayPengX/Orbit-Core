@@ -578,7 +578,7 @@ regularly now.
 
 **Signing in.**
 - **Devices never keep the pass.** Signing in gives the device a refresh
-  token (60 days, renewed each use) and the app a short session token
+  token (60 days, renewed each use) and the app a short session token The session token is kept on the device beside the refresh token (`quadra.token:<app>`, the apps sharing one origin; only the signed-in account's, under 12 minutes old, gone on sign-out), so a cold start's first data call goes out at once instead of after a sign-in round trip, and a young token is never held for a refresh under way.
   (`quadra-token.js`).
 - Tokens are `<base64url JSON>.<HMAC-SHA256>` under `ECO_TOKEN_SECRET`.
   Sign-ins made before that secret (2026-10-05) were signed with a key made
