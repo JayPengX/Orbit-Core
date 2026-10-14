@@ -40,6 +40,9 @@ import { handleWeather } from './weather.js';
 import { weatherCron, skillReport } from './weather-skill.js';
 import { handleTransit, tally } from './transit.js';
 import { readDev, capacityCron } from './eco-admin.js';
+import { paceOf } from './pace.js';
+import { beat, tellOwner, systemReport, tell, billNotice, OPS_DOC } from './ops.js';
+import { applyScale } from './capacity.js';
 import { handleSports, sportsCron, useDevSettings } from './sports.js';
 import { isAllowedOrigin, corsHeaders, json } from './http.js';
 import { handleData } from './data.js';
@@ -331,6 +334,25 @@ const GEMINI_ALLOWED_MODELS = ['gemini-3.5-flash-lite', 'gemini-3.7-flash'];
 const geminiFetch = (env, url, init) => (env.GEMINI_RELAY ? env.GEMINI_RELAY.fetch(`https://gemini-relay/?to=${encodeURIComponent(url)}`, init) : fetch(url, init));
 function geminiUrl(model, env) {
   return `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${env.GEMINI_API_KEY}`;
+}
+// One tiny Gemini call (a few tokens), the way Orbit Class's calls go: the
+// key, the relay and the model answering (the admin panel's 系統, and /ops
+// for the repo's workflow). Never the key or the URL in the answer.
+async function geminiCheck(env, model = GEMINI_ALLOWED_MODELS[0]) {
+  const t = Date.now();
+  if (!env.GEMINI_API_KEY) return { ok: false, model, error: 'GEMINI_API_KEY not set' };
+  try {
+    const res = await geminiFetch(env, geminiUrl(model, env), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'Reply with the single word OK.' }] }], generationConfig: { maxOutputTokens: 256, thinkingConfig: buildGenerationConfig(model).thinkingConfig } })
+    });
+    const j = await res.json().catch(() => null);
+    const text = (j?.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('').trim();
+    return { ok: res.ok && !!text, status: res.status, model, via: env.GEMINI_RELAY ? 'relay (Taiwan)' : 'direct', ms: Date.now() - t, reply: text.slice(0, 20), tokens: j?.usageMetadata?.totalTokenCount ?? null, error: res.ok ? undefined : String(j?.error?.message || '').slice(0, 160) };
+  } catch (e) {
+    return { ok: false, model, ms: Date.now() - t, error: String(e?.message || e).slice(0, 160) };
+  }
 }
 
 // The exact shape src/gemini-ocr.js's normalizeAIOutput() reads back,
@@ -989,6 +1011,10 @@ const ECO_DEPS = {
   sha256Hex,
   generateCode,
   now: () => Date.now(),
+  // The admin panel's 系統 (ops.js): the store's collections, a Gemini check, a builder by hand.
+  count: DOCS.count,
+  geminiCheck: env => geminiCheck(env),
+  build: (env, job) => runBuilders(env, { proxy: builderProxy(env), now: Date.now(), ...(job === 'watch-full' ? { job: 'watch', full: true } : ['watch', 'cutouts', 'buses'].includes(job) ? { job } : { only: job }), log: () => {} }),
   // Securities' money counted here (stock-check.js), its market data read as the apps read it.
   checkStock: (env, docId, payload, wallet) => checkStock(env, docId, payload, wallet, { read: url => priceReads(env).read(url), fsGet: DOCS.get, fsWrite: DOCS.write }, LOCK_SINCE)
 };
@@ -1070,7 +1096,10 @@ async function devBody(env, ctx) {
   const key = new Request('https://orbit-config.quadra/dev');
   const hit = await caches.default.match(key);
   if (hit) return hit.text();
-  const body = JSON.stringify(await readDev(env, ECO_DEPS));
+  // Paced by the bill's guard (pace.js): every live refresh `slow` times slower.
+  const pace = await paceOf(env);
+  const dev = await readDev(env, ECO_DEPS);
+  const body = JSON.stringify(pace.slow > 1 ? { ...applyScale(dev, pace.slow), pace: pace.pace } : dev);
   ctx.waitUntil(caches.default.put(key, new Response(body, { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=60' } })));
   return body;
 }
@@ -1115,6 +1144,15 @@ export default {
       if (!/^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin) || sessionLimited(`store:${ip}`, 2)) return errorJson('FORBIDDEN_ORIGIN', 403, headers, request);
       if (!env.STORE) return json({ d1: false }, 200, headers);
       return json({ d1: true, collections: await DOCS.count(env) }, 200, headers);
+    }
+    // The repo's own checks (Shared-Proxy's build.yml), Bearer DATA_PUSH_SECRET:
+    // ?check=gemini (one tiny call through the relay) or system (ops.js).
+    if (path === '/ops' && request.method === 'POST') {
+      if (!env.DATA_PUSH_SECRET || request.headers.get('Authorization') !== `Bearer ${env.DATA_PUSH_SECRET}`) return errorJson('FORBIDDEN_ORIGIN', 403, headers, request);
+      const check = new URL(request.url).searchParams.get('check');
+      if (check === 'gemini') return json(await geminiCheck(env), 200, headers);
+      if (check === 'system') return json(await systemReport(env, ECO_DEPS), 200, headers);
+      return json({ error: { message: 'check=gemini|system' } }, 400, headers);
     }
     // A builder's job now (builders/run.js), by hand: Bearer DATA_PUSH_SECRET
     // (Shared-Proxy's build.yml). ?job=watch|cutouts|buses, or
@@ -1195,30 +1233,36 @@ export default {
   // (kambi.js).
   async scheduled(event, env, ctx) {
     const tick = new Date(event.scheduledTime || Date.now());
+    const min = tick.getUTCMinutes();
+    // Each job's heartbeat kept (ops.js: the admin panel's 系統); a failure logged.
+    const run = (job, fn, log = r => r) => ctx.waitUntil(beat(env, job, fn).then(r => (r = log(r)) && console.log(job, JSON.stringify(r))).catch(e => console.log(`${job} failed`, String(e?.message || e))));
     // F1's laps while a session runs (sports.js, f1-live.js): every minute of an F1 weekend.
-    if (F1_DAYS.has(tick.getUTCDay())) ctx.waitUntil(sportsCron(env, tick.getTime()));
-    // The family's data (builders/), once an hour.
-    if (event.cron !== SETTLE_CRON && BUILD_SLOTS[tick.getUTCMinutes()]) ctx.waitUntil(runBuilders(env, { proxy: builderProxy(env), now: tick.getTime() }).catch(e => console.log('builders failed', String(e))));
-    // The bill's guard: its clock woken (started if it isn't).
-    if (event.cron !== SETTLE_CRON && tick.getUTCMinutes() % 10 === 0 && env.GUARD) ctx.waitUntil(env.GUARD.fetch('https://quota-guard/tick').catch(() => {}));
+    if (F1_DAYS.has(tick.getUTCDay())) run('f1', () => sportsCron(env, tick.getTime()), () => null);
+    // (The bill's pace, pace.js: what can wait waits.)
+    const pace = (await paceOf(env)).pace;
+    // The family's data (builders/), each job at its minute.
+    if (event.cron !== SETTLE_CRON && BUILD_SLOTS[min]) run(`build:${BUILD_SLOTS[min]}`, () => runBuilders(env, { proxy: builderProxy(env), now: tick.getTime(), pace, log: () => {} }));
+    // The bill's guard: its clock woken (started if it isn't); and what the
+    // owner should hear of it (ops.js tellOwner: a higher alert, a stop, a new pace).
+    if (event.cron !== SETTLE_CRON && min % 10 === 0) {
+      if (env.GUARD) ctx.waitUntil(env.GUARD.fetch('https://quota-guard/tick').catch(() => {}));
+      if (storeReady(env)) run('alerts', () => tellOwner(env, ECO_DEPS), r => (r.news ? r : null));
+    }
     // Odd minutes: Quadra Play's slips whose games should be over (settle.js),
     // in an invocation of its own (its own fetches and CPU).
     if (event.cron === SETTLE_CRON) {
       // (Every fourth minute the lottery's tickets instead, lotto.js: each run its own fetches.)
-      const tickets = new Date(event.scheduledTime || Date.now()).getUTCMinutes() % 4 === 3;
-      if (storeReady(env))
-        ctx.waitUntil(
-          (tickets ? lottoCron(env, playDeps(env)).then(r => r.settled && console.log('play tickets', JSON.stringify(r))) : settleCron(env, playDeps(env)).then(r => r.looked && console.log('play settle', JSON.stringify(r)))).catch(e => console.log('play cron failed', String(e)))
-        );
+      if (!storeReady(env)) return;
+      if (min % 4 === 3) run('lottery', () => lottoCron(env, playDeps(env)), r => (r.settled ? r : null));
+      else run('settle', () => settleCron(env, playDeps(env)), r => (r.looked ? r : null));
       return;
     }
-    ctx.waitUntil(sendDue(env).then(r => r.sent && console.log('push sent', JSON.stringify(r))));
+    run('notices', () => sendDue(env), r => (r.sent ? r : null));
     // Orbit Weather's scoring, once an hour (weather-skill.js).
-    if (new Date(event.scheduledTime || Date.now()).getUTCMinutes() === 10) ctx.waitUntil(weatherCron(env).then(r => console.log('weather skill', JSON.stringify(r))).catch(e => console.log('weather skill failed', String(e))));
+    if (!pace && min === 10) run('weather-skill', () => weatherCron(env));
     if (!storeReady(env)) return;
     // The live refreshes by how many people there are (capacity.js), every 6 hours.
-    const at = new Date(event.scheduledTime || Date.now());
-    if (at.getUTCMinutes() === 20 && at.getUTCHours() % 6 === 0) ctx.waitUntil(capacityCron(env, ECO_DEPS).then(r => console.log('capacity', JSON.stringify(r))).catch(e => console.log('capacity failed', String(e))));
-    ctx.waitUntil(refreshKambiWatch(env, KAMBI_DEPS).then(r => console.log('kambi watch', JSON.stringify(r))));
+    if (min === 20 && tick.getUTCHours() % 6 === 0) run('capacity', () => capacityCron(env, ECO_DEPS));
+    run('kambi', () => refreshKambiWatch(env, KAMBI_DEPS), r => (r.checked || r.saved ? r : null));
   }
 };

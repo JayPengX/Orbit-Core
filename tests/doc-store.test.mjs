@@ -1,28 +1,10 @@
 // The Pass's store on D1 (doc-store.js), run on SQLite itself (D1 is SQLite).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DatabaseSync } from 'node:sqlite';
+import { fakeD1 as fakeD1Of } from './fake-d1.mjs';
 import { d1Store, docStore, storeReady, SCHEMA } from '../doc-store.js';
 
-// D1's API over node:sqlite.
-function fakeD1() {
-  const db = new DatabaseSync(':memory:');
-  db.exec(SCHEMA);
-  return {
-    prepare: sql => {
-      let args = [];
-      const st = db.prepare(sql);
-      const self = {
-        bind: (...a) => ((args = a), self),
-        first: async () => st.get(...args) || null,
-        run: async () => ({ meta: { changes: Number(st.run(...args).changes) } }),
-        all: async () => ({ results: st.all(...args) })
-      };
-      return self;
-    }
-  };
-}
-// Firestore, in memory, its shape (updateTime per write).
+const fakeD1 = () => fakeD1Of(SCHEMA);
 test('D1: a write only if it is still what was read; a create only if new; a race lost says so', async () => {
   const s = d1Store(fakeD1());
   assert.deepEqual(await s.get('eco-wallets', 'a'), { exists: false, updateTime: '', payload: '' });
@@ -55,4 +37,13 @@ test('the store: every call (env, …) on D1; batches each write on its own; cou
   assert.deepEqual((await store.list(env, 'eco-wallets')).map(d => d.id), ['a']);
   assert.ok(storeReady(env));
   assert.ok(!storeReady({}));
+});
+
+test('a new version never repeats the one it replaces', async () => {
+  const s = d1Store(fakeD1());
+  const w = await s.write('c', 'a', 'one');
+  // The same stamp asked for again: a different one is used.
+  const again = await s.write('c', 'a', 'two', { updateTime: w.updateTime }, w.updateTime);
+  assert.notEqual(again.updateTime, w.updateTime);
+  await assert.rejects(s.write('c', 'a', 'three', { updateTime: w.updateTime }), e => e.precondition);
 });

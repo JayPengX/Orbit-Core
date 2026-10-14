@@ -14,6 +14,7 @@
 // The token is checked against ADMIN_TOKEN_HASH (its SHA-256; the token
 // itself is never in the repo). Clearing the hash turns this off.
 
+import { systemReport, alertAccount, tell, OPS_DOC } from './ops.js';
 import { newPasscode, updateWallet, deleteAccount, ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, PAIR_MS, ECO_LIMITS, parseWallet, poolBalance, plusMember, plusLapsed, taipeiMonth, gen, emptyWallet } from './eco.js';
 import { sendPush } from './push.js';
 import { KAMBI_COLLECTION } from './kambi.js';
@@ -737,6 +738,37 @@ export const ADMIN_TOOLS = {
       retired = doc.exists ? JSON.parse(doc.payload) : null;
     } catch {}
     return { at: deps.now(), live, retired };
+  },
+  // The proxy watching itself (ops.js): the bill and its pace, every cron
+  // job's heartbeat, the store, R2's folders, which secrets are set.
+  async system({ env, deps }) {
+    return systemReport(env, deps);
+  },
+  // Who hears of the bill (ops.js tellOwner): an account, found by its id or its pass.
+  async 'alerts-set'({ env, deps, body }) {
+    let account = String(body.account || '').trim();
+    const code = String(body.passcode || '').trim().toUpperCase().replace(/[\s-]/g, '');
+    if (code) account = await deps.sha256Hex(code);
+    if (account && !(await deps.fsGet(env, WALLET_COLLECTION, account).catch(() => null))?.exists) return { error: 'SYNC_PASSCODE_NOT_FOUND', status: 404 };
+    await deps.fsWrite(env, ...OPS_DOC, JSON.stringify({ alertAccount: account, at: deps.now() }));
+    return { alertAccount: account ? account.slice(0, 8) : '' };
+  },
+  // A notice to that account now, to see it arrive.
+  async 'alert-test'({ env, deps }) {
+    const account = await alertAccount(env, deps);
+    if (!account) return { told: 'no account set' };
+    const told = await tell(env, account, lang => ({ title: lang === 'en' ? 'Quadra admin: a test notice' : 'Quadra 管理：測試通知', body: lang === 'en' ? 'Bill alerts arrive here.' : '帳單警示會送到這裡。', tag: 'ops:test', kind: 'bill', url: 'https://jaypengx.github.io/Shared-Proxy/admin/' }));
+    return { told };
+  },
+  // One tiny Gemini call through the relay.
+  async 'gemini-check'({ env, deps }) {
+    return deps.geminiCheck ? deps.geminiCheck(env) : { ok: false, error: 'not here' };
+  },
+  // A builder now, whatever the pace (builders/run.js).
+  async build({ env, deps, body }) {
+    const job = String(body.job || '');
+    if (!['watch', 'watch-full', 'cutouts', 'buses', 'asia', 'cpbl', 'sports', 'photos', 'winprob'].includes(job)) return { error: 'ECO_UNKNOWN_OP', status: 400 };
+    return deps.build(env, job);
   },
   async health() {
     const one = async ([name, url, use]) => {

@@ -43,6 +43,9 @@ export function d1Store(raw) {
       return row ? { exists: true, updateTime: row.updated, payload: row.payload } : { exists: false, updateTime: '', payload: '' };
     },
     async write(collection, id, payload, pre, updated = stamp()) {
+      // A new version is never the one it replaces (the same millisecond and
+      // the same three random digits would let a stale write through).
+      while (pre?.updateTime && updated === pre.updateTime) updated = stamp();
       let r;
       if (pre?.updateTime) r = await db.prepare('UPDATE docs SET payload = ?, updated = ? WHERE coll = ? AND id = ? AND updated = ?').bind(payload, updated, collection, id, pre.updateTime).run();
       else if (pre?.exists === false) r = await db.prepare('INSERT OR IGNORE INTO docs (coll, id, payload, updated) VALUES (?, ?, ?, ?)').bind(collection, id, payload, updated).run();

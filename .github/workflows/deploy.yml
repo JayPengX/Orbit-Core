@@ -29,6 +29,14 @@ jobs:
       HAS_ADMIN_TOKEN: ${{ secrets.ECO_ADMIN_TOKEN != '' }}
       HAS_PUSH_SECRET: ${{ secrets.DATA_PUSH_SECRET != '' }}
     steps:
+      # The account: the deploy token's own (one), so it needn't be a secret.
+      - name: The account
+        run: |
+          id=$(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" https://api.cloudflare.com/client/v4/accounts | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.parse(s).result[0].id)}catch{console.log("")}})')
+          [ -n "$id" ] || { echo "the token sees no account"; exit 1; }
+          echo "CLOUDFLARE_ACCOUNT_ID=$id" >> "$GITHUB_ENV"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       - name: Checkout
         uses: actions/checkout@v4
       # The family's data (R2 bucket quadra-data, in Asia-Pacific; data.js):
@@ -43,7 +51,6 @@ jobs:
           echo "quadra-data bound as DATA"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       # The Pass's store on Cloudflare (D1 quadra-store, doc-store.js): made
       # once and bound to the proxy with its id (the Worker makes its table).
       # The deploy token needs Account · D1 · Edit (README §11).
@@ -57,20 +64,19 @@ jobs:
           echo "quadra-store bound as STORE ($id)"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       # Gemini's relay, pinned to Taiwan (gemini-relay.js): before the proxy that binds it.
       - name: Deploy gemini-relay
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy --config wrangler.gemini.toml
           wranglerVersion: '4'
       - name: Deploy orbit-workers-proxy (the proxy, every route)
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy
           # wrangler.toml's [placement] uses `region` (explicit cloud-region
           # placement, see that file's own comment) instead of the older
@@ -99,7 +105,6 @@ jobs:
           cd "$RUNNER_TEMP" && npx --yes wrangler@4 delete sports-proxy --force && echo "sports-proxy deleted"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       # The Quadra Pass token secret (see quadra-token.js): /eco signs
       # session tokens with it and every route checks them. Only when the repo has the secret
       # ECO_TOKEN_SECRET (any long random string); until then the proxy's
@@ -110,7 +115,6 @@ jobs:
           printf '%s' "$ECO_TOKEN_SECRET" | npx --yes wrangler@4 secret put ECO_TOKEN_SECRET
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           ECO_TOKEN_SECRET: ${{ secrets.ECO_TOKEN_SECRET }}
       # The builders' key to write the family's data (data.js /data/push; the
       # same secret is Shared-Data's).
@@ -119,7 +123,6 @@ jobs:
         run: printf '%s' "$DATA_PUSH_SECRET" | npx --yes wrangler@4 secret put DATA_PUSH_SECRET
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           DATA_PUSH_SECRET: ${{ secrets.DATA_PUSH_SECRET }}
       # The owner's admin token (tools/issue-passes.mjs makes it and keeps it
       # on the owner's computer): handing out passes, /eco op 'admin'.
@@ -128,24 +131,23 @@ jobs:
         run: printf '%s' "$ECO_ADMIN_TOKEN" | npx --yes wrangler@4 secret put ECO_ADMIN_TOKEN
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           ECO_ADMIN_TOKEN: ${{ secrets.ECO_ADMIN_TOKEN }}
-      # Firebase is gone (the store is D1, doc-store.js): its service
-      # account's secrets taken off the proxy. FIREBASE_PRIVATE_KEY stays until
-      # 2026-12-05: sign-ins made before ECO_TOKEN_SECRET (2026-10-05, 60 days)
-      # were signed with a key made from it (quadra-token.js).
-      - name: Firebase's secrets off the proxy
+      # Retired secrets taken off the proxy: Firebase's (the store is D1,
+      # doc-store.js) and MATCH_FIND_DISPATCH_TOKEN (a GitHub token for the
+      # /match-dispatch route, removed long ago). FIREBASE_PRIVATE_KEY stays
+      # until 2026-12-05: sign-ins made before ECO_TOKEN_SECRET (2026-10-05,
+      # 60 days) were signed with a key made from it (quadra-token.js).
+      - name: Retired secrets off the proxy
         continue-on-error: true
         run: |
           have=$(npx --yes wrangler@4 secret list --name orbit-workers-proxy 2>/dev/null || true)
-          gone="FIREBASE_CLIENT_EMAIL FIREBASE_PROJECT_ID"
+          gone="FIREBASE_CLIENT_EMAIL FIREBASE_PROJECT_ID MATCH_FIND_DISPATCH_TOKEN"
           [ "$(date -u +%Y%m%d)" -ge 20261206 ] && gone="$gone FIREBASE_PRIVATE_KEY"
           for s in $gone; do
             if printf '%s' "$have" | grep -q "\"$s\""; then echo y | npx --yes wrangler@4 secret delete "$s" --name orbit-workers-proxy && echo "$s removed"; fi
           done
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       # A deploy turns a Worker's workers.dev address and crons back on: while
       # the guard has the proxies stopped (the plan's amounts nearly used),
       # they go off again now, not at the guard's next run.
@@ -165,4 +167,3 @@ jobs:
           done
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
