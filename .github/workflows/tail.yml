@@ -20,7 +20,7 @@ on:
 jobs:
   tail:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       # The account: the deploy token's own (one), so it needn't be a secret.
       - name: The account
@@ -52,7 +52,8 @@ jobs:
       - name: Listen
         run: |
           if [ "$CPU" != "true" ]; then timeout "$(( ${MINUTES:-6} * 60 ))" npx --yes wrangler@4 tail "$WORKER" --format pretty || true; exit 0; fi
-          (timeout "$(( ${MINUTES:-6} * 60 ))" npx --yes wrangler@4 tail "$WORKER" --format json || true) | node -e '
+          # (The listener ends the pipe itself: a timeout on npx left wrangler holding it open.)
+          timeout -k 5 "$(( ${MINUTES:-6} * 60 + 20 ))" npx --yes wrangler@4 tail "$WORKER" --format json 2>/dev/null | node -e '
             const by = {}; let buf = "";
             const add = e => {
               const r = e.event?.request, c = e.event?.cron;
@@ -61,8 +62,10 @@ jobs:
               const k = (by[key] ||= { n: 0, cpu: 0, wall: 0 });
               k.n++; k.cpu += e.cpuTime || 0; k.wall += e.wallTime || 0;
             };
+            const finish = () => { const rows = Object.entries(by).sort((a, b) => b[1].cpu - a[1].cpu); const all = rows.reduce((s, [, v]) => s + v.cpu, 0); console.log("cpu ms in all:", all, "(cpu ms, count, wall ms, what)"); for (const [k, v] of rows) console.log(String(v.cpu).padStart(8), String(v.n).padStart(6), String(Math.round(v.wall)).padStart(9), k); process.exit(0); };
+            setTimeout(finish, Number(process.env.MINUTES || 6) * 60_000);
             process.stdin.on("data", d => { buf += d; let i; while ((i = buf.indexOf("\n}\n")) >= 0) { const one = buf.slice(0, i + 2); buf = buf.slice(i + 3); try { add(JSON.parse(one)); } catch {} } });
-            process.stdin.on("end", () => { try { add(JSON.parse(buf)); } catch {} const rows = Object.entries(by).sort((a, b) => b[1].cpu - a[1].cpu); const all = rows.reduce((s, [, v]) => s + v.cpu, 0); console.log("cpu ms in all:", all); for (const [k, v] of rows) console.log(String(v.cpu).padStart(8), String(v.n).padStart(6), String(Math.round(v.wall)).padStart(9), k); });'
+            process.stdin.on("end", finish);' || true
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           WORKER: ${{ inputs.worker }}
