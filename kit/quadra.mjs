@@ -3090,16 +3090,32 @@ export function tabBar({ tabs, onSelect, hash = id => `#${id}`, nav = document.g
     if (still) requestAnimationFrame(() => requestAnimationFrame(() => nav.style.removeProperty('transition')));
   };
   if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => pill(true)).observe(nav);
-  // Scrolling down, the bar draws in to its icons; back up (or at the top), its labels again.
+  // Scrolling down, the bar draws in to its icons; its labels come back at
+  // the top, or after a scroll back up of a good part of the screen in one
+  // go, as iOS's: not on a nudge up, nor on the page bouncing back at its foot
+  // (a fling's rubber band moved it up a few px and brought them back).
   let lastY = globalThis.scrollY || 0;
+  let dir = 0;
+  let turnY = lastY;
   globalThis.addEventListener?.(
     'scroll',
     () => {
-      const y = globalThis.scrollY || 0;
       const root = document.documentElement;
-      if (y < 40 || y < lastY - 6) root.classList.remove('q-tabs-small');
-      else if (y > lastY + 6 && !reducedMotion()) root.classList.add('q-tabs-small');
-      if (Math.abs(y - lastY) > 6) lastY = y;
+      const max = Math.max(0, root.scrollHeight - globalThis.innerHeight);
+      const y = Math.min(Math.max(globalThis.scrollY || 0, 0), max);
+      if (y < 40) {
+        root.classList.remove('q-tabs-small');
+        [lastY, dir, turnY] = [y, 0, y];
+        return;
+      }
+      if (y > lastY) {
+        if (dir !== 1) [dir, turnY] = [1, lastY];
+        if (y - turnY > 12 && !reducedMotion()) root.classList.add('q-tabs-small');
+      } else if (y < lastY) {
+        if (dir !== -1) [dir, turnY] = [-1, lastY];
+        if (turnY - y > Math.max(160, globalThis.innerHeight * 0.3)) root.classList.remove('q-tabs-small');
+      }
+      lastY = y;
     },
     { passive: true }
   );
