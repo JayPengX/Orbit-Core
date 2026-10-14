@@ -34,9 +34,28 @@
 // and the period is counted from a day before it starts (UTC midnight of the
 // day before PERIOD_DAY): an earlier start only counts more.
 //
+// Pacing (the owner, 2026-10-14: "pace it out greatly"): before any stop,
+// the month is paced. From the period's use so far the guard projects where
+// each count ends (the first three days counted as three, so a busy first
+// day isn't read as a month of them) and sets a pace the proxy follows
+// (`guard:pace` in KV, written only when it changes; pace.js):
+//   0  under 60% projected: as configured;
+//   1  60%: live refreshes ×2 slower, the background builders that can wait
+//      (photos, cutouts, buses, win probability) and the hourly extras off;
+//   2  80%: ×4, every builder off, each session's reads halved;
+//   3  90% (the stop's own mark, reached before the month ends): ×8, reads
+//      quartered.
+// A pace goes up at once and down only 10 points under its mark. The stop at
+// STOP_AT of what's been used stays the last word.
+//
+// Alerts: `alert` is the highest of 50%, 75%, 90% any count has reached this
+// period; the proxy's cron tells the owner's phone when it or the pace rises
+// (worker.js, the account set in the admin panel).
+//
 // Needs CF_GUARD_TOKEN (an API token: Account Analytics Read, Workers Scripts
-// Edit) and CF_ACCOUNT_ID, set by deploy.yml from the repo's secrets. Without
-// them it is unarmed and says so (the admin panel's 容量).
+// Edit), set by deploy-guard.yml from the repo's secret; the account is the
+// one the token belongs to (asked once, kept in the state). Without the
+// token it is unarmed and says so (the admin panel's 容量).
 
 export const PLAN = {
   requests: 10_000_000,
@@ -77,6 +96,15 @@ export const PLAN_ZH = {
 export const R2_CLASS_B = new Set(['HeadBucket', 'HeadObject', 'GetObject', 'UsageSummary', 'GetBucketEncryption', 'GetBucketLocation', 'GetBucketCors', 'GetBucketLifecycleConfiguration']);
 export const R2_FREE = new Set(['DeleteObject', 'DeleteBucket', 'AbortMultipartUpload']);
 export const STOP_AT = 0.9;
+export const PACE_KEY = 'guard:pace';
+// A pace's mark (projected share of the plan) and what it does (pace.js reads `slow`, `reads`).
+export const PACES = [
+  { at: 0, slow: 1, reads: 1 },
+  { at: 0.6, slow: 2, reads: 1 },
+  { at: 0.8, slow: 4, reads: 0.5 },
+  { at: 0.9, slow: 8, reads: 0.25 }
+];
+export const ALERTS = [0.5, 0.75, 0.9];
 // (sports-proxy, the old forwarder, is deleted from 2026-10-20: a 404 for it is
 // nothing to stop or start. Stopped with the proxy until then: it reaches the
 // proxy through a service binding, not its address.)
@@ -149,7 +177,7 @@ async function graphql(env, fetcher, query, variables) {
     throw e;
   }
   const acc = body.data?.viewer?.accounts?.[0];
-  if (!acc) throw new Error('analytics: no account (CF_ACCOUNT_ID?)');
+  if (!acc) throw new Error('analytics: no account');
   return acc;
 }
 
@@ -238,12 +266,38 @@ export function judge(use, stopAt = STOP_AT) {
   return { share, over, top };
 }
 
-// Where the period ends up at this pace (the panel's 預估).
-export function projected(use, p, now) {
-  const f = (p.end - p.from) / Math.max(DAY / 24, now - p.from);
+// Where the period ends up at this pace (the panel's 預估). `floor`: the
+// least time counted as gone (pacing counts three days at least).
+export function projected(use, p, now, floor = DAY / 24) {
+  const f = (p.end - p.from) / Math.max(floor, now - p.from);
   const out = {};
   for (const k of Object.keys(PLAN)) out[k] = /Bytes$/.test(k) ? use[k] : Math.round((use[k] || 0) * f);
   return out;
+}
+
+// The pace for a projection (each rate count's projected share; storage
+// isn't paced), with the last pace for the way down.
+export function paceFor(proj, last = 0) {
+  let top = 0;
+  for (const k of Object.keys(PLAN)) if (!/Bytes$/.test(k)) top = Math.max(top, (proj[k] || 0) / PLAN[k]);
+  let pace = 0;
+  for (let i = PACES.length - 1; i > 0; i--)
+    if (top >= PACES[i].at || (i <= last && top >= PACES[i].at - 0.1)) {
+      pace = i;
+      break;
+    }
+  return { pace, top };
+}
+export const alertFor = share => ALERTS.filter(a => Object.values(share).some(v => v >= a)).length;
+
+// The account the token belongs to (one: the guard's own token).
+async function accountOf(env, fetcher) {
+  if (env.CF_ACCOUNT_ID) return env.CF_ACCOUNT_ID;
+  const res = await fetcher(`${API}/accounts`, { headers: { Authorization: `Bearer ${env.CF_GUARD_TOKEN}` } });
+  const j = await res.json().catch(() => ({}));
+  const id = j.result?.[0]?.id;
+  if (!id) throw new Error(`no account for the token (${res.status})`);
+  return id;
 }
 
 // ---- Cloudflare's API: a Worker's address and crons ----
@@ -280,16 +334,26 @@ export async function startWorker(env, fetcher, name, saved) {
 // when something changed, or hourly for the panel: KV's 1M writes a month).
 export async function guardRun(env, { fetcher = fetch, now = Date.now(), kv = env.RATE_LIMIT_KV } = {}) {
   const prev = JSON.parse((await kv.get(STATE_KEY).catch(() => null)) || 'null') || {};
-  const armed = !!(env.CF_GUARD_TOKEN && env.CF_ACCOUNT_ID);
+  let armed = !!env.CF_GUARD_TOKEN;
   const stopAt = Number(env.STOP_AT) || STOP_AT;
-  const state = { ...prev, at: now, armed, stopAt, plan: PLAN };
+  const state = { ...prev, at: now, armed, stopAt, plan: PLAN, paces: PACES };
+  if (armed && !prev.account && !env.CF_ACCOUNT_ID)
+    try {
+      state.account = await accountOf(env, fetcher);
+    } catch (e) {
+      state.error = String(e.message || e).slice(0, 300);
+    }
+  env = { ...env, CF_ACCOUNT_ID: env.CF_ACCOUNT_ID || state.account };
+  armed = state.armed = armed && !!env.CF_ACCOUNT_ID;
   if (!armed) {
-    state.error = 'CF_GUARD_TOKEN / CF_ACCOUNT_ID not set: not watching the bill';
+    state.error = state.error || 'CF_GUARD_TOKEN not set: not watching the bill';
   } else {
     try {
       const { use, period: p, cpuWay, partial } = await readUse(env, fetcher, now);
       const j = judge(use, stopAt);
-      Object.assign(state, { use, period: p, cpuWay, partial, share: j.share, top: j.top, projected: projected(use, p, now), error: null, blindSince: null });
+      const newPeriod = prev.period && p.start > prev.period.start;
+      const pace = paceFor(projected(use, p, now, 3 * DAY), newPeriod ? 0 : prev.pace || 0);
+      Object.assign(state, { use, period: p, cpuWay, partial, share: j.share, top: j.top, projected: projected(use, p, now), pace: pace.pace, paceTop: pace.top, alert: alertFor(j.share), error: null, blindSince: null });
       if (j.over.length && !prev.stopped) state.stopped = { at: now, why: j.over, periodStart: p.start, saved: {} };
       else if (prev.stopped && p.start > prev.stopped.periodStart && !j.over.length) state.restart = true;
     } catch (e) {
@@ -323,7 +387,12 @@ export async function guardRun(env, { fetcher = fetch, now = Date.now(), kv = en
     state.stopped = { ...state.stopped, saved };
   }
   state.acts = acts;
-  const changed = acts.length || !!prev.stopped !== !!state.stopped || prev.error !== state.error || prev.armed !== armed;
+  // The pace for the proxy (pace.js), only when it changes.
+  if ((state.pace || 0) !== (prev.pace || 0)) {
+    state.paceSince = now;
+    await kv.put(PACE_KEY, JSON.stringify({ pace: state.pace || 0, ...PACES[state.pace || 0], at: now, top: state.paceTop }));
+  }
+  const changed = acts.length || !!prev.stopped !== !!state.stopped || prev.error !== state.error || prev.armed !== armed || (state.pace || 0) !== (prev.pace || 0) || (state.alert || 0) !== (prev.alert || 0);
   if (changed || !prev.at || now - (prev.saved || 0) >= 3_600_000) {
     state.saved = now;
     await kv.put(STATE_KEY, JSON.stringify(state));

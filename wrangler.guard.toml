@@ -1,11 +1,12 @@
 # The hard stop on Cloudflare's bill (guard.js): reads the account's use
-# every five minutes and takes both proxies off the air before anything
-# passes the $5 Workers Paid plan's included amounts, until the next period.
+# every five minutes, paces the month (guard:pace, pace.js) and takes the
+# proxy off the air before anything passes the $5 Workers Paid plan's
+# included amounts, until the next period.
 #
-# CI deploys it on every push to main (.github/workflows/deploy.yml), with its
-# secrets from the repo's: CF_GUARD_TOKEN (an API token the owner makes:
-# Account Analytics Read + Workers Scripts Edit) and CF_ACCOUNT_ID
-# (CLOUDFLARE_ACCOUNT_ID). Manual deploy:
+# CI deploys it when its own files change (.github/workflows/deploy-guard.yml),
+# with one secret from the repo's: CF_GUARD_TOKEN (an API token the owner
+# makes: Account Analytics Read + Workers Scripts Edit); the account is the
+# token's own. Manual deploy:
 #   npx wrangler deploy -c wrangler.guard.toml
 name = "quota-guard"
 main = "guard-worker.js"

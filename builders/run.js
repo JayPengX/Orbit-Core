@@ -18,6 +18,7 @@
 // (sports.js). Nothing is built on GitHub any more (Shared-Data retired).
 
 import { r2Store } from './store.js';
+import { builderAllowed } from '../pace.js';
 import { runWatch } from './watch.js';
 import { runWinprob } from './winprob.js';
 import { runCpbl, CPBL_HOUR } from './cpbl.js';
@@ -34,12 +35,15 @@ export const WINPROB_HOUR = 23;
 export const SLOTS = { 16: 'watch', 20: 'cutouts', 22: 'daily', 24: 'buses' };
 
 // `proxy(url, trim)`: a read through the data proxy's route (its trims and edge cache), its JSON or null.
-export async function runBuilders(env, { proxy, now = Date.now(), job = SLOTS[new Date(now).getUTCMinutes()], full, only, log = console.log } = {}) {
+// `pace` (pace.js): at 1 only what phones would miss runs, from 2 nothing
+// (a job asked for by hand, `only`, runs whatever the pace).
+export async function runBuilders(env, { proxy, now = Date.now(), job = SLOTS[new Date(now).getUTCMinutes()], full, only, pace = 0, log = console.log } = {}) {
   if (!env.DATA || (!job && !only)) return { off: env.DATA ? 'no job this minute' : 'no data bucket' };
   const store = r2Store(env.DATA);
   const hour = new Date(now).getUTCHours();
   const done = {};
   const step = async (name, fn) => {
+    if (!only && !builderAllowed(pace, name)) return void (done[name] = { paced: pace });
     try {
       done[name] = await fn();
     } catch (e) {

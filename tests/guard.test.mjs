@@ -59,6 +59,7 @@ function fakeCf(use, { cpuField = true, fail = false, d1Fail = false } = {}) {
       if (q.includes('r2StorageAdaptiveGroups')) return acc({ x: [{ max: { payloadSize: use.r2Bytes || 0, metadataSize: 0 }, dimensions: { bucketName: 'quadra-data', datetime: '2026-10-20T00:00:00Z' } }, { max: { payloadSize: 1, metadataSize: 0 }, dimensions: { bucketName: 'quadra-data', datetime: '2026-10-19T00:00:00Z' } }] });
       return acc({ x: [] });
     }
+    if (url.endsWith('/accounts')) return json({ success: true, result: [{ id: 'acct-1' }] });
     const m = /scripts\/([^/]+)\/(subdomain|schedules)$/.exec(url);
     const w = workers[m[1]];
     if (!w) return { ok: false, status: 404, json: async () => ({ success: false, errors: [{ message: 'This Worker does not exist on your account.' }] }) };
@@ -209,4 +210,36 @@ test('a Worker that is gone (the old sports-proxy, deleted) never keeps the prox
   const back = await guardRun(env, { fetcher: cf2.fetcher, kv, now: T('2026-11-13T00:05:00Z') });
   assert.equal(back.stopped, null);
   assert.ok(cf.workers['orbit-workers-proxy'].on);
+});
+
+test('pacing: the projected month sets the pace; it goes up at once, down only 10 points under its mark', async () => {
+  const { paceFor, alertFor, PACES } = await import('../guard.js');
+  assert.equal(paceFor({ requests: 5_000_000 }).pace, 0);
+  assert.equal(paceFor({ requests: 6_100_000 }).pace, 1);
+  assert.equal(paceFor({ cpuMs: 24_500_000 }).pace, 2);
+  assert.equal(paceFor({ kvWrite: 950_000 }).pace, 3);
+  assert.equal(paceFor({ requests: 8_500_000 }, 3).pace, 3, 'held: 85% is within 10 points of 90%');
+  assert.equal(paceFor({ requests: 7_500_000 }, 3).pace, 2);
+  assert.equal(paceFor({ requests: 4_000_000 }, 1).pace, 0);
+  assert.equal(paceFor({ kvBytes: 999_000_000 }).pace, 0, 'storage is never paced');
+  assert.deepEqual(PACES.map(p => p.slow), [1, 2, 4, 8]);
+  assert.equal(alertFor({ requests: 0.2, cpuMs: 0.55 }), 1);
+  assert.equal(alertFor({ requests: 0.91 }), 3);
+});
+
+test('the account is the token\'s own (asked once, kept); the pace is written for the proxy only when it changes', async () => {
+  const cf = fakeCf({ requests: 2_000_000 });
+  const kv = fakeKv();
+  const bare = { CF_GUARD_TOKEN: 't', PERIOD_DAY: '13' };
+  // Five days in at 2M: 12M a month projected, pace 3.
+  const s = await guardRun(bare, { fetcher: cf.fetcher, kv, now: T('2026-10-18T00:00:00Z') });
+  assert.equal(s.account, 'acct-1');
+  assert.ok(s.armed);
+  assert.equal(s.pace, 3);
+  assert.equal(JSON.parse(kv.m.get('guard:pace')).slow, 8);
+  assert.equal(cf.calls.filter(c => c.endsWith('/accounts')).length, 1);
+  kv.m.delete('guard:pace');
+  const again = await guardRun(bare, { fetcher: fakeCf({ requests: 2_000_000 }).fetcher, kv, now: T('2026-10-18T00:05:00Z') });
+  assert.equal(again.pace, 3);
+  assert.equal(kv.m.get('guard:pace'), undefined, 'unchanged: not written again');
 });

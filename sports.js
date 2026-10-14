@@ -12,6 +12,7 @@
 // (from /eco), checked with ECO_TOKEN_SECRET and counted per session and app
 // in this isolate's memory, never in KV. A localhost page without one is let
 // in by the dev door (SPORTS_DEV).
+import { paceOf } from './pace.js';
 import { readToken, sessionLimited } from './quadra-token.js';
 import { BRANDS } from './kit/brand.mjs';
 import { ASIA_HOST, asiaBaseballResponse, asiaTarget, cpblBoxTarget } from './asia-baseball.js';
@@ -1008,7 +1009,9 @@ async function checkSession(env, requestParams, headers, weight = 1, request = n
   }
   const session = await readToken(env.ECO_TOKEN_SECRET, requestParams.get('qt') || '', 'ses');
   if (!session) return { error: json({ error: { code: 'QUADRA_PASS_REQUIRED', message: 'Sign in with a Quadra Pass.' } }, 401, headers) };
-  for (let i = 0; i < weight; i++) if (sessionLimited(`${app}:${session.s}`, SESSION_RATE_LIMIT)) return { error: tooMany(headers) };
+  // (Paced by the bill's guard: a share of the usual, pace.js.)
+  const limit = Math.max(60, Math.round(SESSION_RATE_LIMIT * (await paceOf(env)).reads));
+  for (let i = 0; i < weight; i++) if (sessionLimited(`${app}:${session.s}`, limit)) return { error: tooMany(headers) };
   return { session };
 }
 
