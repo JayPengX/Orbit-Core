@@ -15,18 +15,20 @@
   .lede { color: var(--q-muted); margin: 4px 2px 16px; line-height: 1.5; }
   h2 { font-size: 20px; margin: 24px 2px 10px; }
   h3 { font-size: 16px; margin: 18px 0 8px; }
-  .card { border: 1px solid var(--q-border); border-radius: var(--q-radius); background: var(--q-surface); box-shadow: var(--q-shadow-sm); padding: 16px 18px; }
+  .card { border: 0; border-radius: var(--q-r-card); background: var(--q-surface); padding: 16px 18px; }
   .card + .card { margin-top: 12px; }
   .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
   .spread { justify-content: space-between; }
-  input, select { font: inherit; font-size: 16px; padding: 11px 13px; border-radius: 12px; border: 1px solid var(--q-border); background: var(--q-surface-2); color: var(--q-text); min-width: 0; }
+  input, select { font: inherit; font-size: 16px; padding: 11px 13px; border-radius: var(--q-r-cell); border: 0; background: var(--q-fill-3); color: var(--q-text); min-width: 0; }
   input[type='number'] { width: 120px; }
   .grow { flex: 1 1 200px; }
-  button { font: inherit; font-size: 15px; font-weight: 700; padding: 11px 16px; border-radius: 12px; border: 1px solid var(--q-border); background: var(--q-surface); color: var(--q-text); cursor: pointer; white-space: nowrap; }
-  button.primary { background: var(--q-accent); border-color: var(--q-accent); color: #fff; }
-  button.danger { color: var(--q-bad); border-color: color-mix(in srgb, var(--q-bad) 45%, var(--q-border)); }
-  button.small, a.button.small { padding: 7px 12px; font-size: 13.5px; border-radius: 10px; }
-  a.button { display: inline-block; font-weight: 700; border: 1px solid var(--q-border); background: var(--q-surface); color: var(--q-text); text-decoration: none; white-space: nowrap; }
+  /* The kit's buttons: capsules, grey with the accent's text; the main one filled. */
+  button { font: inherit; font-size: 15px; font-weight: 600; padding: 11px 18px; border-radius: 999px; border: 0; background: var(--q-fill-2); color: var(--q-accent); cursor: pointer; white-space: nowrap; transition: transform var(--q-dur-snappy) var(--q-spring-snappy); }
+  button:active:not(:disabled) { transform: scale(0.96); }
+  button.primary { background: var(--q-accent); color: #fff; }
+  button.danger { color: var(--q-red); background: color-mix(in srgb, var(--q-red) 14%, transparent); }
+  button.small, a.button.small { padding: 7px 14px; font-size: 14px; border-radius: 999px; }
+  a.button { display: inline-block; font-weight: 600; border: 0; border-radius: 999px; background: var(--q-fill-2); color: var(--q-accent); text-decoration: none; white-space: nowrap; }
   button:disabled { opacity: 0.5; cursor: default; }
   .muted { color: var(--q-muted); font-size: 14px; }
   .error { color: var(--q-bad); font-weight: 600; min-height: 1.2em; margin: 8px 0 0; }
@@ -36,11 +38,11 @@
   /* Views */
   .tabs { position: sticky; top: 0; z-index: 2; display: flex; gap: 4px; padding: 4px; margin: 8px 0 4px; border-radius: 999px; background: var(--q-fill, var(--q-surface-2)); overflow-x: auto; scrollbar-width: none; }
   .tabs::-webkit-scrollbar { display: none; }
-  .tabs button { flex: 1 0 auto; border: 0; background: none; border-radius: 999px; padding: 9px 16px; color: var(--q-text-2); }
-  .tabs button[aria-pressed='true'] { background: var(--q-surface); color: var(--q-accent); box-shadow: var(--q-shadow-sm); }
+  .tabs button { flex: 1 0 auto; border: 0; background: none; border-radius: 999px; padding: 9px 16px; color: var(--q-label); font-weight: 500; }
+  .tabs button[aria-pressed='true'] { background: var(--q-elevated); color: var(--q-label); box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12), 0 3px 1px rgba(0, 0, 0, 0.04); }
   /* Figures */
   .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
-  .tile { padding: 12px 14px; border-radius: 14px; background: var(--q-surface-2); min-width: 0; }
+  .tile { padding: 12px 14px; border-radius: 16px; background: var(--q-fill-4); min-width: 0; }
   .tile small { display: block; color: var(--q-muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .tile strong { display: block; font-size: 24px; font-weight: 800; margin-top: 2px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .tile em { display: block; font-style: normal; color: var(--q-muted); font-size: 12px; margin-top: 2px; white-space: nowrap; }
