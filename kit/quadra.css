@@ -1207,14 +1207,32 @@ button,
   border-radius: 3px;
   background: var(--q-label-3);
 }
+/* Rises quick and settles, no long crawl at the end (iOS's sheet: about
+   0.4 s; a spring's tail on a sheet this tall was a slow last 90 px). */
 .q-sheet[open] {
-  animation: q-sheet-up var(--q-dur-smooth) var(--q-spring-smooth);
+  animation: q-sheet-up 0.42s var(--q-ease);
 }
 .q-sheet[open]::backdrop {
   animation: q-fade-in 0.3s ease-out;
 }
 .q-sheet.q-settle {
-  transition: transform var(--q-dur-snappy) var(--q-spring-snappy);
+  transition: transform 0.36s var(--q-spring-snappy);
+}
+/* Under a finger (quadra.mjs sheetSwipe): its own layer, nothing between it and the finger. */
+.q-sheet.q-dragging {
+  animation: none;
+  transition: none;
+  will-change: transform;
+}
+/* Closing (quadra.mjs closeSheet): down to the foot at the finger's own speed, the dimming fading. */
+.q-sheet.q-leaving {
+  animation: none;
+  transition: transform var(--q-leave, 0.3s) cubic-bezier(0.2, 0.7, 0.3, 1);
+  will-change: transform;
+  pointer-events: none;
+}
+.q-sheet.q-leaving::backdrop {
+  animation: q-fade-out 0.3s ease forwards;
 }
 /* Closing (an app adds .q-closing, then closes it a moment later). */
 .q-sheet.q-closing {
@@ -2171,7 +2189,8 @@ input[type='checkbox'][switch] {
   .q-tabbar .q-tab,
   .q-tabbar .q-tab-icon,
   .q-tabbar .q-tab-label,
-  .q-progress > i {
+  .q-progress > i,
+  .q-sheet.q-settle {
     transition: none;
   }
   .q-sheet[open],

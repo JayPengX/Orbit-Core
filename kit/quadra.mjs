@@ -784,28 +784,57 @@ export function haptic() {
 // whose kit is an older one (an import of a name the old kit lacks would not).
 if (typeof globalThis !== 'undefined') globalThis.quadraHaptic = haptic;
 
+// A sheet closing slides to the foot as its dimming fades, as iOS's (its ✕,
+// a tap outside, a swipe): quicker the faster a finger let it go (`speed`,
+// px/ms), a third of a second at most. A wide screen's (it popped in) and
+// one asked for no motion just close.
+export function closeSheet(d, speed = 0) {
+  if (!d?.open || d.classList.contains('q-leaving')) return;
+  if (innerWidth >= 720 || globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return d.close();
+  const rest = Math.max(0, innerHeight - d.getBoundingClientRect().top);
+  const ms = Math.round(Math.min(300, Math.max(160, speed > 0 ? rest / speed : 300)));
+  d.classList.remove('q-settle', 'q-dragging');
+  d.style.setProperty('--q-leave', `${ms}ms`);
+  d.classList.add('q-leaving');
+  d.style.transform = 'translateY(110%)';
+  let done = false;
+  const shut = () => {
+    if (done) return;
+    done = true;
+    d.close();
+    d.classList.remove('q-leaving');
+    d.style.transform = '';
+  };
+  d.addEventListener('transitionend', e => e.target === d && e.propertyName === 'transform' && shut());
+  setTimeout(shut, ms + 60);
+}
+if (typeof globalThis !== 'undefined') globalThis.quadraCloseSheet = closeSheet;
+
 // A sheet swiped down from its top closes, as on iOS (a phone's bottom
-// sheets, dialog.q-sheet): it follows the finger and closes past 120 px or a
-// quick flick, else springs back. Not from a field or a sideways list, and
-// not while the sheet is scrolled (that finger scrolls it).
+// sheets, dialog.q-sheet): it follows the finger and closes past 120 px or
+// on a flick (its speed over the last tenth of a second, not since the
+// touch), else springs back. Not from a field or a sideways list, and not
+// while the sheet is scrolled (that finger scrolls it).
 function sheetSwipe() {
   if (typeof document === 'undefined' || document.__quadraSheetSwipe) return;
   document.__quadraSheetSwipe = true;
   let sheet = null;
   let y0 = 0;
   let x0 = 0;
-  let t0 = 0;
   let dy = 0;
   let dragging = false;
+  // The finger's last moves: [time, y], for its speed when it lets go.
+  let trail = [];
   document.addEventListener(
     'touchstart',
     e => {
       const s = e.target.closest?.('dialog.q-sheet[open]');
       sheet = null;
-      if (!s || e.touches.length !== 1 || innerWidth >= 720 || s.scrollTop > 0) return;
+      if (!s || e.touches.length !== 1 || innerWidth >= 720 || s.scrollTop > 0 || s.classList.contains('q-leaving')) return;
       if (e.target.closest('input, textarea, select, [contenteditable], .q-chips, .ot-scroll-chips, .leaflet-container')) return;
       sheet = s;
-      [x0, y0, t0, dy, dragging] = [e.touches[0].clientX, e.touches[0].clientY, Date.now(), 0, false];
+      [x0, y0, dy, dragging] = [e.touches[0].clientX, e.touches[0].clientY, 0, false];
+      trail = [[e.timeStamp, 0]];
     },
     { passive: true }
   );
@@ -822,6 +851,7 @@ function sheetSwipe() {
           // (A sheet with more to show scrolls up; one that fits gives a little.)
           if (sheet.scrollHeight > sheet.clientHeight + 1) return void (sheet = null);
           dragging = true;
+          sheet.classList.add('q-dragging');
           return;
         }
         // Downward from the first move on, the finger is the sheet's: left
@@ -829,10 +859,15 @@ function sheetSwipe() {
         if (y > 0 && y >= Math.abs(x) && e.cancelable) e.preventDefault();
         if (y < 8) return;
         dragging = true;
+        // Taken from where it is (still rising, or springing back).
+        sheet.classList.remove('q-settle');
+        sheet.classList.add('q-dragging');
       }
       // Down with the finger; pulled up, it gives a little and no more (iOS's rubber band).
       dy = y >= 0 ? y : -Math.sqrt(-y) * 2.2;
       sheet.style.transform = `translateY(${dy}px)`;
+      trail.push([e.timeStamp, y]);
+      while (trail.length > 2 && e.timeStamp - trail[0][0] > 100) trail.shift();
       if (e.cancelable) e.preventDefault();
     },
     { passive: false }
@@ -842,15 +877,16 @@ function sheetSwipe() {
     sheet = null;
     if (!s || !dragging) return;
     dragging = false;
+    s.classList.remove('q-dragging');
+    const [[ta, ya], [tb, yb]] = [trail[0], trail.at(-1)];
+    const speed = tb > ta ? (yb - ya) / (tb - ta) : 0;
+    if (speed > -0.2 && (dy > 120 || (dy > 24 && speed > 0.5))) {
+      haptic();
+      return closeSheet(s, speed);
+    }
     s.classList.add('q-settle');
-    const gone = dy > 120 || (dy > 40 && dy / Math.max(1, Date.now() - t0) > 0.6);
-    s.style.transform = gone ? 'translateY(110%)' : '';
-    if (gone) haptic();
-    setTimeout(() => {
-      if (gone) s.close();
-      s.classList.remove('q-settle');
-      s.style.transform = '';
-    }, 300);
+    s.style.transform = '';
+    setTimeout(() => s.classList.remove('q-settle'), 500);
   };
   document.addEventListener('touchend', end);
   document.addEventListener('touchcancel', end);
