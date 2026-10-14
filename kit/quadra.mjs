@@ -3093,21 +3093,30 @@ export function tabBar({ tabs, onSelect, hash = id => `#${id}`, nav = document.g
   // Scrolling down, the bar draws in to its icons; its labels come back at
   // the top, or after a scroll back up of a good part of the screen in one
   // go, as iOS's: not on a nudge up, nor on the page bouncing back at its foot
-  // (a fling's rubber band moved it up a few px and brought them back).
+  // (a fling's rubber band moved it up a few px and brought them back). Only
+  // a page with room to scroll (one that nearly fits, Transit's 交通 at 78 px,
+  // never draws it in: its labels would come back only at its very top), and
+  // never from what the page did itself: a page grown shorter pulling the
+  // scroll up, or a tab's own place put back (a change of tab shows the whole
+  // bar, as iOS's, the map's included).
   let lastY = globalThis.scrollY || 0;
+  let lastMax = 0;
   let dir = 0;
   let turnY = lastY;
+  const root = document.documentElement;
+  const resetScroll = (y = globalThis.scrollY || 0) => {
+    root.classList.remove('q-tabs-small');
+    [lastY, dir, turnY] = [y, 0, y];
+  };
   globalThis.addEventListener?.(
     'scroll',
     () => {
-      const root = document.documentElement;
       const max = Math.max(0, root.scrollHeight - globalThis.innerHeight);
       const y = Math.min(Math.max(globalThis.scrollY || 0, 0), max);
-      if (y < 40) {
-        root.classList.remove('q-tabs-small');
-        [lastY, dir, turnY] = [y, 0, y];
-        return;
-      }
+      const shrunk = max < lastMax - 1 && y >= max - 1;
+      lastMax = max;
+      if (y < 40 || max < 200) return resetScroll(y);
+      if (shrunk) return void ([lastY, turnY] = [y, y]);
       if (y > lastY) {
         if (dir !== 1) [dir, turnY] = [1, lastY];
         if (y - turnY > 12 && !reducedMotion()) root.classList.add('q-tabs-small');
@@ -3155,8 +3164,9 @@ export function tabBar({ tabs, onSelect, hash = id => `#${id}`, nav = document.g
       if (changed && !first) {
         // After the app has drawn the tab (it does so right after select).
         const y = top ? 0 : places[id] || 0;
+        resetScroll(y);
         globalThis.scrollTo?.(0, y);
-        if (y) requestAnimationFrame(() => globalThis.scrollTo(0, y));
+        if (y) requestAnimationFrame(() => (globalThis.scrollTo(0, y), resetScroll(globalThis.scrollY || 0)));
       }
     },
     // A count (a number or short text) on a tab's icon; 0/''/null hides it.
