@@ -7,7 +7,7 @@
 //   tabs    「每個分頁」: one line per tab, in the tab bar's order
 //   …       what's particular to it (a few topics)
 //   money   「錢怎麼算」: how it touches the one Quadra wallet
-// (The Quadra Pass's own guide: what, account, one, safe, plus, vip, money.)
+// (The Quadra Pass's own guide: what, account, one, net, safe, plus, vip, money.)
 //
 // HELP[app][lang] = [[topic id, title, [paragraphs]], …]
 
@@ -28,6 +28,11 @@ export const HELP = {
       ['one', '一次只用一個 App', [
         '同一個通行碼一次只在一個 App、一台裝置上使用。打開另一個 App（或另一台裝置），原本那個會暫停並顯示「在別處使用中」，按一下就能拿回來，資料不會互相蓋掉。',
         '從一個 App 跳到另一個（例如 Orbit Sports 的「到 Play 下注」）會自動帶著登入。'
+      ]],
+      ['net', '沒有網路的時候', [
+        'Words、Weather 和 Class 沒有網路也能打開：背單字、上次的天氣預報和你的課表都在手機上，連上網路後再同步。底部會顯示「沒有網路連線」。',
+        'Securities、Play、Transit 和 Sports 的內容都是即時的（報價、賠率、公車到站、比分），舊的資料會讓人誤會，所以沒有網路時只顯示「沒有網路連線」和「重試」，連上網路就自動回來。',
+        '網路很慢時，App 會先用手機上的資料打開，底部顯示「網路連線很慢」，新資料到了就更新。'
       ]],
       ['safe', '安全', [
         '伺服器只保存通行碼的雜湊值；裝置上只有會過期、可以撤銷的登入憑證，不會有通行碼本身。',
@@ -61,6 +66,11 @@ export const HELP = {
       ['one', 'One app at a time', [
         'A pass is used in one app on one device at a time. Opening another app (or device) pauses the first, which says it’s in use elsewhere; one tap takes it back, so nothing overwrites anything.',
         'Going from one app to another (Bet in Play from Orbit Sports, say) arrives signed in.'
+      ]],
+      ['net', 'Without a connection', [
+        'Words, Weather and Class open with no connection: your words, the last forecast and your timetable are on the phone, and sync once you’re back online. A note at the bottom says “No internet connection”.',
+        'Securities, Play, Transit and Sports are live (prices, odds, buses, scores), and old figures would mislead, so with no connection they show only “No internet connection” and Try again, and come back by themselves once you’re online.',
+        'On a slow connection an app opens on what the phone has, says “Slow internet connection” at the bottom, and updates as the new data arrives.'
       ]],
       ['safe', 'Security', [
         'The server keeps only a hash of the pass; devices keep only sign-ins that expire and can be revoked, never the pass itself.',

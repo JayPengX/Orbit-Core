@@ -3061,6 +3061,208 @@ function steadyTabBar() {
 }
 steadyTabBar();
 
+// ---- The connection: off, slow, or fine, said once for every app ----------------------------
+//
+// Every request the page makes beyond its own files is watched (the kit's
+// and the app's own: Weather's forecast, Transit's buses). An answer of any
+// kind means the network is there; a request that reached nothing, or the
+// phone saying it's offline, means it isn't; one still waiting after 5 s
+// with nothing answered meanwhile means it's slow. While it's off or slow a
+// glass capsule over the tab bar says so (沒有網路連線, 網路連線很慢) and the
+// app goes on with what the phone kept (every read answers its saved copy
+// when the network fails); a tap tries again. Back on, the capsule goes
+// and the app's own refresh runs (topActions' refresh) once.
+// netState() 'online' | 'offline' | 'slow'; onNet(fn(next, was)).
+const NET_SLOW_MS = 5000;
+const net = { state: 'online', waiting: new Map(), lastOk: Date.now(), fails: 0, subs: new Set(), refresh: null, timer: 0, id: 0, only: null, reached: false, hadReached: false };
+export const netState = () => net.state;
+export function onNet(fn) {
+  net.subs.add(fn);
+  return () => net.subs.delete(fn);
+}
+function setNet(next) {
+  if (next === net.state) return;
+  const was = net.state;
+  net.state = next;
+  rec('net', { next, was });
+  paintNet();
+  for (const fn of net.subs) {
+    try {
+      fn(next, was);
+    } catch {}
+  }
+  // Back on: the app's refresh; an online-only app that opened with no connection (its first screen never read) opens again.
+  if (next === 'offline') net.hadReached = net.reached;
+  if (next === 'online' && was === 'offline') setTimeout(() => (net.only && !net.hadReached ? location.reload() : net.refresh?.()), 0);
+  clearInterval(net.timer);
+  // While it's off or slow: judged each second, and the network tried every 10 s.
+  if (next !== 'online') {
+    let n = 0;
+    net.timer = setInterval(() => (judgeNet(), ++n % 10 === 0 && probeNet()), 1000);
+  }
+}
+// The rule: the phone says it's offline, or twice nothing was reached since
+// the last answer (a phone on Wi-Fi without internet says it's online): off.
+// A request waiting over 5 s with nothing answered meanwhile: slow.
+export function netVerdict({ onLine = true, fails = 0, waitingSince = [], lastOk = 0, now = Date.now() } = {}) {
+  if (onLine === false || fails >= 2) return 'offline';
+  return waitingSince.some(t => now - t > NET_SLOW_MS) && now - lastOk > NET_SLOW_MS ? 'slow' : 'online';
+}
+function judgeNet() {
+  setNet(netVerdict({ onLine: globalThis.navigator?.onLine, fails: net.fails, waitingSince: [...net.waiting.values()], lastOk: net.lastOk }));
+}
+// One small ask that never comes from a copy: the kit's version.
+function probeNet() {
+  const base = globalThis.QUADRA_KIT?.base;
+  if (!base) return;
+  globalThis.fetch(`${base}version.json?net=${Date.now()}`, { cache: 'no-store', signal: AbortSignal.timeout(8000) }).catch(() => {});
+}
+function paintNet() {
+  if (typeof document === 'undefined') return;
+  paintCover();
+  let box = document.querySelector('.q-net');
+  if (net.state === 'online') {
+    if (box && !box.classList.contains('out')) {
+      box.classList.add('out');
+      setTimeout(() => box.classList.contains('out') && box.remove(), 320);
+    }
+    document.documentElement.classList.remove('q-net-on');
+    return;
+  }
+  const zh = detectLang() !== 'en';
+  // (Off in an online-only app: its cover says it, not the capsule too.)
+  if (net.only && net.state === 'offline') {
+    box?.remove();
+    document.documentElement.classList.remove('q-net-on');
+    return;
+  }
+  if (!box) {
+    box = node('button', { class: 'q-net', type: 'button', role: 'status', 'aria-live': 'polite' });
+    box.addEventListener('click', () => {
+      haptic();
+      net.fails = 0;
+      probeNet();
+      net.refresh?.();
+    });
+    document.body.append(box);
+  }
+  box.classList.remove('out');
+  box.dataset.state = net.state;
+  box.innerHTML = `${icon(net.state)}<span></span>`;
+  box.querySelector('span').textContent = net.state === 'offline' ? (zh ? '沒有網路連線' : 'No internet connection') : zh ? '網路連線很慢' : 'Slow internet connection';
+  document.documentElement.classList.add('q-net-on');
+}
+// An app whose every screen is live (Securities' prices and trades, Play's
+// odds, Transit's buses, Sports' scores): with no connection it isn't shown
+// on what the phone kept (an hour-old price or bus reads as now), but
+// covered: its mark, 沒有網路連線, why, and 重試. A slow connection never
+// covers it (the capsule says so; the answers come). Apps that are useful on
+// what they kept (Words, Weather, Class) don't call this and lock only what
+// needs the network. `why`: one short line, { zh, en }.
+export function onlineOnly(why = {}) {
+  net.only = { why: (detectLang() === 'en' ? why.en : why.zh) || '' };
+  // (The capsule too: one drawn before the app said so goes.)
+  paintNet();
+}
+function paintCover() {
+  if (typeof document === 'undefined' || !document.body) return;
+  let cover = document.querySelector('.q-offline');
+  if (!net.only || net.state !== 'offline') {
+    cover?.remove();
+    return;
+  }
+  if (cover) return;
+  const zh = detectLang() !== 'en';
+  const boot = document.getElementById('loading');
+  const logo = boot?.getAttribute('data-logo') || './favicon.svg';
+  const title = boot?.getAttribute('data-title') || document.title;
+  cover = node('div', { class: 'q-offline', role: 'alert' }, [
+    node('img', { class: 'q-offline-logo', src: logo, alt: '', width: 64, height: 64 }),
+    node('p', { class: 'q-offline-app', text: title }),
+    node('h2', { class: 'q-offline-title', text: zh ? '沒有網路連線' : 'No internet connection' }),
+    net.only.why ? node('p', { class: 'q-offline-why', text: net.only.why }) : null
+  ]);
+  const again = node('button', { class: 'q-btn primary q-offline-again', type: 'button', text: zh ? '重試' : 'Try again' });
+  again.addEventListener('click', () => {
+    haptic();
+    again.disabled = true;
+    net.fails = 0;
+    probeNet();
+    setTimeout(() => ((again.disabled = false), judgeNet()), 1500);
+  });
+  cover.append(again);
+  document.body.append(cover);
+}
+function watchNet() {
+  if (typeof window === 'undefined' || window.__quadraNet || typeof window.fetch !== 'function') return;
+  window.__quadraNet = true;
+  const real = window.fetch.bind(window);
+  const own = url => {
+    try {
+      const u = new URL(url, location.href);
+      // The page's own files (its service worker keeps them) aren't the connection; the probe is.
+      return u.origin === location.origin && !u.searchParams.has('net');
+    } catch {
+      return true;
+    }
+  };
+  window.fetch = (input, init) => {
+    const url = typeof input === 'string' ? input : input?.url || String(input);
+    if (own(url)) return real(input, init);
+    const k = ++net.id;
+    net.waiting.set(k, Date.now());
+    if (net.state === 'online') setTimeout(judgeNet, NET_SLOW_MS + 50);
+    return real(input, init).then(
+      res => {
+        net.waiting.delete(k);
+        net.lastOk = Date.now();
+        net.reached = true;
+        net.fails = 0;
+        judgeNet();
+        return res;
+      },
+      error => {
+        net.waiting.delete(k);
+        // Given up on by the app (a sheet closed): says nothing of the network. A time limit run out: slow at best.
+        if (error?.name !== 'AbortError') net.fails += error?.name === 'TimeoutError' ? 0 : 1;
+        judgeNet();
+        throw error;
+      }
+    );
+  };
+  addEventListener('offline', judgeNet);
+  addEventListener('online', () => {
+    net.fails = 0;
+    probeNet();
+    judgeNet();
+  });
+  // (Judged once the module has run: its icons are defined further on.)
+  setTimeout(judgeNet, 0);
+}
+watchNet();
+
+// The app's own files kept for opening without a connection: its service
+// worker registered, and told every file the page has loaded (the first
+// opening's too, before the worker was in charge; again when the app goes
+// to the background, for what it loaded later), so it opens offline next
+// time. Every app calls this in place of registering its own.
+export function keepOffline(path = './sw.js') {
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator) || !globalThis.isSecureContext) return;
+  const tell = reg => {
+    const urls = [location.href.split('#')[0], ...performance.getEntriesByType('resource').map(e => e.name)].filter(u => u.startsWith(location.origin) && !/version\.json/.test(u));
+    reg?.active?.postMessage({ type: 'cache', urls });
+  };
+  navigator.serviceWorker
+    // (The worker itself always from the network: an update never waits on a browser's copy of sw.js.)
+    .register(path, { updateViaCache: 'none' })
+    .then(() => navigator.serviceWorker.ready)
+    .then(reg => {
+      tell(reg);
+      document.addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && tell(reg));
+    })
+    .catch(() => {});
+}
+
 // ---- The app frame: the tab bar and the top-right, the same in every app -------------------
 //
 // Every app's header is the same markup (index.html):
@@ -3087,6 +3289,8 @@ export const ICONS = {
   pass: '<rect x="3" y="5" width="18" height="14" rx="3"/><circle cx="9" cy="11" r="2.2"/><path d="M5.8 16.2c.6-1.6 1.8-2.4 3.2-2.4s2.6.8 3.2 2.4M14.5 10h3.5M14.5 13.5h2.5"/>',
   eye: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3.2"/>',
   grid: '<rect x="4" y="4" width="6.5" height="6.5" rx="1.8"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.8"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.8"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.8"/>',
+  offline: '<path d="M2.5 8.8a14 14 0 0 1 4-2.6M9.6 5.2A14 14 0 0 1 21.5 8.8M5.6 12.3a9 9 0 0 1 3.7-2.1M14.7 10.3a9 9 0 0 1 3.7 2M8.9 15.7a4.5 4.5 0 0 1 6.2 0"/><circle cx="12" cy="19" r=".6"/><path d="M3.5 3.5l17 17"/>',
+  slow: '<path d="M2.5 8.8a14 14 0 0 1 19 0" opacity=".3"/><path d="M5.6 12.3a9 9 0 0 1 12.8 0" opacity=".3"/><path d="M8.9 15.7a4.5 4.5 0 0 1 6.2 0"/><circle cx="12" cy="19" r=".6"/>',
   help: '<circle cx="12" cy="12" r="9"/><path d="M9.4 9.4a2.7 2.7 0 0 1 5.2 1c0 1.8-2.6 2.3-2.6 3.9"/><circle cx="12" cy="17.2" r=".5"/>',
   refresh: '<path d="M19.5 11.5a7.5 7.5 0 1 0-2.2 5.4"/><path d="M19.5 4.5v7h-7"/>'
 };
@@ -3247,6 +3451,8 @@ export function topActions(s, { help = null, refresh = null, extra = null, into 
   helpBtn.innerHTML = icon('help');
   helpBtn.addEventListener('click', () => (help ? help() : openHelp(s)));
   let refreshBtn = null;
+  // (Also what runs when the connection comes back.)
+  if (refresh) net.refresh = refresh;
   if (refresh) {
     refreshBtn = node('button', { class: 'q-icon-btn q-refresh', id: 'refresh', type: 'button', 'aria-label': en ? 'Refresh' : '重新整理', title: en ? 'Refresh' : '重新整理' });
     refreshBtn.innerHTML = icon('refresh');
