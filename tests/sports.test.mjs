@@ -10,7 +10,7 @@ globalThis.fetch = async url => {
   if (String(url).includes('refuse')) return new Response('no', { status: 403 });
   if (String(url).includes('fail')) return new Response('nope', { status: 500 });
   if (String(url).includes('slow')) await new Promise(r => setTimeout(r, 3_500));
-  return new Response(JSON.stringify({ from: String(url) }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  return new Response(JSON.stringify({ from: String(url), text: 'a\nb' }, null, String(url).includes('pretty') ? 2 : 0), { status: 200, headers: { 'Content-Type': 'application/json' } });
 };
 const worker = (await import('../worker.js')).default;
 const ctx = { waitUntil: p => p };
@@ -69,6 +69,37 @@ test("a slow URL answers 504 at once and doesn't hold back the rest of its batch
   assert.ok(Date.now() - t0 < 3_400);
   assert.equal(r[0].s, 200);
   assert.equal(r[1].s, 504);
+});
+
+test('with lines, each item is written the moment it is in, a line of its own, the slow one after', async () => {
+  const fast = 'https://site.api.espn.com/apis/site/v2/sports/soccer/ger.1/standings?pretty';
+  const slow = 'https://site.api.espn.com/apis/site/v2/sports/soccer/slow.2/standings';
+  const bad = 'https://evil.example.com/y';
+  const t0 = Date.now();
+  const res = await get(`https://proxy.test/sports-proxy?batch=1&lines=1&u=${encodeURIComponent(slow)}&u=${encodeURIComponent(fast)}&u=${encodeURIComponent(bad)}`);
+  const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+  const got = [];
+  let rest = '';
+  for (;;) {
+    const { done, value } = await reader.read();
+    rest += value || '';
+    const parts = rest.split('\n');
+    rest = parts.pop();
+    for (const part of parts) got.push({ at: Date.now() - t0, ...JSON.parse(part) });
+    if (done) break;
+  }
+  assert.equal(rest, '');
+  assert.deepEqual(got.map(x => x.i).sort(), [0, 1, 2]);
+  const by = Object.fromEntries(got.map(x => [x.i, x]));
+  // The fast one (pretty-printed upstream: its line breaks are spaces, the same JSON) long before the slow one.
+  assert.equal(by[1].s, 200);
+  assert.deepEqual(by[1].b, { from: fast, text: 'a\nb' });
+  assert.ok(by[1].at < 1_000, String(by[1].at));
+  assert.equal(by[2].s, 400);
+  // The slow one waited for (no 504 and a second ask): its line comes last.
+  assert.equal(by[0].s, 200);
+  assert.ok(by[0].at >= 3_400);
+  assert.equal(got.at(-1).i, 0);
 });
 
 test("a formula1.com driver or team page comes trimmed to its grids of figures", async () => {
@@ -321,4 +352,11 @@ test('a batch answers up to 24 reads (a first paint, about 28, in two requests),
   const { r } = await (await get(`https://proxy.test/sports-proxy?batch=1${many}`)).json();
   assert.equal(r.length, 24);
   assert.ok(r.every((x, i) => x.s === 200 && x.b.from === u(i)));
+});
+
+test('the dev doors let in a page from this computer, http or https (the preview over --h2), and nothing else', async () => {
+  const { isAllowedOrigin, LOCAL_ORIGIN } = await import('../http.js');
+  for (const o of ['http://localhost:8123', 'https://localhost:39789', 'http://127.0.0.1:5173']) assert.ok(isAllowedOrigin(o) && LOCAL_ORIGIN.test(o), o);
+  for (const o of ['https://localhost.evil.com', 'https://evil.com', 'http://localhost', 'https://jaypengx.github.io.evil.com']) assert.ok(!LOCAL_ORIGIN.test(o), o);
+  assert.ok(!isAllowedOrigin('https://evil.com'));
 });

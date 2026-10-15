@@ -3,9 +3,12 @@
 // a JSON answer.
 
 export const ALLOWED_ORIGINS = ['https://jaypengx.github.io'];
+// A page served from this computer (the preview tool; over --h2 an https
+// one, as Pages serves a phone): the dev doors let it in (sports.js, worker.js).
+export const LOCAL_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1):\d+$/;
 
 export function isAllowedOrigin(origin) {
-  return ALLOWED_ORIGINS.includes(origin) || /^http:\/\/localhost:\d+$/.test(origin || '');
+  return ALLOWED_ORIGINS.includes(origin) || LOCAL_ORIGIN.test(origin || '');
 }
 
 // X-Worker-Colo carries the IATA code of the Cloudflare colo the request came

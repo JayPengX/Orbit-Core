@@ -44,7 +44,7 @@ import { paceOf } from './pace.js';
 import { beat, tellOwner, systemReport, tell, billNotice, OPS_DOC } from './ops.js';
 import { applyScale } from './capacity.js';
 import { handleSports, sportsCron, useDevSettings } from './sports.js';
-import { isAllowedOrigin, corsHeaders, json } from './http.js';
+import { isAllowedOrigin, corsHeaders, json, LOCAL_ORIGIN } from './http.js';
 import { handleData } from './data.js';
 import { handleStock } from './stock-fill.js';
 import { runBuilders, SLOTS as BUILD_SLOTS } from './builders/run.js';
@@ -1142,7 +1142,7 @@ export default {
     // The Pass's store (doc-store.js): each collection's count (no
     // document), from a localhost page (the dev door).
     if (path === '/store/check' && request.method === 'GET') {
-      if (!/^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin) || sessionLimited(`store:${ip}`, 2)) return errorJson('FORBIDDEN_ORIGIN', 403, headers, request);
+      if (!LOCAL_ORIGIN.test(origin) || sessionLimited(`store:${ip}`, 2)) return errorJson('FORBIDDEN_ORIGIN', 403, headers, request);
       if (!env.STORE) return json({ d1: false }, 200, headers);
       return json({ d1: true, collections: await DOCS.count(env) }, 200, headers);
     }
@@ -1194,7 +1194,7 @@ export default {
       const session = qt ? await readToken(await tokenSecret(env), qt, 'ses') : null;
       if (session && sessionLimited(`pl:${session.s}`, 30)) return errorJson('RATE_LIMITED', 429, headers, request);
       // The dev door: a localhost page may have a slip's prices checked (nothing placed), 10 a minute an address.
-      const dev = !session && /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin);
+      const dev = !session && LOCAL_ORIGIN.test(origin);
       if (dev && sessionLimited(`pl:dev:${ip}`, 10)) return errorJson('RATE_LIMITED', 429, headers, request);
       return handlePlay(request, env, headers, session, { ...playDeps(env), dev });
     }
@@ -1214,7 +1214,7 @@ export default {
       return handleWeather(request, env, headers, path, { session, ctx, limited: () => sessionLimited(`w:${session?.s}`, 30) });
     }
     // Orbit Transit (transit.js): a Quadra Pass session for everything but
-    // the usage page. Or a local dev page (http://localhost:<port>: the
+    // the usage page. Or a local dev page (localhost, http or https: the
     // preview's --live, testing on today's real buses and trains): transit
     // data only, no account, 300 asks a minute an address (a search is dozens); Google's paid asks
     // stay under transit.js's monthly caps either way. TRANSIT_DEV = "off"
@@ -1222,7 +1222,7 @@ export default {
     if (path === '/transit' || path.startsWith('/transit/')) {
       const qt = new URL(request.url).searchParams.get('qt');
       const signed = qt ? await readToken(await tokenSecret(env), qt, 'ses') : null;
-      const dev = !signed && env.TRANSIT_DEV !== 'off' && /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin);
+      const dev = !signed && env.TRANSIT_DEV !== 'off' && LOCAL_ORIGIN.test(origin);
       const session = signed || (dev ? { s: 'dev', dev: true } : null);
       return handleTransit(request, env, headers, path, { session, ctx, limited: () => sessionLimited(dev ? `t:dev:${ip}` : `t:${session?.s}`, dev ? 300 : 90) });
     }

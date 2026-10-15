@@ -15,7 +15,7 @@
 // football's and basketball's points by the share of the clock left
 // (livePoints, liveGoals). Kambi's sports use Kambi's own live prices
 // (kambi.mjs, parseKambiInPlay), the margin taken out.
-import { fitTeamRuns, TEAM_RUNS_DISPERSION, GOALS_DISPERSION, estimateLineOdds, round2 } from '#kit/play-odds.mjs';
+import { fitted, fitTeamRuns, TEAM_RUNS_DISPERSION, GOALS_DISPERSION, estimateLineOdds, round2 } from '#kit/play-odds.mjs';
 import { pointsModel, pointsMarkets, normalCdf, normalQuantile, SCORE_SPREAD } from '#kit/play-markets.mjs';
 import { isSoccer } from '#kit/play-teams.mjs';
 
@@ -89,6 +89,9 @@ export function liveSoccer({ means, awayScore, homeScore, minutesLeft }) {
 
 // Each team's mean goals matching the pregame home and away win chances.
 export function fitGoals(homeWin, awayWin) {
+  return fitted(`goals|${homeWin}|${awayWin}`, () => goalsFor(homeWin, awayWin));
+}
+function goalsFor(homeWin, awayWin) {
   const chances = (home, away) => {
     const A = nbPmf(away, GOALS_DISPERSION, 15);
     const H = nbPmf(home, GOALS_DISPERSION, 15);

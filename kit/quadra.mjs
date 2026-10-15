@@ -615,21 +615,48 @@ async function flush() {
   if (!items.length) return;
   const one = item => fetchOne(item.url, item.trim, item.timeout).then(item.resolve, item.reject);
   if (items.length === 1) return void items.forEach(one);
+  // Each item once: its answer, or asked again alone (a failed source, or
+  // none came), or its failure.
+  const done = new Set();
+  const settle = (i, got) => {
+    const item = items[i];
+    if (!item || done.has(i)) return;
+    done.add(i);
+    if (got?.s === 200) item.resolve(got.b);
+    else if (got?.s >= 500 || !got) one(item);
+    else item.reject(Object.assign(new Error(`HTTP ${got.s}`), { status: got.s }));
+  };
   try {
     const u = items.map(i => `&u=${encodeURIComponent(i.trim ? `${i.trim}!${i.url}` : i.url)}`).join('');
-    const res = await signedFetch(`${PROXY_URL}?batch=1${u}${appParam()}`, { signal: AbortSignal.timeout(Math.max(...items.map(i => i.timeout))) });
+    // `lines`: the proxy writes each item the moment it's in, a line of its
+    // own ({ i, s, b }), taken here as it comes: a batch answered whole
+    // waited on its slowest item. (A proxy from before answers whole: { r }.)
+    const res = await signedFetch(`${PROXY_URL}?batch=1&lines=1${u}${appParam()}`, { signal: AbortSignal.timeout(Math.max(...items.map(i => i.timeout))) });
     if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
-    const { r } = await res.json();
-    items.forEach((item, i) => {
-      const got = r?.[i];
-      if (got?.s === 200) item.resolve(got.b);
-      else if (got?.s >= 500 || !got) one(item);
-      else item.reject(Object.assign(new Error(`HTTP ${got.s}`), { status: got.s }));
-    });
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let text = '';
+    let whole = false;
+    for (;;) {
+      const { done: end, value } = await reader.read();
+      text += decoder.decode(value || new Uint8Array(), { stream: !end });
+      whole ||= text.startsWith('{"r":');
+      if (!whole) {
+        const parts = text.split('\n');
+        text = parts.pop();
+        for (const part of parts) if (part) {
+          const got = JSON.parse(part);
+          settle(got.i, got);
+        }
+      }
+      if (end) break;
+    }
+    if (whole) JSON.parse(text).r?.forEach((got, i) => settle(i, got));
+    items.forEach((item, i) => settle(i, null));
   } catch (error) {
     // Over the limit: each asked again alone would only count against it more.
     if (error?.status === 429 || error?.status === 401) items.forEach(item => item.reject(error));
-    else items.forEach(one);
+    else items.forEach((item, i) => settle(i, null));
   }
 }
 // A read that failed, in the 除錯紀錄 (where, and why; never the token).

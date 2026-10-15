@@ -415,8 +415,14 @@ own key:
 `<trim>!<url>`) answers many reads in one request. The kit sends up to 24
 reads made within milliseconds of each other as one batch, because the
 plan bills per request and a first paint asks for about 28 lists.
-- An item not answered within about 3 s is answered as a failure, so one
-  slow upstream never holds the rest.
+- The kit asks with `&lines=1`: each item is written the moment it's in,
+  a line of its own (`{"i":<place>,"s":…,"b":…}`), and the app takes it as
+  it comes. Answered whole (`{"r":[…]}`, without `lines`), a batch waited
+  on its slowest item: Play's first paint had 23 lists ready in a second
+  wait 3 s on one. The kit reads either.
+- An item not answered within 10 s on a line (3 s answered whole) is
+  answered as a failure (504) and the app asks for it alone; its read goes
+  on into the cache.
 - An item that throws answers `{"s":500,"e":…}` for itself alone.
 - A Worker call has 10,000 fetches (the $5 plan), shared by the batch's
   items; six connections are open at once.
