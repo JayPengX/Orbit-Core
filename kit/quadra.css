@@ -1220,8 +1220,10 @@ button,
   background: var(--q-label-3);
 }
 /* Rises quick and settles, no long crawl at the end (iOS's sheet: about
-   0.4 s; a spring's tail on a sheet this tall was a slow last 90 px). */
-.q-sheet[open] {
+   0.4 s; a spring's tail on a sheet this tall was a slow last 90 px).
+   Once (.q-risen, quadra.mjs): a drag turns the animation off, and turned
+   back on it played again, so a sheet let go of dropped and rose anew. */
+.q-sheet[open]:not(.q-risen) {
   animation: q-sheet-up 0.42s var(--q-ease);
 }
 .q-sheet[open]::backdrop {
