@@ -177,11 +177,11 @@ test('an hourly run reads only the last two US days from ESPN and the months its
 });
 
 test("Apple TV in the daily run: the clubs' pages too, each game's page read once, an older game's page kept in its month for good", async () => {
-  const { runWatch, APPLE_MLS } = await import('../builders/watch.js');
+  const { runWatch, APPLE_MLS, APPLE_SEARCH } = await import('../builders/watch.js');
   const { r2Store, memoryBucket } = await import('../builders/store.js');
   const now = Date.parse('2026-10-15T20:00:00Z');
   const ev = (id, date, state) => ({ id, date, season: { year: 2026 }, competitions: [{ status: { type: { state } }, competitors: [{ homeAway: 'home', team: { id: '1', abbreviation: 'ATL', displayName: 'Atlanta United FC' }, score: '1' }, { homeAway: 'away', team: { id: '2', abbreviation: 'MIA', displayName: 'Inter Miami CF' }, score: '0' }] }] });
-  const store = r2Store(memoryBucket({ 'sports/watch/_pending.json': { games: [] }, 'sports/watch.json': { games: {} }, 'sports/mls/2026.json': { events: [ev('700', '2026-03-01T00:30Z', 'post'), ev('701', '2026-08-17T00:30Z', 'post'), ev('702', '2026-10-25T23:30Z', 'pre')] } }));
+  const store = r2Store(memoryBucket({ 'sports/watch/_pending.json': { games: [] }, 'sports/watch.json': { games: {} }, 'sports/mls/2026.json': { events: [ev('700', '2026-03-01T00:30Z', 'post'), ev('701', '2026-08-17T00:30Z', 'post'), ev('702', '2026-10-25T23:30Z', 'pre'), ev('703', '2026-10-31T17:00Z', 'pre')] } }));
   const page = data => new Response(`<html><script type="application/json" id="serialized-server-data">${JSON.stringify(data)}</script></html>`);
   const game = (id, title, extra = {}) => ({ type: 'SportingEvent', title, segue: { destination: { id }, url: `https://tv.apple.com/tw/sporting-event/x/${id}` }, ...extra });
   const club = 'https://tv.apple.com/tw/team/x/umc.cst.atl';
@@ -191,6 +191,9 @@ test("Apple TV in the daily run: the clubs' pages too, each game's page read onc
     asked.push(url);
     if (url === APPLE_MLS) return page({ shelves: [{ items: [{ type: 'Team', segue: { url: club } }] }] });
     if (url === club) return page({ shelves: [{ items: [game('umc.cse.old', '亞特蘭大 vs 邁阿密'), game('umc.cse.next', '亞特蘭大 vs 邁阿密', { badge: { isoDatetime: '2026-10-25T23:30:00.000Z' }, competitors: [{ abbreviation: 'ATL' }, { abbreviation: 'MIA' }] })] }] });
+    // The game its club's page left out: Apple's search for its home club.
+    if (url === `${APPLE_SEARCH}${encodeURIComponent('Atlanta United FC')}`) return page({ shelves: [{ items: [game('umc.cse.srch', '亞特蘭大 vs 邁阿密', { badge: { isoDatetime: '2026-10-31T17:00:00.000Z' } }), game('umc.cse.far', '亞特蘭大 vs 邁阿密', { badge: { isoDatetime: '2026-11-30T17:00:00.000Z' } })] }] });
+    if (url.endsWith('/umc.cse.srch')) return page({ type: 'SportingEvent', title: '亞特蘭大 vs 邁阿密', impressionMetrics: { id: { id: 'umc.cse.srch' } }, badge: { isoDatetime: '2026-10-31T17:00:00.000Z' }, competitors: [{ abbreviation: 'ATL' }, { abbreviation: 'MIA' }] });
     if (url.endsWith('/umc.cse.old')) return page({ type: 'SportingEvent', title: '亞特蘭大 vs 邁阿密', impressionMetrics: { id: { id: 'umc.cse.old' } }, primaryMetadata: [{ isoDatetime: '2026-08-17T00:00:00.000Z' }], competitors: [{ abbreviation: 'ATL' }, { abbreviation: 'MIA' }] });
     return new Response('', { status: 404 });
   };
@@ -204,15 +207,17 @@ test("Apple TV in the daily run: the clubs' pages too, each game's page read onc
     }
   };
   const r = await run();
-  assert.equal(r.apple.matched, 2);
-  // The game to come: in the recent pack; the one two months back: in its month, for good.
+  assert.equal(r.apple.matched, 3);
+  // The games to come: in the recent pack (the one the club's page left out found by search, the game at another time not read); the one two months back: in its month, for good.
+  assert.equal((await store.json('sports/watch.json')).games['mls:703:'].apple, 'https://tv.apple.com/tw/sporting-event/x/umc.cse.srch');
+  assert.ok(!asked.some(u => u.endsWith('/umc.cse.far')));
   assert.equal((await store.json('sports/watch.json')).games['mls:702:'].apple, 'https://tv.apple.com/tw/sporting-event/x/umc.cse.next');
   assert.equal((await store.json('sports/watch/mls/2026-08.json')).games['mls:701:'].apple, 'https://tv.apple.com/tw/sporting-event/x/umc.cse.old');
   assert.ok(!(await store.json('sports/watch/mls/2026-03.json'))?.games?.['mls:700:']?.apple);
-  // The next day the game's own page isn't read again.
+  // The next day no game's own page is read again, nor searched for.
   asked.length = 0;
   await run();
-  assert.ok(!asked.some(u => u.endsWith('/umc.cse.old')));
+  assert.ok(!asked.some(u => u.endsWith('/umc.cse.old') || u.endsWith('/umc.cse.srch') || u.startsWith(APPLE_SEARCH)));
   assert.equal((await store.json('sports/watch/mls/2026-08.json')).games['mls:701:'].apple, 'https://tv.apple.com/tw/sporting-event/x/umc.cse.old');
 });
 
