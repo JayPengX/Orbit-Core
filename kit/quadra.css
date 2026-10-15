@@ -1226,6 +1226,11 @@ button,
 .q-sheet[open]:not(.q-risen) {
   animation: q-sheet-up 0.42s var(--q-ease);
 }
+/* Its own layer all the while it's open: made at the touch, it cost a
+   dropped frame or two as the finger started the drag. */
+.q-sheet[open] {
+  will-change: transform;
+}
 .q-sheet[open]::backdrop {
   animation: q-fade-in 0.3s ease-out;
 }
