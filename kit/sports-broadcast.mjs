@@ -389,6 +389,8 @@ const ELTA_TITLES = {
   ucl: /歐洲冠軍足球聯賽$/,
   uel: /歐霸足球聯賽$/,
   uecl: /歐洲協會足球聯賽$/,
+  // ELTA's from the third round (January: the Premier League's clubs in), on 足球VIP for 2026/27.
+  facup: /足總盃$/,
   nationsleague: /歐洲國家足球聯賽$/,
   cpbl: /^中華職棒(?!.*(明星|戰術))/
 };
