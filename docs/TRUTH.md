@@ -214,8 +214,9 @@ picks, Play's odds and 為你推薦) goes through these steps, in order:
   http://localhost:8123' 'https://orbit-workers-proxy.pengzjay.workers.dev/
   sports-proxy?url=<encoded upstream>&app=<an app id in kit/brand.mjs:
   odds, stock…>'` (`?batch=1` as the kit asks), and Orbit Transit's at
-  `/transit/…` on the same address. Weather
-  has no door (its saved fixtures; `/weather/status?sample=forecast`).
+  `/transit/…` on the same address, and Orbit Weather's at `/weather?lat=
+  &lon=&lines=1` and `/weather/where` (30 a minute an address; Google's
+  day's cap counts its calls too).
   `tools/preview.mjs --live` sends a page's calls through it. Reach for it
   before saying a source can't be read.
 - **Real credentials never go in a local `.env` or a repo**; keys live as
