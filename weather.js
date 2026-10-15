@@ -576,8 +576,10 @@ export async function keptJson(env, key) {
   }
   return kvJson(env, key);
 }
-// `entry.at` is when it was made; `prev` the copy it replaces.
-export async function keepJson(env, key, entry, ttlS, prev = null) {
+// `entry.at` is when it was made; `prev` the copy it replaces. `defer`
+// (the request's waitUntil): the KV copy written behind the answer, not
+// waited for (the edge's copy is what the next ask reads).
+export async function keepJson(env, key, entry, ttlS, prev = null, defer = null) {
   const c = edge();
   // (A quick entry is replaced in KV too as soon as it's whole: another place's edge reads KV.)
   const due = !c || !prev?.kvAt || prev.quick || entry.at - prev.kvAt >= KV_EVERY_MS;
@@ -587,19 +589,21 @@ export async function keepJson(env, key, entry, ttlS, prev = null) {
       await c.put(edgeKey(key), new Response(JSON.stringify(out), { headers: { 'Content-Type': 'application/json', 'Cache-Control': `max-age=${Math.max(60, Math.floor(ttlS))}` } }));
     } catch {}
   }
-  if (due) await kvPut(env, key, out, ttlS);
+  if (due) await later(kvPut(env, key, out, ttlS), defer);
   return out;
 }
+// Waited for, or handed to the request's waitUntil (`defer`).
+const later = (p, defer) => (defer ? void defer(p) : p);
 
 // A national list kept whole (MOENV's AQI sites and forecast, CWA's
 // warnings): fresh for `freshMs`, the last good copy used while under
 // KEEP_MS if the source fails.
-async function shared(env, key, freshMs, make, now) {
+async function shared(env, key, freshMs, make, now, defer = null) {
   const hit = await keptJson(env, key);
   if (hit && now - hit.at < freshMs) return { ...hit, state: 'ok' };
   try {
     const data = await make();
-    const entry = await keepJson(env, key, { at: now, data }, KEEP_MS / 1000, hit);
+    const entry = await keepJson(env, key, { at: now, data }, KEEP_MS / 1000, hit, defer);
     return { ...entry, state: 'ok' };
   } catch (e) {
     if (hit && now - hit.at < KEEP_MS) return { ...hit, state: 'stale' };
@@ -608,13 +612,24 @@ async function shared(env, key, freshMs, make, now) {
 }
 
 // Today's Google calls, counted in KV: true while `calls` more fit under
-// the cap (and counts them).
-export async function googleAllowed(env, now, calls = 4) {
+// the cap (and counts them). The count is also kept here (a KV write takes
+// a moment to be read back): two asks of one refresh, side by side, each
+// count, and the write can go behind the answer (`defer`).
+// (The writes one after another, each the newest count: a smaller one never lands last.)
+const tallies = new WeakMap(); // the KV namespace → { key, n, put }
+export async function googleAllowed(env, now, calls = 4, defer = null) {
   const key = `weather:google:${twDate(now)}`;
-  const n = Number(await kvJson(env, key)) || 0;
+  const read = Number(await kvJson(env, key)) || 0;
+  const kv = env.RATE_LIMIT_KV;
+  const mine = kv && tallies.get(kv)?.key === key ? tallies.get(kv) : null;
+  const n = Math.max(read, mine?.n || 0);
   if (n + calls > GOOGLE_DAILY_CALLS) return false;
   // Kept 40 days: the admin panel's Google 帳單 adds a month of them (Weather is billed past 10,000 a month).
-  await kvPut(env, key, n + calls, 40 * 86_400);
+  if (!kv) return true;
+  const t = { key, n: n + calls };
+  t.put = (mine?.put || Promise.resolve()).then(() => kvPut(env, key, t.n, 40 * 86_400));
+  tallies.set(kv, t);
+  await later(t.put, defer);
   return true;
 }
 
@@ -640,8 +655,8 @@ export function townships() {
 
 // MOENV's AQI sites, kept whole in KV 20 minutes (the cell build and the
 // cron's history share them).
-export const airSites = (env, fetchFn, now) =>
-  shared(env, 'weather:moenv:aqi', 20 * MIN, () => getJson(fetchFn, moenvUrl(env, 'aqx_p_432', '&limit=1000'), env).then(j => (Array.isArray(j) ? j : j.records || []).map(s => ({ sitename: s.sitename, county: s.county, aqi: s.aqi, status: s.status, pollutant: s.pollutant, pm10: s.pm10, 'pm2.5': s['pm2.5'], o3: s.o3, latitude: s.latitude, longitude: s.longitude, publishtime: s.publishtime }))), now);
+export const airSites = (env, fetchFn, now, defer = null) =>
+  shared(env, 'weather:moenv:aqi', 20 * MIN, () => getJson(fetchFn, moenvUrl(env, 'aqx_p_432', '&limit=1000'), env).then(j => (Array.isArray(j) ? j : j.records || []).map(s => ({ sitename: s.sitename, county: s.county, aqi: s.aqi, status: s.status, pollutant: s.pollutant, pm10: s.pm10, 'pm2.5': s['pm2.5'], o3: s.o3, latitude: s.latitude, longitude: s.longitude, publishtime: s.publishtime }))), now, defer);
 
 // Each AQI site's last 48 hours (`weather:aqi:hist`, written by the hourly
 // cron): { sites: { name: [[t, aqi, pm25], …] } }. Pure: the history with
@@ -1163,7 +1178,8 @@ export function weekAdvice(out, resp, win) {
 // what takes long (Google's hours 49–240, ten pages one after another, and
 // its air forecast) is left to the next build, the last of them used
 // meanwhile; the entry says so (`quick`) and cellForecast builds it whole behind the answer.
-export async function buildCell(env, lat, lon, { fetchFn = fetch, now = Date.now(), prev = null, quick = false } = {}) {
+// `defer`: the request's waitUntil, for KV's writes (behind the answer).
+export async function buildCell(env, lat, lon, { fetchFn = fetch, now = Date.now(), prev = null, quick = false, defer = null } = {}) {
   const cell = cellOf(lat, lon);
   const keep = part => (prev?.parts?.[part] && now - prev.parts[part].at < KEEP_MS ? prev.parts[part] : null);
   const settle = async (part, make) => {
@@ -1188,14 +1204,17 @@ export async function buildCell(env, lat, lon, { fetchFn = fetch, now = Date.now
   const gairDue = env.GOOGLE_WEATHER_KEY && inTaiwan && !gairNoted && (!gairPrev || now - gairPrev.at >= FAR_MS);
   const wantGair = gairDue && !quick;
   const deferred = quick && (farDue || gairDue);
-  // (Counted before the weather's calls: KV's counter isn't atomic.)
-  const gairJob =
-    wantGair && (await googleAllowed(env, now, 1))
-      ? fetchGoogleAir(env, lat, lon, fetchFn, now).then(
-          v => ({ ok: true, v }),
-          e => (console.log('weather google air failed', String(e.message || e).slice(0, 160)), { ok: false, off: /\b40[03]\b/.test(String(e.message)) })
-        )
-      : null;
+  // (Counted beside the weather's calls: googleAllowed keeps its own tally.)
+  const gairJob = wantGair
+    ? googleAllowed(env, now, 1, defer).then(ok =>
+        ok
+          ? fetchGoogleAir(env, lat, lon, fetchFn, now).then(
+              v => ({ ok: true, v }),
+              e => (console.log('weather google air failed', String(e.message || e).slice(0, 160)), { ok: false, off: /\b40[03]\b/.test(String(e.message)) })
+            )
+          : null
+      )
+    : null;
   // Google's forecast from under GOOGLE_FC_MS ago: only its current conditions again.
   const gFc = prev?.parts?.google?.v && now - (prev.parts.google.fcAt ?? prev.parts.google.at) < GOOGLE_FC_MS ? prev.parts.google : null;
   const googleNowOnly = async () => {
@@ -1209,11 +1228,11 @@ export async function buildCell(env, lat, lon, { fetchFn = fetch, now = Date.now
   };
   const justBuilt = gFc && prev?.quick && now - prev.at < GOOGLE_FC_MS;
   const [google, cwa, aqi, aqf, warn, weights, aqiHist, gairRes] = await Promise.all([
-    !env.GOOGLE_WEATHER_KEY ? { state: 'off', v: null } : justBuilt && wantFar ? ((await googleAllowed(env, now, 10)) ? farOnly() : { state: 'ok', ...gFc }) : gFc && !wantFar ? ((await googleAllowed(env, now, 1)) ? googleNowOnly() : { state: 'ok', ...gFc }) : (await googleAllowed(env, now, wantFar ? 12 : 4)) ? settle('google', () => fetchGoogle(env, lat, lon, fetchFn, !inTaiwan, wantFar)) : wantFar && (await googleAllowed(env, now, 4)) ? settle('google', () => fetchGoogle(env, lat, lon, fetchFn, !inTaiwan)) : keep('google') ? { state: 'stale', ...keep('google') } : { state: 'capped', v: null },
+    !env.GOOGLE_WEATHER_KEY ? { state: 'off', v: null } : justBuilt && wantFar ? ((await googleAllowed(env, now, 10, defer)) ? farOnly() : { state: 'ok', ...gFc }) : gFc && !wantFar ? ((await googleAllowed(env, now, 1, defer)) ? googleNowOnly() : { state: 'ok', ...gFc }) : (await googleAllowed(env, now, wantFar ? 12 : 4, defer)) ? settle('google', () => fetchGoogle(env, lat, lon, fetchFn, !inTaiwan, wantFar)) : wantFar && (await googleAllowed(env, now, 4, defer)) ? settle('google', () => fetchGoogle(env, lat, lon, fetchFn, !inTaiwan)) : keep('google') ? { state: 'stale', ...keep('google') } : { state: 'capped', v: null },
     env.CWA_KEY && inTaiwan ? settle('cwa', () => fetchCwa(env, lat, lon, fetchFn)) : { state: inTaiwan ? 'off' : 'n/a', v: null },
-    env.MOENV_KEY && inTaiwan ? airSites(env, fetchFn, now) : null,
-    env.MOENV_KEY && inTaiwan ? shared(env, 'weather:moenv:aqf', 3 * HOUR, () => getJson(fetchFn, moenvUrl(env, 'aqf_p_01', '&limit=100'), env).then(j => (Array.isArray(j) ? j : j.records || []).map(f => ({ area: f.area, forecastdate: f.forecastdate, aqi: f.aqi, majorpollutant: f.majorpollutant }))), now) : null,
-    env.CWA_KEY && inTaiwan ? shared(env, 'weather:cwa:warn', 30 * MIN, () => getJson(fetchFn, cwaUrl(env, 'W-C0033-001'), env), now) : null,
+    env.MOENV_KEY && inTaiwan ? airSites(env, fetchFn, now, defer) : null,
+    env.MOENV_KEY && inTaiwan ? shared(env, 'weather:moenv:aqf', 3 * HOUR, () => getJson(fetchFn, moenvUrl(env, 'aqf_p_01', '&limit=100'), env).then(j => (Array.isArray(j) ? j : j.records || []).map(f => ({ area: f.area, forecastdate: f.forecastdate, aqi: f.aqi, majorpollutant: f.majorpollutant }))), now, defer) : null,
+    env.CWA_KEY && inTaiwan ? shared(env, 'weather:cwa:warn', 30 * MIN, () => getJson(fetchFn, cwaUrl(env, 'W-C0033-001'), env), now, defer) : null,
     kvJson(env, 'weather:weights'),
     inTaiwan ? kvJson(env, 'weather:aqi:hist') : null,
     gairJob
@@ -1268,24 +1287,29 @@ export async function noteRecent(env, cell, now) {
 }
 
 // The cell from KV, fresh or refreshed (in the background when it's merely
-// old). `freshMs` longer for the open status sample.
-export async function cellForecast(env, ctx, lat, lon, { fetchFn = fetch, now = Date.now(), freshMs = FRESH_MS } = {}) {
+// old). `freshMs` longer for the open status sample. `follow`: told of the
+// job that makes an answer that isn't the last word whole (a promise of the
+// whole answer, or null), so the request can send it the moment it's in.
+export async function cellForecast(env, ctx, lat, lon, { fetchFn = fetch, now = Date.now(), freshMs = FRESH_MS, follow = null } = {}) {
   const key = `weather:cell:${cellOf(lat, lon)}`;
+  // KV's writes (the cell's hourly copy, the recent cells, Google's count) behind the answer.
+  const defer = ctx?.waitUntil ? p => ctx.waitUntil(p) : null;
   // (An entry from before one truth, without `bySource`, is not used.)
   const found = await keptJson(env, key);
   const hit = found?.bySource ? found : null;
   const refresh = async (prev = hit, kept = found, quick = false, at = now) => {
-    const entry = await keepJson(env, key, await buildCell(env, lat, lon, { fetchFn, now: at, prev, quick }), KEEP_MS / 1000, kept);
-    await noteRecent(env, cellOf(lat, lon), at);
+    const entry = await keepJson(env, key, await buildCell(env, lat, lon, { fetchFn, now: at, prev, quick, defer }), KEEP_MS / 1000, kept, defer);
+    await later(noteRecent(env, cellOf(lat, lon), at), defer);
     return entry;
   };
   // A quick entry made whole behind the answer (the far hours, the air forecast).
   // (On the request's clock, moved on by the time since: the whole answer is newer than the quick one.)
   const t0 = Date.now();
-  const finish = entry => {
-    const job = refresh(entry, entry, false, now + (Date.now() - t0)).catch(e => console.log('weather finish failed', String(e.message || e)));
+  const behind = job => {
     if (ctx?.waitUntil) ctx.waitUntil(job);
+    follow?.(job.then(entry => entry?.resp || null));
   };
+  const finish = entry => behind(refresh(entry, entry, false, now + (Date.now() - t0)).catch(e => (console.log('weather finish failed', String(e.message || e)), null)));
   if (hit && now - hit.at < freshMs) {
     // Still being made whole: said so, so the page asks again shortly (and
     // the job again if it never landed).
@@ -1303,7 +1327,7 @@ export async function cellForecast(env, ctx, lat, lon, { fetchFn = fetch, now = 
     const job = refresh().catch(e => (console.log('weather refresh failed', String(e.message || e)), null));
     const done = await Promise.race([job, new Promise(r => setTimeout(r, FRESH_WAIT_MS, null))]);
     if (done?.resp) return done.resp;
-    if (ctx?.waitUntil) ctx.waitUntil(job);
+    behind(job);
     return { ...hit.resp, cached: true, refreshing: true };
   }
   // Someone waiting: the quick answer now, the rest behind it.
@@ -1460,7 +1484,25 @@ export async function handleWeather(request, env, headers, path, { session = nul
       located = { by: 'ip', city: cf.city || null };
     } else if (!q.get('lat') || !q.get('lon')) return send({ code: 'BAD_LOCATION' }, 400);
     if (!(Math.abs(lat) <= 90) || !(Math.abs(lon) <= 180)) return send({ code: 'BAD_LOCATION' }, 400);
-    return send({ ...(await cellForecast(env, ctx, lat, lon, { fetchFn })), located, lat: Math.round(lat * 100) / 100, lon: Math.round(lon * 100) / 100 });
+    const where = { located, lat: Math.round(lat * 100) / 100, lon: Math.round(lon * 100) / 100 };
+    // `lines=1`: an answer that isn't the last word (the quick one, or an
+    // old copy whose refresh is slow) is the first line, and the whole one
+    // the second, on the same request the moment it's in (the page asked
+    // again every 2 s for it). Without a job to follow, one line.
+    let rest = null;
+    const first = { ...(await cellForecast(env, ctx, lat, lon, { fetchFn, follow: q.get('lines') ? job => (rest = job) : null })), ...where };
+    if (!rest) return send(first);
+    const enc = new TextEncoder();
+    const { readable, writable } = new TransformStream();
+    const out = writable.getWriter();
+    const body = (async () => {
+      await out.write(enc.encode(`${JSON.stringify(first)}\n`));
+      const whole = await rest.catch(() => null);
+      if (whole) await out.write(enc.encode(`${JSON.stringify({ ...whole, ...where })}\n`));
+      await out.close();
+    })().catch(() => out.abort().catch(() => {}));
+    if (ctx?.waitUntil) ctx.waitUntil(body);
+    return new Response(readable, { headers: { ...headers, 'Content-Type': 'application/x-ndjson; charset=utf-8' } });
   }
   return send({ code: 'NOT_FOUND' }, 404);
 }
