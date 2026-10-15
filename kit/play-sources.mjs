@@ -179,6 +179,41 @@ function closeProbability(side) {
 const seenStarts = new Map();
 const espnPregame = new Map();
 
+// A game's DraftKings lines on ESPN's scoreboard, the closing ones (a game
+// under way still carries them): { outcomes, total }, each null when not there.
+function espnLines(comp, sport) {
+  const odds = comp?.odds?.[0];
+  const ml = odds?.moneyline;
+  let outcomes = null;
+  if (isSoccer(sport)) {
+    const fair = devigProportional([closeProbability(ml?.away), closeProbability(ml?.draw), closeProbability(ml?.home)]);
+    if (fair) outcomes = { away: fair[0], draw: fair[1], home: fair[2] };
+  } else {
+    const fair = devigProportional([closeProbability(ml?.away), closeProbability(ml?.home)]);
+    if (fair) outcomes = { away: fair[0], home: fair[1] };
+  }
+  let total = null;
+  const over = odds?.total?.over?.close;
+  const under = odds?.total?.under?.close;
+  if (over?.line && under) {
+    const line = Number(String(over.line).replace(/^[ou]/, ''));
+    const fair = devigProportional([americanToProbability(over.odds), americanToProbability(under.odds)]);
+    if (Number.isFinite(line) && fair) total = { line, overFair: fair[0] };
+  }
+  return { outcomes, total };
+}
+const pregameOf = (outcomes, total) => ({ homeWin: outcomes.home, awayWin: outcomes.away, draw: outcomes.draw ?? 0, totalLine: total?.line ?? null, overFair: total?.overFair ?? 0.5 });
+// The pregame lines of a live page's games not seen before they began (the
+// board reads only games to come): from the page itself, not each one's summary.
+function notePregame(data, sport) {
+  for (const event of data?.events || []) {
+    const key = `${sport}|${event.id}`;
+    if (espnPregame.has(key)) continue;
+    const { outcomes, total } = espnLines(event.competitions?.[0], sport);
+    if (outcomes) espnPregame.set(key, pregameOf(outcomes, total));
+  }
+}
+
 export function parseEspnScoreboard(data, sport, post = null) {
   const games = [];
   for (const event of data.events || []) {
@@ -203,23 +238,7 @@ export function parseEspnScoreboard(data, sport, post = null) {
     const teamIds = Object.fromEntries(comp.competitors.map(c => [c.homeAway, c.team.id ? String(c.team.id) : null]));
     for (const c of comp.competitors) rememberLogo(sport, c.team.displayName, c.team.logo);
     const odds = comp.odds?.[0];
-    const ml = odds?.moneyline;
-    let outcomes = null;
-    if (isSoccer(sport)) {
-      const fair = devigProportional([closeProbability(ml?.away), closeProbability(ml?.draw), closeProbability(ml?.home)]);
-      if (fair) outcomes = { away: fair[0], draw: fair[1], home: fair[2] };
-    } else {
-      const fair = devigProportional([closeProbability(ml?.away), closeProbability(ml?.home)]);
-      if (fair) outcomes = { away: fair[0], home: fair[1] };
-    }
-    let total = null;
-    const over = odds?.total?.over?.close;
-    const under = odds?.total?.under?.close;
-    if (over?.line && under) {
-      const line = Number(String(over.line).replace(/^[ou]/, ''));
-      const fair = devigProportional([americanToProbability(over.odds), americanToProbability(under.odds)]);
-      if (Number.isFinite(line) && fair) total = { line, overFair: fair[0] };
-    }
+    const { outcomes, total } = espnLines(comp, sport);
     // Run line / handicap from the away team's side: { awayLine: -1.5, awayFair }.
     let spread = null;
     const awaySpread = odds?.pointSpread?.away?.close;
@@ -232,7 +251,7 @@ export function parseEspnScoreboard(data, sport, post = null) {
       const whole = ['football', 'basketball'].includes(familyOf(sport));
       if (Number.isFinite(awayLine) && (whole || awayLine % 1 !== 0) && fair) spread = { awayLine, awayFair: fair[0] };
     }
-    if (outcomes) espnPregame.set(`${sport}|${event.id}`, { homeWin: outcomes.home, awayWin: outcomes.away, draw: outcomes.draw ?? 0, totalLine: total?.line ?? null, overFair: total?.overFair ?? 0.5 });
+    if (outcomes) espnPregame.set(`${sport}|${event.id}`, pregameOf(outcomes, total));
     // Dated but not timed yet (timeValid false: the day's 00:00 in New
     // York): a book's time for it (Kambi's, Polymarket's) when one lists it,
     // else the earliest it can start (noon there, 00:00 the next day here),
@@ -1002,13 +1021,14 @@ export async function loadLive(now = new Date(), minLiquidity = 5000, { also = [
   // (`also`: a league known to have a game on, which this page's reads may not have seen.)
   const leagues = [...new Set([...liveLeagues(now), ...also.filter(key => ESPN_PATH[key]).filter(key => !KAMBI_LEAGUES.includes(key))])];
   const [espn, kambi, books] = await Promise.all([
-    Promise.all(leagues.map(key => liveEspnPages(key, now).then(pages => dedupe(pages.flatMap(d => parseEspnLive(d, key)))).catch(() => []))),
+    Promise.all(leagues.map(key => liveEspnPages(key, now).then(pages => (pages.forEach(d => notePregame(d, key)), dedupe(pages.flatMap(d => parseEspnLive(d, key))))).catch(() => []))),
     Promise.all(KAMBI_LEAGUES.map(key => getJson(kambiUrl(LEAGUES[key].kambi, 'in-play'), 'kambi-events').then(d => parseKambiInPlay(d, key)).catch(() => []))),
     // Kambi's live prices of the ESPN leagues on now.
     Promise.all(leagues.filter(key => LEAGUES[key]?.book).map(key => getJson(kambiUrl(LEAGUES[key].book, 'in-play'), 'kambi-events').then(d => parseKambiInPlay(d, key)).catch(() => [])))
   ]);
   const games = attachKambiLive(espn.flat(), books.flat());
-  const pmMlb = games.some(g => g.sport === 'mlb') ? await fetchPolymarketLiveEvents(POLYMARKET_TAG.mlb, now).catch(() => []) : [];
+  // (Polymarket's live list read with the games' pregame lines, not before them.)
+  const pmLive = games.some(g => g.sport === 'mlb') ? fetchPolymarketLiveEvents(POLYMARKET_TAG.mlb, now).catch(() => []) : Promise.resolve([]);
   await Promise.all(
     games.map(async game => {
       const key = `${game.sport}|${game.espnId}`;
@@ -1020,6 +1040,7 @@ export async function loadLive(now = new Date(), minLiquidity = 5000, { also = [
         if (!game.pregame) pregameCache.delete(key);
       }
       if (game.sport !== 'mlb') return;
+      const pmMlb = await pmLive;
       // The game's own event, not its side events ("… - 1st Inning Winner").
       const event = pmMlb.find(e => {
         if (/ - /.test(e.title || '')) return false;
