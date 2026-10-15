@@ -67,6 +67,9 @@ export function readDev() {
 readDev();
 // fn again every dev(key) seconds, the setting read at each beat (a change
 // applies at the next one). Answers a stop.
+// A sheet under a finger or on its way out: a live redraw then stutters
+// the drag (each app's beats wait for the next one).
+export const sheetHeld = () => typeof document !== 'undefined' && Boolean(document.querySelector('dialog.q-sheet.q-dragging, dialog.q-sheet.q-leaving'));
 export function everyDev(key, fn) {
   let timer = 0;
   let stopped = false;
@@ -75,7 +78,7 @@ export function everyDev(key, fn) {
       if (stopped) return;
       readDev();
       try {
-        fn();
+        if (!sheetHeld()) fn();
       } finally {
         beat();
       }
@@ -870,16 +873,20 @@ function sheetSwipe() {
         // Downward from the first move on, the finger is the sheet's: left
         // alone below 8 px, Safari began scrolling the page behind with it.
         if (y > 0 && y >= Math.abs(x) && e.cancelable) e.preventDefault();
-        if (y < 8) return;
+        if (y < 4) return;
+        // From here, not from the touch: the sheet moves on with the finger
+        // instead of jumping the first few pixels it was held still for.
+        y0 += 4;
         dragging = true;
         // Taken from where it is (still rising, or springing back).
         sheet.classList.remove('q-settle');
         sheet.classList.add('q-dragging', 'q-risen');
       }
       // Down with the finger; pulled up, it gives a little and no more (iOS's rubber band).
-      dy = y >= 0 ? y : -Math.sqrt(-y) * 2.2;
+      const yy = e.touches[0].clientY - y0;
+      dy = yy >= 0 ? yy : -Math.sqrt(-yy) * 2.2;
       sheet.style.transform = `translateY(${dy}px)`;
-      trail.push([e.timeStamp, y]);
+      trail.push([e.timeStamp, yy]);
       while (trail.length > 2 && e.timeStamp - trail[0][0] > 100) trail.shift();
       if (e.cancelable) e.preventDefault();
     },
