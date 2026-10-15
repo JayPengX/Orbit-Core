@@ -360,3 +360,10 @@ test('the dev doors let in a page from this computer, http or https (the preview
   for (const o of ['https://localhost.evil.com', 'https://evil.com', 'http://localhost', 'https://jaypengx.github.io.evil.com']) assert.ok(!LOCAL_ORIGIN.test(o), o);
   assert.ok(!isAllowedOrigin('https://evil.com'));
 });
+
+test("Play's winner markets read apart from their events come trimmed to their prices and their event's id", async () => {
+  const { trimPolymarketMarkets } = await import('../sports.js');
+  const raw = [{ id: '1', question: 'Will Everton FC win on 2026-10-17?', outcomes: '["Yes","No"]', outcomePrices: '["0.3","0.7"]', liquidity: '9000', description: 'x'.repeat(5000), clobTokenIds: '["1","2"]', events: [{ id: '7', title: 'Everton FC vs. Chelsea FC', description: 'y'.repeat(5000) }] }];
+  assert.deepEqual(trimPolymarketMarkets(raw), [{ question: 'Will Everton FC win on 2026-10-17?', outcomes: '["Yes","No"]', outcomePrices: '["0.3","0.7"]', liquidity: '9000', event: '7' }]);
+  assert.equal(trimPolymarketMarkets({ error: 1 }).error, 1);
+});

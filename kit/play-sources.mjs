@@ -370,22 +370,47 @@ export const EXTRA_LEAGUES = Object.keys(LEAGUES).filter(key => LEAGUES[key].pat
 
 // Only events ending (a game's: its start) from 6 hours ago, to the hour so
 // the address is the same for an hour (the proxy's cache): Polymarket keeps
-// games long over open, and the Premier League's first page was half of
-// them (15 MB → 7 MB for the proxy to read and trim, about 100 ms of its CPU
-// a page). Every reader here skips a game that has started; the live board
-// reads its own list (fetchPolymarketLiveEvents).
+// games long over open. Every reader here skips a game that has started;
+// the live board reads its own list (fetchPolymarketLiveEvents).
 export const endedSince = (now = Date.now()) => new Date(Math.floor((now - 6 * 3_600_000) / 3_600_000) * 3_600_000).toISOString().replace('.000Z', 'Z');
+// A league's events, with only the markets something here reads (`trim`,
+// the proxy's): the events without their markets (include_markets=false),
+// each game's winner markets on their own (sports_market_types=moneyline),
+// and the championships whole (by id). A page with every market was 7-15 MB
+// for the proxy to read (corners, players' shots and exact scores, 95% of
+// it), about 40 MB a board in all, ~100 ms of its CPU a page; this is about
+// 1 MB, and no page waits for the one before its markets. Without `trim`
+// (F1's: its race markets aren't games'), every market, as Polymarket has them.
 export async function fetchPolymarketEvents(tagId, trim, now = Date.now()) {
-  const events = [];
+  const since = endedSince(now);
+  if (!trim) return pages(`${GAMMA}/events?tag_id=${tagId}&closed=false&end_date_min=${since}&order=startTime&ascending=true`, '', 100);
+  return polymarketGames(tagId, `end_date_min=${since}`, since, trim);
+}
+async function pages(address, trim, size) {
+  const out = [];
   for (let page = 0; page < 10; page++) {
-    const batch = await getJson(
-      `${GAMMA}/events?tag_id=${tagId}&closed=false&end_date_min=${endedSince(now)}&limit=100&offset=${page * 100}&order=startTime&ascending=true`,
-      trim
-    );
-    events.push(...batch);
-    if (batch.length < 100) break;
+    const batch = await getJson(`${address}&limit=${size}&offset=${page * size}`, trim);
+    out.push(...batch);
+    if (batch.length < size) break;
   }
-  return events;
+  return out;
+}
+async function polymarketGames(tagId, eventsFrom, marketsFrom, trim) {
+  const [events, markets] = await Promise.all([
+    pages(`${GAMMA}/events?tag_id=${tagId}&closed=false&${eventsFrom}&order=startTime&ascending=true&include_markets=false`, trim, 100),
+    pages(`${GAMMA}/markets?tag_id=${tagId}&closed=false&sports_market_types=moneyline&end_date_min=${marketsFrom}&order=id&ascending=true`, 'polymarket-markets', 500)
+  ]);
+  const titles = [...FUTURES, ...EXTRA_FUTURES].map(f => f.title);
+  const champions = events.filter(e => titles.some(t => t.test(e.title || ''))).map(e => `id=${e.id}`);
+  const whole = new Map((champions.length ? await getJson(`${GAMMA}/events?${champions.join('&')}`, trim) : []).map(e => [String(e.id), e]));
+  const byEvent = new Map();
+  for (const m of markets) {
+    // (`event`: the proxy's trim; Polymarket's own: its events.)
+    const id = String(m.event ?? m.events?.[0]?.id);
+    if (!byEvent.has(id)) byEvent.set(id, []);
+    byEvent.get(id).push(m);
+  }
+  return events.map(e => whole.get(String(e.id)) ?? { ...e, markets: byEvent.get(String(e.id)) ?? [] });
 }
 
 function eventTeams(event) {
@@ -1032,7 +1057,7 @@ export function attachKambiLive(games, kambiGames) {
 // refresh was an address never seen, read and trimmed again, megabytes each.)
 export async function fetchPolymarketLiveEvents(tagId, now) {
   const since = new Date(Math.floor((now.getTime() - 6 * 3_600_000) / 600_000) * 600_000).toISOString();
-  return getJson(`${GAMMA}/events?tag_id=${tagId}&closed=false&limit=100&order=startTime&ascending=true&start_time_min=${since}`, 'polymarket-events');
+  return polymarketGames(tagId, `start_time_min=${since}`, since, 'polymarket-events');
 }
 
 // A Kambi league's own schedule (schedules.mjs), every game on it the house

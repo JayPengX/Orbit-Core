@@ -639,13 +639,15 @@ async function flush() {
     let whole = false;
     for (;;) {
       const { done: end, value } = await reader.read();
+      // (A line ends only in what just came: a 2 MB line isn't searched again at each piece of it.)
+      let from = text.length;
       text += decoder.decode(value || new Uint8Array(), { stream: !end });
       whole ||= text.startsWith('{"r":');
-      if (!whole) {
-        const parts = text.split('\n');
-        text = parts.pop();
-        for (const part of parts) if (part) {
-          const got = JSON.parse(part);
+      for (let nl; !whole && (nl = text.indexOf('\n', from)) >= 0; from = 0) {
+        const line = text.slice(0, nl);
+        text = text.slice(nl + 1);
+        if (line) {
+          const got = JSON.parse(line);
           settle(got.i, got);
         }
       }

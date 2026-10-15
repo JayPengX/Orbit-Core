@@ -404,7 +404,7 @@ own key:
 
 | Trim | What |
 | --- | --- |
-| `polymarket-events`, `polymarket-games` | A league's events and markets (a 100-event page goes from ~11.5 MB to ~0.45 MB) |
+| `polymarket-events`, `polymarket-games`, `polymarket-markets` | A league's events and markets (a 100-event page goes from ~11.5 MB to ~0.45 MB). Play asks for the events without their markets (`include_markets=false`), the games' winner markets apart (`/markets`, `sports_market_types=moneyline`) and the championships whole by id: ~3 MB for the proxy to read a board where every market was ~40 MB |
 | `kambi-events`, `kambi-offers` | Kambi's lists |
 | `espn-roster`, `espn-news`, `espn-athletes` | ESPN's heavy pages |
 | `elta`, `eltavod` | ELTA's program list and season pages |
