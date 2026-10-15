@@ -854,7 +854,9 @@ What was decided, so it isn't undone. Newer calls win.
 - 2026-10-15: a Transit trip with stops is planned and shown whole (each
   way to the last place, through every stop), not as the way to the first
   stop alone; with one more way: one YouBike kept the whole trip (parked
-  at each stop, returned only near the last).
+  at each stop, returned only near the last), and it's the recommendation
+  unless a stop is far (a ride over 20 minutes) or walking it all is
+  sooner: buses between stops are poor, the bike works best overall.
 - 2026-10-15: Transit lists a train (or a bus) and then a ride over 頭前溪
   as a choice when it gets there 5 minutes sooner than the recommended ways
   like it (竹東高中 → 成功九街: the train to 竹中 and a ride home); one by
