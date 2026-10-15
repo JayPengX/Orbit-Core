@@ -690,6 +690,31 @@ async function fetchYahooWithCrumb(upstreamUrl) {
   }
 }
 
+// Yahoo (quotes, charts, search, a company's numbers), asked as a browser:
+// Yahoo limits an address, and the proxy's is shared (in Taiwan, with every
+// other Worker there), so a refusal (429, or a 403 or 5xx while it does) is
+// asked of its twin host (2026-10-14: query1 refused, query2 answered), then
+// as a signed-in visitor (the cookie and crumb), whom it turns away least
+// (走勢圖載入失敗 now and then, 2026-10-15). A bot's name was refused first.
+const yahooRefused = res => res.status === 429 || res.status === 403 || res.status >= 500;
+async function fetchYahoo(upstreamUrl) {
+  const twin = new URL(upstreamUrl.toString());
+  twin.hostname = upstreamUrl.hostname === 'query1.finance.yahoo.com' ? 'query2.finance.yahoo.com' : 'query1.finance.yahoo.com';
+  const plain = url => fetch(url.toString(), { headers: { 'User-Agent': BROWSER_UA }, signal: AbortSignal.timeout(SPORTS_PROXY_UPSTREAM_TIMEOUT_MS) });
+  const tries = needsYahooCrumb(upstreamUrl) ? [() => fetchYahooWithCrumb(upstreamUrl), () => fetchYahooWithCrumb(twin)] : [() => plain(upstreamUrl), () => plain(twin), () => fetchYahooWithCrumb(twin)];
+  let res = null;
+  let failure = null;
+  for (const ask of tries) {
+    const next = await ask().catch(error => void (failure = error));
+    if (!next) continue;
+    res?.body?.cancel?.().catch(() => {});
+    res = next;
+    if (!yahooRefused(res)) break;
+  }
+  if (!res) throw failure;
+  return res;
+}
+
 // A translate answer with no text in it.
 export function emptyTranslation(text) {
   try {
@@ -728,8 +753,8 @@ async function fetchUpstream(upstreamUrl, trim) {
       ? await asiaBaseballResponse(upstreamUrl)
       : upstreamUrl.hostname === F1_LIVE_HOST
       ? await f1LiveResponse(upstreamUrl, { log: f1Log })
-      : needsYahooCrumb(upstreamUrl)
-      ? await fetchYahooWithCrumb(upstreamUrl)
+      : YAHOO_HOSTS.has(upstreamUrl.hostname)
+      ? await fetchYahoo(upstreamUrl)
       : upstreamUrl.hostname === 'clients5.google.com'
         ? await translateUpstream(upstreamUrl)
         : await fetch(upstreamUrl.toString(), {
@@ -737,20 +762,14 @@ async function fetchUpstream(upstreamUrl, trim) {
           headers: upstreamUrl.hostname === YT_HOST ? { 'User-Agent': BROWSER_UA, 'Accept-Language': 'en-US,en;q=0.9', Cookie: 'SOCS=CAI; CONSENT=YES+' } : { 'User-Agent': SPORTS_PROXY_FETCH_USER_AGENT },
           signal: AbortSignal.timeout(SPORTS_PROXY_UPSTREAM_TIMEOUT_MS)
         });
-    // Yahoo's two hosts serve the same: one that turns this Worker away
-    // (429: Yahoo limits an address, and the proxy's is shared, in Taiwan)
-    // is asked of the other (2026-10-14: query1 refused, query2 answered).
-    if (upstream.status === 429 && YAHOO_HOSTS.has(upstreamUrl.hostname)) {
-      const other = new URL(upstreamUrl.toString());
-      other.hostname = upstreamUrl.hostname === 'query1.finance.yahoo.com' ? 'query2.finance.yahoo.com' : 'query1.finance.yahoo.com';
-      upstream = needsYahooCrumb(other) ? await fetchYahooWithCrumb(other) : await fetch(other.toString(), { headers: { 'User-Agent': SPORTS_PROXY_FETCH_USER_AGENT }, signal: AbortSignal.timeout(SPORTS_PROXY_UPSTREAM_TIMEOUT_MS) });
-    }
   } catch (error) {
     return { fetchError: error };
   }
   try {
     const contentType = upstream.headers.get('Content-Type') || 'application/json';
-    if (upstream.status !== 200) return { status: upstream.status, contentType, body: upstream.body };
+    // Yahoo turning the proxy away is the source's failure (503), never the
+    // phone's limit (429): the kit asks again, where a 429 held it a minute.
+    if (upstream.status !== 200) return { status: upstream.status === 429 && YAHOO_HOSTS.has(upstreamUrl.hostname) ? 503 : upstream.status, contentType, body: upstream.body };
     let body = await upstream.arrayBuffer();
     // Google sometimes answers a translation with nothing ([[""]], when it's
     // busy): a failure, not kept (it was, a month, and the line stayed English).

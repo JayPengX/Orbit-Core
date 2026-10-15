@@ -390,7 +390,7 @@ upstream through, if its host is on `SPORTS_PROXY_ALLOWED_HOSTS`:
 | `gamma-api.polymarket.com` | Polymarket events and markets (Play's prices, Sports' chances) |
 | `clob.polymarket.com` | Only `/prices-history`: a market's price line (Sports' win probability where ESPN has none) |
 | `eu-offering-api.kambicdn.com` | Kambi's odds and live scores (Play's Asian baseball, EuroLeague, K League) |
-| `query1/query2.finance.yahoo.com` | Quotes, charts, search, fundamentals, news (Securities) |
+| `query1/query2.finance.yahoo.com` | Quotes, charts, search, fundamentals, news (Securities); asked as a browser, a refusal asked of the twin host, then with Yahoo's session cookie and crumb (`fetchYahoo`); a refusal of all is a 503, never the phone's 429 |
 | `clients5.google.com` | Only `/translate_a/t` (≤ 5,000 chars), sent upstream as a POST, kept a month: a company's description in the reader's language |
 | `piceltaott-elta.cdn.hinet.net` | ELTA's live program list (which channel carries which game), always trimmed |
 | `eltaott.tv` | ELTA.tv's season pages (whether a game's whole video is there) |
