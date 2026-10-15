@@ -843,6 +843,9 @@ What was decided, so it isn't undone. Newer calls win.
 - 2026-10-14: iOS 27 for every app (§11): the kit rebuilt as one design
   system (tokens, glass, springs, controls, `kit/ui.mjs`) and every app's
   own copies of its controls replaced by the kit's.
+- 2026-10-15: Orbit Class's style panel (presets, a custom colour, style
+  slots) deleted; Class has one look. Its tabs one question each: 今天,
+  課表 (any day in either week, 調課), 工具 (the week, AI, 分享).
 - 2026-10-15: online and offline (§9): Securities, Play, Transit and
   Sports need the connection (covered without it); Words, Weather and
   Class work offline with the network's parts locked; Passion Beats opens
