@@ -1136,7 +1136,10 @@ function uprightTurn() {
       root.style.setProperty('--q-turn-w', `${h}px`);
       root.style.setProperty('--q-turn-h', `${w}px`);
     }
-    if ((root.dataset.qTurn || '') !== turn) root.dataset.qTurn = turn;
+    // Upright, no mark at all: an empty one still matches html[data-q-turn],
+    // whose rules put every alert in the top-left corner.
+    if (turn && root.dataset.qTurn !== turn) root.dataset.qTurn = turn;
+    else if (!turn && 'qTurn' in root.dataset) delete root.dataset.qTurn;
     turnRules(turn ? [h, w, turn] : null);
   };
   set();
