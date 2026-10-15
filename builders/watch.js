@@ -482,7 +482,9 @@ export async function runWatch({ store, proxy, get = fetch, now = Date.now(), un
         const stash = (await store.json(APPLE_KNOWN).catch(() => null))?.events || {};
         for (const [id, x] of events) if (stash[id]) events.set(id, { ...stash[id], ...x, start: x.start || stash[id].start, teams: x.teams || stash[id].teams });
         let readPages = 0;
-        for (const x of events.values()) {
+        // The games to come first (a club's page dates them, its clubs on their own page), soonest first; then the rest, older ones.
+        const soon = x => (x.start ? Math.abs(Date.parse(x.start) - now) - (Date.parse(x.start) > now ? 1e13 : 0) : Infinity);
+        for (const x of [...events.values()].sort((a, b) => soon(a) - soon(b))) {
           if ((x.start && x.teams) || !x.url || readPages >= APPLE_READS) continue;
           readPages++;
           const page = await appleData(x.url);
@@ -497,7 +499,9 @@ export async function runWatch({ store, proxy, get = fetch, now = Date.now(), un
         const known = () => [...Object.values(stash), ...events.values()].filter(x => x.start && x.teams);
         let searched = 0;
         let searchReads = 0;
-        for (const g of espn.values()) {
+        // (The games to come first, soonest first; then the last ten days'.)
+        const upcoming = g => (Date.parse(g.start) > now ? Date.parse(g.start) - now : 1e13 + now - Date.parse(g.start));
+        for (const g of [...espn.values()].sort((a, b) => upcoming(a) - upcoming(b))) {
           if (Date.parse(g.start) < now - KEEP || !g.home || appleMatch(g, known()) || searched >= APPLE_SEARCHES) continue;
           searched++;
           const found = appleEvents(await appleData(`${APPLE_SEARCH}${encodeURIComponent(g.home)}`));
