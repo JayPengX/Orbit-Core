@@ -835,6 +835,9 @@ function sheetSwipe() {
   let dragging = false;
   // The finger's last moves: [time, y], for its speed when it lets go.
   let trail = [];
+  // A sheet's rise plays once (.q-risen): risen, grabbed, or shut and reset for its next opening.
+  document.addEventListener('animationend', e => e.animationName === 'q-sheet-up' && e.target.classList.add('q-risen'));
+  document.addEventListener('close', e => e.target.classList?.remove('q-risen'), true);
   document.addEventListener(
     'touchstart',
     e => {
@@ -861,7 +864,7 @@ function sheetSwipe() {
           // (A sheet with more to show scrolls up; one that fits gives a little.)
           if (sheet.scrollHeight > sheet.clientHeight + 1) return void (sheet = null);
           dragging = true;
-          sheet.classList.add('q-dragging');
+          sheet.classList.add('q-dragging', 'q-risen');
           return;
         }
         // Downward from the first move on, the finger is the sheet's: left
@@ -871,7 +874,7 @@ function sheetSwipe() {
         dragging = true;
         // Taken from where it is (still rising, or springing back).
         sheet.classList.remove('q-settle');
-        sheet.classList.add('q-dragging');
+        sheet.classList.add('q-dragging', 'q-risen');
       }
       // Down with the finger; pulled up, it gives a little and no more (iOS's rubber band).
       dy = y >= 0 ? y : -Math.sqrt(-y) * 2.2;
