@@ -445,9 +445,9 @@ served at once while it refreshes in the background.
 
 | Tier | What | Fresh | Stale |
 | --- | --- | --- | --- |
-| `live` | Scoreboards and summaries within a day of today | the 開發 setting `proxyLive` (2 s; 0 = half ESPN's own max-age, 2–5 s) | never |
+| `live` | Scoreboards and summaries within a day of today | the 開發 setting `proxyLive` (2 s; 0 = half ESPN's own max-age, 2–5 s); a scoreboard with no game on until 5 min before its next game, 10 min at most (`quietFor`) | never |
 | `final` | A game over, or a day whose every game is over | `proxyFinalH` (24 h) | never |
-| `odds` | Polymarket events, live odds | 10 s | never |
+| `odds` | Polymarket events (Play asks only events ending from 6 h ago, to the hour; live ones from 6 h back, to ten minutes: addresses that stay the same), live odds | 10 s | never |
 | `f1-live` | F1's live snapshot / laps | 4 s / 15 s (`?final=1` laps: as standings) | never |
 | `schedule` | Scoreboards 2+ days away | 10 min | 1 day |
 | `season` | A whole year (a race series', a tour's) | 3 min | 30 min |
@@ -851,7 +851,11 @@ apps' pages and the nightly packs stay up and open on what the phone has.
   `site/` or `brand/`.
 - **Loading.** Each app's page carries only `kit/loader.html`'s two
   snippets: an import map for `#kit/…` at the version the device last saw
-  (`quadra.kit`), the stylesheet, and `boot.js`.
+  (`quadra.kit`), the stylesheet, and `boot.js`. Each app's deploy lists
+  the kit modules its first screen imports right after them as
+  modulepreload (`kit/preload.mjs`, called by its `stamp-version.mjs`, Orbit
+  Class's `vite.config.js`), so they're asked for with the page, not one
+  import level at a time.
 - **Updating.** The kit notes a newer version on every opening, and
   `watchUpdates` puts it in place like a deploy of the app.
 - **Tools.** `node kit/apps.mjs` points the apps at it (refreshing the
@@ -902,7 +906,7 @@ apps' pages and the nightly packs stay up and open on what the phone has.
 | `postseason.mjs` | Sports, Play | MLB's postseason from MLB itself |
 | `holidays.mjs` | Class, Weather, Transit | Taiwan's days off and 補班 days |
 | `devconfig.mjs` | Workers | The `DEV` table for the Workers |
-| `stamp.mjs`, `apps.mjs`, `link.mjs`, `loader.html` | build | Publishing and wiring the kit |
+| `stamp.mjs`, `apps.mjs`, `link.mjs`, `loader.html`, `preload.mjs` | build | Publishing and wiring the kit; each app's kit modules preloaded |
 
 ## 10. The brand and the renamed repos
 

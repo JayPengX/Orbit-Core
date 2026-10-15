@@ -15,7 +15,7 @@ const dest = join(out, 'kit');
 await rm(dest, { recursive: true, force: true });
 await cp(src, dest, { recursive: true });
 // Build and dev tools stay out of the site.
-for (const tool of ['stamp.mjs', 'link.mjs', 'loader.html', 'apps.mjs']) await rm(join(dest, tool), { force: true });
+for (const tool of ['stamp.mjs', 'link.mjs', 'loader.html', 'apps.mjs', 'preload.mjs']) await rm(join(dest, tool), { force: true });
 
 const LOCAL = /((?:from|import\(|import)\s*['"])(\.\/[^'"?]+\.m?js)(['"])/g;
 for (const name of await readdir(dest)) {

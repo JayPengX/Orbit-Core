@@ -18,6 +18,8 @@
 //                          [--latency ms]  (each of the app's own files answers this much later:
 //                          a phone's round trip to GitHub Pages, e.g. 150)
 //                          [--root dir]  (the repos from there, e.g. a stamped copy)
+//                          [--h2]  (the app's files over HTTP/2, as GitHub Pages serves them:
+//                          no six-connection queue; a throwaway certificate)
 //                          [--fake-yahoo]  (made-up Yahoo prices: spark and chart answers
 //                          for any symbol, for when Yahoo answers 429)
 //
@@ -49,11 +51,12 @@
 //
 // Needs Playwright (global in the container: /opt/node22/lib/node_modules).
 import { createServer } from 'node:http';
+import { createSecureServer } from 'node:http2';
+import { execFile, execFileSync } from 'node:child_process';
 import { readFile, stat, mkdir, mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join, extname, resolve } from 'node:path';
-import { execFile } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { ASIA_HOST, asiaBaseballResponse } from '../asia-baseball.js';
 import { F1_LIVE_HOST, f1LiveResponse, memoryLog, sampleLive } from '../f1-live.js';
@@ -207,6 +210,11 @@ const clock = opt('clock', '');
 // --root dir: where the repos are (default: next to this one), e.g. a copy
 // stamped by scripts/stamp-version.mjs, to see a deploy's loading.
 const ROOT = resolve(opt('root', new URL('../../', import.meta.url).pathname));
+// --h2: served over HTTP/2 (TLS, a certificate made for the run), as Pages
+// and Cloudflare serve a phone: over HTTP/1.1 Chromium asks six files at a
+// time, so a page that lists its modules up front queued here and nowhere
+// else. The proxy's dev door still sees a localhost origin (below).
+const h2 = flag('h2');
 // The repos as they were at --upgrade's date or ref, copied out of git.
 async function snapshotRoot(when, repos) {
   const to = await mkdtemp(join(tmpdir(), 'quadra-upgrade-'));
@@ -267,7 +275,13 @@ async function external(req, res) {
   });
 }
 const pointFetch = `(()=>{const f=window.fetch;window.fetch=(i,o={})=>{const u=typeof i==='string'?i:i.url;return /^https:\\/\\/(orbit-workers-proxy|sports-proxy)\\.pengzjay\\.workers\\.dev\\//.test(u)${live ? "&&!/orbit-workers-proxy\\.pengzjay\\.workers\\.dev\\/transit/.test(u)" : ''}?f('/__ext?u='+encodeURIComponent(u),{method:o.method||i.method||'GET',body:o.body,headers:o.headers}):f(i,o)}})();`;
-const server = createServer(async (req, res) => {
+const h2Cert = () => {
+  const dir = join(tmpdir(), `quadra-h2-${process.pid}`);
+  mkdirSync(dir, { recursive: true });
+  execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1', '-subj', '/CN=localhost', '-keyout', join(dir, 'key.pem'), '-out', join(dir, 'cert.pem')], { stdio: 'ignore' });
+  return { key: readFileSync(join(dir, 'key.pem')), cert: readFileSync(join(dir, 'cert.pem')), allowHTTP1: true };
+};
+const server = (h2 && !serve ? (fn => createSecureServer(h2Cert(), fn)) : createServer)(async (req, res) => {
   const path = decodeURIComponent(new URL(req.url, 'http://x').pathname);
   if (serve && path === '/__ext') return external(req, res).catch(() => res.end());
   // Served: no service worker (it would keep the page from these answers).
@@ -290,7 +304,7 @@ const server = createServer(async (req, res) => {
   }
 });
 await new Promise(r => server.listen(serve ? port : 0, r));
-const base = `http://localhost:${server.address().port}/${renamed}/`;
+const base = `${h2 && !serve ? 'https' : 'http'}://localhost:${server.address().port}/${renamed}/`;
 
 // ---- Upstream data, straight from the source ----
 // Given up after 8 s, like the Worker (SPORTS_PROXY_UPSTREAM_TIMEOUT_MS).
@@ -583,6 +597,12 @@ await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(?!
   if (body.op === 'pair-create') Object.assign(reply, { code: 'ABCD2345', exp: Date.now() + 600_000 });
   await route.fulfill({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(reply) });
 });
+// (Over --h2 the page is https: the dev door is asked as the http page it
+// lets in, and its answer handed to the page as for its own origin.)
+async function asHttpPage(route, url) {
+  const res = await route.fetch({ url, headers: { ...route.request().headers(), origin: `http://localhost:${server.address().port}` } });
+  return route.fulfill({ response: res, headers: { ...res.headers(), 'access-control-allow-origin': new URL(base).origin } });
+}
 // The sports proxy: the main Worker's /sports-proxy.
 const SPORTS = /^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/sports-proxy/;
 // Every item asked of the proxy (its time): the busiest minute is printed at
@@ -592,7 +612,7 @@ if (live) {
   await context.route(SPORTS, route => {
     const u = new URL(route.request().url());
     u.searchParams.delete('qt');
-    return route.continue({ url: u.toString() });
+    return h2 ? asHttpPage(route, u.toString()) : route.continue({ url: u.toString() });
   });
   context.on?.('response', async res => {
     if (!SPORTS.test(res.url())) return;
@@ -606,6 +626,7 @@ if (live) {
     r.forEach((x, i) => (x.s !== 200 || x.ms > 2500) && console.log(`live: ${x.s} ${x.ms ?? '?'} ms ${x.c || ''} ${x.e || ''} ${short(asked[i])}`));
   });
 }
+if (live && h2) await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/transit/, route => asHttpPage(route));
 if (!live) await context.route(SPORTS, async route => {
   const u = new URL(route.request().url());
   const cors = { 'Access-Control-Allow-Origin': '*' };
@@ -629,7 +650,7 @@ const curlBin = url =>
   new Promise(resolve => {
     execFile('curl', ['-s', '-L', '-f', '-m', '20', url], { encoding: 'buffer', maxBuffer: 32 * 1024 * 1024 }, (err, stdout) => resolve(err ? null : stdout));
   });
-await context.route(/^https:\/\/(?!orbit-workers-proxy|sports-proxy)/, async route => {
+await context.route(/^https:\/\/(?!orbit-workers-proxy|sports-proxy|localhost[:/])/, async route => {
   const url = route.request().url();
   const body = await curlBin(url);
   if (!body) {
