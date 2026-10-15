@@ -108,19 +108,27 @@ purpose: money). Not yet seen on a phone.
 ## Speed (2026-10-15)
 
 Measured with `tools/preview.mjs --live --h2 --latency 120 --timing
---reopen` on stamped copies, median of 3, Chromium (not yet on a phone).
-Reopens: Sports 2.8 → 1.6 s (the proxy's scoreboards with no game on kept
-until just before the next game: its 24 league days 2.3 s → 0.43 s asked
-again), Play 4.3 → 4.0, Securities 1.00 → 0.90, Words 0.91 → 0.79, Weather
-0.84 → 0.55, Transit 2.1 → 1.9, Class unchanged (0.67). Every app's deploy
-lists the kit modules its first screen imports (`kit/preload.mjs`). First
-openings are bound by the sources (Play's whole board 7–10 s).
-The proxy's CPU under use is the Polymarket lists (a 15-minute tail: 9.2
-of 10.3 CPU-seconds), ~100 ms a 10–15 MB page; Play now asks only for
-events ending from 6 hours ago (the Premier League's first list 15 → 7 MB
-upstream) and the live list by ten-minute addresses. The crons were 0.5 s
-in those 15 minutes. Still each page's parse: a lighter Polymarket read
-(their API has no field filter) is the next lever if CPU ever matters.
+--reopen` on stamped copies (`--profile` for the main thread), Chromium,
+not yet on a phone; the second round A/B, the old and new code alternated.
+- **Reopens:** Play 4.3 → 2.7 s (its saved board drawn once today's reads
+  have gone out; every model fit kept on the device, `play.fits`: a board
+  prices in a quarter of the time), Sports 2.8 → about 2 s (scoreboards
+  with no game on kept until just before the next game), Weather 0.84 →
+  0.55, Words 0.91 → 0.77, Securities 1.00 → 0.87, Transit 2.1 → 2.1 (TDX's
+  live bikes; from Europe each miss crosses to Taiwan), Class 0.66 → 0.62.
+- **First openings:** Play about 10 → 8 s (the live board read once the
+  leagues are in, each game's pregame line from the live pages: 36 reads →
+  17), Sports about 4.9 → 3.4 (noisy: Europe's games were on). Bound by the
+  sources.
+- **The proxy:** a batch writes each read the moment it's in (`&lines=1`;
+  answered whole it waited on its slowest: 23 lists ready in a second
+  waited 3.6 s on one). Play's Polymarket lists are read without the
+  markets nobody reads: a board's 37.5 MB for the proxy to parse → 2.2 MB,
+  86-159 ms of CPU → 6-10 ms, 1.7 MB → 0.24 MB to the phone. Under use the
+  Polymarket trims were 9.2 of 10.3 CPU-seconds in a 15-minute tail.
+- Every app's deploy lists the kit modules its first screen imports
+  (`kit/preload.mjs`). The kit's clean-up of kept answers runs every 6
+  hours, idle, not at each open.
 
 ## Workflows (Shared-Proxy, by hand from Actions)
 
