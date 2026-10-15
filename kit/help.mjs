@@ -7,7 +7,8 @@
 //   tabs    「每個分頁」: one line per tab, in the tab bar's order
 //   …       what's particular to it (a few topics)
 //   money   「錢怎麼算」: how it touches the one Quadra wallet
-// (The Quadra Pass's own guide: what, account, one, net, safe, plus, vip, money.)
+// (The Quadra Pass's own guide: what, tabs, devices, one, net, notify, safe,
+// plus, vip, money.)
 //
 // HELP[app][lang] = [[topic id, title, [paragraphs]], …]
 
@@ -17,76 +18,104 @@ export const HELP = {
   pass: {
     zh: [
       ['what', 'Quadra Pass 是什麼', [
-        'Quadra Pass 是你在所有 App 的帳號：Quadra 的 Securities、Play，和 Orbit 的 Class、Weather、Transit、Sports、Words。每個 App 都用它登入，資料都存在它裡面。',
-        '通行碼是一組 10 個字的代碼，就是這個帳號的鑰匙：知道它的人就能用，所以不要給別人。它只在建立或更換時顯示一次，裝置上不會保存，請記在安全的地方。',
-        '在新裝置登入：輸入通行碼，或在已登入的裝置打開帳戶，按「新增裝置」取得 8 碼裝置代碼（10 分鐘內、只能用一次）。'
+        'Quadra Pass 是你在所有 App 的帳號：Quadra 的 Securities、Play，和 Orbit 的 Class、Weather、Transit、Sports、Words。每個 App 都用它登入，資料都存在它裡面，每台裝置都一樣。',
+        '通行碼是一組 10 個字的代碼，由分享 Quadra 給你的人發給你，App 裡不能自己建立。它就是帳號的鑰匙：知道它的人就能用，所以不要給別人。它只在拿到或更換時顯示一次，裝置上不會保存，請記在安全的地方。',
+        '每個 App 右上角的帳戶按鈕（人像，Plus 會員是自己的頭像）打開 Quadra Pass。'
       ]],
-      ['account', '帳戶明細', [
-        '每個 App 右上角的人像按鈕打開帳戶：帳號、開戶日期、Quadra 餘額、這個月的收入與支出，以及最近的明細（每一筆是哪個 App、做了什麼）。',
-        '帳戶裡也能切換 App、新增裝置、開關通知和管理安全設定。'
+      ['tabs', '每個分頁', [
+        'Pass：Quadra 餘額、開戶日、本月收入與支出、下次發薪和最近明細；下面是這個 App 自己的設定（有的話）、新增裝置、通知、除錯紀錄和帳戶安全。',
+        'Plus：加入或管理 Quadra Plus、它回饋了多少，和會員的頭像與頭像框。',
+        '真相：用真實的數字和你自己的紀錄，算錢從哪裡來、莊家和券商怎麼賺；最下面是財富等級。',
+        'App：每個 Quadra 和 Orbit 的 App、上次什麼時候用、它的說明，和打開它。',
+        '說明：每個 App 怎麼用，就是這裡。'
+      ]],
+      ['devices', '登入與裝置', [
+        '在新裝置登入：輸入通行碼，或在已登入的裝置打開 Pass，按「新增裝置」取得 8 碼裝置代碼（10 分鐘內、只能用一次）。',
+        '從一個 App 跳到另一個（例如 Orbit Sports 的「到 Play 下注」）會自動帶著登入。',
+        '「在這台裝置登出」會清除這台裝置上的所有資料；資料都還在 Quadra Pass，再登入就回來。'
       ]],
       ['one', '一次只用一個 App', [
-        '同一個通行碼一次只在一個 App、一台裝置上使用。打開另一個 App（或另一台裝置），原本那個會暫停並顯示「在別處使用中」，按一下就能拿回來，資料不會互相蓋掉。',
-        '從一個 App 跳到另一個（例如 Orbit Sports 的「到 Play 下注」）會自動帶著登入。'
+        '同一個通行碼一次只在一個 App、一台裝置上使用。打開另一個 App（或另一台裝置），原本那個會暫停並顯示在哪裡使用中，按「在這裡繼續」就能拿回來，資料不會互相蓋掉。'
       ]],
       ['net', '沒有網路的時候', [
         'Words、Weather 和 Class 沒有網路也能打開：背單字、上次的天氣預報和你的課表都在手機上，連上網路後再同步。底部會顯示「沒有網路連線」。',
         'Securities、Play、Transit 和 Sports 的內容都是即時的（報價、賠率、公車到站、比分），舊的資料會讓人誤會，所以沒有網路時只顯示「沒有網路連線」和「重試」，連上網路就自動回來。',
         '網路很慢時，App 會先用手機上的資料打開，底部顯示「網路連線很慢」，新資料到了就更新。'
       ]],
+      ['notify', '通知與除錯紀錄', [
+        '「系統通知」一個開關管全部，下面依 App 分開，每種通知各自開關（比賽開打、投注單結算、成交、上課、降雨、公車到站…）。設定跟著 Quadra Pass，每個 App、每台裝置都一樣；App 開著時，通知顯示在畫面上方。',
+        '除錯紀錄：打開「記錄操作過程」，App 會記下它做了什麼；遇到問題時按「複製紀錄」或「分享檔案」傳出去。紀錄裡沒有通行碼。關閉時只留每件事的最後一次。'
+      ]],
       ['safe', '安全', [
         '伺服器只保存通行碼的雜湊值；裝置上只有會過期、可以撤銷的登入憑證，不會有通行碼本身。',
-        '帳戶裡可以「登出其他所有裝置」（這台保持登入），或「更換通行碼」（新的只顯示一次，舊的立刻失效）。忘記通行碼時，在還登入的裝置更換一組就好。'
+        'Pass 的「帳戶安全」可以「登出其他所有裝置」（這台保持登入），或「更換通行碼」：舊的立刻失效、其他裝置登出，新的只顯示一次，要輸入它的最後 5 個字確認記好了。忘記通行碼時，在還登入的裝置更換一組就好。'
       ]],
       ['plus', 'Quadra Plus 會員', [
-        '一個會員，用在 Play 和 Securities：月繳 NT$490（第一次加入的那個月免費），或年繳 NT$4,900，等於每月約 NT$408、省下兩個月。從 Quadra 餘額扣款，在帳戶裡加入或管理；會員的帳戶按鈕有金色星星。',
-        'Plus 是 Play 和 Securities 的會員方案，所有權益都讓下注和交易更便宜或更大：Play 每週一送 NT$200 免費投注（每月約 NT$867）、3 關以上串關加成 ×1.5、提前兌現只扣 2%（一般 5%）；Securities 手續費 2.8 折、換匯點差減半、融資利率少 1%。另外會員可以在 Quadra Pass 的「Plus」自訂頭像和頭像框，所有 App 的帳戶按鈕都看得到。它怎麼替 Quadra 賺錢，Quadra Pass 的「真相」算給你看。會員卡上會顯示本月和加入以來回饋了多少。每週免費投注入帳時會通知你；續訂前三天（第一個免費月也一樣）會提醒扣款金額，想停就到 Quadra Pass › Plus › 管理會員。每月 1 日從餘額自動扣款，沒打開 App 也照扣；餘額不足扣款失敗，會員就停止，要重新加入。取消後用到期滿，已付不退費，價格含 5% 營業稅。免費投注照運彩業者的規則：每個選項賠率 1.50 以上、不能提前兌現、7 天內用完。',
-        '月繳隨時可以取消，已付的月份照常享有權益；年繳到期自動續約，也可以在「管理會員」取消續約。'
+        '一個會員，用在 Play 和 Securities。月繳 NT$490：第一次加入的那個月免費，之後再加入，當月按剩下的天數計費。年繳 NT$4,900 一次付 12 個月，每月約 NT$408、省 NT$980。從 Quadra 餘額扣款，在 Quadra Pass 的「Plus」加入；會員的帳戶按鈕有金色 ✦。',
+        'Play：每週一張 NT$200 免費投注（那一週打開任何 App 就入帳，沒打開的週不補）、3 關以上每個贏的組合串關加成 ×1.5、提前兌現只扣 2%（一般 5%）。Securities：所有市場手續費 2.8 折、換匯點差減半、新的融資利率少 1%。所有權益都讓下注和交易更便宜或更大；它怎麼替 Quadra 賺錢，「真相」算給你看。',
+        '頭像與頭像框：會員在「Plus」挑選，每個 App 的帳戶按鈕都看得到；連續訂閱 3、6、12 個月解鎖限定款，中斷一個月就從頭算。會員停止時會隱藏，重新加入會回來。',
+        '每月 1 日從餘額扣款，沒打開 App 的月份也照扣（下次打開時補扣）；年繳每年續約一次，餘額不夠一年就改成按月扣。餘額不足扣款失敗，會員就停止，要重新加入。每週免費投注入帳和續訂前三天都會通知你。「Plus」頁顯示本月和累計回饋了多少（面額）。',
+        '想停：「Plus」›「管理」›「管理會員」›「取消自動續訂」，權益用到期滿；已付不退費，價格含 5% 營業稅。免費投注照運彩業者的規則：賠率 1.50 以上（串關看總賠率）、不能提前兌現、7 天內用完，贏了只拿獎金、不退本金。'
       ]],
       ['vip', 'VIP 投注回饋與新手禮', [
-        'VIP 不用加入也不用付費：每個月在 Play 的投注（運彩、彩券、刮刮樂，退款不算）決定當月等級，下個月第一次打開 App 時回饋當月投注額的一部分：🥉 銅卡 NT$10,000 起 0.5%、🥈 銀卡 NT$50,000 起 0.8%、🥇 金卡 NT$150,000 起 1.2%、◆ 黑卡 NT$500,000 起 1.5%。Play 首頁的餘額卡上看得到本月等級和離下一級還差多少。',
+        'VIP 不用加入也不用付費：每個月在 Play 的投注（運彩、彩券、刮刮樂，退款不算）決定當月等級，下個月第一次打開任何 App 時回饋當月投注額的一部分：🥉 銅卡 NT$10,000 起 0.5%、🥈 銀卡 NT$50,000 起 0.8%、🥇 金卡 NT$150,000 起 1.2%、◆ 黑卡 NT$500,000 起 1.5%。Play 首頁的餘額卡上看得到本月等級和離下一級還差多少。',
         '新手禮：在 Play 第一次用自己的錢下注後，送一張 NT$200 免費投注（7 天內有效）；在 Securities 的第一筆交易免手續費（稅和規費照收）。'
       ]],
       ['money', '錢怎麼算', [
-        '所有 App 共用一個新台幣錢包。新帳號開戶金 NT$30,000；每個月 1 日固定發薪 NT$6,000，跟薪水一樣，存多存少都一樣。系統發的錢只有三種：開戶金、月薪，和財富等級獎勵（身價第一次到達一個等級時送一次，小資族 NT$1,000 到億萬大亨 NT$30,000）。月薪在那個月第一次打開任何 App 時入帳，沒打開的月份下次補發。Quadra Pass 的「真相」把你的錢分成三方：系統發的、Quadra 收走的（Play 的莊家優勢、Plus、透支利息），和你自己的成績。',
+        '所有 App 共用一個新台幣錢包。新帳號開戶金 NT$30,000；每個月 1 日固定發薪 NT$6,000，跟薪水一樣，存多存少都一樣。系統發的錢只有這些：開戶金、月薪、財富等級獎勵（身價第一次到達一個等級時送一次，小資族 NT$1,000 到億萬大亨 NT$30,000），和 Play 的 VIP 回饋。月薪在那個月第一次打開任何 App 時入帳，沒打開的月份下次補發。',
+        '「真相」把你的錢分成三方：系統發的、和 Quadra 的輸贏（Play 的輸贏，扣掉 Plus 月費和透支利息），和你自己的成績（投資的漲跌）。',
         '餘額可以是負的（透支），每月計息 1%。就像交割款沒付，2 天內沒補足就是違約交割：扣透支金額 7% 的違約金、自動賣出持股補足，而且 5 年內不能融資、融券。自己先賣就沒事。融資借來的錢只能留在 Securities 買賣，不能拿去 Play 或補透支。',
         'Securities 投資、Play 下注和買彩券；Orbit 的 App 都不用錢。錢只存在 Quadra Pass，不能在帳號之間轉。'
       ]]
     ],
     en: [
       ['what', 'What the Quadra Pass is', [
-        'The Quadra Pass is your account in every app: Quadra’s Securities and Play, and Orbit’s Class, Weather, Transit, Sports and Words. Each signs in with it and keeps its data on it.',
-        'The pass is a 10-character code, the key to the account: anyone who knows it can use it, so keep it to yourself. It’s shown only when it’s made or changed and never kept on a device: write it down somewhere safe.',
-        'On a new device, enter the pass, or on a signed-in device open the account and choose “Add a device” for an 8-character device code (10 minutes, once).'
+        'The Quadra Pass is your account in every app: Quadra’s Securities and Play, and Orbit’s Class, Weather, Transit, Sports and Words. Each signs in with it and keeps its data on it, the same on every device.',
+        'The pass is a 10-character code, given to you by whoever shared Quadra with you: it can’t be made in an app. It’s the key to the account: anyone who knows it can use it, so keep it to yourself. It’s shown only when you get it or change it and never kept on a device: write it down somewhere safe.',
+        'The account button at the top right of every app (a person, or a Plus member’s own avatar) opens the Quadra Pass.'
       ]],
-      ['account', 'Account details', [
-        'The person button at the top right of every app opens the account: its number, when it was opened, the Quadra balance, this month’s money in and out, and the latest entries (which app, what for).',
-        'The account also switches apps, adds devices, turns notices on and off and holds the security settings.'
+      ['tabs', 'Each tab', [
+        'Pass: the Quadra balance, when it was opened, this month’s money in and out, the next pay and the latest entries; below them this app’s own settings (if it has any), adding a device, notifications, the debug log and security.',
+        'Plus: join or manage Quadra Plus, what it gave back, and a member’s avatar and frame.',
+        'Truth: where the money comes from and how the house and the broker earn, in real numbers and your own record; wealth levels at the foot.',
+        'App: every Quadra and Orbit app, when you last used it, its guide and a way in.',
+        'Help: how every app works, here.'
+      ]],
+      ['devices', 'Signing in and devices', [
+        'On a new device, enter the pass, or on a signed-in device open Pass and choose “Add a device” for an 8-character device code (10 minutes, once).',
+        'Going from one app to another (Bet in Play from Orbit Sports, say) arrives signed in.',
+        '“Sign out on this device” wipes everything on this device; it all stays on your Quadra Pass and comes back when you sign in.'
       ]],
       ['one', 'One app at a time', [
-        'A pass is used in one app on one device at a time. Opening another app (or device) pauses the first, which says it’s in use elsewhere; one tap takes it back, so nothing overwrites anything.',
-        'Going from one app to another (Bet in Play from Orbit Sports, say) arrives signed in.'
+        'A pass is used in one app on one device at a time. Opening another app (or device) pauses the first, which says where it’s in use; “Continue here” takes it back, so nothing overwrites anything.'
       ]],
       ['net', 'Without a connection', [
         'Words, Weather and Class open with no connection: your words, the last forecast and your timetable are on the phone, and sync once you’re back online. A note at the bottom says “No internet connection”.',
         'Securities, Play, Transit and Sports are live (prices, odds, buses, scores), and old figures would mislead, so with no connection they show only “No internet connection” and Try again, and come back by themselves once you’re online.',
         'On a slow connection an app opens on what the phone has, says “Slow internet connection” at the bottom, and updates as the new data arrives.'
       ]],
+      ['notify', 'Notifications and the debug log', [
+        'One switch, System notices, turns them all on or off; below it each app’s kinds have their own switches (a game starts, a slip settled, an order filled, a class, rain, a bus nearly here…). The settings follow your Quadra Pass, the same in every app and on every device; while an app is open, a notice shows at the top of the screen.',
+        'Debug log: turn on “Record what the app does” and the app notes what it did; when something goes wrong, Copy or Share file to send it. It never holds your pass. Off, it keeps only the last of each thing.'
+      ]],
       ['safe', 'Security', [
         'The server keeps only a hash of the pass; devices keep only sign-ins that expire and can be revoked, never the pass itself.',
-        'The account can sign out every other device (this one stays in) or change the pass (the new one is shown once, the old one stops at once). Forgot it? Change it from a device that’s still signed in.'
+        'Pass’s Security can sign out every other device (this one stays in) or change the pass: the old one stops at once and other devices sign out, and the new one is shown once, closed only when you type its last 5 characters. Forgot it? Change it from a device that’s still signed in.'
       ]],
       ['plus', 'Quadra Plus', [
-        'One membership for Play and Securities: NT$490 a month (the first month you ever join is free), or NT$4,900 a year, about NT$408 a month with two months free. It comes from the Quadra balance; join or manage it in the account, and a member’s account button has a gold star.',
-        'Plus is Play’s and Securities’ membership, and every perk makes betting or trading cheaper or bigger. Play: a NT$200 free bet every Monday (about NT$867 a month), the parlay boost ×1.5 on 3 picks or more, and cash out keeps 2% instead of 5%. Securities: commission at 28% of the usual rate, half the FX spread, and margin loans 1 point cheaper. Members can also pick an avatar and a frame in the Quadra Pass’s Plus tab, shown on the account button in every app. How it earns Quadra money is worked out in the Quadra Pass’s Truth tab. The Plus card shows what it gave back this month and since you joined. You’re told when each weekly free bet arrives, and three days before a renewal (the free month too) what it will charge; to stop, go to Quadra Pass › Plus › Manage membership. It’s charged from your balance on the 1st of every month, whether or not you open an app; if the balance can’t cover it the charge fails and the membership stops until you join again. Cancelling keeps what’s paid, nothing is refunded, and prices include 5% VAT. Free bets follow a sportsbook’s terms: odds of 1.50 or more on every pick, no cash out, used within 7 days.',
-        'Monthly stops whenever you like, keeping the perks for months paid; yearly renews each year, and renewal can be turned off under Manage membership.'
+        'One membership for Play and Securities. Monthly is NT$490: the first month you ever join is free, and joining again later charges this month by the days left. Yearly is NT$4,900 for 12 months at once, about NT$408 a month, NT$980 less. It comes from the Quadra balance; join in the Quadra Pass’s Plus tab, and a member’s account button has a gold ✦.',
+        'Play: a NT$200 free bet each week (it arrives the week you open any app; a week you miss isn’t made up), the parlay boost ×1.5 on every winning combination of 3 picks or more, and cash out keeps 2% instead of 5%. Securities: commission at 28% of the usual rate in every market, half the FX spread, and new margin loans 1 point cheaper. Every perk makes betting or trading cheaper or bigger; how it earns Quadra money is worked out in Truth.',
+        'Avatars and frames: a member picks them in Plus, shown on the account button in every app; 3, 6 and 12 months in a row unlock the rarest, and a month missed starts the count again. They’re hidden when the membership stops and come back when you join again.',
+        'It’s charged from your balance on the 1st of every month, including months you didn’t open an app (charged when you’re back); yearly renews once a year, by the month if the balance can’t cover a year. If the balance can’t cover a charge, it fails and the membership stops until you join again. You’re told when each weekly free bet arrives and three days before a renewal. The Plus tab shows what it gave back this month and in all (face value).',
+        'To stop: Plus › Manage › Manage membership › Stop renewing; the perks last to the end of what’s paid. Nothing is refunded, and prices include 5% VAT. Free bets follow a sportsbook’s terms: odds of 1.50 or more (a parlay’s taken together), no cash out, used within 7 days, and a win pays the winnings, not the stake.'
       ]],
       ['vip', 'VIP cashback and welcome offers', [
-        'VIP is free and needs no sign-up: what you stake in Play in a month (bets, lottery and scratch cards; refunds don’t count) sets that month’s tier, and a share of it comes back the first time you open an app the next month: 🥉 Bronze from NT$10,000 0.5%, 🥈 Silver from NT$50,000 0.8%, 🥇 Gold from NT$150,000 1.2%, ◆ Black from NT$500,000 1.5%. Play’s balance card shows this month’s tier and what’s left to the next.',
+        'VIP is free and needs no sign-up: what you stake in Play in a month (bets, lottery and scratch cards; refunds don’t count) sets that month’s tier, and a share of it comes back the first time you open any app the next month: 🥉 Bronze from NT$10,000 0.5%, 🥈 Silver from NT$50,000 0.8%, 🥇 Gold from NT$150,000 1.2%, ◆ Black from NT$500,000 1.5%. Play’s balance card shows this month’s tier and what’s left to the next.',
         'Welcome offers: your first bet in Play with your own money brings a NT$200 free bet (7 days), and your first trade in Securities pays no commission (taxes and fees as usual).'
       ]],
       ['money', 'Money', [
-        'Every app shares one NT$ wallet. A new pass opens with NT$30,000; the 1st of every month pays a fixed NT$6,000, like a salary: the same however much you hold. The system gives money three ways only: the opening money, the pay, and wealth level rewards (paid once, the first time what you’re worth reaches a level: NT$1,000 for Saver up to NT$30,000 for Tycoon). The pay comes the first time that month you open any app; a month you miss is paid when you’re back. The Quadra Pass’s Truth tab splits your money three ways: what the system gave, what Quadra took (Play’s house edge, Plus, overdraft interest), and your own result.',
+        'Every app shares one NT$ wallet. A new pass opens with NT$30,000; the 1st of every month pays a fixed NT$6,000, like a salary: the same however much you hold. The system gives money only as the opening money, the pay, wealth level rewards (paid once, the first time what you’re worth reaches a level: NT$1,000 for Saver up to NT$30,000 for Tycoon) and Play’s VIP cashback. The pay comes the first time that month you open any app; a month you miss is paid when you’re back.',
+        'Truth splits your money three ways: what the system gave, your result against Quadra (Play’s wins and losses, less Plus fees and overdraft interest), and your own result (your investments).',
         'The balance can go below zero (an overdraft) at 1% a month. Like an unpaid settlement, if it isn’t covered within 2 days it’s a default: a 7% penalty on what’s owed, holdings sold for it, and no margin or short selling for 5 years. Sell something first and none of that happens. Money borrowed on margin stays in Securities for trading: it can’t be bet in Play or cover an overdraft.',
         'Securities invests, Play bets and sells lottery tickets; the Orbit apps don’t use money. Money lives on the Quadra Pass only and can’t move between passes.'
       ]]
