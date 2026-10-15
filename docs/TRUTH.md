@@ -850,6 +850,10 @@ What was decided, so it isn't undone. Newer calls win.
   Sports need the connection (covered without it); Words, Weather and
   Class work offline with the network's parts locked; Passion Beats opens
   offline. A slow connection opens on the phone's copy with the capsule.
+- 2026-10-15: Transit lists a train (or a bus) and then a ride over 頭前溪
+  as a choice when it gets there 5 minutes sooner than the recommended ways
+  like it (竹東高中 → 成功九街: the train to 竹中 and a ride home); one by
+  train and one by bus at most, under the recommendations, never one.
 - 2026-10-14: a game is over the moment the rules say so (Sports
   `overByRule`: an NBA 4th over with the scores apart, MLB's home side
   ahead in the middle of the 9th…), not when ESPN marks it minutes later;
