@@ -33,7 +33,8 @@
 // Orbit Weather: /weather is answered by weather.js itself on the saved
 // answers in tests/fixtures/weather (Taipei 101, 2026-10-02 evening; no keys
 // needed), /weather/where by NLSC's real point query, and the page's position
-// is Taipei 101 (--no-geo: location refused).
+// is Taipei 101 (--no-geo: location refused). With --live, the real proxy
+// through Weather's dev door: today's forecast where the page is.
 //   hash  the page's #hash to open (a tab), one screenshot each; none: the start
 //
 // What it does:
@@ -277,7 +278,7 @@ async function external(req, res) {
     }
   });
 }
-const pointFetch = `(()=>{const f=window.fetch;window.fetch=(i,o={})=>{const u=typeof i==='string'?i:i.url;return /^https:\\/\\/(orbit-workers-proxy|sports-proxy)\\.pengzjay\\.workers\\.dev\\//.test(u)${live ? "&&!/orbit-workers-proxy\\.pengzjay\\.workers\\.dev\\/transit/.test(u)" : ''}?f('/__ext?u='+encodeURIComponent(u),{method:o.method||i.method||'GET',body:o.body,headers:o.headers}):f(i,o)}})();`;
+const pointFetch = `(()=>{const f=window.fetch;window.fetch=(i,o={})=>{const u=typeof i==='string'?i:i.url;return /^https:\\/\\/(orbit-workers-proxy|sports-proxy)\\.pengzjay\\.workers\\.dev\\//.test(u)${live ? "&&!/orbit-workers-proxy\\.pengzjay\\.workers\\.dev\\/(transit|weather)/.test(u)" : ''}?f('/__ext?u='+encodeURIComponent(u),{method:o.method||i.method||'GET',body:o.body,headers:o.headers}):f(i,o)}})();`;
 const h2Cert = () => {
   const dir = join(tmpdir(), `quadra-h2-${process.pid}`);
   mkdirSync(dir, { recursive: true });
@@ -531,7 +532,7 @@ const weatherKv = new Map();
 const weatherEnv = { GOOGLE_WEATHER_KEY: 'preview', CWA_KEY: 'preview', MOENV_KEY: 'preview', RATE_LIMIT_KV: { get: async k => weatherKv.get(k) ?? null, put: async (k, v) => void weatherKv.set(k, v) } };
 const weatherFetch = weatherFixtures();
 const curlText = url => new Promise(resolve => execFile('curl', ['-s', '-m', '20', url], (err, stdout) => resolve(err ? '' : stdout)));
-await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(weather|push)/, async route => {
+await context.route(live ? /^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/push/ : /^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(weather|push)/, async route => {
   const req = route.request();
   const u = new URL(req.url());
   const cors = { 'Access-Control-Allow-Origin': '*' };
