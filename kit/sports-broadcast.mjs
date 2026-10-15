@@ -101,11 +101,14 @@ export const eltaAppUrl = n => (ELTA_PLAY[n] ? `eltatv://live/${n}` : null);
 //   'venue' Chinese commentary with the ground's sound on the second track
 //           (副聲道現場原音)
 //   'zh'    Chinese only (中文, a MAX channel's program that says nothing, CPBL's)
+//   'data'  數據視角: the game drawn from its data, no commentary and not the
+//           pictures (a MAX channel's, beside the 體育台's real broadcast:
+//           Leeds v Man United on MAX6, 2026-10-18); never the way to watch
 // `adFree`: said so, or a MAX channel.
 const SPORTS_TV = new Set([101, 105, 110, 115]);
 export function eltaAudio(title, ch, league = '') {
   const t = String(title || '');
-  const audio = /雙語/.test(t) ? (league === 'cpbl' ? 'local' : 'dual') : /副聲道/.test(t) ? 'venue' : /原音|英文|English/i.test(t) ? 'en' : /中文/.test(t) ? 'zh' : SPORTS_TV.has(ch) && league !== 'cpbl' ? 'dual' : 'zh';
+  const audio = /數據視角/.test(t) ? 'data' : /雙語/.test(t) ? (league === 'cpbl' ? 'local' : 'dual') : /副聲道/.test(t) ? 'venue' : /原音|英文|English/i.test(t) ? 'en' : /中文/.test(t) ? 'zh' : SPORTS_TV.has(ch) && league !== 'cpbl' ? 'dual' : 'zh';
   return { audio, adFree: /無廣告/.test(t) || (ch >= 540 && ch <= 549) };
 }
 export const AUDIO_NAMES = {
@@ -113,16 +116,18 @@ export const AUDIO_NAMES = {
   dual: { zh: '雙語', en: 'Chinese + English' },
   venue: { zh: '中文・現場音', en: 'Chinese + ground' },
   local: { zh: '雙語・中文', en: 'Two Chinese crews' },
-  zh: { zh: '中文', en: 'Chinese' }
+  zh: { zh: '中文', en: 'Chinese' },
+  data: { zh: '數據視角', en: 'Data view' }
 };
 // Whether a channel has the commentary the person likes: Chinese on every
 // kind but 'en'; the original on 'en' and on 'dual' (its second track).
-export const hasAudio = (c, prefer = 'en') => (prefer === 'zh' ? c.audio !== 'en' : c.audio === 'en' || c.audio === 'dual');
+export const hasAudio = (c, prefer = 'en') => c.audio !== 'data' && (prefer === 'zh' ? c.audio !== 'en' : c.audio === 'en' || c.audio === 'dual');
 // How well a channel suits the person: no ads first (a MAX channel before
 // the 體育台 with the same game, whatever their commentary: the owner's
 // call), then their commentary (on its main track before a second one).
-// Lower is better.
+// A data view after every real broadcast. Lower is better.
 export function channelRank(c, prefer = 'en') {
+  if (c.audio === 'data') return 30;
   const order = prefer === 'zh' ? { zh: 0, dual: 0, venue: 0, local: 0, en: 3 } : { en: 0, dual: 1, venue: 2, local: 3, zh: 3 };
   return (c.adFree ? 0 : 10) + (order[c.audio] ?? 3);
 }
