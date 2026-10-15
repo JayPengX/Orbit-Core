@@ -612,3 +612,27 @@ test('a pack a phone kept before the move (under the Pages address) is still its
     globalThis.caches = had;
   }
 });
+
+test('what the device keeps is pruned of copies older than a few days, at most every 6 hours, not at every open', async () => {
+  const kept = new Map();
+  let keysRead = 0;
+  const had = { caches: globalThis.caches, idle: globalThis.requestIdleCallback };
+  globalThis.caches = { open: async () => ({ match: async k => kept.get(k)?.clone() || null, put: async (k, r) => void kept.set(k, r), keys: async () => (keysRead++, [...kept.keys()]), delete: async k => kept.delete(k) }) };
+  globalThis.requestIdleCallback = f => f();
+  store.delete('quadra.dataPruned');
+  // (A kit just loaded: an app opened.)
+  const fresh = await import('../kit/quadra.mjs?pruning');
+  kept.set('https://quadra.data/old', new Response('{}', { headers: { 'x-at': String(Date.now() - 5 * 86_400_000) } }));
+  globalThis.fetch = async () => new Response('{"n":1}', { status: 200 });
+  await fresh.proxyJson('https://x.test/prune-1', { ttl: 1 });
+  await new Promise(r => setTimeout(r, 30));
+  assert.equal(kept.has('https://quadra.data/old'), false, 'the old copy went');
+  assert.equal(keysRead, 1);
+  // Another read (another open) within 6 hours: nothing walked again.
+  await (await import('../kit/quadra.mjs?pruning-again')).proxyJson('https://x.test/prune-2', { ttl: 1 });
+  await new Promise(r => setTimeout(r, 30));
+  assert.equal(keysRead, 1);
+  assert.ok(Number(store.get('quadra.dataPruned')) > 0);
+  globalThis.caches = had.caches;
+  globalThis.requestIdleCallback = had.idle;
+});

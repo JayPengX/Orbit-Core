@@ -484,21 +484,39 @@ async function persisted(key) {
     return null;
   }
 }
-let prunedAt = 0;
 async function persist(key, text) {
   if (!hasCaches()) return;
   try {
     const cache = await caches.open(DATA_CACHE);
     await cache.put(key, new Response(text, { headers: { 'content-type': 'application/json', 'x-at': String(Date.now()) } }));
-    // Now and then, what's older than a few days goes.
-    if (Date.now() - prunedAt > 10 * 60_000) {
-      prunedAt = Date.now();
+    prune();
+  } catch {}
+}
+// Now and then (every 6 hours on this device, while it's idle), what's
+// older than a few days goes. It read every copy kept: at each app's open
+// it was a tenth to half a second of work, beside the app's own reads.
+const PRUNED_KEY = 'quadra.dataPruned';
+const PRUNE_EVERY_MS = 6 * 3_600_000;
+let prunedAt = 0;
+function prune() {
+  try {
+    prunedAt = Math.max(prunedAt, Number(globalThis.localStorage?.getItem(PRUNED_KEY)) || 0);
+  } catch {}
+  if (Date.now() - prunedAt < PRUNE_EVERY_MS) return;
+  prunedAt = Date.now();
+  try {
+    globalThis.localStorage?.setItem(PRUNED_KEY, String(prunedAt));
+  } catch {}
+  const idle = globalThis.requestIdleCallback || (f => setTimeout(f, 5000));
+  idle(async () => {
+    try {
+      const cache = await caches.open(DATA_CACHE);
       for (const req of await cache.keys()) {
         const res = await cache.match(req);
         if (Date.now() - (Number(res?.headers.get('x-at')) || 0) > DATA_KEEP_MS) await cache.delete(req);
       }
-    }
-  } catch {}
+    } catch {}
+  });
 }
 export function clearData() {
   memory.clear();
