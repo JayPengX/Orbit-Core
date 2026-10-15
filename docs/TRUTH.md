@@ -646,9 +646,10 @@ On top of them, **apps put live knowledge over slower copies** (§8).
   doing). A thing shown in five places is shown in the one that answers it.
 - **Only what's real for a person in Taiwan**: Sports lists only what
   ELTA.tv and Apple TV carry, recommends only games on TV here at hours
-  people are awake (05:00 to midnight; a big game in the small hours among
-  the others); Play sells what Taiwan can watch; Transit is Taiwan's (its
-  map stays around Taiwan); Securities' rules are Taiwan's brokers'.
+  people are awake (05:00 to midnight; in the small hours every game of
+  their own leagues, and a big one of any, among the others, 2026-10-15);
+  Play sells what Taiwan can watch; Transit is Taiwan's (its map stays
+  around Taiwan); Securities' rules are Taiwan's brokers'.
 - **Like the real thing, not a teaching tool**: Play is a plain sportsbook
   (prices and the slip; no analysis tags), its lottery Taiwan Lottery's own
   tables; Securities is a broker (margin calls at 130%, 融券's deposit, 定存
