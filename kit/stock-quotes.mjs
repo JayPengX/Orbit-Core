@@ -27,9 +27,12 @@ export function ttlFor(url) {
 let reader = null;
 // The reader every fetch here goes through: (url, { ttl, persist, timeout }) -> JSON.
 export const useQuotesReader = fn => void (reader = fn);
+// Kept on the device: what lasts past a minute, and every chart (a day's
+// too: a read Yahoo turns down answers the last one drawn, not an error).
 const getJson = url => {
   if (!reader) throw new Error('quotes: no reader');
-  return reader(url, { ttl: ttlFor(url), persist: ttlFor(url) > 60_000, timeout: 15_000 });
+  const ttl = ttlFor(url);
+  return reader(url, { ttl, persist: ttl > 60_000 || url.includes('/v8/finance/chart/'), timeout: 15_000 });
 };
 
 // The FX symbol for a currency's price in NT$ (USDTWD=X: NT$ per US$).

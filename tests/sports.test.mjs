@@ -278,6 +278,33 @@ test('Yahoo: a host that turns the proxy away (429) is asked of its twin', async
   }
 });
 
+test('Yahoo: refused by both hosts, a chart is asked as a signed-in visitor; refused by all, it is a 503, never the phone\'s 429', async () => {
+  const real = globalThis.fetch;
+  const asked = [];
+  let refuseAll = false;
+  globalThis.fetch = async (url, init = {}) => {
+    const u = new URL(String(url));
+    asked.push(`${u.hostname}${u.searchParams.get('crumb') ? '+crumb' : ''}`);
+    assert.match(init.headers?.['User-Agent'] || '', /^Mozilla/, 'asked as a browser');
+    if (u.hostname === 'fc.yahoo.com') return new Response('', { status: 404, headers: { 'Set-Cookie': 'A3=x; Path=/' } });
+    if (u.pathname === '/v1/test/getcrumb') return new Response('abc', { status: 200 });
+    if (refuseAll || !u.searchParams.get('crumb')) return new Response('Too Many Requests', { status: 429 });
+    return new Response(JSON.stringify({ chart: { result: [] } }), { status: 200 });
+  };
+  try {
+    store.clear();
+    const chart = s => `https://proxy.test/sports-proxy?url=${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${s}?range=1d&interval=5m`)}&app=stock`;
+    const ok = await worker.fetch(new Request(chart('YYYY'), { headers: { Origin: 'https://jaypengx.github.io' } }), {}, ctx);
+    assert.equal(ok.status, 200);
+    assert.deepEqual(asked, ['query1.finance.yahoo.com', 'query2.finance.yahoo.com', 'fc.yahoo.com', 'query2.finance.yahoo.com', 'query2.finance.yahoo.com+crumb']);
+    refuseAll = true;
+    const no = await worker.fetch(new Request(chart('XXXX'), { headers: { Origin: 'https://jaypengx.github.io' } }), {}, ctx);
+    assert.equal(no.status, 503);
+  } finally {
+    globalThis.fetch = real;
+  }
+});
+
 test('a batch answers up to 24 reads (a first paint, about 28, in two requests), no more', async () => {
   const u = n => `https://site.api.espn.com/apis/site/v2/sports/soccer/x${n}.1/scoreboard`;
   const many = Array.from({ length: 30 }, (_, i) => `&u=${encodeURIComponent(u(i))}`).join('');
