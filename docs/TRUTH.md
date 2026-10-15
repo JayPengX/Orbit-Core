@@ -853,7 +853,8 @@ What was decided, so it isn't undone. Newer calls win.
   offline. A slow connection opens on the phone's copy with the capsule.
 - 2026-10-15: a Transit trip with stops is planned and shown whole (each
   way to the last place, through every stop), not as the way to the first
-  stop alone.
+  stop alone; with one more way: one YouBike kept the whole trip (parked
+  at each stop, returned only near the last).
 - 2026-10-15: Transit lists a train (or a bus) and then a ride over 頭前溪
   as a choice when it gets there 5 minutes sooner than the recommended ways
   like it (竹東高中 → 成功九街: the train to 竹中 and a ride home); one by
