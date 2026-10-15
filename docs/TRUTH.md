@@ -857,6 +857,10 @@ What was decided, so it isn't undone. Newer calls win.
   at each stop, returned only near the last), and it's the recommendation
   unless a stop is far (a ride over 20 minutes) or walking it all is
   sooner: buses between stops are poor, the bike works best overall.
+  With TPASS's free half hour it's still kept through stops (never
+  returned at each: some are very close), and changed at a dock by a stop
+  only before a ride would take the rental past 30 minutes, the stays
+  counted.
 - 2026-10-15: Transit lists a train (or a bus) and then a ride over 頭前溪
   as a choice when it gets there 5 minutes sooner than the recommended ways
   like it (竹東高中 → 成功九街: the train to 竹中 and a ride home); one by
