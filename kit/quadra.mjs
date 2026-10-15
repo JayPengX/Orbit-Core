@@ -1942,7 +1942,7 @@ export function plusPerks(lang = 'zh') {
   return [
     ['odds', en ? `A ${money(o.bonusBet)} free bet every week` : `每週 ${money(o.bonusBet)} 免費投注`, en ? `One ${money(o.bonusBet)} free bet each Monday (4 or 5 a month); keep what it wins` : `每週一送 1 張 ${money(o.bonusBet)}（一個月 4 到 5 張），贏了獎金歸你`],
     ['odds', en ? `Parlay boost ×${o.boost}` : `串關加成 ×${o.boost}`, en ? 'Every winning combination of 3 picks or more' : '3 關以上每個贏的組合'],
-    ['odds', en ? 'Better cash out' : '提前兌現更划算', en ? `Keeps ${pct(o.cashOutKeep)} instead of 5%` : `只扣 ${pct(o.cashOutKeep)}，一般扣 5%`],
+    ['odds', en ? 'Better cash out' : '提前兌現更划算', en ? `Keeps ${pct(o.cashOutKeep)} instead of 3%` : `只扣 ${pct(o.cashOutKeep)}，一般扣 3%`],
     ['stock', en ? `Commission ${pct(1 - PLUS.stock.commission)} off` : `證券手續費 ${Math.round(PLUS.stock.commission * 100) / 10} 折`, en ? 'Every market, every order' : '所有市場、每一筆委託'],
     ['stock', en ? 'FX at half the spread' : '換匯點差減半', en ? 'Every currency' : '所有幣別'],
     ['stock', en ? `Margin ${pct(PLUS.stock.loanCut)} cheaper` : `融資利率少 ${pct(PLUS.stock.loanCut)}`, en ? 'On every new loan, every currency' : '每筆新借款、所有幣別'],
