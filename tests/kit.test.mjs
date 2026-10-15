@@ -94,6 +94,13 @@ test('proxyJson batches requests made together and remembers answers', async () 
   assert.equal(d.echo, 'https://x.test/d');
   assert.equal(calls.length, 2);
   assert.ok(!calls[1].includes('batch=1'));
+  // `alone`: its own request even when others are asked with it (a batch answers only when its slowest is in).
+  calls.length = 0;
+  const [e] = await Promise.all([kit.proxyJson('https://x.test/e', { persist: false, alone: true }), kit.proxyJson('https://x.test/f', { persist: false }), kit.proxyJson('https://x.test/g', { persist: false })]);
+  assert.equal(e.echo, 'https://x.test/e');
+  assert.equal(calls.length, 2);
+  assert.ok(calls.some(u => u.includes('batch=1') && !u.includes('x.test%2Fe')));
+  assert.ok(calls.some(u => !u.includes('batch=1') && u.includes('x.test%2Fe') && !u.includes('mirror=0')));
 });
 
 test("a failed read answers the copy the device has, of any age (a league never turns into 'no data' for a refused minute)", async () => {

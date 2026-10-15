@@ -672,8 +672,10 @@ const RETRY_MS = 15_000;
 // A read over for good is answered from what the proxy keeps (sports.js),
 // in the batch like any other. `mirror: false`: this one from its source,
 // never a kept copy, asked on its own.
-export function proxyJson(url, { ttl = 60_000, trim = '', persist: keep = true, timeout = 20_000, mirror = true } = {}) {
-  return keptJson(url, dataKey(url, trim), { ttl, keep }, () => (mirror && !mirrorGone.has(`${trim}!${url}`) ? enqueue(url, trim, timeout) : fetchOne(url, trim, timeout, '&mirror=0')));
+// (`alone`: never in a batch, which answers only when its slowest read is
+// in: a league's table waited on its playoffs' game days, 2026-10-15.)
+export function proxyJson(url, { ttl = 60_000, trim = '', persist: keep = true, timeout = 20_000, mirror = true, alone = false } = {}) {
+  return keptJson(url, dataKey(url, trim), { ttl, keep }, () => (!mirror || mirrorGone.has(`${trim}!${url}`) ? fetchOne(url, trim, timeout, '&mirror=0') : alone ? fetchOne(url, trim, timeout) : enqueue(url, trim, timeout)));
 }
 // The family's data (the proxy's /data/, kept in R2 on Cloudflare; built at
 // night and through the day): what doesn't change in a day (a league's
