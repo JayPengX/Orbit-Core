@@ -8,7 +8,7 @@ import {
   airForecast, parseGoogleAir, googleAirBody, parseAirHistory,
   weatherStatus, handleWeather, scrub, cellOf, nearestStation, townIds, airArea, parseCwaTown, cwaAt, parseGoogleDay, parseGoogleHour,
   blend, buildCell, GOOGLE_DAILY_CALLS, parseVillage, whereIs, addAirReading, briefText, rainPhrase, weatherCheck, noteRecent, cellForecast, FRESH_WAIT_MS, advise, adviceWindow, parseCwaWarnings, aqiLevel, uvLevel, num, DEFAULT_WEIGHTS
-, popStep, keepJson, keptJson, KV_EVERY_MS } from '../weather.js';
+, popStep, keepJson, keptJson, KV_EVERY_MS, googleAllowed } from '../weather.js';
 import { STATIONS } from '../weather-stations.js';
 import { upstream as fixtureUpstream } from './fixtures/weather/upstream.mjs';
 
@@ -183,10 +183,13 @@ test('the cell cache: fresh from KV; an old one refreshed, its answer if in with
   slow = FRESH_WAIT_MS + 500;
   const waits = [];
   const t0 = Date.now();
-  const old = await cellForecast(e, { waitUntil: p => waits.push(p) }, 25.034, 121.565, { fetchFn: f, now: NOW + 120 * 60_000 });
+  let followed = null;
+  const old = await cellForecast(e, { waitUntil: p => waits.push(p) }, 25.034, 121.565, { fetchFn: f, now: NOW + 120 * 60_000, follow: job => (followed = job) });
   assert.ok(Date.now() - t0 < FRESH_WAIT_MS + 400);
   assert.equal(old.refreshing, true);
   assert.equal(old.at, NOW + 60 * 60_000);
+  // (The request that asked can follow the refresh: the new answer when it's in.)
+  assert.equal((await followed).at, NOW + 120 * 60_000);
   await Promise.all(waits);
   assert.equal(JSON.parse(kv.store.get('weather:cell:25.03,121.57')).at, NOW + 120 * 60_000);
 });
@@ -267,6 +270,38 @@ test('/weather: a Quadra Pass session, a place or where the IP says', async () =
   assert.deepEqual(byIp.located, { by: 'ip', city: 'Taipei' });
   assert.equal(byIp.place.town, '信義區');
   assert.equal((await get('?auto=1', { cf: {} })).status, 404);
+});
+
+test('/weather?lines=1: the quick answer, then the whole one on the same request; a whole cell, one line', async () => {
+  const e = { ...env, RATE_LIMIT_KV: memKv() };
+  const waits = [];
+  const get = () => handleWeather(new Request('https://w.example/weather?lat=25.034&lon=121.565&lines=1'), e, {}, '/weather', { fetchFn: upstream(), cf: undefined, session: { s: 'x' }, ctx: { waitUntil: p => waits.push(p) } });
+  const lines = (await (await get()).text()).trim().split('\n').map(l => JSON.parse(l));
+  assert.equal(lines.length, 2);
+  assert.equal(lines[0].more, true);
+  assert.ok(!lines[1].more && !lines[1].refreshing && !lines[1].cached);
+  assert.equal(lines[1].air.hourly.length, 96, 'the air forecast came with it');
+  assert.ok(lines[1].hours.length > lines[0].hours.length, 'hours to day 10');
+  assert.deepEqual(lines[1].located, { by: 'device' });
+  assert.equal(lines[1].place.town, '信義區');
+  await Promise.all(waits);
+  const again = (await (await get()).text()).trim();
+  assert.ok(!again.includes('\n'));
+  assert.equal(JSON.parse(again).cached, true);
+  assert.ok(!JSON.parse(again).more);
+});
+
+test("Google's count: two asks of one refresh side by side both count, the newest written last", async () => {
+  const store = new Map();
+  let slow = 40;
+  const kv = { store, get: async k => store.get(k) ?? null, put: async (k, v) => { const wait = slow; slow = 0; await new Promise(r => setTimeout(r, wait)); store.set(k, v); } };
+  const e = { RATE_LIMIT_KV: kv };
+  const waits = [];
+  assert.deepEqual(await Promise.all([googleAllowed(e, NOW, 1, p => waits.push(p)), googleAllowed(e, NOW, 4, p => waits.push(p))]), [true, true]);
+  await Promise.all(waits);
+  assert.equal(Number(store.get('weather:google:2026-10-02')), 5);
+  assert.equal(await googleAllowed(e, NOW, GOOGLE_DAILY_CALLS - 5), true);
+  assert.equal(await googleAllowed(e, NOW, 1), false, 'the cap counts what this Worker has asked, not only what KV says yet');
 });
 
 test('the township list for the picker', async () => {
