@@ -680,7 +680,7 @@ kit's `quadra.mjs` (the same tables in both).
 
 **What Plus gives.**
 - **Play** (`PLUS.odds`): the weekly free bet, the parlay boost ×1.5, and
-  cash-out keeps 2% instead of 5%.
+  cash-out keeps 2% instead of 3%.
 - **Securities** (`PLUS.stock`): commission at 2.8折 (×0.28), half the FX
   spread, and margin loans 1 point a year cheaper.
 - **Looks**: an avatar and a frame on the account button, some only after a

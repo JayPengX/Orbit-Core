@@ -25,7 +25,7 @@ export const PLUS = {
   // Play: a NT$bonusBet free bet each week (the Worker's `eco:fb:<Monday>`;
   // free bets take odds of 1.50 or longer, a parlay's all together), the parlay boost
   // ×boost (Play's PARLAY_BOOST: 3+ picks, where the house's cut multiplies
-  // with every pick), and cash out keeps cashOutKeep instead of 5% (money
+  // with every pick), and cash out keeps cashOutKeep instead of 3% (money
   // back on the slip sooner, to bet again).
   odds: { bonusBet: 200, boost: 1.5, cashOutKeep: 0.02 },
   // Securities: commission at 2.8折 (×0.28, a Taiwan online broker's best
