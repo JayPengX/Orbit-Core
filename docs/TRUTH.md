@@ -851,6 +851,10 @@ What was decided, so it isn't undone. Newer calls win.
   Sports need the connection (covered without it); Words, Weather and
   Class work offline with the network's parts locked; Passion Beats opens
   offline. A slow connection opens on the phone's copy with the capsule.
+- 2026-10-15: Transit times a YouBike rental when you say you took one
+  (a station's card), and with TPASS's free half hour warns at 25 minutes
+  and offers, optional, the stations near you to return it at and take
+  another.
 - 2026-10-15: a Transit trip with stops is planned and shown whole (each
   way to the last place, through every stop), not as the way to the first
   stop alone; with one more way: one YouBike kept the whole trip (parked
