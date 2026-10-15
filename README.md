@@ -298,7 +298,9 @@ Orbit Weather's server (its design: Orbit-Weather's README).
   for 10. It blends Google Weather, CWA (中央氣象署: the nearest automatic,
   manned and rain-gauge stations from the committed `weather-stations.js`)
   and MOENV (環境部: air quality, UV). Farther than any station (abroad), it
-  uses Google only.
+  uses Google only. With `&lines=1`, an answer that isn't the last word
+  (the quick one, `more`; an old copy whose refresh is slow, `refreshing`)
+  is the first line and the whole one the second, on the same request.
 - `GET /weather/where`: the 縣市 and 鄉鎮市區, from NLSC's point query.
 - `GET /weather/places`: every township, for the place picker.
 - `GET /weather/status` (`?sample=<n>`): each key set and answering;
@@ -306,7 +308,11 @@ Orbit Weather's server (its design: Orbit-Weather's README).
   fixtures).
 - `GET /weather/skill`: the scoring report.
 
-**Caching.** A cell is kept in KV 15 minutes. One older but under 3 hours
+A page on this computer (a localhost Origin) reads `/weather` and
+`/weather/where` without a pass, 30 a minute an address (`WEATHER_DEV`).
+
+**Caching.** A cell is kept in KV 15 minutes; KV's writes (the cell's hourly
+copy, the recent cells, Google's count) go behind the answer. One older but under 3 hours
 is answered at once and refreshed behind. A source that fails is replaced
 by its last good copy under 6 hours old, and `partial` says so.
 
