@@ -498,6 +498,17 @@ if (shuffle)
       }
     }, 30);
   });
+// The moment the loading screen goes (--timing), taken in the page.
+if (timing)
+  await context.addInitScript(() => {
+    const watch = () => {
+      const box = document.getElementById('loading');
+      if (!box) return void (document.readyState === 'loading' && requestAnimationFrame(watch));
+      if (box.hidden) return void (globalThis.__loadingGone ??= performance.now());
+      new MutationObserver((_, seen) => box.hidden && ((globalThis.__loadingGone ??= performance.now()), seen.disconnect())).observe(box, { attributes: true, attributeFilter: ['hidden'] });
+    };
+    document.addEventListener('readystatechange', watch, { once: true });
+  });
 if (device === 'ipad') await context.addInitScript(() => Object.defineProperty(Navigator.prototype, 'maxTouchPoints', { get: () => 5 }));
 await context.addInitScript(
   ([refresh, lang, stores]) => {
@@ -697,6 +708,8 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
   if (clockAt) await page.clock.install({ time: new Date(clockAt) });
   page.on('console', m => m.type() === 'error' && errors.push(m.text()));
   page.on('pageerror', e => errors.push(String(e.stack || e)));
+  page.on('requestfailed', r => DEBUG && console.log('request failed', r.failure()?.errorText, r.url().slice(0, 140)));
+  page.on('framenavigated', f => DEBUG && f === page.mainFrame() && console.log('navigated', Date.now() - started, f.url().slice(0, 140)));
   // (A failed resource by its address: the console only says "404".)
   page.on('response', r => r.status() >= 400 && errors.push(`${r.status()} ${r.url().replace(/([?&](qt|u)=)[^&]+/g, '$1…').slice(0, 160)}`));
   const started = Date.now();
@@ -738,9 +751,13 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
       }, Math.max(0, netBack - (Date.now() - started)));
   }
   if (timing) {
+    // When it went, as the page saw it (from the navigation's start): the
+    // tool's own polling can answer seconds late while slow image routes
+    // hold its connection to the browser.
     const shown = await page
       .waitForFunction(() => document.getElementById('loading')?.hidden, null, { timeout: 60_000, polling: 50 })
-      .then(() => Date.now() - started)
+      .then(() => page.evaluate(() => globalThis.__loadingGone ?? null))
+      .then(at => (at == null ? Date.now() - started : Math.round(at)))
       .catch(() => null);
     const paint = await page.evaluate(() => performance.getEntriesByName('first-contentful-paint')[0]?.startTime ?? null);
     // How many round trips the app's own files took: each request's start,
