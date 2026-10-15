@@ -53,6 +53,9 @@ TDX_PER_SEC = "4"
 # A local dev page (the preview's --live) may ask for transit data without a
 # Quadra Pass, rate-limited (worker.js). "off" closes it.
 TRANSIT_DEV = "on"
+# Weather's the same (worker.js): the forecast and the place from a local
+# page, 30 a minute an address. "off" closes it.
+WEATHER_DEV = "on"
 # The sports proxy's dev door (sports.js checkSession): a local
 # page may read without a Quadra Pass, rate-limited. "off" closes it.
 SPORTS_DEV = "on"

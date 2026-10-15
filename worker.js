@@ -1207,11 +1207,17 @@ export default {
     }
     // Orbit Weather (weather.js): a Quadra Pass session for the forecast and
     // the place; the township list, the keys' check and the skill are open.
+    // Or a local dev page (localhost: the preview's --live, timing the
+    // forecast on real data), as Transit's: no account, 30 asks a minute an
+    // address; Google's calls stay under the day's cap either way.
+    // WEATHER_DEV = "off" (wrangler.toml [vars]) closes it.
     if (path === '/weather' || path.startsWith('/weather/')) {
       if (path === '/weather/skill') return new Response(JSON.stringify(await skillReport(env)), { headers: { ...headers, 'Content-Type': 'application/json' } });
       const qt = new URL(request.url).searchParams.get('qt');
-      const session = qt ? await readToken(await tokenSecret(env), qt, 'ses') : null;
-      return handleWeather(request, env, headers, path, { session, ctx, limited: () => sessionLimited(`w:${session?.s}`, 30) });
+      const signed = qt ? await readToken(await tokenSecret(env), qt, 'ses') : null;
+      const dev = !signed && env.WEATHER_DEV !== 'off' && LOCAL_ORIGIN.test(origin);
+      const session = signed || (dev ? { s: 'dev', dev: true } : null);
+      return handleWeather(request, env, headers, path, { session, ctx, limited: () => sessionLimited(dev ? `w:dev:${ip}` : `w:${session?.s}`, 30) });
     }
     // Orbit Transit (transit.js): a Quadra Pass session for everything but
     // the usage page. Or a local dev page (localhost, http or https: the
