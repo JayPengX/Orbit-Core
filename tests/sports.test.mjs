@@ -94,12 +94,21 @@ test('an old copy is answered when its fresh read is slow, and a source turning 
   assert.equal(r[1].s, 502);
 });
 
+// The limiter counts by the clock's minute: a run of 601 asks that crossed
+// one started counting again and never reached the limit (a failed run on
+// CI, 2026-10-15). Begun 3 s or more before the next minute.
+const clearOfMinuteEdge = async () => {
+  const left = 60_000 - (Date.now() % 60_000);
+  if (left < 3_000) await new Promise(r => setTimeout(r, left + 50));
+};
+
 test("each app's asks are counted apart: one app's busy minute never stops another's", async () => {
   const { signToken } = await import('../quadra-token.js');
   const env = { ECO_TOKEN_SECRET: 'test-secret' };
   const qt = await signToken('test-secret', { k: 'ses', d: 'd1', s: 'apps-test', e: Date.now() + 3_600_000 });
   const ask = app => worker.fetch(new Request(`https://proxy.test/sports-proxy?batch=1&u=${encodeURIComponent('https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/standings')}&app=${app}&qt=${qt}`, { headers: { Origin: 'https://jaypengx.github.io' } }), env, ctx);
   let last;
+  await clearOfMinuteEdge();
   for (let i = 0; i < 601 && (last = await ask('odds')).status === 200; i++);
   assert.equal(last.status, 429, 'Securities past its minute');
   assert.equal((await ask('match')).status, 200, 'Sports still reads');
@@ -108,6 +117,7 @@ test("each app's asks are counted apart: one app's busy minute never stops anoth
 test("without a pass to check, each app at an address has a session's minute (never an hour's count shared by every app)", async () => {
   const ask = app => worker.fetch(new Request(`https://proxy.test/sports-proxy?batch=1&u=${encodeURIComponent('https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/standings')}&app=${app}`, { headers: { Origin: 'https://jaypengx.github.io', 'CF-Connecting-IP': '203.0.113.9' } }), {}, ctx);
   let last;
+  await clearOfMinuteEdge();
   for (let i = 0; i < 601 && (last = await ask('stock')).status === 200; i++);
   assert.equal(last.status, 429, 'Securities past its minute');
   assert.equal((await ask('match')).status, 200, 'Sports still reads');
