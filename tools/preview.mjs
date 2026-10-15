@@ -176,6 +176,9 @@ const reopen = flag('reopen') || Boolean(upgrade) || Boolean(net);
 // --freezes: every stretch over 100 ms the page couldn't answer a tap (its
 // main thread busy), from the moment it starts: [when, how long] in ms.
 const freezes = flag('freezes');
+// --profile: where the page's main thread spent its time until the loading
+// screen went (Chromium): each function's own time, the 15 largest.
+const profile = flag('profile');
 // --shuffle: what the page shows the moment the loading screen goes, against
 // what it shows at the end of --wait: anything that moved, came or went
 // after it lifted (a reshuffle the person sees). By each card's first line.
@@ -213,7 +216,7 @@ const ROOT = resolve(opt('root', new URL('../../', import.meta.url).pathname));
 // --h2: served over HTTP/2 (TLS, a certificate made for the run), as Pages
 // and Cloudflare serve a phone: over HTTP/1.1 Chromium asks six files at a
 // time, so a page that lists its modules up front queued here and nowhere
-// else. The proxy's dev door still sees a localhost origin (below).
+// else. The proxy's dev doors let an https localhost page in too.
 const h2 = flag('h2');
 // The repos as they were at --upgrade's date or ref, copied out of git.
 async function snapshotRoot(when, repos) {
@@ -608,12 +611,6 @@ await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(?!
   if (body.op === 'pair-create') Object.assign(reply, { code: 'ABCD2345', exp: Date.now() + 600_000 });
   await route.fulfill({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(reply) });
 });
-// (Over --h2 the page is https: the dev door is asked as the http page it
-// lets in, and its answer handed to the page as for its own origin.)
-async function asHttpPage(route, url) {
-  const res = await route.fetch({ url, headers: { ...route.request().headers(), origin: `http://localhost:${server.address().port}` } });
-  return route.fulfill({ response: res, headers: { ...res.headers(), 'access-control-allow-origin': new URL(base).origin } });
-}
 // The sports proxy: the main Worker's /sports-proxy.
 const SPORTS = /^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/sports-proxy/;
 // Every item asked of the proxy (its time): the busiest minute is printed at
@@ -623,7 +620,7 @@ if (live) {
   await context.route(SPORTS, route => {
     const u = new URL(route.request().url());
     u.searchParams.delete('qt');
-    return h2 ? asHttpPage(route, u.toString()) : route.continue({ url: u.toString() });
+    return route.continue({ url: u.toString() });
   });
   context.on?.('response', async res => {
     if (!SPORTS.test(res.url())) return;
@@ -633,11 +630,15 @@ if (live) {
     const short = x => String(x).replace(/^https:\/\/site\.api\.espn\.com\/apis\/(site\/v2|v2|common\/v3)\/sports\//, 'espn:').slice(0, 110);
     if (!res.ok()) return console.log(`live: ${res.status()} ${asked.length} asked (${short(asked[0])}…)`);
     if (!u.searchParams.has('batch')) return;
-    const { r = [] } = await res.json().catch(() => ({}));
-    r.forEach((x, i) => (x.s !== 200 || x.ms > 2500) && console.log(`live: ${x.s} ${x.ms ?? '?'} ms ${x.c || ''} ${x.e || ''} ${short(asked[i])}`));
+    // (Whole, { r }, or a line an item in the order they came: { i, … }.)
+    const text = await res.text().catch(() => '');
+    let r = [];
+    try {
+      r = text.startsWith('{"r":') ? JSON.parse(text).r.map((x, i) => ({ i, ...x })) : text.split('\n').filter(Boolean).map(line => JSON.parse(line));
+    } catch {}
+    r.forEach(x => (x.s !== 200 || x.ms > 2500) && console.log(`live: ${x.s} ${x.ms ?? '?'} ms ${x.c || ''} ${x.e || ''} ${short(asked[x.i])}`));
   });
 }
-if (live && h2) await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/transit/, route => asHttpPage(route));
 if (!live) await context.route(SPORTS, async route => {
   const u = new URL(route.request().url());
   const cors = { 'Access-Control-Allow-Origin': '*' };
@@ -732,6 +733,8 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
     page.on('requestfinished', r => at.has(r) && (at.get(r).took = `${Date.now() - started - at.get(r).t} ms`));
     page.on('requestfailed', r => at.has(r) && (at.get(r).took = 'failed'));
   }
+  const cdp = profile && engine !== 'webkit' ? await context.newCDPSession(page) : null;
+  if (cdp) await cdp.send('Profiler.enable').then(() => cdp.send('Profiler.setSamplingInterval', { interval: 500 })).then(() => cdp.send('Profiler.start'));
   // (With --net, from the page's first bytes: a slow connection's whole load is what's measured below.)
   const went = await page.goto(`${base}${hash ? `#${hash}` : ''}`, net ? { waitUntil: 'commit' } : {}).then(() => '', e => e.message.split('\n')[0]);
   if (went) console.log(`net: the page didn't open (${went})`);
@@ -766,6 +769,20 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
     const waves = new Set(own.map(r => Math.round(r.at / step))).size;
     console.log(`timing ${key}${hash ? `#${hash}` : ''}: loading screen gone after ${shown == null ? 'over 60 s' : `${shown} ms`}, first paint ${paint == null ? '?' : `${Math.round(paint)} ms`}, ${own.length} own files in ~${waves} waves (last asked at ${own.at(-1)?.at ?? 0} ms)`);
     if (DEBUG) for (const r of own) console.log(`  ${String(r.at).padStart(6)} ms  ${r.url.slice(0, 100)}`);
+  }
+  if (cdp) {
+    if (!timing) await page.waitForFunction(() => document.getElementById('loading')?.hidden ?? true, null, { timeout: 60_000, polling: 50 }).catch(() => {});
+    const { profile: prof } = await cdp.send('Profiler.stop');
+    const by = new Map();
+    const node = new Map(prof.nodes.map(n => [n.id, n]));
+    const gaps = prof.timeDeltas;
+    prof.samples.forEach((id, i) => {
+      const f = node.get(id).callFrame;
+      const k = `${f.functionName || '(anonymous)'} ${f.url.split('/').pop().replace(/\?.*/, '')}${f.url ? `:${f.lineNumber + 1}` : ''}`;
+      by.set(k, (by.get(k) || 0) + (gaps[i + 1] ?? 0) / 1000);
+    });
+    const busy = [...by].filter(([k]) => !/^\((idle|program|garbage collector)\)/.test(k)).reduce((a, [, v]) => a + v, 0);
+    console.log(`profile ${key}: ${Math.round(busy)} ms of script until the loading screen went; the most:\n${[...by].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([k, v]) => `  ${String(Math.round(v)).padStart(5)} ms  ${k}`).join('\n')}`);
   }
   if (geoPath.length) {
     // (The clock moved on with it: each step is geoEvery of real time, so the page's pace is real.)

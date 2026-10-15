@@ -103,6 +103,40 @@ test('proxyJson batches requests made together and remembers answers', async () 
   assert.ok(calls.some(u => !u.includes('batch=1') && u.includes('x.test%2Fe') && !u.includes('mirror=0')));
 });
 
+test('a batch is taken a line at a time: each item the moment the proxy writes it, one with no line asked alone', async () => {
+  const calls = [];
+  let finish;
+  const last = new Promise(r => (finish = r));
+  globalThis.fetch = async url => {
+    calls.push(String(url));
+    const u = new URL(url);
+    if (!u.searchParams.has('batch')) return new Response(JSON.stringify({ alone: u.searchParams.get('url') }), { status: 200 });
+    assert.ok(u.searchParams.has('lines'));
+    const enc = new TextEncoder();
+    const body = new ReadableStream({
+      async start(c) {
+        // The second item first, cut mid-line; the first once the test lets it; the third never.
+        c.enqueue(enc.encode('{"i":1,"s":200,"b":{"n'));
+        c.enqueue(enc.encode('":2}}\n'));
+        await last;
+        c.enqueue(enc.encode('{"i":0,"s":200,"b":{"n":1}}\n'));
+        c.close();
+      }
+    });
+    return new Response(body, { status: 200 });
+  };
+  const [a, b, c] = ['https://x.test/l1', 'https://x.test/l2', 'https://x.test/l3'].map(x => kit.proxyJson(x, { persist: false }));
+  assert.deepEqual(await b, { n: 2 });
+  let aIn = false;
+  a.then(() => (aIn = true));
+  await new Promise(r => setTimeout(r, 20));
+  assert.equal(aIn, false);
+  finish();
+  assert.deepEqual(await a, { n: 1 });
+  assert.deepEqual(await c, { alone: 'https://x.test/l3' });
+  assert.equal(calls.length, 2);
+});
+
 test("a failed read answers the copy the device has, of any age (a league never turns into 'no data' for a refused minute)", async () => {
   const kept = new Map();
   const had = globalThis.caches;

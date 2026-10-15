@@ -18,7 +18,7 @@ import { BRANDS } from './kit/brand.mjs';
 import { ASIA_HOST, asiaBaseballResponse, asiaTarget, cpblBoxTarget } from './asia-baseball.js';
 import { F1_LIVE_HOST, f1LiveResponse, doLog, sampleLive } from './f1-live.js';
 import { cleanDev } from './kit/devconfig.mjs';
-import { json } from './http.js';
+import { json, LOCAL_ORIGIN } from './http.js';
 import { mirrorPath } from './kit/mirror.mjs';
 
 // ==== /sports-proxy - CORS passthrough for public sports data ==============
@@ -1041,7 +1041,6 @@ const browserMaxAge = policy => Math.min(policy.fresh, 600);
 // (the preview tool testing on the real proxy, its cache and its limits) may
 // read without a Quadra Pass, a session's limit for each app at an address. SPORTS_DEV = "off"
 // (wrangler.toml [vars]) closes it.
-const DEV_ORIGIN = /^http:\/\/(localhost|127\.0\.0\.1):\d+$/;
 // Which app asks (the kit says): each app's asks are counted apart, so one
 // left running in the background never uses up another's minute. Only the
 // family's apps (any other name counts as one).
@@ -1053,7 +1052,7 @@ async function checkSession(env, requestParams, headers, weight = 1, request = n
   // the same limit as a signed-in session's, for each app at an address, a
   // minute, in memory (an hour's count in KV, shared by every app, was used
   // up by one look through Sports, and each server saw its own count).
-  const dev = !requestParams.get('qt') && env.SPORTS_DEV !== 'off' && DEV_ORIGIN.test(request?.headers.get('Origin') || '');
+  const dev = !requestParams.get('qt') && env.SPORTS_DEV !== 'off' && LOCAL_ORIGIN.test(request?.headers.get('Origin') || '');
   if (!env.ECO_TOKEN_SECRET || dev) {
     for (let i = 0; i < weight; i++) if (sessionLimited(`ip:${app}:${ip}`, SESSION_RATE_LIMIT)) return { error: tooMany(headers) };
     return { session: { s: `ip:${ip}`, dev, open: !env.ECO_TOKEN_SECRET } };
@@ -1073,48 +1072,66 @@ async function checkSession(env, requestParams, headers, weight = 1, request = n
 // Every URL still goes through the shared cache on its own. 24: a first
 // paint asks for about 28 lists at once (12, the free plan's 50 fetches a
 // call, sent them as three requests; the $5 plan allows 10,000).
+// With `&lines=1` (the kit's, from 2026-10-15) each item is written the
+// moment it's in, a line of its own ({ i: its place, s, b }), so the app
+// takes each as it comes: answered whole, a batch waited on its slowest
+// item, and a first paint's 23 lists ready in a second waited 3 s on one.
 const BATCH_MAX = 24;
 // One slow upstream mustn't hold back the rest of its batch: an item not
 // answered within this answers 504 (the app asks for it again on its own),
-// while its fetch goes on in the background into the shared cache.
+// while its fetch goes on in the background into the shared cache. Its own
+// line holds back nothing: it waits as long as the app would for it alone.
 const BATCH_ITEM_WAIT_MS = 3_000;
+const LINE_ITEM_WAIT_MS = 10_000;
 async function handleBatch(request, env, headers, ip, ctx, requestParams) {
   const items = requestParams.getAll('u').slice(0, BATCH_MAX);
   if (!items.length) return json({ error: { message: 'Missing u' } }, 400, headers);
   const gate = await checkSession(env, requestParams, headers, items.length, request, ip);
   if (gate.error) return gate.error;
-  const results = await Promise.all(
-    items.map(item => {
-      const work = batchItem(item, ctx);
-      ctx?.waitUntil?.(work.catch(() => {}));
-      let timer;
-      const late = new Promise(resolve => (timer = setTimeout(() => resolve('{"s":504}'), BATCH_ITEM_WAIT_MS)));
-      return Promise.race([work.finally(() => clearTimeout(timer)), late]);
-    })
-  );
+  const lines = requestParams.has('lines');
+  const answers = items.map(item => {
+    const work = batchItem(item, ctx);
+    ctx?.waitUntil?.(work.catch(() => {}));
+    let timer;
+    const late = new Promise(resolve => (timer = setTimeout(() => resolve('{"s":504}'), lines ? LINE_ITEM_WAIT_MS : BATCH_ITEM_WAIT_MS)));
+    return Promise.race([work.finally(() => clearTimeout(timer)), late]);
+  });
   // Written out as the bytes came (never decoded, never joined into one
   // string): a season's page is 6 MB, and copies of a few of them at once
   // ran a Worker out of memory, failing every batch on it together.
   const enc = new TextEncoder();
   const { readable, writable } = new TransformStream();
   const w = writable.getWriter();
+  // One item: its head (`{"s":…`, its place first on a line), then its body.
+  // A line's body has its line breaks as spaces: in JSON they can only be
+  // spacing between values (never inside a string), so it's the same JSON.
+  const flat = chunk => (lines && chunk.includes(10) ? chunk.map(b => (b === 10 ? 32 : b)) : chunk);
+  const writeItem = async (x, i) => {
+    const open = lines ? `{"i":${i},` : '{';
+    if (typeof x === 'string') return w.write(enc.encode(open + x.slice(1)));
+    await w.write(enc.encode(open + x.head.slice(1)));
+    if (typeof x.body === 'string') await w.write(enc.encode(lines ? x.body.replaceAll('\n', ' ') : x.body));
+    else if (x.body instanceof ArrayBuffer) await w.write(flat(new Uint8Array(x.body)));
+    else if (x.body) for await (const chunk of x.body) await w.write(flat(chunk));
+    await w.write(enc.encode('}'));
+  };
   const pump = (async () => {
+    if (lines) {
+      // Each in the order it's in; one at a time (a line is never cut by another).
+      let chain = Promise.resolve();
+      await Promise.all(answers.map((answer, i) => answer.then(x => (chain = chain.then(() => writeItem(x, i)).then(() => w.write(enc.encode('\n')))))));
+      await chain;
+    } else {
+      const results = await Promise.all(answers);
       await w.write(enc.encode('{"r":['));
       for (let i = 0; i < results.length; i++) {
-        const x = results[i];
         if (i) await w.write(enc.encode(','));
-        if (typeof x === 'string') await w.write(enc.encode(x));
-        else {
-          await w.write(enc.encode(x.head));
-          if (typeof x.body === 'string') await w.write(enc.encode(x.body));
-          else if (x.body instanceof ArrayBuffer) await w.write(new Uint8Array(x.body));
-          else if (x.body) for await (const chunk of x.body) await w.write(chunk);
-          await w.write(enc.encode('}'));
-        }
+        await writeItem(results[i], i);
       }
       await w.write(enc.encode(']}'));
-      await w.close();
-    })().catch(error => w.abort(error).catch(() => {}));
+    }
+    await w.close();
+  })().catch(error => w.abort(error).catch(() => {}));
   ctx?.waitUntil?.(pump);
   return new Response(readable, { status: 200, headers: { ...headers, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
 }

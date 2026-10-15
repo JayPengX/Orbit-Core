@@ -13,7 +13,7 @@
 // bigger cuts the lottery takes on its many-outcome markets (the top-scoring
 // inning, 1.92; 第N分, 1.31), scaled by the number of outcomes. Every one of
 // these is marked unchecked.
-import { estimateLineOdds, round2, scoreGrid, fitTeamRuns, fitTotalRuns, GOALS_DISPERSION, TEAM_RUNS_DISPERSION } from '#kit/play-odds.mjs';
+import { fitted, estimateLineOdds, round2, scoreGrid, fitTeamRuns, fitTotalRuns, GOALS_DISPERSION, TEAM_RUNS_DISPERSION } from '#kit/play-odds.mjs';
 
 export const CUT = {
   twoWay: 1.158,
@@ -199,6 +199,9 @@ const chance = (grid, test) => grid.reduce((s, x) => (test(x.away, x.home) ? s +
 // Hockey: each team's goals fitted to DraftKings' total and the home win
 // chance (a regulation tie goes to overtime, split by the teams' strength).
 export function fitHockey(homeWin, total) {
+  return fitted(`hockey|${homeWin}|${total?.line}|${total?.overFair}`, () => hockeyFor(homeWin, total));
+}
+function hockeyFor(homeWin, total) {
   const mean = total ? fitTotalRuns(total.line, total.overFair, GOALS_DISPERSION) : 6;
   let lo = 0.1;
   let hi = 0.9;

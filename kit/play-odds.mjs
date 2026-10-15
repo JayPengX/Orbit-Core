@@ -2,6 +2,47 @@
 import { minLegsProblem, BASE_CUT } from '#kit/play-rules.mjs';
 // Pure odds math, shared by the browser page and scripts/build-data.mjs.
 
+// Every fit of a model to a game's prices (a bisection over score grids: the
+// slow part of a board) kept by its exact inputs: in memory (the Worker's
+// isolate too) and on the device, so a redraw, a new read with the same
+// prices or the next open never fits the same game again. A fit is the same
+// numbers either way. Tied to the models (bump FITS_V when a fit changes),
+// not the deploy.
+const FITS_KEY = 'play.fits';
+const FITS_V = 1;
+const FITS_MAX = 4000;
+const FITS_SAVED = 1500;
+let fits = null;
+let fitsTimer = 0;
+function fitStore() {
+  if (fits) return fits;
+  fits = new Map();
+  try {
+    const store = globalThis.localStorage;
+    const saved = JSON.parse(store?.getItem(FITS_KEY) || 'null');
+    if (saved?.v === FITS_V && Array.isArray(saved.list)) for (const [key, value] of saved.list) fits.set(key, Object.freeze(value));
+    // (Team runs were kept apart before 2026-10-15.)
+    store?.removeItem('oddsStudy.teamRuns');
+  } catch {}
+  return fits;
+}
+export function fitted(key, fit) {
+  const store = fitStore();
+  const hit = store.get(key);
+  if (hit !== undefined) return hit;
+  const value = Object.freeze(fit());
+  store.set(key, value);
+  if (store.size > FITS_MAX) store.delete(store.keys().next().value);
+  if (globalThis.localStorage && !fitsTimer)
+    fitsTimer = setTimeout(() => {
+      fitsTimer = 0;
+      try {
+        globalThis.localStorage.setItem(FITS_KEY, JSON.stringify({ v: FITS_V, list: [...store].slice(-FITS_SAVED) }));
+      } catch {}
+    }, 2000);
+  return value;
+}
+
 // A game's winner: lottery implied chance ~= fair chance x K, the lottery's
 // two-way cut (rules.mjs BASE_CUT), whatever priced the game.
 export const K_WIN = BASE_CUT.twoWay;
@@ -194,6 +235,9 @@ export function totalOverChance(line, mu, r = MLB_TOTAL_DISPERSION) {
 // Mean runs matching a line's fair over chance. On a whole line (8) the chance
 // is over given no push, as a book prices it.
 export function fitTotalRuns(line, overFair, r = MLB_TOTAL_DISPERSION) {
+  return fitted(`total|${line}|${overFair}|${r}`, () => fitTotal(line, overFair, r));
+}
+function fitTotal(line, overFair, r) {
   const over = mu => {
     if (line % 1 !== 0) return totalOverChance(line, mu, r);
     const cdf = runsCdf(mu, r, line);
@@ -304,6 +348,9 @@ function gridChance({ grid, size }, test) {
 
 // The two teams' mean runs matching DraftKings' home win chance and total.
 export function fitTeamRuns(homeWinFair, totalLine, overFair, r = TEAM_RUNS_DISPERSION) {
+  return fitted(`runs|${homeWinFair}|${totalLine}|${overFair}|${r}`, () => fitRuns(homeWinFair, totalLine, overFair, r));
+}
+function fitRuns(homeWinFair, totalLine, overFair, r) {
   const overChance = g => {
     if (totalLine % 1 !== 0) return gridChance(g, (h, a) => h + a > totalLine);
     const push = gridChance(g, (h, a) => h + a === totalLine);
