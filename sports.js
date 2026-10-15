@@ -130,8 +130,9 @@ function refreshDev(env, ctx) {
 export function freshFor(policy, result, settings = dev) {
   if (result?.final) return settings.proxyFinalH * 3600;
   if (policy.tier !== 'live') return policy.fresh;
-  if (settings.proxyLive > 0) return settings.proxyLive;
-  return result?.maxAge > 0 ? Math.min(5, Math.max(2, Math.round(result.maxAge / 2))) : policy.fresh;
+  const live = settings.proxyLive > 0 ? settings.proxyLive : result?.maxAge > 0 ? Math.min(5, Math.max(2, Math.round(result.maxAge / 2))) : policy.fresh;
+  // A scoreboard with no game on: until shortly before its next game (quietFor).
+  return Math.max(live, result?.quiet || 0);
 }
 // Polymarket's pages mix every open market for a league, today's games
 // included, and Match Find's live-odds poll asks for them every 30s - so
@@ -789,7 +790,10 @@ async function fetchUpstream(upstreamUrl, trim) {
       }
     }
     const maxAge = Number(/max-age=(\d+)/.exec(upstream.headers.get('Cache-Control') || '')?.[1]) || 0;
-    return { status: 200, contentType, body, final: settled(upstreamUrl, body), maxAge };
+    // (Read once, for both: over for good, or quiet until its next game.)
+    const data = settleable(upstreamUrl) ? parsed(body) : null;
+    const final = data != null && settledData(upstreamUrl, data);
+    return { status: 200, contentType, body, final, quiet: data != null && !final ? quietFor(upstreamUrl, data) : 0, maxAge };
   } catch (error) {
     return { fetchError: error };
   }
@@ -800,11 +804,37 @@ async function fetchUpstream(upstreamUrl, trim) {
 // next day's games) with games, every one of them over.
 export function settled(url, body) {
   if (!settleable(url)) return false;
+  const data = parsed(body);
+  return data != null && settledData(url, data);
+}
+function parsed(body) {
   try {
-    return settledData(url, JSON.parse(typeof body === 'string' ? body : new TextDecoder().decode(body)));
+    return JSON.parse(typeof body === 'string' ? body : new TextDecoder().decode(body));
   } catch {
-    return false;
+    return null;
   }
+}
+// How long a live-tier scoreboard (a day's or a month's) can't change: with
+// no game on, until shortly before its next game starts (QUIET_LEAD), at
+// most QUIET_MAX; 0 while any game is on or one is past its start and not
+// over. A day of no games or of games all hours away was read again every
+// 10 seconds: each opening of Sports waited about a second on ESPN for every
+// league's yesterday and today.
+const QUIET_MAX = 10 * MINUTE;
+const QUIET_LEAD = 5 * MINUTE;
+export function quietFor(url, data, now = Date.now()) {
+  if (url.hostname !== 'site.api.espn.com' || !url.pathname.endsWith('/scoreboard') || !data || !Array.isArray(data.events)) return 0;
+  let next = Infinity;
+  for (const e of data.events) {
+    const type = e?.status?.type ?? e?.competitions?.[0]?.status?.type;
+    const state = type?.state;
+    if (state === 'post' || type?.completed === true) continue;
+    if (state !== 'pre') return 0;
+    const start = Date.parse(e?.date ?? e?.competitions?.[0]?.date);
+    if (!Number.isFinite(start)) return 0;
+    next = Math.min(next, start);
+  }
+  return Math.max(0, Math.min(QUIET_MAX, Math.floor((next - now) / 1000) - QUIET_LEAD));
 }
 // The reads that can be over for good: a game's summary, a day's or a
 // month's scoreboard (ESPN), a month of Asia's baseball.

@@ -368,11 +368,18 @@ export const EXTRA_LEAGUES = Object.keys(LEAGUES).filter(key => LEAGUES[key].pat
 
 // ---- Polymarket ---------------------------------------------------------------
 
-async function fetchPolymarketEvents(tagId, trim) {
+// Only events ending (a game's: its start) from 6 hours ago, to the hour so
+// the address is the same for an hour (the proxy's cache): Polymarket keeps
+// games long over open, and the Premier League's first page was half of
+// them (15 MB → 7 MB for the proxy to read and trim, about 100 ms of its CPU
+// a page). Every reader here skips a game that has started; the live board
+// reads its own list (fetchPolymarketLiveEvents).
+export const endedSince = (now = Date.now()) => new Date(Math.floor((now - 6 * 3_600_000) / 3_600_000) * 3_600_000).toISOString().replace('.000Z', 'Z');
+export async function fetchPolymarketEvents(tagId, trim, now = Date.now()) {
   const events = [];
   for (let page = 0; page < 10; page++) {
     const batch = await getJson(
-      `${GAMMA}/events?tag_id=${tagId}&closed=false&limit=100&offset=${page * 100}&order=startTime&ascending=true`,
+      `${GAMMA}/events?tag_id=${tagId}&closed=false&end_date_min=${endedSince(now)}&limit=100&offset=${page * 100}&order=startTime&ascending=true`,
       trim
     );
     events.push(...batch);
@@ -1020,8 +1027,11 @@ export function attachKambiLive(games, kambiGames) {
 }
 
 // Polymarket events that started in the last six hours (games in progress).
-async function fetchPolymarketLiveEvents(tagId, now) {
-  const since = new Date(now.getTime() - 6 * 3_600_000).toISOString();
+// (From 6 hours back, to ten minutes: the same address for ten minutes, so
+// each live refresh shares the proxy's copy. To the millisecond, every
+// refresh was an address never seen, read and trimmed again, megabytes each.)
+export async function fetchPolymarketLiveEvents(tagId, now) {
+  const since = new Date(Math.floor((now.getTime() - 6 * 3_600_000) / 600_000) * 600_000).toISOString();
   return getJson(`${GAMMA}/events?tag_id=${tagId}&closed=false&limit=100&order=startTime&ascending=true&start_time_min=${since}`, 'polymarket-events');
 }
 

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DEV, cleanDev } from '../kit/devconfig.mjs';
-import { freshFor } from '../sports.js';
+import { freshFor, quietFor } from '../sports.js';
 
 test('developer settings: each in range, a bad or missing one its default', () => {
   const d = cleanDev({ sportsGame: 1, sportsList: '30', f1Board: 'x', mirror: 'no', extra: 5 });
@@ -22,6 +22,22 @@ test("the proxy's live cache: the seconds set, or half the source's max-age, and
   assert.equal(freshFor(live, {}, { ...settings, proxyLive: 0 }), 10, 'no max-age: the tier its own');
   assert.equal(freshFor(live, { final: true }, settings), 12 * 3600);
   assert.equal(freshFor({ tier: 'standings', fresh: 1800 }, { maxAge: 10 }, settings), 1800, 'only live answers follow');
+  assert.equal(freshFor(live, { maxAge: 10, quiet: 600 }, settings), 600, 'a scoreboard with no game on: its quiet time');
+  assert.equal(freshFor(live, { maxAge: 10, quiet: 0 }, { ...settings, proxyLive: 30 }), 30, 'never shorter than the seconds set');
+});
+
+test('a scoreboard is quiet until 5 minutes before its next game (10 minutes at most), never while a game is on', () => {
+  const now = Date.parse('2026-10-15T04:00:00Z');
+  const day = new URL('https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/scoreboard?dates=20261015');
+  const ev = (state, date, completed = state === 'post') => ({ date, status: { type: { state, completed } } });
+  assert.equal(quietFor(day, { events: [] }, now), 600, 'no games: the most');
+  assert.equal(quietFor(day, { events: [ev('post', '2026-10-15T01:00Z'), ev('pre', '2026-10-15T18:00Z')] }, now), 600, 'over, and the next hours away');
+  assert.equal(quietFor(day, { events: [ev('pre', '2026-10-15T04:08Z')] }, now), 180, 'a start 8 minutes away: fresh 3');
+  assert.equal(quietFor(day, { events: [ev('pre', '2026-10-15T04:03Z')] }, now), 0, 'about to start: live');
+  assert.equal(quietFor(day, { events: [ev('pre', '2026-10-15T03:50Z')] }, now), 0, 'past its start, not begun: live');
+  assert.equal(quietFor(day, { events: [ev('in', '2026-10-15T03:00Z'), ev('pre', '2026-10-15T18:00Z')] }, now), 0, 'a game on: live');
+  assert.equal(quietFor(day, { events: [{ competitions: [{ date: '2026-10-15T18:00Z', status: { type: { state: 'pre' } } }] }] }, now), 600, "the competition's own status and date");
+  assert.equal(quietFor(new URL('https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/summary?event=1'), { events: [] }, now), 0, 'only scoreboards');
 });
 
 test("TDX's points and the guard: a month's 200 last, slower never off", async () => {

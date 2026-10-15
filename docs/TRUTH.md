@@ -153,9 +153,10 @@ file is how to work on them.
   everything again and looked slower than a phone (2026-10-12).
 - **At a phone's latency** (`--latency 120`, `--timing`), and on a deploy's
   build (`--root` on a copy stamped by `scripts/stamp-version.mjs` and
-  `kit/stamp.mjs`): the dev page has no modulepreload. The local server is
-  HTTP/1.1 with six connections; GitHub Pages and Cloudflare are HTTP/2,
-  so requests queuing behind each other locally aren't a phone's problem.
+  `kit/stamp.mjs`): the dev page has no modulepreload. Add `--h2`: the
+  local server is otherwise HTTP/1.1 with six connections, where a page
+  that lists its modules up front queues as it never does on GitHub Pages
+  and Cloudflare (HTTP/2).
 - **For movement after the loading screen** (`--shuffle`), and for text
   that wrapped or was cut (the preview prints `wraps:` and `cut:`).
 - **Live on the iOS Simulator**, iPhone Safari itself and the closest
