@@ -16,7 +16,7 @@
 // days; a game's highlights looked for while it's four days old at most.
 //
 // → sports/watch/<league>/<YYYY-MM>.json ({ games: { key: { t, hl?, elta?,
-// miss?, not? } } }, by the month of its start in UTC) and
+// apple?, miss?, not? } } }, by the month of its start in UTC) and
 // sports/watch/index.json ({ built, checked, leagues: { key: { months, kept
 // } } }): the season's, read by the app for a game the recent pack has let
 // go. A game's links never change: kept, never looked for again. ELTA's: each
@@ -25,6 +25,9 @@
 // while the run's time lasts, given up after two misses.
 //
 // → sports/elta-pages.json: ELTA.tv's sports index ({ built, pages }).
+//
+// → sports/apple-mls.json: Apple TV's MLS games read so far ({ built, events:
+// { id: { id, url, start, teams } } }), each game's page read once.
 
 import { CATALOG, asiaMonthOf, asiaMonthUrl } from '../kit/catalog.mjs';
 import { teamNameZh } from '../kit/names.mjs';
@@ -128,6 +131,35 @@ export function appleMatch(game, events) {
   const hits = [...events].filter(x => x.start && x.teams && Math.abs(Date.parse(x.start) - at) <= 60 * 60_000 && x.teams.some(t => mine.has(code(t))));
   return hits.length === 1 ? hits[0] : hits.find(x => x.teams.every(t => mine.has(code(t)))) || null;
 }
+
+// The clubs' pages the channel's page links (each its last games and next ones).
+export function appleClubs(data) {
+  const out = new Set();
+  const walk = o => {
+    if (Array.isArray(o)) return o.forEach(walk);
+    if (!o || typeof o !== 'object') return;
+    const url = typeof o.segue?.url === 'string' ? o.segue.url : typeof o.url === 'string' ? o.url : '';
+    if (/^https:\/\/tv\.apple\.com\/tw\/team\/[^?]*\/umc\.cst\.\w+/.test(url)) out.add(url.split('?')[0]);
+    for (const v of Object.values(o)) if (v && typeof v === 'object') walk(v);
+  };
+  walk(data);
+  return [...out];
+}
+// A season pack's (or ESPN day's) MLS games, played or to come: { id, league, kind, start, teams }.
+export function mlsGames(data) {
+  const out = [];
+  for (const ev of data?.events || []) {
+    const c = ev.competitions?.[0];
+    if (/postponed|canceled|cancelled/i.test(c?.status?.type?.name || '')) continue;
+    const teams = (c?.competitors || []).map(x => x.team?.abbreviation).filter(Boolean);
+    if (teams.length === 2 && ev.date) out.push({ id: String(ev.id), league: 'mls', kind: 'match', start: ev.date, teams });
+  }
+  return out;
+}
+// Apple's games read on their own pages, kept (each read once; about 400 a
+// season, so the first runs take three days).
+const APPLE_KNOWN = 'sports/apple-mls.json';
+const APPLE_READS = 150;
 
 // ---- The season archive: rules carried over from the GitHub build ---------------------
 
@@ -410,9 +442,16 @@ export async function runWatch({ store, proxy, get = fetch, now = Date.now(), un
     }
   }
 
-  // Apple TV's page of each MLS game: once a day (its list changes slowly), kept as the games are.
+  // Apple TV's page of each MLS game: once a day (its lists change slowly).
+  // The channel's page lists only the games around now, so each club's page
+  // too (its last 15 games and next 5); a game listed without its kick-off
+  // or clubs is read on its own page once, kept in sports/apple-mls.json.
+  // Matched to the season's every game (its pack, and ESPN's days around
+  // now): a game to come or of the last ten days in the recent pack, one
+  // older in the archive for good (the channel's page was all a game a
+  // fortnight old had: the person left to find it, 2026-10-15).
   for (const [k, v] of Object.entries(old)) if (v.apple && !out[k] && now - (v.at || 0) < KEEP) out[k] = v;
-  let apple = { listed: 0, matched: 0 };
+  let apple = { listed: 0, matched: 0, read: 0, kept: 0 };
   if (full)
     try {
       const appleData = async url => {
@@ -432,29 +471,39 @@ export async function runWatch({ store, proxy, get = fetch, now = Date.now(), un
       const data = await appleData(APPLE_MLS);
       if (data) {
         const events = appleEvents(data);
+        for (const club of appleClubs(data)) {
+          const page = await appleData(club);
+          if (page) appleEvents(page, events);
+        }
+        const known = (await store.json(APPLE_KNOWN).catch(() => null))?.events || {};
+        for (const [id, x] of events) if (known[id]) events.set(id, { ...known[id], ...x, start: x.start || known[id].start, teams: x.teams || known[id].teams });
         let readPages = 0;
         for (const x of events.values()) {
-          if ((x.start && x.teams) || !x.url || readPages >= 60) continue;
+          if ((x.start && x.teams) || !x.url || readPages >= APPLE_READS) continue;
           readPages++;
           const page = await appleData(x.url);
           if (page) appleEvents(page, new Map([[x.id, x]])).forEach((v, id) => id === x.id && events.set(id, v));
         }
+        // Each game read kept (a season's: Apple's ids never change), the rest of the year's let go.
+        const keptEvents = {};
+        for (const x of [...Object.values(known), ...events.values()]) if (x.start && x.teams && x.url && now - Date.parse(x.start) < 400 * DAY) keptEvents[x.id] = { id: x.id, url: x.url, start: x.start, teams: x.teams };
+        await store.put(APPLE_KNOWN, { built: new Date(now).toISOString().slice(0, 10), events: keptEvents });
+        const listed = Object.values(keptEvents);
+        const espn = new Map();
+        for (const y of [year - 1, year]) for (const g of mlsGames(await seasonPack('mls', y))) espn.set(g.id, g);
+        for (let i = -1; i <= 7; i++) for (const g of mlsGames(await json(`${SITE}/soccer/usa.1/scoreboard?dates=${usDate(now + i * DAY)}`).catch(() => null))) espn.set(g.id, g);
         let matched = 0;
-        for (let i = -1; i <= 7; i++) {
-          const day = await json(`${SITE}/soccer/usa.1/scoreboard?dates=${usDate(now + i * DAY)}`).catch(() => null);
-          for (const ev of day?.events || []) {
-            const c = ev.competitions?.[0];
-            const teams = (c?.competitors || []).map(x => x.team?.abbreviation).filter(Boolean);
-            if (teams.length !== 2) continue;
-            const g = { id: String(ev.id), league: 'mls', kind: 'match', start: ev.date, teams };
-            const hit = appleMatch(g, events.values());
-            if (!hit?.url) continue;
-            const k = HL.watchKey(g);
-            out[k] = { ...out[k], apple: hit.url, at: Date.parse(g.start) };
-            matched++;
-          }
+        let archived = 0;
+        for (const g of espn.values()) {
+          const hit = appleMatch(g, listed);
+          if (!hit) continue;
+          const k = HL.watchKey(g);
+          const at = Date.parse(g.start);
+          matched++;
+          if (at > now - KEEP) out[k] = { ...out[k], apple: hit.url, at };
+          if (at < now && stored(g)?.apple !== hit.url) keep(g, { apple: hit.url }), archived++;
         }
-        apple = { listed: events.size, matched };
+        apple = { listed: events.size, matched, read: readPages, kept: archived };
       }
     } catch {}
 
