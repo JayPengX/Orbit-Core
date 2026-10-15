@@ -3349,7 +3349,7 @@ dialog {
 }
 .q-pass-title { display: flex; align-items: center; gap: 10px; }
 .q-pass-title img { border-radius: 8px; }
-.q-pass-tabs { position: sticky; top: -1px; z-index: 2; margin: 0 -18px 12px; padding: 8px 18px; background: var(--q-page); overflow-x: auto; flex-wrap: nowrap; }
+.q-pass-tabs { position: sticky; top: -1px; z-index: 2; margin: 0 calc(-1 * var(--q-margin)) 12px; padding: 8px var(--q-margin); background: var(--q-sheet); overflow-x: auto; flex-wrap: nowrap; }
 .q-pass-tabs .q-chip[aria-selected='true'] { background: var(--accent); color: #fff; border-color: transparent; }
 .q-pass-body { display: grid; gap: 4px; }
 .q-pass .q-section { margin-top: 14px; }
