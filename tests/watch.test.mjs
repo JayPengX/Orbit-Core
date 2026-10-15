@@ -43,6 +43,19 @@ test("Apple TV's MLS games: each with its page, kick-off and clubs, matched to E
   assert.equal(appleMatch({ start: '2026-10-10T23:30Z', teams: ['ATL', 'CIN'] }, ev.values()), null);
 });
 
+test("Apple TV's clubs' pages (each its last games and next) and the season's MLS games to match them to", async () => {
+  const { appleClubs, mlsGames } = await import('../builders/watch.js');
+  const club = id => ({ type: 'Team', segue: { url: `https://tv.apple.com/tw/team/x/umc.cst.${id}?ctx_brand=tvs.sbd.7000` } });
+  assert.deepEqual(appleClubs({ shelves: [{ items: [club('a'), club('b'), club('a'), { segue: { url: 'https://tv.apple.com/tw/shelf/x/edt.col.1' } }] }] }), ['https://tv.apple.com/tw/team/x/umc.cst.a', 'https://tv.apple.com/tw/team/x/umc.cst.b']);
+  const ev = (id, state, name = '') => ({ id, date: '2026-11-08T00:00Z', competitions: [{ status: { type: { state, name } }, competitors: [{ team: { abbreviation: 'SEA' } }, { team: { abbreviation: 'LAFC' } }] }] });
+  // Played or to come, never one called off.
+  assert.deepEqual(
+    mlsGames({ events: [ev(1, 'post'), ev(2, 'pre'), ev(3, 'post', 'STATUS_POSTPONED')] }).map(g => g.id),
+    ['1', '2']
+  );
+  assert.deepEqual(mlsGames({ events: [ev(2, 'pre')] })[0], { id: '2', league: 'mls', kind: 'match', start: '2026-11-08T00:00Z', teams: ['SEA', 'LAFC'] });
+});
+
 test("a game's ELTA.tv episodes for the season's archive: its 原音 cut and ELTA's own, on its day in Taiwan; the season kept, last season's playoffs before the next", async () => {
   const { eltaOf, keeps } = await import('../builders/watch.js');
   const e = { id: '9', league: 'mlb', kind: 'match', start: '2026-10-01T01:08Z', status: { state: 'post' }, home: { en: 'Houston Astros' }, away: { en: 'Chicago White Sox' } };
@@ -161,6 +174,46 @@ test('an hourly run reads only the last two US days from ESPN and the months its
   assert.deepEqual([...new Set(days)].sort(), ['20261012', '20261013']);
   assert.ok(!asked.some(u => u.includes('eltaott.tv')), 'nothing waiting for ELTA: ELTA not read');
   assert.equal(new Date(Date.UTC(2026, 9, 13, FULL_HOUR)).getUTCHours(), 20);
+});
+
+test("Apple TV in the daily run: the clubs' pages too, each game's page read once, an older game's page kept in its month for good", async () => {
+  const { runWatch, APPLE_MLS } = await import('../builders/watch.js');
+  const { r2Store, memoryBucket } = await import('../builders/store.js');
+  const now = Date.parse('2026-10-15T20:00:00Z');
+  const ev = (id, date, state) => ({ id, date, season: { year: 2026 }, competitions: [{ status: { type: { state } }, competitors: [{ homeAway: 'home', team: { id: '1', abbreviation: 'ATL', displayName: 'Atlanta United FC' }, score: '1' }, { homeAway: 'away', team: { id: '2', abbreviation: 'MIA', displayName: 'Inter Miami CF' }, score: '0' }] }] });
+  const store = r2Store(memoryBucket({ 'sports/watch/_pending.json': { games: [] }, 'sports/watch.json': { games: {} }, 'sports/mls/2026.json': { events: [ev('700', '2026-03-01T00:30Z', 'post'), ev('701', '2026-08-17T00:30Z', 'post'), ev('702', '2026-10-25T23:30Z', 'pre')] } }));
+  const page = data => new Response(`<html><script type="application/json" id="serialized-server-data">${JSON.stringify(data)}</script></html>`);
+  const game = (id, title, extra = {}) => ({ type: 'SportingEvent', title, segue: { destination: { id }, url: `https://tv.apple.com/tw/sporting-event/x/${id}` }, ...extra });
+  const club = 'https://tv.apple.com/tw/team/x/umc.cst.atl';
+  const asked = [];
+  const get = async url => {
+    url = String(url);
+    asked.push(url);
+    if (url === APPLE_MLS) return page({ shelves: [{ items: [{ type: 'Team', segue: { url: club } }] }] });
+    if (url === club) return page({ shelves: [{ items: [game('umc.cse.old', '亞特蘭大 vs 邁阿密'), game('umc.cse.next', '亞特蘭大 vs 邁阿密', { badge: { isoDatetime: '2026-10-25T23:30:00.000Z' }, competitors: [{ abbreviation: 'ATL' }, { abbreviation: 'MIA' }] })] }] });
+    if (url.endsWith('/umc.cse.old')) return page({ type: 'SportingEvent', title: '亞特蘭大 vs 邁阿密', impressionMetrics: { id: { id: 'umc.cse.old' } }, primaryMetadata: [{ isoDatetime: '2026-08-17T00:00:00.000Z' }], competitors: [{ abbreviation: 'ATL' }, { abbreviation: 'MIA' }] });
+    return new Response('', { status: 404 });
+  };
+  const run = async () => {
+    const real = globalThis.fetch;
+    globalThis.fetch = get;
+    try {
+      return await runWatch({ store, proxy: async () => null, get, now, until: now, sleep: async () => {}, full: true });
+    } finally {
+      globalThis.fetch = real;
+    }
+  };
+  const r = await run();
+  assert.equal(r.apple.matched, 2);
+  // The game to come: in the recent pack; the one two months back: in its month, for good.
+  assert.equal((await store.json('sports/watch.json')).games['mls:702:'].apple, 'https://tv.apple.com/tw/sporting-event/x/umc.cse.next');
+  assert.equal((await store.json('sports/watch/mls/2026-08.json')).games['mls:701:'].apple, 'https://tv.apple.com/tw/sporting-event/x/umc.cse.old');
+  assert.ok(!(await store.json('sports/watch/mls/2026-03.json'))?.games?.['mls:700:']?.apple);
+  // The next day the game's own page isn't read again.
+  asked.length = 0;
+  await run();
+  assert.ok(!asked.some(u => u.endsWith('/umc.cse.old')));
+  assert.equal((await store.json('sports/watch/mls/2026-08.json')).games['mls:701:'].apple, 'https://tv.apple.com/tw/sporting-event/x/umc.cse.old');
 });
 
 test('win probability on R2: a game kept is never read again, Polymarket only through the proxy, a month let go goes', async () => {
