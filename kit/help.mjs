@@ -347,7 +347,8 @@ export const HELP = {
       ]],
       ['tabs', '畫面', [
         '主畫面：目前這一節、倒數和下一節；下面是今天的全部課程，點一節看詳細資料（一週哪幾天、第幾節上這門課）。今天的課上完了，就換成下一個上課日的課。',
-        '設定面板：新增或修改課表，也可以拍課表照片讓 AI 匯入，或用一句話請 AI 修改；外觀和備份也在這裡。倒數活動打開「結束後自動刪除」，活動過了就自己刪掉。'
+        '設定面板：新增或修改課表，也可以拍課表照片讓 AI 匯入，或用一句話請 AI 修改；外觀和備份也在這裡。倒數活動打開「結束後自動刪除」，活動過了就自己刪掉。',
+        '調課：點一節課再按「調課」，或在「工具」按「新增調課」，選要對調的另一節（同一天、別天或別週都可以）。只換那兩天，其他週照舊；點那節或「工具」裡的調課可以取消。'
       ]],
       ['share', '分享課表', [
         '課表只有建立它的 Quadra Pass 能編輯。要分享時按「產生分享金鑰」（24 小時內有效），對方在自己的 Orbit Class 輸入就得到一份自己的副本。'
@@ -362,7 +363,8 @@ export const HELP = {
       ]],
       ['tabs', 'The screens', [
         'The main screen: the current period, its countdown and the next; below, the whole day, each period tappable for details (which days and periods it meets). Once today’s classes are over, it shows the next school day’s.',
-        'The settings panel: add or change the schedule, import it from a photo with AI or change it in a sentence; appearance and backups too. In 倒數活動, “Delete when over” clears a countdown once it has passed.'
+        'The settings panel: add or change the schedule, import it from a photo with AI or change it in a sentence; appearance and backups too. In 倒數活動, “Delete when over” clears a countdown once it has passed.',
+        'Swapping a class: tap a period and Swap, or Swap a class in Tools, then pick the period to trade with (the same day, another day or another week). Only those two days change; tap the period, or the swap in Tools, to undo it.'
       ]],
       ['share', 'Sharing a schedule', [
         'Only the Quadra Pass that made a schedule edits it. To share it, make a share key (valid 24 hours): entering it in their own Orbit Class gives a classmate their own copy.'
