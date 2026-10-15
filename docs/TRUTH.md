@@ -853,6 +853,10 @@ What was decided, so it isn't undone. Newer calls win.
   Sports need the connection (covered without it); Words, Weather and
   Class work offline with the network's parts locked; Passion Beats opens
   offline. A slow connection opens on the phone's copy with the capsule.
+- 2026-10-16: a Transit trip to be somewhere by a time nothing reaches any
+  more (07:21 for 上學 by 08:00) is planned from where you are, leaving now,
+  each way saying how late; never the way leaving latest (it had put a
+  16:20 ride and train first).
 - 2026-10-15: Transit's map opens on where you are and follows you, as a
   phone's own maps do (it had stayed where it was left: iOS wasn't asked
   again after the first opening), until a finger moves it; back after 5
