@@ -1990,6 +1990,95 @@ input[type='checkbox'][switch] {
   transform: translateX(-50%);
   animation: q-toast-in var(--q-dur-bouncy) var(--q-spring-bouncy);
 }
+.q-net {
+  position: fixed;
+  z-index: 2147482800;
+  left: 50%;
+  bottom: calc(var(--q-nav, 0px) + 12px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100vw - 32px);
+  padding: 11px 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--q-glass-strong);
+  -webkit-backdrop-filter: blur(30px) saturate(2);
+  backdrop-filter: blur(30px) saturate(2);
+  box-shadow: var(--q-glass-rim), var(--q-glass-drop);
+  color: var(--q-label);
+  font: 600 15px/20px var(--q-font);
+  white-space: nowrap;
+  transform: translateX(-50%);
+  animation: q-toast-in var(--q-dur-bouncy) var(--q-spring-bouncy);
+  cursor: pointer;
+}
+.q-net svg {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.q-net[data-state='offline'] svg {
+  color: var(--q-red);
+}
+.q-net[data-state='slow'] svg {
+  color: var(--q-orange);
+}
+.q-net.out {
+  opacity: 0;
+  transform: translate(-50%, 16px) scale(0.94);
+  transition: opacity 0.2s, transform 0.3s var(--q-ease);
+}
+/* An online-only app with no connection (quadra.mjs onlineOnly): covered, the page's own colour, its mark in the middle. */
+.q-offline {
+  position: fixed;
+  inset: 0;
+  z-index: 2147482950;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 6px;
+  padding: max(24px, env(safe-area-inset-top)) 32px max(24px, env(safe-area-inset-bottom));
+  background: var(--q-page);
+  color: var(--q-label);
+  font-family: var(--q-font);
+  text-align: center;
+  animation: q-fade-in 0.25s ease-out;
+}
+.q-offline-logo {
+  width: 64px;
+  height: 64px;
+  border-radius: 15px;
+  margin-bottom: 6px;
+}
+.q-offline-app {
+  margin: 0;
+  color: var(--q-label-2);
+  font: var(--q-t-footnote);
+}
+.q-offline-title {
+  margin: 8px 0 0;
+  font: var(--q-t-title3, 600 20px/25px var(--q-font));
+}
+.q-offline-why {
+  margin: 0;
+  max-width: 280px;
+  color: var(--q-label-2);
+  font: var(--q-t-subhead, 15px/20px var(--q-font));
+}
+.q-offline-again {
+  margin-top: 18px;
+  min-width: 140px;
+}
+/* A toast while the connection's capsule is up: above it. */
+.q-net-on .q-toast {
+  bottom: calc(var(--q-nav, 0px) + 66px);
+}
 .q-toast.out {
   opacity: 0;
   transform: translate(-50%, 16px) scale(0.94);
@@ -2198,6 +2287,7 @@ input[type='checkbox'][switch] {
   .q-ask,
   .q-banner,
   .q-toast,
+  .q-net,
   .q-menu,
   .q-accessory,
   .q-skel {

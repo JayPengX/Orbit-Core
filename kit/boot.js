@@ -156,7 +156,7 @@
   var fail = function (message, broken) {
     if (box.hidden || !q('.q-boot-error').hidden || window.__bootUpdating) return;
     if (broken && heal()) return;
-    q('.q-boot-error-text').textContent = message || L('頁面沒有正常啟動，可能是網路不穩。', "The page didn't start, maybe a network hiccup.");
+    q('.q-boot-error-text').textContent = message || (navigator.onLine === false ? L('沒有網路連線。', 'No internet connection.') : L('頁面沒有正常啟動，可能是網路不穩。', "The page didn't start, maybe a network hiccup."));
     q('.q-boot-error').hidden = false;
     q('.q-boot-bar').hidden = true;
     step.hidden = true;

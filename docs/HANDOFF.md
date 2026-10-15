@@ -87,6 +87,24 @@ court, Play's tickets, Class's layered editor). Checked at 375 px in WebKit,
 light and dark, and in the iOS 27 simulator's Safari (the install screen;
 signing in there needs the owner's pass).
 
+## Online and offline (2026-10-15)
+
+The kit watches every request (`netState`): no connection or a slow one
+says so in a glass capsule over the tab bar. Securities, Play, Transit and
+Sports are online-only (`onlineOnly`: covered, 沒有網路連線, 重試, gone by
+itself when the connection's back). Words, Weather and Class open offline
+on what they kept; Words keeps its progress on the phone at every change
+and Class remembers an edit not yet sent (both merged with the pass's
+copy before anything is written). Passion Beats has a worker of its own.
+Every app's worker keeps its files from the first visit (`keepOffline`),
+answers any kept version when offline, and waits 2.5 s for the network
+before its copy; the loader's import map stamps every kit module.
+Measured (`tools/preview.mjs --net offline|slow:8000 --root <stamped>`):
+offline every app opens in 0.1–2.4 s (the cover or the app); every request
+8 s late, Words 0.1 s, Weather 1.6, Play 2.5, Class 3.1, Transit 4.1,
+Sports and Securities about 8 (Securities waits for the sign-in on
+purpose: money). Not yet seen on a phone.
+
 ## Workflows (Shared-Proxy, by hand from Actions)
 
 - **Run a builder or a check** (`build.yml`): any builder now, a tiny

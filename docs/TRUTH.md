@@ -485,7 +485,8 @@ On top of them, **apps put live knowledge over slower copies** (§8).
   redraw changes only what changed (`morph`), never the whole page every
   few seconds.
 - **Location fast**: a quick Wi-Fi or cell fix first, GPS behind it; the
-  phone is asked unprompted once, never at every open.
+  phone is asked unprompted once, never at every open (the kit's
+  `mayLocate`, Weather's and Transit's rule).
 - No flash, blink or broken-picture icon on a redraw. Strips keep their
   scroll, and pictures seen before are drawn at once (kept decoded and
   remembered; a new one fades in; a failed one tried again, hidden
@@ -494,6 +495,19 @@ On top of them, **apps put live knowledge over slower copies** (§8).
 - **A live block keeps its shape**: drawn at once from the last reading,
   new numbers faded in as they replace the old, never a spinner where a
   number was.
+
+- **No connection, or a slow one: never stuck, never misleading**
+  (2026-10-15, the owner: "some deserve working offline but with certain
+  features locked … some should be banned working offline, like
+  Securities, Play, Transit"). An app whose screens are all live
+  (Securities, Play, Transit, Sports) is covered with no connection (the
+  kit's `onlineOnly`: 沒有網路連線, why, 重試), never shown on old prices,
+  odds, buses or scores. Words, Weather and Class open on what they kept,
+  with what needs the network locked; what's done offline is kept on the
+  phone and merged when it's back, never written over a newer copy. A slow
+  connection covers nothing: the app opens on the phone's copy and the
+  kit's capsule says 網路連線很慢. Every app opens offline as far as its
+  cover (`keepOffline`; its worker gives the network 2.5 s, then its copy).
 
 ## 10. iPhone Safari is the platform
 
@@ -828,6 +842,10 @@ What was decided, so it isn't undone. Newer calls win.
 - 2026-10-14: iOS 27 for every app (§11): the kit rebuilt as one design
   system (tokens, glass, springs, controls, `kit/ui.mjs`) and every app's
   own copies of its controls replaced by the kit's.
+- 2026-10-15: online and offline (§9): Securities, Play, Transit and
+  Sports need the connection (covered without it); Words, Weather and
+  Class work offline with the network's parts locked; Passion Beats opens
+  offline. A slow connection opens on the phone's copy with the capsule.
 - 2026-10-14: a game is over the moment the rules say so (Sports
   `overByRule`: an NBA 4th over with the scores apart, MLB's home side
   ahead in the middle of the 9th…), not when ESPN marks it minutes later;

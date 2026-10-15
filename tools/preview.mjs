@@ -164,6 +164,8 @@ const flaky = Number(opt('flaky', 0));
 // answered that much later; 8000 ms by default). The service worker runs
 // (it's what opens an app offline), so the first opening fills it.
 const net = opt('net', '');
+// --net-back ms: with --net offline, the connection comes back that long into the second opening.
+const netBack = Number(opt('net-back', 0));
 const netSlow = /^slow/.test(net) ? Number(net.split(':')[1]) || 8000 : 0;
 if (net && net !== 'offline' && !netSlow) throw new Error('--net offline | slow[:ms]');
 const netNow = { offline: false, slow: 0 };
@@ -272,7 +274,7 @@ const server = createServer(async (req, res) => {
   if (serve && path.endsWith('/sw.js')) return res.writeHead(404).end();
   // The kit's version.json is stamped only on Pages (kit/stamp.mjs): here
   // one the kit takes as the first it's seen (only noted, no reload).
-  if (path === '/Shared-Proxy/kit/version.json') return res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }).end('{"version":"local"}');
+  if (path === '/Shared-Proxy/kit/version.json' && !existsSync(join(served.root, 'Shared-Proxy/kit/version.json'))) return res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }).end('{"version":"local"}');
   // The kit, as the apps load it from Shared-Proxy's Pages (kit/loader.html).
   let file = path.startsWith('/Shared-Proxy/kit/') ? join(served.root, path) : join(served.dir, path.replace(/^\/[^/]+\//, '/'));
   if (latency) await new Promise(r => setTimeout(r, latency));
@@ -660,8 +662,10 @@ if (serve) {
 await mkdir(out, { recursive: true });
 const errors = [];
 let opening = 0;
-for (const hash of (hashes.length ? hashes : ['']).flatMap(h => (reopen ? [h, h] : [h]))) {
-  const first = opening++ % (reopen ? 2 : 1) === 0;
+// (--net: opened twice online first, as a phone that has used the app: the second has the kit's version noted and kept.)
+const per = net ? 3 : reopen ? 2 : 1;
+for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(h))) {
+  const first = opening++ % per !== per - 1 || per === 1;
   Object.assign(served, first && oldRoot ? { root: oldRoot, dir: join(oldRoot, repo, key === 'orbit' ? 'dist' : 'public') } : { root: ROOT, dir });
   flakyNow.on = Boolean(flaky) && (first || !reopen);
   Object.assign(netNow, { offline: !first && net === 'offline', slow: first ? 0 : netSlow });
@@ -694,16 +698,23 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => (reopen ? [h, h]
     page.on('requestfinished', r => at.has(r) && (at.get(r).took = `${Date.now() - started - at.get(r).t} ms`));
     page.on('requestfailed', r => at.has(r) && (at.get(r).took = 'failed'));
   }
-  const went = await page.goto(`${base}${hash ? `#${hash}` : ''}`).then(() => '', e => e.message.split('\n')[0]);
+  // (With --net, from the page's first bytes: a slow connection's whole load is what's measured below.)
+  const went = await page.goto(`${base}${hash ? `#${hash}` : ''}`, net ? { waitUntil: 'commit' } : {}).then(() => '', e => e.message.split('\n')[0]);
   if (went) console.log(`net: the page didn't open (${went})`);
   if (net && !first && !went) {
     // When the loading screen went (a person stuck behind it is the bug), and what the page says.
     const shown = await page
-      .waitForFunction(() => { const b = document.getElementById('loading'); return b ? b.hidden : !document.body.classList.contains('orbit-booting'); }, null, { timeout: 30_000, polling: 50 })
+      .waitForFunction(() => { const b = document.getElementById('loading'); return b ? b.hidden : document.readyState !== 'loading' && Boolean(document.body) && !document.body.classList.contains('orbit-booting'); }, null, { timeout: 30_000, polling: 50 })
       .then(() => `${Date.now() - started} ms`)
       .catch(() => 'over 30 s');
     const said = await page.evaluate(() => [...document.querySelectorAll('#loading:not([hidden]) p, .q-net, .q-toast, [role=status], [role=alert]')].map(e => e.innerText?.trim()).filter(Boolean).join(' | ').slice(0, 300)).catch(() => '');
     console.log(`net ${net}: loading screen gone after ${shown}${said ? `; says: ${said}` : ''}`);
+    if (netBack && netNow.offline)
+      setTimeout(async () => {
+        netNow.offline = false;
+        await context.setOffline(false);
+        console.log(`net: back online at ${Date.now() - started} ms`);
+      }, Math.max(0, netBack - (Date.now() - started)));
   }
   if (timing) {
     const shown = await page
