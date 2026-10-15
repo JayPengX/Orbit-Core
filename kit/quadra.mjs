@@ -1137,10 +1137,85 @@ function uprightTurn() {
       root.style.setProperty('--q-turn-h', `${w}px`);
     }
     if ((root.dataset.qTurn || '') !== turn) root.dataset.qTurn = turn;
+    turnRules(turn ? [h, w, turn] : null);
   };
   set();
   globalThis.addEventListener?.('resize', set);
   globalThis.screen?.orientation?.addEventListener?.('change', set);
+  // A stylesheet that arrives later is read the same way.
+  if (typeof MutationObserver === 'function' && document.head) {
+    new MutationObserver(() => root.dataset.qTurn && set()).observe(document.head, { childList: true });
+    document.addEventListener('load', e => e.target?.tagName === 'LINK' && root.dataset.qTurn && set(), true);
+  }
+}
+// Turned, the page is still laid out by the phone's sideways screen: its
+// @media widths and vw/vh lengths read 874 px wide, and the notch's and home
+// bar's margins (safe-area insets) land on the page's left and right, so
+// the page came out narrower and laid out differently from upright. While
+// turned, each is read against the upright screen instead ([width, height,
+// turn]: an inset is the sideways screen's side that is now the page's
+// top, left, …); null puts every rule back as written.
+const turnedMedia = new Map();
+const turnedStyles = new Map();
+const VIEW_LEN = /(-?[\d.]+)(d|s|l)?v(w|h|min|max)\b|safe-area-inset-(top|right|bottom|left)/g;
+const TURN_SIDES = {
+  '-90': { top: 'left', left: 'bottom', bottom: 'right', right: 'top' },
+  90: { top: 'right', left: 'top', bottom: 'left', right: 'bottom' },
+};
+function turnRules(size) {
+  if (typeof document === 'undefined') return;
+  const [W, H, turn] = size || [];
+  const sizeFits = (_, side, dim, n, unit) => {
+    const px = Number(n) * (unit === 'em' || unit === 'rem' ? 16 : 1);
+    const have = /height/.test(dim) ? H : W;
+    const ok = side === 'min-' ? have >= px : side === 'max-' ? have <= px : have === px;
+    return ok ? '(min-width: 0px)' : '(max-width: 0px)';
+  };
+  const viewLen = (_, n, __, axis, side) => {
+    if (side) return `safe-area-inset-${TURN_SIDES[turn][side]}`;
+    const unit = { w: W, h: H, min: Math.min(W, H), max: Math.max(W, H) }[axis];
+    return `${Math.round(Number(n) * unit) / 100}px`;
+  };
+  const walk = rules => {
+    for (const rule of rules || []) {
+      if (rule.media && rule.cssRules) {
+        const was = turnedMedia.get(rule) ?? rule.media.mediaText;
+        if (/width|height|orientation/.test(was)) {
+          turnedMedia.set(rule, was);
+          const text = size
+            ? was
+                .replace(/\(\s*(min-|max-)?(width|height|device-width|device-height)\s*:\s*([\d.]+)(px|em|rem)?\s*\)/g, sizeFits)
+                .replace(/\(\s*orientation\s*:\s*(\w+)\s*\)/g, (_, o) => (o === 'portrait' ? '(min-width: 0px)' : '(max-width: 0px)'))
+            : was;
+          if (rule.media.mediaText !== text) rule.media.mediaText = text;
+        }
+      }
+      // The turned page's own rules (html[data-q-turn]) already speak sideways.
+      if (rule.style && !/data-q-turn/.test(rule.selectorText || '')) {
+        // The whole declaration block: an inset inside a shorthand (padding)
+        // has no longhand to read.
+        const was = turnedStyles.get(rule) ?? rule.style.cssText;
+        VIEW_LEN.lastIndex = 0;
+        if (VIEW_LEN.test(was)) {
+          turnedStyles.set(rule, was);
+          const text = size ? was.replace(VIEW_LEN, viewLen) : was;
+          if (rule.style.cssText !== text) rule.style.cssText = text;
+        }
+      }
+      if (rule.styleSheet) walk(safeRules(rule.styleSheet));
+      if (rule.cssRules) walk(rule.cssRules);
+    }
+  };
+  if (!size && !turnedMedia.size && !turnedStyles.size) return;
+  for (const sheet of document.styleSheets) walk(safeRules(sheet));
+}
+// Another site's stylesheet (the fonts) can't be read; it has no layout rules.
+function safeRules(sheet) {
+  try {
+    return sheet.cssRules;
+  } catch {
+    return null;
+  }
 }
 // The phone paints its own status bar above the page in the theme colour (or
 // black), so the theme colour is the strip's: one colour from the top of the
