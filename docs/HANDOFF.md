@@ -5,7 +5,7 @@ what's open and why. It's rewritten as things change, never appended to; the
 history is the git log of each repo (each round's list and what was done are
 in its commits). What each app does in detail is its README.
 
-Updated 2026-10-14.
+Updated 2026-10-15.
 
 ## The repos
 
@@ -104,6 +104,23 @@ offline every app opens in 0.1–2.4 s (the cover or the app); every request
 8 s late, Words 0.1 s, Weather 1.6, Play 2.5, Class 3.1, Transit 4.1,
 Sports and Securities about 8 (Securities waits for the sign-in on
 purpose: money). Not yet seen on a phone.
+
+## Speed (2026-10-15)
+
+Measured with `tools/preview.mjs --live --h2 --latency 120 --timing
+--reopen` on stamped copies, median of 3, Chromium (not yet on a phone).
+Reopens: Sports 2.8 → 1.6 s (the proxy's scoreboards with no game on kept
+until just before the next game: its 24 league days 2.3 s → 0.43 s asked
+again), Play 4.3 → 4.0, Securities 1.00 → 0.90, Words 0.91 → 0.79, Weather
+0.84 → 0.55, Transit 2.1 → 1.9, Class unchanged (0.67). Every app's deploy
+lists the kit modules its first screen imports (`kit/preload.mjs`). First
+openings are bound by the sources (Play's whole board 7–10 s).
+The proxy's CPU under use is the Polymarket lists (a 15-minute tail: 9.2
+of 10.3 CPU-seconds), ~100 ms a 10–15 MB page; Play now asks only for
+events ending from 6 hours ago (the Premier League's first list 15 → 7 MB
+upstream) and the live list by ten-minute addresses. The crons were 0.5 s
+in those 15 minutes. Still each page's parse: a lighter Polymarket read
+(their API has no field filter) is the next lever if CPU ever matters.
 
 ## Workflows (Shared-Proxy, by hand from Actions)
 
