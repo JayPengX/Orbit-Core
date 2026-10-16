@@ -126,9 +126,9 @@ function accrue(s, t) {
   }
 }
 
-// Cash, holdings and loans as of `now`, and where the money went.
-export function replay(account, now = Date.now()) {
-  const s = {
+// The state replay starts from.
+function startState(account) {
+  return {
     cash: { [BASE]: 0 },
     positions: {},
     loans: {},
@@ -149,11 +149,9 @@ export function replay(account, now = Date.now()) {
     held: {},
     log: []
   };
-  for (const e of [...(account?.events || [])].sort(byTime)) {
-    // The account as it stood at `now`: later events (a dividend still to be
-    // paid, or a moment in the past being checked) don't count yet.
-    if (e.t > now) break;
-    accrue(s, e.t);
+}
+// One event applied (after accrue to its moment).
+function applyEvent(s, e) {
     switch (e.type) {
       // 違約金: charged on a default (an overdraft sold for).
       case 'penalty':
@@ -263,6 +261,17 @@ export function replay(account, now = Date.now()) {
       }
     }
     s.log.push(e);
+}
+
+// Cash, holdings and loans as of `now`, and where the money went.
+export function replay(account, now = Date.now()) {
+  const s = startState(account);
+  for (const e of [...(account?.events || [])].sort(byTime)) {
+    // The account as it stood at `now`: later events (a dividend still to be
+    // paid, or a moment in the past being checked) don't count yet.
+    if (e.t > now) break;
+    accrue(s, e.t);
+    applyEvent(s, e);
   }
   accrue(s, now);
   for (const [cur, v] of Object.entries(s.cash)) if (Math.abs(v) < EPS) s.cash[cur] = 0;
@@ -1534,14 +1543,26 @@ export function applyBondCashflows(account, symbol, { rates, now = Date.now() })
 // day's closing prices and rates: priceAt(symbol, t) and rateAt(currency, t)
 // return null when unknown (the last trade price is used then).
 export function netWorthSeries(account, days, priceAt, rateAt) {
-  const out = [];
-  for (const t of days) {
+  // One pass over the log (days in order): the account at each day is the
+  // one before it plus that day's events; what accrues to the day itself
+  // (loan interest, a short's fee) is added to the figures, not kept, so
+  // each day's is exactly replay(account, day)'s.
+  const order = days.map((t, i) => [t, i]).sort((a, b) => a[0] - b[0]);
+  const events = [...(account.events || [])].sort(byTime);
+  const divs = events.filter(e => e.type === 'div' && e.ex != null);
+  const s = startState(account);
+  const found = [];
+  let i = 0;
+  for (const [t, at] of order) {
     if (t < account.created) continue;
-    const s = replay(account, t);
-    let nw = s.receivable || 0;
+    for (; i < events.length && events[i].t <= t; i++) {
+      accrue(s, events[i].t);
+      applyEvent(s, events[i]);
+    }
+    let nw = divs.reduce((sum, e) => (e.ex <= t && e.t > t ? sum + e.net * (e.twd || 1) : sum), 0);
     let ok = true;
     for (const [cur, amount] of Object.entries(s.cash)) {
-      if (!amount) continue;
+      if (!amount || Math.abs(amount) < EPS) continue;
       const r = rateAt(cur, t);
       if (!r) ok = false;
       nw += amount * (r || 0);
@@ -1549,12 +1570,16 @@ export function netWorthSeries(account, days, priceAt, rateAt) {
     for (const p of Object.values(s.positions)) {
       const r = rateAt(p.currency, t);
       if (!r) ok = false;
-      nw += p.qty * (priceAt(p.symbol, t) ?? p.last) * (r || 0) - (p.borrowFee || 0) * (r || 0);
+      const fee = p.borrowFee + (p.qty < 0 && t > p.feeLast && !p.credit && !p.dayShort ? (-p.cost * SHORT_FEE * (t - p.feeLast)) / YEAR_MS : 0);
+      nw += p.qty * (priceAt(p.symbol, t) ?? p.last) * (r || 0) - (fee || 0) * (r || 0);
     }
-    for (const loan of Object.values(s.loans)) nw -= loan.balance * (rateAt(loan.currency, t) || 0);
-    if (ok) out.push([t, nw, s.deposits]);
+    for (const loan of Object.values(s.loans)) {
+      const balance = loan.balance + (t > loan.last && loan.balance > EPS ? (loan.balance * loan.rate * (t - loan.last)) / YEAR_MS : 0);
+      nw -= balance * (rateAt(loan.currency, t) || 0);
+    }
+    if (ok) found.push([at, [t, nw, s.deposits]]);
   }
-  return out;
+  return found.sort((a, b) => a[0] - b[0]).map(x => x[1]);
 }
 
 // Records today's net worth (and money put in) once every 10 minutes at most.
