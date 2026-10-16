@@ -228,6 +228,13 @@ function scoreboardPolicy(url) {
   return from <= today + 1 && to >= today - 1 ? CACHE_LIVE : CACHE_SCHEDULE;
 }
 
+// A month's board as Play reads it (`&trim=espn-board`: games to come and
+// their lines, no scores): two minutes, as Kambi's pre-match lists. Read
+// whole every 10 seconds before (the live tier), megabytes each. A month
+// read untrimmed (Orbit Sports' cups, with scores) stays live.
+const CACHE_BOARD_MONTH = { tier: 'board-month', fresh: 2 * MINUTE, stale: 0 };
+const policyOf = (url, trim) => (trim === TRIM_ESPN_BOARD && /^\d{6}$/.test(url.searchParams.get('dates') || '') ? CACHE_BOARD_MONTH : cachePolicyFor(url));
+
 function cachePolicyFor(url) {
   switch (url.hostname) {
     case 'site.api.espn.com':
@@ -422,6 +429,34 @@ export function trimEspnAthletes(data) {
       athlete: { id: x.athlete?.id, displayName: x.athlete?.displayName, teamId: x.athlete?.teamId, position: x.athlete?.position ? { abbreviation: x.athlete.position.abbreviation } : undefined },
       categories: (x.categories || []).map(c => ({ name: c.name, values: c.values }))
     }))
+  };
+}
+
+// Opt-in (`&trim=espn-board`) for a league's scoreboard as Play's board
+// reads it (kit/play-sources.mjs parseEspnScoreboard and mlbPostseason): each
+// game's id, time, season type and state, its sides and DraftKings' closing
+// lines; and what this proxy reads of it (settledData, quietFor). NHL's
+// month falls from ~4.5 MB to ~0.13 MB.
+const TRIM_ESPN_BOARD = 'espn-board';
+export function trimEspnBoard(data) {
+  if (!data || typeof data !== 'object' || !Array.isArray(data.events)) return data;
+  const type = t => t && { state: t.state, completed: t.completed };
+  const status = x => x && { type: type(x.type) };
+  const close = x => x && { close: x.close && { odds: x.close.odds, line: x.close.line } };
+  const sides = (x, keys) => x && Object.fromEntries(keys.map(k => [k, close(x[k])]));
+  const team = t => t && { id: t.id, displayName: t.displayName, abbreviation: t.abbreviation, logo: t.logo };
+  const game = c =>
+    c && {
+      date: c.date,
+      timeValid: c.timeValid,
+      neutralSite: c.neutralSite,
+      notes: Array.isArray(c.notes) ? c.notes.slice(0, 1).map(n => ({ headline: n?.headline })) : undefined,
+      status: status(c.status),
+      competitors: Array.isArray(c.competitors) ? c.competitors.map(x => x && { homeAway: x.homeAway, team: team(x.team) }) : c.competitors,
+      odds: Array.isArray(c.odds) ? c.odds.slice(0, 1).map(o => o && { moneyline: sides(o.moneyline, ['away', 'home', 'draw']), total: sides(o.total, ['over', 'under']), pointSpread: sides(o.pointSpread, ['away', 'home']) }) : undefined
+    };
+  return {
+    events: data.events.map(e => e && { id: e.id, date: e.date, season: e.season && { type: e.season.type }, status: status(e.status), competitions: Array.isArray(e.competitions) ? e.competitions.slice(0, 1).map(game) : e.competitions })
   };
 }
 
@@ -793,7 +828,7 @@ async function fetchUpstream(upstreamUrl, trim) {
     if (trim) {
       try {
         const parsed = JSON.parse(new TextDecoder().decode(body));
-        body = JSON.stringify(trim === TRIM_KAMBI_EVENTS ? trimKambi(parsed) : trim === TRIM_KAMBI_OFFERS ? trimKambiOffers(parsed) : trim === TRIM_ESPN_ROSTER ? trimEspnRoster(parsed) : trim === TRIM_ESPN_ATHLETES ? trimEspnAthletes(parsed) : trim === TRIM_ESPN_NEWS ? trimEspnNews(parsed) : trim === TRIM_ELTA ? trimElta(parsed) : trim === TRIM_POLYMARKET_GAMES ? trimPolymarketGames(parsed) : trim === TRIM_POLYMARKET_MARKETS ? trimPolymarketMarkets(parsed) : trimPolymarketEvents(parsed));
+        body = JSON.stringify(trim === TRIM_KAMBI_EVENTS ? trimKambi(parsed) : trim === TRIM_KAMBI_OFFERS ? trimKambiOffers(parsed) : trim === TRIM_ESPN_ROSTER ? trimEspnRoster(parsed) : trim === TRIM_ESPN_ATHLETES ? trimEspnAthletes(parsed) : trim === TRIM_ESPN_NEWS ? trimEspnNews(parsed) : trim === TRIM_ESPN_BOARD ? trimEspnBoard(parsed) : trim === TRIM_ELTA ? trimElta(parsed) : trim === TRIM_POLYMARKET_GAMES ? trimPolymarketGames(parsed) : trim === TRIM_POLYMARKET_MARKETS ? trimPolymarketMarkets(parsed) : trimPolymarketEvents(parsed));
       } catch {
         // Not the JSON shape expected - pass it through untouched.
       }
@@ -900,6 +935,7 @@ function trimFor(trimParam, upstreamUrl) {
   if (trimParam === TRIM_ESPN_ROSTER && upstreamUrl.hostname === 'site.api.espn.com' && upstreamUrl.pathname.endsWith('/roster')) return TRIM_ESPN_ROSTER;
   if (trimParam === TRIM_ESPN_ATHLETES && upstreamUrl.hostname === 'site.api.espn.com' && upstreamUrl.pathname.endsWith('/statistics/byathlete')) return TRIM_ESPN_ATHLETES;
   if (trimParam === TRIM_ESPN_NEWS && upstreamUrl.hostname === 'site.api.espn.com' && upstreamUrl.pathname.endsWith('/news')) return TRIM_ESPN_NEWS;
+  if (trimParam === TRIM_ESPN_BOARD && upstreamUrl.hostname === 'site.api.espn.com' && upstreamUrl.pathname.endsWith('/scoreboard')) return TRIM_ESPN_BOARD;
   if (trimParam === TRIM_KAMBI_OFFERS && upstreamUrl.hostname === 'eu-offering-api.kambicdn.com' && upstreamUrl.pathname.includes('/betoffer/')) return TRIM_KAMBI_OFFERS;
   return null;
 }
@@ -977,7 +1013,7 @@ async function keep(key, url, body) {
 }
 
 async function resolveOne(upstreamUrl, trim, ctx, { mirror = true, within } = {}) {
-  let policy = cachePolicyFor(upstreamUrl);
+  let policy = policyOf(upstreamUrl, trim);
   const cache = caches.default;
   // A trimmed response is cached under its own key (a marker param on the
   // cache key only - never sent upstream), so it can't be served to a
@@ -1190,7 +1226,7 @@ async function handleSportsProxyRequest(request, env, headers, ip, ctx) {
   const gate = await checkSession(env, requestParams, headers, 1, request, ip);
   if (gate.error) return gate.error;
   const trim = trimFor(requestParams.get('trim'), upstreamUrl);
-  headers['X-Sports-Proxy-Cache-Tier'] = cachePolicyFor(upstreamUrl).tier;
+  headers['X-Sports-Proxy-Cache-Tier'] = policyOf(upstreamUrl, trim).tier;
 
   // (`within`: this Worker's own reads only, a live bet checked on a copy that young.)
   const within = ip === 'worker' && requestParams.has('within') ? Math.max(0, Number(requestParams.get('within')) || 0) : undefined;
