@@ -512,6 +512,8 @@ export function parseWallet(text) {
   return null;
 }
 
+// How often a save of an app's data alone notes the app's last use in the wallet.
+const TOUCH_EVERY_MS = 10 * 60_000;
 function touchApp(wallet, app, now) {
   if (!ECO_APPS[app]) return wallet;
   const had = wallet.apps?.[app];
@@ -636,6 +638,11 @@ export async function handleEcoRequest(request, env, headers, ip, deps) {
           // What falls due with the write comes with it (fixed ids: never
           // twice): the welcome bonus bet right after a first bet.
           const patch = cleanPatch(body.wallet);
+          // A save of the app's data alone (nothing for the wallet, no
+          // payday due, the app's last use noted within 10 minutes): the
+          // wallet isn't rewritten (it was, whole, at every save: Words saves
+          // at each answer).
+          if (!patch.entries.length && !Object.keys(patch.snap).length && !Object.keys(patch.settings).length && !stock && now - (w.apps?.[app]?.last || 0) < TOUCH_EVERY_MS && !paydayEntries(w, now).length) return w;
           const merged = mergeWallet(w, { ...patch, entries: stamped(appEntries(patch.entries, w), w, now), snap: appSnap(patch.snap, app, w, stock, now) });
           return touchApp(mergeWallet(merged, { entries: paydayEntries(merged, now) }), app, now);
         },
