@@ -130,6 +130,26 @@ not yet on a phone; the second round A/B, the old and new code alternated.
   (`kit/preload.mjs`). The kit's clean-up of kept answers runs every 6
   hours, idle, not at each open.
 
+### Features, the third round (2026-10-16), measured
+
+- Transit's trip plans: first 4.2 → 2.6 s, all 5.5 → 4.3 s (waits side by
+  side); a stop's card reads nothing off its tab; walks from a ~40 m grid.
+- Weather (its dev door, `/weather` from localhost): a new place's first
+  answer 2.9 → 1.5 s, whole 10 days 7.2 → 4.9 s, 3–5 requests → 1 (the rest
+  comes as a second line, `lines=1`); pins asked together.
+- Play: a moneyline's check MLB 2.3 / NFL 11 / NHL 4.0 s → 0.5 s; a live
+  bet's 9 reads → 1; ESPN month pages trimmed (NHL 4.5 → 0.13 MB) and read
+  every 2 min; cash out 5 → 3 writes.
+- Securities: net worth 170 → 7 ms; a waiting order asked 80 → 6 times an
+  hour, filled from the bars since its last look (a phone waiting to ask
+  can't get under its limit).
+- Words' lists 0.4–1.3 s → 4–17 ms a draw.
+- Everyone: a save is 1 request (was 2: a preflight); the heartbeat and a
+  save don't send back an unchanged wallet, nor rewrite it for a data-only
+  save; live polls don't re-read and rewrite the phone's copy; no R2 read
+  per live miss; notices' due times on each list's own key (a shared key
+  could lose a list).
+
 ## Workflows (Shared-Proxy, by hand from Actions)
 
 - **Run a builder or a check** (`build.yml`): any builder now, a tiny
@@ -154,6 +174,17 @@ not yet on a phone; the second round A/B, the old and new code alternated.
 - **Not yet seen on a phone:** the proxy's back-fills and plan buys in
   Securities (tested, and the page checked at 375 px in WebKit), a live
   bet's 5-second wait in Play.
+- **Money, found and not yet closed:** (1) a wallet keeps every entry; at
+  ~7,600 entries it passes 900 KB (`WALLET_MAX_LENGTH`) and the account can't
+  save or sign in: fold old per-event entries into monthly sums, keeping
+  every id a "never twice" check reads (payouts, prizes, plus months), with
+  tests that try to pay twice. (2) Securities: a phone can hold back its
+  ask and cancel an order the price already crossed: the Worker should rule
+  on cancels (fill if its bars crossed since the last look) and the save
+  check accept only its fills and cancels.
+- **Written, not pushed (not seen on a screen):** Transit's bus stops from
+  the packs (side rule moves 臺北轉運站 3 → 2 sides), Play's tap and live
+  redraws, Words' recordings cache-first and faster wrong-answer choices.
 - **The preview tool** can't reach `asia-baseball.quadra` or Polymarket
   from the owner's Mac without `--live` (their 502s there are the tool's,
   not the apps').
