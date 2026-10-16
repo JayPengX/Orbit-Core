@@ -95,3 +95,18 @@ test('a live winner is priced without the game\'s own markets; its other picks w
     assert.deepEqual(asked, b.kind === 'ml' ? ['live:kleague'] : ['live:kleague', 'offers:live:9'], b.id);
   }
 });
+
+test("a live pick's check reads its own league's live pages alone, not every league's", async () => {
+  const src = await import('../kit/play-sources.mjs');
+  const asked = [];
+  src.useReader({ proxyJson: async url => (asked.push(url), { events: [] }) });
+  await src.loadLive(NOW, 5000, { only: ['nhl'] });
+  assert.ok(asked.length >= 1 && asked.every(u => /hockey\/nhl|kambicdn\.com\/.*ice_hockey\/nhl/.test(u)), asked.join('\n'));
+  asked.length = 0;
+  await src.loadLive(NOW, 5000, { only: ['kbo'] });
+  assert.ok(asked.length === 1 && /kambicdn/.test(asked[0]), asked.join('\n'));
+  // The phone's live board: every league that may have a game on, MLB and the Premier League always.
+  asked.length = 0;
+  await src.loadLive(NOW, 5000);
+  assert.ok(asked.some(u => u.includes('baseball/mlb')) && asked.some(u => u.includes('soccer/eng.1')));
+});
