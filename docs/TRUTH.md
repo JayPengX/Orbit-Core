@@ -488,9 +488,10 @@ On top of them, **apps put live knowledge over slower copies** (§8).
   few seconds.
 - **Location fast**: a quick Wi-Fi or cell fix first, GPS behind it; the
   phone is asked unprompted once, never at every open (the kit's
-  `mayLocate`, Weather's and Transit's rule), except that once it gave a
-  fix (you allowed it) Transit asks again at each opening: its map opens
-  on where you are, following you (2026-10-15).
+  `mayLocate`, Weather's and Transit's rule; asking again at each opening
+  once allowed put iOS's prompt at every launch, 2026-10-16). A phone that
+  lets it be read without asking gives the fresh fix at each opening;
+  Transit's map opens on it and follows you (2026-10-15).
 - No flash, blink or broken-picture icon on a redraw. Strips keep their
   scroll, and pictures seen before are drawn at once (kept decoded and
   remembered; a new one fades in; a failed one tried again, hidden
@@ -858,6 +859,10 @@ What was decided, so it isn't undone. Newer calls win.
   more (07:21 for 上學 by 08:00) is planned from where you are, leaving now,
   each way saying how late; never the way leaving latest (it had put a
   16:20 ride and train first).
+- 2026-10-16: Transit never asks for the location at launch on a phone
+  that would prompt (it asked at every launch and update); YouBike's counts
+  read again every 30 s on the map (strip, stations, card), a launch drawn
+  at once from the counts kept on the phone.
 - 2026-10-15: Transit's map opens on where you are and follows you, as a
   phone's own maps do (it had stayed where it was left: iOS wasn't asked
   again after the first opening), until a finger moves it; back after 5
