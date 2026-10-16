@@ -59,7 +59,7 @@ export async function housePick(leg, now, once) {
     return { bet, odds: bet.estOdds };
   }
   if (leg.live) {
-    const data = await once(`live:${leg.sport}`, () => src.loadLive(now, LIVE_MIN_LIQUIDITY, { also: [leg.sport] }));
+    const data = await once(`live:${leg.sport}`, () => src.loadLive(now, LIVE_MIN_LIQUIDITY, { only: [leg.sport] }));
     const board = liveBets(data);
     const plain = board.bets.find(b => b.id === leg.id);
     // (The winner is never the game's own markets': the same bet without them.)
@@ -149,7 +149,7 @@ async function houseChance(leg, now, once) {
     const h = await housePick(leg, now, once);
     return h.bet ? { p: h.bet.fairChance > 0 && h.bet.fairChance < 1 ? h.bet.fairChance : (1 / h.odds) * (1 - FALLBACK_MARGIN), live: false } : null;
   }
-  const data = await once(`live:${leg.sport}`, () => src.loadLive(now, LIVE_MIN_LIQUIDITY, { also: [leg.sport] }));
+  const data = await once(`live:${leg.sport}`, () => src.loadLive(now, LIVE_MIN_LIQUIDITY, { only: [leg.sport] }));
   const board = liveBets(data);
   const game = board.games.find(g => g.sport === leg.sport && g.away.en === leg.away && g.home.en === leg.home);
   if (!game) return null;

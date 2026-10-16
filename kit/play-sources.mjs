@@ -1018,12 +1018,15 @@ function liveEspnPages(key, now) {
 }
 const dedupe = games => [...new Map(games.map(g => [g.espnId, g])).values()];
 
-export async function loadLive(now = new Date(), minLiquidity = 5000, { also = [] } = {}) {
-  // (`also`: a league known to have a game on, which this page's reads may not have seen.)
-  const leagues = [...new Set([...liveLeagues(now), ...also.filter(key => ESPN_PATH[key]).filter(key => !KAMBI_LEAGUES.includes(key))])];
+export async function loadLive(now = new Date(), minLiquidity = 5000, { also = [], only = null } = {}) {
+  // (`also`: a league known to have a game on, which this page's reads may not have seen.
+  // `only`: these leagues alone, their pages, Kambi's lists and Polymarket only for MLB: the Worker's check of a live pick.)
+  const espnLeague = key => ESPN_PATH[key] && !KAMBI_LEAGUES.includes(key);
+  const leagues = only ? only.filter(espnLeague) : [...new Set([...liveLeagues(now), ...also.filter(espnLeague)])];
+  const kambiLeagues = only ? KAMBI_LEAGUES.filter(key => only.includes(key)) : KAMBI_LEAGUES;
   const [espn, kambi, books] = await Promise.all([
     Promise.all(leagues.map(key => liveEspnPages(key, now).then(pages => (pages.forEach(d => notePregame(d, key)), dedupe(pages.flatMap(d => parseEspnLive(d, key))))).catch(() => []))),
-    Promise.all(KAMBI_LEAGUES.map(key => getJson(kambiUrl(LEAGUES[key].kambi, 'in-play'), 'kambi-events').then(d => parseKambiInPlay(d, key)).catch(() => []))),
+    Promise.all(kambiLeagues.map(key => getJson(kambiUrl(LEAGUES[key].kambi, 'in-play'), 'kambi-events').then(d => parseKambiInPlay(d, key)).catch(() => []))),
     // Kambi's live prices of the ESPN leagues on now.
     Promise.all(leagues.filter(key => LEAGUES[key]?.book).map(key => getJson(kambiUrl(LEAGUES[key].book, 'in-play'), 'kambi-events').then(d => parseKambiInPlay(d, key)).catch(() => [])))
   ]);
