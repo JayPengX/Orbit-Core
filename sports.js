@@ -946,9 +946,19 @@ export function slimEspn(x) {
 }
 const gz = async bytes => new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer());
 const gunzipped = async raw => (raw[0] === 0x1f && raw[1] === 0x8b ? new Uint8Array(await new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()) : raw);
+// A key R2 was just found not to have (a game not over yet, a day still to
+// play) isn't asked of R2 again for a while: a live game's sheet missed the
+// edge's 2-second copy at every beat, an R2 read (and a round trip) each time.
+const NOT_KEPT_MS = 10 * MINUTE;
+const notKept = new Map(); // key → until when it isn't asked again
 async function readKept(key, url) {
+  if (notKept.get(key) > Date.now()) return null;
   const obj = await dataBucket.get(key).catch(() => null);
-  if (!obj) return null;
+  if (!obj) {
+    if (notKept.size > 5000) notKept.clear();
+    notKept.set(key, Date.now() + NOT_KEPT_MS);
+    return null;
+  }
   try {
     const copy = JSON.parse(new TextDecoder().decode(await gunzipped(new Uint8Array(await obj.arrayBuffer()))));
     // (The nightly mirror's copies carry a day's `until`; one that's over for good is kept for good.)
@@ -962,6 +972,7 @@ async function keep(key, url, body) {
     const data = JSON.parse(typeof body === 'string' ? body : new TextDecoder().decode(body));
     const text = JSON.stringify({ until: FOREVER, data: url.hostname === 'site.api.espn.com' ? slimEspn(data) : data });
     await dataBucket.put(key, await gz(new TextEncoder().encode(text)), { httpMetadata: { contentType: 'application/gzip' } });
+    notKept.delete(key);
   } catch {}
 }
 

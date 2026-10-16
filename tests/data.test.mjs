@@ -77,8 +77,25 @@ test('push: only with the secret; files written and deleted; then read, with the
   assert.deepEqual(listed.files.map(f => f[0]), ['sports/index.json']);
 });
 
-test('a file R2 doesn\'t hold: 404', async () => {
-  assert.equal((await ask('/data/bus/Nowhere.json', {}, { DATA: fakeR2() })).status, 404);
+test('a file R2 doesn\'t hold: 404, noted at the edge so the next ask (an app tries again in 15 s) reads nothing', async () => {
+  const had = globalThis.caches;
+  const edge = new Map();
+  const waits = [];
+  globalThis.caches = { default: { match: async k => edge.get(k.url)?.clone(), put: async (k, r) => void edge.set(k.url, r), delete: async k => edge.delete(k.url) } };
+  const local = { waitUntil: p => waits.push(p), passThroughOnException() {} };
+  try {
+    const DATA = fakeR2();
+    let gets = 0;
+    const get = DATA.get;
+    DATA.get = k => (gets++, get(k));
+    const read = () => worker.fetch(new Request('https://orbit-workers-proxy.test/data/bus/Nowhere.json', { headers: { Origin: 'https://jaypengx.github.io' } }), { DATA }, local);
+    assert.equal((await read()).status, 404);
+    await Promise.all(waits);
+    assert.equal((await read()).status, 404);
+    assert.equal(gets, 1);
+  } finally {
+    globalThis.caches = had;
+  }
 });
 
 test('no bucket yet: pushing says so (the builder carries on), reading is Pages\'', async () => {

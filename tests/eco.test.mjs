@@ -765,3 +765,23 @@ test('a save and an inbox drop as a plain POST (one request, no preflight): the 
   const after = await t.call('GET', `${t.qt(aa.data.token)}&app=stock&inbox=1`);
   assert.deepEqual(after.data.wallet.inbox?.stock || [], []);
 });
+
+test("a save of an app's data alone doesn't rewrite the wallet (unless its last use is 10 minutes old, or the wallet has news)", async () => {
+  const t = setup();
+  const a = await newPass(t, 'vocab');
+  let walletWrites = 0;
+  const fsWrite = t.deps.fsWrite;
+  t.deps.fsWrite = (env, collection, ...rest) => (collection === 'eco-wallets' && walletWrites++, fsWrite(env, collection, ...rest));
+  await t.call('POST', '?app=vocab', { op: 'write', qt: a.token, payload: 'v:1' });
+  const w1 = walletWrites;
+  for (let i = 2; i < 5; i++) assert.equal((await t.call('POST', '?app=vocab', { op: 'write', qt: a.token, payload: `v:${i}` })).status, 200);
+  assert.equal(walletWrites, w1, 'data alone: no wallet write');
+  assert.equal((await t.call('GET', `${t.qt(a.token)}&app=vocab`)).data.payload, 'v:4');
+  // An entry: written.
+  await t.call('POST', '?app=vocab', { op: 'write', qt: a.token, payload: 'v:5', wallet: { settings: { x: { value: 1, t: 1 } } } });
+  assert.equal(walletWrites, w1 + 1);
+  // Ten minutes on: the last use noted again.
+  t.advance(11 * 60_000);
+  await t.call('POST', '?app=vocab', { op: 'write', qt: a.token, payload: 'v:6' });
+  assert.equal(walletWrites, w1 + 2);
+});
