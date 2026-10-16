@@ -859,6 +859,10 @@ What was decided, so it isn't undone. Newer calls win.
   more (07:21 for 上學 by 08:00) is planned from where you are, leaving now,
   each way saying how late; never the way leaving latest (it had put a
   16:20 ride and train first).
+- 2026-10-16: Transit's YouBike timer runs by itself while navigating
+  (started at the station by the bike's ride, started over at a swap,
+  ended once the bike is returned), its minutes on the bike's step; no
+  words in the app explaining it (explained to the owner instead).
 - 2026-10-16: Transit never asks for the location at launch on a phone
   that would prompt (it asked at every launch and update); YouBike's counts
   read again every 30 s on the map (strip, stations, card), a launch drawn
