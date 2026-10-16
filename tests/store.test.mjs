@@ -23,3 +23,10 @@ test('store: a folder replaced whole, what isn\'t in it goes', async () => {
   assert.deepEqual((await s.list('sports/')).sort(), ['sports/other.json', 'sports/watch/index.json', 'sports/watch/mlb/2026-09.json']);
 });
 
+
+test("store: a rebuilt pack that only has a new `built` stamp isn't written again (phones keep theirs)", async () => {
+  const s = r2Store(memoryBucket());
+  assert.equal(await s.put('bus/Hsinchu.json', { v: 1, built: '2026-10-09T00:00:00Z', routes: [1] }), true);
+  assert.equal(await s.put('bus/Hsinchu.json', { v: 1, built: '2026-10-16T00:00:00Z', routes: [1] }), false);
+  assert.equal(await s.put('bus/Hsinchu.json', { v: 1, built: '2026-10-16T00:00:00Z', routes: [1, 2] }), true);
+});
