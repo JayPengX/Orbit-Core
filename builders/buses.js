@@ -288,7 +288,7 @@ export async function runBuses({ store, env, now = Date.now(), until = now + 8 *
         index.cities[city] = { routes: p.routes.length, bytes: Object.values(index.squares).reduce((a, b) => a + b, 0), squares: Object.keys(parts).length, built };
       } else {
         const text = JSON.stringify(p);
-        await store.put(`bus/${city}.json`, text);
+        await store.put(`bus/${city}.json`, p);
         index.cities[city] = { routes: p.routes.length, bytes: text.length, built };
       }
       const { shapes, squares: sq } = await cityShapes(tdx, city);
