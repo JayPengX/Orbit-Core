@@ -174,17 +174,15 @@ not yet on a phone; the second round A/B, the old and new code alternated.
 - **Not yet seen on a phone:** the proxy's back-fills and plan buys in
   Securities (tested, and the page checked at 375 px in WebKit), a live
   bet's 5-second wait in Play.
-- **Money, found and not yet closed:** (1) a wallet keeps every entry; at
-  ~7,600 entries it passes 900 KB (`WALLET_MAX_LENGTH`) and the account can't
-  save or sign in: fold old per-event entries into monthly sums, keeping
-  every id a "never twice" check reads (payouts, prizes, plus months), with
-  tests that try to pay twice. (2) Securities: a phone can hold back its
-  ask and cancel an order the price already crossed: the Worker should rule
-  on cancels (fill if its bars crossed since the last look) and the save
-  check accept only its fills and cancels.
-- **Written, not pushed (not seen on a screen):** Transit's bus stops from
-  the packs (side rule moves 臺北轉運站 3 → 2 sides), Play's tap and live
-  redraws, Words' recordings cache-first and faster wrong-answer choices.
+- **Money holes closed (2026-10-16):** a wallet past 600 KB folds its old
+  entries into monthly sums (`foldWallet`: the balance and each app's and
+  kind's sums unchanged; eco:* and Securities' never folded; Play's only past
+  400 days, so a paid slip's stake and payout go together) and the limit is
+  1.8 MB (D1's row 2 MB); Securities' cancels are the proxy's to rule on
+  (`op: 'cancel'`), and a save's "cancel" of an order the proxy filled or
+  saw reached counts as the fill.
+- **Written, not pushed:** Transit's bus stops from the packs (the side
+  rule moves 臺北轉運站 3 → 2 sides; its alert test hangs).
 - **The preview tool** can't reach `asia-baseball.quadra` or Polymarket
   from the owner's Mac without `--live` (their 502s there are the tool's,
   not the apps').

@@ -803,3 +803,40 @@ test('a read that says which wallet it holds (w) gets no wallet back while it is
   assert.equal(saved.data.same, true);
   assert.equal(saved.data.wallet, undefined);
 });
+
+test("a big wallet's old entries fold into monthly sums: the same balance and sums, the Pass's own and Securities' kept, and no paid slip can be paid again", async () => {
+  const { foldWallet, FOLD_AT, updateWallet } = await import('../eco.js');
+  const now = Date.parse('2027-12-01T00:00:00Z');
+  const DAY = 86_400_000;
+  const entries = [
+    { id: 'eco:start', t: now - 900 * DAY, app: 'eco', kind: 'start', amount: 100_000 },
+    { id: 'eco:plus:2026-01', t: now - 700 * DAY, app: 'eco', kind: 'plus', amount: -99 },
+    { id: 'stock:dep-1', t: now - 700 * DAY, app: 'stock', kind: 'deposit', amount: -5000 }
+  ];
+  // Slips: settled long ago (stake and payout), a lost one, and recent ones.
+  for (let i = 0; i < 3000; i++) {
+    const t = now - (900 - (i % 880)) * DAY;
+    entries.push({ id: `odds:stake-s${i}`, t, app: 'odds', kind: 'stake', amount: -100 });
+    if (i % 2) entries.push({ id: `odds:payout-s${i}`, t: t + DAY, app: 'odds', kind: 'payout', amount: 190 });
+  }
+  const w = { ...emptyWallet(now - 900 * DAY), entries };
+  const before = poolBalance(w);
+  const sums = x => x.entries.reduce((m, e) => ((m[`${e.app}:${e.kind}`] = Math.round(((m[`${e.app}:${e.kind}`] || 0) + e.amount) * 100) / 100), m), {});
+  const folded = foldWallet(w, now);
+  assert.ok(folded.entries.length < w.entries.length / 2, `${w.entries.length} → ${folded.entries.length}`);
+  assert.equal(poolBalance(folded), before);
+  assert.deepEqual(sums(folded), sums(w));
+  for (const id of ['eco:start', 'eco:plus:2026-01', 'stock:dep-1']) assert.ok(folded.entries.some(e => e.id === id), id);
+  // The settling guard (settle.js paySlip: pay only with the stake there and no payout yet) never opens again for a paid slip.
+  const have = new Set(folded.entries.map(e => e.id));
+  for (let i = 1; i < 3000; i += 2) assert.ok(!(have.has(`odds:stake-s${i}`) && !have.has(`odds:payout-s${i}`)), `slip s${i}`);
+  // Folding again changes nothing; a save to a wallet past FOLD_AT folds it and goes through.
+  assert.deepEqual(foldWallet(folded, now), folded);
+  const big = { ...w, entries: [...w.entries, ...Array.from({ length: 3000 }, (_, i) => ({ id: `odds:stake-x${i}`, t: now - 500 * DAY, app: 'odds', kind: 'stake', amount: -1 }))] };
+  assert.ok(JSON.stringify(big).length > FOLD_AT);
+  let doc = { exists: true, payload: JSON.stringify(big), updateTime: 'v1' };
+  const deps = { now: () => now, fsGet: async () => doc, fsWrite: async (env, c, id, text) => ((doc = { exists: true, payload: text, updateTime: 'v2' }), { updateTime: 'v2' }) };
+  const r = await updateWallet({}, deps, 'acct', x => ({ ...x, entries: [...x.entries, { id: 'odds:stake-new', t: now, app: 'odds', kind: 'stake', amount: -10 }] }));
+  assert.ok(doc.payload.length < FOLD_AT, `saved folded: ${doc.payload.length}`);
+  assert.equal(poolBalance(r.wallet), Math.round((poolBalance(big) - 10) * 100) / 100);
+});
