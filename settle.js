@@ -272,8 +272,8 @@ export async function handlePlay(request, env, headers, session, deps) {
     if (body.op === 'open') return json({ watching: 0, added: 0 }, 200, headers);
     if (body.op === 'cashout') {
       // Cashed out here: the value checked against the house's own now
-      // (price.js cashOutQuote), the slip taken from 'open' (never settled
-      // too), the payout written by the Worker (the ledger's id, kind
+      // (price.js cashOutQuote), the slip marked cashed in 'open' (never
+      // settled too), the payout written by the Worker (the ledger's id, kind
       // 'cashout'). Settled first: its result stands.
       const id = String(body.id || '');
       const asked = Math.floor(Number(body.value));
@@ -300,8 +300,8 @@ export async function handlePlay(request, env, headers, session, deps) {
         }
         const paid = await updateWallet(env, deps, account, w => (w.entries.some(e => e.id === `odds:payout-${id}`) ? w : { ...w, entries: [...w.entries, { id: `odds:payout-${id}`, t: now, app: 'odds', kind: 'cashout', amount: asked }] }));
         await changeRecords(env, deps, account, records => ({ ...records, [id]: { ...recordOf(open.slip, now), settled: true, cashedOut: true, payout: asked } }));
-        await deps.fsDelete(env, OPEN_COLLECTION, key).catch(() => {});
-        await changeIndex(env, deps, index => (key in index.due ? { ...index, due: Object.fromEntries(Object.entries(index.due).filter(([k]) => k !== key)) } : index)).catch(() => {});
+        // (Left marked cashed: the cron drops it and its place in the index
+        // when it next comes due, and never settles it.)
         return json({ cashedOut: asked, wallet: paid?.wallet }, 200, headers);
       }
       return errorJson('RATE_LIMITED', 429, headers, request);
