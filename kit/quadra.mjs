@@ -2524,7 +2524,11 @@ export async function enablePush(s, force = false) {
   try {
     const reg = await Promise.race([navigator.serviceWorker.ready, new Promise(r => setTimeout(r, 4000))]);
     if (!reg?.pushManager) return false;
-    const { key } = await fetch(`${PUSH_URL}/key`).then(r => r.json());
+    // The Worker's key, asked once a day (it was asked at every list change).
+    const day = new Date().toDateString();
+    const kept = readJson('quadra.push.key', null);
+    const key = kept?.day === day && kept.key ? kept.key : (await fetch(`${PUSH_URL}/key`).then(r => r.json())).key;
+    if (key && !(kept?.day === day && kept.key === key)) writeStore('quadra.push.key', JSON.stringify({ key, day }));
     let sub = await reg.pushManager.getSubscription();
     // One made with another key is replaced.
     const own = sub?.options?.applicationServerKey ? btoa(String.fromCharCode(...new Uint8Array(sub.options.applicationServerKey))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '') === key : true;
