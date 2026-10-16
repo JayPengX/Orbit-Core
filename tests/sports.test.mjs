@@ -288,6 +288,16 @@ test('a game over is kept in R2 the first time anyone reads it; after that it co
     await ask(`https://proxy.test/sports-proxy?url=${encodeURIComponent(on)}&app=match`);
     await new Promise(r => setTimeout(r, 20));
     assert.equal([...bucket.m.keys()].filter(k => k.includes('event~3D901')).length, 0, 'a game on: not kept');
+    // Asked again while it's on (the edge's 2-second copy gone): R2, just found without it, isn't asked again.
+    let gets = 0;
+    const get = bucket.get.bind(bucket);
+    bucket.get = async k => (gets++, get(k));
+    for (let i = 0; i < 2; i++) {
+      store.clear();
+      await ask(`https://proxy.test/sports-proxy?url=${encodeURIComponent(on)}&app=match`);
+    }
+    assert.equal(gets, 0, 'no R2 read for a game it has just been found not to have');
+    bucket.get = get;
     store.clear();
     const n = asked.length;
     const again = await ask(`https://proxy.test/sports-proxy?url=${encodeURIComponent(over)}&app=match`);
