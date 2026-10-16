@@ -16,7 +16,7 @@
 
 import { systemReport, alertAccount, tell, OPS_DOC } from './ops.js';
 import { newPasscode, updateWallet, deleteAccount, ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, PAIR_MS, ECO_LIMITS, parseWallet, poolBalance, plusMember, plusLapsed, taipeiMonth, gen, emptyWallet } from './eco.js';
-import { sendPush } from './push.js';
+import { sendPush, dueLists } from './push.js';
 import { KAMBI_COLLECTION } from './kambi.js';
 import { usage as transitUsage, CAPS as TRANSIT_CAPS, TDX_POINTS, tdxPoints, tdxGuard } from './transit.js';
 import { twDate, GOOGLE_DAILY_CALLS } from './weather.js';
@@ -301,10 +301,8 @@ const PUSH_KV = '通知訂閱（KV）';
 async function dropPushes(env, keys) {
   const kv = env.RATE_LIMIT_KV;
   if (!kv || !keys.length) return;
+  // (A list's due time is its own key's: gone with it.)
   for (const k of keys) await kv.delete(k);
-  const due = (await kv.get('push:due', 'json').catch(() => null)) || {};
-  const left = Object.fromEntries(Object.entries(due).filter(([k]) => !keys.includes(k)));
-  if (Object.keys(left).length !== Object.keys(due).length) await kv.put('push:due', JSON.stringify(left));
 }
 
 function summary(plan) {
@@ -492,7 +490,7 @@ export const ADMIN_TOOLS = {
   async pushes({ env, deps }) {
     const records = await pushRecords(env);
     const kv = env.RATE_LIMIT_KV;
-    const due = kv ? (await kv.get('push:due', 'json')) || {} : {};
+    const due = kv?.list ? Object.fromEntries(await dueLists(kv)) : {};
     // A subscription outlives an account removed some other way (it keeps
     // 60 days in KV): those are shown apart and 整理 takes them.
     const accounts = new Set((await deps.fsList(env, WALLET_COLLECTION, 300)).map(w => w.id));
@@ -548,9 +546,6 @@ export const ADMIN_TOOLS = {
       for (const r of records) await kv.delete(r.key);
       pushes = records.length;
       await kv.delete(`push:prefs:${hit.id}`).catch(() => {});
-      const due = (await kv.get('push:due', 'json').catch(() => null)) || {};
-      const left = Object.fromEntries(Object.entries(due).filter(([k]) => !k.startsWith(`push:${hit.id}:`)));
-      if (Object.keys(left).length !== Object.keys(due).length) await kv.put('push:due', JSON.stringify(left));
     }
     return { ok: true, ref: hit.id.slice(0, 8), balance, apps: appsOf(hit.wallet).map(a => a.app), shares, pushes };
   },

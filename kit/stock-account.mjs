@@ -787,6 +787,26 @@ export function applyFills(account, fills, rates, now = Date.now()) {
   return { account: next, filled, rejected };
 }
 
+// Whether the phone asks the proxy about an open order now (askFills): when
+// will make no difference to its price (the proxy fills from the bars since
+// it last looked, stock-fill.js), only to how soon a fill shows. At once
+// for one it hasn't asked about, a session begun since it last asked, an
+// after-hours order past its match, and a price at or within 1% of its
+// trigger; else every FILL_ASK_EVERY.
+export const FILL_ASK_EVERY = 10 * 60_000;
+export function fillAskDue(order, quote, lastAsk, now = Date.now()) {
+  if (!(lastAsk > 0) || now - lastAsk >= FILL_ASK_EVERY) return true;
+  const s = quote?.session;
+  if (s && s.start > lastAsk && now >= s.start) return true;
+  if (order.after) return now >= order.after && lastAsk < order.after;
+  const p = quote?.price;
+  if (!(p > 0)) return false;
+  const buy = order.side === 'buy';
+  if (order.type === 'limit') return buy ? p <= order.limit * 1.01 : p >= order.limit * 0.99;
+  if (order.type === 'stop') return buy ? p >= order.stop * 0.99 : p <= order.stop * 1.01;
+  return false;
+}
+
 // When an order waiting while the page was closed would have filled: the
 // first price bar after it was placed that reaches its price (bars:
 // [{ t, o, h, l, c }], oldest first). A gap through the price fills at the

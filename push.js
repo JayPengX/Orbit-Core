@@ -30,7 +30,9 @@
 //          shared cache); asked again every run (each 2 minutes), not each 15
 //
 // Stored in KV (RATE_LIMIT_KV): `push:<account>:<app>` the device's
-// subscription and list, `push:prefs:<account>` the switches, `push:due` when each list's next notice is due,
+// subscription and list (its next notice's time in the key's metadata, `due`:
+// one list of the keys finds what's due, and no one key every phone rewrites
+// loses another's time), `push:prefs:<account>` the switches,
 // `push:vapid` the Worker's own key pair (made on first use). One device a
 // person an app: the one that subscribed last (Quadra runs one live session
 // an account anyway).
@@ -180,13 +182,32 @@ export function cleanPrefs(body) {
 }
 // Whether the pass's switches let this notice through (all do without any).
 export const wanted = (prefs, app, item) => !prefs || (prefs.on !== false && !(item.kind && prefs.off?.includes(`${app}:${item.kind}`)));
-async function setDue(env, key, next) {
-  const kv = env.RATE_LIMIT_KV;
-  const due = (await kv.get('push:due', 'json')) || {};
-  if ((due[key] || 0) === (next || 0)) return;
-  if (next) due[key] = next;
-  else delete due[key];
-  await kv.put('push:due', JSON.stringify(due));
+// A list kept with when its next notice is due (none: no subscription or nothing on it).
+const dueOf = record => (record.sub && record.items?.length ? record.items[0].at : 0);
+const putRecord = (kv, key, record) => kv.put(key, JSON.stringify(record), { expirationTtl: 60 * 86_400, metadata: { due: dueOf(record) } });
+// Each list and its due time, from the keys' metadata (`push:prefs:` and the Worker's own skipped).
+export async function dueLists(kv) {
+  const out = [];
+  let cursor;
+  for (let i = 0; i < 20; i++) {
+    const page = await kv.list({ prefix: 'push:', cursor });
+    for (const k of page.keys) if (k.metadata?.due) out.push([k.name, k.metadata.due]);
+    if (page.list_complete || !page.cursor) break;
+    cursor = page.cursor;
+  }
+  return out;
+}
+// (Lists kept before the due time moved into their own keys: given it once, from the old shared key.)
+const moved = new WeakSet(); // the KV namespaces checked
+async function moveOldDue(kv) {
+  if (moved.has(kv)) return;
+  const old = await kv.get('push:due', 'json').catch(() => null);
+  for (const key of Object.keys(old || {})) {
+    const record = await kv.get(key, 'json').catch(() => null);
+    if (record) await putRecord(kv, key, record);
+  }
+  if (old) await kv.delete('push:due');
+  moved.add(kv);
 }
 
 export async function handlePush(request, env, headers, session, path) {
@@ -219,13 +240,13 @@ export async function handlePush(request, env, headers, session, path) {
     record.items = cleanItems(body?.items).filter(x => !(x.tag && told[toldKey(x)]));
   } else return reply({ error: { message: 'Not found' } }, 404);
   // Each open sends the app's list again; written only when it changed (or
-  // once a month, so the 60-day expiry never takes a quiet one).
+  // once a month, so the 60-day expiry never takes a quiet one), its due
+  // time with it.
   const now = Date.now();
   if (JSON.stringify(record) !== was || !(now - (record.kept || 0) < 30 * 86_400_000)) {
     record.kept = now;
-    await kv.put(key, JSON.stringify(record), { expirationTtl: 60 * 86_400 });
+    await putRecord(kv, key, record);
   }
-  await setDue(env, key, record.sub && record.items.length ? record.items[0].at : 0);
   return reply({ ok: true, n: record.items.length });
 }
 
@@ -311,19 +332,14 @@ export async function runCheck(check, lang, env) {
 // answer yet waits 15 minutes more), and the lists' next times.
 export async function sendDue(env, now = Date.now()) {
   const kv = env.RATE_LIMIT_KV;
-  if (!kv) return { sent: 0 };
-  const due = (await kv.get('push:due', 'json')) || {};
+  if (!kv?.list) return { sent: 0 };
+  await moveOldDue(kv);
   let sent = 0;
-  let changed = false;
   const prefsOf = {};
-  for (const [key, next] of Object.entries(due)) {
+  for (const [key, next] of await dueLists(kv)) {
     if (next > now + 60_000) continue;
     const record = await kv.get(key, 'json');
-    if (!record?.sub) {
-      delete due[key];
-      changed = true;
-      continue;
-    }
+    if (!record?.sub) continue;
     const keep = [];
     let gone = false;
     // push:<account>:<app>
@@ -355,18 +371,12 @@ export async function sendDue(env, now = Date.now()) {
       if (r === 'gone') gone = true;
       else if (r === 'sent') sent++;
     }
-    if (gone) {
-      await kv.delete(key);
-      delete due[key];
-    } else {
+    if (gone) await kv.delete(key);
+    else {
       record.items = keep.sort((a, b) => a.at - b.at);
-      await kv.put(key, JSON.stringify(record), { expirationTtl: 60 * 86_400 });
-      if (record.items.length) due[key] = record.items[0].at;
-      else delete due[key];
+      await putRecord(kv, key, record);
     }
-    changed = true;
   }
-  if (changed) await kv.put('push:due', JSON.stringify(due));
   return { sent };
 }
 
