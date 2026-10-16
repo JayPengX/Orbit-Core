@@ -460,6 +460,30 @@ export function trimEspnBoard(data) {
   };
 }
 
+// Opt-in (`&trim=espn-injuries`) for a league's injury report (Sports' team
+// page): each team's id and each player's name, card link, headshot, status,
+// what and until when, and ESPN's comment, in ESPN's own shape. MLB's 3.1 MB
+// (every player's dozen links, his whole profile) falls to a fraction.
+const TRIM_ESPN_INJURIES = 'espn-injuries';
+export function trimEspnInjuries(data) {
+  if (!data || typeof data !== 'object' || !Array.isArray(data.injuries)) return data;
+  const card = a => (a?.links || []).find(l => Array.isArray(l?.rel) && l.rel.includes('playercard'));
+  return {
+    injuries: data.injuries.map(t => ({
+      id: t?.id,
+      injuries: (t?.injuries || []).map(i => ({
+        status: i?.status,
+        type: i?.type?.description ? { description: i.type.description } : undefined,
+        details: i?.details ? { type: i.details.type, detail: i.details.detail, returnDate: i.details.returnDate } : undefined,
+        date: i?.date,
+        shortComment: i?.shortComment,
+        longComment: i?.shortComment ? undefined : i?.longComment,
+        athlete: i?.athlete && { displayName: i.athlete.displayName, headshot: i.athlete.headshot?.href ? { href: i.athlete.headshot.href } : undefined, links: card(i.athlete) ? [{ rel: ['playercard'], href: card(i.athlete).href }] : undefined }
+      }))
+    }))
+  };
+}
+
 // ELTA's schedule, a small fraction of it: each live program's day, start
 // and end (Unix seconds), channel, league (ELTA's English name and its Chinese one) and title.
 const TRIM_ELTA = 'elta';
@@ -828,7 +852,7 @@ async function fetchUpstream(upstreamUrl, trim) {
     if (trim) {
       try {
         const parsed = JSON.parse(new TextDecoder().decode(body));
-        body = JSON.stringify(trim === TRIM_KAMBI_EVENTS ? trimKambi(parsed) : trim === TRIM_KAMBI_OFFERS ? trimKambiOffers(parsed) : trim === TRIM_ESPN_ROSTER ? trimEspnRoster(parsed) : trim === TRIM_ESPN_ATHLETES ? trimEspnAthletes(parsed) : trim === TRIM_ESPN_NEWS ? trimEspnNews(parsed) : trim === TRIM_ESPN_BOARD ? trimEspnBoard(parsed) : trim === TRIM_ELTA ? trimElta(parsed) : trim === TRIM_POLYMARKET_GAMES ? trimPolymarketGames(parsed) : trim === TRIM_POLYMARKET_MARKETS ? trimPolymarketMarkets(parsed) : trimPolymarketEvents(parsed));
+        body = JSON.stringify(trim === TRIM_KAMBI_EVENTS ? trimKambi(parsed) : trim === TRIM_KAMBI_OFFERS ? trimKambiOffers(parsed) : trim === TRIM_ESPN_ROSTER ? trimEspnRoster(parsed) : trim === TRIM_ESPN_ATHLETES ? trimEspnAthletes(parsed) : trim === TRIM_ESPN_NEWS ? trimEspnNews(parsed) : trim === TRIM_ESPN_INJURIES ? trimEspnInjuries(parsed) : trim === TRIM_ESPN_BOARD ? trimEspnBoard(parsed) : trim === TRIM_ELTA ? trimElta(parsed) : trim === TRIM_POLYMARKET_GAMES ? trimPolymarketGames(parsed) : trim === TRIM_POLYMARKET_MARKETS ? trimPolymarketMarkets(parsed) : trimPolymarketEvents(parsed));
       } catch {
         // Not the JSON shape expected - pass it through untouched.
       }
@@ -936,6 +960,7 @@ function trimFor(trimParam, upstreamUrl) {
   if (trimParam === TRIM_ESPN_ATHLETES && upstreamUrl.hostname === 'site.api.espn.com' && upstreamUrl.pathname.endsWith('/statistics/byathlete')) return TRIM_ESPN_ATHLETES;
   if (trimParam === TRIM_ESPN_NEWS && upstreamUrl.hostname === 'site.api.espn.com' && upstreamUrl.pathname.endsWith('/news')) return TRIM_ESPN_NEWS;
   if (trimParam === TRIM_ESPN_BOARD && upstreamUrl.hostname === 'site.api.espn.com' && upstreamUrl.pathname.endsWith('/scoreboard')) return TRIM_ESPN_BOARD;
+  if (trimParam === TRIM_ESPN_INJURIES && upstreamUrl.hostname === 'site.api.espn.com' && upstreamUrl.pathname.endsWith('/injuries')) return TRIM_ESPN_INJURIES;
   if (trimParam === TRIM_KAMBI_OFFERS && upstreamUrl.hostname === 'eu-offering-api.kambicdn.com' && upstreamUrl.pathname.includes('/betoffer/')) return TRIM_KAMBI_OFFERS;
   return null;
 }
