@@ -85,7 +85,10 @@ const ENTRY_APPS = new Set(['stock', 'odds']);
 // copy them (the app republishes its merged ledger).
 const LEDGER_APPS = new Set(['odds']);
 
-export const WALLET_MAX_LENGTH = 900_000;
+// (D1 holds a row of up to 2 MB.)
+export const WALLET_MAX_LENGTH = 1_800_000;
+// A wallet past this has its old entries folded into monthly sums (foldWallet).
+export const FOLD_AT = 600_000;
 const MAX_ENTRIES_PER_WRITE = 1000;
 const MAX_AMOUNT = 1_000_000_000;
 const MAX_MERGE_SOURCES = 12;
@@ -974,10 +977,16 @@ export async function updateWallet(env, deps, docId, change, { create = false, s
     const doc = await deps.fsGet(env, WALLET_COLLECTION, docId);
     const current = doc.exists ? parseWallet(doc.payload) : null;
     if (!current && !create) return null;
-    const next = change(current || emptyWallet(deps.now()));
+    let next = change(current || emptyWallet(deps.now()));
     // Nothing to write (refused, or no change).
     if (current && (skipIf() || next === current)) return { wallet: current, updateTime: doc.updateTime };
-    const text = JSON.stringify(next);
+    let text = JSON.stringify(next);
+    // Grown big (every bet, fee and prize is an entry): its old ones folded,
+    // so it never reaches the limit and stops saving.
+    if (text.length > FOLD_AT) {
+      next = foldWallet(next, deps.now());
+      text = JSON.stringify(next);
+    }
     if (text.length > WALLET_MAX_LENGTH) throw new Error('wallet too big');
     try {
       const written = await deps.fsWrite(env, WALLET_COLLECTION, docId, text, doc.exists ? { updateTime: doc.updateTime } : { exists: false });
@@ -987,6 +996,38 @@ export async function updateWallet(env, deps, docId, change, { create = false, s
     }
   }
   throw new Error('wallet busy, try again');
+}
+
+// Old entries as one a month for each app and kind (`fold:<app>:<kind>:<YYYY-MM>`,
+// its amount their sum, `n` how many): the balance and every app's and kind's
+// sums stay the same. Never folded: the Pass's own (eco:*: the start, Plus
+// months, the welcome bet, an undo, a rebase: ids checks look up),
+// Securities' (its saves' deposits are checked against them), and Play's
+// until they're over 400 days old (a slip is paid only while its stake is in
+// the wallet, and never twice while its payout is: a season's futures are
+// settled within the year); anything else after 180 days.
+const FOLD_PLAY_MS = 400 * 86_400_000;
+const FOLD_MS = 180 * 86_400_000;
+export function foldWallet(w, now) {
+  const kept = [];
+  const folds = new Map();
+  for (const e of w.entries || []) {
+    const id = String(e?.id || '');
+    const age = now - (Number(e?.t) || now);
+    const foldable = e?.app && e.app !== 'eco' && e.app !== 'stock' && id !== 'odds:start' && Number.isFinite(e.amount) && age > (e.app === 'odds' ? FOLD_PLAY_MS : FOLD_MS);
+    if (!foldable && !id.startsWith('fold:')) {
+      kept.push(e);
+      continue;
+    }
+    const month = id.startsWith('fold:') ? id.split(':')[3] : new Date(Number(e.t) + 8 * 3_600_000).toISOString().slice(0, 7);
+    const key = id.startsWith('fold:') ? id : `fold:${e.app}:${e.kind || ''}:${month}`;
+    const f = folds.get(key) || { id: key, t: 0, app: e.app, kind: e.kind || '', amount: 0, n: 0 };
+    f.amount = Math.round((f.amount + e.amount) * 100) / 100;
+    f.n += id.startsWith('fold:') ? Number(e.n) || 0 : 1;
+    f.t = Math.max(f.t, Number(e.t) || 0);
+    folds.set(key, f);
+  }
+  return { ...w, entries: [...folds.values(), ...kept].sort((a, b) => (a.t || 0) - (b.t || 0)) };
 }
 
 // `retire`: deleted for good (not moved to another pass by a merge or a new
