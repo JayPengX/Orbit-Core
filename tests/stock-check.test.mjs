@@ -120,3 +120,19 @@ test('an open order only holds money back: a negative hold adds nothing', async 
   const r = await checkStock(env, 'acct', await pack({ ...account(start), orders: [{ id: 'o', status: 'open', side: 'buy', currency: 'TWD', reserve: -1_000_000 }] }), { entries: [] }, d, LOCK, T + 1);
   assert.equal(r.cash, 100_000);
 });
+
+test("an order the phone shows cancelled that the proxy filled still counts as filled; one the proxy let be cancelled doesn't", async () => {
+  const order = (id, status = 'cancelled') => ({ id, status, symbol: '2330.TW', name: 'TSMC', side: 'buy', type: 'market', qty: 10, market: 'TW', kind: 'stock', currency: 'TWD', t: T - 1000, rev: 1, done: T + 500 });
+  const d = deps({ b9: issuedFill('b9', 'buy', 1005, 10) });
+  // Filled by the proxy, then "cancelled" by a phone that held back its ask.
+  await checkStock(env, 'acct', await pack(account(start)), { entries: [] }, d, LOCK, T);
+  const dodged = await checkStock(env, 'acct', await pack({ ...account(start), orders: [order('b9')] }), { entries: [] }, d, LOCK, T + 2000);
+  const price = fillPrice({ k: 'market', side: 'buy' }, 1005, 'TW', 'stock');
+  assert.ok(dodged.cash < 100_000 - price * 10 + 1, `the fill counted: ${dodged.cash}`);
+  // A cancel the proxy ruled on (nothing reached): no fill.
+  const d2 = deps({});
+  d2.store.set(`${FILLS_COLLECTION}/acct`, JSON.stringify({ v: 2, fills: {}, open: {}, cancelled: { c1: T } }));
+  await checkStock(env, 'acct', await pack(account(start)), { entries: [] }, d2, LOCK, T);
+  const fair = await checkStock(env, 'acct', await pack({ ...account(start), orders: [order('c1')] }), { entries: [] }, d2, LOCK, T + 2000);
+  assert.equal(fair.cash, 100_000);
+});

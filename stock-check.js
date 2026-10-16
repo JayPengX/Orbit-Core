@@ -37,12 +37,12 @@
 // owed. Borrowed money can't leave Securities.
 //
 // deps: { read(url) -> JSON, fsGet, fsWrite }.
-import { replay, ownCash } from './kit/stock-account.mjs';
+import { replay, ownCash, applyFills } from './kit/stock-account.mjs';
 import { unpack } from './kit/stock-codec.mjs';
 import { BONDS } from './kit/stock-bonds.mjs';
 import { marketFill, dealPrice, currencyInfo } from './kit/stock-markets.mjs';
 import { fxSymbol } from './kit/stock-quotes.mjs';
-import { issuedFills } from './stock-fill.js';
+import { readFillsBook, decideFills } from './stock-fill.js';
 
 export const VERIFIED_COLLECTION = 'stock-verified';
 const YAHOO = 'https://query1.finance.yahoo.com';
@@ -315,10 +315,26 @@ export async function checkStock(env, docId, payload, wallet, deps, lockSince, n
   const adj = { ...(kept.adj || {}) };
   const first = !doc.exists;
   // The fills this Worker issued (stock-fill.js).
-  const issued = await issuedFills(env, docId, deps.fsGet);
+  const book = await readFillsBook(env, docId, deps.fsGet);
+  const issued = { ...book.fills };
+  // An order the phone shows cancelled that this Worker didn't let be
+  // cancelled: filled if the Worker filled it, or its bars reached its price
+  // since the Worker last looked (a phone holding back its ask, then
+  // cancelling once the price went against it, still takes the fill). The
+  // fill is counted as the Worker's (checked below like any other).
+  const filledIds = new Set(account.events.filter(e => e?.type === 'fill' && e.orderId).map(e => e.orderId));
+  const dodged = (Array.isArray(account.orders) ? account.orders : []).filter(o => o?.status === 'cancelled' && o.id && !filledIds.has(o.id) && !book.cancelled[o.id] && (book.fills[o.id] || book.open[o.id]));
+  const undecided = dodged.filter(o => !issued[o.id]).map(o => ({ id: o.id, ...book.open[o.id] }));
+  if (undecided.length) Object.assign(issued, (await decideFills(undecided, { read: deps.read, now }).catch(() => ({ fills: {} }))).fills);
+  const forced = [];
+  for (const o of dodged.filter(x => issued[x.id])) {
+    const reopened = { ...account, orders: account.orders.map(x => (x.id === o.id ? { ...x, status: 'open' } : x)) };
+    const r = applyFills(reopened, { [o.id]: issued[o.id] }, { TWD: 1, ...twdRates(account.events) }, now);
+    forced.push(...r.filled);
+  }
   // In time order, each id once, each checked against the account as counted so far.
   const seen = new Set();
-  const events = [...account.events]
+  const events = [...account.events, ...forced]
     .filter(e => e?.id && !seen.has(e.id) && seen.add(e.id))
     .sort((a, b) => a.t - b.t || (a.id < b.id ? -1 : 1));
   // (Open orders only hold money back: a phone's figure can't add any.)

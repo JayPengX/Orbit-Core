@@ -63,8 +63,24 @@ export function readBook(doc) {
   try {
     raw = doc?.exists ? JSON.parse(doc.payload) : null;
   } catch {}
-  if (raw?.v === 2) return { v: 2, fills: raw.fills || {}, open: raw.open || {}, plans: raw.plans || {} };
-  return { v: 2, fills: raw && typeof raw === 'object' ? raw : {}, open: {}, plans: {} };
+  if (raw?.v === 2) return { v: 2, fills: raw.fills || {}, open: raw.open || {}, plans: raw.plans || {}, cancelled: raw.cancelled || {} };
+  return { v: 2, fills: raw && typeof raw === 'object' ? raw : {}, open: {}, plans: {}, cancelled: {} };
+}
+// The whole book (stock-check.js: what this Worker filled, saw open, and let be cancelled).
+export async function readFillsBook(env, account, fsGet) {
+  return readBook(await fsGet(env, FILLS_COLLECTION, account).catch(() => null));
+}
+// A fill as the record keeps it.
+const recordOf = (f, o) => ({ ...f, s: o.symbol, side: o.side, q: o.qty, k: o.type, ...(o.limit != null ? { l: o.limit } : {}), ...(o.stop != null ? { st: o.stop } : {}), seen: o.t });
+const answerOf = f => ({ quote: f.quote, t: f.t, ...(f.twd ? { twd: f.twd } : {}) });
+async function writeBook(env, deps, account, book, now) {
+  const fills = Object.entries(book.fills)
+    .filter(([, f]) => now - f.t < KEEP_MS)
+    .sort((a, b) => b[1].t - a[1].t)
+    .slice(0, KEEP);
+  const open = Object.entries(book.open).filter(([, o]) => now - o.t < OPEN_MS).slice(-KEEP);
+  const cancelled = Object.entries(book.cancelled || {}).filter(([, t]) => now - t < KEEP_MS).slice(-KEEP);
+  await deps.fsWrite(env, FILLS_COLLECTION, account, JSON.stringify({ v: 2, fills: Object.fromEntries(fills), open: Object.fromEntries(open), plans: book.plans, cancelled: Object.fromEntries(cancelled) }));
 }
 // The fills issued for an account (stock-check.js reads them).
 export async function issuedFills(env, account, fsGet) {
@@ -178,6 +194,34 @@ export async function handleStock(request, env, headers, session, deps) {
   } catch {
     return json({ error: { message: 'Bad body' } }, 400, headers);
   }
+  // A cancel is this Worker's to rule on (the money lock-down): an order whose
+  // price its bars reached since it last looked is filled, not cancelled (a
+  // phone that held back its ask can't cancel a fill that would lose it
+  // money); one never reached is cancelled here, and never fills after.
+  if (body?.op === 'cancel') {
+    const o = cleanOrder(body.order);
+    if (!o) return json({ error: { message: 'Bad order' } }, 400, headers);
+    const now = deps.now();
+    const book = readBook(await deps.fsGet(env, FILLS_COLLECTION, session.d));
+    if (book.fills[o.id]) return json({ fill: answerOf(book.fills[o.id]) }, 200, headers);
+    if (book.cancelled[o.id]) return json({ cancelled: true }, 200, headers);
+    const kept = book.open[o.id];
+    if (kept) {
+      const { fills } = await decideFills([{ id: o.id, ...kept }], { read: deps.read, now });
+      const f = fills[o.id];
+      if (f) {
+        book.fills[o.id] = recordOf(f, kept);
+        delete book.open[o.id];
+        await writeBook(env, deps, session.d, book, now);
+        return json({ fill: answerOf(f) }, 200, headers);
+      }
+      delete book.open[o.id];
+    }
+    // (Never asked about: this Worker never saw it, so nothing of it could fill.)
+    book.cancelled[o.id] = now;
+    await writeBook(env, deps, session.d, book, now);
+    return json({ cancelled: true }, 200, headers);
+  }
   if (body?.op !== 'fill') return json({ error: { message: 'Unknown op' } }, 400, headers);
   const orders = (Array.isArray(body.orders) ? body.orders : []).slice(0, MAX_ORDERS).map(cleanOrder).filter(Boolean);
   const plans = (Array.isArray(body.plans) ? body.plans : []).slice(0, 20).map(cleanPlan).filter(Boolean);
@@ -202,7 +246,7 @@ export async function handleStock(request, env, headers, session, deps) {
   // were: looked at since it was seen.)
   for (const o of Object.values(book.open)) if (o.lk == null) o.lk = o.t;
   for (const o of orders)
-    if (!book.fills[o.id] && !book.open[o.id]) {
+    if (!book.fills[o.id] && !book.open[o.id] && !book.cancelled[o.id]) {
       book.open[o.id] = termsOf(o, now);
       changed = true;
     }
@@ -218,22 +262,14 @@ export async function handleStock(request, env, headers, session, deps) {
   }
   for (const [id, f] of Object.entries(fresh)) {
     const o = book.open[id];
-    book.fills[id] = { ...f, s: o.symbol, side: o.side, q: o.qty, k: o.type, ...(o.limit != null ? { l: o.limit } : {}), ...(o.stop != null ? { st: o.stop } : {}), seen: o.t };
+    book.fills[id] = recordOf(f, o);
     delete book.open[id];
     changed = true;
   }
-  const answerOf = f => ({ quote: f.quote, t: f.t, ...(f.twd ? { twd: f.twd } : {}) });
   const answer = Object.fromEntries(orders.filter(o => book.fills[o.id]).map(o => [o.id, answerOf(book.fills[o.id])]));
   // The plans' months filled (asked for or not).
   const asked = new Set(plans.map(p => p.id));
   for (const [id, f] of Object.entries(book.fills)) if (f.plan && asked.has(f.plan)) answer[id] = answerOf(f);
-  if (changed) {
-    const fills = Object.entries(book.fills)
-      .filter(([, f]) => now - f.t < KEEP_MS)
-      .sort((a, b) => b[1].t - a[1].t)
-      .slice(0, KEEP);
-    const open = Object.entries(book.open).filter(([, o]) => now - o.t < OPEN_MS).slice(-KEEP);
-    await deps.fsWrite(env, FILLS_COLLECTION, session.d, JSON.stringify({ v: 2, fills: Object.fromEntries(fills), open: Object.fromEntries(open), plans: book.plans }));
-  }
+  if (changed) await writeBook(env, deps, session.d, book, now);
   return json({ fills: answer }, 200, headers);
 }
