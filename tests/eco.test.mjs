@@ -785,3 +785,21 @@ test("a save of an app's data alone doesn't rewrite the wallet (unless its last 
   await t.call('POST', '?app=vocab', { op: 'write', qt: a.token, payload: 'v:6' });
   assert.equal(walletWrites, w1 + 2);
 });
+
+test('a read that says which wallet it holds (w) gets no wallet back while it is the same; a changed one comes whole', async () => {
+  const t = setup();
+  const a = await newPass(t, 'vocab');
+  const first = await t.call('GET', `${t.qt(a.token)}&app=vocab`);
+  assert.ok(first.data.wallet && first.data.walletTime);
+  const again = await t.call('GET', `${t.qt(first.data.token)}&w=${encodeURIComponent(first.data.walletTime)}`);
+  assert.equal(again.data.same, true);
+  assert.equal(again.data.wallet, undefined);
+  assert.ok(Number.isFinite(again.data.pool));
+  await t.call('POST', '?app=vocab', { op: 'write', qt: again.data.token, payload: 'v', wallet: { settings: { x: { value: 1, t: 1 } } } });
+  const changed = await t.call('GET', `${t.qt(again.data.token)}&w=${encodeURIComponent(first.data.walletTime)}`);
+  assert.ok(changed.data.wallet && !changed.data.same);
+  // A save of the data alone, the wallet as held: not sent back.
+  const saved = await t.call('POST', '?app=vocab', { op: 'write', qt: changed.data.token, payload: 'v2', w: changed.data.walletTime });
+  assert.equal(saved.data.same, true);
+  assert.equal(saved.data.wallet, undefined);
+});

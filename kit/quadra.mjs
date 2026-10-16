@@ -1317,6 +1317,9 @@ function makeSession(app, { lang, heartbeat }) {
   let active = false;
   let live = null;
   let wallet = cachedWallet();
+  // When the Worker's copy of the wallet held here was made: a read sends it,
+  // and an unchanged wallet doesn't come back (`same`).
+  let walletAt = '';
   let timer = 0;
   let started = false;
 
@@ -1374,7 +1377,10 @@ function makeSession(app, { lang, heartbeat }) {
       tokenAt = Date.now();
       writeStore(tokenKey, JSON.stringify({ t: token, at: tokenAt, account: storedAccount() }));
     }
-    if (data.wallet) setWallet(data.wallet);
+    if (data.wallet) {
+      walletAt = data.walletTime || '';
+      setWallet(data.wallet);
+    }
     if (typeof data.payload === 'string') cachePayload(app, storedAccount(), data.payload);
     if (data.active != null) setActive(Boolean(data.active), data.live || null);
     return data;
@@ -1465,9 +1471,12 @@ function makeSession(app, { lang, heartbeat }) {
     });
   // A device code: sign in on another device within 10 minutes, once.
   s.deviceCode = () => withToken(qt => call('POST', '', { op: 'pair-create', qt }));
+  // (The heartbeat's read every 2 minutes: the whole wallet, up to hundreds
+  // of KB, came back each time, and every app redrew for it.)
   s.read = ({ data = false, inbox = false } = {}) =>
-    withToken(qt => call('GET', qs({ qt, app: data ? app : '', inbox: inbox ? '1' : '' }))).then(res => {
+    withToken(qt => call('GET', qs({ qt, app: data ? app : '', inbox: inbox ? '1' : '', w: wallet ? walletAt : '' }))).then(res => {
       absorb(res);
+      if (res.same) res.wallet = wallet;
       return res;
     });
   s.write = ({ payload, wallet: patch } = {}) =>
@@ -1478,10 +1487,12 @@ function makeSession(app, { lang, heartbeat }) {
         error.live = live;
         throw error;
       }
-      return call('POST', qs({ app }), { op: 'write', qt, payload, wallet: patch });
+      return call('POST', qs({ app }), { op: 'write', qt, payload, wallet: patch, w: wallet ? walletAt : '' });
     }).then(res => {
       if (typeof payload === 'string') cachePayload(app, storedAccount(), payload);
-      return absorb(res);
+      absorb(res);
+      if (res.same) res.wallet = wallet;
+      return res;
     });
   // Quadra Plus: join (on) or leave (off); the Worker bills it.
   s.plus = (on, plan = 'month') => withToken(qt => call('POST', '', { op: 'plus', qt, on: Boolean(on), plan })).then(absorb);
