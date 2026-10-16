@@ -104,11 +104,15 @@ export const eltaAppUrl = n => (ELTA_PLAY[n] ? `eltatv://live/${n}` : null);
 //   'data'  數據視角: the game drawn from its data, no commentary and not the
 //           pictures (a MAX channel's, beside the 體育台's real broadcast:
 //           Leeds v Man United on MAX6, 2026-10-18); never the way to watch
+//   'cam'   another view of the game (球員特寫視角: one player followed,
+//           Joao Pedro on MAX10 beside 艾佛頓 v 切爾西 on 愛爾達2台 and
+//           MAX9, 2026-10-17): its sound unsaid, so no commentary counted,
+//           after every real broadcast like a data view
 // `adFree`: said so, or a MAX channel.
 const SPORTS_TV = new Set([101, 105, 110, 115]);
 export function eltaAudio(title, ch, league = '') {
   const t = String(title || '');
-  const audio = /數據視角/.test(t) ? 'data' : /雙語/.test(t) ? (league === 'cpbl' ? 'local' : 'dual') : /副聲道/.test(t) ? 'venue' : /原音|英文|English/i.test(t) ? 'en' : /中文/.test(t) ? 'zh' : SPORTS_TV.has(ch) && league !== 'cpbl' ? 'dual' : 'zh';
+  const audio = /數據視角/.test(t) ? 'data' : /視角/.test(t) ? 'cam' : /雙語/.test(t) ? (league === 'cpbl' ? 'local' : 'dual') : /副聲道/.test(t) ? 'venue' : /原音|英文|English/i.test(t) ? 'en' : /中文/.test(t) ? 'zh' : SPORTS_TV.has(ch) && league !== 'cpbl' ? 'dual' : 'zh';
   return { audio, adFree: /無廣告/.test(t) || (ch >= 540 && ch <= 549) };
 }
 export const AUDIO_NAMES = {
@@ -117,17 +121,19 @@ export const AUDIO_NAMES = {
   venue: { zh: '中文・現場音', en: 'Chinese + ground' },
   local: { zh: '雙語・中文', en: 'Two Chinese crews' },
   zh: { zh: '中文', en: 'Chinese' },
-  data: { zh: '數據視角', en: 'Data view' }
+  data: { zh: '數據視角', en: 'Data view' },
+  cam: { zh: '球員視角', en: 'Player cam' }
 };
 // Whether a channel has the commentary the person likes: Chinese on every
 // kind but 'en'; the original on 'en' and on 'dual' (its second track).
-export const hasAudio = (c, prefer = 'en') => c.audio !== 'data' && (prefer === 'zh' ? c.audio !== 'en' : c.audio === 'en' || c.audio === 'dual');
+export const ALT_VIEW = new Set(['data', 'cam']);
+export const hasAudio = (c, prefer = 'en') => !ALT_VIEW.has(c.audio) && (prefer === 'zh' ? c.audio !== 'en' : c.audio === 'en' || c.audio === 'dual');
 // How well a channel suits the person: no ads first (a MAX channel before
 // the 體育台 with the same game, whatever their commentary: the owner's
 // call), then their commentary (on its main track before a second one).
-// A data view after every real broadcast. Lower is better.
+// A data view or player cam after every real broadcast. Lower is better.
 export function channelRank(c, prefer = 'en') {
-  if (c.audio === 'data') return 30;
+  if (ALT_VIEW.has(c.audio)) return 30;
   const order = prefer === 'zh' ? { zh: 0, dual: 0, venue: 0, local: 0, en: 3 } : { en: 0, dual: 1, venue: 2, local: 3, zh: 3 };
   return (c.adFree ? 0 : 10) + (order[c.audio] ?? 3);
 }
@@ -497,7 +503,7 @@ export function eltaEpisode(episodes, e, sides, { prefer = 'en' } = {}) {
   const shifts = football && tw.getUTCHours() < 6 ? [0, -1] : [0];
   const off = ([m, d]) => shifts.map(shift => new Date(tw.getTime() + shift * 86_400_000)).findIndex(x => x.getUTCMonth() + 1 === m && x.getUTCDate() === d);
   const fits = episodes
-    .filter(x => !/數據視角|精華|集錦|Highlights/i.test(x.title))
+    .filter(x => !/視角|精華|集錦|Highlights/i.test(x.title))
     .map(x => ({ x, ...episodeParts(x.title) }))
     .map(x => ({ ...x, off: x.day ? Math.min(off(x.day), 1) : 2 }))
     .filter(x => x.teams.length === 2 && (!x.day || off(x.day) >= 0))
