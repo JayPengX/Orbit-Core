@@ -46,8 +46,12 @@ function unb64url(text) {
 // itself is gone (the store is D1), and deploy.yml takes FIREBASE_PRIVATE_KEY
 // off on 2026-12-06, after which `derived` is empty and only the secret signs.
 const earlier = new Map();
+// (Worked out once an isolate, not at every request.)
+const derivedOf = new Map();
 export async function tokenSecret(env) {
-  const derived = env.FIREBASE_PRIVATE_KEY ? b64url(new Uint8Array(await crypto.subtle.digest('SHA-256', enc.encode(`quadra-token:${env.FIREBASE_PRIVATE_KEY}`)))) : '';
+  const k = env.FIREBASE_PRIVATE_KEY || '';
+  if (k && !derivedOf.has(k)) derivedOf.set(k, b64url(new Uint8Array(await crypto.subtle.digest('SHA-256', enc.encode(`quadra-token:${k}`)))));
+  const derived = k ? derivedOf.get(k) : '';
   if (!env.ECO_TOKEN_SECRET) return derived;
   if (derived && derived !== env.ECO_TOKEN_SECRET) earlier.set(env.ECO_TOKEN_SECRET, derived);
   return env.ECO_TOKEN_SECRET;
