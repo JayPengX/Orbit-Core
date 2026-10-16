@@ -284,9 +284,12 @@ its open orders after each refresh, and this Worker reads its own fresh quote
 (the kit's `stock-quotes.mjs` through the data proxy's route) and decides
 each with the kit's `triggerPrice`. The first time it sees an order it keeps
 its terms and that moment (`stock-fills/<account>` `open`): the phone can't
-date an order back or change it later. One that waited across a session the
-phone wasn't open for is filled from the bars since (the kit's
-`backfillPrice`, once a session); a monthly plan seen before its day is
+date an order back or change it later. Seen for the first time, an order
+met now fills at the quote now; after that, from the 5-minute bars since it
+was last looked at (`lk`; the kit's `backfillPrice`: the first bar that
+reached its price, at its terms), the quote only when no bar has yet, and a
+limit then at its limit. So when the phone asks wins nothing: one that waits
+until the price has gone past its limit gets the limit; a monthly plan seen before its day is
 filled at the first bar on or after it (`plans`, `plan:<id>:<month>`). A fill
 is kept with its terms and NT$ rate and answered; the phone applies exactly
 that (`applyFills`).

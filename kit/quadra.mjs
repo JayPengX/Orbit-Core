@@ -1258,7 +1258,19 @@ function keepStatusStrip() {
   uprightTurn();
   syncThemeColor();
   if (typeof MutationObserver === 'function') {
-    new MutationObserver(() => { statusStrip(); syncThemeColor(); }).observe(document.body, { childList: true, attributes: true, attributeFilter: ['style', 'class', 'data-theme', 'data-sky'] });
+    // (The colour read again only when the strip came back or the body's
+    // look really changed: a tap's haptic adds and removes a node, and an
+    // app re-setting a class it has, each forced a style recalculation.)
+    const look = () => `${document.body.className}|${document.body.getAttribute('style') || ''}|${document.body.dataset.theme || ''}|${document.body.dataset.sky || ''}`;
+    let seen = look();
+    new MutationObserver(() => {
+      const had = document.querySelector('.q-statusbar');
+      statusStrip();
+      const now = look();
+      if (had && now === seen) return;
+      seen = now;
+      syncThemeColor();
+    }).observe(document.body, { childList: true, attributes: true, attributeFilter: ['style', 'class', 'data-theme', 'data-sky'] });
     new MutationObserver(syncThemeColor).observe(document.documentElement, { attributes: true, attributeFilter: ['style', 'class', 'data-theme'] });
   }
   globalThis.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change', syncThemeColor);
