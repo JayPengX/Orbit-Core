@@ -13,9 +13,10 @@
 // money lock-down, 2026-10-14): the first time this Worker sees an order it
 // keeps its terms (symbol, side, quantity, type, limit, stop) and the
 // moment it saw it, which stands for when it was placed (a phone can't date
-// an order into the past to catch a price that already happened). An order
-// that waited across a session the phone wasn't open for is filled from the
-// price bars since then (the kit's backfillPrice, once a session). What
+// an order into the past to catch a price that already happened). After its
+// first look, an order is filled from the price bars since it was last
+// looked at (the kit's backfillPrice: the first bar that reached its price,
+// at its terms), so when the phone asks makes no difference. What
 // fills is kept with those terms and the NT$ rate of its currency
 // (`stock-fills/<account>`); stock-check.js counts a fill only when it
 // matches one issued here.
@@ -106,38 +107,63 @@ async function planFills(book, now) {
   return out;
 }
 
-// An order's terms as first seen: `t` the moment this Worker saw it.
+// An order's terms as first seen: `t` the moment this Worker saw it (`lk`,
+// from when its bars were last looked at, is added by its first look).
 const termsOf = (o, now) => ({ symbol: o.symbol, side: o.side, type: o.type, qty: o.qty, limit: o.limit, stop: o.stop, after: o.after, expires: o.expires, market: o.market, kind: o.kind, currency: o.currency, t: now });
 
+// From when an order's bars still need looking at: a bar back from its last
+// look (the newest bar then was still forming), never before it was seen.
+const BAR_BACK = 10 * 60_000;
+const fromOf = o => Math.max(o.t, (o.lk ?? o.t) - BAR_BACK);
+// How far an order's last look may move before it's worth a write.
+const LOOK_SAVE = 6 * 3_600_000;
+
 // The orders' fills now: { orderId: { quote, t, twd } } for those whose price
-// is met (now, or in a session since the order was seen that the phone
-// wasn't open for). `orders`: each with its kept terms (t: when first seen,
-// bf: when its bars were last looked at).
+// is met. `orders`: each with its kept terms (t: when first seen; lk: from
+// when its price bars were last looked at, none the first time). An order
+// looked at before is decided on the price bars since then, not on the
+// quote alone: the first bar that reached its price fills it there, at the
+// order's terms (a limit at its limit or better on a gap), so a phone that
+// waits to ask until the price has gone past its limit gets the limit, not
+// the price now (the money lock-down: a moment chosen by the phone wins
+// nothing). Only when no bar reached it does the quote now count, and then a
+// limit fills at its limit. Seen for the first time, it fills at the quote
+// now when that meets it (a limit already met when placed: the price now).
 export async function decideFills(orders, { read, now = Date.now() }) {
   useQuotesReader(url => read(url));
   const currencies = [...new Set(orders.map(o => o.currency).filter(c => c && c !== 'TWD'))];
   const symbols = [...new Set([...orders.map(o => o.symbol), ...currencies.map(fxSymbol)])];
-  const quotes = await fetchQuotes(symbols);
+  // The bars each symbol needs (from its earliest order's last look), read
+  // with the quotes.
+  const want = new Map();
+  for (const o of orders) if (o.lk != null && !o.after) want.set(o.symbol, Math.min(want.get(o.symbol) ?? Infinity, fromOf(o)));
+  const barsOf = new Map();
+  const [quotes] = await Promise.all([
+    fetchQuotes(symbols),
+    ...[...want].map(async ([s, from]) => barsOf.set(s, await fetchBars(s, from).catch(() => null)))
+  ]);
   const twdOf = c => (!c ? undefined : c === 'TWD' ? 1 : quotes.get(fxSymbol(c))?.price);
   const fills = {};
   const looked = {};
   for (const o of orders) {
-    const q = quotes.get(o.symbol);
     const twd = twdOf(o.currency);
+    const rate = twd > 0 ? { twd } : {};
+    const bars = barsOf.get(o.symbol);
+    if (bars) {
+      const hit = backfillPrice({ ...o, t: fromOf(o) }, bars);
+      if (hit && hit.price > 0) {
+        fills[o.id] = { quote: hit.price, t: Math.max(o.t, hit.t), ...rate };
+        continue;
+      }
+      const last = bars.at(-1)?.t;
+      if (last > (o.lk ?? 0)) looked[o.id] = Math.min(last, now);
+    }
+    if (o.lk == null) looked[o.id] = now;
+    const q = quotes.get(o.symbol);
     // (Past its end, only what met its price before then.)
     const price = q && !(o.expires && now >= o.expires) ? triggerPrice(o, q, now) : null;
-    if (Number.isFinite(price) && price > 0) {
-      fills[o.id] = { quote: price, t: now, ...(twd > 0 ? { twd } : {}) };
-      continue;
-    }
-    // Waited across a session the phone wasn't open for: that session's bars,
-    // once per session.
-    const start = q?.session?.start;
-    if (!(start > o.t) || (o.bf || 0) >= start || o.after) continue;
-    looked[o.id] = now;
-    const bars = await fetchBars(o.symbol, o.t).catch(() => []);
-    const hit = backfillPrice(o, bars.filter(b => b.t < start));
-    if (hit && hit.price > 0) fills[o.id] = { quote: hit.price, t: Math.max(o.t, hit.t), ...(twd > 0 ? { twd } : {}) };
+    if (!(Number.isFinite(price) && price > 0)) continue;
+    fills[o.id] = { quote: o.lk != null && o.type === 'limit' && !o.after ? o.limit : price, t: now, ...rate };
   }
   return { fills, looked };
 }
@@ -172,7 +198,9 @@ export async function handleStock(request, env, headers, session, deps) {
     const due = await planFills({ ...book, plans: Object.fromEntries(plans.map(p => [p.id, book.plans[p.id]])) }, now).catch(() => ({}));
     for (const [id, f] of Object.entries(due)) (book.fills[id] = f), (changed = true);
   }
-  // First seen now: its terms kept as they are.
+  // First seen now: its terms kept as they are. (One kept before its looks
+  // were: looked at since it was seen.)
+  for (const o of Object.values(book.open)) if (o.lk == null) o.lk = o.t;
   for (const o of orders)
     if (!book.fills[o.id] && !book.open[o.id]) {
       book.open[o.id] = termsOf(o, now);
@@ -180,7 +208,14 @@ export async function handleStock(request, env, headers, session, deps) {
     }
   const waiting = orders.filter(o => !book.fills[o.id] && book.open[o.id]).map(o => ({ id: o.id, ...book.open[o.id] }));
   const { fills: fresh, looked } = waiting.length ? await decideFills(waiting, { read: deps.read, now }).catch(() => ({ fills: {}, looked: {} })) : { fills: {}, looked: {} };
-  for (const [id, at] of Object.entries(looked)) if (book.open[id]) (book.open[id].bf = at), (changed = true);
+  // (A look kept when it's an order's first, or has moved a while.)
+  for (const [id, at] of Object.entries(looked)) {
+    const o = book.open[id];
+    if (!o) continue;
+    if (o.lk == null || at - o.lk >= LOOK_SAVE) changed = true;
+    o.lk = at;
+    delete o.bf;
+  }
   for (const [id, f] of Object.entries(fresh)) {
     const o = book.open[id];
     book.fills[id] = { ...f, s: o.symbol, side: o.side, q: o.qty, k: o.type, ...(o.limit != null ? { l: o.limit } : {}), ...(o.stop != null ? { st: o.stop } : {}), seen: o.t };
