@@ -81,3 +81,22 @@ test('not started yet: not read; never seen and long past: given up', async () =
   await refreshKambiWatch(env, deps);
   assert.equal(entry(store, '123456789').done, true);
 });
+
+test("Play's results check asks the Worker to watch only the Kambi matches it isn't watching already", async () => {
+  const src = await import('../kit/play-sources.mjs');
+  src.useReader({ proxyJson: async () => ({ events: [] }) });
+  const posts = [];
+  const real = globalThis.fetch;
+  globalThis.fetch = async (url, init) => (posts.push([String(url), init?.method || 'GET']), new Response('{}', { status: 200 }));
+  try {
+    const leg = id => ({ id: `npb|${id}|ml|home`, sport: 'npb', kind: 'ml', side: 'home', kambiId: id, start: '2026-10-16T09:00:00Z', away: 'A', home: 'B' });
+    // Placed through the Worker (watched as it was placed): not asked again.
+    await src.fetchOutcomes([leg(101)], new Date('2026-10-16T10:00:00Z'), { watch: [] });
+    assert.equal(posts.filter(([u, m]) => u.includes('/kambi') && m === 'POST').length, 0);
+    // An older slip's pick: asked once.
+    await src.fetchOutcomes([leg(102)], new Date('2026-10-16T10:00:00Z'), { watch: [leg(102)] });
+    assert.equal(posts.filter(([u, m]) => u.includes('/kambi') && m === 'POST').length, 1);
+  } finally {
+    globalThis.fetch = real;
+  }
+});

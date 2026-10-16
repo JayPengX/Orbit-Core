@@ -202,7 +202,8 @@ says "final" in public, and a match's live data disappears hours after it
 ends. A bet whose app isn't opened in that window could never be settled.
 
 - `POST /kambi { events: [{ id, start }] }`: Play registers the matches its
-  open bets are on.
+  open bets are on, only a slip's from before the lock-down (2026-10-12):
+  one placed since is registered by `/play` as it's placed (`watchSlips`).
 - The cron keeps each one's latest `livedata.json` in the store (D1). It reads
   the least recently checked first (150 a run), and marks
   an entry `gone` once Kambi drops it. A match is watched from its start
