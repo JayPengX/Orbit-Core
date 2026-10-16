@@ -378,3 +378,75 @@ test("Play's winner markets read apart from their events come trimmed to their p
   assert.deepEqual(trimPolymarketMarkets(raw), [{ question: 'Will Everton FC win on 2026-10-17?', outcomes: '["Yes","No"]', outcomePrices: '["0.3","0.7"]', liquidity: '9000', event: '7' }]);
   assert.equal(trimPolymarketMarkets({ error: 1 }).error, 1);
 });
+
+test("Play's month boards come trimmed to what the board reads, the same games and lines, kept two minutes", async () => {
+  const { trimEspnBoard, settledData, quietFor } = await import('../sports.js');
+  const { parseEspnScoreboard } = await import('../kit/play-sources.mjs');
+  const close = (odds, line) => ({ open: { odds: '+100' }, close: { odds, ...(line ? { line } : {}) }, current: { odds: '-999' }, link: { href: 'x' } });
+  const side = (homeAway, id, name, abbreviation) => ({ id, homeAway, score: '0', records: [{ summary: '9-9' }], statistics: [{ name: 'x', displayValue: 'y'.repeat(500) }], team: { id, uid: `t:${id}`, displayName: name, abbreviation, shortDisplayName: name, logo: `https://a.espncdn.com/${id}.png`, links: [{ href: 'z' }], venue: { id: 1 } } });
+  const event = (id, date, state, extra = {}) => ({
+    id,
+    uid: `e:${id}`,
+    date,
+    name: 'A at B',
+    season: { year: 2026, type: extra.seasonType ?? 2, slug: 'regular-season' },
+    status: { clock: 0, type: { id: '1', name: 'STATUS', state, completed: state === 'post', detail: 'x' } },
+    links: [{ href: 'x'.repeat(300) }],
+    competitions: [
+      {
+        id,
+        date,
+        timeValid: extra.timeValid ?? true,
+        neutralSite: extra.neutral ?? false,
+        venue: { fullName: 'Park', address: { city: 'X' } },
+        broadcasts: [{ names: ['TV'] }],
+        notes: extra.note ? [{ type: 'event', headline: extra.note }] : [],
+        status: { clock: 0, type: { id: '1', name: 'STATUS', state, completed: state === 'post', detail: 'x' } },
+        competitors: [side('home', extra.homeId ?? '10', extra.home ?? 'Home Club', 'HOM'), side('away', '20', extra.away ?? 'Away Club', extra.awayAbbr ?? 'AWY')],
+        odds: [
+          {
+            provider: { name: 'DraftKings' },
+            details: 'HOM -150',
+            moneyline: { home: close('-150'), away: close('+130'), ...(extra.draw ? { draw: close('+250') } : {}) },
+            total: { over: close('-110', 'o8.5'), under: close('-110', 'u8.5') },
+            pointSpread: { home: close('-120', '-1.5'), away: close('+100', '+1.5') }
+          }
+        ]
+      }
+    ]
+  });
+  const raw = {
+    leagues: [{ name: 'League', calendar: Array.from({ length: 50 }, (_, i) => `2026-10-${i}`) }],
+    events: [
+      event('1', '2026-10-20T23:00Z', 'pre'),
+      event('2', '2026-10-21T04:00Z', 'pre', { timeValid: false, neutral: true }),
+      event('3', '2026-10-22T23:00Z', 'pre', { note: 'ALCS - Game 7 (If Necessary)', seasonType: 3 }),
+      event('4', '2026-10-23T23:00Z', 'pre', { away: 'TBD', awayAbbr: 'TBD' }),
+      event('5', '2026-10-24T19:00Z', 'pre', { draw: true }),
+      event('6', '2026-10-01T23:00Z', 'post'),
+      event('7', '2026-10-16T23:00Z', 'in')
+    ]
+  };
+  const trimmed = JSON.parse(JSON.stringify(trimEspnBoard(raw)));
+  assert.ok(JSON.stringify(trimmed).length < JSON.stringify(raw).length / 3);
+  for (const sport of ['mlb', 'nba', 'epl']) assert.deepEqual(parseEspnScoreboard(trimmed, sport), parseEspnScoreboard(raw, sport), sport);
+  assert.equal(parseEspnScoreboard(trimmed, 'mlb').length, 3);
+  // MLB's postseason list is read when a play-off game is to come (season type 3, the event's own state).
+  assert.deepEqual(trimmed.events.map(e => [e.season.type, e.status.type.state]), raw.events.map(e => [e.season.type, e.status.type.state]));
+  // What this proxy reads of it: over for good, or quiet until its next game.
+  const url = new URL('https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard?dates=202610&limit=1000');
+  for (const now of [Date.parse('2026-10-16T12:00:00Z'), Date.parse('2026-11-05T00:00:00Z')]) {
+    assert.equal(settledData(url, trimmed, now), settledData(url, raw, now));
+    assert.equal(quietFor(url, trimmed, now), quietFor(url, raw, now));
+  }
+  assert.equal(trimEspnBoard({ nope: 1 }).nope, 1, 'not a scoreboard: as it was');
+  // Asked trimmed, a month is fresh two minutes; untrimmed (Sports' cups, with scores) it stays live.
+  const month = 'https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard?dates=202611&limit=1000';
+  const board = await get(`https://proxy.test/sports-proxy?url=${encodeURIComponent(month)}&trim=espn-board`);
+  assert.equal(board.headers.get('X-Sports-Proxy-Cache-Tier'), 'board-month');
+  assert.match(board.headers.get('Cache-Control'), /max-age=120\b/);
+  const plain = await get(`https://proxy.test/sports-proxy?url=${encodeURIComponent(month)}`);
+  assert.equal(plain.headers.get('X-Sports-Proxy-Cache-Tier'), 'live');
+  const day = await get(`https://proxy.test/sports-proxy?url=${encodeURIComponent('https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard?dates=20261116')}&trim=espn-board`);
+  assert.notEqual(day.headers.get('X-Sports-Proxy-Cache-Tier'), 'board-month');
+});

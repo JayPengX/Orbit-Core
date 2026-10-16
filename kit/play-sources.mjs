@@ -289,7 +289,7 @@ export function laterGames(games, listed, now, fromDay = DAILY_DAYS) {
   });
 }
 async function withLaterGames(sport, path, listed, now, fromDay = DAILY_DAYS) {
-  const pages = await Promise.all(monthsAhead(now, fromDay).map(m => getJson(`${ESPN}/${path}/scoreboard?dates=${m}`).catch(() => null)));
+  const pages = await Promise.all(monthsAhead(now, fromDay).map(m => getJson(`${ESPN}/${path}/scoreboard?dates=${m}`, 'espn-board').catch(() => null)));
   const later = laterGames(pages.filter(Boolean).flatMap(page => parseEspnScoreboard(page, sport)), listed, now, fromDay);
   return withHousePrices(await withKambiBook([...listed, ...later], sport, now), sport, path, getJson);
 }
@@ -363,7 +363,8 @@ const fetchEspnEpl = now => fetchMonths('epl', LEAGUES.epl.path, now);
 async function fetchMonths(key, path, now) {
   kambiBook(key);
   loadStrengths(key, path, getJson).catch(() => {});
-  const pages = await Promise.all(monthsAhead(now, -1).map(m => getJson(`${ESPN}/${path}/scoreboard?dates=${m}&limit=1000`).catch(() => null)));
+  // (Trimmed by the proxy to what the board reads: `espn-board`.)
+  const pages = await Promise.all(monthsAhead(now, -1).map(m => getJson(`${ESPN}/${path}/scoreboard?dates=${m}&limit=1000`, 'espn-board').catch(() => null)));
   if (pages.every(p => p === null)) throw new Error(`ESPN ${key} unreachable`);
   const post = key === 'mlb' ? await mlbPostseason(pages, now) : null;
   const games = laterGames(pages.filter(Boolean).flatMap(page => parseEspnScoreboard(page, key, post)), [], now, -1);
