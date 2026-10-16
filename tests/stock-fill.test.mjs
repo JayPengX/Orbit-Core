@@ -148,3 +148,24 @@ test('a limit the quote has met but no bar has yet fills at its limit, not the p
   const fill = await askLater(limitBuy, 240, null);
   assert.deepEqual(fill, { quote: 249, t: now + 30 * 60_000 });
 });
+
+test('the phone asks about a waiting order at once when it matters, else every 10 minutes', async () => {
+  const { fillAskDue, FILL_ASK_EVERY } = await import('../kit/stock-account.mjs');
+  const session = { start: Date.parse('2026-10-13T13:30:00Z'), end: Date.parse('2026-10-13T20:00:00Z') };
+  const quote = price => ({ price, session });
+  const buy = { side: 'buy', type: 'limit', limit: 240 };
+  const asked = now - 60_000;
+  assert.equal(fillAskDue(buy, quote(250), undefined, now), true, 'not asked about yet');
+  assert.equal(fillAskDue(buy, quote(250), asked, now), false, '4% away, asked a minute ago');
+  assert.equal(fillAskDue(buy, quote(250), now - FILL_ASK_EVERY, now), true, 'every 10 minutes');
+  assert.equal(fillAskDue(buy, quote(242), asked, now), true, 'within 1%');
+  assert.equal(fillAskDue(buy, quote(239), asked, now), true, 'met');
+  assert.equal(fillAskDue({ side: 'sell', type: 'stop', stop: 245 }, quote(247), asked, now), true);
+  assert.equal(fillAskDue({ side: 'sell', type: 'stop', stop: 245 }, quote(250), asked, now), false);
+  assert.equal(fillAskDue({ side: 'buy', type: 'market' }, quote(250), session.start - 60_000, session.start + 1000), true, 'a session begun since');
+  // Over an hour of 45-second refreshes, a limit 4% away: 6 asks, not 80.
+  let last = 0;
+  let asks = 0;
+  for (let t = now; t < now + 3_600_000; t += 45_000) if (fillAskDue(buy, quote(250), last, t)) (asks++, (last = t));
+  assert.equal(asks, 6);
+});
