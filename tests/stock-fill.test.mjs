@@ -201,3 +201,37 @@ test('net worth by day in one pass is each day\'s replay exactly (a loan, a shor
     assert.equal(dep, s.deposits);
   }
 });
+
+// A cancel asked of the proxy, `at` minutes after it was first seen, the price moving as `bars` say.
+async function cancelLater(order, price, bars) {
+  const docs = new Map();
+  let at = now;
+  let reader = moving(250, [], now);
+  const deps = {
+    json: (data, status) => new Response(JSON.stringify(data), { status }),
+    errorJson: (code, status) => new Response(JSON.stringify({ error: { code } }), { status }),
+    fsGet: async (env, c, id) => (docs.has(`${c}/${id}`) ? { exists: true, payload: docs.get(`${c}/${id}`) } : { exists: false }),
+    fsWrite: async (env, c, id, payload) => void docs.set(`${c}/${id}`, payload),
+    now: () => at,
+    read: url => reader(url)
+  };
+  const ask = body => handleStock(new Request('https://x/stock', { method: 'POST', body: JSON.stringify(body) }), {}, {}, { a: 'stock', d: 'acc' }, deps).then(r => r.json());
+  assert.deepEqual((await ask({ op: 'fill', orders: [order] })).fills, {}, 'not met when placed');
+  at = now + 30 * 60_000;
+  reader = moving(price, bars, at);
+  const cancel = await ask({ op: 'cancel', order });
+  at = now + 60 * 60_000;
+  const later = await ask({ op: 'fill', orders: [order] });
+  return { cancel, later: later.fills[order.id] || null };
+}
+
+test('a cancel is the proxy\'s to rule on: an order the price reached since it last looked is filled, not cancelled; one never reached is cancelled for good', async () => {
+  // 250 → through the 249 limit at the 10-minute bar → 240: the phone held back its ask, then cancelled.
+  const through = [[0, 250, 250.4, 249.6, 250], [5, 250, 250.2, 249.5, 249.7], [10, 249.6, 249.7, 246, 246.5], [20, 242.5, 242.6, 240, 240.2]];
+  const dodged = await cancelLater(limitBuy, 240, through);
+  assert.deepEqual(dodged.cancel, { fill: { quote: 249, t: now + 10 * 60_000 } });
+  // Never reached: cancelled, and no fill later however the price moves.
+  const never = await cancelLater({ ...limitBuy, id: 'order0102' }, 252, [[0, 250, 250.4, 249.6, 250], [10, 250, 252, 249.5, 252]]);
+  assert.deepEqual(never.cancel, { cancelled: true });
+  assert.equal(never.later, null);
+});
