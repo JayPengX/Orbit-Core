@@ -47,8 +47,11 @@ export function r2Store(bucket) {
     async put(path, data) {
       let b = data instanceof Uint8Array ? data : enc.encode(typeof data === 'string' ? data : JSON.stringify(data));
       if (path.endsWith('.gz') && !isGz(b)) b = await gzip(b);
-      // (The sum of what's meant, not of gzip's bytes, which carry a time.)
-      const sum = await sha256(path.endsWith('.gz') ? await gunzip(b) : b);
+      // (The sum of what's meant, not of gzip's bytes, which carry a time,
+      // nor of an object's `built` stamp: a week's rebuild of a bus pack
+      // that didn't change isn't written, and phones keep theirs.)
+      const stamped = data && typeof data === 'object' && !(data instanceof Uint8Array) && 'built' in data;
+      const sum = await sha256(stamped ? enc.encode(JSON.stringify({ ...data, built: undefined })) : path.endsWith('.gz') ? await gunzip(b) : b);
       const was = known.has(path) ? known.get(path) : (await bucket.head(path))?.customMetadata?.sha256;
       if (was === sum) return stats.same++, false;
       await bucket.put(path, b, { httpMetadata: { contentType: typeOf(path) }, customMetadata: { sha256: sum } });
