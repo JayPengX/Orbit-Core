@@ -6,8 +6,9 @@
 //
 // A pick passes when the house would sell it at that price now: its price
 // is no better than the house's (with or without the game's own Kambi
-// markets and players read, either of which Play may have shown), give or
-// take a cent's rounding and 1% for a board a moment old. A pre-game pick's
+// markets and players read, either of which Play may have shown: each read
+// only where it can change the pick), give or take a cent's rounding and 1%
+// for a board a moment old. A pre-game pick's
 // game must not have started (by this read, not the phone's clock); a live
 // pick must be on the live board. A pick refused comes back with the
 // house's price now (null: not on sale), and Play asks again at it.
@@ -61,6 +62,8 @@ export async function housePick(leg, now, once) {
     const data = await once(`live:${leg.sport}`, () => src.loadLive(now, LIVE_MIN_LIQUIDITY, { also: [leg.sport] }));
     const board = liveBets(data);
     const plain = board.bets.find(b => b.id === leg.id);
+    // (The winner is never the game's own markets': the same bet without them.)
+    if (plain?.kind === 'ml') return usable(plain) ? { bet: plain, odds: plain.estOdds } : { gone: true };
     const game = board.games.find(g => g.id === leg.gameId);
     const offers = game?.kambiId ? await once(`offers:live:${game.kambiId}`, () => src.loadGameOffers(game, { live: true }).catch(() => null)) : null;
     const rich = offers ? liveBets(data, { offersOf: g => (g.id === game.id ? offers : null) }).bets.find(b => b.id === leg.id) : null;
@@ -73,10 +76,14 @@ export async function housePick(leg, now, once) {
   if (Date.parse(game.startUtc) <= t) return { started: true };
   const plain = boardBets({ games: [game] }, { now }).find(b => b.id === leg.id);
   // With the game's own markets and its players' numbers (Play reads them
-  // when the game is opened): the house's richer prices.
+  // when the game is opened): the house's richer prices. Only what can
+  // change this pick is read (the same bet either way): the winner is never
+  // the game's own markets' nor its players', and players only add their
+  // own picks (a pick on the plain board isn't one).
+  if (plain?.kind === 'ml') return usable(plain) ? { bet: plain, odds: plain.estOdds } : { gone: true };
   const [offers, players] = await Promise.all([
     game.kambiId ? once(`offers:${game.kambiId}`, () => src.loadGameOffers(game).catch(() => null)) : null,
-    once(`players:${game.id}`, () => src.loadPlayers(game).catch(() => null))
+    plain ? null : once(`players:${game.id}`, () => src.loadPlayers(game).catch(() => null))
   ]);
   const rich = offers || players?.length ? boardBets({ games: [{ ...game, ...(offers ? { offers } : {}), ...(players?.length ? { players } : {}) }] }, { now }).find(b => b.id === leg.id) : null;
   const best = [plain, rich].filter(usable).sort((a, b) => b.estOdds - a.estOdds)[0];
@@ -146,7 +153,8 @@ async function houseChance(leg, now, once) {
   const board = liveBets(data);
   const game = board.games.find(g => g.sport === leg.sport && g.away.en === leg.away && g.home.en === leg.home);
   if (!game) return null;
-  const offers = game.kambiId ? await once(`offers:live:${game.kambiId}`, () => src.loadGameOffers(game, { live: true }).catch(() => null)) : null;
+  // (The winner is never the game's own markets': not read for it.)
+  const offers = game.kambiId && leg.kind !== 'ml' ? await once(`offers:live:${game.kambiId}`, () => src.loadGameOffers(game, { live: true }).catch(() => null)) : null;
   const same = b => b.gameId === game.id && b.kind === leg.kind && b.side === leg.side && (leg.kind === 'ml' || lineOf(b) === leg.line) && (leg.kind !== 'teamtotal' || b.team === leg.team);
   const bets = [board.bets.find(same), offers ? liveBets(data, { offersOf: g => (g.id === game.id ? offers : null) }).bets.find(same) : null].filter(usable);
   if (!bets.length) return null;

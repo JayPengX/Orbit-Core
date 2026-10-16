@@ -283,7 +283,8 @@ test('a game over is kept in R2 the first time anyone reads it; after that it co
     const on = 'https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/summary?event=901';
     const first = await (await ask(`https://proxy.test/sports-proxy?url=${encodeURIComponent(over)}&app=match`)).json();
     assert.ok(first.boxscore);
-    await new Promise(r => setTimeout(r, 20));
+    // (R2's copy is written behind the answer: waited for, not guessed at 20 ms; a busy run took longer.)
+    for (let i = 0; i < 300 && ![...bucket.m.keys()].some(k => k.includes('event~3D900')); i++) await new Promise(r => setTimeout(r, 10));
     assert.equal([...bucket.m.keys()].filter(k => k.includes('event~3D900')).length, 1, 'kept');
     await ask(`https://proxy.test/sports-proxy?url=${encodeURIComponent(on)}&app=match`);
     await new Promise(r => setTimeout(r, 20));
