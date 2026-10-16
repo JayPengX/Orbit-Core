@@ -181,8 +181,11 @@ not yet on a phone; the second round A/B, the old and new code alternated.
   1.8 MB (D1's row 2 MB); Securities' cancels are the proxy's to rule on
   (`op: 'cancel'`), and a save's "cancel" of an order the proxy filled or
   saw reached counts as the fill.
-- **Written, not pushed:** Transit's bus stops from the packs (the side
-  rule moves 臺北轉運站 3 → 2 sides; its alert test hangs).
+- **Not pushed on purpose:** Transit's bus stops drawn from the packs (no
+  TDX read per pan). Its sides don't match TDX's: 臺北轉運站 five signs
+  facing E, N, SE, SE, SW where TDX has two (S, W); 新竹火車站 S where TDX
+  has SW, plus the 中正路 signs apart. Kept in a worktree until the side
+  rule matches.
 - **The preview tool** can't reach `asia-baseball.quadra` or Polymarket
   from the owner's Mac without `--live` (their 502s there are the tool's,
   not the apps').
