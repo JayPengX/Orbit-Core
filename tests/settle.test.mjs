@@ -182,9 +182,19 @@ test('cash out: the value checked against the house\'s, paid by the Worker; neve
   const paid = doc(WALLET_COLLECTION, ACCOUNT).entries.filter(e => e.id === 'odds:payout-slipwin01');
   assert.deepEqual(paid.map(e => [e.kind, e.amount]), [['cashout', 120]]);
   assert.equal(doc(SETTLED_COLLECTION, ACCOUNT).slips.slipwin01.cashedOut, true);
+  // Left marked cashed (no delete, no index rewrite on the cash out): cashed out again, nothing more.
+  const key = `${ACCOUNT}_slipwin01`;
+  assert.equal(doc(OPEN_COLLECTION, key).state, 'cashed');
+  assert.ok(key in doc(OPEN_COLLECTION, OPEN_INDEX).due);
+  assert.equal((await post(deps, { op: 'cashout', id: 'slipwin01', value: 120 })).body.settled.cashedOut, true);
   now.t = Date.parse(START) + 4 * 3_600_000;
   await settleCron(env, deps);
   assert.equal(doc(WALLET_COLLECTION, ACCOUNT).entries.filter(e => e.id === 'odds:payout-slipwin01').length, 1);
+  // The cron dropped it when it came due, its game over: never settled, its record the cash out's.
+  assert.equal(doc(OPEN_COLLECTION, key), null);
+  assert.ok(!(key in doc(OPEN_COLLECTION, OPEN_INDEX).due));
+  assert.equal(doc(SETTLED_COLLECTION, ACCOUNT).slips.slipwin01.payout, 120);
+  assert.equal(doc(WALLET_COLLECTION, ACCOUNT).entries.filter(e => e.id.endsWith('slipwin01') && e.kind !== 'stake').length, 1);
   // Settled first: the cash out gets the result instead.
   const late = await post(deps, { op: 'cashout', id: 'slipwin02', value: 120 });
   assert.equal(late.body.settled.payout, 180);
