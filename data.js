@@ -50,9 +50,14 @@ async function readFile(env, ctx, path, request) {
   const key = new Request(`https://quadra-data.quadra/${path}`);
   const cache = typeof caches !== 'undefined' ? caches.default : null;
   const hit = cache && (await cache.match(key));
-  if (hit) return hit;
+  // (A file not built yet is noted at the edge for 2 minutes: an app asks
+  // again every 15 s, each an R2 read for nothing.)
+  if (hit) return hit.headers.get('X-Data-Missing') ? new Response('', { status: 404 }) : hit;
   const obj = env.DATA ? await env.DATA.get(path) : null;
-  if (!obj) return new Response('', { status: 404 });
+  if (!obj) {
+    if (cache) ctx.waitUntil(cache.put(key, new Response('', { headers: { 'X-Data-Missing': '1', 'Cache-Control': 'public, max-age=120' } })));
+    return new Response('', { status: 404 });
+  }
   const res = new Response(obj.body, { headers: { 'Content-Type': typeOf(path), ETag: obj.httpEtag, 'Cache-Control': `public, max-age=${maxAge(path)}` } });
   if (cache) ctx.waitUntil(cache.put(key, res.clone()));
   return res;
