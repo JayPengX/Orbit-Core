@@ -585,13 +585,24 @@ async function place(env, q, { fetchFn, ctx, now, cache }) {
   const id = String(q.get('id') || '');
   if (!/^[A-Za-z0-9_-]{10,300}$/.test(id)) return [{ code: 'BAD_PLACE' }, 400];
   if (!googleKey(env)) return [{ code: 'NO_KEY' }, 503];
-  // A place's name is Pro; its position and address Essentials.
-  const pro = q.get('name') === '1' && (await spend(env, 'detailsPro', 1, now, ctx));
-  const key = new Request(`https://transit-cache.quadra/place/${id}?pro=${pro ? 1 : 0}`);
-  try {
-    const hit = cache && (await cache.match(key));
-    if (hit) return [await hit.json(), 200];
-  } catch {}
+  // A place's name is Pro; its position and address Essentials. A copy kept
+  // here is looked for first: only a call Google bills counts toward its cap.
+  const keyOf = pro => new Request(`https://transit-cache.quadra/place/${id}?pro=${pro ? 1 : 0}`);
+  const kept = async pro => {
+    try {
+      const hit = cache && (await cache.match(keyOf(pro)));
+      return hit ? await hit.json() : null;
+    } catch {
+      return null;
+    }
+  };
+  const wantName = q.get('name') === '1';
+  const named = wantName ? await kept(true) : null;
+  if (named) return [named, 200];
+  const pro = wantName && (await spend(env, 'detailsPro', 1, now, ctx));
+  const plain = pro ? null : await kept(false);
+  if (plain) return [plain, 200];
+  const key = keyOf(pro);
   if (!pro && !(await spend(env, 'details', 1, now, ctx))) return [{ code: 'CAP_REACHED' }, 429];
   const session = /^[A-Za-z0-9_-]{8,64}$/.test(q.get('s') || '') ? `&sessionToken=${q.get('s')}` : '';
   const fields = `id,location,formattedAddress,types${pro ? ',displayName' : ''}`;
