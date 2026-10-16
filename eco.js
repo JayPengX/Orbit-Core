@@ -679,13 +679,11 @@ export async function handleEcoRequest(request, env, headers, ip, deps) {
   }
 }
 
+// (Read side by side, not one after another: up to 12 round trips to D1.)
 async function readInbox(env, deps, wallet, app) {
-  const out = [];
-  for (const id of (wallet.inbox?.[app] || []).slice(0, 12)) {
-    const item = await deps.fsGet(env, INBOX_COLLECTION, id);
-    if (item.exists) out.push({ id, payload: item.payload });
-  }
-  return out;
+  const ids = (wallet.inbox?.[app] || []).slice(0, 12);
+  const items = await Promise.all(ids.map(id => deps.fsGet(env, INBOX_COLLECTION, id)));
+  return ids.map((id, i) => items[i].exists && { id, payload: items[i].payload }).filter(Boolean);
 }
 
 const sessionToken = (secret, c, now) => signToken(secret, { k: 'ses', d: c.d, a: c.a, s: c.s, g: c.g, e: now + SESSION_MS });

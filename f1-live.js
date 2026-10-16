@@ -385,8 +385,14 @@ export class F1Log {
     if (request.method === 'POST') {
       const log = addSample(await this.storage.get(key), await request.json());
       await this.storage.put(key, log);
-      // A fortnight's sessions kept.
-      for (const k of (await this.storage.list()).keys()) if (Date.parse(k) < Date.now() - 14 * 86_400_000) await this.storage.delete(k);
+      // A fortnight's sessions kept: those older listed (keys are their
+      // starts, in time order), once an hour, not every log read whole at
+      // every minute's sample.
+      if (!(Date.now() - (this.pruned || 0) < 3_600_000)) {
+        this.pruned = Date.now();
+        const cutoff = Date.now() - 14 * 86_400_000;
+        for (const k of (await this.storage.list({ end: new Date(cutoff + 86_400_000).toISOString() })).keys()) if (Date.parse(k) < cutoff) await this.storage.delete(k);
+      }
       return new Response('ok');
     }
     return new Response(JSON.stringify((await this.storage.get(key)) || null), { headers: { 'Content-Type': 'application/json' } });

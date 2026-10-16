@@ -122,10 +122,14 @@ test('each minute\'s look keeps every car\'s last lap once, the places and stops
 test('the Durable Object keeps a session\'s log under its start and a fortnight of them', async () => {
   const { F1Log } = await import('../f1-live.js');
   const m = new Map([['2020-01-01T00:00:00.000Z', {}]]);
-  const storage = { get: async k => m.get(k), put: async (k, v) => void m.set(k, v), list: async () => new Map(m), delete: async k => m.delete(k) };
+  let lists = 0;
+  const storage = { get: async k => m.get(k), put: async (k, v) => void m.set(k, v), list: async ({ end } = {}) => (lists++, new Map([...m].filter(([k]) => !end || k < end))), delete: async k => m.delete(k) };
   const o = new F1Log({ storage });
   const key = encodeURIComponent(new Date().toISOString());
   assert.equal(await (await o.fetch(new Request(`https://f1-log/?key=${key}`, { method: 'POST', body: JSON.stringify({ cars: { 1: [3, 90000, 0, 1, 0] } }) }))).text(), 'ok');
   assert.deepEqual((await (await o.fetch(new Request(`https://f1-log/?key=${key}`))).json()).cars['1'], [[3, 90000, 0, 1, 0]]);
   assert.equal(m.has('2020-01-01T00:00:00.000Z'), false);
+  // The next minute's sample: no listing (once an hour).
+  await o.fetch(new Request(`https://f1-log/?key=${key}`, { method: 'POST', body: JSON.stringify({ cars: { 1: [4, 90000, 0, 1, 0] } }) }));
+  assert.equal(lists, 1);
 });
