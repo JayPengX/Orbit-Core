@@ -3581,13 +3581,14 @@ export function tabBar({ tabs, onSelect, hash = id => `#${id}`, nav = document.g
       const first = current == null;
       if (changed && !first) places[current] = globalThis.scrollY || 0;
       current = id;
-      requestAnimationFrame(() => pill(first));
+      // (The same tab again, as an app's redraw asks: nothing written, the pill left.)
+      if (changed) requestAnimationFrame(() => pill(first));
       for (const [tid, b] of buttons) {
         const on = tid === id;
-        b.setAttribute('aria-selected', String(on));
-        b.tabIndex = on ? 0 : -1;
+        if (b.getAttribute('aria-selected') !== String(on)) b.setAttribute('aria-selected', String(on));
+        if (b.tabIndex !== (on ? 0 : -1)) b.tabIndex = on ? 0 : -1;
         const panel = document.getElementById(`panel-${tid}`);
-        if (panel) panel.hidden = !on;
+        if (panel && panel.hidden !== !on) panel.hidden = !on;
       }
       // Only a change of tab moves the address (the first paint leaves it:
       // the app reads it to start).
@@ -3619,7 +3620,9 @@ export function tabBar({ tabs, onSelect, hash = id => `#${id}`, nav = document.g
     },
     hide(id, hidden = true) {
       const b = buttons.get(id);
-      if (b) b.hidden = Boolean(hidden);
+      // (Already so: nothing to move.)
+      if (!b || b.hidden === Boolean(hidden)) return;
+      b.hidden = Boolean(hidden);
       nav.style.setProperty('--q-tabs', String([...buttons.values()].filter(x => !x.hidden).length));
       requestAnimationFrame(() => pill(true));
     }
