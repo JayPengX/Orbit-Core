@@ -253,8 +253,8 @@ ends. A bet whose app isn't opened in that window could never be settled.
   live pick reads its own league's live pages alone (`loadLive({ only })`).
   `op: 'check'` from a localhost page: the check alone.
 - `POST { op: 'cashout', id, value }`: the value checked against the house's
-  own (price.js cashOutQuote), the slip taken from `open` (never settled
-  too), the Worker pays odds:payout-<slip> (kind cashout).
+  own (price.js cashOutQuote), the slip marked cashed in `open` (never
+  settled too; the cron drops it when it next comes due), the Worker pays odds:payout-<slip> (kind cashout).
 - Lottery (lotto.js): `op: 'tickets'` sold by the Worker's clock, settled
   from Taiwan Lottery's draws by the cron (every fourth odd minute), paid
   odds:prize-<id>; `op: 'scratch'` a card's prize drawn here, `op: 'reveal'`
