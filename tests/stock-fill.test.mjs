@@ -91,3 +91,60 @@ test('applyFills: an open order filled at the proxy\'s quote and moment, the acc
   assert.equal(r.account.orders.find(o => o.id === b.order.id).status, 'open');
   assert.ok(replay(r.account, now + 6000).positions.AAPL?.qty === 1);
 });
+
+// A market that moves: the quote now (`price`) and 5-minute bars since the
+// order was placed ([offset minutes, open, high, low, close]).
+const moving = (price, bars, at) => async url => {
+  if (!bars && url.includes('/v8/finance/chart')) throw new Error('unavailable');
+  bars ||= [];
+  const meta = { symbol: 'AAPL', regularMarketPrice: price, chartPreviousClose: 250, currency: 'USD', instrumentType: 'EQUITY', exchangeTimezoneName: 'America/New_York', regularMarketTime: at / 1000 - 30, regularMarketDayHigh: Math.max(price, ...bars.map(b => b[2])), regularMarketDayLow: Math.min(price, ...bars.map(b => b[3])), currentTradingPeriod: { regular: { start: Date.parse('2026-10-13T13:30:00Z') / 1000, end: Date.parse('2026-10-13T20:00:00Z') / 1000 } } };
+  if (url.includes('/v7/finance/spark')) return { spark: { result: [{ symbol: 'AAPL', response: [{ meta, timestamp: [], indicators: { quote: [{ close: [] }] } }] }] } };
+  const q = { open: bars.map(b => b[1]), high: bars.map(b => b[2]), low: bars.map(b => b[3]), close: bars.map(b => b[4]), volume: bars.map(() => 100) };
+  return { chart: { result: [{ meta, timestamp: bars.map(b => (now + b[0] * 60_000) / 1000), indicators: { quote: [q] } }] } };
+};
+// Placed at `now` (price 250), then asked for again 30 minutes later.
+async function askLater(order, price, bars) {
+  const docs = new Map();
+  let at = now;
+  let reader = moving(250, [], now);
+  const deps = {
+    json: (data, status) => new Response(JSON.stringify(data), { status }),
+    errorJson: (code, status) => new Response(JSON.stringify({ error: { code } }), { status }),
+    fsGet: async (env, c, id) => (docs.has(`${c}/${id}`) ? { exists: true, payload: docs.get(`${c}/${id}`) } : { exists: false }),
+    fsWrite: async (env, c, id, payload) => void docs.set(`${c}/${id}`, payload),
+    now: () => at,
+    read: url => reader(url)
+  };
+  const ask = () => handleStock(new Request('https://x/stock', { method: 'POST', body: JSON.stringify({ op: 'fill', orders: [order] }) }), {}, {}, { a: 'stock', d: 'acc' }, deps).then(r => r.json());
+  const first = await ask();
+  assert.deepEqual(first.fills, {}, 'not met when placed');
+  at = now + 30 * 60_000;
+  reader = moving(price, bars, at);
+  return (await ask()).fills[order.id];
+}
+const limitBuy = { id: 'order0100', symbol: 'AAPL', side: 'buy', type: 'limit', limit: 249, qty: 1, t: now, market: 'US', kind: 'stock', currency: 'USD' };
+
+test('a phone that waits to ask until the price has fallen past its limit gets its limit, at the moment it was reached', async () => {
+  // 250 → through 249 at the 10-minute bar → 240 now.
+  const bars = [[0, 250, 250.4, 249.6, 250], [5, 250, 250.2, 249.5, 249.7], [10, 249.6, 249.7, 246, 246.5], [15, 246.5, 246.6, 242, 242.5], [20, 242.5, 242.6, 240, 240.2], [25, 240.2, 240.4, 239.8, 240]];
+  const fill = await askLater(limitBuy, 240, bars);
+  assert.deepEqual(fill, { quote: 249, t: now + 10 * 60_000 }, 'the limit when the price reached it, not 240 now');
+  // A gap through it: the bar's open, as a real order.
+  const gap = await askLater(limitBuy, 240, [[0, 250, 250.4, 249.6, 250], [5, 247, 247.5, 245, 246], [10, 246, 246, 240, 240]]);
+  assert.deepEqual(gap, { quote: 247, t: now + 5 * 60_000 });
+});
+
+test('a limit or stop the price passed while the phone was away fills, though the price came back', async () => {
+  const dip = [[0, 250, 250.4, 249.6, 250], [5, 250, 250.1, 247, 248], [10, 248, 255, 248, 254.5], [15, 254.5, 256, 254, 255]];
+  assert.deepEqual(await askLater(limitBuy, 255, dip), { quote: 249, t: now + 5 * 60_000 });
+  // A stop to sell at 248: met in the dip, filled there (not left open while the phone waits).
+  const stop = { ...limitBuy, id: 'order0101', side: 'sell', type: 'stop', stop: 248, limit: undefined };
+  assert.deepEqual(await askLater(stop, 255, dip), { quote: 248, t: now + 5 * 60_000 });
+});
+
+test('a limit the quote has met but no bar has yet fills at its limit, not the price now', async () => {
+  assert.deepEqual(await askLater(limitBuy, 240, [[0, 250, 250.4, 249.6, 250], [5, 250, 250.1, 249.5, 249.6]]), { quote: 249, t: now + 30 * 60_000 });
+  // Bars that can't be read: the same.
+  const fill = await askLater(limitBuy, 240, null);
+  assert.deepEqual(fill, { quote: 249, t: now + 30 * 60_000 });
+});
