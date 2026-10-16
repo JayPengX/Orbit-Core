@@ -42,9 +42,18 @@ test('notice lists keep only sane items, in time order', () => {
 });
 
 // A KV that lives in memory.
+// KV as Workers has it: a key's metadata comes back with a list.
 const memoryKv = () => {
   const m = new Map();
-  return { get: async (k, type) => (m.has(k) ? (type === 'json' ? JSON.parse(m.get(k)) : m.get(k)) : null), put: async (k, v) => void m.set(k, v), delete: async k => void m.delete(k), m };
+  const meta = new Map();
+  return {
+    get: async (k, type) => (m.has(k) ? (type === 'json' ? JSON.parse(m.get(k)) : m.get(k)) : null),
+    put: async (k, v, o) => void (m.set(k, v), meta.set(k, o?.metadata)),
+    delete: async k => void (m.delete(k), meta.delete(k)),
+    list: async ({ prefix = '' } = {}) => ({ keys: [...m.keys()].filter(k => k.startsWith(prefix)).map(name => ({ name, ...(meta.get(name) ? { metadata: meta.get(name) } : {}) })), list_complete: true }),
+    m,
+    meta
+  };
 };
 
 test('subscribe, schedule, then the due notices go out', async () => {
@@ -68,7 +77,8 @@ test('subscribe, schedule, then the due notices go out', async () => {
   assert.match(sent[0].init.headers.Authorization, /^vapid t=[\w-]+\.[\w-]+\.[\w-]+, k=[\w-]+$/);
   const record = JSON.parse(kv.m.get('push:acct:match'));
   assert.deepEqual(record.items.map(x => x.title), ['tomorrow']);
-  assert.equal(JSON.parse(kv.m.get('push:due'))['push:acct:match'], record.items[0].at);
+  assert.equal(kv.meta.get('push:acct:match').due, record.items[0].at, "the list's next time on its own key");
+  assert.equal(kv.m.has('push:due'), false, 'no shared key every phone rewrites');
 });
 
 test('a kind switched off in any app (or notices off) is never sent', async () => {
@@ -173,8 +183,7 @@ test("a game's final score is told once, however often the app schedules it agai
 });
 
 test("a race's final: the winner and the podium from the day's board, once it's over", async () => {
-  const m = new Map();
-  const kv = { m, get: async (k, t) => (m.has(k) ? (t === 'json' ? JSON.parse(m.get(k)) : m.get(k)) : null), put: async (k, v) => void m.set(k, v), delete: async k => void m.delete(k) };
+  const kv = memoryKv();
   const env = { RATE_LIMIT_KV: kv };
   const post = (session, path, body) => handlePush(new Request(`https://w/${path}`, { method: 'POST', body: JSON.stringify(body) }), env, {}, session, path);
   const match = { d: 'acct', a: 'match' };
@@ -239,4 +248,29 @@ test('a pick starting is sent once, even when the open app sends its list again 
   } finally {
     globalThis.fetch = realFetch;
   }
+});
+
+test("each list's due time is its own: two phones scheduling at once both keep theirs, and a list kept the old way is moved over once", async () => {
+  const kv = memoryKv();
+  const env = { RATE_LIMIT_KV: kv };
+  const keys = { p256dh: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4', auth: 'BTBZMqHH6r4Tts7J_aSIgg' };
+  const post = (session, path, body) => handlePush(new Request(`https://w/${path}`, { method: 'POST', body: JSON.stringify(body) }), env, {}, session, path);
+  const now = Date.now();
+  const a = { d: 'a1', a: 'match' };
+  const b = { d: 'b2', a: 'orbit' };
+  await Promise.all([post(a, '/push/subscribe', { sub: { endpoint: 'https://push.example/a', keys } }), post(b, '/push/subscribe', { sub: { endpoint: 'https://push.example/b', keys } })]);
+  await Promise.all([post(a, '/push/schedule', { items: [{ at: now + 10_000, title: 'a' }] }), post(b, '/push/schedule', { items: [{ at: now + 20_000, title: 'b' }] })]);
+  // One list from before, its time only in the old shared key.
+  kv.m.set('push:c3:vocab', JSON.stringify({ sub: { endpoint: 'https://push.example/c', keys }, items: [{ at: now + 30_000, title: 'c' }] }));
+  kv.m.set('push:due', JSON.stringify({ 'push:c3:vocab': now + 30_000 }));
+  const sent = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async url => (sent.push(String(url)), new Response(null, { status: 201 }));
+  try {
+    assert.equal((await sendDue(env, now + 60_000)).sent, 3);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  assert.deepEqual(sent.sort(), ['https://push.example/a', 'https://push.example/b', 'https://push.example/c']);
+  assert.equal(kv.m.has('push:due'), false);
 });
