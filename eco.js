@@ -567,21 +567,32 @@ export async function handleEcoRequest(request, env, headers, ip, deps) {
   const secret = await tokenSecret(env);
 
   try {
-    if (request.method === 'POST') {
-      const body = await deps.readJsonBody(request);
+    // A save and an inbox item dropped also come as a POST (`op: 'write'`,
+    // `op: 'drop-inbox'`, the session in the body): a POST of plain text is
+    // one request, where a PATCH or DELETE is two (the browser asks first).
+    let method = request.method;
+    let body = null;
+    if (method === 'POST' || method === 'PATCH') {
+      body = await deps.readJsonBody(request);
       if (body === deps.INVALID_BODY || !isObj(body)) return errorJson('INVALID_JSON', 400, headers, request);
-      const run = OPS[body.op];
-      if (!run) return errorJson('ECO_UNKNOWN_OP', 400, headers, request);
-      return await run({ request, env, headers, ip, deps, body, app: app || str(body.app, 12) || '', secret });
+    }
+    if (method === 'POST') {
+      if (body.op === 'write') method = 'PATCH';
+      else if (body.op === 'drop-inbox') method = 'DELETE';
+      else {
+        const run = OPS[body.op];
+        if (!run) return errorJson('ECO_UNKNOWN_OP', 400, headers, request);
+        return await run({ request, env, headers, ip, deps, body, app: app || str(body.app, 12) || '', secret });
+      }
     }
 
     // Everything else needs a session.
-    const claims = await readToken(secret, url.searchParams.get('qt'), 'ses', deps.now());
+    const claims = await readToken(secret, (method !== request.method && str(body.qt, 4096)) || url.searchParams.get('qt'), 'ses', deps.now());
     if (!claims) return errorJson('ECO_TOKEN_INVALID', 401, headers, request);
     if (sessionLimited(`${app}:${claims.s}`, TOKEN_LIMIT, 60_000, deps.now())) return errorJson('RATE_LIMITED', 429, headers, request);
     const docId = claims.d;
 
-    if (request.method === 'GET') {
+    if (method === 'GET') {
       const walletDoc = await deps.fsGet(env, WALLET_COLLECTION, docId);
       let wallet = walletDoc.exists ? parseWallet(walletDoc.payload) : null;
       if (!wallet || claims.g !== gen(wallet)) return errorJson('ECO_SIGNED_OUT', 401, headers, request);
@@ -603,9 +614,7 @@ export async function handleEcoRequest(request, env, headers, ip, deps) {
       return json(out, 200, headers);
     }
 
-    if (request.method === 'PATCH') {
-      const body = await deps.readJsonBody(request);
-      if (body === deps.INVALID_BODY || !isObj(body)) return errorJson('INVALID_JSON', 400, headers, request);
+    if (method === 'PATCH') {
       const hasPayload = body.payload !== undefined;
       if (hasPayload && !(app && typeof body.payload === 'string' && body.payload && body.payload.length <= ECO_APPS[app].maxPayload)) {
         return errorJson('MISSING_PAYLOAD', 400, headers, request);
@@ -643,7 +652,9 @@ export async function handleEcoRequest(request, env, headers, ip, deps) {
     const w = await deps.fsGet(env, WALLET_COLLECTION, docId);
     const wallet = w.exists ? parseWallet(w.payload) : null;
     if (!wallet || claims.g !== gen(wallet)) return errorJson('ECO_SIGNED_OUT', 401, headers, request);
-    const inboxId = url.searchParams.get('inbox');
+    const inboxId = method !== request.method ? str(body.inbox, 200) : url.searchParams.get('inbox');
+    // (Dropping an inbox item never falls through to deleting the app's data or the account.)
+    if (method !== request.method && !inboxId) return errorJson('ECO_INBOX_MISSING', 400, headers, request);
     if (inboxId) {
       if (!app) return errorJson('ECO_UNKNOWN_APP', 400, headers, request);
       const result = await updateWallet(env, deps, docId, x => ({ ...x, inbox: { ...x.inbox, [app]: (x.inbox?.[app] || []).filter(id => id !== inboxId) } }));

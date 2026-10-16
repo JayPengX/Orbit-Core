@@ -153,6 +153,27 @@ test("a failed read answers the copy the device has, of any age (a league never 
   globalThis.caches = had;
 });
 
+test("a live read (asked every few seconds) reads the device's copy once and writes it once a minute, the last answer in memory its fallback", async () => {
+  const kept = new Map();
+  let reads = 0;
+  let writes = 0;
+  const had = globalThis.caches;
+  globalThis.caches = { open: async () => ({ match: async k => (reads++, kept.get(k)?.clone() || null), put: async (k, r) => (writes++, void kept.set(k, r)), keys: async () => [], delete: async () => true }) };
+  let n = 0;
+  let up = true;
+  globalThis.fetch = async () => (up ? new Response(JSON.stringify({ n: ++n }), { status: 200 }) : new Response('{}', { status: 502 }));
+  const u = 'https://x.test/live-poll';
+  for (let i = 1; i <= 4; i++) {
+    assert.equal((await kit.proxyJson(u, { ttl: 1, mirror: false })).n, i);
+    await new Promise(r => setTimeout(r, 5));
+  }
+  assert.equal(reads, 1, "the device's copy read for the first read only");
+  assert.equal(writes, 1, 'written once in the minute');
+  up = false;
+  assert.equal((await kit.proxyJson(u, { ttl: 1, mirror: false })).n, 4, 'a failure: the last answer this page had');
+  globalThis.caches = had;
+});
+
 test('packJson reads a pack from the family\'s data (/data/, R2), not the data proxy; a pack not there is a failure', async () => {
   const asked = [];
   globalThis.fetch = async url => (asked.push(String(url)), String(url).endsWith('nba/2026.json') ? new Response('{"events":[1,2]}', { status: 200 }) : new Response('nope', { status: 404 }));

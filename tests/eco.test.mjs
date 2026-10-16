@@ -744,3 +744,24 @@ test('the lock-down: an app adds no money to the pool (the Worker does); a slip 
   assert.equal(r.data.pool, acct.pool - 600);
   assert.equal((await send([{ id: 'odds:refund-older', t: 4, app: 'odds', kind: 'refund', amount: 9_000 }])).data.pool, acct.pool - 600);
 });
+
+test('a save and an inbox drop as a plain POST (one request, no preflight): the same as PATCH and DELETE; a drop never deletes more', async () => {
+  const t = setup();
+  const a = await newPass(t, 'stock');
+  const w = await t.call('POST', '?app=stock', { op: 'write', qt: a.token, payload: 'gz1:posted' });
+  assert.equal(w.status, 200);
+  assert.ok(w.data.updateTime && w.data.token);
+  assert.equal((await t.call('GET', `${t.qt(w.data.token)}&app=stock`)).data.payload, 'gz1:posted');
+  assert.equal((await t.call('POST', '?app=stock', { op: 'write', qt: 'forged', payload: 'gz1:x' })).status, 401);
+  // An item in the inbox (another pass merged in), dropped by POST.
+  const b = await newPass(t, 'stock');
+  await t.call('POST', '?app=stock', { op: 'write', qt: b.token, payload: 'gz1:b' });
+  const aa = await t.call('POST', '', { op: 'refresh', refresh: a.refresh, app: 'stock', claim: true });
+  const m = await t.call('POST', '', { op: 'merge', qt: aa.data.token, sources: [{ passcode: b.passcode }] });
+  const id = m.data.wallet.inbox.stock[0];
+  assert.equal((await t.call('POST', '?app=stock', { op: 'drop-inbox', qt: aa.data.token })).status, 400, 'no item: nothing deleted');
+  assert.equal((await t.call('GET', `${t.qt(aa.data.token)}&app=stock`)).data.payload, 'gz1:posted', "the app's data still there");
+  assert.equal((await t.call('POST', '?app=stock', { op: 'drop-inbox', qt: aa.data.token, inbox: id })).status, 200);
+  const after = await t.call('GET', `${t.qt(aa.data.token)}&app=stock&inbox=1`);
+  assert.deepEqual(after.data.wallet.inbox?.stock || [], []);
+});

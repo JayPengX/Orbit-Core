@@ -197,6 +197,8 @@
         return null;
       });
   };
+  // (The kit's watch skips its own first check, this one just made.)
+  window.__bootChecked = Date.now();
   Promise.all([read('./version.json'), kit.base ? read(kit.base + 'version.json') : null]).then(function (got) {
     var latest = got[0];
     var kitLatest = got[1];

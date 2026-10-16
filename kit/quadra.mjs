@@ -425,10 +425,13 @@ function cachePayload(app, account, payload) {
 
 // ---- The Worker ----------------------------------------------------------------------
 
+// (JSON sent as plain text, and saves as a POST: a request the browser sends
+// at once, where a JSON content type, a PATCH or a DELETE is asked about
+// first, a second request and a round trip before every save.)
 async function call(method, query = '', body) {
   const res = await fetch(`${ECO_URL}${query}`, {
     method,
-    headers: body ? { 'Content-Type': 'application/json' } : {},
+    headers: body ? { 'Content-Type': 'text/plain;charset=UTF-8' } : {},
     body: body ? JSON.stringify(body) : undefined,
     signal: AbortSignal.timeout(25_000)
   });
@@ -746,13 +749,19 @@ const mirrorGone = new Set();
 export function unmirror(url, trim = '') {
   mirrorGone.add(`${trim}!${url}`);
 }
+// A live read (asked every few seconds) is kept on the device at most once a
+// minute: each copy is a whole answer's write (an MLB game's is 0.9 MB).
+const LIVE_KEEP_MS = 60_000;
+const keptAt = new Map(); // key → when it was last written to the device
 function keptJson(url, key, { ttl, keep }, read) {
   const hit = memory.get(key);
   if (hit && Date.now() - hit.at < (hit.failed ? Math.min(ttl, hit.hold) : hit.stale ? Math.min(ttl, RETRY_MS) : ttl)) return hit.promise;
   let entry;
   const promise = (async () => {
-    const saved = keep ? await persisted(key) : null;
-    if (saved && Date.now() - saved.at < ttl) return saved.data;
+    // The last answer this page had is the copy to fall back on: the
+    // device's is read (and parsed) only for a key's first read here.
+    const saved = keep ? (hit?.data !== undefined ? { at: hit.dataAt, data: hit.data } : await persisted(key)) : null;
+    if (saved && Date.now() - saved.at < ttl) return ((entry.data = saved.data), (entry.dataAt = saved.at), saved.data);
     let got;
     try {
       got = await read();
@@ -763,11 +772,19 @@ function keptJson(url, key, { ttl, keep }, read) {
       if (!saved) throw error;
       recFail(url, error);
       entry.stale = true;
+      entry.data = saved.data;
+      entry.dataAt = saved.at;
       return saved.data;
     }
     const data = typeof got === 'string' ? JSON.parse(got) : got;
-    // Kept on the device off the critical path.
-    if (keep) setTimeout(() => persist(key, typeof got === 'string' ? got : JSON.stringify(got)), 0);
+    entry.data = data;
+    entry.dataAt = Date.now();
+    // Kept on the device off the critical path (a live one once a minute).
+    if (keep && (ttl >= LIVE_KEEP_MS || !(Date.now() - (keptAt.get(key) || 0) < LIVE_KEEP_MS))) {
+      keptAt.set(key, Date.now());
+      if (keptAt.size > 500) keptAt.delete(keptAt.keys().next().value);
+      setTimeout(() => persist(key, typeof got === 'string' ? got : JSON.stringify(got)), 0);
+    }
     return data;
   })();
   entry = { at: Date.now(), promise, failed: false, stale: false };
@@ -1257,7 +1274,8 @@ export function quadraSession(app, { lang = detectLang(), heartbeat = 120_000 } 
   // Every app notes the kit's newest version for its next opening, also
   // the apps that don't watch for updates (watchUpdates puts it in place
   // at once).
-  if (typeof document !== 'undefined') setTimeout(() => kitLatest(), 4000);
+  // (A page that watches already asks with every check.)
+  if (typeof document !== 'undefined') setTimeout(() => watching || kitLatest(), 4000);
   const made = makeSession(app, { lang, heartbeat });
   // A link to a guide (#help=<app>:<topic>, helpUrl) opens the Quadra Pass
   // sheet on it, once the app's first screen is up.
@@ -1448,14 +1466,14 @@ function makeSession(app, { lang, heartbeat }) {
         error.live = live;
         throw error;
       }
-      return call('PATCH', qs({ qt, app }), { payload, wallet: patch });
+      return call('POST', qs({ app }), { op: 'write', qt, payload, wallet: patch });
     }).then(res => {
       if (typeof payload === 'string') cachePayload(app, storedAccount(), payload);
       return absorb(res);
     });
   // Quadra Plus: join (on) or leave (off); the Worker bills it.
   s.plus = (on, plan = 'month') => withToken(qt => call('POST', '', { op: 'plus', qt, on: Boolean(on), plan })).then(absorb);
-  s.dropInbox = id => withToken(qt => call('DELETE', qs({ qt, app, inbox: id })));
+  s.dropInbox = id => withToken(qt => call('POST', qs({ app }), { op: 'drop-inbox', qt, inbox: id }));
   // Other passes into this one (they're deleted after).
   s.merge = passes => withToken(qt => call('POST', '', { op: 'merge', qt, sources: passes.map(passcode => ({ passcode })) })).then(absorb);
   s.op = (op, body = {}) => withToken(qt => call('POST', '', { op, qt, ...body }));
@@ -2998,7 +3016,7 @@ export function watchUpdates({ current, key, cachePrefix, every = 15_000 } = {})
     const wait = n ? 5_000 - (Date.now() - Number(at)) : 0;
     if (wait > 0) {
       clearTimeout(retry);
-      retry = setTimeout(check, wait + 50);
+      retry = setTimeout(() => check(true), wait + 50);
       return;
     }
     sessionStorage.setItem(flag, `${latest}|${n + 1}|${Date.now()}`);
@@ -3011,9 +3029,13 @@ export function watchUpdates({ current, key, cachePrefix, every = 15_000 } = {})
     await reg?.update?.().catch(() => {});
     location.replace(`${location.pathname}?v=${encodeURIComponent(latest)}${location.hash}`);
   }
-  async function check() {
-    if (checking) return;
+  // An opening asks once: boot.js has just asked (window.__bootChecked), and
+  // the page's first check, its pageshow and its focus come within seconds.
+  let lastAt = globalThis.__bootChecked || 0;
+  async function check(force = false) {
+    if (checking || (!force && Date.now() - lastAt < 3000)) return;
     checking = true;
+    lastAt = Date.now();
     try {
       const [res, kitNew] = await Promise.all([fetch(`./version.json?t=${Date.now()}`, { cache: 'no-store' }), kitLatest()]);
       const appNew = res.ok ? (await res.json())?.version : null;
@@ -3027,12 +3049,13 @@ export function watchUpdates({ current, key, cachePrefix, every = 15_000 } = {})
     }
   }
   check();
-  channel?.addEventListener('message', () => check());
+  channel?.addEventListener('message', () => check(true));
   document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && check());
   globalThis.addEventListener?.('focus', () => check());
-  globalThis.addEventListener?.('online', () => check());
+  globalThis.addEventListener?.('online', () => check(true));
   globalThis.addEventListener?.('pageshow', () => check());
-  setInterval(check, every);
+  // (Not while the app is out of sight: coming back asks at once.)
+  setInterval(() => document.visibilityState !== 'hidden' && check(), every);
 }
 // Every app's page starts the watch as the kit loads: its build-version and
 // its cached files' prefix (the loading screen's data-cache), the same ones
@@ -3601,14 +3624,19 @@ export function topActions(s, { help = null, refresh = null, extra = null, into 
 }
 
 // Big numbers never wrap: they shrink (to 60% at most) to fit their box.
+// (All reset, then all measured, then all set: one layout, not one a number.)
 export function fitNumbers(nodes) {
-  for (const el of nodes) {
-    el.style.fontSize = '';
+  const list = [...nodes];
+  for (const el of list) el.style.fontSize = '';
+  const fits = list.map(el => {
     const box = el.parentElement?.clientWidth || 0;
-    if (!box || el.scrollWidth <= box) continue;
-    const base = parseFloat(getComputedStyle(el).fontSize);
-    el.style.fontSize = `${Math.max(base * 0.6, (base * box) / el.scrollWidth - 0.5)}px`;
-  }
+    const wide = el.scrollWidth;
+    return box && wide > box ? { box, wide, base: parseFloat(getComputedStyle(el).fontSize) } : null;
+  });
+  list.forEach((el, i) => {
+    const f = fits[i];
+    if (f) el.style.fontSize = `${Math.max(f.base * 0.6, (f.base * f.box) / f.wide - 0.5)}px`;
+  });
 }
 
 // ---- 除錯紀錄: what an app did, for its maker to replay ---------------------------------------
