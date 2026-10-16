@@ -885,10 +885,12 @@ const ESPN_PATH = Object.fromEntries(Object.entries(LEAGUES).map(([key, league])
 
 // Outcomes for saved-slip legs that have started: legId -> outcome (see
 // legResult). The reading is the shared kit's (settle.mjs readOutcomes), the
-// same the Worker settles with; Kambi matches with bets on them are watched
-// by the Worker (their scores kept from now on).
-export async function fetchOutcomes(legs, now = new Date()) {
-  watchKambiMatches(legs.filter(l => LEAGUES[l.sport]?.kambi && l.kambiId)).catch(() => {});
+// same the Worker settles with. `watch`: the picks whose Kambi matches the
+// Worker is asked to watch (their scores kept from now on); a slip placed
+// through the Worker is watched by it already (settle.js watchSlips).
+export async function fetchOutcomes(legs, now = new Date(), { watch = legs } = {}) {
+  const kambi = watch.filter(l => LEAGUES[l.sport]?.kambi && l.kambiId);
+  if (kambi.length) watchKambiMatches(kambi).catch(() => {});
   return readOutcomes(legs, { read: getJson, keptKambi: fetchKeptKambi, now });
 }
 
