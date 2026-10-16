@@ -242,7 +242,9 @@ ends. A bet whose app isn't opened in that window could never be settled.
   code (price.js: the kit's play-sources and play-bets, read through the
   sports proxy's SPORTS binding with a session this Worker signs), refused
   when better than the house's price now (1% and a cent of slack), started,
-  or off the board; the slip's money checked (combinations, boost, free bet,
+  or off the board (reading only what can change the pick: a winner the
+  league's board alone, another market the game's own Kambi markets too, a
+  player's pick its players as well); the slip's money checked (combinations, boost, free bet,
   rules, the pool); then the stake taken (odds:stake-<slip>) and the slip
   watched, its picks the house's own bets (`price.js keptLeg`, the kit's
   `legOf`): settled on what was priced, never on terms a phone sent. A live
