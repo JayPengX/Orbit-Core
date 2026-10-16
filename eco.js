@@ -608,6 +608,11 @@ export async function handleEcoRequest(request, env, headers, ip, deps) {
         out.token = await sessionToken(secret, claims, deps.now());
       }
       Object.assign(out, { wallet: publicWallet(wallet), walletTime, pool: poolBalance(wallet), updateTime: '', payload: '' });
+      // The wallet the device already holds (`w`, when it was made): not sent again.
+      if (walletTime && url.searchParams.get('w') === walletTime) {
+        delete out.wallet;
+        out.same = true;
+      }
       if (app) {
         const doc = await deps.fsGet(env, ECO_APPS[app].collection, docId);
         if (doc.exists) Object.assign(out, { updateTime: doc.updateTime, payload: doc.payload });
@@ -651,6 +656,11 @@ export async function handleEcoRequest(request, env, headers, ip, deps) {
       if (!result) return errorJson('ECO_SIGNED_OUT', 401, headers, request);
       if (refused) return json({ error: { code: refused, message: refused }, live: liveOf(result.wallet) }, refused === 'ECO_SIGNED_OUT' ? 401 : 409, headers);
       const out = { wallet: publicWallet(result.wallet), walletTime: result.updateTime, pool: poolBalance(result.wallet), token: await sessionToken(secret, claims, now) };
+      // (A save that left the wallet as the device holds it: not sent back.)
+      if (body.w && body.w === result.updateTime) {
+        delete out.wallet;
+        out.same = true;
+      }
       if (hasPayload) out.updateTime = (await deps.fsWrite(env, ECO_APPS[app].collection, docId, body.payload)).updateTime;
       return json(out, 200, headers);
     }
