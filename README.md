@@ -249,7 +249,8 @@ ends. A bet whose app isn't opened in that window could never be settled.
   watched, its picks the house's own bets (`price.js keptLeg`, the kit's
   `legOf`): settled on what was priced, never on terms a phone sent. A live
   pick waits 5 s (`LIVE_DELAY_MS`) and is priced again on reads no older
-  than 2 s (the sports proxy's `within`, this Worker's own reads only).
+  than 2 s (the sports proxy's `within`, this Worker's own reads only); a
+  live pick reads its own league's live pages alone (`loadLive({ only })`).
   `op: 'check'` from a localhost page: the check alone.
 - `POST { op: 'cashout', id, value }`: the value checked against the house's
   own (price.js cashOutQuote), the slip taken from `open` (never settled
