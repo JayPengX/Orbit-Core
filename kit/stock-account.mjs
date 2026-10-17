@@ -46,7 +46,7 @@ import {
 import { nextTradingStart, isTradingDay } from '#kit/stock-holidays.mjs';
 import { TD_MIN, tdRate, addMonths, tdInterest, incomeTaxes, lendable, LEND_RATE, LEND_LOT, LEND_RECALL, LEND_TERM_DAYS, addWeekdays, lendFee } from '#kit/stock-savings.mjs';
 import { BONDS, couponDates } from '#kit/stock-bonds.mjs';
-import { creditAccount, creditUsed, dayTradeSellFirst, termDue, afterHours, SHORT_DEPOSIT, SHORT_HANDLING } from '#kit/stock-credit.mjs';
+import { creditAccount, creditUsed, dayTradeBuyFirst, dayTradeSellFirst, termDue, afterHours, SHORT_DEPOSIT, SHORT_HANDLING } from '#kit/stock-credit.mjs';
 
 export const ACCOUNT_VERSION = 1;
 // Every new account opens with the same NT$100,000 (Quadra's base amount);
@@ -692,8 +692,10 @@ function fillOrder(account, order, price, rates, now, at = now) {
   const quote = price;
   if (order.type !== 'limit') price = marketFill(order.market, order.kind, order.side, price);
   else price = order.side === 'buy' ? Math.min(price, order.limit) : Math.max(price, order.limit);
-  // A Taiwan stock sold the day it was bought pays the day-trade tax.
-  const dayTrade = order.side === 'sell' && order.market === 'TW' && (order.dayShort || account.events.some(e => e.type === 'fill' && e.symbol === order.symbol && e.side === 'buy' && e.t <= at && localDayOf(e.t, 'TW') === localDayOf(at, 'TW')));
+  // A Taiwan stock sold the day it was bought pays the day-trade tax (half),
+  // once the account may day trade buying first (3 months open, 10 trades in
+  // the year: dayTradeBuyFirst, as Help says); before that, the full tax.
+  const dayTrade = order.side === 'sell' && order.market === 'TW' && (order.dayShort || (dayTradeBuyFirst(account, at) && account.events.some(e => e.type === 'fill' && e.symbol === order.symbol && e.side === 'buy' && e.t <= at && localDayOf(e.t, 'TW') === localDayOf(at, 'TW'))));
   let est = estimate({ market: order.market, kind: order.kind, currency: order.currency, side: order.side, qty: order.qty, price, t: at, dayTrade, first: firstTrade(account) });
   // 融券手續費: 0.08% of what's sold short (Taiwan drops the fraction).
   if (order.credit) {
