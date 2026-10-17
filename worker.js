@@ -25,6 +25,7 @@
 // runs in Taiwan ([placement], wrangler.toml), where the people and most
 // sources are. The Quadra Pass is the only way anything is saved.
 
+import { handleSlip } from './slip.js';
 import en from './locales/en.js';
 import zhTW from './locales/zh-TW.js';
 import { handleEcoRequest, LOCK_SINCE } from './eco.js';
@@ -1133,6 +1134,8 @@ export default {
     // The data proxy for Sports, Play and Securities (sports.js): its own
     // session gate and per-app limits.
     if (path === '/sports-proxy') return handleSports(request, env, ctx, headers, ip);
+    // Slip Tracker's narrow door (slip.js): no pass, Asian baseball only, small caps.
+    if (path === '/slip') return handleSlip(request, env, ctx, headers, ip);
     // The bill's guard (guard.js), as it last read the bill: armed or not,
     // each count's share of the $5 plan, stopped or not. No key or token.
     if (path === '/guard' && request.method === 'GET') {

@@ -1165,11 +1165,13 @@ const BATCH_MAX = 24;
 // line holds back nothing: it waits as long as the app would for it alone.
 const BATCH_ITEM_WAIT_MS = 3_000;
 const LINE_ITEM_WAIT_MS = 10_000;
-async function handleBatch(request, env, headers, ip, ctx, requestParams) {
+async function handleBatch(request, env, headers, ip, ctx, requestParams, { checked = false } = {}) {
   const items = requestParams.getAll('u').slice(0, BATCH_MAX);
   if (!items.length) return json({ error: { message: 'Missing u' } }, 400, headers);
-  const gate = await checkSession(env, requestParams, headers, items.length, request, ip);
-  if (gate.error) return gate.error;
+  if (!checked) {
+    const gate = await checkSession(env, requestParams, headers, items.length, request, ip);
+    if (gate.error) return gate.error;
+  }
   const lines = requestParams.has('lines');
   const answers = items.map(item => {
     const work = batchItem(item, ctx);
@@ -1216,6 +1218,13 @@ async function handleBatch(request, env, headers, ip, ctx, requestParams) {
   })().catch(error => w.abort(error).catch(() => {}));
   ctx?.waitUntil?.(pump);
   return new Response(readable, { status: 200, headers: { ...headers, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+}
+// A batch let in by a door of its own (slip.js: its own origin, addresses,
+// limits and daily cap), through the same cache and kept reads.
+export function checkedBatch(request, env, ctx, headers, ip, requestParams) {
+  refreshDev(env, ctx);
+  dataBucket = env.DATA || null;
+  return handleBatch(request, env, headers, ip, ctx, requestParams, { checked: true });
 }
 // One item that throws is that item's failure (its error said), never the
 // whole batch's: the rest of a first paint (MLB, NBA, the Premier League)

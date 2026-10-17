@@ -34,7 +34,7 @@ file is how to work on them.
 - **One person runs the whole family** and works across every repo in
   `~/Documents/GitHub` (Orbit-Class, Orbit-Transit, Orbit-Weather,
   Orbit-Sports (was Quadra Fixtures), Orbit-Words (was Quadra Hub),
-  Quadra-Play, Quadra-Securities, Shared-Proxy; Shared-Data retired 2026-10-13). A request that names no
+  Quadra-Play, Quadra-Securities, Shared-Proxy; Shared-Data retired 2026-10-13; Slip-Tracker, independent, 2026-10-17). A request that names no
   repo means whichever the context says, often several.
 - **They use the apps on their iPhone, installed on the home screen, in
   Safari's engine**, every day, and send what they find: a list (9, 22, 33,
@@ -893,3 +893,6 @@ What was decided, so it isn't undone. Newer calls win.
   `overByRule`: an NBA 4th over with the scores apart, MLB's home side
   ahead in the middle of the 9th…), not when ESPN marks it minutes later;
   比賽資訊 says when it ended.
+- 2026-10-17: Slip Tracker (運彩追蹤), an independent page for real 台灣運彩
+  tickets: no Pass and no kit (what it reuses is copied); the proxy only
+  through its narrow `/slip` door, capped low so strangers can't drain it.
