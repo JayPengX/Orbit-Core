@@ -590,6 +590,8 @@ if (!live) await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.worker
   const res = await handleTransit(new Request(req.url()), transitEnv, cors, u.pathname, { session: { s: 'preview' }, fetchFn, cache: null });
   await route.fulfill({ status: res.status, contentType: 'application/json', headers: cors, body: await res.text() });
 });
+// The /stock Worker's store for the run.
+const stockDocs = new Map();
 await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(?!weather|push|transit|sports-proxy|data\/)/, async route => {
   const req = route.request();
   const body = req.postDataJSON?.() || {};
@@ -625,6 +627,24 @@ await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(?!
       }
     }
     return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(reply) });
+  }
+  // Quadra Securities' orders, plans and 新股申購 (stock-fill.js): the
+  // Worker's own code on a store of the run's, today's real data.
+  if (new URL(req.url()).pathname === '/stock') {
+    const { handleStock } = await import('../stock-fill.js');
+    const res = await handleStock(new Request('https://x/stock', { method: 'POST', body: JSON.stringify(body) }), { ECO_TOKEN_SECRET: 'preview' }, { 'Access-Control-Allow-Origin': '*' }, { a: 'stock', d: 'preview' }, {
+      json: (data, status = 200, headers = {}) => new Response(JSON.stringify(data), { status, headers }),
+      errorJson: (code, status) => new Response(JSON.stringify({ error: { code } }), { status }),
+      fsGet: async (env, c, id) => (stockDocs.has(`${c}/${id}`) ? { exists: true, payload: stockDocs.get(`${c}/${id}`) } : { exists: false }),
+      fsWrite: async (env, c, id, data) => void stockDocs.set(`${c}/${id}`, data),
+      now: () => Date.now(),
+      read: async url => {
+        const x = await upstream(url);
+        if (x.status !== 200) throw new Error(String(x.status));
+        return JSON.parse(x.body);
+      }
+    });
+    return route.fulfill({ status: res.status, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: await res.text() });
   }
   const reply = { token: 'preview', wallet, active: true, live: { app: appId } };
   // The app's data, as the Worker gives it: on a sign-in, and on a read
