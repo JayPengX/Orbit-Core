@@ -83,3 +83,10 @@ test("TheSportsDB's cutouts are drawn at its small size (about 50 KB, not 250)",
   assert.equal(smallPhoto('https://r2.thesportsdb.com/images/media/player/cutout/u953kk1763669460.png'), 'https://r2.thesportsdb.com/images/media/player/cutout/u953kk1763669460.png/small');
   assert.equal(smallPhoto('https://r2.thesportsdb.com/images/media/player/cutout/u953kk1763669460.png/small'), 'https://r2.thesportsdb.com/images/media/player/cutout/u953kk1763669460.png/small');
 });
+
+test("a Premier League player on the league's older path (last season's, an old club's shirt) gets his face first, that photo last", async () => {
+  const { isOldOwn } = await import('../kit/photos.mjs');
+  assert.equal(isOldOwn('https://resources.premierleague.com/premierleague/photos/players/250x250/p114283.png'), true);
+  assert.equal(isOldOwn('https://resources.premierleague.com/premierleague25/photos/players/110x140/549939.png'), false);
+  assert.equal(isOldOwn(null), false);
+});
