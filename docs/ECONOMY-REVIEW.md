@@ -58,3 +58,22 @@ for them, using `node tools/economy.mjs` (v11, now).
 
 Each change runs through `tools/economy.mjs` first. Its numbers go in the
 commit, and every new faucet gets a test that tries to exploit it (§13).
+
+## Done (2026-10-18)
+
+- **新股申購 is live in Securities.**
+  - It uses TWSE's real list, and the Worker draws at TWSE's published rate.
+  - Every event is checked on TWSE's own figures (kit/stock-ipo.mjs,
+    stock-fill.js, stock-check.js).
+  - At ~0.2–10% win rates, an active applicant wins a few times a year.
+    Each win is the offer's discount (a listed company's offer this week
+    was worth NT$128,500 at that day's price).
+- **Securities' home shows what's trading now** (US, crypto, Japan, Hong
+  Kong, Taiwan, each until when).
+- **Dividends were already shown** in the portfolio's income card.
+- **Weekday effort pay: left out.** It runs against the owner's calls of
+  2026-09-29 (no nags or fake promotions) and 2026-10-01 (a fixed NT$6,000
+  pay). 新股申購 gives the weekday a real decision with a positive expected
+  value instead.
+- **Weekly prediction contest: not built.** It needs players to compete
+  against. One active account would only play the house.
