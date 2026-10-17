@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { twHoliday, twWorkday, twDayOff } from '../kit/holidays.mjs';
-import { mlbPostseason, mlbGameFor, mlbGone, roundKey } from '../kit/postseason.mjs';
+import { mlbPostseason, mlbGameFor, mlbGone, roundKey, listedTime } from '../kit/postseason.mjs';
 import { archivedSession, trimF1Live } from '../f1-live.js';
 
 test("Taiwan's days off: the holidays, the days in lieu, weekends; TWSE's own closing days aren't anyone else's", () => {
@@ -60,4 +60,15 @@ test("MLB's If Necessary games: 待定 until the game before them in their serie
   assert.equal(g5b.timeTbd, false);
   assert.equal(g5b.start, '2026-10-17T01:00:00Z');
   assert.equal(g6b.timeTbd, true);
+});
+
+test("MLB's first pitch shows as the hour it's listed at: 17:08 is 17:00, as ESPN and ELTA have it", () => {
+  assert.equal(listedTime('2026-10-18T21:08:00Z'), '2026-10-18T21:00:00.000Z');
+  assert.equal(listedTime('2026-10-20T00:08:00Z'), '2026-10-20T00:00:00.000Z');
+  assert.equal(listedTime('2026-10-18T23:38:00Z'), '2026-10-18T23:30:00.000Z');
+  assert.equal(listedTime('2026-10-18T17:15:00Z'), '2026-10-18T17:15:00Z');
+  assert.equal(listedTime('2026-10-18T21:00:00Z'), '2026-10-18T21:00:00Z');
+  const [g] = mlbPostseason({ dates: [{ date: '2026-10-18', games: [{ gamePk: 849817, officialDate: '2026-10-18', gameDate: '2026-10-18T21:08:00Z', description: 'ALCS Game 5', seriesGameNumber: 5, status: { abstractGameState: 'Preview', detailedState: 'Scheduled' }, teams: { home: { team: { id: 114, name: 'Cleveland Guardians' } }, away: { team: { id: 139, name: 'Tampa Bay Rays' } } } }] }] });
+  assert.equal(g.start, '2026-10-18T21:00:00.000Z');
+  assert.equal(g.firstPitch, '2026-10-18T21:08:00Z');
 });

@@ -11,7 +11,8 @@
 // an older kit without this file leaves them as before.
 //
 //   mlbPostseasonUrl(year)      the read (through the proxy, minutes fresh)
-//   mlbPostseason(data)         → [{ pk, day, start, timeTbd, round, game, of, maybe, home, away, state }]
+//   mlbPostseason(data)         → [{ pk, day, start (the listed hour), firstPitch, timeTbd, round, game, of, maybe, home, away, state }]
+//   listedTime(iso)             MLB's first pitch (17:08) as the hour it's listed at (17:00)
 //   roundKey(text)              'ALDS' | 'NLCS' | 'WS' | 'ALWC' … from ESPN's note or MLB's description
 //   mlbGameFor(list, game)      the MLB game of an app's game ({ note, home, away })
 //   mlbGone(list, game, day, from)  whether an app's game to come won't be played (its series over)
@@ -42,6 +43,18 @@ const side = t => (known(t) ? { name: t.name, id: String(t.id) } : null);
 const DAY = 86_400_000;
 const untimed = day => new Date(Date.parse(`${day}T00:00:00Z`) + DAY).toISOString();
 
+// MLB's gameDate is the first pitch, a few minutes after the hour the game
+// is listed and televised at (17:08 for a 17:00 game; ESPN and ELTA say
+// 17:00, the owner 2026-10-18: "5:08 is too weird"). The listed hour: a
+// time 1–12 minutes past :00 or :30 is put back to it; another (a 13:15
+// start) is as it is.
+export function listedTime(iso) {
+  const t = Date.parse(iso || '');
+  if (!Number.isFinite(t)) return iso;
+  const past = new Date(t).getUTCMinutes() % 30;
+  return past >= 1 && past <= 12 ? new Date(t - past * 60_000 - (t % 60_000)).toISOString() : iso;
+}
+
 export function mlbPostseason(data) {
   const out = [];
   for (const d of data?.dates || [])
@@ -54,7 +67,8 @@ export function mlbPostseason(data) {
       out.push({
         pk: g.gamePk,
         day,
-        start: timeTbd ? untimed(day) : g.gameDate,
+        start: timeTbd ? untimed(day) : listedTime(g.gameDate),
+        firstPitch: timeTbd ? null : g.gameDate,
         timeTbd,
         round: roundKey(g.description) || roundKey(`${/^(AL|NL)/.exec(g.description || '')?.[1] || ''} ${g.seriesDescription || ''}`) || (g.gameType === 'W' ? 'WS' : ''),
         game: Number(g.seriesGameNumber) || gameNumber(g.description),
