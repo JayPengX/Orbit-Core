@@ -5,7 +5,7 @@ what's open and why. It's rewritten as things change, never appended to; the
 history is the git log of each repo (each round's list and what was done are
 in its commits). What each app does in detail is its README.
 
-Updated 2026-10-15.
+Updated 2026-10-18.
 
 ## The repos
 
@@ -162,6 +162,15 @@ not yet on a phone; the second round A/B, the old and new code alternated.
 
 ## Open
 
+- **Tonight's round (2026-10-18):** a Taiwan day trade bought first gets
+  the half tax only once the account can day trade (`dayTradeBuyFirst`: 3
+  months open, 10 trades in the year); before that it pays the full 0.3%.
+  The preview tool has an `admin [view…]` target (the panel on a local
+  stand-in with fake data, no sign-in). iPad and 375 px fixes across Play,
+  Securities, Sports, Words, Class and the admin panel (nothing wraps or
+  scrolls sideways but the slide rows and pinned tables).
+- **No English yet:** Transit and Weather are Chinese only (each has a task
+  card waiting for the owner to start).
 - **The owner's steps** (`OWNER-STEPS.md`): phone alerts in 系統, a $5.01
   billing email at Cloudflare, the renewal day, deleting Shared-Data and the
   Firebase project, revoking the old Match Find token.
