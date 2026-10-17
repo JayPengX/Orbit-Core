@@ -55,7 +55,7 @@
 import { createServer } from 'node:http';
 import { createSecureServer } from 'node:http2';
 import { execFile, execFileSync } from 'node:child_process';
-import { readFile, stat, mkdir, mkdtemp } from 'node:fs/promises';
+import { readFile, stat, mkdir, mkdtemp, rm, cp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join, extname, resolve } from 'node:path';
@@ -256,7 +256,27 @@ if (!existsSync(dir)) throw new Error(`${dir} missing${key === 'orbit' ? ' (run 
 
 // What's served: the current repos, or --upgrade's old ones for the first opening.
 const served = { root: ROOT, dir };
-const oldRoot = upgrade ? await snapshotRoot(upgrade, [[repo, [key === 'orbit' ? 'dist' : 'public']], ['Shared-Proxy', ['kit']]]) : null;
+const oldRoot = upgrade ? await snapshotRoot(upgrade, [[repo, [key === 'orbit' ? 'dist' : 'public', ...(key === 'orbit' ? [] : ['scripts', 'package.json'])]], ['Shared-Proxy', ['kit']]]) : null;
+// Both stamped as a deploy is (the app's ?v= files and version.json, the
+// kit's): unstamped, a page says it's 'dev' and never updates, so an
+// installed app's update (the old page finding the new one, its service
+// worker's kept files) went untried. The current one from a copy.
+async function stampRoot(root, version) {
+  const app = join(root, repo);
+  if (key !== 'orbit' && existsSync(join(app, 'scripts/stamp-version.mjs'))) execFileSync('node', ['scripts/stamp-version.mjs', version], { cwd: app, stdio: 'ignore' });
+  const out = await mkdtemp(join(tmpdir(), 'quadra-kit-'));
+  execFileSync('node', [join(root, 'Shared-Proxy/kit/stamp.mjs'), out, `kit-${version}`], { stdio: 'ignore' });
+  await rm(join(root, 'Shared-Proxy/kit'), { recursive: true, force: true });
+  await cp(join(out, 'kit'), join(root, 'Shared-Proxy/kit'), { recursive: true });
+}
+let newRoot = null;
+if (oldRoot) {
+  await stampRoot(oldRoot, 'old');
+  newRoot = await mkdtemp(join(tmpdir(), 'quadra-new-'));
+  for (const part of [key === 'orbit' ? 'dist' : 'public', ...(key === 'orbit' ? [] : ['scripts', 'package.json'])]) if (existsSync(join(ROOT, repo, part))) await cp(join(ROOT, repo, part), join(newRoot, repo, part), { recursive: true });
+  await cp(join(ROOT, 'Shared-Proxy/kit'), join(newRoot, 'Shared-Proxy/kit'), { recursive: true });
+  await stampRoot(newRoot, 'new');
+}
 
 // ---- A static server for the app ----
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.mp3': 'audio/mpeg', '.webmanifest': 'application/manifest+json' };
@@ -440,7 +460,7 @@ const stub = { grantPermissions: async () => {}, setGeolocation: async () => {},
 const contextOptions = {
   // No service workers: their fetches would miss the routes below (with
   // --net they run: an app opens offline on what its worker kept).
-  serviceWorkers: net ? 'allow' : 'block',
+  serviceWorkers: net || upgrade ? 'allow' : 'block',
   viewport: { width, height },
   deviceScaleFactor: 2,
   isMobile: device !== 'pc',
@@ -702,7 +722,8 @@ let opening = 0;
 const per = net ? 3 : reopen ? 2 : 1;
 for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(h))) {
   const first = opening++ % per !== per - 1 || per === 1;
-  Object.assign(served, first && oldRoot ? { root: oldRoot, dir: join(oldRoot, repo, key === 'orbit' ? 'dist' : 'public') } : { root: ROOT, dir });
+  const at = first && oldRoot ? oldRoot : newRoot;
+  Object.assign(served, at ? { root: at, dir: join(at, repo, key === 'orbit' ? 'dist' : 'public') } : { root: ROOT, dir });
   flakyNow.on = Boolean(flaky) && (first || !reopen);
   Object.assign(netNow, { offline: !first && net === 'offline', slow: first ? 0 : netSlow });
   if (net && !serve) await context.setOffline(netNow.offline);
