@@ -901,3 +901,9 @@ What was decided, so it isn't undone. Newer calls win.
   in the family: 12 scans a day an address, 150 a day in all. The page then
   matches each pick to a real game, and the person checks the ticket before
   it's saved.
+- 2026-10-18: no medal emoji on VIP tiers (by name alone); Play's
+  場中焦點 never pops in after the loading screen; a sheet swipes away on
+  an iPad too; win probability read every minute; Securities gets
+  新股申購 (TWSE's real subscriptions, drawn by the proxy at TWSE's rate)
+  and what's trading now; the overnight loop may change anything,
+  the economy included (docs/ECONOMY-REVIEW.md).
