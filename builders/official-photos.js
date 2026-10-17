@@ -270,7 +270,7 @@ export async function officialPhotos({ write, carry, leagues = OFFICIAL, espn = 
 // again after two weeks. → sports/cutouts/photos.json
 // ({ built, players: [[name, url]…], none: { key: when } }).
 export const CUTOUT_LEAGUES = ['scotland', 'ucl', 'uel', 'uecl', 'mls', 'facup', 'nationsleague'];
-const TSDB = 'https://www.thesportsdb.com/api/v1/json/3/searchplayers.php?p=';
+const TSDB = 'https://www.thesportsdb.com/api/v1/json/123/searchplayers.php?p=';
 const NONE_AGAIN = 14 * 86_400_000;
 export async function tsdbCutout(name, fetchJson = async u => {
   const r = await fetch(u, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(20_000) });

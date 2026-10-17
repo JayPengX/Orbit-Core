@@ -180,7 +180,7 @@ export async function espnSearchPhoto(name, sport, fetchJson = defaultJson, chec
 // Its player search (free key, open to browsers): the player's cutout when
 // their name and sport match. Its thumbnails are often casual pictures, so
 // only the cutout counts.
-const TSDB_SEARCH = 'https://www.thesportsdb.com/api/v1/json/3/searchplayers.php?p=';
+const TSDB_SEARCH = 'https://www.thesportsdb.com/api/v1/json/123/searchplayers.php?p=';
 const TSDB_SPORT = { soccer: 'Soccer', baseball: 'Baseball', basketball: 'Basketball', football: 'American Football', hockey: 'Ice Hockey', racing: 'Motorsport' };
 // Its free key takes about 30 searches a minute: they go one at a time, 2.1 s
 // apart, so a roster opened (or a few teams flicked through) never hits the
