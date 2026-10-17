@@ -318,7 +318,8 @@ export function vipStatus(wallet, now = Date.now()) {
   const paid = (wallet?.entries || []).filter(e => e.app === 'eco' && e.kind === 'vip').sort((a, b) => b.t - a.t)[0] ?? null;
   return { month, stakes, tier, back: tier ? Math.floor(stakes * tier.back) : 0, next, toNext: next ? next.min - stakes : 0, paid };
 }
-export const vipName = (tier, lang = 'zh') => (tier ? `${tier.icon} ${lang === 'en' ? tier.en : tier.zh}` : '');
+// The tier's name alone (a medal emoji before it read as clip art, the owner 2026-10-18).
+export const vipName = (tier, lang = 'zh') => (tier ? (lang === 'en' ? tier.en : tier.zh) : '');
 
 // The welcome offer (eco.js WELCOME): the first paid bet in Play brings a
 // NT$WELCOME.bet free bet (`eco:fb:welcome`), once. Still to come?
