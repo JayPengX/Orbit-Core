@@ -173,6 +173,7 @@ of the colo the request came in through).
 | `GET /weather…` | `weather.js`, `weather-skill.js` | Orbit Weather (§3.2) |
 | `GET /transit/…` | `transit.js` | Orbit Transit (§3.3) |
 | `GET /sports-proxy` | `sports.js` | The data proxy for Sports, Play and Securities (§4) |
+| `GET /slip` | `slip.js` | Slip Tracker's door (an independent page, no pass): only NPB/KBO/CPBL month lists, its origin only, ≤3 addresses an ask, 6 asks a minute and 60 an hour an address, 3,000 a day in all (D1 `slip_day`), closed from pace 2 |
 
 **The gate.** Every route except signing in needs a Quadra Pass session
 (`qt=`). Sessions are counted per session and app in memory
