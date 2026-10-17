@@ -896,3 +896,8 @@ What was decided, so it isn't undone. Newer calls win.
 - 2026-10-17: Slip Tracker (運彩追蹤), an independent page for real 台灣運彩
   tickets: no Pass and no kit (what it reuses is copied); the proxy only
   through its narrow `/slip` door, capped low so strangers can't drain it.
+- 2026-10-17: Slip Tracker reads a ticket from a photo (`/slip-scan`, Gemini,
+  Class's photo import made narrower). With no Pass, its caps are the tightest
+  in the family: 12 scans a day an address, 150 a day in all. The page then
+  matches each pick to a real game, and the person checks the ticket before
+  it's saved.
