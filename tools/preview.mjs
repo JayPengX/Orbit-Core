@@ -1016,6 +1016,20 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
       if (![...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()) && el.children.length > 2) continue;
       if (el.scrollWidth > el.clientWidth + 1) out.push(`${el.tagName.toLowerCase()}${[...el.classList].map(c => `.${c}`).join('')} "${el.textContent.trim().slice(0, 40)}" (${el.scrollWidth}>${el.clientWidth})`);
     }
+    // A picker (a select) whose chosen option is wider than its face: the
+    // system cuts it with no overflow to see (FX's "TWD · Taiw…").
+    const ctx = document.createElement('canvas').getContext('2d');
+    for (const el of document.querySelectorAll('select')) {
+      const cs = getComputedStyle(el);
+      const r = el.getBoundingClientRect();
+      if (!r.width || cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) === 0 || el.closest('[hidden]')) continue;
+      const text = el.selectedOptions[0]?.textContent.trim();
+      if (!text) continue;
+      ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+      const room = el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - (cs.appearance === 'none' ? 0 : 18);
+      const need = Math.ceil(ctx.measureText(text).width);
+      if (need > room + 1) out.push(`select${el.id ? `#${el.id}` : ''}${[...el.classList].map(c => `.${c}`).join('')} "${text.slice(0, 40)}" (${need}>${Math.round(room)})`);
+    }
     return [...new Set(out)].slice(0, 25);
   });
   if (cuts.length) console.log(`cut:\n  ${cuts.join('\n  ')}`);
