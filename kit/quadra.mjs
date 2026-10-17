@@ -3603,6 +3603,15 @@ export function tabBar({ tabs, onSelect, hash = id => `#${id}`, nav = document.g
         if (b.tabIndex !== (on ? 0 : -1)) b.tabIndex = on ? 0 : -1;
         const panel = document.getElementById(`panel-${tid}`);
         if (panel && panel.hidden !== !on) panel.hidden = !on;
+        // A tab the person chose fades in, as iOS 26's do (never the first
+        // one: the page opens still). Opacity only: a transform would make
+        // the panel hold its fixed children for the moment.
+        if (on && panel && changed && !first && !reducedMotion()) {
+          panel.classList.remove('q-panel-in');
+          void panel.offsetWidth;
+          panel.classList.add('q-panel-in');
+          panel.addEventListener('animationend', () => panel.classList.remove('q-panel-in'), { once: true });
+        }
       }
       // Only a change of tab moves the address (the first paint leaves it:
       // the app reads it to start).
@@ -3903,3 +3912,47 @@ function halftimeBeat() {
   tick();
   halftimeTimer = setInterval(tick, 1000);
 }
+
+// ---- A live number that changed: a small spring pop -------------------------------------------
+//
+// Any element with data-q-live="<key>" (a score, a price, a balance) pops
+// once when its text changes, wherever the app's redraw put it (the key
+// carries it across a node replaced by a redraw). Never in the first
+// seconds after opening (the page opens still), nor while hidden, nor with
+// less movement asked. The app only marks its numbers.
+export const LIVE_QUIET_MS = 6000;
+const liveSeen = new Map();
+export function liveChanged(key, text, now = globalThis.performance?.now?.() ?? Date.now()) {
+  const before = liveSeen.get(key);
+  liveSeen.set(key, text);
+  // (A number for a number: '…' or '–' becoming one is it arriving, not changing.)
+  return before != null && before !== text && /\d/.test(before) && /\d/.test(text) && now > LIVE_QUIET_MS;
+}
+function watchLive() {
+  if (typeof document === 'undefined' || typeof MutationObserver === 'undefined' || document.__quadraLive) return;
+  document.__quadraLive = true;
+  const pop = el => {
+    if (reducedMotion() || document.hidden) return;
+    el.classList.remove('q-bump');
+    void el.offsetWidth;
+    el.classList.add('q-bump');
+    el.addEventListener('animationend', () => el.classList.remove('q-bump'), { once: true });
+  };
+  const check = el => {
+    const key = el.dataset.qLive;
+    if (key && liveChanged(key, el.textContent.trim())) pop(el);
+  };
+  const scan = () => document.querySelectorAll('[data-q-live]').forEach(el => liveSeen.set(el.dataset.qLive, el.textContent.trim()));
+  new MutationObserver(list => {
+    const found = new Set();
+    for (const m of list) {
+      const t = m.target.nodeType === 1 ? m.target : m.target.parentElement;
+      const own = t?.closest?.('[data-q-live]');
+      if (own) found.add(own);
+      for (const n of m.addedNodes) if (n.nodeType === 1) (n.matches('[data-q-live]') ? [n] : n.querySelectorAll('[data-q-live]')).forEach(x => found.add(x));
+    }
+    found.forEach(check);
+  }).observe(document.documentElement, { childList: true, subtree: true, characterData: true });
+  scan();
+}
+watchLive();

@@ -682,3 +682,13 @@ test("中場休息 counts down from the half's last play, by the league's break"
   await new Promise(r => setTimeout(r, 0));
   assert.equal(kit.halftimeEnd('t:2'), null);
 });
+
+test('a live number pops only when it changed, and never in the first seconds', () => {
+  assert.equal(kit.liveChanged('t:a', '1-0', 10_000), false);
+  assert.equal(kit.liveChanged('t:a', '1-0', 11_000), false);
+  assert.equal(kit.liveChanged('t:a', '2-0', 12_000), true);
+  assert.equal(kit.liveChanged('t:b', '0-0', 100), false);
+  assert.equal(kit.liveChanged('t:b', '1-0', kit.LIVE_QUIET_MS - 1), false);
+  assert.equal(kit.liveChanged('t:c', '…', 10_000), false);
+  assert.equal(kit.liveChanged('t:c', 'NT$1,000', 11_000), false);
+});

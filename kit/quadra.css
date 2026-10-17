@@ -2272,6 +2272,29 @@ input[type='checkbox'][switch] {
   }
 }
 
+/* ---- A tab chosen fades in (kit tabBar; never the first) ---- */
+.q-panel-in {
+  animation: q-panel-in 0.24s var(--q-ease) both;
+}
+@keyframes q-panel-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* ---- A live number that changed pops once (data-q-live, kit/quadra.mjs) ---- */
+:where(span, b, strong, small, em, i)[data-q-live] {
+  display: inline-block;
+}
+.q-bump {
+  animation: q-bump var(--q-dur-bouncy) var(--q-spring-bouncy);
+}
+@keyframes q-bump {
+  30% {
+    transform: scale(1.18);
+  }
+}
+
 /* ---- Less movement when asked: no springs, no slides ---- */
 @media (prefers-reduced-motion: reduce) {
   .q-btn,
@@ -2297,6 +2320,8 @@ input[type='checkbox'][switch] {
   .q-net,
   .q-menu,
   .q-accessory,
+  .q-panel-in,
+  .q-bump,
   .q-skel {
     animation: none;
   }
