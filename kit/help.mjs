@@ -58,7 +58,7 @@ export const HELP = {
         '想停：「Plus」›「管理」›「管理會員」›「取消自動續訂」，權益用到期滿；已付不退費，價格含 5% 營業稅。免費投注照運彩業者的規則：賠率 1.50 以上（串關看總賠率）、不能提前兌現、7 天內用完，贏了只拿獎金、不退本金。'
       ]],
       ['vip', 'VIP 投注回饋與新手禮', [
-        'VIP 不用加入也不用付費：每個月在 Play 的投注（運彩、彩券、刮刮樂，退款不算）決定當月等級，下個月第一次打開任何 App 時回饋當月投注額的一部分：🥉 銅卡 NT$10,000 起 0.5%、🥈 銀卡 NT$50,000 起 0.8%、🥇 金卡 NT$150,000 起 1.2%、◆ 黑卡 NT$500,000 起 1.5%。Play 首頁的餘額卡上看得到本月等級和離下一級還差多少。',
+        'VIP 不用加入也不用付費：每個月在 Play 的投注（運彩、彩券、刮刮樂，退款不算）決定當月等級，下個月第一次打開任何 App 時回饋當月投注額的一部分：銅卡 NT$10,000 起 0.5%、銀卡 NT$50,000 起 0.8%、金卡 NT$150,000 起 1.2%、黑卡 NT$500,000 起 1.5%。Play 首頁的餘額卡上看得到本月等級和離下一級還差多少。',
         '新手禮：在 Play 第一次用自己的錢下注後，送一張 NT$200 免費投注（7 天內有效）；在 Securities 的第一筆交易免手續費（稅和規費照收）。'
       ]],
       ['money', '錢怎麼算', [
@@ -110,7 +110,7 @@ export const HELP = {
         'To stop: Plus › Manage › Manage membership › Stop renewing; the perks last to the end of what’s paid. Nothing is refunded, and prices include 5% VAT. Free bets follow a sportsbook’s terms: odds of 1.50 or more (a parlay’s taken together), no cash out, used within 7 days, and a win pays the winnings, not the stake.'
       ]],
       ['vip', 'VIP cashback and welcome offers', [
-        'VIP is free and needs no sign-up: what you stake in Play in a month (bets, lottery and scratch cards; refunds don’t count) sets that month’s tier, and a share of it comes back the first time you open any app the next month: 🥉 Bronze from NT$10,000 0.5%, 🥈 Silver from NT$50,000 0.8%, 🥇 Gold from NT$150,000 1.2%, ◆ Black from NT$500,000 1.5%. Play’s balance card shows this month’s tier and what’s left to the next.',
+        'VIP is free and needs no sign-up: what you stake in Play in a month (bets, lottery and scratch cards; refunds don’t count) sets that month’s tier, and a share of it comes back the first time you open any app the next month: Bronze from NT$10,000 0.5%, Silver from NT$50,000 0.8%, Gold from NT$150,000 1.2%, Black from NT$500,000 1.5%. Play’s balance card shows this month’s tier and what’s left to the next.',
         'Welcome offers: your first bet in Play with your own money brings a NT$200 free bet (7 days), and your first trade in Securities pays no commission (taxes and fees as usual).'
       ]],
       ['money', 'Money', [

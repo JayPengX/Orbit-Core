@@ -438,7 +438,7 @@ test('VIP in the kit: the same tiers as the Worker, this month so far', async ()
   assert.equal(v.toNext, 90_000);
   assert.equal(v.paid.amount, 80);
   assert.equal(kit.vipStatus({ entries: [] }, now).tier, null);
-  assert.equal(kit.vipName(v.tier, 'en'), '🥈 Silver');
+  assert.equal(kit.vipName(v.tier, 'en'), 'Silver');
   assert.equal(kit.WELCOME.bet, eco.WELCOME.bet);
   assert.equal(kit.welcomeDue({ entries: [] }), true);
   assert.equal(kit.welcomeDue(w), false);
