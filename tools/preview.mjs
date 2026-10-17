@@ -896,7 +896,10 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
     [...document.querySelectorAll('body *')]
       .filter(el => {
         const cs = getComputedStyle(el);
-        const row = cs.display.includes('flex') && cs.flexDirection === 'row' && cs.flexWrap === 'nowrap';
+        // (A row of cards made to slide: a flex row, a grid flowing by
+        // column, or one snapping sideways, as Play's 為你推薦 and
+        // Securities' 全球行情 are.)
+        const row = (cs.display.includes('flex') && cs.flexDirection === 'row' && cs.flexWrap === 'nowrap') || (cs.display.includes('grid') && cs.gridAutoFlow.startsWith('column')) || /^x\b/.test(cs.scrollSnapType);
         return !row && /auto|scroll/.test(cs.overflowX) && /auto|scroll/.test(cs.overflowY) && el.clientWidth && el.scrollWidth > el.clientWidth + 1 && !el.closest('[hidden]');
       })
       .slice(0, 6)
