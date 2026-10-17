@@ -12,7 +12,8 @@
 //                          [--clock 2026-10-06T10:05]  (the page's clock, Taipei time)
 //                          [--snap '{json}']  (the wallet's snap to start with, e.g. Play's open slips)
 //                          [--fixture 'text-in-url=file.json']  (repeatable: that saved answer
-//                          for any upstream URL containing the text, e.g. when Yahoo rate-limits)
+//                          for any upstream URL containing the text, e.g. when Yahoo rate-limits;
+//                          the file is read at each ask, so swapping it mid-run changes the game)
 //                          [--timing]  (loading speed: when the loading screen went away, how
 //                          many of the app's own files and how deep their import chain was)
 //                          [--latency ms]  (each of the app's own files answers this much later:
@@ -121,7 +122,8 @@ const wait = Number(opt('wait', 6000));
 const payloadFile = opt('payload', '');
 const fixtures = [];
 for (let f = opt('fixture', ''); f; f = opt('fixture', '')) {
-  const i = f.indexOf('=');
+  // (Split at the last '=': the text can be a URL's own, 'dates=20261017'.)
+  const i = f.lastIndexOf('=');
   fixtures.push([f.slice(0, i), resolve(f.slice(i + 1))]);
 }
 // --clock ISO: the page's time starts then (and runs on): a live session made up with --fixture, say.
