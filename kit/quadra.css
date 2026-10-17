@@ -2868,24 +2868,17 @@ dialog.q-moved::backdrop {
   font-size: 15px;
   font-weight: 750;
   line-height: 1.3;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  /* One line: a long name shrinks to fit (the app's fitNumbers), so every
+     card's price sits at the same height. */
+  white-space: nowrap;
 }
 .q-rec-sub {
   margin: 0;
   color: var(--q-muted);
   font-size: 13px;
   line-height: 1.35;
-  /* Two lines rather than a name cut off mid-word; a line breaks between
-     words (· parts), never inside 加密貨幣. */
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  word-break: keep-all;
-  overflow-wrap: anywhere;
+  /* One line, shrunk to fit like the name above it. */
+  white-space: nowrap;
 }
 .q-rec-foot {
   /* One row: the price and its change side by side, never the change under
