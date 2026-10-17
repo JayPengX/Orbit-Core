@@ -166,15 +166,41 @@ export function tsdbDays(ym, now = Date.now()) {
   }
   return days;
 }
-// Plain fetch, each answer kept 10 minutes in memory.
+// Plain fetch, each answer kept 10 minutes in memory. Two at a time, and
+// after a refusal none for a minute: a month's days asked at once (a few
+// months, 80-odd) drew TheSportsDB's 429 (2026-10-17).
 const directCache = new Map();
+const DIRECT_AT_ONCE = 2;
+const DIRECT_HOLD_MS = 60_000;
+let directBusy = 0;
+let directHeldUntil = 0;
+const directQueue = [];
+const directNext = () => {
+  while (directBusy < DIRECT_AT_ONCE && directQueue.length) directQueue.shift()();
+};
+function directRead(url) {
+  return new Promise((resolve, reject) => {
+    directQueue.push(() => {
+      if (Date.now() < directHeldUntil) return reject(new Error('held'));
+      directBusy++;
+      fetch(url)
+        .then(r => {
+          if (!r.ok) throw new Error(String(r.status));
+          return r.json();
+        })
+        .then(resolve, error => {
+          directHeldUntil = Date.now() + DIRECT_HOLD_MS;
+          reject(error);
+        })
+        .finally(() => (directBusy--, directNext()));
+    });
+    directNext();
+  });
+}
 function directJson(url) {
   const hit = directCache.get(url);
   if (hit && Date.now() - hit.at < 10 * 60_000) return hit.p;
-  const p = fetch(url).then(r => {
-    if (!r.ok) throw new Error(String(r.status));
-    return r.json();
-  });
+  const p = directRead(url);
   directCache.set(url, { at: Date.now(), p });
   p.catch(() => directCache.delete(url));
   return p;
