@@ -3814,3 +3814,78 @@ function recRows(s, note) {
     ])
   ]);
 }
+
+// ---- 中場休息: how long the break has left, the same in every app ----------------------------
+// When a half ended, to the second: the latest play on the wall clock in
+// ESPN's game summary (soccer's 'halftime' key event, basketball's End
+// Period, football's End of Half: checked live 2026-10-17). The break's
+// length is the league's rule; past it, the countdown goes and 中場休息
+// stays alone. Kept on the phone for the rest of the break, so reopening
+// the app doesn't ask again. Every countdown shown ticks from one beat,
+// never a redraw (an element with halftimeAttrs).
+const HALFTIME_MIN = { soccer: 15, basketball: 15, football: 13 };
+const HALFTIME_LEAGUE_MIN = { ncaaf: 20, 'college-football': 20, 'football/college-football': 20 };
+const HALFTIME_KEY = 'quadra.halftime';
+export const halftimeMinutes = (sport, league = '') => HALFTIME_LEAGUE_MIN[league] ?? HALFTIME_MIN[sport] ?? null;
+export function halftimeStartOf(summary) {
+  const drives = summary?.drives || {};
+  const plays = [...(summary?.plays || []), ...(summary?.keyEvents || []), ...(drives.previous || []).flatMap(d => d?.plays || []), ...(drives.current?.plays || [])];
+  const at = plays.map(p => Date.parse(p?.wallclock || '')).filter(Number.isFinite);
+  return at.length ? Math.max(...at) : null;
+}
+// "12:34" left at `now`; '' once the break's length is up.
+export function halftimeClock(end, now = Date.now()) {
+  const s = Math.ceil((end - now) / 1000);
+  return end && s > 0 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : '';
+}
+const halftimeEnds = (() => {
+  try {
+    const kept = JSON.parse(localStorage.getItem(HALFTIME_KEY) || '{}');
+    // A break long over is forgotten.
+    return new Map(Object.entries(kept).filter(([, end]) => end > Date.now() - 3_600_000));
+  } catch {
+    return new Map();
+  }
+})();
+const halftimeAsked = new Map();
+export const halftimeEnd = key => halftimeEnds.get(String(key)) ?? null;
+// A game at half-time: its break's end found once (read: () => ESPN's
+// summary of it), then ticking. A summary not yet at the break (a cached
+// copy from before the whistle) is asked again 20 s later.
+export function watchHalftime(key, { sport, league = '', read }) {
+  key = String(key);
+  const minutes = halftimeMinutes(sport, league);
+  if (!minutes || halftimeEnds.has(key) || Date.now() - (halftimeAsked.get(key) || 0) < 20_000) return halftimeEnd(key);
+  halftimeAsked.set(key, Date.now());
+  Promise.resolve()
+    .then(read)
+    .then(summary => {
+      const status = summary?.header?.competitions?.[0]?.status?.type || {};
+      const start = halftimeStartOf(summary);
+      if (!start || !/HALFTIME|^HT$|^half/i.test(`${status.name || ''} ${status.shortDetail || ''}`.trim())) return;
+      halftimeEnds.set(key, start + minutes * 60_000);
+      try {
+        localStorage.setItem(HALFTIME_KEY, JSON.stringify(Object.fromEntries(halftimeEnds)));
+      } catch {}
+      halftimeBeat();
+    })
+    .catch(() => {});
+  halftimeBeat();
+  return null;
+}
+// What an element showing a game's break carries for the beat: its key and
+// the words before the countdown ('中場休息', or '' for the countdown alone).
+export const halftimeAttrs = (key, label = '') => ({ 'data-halftime': String(key), 'data-halftime-label': label });
+let halftimeTimer = 0;
+function halftimeBeat() {
+  if (halftimeTimer || typeof document === 'undefined') return;
+  const tick = () => {
+    const shown = document.querySelectorAll('[data-halftime]');
+    for (const node of shown) {
+      const text = [node.dataset.halftimeLabel, halftimeClock(halftimeEnd(node.dataset.halftime))].filter(Boolean).join(' ');
+      if (node.textContent !== text) node.textContent = text;
+    }
+  };
+  tick();
+  halftimeTimer = setInterval(tick, 1000);
+}
