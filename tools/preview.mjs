@@ -426,6 +426,10 @@ const upstream = url => {
     if (!cache.has(url)) cache.set(url, asiaBaseballResponse(new URL(url)).then(async r => ({ status: r.status, body: await r.text() })));
     return cache.get(url);
   }
+  // Yahoo's quote and quoteSummary want the cookie and crumb: asked as the Worker asks (sports.js).
+  if (!cache.has(url) && /^https:\/\/query[12]\.finance\.yahoo\.com\/(v7\/finance\/quote|v10\/finance\/quoteSummary\/)/.test(url)) {
+    cache.set(url, import('../sports.js').then(m => m.fetchYahoo(new URL(url))).then(async r => ({ status: r.status, body: await r.text() }), () => ({ status: 502, body: '' })));
+  }
   if (!cache.has(url)) {
     const t0 = Date.now();
     // DEBUG: status, size, when it was asked (ms from start) and how long it took.
