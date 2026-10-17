@@ -54,7 +54,7 @@
   /* Tables */
   .tablewrap { overflow-x: auto; }
   /* On a phone a table keeps its main columns (the week's money: its net, not in and out). */
-  @media (max-width: 520px) { th.wide, td.wide { display: none; } table th, table td { padding-inline: 5px; } }
+  @media (max-width: 520px) { th.wide, td.wide { display: none; } table th, table td { padding-inline: 5px; } .tablewrap table { font-size: 13px; } }
   table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
   th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--q-divider); white-space: nowrap; }
   th { color: var(--q-muted); font-weight: 600; }
@@ -115,6 +115,11 @@
   .kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
   .actions { display: grid; gap: 12px; }
   .action { padding: 14px; border-radius: 14px; background: var(--q-surface); border: 1px solid var(--q-border); }
+  /* Reset's apps to keep: two to a row, each on one line. */
+  .keeps { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px 12px; margin-bottom: 10px; }
+  .keep { display: flex; align-items: center; gap: 6px; font-size: 14px; white-space: nowrap; }
+  /* An action's note, only once there is one (an empty pair left a blank band under each). */
+  .action .error:empty, .action .ok:empty { display: none; }
   .action h3 { margin: 0 0 4px; font-size: 15px; }
   .action p.muted { margin: 0 0 10px; }
   /* Wide screens: the views down the side, the page beside them. */
@@ -137,8 +142,8 @@
   .pane-head > button { flex: none; }
   .pane-head h2 { margin: 0; }
   /* The checks as a grid of equal buttons (three rows of pills of every width before). */
-  .actions { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
-  .actions button { padding-inline: 10px; }
+  .checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+  .checks button { padding-inline: 10px; }
   .pane-head .muted { margin: 2px 0 0; }
   /* 開發: the settings */
   .set-group { margin-top: 12px; }
@@ -357,7 +362,7 @@
       <div class="pane-head"><div><h2>排程工作</h2><p class="muted">每個排程工作最近一次跑的時間、結果、花多久。黃色是比平常晚。</p></div></div>
       <ul class="checks" id="beats"></ul>
       <div class="pane-head"><div><h2>檢查與建置</h2><p class="muted">Gemini：經台灣中繼送一個很小的請求。建置：不管節流，現在跑一次。</p></div></div>
-      <div class="actions" id="sys-actions"></div>
+      <div class="checks" id="sys-actions"></div>
       <p class="muted" id="sys-out" style="overflow-wrap:anywhere"></p>
       <div class="twocol" style="margin-top:12px">
         <div class="card"><div class="row spread"><strong>R2 資料</strong><span class="muted" id="r2-sum"></span></div><ul class="checks" id="r2" style="margin-top:8px"></ul></div>
@@ -422,6 +427,9 @@ const store = { get: () => { try { return localStorage.getItem(KEY) || ''; } cat
 let token = store.get();
 const APPS = { stock: 'Quadra 證券', odds: 'Quadra Play', match: 'Orbit Sports', vocab: 'Orbit Words', orbit: 'Orbit Class', weather: 'Orbit Weather', transit: 'Orbit Transit' };
 const appName = a => APPS[a] || a;
+// A record's kind in words (the key itself when it's one not named here).
+const KINDS = { start: '開戶金', pay: '月薪', grant: '補發', rank: '排名獎', rebase: '重算', vip: 'VIP', admin: '手動調整', plus: 'Plus 月費', od: '透支利息', stake: '下注', payout: '派彩', win: '派彩', refund: '退款', cashout: '提前兌現', lottery: '彩券', prize: '彩券獎金', undo: '撤銷' };
+const kindName = k => KINDS[k] || k;
 
 const WHY = {
   FORBIDDEN: '管理金鑰不對（或還沒部署好，等一分鐘再試）。',
@@ -455,6 +463,8 @@ const el = (tag, props = {}, kids = []) => {
   return n;
 };
 const fmt = t => (t ? new Date(t).toLocaleString('zh-TW', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) : '—');
+// This year's without the year (a record's time in a phone-wide table).
+const fmtShort = t => (t && new Date(t).getFullYear() === new Date().getFullYear() ? new Date(t).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) : fmt(t));
 const fmtDay = t => (t ? new Date(t).toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric' }) : '—');
 const money = v => (v == null ? '—' : `${v < 0 ? '−' : ''}NT$${Math.abs(Math.round(v)).toLocaleString()}`);
 const ago = t => {
@@ -542,7 +552,7 @@ async function loadOverview() {
         ? flows.map(([k, v]) => {
             const [a, kind] = k.split(':');
             const net = v.in - v.out;
-            return el('tr', {}, [el('td', { text: `${a === 'eco' ? 'Quadra' : appName(a)} · ${kind}` }), el('td', { class: 'right', text: v.n }), el('td', { class: 'right pos wide', text: money(v.in) }), el('td', { class: 'right neg wide', text: money(v.out) }), el('td', { class: `right ${net >= 0 ? 'pos' : 'neg'}`, text: money(net) })]);
+            return el('tr', {}, [el('td', { text: `${a === 'eco' ? 'Quadra' : appName(a)} · ${kindName(kind)}` }), el('td', { class: 'right', text: v.n }), el('td', { class: 'right pos wide', text: money(v.in) }), el('td', { class: 'right neg wide', text: money(v.out) }), el('td', { class: `right ${net >= 0 ? 'pos' : 'neg'}`, text: money(net) })]);
           })
         : [el('tr', {}, [el('td', { colspan: '5', class: 'muted', text: '這週沒有金流。' })])])
     );
@@ -672,7 +682,7 @@ async function openAccount(ref) {
 function action(title, text, controls, run) {
   const err = el('p', { class: 'error' });
   const ok = el('p', { class: 'ok' });
-  const box = el('div', { class: 'action' }, [el('h3', { text: title }), text ? el('p', { class: 'muted', text }) : null, el('div', { class: 'row' }, controls), err, ok]);
+  const box = el('div', { class: 'action' }, [el('h3', { text: title }), text ? el('p', { class: 'muted', text }) : null, ...(Array.isArray(controls[0]) ? controls : [controls]).map((line, i) => el('div', { class: 'row', style: i ? 'margin-top:8px' : null }, line)), err, ok]);
   box.run = async (btn, ...args) => {
     err.textContent = ok.textContent = '';
     await busy(btn, async () => {
@@ -702,10 +712,10 @@ function drawAccount(a) {
 
   const reload = () => openAccount(a.ref);
   // Money by hand.
-  const amt = el('input', { type: 'number', step: '1', placeholder: '金額（負數為扣款）', style: 'flex:1 1 170px' });
-  const note = el('input', { class: 'grow', placeholder: '原因（必填，帳戶紀錄看得到）', maxlength: '60' });
+  const amt = el('input', { type: 'number', step: '1', class: 'grow', placeholder: '金額（負數為扣款）' });
+  const note = el('input', { class: 'grow', placeholder: '原因（必填）', maxlength: '60' });
   const grantBtn = el('button', { class: 'primary', text: '入帳' });
-  const grant = action('調整金額', '更正、補償或獎金：寫進帳戶紀錄，正數加錢、負數扣錢。', [amt, note, grantBtn], async () => {
+  const grant = action('調整金額', '更正、補償或獎金：原因寫進帳戶紀錄，本人看得到；正數加錢、負數扣錢。', [[amt], [note, grantBtn]], async () => {
     const v = Number(amt.value);
     if (!confirm(`${v >= 0 ? '加' : '扣'} ${money(Math.abs(v))} 給帳戶 ${a.ref}？\n原因：${note.value}`)) return '已取消';
     const r = await admin('grant', { wallet: a.ref, amount: v, note: note.value });
@@ -717,7 +727,7 @@ function drawAccount(a) {
   const months = el('select', {}, [1, 2, 3, 6, 12].map(n => el('option', { value: String(n), text: `${n} 個月` })));
   const giveBtn = el('button', { class: 'primary', text: '送 Plus' });
   const stopBtn = el('button', { text: '停止續訂' });
-  const plus = action('Plus', '送免費的月份（從這個月起，已有的月份不重複），或停止自動續訂（已付的月份照常）。', [months, giveBtn, stopBtn], async kind => {
+  const plus = action('Plus', '送免費的月份（從這個月起，已有的月份不重複），或停止自動續訂（已付的月份照常）。', [[months, giveBtn], [stopBtn]], async kind => {
     const r = kind === 'stop' ? await admin('plus', { wallet: a.ref, stop: true }) : await admin('plus', { wallet: a.ref, months: Number(months.value) });
     setTimeout(reload, 900);
     return kind === 'stop' ? '已停止續訂' : r.member ? '已送出，現在是會員' : '已送出';
@@ -743,7 +753,7 @@ function drawAccount(a) {
   recover.append(codeOut);
   codeBtn.onclick = () => recover.run(codeBtn);
   // A test notice.
-  const pushApp = el('select', {}, a.pushes.map(x => el('option', { value: x, text: appName(x) })));
+  const pushApp = el('select', { class: 'grow' }, a.pushes.map(x => el('option', { value: x, text: appName(x) })));
   const pushBtn = el('button', { text: '送測試通知' });
   const pushTest = a.pushes.length
     ? action('測試通知', '送一則測試通知到這個帳戶訂閱的裝置。', [pushApp, pushBtn], async () => {
@@ -753,17 +763,17 @@ function drawAccount(a) {
     : null;
   if (pushTest) pushBtn.onclick = () => pushTest.run(pushBtn);
   // Reset, at its owner's request.
-  const pass = el('input', { class: 'grow', placeholder: '他的 Quadra Pass（重置需要本人的 Pass）', autocomplete: 'off' });
-  const keepBoxes = Object.entries(APPS).map(([k, n]) => el('label', { class: 'row', style: 'gap:6px' }, [el('input', { type: 'checkbox', value: k }), el('span', { text: `保留 ${n}` })]));
+  const pass = el('input', { class: 'grow', placeholder: '本人的 Quadra Pass', autocomplete: 'off' });
+  const keepBoxes = Object.entries(APPS).map(([k, n]) => el('label', { class: 'keep' }, [el('input', { type: 'checkbox', value: k }), el('span', { text: `保留 ${n}` })]));
   const resetBtn = el('button', { class: 'danger', text: '重置帳戶' });
-  const reset = action('重置帳戶', '本人要求時：保留 Pass 和勾選的 App 資料，其他全部重來（新的錢包、其他 App 的資料刪除、所有裝置登出）。無法復原。', [pass, resetBtn], async () => {
+  const reset = action('重置帳戶', '本人要求時（要他的 Pass）：保留 Pass 和勾選的 App 資料，其他全部重來（新的錢包、其他 App 的資料刪除、所有裝置登出）。無法復原。', [pass, resetBtn], async () => {
     const keep = keepBoxes.map(l => l.querySelector('input')).filter(i => i.checked).map(i => i.value);
     if (!confirm(`重置帳戶 ${a.ref}？保留：${keep.length ? keep.map(appName).join('、') : '無'}。無法復原。`)) return '已取消';
     const r = await admin('reset', { passcode: pass.value, keep });
     setTimeout(reload, 900);
     return `已重置，刪除了 ${r.gone.map(appName).join('、') || '無'}`;
   });
-  reset.insertBefore(el('div', { class: 'chips', style: 'margin-bottom:10px' }, keepBoxes), reset.querySelector('.row'));
+  reset.insertBefore(el('div', { class: 'keeps' }, keepBoxes), reset.querySelector('.row'));
   resetBtn.onclick = () => reset.run(resetBtn);
   // Taking an unused pass back.
   const removeBtn = el('button', { class: 'danger', text: '收回這組 Pass' });
@@ -778,8 +788,8 @@ function drawAccount(a) {
   if (remove) removeBtn.onclick = () => remove.run(removeBtn);
 
   // One app's data cleared.
-  const clearApp = el('select', {}, a.apps.map(x => el('option', { value: x.app, text: appName(x.app) })));
-  const clearBtn = el('button', { class: 'danger', text: '清除這個 App 的資料' });
+  const clearApp = el('select', { class: 'grow' }, a.apps.map(x => el('option', { value: x.app, text: appName(x.app) })));
+  const clearBtn = el('button', { class: 'danger', text: '清除資料' });
   const clear = a.apps.length
     ? action('清除某個 App 的資料', '只刪這個 App 的資料（和它的收件匣），錢包和其他 App 不動；所有裝置登出，免得舊資料被傳回來。無法復原。', [clearApp, clearBtn], async () => {
         if (!confirm(`清除帳戶 ${a.ref} 在 ${appName(clearApp.value)} 的資料？無法復原。`)) return '已取消';
@@ -821,11 +831,11 @@ function drawAccount(a) {
   };
   const records = el('div', { class: 'tablewrap' }, [
     el('table', {}, [
-      el('thead', {}, [el('tr', {}, ['時間', '來源', '種類', '金額', '備註', ''].map((h, i) => el('th', { class: i === 3 ? 'right' : null, text: h })))]),
+      el('thead', {}, [el('tr', {}, ['時間', '來源', '種類', '金額', '備註', ''].map((h, i) => el('th', { class: i === 3 ? 'right' : i === 1 || i === 4 ? 'wide' : null, text: h })))]),
       el('tbody', {}, a.recent.length ? a.recent.map(e => {
         const btn = e.amount && !e.undone && !e.id?.startsWith('eco:undo:') ? el('button', { class: 'small', text: '撤銷' }) : null;
         if (btn) btn.onclick = () => undo(e, btn);
-        return el('tr', {}, [el('td', { text: fmt(e.t) }), el('td', { text: e.app === 'eco' ? 'Quadra' : appName(e.app) }), el('td', { text: e.kind }), el('td', { class: `right ${e.amount > 0 ? 'pos' : e.amount < 0 ? 'neg' : ''}`, text: e.amount ? money(e.amount) : '—' }), el('td', { text: e.note }), el('td', {}, [e.undone ? el('span', { class: 'tag', text: '已撤銷' }) : btn])]);
+        return el('tr', {}, [el('td', { text: fmtShort(e.t) }), el('td', { class: 'wide', text: e.app === 'eco' ? 'Quadra' : appName(e.app) }), el('td', { text: kindName(e.kind), title: e.kind }), el('td', { class: `right ${e.amount > 0 ? 'pos' : e.amount < 0 ? 'neg' : ''}`, text: e.amount ? money(e.amount) : '—' }), el('td', { class: 'wide', text: e.note }), el('td', {}, [e.undone ? el('span', { class: 'tag', text: '已撤銷' }) : btn])]);
       }) : [el('tr', {}, [el('td', { colspan: '6', class: 'muted', text: '沒有紀錄。' })])])
     ])
   ]);
