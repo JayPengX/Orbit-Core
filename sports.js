@@ -57,6 +57,9 @@ const SPORTS_PROXY_ALLOWED_HOSTS = [
   // currencies, crypto, metals and indexes worldwide.
   'query1.finance.yahoo.com',
   'query2.finance.yahoo.com',
+  // TWSE's list of public subscriptions (新股申購, kit/stock-ipo.mjs):
+  // Securities' applications and the Worker's draw (only that announcement).
+  'www.twse.com.tw',
   // Google's translate endpoint (the Chrome dictionary's, no key): a
   // company's description in the reader's language (Securities). Only
   // /translate_a/t; sent upstream as a POST (see fetchUpstream), kept a month.
@@ -276,6 +279,9 @@ function cachePolicyFor(url) {
     case 'query1.finance.yahoo.com':
     case 'query2.finance.yahoo.com':
       return yahooPolicy(url);
+    // 新股申購's list: a draw's rate comes out on its day (minutes).
+    case 'www.twse.com.tw':
+      return CACHE_TEAM_SCHEDULE;
     case 'clients5.google.com':
       return CACHE_TRANSLATE;
     case ELTA_HOST:
@@ -971,6 +977,7 @@ function parseTarget(target) {
     if (u.hostname === 'clients5.google.com' && (u.pathname !== '/translate_a/t' || (u.searchParams.get('q') || '').length > 5000)) return null;
     if (u.hostname === ELTA_HOST && u.pathname !== ELTA_PATH) return null;
     if (u.hostname === 'clob.polymarket.com' && u.pathname !== '/prices-history') return null;
+    if (u.hostname === 'www.twse.com.tw' && u.pathname !== '/rwd/zh/announcement/publicForm') return null;
     if (u.hostname === ELTA_VOD_HOST && (!/^\/sports\/play\/1\/\d{1,6}$/.test(u.pathname) || u.search)) return null;
     // A search (its words, in English as seen from Taiwan) or a video's page, nothing else.
     if (u.hostname === YT_HOST && !(u.pathname === '/results' ? [...u.searchParams.keys()].every(k => ['search_query', 'hl', 'gl'].includes(k)) && (u.searchParams.get('search_query') || '').length > 0 && (u.searchParams.get('search_query') || '').length <= 200 : u.pathname === '/watch' && [...u.searchParams.keys()].join() === 'v' && /^[\w-]{11}$/.test(u.searchParams.get('v')))) return null;
