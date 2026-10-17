@@ -25,6 +25,7 @@
 //                          for any symbol, for when Yahoo answers 429)
 //
 //   app   sports | play | securities | words | orbit | weather | transit (or the repo's folder name)
+//         | admin [overview accounts issue money dev data ops clean]  (the admin panel, made-up accounts)
 //
 // Orbit Transit: /transit is answered by transit.js itself on made-up TDX
 // answers around 新竹車站 (tests/fixtures/transit; until the TDX key is set no
@@ -242,7 +243,9 @@ async function snapshotRoot(when, repos) {
 }
 const [appArg, ...hashes] = args;
 
-const APPS = { sports: ['Orbit-Sports', 'match'], play: ['Quadra-Play', 'odds'], securities: ['Quadra-Securities', 'stock'], words: ['Orbit-Words', 'vocab'], orbit: ['Orbit-Class', 'orbit'], weather: ['Orbit-Weather', 'weather'], transit: ['Orbit-Transit', 'transit'] };
+const APPS = { sports: ['Orbit-Sports', 'match'], play: ['Quadra-Play', 'odds'], securities: ['Quadra-Securities', 'stock'], words: ['Orbit-Words', 'vocab'], orbit: ['Orbit-Class', 'orbit'], weather: ['Orbit-Weather', 'weather'], transit: ['Orbit-Transit', 'transit'], admin: ['Shared-Proxy', 'admin'] };
+// The admin panel's key in a preview: the run's own, never the owner's.
+const ADMIN_KEY = 'preview-admin-key-0123456789abcdef0123456789';
 // The old names still work.
 const ALIAS = { fixtures: 'sports', hub: 'words' };
 const key = Object.keys(APPS).find(k => k === (ALIAS[appArg] || appArg) || APPS[k][0].toLowerCase() === String(appArg).toLowerCase());
@@ -251,7 +254,7 @@ const [renamed, appId] = APPS[key];
 // A clone made before the rename keeps the old folder name.
 const OLD = { 'Orbit-Sports': 'Quadra-Fixtures', 'Orbit-Words': 'Quadra-Hub' };
 const repo = existsSync(join(ROOT, renamed)) || !OLD[renamed] ? renamed : OLD[renamed];
-const dir = key === 'orbit' ? join(ROOT, repo, 'dist') : join(ROOT, repo, 'public');
+const dir = key === 'orbit' ? join(ROOT, repo, 'dist') : key === 'admin' ? join(ROOT, repo, 'site') : join(ROOT, repo, 'public');
 if (!existsSync(dir)) throw new Error(`${dir} missing${key === 'orbit' ? ' (run npm run build in Orbit-Class)' : ''}`);
 
 // What's served: the current repos, or --upgrade's old ones for the first opening.
@@ -546,7 +549,7 @@ await context.addInitScript(
       localStorage.setItem('quadra.lang', lang);
     } catch {}
   },
-  [signedOut ? '' : refresh, lang, stores]
+  [signedOut ? '' : refresh, lang, key === 'admin' && !signedOut ? [...stores, ['quadra.admin', ADMIN_KEY]] : stores]
 );
 // Orbit Weather's routes (see the top): weather.js on the fixtures, one KV
 // for the run.
@@ -654,6 +657,56 @@ await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(?!
   if (body.op === 'pair-create') Object.assign(reply, { code: 'ABCD2345', exp: Date.now() + 600_000 });
   await route.fulfill({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(reply) });
 });
+// The admin panel (site/admin, `admin [view…]`): eco-admin.js's own
+// handler on made-up accounts in this run's memory, opened with a throwaway
+// key of the run's (never the owner's, never the live Worker's). A view
+// named is the tab clicked once it opens (accounts, money, dev…).
+if (key === 'admin') {
+  const { handleAdmin } = await import('../eco-admin.js');
+  const { WALLET_COLLECTION } = await import('../eco.js');
+  const { createHash, randomBytes } = await import('node:crypto');
+  const docs = new Map();
+  const DAY = 86_400_000;
+  const APPS_USED = ['stock', 'odds', 'match', 'vocab', 'orbit', 'weather', 'transit'];
+  // Twelve accounts: made over the last 40 days, a few apps each, pay and play.
+  for (let i = 0; i < 12; i++) {
+    const made = now - (40 - i * 3) * DAY;
+    const apps = Object.fromEntries(APPS_USED.filter((a, j) => (i + j) % 3 !== 0).map((a, j) => [a, { first: made, last: now - ((i * 7 + j) % 9) * DAY - i * 3_600_000 }]));
+    const entries = [
+      { id: 'eco:start', t: made, app: 'eco', kind: 'start', amount: 30_000 },
+      { id: 'eco:pay:2026-10', t: now - 17 * DAY, app: 'eco', kind: 'pay', amount: 6_000 },
+      ...Array.from({ length: i % 5 }, (_, k) => ({ id: `odds:s${k}`, t: now - k * DAY, app: 'odds', kind: 'stake', amount: -200 * (k + 1) })),
+      ...(i % 4 === 0 ? [{ id: 'odds:w1', t: now - 2 * DAY, app: 'odds', kind: 'win', amount: 1_850 }] : []),
+      ...(i % 3 === 0 ? [{ id: `eco:plus:${new Date(now + 8 * 3_600_000).toISOString().slice(0, 7)}`, t: now - 10 * DAY, app: 'eco', kind: 'plus', amount: -199 }] : [])
+    ];
+    const w = { v: 1, v2: made, created: made, entries, snap: {}, settings: {}, apps, inbox: {} };
+    docs.set(`${WALLET_COLLECTION}/${createHash('sha256').update(`PREVIEW${i}`).digest('hex')}`, { payload: JSON.stringify(w), updateTime: new Date(made).toISOString() });
+  }
+  const kv = new Map();
+  const env = { ECO_ADMIN_TOKEN: ADMIN_KEY, RATE_LIMIT_KV: { get: async k => kv.get(k) ?? null, put: async (k, v) => void kv.set(k, v), list: async () => ({ keys: [] }), delete: async k => void kv.delete(k) } };
+  const stamp = () => new Date().toISOString();
+  const deps = {
+    now: () => Date.now(),
+    json: (data, status = 200) => new Response(JSON.stringify(data), { status }),
+    errorJson: (code, status) => new Response(JSON.stringify({ error: { code } }), { status }),
+    rateLimitResponse: async () => null,
+    sha256Hex: async text => createHash('sha256').update(String(text)).digest('hex'),
+    generateCode: n => randomBytes(n).toString('hex').toUpperCase().slice(0, n),
+    fsGet: async (e, c, id) => (docs.has(`${c}/${id}`) ? { exists: true, ...docs.get(`${c}/${id}`) } : { exists: false }),
+    fsWrite: async (e, c, id, payload) => (docs.set(`${c}/${id}`, { payload, updateTime: stamp() }), { updateTime: stamp() }),
+    fsDelete: async (e, c, id) => void docs.delete(`${c}/${id}`),
+    fsList: async (e, c, limit = 300) => [...docs].filter(([k]) => k.startsWith(`${c}/`)).slice(0, limit).map(([k, v]) => ({ id: k.slice(c.length + 1), ...v })),
+    fsCollections: async () => [...new Set([...docs.keys()].map(k => k.split('/')[0]))],
+    fsBatch: async (e, ops) => {
+      for (const op of ops) op.delete ? docs.delete(op.delete.join('/')) : op.update && docs.set(`${op.update[0]}/${op.update[1]}`, { payload: op.update[2], updateTime: stamp() });
+    }
+  };
+  await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/eco/, async route => {
+    const body = route.request().postDataJSON?.() || {};
+    const res = await handleAdmin({ env, deps, headers: {}, request: new Request('https://x/eco'), ip: '127.0.0.1', body });
+    return route.fulfill({ status: res.status, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: await res.text() });
+  });
+}
 // The sports proxy: the main Worker's /sports-proxy.
 const SPORTS = /^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/sports-proxy/;
 // Every item asked of the proxy (its time): the busiest minute is printed at
@@ -780,7 +833,7 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
   const cdp = profile && engine !== 'webkit' ? await context.newCDPSession(page) : null;
   if (cdp) await cdp.send('Profiler.enable').then(() => cdp.send('Profiler.setSamplingInterval', { interval: 500 })).then(() => cdp.send('Profiler.start'));
   // (With --net, from the page's first bytes: a slow connection's whole load is what's measured below.)
-  const went = await page.goto(`${base}${hash ? `#${hash}` : ''}`, net ? { waitUntil: 'commit' } : {}).then(() => '', e => e.message.split('\n')[0]);
+  const went = await page.goto(key === 'admin' ? `${base}admin/` : `${base}${hash ? `#${hash}` : ''}`, net ? { waitUntil: 'commit' } : {}).then(() => '', e => e.message.split('\n')[0]);
   if (went) console.log(`net: the page didn't open (${went})`);
   if (net && !first && !went) {
     // When the loading screen went (a person stuck behind it is the bug), and what the page says.
@@ -838,7 +891,8 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
     }
     if (Date.now() < until) await page.waitForTimeout(until - Date.now());
   } else await page.waitForTimeout(wait);
-  for (const sel of clicks) {
+  // The admin panel's views are tabs, not addresses: the one named, clicked.
+  for (const sel of [...(key === 'admin' && hash ? [`[data-view="${hash}"]`] : []), ...clicks]) {
     // ('js:<code>': run on the page instead, e.g. a click on something the tab bar covers.)
     if (sel.startsWith('js:')) await page.evaluate(sel.slice(3)).catch(e => errors.push(`click ${sel}: ${e.message.split('\n')[0]}`));
     else await page.click(sel).catch(e => errors.push(`click ${sel}: ${e.message.split('\n')[0]}`));

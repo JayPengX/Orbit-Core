@@ -21,7 +21,9 @@
   .spread { justify-content: space-between; }
   input, select { font: inherit; font-size: 16px; padding: 11px 13px; border-radius: var(--q-r-cell); border: 0; background: var(--q-fill-3); color: var(--q-text); min-width: 0; }
   input[type='number'] { width: 120px; }
-  .grow { flex: 1 1 200px; }
+  /* A field takes the row's room and its button stays beside it, never on a line below. */
+  .grow { flex: 1 1 0; min-width: 0; }
+  .row > button { flex: none; }
   /* The kit's buttons: capsules, grey with the accent's text; the main one filled. */
   button { font: inherit; font-size: 15px; font-weight: 600; padding: 11px 18px; border-radius: 999px; border: 0; background: var(--q-fill-2); color: var(--q-accent); cursor: pointer; white-space: nowrap; transition: transform var(--q-dur-snappy) var(--q-spring-snappy); }
   button:active:not(:disabled) { transform: scale(0.96); }
@@ -51,6 +53,8 @@
   .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
   /* Tables */
   .tablewrap { overflow-x: auto; }
+  /* On a phone a table keeps its main columns (the week's money: its net, not in and out). */
+  @media (max-width: 520px) { th.wide, td.wide { display: none; } table th, table td { padding-inline: 5px; } }
   table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
   th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--q-divider); white-space: nowrap; }
   th { color: var(--q-muted); font-weight: 600; }
@@ -67,6 +71,8 @@
   .tag.bad { background: color-mix(in srgb, var(--q-bad) 14%, transparent); color: var(--q-bad); }
   .chips { display: flex; gap: 6px; flex-wrap: wrap; }
   .chips button { padding: 7px 12px; font-size: 13.5px; border-radius: 999px; }
+  /* On a phone the filters slide, one row. */
+  @media (max-width: 520px) { .chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-inline: -4px; padding-inline: 4px; } .chips::-webkit-scrollbar { display: none; } .chips button { flex: none; } }
   .chips button[aria-pressed='true'] { background: var(--q-accent); border-color: var(--q-accent); color: #fff; }
   .pos { color: var(--q-good); }
   .flow { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
@@ -125,8 +131,14 @@
     .tabs button { padding: 9px 4px; border-radius: 12px; font-size: 13px; white-space: nowrap; }
     .tabs button .ic { display: none; }
   }
-  .pane-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 18px 2px 10px; }
+  /* The title and its note on the left, the button at the top right: never the button on a line below. */
+  .pane-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin: 18px 2px 10px; }
+  .pane-head > div { flex: 1 1 0; min-width: 0; }
+  .pane-head > button { flex: none; }
   .pane-head h2 { margin: 0; }
+  /* The checks as a grid of equal buttons (three rows of pills of every width before). */
+  .actions { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+  .actions button { padding-inline: 10px; }
   .pane-head .muted { margin: 2px 0 0; }
   /* 開發: the settings */
   .set-group { margin-top: 12px; }
@@ -214,7 +226,7 @@
         <h3>各 App</h3>
         <div class="card tablewrap"><table id="ov-apps"><thead><tr><th>App</th><th class="right">用過的帳戶</th><th class="right">這週用過</th></tr></thead><tbody></tbody></table></div>
         <h3>這週的錢（各 App · 種類）</h3>
-        <div class="card tablewrap"><table id="ov-flows"><thead><tr><th>來源</th><th class="right">筆數</th><th class="right">進</th><th class="right">出</th><th class="right">淨額</th></tr></thead><tbody></tbody></table></div>
+        <div class="card tablewrap"><table id="ov-flows"><thead><tr><th>來源</th><th class="right">筆數</th><th class="right wide">進</th><th class="right wide">出</th><th class="right">淨額</th></tr></thead><tbody></tbody></table></div>
       </div>
     </section>
 
@@ -223,7 +235,7 @@
       <div class="row spread"><h2>帳戶</h2><div class="row"><button id="csv" class="small">下載 CSV</button><button id="load" class="small">重新整理</button></div></div>
       <div class="card">
         <div class="row"><input id="search" class="grow" type="search" placeholder="搜尋帳戶代號或 App" autocomplete="off" /></div>
-        <div class="row" style="margin-top:10px"><input id="find-pass" class="grow" autocomplete="off" placeholder="用 Quadra Pass 找帳戶（他念給你的那組）" /><button id="find" class="small">找</button></div>
+        <div class="row" style="margin-top:10px"><input id="find-pass" class="grow" autocomplete="off" placeholder="用 Quadra Pass 找帳戶" /><button id="find" class="small">找</button></div>
         <p id="find-error" class="error"></p>
         <div class="chips" id="filters" style="margin-top:10px">
           <button data-filter="all" aria-pressed="true">全部</button>
@@ -236,7 +248,7 @@
         <p id="wallets-sum" class="muted" style="margin:10px 0 0">載入中…</p>
         <p id="wallets-error" class="error"></p>
         <div class="tablewrap"><table id="wallets" hidden><thead><tr>
-          <th data-sort="ref">代號</th><th data-sort="state">狀態</th><th data-sort="apps">App</th><th data-sort="created">建立</th><th data-sort="lastUsed">最後使用</th><th data-sort="balance" class="right">餘額</th>
+          <th data-sort="ref">代號</th><th data-sort="state">狀態</th><th data-sort="apps" class="wide">App</th><th data-sort="created" class="wide">建立</th><th data-sort="lastUsed">最後使用</th><th data-sort="balance" class="right">餘額</th>
         </tr></thead><tbody></tbody></table></div>
         <p class="muted" style="margin:10px 0 0">點一列打開帳戶：看明細、調整金額、撤銷紀錄、送 Plus、登出所有裝置、產生找回代碼、清除某個 App 的資料、匯出、重置或刪除。</p>
       </div>
@@ -257,7 +269,7 @@
       <h2>找回帳戶</h2>
       <div class="card">
         <p class="muted">有人弄丟了 Quadra Pass：在「帳戶」找到他的帳戶代號貼在這裡（或直接打開那個帳戶），產生一組 10 分鐘有效的裝置代碼給他登入，再請他在帳戶裡設定新的 Pass。</p>
-        <div class="row"><input id="ref" class="grow" autocomplete="off" placeholder="帳戶代號（至少 6 碼）" /><button id="recover" class="primary">產生裝置代碼</button></div>
+        <div class="row"><input id="ref" class="grow" autocomplete="off" placeholder="帳戶代號" /><button id="recover" class="primary">產生代碼</button></div>
         <p id="recover-error" class="error"></p>
         <div id="recovered" hidden><div id="device-code" class="code"></div><p id="device-exp" class="muted"></p></div>
       </div>
@@ -279,12 +291,12 @@
         <p id="bc-ok" class="ok"></p>
       </div>
       <div class="row spread"><h2>Google 帳單</h2><button id="bill-load" class="small">重新整理</button></div>
-      <p class="muted">Gemini、地圖、地點搜尋、路線、天氣：本月用了多少、估計花多少，和你輸入的餘額還剩多少。Google 沒有提供預付餘額的 API，所以餘額要手動輸入（每次加值後再輸入一次）；花費是依下面的價格估算，以 Google Cloud 帳單為準。</p>
+      <p class="muted">Gemini、地圖、地點搜尋、路線、天氣：本月用了多少、估計花多少，和你輸入的餘額還剩多少。Google 沒有提供預付餘額的 API，所以餘額要手動輸入（每次加值後再輸入一次，從輸入那刻起算）；花費是依下面的價格估算，以 Google Cloud 帳單為準。</p>
       <p id="bill-error" class="error"></p>
       <div class="card">
         <div class="tiles" id="bill-tiles"></div>
         <div class="tablewrap" style="margin-top:12px"><table id="bill-rows"><thead><tr><th>服務</th><th class="right">本月 / 免費</th><th class="right">估計</th></tr></thead><tbody></tbody></table></div>
-        <div class="row" style="margin-top:14px"><input id="bill-balance" type="number" min="0" step="1" placeholder="現在的餘額（NT$）" style="flex:1 1 180px" /><button id="bill-save" class="primary">儲存餘額（從現在起算）</button></div>
+        <div class="row" style="margin-top:14px"><input id="bill-balance" type="number" min="0" step="1" placeholder="現在的餘額（NT$）" class="grow" /><button id="bill-save" class="primary">儲存餘額</button></div>
         <p id="bill-ok" class="ok"></p>
         <details style="margin-top:10px"><summary class="muted" style="cursor:pointer">價格（美元；超過免費額度後每 1,000 次、Gemini 每 100 萬 token）與匯率</summary>
           <div id="bill-prices" class="prices"></div>
@@ -296,7 +308,7 @@
       <p id="use-error" class="error"></p>
       <div class="tiles" id="use-tiles"></div>
       <div class="card" style="margin-top:12px">
-        <div class="row spread"><strong>TDX 點數（每月 200 點）</strong><span class="muted">基本 1,500 次 1 點 · 進階 200 次 1 點</span></div>
+        <div><strong>TDX 點數（每月 200 點）</strong><p class="muted" style="margin:2px 0 0">基本 1,500 次 1 點 · 進階 200 次 1 點</p></div>
         <div class="tiles" id="tdx-tiles" style="margin-top:10px"></div>
         <svg id="tdx-chart" class="chart" viewBox="0 0 360 150" role="img" aria-label="每天的 TDX 點數" style="margin-top:12px"></svg>
         <div class="tablewrap"><table id="tdx-days"><thead><tr><th>日期</th><th class="right">基本</th><th class="right">進階</th><th class="right">點數</th></tr></thead><tbody></tbody></table></div>
@@ -345,7 +357,7 @@
       <div class="pane-head"><div><h2>排程工作</h2><p class="muted">每個排程工作最近一次跑的時間、結果、花多久。黃色是比平常晚。</p></div></div>
       <ul class="checks" id="beats"></ul>
       <div class="pane-head"><div><h2>檢查與建置</h2><p class="muted">Gemini：經台灣中繼送一個很小的請求。建置：不管節流，現在跑一次。</p></div></div>
-      <div class="row" id="sys-actions"></div>
+      <div class="actions" id="sys-actions"></div>
       <p class="muted" id="sys-out" style="overflow-wrap:anywhere"></p>
       <div class="twocol" style="margin-top:12px">
         <div class="card"><div class="row spread"><strong>R2 資料</strong><span class="muted" id="r2-sum"></span></div><ul class="checks" id="r2" style="margin-top:8px"></ul></div>
@@ -497,7 +509,18 @@ function show(view) {
 $('tabs').onclick = e => e.target.dataset.view && show(e.target.dataset.view);
 
 // ---- 總覽 ----
-const tile = (label, value, sub = '') => el('div', { class: 'tile' }, [el('small', { text: label }), el('strong', { text: value }), sub ? el('em', { text: sub }) : null]);
+// A tile's figure on one line: a wide one shrinks (to 60% at most) once it's on the page.
+const fitFigure = n => {
+  n.style.fontSize = '';
+  if (!n.isConnected || n.scrollWidth <= n.clientWidth) return;
+  const base = parseFloat(getComputedStyle(n).fontSize);
+  n.style.fontSize = `${Math.max(base * 0.6, Math.floor((base * n.clientWidth * 10) / n.scrollWidth) / 10)}px`;
+};
+const tile = (label, value, sub = '') => {
+  const figure = el('strong', { text: value });
+  requestAnimationFrame(() => fitFigure(figure));
+  return el('div', { class: 'tile' }, [el('small', { text: label }), figure, sub ? el('em', { text: sub }) : null]);
+};
 async function loadOverview() {
   $('ov-error').textContent = '';
   try {
@@ -519,7 +542,7 @@ async function loadOverview() {
         ? flows.map(([k, v]) => {
             const [a, kind] = k.split(':');
             const net = v.in - v.out;
-            return el('tr', {}, [el('td', { text: `${a === 'eco' ? 'Quadra' : appName(a)} · ${kind}` }), el('td', { class: 'right', text: v.n }), el('td', { class: 'right pos', text: money(v.in) }), el('td', { class: 'right neg', text: money(v.out) }), el('td', { class: `right ${net >= 0 ? 'pos' : 'neg'}`, text: money(net) })]);
+            return el('tr', {}, [el('td', { text: `${a === 'eco' ? 'Quadra' : appName(a)} · ${kind}` }), el('td', { class: 'right', text: v.n }), el('td', { class: 'right pos wide', text: money(v.in) }), el('td', { class: 'right neg wide', text: money(v.out) }), el('td', { class: `right ${net >= 0 ? 'pos' : 'neg'}`, text: money(net) })]);
           })
         : [el('tr', {}, [el('td', { colspan: '5', class: 'muted', text: '這週沒有金流。' })])])
     );
@@ -539,7 +562,7 @@ function drawChart(o) {
     const a = o.signups[i], b = o.lastSeen[i];
     out += `<rect x="${x + bw * 0.14}" y="${y(a)}" width="${bw * 0.34}" height="${H - 30 - y(a)}" rx="3" fill="var(--q-accent)"><title>${d} 新帳戶 ${a}</title></rect>`;
     out += `<rect x="${x + bw * 0.52}" y="${y(b)}" width="${bw * 0.34}" height="${H - 30 - y(b)}" rx="3" fill="#16a34a"><title>${d} 最後使用 ${b}</title></rect>`;
-    if (i % 2 === 0 || i === n - 1) out += `<text x="${x + bw / 2}" y="${H - 6}" text-anchor="middle" font-size="18" fill="currentColor" fill-opacity=".6">${Number(d.slice(5, 7))}/${Number(d.slice(8))}</text>`;
+    if ((n - 1 - i) % 2 === 0) out += `<text x="${x + bw / 2}" y="${H - 6}" text-anchor="middle" font-size="18" fill="currentColor" fill-opacity=".6">${Number(d.slice(5, 7))}/${Number(d.slice(8))}</text>`;
   });
   out += `<text x="${pad}" y="18" font-size="18" fill="currentColor" fill-opacity=".6">最多 ${max}</text>`;
   svg.innerHTML = out;
@@ -579,8 +602,8 @@ function drawWallets() {
       el('tr', { class: 'tap', onclick: () => openAccount(w.ref) }, [
         el('td', { class: 'num', text: w.ref }),
         el('td', {}, [el('span', { class: `tag${w.plus ? ' plus' : w.lastUsed ? ' on' : ''}`, text: stateOf(w) })]),
-        el('td', { text: w.apps.length ? w.apps.map(appName).join('、') : '—' }),
-        el('td', { text: fmtDay(w.created) }),
+        el('td', { class: 'wide', text: w.apps.length ? w.apps.map(appName).join('、') : '—' }),
+        el('td', { class: 'wide', text: fmtDay(w.created) }),
         el('td', { text: ago(w.lastUsed ? Date.parse(w.lastUsed) : 0) }),
         el('td', { class: `right ${w.balance < 0 ? 'neg' : ''}`, text: money(w.balance) })
       ])
