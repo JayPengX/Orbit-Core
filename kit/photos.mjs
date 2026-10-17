@@ -46,6 +46,8 @@ const OWN_PHOTO = {
 // its clubs' leagues'; a player who moved this summer is under his new one):
 // the leagues' own, then TheSportsDB's studio cutouts for everyone else
 // (Scotland, the cups' other clubs, national teams), gathered each night.
+// A league photo on its older path (the Premier League's 'o'): last season's.
+export const isOldOwn = url => typeof url === 'string' && /resources\.premierleague\.com\/premierleague\/photos\//.test(url);
 const SOCCER_OWN = ['epl', 'laliga', 'bundesliga', 'seriea', 'ligue1', 'mls', 'cutouts'];
 const ownLists = {};
 function ownList(league) {
@@ -280,7 +282,13 @@ export function personPhoto(name, league, opts) {
   const face = facePhoto(name, league);
   // The league's own studio photo, the feed's, one found before, ESPN's by id;
   // FotMob's face (a head in a circle, not the half-body the rest are) last.
-  const list = [...new Set([ownPhoto(name, league), ...urls, known, guess, ...later, face].map(smallPhoto).filter(Boolean))];
+  // A league photo only on its older path is last of all: it's last season's,
+  // a player who moved in the summer in his old club's shirt (Grealish in
+  // City's, Maitland-Niles in Southampton's, 2026-10-17).
+  const leaguePhoto = ownPhoto(name, league);
+  const stale = isOldOwn(leaguePhoto);
+  // (Then FotMob's face first: ESPN has no footballers' pictures, its address only fails, slowly.)
+  const list = [...new Set([stale ? face : leaguePhoto, ...urls, known, guess, ...later, face, stale ? leaguePhoto : null].map(smallPhoto).filter(Boolean))];
   const guesses = new Set([guessed, ...later.map(smallPhoto)].filter(Boolean));
   const found = url => logoPicture(url, null, `${cls} photo${isCutout(url) ? ' cutout' : ''}`, () => fallback());
   const search = stand => {
