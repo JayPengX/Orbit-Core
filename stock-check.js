@@ -42,7 +42,8 @@ import { unpack } from './kit/stock-codec.mjs';
 import { BONDS } from './kit/stock-bonds.mjs';
 import { marketFill, dealPrice, currencyInfo } from './kit/stock-markets.mjs';
 import { fxSymbol } from './kit/stock-quotes.mjs';
-import { readFillsBook, decideFills } from './stock-fill.js';
+import { readFillsBook, decideFills, ipoList, ipoDraw, ipoKeyOf } from './stock-fill.js';
+import { IPO_FEE, IPO_WIN_FEE, ipoOpen, ipoDrawn, ipoBackAt, ipoListAt } from './kit/stock-ipo.mjs';
 
 export const VERIFIED_COLLECTION = 'stock-verified';
 const YAHOO = 'https://query1.finance.yahoo.com';
@@ -252,6 +253,35 @@ export async function checkEvent(e, account, wallet, read, issued = {}, ctx = {}
       const fill = account.events.find(x => x.type === 'fill' && x.side === 'buy' && `loan:${x.orderId}` === e.id);
       return fill && fill.symbol === e.symbol && near(fill.financed || 0, e.amount, 0.01) && e.amount <= fill.total * 0.7 + 1 ? 'ok' : 'bad';
     }
+    // 新股申購 (kit/stock-ipo.mjs): on TWSE's own figures, never the phone's.
+    // An application: its price, shares and fee as TWSE lists them, in its
+    // window, seen by this Worker in it (stock-fill.js), with the money.
+    // A loss's money back and a win's shares: only as the draw went (the
+    // Worker's own hash, worked out again here), on their own days.
+    case 'ipo':
+    case 'ipoback':
+    case 'ipowin': {
+      const io = ctx.ipo;
+      if (!io) return 'later';
+      const list = await io.list();
+      if (!list) return 'later';
+      const sub = list.find(x => x.code === e.code && x.draw === e.draw);
+      const key = sub && ipoKeyOf(sub);
+      if (!sub || io.seen[key] == null || !(io.seen[key] < sub.to + 14 * 3_600_000)) return 'bad';
+      const total = Math.round(sub.price * sub.qty);
+      if (e.type === 'ipo') {
+        if (e.price !== sub.price || e.qty !== sub.qty || e.fee !== IPO_FEE || e.id !== `ipo:${sub.code}:${sub.draw}` || !ipoOpen(sub, e.t)) return 'bad';
+        const s = replay(account, e.t);
+        return (s.cash.TWD || 0) + 1 >= total + IPO_FEE ? 'ok' : 'bad';
+      }
+      // (Its application counted first.)
+      if (!account.events.some(x => x.type === 'ipo' && x.id === `ipo:${sub.code}:${sub.draw}`)) return 'bad';
+      if (!ipoDrawn(sub, now)) return 'later';
+      const won = await io.draw(sub);
+      if (won == null) return 'later';
+      if (e.type === 'ipoback') return !won && e.amount === total && e.t === ipoBackAt(sub) ? 'ok' : 'bad';
+      return won && e.price === sub.price && e.qty === sub.qty && e.fee === IPO_WIN_FEE && e.t === ipoListAt(sub) ? 'ok' : 'bad';
+    }
     // What only takes money out, or moves nothing: as it is.
     case 'td':
     case 'repay':
@@ -341,6 +371,9 @@ export async function checkStock(env, docId, payload, wallet, deps, lockSince, n
   const orders = (Array.isArray(account.orders) ? account.orders : []).map(o => ({ ...o, reserve: Math.max(0, Number(o?.reserve) || 0), deposit: Math.max(0, Number(o?.deposit) || 0) }));
   const counted = { ...account, orders, events: [] };
   const used = new Set();
+  // 新股申購's checks: TWSE's list read once, when an event needs it.
+  let listRead = null;
+  const ipo = { seen: book.ipo || {}, list: () => (listRead ||= ipoList(deps.read).then(l => (l.length ? l : null)).catch(() => null)), draw: sub => ipoDraw(env, docId, sub) };
   let checked = 0;
   for (const raw of events) {
     let e = adj[raw.id] ? { ...raw, ...adj[raw.id] } : raw;
@@ -348,10 +381,10 @@ export async function checkStock(env, docId, payload, wallet, deps, lockSince, n
     // The account as it was before the lock-down: taken as it was.
     if (!verdict && first && e.t < lockSince) verdict = 'ok';
     // (A pool deposit follows the wallet: always looked at again.)
-    if (e.type === 'deposit' && e.pool) verdict = await checkEvent(e, counted, wallet, deps.read, issued, { now, used }).catch(() => 'later');
+    if (e.type === 'deposit' && e.pool) verdict = await checkEvent(e, counted, wallet, deps.read, issued, { now, used, ipo }).catch(() => 'later');
     if (!verdict && checked < 40) {
       checked++;
-      verdict = await checkEvent(e, counted, wallet, deps.read, issued, { now, used }).catch(() => 'later');
+      verdict = await checkEvent(e, counted, wallet, deps.read, issued, { now, used, ipo }).catch(() => 'later');
       if (verdict?.adjust) {
         adj[e.id] = verdict.adjust;
         e = { ...e, ...verdict.adjust };

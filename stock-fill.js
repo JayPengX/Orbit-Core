@@ -33,6 +33,8 @@
 
 import { fetchQuotes, fetchBars, fxSymbol, useQuotesReader } from './kit/stock-quotes.mjs';
 import { triggerPrice, backfillPrice, planRuns, planOrderId } from './kit/stock-account.mjs';
+import { IPO_URL, parseIpoList, ipoOpen, ipoDrawn, ipoWon, ipoDrawKey } from './kit/stock-ipo.mjs';
+import { tokenSecret } from './quadra-token.js';
 
 export const FILLS_COLLECTION = 'stock-fills';
 const MAX_ORDERS = 40;
@@ -63,8 +65,8 @@ export function readBook(doc) {
   try {
     raw = doc?.exists ? JSON.parse(doc.payload) : null;
   } catch {}
-  if (raw?.v === 2) return { v: 2, fills: raw.fills || {}, open: raw.open || {}, plans: raw.plans || {}, cancelled: raw.cancelled || {} };
-  return { v: 2, fills: raw && typeof raw === 'object' ? raw : {}, open: {}, plans: {}, cancelled: {} };
+  if (raw?.v === 2) return { v: 2, fills: raw.fills || {}, open: raw.open || {}, plans: raw.plans || {}, cancelled: raw.cancelled || {}, ipo: raw.ipo || {} };
+  return { v: 2, fills: raw && typeof raw === 'object' ? raw : {}, open: {}, plans: {}, cancelled: {}, ipo: {} };
 }
 // The whole book (stock-check.js: what this Worker filled, saw open, and let be cancelled).
 export async function readFillsBook(env, account, fsGet) {
@@ -80,7 +82,9 @@ async function writeBook(env, deps, account, book, now) {
     .slice(0, KEEP);
   const open = Object.entries(book.open).filter(([, o]) => now - o.t < OPEN_MS).slice(-KEEP);
   const cancelled = Object.entries(book.cancelled || {}).filter(([, t]) => now - t < KEEP_MS).slice(-KEEP);
-  await deps.fsWrite(env, FILLS_COLLECTION, account, JSON.stringify({ v: 2, fills: Object.fromEntries(fills), open: Object.fromEntries(open), plans: book.plans, cancelled: Object.fromEntries(cancelled) }));
+  // (新股申購 seen: kept a year, the draw and the listing well past.)
+  const ipo = Object.entries(book.ipo || {}).filter(([, t]) => now - t < 365 * 86_400_000);
+  await deps.fsWrite(env, FILLS_COLLECTION, account, JSON.stringify({ v: 2, fills: Object.fromEntries(fills), open: Object.fromEntries(open), plans: book.plans, cancelled: Object.fromEntries(cancelled), ...(ipo.length ? { ipo: Object.fromEntries(ipo) } : {}) }));
 }
 // The fills issued for an account (stock-check.js reads them).
 export async function issuedFills(env, account, fsGet) {
@@ -184,6 +188,55 @@ export async function decideFills(orders, { read, now = Date.now() }) {
   return { fills, looked };
 }
 
+// ---- 新股申購 (kit/stock-ipo.mjs) ----
+// TWSE's list of subscriptions (the data proxy's copy, kept a while there).
+export async function ipoList(read) {
+  return parseIpoList(await read(IPO_URL));
+}
+const IPO_KEY = /^\d{4}:\d{10,14}$/;
+export const ipoKeyOf = s => `${s.code}:${s.draw}`;
+// Whether this account's application to `s` won: a keyed hash (the Pass's
+// signing secret) of the account and the issue, against TWSE's rate.
+export async function ipoDraw(env, account, s) {
+  const secret = await tokenSecret(env);
+  if (!secret) return null;
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(`ipo|${secret}`), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const mac = new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(ipoDrawKey(account, s))));
+  return ipoWon([...mac.slice(0, 4)].map(b => b.toString(16).padStart(2, '0')).join(''), s.rate);
+}
+// The phone's applications: each one seen here in its window is kept (the
+// moment first seen); asked about after its draw, one kept says whether it
+// won. One never seen in its window counts for nothing (asked after the
+// draw, it's never kept: a phone can't apply to the ones it learns it won).
+//   { op: 'ipo', apps: ['code:draw'…] } → { seen: { key: t }, drawn: { key: { won, rate } } }
+async function handleIpo(body, env, headers, session, deps) {
+  const keys = [...new Set((Array.isArray(body.apps) ? body.apps : []).map(String).filter(k => IPO_KEY.test(k)))].slice(0, 30);
+  const now = deps.now();
+  const book = readBook(await deps.fsGet(env, FILLS_COLLECTION, session.d));
+  if (!keys.length) return deps.json({ seen: {}, drawn: {} }, 200, headers);
+  const list = await ipoList(deps.read).catch(() => []);
+  const byKey = new Map(list.map(s => [ipoKeyOf(s), s]));
+  let changed = false;
+  const seen = {};
+  const drawn = {};
+  for (const k of keys) {
+    const s = byKey.get(k);
+    if (!s) continue;
+    if (book.ipo[k] == null && ipoOpen(s, now)) {
+      book.ipo[k] = now;
+      changed = true;
+    }
+    if (book.ipo[k] == null) continue;
+    seen[k] = book.ipo[k];
+    if (ipoDrawn(s, now)) {
+      const won = await ipoDraw(env, session.d, s);
+      if (won != null) drawn[k] = { won, rate: s.rate };
+    }
+  }
+  if (changed) await writeBook(env, deps, session.d, book, now);
+  return deps.json({ seen, drawn }, 200, headers);
+}
+
 export async function handleStock(request, env, headers, session, deps) {
   const { json, errorJson } = deps;
   if (!session || session.a !== 'stock') return errorJson('ECO_TOKEN_INVALID', 401, headers, request);
@@ -222,6 +275,7 @@ export async function handleStock(request, env, headers, session, deps) {
     await writeBook(env, deps, session.d, book, now);
     return json({ cancelled: true }, 200, headers);
   }
+  if (body?.op === 'ipo') return handleIpo(body, env, headers, session, deps);
   if (body?.op !== 'fill') return json({ error: { message: 'Unknown op' } }, 400, headers);
   const orders = (Array.isArray(body.orders) ? body.orders : []).slice(0, MAX_ORDERS).map(cleanOrder).filter(Boolean);
   const plans = (Array.isArray(body.plans) ? body.plans : []).slice(0, 20).map(cleanPlan).filter(Boolean);

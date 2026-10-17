@@ -139,6 +139,8 @@ function startState(account) {
     tds: {},
     lent: {},
     lendIncome: 0,
+    // 新股申購 (stock-ipo.mjs) by issue: its application and what came of it ('drawing', 'won', 'lost').
+    ipos: {},
     dividends: 0,
     // Bank interest on NT$ cash: accrued so far, and paid out (net).
     cashInterest: 0,
@@ -197,6 +199,35 @@ function applyEvent(s, e) {
       case 'fill':
         applyFill(s, e);
         break;
+      // 新股申購: the shares' price and the fee held at applying; a loss's
+      // money back after the draw (the fee kept); a win's shares on the
+      // listing day at the offer price (already paid), with its NT$50.
+      case 'ipo': {
+        const key = `${e.code}:${e.draw}`;
+        if (s.ipos[key]) break;
+        add(s.cash, BASE, -(Math.round(e.price * e.qty) + e.fee));
+        s.paid.fee += e.fee;
+        s.ipos[key] = { ...e, state: 'drawing' };
+        break;
+      }
+      case 'ipoback': {
+        const app = s.ipos[`${e.code}:${e.draw}`];
+        if (!app || app.state !== 'drawing') break;
+        add(s.cash, BASE, e.amount);
+        app.state = 'lost';
+        break;
+      }
+      case 'ipowin': {
+        const app = s.ipos[`${e.code}:${e.draw}`];
+        if (!app || app.state !== 'drawing') break;
+        const total = Math.round(app.price * app.qty);
+        applyFill(s, { id: e.id, t: e.t, type: 'fill', side: 'buy', symbol: app.symbol, name: app.name, kind: 'stock', market: 'TW', currency: BASE, qty: app.qty, price: app.price, gross: total, total, commission: 0, tax: 0, fee: 0 });
+        // (Paid at applying: the fill's money given back, its fee taken.)
+        add(s.cash, BASE, total - e.fee);
+        s.paid.fee += e.fee;
+        app.state = 'won';
+        break;
+      }
       case 'split': {
         const p = s.positions[e.symbol];
         if (p) p.qty *= e.ratio;
