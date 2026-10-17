@@ -174,6 +174,7 @@ of the colo the request came in through).
 | `GET /transit/…` | `transit.js` | Orbit Transit (§3.3) |
 | `GET /sports-proxy` | `sports.js` | The data proxy for Sports, Play and Securities (§4) |
 | `GET /slip` | `slip.js` | Slip Tracker's door (an independent page, no pass): only NPB/KBO/CPBL month lists, its origin only, ≤3 addresses an ask, 6 asks a minute and 60 an hour an address, 3,000 a day in all (D1 `slip_day`), closed from pace 2 |
+| `POST /slip-scan` | `slip.js` | Slip Tracker's ticket photo read by Gemini (Class's `/gemini` made narrower: fixed prompt and schema, one JPEG ≤1.5 MB, flash-lite then 3.7-flash if Google is busy): its origin only, 2 a minute, 6 an hour and 12 a day an address, 150 a day in all (D1 `slip_day`, counted before each, refused if the count fails), closed from pace 2 |
 
 **The gate.** Every route except signing in needs a Quadra Pass session
 (`qt=`). Sessions are counted per session and app in memory

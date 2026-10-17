@@ -8,6 +8,7 @@
 //                                app's data (eco.js)
 //   POST  /gemini                Orbit Class's AI schedule-photo import
 //   POST  /nl-edit               Orbit Class's natural-language edits
+//   GET   /slip, POST /slip-scan Slip Tracker's game lists and ticket photos (slip.js)
 //   GET   /kambi                 Kambi's live scores for Quadra Play (kambi.js)
 //   GET/POST /push/…             notices while an app is closed (push.js)
 //   GET   /weather/…             Orbit Weather's blended forecast (weather.js)
@@ -25,7 +26,7 @@
 // runs in Taiwan ([placement], wrangler.toml), where the people and most
 // sources are. The Quadra Pass is the only way anything is saved.
 
-import { handleSlip } from './slip.js';
+import { handleSlip, handleSlipScan } from './slip.js';
 import en from './locales/en.js';
 import zhTW from './locales/zh-TW.js';
 import { handleEcoRequest, LOCK_SINCE } from './eco.js';
@@ -1136,6 +1137,8 @@ export default {
     if (path === '/sports-proxy') return handleSports(request, env, ctx, headers, ip);
     // Slip Tracker's narrow door (slip.js): no pass, Asian baseball only, small caps.
     if (path === '/slip') return handleSlip(request, env, ctx, headers, ip);
+    // …and its ticket photos, read by Gemini (no pass, a few a day).
+    if (path === '/slip-scan') return handleSlipScan(request, env, headers, ip, (model, parts, schema) => proxyGeminiRequest(model, parts, schema, env, headers, ctx, 'slip-scan'));
     // The bill's guard (guard.js), as it last read the bill: armed or not,
     // each count's share of the $5 plan, stopped or not. No key or token.
     if (path === '/guard' && request.method === 'GET') {
