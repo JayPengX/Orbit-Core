@@ -91,12 +91,14 @@ export async function findMarket(league, { start, home, away }, getJson) {
   return { slug: event.slug, home: yes(h), draw: yes(draw), away: yes(a) };
 }
 
-// One token's price, every 2 minutes for the 6 hours from the start (a game,
+// One token's price, every minute for the 6 hours from the start (a game,
 // even one in extra innings; never a market left open for days after it).
+// Every minute, not 2: a finger on the chart read the game in 2-minute
+// steps (the owner, 2026-10-18; F1's races are read by the minute too).
 const LONGEST = 6 * 3600;
 export const historyUrl = (token, start) => {
   const from = Math.floor(Date.parse(start) / 60_000) * 60;
-  return `${CLOB}?market=${token}&startTs=${from}&endTs=${from + LONGEST}&fidelity=2`;
+  return `${CLOB}?market=${token}&startTs=${from}&endTs=${from + LONGEST}&fidelity=1`;
 };
 
 // The prices as one line of points; after the market has settled (a side at

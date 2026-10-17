@@ -858,11 +858,12 @@ if (typeof globalThis !== 'undefined') globalThis.quadraHaptic = haptic;
 // px/ms) and eases out to the foot over 0.38 to 0.5 s (a ✕ 0.45 s from an
 // even start), the way UIKit's
 // sheet does (a flick had been gone in a sixth of a second, the ✕'s in a
-// quarter: too quick for iOS). A wide screen's (it popped in) and one asked
-// for no motion just close.
+// quarter: too quick for iOS). A wide screen's card (it popped in) closed
+// by its ✕ or a tap outside just closes; swiped down, it goes on down with
+// the finger, as an iPad's does. One asked for no motion just closes.
 export function closeSheet(d, speed = 0) {
   if (!d?.open || d.classList.contains('q-leaving')) return;
-  if (innerWidth >= 720 || globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return d.close();
+  if ((innerWidth >= 720 && !(speed > 0)) || globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return d.close();
   const rest = Math.max(1, innerHeight - d.getBoundingClientRect().top);
   const ms = speed > 0 ? Math.round(Math.min(500, Math.max(380, 380 + rest / 8 - speed * 60))) : 450;
   // The curve starts as fast as the finger moved (its first handle's slope is
@@ -874,7 +875,8 @@ export function closeSheet(d, speed = 0) {
   d.style.setProperty('--q-leave', `${ms}ms`);
   d.style.setProperty('--q-leave-ease', ease);
   d.classList.add('q-leaving');
-  d.style.transform = 'translateY(110%)';
+  // Past the foot of the screen (a wide screen's card sits in its middle: 110% of its own height left it in view).
+  d.style.transform = `translateY(${Math.ceil(rest + 40)}px)`;
   let done = false;
   const shut = () => {
     if (done) return;
@@ -890,7 +892,8 @@ export function closeSheet(d, speed = 0) {
 if (typeof globalThis !== 'undefined') globalThis.quadraCloseSheet = closeSheet;
 
 // A sheet swiped down from its top closes, as on iOS (a phone's bottom
-// sheets, dialog.q-sheet): it follows the finger and closes past 120 px or
+// sheets, dialog.q-sheet, and an iPad's card: it couldn't be swiped away
+// there, the owner 2026-10-18): it follows the finger and closes past 120 px or
 // on a flick (its speed over the last tenth of a second, not since the
 // touch), else springs back. Not from a field or a sideways list, and not
 // while the sheet is scrolled (that finger scrolls it).
@@ -905,14 +908,14 @@ function sheetSwipe() {
   // The finger's last moves: [time, y], for its speed when it lets go.
   let trail = [];
   // A sheet's rise plays once (.q-risen): risen, grabbed, or shut and reset for its next opening.
-  document.addEventListener('animationend', e => e.animationName === 'q-sheet-up' && e.target.classList.add('q-risen'));
+  document.addEventListener('animationend', e => (e.animationName === 'q-sheet-up' || e.animationName === 'q-pop-in') && e.target.classList?.contains('q-sheet') && e.target.classList.add('q-risen'));
   document.addEventListener('close', e => e.target.classList?.remove('q-risen'), true);
   document.addEventListener(
     'touchstart',
     e => {
       const s = e.target.closest?.('dialog.q-sheet[open]');
       sheet = null;
-      if (!s || e.touches.length !== 1 || innerWidth >= 720 || s.scrollTop > 0 || s.classList.contains('q-leaving')) return;
+      if (!s || e.touches.length !== 1 || s.scrollTop > 0 || s.classList.contains('q-leaving')) return;
       if (e.target.closest('input, textarea, select, [contenteditable], .q-chips, .ot-scroll-chips, .leaflet-container')) return;
       sheet = s;
       [x0, y0, dy, dragging] = [e.touches[0].clientX, e.touches[0].clientY, 0, false];

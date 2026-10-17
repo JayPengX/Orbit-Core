@@ -1272,7 +1272,8 @@ button,
   .q-sheet::before {
     display: none;
   }
-  .q-sheet[open] {
+  /* Once, as the phone's rise (a card let go of after a swipe popped in again). */
+  .q-sheet[open]:not(.q-risen) {
     animation: q-pop-in var(--q-dur-snappy) var(--q-spring-snappy);
   }
 }
@@ -2314,6 +2315,7 @@ input[type='checkbox'][switch] {
     transition: none;
   }
   .q-sheet[open],
+  .q-sheet[open]:not(.q-risen),
   .q-ask,
   .q-banner,
   .q-toast,
