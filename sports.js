@@ -772,7 +772,8 @@ async function fetchYahooWithCrumb(upstreamUrl) {
 // as a signed-in visitor (the cookie and crumb), whom it turns away least
 // (走勢圖載入失敗 now and then, 2026-10-15). A bot's name was refused first.
 const yahooRefused = res => res.status === 429 || res.status === 403 || res.status >= 500;
-async function fetchYahoo(upstreamUrl) {
+// (Exported for tools/preview.mjs, which asks Yahoo as the Worker does.)
+export async function fetchYahoo(upstreamUrl) {
   const twin = new URL(upstreamUrl.toString());
   twin.hostname = upstreamUrl.hostname === 'query1.finance.yahoo.com' ? 'query2.finance.yahoo.com' : 'query1.finance.yahoo.com';
   const plain = url => fetch(url.toString(), { headers: { 'User-Agent': BROWSER_UA }, signal: AbortSignal.timeout(SPORTS_PROXY_UPSTREAM_TIMEOUT_MS) });
