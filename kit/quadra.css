@@ -3613,3 +3613,14 @@ html[data-q-turn='90'] dialog[open]:not(.q-sheet) {
 html[data-q-turn] dialog[open] {
   animation: none;
 }
+
+/* Prose that runs onto more lines never leaves a word or a character alone
+   on its last one (Transit's 交通 card ended on "現。" by itself), and a
+   heading that must break, breaks into even halves. Every app, through the
+   kit; :where keeps it the weakest rule, so an app's own still wins. */
+:where(p, li, dd, figcaption, .q-sheet small) {
+  text-wrap: pretty;
+}
+:where(h1, h2, h3) {
+  text-wrap: balance;
+}
