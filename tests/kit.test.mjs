@@ -657,3 +657,28 @@ test('what the device keeps is pruned of copies older than a few days, at most e
   globalThis.caches = had.caches;
   globalThis.requestIdleCallback = had.idle;
 });
+
+test("中場休息 counts down from the half's last play, by the league's break", async () => {
+  // Chelsea at Everton, 2026-10-17: the half ended 12:20:20Z (45'+4').
+  const summary = {
+    header: { competitions: [{ status: { type: { name: 'STATUS_HALFTIME', shortDetail: 'HT' } } }] },
+    keyEvents: [{ type: { type: 'kickoff' }, wallclock: '2026-10-17T11:32:18Z' }, { type: { type: 'halftime' }, wallclock: '2026-10-17T12:20:20Z' }]
+  };
+  assert.equal(kit.halftimeStartOf(summary), Date.parse('2026-10-17T12:20:20Z'));
+  // Football's end of half sits inside its drives.
+  assert.equal(kit.halftimeStartOf({ drives: { previous: [{ plays: [{ wallclock: '2026-10-11T15:09:32Z' }] }] } }), Date.parse('2026-10-11T15:09:32Z'));
+  assert.equal(kit.halftimeMinutes('soccer'), 15);
+  assert.equal(kit.halftimeMinutes('football', 'ncaaf'), 20);
+  assert.equal(kit.halftimeMinutes('baseball'), null);
+  const end = Date.parse('2026-10-17T12:35:20Z');
+  assert.equal(kit.halftimeClock(end, Date.parse('2026-10-17T12:22:46Z')), '12:34');
+  assert.equal(kit.halftimeClock(end, end + 1000), '');
+  assert.equal(kit.watchHalftime('t:1', { sport: 'soccer', read: async () => summary }), null);
+  await new Promise(r => setTimeout(r, 0));
+  assert.equal(kit.halftimeEnd('t:1'), end);
+  assert.deepEqual(JSON.parse(store.get('quadra.halftime'))['t:1'], end);
+  // A copy from before the whistle isn't taken.
+  kit.watchHalftime('t:2', { sport: 'soccer', read: async () => ({ ...summary, header: { competitions: [{ status: { type: { name: 'STATUS_FIRST_HALF' } } }] } }) });
+  await new Promise(r => setTimeout(r, 0));
+  assert.equal(kit.halftimeEnd('t:2'), null);
+});
