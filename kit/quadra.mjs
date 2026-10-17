@@ -3393,6 +3393,17 @@ function watchNet() {
       return true;
     }
   };
+  // The family's own: the proxy, the page's site (the kit's probe), the kit's.
+  const ours = url => {
+    try {
+      const u = new URL(url, location.href);
+      return u.origin === location.origin || u.hostname.endsWith('.workers.dev') || (globalThis.QUADRA_KIT?.base && u.href.startsWith(new URL(globalThis.QUADRA_KIT.base, location.href).href));
+    } catch {
+      return true;
+    }
+  };
+  let probedAt = 0;
+  const probeSoon = () => Date.now() - probedAt > 5000 && ((probedAt = Date.now()), probeNet());
   window.fetch = (input, init) => {
     const url = typeof input === 'string' ? input : input?.url || String(input);
     if (own(url)) return real(input, init);
@@ -3411,7 +3422,10 @@ function watchNet() {
       error => {
         net.waiting.delete(k);
         // Given up on by the app (a sheet closed): says nothing of the network. A time limit run out: slow at best.
-        if (error?.name !== 'AbortError') net.fails += error?.name === 'TimeoutError' ? 0 : 1;
+        // Another site's refusal reads the same as no network (TheSportsDB's 429 has no CORS header: the
+        // browser calls it a failed request, and two put an online-only app behind 沒有網路連線, 2026-10-17):
+        // only the family's own (the proxy, the kit's probe) count; another's asks the probe instead.
+        if (error?.name !== 'AbortError' && error?.name !== 'TimeoutError') ours(url) ? (net.fails += 1) : probeSoon();
         judgeNet();
         throw error;
       }
