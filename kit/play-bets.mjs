@@ -37,7 +37,8 @@ export function f1Bets(f1, { now = new Date(), memo = {}, loadedAt = null } = {}
       fairChance: d.fair,
       fairMargin: null,
       errKey: `${phase === 'pre' ? 'f1Pre' : 'f1'}${d.fair < 0.01 ? 'Longshot' : ''}`,
-      estOdds: estimateF1Odds(d.fair)
+      // Never longer than the bookmaker's own price (2026-10's 美國站: Gasly 301 at Kambi, 500 here from the devigged chance).
+      estOdds: Math.min(estimateF1Odds(d.fair), d.book > 1 ? d.book : Infinity)
     });
   }
   // 前三名: the same drivers finishing in the top three.

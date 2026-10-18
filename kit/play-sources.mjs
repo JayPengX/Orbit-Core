@@ -556,6 +556,9 @@ export function parseF1RaceWinner(events, now) {
       // before a grid penalty), at its ask: what buying it there costs, so
       // the house never pays out longer than the market (the cut on top).
       .map((d, i) => (d.firm ? { name: d.name, fair: Math.max(d.raw, d.ask), firm: true } : { name: d.name, fair: Math.max(fair[i], d.last > 0 && d.last < 1 ? d.last : 0) }))
+      // An untraded longshot's quote (under 2%: Polymarket's floor, eight drivers at
+      // the same 0.8% where Kambi had them at 751 to 1001) says nothing: a bookmaker's price stands over it.
+      .map(d => (!d.firm && d.fair < SOFT_UNDER ? { ...d, soft: true } : d))
       .sort((a, b) => b.fair - a.fair)
   };
 }
@@ -571,16 +574,29 @@ const surnameKey = n => {
   const words = String(n || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\b(jr|sr)\b\.?/g, '').trim().split(/\s+/);
   return words.at(-1).replace(/[^a-z]/g, '');
 };
+const SOFT_UNDER = 0.02;
 export function mergeF1Boards(...boards) {
   const out = new Map();
-  for (const board of boards.filter(Boolean))
+  const real = boards.filter(Boolean);
+  for (const board of real)
     for (const d of board.drivers || []) {
       const k = surnameKey(d.name);
       const had = out.get(k);
       const firm = !!d.firm;
-      if (!had || (firm && !had.firm) || (firm === !!had.firm && d.fair > had.fair)) out.set(k, { name: had?.name ?? d.name, fair: d.fair, ...(firm || had?.firm ? { firm: true } : {}) });
+      // A soft quote (an untraded longshot's) only where no other board has the driver; any other replaces it.
+      const better = !had || (had.soft && !d.soft) || (!d.soft && ((firm && !had.firm) || (firm === !!had.firm && d.fair > had.fair)));
+      const book = d.book ?? had?.book;
+      if (better) out.set(k, { name: had?.name ?? d.name, fair: d.fair, ...(firm || had?.firm ? { firm: true } : {}), ...(d.soft ? { soft: true } : {}), ...(book ? { book } : {}) });
+      else if (d.book && !had.book) had.book = d.book;
     }
-  return [...out.values()].sort((a, b) => b.fair - a.fair);
+  // A bookmaker's board is the grid: a driver only a prediction market still
+  // lists (a seat lost, 2026's Tsunoda) goes, unless traded firmly.
+  const book = real.find(b => b.source === 'kambi');
+  const grid = book ? new Set(book.drivers.map(d => surnameKey(d.name))) : null;
+  return [...out.entries()]
+    .filter(([k, d]) => !grid || grid.has(k) || d.firm)
+    .map(([, { soft, ...d }]) => d)
+    .sort((a, b) => b.fair - a.fair);
 }
 
 // Kambi's F1 race, for when Polymarket hasn't opened the next one yet (it
@@ -591,9 +607,10 @@ export function nextKambiF1Race(list, now) {
   return (list?.events || [])
     .map(x => x.event)
     // A Grand Prix ("Race: Bahrain GP 2026", "Singapore GP 2026"), not the season's
-    // championships nor the weekend's other sessions (" Practice 1: Singapore GP 2026",
+    // championships, a driver's or team's "United States GP Specials" (same start,
+    // listed first, no winner board: Kambi's prices went missing, 2026-10) nor the weekend's other sessions (" Practice 1: Singapore GP 2026",
     // two days before the race and with no winner board: Russell went 3% on Polymarket alone).
-    .filter(e => e && /^race:|\bGP\b|grand prix/i.test(e.name || '') && !/champion|practice|qualifying|sprint|shootout/i.test(e.name || '') && e.state === 'NOT_STARTED' && Date.parse(e.start) > now.getTime())
+    .filter(e => e && /^race:|\bGP\b|grand prix/i.test(e.name || '') && !/champion|practice|qualifying|sprint|shootout|special/i.test(e.name || '') && e.state === 'NOT_STARTED' && Date.parse(e.start) > now.getTime())
     .sort((a, b) => Date.parse(a.start) - Date.parse(b.start))[0] ?? null;
 }
 export function parseKambiF1Race(event, offers) {
@@ -601,13 +618,14 @@ export function parseKambiF1Race(event, offers) {
   const drivers = (offer?.outcomes || []).filter(o => o.odds > 1000 && o.participant).map(o => ({ name: o.participant, raw: 1000 / o.odds }));
   if (drivers.length < 10) return null;
   const fair = devigPower(drivers.map(d => d.raw));
+  // (Its own price kept: the house never pays longer than the bookmaker, play-bets.mjs.)
   const gp = event.name.replace(/^race:\s*/i, '').replace(/\s*\d{4}$/, '').replace(/\bGP\b/, 'Grand Prix');
   return {
     title: gp,
     slug: `kambi-${event.id}`,
     source: 'kambi',
     startUtc: new Date(event.start).toISOString(),
-    drivers: drivers.map((d, i) => ({ name: d.name, fair: fair[i] })).sort((a, b) => b.fair - a.fair)
+    drivers: drivers.map((d, i) => ({ name: d.name, fair: fair[i], book: Math.round(100 / d.raw) / 100 })).sort((a, b) => b.fair - a.fair)
   };
 }
 
