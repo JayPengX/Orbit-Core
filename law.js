@@ -6,11 +6,12 @@
 // and Gemini answers from those articles only, citing one for every point;
 // a point citing anything else is dropped here.
 //
-// No Pass: only Orbit Law's origin (or a localhost page), 10 asks a minute an
-// address in memory, and Gemini's calls 20 a day an address (hashed) and 300
-// a day in all (Taiwan's day), counted in D1 before each call (a failed count
-// turns the ask away). An answer is kept in KV by the law's version (m), the
-// articles, the question and the language: asked again, it's free.
+// A Quadra Pass of Orbit Law's (worker.js reads it; none, a 401 {error:
+// 'pass'}), from Orbit Law's origin (or a localhost page) only: 10 asks a
+// minute a Pass in memory, and Gemini's calls 40 a day a Pass (hashed) and
+// 300 a day in all (Taiwan's day), counted in D1 before each call (a failed
+// count turns the ask away). An answer is kept in KV by the law's version
+// (m), the articles, the question and the language: asked again, it's free.
 // Stopped from the guard's pace 2.
 //
 // The rest of Orbit Law's AI (law-chat.js) shares this file's pieces: the
@@ -25,7 +26,7 @@ export const DATA = 'https://jaypengx.github.io/Orbit-Law/data/';
 // perDay: Gemini's answers a day in all, /law-ask's and /law-chat's (a chat
 // turn's plan counts with its answer, as one), near the low end of the
 // spec's estimate (about 200 turns a day).
-export const LAW_LIMITS = { perIp: 20, chatPerPass: 30, perDay: 300, perMinute: 10, maxArts: 8, maxQ: 300, maxBody: 4096 };
+export const LAW_LIMITS = { perPass: 40, chatPerPass: 30, perDay: 300, perMinute: 10, maxArts: 8, maxQ: 300, maxBody: 4096 };
 export const PCODE = /^[A-Z]\d{7}$/;
 export const ART = /^\d{1,4}(-\d{1,3})?$/;
 const ANSWER_TTL_S = 180 * 86_400;
@@ -133,7 +134,8 @@ export async function readLaw(p) {
 }
 
 // ---- The day's counts: D1 (STORE), or memory with no store (the tests) ----
-// One row a key a day: 'g' the day's calls in all, 'ip:<hash>' an address's.
+// One row a key a day: 'g' the day's calls in all, 'ask:<hash>' and
+// 'chat:<hash>' a Pass's.
 const memory = new Map();
 const ready = new WeakSet();
 async function table(env, day) {
@@ -169,7 +171,7 @@ async function addOne(env, k, day) {
 }
 export const forgetLawCounts = () => memory.clear();
 
-// One Gemini answer spent for `who` (an address or a Pass) on the day:
+// One Gemini answer spent for `who` (a Pass's count) on the day:
 // counted before the call, `who` first (a capped one adds nothing to the
 // day's), then the day's, then `who` again (two at once). → `who`'s count
 // now, or 0 when it's capped (a count that fails is capped).
@@ -204,11 +206,11 @@ export async function modelJson(gemini, prompt, schema) {
 // The Quadra Pass behind a session of Orbit Law's (worker.js reads `qt=`):
 // its account (the pass's SHA-256), or null.
 export const passOf = session => (session?.a === 'law' && typeof session.d === 'string' && session.d ? session.d : null);
-// A Pass's (or an address's) day's count, by a hash of it and the day.
+// A Pass's day's count on a route, by a hash of the Pass and the day.
 export const passKey = async (route, who, day) => `${route}:${(await sha256Hex(`law|${day}|${who}`)).slice(0, 24)}`;
 
 // What every route here checks first, in order: POST, Orbit Law's origin,
-// whose asks they are (`who`: a Pass; null, not signed in), the body's
+// whose asks they are (`who`: the Pass; null, not signed in), the body's
 // size, its JSON, the ask itself (`read`: the ask, or what's wrong with
 // it), 10 asks a minute, the guard's pace. → the ask, or the answer
 // turning it away.
@@ -232,9 +234,11 @@ export async function opening(request, env, headers, { maxBody, read, who }) {
   return ask;
 }
 
-// gemini(parts, schema) -> the upstream Response (worker.js's proxyGeminiRequest).
-export async function handleLawAsk(request, env, ctx, headers, ip, gemini) {
-  const ask = await opening(request, env, headers, { maxBody: LAW_LIMITS.maxBody, read: readAsk, who: ip });
+// gemini(parts, schema) -> the upstream Response (worker.js's proxyGeminiRequest);
+// session: the request's Quadra Pass session (worker.js), or null.
+export async function handleLawAsk(request, env, ctx, headers, session, gemini) {
+  const pass = passOf(session);
+  const ask = await opening(request, env, headers, { maxBody: LAW_LIMITS.maxBody, read: readAsk, who: pass });
   if (ask instanceof Response) return ask;
 
   let law;
@@ -251,14 +255,14 @@ export async function handleLawAsk(request, env, ctx, headers, ip, gemini) {
   const info = { p: law.p, n: law.n, m: law.m };
 
   const day = twDay();
-  const who = await passKey('ip', ip, day);
+  const who = await passKey('ask', pass, day);
   const cacheKey = `law:ask:v1:${await sha256Hex([law.p, law.m, [...keys].sort().join(','), ask.q, ask.lang].join('|'))}`;
-  const left = n => Math.max(0, LAW_LIMITS.perIp - n);
+  const left = n => Math.max(0, LAW_LIMITS.perPass - n);
   const hit = await kept(env, cacheKey);
   if (hit) return json({ ...hit, law: info, cached: true, left: left(await countOf(env, who, day)) }, 200, headers);
 
   if (!env.GEMINI_API_KEY) return fail('setup', 503, headers);
-  const used = await spend(env, who, LAW_LIMITS.perIp, day);
+  const used = await spend(env, who, LAW_LIMITS.perPass, day);
   if (!used) return fail('cap', 429, headers, { left: 0 });
 
   let out;
