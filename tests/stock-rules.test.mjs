@@ -36,3 +36,20 @@ test('融券 puts up 90% of the sale, the part under NT$100 counted as NT$100 (�
   assert.equal(r.order.deposit, 90_500, '100,500 × 90% = 90,450: NT$90,500');
   assert.equal(SA.replay(r.account, now).positions['2330.TW'].shortDeposit, 90_500);
 });
+
+test('Taiwan: whole lots and odd lots are separate orders; 1,500 shares is two', async () => {
+  const { mixedLot } = await import('../kit/stock-markets.mjs');
+  assert.deepEqual(mixedLot('TW', 'stock', 1500), { lots: 1000, odd: 500 });
+  assert.deepEqual([mixedLot('TW', 'stock', 999), mixedLot('TW', 'etf', 3000), mixedLot('US', 'stock', 1500), mixedLot('TW', 'fund', 1500)], [null, null, null, null]);
+  const acc = SA.newAccount(1_000_000, now - DAY, 'acc');
+  const buy = qty => SA.placeOrder(acc, { side: 'buy', type: 'limit', limit: 100, qty }, { quote: tw(100), rates, valuation: ok, now, id: `b${qty}` });
+  assert.deepEqual(buy(1500), { error: 'mixedLot', lots: 1000, odd: 500 });
+  assert.equal(buy(1000).error, undefined);
+  assert.equal(buy(500).error, undefined);
+  // Selling 1,500 held: also two orders.
+  const held = buy(1000).account;
+  const more = SA.placeOrder(held, { side: 'buy', type: 'limit', limit: 100, qty: 500 }, { quote: tw(100), rates, valuation: ok, now, id: 'b2' }).account;
+  assert.equal(SA.placeOrder(more, { side: 'sell', type: 'limit', limit: 100, qty: 1500 }, { quote: tw(100), rates, valuation: ok, now, id: 's' }).error, 'mixedLot');
+  // The broker's own sale (forced, or to cover an overdraft) splits itself.
+  assert.equal(SA.placeOrder(more, { side: 'sell', type: 'market', qty: 1500, forced: true }, { quote: tw(100), rates, valuation: ok, now, id: 'f' }).error, undefined);
+});

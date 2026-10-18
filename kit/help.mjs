@@ -138,7 +138,7 @@ export const HELP = {
         '市價單：開盤時立刻成交（買在賣價、賣在買價）；休市時送出的，開盤後第一個報價成交，多保留 3%，沒用到的退回。限價單：買進到限價或更低、賣出到限價或更高才成交。停損／觸價單：價格穿過觸發價時用市價成交。',
         '限價和停損單預設「當日有效」，收盤還沒成交就失效；選「長效」保留 30 天。加密貨幣和外匯對永遠是長效。觸發時現金不夠，委託會被取消。',
         'App 關著也照算：伺服器用那段時間的價格，找出第一個碰到你價格的時間成交，記在那個時間。',
-        '台股、美股的限價要符合跳動單位，台股限價要在漲跌幅 ±10% 內；台股零股 9:10 開始撮合。每筆交易都看得到交割日（台股 T+2、美股 T+1）：賣出的錢馬上可以再買同一個市場，交割後才能換匯。'
+        '台股、美股的限價要符合跳動單位，台股限價要在漲跌幅 ±10% 內；台股整股（1,000 股的倍數）和零股（1–999 股）要分開下單，零股 9:10 開始撮合。每筆交易都看得到交割日（台股 T+2、美股 T+1）：賣出的錢馬上可以再買同一個市場，交割後才能換匯。'
       ]],
       ['plans', '定期定額與到價提醒', [
         '定期定額（📅）：每月第幾天買多少新台幣。那天 00:00 之後的第一個價格成交，扣掉成本能買多少就買多少；外幣標的只換需要的新台幣。那個月餘額不夠就跳過，記在紀錄裡。',
@@ -193,7 +193,7 @@ export const HELP = {
         'Market: fills at once while the market is open (buying at the ask, selling at the bid); placed while it’s closed, at the first price after the open, holding 3% extra (the unused part comes back). Limit: a buy fills at your price or lower, a sell at your price or higher. Stop: a market order once the price passes your stop.',
         'Limit and stop orders are day orders by default: not filled by the close, they lapse; GTC keeps one for 30 days. Crypto and currency pairs are always GTC. An order whose cash is no longer there when it triggers is dropped.',
         'Closed apps still count: the server walks the prices of the time away, fills at the first moment that reached your price, and dates it then.',
-        'Taiwan and US limit prices must sit on the exchange’s tick, and Taiwan’s within the day’s ±10%; Taiwan odd lots match from 9:10. Every trade shows when it settles (Taiwan T+2, US T+1): sale money buys again at once in its market, but can be exchanged only once settled.'
+        'Taiwan and US limit prices must sit on the exchange’s tick, and Taiwan’s within the day’s ±10%; Taiwan whole lots (multiples of 1,000) and odd lots (1–999 shares) are separate orders, and odd lots match from 9:10. Every trade shows when it settles (Taiwan T+2, US T+1): sale money buys again at once in its market, but can be exchanged only once settled.'
       ]],
       ['plans', 'Monthly plans and price alerts', [
         'Monthly plan (📅): NT$ an amount on a day of every month. It buys at the first price after 00:00 that day, as much as the money covers after costs; a foreign one exchanges only the NT$ it needs. A month without enough is skipped and recorded.',

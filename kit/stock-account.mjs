@@ -39,6 +39,7 @@ import {
   roundQty,
   tradeCosts,
   lotProblem,
+  mixedLot,
   localDayOf
 } from '#kit/stock-markets.mjs';
 import { nextTradingStart, isTradingDay } from '#kit/stock-holidays.mjs';
@@ -544,6 +545,10 @@ export function placeOrder(account, req, { quote, rates, valuation, now = Date.n
   // Board lots (Japan 100, China's buys 100, Hong Kong each stock's own).
   const lot = lotProblem(quote.market, quote.symbol, quote.kind, side, qty, Math.max(0, avail.qty[quote.symbol] || 0));
   if (lot) return { error: 'lot', lot: lot.lot };
+  // Taiwan: whole lots and odd lots go in separate orders. (The broker's own
+  // sales, forced or to cover, it splits itself.)
+  const mixed = !req.forced && !req.cover && mixedLot(quote.market, quote.kind, qty);
+  if (mixed) return { error: 'mixedLot', ...mixed };
   // China's T+1: shares bought today can be sold from the next trading day.
   if (side === 'sell' && quote.market === 'CN') {
     const today = localDayOf(now, 'CN');
