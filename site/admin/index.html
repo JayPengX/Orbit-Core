@@ -425,7 +425,7 @@ const KEY = 'quadra.admin';
 const $ = id => document.getElementById(id);
 const store = { get: () => { try { return localStorage.getItem(KEY) || ''; } catch { return ''; } }, set: v => { try { v ? localStorage.setItem(KEY, v) : localStorage.removeItem(KEY); } catch {} } };
 let token = store.get();
-const APPS = { stock: 'Quadra 證券', odds: 'Quadra Play', match: 'Orbit Sports', vocab: 'Orbit Words', orbit: 'Orbit Class', weather: 'Orbit Weather', transit: 'Orbit Transit', slip: 'Orbit Slips' };
+const APPS = { stock: 'Quadra 證券', odds: 'Quadra Play', match: 'Orbit Sports', vocab: 'Orbit Words', orbit: 'Orbit Class', weather: 'Orbit Weather', transit: 'Orbit Transit', slip: 'Orbit Slips', beats: 'Orbit Beats' };
 const appName = a => APPS[a] || a;
 // A record's kind in words (the key itself when it's one not named here).
 const KINDS = { start: '開戶金', pay: '月薪', grant: '補發', rank: '排名獎', rebase: '重算', vip: 'VIP', admin: '手動調整', plus: 'Plus 月費', od: '透支利息', stake: '下注', payout: '派彩', win: '派彩', refund: '退款', cashout: '提前兌現', lottery: '彩券', prize: '彩券獎金', undo: '撤銷' };

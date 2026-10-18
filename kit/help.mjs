@@ -12,7 +12,7 @@
 //
 // HELP[app][lang] = [[topic id, title, [paragraphs]], …]
 
-export const HELP_ORDER = ['pass', 'stock', 'odds', 'match', 'vocab', 'orbit', 'weather', 'transit', 'slip'];
+export const HELP_ORDER = ['pass', 'stock', 'odds', 'match', 'vocab', 'orbit', 'weather', 'transit', 'slip', 'beats'];
 
 export const HELP = {
   pass: {
@@ -558,6 +558,48 @@ export const HELP = {
       ]],
       ['money', 'Money', [
         'Orbit Slips sells nothing and moves no money: it only follows tickets you’ve bought. The account, Quadra Plus and the truth about the money are in the Quadra Pass, top right.'
+      ]]
+    ]
+  },
+  beats: {
+    zh: [
+      ['what', 'Orbit Beats 是什麼', [
+        'Orbit 的節拍作曲：給它一組節拍片段（鼓、貝斯、旋律、Loop），它聽出速度和每段的角色，排成一首首新歌，用的都是你原本的聲音。全部在手機上算，什麼都不上傳；沒有網路也能用。'
+      ]],
+      ['add', '放進片段', [
+        '三種方式：一段錄音（片段之間留 0.2 秒以上的安靜，會自動切開）；一整包取樣（一次選很多檔，每個檔各自切）；或直接用麥克風錄。WAV 最好，手機能播的格式（m4a、mp3…）也可以。',
+        '手機錄的安靜不是真的無聲：切出來的數量不對，到「切片」把「安靜門檻」調高（例如 -60 dB）。上次用的整組片段會留在這支手機上，下次打開就在。'
+      ]],
+      ['roles', '速度與角色', [
+        '速度從片段聽出來（70–190 BPM）；聽成一半或兩倍時，按 ½ 或 ×2，也可以直接輸入。每段的角色（Riff、樂句、貝斯、Hi-hat、過門、大鼓、808、小鼓、Tick、滾奏、不用）也是聽出來的，點片段可以試聽，選單可以改；改過的不會被重聽蓋掉。',
+        '至少要有一段 Riff 或樂句。每組片段的速度和你改過的角色會存在 Quadra Pass，換手機選同一組也在。'
+      ]],
+      ['make', '做歌', [
+        '選首數、長度（小節）、鼓的風格（四拍、嘻哈、Trap、半速、碎拍、House、Dembow、Afrobeats）、人味（搖擺和時間的飄移），按「做歌」。每首有段落圖（前奏、主歌、副歌、間奏、橋段、尾奏），可以直接播、單首下載，或全部打包成 zip。',
+        '同一個種子做出同樣的歌。設定存在 Quadra Pass，每支手機都一樣。'
+      ]],
+      ['money', '錢怎麼算', [
+        'Orbit Beats 免費，不碰錢，也不上傳你的聲音。帳戶、Quadra Plus 和錢的真相，都在右上角的 Quadra Pass 裡。'
+      ]]
+    ],
+    en: [
+      ['what', 'What Orbit Beats is', [
+        'Orbit’s beat maker: give it a set of beat pieces (drums, bass, melodies, loops) and it hears the tempo and what each piece is, then arranges them into new songs, using your sounds exactly as recorded. It all runs on the phone: nothing is uploaded, and it works offline.'
+      ]],
+      ['add', 'Adding pieces', [
+        'Three ways: one recording (0.2 s or more of silence between pieces, split for you); a whole sample pack (pick many files at once, each split the same way); or record with the microphone. WAV is best; anything the phone can play (m4a, mp3, …) works too.',
+        'A phone’s silence isn’t really silent: if the count is off, raise Silence below under Splitting (say to -60 dB). The last set of pieces stays on this phone and is there the next time.'
+      ]],
+      ['roles', 'Tempo and roles', [
+        'The tempo is heard from the pieces (70–190 BPM); if it hears half or double, tap ½ or ×2, or type it. Each piece’s role (riff, phrase, bass, hats, fill, kick, 808, snare, tick, roll, not used) is heard too: tap a piece to hear it, and change its role in its menu; a role set by hand is never heard over.',
+        'At least one riff or phrase is needed. Each set’s tempo and the roles you set are kept on your Quadra Pass, so another phone with the same pieces has them.'
+      ]],
+      ['make', 'Making songs', [
+        'Pick how many, their length in bars, the drum styles (four-on-floor, hip-hop, trap, half-time, broken, house, dembow, afrobeats) and humanize (swing and timing drift), and make. Each song shows its sections (intro, verse, hook, break, bridge, outro); play it, download it, or get them all in a zip.',
+        'The same seed makes the same songs. Your settings are kept on your Quadra Pass, the same on every phone.'
+      ]],
+      ['money', 'Money', [
+        'Orbit Beats is free, moves no money and uploads none of your sounds. The account, Quadra Plus and the truth about the money are in the Quadra Pass, top right.'
       ]]
     ]
   },
