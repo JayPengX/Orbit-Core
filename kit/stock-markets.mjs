@@ -7,6 +7,7 @@
 // rates, halved). `loanRate`: yearly interest on money borrowed in it.
 import { isTradingDay, earlyClose } from '#kit/stock-holidays.mjs';
 import { HK_LOT_TABLE } from '#kit/stock-hk-lots.mjs';
+import { TOPIX500, JP_ETF_UNITS } from '#kit/stock-jp-lists.mjs';
 
 export const CURRENCIES = {
   TWD: { symbol: 'NT$', digits: 0, spread: 0, loanRate: 0.065, zh: '新台幣', en: 'Taiwan dollar', flag: '🇹🇼' },
@@ -202,17 +203,44 @@ export function divPayDate(market, ex, payDay = null) {
   return t;
 }
 
+// Tokyo's lists (stock-jp-lists.mjs): a code's TOPIX500 membership and an
+// ETF's trading unit (1 when not listed).
+let jpLists = null;
+function jp() {
+  if (!jpLists) {
+    jpLists = { t500: new Set(TOPIX500.split(/\s+/).filter(Boolean)), units: new Map() };
+    for (const [unit, codes] of Object.entries(JP_ETF_UNITS)) for (const c of codes.split(/\s+/).filter(Boolean)) jpLists.units.set(c, Number(unit));
+  }
+  return jpLists;
+}
+const jpCode = symbol => /^([0-9A-Z]{4})\.T$/i.exec(symbol || '')?.[1]?.toUpperCase() ?? null;
+export const inTopix500 = symbol => jp().t500.has(jpCode(symbol));
+export const jpEtfUnit = symbol => jp().units.get(jpCode(symbol)) ?? 1;
+
 // The price steps an exchange accepts, by price band:
 // - Taiwan (TWSE/TPEx), ETFs finer;
 // - US: a cent (a hundredth of a cent under US$1);
 // - Hong Kong: the spread table (after the 2025 reduction);
-// - Japan: the finer table of the large caps (TOPIX 500), which every
-//   ordinary table's price also sits on;
+// - Japan (JPX 呼値の単位, "up to" each price): TOPIX500's finer table, which
+//   ETFs traded in 10s or more share; ETFs traded in 1s their own; every
+//   other issue the ordinary table (¥1 to ¥3,000, ¥5 to ¥5,000, ¥10 to
+//   ¥30,000...). Without a `symbol`, TOPIX500's, whose steps every table's
+//   prices sit on. (From 2027-03-01 JPX sets each issue's table by its
+//   liquidity, STR, which isn't published here.)
 // - Korea: the 2023 table, ETFs 5 won;
 // - China A-shares: 0.01 yuan, funds 0.001.
 // Other markets aren't checked.
 const bands = (price, table) => table.find(([below]) => price < below)?.[1] ?? table.at(-1)[1];
-export function tickSize(market, kind, price) {
+const upTo = (price, table) => table.find(([most]) => price <= most + 1e-9)?.[1] ?? table.at(-1)[1];
+const JP_FINE = [[1000, 0.1], [3000, 0.5], [10000, 1], [30000, 5], [100000, 10], [300000, 50], [1e6, 100], [3e6, 500], [1e7, 1000], [3e7, 5000], [Infinity, 10000]];
+const JP_ETF_ONE = [[10000, 1], [30000, 5], [100000, 10], [300000, 50], [1e6, 100], [3e6, 500], [1e7, 1000], [3e7, 5000], [Infinity, 10000]];
+const JP_OTHER = [[3000, 1], [5000, 5], [30000, 10], [50000, 50], [300000, 100], [500000, 500], [3e6, 1000], [5e6, 5000], [3e7, 10000], [5e7, 50000], [Infinity, 100000]];
+export function jpTickTable(kind, symbol) {
+  if (!symbol) return JP_FINE;
+  if (kind === 'etf') return jpEtfUnit(symbol) >= 10 ? JP_FINE : JP_ETF_ONE;
+  return inTopix500(symbol) ? JP_FINE : JP_OTHER;
+}
+export function tickSize(market, kind, price, symbol = null) {
   if (market === 'TW') {
     if (kind === 'etf' || kind === 'bond') return price < 50 ? 0.01 : 0.05;
     return price < 10 ? 0.01 : price < 50 ? 0.05 : price < 100 ? 0.1 : price < 500 ? 0.5 : price < 1000 ? 1 : 5;
@@ -220,7 +248,7 @@ export function tickSize(market, kind, price) {
   if (market === 'US') return price < 1 ? 0.0001 : 0.01;
   if (market === 'HK')
     return bands(price, [[0.25, 0.001], [0.5, 0.005], [20, 0.01], [50, 0.02], [100, 0.05], [200, 0.1], [500, 0.2], [1000, 0.5], [2000, 1], [5000, 2], [Infinity, 5]]);
-  if (market === 'JP') return bands(price, [[1000, 0.1], [3000, 0.5], [10000, 1], [30000, 5], [100000, 10], [300000, 50], [1000000, 100], [3000000, 500], [10000000, 1000], [30000000, 5000], [Infinity, 10000]]);
+  if (market === 'JP') return upTo(price, jpTickTable(kind, symbol));
   if (market === 'KR') return kind === 'etf' ? 5 : bands(price, [[2000, 1], [5000, 5], [20000, 10], [50000, 50], [200000, 100], [500000, 500], [Infinity, 1000]]);
   if (market === 'CN') return kind === 'etf' ? 0.001 : 0.01;
   return null;
@@ -237,8 +265,9 @@ export const toTick = (price, tick, dir = 0) => {
 // 初次上市股票首五個交易日無漲跌幅限制, TPEx's 初次上櫃 the same; quote.listed,
 // its listing day, from stock-ipo.mjs listedOn); mainland China ±10% (±20%
 // on the STAR Market, 688xxx, and ChiNext, 300xxx/301xxx); Korea ±30%;
-// Japan a fixed yen amount by price band. Orders outside them are refused by the exchange.
-const JP_LIMITS = [[100, 30], [200, 50], [500, 80], [700, 100], [1000, 150], [1500, 300], [2000, 400], [3000, 500], [5000, 700], [7000, 1000], [10000, 1500], [15000, 3000], [20000, 4000], [30000, 5000], [50000, 7000], [70000, 10000], [100000, 15000], [150000, 30000], [200000, 40000], [300000, 50000], [500000, 70000], [700000, 100000], [1000000, 150000], [Infinity, 300000]];
+// Japan a fixed yen amount by price band (JPX 値幅制限), for stocks and ETFs
+// alike. Orders outside them are refused by the exchange.
+const JP_LIMITS = [[100, 30], [200, 50], [500, 80], [700, 100], [1000, 150], [1500, 300], [2000, 400], [3000, 500], [5000, 700], [7000, 1000], [10000, 1500], [15000, 3000], [20000, 4000], [30000, 5000], [50000, 7000], [70000, 10000], [100000, 15000], [150000, 30000], [200000, 40000], [300000, 50000], [500000, 70000], [700000, 100000], [1e6, 150000], [1.5e6, 300000], [2e6, 400000], [3e6, 500000], [5e6, 700000], [7e6, 1e6], [1e7, 1.5e6], [1.5e7, 3e6], [2e7, 4e6], [3e7, 5e6], [5e7, 7e6], [Infinity, 1e7]];
 export const NEW_LISTING_DAYS = 5;
 // Whether `now` is within the first NEW_LISTING_DAYS Taiwan trading days from
 // the listing day `listed` (that day the first).
@@ -262,8 +291,8 @@ export function limitShare(quote, now = Date.now()) {
 }
 export function priceLimits(quote, now = Date.now()) {
   if (!(quote?.prev > 0)) return null;
-  const tick = x => tickSize(quote.market, quote.kind, x);
-  if (quote.market === 'JP' && quote.kind === 'stock') {
+  const tick = x => tickSize(quote.market, quote.kind, x, quote.symbol);
+  if (quote.market === 'JP' && (quote.kind === 'stock' || quote.kind === 'etf')) {
     const w = bands(quote.prev, JP_LIMITS);
     return { up: quote.prev + w, down: Math.max(tick(1), quote.prev - w) };
   }
@@ -275,7 +304,7 @@ export function priceLimits(quote, now = Date.now()) {
 }
 
 // Board lots: the smallest amount the exchange trades. Japan trades every
-// stock in units of 100; mainland China buys in 100s (an odd remainder can
+// stock in units of 100 and each ETF in its own (jpEtfUnit); mainland China buys in 100s (an odd remainder can
 // only be sold whole); Hong Kong's lot is each security's own (every HKEX
 // equity, ETF and REIT's, from its List of Securities: stock-hk-lots.mjs).
 // Taiwan has its odd-lot session, and Singapore its unit-share market, so
@@ -298,6 +327,7 @@ export function hkLot(symbol) {
 export function lotSize(market, symbol, kind) {
   if (!['stock', 'etf', 'bond'].includes(kind)) return 1;
   if (market === 'JP' && kind === 'stock') return 100;
+  if (market === 'JP' && kind === 'etf') return jpEtfUnit(symbol);
   if (market === 'CN') return 100;
   if (market === 'HK') return hkLot(symbol) || 1;
   return 1;
