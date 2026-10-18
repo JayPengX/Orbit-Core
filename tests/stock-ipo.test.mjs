@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseIpoList, rocDay, ipoOpen, ipoHold, ipoWon, ipoApplyEvent, ipoBackEvent, ipoWinEvent, IPO_FEE, IPO_WIN_FEE } from '../kit/stock-ipo.mjs';
+import { parseIpoList, rocDay, ipoOpen, ipoHold, ipoWon, ipoApplyEvent, ipoBackEvent, ipoWinEvent, IPO_FEE, IPO_WIN_FEE, IPO_URL, ipoUrls, listedOn } from '../kit/stock-ipo.mjs';
 import { replay } from '../kit/stock-account.mjs';
-import { handleStock, FILLS_COLLECTION, moveBook, ipoDraw } from '../stock-fill.js';
+import { handleStock, FILLS_COLLECTION, moveBook, ipoDraw, ipoList } from '../stock-fill.js';
 import { checkStock, VERIFIED_COLLECTION } from '../stock-check.js';
 import { pack } from '../kit/stock-codec.mjs';
 
@@ -179,4 +179,24 @@ test("a first listing has no daily price limit for its first five trading days (
   assert.equal(place(q, at).error, undefined);
   const day6 = tpe('2026-10-30');
   assert.equal(place({ ...q, got: day6, marketTime: day6, session: { start: tpe('2026-10-30', '09:00'), end: tpe('2026-10-30', '13:30') } }, day6).error, 'priceLimit');
+});
+
+test("TWSE's list is a year's: in early January last year's is read too, so a December draw still resolves", async () => {
+  assert.deepEqual(ipoUrls(Date.UTC(2026, 9, 18)), [IPO_URL]);
+  assert.deepEqual(ipoUrls(Date.UTC(2027, 0, 5)), [IPO_URL, `${IPO_URL}&date=20260101`]);
+  // A December 2026 draw, applied in its window, asked about in January 2027:
+  // the default list is 2027's (empty), 2026's has it.
+  const dec = { stat: 'OK', fields: FIELDS, data: [row('115/12/29', '某新股', '7777', '初上市', '115/12/22', '115/12/24', '50', '50', '116/01/06', '1,000', '0')] };
+  const [s] = parseIpoList(dec);
+  const key = `${s.code}:${s.draw}`;
+  const now = { t: s.from + 10 * H };
+  const deps = { ...workerDeps({ v: dec }, now) };
+  assert.equal((await ask(deps, [key])).seen[key], now.t);
+  dec.data[0][16] = '100';
+  const byUrl = url => (url.includes('date=2026') ? dec : { stat: 'OK', fields: FIELDS, data: [] });
+  const jan = { ...deps, read: async url => byUrl(url) };
+  now.t = Date.UTC(2027, 0, 2, 2);
+  assert.deepEqual((await ask(jan, [key])).drawn[key], { won: true, rate: 1 });
+  // listedOn finds its listing day in the merged list: no limit on its first days.
+  assert.equal(listedOn(await ipoList(jan.read, now.t), '7777.TW'), s.list);
 });
