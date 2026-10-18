@@ -135,8 +135,12 @@ export function scrub(text, env) {
   return out;
 }
 
+// Every source given up after this (Google, CWA, NLSC): one that hangs
+// mustn't hold a forecast, or the hourly scoring, open with it.
+const UPSTREAM_MS = 10_000;
+
 export async function getJson(fetchFn, url, env, body = null) {
-  const res = await fetchFn(url, body ? { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : { headers: { Accept: 'application/json' } });
+  const res = await fetchFn(url, body ? { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(UPSTREAM_MS) } : { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(UPSTREAM_MS) });
   const text = await res.text();
   if (!res.ok) throw new Error(scrub(`${res.status} ${text.slice(0, 160)}`, env));
   return JSON.parse(text);
@@ -702,7 +706,7 @@ export async function whereIs(lat, lon, { fetchFn = fetch, cache = globalThis.ca
   const key = `https://weather.cache/where/${la},${lo}`;
   const hit = cache && (await cache.match(key).catch(() => null));
   if (hit) return hit.json();
-  const res = await fetchFn(`${NLSC}${lo}/${la}`, { headers: { Accept: 'application/xml' } });
+  const res = await fetchFn(`${NLSC}${lo}/${la}`, { headers: { Accept: 'application/xml' }, signal: AbortSignal.timeout(UPSTREAM_MS) });
   const place = parseVillage(res.ok ? await res.text() : '');
   if (cache && (res.ok || place.county)) await cache.put(key, new Response(JSON.stringify(place), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=2592000' } })).catch(() => {});
   return place;
@@ -1382,7 +1386,7 @@ async function probe(env, source, fetchFn) {
   const [url, good] = CHECKS[source](env);
   const t0 = Date.now();
   try {
-    const res = await fetchFn(url, { headers: { Accept: 'application/json' } });
+    const res = await fetchFn(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(UPSTREAM_MS) });
     const text = await res.text();
     let body = null;
     try {
@@ -1451,7 +1455,7 @@ export async function handleWeather(request, env, headers, path, { session = nul
         await cachedText(env, `weather:sample:${sample}`, 3600, async () => {
           const made = SAMPLES[sample](env);
           const [url, body] = Array.isArray(made) ? made : [made, null];
-          const res = await fetchFn(url, body ? { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : { headers: { Accept: 'application/json' } });
+          const res = await fetchFn(url, body ? { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(UPSTREAM_MS) } : { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(UPSTREAM_MS) });
           return JSON.stringify({ status: res.status, body: scrub(await res.text(), env) });
         })
       );

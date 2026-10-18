@@ -132,6 +132,16 @@ test('one truth: the answer names no source and carries no second opinion', asyn
   assert.equal(entry.bySource.hours.length, 49, 'this hour and the next 48');
 });
 
+test('every source asked is given up on after a while: none can hold a forecast open', async () => {
+  const signals = [];
+  const f = upstream();
+  const fetchFn = (url, o) => (signals.push(o?.signal), f(url, o));
+  await buildCell({ ...env, RATE_LIMIT_KV: memKv() }, 25.034, 121.565, { fetchFn, now: NOW });
+  await whereIs(25.03412, 121.56456, { fetchFn: async (url, o) => (signals.push(o?.signal), answer(404, '')), cache: null });
+  assert.ok(signals.length > 3);
+  assert.ok(signals.every(s => s instanceof AbortSignal));
+});
+
 test('a failing source: the others answer, the last good copy is used', async () => {
   const e = { ...env, RATE_LIMIT_KV: memKv() };
   const good = await buildCell(e, 25.034, 121.565, { fetchFn: upstream(), now: NOW });

@@ -351,3 +351,18 @@ test('a subscription only to a real push service (Apple, FCM, Mozilla, Windows),
   }
   assert.deepEqual(sent, []);
 });
+
+test('a check or a push that hangs is given up on (the cron sends the rest)', async () => {
+  const real = globalThis.fetch;
+  const signals = [];
+  globalThis.fetch = async (url, o) => (signals.push(o?.signal), { ok: true, status: 200, json: async () => ({ chart: { result: [{ meta: { regularMarketPrice: 10 } }] } }) });
+  try {
+    await runCheck({ yahoo: '2330.TW', op: 'above', price: 5 }, 'zh', {});
+    await runCheck({ espn: 'baseball/mlb', event: '1' }, 'zh', {});
+    await runCheck({ espn: 'racing/f1', event: '1', session: 'Race', day: '20261018' }, 'zh', {});
+  } finally {
+    globalThis.fetch = real;
+  }
+  assert.equal(signals.length, 3);
+  assert.ok(signals.every(s => s instanceof AbortSignal));
+});
