@@ -135,7 +135,7 @@ export const HELP = {
       ]],
       ['orders', '委託單', [
         '每筆委託都由 Quadra 的伺服器用它的即時報價成交；掛著的時候，要用的現金或股票會先保留。',
-        '市價單：開盤時立刻成交（買在賣價、賣在買價）；休市時送出的，開盤後第一個報價成交，多保留 3%，沒用到的退回。限價單：買進到限價或更低、賣出到限價或更高才成交。停損／觸價單：價格穿過觸發價時用市價成交。',
+        '市價單：開盤時立刻成交（買在賣價、賣在買價）；休市時送出的，開盤後第一個報價成交，多保留 3%，沒用到的退回；台股市價和停損單照券商的算法，以漲停價保留現金、計算額度。限價單：買進到限價或更低、賣出到限價或更高才成交。停損／觸價單：價格穿過觸發價時用市價成交。',
         '限價和停損單預設「當日有效」，收盤還沒成交就失效；選「長效」保留 30 天。加密貨幣和外匯對永遠是長效。觸發時現金不夠，委託會被取消。',
         'App 關著也照算：伺服器用那段時間的價格，找出第一個碰到你價格的時間成交，記在那個時間。',
         '台股、美股的限價要符合跳動單位，台股限價要在漲跌幅 ±10% 內；台股整股（1,000 股的倍數）和零股（1–999 股）要分開下單，零股 9:10 開始撮合。每筆交易都看得到交割日（台股 T+2、美股 T+1）：賣出的錢馬上可以再買同一個市場，交割後才能換匯。'
@@ -190,7 +190,7 @@ export const HELP = {
       ]],
       ['orders', 'Orders', [
         'Every order is filled by Quadra’s server at its own live quote; while an order waits, the cash or shares it needs are held.',
-        'Market: fills at once while the market is open (buying at the ask, selling at the bid); placed while it’s closed, at the first price after the open, holding 3% extra (the unused part comes back). Limit: a buy fills at your price or lower, a sell at your price or higher. Stop: a market order once the price passes your stop.',
+        'Market: fills at once while the market is open (buying at the ask, selling at the bid); placed while it’s closed, at the first price after the open, holding 3% extra (the unused part comes back); a Taiwan market or stop order holds its cost and counts against limits at the day’s limit-up price, as brokers do. Limit: a buy fills at your price or lower, a sell at your price or higher. Stop: a market order once the price passes your stop.',
         'Limit and stop orders are day orders by default: not filled by the close, they lapse; GTC keeps one for 30 days. Crypto and currency pairs are always GTC. An order whose cash is no longer there when it triggers is dropped.',
         'Closed apps still count: the server walks the prices of the time away, fills at the first moment that reached your price, and dates it then.',
         'Taiwan and US limit prices must sit on the exchange’s tick, and Taiwan’s within the day’s ±10%; Taiwan whole lots (multiples of 1,000) and odd lots (1–999 shares) are separate orders, and odd lots match from 9:10. Every trade shows when it settles (Taiwan T+2, US T+1): sale money buys again at once in its market, but can be exchanged only once settled.'

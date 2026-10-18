@@ -606,7 +606,8 @@ export function placeOrder(account, req, { quote, rates, valuation, now = Date.n
     const credit = creditAccount(account, now);
     if (!credit.open) return { error: 'creditNeeded' };
     if (quote.market === 'TW') {
-      const loan = marginLoan('TW', quote.currency, quote.price * qty, quote.price * qty, rate);
+      const value = quotaPrice(order, quote, now) * qty;
+      const loan = marginLoan('TW', quote.currency, value, value, rate);
       const room = credit.limit - creditUsed(valuation).loan;
       if (loan > room + EPS) return { error: 'creditLimit', room: Math.max(0, Math.floor(room)), limit: credit.limit };
     }
@@ -646,8 +647,9 @@ export function placeOrder(account, req, { quote, rates, valuation, now = Date.n
         const credit = creditAccount(account, now);
         if (credit.open) {
           const room = credit.limit - creditUsed(valuation).short;
-          if (short * quote.price > room + EPS) return { error: 'creditLimit', room: Math.max(0, Math.floor(room)), limit: credit.limit };
-          const deposit = shortDeposit(short * quote.price);
+          const value = short * quotaPrice(order, quote, now);
+          if (value > room + EPS) return { error: 'creditLimit', room: Math.max(0, Math.floor(room)), limit: credit.limit };
+          const deposit = shortDeposit(value);
           const cash = avail.cash[quote.currency] || 0;
           if (deposit > cash + EPS) return { error: 'funds', need: deposit, have: Math.max(0, cash), currency: quote.currency };
           order.short = true;
@@ -655,7 +657,7 @@ export function placeOrder(account, req, { quote, rates, valuation, now = Date.n
           order.deposit = deposit;
         } else if (dayTradeSellFirst(account, now) && !order.after && twSession(now)) {
           // Within the day's day-trade limit (當沖額度, stock-credit.mjs).
-          const amount = short * (order.limit ?? quote.price) * rates[quote.currency];
+          const amount = short * quotaPrice(order, quote, now) * rates[quote.currency];
           const room = dayTradeRoom(account, valuation.netWorth, now);
           if (amount > room.left + EPS) return { error: 'dayTradeLimit', room: room.left, limit: room.limit, used: room.used };
           order.short = true;
@@ -688,6 +690,19 @@ export function placeOrder(account, req, { quote, rates, valuation, now = Date.n
   return { account: filled.account, order: filled.order, fill: filled.fill, error: filled.error, need: filled.need, have: filled.have };
 }
 
+// The most a Taiwan market or stop order can fill at, the day's limit-up
+// (漲停價), which a broker counts its amount at (兆豐證券: 受託買賣額度一律以
+// 漲停價計算): the session's from yesterday's close while it trades, the
+// next one's from the last price while shut. Null elsewhere, for a limit
+// order, and after hours (盤後 matches at the close).
+export function limitUpFor(order, quote, now = Date.now()) {
+  if (quote?.market !== 'TW' || order.type === 'limit' || order.after || (order.type === 'market' && afterHours(now))) return null;
+  return priceLimits(isOpen(quote, now) ? quote : { ...quote, prev: quote.price })?.up ?? null;
+}
+// The price an order's amount is counted at (額度, deposits): its limit, a
+// Taiwan market or stop order's limit-up, else the price.
+const quotaPrice = (order, quote, now) => order.limit ?? limitUpFor(order, quote, now) ?? quote.price;
+
 // What a buy order needs in its currency, the very figure placeOrder checks:
 // { est (the all-in estimate), reserve (what's held until it fills),
 // buffer (the part of reserve above the estimate, returned when it fills) }.
@@ -702,10 +717,14 @@ export function requiredCash(order, quote, now = Date.now()) {
   // What's held above the estimate: nothing for a limit order (its limit is
   // its most); RESERVE_BUFFER while it waits for its market; FRESH_BUFFER
   // for one held a moment for a fresh price (the price may tick up).
-  const extra = order.type === 'limit' ? 0 : !fillsNow ? RESERVE_BUFFER : order.waitFresh ? FRESH_BUFFER : 0;
+  // A Taiwan market or stop order holds its cost at the limit-up, the most
+  // it can fill at, and nothing more.
+  const up = limitUpFor(order, quote, now);
+  const held = up ? estimate({ market: quote.market, kind: quote.kind, currency: quote.currency, side: 'buy', qty: order.qty, price: up }) : est;
+  const extra = order.type === 'limit' || up ? 0 : !fillsNow ? RESERVE_BUFFER : order.waitFresh ? FRESH_BUFFER : 0;
   // On margin, only one's own part is held (自備款); the broker lends the rest.
-  const lent = order.margin ? marginLoan(quote.market, quote.currency, est.gross, est.total, order.margin) : 0;
-  const reserve = roundCash((est.total - lent) * (1 + extra), quote.currency);
+  const lent = order.margin ? marginLoan(quote.market, quote.currency, held.gross, held.total, order.margin) : 0;
+  const reserve = roundCash((held.total - lent) * (1 + extra), quote.currency);
   return { est, reserve, buffer: Math.max(0, reserve - est.total), fillsNow, ref };
 }
 
