@@ -71,7 +71,8 @@ SPORTS_DEV = "on"
 # Workers KV: what has to outlive an isolate and be seen by the crons:
 # push subscriptions (push.js), Orbit Transit's monthly Google meter and TDX
 # token (transit.js), Orbit Weather's daily Google count, its scoring and an
-# hourly copy of each cell (weather.js, weather-skill.js). Not rate limits:
+# hourly copy of each cell (weather.js, weather-skill.js), Orbit Law's answers
+# (law.js). Not rate limits:
 # those are in memory (worker.js), and caches are in Cloudflare's cache, so
 # the plan's million writes a month stay far off.
 
