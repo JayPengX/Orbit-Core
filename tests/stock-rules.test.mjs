@@ -275,3 +275,33 @@ test('定期定額: three months running without the cash end the plan (連續�
   assert.equal(r.ended, true);
   assert.deepEqual([r.account.plans.p1.on, r.account.plans.p1.ended], [false, 'funds']);
 });
+
+test('借券: the fee day by day at each close (算頭不算尾, /365), an ask from 0.01% to 16% lent only at or under the going rate, six months renewed twice', async () => {
+  const { lendFee, lendEnds, LEND_RATE } = await import('../kit/stock-savings.mjs');
+  const d0 = Date.parse('2026-10-12T10:00:00+08:00');
+  const close = (dd, c) => ({ t: Date.parse(`2026-10-${dd}T13:30:00+08:00`), c });
+  const lend = { qty: 1000, price: 100, rate: 0.012, t: d0 };
+  // 12th 100, 13th 110, 14th none (the 13th's), 15th 90; back on the 16th: four days.
+  const closes = [close(12, 100), close(13, 110), close(15, 90), close(16, 200)];
+  assert.equal(lendFee(lend, Date.parse('2026-10-16T09:00:00+08:00'), closes).gross, Math.round((410 * 1000 * 0.012) / 365));
+  assert.equal(lendFee(lend, Date.parse('2026-10-16T09:00:00+08:00')).gross, Math.round((1000 * 100 * 0.012 * (Date.parse('2026-10-16T09:00:00+08:00') - d0)) / (365 * DAY)), 'no closes: the price when lent');
+  const day = t => SA.taipeiDay(t);
+  assert.equal(day(lendEnds(lend)), '2027-04-12');
+  assert.equal(day(lendEnds({ ...lend, renew: true })), '2028-04-12', 'renewed twice: eighteen months');
+  // Offers.
+  const acc = { ...SA.newAccount(1_000_000, now - 30 * DAY, 'acc') };
+  acc.events = [...acc.events, { id: 'f1', type: 'fill', t: now - 10 * DAY, orderId: 'f1', symbol: '2330.TW', name: 'TSMC', kind: 'stock', market: 'TW', currency: 'TWD', side: 'buy', qty: 2000, price: 100, gross: 200_000, total: 200_000, commission: 0, tax: 0, fee: 0, twd: 1, settle: now - 8 * DAY }];
+  const offer = more => SA.lendShares(acc, { symbol: '2330.TW', qty: 1000, price: 100, ...more }, now, 'l1');
+  assert.equal(offer({}).event.rate, LEND_RATE.stock);
+  assert.equal(offer({ rate: 0.005 }).event.rate, 0.005);
+  assert.deepEqual(offer({ rate: 0.05 }), { error: 'lendNoTaker', rate: LEND_RATE.stock });
+  assert.equal(offer({ rate: 0.17 }).error, 'lendRate');
+  assert.equal(offer({ rate: 0 }).error, 'lendRate');
+  // A renewed contract runs on past six months; the fee then at the closes given.
+  const lent = offer({ renew: true }).account;
+  assert.equal(Object.keys(SA.replay(SA.matureLending(lent, now + 200 * DAY), now + 200 * DAY).lent).length, 1);
+  const ended = SA.matureLending(lent, now + 600 * DAY, { closesOf: () => [{ t: now, c: 50 }] });
+  const pay = ended.events.find(e => e.type === 'lendpay');
+  assert.equal(day(pay.t), day(lendEnds({ t: now, renew: true })));
+  assert.equal(pay.gross, Math.round((1000 * 50 * 0.012 * Math.round((lendEnds({ t: now, renew: true }) - now) / DAY)) / 365), 'each day at the close');
+});
