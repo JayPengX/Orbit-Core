@@ -149,7 +149,9 @@ const tsdbNum = x => (x === '' || x == null || !Number.isFinite(Number(x)) ? nul
 const TSDB_LONGEST = 5 * 3_600_000;
 export function parseTsdbDay(data, now = Date.now()) {
   return (data?.events || []).map(e => {
-    const start = new Date(`${String(e.strTimestamp || `${e.dateEvent}T${e.strTime || '10:35:00'}`).replace(/Z?$/, 'Z')}`).toISOString();
+    // UTC unless the timestamp names its own zone (Z, +00:00).
+    const stamp = String(e.strTimestamp || `${e.dateEvent}T${e.strTime || '10:35:00'}`);
+    const start = new Date(/(Z|[+-]\d\d:?\d\d)$/i.test(stamp) ? stamp : `${stamp}Z`).toISOString();
     const status = String(e.strStatus || '').toUpperCase();
     // A side held scoreless is left empty (Brothers None, Lions 1, final):
     // once either side has a score, the other's is 0.

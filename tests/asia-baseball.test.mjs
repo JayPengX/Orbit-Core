@@ -122,3 +122,11 @@ test('TheSportsDB leaves a scoreless side empty: it is 0 once the other side has
   const [pre] = parseTsdbDay({ events: [{ idEvent: '2', strTimestamp: '2026-10-11T09:05:00', strHomeTeam: 'Uni-President Lions', strAwayTeam: 'CTBC Brothers', intHomeScore: null, intAwayScore: null, strStatus: 'NS' }] }, Date.parse('2026-10-10T14:00:00Z'));
   assert.equal(pre.awayScore, null);
 });
+
+test('TheSportsDB time: UTC when bare, kept when it names its zone (+00:00, Z, +08:00)', () => {
+  const at = strTimestamp => parseTsdbDay({ events: [{ idEvent: '1', strTimestamp, strHomeTeam: 'CTBC Brothers', strAwayTeam: 'Uni-President Lions', strStatus: 'NS' }] })[0].start;
+  assert.equal(at('2026-10-11T09:05:00'), '2026-10-11T09:05:00.000Z');
+  assert.equal(at('2026-10-11T09:05:00+00:00'), '2026-10-11T09:05:00.000Z');
+  assert.equal(at('2026-10-11T09:05:00Z'), '2026-10-11T09:05:00.000Z');
+  assert.equal(at('2026-10-11T17:05:00+08:00'), '2026-10-11T09:05:00.000Z');
+});
