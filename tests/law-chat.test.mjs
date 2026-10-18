@@ -90,8 +90,8 @@ globalThis.fetch = async (url, init) => {
   return new Response('', { status: 404 });
 };
 const worker = (await import('../worker.js')).default;
-const { LAW_LIMITS, forgetLawCounts } = await import('../law.js');
-const { CHAT_LIMITS, readChat, readPlan, checkChat, textHits, forgetLists } = await import('../law-chat.js');
+const { LAW_LIMITS, forgetLawCounts, forgetLists } = await import('../law.js');
+const { CHAT_LIMITS, readChat, readPlan, checkChat, textHits } = await import('../law-chat.js');
 const { signToken } = await import('../quadra-token.js');
 const { forgetPace } = await import('../pace.js');
 const ctx = { waitUntil: p => p };

@@ -6,6 +6,15 @@ import assert from 'node:assert/strict';
 import { fakeD1 } from './fake-d1.mjs';
 
 const LAW = { p: 'B0000001', n: '民法', m: '20250101', a: [['C', '第一章', '法例'], ['A', '1', '民事，法律所未規定者，依習慣。'], ['A', '15', '受監護宣告之人，無行為能力。'], ['A', '15-1', '對於因精神障礙…得因本人…之聲請，為輔助之宣告。']] };
+// A bill as 立法院's API has it: its 對照表 (one row whose article can't be told).
+const BILL = {
+  議案名稱: '「民法部分條文修正草案」，請審議案。',
+  '提案單位/提案委員': '本院委員甲等16人',
+  案由: '為保障承租人，擬具「民法部分條文修正草案」。',
+  對照表: [{ law_name: '民法', rows: [{ 修正: '第十五條之一　對於因精神障礙…得因本人之聲請，為輔助之宣告。', 現行: '第十五條之一　對於因精神障礙…為輔助之宣告。', 說明: '放寬聲請人。' }, { 增訂: '第四百二十一條之一　押金不得超過二個月租金。', 說明: '明定押金上限。' }, { 說明: '條次調整。' }] }]
+};
+const bills = [];
+let billStatus = 200;
 const laws = [];
 const gemini = [];
 let reply = { answer: '輔助宣告由法院為之。', points: [{ text: '可聲請輔助宣告', cites: ['第15條之1'] }, { text: '外部條文', cites: ['16'] }, { text: '沒有出處', cites: [] }], covered: true };
@@ -16,6 +25,14 @@ globalThis.fetch = async (url, init) => {
     gemini.push(JSON.parse(init.body));
     return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(reply) }] } }] }), { status: geminiStatus, headers: { 'Content-Type': 'application/json' } });
   }
+  if (u.startsWith('https://v2.ly.govapi.tw/bill/')) {
+    bills.push({ u, init });
+    if (billStatus !== 200) return new Response('', { status: billStatus });
+    const id = u.split('/').pop();
+    if (id === '202110000010000') return new Response(JSON.stringify({ error: false, data: BILL }));
+    if (id === '202110000020000') return new Response(JSON.stringify({ error: false, data: { 議案名稱: '預算案', 對照表: [] } }));
+    return new Response(JSON.stringify({ error: true, message: 'not found' }), { status: 404 });
+  }
   if (u.startsWith('https://jaypengx.github.io/Orbit-Law/data/law/')) {
     laws.push({ u, init });
     return u.endsWith('/B0000001.json') ? new Response(JSON.stringify(LAW), { status: 200 }) : new Response('', { status: 404 });
@@ -23,7 +40,7 @@ globalThis.fetch = async (url, init) => {
   throw new Error(`unexpected fetch ${u}`);
 };
 const worker = (await import('../worker.js')).default;
-const { LAW_LIMITS, checkAnswer, citeKey, readAsk, forgetLawCounts } = await import('../law.js');
+const { LAW_LIMITS, checkAnswer, citeKey, readAsk, forgetLawCounts, rowKey, checkBill } = await import('../law.js');
 const { signToken } = await import('../quadra-token.js');
 const ctx = { waitUntil: p => p };
 
@@ -56,7 +73,8 @@ test('the ask is checked before anything is read', async () => {
   for (const bad of [{ ...OK, p: 'b0000001' }, { ...OK, p: 'B000001' }, { ...OK, arts: [] }, { ...OK, arts: Array.from({ length: 9 }, (_, i) => String(i + 1)) }, { ...OK, arts: ['15之1'] }, { ...OK, lang: 'jp' }, { ...OK, q: 'x'.repeat(301) }, { ...OK, q: 5 }]) {
     assert.equal(typeof readAsk(bad), 'string', JSON.stringify(bad));
   }
-  assert.deepEqual(readAsk({ p: 'B0000001', arts: ['15', '15'], q: '  a \n b ' }), { p: 'B0000001', arts: ['15'], q: 'a b', lang: 'zh' });
+  assert.deepEqual(readAsk({ p: 'B0000001', arts: ['15', '15'], q: '  a \n b ' }), { mode: 'ask', p: 'B0000001', arts: ['15'], q: 'a b', lang: 'zh' });
+  assert.equal(readAsk({ ...OK, mode: 'poem' }), 'mode');
   const before = laws.length;
   const r = await ask({ ...OK, p: 'nope' });
   assert.equal(r.status, 400);
@@ -177,4 +195,57 @@ test('Gemini failing is a 502, nothing kept', async () => {
   } finally {
     geminiStatus = 200;
   }
+});
+
+// ---- mode 'bill' ----
+
+const BILL_ASK = { mode: 'bill', bill: '202110000010000', lang: 'zh' };
+
+test('a bill\'s 對照表 row tells its article', () => {
+  for (const [t, k] of [['第十五條之一　對於', '15-1'], ['第 15 條 本法', '15'], ['第一百零五條', '105'], ['第二十條之十二', '20-12'], ['第十條', '10'], ['說明', ''], ['', '']]) assert.equal(rowKey(t), k, t);
+  for (const bad of [{ mode: 'bill' }, { mode: 'bill', bill: '12' }, { mode: 'bill', bill: '2021/../x' }]) assert.equal(readAsk(bad), 'bill');
+  assert.deepEqual(readAsk({ ...BILL_ASK, lang: 'en' }), { mode: 'bill', bill: '202110000010000', lang: 'en' });
+});
+
+test('a bill is explained from its own 對照表 only, each change citing an article the table has; kept 30 days by bill and language', async () => {
+  const env = envOf();
+  reply = { answer: '放寬聲請人並設押金上限。', changes: [{ text: '押金最多兩個月', article: '第421條之1' }, { text: '別的條文', article: '99' }, { text: '', article: '15-1' }], who: ['房客', '房東', '監護人', '法院', '第五'], covered: true };
+  try {
+    const r = await ask(BILL_ASK, { env, pass: 'bill' });
+    assert.equal(r.status, 200);
+    const j = await r.json();
+    assert.deepEqual(j, { answer: '放寬聲請人並設押金上限。', changes: [{ text: '押金最多兩個月', article: '421-1' }], who: ['房客', '房東', '監護人', '法院'], covered: true, bill: { id: '202110000010000', n: BILL.議案名稱, by: '本院委員甲等16人' }, cached: false, left: LAW_LIMITS.perPass - 1 });
+    const sent = gemini.at(-1);
+    const prompt = sent.contents[0].parts[0].text;
+    assert.match(prompt, /\[key "15-1"\]/);
+    assert.match(prompt, /\[key "421-1"\]/);
+    assert.match(prompt, /增訂: 第四百二十一條之一/);
+    assert.match(prompt, /為保障承租人/);
+    assert.deepEqual(Object.keys(sent.generationConfig.response_schema.properties), ['answer', 'changes', 'who', 'covered']);
+    assert.deepEqual(bills.at(-1).init.cf.cacheTtlByStatus, { '200-299': 86_400, 404: 60, '500-599': 0 });
+    const calls = gemini.length;
+    const again = await (await ask(BILL_ASK, { env, pass: 'bill' })).json();
+    assert.equal(gemini.length, calls);
+    assert.deepEqual([again.cached, again.left, again.changes], [true, LAW_LIMITS.perPass - 1, j.changes]);
+    assert.ok(env.RATE_LIMIT_KV.m.has('law:bill:v1:202110000010000|zh'));
+    assert.equal((await (await ask({ ...BILL_ASK, lang: 'en' }, { env, pass: 'bill' })).json()).cached, false);
+  } finally {
+    reply = { answer: '輔助宣告由法院為之。', points: [{ text: '可聲請輔助宣告', cites: ['第15條之1'] }, { text: '外部條文', cites: ['16'] }, { text: '沒有出處', cites: [] }], covered: true };
+  }
+  assert.deepEqual(checkBill({ answer: 'x', changes: [{ text: 'y', article: '9' }], who: [], covered: true }, ['1']), { answer: 'x', changes: [], who: [], covered: false });
+});
+
+test('a bill not there, or with no 對照表, is a 404 {error:"bill"}; 立法院\'s API failing a 502; nothing asked', async () => {
+  const before = gemini.length;
+  for (const bill of ['202199999990000', '202110000020000']) {
+    const r = await ask({ ...BILL_ASK, bill });
+    assert.deepEqual([r.status, (await r.json()).error], [404, 'bill']);
+  }
+  billStatus = 500;
+  try {
+    assert.equal((await ask(BILL_ASK)).status, 502);
+  } finally {
+    billStatus = 200;
+  }
+  assert.equal(gemini.length, before);
 });
