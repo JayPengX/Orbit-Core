@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import {
   airForecast, parseGoogleAir, googleAirBody, parseAirHistory,
   weatherStatus, handleWeather, scrub, cellOf, nearestStation, townIds, airArea, parseCwaTown, cwaAt, parseGoogleDay, parseGoogleHour,
-  blend, buildCell, GOOGLE_DAILY_CALLS, parseVillage, whereIs, addAirReading, briefText, rainPhrase, weatherCheck, noteRecent, cellForecast, FRESH_WAIT_MS, advise, adviceWindow, parseCwaWarnings, aqiLevel, uvLevel, num, DEFAULT_WEIGHTS
+  blend, buildCell, GOOGLE_DAILY_CALLS, twDate, parseVillage, whereIs, addAirReading, briefText, rainPhrase, weatherCheck, noteRecent, cellForecast, FRESH_WAIT_MS, advise, adviceWindow, parseCwaWarnings, aqiLevel, uvLevel, num, DEFAULT_WEIGHTS
 , popStep, keepJson, keptJson, KV_EVERY_MS, googleAllowed } from '../weather.js';
 import { STATIONS } from '../weather-stations.js';
 import { upstream as fixtureUpstream } from './fixtures/weather/upstream.mjs';
@@ -388,6 +388,17 @@ test('samples are a fixed list, cached in KV', async () => {
     assert.ok(!j.body.includes('g-secret-key-123'));
   }
   assert.equal(calls, 1);
+  assert.equal(await kv.get(`weather:google:${twDate(Date.now())}`), '1', 'a Google sample counts under the cap');
+});
+
+test('a Google sample past the daily cap asks nobody', async () => {
+  const kv = memKv();
+  await kv.put(`weather:google:${twDate(Date.now())}`, String(GOOGLE_DAILY_CALLS));
+  let calls = 0;
+  const fetchFn = async () => (calls++, answer(200, { ok: 1 }));
+  const r = await handleWeather(new Request('https://w.example/weather/status?sample=google-days'), { ...env, RATE_LIMIT_KV: kv }, {}, '/weather/status', { fetchFn });
+  assert.equal((await r.json()).status, 429);
+  assert.equal(calls, 0);
 });
 
 test('default weights start Google 0.6, CWA 0.4', () => {

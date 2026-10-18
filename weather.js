@@ -1383,6 +1383,7 @@ for (const county of Object.keys(COUNTY_IDS)) {
 
 async function probe(env, source, fetchFn) {
   if (!env[KEYS[source]]) return { key: false, ok: false, note: 'not set' };
+  if (source === 'google' && !(await googleAllowed(env, Date.now(), 1))) return { key: true, ok: false, note: 'daily cap reached' };
   const [url, good] = CHECKS[source](env);
   const t0 = Date.now();
   try {
@@ -1453,6 +1454,8 @@ export async function handleWeather(request, env, headers, path, { session = nul
       if (!SAMPLES[sample]) return send({ code: 'NOT_FOUND', samples: Object.keys(SAMPLES) }, 404);
       return send(
         await cachedText(env, `weather:sample:${sample}`, 3600, async () => {
+          // (Google's samples are paid calls: they count under the day's cap.)
+          if (sample.startsWith('google') && !(await googleAllowed(env, Date.now(), 1, ctx?.waitUntil ? p => ctx.waitUntil(p) : null))) return JSON.stringify({ status: 429, body: 'GOOGLE_DAILY_CAP' });
           const made = SAMPLES[sample](env);
           const [url, body] = Array.isArray(made) ? made : [made, null];
           const res = await fetchFn(url, body ? { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(UPSTREAM_MS) } : { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(UPSTREAM_MS) });
