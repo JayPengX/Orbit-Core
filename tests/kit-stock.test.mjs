@@ -201,6 +201,13 @@ test('dividends, interest and lending fees: withholding and the health premium a
   assert.deepEqual(dividendTaxes('TW', 19_999), { withheld: 0, nhi: 0, net: 19_999 });
   assert.deepEqual(dividendTaxes('TW', 20_000), { withheld: 0, nhi: 422, net: 19_578 });
   assert.deepEqual(dividendTaxes('US', 100), { withheld: 30, nhi: 0, net: 70 });
+  // 健保署: to the dollar, 角 rounded half up (20,030 × 2.11% = 422.633: 423), on at most NT$10 million
+  // (its own example: 9,366,000 × 2.11% = 197,622.6 → 197,623).
+  assert.equal(dividendTaxes('TW', 20_030).nhi, 423);
+  assert.equal(dividendTaxes('TW', 20_010).nhi, 422);
+  assert.equal(dividendTaxes('TW', 9_366_000).nhi, 197_623);
+  assert.equal(dividendTaxes('TW', 12_000_000).nhi, 211_000);
+  assert.equal(incomeTaxes(20_030).nhi, 423, 'interest the same');
   // Interest: 10% withheld over NT$20,000 (not at it); the premium from it.
   assert.deepEqual(incomeTaxes(20_000), { withheld: 0, nhi: 422, net: 19_578 });
   assert.deepEqual(incomeTaxes(20_001), { withheld: 2_000, nhi: 422, net: 17_579 });
