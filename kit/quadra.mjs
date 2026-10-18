@@ -2915,18 +2915,12 @@ export function isPhoneOrTablet() {
 }
 const isIOS = () => /iPhone|iPad|iPod/i.test(globalThis.navigator?.userAgent || '') || (/Macintosh/.test(globalThis.navigator?.userAgent || '') && (globalThis.navigator?.maxTouchPoints || 0) > 1);
 const inAppBrowser = () => /Line\/|FBAN|FBAV|Instagram|Messenger|MicroMessenger|KAKAOTALK/i.test(globalThis.navigator?.userAgent || '');
-const visiting = () => {
-  try {
-    return sessionStorage.getItem('quadra.visit') === '1' || /[#&]q[hp]=/.test(globalThis.location?.hash || '');
-  } catch {
-    return false;
-  }
-};
-
-// On phones and tablets the apps run from the home screen only. Returns true
-// when it covered the page (the app shouldn't start).
+// On phones and tablets the apps run from the home screen only, every one
+// of them: opened from another app or a link in Safari, it asks to be added
+// too (a hand-over no longer lets it run in the browser). Returns true when
+// it covered the page (the app shouldn't start).
 export function installGate(app, lang = detectLang()) {
-  if (!isPhoneOrTablet() || isStandalone() || visiting()) return false;
+  if (!isPhoneOrTablet() || isStandalone()) return false;
   const en = lang === 'en';
   const name = appName(app);
   const steps = inAppBrowser()
