@@ -68,6 +68,7 @@ let answer = {
   next: ['保留租約與收據'],
   followups: ['房東不還押金怎麼辦？']
 };
+const GROUND = {};
 let geminiStatus = 200;
 let textStatus = 200;
 globalThis.fetch = async (url, init) => {
@@ -87,6 +88,7 @@ globalThis.fetch = async (url, init) => {
   if (law) return LAWS[law] ? new Response(JSON.stringify({ p: law, ...LAWS[law] })) : new Response('', { status: 404 });
   const b = path.match(/^text\/(\d+)\.json$/)?.[1];
   if (b) return textStatus !== 200 ? new Response('', { status: textStatus }) : TEXT.has(Number(b)) ? new Response(JSON.stringify(TEXT.get(Number(b)))) : new Response('', { status: 404 });
+  if (GROUND[path]) return new Response(JSON.stringify(GROUND[path]));
   return new Response('', { status: 404 });
 };
 const worker = (await import('../worker.js')).default;
@@ -315,4 +317,42 @@ test('Gemini or Orbit Law failing is a 502, nothing kept; no key a 503; the guar
   } finally {
     forgetPace();
   }
+});
+
+test('figures, notices and bills Orbit Law publishes ground the answer, and come back with it', async () => {
+  const { forgetGround } = await import('../law-ground.js');
+  GROUND['ai/facts.json'] = { facts: [{ id: 'minwage', k: ['最低工資', '基本工資'], t: '最低工資', text: '每月最低工資及每小時最低工資', now: '月薪 NT$28,590、時薪 NT$190（2025-01-01 起）', next: '月薪 NT$29,500、時薪 NT$196（2026-01-01 起）', law: '最低工資法', src: ['https://www.mol.gov.tw/1607/28162/'] }] };
+  GROUND['ai/news.json'] = { news: [['2025-09-15', '勞動部', '最低工資審議會決議調整每月最低工資', 'https://www.mol.gov.tw/news/1', '審議會決議每月最低工資調整'], ['2025-01-01', '內政部', '戶籍登記新制上路', 'https://www.moi.gov.tw/x', '戶籍']] };
+  GROUND['bills/items.json'] = { items: [{ k: 'b1', n: '勞動基準法部分條文修正草案', stage: 2, u: '2026-10-01', by: [['民進黨', 2]] }, { k: 'b2', n: '民法部分條文修正草案', stage: 6, passed: '2026-05-01', u: '2026-05-01' }] };
+  forgetGround();
+  try {
+    const r = await chat({ q: '現在基本工資多少？勞動基準法有要修法嗎？', lang: 'zh' });
+    assert.equal(r.status, 200);
+    const j = await r.json();
+    const p = lastOf('answer');
+    assert.match(p, /政府公告與數字/);
+    assert.match(p, /NT\$28,590/);
+    assert.match(p, /最低工資審議會/);
+    assert.doesNotMatch(p, /戶籍登記/);
+    assert.match(p, /立法院進度/);
+    assert.match(p, /勞動基準法部分條文修正草案」進度：委員會/);
+    assert.doesNotMatch(p, /民法部分條文/);
+    assert.deepEqual(j.bills, [{ k: 'b1', n: '勞動基準法部分條文修正草案', stage: 2 }]);
+    assert.equal(j.notices.length, 2);
+    assert.equal(j.notices[1].url, 'https://www.mol.gov.tw/news/1');
+    assert.equal(j.notices[1].agency, '勞動部');
+  } finally {
+    for (const k of Object.keys(GROUND)) delete GROUND[k];
+    forgetGround();
+  }
+});
+
+test('without Orbit Law\'s figures (not published yet), a chat is as before', async () => {
+  const { forgetGround } = await import('../law-ground.js');
+  forgetGround();
+  const r = await chat({ q: '最低工資多少？', lang: 'zh' });
+  const j = await r.json();
+  assert.equal(r.status, 200);
+  assert.equal(j.notices, undefined);
+  assert.equal(j.bills, undefined);
 });
