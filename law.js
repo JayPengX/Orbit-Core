@@ -449,19 +449,11 @@ const JOBS = {
 
 // gemini(parts, schema) -> the upstream Response (worker.js's proxyGeminiRequest);
 // session: the request's Quadra Pass session (worker.js), or null.
-// (Until Orbit Law's signed-in app is live, the app before it asks about
-// articles with no session: those are counted by its address, 20 a day as
-// before; bills and diffs need the Pass. Drop it once that app is out.)
-export const LAW_ASK_UNSIGNED = 20;
-const addressOf = request => `ip:${request.headers.get('CF-Connecting-IP') || ''}`;
-
 export async function handleLawAsk(request, env, ctx, headers, session, gemini) {
-  const signed = passOf(session);
-  const pass = signed || addressOf(request);
+  const pass = passOf(session);
   const ask = await opening(request, env, headers, { maxBody: LAW_LIMITS.maxBody, read: readAsk, who: pass });
   if (ask instanceof Response) return ask;
-  if (!signed && ask.mode !== 'ask') return fail('pass', 401, headers);
-  const cap = signed ? LAW_LIMITS.perPass : LAW_ASK_UNSIGNED;
+  const cap = LAW_LIMITS.perPass;
 
   let job;
   try {
