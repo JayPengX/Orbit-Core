@@ -2,7 +2,7 @@
 // over a newer or unreadable one on the Pass.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { passSync } from '../kit/pass-sync.mjs';
+import { passSync, BRIEF_MS, CLAIM_WAIT_MS } from '../kit/pass-sync.mjs';
 
 // An app's payload: { v: 1, items: { key: time } }, merged newest per key.
 const encodeCopy = s => JSON.stringify({ v: 1, items: s.items });
@@ -14,12 +14,14 @@ const decodeCopy = text => {
     return null;
   }
 };
+const flush = () => new Promise(r => setImmediate(r));
 const keys = payload => Object.keys(decodeCopy(payload)?.items || {}).sort();
 
 // The Worker, as far as an app's payload goes: one live session; a write
 // from any other refused.
 function worker() {
-  const w = { payload: '', live: null, writes: 0 };
+  const w = { payload: '', live: null, writes: 0, reads: 0, time: 0, fail: null };
+  const stamp = () => (w.payload ? `t${w.time}` : '');
   w.session = name => {
     const listeners = {};
     const q = {
@@ -30,30 +32,44 @@ function worker() {
         q.active = live;
         (listeners.active || []).forEach(fn => fn(live));
       },
-      claim: () => ((w.live = name), q.set(true), { payload: w.payload }),
-      read: async () => (q.set(w.live === name), { payload: w.payload }),
+      claim: () => {
+        w.live = name;
+        q.set(true);
+        (listeners.claim || []).forEach(fn => fn({ ok: true, active: true }));
+        return { payload: w.payload, updateTime: stamp() };
+      },
+      read: async () => (w.reads++, q.set(w.live === name), { payload: w.payload, updateTime: stamp() }),
       write: async ({ payload }) => {
+        if (w.fail) {
+          const error = w.fail;
+          w.fail = null;
+          if (error.landed) [w.payload, w.time] = [payload, w.time + 1];
+          throw error;
+        }
         if (!q.active || w.live !== name) {
           q.set(false);
           throw Object.assign(new Error('not live'), { code: 'ECO_SESSION_MOVED' });
         }
         w.writes++;
+        w.time++;
         w.payload = payload;
-        return {};
+        return { updateTime: stamp() };
       }
     };
     return q;
   };
   return w;
 }
-function device(w, name) {
+function device(w, name, clock = { t: 0 }) {
   const q = w.session(name);
-  const state = { items: {} };
+  const state = { items: {}, applied: 0 };
   const doc = { visibilityState: 'visible', listeners: [], addEventListener: (_, fn) => doc.listeners.push(fn) };
   const sync = passSync(q, {
     decode: decodeCopy,
     encode: () => encodeCopy(state),
+    now: () => clock.t,
     apply: theirs => {
+      state.applied++;
       for (const [k, t] of Object.entries(theirs.items)) if (!(state.items[k] >= t)) state.items[k] = t;
     }
   });
@@ -63,7 +79,8 @@ function device(w, name) {
     sync,
     open: async () => (await sync.first(q.claim(), { local: Object.keys(state.items).length > 0 }), sync.watch(doc), sync.sync()),
     add: async (key, t) => ((state.items = { ...state.items, [key]: t }), sync.changed(), sync.sync()),
-    hide: () => (doc.visibilityState = 'hidden'),
+    doc,
+    hide: () => ((doc.visibilityState = 'hidden'), doc.listeners.forEach(fn => fn())),
     show: async () => {
       doc.visibilityState = 'visible';
       w.live = name;
@@ -75,14 +92,16 @@ function device(w, name) {
 
 test("back on screen: the Pass is read before writing, so another phone's changes are never written over", async () => {
   const w = worker();
-  const a = device(w, 'A');
+  const clock = { t: 0 };
+  const a = device(w, 'A', clock);
   const b = device(w, 'B');
   await a.open();
   await a.add('apple', 1);
   a.hide();
   await b.open();
   await b.add('banana', 2);
-  // A still believes it's live; coming back it reads first.
+  // A still believes it's live; coming back a minute later it reads first.
+  clock.t += 60_000;
   await a.show();
   assert.equal(a.state.items.banana, 2);
   await a.add('cherry', 3);
@@ -140,4 +159,122 @@ test("a copy this version can't read is never written over; nothing changed, not
   c.hide();
   await c.show();
   assert.equal(w2.writes, writes);
+});
+
+test('back within 10 s, read and nothing changed here meanwhile: the Pass is not read again', async () => {
+  const w = worker();
+  const clock = { t: 0 };
+  const a = device(w, 'A', clock);
+  await a.open();
+  await a.add('apple', 1);
+  const reads = w.reads;
+  a.hide();
+  clock.t += BRIEF_MS - 1;
+  await a.show();
+  assert.equal(w.reads, reads);
+  // Away longer: read once.
+  a.hide();
+  clock.t += BRIEF_MS;
+  await a.show();
+  assert.equal(w.reads, reads + 1);
+});
+
+test("back on screen: the one read waits for the kit's claim, or 3 s without one", async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const w = worker();
+  const clock = { t: 0 };
+  const a = device(w, 'A', clock);
+  await a.open();
+  const reads = w.reads;
+  a.hide();
+  clock.t += 60_000;
+  a.doc.visibilityState = 'visible';
+  a.doc.listeners.forEach(fn => fn());
+  await flush();
+  assert.equal(w.reads, reads, 'not read before the claim');
+  a.q.claim();
+  await flush();
+  assert.equal(w.reads, reads + 1);
+  t.mock.timers.tick(CLAIM_WAIT_MS);
+  await flush();
+  assert.equal(w.reads, reads + 1, 'one read, not two');
+  // No claim reply (offline): read after 3 s.
+  a.hide();
+  clock.t += 60_000;
+  a.doc.visibilityState = 'visible';
+  a.doc.listeners.forEach(fn => fn());
+  t.mock.timers.tick(CLAIM_WAIT_MS - 1);
+  await flush();
+  assert.equal(w.reads, reads + 1);
+  t.mock.timers.tick(1);
+  await flush();
+  assert.equal(w.reads, reads + 2);
+});
+
+test('a copy the same as the one last read or written here is not merged again', async () => {
+  const w = worker();
+  const a = device(w, 'A');
+  await a.open();
+  await a.add('apple', 1);
+  const applied = a.state.applied;
+  a.sync.stale();
+  await a.sync.sync();
+  assert.equal(a.state.applied, applied);
+  const b = device(w, 'B');
+  await b.open();
+  await b.add('banana', 2);
+  w.live = 'A';
+  a.sync.stale();
+  await a.sync.sync();
+  assert.equal(a.state.applied, applied + 1);
+  assert.equal(a.state.items.banana, 2);
+});
+
+test('a write lost on the way (it may have landed) reads the Pass first next time', async () => {
+  const w = worker();
+  const a = device(w, 'A');
+  await a.open();
+  await a.add('apple', 1);
+  w.fail = Object.assign(new Error('network'), { landed: true });
+  await a.add('banana', 2);
+  assert.equal(a.sync.dirty, true);
+  assert.equal(a.sync.pulled, false);
+  const reads = w.reads;
+  await a.sync.sync();
+  assert.equal(w.reads, reads + 1);
+  assert.deepEqual(keys(w.payload), ['apple', 'banana']);
+});
+
+test("a read started before the copy went stale is merged but doesn't count as read", async () => {
+  const w = worker();
+  const a = device(w, 'A');
+  await a.open();
+  let release;
+  const read = a.q.read;
+  a.q.read = async opts => (await new Promise(r => (release = r)), read(opts));
+  a.sync.stale();
+  a.sync.changed();
+  const going = a.sync.sync();
+  await Promise.resolve();
+  a.sync.stale();
+  release();
+  await going;
+  assert.equal(a.sync.pulled, false);
+  assert.equal(w.writes, 0);
+  a.q.read = read;
+  await a.sync.sync();
+  assert.equal(a.sync.pulled, true);
+  assert.equal(w.writes, 1);
+});
+
+test('known: false until a copy of the Pass has been read (opened offline), true after', async () => {
+  const w = worker();
+  const a = device(w, 'A');
+  await a.sync.first({ offline: true }, { local: false });
+  assert.equal(a.sync.known, false);
+  await a.sync.sync();
+  assert.equal(a.sync.known, false);
+  a.q.claim();
+  await a.sync.sync();
+  assert.equal(a.sync.known, true);
 });
