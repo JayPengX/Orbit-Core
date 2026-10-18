@@ -45,7 +45,14 @@ export function shadeLong(kind, odds) {
 }
 
 // { lock: 'low' | 'high' | null, minLegs } for an option at `odds` (shaded already).
-export function houseRule(kind, odds) {
+// 運彩 sets 限2關 / 限3關 per game or market (投注規範 §21), not by price:
+// `event` (that game's or market's own minimum, when a source gives one)
+// takes the place of the price bands.
+export function houseRule(kind, odds, { event = null } = {}) {
+  const rule = priceRule(kind, odds);
+  return event > 0 ? { ...rule, minLegs: Math.max(1, Math.round(event)) } : rule;
+}
+function priceRule(kind, odds) {
   const r = HOUSE_RULES;
   if (!(odds > 0)) return { lock: null, minLegs: 1 };
   if (OUTRIGHT.has(kind)) return { lock: odds < r.lockLowOutright ? 'low' : null, minLegs: odds < r.twoLegsOutright ? 2 : 1 };
@@ -55,10 +62,12 @@ export function houseRule(kind, odds) {
   if (odds < r.twoLegsUnder) return { lock: null, minLegs: 2 };
   return { lock: null, minLegs: 1 };
 }
-// The board's option priced by the house's rules: its long price shaded, then locked or limited.
+// The board's option priced by the house's rules: its long price shaded, then
+// locked or limited (by its market's or game's own 限關 when known: eventMinLegs).
+export const eventMinLegs = o => o.eventMinLegs ?? o.m?.minLegs ?? o.game?.minLegs ?? null;
 export function withRules(o) {
   const estOdds = shadeLong(o.kind, o.estOdds);
-  return Object.assign(o, { estOdds }, houseRule(o.kind, estOdds));
+  return Object.assign(o, { estOdds }, houseRule(o.kind, estOdds, { event: eventMinLegs(o) }));
 }
 
 // The fewest games any combination on a ticket has: every one of its
