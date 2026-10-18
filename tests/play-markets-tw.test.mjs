@@ -2,8 +2,8 @@
 // on sale, how each new market is priced, and how each settles.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { legResult, touchdowns } from '../kit/settle.mjs';
-import { pointsModel, pointsMarkets, BASKETBALL_BANDS, fitHockey, goalMarkets, baseballMarkets } from '../kit/play-markets.mjs';
+import { legResult, touchdowns, kambiSets, decidedSetMatch, decidedTeamGame, parseKambiLiveData } from '../kit/settle.mjs';
+import { pointsModel, pointsMarkets, BASKETBALL_BANDS, fitHockey, goalMarkets, baseballMarkets, setMarkets, setChance, matchFromSet } from '../kit/play-markets.mjs';
 import { parseOffers } from '../kit/play-offers.mjs';
 import { gameOptions } from '../kit/play-board.mjs';
 import { houseRule, withRules } from '../kit/play-rules.mjs';
@@ -117,4 +117,49 @@ test("限2關 / 限3關: a game's or market's own minimum (運彩 §21) wins ove
   assert.ok(ruled.filter(o => !o.lock).every(o => o.minLegs === 3), "the game's 限3關 on every market");
   assert.equal(withRules({ kind: 'ml', estOdds: 1.1, eventMinLegs: 2, m: { minLegs: 3 } }).minLegs, 2, "the pick's own first");
   assert.equal(withRules({ kind: 'score', estOdds: 9, m: { minLegs: 3 }, game: { minLegs: 1 } }).minLegs, 3, "then the market's, then the game's");
+});
+
+test('set sports (tennis, volleyball, badminton, table tennis, esports): 讓盤, 正確比數 and 單盤不讓分 priced from the match, Kambi\'s read, each settled from the sets', () => {
+  assert.ok(Math.abs(matchFromSet(setChance(0.7, 3), 3) - 0.7) < 1e-9);
+  for (const bestOf of [3, 5]) {
+    const markets = setMarkets({ homeWin: 0.7, bestOf });
+    const score = markets.find(m => m.kind === 'setscore');
+    assert.equal(score.picks.length, bestOf === 3 ? 4 : 6);
+    assert.ok(Math.abs(sum(score.picks) - 1) < 1e-9);
+    const home = score.picks.filter(p => Number(p.score.split('-')[0]) > Number(p.score.split('-')[1]));
+    assert.ok(Math.abs(sum(home) - 0.7) < 1e-9, 'the home side wins as often as the match says');
+    assert.ok(markets.filter(m => m.kind === 'sethcap').every(m => m.giver === 'home' && m.awayLine > 0));
+  }
+  // Kambi's live data: each set's games, -1 for one not played; best of the entries.
+  const live = { sets: { home: [6, 6, 5, -1, -1], away: [3, 7, 7, -1, -1] } };
+  assert.deepEqual(kambiSets(live), { home: [6, 6, 5], away: [3, 7, 7], bestOf: 5 });
+  assert.equal(decidedSetMatch(live, 'tennis'), null, '1-2 in a best of five: not over');
+  const done = decidedSetMatch({ sets: { home: [6, 6, 5], away: [3, 7, 7] } }, 'tennis');
+  assert.deepEqual([done.homeScore, done.awayScore], [1, 2]);
+  assert.equal(decidedSetMatch({ sets: { home: [6, 6, 5], away: [3, 7, 4] } }, 'tennis'), null, 'third set under way');
+  assert.equal(decidedSetMatch({ sets: { home: [25, 23, 15, -1, -1], away: [20, 25, 13, -1, -1] } }, 'volleyball'), null, 'a third set at 15 is not over in volleyball');
+  assert.equal(decidedSetMatch({ sets: { home: [25, 23, 25, 20, 15], away: [20, 25, 13, 25, 13] } }, 'volleyball').homeScore, 3, 'the fifth to 15');
+  assert.equal(decidedSetMatch({ sets: { home: [11, 13, -1], away: [5, 11, -1] } }, 'tabletennis').homeScore, 2, '13-11: a two-point lead past 11');
+  const kambi = parseKambiLiveData({ liveData: { score: { home: '0', away: '0', version: 1 }, statistics: { sets: { home: [6, 6, -1], away: [3, 7, -1] } } } });
+  assert.equal(decidedTeamGame(kambi, 'tennis', '2026-10-18T00:00:00Z'), null, '1-1: a third set to come');
+  kambi.sets = { home: [6, 6, 6], away: [3, 7, 2] };
+  assert.equal(decidedTeamGame(kambi, 'tennis', '2026-10-18T00:00:00Z').homeScore, 2);
+  // Settled from the sets: 讓盤 on sets won, 大小 and 讓局 on games, 正確比數, the first set.
+  const g = { status: 'final', ...done };
+  assert.equal(legResult({ sport: 'tennis', kind: 'ml', side: 'away' }, g), 'won');
+  assert.equal(legResult({ sport: 'tennis', kind: 'sethcap', side: 'home', line: 1.5 }, g), 'won');
+  assert.equal(legResult({ sport: 'tennis', kind: 'setscore', score: '1-2' }, g), 'won');
+  assert.equal(legResult({ sport: 'tennis', kind: 'gametotal', side: 'over', line: 33.5 }, g), 'won', '34 games');
+  assert.equal(legResult({ sport: 'tennis', kind: 'gamehcap', side: 'away', line: 0.5 }, g), 'won', '17-17 in games');
+  assert.equal(legResult({ sport: 'tennis', kind: 'set1', side: 'home' }, g), 'won');
+  // Kambi's labels for them.
+  const k = (label, type, outcomes) => ({ criterion: { englishLabel: label }, betOfferType: { englishName: type }, outcomes });
+  const page = { events: [{ homeName: 'A Player', awayName: 'B Player' }], betOffers: [
+    k('Total Games', 'Over/Under', [{ type: 'OT_OVER', line: 22500, odds: 1900 }, { type: 'OT_UNDER', line: 22500, odds: 1900 }]),
+    k('Game Handicap', 'Handicap', [{ type: 'OT_ONE', line: -3500, odds: 1900 }, { type: 'OT_TWO', line: 3500, odds: 1900 }]),
+    k('Set Betting', 'Correct Score', [{ label: '2-0', odds: 2500 }, { label: '2-1', odds: 4000 }, { label: '1-2', odds: 5000 }, { label: '0-2', odds: 4500 }]),
+    k('Set 1', 'Match', [{ type: 'OT_ONE', odds: 1600 }, { type: 'OT_TWO', odds: 2300 }])
+  ] };
+  const { markets } = parseOffers(page, { sport: 'tennis', home: { en: 'A Player' }, away: { en: 'B Player' } });
+  assert.deepEqual(markets.map(m => m.market).sort(), ['gh|3.5', 'gt|22.5', 'set1', 'setscore']);
 });

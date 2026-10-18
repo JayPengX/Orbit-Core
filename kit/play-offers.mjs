@@ -18,6 +18,7 @@ import { CUT } from '#kit/play-markets.mjs';
 import { familyOf } from '#kit/play-teams.mjs';
 import { sideOfGame, sideScore } from '#kit/play-house.mjs';
 import { propOf } from '#kit/play-props.mjs';
+import { SET_SPORTS } from '#kit/settle.mjs';
 
 export const offersUrl = (kambiBase, id, live = false) => `${kambiBase}/betoffer/event/${encodeURIComponent(id)}.json?lang=en_GB&market=GB${live ? '&live=1' : ''}`;
 
@@ -46,7 +47,8 @@ const FULL = {
 // The game's markets and players' markets: { markets, props } (markets in
 // markets.mjs's shape: { kind, market, cut, picks, line, team, ... }).
 export function parseOffers(data, game) {
-  const family = familyOf(game.sport);
+  // (A set sport not in the catalogue yet is its own family.)
+  const family = familyOf(game.sport) ?? (SET_SPORTS.has(game.sport) ? game.sport : null);
   const event = data?.events?.[0];
   const kHome = event?.homeName ?? '';
   const kAway = event?.awayName ?? '';
@@ -81,6 +83,7 @@ export function parseOffers(data, game) {
     else if (family === 'baseball') push(baseballMarket(label, type, outs, sideOf));
     else if (family === 'football' || family === 'basketball') push(pointsMarket(label, type, outs, sideOf));
     else if (family === 'hockey') push(hockeyMarket(label, type, outs, sideOf, flip));
+    else if (SET_SPORTS.has(family)) push(setSportMarket(label, type, outs, sideOf, flip, family, kHome, kAway));
   }
   return { markets: fewLines(dedupe(markets)), props };
 }
@@ -126,7 +129,7 @@ function overUnder(kind, outs, { team = null, main = false, family }) {
 function halfOk(line, family) {
   const frac = Math.abs(line % 1);
   if (frac === 0.5) return true;
-  return frac === 0 && ['football', 'basketball'].includes(family);
+  return frac === 0 && (['football', 'basketball'].includes(family) || SET_SPORTS.has(family));
 }
 
 // A two-way handicap from each side's line (OT_ONE is Kambi's home; Asian
@@ -155,7 +158,7 @@ function handicap(kind, outs, sideOf, family, kHome, kAway = '') {
   const fair = fairOf([awayOut, homeSide === 'home' ? home : away]);
   if (!fair) return null;
   const giver = awayLine < 0 ? 'away' : 'home';
-  const market = kind === 'gamehcap' ? `gh|${awayLine}` : `rl|${awayLine}`;
+  const market = kind === 'gamehcap' ? `gh|${awayLine}` : kind === 'sethcap' ? `sh|${awayLine}` : `rl|${awayLine}`;
   return { kind, market, awayLine, giver, cut: CUT.twoWay, picks: [{ side: 'away', line: awayLine, fair: fair[0] }, { side: 'home', line: -awayLine, fair: fair[1] }] };
 }
 
@@ -258,6 +261,18 @@ function pointsMarket(label, type, outs, sideOf) {
 // (Hockey's 60-minute winner is the board's own 不讓分, three ways; its
 // 雙方進球 isn't on 運彩's list, so Kambi's isn't read.)
 function hockeyMarket() {
+  return null;
+}
+
+// A set sport's (tennis, volleyball, badminton, table tennis, esports) whole
+// match: 大小 and 讓局 on games or points, 讓盤 on sets, 正確比數 in sets
+// and 單盤不讓分, as Kambi names them; each settles in settle.mjs.
+function setSportMarket(label, type, outs, sideOf, flip, family, kHome, kAway) {
+  if (/^Total (Games|Points)$/.test(label) && type === 'Over/Under') return overUnder('gametotal', outs, { family });
+  if (/^(Game|Point) Handicap$/.test(label) && /Handicap/.test(type)) return handicap('gamehcap', outs, sideOf, family, kHome, kAway);
+  if (label === 'Set Handicap' && /Handicap/.test(type)) return handicap('sethcap', outs, sideOf, family, kHome, kAway);
+  if ((label === 'Set Betting' || label === 'Correct Score') && type === 'Correct Score') return correctScore('setscore', outs, flip);
+  if (label === 'Set 1' && type === 'Match') return threeWay('set1', 'set1', outs, sideOf);
   return null;
 }
 
