@@ -53,3 +53,16 @@ test('Taiwan: whole lots and odd lots are separate orders; 1,500 shares is two',
   // The broker's own sale (forced, or to cover an overdraft) splits itself.
   assert.equal(SA.placeOrder(more, { side: 'sell', type: 'market', qty: 1500, forced: true }, { quote: tw(100), rates, valuation: ok, now, id: 'f' }).error, undefined);
 });
+
+test('a recall returns the shares in 3 Taiwan business days, holidays skipped', async () => {
+  const { addWeekdays } = await import('../kit/stock-savings.mjs');
+  const day = t => SA.taipeiDay(t);
+  // Friday 2026-10-23: Monday 10-26 is a TWSE holiday (光復節 observed).
+  assert.equal(day(addWeekdays(Date.parse('2026-10-23T04:00:00Z'), 3)), '2026-10-29');
+  // Over Lunar New Year 2027 (02-03 to 02-10 shut).
+  assert.equal(day(addWeekdays(Date.parse('2027-02-02T04:00:00Z'), 1)), '2027-02-11');
+  const acc = SA.newAccount(1_000_000, now - 30 * DAY, 'acc');
+  const lent = { ...acc, events: [...acc.events, { id: 'lend:l1', type: 'lend', t: now - 10 * DAY, symbol: '2330.TW', name: 'TSMC', market: 'TW', kind: 'stock', currency: 'TWD', qty: 1000, price: 100, rate: 0.012 }] };
+  const at = Date.parse('2026-10-23T04:00:00Z');
+  assert.equal(day(SA.recallShares(lent, 'lend:l1', at).back), '2026-10-29');
+});
