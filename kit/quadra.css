@@ -2083,9 +2083,23 @@ input[type='checkbox'][switch] {
   margin-top: 18px;
   min-width: 140px;
 }
-/* A toast while the connection's capsule is up: above it. */
+/* A toast while the connection's capsule is up: above it. An app's
+   floating buttons too: marked data-q-fab, they rise by the capsule's
+   height (--q-net-h, 0 while it's down, for an app placing its own). */
+:root {
+  --q-net-h: 0px;
+}
+.q-net-on {
+  --q-net-h: 54px;
+}
 .q-net-on .q-toast {
   bottom: calc(var(--q-nav, 0px) + 66px);
+}
+[data-q-fab] {
+  transition: translate var(--q-dur, 0.25s) var(--q-ease, ease);
+}
+.q-net-on [data-q-fab] {
+  translate: 0 calc(-1 * var(--q-net-h));
 }
 .q-toast.out {
   opacity: 0;
