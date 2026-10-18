@@ -622,9 +622,10 @@ test('包牌 (系統組合): every n of the numbers picked is a bet, each won ti
     return per;
   };
   const counted = r => Object.fromEntries(r.wins.map(w => [w.tier, w.n]));
-  const lotto = { numbers: [1, 2, 3, 4, 5, 6], special: 7, pools: {} };
+  const paid = { perPrize: 50_000, winners: 10, pool: 0 };
+  const lotto = { numbers: [1, 2, 3, 4, 5, 6], special: 7, pools: { jackpot: paid, second: paid, third: paid, fourth: paid } };
   for (const sel of [{ zones: [[1, 2, 3, 4, 7, 20, 21, 22, 23]] }, { zones: [[1, 2, 3, 4, 5, 6, 7, 30]] }, { zones: [[1, 2, 3, 20, 21, 22, 23]] }]) assert.deepEqual(counted(ticketPrize({ game: 'lotto649', sel }, lotto)), brute('lotto649', sel, lotto), JSON.stringify(sel));
-  const sp = { numbers: [1, 2, 3, 4, 5, 6], zone2: 7, pools: {} };
+  const sp = { numbers: [1, 2, 3, 4, 5, 6], zone2: 7, pools: { jackpot: paid, second: paid } };
   for (const sel of [{ zones: [[1, 2, 3, 4, 5, 20, 21], [7, 8, 1]] }, { zones: [[1, 2, 3, 20, 21, 22, 23, 24], [2]] }]) assert.deepEqual(counted(ticketPrize({ game: 'super638', sel }, sp)), brute('super638', sel, sp), JSON.stringify(sel));
   const d539 = { numbers: [1, 2, 3, 4, 5], pools: {} };
   const sel539 = { zones: [[1, 2, 3, 4, 30, 31, 32]] };
@@ -635,6 +636,32 @@ test('包牌 (系統組合): every n of the numbers picked is a bet, each won ti
   assert.equal(b.ticket.cost, 700);
   const won = settleTicket(b.account, 'w7', sp, now).tickets[0];
   assert.deepEqual([won.tier, won.gross, won.prize], ['third', 2 * 150_000 + 5 * 4_000, 2 * 119_400 + 5 * 4_000]);
+});
+
+test('a draw settles once its prizes are out; a won 頭獎 pays at least its floor; 樂合彩 pays what the draw paid', () => {
+  const now = new Date('2026-10-20T13:00:00Z');
+  const zero = { prize: 0, lastPrize: 0, winnerCount: 0, perPrize: 0 };
+  // 大樂透's numbers out, its prizes not yet (every tier still 0).
+  const early = parseDraw('lotto649', { drawNumberSize: [1, 2, 3, 4, 5, 6, 7], jackpotAssign: zero, secondAssign: zero, normalAssign: zero });
+  assert.equal(early.paid, false);
+  const jackpot = { id: 'j', game: 'lotto649', sel: { zones: [[1, 2, 3, 4, 5, 6]] }, multiple: 1, status: 'open' };
+  assert.equal(ticketPrize(jackpot, early).pending, true);
+  assert.equal(ticketPrize(jackpot, { numbers: [1, 2, 3, 4, 5, 6], special: 7, pools: {} }).pending, true, 'a pool tier with nothing read: waits, never 0');
+  const acc = { ledger: [], tickets: [jackpot, { ...jackpot, id: 'n', sel: { zones: [[1, 2, 3, 40, 41, 42]] } }] };
+  const after = settleTicket(settleTicket(acc, 'j', early, now), 'n', early, now);
+  assert.equal(after.tickets[0].status, 'open', 'the 頭獎 waits');
+  assert.deepEqual([after.tickets[1].status, after.tickets[1].prize], ['settled', 400], 'a fixed 普獎 is paid at once');
+  // Out: nobody else won, NT$5,000萬 in the pool: the 頭獎 pays its NT$1億 floor.
+  const out = parseDraw('lotto649', { drawNumberSize: [1, 2, 3, 4, 5, 6, 7], jackpotAssign: { prize: 30_000_000, lastPrize: 20_000_000, winnerCount: 0, perPrize: 0 }, normalAssign: { winnerCount: 39_017, perPrize: 400 } });
+  assert.equal(ticketPrize(jackpot, out).prize, 100_000_000);
+  const sp = parseDraw('super638', { drawNumberSize: [1, 2, 3, 4, 5, 6, 7], super638JackpotAssign: { prize: 15_068_634, lastPrize: 152_152_700, winnerCount: 0, perPrize: 0 }, super638NormalAssign: { winnerCount: 29_047, perPrize: 100 } });
+  assert.equal(ticketPrize({ game: 'super638', sel: { zones: [[1, 2, 3, 4, 5, 6], [7]] } }, sp).prize, 200_000_000, '威力彩: NT$2億');
+  // 39樂合彩's own results: 二合 paid 60倍 (NT$1,500) from 2026-10-12.
+  const m539 = parseDraw('m39', { drawNumberSize: [10, 20, 26, 32, 39], m539TwoAssign: { multiple: '60倍', perPrize: 1_500, winnerCount: 13_670 }, m539ThreeAssign: { perPrize: 11_250, winnerCount: 215 } });
+  assert.deepEqual(m539.numbers, [10, 20, 26, 32, 39]);
+  assert.equal(ticketPrize({ game: 'm39', sel: { numbers: [10, 20, 1], size: 2 } }, m539).prize, 1_500);
+  assert.equal(ticketPrize({ game: 'm39', sel: { numbers: [10, 20, 26], size: 3 } }, m539).prize, 11_250);
+  assert.equal(ticketPrize({ game: 'm39', sel: { numbers: [10, 20, 26, 32], size: 4 } }, m539).prize, 212_500, 'none read: the table');
 });
 
 test('倍數 and 多期 as each game takes them (台灣彩券 投注方式), 多期 a ticket a draw', () => {

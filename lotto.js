@@ -154,6 +154,11 @@ export async function lottoCron(env, deps) {
       continue;
     }
     const after = settleTicket({ ...BOTTOMLESS, ledger: [], tickets: [ticket] }, ticket.id, draw, new Date(now));
+    // Numbers out, prizes not yet (a pool or capped tier won): looked at again.
+    if (after.tickets[0].status === 'open') {
+      later[key] = now + AGAIN;
+      continue;
+    }
     const prize = after.ledger.find(e => e.id === `prize-${ticket.id}`);
     if (prize) await updateWallet(env, deps, account, w => (w.entries.some(e => e.id === `odds:prize-${ticket.id}`) ? w : { ...w, entries: [...w.entries, { id: `odds:prize-${ticket.id}`, t: now, app: 'odds', kind: 'prize', amount: prize.amount }] }));
     await deps.fsDelete(env, TICKET_COLLECTION, key);
