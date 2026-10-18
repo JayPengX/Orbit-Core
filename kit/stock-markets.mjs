@@ -6,6 +6,7 @@
 // each exchange, as a share of the amount (the gap between its buy and sell
 // rates, halved). `loanRate`: yearly interest on money borrowed in it.
 import { isTradingDay } from '#kit/stock-holidays.mjs';
+import { HK_LOT_TABLE } from '#kit/stock-hk-lots.mjs';
 
 export const CURRENCIES = {
   TWD: { symbol: 'NT$', digits: 0, spread: 0, loanRate: 0.065, zh: '新台幣', en: 'Taiwan dollar', flag: '🇹🇼' },
@@ -256,20 +257,37 @@ export function priceLimits(quote, now = Date.now()) {
 
 // Board lots: the smallest amount the exchange trades. Japan trades every
 // stock in units of 100; mainland China buys in 100s (an odd remainder can
-// only be sold whole); Hong Kong's lot is each stock's own (the listed ones
-// here, from HKEX; others unchecked). Taiwan has its odd-lot session, and
-// Singapore its unit-share market, so any number goes there.
-const HK_LOTS = { '0700.HK': 100, '9988.HK': 100, '3690.HK': 100, '1810.HK': 200, '9618.HK': 50, '1211.HK': 500, '0005.HK': 400, '0941.HK': 500, '1299.HK': 200, '0388.HK': 100, '2318.HK': 500, '2800.HK': 500, '2828.HK': 200, '3033.HK': 200 };
+// only be sold whole); Hong Kong's lot is each security's own (every HKEX
+// equity, ETF and REIT's, from its List of Securities: stock-hk-lots.mjs).
+// Taiwan has its odd-lot session, and Singapore its unit-share market, so
+// any number goes there.
+let hkLots = null;
+// A Hong Kong symbol's board lot (0700.HK: 100), or null when HKEX's list
+// doesn't have it.
+export function hkLot(symbol) {
+  if (!hkLots) {
+    hkLots = new Map();
+    for (const [lot, codes] of Object.entries(HK_LOT_TABLE)) {
+      let code = 0;
+      for (const gap of codes.split(',')) hkLots.set((code += parseInt(gap, 36)), Number(lot));
+    }
+  }
+  const m = /^(\d{1,5})\.HK$/i.exec(symbol || '');
+  return (m && hkLots.get(Number(m[1]))) || null;
+}
+// (An HK symbol not on HKEX's list: 1 here; lotProblem refuses its orders.)
 export function lotSize(market, symbol, kind) {
   if (!['stock', 'etf', 'bond'].includes(kind)) return 1;
   if (market === 'JP' && kind === 'stock') return 100;
   if (market === 'CN') return 100;
-  if (market === 'HK') return HK_LOTS[symbol] || 1;
+  if (market === 'HK') return hkLot(symbol) || 1;
   return 1;
 }
 // Whether `qty` is a tradable amount there: whole lots, or (selling) all
-// that's left of an odd remainder.
+// that's left of an odd remainder. { lot } when it isn't; { lot: null,
+// unknown: true } for a Hong Kong security whose lot isn't known.
 export function lotProblem(market, symbol, kind, side, qty, held = 0) {
+  if (market === 'HK' && ['stock', 'etf', 'bond'].includes(kind) && !hkLot(symbol)) return { lot: null, unknown: true };
   const lot = lotSize(market, symbol, kind);
   if (lot <= 1 || Math.abs(qty / lot - Math.round(qty / lot)) < 1e-9) return null;
   if (side === 'sell' && Math.abs(qty - held) < 1e-9 && held % lot !== 0) return null;
