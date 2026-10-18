@@ -104,10 +104,28 @@ export const asiaMonthOf = ms => new Date(ms + 8 * 3_600_000).toISOString().slic
 export async function asiaMonth(getJson, league, ym, { now = Date.now(), fetchJson = directJson } = {}) {
   const data = await getJson(asiaMonthUrl(league, ym)).catch(() => null);
   const games = Array.isArray(data?.games) ? data.games : [];
-  if (league !== 'cpbl' || games.length) return games;
+  if (league !== 'cpbl') return games;
+  if (games.length) return cpblFresh(games, now, fetchJson);
   const days = tsdbDays(ym, now);
   const lists = await Promise.all(days.map(d => fetchJson(`${TSDB_DAY}?d=${d}&l=${TSDB_CPBL}`).then(x => parseTsdbDay(x, now)).catch(() => [])));
   return lists.flat().sort((x, y) => x.start.localeCompare(y.start));
+}
+
+// The proxy's copy can lag a game (台灣大賽 G1 still "pre" the day after,
+// 2026-10-18): a game three hours past its start and not over (nor called
+// off) has its day read again from TheSportsDB on the device, its score and
+// state taken from there.
+async function cpblFresh(games, now, fetchJson) {
+  const old = g => (g.state === 'pre' || g.state === 'in') && now - Date.parse(g.start) > 3 * 3_600_000 && now - Date.parse(g.start) < 14 * 86_400_000;
+  const days = [...new Set(games.filter(old).map(g => new Date(Date.parse(g.start) + 8 * 3_600_000).toISOString().slice(0, 10)))];
+  if (!days.length) return games;
+  const fresh = (await Promise.all(days.map(d => fetchJson(`${TSDB_DAY}?d=${d}&l=${TSDB_CPBL}`).then(x => parseTsdbDay(x, now)).catch(() => [])))).flat();
+  const key = g => `${g.start.slice(0, 10)}|${[g.home.en, g.away.en].sort().join('|')}`;
+  const byKey = new Map(fresh.filter(g => g.state === 'post' || g.state === 'void').map(g => [key(g), g]));
+  return games.map(g => {
+    const f = old(g) && byKey.get(key(g));
+    return f ? { ...g, homeScore: f.homeScore, awayScore: f.awayScore, state: f.state } : g;
+  });
 }
 
 // ---- CPBL from TheSportsDB (the proxy's fallback, and the device's) ---------------
