@@ -404,6 +404,43 @@ export function usExtendedEnd(t) {
   return t + 86_400_000;
 }
 
+// US market-wide circuit breakers (NYSE Rule 7.12): the S&P 500 down 7%
+// (level 1) or 13% (level 2) from yesterday's close halts every US stock
+// 15 minutes, unless it's reached at 15:25 or later; down 20% (level 3)
+// shuts trading for the day. Each level once a day. From the S&P 500's quote
+// (SPX, its day's line): { level, until } while halted, else null.
+export const SPX = '^GSPC';
+export function marketHalt(spx, now = Date.now()) {
+  if (!(spx?.prev > 0)) return null;
+  const day = localDayOf(now, 'US');
+  const [y, m, d] = day.split('-').map(Number);
+  const points = [...(spx.line || []), [spx.marketTime, spx.price]].filter(([t, p]) => t > 0 && t <= now && p > 0 && localDayOf(t, 'US') === day).sort((a, b) => a[0] - b[0]);
+  const reached = share => points.find(([, p]) => p <= spx.prev * (1 - share))?.[0] ?? null;
+  const level3 = reached(0.2);
+  if (level3 != null) return { level: 3, until: earlyCloseAt('US', now) ?? zonedTime(y, m, d, 16, 0, 0, tzOf('US')) };
+  const cutoff = zonedTime(y, m, d, 15, 25, 0, tzOf('US'));
+  let halt = null;
+  for (const [share, level] of [[0.07, 1], [0.13, 2]]) {
+    const t = reached(share);
+    if (t != null && t < cutoff && now < t + 15 * 60_000) halt = { level, until: t + 15 * 60_000 };
+  }
+  return halt;
+}
+// A US stock's Limit Up-Limit Down band (LULD Plan, as amended), its share
+// either side of the reference price (the last 5 minutes' average): Tier 1
+// (S&P 500, Russell 1000, some ETPs) 5% over US$3, Tier 2 10%; US$0.75-3
+// 20%; under US$0.75 the lesser of US$0.15 or 75%; doubled from 15:35 for
+// Tier 1, and for Tier 2 at US$3 or under. Prices outside it pause the stock
+// 5 minutes (which Yahoo's 5-minute bars can't show: the band is for the
+// app to show).
+export function luldBand(price, { tier = 1, t = Date.now() } = {}) {
+  if (!(price > 0)) return null;
+  const share = price > 3 ? (tier === 1 ? 0.05 : 0.1) : price >= 0.75 ? 0.2 : Math.min(0.15 / price, 0.75);
+  const { minutes } = localParts(t, 'US');
+  const late = minutes >= 935 && minutes < 960 && (tier === 1 || price <= 3);
+  return late ? share * 2 : share;
+}
+
 // Lunch breaks, in the market's own time: no trading in between.
 const LUNCH = { JP: [690, 750], HK: [720, 780], CN: [690, 780], SG: [720, 780] };
 export function atLunch(market, t) {

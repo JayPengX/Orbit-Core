@@ -34,6 +34,7 @@
 // deps: { fsGet, fsWrite, read(url) -> JSON (the data proxy's route), now }.
 
 import { fetchQuotes, fetchBars, fxSymbol, useQuotesReader } from './kit/stock-quotes.mjs';
+import { marketHalt, SPX } from './kit/stock-markets.mjs';
 import { triggerPrice, backfillPrice, closingMatch, planRuns, planOrderId, planFillBar, planOrderType, planAllowed, PLAN_DAY_MAX } from './kit/stock-account.mjs';
 import { ipoUrls, parseIpoList, ipoOpen, ipoDrawn, ipoWon, ipoDrawKey } from './kit/stock-ipo.mjs';
 import { tokenSecret } from './quadra-token.js';
@@ -218,7 +219,9 @@ const LOOK_SAVE = 6 * 3_600_000;
 export async function decideFills(orders, { read, now = Date.now() }) {
   useQuotesReader(url => read(url));
   const currencies = [...new Set(orders.map(o => o.currency).filter(c => c && c !== 'TWD'))];
-  const symbols = [...new Set([...orders.map(o => o.symbol), ...currencies.map(fxSymbol)])];
+  // (With a US order, the S&P 500 too: a market-wide halt fills nothing.)
+  const us = orders.some(o => o.market === 'US');
+  const symbols = [...new Set([...orders.map(o => o.symbol), ...currencies.map(fxSymbol), ...(us ? [SPX] : [])])];
   // The bars each symbol needs (from its earliest order's last look), read
   // with the quotes.
   // (A symbol with a US extended-hours order: its pre- and post-market bars too.)
@@ -230,6 +233,7 @@ export async function decideFills(orders, { read, now = Date.now() }) {
     fetchQuotes(symbols),
     ...[...want].map(async ([s, from]) => barsOf.set(s, await fetchBars(s, from, { prePost: prePost.has(s) }).catch(() => null)))
   ]);
+  const halt = us ? marketHalt(quotes.get(SPX), now) : null;
   const twdOf = c => (!c ? undefined : c === 'TWD' ? 1 : quotes.get(fxSymbol(c))?.price);
   const fills = {};
   const looked = {};
@@ -249,7 +253,7 @@ export async function decideFills(orders, { read, now = Date.now() }) {
     if (o.lk == null) looked[o.id] = now;
     const q = quotes.get(o.symbol);
     // (Past its end, only what met its price before then.)
-    const price = q && !(o.expires && now >= o.expires) ? triggerPrice(o, q, now) : null;
+    const price = q && !(o.expires && now >= o.expires) ? triggerPrice(o, q, now, { halt }) : null;
     if (!(Number.isFinite(price) && price > 0)) continue;
     // (Taiwan's closing and after-hours matches are one price for all: the close.)
     const one = o.after || closingMatch(o, q, now)?.price != null;

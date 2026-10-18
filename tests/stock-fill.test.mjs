@@ -307,3 +307,11 @@ test("/stock: a Taiwan plan's month fills at the odd-lot session's first match, 
   assert.deepEqual([r.fill.qty, r.fill.price, r.fill.commission], [48, 62, 1]);
   assert.equal(await checkEvent(r.fill, acc, null, read, { 'plan:plan0001:2026-10': kept }, { now: at }), 'ok');
 });
+
+test('a US market-wide halt (the S&P 500 down 7% in the last 15 minutes) fills no US order at the proxy', async () => {
+  const meta = (symbol, price, prev) => ({ symbol, response: [{ meta: { symbol, regularMarketPrice: price, chartPreviousClose: prev, currency: 'USD', instrumentType: symbol.startsWith('^') ? 'INDEX' : 'EQUITY', exchangeTimezoneName: 'America/New_York', regularMarketTime: now / 1000 - 60, currentTradingPeriod: { regular: { start: Date.parse('2026-10-13T13:30:00Z') / 1000, end: Date.parse('2026-10-13T20:00:00Z') / 1000 } } }, timestamp: [], indicators: { quote: [{ close: [] }] } }] });
+  const readAt = spx => async url => ({ spark: { result: decodeURIComponent(/symbols=([^&]+)/.exec(url)[1]).split(',').map(s => (s === '^GSPC' ? meta(s, spx, 6000) : meta(s, 250, 249))) } });
+  const order = cleanOrder({ id: 'order0001', symbol: 'AAPL', side: 'buy', type: 'market', qty: 1, t: now - 1000, market: 'US', kind: 'stock' });
+  assert.deepEqual((await decideFills([order], { read: readAt(5500), now })).fills, {});
+  assert.deepEqual((await decideFills([order], { read: readAt(5990), now })).fills, { order0001: { quote: 250, t: now } });
+});

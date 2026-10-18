@@ -512,7 +512,9 @@ export function closingMatch(order, quote, now = Date.now()) {
 // The price an open order fills at on this quote, or null. An order placed
 // before the current session started also fills on the session's high or
 // low having reached its price (the page can't watch every tick).
-export function triggerPrice(order, quote, now) {
+// `halt`: the US market-wide halt now (marketHalt), when there's one.
+export function triggerPrice(order, quote, now, { halt = null } = {}) {
+  if (halt && now < halt.until && order.market === 'US' && LISTED.has(order.kind)) return null;
   // Taiwan's after-hours sessions: one match at 14:30, at the close.
   if (order.after) {
     if (!quote || now < order.after || !(quote.marketTime >= order.after - 3_600_000)) return null;
@@ -582,7 +584,7 @@ export function expireOrders(account, now = Date.now()) {
 // A new order. Fills at once when its market is open and its price is met;
 // otherwise it waits (and holds its cash or shares) until it fills or is
 // cancelled. Returns { account, order, fill } or { error }.
-export function placeOrder(account, req, { quote, rates, valuation, now = Date.now(), id = randomId() }) {
+export function placeOrder(account, req, { quote, rates, valuation, now = Date.now(), id = randomId(), halt = null }) {
   const { side, type = 'market' } = req;
   if (!quote) return { error: 'noQuote' };
   if (!isTradable(quote.kind)) return { error: 'notTradable' };
@@ -757,7 +759,7 @@ export function placeOrder(account, req, { quote, rates, valuation, now = Date.n
     order.reserve = reserve;
   }
   let next = { ...account, orders: [...(account.orders || []), order] };
-  const price = order.waitFresh ? null : triggerPrice(order, quote, now);
+  const price = order.waitFresh ? null : triggerPrice(order, quote, now, { halt });
   if (price === null) return { account: next, order, fill: null };
   const filled = fillOrder(next, order, price, rates, now);
   return { account: filled.account, order: filled.order, fill: filled.fill, error: filled.error, need: filled.need, have: filled.have };
@@ -937,7 +939,7 @@ export function cancelOrder(account, orderId, now = Date.now()) {
 }
 
 // Fills every open order whose price is met on these quotes.
-export function processOrders(account, quotes, rates, now = Date.now()) {
+export function processOrders(account, quotes, rates, now = Date.now(), { halt = null } = {}) {
   let next = account;
   const filled = [];
   const rejected = [];
@@ -945,7 +947,7 @@ export function processOrders(account, quotes, rates, now = Date.now()) {
     const quote = quotes.get(order.symbol);
     if (!quote || !rates?.[order.currency]) continue;
     if (order.waitFresh && !(quote.got >= order.waitFresh)) continue;
-    const price = triggerPrice(order, quote, now);
+    const price = triggerPrice(order, quote, now, { halt });
     if (price === null) continue;
     const r = fillOrder(next, order, price, rates, now);
     next = r.account;
