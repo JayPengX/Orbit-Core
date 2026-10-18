@@ -440,7 +440,8 @@ export function trimEspnAthletes(data) {
     categories: (data.categories || []).map(c => ({ name: c.name, names: c.names })),
     athletes: data.athletes.map(x => ({
       athlete: { id: x.athlete?.id, displayName: x.athlete?.displayName, teamId: x.athlete?.teamId, position: x.athlete?.position ? { abbreviation: x.athlete.position.abbreviation } : undefined },
-      categories: (x.categories || []).map(c => ({ name: c.name, values: c.values }))
+      // (Three places are all any stat writes: 35.765625 minutes is 35.766.)
+      categories: (x.categories || []).map(c => ({ name: c.name, values: Array.isArray(c.values) ? c.values.map(v => (typeof v === 'number' ? Math.round(v * 1000) / 1000 : v)) : c.values }))
     }))
   };
 }
@@ -490,8 +491,8 @@ export function trimFotmobPage(data) {
     teams: [...teams.values()]
   };
 }
-// One of FotMob's stat lists (always): its name and the top ten, each with
-// his club and games. ~140 KB to ~3 KB.
+// One of FotMob's stat lists (always): its name and the top hundred, each
+// with his club and games. ~140 KB to ~25 KB.
 const TRIM_FOTMOB_STAT = 'fotmob-stat';
 export function trimFotmobStat(data) {
   const t = data?.TopLists?.[0];
@@ -501,7 +502,7 @@ export function trimFotmobStat(data) {
     title: t.Title,
     format: t.StatFormat,
     decimals: t.StatDecimals,
-    list: (t.StatList || []).slice(0, 10).map(x => ({ id: x.ParticiantId ?? x.ParticipantId, name: x.ParticipantName, teamId: x.TeamId, teamName: x.TeamName, value: x.StatValue, sub: x.SubStatValue, games: x.MatchesPlayed, mins: x.MinutesPlayed, rank: x.Rank }))
+    list: (t.StatList || []).slice(0, 100).map(x => ({ id: x.ParticiantId ?? x.ParticipantId, name: x.ParticipantName, teamId: x.TeamId, teamName: x.TeamName, value: x.StatValue, sub: x.SubStatValue, games: x.MatchesPlayed, mins: x.MinutesPlayed, rank: x.Rank }))
   };
 }
 
