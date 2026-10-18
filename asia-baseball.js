@@ -5,7 +5,7 @@
 //
 //   NPB   npb.jp's monthly schedule page (HTML)
 //   KBO   koreabaseball.com's monthly schedule list (a POST answered in JSON rows)
-//   CPBL  cpbl.com.tw's season list (a POST with the page's anti-forgery token)
+//   CPBL  TheSportsDB's day lists (CPBL's own site turns addresses outside Taiwan away)
 //
 // Served by the sports proxy as if from `https://asia-baseball.quadra/<league>/<YYYY-MM>.json`,
 // so the apps read it through proxyJson like any other list:
@@ -44,14 +44,6 @@ const KBO_TEAMS = {
   KT: ['KT Wiz', 'KT巫師'],
   SSG: ['SSG Landers', 'SSG登陸者'],
   키움: ['Kiwoom Heroes', '培證英雄']
-};
-const CPBL_TEAMS = {
-  中信兄弟: ['CTBC Brothers', '中信兄弟'],
-  '統一7-ELEVEn獅': ['Uni-President Lions', '統一7-ELEVEn獅'],
-  樂天桃猿: ['Rakuten Monkeys', '樂天桃猿'],
-  富邦悍將: ['Fubon Guardians', '富邦悍將'],
-  味全龍: ['Wei Chuan Dragons', '味全龍'],
-  台鋼雄鷹: ['TSG Hawks', '台鋼雄鷹']
 };
 const team = (table, name) => {
   const hit = table[String(name || '').trim()];
@@ -146,35 +138,6 @@ export function parseKbo(data, year, now = Date.now()) {
 
 // ---- CPBL ------------------------------------------------------------------------
 
-// GameResult: '' not played, '0' played, '2' played (a tie or called), '1'
-// postponed (the game is listed again on its new date).
-// KindCode: A the regular season, E the play-off challenge (季後挑戰賽), C
-// the Taiwan Series (台灣大賽); a play-off game says which (`playoff`).
-const CPBL_PLAYOFF = { E: 'challenge', C: 'final' };
-export function parseCpbl(list, now = Date.now()) {
-  return (list || [])
-    .filter(g => g.KindCode === 'A' || !g.KindCode || CPBL_PLAYOFF[g.KindCode])
-    .map(g => {
-      const [date, clock] = String(g.PreExeDate || g.GameDateTimeS || g.GameDate).split('T');
-      const [y, m, d] = date.split('-').map(Number);
-      const [hh, mm] = String(clock || '18:35').split(':').map(Number);
-      const start = utc(y, m, d, hh, mm, 8);
-      const result = String(g.GameResult ?? '');
-      return {
-        // (A play-off game's number is its kind's own: E3, the challenge's third.)
-        id: `cpbl-${g.Year}-${CPBL_PLAYOFF[g.KindCode] ? g.KindCode : ''}${g.GameSno}-${start.slice(0, 10)}`,
-        start,
-        home: team(CPBL_TEAMS, g.HomeTeamName),
-        away: team(CPBL_TEAMS, g.VisitingTeamName),
-        homeScore: result === '' && now < Date.parse(start) ? null : num(g.HomeScore),
-        awayScore: result === '' && now < Date.parse(start) ? null : num(g.VisitingScore),
-        state: result === '1' ? 'void' : stateOf({ start, over: result === '0' || result === '2', scored: result !== '', now }),
-        venue: g.FieldAbbe || '',
-        ...(CPBL_PLAYOFF[g.KindCode] ? { playoff: CPBL_PLAYOFF[g.KindCode] } : {})
-      };
-    });
-}
-
 // ---- Fetching ----------------------------------------------------------------------
 
 const UA = 'Mozilla/5.0 (compatible; Orbit-Sports/1.0; +https://github.com/JayPengX/Orbit-Sports)';
@@ -223,39 +186,7 @@ async function cpblPage(at) {
   return { page, html: page.ok ? await page.text() : '', cookie: cookie() };
 }
 
-async function fetchCpbl(year, month) {
-  const { page, html, cookie: cookies } = await cpblPage('https://www.cpbl.com.tw/schedule');
-  if (!page.ok) throw new Error(`cpbl page ${page.status}`);
-  const token = /url: '\/schedule\/getgamedatas'[\s\S]{0,400}?RequestVerificationToken: '([^']+)'/.exec(html)?.[1];
-  if (!token) throw new Error('cpbl token');
-  // The regular season's list, and the play-offs' (each its own kind) from October.
-  const kind = async code => {
-    const res = await fetch('https://www.cpbl.com.tw/schedule/getgamedatas', {
-      method: 'POST',
-      headers: {
-        'User-Agent': BROWSER_UA,
-        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-        'X-Requested-With': 'XMLHttpRequest',
-        RequestVerificationToken: token,
-        Cookie: cookies,
-        Referer: 'https://www.cpbl.com.tw/schedule',
-        Origin: 'https://www.cpbl.com.tw'
-      },
-      body: `calendar=${year}%2F01%2F01&location=&kindCode=${code}`,
-      signal: AbortSignal.timeout(TIMEOUT)
-    });
-    if (!res.ok) throw new Error(`cpbl ${res.status}`);
-    const data = await res.json();
-    if (!data?.Success) throw new Error('cpbl answer');
-    return JSON.parse(data.GameDatas || '[]');
-  };
-  const [regular, ...playoffs] = await Promise.all([kind('A'), ...(month >= 9 ? ['E', 'C'].map(code => kind(code).catch(() => [])) : [])]);
-  const prefix = `${year}-${String(month).padStart(2, '0')}`;
-  return parseCpbl([...regular, ...playoffs.flat()]).filter(g => g.start.slice(0, 7) === prefix || new Date(Date.parse(g.start) + 8 * HOUR).toISOString().slice(0, 7) === prefix);
-}
-
-// CPBL's site turns some networks away: TheSportsDB's day lists instead (its
-// free key answers 3 games a request, CPBL's most in a day). Each day of the
+// TheSportsDB's day lists (its free key answers 3 games a request, CPBL's most in a day). Each day of the
 // month up to two weeks ahead.
 // The day lists and their parsing are the kit's (shared with the apps, which
 // read them straight from the device when this proxy can't).
@@ -281,8 +212,7 @@ async function inTurns(items, n, work) {
   }));
   return out;
 }
-const TSDB_RETRY_MS = 1500;
-const pause = ms => new Promise(r => setTimeout(r, ms));
+const TSDB_TIMEOUT = 5_000;
 async function fetchCpblTsdb(year, month, { from = Date.UTC(year, month - 1, 1), now = Date.now() } = {}) {
   let days = [];
   const last = Math.min(Date.UTC(year, month, 0), now + 14 * 24 * HOUR);
@@ -293,18 +223,10 @@ async function fetchCpblTsdb(year, month, { from = Date.UTC(year, month - 1, 1),
   // (reason kept): never an empty month served and cached as if the league
   // had no games (TheSportsDB can refuse this Worker's requests).
   const failures = [];
-  // Two at a time, a day turned away (429) asked once more after a pause:
-  // TheSportsDB's free key counts Cloudflare's shared addresses together, and
-  // four at a time had every day of a month refused (a 502 for CPBL's
-  // October and November, 2026-10-18). (A Worker call keeps only six
-  // connections open, and the rest of a batch needs some.)
-  const day = (d, again = true) =>
-    fetch(`${TSDB}?d=${d}&l=${TSDB_CPBL}`, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(TIMEOUT), cf: { cacheTtl: d < over ? 7 * 86_400 : 600, cacheEverything: true } }).then(async r => {
-      if (r.status === 429 && again) {
-        r.body?.cancel?.().catch(() => {});
-        await pause(TSDB_RETRY_MS);
-        return day(d, false);
-      }
+  // Two at a time, a refusal not asked again (the phones read it then; a
+  // Worker call keeps only six connections open, and a batch needs some).
+  const day = d =>
+    fetch(`${TSDB}?d=${d}&l=${TSDB_CPBL}`, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(TSDB_TIMEOUT), cf: { cacheTtl: d < over ? 7 * 86_400 : 600, cacheEverything: true } }).then(async r => {
       if (!r.ok) throw new Error(`tsdb ${r.status}`);
       return parseTsdbDay(await r.json());
     });
@@ -312,31 +234,16 @@ async function fetchCpblTsdb(year, month, { from = Date.UTC(year, month - 1, 1),
   if (days.length && failures.length === days.length) throw new Error(`${failures[0]} (every day)`);
   return lists.flat();
 }
-// CPBL's own list, and TheSportsDB's days after its last game: CPBL's list
-// can stop short of the month (October's games were missing from it while
-// the season still had a week to go, so Orbit Sports showed no schedule).
+// CPBL's month from TheSportsDB's day lists: CPBL's own site turns every
+// address outside Taiwan away (Cloudflare's too), and TheSportsDB's free key
+// often refuses Cloudflare: then a quick 502, and the phones read TheSportsDB
+// themselves (kit catalog asiaMonth). Owner's call 2026-10-18: no paid key.
 async function cpbl(year, month, now = Date.now()) {
   // December to February: no CPBL games (the season opens in March, 台灣大賽
   // is over by early November), nothing to ask for.
   if (month === 12 || month <= 2) return [];
-  let ownError = '';
-  const own = await fetchCpbl(year, month).catch(error => ((ownError = String(error.message || error)), null));
-  if (!own) {
-    return fetchCpblTsdb(year, month, { now }).catch(error => {
-      throw new Error(`${ownError}; ${error.message}`);
-    });
-  }
-  const last = own.reduce((m, g) => Math.max(m, Date.parse(g.start)), 0);
-  const from = Math.max(Date.UTC(year, month - 1, 1), last ? last + 24 * HOUR : 0, now - 2 * 24 * HOUR);
-  return mergeCpbl(own, await fetchCpblTsdb(year, month, { from, now }).catch(() => []));
+  return fetchCpblTsdb(year, month, { now });
 }
-// One list from two sources: a game in both (the same Taiwan day and clubs) once, CPBL's own copy.
-const cpblKey = g => `${new Date(Date.parse(g.start) + 8 * HOUR).toISOString().slice(0, 10)}|${[g.home.en, g.away.en].sort().join('|')}`;
-export function mergeCpbl(own, extra) {
-  const seen = new Set(own.map(cpblKey));
-  return [...own, ...extra.filter(g => !seen.has(cpblKey(g)) && seen.add(cpblKey(g)))];
-}
-
 const FETCHERS = { npb: fetchNpb, kbo: fetchKbo, cpbl };
 
 // ---- A CPBL game's box score (the league's own: its box page's getlive) -----------

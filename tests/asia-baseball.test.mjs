@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { parseNpb, parseKbo, parseCpbl, parseTsdbDay, asiaTarget, mergeCpbl, parseCpblBox, cpblBoxTarget } from '../asia-baseball.js';
+import { parseNpb, parseKbo, parseTsdbDay, asiaTarget, parseCpblBox, cpblBoxTarget } from '../asia-baseball.js';
 
 const fixture = name => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8');
 const now = Date.parse('2026-09-29T12:00:00Z');
@@ -32,25 +32,11 @@ test('KBO: away first in the list, rain-outs void', () => {
   assert.equal(rained[0].state, 'void');
 });
 
-test('CPBL: the season list, postponed games void; TheSportsDB when the site turns us away', () => {
-  const games = parseCpbl(JSON.parse(fixture('cpbl-2026.json')), now);
-  assert.deepEqual(games.map(g => g.state), ['void', 'void', 'post', 'post', 'post', 'pre']);
-  assert.equal(games[3].start, '2026-09-22T10:35:00.000Z');
-  assert.equal(games[3].home.zh, '富邦悍將');
+test("CPBL: TheSportsDB's day list", () => {
   const day = parseTsdbDay(JSON.parse(fixture('tsdb-cpbl-2026-09-28.json')), now);
   assert.equal(day.length, 3);
   assert.deepEqual([day[0].away.zh, day[0].awayScore, day[0].homeScore, day[0].home.zh, day[0].state], ['台鋼雄鷹', 10, 19, '中信兄弟', 'post']);
   assert.ok(day.some(g => g.away.en === 'Uni-President Lions'));
-});
-
-test("CPBL: TheSportsDB's days fill in after CPBL's own list stops, each game once", () => {
-  const own = parseCpbl(JSON.parse(fixture('cpbl-2026.json')), now);
-  const extra = parseTsdbDay(JSON.parse(fixture('tsdb-cpbl-2026-09-28.json')), now);
-  const twin = { ...own.at(-1), id: 'cpbl-tsdb-x' };
-  const merged = mergeCpbl(own, [...extra, twin]);
-  assert.equal(merged.length, own.length + extra.length);
-  assert.ok(!merged.some(g => g.id === 'cpbl-tsdb-x'));
-  assert.equal(mergeCpbl([], extra).length, extra.length);
 });
 
 test('the address names a league and a month', () => {
@@ -72,7 +58,7 @@ test('CPBL: every source refusing is an error, never an empty month', async () =
   }
 });
 
-test('CPBL: a day TheSportsDB turns away (429) is asked once more; December asks nothing and is no games', async () => {
+test('CPBL: TheSportsDB refusing a day is not asked again (the phones read it); December asks nothing and is no games', async () => {
   const { asiaBaseballResponse } = await import('../asia-baseball.js');
   const real = globalThis.fetch;
   const asked = new Map();
@@ -80,14 +66,13 @@ test('CPBL: a day TheSportsDB turns away (429) is asked once more; December asks
     const u = String(url);
     if (!u.includes('thesportsdb')) return new Response('no', { status: 404 });
     asked.set(u, (asked.get(u) || 0) + 1);
-    if (asked.get(u) === 1) return new Response('slow down', { status: 429 });
     return new Response(JSON.stringify({ events: [{ idEvent: '9', strTimestamp: '2026-11-01T09:05:00', strHomeTeam: 'CTBC Brothers', strAwayTeam: 'Uni-President Lions', strStatus: 'NS' }] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
   };
   try {
     const r = await asiaBaseballResponse(new URL('https://asia-baseball.quadra/cpbl/2026-11.json'));
     assert.equal(r.status, 200);
     assert.ok((await r.json()).games.length >= 1);
-    assert.ok([...asked.values()].every(n => n === 2));
+    assert.ok([...asked.values()].every(n => n === 1));
     asked.clear();
     const dec = await asiaBaseballResponse(new URL('https://asia-baseball.quadra/cpbl/2026-12.json'));
     assert.equal(dec.status, 200);
@@ -129,13 +114,7 @@ test("CPBL's box score: its page's getlive answer as the app's box (sides, batte
   assert.deepEqual(box.plays.map(p => [p.batter, p.result, p.scoring]), [['甲', '一安', false], ['乙', '二安', true]]);
 });
 
-test('CPBL play-offs: its own lists by kind (E the challenge, C the Taiwan Series), TheSportsDB by round 0; a play-off box read by its kind', () => {
-  const own = parseCpbl([
-    { KindCode: 'A', Year: 2026, GameSno: 360, GameDate: '2026-10-05T00:00:00', GameDateTimeS: '2026-10-05T18:35:00', HomeTeamName: '中信兄弟', VisitingTeamName: '統一7-ELEVEn獅', GameResult: '0', HomeScore: 1, VisitingScore: 2 },
-    { KindCode: 'E', Year: 2026, GameSno: 2, GameDate: '2026-10-10T00:00:00', GameDateTimeS: '2026-10-10T17:05:00', HomeTeamName: '統一7-ELEVEn獅', VisitingTeamName: '中信兄弟', GameResult: '', HomeScore: 0, VisitingScore: 0 },
-    { KindCode: 'B', Year: 2026, GameSno: 1, GameDate: '2026-07-10T00:00:00', HomeTeamName: '中信兄弟', VisitingTeamName: '味全龍', GameResult: '0' }
-  ], Date.parse('2026-10-10T08:00:00Z'));
-  assert.deepEqual(own.map(g => [g.id, g.playoff]), [['cpbl-2026-360-2026-10-05', undefined], ['cpbl-2026-E2-2026-10-10', 'challenge']]);
+test('CPBL play-offs: TheSportsDB by round 0; a play-off box read by its kind', () => {
   const tsdb = parseTsdbDay({ events: [{ idEvent: '1', strTimestamp: '2026-10-09T09:05:00', strHomeTeam: 'CTBC Brothers', strAwayTeam: 'Uni-President Lions', intRound: '0', strStatus: 'FT', intHomeScore: '4', intAwayScore: '1' }, { idEvent: '2', strTimestamp: '2026-10-01T09:05:00', strHomeTeam: 'TSG Hawks', strAwayTeam: 'Rakuten Monkeys', intRound: '21', strStatus: 'FT', intHomeScore: '1', intAwayScore: '2' }] });
   assert.deepEqual(tsdb.map(g => g.playoff), [true, undefined]);
   assert.deepEqual(cpblBoxTarget(new URL('https://asia-baseball.quadra/cpbl/box/2026-E2.json')), { year: 2026, sno: 2, kind: 'E' });
