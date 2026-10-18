@@ -47,3 +47,44 @@ test('a new version never repeats the one it replaces', async () => {
   assert.notEqual(again.updateTime, w.updateTime);
   await assert.rejects(s.write('c', 'a', 'three', { updateTime: w.updateTime }), e => e.precondition);
 });
+
+test('changeDoc: one JSON document read, changed and written over the version read; a lost race changed again; unchanged, nothing written; null, deleted', async () => {
+  const { changeDoc, parseDoc } = await import('../doc-store.js');
+  const s = d1Store(fakeD1());
+  let writes = 0;
+  const deps = { fsGet: (env, c, id) => s.get(c, id), fsWrite: (env, c, id, p, pre) => (writes++, s.write(c, id, p, pre)), fsDelete: (env, c, id) => s.delete(c, id) };
+  const read = v => v || { n: 0 };
+  assert.deepEqual(await changeDoc({}, deps, 'c', 'd', v => ({ n: v.n + 1 }), { read }), { n: 1 });
+  // A race: another request writes n=10 after this one read n=1.
+  const doc = await s.get('c', 'd');
+  let raced = false;
+  const racing = { ...deps, fsGet: async (env, c, id) => {
+    const got = await s.get(c, id);
+    if (!raced) {
+      raced = true;
+      await s.write(c, id, JSON.stringify({ n: 10 }), { updateTime: doc.updateTime });
+    }
+    return got;
+  } };
+  assert.deepEqual(await changeDoc({}, racing, 'c', 'd', v => ({ n: v.n + 1 }), { read }), { n: 11 }, 'changed again on the newer copy');
+  assert.deepEqual(parseDoc(await s.get('c', 'd')), { n: 11 });
+  // Unchanged: no write.
+  writes = 0;
+  const same = await changeDoc({}, deps, 'c', 'd', v => v, { read });
+  assert.deepEqual(same, { n: 11 });
+  assert.equal(writes, 0);
+  // Written as `write` says; null deletes it.
+  await changeDoc({}, deps, 'c', 'd', () => ({ n: 0 }), { read, write: v => (v.n ? v : null) });
+  assert.equal((await s.get('c', 'd')).exists, false);
+  // Every attempt lost: undefined.
+  const always = { ...deps, fsWrite: async () => Promise.reject(Object.assign(new Error('lost'), { precondition: true })) };
+  assert.equal(await changeDoc({}, always, 'c', 'e', v => ({ n: v.n + 1 }), { read, attempts: 3 }), undefined);
+  // Any other failure is thrown.
+  const broken = { ...deps, fsWrite: async () => Promise.reject(new Error('D1 down')) };
+  await assert.rejects(changeDoc({}, broken, 'c', 'e', v => ({ n: v.n + 1 }), { read }), /D1 down/);
+  // An unreadable document reads as none.
+  await s.write('c', 'bad', '{nope');
+  assert.equal(parseDoc(await s.get('c', 'bad')), null);
+  assert.equal(parseDoc({ exists: false }), null);
+  assert.equal(parseDoc(null), null);
+});

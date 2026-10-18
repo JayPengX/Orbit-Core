@@ -35,6 +35,7 @@ import { fetchQuotes, fetchBars, fxSymbol, useQuotesReader } from './kit/stock-q
 import { triggerPrice, backfillPrice, planRuns, planOrderId } from './kit/stock-account.mjs';
 import { IPO_URL, parseIpoList, ipoOpen, ipoDrawn, ipoWon, ipoDrawKey } from './kit/stock-ipo.mjs';
 import { tokenSecret } from './quadra-token.js';
+import { parseDoc, changeDoc } from './doc-store.js';
 
 export const FILLS_COLLECTION = 'stock-fills';
 const MAX_ORDERS = 40;
@@ -60,11 +61,8 @@ export function cleanOrder(o) {
 
 // The kept document: { v: 2, fills: { id: fill }, open: { id: terms },
 // plans: { id: [terms…] } } (before v2, the fills alone).
-export function readBook(doc) {
-  let raw = null;
-  try {
-    raw = doc?.exists ? JSON.parse(doc.payload) : null;
-  } catch {}
+export const readBook = doc => bookOf(parseDoc(doc));
+function bookOf(raw) {
   if (raw?.v === 2) return { v: 2, fills: raw.fills || {}, open: raw.open || {}, plans: raw.plans || {}, cancelled: raw.cancelled || {}, ipo: raw.ipo || {} };
   return { v: 2, fills: raw && typeof raw === 'object' ? raw : {}, open: {}, plans: {}, cancelled: {}, ipo: {} };
 }
@@ -75,7 +73,33 @@ export async function readFillsBook(env, account, fsGet) {
 // A fill as the record keeps it.
 const recordOf = (f, o) => ({ ...f, s: o.symbol, side: o.side, q: o.qty, k: o.type, ...(o.limit != null ? { l: o.limit } : {}), ...(o.stop != null ? { st: o.stop } : {}), seen: o.t });
 const answerOf = f => ({ quote: f.quote, t: f.t, ...(f.twd ? { twd: f.twd } : {}) });
-async function writeBook(env, deps, account, book, now) {
+// Two copies of the book as one (a request that read it before another's
+// write, merged into the newer one): a fill or a cancel either issued stands,
+// a fill issued first never replaced (the phone it answered applies it); an
+// order waiting keeps its terms as first seen and its latest look.
+export function mergeBooks(base, mine) {
+  const fills = { ...mine.fills, ...base.fills };
+  const cancelled = { ...mine.cancelled, ...base.cancelled };
+  const open = {};
+  for (const id of new Set([...Object.keys(base.open), ...Object.keys(mine.open)])) {
+    if (fills[id] || cancelled[id]) continue;
+    const [a, b] = [base.open[id], mine.open[id]];
+    const first = !a ? b : !b ? a : b.t < a.t ? b : a;
+    const lk = Math.max(a?.lk ?? -Infinity, b?.lk ?? -Infinity);
+    open[id] = Number.isFinite(lk) ? { ...first, lk } : first;
+  }
+  const plans = {};
+  for (const id of new Set([...Object.keys(base.plans), ...Object.keys(mine.plans)])) {
+    const seen = new Map();
+    for (const v of [...(base.plans[id] || []), ...(mine.plans[id] || [])]) seen.set(`${v.seen}|${v.symbol}|${v.day}|${v.amount}`, v);
+    plans[id] = [...seen.values()].sort((x, y) => x.seen - y.seen).slice(-12);
+  }
+  const ipo = { ...mine.ipo };
+  for (const [k, t] of Object.entries(base.ipo)) ipo[k] = Math.min(t, ipo[k] ?? Infinity);
+  return { v: 2, fills, open, plans, cancelled, ipo };
+}
+// The book trimmed to what's kept.
+function trimBook(book, now) {
   const fills = Object.entries(book.fills)
     .filter(([, f]) => now - f.t < KEEP_MS)
     .sort((a, b) => b[1].t - a[1].t)
@@ -84,7 +108,19 @@ async function writeBook(env, deps, account, book, now) {
   const cancelled = Object.entries(book.cancelled || {}).filter(([, t]) => now - t < KEEP_MS).slice(-KEEP);
   // (新股申購 seen: kept a year, the draw and the listing well past.)
   const ipo = Object.entries(book.ipo || {}).filter(([, t]) => now - t < 365 * 86_400_000);
-  await deps.fsWrite(env, FILLS_COLLECTION, account, JSON.stringify({ v: 2, fills: Object.fromEntries(fills), open: Object.fromEntries(open), plans: book.plans, cancelled: Object.fromEntries(cancelled), ...(ipo.length ? { ipo: Object.fromEntries(ipo) } : {}) }));
+  return { v: 2, fills: Object.fromEntries(fills), open: Object.fromEntries(open), plans: book.plans, cancelled: Object.fromEntries(cancelled), ipo: Object.fromEntries(ipo) };
+}
+// The book written over the copy it was read from only: a request that lost
+// the race merges its changes into the newer copy (mergeBooks) and writes
+// again, so one never drops what another issued (a fill answered and then
+// lost would count at the worst price since). The book as written.
+async function writeBook(env, deps, account, book, now) {
+  const written = await changeDoc(env, deps, FILLS_COLLECTION, account, raw => trimBook(mergeBooks(bookOf(raw), book), now), {
+    attempts: 5,
+    write: ({ ipo, ...rest }) => ({ ...rest, ...(Object.keys(ipo).length ? { ipo } : {}) })
+  });
+  if (!written) throw new Error('stock-fills busy');
+  return written;
 }
 // The fills issued for an account (stock-check.js reads them).
 export async function issuedFills(env, account, fsGet) {
@@ -265,14 +301,16 @@ export async function handleStock(request, env, headers, session, deps) {
       if (f) {
         book.fills[o.id] = recordOf(f, kept);
         delete book.open[o.id];
-        await writeBook(env, deps, session.d, book, now);
-        return json({ fill: answerOf(f) }, 200, headers);
+        const saved = await writeBook(env, deps, session.d, book, now);
+        return json({ fill: answerOf(saved.fills[o.id] || f) }, 200, headers);
       }
       delete book.open[o.id];
     }
     // (Never asked about: this Worker never saw it, so nothing of it could fill.)
     book.cancelled[o.id] = now;
-    await writeBook(env, deps, session.d, book, now);
+    const saved = await writeBook(env, deps, session.d, book, now);
+    // (Filled meanwhile by another request: the fill stands.)
+    if (saved.fills[o.id]) return json({ fill: answerOf(saved.fills[o.id]) }, 200, headers);
     return json({ cancelled: true }, 200, headers);
   }
   if (body?.op === 'ipo') return handleIpo(body, env, headers, session, deps);
@@ -320,10 +358,11 @@ export async function handleStock(request, env, headers, session, deps) {
     delete book.open[id];
     changed = true;
   }
-  const answer = Object.fromEntries(orders.filter(o => book.fills[o.id]).map(o => [o.id, answerOf(book.fills[o.id])]));
+  // (Answered from the book as written: a fill another request issued first is the one.)
+  const kept = changed ? await writeBook(env, deps, session.d, book, now) : book;
+  const answer = Object.fromEntries(orders.filter(o => kept.fills[o.id]).map(o => [o.id, answerOf(kept.fills[o.id])]));
   // The plans' months filled (asked for or not).
   const asked = new Set(plans.map(p => p.id));
-  for (const [id, f] of Object.entries(book.fills)) if (f.plan && asked.has(f.plan)) answer[id] = answerOf(f);
-  if (changed) await writeBook(env, deps, session.d, book, now);
+  for (const [id, f] of Object.entries(kept.fills)) if (f.plan && asked.has(f.plan)) answer[id] = answerOf(f);
   return json({ fills: answer }, 200, headers);
 }

@@ -43,6 +43,7 @@ import { BONDS } from './kit/stock-bonds.mjs';
 import { marketFill, dealPrice, currencyInfo } from './kit/stock-markets.mjs';
 import { fxSymbol } from './kit/stock-quotes.mjs';
 import { readFillsBook, decideFills, ipoList, ipoDraw, ipoKeyOf } from './stock-fill.js';
+import { parseDoc } from './doc-store.js';
 import { IPO_FEE, IPO_WIN_FEE, ipoOpen, ipoDrawn, ipoBackAt, ipoListAt } from './kit/stock-ipo.mjs';
 
 export const VERIFIED_COLLECTION = 'stock-verified';
@@ -339,11 +340,14 @@ export async function checkStock(env, docId, payload, wallet, deps, lockSince, n
   const account = await unpack(payload).catch(() => null);
   if (!account || !Array.isArray(account.events)) return null;
   const doc = await deps.fsGet(env, VERIFIED_COLLECTION, docId);
-  const kept = (doc.exists && JSON.parse(doc.payload)) || { ok: [], bad: [] };
+  // (One that can't be read is as none: checked again from the start, never a save stuck on it.)
+  const stored = parseDoc(doc);
+  const valid = Array.isArray(stored?.ok) && Array.isArray(stored?.bad);
+  const kept = valid ? stored : { ok: [], bad: [] };
   const ok = new Set(kept.ok);
   const bad = new Set(kept.bad);
   const adj = { ...(kept.adj || {}) };
-  const first = !doc.exists;
+  const first = !valid;
   // The fills this Worker issued (stock-fill.js).
   const book = await readFillsBook(env, docId, deps.fsGet);
   const issued = { ...book.fills };

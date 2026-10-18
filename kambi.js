@@ -22,7 +22,7 @@
 // An entry: { id, start, live (Kambi's liveData object, or null), seen (when
 // it was last read), gone (Kambi no longer has it), checked, done }.
 
-import { storeReady } from './doc-store.js';
+import { storeReady, parseDoc, changeDoc } from './doc-store.js';
 
 export const KAMBI_COLLECTION = 'kambi-results';
 // One document listing every watched match and its start, so each cron run
@@ -53,13 +53,6 @@ export async function fetchKambiLive(id) {
   return { status: res.status, data };
 }
 
-const parse = payload => {
-  try {
-    return JSON.parse(payload);
-  } catch {
-    return null;
-  }
-};
 
 export async function handleKambiRequest(request, env, headers, ip, deps) {
   const { json, errorJson, upstreamFailed } = deps;
@@ -73,7 +66,7 @@ export async function handleKambiRequest(request, env, headers, ip, deps) {
       await Promise.all(
         ids.map(async id => {
           const doc = await deps.fsGet(env, KAMBI_COLLECTION, id);
-          const entry = doc.exists ? parse(doc.payload) : null;
+          const entry = parseDoc(doc);
           if (entry) results[id] = entry;
         })
       );
@@ -118,31 +111,25 @@ export async function watchKambi(env, deps, list) {
   return { watching: events.length, added };
 }
 
+const asIndex = index => (index && typeof index.ids === 'object' ? index : null);
 async function readIndex(env, deps) {
-  const doc = await deps.fsGet(env, KAMBI_COLLECTION, KAMBI_INDEX);
-  const index = doc.exists ? parse(doc.payload) : null;
-  return { index: index && typeof index.ids === 'object' ? index : null, updateTime: doc.updateTime, exists: doc.exists };
+  return { index: asIndex(parseDoc(await deps.fsGet(env, KAMBI_COLLECTION, KAMBI_INDEX))) };
 }
-
-async function writeIndex(env, deps, change) {
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const { index, updateTime, exists } = await readIndex(env, deps);
-    const next = change(index || { ids: {} });
-    try {
-      await deps.fsWrite(env, KAMBI_COLLECTION, KAMBI_INDEX, JSON.stringify(next), exists ? { updateTime } : { exists: false });
-      return next;
-    } catch (error) {
-      if (!error.precondition) throw error;
-    }
-  }
-  return null;
-}
+const writeIndex = (env, deps, change) => changeDoc(env, deps, KAMBI_COLLECTION, KAMBI_INDEX, index => change(index || { ids: {} }), { read: asIndex }).then(r => r ?? null);
 
 const addToIndex = (env, deps, events) =>
   writeIndex(env, deps, index => {
     const ids = { ...index.ids };
-    for (const e of events) if (!index.done?.[String(e.id)]) ids[String(e.id)] = new Date(e.start).toISOString();
-    return { ...index, ids };
+    let changed = false;
+    for (const e of events) {
+      const id = String(e.id);
+      const start = new Date(e.start).toISOString();
+      if (index.done?.[id] || ids[id] === start) continue;
+      ids[id] = start;
+      changed = true;
+    }
+    // (Every match already watched: the index isn't written again.)
+    return changed ? { ...index, ids } : index;
   });
 
 // One cron run: reads the watched matches that have started and aren't
@@ -155,7 +142,7 @@ export async function refreshKambiWatch(env, deps) {
     const docs = await deps.fsList(env, KAMBI_COLLECTION, 300);
     const ids = {};
     for (const d of docs) {
-      const e = d.id !== KAMBI_INDEX && parse(d.payload);
+      const e = d.id !== KAMBI_INDEX && parseDoc({ exists: true, payload: d.payload });
       if (e?.start && !e.done) ids[d.id] = e.start;
     }
     index = (await writeIndex(env, deps, () => ({ ids }))) || { ids };
@@ -166,7 +153,7 @@ export async function refreshKambiWatch(env, deps) {
   const entries = [];
   for (const [id] of dueIds) {
     const doc = await deps.fsGet(env, KAMBI_COLLECTION, id);
-    const entry = doc.exists ? parse(doc.payload) : null;
+    const entry = parseDoc(doc);
     if (entry) entries.push({ doc: id, entry });
   }
   const old = [];
