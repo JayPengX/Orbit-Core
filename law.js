@@ -7,6 +7,9 @@
 // a point citing anything else is dropped here. Its other mode:
 //   { mode: 'bill', bill: 議案編號, lang }: a bill explained from its own
 //     對照表 (立法院's API), each change citing an article the table has.
+//   { mode: 'diff', p, arts, lang }: an amendment explained from Orbit Law's
+//     diff/<p>.json (each article's text before and after), every point
+//     citing one of those articles.
 //
 // A Quadra Pass of Orbit Law's (worker.js reads it; none, a 401 {error:
 // 'pass'}), from Orbit Law's origin (or a localhost page) only: 10 asks a
@@ -35,6 +38,7 @@ const BILL = /^\d{6,24}$/;
 const LY = 'https://v2.ly.govapi.tw/bill/';
 const ANSWER_TTL_S = 180 * 86_400;
 const BILL_TTL_S = 30 * 86_400;
+const DIFF_TTL_S = 180 * 86_400;
 export const twDay = (now = Date.now()) => new Date(now + 8 * 3_600_000).toISOString().slice(0, 10);
 export const fail = (error, status, headers, more) => json({ error, ...more }, status, headers);
 
@@ -85,9 +89,10 @@ export function readAsk(body) {
   const { p, arts, lang = 'zh', mode = 'ask' } = body;
   if (lang !== 'zh' && lang !== 'en') return 'lang';
   if (mode === 'bill') return typeof body.bill === 'string' && BILL.test(body.bill) ? { mode, bill: body.bill, lang } : 'bill';
-  if (mode !== 'ask') return 'mode';
+  if (mode !== 'ask' && mode !== 'diff') return 'mode';
   if (typeof p !== 'string' || !PCODE.test(p)) return 'p';
   if (!Array.isArray(arts) || !arts.length || arts.length > LAW_LIMITS.maxArts || !arts.every(a => typeof a === 'string' && ART.test(a))) return 'arts';
+  if (mode === 'diff') return { mode, p, arts: [...new Set(arts)], lang };
   if (body.q != null && typeof body.q !== 'string') return 'q';
   const q = (body.q || '').replace(/\s+/g, ' ').trim();
   if (q.length > LAW_LIMITS.maxQ) return 'q';
@@ -268,6 +273,23 @@ export function checkBill(raw, keys) {
   return { answer, changes, who, covered: raw?.covered === true && changes.length > 0 };
 }
 
+// ---- An amendment (mode 'diff') ----------------------------------------------------
+
+export function diffPrompt(law, arts, lang) {
+  const body = arts.map(([key, [was, now]]) => `[key "${key}"] ${label(key, 'zh')}\n修正前: ${was ?? '(無，新增條文)'}\n修正後: ${now ?? '(刪除)'}`).join('\n\n');
+  return `You explain an amendment of Taiwan's 「${law.n}」 (amended ${law.m}; the version before, ${law.was || 'unknown'}) using ONLY the articles quoted below, each before and after. Return JSON matching the schema.
+
+Articles:
+${body}
+
+Rules:
+- answer: 2 to 3 sentences in plain words: what changed, and what that means in practice.
+- points: each one change in plain words; its cites lists the key of every article it rests on, exactly as given in quotes (e.g. "15" or "15-1"). Never a point without a cite, never a key not listed above.
+- Use only the text above; no other law, ruling or outside knowledge; don't fill gaps. covered: false if the text doesn't show what changed.
+- This is general information, not legal advice.
+- Write everything in ${lang === 'en' ? 'plain English' : 'Traditional Chinese as used in Taiwan (繁體中文)'}.`;
+}
+
 // ---- The day's counts: D1 (STORE), or memory with no store (the tests) ----
 // One row a key a day: 'g' the day's calls in all, 'ask:<hash>' and
 // 'chat:<hash>' a Pass's.
@@ -401,6 +423,24 @@ const JOBS = {
       prompt: billPrompt(bill, rows, ask.lang),
       schema: BILL_SCHEMA,
       check: raw => checkBill(raw, rows.map(r => r.key))
+    };
+  },
+  // Orbit Law's diff/<p>.json: { p, m, was, arts: { key: [old | null, new | null] } },
+  // for a law amended in the last 120 days.
+  async diff(ask, headers) {
+    const diff = await readData(`diff/${ask.p}.json`);
+    if (!diff) return fail('diff', 404, headers);
+    const arts = ask.arts.filter(k => Array.isArray(diff.arts?.[k])).map(k => [k, diff.arts[k]]);
+    if (!arts.length) return fail('arts', 400, headers);
+    const keys = arts.map(([k]) => k);
+    const law = { p: ask.p, n: (await rowOf(ask.p))?.[1] || '', m: String(diff.m ?? ''), was: String(diff.was ?? '') };
+    return {
+      key: `law:diff:v1:${await sha256Hex([law.p, law.m, [...keys].sort().join(','), ask.lang].join('|'))}`,
+      ttl: DIFF_TTL_S,
+      info: { law },
+      prompt: diffPrompt(law, arts, ask.lang),
+      schema: SCHEMA,
+      check: raw => checkAnswer(raw, keys)
     };
   }
 };

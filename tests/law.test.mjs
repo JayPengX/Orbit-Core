@@ -15,6 +15,9 @@ const BILL = {
 };
 const bills = [];
 let billStatus = 200;
+// An amendment as Orbit Law's build writes it.
+const DIFF = { p: 'B0000001', m: '20260817', was: '20250101', arts: { 15: ['受監護宣告之人，無行為能力。', '受監護宣告之人，無行為能力；但…'], '15-3': [null, '新增之條文。'], 16: ['舊的。', null] } };
+let diffStatus = 200;
 const laws = [];
 const gemini = [];
 let reply = { answer: '輔助宣告由法院為之。', points: [{ text: '可聲請輔助宣告', cites: ['第15條之1'] }, { text: '外部條文', cites: ['16'] }, { text: '沒有出處', cites: [] }], covered: true };
@@ -33,6 +36,10 @@ globalThis.fetch = async (url, init) => {
     if (id === '202110000020000') return new Response(JSON.stringify({ error: false, data: { 議案名稱: '預算案', 對照表: [] } }));
     return new Response(JSON.stringify({ error: true, message: 'not found' }), { status: 404 });
   }
+  if (u === 'https://jaypengx.github.io/Orbit-Law/data/diff/B0000001.json') return diffStatus === 200 ? new Response(JSON.stringify(DIFF)) : new Response('', { status: diffStatus });
+  if (u === 'https://jaypengx.github.io/Orbit-Law/data/index.json') return new Response(JSON.stringify({ laws: [['B0000001', '民法', '法律', '', '20250101', 0, 'Civil Code', 4]] }));
+  if (u === 'https://jaypengx.github.io/Orbit-Law/data/orders.json') return new Response(JSON.stringify({ laws: [] }));
+  if (u.startsWith('https://jaypengx.github.io/Orbit-Law/data/diff/')) return new Response('', { status: 404 });
   if (u.startsWith('https://jaypengx.github.io/Orbit-Law/data/law/')) {
     laws.push({ u, init });
     return u.endsWith('/B0000001.json') ? new Response(JSON.stringify(LAW), { status: 200 }) : new Response('', { status: 404 });
@@ -246,6 +253,52 @@ test('a bill not there, or with no 對照表, is a 404 {error:"bill"}; 立法院
     assert.equal((await ask(BILL_ASK)).status, 502);
   } finally {
     billStatus = 200;
+  }
+  assert.equal(gemini.length, before);
+});
+
+// ---- mode 'diff' ----
+
+const DIFF_ASK = { mode: 'diff', p: 'B0000001', arts: ['15', '15-3', '16', '99'], lang: 'zh' };
+
+test('an amendment is explained from its before and after only, every point citing one of them; kept by the version, the articles and the language', async () => {
+  assert.deepEqual(readAsk(DIFF_ASK), { mode: 'diff', p: 'B0000001', arts: ['15', '15-3', '16', '99'], lang: 'zh' });
+  for (const bad of [{ ...DIFF_ASK, p: 'x' }, { ...DIFF_ASK, arts: [] }, { ...DIFF_ASK, arts: Array.from({ length: 9 }, (_, i) => String(i + 1)) }]) assert.equal(typeof readAsk(bad), 'string');
+  const env = envOf();
+  reply = { answer: '新增但書。', points: [{ text: '加了但書', cites: ['第15條'] }, { text: '刪了第16條', cites: ['16'] }, { text: '別的', cites: ['17'] }], covered: true };
+  try {
+    const r = await ask(DIFF_ASK, { env, pass: 'diff' });
+    assert.equal(r.status, 200);
+    const j = await r.json();
+    assert.deepEqual(j, { answer: '新增但書。', points: [{ text: '加了但書', cites: ['15'] }, { text: '刪了第16條', cites: ['16'] }], covered: true, law: { p: 'B0000001', n: '民法', m: '20260817', was: '20250101' }, cached: false, left: LAW_LIMITS.perPass - 1 });
+    const prompt = gemini.at(-1).contents[0].parts[0].text;
+    assert.match(prompt, /\[key "15-3"\] 第15條之3\n修正前: \(無，新增條文\)\n修正後: 新增之條文。/);
+    assert.match(prompt, /\[key "16"\] 第16條\n修正前: 舊的。\n修正後: \(刪除\)/);
+    assert.doesNotMatch(prompt, /key "99"/);
+    const calls = gemini.length;
+    assert.equal((await (await ask({ ...DIFF_ASK, arts: ['16', '15-3', '15'] }, { env, pass: 'diff' })).json()).cached, true);
+    assert.equal(gemini.length, calls);
+    DIFF.m = '20261001';
+    try {
+      assert.equal((await (await ask(DIFF_ASK, { env, pass: 'diff' })).json()).cached, false);
+    } finally {
+      DIFF.m = '20260817';
+    }
+  } finally {
+    reply = { answer: '輔助宣告由法院為之。', points: [{ text: '可聲請輔助宣告', cites: ['第15條之1'] }, { text: '外部條文', cites: ['16'] }, { text: '沒有出處', cites: [] }], covered: true };
+  }
+});
+
+test('no amendment of the law is a 404 {error:"diff"}, none of the articles a 400; Orbit Law failing a 502; nothing asked', async () => {
+  const before = gemini.length;
+  const r = await ask({ ...DIFF_ASK, p: 'C0000001' });
+  assert.deepEqual([r.status, (await r.json()).error], [404, 'diff']);
+  assert.equal((await ask({ ...DIFF_ASK, arts: ['99'] })).status, 400);
+  diffStatus = 500;
+  try {
+    assert.equal((await ask(DIFF_ASK)).status, 502);
+  } finally {
+    diffStatus = 200;
   }
   assert.equal(gemini.length, before);
 });

@@ -81,7 +81,7 @@ runs near each caller; only Gemini goes through `gemini-relay.js`, pinned to Tai
 | `/sports-proxy` | `sports.js`, `asia-baseball.js`, `f1-live.js` | The data proxy (§3.1) |
 | `/gemini`, `/nl-edit` | `worker.js` | Orbit Class's photo import and plain-language edits (fixed prompts) |
 | `/slip`, `/slip-scan` | `slip.js` | Orbit Slips' ticket photo read (tight caps) |
-| `/law-ask` | `law.js` | Orbit Law's questions on 1-8 articles of a law: the text read from Orbit Law's data, every point cited and checked; answers kept in KV by the law's version; `mode: 'bill'` a bill explained from its 對照表 (立法院's API), each change citing a row's article, kept 30 days; a Pass of Orbit Law's, 40 Gemini calls a day a Pass and 300 in all with `/law-chat`'s (D1) |
+| `/law-ask` | `law.js` | Orbit Law's questions on 1-8 articles of a law: the text read from Orbit Law's data, every point cited and checked; answers kept in KV by the law's version; `mode: 'bill'` a bill explained from its 對照表 (立法院's API), each change citing a row's article, kept 30 days; `mode: 'diff'` an amendment explained from Orbit Law's `diff/<p>.json`, kept 180 days by version; a Pass of Orbit Law's, 40 Gemini calls a day a Pass and 300 in all with `/law-chat`'s (D1) |
 | `/law-chat` | `law-chat.js` | Orbit Law's 問法律: a plan, the articles found in Orbit Law's lists and full-text index (14 at most), an answer from those only, every point's cites checked; a Pass of Orbit Law's, 30 turns a day a Pass; first questions kept in KV 30 days |
 | `/data/…` | `data.js` | R2, public reads |
 | `/config` | `worker.js` | The live speeds |
