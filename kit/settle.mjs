@@ -122,7 +122,23 @@ export function legResult(leg, outcome) {
     case 'total':
       return push(leg.side === 'over' ? away + home - leg.line : leg.line - away - home);
     case 'runline':
+    case 'sethcap':
+      // 讓分, and a set sport's 讓盤 on the sets won.
       return push(leg.side === 'away' ? away + leg.line - home : home + leg.line - away);
+    case 'gametotal':
+    case 'gamehcap': {
+      // A set sport's 大小 and 讓局 on every set's games (points, for
+      // volleyball, badminton and table tennis).
+      if (!a.length && !h.length) return null;
+      const ga = firstPeriods(a, a.length);
+      const gh = firstPeriods(h, h.length);
+      if (leg.kind === 'gametotal') return push(leg.side === 'over' ? ga + gh - leg.line : leg.line - ga - gh);
+      return push(leg.side === 'away' ? ga + leg.line - gh : gh + leg.line - ga);
+    }
+    case 'set1':
+      // 單盤不讓分: the first set's winner.
+      if (!a.length || !h.length) return null;
+      return win(leg.side === 'away' ? a[0] > h[0] : h[0] > a[0]);
     case 'teamtotal': {
       const runs = leg.team === 'away' ? away : home;
       return push(leg.side === 'over' ? runs - leg.line : leg.line - runs);
@@ -138,8 +154,9 @@ export function legResult(leg, outcome) {
       const m = leg.team === 'home' ? home - away : away - home;
       return win(m >= leg.lo && (leg.hi == null || m <= leg.hi));
     }
-    case 'score': {
-      // Correct score, written home-away; 'other' is any score not listed.
+    case 'score':
+    case 'setscore': {
+      // Correct score, written home-away ('setscore': in sets); 'other' is any score not listed.
       const final = `${home}-${away}`;
       return win(leg.score === 'other' ? !(leg.listed || []).includes(final) : leg.score === final);
     }
@@ -624,9 +641,65 @@ export function parseKambiLiveData(data) {
   return {
     score: { home: Number(live.score.home) || 0, away: Number(live.score.away) || 0 },
     periods: kambiPeriods(live.score.info),
+    // A set sport's games in each set (kambiSets).
+    sets: live.statistics?.sets ?? null,
     changedAt: Number.isFinite(changed) ? changed : null,
     clock: live.matchClock ? { period: live.matchClock.periodId || '', left: (Number(live.matchClock.minutesLeftInPeriod) || 0) * 60 + (Number(live.matchClock.secondsLeftInMinute) || 0), running: Boolean(live.matchClock.running) } : null
   };
+}
+
+// ---- Set sports: tennis, volleyball, badminton, table tennis, esports ----
+//
+// Settled from Kambi's live data, whose `statistics.sets` lists each set's
+// games (points; -1 for one not played) and has as many entries as the
+// match is best of. A set is over at its sport's target with a two-point
+// (game) lead, or at its cap: tennis 6 (7 in a tie-break), volleyball 25
+// (15 in a deciding fifth), badminton 21 (30 at most), table tennis 11.
+// Esports' maps: only a set followed by another counts as over.
+export const SET_RULES = {
+  tennis: { to: 6, cap: 7 },
+  volleyball: { to: 25, last: 15 },
+  badminton: { to: 21, cap: 30 },
+  tabletennis: { to: 11 },
+  esports: null
+};
+export const SET_SPORTS = new Set(Object.keys(SET_RULES));
+// Each set's games: { home, away, bestOf } (unplayed sets left out), or null.
+export function kambiSets(live) {
+  const s = live?.sets ?? live?.statistics?.sets;
+  if (!Array.isArray(s?.home) || !Array.isArray(s?.away)) return null;
+  const n = Math.min(s.home.length, s.away.length);
+  const home = [];
+  const away = [];
+  for (let i = 0; i < n && s.home[i] >= 0 && s.away[i] >= 0; i++) {
+    home.push(Number(s.home[i]));
+    away.push(Number(s.away[i]));
+  }
+  return { home, away, bestOf: n };
+}
+// Whether set i (from 0) ended home-away.
+export function setOver(sport, i, bestOf, home, away) {
+  const r = SET_RULES[sport];
+  if (!r) return false;
+  const hi = Math.max(home, away);
+  const target = r.last && i === bestOf - 1 ? r.last : r.to;
+  return (hi >= target && Math.abs(home - away) >= 2) || (r.cap != null && hi >= r.cap && home !== away);
+}
+// A set sport's result once a side has won the match's sets, or null: the
+// sets won as the score, each set's games as the periods.
+export function decidedSetMatch(live, sport) {
+  const s = kambiSets(live);
+  if (!s || !s.bestOf) return null;
+  let home = 0;
+  let away = 0;
+  s.home.forEach((h, i) => {
+    const a = s.away[i];
+    const done = i < s.home.length - 1 || setOver(sport, i, s.bestOf, h, a);
+    if (done && h !== a) h > a ? home++ : away++;
+  });
+  const need = Math.ceil(s.bestOf / 2);
+  if (home < need && away < need) return null;
+  return { status: 'final', homeScore: home, awayScore: away, homeInnings: s.home, awayInnings: s.away };
 }
 
 // How long a score must stay the same before a finished-looking game counts as over.
@@ -640,6 +713,8 @@ const TIE_INNINGS = { npb: 12, cpbl: 12, kbo: 11 };
 // /kambi watch), so the game is over whenever its score says it can be.
 export function decidedTeamGame(live, sport, start, now = new Date(), { ended = false } = {}) {
   const family = LEAGUES[sport]?.family;
+  // A set sport: over once a side has won its sets.
+  if (live && SET_SPORTS.has(family ?? sport)) return decidedSetMatch(live, family ?? sport);
   if (!live || (family !== 'baseball' && family !== 'basketball' && family !== 'soccer')) return null;
   const { home, away } = live.score;
   const n = live.periods.home.length;
