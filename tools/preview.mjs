@@ -633,8 +633,9 @@ await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(?!
     if (body.op === 'tickets') {
       const { buyTicket } = await import('../kit/play-lottery.mjs');
       const bottomless = { v: 1, created: '', ledger: [{ id: 'x', amount: 1e12 }], slips: [], tickets: [] };
+      // (多期: a ticket a draw, `tickets`; before 多期, `ticket` alone.)
       const sold = (body.tickets || []).map(x => buyTicket(bottomless, x, new Date()));
-      reply = sold.some(r => r.error) ? { refused: { problem: sold.find(r => r.error).error } } : { tickets: sold.map(r => r.ticket) };
+      reply = sold.some(r => r.error) ? { refused: { problem: sold.find(r => r.error).error } } : { tickets: sold.flatMap(r => r.tickets || [r.ticket]) };
     }
     if (body.op === 'scratch') {
       const { CARDS, drawPrize } = await import('../kit/play-scratch.mjs');
