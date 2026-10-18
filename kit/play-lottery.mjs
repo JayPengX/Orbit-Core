@@ -5,8 +5,8 @@
 //   威力彩       6 of 1-38 + 1 of 1-8      NT$100   Mon, Thu 20:30
 //   大樂透       6 of 1-49 (+ special)     NT$50    Tue, Fri 20:30
 //   今彩539      5 of 1-39                 NT$50    Mon-Sat 20:30
-//   3星彩        3 digits                  NT$25    Mon-Sat 20:30
-//   4星彩        4 digits                  NT$25    Mon-Sat 20:30
+//   3星彩        3 digits, in order        NT$25    Mon-Sat 20:30
+//   4星彩        4 digits, in order        NT$25    Mon-Sat 20:30
 //   38樂合彩     2-5 of 1-38, on 威力彩's first zone     NT$25 a combination
 //   39樂合彩     2-4 of 1-39, on 今彩539's draw          NT$25 a combination
 //   49樂合彩     2-4 of 1-49, on 大樂透's six numbers    NT$25 a combination
@@ -75,22 +75,27 @@ export const GAMES = {
     zh: '3星彩', en: '3 Star', price: 25, days: [1, 2, 3, 4, 5, 6], color: '#7c3aed',
     digits: 3,
     api: { path: '3DResult', list: 'lotto3DRes' },
-    // 正彩 exact order; 組彩 any order (by how many orders the digits make);
-    // 對彩 the last two digits in order.
-    plays: {
-      straight: { zh: '正彩', en: 'Straight', prize: 12_500 },
-      box: { zh: '組彩', en: 'Box', prizes: { 6: 2_000, 3: 4_000 } },
-      pair: { zh: '對彩', en: 'Pair', prize: 1_250 }
-    }
+    // Since 2024-01-01 one play, the digits in order, paid by how many of
+    // the last digits match (壹獎 all, 貳獎 the last two, 參獎 the last
+    // one); 組彩 and 對彩 are gone.
+    tiers: [
+      { key: 'first', zh: '壹獎', en: '1st', hits: 3, prize: 5_000 },
+      { key: 'second', zh: '貳獎', en: '2nd', hits: 2, prize: 500 },
+      { key: 'third', zh: '參獎', en: '3rd', hits: 1, prize: 50 }
+    ],
+    // (The one play, as Play's picker lists them.)
+    plays: { straight: { zh: '正彩', en: 'Straight', prize: 5_000 } }
   },
   star4: {
     zh: '4星彩', en: '4 Star', price: 25, days: [1, 2, 3, 4, 5, 6], color: '#0891b2',
     digits: 4,
     api: { path: '4DResult', list: 'lotto4DRes' },
-    plays: {
-      straight: { zh: '正彩', en: 'Straight', prize: 125_000 },
-      box: { zh: '組彩', en: 'Box', prizes: { 24: 5_000, 12: 10_000, 6: 20_000, 4: 30_000 } }
-    }
+    tiers: [
+      { key: 'first', zh: '壹獎', en: '1st', hits: 4, prize: 50_000 },
+      { key: 'second', zh: '貳獎', en: '2nd', hits: 3, prize: 5_000 },
+      { key: 'third', zh: '參獎', en: '3rd', hits: 2, prize: 500 }
+    ],
+    plays: { straight: { zh: '正彩', en: 'Straight', prize: 50_000 } }
   },
   m38: {
     zh: '38樂合彩', en: '38 Combo', price: 25, days: [1, 4], color: '#be123c', of: 'super638',
@@ -175,12 +180,10 @@ export function quickPick(n, max) {
 export { choose };
 
 // How many bets a selection makes (a 樂合彩 pick of 5 numbers as 二合 is
-// C(5,2) = 10 combinations; a 組彩 box is one bet).
+// C(5,2) = 10 combinations; any other selection is one bet).
 export function betCount(gameId, sel) {
   const g = GAMES[gameId];
-  if (g.combo) return choose(sel.numbers.length, sel.size);
-  if (gameId === 'bingo') return sel.side ? 1 : 1;
-  return 1;
+  return g.combo ? choose(sel.numbers.length, sel.size) : 1;
 }
 
 // A selection is valid for its game: { ok } or { error }.
@@ -190,8 +193,7 @@ export function checkSelection(gameId, sel) {
   const inRange = (arr, max) => arr.every(n => Number.isInteger(n) && n >= 1 && n <= max);
   if (g.digits) {
     if (!Array.isArray(sel.digits) || sel.digits.length !== g.digits || !sel.digits.every(d => Number.isInteger(d) && d >= 0 && d <= 9)) return { error: 'digits' };
-    if (!g.plays[sel.play]) return { error: 'play' };
-    if (sel.play === 'box' && boxWays(sel.digits) === 1) return { error: 'boxSame' };
+    if (sel.play != null && !g.plays[sel.play]) return { error: 'play' };
     return { ok: true };
   }
   if (g.combo) {
@@ -209,16 +211,6 @@ export function checkSelection(gameId, sel) {
   for (const [i, z] of g.zones.entries()) if (zones[i]?.length !== z.n || !uniq(zones[i]) || !inRange(zones[i], z.max)) return { error: 'numbers' };
   return { ok: true };
 }
-
-// In how many orders a set of digits can come (1 for 777, 3 for 772, 6 for 123 …).
-export function boxWays(digits) {
-  const counts = {};
-  for (const d of digits) counts[d] = (counts[d] || 0) + 1;
-  let ways = factorial(digits.length);
-  for (const c of Object.values(counts)) ways /= factorial(c);
-  return ways;
-}
-const factorial = n => (n <= 1 ? 1 : n * factorial(n - 1));
 
 // ---- Results --------------------------------------------------------------------------
 //
@@ -275,14 +267,14 @@ export function ticketPrize(ticket, draw) {
     return tier ? { prize: tier.pool ? pool(tier, tier.key) : tier.prize, tier: tier.key, detail: [h, sp ? 1 : 0] } : { prize: 0, tier: null, detail: [h, sp ? 1 : 0] };
   }
   if (g.digits) {
+    // How many of the last digits match, in place (a ticket from before
+    // 組彩 and 對彩 went is checked the same way).
     const d = draw.digits;
     const s = sel.digits;
-    if (sel.play === 'straight') return s.every((x, i) => x === d[i]) ? { prize: g.plays.straight.prize, tier: 'straight' } : { prize: 0, tier: null };
-    if (sel.play === 'box') {
-      const same = [...s].sort().join() === [...d].sort().join();
-      return same ? { prize: g.plays.box.prizes[boxWays(s)] || 0, tier: 'box' } : { prize: 0, tier: null };
-    }
-    if (sel.play === 'pair') return s[1] === d[1] && s[2] === d[2] ? { prize: g.plays.pair.prize, tier: 'pair' } : { prize: 0, tier: null };
+    let h = 0;
+    while (h < s.length && s.at(-1 - h) === d.at(-1 - h)) h++;
+    const tier = g.tiers.find(t => t.hits === h);
+    return tier ? { prize: tier.prize, tier: tier.key, detail: [h] } : { prize: 0, tier: null, detail: [h] };
   }
   if (g.combo) {
     // Every combination of `size` among the numbers chosen is a bet; each
@@ -329,13 +321,8 @@ export function expectedReturn(gameId, extra = {}) {
     return s;
   }
   if (g.digits) {
-    const n = 10 ** g.digits;
-    if (extra.play === 'box') {
-      const ways = extra.ways || (g.digits === 3 ? 6 : 24);
-      return ((ways / n) * g.plays.box.prizes[ways]) / g.price;
-    }
-    if (extra.play === 'pair') return ((1 / 100) * g.plays.pair.prize) / g.price;
-    return ((1 / n) * g.plays.straight.prize) / g.price;
+    // The last `hits` digits match and (short of all) the one before misses.
+    return g.tiers.reduce((s, t) => s + (10 ** -t.hits) * (t.hits < g.digits ? 0.9 : 1) * t.prize, 0) / g.price;
   }
   return null;
 }
