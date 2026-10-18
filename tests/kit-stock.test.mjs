@@ -397,3 +397,77 @@ test("Securities' own paydays stop where Quadra's begin, each month once", () =>
   assert.ok(added.every(e => e.id.slice(4) < INCOME_UNTIL_MONTH));
   assert.equal(applyIncome(account, Date.parse('2026-12-15T00:00:00Z')).added.length, 0);
 });
+
+// ---- Corporate actions, interest and FX on their real rules ---------------------
+
+const SA = await import('../kit/stock-account.mjs');
+const DAY_MS = 86_400_000;
+const twFill = (id, t, qty, price, more = {}) => ({ id, type: 'fill', t, orderId: id, symbol: '2330.TW', name: 'TSMC', kind: 'stock', market: 'TW', currency: 'TWD', side: 'buy', qty, price, gross: qty * price, total: qty * price, commission: 0, tax: 0, fee: 0, twd: 1, ...more });
+
+test('新股申購 won: its shares get the dividends and splits after the listing, as shares bought do', () => {
+  const t0 = Date.parse('2026-03-02T01:00:00Z');
+  const sub = { code: '6999', name: 'New Co', symbol: '6999.TW', price: 50, qty: 1000, draw: t0 + 10 * DAY_MS, list: t0 + 20 * DAY_MS };
+  let acc = SA.newAccount(100_000, t0 - DAY_MS, 'acc');
+  acc = { ...acc, events: [...acc.events, ipoApplyEvent(sub, t0), ipoWinEvent(sub)] };
+  const ex = t0 + 60 * DAY_MS;
+  const { added } = SA.applyCorporateActions(acc, '6999.TW', { dividends: [{ date: ex, amount: 2 }], splits: [] }, { rates: { TWD: 1 }, now: ex + DAY_MS });
+  assert.equal(added.length, 1, 'the dividend on the IPO shares');
+  assert.equal(added[0].shares, 1000);
+  assert.equal(added[0].gross, 2000);
+  // Not before it listed.
+  assert.equal(SA.applyCorporateActions(acc, '6999.TW', { dividends: [{ date: t0 + 15 * DAY_MS, amount: 2 }] }, { rates: { TWD: 1 }, now: ex }).added.length, 0);
+});
+
+test('a split multiplies the shares lent out and the 融資 shares, and deletes the orders waiting from before it (a Taiwan broker deletes 長效單 at 除權)', () => {
+  const t0 = Date.parse('2026-03-02T01:00:00Z');
+  let acc = SA.newAccount(1_000_000, t0 - DAY_MS, 'acc');
+  acc = { ...acc, events: [...acc.events, twFill('b1', t0, 2000, 100, { financed: 1 }), { id: 'lend:l1', type: 'lend', t: t0 + DAY_MS, symbol: '2330.TW', name: 'TSMC', market: 'TW', kind: 'stock', currency: 'TWD', qty: 1000, price: 100, rate: 0.01 }] };
+  const waiting = { id: 'o1', t: t0 + 2 * DAY_MS, status: 'open', rev: 1, side: 'sell', type: 'limit', limit: 120, qty: 1000, symbol: '2330.TW', market: 'TW', kind: 'stock', currency: 'TWD' };
+  acc = { ...acc, orders: [waiting] };
+  const split = t0 + 10 * DAY_MS;
+  const feeBefore = lendFee(SA.replay(acc, split - 1).lent['lend:l1'], split + 30 * DAY_MS).gross;
+  const { account } = SA.applyCorporateActions(acc, '2330.TW', { splits: [{ date: split, ratio: 2 }] }, { rates: { TWD: 1 }, now: split + DAY_MS });
+  const s = SA.replay(account, split + DAY_MS);
+  assert.equal(s.positions['2330.TW'].qty, 4000);
+  assert.equal(s.positions['2330.TW'].marginQty, 4000);
+  assert.equal(s.lent['lend:l1'].qty, 2000);
+  assert.equal(lendFee(s.lent['lend:l1'], split + 30 * DAY_MS).gross, feeBefore, 'the lending fee is the same money');
+  assert.equal(available(account, s).qty['2330.TW'], 2000, 'the shares not lent, none held by the deleted order');
+  const o = account.orders.find(x => x.id === 'o1');
+  assert.deepEqual([o.status, o.reason], ['cancelled', 'split']);
+});
+
+test('interest on cash: one rule with deposits and lending (over NT$20,000 withheld 10%, NT$20,000 or more the 2.11% NHI)', () => {
+  const created = Date.parse('2026-01-01T00:00:00Z');
+  const payday = Date.parse('2026-06-20T16:00:00Z');
+  const gross = cash => SA.applyCashInterest({ ...SA.newAccount(0, created, 'acc'), events: [{ id: 'd', type: 'deposit', t: created, currency: 'TWD', amount: cash }] }, payday + 1).added[0];
+  // The cash that earns exactly NT$20,000 at the June payday.
+  let lo = 1e6;
+  let hi = 1e7;
+  while (hi - lo > 1) {
+    const mid = Math.floor((lo + hi) / 2);
+    if (gross(mid).gross < 20_000) lo = mid;
+    else hi = mid;
+  }
+  const at = gross(hi);
+  assert.equal(at.gross, 20_000);
+  assert.deepEqual([at.withheld, at.nhi], [0, Math.floor(20_000 * 0.0211)], 'exactly NT$20,000: the premium, no withholding');
+  assert.deepEqual({ withheld: at.withheld, nhi: at.nhi, net: at.net }, incomeTaxes(20_000));
+});
+
+test("Plus's half FX spread goes by the exchange's own month, not today's", () => {
+  const plusMonth = Date.parse('2026-09-10T02:00:00Z');
+  const now = Date.parse('2026-10-18T02:00:00Z');
+  SA.usePlus({ months: new Set(['2026-09']), fxSpread: 0.5, commission: 1, loanCut: 0 });
+  try {
+    const rates = { TWD: 1, USD: 32 };
+    const then = SA.quoteExchange('TWD', 'USD', 32_000, rates, true, plusMonth);
+    const today = SA.quoteExchange('TWD', 'USD', 32_000, rates, true, now);
+    assert.equal(then.spread, today.spread / 2);
+    const acc = SA.newAccount(100_000, plusMonth - DAY_MS, 'acc');
+    const r = SA.exchange(acc, { from: 'TWD', to: 'USD', amount: 32_000 }, { rates, now: plusMonth, id: 'x' });
+    assert.equal(r.event.spread, then.spread, 'an exchange dated in a Plus month has its half spread');
+  } finally {
+    SA.usePlus(null);
+  }
+});

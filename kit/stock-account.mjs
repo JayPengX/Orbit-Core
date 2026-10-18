@@ -27,8 +27,6 @@ import {
   isOddLot,
   oddLotOpen,
   CASH_RATE,
-  NHI_RATE,
-  NHI_THRESHOLD,
   onTick,
   priceLimits,
   tickSize,
@@ -228,9 +226,18 @@ function applyEvent(s, e) {
         app.state = 'won';
         break;
       }
+      // A split: the shares held, the 融資 shares among them and the shares
+      // lent out (借券: the borrower returns the split's number, TWSE's
+      // 借券 rules for 除權) all times the ratio (a lent lot's price over it: its fee the same); what
+      // was paid is the same.
       case 'split': {
         const p = s.positions[e.symbol];
-        if (p) p.qty *= e.ratio;
+        if (p) {
+          p.qty *= e.ratio;
+          if (p.marginQty > 0) p.marginQty *= e.ratio;
+          if (p.last > 0) p.last /= e.ratio;
+        }
+        for (const l of Object.values(s.lent)) if (l.symbol === e.symbol && l.t < e.t) [l.qty, l.price] = [l.qty * e.ratio, l.price / e.ratio];
         break;
       }
       case 'interest':
@@ -887,30 +894,32 @@ export function fxSpread(from, to, fxOpen = true, t = Date.now()) {
   return Math.max(currencyInfo(from).spread, currencyInfo(to).spread) * (fxOpen ? 1 : CLOSED_FX_MULTIPLIER) * (plusAt(t) ? plus.fxSpread : 1);
 }
 
-// What `amount` of `from` buys in `to`: the middle rate less the spread,
-// rounded down to the currency's smallest unit.
-export function quoteExchange(from, to, amount, rates, fxOpen = true) {
+// What `amount` of `from` buys in `to` at `t`: the middle rate less the
+// spread (Plus's half spread if `t` is a Plus month: a bank charges the
+// spread of the moment of the exchange, never of today), rounded down to
+// the currency's smallest unit.
+export function quoteExchange(from, to, amount, rates, fxOpen = true, t = Date.now()) {
   if (!rates?.[from] || !rates?.[to] || from === to || !(amount > 0)) return null;
   const mid = rates[from] / rates[to];
-  const spread = fxSpread(from, to, fxOpen);
+  const spread = fxSpread(from, to, fxOpen, t);
   const f = 10 ** currencyInfo(to).digits;
   const received = Math.floor(amount * mid * (1 - spread) * f + 1e-7) / f;
   return { from, to, amount, mid, spread, rate: received / amount, received, spreadTWD: amount * rates[from] - received * rates[to] };
 }
 
 // How much `from` it takes to receive `need` of `to`.
-export function amountFor(from, to, need, rates, fxOpen = true) {
+export function amountFor(from, to, need, rates, fxOpen = true, t = Date.now()) {
   if (!rates?.[from] || !rates?.[to] || !(need > 0)) return null;
   const f = 10 ** currencyInfo(from).digits;
-  let amount = Math.ceil(((need / (rates[from] / rates[to])) / (1 - fxSpread(from, to, fxOpen))) * f - 1e-7) / f;
+  let amount = Math.ceil(((need / (rates[from] / rates[to])) / (1 - fxSpread(from, to, fxOpen, t))) * f - 1e-7) / f;
   // Rounding can leave it a unit short.
-  for (let i = 0; i < 3 && quoteExchange(from, to, amount, rates, fxOpen).received < need; i++) amount += 1 / f;
+  for (let i = 0; i < 3 && quoteExchange(from, to, amount, rates, fxOpen, t).received < need; i++) amount += 1 / f;
   return Math.round(amount * f) / f;
 }
 
 export function exchange(account, { from, to, amount }, { rates, fxOpen = true, now = Date.now(), id = randomId() }) {
   amount = roundCash(Number(amount), from);
-  const q = quoteExchange(from, to, amount, rates, fxOpen);
+  const q = quoteExchange(from, to, amount, rates, fxOpen, now);
   if (!q) return { error: 'fx' };
   if (!(q.received > 0)) return { error: 'tooSmall' };
   const free = withdrawable(account, replay(account, now), now);
@@ -1245,7 +1254,7 @@ export function repayAll(account, rates, fxOpen, now = Date.now()) {
         .sort(([a, va], [b, vb]) => (a === BASE ? -1 : b === BASE ? 1 : vb * rates[b] - va * rates[a]));
       if (!sources.length) break;
       const [from, has] = sources[0];
-      const need = amountFor(from, currency, Math.ceil(loan.balance * 100) / 100, rates, fxOpen);
+      const need = amountFor(from, currency, Math.ceil(loan.balance * 100) / 100, rates, fxOpen, now);
       const x = exchange(next, { from, to: currency, amount: Math.min(has, need) }, { rates, fxOpen, now, id: nextId() });
       if (x.error) break;
       next = x.account;
@@ -1374,7 +1383,7 @@ export function payDown(account, amountTWD, { rates, fxOpen = true, now = Date.n
       // NT$ to exchange: settled only (not 交割中 sale money).
       const has = Math.max(0, withdrawable(next, s, now)[BASE] || 0);
       if (has <= EPS) break;
-      const fx = exchange(next, { from: BASE, to: currency, amount: Math.min(has, amountFor(BASE, currency, want, rates, fxOpen)) }, { rates, fxOpen, now, id: nextId() });
+      const fx = exchange(next, { from: BASE, to: currency, amount: Math.min(has, amountFor(BASE, currency, want, rates, fxOpen, now)) }, { rates, fxOpen, now, id: nextId() });
       if (fx.error) break;
       next = fx.account;
     }
@@ -1467,23 +1476,30 @@ export function marginHistory(account, { times, priceAt, rateAt }) {
 
 // ---- Dividends and splits ----------------------------------------------------
 
+// Shares of `symbol` held just before `t`: bought and sold, split, and a
+// 新股申購 won (its shares the account's from the listing day, as replay
+// counts them: only for an application it has).
 function sharesAt(account, symbol, t) {
   let qty = 0;
+  const applied = new Set(account.events.filter(e => e.type === 'ipo').map(e => `${e.code}:${e.draw}`));
   for (const e of [...account.events].sort(byTime)) {
     if (e.t >= t) break;
     if (e.symbol !== symbol) continue;
     if (e.type === 'fill') qty += e.side === 'buy' ? e.qty : -e.qty;
+    else if (e.type === 'ipowin' && applied.has(`${e.code}:${e.draw}`)) qty += e.qty;
     else if (e.type === 'split') qty *= e.ratio;
   }
   return Math.abs(qty) > EPS ? qty : 0;
 }
+// What puts shares of `symbol` in the account: a trade, or a 新股申購 won.
+const holdingEvents = (account, symbol) => account.events.filter(e => (e.type === 'fill' || e.type === 'ipowin') && e.symbol === symbol);
 
 // Credits the dividends and applies the splits of `symbol` that happened
 // while it was held. Yahoo's dividend amounts are adjusted for later splits,
 // so each is scaled back to the shares of its own day. A dividend counts on
 // its ex-date (shares held then) and is paid on its market's usual pay day.
 export function applyCorporateActions(account, symbol, { dividends = [], splits = [] }, { rates, now = Date.now() }) {
-  const fills = account.events.filter(e => e.type === 'fill' && e.symbol === symbol);
+  const fills = holdingEvents(account, symbol);
   if (!fills.length) return { account, added: [] };
   const first = Math.min(...fills.map(e => e.t));
   const info = fills[0];
@@ -1497,6 +1513,10 @@ export function applyCorporateActions(account, symbol, { dividends = [], splits 
     const event = { id, type: 'split', t: sp.date, symbol, ratio: sp.ratio };
     next = { ...next, events: [...next.events, event] };
     added.push(event);
+    // An order waiting from before it is deleted, as a Taiwan broker deletes
+    // its 長效單 on a stock's 除權 or 面額變更 (its price and shares were the old
+    // stock's); the money or shares it held come free.
+    for (const o of next.orders || []) if (o.status === 'open' && o.symbol === symbol && o.t < sp.date) next = updateOrder(next, { ...o, status: 'cancelled', reason: 'split', rev: (o.rev || 0) + 1, done: sp.date });
   }
   const rate = rates?.[info.currency];
   if (!rate) return { account: next, added };
@@ -1818,7 +1838,7 @@ export function runPlan(account, plan, run, { price, twd, at = run.t, quote }, n
   let budget = plan.amount;
   let fx = null;
   if (meta.currency !== BASE) {
-    fx = quoteExchange(BASE, meta.currency, plan.amount, rates, true);
+    fx = quoteExchange(BASE, meta.currency, plan.amount, rates, true, at);
     if (!fx?.received) return reject('tooSmall');
     budget = fx.received;
   }
@@ -1833,7 +1853,7 @@ export function runPlan(account, plan, run, { price, twd, at = run.t, quote }, n
   if (fx) {
     // Only what the units need is exchanged: the rest stays in NT$.
     const cost = estimate({ ...meta, side: 'buy', qty, price: ask }).total;
-    const need = amountFor(BASE, meta.currency, cost, rates, true);
+    const need = amountFor(BASE, meta.currency, cost, rates, true, at);
     const r = exchange(next, { from: BASE, to: meta.currency, amount: Math.min(plan.amount, need) }, { rates, fxOpen: true, now: at, id: `plan:${plan.id}:${run.month}` });
     if (r.error) return reject(r.error === 'funds' || r.error === 'unsettled' ? 'funds' : 'tooSmall');
     next = r.account;
@@ -1911,8 +1931,8 @@ function interestDays(from, to) {
 }
 
 // Interest earned on NT$ cash since the last payment, paid on each pay day
-// up to `now`. A payment of NT$20,000 or more has 10% tax withheld and the
-// 2.11% NHI premium taken, as a Taiwan bank would.
+// up to `now`. As a Taiwan bank: 10% tax withheld from a payment over
+// NT$20,000, and the 2.11% NHI premium from one of NT$20,000 or more.
 export function applyCashInterest(account, now = Date.now()) {
   const have = new Set(account.events.filter(e => e.type === 'interest').map(e => e.id));
   let next = account;
@@ -1924,9 +1944,9 @@ export function applyCashInterest(account, now = Date.now()) {
     const paid = next.events.filter(e => e.type === 'interest' && e.t < t).reduce((sum, e) => sum + e.gross, 0);
     const gross = Math.floor(s.cashInterest - paid);
     if (gross < 1) continue;
-    const withheld = gross >= NHI_THRESHOLD ? Math.floor(gross * 0.1) : 0;
-    const nhi = gross >= NHI_THRESHOLD ? Math.floor(gross * NHI_RATE) : 0;
-    const event = { id, type: 'interest', t, currency: BASE, gross, withheld, nhi, net: gross - withheld - nhi, rate: CASH_RATE };
+    // (One rule for every interest payment: stock-savings.mjs incomeTaxes.)
+    const { withheld, nhi, net } = incomeTaxes(gross);
+    const event = { id, type: 'interest', t, currency: BASE, gross, withheld, nhi, net, rate: CASH_RATE };
     next = { ...next, events: [...next.events, event] };
     added.push(event);
   }
