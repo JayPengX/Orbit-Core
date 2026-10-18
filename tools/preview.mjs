@@ -971,7 +971,7 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
       .map(el => `${el.tagName.toLowerCase()}${[...el.classList].map(c => `.${c}`).join('')} (${el.scrollWidth}>${el.clientWidth})`)
   );
   if (slides.length) console.log(`scrolls sideways:\n  ${slides.join('\n  ')}`);
-  // Text that broke onto a second row (TRUTH §10): a short label whose words
+  // Text that broke onto a second row: a short label whose words
   // split over lines, or a row of chips that wrapped. Some rows are made to
   // wrap (a list of tags): read each one against the screenshot.
   const wraps = await page.evaluate(() => {
@@ -1006,7 +1006,7 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
     return [...new Set(out)].slice(0, 25);
   });
   if (wraps.length) console.log(`wraps:\n  ${wraps.join('\n  ')}`);
-  // Text cut short (TRUTH §10: an ellipsis or a clipped edge counts as a
+  // Text cut short (an ellipsis or a clipped edge counts as a
   // wrap): an element whose own text runs past its box, ellipsis or clipped.
   const cuts = await page.evaluate(() => {
     const out = [];

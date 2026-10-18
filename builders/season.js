@@ -1,4 +1,4 @@
-// Which games' data Shared-Data keeps: the owner's rule (2026-10-12, TRUTH §7).
+// Which games' data Shared-Data keeps: the owner's rule (2026-10-12).
 //
 // A league's season is kept whole (every game's and race's result, box score,
 // watch links, win probability, tables, players' and teams' numbers, the

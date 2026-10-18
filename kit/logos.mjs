@@ -2,8 +2,7 @@
 // (Quadra Play and Orbit Sports): ESPN's logo files, TheSportsDB's club
 // and league badges for what ESPN doesn't carry, national flags, and the F1
 // grid's colours. Keys are Quadra Play's league keys (Orbit Sports maps its own
-// to them). Part of the shared kit: edit it in Shared-Proxy/kit, copy it with
-// `node kit/sync.mjs`.
+// to them). Part of the shared kit.
 
 // Strips club-suffix boilerplate so ESPN's "Liverpool" matches Polymarket's
 // "Liverpool FC" and "AFC Bournemouth" matches "Bournemouth".
