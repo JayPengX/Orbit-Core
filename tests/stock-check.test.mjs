@@ -147,3 +147,17 @@ test('a checked record that can\'t be read is checked again from nothing: the sa
   assert.equal(r.cash, 100_000 - buy.total);
   assert.ok(Array.isArray(JSON.parse(d.store.get(`${VERIFIED_COLLECTION}/acct`)).ok));
 });
+
+test("a phone clock set ahead never holds a save back: what it did is counted at the proxy's time", async () => {
+  const d = deps();
+  // A day ahead on the phone: an exchange done "tomorrow".
+  const ex = { id: 'fx:ahead', type: 'fx', t: T + 86_400_000, from: 'TWD', to: 'USD', amount: 32_000, received: 990, twdFrom: 1, twdTo: 32.05 };
+  const r = await check(d, [ex], T + 60_000);
+  assert.equal(r.cash, 100_000 - 32_000, 'the NT$ left at once, not left waiting a day');
+  assert.equal(JSON.parse(d.store.get(`${VERIFIED_COLLECTION}/acct`)).adj['fx:ahead'].t, T + 60_000);
+  // A dividend paid on its day ahead stays ahead (dated by its rule, not by the phone).
+  const div = { id: 'div:2330.TW:x', type: 'div', t: T + 20 * 86_400_000, ex: T - 86_400_000, symbol: '2330.TW', currency: 'TWD', shares: 1, perShare: 1, gross: 1, withheld: 0, nhi: 0, net: 1, twd: 1 };
+  const r2 = await check(d, [ex, div], T + 120_000);
+  assert.equal(JSON.parse(d.store.get(`${VERIFIED_COLLECTION}/acct`)).adj?.[div.id], undefined);
+  assert.equal(r2.cash, 100_000 - 32_000);
+});
