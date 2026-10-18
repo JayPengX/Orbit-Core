@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 // (Every kit module in the loader's import map, at the version noted: listed from the folder, the build tools left out.)
-const KIT_TOOLS = ['apps.mjs', 'link.mjs', 'stamp.mjs', 'sync.mjs', 'preload.mjs'];
+import { KIT_TOOLS } from './preload.mjs';
 const kitMods = (await (await import('node:fs/promises')).readdir(new URL('./', import.meta.url))).filter(f => f.endsWith('.mjs') && !KIT_TOOLS.includes(f)).sort();
 const loader = (await readFile(new URL('./loader.html', import.meta.url), 'utf8')).replace(/f=\[[^\]]*\]/, `f=[${kitMods.map(f => `'${f}'`).join(',')}]`);
 const block = name => loader.slice(loader.indexOf(`<!-- kit:${name}`), loader.indexOf(`<!-- /kit:${name} -->`) + `<!-- /kit:${name} -->`.length);
