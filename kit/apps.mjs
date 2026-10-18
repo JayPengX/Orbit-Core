@@ -26,7 +26,9 @@ const APPS = {
   'Orbit-Words': { site: 'public', mods: ['quadra'], copies: ['lib/quadra.mjs', 'quadra.css', 'boot.js', 'sw-images.js'] },
   'Orbit-Weather': { site: 'public', mods: ['quadra'], copies: ['lib/quadra.mjs', 'quadra.css', 'boot.js'] },
   'Orbit-Transit': { site: 'public', mods: ['quadra'], copies: ['lib/quadra.mjs', 'quadra.css', 'boot.js'] },
-  'Orbit-Class': { site: '.', mods: ['quadra'], copies: ['src/quadra.mjs', 'css/quadra.css'] }
+  'Orbit-Class': { site: '.', mods: ['quadra'], copies: ['src/quadra.mjs', 'css/quadra.css'] },
+  'Slip-Tracker': { site: 'public', mods: ['quadra'], copies: [] },
+  'Passion-Beats': { site: 'public', mods: ['quadra'], copies: [] }
 };
 const CHECKOUT = `      - name: The shared kit (Shared-Proxy/kit), for the tests
         uses: actions/checkout@v4

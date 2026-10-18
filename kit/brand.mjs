@@ -7,7 +7,7 @@
 //           Quadra Pass every app signs in with. A square tile with a gold
 //           corner (the fourth quadrant).
 //   Orbit   everyday tools: Orbit Class, Weather, Transit, Sports, Words,
-//           Slips.
+//           Slips, Beats.
 //           A planet with its ring and a moon.
 //
 // `id` stays what the apps and the pass store under (stock, odds, match,
@@ -28,6 +28,7 @@ export const BRANDS = {
   transit: { family: 'orbit', name: 'Orbit Transit', short: 'Transit', repo: 'Orbit-Transit', from: '#6ee7b7', to: '#064e3b', ink: '#047857', color: '#10b981', role: { zh: '大眾運輸', en: 'Public transport' }, tag: { zh: '全台公車、火車、捷運與 YouBike，一次規劃', en: 'Buses, trains, metros and bikes across Taiwan' } },
   match: { family: 'orbit', name: 'Orbit Sports', short: 'Sports', repo: 'Orbit-Sports', was: 'Quadra-Fixtures', from: '#fdba74', to: '#9a3412', ink: '#c2410c', color: '#ea580c', role: { zh: '賽程與比分', en: 'Scores and schedules' }, tag: { zh: '所有運動的賽程、比分與數據', en: 'Every sport, every match, every stat' } },
   slip: { family: 'orbit', name: 'Orbit Slips', short: 'Slips', repo: 'Slip-Tracker', from: '#fcd34d', to: '#78350f', ink: '#b45309', color: '#d97706', role: { zh: '運彩追蹤', en: 'Ticket tracker' }, tag: { zh: '買了的運彩，即時追蹤：比分、機率、現在價值', en: 'Your sports lottery tickets, followed live' } },
+  beats: { family: 'orbit', name: 'Orbit Beats', short: 'Beats', repo: 'Passion-Beats', from: '#f0abfc', to: '#701a75', ink: '#a21caf', color: '#c026d3', role: { zh: '節拍作曲', en: 'Beat maker' }, tag: { zh: '把你的節拍片段，排成一首首新歌', en: 'Your beat pieces, arranged into new songs' } },
   vocab: { family: 'orbit', name: 'Orbit Words', short: 'Words', repo: 'Orbit-Words', was: 'Quadra-Hub', from: '#f9a8d4', to: '#831843', ink: '#be185d', color: '#db2777', role: { zh: '英文單字', en: 'English words' }, tag: { zh: '背得住的英文單字：大考 6000 字，真人發音', en: 'English words that stay with you' } }
 };
 // Orbit Sports and Orbit Words were Quadra Fixtures and Quadra Hub; their
@@ -64,6 +65,8 @@ export const GLYPHS = {
   vocab: c => `<path d="M64 38 C52 28 34 26 18 30 V100 C34 96 52 98 64 108 C76 98 94 96 110 100 V30 C94 26 76 28 64 38 Z" fill="none" stroke="${c}" stroke-width="10" stroke-linejoin="round"/><path d="M64 38 V106" stroke="${c}" stroke-width="10" stroke-linecap="round"/>`,
   // A ticket torn along its line, a tick on it.
   slip: (c, a = '#16a34a') => `<path d="M24 30 H104 V54 A10 10 0 0 0 104 74 V98 H24 V74 A10 10 0 0 0 24 54 Z" fill="none" stroke="${c}" stroke-width="10" stroke-linejoin="round"/><path d="M48 64 L60 76 L82 50" fill="none" stroke="${a}" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>`,
+  // A waveform: five bars, the middle one tallest, a beat lit on it.
+  beats: (c, a = '#f472b6') => `<path d="M24 52 V76 M44 38 V90 M64 22 V106 M84 38 V90 M104 52 V76" stroke="${c}" stroke-width="12" stroke-linecap="round"/><circle cx="64" cy="64" r="9" fill="${a}"/>`,
   // The pass: a card with its chip.
   pass: (c, a = GOLD) => `<rect x="16" y="32" width="96" height="64" rx="12" fill="none" stroke="${c}" stroke-width="10"/><rect x="30" y="50" width="22" height="16" rx="4" fill="${a}"/><path d="M30 80 H72" stroke="${c}" stroke-width="8" stroke-linecap="round"/>`
 };

@@ -10,6 +10,7 @@
 //   Orbit Sports        match   scores, schedules and stats (was Quadra Fixtures)
 //   Orbit Words         vocab   English words (was Quadra Hub)
 //   Orbit Slips         slip    台灣運彩 tickets followed live (was Slip Tracker)
+//   Orbit Beats         beats   beat pieces arranged into songs (was Passion Beats)
 //
 // The names, colours and marks are brand.mjs's. The Quadra Pass (the
 // account, Plus, the truth about the money, every app and its guide) is the
