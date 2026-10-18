@@ -22,14 +22,22 @@ export const CUT = {
   score: 1.5
 };
 
+// 籃球勝分差 as 台灣運彩 sells it: each team by 1-5 … 21-25 or 26+ (12
+// picks), and since 2024 a 6-pick one, 1-5, 6-10 or 11+ (GM-talk 4609).
+export const BASKETBALL_BANDS = [[1, 5], [6, 10], [11, 15], [16, 20], [21, 25], [26, null]];
+export const BASKETBALL_BANDS6 = [[1, 5], [6, 10], [11, null]];
+// Touchdowns a point scored, NFL (about 2.4 a team on 22 points).
+export const TD_PER_POINT = 0.11;
+
 // Each league's spread of the final margin and total (points), from the usual
-// size of results against the closing line.
+// size of results against the closing line. `bands`: its 勝分差 (none for
+// American football: 運彩 doesn't sell one); `td`: 達陣數大小 sold.
 export const SCORE_SPREAD = {
-  nfl: { margin: 13.5, total: 10.5, bands: [[1, 6], [7, 12], [13, 18], [19, null]], step: 3 },
-  nba: { margin: 12.5, total: 18, bands: [[1, 5], [6, 10], [11, 15], [16, 20], [21, null]], step: 4 },
-  wnba: { margin: 11, total: 14, bands: [[1, 5], [6, 10], [11, 15], [16, null]], step: 4 },
+  nfl: { margin: 13.5, total: 10.5, bands: null, step: 3, td: TD_PER_POINT },
+  nba: { margin: 12.5, total: 18, bands: BASKETBALL_BANDS, bands6: BASKETBALL_BANDS6, step: 4 },
+  wnba: { margin: 11, total: 14, bands: BASKETBALL_BANDS, bands6: BASKETBALL_BANDS6, step: 4 },
   // EuroLeague: shorter games (40 minutes), lower scoring than the NBA.
-  euroleague: { margin: 11, total: 15, bands: [[1, 5], [6, 10], [11, 15], [16, null]], step: 4 }
+  euroleague: { margin: 11, total: 15, bands: BASKETBALL_BANDS, bands6: BASKETBALL_BANDS6, step: 4 }
 };
 
 export function normalCdf(z) {
@@ -141,18 +149,51 @@ export function pointsMarkets(m, { spreadLine, totalLine }) {
       ] });
     }
   }
-  // Winning margin: each team by each band.
-  const bands = [];
-  for (const team of ['home', 'away']) {
-    for (const [lo, hi] of m.spec.bands) {
-      const fair = team === 'home' ? marginBetween(m, lo, hi) : marginBetween({ ...m, margin: -m.margin }, lo, hi);
-      bands.push({ side: `${team}|${lo}`, team, lo, hi, fair });
+  // Winning margin (勝分差): each team by each band; basketball's 6-pick one
+  // as its own market ('margin6'). Both settle as 'margin' (lo, hi).
+  const marginMarket = (market, list) => {
+    const bands = [];
+    for (const team of ['home', 'away']) {
+      for (const [lo, hi] of list) {
+        const fair = team === 'home' ? marginBetween(m, lo, hi) : marginBetween({ ...m, margin: -m.margin }, lo, hi);
+        bands.push({ side: `${team}|${lo}`, team, lo, hi, fair });
+      }
     }
-  }
-  const sum = bands.reduce((s, b) => s + b.fair, 0);
-  out.push({ kind: 'margin', market: 'margin', cut: CUT.bands, picks: bands.map(b => ({ ...b, fair: b.fair / sum })) });
+    const sum = bands.reduce((s, b) => s + b.fair, 0);
+    out.push({ kind: 'margin', market, cut: CUT.bands, picks: bands.map(b => ({ ...b, fair: b.fair / sum })) });
+  };
+  if (m.spec.bands) marginMarket('margin', m.spec.bands);
+  if (m.spec.bands6) marginMarket('margin6', m.spec.bands6);
   // First half: half the margin, a tie as likely as a whole point either way.
   const h = { margin: m.margin / 2, marginSd: m.marginSd / Math.SQRT2 };
+  if (m.spec.td) {
+    // 半場讓分 (American football): the first half's margin around its middle.
+    for (const d of [-1, 0, 1]) {
+      const awayLine = round2(half(h.margin) + d * step);
+      if (Math.abs(awayLine) < 0.5) continue;
+      const awayCover = normalCdf((awayLine - h.margin) / h.marginSd);
+      if (awayCover < 0.04 || awayCover > 0.96) continue;
+      out.push({ kind: 'hrunline', market: `hrl|${awayLine}`, awayLine, giver: awayLine < 0 ? 'away' : 'home', posted: d === 0, steps: Math.abs(d), cut: CUT.twoWay, picks: [
+        { side: 'away', fair: awayCover, line: awayLine },
+        { side: 'home', fair: 1 - awayCover, line: -awayLine }
+      ] });
+    }
+    // 達陣數大小: the game's touchdowns (overtime's too), Poisson on the total.
+    if (m.total != null) {
+      const mean = m.total * m.spec.td;
+      for (const d of [-1, 0, 1]) {
+        const line = Math.floor(mean) + 0.5 + d;
+        if (line < 0.5) continue;
+        let under = 0;
+        for (let k = 0, p = Math.exp(-mean); k <= line; k++, p *= mean / k) under += p;
+        if (under < 0.04 || under > 0.96) continue;
+        out.push({ kind: 'tdtotal', market: `td|${line}`, line, posted: d === 0, steps: Math.abs(d), cut: CUT.twoWay, picks: [
+          { side: 'over', fair: 1 - under },
+          { side: 'under', fair: under }
+        ] });
+      }
+    }
+  }
   const tie = marginBetween(h, 0, 0);
   const home = 1 - normalCdf((0.5 - h.margin) / h.marginSd);
   out.push({ kind: 'half', market: 'half', cut: CUT.threeWay, picks: [

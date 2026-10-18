@@ -321,6 +321,8 @@ function optionId(game, m, pick) {
   }
   return `${game.id}|${m.kind}|${m.market}|${pick.side}`;
 }
+// Handicaps besides the game's own run line (半場讓分, [1-5局]讓分, 讓盤, 讓局): `line` is the pick's.
+export const HCAP_KINDS = new Set(['hrunline', 'f5runline', 'sethcap', 'gamehcap']);
 function marketOptions(game, base, markets, { real = false } = {}) {
   const out = [];
   for (const m of markets) {
@@ -341,11 +343,13 @@ function marketOptions(game, base, markets, { real = false } = {}) {
         ...(real ? { real: true } : {}),
         m,
         pick,
-        settle: { lo: pick.lo, hi: pick.hi, score: pick.score, listed: m.listed, team: pick.team, ht: pick.ht, ft: pick.ft, ...(m.line != null && m.kind !== 'total' ? { line: m.line } : {}) }
+        // A handicap's line is each pick's own (its side's), a total's the market's.
+        settle: { lo: pick.lo, hi: pick.hi, score: pick.score, listed: m.listed, team: pick.team, ht: pick.ht, ft: pick.ft, ...(pick.line != null ? { line: pick.line } : m.line != null && m.kind !== 'total' ? { line: m.line } : {}) }
       };
       if (m.kind === 'runline') Object.assign(o, { runLine: pick.line, awayLine: m.awayLine, giver: m.giver });
+      else if (HCAP_KINDS.has(m.kind)) Object.assign(o, { line: pick.line, awayLine: m.awayLine, giver: m.giver });
       if (m.kind === 'teamtotal') Object.assign(o, { team: m.team, teamLine: m.line });
-      if (m.kind === 'htotal' || m.kind === 'f5total' || m.kind === 'corners') Object.assign(o, { line: m.line });
+      if (m.kind === 'htotal' || m.kind === 'f5total' || m.kind === 'corners' || m.kind === 'tdtotal') Object.assign(o, { line: m.line });
       if (m.kind === 'total') Object.assign(o, { totalLine: m.line, mainLine: m.main });
       out.push(o);
     }
@@ -422,7 +426,7 @@ export function gameOptions(game) {
   // A game settled from its final score alone (schedules.mjs): nothing on a part of it.
   return game.scoreOnly ? out.filter(o => !PART_KINDS.has(o.kind)) : out;
 }
-const PART_KINDS = new Set(['htft', 'htotal', 'f5', 'f5total', 'q1', 'half', 'regulation', 'firstinning', 'inning', 'nextrun']);
+const PART_KINDS = new Set(['htft', 'htotal', 'hrunline', 'f5', 'f5total', 'f5runline', 'q1', 'half', 'regulation', 'firstinning', 'inningtotal', 'inningml', 'inning', 'nextrun', 'tdtotal']);
 
 // ---- The simulated crowd's pool ----------------------------------------------
 
