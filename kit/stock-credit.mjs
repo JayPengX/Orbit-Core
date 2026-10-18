@@ -36,12 +36,38 @@ export const EXTEND_WINDOW = 30 * DAY;
 // the sale money too, both as collateral; the 融券手續費 is 0.08% of the sale.
 export const SHORT_DEPOSIT = 0.9;
 export const SHORT_HANDLING = 0.0008;
-// Day trading (現股當沖): buying then selling the same day needs the account
-// open three months with ten trades in the last year; selling first and
-// buying back the same day, a year open with ten trades. A day-trade short
-// not bought back by the close is bought back for the account.
+// Day trading (現股當沖), TWSE's 當日沖銷作業辦法: either way round (buying
+// then selling the same day, or selling first and buying back), the account
+// open three months with ten trades in the last year, or a credit account
+// (信用帳戶) open, which needs as much. A day-trade short not bought back by
+// the close is bought back for the account.
 export const DAY_TRADE_BUY_FIRST_MONTHS = 3;
-export const DAY_TRADE_SELL_FIRST_MONTHS = 12;
+export const DAY_TRADE_SELL_FIRST_MONTHS = 3;
+// The day's day-trade limit (當沖額度), as a Taiwan broker sets it from what
+// the account is worth: twice its net worth in NT$, in steps of NT$100,000,
+// at least NT$500,000 (a new account's usual 委託額度) and at most
+// NT$50,000,000. Counted on what's sold first (each such order's amount when
+// placed; a cancelled one gives it back); what's bought first is paid in
+// full and needs none.
+export const DAY_TRADE_LIMIT = { multiple: 2, step: 100_000, min: 500_000, max: 50_000_000 };
+export function dayTradeLimit(netWorthTWD) {
+  const { multiple, step, min, max } = DAY_TRADE_LIMIT;
+  const v = Math.floor((Math.max(0, Number(netWorthTWD) || 0) * multiple) / step) * step;
+  return Math.min(max, Math.max(min, v));
+}
+// What of today's limit (Taiwan's day) is used: NT$.
+export function dayTradeUsed(account, now = Date.now()) {
+  const day = localDayOf(now, 'TW');
+  return (account?.orders || [])
+    .filter(o => o.dayShort && (o.status === 'open' || o.status === 'filled') && localDayOf(o.t, 'TW') === day)
+    .reduce((sum, o) => sum + (Number(o.dayTradeTWD) || 0), 0);
+}
+// { limit, used, left } for the day.
+export function dayTradeRoom(account, netWorthTWD, now = Date.now()) {
+  const limit = dayTradeLimit(netWorthTWD);
+  const used = Math.round(dayTradeUsed(account, now));
+  return { limit, used, left: Math.max(0, limit - used) };
+}
 
 const fills = account => (account?.events || []).filter(e => e.type === 'fill' && !e.forced);
 
@@ -85,8 +111,9 @@ export function openCredit(account, limit, netWorthTWD, now = Date.now()) {
 }
 
 // Day trading allowed, and which way.
-export const dayTradeBuyFirst = (account, now = Date.now()) => monthsOpen(account, DAY_TRADE_BUY_FIRST_MONTHS, now) && yearOfTrading(account, now).trades >= CREDIT_MIN_TRADES;
-export const dayTradeSellFirst = (account, now = Date.now()) => monthsOpen(account, DAY_TRADE_SELL_FIRST_MONTHS, now) && yearOfTrading(account, now).trades >= CREDIT_MIN_TRADES;
+const dayTrader = (account, months, now) => creditAccount(account, now).open || (monthsOpen(account, months, now) && yearOfTrading(account, now).trades >= CREDIT_MIN_TRADES);
+export const dayTradeBuyFirst = (account, now = Date.now()) => dayTrader(account, DAY_TRADE_BUY_FIRST_MONTHS, now);
+export const dayTradeSellFirst = (account, now = Date.now()) => dayTrader(account, DAY_TRADE_SELL_FIRST_MONTHS, now);
 
 // What the credit account has out now, in NT$ at cost: 融資 lent and 融券 sold.
 export function creditUsed(valuation) {

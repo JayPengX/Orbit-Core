@@ -223,6 +223,11 @@ Served from this repo's Pages, never copied. Each app's page carries
 | `holidays.mjs` | Taiwan's days off |
 | `sw-images.js` | Other sites' pictures in one shared cache |
 
+**Securities' broker rules** follow Taiwan's real ones (`stock-credit.mjs`):
+現股當沖 either way round after 3 months with 10 trades or with a credit
+account; a daily 當沖額度 on what's sold first, twice net worth in NT$100,000
+steps, NT$500,000 to NT$50,000,000 (`dayTradeRoom`).
+
 **Brand:** `node brand/generate.mjs [id…|site]` writes every app's icons,
 share cards, manifest and page tags. Renamed repos (Passion-Beats,
 Slip-Tracker) are small redirect repos.
