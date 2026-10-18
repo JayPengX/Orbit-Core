@@ -270,10 +270,16 @@ export function settleDate(market, t) {
     const w = next.getUTCDay();
     if (w !== 0 && w !== 6 && tradingDay(market, day)) n--;
   }
-  // 23:59:59 local: UTC of that wall time, from the zone's offset then.
-  const guess = Date.UTC(y, m - 1, d, 23, 59, 59);
-  const off = guess - Date.parse(new Date(guess).toLocaleString('en-US', { timeZone: tz }) + ' UTC');
-  return guess + off;
+  return zonedTime(y, m, d, 23, 59, 59, tz);
+}
+// The moment a wall time in a zone is (`y-m-d hh:mm:ss` there), from the
+// zone's offset at that time. (Read with formatToParts: a locale string
+// parsed back with Date.parse is up to each engine, and Safari's isn't V8's.)
+export function zonedTime(y, m, d, hh, mm, ss, tz) {
+  const guess = Date.UTC(y, m - 1, d, hh, mm, ss);
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: tz, year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric', hourCycle: 'h23' }).formatToParts(guess).map(x => [x.type, x.value]));
+  const shown = Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day), Number(p.hour) % 24, Number(p.minute), Number(p.second));
+  return guess + (guess - shown);
 }
 
 // Half the bid-ask spread, which a market order pays on top of the last

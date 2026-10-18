@@ -16,6 +16,7 @@
 //   1000     74%         70%    NT$1,200萬   (half the price back is a prize)
 //   2000     75%         69%    NT$2,000萬
 import { randomInt } from '#kit/play-lottery.mjs';
+import { seededRandom, prizeAfterTax } from '#kit/play-odds.mjs';
 
 // Prize tiers by price: multiples of the price and their odds (1 in N tickets).
 const TABLES = {
@@ -62,17 +63,9 @@ export function drawPrize(id, rand = Math.random) {
 }
 const cryptoRand = () => randomInt(2 ** 30) / 2 ** 30;
 
-// A small seeded generator, so a card's face is the same every time it's drawn.
-function seeded(seed) {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
+// A small seeded generator (the slip simulator's Mulberry32), so a card's
+// face is the same every time it's drawn.
+const seeded = seededRandom;
 const pickOf = (rand, list) => list[Math.floor(rand() * list.length)];
 const shuffle = (rand, list) => {
   const a = [...list];
@@ -267,7 +260,7 @@ export function buyScratch(account, { id, card }, now = new Date(), { extra = 0,
 export function revealScratch(account, ticketId, now = new Date()) {
   const ticket = (account.tickets || []).find(x => x.id === ticketId);
   if (!ticket || ticket.status !== 'open' || !ticket.card) return account;
-  const net = ticket.prize > 5_000 ? Math.round(ticket.prize * 0.796) : ticket.prize;
+  const net = prizeAfterTax(ticket.prize);
   const t = now.toISOString();
   const ledger = net > 0 && !account.ledger.some(e => e.id === `prize-${ticketId}`) ? [...account.ledger, { id: `prize-${ticketId}`, t, kind: 'prize', amount: net }] : account.ledger;
   return { ...account, updated: t, ledger, tickets: account.tickets.map(x => (x.id === ticketId ? { ...x, status: 'settled', gross: x.prize, prize: net, settledAt: t } : x)) };

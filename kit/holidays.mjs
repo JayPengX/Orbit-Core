@@ -71,11 +71,13 @@ const WORKDAYS = { 2026: [], 2027: [] };
 // The fixed-date holidays, for a year past the list (its in-lieu days and the lunar ones can't be known).
 const FIXED = { '01-01': HOLIDAYS[2026]['01-01'], '02-28': ['和平紀念日', 'Peace Memorial Day'], '04-04': ['兒童節', "Children's Day"], '05-01': ['勞動節', 'Labour Day'], '09-28': ['教師節', "Teachers' Day"], '10-10': ['國慶日', 'National Day'], '10-25': ['光復節', 'Retrocession Day'], '12-25': ['行憲紀念日', 'Constitution Day'] };
 
-// Taiwan's calendar day of a time: 'YYYY-MM-DD'.
+// Taiwan's calendar day of a time: 'YYYY-MM-DD' ('' for no time at all: an
+// invalid date or text is no day, never a thrown error). A date-time string
+// counts as its moment.
 export function twDay(t) {
   if (typeof t === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
-  const ms = t instanceof Date ? t.getTime() : Number(t);
-  return new Date(ms + 8 * 3_600_000).toISOString().slice(0, 10);
+  const ms = t instanceof Date ? t.getTime() : typeof t === 'string' ? Date.parse(t) : Number(t);
+  return Number.isFinite(ms) ? new Date(ms + 8 * 3_600_000).toISOString().slice(0, 10) : '';
 }
 
 export function twHoliday(t) {

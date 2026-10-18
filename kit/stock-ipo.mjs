@@ -27,8 +27,11 @@ export function rocDay(text) {
   if (!m) return null;
   return Date.UTC(Number(m[1]) + 1911, Number(m[2]) - 1, Number(m[3])) - TPE;
 }
+// A figure in TWSE's list, or null: blank (a cell not filled in yet) is
+// no figure, not 0 (Number('') is 0: a blank 實際承銷價 dropped the issue).
 const num = text => {
-  const v = Number(String(text ?? '').replace(/,/g, ''));
+  const s = String(text ?? '').replace(/,/g, '').trim();
+  const v = s ? Number(s) : NaN;
   return Number.isFinite(v) ? v : null;
 };
 
@@ -52,7 +55,8 @@ export function parseIpoList(json) {
     // Shares only: 4-digit codes (6-digit warrants, bonds' letters out), not cancelled.
     if (!/^\d{4}$/.test(code) || /債/.test(kind) || (col.cancel >= 0 && String(r[col.cancel] || '').trim())) continue;
     const [draw, from, to, list] = [rocDay(r[col.draw]), rocDay(r[col.from]), rocDay(r[col.to]), rocDay(r[col.list])];
-    const price = num(r[col.real]) ?? num(r[col.price]);
+    // The final offer price where it's set (未訂出, blank or 0 until then), else the announced one.
+    const price = [num(r[col.real]), num(r[col.price])].find(v => v > 0) ?? null;
     const qty = num(r[col.qty]);
     if (draw == null || from == null || to == null || !(price > 0) || !(qty > 0)) continue;
     const rate = num(r[col.rate]);
@@ -83,5 +87,5 @@ export const ipoDrawKey = (account, s) => `ipo:${account}:${s.code}:${s.draw}`;
 
 // The account's events for a subscription.
 export const ipoApplyEvent = (s, t) => ({ id: `ipo:${s.code}:${s.draw}`, type: 'ipo', t, code: s.code, name: s.name, symbol: s.symbol, market: 'TW', kind: 'stock', currency: 'TWD', price: s.price, qty: s.qty, fee: IPO_FEE, draw: s.draw, list: s.list });
-export const ipoBackEvent = apply => ({ id: `ipoback:${apply.code}:${apply.draw}`, type: 'ipoback', t: apply.draw + DAY + 9 * 3_600_000, code: apply.code, draw: apply.draw, amount: Math.round(apply.price * apply.qty) });
-export const ipoWinEvent = apply => ({ id: `ipowin:${apply.code}:${apply.draw}`, type: 'ipowin', t: (apply.list ?? apply.draw + 7 * DAY) + 9 * 3_600_000, code: apply.code, draw: apply.draw, symbol: apply.symbol, name: apply.name, market: 'TW', kind: 'stock', currency: 'TWD', price: apply.price, qty: apply.qty, fee: IPO_WIN_FEE });
+export const ipoBackEvent = apply => ({ id: `ipoback:${apply.code}:${apply.draw}`, type: 'ipoback', t: ipoBackAt(apply), code: apply.code, draw: apply.draw, amount: Math.round(apply.price * apply.qty) });
+export const ipoWinEvent = apply => ({ id: `ipowin:${apply.code}:${apply.draw}`, type: 'ipowin', t: ipoListAt(apply), code: apply.code, draw: apply.draw, symbol: apply.symbol, name: apply.name, market: 'TW', kind: 'stock', currency: 'TWD', price: apply.price, qty: apply.qty, fee: IPO_WIN_FEE });

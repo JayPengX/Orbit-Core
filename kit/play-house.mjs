@@ -19,8 +19,8 @@
 // even. Cut like every other price (rules.mjs houseCut).
 import { normalizeTeamName, isSoccer, familyOf } from '#kit/play-teams.mjs';
 // The same side under two spellings: the shared kit's (settle.mjs).
-import { sameSide } from '#kit/settle.mjs';
-export { sameSide };
+import { sameSide, sideScore, sideOfGame, sidesMatch } from '#kit/settle.mjs';
+export { sameSide, sideScore, sideOfGame, sidesMatch };
 
 const ESPN_STANDINGS = 'https://site.api.espn.com/apis/v2/sports';
 

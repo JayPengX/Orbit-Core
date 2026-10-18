@@ -21,7 +21,7 @@ import { loadGamePlayers } from '#kit/play-players.mjs';
 export const PROXY_URL = 'https://orbit-workers-proxy.pengzjay.workers.dev';
 // Reading results and the parsers both the phone and the Worker's settling
 // use: the shared kit's (settle.mjs), one copy.
-import { yyyymmdd, parseJsonArray, futureTeamName, sameGame, sameSide, parseOpenF1Flags, parseEspnResults, parseEspnRace, parseEspnPole, parseFutureResult, teamCorners, asiaResult, kambiUnresolvable, kambiInPlay, readOutcomes, F1_FLAG_KINDS } from '#kit/settle.mjs';
+import { yyyymmdd, parseJsonArray, futureTeamName, sameGame, sidesMatch, parseOpenF1Flags, parseEspnResults, parseEspnRace, parseEspnPole, parseFutureResult, teamCorners, asiaResult, kambiUnresolvable, kambiInPlay, readOutcomes, F1_FLAG_KINDS } from '#kit/settle.mjs';
 export { futureTeamName, parseOpenF1Flags, parseEspnResults, parseEspnRace, parseEspnPole, parseFutureResult, teamCorners, asiaResult, kambiUnresolvable, kambiInPlay, F1_FLAG_KINDS };
 const ESPN = 'https://site.api.espn.com/apis/site/v2/sports';
 const GAMMA = 'https://gamma-api.polymarket.com';
@@ -309,9 +309,10 @@ export function attachKambi(games, kambiGames) {
     let flip = false;
     const i = kambiGames.findIndex((k, j) => {
       if (used.has(j) || Math.abs(Date.parse(k.startUtc) - t) > (g.timeTbd ? TBD_MATCH_MS : 12 * 3_600_000)) return false;
-      if (sameSide(k.home.en, g.home) && sameSide(k.away.en, g.away)) return !(flip = false);
-      if (sameSide(k.home.en, g.away) && sameSide(k.away.en, g.home)) return (flip = true);
-      return false;
+      // (Which way round by the surer match: a city's two clubs share a word.)
+      const order = sidesMatch(k.home.en, k.away.en, g.home, g.away);
+      flip = order === 'flip';
+      return Boolean(order);
     });
     if (i < 0) return g;
     used.add(i);
@@ -1085,9 +1086,9 @@ export function attachKambiLive(games, kambiGames) {
     let flip = false;
     const k = kambiGames.find(x => {
       if (x.sport !== g.sport) return false;
-      if (sameSide(x.home, g.home) && sameSide(x.away, g.away)) return !(flip = false);
-      if (sameSide(x.home, g.away) && sameSide(x.away, g.home)) return (flip = true);
-      return false;
+      const order = sidesMatch(x.home, x.away, g.home, g.away);
+      flip = order === 'flip';
+      return Boolean(order);
     });
     if (!k) return g;
     const ml = k.ml && flip ? { ...k.ml, home: k.ml.away, away: k.ml.home } : k.ml;
@@ -1127,7 +1128,7 @@ export function pricedByKambi(game, kambiGames) {
     k =>
       k.sport === game.sport &&
       Math.abs(Date.parse(k.startUtc) - t) < 12 * 3_600_000 &&
-      ((sameSide(k.home.en, game.home) && sameSide(k.away.en, game.away)) || (sameSide(k.home.en, game.away) && sameSide(k.away.en, game.home)))
+      Boolean(sidesMatch(k.home.en, k.away.en, game.home, game.away))
   );
 }
 

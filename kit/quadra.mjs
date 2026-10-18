@@ -187,8 +187,8 @@ export const OVERDRAFT_RATE = 0.01;
 export const overdraft = wallet => Math.max(0, -poolBalance(wallet));
 
 // Quadra Plus and free bets: plus.mjs, shared with the Worker.
-import { PLUS, plusMonth, plusMonths, plusMember, FREEBET, freeBetValue, freeBets } from './plus.mjs';
-export { PLUS, plusMonths, plusMember, FREEBET, freeBetValue, freeBets };
+import { PLUS, plusMonth, plusMonths, plusMember, FREEBET, freeBetValue, freeBets, VIP, vipStakes, vipTier, WELCOME } from './plus.mjs';
+export { PLUS, plusMonths, plusMember, FREEBET, freeBetValue, freeBets, VIP, vipStakes, vipTier, WELCOME };
 // A charge the balance couldn't cover (eco.js `eco:plusfail:<month>`) after
 // the last paid month: the membership lapsed and won't renew until joined again.
 export const plusLapsed = wallet => {
@@ -284,32 +284,8 @@ export const frameOf = (wallet, now = Date.now()) => worn(wallet, 'frame', FRAME
 
 // ---- VIP: free tiers by what's played, with cashback -----------------------------------
 //
-// A Taiwan month's gaming stakes (Play's bets and lottery and scratch
-// tickets, less refunds: `odds` entries of kind stake / lottery / refund)
-// set that month's tier, and the Worker pays the tier's share of them back
-// on the next month's first read (`eco:vip:<month>`, kind 'vip'; eco.js
-// VIP, the same table). Loyalty cashback like a real sportsbook's or
-// casino's: a sliver of the house's cut (every product keeps 14% or more;
-// the top rate is 1.5%), for the players who bring the most.
-export const VIP = {
-  from: '2026-10',
-  tiers: [
-    { id: 'bronze', min: 10_000, back: 0.005, icon: '🥉', zh: '銅卡', en: 'Bronze' },
-    { id: 'silver', min: 50_000, back: 0.008, icon: '🥈', zh: '銀卡', en: 'Silver' },
-    { id: 'gold', min: 150_000, back: 0.012, icon: '🥇', zh: '金卡', en: 'Gold' },
-    { id: 'black', min: 500_000, back: 0.015, icon: '◆', zh: '黑卡', en: 'Black' }
-  ]
-};
-// A month's (YYYY-MM, Taiwan) gaming stakes, whole NT$.
-export function vipStakes(wallet, month) {
-  let sum = 0;
-  for (const e of wallet?.entries || []) {
-    if (e.app !== 'odds' || typeof e.t !== 'number' || plusMonth(e.t) !== month) continue;
-    if (e.kind === 'stake' || e.kind === 'lottery' || e.kind === 'refund') sum -= e.amount;
-  }
-  return Math.max(0, Math.round(sum));
-}
-export const vipTier = stakes => [...VIP.tiers].reverse().find(t => stakes >= t.min) ?? null;
+// The table and a month's stakes are plus.mjs's (VIP, vipStakes, vipTier),
+// one copy for the kit and the Worker that pays the cashback.
 // This month so far: stakes, tier, the cashback it's heading for, the next
 // tier and what's left to reach it; and last month's cashback if paid.
 export function vipStatus(wallet, now = Date.now()) {
@@ -323,9 +299,8 @@ export function vipStatus(wallet, now = Date.now()) {
 // The tier's name alone (a medal emoji before it read as clip art, the owner 2026-10-18).
 export const vipName = (tier, lang = 'zh') => (tier ? (lang === 'en' ? tier.en : tier.zh) : '');
 
-// The welcome offer (eco.js WELCOME): the first paid bet in Play brings a
-// NT$WELCOME.bet free bet (`eco:fb:welcome`), once. Still to come?
-export const WELCOME = { bet: 200 };
+// The welcome offer (WELCOME, plus.mjs; eco.js gives it): the first paid bet
+// in Play brings a NT$WELCOME.bet free bet (`eco:fb:welcome`), once. Still to come?
 export const welcomeDue = wallet => {
   const entries = wallet?.entries || [];
   return !entries.some(e => e.id === 'eco:fb:welcome') && !entries.some(e => e.app === 'odds' && e.kind === 'stake' && e.amount < 0);
@@ -774,8 +749,12 @@ function keptJson(url, key, { ttl, keep }, read) {
     const saved = keep ? (hit?.data !== undefined ? { at: hit.dataAt, data: hit.data } : await persisted(key)) : null;
     if (saved && Date.now() - saved.at < ttl) return ((entry.data = saved.data), (entry.dataAt = saved.at), saved.data);
     let got;
+    let data;
     try {
       got = await read();
+      // (An answer that isn't JSON, cut off or a captive portal's page, is a
+      // failed read like any other: the device's copy answers, nothing saved.)
+      data = typeof got === 'string' ? JSON.parse(got) : got;
     } catch (error) {
       // A fresh read failed: the copy this device has (of any age) is the
       // answer, and it's asked again soon. A league that read fine an hour
@@ -787,7 +766,6 @@ function keptJson(url, key, { ttl, keep }, read) {
       entry.dataAt = saved.at;
       return saved.data;
     }
-    const data = typeof got === 'string' ? JSON.parse(got) : got;
     entry.data = data;
     entry.dataAt = Date.now();
     // Kept on the device off the critical path (a live one once a minute).
@@ -1283,6 +1261,8 @@ function keepStatusStrip() {
     const look = () => `${document.body.className}|${document.body.getAttribute('style') || ''}|${document.body.dataset.theme || ''}|${document.body.dataset.sky || ''}`;
     let seen = look();
     new MutationObserver(() => {
+      // (A test's page torn down under a pending observer: nothing to keep.)
+      if (typeof document === 'undefined' || !document?.body) return;
       const had = document.querySelector('.q-statusbar');
       statusStrip();
       const now = look();
@@ -1290,7 +1270,7 @@ function keepStatusStrip() {
       seen = now;
       syncThemeColor();
     }).observe(document.body, { childList: true, attributes: true, attributeFilter: ['style', 'class', 'data-theme', 'data-sky'] });
-    new MutationObserver(syncThemeColor).observe(document.documentElement, { attributes: true, attributeFilter: ['style', 'class', 'data-theme'] });
+    new MutationObserver(() => typeof document !== 'undefined' && syncThemeColor()).observe(document.documentElement, { attributes: true, attributeFilter: ['style', 'class', 'data-theme'] });
   }
   globalThis.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change', syncThemeColor);
   globalThis.addEventListener?.('load', syncThemeColor);
@@ -3694,19 +3674,60 @@ export function topActions(s, { help = null, refresh = null, extra = null, into 
 }
 
 // Big numbers never wrap: they shrink (to 60% at most) to fit their box.
-// (All reset, then all measured, then all set: one layout, not one a number.)
+// (All reset, then all measured, then all set: one layout, not one a
+// number. Widths are fractional: whole pixels rounded a 64.4px number into
+// a 64px box, which then showed 11,7… instead of shrinking. Text doesn't
+// narrow exactly with its size, −NT$1,052 at 13.2px still 75.9px in a 75px
+// box, so each one shrunk is checked again and stepped down until it fits.)
+// Play's and Securities' own copies were this; `node.__fit` is the text it
+// was last fitted for (watchFit).
+const textWidth = node => {
+  const range = document.createRange();
+  range.selectNodeContents(node);
+  return range.getBoundingClientRect().width;
+};
 export function fitNumbers(nodes) {
   const list = [...nodes];
-  for (const el of list) el.style.fontSize = '';
-  const fits = list.map(el => {
-    const box = el.parentElement?.clientWidth || 0;
-    const wide = el.scrollWidth;
-    return box && wide > box ? { box, wide, base: parseFloat(getComputedStyle(el).fontSize) } : null;
+  for (const node of list) {
+    node.style.fontSize = '';
+    node.__fit = node.textContent;
+  }
+  const sizes = list.map(node => {
+    const box = node.getBoundingClientRect().width;
+    const need = textWidth(node);
+    if (!box || need <= box) return null;
+    const full = parseFloat(getComputedStyle(node).fontSize);
+    return Math.max(full * 0.6, Math.floor(((full * (box - 0.5)) / need) * 10) / 10);
   });
-  list.forEach((el, i) => {
-    const f = fits[i];
-    if (f) el.style.fontSize = `${Math.max(f.base * 0.6, (f.base * f.box) / f.wide - 0.5)}px`;
+  list.forEach((node, i) => sizes[i] && (node.style.fontSize = `${sizes[i]}px`));
+  list.forEach((node, i) => {
+    if (!sizes[i]) return;
+    const floor = sizes[i] * 0.85;
+    for (let size = sizes[i]; size > floor && textWidth(node) > node.getBoundingClientRect().width - 0.5; ) node.style.fontSize = `${(size -= 0.4)}px`;
   });
+}
+// Keeps every `selector` number fitted: when its text changes (only those
+// new or changed since they were last fitted: every one on every redraw was
+// most of a tap's time), when its box resizes, and once the fonts load (a
+// number fitted before its font came widens while its box doesn't move).
+// `roots`: where to watch for redraws (the page by default).
+export function watchFit(selector, { roots = null } = {}) {
+  if (typeof ResizeObserver !== 'function' || typeof MutationObserver !== 'function' || typeof document === 'undefined') return () => {};
+  const resized = new ResizeObserver(entries => fitNumbers(entries.map(e => e.target)));
+  const seen = new WeakSet();
+  const watch = new MutationObserver(() => {
+    const nodes = [...document.querySelectorAll(selector)].filter(node => node.__fit !== node.textContent);
+    for (const node of nodes) if (!seen.has(node)) (seen.add(node), resized.observe(node));
+    if (nodes.length) fitNumbers(nodes);
+  });
+  for (const root of roots || [document.body]) if (root) watch.observe(root, { childList: true, subtree: true, characterData: true });
+  const fonts = () => fitNumbers(document.querySelectorAll(selector));
+  document.fonts?.addEventListener?.('loadingdone', fonts);
+  return () => {
+    watch.disconnect();
+    resized.disconnect();
+    document.fonts?.removeEventListener?.('loadingdone', fonts);
+  };
 }
 
 // ---- 除錯紀錄: what an app did, for its maker to replay ---------------------------------------

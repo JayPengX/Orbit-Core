@@ -72,3 +72,15 @@ test("MLB's first pitch shows as the hour it's listed at: 17:08 is 17:00, as ESP
   assert.equal(g.start, '2026-10-18T21:00:00.000Z');
   assert.equal(g.firstPitch, '2026-10-18T21:08:00Z');
 });
+
+test("Taiwan's day of anything: a date-time string as its moment, nonsense as no day (never a thrown error)", () => {
+  assert.equal(twHoliday('2026-10-09T23:30:00+08:00').zh, '國慶日補假');
+  assert.equal(twHoliday('2026-10-09T16:30:00Z').zh, '國慶日', 'already the 10th in Taiwan');
+  assert.equal(twHoliday('not a date'), null);
+  assert.equal(twHoliday(NaN), null);
+  assert.equal(twHoliday(new Date('x')), null);
+  assert.equal(twDayOff('2026-10-09'), true);
+  // 2027: 行憲紀念日 on a Saturday, the Friday before off.
+  assert.equal(twHoliday('2027-12-24').zh, '行憲紀念日補假');
+  assert.equal(twWorkday('2027-12-27'), true);
+});

@@ -49,6 +49,12 @@ const norm = name =>
 
 // Top-scoring inning: 0-8 for innings 1-9, 9 for a tie for the most. Extra
 // innings don't count; an inning a team didn't bat counts as 0.
+// Runs, goals or points in a side's first `n` periods (innings, halves,
+// quarters): a period missing or unread counts as 0.
+const firstPeriods = (list, n) => list.slice(0, n).reduce((s, x) => s + (Number(x) || 0), 0);
+// A soccer half is one period; elsewhere a first half is two quarters.
+const halfPeriods = sport => (sport && isSoccer(sport) ? 1 : 2);
+
 export function topInning(awayInnings, homeInnings) {
   const runs = Array.from({ length: 9 }, (_, i) => (Number(awayInnings[i]) || 0) + (Number(homeInnings[i]) || 0));
   const most = Math.max(...runs);
@@ -94,6 +100,9 @@ export function legResult(leg, outcome) {
   const home = Number(outcome.homeScore);
   if (!Number.isFinite(away) || !Number.isFinite(home)) return null;
   const push = diff => (diff === 0 ? 'void' : win(diff > 0));
+  // Each side's period scores (innings, halves, quarters), as read.
+  const a = outcome.awayInnings || [];
+  const h = outcome.homeInnings || [];
   switch (leg.kind) {
     case 'ml':
       return win(leg.side === 'draw' ? away === home : leg.side === 'away' ? away > home : home > away);
@@ -121,8 +130,6 @@ export function legResult(leg, outcome) {
     }
     case 'htft': {
       // Half-time and full-time results, both right.
-      const a = outcome.awayInnings || [];
-      const h = outcome.homeInnings || [];
       if (!a.length && !h.length) return null;
       const res = (x, y) => (y > x ? 'home' : y === x ? 'draw' : 'away');
       return win(res(Number(a[0]) || 0, Number(h[0]) || 0) === leg.ht && res(away, home) === leg.ft);
@@ -132,21 +139,16 @@ export function legResult(leg, outcome) {
       return win(leg.side.split('|').includes(away > home ? 'away' : away === home ? 'draw' : 'home'));
     case 'htotal': {
       // First-half total: one soccer half, two quarters.
-      const a = outcome.awayInnings || [];
-      const h = outcome.homeInnings || [];
       if (!a.length && !h.length) return null;
-      const periods = leg.sport && isSoccer(leg.sport) ? 1 : 2;
-      const sum = list => list.slice(0, periods).reduce((s, x) => s + (Number(x) || 0), 0);
-      const pts = sum(a) + sum(h);
+      const periods = halfPeriods(leg.sport);
+      const pts = firstPeriods(a, periods) + firstPeriods(h, periods);
       return push(leg.side === 'over' ? pts - leg.line : leg.line - pts);
     }
     case 'f5total': {
       // Runs in the first five innings.
-      const a = outcome.awayInnings || [];
-      const h = outcome.homeInnings || [];
       // A final shorter than five innings (called off early): the stake back.
       if (a.length < 5 || h.length < 5) return outcome.status === 'final' ? 'void' : null;
-      const runs = [...a.slice(0, 5), ...h.slice(0, 5)].reduce((s, x) => s + (Number(x) || 0), 0);
+      const runs = firstPeriods(a, 5) + firstPeriods(h, 5);
       return push(leg.side === 'over' ? runs - leg.line : leg.line - runs);
     }
     case 'goalbands':
@@ -157,18 +159,15 @@ export function legResult(leg, outcome) {
     case 'regulation': {
       // Part of the game, from the period scores: the first half (one soccer
       // half, two quarters), the first five innings, or hockey's three periods.
-      const periods = leg.kind === 'f5' ? 5 : leg.kind === 'regulation' ? 3 : leg.kind === 'q1' || (leg.sport && isSoccer(leg.sport)) ? 1 : 2;
-      const a = outcome.awayInnings || [];
-      const h = outcome.homeInnings || [];
+      const periods = leg.kind === 'f5' ? 5 : leg.kind === 'regulation' ? 3 : leg.kind === 'q1' ? 1 : halfPeriods(leg.sport);
       if (!a.length && !h.length) return null;
-      const sum = list => list.slice(0, periods).reduce((s, x) => s + (Number(x) || 0), 0);
-      const pa = sum(a);
-      const ph = sum(h);
+      const pa = firstPeriods(a, periods);
+      const ph = firstPeriods(h, periods);
       return win(leg.side === 'draw' ? pa === ph : leg.side === 'away' ? pa > ph : ph > pa);
     }
     case 'firstinning': {
-      if (!outcome.awayInnings?.length) return null;
-      const runs = (Number(outcome.awayInnings[0]) || 0) + (Number(outcome.homeInnings?.[0]) || 0);
+      if (!a.length) return null;
+      const runs = firstPeriods(a, 1) + firstPeriods(h, 1);
       return win((runs > 0) === (leg.side === 'yes'));
     }
     case 'nextrun': {
@@ -186,8 +185,8 @@ export function legResult(leg, outcome) {
       return push(leg.side === 'over' ? n - leg.line : leg.line - n);
     }
     case 'inning':
-      if (!outcome.awayInnings?.length) return null;
-      return win(topInning(outcome.awayInnings, outcome.homeInnings || []) === leg.inning);
+      if (!a.length) return null;
+      return win(topInning(a, h) === leg.inning);
     default:
       return null;
   }
@@ -279,12 +278,35 @@ export function sameGame(a, b) {
 }
 // The same side under two spellings (Kambi's, a league's own, ESPN's): equal,
 // one inside the other, or a shared long word ("Rakuten Monkeys" / "Rakuten").
-export function sameSide(a, b) {
+// sideScore says how surely: 3 equal, 2 one inside the other, 1 a shared
+// word, 0 not. A shared word alone is the weakest: a city's two clubs share
+// one (Chicago's Cubs and White Sox, Manchester's, Madrid's, New York's), so
+// which side a name is, and which way round two listings of a game are, go
+// by the surer match (sideOfGame, sidesMatch), never by any match at all.
+export function sideScore(a, b) {
   const [x, y] = [normalizeTeamName(a), normalizeTeamName(b)];
-  if (!x || !y) return false;
-  if (x === y || x.includes(y) || y.includes(x)) return true;
+  if (!x || !y) return 0;
+  if (x === y) return 3;
+  if (x.includes(y) || y.includes(x)) return 2;
   const words = new Set(x.split(' ').filter(w => w.length >= 4));
-  return y.split(' ').some(w => w.length >= 4 && words.has(w));
+  return y.split(' ').some(w => w.length >= 4 && words.has(w)) ? 1 : 0;
+}
+export const sameSide = (a, b) => sideScore(a, b) > 0;
+// Which of a game's two sides a name is: 'home', 'away', or null (neither, or
+// both alike).
+export function sideOfGame(name, home, away) {
+  const h = sideScore(name, home);
+  const a = sideScore(name, away);
+  return h > a ? 'home' : a > h ? 'away' : null;
+}
+// Two listings of a game's sides: in the same order ('same'), crossed
+// ('flip'), or not the same two sides (null). Each side must match; the
+// order that matches more surely wins (the same order on a tie).
+export function sidesMatch(xHome, xAway, yHome, yAway) {
+  const pair = (p, q) => (p > 0 && q > 0 ? p + q : 0);
+  const same = pair(sideScore(xHome, yHome), sideScore(xAway, yAway));
+  const cross = pair(sideScore(xHome, yAway), sideScore(xAway, yHome));
+  return !same && !cross ? null : same >= cross ? 'same' : 'flip';
 }
 // Who scored each run of a game, in order, from ESPN's scoring plays (each
 // carries the score after it): ['home', 'home', 'away', …].
@@ -397,7 +419,9 @@ export function parseFutureResult(events) {
     const name = futureTeamName(m);
     const outcomes = parseJsonArray(m.outcomes);
     const prices = parseJsonArray(m.outcomePrices);
-    const yes = Number(prices?.[outcomes?.findIndex(o => /^yes$/i.test(o)) ?? 0]);
+    // (Outcomes that can't be read are no answer: never the first price taken as Yes.)
+    const at = Array.isArray(outcomes) ? outcomes.findIndex(o => /^yes$/i.test(o)) : -1;
+    const yes = at >= 0 ? Number(prices?.[at]) : NaN;
     if (name && yes >= 0.99) return { status: 'final', winner: name };
   }
   return { status: 'pending' };
@@ -601,7 +625,7 @@ export async function readOutcomes(legs, { read, keptKambi = async () => null, n
       if (league?.schedule?.asia && !leg.kambiId) {
         const t = Date.parse(leg.start);
         const games = await asiaMonth(page, league.schedule.asia, asiaMonthOf(t)).catch(() => []);
-        const g = games.find(x => Math.abs(Date.parse(x.start) - t) < 12 * 3_600_000 && sameSide(x.home?.en, leg.home) && sameSide(x.away?.en, leg.away));
+        const g = games.find(x => Math.abs(Date.parse(x.start) - t) < 12 * 3_600_000 && sidesMatch(x.home?.en, x.away?.en, leg.home, leg.away) === 'same');
         if (g) out.set(leg.id, asiaResult(g));
         return;
       }
