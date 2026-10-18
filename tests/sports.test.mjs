@@ -450,3 +450,13 @@ test("Play's month boards come trimmed to what the board reads, the same games a
   const day = await get(`https://proxy.test/sports-proxy?url=${encodeURIComponent('https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard?dates=20261116')}&trim=espn-board`);
   assert.notEqual(day.headers.get('X-Sports-Proxy-Cache-Tier'), 'board-month');
 });
+
+test("espn-leaders: basketball's and baseball's leaders and football's scorers, each leader's number, person and club only", async () => {
+  const { trimEspnLeaders } = await import('../sports.js');
+  const athlete = { id: '1', displayName: 'Luka Doncic', shortName: 'L. Doncic', headshot: { href: 'h.png' }, links: [{ x: 'big' }], birthPlace: {} };
+  const v3 = trimEspnLeaders({ requestedSeason: { year: 2026, displayName: '2025-26', type: {} }, leaders: { categories: [{ name: 'pointsPerGame', displayName: 'Points', leaders: [{ value: 33.5, displayValue: '33.5', athlete, team: { id: '13', logos: [] } }] }] } });
+  assert.deepEqual(v3, { season: { year: 2026, displayName: '2025-26' }, categories: [{ name: 'pointsPerGame', leaders: [{ value: 33.5, displayValue: '33.5', team: { id: '13' }, athlete: { id: '1', displayName: 'Luka Doncic', shortName: 'L. Doncic', headshot: 'h.png' } }] }] });
+  const soccer = trimEspnLeaders({ season: { year: 2026, displayName: '2026-27 English Premier League' }, stats: [{ name: 'goalsLeaders', leaders: [{ value: 6, displayValue: 'Matches: 6, Goals: 6', athlete: { ...athlete, team: { id: '382' } } }] }] });
+  assert.equal(soccer.categories[0].leaders[0].team.id, '382');
+  assert.deepEqual(trimEspnLeaders({ results: [] }), { results: [] }, 'not a leaders page: as it was');
+});
