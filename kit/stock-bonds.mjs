@@ -20,11 +20,11 @@ export const ISSUERS = {
     live: [[0.25, '^IRX'], [2, '2YY=F'], [5, '^FVX'], [10, '^TNX'], [30, '^TYX']]
   },
   TW: {
-    zh: '中央政府公債', en: 'Taiwan government bond', flag: '🇹🇼', currency: 'TWD', face: 100_000, freq: 1, tax: 0.1, tz: 'Asia/Taipei', hours: [9, 13.5],
+    zh: '台灣公債', en: 'Taiwan govt', flag: '🇹🇼', currency: 'TWD', face: 100_000, freq: 1, tax: 0.1, tz: 'Asia/Taipei', hours: [9, 13.5],
     reference: [[2, 1.45], [5, 1.55], [10, 1.7], [20, 1.85], [30, 1.95]]
   },
   JP: {
-    zh: '日本公債', en: 'Japanese government bond', flag: '🇯🇵', currency: 'JPY', face: 100_000, freq: 2, tax: 0.15315, tz: 'Asia/Tokyo', hours: [9, 15],
+    zh: '日本公債', en: 'Japan govt', flag: '🇯🇵', currency: 'JPY', face: 100_000, freq: 2, tax: 0.15315, tz: 'Asia/Tokyo', hours: [9, 15],
     reference: [[2, 1.0], [5, 1.3], [10, 1.9], [20, 2.6], [30, 3.0]]
   },
   DE: {
@@ -69,9 +69,10 @@ export const BONDS = Object.fromEntries(
   LIST.map(([id, issuer, coupon, maturity]) => [id, { id, issuer, coupon, maturity: Date.parse(`${maturity}T00:00:00Z`), ...ISSUERS[issuer] }])
 );
 
+// (English in the market's shorthand, 10Y and 3M, so a name fits a phone's row.)
 export function bondName(bond, locale) {
   const years = Math.max(0, (bond.maturity - Date.now()) / YEAR);
-  const term = years < 1 ? (locale === 'zh' ? `${Math.round(years * 12)} 個月` : `${Math.round(years * 12)}-month`) : locale === 'zh' ? `${Math.round(years)} 年` : `${Math.round(years)}-year`;
+  const term = years < 1 ? (locale === 'zh' ? `${Math.round(years * 12)} 個月` : `${Math.round(years * 12)}M`) : locale === 'zh' ? `${Math.round(years)} 年` : `${Math.round(years)}Y`;
   const date = new Date(bond.maturity).toISOString().slice(0, 7).replace('-', '/');
   const issuer = locale === 'zh' ? bond.zh : bond.en;
   if (!bond.coupon) return locale === 'zh' ? `${issuer} ${term}國庫券（${date} 到期）` : `${issuer} ${term} bill (${date})`;
