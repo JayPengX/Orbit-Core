@@ -341,25 +341,37 @@ test('a free bet pays only its winnings; a slip refunded while lost has had its 
   assert.equal(plus.slips[0].payout, 100 + 700 * 1.075 - 0.5);
 });
 
-test("Taiwan's withholding: each combination over NT$5,000 taxed on its own; the ticket capped at NT$20 million", () => {
-  assert.equal(afterTax(5_000), 5_000);
-  assert.ok(Math.abs(afterTax(5_001) - 5_001 * 0.796) < 1e-9);
+test("台灣運彩's withholding (115.6.8): 20% only when a combination's NT$10 單注 wins over NT$5,000 (odds over 500), no stamp duty for a member", () => {
+  // §29: per 單注, not per combination: NT$1,000 at 6.0 pays NT$6,000 whole.
+  assert.equal(afterTax(6_000, 1_000), 6_000);
+  assert.deepEqual(settleSlip({ legs: [{ odds: 6, result: 'won' }], sizes: [1], stake: 1_000 }), { gross: 6_000, net: 6_000, taxed: 0 });
+  // Odds of exactly 500: a 單注 wins NT$5,000, not over it.
+  assert.equal(afterTax(50_000, 100), 50_000);
+  // NT$100 at 600: a 單注 wins NT$6,000, so 20% (§31: no 4‰ stamp duty for a member).
+  assert.equal(afterTax(60_000, 100), 48_000);
+  assert.deepEqual(settleSlip({ legs: [{ odds: 600, result: 'won' }], sizes: [1], stake: 100 }), { gross: 60_000, net: 48_000, taxed: 1 });
+  // A parlay at 20 × 30 = 600: taxed; its 2-pick combinations of a system each judged on their own.
+  const par = settleSlip({ legs: [{ odds: 20, result: 'won', gameId: 'a' }, { odds: 30, result: 'won', gameId: 'b' }], sizes: [2], stake: 10 });
+  assert.deepEqual(par, { gross: 6_000, net: 4_800, taxed: 1 });
+  const sys = settleSlip({ legs: [{ odds: 20, result: 'won', gameId: 'a' }, { odds: 30, result: 'won', gameId: 'b' }, { odds: 10, result: 'won', gameId: 'c' }], sizes: [2], stake: 100 });
+  assert.equal(sys.taxed, 1, '600 taxed; 200 and 300 not');
+  assert.equal(sys.net, 60_000 * 0.8 + 20_000 + 30_000);
+  // The boost counts: a 3-pick parlay at 7.9 × 7.9 × 7.9 ≈ 493 is untaxed, but ≈ 517 with the 5% boost.
+  assert.equal(settleSlip({ legs: [7.9, 7.9, 7.9].map((odds, i) => ({ odds, result: 'won', gameId: String(i) })), sizes: [3], stake: 100 }).taxed, 0);
+  assert.equal(settleSlip({ legs: [7.9, 7.9, 7.9].map((odds, i) => ({ odds, result: 'won', gameId: String(i) })), sizes: [3], stake: 100, boost: 1 }).taxed, 1);
+  // The settle path pays the same, rounded to the dollar (§18).
+  const paid = applyResults(acct([{ ...slipOf([{ odds: 6, gameId: 'a' }]), stake: 1_000, cost: 1_000 }]), 's1', ['won'], new Date('2026-10-02T00:00:00Z'));
+  assert.deepEqual(paid.ledger.map(e => [e.id, e.amount]), [['payout-s1', 6_000]]);
+  const long = applyResults(acct([slipOf([{ odds: 600.55, gameId: 'a' }])]), 's1', ['won'], new Date('2026-10-02T00:00:00Z'));
+  assert.equal(long.slips[0].payout, 48_044, 'NT$60,055 less 20%: 48,044');
+  // Draw games and scratch cards (Taiwan Lottery) still lose 20.4% over NT$5,000 a bet.
   assert.equal(prizeAfterTax(5_000), 5_000);
   assert.equal(prizeAfterTax(5_001), 3_981);
   assert.equal(prizeAfterTax(0), 0);
-  // Two singles of NT$3,000 each: neither is taxed, though they add up past 5,000.
-  const two = settleSlip({ legs: [{ odds: 3, result: 'won', gameId: 'a' }, { odds: 3, result: 'won', gameId: 'b' }], sizes: [1], stake: 1_000 });
-  assert.deepEqual(two, { gross: 6_000, net: 6_000, taxed: 0 });
-  const big = settleSlip({ legs: [{ odds: 10, result: 'won' }], sizes: [1], stake: 1_000 });
-  assert.equal(big.net, 10_000 * 0.796);
-  assert.equal(big.taxed, 1);
-  // A 2-of-3 system: each combination taxed on its own (台灣運彩), so two of three over NT$5,000.
-  const sys = settleSlip({ legs: [{ odds: 3, result: 'won', gameId: 'a' }, { odds: 2, result: 'won', gameId: 'b' }, { odds: 2, result: 'won', gameId: 'c' }], sizes: [2], stake: 1_000 });
-  assert.equal(sys.taxed, 2, 'NT$6,000, 6,000 and 4,000: two over NT$5,000');
-  assert.equal(sys.net, 6_000 * 0.796 * 2 + 4_000);
+  // The ticket's NT$20 million cap.
   const cap = settleSlip({ legs: Array.from({ length: 6 }, (_, i) => ({ odds: 20, result: 'won', gameId: String(i) })), sizes: [6], stake: 1_000 });
   assert.equal(cap.gross, SLIP_RULES.maxPayout);
-  assert.ok(Math.abs(cap.net - SLIP_RULES.maxPayout * 0.796) < 1e-6);
+  assert.ok(Math.abs(cap.net - SLIP_RULES.maxPayout * 0.8) < 1e-6);
   assert.deepEqual(settleSlip({ legs: [{ odds: 3, result: 'void' }], sizes: [1], stake: 100 }), { gross: 100, net: 100, taxed: 0 }, 'a single called off: the stake back');
   assert.deepEqual(settleSlip({ legs: [{ odds: 3, result: 'lost' }], sizes: [1], stake: 100 }), { gross: 0, net: 0, taxed: 0 });
 });
