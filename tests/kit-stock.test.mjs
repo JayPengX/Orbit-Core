@@ -305,7 +305,8 @@ test("Taiwan's close and after-hours sessions", () => {
   assert.equal(pastClose(t, Date.parse('2026-10-16T05:29:59Z')), false);
   assert.equal(pastClose(t, Date.parse('2026-10-16T05:30:00Z')), true);
   assert.equal(afterHours(Date.parse('2026-10-16T05:29:59Z')), null);
-  assert.deepEqual(afterHours(Date.parse('2026-10-16T06:00:00Z')), { from: Date.parse('2026-10-16T05:30:00Z'), match: Date.parse('2026-10-16T06:30:00Z') });
+  assert.deepEqual(afterHours(Date.parse('2026-10-16T06:00:00Z')), { from: Date.parse('2026-10-16T06:00:00Z'), match: Date.parse('2026-10-16T06:30:00Z') }, '盤後定價 from 14:00');
+  assert.deepEqual(afterHours(Date.parse('2026-10-16T05:35:00Z'), true), { from: Date.parse('2026-10-16T05:40:00Z'), match: Date.parse('2026-10-16T06:30:00Z') }, '盤後零股 from 13:40');
   assert.equal(afterHours(Date.parse('2026-10-16T06:30:00Z')), null);
   assert.equal(afterHours(Date.parse('2026-10-09T06:00:00Z')), null, 'a holiday');
   assert.equal(taipeiDay(termDue(Date.parse('2026-08-31T04:00:00Z'))), '2027-02-28', 'six months, the month-end clamp');

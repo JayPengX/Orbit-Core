@@ -118,3 +118,63 @@ test('Taiwan odd lots take limit orders only (盤中 and 盤後零股: 以限價
   assert.equal(SA.placeOrder(acc, { side: 'buy', qty: 1000, type: 'market' }, { quote: tw(100), rates, valuation: ok, now, id: 'w' }).error, undefined, 'whole lots: market is fine');
   assert.equal(SA.placeOrder(acc, { side: 'buy', qty: 5, type: 'market' }, { quote: { ...tw(100), market: 'US', symbol: 'AAPL', currency: 'USD' }, rates: { TWD: 1, USD: 32 }, valuation: ok, now, id: 'u' }).error !== 'oddLotLimit', true);
 });
+
+// TWSE 交易制度: 13:25-13:30 the closing call auction (limit orders only, one
+// match at 13:30 at the close); 盤後零股 orders 13:40-14:30, 盤後定價
+// 14:00-14:30, each matched once at 14:30.
+const taipei = hm => Date.parse(`2026-10-13T${hm}:00+08:00`);
+test("Taiwan's closing call auction: from 13:25 whole lots wait for one match at 13:30, at the close; market orders refused", () => {
+  const acc = SA.newAccount(1_000_000, now - DAY, 'acc');
+  const at = taipei('13:27');
+  // (Yahoo's Taiwan prices run 20 minutes behind: at 13:27 it shows 13:07's.)
+  const late = tw(99, { marketTime: taipei('13:07') });
+  const place = (req, q = late, t = at, id = 'o') => SA.placeOrder(acc, { side: 'buy', qty: 1000, ...req }, { quote: q, rates, valuation: ok, now: t, id });
+  assert.deepEqual(place({ type: 'market' }), { error: 'closingAuction', match: taipei('13:30') });
+  assert.equal(place({ type: 'market' }, late, taipei('13:24')).fill?.price > 0, true, 'before 13:25: continuous');
+  // A limit order placed during it never fills on a price before 13:30.
+  const r = place({ type: 'limit', limit: 100 });
+  assert.equal(r.fill, null);
+  assert.equal(r.order.expires, taipei('14:30'), 'a day order lasts until its closing match is known');
+  // The match is in (the close, 98.5): it fills at the close, dated then.
+  const close = tw(98.5, { marketTime: taipei('13:30') });
+  assert.equal(SA.processOrders(r.account, new Map([['2330.TW', close]]), rates, taipei('13:29')).filled.length, 0, 'still collecting');
+  const done = SA.processOrders(r.account, new Map([['2330.TW', close]]), rates, taipei('13:50'));
+  assert.equal(done.filled[0].price, 98.5);
+  // Over its limit: no match, and it ends unmatched at 14:30.
+  const high = tw(101, { marketTime: taipei('13:30') });
+  assert.equal(SA.processOrders(r.account, new Map([['2330.TW', high]]), rates, taipei('13:50')).filled.length, 0);
+  assert.equal(SA.expireOrders(r.account, taipei('14:30')).expired.length, 1);
+  // An order from before 13:25 still fills on a continuous price shown late.
+  const early = place({ type: 'limit', limit: 98 }, tw(99), taipei('10:00'), 'e');
+  assert.equal(SA.processOrders(early.account, new Map([['2330.TW', tw(97.5, { marketTime: taipei('13:06') })]]), rates, at).filled[0].price, 97.5);
+  // Odd lots (盤中零股, its own auctions to 13:30) aren't in it.
+  assert.equal(SA.closingMatch({ ...r.order, qty: 500 }, close, taipei('13:50')), null);
+});
+
+test("the closing call auction in price bars: a bar from 13:25 is the close, matched at 13:30", () => {
+  const order = { id: 'o', market: 'TW', kind: 'stock', symbol: '2330.TW', side: 'buy', type: 'limit', limit: 100, qty: 1000, t: taipei('10:00'), expires: taipei('14:30') };
+  const bars = [
+    { t: taipei('13:20'), o: 101, h: 101.5, l: 100.5, c: 101 },
+    { t: taipei('13:25'), o: 99.5, h: 99.5, l: 99.5, c: 99.5 }
+  ];
+  assert.deepEqual(SA.backfillPrice(order, bars, taipei('13:50')), { t: taipei('13:30'), price: 99.5 });
+  assert.equal(SA.backfillPrice({ ...order, limit: 99 }, bars, taipei('13:50')), null, 'under the close: no match');
+  assert.equal(SA.backfillPrice(order, bars, taipei('13:29')), null, 'not matched yet');
+  assert.equal(SA.backfillPrice({ ...order, t: taipei('13:31') }, bars, taipei('13:50')), null, 'placed after the close');
+  // Placed during the auction: in the match too.
+  assert.deepEqual(SA.backfillPrice({ ...order, t: taipei('13:27') }, bars, taipei('13:50')), { t: taipei('13:30'), price: 99.5 });
+  // A sell above the close isn't met there (it would have been on the 13:25 bar's high before).
+  assert.equal(SA.backfillPrice({ ...order, side: 'sell', limit: 99.6 }, bars.slice(1), taipei('13:50')), null);
+});
+
+test("Taiwan's after-hours sessions take orders from 13:40 (盤後零股) and 14:00 (盤後定價), both matched at 14:30", () => {
+  const acc = SA.newAccount(1_000_000, now - DAY, 'acc');
+  const place = (qty, t) => SA.placeOrder(acc, { side: 'buy', type: 'limit', limit: 100, qty }, { quote: tw(100), rates, valuation: ok, now: t, id: `o${qty}${t}` });
+  assert.deepEqual(place(1000, taipei('13:35')), { error: 'afterHoursWait', from: taipei('14:00') });
+  assert.deepEqual(place(500, taipei('13:35')), { error: 'afterHoursWait', from: taipei('13:40') });
+  assert.equal(place(500, taipei('13:45')).order.after, taipei('14:30'));
+  assert.equal(place(1000, taipei('13:45')).error, 'afterHoursWait');
+  assert.equal(place(1000, taipei('14:05')).order.after, taipei('14:30'));
+  // After 14:30: an order for the next session, as before.
+  assert.equal(place(1000, taipei('14:35')).order.after, undefined);
+});
