@@ -17,7 +17,7 @@
 //
 // Interest and lending fees are income: a payment over NT$20,000 has 10%
 // withheld (扣繳) and 2.11% supplementary health premium (二代健保).
-import { NHI_RATE, NHI_THRESHOLD } from '#kit/stock-markets.mjs';
+import { NHI_THRESHOLD, nhiPremium } from '#kit/stock-markets.mjs';
 import { isTradingDay } from '#kit/stock-holidays.mjs';
 
 const DAY = 86_400_000;
@@ -56,7 +56,7 @@ export function fullMonths(from, to) {
 export function incomeTaxes(gross) {
   const big = gross > NHI_THRESHOLD;
   const withheld = big ? Math.round(gross * 0.1) : 0;
-  const nhi = gross >= NHI_THRESHOLD ? Math.floor(gross * NHI_RATE) : 0;
+  const nhi = nhiPremium(gross);
   return { withheld, nhi, net: gross - withheld - nhi };
 }
 

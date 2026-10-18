@@ -32,8 +32,8 @@
 // deps: { fsGet, fsWrite, read(url) -> JSON (the data proxy's route), now }.
 
 import { fetchQuotes, fetchBars, fxSymbol, useQuotesReader } from './kit/stock-quotes.mjs';
-import { triggerPrice, backfillPrice, planRuns, planOrderId } from './kit/stock-account.mjs';
-import { IPO_URL, parseIpoList, ipoOpen, ipoDrawn, ipoWon, ipoDrawKey } from './kit/stock-ipo.mjs';
+import { triggerPrice, backfillPrice, closingMatch, planRuns, planOrderId } from './kit/stock-account.mjs';
+import { ipoUrls, parseIpoList, ipoOpen, ipoDrawn, ipoWon, ipoDrawKey } from './kit/stock-ipo.mjs';
 import { tokenSecret } from './quadra-token.js';
 import { parseDoc, changeDoc } from './doc-store.js';
 import { bodyText } from './http.js';
@@ -229,7 +229,7 @@ export async function decideFills(orders, { read, now = Date.now() }) {
     const rate = twd > 0 ? { twd } : {};
     const bars = barsOf.get(o.symbol);
     if (bars) {
-      const hit = backfillPrice({ ...o, t: fromOf(o) }, bars);
+      const hit = backfillPrice({ ...o, t: fromOf(o) }, bars, now);
       if (hit && hit.price > 0) {
         fills[o.id] = { quote: hit.price, t: Math.max(o.t, hit.t), ...rate };
         continue;
@@ -242,15 +242,22 @@ export async function decideFills(orders, { read, now = Date.now() }) {
     // (Past its end, only what met its price before then.)
     const price = q && !(o.expires && now >= o.expires) ? triggerPrice(o, q, now) : null;
     if (!(Number.isFinite(price) && price > 0)) continue;
-    fills[o.id] = { quote: o.lk != null && o.type === 'limit' && !o.after ? o.limit : price, t: now, ...rate };
+    // (Taiwan's closing and after-hours matches are one price for all: the close.)
+    const one = o.after || closingMatch(o, q, now)?.price != null;
+    fills[o.id] = { quote: o.lk != null && o.type === 'limit' && !one ? o.limit : price, t: now, ...rate };
   }
   return { fills, looked };
 }
 
 // ---- 新股申購 (kit/stock-ipo.mjs) ----
-// TWSE's list of subscriptions (the data proxy's copy, kept a while there).
-export async function ipoList(read) {
-  return parseIpoList(await read(IPO_URL));
+// TWSE's list of subscriptions (the data proxy's copy, kept a while there);
+// early in a year last year's too (ipoUrls), so a December draw still
+// resolves in January. This year's must be read; last year's may fail.
+export async function ipoList(read, now = Date.now()) {
+  const [first, ...rest] = ipoUrls(now);
+  const lists = [parseIpoList(await read(first)), ...(await Promise.all(rest.map(u => read(u).then(parseIpoList).catch(() => []))))];
+  const seen = new Set();
+  return lists.flat().filter(s => !seen.has(ipoKeyOf(s)) && seen.add(ipoKeyOf(s)));
 }
 const IPO_KEY = /^\d{4}:\d{10,14}$/;
 export const ipoKeyOf = s => `${s.code}:${s.draw}`;
@@ -273,7 +280,7 @@ async function handleIpo(body, env, headers, session, deps) {
   const now = deps.now();
   const book = readBook(await deps.fsGet(env, FILLS_COLLECTION, session.d));
   if (!keys.length) return deps.json({ seen: {}, drawn: {} }, 200, headers);
-  const list = await ipoList(deps.read).catch(() => []);
+  const list = await ipoList(deps.read, now).catch(() => []);
   const byKey = new Map(list.map(s => [ipoKeyOf(s), s]));
   let changed = false;
   const seen = {};

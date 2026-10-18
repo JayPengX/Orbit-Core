@@ -21,6 +21,16 @@ export const IPO_URL = 'https://www.twse.com.tw/rwd/zh/announcement/publicForm?r
 const DAY = 86_400_000;
 const TPE = 8 * 3_600_000;
 
+// TWSE's list is one calendar year's, by draw day (the default this year's,
+// `&date=YYYY0101` another's): a December draw lists, refunds and starts
+// its five unlimited days in January, after it's gone from this year's
+// list, so for the first IPO_CARRY of a year last year's is read too.
+export const IPO_CARRY = 45 * DAY;
+export function ipoUrls(now = Date.now()) {
+  const y = new Date(now + TPE).getUTCFullYear();
+  return now - (Date.UTC(y, 0, 1) - TPE) < IPO_CARRY ? [IPO_URL, `${IPO_URL}&date=${y - 1}0101`] : [IPO_URL];
+}
+
 // '115/10/22' (民國) → that day's Taipei midnight (ms), or null.
 export function rocDay(text) {
   const m = /^(\d{2,3})\/(\d{1,2})\/(\d{1,2})$/.exec(String(text || '').trim());
@@ -64,6 +74,16 @@ export function parseIpoList(json) {
     out.push({ code, name: String(r[col.name] || '').trim(), symbol: `${code}.${otc ? 'TWO' : 'TW'}`, market: 'TW', kind, ipo: /^初上/.test(kind), from, to, draw, list, price, qty, rate: rate > 0 ? Math.min(1, Math.round(rate * 1e4) / 1e6) : null });
   }
   return out;
+}
+
+// A first listing's listing day (Taipei midnight) for `symbol` in the list
+// (parseIpoList), or null: 初上市 and 初上櫃 (創新板's and 第一上市's too), whose
+// shares trade with no daily price limit for their first five trading days
+// (stock-markets.mjs newListing; a cash offering's shares already trade).
+// Set it on the quote (quote.listed) so the order rules see it.
+export function listedOn(list, symbol) {
+  const s = (list || []).find(x => x.symbol === symbol && /初上/.test(x.kind) && x.list != null);
+  return s ? s.list : null;
 }
 
 // What an application holds: the shares at the offer price and the fee.

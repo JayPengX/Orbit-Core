@@ -154,6 +154,23 @@ function localParts(t, market) {
 }
 export const localDayOf = (t, market) => localParts(t, market).day;
 
+// When a dividend that went ex at `ex` is paid: on `payDay` (Yahoo's
+// calendarEvents.dividendDate, a date: 'YYYY-MM-DD' or its UTC midnight)
+// where it's known, else the market's usual DIV_PAY_DAYS later, moved to
+// its next trading day (a pay day is never a weekend or a holiday). At the
+// ex-date's own time of day.
+export function divPayDate(market, ex, payDay = null) {
+  const day = typeof payDay === 'number' && Number.isFinite(payDay) ? new Date(payDay).toISOString().slice(0, 10) : /^\d{4}-\d{2}-\d{2}$/.test(payDay || '') ? payDay : null;
+  const { day: exDay, minutes } = localParts(ex, market);
+  if (day && day >= exDay) {
+    const [y, m, d] = day.split('-').map(Number);
+    return zonedTime(y, m, d, Math.floor(minutes / 60), minutes % 60, 0, tzOf(market));
+  }
+  let t = ex + divPayDays(market) * 86_400_000;
+  for (let i = 0; i < 30 && !isTradingDay(market, localDayOf(t, market)); i++) t += 86_400_000;
+  return t;
+}
+
 // The price steps an exchange accepts, by price band:
 // - Taiwan (TWSE/TPEx), ETFs finer;
 // - US: a cent (a hundredth of a cent under US$1);
@@ -185,25 +202,41 @@ export const toTick = (price, tick, dir = 0) => {
 };
 
 // Daily price limits: how far from yesterday's close a price may go.
-// Taiwan ±10%; mainland China ±10% (±20% on the STAR Market, 688xxx, and
-// ChiNext, 300xxx/301xxx); Korea ±30%; Japan a fixed yen amount by price
-// band. Orders outside them are refused by the exchange.
+// Taiwan ±10%, but none in a first listing's first five trading days (TWSE
+// 初次上市股票首五個交易日無漲跌幅限制, TPEx's 初次上櫃 the same; quote.listed,
+// its listing day, from stock-ipo.mjs listedOn); mainland China ±10% (±20%
+// on the STAR Market, 688xxx, and ChiNext, 300xxx/301xxx); Korea ±30%;
+// Japan a fixed yen amount by price band. Orders outside them are refused by the exchange.
 const JP_LIMITS = [[100, 30], [200, 50], [500, 80], [700, 100], [1000, 150], [1500, 300], [2000, 400], [3000, 500], [5000, 700], [7000, 1000], [10000, 1500], [15000, 3000], [20000, 4000], [30000, 5000], [50000, 7000], [70000, 10000], [100000, 15000], [150000, 30000], [200000, 40000], [300000, 50000], [500000, 70000], [700000, 100000], [1000000, 150000], [Infinity, 300000]];
-export function limitShare(quote) {
+export const NEW_LISTING_DAYS = 5;
+// Whether `now` is within the first NEW_LISTING_DAYS Taiwan trading days from
+// the listing day `listed` (that day the first).
+export function newListing(listed, now = Date.now()) {
+  if (!(listed > 0) || now < listed) return false;
+  const last = localDayOf(now, 'TW');
+  let n = 0;
+  for (let t = listed, i = 0; i < 40; t += 86_400_000, i++) {
+    const day = localDayOf(t, 'TW');
+    if (day > last) break;
+    if (isTradingDay('TW', day) && ++n > NEW_LISTING_DAYS) return false;
+  }
+  return n > 0;
+}
+export function limitShare(quote, now = Date.now()) {
   if (!quote || !['stock', 'etf', 'bond'].includes(quote.kind)) return null;
-  if (quote.market === 'TW') return 0.1;
+  if (quote.market === 'TW') return newListing(quote.listed, now) ? null : 0.1;
   if (quote.market === 'KR') return 0.3;
   if (quote.market === 'CN') return /^(688|300|301)\d{3}\./.test(quote.symbol || '') ? 0.2 : 0.1;
   return null;
 }
-export function priceLimits(quote) {
+export function priceLimits(quote, now = Date.now()) {
   if (!(quote?.prev > 0)) return null;
   const tick = x => tickSize(quote.market, quote.kind, x);
   if (quote.market === 'JP' && quote.kind === 'stock') {
     const w = bands(quote.prev, JP_LIMITS);
     return { up: quote.prev + w, down: Math.max(tick(1), quote.prev - w) };
   }
-  const share = limitShare(quote);
+  const share = limitShare(quote, now);
   if (!share) return null;
   const up = quote.prev * (1 + share);
   const down = quote.prev * (1 - share);
@@ -448,14 +481,18 @@ export function dealPrice(market, side, price) {
 }
 
 // Taiwan's NHI supplementary premium (二代健保補充保費): 2.11% of any single
-// Taiwan dividend payment of NT$20,000 or more.
+// payment of NT$20,000 or more (a Taiwan dividend, interest, a lending fee),
+// on at most NT$10 million of it, to the dollar with 角 rounded half up
+// (健保署 扣取及繳納補充保險費實務手冊: 以元為單位，角以下四捨五入).
 export const NHI_RATE = 0.0211;
 export const NHI_THRESHOLD = 20_000;
+export const NHI_CAP = 10_000_000;
+export const nhiPremium = gross => (gross >= NHI_THRESHOLD ? Math.round(Math.min(gross, NHI_CAP) * NHI_RATE) : 0);
 
 export function dividendTaxes(market, gross) {
   const m = MARKETS[market] || MARKETS.INTL;
   const withheld = roundCash(gross * (m.withholding || 0), m.currency || 'USD');
-  const nhi = m.nhi && gross >= NHI_THRESHOLD ? Math.floor(gross * NHI_RATE) : 0;
+  const nhi = m.nhi ? nhiPremium(gross) : 0;
   return { withheld, nhi, net: gross - withheld - nhi };
 }
 
