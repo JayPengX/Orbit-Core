@@ -1,6 +1,5 @@
 // Teams in Chinese, as Taiwan writes them, for Orbit Sports and Play alike
-// (copied into both by kit/sync.mjs as lib/names.mjs; never edit an app's
-// copy). The American leagues are city + nickname (the lottery writes both,
+// (both load it from the kit, #kit/names.mjs). The American leagues are city + nickname (the lottery writes both,
 // "匹茲堡海盜"; a row has room for the nickname, "海盜"); clubs elsewhere one
 // name, whatever competition they play in. Also how ELTA's schedule is
 // matched to games (its titles use these names).
@@ -113,6 +112,27 @@ const ASIA = {
 // Asian clubs' short names ("統一7-ELEVEn獅" → 統一獅), for a row.
 const ASIA_SHORT = { '統一7-ELEVEn獅': '統一獅', '橫濱DeNA海灣之星': '橫濱DeNA', '北海道日本火腿鬥士': '火腿', '東北樂天金鷲': '樂天金鷲', '東京養樂多燕子': '養樂多', '廣島東洋鯉魚': '廣島鯉魚', '福岡軟銀鷹': '軟銀鷹', '千葉羅德海洋': '羅德', '埼玉西武獅': '西武獅', '歐力士猛牛': '歐力士' };
 
+// American college football (FBS) by school, as Taiwan's lottery writes them:
+// the school, no nickname ("Florida State Seminoles" → 佛羅里達州立). Matched
+// on the start of ESPN's name, longest school first (Florida State before Florida).
+const COLLEGE = {
+  'Air Force': '空軍官校', Akron: '阿克倫', Alabama: '阿拉巴馬', 'App State': '阿帕拉契州立', 'Appalachian State': '阿帕拉契州立', Arizona: '亞利桑那', 'Arizona State': '亞利桑那州立', Arkansas: '阿肯色', 'Arkansas State': '阿肯色州立', Army: '陸軍官校', Auburn: '奧本',
+  'Ball State': '鮑爾州立', Baylor: '貝勒', 'Boise State': '博伊西州立', 'Boston College': '波士頓學院', 'Bowling Green': '鮑林格林', Buffalo: '水牛城', BYU: '楊百翰', California: '加州柏克萊', Cal: '加州柏克萊', 'Central Michigan': '中密西根', Charlotte: '夏洛特', Cincinnati: '辛辛那提', Clemson: '克萊門森', 'Coastal Carolina': '海岸卡羅來納', Colorado: '科羅拉多', 'Colorado State': '科羅拉多州立',
+  Delaware: '德拉瓦', Duke: '杜克', 'East Carolina': '東卡羅來納', 'Eastern Michigan': '東密西根', FIU: '佛羅里達國際', Florida: '佛羅里達', 'Florida Atlantic': '佛羅里達大西洋', 'Florida State': '佛羅里達州立', 'Fresno State': '弗雷斯諾州立', Georgia: '喬治亞', 'Georgia Southern': '喬治亞南方', 'Georgia State': '喬治亞州立', 'Georgia Tech': '喬治亞理工',
+  "Hawai'i": '夏威夷', Hawaii: '夏威夷', Houston: '休士頓', Illinois: '伊利諾', Indiana: '印第安納', Iowa: '愛荷華', 'Iowa State': '愛荷華州立', 'Jacksonville State': '傑克森維爾州立', 'James Madison': '詹姆斯麥迪遜', Kansas: '堪薩斯', 'Kansas State': '堪薩斯州立', 'Kennesaw State': '肯尼索州立', 'Kent State': '肯特州立', Kentucky: '肯塔基',
+  Liberty: '自由大學', Louisiana: '路易斯安那', 'Louisiana Tech': '路易斯安那理工', 'UL Monroe': '路易斯安那門羅', Louisville: '路易維爾', LSU: '路易斯安那州立', Marshall: '馬歇爾', Maryland: '馬里蘭', Massachusetts: '麻薩諸塞', UMass: '麻薩諸塞', Memphis: '曼菲斯', 'Miami': '邁阿密', 'Miami (OH)': '邁阿密（俄亥俄）', Michigan: '密西根', 'Michigan State': '密西根州立', 'Middle Tennessee': '中田納西', Minnesota: '明尼蘇達', 'Mississippi State': '密西西比州立', Missouri: '密蘇里', 'Missouri State': '密蘇里州立',
+  Navy: '海軍官校', 'NC State': '北卡州立', Nebraska: '內布拉斯加', Nevada: '內華達', 'New Mexico': '新墨西哥', 'New Mexico State': '新墨西哥州立', 'North Carolina': '北卡羅來納', 'North Texas': '北德州', 'Northern Illinois': '北伊利諾', Northwestern: '西北', 'Notre Dame': '聖母', Ohio: '俄亥俄', 'Ohio State': '俄亥俄州立', Oklahoma: '奧克拉荷馬', 'Oklahoma State': '奧克拉荷馬州立', 'Old Dominion': '老道明', 'Ole Miss': '密西西比', Oregon: '奧勒岡', 'Oregon State': '奧勒岡州立',
+  'Penn State': '賓州州立', Pittsburgh: '匹茲堡', Purdue: '普渡', Rice: '萊斯', Rutgers: '羅格斯', 'Sam Houston': '山姆休士頓', 'San Diego State': '聖地牙哥州立', 'San José State': '聖荷西州立', 'San Jose State': '聖荷西州立', SMU: '南方衛理', 'South Alabama': '南阿拉巴馬', 'South Carolina': '南卡羅來納', 'South Florida': '南佛羅里達', 'Southern Miss': '南密西西比', Stanford: '史丹佛', Syracuse: '雪城',
+  TCU: '德州基督教', Temple: '天普', Tennessee: '田納西', Texas: '德州', 'Texas A&M': '德州農工', 'Texas State': '德州州立', 'Texas Tech': '德州理工', Toledo: '托雷多', Troy: '特洛伊', Tulane: '杜蘭', Tulsa: '塔爾薩', UAB: '阿拉巴馬伯明罕', UCF: '中佛羅里達', UCLA: '加州大學洛杉磯', UConn: '康乃狄克', UNLV: '內華達拉斯維加斯', USC: '南加州', Utah: '猶他', 'Utah State': '猶他州立', UTEP: '德州艾爾帕索', UTSA: '德州聖安東尼奧',
+  Vanderbilt: '范德堡', Virginia: '維吉尼亞', 'Virginia Tech': '維吉尼亞理工', 'Wake Forest': '維克森林', Washington: '華盛頓', 'Washington State': '華盛頓州立', 'West Virginia': '西維吉尼亞', 'Western Kentucky': '西肯塔基', 'Western Michigan': '西密西根', Wisconsin: '威斯康辛', Wyoming: '懷俄明'
+};
+const COLLEGE_BY_LENGTH = Object.keys(COLLEGE).sort((a, b) => b.length - a.length);
+// ESPN's "School Nickname" (the lottery's too) → the school in Chinese, or null.
+function collegeZh(name) {
+  const school = COLLEGE_BY_LENGTH.find(s => name === s || name.startsWith(`${s} `));
+  return school ? COLLEGE[school] : null;
+}
+
 const SOCCER = new Set(['soccer']);
 // A team in Chinese: { full, short }, or null when there's no Chinese name.
 // `key` is the league (Play's key; Orbit Sports' own is the same), `sport` its sport.
@@ -121,6 +141,10 @@ export function teamNameZh(key, name, sport = '') {
   const n = normalizeTeamName(name);
   const us = US[key]?.[name] || US_BY_KEY[key]?.[n];
   if (us) return { full: `${us[0]}${us[0] && /^[\d]/.test(us[1]) ? ' ' : ''}${us[1]}`, short: us[1] };
+  if (key === 'ncaaf') {
+    const zh = collegeZh(name);
+    return zh ? { full: zh, short: zh } : null;
+  }
   if (['npb', 'kbo', 'cpbl'].includes(key)) {
     const zh = ASIA[n];
     return zh ? { full: zh, short: ASIA_SHORT[zh] || zh } : null;
@@ -148,6 +172,7 @@ export function teamsByZh(query, most = 6) {
   for (const table of Object.values(US)) for (const [name, [city, nick]] of Object.entries(table)) add(name, `${city}${nick}`);
   for (const [name, zh] of Object.entries(CLUBS)) add(name, zh);
   for (const [name, zh] of Object.entries(ASIA)) add(name, zh);
+  for (const [name, zh] of Object.entries(COLLEGE)) add(name, zh);
   // One English name a team (a club written several ways: the first).
   const seen = new Set();
   return [...out.values()]
