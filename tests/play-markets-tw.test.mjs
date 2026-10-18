@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { legResult, touchdowns } from '../kit/settle.mjs';
-import { pointsModel, pointsMarkets, BASKETBALL_BANDS, fitHockey, goalMarkets } from '../kit/play-markets.mjs';
+import { pointsModel, pointsMarkets, BASKETBALL_BANDS, fitHockey, goalMarkets, baseballMarkets } from '../kit/play-markets.mjs';
 import { parseOffers } from '../kit/play-offers.mjs';
 import { gameOptions } from '../kit/play-board.mjs';
 
@@ -67,4 +67,39 @@ test("hockey sells 正確進球數, not 雙方進球 or goal bands; soccer no dr
   assert.ok(epl.length > 20 && !epl.some(o => o.kind === 'dnb'));
   assert.ok(epl.some(o => o.kind === 'dc'), '雙勝 stays');
   assert.equal(legResult({ sport: 'epl', kind: 'dnb', side: 'home' }, game(1, 1)), 'void', 'an old draw-no-bet pick settles');
+});
+
+test('baseball: 單局大小 and 單局不讓分 on the first inning in place of 首局得分, and [1-5局]讓分; how each settles', () => {
+  const markets = baseballMarkets({ homeWin: 0.6, total: { line: 8.5, overFair: 0.5 } });
+  assert.ok(!markets.some(m => m.kind === 'firstinning'));
+  const it = markets.find(m => m.market === 'itot|1|0.5');
+  const ml = markets.find(m => m.market === 'iml|1');
+  assert.ok(it && ml && it.period === 1 && ml.period === 1);
+  assert.ok(it.picks[0].fair > 0.35 && it.picks[0].fair < 0.65, 'a run in the first about half the time');
+  assert.ok(Math.abs(sum(ml.picks) - 1) < 1e-9);
+  assert.ok(Math.abs(ml.picks.find(p => p.side === 'draw').fair - it.picks[1].fair) < it.picks[0].fair, 'a scoreless first is a 和');
+  const f5 = markets.filter(m => m.kind === 'f5runline');
+  assert.deepEqual(f5.map(m => m.awayLine), [0.5, 1.5], 'the home favourite gives the runs');
+  assert.equal(f5[0].giver, 'home');
+  // The board keeps the inning and the pick's line for settling.
+  const opts = gameOptions({ id: 'b', sport: 'mlb', startUtc: '2026-10-20T23:00:00Z', home: { en: 'A' }, away: { en: 'B' }, draftKings: { home: 0.6, away: 0.4 }, total: { line: 8.5, overFair: 0.5 } });
+  const o = opts.find(x => x.kind === 'f5runline' && x.side === 'home');
+  assert.equal(o.settle.line, -o.awayLine);
+  assert.equal(opts.find(x => x.kind === 'inningml').settle.period, 1);
+  // Settled from the inning's runs.
+  const g = game(4, 5, { awayInnings: [1, 0, 0, 2, 0, 1, 0, 0, 0], homeInnings: [1, 0, 2, 0, 1, 0, 0, 1, 0] });
+  assert.equal(legResult({ kind: 'inningtotal', period: 1, side: 'over', line: 1.5 }, g), 'won');
+  assert.equal(legResult({ kind: 'inningml', period: 1, side: 'draw' }, g), 'won');
+  assert.equal(legResult({ kind: 'inningml', period: 1, side: 'home' }, g), 'lost');
+  assert.equal(legResult({ kind: 'inningml', period: 1, side: 'home' }, game(4, 3)), null, 'innings unread: not decided');
+  assert.equal(legResult({ kind: 'f5runline', side: 'home', line: -0.5 }, g), 'won', '3-4 after five');
+  assert.equal(legResult({ kind: 'f5runline', side: 'home', line: -1.5 }, g), 'lost');
+  assert.equal(legResult({ kind: 'f5runline', side: 'home', line: -1 }, g), 'void');
+  assert.equal(legResult({ kind: 'f5runline', side: 'home', line: -0.5 }, game(1, 0, { awayInnings: [1, 0, 0, 0], homeInnings: [0, 0, 0, 0] })), 'void', 'called before five');
+  assert.equal(legResult({ kind: 'firstinning', side: 'yes' }, g), 'won', 'an old 首局得分 pick settles');
+  // Kambi's first-inning total is read as 單局大小.
+  const ou = { criterion: { englishLabel: 'Total Runs - Inning 1' }, betOfferType: { englishName: 'Over/Under' }, outcomes: [{ type: 'OT_OVER', line: 500, odds: 2000 }, { type: 'OT_UNDER', line: 500, odds: 1800 }] };
+  const [k] = parseOffers({ events: [{ homeName: 'A', awayName: 'B' }], betOffers: [ou] }, { sport: 'mlb', home: { en: 'A' }, away: { en: 'B' } }).markets;
+  assert.equal(k.kind, 'inningtotal');
+  assert.equal(k.market, 'itot|1|0.5');
 });
