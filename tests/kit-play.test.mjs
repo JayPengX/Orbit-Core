@@ -12,6 +12,8 @@ import { CARD_ORDER, face, facePays, tiersOf, drawPrize, buyScratch, revealScrat
 import { propResult } from '../kit/play-props.mjs';
 import { parseOffers } from '../kit/play-offers.mjs';
 import { parseKambiInPlay } from '../kit/play-kambi.mjs';
+import { fitHockey, hockeyWinner, goalMarkets } from '../kit/play-markets.mjs';
+import { liveMarkets, liveGoals } from '../kit/play-live.mjs';
 import { attachKambi, pricedByKambi } from '../kit/play-sources.mjs';
 
 const game = (awayScore, homeScore, extra = {}) => ({ status: 'final', awayScore, homeScore, ...extra });
@@ -235,7 +237,7 @@ test("a city's two clubs: which side a name is goes by the surer match, never by
   assert.deepEqual(tt, { home: 4.5, away: 3.5 }, "ESPN's home is the White Sox");
 });
 
-test("hockey's 讓分 and 大小 are on 60 minutes: overtime and the shootout left out, and priced from Kambi's regular-time lines", () => {
+test("every hockey market is on 60 minutes (overtime and the shootout left out), 不讓分 three ways, priced so", () => {
   // 2-2 after three periods, won 3-2 in overtime (ESPN's linescores: P1, P2, P3, OT).
   const ot = game(3, 2, { awayInnings: [1, 0, 1, 1], homeInnings: [0, 1, 1, 0] });
   const nhl = leg => legResult({ sport: 'nhl', ...leg }, ot);
@@ -249,9 +251,29 @@ test("hockey's 讓分 and 大小 are on 60 minutes: overtime and the shootout le
   const so = game(4, 3, { awayInnings: [2, 0, 1, 0, 1], homeInnings: [1, 1, 1, 0, 0] });
   assert.equal(legResult({ sport: 'nhl', kind: 'total', side: 'under', line: 6.5 }, so), 'won', '6 in 60 minutes');
   assert.equal(legResult({ sport: 'nhl', kind: 'total', side: 'over', line: 4.5 }, game(3, 2)), null, 'periods unread: not decided');
-  // The winner still counts overtime; other sports their whole game.
-  assert.equal(nhl({ kind: 'ml', side: 'away' }), 'won');
+  // Every other market too: 不讓分 three ways (a 60-minute tie is 和局), 雙方進球, goal bands, margin, 單雙.
+  assert.equal(nhl({ kind: 'ml', side: 'draw', threeWay: true }), 'won');
+  assert.equal(nhl({ kind: 'ml', side: 'away', threeWay: true }), 'lost');
+  assert.equal(nhl({ kind: 'ml', side: 'away' }), 'void', 'a two-way winner bought before: a tie not on offer');
+  assert.equal(legResult({ sport: 'nhl', kind: 'ml', side: 'away', threeWay: true }, game(4, 2, { awayInnings: [2, 1, 1], homeInnings: [1, 0, 1] })), 'won');
+  assert.equal(nhl({ kind: 'btts', side: 'yes' }), 'won');
+  assert.equal(legResult({ sport: 'nhl', kind: 'btts', side: 'yes' }, game(1, 0, { awayInnings: [0, 0, 0, 1], homeInnings: [0, 0, 0, 0] })), 'lost', '0-0 in 60 minutes');
+  assert.equal(nhl({ kind: 'goalbands', lo: 0, hi: 4 }), 'won');
+  assert.equal(nhl({ kind: 'margin', team: 'away', lo: 1, hi: 1 }), 'lost');
+  assert.equal(nhl({ kind: 'oddeven', side: 'even' }), 'won');
+  // Other sports: their whole game.
   assert.equal(legResult({ sport: 'nba', kind: 'total', side: 'over', line: 4.5 }, ot), 'won');
+  // Priced on 60 minutes: three ways, summing to one; DraftKings' total (overtime's goal in it) read as fewer 60-minute goals than Kambi's regular-time line.
+  const means = fitHockey(0.55, { line: 6.5, overFair: 0.5 });
+  const reg = fitHockey(0.55, { line: 6.5, overFair: 0.5, regulation: true });
+  assert.ok(means.home + means.away < reg.home + reg.away);
+  const w = hockeyWinner(means);
+  assert.ok(Math.abs(w.away + w.draw + w.home - 1) < 1e-6 && w.draw > 0.15 && w.home > w.away);
+  const kinds = new Set(goalMarkets(means, { family: 'hockey', totalLine: 6.5 }).map(m => m.kind));
+  assert.ok(!kinds.has('regulation'), 'the 60-minute winner is the 不讓分 itself');
+  const liveWin = liveMarkets(liveGoals({ means, awayScore: 2, homeScore: 2, share: 0.1 }), { sport: 'nhl', awayScore: 2, homeScore: 2 }).filter(m => m.kind === 'ml');
+  assert.deepEqual(liveWin.map(m => m.side), ['home', 'draw', 'away']);
+  assert.ok(liveWin.find(m => m.side === 'draw').fair > 0.5, 'level late on: a tie the likeliest');
   // Kambi's lines read: the regular-time ones (the overtime ones aren't how it's settled).
   const line = (label, over) => ({ criterion: { englishLabel: label }, betOfferType: { englishName: 'Over/Under' }, outcomes: [{ type: 'OT_OVER', line: over, odds: 1900 }, { type: 'OT_UNDER', line: over, odds: 1900 }] });
   const event = { events: [{ homeName: 'Boston Bruins', awayName: 'Detroit Red Wings' }], betOffers: [line('Total Goals - Including Overtime and Penalty Shootout', 6500), line('Total Goals - Regular Time', 5500)] };
@@ -259,6 +281,9 @@ test("hockey's 讓分 and 大小 are on 60 minutes: overtime and the shootout le
   assert.deepEqual(markets.filter(m => m.kind === 'total').map(m => m.line), [5.5]);
   const live = parseKambiInPlay({ events: [{ event: { id: 1, state: 'STARTED', homeName: 'Boston Bruins', awayName: 'Detroit Red Wings', start: '2026-10-18T23:00:00Z' }, betOffers: [line('Total Goals - Including Overtime and Penalty Shootout', 6500), line('Total Goals - Regular Time', 5500), line('Total Goals - Period 2', 1500)] }] }, 'nhl');
   assert.equal(live[0].total.line, 5.5);
+  const match = (label, odds) => ({ criterion: { englishLabel: label }, betOfferType: { englishName: 'Match' }, outcomes: odds.map(([type, o]) => ({ type, odds: o })) });
+  const [ko] = parseKambiInPlay({ events: [{ event: { id: 1, state: 'STARTED', homeName: 'Boston Bruins', awayName: 'Detroit Red Wings', start: '2026-10-18T23:00:00Z' }, betOffers: [match('Moneyline - Including Overtime and penalty shootout', [['OT_ONE', 1800], ['OT_TWO', 2000]]), match('Match Odds - Regular Time', [['OT_ONE', 2400], ['OT_CROSS', 4000], ['OT_TWO', 2700]])] }] }, 'nhl');
+  assert.ok(ko.ml.draw > 0.2, "Kambi's live winner: the regular-time three-way one");
 });
 
 // ---- A slip paid -----------------------------------------------------------------

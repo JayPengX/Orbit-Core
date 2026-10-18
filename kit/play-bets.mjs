@@ -166,7 +166,7 @@ export function kambiLiveBets(game, g, base) {
     const k3 = houseCut({ base: LIVE_THREE_WAY, sport: game.sport });
     for (const side of g.ml.draw != null ? ['home', 'draw', 'away'] : ['away', 'home']) {
       const cut = side === 'draw' || g.ml.draw != null ? k3 : k;
-      bets.push({ ...common, cut, id: `${game.id}|ml|${side}`, kind: 'ml', side, market: 'ml', posted: true, fairChance: g.ml[side], estOdds: liveOdds(g.ml[side], cut) });
+      bets.push({ ...common, cut, id: `${game.id}|ml|${side}`, kind: 'ml', side, market: 'ml', posted: true, fairChance: g.ml[side], estOdds: liveOdds(g.ml[side], cut), ...(g.ml.draw != null ? { settle: { threeWay: true } } : {}) });
     }
   }
   if (g.spread) {
@@ -255,11 +255,11 @@ export function liveBets(data, { offersOf = () => null } = {}) {
     if (g.delayed) continue;
     const base = { gameId: game.id, game, sport: g.sport, start: g.startUtc, live: true, fairMargin: null, errKey: g.sport === 'mlb' ? 'live' : family === 'soccer' ? 'liveSoccer' : 'liveOther' };
     // The live cut (soccer's winner at its three-way one), more for the leagues the house knows less.
-    const cut = { ml: houseCut({ base: family === 'soccer' ? LIVE_THREE_WAY : 'live', sport: game.sport }), other: houseCut({ base: 'live', sport: game.sport }) };
+    const cut = { ml: houseCut({ base: family === 'soccer' || family === 'hockey' ? LIVE_THREE_WAY : 'live', sport: game.sport }), other: houseCut({ base: 'live', sport: game.sport }) };
     for (const m of markets ?? (dist ? liveMarkets(dist, { sport: g.sport, awayScore: g.awayScore, homeScore: g.homeScore, pm: g.pm }) : [])) {
       const k = m.kind === 'ml' ? cut.ml : cut.other;
       const common = { ...base, kind: m.kind, side: m.side, market: m.market, posted: m.posted, fairChance: m.fair, cut: k, estOdds: liveOdds(m.fair, k) };
-      if (m.kind === 'ml') bets.push({ ...common, id: `${game.id}|ml|${m.side}` });
+      if (m.kind === 'ml') bets.push({ ...common, id: `${game.id}|ml|${m.side}`, ...(family === 'hockey' ? { settle: { threeWay: true } } : {}) });
       else if (m.kind === 'total') bets.push({ ...common, id: `${game.id}|tot|${m.line}|${m.side}`, totalLine: m.line, mainLine: m.main });
       else if (m.kind === 'runline') bets.push({ ...common, id: `${game.id}|rl|${m.line}|${m.side}`, runLine: m.line, awayLine: m.awayLine, giver: m.giver });
       else if (m.kind === 'teamtotal') bets.push({ ...common, id: `${game.id}|tt|${m.team}|${m.line}|${m.side}`, team: m.team, teamLine: m.line });

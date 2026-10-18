@@ -90,7 +90,8 @@ export function parseKambiEvents(data, sport, now = new Date(), { unpriced = fal
     if (total) {
       const over = outcome(total, 'OT_OVER');
       const fair = fairPair(over, outcome(total, 'OT_UNDER'));
-      if (fair && over?.line != null) game.total = { line: over.line / 1000, overFair: fair[0] };
+      // (NHL's is its 60 minutes': no overtime goal in it, markets.mjs fitHockey.)
+      if (fair && over?.line != null) game.total = { line: over.line / 1000, overFair: fair[0], ...(/regular time/i.test(total.criterion?.englishLabel || total.criterion?.label || '') ? { regulation: true } : {}) };
     }
     games.push(game);
   }
@@ -126,13 +127,15 @@ export function parseKambiInPlay(data, sport) {
     const e = item.event;
     if (!e || e.state !== 'STARTED' || !e.homeName || !e.awayName) continue;
     const offers = item.betOffers || [];
-    const match = matchOffer(offers);
+    // Hockey's winner is its 60 minutes' (regular time), three ways.
+    const hockey = family === 'hockey';
+    const match = hockey ? offers.find(o => isMatch(o) && wholeLine(family, o.criterion?.englishLabel || '')) : matchOffer(offers);
     const one = outcome(match || { outcomes: [] }, 'OT_ONE');
     const two = outcome(match || { outcomes: [] }, 'OT_TWO');
     // Soccer's live winner has a draw: all three open, or none sold.
     const cross = outcome(match || { outcomes: [] }, 'OT_CROSS');
-    const three = family === 'soccer' && open(one) && open(cross) && open(two) ? fairThree(one, cross, two) : null;
-    const win = family !== 'soccer' && open(one) && open(two) ? fairPair(one, two) : null;
+    const three = (family === 'soccer' || hockey) && open(one) && open(cross) && open(two) ? fairThree(one, cross, two) : null;
+    const win = family !== 'soccer' && !hockey && open(one) && open(two) ? fairPair(one, two) : null;
     const game = {
       kambiId: e.id,
       sport,

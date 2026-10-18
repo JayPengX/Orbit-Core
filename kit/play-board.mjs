@@ -28,7 +28,7 @@ import {
   GOALS_DISPERSION,
   TOP_INNING_ODDS
 } from '#kit/play-odds.mjs';
-import { pointsModel, pointsMarkets, goalMarkets, fitHockey, baseballMarkets, marketOdds } from '#kit/play-markets.mjs';
+import { pointsModel, pointsMarkets, goalMarkets, fitHockey, hockeyWinner, baseballMarkets, marketOdds } from '#kit/play-markets.mjs';
 import { fitGoals } from '#kit/play-live.mjs';
 import { houseCut, houseRule, withRules, shadeLong } from '#kit/play-rules.mjs';
 import { withModelLines } from '#kit/play-lines.mjs';
@@ -361,14 +361,19 @@ export function gameOptions(game) {
   // our own, so it gets every market all the same.
   game = withModelLines(game, blend.probs);
   const base = { gameId: game.id, game, sport: game.sport, start: game.startUtc };
-  const sides = isSoccer(game.sport) ? ['home', 'draw', 'away'] : ['away', 'home'];
+  // Hockey's 不讓分 is its 60 minutes' result, three ways, as 台灣運彩 sells
+  // it: from the model fitted to the books' winner (overtime's included).
+  const hockey = familyOf(game.sport) === 'hockey';
+  const threeWay = isSoccer(game.sport) || hockey;
+  const chances = hockey ? hockeyWinner(fitHockey(blend.probs.home / (blend.probs.home + blend.probs.away), game.total)) : blend.probs;
+  const sides = threeWay ? ['home', 'draw', 'away'] : ['away', 'home'];
   // The winner at the lottery's cut (rules.mjs houseCut), the same for every
   // source; two books' gap is the price's margin of error.
   const [first, second] = [game.kambi, game.draftKings, game.polymarket].filter(Boolean);
   const both = first && second && Object.keys(first).every(k => k in second);
   // Soccer's 不讓分 has three outcomes: the lottery's three-way cut (its 1X2
   // odds add up to about 120%), not the two-way one.
-  const mlCut = houseCut({ base: isSoccer(game.sport) ? 'threeWay' : blend.k, sport: game.sport });
+  const mlCut = houseCut({ base: threeWay ? 'threeWay' : blend.k, sport: game.sport });
   const out = sides.map(side => ({
     ...base,
     id: `${game.id}|ml|${side}`,
@@ -376,11 +381,12 @@ export function gameOptions(game) {
     side,
     market: 'ml',
     // Never below half of Polymarket's 1-cent price step.
-    fairMargin: both ? Math.max(0.005, Math.abs(first[side] - second[side]) / 2) : null,
+    fairMargin: both && !hockey ? Math.max(0.005, Math.abs(first[side] - second[side]) / 2) : null,
     errKey: errKeyOf(game.sport),
-    fairChance: blend.probs[side],
+    fairChance: chances[side],
     cut: mlCut,
-    estOdds: estimateLotteryOdds(blend.probs[side], mlCut)
+    estOdds: estimateLotteryOdds(chances[side], mlCut),
+    ...(hockey ? { settle: { threeWay: true } } : {})
   }));
   const family = familyOf(game.sport);
   if (family === 'baseball' || family === 'soccer') out.push(...lineOptions(game, base, blend.probs));

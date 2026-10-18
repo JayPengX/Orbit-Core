@@ -196,31 +196,72 @@ export function goalGrid(means, share = 1) {
 
 const chance = (grid, test) => grid.reduce((s, x) => (test(x.away, x.home) ? s + x.p : s), 0);
 
-// Hockey: each team's goals fitted to DraftKings' total and the home win
-// chance (a regulation tie goes to overtime, split by the teams' strength).
+// Hockey: each team's goals in 60 minutes (how 台灣運彩 settles every hockey
+// market), fitted to the home win chance (overtime's included: a regulation
+// tie goes to overtime, split by the teams' strength) and the total.
+// DraftKings' total counts overtime's (or the shootout's) one deciding goal;
+// Kambi's regular-time one (`regulation`) doesn't.
 export function fitHockey(homeWin, total) {
-  return fitted(`hockey|${homeWin}|${total?.line}|${total?.overFair}`, () => hockeyFor(homeWin, total));
+  return fitted(`hockey|${homeWin}|${total?.line}|${total?.overFair}|${total?.regulation ? 1 : 0}`, () => hockeyFor(homeWin, total));
 }
-function hockeyFor(homeWin, total) {
-  const mean = total ? fitTotalRuns(total.line, total.overFair, GOALS_DISPERSION) : 6;
+// Independent goals tie too rarely: about 16% of NHL games level after 60
+// minutes where 22-24% really go to overtime (a trailing side's goalie
+// pulled, the game played to the score). Ties lifted by this much, the rest
+// scaled down, so 不讓分's 和局 is priced near the real rate.
+export const HOCKEY_TIE_LIFT = 1.45;
+export function hockeyGrid(means) {
+  const grid = goalGrid(means);
+  const tie = chance(grid, (a, h) => a === h);
+  const rest = (1 - tie * HOCKEY_TIE_LIFT) / (1 - tie);
+  return grid.map(x => ({ ...x, p: x.p * (x.away === x.home ? HOCKEY_TIE_LIFT : rest) }));
+}
+function splitFor(mean, homeWin) {
   let lo = 0.1;
   let hi = 0.9;
   for (let i = 0; i < 40; i++) {
     const s = (lo + hi) / 2;
-    const g = goalGrid({ home: mean * s, away: mean * (1 - s) });
+    const g = hockeyGrid({ home: mean * s, away: mean * (1 - s) });
     const win = chance(g, (a, h) => h > a) + chance(g, (a, h) => h === a) * s;
     if (win < homeWin) lo = s;
     else hi = s;
   }
-  const s = (lo + hi) / 2;
+  return (lo + hi) / 2;
+}
+function hockeyFor(homeWin, total) {
+  let mean = total ? fitTotalRuns(total.line, total.overFair, GOALS_DISPERSION) : 6;
+  if (total && !total.regulation) {
+    // The 60-minute mean whose total, with a tie's one deciding goal, is over
+    // the line as often as the book says.
+    const over = m => {
+      const s = splitFor(m, homeWin);
+      const g = hockeyGrid({ home: m * s, away: m * (1 - s) });
+      const final = (a, h) => a + h + (a === h ? 1 : 0);
+      const push = chance(g, (a, h) => final(a, h) === total.line);
+      return chance(g, (a, h) => final(a, h) > total.line) / (1 - push || 1);
+    };
+    let lo = mean * 0.6;
+    let hi = mean;
+    for (let i = 0; i < 25; i++) {
+      const mid = (lo + hi) / 2;
+      if (over(mid) < total.overFair) lo = mid;
+      else hi = mid;
+    }
+    mean = (lo + hi) / 2;
+  }
+  const s = splitFor(mean, homeWin);
   return { home: mean * s, away: mean * (1 - s) };
+}
+// Hockey's 不讓分: the 60-minute result, three ways (台灣運彩's 客勝、和局、主勝).
+export function hockeyWinner(means) {
+  const grid = hockeyGrid(means);
+  return { away: chance(grid, (a, h) => a > h), draw: chance(grid, (a, h) => a === h), home: chance(grid, (a, h) => h > a) };
 }
 
 const CORRECT_SCORES = ['1-0', '2-0', '2-1', '3-0', '3-1', '3-2', '0-0', '1-1', '2-2', '3-3', '0-1', '0-2', '1-2', '0-3', '1-3', '2-3'];
 
 export function goalMarkets(means, { family, totalLine }) {
   const out = [];
-  const grid = goalGrid(means);
+  const grid = family === 'hockey' ? hockeyGrid(means) : goalGrid(means);
   const favourite = means.away > means.home ? 'away' : 'home';
   const lines = family === 'hockey' ? [1.5, 2.5] : [0.5, 1.5, 2.5];
   // Handicaps: the favourite giving goals, and taking them for hockey's puck line.
@@ -247,7 +288,7 @@ export function goalMarkets(means, { family, totalLine }) {
     }
   }
   if (family === 'hockey') {
-    // Totals around DraftKings' line, and the 60-minute (regulation) result.
+    // Totals (60 minutes') around the book's line.
     const main = totalLine != null ? (totalLine % 1 ? totalLine : totalLine + 0.5) : 5.5;
     for (const d of [-1, 0, 1]) {
       const line = main + d;
@@ -257,34 +298,23 @@ export function goalMarkets(means, { family, totalLine }) {
         { side: 'under', fair: 1 - over }
       ] });
     }
-    out.push({ kind: 'regulation', market: 'regulation', cut: CUT.threeWay, picks: [
-      { side: 'away', fair: chance(grid, (a, h) => a > h) },
-      { side: 'draw', fair: chance(grid, (a, h) => a === h) },
-      { side: 'home', fair: chance(grid, (a, h) => h > a) }
-    ] });
-    // The final score counts overtime's (or the shootout's) winning goal: a
-    // tie after 60 minutes ends one goal apart, won by each side as strong.
-    const homeShare = means.home / (means.home + means.away);
-    const finals = [];
-    for (const x of grid) {
-      if (x.away !== x.home) finals.push(x);
-      else finals.push({ away: x.away, home: x.home + 1, p: x.p * homeShare }, { away: x.away + 1, home: x.home, p: x.p * (1 - homeShare) });
-    }
-    const yes = chance(finals, (a, h) => a > 0 && h > 0);
+    // Everything on 60 minutes, as 台灣運彩 settles it: the winner (three
+    // ways) is the board's 不讓分 (board.mjs).
+    const yes = chance(grid, (a, h) => a > 0 && h > 0);
     out.push({ kind: 'btts', market: 'btts', cut: CUT.twoWay, picks: [{ side: 'yes', fair: yes }, { side: 'no', fair: 1 - yes }] });
     const bands = [[0, 4], [5, 6], [7, 8], [9, null]];
-    out.push({ kind: 'goalbands', market: 'goalbands', cut: CUT.bands, picks: bands.map(([lo, hi]) => ({ side: `${lo}`, lo, hi, fair: chance(finals, (a, h) => a + h >= lo && (hi == null || a + h <= hi)) })) });
+    out.push({ kind: 'goalbands', market: 'goalbands', cut: CUT.bands, picks: bands.map(([lo, hi]) => ({ side: `${lo}`, lo, hi, fair: chance(grid, (a, h) => a + h >= lo && (hi == null || a + h <= hi)) })) });
     const margins = [];
     for (const team of ['home', 'away']) {
       for (const [lo, hi] of [[1, 1], [2, 2], [3, null]]) {
-        margins.push({ side: `${team}|${lo}`, team, lo, hi, fair: chance(finals, (a, h) => {
+        margins.push({ side: `${team}|${lo}`, team, lo, hi, fair: chance(grid, (a, h) => {
           const m = team === 'home' ? h - a : a - h;
           return m >= lo && (hi == null || m <= hi);
         }) });
       }
     }
     out.push({ kind: 'margin', market: 'margin', cut: CUT.bands, picks: margins });
-    const odd = chance(finals, (a, h) => (a + h) % 2 === 1);
+    const odd = chance(grid, (a, h) => (a + h) % 2 === 1);
     out.push({ kind: 'oddeven', market: 'oddeven', cut: CUT.twoWay, picks: [{ side: 'odd', fair: odd }, { side: 'even', fair: 1 - odd }] });
     return out;
   } else {
