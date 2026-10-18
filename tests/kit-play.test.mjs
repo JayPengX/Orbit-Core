@@ -7,7 +7,7 @@ import { legResult, applyResults, voidAt, lateOutcome, decidedSoFar, parseEspnRe
 import { settleSlip, evaluateSlip, slipPayoutTable, slipOutlook, analyzeSlip, afterTax, prizeAfterTax, SLIP_RULES, combosBySize, comboCount, slipErrors, slipSizes, choose, maskChance, exclusiveMasks, estimateLineOdds, estimateFuturesOdds, estimateF1Odds, devigPower, devigTwoWay, devigProportional, americanToProbability, boostRate, seededRandom, quantile, median } from '../kit/play-odds.mjs';
 import { cashOutState, CASHOUT_KEEP, CASHOUT_MAX_OPEN } from '../kit/play-cashout.mjs';
 import { houseRule, shadeLong, minLegsProblem, HOUSE_RULES, LONG_FROM } from '../kit/play-rules.mjs';
-import { GAMES, ticketPrize, settleTicket, buyTicket, nextDraw, checkSelection, betCount, expectedReturn, mergeTickets, addTickets, BINGO_DRAWS, GAME_ORDER } from '../kit/play-lottery.mjs';
+import { GAMES, ticketPrize, parseDraw, cappedPrize, settleTicket, buyTicket, nextDraw, checkSelection, betCount, expectedReturn, mergeTickets, addTickets, BINGO_DRAWS, GAME_ORDER } from '../kit/play-lottery.mjs';
 import { CARD_ORDER, face, facePays, tiersOf, drawPrize, buyScratch, revealScratch, expectedReturn as scratchReturn } from '../kit/play-scratch.mjs';
 import { propResult } from '../kit/play-props.mjs';
 import { parseOffers } from '../kit/play-offers.mjs';
@@ -517,6 +517,14 @@ test("lottery prizes by Taiwan Lottery's tables, each game", () => {
   assert.equal(t('lotto649', { zones: [[1, 2, 3, 7, 41, 42]] }, lotto).tier, 'sixth');
   assert.equal(t('lotto649', { zones: [[1, 2, 40, 41, 42, 43]] }, lotto).prize, 0);
   assert.equal(t('daily539', { zones: [[1, 2, 3, 30, 31]] }, { numbers: [1, 2, 3, 4, 5] }).prize, 300);
+  // 今彩539: each tier capped at NT$24,000,000 a draw, shared past it (rounded down).
+  const d539 = parseDraw('daily539', { drawNumberSize: [7, 25, 26, 29, 31], d539JackpotAssign: { winnerCount: 3, perPrize: 8_000_000 }, d539SecondAssign: { winnerCount: 1_300, perPrize: 18_461 } });
+  assert.equal(t('daily539', { zones: [[7, 25, 26, 29, 31]] }, d539).prize, 6_000_000, 'three real jackpots and ours: 24M / 4');
+  assert.equal(t('daily539', { zones: [[7, 25, 26, 29, 31]] }, { ...d539, pools: {} }).prize, 8_000_000, 'no winners read: the printed prize');
+  assert.equal(t('daily539', { zones: [[7, 25, 26, 29, 1]] }, d539).prize, Math.floor(24_000_000 / 1_301));
+  assert.equal(t('daily539', { zones: [[7, 25, 26, 1, 2]] }, d539).prize, 300, 'under the cap: the printed prize');
+  assert.equal(cappedPrize(GAMES.daily539.tiers[0], 1, 2), 8_000_000, 'three bets fit under the cap');
+  assert.equal(cappedPrize(GAMES.daily539.tiers[0], 2, 2), 6_000_000, "a ticket's multiple counts as that many bets");
   // 3星彩 / 4星彩 (2024 on): in order, by how many of the last digits match.
   const star3 = { digits: [1, 2, 3] };
   assert.deepEqual(t('star3', { play: 'straight', digits: [1, 2, 3] }, star3), { prize: 5_000, tier: 'first', detail: [3] });
