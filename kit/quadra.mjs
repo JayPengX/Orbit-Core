@@ -187,8 +187,8 @@ export const OVERDRAFT_RATE = 0.01;
 export const overdraft = wallet => Math.max(0, -poolBalance(wallet));
 
 // Quadra Plus and free bets: plus.mjs, shared with the Worker.
-import { PLUS, plusMonth, plusMonths, plusMember, FREEBET, freeBetValue, freeBets, VIP, vipStakes, vipTier, WELCOME } from './plus.mjs';
-export { PLUS, plusMonths, plusMember, FREEBET, freeBetValue, freeBets, VIP, vipStakes, vipTier, WELCOME };
+import { PLUS, plusMonth, plusMonths, plusMember, FREEBET, freeBetValue, freeBets, VIP, vipStakes, vipTier, WELCOME, welcomeEarned } from './plus.mjs';
+export { PLUS, plusMonths, plusMember, FREEBET, freeBetValue, freeBets, VIP, vipStakes, vipTier, WELCOME, welcomeEarned };
 // A charge the balance couldn't cover (eco.js `eco:plusfail:<month>`) after
 // the last paid month: the membership lapsed and won't renew until joined again.
 export const plusLapsed = wallet => {
@@ -303,7 +303,7 @@ export const vipName = (tier, lang = 'zh') => (tier ? (lang === 'en' ? tier.en :
 // in Play brings a NT$WELCOME.bet free bet (`eco:fb:welcome`), once. Still to come?
 export const welcomeDue = wallet => {
   const entries = wallet?.entries || [];
-  return !entries.some(e => e.id === 'eco:fb:welcome') && !entries.some(e => e.app === 'odds' && e.kind === 'stake' && e.amount < 0);
+  return !entries.some(e => e.id === 'eco:fb:welcome') && !welcomeEarned(wallet);
 };
 
 // ---- Free bets: plus.mjs (FREEBET, freeBetValue, freeBets) ---------------------------

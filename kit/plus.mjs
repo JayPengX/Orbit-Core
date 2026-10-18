@@ -90,5 +90,10 @@ export function vipStakes(wallet, month) {
 export const vipTier = stakes => [...VIP.tiers].reverse().find(t => stakes >= t.min) ?? null;
 
 // The welcome offer: the first paid bet in Play brings a NT$WELCOME.bet free
-// bet (`eco:fb:welcome`, the Worker's, once; quadra.mjs welcomeDue).
-export const WELCOME = { bet: 200 };
+// bet (`eco:fb:welcome`, the Worker's, once; quadra.mjs welcomeDue). A
+// qualifying bet, as a real sportsbook's welcome offer asks: one stake of
+// at least `minStake` (Play's smallest ticket, SLIP_RULES.minTicket), so a
+// NT$0.01 stake or a free bet's top-up doesn't buy NT$200.
+export const WELCOME = { bet: 200, minStake: 100 };
+// Whether a wallet's entries hold that qualifying bet.
+export const welcomeEarned = wallet => (wallet?.entries || []).some(e => e.app === 'odds' && e.kind === 'stake' && e.amount <= -WELCOME.minStake);
