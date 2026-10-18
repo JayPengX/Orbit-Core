@@ -66,3 +66,17 @@ test('a recall returns the shares in 3 Taiwan business days, holidays skipped', 
   const at = Date.parse('2026-10-23T04:00:00Z');
   assert.equal(day(SA.recallShares(lent, 'lend:l1', at).back), '2026-10-29');
 });
+
+test('融券 earns interest on its deposit and the sale money held (§51, 0.20% a year), paid when bought back', async () => {
+  const { SHORT_INTEREST } = await import('../kit/stock-credit.mjs');
+  const r = SA.placeOrder(credit(), { side: 'sell', type: 'limit', limit: 100, qty: 1000 }, { quote: tw(100), rates, valuation: ok, now, id: 's1' });
+  const held = r.fill.total;
+  const later = now + 100 * DAY;
+  const s0 = SA.replay(r.account, later);
+  const owed = ((90_000 + held) * SHORT_INTEREST * 100) / 365;
+  assert.ok(Math.abs(s0.positions['2330.TW'].shortInterest - owed) < 1e-6, 'accrued day by day');
+  const buy = { id: 'b1', type: 'fill', t: later, orderId: 'b1', symbol: '2330.TW', name: 'TSMC', kind: 'stock', market: 'TW', currency: 'TWD', side: 'buy', qty: 1000, price: 100, gross: 100_000, total: 100_142, commission: 142, tax: 0, fee: 0, twd: 1 };
+  const s1 = SA.replay({ ...r.account, events: [...r.account.events, buy] }, later);
+  assert.equal(s1.cash.TWD - s0.cash.TWD, 90_000 + held - 100_142 + Math.floor(owed), 'deposit, sale money and interest back, less the buyback');
+  assert.equal(s1.positions['2330.TW'], undefined);
+});
