@@ -8,6 +8,7 @@
 // as lib/photos.mjs: never edit an app's copy.
 import { CATALOG } from '#kit/catalog.mjs';
 import { logoPicture, f1Driver, f1Constructor } from '#kit/logos.mjs';
+import { fold } from '#kit/names.mjs';
 import * as kit from '#kit/quadra.mjs';
 
 import { CDN, smallPhoto, espnHeadshot, espnCollegeHeadshot } from './photo-urls.mjs';
@@ -20,12 +21,7 @@ export const isCutout = url => typeof url === 'string' && /thesportsdb\.com\/ima
 
 const sportOf = league => CATALOG[league]?.sport || league || '';
 const plain = s =>
-  String(s || '')
-    .normalize('NFKD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase()
-    // The letters NFKD doesn't take apart (Rønnow, ESPN's Ronnow).
-    .replace(/[øœæßđðłıþ]/g, c => ({ ø: 'o', œ: 'oe', æ: 'ae', ß: 'ss', đ: 'd', ð: 'd', ł: 'l', ı: 'i', þ: 'th' })[c])
+  fold(s)
     .replace(/\b(jr|sr|ii|iii)\b\.?/g, '')
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
