@@ -197,6 +197,14 @@ not yet on a phone; the second round A/B, the old and new code alternated.
   1.8 MB (D1's row 2 MB); Securities' cancels are the proxy's to rule on
   (`op: 'cancel'`), and a save's "cancel" of an order the proxy filled or
   saw reached counts as the fill.
+- **Money holes closed (2026-10-18, the proxy's audit):** a free bet only on
+  one pick or a parlay (on several singles or a system its value was staked
+  on every combination), its stake exactly the token plus the top-up; one
+  token or one slip id once a batch (two slips could spend one token); one
+  lottery ticket id once a sale; a session writes only its own app's data;
+  Securities' fills book merged on a lost race (two asks at once dropped a
+  fill); a cash out whose payment failed is paid by the cron. Every stored
+  document's read-change-write is `doc-store.js changeDoc`.
 - **Not pushed on purpose:** Transit's bus stops drawn from the packs (no
   TDX read per pan). Its sides don't match TDX's: 臺北轉運站 five signs
   facing E, N, SE, SE, SW where TDX has two (S, W); 新竹火車站 S where TDX

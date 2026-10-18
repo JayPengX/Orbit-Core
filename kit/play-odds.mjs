@@ -521,6 +521,9 @@ const boosted = (stake, product, size, x) => stake * (1 + (product - 1) * (1 + (
 export function afterTax(pay) {
   return pay > SLIP_RULES.taxFree ? pay * (1 - SLIP_RULES.taxRate - SLIP_RULES.stampRate) : pay;
 }
+// A lottery or scratch card prize after the same withholding, in whole NT$
+// (play-lottery.mjs, play-scratch.mjs).
+export const prizeAfterTax = gross => (gross > SLIP_RULES.taxFree ? Math.round(afterTax(gross)) : gross);
 
 export function choose(n, k) {
   if (k < 0 || k > n) return 0;
@@ -625,10 +628,9 @@ export function slipErrors({ mode, legs, sizes, stake }) {
 // Fair chances are treated as independent (different games).
 export function evaluateSlip({ legs, sizes, stake, boost = 0 }) {
   const n = legs.length;
-  const sizeSet = new Set(sizes);
-  const masks = clashMasks(legs);
   const combos = comboCount(legs, sizes);
   const cost = combos * stake;
+  const table = slipPayoutTable({ legs, sizes, stake, boost });
   const byHits = Array.from({ length: n + 1 }, (_, hits) => ({ hits, chance: 0, min: Infinity, max: 0 }));
   let expected = 0;
   let expectedNet = 0;
@@ -640,23 +642,8 @@ export function evaluateSlip({ legs, sizes, stake, boost = 0 }) {
     const chance = maskChance(legs, won, groups);
     let m = 0;
     for (let i = 0; i < n; i++) if (won & (1 << i)) m++;
-    // Every combination made only of winning legs pays stake x its odds.
-    let gross = 0;
-    let net = 0;
-    for (let pick = won; pick > 0; pick = (pick - 1) & won) {
-      if (clashes(pick, masks)) continue;
-      let size = 0;
-      let product = 1;
-      for (let i = 0; i < n; i++) if (pick & (1 << i)) (size++, (product *= legs[i].odds));
-      if (!sizeSet.has(size)) continue;
-      const pay = boosted(stake, product, size, boost);
-      gross += pay;
-      net += afterTax(pay);
-    }
-    if (gross > SLIP_RULES.maxPayout) {
-      net *= SLIP_RULES.maxPayout / gross;
-      gross = SLIP_RULES.maxPayout;
-    }
+    const gross = table.gross[won];
+    const net = table.net[won];
     expected += chance * gross;
     expectedNet += chance * net;
     if (gross > 0) anyPayout += chance;

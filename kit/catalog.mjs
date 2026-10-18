@@ -1,5 +1,5 @@
 // Every sport and league Quadra covers, once, for Orbit Sports and Play alike
-// (copied into both by kit/sync.mjs; never edit an app's copy). Each app
+// (served to both from the kit, #kit/catalog.mjs; apps keep no copy). Each app
 // builds its own view of it (Orbit Sports' lib/leagues.mjs, Play's lib/teams.mjs),
 // so a league added or fixed here reaches both.
 //

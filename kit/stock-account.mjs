@@ -1643,7 +1643,9 @@ export function benchmarkValue(deposits, points, price) {
 
 // ---- Merge (sync) ------------------------------------------------------------
 
-const STATUS_RANK = { open: 0, cancelled: 1, rejected: 1, filled: 2 };
+// (Every status an order can end in: one missing ranks as NaN and loses to
+// whichever copy came first, so an expired order came back open.)
+const STATUS_RANK = { open: 0, cancelled: 1, rejected: 1, expired: 1, filled: 2 };
 
 // Two copies of the account become one. A copy started over (a new id) wins
 // if it's the newer start.
@@ -1686,6 +1688,19 @@ export function mergeAccounts(a, b) {
   // Paydays began at the earlier of the two.
   if (a.income || b.income) merged.income = { since: Math.min(a.income?.since ?? Infinity, b.income?.since ?? Infinity) };
   if (a.alerts || b.alerts) merged.alerts = latest(a.alerts, b.alerts);
+  // The account's standing with the broker, whichever copy saw it first:
+  // an overdraft's and a margin call's clocks run from the earlier start
+  // (each check clears one that's over, so a copy that cleared it loses
+  // nothing), and a default stays on the record (its 違約金 is charged once
+  // per overdraft by `defaultAt`: a copy without it charged it again, and
+  // its ban on margin and shorts was gone).
+  const earlier = (x, y) => (!x ? y : !y ? x : (y.since ?? Infinity) < (x.since ?? Infinity) ? y : x);
+  for (const key of ['od', 'call']) {
+    const kept = earlier(a[key], b[key]);
+    if (kept) merged[key] = kept;
+  }
+  if (a.defaultAt || b.defaultAt) merged.defaultAt = Math.max(a.defaultAt || 0, b.defaultAt || 0);
+  if (a.welcome === true || b.welcome === true) merged.welcome = true;
   return merged;
 }
 

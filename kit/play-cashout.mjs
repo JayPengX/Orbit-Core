@@ -27,9 +27,11 @@ export const CASHOUT_MAX_OPEN = 8;
 
 // `chances`: one per leg, the fair chance now of each undecided leg (null
 // when there's no price now), or { p, live } (live: its game is in play).
-// -> { value: whole NT$ | null, reason: '' | 'noPrice' | 'sameGame' | 'tooMany' | 'done', leg: index }
+// -> { value: whole NT$ | null, reason: '' | 'noPrice' | 'sameGame' | 'tooMany' | 'done' | 'free', leg: index }
 export function cashOutState(slip, chances, { keep = CASHOUT_KEEP } = {}) {
   if (!slip || slip.status !== 'open' || slip.recovered || !slip.legs?.length) return { value: null, reason: 'done' };
+  // A free bet's slip is never sold back (its stake was never paid).
+  if (slip.free) return { value: null, reason: 'free' };
   const open = [];
   slip.legs.forEach((leg, i) => leg.result || open.push(i));
   if (!open.length) return { value: null, reason: 'done' };

@@ -113,7 +113,7 @@ mirror })`) goes down these layers until one answers.
 | 2 | **Device cache** | Cache Storage (`persist`, the default) | the last answer of each URL; `peekJson(url)` gives it at any age so a screen paints at once | younger than `ttl`: used without asking anyone |
 | 3 | **Failure hold** | the page | a URL that just failed (after one retry) | as long as it would have been kept, a minute at most, so a source that is down isn't asked again by every part of a page |
 | 4 | **The family's data** | R2 (`quadra-data`), the proxy's `/data/` (`data.js`), read with `packJson` | a league's whole season (`sports/<league>/<year>.json`), its days and bounds, CPBL's tables and months, past win-probability lines, watch links, photo lists, bus packs, shapes, where.json: built by the proxy's cron (§4.7) | until it's rebuilt (the edge keeps a file 2–10 min) |
-| 5 | **The edge cache** | the proxy's cache in Taiwan (one place: the proxy runs there) | every successful upstream answer, shared by everyone who asks the same URL | by tier (§4.4): live 2 s by default, a finished game 24 h, standings 30 min, … |
+| 5 | **The edge cache** | the proxy's cache at the colo a request comes in through (Taiwan's, for the family's phones) | every successful upstream answer, shared by everyone who asks the same URL | by tier (§4.4): live 2 s by default, a finished game 24 h, standings 30 min, … |
 | 6 | **Kept on demand** | R2 `mirror/` (`sports.js` `settleable`, `readKept`, `keep`) | a read over for good (a finished game's summary, a day or month of ESPN games all completed, a past Asian month), kept the first time anyone reads it, ESPN's slimmed; the nightly mirror's old copies count too | for good (wiped with its season) |
 | 7 | **The upstream** | ESPN, Kambi, Yahoo, … | the truth now | — |
 
@@ -148,17 +148,39 @@ Failure rules across the layers:
 ## 3. The proxy (`orbit-workers-proxy`)
 
 One Worker, one router (`worker.js`), each route's work in its own file:
-`http.js` (CORS and JSON answers for every route), `eco.js`, `eco-admin.js`,
-`money.js`, `capacity.js`, `push.js`, `quadra-token.js`, `kambi.js`,
-`settle.js`, `price.js`, `lotto.js`, `stock-check.js`, `sports.js`,
-`asia-baseball.js`, `f1-live.js`, `weather.js`, `weather-stations.js`,
-`weather-skill.js`, `transit.js`, `locales/`, `wrangler.toml`.
 
-Its placement is pinned to `gcp:asia-east1` (Changhua, Taiwan). Its people
-and most of its sources are Taiwan's (TDX, CWA, the Pass), Taiwan is a
-Gemini-supported location, and Smart Placement once ran it from Hong Kong,
-which Gemini refuses. Every response carries `X-Worker-Colo` (the IATA code
-of the colo the request came in through).
+| File | What |
+| --- | --- |
+| `http.js` | CORS and JSON answers for every route, the allowed origins and the localhost dev doors' pattern |
+| `quadra-token.js` | Signed session and refresh tokens, sealed hand-overs, the in-memory per-session limiter (`sessionLimited`) |
+| `doc-store.js` | The Pass's store on D1, and the one read-change-write of a JSON document the money files use (`changeDoc`, `parseDoc`, below) |
+| `eco.js`, `eco-admin.js`, `money.js`, `capacity.js`, `ops.js` | The Pass (§5), the owner's panel, the money report, capacity, the system report and the owner's alerts |
+| `settle.js`, `price.js`, `lotto.js`, `kambi.js` | Quadra Play's slips, prices, lottery and Kambi watch (§3.1) |
+| `stock-fill.js`, `stock-check.js` | Quadra Securities' fills and the check of every save (§3.1) |
+| `sports.js`, `asia-baseball.js`, `f1-live.js`, `slip.js` | The data proxy (§4) and Orbit Slips' narrow doors |
+| `data.js`, `builders/` | The family's data in R2 (§4.7) |
+| `weather.js`, `weather-stations.js`, `weather-skill.js` | Orbit Weather (§3.2) |
+| `transit.js` | Orbit Transit (§3.3) |
+| `push.js` | Notices (§7) |
+| `pace.js`; `guard.js`, `guard-worker.js` | Following the bill's pace; the guard itself, a Worker of its own (§8.1) |
+| `gemini-relay.js` | Gemini's relay, a Worker of its own pinned to Taiwan |
+| `locales/`, `wrangler*.toml` | Class's AI prompts' words; each Worker's config |
+
+It has no `[placement]` (wrangler.toml): it runs at the colo each request
+comes in through. Pinned whole to Taiwan, Yahoo turned most of its reads
+away (2026-10-14), and every Securities price and fill goes through Yahoo;
+Gemini alone, which refuses Hong Kong, goes through `gemini-relay`, pinned
+to Taiwan (the service binding `GEMINI_RELAY`). Every response carries
+`X-Worker-Colo` (the IATA code of the colo the request came in through).
+
+**One way to change a stored document** (`doc-store.js changeDoc`): read
+it, change it, write it only over the version read (D1's `updated`), and on
+a lost race read and change it again. Play's watch index and records
+(`settle.js`), the lottery's index (`lotto.js`), Kambi's index (`kambi.js`),
+Securities' fills book (`stock-fill.js`) and the retired ledger
+(`money.js`) all go through it; the wallet has its own (`eco.js
+updateWallet`: the same loop, plus folding). A write without a
+precondition lets two requests at once lose each other's changes.
 
 | Route | File | What |
 | --- | --- | --- |
@@ -167,14 +189,19 @@ of the colo the request came in through).
 | `POST /gemini` | `worker.js` | Orbit Class's AI import of a timetable photo |
 | `POST /nl-edit` | `worker.js` | Orbit Class's edits in plain language ("move Tuesday's maths to room 302") |
 | `GET/POST /kambi` | `kambi.js` | The last live data of Kambi matches Quadra Play has bets on (§3.1) |
-| `POST /stock` | `stock-fill.js` | Quadra Securities' orders filled at the proxy's own quote (§3.1) |
+| `POST /stock` | `stock-fill.js` | Quadra Securities' orders filled at the proxy's own quote (`op: 'fill'`), a cancel ruled on (`op: 'cancel'`), 新股申購 applications seen and drawn (`op: 'ipo'`) (§3.1); a Securities session, 30 a minute |
 | `GET/POST /play` | `settle.js`, `price.js`, `lotto.js` | Quadra Play's slips placed (prices checked), cashed out, settled and paid; its lottery tickets and scratch cards sold and paid (§3.1) |
 | `GET/POST /push/…` | `push.js` | Notices while an app is closed (§7) |
 | `GET /weather…` | `weather.js`, `weather-skill.js` | Orbit Weather (§3.2) |
 | `GET /transit/…` | `transit.js` | Orbit Transit (§3.3) |
 | `GET /sports-proxy` | `sports.js` | The data proxy for Sports, Play and Securities (§4) |
-| `GET /slip` | `slip.js` | Slip Tracker's door (an independent page, no pass): only NPB/KBO/CPBL month lists, its origin only, ≤3 addresses an ask, 6 asks a minute and 60 an hour an address, 3,000 a day in all (D1 `slip_day`), closed from pace 2 |
-| `POST /slip-scan` | `slip.js` | Slip Tracker's ticket photo read by Gemini (Class's `/gemini` made narrower: fixed prompt and schema, one JPEG ≤1.5 MB, flash-lite then 3.7-flash if Google is busy): its origin only, 2 a minute, 6 an hour and 12 a day an address, 150 a day in all (D1 `slip_day`, counted before each, refused if the count fails), closed from pace 2 |
+| `GET /slip` | `slip.js` | Orbit Slips' old door, for its pages from before it read through the sports proxy with a Pass (`app=slip`): only NPB/KBO/CPBL month lists, its origin only, ≤3 addresses an ask, 6 asks a minute and 60 an hour an address, 3,000 a day in all (D1 `slip_day`), closed from pace 2 |
+| `POST /slip-scan` | `slip.js` | Orbit Slips' ticket photo read by Gemini (Class's `/gemini` made narrower: fixed prompt and schema, one JPEG, PNG or WebP of at most 2 MB of base64, flash-lite then 3.7-flash if Google is busy): its origin only; with a Pass (`qt`) 3 a minute and 30 a day an account, without one 2 a minute, 6 an hour and 12 a day an address; 400 a day in all (D1 `slip_day`, counted before each, refused if the count fails); closed from pace 2 |
+| `GET /guard` | `worker.js` | The bill's guard as it last read the bill (armed, each count's share, stopped, the pace): no key needed, nothing secret |
+| `GET /store/check` | `worker.js` | Each D1 collection's count (no document), from a localhost page only, 2 a minute |
+| `POST /ops?check=gemini` or `system` | `worker.js`, `ops.js` | The repo's own checks (`build.yml`), Bearer `DATA_PUSH_SECRET` |
+| `POST /data/build` | `builders/run.js` | A builder now, by hand (`build.yml`), Bearer `DATA_PUSH_SECRET` |
+| `GET /data/…`, `POST /data/push`, `GET /data/_list` | `data.js` | The family's data (§4.7) |
 
 **The gate.** Every route except signing in needs a Quadra Pass session
 (`qt=`). Sessions are counted per session and app in memory
@@ -187,15 +214,23 @@ gets a dev session on `/transit` (`TRANSIT_DEV`, 300 a minute per address).
 That is how tests and scripts read real data without a pass. Weather has no
 door: it uses its saved fixtures.
 
-**The cron** (`*/2 * * * *`, the even minutes):
+**The cron** (`*/2 * * * *`, the even minutes; `worker.js scheduled`, each
+job's heartbeat kept by `ops.js beat`):
 
 - push notices that are due, every run;
 - Kambi's watched matches, every run;
-- the weather scoring, hourly at :10;
-- the capacity check, every 6 hours at :20.
+- a builder at its minute (`builders/run.js SLOTS`: :16 watch, :20 cutouts,
+  :22 the daily ones by the hour, :24 buses), as the pace allows;
+- the guard's clock woken and the owner's alerts (`ops.js tellOwner`), every
+  10 minutes;
+- the weather scoring, hourly at :10 (not while paced);
+- the capacity check, every 6 hours at :20;
+- F1's lap log, every minute Thursday to Monday UTC (on both crons).
 
 **The odd minutes** (`1-59/2 * * * *`, `SETTLE_CRON`, an invocation of its
-own: its own fetches and CPU): Quadra Play's slips that are due (§3.1).
+own: its own fetches and CPU): Quadra Play's slips that are due (§3.1);
+every fourth odd minute (`min % 4 === 3`) the lottery's drawn tickets
+instead.
 
 ### 3.1 `/kambi` and `/play`
 
@@ -254,14 +289,22 @@ ends. A bet whose app isn't opened in that window could never be settled.
   pick waits 5 s (`LIVE_DELAY_MS`) and is priced again on reads no older
   than 2 s (the sports proxy's `within`, this Worker's own reads only); a
   live pick reads its own league's live pages alone (`loadLive({ only })`).
+  A batch with one slip id twice, or one free bet's token on two slips, is
+  refused whole (each slip is checked against the wallet as it was, so two
+  could otherwise spend one token). A free bet goes only on one pick or a
+  parlay (`price.js freeShape`, as Play offers it: on several singles or a
+  system its value would be staked on every combination), its stake exactly
+  the token's value plus the top-up.
   `op: 'check'` from a localhost page: the check alone.
 - `POST { op: 'cashout', id, value }`: the value checked against the house's
   own (price.js cashOutQuote), the slip marked cashed in `open` (never
   settled too; the cron drops it when it next comes due), the Worker pays odds:payout-<slip> (kind cashout).
+  The cron, dropping a cashed slip, pays it first if the wallet still lacks
+  that payout (a wallet write that failed after the slip was marked).
 - Lottery (lotto.js): `op: 'tickets'` sold by the Worker's clock, settled
   from Taiwan Lottery's draws by the cron (every fourth odd minute), paid
-  odds:prize-<id>; `op: 'scratch'` a card's prize drawn here, `op: 'reveal'`
-  pays it. (`op: 'tickets-open'` closed on 2026-10-14, as `open`.)
+  odds:prize-<id> (one ticket id once a sale); `op: 'scratch'` a card's
+  prize drawn here, `op: 'reveal'` pays it. (`op: 'tickets-open'` closed on 2026-10-14, as `open`.)
 
 **The lock-down (2026-10-12; exploit-proof 2026-10-14): the proxy is the
 only one adding money.** `eco.js appEntries`: an app's wallet entries are
@@ -297,6 +340,16 @@ until the price has gone past its limit gets the limit; a monthly plan seen befo
 filled at the first bar on or after it (`plans`, `plan:<id>:<month>`). A fill
 is kept with its terms and NT$ rate and answered; the phone applies exactly
 that (`applyFills`).
+
+The book (`stock-fills/<account>`: fills, orders waiting, cancels, plans,
+新股申購 seen) is written only over the copy it was read from; a request
+that loses the race merges into the newer copy (`mergeBooks`: a fill or
+cancel either issued stands, the first fill issued for an order is the one,
+an order waiting keeps its terms as first seen and its latest look) and is
+answered from the book as written. Two asks at once (a refresh and a
+cancel) never drop each other's fills. A record of checked events
+(`stock-verified/<account>`) that can't be read is checked again from the
+start, never a save stuck on it.
 
 ### 3.2 `/weather`
 
@@ -380,10 +433,11 @@ any other: the same router, CORS (`http.js`), sessions and crons.
 
 It was a Worker of its own (`sports-proxy`) while the proxy was pinned to
 Virginia for Gemini: `[placement]` is a whole Worker's, and every sports
-read from Taiwan crossed the Pacific. With the proxy in Taiwan, where the
-people are, it moved in (the owner: one proxy for everything). One address
-means one connection for a phone instead of two, one edge cache in Taiwan
-shared by everyone, and the developer settings read in place.
+read from Taiwan crossed the Pacific. With the proxy run near its callers
+(no placement since 2026-10-14; Gemini through its relay, §3), it moved in
+(the owner: one proxy for everything). One address means one connection for
+a phone instead of two, one edge cache near the people shared by everyone,
+and the developer settings read in place.
 
 The old address, `sports-proxy.pengzjay.workers.dev`, was a forwarder to
 the proxy for phones on a kit from before the move. Its code is gone;
@@ -652,7 +706,7 @@ regularly now.
 | `POST { op: 'login', passcode, app }` | Sign in on this device |
 | `POST { op: 'refresh', refresh, app, claim?, data?, inbox? }` | A session (and a renewed refresh token); `claim` makes this app live |
 | `GET /eco?qt=T[&app=A][&inbox=1]` | The wallet, the pool and app A's data; `active` says whether this session is the live one (a fresh `token` comes back while it is) |
-| `PATCH /eco?qt=T&app=A { payload?, wallet? }` | App A's data and/or a wallet change (live session only) |
+| `PATCH /eco?qt=T&app=A { payload?, wallet? }` | App A's data and/or a wallet change (live session only; A must be the session's own app, else 403) |
 | `DELETE /eco?qt=T[&app=A][&inbox=ID]` | The account, one app's data, or one inbox item |
 | `POST { op: 'pair-create', qt }` / `{ op: 'pair-redeem', code, app }` | A device code (8 characters, 10 minutes, once) and signing in with it |
 | `POST { op: 'handoff', qt }` / `{ op: 'redeem', handoff, app }` | A sealed sign-in (3 minutes) for a link to another app (`#qh=`); home-screen apps don't share storage |
@@ -882,11 +936,20 @@ apps' pages and the nightly packs stay up and open on what the phone has.
   Class's `vite.config.js`), so they're asked for with the page, not one
   import level at a time.
 - **Updating.** The kit notes a newer version on every opening, and
-  `watchUpdates` puts it in place like a deploy of the app.
+  `watchUpdates` puts it in place like a deploy of the app. A phone can
+  still be on an older kit for a while, so an app uses a new kit export
+  through the module object with a fallback (`import * as kit …;
+  kit.watchFit?.(…)`), never by name (TRUTH §6). Inside the kit, modules
+  import each other freely: one page load runs one version of all of them.
+- **The import map.** `loader.html`'s list (`f=[…]`) is every served
+  module, the tools left out (`KIT_TOOLS` in `preload.mjs`, the one list
+  `stamp.mjs` and `apps.mjs` read). A module missing from it can't be
+  imported by an app at all; `tests/kit-loader.test.mjs` fails until it's
+  listed (`node kit/apps.mjs` writes the list into every app).
 - **Tools.** `node kit/apps.mjs` points the apps at it (refreshing the
   snippets between the `kit:head` / `kit:boot` markers). `node
   kit/link.mjs` links checked-out apps (`<app>/.kit`) for their tests; CI
-  checks this repo out instead.
+  checks this repo out instead. (`kit/sync.mjs`, the old copier, is gone.)
 
 ### 9.1 `quadra.mjs`: the core (every app)
 
@@ -895,7 +958,7 @@ apps' pages and the nightly packs stay up and open on what the phone has.
 | **Apps and language** | `APPS` (from brand), `detectLocale`, Taiwan days (`taipeiDay`) |
 | **The economy** | `PAY`, `WEALTH_RANKS`, `worthOf`, `moneySides` (given / quadra / own, the Pass's 真相), the pool (`poolBalance`, `overdraft`; an app's own part left out) |
 | **Plus** | `PLUS`, `plusMember`, `plusMonths`, `plusLapsed`, `plusRenewing`, `plusPlan`, `plusUntil`, `plusJoinPrice`, `plusReturns`, `plusTenure`, `plusNotices`; Looks (`avatar`, `frame`, streaks) |
-| **VIP and free bets** | `VIP`, the month's stakes, tier and cashback; `WELCOME`; `FREEBET`, the unspent tokens |
+| **VIP and free bets** | `VIP`, `vipStakes`, `vipTier`, `WELCOME`, `FREEBET` and the unspent tokens live in `plus.mjs` (pure: the Worker can load it) and are re-exported here; `vipStatus` (the month so far), `welcomeDue` |
 | **Storage** | The device keeps a refresh token and the account's id, never the pass; each app's own data copy for a cold start (small ones); signing out removes every app's keys on the origin, keeping only the device's language, safe area and kit version |
 | **Data** | `proxyJson` (batched, remembered, device-cached, failures held; the proxy answers a held read from the mirror or R2), `peekJson`, `packJson` (the family's data, `/data/`), `mirrorBuilt`, `workerJson`/lines (the Worker's routes signed), `translate` (through the proxy, kept a month; Chinese-in-English handled) |
 | **The session** | `quadraSession(app)`: `start()` (the sign-in gate, then live), `on('wallet'|'active'|'signedout')`, `read`, `write` (live only), `proxy(url)`; a heartbeat every 2 minutes and on wake; `#qh=` hand-offs; another app taking over pauses this one |
@@ -907,7 +970,7 @@ apps' pages and the nightly packs stay up and open on what the phone has.
 | **The shell** | `installGate` (home screen only on phones, every app, a hand-over from another app too; a QR page on computers for phone-only apps); `watchUpdates` (version.json on load, every 15 s, on focus, visibility and online, and from other open pages over BroadcastChannel; a newer app or kit loads at once, the scroll and tab kept by `rememberPlace`/`restorePlace`, retried when the CDN lags); `kitLatest`; strips that scroll sideways keep their place across redraws |
 | **The connection** | Every request beyond the page's own files watched (`watchNet`, the apps' own too): off when the phone says so or twice nothing reached since the last answer, slow when one waits over 5 s with nothing answered meanwhile (`netVerdict`, `netState`, `onNet`); a glass capsule over the tab bar says 沒有網路連線 or 網路連線很慢 (a tap tries again), and the app's refresh runs when it's back. `onlineOnly({ zh, en })`: an app whose screens are all live (Securities, Play, Transit, Sports) is covered with no connection (its mark, 沒有網路連線, why, 重試) instead of showing old figures, never on a slow one; back online it refreshes, or opens again if it never read its first screen. Words, Weather and Class work on what they kept. `keepOffline(path)`: each app's worker registered (`updateViaCache: 'none'`) and told every file the page loaded (the first visit's too, again on going to the background) |
 | **Location** | `mayLocate(key, { force })`: iOS asked where the phone is unprompted once per app, never at every opening, return or tick; a phone that would ask again stays on the last place until a tap (Weather, Transit) |
-| **The frame** | `tabBar` (each tab keeps its place; a tab chosen fades in, never the first; tapping the open tab scrolls up, again resets), `data-q-live="key"` on a score, price or balance (it pops once when its text changes, never in the first 6 s or with less movement asked; `liveChanged`), `topActions` (說明 · 重新整理 · the account), `icon`, `fitNumbers` (a number too wide shrinks, to 60%) |
+| **The frame** | `tabBar` (each tab keeps its place; a tab chosen fades in, never the first; tapping the open tab scrolls up, again resets), `data-q-live="key"` on a score, price or balance (it pops once when its text changes, never in the first 6 s or with less movement asked; `liveChanged`), `topActions` (說明 · 重新整理 · the account), `icon`, `fitNumbers` (a number too wide shrinks, to 60%: fractional widths, then stepped down until it really fits, as Play's and Securities' own copies did), `watchFit(selector, { roots })` (keeps those numbers fitted on redraws, resizes and font loads; new, so used as `kit.watchFit?.()`) |
 | **The developer settings** | `dev(key)`, `everyDev(key, fn)` |
 | **除錯紀錄** | `rec(kind, data)`: the last of each kind in memory; with 記錄 on, a log on the device (2 MB, never a pass or token) to copy |
 
@@ -931,6 +994,20 @@ apps' pages and the nightly packs stay up and open on what the phone has.
 | `postseason.mjs` | Sports, Play | MLB's postseason from MLB itself |
 | `holidays.mjs` | Class, Weather, Transit | Taiwan's days off and 補班 days |
 | `devconfig.mjs` | Workers | The `DEV` table for the Workers |
+| `plus.mjs` | all, the Worker | Plus, free bets and VIP as rules alone (`PLUS`, `plusMonth`, `FREEBET`, `freeBets`, `VIP`, `vipStakes`, `vipTier`, `WELCOME`); `quadra.mjs` re-exports them |
+| `mirror.mjs` | kit, `sports.js`, builders | Which hosts the mirror holds and where a read's copy is kept (`mirrorPath`) |
+| `photo-urls.mjs` | `photos.mjs`, `play-players.mjs` | ESPN headshot addresses alone (no page) |
+| `settle.mjs` | Play, `settle.js` | A pick's result from its game (`legResult`: every kind, a whole line a push, part-game markets from the period scores, soccer at 90 minutes), a slip paid once (`applyResults`, `payout-<slip>`; lost the moment nothing left can pay; a free bet its winnings; Plus's boost its own `plus-<slip>`); the sources' results (ESPN, OpenF1's flags, Polymarket, Kambi, Asia's months). Two spellings of a side: `sideScore` (3 equal, 2 inside, 1 a shared word), `sameSide`, and for which side or which way round, `sideOfGame` / `sidesMatch` (the surer match: a city's two clubs share a word) |
+| `play-odds.mjs` | Play, the Worker | The odds math: devigging, lottery-style prices, the slip (`SLIP_RULES`, combinations, `slipPayoutTable` the one payout loop, `evaluateSlip` / `slipOutlook` / `analyzeSlip` over it, `settleSlip`), Taiwan's withholding (`afterTax` per combination; `prizeAfterTax` for a lottery or scratch prize), `seededRandom`, `choose` |
+| `play-rules.mjs` | Play, the Worker | The house's rules: locks, 限幾關 (`houseRule`, `minLegsProblem`), the long end shaded, `BASE_CUT`, `houseCut` by league tier |
+| `play-cashout.mjs` | Play, `price.js` | Cash out: the fair chance of each open pick less its cut, every way they can land, less the keep; paused for a free bet, no price, two picks of one game, too many open |
+| `play-board.mjs`, `play-bets.mjs`, `play-markets.mjs`, `play-lines.mjs`, `play-live.mjs`, `play-house.mjs`, `play-propmodel.mjs`, `play-props.mjs`, `play-players.mjs`, `play-offers.mjs`, `play-kambi.mjs`, `play-sources.mjs`, `play-schedules.mjs`, `play-teams.mjs` | Play, the Worker | The board: every option of a game priced in one place (models, our own lines, live, the house's own chances, players' markets, Kambi's full lists turned to ESPN's sides, the sources and schedules) |
+| `play-lottery.mjs`, `play-scratch.mjs` | Play, `lotto.js` | Taiwan Lottery's games (tables, draw times, BINGO's 203 draws, house draws from 20:30's BINGO) and twelve scratch cards (a face that pays exactly its prize); prizes taxed by `prizeAfterTax` |
+| `stock-account.mjs` | Securities, `stock-fill.js`, `stock-check.js` | The account as a log replayed (`replay`, `valuate`), orders, fills, FX, loans and calls, deposits, lending, plans, alerts, the pool; `mergeAccounts` (every event once, an order's furthest status: open < cancelled = rejected = expired < filled; an overdraft's and a call's clocks from the copy that saw them first; a default kept) |
+| `stock-markets.mjs` | Securities | Currencies, markets, ticks and daily limits, lots, costs and taxes (Taiwan's floored, the day trade's half tax, odd lots, funds), settlement dates (`settleDate`, `zonedTime`: a wall time in a zone, never a locale string parsed back), margin rates |
+| `stock-holidays.mjs` | Securities | Exchange calendars: rules (Easter, nth weekdays, substitutes) and listed years (Taiwan, Hong Kong, China, Korea, Singapore 2026–27) |
+| `stock-savings.mjs`, `stock-credit.mjs`, `stock-bonds.mjs`, `stock-ipo.mjs`, `stock-quotes.mjs`, `stock-codec.mjs` | Securities, the Worker | 定存 and 借券 with their taxes; 信用交易 (terms, day trading, after-hours); bonds priced from curves; 新股申購 (TWSE's list: a blank or 0 final price falls back to the announced one); quotes; gzip saves |
+| `sports-broadcast.mjs`, `sports-highlights.mjs`, `sports-winprob.mjs` | Sports, builders | Where to watch, highlights, win probability: one copy for the app and the builders |
 | `stamp.mjs`, `apps.mjs`, `link.mjs`, `loader.html`, `preload.mjs` | build | Publishing and wiring the kit; each app's kit modules preloaded |
 
 ## 10. The brand and the renamed repos
@@ -1058,22 +1135,36 @@ See `tools/README.md` for every flag.
 
 | File | What it covers |
 | --- | --- |
-| `eco.test.mjs`, `pass.test.mjs` | The Pass, merges, Plus, VIP, pay, rebases |
+| `eco.test.mjs`, `pass.test.mjs` | The Pass, merges, Plus, VIP, pay, rebases; a session writes only its own app's data |
 | `money.test.mjs` | The money report |
+| `settle.test.mjs`, `price.test.mjs` | Play's slips placed (prices, free bets' shape, one token and one id once a batch), settled, cashed out (a failed payment paid by the cron), the dev door |
+| `lotto.test.mjs` | The lottery and scratch cards sold, drawn and paid once |
+| `stock-fill.test.mjs`, `stock-check.test.mjs`, `stock-ipo.test.mjs` | Securities' fills (terms as first seen, bars since the last look, cancels, two asks at once), every save's check, 新股申購 |
+| `doc-store.test.mjs` | D1's store (preconditions), `changeDoc` (a lost race changed again, nothing written unchanged, null deletes) |
 | `push.test.mjs` | Push encryption, lists, checks |
 | `sports.test.mjs`, `final-cache.test.mjs` | The data proxy through the router: allowlist, trims, batches, cache tiers, the final tier, the mirror answered in place, reads kept on demand |
+| `slip.test.mjs` | Orbit Slips' doors: origin, addresses, limits |
 | `f1-live.test.mjs`, `f1live-kit.test.mjs` | F1's feed trim, sessions, the lap log, `kit/f1live.mjs` |
 | `asia-baseball.test.mjs` | NPB, KBO, CPBL parsing |
 | `kambi.test.mjs` | The Kambi watch |
-| `transit.test.mjs` | TDX rules, caps, routes |
+| `transit.test.mjs` | TDX rules, caps, routes (one test times TDX's spacing by the wall clock: it can fail on a busy machine and pass alone) |
 | `weather.test.mjs`, `weather-skill.test.mjs` | The blend and the scoring |
 | `capacity.test.mjs`, `devconfig.test.mjs` | Capacity and settings |
 | `data.test.mjs`, `store.test.mjs` | `/data/` (push, list, read), the builders' R2 store |
-| `watch.test.mjs`, `builders-*.test.mjs`, `official-photos.test.mjs`, `cpbl.test.mjs` | The builders: watch links (light and full runs), win probability, season packs, CPBL, photos, buses, each on an in-memory R2 |
+| `watch.test.mjs`, `builders-*.test.mjs`, `official-photos.test.mjs`, `cpbl.test.mjs` | The builders: watch links (light and full runs), win probability, season packs and days, CPBL, photos, buses, deadlines (`within`), each on an in-memory R2 |
 | `guard.test.mjs` | The hard stop: the period, the plan's amounts, stopping and starting the proxy, a deploy undone, a Worker gone, blind and unarmed; pacing and alerts; the account from the token |
 | `pace.test.mjs` | The proxy following the pace: read once a minute, builders parked |
 | `ops.test.mjs` | Heartbeats (on SQLite), the bill's news and the owner's notice, the system report (secrets set or not, never a value) |
-| `kit.test.mjs`, `kit-css.test.mjs`, `kit-calendar.test.mjs`, `photos.test.mjs` | The kit |
+| `kit.test.mjs`, `kit-css.test.mjs`, `kit-calendar.test.mjs`, `photos.test.mjs`, `net.test.mjs`, `play-fits.test.mjs` | The kit (the connection's rule, Play's model fits kept) |
+| `kit-stock.test.mjs` | Securities' rules: two devices' copies merged (an expired order, a default, an overdraft's clock), settlement dates over holidays and daylight saving, ticks and limits at their edges, costs and taxes at their thresholds, calendars, credit, bonds, IPOs, Taiwan's day in every module |
+| `kit-play.test.mjs` | Play's money: every kind of pick settled, a slip paid once (free bets, refunds, Plus's boost), withholding and the cap, the odds math against a brute force, cash out, a city's two clubs matched to the right sides, every lottery game's prizes and draw times, scratch faces |
+| `kit-loader.test.mjs`, `kit-data.test.mjs` | The import map lists every served module and every kit import resolves; reads: a failed or garbled read answers the device's copy and is never saved, nothing kept is a failure, the hold, packs, the wipe |
+
+The fakes: `tests/fake-d1.mjs` (D1 over `node:sqlite`, for `doc-store.js`'s
+real queries); most money tests use an in-memory store with the same
+preconditions (`{ updateTime }`, `{ exists: false }`). The suite passes in
+any time zone (`TZ=America/Los_Angeles npm test`): nothing may depend on
+the machine's.
 
 ## 14. What depends on what: the change checklist
 
@@ -1091,6 +1182,8 @@ pushing a change, find its row and check every place it names.
 | A cache tier or `DEV` default | `capacity.js`'s estimates, the admin panel |
 | `f1-live.js` (`trimF1Live`, laps) | Orbit Sports (`lib/f1.mjs`, `sheets.js`: live board, 數據, track map, race chance, standings at the flag); Quadra Play (F1 settling, `kit/f1live.mjs`); `tests/f1-live.test.mjs` |
 | `asia-baseball.js` | Sports (CPBL/NPB/KBO lists, box scores), Play (Kambi + these for settling), `builders/asia.js`, `builders/cpbl.js`, `builders/sports.js` (`asiaBounds`) |
+| `settle.js`, `price.js`, `lotto.js` (what a slip or ticket may be) | Play's own rules (`placeFreeSlip`, `freeShape` in its `app.js`), the kit's `play-odds.mjs` (`slipErrors`, `SLIP_RULES`), `tests/settle.test.mjs`, `price.test.mjs` |
+| `doc-store.js changeDoc` | Every caller (settle, lotto, kambi, stock-fill, money) and their tests' in-memory stores |
 | `eco.js` money rules | The kit's tables (`PLUS`, `VIP`, `WEALTH_RANKS`, `PAY`: the same numbers), `truth.mjs`, `tools/economy.mjs`, `help.mjs`'s money topics, Play and Securities |
 | `push.js` checks | The apps that schedule them: Sports (finals), Securities (prices), Weather (brief, rain), Transit (到站提醒); the kit's `NOTICE_KINDS` |
 | `quadra.css` or the frame | Every app at 375 px, light and dark, WebKit; the status-bar strip rule (TRUTH §10) |

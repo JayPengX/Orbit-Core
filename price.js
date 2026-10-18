@@ -25,6 +25,8 @@ import { cashOutState, CASHOUT_KEEP } from './kit/play-cashout.mjs';
 // and a board read a moment before this one.
 export const PRICE_SLACK = 0.01;
 export const priceOk = (asked, house) => asked <= house * (1 + PRICE_SLACK) + 0.005;
+// A free bet's ticket: one pick, or a parlay (Play's freeShape).
+export const freeShape = (mode, n) => mode === 'parlay' || (mode === 'single' && n === 1);
 // Free bets take odds of this or longer, a parlay's all together (Play's FREE_MIN_ODDS).
 export const FREE_MIN_ODDS = 1.5;
 
@@ -118,9 +120,13 @@ export async function checkSlip(slip, wallet, deps, now = new Date(), reads = nu
   const house = checked.map((c, i) => ({ ...c.bet, odds: Number(legs[i].odds) }));
   const free = slip.free ? freeBets(wallet, now.getTime()).find(x => x.id === slip.free) : null;
   if (slip.free) {
+    // Only on one pick or a parlay, as Play offers it: on several singles or
+    // a system the token's value would be staked on every combination.
+    if (!freeShape(slip.mode, n)) return { problem: 'freeShape' };
     if (!free || Number(slip.freeValue) !== free.value) return { problem: 'free' };
     if (legs.reduce((x, l) => x * Number(l.odds), 1) < FREE_MIN_ODDS - 1e-9) return { problem: 'freeOdds' };
-    if (Math.round(slip.stake - free.value) !== Math.round(slip.cost) || slip.cost < 0) return { problem: 'cost' };
+    // (The token's value and the top-up are the stake, exactly: Play's placeFreeSlip.)
+    if (Math.abs(slip.stake - free.value - slip.cost) > 0.005 || slip.cost < 0) return { problem: 'cost' };
   } else if (Math.abs(comboCount(house, slip.sizes) * slip.stake - slip.cost) > 0.01) return { problem: 'cost' };
   // (A free bet's stake is its token's value and the top-up: not the stake unit's.)
   const errors = slipErrors({ mode: slip.mode, legs: house, sizes: slip.sizes, stake: slip.stake }).filter(e => !(slip.free && (e === 'stakeUnit' || e === 'ticketMin')));

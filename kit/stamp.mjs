@@ -7,6 +7,7 @@
 //   node kit/stamp.mjs <out> <version>
 import { cp, readdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
+import { KIT_TOOLS } from './preload.mjs';
 
 const [out, version] = process.argv.slice(2);
 if (!out || !version) throw new Error('usage: node kit/stamp.mjs <out> <version>');
@@ -15,7 +16,7 @@ const dest = join(out, 'kit');
 await rm(dest, { recursive: true, force: true });
 await cp(src, dest, { recursive: true });
 // Build and dev tools stay out of the site.
-for (const tool of ['stamp.mjs', 'link.mjs', 'loader.html', 'apps.mjs', 'preload.mjs']) await rm(join(dest, tool), { force: true });
+for (const tool of KIT_TOOLS) await rm(join(dest, tool), { force: true });
 
 const LOCAL = /((?:from|import\(|import)\s*['"])(\.\/[^'"?]+\.m?js)(['"])/g;
 for (const name of await readdir(dest)) {

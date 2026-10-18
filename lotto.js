@@ -16,7 +16,8 @@
 // tables, so the same amount, never twice.
 import { GAMES, buyTicket, settleTicket, drawFor } from './kit/play-lottery.mjs';
 import { CARDS, drawPrize } from './kit/play-scratch.mjs';
-import { updateWallet, WALLET_COLLECTION, parseWallet, poolBalance } from './eco.js';
+import { updateWallet, poolBalance } from './eco.js';
+import { parseDoc, changeDoc } from './doc-store.js';
 
 export const TICKET_COLLECTION = 'odds-tickets';
 export const TICKET_INDEX = '_index';
@@ -28,13 +29,6 @@ export const RUN_TICKETS = 40;
 // A draw not out this long after its time: looked at again in 10 minutes.
 const AGAIN = 10 * 60_000;
 
-const parse = text => {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return null;
-  }
-};
 const keyOf = (account, id) => `${account}_${id}`;
 // Tickets checked on an account with no limit to spend (the pool is checked apart).
 const BOTTOMLESS = { v: 1, created: '', ledger: [{ id: 'x', amount: 1e12 }], slips: [], tickets: [] };
@@ -44,25 +38,8 @@ const cryptoSeed = () => crypto.getRandomValues(new Uint32Array(1))[0] >>> 1;
 // A lottery prize over NT$5,000 is taxed (20% and 0.4% stamp duty), as Play's.
 const netPrize = gross => (gross > 5_000 ? Math.round(gross * 0.796) : gross);
 
-async function changeIndex(env, deps, change) {
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const doc = await deps.fsGet(env, TICKET_COLLECTION, TICKET_INDEX);
-    const index = (doc.exists && parse(doc.payload)) || { due: {} };
-    const next = change(index);
-    if (next === index) return index;
-    try {
-      await deps.fsWrite(env, TICKET_COLLECTION, TICKET_INDEX, JSON.stringify(next), doc.exists ? { updateTime: doc.updateTime } : { exists: false });
-      return next;
-    } catch (error) {
-      if (!error.precondition) throw error;
-    }
-  }
-  return null;
-}
-async function readWallet(env, deps, account) {
-  const doc = await deps.fsGet(env, WALLET_COLLECTION, account);
-  return doc.exists ? parseWallet(doc.payload) : null;
-}
+const asIndex = index => (index && typeof index.due === 'object' ? index : { due: {} });
+const changeIndex = (env, deps, change) => changeDoc(env, deps, TICKET_COLLECTION, TICKET_INDEX, change, { read: asIndex }).then(r => r ?? null);
 // Entries into the wallet with the cost checked against the pool at the
 // moment of writing; true when they're in.
 async function charge(env, deps, account, entries, cost) {
@@ -97,7 +74,8 @@ export async function handleLotto(body, env, account, deps, now) {
       if (r.error) return { refused: { problem: r.error } };
       tickets.push(r.ticket);
     }
-    if (!tickets.length) return { refused: { problem: 'shape' } };
+    // (One id once: the same id twice would be charged twice for one ticket.)
+    if (!tickets.length || new Set(tickets.map(x => x.id)).size !== tickets.length) return { refused: { problem: 'shape' } };
     const cost = tickets.reduce((s, x) => s + x.cost, 0);
     const wallet = await charge(env, deps, account, tickets.map(x => ({ id: `odds:lotto-${x.id}`, t: now, app: 'odds', kind: 'lottery', amount: -x.cost })), cost);
     if (!wallet) return { refused: { problem: 'funds' } };
@@ -118,7 +96,7 @@ export async function handleLotto(body, env, account, deps, now) {
     const id = String(body.id || '');
     const key = keyOf(account, id);
     const doc = await deps.fsGet(env, TICKET_COLLECTION, key);
-    const kept = doc.exists ? parse(doc.payload) : null;
+    const kept = parseDoc(doc);
     if (!kept?.ticket?.card) return { refused: { problem: 'unknown' } };
     const prize = netPrize(kept.ticket.prize);
     const result = prize > 0 ? await updateWallet(env, deps, account, w => (w.entries.some(e => e.id === `odds:prize-${id}`) ? w : { ...w, entries: [...w.entries, { id: `odds:prize-${id}`, t: now, app: 'odds', kind: 'prize', amount: prize }] })) : null;
@@ -134,8 +112,7 @@ export async function handleLotto(body, env, account, deps, now) {
 // One cron run: the tickets whose draw is out, settled and paid.
 export async function lottoCron(env, deps) {
   const now = deps.now();
-  const doc = await deps.fsGet(env, TICKET_COLLECTION, TICKET_INDEX);
-  const index = (doc.exists && parse(doc.payload)) || { due: {} };
+  const index = asIndex(parseDoc(await deps.fsGet(env, TICKET_COLLECTION, TICKET_INDEX)));
   const due = Object.entries(index.due)
     .filter(([, at]) => at <= now)
     .sort((a, b) => a[1] - b[1])
@@ -146,7 +123,7 @@ export async function lottoCron(env, deps) {
   const drop = new Set();
   let settled = 0;
   for (const [key] of due) {
-    const kept = (await deps.fsGet(env, TICKET_COLLECTION, key).then(d => (d.exists ? parse(d.payload) : null))) || null;
+    const kept = parseDoc(await deps.fsGet(env, TICKET_COLLECTION, key));
     if (!kept?.ticket?.draw) {
       drop.add(key);
       continue;

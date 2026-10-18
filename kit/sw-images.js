@@ -4,8 +4,8 @@
 // and checked again in the background after a week. Most of these sites
 // tell browsers to keep a picture for seconds (ESPN's two), so without this
 // every opening downloaded every logo again. A download that fails is tried
-// again before the page sees an error. Part of the shared kit: edit it in
-// Shared-Proxy/kit, copy it with `node kit/sync.mjs`.
+// again before the page sees an error. Part of the shared kit: each app's
+// service worker loads it from Shared-Proxy's Pages; edit it there.
 const IMAGE_CACHE = 'quadra-images-v1';
 const IMAGE_FRESH_MS = 7 * 86_400_000;
 const IMAGE_MAX = 1_500;

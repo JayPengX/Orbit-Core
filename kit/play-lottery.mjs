@@ -25,6 +25,8 @@
 // Lottery's own (樂合彩 30/230/2,700/46,000 times the NT$25 on 38, 45/450/8,500
 // on 39, 50/500/8,000 on 49).
 
+import { choose, prizeAfterTax } from '#kit/play-odds.mjs';
+
 export const API = 'https://api.taiwanlottery.com/TLCAPIWeB/Lottery';
 const TPE = 8 * 3_600_000;
 const DAY = 86_400_000;
@@ -195,12 +197,7 @@ export function quickPick(n, max) {
   while (out.size < n) out.add(1 + randomInt(max));
   return [...out].sort((a, b) => a - b);
 }
-const choose = (n, k) => {
-  if (k < 0 || k > n) return 0;
-  let r = 1;
-  for (let i = 1; i <= k; i++) r = (r * (n - k + i)) / i;
-  return Math.round(r);
-};
+// (The slip's own: one copy of the arithmetic.)
 export { choose };
 
 // How many bets a selection makes (a 樂合彩 pick of 5 numbers as 二合 is
@@ -505,7 +502,7 @@ export function settleTicket(account, ticketId, draw, now = new Date()) {
   const r = ticketPrize(ticket, draw);
   // BINGO's prize already counts its multiple (it's a multiple of the stake).
   const gross = r.prize * (ticket.game === 'bingo' ? 1 : ticket.multiple || 1);
-  const net = gross > 5_000 ? Math.round(gross * (1 - 0.204)) : gross;
+  const net = prizeAfterTax(gross);
   const t = now.toISOString();
   const settled = { ...ticket, status: 'settled', prize: net, gross, tier: r.tier, detail: r.detail, drawn: summarize(draw), settledAt: t };
   const ledger = net > 0 && !account.ledger.some(e => e.id === `prize-${ticketId}`) ? [...account.ledger, { id: `prize-${ticketId}`, t, kind: 'prize', amount: net }] : account.ledger;

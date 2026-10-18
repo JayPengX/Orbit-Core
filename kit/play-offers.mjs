@@ -16,7 +16,7 @@
 import { devigProportional } from '#kit/play-odds.mjs';
 import { CUT } from '#kit/play-markets.mjs';
 import { familyOf } from '#kit/play-teams.mjs';
-import { sameSide } from '#kit/play-house.mjs';
+import { sideOfGame, sideScore } from '#kit/play-house.mjs';
 import { propOf } from '#kit/play-props.mjs';
 
 export const offersUrl = (kambiBase, id, live = false) => `${kambiBase}/betoffer/event/${encodeURIComponent(id)}.json?lang=en_GB&market=GB${live ? '&live=1' : ''}`;
@@ -50,9 +50,13 @@ export function parseOffers(data, game) {
   const kHome = event?.homeName ?? '';
   const kAway = event?.awayName ?? '';
   // Kambi's first-named side is the board's away side: turn every side round.
-  const flip = Boolean(kHome && !sameSide(kHome, game.home.en) && sameSide(kHome, game.away.en));
+  // (Which side a name is goes by the surer match: a city's two clubs share a word.)
+  const flip = Boolean(kHome) && sideOfGame(kHome, game.home.en, game.away.en) === 'away';
   const sideOf = one => (one === flip ? 'away' : 'home'); // one: Kambi's home (OT_ONE)
-  const teamOf = name => (sameSide(name, kHome) ? sideOf(true) : sameSide(name, kAway) ? sideOf(false) : null);
+  const teamOf = name => {
+    const k = sideOfGame(name, kHome, kAway);
+    return k ? sideOf(k === 'home') : null;
+  };
   const markets = [];
   const props = [];
   const full = FULL[family] ?? {};
@@ -68,7 +72,7 @@ export function parseOffers(data, game) {
       continue;
     }
     if (full.total?.test(label) && type === 'Over/Under') push(overUnder('total', outs, { main, family }));
-    else if (full.spread?.test(label) && /Handicap/.test(type)) push(handicap('runline', outs, sideOf, family, kHome));
+    else if (full.spread?.test(label) && /Handicap/.test(type)) push(handicap('runline', outs, sideOf, family, kHome, kAway));
     else if (full.team && type === 'Over/Under' && full.team.exec(label)) {
       const team = teamOf(full.team.exec(label)[1]);
       if (team) push(overUnder('teamtotal', outs, { team, family }));
@@ -126,13 +130,20 @@ function halfOk(line, family) {
 
 // A two-way handicap from each side's line (OT_ONE is Kambi's home; Asian
 // handicaps name the side instead).
-function handicap(kind, outs, sideOf, family, kHome) {
+function handicap(kind, outs, sideOf, family, kHome, kAway = '') {
   if (outs.length !== 2) return null;
   const kSide = o => (o.type === 'OT_ONE' ? true : o.type === 'OT_TWO' ? false : null);
   const [a, b] = outs;
   // Asian handicap outcomes are untyped: they name their side.
   const named = o => o.participant || o.label;
-  const firstHome = kSide(a) ?? (named(a) && named(b) ? sameSide(named(a), kHome) : null);
+  // (By the surer match; a name like neither side is the away one, as before;
+  // one like both alike, Chicago's two clubs, isn't read.)
+  const namedHome = () => {
+    const h = sideScore(named(a), kHome);
+    const w = sideScore(named(a), kAway);
+    return h === w && h > 0 ? null : h > w;
+  };
+  const firstHome = kSide(a) ?? (named(a) && named(b) ? namedHome() : null);
   if (firstHome == null) return null;
   const home = firstHome ? a : b;
   const away = firstHome ? b : a;

@@ -40,7 +40,7 @@
 // readJsonBody, INVALID_BODY, fsGet, fsWrite, fsDelete, now }, plus `read(url)`
 // (a source's JSON, or null), and `notify(account, message)` (push.js).
 
-import { storeReady } from './doc-store.js';
+import { storeReady, parseDoc, changeDoc } from './doc-store.js';
 import { readOutcomes, legResult, applyResults, finalOf, familyOf, LEAGUES } from './kit/settle.mjs';
 import { updateWallet, WALLET_COLLECTION, parseWallet, poolBalance, LOCK_SINCE } from './eco.js';
 import { checkSlip, useReads, cashOutQuote, cashOutOk } from './price.js';
@@ -80,13 +80,6 @@ const MAX_SLIP_BYTES = 24_000;
 const SLIP_ID = /^[a-z0-9]{8,32}$/;
 const ACCOUNT = /^[A-Za-z0-9_-]{8,128}$/;
 
-const parse = text => {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return null;
-  }
-};
 const keyOf = (account, slipId) => `${account}_${slipId}`;
 
 // What's kept of a slip: what settling needs (and its picks' names for the notice).
@@ -148,43 +141,19 @@ export function settleOne(slip, results, finals, now) {
 
 // ---- The index: every watched slip and when it's next due, one read a run ----
 
+const asIndex = index => (index && typeof index.due === 'object' ? index : { due: {} });
 async function readIndex(env, deps) {
-  const doc = await deps.fsGet(env, OPEN_COLLECTION, OPEN_INDEX);
-  const index = doc.exists ? parse(doc.payload) : null;
-  return { index: index && typeof index.due === 'object' ? index : { due: {} }, updateTime: doc.updateTime, exists: doc.exists };
+  return { index: asIndex(parseDoc(await deps.fsGet(env, OPEN_COLLECTION, OPEN_INDEX))) };
 }
-async function changeIndex(env, deps, change) {
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const { index, updateTime, exists } = await readIndex(env, deps);
-    const next = change(index);
-    if (next === index) return index;
-    try {
-      await deps.fsWrite(env, OPEN_COLLECTION, OPEN_INDEX, JSON.stringify(next), exists ? { updateTime } : { exists: false });
-      return next;
-    } catch (error) {
-      if (!error.precondition) throw error;
-    }
-  }
-  return null;
-}
+const changeIndex = (env, deps, change) => changeDoc(env, deps, OPEN_COLLECTION, OPEN_INDEX, change, { read: asIndex }).then(r => r ?? null);
 
 // ---- The records Play applies -------------------------------------------------
 
+// (An account's records: { slips: { id: record } }; none left, the document goes.)
 async function changeRecords(env, deps, account, change) {
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const doc = await deps.fsGet(env, SETTLED_COLLECTION, account);
-    const records = (doc.exists && parse(doc.payload)?.slips) || {};
-    const next = change(records);
-    if (next === records) return records;
-    try {
-      if (!Object.keys(next).length && doc.exists) await deps.fsDelete(env, SETTLED_COLLECTION, account);
-      else await deps.fsWrite(env, SETTLED_COLLECTION, account, JSON.stringify({ slips: next }), doc.exists ? { updateTime: doc.updateTime } : { exists: false });
-      return next;
-    } catch (error) {
-      if (!error.precondition) throw error;
-    }
-  }
-  throw new Error('records busy');
+  const out = await changeDoc(env, deps, SETTLED_COLLECTION, account, change, { read: v => v?.slips || {}, write: slips => (Object.keys(slips).length ? { slips } : null) });
+  if (out === undefined) throw new Error('records busy');
+  return out;
 }
 const recordOf = (slip, at) => ({
   results: slip.legs.map(l => l.result ?? null),
@@ -213,7 +182,7 @@ export async function handlePlay(request, env, headers, session, deps) {
   try {
     if (request.method === 'GET') {
       const doc = await deps.fsGet(env, SETTLED_COLLECTION, account);
-      return json({ settled: (doc.exists && parse(doc.payload)?.slips) || {} }, 200, headers);
+      return json({ settled: parseDoc(doc)?.slips || {} }, 200, headers);
     }
     if (request.method !== 'POST') return errorJson('SYNC_METHOD_NOT_ALLOWED', 405, headers, request);
     const body = await deps.readJsonBody(request);
@@ -227,7 +196,11 @@ export async function handlePlay(request, env, headers, session, deps) {
       // taken from the wallet and the slip watched, all or none.
       const slips = (Array.isArray(body.slips) ? body.slips : []).slice(0, MAX_SLIPS);
       const clean = slips.map(cleanSlip);
-      if (!clean.length || clean.some(x => !x)) return json({ refused: { problem: 'shape' } }, 200, headers);
+      if (!clean.length || clean.some(x => !x) || new Set(clean.map(x => x.id)).size !== clean.length) return json({ refused: { problem: 'shape' } }, 200, headers);
+      // A free bet's token on one slip of the batch only (each slip is
+      // checked against the wallet as it was: two could spend one token).
+      const tokens = clean.filter(x => x.free).map(x => x.free);
+      if (new Set(tokens).size !== tokens.length) return json({ refused: { problem: 'free' } }, 200, headers);
       const doc = await deps.fsGet(env, WALLET_COLLECTION, account);
       const wallet = doc.exists ? parseWallet(doc.payload) : null;
       if (!wallet) return errorJson('ECO_SIGNED_OUT', 401, headers, request);
@@ -281,10 +254,10 @@ export async function handlePlay(request, env, headers, session, deps) {
       const key = keyOf(account, id);
       for (let attempt = 0; attempt < 3; attempt++) {
         const doc = await deps.fsGet(env, OPEN_COLLECTION, key);
-        const open = doc.exists ? parse(doc.payload) : null;
+        const open = parseDoc(doc);
         if (!open || open.state !== 'open') {
           const records = await deps.fsGet(env, SETTLED_COLLECTION, account);
-          const record = (records.exists && parse(records.payload)?.slips?.[id]) || null;
+          const record = parseDoc(records)?.slips?.[id] || null;
           if (record?.settled || open?.state === 'settling') return json({ settled: record || { settled: true, pending: true } }, 200, headers);
           return json({ refused: { problem: 'unknown' } }, 200, headers);
         }
@@ -344,7 +317,7 @@ const keptKambi = (env, deps) => async ids => {
   const out = new Map();
   for (const id of ids) {
     const doc = await deps.fsGet(env, KAMBI_COLLECTION, id);
-    const entry = doc.exists ? parse(doc.payload) : null;
+    const entry = parseDoc(doc);
     if (entry) out.set(id, entry);
   }
   return out;
@@ -383,7 +356,10 @@ export async function settleCron(env, deps) {
   const drop = new Set();
   for (const [key] of due) {
     const doc = await deps.fsGet(env, OPEN_COLLECTION, key);
-    const open = doc.exists ? parse(doc.payload) : null;
+    const open = parseDoc(doc);
+    // Cashed out: its payout made sure of (a cash out whose wallet write
+    // failed after the slip was marked would otherwise be lost), then dropped.
+    if (open?.slip && open.state === 'cashed') await payCashOut(env, deps, open, now);
     if (!open?.slip || open.state === 'cashed') {
       drop.add(key);
       if (doc.exists) await deps.fsDelete(env, OPEN_COLLECTION, key).catch(() => {});
@@ -447,6 +423,23 @@ export async function settleCron(env, deps) {
       return { ...idx, due: next };
     });
   return { watched: Object.keys(index.due).length, looked: docs.length, decided, settled };
+}
+
+// A cash out's payout, once (its id the ledger's), only for a slip whose
+// stake the wallet has.
+async function payCashOut(env, deps, open, now) {
+  const id = open.slip.id;
+  const value = Math.floor(Number(open.value));
+  if (!(value >= 1)) return;
+  let paid = false;
+  await updateWallet(env, deps, open.account, w => {
+    const have = new Set(w.entries.map(e => e.id));
+    if (!have.has(`odds:stake-${id}`) || have.has(`odds:payout-${id}`)) return (paid = false), w;
+    paid = true;
+    return { ...w, entries: [...w.entries, { id: `odds:payout-${id}`, t: open.at || now, app: 'odds', kind: 'cashout', amount: value }] };
+  });
+  // (Paid only now: its record too, for Play to apply; one already applied isn't brought back.)
+  if (paid) await changeRecords(env, deps, open.account, records => ({ ...records, [id]: { ...recordOf(open.slip, open.at || now), settled: true, cashedOut: true, payout: value } }));
 }
 
 // A settled slip: the wallet paid (the ids Play's ledger uses; only for a

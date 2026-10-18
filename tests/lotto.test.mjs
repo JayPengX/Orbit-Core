@@ -84,3 +84,12 @@ test('tickets from before the lock-down are watched no more: a ticket handed ove
   assert.equal(doc(TICKET_COLLECTION, `${ACCOUNT}_oldcard001`), null);
   assert.equal((await post(deps, { op: 'reveal', id: 'oldcard001' })).body.refused.problem, 'unknown');
 });
+
+test('one ticket id twice in a sale: refused, nothing charged', async () => {
+  const now = { t: Date.parse('2026-10-12T04:00:00Z') };
+  const { deps, doc } = setup(now, money);
+  const t = { id: 'lotto00009', game: 'daily539', sel: { zones: [[1, 2, 3, 4, 5]] }, multiple: 1 };
+  const r = await post(deps, { op: 'tickets', tickets: [t, { ...t, multiple: 2 }] });
+  assert.equal(r.body.refused?.problem, 'shape');
+  assert.ok(!doc(WALLET_COLLECTION, ACCOUNT).entries.some(e => e.kind === 'lottery'));
+});
