@@ -876,6 +876,41 @@ test('a read that says which wallet it holds (w) gets no wallet back while it is
   assert.equal(saved.data.wallet, undefined);
 });
 
+test('a read or a wake claim that says which data it holds (since) gets { unchanged, updateTime } and no payload while it is the same; the claim takes w too', async () => {
+  const t = setup();
+  const a = await newPass(t, 'vocab');
+  const saved = await t.call('POST', '?app=vocab', { op: 'write', qt: a.token, payload: 'v:1' });
+  const held = saved.data.updateTime;
+  assert.ok(held);
+  const same = await t.call('GET', `${t.qt(saved.data.token)}&app=vocab&since=${encodeURIComponent(held)}`);
+  assert.equal(same.data.unchanged, true);
+  assert.equal(same.data.updateTime, held);
+  assert.equal(same.data.payload, undefined);
+  // No since (an older kit): the data, as before.
+  const plain = await t.call('GET', `${t.qt(same.data.token)}&app=vocab`);
+  assert.equal(plain.data.payload, 'v:1');
+  assert.equal(plain.data.unchanged, undefined);
+  // Changed since: the data comes whole.
+  await t.call('POST', '?app=vocab', { op: 'write', qt: plain.data.token, payload: 'v:2' });
+  const changed = await t.call('GET', `${t.qt(plain.data.token)}&app=vocab&since=${encodeURIComponent(held)}`);
+  assert.equal(changed.data.payload, 'v:2');
+  assert.equal(changed.data.unchanged, undefined);
+  // The wake: one request, the claim with the data and the wallet as held.
+  const now = changed.data.updateTime;
+  const peek = await t.call('POST', '', { op: 'refresh', refresh: a.refresh, app: 'vocab' });
+  const wake = await t.call('POST', '', { op: 'refresh', refresh: a.refresh, app: 'vocab', claim: true, data: true, since: now, w: peek.data.walletTime });
+  assert.equal(wake.data.active, true);
+  assert.equal(wake.data.unchanged, true);
+  assert.equal(wake.data.updateTime, now);
+  assert.equal(wake.data.payload, undefined);
+  assert.equal(wake.data.same, true);
+  assert.equal(wake.data.wallet, undefined);
+  assert.ok(wake.data.token && wake.data.refresh);
+  const stale = await t.call('POST', '', { op: 'refresh', refresh: wake.data.refresh, app: 'vocab', claim: true, data: true, since: held, w: 'old' });
+  assert.equal(stale.data.payload, 'v:2');
+  assert.ok(stale.data.wallet && !stale.data.same);
+});
+
 test("a big wallet's old entries fold into monthly sums: the same balance and sums, the Pass's own and Securities' kept, and no paid slip can be paid again", async () => {
   const { foldWallet, FOLD_AT, updateWallet } = await import('../eco.js');
   const now = Date.parse('2027-12-01T00:00:00Z');

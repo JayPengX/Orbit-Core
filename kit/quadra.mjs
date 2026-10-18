@@ -1411,11 +1411,15 @@ function makeSession(app, { lang, heartbeat }) {
     if (refreshing) await refreshing.catch(() => {});
     if (!token || Date.now() - tokenAt > 15 * 60_000) await (refreshing || refresh({ claim: false }));
   }
-  async function refreshOnce({ claim = false, data = false } = {}) {
+  // (`since`: the updateTime of the app's data held here; still the same,
+  // it doesn't come back: `unchanged`. A Worker without it sends it anyway.)
+  async function refreshOnce({ claim = false, data = false, since = '' } = {}) {
     const ref = readStore(KEY.refresh);
     if (!ref) return signedOut();
     try {
-      return absorb(await call('POST', '', { op: 'refresh', refresh: ref, app, claim, data, inbox: data }));
+      const res = absorb(await call('POST', '', { op: 'refresh', refresh: ref, app, claim, data, inbox: data, w: wallet ? walletAt : '', since: data ? since : '' }));
+      if (res.same) res.wallet = wallet;
+      return res;
     } catch (error) {
       if (error.code === 'ECO_SIGNED_OUT' || error.code === 'ECO_TOKEN_INVALID') return signedOut();
       throw error;
@@ -1461,7 +1465,8 @@ function makeSession(app, { lang, heartbeat }) {
 
   s.login = login;
   s.create = create;
-  s.claim = () => refresh({ claim: true });
+  // ({ data, since }: the app's data in the same request, as for read.)
+  s.claim = ({ data = false, since = '' } = {}) => refresh({ claim: true, data, since });
   s.signOut = () => signedOut();
   // Every other device signed out; this one stays signed in.
   s.signOutEverywhere = () => withToken(qt => call('POST', '', { op: 'signout-all', qt })).then(absorb);
@@ -1475,8 +1480,11 @@ function makeSession(app, { lang, heartbeat }) {
   s.deviceCode = () => withToken(qt => call('POST', '', { op: 'pair-create', qt }));
   // (The heartbeat's read every 2 minutes: the whole wallet, up to hundreds
   // of KB, came back each time, and every app redrew for it.)
-  s.read = ({ data = false, inbox = false } = {}) =>
-    withToken(qt => call('GET', qs({ qt, app: data ? app : '', inbox: inbox ? '1' : '', w: wallet ? walletAt : '' }))).then(res => {
+  // (`since`: the updateTime of the app's data held here; while it's still
+  // the same, { unchanged: true, updateTime } comes back without `payload`.
+  // An older Worker sends the data anyway: no `unchanged` means changed.)
+  s.read = ({ data = false, inbox = false, since = '' } = {}) =>
+    withToken(qt => call('GET', qs({ qt, app: data ? app : '', inbox: inbox ? '1' : '', w: wallet ? walletAt : '', since: data ? since : '' }))).then(res => {
       absorb(res);
       if (res.same) res.wallet = wallet;
       return res;

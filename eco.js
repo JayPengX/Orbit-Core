@@ -26,14 +26,17 @@
 //     Class share keys (`eco-shares`).
 //
 // With a session token (`qt`):
-//   GET    /eco?qt=T[&app=A][&inbox=1]   the wallet, app A's data; `active`
-//            says whether this session is the account's live one, and while
-//            it is a fresh `token` comes back
+//   GET    /eco?qt=T[&app=A][&inbox=1][&w=W][&since=U]   the wallet, app A's
+//            data; `active` says whether this session is the account's live
+//            one, and while it is a fresh `token` comes back. The wallet the
+//            device holds (`w`, its walletTime) isn't sent again (`same`); nor
+//            is A's data when it's still the one of `since` (its updateTime):
+//            { unchanged: true, updateTime } in place of `payload`
 //   PATCH  /eco?qt=T[&app=A]  { payload?, wallet? }   only while live
 //   DELETE /eco?qt=T[&app=A][&inbox=ID]   the account (or one app's data)
 //   POST   /eco { op: 'create', app }                 a new pass, signed in
 //   POST   /eco { op: 'login', passcode, app }        sign in on this device
-//   POST   /eco { op: 'refresh', refresh, app, claim?, data?, inbox? }
+//   POST   /eco { op: 'refresh', refresh, app, claim?, data?, inbox?, w?, since? }
 //   POST   /eco { op: 'pair-create', qt }             a device code (10 min)
 //   POST   /eco { op: 'pair-redeem', code, app }      sign in with it
 //   POST   /eco { op: 'handoff', qt }                 sign-in for a link
@@ -612,14 +615,9 @@ export async function handleEcoRequest(request, env, headers, ip, deps) {
         out.token = await sessionToken(secret, claims, deps.now());
       }
       Object.assign(out, { wallet: publicWallet(wallet), walletTime, pool: poolBalance(wallet), updateTime: '', payload: '' });
-      // The wallet the device already holds (`w`, when it was made): not sent again.
-      if (walletTime && url.searchParams.get('w') === walletTime) {
-        delete out.wallet;
-        out.same = true;
-      }
+      sameWallet(out, url.searchParams.get('w'));
       if (app) {
-        const doc = await deps.fsGet(env, ECO_APPS[app].collection, docId);
-        if (doc.exists) Object.assign(out, { updateTime: doc.updateTime, payload: doc.payload });
+        Object.assign(out, await appData(env, deps, app, docId, url.searchParams.get('since')));
         if (url.searchParams.get('inbox') === '1') out.inbox = await readInbox(env, deps, wallet, app);
       }
       return json(out, 200, headers);
@@ -727,7 +725,25 @@ async function signIn(ctx, docId, { passcode = null } = {}) {
   return deps.json(out, 200, headers);
 }
 
-async function sessionReply(env, deps, secret, result, c, now, { app, inbox = false } = {}) {
+// App `app`'s data for the account: { payload, updateTime } ('' for none),
+// or { unchanged: true, updateTime } when it's still the one the device
+// holds (`since`, the updateTime it came with).
+async function appData(env, deps, app, docId, since = '') {
+  const doc = await deps.fsGet(env, ECO_APPS[app].collection, docId);
+  if (!doc.exists) return { payload: '', updateTime: '' };
+  if (since && since === doc.updateTime) return { unchanged: true, payload: undefined, updateTime: doc.updateTime };
+  return { payload: doc.payload, updateTime: doc.updateTime };
+}
+
+// The wallet the device already holds (`w`, its walletTime): not sent again.
+function sameWallet(out, w) {
+  if (!w || !out.walletTime || w !== out.walletTime) return out;
+  delete out.wallet;
+  out.same = true;
+  return out;
+}
+
+async function sessionReply(env, deps, secret, result, c, now, { app, inbox = false, since = '' } = {}) {
   const out = {
     token: await sessionToken(secret, c, now),
     active: true,
@@ -738,8 +754,7 @@ async function sessionReply(env, deps, secret, result, c, now, { app, inbox = fa
     updateTime: ''
   };
   if (app) {
-    const doc = await deps.fsGet(env, ECO_APPS[app].collection, c.d);
-    if (doc.exists) Object.assign(out, { payload: doc.payload, updateTime: doc.updateTime });
+    Object.assign(out, await appData(env, deps, app, c.d, since));
     if (inbox) out.inbox = await readInbox(env, deps, result.wallet, app);
   }
   return out;
@@ -791,12 +806,13 @@ async function ecoRefresh(ctx) {
   if (!wallet || gen(wallet) !== c.g) return errorJson('ECO_SIGNED_OUT', 401, headers, request);
   const claims = { d: c.d, s: c.s, a: app, g: c.g };
   const live = isActive(wallet, claims);
-  if (!live && !body.claim) return json({ active: false, live: liveOf(wallet), wallet: publicWallet(wallet), pool: poolBalance(wallet) }, 200, headers);
+  const w = str(body.w, 100);
+  if (!live && !body.claim) return json(sameWallet({ active: false, live: liveOf(wallet), wallet: publicWallet(wallet), walletTime: doc.updateTime, pool: poolBalance(wallet) }, w), 200, headers);
   let result = { wallet, updateTime: doc.updateTime };
   if (!live || paydayEntries(wallet, now).length) {
     result = await updateWallet(env, deps, c.d, w => ({ ...touchApp(mergeWallet(w, { entries: paydayEntries(w, now) }), app, now), live: { sid: c.s, app, t: now } }));
   }
-  const out = await sessionReply(env, deps, secret, result, claims, now, { app: body.data ? app : '', inbox: body.inbox });
+  const out = sameWallet(await sessionReply(env, deps, secret, result, claims, now, { app: body.data ? app : '', inbox: body.inbox, since: str(body.since, 100) }), w);
   out.refresh = await refreshToken(secret, claims, now);
   // Taken back from another device or app that was live meanwhile: this
   // app's copy may be behind (the kit tells the app, 'active').
