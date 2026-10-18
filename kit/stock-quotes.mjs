@@ -379,6 +379,8 @@ export function parseFundamentals(json) {
     target: raw(fd.targetMeanPrice) != null ? { mean: money(fd.targetMeanPrice), high: money(fd.targetHighPrice), low: money(fd.targetLowPrice), analysts: raw(fd.numberOfAnalystOpinions), rating: fd.recommendationKey || null } : null,
     earningsDate: raw(ce.earnings?.earningsDate?.[0]) ? raw(ce.earnings.earningsDate[0]) * 1000 : null,
     exDividendDate: raw(ce.exDividendDate) ? raw(ce.exDividendDate) * 1000 : raw(sd.exDividendDate) ? raw(sd.exDividendDate) * 1000 : null,
+    // The pay date of that dividend (Yahoo has it for the US, mostly not for Taiwan).
+    dividendDate: raw(ce.dividendDate) ? raw(ce.dividendDate) * 1000 : null,
     ceo: (ap.companyOfficers || []).find(o => /CEO|Chief Executive/i.test(o.title || ''))?.name?.replace(/\s+/g, ' ').replace(/^(Mr|Ms|Mrs|Dr)\.\s*/, '') || null,
     city: ap.city || null,
     yearly: (er.financialsChart?.yearly || []).map(y => ({ label: String(y.date), revenue: raw(y.revenue), earnings: raw(y.earnings) })).filter(y => y.revenue != null),

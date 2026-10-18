@@ -173,7 +173,7 @@ export const HELP = {
       ]],
       ['money', '錢怎麼算', [
         'Securities 的新台幣就是 Quadra 餘額：買進時從錢包出去，賣出時回來。月薪和其他 App 的錢都會以新台幣存入，算投入的本金，不算報酬。',
-        '股利照各國規定預扣稅，除息日持有就有，現金在發放日入帳（台股約 4 週後、美股約 1 週後）；在那之前列為「待入帳」，算在淨值裡但不能花。',
+        '股利照各國規定預扣稅，除息日持有就有，現金在發放日入帳（有公布的照公布日期，否則台股約 4 週後、美股約 1 週後，遇假日順延到下一個交易日）；在那之前列為「待入帳」，算在淨值裡但不能花。',
         '餘額變負的（透支）時不能再花錢，「一鍵賣出補足」會找出最少要賣哪些來補。'
       ]]
     ],
@@ -228,7 +228,7 @@ export const HELP = {
       ]],
       ['money', 'Money', [
         'Securities’ NT$ is the Quadra balance: buying spends from it, selling returns to it. The monthly pay and the other apps’ money arrive as NT$ deposits, counted as money put in, not as return.',
-        'Dividends have each country’s withholding: held on the ex-date, the cash arrives on the pay day (about 4 weeks later in Taiwan, a week in the US); until then it’s listed as on the way, counted in net worth but not spendable.',
+        'Dividends have each country’s withholding: held on the ex-date, the cash arrives on the pay day (the announced one where known, else about 4 weeks later in Taiwan and a week in the US, moved past holidays to the next trading day); until then it’s listed as on the way, counted in net worth but not spendable.',
         'With the balance below zero (an overdraft) nothing more can be spent, and Sell to cover finds the fewest sales that cover it.'
       ]]
     ]
