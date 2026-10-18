@@ -108,3 +108,15 @@ test('plans: listed shares only in Taiwan and the US; a US one from US$10, bough
   assert.equal(SA.runPlan(acc, { ...plan, amount: 200 }, run, { price: 250, twd: 32 }, NOW).order.reason, 'planMin');
   assert.equal(SA.runPlan(acc, { ...plan, id: 'p2', symbol: '7203.T', market: 'JP', currency: 'JPY' }, run, { price: 3000, twd: 0.21 }, NOW).order.reason, 'planMarket');
 });
+
+test('Hong Kong takes limit orders only (HKEX: no market order); the broker\'s own forced sale still goes', () => {
+  const t = at('2026-10-13T10:00', 'Asia/Hong_Kong');
+  const hk = { symbol: '0700.HK', name: 'Tencent', kind: 'stock', market: 'HK', currency: 'HKD', price: 500, prev: 500, got: t, marketTime: t, tz: 'Asia/Hong_Kong', session: { start: at('2026-10-13T09:30', 'Asia/Hong_Kong'), end: at('2026-10-13T16:00', 'Asia/Hong_Kong') } };
+  const place = (req, acc = rich()) => SA.placeOrder(acc, req, { quote: hk, rates: RATES, valuation: OK, now: t, id: 'h1' });
+  assert.equal(place({ side: 'buy', type: 'market', qty: 100 }).error, 'limitOnly');
+  assert.equal(place({ side: 'buy', type: 'stop', stop: 510, qty: 100 }).error, 'limitOnly');
+  const bought = place({ side: 'buy', type: 'limit', limit: 500, qty: 100 });
+  assert.equal(bought.error, undefined);
+  assert.equal(place({ side: 'sell', type: 'market', qty: 100, forced: true }, bought.account).error, undefined);
+  assert.equal(SM.limitOnly('JP'), false, 'Tokyo takes market orders (JPX: 成行)');
+});

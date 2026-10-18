@@ -313,6 +313,12 @@ export function lotProblem(market, symbol, kind, side, qty, held = 0) {
   return { lot };
 }
 
+// Markets that take limit orders only: Hong Kong (HKEX's continuous
+// session takes limit, enhanced limit and special limit orders, no market
+// order; its auctions at-auction limit orders).
+const LIMIT_ONLY = new Set(['HK']);
+export const limitOnly = market => LIMIT_ONLY.has(market);
+
 // Lunch breaks, in the market's own time: no trading in between.
 const LUNCH = { JP: [690, 750], HK: [720, 780], CN: [690, 780], SG: [720, 780] };
 export function atLunch(market, t) {
