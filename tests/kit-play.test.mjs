@@ -7,7 +7,7 @@ import { legResult, applyResults, voidAt, lateOutcome, decidedSoFar, parseEspnRe
 import { settleSlip, evaluateSlip, slipPayoutTable, slipOutlook, analyzeSlip, afterTax, prizeAfterTax, SLIP_RULES, combosBySize, comboCount, slipErrors, slipSizes, choose, maskChance, exclusiveMasks, estimateLineOdds, estimateFuturesOdds, estimateF1Odds, devigPower, devigTwoWay, devigProportional, americanToProbability, boostRate, seededRandom, quantile, median } from '../kit/play-odds.mjs';
 import { cashOutState, CASHOUT_KEEP, CASHOUT_MAX_OPEN } from '../kit/play-cashout.mjs';
 import { houseRule, shadeLong, minLegsProblem, HOUSE_RULES, LONG_FROM } from '../kit/play-rules.mjs';
-import { GAMES, ticketPrize, settleTicket, buyTicket, nextDraw, checkSelection, betCount, boxWays, expectedReturn, mergeTickets, addTickets, HOUSE_SLOT, BINGO_DRAWS } from '../kit/play-lottery.mjs';
+import { GAMES, ticketPrize, settleTicket, buyTicket, nextDraw, checkSelection, betCount, expectedReturn, mergeTickets, addTickets, BINGO_DRAWS, GAME_ORDER } from '../kit/play-lottery.mjs';
 import { CARD_ORDER, face, facePays, tiersOf, drawPrize, buyScratch, revealScratch, expectedReturn as scratchReturn } from '../kit/play-scratch.mjs';
 import { propResult } from '../kit/play-props.mjs';
 import { parseOffers } from '../kit/play-offers.mjs';
@@ -504,15 +504,19 @@ test("lottery prizes by Taiwan Lottery's tables, each game", () => {
   assert.equal(t('lotto649', { zones: [[1, 2, 3, 7, 41, 42]] }, lotto).tier, 'sixth');
   assert.equal(t('lotto649', { zones: [[1, 2, 40, 41, 42, 43]] }, lotto).prize, 0);
   assert.equal(t('daily539', { zones: [[1, 2, 3, 30, 31]] }, { numbers: [1, 2, 3, 4, 5] }).prize, 300);
-  // 3星彩: straight, box by the digits' orders, the last two in order.
+  // 3星彩 / 4星彩 (2024 on): in order, by how many of the last digits match.
   const star3 = { digits: [1, 2, 3] };
-  assert.equal(t('star3', { play: 'straight', digits: [1, 2, 3] }, star3).prize, 12_500);
-  assert.equal(t('star3', { play: 'box', digits: [3, 2, 1] }, star3).prize, 2_000);
-  assert.equal(t('star3', { play: 'box', digits: [1, 1, 2] }, { digits: [1, 2, 1] }).prize, 4_000);
-  assert.equal(t('star3', { play: 'pair', digits: [9, 2, 3] }, star3).prize, 1_250);
-  assert.equal(t('star4', { play: 'box', digits: [1, 1, 2, 2] }, { digits: [2, 1, 2, 1] }).prize, 20_000);
-  assert.equal(boxWays([1, 1, 1]), 1);
-  assert.equal(boxWays([1, 2, 3, 4]), 24);
+  assert.deepEqual(t('star3', { play: 'straight', digits: [1, 2, 3] }, star3), { prize: 5_000, tier: 'first', detail: [3] });
+  assert.equal(t('star3', { play: 'straight', digits: [9, 2, 3] }, star3).prize, 500);
+  assert.equal(t('star3', { play: 'straight', digits: [2, 9, 3] }, star3).prize, 50);
+  assert.equal(t('star3', { play: 'straight', digits: [1, 2, 9] }, star3).prize, 0, 'the first two in place: nothing');
+  assert.equal(t('star3', { play: 'straight', digits: [3, 2, 1] }, star3).prize, 0, 'any order (組彩) no longer pays');
+  assert.equal(t('star3', { play: 'pair', digits: [9, 2, 3] }, star3).prize, 500, 'a 對彩 from before: checked in place');
+  const star4 = { digits: [1, 2, 3, 4] };
+  assert.equal(t('star4', { play: 'straight', digits: [1, 2, 3, 4] }, star4).prize, 50_000);
+  assert.equal(t('star4', { play: 'straight', digits: [0, 2, 3, 4] }, star4).prize, 5_000);
+  assert.equal(t('star4', { play: 'straight', digits: [0, 0, 3, 4] }, star4).prize, 500);
+  assert.equal(t('star4', { play: 'straight', digits: [1, 2, 3, 0] }, star4).prize, 0);
   // 樂合彩: every combination inside the draw wins.
   assert.equal(t('m39', { numbers: [1, 2, 3, 30], size: 2 }, { numbers: [1, 2, 3, 4, 5] }).prize, 3 * 1_125);
   assert.equal(betCount('m39', { numbers: [1, 2, 3, 30], size: 2 }), 6);
@@ -524,19 +528,17 @@ test("lottery prizes by Taiwan Lottery's tables, each game", () => {
   assert.equal(t('bingo', { side: 'small' }, bingo).prize, 0);
   assert.equal(t('bingo', { side: 'odd' }, bingo).prize, 150);
   assert.equal(t('bingo', { side: 'bullseye', bull: 79 }, bingo).prize, 1_200);
-  // 雙贏彩: all twelve or none pay the top prize.
-  assert.equal(t('lotto1224', { zones: [[13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]] }, { numbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] }).prize, 15_000_000);
-  assert.equal(t('lotto1224', { zones: [[1, 2, 3, 4, 5, 6, 13, 14, 15, 16, 17, 18]] }, { numbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] }).prize, 0);
-  assert.equal(t('lotto740', { zones: [[1, 2, 3, 30, 31, 32, 33]] }, { numbers: [1, 2, 3, 4, 5, 6, 7] }).prize, 200);
 });
 
 test('lottery tickets: checked, bought at their draw, settled once with the tax, merged settled-first', () => {
   assert.deepEqual(checkSelection('super638', { zones: [[1, 2, 3, 4, 5, 6], [9]] }), { error: 'numbers' });
   assert.deepEqual(checkSelection('super638', { zones: [[1, 2, 3, 4, 5, 5], [1]] }), { error: 'numbers' });
-  assert.deepEqual(checkSelection('star3', { play: 'box', digits: [7, 7, 7] }), { error: 'boxSame' });
+  assert.deepEqual(checkSelection('star3', { play: 'box', digits: [3, 2, 1] }), { error: 'play' });
+  assert.deepEqual(checkSelection('star4', { play: 'straight', digits: [7, 7, 7, 7] }), { ok: true });
   assert.deepEqual(checkSelection('bingo', { numbers: Array.from({ length: 11 }, (_, i) => i + 1) }), { error: 'numbers' });
   assert.deepEqual(checkSelection('bingo', { side: 'bullseye', bull: 81 }), { error: 'side' });
-  assert.deepEqual(checkSelection('m38', { numbers: [1, 2], size: 3 }), { error: 'numbers' });
+  assert.deepEqual(checkSelection('m39', { numbers: [1, 2], size: 3 }), { error: 'numbers' });
+  assert.ok(!GAMES.m38, '38樂合彩 is gone (last drawn 2023-12-28)');
   const now = new Date('2026-10-19T10:00:00Z'); // Monday 18:00 Taipei: tonight's 威力彩
   const acc = { ledger: [{ id: 'start', amount: 1_000, t: '' }], tickets: [] };
   const bought = buyTicket(acc, { id: 't1', game: 'super638', sel: { zones: [[1, 2, 3, 4, 5, 6], [7]] }, multiple: 3 }, now);
@@ -583,11 +585,14 @@ test('draw times: sales close half an hour before 20:30, BINGO every five minute
   assert.equal(nextDraw('bingo', at('2026-10-19T15:53:59Z')).slot, BINGO_DRAWS - 1, '23:55, the last');
   assert.equal(nextDraw('bingo', at('2026-10-19T15:54:00Z')).slot, BINGO_DRAWS - 1, 'a minute before the draw: still in it');
   assert.deepEqual(nextDraw('bingo', at('2026-10-19T15:54:01Z')), { date: '2026-10-20', slot: 0, at: at('2026-10-19T23:05:00Z') });
-  assert.equal(HOUSE_SLOT, 161, "20:30's BINGO draw");
   // What the fixed-prize tables pay back on average, as a real lottery's.
-  for (const id of ['daily539', 'lotto740', 'lotto1224']) assert.ok(expectedReturn(id) > 0.3 && expectedReturn(id) < 0.9, id);
+  for (const id of ['daily539']) assert.ok(expectedReturn(id) > 0.3 && expectedReturn(id) < 0.9, id);
+  // 3星彩 and 4星彩 pay back 56%: 5 + 4.5 + 4.5 of every NT$25.
+  for (const id of ['star3', 'star4']) assert.ok(Math.abs(expectedReturn(id) - 0.56) < 1e-9, id);
   for (const stars of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) assert.ok(expectedReturn('bingo', { stars }) > 0.4 && expectedReturn('bingo', { stars }) < 0.9, `bingo ${stars}`);
-  assert.equal(Object.keys(GAMES).length, 11);
+  // 雙贏彩 (last drawn 2023-12-30) and 大福彩 (2019-04-27) are no longer sold.
+  assert.deepEqual(Object.keys(GAMES).sort(), [...GAME_ORDER].sort());
+  assert.ok(!GAMES.lotto1224 && !GAMES.lotto740);
 });
 
 test('scratch cards: every face pays exactly its prize, the prize taxed once over NT$5,000', () => {

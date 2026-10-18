@@ -93,3 +93,17 @@ test('one ticket id twice in a sale: refused, nothing charged', async () => {
   assert.equal(r.body.refused?.problem, 'shape');
   assert.ok(!doc(WALLET_COLLECTION, ACCOUNT).entries.some(e => e.kind === 'lottery'));
 });
+
+test('a ticket of a game no longer sold (雙贏彩) gets its cost back once, and is watched no more', async () => {
+  const now = { t: Date.parse('2026-10-19T13:00:00Z') };
+  const { store, deps, doc } = setup(now, [...money, { id: 'odds:lotto-house00001', t: 1, app: 'odds', kind: 'lottery', amount: -50 }]);
+  const key = `${ACCOUNT}_house00001`;
+  const ticket = { id: 'house00001', t: '2026-10-19T04:00:00Z', game: 'lotto1224', draw: { date: '2026-10-19', at: Date.parse('2026-10-19T12:30:00Z') }, sel: { zones: [[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]] }, bets: 1, multiple: 1, cost: 50, status: 'open' };
+  store.set(`${TICKET_COLLECTION}/${key}`, { payload: JSON.stringify({ account: ACCOUNT, ticket, t: 1 }), updateTime: 't1' });
+  store.set(`${TICKET_COLLECTION}/_index`, { payload: JSON.stringify({ due: { [key]: ticket.draw.at + 180_000 } }), updateTime: 'i1' });
+  await lottoCron(env, deps);
+  await lottoCron(env, deps);
+  assert.deepEqual(doc(WALLET_COLLECTION, ACCOUNT).entries.filter(e => e.id === 'odds:refund-house00001').map(e => [e.kind, e.amount]), [['refund', 50]]);
+  assert.equal(doc(TICKET_COLLECTION, key), null);
+  assert.deepEqual(doc(TICKET_COLLECTION, '_index').due, {});
+});

@@ -253,7 +253,7 @@ export const HELP = {
         '比賽結束由伺服器自動結算並通知你，App 關著也一樣；取消的比賽算賠率 1.00（無效）；延期的比賽 48 小時內沒開打也是（棒球看當地的當天、美式足球看當週），中斷的比賽沒在同樣時間內打完，還沒有結果的選項無效。冰球每種玩法都只算 60 分鐘（不含延長賽和射門大賽），所以不讓分有和局。'
       ]],
       ['lottery', '彩券', [
-        '威力彩、大樂透、今彩539、3星彩、4星彩、38／39／49樂合彩、賓果賓果、雙贏彩和大福彩，照台灣彩券的規則和真實開獎對獎；晚上開獎的在開獎前半小時停售。雙贏彩和大福彩已經停賣，號碼取當晚 20:30 那期賓果賓果算出來。威力彩前兩獎和大樂透前四獎照那期每注實際派彩，和真的中獎人一起分。',
+        '威力彩、大樂透、今彩539、3星彩、4星彩、39／49樂合彩和賓果賓果，照台灣彩券的規則和真實開獎對獎；晚上開獎的在開獎前半小時停售。威力彩前兩獎和大樂透前四獎照那期每注實際派彩，和真的中獎人一起分。',
         '刮刮樂 12 種（NT$100 到 2,000 各兩種），獎金表照台灣彩券 2026 年的卡；買的時候就決定中多少，刮開就知道。',
         '選號時快選補滿，+1／+5／+10 再加幾注；購買列一直在下面。中獎自動入帳並通知你。'
       ]],
@@ -286,7 +286,7 @@ export const HELP = {
         'The server settles each slip when its games are over and tells you, with the app closed too; a cancelled game counts at 1.00 (void), and so does a postponed one not started within 48 hours (baseball: that local day; American football: that week); a suspended game not finished in that time voids the picks it hadn’t decided yet. Every hockey market counts 60 minutes only (no overtime or shootout), so its winner has a draw.'
       ]],
       ['lottery', 'Lottery', [
-        'Super Lotto 威力彩, Lotto 6/49 大樂透, Daily Cash 539, 3D and 4D, 38/39/49 樂合彩, BINGO BINGO, 雙贏彩 and 大福彩, checked against Taiwan Lottery’s rules and real draws; evening draws stop selling half an hour before. 雙贏彩 and 大福彩 are no longer sold, so their numbers come from that night’s 20:30 BINGO draw. 威力彩’s top two prizes and 大樂透’s top four pay what that draw paid per winner, shared with the real winners.',
+        'Super Lotto 威力彩, Lotto 6/49 大樂透, Daily Cash 539, 3D and 4D, 39/49 樂合彩 and BINGO BINGO, checked against Taiwan Lottery’s rules and real draws; evening draws stop selling half an hour before. 威力彩’s top two prizes and 大樂透’s top four pay what that draw paid per winner, shared with the real winners.',
         '12 scratch cards (two at each price, NT$100 to 2,000), their prize tables Taiwan Lottery’s 2026 cards; the prize is fixed when a card is bought, and scratching shows it.',
         'Quick pick fills a line, +1/+5/+10 add more, and the buy bar stays in view. Wins are paid in automatically and you’re told.'
       ]],
