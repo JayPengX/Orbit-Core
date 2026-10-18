@@ -603,6 +603,9 @@ export function slipErrors({ mode, legs, sizes, stake }) {
   const n = legs.length;
   if (n === 0) return ['empty'];
   if (n > SLIP_RULES.maxLegs) errors.push('tooManyLegs');
+  // Odds of 1.00 or less pay nothing over the stake: no sportsbook (台灣運彩
+  // included) offers them, so a pick priced so can't be bought.
+  if (legs.some(l => !(Number(l.odds) > 1))) errors.push('odds');
   // Two picks of one game can't share a combination: a parlay of them, or a
   // system size with no combination left, can't be bought.
   const by = combosBySize(legs);
@@ -711,10 +714,24 @@ export function slipOutlook({ legs, sizes, stake, boost = 0 }) {
 // What a finished ticket pays. Each leg is 'won', 'lost' or 'void' (called
 // off: the lottery counts it at odds 1.00, so a single gets its stake back
 // and a parlay goes on without it). Gross is before tax, net after.
+// `taxed`: how many of the paying combinations are over SLIP_RULES.taxFree,
+// each withheld on its own as 台灣運彩 does (a ticket's tax is per
+// combination, never on the ticket's total).
 export function settleSlip({ legs, sizes, stake, boost = 0 }) {
-  const { gross, net } = slipPayoutTable({ legs: legs.map(l => ({ gameId: l.gameId, odds: l.result === 'void' ? 1 : l.odds })), sizes, stake, boost });
+  const priced = legs.map(l => ({ gameId: l.gameId, odds: l.result === 'void' ? 1 : l.odds }));
+  const { gross, net } = slipPayoutTable({ legs: priced, sizes, stake, boost });
   const mask = legs.reduce((m, l, i) => (l.result === 'lost' ? m : m | (1 << i)), 0);
-  return { gross: gross[mask], net: net[mask] };
+  const sizeSet = new Set(sizes);
+  const masks = clashMasks(priced);
+  let taxed = 0;
+  for (let pick = mask; pick > 0; pick = (pick - 1) & mask) {
+    if (clashes(pick, masks)) continue;
+    let size = 0;
+    let product = 1;
+    for (let i = 0; i < priced.length; i++) if (pick & (1 << i)) (size++, (product *= priced[i].odds));
+    if (sizeSet.has(size) && boosted(stake, product, size, boost) > SLIP_RULES.taxFree) taxed++;
+  }
+  return { gross: gross[mask], net: net[mask], taxed };
 }
 
 // A deep look at one ticket, all exact except the one-year outlook:
