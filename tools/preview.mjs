@@ -51,7 +51,7 @@
 //   - answers the data proxy (/sports-proxy, single and ?batch=1) by fetching
 //     the upstream URL itself (curl, through the container's HTTPS proxy), so
 //     the page shows today's real scores, prices and odds;
-//   - writes <out>/<app>-<hash>.png and prints the page's console errors.
+//   - writes <out>/<app>-<hash>[-en][-<click>].png and prints the page's console errors.
 //
 // Needs Playwright (global in the container: /opt/node22/lib/node_modules).
 import { createServer } from 'node:http';
@@ -79,9 +79,11 @@ import { upstream as transitFixtures } from '../tests/fixtures/transit/upstream.
 const require = createRequire(import.meta.url);
 // The container's global one, or a Mac's in ~/.local/opt/playwright.
 let playwright;
+let playwrightDir = '';
 for (const p of ['playwright', '/opt/node22/lib/node_modules/playwright', `${process.env.HOME}/.local/opt/playwright/node_modules/playwright`]) {
   try {
     playwright = require(p);
+    playwrightDir = require.resolve(`${p}/package.json`).replace(/package\.json$/, '');
     break;
   } catch {}
 }
@@ -463,6 +465,21 @@ const refresh = `${b64(JSON.stringify({ d: '0123456789abcdef0123456789abcdef' })
 // data: a second opening read everything again, which Safari never does),
 // so --reopen there runs in a profile of its own, thrown away after.
 const persistent = engine === 'webkit' && reopen && !serve;
+// WebKit missing here (the cloud container has only Chromium): downloaded
+// once; when that can't be done, one clear line and out, not a stack.
+if (engine === 'webkit' && !serve && !existsSync(playwright.webkit.executablePath())) {
+  console.log('WebKit is not installed here: downloading it (npx playwright install webkit)…');
+  let why = '';
+  try {
+    execFileSync(process.execPath, [join(playwrightDir, 'cli.js'), 'install', 'webkit'], { stdio: ['ignore', 'ignore', 'pipe'], timeout: 300_000 });
+  } catch (e) {
+    why = String(e.stderr || e.message).split('\n').find(l => /fail|error/i.test(l))?.trim() || 'timed out';
+  }
+  if (!existsSync(playwright.webkit.executablePath())) {
+    console.log(`webkit: couldn't download WebKit (${why || 'not found after install'}): run without --webkit (Chromium), or on a Mac with \`npx playwright install webkit\` first`);
+    process.exit(1);
+  }
+}
 const browser = serve || persistent ? null : await playwright[engine].launch();
 const stub = { grantPermissions: async () => {}, setGeolocation: async () => {}, addInitScript: async (fn, arg) => void inits.push(`(${fn})(${JSON.stringify(arg)})`), route: async (p, h) => void extRoutes.push([p, h]) };
 const contextOptions = {
@@ -948,7 +965,9 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
   }
   if (freezes) console.log(`freezes ${key}${hash ? `#${hash}` : ''}: ${JSON.stringify(await page.evaluate(() => globalThis.__freezes || []))}`);
   for (const js of evals) console.log('eval:', JSON.stringify(await page.evaluate(js).catch(e => `error ${e.message}`)));
-  const file = join(out, `${key}-${hash || 'start'}${reopen ? (first ? '-1' : '-2') : ''}${clicks.length ? '-clicked' : ''}${dark ? '-dark' : ''}${engine === 'webkit' ? '-webkit' : ''}.png`);
+  // The language and what was clicked in the name: runs that differ only in those don't overwrite each other.
+  const slug = c => c.replace(/^js:/, '').replace(/[^\p{L}\p{N}]+/gu, '_').replace(/^_+|_+$/g, '').slice(0, 32);
+  const file = join(out, `${key}-${hash || 'start'}${reopen ? (first ? '-1' : '-2') : ''}${lang !== 'zh' ? `-${lang}` : ''}${clicks.length ? `-${clicks.map(slug).join('+')}` : ''}${dark ? '-dark' : ''}${engine === 'webkit' ? '-webkit' : ''}.png`);
   await page.screenshot({ path: file, fullPage: full });
   if (shotSel) {
     // The element at its whole height: its scrollers opened up, laid over the page's top.
@@ -1037,15 +1056,28 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
   // wrap): an element whose own text runs past its box, ellipsis or clipped.
   const cuts = await page.evaluate(() => {
     const out = [];
+    // What runs past the box is only aria-hidden decoration (a drawing that
+    // bleeds off the edge): no text a person reads is past it.
+    const onlyDecoration = (el, r) => {
+      const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      const range = document.createRange();
+      for (let n; (n = walk.nextNode()); ) {
+        if (!n.textContent.trim() || n.parentElement.closest('[aria-hidden="true"], [hidden], svg')) continue;
+        range.selectNodeContents(n);
+        if ([...range.getClientRects()].some(x => x.width && (x.right > r.right + 1 || x.left < r.left - 1))) return false;
+      }
+      return true;
+    };
     for (const el of document.querySelectorAll('body *')) {
-      if (el.closest('[hidden], svg, .leaflet-container, .maplibregl-map') || !el.textContent.trim()) continue;
+      // (Decoration hidden from readers, aria-hidden, isn't text a person reads: Weather's failure screen's art.)
+      if (el.closest('[hidden], [aria-hidden="true"], svg, .leaflet-container, .maplibregl-map') || !el.textContent.trim()) continue;
       const r = el.getBoundingClientRect();
       if (!r.width || r.bottom < 0 || r.top > innerHeight * 6) continue;
       const cs = getComputedStyle(el);
       if (cs.visibility === 'hidden' || !/hidden|clip/.test(cs.overflowX) || cs.display === 'none') continue;
       // Only text this element holds itself (a scroller's children aren't cut).
       if (![...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()) && el.children.length > 2) continue;
-      if (el.scrollWidth > el.clientWidth + 1) out.push(`${el.tagName.toLowerCase()}${[...el.classList].map(c => `.${c}`).join('')} "${el.textContent.trim().slice(0, 40)}" (${el.scrollWidth}>${el.clientWidth})`);
+      if (el.scrollWidth > el.clientWidth + 1 && !(el.querySelector('[aria-hidden="true"]') && onlyDecoration(el, r))) out.push(`${el.tagName.toLowerCase()}${[...el.classList].map(c => `.${c}`).join('')} "${el.textContent.trim().slice(0, 40)}" (${el.scrollWidth}>${el.clientWidth})`);
     }
     // A picker (a select) whose chosen option is wider than its face: the
     // system cuts it with no overflow to see (FX's "TWD · Taiw…").
@@ -1053,7 +1085,7 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
     for (const el of document.querySelectorAll('select')) {
       const cs = getComputedStyle(el);
       const r = el.getBoundingClientRect();
-      if (!r.width || cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) === 0 || el.closest('[hidden]')) continue;
+      if (!r.width || cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) === 0 || el.closest('[hidden], [aria-hidden="true"]')) continue;
       const text = el.selectedOptions[0]?.textContent.trim();
       if (!text) continue;
       ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
