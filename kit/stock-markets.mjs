@@ -303,6 +303,14 @@ export const ODD_LOT_OPEN = { h: 9, m: 10 };
 export function isOddLot(market, kind, qty) {
   return market === 'TW' && (kind === 'stock' || kind === 'etf' || kind === 'bond') && Math.round(qty) % 1000 !== 0;
 }
+// Whole lots (1,000 shares) and odd lots (1-999) are separate orders in
+// Taiwan (TWSE: 零股 1股~999股): an order of 1,500 is a lot and 500 odd
+// shares, two orders. { lots, odd } for an amount that mixes them, else null.
+export function mixedLot(market, kind, qty) {
+  const n = Math.round(qty);
+  if (market !== 'TW' || !['stock', 'etf', 'bond'].includes(kind) || n < 1000 || n % 1000 === 0) return null;
+  return { lots: n - (n % 1000), odd: n % 1000 };
+}
 export function oddLotOpen(t) {
   const d = new Date(t + 8 * 3_600_000);
   return d.getUTCHours() * 60 + d.getUTCMinutes() >= ODD_LOT_OPEN.h * 60 + ODD_LOT_OPEN.m;
