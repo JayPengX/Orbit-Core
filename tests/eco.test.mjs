@@ -292,6 +292,18 @@ test("a phone clock set ahead never blocks a later save: a setting's time is the
   assert.equal(later.data.wallet.snap.vocab.words, 6);
 });
 
+test('a claim says when it took the pass back from another live device (the app reads what changed)', async () => {
+  const t = setup();
+  const a = await newPass(t, 'stock');
+  const b = await t.call('POST', '', { op: 'login', passcode: a.passcode, app: 'stock' });
+  assert.equal(b.status, 200);
+  const back = await t.call('POST', '', { op: 'refresh', refresh: a.refresh, app: 'stock', claim: true });
+  assert.equal(back.data.active, true);
+  assert.equal(back.data.took, true);
+  const again = await t.call('POST', '', { op: 'refresh', refresh: back.data.refresh, app: 'stock', claim: true });
+  assert.equal(again.data.took, undefined, 'still its own: nothing taken');
+});
+
 test('Orbit sharing: a key gives a copy of the schedule as it is', async () => {
   const t = setup();
   const owner = await newPass(t, 'orbit');

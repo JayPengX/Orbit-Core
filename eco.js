@@ -798,6 +798,9 @@ async function ecoRefresh(ctx) {
   }
   const out = await sessionReply(env, deps, secret, result, claims, now, { app: body.data ? app : '', inbox: body.inbox });
   out.refresh = await refreshToken(secret, claims, now);
+  // Taken back from another device or app that was live meanwhile: this
+  // app's copy may be behind (the kit tells the app, 'active').
+  if (!live && wallet.live) out.took = true;
   return json(out, 200, headers);
 }
 
