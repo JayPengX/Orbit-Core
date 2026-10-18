@@ -216,6 +216,7 @@ Served from this repo's Pages, never copied. Each app's page carries
 | `boot.js` | The loading screen and the version check |
 | `brand.mjs` | Families, names, colours, marks, repos, `RENAMED`, `DEV` |
 | `pass.mjs`, `help.mjs`, `truth.mjs` | The Pass sheet; every app's guide; 真相 (the house's real numbers) |
+| `pass-sync.mjs` | An app's payload kept in step with the Pass's copy (read and merged before any write); Words, Weather, Slips |
 | `catalog.mjs`, `logos.mjs`, `names.mjs`, `photos.mjs` | Leagues; logos; Chinese team names; studio headshots |
 | `f1live.mjs`, `postseason.mjs`, `sports-*.mjs` | F1 sessions; MLB's postseason; highlights, broadcast, win probability (also run by builders) |
 | `play-*.mjs`, `stock-*.mjs` | Play's and Securities' pricing and ledgers, shared with the Worker |
