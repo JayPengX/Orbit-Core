@@ -154,11 +154,16 @@ const RATE_WINDOW_MS = 60 * 60 * 1000;
 const DAY_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 const requestLog = new Map();
-function isRateLimitedInMemory(bucketKey, limit, windowMs = RATE_WINDOW_MS, now = Date.now()) {
+export function isRateLimitedInMemory(bucketKey, limit, windowMs = RATE_WINDOW_MS, now = Date.now()) {
   const bucket = Math.floor(now / windowMs);
   const c = requestLog.get(bucketKey);
   if (!c || c.bucket !== bucket) {
-    if (requestLog.size > 20000) requestLog.clear();
+    // Full: drop the past windows' counts, then per-client ones; never the
+    // global daily caps (a spray of new addresses mustn't reset them).
+    if (requestLog.size > 20000) {
+      for (const [k, v] of requestLog) if (v.bucket !== Math.floor(now / (k.startsWith('daily-cap:') ? DAY_WINDOW_MS : windowMs))) requestLog.delete(k);
+      if (requestLog.size > 20000) for (const k of requestLog.keys()) if (!k.startsWith('daily-cap:')) requestLog.delete(k);
+    }
     requestLog.set(bucketKey, { bucket, n: 1 });
     return 1 > limit;
   }
