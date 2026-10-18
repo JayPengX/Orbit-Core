@@ -197,3 +197,28 @@ test('追繳 is cancelled once the 差額 notified is paid in full, bit by bit, 
   assert.equal(SA.callState(call, v, now + 3 * DAY).sell, true, 'not paid: sold at the deadline as before');
   assert.equal(SA.callState({ ...call, need: 0 }, v, now + DAY, 0).call !== null, true, 'nothing to pay (shorts): only 166% cancels it');
 });
+
+test('證券交易稅條例: the day-trade rate to 2027-12-31 (§2-2), bond ETFs untaxed to 2026-12-31 (§2-1), then 0.1%', async () => {
+  const { tradeCosts, DAY_TRADE_TAX_UNTIL, BOND_ETF_TAX_FREE_UNTIL } = await import('../kit/stock-markets.mjs');
+  const sell = o => tradeCosts({ currency: 'TWD', market: 'TW', kind: 'stock', side: 'sell', gross: 100_000, ...o });
+  assert.equal(sell({ dayTrade: true, t: DAY_TRADE_TAX_UNTIL - 1 }).tax, 150);
+  assert.equal(sell({ dayTrade: true, t: DAY_TRADE_TAX_UNTIL }).tax, 300, '2028: the full 0.3%');
+  assert.equal(sell({ kind: 'bond', t: BOND_ETF_TAX_FREE_UNTIL - 1 }).tax, 0);
+  assert.equal(sell({ kind: 'bond', t: BOND_ETF_TAX_FREE_UNTIL }).tax, 100, '2027: 0.1%');
+  // Only the matched part at the day rate: half of it 0.15%, half 0.3%.
+  assert.equal(sell({ dayTrade: 0.5, t: now }).tax, 225);
+  assert.equal(sell({ dayTrade: 0, t: now }).tax, 300);
+});
+
+test('當沖 tax on the matched quantity only; odd lots and 融資 buys never match (§2-2, TWSE 當沖辦法)', () => {
+  const fill = (id, side, qty, t, more = {}) => ({ id, type: 'fill', t, orderId: id, symbol: '2330.TW', name: 'TSMC', kind: 'stock', market: 'TW', currency: 'TWD', side, qty, price: 100, gross: qty * 100, total: qty * 100, commission: 0, tax: 0, fee: 0, twd: 1, ...more });
+  const acc = (...events) => ({ ...SA.newAccount(1_000_000, now - 400 * DAY, 'acc'), events });
+  const sale = qty => ({ id: 's', market: 'TW', kind: 'stock', symbol: '2330.TW', side: 'sell', qty });
+  const old = fill('h', 'buy', 5000, now - 10 * DAY);
+  assert.equal(SA.dayTradeShare(acc(old, fill('b', 'buy', 1000, now - 60_000)), sale(3000), now), 1 / 3, 'a lot bought today, three sold');
+  assert.equal(SA.dayTradeShare(acc(old, fill('b', 'buy', 2000, now - 60_000), fill('s0', 'sell', 1000, now - 30_000)), sale(2000), now), 0.5, "an earlier sale took one of today's two lots");
+  assert.equal(SA.dayTradeShare(acc(old, fill('b', 'buy', 500, now - 60_000)), sale(1000), now), 0, 'an odd lot bought');
+  assert.equal(SA.dayTradeShare(acc(old, fill('b', 'buy', 1000, now - 60_000)), sale(500), now), 0, 'an odd lot sold');
+  assert.equal(SA.dayTradeShare(acc(old, fill('b', 'buy', 1000, now - 60_000, { financed: 60_000 })), sale(1000), now), 0, '融資, not 現款');
+  assert.equal(SA.dayTradeShare(acc(old, fill('b', 'buy', 1000, now - DAY)), sale(1000), now), 0, "yesterday's");
+});

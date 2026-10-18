@@ -53,13 +53,19 @@ export function normalizeCurrency(code) {
 // `delay`: minutes Yahoo's prices from this market run behind (Yahoo's own
 // exchangeDataDelayedBy): US stocks, forex and crypto are live; Taiwan,
 // Tokyo, Seoul and Sydney 20 minutes; most others 15; unknown markets 15.
+// Tax rates that end on a date in law (證券交易稅條例 §2-1, §2-2): the
+// first moment (Taiwan time) they no longer apply.
+export const BOND_ETF_TAX_FREE_UNTIL = Date.parse('2027-01-01T00:00:00+08:00');
+export const DAY_TRADE_TAX_UNTIL = Date.parse('2028-01-01T00:00:00+08:00');
 export const MARKETS = {
   TW: {
     delay: 20, zh: '台股', en: 'Taiwan', flag: '🇹🇼', currency: 'TWD', suffixes: ['.TW', '.TWO'],
     // Odd lots (零股): most brokers' minimum is NT$1, not 20. A stock sold the
-    // day it was bought (當沖) pays half the tax, 0.15% (to 2027).
+    // day it was bought (當沖) pays half the tax, 0.15%, to 2027-12-31
+    // (證券交易稅條例 §2-2); bond ETFs pay none to 2026-12-31 (§2-1), then
+    // 0.1% (§2). (An extension of either is the Legislative Yuan's: move the date.)
     commission: { rate: 0.001425, min: 20, oddMin: 1 }, floorFees: true,
-    sell: { stock: { tax: 0.003, dayTrade: 0.0015 }, etf: { tax: 0.001 }, bond: { tax: 0 } },
+    sell: { stock: { tax: 0.003, dayTrade: 0.0015, dayTradeUntil: DAY_TRADE_TAX_UNTIL }, etf: { tax: 0.001 }, bond: { tax: 0, until: BOND_ETF_TAX_FREE_UNTIL, after: 0.001 } },
     withholding: 0, nhi: true
   },
   US: {
@@ -434,10 +440,19 @@ export function roundCash(amount, currency) {
   return Math.round(amount * f) / f;
 }
 
-function levy(rules, kind) {
+// A kind's tax and fee at `t`: a rate with an `until` gives way to its
+// `after` then.
+function levy(rules, kind, t = Date.now()) {
   const own = rules?.[kind] || {};
   const all = rules?.all || {};
-  return { tax: own.tax ?? all.tax ?? 0, fee: own.fee ?? all.fee ?? 0 };
+  const tax = own.until != null && t >= own.until ? own.after : own.tax;
+  return { tax: tax ?? all.tax ?? 0, fee: own.fee ?? all.fee ?? 0 };
+}
+// The day-trade rate for a kind at `t` (null: none, or past its end).
+function dayTradeRate(rules, kind, t = Date.now()) {
+  const own = rules?.[kind];
+  if (own?.dayTrade == null || (own.dayTradeUntil != null && t >= own.dayTradeUntil)) return null;
+  return own.dayTrade;
 }
 
 // What a trade of `gross` (price × quantity, in the market's currency) costs
@@ -446,14 +461,16 @@ function levy(rules, kind) {
 // `discount`: the share of the commission charged (Quadra Plus: 0.5), the
 // minimum included.
 // `oddLot`: a Taiwan odd-lot trade (its own, lower minimum); `dayTrade`: a
-// Taiwan stock sold the same day it was bought (half the tax).
+// Taiwan stock sold the same day it was bought (half the tax): true for all
+// of it, or the share of it that's day-traded (§2-2: 同數量, only the
+// quantity matched with the day's buys). `t`: when (for the rates that end).
 // Mutual funds are bought through a fund platform, not an exchange: a
 // subscription fee (申購手續費) on the amount bought, as Taiwan's online
 // fund platforms charge after their usual discount on the 3% list fee;
 // selling (redeeming) costs nothing, with no exchange fee or tax.
 export const FUND_FEE = 0.01;
 
-export function tradeCosts({ market, side, kind, gross, currency, discount = 1, oddLot = false, dayTrade = false }) {
+export function tradeCosts({ market, side, kind, gross, currency, discount = 1, oddLot = false, dayTrade = false, t = Date.now() }) {
   const m = MARKETS[market] || MARKETS.INTL;
   const round = m.floorFees ? x => Math.floor(x) : x => roundCash(x, currency);
   if (kind === 'fund') {
@@ -464,10 +481,11 @@ export function tradeCosts({ market, side, kind, gross, currency, discount = 1, 
   // The discount is off the commission, and the minimum applies after it (a
   // broker's 2.8折 still charges NT$20 at least); free (0) is free.
   const commission = gross > 0 && m.commission.rate > 0 && discount > 0 ? round(Math.max(gross * m.commission.rate * discount, min)) : 0;
-  const rules = levy(side === 'buy' ? m.buy : m.sell, kind);
-  const dayRate = dayTrade ? (side === 'buy' ? m.buy : m.sell)?.[kind]?.dayTrade : null;
+  const rules = levy(side === 'buy' ? m.buy : m.sell, kind, t);
+  const dayRate = dayTrade ? dayTradeRate(side === 'buy' ? m.buy : m.sell, kind, t) : null;
+  const dayShare = dayRate == null ? 0 : dayTrade === true ? 1 : Math.min(1, Math.max(0, Number(dayTrade) || 0));
   const { fee: feeRate } = rules;
-  const taxRate = dayRate ?? rules.tax;
+  const taxRate = dayShare ? dayShare * dayRate + (1 - dayShare) * rules.tax : rules.tax;
   const tax = round(gross * taxRate);
   const fee = round(gross * feeRate);
   return { commission, tax, fee, total: commission + tax + fee, taxRate, feeRate };

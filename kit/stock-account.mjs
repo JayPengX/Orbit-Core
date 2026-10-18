@@ -465,7 +465,7 @@ export const firstTrade = account => account?.welcome === true && !traded(accoun
 export function estimate({ market, kind, currency, side, qty, price, t = Date.now(), dayTrade = false, first = false }) {
   const deal = dealPrice(market, side, price);
   const gross = roundCash(deal * qty, currency);
-  const costs = tradeCosts({ market, side, kind, gross, currency, discount: first ? 0 : plusAt(t) ? plus.commission : 1, oddLot: isOddLot(market, kind, qty), dayTrade });
+  const costs = tradeCosts({ market, side, kind, gross, currency, discount: first ? 0 : plusAt(t) ? plus.commission : 1, oddLot: isOddLot(market, kind, qty), dayTrade, t });
   const total = side === 'buy' ? gross + costs.total : gross - costs.total;
   return { price: deal, gross, ...costs, costs: costs.total, total };
 }
@@ -776,6 +776,25 @@ function updateOrder(account, order) {
   return { ...account, orders: account.orders.map(o => (o.id === order.id ? order : o)) };
 }
 
+// The share of a Taiwan sale that's a day trade (現股當沖, 證券交易稅條例
+// §2-2: 同一營業日現款買進與現券賣出同種類同數量): the quantity the day's
+// cash buys of whole lots leave after the day's earlier sales, over the
+// sale's. Odd lots can't be day-traded (TWSE 當日沖銷交易作業辦法: 零股交易
+// 不適用), nor can 融資 buys (not 現款), so they match nothing. 0 when none.
+export function dayTradeShare(account, order, at) {
+  if (order.market !== 'TW' || order.side !== 'sell' || !(order.qty > 0) || isOddLot(order.market, order.kind, order.qty)) return 0;
+  const day = localDayOf(at, 'TW');
+  let bought = 0;
+  let sold = 0;
+  for (const e of account.events) {
+    if (e.type !== 'fill' || e.symbol !== order.symbol || e.t > at || e.orderId === order.id || localDayOf(e.t, 'TW') !== day) continue;
+    const lots = e.qty - (Math.round(e.qty) % 1000);
+    if (e.side === 'buy' && !e.financed) bought += lots;
+    else if (e.side === 'sell') sold += lots;
+  }
+  return Math.min(order.qty, Math.max(0, bought - sold)) / order.qty;
+}
+
 // Fills `order` at `price`. The fill is dated `at` (a past moment when it's
 // found in the price history); cash and shares are checked as of `now`.
 function fillOrder(account, order, price, rates, now, at = now) {
@@ -787,7 +806,7 @@ function fillOrder(account, order, price, rates, now, at = now) {
   // A Taiwan stock sold the day it was bought pays the day-trade tax (half),
   // once the account may day trade buying first (3 months open, 10 trades in
   // the year: dayTradeBuyFirst, as Help says); before that, the full tax.
-  const dayTrade = order.side === 'sell' && order.market === 'TW' && (order.dayShort || (dayTradeBuyFirst(account, at) && account.events.some(e => e.type === 'fill' && e.symbol === order.symbol && e.side === 'buy' && e.t <= at && localDayOf(e.t, 'TW') === localDayOf(at, 'TW'))));
+  const dayTrade = order.side === 'sell' && order.market === 'TW' && (order.dayShort || (dayTradeBuyFirst(account, at) && dayTradeShare(account, order, at)));
   let est = estimate({ market: order.market, kind: order.kind, currency: order.currency, side: order.side, qty: order.qty, price, t: at, dayTrade, first: firstTrade(account) });
   // 融券手續費: 0.08% of what's sold short (Taiwan drops the fraction).
   if (order.credit) {
