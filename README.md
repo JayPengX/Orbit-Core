@@ -259,6 +259,7 @@ Slip-Tracker) are small redirect repos.
 | `node tools/preview.mjs <app>` | The app at phone size with real data (`--live`, `--width 375`, `--lang en`, `--click`, `--eval`, `--store`, `--webkit`, `--reopen`, `--serve`…; `tools/README.md`). Prints `wraps:`, `cut:`, `scrolls sideways:` |
 | `node tools/economy.mjs` | The economy on paper, old settings against new |
 | `node tools/leagues-audit.mjs` | Every catalogue league against its sources |
+| `node tools/hk-lots.mjs` | Hong Kong board lots for Securities, from HKEX |
 | `node tools/espn.mjs <path>` | The shape of an ESPN answer |
 | `node tools/issue-passes.mjs` | Issue passes (the owner) |
 

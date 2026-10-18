@@ -277,3 +277,33 @@ test("a pass merged into another: its fills book merges into the other's (its fi
   assert.deepEqual(Object.keys(book.fills).sort(), ['o1', 'o3']);
   assert.deepEqual(Object.keys(book.cancelled), ['o2']);
 });
+
+test("/stock: a Taiwan plan's month fills at the odd-lot session's first match, as a limit order the check accepts", async () => {
+  const at = Date.parse('2026-10-13T10:00:00+08:00');
+  const seen = Date.parse('2026-10-01T12:00:00+08:00');
+  const docs = new Map([[`${FILLS_COLLECTION}/acc`, JSON.stringify({ v: 2, fills: {}, open: {}, cancelled: {}, plans: { plan0001: [{ symbol: '0050.TW', day: 13, amount: 3_000, currency: 'TWD', market: 'TW', kind: 'etf', seen }] } })]]);
+  const times = ['09:00', '09:05', '09:10', '09:15'].map(x => Date.parse(`2026-10-13T${x}:00+08:00`) / 1000);
+  const opens = [60, 61, 62, 63];
+  const meta = { symbol: '0050.TW', currency: 'TWD', instrumentType: 'ETF', exchangeTimezoneName: 'Asia/Taipei', regularMarketPrice: 63 };
+  const read = async url => ({ chart: { result: [{ meta, timestamp: times, indicators: { quote: [{ open: opens, high: opens, low: opens, close: opens, volume: opens }] } }] } });
+  const deps = {
+    json: (data, status) => new Response(JSON.stringify(data), { status }),
+    errorJson: (code, status) => new Response(JSON.stringify({ error: { code } }), { status }),
+    fsGet: async (env, c, id) => (docs.has(`${c}/${id}`) ? { exists: true, payload: docs.get(`${c}/${id}`) } : { exists: false }),
+    fsWrite: async (env, c, id, payload) => void docs.set(`${c}/${id}`, payload),
+    now: () => at,
+    read
+  };
+  const plan = { id: 'plan0001', symbol: '0050.TW', day: 13, amount: 3_000, currency: 'TWD', market: 'TW', kind: 'etf' };
+  const res = await (await handleStock(new Request('https://x/stock', { method: 'POST', body: JSON.stringify({ op: 'fill', plans: [plan] }) }), {}, {}, { a: 'stock', d: 'acc' }, deps)).json();
+  const f = res.fills['plan:plan0001:2026-10'];
+  assert.deepEqual(f, { quote: 62, t: times[2] * 1000, twd: 1 });
+  const kept = JSON.parse(docs.get(`${FILLS_COLLECTION}/acc`)).fills['plan:plan0001:2026-10'];
+  assert.deepEqual([kept.k, kept.l], ['limit', 62]);
+  // The phone's month, run at that fill, passes the check: at 62 itself, NT$1 a trade.
+  const { runPlan, newAccount } = await import('../kit/stock-account.mjs');
+  const acc = newAccount(100_000, seen - 86_400_000, 'acc');
+  const r = runPlan(acc, { ...plan, name: '0050', on: true, since: seen }, { month: '2026-10', t: Date.parse('2026-10-13T00:00:00+08:00') }, { price: f.quote, twd: 1, at: f.t }, at);
+  assert.deepEqual([r.fill.qty, r.fill.price, r.fill.commission], [48, 62, 1]);
+  assert.equal(await checkEvent(r.fill, acc, null, read, { 'plan:plan0001:2026-10': kept }, { now: at }), 'ok');
+});
