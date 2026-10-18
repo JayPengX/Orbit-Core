@@ -6,6 +6,7 @@ import { legResult, touchdowns } from '../kit/settle.mjs';
 import { pointsModel, pointsMarkets, BASKETBALL_BANDS, fitHockey, goalMarkets, baseballMarkets } from '../kit/play-markets.mjs';
 import { parseOffers } from '../kit/play-offers.mjs';
 import { gameOptions } from '../kit/play-board.mjs';
+import { houseRule, withRules } from '../kit/play-rules.mjs';
 
 const game = (away, home, extra = {}) => ({ status: 'final', awayScore: away, homeScore: home, awayInnings: [], homeInnings: [], ...extra });
 const sum = picks => picks.reduce((s, p) => s + p.fair, 0);
@@ -102,4 +103,18 @@ test('baseball: 單局大小 and 單局不讓分 on the first inning in place of
   const [k] = parseOffers({ events: [{ homeName: 'A', awayName: 'B' }], betOffers: [ou] }, { sport: 'mlb', home: { en: 'A' }, away: { en: 'B' } }).markets;
   assert.equal(k.kind, 'inningtotal');
   assert.equal(k.market, 'itot|1|0.5');
+});
+
+test("限2關 / 限3關: a game's or market's own minimum (運彩 §21) wins over the price bands; the bands only when none is known", () => {
+  assert.deepEqual(houseRule('ml', 1.05), { lock: null, minLegs: 3 }, 'no event minimum: the price bands, as before');
+  assert.deepEqual(houseRule('ml', 1.05, { event: 1 }), { lock: null, minLegs: 1 }, 'a game sold single');
+  assert.deepEqual(houseRule('ml', 2.4, { event: 2 }), { lock: null, minLegs: 2 }, 'a game 限2關 at any price');
+  assert.deepEqual(houseRule('ml', 1.02, { event: 1 }), { lock: 'low', minLegs: 1 }, 'still locked when all but certain');
+  const g = { id: 'g', sport: 'epl', startUtc: '2026-10-20T11:30:00Z', home: { en: 'Arsenal' }, away: { en: 'Leeds United' }, draftKings: { home: 0.6, draw: 0.25, away: 0.15 }, total: { line: 2.5, overFair: 0.5 } };
+  const plain = gameOptions(g);
+  const ruled = gameOptions({ ...g, minLegs: 3 });
+  assert.ok(plain.some(o => !o.lock && o.minLegs === 1));
+  assert.ok(ruled.filter(o => !o.lock).every(o => o.minLegs === 3), "the game's 限3關 on every market");
+  assert.equal(withRules({ kind: 'ml', estOdds: 1.1, eventMinLegs: 2, m: { minLegs: 3 } }).minLegs, 2, "the pick's own first");
+  assert.equal(withRules({ kind: 'score', estOdds: 9, m: { minLegs: 3 }, game: { minLegs: 1 } }).minLegs, 3, "then the market's, then the game's");
 });
