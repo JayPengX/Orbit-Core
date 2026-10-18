@@ -7,6 +7,7 @@
 //                          [--store 'key=value']  (a localStorage entry to start with)
 //                          [--geo lat,lon]  (where the phone is; Transit's default 新竹車站)
 //                          [--geo-path 'lat,lon;…' --geo-every ms]  (the phone moving, during --wait)
+//                          [--safari]  (opened in Safari, not from the home screen: the install screen)
 //                          [--signed-out]  (the sign-in screen, as a new device sees it)
 //                          [--entry '{json}']  (a wallet entry to add: an economy scenario)
 //                          [--clock 2026-10-06T10:05]  (the page's clock, Taipei time)
@@ -542,12 +543,15 @@ if (timing)
     };
     document.addEventListener('readystatechange', watch, { once: true });
   });
+// Opened from the home screen (iOS's navigator.standalone), as every app on a
+// phone must be: --safari shows the page as Safari opens it (the kit's
+// add-to-home-screen screen).
+if (!process.argv.includes('--safari')) await context.addInitScript(() => Object.defineProperty(Navigator.prototype, 'standalone', { get: () => true }));
 if (device === 'ipad') await context.addInitScript(() => Object.defineProperty(Navigator.prototype, 'maxTouchPoints', { get: () => 5 }));
 await context.addInitScript(
   ([refresh, lang, stores]) => {
     try {
       for (const [k, v] of stores) localStorage.setItem(k, v);
-      sessionStorage.setItem('quadra.visit', '1');
       if (refresh) localStorage.setItem('quadra.refresh', refresh);
       if (refresh) localStorage.setItem('quadra.account', '0123456789abcdef');
       localStorage.setItem('quadra.lang', lang);
