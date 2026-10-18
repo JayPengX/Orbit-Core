@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parseIpoList, rocDay, ipoOpen, ipoHold, ipoWon, ipoApplyEvent, ipoBackEvent, ipoWinEvent, IPO_FEE, IPO_WIN_FEE } from '../kit/stock-ipo.mjs';
 import { replay } from '../kit/stock-account.mjs';
-import { handleStock, FILLS_COLLECTION } from '../stock-fill.js';
+import { handleStock, FILLS_COLLECTION, moveBook, ipoDraw } from '../stock-fill.js';
 import { checkStock, VERIFIED_COLLECTION } from '../stock-check.js';
 import { pack } from '../kit/stock-codec.mjs';
 
@@ -130,4 +130,25 @@ test("the checker: an application at TWSE's price, seen in time, and the draw's 
   const cheap = { ...apply, price: 1 };
   const r2 = await checkStock(ENV, 'acct', await pack(account([...start, cheap])), { entries: [] }, d, LOCK, apply.t + 1);
   assert.deepEqual(r2.refused, [cheap.id]);
+});
+
+test('/stock ipo after a merge: an application made on the old pass is drawn as that pass, not the new one', async () => {
+  // A rate at which the two accounts' draws differ.
+  let list, s;
+  for (const pct of ['10', '20', '30', '40', '50', '60', '70', '80', '90']) {
+    list = { v: LIST(pct, '0') };
+    [s] = parseIpoList(list.v);
+    if ((await ipoDraw(ENV, 'from', s)) !== (await ipoDraw(ENV, 'to', s))) break;
+  }
+  const key = `${s.code}:${s.draw}`;
+  const now = { t: s.from + 10 * H };
+  assert.notEqual(await ipoDraw(ENV, 'from', s), await ipoDraw(ENV, 'to', s));
+  const deps = { ...workerDeps(list, now) };
+  deps.fsDelete = async (env, c, id) => void deps.docs.delete(`${c}/${id}`);
+  await ask(deps, [key], 'from');
+  await moveBook(ENV, deps, 'from', 'to', now.t);
+  now.t = s.draw + 12 * H;
+  const r = await ask(deps, [key], 'to');
+  assert.equal(r.seen[key], s.from + 10 * H);
+  assert.equal(r.drawn[key].won, await ipoDraw(ENV, 'from', s));
 });

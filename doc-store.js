@@ -144,12 +144,17 @@ export async function changeDoc(env, deps, collection, id, change, { read = v =>
 // into another): every `<from>_<id>` the collection's index (`due`: key →
 // time) lists is written again as `<to>_<id>` with `account: to`, the old
 // one deleted, and the index changed to match. How many moved.
-export async function moveOwned(env, deps, collection, indexId, from, to) {
+// (`all`: also the account's documents the index doesn't name, found by one
+// listing of the collection's ids: Play's scratch cards, kept until revealed.)
+export async function moveOwned(env, deps, collection, indexId, from, to, { all = false } = {}) {
   const asIndex = v => (v && typeof v.due === 'object' ? v : { due: {} });
   const index = asIndex(parseDoc(await deps.fsGet(env, collection, indexId)));
   const prefix = `${from}_`;
   const moved = [];
-  for (const [key, at] of Object.entries(index.due)) {
+  const owned = Object.entries(index.due);
+  if (all && deps.fsList)
+    for (const { id } of await deps.fsList(env, collection, 300, { idsOnly: true })) if (id.startsWith(prefix) && !(id in index.due)) owned.push([id, null]);
+  for (const [key, at] of owned) {
     if (!key.startsWith(prefix)) continue;
     const value = parseDoc(await deps.fsGet(env, collection, key));
     if (!value) continue;
@@ -163,10 +168,11 @@ export async function moveOwned(env, deps, collection, indexId, from, to) {
     await deps.fsDelete(env, collection, key);
     moved.push([key, next, at]);
   }
-  if (moved.length)
+  if (moved.some(([, , at]) => at != null))
     await changeDoc(env, deps, collection, indexId, idx => {
       const due = { ...idx.due };
       for (const [key, next, at] of moved) {
+        if (at == null) continue;
         due[next] = due[key] ?? at;
         delete due[key];
       }

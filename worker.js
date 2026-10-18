@@ -1021,7 +1021,7 @@ const ECO_DEPS = {
   checkStock: (env, docId, payload, wallet) => checkStock(env, docId, payload, wallet, { read: url => priceReads(env).read(url), fsGet: DOCS.get, fsWrite: DOCS.write }, LOCK_SINCE),
   // A pass merged into another: what this Worker watches for it moves too.
   moveRecords: async (env, from, to, now) => {
-    const deps = { fsGet: DOCS.get, fsWrite: DOCS.write, fsDelete: DOCS.delete, now: () => Date.now() };
+    const deps = { fsGet: DOCS.get, fsWrite: DOCS.write, fsDelete: DOCS.delete, fsList: DOCS.list, now: () => Date.now() };
     await moveSlips(env, deps, from, to);
     await moveTickets(env, deps, from, to);
     await moveBook(env, deps, from, to, now);

@@ -383,7 +383,7 @@ export async function checkStock(env, docId, payload, wallet, deps, lockSince, n
   const used = new Set();
   // 新股申購's checks: TWSE's list read once, when an event needs it.
   let listRead = null;
-  const ipo = { seen: book.ipo || {}, list: () => (listRead ||= ipoList(deps.read).then(l => (l.length ? l : null)).catch(() => null)), draw: sub => ipoDraw(env, docId, sub) };
+  const ipo = { seen: book.ipo || {}, list: () => (listRead ||= ipoList(deps.read).then(l => (l.length ? l : null)).catch(() => null)), draw: sub => ipoDraw(env, book.ipoFrom?.[ipoKeyOf(sub)] || docId, sub) };
   let checked = 0;
   for (const raw of events) {
     let e = adj[raw.id] ? { ...raw, ...adj[raw.id] } : raw;

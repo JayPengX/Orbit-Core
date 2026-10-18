@@ -60,11 +60,14 @@ export function cleanOrder(o) {
 }
 
 // The kept document: { v: 2, fills: { id: fill }, open: { id: terms },
-// plans: { id: [terms…] } } (before v2, the fills alone).
+// plans: { id: [terms…] }, cancelled, ipo: { key: t }, ipoFrom: { key:
+// account } } (before v2, the fills alone). `ipoFrom`: an application made
+// on a pass since merged into this one, drawn as that pass's (the draw is
+// keyed to the account it was made under: here it would be another draw).
 export const readBook = doc => bookOf(parseDoc(doc));
 function bookOf(raw) {
-  if (raw?.v === 2) return { v: 2, fills: raw.fills || {}, open: raw.open || {}, plans: raw.plans || {}, cancelled: raw.cancelled || {}, ipo: raw.ipo || {} };
-  return { v: 2, fills: raw && typeof raw === 'object' ? raw : {}, open: {}, plans: {}, cancelled: {}, ipo: {} };
+  if (raw?.v === 2) return { v: 2, fills: raw.fills || {}, open: raw.open || {}, plans: raw.plans || {}, cancelled: raw.cancelled || {}, ipo: raw.ipo || {}, ipoFrom: raw.ipoFrom || {} };
+  return { v: 2, fills: raw && typeof raw === 'object' ? raw : {}, open: {}, plans: {}, cancelled: {}, ipo: {}, ipoFrom: {} };
 }
 // The whole book (stock-check.js: what this Worker filled, saw open, and let be cancelled).
 export async function readFillsBook(env, account, fsGet) {
@@ -96,7 +99,13 @@ export function mergeBooks(base, mine) {
   }
   const ipo = { ...mine.ipo };
   for (const [k, t] of Object.entries(base.ipo)) ipo[k] = Math.min(t, ipo[k] ?? Infinity);
-  return { v: 2, fills, open, plans, cancelled, ipo };
+  // (An application both copies hold is the newer copy's: its own, or the pass it came from.)
+  const ipoFrom = {};
+  for (const k of Object.keys(ipo)) {
+    const from = base.ipo[k] != null ? base.ipoFrom?.[k] : mine.ipoFrom?.[k];
+    if (from) ipoFrom[k] = from;
+  }
+  return { v: 2, fills, open, plans, cancelled, ipo, ipoFrom };
 }
 // The book trimmed to what's kept.
 function trimBook(book, now) {
@@ -108,7 +117,8 @@ function trimBook(book, now) {
   const cancelled = Object.entries(book.cancelled || {}).filter(([, t]) => now - t < KEEP_MS).slice(-KEEP);
   // (新股申購 seen: kept a year, the draw and the listing well past.)
   const ipo = Object.entries(book.ipo || {}).filter(([, t]) => now - t < 365 * 86_400_000);
-  return { v: 2, fills: Object.fromEntries(fills), open: Object.fromEntries(open), plans: book.plans, cancelled: Object.fromEntries(cancelled), ipo: Object.fromEntries(ipo) };
+  const ipoFrom = Object.fromEntries(ipo.filter(([k]) => book.ipoFrom?.[k]).map(([k]) => [k, book.ipoFrom[k]]));
+  return { v: 2, fills: Object.fromEntries(fills), open: Object.fromEntries(open), plans: book.plans, cancelled: Object.fromEntries(cancelled), ipo: Object.fromEntries(ipo), ipoFrom };
 }
 // The book written over the copy it was read from only: a request that lost
 // the race merges its changes into the newer copy (mergeBooks) and writes
@@ -117,7 +127,7 @@ function trimBook(book, now) {
 async function writeBook(env, deps, account, book, now) {
   const written = await changeDoc(env, deps, FILLS_COLLECTION, account, raw => trimBook(mergeBooks(bookOf(raw), book), now), {
     attempts: 5,
-    write: ({ ipo, ...rest }) => ({ ...rest, ...(Object.keys(ipo).length ? { ipo } : {}) })
+    write: ({ ipo, ipoFrom, ...rest }) => ({ ...rest, ...(Object.keys(ipo).length ? { ipo } : {}), ...(Object.keys(ipoFrom).length ? { ipoFrom } : {}) })
   });
   if (!written) throw new Error('stock-fills busy');
   return written;
@@ -128,7 +138,10 @@ async function writeBook(env, deps, account, book, now) {
 export async function moveBook(env, deps, from, to, now) {
   const doc = await deps.fsGet(env, FILLS_COLLECTION, from);
   if (!doc.exists) return;
-  await writeBook(env, deps, to, readBook(doc), now);
+  const book = readBook(doc);
+  // Its 新股申購 still drawn as the pass they were made on.
+  for (const k of Object.keys(book.ipo)) book.ipoFrom[k] ||= from;
+  await writeBook(env, deps, to, book, now);
   await deps.fsDelete(env, FILLS_COLLECTION, from);
 }
 // The fills issued for an account (stock-check.js reads them).
@@ -274,7 +287,7 @@ async function handleIpo(body, env, headers, session, deps) {
     if (book.ipo[k] == null) continue;
     seen[k] = book.ipo[k];
     if (ipoDrawn(s, now)) {
-      const won = await ipoDraw(env, session.d, s);
+      const won = await ipoDraw(env, book.ipoFrom[k] || session.d, s);
       if (won != null) drawn[k] = { won, rate: s.rate };
     }
   }
