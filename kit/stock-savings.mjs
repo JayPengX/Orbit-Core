@@ -24,12 +24,14 @@ const DAY = 86_400_000;
 const YEAR_MS = 365 * DAY;
 const TPE = 8 * 3_600_000;
 
+// Bank of Taiwan's posted fixed rates (一般, under NT$5 million), as the
+// central bank's 牌告利率資訊網 lists them on 2026-10-18.
 export const TD_TERMS = [
-  { months: 1, rate: 0.0123 },
-  { months: 3, rate: 0.0139 },
-  { months: 6, rate: 0.0156 },
-  { months: 9, rate: 0.0163 },
-  { months: 12, rate: 0.0172 }
+  { months: 1, rate: 0.01225 },
+  { months: 3, rate: 0.0129 },
+  { months: 6, rate: 0.01465 },
+  { months: 9, rate: 0.0158 },
+  { months: 12, rate: 0.017 }
 ];
 export const TD_MIN = 10_000;
 export const TD_EARLY = 0.8;
