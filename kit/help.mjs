@@ -141,7 +141,7 @@ export const HELP = {
         '台股、美股的限價要符合跳動單位，台股限價要在漲跌幅 ±10% 內（新上市、上櫃股票前 5 個交易日不設漲跌幅）；台股整股（1,000 股的倍數）和零股（1–999 股）要分開下單，零股只能下限價單、9:10 開始撮合。每筆交易都看得到交割日（台股 T+2、美股 T+1）：賣出的錢馬上可以再買同一個市場，交割後才能換匯。'
       ]],
       ['plans', '定期定額與到價提醒', [
-        '定期定額（📅）：每月第幾天買多少新台幣。那天 00:00 之後的第一個價格成交，扣掉成本能買多少就買多少；外幣標的只換需要的新台幣。那個月餘額不夠就跳過，記在紀錄裡。',
+        '定期定額（📅）：每月 1 到 31 日選一天、每次至少 NT$100（那個月沒有這天就在月底買）。台股那天以盤中零股第一盤（09:10，2026/12/7 起 09:00）的限價成交，扣掉成本能買多少就買多少，每筆手續費 NT$1（2026 年底前，之後 0.1425%、最低 NT$1）；外幣標的只換需要的新台幣。那個月餘額不夠就跳過，連續 3 個月扣款失敗，定期定額就停止。',
         '到價提醒（🔔）：漲到或跌到某個價格時通知你，App 關著時伺服器也會檢查。成交、委託失效、維持率偏低和股利利息入帳也會通知；每一種都能在 Quadra Pass 的通知各自開關。'
       ]],
       ['fx', '換匯與外幣', [
@@ -154,20 +154,20 @@ export const HELP = {
         '買進時可以選「融資」：成交時券商借你一部分，買的股票就是擔保，賣出時先還融資（沒有單獨借現金這回事）。融資成數和券商一樣：台股上市 6 成、上櫃 5 成（借成交價金乘成數，未滿千元的部分不借），其他市場 5 成（美國 Reg T），陸股、印度股、加密貨幣、基金、黃金存摺不能融資；公債 9 成、公司債 7 成。利息加在融資上，還款或賣出時一起付。持股會分開記「現股」和「融資」：融資買進的股票是券商的擔保品，只能融資賣出（賣得的錢先還融資）或用現金償還變成現股；賣出時先賣現股。融資到期、追繳沒補足或沒有信用帳戶時，券商只會處分融資的股票，不會動你的現股。融資的股票一樣有股東權益：配股配息、股東會、現金增資都有份。',
         '融資和借券放空（任何市場）都要先開「信用帳戶」（換匯・融資 › 融資）：沒有信用帳戶時，手上的融資和放空會被券商處分。開戶條件：證券帳戶滿 3 個月、最近一年成交 10 筆以上、成交金額達額度的一半；額度 50 萬、100 萬、200 萬、300 萬、500 萬，50 萬以上還要財力證明（總資產達額度 3 成）。台股的融資、融券各用自己的額度。外匯對賣出不算借券，不用信用帳戶。',
         '融資、融券期限 6 個月，到期前一個月內可以按「展延」再延 6 個月；到期沒展延，融資的股票會被賣出、融券會被買回。融券：要繳賣出金額 9 成的保證金（未滿百元以百元計），賣出的錢也押在券商，買回時一起退；另收 0.08% 融券手續費，不收借券利息；保證金和押著的賣出款有年息 0.2%，買回時付給你。融券要用融券買進（或現券償還）了結；股東會、除權息前要依規定強制回補。其他市場的放空照國外券商：借券年費 3%，開倉後資產要有欠款的 150%，期間的股利由你付。',
-        '現股當沖：當天買進再賣出，證交稅減半（0.15%）。證券帳戶滿 3 個月、最近一年成交 10 筆，或已開信用帳戶，就能當沖（先買後賣、先賣後買都一樣）；先賣後買有每日當沖額度（淨資產的 2 倍，最少 NT$50 萬、最多 NT$5,000 萬），收盤前一定要買回，沒買回會被自動買回。13:25 起整股進收盤前集合競價：只收限價單，13:30 以收盤價撮合一次。收盤後零股 13:40、整股 14:00 起到 14:30 下的台股單進「盤後交易」（零股盤後、整股盤後定價），14:30 以收盤價撮合一次，沒成交就取消；13:30 到開放前送出的會被退回。',
+        '現股當沖：當天買進再賣出，證交稅減半（0.15%，到 2027 年底；只算當天買賣配對的股數，零股不適用）。證券帳戶滿 3 個月、最近一年成交 10 筆，或已開信用帳戶，就能當沖（先買後賣、先賣後買都一樣）；先賣後買有每日當沖額度（淨資產的 2 倍，最少 NT$50 萬、最多 NT$5,000 萬），收盤前一定要買回，沒買回會被自動買回。13:25 起整股進收盤前集合競價：只收限價單，13:30 以收盤價撮合一次。收盤後零股 13:40、整股 14:00 起到 14:30 下的台股單進「盤後交易」（零股盤後、整股盤後定價），14:30 以收盤價撮合一次，沒成交就取消；13:30 到開放前送出的會被退回。',
         '維持率收盤時低於 130% 會追繳，兩個營業日內要補到 166%，或繳足通知的補繳差額；到期還低於 130%，融資買進的持股全部賣出（斷頭）；低於 100% 馬上強制處理。'
       ]],
       ['save', '閒錢：活存、定存、借券', [
         '交割帳戶裡的新台幣有活存利息，年利率 0.8%，每天計息，6 月 21 日和 12 月 21 日入帳。',
         '定存：最少 NT$10,000，1、3、6、9 或 12 個月，臺灣銀行牌告固定利率（1 年 1.72%），到期本息回到現金，也可以設自動轉存。提前解約未滿 1 個月沒有利息，滿 1 個月以上按存滿的期別利率打 8 折。',
-        '借券出借：整張、已交割、不是融資買進的台股或 ETF 可以借出去收借券費（股票年 1.2%、ETF 0.6%，券商收 3 成），借出去的股票不能賣，召回要 3 個營業日，最長 180 天。',
+        '借券出借：整張、已交割、不是融資買進的台股或 ETF 可以借出去收借券費。年費率自己出價（0.01%～16%），有人借才成交：出價不高於市場行情（股票 1.2%、ETF 0.6%）就借得出去，高於行情沒人借。借券費每天按當天收盤價計算，還券時一次收（券商收 3 成）。借出去的股票不能賣，召回要 3 個營業日；每次借 6 個月，同意續借最多再續 2 次。',
         '單筆利息或借券費超過 NT$20,000 扣繳 10% 和 2.11% 二代健保。違約交割時銀行會先把定存解約抵債、券商召回借出的股票來賣。'
       ]],
       ['time', '回測（時光機）', [
         '在「紀錄」的「回測」試算：幾年前投入一筆錢（或每月定期定額）到某個知名基金或股票，現在會變多少、中間最大跌幅多少、最好和最差的一年，和放銀行比。標的頁也有連結。'
       ]],
       ['fees', '費用', [
-        '台股手續費 0.1425%（最低 NT$20，折扣後也一樣；零股最低 NT$1），賣出另收 0.3% 證交稅（ETF 0.1%、債券 ETF 免、當沖 0.15%），元以下無條件捨去；美股、日股等海外市場照複委託常見網路費率；共同基金透過基金平台申購，收 1% 申購手續費，贖回不收費。股利照各國規定預扣稅。',
+        '台股手續費 0.1425%（最低 NT$20，折扣後也一樣；零股最低 NT$1），賣出另收 0.3% 證交稅（ETF 0.1%、債券 ETF 2026 年底前免稅、之後 0.1%，當沖 0.15% 到 2027 年底），元以下無條件捨去；美股、日股等海外市場照複委託常見網路費率；共同基金透過基金平台申購，收 1% 申購手續費，贖回不收費。股利照各國規定預扣稅。',
         '換匯用市場中間價加減銀行價差；週末外匯休市時價差加倍。融資按天計息。新手禮：第一筆交易免手續費（稅和規費照收）。',
         'Quadra Plus 會員手續費（含基金申購手續費）2.8 折、點差減半、融資利率少 1%：交易越多、借越多，省越多，這正是它要你做的事。'
       ]],
@@ -196,7 +196,7 @@ export const HELP = {
         'Taiwan and US limit prices must sit on the exchange’s tick, and Taiwan’s within the day’s ±10% (none for a new listing’s first 5 trading days); Taiwan whole lots (multiples of 1,000) and odd lots (1–999 shares) are separate orders, and odd lots take limit orders only and match from 9:10. Every trade shows when it settles (Taiwan T+2, US T+1): sale money buys again at once in its market, but can be exchanged only once settled.'
       ]],
       ['plans', 'Monthly plans and price alerts', [
-        'Monthly plan (📅): NT$ an amount on a day of every month. It buys at the first price after 00:00 that day, as much as the money covers after costs; a foreign one exchanges only the NT$ it needs. A month without enough is skipped and recorded.',
+        'Monthly plan (📅): at least NT$100 on a day from 1 to 31 (in a shorter month, its last day). A Taiwan one buys with a limit order at the odd-lot session’s first match (09:10, 09:00 from 2026-12-07), as much as the money covers after costs, at NT$1 a buy (until the end of 2026; then 0.1425%, at least NT$1); a foreign one exchanges only the NT$ it needs. A month without enough is skipped; three in a row end the plan.',
         'Price alert (🔔): tells you when a price rises or falls to yours, checked by the server while the app is closed. Fills, lapsed orders, low margin and dividends and interest are told too; each kind has its own switch in the Quadra Pass’s notifications.'
       ]],
       ['fx', 'Exchange and currencies', [
@@ -209,20 +209,20 @@ export const HELP = {
         'Buy on margin by choosing 融資 on the order: the broker lends part of it as it fills, the shares its collateral, and selling repays it first (there’s no borrowing cash on its own). How much is lent is a broker’s: Taiwan 60% listed, 50% OTC (of the trade’s value, the part under NT$1,000 not lent); 50% elsewhere (US Reg T); none on A-shares, Indian stocks, crypto, funds or the gold passbook; government bonds 90%, corporate 70%. Interest is added to the loan and paid when it’s repaid or the shares are sold. A holding keeps its own shares (現股) and its margin shares (融資) apart: shares bought on margin are the broker’s collateral, sold only as a margin sale (the money repays the loan first) or turned into your own by repaying in cash; a sale sells your own first. When margin is due, a call isn’t met or there’s no credit account, the broker sells only the margin shares, never your own. Margin shares keep every shareholder right: dividends, meetings and rights issues.',
         'Margin and borrowed shorts (any market) need a credit account first (FX & loans › Loans); without one, the broker closes any margin or shorts held. To open one: the account 3 months old, 10 trades in the last year, and that year’s turnover at least half the limit; limits of NT$500k, 1M, 2M, 3M or 5M, above 500k with proof of means (net worth 30% of the limit). Taiwan’s 融資 and 融券 each have their own limit. Selling a currency pair borrows nothing and needs no credit account.',
         'Taiwan margin (融資) and short sales (融券) run six months; within the last month, Extend adds six more. Past due without one, margin shares are sold and shorts bought back. A 融券 short puts up 90% of the sale as a deposit (rounded up to NT$100), and the sale money stays with the broker too, both returned on buying back; it costs a 0.08% fee and no borrow interest, and the deposit and sale money earn 0.2% a year, paid when you buy back. A 融券 position is closed by buying back (or delivering shares you hold), and must be covered before shareholder meetings and ex-dates by the rules. Shorts elsewhere follow a foreign broker: a 3% a year borrow fee, assets of 150% of what’s owed after opening, and dividends paid meanwhile charged to you.',
-        'Day trading (現股當沖): bought and sold the same day, the sell tax is halved (0.15%). Either way round needs the account 3 months old with 10 trades in the last year, or a credit account; selling first has a daily day-trade limit (twice net worth, NT$500,000 to NT$50 million) and must be bought back before the close or it’s bought back for you. From 13:25 whole lots go into the closing call auction: limit orders only, matched once at 13:30 at the close. After the close, Taiwan orders placed from 13:40 (odd lots) or 14:00 (whole lots) until 14:30 go to after-hours trading, matched once at 14:30 at the close; unfilled ones are cancelled, and ones sent before their session opens are refused.',
+        'Day trading (現股當沖): bought and sold the same day, the sell tax is halved (0.15%, until the end of 2027; only on the shares matched within the day, never odd lots). Either way round needs the account 3 months old with 10 trades in the last year, or a credit account; selling first has a daily day-trade limit (twice net worth, NT$500,000 to NT$50 million) and must be bought back before the close or it’s bought back for you. From 13:25 whole lots go into the closing call auction: limit orders only, matched once at 13:30 at the close. After the close, Taiwan orders placed from 13:40 (odd lots) or 14:00 (whole lots) until 14:30 go to after-hours trading, matched once at 14:30 at the close; unfilled ones are cancelled, and ones sent before their session opens are refused.',
         'If the maintenance ratio is under 130% at the close, it’s a margin call: two business days to bring it back to 166% or pay the amount called in full; still under 130% at the deadline, margin-bought holdings are sold; under 100% they’re sold at once.'
       ]],
       ['save', 'Idle money: cash, deposits, lending', [
         'NT$ in the settlement account earns 0.8% a year, accrued daily and paid on June 21 and December 21.',
         'Time deposits: NT$10,000 or more for 1, 3, 6, 9 or 12 months at Bank of Taiwan’s posted fixed rates (1.72% for a year); principal and interest come back to cash at maturity, or roll over if you choose. Closed early: no interest under a month, past that 80% of the rate for the term held.',
-        'Lending shares: whole lots of settled Taiwan stocks or ETFs not bought on margin earn a lending fee (1.2% a year for stocks, 0.6% for ETFs; the broker keeps 30%); lent shares can’t be sold, take 3 business days to recall, and come back after 180 days at most.',
+        'Lending shares: whole lots of settled Taiwan stocks or ETFs not bought on margin earn a lending fee at a yearly rate you ask (0.01% to 16%). It lends only when a borrower takes it: at or under the going rate (1.2% for stocks, 0.6% for ETFs) it lends, above it nobody borrows. The fee accrues each day on that day’s close and is paid when the shares come back (the broker keeps 30%). Lent shares can’t be sold and take 3 business days to recall; a loan runs 6 months, renewed at most twice if you agree.',
         'Interest or a fee over NT$20,000 at once has 10% tax and 2.11% health premium withheld. In a default the bank breaks your deposits against the debt and the broker recalls lent shares to sell.'
       ]],
       ['time', 'Backtest (time machine)', [
         'In History’s Backtest: what a lump sum (or a monthly plan) in a well-known fund or stock years ago would be worth now, its worst drop, its best and worst years, against a bank deposit. A holding’s sheet links to it too.'
       ]],
       ['fees', 'Fees', [
-        'Taiwan commission is 0.1425% (at least NT$20 even after discounts; odd lots at least NT$1), plus 0.3% tax on sales (ETFs 0.1%, bond ETFs none, day trades 0.15%), rounded down to the dollar; overseas markets at common online sub-brokerage rates; mutual funds are bought through a fund platform at a 1% subscription fee, with nothing on redeeming. Dividends have each country’s withholding.',
+        'Taiwan commission is 0.1425% (at least NT$20 even after discounts; odd lots at least NT$1), plus 0.3% tax on sales (ETFs 0.1%, bond ETFs none until the end of 2026 and 0.1% after, day trades 0.15% until the end of 2027), rounded down to the dollar; overseas markets at common online sub-brokerage rates; mutual funds are bought through a fund platform at a 1% subscription fee, with nothing on redeeming. Dividends have each country’s withholding.',
         'Exchanges are at the mid-market rate plus or minus a bank’s spread, doubled while FX markets are shut. Margin interest accrues daily. Welcome offer: your first trade pays no commission (taxes and fees as usual).',
         'Quadra Plus members pay 28% of the commission (fund subscription fees too), half the FX spread and margin 1 point cheaper: the more you trade and borrow, the more you save, which is exactly what it wants you to do.'
       ]],
