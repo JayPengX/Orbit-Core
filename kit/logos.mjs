@@ -168,7 +168,7 @@ export const F1_TEAMS = {
   aston: { name: 'Aston Martin', page: 'aston-martin', f1: 'astonmartin', zh: '奧斯頓馬丁', color: '#229971', drivers: ['Alonso', 'Stroll'] },
   alpine: { name: 'Alpine', page: 'alpine', f1: 'alpine', zh: '雅爾派', color: '#ff87bc', drivers: ['Gasly', 'Colapinto'] },
   williams: { name: 'Williams', page: 'williams', f1: 'williams', zh: '威廉斯', color: '#64c4ff', drivers: ['Albon', 'Sainz'] },
-  rb: { name: 'Racing Bulls', aka: ['RB F1 Team', 'Visa Cash App RB', 'VCARB'], page: 'racing-bulls', f1: 'racingbulls', zh: 'Racing Bulls', color: '#6692ff', drivers: ['Lawson', 'Lindblad'] },
+  rb: { name: 'Racing Bulls', aka: ['RB F1 Team', 'Visa Cash App RB', 'VCARB'], page: 'racing-bulls', f1: 'racingbulls', zh: '小紅牛', color: '#6692ff', drivers: ['Lawson', 'Lindblad'] },
   haas: { name: 'Haas', page: 'haas', f1: 'haasf1team', zh: '哈斯', color: '#9ea3a8', drivers: ['Ocon', 'Bearman'] },
   audi: { name: 'Audi', page: 'audi', f1: 'audi', zh: '奧迪', color: '#bb0a30', drivers: ['Hulkenberg', 'Bortoleto'] },
   cadillac: { name: 'Cadillac', page: 'cadillac', f1: 'cadillac', zh: '凱迪拉克', color: '#c9a227', drivers: ['Perez', 'Bottas'] }
