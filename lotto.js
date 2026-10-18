@@ -3,9 +3,10 @@
 // Worker (the owner's lock-down, 2026-10-12: the proxy is the only one adding
 // money), with Play's own code (the kit's play-lottery and play-scratch).
 //
-//   POST /play { op: 'tickets', tickets: [{ id, game, sel, multiple }] }
+//   POST /play { op: 'tickets', tickets: [{ id, game, sel, multiple, periods }] }
 //        sold (each checked, its draw the next one by the Worker's clock, the
-//        cost from the pool, all or none): { tickets: [ticket…], wallet }
+//        cost from the pool, all or none; 多期: a ticket a draw, <id>-2 …):
+//        { tickets: [ticket…], wallet }
 //   POST /play { op: 'scratch', id, card }   a card bought, its prize drawn
 //        here: { ticket, wallet }
 //   POST /play { op: 'reveal', id }          scratched: its prize paid
@@ -23,6 +24,8 @@ import { parseDoc, changeDoc, moveOwned } from './doc-store.js';
 export const TICKET_COLLECTION = 'odds-tickets';
 export const TICKET_INDEX = '_index';
 const MAX_TICKETS = 50;
+// Tickets one sale makes at most, 多期 counted (each a write and a cron read).
+const MAX_SOLD = 120;
 const TICKET_ID = /^[a-z0-9]{8,32}$/;
 // Tickets settled a run at most (each a draw read and two writes; the free
 // plan's 50 fetches set it at 6).
@@ -76,12 +79,12 @@ export async function handleLotto(body, env, account, deps, now) {
     const tickets = [];
     for (const x of asked) {
       if (!TICKET_ID.test(String(x?.id)) || !GAMES[x?.game]) return { refused: { problem: 'shape' } };
-      const r = buyTicket(BOTTOMLESS, { id: String(x.id), game: x.game, sel: x.sel, multiple: x.multiple }, new Date(now));
+      const r = buyTicket(BOTTOMLESS, { id: String(x.id), game: x.game, sel: x.sel, multiple: x.multiple, periods: x.periods }, new Date(now));
       if (r.error) return { refused: { problem: r.error } };
-      tickets.push(r.ticket);
+      tickets.push(...(r.tickets || [r.ticket]));
     }
     // (One id once: the same id twice would be charged twice for one ticket.)
-    if (!tickets.length || new Set(tickets.map(x => x.id)).size !== tickets.length) return { refused: { problem: 'shape' } };
+    if (!tickets.length || tickets.length > MAX_SOLD || new Set(tickets.map(x => x.id)).size !== tickets.length) return { refused: { problem: 'shape' } };
     const cost = tickets.reduce((s, x) => s + x.cost, 0);
     const wallet = await charge(env, deps, account, tickets.map(x => ({ id: `odds:lotto-${x.id}`, t: now, app: 'odds', kind: 'lottery', amount: -x.cost })), cost);
     if (!wallet) return { refused: { problem: 'funds' } };

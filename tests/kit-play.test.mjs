@@ -7,7 +7,7 @@ import { legResult, applyResults, voidAt, lateOutcome, decidedSoFar, parseEspnRe
 import { settleSlip, evaluateSlip, slipPayoutTable, slipOutlook, analyzeSlip, afterTax, prizeAfterTax, SLIP_RULES, combosBySize, comboCount, slipErrors, slipSizes, choose, maskChance, exclusiveMasks, estimateLineOdds, estimateFuturesOdds, estimateF1Odds, devigPower, devigTwoWay, devigProportional, americanToProbability, boostRate, seededRandom, quantile, median } from '../kit/play-odds.mjs';
 import { cashOutState, CASHOUT_KEEP, CASHOUT_MAX_OPEN } from '../kit/play-cashout.mjs';
 import { houseRule, shadeLong, minLegsProblem, HOUSE_RULES, LONG_FROM } from '../kit/play-rules.mjs';
-import { GAMES, ticketPrize, parseDraw, cappedPrize, settleTicket, buyTicket, nextDraw, checkSelection, betCount, expectedReturn, mergeTickets, addTickets, BINGO_DRAWS, GAME_ORDER } from '../kit/play-lottery.mjs';
+import { GAMES, ticketPrize, parseDraw, cappedPrize, settleTicket, buyTicket, nextDraw, nextDraws, limits, checkSelection, betCount, expectedReturn, mergeTickets, addTickets, BINGO_DRAWS, GAME_ORDER } from '../kit/play-lottery.mjs';
 import { CARD_ORDER, face, facePays, tiersOf, drawPrize, buyScratch, revealScratch, expectedReturn as scratchReturn } from '../kit/play-scratch.mjs';
 import { propResult } from '../kit/play-props.mjs';
 import { parseOffers } from '../kit/play-offers.mjs';
@@ -562,15 +562,15 @@ test('lottery tickets: checked, bought at their draw, settled once with the tax,
   assert.ok(!GAMES.m38, '38樂合彩 is gone (last drawn 2023-12-28)');
   const now = new Date('2026-10-19T10:00:00Z'); // Monday 18:00 Taipei: tonight's 威力彩
   const acc = { ledger: [{ id: 'start', amount: 1_000, t: '' }], tickets: [] };
-  const bought = buyTicket(acc, { id: 't1', game: 'super638', sel: { zones: [[1, 2, 3, 4, 5, 6], [7]] }, multiple: 3 }, now);
+  const bought = buyTicket(acc, { id: 't1', game: 'super638', sel: { zones: [[1, 2, 3, 4, 5, 6], [7]] } }, now);
   assert.equal(bought.ticket.draw.date, '2026-10-19');
-  assert.equal(bought.ticket.cost, 300);
+  assert.equal(bought.ticket.cost, 100);
   assert.equal(buyTicket({ ledger: [] }, { id: 't', game: 'super638', sel: { zones: [[1, 2, 3, 4, 5, 6], [7]] } }, now).error, 'funds');
-  // 3 × NT$150,000 (5 + the second zone): each bet taxed, 3 × 119,400.
+  // NT$150,000 (5 + the second zone): taxed, 119,400.
   const won = settleTicket(bought.account, 't1', { numbers: [1, 2, 3, 4, 5, 40], zone2: 7, pools: {} }, now);
-  assert.equal(won.tickets[0].gross, 450_000);
-  assert.equal(won.tickets[0].prize, 358_200);
-  assert.equal(won.ledger.at(-1).amount, 358_200);
+  assert.equal(won.tickets[0].gross, 150_000);
+  assert.equal(won.tickets[0].prize, 119_400);
+  assert.equal(won.ledger.at(-1).amount, 119_400);
   assert.equal(settleTicket(won, 't1', { numbers: [1, 2, 3, 4, 5, 6], zone2: 7, pools: {} }, now), won, 'settled once');
   // Tax is withheld bet by bet, never on the ticket's total: six 二合 of
   // NT$1,250 (7,500 together) paid whole; a 三合 of NT$12,500 taxed on its own;
@@ -594,6 +594,32 @@ test('lottery tickets: checked, bought at their draw, settled once with the tax,
   const withWorker = addTickets({ ledger: [], tickets: [] }, [{ id: 'w1', t: '2026-10-19T00:00:00.000Z', cost: 50 }], now);
   assert.deepEqual(withWorker.ledger.map(e => [e.id, e.amount]), [['lotto-w1', -50]]);
   assert.equal(addTickets(withWorker, [{ id: 'w1', t: '', cost: 50 }], now), withWorker);
+});
+
+test('倍數 and 多期 as each game takes them (台灣彩券 投注方式), 多期 a ticket a draw', () => {
+  const now = new Date('2026-10-19T10:00:00Z'); // Monday 18:00 Taipei
+  const acc = { ledger: [{ id: 'start', amount: 100_000, t: '' }], tickets: [] };
+  const buy = x => buyTicket(acc, { id: 'm1', ...x }, now);
+  const one = { zones: [[1, 2, 3, 4, 5, 6], [7]] };
+  assert.deepEqual([limits('super638'), limits('m39'), limits('star3'), limits('bingo'), limits('daily539'), limits('m49')], [
+    { multiple: 1, periods: 10 }, { multiple: 10, periods: 24 }, { multiple: 50, periods: 24 }, { multiple: 50, periods: 12 }, { multiple: 1, periods: 24 }, { multiple: 10, periods: 10 }
+  ]);
+  assert.equal(buy({ game: 'super638', sel: one, multiple: 2 }).error, 'multiple', '威力彩 takes no 倍數');
+  assert.equal(buy({ game: 'm39', sel: { numbers: [1, 2], size: 2 }, multiple: 11 }).error, 'multiple', '樂合彩: 10 at most');
+  assert.equal(buy({ game: 'm39', sel: { numbers: [1, 2], size: 2 }, multiple: 10 }).ticket.cost, 250);
+  assert.equal(buy({ game: 'star3', sel: { play: 'straight', digits: [1, 2, 3] }, multiple: 50 }).ticket.cost, 1_250);
+  assert.equal(buy({ game: 'super638', sel: one, periods: 11 }).error, 'periods');
+  assert.equal(buy({ game: 'bingo', sel: { numbers: [1] }, periods: 13 }).error, 'periods');
+  // 威力彩 for 3 draws: Monday, Thursday, next Monday; a ticket and a cost each.
+  const three = buy({ game: 'super638', sel: one, periods: 3 });
+  assert.deepEqual(three.tickets.map(x => [x.id, x.draw.date, x.cost, x.series.n]), [['m1', '2026-10-19', 100, 1], ['m1-2', '2026-10-22', 100, 2], ['m1-3', '2026-10-26', 100, 3]]);
+  assert.equal(three.ticket, three.tickets[0]);
+  assert.deepEqual(three.account.ledger.slice(1).map(e => [e.id, e.amount]), [['lotto-m1', -100], ['lotto-m1-2', -100], ['lotto-m1-3', -100]]);
+  assert.equal(buyTicket({ ledger: [{ id: 's', amount: 250, t: '' }] }, { id: 'f', game: 'super638', sel: one, periods: 3 }, now).error, 'funds', 'all draws paid now');
+  // BINGO's run goes on past 23:55 into the next morning.
+  const late = nextDraws('bingo', Date.parse('2026-10-19T15:46:00Z'), 3);
+  assert.deepEqual(late.map(d => [d.date, d.slot]), [['2026-10-19', 201], ['2026-10-19', 202], ['2026-10-20', 0]]);
+  assert.equal(buyTicket(acc, { id: 'x', game: 'super638', sel: one }, now).tickets.length, 1);
 });
 
 test('draw times: sales close half an hour before 20:30, BINGO every five minutes from 07:05 to 23:55', () => {
