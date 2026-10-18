@@ -4,7 +4,9 @@
 // explain them plainly), lang: 'zh' | 'en' }. The law's text is read here
 // from Orbit Law's own data (a day at the edge), never taken from the page,
 // and Gemini answers from those articles only, citing one for every point;
-// a point citing anything else is dropped here.
+// a point citing anything else is dropped here. Its other mode:
+//   { mode: 'bill', bill: 議案編號, lang }: a bill explained from its own
+//     對照表 (立法院's API), each change citing an article the table has.
 //
 // A Quadra Pass of Orbit Law's (worker.js reads it; none, a 401 {error:
 // 'pass'}), from Orbit Law's origin (or a localhost page) only: 10 asks a
@@ -26,10 +28,13 @@ export const DATA = 'https://jaypengx.github.io/Orbit-Law/data/';
 // perDay: Gemini's answers a day in all, /law-ask's and /law-chat's (a chat
 // turn's plan counts with its answer, as one), near the low end of the
 // spec's estimate (about 200 turns a day).
-export const LAW_LIMITS = { perPass: 40, chatPerPass: 30, perDay: 300, perMinute: 10, maxArts: 8, maxQ: 300, maxBody: 4096 };
+export const LAW_LIMITS = { perPass: 40, chatPerPass: 30, perDay: 300, perMinute: 10, maxArts: 8, maxQ: 300, maxBody: 4096, billChars: 14_000 };
 export const PCODE = /^[A-Z]\d{7}$/;
 export const ART = /^\d{1,4}(-\d{1,3})?$/;
+const BILL = /^\d{6,24}$/;
+const LY = 'https://v2.ly.govapi.tw/bill/';
 const ANSWER_TTL_S = 180 * 86_400;
+const BILL_TTL_S = 30 * 86_400;
 export const twDay = (now = Date.now()) => new Date(now + 8 * 3_600_000).toISOString().slice(0, 10);
 export const fail = (error, status, headers, more) => json({ error, ...more }, status, headers);
 
@@ -74,17 +79,19 @@ export function checkAnswer(raw, keys) {
   return { answer, points, covered: raw?.covered === true && points.length > 0 };
 }
 
-// The ask, read and checked; a string is what's wrong with it.
+// The ask, read and checked by its mode; a string is what's wrong with it.
 export function readAsk(body) {
   if (!body || typeof body !== 'object') return 'bad';
-  const { p, arts, lang = 'zh' } = body;
+  const { p, arts, lang = 'zh', mode = 'ask' } = body;
+  if (lang !== 'zh' && lang !== 'en') return 'lang';
+  if (mode === 'bill') return typeof body.bill === 'string' && BILL.test(body.bill) ? { mode, bill: body.bill, lang } : 'bill';
+  if (mode !== 'ask') return 'mode';
   if (typeof p !== 'string' || !PCODE.test(p)) return 'p';
   if (!Array.isArray(arts) || !arts.length || arts.length > LAW_LIMITS.maxArts || !arts.every(a => typeof a === 'string' && ART.test(a))) return 'arts';
-  if (lang !== 'zh' && lang !== 'en') return 'lang';
   if (body.q != null && typeof body.q !== 'string') return 'q';
   const q = (body.q || '').replace(/\s+/g, ' ').trim();
   if (q.length > LAW_LIMITS.maxQ) return 'q';
-  return { p, arts: [...new Set(arts)], q, lang };
+  return { mode, p, arts: [...new Set(arts)], q, lang };
 }
 
 const SCHEMA = {
@@ -131,6 +138,134 @@ export async function readLaw(p) {
   if (j === null) return null;
   if (!j || !Array.isArray(j.a)) throw new Error('law shape');
   return { p, n: String(j.n || ''), m: String(j.m ?? ''), a: j.a };
+}
+
+// Orbit Law's lists (rows [p, name, level, category, m, repealed, …]):
+// index.json the laws (in the full-text index's order), orders.json the
+// regulations, read only when a name or code isn't a law's. Kept an hour
+// in the isolate (orders.json is a megabyte).
+const lists = new Map();
+export const forgetLists = () => lists.clear();
+export async function readList(name, now = Date.now()) {
+  const had = lists.get(name);
+  if (had && now - had.at < 3_600_000) return had.v;
+  const j = await readData(name);
+  if (!Array.isArray(j?.laws)) throw new Error(`${name} shape`);
+  const rows = j.laws.filter(r => Array.isArray(r) && typeof r[0] === 'string' && typeof r[1] === 'string');
+  const v = { rows, byP: new Map(rows.map((r, i) => [r[0], i])), byName: new Map() };
+  rows.forEach((r, i) => !r[5] && !v.byName.has(r[1]) && v.byName.set(r[1], i));
+  lists.set(name, { at: now, v });
+  return v;
+}
+
+// A law's or a regulation's row, by its code; null when neither has it.
+export async function rowOf(p) {
+  for (const name of ['index.json', 'orders.json']) {
+    const list = await readList(name);
+    if (list.byP.has(p)) return list.rows[list.byP.get(p)];
+  }
+  return null;
+}
+
+// ---- A bill (mode 'bill') -------------------------------------------------------
+
+// 第十五條之一 or 第 15 條 (a 對照表 row's first words) → '15-1'; '' for none.
+const DIGIT = { 零: 0, 〇: 0, 一: 1, 二: 2, 兩: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9 };
+const UNIT = { 十: 10, 百: 100, 千: 1000 };
+function cnNumber(s) {
+  if (/^\d+$/.test(s)) return Number(s);
+  let total = 0;
+  let digit = 0;
+  for (const ch of s) {
+    if (ch in DIGIT) digit = DIGIT[ch];
+    else if (ch in UNIT) {
+      total += (digit || 1) * UNIT[ch];
+      digit = 0;
+    } else return NaN;
+  }
+  return total + digit;
+}
+export function rowKey(text) {
+  const m = String(text || '').match(/^\s*第\s*([零〇一二兩三四五六七八九十百千\d]+)\s*條(?:\s*之\s*([零〇一二兩三四五六七八九十百千\d]+))?/);
+  if (!m) return '';
+  const key = m[2] ? `${cnNumber(m[1])}-${cnNumber(m[2])}` : String(cnNumber(m[1]));
+  return ART.test(key) ? key : '';
+}
+
+// A bill from 立法院's API (v2.ly.govapi.tw), a day at the edge: { id, n:
+// 議案名稱, by: 提案單位/委員, why: 案由, rows: [{ key, law, old, now, added,
+// note }] } (its 對照表, the rows whose article it can tell); null when
+// there's no such bill.
+export async function readBill(id) {
+  const res = await fetch(`${LY}${encodeURIComponent(id)}`, { cf: { cacheTtlByStatus: { '200-299': 86_400, 404: 60, '500-599': 0 }, cacheEverything: true }, signal: AbortSignal.timeout(8000) });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`bill ${res.status}`);
+  const j = await res.json();
+  if (!j?.data) return null;
+  const d = j.data;
+  const rows = [];
+  for (const t of Array.isArray(d['對照表']) ? d['對照表'] : []) {
+    for (const r of Array.isArray(t?.rows) ? t.rows : []) {
+      const now = String(r['修正'] || r['增訂'] || '');
+      const old = String(r['現行'] || '');
+      const key = rowKey(now) || rowKey(old);
+      if (key) rows.push({ key, law: String(t.law_name || ''), old, now, added: Boolean(r['增訂']), note: String(r['說明'] || '') });
+    }
+  }
+  return { id, n: String(d['議案名稱'] || ''), by: String(d['提案單位/提案委員'] || ''), why: String(d['案由'] || ''), rows };
+}
+
+// The rows a prompt quotes: in order, while they fit in `max` characters.
+export function billRows(rows, max) {
+  const out = [];
+  let n = 0;
+  for (const r of rows) {
+    const size = r.old.length + r.now.length + r.note.length;
+    if (n + size > max) continue;
+    n += size;
+    out.push(r);
+  }
+  return out;
+}
+const rowText = r => `[key "${r.key}"] ${r.law} ${label(r.key, 'zh')}\n${r.old ? `現行: ${r.old}\n` : ''}${r.now ? `${r.added ? '增訂' : '修正'}: ${r.now}\n` : '(刪除)\n'}${r.note ? `說明: ${r.note}` : ''}`;
+
+const BILL_SCHEMA = {
+  type: 'object',
+  properties: {
+    answer: { type: 'string' },
+    changes: { type: 'array', items: { type: 'object', properties: { text: { type: 'string' }, article: { type: 'string' } }, required: ['text', 'article'] } },
+    who: { type: 'array', items: { type: 'string' } },
+    covered: { type: 'boolean' }
+  },
+  required: ['answer', 'changes', 'who', 'covered']
+};
+
+export function billPrompt(bill, rows, lang) {
+  return `You explain a bill before Taiwan's Legislative Yuan (立法院), 「${bill.n}」 (proposed by ${bill.by || 'unknown'}), using ONLY its comparison table quoted below (現行: the law now; 修正 or 增訂: the bill's text; 說明: the proposers' reasons). Return JSON matching the schema.
+
+${bill.why ? `案由: ${bill.why.slice(0, 1500)}\n\n` : ''}Comparison table:
+${rows.map(rowText).join('\n\n')}
+
+Rules:
+- answer: 2 to 3 sentences in plain words: what the bill would change.
+- changes: up to 8, each one change in plain words, and article: the key of the article it's in, exactly as given in quotes (e.g. "15" or "15-1"). Never a key not listed above.
+- who: up to 4 short names of the groups of people it affects.
+- Use only the table and 案由 above; don't fill gaps. covered: false if they're too thin to say what changes.
+- Describe what the bill proposes, neutrally; it isn't law unless passed.
+- Write everything in ${lang === 'en' ? 'plain English' : 'Traditional Chinese as used in Taiwan (繁體中文)'}.`;
+}
+
+// The model's explanation, checked: a change stays only if its article is
+// one the table has; none left, not covered.
+export function checkBill(raw, keys) {
+  const given = new Set(keys);
+  const changes = (Array.isArray(raw?.changes) ? raw.changes : [])
+    .map(c => ({ text: typeof c?.text === 'string' ? c.text.trim() : '', article: citeKey(c?.article) }))
+    .filter(c => c.text && given.has(c.article))
+    .slice(0, 8);
+  const who = (Array.isArray(raw?.who) ? raw.who : []).filter(x => typeof x === 'string' && x.trim()).map(x => x.trim()).slice(0, 4);
+  const answer = typeof raw?.answer === 'string' ? raw.answer.trim() : '';
+  return { answer, changes, who, covered: raw?.covered === true && changes.length > 0 };
 }
 
 // ---- The day's counts: D1 (STORE), or memory with no store (the tests) ----
@@ -234,6 +369,42 @@ export async function opening(request, env, headers, { maxBody, read, who }) {
   return ask;
 }
 
+// Each mode's work before Gemini: { key: where its answer is kept, ttl,
+// info: what the answer carries with it, prompt, schema, check(raw) }, or
+// the answer turning it away.
+const JOBS = {
+  async ask(ask, headers) {
+    const law = await readLaw(ask.p);
+    if (!law) return fail('law', 404, headers);
+    const want = new Set(ask.arts);
+    const articles = law.a.filter(x => Array.isArray(x) && x[0] === 'A' && want.has(String(x[1])) && typeof x[2] === 'string');
+    if (!articles.length) return fail('arts', 400, headers);
+    const keys = articles.map(x => String(x[1]));
+    return {
+      key: `law:ask:v1:${await sha256Hex([law.p, law.m, [...keys].sort().join(','), ask.q, ask.lang].join('|'))}`,
+      ttl: ANSWER_TTL_S,
+      info: { law: { p: law.p, n: law.n, m: law.m } },
+      prompt: lawPrompt(law, articles, ask.q, ask.lang),
+      schema: SCHEMA,
+      check: raw => checkAnswer(raw, keys)
+    };
+  },
+  // (A bill with no 對照表 has nothing to cite: a 404 too.)
+  async bill(ask, headers) {
+    const bill = await readBill(ask.bill);
+    const rows = bill ? billRows(bill.rows, LAW_LIMITS.billChars) : [];
+    if (!rows.length) return fail('bill', 404, headers);
+    return {
+      key: `law:bill:v1:${bill.id}|${ask.lang}`,
+      ttl: BILL_TTL_S,
+      info: { bill: { id: bill.id, n: bill.n, by: bill.by } },
+      prompt: billPrompt(bill, rows, ask.lang),
+      schema: BILL_SCHEMA,
+      check: raw => checkBill(raw, rows.map(r => r.key))
+    };
+  }
+};
+
 // gemini(parts, schema) -> the upstream Response (worker.js's proxyGeminiRequest);
 // session: the request's Quadra Pass session (worker.js), or null.
 export async function handleLawAsk(request, env, ctx, headers, session, gemini) {
@@ -241,25 +412,19 @@ export async function handleLawAsk(request, env, ctx, headers, session, gemini) 
   const ask = await opening(request, env, headers, { maxBody: LAW_LIMITS.maxBody, read: readAsk, who: pass });
   if (ask instanceof Response) return ask;
 
-  let law;
+  let job;
   try {
-    law = await readLaw(ask.p);
+    job = await JOBS[ask.mode](ask, headers);
   } catch {
     return fail('upstream', 502, headers);
   }
-  if (!law) return fail('law', 404, headers);
-  const want = new Set(ask.arts);
-  const articles = law.a.filter(x => Array.isArray(x) && x[0] === 'A' && want.has(String(x[1])) && typeof x[2] === 'string');
-  if (!articles.length) return fail('arts', 400, headers);
-  const keys = articles.map(x => String(x[1]));
-  const info = { p: law.p, n: law.n, m: law.m };
+  if (job instanceof Response) return job;
 
   const day = twDay();
   const who = await passKey('ask', pass, day);
-  const cacheKey = `law:ask:v1:${await sha256Hex([law.p, law.m, [...keys].sort().join(','), ask.q, ask.lang].join('|'))}`;
   const left = n => Math.max(0, LAW_LIMITS.perPass - n);
-  const hit = await kept(env, cacheKey);
-  if (hit) return json({ ...hit, law: info, cached: true, left: left(await countOf(env, who, day)) }, 200, headers);
+  const hit = await kept(env, job.key);
+  if (hit) return json({ ...hit, ...job.info, cached: true, left: left(await countOf(env, who, day)) }, 200, headers);
 
   if (!env.GEMINI_API_KEY) return fail('setup', 503, headers);
   const used = await spend(env, who, LAW_LIMITS.perPass, day);
@@ -267,10 +432,10 @@ export async function handleLawAsk(request, env, ctx, headers, session, gemini) 
 
   let out;
   try {
-    out = checkAnswer(await modelJson(gemini, lawPrompt(law, articles, ask.q, ask.lang), SCHEMA), keys);
+    out = job.check(await modelJson(gemini, job.prompt, job.schema));
   } catch {
     return fail('upstream', 502, headers, { left: left(used) });
   }
-  keep(env, ctx, cacheKey, out, ANSWER_TTL_S);
-  return json({ ...out, law: info, cached: false, left: left(used) }, 200, headers);
+  keep(env, ctx, job.key, out, job.ttl);
+  return json({ ...out, ...job.info, cached: false, left: left(used) }, 200, headers);
 }

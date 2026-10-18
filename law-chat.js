@@ -18,7 +18,7 @@
 // by the question, its answer by the versions (m) of the laws found too, so
 // a new version asks again. Follow-ups aren't kept (they rarely repeat).
 import { json } from './http.js';
-import { LAW_LIMITS, PCODE, ART, fail, twDay, sha256Hex, citeKey, cited, label, readData, readLaw, opening, passOf, passKey, spend, countOf, kept, keep, modelJson } from './law.js';
+import { LAW_LIMITS, PCODE, ART, fail, twDay, sha256Hex, citeKey, cited, label, readData, readList, readLaw, opening, passOf, passKey, spend, countOf, kept, keep, modelJson } from './law.js';
 
 export const CHAT_LIMITS = { maxQ: 500, maxTurns: 6, maxTurn: 1500, maxPins: 2, maxArts: 14, maxChars: 14_000, maxLaws: 8, maxBuckets: 16, maxBody: 40_000 };
 const CHAT_TTL_S = 30 * 86_400;
@@ -136,24 +136,6 @@ export const SHORT_NAMES = {
   大法官法: '憲法訴訟法',
   憲訴法: '憲法訴訟法'
 };
-
-// Orbit Law's lists (rows [p, name, level, category, m, repealed, …]):
-// index.json the laws (in the full-text index's order), orders.json the
-// regulations, read when a name or code isn't a law's. Kept an hour in the
-// isolate (orders.json is a megabyte).
-const lists = new Map();
-export const forgetLists = () => lists.clear();
-async function readList(name, now = Date.now()) {
-  const had = lists.get(name);
-  if (had && now - had.at < 3_600_000) return had.v;
-  const j = await readData(name);
-  if (!Array.isArray(j?.laws)) throw new Error(`${name} shape`);
-  const rows = j.laws.filter(r => Array.isArray(r) && typeof r[0] === 'string' && typeof r[1] === 'string');
-  const v = { rows, byP: new Map(rows.map((r, i) => [r[0], i])), byName: new Map() };
-  rows.forEach((r, i) => !r[5] && !v.byName.has(r[1]) && v.byName.set(r[1], i));
-  lists.set(name, { at: now, v });
-  return v;
-}
 
 // A name to its row: the exact name, its short name's, then the shortest
 // in force that starts with it; the laws first, then the regulations.
