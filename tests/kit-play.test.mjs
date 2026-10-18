@@ -337,8 +337,9 @@ test('a free bet pays only its winnings; a slip refunded while lost has had its 
   // Three picks: the 5% boost on the winnings, ×1.5 for a member: 7.5%.
   const legs = [{ odds: 2, gameId: 'a' }, { odds: 2, gameId: 'b' }, { odds: 2, gameId: 'c' }];
   const plus = applyResults(acct([slipOf(legs, { boost: 1.5 })]), 's1', ['won', 'won', 'won'], now);
-  assert.deepEqual(plus.ledger.map(e => [e.id, e.amount]), [['payout-s1', 835], ['plus-s1', 17]]);
-  assert.equal(plus.slips[0].payout, 100 + 700 * 1.075 - 0.5);
+  assert.deepEqual(plus.ledger.map(e => [e.id, e.amount]), [['payout-s1', 835], ['plus-s1', 18]]);
+  // (852.5, rounded half up to the NT$ as 運彩 §18 says.)
+  assert.equal(plus.slips[0].payout, 853);
 });
 
 test("台灣運彩's withholding (115.6.8): 20% only when a combination's NT$10 單注 wins over NT$5,000 (odds over 500), no stamp duty for a member", () => {
