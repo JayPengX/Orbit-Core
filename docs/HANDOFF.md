@@ -169,8 +169,14 @@ not yet on a phone; the second round A/B, the old and new code alternated.
   stand-in with fake data, no sign-in). iPad and 375 px fixes across Play,
   Securities, Sports, Words, Class and the admin panel (nothing wraps or
   scrolls sideways but the slide rows and pinned tables).
-- **No English yet:** Transit and Weather are Chinese only (each has a task
-  card waiting for the owner to start).
+- **English in Transit and Weather (2026-10-18):** every screen, sheet and
+  notice (`lib/lang.mjs`'s `W(zh, en)`, the kit's `detectLang`). Place,
+  stop and station names stay Chinese (the data's own). Weather's advice
+  comes from the proxy in Chinese and is turned over by `advice-en.mjs`
+  (a sentence it can't read is left out in English); its headline shows
+  only for My route. Transit's plan tags stay Chinese inside (the code
+  compares them) and show through `tagText`; TRA's kinds through
+  `trainKind`.
 - **The owner's steps** (`OWNER-STEPS.md`): phone alerts in 系統, a $5.01
   billing email at Cloudflare, the renewal day, deleting Shared-Data and the
   Firebase project, revoking the old Match Find token.
