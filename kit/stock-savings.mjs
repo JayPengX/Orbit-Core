@@ -18,6 +18,7 @@
 // Interest and lending fees are income: a payment over NT$20,000 has 10%
 // withheld (扣繳) and 2.11% supplementary health premium (二代健保).
 import { NHI_RATE, NHI_THRESHOLD } from '#kit/stock-markets.mjs';
+import { isTradingDay } from '#kit/stock-holidays.mjs';
 
 const DAY = 86_400_000;
 const YEAR_MS = 365 * DAY;
@@ -77,13 +78,13 @@ export const LEND_RECALL = 3;
 export const LEND_TERM_DAYS = 180;
 export const lendable = (market, kind) => market === 'TW' && Boolean(LEND_RATE[kind]);
 
-// `n` weekdays after `t` (a recall's return day).
+// `n` Taiwan business days after `t` (a recall's return day): weekends and
+// TWSE's holidays skipped (TWSE 借券 Q&A: recalls count 營業日).
 export function addWeekdays(t, n) {
   let x = t;
   for (let left = n; left > 0; ) {
     x += DAY;
-    const day = new Date(x + TPE).getUTCDay();
-    if (day !== 0 && day !== 6) left--;
+    if (isTradingDay('TW', new Date(x + TPE).toISOString().slice(0, 10))) left--;
   }
   return x;
 }
