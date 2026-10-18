@@ -2,31 +2,24 @@
 // The house's rules for single options, shared by the bet slip and the
 // simulated crowd, so both play by exactly the same rules.
 //
-// The house protects itself at both ends of the price range, as bookmakers
-// do (2026-10-11, the owner: "lock less, 限幾關 instead, but not too many"):
-// - a near-certain pick is locked; a very short one is sold only inside a
-//   parlay of 2 or 3+ games (限2關 / 限3關), so nobody can lean on it alone;
-//   the bands are narrow, so few picks carry one;
+// 限2關 / 限3關 is 運彩's, set per game or per market (投注規範 §21), never by
+// price: a pick carries one only when its game's or market's own minimum is
+// known (eventMinLegs); with none known it sells as a single. The house
+// still guards the long end, as bookmakers do:
 // - a long price stays on sale with more margin on it (the favourite-longshot
 //   shade: past LONG_FROM only part of the price is paid, as a bookmaker
 //   shortens the outsiders it can price least well), and is locked only when
 //   it's far out (an ordinary game market at 30, a many-outcome one at 150).
 //   Locking every price from 8 locked both sides of most lopsided pairs (an
 //   F1 teammate head to head showed three locks in four).
-// F1 and championships are priced one by one up to 500; a runaway favourite
-// is sold only in a parlay, and locked only when it's all but decided.
+// F1 and championships are priced one by one up to 500, and locked only
+// when it's all but decided.
 export const HOUSE_RULES = {
-  // At or under this, locked.
-  lockLow: 1.03,
-  // Under these, only in a parlay of at least 3 / 2 games.
-  threeLegsUnder: 1.12,
-  twoLegsUnder: 1.25,
   // At or over this, locked: ordinary game markets / many-outcome markets.
   lockHigh: 30,
   lockHighExotic: 150,
-  // F1 and championships: under this, locked; under the next, 限2關.
-  lockLowOutright: 1.12,
-  twoLegsOutright: 1.3
+  // F1 and championships: under this, locked.
+  lockLowOutright: 1.12
 };
 // Past this price an ordinary market's odds pay only LONG_SHARE of the rest.
 export const LONG_FROM = 6;
@@ -44,23 +37,17 @@ export function shadeLong(kind, odds) {
   return Math.round((LONG_FROM + (odds - LONG_FROM) * LONG_SHARE) * 100) / 100;
 }
 
-// { lock: 'low' | 'high' | null, minLegs } for an option at `odds` (shaded already).
-// 運彩 sets 限2關 / 限3關 per game or market (投注規範 §21), not by price:
-// `event` (that game's or market's own minimum, when a source gives one)
-// takes the place of the price bands.
+// { lock: 'low' | 'high' | null, minLegs } for an option at `odds` (shaded
+// already); `event`: its game's or market's own 限關 (投注規範 §21), else 1.
 export function houseRule(kind, odds, { event = null } = {}) {
-  const rule = priceRule(kind, odds);
-  return event > 0 ? { ...rule, minLegs: Math.max(1, Math.round(event)) } : rule;
+  const minLegs = event > 0 ? Math.max(1, Math.round(event)) : 1;
+  return { lock: priceLock(kind, odds), minLegs };
 }
-function priceRule(kind, odds) {
+function priceLock(kind, odds) {
   const r = HOUSE_RULES;
-  if (!(odds > 0)) return { lock: null, minLegs: 1 };
-  if (OUTRIGHT.has(kind)) return { lock: odds < r.lockLowOutright ? 'low' : null, minLegs: odds < r.twoLegsOutright ? 2 : 1 };
-  if (odds <= r.lockLow) return { lock: 'low', minLegs: 1 };
-  if (odds >= (EXOTIC.has(kind) ? r.lockHighExotic : r.lockHigh)) return { lock: 'high', minLegs: 1 };
-  if (odds < r.threeLegsUnder) return { lock: null, minLegs: 3 };
-  if (odds < r.twoLegsUnder) return { lock: null, minLegs: 2 };
-  return { lock: null, minLegs: 1 };
+  if (!(odds > 0)) return null;
+  if (OUTRIGHT.has(kind)) return odds < r.lockLowOutright ? 'low' : null;
+  return odds >= (EXOTIC.has(kind) ? r.lockHighExotic : r.lockHigh) ? 'high' : null;
 }
 // The board's option priced by the house's rules: its long price shaded, then
 // locked or limited (by its market's or game's own 限關 when known: eventMinLegs).
