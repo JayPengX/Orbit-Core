@@ -471,6 +471,42 @@ export function trimEspnLeaders(data) {
   };
 }
 
+// Opt-in (`&trim=jolpica-results`) for a season's race results (Jolpica's
+// /results.json, a hundred a page), as Orbit Sports' F1 數據領先 counts them
+// (wins, podiums, top tens, fastest laps, places gained): each race's round
+// and each result's place, grid, points, laps, status, fastest-lap rank and
+// driver. A page falls from ~64 KB to ~12 KB.
+const TRIM_JOLPICA_RESULTS = 'jolpica-results';
+export function trimJolpicaResults(data) {
+  const m = data?.MRData;
+  if (!m?.RaceTable?.Races) return data;
+  return {
+    MRData: {
+      total: m.total,
+      limit: m.limit,
+      offset: m.offset,
+      RaceTable: {
+        season: m.RaceTable.season,
+        Races: m.RaceTable.Races.map(r => ({
+          season: r.season,
+          round: r.round,
+          Results: (r.Results || r.QualifyingResults || []).map(x => ({
+            position: x.position,
+            positionText: x.positionText,
+            grid: x.grid,
+            points: x.points,
+            laps: x.laps,
+            status: x.status,
+            FastestLap: x.FastestLap ? { rank: x.FastestLap.rank } : undefined,
+            Driver: { driverId: x.Driver?.driverId, code: x.Driver?.code, givenName: x.Driver?.givenName, familyName: x.Driver?.familyName },
+            Constructor: { constructorId: x.Constructor?.constructorId, name: x.Constructor?.name }
+          }))
+        }))
+      }
+    }
+  };
+}
+
 // FotMob's league or team page (always): its stats, each with its top three
 // and where its whole list is, and the table's teams (to match ESPN's by
 // name). A league's page falls from ~850 KB to ~25 KB.
@@ -927,7 +963,7 @@ async function fetchUpstream(upstreamUrl, trim) {
     if (trim) {
       try {
         const parsed = JSON.parse(new TextDecoder().decode(body));
-        body = JSON.stringify(trim === TRIM_KAMBI_EVENTS ? trimKambi(parsed) : trim === TRIM_KAMBI_OFFERS ? trimKambiOffers(parsed) : trim === TRIM_ESPN_ROSTER ? trimEspnRoster(parsed) : trim === TRIM_ESPN_ATHLETES ? trimEspnAthletes(parsed) : trim === TRIM_ESPN_NEWS ? trimEspnNews(parsed) : trim === TRIM_ESPN_LEADERS ? trimEspnLeaders(parsed) : trim === TRIM_FOTMOB_PAGE ? trimFotmobPage(parsed) : trim === TRIM_FOTMOB_STAT ? trimFotmobStat(parsed) : trim === TRIM_ESPN_INJURIES ? trimEspnInjuries(parsed) : trim === TRIM_ESPN_BOARD ? trimEspnBoard(parsed) : trim === TRIM_ELTA ? trimElta(parsed) : trim === TRIM_POLYMARKET_GAMES ? trimPolymarketGames(parsed) : trim === TRIM_POLYMARKET_MARKETS ? trimPolymarketMarkets(parsed) : trimPolymarketEvents(parsed));
+        body = JSON.stringify(trim === TRIM_KAMBI_EVENTS ? trimKambi(parsed) : trim === TRIM_KAMBI_OFFERS ? trimKambiOffers(parsed) : trim === TRIM_ESPN_ROSTER ? trimEspnRoster(parsed) : trim === TRIM_ESPN_ATHLETES ? trimEspnAthletes(parsed) : trim === TRIM_ESPN_NEWS ? trimEspnNews(parsed) : trim === TRIM_ESPN_LEADERS ? trimEspnLeaders(parsed) : trim === TRIM_JOLPICA_RESULTS ? trimJolpicaResults(parsed) : trim === TRIM_FOTMOB_PAGE ? trimFotmobPage(parsed) : trim === TRIM_FOTMOB_STAT ? trimFotmobStat(parsed) : trim === TRIM_ESPN_INJURIES ? trimEspnInjuries(parsed) : trim === TRIM_ESPN_BOARD ? trimEspnBoard(parsed) : trim === TRIM_ELTA ? trimElta(parsed) : trim === TRIM_POLYMARKET_GAMES ? trimPolymarketGames(parsed) : trim === TRIM_POLYMARKET_MARKETS ? trimPolymarketMarkets(parsed) : trimPolymarketEvents(parsed));
       } catch {
         // Not the JSON shape expected - pass it through untouched.
       }
@@ -1036,6 +1072,7 @@ function trimFor(trimParam, upstreamUrl) {
   if (trimParam === TRIM_ESPN_ROSTER && upstreamUrl.hostname === 'site.api.espn.com' && upstreamUrl.pathname.endsWith('/roster')) return TRIM_ESPN_ROSTER;
   if (trimParam === TRIM_ESPN_ATHLETES && upstreamUrl.hostname === 'site.api.espn.com' && upstreamUrl.pathname.endsWith('/statistics/byathlete')) return TRIM_ESPN_ATHLETES;
   if (trimParam === TRIM_ESPN_LEADERS && upstreamUrl.hostname === 'site.api.espn.com' && /\/(leaders|statistics)$/.test(upstreamUrl.pathname)) return TRIM_ESPN_LEADERS;
+  if (trimParam === TRIM_JOLPICA_RESULTS && upstreamUrl.hostname === 'api.jolpi.ca' && /\/(results|qualifying\/1)\.json$/.test(upstreamUrl.pathname)) return TRIM_JOLPICA_RESULTS;
   if (trimParam === TRIM_ESPN_NEWS && upstreamUrl.hostname === 'site.api.espn.com' && upstreamUrl.pathname.endsWith('/news')) return TRIM_ESPN_NEWS;
   if (trimParam === TRIM_ESPN_BOARD && upstreamUrl.hostname === 'site.api.espn.com' && upstreamUrl.pathname.endsWith('/scoreboard')) return TRIM_ESPN_BOARD;
   if (trimParam === TRIM_ESPN_INJURIES && upstreamUrl.hostname === 'site.api.espn.com' && upstreamUrl.pathname.endsWith('/injuries')) return TRIM_ESPN_INJURIES;

@@ -478,3 +478,11 @@ test('FotMob: its two hosts only for those pages', async () => {
   assert.equal(await ask('https://www.fotmob.com/api/data/leagues?id=47&x=1'), 400);
   assert.equal(await ask('https://data.fotmob.com/stats/47/season/36781/../../x.json'), 400);
 });
+
+test("Jolpica's season results for F1's 數據領先: each result to what's counted", async () => {
+  const { trimJolpicaResults } = await import('../sports.js');
+  const r = { number: '63', position: '1', positionText: '1', points: '25', grid: '1', laps: '58', status: 'Finished', Time: { millis: '1' }, FastestLap: { rank: '6', lap: '21' }, Driver: { driverId: 'russell', code: 'RUS', givenName: 'George', familyName: 'Russell', url: 'x' }, Constructor: { constructorId: 'mercedes', name: 'Mercedes', url: 'y' } };
+  const t = trimJolpicaResults({ MRData: { total: '374', limit: '100', offset: '0', RaceTable: { season: '2026', Races: [{ season: '2026', round: '1', raceName: 'x', Circuit: {}, Results: [r] }] } } });
+  assert.deepEqual(t.MRData.RaceTable.Races[0].Results[0], { position: '1', positionText: '1', grid: '1', points: '25', laps: '58', status: 'Finished', FastestLap: { rank: '6' }, Driver: { driverId: 'russell', code: 'RUS', givenName: 'George', familyName: 'Russell' }, Constructor: { constructorId: 'mercedes', name: 'Mercedes' } });
+  assert.equal(t.MRData.total, '374');
+});
