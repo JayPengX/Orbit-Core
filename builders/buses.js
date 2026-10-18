@@ -60,7 +60,9 @@ export function tdxClient(env, { get = fetch, sleep = ms => new Promise(r => set
   const pages = async (path, top, each) => {
     for (let skip = 0; ; skip += top) {
       const rows = await ask(`${path}${path.includes('?') ? '&' : '?'}$top=${top}&$skip=${skip}`);
-      const list = Array.isArray(rows) ? rows : rows?.Routes || rows?.data || [];
+      const list = Array.isArray(rows) ? rows : [rows?.Routes, rows?.data].find(Array.isArray);
+      // (An answer that isn't a list is a failure, never "no more rows": a pack cut short would be written over a whole one.)
+      if (!list) throw new Error(`${path}: not a list`);
       each(list);
       if (list.length < top) return;
     }
@@ -258,12 +260,14 @@ export async function buildWhere(store, tdx, index, built) {
   }
   for (const city of BIKE_CITIES) {
     try {
-      const k = packs.length;
-      let n = 0;
+      // (Marked once every page is in: a city that failed half way would leave its stations under the next city's number.)
+      const at = [];
       await tdx.pages(`basic/v2/Bike/Station/City/${city}?$select=StationUID,StationPosition`, 1000, rows => {
-        for (const s of rows) mark(Number(s.StationPosition?.PositionLat), Number(s.StationPosition?.PositionLon), k), n++;
+        for (const s of rows) at.push([Number(s.StationPosition?.PositionLat), Number(s.StationPosition?.PositionLon)]);
       });
-      if (n) packs.push(`bike:${city}`);
+      if (!at.length) continue;
+      const k = packs.push(`bike:${city}`) - 1;
+      for (const [lat, lon] of at) mark(lat, lon, k);
     } catch {}
   }
   await store.put('where.json', { v: 1, built, cell: CELL, packs, cells: Object.fromEntries([...cells].map(([c, s]) => [c, [...s].sort((a, b) => a - b)])) });
@@ -281,6 +285,9 @@ export async function runBuses({ store, env, now = Date.now(), until = now + 8 *
     if (Date.now() >= until) break;
     try {
       const p = await packCity(tdx, city, built);
+      // (A pack with no routes, or under half what it had, is a read gone wrong: the one there stays.)
+      const had = index.cities?.[city]?.routes || 0;
+      if (!p.routes.length || p.routes.length < had / 2) throw new Error(`${city}: ${p.routes.length} routes, had ${had}`);
       if (city === 'InterCity') {
         const parts = squares(p);
         for (const [k, sq] of Object.entries(parts)) await store.put(`bus/InterCity/${k}.json`, sq);

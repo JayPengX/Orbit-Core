@@ -16,7 +16,8 @@
 //   GET /transit/route    plans from A to B: Google's transit routes and TDX's
 //                         planner, made one shape (the app adds YouBike plans)
 //   GET /transit/status   (open) this month's use against each cap, which
-//                         keys are set; never a key itself
+//                         keys are set; never a key itself. ?sample=<name>:
+//                         one fixed real ask (a session's or the dev door's)
 //
 // Secrets: TDX_CLIENT_ID, TDX_CLIENT_SECRET (tdx.transportdata.tw → 會員中心 →
 // API 金鑰); GOOGLE_MAPS_BROWSER_KEY (Maps JavaScript API only, restricted to
@@ -190,7 +191,10 @@ export function tdxRequest(raw) {
   const [pathPart, queryPart = ''] = raw.replace(/^\/+/, '').split('?');
   let path;
   try {
-    path = pathPart.split('/').map(s => encodeURIComponent(decodeURIComponent(s))).join('/');
+    const parts = pathPart.split('/').map(s => decodeURIComponent(s));
+    // (No "." or ".." segment: the address would be read a level up, past the allowlist.)
+    if (parts.some(s => s === '.' || s === '..')) return null;
+    path = parts.map(s => encodeURIComponent(s)).join('/');
   } catch {
     return null;
   }
@@ -221,7 +225,8 @@ export async function tdxAccess(env, fetchFn = fetch, now = Date.now()) {
   const res = await fetchFn(TDX_AUTH, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ grant_type: 'client_credentials', client_id: env.TDX_CLIENT_ID, client_secret: env.TDX_CLIENT_SECRET }).toString()
+    body: new URLSearchParams({ grant_type: 'client_credentials', client_id: env.TDX_CLIENT_ID, client_secret: env.TDX_CLIENT_SECRET }).toString(),
+    signal: timeout(10_000)
   });
   if (!res.ok) throw Object.assign(new Error(`TDX auth ${res.status}`), { status: res.status });
   const j = await res.json();
@@ -281,16 +286,20 @@ async function devNow() {
 // advanced ones seen since (half when none yet).
 export function tdxPoints(used, now = Date.now()) {
   const today = twDay(now);
-  let b = 0, a = 0, todayPts = 0;
+  // TDX's month is Taiwan's; the meter is Google's (Pacific): its first 16 hours of a Taiwan month still hold last month's days, never counted in this one.
+  const thisMonth = today.slice(0, 7);
+  let b = 0, a = 0, all = 0, todayPts = 0;
   for (const [k, n] of Object.entries(used || {})) {
     const m = /^tdx:([ab]):(\d{4}-\d{2}-\d{2})$/.exec(k);
     if (!m) continue;
+    all += n;
+    if (!m[2].startsWith(thisMonth)) continue;
     const p = n / (m[1] === 'b' ? TDX_POINTS.basic : TDX_POINTS.advanced);
     if (m[1] === 'b') b += n;
     else a += n;
     if (m[2] === today) todayPts += p;
   }
-  const before = Math.max(0, (used?.tdx || 0) - b - a);
+  const before = Math.max(0, (used?.tdx || 0) - all);
   const share = a + b ? a / (a + b) : 0.5;
   const month = b / TDX_POINTS.basic + a / TDX_POINTS.advanced + before * (share / TDX_POINTS.advanced + (1 - share) / TDX_POINTS.basic);
   return { month, today: todayPts };
@@ -519,7 +528,7 @@ async function search(env, q, { fetchFn, ctx, now, cache }) {
     // (Asked once more on a failure before OpenStreetMap: its search is far weaker in Taiwan.)
     const ask = async b => {
       for (let k = 0; k < 2; k++) {
-        const res = await fetchFn(`${PLACES}places:autocomplete`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': googleKey(env) }, body: JSON.stringify(b) }).catch(() => null);
+        const res = await fetchFn(`${PLACES}places:autocomplete`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': googleKey(env) }, body: JSON.stringify(b), signal: timeout(8000) }).catch(() => null);
         if (res?.ok) return parseAutocomplete(await res.json());
         if (res && res.status < 500 && res.status !== 429) return null;
       }
@@ -538,7 +547,7 @@ async function search(env, q, { fetchFn, ctx, now, cache }) {
       } catch {}
       if (!(await spend(env, 'textSearch', 1, now, ctx))) return [];
       const tb = { textQuery: text, languageCode: 'zh-TW', regionCode: 'tw', pageSize: 20, ...(origin ? { locationBias: { circle: { center: origin, radius: 10_000 } } } : {}) };
-      const res = await fetchFn(TEXT_SEARCH, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': googleKey(env), 'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.types' }, body: JSON.stringify(tb) }).catch(() => null);
+      const res = await fetchFn(TEXT_SEARCH, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': googleKey(env), 'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.types' }, body: JSON.stringify(tb), signal: timeout(8000) }).catch(() => null);
       if (!res?.ok) return [];
       const j = await res.json();
       if (cache) {
@@ -560,7 +569,7 @@ async function search(env, q, { fetchFn, ctx, now, cache }) {
   try {
     const hit = cache && (await cache.match(key));
     if (hit) return { items: nearFirst(parseNominatim(await hit.json()).map(i => ({ ...i, dist: lat != null && lon != null ? Math.round(distM(lat, lon, i.lat, i.lon)) : null })), [], text), by: 'osm' };
-    const res = await fetchFn(url, { headers: { 'User-Agent': 'OrbitTransit/1.0 (https://jaypengx.github.io/Orbit-Transit/)', Accept: 'application/json' } });
+    const res = await fetchFn(url, { headers: { 'User-Agent': 'OrbitTransit/1.0 (https://jaypengx.github.io/Orbit-Transit/)', Accept: 'application/json' }, signal: timeout(8000) });
     if (!res.ok) return { items: [], by: 'osm' };
     const list = await res.json();
     if (cache) {
@@ -606,9 +615,9 @@ async function place(env, q, { fetchFn, ctx, now, cache }) {
   if (!pro && !(await spend(env, 'details', 1, now, ctx))) return [{ code: 'CAP_REACHED' }, 429];
   const session = /^[A-Za-z0-9_-]{8,64}$/.test(q.get('s') || '') ? `&sessionToken=${q.get('s')}` : '';
   const fields = `id,location,formattedAddress,types${pro ? ',displayName' : ''}`;
-  const res = await fetchFn(`${PLACES}places/${encodeURIComponent(id)}?languageCode=zh-TW&regionCode=tw${session}`, { headers: { 'X-Goog-Api-Key': googleKey(env), 'X-Goog-FieldMask': fields } });
-  if (!res.ok) return [{ code: 'PLACE_FAILED', status: res.status }, 502];
-  const out = parsePlace(await res.json());
+  const res = await fetchFn(`${PLACES}places/${encodeURIComponent(id)}?languageCode=zh-TW&regionCode=tw${session}`, { headers: { 'X-Goog-Api-Key': googleKey(env), 'X-Goog-FieldMask': fields }, signal: timeout(8000) }).catch(() => null);
+  if (!res?.ok) return [{ code: 'PLACE_FAILED', status: res?.status }, 502];
+  const out = parsePlace(await res.json().catch(() => null));
   if (!out) return [{ code: 'PLACE_FAILED' }, 502];
   // Kept a day (Google allows place ids kept; positions are refreshed daily).
   if (cache) {
@@ -886,7 +895,8 @@ async function routes(env, q, { fetchFn, ctx, now, cache }) {
   const modes = parseModes(q.get('modes'));
   const modeKey = MODES.filter(m => modes.has(m)).join('');
   const atRaw = Number(q.get('at'));
-  const at = Number.isFinite(atRaw) && atRaw > now - 5 * MIN ? Math.max(atRaw, now) : now;
+  // (Never further ahead than 60 days: a time no Date can hold would throw.)
+  const at = Number.isFinite(atRaw) && atRaw > now - 5 * MIN ? Math.min(Math.max(atRaw, now), now + 60 * 1440 * MIN) : now;
   // Plans for the same ~100 m and 5 minutes are shared.
   const round = v => v.toFixed(3);
   const slot = Math.floor(at / (5 * MIN));
@@ -957,7 +967,9 @@ async function routes(env, q, { fetchFn, ctx, now, cache }) {
     // The app ranks them (by what's practical, not only the soonest there): it gets them all.
     .slice(0, 16);
   const out = { from, to, at, by, plans, sources: { ...sources, ms: took } };
-  if (cache && plans.length) {
+  // Only a whole answer is kept: a planner that failed (busy, an error) leaves it out, never shared for 5 minutes (TRUTH §7).
+  const failed = Object.values(sources).some(v => v === 'busy' || v === 'error' || String(v).startsWith('http'));
+  if (cache && plans.length && !failed) {
     const put = cache.put(cacheKey, new Response(JSON.stringify(out), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=300' } })).catch(() => {});
     if (ctx?.waitUntil) ctx.waitUntil(put);
   }
@@ -968,8 +980,8 @@ async function routes(env, q, { fetchFn, ctx, now, cache }) {
 //
 // /transit/status?sample=<name>: one small, fixed ask each (a few rows, around
 // 新竹車站), cached like any other (TDX's by its rule, the planners' an hour),
-// to see TDX's and Google's real answers without a session. Never an
-// arbitrary path: only these.
+// to see TDX's and Google's real answers (a session's, or the dev door's:
+// each spends a real ask). Never an arbitrary path: only these.
 const AT = { lat: 24.8016, lon: 120.9716 }; // 新竹車站
 const TO = { lat: 25.0478, lon: 121.517 }; // 台北車站
 export const SAMPLES = {
@@ -1001,12 +1013,13 @@ async function statusSample(env, name, deps) {
   if (name === 'maas' || name === 'maas-local') {
     const token = await tdxAccess(env, deps.fetchFn, deps.now);
     if (!token) return { name, status: 503, body: 'no TDX key' };
+    if (!paced(env, deps.now) || !(await myTurn(env))) return { name, status: 429, body: 'busy' };
     // maas-local: across Hsinchu (新竹車站 → 竹北 光明六路), where buses do the work.
     const to = name === 'maas' ? TO : { lat: 24.839, lon: 121.008 };
     // transit=: which of TDX's transit codes to allow (to learn what each one is).
     const codes = /^[0-9](,[0-9]){0,9}$/.test(deps.transit || '') ? deps.transit : '3,4,5,6,7,8,9';
     const params = new URLSearchParams({ origin: `${AT.lat},${AT.lon}`, destination: `${to.lat},${to.lon}`, gc: '1.0', top: '5', transit: codes, transfer_time: '0,60', first_mile_mode: '0', first_mile_time: '15', last_mile_mode: '0', last_mile_time: '15' });
-    const r = await fetchOf(deps)(`${TDX_BASE}maas/routing?${params}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } });
+    const r = await fetchOf(deps)(`${TDX_BASE}maas/routing?${params}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, signal: timeout(15_000) });
     await tallyTdx(env, 'maas/routing', deps.now, deps.ctx);
     const text = await r.text();
     let parsed = null;
@@ -1021,7 +1034,7 @@ async function statusSample(env, name, deps) {
     out = { name, status: r.status, body: cut(text), shape, parsed };
   } else if (name === 'google-route') {
     if (!googleKey(env) || !(await spend(env, 'routes', 1, deps.now, deps.ctx))) return { name, status: 503, body: 'no key or cap' };
-    const r = await fetchOf(deps)(ROUTES, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': googleKey(env), 'X-Goog-FieldMask': GOOGLE_ROUTE_FIELDS }, body: JSON.stringify(googleRouteBody(AT, TO)) });
+    const r = await fetchOf(deps)(ROUTES, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': googleKey(env), 'X-Goog-FieldMask': GOOGLE_ROUTE_FIELDS }, body: JSON.stringify(googleRouteBody(AT, TO)), signal: timeout(15_000) });
     const text = await r.text();
     let parsed = null;
     try {
@@ -1103,18 +1116,27 @@ async function walks(env, q, { fetchFn, ctx, now, cache }) {
   return [{ walks: out, src }, 200];
 }
 
-export async function handleTransit(request, env, headers, path, { session = null, limited = () => false, ctx = null, fetchFn = fetch, cache = globalThis.caches?.default, now = Date.now() } = {}) {
+// Anything that throws is that ask's failure, said in JSON with the CORS headers (never the Worker's 1101 page).
+export async function handleTransit(request, env, headers, path, opts = {}) {
+  try {
+    return await transitRoute(request, env, headers, path, opts);
+  } catch {
+    return new Response(JSON.stringify({ code: 'TRANSIT_FAILED' }), { status: 502, headers: { ...headers, 'Content-Type': 'application/json; charset=utf-8' } });
+  }
+}
+async function transitRoute(request, env, headers, path, { session = null, limited = () => false, ctx = null, fetchFn = fetch, cache = globalThis.caches?.default, now = Date.now() } = {}) {
   const send = (data, status = 200, extra = {}) => new Response(typeof data === 'string' ? data : JSON.stringify(data), { status, headers: { ...headers, 'Content-Type': 'application/json; charset=utf-8', ...extra } });
   if (request.method !== 'GET') return send({ code: 'GET_ONLY' }, 405);
   const q = new URL(request.url).searchParams;
   const deps = { fetchFn, ctx, now, cache };
   if (path === '/transit/status') {
     const sample = q.get('sample');
-    if (sample) return send(await statusSample(env, sample, { ...deps, fresh: q.get('fresh') === '1', transit: q.get('transit') || '' }));
-    return send({ month: billingMonth(now), used: await usage(env, now), caps: CAPS, keys: { tdx: Boolean(env.TDX_CLIENT_ID && env.TDX_CLIENT_SECRET), mapsBrowser: Boolean(env.GOOGLE_MAPS_BROWSER_KEY), google: Boolean(googleKey(env)) }, tdxPerMin: Number(env.TDX_PER_MIN) || 5 });
+    if (!sample) return send({ month: billingMonth(now), used: await usage(env, now), caps: CAPS, keys: { tdx: Boolean(env.TDX_CLIENT_ID && env.TDX_CLIENT_SECRET), mapsBrowser: Boolean(env.GOOGLE_MAPS_BROWSER_KEY), google: Boolean(googleKey(env)) }, tdxPerMin: Number(env.TDX_PER_MIN) || 5 });
   }
   if (!session) return send({ code: 'ECO_TOKEN_INVALID' }, 401);
   if (limited()) return send({ code: 'RATE_LIMITED' }, 429);
+  // A sample spends a real ask (Google's routes, TDX's points): a session's or the dev door's, never anyone's.
+  if (path === '/transit/status') return send(await statusSample(env, q.get('sample'), { ...deps, fresh: q.get('fresh') === '1', transit: q.get('transit') || '' }));
   if (path === '/transit/config') {
     // One map load per call (the app asks once each time it opens).
     // (A dev page gets NLSC's map: the browser key works only on the site, and no map load is spent.)

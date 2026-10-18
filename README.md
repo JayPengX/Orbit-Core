@@ -362,7 +362,7 @@ Orbit Transit's server (`transit.js`).
 | `/transit/search` | Places by name: Google's autocomplete, OpenStreetMap's past the cap |
 | `/transit/place` | One place's position and name (Google Place Details) |
 | `/transit/route` | Plans from A to B: Google's transit routes and TDX's planner, in one shape (the app adds YouBike plans itself) |
-| `/transit/status` | Open: this month's use against each cap, which keys are set (never a key) |
+| `/transit/status` | Open: this month's use against each cap, which keys are set (never a key). `?sample=<name>`: one fixed real ask of TDX or Google, a session's or the dev door's only (each spends) |
 
 Google's free monthly use per SKU (10,000 Essentials, 5,000 Pro) is counted
 in KV, flushed in batches (a write a batch, not a call). It is counted

@@ -173,7 +173,10 @@ const onceOnly = x => Boolean(x.tag && (x.check?.espn || x.check?.yahoo));
 // by its tag and time (a game's start, a class at 10:00), so an app sending
 // its list again in the minutes after a start (its item still on it, not
 // yet run) has it sent once, and a tomorrow with the same tag still is.
-export const toldKey = x => (onceOnly(x) ? x.tag : `${x.tag}@${x.at}`);
+// A checked item is moved on at each run (`at` now + 2 minutes) and an app
+// sends its first `at` again: it's known by when it lapses (`until`), else
+// when it was first due, never by the moved `at` (or it's told twice).
+export const toldKey = x => (onceOnly(x) ? x.tag : `${x.tag}@${x.until || x.firstAt || x.at}`);
 const recordKey = (account, app) => `push:${account}:${app}`;
 const prefsKey = account => `push:prefs:${account}`;
 export function cleanPrefs(body) {
@@ -256,7 +259,8 @@ export async function runCheck(check, lang, env) {
   if (check.weather) return weatherCheck(env, check.weather);
   if (check.bus) {
     const got = await tdxGet(env, check.bus.path);
-    if (got.status !== 200) return null;
+    // (A copy kept while TDX fails says where the bus was minutes ago: never told from, the alert kept for a fresh one.)
+    if (got.status !== 200 || got.state === 'stale') return null;
     const j = JSON.parse(got.body);
     // TDX's v2 answers are a list, or an object holding it (the app's rows()).
     const rows = Array.isArray(j) ? j : (j && typeof j === 'object' && Object.values(j).find(Array.isArray)) || [];
@@ -266,8 +270,9 @@ export async function runCheck(check, lang, env) {
       // estimate about a minute old said a bus a minute further off.)
       .map(r => {
         const made = Date.parse(r.DataTime || '');
-        const age = Number.isFinite(made) ? Math.min(300, Math.max(0, (Date.now() - made) / 1000)) : 0;
-        return Math.max(0, Number(r.EstimateTime) - age);
+        const age = Number.isFinite(made) ? Math.max(0, (Date.now() - made) / 1000) : 0;
+        // (An estimate over 5 minutes old is no news of the bus now.)
+        return age > 300 ? NaN : Math.max(0, Number(r.EstimateTime) - age);
       })
       .filter(Number.isFinite);
     if (!secs.length) return null;
