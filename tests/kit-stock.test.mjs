@@ -455,6 +455,32 @@ test('interest on cash: one rule with deposits and lending (over NT$20,000 withh
   assert.deepEqual({ withheld: at.withheld, nhi: at.nhi, net: at.net }, incomeTaxes(20_000));
 });
 
+test('day trading sold first (當日沖銷作業辦法): three months open with ten trades, or a credit account; within the day\'s 當沖額度', async () => {
+  const C = await import('../kit/stock-credit.mjs');
+  const now = Date.parse('2026-10-13T02:00:00Z'); // Tuesday 10:00 in Taipei
+  const trades = Array.from({ length: 10 }, (_, i) => twFill(`t${i}`, now - (i + 1) * 5 * DAY_MS, 1, 100, { symbol: '2317.TW' }));
+  const opened = months => ({ ...SA.newAccount(100_000, now - months * 31 * DAY_MS, 'acc'), events: [{ id: 'd', type: 'deposit', t: now - months * 31 * DAY_MS, currency: 'TWD', amount: 300_000 }, ...trades] });
+  assert.equal(C.dayTradeSellFirst(opened(4), now), true, 'three months, not twelve');
+  assert.equal(C.dayTradeSellFirst(opened(2), now), false);
+  const young = opened(2);
+  const credited = { ...young, events: [...young.events, { id: 'credit:1', type: 'credit', t: now - DAY_MS, limit: 500_000 }] };
+  assert.equal(C.dayTradeSellFirst(credited, now), true, 'a credit account holder qualifies');
+  assert.equal(C.dayTradeBuyFirst(credited, now), true);
+  // The limit: twice net worth in NT$100,000 steps, NT$500,000 to NT$50,000,000.
+  assert.deepEqual([C.dayTradeLimit(0), C.dayTradeLimit(300_000), C.dayTradeLimit(1_234_567), C.dayTradeLimit(1e9)], [500_000, 600_000, 2_400_000, 50_000_000]);
+  const quote = { symbol: '2330.TW', name: 'TSMC', kind: 'stock', market: 'TW', currency: 'TWD', price: 1000, got: now, session: { start: Date.parse('2026-10-13T01:00:00Z'), end: Date.parse('2026-10-13T05:30:00Z') }, tz: 'Asia/Taipei' };
+  const valuation = { margin: 'ok', netWorth: 300_000, assets: 300_000, debtTWD: 0, shortTWD: 0 };
+  const sell = (account, qty, at) => SA.placeOrder(account, { side: 'sell', type: 'limit', limit: 1000, qty }, { quote, rates: { TWD: 1 }, valuation, now: at, id: `s${at}` });
+  const over = sell(opened(4), 1000, now);
+  assert.equal(over.error, 'dayTradeLimit');
+  assert.deepEqual([over.limit, over.used, over.room], [600_000, 0, 600_000]);
+  const first = sell(opened(4), 500, now);
+  assert.equal(first.error, undefined);
+  assert.equal(C.dayTradeUsed(first.account, now + 1), 500_000);
+  assert.equal(sell(first.account, 200, now + 1).error, 'dayTradeLimit', 'NT$700,000 of NT$600,000');
+  assert.equal(C.dayTradeUsed(first.account, now + DAY_MS), 0, 'a new day, a new limit');
+});
+
 test("Plus's half FX spread goes by the exchange's own month, not today's", () => {
   const plusMonth = Date.parse('2026-09-10T02:00:00Z');
   const now = Date.parse('2026-10-18T02:00:00Z');

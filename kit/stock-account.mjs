@@ -44,7 +44,7 @@ import {
 import { nextTradingStart, isTradingDay } from '#kit/stock-holidays.mjs';
 import { TD_MIN, tdRate, addMonths, tdInterest, incomeTaxes, lendable, LEND_RATE, LEND_LOT, LEND_RECALL, LEND_TERM_DAYS, addWeekdays, lendFee } from '#kit/stock-savings.mjs';
 import { BONDS, couponDates } from '#kit/stock-bonds.mjs';
-import { creditAccount, creditUsed, dayTradeBuyFirst, dayTradeSellFirst, termDue, afterHours, SHORT_DEPOSIT, SHORT_HANDLING } from '#kit/stock-credit.mjs';
+import { creditAccount, creditUsed, dayTradeBuyFirst, dayTradeSellFirst, dayTradeRoom, termDue, afterHours, SHORT_DEPOSIT, SHORT_HANDLING } from '#kit/stock-credit.mjs';
 
 export const ACCOUNT_VERSION = 1;
 // Every new account opens with the same NT$100,000 (Quadra's base amount);
@@ -637,8 +637,13 @@ export function placeOrder(account, req, { quote, rates, valuation, now = Date.n
           order.credit = true;
           order.deposit = deposit;
         } else if (dayTradeSellFirst(account, now) && !order.after && twSession(now)) {
+          // Within the day's day-trade limit (當沖額度, stock-credit.mjs).
+          const amount = short * (order.limit ?? quote.price) * rates[quote.currency];
+          const room = dayTradeRoom(account, valuation.netWorth, now);
+          if (amount > room.left + EPS) return { error: 'dayTradeLimit', room: room.left, limit: room.limit, used: room.used };
           order.short = true;
           order.dayShort = true;
+          order.dayTradeTWD = Math.round(amount);
           order.tif = 'day';
         } else return { error: 'creditNeeded' };
       }
