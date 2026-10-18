@@ -45,7 +45,7 @@ import {
 import { nextTradingStart, isTradingDay } from '#kit/stock-holidays.mjs';
 import { TD_MIN, tdRate, addMonths, tdInterest, incomeTaxes, lendable, LEND_RATE, LEND_LOT, LEND_RECALL, LEND_TERM_DAYS, addWeekdays, lendFee } from '#kit/stock-savings.mjs';
 import { BONDS, couponDates } from '#kit/stock-bonds.mjs';
-import { creditAccount, creditUsed, dayTradeBuyFirst, dayTradeSellFirst, dayTradeRoom, termDue, afterHours, shortDeposit, SHORT_HANDLING } from '#kit/stock-credit.mjs';
+import { creditAccount, creditUsed, dayTradeBuyFirst, dayTradeSellFirst, dayTradeRoom, termDue, afterHours, shortDeposit, SHORT_HANDLING, SHORT_INTEREST } from '#kit/stock-credit.mjs';
 
 export const ACCOUNT_VERSION = 1;
 // Every new account opens with the same NT$100,000 (Quadra's base amount);
@@ -113,6 +113,8 @@ function accrue(s, t) {
   s.cashLast = Math.max(s.cashLast, t);
   for (const p of Object.values(s.positions)) {
     if (p.qty < 0 && t > p.feeLast && !p.credit && !p.dayShort) p.borrowFee += (-p.cost * SHORT_FEE * (t - p.feeLast)) / YEAR_MS;
+    // 融券: the deposit and sale money held earn the account interest.
+    if (p.qty < 0 && t > p.feeLast && p.credit) p.shortInterest = (p.shortInterest || 0) + (((p.shortDeposit || 0) + (p.shortHeld || 0)) * SHORT_INTEREST * (t - p.feeLast)) / YEAR_MS;
     p.feeLast = Math.max(p.feeLast ?? t, t);
   }
   for (const loan of Object.values(s.loans)) {
@@ -347,11 +349,21 @@ function applyFill(s, e) {
     let realizedLocal = buy ? -cost - part : part - cost;
     let realized = buy ? -costTWD - part * twd : part * twd - costTWD;
     if (buy && (p.shortDeposit || p.shortHeld)) {
-      // A 融券 bought back: that part's deposit and held sale money come back.
+      // A 融券 bought back: that part's deposit and held sale money come back,
+      // with their interest (融券利息, the fraction of a dollar dropped).
       const back = (p.shortDeposit + p.shortHeld) * share;
       p.shortDeposit -= p.shortDeposit * share;
       p.shortHeld -= p.shortHeld * share;
       add(s.cash, e.currency, back);
+      const f = 10 ** currencyInfo(e.currency).digits;
+      const earned = Math.floor(((p.shortInterest || 0) * share * f) + 1e-9) / f;
+      p.shortInterest = (p.shortInterest || 0) * (1 - share);
+      if (earned > 0) {
+        add(s.cash, e.currency, earned);
+        s.interestEarned += earned * twd;
+        realizedLocal += earned;
+        realized += earned * twd;
+      }
     }
     if (buy) {
       // Buying back pays the borrowing fee accrued on that part.
@@ -1121,7 +1133,7 @@ export function valuate(s, quotes, rates) {
     } else {
       shortTWD -= valueTWD;
       feesTWD += fee;
-      shortCashTWD += ((p.shortDeposit || 0) + (p.shortHeld || 0)) * (r ?? 0);
+      shortCashTWD += ((p.shortDeposit || 0) + (p.shortHeld || 0) + (p.shortInterest || 0)) * (r ?? 0);
     }
     out.positions.push({
       ...p,
