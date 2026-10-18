@@ -245,7 +245,25 @@ test('the odds math: combinations, exclusive picks, the expected payout against 
   assert.deepEqual(combosBySize([{ gameId: 'a' }, { gameId: 'a' }, { gameId: 'b' }]), [1, 3, 2]);
   assert.equal(comboCount([{}, {}, {}, {}], [2, 3]), 6 + 4);
   assert.deepEqual([choose(5, 2), choose(49, 6), choose(3, 4), choose(3, -1)], [10, 13_983_816, 0, 0]);
-  assert.deepEqual(slipSizes('system', 4, [3, 2, 2, 5, 1]), [2, 3]);
+  assert.deepEqual(slipSizes('system', 4, [3, 2, 2, 5, 1, 0]), [1, 2, 3]);
+  // 過關組合: 2 to 12 games, 過1關 to 過N關 (台灣運彩: 過1關 … 過12關).
+  const two = [{ gameId: 'a', odds: 2 }, { gameId: 'b', odds: 3 }];
+  assert.deepEqual(slipSizes('system', 2, [1, 2]), [1, 2]);
+  assert.deepEqual(slipErrors({ mode: 'system', legs: two, sizes: [1, 2], stake: 100 }), [], 'two games, 過1關 and 過2關');
+  assert.equal(comboCount(two, [1, 2]), 3);
+  assert.deepEqual(slipErrors({ mode: 'system', legs: two, sizes: [1], stake: 100 }), [], '過1關 alone');
+  assert.deepEqual(slipErrors({ mode: 'system', legs: two, sizes: [], stake: 100 }), ['noSizes']);
+  assert.deepEqual(slipErrors({ mode: 'system', legs: [{ gameId: 'a', odds: 2 }], sizes: [1], stake: 100 }), ['systemNeedsTwo']);
+  assert.ok(slipErrors({ mode: 'system', legs: [{ gameId: 'a', odds: 2 }, { gameId: 'a', odds: 3 }], sizes: [1], stake: 100 }).includes('systemNeedsTwo'), 'two picks of one game are one game');
+  // 包牌: 7 picks on 6 games (the lottery's own example): 過1關 7, 過2關 20, 過3關 30, 過4關 25 = 82 combinations.
+  const seven = ['a', 'b', 'c', 'd', 'e', 'f', 'f'].map(gameId => ({ gameId, odds: 10 }));
+  assert.deepEqual([1, 2, 3, 4].map(k => comboCount(seven, [k])), [7, 20, 30, 25]);
+  assert.deepEqual(slipErrors({ mode: 'system', legs: seven, sizes: [1, 2, 3, 4], stake: 10 }), []);
+  // A 限2關 pick can't be in a 過1關.
+  assert.ok(slipErrors({ mode: 'system', legs: [{ gameId: 'a', odds: 2, minLegs: 2 }, { gameId: 'b', odds: 3 }], sizes: [1, 2], stake: 100 }).includes('minLegs'));
+  // Paid: 過1關 and 過2關 on two games, one won one lost: the winner's single.
+  assert.equal(settleSlip({ legs: [{ ...two[0], result: 'won' }, { ...two[1], result: 'lost' }], sizes: [1, 2], stake: 100 }).gross, 200);
+  assert.equal(settleSlip({ legs: [{ ...two[0], result: 'won' }, { ...two[1], result: 'won' }], sizes: [1, 2], stake: 100 }).gross, 200 + 300 + 600);
   assert.deepEqual(slipSizes('parlay', 1), []);
   assert.deepEqual(slipErrors({ mode: 'parlay', legs: [{ gameId: 'a', odds: 2 }, { gameId: 'a', odds: 2 }], sizes: [2], stake: 100 }), ['sameGame']);
   assert.deepEqual(slipErrors({ mode: 'single', legs: [{ odds: 2 }], sizes: [1], stake: 15 }), ['stakeUnit', 'ticketMin']);
