@@ -3702,6 +3702,20 @@ html[data-q-turn] dialog[open] {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 18px 36px -20px color-mix(in srgb, var(--q-hc-b) 80%, transparent);
   -webkit-tap-highlight-color: transparent;
 }
+/* In dark the accents brighten; the card keeps a deep colour so white type
+   stays readable. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .q-hero-card {
+    --q-hc-a: color-mix(in srgb, var(--q-accent) 38%, #05070d);
+    --q-hc-b: color-mix(in srgb, var(--q-accent) 72%, #05070d);
+    --q-hc-glow: color-mix(in srgb, var(--q-accent) 60%, transparent);
+  }
+}
+:root[data-theme='dark'] .q-hero-card {
+  --q-hc-a: color-mix(in srgb, var(--q-accent) 38%, #05070d);
+  --q-hc-b: color-mix(in srgb, var(--q-accent) 72%, #05070d);
+  --q-hc-glow: color-mix(in srgb, var(--q-accent) 60%, transparent);
+}
 .q-hc-eyebrow {
   display: flex;
   align-items: center;
@@ -4073,4 +4087,44 @@ div.q-ritem {
   flex-wrap: wrap;
   gap: 4px 6px;
   margin-top: 2px;
+}
+/* A row's right-hand stack: a value over a tag or a small line (holdings). */
+.q-ritem-end {
+  flex: none;
+  display: grid;
+  justify-items: end;
+  gap: 3px;
+  max-width: 45%;
+  font: 600 16px/20px var(--q-font);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+.q-ritem-end small {
+  color: var(--q-label-2);
+  font: var(--q-t-footnote);
+}
+/* A card in a rail: a name, a big number, a tag, the app's own drawing. */
+.q-rail-card {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+  padding: 14px 16px;
+  border-radius: 20px;
+  background: var(--q-surface);
+  color: var(--q-label);
+  text-decoration: none;
+}
+.q-rail-card > small {
+  overflow: hidden;
+  color: var(--q-label-2);
+  font: 600 13px/18px var(--q-font);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.q-rail-card > strong {
+  font: 700 22px/26px var(--q-font-rounded);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
 }
