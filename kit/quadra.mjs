@@ -1239,6 +1239,9 @@ function safeRules(sheet) {
 // screen down to the page, never a black band with a seam under it. Kept in
 // step with light and dark and with an app recolouring the strip.
 function syncThemeColor() {
+  // (Called by observers and listeners that can outlive their page: a test's
+  // torn-down document, a colour-scheme change after it's gone.)
+  if (typeof document === 'undefined' || !document?.head) return;
   const bar = document.querySelector('.q-statusbar');
   if (!bar || typeof getComputedStyle !== 'function') return;
   const colour = getComputedStyle(bar).backgroundColor;
@@ -1549,7 +1552,13 @@ function makeSession(app, { lang, heartbeat }) {
   let waking = null;
   function wake() {
     if (!storedAccount() || waking) return;
+    const was = active;
     waking = refresh({ claim: true })
+      // Back from another device or app that was live meanwhile (the Worker's
+      // `took`): told as becoming live again even when this one never saw
+      // itself paused (asleep, no beat), so the app reads what changed.
+      // (One that saw itself paused was told by setActive already.)
+      .then(res => res?.took && was && active && emit('active', true))
       .catch(() => {})
       .finally(() => (waking = null));
   }
