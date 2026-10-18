@@ -10,6 +10,7 @@
 //   POST  /nl-edit               Orbit Class's natural-language edits
 //   GET   /slip, POST /slip-scan Slip Tracker's game lists and ticket photos (slip.js)
 //   POST  /law-ask               Orbit Law's questions on a law's articles (law.js)
+//   POST  /law-chat              Orbit Law's 問法律, answered from the articles it finds (law-chat.js)
 //   GET   /kambi                 Kambi's live scores for Quadra Play (kambi.js)
 //   GET/POST /push/…             notices while an app is closed (push.js)
 //   GET   /weather/…             Orbit Weather's blended forecast (weather.js)
@@ -29,6 +30,7 @@
 
 import { handleSlip, handleSlipScan } from './slip.js';
 import { handleLawAsk } from './law.js';
+import { handleLawChat } from './law-chat.js';
 import en from './locales/en.js';
 import zhTW from './locales/zh-TW.js';
 import { handleEcoRequest, LOCK_SINCE } from './eco.js';
@@ -1159,7 +1161,11 @@ async function route(request, env, ctx, headers, origin) {
   // …and its ticket photos, read by Gemini (no pass, a few a day).
   if (path === '/slip-scan') return handleSlipScan(request, env, headers, ip, (model, parts, schema) => proxyGeminiRequest(model, parts, schema, env, headers, ctx, 'slip-scan'));
   // Orbit Law's questions (law.js): no pass, its origin only, a day's caps in D1.
-  if (path === '/law-ask') return handleLawAsk(request, env, ctx, headers, ip, (parts, schema) => proxyGeminiRequest(GEMINI_ALLOWED_MODELS[0], parts, schema, env, headers, ctx, 'law-ask', 25_000));
+  // (Gemini's first model, Flash-Lite: a few seconds' work.)
+  const lawGemini = feature => (parts, schema) => proxyGeminiRequest(GEMINI_ALLOWED_MODELS[0], parts, schema, env, headers, ctx, feature, 25_000);
+  if (path === '/law-ask') return handleLawAsk(request, env, ctx, headers, ip, lawGemini('law-ask'));
+  // …and its 問法律 (law-chat.js): a Quadra Pass of Orbit Law's, a day's caps a Pass.
+  if (path === '/law-chat') return handleLawChat(request, env, ctx, headers, await sessionOf(request, env), lawGemini('law-chat'));
   // The bill's guard (guard.js), as it last read the bill: armed or not,
   // each count's share of the $5 plan, stopped or not. No key or token.
   if (path === '/guard' && request.method === 'GET') {
