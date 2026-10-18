@@ -43,7 +43,7 @@ import {
   localDayOf
 } from '#kit/stock-markets.mjs';
 import { nextTradingStart, isTradingDay } from '#kit/stock-holidays.mjs';
-import { TD_MIN, tdRate, addMonths, tdInterest, incomeTaxes, lendable, LEND_RATE, LEND_LOT, LEND_RECALL, LEND_TERM_DAYS, addWeekdays, lendFee } from '#kit/stock-savings.mjs';
+import { TD_MIN, tdRate, addMonths, tdInterest, incomeTaxes, lendable, LEND_RATE, LEND_RATE_MIN, LEND_RATE_MAX, LEND_LOT, LEND_RECALL, lendEnds, addWeekdays, lendFee } from '#kit/stock-savings.mjs';
 import { BONDS, couponDates } from '#kit/stock-bonds.mjs';
 import { creditAccount, creditUsed, dayTradeBuyFirst, dayTradeSellFirst, dayTradeRoom, termDue, afterHours, closingAuction, shortDeposit, SHORT_HANDLING, SHORT_INTEREST } from '#kit/stock-credit.mjs';
 
@@ -462,10 +462,20 @@ export function withdrawable(account, s, now = Date.now()) {
 const traded = account => (account?.events || []).some(e => e.type === 'fill');
 export const withWelcome = account => (account && !traded(account) && !account.welcome ? { ...account, welcome: true } : account);
 export const firstTrade = account => account?.welcome === true && !traded(account);
-export function estimate({ market, kind, currency, side, qty, price, t = Date.now(), dayTrade = false, first = false }) {
+// A Taiwan amount mixing whole lots and odd shares (a plan's buy) is two
+// trades (TWSE: 整股 and 零股 are separate orders), each with its own costs
+// and minimum. `plan`: a monthly plan's buy (its own fee).
+export function estimate({ market, kind, currency, side, qty, price, t = Date.now(), dayTrade = false, first = false, plan = false }) {
   const deal = dealPrice(market, side, price);
   const gross = roundCash(deal * qty, currency);
-  const costs = tradeCosts({ market, side, kind, gross, currency, discount: first ? 0 : plusAt(t) ? plus.commission : 1, oddLot: isOddLot(market, kind, qty), dayTrade });
+  const cost = (q, g) => tradeCosts({ market, side, kind, gross: g, currency, discount: first ? 0 : plusAt(t) ? plus.commission : 1, oddLot: isOddLot(market, kind, q), dayTrade, t, plan });
+  const mixed = mixedLot(market, kind, qty);
+  let costs = cost(qty, gross);
+  if (mixed) {
+    const lotsGross = roundCash(deal * mixed.lots, currency);
+    const [a, b] = [cost(mixed.lots, lotsGross), cost(mixed.odd, gross - lotsGross)];
+    costs = { ...a, commission: a.commission + b.commission, tax: a.tax + b.tax, fee: a.fee + b.fee, total: a.total + b.total };
+  }
   const total = side === 'buy' ? gross + costs.total : gross - costs.total;
   return { price: deal, gross, ...costs, costs: costs.total, total };
 }
@@ -579,9 +589,10 @@ export function placeOrder(account, req, { quote, rates, valuation, now = Date.n
   if (band && type === 'limit' && (req.limit > band.up + EPS || req.limit < band.down - EPS)) return { error: 'priceLimit', ...band };
   const s = replay(account, now);
   const avail = available(account, s);
-  // Board lots (Japan 100, China's buys 100, Hong Kong each stock's own).
+  // Board lots (Japan 100, China's buys 100, Hong Kong each stock's own;
+  // one HKEX's list doesn't have can't be sized: lotUnknown).
   const lot = lotProblem(quote.market, quote.symbol, quote.kind, side, qty, Math.max(0, avail.qty[quote.symbol] || 0));
-  if (lot) return { error: 'lot', lot: lot.lot };
+  if (lot) return lot.unknown ? { error: 'lotUnknown' } : { error: 'lot', lot: lot.lot };
   // Taiwan: whole lots and odd lots go in separate orders. (The broker's own
   // sales, forced or to cover, it splits itself.)
   const mixed = !req.forced && !req.cover && mixedLot(quote.market, quote.kind, qty);
@@ -776,6 +787,25 @@ function updateOrder(account, order) {
   return { ...account, orders: account.orders.map(o => (o.id === order.id ? order : o)) };
 }
 
+// The share of a Taiwan sale that's a day trade (現股當沖, 證券交易稅條例
+// §2-2: 同一營業日現款買進與現券賣出同種類同數量): the quantity the day's
+// cash buys of whole lots leave after the day's earlier sales, over the
+// sale's. Odd lots can't be day-traded (TWSE 當日沖銷交易作業辦法: 零股交易
+// 不適用), nor can 融資 buys (not 現款), so they match nothing. 0 when none.
+export function dayTradeShare(account, order, at) {
+  if (order.market !== 'TW' || order.side !== 'sell' || !(order.qty > 0) || isOddLot(order.market, order.kind, order.qty)) return 0;
+  const day = localDayOf(at, 'TW');
+  let bought = 0;
+  let sold = 0;
+  for (const e of account.events) {
+    if (e.type !== 'fill' || e.symbol !== order.symbol || e.t > at || e.orderId === order.id || localDayOf(e.t, 'TW') !== day) continue;
+    const lots = e.qty - (Math.round(e.qty) % 1000);
+    if (e.side === 'buy' && !e.financed) bought += lots;
+    else if (e.side === 'sell') sold += lots;
+  }
+  return Math.min(order.qty, Math.max(0, bought - sold)) / order.qty;
+}
+
 // Fills `order` at `price`. The fill is dated `at` (a past moment when it's
 // found in the price history); cash and shares are checked as of `now`.
 function fillOrder(account, order, price, rates, now, at = now) {
@@ -787,8 +817,8 @@ function fillOrder(account, order, price, rates, now, at = now) {
   // A Taiwan stock sold the day it was bought pays the day-trade tax (half),
   // once the account may day trade buying first (3 months open, 10 trades in
   // the year: dayTradeBuyFirst, as Help says); before that, the full tax.
-  const dayTrade = order.side === 'sell' && order.market === 'TW' && (order.dayShort || (dayTradeBuyFirst(account, at) && account.events.some(e => e.type === 'fill' && e.symbol === order.symbol && e.side === 'buy' && e.t <= at && localDayOf(e.t, 'TW') === localDayOf(at, 'TW'))));
-  let est = estimate({ market: order.market, kind: order.kind, currency: order.currency, side: order.side, qty: order.qty, price, t: at, dayTrade, first: firstTrade(account) });
+  const dayTrade = order.side === 'sell' && order.market === 'TW' && (order.dayShort || (dayTradeBuyFirst(account, at) && dayTradeShare(account, order, at)));
+  let est = estimate({ market: order.market, kind: order.kind, currency: order.currency, side: order.side, qty: order.qty, price, t: at, dayTrade, first: firstTrade(account), plan: Boolean(order.plan) });
   // 融券手續費: 0.08% of what's sold short (Taiwan drops the fraction).
   if (order.credit) {
     const held = Math.max(0, replay(account, at).positions[order.symbol]?.qty || 0);
@@ -1108,7 +1138,11 @@ export function lendableQty(account, symbol, now = Date.now()) {
   return Math.max(0, Math.floor((Math.min(free, p.qty - settling) + EPS) / LEND_LOT) * LEND_LOT);
 }
 
-export function lendShares(account, { symbol, qty, price }, now = Date.now(), id = randomId()) {
+// An offer to lend `qty` at a yearly `rate` (the going rate by default):
+// lent at once when a borrower takes it, at that rate (one above the going
+// rate finds none: lendNoTaker). `renew`: the lender agrees to its two
+// renewals (lendEnds).
+export function lendShares(account, { symbol, qty, price, rate, renew = false }, now = Date.now(), id = randomId()) {
   const s = replay(account, now);
   const p = s.positions[symbol];
   if (!p || !lendable(p.market, p.kind)) return { error: 'notLendable' };
@@ -1118,34 +1152,41 @@ export function lendShares(account, { symbol, qty, price }, now = Date.now(), id
   const can = lendableQty(account, symbol, now);
   if (qty > can + EPS) return { error: 'lendQty', can };
   if (!(price > 0)) return { error: 'noQuote' };
-  const event = { id: `lend:${id}`, type: 'lend', t: now, symbol, name: p.name, market: p.market, kind: p.kind, currency: p.currency, qty, price, rate: LEND_RATE[p.kind] };
+  const going = LEND_RATE[p.kind];
+  rate = rate == null ? going : Number(rate);
+  if (!(rate >= LEND_RATE_MIN - EPS && rate <= LEND_RATE_MAX + EPS)) return { error: 'lendRate', min: LEND_RATE_MIN, max: LEND_RATE_MAX };
+  if (rate > going + EPS) return { error: 'lendNoTaker', rate: going };
+  const event = { id: `lend:${id}`, type: 'lend', t: now, symbol, name: p.name, market: p.market, kind: p.kind, currency: p.currency, qty, price, rate, ...(renew ? { renew: true } : {}) };
   return { account: { ...account, events: [...account.events, event] }, event };
 }
 
-function lendEnd(lend, at, back) {
+function lendEnd(lend, at, back, closes = null) {
   const key = lend.id.slice(5);
-  const fee = lendFee(lend, back);
+  const fee = lendFee(lend, back, closes);
   return [
     { id: `recall:${key}`, type: 'recall', t: at, lend: lend.id, back },
     { id: `lendpay:${key}`, type: 'lendpay', t: back, lend: lend.id, symbol: lend.symbol, currency: BASE, ...fee }
   ];
 }
 
-// 召回: the shares come back (and the fee is paid) in LEND_RECALL business days.
-export function recallShares(account, lendId, now = Date.now()) {
+// 召回: the shares come back (and the fee is paid) in LEND_RECALL business
+// days. `closes`: the shares' daily closes since it was lent (lendFee), for
+// the fee day by day.
+export function recallShares(account, lendId, now = Date.now(), { closes = null } = {}) {
   const l = replay(account, now).lent[lendId];
   if (!l) return { error: 'lendGone' };
   if (l.back) return { account, back: l.back };
   const back = addWeekdays(now, LEND_RECALL);
-  return { account: { ...account, events: [...account.events, ...lendEnd(l, now, back)] }, back };
+  return { account: { ...account, events: [...account.events, ...lendEnd(l, now, back, closes)] }, back };
 }
 
-// Contracts past their term end by themselves (dated then).
-export function matureLending(account, now = Date.now()) {
+// Contracts past their term end by themselves (dated then). `closesOf`:
+// symbol → its daily closes (lendFee).
+export function matureLending(account, now = Date.now(), { closesOf = null } = {}) {
   const s = replay(account, now);
-  const due = Object.values(s.lent).filter(l => !l.back && l.t + LEND_TERM_DAYS * 86_400_000 <= now);
+  const due = Object.values(s.lent).filter(l => !l.back && lendEnds(l) <= now);
   if (!due.length) return account;
-  return { ...account, events: [...account.events, ...due.flatMap(l => lendEnd(l, l.t + LEND_TERM_DAYS * 86_400_000, l.t + LEND_TERM_DAYS * 86_400_000))] };
+  return { ...account, events: [...account.events, ...due.flatMap(l => lendEnd(l, lendEnds(l), lendEnds(l), closesOf?.(l.symbol) ?? null))] };
 }
 
 // Everything lent is called back (a default or a margin call: the broker
@@ -1866,13 +1907,21 @@ export const watched = account => Object.entries(account?.watch || {}).filter(([
 // ---- Monthly plans (定期定額) --------------------------------------------------
 //
 // A plan buys `amount` NT$ worth of one symbol on day `day` of every month
-// (the first price on or after that day, 00:00 Taiwan time). A foreign
+// (1-31; a shorter month's last day; the first price on or after that day,
+// 00:00 Taiwan time). A Taiwan stock or ETF is bought as brokers do: a limit
+// order in the intraday odd-lot session, at its first match (planFillBar),
+// the whole lots in it split off as their own trade (estimate). A foreign
 // symbol's NT$ is exchanged first, at that moment's rate. Each month's buy
 // is an order with a fixed id (plan:<plan>:<YYYY-MM>), so a month runs once
 // however many devices catch up on it. Plans merge like the watchlist: the
-// latest change wins.
-
-export const PLAN_MIN = 1000;
+// latest change wins. Three months running without the cash end the plan,
+// as brokers do (國票 點點投 Q4: 連續三次扣款失敗則停止執行).
+//
+// From NT$100 on any day 1-31 (國泰證券 定期定額: 每筆最低新台幣100元, 每月1~31號,
+// 遇非交易日順延).
+export const PLAN_MIN = 100;
+export const PLAN_DAY_MAX = 31;
+export const PLAN_FAIL_LIMIT = 3;
 export const PLAN_MAX_CATCHUP = 24;
 
 export function setPlan(account, { id, symbol, amount, day, on = true, name, kind, market, currency }, now = Date.now()) {
@@ -1882,7 +1931,7 @@ export function setPlan(account, { id, symbol, amount, day, on = true, name, kin
   day = Math.round(Number(day));
   const old = account.plans?.[id];
   if (on && !(amount >= PLAN_MIN && amount <= MAX_START)) return { error: 'planAmount' };
-  if (on && !(day >= 1 && day <= 28)) return { error: 'planDay' };
+  if (on && !(day >= 1 && day <= PLAN_DAY_MAX)) return { error: 'planDay' };
   const plan = { ...(old || {}), id, symbol: symbol ?? old?.symbol, amount: amount || old?.amount, day: day || old?.day, on, t: now, since: old?.since ?? now };
   for (const [k, v] of Object.entries({ name, kind, market, currency })) if (v) plan[k] = v;
   return { account: { ...account, plans: { ...(account.plans || {}), [id]: plan } }, plan };
@@ -1907,9 +1956,25 @@ export function dedupePlans(account, now = Date.now()) {
   return plans ? { ...account, plans } : account;
 }
 
-// The Taiwan midnight a month's buy is due: YYYY-MM-DD 00:00 +08:00.
+// The Taiwan midnight a month's buy is due: YYYY-MM-DD 00:00 +08:00 (the
+// month's last day when it's shorter).
 export function planDue(month, day) {
-  return Date.parse(`${month}-${String(day).padStart(2, '0')}T00:00:00+08:00`);
+  const [y, m] = month.split('-').map(Number);
+  const d = Math.min(day, new Date(Date.UTC(y, m, 0)).getUTCDate());
+  return Date.parse(`${month}-${String(d).padStart(2, '0')}T00:00:00+08:00`);
+}
+// A Taiwan stock, ETF or bond ETF: bought through the odd-lot session.
+const planOddLots = ({ market, kind } = {}) => market === 'TW' && LISTED.has(kind);
+// How a plan's buy is ordered: a limit order for Taiwan's odd-lot session
+// (盤中零股: 以限價為之; the broker's limit is the day's limit-up, so it fills
+// at the match), else at the market.
+export const planOrderType = meta => (planOddLots(meta) ? 'limit' : 'market');
+// The price bar a month's buy fills on (bars oldest first): the first at or
+// after it's due with a price, and in Taiwan's odd-lot session from its first
+// match (09:10; 09:00 from 2026-12-07).
+export function planFillBar(meta, bars, due) {
+  const odd = planOddLots(meta);
+  return bars.find(b => b.t >= due && b.o > 0 && (!odd || oddLotOpen(b.t))) || null;
 }
 const monthOf = t => taipeiDay(t).slice(0, 7);
 const nextMonth = month => {
@@ -1954,10 +2019,17 @@ export function runPlan(account, plan, run, { price, twd, at = run.t, quote }, n
   const id = planOrderId(plan, run.month);
   if (account.orders.some(o => o.id === id)) return { account };
   const meta = { symbol: plan.symbol, name: quote?.name || plan.name, kind: quote?.kind || plan.kind, market: quote?.market || plan.market, currency: quote?.currency || plan.currency };
-  const order = { id, ...meta, side: 'buy', type: 'market', qty: 0, t: at, status: 'open', rev: 1, plan: plan.id, reserve: 0 };
+  const type = planOrderType(meta);
+  const order = { id, ...meta, side: 'buy', type, ...(type === 'limit' ? { limit: price } : {}), qty: 0, t: at, status: 'open', rev: 1, plan: plan.id, reserve: 0 };
   const reject = reason => {
     const rejected = { ...order, status: 'rejected', reason, rev: 2, done: at };
-    return { account: { ...account, orders: [...account.orders, rejected] }, order: rejected };
+    let next = { ...account, orders: [...account.orders, rejected] };
+    // The PLAN_FAIL_LIMIT-th month running without the cash: the plan ends.
+    const mine = next.orders.filter(o => o.plan === plan.id && o.id.startsWith(`plan:${plan.id}:`)).sort((a, b) => (a.id < b.id ? 1 : -1));
+    const fails = mine.findIndex(o => !(o.status === 'rejected' && o.reason === 'funds'));
+    const ended = reason === 'funds' && (fails < 0 ? mine.length : fails) >= PLAN_FAIL_LIMIT;
+    if (ended && next.plans?.[plan.id]?.on) next = { ...next, plans: { ...next.plans, [plan.id]: { ...next.plans[plan.id], on: false, t: Math.max(at, next.plans[plan.id].t || 0), ended: 'funds' } } };
+    return { account: next, order: rejected, ...(ended ? { ended: true } : {}) };
   };
   if (!(price > 0) || !(twd > 0) || !meta.currency) return { account };
   const avail = available(account, replay(account, now));
@@ -1970,17 +2042,18 @@ export function runPlan(account, plan, run, { price, twd, at = run.t, quote }, n
     if (!fx?.received) return reject('tooSmall');
     budget = fx.received;
   }
-  // Sized at the ask it will actually pay.
-  const ask = marketFill(meta.market, meta.kind, 'buy', price);
+  // Sized at the price it will actually pay (a market order's ask), with the plan's fee.
+  const ask = type === 'limit' ? price : marketFill(meta.market, meta.kind, 'buy', price);
+  const costOf = q => estimate({ ...meta, side: 'buy', qty: q, price: ask, t: at, plan: true }).total;
   let qty = roundQty(budget / ask, meta.kind);
-  const first = qty > 0 ? estimate({ ...meta, side: 'buy', qty, price: ask }).total : 0;
+  const first = qty > 0 ? costOf(qty) : 0;
   if (first > budget) qty = roundQty((qty * budget) / first, meta.kind);
-  while (qty > 0 && estimate({ ...meta, side: 'buy', qty, price: ask }).total > budget + EPS) qty = roundQty(qty - (qtyStep(meta.kind) >= 1 ? 1 : qty * 0.001), meta.kind);
+  while (qty > 0 && costOf(qty) > budget + EPS) qty = roundQty(qty - (qtyStep(meta.kind) >= 1 ? 1 : qty * 0.001), meta.kind);
   if (!(qty > 0)) return reject('tooSmall');
   let next = account;
   if (fx) {
     // Only what the units need is exchanged: the rest stays in NT$.
-    const cost = estimate({ ...meta, side: 'buy', qty, price: ask }).total;
+    const cost = costOf(qty);
     const need = amountFor(BASE, meta.currency, cost, rates, true, at);
     const r = exchange(next, { from: BASE, to: meta.currency, amount: Math.min(plan.amount, need) }, { rates, fxOpen: true, now: at, id: `plan:${plan.id}:${run.month}` });
     if (r.error) return reject(r.error === 'funds' || r.error === 'unsettled' ? 'funds' : 'tooSmall');

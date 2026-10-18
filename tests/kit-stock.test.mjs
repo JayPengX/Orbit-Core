@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { mergeAccounts, mergeDistinct, newAccount, replay, available, withdrawable, unsettled, taipeiDay, nextPayday, applyIncome, INCOME_UNTIL_MONTH } from '../kit/stock-account.mjs';
 import { settleDate, settleDays, zonedTime, tickSize, onTick, toTick, priceLimits, tradeCosts, dividendTaxes, lotProblem, marketOf, kindOf, roundQty, roundCash, marketFill, isOddLot, oddLotOpen, collateralRate, localDayOf, T1_EUROPE } from '../kit/stock-markets.mjs';
 import { easter, isHoliday, isTradingDay, upcomingHolidays, nextTradingStart, localDay } from '../kit/stock-holidays.mjs';
-import { incomeTaxes, tdInterest, addMonths, fullMonths, addWeekdays, lendFee } from '../kit/stock-savings.mjs';
+import { incomeTaxes, tdInterest, addMonths, fullMonths, addWeekdays, lendFee, TD_TERMS } from '../kit/stock-savings.mjs';
 import { pastClose, afterHours, termDue, creditCheck, CREDIT_TIERS } from '../kit/stock-credit.mjs';
 import { BONDS, priceAt, couponDates, curveYield, bondSession } from '../kit/stock-bonds.mjs';
 import { rocDay, parseIpoList, ipoWon, ipoOpen, ipoDrawn, ipoBackAt, ipoListAt, ipoBackEvent, ipoWinEvent, ipoApplyEvent, ipoHold, IPO_FEE } from '../kit/stock-ipo.mjs';
@@ -222,11 +222,13 @@ test('time deposits: whole months, the month-end clamp, and 80% of the rate held
   assert.equal(taipeiDay(addMonths(t0, 13)), '2027-02-28');
   assert.equal(fullMonths(t0, addMonths(t0, 3) - 1), 2);
   assert.equal(fullMonths(t0, addMonths(t0, 3)), 3);
-  const td = { amount: 100_000, rate: 0.0172, months: 12, t: t0, ends: addMonths(t0, 12) };
-  assert.deepEqual(tdInterest(td, td.ends), { gross: 1_720, early: false });
+  const td = { amount: 100_000, rate: 0.017, months: 12, t: t0, ends: addMonths(t0, 12) };
+  assert.deepEqual(tdInterest(td, td.ends), { gross: 1_700, early: false });
   assert.deepEqual(tdInterest(td, addMonths(t0, 1) - 1), { gross: 0, early: true }, 'under a month: nothing');
   const at = addMonths(t0, 4);
-  assert.equal(tdInterest(td, at).gross, Math.round((100_000 * 0.0139 * 0.8 * (at - t0)) / (365 * 86_400_000)), "four months held: 3 months' posted rate");
+  assert.equal(tdInterest(td, at).gross, Math.round((100_000 * 0.0129 * 0.8 * (at - t0)) / (365 * 86_400_000)), "four months held: 3 months' posted rate");
+  // Bank of Taiwan's board on 2026-10-18.
+  assert.deepEqual(TD_TERMS.map(x => x.rate), [0.01225, 0.0129, 0.01465, 0.0158, 0.017]);
   // Weekdays for a recall's return.
   assert.equal(taipeiDay(addWeekdays(Date.parse('2026-10-16T04:00:00Z'), 3)), '2026-10-21');
 });

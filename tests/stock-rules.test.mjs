@@ -197,3 +197,132 @@ test('追繳 is cancelled once the 差額 notified is paid in full, bit by bit, 
   assert.equal(SA.callState(call, v, now + 3 * DAY).sell, true, 'not paid: sold at the deadline as before');
   assert.equal(SA.callState({ ...call, need: 0 }, v, now + DAY, 0).call !== null, true, 'nothing to pay (shorts): only 166% cancels it');
 });
+
+test('證券交易稅條例: the day-trade rate to 2027-12-31 (§2-2), bond ETFs untaxed to 2026-12-31 (§2-1), then 0.1%', async () => {
+  const { tradeCosts, DAY_TRADE_TAX_UNTIL, BOND_ETF_TAX_FREE_UNTIL } = await import('../kit/stock-markets.mjs');
+  const sell = o => tradeCosts({ currency: 'TWD', market: 'TW', kind: 'stock', side: 'sell', gross: 100_000, ...o });
+  assert.equal(sell({ dayTrade: true, t: DAY_TRADE_TAX_UNTIL - 1 }).tax, 150);
+  assert.equal(sell({ dayTrade: true, t: DAY_TRADE_TAX_UNTIL }).tax, 300, '2028: the full 0.3%');
+  assert.equal(sell({ kind: 'bond', t: BOND_ETF_TAX_FREE_UNTIL - 1 }).tax, 0);
+  assert.equal(sell({ kind: 'bond', t: BOND_ETF_TAX_FREE_UNTIL }).tax, 100, '2027: 0.1%');
+  // Only the matched part at the day rate: half of it 0.15%, half 0.3%.
+  assert.equal(sell({ dayTrade: 0.5, t: now }).tax, 225);
+  assert.equal(sell({ dayTrade: 0, t: now }).tax, 300);
+});
+
+test('當沖 tax on the matched quantity only; odd lots and 融資 buys never match (§2-2, TWSE 當沖辦法)', () => {
+  const fill = (id, side, qty, t, more = {}) => ({ id, type: 'fill', t, orderId: id, symbol: '2330.TW', name: 'TSMC', kind: 'stock', market: 'TW', currency: 'TWD', side, qty, price: 100, gross: qty * 100, total: qty * 100, commission: 0, tax: 0, fee: 0, twd: 1, ...more });
+  const acc = (...events) => ({ ...SA.newAccount(1_000_000, now - 400 * DAY, 'acc'), events });
+  const sale = qty => ({ id: 's', market: 'TW', kind: 'stock', symbol: '2330.TW', side: 'sell', qty });
+  const old = fill('h', 'buy', 5000, now - 10 * DAY);
+  assert.equal(SA.dayTradeShare(acc(old, fill('b', 'buy', 1000, now - 60_000)), sale(3000), now), 1 / 3, 'a lot bought today, three sold');
+  assert.equal(SA.dayTradeShare(acc(old, fill('b', 'buy', 2000, now - 60_000), fill('s0', 'sell', 1000, now - 30_000)), sale(2000), now), 0.5, "an earlier sale took one of today's two lots");
+  assert.equal(SA.dayTradeShare(acc(old, fill('b', 'buy', 500, now - 60_000)), sale(1000), now), 0, 'an odd lot bought');
+  assert.equal(SA.dayTradeShare(acc(old, fill('b', 'buy', 1000, now - 60_000)), sale(500), now), 0, 'an odd lot sold');
+  assert.equal(SA.dayTradeShare(acc(old, fill('b', 'buy', 1000, now - 60_000, { financed: 60_000 })), sale(1000), now), 0, '融資, not 現款');
+  assert.equal(SA.dayTradeShare(acc(old, fill('b', 'buy', 1000, now - DAY)), sale(1000), now), 0, "yesterday's");
+});
+
+test('定期定額: NT$100 on any day 1-31 (a short month its last day), NT$1 a buy to 2026-12-31, then 0.1425% (NT$1 least)', async () => {
+  const { tradeCosts, PLAN_FLAT_FEE_UNTIL } = await import('../kit/stock-markets.mjs');
+  const acc = SA.newAccount(100_000, now - DAY, 'acc');
+  const plan = req => SA.setPlan(acc, { symbol: '2330.TW', amount: 100, day: 31, ...req }, now);
+  assert.equal(plan({}).plan.day, 31);
+  assert.equal(plan({ amount: 99 }).error, 'planAmount');
+  assert.equal(plan({ day: 32 }).error, 'planDay');
+  assert.equal(new Date(SA.planDue('2027-02', 31) + 8 * 3_600_000).toISOString().slice(0, 10), '2027-02-28');
+  assert.equal(new Date(SA.planDue('2026-10', 31) + 8 * 3_600_000).toISOString().slice(0, 10), '2026-10-31');
+  const buy = o => tradeCosts({ currency: 'TWD', market: 'TW', kind: 'stock', side: 'buy', plan: true, ...o });
+  assert.equal(buy({ gross: 1_000_000, t: now }).commission, 1, 'flat, whatever the size');
+  assert.equal(buy({ gross: 100_000, t: PLAN_FLAT_FEE_UNTIL }).commission, 142);
+  assert.equal(buy({ gross: 300, t: PLAN_FLAT_FEE_UNTIL }).commission, 1);
+  assert.equal(buy({ gross: 100_000, t: now, market: 'US', currency: 'USD' }).commission, 100, 'elsewhere, the usual rate');
+});
+
+test("定期定額 in Taiwan: a limit order in the odd-lot session from its first match (09:10; 09:00 from 2026-12-07), the whole lots split off", async () => {
+  const { oddLotOpen } = await import('../kit/stock-markets.mjs');
+  const meta = { market: 'TW', kind: 'etf' };
+  const due = Date.parse('2026-10-13T00:00:00+08:00');
+  const bar = (hhmm, o) => ({ t: Date.parse(`2026-10-13T${hhmm}:00+08:00`), o, h: o, l: o, c: o });
+  const bars = [bar('09:00', 50), bar('09:05', 51), bar('09:10', 52), bar('09:15', 53)];
+  assert.equal(SA.planFillBar(meta, bars, due).o, 52);
+  assert.equal(SA.planFillBar({ market: 'US', kind: 'etf' }, bars, due).o, 50, 'elsewhere, the first price');
+  assert.equal(SA.planOrderType(meta), 'limit');
+  assert.equal(SA.planOrderType({ market: 'US', kind: 'stock' }), 'market');
+  assert.equal(oddLotOpen(Date.parse('2026-12-04T09:05:00+08:00')), false);
+  assert.equal(oddLotOpen(Date.parse('2026-12-07T09:00:00+08:00')), true, 'from 2026-12-07 with the whole lots');
+  // NT$80,000 at 50: 1,599 shares (a lot and 599), NT$1 each (two trades), at the price itself.
+  const acc = SA.newAccount(100_000, now - DAY, 'acc');
+  const p = { id: 'p1', symbol: '0050.TW', name: '0050', kind: 'etf', market: 'TW', currency: 'TWD', amount: 80_000, day: 13, on: true, since: now - 30 * DAY };
+  const r = SA.runPlan(acc, p, { month: '2026-10', t: due }, { price: 50, twd: 1, at: bar('09:10', 50).t }, now);
+  assert.equal(r.order.type, 'limit');
+  assert.deepEqual([r.fill.qty, r.fill.price, r.fill.commission, r.fill.total], [1_599, 50, 2, 79_952]);
+  // Any mixed amount is two trades.
+  const est = SA.estimate({ market: 'TW', kind: 'stock', currency: 'TWD', side: 'buy', qty: 1_010, price: 10, t: now });
+  assert.equal(est.commission, 20 + 1, "a lot (NT$14, the NT$20 least) and 10 odd shares (NT$1 least), each its own trade's minimum");
+});
+
+test('定期定額: three months running without the cash end the plan (連續三次扣款失敗)', () => {
+  let acc = SA.newAccount(0, now - 400 * DAY, 'acc');
+  const set = SA.setPlan(acc, { id: 'p1', symbol: '0050.TW', amount: 1_000, day: 5, kind: 'etf', market: 'TW', currency: 'TWD', name: '0050' }, now - 120 * DAY);
+  acc = set.account;
+  const p = set.plan;
+  const run = (month, a) => SA.runPlan(a, p, { month, t: SA.planDue(month, 5) }, { price: 50, twd: 1 }, now);
+  let r = run('2026-07', acc);
+  r = run('2026-08', r.account);
+  assert.equal(r.account.plans.p1.on, true, 'two: still on');
+  r = run('2026-09', r.account);
+  assert.equal(r.ended, true);
+  assert.deepEqual([r.account.plans.p1.on, r.account.plans.p1.ended], [false, 'funds']);
+});
+
+test('借券: the fee day by day at each close (算頭不算尾, /365), an ask from 0.01% to 16% lent only at or under the going rate, six months renewed twice', async () => {
+  const { lendFee, lendEnds, LEND_RATE } = await import('../kit/stock-savings.mjs');
+  const d0 = Date.parse('2026-10-12T10:00:00+08:00');
+  const close = (dd, c) => ({ t: Date.parse(`2026-10-${dd}T13:30:00+08:00`), c });
+  const lend = { qty: 1000, price: 100, rate: 0.012, t: d0 };
+  // 12th 100, 13th 110, 14th none (the 13th's), 15th 90; back on the 16th: four days.
+  const closes = [close(12, 100), close(13, 110), close(15, 90), close(16, 200)];
+  assert.equal(lendFee(lend, Date.parse('2026-10-16T09:00:00+08:00'), closes).gross, Math.round((410 * 1000 * 0.012) / 365));
+  assert.equal(lendFee(lend, Date.parse('2026-10-16T09:00:00+08:00')).gross, Math.round((1000 * 100 * 0.012 * (Date.parse('2026-10-16T09:00:00+08:00') - d0)) / (365 * DAY)), 'no closes: the price when lent');
+  const day = t => SA.taipeiDay(t);
+  assert.equal(day(lendEnds(lend)), '2027-04-12');
+  assert.equal(day(lendEnds({ ...lend, renew: true })), '2028-04-12', 'renewed twice: eighteen months');
+  // Offers.
+  const acc = { ...SA.newAccount(1_000_000, now - 30 * DAY, 'acc') };
+  acc.events = [...acc.events, { id: 'f1', type: 'fill', t: now - 10 * DAY, orderId: 'f1', symbol: '2330.TW', name: 'TSMC', kind: 'stock', market: 'TW', currency: 'TWD', side: 'buy', qty: 2000, price: 100, gross: 200_000, total: 200_000, commission: 0, tax: 0, fee: 0, twd: 1, settle: now - 8 * DAY }];
+  const offer = more => SA.lendShares(acc, { symbol: '2330.TW', qty: 1000, price: 100, ...more }, now, 'l1');
+  assert.equal(offer({}).event.rate, LEND_RATE.stock);
+  assert.equal(offer({ rate: 0.005 }).event.rate, 0.005);
+  assert.deepEqual(offer({ rate: 0.05 }), { error: 'lendNoTaker', rate: LEND_RATE.stock });
+  assert.equal(offer({ rate: 0.17 }).error, 'lendRate');
+  assert.equal(offer({ rate: 0 }).error, 'lendRate');
+  // A renewed contract runs on past six months; the fee then at the closes given.
+  const lent = offer({ renew: true }).account;
+  assert.equal(Object.keys(SA.replay(SA.matureLending(lent, now + 200 * DAY), now + 200 * DAY).lent).length, 1);
+  const ended = SA.matureLending(lent, now + 600 * DAY, { closesOf: () => [{ t: now, c: 50 }] });
+  const pay = ended.events.find(e => e.type === 'lendpay');
+  assert.equal(day(pay.t), day(lendEnds({ t: now, renew: true })));
+  assert.equal(pay.gross, Math.round((1000 * 50 * 0.012 * Math.round((lendEnds({ t: now, renew: true }) - now) / DAY)) / 365), 'each day at the close');
+});
+
+test("Hong Kong board lots: every HKEX security's own, from its List of Securities; one not on it refused (lotUnknown)", async () => {
+  const { hkLot, lotSize, lotProblem } = await import('../kit/stock-markets.mjs');
+  // HKEX: Tencent 100, HSBC 400, Xiaomi 200, Tracker Fund 500, CKH 500.
+  assert.deepEqual(['0700.HK', '0005.HK', '1810.HK', '2800.HK', '0001.HK'].map(hkLot), [100, 400, 200, 500, 500]);
+  assert.equal(lotSize('HK', '0005.HK', 'stock'), 400);
+  assert.deepEqual(lotProblem('HK', '0005.HK', 'stock', 'buy', 100), { lot: 400 });
+  assert.equal(lotProblem('HK', '0005.HK', 'stock', 'buy', 800), null);
+  assert.deepEqual(lotProblem('HK', '0007.HK', 'stock', 'buy', 100), { lot: null, unknown: true }, 'not listed');
+  const hk = { symbol: '0007.HK', name: 'X', kind: 'stock', market: 'HK', currency: 'HKD', price: 10, prev: 10, got: now, marketTime: now, tz: 'Asia/Hong_Kong' };
+  assert.equal(SA.placeOrder(SA.newAccount(1_000_000, now - DAY, 'acc'), { side: 'buy', type: 'limit', limit: 10, qty: 100 }, { quote: hk, rates: { TWD: 1, HKD: 4 }, valuation: ok, now, id: 'h' }).error, 'lotUnknown');
+});
+
+test("複委託: an online order's minimum at Taiwan brokers (¥3,000, €35, £75, HK$50); dividends withheld as the broker's account has them (Japan 15.315%, France 25%)", async () => {
+  const { tradeCosts, dividendTaxes } = await import('../kit/stock-markets.mjs');
+  const buy = (market, currency, gross) => tradeCosts({ market, currency, gross, side: 'buy', kind: 'etf' }).commission;
+  assert.deepEqual([buy('JP', 'JPY', 100_000), buy('FR', 'EUR', 1_000), buy('DE', 'EUR', 1_000), buy('UK', 'GBP', 1_000), buy('HK', 'HKD', 1_000)], [3_000, 35, 35, 75, 50]);
+  assert.equal(buy('JP', 'JPY', 2_000_000), 5_000, 'the rate past the minimum');
+  assert.equal(dividendTaxes('JP', 10_000).withheld, 1_532);
+  assert.equal(dividendTaxes('FR', 100).withheld, 25);
+});
