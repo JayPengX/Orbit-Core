@@ -94,7 +94,7 @@ export async function handleLotto(body, env, account, deps, now) {
   if (body.op === 'scratch') {
     const id = String(body.id || '');
     const card = CARDS[body.card];
-    if (!TICKET_ID.test(id) || !card) return { refused: { problem: 'shape' } };
+    if (!TICKET_ID.test(id) || !card || card.retired) return { refused: { problem: 'shape' } };
     const ticket = { id, t: new Date(now).toISOString(), game: `scratch:${body.card}`, card: body.card, cost: card.price, prize: drawPrize(body.card, cryptoUnit), seed: cryptoSeed(), status: 'open' };
     const wallet = await charge(env, deps, account, [{ id: `odds:lotto-${id}`, t: now, app: 'odds', kind: 'lottery', amount: -card.price }], card.price);
     if (!wallet) return { refused: { problem: 'funds' } };

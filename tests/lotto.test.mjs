@@ -98,6 +98,7 @@ test('a scratch card\'s prize is drawn by the Worker and paid once, when it is s
   const { ticket } = r.body;
   assert.equal(typeof ticket.prize, 'number');
   assert.equal(doc(WALLET_COLLECTION, ACCOUNT).entries.find(e => e.id === 'odds:lotto-scratch001').amount, -ticket.cost);
+  assert.equal((await post(deps, { op: 'scratch', id: 'scratch002', card: 'palace' })).body.refused.problem, 'shape', 'a retired card is not sold');
   const first = await post(deps, { op: 'reveal', id: 'scratch001' });
   assert.equal(first.body.prize, ticket.prize > 5000 ? Math.round(ticket.prize * 0.796) : ticket.prize);
   assert.equal((await post(deps, { op: 'reveal', id: 'scratch001' })).body.refused.problem, 'unknown');
