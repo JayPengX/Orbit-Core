@@ -45,7 +45,7 @@ import {
 import { nextTradingStart, isTradingDay } from '#kit/stock-holidays.mjs';
 import { TD_MIN, tdRate, addMonths, tdInterest, incomeTaxes, lendable, LEND_RATE, LEND_LOT, LEND_RECALL, LEND_TERM_DAYS, addWeekdays, lendFee } from '#kit/stock-savings.mjs';
 import { BONDS, couponDates } from '#kit/stock-bonds.mjs';
-import { creditAccount, creditUsed, dayTradeBuyFirst, dayTradeSellFirst, dayTradeRoom, termDue, afterHours, shortDeposit, SHORT_HANDLING, SHORT_INTEREST } from '#kit/stock-credit.mjs';
+import { creditAccount, creditUsed, dayTradeBuyFirst, dayTradeSellFirst, dayTradeRoom, termDue, afterHours, closingAuction, shortDeposit, SHORT_HANDLING, SHORT_INTEREST } from '#kit/stock-credit.mjs';
 
 export const ACCOUNT_VERSION = 1;
 // Every new account opens with the same NT$100,000 (Quadra's base amount);
@@ -470,6 +470,27 @@ export function estimate({ market, kind, currency, side, qty, price, t = Date.no
   return { price: deal, gross, ...costs, costs: costs.total, total };
 }
 
+// A Taiwan whole-lot order of a listed stock, ETF or bond ETF: it goes
+// through the closing call auction (stock-credit.mjs closingAuction).
+const LISTED = new Set(['stock', 'etf', 'bond']);
+const atClosingAuction = order => order.market === 'TW' && LISTED.has(order.kind) && !order.after && !isOddLot(order.market, order.kind, order.qty);
+// One match at the close: a buy whose limit is at or above it, a sell at or
+// below, a market order at it; a stop order waits.
+const crossAt = (order, close) => (order.type === 'limit' ? ((order.side === 'buy' ? order.limit >= close : order.limit <= close) ? close : null) : order.type === 'market' ? close : null);
+// Taiwan's closing call auction on this quote: { price } (the close, or null
+// when the order doesn't meet it) once the 13:30 match is in (a price of
+// 13:25 or later: none trade between), for an order placed before 13:30;
+// { price: null } while it's collecting (13:25-13:30) or for an order
+// placed during it whose match isn't in yet; null when it doesn't apply.
+export function closingMatch(order, quote, now = Date.now()) {
+  if (!atClosingAuction(order)) return null;
+  const c = closingAuction(now);
+  if (!c || order.t >= c.match) return null;
+  if (quote?.marketTime >= c.from) return { price: now >= c.match ? crossAt(order, quote.price) : null };
+  // (Placed during it: it never matches before 13:30.)
+  return order.t >= c.from ? { price: null } : null;
+}
+
 // The price an open order fills at on this quote, or null. An order placed
 // before the current session started also fills on the session's high or
 // low having reached its price (the page can't watch every tick).
@@ -477,10 +498,11 @@ export function triggerPrice(order, quote, now) {
   // Taiwan's after-hours sessions: one match at 14:30, at the close.
   if (order.after) {
     if (!quote || now < order.after || !(quote.marketTime >= order.after - 3_600_000)) return null;
-    const close = quote.price;
-    if (order.type === 'limit') return order.side === 'buy' ? (order.limit >= close ? close : null) : order.limit <= close ? close : null;
-    return order.type === 'market' ? close : null;
+    return crossAt(order, quote.price);
   }
+  // Taiwan's closing call auction (13:25-13:30): one match at 13:30, at the close.
+  const closing = quote && closingMatch(order, quote, now);
+  if (closing) return closing.price;
   if (!quote || !isOpen(quote, now)) return null;
   if (isOddLot(order.market, order.kind, order.qty) && !oddLotOpen(now)) return null;
   if (quote.kind !== 'crypto' && quote.session && quote.marketTime < quote.session.start) return null;
@@ -511,6 +533,9 @@ function checkQty(qty, kind) {
 
 // Good-till-cancelled orders last this long (brokers' 長效單: a month).
 export const GTC_DAYS = 30;
+// How long after Taiwan's 13:30 close a whole-lot day order waits for its
+// closing match to be known (to 14:30).
+export const CLOSE_DECIDE = 60 * 60_000;
 // When a day order placed now ends: the close of the session it's for (the
 // one under way, or the next one when the market is shut).
 export function dayOrderEnd(quote, now = Date.now()) {
@@ -615,21 +640,30 @@ export function placeOrder(account, req, { quote, rates, valuation, now = Date.n
     }
     order.margin = rate;
   }
-  // After Taiwan's close and before 14:30: the after-hours sessions (盤後定價,
-  // 盤後零股), limit or market orders, matched once at 14:30 at the close;
-  // what doesn't match ends with the day.
+  // After Taiwan's close and before 14:30: the after-hours sessions (盤後零股
+  // from 13:40, 盤後定價 from 14:00), limit or market orders, matched once at
+  // 14:30 at the close; what doesn't match ends with the day. Before its
+  // session takes orders, one is refused (afterHoursWait: from when).
   if (quote.market === 'TW' && !req.forced) {
-    const after = afterHours(now);
+    const after = afterHours(now, isOddLot(quote.market, quote.kind, qty));
     if (after && type !== 'stop') {
+      if (now < after.from && !req.cover) return { error: 'afterHoursWait', from: after.from };
       order.after = after.match;
       order.tif = 'day';
     }
+    // The closing call auction (13:25-13:30) takes limit orders only.
+    const c = closingAuction(now);
+    if (type === 'market' && !req.cover && c && now < c.match && atClosingAuction(order)) return { error: 'closingAuction', match: c.match };
   }
   // How long it lasts: a day order ends with its session (what exchanges
   // and brokers do by default); good-till-cancelled lasts GTC_DAYS. Crypto
   // and currency pairs never close, so theirs are GTC.
   if (!order.after) order.tif = req.tif === 'gtc' || quote.kind === 'crypto' || quote.kind === 'fx' ? 'gtc' : 'day';
   order.expires = order.after ? order.after + 9 * 3_600_000 : order.tif === 'gtc' ? now + GTC_DAYS * 86_400_000 : dayOrderEnd(quote, now);
+  // A Taiwan whole-lot day order is in its day's 13:30 closing match: it
+  // lasts until that's known (CLOSE_DECIDE; Yahoo's Taiwan prices run 20
+  // minutes behind), ending unmatched after it.
+  if (order.tif === 'day' && atClosingAuction(order)) order.expires += CLOSE_DECIDE;
   if (side === 'sell') {
     const have = Math.max(0, avail.qty[quote.symbol] || 0);
     const short = qty - have;
@@ -910,12 +944,24 @@ export function fillAskDue(order, quote, lastAsk, now = Date.now()) {
 // When an order waiting while the page was closed would have filled: the
 // first price bar after it was placed that reaches its price (bars:
 // [{ t, o, h, l, c }], oldest first). A gap through the price fills at the
-// bar's open, like a real order.
-export function backfillPrice(order, bars) {
+// bar's open, like a real order. A Taiwan whole-lot order's bars from 13:25
+// are the closing call auction's: nothing trades in it until the 13:30
+// match, so such a bar is the close, and an order placed before 13:30 that
+// meets it fills there at 13:30 (once that's past by `now`).
+export function backfillPrice(order, bars, now = Date.now()) {
   const odd = isOddLot(order.market, order.kind, order.qty);
+  const closing = atClosingAuction(order);
   for (const b of bars) {
     if (order.expires && b.t >= order.expires) break;
-    if (b.t < order.t || !Number.isFinite(b.o)) continue;
+    if (!Number.isFinite(b.o)) continue;
+    const c = closing ? closingAuction(b.t) : null;
+    if (c) {
+      if (order.t >= c.match || now < c.match || !Number.isFinite(b.c)) continue;
+      const price = crossAt(order, b.c);
+      if (price != null) return { t: c.match, price };
+      continue;
+    }
+    if (b.t < order.t) continue;
     if (odd && !oddLotOpen(b.t)) continue;
     const buy = order.side === 'buy';
     if (order.type === 'market') return { t: b.t, price: b.o };
