@@ -1676,6 +1676,12 @@ export function netWorthSeries(account, days, priceAt, rateAt) {
       if (!r) ok = false;
       const fee = p.borrowFee + (p.qty < 0 && t > p.feeLast && !p.credit && !p.dayShort ? (-p.cost * SHORT_FEE * (t - p.feeLast)) / YEAR_MS : 0);
       nw += p.qty * (priceAt(p.symbol, t) ?? p.last) * (r || 0) - (fee || 0) * (r || 0);
+      // 融券: the deposit and the sale money the broker holds are the account's (as valuate counts them).
+      if (p.qty < 0) {
+        const held = (p.shortDeposit || 0) + (p.shortHeld || 0);
+        const interest = (p.shortInterest || 0) + (p.credit && t > p.feeLast ? (held * SHORT_INTEREST * (t - p.feeLast)) / YEAR_MS : 0);
+        nw += (held + interest) * (r || 0);
+      }
     }
     for (const loan of Object.values(s.loans)) {
       const balance = loan.balance + (t > loan.last && loan.balance > EPS ? (loan.balance * loan.rate * (t - loan.last)) / YEAR_MS : 0);

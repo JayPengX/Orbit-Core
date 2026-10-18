@@ -170,7 +170,7 @@ test('the phone asks about a waiting order at once when it matters, else every 1
   assert.equal(asks, 6);
 });
 
-test('net worth by day in one pass is each day\'s replay exactly (a loan, a short, a dividend owed, cash in two currencies)', async () => {
+test('net worth by day in one pass is each day\'s replay exactly (a loan, a short, a 融券 short and its deposit, a dividend owed, cash in two currencies)', async () => {
   const { newAccount, netWorthSeries, replay } = await import('../kit/stock-account.mjs');
   const DAY = 86_400_000;
   const created = now - 60 * DAY;
@@ -182,6 +182,7 @@ test('net worth by day in one pass is each day\'s replay exactly (a loan, a shor
     { id: 'loan1', type: 'borrow', t: created + 5 * DAY, currency: 'USD', amount: 500, rate: 0.07 },
     fill('s1', created + 9 * DAY, 'TSLA', 'sell', 2, 300),
     fill('b2', created + 12 * DAY, '2330.TW', 'buy', 10, 1000, 'TWD'),
+    { ...fill('c1', created + 14 * DAY, '2317.TW', 'sell', 1000, 100, 'TWD'), credit: true },
     { id: 'div1', type: 'div', t: created + 40 * DAY, ex: created + 20 * DAY, symbol: 'AAPL', currency: 'USD', net: 3, gross: 3, withheld: 0, twd: 32, shares: 3, perShare: 1 },
     { id: 'rp1', type: 'repay', t: created + 30 * DAY, currency: 'USD', amount: 200 }
   );
@@ -195,7 +196,7 @@ test('net worth by day in one pass is each day\'s replay exactly (a loan, a shor
     const s = replay(a, t);
     let want = s.receivable;
     for (const [c, v] of Object.entries(s.cash)) want += v * rateAt(c, t);
-    for (const p of Object.values(s.positions)) want += p.qty * priceAt(p.symbol, t) * rateAt(p.currency, t) - p.borrowFee * rateAt(p.currency, t);
+    for (const p of Object.values(s.positions)) want += p.qty * priceAt(p.symbol, t) * rateAt(p.currency, t) - p.borrowFee * rateAt(p.currency, t) + (p.qty < 0 ? ((p.shortDeposit || 0) + (p.shortHeld || 0) + (p.shortInterest || 0)) * rateAt(p.currency, t) : 0);
     for (const l of Object.values(s.loans)) want -= l.balance * rateAt(l.currency, t);
     assert.ok(Math.abs(nw - want) < 1e-6, `${t}: ${nw} vs ${want}`);
     assert.equal(dep, s.deposits);
