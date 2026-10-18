@@ -336,6 +336,10 @@ function affordable(counted, e) {
 // { cash, held, opened } (held: the holdings at what was paid for them, less
 // what's owed beyond the cash; opened: the account's opening money), with
 // each new event checked once (`stock-verified/<account>`).
+// Events a phone dates by its own clock when the person acts (the rest, a
+// dividend's pay day, a deposit's or a loan's end, an IPO's draw and
+// listing, are dated by their rules and may lie ahead).
+const PHONE_DATED = new Set(['fill', 'fx', 'deposit', 'td', 'lend', 'recall', 'borrow', 'repay', 'extend', 'ipo', 'penalty']);
 export async function checkStock(env, docId, payload, wallet, deps, lockSince, now = Date.now()) {
   const account = await unpack(payload).catch(() => null);
   if (!account || !Array.isArray(account.events)) return null;
@@ -382,6 +386,13 @@ export async function checkStock(env, docId, payload, wallet, deps, lockSince, n
   for (const raw of events) {
     let e = adj[raw.id] ? { ...raw, ...adj[raw.id] } : raw;
     let verdict = ok.has(e.id) ? 'ok' : bad.has(e.id) ? 'bad' : null;
+    // Something the phone did, dated ahead of this Worker's clock (a phone
+    // clock set ahead): counted at the Worker's time, as it reached it,
+    // never left waiting (and the account's later saves stuck behind it).
+    if (!verdict && e.t > now && PHONE_DATED.has(e.type) && !e.maturity) {
+      adj[e.id] = { ...adj[e.id], t: now };
+      e = { ...e, t: now };
+    }
     // The account as it was before the lock-down: taken as it was.
     if (!verdict && first && e.t < lockSince) verdict = 'ok';
     // (A pool deposit follows the wallet: always looked at again.)
