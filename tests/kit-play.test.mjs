@@ -505,14 +505,15 @@ test('cash out: paused when it should be, and never worth more than holding the 
 
 test("lottery prizes by Taiwan Lottery's tables, each game", () => {
   const t = (game, sel, draw, extra = {}) => ticketPrize({ game, sel, ...extra }, draw);
+  const brief = ({ prize, tier, detail }) => ({ prize, tier, detail });
   const sp = { numbers: [1, 2, 3, 4, 5, 6], zone2: 7, pools: { jackpot: { perPrize: 0, winners: 0, pool: 300_000_000 }, second: { perPrize: 1_000_000, winners: 3, pool: 0 } } };
   assert.equal(t('super638', { zones: [[1, 2, 3, 4, 5, 6], [7]] }, sp).prize, 300_000_000, 'nobody else won: the whole pool');
   assert.equal(t('super638', { zones: [[1, 2, 3, 4, 5, 6], [8]] }, sp).prize, 750_000, 'shared with the three real winners');
-  assert.deepEqual(t('super638', { zones: [[1, 2, 3, 10, 11, 12], [7]] }, sp), { prize: 400, tier: 'seventh', detail: [3, 1] });
+  assert.deepEqual(brief(t('super638', { zones: [[1, 2, 3, 10, 11, 12], [7]] }, sp)), { prize: 400, tier: 'seventh', detail: [3, 1] });
   assert.equal(t('super638', { zones: [[1, 20, 21, 22, 23, 24], [7]] }, sp).prize, 100, '普獎: one and the second zone');
   assert.equal(t('super638', { zones: [[1, 20, 21, 22, 23, 24], [8]] }, sp).prize, 0);
   const lotto = { numbers: [1, 2, 3, 4, 5, 6], special: 7, pools: {} };
-  assert.deepEqual(t('lotto649', { zones: [[1, 2, 7, 40, 41, 42]] }, lotto), { prize: 400, tier: 'seventh', detail: [2, 1] });
+  assert.deepEqual(brief(t('lotto649', { zones: [[1, 2, 7, 40, 41, 42]] }, lotto)), { prize: 400, tier: 'seventh', detail: [2, 1] });
   assert.equal(t('lotto649', { zones: [[1, 2, 3, 40, 41, 42]] }, lotto).tier, 'normal');
   assert.equal(t('lotto649', { zones: [[1, 2, 3, 7, 41, 42]] }, lotto).tier, 'sixth');
   assert.equal(t('lotto649', { zones: [[1, 2, 40, 41, 42, 43]] }, lotto).prize, 0);
@@ -527,7 +528,7 @@ test("lottery prizes by Taiwan Lottery's tables, each game", () => {
   assert.equal(cappedPrize(GAMES.daily539.tiers[0], 2, 2), 6_000_000, "a ticket's multiple counts as that many bets");
   // 3星彩 / 4星彩 (2024 on): in order, by how many of the last digits match.
   const star3 = { digits: [1, 2, 3] };
-  assert.deepEqual(t('star3', { play: 'straight', digits: [1, 2, 3] }, star3), { prize: 5_000, tier: 'first', detail: [3] });
+  assert.deepEqual(brief(t('star3', { play: 'straight', digits: [1, 2, 3] }, star3)), { prize: 5_000, tier: 'first', detail: [3] });
   assert.equal(t('star3', { play: 'straight', digits: [9, 2, 3] }, star3).prize, 500);
   assert.equal(t('star3', { play: 'straight', digits: [2, 9, 3] }, star3).prize, 50);
   assert.equal(t('star3', { play: 'straight', digits: [1, 2, 9] }, star3).prize, 0, 'the first two in place: nothing');
@@ -594,6 +595,46 @@ test('lottery tickets: checked, bought at their draw, settled once with the tax,
   const withWorker = addTickets({ ledger: [], tickets: [] }, [{ id: 'w1', t: '2026-10-19T00:00:00.000Z', cost: 50 }], now);
   assert.deepEqual(withWorker.ledger.map(e => [e.id, e.amount]), [['lotto-w1', -50]]);
   assert.equal(addTickets(withWorker, [{ id: 'w1', t: '', cost: 50 }], now), withWorker);
+});
+
+test('包牌 (系統組合): every n of the numbers picked is a bet, each won tier paid and taxed bet by bet', () => {
+  const now = new Date('2026-10-19T10:00:00Z');
+  const acc = { ledger: [{ id: 'start', amount: 1_000_000, t: '' }], tickets: [] };
+  // 台灣彩券's own counts: 威力彩 8 + 2 numbers = 28 × 2 = 56 bets; 大樂透 7 = 7; 今彩539 6 = 6.
+  assert.equal(betCount('super638', { zones: [[1, 2, 3, 4, 5, 6, 7, 8], [1, 2]] }), 56);
+  assert.equal(betCount('lotto649', { zones: [[5, 10, 18, 24, 32, 33, 47]] }), 7);
+  assert.equal(betCount('daily539', { zones: [[1, 7, 29, 30, 35, 39]] }), 6);
+  assert.equal(betCount('lotto649', { zones: [Array.from({ length: 16 }, (_, i) => i + 1)] }), 8_008);
+  assert.deepEqual(checkSelection('lotto649', { zones: [Array.from({ length: 17 }, (_, i) => i + 1)] }), { error: 'numbers' }, '16 at most');
+  assert.deepEqual(checkSelection('super638', { zones: [[1, 2, 3, 4, 5, 6], [1, 2, 3, 4, 5, 6, 7, 8]] }), { ok: true });
+  assert.deepEqual(checkSelection('m39', { numbers: Array.from({ length: 11 }, (_, i) => i + 1), size: 2 }), { error: 'numbers' }, '樂合彩 系統組合: 10 at most');
+  assert.equal(buyTicket(acc, { id: 'w', game: 'super638', sel: { zones: [[1, 2, 3, 4, 5, 6, 7, 8], [1, 2]] } }, now).ticket.cost, 5_600);
+  // Each bet against a brute force of every combination.
+  const subsets = (a, n) => (n === 0 ? [[]] : a.length < n ? [] : [...subsets(a.slice(1), n - 1).map(x => [a[0], ...x]), ...subsets(a.slice(1), n)]);
+  const brute = (game, sel, draw) => {
+    const per = {};
+    const single = z => ticketPrize({ game, sel: { zones: z } }, draw);
+    const zs = sel.zones.length === 2 ? subsets(sel.zones[0], 6).flatMap(a => sel.zones[1].map(b => [a, [b]])) : subsets(sel.zones[0], GAMES[game].zones[0].n).map(a => [a]);
+    for (const z of zs) {
+      const r = single(z);
+      if (r.tier) per[r.tier] = (per[r.tier] || 0) + 1;
+    }
+    return per;
+  };
+  const counted = r => Object.fromEntries(r.wins.map(w => [w.tier, w.n]));
+  const lotto = { numbers: [1, 2, 3, 4, 5, 6], special: 7, pools: {} };
+  for (const sel of [{ zones: [[1, 2, 3, 4, 7, 20, 21, 22, 23]] }, { zones: [[1, 2, 3, 4, 5, 6, 7, 30]] }, { zones: [[1, 2, 3, 20, 21, 22, 23]] }]) assert.deepEqual(counted(ticketPrize({ game: 'lotto649', sel }, lotto)), brute('lotto649', sel, lotto), JSON.stringify(sel));
+  const sp = { numbers: [1, 2, 3, 4, 5, 6], zone2: 7, pools: {} };
+  for (const sel of [{ zones: [[1, 2, 3, 4, 5, 20, 21], [7, 8, 1]] }, { zones: [[1, 2, 3, 20, 21, 22, 23, 24], [2]] }]) assert.deepEqual(counted(ticketPrize({ game: 'super638', sel }, sp)), brute('super638', sel, sp), JSON.stringify(sel));
+  const d539 = { numbers: [1, 2, 3, 4, 5], pools: {} };
+  const sel539 = { zones: [[1, 2, 3, 4, 30, 31, 32]] };
+  assert.deepEqual(counted(ticketPrize({ game: 'daily539', sel: sel539 }, d539)), brute('daily539', sel539, d539));
+  // 威力彩 7 + 1 numbers with 5 + the second zone: 2 參獎 (NT$150,000 each, taxed
+  // on its own) and 5 伍獎 (NT$4,000, paid whole).
+  const b = buyTicket(acc, { id: 'w7', game: 'super638', sel: { zones: [[1, 2, 3, 4, 5, 20, 21], [7]] } }, now);
+  assert.equal(b.ticket.cost, 700);
+  const won = settleTicket(b.account, 'w7', sp, now).tickets[0];
+  assert.deepEqual([won.tier, won.gross, won.prize], ['third', 2 * 150_000 + 5 * 4_000, 2 * 119_400 + 5 * 4_000]);
 });
 
 test('倍數 and 多期 as each game takes them (台灣彩券 投注方式), 多期 a ticket a draw', () => {
