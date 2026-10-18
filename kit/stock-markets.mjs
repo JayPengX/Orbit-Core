@@ -481,14 +481,18 @@ export function dealPrice(market, side, price) {
 }
 
 // Taiwan's NHI supplementary premium (二代健保補充保費): 2.11% of any single
-// Taiwan dividend payment of NT$20,000 or more.
+// payment of NT$20,000 or more (a Taiwan dividend, interest, a lending fee),
+// on at most NT$10 million of it, to the dollar with 角 rounded half up
+// (健保署 扣取及繳納補充保險費實務手冊: 以元為單位，角以下四捨五入).
 export const NHI_RATE = 0.0211;
 export const NHI_THRESHOLD = 20_000;
+export const NHI_CAP = 10_000_000;
+export const nhiPremium = gross => (gross >= NHI_THRESHOLD ? Math.round(Math.min(gross, NHI_CAP) * NHI_RATE) : 0);
 
 export function dividendTaxes(market, gross) {
   const m = MARKETS[market] || MARKETS.INTL;
   const withheld = roundCash(gross * (m.withholding || 0), m.currency || 'USD');
-  const nhi = m.nhi && gross >= NHI_THRESHOLD ? Math.floor(gross * NHI_RATE) : 0;
+  const nhi = m.nhi ? nhiPremium(gross) : 0;
   return { withheld, nhi, net: gross - withheld - nhi };
 }
 
