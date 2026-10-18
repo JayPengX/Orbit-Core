@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   tdxRequest, tdxGet, SLOW_MS, tdxAccess, resetTdxToken, resetPace, resetTurns, resetMeter, spend, usage, flushUse, billingMonth, CAPS,
-  parseGoogleRoutes, parseAutocomplete, nearFirst, parseNominatim, parsePlace, parseTdxRoutes, planSig, googleRouteBody, handleTransit, GOOGLE_ROUTE_FIELDS, tdxPoints, tdxGuard
+  parseGoogleRoutes, parseAutocomplete, nearFirst, parseNominatim, parsePlace, parseTdxRoutes, planSig, googleRouteBody, handleTransit, GOOGLE_ROUTE_FIELDS, tdxPoints, tdxGuard, onceName
 } from '../transit.js';
 
 const NOW = Date.parse('2026-10-03T01:00:00Z');
@@ -676,4 +676,13 @@ test("TDX's month is Taiwan's: the first hours of a Taiwan month don't count las
 test('the TDX allowlist takes no "." or ".." (read a level up, past the rule)', () => {
   for (const p of ['basic/v2/Bus/Route/InterCity/..', 'basic/v2/Bus/Schedule/City/Taipei/%2E%2E', 'basic/v2/Bus/Route/City/./Hsinchu']) assert.equal(tdxRequest(p), null, p);
   assert.ok(tdxRequest('basic/v2/Bus/Route/City/Hsinchu'));
+});
+
+test("TDX's plans: a metro exit's doubled station said once (台北車站 M1, not 台北車站台北車站 M1); a walk of no length is a wait, no step", () => {
+  // (A wait starts and ends at one point: TDX's 0 m, 436 s "walk" at 桃園.)
+  const sec = (type, mode, from, to, dep, arr, length) => ({ type, transport: { mode }, departure: { time: dep, place: { name: from, location: { lat: 25.04, lng: 121.51 } } }, arrival: { time: arr, place: { name: to, location: length ? { lat: 25.05, lng: 121.52 } : { lat: 25.04, lng: 121.51 } } }, travelSummary: { length, duration: (Date.parse(arr) - Date.parse(dep)) / 1000 } });
+  const [p] = parseTdxRoutes({ data: { routes: [{ sections: [sec('pedestrian', 'pedestrian', '起點', '台北車站台北車站 M1', '2026-10-18T09:00:00+08:00', '2026-10-18T09:05:00+08:00', 300), sec('pedestrian', 'pedestrian', '台北車站台北車站 M1', '台北車站台北車站 M1', '2026-10-18T09:05:00+08:00', '2026-10-18T09:12:00+08:00', 0), sec('transit', 'subway', '台北車站', '板橋板橋站 出口3', '2026-10-18T09:12:00+08:00', '2026-10-18T09:25:00+08:00', 7000)] }] } });
+  assert.deepEqual(p.legs.map(l => l.to.name), ['台北車站 M1', '板橋站 出口3']);
+  assert.ok(p.legs.every(l => !(l.mode === 'walk' && l.dist < 5)));
+  for (const n of ['高高屏', '新竹', '台北車站', '屏東屏東']) assert.equal(onceName(n), n === '屏東屏東' ? '屏東' : n);
 });
