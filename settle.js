@@ -15,9 +15,11 @@
 //   - the picks' results and final scores are kept for Play to apply
 //     (`odds-settled/<account>`), the same ids again: nothing twice;
 //   - the real notice (won NT$…, or lost) goes to a phone subscribed to them.
-// A game not over yet is looked at again 15 minutes later; a pick whose game
-// is never found three days after its start is void (as the phone did), and
-// Kambi's kept copies (kambi.js) settle its matches after Kambi drops them.
+// A game not over yet is looked at again 15 minutes later; one not played in
+// its time (48 hours, baseball its day, American football its week: the
+// kit's voidAt, 台灣運彩's rule) is void, as is a pick whose game is never
+// found by then (48 hours at the least), and Kambi's kept copies (kambi.js)
+// settle its matches after Kambi drops them.
 //
 // Cash out and settling never both happen: each takes the slip's document
 // from 'open' with Firestore's updateTime precondition; whoever is second
@@ -41,7 +43,7 @@
 // (a source's JSON, or null), and `notify(account, message)` (push.js).
 
 import { storeReady, parseDoc, changeDoc, moveOwned } from './doc-store.js';
-import { readOutcomes, legResult, applyResults, finalOf, familyOf, LEAGUES } from './kit/settle.mjs';
+import { readOutcomes, legResult, applyResults, finalOf, familyOf, LEAGUES, voidAt, NOT_STARTED_MS } from './kit/settle.mjs';
 import { updateWallet, WALLET_COLLECTION, parseWallet, poolBalance, LOCK_SINCE } from './eco.js';
 import { checkSlip, useReads, cashOutQuote, cashOutOk } from './price.js';
 import { handleLotto } from './lotto.js';
@@ -52,7 +54,6 @@ export const SETTLED_COLLECTION = 'odds-settled';
 export const OPEN_INDEX = '_index';
 const MIN = 60_000;
 const HOUR = 60 * MIN;
-const DAY = 24 * HOUR;
 // How long a game of each kind usually lasts, start to final (the phone's
 // old guess for its notice), and a margin for the result to be posted.
 export const GAME_HOURS = { baseball: 3.3, football: 3.5, basketball: 2.6, hockey: 2.7, soccer: 2.1, sets: 2.5, racing: 2.2 };
@@ -60,8 +61,6 @@ const MARGIN = 10 * MIN;
 const AGAIN = 15 * MIN;
 // A championship (future) is looked at every 6 hours.
 const FUTURE_AGAIN = 6 * HOUR;
-// A game never found this long after its start: its picks are void.
-export const VOID_AFTER = 3 * DAY;
 // From here on a slip is placed through the Worker (op 'place', its price
 // checked); one staked before is only watched (op 'open').
 export const PLACE_SINCE = LOCK_SINCE;
@@ -127,7 +126,9 @@ export function resultsOf(slip, outcomes, now) {
     if (leg.result) return leg.result;
     const result = legResult(leg, outcomes.get(leg.id));
     if (result) return result;
-    const stale = leg.kind !== 'future' && leg.start && now - Date.parse(leg.start) > VOID_AFTER;
+    // A game never found (or never read) past its time, and 48 hours at the
+    // least, so a source down for a night can't void a game that was played.
+    const stale = leg.kind !== 'future' && leg.start && now > Math.max(voidAt(leg), Date.parse(leg.start) + NOT_STARTED_MS);
     return stale ? 'void' : null;
   });
 }

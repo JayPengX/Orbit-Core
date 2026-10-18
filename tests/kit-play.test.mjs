@@ -3,7 +3,7 @@
 // cash out (play-cashout.mjs), the lottery and scratch cards.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { legResult, applyResults, topInning, runOrder, espnDates, sameSide, sideScore, sideOfGame, sidesMatch, parseOpenF1Flags, parseFutureResult, futureTeamName, asiaResult, teamCorners } from '../kit/settle.mjs';
+import { legResult, applyResults, voidAt, lateOutcome, decidedSoFar, parseEspnResults, readOutcomes, topInning, runOrder, espnDates, sameSide, sideScore, sideOfGame, sidesMatch, parseOpenF1Flags, parseFutureResult, futureTeamName, asiaResult, teamCorners } from '../kit/settle.mjs';
 import { settleSlip, evaluateSlip, slipPayoutTable, slipOutlook, analyzeSlip, afterTax, prizeAfterTax, SLIP_RULES, combosBySize, comboCount, slipErrors, slipSizes, choose, maskChance, exclusiveMasks, estimateLineOdds, estimateFuturesOdds, estimateF1Odds, devigPower, devigTwoWay, devigProportional, americanToProbability, boostRate, seededRandom, quantile, median } from '../kit/play-odds.mjs';
 import { cashOutState, CASHOUT_KEEP, CASHOUT_MAX_OPEN } from '../kit/play-cashout.mjs';
 import { houseRule, shadeLong, minLegsProblem, HOUSE_RULES, LONG_FROM } from '../kit/play-rules.mjs';
@@ -90,6 +90,69 @@ test('a pick is undecided until its game is final; a game called off is the stak
   assert.equal(legResult({ kind: 'ml', side: 'home' }, { status: 'final', awayScore: 'x', homeScore: 1 }), null);
   assert.equal(legResult({ kind: 'ml', side: 'home' }, { status: 'final' }), null);
   assert.equal(legResult({ kind: 'nonsense' }, game(1, 2)), null);
+});
+
+test('a game not played in its time is void: 48 hours, baseball its local day, American football its week (台灣運彩 32-33)', async () => {
+  const iso = t => new Date(t).toISOString();
+  // MLB at 4:10 pm Pacific: the day ends at midnight Pacific; CPBL at 18:35 Taipei, midnight Taipei.
+  assert.equal(iso(voidAt({ sport: 'mlb', kind: 'ml', start: '2026-10-11T23:10:00Z' })), '2026-10-12T07:00:00.000Z');
+  assert.equal(iso(voidAt({ sport: 'cpbl', kind: 'ml', start: '2026-10-11T10:35:00Z' })), '2026-10-11T16:00:00.000Z');
+  assert.equal(iso(voidAt({ sport: 'npb', kind: 'ml', start: '2026-07-01T09:00:00Z' })), '2026-07-01T15:00:00.000Z');
+  // The NFL's week runs Thursday to Wednesday: Sunday's game and Thursday's both by the next Thursday.
+  assert.equal(iso(voidAt({ sport: 'nfl', kind: 'ml', start: '2026-10-11T17:00:00Z' })), '2026-10-15T07:00:00.000Z');
+  assert.equal(iso(voidAt({ sport: 'nfl', kind: 'ml', start: '2026-10-16T00:15:00Z' })), '2026-10-22T07:00:00.000Z');
+  // Across the end of daylight saving (1 November): midnight Pacific is 08:00 UTC after it.
+  assert.equal(iso(voidAt({ sport: 'nfl', kind: 'ml', start: '2026-11-01T21:00:00Z' })), '2026-11-05T08:00:00.000Z');
+  // Every other sport: 48 hours.
+  assert.equal(iso(voidAt({ sport: 'nba', kind: 'ml', start: '2026-10-11T23:00:00Z' })), '2026-10-13T23:00:00.000Z');
+  assert.equal(voidAt({ kind: 'future', sport: 'nba', start: '2026-10-11T23:00:00Z' }), Infinity);
+
+  // ESPN: postponed and suspended are pending (void only once past their time), cancelled is void now.
+  const ev = (name, state, extra = {}) => ({ id: '1', date: '2026-10-11T23:00:00Z', competitions: [{ status: { type: { name, state, completed: false } }, competitors: [{ homeAway: 'away', score: '3', team: { displayName: 'A' } }, { homeAway: 'home', score: '1', team: { displayName: 'B' } }] }], ...extra });
+  const [pp, cx, sus, ab] = parseEspnResults({ events: [ev('STATUS_POSTPONED', 'post'), ev('STATUS_CANCELED', 'post'), ev('STATUS_SUSPENDED', 'in'), ev('STATUS_ABANDONED', 'post')] }, 'nba');
+  assert.equal(pp.status, 'pending');
+  assert.equal(pp.postponed, true);
+  assert.equal(cx.status, 'void');
+  assert.equal(sus.suspended, true);
+  assert.deepEqual(ab.sofar, { awayScore: 3, homeScore: 1 });
+
+  const nba = { sport: 'nba', kind: 'ml', side: 'home', start: '2026-10-11T23:00:00Z' };
+  const before = new Date('2026-10-13T22:00:00Z');
+  const after = new Date('2026-10-13T23:30:00Z');
+  assert.equal(lateOutcome(nba, pp, before), pp, 'within 48 hours: may still be played');
+  assert.equal(lateOutcome(nba, pp, after).status, 'void');
+  assert.equal(lateOutcome(nba, { status: 'pending', state: 'pre' }, after).status, 'void', 'never started');
+  const going = { status: 'pending', state: 'in', awayScore: 80, homeScore: 70 };
+  assert.equal(lateOutcome(nba, going, after), going, 'under way: never cut off');
+  // Suspended past its time: what the score already decided stands, the rest is void.
+  const late = lateOutcome(nba, { ...sus, status: 'pending', awayScore: 3, homeScore: 1 }, after);
+  assert.equal(legResult({ kind: 'total', side: 'over', line: 3.5 }, late), 'won');
+  assert.equal(legResult({ kind: 'total', side: 'under', line: 3.5 }, late), 'lost');
+  assert.equal(legResult({ kind: 'total', side: 'over', line: 5.5 }, late), 'void');
+  assert.equal(legResult({ kind: 'teamtotal', team: 'away', side: 'over', line: 2.5 }, late), 'won');
+  assert.equal(legResult({ kind: 'ml', side: 'home' }, late), 'void');
+  assert.equal(legResult({ kind: 'btts', side: 'yes' }, ab.status === 'void' ? ab : null), 'won', 'abandoned with both on the board');
+  assert.equal(decidedSoFar({ kind: 'btts', side: 'no' }, { awayScore: 0, homeScore: 2 }), null);
+  // Baseball: postponed is void once its local day is over, not three days later.
+  const mlb = { sport: 'mlb', kind: 'ml', side: 'home', start: '2026-10-11T23:10:00Z' };
+  assert.equal(lateOutcome(mlb, { status: 'pending', postponed: true }, new Date('2026-10-12T06:59:00Z')).status, 'pending');
+  assert.equal(lateOutcome(mlb, { status: 'pending', postponed: true }, new Date('2026-10-12T07:01:00Z')).status, 'void');
+
+  // Read from ESPN: put off a day and played within 48 hours counts; a makeup later doesn't.
+  const board = (date, name, state, completed, a, h) => ({ events: [{ id: date, date, competitions: [{ status: { type: { name, state, completed } }, competitors: [{ homeAway: 'away', score: String(a), team: { displayName: 'Boston Celtics' } }, { homeAway: 'home', score: String(h), team: { displayName: 'New York Knicks' } }] }] }] });
+  const leg = { id: 'x', sport: 'nba', kind: 'ml', side: 'home', away: 'Boston Celtics', home: 'New York Knicks', start: '2026-10-11T23:00:00Z' };
+  const pages = makeup => url => {
+    const d = /dates=(\d+)/.exec(url)?.[1];
+    if (d === '20261011') return board('2026-10-11T23:00:00Z', 'STATUS_POSTPONED', 'post', false, 0, 0);
+    if (d === makeup.day) return board(makeup.date, 'STATUS_FINAL', 'post', true, 99, 101);
+    return { events: [] };
+  };
+  const soon = await readOutcomes([leg], { read: pages({ day: '20261012', date: '2026-10-12T23:00:00Z' }), now: new Date('2026-10-13T06:00:00Z') });
+  assert.equal(legResult(leg, soon.get('x')), 'won', 'played the next day: settled on it');
+  const waiting = await readOutcomes([leg], { read: pages({ day: '20261014', date: '2026-10-14T23:00:00Z' }), now: new Date('2026-10-12T06:00:00Z') });
+  assert.equal(waiting.get('x').status, 'pending');
+  const gone = await readOutcomes([leg], { read: pages({ day: '20261014', date: '2026-10-14T23:00:00Z' }), now: new Date('2026-10-15T06:00:00Z') });
+  assert.equal(legResult(leg, gone.get('x')), 'void', 'the makeup came after 48 hours: void');
 });
 
 test('F1 and championship picks: names matched without accents or case, positions, head to heads, flags', () => {

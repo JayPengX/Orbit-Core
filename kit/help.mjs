@@ -250,7 +250,7 @@ export const HELP = {
         '投注單照運彩的規則：一關（每個選項各一張，預設）、全部過關、過關組合（2 到 12 場，過 1 關…全過）。最多 12 個選項，串關同一場只能選一個；每張 NT$100–100,000，彩金上限 NT$2,000 萬，每個組合獎金超過 NT$5,000 扣 20% 所得稅和 0.4% 印花稅。',
         '送出前會告訴你花多少、最多拿回多少；照當下的賠率成交，賠率變了會停下來說。場中投注等 5 秒，用那時的賠率再確認一次，跟真的運彩一樣。',
         '🔒 是不開放的選項；「限2關」「限3關」只能放在夠多場的串關裡。',
-        '比賽結束由伺服器自動結算並通知你，App 關著也一樣；延期或取消的比賽算賠率 1.00，開賽 3 天後還沒結果的算無效。'
+        '比賽結束由伺服器自動結算並通知你，App 關著也一樣；取消的比賽算賠率 1.00（無效）；延期的比賽 48 小時內沒開打也是（棒球看當地的當天、美式足球看當週），中斷的比賽沒在同樣時間內打完，還沒有結果的選項無效。'
       ]],
       ['lottery', '彩券', [
         '威力彩、大樂透、今彩539、3星彩、4星彩、38／39／49樂合彩、賓果賓果、雙贏彩和大福彩，照台灣彩券的規則和真實開獎對獎；晚上開獎的在開獎前半小時停售。雙贏彩和大福彩已經停賣，號碼取當晚 20:30 那期賓果賓果算出來。威力彩前兩獎和大樂透前四獎照那期每注實際派彩，和真的中獎人一起分。',
@@ -283,7 +283,7 @@ export const HELP = {
         'The slip follows the sports lottery: singles (one ticket a pick, the default), an all-in parlay, or systems (2 to 12 games, singles … all). Up to 12 picks, one per game in a parlay; NT$100–100,000 a ticket, a NT$20 million cap, and 20% income tax plus 0.4% stamp duty on any combination paying over NT$5,000.',
         'Before it’s placed you’re told the cost and the most it pays; it’s bought at the odds shown, and a price that moved stops it and says so. A live bet waits 5 seconds and is priced again then, as at a real sportsbook.',
         '🔒 marks a market that isn’t open; 限2關 and 限3關 picks go only in a parlay of that many games.',
-        'The server settles each slip when its games are over and tells you, with the app closed too; a postponed or cancelled game counts at 1.00, and one still without a result three days after its start is void.'
+        'The server settles each slip when its games are over and tells you, with the app closed too; a cancelled game counts at 1.00 (void), and so does a postponed one not started within 48 hours (baseball: that local day; American football: that week); a suspended game not finished in that time voids the picks it hadn’t decided yet.'
       ]],
       ['lottery', 'Lottery', [
         'Super Lotto 威力彩, Lotto 6/49 大樂透, Daily Cash 539, 3D and 4D, 38/39/49 樂合彩, BINGO BINGO, 雙贏彩 and 大福彩, checked against Taiwan Lottery’s rules and real draws; evening draws stop selling half an hour before. 雙贏彩 and 大福彩 are no longer sold, so their numbers come from that night’s 20:30 BINGO draw. 威力彩’s top two prizes and 大樂透’s top four pay what that draw paid per winner, shared with the real winners.',

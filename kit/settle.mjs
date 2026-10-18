@@ -68,7 +68,7 @@ export function topInning(awayInnings, homeInnings) {
 // awayInnings, homeInnings } for a game, { status, winner } otherwise.
 export function legResult(leg, outcome) {
   if (!outcome || outcome.status === 'pending') return null;
-  if (outcome.status === 'void') return 'void';
+  if (outcome.status === 'void') return (outcome.sofar && decidedSoFar(leg, outcome.sofar)) || 'void';
   const win = test => (test ? 'won' : 'lost');
   if (leg.kind === 'f1') return win(norm(outcome.winner) === norm(leg.driver));
   if (leg.kind === 'f1pole') return outcome.pole ? win(norm(outcome.pole) === norm(leg.driver)) : null;
@@ -197,6 +197,69 @@ export function legResult(leg, outcome) {
   }
 }
 
+// A pick already decided by the score so far in a game that won't be
+// finished (suspended past its time, or abandoned): 台灣運彩 keeps a pick
+// that already has its result (投注規範 32(二): 大小's over already past the
+// line wins); the rest are void. null: not decided.
+export function decidedSoFar(leg, { awayScore, homeScore }) {
+  const away = Number(awayScore);
+  const home = Number(homeScore);
+  if (!Number.isFinite(away) || !Number.isFinite(home)) return null;
+  const past = (n, line) => (n > line ? (leg.side === 'over' ? 'won' : 'lost') : null);
+  if (leg.kind === 'total') return past(away + home, leg.line);
+  if (leg.kind === 'teamtotal') return past(leg.team === 'away' ? away : home, leg.line);
+  if (leg.kind === 'btts') return away > 0 && home > 0 ? (leg.side === 'yes' ? 'won' : 'lost') : null;
+  return null;
+}
+
+// ---- When a game that hasn't been played is void (台灣運彩 投注規範 32-33) ----
+// A game not started within 48 hours of its scheduled start is void (and one
+// suspended and not finished within that time: its undecided picks);
+// baseball's time is its scheduled day and American football's its
+// scheduled week, local time. Local: the league's home time zone (MLB's and
+// American football's the US's latest, the Pacific); a week runs Thursday to
+// Wednesday, the NFL's.
+export const NOT_STARTED_MS = 48 * 3_600_000;
+const LOCAL_TZ = { npb: 'Asia/Tokyo', kbo: 'Asia/Seoul', cpbl: 'Asia/Taipei' };
+const US_LATEST = 'America/Los_Angeles';
+function wallClock(t, timeZone) {
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' }).formatToParts(new Date(t));
+  const p = Object.fromEntries(parts.map(x => [x.type, Number(x.value)]));
+  return { y: p.year, m: p.month, d: p.day, ms: Date.UTC(p.year, p.month - 1, p.day, p.hour % 24, p.minute, p.second) };
+}
+// Midnight local time, `days` days after t's local date.
+function localMidnight(t, timeZone, days) {
+  const { y, m, d } = wallClock(t, timeZone);
+  const wall = Date.UTC(y, m - 1, d + days);
+  const offset = at => wallClock(at, timeZone).ms - Math.floor(at / 1000) * 1000;
+  const guess = wall - offset(wall);
+  return wall - offset(guess);
+}
+// The moment a game not yet started (or not finished after a suspension)
+// becomes void: Infinity for a pick without a game time.
+export function voidAt(leg) {
+  const start = Date.parse(leg?.start);
+  if (!Number.isFinite(start) || leg.kind === 'future') return Infinity;
+  const family = familyOf(leg.sport);
+  const tz = LOCAL_TZ[leg.sport] ?? US_LATEST;
+  if (family === 'baseball') return localMidnight(start, tz, 1);
+  if (family === 'football') {
+    const { y, m, d } = wallClock(start, tz);
+    const weekday = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+    return localMidnight(start, tz, (4 - weekday + 7) % 7 || 7);
+  }
+  return start + NOT_STARTED_MS;
+}
+// A game read as not over, past its time: void (with the score so far, for
+// picks it already decided) when it never started, was postponed, or was
+// suspended; one under way (a long extra-innings night) is never cut off.
+export function lateOutcome(leg, outcome, now = new Date()) {
+  if (outcome?.status !== 'pending' || now.getTime() <= voidAt(leg)) return outcome;
+  if (outcome.suspended) return { status: 'void', reason: 'late', sofar: { awayScore: outcome.awayScore, homeScore: outcome.homeScore } };
+  if (outcome.postponed || outcome.state === 'pre') return { status: 'void', reason: 'late' };
+  return outcome;
+}
+
 // Records leg results (one per leg, null if not known yet); once every leg
 // is decided the slip is settled and its payout (after tax) is paid in.
 // `finals` (optional, one per leg): the final score to keep with a pick as it
@@ -252,7 +315,11 @@ export const F1_FLAG_KINDS = new Set(['f1sc', 'f1vsc', 'f1red']);
 const MATCH_TOLERANCE_MS = 6 * 60 * 60 * 1000;
 const DAY_MS = 86_400_000;
 const ESPN_PATH = Object.fromEntries(Object.entries(LEAGUES).map(([key, league]) => [key, league.path]));
-const VOID_STATUS = /POSTPONED|CANCELED|CANCELLED|FORFEIT|ABANDONED/;
+// Called off for good (void at once), or put off (void only once past its
+// time: voidAt), or stopped part way, to be finished later.
+const VOID_STATUS = /CANCELED|CANCELLED|FORFEIT|ABANDONED/;
+const POSTPONED = /POSTPONED/;
+const SUSPENDED = /SUSPENDED/;
 
 export function yyyymmdd(date) {
   return date.toISOString().slice(0, 10).replaceAll('-', '');
@@ -342,7 +409,8 @@ export function parseEspnResults(data, sport) {
     const home = side('home');
     if (!away || !home) continue;
     const type = comp.status?.type || {};
-    const status = VOID_STATUS.test(type.name || '') ? 'void' : type.completed && type.state === 'post' ? 'final' : 'pending';
+    const name = type.name || '';
+    const status = VOID_STATUS.test(name) ? 'void' : type.completed && type.state === 'post' ? 'final' : 'pending';
     // Soccer settles on 90 minutes: a tie that went to extra time (or
     // penalties) counts its two halves only.
     const halves = side => (side.linescores || []).slice(0, 2).reduce((sum, l) => sum + (Number(l.value) || 0), 0);
@@ -361,6 +429,10 @@ export function parseEspnResults(data, sport) {
       // Where a game in progress is: 'in', ESPN's short detail ("Top 7th",
       // "Q3 5:21", "67'") and the period number.
       state: type.state ?? null,
+      ...(status === 'pending' && POSTPONED.test(name) ? { postponed: true } : {}),
+      ...(status === 'pending' && SUSPENDED.test(name) ? { suspended: true } : {}),
+      // Abandoned part way: the score so far still decides what it already has.
+      ...(status === 'void' && /ABANDONED/.test(name) && type.state !== 'pre' ? { sofar: { awayScore: Number(away.score), homeScore: Number(home.score) } } : {}),
       detail: type.shortDetail || type.detail || '',
       period: Number(comp.status?.period) || 0
     });
@@ -386,6 +458,7 @@ export function parseEspnRace(data, startUtc) {
   const comp = best.comp;
   const type = comp.status?.type || {};
   if (VOID_STATUS.test(type.name || '')) return { status: 'void' };
+  if (POSTPONED.test(type.name || '')) return { status: 'pending', postponed: true };
   if (!type.completed && !/SESSION_COMPLETE|FINAL/.test(type.name || '')) return { status: 'pending' };
   const ranked = [...(comp.competitors || [])].filter(c => Number(c.order) >= 1).sort((a, b) => Number(a.order) - Number(b.order));
   const first = (comp.competitors || []).find(c => c.winner) ?? ranked[0];
@@ -410,6 +483,7 @@ export function parseEspnPole(data, startUtc) {
   if (!best) return null;
   const type = best.comp.status?.type || {};
   if (VOID_STATUS.test(type.name || '')) return { status: 'void' };
+  if (POSTPONED.test(type.name || '')) return { status: 'pending', postponed: true };
   if (!type.completed && !/SESSION_COMPLETE|FINAL/.test(type.name || '')) return { status: 'pending' };
   const first = (best.comp.competitors || []).find(c => Number(c.order) === 1);
   const name = first?.athlete?.displayName || first?.athlete?.fullName;
@@ -646,32 +720,50 @@ export async function readOutcomes(legs, { read, keptKambi = async () => null, n
       }
       const path = ESPN_PATH[leg.sport];
       if (!path) return;
+      const want = { sport: leg.sport, away: leg.away, home: leg.home, startUtc: leg.start };
+      let found = null;
       for (const date of espnDates(leg.start)) {
         const data = await page(`${ESPN}/${path}/scoreboard?dates=${date}`);
-        const game = data && parseEspnResults(data, leg.sport).find(g => sameGame(g, { sport: leg.sport, away: leg.away, home: leg.home, startUtc: leg.start }));
-        if (game) {
-          // 第N分 needs the order the runs came in: the game's scoring plays;
-          // a player's pick their box score; corners the teams' stats.
-          if ((leg.kind === 'nextrun' || leg.kind === 'prop' || leg.kind === 'corners') && game.status === 'final') {
-            const summary = await page(`${ESPN}/${path}/summary?event=${game.espnId}`);
-            if (!summary) return;
-            if (leg.kind === 'nextrun') out.set(leg.id, { ...game, runOrder: runOrder(summary.plays) });
-            else if (leg.kind === 'prop') {
-              // Kambi settles players' soccer markets on 90 minutes; ESPN's
-              // numbers count extra time: a tie that went on is void.
-              const status = summary.header?.competitions?.[0]?.status?.type?.name || '';
-              const prop = /AET|PEN|EXTRA|SHOOTOUT/i.test(status) && isSoccer(leg.sport) ? { status: 'void' } : propOutcome(leg, summary);
-              if (prop) out.set(leg.id, { ...game, prop });
-            } else {
-              const corners = teamCorners(summary);
-              if (corners) out.set(leg.id, { ...game, corners });
-            }
-            return;
+        found = (data && parseEspnResults(data, leg.sport).find(g => sameGame(g, want))) || null;
+        if (found) break;
+      }
+      // Put off (or moved off its day): the same two teams played again
+      // within the game's time still count (a makeup after it isn't this game).
+      if (!found || found.postponed) {
+        const start = Date.parse(leg.start);
+        const until = Math.min(voidAt(leg), now.getTime());
+        const dates = [];
+        for (let t = start + DAY_MS; t <= until + DAY_MS; t += DAY_MS) dates.push(...espnDates(new Date(t).toISOString()));
+        for (const date of [...new Set(dates)].filter(d => !espnDates(leg.start).includes(d))) {
+          const data = await page(`${ESPN}/${path}/scoreboard?dates=${date}`);
+          const again = data && parseEspnResults(data, leg.sport).find(g => !g.postponed && sameGame({ ...g, startUtc: leg.start }, want) && Date.parse(g.startUtc) > start && Date.parse(g.startUtc) <= voidAt(leg));
+          if (again) {
+            found = again;
+            break;
           }
-          out.set(leg.id, game);
-          return;
         }
       }
+      const game = found;
+      if (!game) return;
+      // 第N分 needs the order the runs came in: the game's scoring plays;
+      // a player's pick their box score; corners the teams' stats.
+      if ((leg.kind === 'nextrun' || leg.kind === 'prop' || leg.kind === 'corners') && game.status === 'final') {
+        const summary = await page(`${ESPN}/${path}/summary?event=${game.espnId}`);
+        if (!summary) return;
+        if (leg.kind === 'nextrun') out.set(leg.id, { ...game, runOrder: runOrder(summary.plays) });
+        else if (leg.kind === 'prop') {
+          // Kambi settles players' soccer markets on 90 minutes; ESPN's
+          // numbers count extra time: a tie that went on is void.
+          const status = summary.header?.competitions?.[0]?.status?.type?.name || '';
+          const prop = /AET|PEN|EXTRA|SHOOTOUT/i.test(status) && isSoccer(leg.sport) ? { status: 'void' } : propOutcome(leg, summary);
+          if (prop) out.set(leg.id, { ...game, prop });
+        } else {
+          const corners = teamCorners(summary);
+          if (corners) out.set(leg.id, { ...game, corners });
+        }
+        return;
+      }
+      out.set(leg.id, game);
     })
   );
   if (kambiGone.length) {
@@ -685,6 +777,8 @@ export async function readOutcomes(legs, { read, keptKambi = async () => null, n
       else if (live && !entry.gone) out.set(leg.id, kambiInPlay(live, leg.sport));
     }
   }
+  // Past its time without being played (or finished): void (voidAt).
+  for (const leg of legs) if (out.has(leg.id)) out.set(leg.id, lateOutcome(leg, out.get(leg.id), now));
   return out;
 }
 

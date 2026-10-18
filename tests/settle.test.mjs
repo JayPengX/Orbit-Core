@@ -154,7 +154,7 @@ test('a game not over is looked at again later; a parlay with a pick lost settle
   assert.equal(s2.doc(SETTLED_COLLECTION, ACCOUNT).slips.parlay001.settled, true);
 });
 
-test('a game never found is void three days after its start', async () => {
+test('a game never found is void 48 hours after its start (its local day, for baseball, at the least), not before', async () => {
   const now = { t: Date.parse(START) + 4 * 3_600_000 };
   const { store, deps, doc } = setup(now);
   deps.read = async () => ({ events: [] });
@@ -162,7 +162,11 @@ test('a game never found is void three days after its start', async () => {
   await watch(deps, [slip('slipwin01', [leg('home')])]);
   await settleCron(env, deps);
   assert.equal(doc(SETTLED_COLLECTION, ACCOUNT), null);
-  now.t = Date.parse(START) + 3 * 86_400_000 + 3_600_000;
+  // Past the day (midnight Pacific) but within 48 hours: a night's outage can't void it.
+  now.t = Date.parse(START) + 47 * 3_600_000;
+  await settleCron(env, deps);
+  assert.equal(doc(SETTLED_COLLECTION, ACCOUNT), null);
+  now.t = Date.parse(START) + 49 * 3_600_000;
   await settleCron(env, deps);
   assert.deepEqual(doc(SETTLED_COLLECTION, ACCOUNT).slips.slipwin01.results, ['void']);
   assert.equal(doc(WALLET_COLLECTION, ACCOUNT).entries.find(e => e.id === 'odds:payout-slipwin01').amount, 100);
