@@ -35,7 +35,7 @@ orbit-workers-proxy (one Worker, Taiwan)
    /weather  Google + CWA + MOENV blended (KV cells)
    /transit  TDX, Google Maps/Places/Routes
    /sports-proxy  ESPN, MLB, Jolpica, Polymarket, Kambi, Yahoo, ELTA, YouTube, F1 timing, Asian leagues
-   /gemini, /nl-edit, /slip-scan  Gemini via gemini-relay
+   /gemini, /nl-edit, /slip-scan, /law-ask  Gemini via gemini-relay
    /data     the family's data in R2, built by builders/ on the cron
    /config   the owner's live speeds
 quota-guard  reads the bill every 5 minutes; paces, then stops the proxy at 90% of the $5 plan
@@ -81,6 +81,7 @@ runs near each caller; only Gemini goes through `gemini-relay.js`, pinned to Tai
 | `/sports-proxy` | `sports.js`, `asia-baseball.js`, `f1-live.js` | The data proxy (§3.1) |
 | `/gemini`, `/nl-edit` | `worker.js` | Orbit Class's photo import and plain-language edits (fixed prompts) |
 | `/slip`, `/slip-scan` | `slip.js` | Orbit Slips' ticket photo read (tight caps) |
+| `/law-ask` | `law.js` | Orbit Law's questions on 1-8 articles of a law: the text read from Orbit Law's data, every point cited and checked; answers kept in KV by the law's version; no pass, 20 Gemini calls a day an address and 500 in all (D1) |
 | `/data/…` | `data.js` | R2, public reads |
 | `/config` | `worker.js` | The live speeds |
 

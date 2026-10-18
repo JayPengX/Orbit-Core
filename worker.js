@@ -9,6 +9,7 @@
 //   POST  /gemini                Orbit Class's AI schedule-photo import
 //   POST  /nl-edit               Orbit Class's natural-language edits
 //   GET   /slip, POST /slip-scan Slip Tracker's game lists and ticket photos (slip.js)
+//   POST  /law-ask               Orbit Law's questions on a law's articles (law.js)
 //   GET   /kambi                 Kambi's live scores for Quadra Play (kambi.js)
 //   GET/POST /push/…             notices while an app is closed (push.js)
 //   GET   /weather/…             Orbit Weather's blended forecast (weather.js)
@@ -27,6 +28,7 @@
 // sources are. The Quadra Pass is the only way anything is saved.
 
 import { handleSlip, handleSlipScan } from './slip.js';
+import { handleLawAsk } from './law.js';
 import en from './locales/en.js';
 import zhTW from './locales/zh-TW.js';
 import { handleEcoRequest, LOCK_SINCE } from './eco.js';
@@ -554,7 +556,8 @@ function buildGenerationConfig(model, schema) {
 // JSON the client parses itself either way, and buffering the whole thing
 // in the Worker first only adds the upstream's full download time to every
 // request before a single byte reaches the browser.
-async function proxyGeminiRequest(model, parts, schema, env, headers, ctx, feature) {
+// (timeoutMs: given up on after that long; Orbit Law's asks, a few seconds' work.)
+async function proxyGeminiRequest(model, parts, schema, env, headers, ctx, feature, timeoutMs) {
   try {
     const upstream = await geminiFetch(env, geminiUrl(model, env), {
       method: 'POST',
@@ -562,7 +565,8 @@ async function proxyGeminiRequest(model, parts, schema, env, headers, ctx, featu
       body: JSON.stringify({
         contents: [{ parts }],
         generationConfig: buildGenerationConfig(model, schema)
-      })
+      }),
+      signal: timeoutMs ? AbortSignal.timeout(timeoutMs) : undefined
     });
     let body = upstream.body;
     if (upstream.ok && body && ctx) {
@@ -1154,6 +1158,8 @@ async function route(request, env, ctx, headers, origin) {
   if (path === '/slip') return handleSlip(request, env, ctx, headers, ip);
   // …and its ticket photos, read by Gemini (no pass, a few a day).
   if (path === '/slip-scan') return handleSlipScan(request, env, headers, ip, (model, parts, schema) => proxyGeminiRequest(model, parts, schema, env, headers, ctx, 'slip-scan'));
+  // Orbit Law's questions (law.js): no pass, its origin only, a day's caps in D1.
+  if (path === '/law-ask') return handleLawAsk(request, env, ctx, headers, ip, (parts, schema) => proxyGeminiRequest(GEMINI_ALLOWED_MODELS[0], parts, schema, env, headers, ctx, 'law-ask', 25_000));
   // The bill's guard (guard.js), as it last read the bill: armed or not,
   // each count's share of the $5 plan, stopped or not. No key or token.
   if (path === '/guard' && request.method === 'GET') {
