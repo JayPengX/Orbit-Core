@@ -138,6 +138,8 @@ export const GAMES = {
 };
 export const GAME_ORDER = ['super638', 'lotto649', 'daily539', 'bingo', 'star3', 'star4', 'm39', 'm49'];
 export const gameName = (id, lang = 'zh') => GAMES[id]?.[lang === 'en' ? 'en' : 'zh'] || id;
+// A prize tier's own name (頭獎 … 普獎), as the results print it.
+export const tierName = (id, key, lang = 'zh') => GAMES[id]?.tiers?.find(t => t.key === key)?.[lang === 'en' ? 'en' : 'zh'] ?? null;
 // What the slip may offer: { multiple, periods } (1: none).
 export const limits = id => ({ multiple: GAMES[id]?.multiple || 1, periods: GAMES[id]?.periods || 1 });
 
@@ -151,6 +153,31 @@ export const CLOSE_MS = 30 * 60_000;
 export const BINGO_FIRST = '07:05';
 export const BINGO_DRAWS = 203;
 const BINGO_STEP = 5 * 60_000;
+// (A BINGO draw stops selling a minute before it.)
+const BINGO_CLOSE = 60_000;
+// When a draw stops selling (截止): the countdown players watch.
+export const closesAt = (gameId, draw) => draw.at - (gameId === 'bingo' ? BINGO_CLOSE : CLOSE_MS);
+
+// ---- 期別 ------------------------------------------------------------------------------
+//
+// A draw's 期別: the ROC year and its draw of that year (115000083). BINGO's
+// is exact (203 a day from 1 Jan: 115058668 is 2026-10-17's first); an evening
+// game's counts its draw days on from a known draw (a 春節 加開 shifts it, so
+// the results' own `period` is the word once out).
+const rocYear = date => Number(date.slice(0, 4)) - 1911;
+export function drawTerm(gameId, draw, latest) {
+  if (!draw?.date) return null;
+  if (gameId === 'bingo') return rocYear(draw.date) * 1e6 + Math.round((Date.parse(draw.date) - Date.parse(`${draw.date.slice(0, 4)}-01-01`)) / DAY) * BINGO_DRAWS + draw.slot + 1;
+  if (!latest?.period || !latest.date || latest.date >= draw.date) return null;
+  const g = GAMES[gameId];
+  const days = GAMES[g.of]?.days || g.days;
+  const year = draw.date.slice(0, 4);
+  // A new year starts at 1: count from its first day.
+  let from = latest.date.slice(0, 4) === year ? latest.date : null;
+  let n = from ? latest.period : rocYear(draw.date) * 1e6;
+  for (let t = Date.parse(from || `${year}-01-01`) + (from ? DAY : 0); t <= Date.parse(draw.date); t += DAY) if (days.includes(new Date(t).getUTCDay())) n++;
+  return n;
+}
 
 // The draw a ticket bought now goes into: { date, slot? (BINGO), at (ms) }.
 export function nextDraw(gameId, now = Date.now()) {
@@ -159,7 +186,7 @@ export function nextDraw(gameId, now = Date.now()) {
     for (let d = 0; d < 3; d++) {
       const date = taipeiDate(now + d * DAY);
       const first = at(date, BINGO_FIRST);
-      const slot = Math.max(0, Math.ceil((now + 60_000 - first) / BINGO_STEP));
+      const slot = Math.max(0, Math.ceil((now + BINGO_CLOSE - first) / BINGO_STEP));
       if (slot < BINGO_DRAWS) return { date, slot, at: first + slot * BINGO_STEP };
     }
     return null;
@@ -247,7 +274,7 @@ export function parseDraw(gameId, record) {
   if (g.combo) {
     const each = ['', '', 'Two', 'Three', 'Four'];
     const prizes = Object.fromEntries(Object.keys(g.combo.sizes).map(k => [k, Number(record[`${g.api.assign}${each[k]}Assign`]?.perPrize) || 0]).filter(([, v]) => v));
-    return { numbers: size.slice(0, g.combo.drawn).map(Number), prizes, paid };
+    return { numbers: size.slice(0, g.combo.drawn).map(Number), prizes, paid, period: Number(record.period) || null };
   }
   const pools = {};
   for (const t of g.tiers || []) {
@@ -256,12 +283,15 @@ export function parseDraw(gameId, record) {
     pools[t.key] = { perPrize: Number(a.perPrize) || 0, winners: Number(a.winnerCount) || 0, pool: (Number(a.prize) || 0) + (Number(a.lastPrize) || 0) };
   }
   // (Its 期別, the draw's number: 第 N 期 on a ticket and its result.)
+  // `order`: 開出順序 (numbers: 大小順序).
   const term = record.period ?? record.drawTerm;
   const t = term != null ? { term } : {};
-  if (g.digits) return { digits: (record.drawNumberAppear || []).map(Number), ...t };
-  if (gameId === 'super638') return { numbers: size.slice(0, 6).map(Number), zone2: Number(size[6]), pools, paid, ...t };
-  if (gameId === 'lotto649') return { numbers: size.slice(0, 6).map(Number), special: Number(size[6]), pools, paid, ...t };
-  if (gameId === 'daily539') return { numbers: size.slice(0, 5).map(Number), pools, paid, ...t };
+  const period = Number(term) || null;
+  const order = n => (record.drawNumberAppear || []).slice(0, n).map(Number);
+  if (g.digits) return { digits: (record.drawNumberAppear || []).map(Number), period, ...t };
+  if (gameId === 'super638') return { numbers: size.slice(0, 6).map(Number), zone2: Number(size[6]), pools, paid, period, order: order(6), ...t };
+  if (gameId === 'lotto649') return { numbers: size.slice(0, 6).map(Number), special: Number(size[6]), pools, paid, period, order: order(6), ...t };
+  if (gameId === 'daily539') return { numbers: size.slice(0, 5).map(Number), pools, paid, period, order: order(5), ...t };
   return null;
 }
 
@@ -445,6 +475,26 @@ export async function latestResults() {
     star4: c.lotto4DResult && { ...parseDraw('star4', c.lotto4DResult), date: String(c.lotto4DResult.lotteryDate).slice(0, 10) }
   };
 }
+// The next draws as Taiwan Lottery shows them: { gameId: { date, period?,
+// jackpot?: { amount, desc } } }, `period` its 期別 (威力彩 and 大樂透) and
+// `jackpot` the 頭獎 it advertises, desc 上看 (expected) or 保證 (the NT$2億 /
+// NT$1億 floor): 「頭獎上看 3.2 億」.
+const CODES = { 5134: 'super638', 5118: 'lotto649', 5120: 'daily539', 1197: 'm39', 1121: 'm49', 2108: 'star3', 2109: 'star4', 1102: 'bingo' };
+export async function upcoming() {
+  const [next, upto, pots] = await Promise.all(['NextDrawDate', 'uptoPrize', 'Jackpot'].map(p => getJson(`${API}/${p}`)));
+  const out = {};
+  for (const x of next?.content?.nextDrawDateList || []) {
+    const id = CODES[x.gameCode];
+    const d = String(x.drawDate || '');
+    if (id && d.length >= 8) out[id] = { date: `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`, ...(x.drawTerm && { period: Number(x.drawTerm) }) };
+  }
+  for (const x of pots?.content?.jackpotList || []) {
+    const id = CODES[x.gameCode];
+    const desc = upto?.content?.uptoPrizeList?.find(u => u.gameCode === x.gameCode)?.uptoDesc;
+    if (id && x.isShow && Number(x.jackpot) > 0) out[id] = { ...out[id], jackpot: { amount: Number(x.jackpot), desc: desc || '上看' } };
+  }
+  return out;
+}
 // A jackpot as it stands for the next draw: nobody won it, so it carries over.
 const poolOf = a => (a ? (Number(a.winnerCount) ? Number(a.prize) || 0 : (Number(a.prize) || 0) + (Number(a.lastPrize) || 0)) : null);
 
@@ -497,7 +547,7 @@ export function settleTicket(account, ticketId, draw, now = new Date()) {
   const ledger = net > 0 && !account.ledger.some(e => e.id === `prize-${ticketId}`) ? [...account.ledger, { id: `prize-${ticketId}`, t, kind: 'prize', amount: net }] : account.ledger;
   return { ...account, updated: t, ledger, tickets: account.tickets.map(x => (x.id === ticketId ? settled : x)) };
 }
-const summarize = d => ({ numbers: d.numbers, special: d.special, zone2: d.zone2, digits: d.digits, bull: d.bull, ...(d.term != null ? { term: d.term } : {}) });
+const summarize = d => ({ numbers: d.numbers, special: d.special, zone2: d.zone2, digits: d.digits, bull: d.bull, period: d.period ?? d.term, ...(d.term != null ? { term: d.term } : {}) });
 
 // Tickets whose draw is due: open, and past their draw time (plus a little
 // for the results to appear).
