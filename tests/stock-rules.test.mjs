@@ -178,3 +178,22 @@ test("Taiwan's after-hours sessions take orders from 13:40 (盤後零股) and 14
   // After 14:30: an order for the next session, as before.
   assert.equal(place(1000, taipei('14:35')).order.after, undefined);
 });
+
+test('追繳 is cancelled once the 差額 notified is paid in full, bit by bit, even under 166% (§55(3)); a sale\'s repayment isn\'t a payment', () => {
+  const call = { since: now, due: now + 2 * DAY, need: 10_000 };
+  const v = { owed: 100_000, assets: 125_000, ratio: 1.25 };
+  const ev = (id, t, amount, currency = 'TWD') => ({ id, type: 'repay', t, currency, amount });
+  const acc = { events: [
+    ev('repay:before', now - DAY, 50_000),
+    ev('repay:pd1', now + 1000, 4_000),
+    { id: 'fill:s1', type: 'fill', side: 'sell', orderId: 's1', t: now + 2000 },
+    ev('repay:s1', now + 2000, 30_000),
+    ev('repay:pd2', now + 3000, 100, 'USD')
+  ] };
+  assert.equal(SA.callPaid(acc, call, { USD: 32 }), 4_000 + 3_200);
+  assert.equal(SA.callPaid(acc, call), 4_000, 'no rate: the US$ payment left out');
+  assert.deepEqual(SA.callState(call, v, now + DAY, 7_200), { call, sell: false, event: null });
+  assert.deepEqual(SA.callState(call, v, now + DAY, 10_000), { call: null, sell: false, event: 'met', paid: true });
+  assert.equal(SA.callState(call, v, now + 3 * DAY).sell, true, 'not paid: sold at the deadline as before');
+  assert.equal(SA.callState({ ...call, need: 0 }, v, now + DAY, 0).call !== null, true, 'nothing to pay (shorts): only 166% cancels it');
+});

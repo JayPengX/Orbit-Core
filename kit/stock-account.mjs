@@ -1396,8 +1396,9 @@ export function callPlan(account, valuation) {
 // The ratio is judged on closing prices: a dip under 130% while Taiwan is
 // trading calls nothing yet. After the close it's a call (追繳通知), due by
 // the close of the second business day after. Paying cash against the loans
-// (補繳), repaying or selling can meet it; it's cancelled only back at 166%.
-// At the deadline: under 130% still, the margin holdings are sold from the
+// (補繳), repaying or selling can meet it; it's cancelled back at 166%, or
+// once the 差額 notified (call.need) is paid in full, bit by bit or at once
+// (TWSE 融資融券業務操作辦法 §55(3), (4)). At the deadline: under 130% still, the margin holdings are sold from the
 // next business day (the orders wait for its open); between 130% and 166%
 // nothing is sold yet, but the call stands, and a later fall under 130% is
 // sold the next business day with no new grace.
@@ -1432,12 +1433,28 @@ export function callNeed(v) {
   if (!(v.owed > EPS) || v.ratio >= MARGIN_RESTORE) return 0;
   return Math.max(0, Math.ceil((MARGIN_RESTORE * v.owed - v.assets) / (MARGIN_RESTORE - 1)));
 }
+// NT$ paid against the loans since a call was issued (補繳): the account's
+// own cash paid in (repay events), not what a sale repaid. Another
+// currency's at `rates` (NT$ per unit), left out without one.
+export function callPaid(account, call, rates = {}) {
+  if (!call) return 0;
+  const sold = new Set((account?.events || []).filter(e => e.type === 'fill' && e.side === 'sell').map(e => `repay:${e.orderId}`));
+  let paid = 0;
+  for (const e of account?.events || []) {
+    if (e.type !== 'repay' || !(e.t >= call.since) || sold.has(e.id)) continue;
+    const r = e.currency === BASE ? 1 : rates?.[e.currency];
+    if (r > 0) paid += e.amount * r;
+  }
+  return paid;
+}
 // Where a call stands at a check: { call (to keep on the account, or null),
 // sell (sell the margin holdings now), event ('issued' | 'met' | 'cleared' |
-// 'intraday' | null) }.
-export function callState(call, v, now = Date.now()) {
+// 'intraday' | null), paid (met by paying the 差額 in full) }. `paid`: NT$
+// paid since it was issued (callPaid).
+export function callState(call, v, now = Date.now(), paid = 0) {
   if (!(v.owed > EPS)) return { call: null, sell: false, event: call ? 'cleared' : null };
   if (call && v.ratio >= MARGIN_RESTORE) return { call: null, sell: false, event: 'met' };
+  if (call && call.need > 0 && paid >= call.need - 0.5) return { call: null, sell: false, event: 'met', paid: true };
   if (!call) {
     if (v.ratio >= MARGIN_CALL) return { call: null, sell: false, event: null };
     if (twSession(now)) return { call: null, sell: false, event: 'intraday' };
