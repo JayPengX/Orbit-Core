@@ -244,7 +244,7 @@ async function snapshotRoot(when, repos) {
 }
 const [appArg, ...hashes] = args;
 
-const APPS = { sports: ['Orbit-Sports', 'match'], play: ['Quadra-Play', 'odds'], securities: ['Quadra-Securities', 'stock'], words: ['Orbit-Words', 'vocab'], orbit: ['Orbit-Class', 'orbit'], weather: ['Orbit-Weather', 'weather'], transit: ['Orbit-Transit', 'transit'], slips: ['Slip-Tracker', 'slip'], beats: ['Passion-Beats', 'beats'], admin: ['Shared-Proxy', 'admin'] };
+const APPS = { sports: ['Orbit-Sports', 'match'], play: ['Quadra-Play', 'odds'], securities: ['Quadra-Securities', 'stock'], words: ['Orbit-Words', 'vocab'], orbit: ['Orbit-Class', 'orbit'], weather: ['Orbit-Weather', 'weather'], transit: ['Orbit-Transit', 'transit'], slips: ['Orbit-Slips', 'slip'], beats: ['Orbit-Beats', 'beats'], admin: ['Shared-Proxy', 'admin'] };
 // The admin panel's key in a preview: the run's own, never the owner's.
 const ADMIN_KEY = 'preview-admin-key-0123456789abcdef0123456789';
 // The old names still work.

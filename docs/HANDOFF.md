@@ -19,8 +19,8 @@ Updated 2026-10-18.
 | Orbit-Weather | One blended forecast to the township | Pages on push |
 | Orbit-Words | Vocabulary with a memory model | Pages on push |
 | Orbit-Class | The class timetable (Vite build) | Pages on push |
-| Passion-Beats | A separate project (its own CLAUDE.md) | Pages on push |
-| Slip-Tracker | 運彩追蹤: real Taiwan Sports Lottery tickets followed live (independent: no Pass, no kit; ESPN straight from the phone, only Asian baseball through `/slip`; ticket photos read by Gemini through `/slip-scan`) | Pages on push |
+| Orbit-Beats | A separate project (its own CLAUDE.md) | Pages on push |
+| Orbit-Slips | 運彩追蹤: real Taiwan Sports Lottery tickets followed live (independent: no Pass, no kit; ESPN straight from the phone, only Asian baseball through `/slip`; ticket photos read by Gemini through `/slip-scan`) | Pages on push |
 | Shared-Data | Retired 2026-10-13 and archived; its data lives in R2. The owner deletes it (OWNER-STEPS) | none |
 
 Every app loads the kit from Shared-Proxy's Pages, so a kit change is one
