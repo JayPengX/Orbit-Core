@@ -722,3 +722,10 @@ test('a live number pops only when it changed, and never in the first seconds', 
   assert.equal(kit.liveChanged('t:c', '…', 10_000), false);
   assert.equal(kit.liveChanged('t:c', 'NT$1,000', 11_000), false);
 });
+
+test('taipeiDay takes a number, an ISO string or a Date', () => {
+  const t = Date.UTC(2026, 9, 17, 16, 30); // 00:30 on the 18th in Taipei
+  assert.equal(kit.taipeiDay(t), '2026-10-18');
+  assert.equal(kit.taipeiDay(new Date(t).toISOString()), '2026-10-18');
+  assert.equal(kit.taipeiDay(new Date(t)), '2026-10-18');
+});
