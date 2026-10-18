@@ -461,14 +461,12 @@ test('prices from chances: never under 1.01, the long end capped, the books\' ma
   assert.equal(median([]), null);
 });
 
-test("the house's rules: locked at both ends, a short price only in a parlay, the long end shaded", () => {
-  assert.deepEqual(houseRule('ml', 1.03), { lock: 'low', minLegs: 1 });
-  assert.deepEqual(houseRule('ml', 1.05), { lock: null, minLegs: 3 });
-  assert.deepEqual(houseRule('ml', 1.2), { lock: null, minLegs: 2 });
-  assert.deepEqual(houseRule('ml', 1.25), { lock: null, minLegs: 1 });
+test("the house's rules: no 限關 by price (運彩 §21), the long end locked and shaded", () => {
+  for (const odds of [1.01, 1.03, 1.05, 1.2, 1.25]) assert.deepEqual(houseRule('ml', odds), { lock: null, minLegs: 1 }, `${odds}: a single`);
   assert.deepEqual(houseRule('ml', 30), { lock: 'high', minLegs: 1 });
   assert.deepEqual(houseRule('score', 30), { lock: null, minLegs: 1 }, 'many-outcome markets go to 150');
-  assert.deepEqual(houseRule('f1', 1.1), { lock: 'low', minLegs: 2 });
+  assert.deepEqual(houseRule('f1', 1.1), { lock: 'low', minLegs: 1 });
+  assert.deepEqual(houseRule('f1', 1.2), { lock: null, minLegs: 1 });
   assert.deepEqual(houseRule('f1', 200), { lock: null, minLegs: 1 });
   assert.deepEqual(houseRule('ml', NaN), { lock: null, minLegs: 1 });
   assert.equal(shadeLong('ml', LONG_FROM), LONG_FROM);
@@ -476,7 +474,7 @@ test("the house's rules: locked at both ends, a short price only in a parlay, th
   assert.equal(shadeLong('score', 16), 16);
   assert.equal(minLegsProblem([{ minLegs: 3 }, {}], [2]), 3);
   assert.equal(minLegsProblem([{ minLegs: 2 }, {}], [2]), 0);
-  assert.equal(HOUSE_RULES.lockLow < HOUSE_RULES.threeLegsUnder, true);
+  assert.deepEqual(Object.keys(HOUSE_RULES).sort(), ['lockHigh', 'lockHighExotic', 'lockLowOutright']);
 });
 
 // ---- Cash out --------------------------------------------------------------------
