@@ -46,8 +46,8 @@ test('past the day’s cap every address waits until tomorrow', async () => {
 // /slip-scan: a ticket's photo, read by Gemini under tight caps.
 const { SCAN_LIMITS, forgetScans } = await import('../slip.js');
 const gemini = [];
-const scan = ({ origin = 'https://jaypengx.github.io', ip = '203.0.113.1', image = { mime_type: 'image/jpeg', data: 'AAAA' }, env = { GEMINI_API_KEY: 'k' } } = {}) =>
-  worker.fetch(new Request('https://proxy.test/slip-scan', { method: 'POST', headers: { Origin: origin, 'CF-Connecting-IP': ip, 'Content-Type': 'application/json' }, body: JSON.stringify({ image }) }), env, ctx);
+const scan = ({ origin = 'https://jaypengx.github.io', ip = '203.0.113.1', image = { mime_type: 'image/jpeg', data: 'AAAA' }, env = { GEMINI_API_KEY: 'k' }, qt } = {}) =>
+  worker.fetch(new Request('https://proxy.test/slip-scan', { method: 'POST', headers: { Origin: origin, 'CF-Connecting-IP': ip, 'Content-Type': 'application/json' }, body: JSON.stringify({ image, qt }) }), env, ctx);
 const realFetch = globalThis.fetch;
 globalThis.fetch = async (url, init) => {
   if (String(url).includes('generativelanguage')) {
@@ -75,6 +75,16 @@ test('an address gets 2 scans a minute', async () => {
   const codes = [];
   for (let i = 0; i < 4; i++) codes.push((await scan({ ip: '203.0.113.6' })).status);
   assert.deepEqual(codes, [200, 200, 429, 429]);
+});
+
+test('with a Quadra Pass, scans count per account (3 a minute), whatever the address', async () => {
+  const { signToken } = await import('../quadra-token.js');
+  const env = { GEMINI_API_KEY: 'k', ECO_TOKEN_SECRET: 'test-secret' };
+  const qt = await signToken('test-secret', { k: 'ses', s: 'sess1', d: 'acct-scan', e: Date.now() + 60_000 });
+  assert.equal((await scan({ ip: '203.0.113.20', env, qt: 'forged.token' })).status, 401);
+  const codes = [];
+  for (let i = 0; i < 4; i++) codes.push((await scan({ ip: `203.0.113.${21 + i}`, env, qt })).status);
+  assert.deepEqual(codes, [200, 200, 200, 429]);
 });
 
 test('past the day’s scans in all, nobody scans until tomorrow', async () => {

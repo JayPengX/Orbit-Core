@@ -122,7 +122,7 @@ export async function sendPush(env, sub, message) {
 
 // ---- The lists ------------------------------------------------------------------
 
-const APP_KEYS = new Set(['match', 'odds', 'stock', 'vocab', 'orbit', 'weather', 'transit']);
+const APP_KEYS = new Set(['match', 'odds', 'stock', 'vocab', 'orbit', 'weather', 'transit', 'slip']);
 const MAX_ITEMS = 60;
 const HOLD_MS = 8 * 3_600_000;
 const CHECK_EVERY = 15 * 60_000;

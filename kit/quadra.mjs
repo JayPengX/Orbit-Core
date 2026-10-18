@@ -9,6 +9,7 @@
 //   Orbit Transit       transit the map, buses, trains and metros
 //   Orbit Sports        match   scores, schedules and stats (was Quadra Fixtures)
 //   Orbit Words         vocab   English words (was Quadra Hub)
+//   Orbit Slips         slip    台灣運彩 tickets followed live (was Slip Tracker)
 //
 // The names, colours and marks are brand.mjs's. The Quadra Pass (the
 // account, Plus, the truth about the money, every app and its guide) is the
@@ -2639,6 +2640,10 @@ export const NOTICE_KINDS = {
     ['order', '委託未成交', 'Order not filled', '委託到期失效、被取消，或定期定額這個月跳過時。', 'When an order lapses or is dropped, or a monthly plan skips a month.'],
     ['margin', '維持率與斷頭', 'Margin call', '維持率偏低，或融資、放空被強制處理時。', 'When margin runs low, or a loan or short is force-closed.'],
     ['income', '股利與利息', 'Dividends and interest', '除息、股利入帳、債券配息和活存利息入帳時。', 'When a holding goes ex-dividend, and when dividends, coupons or interest arrive.']
+  ],
+  slip: [
+    ['start', '注單比賽開打', 'A ticket’s game starts', '注單上的比賽開始時。', 'When a game on one of your tickets starts.'],
+    ['end', '注單比賽結束', 'A ticket’s game ends', '注單上的比賽結束，附上比分。', 'When a game on one of your tickets ends, with the score.']
   ],
   orbit: [['class', '上課提醒', 'Class reminder', '每堂課開始前 5 分鐘。', 'Five minutes before each class.']],
   weather: [

@@ -12,7 +12,7 @@
 //
 // HELP[app][lang] = [[topic id, title, [paragraphs]], …]
 
-export const HELP_ORDER = ['pass', 'stock', 'odds', 'match', 'vocab', 'orbit', 'weather', 'transit'];
+export const HELP_ORDER = ['pass', 'stock', 'odds', 'match', 'vocab', 'orbit', 'weather', 'transit', 'slip'];
 
 export const HELP = {
   pass: {
@@ -517,6 +517,48 @@ export const HELP = {
         'Morning weather: one line each day at that time (rain, temperature, UV, air), for the pinned place you’re at then. Rain alert: rain likely within 2 hours in the daytime, once a day at most. Both switches are in the Quadra Pass’s notifications.'
       ]],
       ['money', 'Money', ['Orbit Weather uses no money.']]
+    ]
+  },
+  slip: {
+    zh: [
+      ['what', 'Orbit Slips 是什麼', [
+        'Orbit 的運彩追蹤：你在台灣運彩買的注單，比賽即時跟著看。每張注單顯示每場的比分、這張現在還會中的機率、現在值多少，和彩券拿走多少。注單存在 Quadra Pass，換手機也在；沒有網路時用手機上的副本。'
+      ]],
+      ['add', '新增注單', [
+        '「拍注單自動填入」：拍注單或截圖，Gemini 讀出每一場、玩法和賠率，對到真的比賽後填進下面，確認後再儲存；對不到的會列出來讓你手動加。每個帳戶一天可以掃 30 張。',
+        '手動新增：選聯盟和日期（昨天到後天），點比賽選玩法（不讓分、讓分、大小、單雙），每一邊都標出運彩大概的賠率；輸入注單上的賠率，會算出公平價和彩券的抽成。過關方式（單場、N串1、N串M）和每組金額填好就能儲存。'
+      ]],
+      ['live', '比賽中', [
+        '每場的圓圈：現在會中是綠色、不會中是紅色，進行中會跳動；結束後打勾、打叉或退回。每張注單：全中可得（稅後）、現在價值（從現在起平均拿回多少）、有派彩的機率，和開賽前的機率做比較。',
+        '「看數字」打開三張收據：全中的話（或已結算的派彩）稅前派彩、所得稅 20% 和印花稅 0.4% 一行一行列出；開賽前的機會；長期平均拿回多少。'
+      ]],
+      ['math', '機率怎麼算', [
+        '每場比賽的比分模型，用 DraftKings 的收盤盤口（經 ESPN，抽水拿掉）去配：足球和冰球用 Poisson 進球，其他用分差和總分的常態分布。比賽中把剩下的時間按比例算，加上現在的比分。沒有盤口的比賽，用注單賠率扣掉運彩量到的抽成估計（標「估」）。',
+        '派彩照台灣運彩的規則：每個組合超過 NT$5,000 預扣 20.4%；全部打平或比賽取消算 1.00。'
+      ]],
+      ['money', '錢怎麼算', [
+        'Orbit Slips 不賣彩券，也不碰錢：只是幫你看已經買的注單。帳戶、Quadra Plus 和錢的真相，都在右上角的 Quadra Pass 裡。'
+      ]]
+    ],
+    en: [
+      ['what', 'What Orbit Slips is', [
+        'Orbit’s tracker for the tickets you bought at Taiwan Sports Lottery, followed live: each ticket shows its games’ scores, the chance it still lands, what it’s worth now and what the lottery takes. Tickets are kept on your Quadra Pass, so a new phone has them; offline, the copy on the phone.'
+      ]],
+      ['add', 'Adding a ticket', [
+        'Scan a ticket: a photo or screenshot, read by Gemini; each game, market and price is matched to a real game and filled in for you to check before saving; any it can’t place are listed to add by hand. 30 scans a day an account.',
+        'By hand: pick the league and day (yesterday to the day after tomorrow), tap a game and its market (moneyline, spread, total, odd/even); each side shows the lottery’s likely price; type the ticket’s odds to see the fair price and the cut. Set the kind (single, N-leg parlay, system) and the stake per combination, and save.'
+      ]],
+      ['live', 'While it plays', [
+        'Each pick’s ring: green when it would win now, red when not, pulsing while live; a tick, a cross or a return once decided. Each ticket: the payout if all land (after tax), what it’s worth now (the average payout from here), the chance of any payout, against where it stood before the games.',
+        'The numbers opens three receipts: the payout if all land (or what it paid), with the 20% income tax and 0.4% stamp duty line by line; the chances before the games; and the long-run average.'
+      ]],
+      ['math', 'How the chances are worked out', [
+        'Each game’s score model is fitted to DraftKings’ closing lines (through ESPN, the margin taken out): Poisson goals for soccer and hockey, a normal margin and total for the rest. In play, the rest of the game is scaled to the time left, plus the score. A game with no market uses the ticket’s odds less the lottery’s measured cut (marked est.).',
+        'Payouts follow Taiwan Sports Lottery’s rules: 20.4% withheld on any combination over NT$5,000; a push or a game called off counts 1.00.'
+      ]],
+      ['money', 'Money', [
+        'Orbit Slips sells nothing and moves no money: it only follows tickets you’ve bought. The account, Quadra Plus and the truth about the money are in the Quadra Pass, top right.'
+      ]]
     ]
   },
   transit: {
