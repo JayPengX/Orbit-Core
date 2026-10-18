@@ -71,7 +71,11 @@ export function passSync(q, { decode, apply, encode, now = Date.now }) {
       unreadable = true;
       return;
     }
-    if (theirs) await apply(theirs);
+    if (theirs) {
+      await apply(theirs);
+      // The merge kept something of this phone's: it goes up, not only at the next edit.
+      if ((await encode()) !== payload) dirty = true;
+    }
     known = true;
     seen = time || '';
     if (at === era) pulled = true;
@@ -123,6 +127,7 @@ export function passSync(q, { decode, apply, encode, now = Date.now }) {
       }
       await take(reply.payload, era, reply.updateTime);
       if (!unreadable && local && (await encode()) !== reply.payload) dirty = true;
+      if (dirty) this.sync();
     },
     changed() {
       dirty = true;

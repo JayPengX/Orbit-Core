@@ -278,3 +278,22 @@ test('known: false until a copy of the Pass has been read (opened offline), true
   await a.sync.sync();
   assert.equal(a.sync.known, true);
 });
+
+test('a read whose merge keeps something only this phone has writes it up at once, not at the next edit', async () => {
+  const w = worker();
+  const b = device(w, 'B');
+  await b.open();
+  await b.add('banana', 2);
+  const a = device(w, 'A');
+  a.state.items = { apple: 1 };
+  // Opened as if nothing were its own: the merge alone shows the Pass lacks apple.
+  await a.sync.first(a.q.claim(), { local: false });
+  await flush();
+  await a.sync.sync();
+  assert.deepEqual(keys(w.payload), ['apple', 'banana']);
+  // Merging a copy that already has everything writes nothing more.
+  const writes = w.writes;
+  a.sync.stale();
+  await a.sync.sync();
+  assert.equal(w.writes, writes);
+});
