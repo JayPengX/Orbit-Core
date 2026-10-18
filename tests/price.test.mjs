@@ -16,7 +16,7 @@ const kambiPage = {
     // A total Kambi prices longer than the model and one shorter.
     offer('Total Goals', 'Over/Under', [o('OT_OVER', 2300, { line: 2500 }), o('OT_UNDER', 1600, { line: 2500 })], ['MAIN_LINE']),
     offer('Asian Handicap', 'Asian Handicap', [o('OT_UNTYPED', 1900, { line: -1500, participant: 'Arsenal' }), o('OT_UNTYPED', 1900, { line: 1500, participant: 'Leeds United' })]),
-    offer('Draw No Bet', 'Match', [o('OT_ONE', 1100), o('OT_TWO', 6000)]),
+    offer('Double Chance', 'Double Chance', [o('OT_ONE_OR_CROSS', 1050), o('OT_ONE_OR_TWO', 1150), o('OT_CROSS_OR_TWO', 3000)]),
     offer('Correct Score', 'Correct Score', [o('OT_UNTYPED', 7000, { label: '2-1' }), o('OT_UNTYPED', 9000, { label: '1-1' })]),
     offer('To Score', 'Player Occurrence Line', [o('OT_YES', 3300, { line: 1000, participant: 'Bukayo Saka' })])
   ]
@@ -63,7 +63,7 @@ test('a pick is priced exactly as with everything read, reading only what can ch
     else if (kind === 'prop') assert.deepEqual(asked.sort(), ['league:epl', 'offers:7', 'players:epl_g'], id);
     else assert.deepEqual(asked.sort(), ['league:epl', 'offers:7'], id);
   }
-  for (const k of ['ml', 'total', 'runline', 'dnb', 'score', 'prop']) assert.ok(kinds.has(k), k);
+  for (const k of ['ml', 'total', 'runline', 'dc', 'score', 'prop']) assert.ok(kinds.has(k), k);
 });
 
 test('a slip is accepted and refused as before, at the house\'s price and just past it', async () => {
