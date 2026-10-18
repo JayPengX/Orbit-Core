@@ -172,3 +172,35 @@ test('Stock Connect: STAR and ChiNext shares only sold, never bought (institutio
   const cost = (side, kind) => SM.tradeCosts({ market: 'CN', side, kind, gross: 1_000_000, currency: 'CNY' });
   assert.deepEqual([cost('buy', 'stock').fee, cost('sell', 'stock').fee, cost('sell', 'stock').tax, cost('buy', 'etf').fee, cost('sell', 'etf').tax], [64.1, 64.1, 500, 40, 0]);
 });
+
+test('US pre- and post-market (富邦, 國泰): 04:00-09:30 and to 18:00 New York time, day limit orders only, filled on those sessions\' bars', async () => {
+  assert.deepEqual(['04:00', '09:29', '09:30', '15:59', '16:00', '17:59', '18:00', '03:59'].map(h => SM.usSession(at(`2026-10-13T${h}`))), ['pre', 'pre', 'regular', 'regular', 'post', 'post', null, null]);
+  assert.equal(SM.usSession(at('2026-11-27T13:30')), 'post', "a half day's post-market from its 13:00 close");
+  assert.equal(SM.usSession(at('2026-11-26T10:00')), null, 'Thanksgiving');
+  const pre = at('2026-10-13T07:00');
+  const q = us('AAPL', 250, { got: pre, marketTime: at('2026-10-12T16:00'), session: usSession });
+  const place = req => SA.placeOrder(rich(), req, { quote: q, rates: RATES, valuation: OK, now: pre, id: 'ext00001' });
+  assert.equal(place({ side: 'buy', type: 'market', qty: 1, ext: true }).error, 'extLimit');
+  assert.equal(place({ side: 'buy', type: 'limit', limit: 251, qty: 1, ext: true, tif: 'gtc' }).error, 'extLimit');
+  const r = place({ side: 'buy', type: 'limit', limit: 251, qty: 1, ext: true });
+  assert.equal(r.error, undefined);
+  assert.equal(r.fill, null, "no fill on the regular session's stale price");
+  assert.equal(r.order.expires, at('2026-10-13T18:00'));
+  // Bars: a pre-market one at 250.5 fills it; an ordinary order skips that bar for the open's.
+  const bars = [{ t: at('2026-10-13T08:00'), o: 250.5, h: 250.6, l: 250.4, c: 250.5 }, { t: at('2026-10-13T09:30'), o: 252, h: 252, l: 251.5, c: 252 }];
+  assert.deepEqual(SA.backfillPrice(r.order, bars, at('2026-10-13T10:00')), { t: bars[0].t, price: 250.5 });
+  assert.deepEqual(SA.backfillPrice({ ...r.order, ext: undefined, type: 'market' }, bars, at('2026-10-13T10:00')), { t: bars[1].t, price: 252 });
+  // The proxy keeps the flag and reads the extended bars for it.
+  const { cleanOrder, decideFills } = await import('../stock-fill.js');
+  const o = cleanOrder({ ...r.order, lk: undefined });
+  assert.equal(o.ext, true);
+  const urls = [];
+  const read = async url => {
+    urls.push(url);
+    if (url.includes('/v8/finance/chart/')) return { chart: { result: [{ meta: { symbol: 'AAPL', regularMarketPrice: 250, currency: 'USD', exchangeTimezoneName: 'America/New_York' }, timestamp: bars.map(b => b.t / 1000), indicators: { quote: [{ open: bars.map(b => b.o), high: bars.map(b => b.h), low: bars.map(b => b.l), close: bars.map(b => b.c) }] } }] } };
+    return { spark: { result: [] } };
+  };
+  const { fills } = await decideFills([{ ...o, t: pre, lk: pre }], { read, now: at('2026-10-13T09:00') });
+  assert.ok(urls.some(u => u.includes('includePrePost=true')));
+  assert.equal(fills[o.id].quote, 250.5);
+});

@@ -59,7 +59,8 @@ export function cleanOrder(o) {
   const n = x => (x != null && Number.isFinite(Number(x)) ? Number(x) : undefined);
   if (!(n(o.qty) > 0)) return null;
   const currency = CURRENCY.test(String(o.currency)) ? String(o.currency) : undefined;
-  return { id: String(o.id), symbol: String(o.symbol), side: o.side, type: o.type, qty: n(o.qty), limit: n(o.limit), stop: n(o.stop), t: n(o.t), after: n(o.after), expires: n(o.expires), market: String(o.market || ''), kind: String(o.kind || ''), currency };
+  // (`ext`: a US pre- and post-market limit order.)
+  return { id: String(o.id), symbol: String(o.symbol), side: o.side, type: o.type, qty: n(o.qty), limit: n(o.limit), stop: n(o.stop), t: n(o.t), after: n(o.after), expires: n(o.expires), market: String(o.market || ''), kind: String(o.kind || ''), currency, ...(o.ext === true && o.type === 'limit' ? { ext: true } : {}) };
 }
 
 // The kept document: { v: 2, fills: { id: fill }, open: { id: terms },
@@ -194,7 +195,7 @@ async function planFills(book, now) {
 
 // An order's terms as first seen: `t` the moment this Worker saw it (`lk`,
 // from when its bars were last looked at, is added by its first look).
-const termsOf = (o, now) => ({ symbol: o.symbol, side: o.side, type: o.type, qty: o.qty, limit: o.limit, stop: o.stop, after: o.after, expires: o.expires, market: o.market, kind: o.kind, currency: o.currency, t: now });
+const termsOf = (o, now) => ({ symbol: o.symbol, side: o.side, type: o.type, qty: o.qty, limit: o.limit, stop: o.stop, after: o.after, expires: o.expires, market: o.market, kind: o.kind, currency: o.currency, ...(o.ext ? { ext: true } : {}), t: now });
 
 // From when an order's bars still need looking at: a bar back from its last
 // look (the newest bar then was still forming), never before it was seen.
@@ -220,12 +221,14 @@ export async function decideFills(orders, { read, now = Date.now() }) {
   const symbols = [...new Set([...orders.map(o => o.symbol), ...currencies.map(fxSymbol)])];
   // The bars each symbol needs (from its earliest order's last look), read
   // with the quotes.
+  // (A symbol with a US extended-hours order: its pre- and post-market bars too.)
   const want = new Map();
+  const prePost = new Set(orders.filter(o => o.ext).map(o => o.symbol));
   for (const o of orders) if (o.lk != null && !o.after) want.set(o.symbol, Math.min(want.get(o.symbol) ?? Infinity, fromOf(o)));
   const barsOf = new Map();
   const [quotes] = await Promise.all([
     fetchQuotes(symbols),
-    ...[...want].map(async ([s, from]) => barsOf.set(s, await fetchBars(s, from).catch(() => null)))
+    ...[...want].map(async ([s, from]) => barsOf.set(s, await fetchBars(s, from, { prePost: prePost.has(s) }).catch(() => null)))
   ]);
   const twdOf = c => (!c ? undefined : c === 'TWD' ? 1 : quotes.get(fxSymbol(c))?.price);
   const fills = {};
