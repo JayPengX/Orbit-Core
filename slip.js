@@ -1,4 +1,4 @@
-// ---- slip.js: /slip and /slip-scan, Orbit Slips' doors (jaypengx.github.io/Slip-Tracker) ----
+// ---- slip.js: /slip and /slip-scan, Orbit Slips' doors (jaypengx.github.io/Orbit-Slips) ----
 // Orbit Slips now reads through the sports proxy with its Quadra Pass
 // (app=slip, like every Orbit app); /slip stays for pages from before that.
 // The old door, for a page with no pass, is narrow and small:

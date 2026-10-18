@@ -34,7 +34,7 @@ file is how to work on them.
 - **One person runs the whole family** and works across every repo in
   `~/Documents/GitHub` (Orbit-Class, Orbit-Transit, Orbit-Weather,
   Orbit-Sports (was Quadra Fixtures), Orbit-Words (was Quadra Hub),
-  Quadra-Play, Quadra-Securities, Shared-Proxy; Shared-Data retired 2026-10-13; Slip-Tracker, independent, 2026-10-17). A request that names no
+  Quadra-Play, Quadra-Securities, Shared-Proxy; Shared-Data retired 2026-10-13; Orbit-Slips, independent, 2026-10-17). A request that names no
   repo means whichever the context says, often several.
 - **They use the apps on their iPhone, installed on the home screen, in
   Safari's engine**, every day, and send what they find: a list (9, 22, 33,
@@ -908,3 +908,10 @@ What was decided, so it isn't undone. Newer calls win.
   新股申購 (TWSE's real subscriptions, drawn by the proxy at TWSE's rate)
   and what's trading now; the overnight loop may change anything,
   the economy included (docs/ECONOMY-REVIEW.md).
+- 2026-10-18: the repos renamed, Passion-Beats → Orbit-Beats and
+  Slip-Tracker → Orbit-Slips (GitHub, the local folders, the kit's paths);
+  the old names are small redirect repos (the path, query and hash kept;
+  their worker replaces the old one so an installed phone moves over). The
+  saved tickets and kits stay: the same origin. No gaps the owner has to
+  find: every new feature tried on real data at 375 px before it's called
+  done.
