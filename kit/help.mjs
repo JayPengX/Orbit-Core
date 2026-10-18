@@ -242,7 +242,7 @@ export const HELP = {
       ['tabs', '每個分頁', [
         '「首頁」：餘額（投注中的金額、現在的兌現價值和本月 VIP）、場中焦點、為你推薦（照你在 Orbit Sports 追蹤的球隊和聯賽，前三個可以一次串成一張）、焦點賽事、你的投注和彩券頭獎。',
         '「賽事」：選運動、聯賽和日期（台灣時間），或搜尋球隊和聯賽；點賠率加入投注單，點比賽看它的所有玩法（分頁、球員、更多）。冠軍盤和 F1 各一張。',
-        '「彩券」：11 種電腦彩券和 12 種刮刮樂。',
+        '「彩券」：8 種電腦彩券和 12 種刮刮樂。',
         '「紀錄」：投注單（進行中、等待開賽、已結算）、彩券、戰績和統計分析。',
         '投注單不是分頁：有選項時，分頁列上方會出現投注單列（幾個選項、金額、最多拿回多少），點開確認送出。'
       ]],
@@ -259,7 +259,7 @@ export const HELP = {
       ]],
       ['boost', '串關加成、提前兌現、免費投注', [
         '串關加成：3 個選項以上每個贏的組合多給獎金，3 個 +5%、4 個 +8%、5 個 +12%、6 個 +15%、7 個以上 +20%（Plus 會員 ×1.5）。',
-        '提前兌現：比賽還沒結束也能先把投注單換成現金。每個還沒結果的選項先扣莊家的差價（賽前 4%、場中 6%），整張再扣 3%（Plus 2%）；串越多、越早兌現拿得越少，兌現永遠不會比留著值錢。某個選項現在沒有報價、同一場有兩個未定的選項，或用了免費投注時，不能兌現。',
+        '提前兌現（Quadra 自己的服務，真正的運彩買了就不能取消或兌現）：比賽還沒結束也能先把投注單換成現金。每個還沒結果的選項先扣莊家的差價（賽前 4%、場中 6%），整張再扣 3%（Plus 2%）；串越多、越早兌現拿得越少，兌現永遠不會比留著值錢。某個選項現在沒有報價、同一場有兩個未定的選項，或用了免費投注時，不能兌現。',
         '免費投注：Plus 會員每週一張和新手禮，在投注單上點一下就用在這張單（單場或一組串關），賠率要 1.50 以上（串關看總賠率），贏了只拿獎金、不退本金，7 天內有效。'
       ]],
       ['money', '錢怎麼算', [
@@ -275,7 +275,7 @@ export const HELP = {
       ['tabs', 'The tabs', [
         'Home: your balance (what’s in open bets, what they’d cash out for and this month’s VIP), live now, for you (from the teams and leagues you follow in Orbit Sports; its top three as one parlay), featured games, your bets and the lottery jackpots.',
         'Games: pick a sport, league and day (Taiwan time), or search teams and leagues; tap a price to add it to the slip, a game for all its markets (by tab, players, more). Outrights and F1 have a board each.',
-        'Lottery: 11 draw games and 12 scratch cards.',
+        'Lottery: 8 draw games and 12 scratch cards.',
         'History: slips (in play, waiting, settled), tickets, wins and stats.',
         'The slip isn’t a tab: with picks on it, a bar above the tab bar shows how many, the stake and the most it pays; tap it to confirm and place.'
       ]],
@@ -292,7 +292,7 @@ export const HELP = {
       ]],
       ['boost', 'Parlay boost, cash out, free bets', [
         'The parlay boost adds to every winning combination of 3 picks or more: 3 picks +5%, 4 +8%, 5 +12%, 6 +15%, 7 or more +20% (×1.5 for Quadra Plus).',
-        'Cash out turns a slip into cash before its games end. Each undecided pick first gives up the house’s margin (4% before its game, 6% in play), then 3% of the whole is kept (2% for Plus): the more picks and the earlier, the less it pays, and cashing out is never worth more than holding on. It pauses while a pick has no price, two undecided picks are on one game, or the slip used a free bet.',
+        'Cash out (Quadra’s own extra: a real 運彩 bet can’t be cancelled or cashed out) turns a slip into cash before its games end. Each undecided pick first gives up the house’s margin (4% before its game, 6% in play), then 3% of the whole is kept (2% for Plus): the more picks and the earlier, the less it pays, and cashing out is never worth more than holding on. It pauses while a pick has no price, two undecided picks are on one game, or the slip used a free bet.',
         'Free bets (Plus’s weekly one and the welcome offer): one tap on the slip uses it on that slip (singles of one pick or one parlay), at odds of 1.50 or more (a parlay’s together); a win pays the winnings, not the stake; 7 days to use it.'
       ]],
       ['money', 'Money', [
