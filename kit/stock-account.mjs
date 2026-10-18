@@ -44,7 +44,7 @@ import {
 import { nextTradingStart, isTradingDay } from '#kit/stock-holidays.mjs';
 import { TD_MIN, tdRate, addMonths, tdInterest, incomeTaxes, lendable, LEND_RATE, LEND_LOT, LEND_RECALL, LEND_TERM_DAYS, addWeekdays, lendFee } from '#kit/stock-savings.mjs';
 import { BONDS, couponDates } from '#kit/stock-bonds.mjs';
-import { creditAccount, creditUsed, dayTradeBuyFirst, dayTradeSellFirst, dayTradeRoom, termDue, afterHours, SHORT_DEPOSIT, SHORT_HANDLING } from '#kit/stock-credit.mjs';
+import { creditAccount, creditUsed, dayTradeBuyFirst, dayTradeSellFirst, dayTradeRoom, termDue, afterHours, shortDeposit, SHORT_HANDLING } from '#kit/stock-credit.mjs';
 
 export const ACCOUNT_VERSION = 1;
 // Every new account opens with the same NT$100,000 (Quadra's base amount);
@@ -385,7 +385,7 @@ function applyFill(s, e) {
     }
     // 融券: the seller's 90% deposit and the sale money stay with the broker.
     if (!buy && e.credit) {
-      const deposit = roundCash((SHORT_DEPOSIT * e.gross * left) / e.qty, e.currency);
+      const deposit = shortDeposit((e.gross * left) / e.qty);
       p.shortDeposit = (p.shortDeposit || 0) + deposit;
       p.shortHeld = (p.shortHeld || 0) + part;
       add(s.cash, e.currency, -(deposit + part));
@@ -630,7 +630,7 @@ export function placeOrder(account, req, { quote, rates, valuation, now = Date.n
         if (credit.open) {
           const room = credit.limit - creditUsed(valuation).short;
           if (short * quote.price > room + EPS) return { error: 'creditLimit', room: Math.max(0, Math.floor(room)), limit: credit.limit };
-          const deposit = roundCash(SHORT_DEPOSIT * short * quote.price, quote.currency);
+          const deposit = shortDeposit(short * quote.price);
           const cash = avail.cash[quote.currency] || 0;
           if (deposit > cash + EPS) return { error: 'funds', need: deposit, have: Math.max(0, cash), currency: quote.currency };
           order.short = true;

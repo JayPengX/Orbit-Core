@@ -27,3 +27,12 @@ test('融資 lends 成交價金 × 成數, the part under NT$1,000 not lent (操
   assert.equal(SA.marginLoan('TW', 'TWD', 1_500, 1_600, 0.6), 0, 'under NT$1,000: nothing lent');
   assert.equal(SA.marginLoan('US', 'USD', 1_000, 1_003, 0.5), 501.5, 'elsewhere: the rate of all it costs');
 });
+
+test('融券 puts up 90% of the sale, the part under NT$100 counted as NT$100 (操作辦法 §49)', async () => {
+  const { shortDeposit } = await import('../kit/stock-credit.mjs');
+  assert.deepEqual([shortDeposit(100_500), shortDeposit(100_000), shortDeposit(1)], [90_500, 90_000, 100]);
+  const r = SA.placeOrder(credit(), { side: 'sell', type: 'limit', limit: 100.5, qty: 1000 }, { quote: tw(100.5), rates, valuation: ok, now, id: 's1' });
+  assert.equal(r.error, undefined);
+  assert.equal(r.order.deposit, 90_500, '100,500 × 90% = 90,450: NT$90,500');
+  assert.equal(SA.replay(r.account, now).positions['2330.TW'].shortDeposit, 90_500);
+});
