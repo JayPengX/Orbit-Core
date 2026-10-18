@@ -29,13 +29,13 @@ node tools/preview.mjs sports --live --width 375
 | `--eval "<js>"`, `--wait ms` | Read something out; wait first |
 | `--store key=value`, `--payload file.json` | Start with this localStorage or Pass payload |
 | `--out dir` | Where shots go (default `/tmp/quadra-preview`) |
-| `--webkit` | Safari's engine instead of Chromium |
+| `--webkit` | Safari's engine instead of Chromium (cloud: once, `apt-get install -y libavif16 libenchant-2-2 libsecret-1-0 libwayland-server0 libmanette-0.2-0 libgles2 libgtk-4-1 libgraphene-1.0-0 libwoff1 libevent-2.1-7t64 libgstreamer-gl1.0-0 libgstreamer-plugins-bad1.0-0 gstreamer1.0-plugins-base`) |
 | `--reopen` | Open twice with storage kept (a returning phone) |
 | `--upgrade <date\|ref>` | The old version, then today's, in one storage |
 | `--flaky <share>`, `--net offline\|slow[:ms]` | Failing or missing network |
 | `--shuffle` | What moved after the loading screen lifted |
 | `--timing`, `--requests`, `--profile`, `--latency ms`, `--h2`, `--root dir` | Speed: when it opened, every call, the CPU profile, a phone's latency, a deploy's build |
-| `--clock ISO`, `--fixture host/path=file` | A made-up time or answer |
+| `--clock ISO`, `--fixture host/path=file` | A made-up time (Taipei unless it ends in Z or ±hh:mm) or answer |
 | `--serve [--port 8123]` | Serve it for the iOS Simulator (`xcrun simctl openurl booted http://localhost:8123/<Repo>/`) |
 | `--no-geo` | (Weather) refuse the position |
 
