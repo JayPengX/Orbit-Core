@@ -105,6 +105,11 @@ export function legResult(leg, outcome) {
   const h = outcome.homeInnings || [];
   switch (leg.kind) {
     case 'ml':
+      // A tie where the winner has no draw to pick (baseball's, basketball's,
+      // American football's two-way 不讓分: an NPB, KBO or CPBL game called
+      // level after 12 innings) is a result not on offer: void, as 台灣運彩
+      // rules (無效投注 Q&A; 投注規範 32(七)). Soccer's is three-way.
+      if (leg.side !== 'draw' && away === home && familyOf(leg.sport) && !isSoccer(leg.sport)) return 'void';
       return win(leg.side === 'draw' ? away === home : leg.side === 'away' ? away > home : home > away);
     case 'total':
       return push(leg.side === 'over' ? away + home - leg.line : leg.line - away - home);

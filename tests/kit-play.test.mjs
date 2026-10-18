@@ -22,6 +22,15 @@ test('a game pick from the final score: winners, lines with a push, part-game ma
   assert.equal(r({ kind: 'ml', side: 'away' }, game(3, 2)), 'won');
   assert.equal(r({ kind: 'ml', side: 'home' }, game(3, 2)), 'lost');
   assert.equal(r({ kind: 'ml', side: 'draw' }, game(1, 1)), 'won');
+  // A two-way winner on a tie (NPB, KBO, CPBL level after 12, an NFL tie): void,
+  // not lost; soccer's three-way winner on a draw is lost.
+  for (const sport of ['npb', 'kbo', 'cpbl', 'mlb', 'nfl', 'nba']) {
+    assert.equal(r({ kind: 'ml', side: 'home', sport }, game(2, 2)), 'void', sport);
+    assert.equal(r({ kind: 'ml', side: 'away', sport }, game(2, 2)), 'void', sport);
+  }
+  assert.equal(r({ kind: 'ml', side: 'home', sport: 'npb' }, game(2, 3)), 'won');
+  assert.equal(r({ kind: 'ml', side: 'home', sport: 'epl' }, game(1, 1)), 'lost');
+  assert.equal(r({ kind: 'ml', side: 'draw', sport: 'epl' }, game(1, 1)), 'won');
   assert.equal(r({ kind: 'total', side: 'over', line: 5.5 }, game(3, 2)), 'lost');
   assert.equal(r({ kind: 'total', side: 'under', line: 5.5 }, game(3, 2)), 'won');
   assert.equal(r({ kind: 'total', side: 'over', line: 5 }, game(3, 2)), 'void', 'a whole line landed on: the stake back');
