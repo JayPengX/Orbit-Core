@@ -442,7 +442,10 @@ test('CPBL: a month the proxy can\'t fill comes from TheSportsDB\'s day lists on
   assert.deepEqual(games.map(g => [g.start, g.home.zh, g.away.en, g.state]), [['2026-10-02T10:35:00.000Z', '富邦悍將', 'Wei Chuan Dragons', 'pre']]);
   // An empty month from the proxy too; other leagues never.
   assert.equal((await asiaMonth(async () => ({ games: [] }), 'cpbl', '2026-10', { now, fetchJson })).length, 1);
-  assert.deepEqual(await asiaMonth(refused, 'npb', '2026-10', { now, fetchJson }), []);
+  await assert.rejects(asiaMonth(refused, 'npb', '2026-10', { now, fetchJson }), /502/);
+  // Both down (the proxy, every day on the device): an error, not 沒有比賽.
+  await assert.rejects(asiaMonth(refused, 'cpbl', '2026-10', { now, fetchJson: refused }), /502/);
+  await assert.rejects(asiaMonth(refused, 'cpbl', '2026-08', { now, fetchJson }), /502/);
   // The proxy's own list when it has one.
   assert.equal((await asiaMonth(async () => ({ games: [{ id: 'x' }] }), 'cpbl', '2026-10', { now, fetchJson })).length, 1);
 });
