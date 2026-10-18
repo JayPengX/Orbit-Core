@@ -29,5 +29,6 @@ export default {
   ECO_SESSION_MOVED: 'Quadra is open in another app.',
   ECO_HANDOFF_EXPIRED: 'This link has expired. Sign in with your Quadra Pass.',
   ECO_NOTHING_TO_SHARE: 'There is no schedule to share yet.',
-  ECO_SHARE_NOT_FOUND: 'No schedule has this key, or it has expired.'
+  ECO_SHARE_NOT_FOUND: 'No schedule has this key, or it has expired.',
+  WORKER_FAILED: 'Something went wrong. Please try again.'
 };

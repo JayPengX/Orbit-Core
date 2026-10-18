@@ -46,7 +46,7 @@ import { paceOf } from './pace.js';
 import { beat, tellOwner, systemReport, tell, billNotice, OPS_DOC } from './ops.js';
 import { applyScale } from './capacity.js';
 import { handleSports, sportsCron, useDevSettings } from './sports.js';
-import { isAllowedOrigin, corsHeaders, json, LOCAL_ORIGIN } from './http.js';
+import { isAllowedOrigin, corsHeaders, json, LOCAL_ORIGIN, bodyText } from './http.js';
 import { handleData } from './data.js';
 import { handleStock, moveBook } from './stock-fill.js';
 import { runBuilders, SLOTS as BUILD_SLOTS } from './builders/run.js';
@@ -118,12 +118,19 @@ function upstreamFailed(error, headers) {
   return json({ error: { code: 'UPSTREAM_FAILED', message: error.message || 'Upstream request failed' } }, 502, headers);
 }
 
-// request.json() resolves to any JSON value, `null` included, so a failed
-// parse needs a sentinel of its own: `(await readJsonBody(request)) ===
-// INVALID_BODY` means the caller should answer INVALID_JSON.
+// A body parses to any JSON value, `null` included, so a failed parse needs
+// a sentinel of its own: `(await readJsonBody(request)) === INVALID_BODY`
+// means the caller should answer INVALID_JSON. So does one past `max` bytes
+// (http.js bodyText): an app's save is at most a few MB, a photo import 18.
 const INVALID_BODY = Symbol('invalid body');
-function readJsonBody(request) {
-  return request.json().catch(() => INVALID_BODY);
+const BODY_MAX = 8_000_000;
+async function readJsonBody(request, max = BODY_MAX) {
+  try {
+    const text = await bodyText(request, max);
+    return text == null ? INVALID_BODY : JSON.parse(text);
+  } catch {
+    return INVALID_BODY;
+  }
 }
 
 // ---- Shared rate limiting (in memory, never KV) ----
@@ -347,7 +354,8 @@ async function geminiCheck(env, model = GEMINI_ALLOWED_MODELS[0]) {
     const res = await geminiFetch(env, geminiUrl(model, env), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'Reply with the single word OK.' }] }], generationConfig: { maxOutputTokens: 256, thinkingConfig: buildGenerationConfig(model).thinkingConfig } })
+      body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'Reply with the single word OK.' }] }], generationConfig: { maxOutputTokens: 256, thinkingConfig: buildGenerationConfig(model).thinkingConfig } }),
+      signal: AbortSignal.timeout(20_000)
     });
     const j = await res.json().catch(() => null);
     const text = (j?.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('').trim();
@@ -693,7 +701,7 @@ async function handleGeminiRequest(request, env, headers, ip, ctx, session = nul
     return errorJson('DAILY_QUOTA_EXCEEDED', 429, headers, request);
   }
 
-  const body = await readJsonBody(request);
+  const body = await readJsonBody(request, MAX_TOTAL_BASE64_LENGTH + 1_000_000);
   if (body === INVALID_BODY) return errorJson('INVALID_JSON', 400, headers, request);
   const { model } = body || {};
   if (!GEMINI_ALLOWED_MODELS.includes(model)) {
@@ -1122,129 +1130,139 @@ async function sessionOf(request, env) {
   return qt ? readToken(await tokenSecret(env), qt, 'ses') : null;
 }
 
+// Every route, by path (fetch below answers anything that throws).
+async function route(request, env, ctx, headers, origin) {
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+  const path = new URL(request.url).pathname.replace(/\/+$/, '');
+
+  // See GEMINI_BILLED_PATHS' own comment - a real, enforced reject, not
+  // just the advisory CORS headers fetch computed.
+  if (GEMINI_BILLED_PATHS.has(path) && !isAllowedOrigin(origin)) {
+    return errorJson('FORBIDDEN_ORIGIN', 403, headers, request);
+  }
+
+  // Orbit Class's AI features need a Quadra Pass session (`qt=`).
+  if (path === '/gemini' || path === '/nl-edit') {
+    const session = await sessionOf(request, env);
+    return path === '/gemini' ? handleGeminiRequest(request, env, headers, ip, ctx, session) : handleNlEditRequest(request, env, headers, ip, ctx, session);
+  }
+  if (path === '/eco') return handleEcoRequest(request, env, headers, ip, ECO_DEPS);
+  // The data proxy for Sports, Play and Securities (sports.js): its own
+  // session gate and per-app limits.
+  if (path === '/sports-proxy') return handleSports(request, env, ctx, headers, ip);
+  // Slip Tracker's narrow door (slip.js): no pass, Asian baseball only, small caps.
+  if (path === '/slip') return handleSlip(request, env, ctx, headers, ip);
+  // …and its ticket photos, read by Gemini (no pass, a few a day).
+  if (path === '/slip-scan') return handleSlipScan(request, env, headers, ip, (model, parts, schema) => proxyGeminiRequest(model, parts, schema, env, headers, ctx, 'slip-scan'));
+  // The bill's guard (guard.js), as it last read the bill: armed or not,
+  // each count's share of the $5 plan, stopped or not. No key or token.
+  if (path === '/guard' && request.method === 'GET') {
+    const g = JSON.parse((await env.RATE_LIMIT_KV?.get(GUARD_STATE).catch(() => null)) || 'null');
+    return json(g ? { at: g.at, armed: g.armed, error: g.error || null, partial: g.partial || null, cpuWay: g.cpuWay || null, stopAt: g.stopAt, share: g.share || null, stopped: g.stopped ? { at: g.stopped.at, why: g.stopped.why } : null, period: g.period || null, pace: g.pace || 0, paceTop: g.paceTop ?? null, alert: g.alert || 0, accountFound: !!g.account } : { ran: false }, 200, headers);
+  }
+  // The Pass's store (doc-store.js): each collection's count (no
+  // document), from a localhost page (the dev door).
+  if (path === '/store/check' && request.method === 'GET') {
+    if (!LOCAL_ORIGIN.test(origin) || sessionLimited(`store:${ip}`, 2)) return errorJson('FORBIDDEN_ORIGIN', 403, headers, request);
+    if (!env.STORE) return json({ d1: false }, 200, headers);
+    return json({ d1: true, collections: await DOCS.count(env) }, 200, headers);
+  }
+  // The repo's own checks (Shared-Proxy's build.yml), Bearer DATA_PUSH_SECRET:
+  // ?check=gemini (one tiny call through the relay) or system (ops.js).
+  if (path === '/ops' && request.method === 'POST') {
+    if (!env.DATA_PUSH_SECRET || request.headers.get('Authorization') !== `Bearer ${env.DATA_PUSH_SECRET}`) return errorJson('FORBIDDEN_ORIGIN', 403, headers, request);
+    const check = new URL(request.url).searchParams.get('check');
+    if (check === 'gemini') return json(await geminiCheck(env), 200, headers);
+    if (check === 'system') return json(await systemReport(env, ECO_DEPS), 200, headers);
+    return json({ error: { message: 'check=gemini|system' } }, 400, headers);
+  }
+  // A builder's job now (builders/run.js), by hand: Bearer DATA_PUSH_SECRET
+  // (Shared-Proxy's build.yml). ?job=watch|cutouts|buses, or
+  // ?only=asia|cpbl|sports|photos|winprob; &full=1 a full watch run.
+  if (path === '/data/build' && request.method === 'POST') {
+    if (!env.DATA_PUSH_SECRET || request.headers.get('Authorization') !== `Bearer ${env.DATA_PUSH_SECRET}`) return errorJson('FORBIDDEN_ORIGIN', 403, headers, request);
+    const q = new URL(request.url).searchParams;
+    const r = await runBuilders(env, { proxy: builderProxy(env), job: q.get('job') || undefined, only: q.get('only') || undefined, full: q.get('full') === '1' ? true : undefined, now: Date.now() });
+    return json(r, 200, headers);
+  }
+  // The family's data, kept in R2 (data.js): packs, the mirror, bus packs.
+  if (path.startsWith('/data/')) return handleData(request, env, ctx, headers, ip, path);
+  // The developer settings (kit/devconfig.mjs), for every app and the
+  // sports proxy: kept a minute in Cloudflare's cache (one read of the
+  // store a minute, however many ask).
+  if (path === '/config' && request.method === 'GET') {
+    const body = await devBody(env, ctx);
+    return new Response(body, { headers: { ...headers, 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=60' } });
+  }
+  if (path === '/kambi') {
+    // A Quadra Pass session only, counted per session in memory.
+    const session = await sessionOf(request, env);
+    if (!session) return errorJson('ECO_TOKEN_INVALID', 401, headers, request);
+    const deps = { ...KAMBI_DEPS, rateLimitResponse: async () => (sessionLimited(`k:${session.s}`, 60) ? errorJson('RATE_LIMITED', 429, headers, request) : null) };
+    return handleKambiRequest(request, env, headers, ip, deps);
+  }
+  // Quadra Play's slips settled here (settle.js): a Quadra Pass session of Play's.
+  // Quadra Securities' orders filled here (stock-fill.js): a Securities session.
+  if (path === '/stock') {
+    const session = await sessionOf(request, env);
+    if (session && sessionLimited(`st:${session.s}`, 30)) return errorJson('RATE_LIMITED', 429, headers, request);
+    return handleStock(request, env, headers, session, { json, errorJson, fsGet: DOCS.get, fsWrite: DOCS.write, now: () => Date.now(), read: url => stockReads(env)(url) });
+  }
+  if (path === '/play') {
+    const session = await sessionOf(request, env);
+    if (session && sessionLimited(`pl:${session.s}`, 30)) return errorJson('RATE_LIMITED', 429, headers, request);
+    // The dev door: a localhost page may have a slip's prices checked (nothing placed), 10 a minute an address.
+    const dev = !session && LOCAL_ORIGIN.test(origin);
+    if (dev && sessionLimited(`pl:dev:${ip}`, 10)) return errorJson('RATE_LIMITED', 429, headers, request);
+    return handlePlay(request, env, headers, session, { ...playDeps(env), dev });
+  }
+  // Web Push (push.js): here, where the Quadra Pass tokens can be read.
+  if (path.startsWith('/push/')) {
+    const session = await sessionOf(request, env);
+    if (session && sessionLimited(`p:${session.s}`, 30)) return errorJson('RATE_LIMITED', 429, headers, request);
+    return handlePush(request, env, headers, session, path);
+  }
+  // Orbit Weather (weather.js): a Quadra Pass session for the forecast and
+  // the place; the township list, the keys' check and the skill are open.
+  // Or a local dev page (localhost: the preview's --live, timing the
+  // forecast on real data), as Transit's: no account, 30 asks a minute an
+  // address; Google's calls stay under the day's cap either way.
+  // WEATHER_DEV = "off" (wrangler.toml [vars]) closes it.
+  if (path === '/weather' || path.startsWith('/weather/')) {
+    if (path === '/weather/skill') return new Response(JSON.stringify(await skillReport(env)), { headers: { ...headers, 'Content-Type': 'application/json' } });
+    const signed = await sessionOf(request, env);
+    const dev = !signed && env.WEATHER_DEV !== 'off' && LOCAL_ORIGIN.test(origin);
+    const session = signed || (dev ? { s: 'dev', dev: true } : null);
+    return handleWeather(request, env, headers, path, { session, ctx, limited: () => sessionLimited(dev ? `w:dev:${ip}` : `w:${session?.s}`, 30) });
+  }
+  // Orbit Transit (transit.js): a Quadra Pass session for everything but
+  // the usage page. Or a local dev page (localhost, http or https: the
+  // preview's --live, testing on today's real buses and trains): transit
+  // data only, no account, 300 asks a minute an address (a search is dozens); Google's paid asks
+  // stay under transit.js's monthly caps either way. TRANSIT_DEV = "off"
+  // (wrangler.toml [vars]) closes it.
+  if (path === '/transit' || path.startsWith('/transit/')) {
+    const signed = await sessionOf(request, env);
+    const dev = !signed && env.TRANSIT_DEV !== 'off' && LOCAL_ORIGIN.test(origin);
+    const session = signed || (dev ? { s: 'dev', dev: true } : null);
+    return handleTransit(request, env, headers, path, { session, ctx, limited: () => sessionLimited(dev ? `t:dev:${ip}` : `t:${session?.s}`, dev ? 300 : 90) });
+  }
+  return errorJson('NOT_FOUND', 404, headers, request);
+}
+
 export default {
+  // A route that throws is still answered with the CORS headers (an app sees
+  // a failure it can try again, not a blocked request), and logged.
   async fetch(request, env, ctx) {
     const origin = request.headers.get('Origin') || '';
     const headers = corsHeaders(origin, request.cf?.colo);
-
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
-
-    const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
-    const path = new URL(request.url).pathname.replace(/\/+$/, '');
-
-    // See GEMINI_BILLED_PATHS' own comment - a real, enforced reject, not
-    // just the advisory CORS headers already computed above.
-    if (GEMINI_BILLED_PATHS.has(path) && !isAllowedOrigin(origin)) {
-      return errorJson('FORBIDDEN_ORIGIN', 403, headers, request);
+    try {
+      return await route(request, env, ctx, headers, origin);
+    } catch (error) {
+      console.log('route failed', new URL(request.url).pathname, String(error?.message || error).slice(0, 200));
+      return errorJson('WORKER_FAILED', 500, headers, request);
     }
-
-    // Orbit Class's AI features need a Quadra Pass session (`qt=`).
-    if (path === '/gemini' || path === '/nl-edit') {
-      const session = await sessionOf(request, env);
-      return path === '/gemini' ? handleGeminiRequest(request, env, headers, ip, ctx, session) : handleNlEditRequest(request, env, headers, ip, ctx, session);
-    }
-    if (path === '/eco') return handleEcoRequest(request, env, headers, ip, ECO_DEPS);
-    // The data proxy for Sports, Play and Securities (sports.js): its own
-    // session gate and per-app limits.
-    if (path === '/sports-proxy') return handleSports(request, env, ctx, headers, ip);
-    // Slip Tracker's narrow door (slip.js): no pass, Asian baseball only, small caps.
-    if (path === '/slip') return handleSlip(request, env, ctx, headers, ip);
-    // …and its ticket photos, read by Gemini (no pass, a few a day).
-    if (path === '/slip-scan') return handleSlipScan(request, env, headers, ip, (model, parts, schema) => proxyGeminiRequest(model, parts, schema, env, headers, ctx, 'slip-scan'));
-    // The bill's guard (guard.js), as it last read the bill: armed or not,
-    // each count's share of the $5 plan, stopped or not. No key or token.
-    if (path === '/guard' && request.method === 'GET') {
-      const g = JSON.parse((await env.RATE_LIMIT_KV?.get(GUARD_STATE).catch(() => null)) || 'null');
-      return json(g ? { at: g.at, armed: g.armed, error: g.error || null, partial: g.partial || null, cpuWay: g.cpuWay || null, stopAt: g.stopAt, share: g.share || null, stopped: g.stopped ? { at: g.stopped.at, why: g.stopped.why } : null, period: g.period || null, pace: g.pace || 0, paceTop: g.paceTop ?? null, alert: g.alert || 0, accountFound: !!g.account } : { ran: false }, 200, headers);
-    }
-    // The Pass's store (doc-store.js): each collection's count (no
-    // document), from a localhost page (the dev door).
-    if (path === '/store/check' && request.method === 'GET') {
-      if (!LOCAL_ORIGIN.test(origin) || sessionLimited(`store:${ip}`, 2)) return errorJson('FORBIDDEN_ORIGIN', 403, headers, request);
-      if (!env.STORE) return json({ d1: false }, 200, headers);
-      return json({ d1: true, collections: await DOCS.count(env) }, 200, headers);
-    }
-    // The repo's own checks (Shared-Proxy's build.yml), Bearer DATA_PUSH_SECRET:
-    // ?check=gemini (one tiny call through the relay) or system (ops.js).
-    if (path === '/ops' && request.method === 'POST') {
-      if (!env.DATA_PUSH_SECRET || request.headers.get('Authorization') !== `Bearer ${env.DATA_PUSH_SECRET}`) return errorJson('FORBIDDEN_ORIGIN', 403, headers, request);
-      const check = new URL(request.url).searchParams.get('check');
-      if (check === 'gemini') return json(await geminiCheck(env), 200, headers);
-      if (check === 'system') return json(await systemReport(env, ECO_DEPS), 200, headers);
-      return json({ error: { message: 'check=gemini|system' } }, 400, headers);
-    }
-    // A builder's job now (builders/run.js), by hand: Bearer DATA_PUSH_SECRET
-    // (Shared-Proxy's build.yml). ?job=watch|cutouts|buses, or
-    // ?only=asia|cpbl|sports|photos|winprob; &full=1 a full watch run.
-    if (path === '/data/build' && request.method === 'POST') {
-      if (!env.DATA_PUSH_SECRET || request.headers.get('Authorization') !== `Bearer ${env.DATA_PUSH_SECRET}`) return errorJson('FORBIDDEN_ORIGIN', 403, headers, request);
-      const q = new URL(request.url).searchParams;
-      const r = await runBuilders(env, { proxy: builderProxy(env), job: q.get('job') || undefined, only: q.get('only') || undefined, full: q.get('full') === '1' ? true : undefined, now: Date.now() });
-      return json(r, 200, headers);
-    }
-    // The family's data, kept in R2 (data.js): packs, the mirror, bus packs.
-    if (path.startsWith('/data/')) return handleData(request, env, ctx, headers, ip, path);
-    // The developer settings (kit/devconfig.mjs), for every app and the
-    // sports proxy: kept a minute in Cloudflare's cache (one read of the
-    // store a minute, however many ask).
-    if (path === '/config' && request.method === 'GET') {
-      const body = await devBody(env, ctx);
-      return new Response(body, { headers: { ...headers, 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=60' } });
-    }
-    if (path === '/kambi') {
-      // A Quadra Pass session only, counted per session in memory.
-      const session = await sessionOf(request, env);
-      if (!session) return errorJson('ECO_TOKEN_INVALID', 401, headers, request);
-      const deps = { ...KAMBI_DEPS, rateLimitResponse: async () => (sessionLimited(`k:${session.s}`, 60) ? errorJson('RATE_LIMITED', 429, headers, request) : null) };
-      return handleKambiRequest(request, env, headers, ip, deps);
-    }
-    // Quadra Play's slips settled here (settle.js): a Quadra Pass session of Play's.
-    // Quadra Securities' orders filled here (stock-fill.js): a Securities session.
-    if (path === '/stock') {
-      const session = await sessionOf(request, env);
-      if (session && sessionLimited(`st:${session.s}`, 30)) return errorJson('RATE_LIMITED', 429, headers, request);
-      return handleStock(request, env, headers, session, { json, errorJson, fsGet: DOCS.get, fsWrite: DOCS.write, now: () => Date.now(), read: url => stockReads(env)(url) });
-    }
-    if (path === '/play') {
-      const session = await sessionOf(request, env);
-      if (session && sessionLimited(`pl:${session.s}`, 30)) return errorJson('RATE_LIMITED', 429, headers, request);
-      // The dev door: a localhost page may have a slip's prices checked (nothing placed), 10 a minute an address.
-      const dev = !session && LOCAL_ORIGIN.test(origin);
-      if (dev && sessionLimited(`pl:dev:${ip}`, 10)) return errorJson('RATE_LIMITED', 429, headers, request);
-      return handlePlay(request, env, headers, session, { ...playDeps(env), dev });
-    }
-    // Web Push (push.js): here, where the Quadra Pass tokens can be read.
-    if (path.startsWith('/push/')) {
-      const session = await sessionOf(request, env);
-      if (session && sessionLimited(`p:${session.s}`, 30)) return errorJson('RATE_LIMITED', 429, headers, request);
-      return handlePush(request, env, headers, session, path);
-    }
-    // Orbit Weather (weather.js): a Quadra Pass session for the forecast and
-    // the place; the township list, the keys' check and the skill are open.
-    // Or a local dev page (localhost: the preview's --live, timing the
-    // forecast on real data), as Transit's: no account, 30 asks a minute an
-    // address; Google's calls stay under the day's cap either way.
-    // WEATHER_DEV = "off" (wrangler.toml [vars]) closes it.
-    if (path === '/weather' || path.startsWith('/weather/')) {
-      if (path === '/weather/skill') return new Response(JSON.stringify(await skillReport(env)), { headers: { ...headers, 'Content-Type': 'application/json' } });
-      const signed = await sessionOf(request, env);
-      const dev = !signed && env.WEATHER_DEV !== 'off' && LOCAL_ORIGIN.test(origin);
-      const session = signed || (dev ? { s: 'dev', dev: true } : null);
-      return handleWeather(request, env, headers, path, { session, ctx, limited: () => sessionLimited(dev ? `w:dev:${ip}` : `w:${session?.s}`, 30) });
-    }
-    // Orbit Transit (transit.js): a Quadra Pass session for everything but
-    // the usage page. Or a local dev page (localhost, http or https: the
-    // preview's --live, testing on today's real buses and trains): transit
-    // data only, no account, 300 asks a minute an address (a search is dozens); Google's paid asks
-    // stay under transit.js's monthly caps either way. TRANSIT_DEV = "off"
-    // (wrangler.toml [vars]) closes it.
-    if (path === '/transit' || path.startsWith('/transit/')) {
-      const signed = await sessionOf(request, env);
-      const dev = !signed && env.TRANSIT_DEV !== 'off' && LOCAL_ORIGIN.test(origin);
-      const session = signed || (dev ? { s: 'dev', dev: true } : null);
-      return handleTransit(request, env, headers, path, { session, ctx, limited: () => sessionLimited(dev ? `t:dev:${ip}` : `t:${session?.s}`, dev ? 300 : 90) });
-    }
-    return errorJson('NOT_FOUND', 404, headers, request);
   },
 
   // The cron (wrangler.toml [triggers]): the notices that are due (push.js),
