@@ -247,7 +247,7 @@ export const HELP = {
         '投注單不是分頁：有選項時，分頁列上方會出現投注單列（幾個選項、金額、最多拿回多少），點開確認送出。'
       ]],
       ['bet', '怎麼下注', [
-        '投注單照運彩的規則：一關（每個選項各一張，預設）、全部過關、過關組合（過 2 關…全過）。最多 12 個選項，串關同一場只能選一個；每張 NT$100–100,000，彩金上限 NT$2,000 萬，每個組合獎金超過 NT$5,000 扣 20% 所得稅和 0.4% 印花稅。',
+        '投注單照運彩的規則：一關（每個選項各一張，預設）、全部過關、過關組合（過 2 關…全過）。最多 12 個選項，串關同一場只能選一個；每張 NT$100–100,000，彩金上限 NT$2,000 萬。照運彩的規定，組合裡每注 NT$10 的獎金超過 NT$5,000（賠率超過 500 倍）才扣 20% 所得稅；會員帳戶免 0.4% 印花稅。',
         '送出前會告訴你花多少、最多拿回多少；照當下的賠率成交，賠率變了會停下來說。場中投注等 5 秒，用那時的賠率再確認一次，跟真的運彩一樣。',
         '🔒 是不開放的選項；「限2關」「限3關」只能放在夠多場的串關裡。',
         '比賽結束由伺服器自動結算並通知你，App 關著也一樣；延期或取消的比賽算賠率 1.00，開賽 3 天後還沒結果的算無效。'
@@ -280,7 +280,7 @@ export const HELP = {
         'The slip isn’t a tab: with picks on it, a bar above the tab bar shows how many, the stake and the most it pays; tap it to confirm and place.'
       ]],
       ['bet', 'Placing a bet', [
-        'The slip follows the sports lottery: singles (one ticket a pick, the default), an all-in parlay, or systems (2 of N … all). Up to 12 picks, one per game in a parlay; NT$100–100,000 a ticket, a NT$20 million cap, and 20% income tax plus 0.4% stamp duty on any combination paying over NT$5,000.',
+        'The slip follows the sports lottery: singles (one ticket a pick, the default), an all-in parlay, or systems (2 of N … all). Up to 12 picks, one per game in a parlay; NT$100–100,000 a ticket, a NT$20 million cap. As the sports lottery’s rules say, 20% income tax is withheld only from a combination whose NT$10 unit wins over NT$5,000 (odds over 500); a member account pays no 0.4% stamp duty.',
         'Before it’s placed you’re told the cost and the most it pays; it’s bought at the odds shown, and a price that moved stops it and says so. A live bet waits 5 seconds and is priced again then, as at a real sportsbook.',
         '🔒 marks a market that isn’t open; 限2關 and 限3關 picks go only in a parlay of that many games.',
         'The server settles each slip when its games are over and tells you, with the app closed too; a postponed or cancelled game counts at 1.00, and one still without a result three days after its start is void.'
@@ -534,7 +534,7 @@ export const HELP = {
       ]],
       ['math', '機率怎麼算', [
         '每場比賽的比分模型，用 DraftKings 的收盤盤口（經 ESPN，抽水拿掉）去配：足球和冰球用 Poisson 進球，其他用分差和總分的常態分布。比賽中把剩下的時間按比例算，加上現在的比分。沒有盤口的比賽，用注單賠率扣掉運彩量到的抽成估計（標「估」）。',
-        '派彩照台灣運彩的規則：每個組合超過 NT$5,000 預扣 20.4%；全部打平或比賽取消算 1.00。'
+        '派彩照台灣運彩的規則：組合裡每注 NT$10 的獎金超過 NT$5,000（賠率超過 500 倍）才預扣 20% 所得稅，門市買的再扣 0.4% 印花稅（會員帳戶免）；全部打平或比賽取消算 1.00。'
       ]],
       ['money', '錢怎麼算', [
         'Orbit Slips 不賣彩券，也不碰錢：只是幫你看已經買的注單。帳戶、Quadra Plus 和錢的真相，都在右上角的 Quadra Pass 裡。'
@@ -554,7 +554,7 @@ export const HELP = {
       ]],
       ['math', 'How the chances are worked out', [
         'Each game’s score model is fitted to DraftKings’ closing lines (through ESPN, the margin taken out): Poisson goals for soccer and hockey, a normal margin and total for the rest. In play, the rest of the game is scaled to the time left, plus the score. A game with no market uses the ticket’s odds less the lottery’s measured cut (marked est.).',
-        'Payouts follow Taiwan Sports Lottery’s rules: 20.4% withheld on any combination over NT$5,000; a push or a game called off counts 1.00.'
+        'Payouts follow Taiwan Sports Lottery’s rules: 20% income tax only on a combination whose NT$10 unit wins over NT$5,000 (odds over 500), plus 0.4% stamp duty on a shop ticket (none for a member account); a push or a game called off counts 1.00.'
       ]],
       ['money', 'Money', [
         'Orbit Slips sells nothing and moves no money: it only follows tickets you’ve bought. The account, Quadra Plus and the truth about the money are in the Quadra Pass, top right.'
