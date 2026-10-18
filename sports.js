@@ -937,7 +937,7 @@ async function fetchUpstream(upstreamUrl, trim) {
       ? await fetchYahoo(upstreamUrl)
       : upstreamUrl.hostname === 'clients5.google.com'
         ? await translateUpstream(upstreamUrl)
-        : await fetch(upstreamUrl.toString(), {
+        : await fetchAllowed(upstreamUrl, {
           // YouTube in English, past its cookie notice, as a browser sees it.
           headers: upstreamUrl.hostname === YT_HOST ? { 'User-Agent': BROWSER_UA, 'Accept-Language': 'en-US,en;q=0.9', Cookie: 'SOCS=CAI; CONSENT=YES+' } : { 'User-Agent': SPORTS_PROXY_FETCH_USER_AGENT },
           signal: AbortSignal.timeout(SPORTS_PROXY_UPSTREAM_TIMEOUT_MS)
@@ -1078,6 +1078,22 @@ function trimFor(trimParam, upstreamUrl) {
   if (trimParam === TRIM_ESPN_INJURIES && upstreamUrl.hostname === 'site.api.espn.com' && upstreamUrl.pathname.endsWith('/injuries')) return TRIM_ESPN_INJURIES;
   if (trimParam === TRIM_KAMBI_OFFERS && upstreamUrl.hostname === 'eu-offering-api.kambicdn.com' && upstreamUrl.pathname.includes('/betoffer/')) return TRIM_KAMBI_OFFERS;
   return null;
+}
+
+// A redirect is followed only to an address the proxy would take itself
+// (parseTarget) or the same site's (its CDN), three at most: an open
+// redirect on a listed site can't send the proxy, and its cache, anywhere
+// else. Any other is a 502.
+const siteOf = host => host.split('.').slice(/\.(com|org|gov|edu|net)\.\w\w$/.test(host) ? -3 : -2).join('.');
+export async function fetchAllowed(url, init, fetchFn = fetch) {
+  for (let hops = 0; ; hops++) {
+    const res = await fetchFn(url.toString(), { ...init, redirect: 'manual' });
+    if (res.status < 300 || res.status > 399 || !res.headers.get('Location')) return res;
+    const to = new URL(res.headers.get('Location'), url);
+    const next = hops >= 3 ? null : parseTarget(to.toString()) || (to.protocol === 'https:' && siteOf(to.hostname) === siteOf(url.hostname) ? to : null);
+    if (!next) return new Response('', { status: 502 });
+    url = next;
+  }
 }
 
 function parseTarget(target) {
