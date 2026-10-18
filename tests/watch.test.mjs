@@ -238,3 +238,29 @@ test('win probability on R2: a game kept is never read again, Polymarket only th
   assert.ok(!asked.some(u => u.includes('polymarket.com')), 'Polymarket never read whole here');
   assert.deepEqual((await store.json('winprob/epl/2026-09.json')).games.k1.none, 'polymarket');
 });
+
+test("an hourly run keeps a game found days ago in the recent pack for its ten days (NLCS Game 4's video was a search two days on)", async () => {
+  const { runWatch } = await import('../builders/watch.js');
+  const { r2Store, memoryBucket } = await import('../builders/store.js');
+  const now = Date.parse('2026-10-18T04:00:00Z');
+  const at = Date.parse('2026-10-16T00:00:00Z');
+  const old = Date.parse('2026-10-06T00:00:00Z');
+  const store = r2Store(
+    memoryBucket({
+      'sports/watch/index.json': { checked: 3, leagues: { mlb: { months: ['2026-10'] } } },
+      'sports/watch/_pending.json': { games: [] },
+      'sports/watch.json': { games: { 'mlb:33:': { hl: { id: 'ZVjnWhgxzjM' }, at }, 'mlb:9:': { hl: { id: 'gone' }, at: old } } }
+    })
+  );
+  const get = async () => new Response('', { status: 404 });
+  const real = globalThis.fetch;
+  globalThis.fetch = get;
+  try {
+    await runWatch({ store, proxy: async () => null, get, now, until: now, sleep: async () => {} });
+  } finally {
+    globalThis.fetch = real;
+  }
+  const pack = await store.json('sports/watch.json');
+  assert.deepEqual(pack.games['mlb:33:'], { hl: { id: 'ZVjnWhgxzjM' }, at });
+  assert.equal(pack.games['mlb:9:'], undefined, 'past ten days: the archive has it');
+});

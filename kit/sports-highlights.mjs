@@ -300,8 +300,14 @@ const months = new Map();
 export const setWatchMonth = (path, p) => {
   if (p?.games) months.set(path, p.games);
 };
-// Whether a game's links could be in its month's file and it isn't read yet.
-export const watchMonthWanted = (e, now = Date.now()) => Boolean(e?.start) && now - Date.parse(e.start) > (WATCH_DAYS - 1) * 86_400_000 && !months.has(watchMonthPath(e));
+// Whether a game's links could be in its month's file and it isn't read yet:
+// past ten days, or past a day with the recent pack read and the game not
+// in it (found in an earlier run, archived: NLCS Game 4's, two days on, 2026-10-18).
+export const watchMonthWanted = (e, now = Date.now()) => {
+  if (!e?.start || months.has(watchMonthPath(e))) return false;
+  const age = now - Date.parse(e.start);
+  return age > (WATCH_DAYS - 1) * 86_400_000 || (age > 86_400_000 && Boolean(pack) && !pack.games?.[watchKey(e)]?.hl);
+};
 // Its month's file read (`readPack`: the kit's packJson); never throws. A
 // failed read isn't kept (asked again next time), only the file as it is.
 export async function loadWatchMonth(e, readPack, now = Date.now()) {

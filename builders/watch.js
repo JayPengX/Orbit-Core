@@ -341,6 +341,18 @@ export async function runWatch({ store, proxy, get = fetch, now = Date.now(), un
   if (full) for (const [key, { months = [] } = {}] of Object.entries(index?.leagues || {})) for (const m of months) await loadMonth(key, m);
   else for (const e of recent) await loadMonth(e.league, monthOf(Date.parse(e.start)));
   const stored = e => archive.get(e.league)?.get(HL.watchKey(e));
+  // Each recent game what the archive has of it (found in an earlier run,
+  // the recent pack since rebuilt without it: an hourly run reads only two
+  // US days, and NLCS Game 4's video, in the archive, was a search on the
+  // phone two days on, 2026-10-18); every entry dated, so the next runs
+  // carry it for its ten days whatever they read.
+  for (const e of recent) {
+    const k = HL.watchKey(e);
+    const a = stored(e);
+    if (a?.hl || has(a)) out[k] = { ...(a.hl ? { hl: a.hl } : {}), ...(has(a) ? { elta: a.elta } : {}), ...out[k] };
+    if (out[k]) out[k].at = Date.parse(e.start);
+  }
+  for (const [k, v] of Object.entries(old)) if (!out[k] && v.at && now - v.at < KEEP && v.at < now) out[k] = v;
   const touched = new Set();
   const keep = (e, v) => {
     if (!archive.has(e.league)) archive.set(e.league, new Map());
@@ -360,7 +372,7 @@ export async function runWatch({ store, proxy, get = fetch, now = Date.now(), un
   for (const e of todo) {
     try {
       const v = await HL.findHighlights(e, read, now);
-      if (v) (out[HL.watchKey(e)] = { ...out[HL.watchKey(e)], hl: v }), found++;
+      if (v) (out[HL.watchKey(e)] = { ...out[HL.watchKey(e)], hl: v, at: Date.parse(e.start) }), found++;
     } catch {
       failed++;
       await sleep(5000);
@@ -420,7 +432,7 @@ export async function runWatch({ store, proxy, get = fetch, now = Date.now(), un
     }
     elta++;
     if (out[k]) out[k].elta = hit;
-    else if (now - Date.parse(e.start) < KEEP) out[k] = { elta: hit };
+    else if (now - Date.parse(e.start) < KEEP) out[k] = { elta: hit, at: Date.parse(e.start) };
     keep(e, { elta: hit });
   }
 
