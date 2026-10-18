@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   tdxRequest, tdxGet, SLOW_MS, tdxAccess, resetTdxToken, resetPace, resetTurns, resetMeter, spend, usage, flushUse, billingMonth, CAPS,
-  parseGoogleRoutes, parseAutocomplete, nearFirst, parseNominatim, parsePlace, parseTdxRoutes, planSig, googleRouteBody, handleTransit, GOOGLE_ROUTE_FIELDS
+  parseGoogleRoutes, parseAutocomplete, nearFirst, parseNominatim, parsePlace, parseTdxRoutes, planSig, googleRouteBody, handleTransit, GOOGLE_ROUTE_FIELDS, tdxPoints, tdxGuard
 } from '../transit.js';
 
 const NOW = Date.parse('2026-10-03T01:00:00Z');
@@ -609,4 +609,71 @@ test("walks by Google's streets: five in one matrix call, each kept a month; wit
   assert.equal(matrix, 2);
   // Outside Taiwan, or none: refused.
   assert.equal((await handleTransit(new Request('https://w/transit/walk?from=35,139&to=24.8,120.9'), env, {}, '/transit/walk', { session: { s: 'S' }, fetchFn, now: NOW, cache })).status, 400);
+});
+
+test("a sample spends a real ask: none without a session or past the limit (a stranger can't use up the month's Google routes or TDX's points)", async () => {
+  fresh();
+  const env = { GOOGLE_MAPS_KEY: 'GK', TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 's', RATE_LIMIT_KV: memKv() };
+  let asked = 0;
+  const fetchFn = async url => (url.includes('token') ? json({ access_token: 'T', expires_in: 86400 }) : (asked++, json({ routes: [], data: { routes: [] } })));
+  for (const [session, limited] of [[null, () => false], [{ s: 'u' }, () => true]])
+    for (const q of ['sample=google-route&fresh=1', 'sample=maas&fresh=1', 'sample=google-route&transit=7']) {
+      const res = await handleTransit(new Request(`https://w/transit/status?${q}`), env, {}, '/transit/status', { session, limited, fetchFn, cache: memCache(), now: NOW });
+      assert.ok(res.status === 401 || res.status === 429);
+    }
+  assert.equal(asked, 0);
+  assert.equal((await usage(env, NOW)).routes || 0, 0);
+  // The usage page itself stays open.
+  assert.equal((await handleTransit(new Request('https://w/transit/status'), env, {}, '/transit/status', { now: NOW })).status, 200);
+});
+
+test('anything a transit ask throws is its failure in JSON with the CORS headers, never the Worker crashing: a time no Date holds, a place Google drops or answers in HTML', async () => {
+  fresh();
+  const env = { GOOGLE_MAPS_KEY: 'GK', TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 's', RATE_LIMIT_KV: memKv() };
+  const headers = { 'Access-Control-Allow-Origin': 'https://jaypengx.github.io' };
+  const ok = async url => (url.includes('token') ? json({ access_token: 'T', expires_in: 86400 }) : json({}));
+  const route = await handleTransit(new Request('https://w/transit/route?from=24.8,120.97&to=25.04,121.5&at=1e17'), env, headers, '/transit/route', { session: { s: 'u' }, fetchFn: ok, cache: memCache(), now: NOW });
+  assert.equal(route.status, 200);
+  assert.ok((await route.json()).at <= NOW + 61 * 86_400_000);
+  for (const fetchFn of [async () => { throw new TypeError('Network connection lost'); }, async () => new Response('<html>oops</html>', { status: 200 })]) {
+    const res = await handleTransit(new Request('https://w/transit/place?id=ChIJabcdefghijk'), env, headers, '/transit/place', { session: { s: 'u' }, fetchFn, cache: memCache(), now: NOW });
+    assert.equal(res.status, 502);
+    assert.equal(res.headers.get('Access-Control-Allow-Origin'), headers['Access-Control-Allow-Origin']);
+    assert.equal((await res.json()).code, 'PLACE_FAILED');
+  }
+});
+
+test("a route answer with a planner that failed isn't kept: the YouBike plans are back on the next ask, not missing for 5 minutes", async () => {
+  fresh();
+  const env = { GOOGLE_MAPS_KEY: 'GK', TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 's', RATE_LIMIT_KV: memKv() };
+  const cache = memCache();
+  let bikeUp = false;
+  const plan = name => ({ data: { routes: [{ sections: [{ type: 'transit', transport: { mode: 'bus', name }, departure: { time: '2026-10-03T09:02:00', place: { name: 'C' } }, arrival: { time: '2026-10-03T09:10:00', place: { name: 'D' } } }] }] } });
+  const fetchFn = async url => {
+    if (url.includes('token')) return json({ access_token: 'T', expires_in: 86400 });
+    if (url.includes('first_mile_mode=3')) return bikeUp ? json(plan('bike')) : json({}, 429);
+    return json(plan('walk'));
+  };
+  const ask = async () => (await handleTransit(new Request('https://w/transit/route?from=24.8,120.97&to=25.04,121.5&src=tdx'), env, {}, '/transit/route', { session: { s: 'u' }, fetchFn, cache, now: NOW })).json();
+  assert.equal((await ask()).sources.tdxBike, 'http 429');
+  bikeUp = true;
+  const again = await ask();
+  assert.ok(!again.cached);
+  assert.deepEqual(again.plans.map(p => p.legs[0].name).sort(), ['bike', 'walk']);
+  assert.ok((await ask()).cached, 'a whole answer is kept');
+});
+
+test("TDX's month is Taiwan's: the first hours of a Taiwan month don't count last month's points (the guard stayed at 30x till 16:00 on the 1st)", () => {
+  const used = {};
+  for (let d = 1; d <= 31; d++) used[`tdx:a:2026-10-${String(d).padStart(2, '0')}`] = 1239;
+  used.tdx = Object.values(used).reduce((a, b) => a + b, 0);
+  const now = Date.parse('2026-10-31T17:00:00Z'); // 2026-11-01 01:00 in Taiwan, still October's meter
+  assert.equal(tdxPoints(used, now).month, 0);
+  assert.equal(tdxGuard(tdxPoints(used, now), now).why, '');
+  assert.ok(tdxPoints(used, Date.parse('2026-10-31T03:00:00Z')).month > 190, 'October itself still counts');
+});
+
+test('the TDX allowlist takes no "." or ".." (read a level up, past the rule)', () => {
+  for (const p of ['basic/v2/Bus/Route/InterCity/..', 'basic/v2/Bus/Schedule/City/Taipei/%2E%2E', 'basic/v2/Bus/Route/City/./Hsinchu']) assert.equal(tdxRequest(p), null, p);
+  assert.ok(tdxRequest('basic/v2/Bus/Route/City/Hsinchu'));
 });

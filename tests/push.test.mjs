@@ -274,3 +274,56 @@ test("each list's due time is its own: two phones scheduling at once both keep t
   assert.deepEqual(sent.sort(), ['https://push.example/a', 'https://push.example/b', 'https://push.example/c']);
   assert.equal(kv.m.has('push:due'), false);
 });
+
+test("a bus alert is told once: its list sent again by the app (opened from the notice) isn't told again", async () => {
+  const kv = memoryKv();
+  const env = { RATE_LIMIT_KV: kv, TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 's', TDX_PER_MIN: '100' };
+  const session = { d: 'acct', a: 'transit' };
+  const post = (p, body) => handlePush(new Request(`https://w${p}`, { method: 'POST', body: JSON.stringify(body) }), env, {}, session, p);
+  await post('/push/subscribe', { sub: { endpoint: 'https://push.example/t', keys: { p256dh: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4', auth: 'BTBZMqHH6r4Tts7J_aSIgg' } } });
+  const now = Date.now();
+  const bus = { path: 'advanced/v2/Bus/EstimatedTimeOfArrival/City/Hsinchu/PassThrough/Station/1234', route: 'HSZ0058', dir: 0, min: 5 };
+  const item = { at: now, until: now + 3_600_000, title: '5608 快到了', body: '{result}', tag: 'bus:abc', kind: 'bus', check: { bus } };
+  await post('/push/schedule', { items: [item] });
+  let sec = 600;
+  let pushes = 0;
+  const was = globalThis.fetch;
+  globalThis.fetch = async url => {
+    if (String(url).includes('openid-connect/token')) return Response.json({ access_token: 'T', expires_in: 86400 });
+    if (String(url).startsWith('https://tdx.')) return Response.json([{ RouteUID: 'HSZ0058', Direction: 0, EstimateTime: sec, StopStatus: 0 }]);
+    pushes++;
+    return new Response(null, { status: 201 });
+  };
+  try {
+    await sendDue(env, now); // 10 minutes off: moved on a run
+    sec = 200;
+    await sendDue(env, now + 120_000);
+    assert.equal(pushes, 1);
+    await post('/push/schedule', { items: [item] });
+    await sendDue(env, now + 240_000);
+    assert.equal(pushes, 1);
+  } finally {
+    globalThis.fetch = was;
+  }
+});
+
+test("a bus alert isn't told from a copy kept while TDX fails (the bus has gone by): it waits for a fresh one", async () => {
+  const path = 'advanced/v2/Bus/EstimatedTimeOfArrival/City/Hsinchu/PassThrough/Station/1234';
+  const now = Date.now();
+  const nineAgo = now - 9 * 60_000;
+  const store = new Map();
+  const cache = {
+    match: async req => (store.has(req.url) ? new Response(store.get(req.url).body, { headers: store.get(req.url).headers }) : undefined),
+    put: async (req, res) => void store.set(req.url, { body: await res.text(), headers: Object.fromEntries(res.headers) })
+  };
+  await cache.put(new Request(`https://transit-cache.quadra/${path}?$format=JSON`), new Response(JSON.stringify([{ RouteUID: 'HSZ0058', Direction: 0, EstimateTime: 120, StopStatus: 0, DataTime: new Date(nineAgo).toISOString() }]), { headers: { 'X-Fetched-At': String(nineAgo) } }));
+  const [wasFetch, wasCaches] = [globalThis.fetch, globalThis.caches];
+  globalThis.caches = { default: cache };
+  globalThis.fetch = async url => (String(url).includes('token') ? Response.json({ access_token: 'T', expires_in: 86400 }) : new Response('err', { status: 503 }));
+  try {
+    assert.equal(await runCheck({ bus: { path, route: 'HSZ0058', dir: 0, min: 5 } }, 'zh', { RATE_LIMIT_KV: memoryKv(), TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 's', TDX_PER_MIN: '100' }), null);
+  } finally {
+    globalThis.fetch = wasFetch;
+    globalThis.caches = wasCaches;
+  }
+});
