@@ -77,7 +77,7 @@ export const ECO_APPS = {
   match: { collection: 'match-find-settings', maxPayload: 100_000 },
   orbit: { collection: 'orbit-quadra', maxPayload: 200_000 },
   weather: { collection: 'orbit-weather', maxPayload: 50_000 },
-  transit: { collection: 'orbit-transit', maxPayload: 100_000 },
+  transit: { collection: 'orbit-transit', maxPayload: 200_000 },
   slip: { collection: 'orbit-slip', maxPayload: 300_000 },
   beats: { collection: 'orbit-beats', maxPayload: 50_000 }
 };

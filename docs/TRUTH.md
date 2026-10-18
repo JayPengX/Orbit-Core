@@ -915,3 +915,9 @@ What was decided, so it isn't undone. Newer calls win.
   saved tickets and kits stay: the same origin. No gaps the owner has to
   find: every new feature tried on real data at 375 px before it's called
   done.
+- 2026-10-18: a Transit ride over 頭前溪 after a bus is recommended when
+  nothing else is close (竹東南 → 成功九街: 5608 and a 20′ ride, half an
+  hour first); a bus then a bus, hidden itself, never hides it. Navigation:
+  looking ahead on a bus keeps following it, and back on the ride with a
+  buzz when your stop is next. Transit's data packs move onto the kit's
+  loader (one download again per phone, once).
