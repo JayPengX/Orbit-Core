@@ -865,7 +865,12 @@ if (typeof globalThis !== 'undefined') globalThis.quadraHaptic = haptic;
 export function closeSheet(d, speed = 0) {
   if (!d?.open || d.classList.contains('q-leaving')) return;
   if ((innerWidth >= 720 && !(speed > 0)) || globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return d.close();
-  const rest = Math.max(1, innerHeight - d.getBoundingClientRect().top);
+  // Where the finger left it (a swipe's translateY) and how far is left to go: the
+  // way to the foot measured from its place at rest, as the transform is (from where
+  // it was dragged to, it stopped that far short of the foot, then vanished: the owner, 2026-10-18).
+  const now = new DOMMatrixReadOnly(getComputedStyle(d).transform === 'none' ? undefined : getComputedStyle(d).transform).m42 || 0;
+  const foot = Math.ceil(innerHeight - (d.getBoundingClientRect().top - now) + 40);
+  const rest = Math.max(1, foot - now);
   const ms = speed > 0 ? Math.round(Math.min(500, Math.max(380, 380 + rest / 8 - speed * 60))) : 450;
   // The curve starts as fast as the finger moved (its first handle's slope is
   // the speed, in the curve's units); without a finger, an even start (iOS's
@@ -877,7 +882,7 @@ export function closeSheet(d, speed = 0) {
   d.style.setProperty('--q-leave-ease', ease);
   d.classList.add('q-leaving');
   // Past the foot of the screen (a wide screen's card sits in its middle: 110% of its own height left it in view).
-  d.style.transform = `translateY(${Math.ceil(rest + 40)}px)`;
+  d.style.transform = `translateY(${foot}px)`;
   let done = false;
   const shut = () => {
     if (done) return;
