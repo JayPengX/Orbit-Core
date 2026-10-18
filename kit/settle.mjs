@@ -152,6 +152,17 @@ export function legResult(leg, outcome) {
     case 'dc':
       // Double chance: either of two results.
       return win(leg.side.split('|').includes(away > home ? 'away' : away === home ? 'draw' : 'home'));
+    case 'hrunline': {
+      // 半場讓分: the first half's score (two quarters) with the pick's line.
+      if (!a.length && !h.length) return null;
+      const pa = firstPeriods(a, 2);
+      const ph = firstPeriods(h, 2);
+      return push(leg.side === 'away' ? pa + leg.line - ph : ph + leg.line - pa);
+    }
+    case 'tdtotal':
+      // 達陣數大小: the game's touchdowns, from its scoring plays.
+      if (!Number.isFinite(outcome.touchdowns)) return null;
+      return push(leg.side === 'over' ? outcome.touchdowns - leg.line : leg.line - outcome.touchdowns);
     case 'htotal': {
       // First-half total: one soccer half, two quarters.
       if (!a.length && !h.length) return null;
@@ -405,6 +416,11 @@ export function runOrder(plays) {
     for (; home < h; home++) order.push('home');
   }
   return order;
+}
+
+// A football game's touchdowns from ESPN's scoring plays (overtime's too).
+export function touchdowns(plays) {
+  return (plays || []).filter(p => p?.type?.abbreviation === 'TD' || /touchdown/i.test(p?.type?.text || '')).length;
 }
 
 // Every game on an ESPN scoreboard with how it stands: 'final', 'void'
@@ -757,10 +773,13 @@ export async function readOutcomes(legs, { read, keptKambi = async () => null, n
       if (!game) return;
       // 第N分 needs the order the runs came in: the game's scoring plays;
       // a player's pick their box score; corners the teams' stats.
-      if ((leg.kind === 'nextrun' || leg.kind === 'prop' || leg.kind === 'corners') && game.status === 'final') {
+      if ((leg.kind === 'nextrun' || leg.kind === 'prop' || leg.kind === 'corners' || leg.kind === 'tdtotal') && game.status === 'final') {
         const summary = await page(`${ESPN}/${path}/summary?event=${game.espnId}`);
         if (!summary) return;
         if (leg.kind === 'nextrun') out.set(leg.id, { ...game, runOrder: runOrder(summary.plays) });
+        else if (leg.kind === 'tdtotal') {
+          if (Array.isArray(summary.scoringPlays)) out.set(leg.id, { ...game, touchdowns: touchdowns(summary.scoringPlays) });
+        }
         else if (leg.kind === 'prop') {
           // Kambi settles players' soccer markets on 90 minutes; ESPN's
           // numbers count extra time: a tie that went on is void.
