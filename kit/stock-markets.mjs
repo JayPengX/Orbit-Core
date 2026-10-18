@@ -57,6 +57,7 @@ export function normalizeCurrency(code) {
 // first moment (Taiwan time) they no longer apply.
 export const BOND_ETF_TAX_FREE_UNTIL = Date.parse('2027-01-01T00:00:00+08:00');
 export const DAY_TRADE_TAX_UNTIL = Date.parse('2028-01-01T00:00:00+08:00');
+export const PLAN_FLAT_FEE_UNTIL = Date.parse('2027-01-01T00:00:00+08:00');
 export const MARKETS = {
   TW: {
     delay: 20, zh: '台股', en: 'Taiwan', flag: '🇹🇼', currency: 'TWD', suffixes: ['.TW', '.TWO'],
@@ -65,6 +66,10 @@ export const MARKETS = {
     // (證券交易稅條例 §2-2); bond ETFs pay none to 2026-12-31 (§2-1), then
     // 0.1% (§2). (An extension of either is the Legislative Yuan's: move the date.)
     commission: { rate: 0.001425, min: 20, oddMin: 1 }, floorFees: true,
+    // A monthly plan's buy (定期定額): NT$1 a trade, whatever its size, at
+    // 國泰, 元大 and 永豐 to 2026-12-31 (money101, 2026-08); then the plan
+    // rate brokers post, 0.1425% with a NT$1 minimum (國票 點點投 Q13).
+    plan: { flat: 1, flatUntil: PLAN_FLAT_FEE_UNTIL, rate: 0.001425, min: 1 },
     sell: { stock: { tax: 0.003, dayTrade: 0.0015, dayTradeUntil: DAY_TRADE_TAX_UNTIL }, etf: { tax: 0.001 }, bond: { tax: 0, until: BOND_ETF_TAX_FREE_UNTIL, after: 0.001 } },
     withholding: 0, nhi: true
   },
@@ -335,10 +340,13 @@ export function marketSlip(market, kind, price) {
 // What a market order fills at, from the last price.
 export const marketFill = (market, kind, side, price) => (side === 'buy' ? price + marketSlip(market, kind, price) : Math.max(0, price - marketSlip(market, kind, price)));
 
-// Taiwan's intraday odd-lot session (盤中零股): from 09:10 to 13:30, matched
-// by call auction; an order of fewer than 1,000 shares (or a part that
-// isn't whole lots) can't fill before 09:10.
+// Taiwan's intraday odd-lot session (盤中零股): to 13:30, matched by call
+// auction; an order of fewer than 1,000 shares (or a part that isn't whole
+// lots) can't fill before its first match: 09:10, and 09:00 with the whole
+// lots from 2026-12-07 (TWSE: 115年12月7日起 於上午9:00起第一次撮合).
 export const ODD_LOT_OPEN = { h: 9, m: 10 };
+export const ODD_LOT_NINE = Date.parse('2026-12-07T00:00:00+08:00');
+export const oddLotOpenAt = t => (t >= ODD_LOT_NINE ? { h: 9, m: 0 } : ODD_LOT_OPEN);
 export function isOddLot(market, kind, qty) {
   return market === 'TW' && (kind === 'stock' || kind === 'etf' || kind === 'bond') && Math.round(qty) % 1000 !== 0;
 }
@@ -352,7 +360,8 @@ export function mixedLot(market, kind, qty) {
 }
 export function oddLotOpen(t) {
   const d = new Date(t + 8 * 3_600_000);
-  return d.getUTCHours() * 60 + d.getUTCMinutes() >= ODD_LOT_OPEN.h * 60 + ODD_LOT_OPEN.m;
+  const open = oddLotOpenAt(t);
+  return d.getUTCHours() * 60 + d.getUTCMinutes() >= open.h * 60 + open.m;
 }
 
 // NT$ cash in the settlement account earns the bank's demand-deposit rate,
@@ -464,13 +473,14 @@ function dayTradeRate(rules, kind, t = Date.now()) {
 // Taiwan stock sold the same day it was bought (half the tax): true for all
 // of it, or the share of it that's day-traded (§2-2: 同數量, only the
 // quantity matched with the day's buys). `t`: when (for the rates that end).
+// `plan`: a monthly plan's buy, at the market's plan fee where it has one.
 // Mutual funds are bought through a fund platform, not an exchange: a
 // subscription fee (申購手續費) on the amount bought, as Taiwan's online
 // fund platforms charge after their usual discount on the 3% list fee;
 // selling (redeeming) costs nothing, with no exchange fee or tax.
 export const FUND_FEE = 0.01;
 
-export function tradeCosts({ market, side, kind, gross, currency, discount = 1, oddLot = false, dayTrade = false, t = Date.now() }) {
+export function tradeCosts({ market, side, kind, gross, currency, discount = 1, oddLot = false, dayTrade = false, t = Date.now(), plan = false }) {
   const m = MARKETS[market] || MARKETS.INTL;
   const round = m.floorFees ? x => Math.floor(x) : x => roundCash(x, currency);
   if (kind === 'fund') {
@@ -480,7 +490,8 @@ export function tradeCosts({ market, side, kind, gross, currency, discount = 1, 
   const min = oddLot && m.commission.oddMin != null ? m.commission.oddMin : m.commission.min;
   // The discount is off the commission, and the minimum applies after it (a
   // broker's 2.8折 still charges NT$20 at least); free (0) is free.
-  const commission = gross > 0 && m.commission.rate > 0 && discount > 0 ? round(Math.max(gross * m.commission.rate * discount, min)) : 0;
+  const p = plan && side === 'buy' ? m.plan : null;
+  const commission = !(gross > 0 && discount > 0) ? 0 : p ? (t < p.flatUntil ? p.flat : round(Math.max(gross * p.rate * discount, p.min))) : m.commission.rate > 0 ? round(Math.max(gross * m.commission.rate * discount, min)) : 0;
   const rules = levy(side === 'buy' ? m.buy : m.sell, kind, t);
   const dayRate = dayTrade ? dayTradeRate(side === 'buy' ? m.buy : m.sell, kind, t) : null;
   const dayShare = dayRate == null ? 0 : dayTrade === true ? 1 : Math.min(1, Math.max(0, Number(dayTrade) || 0));

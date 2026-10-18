@@ -37,7 +37,7 @@
 // owed. Borrowed money can't leave Securities.
 //
 // deps: { read(url) -> JSON, fsGet, fsWrite }.
-import { replay, ownCash, applyFills } from './kit/stock-account.mjs';
+import { replay, ownCash, applyFills, planOrderType } from './kit/stock-account.mjs';
 import { unpack } from './kit/stock-codec.mjs';
 import { BONDS } from './kit/stock-bonds.mjs';
 import { marketFill, dealPrice, currencyInfo } from './kit/stock-markets.mjs';
@@ -144,7 +144,10 @@ export async function checkEvent(e, account, wallet, read, issued = {}, ctx = {}
           if (mine.s !== e.symbol || mine.side !== e.side) return 'bad';
           // A plan's month: no more than its amount (in NT$ at its rate); an order: its shares.
           if (mine.plan ? !(e.total * (e.twd || 1) <= mine.amt + 1) : !near(mine.q, e.qty, 1e-9 * Math.max(1, e.qty))) return 'bad';
-          const want = fillPrice({ k: mine.k, l: mine.l, side: e.side }, mine.quote, e.market, e.kind);
+          // (A plan's month: the kit's own order for it, a Taiwan stock's a limit at the
+          // quote, whatever a fill issued before that rule recorded.)
+          const rule = mine.plan ? { k: planOrderType(e), l: mine.quote } : { k: mine.k, l: mine.l };
+          const want = fillPrice({ ...rule, side: e.side }, mine.quote, e.market, e.kind);
           if (!near(e.price, want, 1e-9 * Math.max(1, want) + 1e-9)) return 'bad';
         } else if (e.side === 'buy' ? e.price < mine.quote * (1 - 1e-9) : e.price > mine.quote * (1 + 1e-9)) return 'bad';
         if (e.currency === 'TWD' || !e.currency) return (e.twd ?? 1) === 1 ? 'ok' : 'bad';

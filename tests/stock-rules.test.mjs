@@ -222,3 +222,56 @@ test('當沖 tax on the matched quantity only; odd lots and 融資 buys never ma
   assert.equal(SA.dayTradeShare(acc(old, fill('b', 'buy', 1000, now - 60_000, { financed: 60_000 })), sale(1000), now), 0, '融資, not 現款');
   assert.equal(SA.dayTradeShare(acc(old, fill('b', 'buy', 1000, now - DAY)), sale(1000), now), 0, "yesterday's");
 });
+
+test('定期定額: NT$100 on any day 1-31 (a short month its last day), NT$1 a buy to 2026-12-31, then 0.1425% (NT$1 least)', async () => {
+  const { tradeCosts, PLAN_FLAT_FEE_UNTIL } = await import('../kit/stock-markets.mjs');
+  const acc = SA.newAccount(100_000, now - DAY, 'acc');
+  const plan = req => SA.setPlan(acc, { symbol: '2330.TW', amount: 100, day: 31, ...req }, now);
+  assert.equal(plan({}).plan.day, 31);
+  assert.equal(plan({ amount: 99 }).error, 'planAmount');
+  assert.equal(plan({ day: 32 }).error, 'planDay');
+  assert.equal(new Date(SA.planDue('2027-02', 31) + 8 * 3_600_000).toISOString().slice(0, 10), '2027-02-28');
+  assert.equal(new Date(SA.planDue('2026-10', 31) + 8 * 3_600_000).toISOString().slice(0, 10), '2026-10-31');
+  const buy = o => tradeCosts({ currency: 'TWD', market: 'TW', kind: 'stock', side: 'buy', plan: true, ...o });
+  assert.equal(buy({ gross: 1_000_000, t: now }).commission, 1, 'flat, whatever the size');
+  assert.equal(buy({ gross: 100_000, t: PLAN_FLAT_FEE_UNTIL }).commission, 142);
+  assert.equal(buy({ gross: 300, t: PLAN_FLAT_FEE_UNTIL }).commission, 1);
+  assert.equal(buy({ gross: 100_000, t: now, market: 'US', currency: 'USD' }).commission, 100, 'elsewhere, the usual rate');
+});
+
+test("定期定額 in Taiwan: a limit order in the odd-lot session from its first match (09:10; 09:00 from 2026-12-07), the whole lots split off", async () => {
+  const { oddLotOpen } = await import('../kit/stock-markets.mjs');
+  const meta = { market: 'TW', kind: 'etf' };
+  const due = Date.parse('2026-10-13T00:00:00+08:00');
+  const bar = (hhmm, o) => ({ t: Date.parse(`2026-10-13T${hhmm}:00+08:00`), o, h: o, l: o, c: o });
+  const bars = [bar('09:00', 50), bar('09:05', 51), bar('09:10', 52), bar('09:15', 53)];
+  assert.equal(SA.planFillBar(meta, bars, due).o, 52);
+  assert.equal(SA.planFillBar({ market: 'US', kind: 'etf' }, bars, due).o, 50, 'elsewhere, the first price');
+  assert.equal(SA.planOrderType(meta), 'limit');
+  assert.equal(SA.planOrderType({ market: 'US', kind: 'stock' }), 'market');
+  assert.equal(oddLotOpen(Date.parse('2026-12-04T09:05:00+08:00')), false);
+  assert.equal(oddLotOpen(Date.parse('2026-12-07T09:00:00+08:00')), true, 'from 2026-12-07 with the whole lots');
+  // NT$80,000 at 50: 1,599 shares (a lot and 599), NT$1 each (two trades), at the price itself.
+  const acc = SA.newAccount(100_000, now - DAY, 'acc');
+  const p = { id: 'p1', symbol: '0050.TW', name: '0050', kind: 'etf', market: 'TW', currency: 'TWD', amount: 80_000, day: 13, on: true, since: now - 30 * DAY };
+  const r = SA.runPlan(acc, p, { month: '2026-10', t: due }, { price: 50, twd: 1, at: bar('09:10', 50).t }, now);
+  assert.equal(r.order.type, 'limit');
+  assert.deepEqual([r.fill.qty, r.fill.price, r.fill.commission, r.fill.total], [1_599, 50, 2, 79_952]);
+  // Any mixed amount is two trades.
+  const est = SA.estimate({ market: 'TW', kind: 'stock', currency: 'TWD', side: 'buy', qty: 1_010, price: 10, t: now });
+  assert.equal(est.commission, 20 + 1, "a lot (NT$14, the NT$20 least) and 10 odd shares (NT$1 least), each its own trade's minimum");
+});
+
+test('定期定額: three months running without the cash end the plan (連續三次扣款失敗)', () => {
+  let acc = SA.newAccount(0, now - 400 * DAY, 'acc');
+  const set = SA.setPlan(acc, { id: 'p1', symbol: '0050.TW', amount: 1_000, day: 5, kind: 'etf', market: 'TW', currency: 'TWD', name: '0050' }, now - 120 * DAY);
+  acc = set.account;
+  const p = set.plan;
+  const run = (month, a) => SA.runPlan(a, p, { month, t: SA.planDue(month, 5) }, { price: 50, twd: 1 }, now);
+  let r = run('2026-07', acc);
+  r = run('2026-08', r.account);
+  assert.equal(r.account.plans.p1.on, true, 'two: still on');
+  r = run('2026-09', r.account);
+  assert.equal(r.ended, true);
+  assert.deepEqual([r.account.plans.p1.on, r.account.plans.p1.ended], [false, 'funds']);
+});
