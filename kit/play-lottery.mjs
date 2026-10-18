@@ -222,10 +222,13 @@ export function parseDraw(gameId, record) {
     const a = record[t.pool];
     pools[t.key] = { perPrize: Number(a.perPrize) || 0, winners: Number(a.winnerCount) || 0, pool: (Number(a.prize) || 0) + (Number(a.lastPrize) || 0) };
   }
-  if (g.digits) return { digits: (record.drawNumberAppear || []).map(Number) };
-  if (gameId === 'super638') return { numbers: size.slice(0, 6).map(Number), zone2: Number(size[6]), pools };
-  if (gameId === 'lotto649') return { numbers: size.slice(0, 6).map(Number), special: Number(size[6]), pools };
-  if (gameId === 'daily539') return { numbers: size.slice(0, 5).map(Number), pools };
+  // (Its 期別, the draw's number: 第 N 期 on a ticket and its result.)
+  const term = record.period ?? record.drawTerm;
+  const t = term != null ? { term } : {};
+  if (g.digits) return { digits: (record.drawNumberAppear || []).map(Number), ...t };
+  if (gameId === 'super638') return { numbers: size.slice(0, 6).map(Number), zone2: Number(size[6]), pools, ...t };
+  if (gameId === 'lotto649') return { numbers: size.slice(0, 6).map(Number), special: Number(size[6]), pools, ...t };
+  if (gameId === 'daily539') return { numbers: size.slice(0, 5).map(Number), pools, ...t };
   return null;
 }
 
@@ -374,8 +377,8 @@ export async function latestResults() {
     super638: parseDraw('super638', c.superLotto638Result) && { ...parseDraw('super638', c.superLotto638Result), date: String(c.superLotto638Result.lotteryDate).slice(0, 10), jackpot: poolOf(c.superLotto638Result.super638JackpotAssign) },
     lotto649: parseDraw('lotto649', c.lotto649Result) && { ...parseDraw('lotto649', c.lotto649Result), date: String(c.lotto649Result.lotteryDate).slice(0, 10), jackpot: poolOf(c.lotto649Result.jackpotAssign) },
     daily539: parseDraw('daily539', c.daily539Result) && { ...parseDraw('daily539', c.daily539Result), date: String(c.daily539Result.lotteryDate).slice(0, 10) },
-    star3: c.lotto3DResult && { digits: c.lotto3DResult.drawNumberAppear, date: String(c.lotto3DResult.lotteryDate).slice(0, 10) },
-    star4: c.lotto4DResult && { digits: c.lotto4DResult.drawNumberAppear, date: String(c.lotto4DResult.lotteryDate).slice(0, 10) }
+    star3: c.lotto3DResult && { ...parseDraw('star3', c.lotto3DResult), date: String(c.lotto3DResult.lotteryDate).slice(0, 10) },
+    star4: c.lotto4DResult && { ...parseDraw('star4', c.lotto4DResult), date: String(c.lotto4DResult.lotteryDate).slice(0, 10) }
   };
 }
 // A jackpot as it stands for the next draw: nobody won it, so it carries over.
@@ -426,7 +429,7 @@ export function settleTicket(account, ticketId, draw, now = new Date()) {
   const ledger = net > 0 && !account.ledger.some(e => e.id === `prize-${ticketId}`) ? [...account.ledger, { id: `prize-${ticketId}`, t, kind: 'prize', amount: net }] : account.ledger;
   return { ...account, updated: t, ledger, tickets: account.tickets.map(x => (x.id === ticketId ? settled : x)) };
 }
-const summarize = d => ({ numbers: d.numbers, special: d.special, zone2: d.zone2, digits: d.digits, bull: d.bull });
+const summarize = d => ({ numbers: d.numbers, special: d.special, zone2: d.zone2, digits: d.digits, bull: d.bull, ...(d.term != null ? { term: d.term } : {}) });
 
 // Tickets whose draw is due: open, and past their draw time (plus a little
 // for the results to appear).

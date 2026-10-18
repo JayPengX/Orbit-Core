@@ -107,3 +107,11 @@ test('a ticket of a game no longer sold (雙贏彩) gets its cost back once, and
   assert.equal(doc(TICKET_COLLECTION, key), null);
   assert.deepEqual(doc(TICKET_COLLECTION, '_index').due, {});
 });
+
+test("a draw keeps its 期別 (第 N 期), as Taiwan Lottery's results give it", async () => {
+  const { parseDraw } = await import('../kit/play-lottery.mjs');
+  const r = { period: 115000097, drawNumberSize: [6, 15, 21, 30, 40, 43, 49] };
+  assert.equal(parseDraw('lotto649', r).term, 115000097);
+  assert.equal(parseDraw('star3', { period: 115000252, drawNumberAppear: [6, 1, 1] }).term, 115000252);
+  assert.equal('term' in parseDraw('daily539', { drawNumberSize: [1, 2, 3, 4, 5] }), false);
+});
