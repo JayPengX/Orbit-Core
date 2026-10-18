@@ -108,6 +108,8 @@ export async function fetchKambiLeague(key, now = new Date(), getJson) {
 const open = o => o && (o.status == null || o.status === 'OPEN') && odds(o);
 // Whole-game lines only: not a set's, a quarter's, an inning's, a team's or the next point's.
 const PART = /\b(\d(st|nd|rd|th)|set|frame|game \d|quarter|half|inning|period|by|next|race|odd|even|regular time)\b/i;
+// Hockey's are its 60 minutes' (Regular Time), as they're settled.
+const wholeLine = (family, label) => (family === 'hockey' ? /regular time$/i.test(label) && !/\b(period|by)\b/i.test(label) : !PART.test(label));
 
 // A league's matches in play (listView …/in-play.json): each with Kambi's
 // live prices, the margin taken out (winner; for baseball and basketball the
@@ -145,12 +147,12 @@ export function parseKambiInPlay(data, sport) {
     // Whole numbers push only where a push is usual (points).
     const lineOk = line => line != null && (Math.abs((line / 1000) % 1) === 0.5 || ['basketball', 'football'].includes(family));
     if (handicaps) {
-      const handicap = offers.find(o => o.betOfferType?.englishName === 'Handicap' && !PART.test(o.criterion?.englishLabel || ''));
+      const handicap = offers.find(o => o.betOfferType?.englishName === 'Handicap' && wholeLine(family, o.criterion?.englishLabel || ''));
       const home = handicap && outcome(handicap, 'OT_ONE');
       const away = handicap && outcome(handicap, 'OT_TWO');
       if (open(home) && open(away) && lineOk(away.line)) game.spread = { awayLine: away.line / 1000, awayFair: fairPair(away, home)[0] };
     }
-    const total = offers.find(o => o.betOfferType?.englishName === 'Over/Under' && !PART.test(o.criterion?.englishLabel || ''));
+    const total = offers.find(o => o.betOfferType?.englishName === 'Over/Under' && wholeLine(family, o.criterion?.englishLabel || ''));
     const over = total && outcome(total, 'OT_OVER');
     const under = total && outcome(total, 'OT_UNDER');
     if (open(over) && open(under) && lineOk(over.line)) game.total = { line: over.line / 1000, overFair: fairPair(over, under)[0] };
