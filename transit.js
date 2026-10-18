@@ -649,6 +649,8 @@ const ms = t => {
   return Number.isFinite(v) ? v : null;
 };
 const pt = (name, ll) => ({ name: name || '', lat: num(ll?.latitude ?? ll?.lat), lon: num(ll?.longitude ?? ll?.lng ?? ll?.lon) });
+// TDX names a metro exit after its station, then the station again (台北車站台北車站 M1, 板橋板橋站 出口3): said once.
+export const onceName = n => String(n || '').replace(/^(.{2,}?)\1/, '$1');
 
 export const GOOGLE_ROUTE_FIELDS = [
   'routes.duration',
@@ -860,14 +862,16 @@ export function parseTdxRoutes(j) {
         arr,
         dur: Number(s.travelSummary?.duration ?? s.duration) || (dep != null && arr != null ? (arr - dep) / 1000 : 0),
         dist: Number(s.travelSummary?.length ?? s.length) || roughMeters(s.departure?.place?.location, s.arrival?.place?.location),
-        from: pt(s.departure?.place?.name, s.departure?.place?.location),
-        to: pt(s.arrival?.place?.name, s.arrival?.place?.location),
+        from: pt(onceName(s.departure?.place?.name), s.departure?.place?.location),
+        to: pt(onceName(s.arrival?.place?.name), s.arrival?.place?.location),
         poly: s.polyline || '',
         fmt: 'f'
       };
     });
-    // TDX pads a trip with zero-length cycle / taxi stubs at its ends: those are no legs.
-    const real = legs.filter(l => !(l.mode !== 'walk' && !/^(tra|hsr|metro|lightrail|bus|ferry|gondola|plane)$/.test(l.mode) && l.dist < 60 && l.dur < 120));
+    // TDX pads a trip with zero-length cycle / taxi stubs at its ends: those
+    // are no legs; nor a "walk" of no length (a wait for the next ride, said
+    // by that ride's time, never shown as walking 23 minutes).
+    const real = legs.filter(l => !(l.mode !== 'walk' && !/^(tra|hsr|metro|lightrail|bus|ferry|gondola|plane)$/.test(l.mode) && l.dist < 60 && l.dur < 120) && !(l.mode === 'walk' && l.dist < 5 && l.from.lat != null && l.to.lat != null));
     if (!real.length) continue;
     plans.push(finishPlan({ src: 'tdx', legs: real, fare: num(r.total_price ?? r.price ?? r.fare) }));
   }
