@@ -521,7 +521,9 @@ export const LOTTERY_TAX = { taxFree: 5000, rate: 0.204 };
 // carries its own (about 15%), and they multiply.
 export const PARLAY_BOOST = [0, 0, 0, 0.05, 0.08, 0.12, 0.15, 0.2];
 export const boostRate = (size, x = 1) => (x > 0 ? (PARLAY_BOOST[Math.min(size, PARLAY_BOOST.length - 1)] || 0) * x : 0);
-const boosted = (stake, product, size, x) => stake * (1 + (product - 1) * (1 + (x > 0 && size >= 3 ? boostRate(size, x) : 0)));
+// A combination's prize, rounded half up to the NT$ (§18: 中獎獎金四捨五入至元).
+const toDollar = v => Math.floor(v + 0.5 + 1e-9);
+const boosted = (stake, product, size, x) => toDollar(stake * (1 + (product - 1) * (1 + (x > 0 && size >= 3 ? boostRate(size, x) : 0))));
 
 // Whether a winning combination paying `pay` on `stake` is taxed: its 單注
 // (NT$10 of the stake) wins over NT$5,000 once rounded to the dollar (§18),
@@ -529,7 +531,7 @@ const boosted = (stake, product, size, x) => stake * (1 + (product - 1) * (1 + (
 export const slipTaxed = (pay, stake) => Math.round((pay * SLIP_RULES.unit) / stake) > SLIP_RULES.taxFree;
 // What a winning combination paying `pay` on `stake` pays after withholding.
 export function afterTax(pay, stake) {
-  return slipTaxed(pay, stake) ? pay * (1 - SLIP_RULES.taxRate) : pay;
+  return slipTaxed(pay, stake) ? pay - toDollar(pay * SLIP_RULES.taxRate) : pay;
 }
 // A lottery or scratch card prize after its withholding, in whole NT$
 // (play-lottery.mjs, play-scratch.mjs).
