@@ -1086,7 +1086,8 @@ function parseTarget(target) {
     if (u.hostname === 'clients5.google.com' && (u.pathname !== '/translate_a/t' || (u.searchParams.get('q') || '').length > 5000)) return null;
     if (u.hostname === ELTA_HOST && u.pathname !== ELTA_PATH) return null;
     if (u.hostname === 'clob.polymarket.com' && u.pathname !== '/prices-history') return null;
-    if (u.hostname === 'www.twse.com.tw' && u.pathname !== '/rwd/zh/announcement/publicForm') return null;
+    // TWSE's announcement lists: 公開申購 (publicForm), 處置 (punish), 注意 (notice).
+    if (u.hostname === 'www.twse.com.tw' && !/^\/rwd\/zh\/announcement\/(publicForm|punish|notice)$/.test(u.pathname)) return null;
     if (u.hostname === ELTA_VOD_HOST && (!/^\/sports\/play\/1\/\d{1,6}$/.test(u.pathname) || u.search)) return null;
     // A search (its words, in English as seen from Taiwan) or a video's page, nothing else.
     if (u.hostname === YT_HOST && !(u.pathname === '/results' ? [...u.searchParams.keys()].every(k => ['search_query', 'hl', 'gl'].includes(k)) && (u.searchParams.get('search_query') || '').length > 0 && (u.searchParams.get('search_query') || '').length <= 200 : u.pathname === '/watch' && [...u.searchParams.keys()].join() === 'v' && /^[\w-]{11}$/.test(u.searchParams.get('v')))) return null;
