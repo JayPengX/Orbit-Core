@@ -105,11 +105,11 @@ test('baseball: 單局大小 and 單局不讓分 on the first inning in place of
   assert.equal(k.market, 'itot|1|0.5');
 });
 
-test("限2關 / 限3關: a game's or market's own minimum (運彩 §21) wins over the price bands; the bands only when none is known", () => {
-  assert.deepEqual(houseRule('ml', 1.05), { lock: null, minLegs: 3 }, 'no event minimum: the price bands, as before');
-  assert.deepEqual(houseRule('ml', 1.05, { event: 1 }), { lock: null, minLegs: 1 }, 'a game sold single');
+test("限2關 / 限3關: only a game's or market's own minimum (運彩 §21), never the price", () => {
+  assert.deepEqual(houseRule('ml', 1.05), { lock: null, minLegs: 1 }, 'none known: a single, at any price');
+  assert.deepEqual(houseRule('ml', 1.02), { lock: null, minLegs: 1 }, 'no low lock either');
   assert.deepEqual(houseRule('ml', 2.4, { event: 2 }), { lock: null, minLegs: 2 }, 'a game 限2關 at any price');
-  assert.deepEqual(houseRule('ml', 1.02, { event: 1 }), { lock: 'low', minLegs: 1 }, 'still locked when all but certain');
+  assert.deepEqual(houseRule('ml', 1.05, { event: 3 }), { lock: null, minLegs: 3 });
   const g = { id: 'g', sport: 'epl', startUtc: '2026-10-20T11:30:00Z', home: { en: 'Arsenal' }, away: { en: 'Leeds United' }, draftKings: { home: 0.6, draw: 0.25, away: 0.15 }, total: { line: 2.5, overFair: 0.5 } };
   const plain = gameOptions(g);
   const ruled = gameOptions({ ...g, minLegs: 3 });
