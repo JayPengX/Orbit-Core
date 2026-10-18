@@ -47,7 +47,8 @@ test('lottery tickets are sold by the Worker (its clock, its check, the cost fro
   assert.equal(doc(WALLET_COLLECTION, ACCOUNT).entries.find(e => e.id === 'odds:lotto-lotto00001').amount, -ticket.cost);
   // A selection the game doesn't take, or more than the pool: refused, nothing taken.
   assert.ok((await post(deps, { op: 'tickets', tickets: [{ id: 'lotto00002', game: 'daily539', sel: { zones: [[1, 2]] }, multiple: 1 }] })).body.refused);
-  assert.equal((await post(deps, { op: 'tickets', tickets: [{ id: 'lotto00003', game: 'daily539', sel: { zones: [[1, 2, 3, 4, 5]] }, multiple: 50 }] })).body.refused.problem, 'funds');
+  assert.equal((await post(deps, { op: 'tickets', tickets: [{ id: 'lotto00003', game: 'daily539', sel: { zones: [[1, 2, 3, 4, 5]] }, periods: 24 }] })).body.refused.problem, 'funds');
+  assert.equal((await post(deps, { op: 'tickets', tickets: [{ id: 'lotto00003', game: 'daily539', sel: { zones: [[1, 2, 3, 4, 5]] }, multiple: 2 }] })).body.refused.problem, 'multiple', '今彩539 takes no 倍數');
   // Before the draw: nothing.
   deps.drawFor = async () => ({ numbers: [1, 2, 3, 4, 5], pools: {} });
   assert.equal((await lottoCron(env, deps)).settled, 0);
@@ -60,6 +61,19 @@ test('lottery tickets are sold by the Worker (its clock, its check, the cost fro
   // Run again: paid once.
   await lottoCron(env, deps);
   assert.equal(doc(WALLET_COLLECTION, ACCOUNT).entries.filter(e => e.id === 'odds:prize-lotto00001').length, 1);
+});
+
+test('多期: a ticket a draw, each charged, watched and paid on its own', async () => {
+  const now = { t: Date.parse('2026-10-12T04:00:00Z') }; // Monday
+  const { deps, doc } = setup(now, money);
+  const r = await post(deps, { op: 'tickets', tickets: [{ id: 'series001', game: 'daily539', sel: { zones: [[1, 2, 3, 4, 5]] }, periods: 3 }] });
+  assert.deepEqual(r.body.tickets.map(x => [x.id, x.draw.date]), [['series001', '2026-10-12'], ['series001-2', '2026-10-13'], ['series001-3', '2026-10-14']]);
+  assert.deepEqual(doc(WALLET_COLLECTION, ACCOUNT).entries.filter(e => e.kind === 'lottery').map(e => [e.id, e.amount]), [['odds:lotto-series001', -50], ['odds:lotto-series001-2', -50], ['odds:lotto-series001-3', -50]]);
+  deps.drawFor = async (game, draw) => (draw.date === '2026-10-13' ? { numbers: [1, 2, 3, 30, 31], pools: {} } : { numbers: [10, 20, 30, 31, 32], pools: {} });
+  now.t = Date.parse('2026-10-14T13:00:00Z');
+  assert.equal((await lottoCron(env, deps)).settled, 3);
+  assert.deepEqual(doc(WALLET_COLLECTION, ACCOUNT).entries.filter(e => e.kind === 'prize').map(e => [e.id, e.amount]), [['odds:prize-series001-2', 300]]);
+  assert.deepEqual(doc(TICKET_COLLECTION, '_index').due, {});
 });
 
 test('a scratch card\'s prize is drawn by the Worker and paid once, when it is scratched', async () => {
@@ -89,7 +103,7 @@ test('one ticket id twice in a sale: refused, nothing charged', async () => {
   const now = { t: Date.parse('2026-10-12T04:00:00Z') };
   const { deps, doc } = setup(now, money);
   const t = { id: 'lotto00009', game: 'daily539', sel: { zones: [[1, 2, 3, 4, 5]] }, multiple: 1 };
-  const r = await post(deps, { op: 'tickets', tickets: [t, { ...t, multiple: 2 }] });
+  const r = await post(deps, { op: 'tickets', tickets: [t, { ...t, sel: { zones: [[6, 7, 8, 9, 10]] } }] });
   assert.equal(r.body.refused?.problem, 'shape');
   assert.ok(!doc(WALLET_COLLECTION, ACCOUNT).entries.some(e => e.kind === 'lottery'));
 });

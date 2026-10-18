@@ -18,6 +18,11 @@
 // on 39, 50/500/8,000 on 49; 38樂合彩 is gone, last drawn 2023-12-28).
 // 今彩539's fixed prizes have a cap per draw (台灣彩券 獎金分配方式: each
 // tier NT$24,000,000; past it the tier is shared, rounded down to the NT$).
+//
+// `multiple`: the most 倍數 a bet takes, `periods`: the most draws (多期) one
+// ticket covers, as each game's 投注方式 says (台灣彩券 遊戲介紹): 威力彩,
+// 大樂透 and 今彩539 take no 倍數; 樂合彩 up to 10; 3星彩, 4星彩 and BINGO up to
+// 50. 多期 2-10 on 威力彩, 大樂透 and 49樂合彩, 2-12 on BINGO, 2-24 on the rest.
 
 import { choose, prizeAfterTax } from '#kit/play-odds.mjs';
 
@@ -29,7 +34,7 @@ const DAY = 86_400_000;
 
 export const GAMES = {
   super638: {
-    zh: '威力彩', en: 'Super Lotto', price: 100, days: [1, 4], color: '#dc2626',
+    zh: '威力彩', en: 'Super Lotto', price: 100, days: [1, 4], color: '#dc2626', multiple: 1, periods: 10,
     zones: [{ n: 6, max: 38 }, { n: 1, max: 8 }],
     api: { path: 'SuperLotto638Result', list: 'superLotto638Res' },
     tiers: [
@@ -46,7 +51,7 @@ export const GAMES = {
     ]
   },
   lotto649: {
-    zh: '大樂透', en: 'Lotto 6/49', price: 50, days: [2, 5], color: '#d97706',
+    zh: '大樂透', en: 'Lotto 6/49', price: 50, days: [2, 5], color: '#d97706', multiple: 1, periods: 10,
     zones: [{ n: 6, max: 49 }],
     special: true,
     api: { path: 'Lotto649Result', list: 'lotto649Res' },
@@ -62,7 +67,7 @@ export const GAMES = {
     ]
   },
   daily539: {
-    zh: '今彩539', en: 'Daily Cash 539', price: 50, days: [1, 2, 3, 4, 5, 6], color: '#059669',
+    zh: '今彩539', en: 'Daily Cash 539', price: 50, days: [1, 2, 3, 4, 5, 6], color: '#059669', multiple: 1, periods: 24,
     zones: [{ n: 5, max: 39 }],
     api: { path: 'Daily539Result', list: 'daily539Res' },
     // `cap`: the tier's total a draw (4 jackpots: NT$6,000,000 each, 2026-04-18).
@@ -74,7 +79,7 @@ export const GAMES = {
     ]
   },
   star3: {
-    zh: '3星彩', en: '3 Star', price: 25, days: [1, 2, 3, 4, 5, 6], color: '#7c3aed',
+    zh: '3星彩', en: '3 Star', price: 25, days: [1, 2, 3, 4, 5, 6], color: '#7c3aed', multiple: 50, periods: 24,
     digits: 3,
     api: { path: '3DResult', list: 'lotto3DRes' },
     // Since 2024-01-01 one play, the digits in order, paid by how many of
@@ -89,7 +94,7 @@ export const GAMES = {
     plays: { straight: { zh: '正彩', en: 'Straight', prize: 5_000 } }
   },
   star4: {
-    zh: '4星彩', en: '4 Star', price: 25, days: [1, 2, 3, 4, 5, 6], color: '#0891b2',
+    zh: '4星彩', en: '4 Star', price: 25, days: [1, 2, 3, 4, 5, 6], color: '#0891b2', multiple: 50, periods: 24,
     digits: 4,
     api: { path: '4DResult', list: 'lotto4DRes' },
     tiers: [
@@ -100,15 +105,15 @@ export const GAMES = {
     plays: { straight: { zh: '正彩', en: 'Straight', prize: 50_000 } }
   },
   m39: {
-    zh: '39樂合彩', en: '39 Combo', price: 25, days: [1, 2, 3, 4, 5, 6], color: '#047857', of: 'daily539',
+    zh: '39樂合彩', en: '39 Combo', price: 25, days: [1, 2, 3, 4, 5, 6], color: '#047857', of: 'daily539', multiple: 10, periods: 24,
     combo: { max: 39, drawn: 5, sizes: { 2: 1_125, 3: 11_250, 4: 212_500 } }
   },
   m49: {
-    zh: '49樂合彩', en: '49 Combo', price: 25, days: [2, 5], color: '#b45309', of: 'lotto649',
+    zh: '49樂合彩', en: '49 Combo', price: 25, days: [2, 5], color: '#b45309', of: 'lotto649', multiple: 10, periods: 10,
     combo: { max: 49, drawn: 6, sizes: { 2: 1_250, 3: 12_500, 4: 200_000 } }
   },
   bingo: {
-    zh: '賓果賓果', en: 'BINGO BINGO', price: 25, color: '#e11d48', every: 5,
+    zh: '賓果賓果', en: 'BINGO BINGO', price: 25, color: '#e11d48', every: 5, multiple: 50, periods: 12,
     // Prize multiples of the NT$25 stake, by stars picked and numbers hit.
     stars: {
       1: { 1: 2 },
@@ -129,6 +134,8 @@ export const GAMES = {
 };
 export const GAME_ORDER = ['super638', 'lotto649', 'daily539', 'bingo', 'star3', 'star4', 'm39', 'm49'];
 export const gameName = (id, lang = 'zh') => GAMES[id]?.[lang === 'en' ? 'en' : 'zh'] || id;
+// What the slip may offer: { multiple, periods } (1: none).
+export const limits = id => ({ multiple: GAMES[id]?.multiple || 1, periods: GAMES[id]?.periods || 1 });
 
 // ---- Draw times ----------------------------------------------------------------------
 
@@ -160,6 +167,13 @@ export function nextDraw(gameId, now = Date.now()) {
     if (draw - CLOSE_MS > now) return { date, at: draw };
   }
   return null;
+}
+
+// The next `n` draws in a row (多期: BINGO's run on past midnight).
+export function nextDraws(gameId, now = Date.now(), n = 1) {
+  const out = [];
+  for (let d = nextDraw(gameId, now); d && out.length < n; d = nextDraw(gameId, d.at)) out.push(d);
+  return out;
 }
 
 // ---- Picks ----------------------------------------------------------------------------
@@ -402,22 +416,29 @@ const poolOf = a => (a ? (Number(a.winnerCount) ? Number(a.prize) || 0 : (Number
 // multiple, cost, status: 'open' | 'settled', prize, tier }], with ledger
 // entries 'lotto-<id>' (the cost) and 'prize-<id>' (a prize).
 
-export function buyTicket(account, { id, game, sel, multiple = 1 }, now = new Date(), { extra = 0 } = {}) {
+// A 倍數 or 多期 past the game's (limits) is refused: { error: 'multiple' }
+// or 'periods'. 多期 buys one ticket a draw, `<id>`, `<id>-2` … each with its
+// own cost and `series` ({ id, n, of }), settled draw by draw: { ticket (the
+// first), tickets }.
+export function buyTicket(account, { id, game, sel, multiple = 1, periods = 1 }, now = new Date(), { extra = 0 } = {}) {
   const g = GAMES[game];
   if (!g) return { error: 'game' };
   const check = checkSelection(game, sel);
   if (check.error) return check;
-  const draw = nextDraw(game, now.getTime());
-  if (!draw) return { error: 'closed' };
+  const mult = Math.max(1, Math.round(Number(multiple) || 1));
+  if (mult > limits(game).multiple) return { error: 'multiple' };
+  const n = Math.max(1, Math.round(Number(periods) || 1));
+  if (n > limits(game).periods) return { error: 'periods' };
+  const draws = nextDraws(game, now.getTime(), n);
+  if (draws.length < n) return { error: 'closed' };
   const bets = betCount(game, sel);
-  const mult = Math.max(1, Math.min(50, Math.round(multiple)));
   const cost = g.price * bets * mult;
   const own = account.ledger.reduce((s, e) => s + e.amount, 0);
-  if (cost > own + extra) return { error: 'funds' };
+  if (cost * n > own + extra) return { error: 'funds' };
   const t = now.toISOString();
-  const ticket = { id, t, game, draw, sel, bets, multiple: mult, cost, status: 'open' };
-  const entry = { id: `lotto-${id}`, t, kind: 'lottery', amount: -cost };
-  return { account: { ...account, updated: t, ledger: [...account.ledger, entry], tickets: [ticket, ...(account.tickets || [])] }, ticket };
+  const tickets = draws.map((draw, k) => ({ id: k ? `${id}-${k + 1}` : id, t, game, draw, sel, bets, multiple: mult, cost, status: 'open', ...(n > 1 && { series: { id, n: k + 1, of: n } }) }));
+  const entries = tickets.map(x => ({ id: `lotto-${x.id}`, t, kind: 'lottery', amount: -cost }));
+  return { account: { ...account, updated: t, ledger: [...account.ledger, ...entries], tickets: [...tickets, ...(account.tickets || [])] }, ticket: tickets[0], tickets };
 }
 
 // A drawn ticket settled: its prize (every bet and multiple) paid in. Tax is
