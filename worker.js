@@ -11,6 +11,7 @@
 //   GET   /slip, POST /slip-scan Slip Tracker's game lists and ticket photos (slip.js)
 //   POST  /law-ask               Orbit Law's questions on a law's articles (law.js)
 //   POST  /law-chat              Orbit Law's 問法律, answered from the articles it finds (law-chat.js)
+//   POST  /law-gist              Orbit Law's shared one-line bill and law summaries (law-gist.js)
 //   GET   /kambi                 Kambi's live scores for Quadra Play (kambi.js)
 //   GET/POST /push/…             notices while an app is closed (push.js)
 //   GET   /weather/…             Orbit Weather's blended forecast (weather.js)
@@ -31,6 +32,7 @@
 import { handleSlip, handleSlipScan } from './slip.js';
 import { handleLawAsk } from './law.js';
 import { handleLawChat } from './law-chat.js';
+import { handleLawGist } from './law-gist.js';
 import en from './locales/en.js';
 import zhTW from './locales/zh-TW.js';
 import { handleEcoRequest, LOCK_SINCE } from './eco.js';
@@ -1166,6 +1168,8 @@ async function route(request, env, ctx, headers, origin) {
   const lawGemini = feature => (parts, schema) => proxyGeminiRequest(GEMINI_ALLOWED_MODELS[0], parts, schema, env, headers, ctx, feature, 25_000);
   if (path === '/law-ask') return handleLawAsk(request, env, ctx, headers, await sessionOf(request, env), lawGemini('law-ask'));
   if (path === '/law-chat') return handleLawChat(request, env, ctx, headers, await sessionOf(request, env), lawGemini('law-chat'));
+  // …and its summaries for cards (law-gist.js): the same Pass, shared and kept, a day's cap in all.
+  if (path === '/law-gist') return handleLawGist(request, env, ctx, headers, await sessionOf(request, env), lawGemini('law-gist'));
   // The bill's guard (guard.js), as it last read the bill: armed or not,
   // each count's share of the $5 plan, stopped or not. No key or token.
   if (path === '/guard' && request.method === 'GET') {
