@@ -122,6 +122,15 @@ async function writeBook(env, deps, account, book, now) {
   if (!written) throw new Error('stock-fills busy');
   return written;
 }
+// A pass merged into another: its book (fills issued, orders waiting,
+// cancels, plans, 新股申購 seen) merged into the other's, so its account,
+// folded in on the phone, checks against what this Worker issued.
+export async function moveBook(env, deps, from, to, now) {
+  const doc = await deps.fsGet(env, FILLS_COLLECTION, from);
+  if (!doc.exists) return;
+  await writeBook(env, deps, to, readBook(doc), now);
+  await deps.fsDelete(env, FILLS_COLLECTION, from);
+}
 // The fills issued for an account (stock-check.js reads them).
 export async function issuedFills(env, account, fsGet) {
   return readBook(await fsGet(env, FILLS_COLLECTION, account).catch(() => null)).fills;

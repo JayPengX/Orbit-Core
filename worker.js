@@ -34,8 +34,8 @@ import { checkStock } from './stock-check.js';
 import { readToken, tokenSecret, signToken, sessionLimited } from './quadra-token.js';
 import { handleKambiRequest, refreshKambiWatch, fetchKambiLive } from './kambi.js';
 import { handlePush, sendDue, notifyNow } from './push.js';
-import { handlePlay, settleCron } from './settle.js';
-import { lottoCron } from './lotto.js';
+import { handlePlay, settleCron, moveSlips } from './settle.js';
+import { lottoCron, moveTickets } from './lotto.js';
 import { asiaBaseballResponse, ASIA_HOST } from './asia-baseball.js';
 import { f1LiveResponse, F1_LIVE_HOST } from './f1-live.js';
 import { handleWeather } from './weather.js';
@@ -48,7 +48,7 @@ import { applyScale } from './capacity.js';
 import { handleSports, sportsCron, useDevSettings } from './sports.js';
 import { isAllowedOrigin, corsHeaders, json, LOCAL_ORIGIN } from './http.js';
 import { handleData } from './data.js';
-import { handleStock } from './stock-fill.js';
+import { handleStock, moveBook } from './stock-fill.js';
 import { runBuilders, SLOTS as BUILD_SLOTS } from './builders/run.js';
 import { docStore, storeReady } from './doc-store.js';
 import { STATE_KEY as GUARD_STATE } from './guard.js';
@@ -1018,7 +1018,14 @@ const ECO_DEPS = {
   geminiCheck: env => geminiCheck(env),
   build: (env, job) => runBuilders(env, { proxy: builderProxy(env), now: Date.now(), ...(job === 'watch-full' ? { job: 'watch', full: true } : ['watch', 'cutouts', 'buses'].includes(job) ? { job } : { only: job }), log: () => {} }),
   // Securities' money counted here (stock-check.js), its market data read as the apps read it.
-  checkStock: (env, docId, payload, wallet) => checkStock(env, docId, payload, wallet, { read: url => priceReads(env).read(url), fsGet: DOCS.get, fsWrite: DOCS.write }, LOCK_SINCE)
+  checkStock: (env, docId, payload, wallet) => checkStock(env, docId, payload, wallet, { read: url => priceReads(env).read(url), fsGet: DOCS.get, fsWrite: DOCS.write }, LOCK_SINCE),
+  // A pass merged into another: what this Worker watches for it moves too.
+  moveRecords: async (env, from, to, now) => {
+    const deps = { fsGet: DOCS.get, fsWrite: DOCS.write, fsDelete: DOCS.delete, now: () => Date.now() };
+    await moveSlips(env, deps, from, to);
+    await moveTickets(env, deps, from, to);
+    await moveBook(env, deps, from, to, now);
+  }
 };
 
 // /kambi (kambi.js): the same plumbing, and Kambi's live data.

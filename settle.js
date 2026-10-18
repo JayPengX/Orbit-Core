@@ -40,7 +40,7 @@
 // readJsonBody, INVALID_BODY, fsGet, fsWrite, fsDelete, now }, plus `read(url)`
 // (a source's JSON, or null), and `notify(account, message)` (push.js).
 
-import { storeReady, parseDoc, changeDoc } from './doc-store.js';
+import { storeReady, parseDoc, changeDoc, moveOwned } from './doc-store.js';
 import { readOutcomes, legResult, applyResults, finalOf, familyOf, LEAGUES } from './kit/settle.mjs';
 import { updateWallet, WALLET_COLLECTION, parseWallet, poolBalance, LOCK_SINCE } from './eco.js';
 import { checkSlip, useReads, cashOutQuote, cashOutOk } from './price.js';
@@ -154,6 +154,17 @@ async function changeRecords(env, deps, account, change) {
   const out = await changeDoc(env, deps, SETTLED_COLLECTION, account, change, { read: v => v?.slips || {}, write: slips => (Object.keys(slips).length ? { slips } : null) });
   if (out === undefined) throw new Error('records busy');
   return out;
+}
+// A pass merged into another: its watched slips and its records for Play
+// go with its money (eco.js merge), so what settles later is paid to the
+// pass that has the stakes.
+export async function moveSlips(env, deps, from, to) {
+  await moveOwned(env, deps, OPEN_COLLECTION, OPEN_INDEX, from, to);
+  const theirs = parseDoc(await deps.fsGet(env, SETTLED_COLLECTION, from))?.slips;
+  if (theirs && Object.keys(theirs).length) {
+    await changeRecords(env, deps, to, records => ({ ...theirs, ...records }));
+    await deps.fsDelete(env, SETTLED_COLLECTION, from);
+  }
 }
 const recordOf = (slip, at) => ({
   results: slip.legs.map(l => l.result ?? null),

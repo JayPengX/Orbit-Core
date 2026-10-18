@@ -233,11 +233,63 @@ test('merge: another pass into this one, then it is gone', async () => {
   assert.equal(m.status, 200);
   assert.deepEqual(m.data.moved, { stock: 1 });
   assert.equal(m.data.wallet.inbox.stock.length, 1);
-  assert.ok(m.data.wallet.entries.some(e => e.id.endsWith(':stock:x')));
+  assert.ok(m.data.wallet.entries.some(e => e.id === 'stock:x'), 'under its own id (Securities checks its deposits by it)');
   assert.equal((await t.call('POST', '', { op: 'login', passcode: b.passcode, app: 'stock' })).status, 404);
   // Old app-only codes are not a source any more.
   const legacy = await t.call('POST', '', { op: 'merge', qt: aa.data.token, sources: [{ app: 'orbit', passcode: 'ABCD2345', manager: 'x' }] });
   assert.equal(legacy.status, 400);
+});
+
+test("merge since the lock-down: Play's winnings come along, and its watched slips, tickets and records move to this pass", async () => {
+  const t = setup();
+  const { updateWallet } = await import('../eco.js');
+  const { moveSlips, OPEN_COLLECTION, OPEN_INDEX, SETTLED_COLLECTION } = await import('../settle.js');
+  const { moveTickets, TICKET_COLLECTION, TICKET_INDEX } = await import('../lotto.js');
+  t.deps.moveRecords = async (env, from, to) => {
+    await moveSlips(env, t.deps, from, to);
+    await moveTickets(env, t.deps, from, to);
+  };
+  const a = await newPass(t, 'odds');
+  const b = await newPass(t, 'odds');
+  const [aId, bId] = [await t.deps.sha256Hex(a.passcode), await t.deps.sha256Hex(b.passcode)];
+  // On b: a slip staked and paid by the Worker (an app can't write a payout), one still open, a ticket waiting.
+  await updateWallet(t.env, t.deps, bId, w => ({ ...w, entries: [...w.entries, { id: 'odds:stake-slipaaaa1', t: 5, app: 'odds', kind: 'stake', amount: -100 }, { id: 'odds:payout-slipaaaa1', t: 6, app: 'odds', kind: 'payout', amount: 250 }, { id: 'odds:stake-slipbbbb2', t: 7, app: 'odds', kind: 'stake', amount: -100 }] }));
+  const put = (c, id, v) => t.deps.fsWrite(t.env, c, id, JSON.stringify(v));
+  await put(OPEN_COLLECTION, `${bId}_slipbbbb2`, { account: bId, state: 'open', slip: { id: 'slipbbbb2' }, t: 7 });
+  await put(OPEN_COLLECTION, OPEN_INDEX, { due: { [`${bId}_slipbbbb2`]: 99, other_x: 5 } });
+  await put(SETTLED_COLLECTION, bId, { slips: { slipaaaa1: { settled: true, payout: 250 } } });
+  await put(TICKET_COLLECTION, `${bId}_tickcccc3`, { account: bId, ticket: { id: 'tickcccc3' }, t: 8 });
+  await put(TICKET_COLLECTION, TICKET_INDEX, { due: { [`${bId}_tickcccc3`]: 50 } });
+  const poolB = (await t.call('GET', `${t.qt(b.token)}&app=odds`)).data.pool;
+  const aa = await t.call('POST', '', { op: 'refresh', refresh: a.refresh, app: 'odds', claim: true });
+  const poolA = aa.data.pool;
+  const m = await t.call('POST', '', { op: 'merge', qt: aa.data.token, sources: [{ passcode: b.passcode }] });
+  assert.equal(m.status, 200);
+  const ids = m.data.wallet.entries.map(e => e.id);
+  for (const id of ['odds:stake-slipaaaa1', 'odds:payout-slipaaaa1', 'odds:stake-slipbbbb2']) assert.ok(ids.includes(id), id);
+  assert.equal(m.data.wallet.entries.filter(e => e.app === 'odds').reduce((s, e) => s + e.amount, 0), 50, 'the NT$250 won is there, once');
+  assert.ok(m.data.pool > poolA && poolB > 0);
+  const get = async (c, id) => JSON.parse((await t.deps.fsGet(t.env, c, id)).payload || 'null');
+  assert.equal(await get(OPEN_COLLECTION, `${bId}_slipbbbb2`), null);
+  assert.equal((await get(OPEN_COLLECTION, `${aId}_slipbbbb2`)).account, aId, 'settled later, paid to this pass');
+  assert.deepEqual(await get(OPEN_COLLECTION, OPEN_INDEX), { due: { other_x: 5, [`${aId}_slipbbbb2`]: 99 } });
+  assert.equal((await get(SETTLED_COLLECTION, aId)).slips.slipaaaa1.payout, 250);
+  assert.equal((await get(TICKET_COLLECTION, `${aId}_tickcccc3`)).account, aId);
+  assert.deepEqual(Object.keys((await get(TICKET_COLLECTION, TICKET_INDEX)).due), [`${aId}_tickcccc3`]);
+});
+
+test("a phone clock set ahead never blocks a later save: a setting's time is the Worker's at the latest", async () => {
+  const t = setup();
+  const a = await newPass(t, 'vocab');
+  const year = 365 * 86_400_000;
+  const ahead = await t.call('PATCH', `${t.qt(a.token)}&app=vocab`, { wallet: { settings: { theme: { value: 'dark', t: Date.now() + year } }, snap: { vocab: { words: 5, t: Date.now() + year } } } });
+  assert.equal(ahead.status, 200);
+  assert.ok(ahead.data.wallet.settings.theme.t < Date.now() + year / 2, 'stamped no later than now');
+  // Another device, its clock right, a moment later: its change stands.
+  t.advance(60_000);
+  const later = await t.call('PATCH', `${t.qt(ahead.data.token)}&app=vocab`, { wallet: { settings: { theme: { value: 'light', t: t.deps.now() } }, snap: { vocab: { words: 6, t: t.deps.now() } } } });
+  assert.equal(later.data.wallet.settings.theme.value, 'light');
+  assert.equal(later.data.wallet.snap.vocab.words, 6);
 });
 
 test('Orbit sharing: a key gives a copy of the schedule as it is', async () => {

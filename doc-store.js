@@ -139,3 +139,38 @@ export async function changeDoc(env, deps, collection, id, change, { read = v =>
   }
   return undefined;
 }
+
+// An account's watched documents moved to another account (a pass merged
+// into another): every `<from>_<id>` the collection's index (`due`: key →
+// time) lists is written again as `<to>_<id>` with `account: to`, the old
+// one deleted, and the index changed to match. How many moved.
+export async function moveOwned(env, deps, collection, indexId, from, to) {
+  const asIndex = v => (v && typeof v.due === 'object' ? v : { due: {} });
+  const index = asIndex(parseDoc(await deps.fsGet(env, collection, indexId)));
+  const prefix = `${from}_`;
+  const moved = [];
+  for (const [key, at] of Object.entries(index.due)) {
+    if (!key.startsWith(prefix)) continue;
+    const value = parseDoc(await deps.fsGet(env, collection, key));
+    if (!value) continue;
+    const next = `${to}_${key.slice(prefix.length)}`;
+    try {
+      await deps.fsWrite(env, collection, next, JSON.stringify({ ...value, account: to }), { exists: false });
+    } catch (error) {
+      if (!error.precondition) throw error;
+      continue;
+    }
+    await deps.fsDelete(env, collection, key);
+    moved.push([key, next, at]);
+  }
+  if (moved.length)
+    await changeDoc(env, deps, collection, indexId, idx => {
+      const due = { ...idx.due };
+      for (const [key, next, at] of moved) {
+        due[next] = due[key] ?? at;
+        delete due[key];
+      }
+      return { ...idx, due };
+    }, { read: asIndex });
+  return moved.length;
+}

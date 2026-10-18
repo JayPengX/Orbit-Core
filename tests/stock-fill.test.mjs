@@ -259,3 +259,20 @@ test('two asks at once never lose each other\'s fills: the second merges into th
   assert.deepEqual(Object.keys(kept.open), ['order0009']);
   assert.ok(kept.cancelled.order0010);
 });
+
+test("a pass merged into another: its fills book merges into the other's (its fills still the proxy's own)", async () => {
+  const { moveBook, readBook } = await import('../stock-fill.js');
+  const docs = new Map();
+  const deps = {
+    fsGet: async (env, c, id) => (docs.has(`${c}/${id}`) ? { exists: true, payload: docs.get(`${c}/${id}`), updateTime: 'u' } : { exists: false }),
+    fsWrite: async (env, c, id, payload) => void docs.set(`${c}/${id}`, payload),
+    fsDelete: async (env, c, id) => void docs.delete(`${c}/${id}`)
+  };
+  docs.set(`${FILLS_COLLECTION}/from`, JSON.stringify({ v: 2, fills: { o1: { quote: 10, t: now } }, open: {}, plans: {}, cancelled: { o2: now } }));
+  docs.set(`${FILLS_COLLECTION}/to`, JSON.stringify({ v: 2, fills: { o3: { quote: 20, t: now } }, open: {}, plans: {}, cancelled: {} }));
+  await moveBook({}, deps, 'from', 'to', now);
+  assert.equal(docs.has(`${FILLS_COLLECTION}/from`), false);
+  const book = readBook({ exists: true, payload: docs.get(`${FILLS_COLLECTION}/to`) });
+  assert.deepEqual(Object.keys(book.fills).sort(), ['o1', 'o3']);
+  assert.deepEqual(Object.keys(book.cancelled), ['o2']);
+});
