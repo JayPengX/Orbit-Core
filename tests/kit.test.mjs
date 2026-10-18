@@ -383,6 +383,17 @@ test('a notice the Worker already sent as a phone notice is not shown again when
   }
 });
 
+test('CPBL: a game the proxy still has as to come, hours after its start, takes its score from TheSportsDB', async () => {
+  const { asiaMonth } = await import('../kit/catalog.mjs');
+  const now = Date.parse('2026-10-18T04:00:00Z');
+  const asked = [];
+  const fetchJson = async url => (asked.push(url), { events: [{ idEvent: '2618128', strTimestamp: '2026-10-17T09:05:00', strHomeTeam: 'Wei Chuan Dragons', strAwayTeam: 'CTBC Brothers', intHomeScore: '3', intAwayScore: '0', strStatus: 'FT', intRound: '0' }] });
+  const g = (start, state) => ({ id: start, start, home: { en: 'Wei Chuan Dragons' }, away: { en: 'CTBC Brothers' }, homeScore: null, awayScore: null, state });
+  const games = await asiaMonth(async () => ({ games: [g('2026-10-17T09:05:00.000Z', 'pre'), g('2026-10-18T09:05:00.000Z', 'pre')] }), 'cpbl', '2026-10', { now, fetchJson });
+  assert.deepEqual(games.map(x => [x.state, x.homeScore, x.awayScore]), [['post', 3, 0], ['pre', null, null]]);
+  assert.deepEqual(asked.map(u => u.match(/d=([\d-]+)/)[1]), ['2026-10-17']);
+});
+
 test('CPBL: a month the proxy can\'t fill comes from TheSportsDB\'s day lists on the device', async () => {
   const { asiaMonth, tsdbDays } = await import('../kit/catalog.mjs');
   const now = Date.parse('2026-09-30T04:00:00Z');
