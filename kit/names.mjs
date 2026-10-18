@@ -122,7 +122,7 @@ const COLLEGE = {
   "Hawai'i": '夏威夷', Hawaii: '夏威夷', Houston: '休士頓', Illinois: '伊利諾', Indiana: '印第安納', Iowa: '愛荷華', 'Iowa State': '愛荷華州立', 'Jacksonville State': '傑克森維爾州立', 'James Madison': '詹姆斯麥迪遜', Kansas: '堪薩斯', 'Kansas State': '堪薩斯州立', 'Kennesaw State': '肯尼索州立', 'Kent State': '肯特州立', Kentucky: '肯塔基',
   Liberty: '自由大學', Louisiana: '路易斯安那', 'Louisiana Tech': '路易斯安那理工', 'UL Monroe': '路易斯安那門羅', Louisville: '路易維爾', LSU: '路易斯安那州立', Marshall: '馬歇爾', Maryland: '馬里蘭', Massachusetts: '麻薩諸塞', UMass: '麻薩諸塞', Memphis: '曼菲斯', 'Miami': '邁阿密', 'Miami (OH)': '邁阿密（俄亥俄）', Michigan: '密西根', 'Michigan State': '密西根州立', 'Middle Tennessee': '中田納西', Minnesota: '明尼蘇達', 'Mississippi State': '密西西比州立', Missouri: '密蘇里', 'Missouri State': '密蘇里州立',
   Navy: '海軍官校', 'NC State': '北卡州立', Nebraska: '內布拉斯加', Nevada: '內華達', 'New Mexico': '新墨西哥', 'New Mexico State': '新墨西哥州立', 'North Carolina': '北卡羅來納', 'North Texas': '北德州', 'Northern Illinois': '北伊利諾', Northwestern: '西北', 'Notre Dame': '聖母', Ohio: '俄亥俄', 'Ohio State': '俄亥俄州立', Oklahoma: '奧克拉荷馬', 'Oklahoma State': '奧克拉荷馬州立', 'Old Dominion': '老道明', 'Ole Miss': '密西西比', Oregon: '奧勒岡', 'Oregon State': '奧勒岡州立',
-  'Penn State': '賓州州立', Pittsburgh: '匹茲堡', Purdue: '普渡', Rice: '萊斯', Rutgers: '羅格斯', 'Sam Houston': '山姆休士頓', 'San Diego State': '聖地牙哥州立', 'San José State': '聖荷西州立', 'San Jose State': '聖荷西州立', SMU: '南方衛理', 'South Alabama': '南阿拉巴馬', 'South Carolina': '南卡羅來納', 'South Florida': '南佛羅里達', 'Southern Miss': '南密西西比', Stanford: '史丹佛', Syracuse: '雪城',
+  'Penn State': '賓州州立', Pittsburgh: '匹茲堡', Purdue: '普渡', Rice: '萊斯', Rutgers: '羅格斯', 'Sacramento State': '沙加緬度州立', 'Sam Houston': '山姆休士頓', 'San Diego State': '聖地牙哥州立', 'San José State': '聖荷西州立', 'San Jose State': '聖荷西州立', SMU: '南方衛理', 'South Alabama': '南阿拉巴馬', 'South Carolina': '南卡羅來納', 'South Florida': '南佛羅里達', 'Southern Miss': '南密西西比', Stanford: '史丹佛', Syracuse: '雪城',
   TCU: '德州基督教', Temple: '天普', Tennessee: '田納西', Texas: '德州', 'Texas A&M': '德州農工', 'Texas State': '德州州立', 'Texas Tech': '德州理工', Toledo: '托雷多', Troy: '特洛伊', Tulane: '杜蘭', Tulsa: '塔爾薩', UAB: '阿拉巴馬伯明罕', UCF: '中佛羅里達', UCLA: '加州大學洛杉磯', UConn: '康乃狄克', UNLV: '內華達拉斯維加斯', USC: '南加州', Utah: '猶他', 'Utah State': '猶他州立', UTEP: '德州艾爾帕索', UTSA: '德州聖安東尼奧',
   Vanderbilt: '范德堡', Virginia: '維吉尼亞', 'Virginia Tech': '維吉尼亞理工', 'Wake Forest': '維克森林', Washington: '華盛頓', 'Washington State': '華盛頓州立', 'West Virginia': '西維吉尼亞', 'Western Kentucky': '西肯塔基', 'Western Michigan': '西密西根', Wisconsin: '威斯康辛', Wyoming: '懷俄明'
 };
@@ -133,6 +133,30 @@ function collegeZh(name) {
   return school ? COLLEGE[school] : null;
 }
 
+// Clubs of the leagues Play carries beyond Europe's big ones (2026-10: every
+// club ESPN lists for each), by their English name as ESPN or Kambi write it
+// (normalized below, as CLUBS'). Soccer's go in with CLUBS, as clubs meet in
+// other competitions (Utrecht in the Europa League); a name two leagues share
+// (Santos) is the league's own below.
+const MORE_CLUBS = {
+  // Eredivisie
+  'ADO Den Haag': '海牙', Excelsior: '鹿特丹精英', 'FC Groningen': '格羅寧根', 'FC Utrecht': '烏德勒支', 'Fortuna Sittard': '錫塔德', 'Go Ahead Eagles': '前進之鷹', Heerenveen: '海倫芬', 'PEC Zwolle': '茲沃勒', 'SC Cambuur': '坎布爾', 'Sparta Rotterdam': '鹿特丹斯巴達', Telstar: '特爾斯達', 'Willem II': '威廉二世',
+  // Liga MX
+  América: '美洲', Atlante: '亞特蘭特', Atlas: '阿特拉斯', 'Atlético de San Luis': '聖路易斯競技', 'Cruz Azul': '藍十字', 'FC Juárez': '華雷斯', Guadalajara: '瓜達拉哈拉', León: '萊昂', Monterrey: '蒙特雷', Necaxa: '內卡薩', Pachuca: '帕丘卡', Puebla: '普埃布拉', 'Pumas UNAM': '美洲獅', Querétaro: '克雷塔羅', 'Santos Laguna': '桑托斯拉古納', 'Tigres UANL': '老虎', Tijuana: '提華納', Toluca: '托盧卡',
+  // Brasileirão
+  'Athletico-PR': '巴拉納競技', 'Atlético-MG': '米內羅競技', Bahia: '巴伊亞', Botafogo: '博塔弗戈', Chapecoense: '沙佩科恩斯', Corinthians: '哥林斯人', Coritiba: '科里蒂巴', Cruzeiro: '克魯塞羅', Flamengo: '佛朗明哥', Fluminense: '弗魯米嫩塞', Grêmio: '格雷米奧', Internacional: '國際', Mirassol: '米拉索爾', Palmeiras: '帕梅拉斯', 'Red Bull Bragantino': '紅牛布拉干蒂諾', Remo: '雷莫', Santos: '桑托斯', 'São Paulo': '聖保羅', 'Vasco da Gama': '華斯高', Vitória: '維多利亞',
+  // K League
+  'Jeonbuk Hyundai Motors': '全北現代', 'Jeonbuk Motors': '全北現代', 'Ulsan HD': '蔚山 HD', 'Ulsan Hyundai': '蔚山 HD', 'Pohang Steelers': '浦項制鐵', 'FC Seoul': '首爾', Gangwon: '江原', 'Gangwon FC': '江原', 'Gwangju FC': '光州', 'Daejeon Hana Citizen': '大田市民', 'Daejeon Citizen': '大田市民', 'Jeju United': '濟州', 'Jeju SK': '濟州', 'Incheon United': '仁川聯', 'Anyang FC': '安養', 'FC Anyang': '安養', 'Gimcheon Sangmu FC': '金泉尚武', 'Gimcheon Sangmu': '金泉尚武', 'Suwon FC': '水原 FC', 'Daegu FC': '大邱', 'Suwon Samsung Bluewings': '水原三星'
+};
+// A league's own names: its clubs a name shared with another league's
+// (Liga MX's Santos), and the NBL's (basketball: not CLUBS').
+const LEAGUE_NAMES = {
+  ligamx: { Santos: '桑托斯拉古納' },
+  nbl: { 'Adelaide 36ers': '阿德萊德 36 人', 'Brisbane Bullets': '布里斯本子彈', 'Cairns Taipans': '凱恩斯太攀蛇', 'Illawarra Hawks': '伊拉瓦拉老鷹', 'Melbourne United': '墨爾本聯', 'New Zealand Breakers': '紐西蘭破浪者', 'Perth Wildcats': '伯斯野貓', 'South East Melbourne Phoenix': '東南墨爾本鳳凰', 'Sydney Kings': '雪梨國王', 'Tasmania JackJumpers': '塔斯馬尼亞跳蟻' }
+};
+for (const [name, zh] of Object.entries(MORE_CLUBS)) CLUBS[normalizeTeamName(name)] ??= zh;
+const LEAGUE_BY_NAME = Object.fromEntries(Object.entries(LEAGUE_NAMES).map(([k, t]) => [k, Object.fromEntries(Object.entries(t).map(([name, zh]) => [normalizeTeamName(name), zh]))]));
+
 const SOCCER = new Set(['soccer']);
 // A team in Chinese: { full, short }, or null when there's no Chinese name.
 // `key` is the league (Play's key; Orbit Sports' own is the same), `sport` its sport.
@@ -141,6 +165,8 @@ export function teamNameZh(key, name, sport = '') {
   const n = normalizeTeamName(name);
   const us = US[key]?.[name] || US_BY_KEY[key]?.[n];
   if (us) return { full: `${us[0]}${us[0] && /^[\d]/.test(us[1]) ? ' ' : ''}${us[1]}`, short: us[1] };
+  const own = LEAGUE_BY_NAME[key]?.[n];
+  if (own) return { full: own, short: own };
   if (key === 'ncaaf') {
     const zh = collegeZh(name);
     return zh ? { full: zh, short: zh } : null;
@@ -172,6 +198,7 @@ export function teamsByZh(query, most = 6) {
   for (const table of Object.values(US)) for (const [name, [city, nick]] of Object.entries(table)) add(name, `${city}${nick}`);
   for (const [name, zh] of Object.entries(CLUBS)) add(name, zh);
   for (const [name, zh] of Object.entries(ASIA)) add(name, zh);
+  for (const t of Object.values(LEAGUE_NAMES)) for (const [name, zh] of Object.entries(t)) add(name, zh);
   for (const [name, zh] of Object.entries(COLLEGE)) add(name, zh);
   // One English name a team (a club written several ways: the first).
   const seen = new Set();
