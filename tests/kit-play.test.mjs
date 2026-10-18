@@ -7,7 +7,7 @@ import { legResult, applyResults, voidAt, lateOutcome, decidedSoFar, parseEspnRe
 import { settleSlip, evaluateSlip, slipPayoutTable, slipOutlook, analyzeSlip, afterTax, prizeAfterTax, SLIP_RULES, combosBySize, comboCount, slipErrors, slipSizes, choose, maskChance, exclusiveMasks, estimateLineOdds, estimateFuturesOdds, estimateF1Odds, devigPower, devigTwoWay, devigProportional, americanToProbability, boostRate, seededRandom, quantile, median } from '../kit/play-odds.mjs';
 import { cashOutState, CASHOUT_KEEP, CASHOUT_MAX_OPEN } from '../kit/play-cashout.mjs';
 import { houseRule, shadeLong, minLegsProblem, HOUSE_RULES, LONG_FROM } from '../kit/play-rules.mjs';
-import { GAMES, ticketPrize, parseDraw, cappedPrize, settleTicket, buyTicket, nextDraw, nextDraws, limits, checkSelection, betCount, expectedReturn, mergeTickets, addTickets, BINGO_DRAWS, GAME_ORDER } from '../kit/play-lottery.mjs';
+import { GAMES, ticketPrize, parseDraw, cappedPrize, settleTicket, buyTicket, nextDraw, nextDraws, limits, drawTerm, tierName, closesAt, CLOSE_MS, checkSelection, betCount, expectedReturn, mergeTickets, addTickets, BINGO_DRAWS, GAME_ORDER } from '../kit/play-lottery.mjs';
 import { CARD_ORDER, face, facePays, tiersOf, drawPrize, buyScratch, revealScratch, expectedReturn as scratchReturn } from '../kit/play-scratch.mjs';
 import { propResult } from '../kit/play-props.mjs';
 import { parseOffers } from '../kit/play-offers.mjs';
@@ -662,6 +662,26 @@ test('a draw settles once its prizes are out; a won 頭獎 pays at least its flo
   assert.equal(ticketPrize({ game: 'm39', sel: { numbers: [10, 20, 1], size: 2 } }, m539).prize, 1_500);
   assert.equal(ticketPrize({ game: 'm39', sel: { numbers: [10, 20, 26], size: 3 } }, m539).prize, 11_250);
   assert.equal(ticketPrize({ game: 'm39', sel: { numbers: [10, 20, 26, 32], size: 4 } }, m539).prize, 212_500, 'none read: the table');
+});
+
+test('期別, 開出順序, tier names and 截止, as Taiwan Lottery prints them', () => {
+  // BINGO: 203 a day from 1 Jan (the results: 2026-10-17 07:05 was 115058668, 2026-02-15's first 115009136).
+  assert.equal(drawTerm('bingo', { date: '2026-10-17', slot: 0 }), 115_058_668);
+  assert.equal(drawTerm('bingo', { date: '2026-02-15', slot: 0 }), 115_009_136);
+  assert.equal(drawTerm('bingo', { date: '2026-10-17', slot: 202 }), 115_058_870);
+  // Evening games count their draw days on from a known draw (Taiwan Lottery's next: 威力彩 115000084, 大樂透 115000098).
+  assert.equal(drawTerm('super638', { date: '2026-10-19' }, { period: 115_000_083, date: '2026-10-15' }), 115_000_084);
+  assert.equal(drawTerm('m49', { date: '2026-10-20' }, { period: 115_000_097, date: '2026-10-16' }), 115_000_098);
+  assert.equal(drawTerm('daily539', { date: '2026-10-22' }, { period: 115_000_252, date: '2026-10-17' }), 115_000_256, 'Mon-Thu, no Sunday');
+  assert.equal(drawTerm('daily539', { date: '2027-01-02' }, { period: 115_000_310, date: '2026-12-31' }), 116_000_002, 'a new year starts at 1');
+  assert.equal(drawTerm('daily539', { date: '2026-10-17' }, { period: 115_000_252, date: '2026-10-17' }), null);
+  const d = parseDraw('super638', { period: 115000083, drawNumberSize: [6, 12, 18, 25, 30, 33, 6], drawNumberAppear: [6, 30, 33, 25, 18, 12, 6] });
+  assert.deepEqual([d.period, d.order, d.numbers, d.zone2], [115_000_083, [6, 30, 33, 25, 18, 12], [6, 12, 18, 25, 30, 33], 6]);
+  assert.deepEqual([tierName('lotto649', 'second'), tierName('super638', 'normal', 'en'), tierName('m39', 'x2')], ['貳獎', 'Consolation', null]);
+  const draw = nextDraw('super638', Date.parse('2026-10-19T10:00:00Z'));
+  assert.equal(closesAt('super638', draw), draw.at - CLOSE_MS, '截止 20:00');
+  const b = nextDraw('bingo', Date.parse('2026-10-19T10:00:00Z'));
+  assert.equal(closesAt('bingo', b), b.at - 60_000);
 });
 
 test('倍數 and 多期 as each game takes them (台灣彩券 投注方式), 多期 a ticket a draw', () => {
