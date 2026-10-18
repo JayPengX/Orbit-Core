@@ -1,24 +1,58 @@
 # Tools
 
-Kept here for quick use in any Quadra session (Claude Code's cloud container
-has Node 22, curl and Playwright's Chromium).
-
 On the owner's Mac: Node 22 in `~/.local/opt/node`, Playwright (WebKit and
-Chromium) in `~/.local/opt/playwright`, which `preview.mjs` finds by itself.
+Chromium) in `~/.local/opt/playwright`; `preview.mjs` finds them itself.
+
+## `node tools/preview.mjs <app> [view…]`
+
+An app on an iPhone-sized page, signed in with a made-up wallet. Apps:
+`sports`, `play`, `securities`, `words`, `orbit` (Class), `weather`,
+`transit`, `slips`, `beats`, `admin`.
+
+It prints console errors and three kinds of layout fault:
+
+- `wraps:` text that broke onto a second row;
+- `cut:` an ellipsis, a clipped box, or a picker too narrow;
+- `scrolls sideways:` a page or sheet wider than the screen.
+
+The usual run:
+
+```bash
+node tools/preview.mjs sports --live --width 375
+```
+
+| Flag | What |
+| --- | --- |
+| `--live` | Real data through the Workers' dev doors; prints the busiest minute |
+| `--width`, `--height`, `--full`, `--dark`, `--lang en` | The screen |
+| `--click "<selector>"` or `--click "js:…"` | Act before the shot (repeatable) |
+| `--eval "<js>"`, `--wait ms` | Read something out; wait first |
+| `--store key=value`, `--payload file.json` | Start with this localStorage or Pass payload |
+| `--out dir` | Where shots go (default `/tmp/quadra-preview`) |
+| `--webkit` | Safari's engine instead of Chromium |
+| `--reopen` | Open twice with storage kept (a returning phone) |
+| `--upgrade <date\|ref>` | The old version, then today's, in one storage |
+| `--flaky <share>`, `--net offline\|slow[:ms]` | Failing or missing network |
+| `--shuffle` | What moved after the loading screen lifted |
+| `--timing`, `--requests`, `--profile`, `--latency ms`, `--h2`, `--root dir` | Speed: when it opened, every call, the CPU profile, a phone's latency, a deploy's build |
+| `--clock ISO`, `--fixture host/path=file` | A made-up time or answer |
+| `--serve [--port 8123]` | Serve it for the iOS Simulator (`xcrun simctl openurl booted http://localhost:8123/<Repo>/`) |
+| `--no-geo` | (Weather) refuse the position |
+
+Without `--live`, Transit uses made-up TDX around 新竹車站 and Weather its
+saved fixtures. `admin [view…]` opens the admin panel on twelve made-up
+accounts, never the owner's key. `DEBUG=1` lists every upstream fetch.
+
+## Others
 
 | Tool | What |
 | --- | --- |
-| `node tools/preview.mjs <app> [hash…]` | (`--upgrade <date\|ref>`: the app as of then, then today's, in one storage: an installed app updated. `--flaky <share>`: that share of answers fails on the first opening. `--shuffle`: what moved after the loading screen lifted; Transit's map markers in view, by kind, and its strip of YouBike stations too.) (`sports`, `words`: Orbit Sports and Words, the old `fixtures`, `hub` too.) (`transit`: Orbit Transit on made-up TDX answers around 新竹車站, `tests/fixtures/transit`, no Google key so the map is NLSC's; the position beside 新竹車站.) (`admin [view…]`: the admin panel, site/admin, on eco-admin.js's own handler and twelve made-up accounts in the run's memory, opened with a throwaway key of the run's, never the owner's; a view named is its tab clicked: `overview accounts issue money dev data ops clean`.) (`weather`: Orbit Weather, its forecast from weather.js on the saved fixtures, the place from NLSC, the position Taipei 101; `--no-geo` refuses it; with `--live`, today's real forecast through Weather's dev door.) Screenshots an app on an iPhone-sized page, signed in with a made-up wallet, with real data (the proxy's upstream fetched directly). Options: `--full`, `--dark`, `--lang en`, `--wait ms`, `--click selector` (repeatable), `--width`, `--height`, `--payload file.json`, `--store key=value` (localStorage to start with), `--out dir` (default `/tmp/quadra-preview`), `--timing` (when the loading screen went away, as the page saw it, how many of the app's own files and in how many waves), `--latency ms` (the app's files answer that much later, like a phone on GitHub Pages), `--clock ISO` (the page's time starts then and runs on: with `--fixture 'f1-live.quadra/now.json=file'`, a made-up live session), `--root dir` (the repos from there, e.g. a copy stamped by `scripts/stamp-version.mjs`, to measure a deploy), `--h2` (the app's files over HTTP/2 as Pages serves them: over HTTP/1.1 Chromium asks six at a time, so a page listing its modules up front queues here as it never does on a phone). `--webkit`: Safari's engine instead of Chromium (on a Mac, close to an iPhone's Safari, which is what the apps' people use; the screenshot ends `-webkit.png`). A clone from before the rename (`Quadra-Fixtures`, `Quadra-Hub` folders) works too. `--requests`: every call the page makes beyond its own files, when it was asked and how long it took. `--profile` (Chromium): where the page's main thread spent its time until the loading screen went, each function's own time, the 15 largest. `--net offline | slow[:ms]`: the second opening with no connection (navigator.onLine false, every request failing) or every request that reaches the network that much later (8000 ms by default), service workers on (what opens an app offline), the first opening filling them; prints when the loading screen went and what the page said. `--reopen`: each page opened twice in one browser (storage kept), the second as a phone that has used the app opens it (with `--webkit`, in a profile of its own: WebKit's private session drops Cache Storage on a reload, which Safari never does, so the second opening read everything again). `--serve [--port 8123]`: no browser of its own, the app served signed in with the same made-up account and answers for another browser, e.g. the iOS Simulator's Safari (`xcrun simctl openurl booted http://localhost:8123/<repo>/`; its calls to the Workers come back to the tool, and no service worker). Prints console errors, anything wider than the screen, a sheet or page that scrolls sideways (`scrolls sideways:`, a bar a few pixels wider than its sheet; rows made to slide, like chips, aren't counted), text that wrapped (`wraps:`) and text cut short by an ellipsis, a clipped box or a picker too narrow for its choice (`cut:`). `DEBUG=1` lists every upstream fetch. |
-| `node tools/leagues-audit.mjs [--sport soccer] [--json]` | Every league in the shared catalogue against its real sources today: what Fixtures would list (schedule, next game day) and what Play could price. Flags a league with nothing in either. |
-| `node tools/economy.mjs` | The economy on paper: each kind of user's income, house take and balance over a year, under the old settings and the current ones. Change a number in `eco.js` / the kit's `ECONOMY`, then here, and rerun. |
-| `node tools/espn.mjs <path> [query]` | Prints the shape of an ESPN site API answer (keys, first items), for finding fields. |
-| `node kit/sync.mjs` | Copies the shared kit into every app checked out beside this repo (`logos.mjs`, every team, league and driver logo, to Play and Fixtures). |
-| `npm test` (each repo) | The tests; Orbit Class also `npx eslint .`. |
+| `node tools/economy.mjs` | Each kind of user over a year, old settings against new |
+| `node tools/leagues-audit.mjs [--sport soccer] [--json]` | Every catalogue league against its sources today |
+| `node tools/espn.mjs <path> [query]` | The shape of an ESPN answer |
+| `node tools/issue-passes.mjs` | Issue passes (the owner) |
+| `node tools/weather-stations.mjs` | Rebuild `weather-stations.js` |
+| `python3 tools/word-audio.py` | Orbit Words' missing recordings |
 
-Notes:
-
-- ESPN answers 403 to unusual User-Agents: fetch it with curl's default.
-- ESPN's scoreboard doesn't take date ranges (`dates=A-B`) any more; one
-  date, or a whole year (`dates=2026`, for race series, tours and UFC).
-- The container's outbound HTTPS goes through a proxy; Node's `fetch` doesn't
-  use it by itself, curl does.
+ESPN answers 403 to unusual User-Agents: use curl's default. Its scoreboard
+takes one date or a whole year, not a range.
