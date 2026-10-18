@@ -517,7 +517,8 @@ On top of them, **apps put live knowledge over slower copies** (§8).
 ## 10. iPhone Safari is the platform
 
 - Installed apps only: on a phone, every app shows the kit's add-to-home-
-  screen screen in Safari (`installGate`). Orbit Class is phone only (a QR
+  screen screen in Safari (`installGate`), opened from another app or a
+  link too: none of them runs in the browser on a phone. Orbit Class is phone only (a QR
   code on a computer).
 - **No text wraps onto a second row that wasn't designed for one.** No
   half-cut words, no label falling under its number. Shorten the words,
