@@ -796,6 +796,10 @@ function keptJson(url, key, { ttl, keep }, read) {
 // const q = quadraSession('odds');
 // q.on('wallet', w => ...)      the wallet changed (pool, settings…)
 // q.on('active', live => ...)   true: this app is the live one; false: paused
+// q.on('claim', c => ...)      every claim's end (opening, coming back,
+//                               q.claim(), a sign-in), also one that changed
+//                               nothing: { ok, active, live, changed }
+//                               (ok false: it didn't reach the Worker)
 // q.on('signedout', () => ...)
 // await q.start()               signs in (the gate) and makes this app live;
 //                               resolves to the first reply ({ payload, inbox,
@@ -1389,7 +1393,7 @@ function makeSession(app, { lang, heartbeat }) {
   }
 
   // Every way of signing in ends here: a refresh token for this device.
-  const signIn = body => call('POST', '', { ...body, app, inbox: true }).then(res => absorb({ ...res, active: true }));
+  const signIn = body => claimed(call('POST', '', { ...body, app, inbox: true }).then(res => absorb({ ...res, active: true })));
   const login = code => signIn(DEVICE_CODE_PATTERN.test(cleanCode(code)) ? { op: 'pair-redeem', code: cleanCode(code) } : { op: 'login', passcode: cleanCode(code) });
   const create = () => signIn({ op: 'create' });
   // A session from the device's refresh token (claim: make this app live).
@@ -1411,9 +1415,26 @@ function makeSession(app, { lang, heartbeat }) {
     if (refreshing) await refreshing.catch(() => {});
     if (!token || Date.now() - tokenAt > 15 * 60_000) await (refreshing || refresh({ claim: false }));
   }
+  // A claim (this app made live) said when it ends, every time: `active`
+  // fires only when it changes, so a claim on coming back that finds this
+  // app still live said nothing, and an app couldn't tell it had landed.
+  function claimed(p) {
+    const was = active;
+    const end = ok => emit('claim', { ok, active, live, changed: active !== was });
+    return p.then(
+      res => (res?.signedOut || end(true), res),
+      error => {
+        end(false);
+        throw error;
+      }
+    );
+  }
   // (`since`: the updateTime of the app's data held here; still the same,
   // it doesn't come back: `unchanged`. A Worker without it sends it anyway.)
-  async function refreshOnce({ claim = false, data = false, since = '' } = {}) {
+  function refreshOnce({ claim = false, data = false, since = '' } = {}) {
+    return claim ? claimed(refreshCall({ claim, data, since })) : refreshCall({ claim, data, since });
+  }
+  async function refreshCall({ claim, data, since }) {
     const ref = readStore(KEY.refresh);
     if (!ref) return signedOut();
     try {
@@ -1527,7 +1548,7 @@ function makeSession(app, { lang, heartbeat }) {
     let first = null;
     try {
       first = await takeHandoff(app);
-      if (first) absorb({ ...first, active: true });
+      if (first) await claimed(Promise.resolve(first).then(f => (absorb({ ...f, active: true }), f)));
       if (!first && storedAccount()) {
         first = await refresh({ claim: true, data });
         if (first?.signedOut) first = null;

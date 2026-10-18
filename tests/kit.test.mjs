@@ -265,6 +265,36 @@ test('token requests made together share one sign-in call to the Worker', async 
   assert.equal(calls.length, 1);
 });
 
+test("every claim says it ended ('claim'), also one that left this app live as it was; 'active' only on a change", async () => {
+  store.clear();
+  const claims = Buffer.from(JSON.stringify({ k: 'ref', d: 'abcdef0123456789abcdef', s: 'S', g: 0, e: 9e15 })).toString('base64url');
+  store.set('quadra.refresh', `${claims}.sig`);
+  store.set('quadra.account', 'abcdef0123456789');
+  let reply = { token: 'tok', wallet: { entries: [] }, active: true };
+  globalThis.fetch = async () => (reply ? new Response(JSON.stringify(reply), { status: 200 }) : Promise.reject(new TypeError('offline')));
+  const s = kit.quadraSession('words', { heartbeat: 1e9 });
+  const seen = [];
+  s.on('active', live => seen.push(['active', live]));
+  s.on('claim', c => seen.push(['claim', c]));
+  await s.claim();
+  await s.claim();
+  reply = { token: 'tok', wallet: { entries: [] }, active: false, live: { app: 'words', device: 'other' } };
+  await s.claim();
+  reply = null;
+  await s.claim().catch(() => {});
+  // Not a claim: no event.
+  reply = { token: 'tok2', wallet: { entries: [] } };
+  await s.ensureToken({ renew: true });
+  assert.deepEqual(seen, [
+    ['active', true],
+    ['claim', { ok: true, active: true, live: null, changed: true }],
+    ['claim', { ok: true, active: true, live: null, changed: false }],
+    ['active', false],
+    ['claim', { ok: true, active: false, live: { app: 'words', device: 'other' }, changed: true }],
+    ['claim', { ok: false, active: false, live: { app: 'words', device: 'other' }, changed: false }]
+  ]);
+});
+
 test("a cold start uses its app's own kept token while it's young and the account's, without waiting on the sign-in", async () => {
   const claims = Buffer.from(JSON.stringify({ k: 'ref', d: 'abcdef0123456789abcdef', s: 'S', g: 0, e: 9e15 })).toString('base64url');
   const calls = [];
