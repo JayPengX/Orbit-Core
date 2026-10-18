@@ -422,6 +422,7 @@ own key:
 | `polymarket-events`, `polymarket-games`, `polymarket-markets` | A league's events and markets (a 100-event page goes from ~11.5 MB to ~0.45 MB). Play asks for the events without their markets (`include_markets=false`), the games' winner markets apart (`/markets`, `sports_market_types=moneyline`) and the championships whole by id: ~3 MB for the proxy to read a board where every market was ~40 MB |
 | `kambi-events`, `kambi-offers` | Kambi's lists |
 | `espn-roster`, `espn-news`, `espn-athletes`, `espn-injuries`, `espn-leaders` | ESPN's heavy pages |
+| `fotmob-page`, `fotmob-stat` (always) | FotMob's league and team pages and stat lists (football's 數據領先), each to its leaders |
 | `espn-board` | A league's scoreboard as Play's board reads it (each game's id, time, state, sides and DraftKings' closing lines): NHL's month ~4.5 MB → ~0.13 MB |
 | `elta`, `eltavod` | ELTA's program list and season pages |
 | `ytsearch`, `ytvideo` | YouTube |

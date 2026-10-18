@@ -460,3 +460,21 @@ test("espn-leaders: basketball's and baseball's leaders and football's scorers, 
   assert.equal(soccer.categories[0].leaders[0].team.id, '382');
   assert.deepEqual(trimEspnLeaders({ results: [] }), { results: [] }, 'not a leaders page: as it was');
 });
+
+test("FotMob for football's 數據領先: only a league's or team's page and its stat lists, each trimmed to its leaders", async () => {
+  const { trimFotmobPage, trimFotmobStat } = await import('../sports.js');
+  const p = { id: 1, name: 'Erling Haaland', teamId: 8456, teamName: 'Manchester City', value: 8, ccode: 'NOR', teamColors: {} };
+  const page = trimFotmobPage({ details: { id: 47, selectedSeason: '2026/2027' }, table: [{ data: { table: { all: [{ id: 8456, name: 'Manchester City', shortName: 'Man City', pts: 21 }] } } }], stats: { teamId: 8456, players: [{ header: 'Top scorer', participant: { stat: { name: 'goals', format: 'number', fractions: 0 } }, fetchAllUrl: 'https://data.fotmob.com/stats/47/season/36781/goals.json', topThree: [p] }] } });
+  assert.deepEqual(page, { id: 47, season: '2026/2027', teamId: 8456, stats: [{ header: 'Top scorer', name: 'goals', format: 'number', fractions: 0, url: 'https://data.fotmob.com/stats/47/season/36781/goals.json', top: [{ id: 1, name: 'Erling Haaland', teamId: 8456, teamName: 'Manchester City', value: 8 }] }], teams: [{ id: 8456, name: 'Manchester City', shortName: 'Man City' }] });
+  const stat = trimFotmobStat({ TopLists: [{ StatName: 'total_tackle', Title: 'Tackles per 90', StatFormat: 'fraction', StatDecimals: 1, StatList: Array.from({ length: 12 }, (_, i) => ({ ParticipantName: `P${i}`, ParticiantId: i, TeamId: 1, TeamName: 'X', StatValue: 4 - i / 10, SubStatValue: 10, MatchesPlayed: 4, MinutesPlayed: 300, Rank: i + 1, Positions: [1] })) }] });
+  assert.equal(stat.list.length, 10);
+  assert.deepEqual(stat.list[0], { id: 0, name: 'P0', teamId: 1, teamName: 'X', value: 4, sub: 10, games: 4, mins: 300, rank: 1 });
+});
+
+test('FotMob: its two hosts only for those pages', async () => {
+  const { handleSports } = await import('../sports.js');
+  const ask = async target => (await handleSports(new Request(`https://x.dev/sports-proxy?url=${encodeURIComponent(target)}`), {}, { waitUntil() {} }, {}, '1.2.3.4')).status;
+  assert.equal(await ask('https://www.fotmob.com/api/data/matchDetails?matchId=1'), 400);
+  assert.equal(await ask('https://www.fotmob.com/api/data/leagues?id=47&x=1'), 400);
+  assert.equal(await ask('https://data.fotmob.com/stats/47/season/36781/../../x.json'), 400);
+});
