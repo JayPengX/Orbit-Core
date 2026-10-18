@@ -35,3 +35,14 @@ test("another session on the feed: not this one's outcome; its archive once it's
   assert.equal(feedOver({ ...quali, session: { ...quali.session, status: 'Finished' }, message: { text: 'CHEQUERED FLAG' } }), false);
   assert.equal(feedOver({ ...quali, part: 3, session: { ...quali.session, status: 'Finished' } }), true);
 });
+
+test("a session named the kit's way or ESPN's (Qual, SR, FP1): the same session", () => {
+  const quali = feed(false, { type: 'Qualifying', name: 'Qualifying' });
+  assert.equal(sameSession(quali, 'Qual', start), true);
+  assert.equal(sameSession(quali, 'Qualifying', start), true);
+  assert.equal(sameSession(quali, 'SQ', start), false);
+  const sprint = feed(false, { type: 'Race', name: 'Sprint' });
+  assert.equal(sameSession(sprint, 'SR', start), true);
+  assert.equal(sameSession(sprint, 'Race', start), false);
+  assert.equal(sameSession(feed(false, { type: 'Practice', name: 'Practice 1' }), 'FP1', start), true);
+});

@@ -11,8 +11,11 @@ export const F1_LIVE = 'https://f1-live.quadra/now.json';
 export const f1Archive = start => `https://f1-live.quadra/session.json?start=${encodeURIComponent(new Date(start).toISOString())}`;
 
 // The feed's session is this one: its kind ('Race', 'Qualifying', 'Sprint',
-// 'Sprint Qualifying', 'Practice') and a start within 3 hours of `start`.
-export function sameSession(feed, kind, start) {
+// 'Sprint Qualifying', 'Practice', or ESPN's short name: FP1, Qual, SR…) and
+// a start within 3 hours of `start`.
+const FEED_KIND = { FP1: 'Practice', FP2: 'Practice', FP3: 'Practice', Qual: 'Qualifying', SS: 'Sprint Qualifying', SQ: 'Sprint Qualifying', SR: 'Sprint', Race: 'Race' };
+export function sameSession(feed, kindOrAbbr, start) {
+  const kind = FEED_KIND[kindOrAbbr] || kindOrAbbr;
   const s = feed?.session;
   if (!s?.start) return false;
   const [h, m] = String(s.gmt || '0:0').split(':').map(Number);
