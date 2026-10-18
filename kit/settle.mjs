@@ -55,6 +55,8 @@ const firstPeriods = (list, n) => list.slice(0, n).reduce((s, x) => s + (Number(
 // A soccer half is one period; elsewhere a first half is two quarters.
 const halfPeriods = sport => (sport && isSoccer(sport) ? 1 : 2);
 
+const REGULATION_KINDS = new Set(['total', 'runline', 'teamtotal']);
+
 export function topInning(awayInnings, homeInnings) {
   const runs = Array.from({ length: 9 }, (_, i) => (Number(awayInnings[i]) || 0) + (Number(homeInnings[i]) || 0));
   const most = Math.max(...runs);
@@ -96,13 +98,20 @@ export function legResult(leg, outcome) {
   if (leg.kind === 'f1team') return win(norm(f1Driver(outcome.winner).team) === norm(leg.team));
   // A player's number in the box score (props.mjs).
   if (leg.kind === 'prop') return propResult(leg, outcome.prop ?? null);
-  const away = Number(outcome.awayScore);
-  const home = Number(outcome.homeScore);
+  let away = Number(outcome.awayScore);
+  let home = Number(outcome.homeScore);
   if (!Number.isFinite(away) || !Number.isFinite(home)) return null;
   const push = diff => (diff === 0 ? 'void' : win(diff > 0));
   // Each side's period scores (innings, halves, quarters), as read.
   const a = outcome.awayInnings || [];
   const h = outcome.homeInnings || [];
+  // Hockey's 讓分 and 大小 are on 60 minutes, without overtime or the
+  // shootout (台灣運彩 投注規範 2(17) 冰球 全場): its three periods.
+  if (familyOf(leg.sport) === 'hockey' && REGULATION_KINDS.has(leg.kind)) {
+    if (a.length < 3 || h.length < 3) return null;
+    away = firstPeriods(a, 3);
+    home = firstPeriods(h, 3);
+  }
   switch (leg.kind) {
     case 'ml':
       // A tie where the winner has no draw to pick (baseball's, basketball's,

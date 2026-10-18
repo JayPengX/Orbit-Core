@@ -39,7 +39,8 @@ const FULL = {
   baseball: { total: /^Total Runs$/, spread: /^Run Line$/, team: /^Total Runs by (.+)$/ },
   football: { total: /^Total Points - Including Overtime$/, spread: /^Point Spread - Including Overtime$/, team: /^Total Points by (.+) - Including Overtime$/ },
   basketball: { total: /^Total Points - Including Overtime$/, spread: /^Point Spread - Including Overtime$/, team: /^Total Points by (.+) - Including Overtime$/ },
-  hockey: { total: /^Total Goals - Including Overtime and Penalty Shootout$/, spread: /^Puck Line - Including Overtime and Penalty Shootout$/, team: /^Total Goals by (.+) - Including Overtime and Penalty Shootout$/ }
+  // Hockey's lines on 60 minutes, as 台灣運彩 settles them (settle.mjs).
+  hockey: { total: /^Total Goals - Regular Time$/, spread: /^Puck Line - Regular Time$/, team: /^Total Goals by (.+) - Regular Time$/ }
 };
 
 // The game's markets and players' markets: { markets, props } (markets in
