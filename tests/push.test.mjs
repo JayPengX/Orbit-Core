@@ -2,7 +2,7 @@
 // notice lists the Worker keeps.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { encryptPush, cleanItems, sendDue, handlePush, runCheck } from '../push.js';
+import { encryptPush, cleanItems, sendDue, handlePush, runCheck, pushEndpoint } from '../push.js';
 
 const unb64u = t => Buffer.from(t, 'base64url');
 async function pairFrom(priv, pub) {
@@ -62,7 +62,7 @@ test('subscribe, schedule, then the due notices go out', async () => {
   const session = { d: 'acct', a: 'match' };
   const post = (path, body) => handlePush(new Request(`https://w/${path}`, { method: 'POST', body: JSON.stringify(body) }), env, {}, session, path);
   const subKeys = { p256dh: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4', auth: 'BTBZMqHH6r4Tts7J_aSIgg' };
-  assert.equal((await post('/push/subscribe', { sub: { endpoint: 'https://push.example/abc', keys: subKeys }, lang: 'zh' })).status, 200);
+  assert.equal((await post('/push/subscribe', { sub: { endpoint: 'https://fcm.googleapis.com/fcm/send/abc', keys: subKeys }, lang: 'zh' })).status, 200);
   const now = Date.now();
   await post('/push/schedule', { items: [{ at: now + 30_000, title: '開賽', body: 'Eagles vs Bears' }, { at: now + 86_400_000, title: 'tomorrow' }] });
   const sent = [];
@@ -73,7 +73,7 @@ test('subscribe, schedule, then the due notices go out', async () => {
   } finally {
     globalThis.fetch = realFetch;
   }
-  assert.equal(sent[0].url, 'https://push.example/abc');
+  assert.equal(sent[0].url, 'https://fcm.googleapis.com/fcm/send/abc');
   assert.match(sent[0].init.headers.Authorization, /^vapid t=[\w-]+\.[\w-]+\.[\w-]+, k=[\w-]+$/);
   const record = JSON.parse(kv.m.get('push:acct:match'));
   assert.deepEqual(record.items.map(x => x.title), ['tomorrow']);
@@ -87,7 +87,7 @@ test('a kind switched off in any app (or notices off) is never sent', async () =
   const post = (session, path, body) => handlePush(new Request(`https://w/${path}`, { method: 'POST', body: JSON.stringify(body) }), env, {}, session, path);
   const stock = { d: 'acct', a: 'stock' };
   const subKeys = { p256dh: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4', auth: 'BTBZMqHH6r4Tts7J_aSIgg' };
-  await post(stock, '/push/subscribe', { sub: { endpoint: 'https://push.example/s', keys: subKeys } });
+  await post(stock, '/push/subscribe', { sub: { endpoint: 'https://fcm.googleapis.com/fcm/send/s', keys: subKeys } });
   const now = Date.now();
   await post(stock, '/push/schedule', { items: [{ at: now + 10_000, title: '到價', kind: 'alert' }, { at: now + 20_000, title: '定期定額', kind: 'fill' }] });
   assert.equal(JSON.parse(kv.m.get('push:acct:stock')).items[0].kind, 'alert');
@@ -129,7 +129,7 @@ test('Orbit Transit’s bus alert: checked each run until the bus is that close,
   const session = { d: 'acct', a: 'transit' };
   const post = (p, body) => handlePush(new Request(`https://w/${p}`, { method: 'POST', body: JSON.stringify(body) }), env, {}, session, p);
   const subKeys = { p256dh: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4', auth: 'BTBZMqHH6r4Tts7J_aSIgg' };
-  assert.equal((await post('/push/subscribe', { sub: { endpoint: 'https://push.example/t', keys: subKeys } })).status, 200, 'Transit may push');
+  assert.equal((await post('/push/subscribe', { sub: { endpoint: 'https://fcm.googleapis.com/fcm/send/t', keys: subKeys } })).status, 200, 'Transit may push');
   await post('/push/schedule', { items: [{ at: now, until: now + 7_200_000, title: '5608 快到了', body: '{result}（竹東高中）', check: { bus } }] });
 
   let sec = 600;
@@ -161,7 +161,7 @@ test("a game's final score is told once, however often the app schedules it agai
   const post = (session, path, body) => handlePush(new Request(`https://w/${path}`, { method: 'POST', body: JSON.stringify(body) }), env, {}, session, path);
   const match = { d: 'acct', a: 'match' };
   const subKeys = { p256dh: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4', auth: 'BTBZMqHH6r4Tts7J_aSIgg' };
-  await post(match, '/push/subscribe', { sub: { endpoint: 'https://push.example/s', keys: subKeys } });
+  await post(match, '/push/subscribe', { sub: { endpoint: 'https://fcm.googleapis.com/fcm/send/s', keys: subKeys } });
   const now = Date.now();
   // The app still has the game on: the final's check, a minute from now.
   const end = () => ({ items: [{ at: Date.now() + 60_000, title: '勇士 vs 快艇', body: 'NBA · {result}', tag: 'end:nba:401918010', kind: 'end', check: { espn: 'basketball/nba', event: '401918010' } }] });
@@ -187,7 +187,7 @@ test("a race's final: the winner and the podium from the day's board, once it's 
   const env = { RATE_LIMIT_KV: kv };
   const post = (session, path, body) => handlePush(new Request(`https://w/${path}`, { method: 'POST', body: JSON.stringify(body) }), env, {}, session, path);
   const match = { d: 'acct', a: 'match' };
-  await post(match, '/push/subscribe', { sub: { endpoint: 'https://push.example/s', keys: { p256dh: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4', auth: 'BTBZMqHH6r4Tts7J_aSIgg' } } });
+  await post(match, '/push/subscribe', { sub: { endpoint: 'https://fcm.googleapis.com/fcm/send/s', keys: { p256dh: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4', auth: 'BTBZMqHH6r4Tts7J_aSIgg' } } });
   const item = { at: Date.now() + 60_000, title: '新加坡站 · 正賽', body: 'F1 · {result}', tag: 'end:f1:600', kind: 'end', check: { espn: 'racing/f1', event: '600', session: 'Race', day: '20261011' } };
   assert.deepEqual(cleanItems([item])[0].check, { espn: 'racing/f1', event: '600', session: 'Race', day: '20261011' });
   let state = 'in';
@@ -231,7 +231,7 @@ test('a pick starting is sent once, even when the open app sends its list again 
   const post = (session, path, body) => handlePush(new Request(`https://w/${path}`, { method: 'POST', body: JSON.stringify(body) }), env, {}, session, path);
   const match = { d: 'acct', a: 'match' };
   const subKeys = { p256dh: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4', auth: 'BTBZMqHH6r4Tts7J_aSIgg' };
-  await post(match, '/push/subscribe', { sub: { endpoint: 'https://push.example/s', keys: subKeys } });
+  await post(match, '/push/subscribe', { sub: { endpoint: 'https://fcm.googleapis.com/fcm/send/s', keys: subKeys } });
   const start = Date.now() - 30_000;
   const pick = at => ({ items: [{ at, title: '新加坡站 排位賽 開始', body: 'F1 · MAX5台', tag: 'match:pick:f1:600~Qual', kind: 'pick' }] });
   const realFetch = globalThis.fetch;
@@ -258,10 +258,10 @@ test("each list's due time is its own: two phones scheduling at once both keep t
   const now = Date.now();
   const a = { d: 'a1', a: 'match' };
   const b = { d: 'b2', a: 'orbit' };
-  await Promise.all([post(a, '/push/subscribe', { sub: { endpoint: 'https://push.example/a', keys } }), post(b, '/push/subscribe', { sub: { endpoint: 'https://push.example/b', keys } })]);
+  await Promise.all([post(a, '/push/subscribe', { sub: { endpoint: 'https://fcm.googleapis.com/fcm/send/a', keys } }), post(b, '/push/subscribe', { sub: { endpoint: 'https://fcm.googleapis.com/fcm/send/b', keys } })]);
   await Promise.all([post(a, '/push/schedule', { items: [{ at: now + 10_000, title: 'a' }] }), post(b, '/push/schedule', { items: [{ at: now + 20_000, title: 'b' }] })]);
   // One list from before, its time only in the old shared key.
-  kv.m.set('push:c3:vocab', JSON.stringify({ sub: { endpoint: 'https://push.example/c', keys }, items: [{ at: now + 30_000, title: 'c' }] }));
+  kv.m.set('push:c3:vocab', JSON.stringify({ sub: { endpoint: 'https://fcm.googleapis.com/fcm/send/c', keys }, items: [{ at: now + 30_000, title: 'c' }] }));
   kv.m.set('push:due', JSON.stringify({ 'push:c3:vocab': now + 30_000 }));
   const sent = [];
   const realFetch = globalThis.fetch;
@@ -271,7 +271,7 @@ test("each list's due time is its own: two phones scheduling at once both keep t
   } finally {
     globalThis.fetch = realFetch;
   }
-  assert.deepEqual(sent.sort(), ['https://push.example/a', 'https://push.example/b', 'https://push.example/c']);
+  assert.deepEqual(sent.sort(), ['https://fcm.googleapis.com/fcm/send/a', 'https://fcm.googleapis.com/fcm/send/b', 'https://fcm.googleapis.com/fcm/send/c']);
   assert.equal(kv.m.has('push:due'), false);
 });
 
@@ -280,7 +280,7 @@ test("a bus alert is told once: its list sent again by the app (opened from the 
   const env = { RATE_LIMIT_KV: kv, TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 's', TDX_PER_MIN: '100' };
   const session = { d: 'acct', a: 'transit' };
   const post = (p, body) => handlePush(new Request(`https://w${p}`, { method: 'POST', body: JSON.stringify(body) }), env, {}, session, p);
-  await post('/push/subscribe', { sub: { endpoint: 'https://push.example/t', keys: { p256dh: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4', auth: 'BTBZMqHH6r4Tts7J_aSIgg' } } });
+  await post('/push/subscribe', { sub: { endpoint: 'https://fcm.googleapis.com/fcm/send/t', keys: { p256dh: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4', auth: 'BTBZMqHH6r4Tts7J_aSIgg' } } });
   const now = Date.now();
   const bus = { path: 'advanced/v2/Bus/EstimatedTimeOfArrival/City/Hsinchu/PassThrough/Station/1234', route: 'HSZ0058', dir: 0, min: 5 };
   const item = { at: now, until: now + 3_600_000, title: '5608 快到了', body: '{result}', tag: 'bus:abc', kind: 'bus', check: { bus } };
@@ -326,4 +326,28 @@ test("a bus alert isn't told from a copy kept while TDX fails (the bus has gone 
     globalThis.fetch = wasFetch;
     globalThis.caches = wasCaches;
   }
+});
+
+test('a subscription only to a real push service (Apple, FCM, Mozilla, Windows), https only; an old record elsewhere is never sent to', async () => {
+  for (const ok of ['https://web.push.apple.com/QGuQ', 'https://fcm.googleapis.com/fcm/send/abc', 'https://updates.push.services.mozilla.com/wpush/v2/x', 'https://wns2-par02p.notify.windows.com/w/?token=x']) assert.ok(pushEndpoint(ok), ok);
+  for (const bad of ['http://fcm.googleapis.com/fcm/send/abc', 'https://push.example/abc', 'https://fcm.googleapis.com.evil.com/x', 'https://evil.com/fcm.googleapis.com', 'https://notify.windows.com.evil.com/x', 'https://evilnotify.windows.com/x', 'https://user@fcm.googleapis.com/x', 'https://fcm.googleapis.com:8443/x', 'https://127.0.0.1/x', 'not a url', null, 42]) assert.ok(!pushEndpoint(bad), String(bad));
+  const kv = memoryKv();
+  const env = { RATE_LIMIT_KV: kv };
+  const session = { d: 'acct', a: 'match' };
+  const post = (path, body) => handlePush(new Request(`https://w/${path}`, { method: 'POST', body: JSON.stringify(body) }), env, {}, session, path);
+  const keys = { p256dh: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4', auth: 'BTBZMqHH6r4Tts7J_aSIgg' };
+  assert.equal((await post('/push/subscribe', { sub: { endpoint: 'https://internal.example/admin', keys } })).status, 400);
+  assert.equal((await post('/push/subscribe', { sub: { endpoint: 'http://fcm.googleapis.com/fcm/send/a', keys } })).status, 400);
+  const now = Date.now();
+  kv.m.set('push:old:match', JSON.stringify({ sub: { endpoint: 'https://internal.example/admin', keys }, items: [{ at: now - 1000, title: 'x' }] }));
+  kv.meta.set('push:old:match', { due: now - 1000 });
+  const sent = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async url => (sent.push(String(url)), new Response(null, { status: 201 }));
+  try {
+    await sendDue(env, now);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  assert.deepEqual(sent, []);
 });

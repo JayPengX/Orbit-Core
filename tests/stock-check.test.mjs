@@ -136,3 +136,14 @@ test("an order the phone shows cancelled that the proxy filled still counts as f
   const fair = await checkStock(env, 'acct', await pack({ ...account(start), orders: [order('c1')] }), { entries: [] }, d2, LOCK, T + 2000);
   assert.equal(fair.cash, 100_000);
 });
+
+test('a checked record that can\'t be read is checked again from nothing: the save is still counted, never stuck', async () => {
+  const d = deps({ b1: issuedFill('b1', 'buy', 1005, 10) });
+  await check(d, []);
+  d.store.set(`${VERIFIED_COLLECTION}/acct`, '{not json');
+  const buy = phoneFill('b1', 'buy', 1005, 10);
+  const r = await checkStock(env, 'acct', await pack(account([...start, buy])), { entries: [] }, d, LOCK, T + 2000);
+  assert.ok(r, 'counted');
+  assert.equal(r.cash, 100_000 - buy.total);
+  assert.ok(Array.isArray(JSON.parse(d.store.get(`${VERIFIED_COLLECTION}/acct`)).ok));
+});

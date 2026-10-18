@@ -46,6 +46,7 @@
 //   POST   /eco { op: 'admin', token, action }        the store's clean-up
 
 import { retire } from './money.js';
+import { SLIP_RULES } from './kit/play-odds.mjs';
 import { storeReady } from './doc-store.js';
 import { tokenSecret, signToken, readToken, seal, unseal, sessionLimited, SESSION_MS, REFRESH_MS, HANDOFF_MS } from './quadra-token.js';
 import { handleAdmin } from './eco-admin.js';
@@ -279,11 +280,14 @@ export function vipEntries(wallet, now) {
   return out;
 }
 // The welcome offer: after the first paid bet in Play, a NT$WELCOME.bet free
-// bet (`eco:fb:welcome`, once per account; 7 days, like every free bet).
-export const WELCOME = { bet: 200 };
+// bet (`eco:fb:welcome`, once per account; 7 days, like every free bet). A
+// paid bet is a ticket's worth at least (Play's smallest, SLIP_RULES
+// minTicket): an app may write a stake of its own (a spend), so a NT$0.01
+// one, or a free bet's NT$0.01 top-up, would buy NT$200 otherwise.
+export const WELCOME = { bet: 200, minStake: SLIP_RULES.minTicket };
 export function welcomeEntries(wallet, now) {
   const entries = wallet?.entries || [];
-  if (entries.some(e => e.id === 'eco:fb:welcome') || !entries.some(e => e.app === 'odds' && e.kind === 'stake' && e.amount < 0)) return [];
+  if (entries.some(e => e.id === 'eco:fb:welcome') || !entries.some(e => e.app === 'odds' && e.kind === 'stake' && e.amount <= -WELCOME.minStake)) return [];
   return [{ id: 'eco:fb:welcome', t: now, app: 'eco', kind: 'freebet', amount: 0, note: String(WELCOME.bet) }];
 }
 export { WEEK };
@@ -629,6 +633,10 @@ export async function handleEcoRequest(request, env, headers, ip, deps) {
     }
 
     if (method === 'PATCH') {
+      // An app writes its own data only (the kit's write names its own app):
+      // a session of one app can't save another's (Securities' money, Class's
+      // schedule) or its figures.
+      if (app && app !== claims.a) return errorJson('ECO_UNKNOWN_APP', 403, headers, request);
       const hasPayload = body.payload !== undefined;
       if (hasPayload && !(app && typeof body.payload === 'string' && body.payload && body.payload.length <= ECO_APPS[app].maxPayload)) {
         return errorJson('MISSING_PAYLOAD', 400, headers, request);

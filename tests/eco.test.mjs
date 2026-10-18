@@ -268,7 +268,7 @@ test('deleting the account removes everything', async () => {
 
 test('clean-up: only Quadra data stays, and wallets lose retired settings', async () => {
   const t = setup();
-  const acct = await newPass(t);
+  const acct = await newPass(t, 'odds');
   await t.call('PATCH', `${t.qt(acct.token)}&app=odds`, { payload: 'gz1:mine', wallet: { settings: { oddsWeeklyLimit: { value: 2000, t: 1 }, 'act:odds': { value: {}, t: 1 } } } });
   const env = {};
   await t.deps.fsWrite(env, ECO_APPS.odds.collection, 'oldhash', 'gz1:old');
@@ -520,6 +520,9 @@ test('welcome: a NT$200 free bet after the first paid bet, once; a write brings 
   const now = Date.UTC(2026, 9, 7, 4);
   assert.deepEqual(welcomeEntries({ entries: [] }, now), []);
   assert.deepEqual(welcomeEntries({ entries: [{ id: 'odds:stake-f', t: now, app: 'odds', kind: 'stake', amount: 0 }] }, now), []);
+  // A stake smaller than a ticket (one an app wrote itself, or a free bet's top-up) isn't a paid bet.
+  for (const amount of [-0.01, -10, -99.99]) assert.deepEqual(welcomeEntries({ entries: [{ id: 'odds:stake-s', t: now, app: 'odds', kind: 'stake', amount }] }, now), [], String(amount));
+  assert.equal(welcomeEntries({ entries: [{ id: 'odds:stake-s', t: now, app: 'odds', kind: 'stake', amount: -100 }] }, now).length, 1);
   const bet = { id: 'odds:stake-a', t: now, app: 'odds', kind: 'stake', amount: -500 };
   assert.deepEqual(welcomeEntries({ entries: [bet] }, now), [{ id: 'eco:fb:welcome', t: now, app: 'eco', kind: 'freebet', amount: 0, note: '200' }]);
   assert.deepEqual(welcomeEntries({ entries: [bet, ...welcomeEntries({ entries: [bet] }, now)] }, now), []);
@@ -528,6 +531,11 @@ test('welcome: a NT$200 free bet after the first paid bet, once; a write brings 
   const w = await t.call('PATCH', `${t.qt(acct.token)}&app=odds`, { wallet: { entries: [{ ...bet, t: 1_700_000_100_000 }] } });
   assert.equal(w.status, 200);
   assert.ok(w.data.wallet.entries.some(e => e.id === 'eco:fb:welcome' && e.app === 'eco'));
+  // A self-written NT$0.01 stake from a new Pass: no free bet.
+  const b = await newPass(t, 'odds');
+  const s = await t.call('PATCH', `${t.qt(b.token)}&app=odds`, { wallet: { entries: [{ id: 'odds:stake-cheap', t: 1_700_000_100_000, app: 'odds', kind: 'stake', amount: -0.01 }] } });
+  assert.equal(s.status, 200);
+  assert.ok(!s.data.wallet.entries.some(e => e.id === 'eco:fb:welcome'));
 });
 
 test('Quadra Plus bills every month like a subscription: months away charged on return; a failed charge lapses it', () => {
@@ -839,4 +847,16 @@ test("a big wallet's old entries fold into monthly sums: the same balance and su
   const r = await updateWallet({}, deps, 'acct', x => ({ ...x, entries: [...x.entries, { id: 'odds:stake-new', t: now, app: 'odds', kind: 'stake', amount: -10 }] }));
   assert.ok(doc.payload.length < FOLD_AT, `saved folded: ${doc.payload.length}`);
   assert.equal(poolBalance(r.wallet), Math.round((poolBalance(big) - 10) * 100) / 100);
+});
+
+test("a session writes its own app's data only: never another app's save or figures", async () => {
+  const t = setup();
+  const acct = await newPass(t, 'vocab');
+  const other = await t.call('PATCH', `${t.qt(acct.token)}&app=stock`, { payload: 'gz1:forged', wallet: { snap: { stock: { t: 5, pl: { tw: 1e9 } } } } });
+  assert.equal(other.status, 403);
+  assert.ok(![...t.store.keys()].some(k => k.startsWith(ECO_APPS.stock.collection)));
+  const posted = await t.call('POST', '?app=orbit', { op: 'write', qt: acct.token, payload: 'gz1:x' });
+  assert.equal(posted.status, 403);
+  // Its own: saved.
+  assert.equal((await t.call('PATCH', `${t.qt(acct.token)}&app=vocab`, { payload: 'gz1:mine' })).status, 200);
 });

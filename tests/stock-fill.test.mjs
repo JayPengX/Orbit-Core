@@ -235,3 +235,27 @@ test('a cancel is the proxy\'s to rule on: an order the price reached since it l
   assert.deepEqual(never.cancel, { cancelled: true });
   assert.equal(never.later, null);
 });
+
+test('two asks at once never lose each other\'s fills: the second merges into the first\'s copy', async () => {
+  const { fakeD1 } = await import('./fake-d1.mjs');
+  const { d1Store, SCHEMA } = await import('../doc-store.js');
+  const store = d1Store(fakeD1(SCHEMA));
+  const deps = {
+    json: (data, status) => new Response(JSON.stringify(data), { status }),
+    errorJson: (code, status) => new Response(JSON.stringify({ error: { code } }), { status }),
+    fsGet: (env, c, id) => store.get(c, id),
+    fsWrite: (env, c, id, payload, pre) => store.write(c, id, payload, pre),
+    now: () => now,
+    read
+  };
+  const ask = body => handleStock(new Request('https://x/stock', { method: 'POST', body: JSON.stringify(body) }), {}, {}, { a: 'stock', d: 'acc' }, deps).then(r => r.json());
+  const order = id => ({ id, symbol: 'AAPL', side: 'buy', type: 'market', qty: 1, t: now - 1000, market: 'US', kind: 'stock' });
+  const waits = { id: 'order0009', symbol: 'AAPL', side: 'buy', type: 'limit', limit: 200, qty: 1, t: now - 1000, market: 'US', kind: 'stock' };
+  const [a, b, c] = await Promise.all([ask({ op: 'fill', orders: [order('order0001')] }), ask({ op: 'fill', orders: [order('order0002'), waits] }), ask({ op: 'cancel', order: { ...waits, id: 'order0010' } })]);
+  assert.ok(a.fills.order0001 && b.fills.order0002);
+  assert.deepEqual(c, { cancelled: true });
+  const kept = JSON.parse((await store.get(FILLS_COLLECTION, 'acc')).payload);
+  assert.deepEqual(Object.keys(kept.fills).sort(), ['order0001', 'order0002']);
+  assert.deepEqual(Object.keys(kept.open), ['order0009']);
+  assert.ok(kept.cancelled.order0010);
+});

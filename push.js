@@ -109,8 +109,25 @@ export async function encryptPush(sub, text, { salt = crypto.getRandomValues(new
   return concat(salt, rs, new Uint8Array([asPublic.length]), asPublic, sealed);
 }
 
-// Sends one message; 'gone' when the device has unsubscribed (404/410).
+// The push services a browser subscribes with (Apple, Google's FCM, Mozilla,
+// Windows), https only: any other endpoint would have this Worker send its
+// signed requests wherever a client asked.
+const PUSH_HOSTS = [/^web\.push\.apple\.com$/, /^fcm\.googleapis\.com$/, /^updates\.push\.services\.mozilla\.com$/, /^[a-z0-9-]+(\.[a-z0-9-]+)*\.notify\.windows\.com$/];
+export function pushEndpoint(endpoint) {
+  if (typeof endpoint !== 'string' || endpoint.length > 2000) return false;
+  let url;
+  try {
+    url = new URL(endpoint);
+  } catch {
+    return false;
+  }
+  return url.protocol === 'https:' && !url.username && !url.password && (url.port === '' || url.port === '443') && PUSH_HOSTS.some(h => h.test(url.hostname));
+}
+
+// Sends one message; 'gone' when the device has unsubscribed (404/410), or
+// its endpoint isn't a push service's (a record saved before that check).
 export async function sendPush(env, sub, message) {
+  if (!pushEndpoint(sub?.endpoint)) return 'gone';
   const res = await fetch(sub.endpoint, {
     method: 'POST',
     headers: { Authorization: await vapidHeader(env, sub.endpoint), 'Content-Encoding': 'aes128gcm', 'Content-Type': 'application/octet-stream', TTL: '14400', Urgency: 'high' },
@@ -232,7 +249,7 @@ export async function handlePush(request, env, headers, session, path) {
   const was = JSON.stringify(record);
   if (path === '/push/subscribe') {
     const sub = body?.sub;
-    if (!sub?.endpoint || !/^https:\/\//.test(sub.endpoint) || !sub.keys?.p256dh || !sub.keys?.auth) return reply({ error: { message: 'Bad subscription' } }, 400);
+    if (!pushEndpoint(sub?.endpoint) || !sub.keys?.p256dh || !sub.keys?.auth) return reply({ error: { message: 'Bad subscription' } }, 400);
     record.sub = { endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth } };
     record.lang = body.lang === 'en' ? 'en' : 'zh';
   } else if (path === '/push/schedule') {

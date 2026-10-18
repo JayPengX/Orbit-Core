@@ -100,3 +100,17 @@ test("Play's results check asks the Worker to watch only the Kambi matches it is
     globalThis.fetch = real;
   }
 });
+
+test('matches already watched: registering them again writes nothing (neither the index nor the entries)', async () => {
+  const now = { t: Date.parse('2026-09-26T13:00:00Z') };
+  const { deps } = setup(now);
+  const events = [{ id: 1029276719, start: '2026-09-26T10:00:00Z' }, { id: 1029276720, start: '2026-09-26T11:00:00Z' }];
+  await handleKambiRequest(req('POST', '', { events }), env, {}, 'ip', deps);
+  let writes = 0;
+  const write = deps.fsWrite;
+  deps.fsWrite = async (...a) => (writes++, write(...a));
+  const again = await handleKambiRequest(req('POST', '', { events }), env, {}, 'ip', deps);
+  assert.deepEqual(again.body, { watching: 2, added: 0 });
+  // (Each entry's create-only write is tried and refused; the index isn't written.)
+  assert.equal(writes, 2);
+});

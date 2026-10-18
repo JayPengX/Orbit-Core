@@ -299,3 +299,45 @@ test('a live pick is priced again after the delay, on fresh reads: moved by then
   assert.equal(r.body.refused.problem, 'moved');
   assert.ok(!doc(WALLET_COLLECTION, ACCOUNT).entries.some(e => e.id === 'odds:stake-liveslip01'));
 });
+
+test('one free bet on two slips of one batch, or one slip sent twice: refused, nothing taken', async () => {
+  const now = { t: Date.parse('2026-10-13T20:00:00Z') };
+  const { store, deps, doc } = setup(now);
+  wallet(store, [{ id: 'eco:start', t: 1, app: 'eco', kind: 'start', amount: 1000 }, { id: 'eco:fb:welcome', t: now.t, app: 'eco', kind: 'freebet', amount: 0, note: '200' }]);
+  deps.checkSlip = async () => ({ ok: true });
+  const later = { ...leg('home'), start: '2026-10-14T23:10:00Z' };
+  const free = { free: 'eco:fb:welcome', freeValue: 200, stake: 200, cost: 0 };
+  const twice = await post(deps, { op: 'place', slips: [slip('freeslip01', [later], free), slip('freeslip02', [later], free)] });
+  assert.equal(twice.body.refused?.problem, 'free');
+  const same = await post(deps, { op: 'place', slips: [slip('slipsame01', [later]), slip('slipsame01', [later])] });
+  assert.equal(same.body.refused?.problem, 'shape');
+  const w = doc(WALLET_COLLECTION, ACCOUNT);
+  assert.ok(!w.entries.some(e => e.kind === 'stake' || e.kind === 'freebet' && e.app === 'odds'));
+  assert.equal(doc(OPEN_COLLECTION, `${ACCOUNT}_freeslip01`), null);
+  // One slip with the token: placed, the token spent once.
+  const one = await post(deps, { op: 'place', slips: [slip('freeslip03', [later], free)] });
+  assert.deepEqual(one.body.placed, ['freeslip03']);
+  assert.equal(doc(WALLET_COLLECTION, ACCOUNT).entries.filter(e => e.id === 'odds:fb-eco:fb:welcome').length, 1);
+});
+
+test('a cash out whose payment failed after the slip was marked is paid by the cron, once', async () => {
+  const now = { t: Date.parse('2026-10-10T21:00:00Z') };
+  const { store, deps, doc } = setup(now);
+  wallet(store, [{ id: 'odds:stake-slipcash01', t: 1, app: 'odds', kind: 'stake', amount: -100 }]);
+  await watch(deps, [slip('slipcash01', [leg('home')])]);
+  deps.cashOutQuote = async () => ({ value: 120, reason: '' });
+  // The wallet's write fails (D1 down a moment) after the slip is marked cashed.
+  const write = deps.fsWrite;
+  deps.fsWrite = async (env, c, id, ...rest) => (c === WALLET_COLLECTION ? Promise.reject(new Error('D1 down')) : write(env, c, id, ...rest));
+  await assert.rejects(post(deps, { op: 'cashout', id: 'slipcash01', value: 120 }), /D1 down/);
+  deps.fsWrite = write;
+  assert.equal(doc(OPEN_COLLECTION, `${ACCOUNT}_slipcash01`).state, 'cashed');
+  assert.ok(!doc(WALLET_COLLECTION, ACCOUNT).entries.some(e => e.id === 'odds:payout-slipcash01'));
+  now.t = Date.parse(START) + 4 * 3_600_000;
+  await settleCron(env, deps);
+  await settleCron(env, deps);
+  const paid = doc(WALLET_COLLECTION, ACCOUNT).entries.filter(e => e.id === 'odds:payout-slipcash01');
+  assert.deepEqual(paid.map(e => [e.kind, e.amount]), [['cashout', 120]]);
+  assert.equal(doc(SETTLED_COLLECTION, ACCOUNT).slips.slipcash01.payout, 120);
+  assert.equal(doc(OPEN_COLLECTION, `${ACCOUNT}_slipcash01`), null);
+});

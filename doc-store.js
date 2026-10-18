@@ -99,3 +99,43 @@ export function docStore() {
     count: async env => Object.fromEntries((await env.STORE.prepare('SELECT coll, COUNT(*) AS n FROM docs GROUP BY coll').all()).results.map(r => [r.coll, r.n]))
   };
 }
+
+// ---- One JSON document changed safely (every caller's read-change-write) ----
+
+// A stored document's JSON (fsGet's answer), or null: missing or unreadable.
+export function parseDoc(doc) {
+  if (!doc?.exists) return null;
+  try {
+    return JSON.parse(doc.payload);
+  } catch {
+    return null;
+  }
+}
+
+// Reads a document, changes it and writes it back only over the version it
+// read; a write that lost the race (another got in between) reads and
+// changes it again, up to `attempts` times. With deps' fsGet / fsWrite /
+// fsDelete (eco.js's plumbing).
+//   read(json|null)   the value `change` works on (a default for a missing one)
+//   change(value)     the next value; the same value: nothing written
+//   write(value)      what's stored (null: the document deleted)
+// The value written (or the unchanged one), or undefined when every attempt
+// lost its race.
+export async function changeDoc(env, deps, collection, id, change, { read = v => v, write = v => v, attempts = 4 } = {}) {
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    const doc = await deps.fsGet(env, collection, id);
+    const value = read(parseDoc(doc));
+    const next = change(value);
+    if (next === value) return value;
+    const out = write(next);
+    try {
+      if (out == null) {
+        if (doc.exists) await deps.fsDelete(env, collection, id);
+      } else await deps.fsWrite(env, collection, id, JSON.stringify(out), doc.exists ? { updateTime: doc.updateTime } : { exists: false });
+      return next;
+    } catch (error) {
+      if (!error.precondition) throw error;
+    }
+  }
+  return undefined;
+}

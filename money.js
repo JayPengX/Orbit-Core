@@ -16,6 +16,8 @@
 // A deleted account's money goes back to the system: its sides are kept in
 // `quadra-config/ledger` (retired), and its worth counts as returned.
 
+import { changeDoc } from './doc-store.js';
+
 export const LEDGER = ['quadra-config', 'ledger'];
 const RESET_ID = 'eco:rebase:v3';
 const num = v => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
@@ -87,16 +89,5 @@ export function addSides(a = {}, b = {}) {
 export async function retire(env, deps, wallet) {
   if (!wallet) return;
   const [collection, id] = LEDGER;
-  for (let i = 0; i < 3; i++) {
-    const doc = await deps.fsGet(env, collection, id).catch(() => ({ exists: false }));
-    let was = {};
-    try {
-      was = doc.exists ? JSON.parse(doc.payload) : {};
-    } catch {}
-    const next = { ...addSides(was, sidesOf(wallet)), since: was.since || deps.now(), at: deps.now() };
-    try {
-      await deps.fsWrite(env, collection, id, JSON.stringify(next), doc.exists && doc.updateTime ? { updateTime: doc.updateTime } : { exists: false });
-      return;
-    } catch {}
-  }
+  await changeDoc(env, deps, collection, id, was => ({ ...addSides(was, sidesOf(wallet)), since: was.since || deps.now(), at: deps.now() }), { read: v => v || {}, attempts: 3 }).catch(() => {});
 }

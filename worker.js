@@ -1109,6 +1109,12 @@ async function devBody(env, ctx) {
 // …which the sports proxy's cache times follow (sports.js), read at most once a minute.
 useDevSettings((env, ctx) => devBody(env, ctx).then(JSON.parse));
 
+// The Quadra Pass session a request carries (`qt=`), or null.
+async function sessionOf(request, env) {
+  const qt = new URL(request.url).searchParams.get('qt');
+  return qt ? readToken(await tokenSecret(env), qt, 'ses') : null;
+}
+
 export default {
   async fetch(request, env, ctx) {
     const origin = request.headers.get('Origin') || '';
@@ -1127,8 +1133,7 @@ export default {
 
     // Orbit Class's AI features need a Quadra Pass session (`qt=`).
     if (path === '/gemini' || path === '/nl-edit') {
-      const qt = new URL(request.url).searchParams.get('qt');
-      const session = qt ? await readToken(await tokenSecret(env), qt, 'ses') : null;
+      const session = await sessionOf(request, env);
       return path === '/gemini' ? handleGeminiRequest(request, env, headers, ip, ctx, session) : handleNlEditRequest(request, env, headers, ip, ctx, session);
     }
     if (path === '/eco') return handleEcoRequest(request, env, headers, ip, ECO_DEPS);
@@ -1181,8 +1186,7 @@ export default {
     }
     if (path === '/kambi') {
       // A Quadra Pass session only, counted per session in memory.
-      const qt = new URL(request.url).searchParams.get('qt');
-      const session = qt ? await readToken(await tokenSecret(env), qt, 'ses') : null;
+      const session = await sessionOf(request, env);
       if (!session) return errorJson('ECO_TOKEN_INVALID', 401, headers, request);
       const deps = { ...KAMBI_DEPS, rateLimitResponse: async () => (sessionLimited(`k:${session.s}`, 60) ? errorJson('RATE_LIMITED', 429, headers, request) : null) };
       return handleKambiRequest(request, env, headers, ip, deps);
@@ -1190,14 +1194,12 @@ export default {
     // Quadra Play's slips settled here (settle.js): a Quadra Pass session of Play's.
     // Quadra Securities' orders filled here (stock-fill.js): a Securities session.
     if (path === '/stock') {
-      const qt = new URL(request.url).searchParams.get('qt');
-      const session = qt ? await readToken(await tokenSecret(env), qt, 'ses') : null;
+      const session = await sessionOf(request, env);
       if (session && sessionLimited(`st:${session.s}`, 30)) return errorJson('RATE_LIMITED', 429, headers, request);
       return handleStock(request, env, headers, session, { json, errorJson, fsGet: DOCS.get, fsWrite: DOCS.write, now: () => Date.now(), read: url => stockReads(env)(url) });
     }
     if (path === '/play') {
-      const qt = new URL(request.url).searchParams.get('qt');
-      const session = qt ? await readToken(await tokenSecret(env), qt, 'ses') : null;
+      const session = await sessionOf(request, env);
       if (session && sessionLimited(`pl:${session.s}`, 30)) return errorJson('RATE_LIMITED', 429, headers, request);
       // The dev door: a localhost page may have a slip's prices checked (nothing placed), 10 a minute an address.
       const dev = !session && LOCAL_ORIGIN.test(origin);
@@ -1206,8 +1208,7 @@ export default {
     }
     // Web Push (push.js): here, where the Quadra Pass tokens can be read.
     if (path.startsWith('/push/')) {
-      const qt = new URL(request.url).searchParams.get('qt');
-      const session = qt ? await readToken(await tokenSecret(env), qt, 'ses') : null;
+      const session = await sessionOf(request, env);
       if (session && sessionLimited(`p:${session.s}`, 30)) return errorJson('RATE_LIMITED', 429, headers, request);
       return handlePush(request, env, headers, session, path);
     }
@@ -1219,8 +1220,7 @@ export default {
     // WEATHER_DEV = "off" (wrangler.toml [vars]) closes it.
     if (path === '/weather' || path.startsWith('/weather/')) {
       if (path === '/weather/skill') return new Response(JSON.stringify(await skillReport(env)), { headers: { ...headers, 'Content-Type': 'application/json' } });
-      const qt = new URL(request.url).searchParams.get('qt');
-      const signed = qt ? await readToken(await tokenSecret(env), qt, 'ses') : null;
+      const signed = await sessionOf(request, env);
       const dev = !signed && env.WEATHER_DEV !== 'off' && LOCAL_ORIGIN.test(origin);
       const session = signed || (dev ? { s: 'dev', dev: true } : null);
       return handleWeather(request, env, headers, path, { session, ctx, limited: () => sessionLimited(dev ? `w:dev:${ip}` : `w:${session?.s}`, 30) });
@@ -1232,8 +1232,7 @@ export default {
     // stay under transit.js's monthly caps either way. TRANSIT_DEV = "off"
     // (wrangler.toml [vars]) closes it.
     if (path === '/transit' || path.startsWith('/transit/')) {
-      const qt = new URL(request.url).searchParams.get('qt');
-      const signed = qt ? await readToken(await tokenSecret(env), qt, 'ses') : null;
+      const signed = await sessionOf(request, env);
       const dev = !signed && env.TRANSIT_DEV !== 'off' && LOCAL_ORIGIN.test(origin);
       const session = signed || (dev ? { s: 'dev', dev: true } : null);
       return handleTransit(request, env, headers, path, { session, ctx, limited: () => sessionLimited(dev ? `t:dev:${ip}` : `t:${session?.s}`, dev ? 300 : 90) });
