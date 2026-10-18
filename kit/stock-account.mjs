@@ -592,14 +592,14 @@ export function placeOrder(account, req, { quote, rates, valuation, now = Date.n
   // Taiwan's daily ±10%.
   for (const x of [type === 'limit' ? Number(req.limit) : null, type === 'stop' ? Number(req.stop) : null]) {
     if (x == null) continue;
-    const tick = tickSize(quote.market, quote.kind, x);
+    const tick = tickSize(quote.market, quote.kind, x, quote.symbol);
     if (!onTick(x, tick)) return { error: 'tick', tick };
   }
   const band = priceLimits(quote, now);
   if (band && type === 'limit' && (req.limit > band.up + EPS || req.limit < band.down - EPS)) return { error: 'priceLimit', ...band };
   const s = replay(account, now);
   const avail = available(account, s);
-  // Board lots (Japan 100, China's buys 100, Hong Kong each stock's own;
+  // Board lots (Japan 100, a Japanese ETF its own, China's buys 100, Hong Kong each stock's own;
   // one HKEX's list doesn't have can't be sized: lotUnknown).
   const lot = lotProblem(quote.market, quote.symbol, quote.kind, side, qty, Math.max(0, avail.qty[quote.symbol] || 0));
   if (lot) return lot.unknown ? { error: 'lotUnknown' } : { error: 'lot', lot: lot.lot };

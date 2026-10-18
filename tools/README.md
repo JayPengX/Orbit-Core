@@ -50,6 +50,7 @@ accounts, never the owner's key. `DEBUG=1` lists every upstream fetch.
 | `node tools/economy.mjs` | Each kind of user over a year, old settings against new |
 | `node tools/leagues-audit.mjs [--sport soccer] [--json]` | Every catalogue league against its sources today |
 | `node tools/hk-lots.mjs [file.xlsx]` | Every HKEX security's board lot into `kit/stock-hk-lots.mjs` (HKEX's List of Securities); run it now and then for new listings |
+| `node tools/jp-lists.mjs` | TOPIX500 (Tokyo's finer ticks) and every Tokyo ETF's trading unit into `kit/stock-jp-lists.mjs` (JPX's files; needs `pdftotext`); run it after TOPIX's October review |
 | `node tools/espn.mjs <path> [query]` | The shape of an ESPN answer |
 | `node tools/issue-passes.mjs` | Issue passes (the owner) |
 | `node tools/weather-stations.mjs` | Rebuild `weather-stations.js` |

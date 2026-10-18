@@ -260,6 +260,7 @@ Slip-Tracker) are small redirect repos.
 | `node tools/economy.mjs` | The economy on paper, old settings against new |
 | `node tools/leagues-audit.mjs` | Every catalogue league against its sources |
 | `node tools/hk-lots.mjs` | Hong Kong board lots for Securities, from HKEX |
+| `node tools/jp-lists.mjs` | Tokyo's TOPIX500 and ETF trading units for Securities, from JPX |
 | `node tools/espn.mjs <path>` | The shape of an ESPN answer |
 | `node tools/issue-passes.mjs` | Issue passes (the owner) |
 

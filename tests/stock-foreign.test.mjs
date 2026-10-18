@@ -120,3 +120,27 @@ test('Hong Kong takes limit orders only (HKEX: no market order); the broker\'s o
   assert.equal(place({ side: 'sell', type: 'market', qty: 100, forced: true }, bought.account).error, undefined);
   assert.equal(SM.limitOnly('JP'), false, 'Tokyo takes market orders (JPX: 成行)');
 });
+
+test('Tokyo ticks (JPX): TOPIX500 on the finer table, other stocks on the ordinary one, ETFs by their trading unit', () => {
+  // Toyota (TOPIX500) at ¥2,999.5; a small cap (not in it) only to the yen.
+  assert.equal(SM.inTopix500('7203.T'), true);
+  assert.equal(SM.inTopix500('1301.T'), false, '極洋: TOPIX Small 1');
+  assert.deepEqual([SM.tickSize('JP', 'stock', 2999, '7203.T'), SM.tickSize('JP', 'stock', 1000, '7203.T'), SM.tickSize('JP', 'stock', 2999, '1301.T'), SM.tickSize('JP', 'stock', 4000, '1301.T'), SM.tickSize('JP', 'stock', 20_000, '1301.T')], [0.5, 0.1, 1, 5, 10]);
+  // 1306 (traded in 10s): the finer table; 1321 (in 1s): ¥1 up to ¥10,000.
+  assert.deepEqual([SM.jpEtfUnit('1306.T'), SM.jpEtfUnit('1321.T'), SM.jpEtfUnit('1319.T')], [10, 1, 1000]);
+  assert.deepEqual([SM.tickSize('JP', 'etf', 4131.5, '1306.T'), SM.tickSize('JP', 'etf', 9999, '1321.T'), SM.tickSize('JP', 'etf', 40_000, '1321.T')], [1, 1, 10]);
+  // Without a symbol: the finer table, as before.
+  assert.equal(SM.tickSize('JP', 'stock', 2999), 0.5);
+  const t = at('2026-10-13T10:00', 'Asia/Tokyo');
+  const jpq = (symbol, kind, price) => ({ symbol, name: symbol, kind, market: 'JP', currency: 'JPY', price, prev: price, got: t, marketTime: t, tz: 'Asia/Tokyo', session: { start: at('2026-10-13T09:00', 'Asia/Tokyo'), end: at('2026-10-13T15:30', 'Asia/Tokyo') } });
+  const place = (q, req) => SA.placeOrder(rich(), req, { quote: q, rates: RATES, valuation: OK, now: t, id: 'j1' });
+  assert.deepEqual(place(jpq('1301.T', 'stock', 2999), { side: 'buy', type: 'limit', limit: 2998.5, qty: 100 }), { error: 'tick', tick: 1 });
+  assert.equal(place(jpq('7203.T', 'stock', 2999), { side: 'buy', type: 'limit', limit: 2998.5, qty: 100 }).error, undefined);
+  // An ETF in its own unit, and inside its daily limit like a stock.
+  assert.deepEqual(place(jpq('1306.T', 'etf', 4131), { side: 'buy', type: 'limit', limit: 4131, qty: 5 }), { error: 'lot', lot: 10 });
+  assert.equal(place(jpq('1306.T', 'etf', 4131), { side: 'buy', type: 'limit', limit: 4131, qty: 10 }).error, undefined);
+  assert.deepEqual(SM.priceLimits(jpq('1306.T', 'etf', 4131), t), { up: 4831, down: 3431 });
+  assert.equal(place(jpq('1306.T', 'etf', 4131), { side: 'buy', type: 'limit', limit: 4900, qty: 10 }).error, 'priceLimit');
+  // Above ¥1 million the bands go on (JPX: ¥300,000 under ¥1.5 million ... ¥10 million from ¥50 million).
+  assert.deepEqual(SM.priceLimits({ ...jpq('9999.T', 'stock', 1_200_000) }, t), { up: 1_500_000, down: 900_000 });
+});
