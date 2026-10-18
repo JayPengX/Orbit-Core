@@ -70,7 +70,7 @@ test('the Pass sheet: every string in both languages; every tab named', async ()
 test('the brand: Quadra is where the money is, Orbit the everyday tools; ids never change', () => {
   const family = id => kit.APPS[id].family;
   assert.deepEqual(Object.keys(kit.APPS).filter(id => family(id) === 'quadra'), ['stock', 'odds']);
-  assert.deepEqual(Object.keys(kit.APPS).filter(id => family(id) === 'orbit').sort(), ['match', 'orbit', 'transit', 'vocab', 'weather']);
+  assert.deepEqual(Object.keys(kit.APPS).filter(id => family(id) === 'orbit').sort(), ['match', 'orbit', 'slip', 'transit', 'vocab', 'weather']);
   assert.equal(kit.APPS.match.name, 'Orbit Sports');
   assert.equal(kit.APPS.vocab.name, 'Orbit Words');
   assert.ok(Object.values(kit.APPS).every(a => a.related === (a.family === 'orbit')));

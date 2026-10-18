@@ -11,8 +11,16 @@ import { execSync } from 'node:child_process';
 import { BRANDS, FAMILIES, PASS, appIcon, familyMark, homeOf, pathOf } from '../kit/brand.mjs';
 import { FORMATS, shareCard } from './marks.mjs';
 
+// The global one, or a Mac's in ~/.local/opt/playwright (as tools/preview.mjs).
 const require = createRequire(`${execSync('npm root -g').toString().trim()}/`);
-const { chromium } = require('playwright');
+let chromium;
+for (const p of ['playwright', `${process.env.HOME}/.local/opt/playwright/node_modules/playwright`]) {
+  try {
+    ({ chromium } = require(p));
+    break;
+  } catch {}
+}
+if (!chromium) throw new Error('Playwright not found: npm i -g playwright');
 const root = new URL('../../', import.meta.url).pathname;
 const here = new URL('../', import.meta.url).pathname;
 const exists = p =>
