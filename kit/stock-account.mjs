@@ -589,7 +589,7 @@ export function placeOrder(account, req, { quote, rates, valuation, now = Date.n
     const credit = creditAccount(account, now);
     if (!credit.open) return { error: 'creditNeeded' };
     if (quote.market === 'TW') {
-      const loan = quote.price * qty * rate;
+      const loan = marginLoan('TW', quote.currency, quote.price * qty, quote.price * qty, rate);
       const room = credit.limit - creditUsed(valuation).loan;
       if (loan > room + EPS) return { error: 'creditLimit', room: Math.max(0, Math.floor(room)), limit: credit.limit };
     }
@@ -687,9 +687,17 @@ export function requiredCash(order, quote, now = Date.now()) {
   // for one held a moment for a fresh price (the price may tick up).
   const extra = order.type === 'limit' ? 0 : !fillsNow ? RESERVE_BUFFER : order.waitFresh ? FRESH_BUFFER : 0;
   // On margin, only one's own part is held (自備款); the broker lends the rest.
-  const own = order.margin ? 1 - order.margin : 1;
-  const reserve = roundCash(est.total * own * (1 + extra), quote.currency);
+  const lent = order.margin ? marginLoan(quote.market, quote.currency, est.gross, est.total, order.margin) : 0;
+  const reserve = roundCash((est.total - lent) * (1 + extra), quote.currency);
   return { est, reserve, buffer: Math.max(0, reserve - est.total), fillsNow, ref };
+}
+
+// What 融資 lends on a purchase: in Taiwan the trade's value (成交價款, before
+// costs) times the rate, the part under NT$1,000 not lent (TWSE 融資融券業務
+// 操作辦法 §50); elsewhere the rate of all it costs.
+export function marginLoan(market, currency, gross, total, rate) {
+  if (market === 'TW') return Math.max(0, Math.floor((gross * rate) / 1000 + 1e-9) * 1000);
+  return roundCash(total * rate, currency);
 }
 
 function updateOrder(account, order) {
@@ -721,7 +729,7 @@ function fillOrder(account, order, price, rates, now, at = now) {
   if (order.side === 'buy' && !order.forced) {
     // This order's own hold is released as it fills.
     const have = Math.min(...moments.map(tt => (available(account, replay(account, tt)).cash[order.currency] || 0))) + (order.reserve || 0);
-    const lent = order.margin ? roundCash(est.total * order.margin, order.currency) : 0;
+    const lent = order.margin ? marginLoan(order.market, order.currency, est.gross, est.total, order.margin) : 0;
     if (est.total - lent > have + EPS) {
       const rejected = { ...order, status: 'rejected', reason: 'funds', rev: order.rev + 1, done: now };
       return { account: updateOrder(account, rejected), order: rejected, fill: null, error: 'funds', need: est.total - lent, have };
@@ -764,7 +772,7 @@ function fillOrder(account, order, price, rates, now, at = now) {
   const extra = [];
   // 融資買進: the loan for this purchase, made as it fills, tied to the stock.
   if (order.side === 'buy' && order.margin) {
-    const amount = roundCash(est.total * order.margin, order.currency);
+    const amount = marginLoan(order.market, order.currency, est.gross, est.total, order.margin);
     if (amount > 0) {
       fill.financed = amount;
       extra.push({ id: `loan:${order.id}`, type: 'borrow', t: at, currency: order.currency, amount, rate: loanRateAt(order.currency, at), symbol: order.symbol });
