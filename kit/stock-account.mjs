@@ -21,7 +21,7 @@ import {
   SHORT_INITIAL,
   currencyInfo,
   dealPrice,
-  divPayDays,
+  divPayDate,
   settleDate,
   marketFill,
   isOddLot,
@@ -45,7 +45,7 @@ import {
 import { nextTradingStart, isTradingDay } from '#kit/stock-holidays.mjs';
 import { TD_MIN, tdRate, addMonths, tdInterest, incomeTaxes, lendable, LEND_RATE, LEND_LOT, LEND_RECALL, LEND_TERM_DAYS, addWeekdays, lendFee } from '#kit/stock-savings.mjs';
 import { BONDS, couponDates } from '#kit/stock-bonds.mjs';
-import { creditAccount, creditUsed, dayTradeBuyFirst, dayTradeSellFirst, dayTradeRoom, termDue, afterHours, shortDeposit, SHORT_HANDLING, SHORT_INTEREST } from '#kit/stock-credit.mjs';
+import { creditAccount, creditUsed, dayTradeBuyFirst, dayTradeSellFirst, dayTradeRoom, termDue, afterHours, closingAuction, shortDeposit, SHORT_HANDLING, SHORT_INTEREST } from '#kit/stock-credit.mjs';
 
 export const ACCOUNT_VERSION = 1;
 // Every new account opens with the same NT$100,000 (Quadra's base amount);
@@ -470,6 +470,27 @@ export function estimate({ market, kind, currency, side, qty, price, t = Date.no
   return { price: deal, gross, ...costs, costs: costs.total, total };
 }
 
+// A Taiwan whole-lot order of a listed stock, ETF or bond ETF: it goes
+// through the closing call auction (stock-credit.mjs closingAuction).
+const LISTED = new Set(['stock', 'etf', 'bond']);
+const atClosingAuction = order => order.market === 'TW' && LISTED.has(order.kind) && !order.after && !isOddLot(order.market, order.kind, order.qty);
+// One match at the close: a buy whose limit is at or above it, a sell at or
+// below, a market order at it; a stop order waits.
+const crossAt = (order, close) => (order.type === 'limit' ? ((order.side === 'buy' ? order.limit >= close : order.limit <= close) ? close : null) : order.type === 'market' ? close : null);
+// Taiwan's closing call auction on this quote: { price } (the close, or null
+// when the order doesn't meet it) once the 13:30 match is in (a price of
+// 13:25 or later: none trade between), for an order placed before 13:30;
+// { price: null } while it's collecting (13:25-13:30) or for an order
+// placed during it whose match isn't in yet; null when it doesn't apply.
+export function closingMatch(order, quote, now = Date.now()) {
+  if (!atClosingAuction(order)) return null;
+  const c = closingAuction(now);
+  if (!c || order.t >= c.match) return null;
+  if (quote?.marketTime >= c.from) return { price: now >= c.match ? crossAt(order, quote.price) : null };
+  // (Placed during it: it never matches before 13:30.)
+  return order.t >= c.from ? { price: null } : null;
+}
+
 // The price an open order fills at on this quote, or null. An order placed
 // before the current session started also fills on the session's high or
 // low having reached its price (the page can't watch every tick).
@@ -477,10 +498,11 @@ export function triggerPrice(order, quote, now) {
   // Taiwan's after-hours sessions: one match at 14:30, at the close.
   if (order.after) {
     if (!quote || now < order.after || !(quote.marketTime >= order.after - 3_600_000)) return null;
-    const close = quote.price;
-    if (order.type === 'limit') return order.side === 'buy' ? (order.limit >= close ? close : null) : order.limit <= close ? close : null;
-    return order.type === 'market' ? close : null;
+    return crossAt(order, quote.price);
   }
+  // Taiwan's closing call auction (13:25-13:30): one match at 13:30, at the close.
+  const closing = quote && closingMatch(order, quote, now);
+  if (closing) return closing.price;
   if (!quote || !isOpen(quote, now)) return null;
   if (isOddLot(order.market, order.kind, order.qty) && !oddLotOpen(now)) return null;
   if (quote.kind !== 'crypto' && quote.session && quote.marketTime < quote.session.start) return null;
@@ -511,6 +533,9 @@ function checkQty(qty, kind) {
 
 // Good-till-cancelled orders last this long (brokers' 長效單: a month).
 export const GTC_DAYS = 30;
+// How long after Taiwan's 13:30 close a whole-lot day order waits for its
+// closing match to be known (to 14:30).
+export const CLOSE_DECIDE = 60 * 60_000;
 // When a day order placed now ends: the close of the session it's for (the
 // one under way, or the next one when the market is shut).
 export function dayOrderEnd(quote, now = Date.now()) {
@@ -550,7 +575,7 @@ export function placeOrder(account, req, { quote, rates, valuation, now = Date.n
     const tick = tickSize(quote.market, quote.kind, x);
     if (!onTick(x, tick)) return { error: 'tick', tick };
   }
-  const band = priceLimits(quote);
+  const band = priceLimits(quote, now);
   if (band && type === 'limit' && (req.limit > band.up + EPS || req.limit < band.down - EPS)) return { error: 'priceLimit', ...band };
   const s = replay(account, now);
   const avail = available(account, s);
@@ -615,21 +640,30 @@ export function placeOrder(account, req, { quote, rates, valuation, now = Date.n
     }
     order.margin = rate;
   }
-  // After Taiwan's close and before 14:30: the after-hours sessions (盤後定價,
-  // 盤後零股), limit or market orders, matched once at 14:30 at the close;
-  // what doesn't match ends with the day.
+  // After Taiwan's close and before 14:30: the after-hours sessions (盤後零股
+  // from 13:40, 盤後定價 from 14:00), limit or market orders, matched once at
+  // 14:30 at the close; what doesn't match ends with the day. Before its
+  // session takes orders, one is refused (afterHoursWait: from when).
   if (quote.market === 'TW' && !req.forced) {
-    const after = afterHours(now);
+    const after = afterHours(now, isOddLot(quote.market, quote.kind, qty));
     if (after && type !== 'stop') {
+      if (now < after.from && !req.cover) return { error: 'afterHoursWait', from: after.from };
       order.after = after.match;
       order.tif = 'day';
     }
+    // The closing call auction (13:25-13:30) takes limit orders only.
+    const c = closingAuction(now);
+    if (type === 'market' && !req.cover && c && now < c.match && atClosingAuction(order)) return { error: 'closingAuction', match: c.match };
   }
   // How long it lasts: a day order ends with its session (what exchanges
   // and brokers do by default); good-till-cancelled lasts GTC_DAYS. Crypto
   // and currency pairs never close, so theirs are GTC.
   if (!order.after) order.tif = req.tif === 'gtc' || quote.kind === 'crypto' || quote.kind === 'fx' ? 'gtc' : 'day';
   order.expires = order.after ? order.after + 9 * 3_600_000 : order.tif === 'gtc' ? now + GTC_DAYS * 86_400_000 : dayOrderEnd(quote, now);
+  // A Taiwan whole-lot day order is in its day's 13:30 closing match: it
+  // lasts until that's known (CLOSE_DECIDE; Yahoo's Taiwan prices run 20
+  // minutes behind), ending unmatched after it.
+  if (order.tif === 'day' && atClosingAuction(order)) order.expires += CLOSE_DECIDE;
   if (side === 'sell') {
     const have = Math.max(0, avail.qty[quote.symbol] || 0);
     const short = qty - have;
@@ -699,7 +733,7 @@ export function placeOrder(account, req, { quote, rates, valuation, now = Date.n
 // order, and after hours (盤後 matches at the close).
 export function limitUpFor(order, quote, now = Date.now()) {
   if (quote?.market !== 'TW' || order.type === 'limit' || order.after || (order.type === 'market' && afterHours(now))) return null;
-  return priceLimits(isOpen(quote, now) ? quote : { ...quote, prev: quote.price })?.up ?? null;
+  return priceLimits(isOpen(quote, now) ? quote : { ...quote, prev: quote.price }, now)?.up ?? null;
 }
 // The price an order's amount is counted at (額度, deposits): its limit, a
 // Taiwan market or stop order's limit-up, else the price.
@@ -910,12 +944,24 @@ export function fillAskDue(order, quote, lastAsk, now = Date.now()) {
 // When an order waiting while the page was closed would have filled: the
 // first price bar after it was placed that reaches its price (bars:
 // [{ t, o, h, l, c }], oldest first). A gap through the price fills at the
-// bar's open, like a real order.
-export function backfillPrice(order, bars) {
+// bar's open, like a real order. A Taiwan whole-lot order's bars from 13:25
+// are the closing call auction's: nothing trades in it until the 13:30
+// match, so such a bar is the close, and an order placed before 13:30 that
+// meets it fills there at 13:30 (once that's past by `now`).
+export function backfillPrice(order, bars, now = Date.now()) {
   const odd = isOddLot(order.market, order.kind, order.qty);
+  const closing = atClosingAuction(order);
   for (const b of bars) {
     if (order.expires && b.t >= order.expires) break;
-    if (b.t < order.t || !Number.isFinite(b.o)) continue;
+    if (!Number.isFinite(b.o)) continue;
+    const c = closing ? closingAuction(b.t) : null;
+    if (c) {
+      if (order.t >= c.match || now < c.match || !Number.isFinite(b.c)) continue;
+      const price = crossAt(order, b.c);
+      if (price != null) return { t: c.match, price };
+      continue;
+    }
+    if (b.t < order.t) continue;
     if (odd && !oddLotOpen(b.t)) continue;
     const buy = order.side === 'buy';
     if (order.type === 'market') return { t: b.t, price: b.o };
@@ -1350,8 +1396,9 @@ export function callPlan(account, valuation) {
 // The ratio is judged on closing prices: a dip under 130% while Taiwan is
 // trading calls nothing yet. After the close it's a call (追繳通知), due by
 // the close of the second business day after. Paying cash against the loans
-// (補繳), repaying or selling can meet it; it's cancelled only back at 166%.
-// At the deadline: under 130% still, the margin holdings are sold from the
+// (補繳), repaying or selling can meet it; it's cancelled back at 166%, or
+// once the 差額 notified (call.need) is paid in full, bit by bit or at once
+// (TWSE 融資融券業務操作辦法 §55(3), (4)). At the deadline: under 130% still, the margin holdings are sold from the
 // next business day (the orders wait for its open); between 130% and 166%
 // nothing is sold yet, but the call stands, and a later fall under 130% is
 // sold the next business day with no new grace.
@@ -1386,12 +1433,28 @@ export function callNeed(v) {
   if (!(v.owed > EPS) || v.ratio >= MARGIN_RESTORE) return 0;
   return Math.max(0, Math.ceil((MARGIN_RESTORE * v.owed - v.assets) / (MARGIN_RESTORE - 1)));
 }
+// NT$ paid against the loans since a call was issued (補繳): the account's
+// own cash paid in (repay events), not what a sale repaid. Another
+// currency's at `rates` (NT$ per unit), left out without one.
+export function callPaid(account, call, rates = {}) {
+  if (!call) return 0;
+  const sold = new Set((account?.events || []).filter(e => e.type === 'fill' && e.side === 'sell').map(e => `repay:${e.orderId}`));
+  let paid = 0;
+  for (const e of account?.events || []) {
+    if (e.type !== 'repay' || !(e.t >= call.since) || sold.has(e.id)) continue;
+    const r = e.currency === BASE ? 1 : rates?.[e.currency];
+    if (r > 0) paid += e.amount * r;
+  }
+  return paid;
+}
 // Where a call stands at a check: { call (to keep on the account, or null),
 // sell (sell the margin holdings now), event ('issued' | 'met' | 'cleared' |
-// 'intraday' | null) }.
-export function callState(call, v, now = Date.now()) {
+// 'intraday' | null), paid (met by paying the 差額 in full) }. `paid`: NT$
+// paid since it was issued (callPaid).
+export function callState(call, v, now = Date.now(), paid = 0) {
   if (!(v.owed > EPS)) return { call: null, sell: false, event: call ? 'cleared' : null };
   if (call && v.ratio >= MARGIN_RESTORE) return { call: null, sell: false, event: 'met' };
+  if (call && call.need > 0 && paid >= call.need - 0.5) return { call: null, sell: false, event: 'met', paid: true };
   if (!call) {
     if (v.ratio >= MARGIN_CALL) return { call: null, sell: false, event: null };
     if (twSession(now)) return { call: null, sell: false, event: 'intraday' };
@@ -1545,11 +1608,19 @@ function sharesAt(account, symbol, t) {
 // What puts shares of `symbol` in the account: a trade, or a 新股申購 won.
 const holdingEvents = (account, symbol) => account.events.filter(e => (e.type === 'fill' || e.type === 'ipowin') && e.symbol === symbol);
 
+// Yahoo's pay date for the dividend that went ex at `ex`: its fundamentals'
+// dividendDate when their exDividendDate (a UTC midnight) is that day.
+const utcDay = t => new Date(t).toISOString().slice(0, 10);
+const payDayOf = (market, ex, exDividendDate, dividendDate) => (exDividendDate > 0 && dividendDate > 0 && utcDay(exDividendDate) === localDayOf(ex, market) ? dividendDate : null);
+
 // Credits the dividends and applies the splits of `symbol` that happened
 // while it was held. Yahoo's dividend amounts are adjusted for later splits,
 // so each is scaled back to the shares of its own day. A dividend counts on
-// its ex-date (shares held then) and is paid on its market's usual pay day.
-export function applyCorporateActions(account, symbol, { dividends = [], splits = [] }, { rates, now = Date.now() }) {
+// its ex-date (shares held then) and is paid on its pay date: Yahoo's
+// (fundamentals' dividendDate, for the dividend that went ex on their
+// exDividendDate) where it's given, else its market's usual pay day, a
+// trading day (divPayDate).
+export function applyCorporateActions(account, symbol, { dividends = [], splits = [], exDividendDate = null, dividendDate = null }, { rates, now = Date.now() }) {
   const fills = holdingEvents(account, symbol);
   if (!fills.length) return { account, added: [] };
   const first = Math.min(...fills.map(e => e.t));
@@ -1584,7 +1655,7 @@ export function applyCorporateActions(account, symbol, { dividends = [], splits 
     const taxes = gross > 0 ? dividendTaxes(info.market, gross) : { withheld: 0, nhi: 0, net: gross };
     // Owed from the ex-date, paid some days later (until then it's pending).
     const event = {
-      id, type: 'div', t: d.date + divPayDays(info.market) * 86_400_000, ex: d.date, symbol, name: info.name, market: info.market, kind: info.kind, currency: info.currency,
+      id, type: 'div', t: divPayDate(info.market, d.date, payDayOf(info.market, d.date, exDividendDate, dividendDate)), ex: d.date, symbol, name: info.name, market: info.market, kind: info.kind, currency: info.currency,
       shares, perShare, gross, withheld: taxes.withheld, nhi: taxes.nhi, net: roundCash(taxes.net, info.currency), twd: rate
     };
     next = { ...next, events: [...next.events, event] };

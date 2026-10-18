@@ -201,6 +201,13 @@ test('dividends, interest and lending fees: withholding and the health premium a
   assert.deepEqual(dividendTaxes('TW', 19_999), { withheld: 0, nhi: 0, net: 19_999 });
   assert.deepEqual(dividendTaxes('TW', 20_000), { withheld: 0, nhi: 422, net: 19_578 });
   assert.deepEqual(dividendTaxes('US', 100), { withheld: 30, nhi: 0, net: 70 });
+  // 健保署: to the dollar, 角 rounded half up (20,030 × 2.11% = 422.633: 423), on at most NT$10 million
+  // (its own example: 9,366,000 × 2.11% = 197,622.6 → 197,623).
+  assert.equal(dividendTaxes('TW', 20_030).nhi, 423);
+  assert.equal(dividendTaxes('TW', 20_010).nhi, 422);
+  assert.equal(dividendTaxes('TW', 9_366_000).nhi, 197_623);
+  assert.equal(dividendTaxes('TW', 12_000_000).nhi, 211_000);
+  assert.equal(incomeTaxes(20_030).nhi, 423, 'interest the same');
   // Interest: 10% withheld over NT$20,000 (not at it); the premium from it.
   assert.deepEqual(incomeTaxes(20_000), { withheld: 0, nhi: 422, net: 19_578 });
   assert.deepEqual(incomeTaxes(20_001), { withheld: 2_000, nhi: 422, net: 17_579 });
@@ -305,7 +312,8 @@ test("Taiwan's close and after-hours sessions", () => {
   assert.equal(pastClose(t, Date.parse('2026-10-16T05:29:59Z')), false);
   assert.equal(pastClose(t, Date.parse('2026-10-16T05:30:00Z')), true);
   assert.equal(afterHours(Date.parse('2026-10-16T05:29:59Z')), null);
-  assert.deepEqual(afterHours(Date.parse('2026-10-16T06:00:00Z')), { from: Date.parse('2026-10-16T05:30:00Z'), match: Date.parse('2026-10-16T06:30:00Z') });
+  assert.deepEqual(afterHours(Date.parse('2026-10-16T06:00:00Z')), { from: Date.parse('2026-10-16T06:00:00Z'), match: Date.parse('2026-10-16T06:30:00Z') }, '盤後定價 from 14:00');
+  assert.deepEqual(afterHours(Date.parse('2026-10-16T05:35:00Z'), true), { from: Date.parse('2026-10-16T05:40:00Z'), match: Date.parse('2026-10-16T06:30:00Z') }, '盤後零股 from 13:40');
   assert.equal(afterHours(Date.parse('2026-10-16T06:30:00Z')), null);
   assert.equal(afterHours(Date.parse('2026-10-09T06:00:00Z')), null, 'a holiday');
   assert.equal(taipeiDay(termDue(Date.parse('2026-08-31T04:00:00Z'))), '2027-02-28', 'six months, the month-end clamp');
@@ -496,4 +504,25 @@ test("Plus's half FX spread goes by the exchange's own month, not today's", () =
   } finally {
     SA.usePlus(null);
   }
+});
+
+test("a dividend's pay date: Yahoo's own where it has one, else the usual delay moved to the next trading day", async () => {
+  const { divPayDate } = await import('../kit/stock-markets.mjs');
+  const { parseFundamentals } = await import('../kit/stock-quotes.mjs');
+  // Taiwan, ex Friday 2026-09-11 09:00: 28 days on is 10-09, a holiday (國慶 observed): paid Monday 10-12.
+  const ex = Date.parse('2026-09-11T01:00:00Z');
+  assert.equal(iso(divPayDate('TW', ex)), '2026-10-12T01:00:00.000Z');
+  assert.equal(iso(divPayDate('TW', Date.parse('2026-06-11T01:00:00Z'))), '2026-07-09T01:00:00.000Z', 'a trading day stays');
+  // The US, ex 2026-08-10 at the open; Yahoo's pay date 08-13 (a UTC midnight): that day at the same hour in New York.
+  const usEx = Date.parse('2026-08-10T13:30:00Z');
+  const f = parseFundamentals({ quoteSummary: { result: [{ calendarEvents: { exDividendDate: { raw: 1786320000 }, dividendDate: { raw: 1786579200 } } }] } });
+  assert.deepEqual([f.exDividendDate, f.dividendDate], [1786320000000, 1786579200000]);
+  assert.equal(iso(divPayDate('US', usEx, f.dividendDate)), '2026-08-13T13:30:00.000Z');
+  assert.equal(parseFundamentals({ quoteSummary: { result: [{ calendarEvents: { dividendDate: {} } }] } }).dividendDate, null, "Taiwan's: mostly none");
+  // Through applyCorporateActions: only for the dividend Yahoo's dates are about.
+  const t0 = Date.parse('2026-03-02T14:30:00Z');
+  const us = { id: 'b', type: 'fill', t: t0, orderId: 'b', symbol: 'AAPL', name: 'Apple', kind: 'stock', market: 'US', currency: 'USD', side: 'buy', qty: 10, price: 100, gross: 1000, total: 1000, commission: 0, tax: 0, fee: 0, twd: 32 };
+  const acc = { ...SA.newAccount(100_000, t0 - DAY_MS, 'acc'), events: [us] };
+  const { added } = SA.applyCorporateActions(acc, 'AAPL', { dividends: [{ date: usEx, amount: 0.26 }, { date: Date.parse('2026-05-11T13:30:00Z'), amount: 0.26 }], exDividendDate: f.exDividendDate, dividendDate: f.dividendDate }, { rates: { USD: 32 }, now: usEx + DAY_MS });
+  assert.deepEqual(added.map(e => iso(e.t)), ['2026-08-13T13:30:00.000Z', '2026-05-18T13:30:00.000Z']);
 });

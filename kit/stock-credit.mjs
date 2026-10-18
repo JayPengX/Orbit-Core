@@ -196,16 +196,30 @@ export function pastClose(t, now) {
   return now >= Date.parse(`${day}T13:30:00+08:00`) || (now - t > DAY && isTradingDay('TW', localDayOf(now, 'TW')));
 }
 
-// Taiwan's after-hours sessions (盤後): 盤後定價 for whole lots (14:00-14:30,
-// at the close) and 盤後零股 for odd lots (13:40-14:30, one auction at
-// 14:30). An order placed after the 13:30 close and before 14:30 on a
-// trading day goes to them: it matches once, at 14:30, at the close (a buy
-// whose limit is at or above it, a sell at or below; a market order at the
-// close), and what doesn't match ends there.
-export function afterHours(t) {
+// TWSE's closing call auction (收盤集合競價, TWSE 交易制度): from 13:25 whole
+// lots are no longer matched as they come; orders are collected and match
+// once at 13:30, at one price, the close. Only limit orders (限價 ROD) are
+// taken then: a market order is refused (退單). { from, match } of `t`'s
+// day once it's 13:25 or later on a trading day, else null.
+export function closingAuction(t) {
   const day = localDayOf(t, 'TW');
   if (!isTradingDay('TW', day)) return null;
-  const from = Date.parse(`${day}T13:30:00+08:00`);
+  const from = Date.parse(`${day}T13:25:00+08:00`);
+  return t >= from ? { from, match: Date.parse(`${day}T13:30:00+08:00`) } : null;
+}
+
+// Taiwan's after-hours sessions (盤後, TWSE 交易制度): 盤後零股 for odd lots
+// takes orders 13:40-14:30, 盤後定價 for whole lots 14:00-14:30, and each
+// matches once at 14:30 (盤後定價 at the day's close; 盤後零股 by call
+// auction, here at the close too): a buy whose limit is at or above it, a
+// sell at or below, a market order at the close; what doesn't match ends
+// there. Between the 13:30 close and 14:30 on a trading day: { from (when
+// its session takes orders), match }; else null. `odd`: an odd-lot order.
+export function afterHours(t, odd = false) {
+  const day = localDayOf(t, 'TW');
+  if (!isTradingDay('TW', day)) return null;
+  const close = Date.parse(`${day}T13:30:00+08:00`);
+  const from = Date.parse(`${day}T${odd ? '13:40' : '14:00'}:00+08:00`);
   const match = Date.parse(`${day}T14:30:00+08:00`);
-  return t >= from && t < match ? { from, match } : null;
+  return t >= close && t < match ? { from, match } : null;
 }
