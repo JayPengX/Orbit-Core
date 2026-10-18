@@ -43,7 +43,7 @@ import {
   localDayOf
 } from '#kit/stock-markets.mjs';
 import { nextTradingStart, isTradingDay } from '#kit/stock-holidays.mjs';
-import { TD_MIN, tdRate, addMonths, tdInterest, incomeTaxes, lendable, LEND_RATE, LEND_LOT, LEND_RECALL, LEND_TERM_DAYS, addWeekdays, lendFee } from '#kit/stock-savings.mjs';
+import { TD_MIN, tdRate, addMonths, tdInterest, incomeTaxes, lendable, LEND_RATE, LEND_RATE_MIN, LEND_RATE_MAX, LEND_LOT, LEND_RECALL, lendEnds, addWeekdays, lendFee } from '#kit/stock-savings.mjs';
 import { BONDS, couponDates } from '#kit/stock-bonds.mjs';
 import { creditAccount, creditUsed, dayTradeBuyFirst, dayTradeSellFirst, dayTradeRoom, termDue, afterHours, closingAuction, shortDeposit, SHORT_HANDLING, SHORT_INTEREST } from '#kit/stock-credit.mjs';
 
@@ -1137,7 +1137,11 @@ export function lendableQty(account, symbol, now = Date.now()) {
   return Math.max(0, Math.floor((Math.min(free, p.qty - settling) + EPS) / LEND_LOT) * LEND_LOT);
 }
 
-export function lendShares(account, { symbol, qty, price }, now = Date.now(), id = randomId()) {
+// An offer to lend `qty` at a yearly `rate` (the going rate by default):
+// lent at once when a borrower takes it, at that rate (one above the going
+// rate finds none: lendNoTaker). `renew`: the lender agrees to its two
+// renewals (lendEnds).
+export function lendShares(account, { symbol, qty, price, rate, renew = false }, now = Date.now(), id = randomId()) {
   const s = replay(account, now);
   const p = s.positions[symbol];
   if (!p || !lendable(p.market, p.kind)) return { error: 'notLendable' };
@@ -1147,34 +1151,41 @@ export function lendShares(account, { symbol, qty, price }, now = Date.now(), id
   const can = lendableQty(account, symbol, now);
   if (qty > can + EPS) return { error: 'lendQty', can };
   if (!(price > 0)) return { error: 'noQuote' };
-  const event = { id: `lend:${id}`, type: 'lend', t: now, symbol, name: p.name, market: p.market, kind: p.kind, currency: p.currency, qty, price, rate: LEND_RATE[p.kind] };
+  const going = LEND_RATE[p.kind];
+  rate = rate == null ? going : Number(rate);
+  if (!(rate >= LEND_RATE_MIN - EPS && rate <= LEND_RATE_MAX + EPS)) return { error: 'lendRate', min: LEND_RATE_MIN, max: LEND_RATE_MAX };
+  if (rate > going + EPS) return { error: 'lendNoTaker', rate: going };
+  const event = { id: `lend:${id}`, type: 'lend', t: now, symbol, name: p.name, market: p.market, kind: p.kind, currency: p.currency, qty, price, rate, ...(renew ? { renew: true } : {}) };
   return { account: { ...account, events: [...account.events, event] }, event };
 }
 
-function lendEnd(lend, at, back) {
+function lendEnd(lend, at, back, closes = null) {
   const key = lend.id.slice(5);
-  const fee = lendFee(lend, back);
+  const fee = lendFee(lend, back, closes);
   return [
     { id: `recall:${key}`, type: 'recall', t: at, lend: lend.id, back },
     { id: `lendpay:${key}`, type: 'lendpay', t: back, lend: lend.id, symbol: lend.symbol, currency: BASE, ...fee }
   ];
 }
 
-// 召回: the shares come back (and the fee is paid) in LEND_RECALL business days.
-export function recallShares(account, lendId, now = Date.now()) {
+// 召回: the shares come back (and the fee is paid) in LEND_RECALL business
+// days. `closes`: the shares' daily closes since it was lent (lendFee), for
+// the fee day by day.
+export function recallShares(account, lendId, now = Date.now(), { closes = null } = {}) {
   const l = replay(account, now).lent[lendId];
   if (!l) return { error: 'lendGone' };
   if (l.back) return { account, back: l.back };
   const back = addWeekdays(now, LEND_RECALL);
-  return { account: { ...account, events: [...account.events, ...lendEnd(l, now, back)] }, back };
+  return { account: { ...account, events: [...account.events, ...lendEnd(l, now, back, closes)] }, back };
 }
 
-// Contracts past their term end by themselves (dated then).
-export function matureLending(account, now = Date.now()) {
+// Contracts past their term end by themselves (dated then). `closesOf`:
+// symbol → its daily closes (lendFee).
+export function matureLending(account, now = Date.now(), { closesOf = null } = {}) {
   const s = replay(account, now);
-  const due = Object.values(s.lent).filter(l => !l.back && l.t + LEND_TERM_DAYS * 86_400_000 <= now);
+  const due = Object.values(s.lent).filter(l => !l.back && lendEnds(l) <= now);
   if (!due.length) return account;
-  return { ...account, events: [...account.events, ...due.flatMap(l => lendEnd(l, l.t + LEND_TERM_DAYS * 86_400_000, l.t + LEND_TERM_DAYS * 86_400_000))] };
+  return { ...account, events: [...account.events, ...due.flatMap(l => lendEnd(l, lendEnds(l), lendEnds(l), closesOf?.(l.symbol) ?? null))] };
 }
 
 // Everything lent is called back (a default or a margin call: the broker
