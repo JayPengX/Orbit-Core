@@ -1544,6 +1544,11 @@ function makeSession(app, { lang, heartbeat }) {
   // by a link, and make this app live.
   s.start = async ({ data = true } = {}) => {
     if (started) return s.first || {};
+    // Every app behind the same two doors (Jay, 2026-10-18): on a phone, the
+    // home screen only (installGate, its page covered and nothing started),
+    // then a Quadra Pass (signInGate below). An app that asked first is
+    // covered once.
+    if (typeof document !== 'undefined' && installGate(app, lang)) return new Promise(() => {});
     started = true;
     let first = null;
     try {
@@ -2945,8 +2950,11 @@ const inAppBrowser = () => /Line\/|FBAN|FBAV|Instagram|Messenger|MicroMessenger|
 // of them: opened from another app or a link in Safari, it asks to be added
 // too (a hand-over no longer lets it run in the browser). Returns true when
 // it covered the page (the app shouldn't start).
+let installCovered = false;
 export function installGate(app, lang = detectLang()) {
   if (!isPhoneOrTablet() || isStandalone()) return false;
+  if (installCovered) return true;
+  installCovered = true;
   const en = lang === 'en';
   const name = appName(app);
   const steps = inAppBrowser()
