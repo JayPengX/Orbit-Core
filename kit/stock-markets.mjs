@@ -451,6 +451,13 @@ export function kindOf(type, symbol, hint) {
   }
 }
 
+// 複委託 (受託買賣外國有價證券): a foreign market is traded through a Taiwan
+// broker's sub-brokerage, and that is cash only, no 融資 and no borrowed
+// short (元大 複委託說明: 不得信用交易). (The FSC's 複委託外幣融資, US index
+// stocks only, was approved 2026-08 but isn't in force: 2027 Q2 at the earliest.)
+const LOCAL_MARKETS = new Set(['TW', 'CRYPTO', 'METAL', 'BOND', 'FX']);
+export const isSubBrokered = market => Boolean(market) && !LOCAL_MARKETS.has(market);
+
 export const TRADABLE_KINDS = new Set(['stock', 'etf', 'bond', 'fund', 'crypto', 'metal', 'govbond', 'fx']);
 // What can be sold short (borrowed and sold): listed shares, crypto and
 // currency pairs (selling EUR/USD bets on the euro falling).
@@ -560,7 +567,8 @@ export function dividendTaxes(market, gross) {
 // value), as brokers set it, and the maintenance ratio (assets ÷ debt) where
 // the broker calls and where it sells.
 //   Taiwan stocks and ETFs: 融資成數, 60% listed (.TW), 50% OTC (.TWO).
-//   Other markets: 50%, the US Reg T rule international brokers apply.
+//   Other markets: 50%, the US Reg T rule international brokers apply, for
+//   a loan against them (borrow); never 融資 (複委託 is cash only: isSubBrokered).
 //   China A-shares (Stock Connect) and India: none (no margin for foreign
 //   retail investors).
 //   Government bonds 90%, corporate bonds 70%.

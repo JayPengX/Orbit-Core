@@ -24,7 +24,8 @@
 //   interest  no more than the account's own interest earned and unpaid
 //   tdend, lendpay   within their rates' bounds (the replay pays each once)
 //   deposit   only money from the pool (an entry the wallet has)
-//   borrow    a purchase's own loan, as its fill says, at most 70% of it
+//   borrow    a purchase's own loan, as its fill says, at most 70% of it,
+//             never abroad (複委託 is cash only: the kit's isSubBrokered)
 // An event that fails is left out of the account's money (the pool never
 // sees it); one whose market data can't be read now is left out until it
 // can; one counted at a worse figure than the phone's is kept with that
@@ -40,7 +41,7 @@
 import { replay, ownCash, applyFills, planOrderType } from './kit/stock-account.mjs';
 import { unpack } from './kit/stock-codec.mjs';
 import { BONDS } from './kit/stock-bonds.mjs';
-import { marketFill, dealPrice, currencyInfo } from './kit/stock-markets.mjs';
+import { marketFill, dealPrice, currencyInfo, isSubBrokered } from './kit/stock-markets.mjs';
 import { fxSymbol } from './kit/stock-quotes.mjs';
 import { readFillsBook, decideFills, ipoList, ipoDraw, ipoKeyOf } from './stock-fill.js';
 import { parseDoc } from './doc-store.js';
@@ -257,6 +258,7 @@ export async function checkEvent(e, account, wallet, read, issued = {}, ctx = {}
       // A purchase's own loan (`loan:<order>`), as its fill says.
       if (!(e.amount > 0)) return 'bad';
       const fill = account.events.find(x => x.type === 'fill' && x.side === 'buy' && `loan:${x.orderId}` === e.id);
+      if (fill && isSubBrokered(fill.market)) return 'bad';
       return fill && fill.symbol === e.symbol && near(fill.financed || 0, e.amount, 0.01) && e.amount <= fill.total * 0.7 + 1 ? 'ok' : 'bad';
     }
     // 新股申購 (kit/stock-ipo.mjs): on TWSE's own figures, never the phone's.
@@ -323,14 +325,16 @@ const worthTWD = (s, rates) =>
   Object.entries(s.cash).reduce((sum, [c, v]) => sum + v * (rates[c] || 0), 0) + Object.values(s.positions).reduce((sum, p) => sum + (p.qty > 0 ? p.costTWD : 0), 0) - owedTWD(s, rates);
 
 // A new fill only with what the account had: the cash for a purchase (less
-// its own loan), the shares for a sale, and for a short sale, worth enough
-// behind it.
+// its own loan, none abroad), the shares for a sale, and for a short sale
+// (never of a foreign stock: 複委託 is cash only), worth enough behind it.
 function affordable(counted, e) {
   const s = replay(counted, e.t);
   const unit = Math.max(1, Math.abs(e.total) * 0.005);
-  if (e.side === 'buy') return (s.cash[e.currency] || 0) + (e.financed || 0) + unit >= e.total;
+  const abroad = isSubBrokered(e.market) && e.kind !== 'fx';
+  if (e.side === 'buy') return (s.cash[e.currency] || 0) + (abroad ? 0 : e.financed || 0) + unit >= e.total;
   const held = Math.max(0, s.positions[e.symbol]?.qty || 0);
   if (held + 1e-6 >= e.qty) return true;
+  if (abroad) return false;
   const after = replay({ ...counted, events: [...counted.events, e] }, e.t);
   const rates = twdRates([...counted.events, e]);
   const short = Object.values(after.positions).reduce((sum, p) => sum + (p.qty < 0 ? -p.costTWD : 0), 0);

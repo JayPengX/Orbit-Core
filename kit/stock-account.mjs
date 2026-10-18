@@ -41,7 +41,8 @@ import {
   lotProblem,
   mixedLot,
   localDayOf,
-  earlyCloseAt
+  earlyCloseAt,
+  isSubBrokered
 } from '#kit/stock-markets.mjs';
 import { nextTradingStart, isTradingDay } from '#kit/stock-holidays.mjs';
 import { TD_MIN, tdRate, addMonths, tdInterest, incomeTaxes, lendable, LEND_RATE, LEND_RATE_MIN, LEND_RATE_MAX, LEND_LOT, LEND_RECALL, lendEnds, addWeekdays, lendFee } from '#kit/stock-savings.mjs';
@@ -640,11 +641,12 @@ export function placeOrder(account, req, { quote, rates, valuation, now = Date.n
   if (req.margin) {
     if (side !== 'buy') return { error: 'side' };
     if (defaulted(account, now)) return { error: 'defaulted' };
+    // 複委託 is cash only (isSubBrokered): no 融資 abroad.
+    if (isSubBrokered(quote.market)) return { error: 'cashOnly' };
     const rate = collateralRate(quote.kind, quote.market, quote.symbol);
     if (!(rate > 0)) return { error: 'notMarginable' };
     if (!valuation || valuation.margin !== 'ok' || account.call) return { error: 'margin' };
-    // 融資 in any market needs the credit account (as a broker's 複委託
-    // does); Taiwan's is also within its limit.
+    // 融資 needs the credit account, within its limit.
     const credit = creditAccount(account, now);
     if (!credit.open) return { error: 'creditNeeded' };
     if (quote.market === 'TW') {
@@ -683,13 +685,15 @@ export function placeOrder(account, req, { quote, rates, valuation, now = Date.n
     const have = Math.max(0, avail.qty[quote.symbol] || 0);
     const short = qty - have;
     if (short > EPS) {
-      // Selling more than is held sells the rest short.
+      // Selling more than is held sells the rest short; never abroad (複委託
+      // is cash only: a foreign stock sells only what's held).
       if (!isShortable(quote.kind)) return { error: 'shares', have };
+      if (isSubBrokered(quote.market) && quote.kind !== 'fx') return { error: 'cashOnly', have };
       if (!valuation) return { error: 'noValuation' };
       if (valuation.margin !== 'ok') return { error: 'margin' };
       if (defaulted(account, now)) return { error: 'defaulted' };
-      // Elsewhere, borrowing to sell needs the credit account too (a
-      // currency pair borrows nothing: selling it is taking its other side).
+      // A crypto short needs the credit account too (a currency pair borrows
+      // nothing: selling it is taking its other side).
       if (quote.market !== 'TW' && quote.kind !== 'fx' && !creditAccount(account, now).open) return { error: 'creditNeeded' };
       // Taiwan: 融券 through the credit account (a 90% deposit, within its
       // limit), or else a day trade sold first (現股當沖) that must be bought
