@@ -28,7 +28,8 @@ const APPS = {
   'Orbit-Transit': { site: 'public', mods: ['quadra'], copies: ['lib/quadra.mjs', 'quadra.css', 'boot.js'] },
   'Orbit-Class': { site: '.', mods: ['quadra'], copies: ['src/quadra.mjs', 'css/quadra.css'] },
   'Orbit-Slips': { site: 'public', mods: ['quadra'], copies: [] },
-  'Orbit-Beats': { site: 'public', mods: ['quadra'], copies: [] }
+  'Orbit-Beats': { site: 'public', mods: ['quadra'], copies: [] },
+  'Orbit-Law': { site: 'public', mods: ['quadra'], copies: [] }
 };
 const CHECKOUT = `      - name: The shared kit (Shared-Proxy/kit), for the tests
         uses: actions/checkout@v4
