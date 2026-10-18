@@ -240,7 +240,7 @@ test('merge: another pass into this one, then it is gone', async () => {
   assert.equal(legacy.status, 400);
 });
 
-test("merge since the lock-down: Play's winnings come along, and its watched slips, tickets and records move to this pass", async () => {
+test("merge since the lock-down: Play's winnings come along, and its watched slips, tickets, unrevealed scratch cards and records move to this pass", async () => {
   const t = setup();
   const { updateWallet } = await import('../eco.js');
   const { moveSlips, OPEN_COLLECTION, OPEN_INDEX, SETTLED_COLLECTION } = await import('../settle.js');
@@ -260,6 +260,8 @@ test("merge since the lock-down: Play's winnings come along, and its watched sli
   await put(SETTLED_COLLECTION, bId, { slips: { slipaaaa1: { settled: true, payout: 250 } } });
   await put(TICKET_COLLECTION, `${bId}_tickcccc3`, { account: bId, ticket: { id: 'tickcccc3' }, t: 8 });
   await put(TICKET_COLLECTION, TICKET_INDEX, { due: { [`${bId}_tickcccc3`]: 50 } });
+  // A scratch card bought on b, not yet revealed (in no index).
+  await put(TICKET_COLLECTION, `${bId}_scrdddd4`, { account: bId, ticket: { id: 'scrdddd4', card: 'x', prize: 100 }, t: 9 });
   const poolB = (await t.call('GET', `${t.qt(b.token)}&app=odds`)).data.pool;
   const aa = await t.call('POST', '', { op: 'refresh', refresh: a.refresh, app: 'odds', claim: true });
   const poolA = aa.data.pool;
@@ -276,6 +278,8 @@ test("merge since the lock-down: Play's winnings come along, and its watched sli
   assert.equal((await get(SETTLED_COLLECTION, aId)).slips.slipaaaa1.payout, 250);
   assert.equal((await get(TICKET_COLLECTION, `${aId}_tickcccc3`)).account, aId);
   assert.deepEqual(Object.keys((await get(TICKET_COLLECTION, TICKET_INDEX)).due), [`${aId}_tickcccc3`]);
+  assert.equal(await get(TICKET_COLLECTION, `${bId}_scrdddd4`), null);
+  assert.equal((await get(TICKET_COLLECTION, `${aId}_scrdddd4`)).account, aId, 'revealed on this pass, paid to it');
 });
 
 test("a phone clock set ahead never blocks a later save: a setting's time is the Worker's at the latest", async () => {

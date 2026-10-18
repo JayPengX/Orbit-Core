@@ -41,9 +41,10 @@ const netPrize = prizeAfterTax;
 
 const asIndex = index => (index && typeof index.due === 'object' ? index : { due: {} });
 const changeIndex = (env, deps, change) => changeDoc(env, deps, TICKET_COLLECTION, TICKET_INDEX, change, { read: asIndex }).then(r => r ?? null);
-// A pass merged into another: its tickets waiting for a draw go with its
-// money (eco.js merge), so a prize is paid to the pass that bought them.
-export const moveTickets = (env, deps, from, to) => moveOwned(env, deps, TICKET_COLLECTION, TICKET_INDEX, from, to);
+// A pass merged into another: its tickets waiting for a draw and its
+// scratch cards not yet revealed (in no index: found by listing) go with its
+// money (eco.js merge), so a prize is paid to the pass that holds them.
+export const moveTickets = (env, deps, from, to) => moveOwned(env, deps, TICKET_COLLECTION, TICKET_INDEX, from, to, { all: true });
 // Entries into the wallet with the cost checked against the pool at the
 // moment of writing; true when they're in.
 async function charge(env, deps, account, entries, cost) {
