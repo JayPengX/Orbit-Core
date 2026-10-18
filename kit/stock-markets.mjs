@@ -47,7 +47,8 @@ export function normalizeCurrency(code) {
 }
 
 // Where each symbol trades and what it costs there. `commission`: the
-// broker's cut both ways, with its minimum in the market's currency (Taiwan
+// broker's cut both ways (`kinds`: a kind's own, `flat` a trade, to `until`),
+// with its minimum in the market's currency (Taiwan
 // brokers' usual 0.1425%, their sub-brokerage 複委託 rates abroad; the
 // minimums an online order pays at Taiwan brokers: 中國信託 (2026-09-29)
 // ¥3,000 and HK$50, 兆豐 €35, £75, CHF 45, C$20, A$40, S$45, ₩35,000). `buy` and
@@ -63,6 +64,9 @@ export function normalizeCurrency(code) {
 export const BOND_ETF_TAX_FREE_UNTIL = Date.parse('2027-01-01T00:00:00+08:00');
 export const DAY_TRADE_TAX_UNTIL = Date.parse('2028-01-01T00:00:00+08:00');
 export const PLAN_FLAT_FEE_UNTIL = Date.parse('2027-01-01T00:00:00+08:00');
+// 國泰證券's US prices to 2026-12-31 (經濟日報 2026-01-06): a stock 0.08%
+// with no minimum, an ETF US$3 a trade, a monthly plan's buy US$0.1.
+export const US_FEE_PROMO_UNTIL = Date.parse('2027-01-01T00:00:00+08:00');
 export const MARKETS = {
   TW: {
     delay: 20, zh: '台股', en: 'Taiwan', flag: '🇹🇼', currency: 'TWD', suffixes: ['.TW', '.TWO'],
@@ -80,7 +84,9 @@ export const MARKETS = {
   },
   US: {
     delay: 0, zh: '美股', en: 'US', flag: '🇺🇸', currency: 'USD', suffixes: [''],
-    commission: { rate: 0.001, min: 3 },
+    commission: { rate: 0.001, min: 3, until: US_FEE_PROMO_UNTIL, kinds: { stock: { rate: 0.0008, min: 0 }, etf: { flat: 3 } } },
+    // A monthly plan's buy (定期定額, 國泰: from US$10, fractional shares).
+    plan: { flat: 0.1, flatUntil: US_FEE_PROMO_UNTIL, rate: 0.001, min: 3 },
     // The SEC's Section 31 fee on sales: US$20.60 per million from 2026-04-04.
     sell: { all: { fee: 0.0000206 } },
     withholding: 0.3
@@ -477,6 +483,10 @@ export function qtyStep(kind) {
   if (kind === 'fund') return 1e-3;
   return 1;
 }
+// A US stock or ETF's fractional shares (碎股): bought by a monthly plan, to
+// this step (4 decimals), and sold down to it.
+export const US_FRACTION = 1e-4;
+export const fractional = (market, kind) => market === 'US' && (kind === 'stock' || kind === 'etf');
 export function roundQty(qty, kind) {
   const step = qtyStep(kind);
   return step >= 1 ? Math.floor(qty + 1e-9) : Math.floor(qty / step + 1e-6) * step;
@@ -525,11 +535,14 @@ export function tradeCosts({ market, side, kind, gross, currency, discount = 1, 
     const commission = side === 'buy' && gross > 0 ? round(gross * FUND_FEE * discount) : 0;
     return { commission, tax: 0, fee: 0, total: commission, taxRate: 0, feeRate: 0 };
   }
-  const min = oddLot && m.commission.oddMin != null ? m.commission.oddMin : m.commission.min;
+  // A kind's own price while it runs (`kinds`, to `until`), else the market's.
+  const c = m.commission.kinds?.[kind] && !(t >= m.commission.until) ? m.commission.kinds[kind] : m.commission;
+  const min = oddLot && c.oddMin != null ? c.oddMin : c.min;
   // The discount is off the commission, and the minimum applies after it (a
-  // broker's 2.8折 still charges NT$20 at least); free (0) is free.
+  // broker's 2.8折 still charges NT$20 at least); free (0) is free. A flat
+  // price is the price.
   const p = plan && side === 'buy' ? m.plan : null;
-  const commission = !(gross > 0 && discount > 0) ? 0 : p ? (t < p.flatUntil ? p.flat : round(Math.max(gross * p.rate * discount, p.min))) : m.commission.rate > 0 ? round(Math.max(gross * m.commission.rate * discount, min)) : 0;
+  const commission = !(gross > 0 && discount > 0) ? 0 : p ? (t < p.flatUntil ? p.flat : round(Math.max(gross * p.rate * discount, p.min))) : c.flat != null ? c.flat : c.rate > 0 ? round(Math.max(gross * c.rate * discount, min)) : 0;
   const rules = levy(side === 'buy' ? m.buy : m.sell, kind, t);
   const dayRate = dayTrade ? dayTradeRate(side === 'buy' ? m.buy : m.sell, kind, t) : null;
   const dayShare = dayRate == null ? 0 : dayTrade === true ? 1 : Math.min(1, Math.max(0, Number(dayTrade) || 0));
