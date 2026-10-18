@@ -202,9 +202,9 @@ function lineOptions(game, base, probs) {
 
 // ---- The model's fallbacks ----------------------------------------------------------
 //
-// Markets Kambi has and the model otherwise wouldn't: soccer's draw no bet
-// and corners. Kambi's own
-// (offers.mjs) take their place once read.
+// Markets Kambi has and the model otherwise wouldn't: soccer's corners.
+// Kambi's own (offers.mjs) take their place once read. (No draw no bet:
+// 運彩 doesn't sell it; a pick bought before still settles, settle.mjs.)
 export const CORNERS_MEAN = 10.2;
 const CORNERS_DISPERSION = 12;
 function fallbackOptions(game, base, probs) {
@@ -212,8 +212,6 @@ function fallbackOptions(game, base, probs) {
   const markets = [];
   const twoWay = houseCut({ base: 'twoWay', sport: game.sport });
   if (family === 'soccer' && probs.draw != null) {
-    const h = probs.home / (probs.home + probs.away);
-    markets.push({ kind: 'dnb', market: 'dnb', cut: twoWay, picks: [{ side: 'home', fair: h }, { side: 'away', fair: 1 - h }] });
     // Corners settle from ESPN's team stats.
     if (LEAGUES[game.sport]?.path && !game.scoreOnly) {
       for (const line of [8.5, 9.5, 10.5, 11.5]) {

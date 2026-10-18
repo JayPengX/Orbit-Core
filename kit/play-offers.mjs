@@ -207,10 +207,7 @@ function correctScore(kind, outs, flip, { other = false } = {}) {
 
 function soccerMarket(label, type, outs, sideOf, flip) {
   if (label === 'Both Teams To Score' && type === 'Yes/No') return yesNo('btts', 'btts', outs);
-  if (label === 'Draw No Bet' && type === 'Match') {
-    const m = threeWay('dnb', 'dnb', outs, sideOf);
-    return m && m.picks.length === 2 ? m : null;
-  }
+  // (Draw No Bet isn't on 運彩's list: 雙勝 (double chance) is its nearest.)
   if (label === 'Double Chance' && type === 'Double Chance') {
     const fair = fairOf(outs);
     if (!fair) return null;
@@ -259,9 +256,9 @@ function pointsMarket(label, type, outs, sideOf) {
   return null;
 }
 
-// (Hockey's 60-minute winner is the board's own 不讓分, three ways.)
-function hockeyMarket(label, type, outs, sideOf, flip) {
-  if (label === 'Both Teams To Score - Regular Time' && type === 'Yes/No') return yesNo('btts', 'btts', outs);
+// (Hockey's 60-minute winner is the board's own 不讓分, three ways; its
+// 雙方進球 isn't on 運彩's list, so Kambi's isn't read.)
+function hockeyMarket() {
   return null;
 }
 

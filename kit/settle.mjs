@@ -178,6 +178,8 @@ export function legResult(leg, outcome) {
       return push(leg.side === 'over' ? runs - leg.line : leg.line - runs);
     }
     case 'goalbands':
+    case 'goalcount':
+      // Total goals in a band (正確進球數: a band of one).
       return win(away + home >= leg.lo && (leg.hi == null || away + home <= leg.hi));
     case 'q1':
     case 'half':

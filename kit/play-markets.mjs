@@ -298,6 +298,9 @@ export function hockeyWinner(means) {
   return { away: chance(grid, (a, h) => a > h), draw: chance(grid, (a, h) => a === h), home: chance(grid, (a, h) => h > a) };
 }
 
+// Hockey's 正確進球數: 0 to 8 goals in 60 minutes, then 9 or more.
+export const GOAL_COUNTS = [...Array.from({ length: 9 }, (_, k) => [k, k]), [9, null]];
+
 const CORRECT_SCORES = ['1-0', '2-0', '2-1', '3-0', '3-1', '3-2', '0-0', '1-1', '2-2', '3-3', '0-1', '0-2', '1-2', '0-3', '1-3', '2-3'];
 
 export function goalMarkets(means, { family, totalLine }) {
@@ -340,11 +343,9 @@ export function goalMarkets(means, { family, totalLine }) {
       ] });
     }
     // Everything on 60 minutes, as 台灣運彩 settles it: the winner (three
-    // ways) is the board's 不讓分 (board.mjs).
-    const yes = chance(grid, (a, h) => a > 0 && h > 0);
-    out.push({ kind: 'btts', market: 'btts', cut: CUT.twoWay, picks: [{ side: 'yes', fair: yes }, { side: 'no', fair: 1 - yes }] });
-    const bands = [[0, 4], [5, 6], [7, 8], [9, null]];
-    out.push({ kind: 'goalbands', market: 'goalbands', cut: CUT.bands, picks: bands.map(([lo, hi]) => ({ side: `${lo}`, lo, hi, fair: chance(grid, (a, h) => a + h >= lo && (hi == null || a + h <= hi)) })) });
+    // ways) is the board's 不讓分 (board.mjs). No 雙方進球 or goal bands
+    // (not on 運彩's hockey list); its 正確進球數 instead, each total to 8, then 9+.
+    out.push({ kind: 'goalcount', market: 'goalcount', cut: CUT.bands, picks: GOAL_COUNTS.map(([lo, hi]) => ({ side: `${lo}`, lo, hi, fair: chance(grid, (a, h) => a + h >= lo && (hi == null || a + h <= hi)) })) });
     const margins = [];
     for (const team of ['home', 'away']) {
       for (const [lo, hi] of [[1, 1], [2, 2], [3, null]]) {
