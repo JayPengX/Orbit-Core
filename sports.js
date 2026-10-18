@@ -438,6 +438,31 @@ export function trimEspnAthletes(data) {
   };
 }
 
+// Opt-in (`&trim=espn-leaders`) for a league's leaders, as Orbit Sports'
+// 數據領先 reads them (its lib/leaders.mjs): basketball's and baseball's
+// list (site v3 /leaders) and football's top scorers and assists (site v2
+// /statistics), each category's name and each leader's number, person and
+// club. MLB's ten a category falls from ~3 MB to ~40 KB.
+const TRIM_ESPN_LEADERS = 'espn-leaders';
+export function trimEspnLeaders(data) {
+  if (!data || typeof data !== 'object') return data;
+  const cats = data.leaders?.categories || data.stats;
+  if (!Array.isArray(cats)) return data;
+  const s = data.requestedSeason || data.season;
+  return {
+    season: s ? { year: s.year, displayName: s.displayName } : undefined,
+    categories: cats.map(c => ({
+      name: c.name,
+      leaders: (c.leaders || []).map(l => ({
+        value: l.value,
+        displayValue: String(l.displayValue || '').slice(0, 40),
+        team: { id: l.team?.id ?? l.athlete?.team?.id },
+        athlete: { id: l.athlete?.id, displayName: l.athlete?.displayName, shortName: l.athlete?.shortName, headshot: l.athlete?.headshot?.href }
+      }))
+    }))
+  };
+}
+
 // Opt-in (`&trim=espn-board`) for a league's scoreboard as Play's board
 // reads it (kit/play-sources.mjs parseEspnScoreboard and mlbPostseason): each
 // game's id, time, season type and state, its sides and DraftKings' closing
@@ -859,7 +884,7 @@ async function fetchUpstream(upstreamUrl, trim) {
     if (trim) {
       try {
         const parsed = JSON.parse(new TextDecoder().decode(body));
-        body = JSON.stringify(trim === TRIM_KAMBI_EVENTS ? trimKambi(parsed) : trim === TRIM_KAMBI_OFFERS ? trimKambiOffers(parsed) : trim === TRIM_ESPN_ROSTER ? trimEspnRoster(parsed) : trim === TRIM_ESPN_ATHLETES ? trimEspnAthletes(parsed) : trim === TRIM_ESPN_NEWS ? trimEspnNews(parsed) : trim === TRIM_ESPN_INJURIES ? trimEspnInjuries(parsed) : trim === TRIM_ESPN_BOARD ? trimEspnBoard(parsed) : trim === TRIM_ELTA ? trimElta(parsed) : trim === TRIM_POLYMARKET_GAMES ? trimPolymarketGames(parsed) : trim === TRIM_POLYMARKET_MARKETS ? trimPolymarketMarkets(parsed) : trimPolymarketEvents(parsed));
+        body = JSON.stringify(trim === TRIM_KAMBI_EVENTS ? trimKambi(parsed) : trim === TRIM_KAMBI_OFFERS ? trimKambiOffers(parsed) : trim === TRIM_ESPN_ROSTER ? trimEspnRoster(parsed) : trim === TRIM_ESPN_ATHLETES ? trimEspnAthletes(parsed) : trim === TRIM_ESPN_NEWS ? trimEspnNews(parsed) : trim === TRIM_ESPN_LEADERS ? trimEspnLeaders(parsed) : trim === TRIM_ESPN_INJURIES ? trimEspnInjuries(parsed) : trim === TRIM_ESPN_BOARD ? trimEspnBoard(parsed) : trim === TRIM_ELTA ? trimElta(parsed) : trim === TRIM_POLYMARKET_GAMES ? trimPolymarketGames(parsed) : trim === TRIM_POLYMARKET_MARKETS ? trimPolymarketMarkets(parsed) : trimPolymarketEvents(parsed));
       } catch {
         // Not the JSON shape expected - pass it through untouched.
       }
@@ -965,6 +990,7 @@ function trimFor(trimParam, upstreamUrl) {
   if (trimParam === TRIM_KAMBI_EVENTS && upstreamUrl.hostname === 'eu-offering-api.kambicdn.com') return TRIM_KAMBI_EVENTS;
   if (trimParam === TRIM_ESPN_ROSTER && upstreamUrl.hostname === 'site.api.espn.com' && upstreamUrl.pathname.endsWith('/roster')) return TRIM_ESPN_ROSTER;
   if (trimParam === TRIM_ESPN_ATHLETES && upstreamUrl.hostname === 'site.api.espn.com' && upstreamUrl.pathname.endsWith('/statistics/byathlete')) return TRIM_ESPN_ATHLETES;
+  if (trimParam === TRIM_ESPN_LEADERS && upstreamUrl.hostname === 'site.api.espn.com' && /\/(leaders|statistics)$/.test(upstreamUrl.pathname)) return TRIM_ESPN_LEADERS;
   if (trimParam === TRIM_ESPN_NEWS && upstreamUrl.hostname === 'site.api.espn.com' && upstreamUrl.pathname.endsWith('/news')) return TRIM_ESPN_NEWS;
   if (trimParam === TRIM_ESPN_BOARD && upstreamUrl.hostname === 'site.api.espn.com' && upstreamUrl.pathname.endsWith('/scoreboard')) return TRIM_ESPN_BOARD;
   if (trimParam === TRIM_ESPN_INJURIES && upstreamUrl.hostname === 'site.api.espn.com' && upstreamUrl.pathname.endsWith('/injuries')) return TRIM_ESPN_INJURIES;
