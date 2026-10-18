@@ -317,3 +317,12 @@ test("Hong Kong board lots: every HKEX security's own, from its List of Securiti
   const hk = { symbol: '0007.HK', name: 'X', kind: 'stock', market: 'HK', currency: 'HKD', price: 10, prev: 10, got: now, marketTime: now, tz: 'Asia/Hong_Kong' };
   assert.equal(SA.placeOrder(SA.newAccount(1_000_000, now - DAY, 'acc'), { side: 'buy', type: 'limit', limit: 10, qty: 100 }, { quote: hk, rates: { TWD: 1, HKD: 4 }, valuation: ok, now, id: 'h' }).error, 'lotUnknown');
 });
+
+test("複委託: an online order's minimum at Taiwan brokers (¥3,000, €35, £75, HK$50); dividends withheld as the broker's account has them (Japan 15.315%, France 25%)", async () => {
+  const { tradeCosts, dividendTaxes } = await import('../kit/stock-markets.mjs');
+  const buy = (market, currency, gross) => tradeCosts({ market, currency, gross, side: 'buy', kind: 'etf' }).commission;
+  assert.deepEqual([buy('JP', 'JPY', 100_000), buy('FR', 'EUR', 1_000), buy('DE', 'EUR', 1_000), buy('UK', 'GBP', 1_000), buy('HK', 'HKD', 1_000)], [3_000, 35, 35, 75, 50]);
+  assert.equal(buy('JP', 'JPY', 2_000_000), 5_000, 'the rate past the minimum');
+  assert.equal(dividendTaxes('JP', 10_000).withheld, 1_532);
+  assert.equal(dividendTaxes('FR', 100).withheld, 25);
+});

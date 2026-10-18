@@ -48,9 +48,13 @@ export function normalizeCurrency(code) {
 
 // Where each symbol trades and what it costs there. `commission`: the
 // broker's cut both ways, with its minimum in the market's currency (Taiwan
-// brokers' usual 0.1425%, their sub-brokerage 複委託 rates abroad). `buy` and
+// brokers' usual 0.1425%, their sub-brokerage 複委託 rates abroad; the
+// minimums an online order pays at Taiwan brokers: 中國信託 (2026-09-29)
+// ¥3,000 and HK$50, 兆豐 €35, £75, CHF 45, C$20, A$40, S$45, ₩35,000). `buy` and
 // `sell`: taxes and exchange fees by kind of security (`all` for every kind).
-// `withholding`: tax kept from dividends paid to a Taiwan resident.
+// `withholding`: tax kept from dividends paid to a Taiwan resident, as a
+// broker's 複委託 account has it withheld (兆豐: Japan 15.315%, France 25%;
+// a treaty's lower rate isn't claimed through it).
 // `delay`: minutes Yahoo's prices from this market run behind (Yahoo's own
 // exchangeDataDelayedBy): US stocks, forex and crypto are live; Taiwan,
 // Tokyo, Seoul and Sydney 20 minutes; most others 15; unknown markets 15.
@@ -81,9 +85,9 @@ export const MARKETS = {
     sell: { all: { fee: 0.0000206 } },
     withholding: 0.3
   },
-  JP: { delay: 20, zh: '日股', en: 'Japan', flag: '🇯🇵', currency: 'JPY', suffixes: ['.T'], commission: { rate: 0.0025, min: 500 }, withholding: 0.15315 },
+  JP: { delay: 20, zh: '日股', en: 'Japan', flag: '🇯🇵', currency: 'JPY', suffixes: ['.T'], commission: { rate: 0.0025, min: 3000 }, withholding: 0.15315 },
   HK: {
-    delay: 15, zh: '港股', en: 'Hong Kong', flag: '🇭🇰', currency: 'HKD', suffixes: ['.HK'], commission: { rate: 0.0025, min: 100 },
+    delay: 15, zh: '港股', en: 'Hong Kong', flag: '🇭🇰', currency: 'HKD', suffixes: ['.HK'], commission: { rate: 0.0025, min: 50 },
     buy: { stock: { tax: 0.001, fee: 0.000085 }, all: { fee: 0.000085 } },
     sell: { stock: { tax: 0.001, fee: 0.000085 }, all: { fee: 0.000085 } },
     withholding: 0
@@ -93,38 +97,38 @@ export const MARKETS = {
     sell: { stock: { tax: 0.0005 } }, withholding: 0.1
   },
   KR: {
-    delay: 20, zh: '韓股', en: 'Korea', flag: '🇰🇷', currency: 'KRW', suffixes: ['.KS', '.KQ'], commission: { rate: 0.003, min: 5000 },
+    delay: 20, zh: '韓股', en: 'Korea', flag: '🇰🇷', currency: 'KRW', suffixes: ['.KS', '.KQ'], commission: { rate: 0.003, min: 35000 },
     // Securities transaction tax on sales, 0.20% on KOSPI and KOSDAQ from 2026
     // (the special tax for rural development included).
     sell: { stock: { tax: 0.002 } }, withholding: 0.22
   },
   UK: {
-    delay: 15, zh: '英股', en: 'UK', flag: '🇬🇧', currency: 'GBP', suffixes: ['.L'], commission: { rate: 0.0025, min: 5 },
+    delay: 15, zh: '英股', en: 'UK', flag: '🇬🇧', currency: 'GBP', suffixes: ['.L'], commission: { rate: 0.0025, min: 75 },
     buy: { stock: { tax: 0.005 } }, withholding: 0
   },
   FR: {
-    delay: 15, zh: '法股', en: 'France', flag: '🇫🇷', currency: 'EUR', suffixes: ['.PA'], commission: { rate: 0.0025, min: 5 },
+    delay: 15, zh: '法股', en: 'France', flag: '🇫🇷', currency: 'EUR', suffixes: ['.PA'], commission: { rate: 0.0025, min: 35 },
     buy: { stock: { tax: 0.004 } }, withholding: 0.25
   },
-  DE: { delay: 15, zh: '德股', en: 'Germany', flag: '🇩🇪', currency: 'EUR', suffixes: ['.DE', '.F'], commission: { rate: 0.0025, min: 5 }, withholding: 0.26375 },
-  NL: { delay: 0, zh: '荷股', en: 'Netherlands', flag: '🇳🇱', currency: 'EUR', suffixes: ['.AS'], commission: { rate: 0.0025, min: 5 }, withholding: 0.15 },
+  DE: { delay: 15, zh: '德股', en: 'Germany', flag: '🇩🇪', currency: 'EUR', suffixes: ['.DE', '.F'], commission: { rate: 0.0025, min: 35 }, withholding: 0.26375 },
+  NL: { delay: 0, zh: '荷股', en: 'Netherlands', flag: '🇳🇱', currency: 'EUR', suffixes: ['.AS'], commission: { rate: 0.0025, min: 35 }, withholding: 0.15 },
   IT: {
-    delay: 15, zh: '義股', en: 'Italy', flag: '🇮🇹', currency: 'EUR', suffixes: ['.MI'], commission: { rate: 0.0025, min: 5 },
+    delay: 15, zh: '義股', en: 'Italy', flag: '🇮🇹', currency: 'EUR', suffixes: ['.MI'], commission: { rate: 0.0025, min: 35 },
     buy: { stock: { tax: 0.001 } }, withholding: 0.26
   },
   ES: {
-    delay: 15, zh: '西股', en: 'Spain', flag: '🇪🇸', currency: 'EUR', suffixes: ['.MC'], commission: { rate: 0.0025, min: 5 },
+    delay: 15, zh: '西股', en: 'Spain', flag: '🇪🇸', currency: 'EUR', suffixes: ['.MC'], commission: { rate: 0.0025, min: 35 },
     buy: { stock: { tax: 0.002 } }, withholding: 0.19
   },
   // The Swiss transfer stamp duty: 0.15% on Swiss securities, half each side.
   CH: {
-    delay: 15, zh: '瑞士股', en: 'Switzerland', flag: '🇨🇭', currency: 'CHF', suffixes: ['.SW'], commission: { rate: 0.0025, min: 5 },
+    delay: 15, zh: '瑞士股', en: 'Switzerland', flag: '🇨🇭', currency: 'CHF', suffixes: ['.SW'], commission: { rate: 0.0025, min: 45 },
     buy: { all: { tax: 0.00075 } }, sell: { all: { tax: 0.00075 } }, withholding: 0.35
   },
   DK: { delay: 0, zh: '丹麥股', en: 'Denmark', flag: '🇩🇰', currency: 'DKK', suffixes: ['.CO'], commission: { rate: 0.0025, min: 40 }, withholding: 0.27 },
-  CA: { delay: 15, zh: '加股', en: 'Canada', flag: '🇨🇦', currency: 'CAD', suffixes: ['.TO', '.V'], commission: { rate: 0.0025, min: 5 }, withholding: 0.25 },
-  AU: { delay: 20, zh: '澳股', en: 'Australia', flag: '🇦🇺', currency: 'AUD', suffixes: ['.AX'], commission: { rate: 0.0025, min: 5 }, withholding: 0.3 },
-  SG: { delay: 10, zh: '星股', en: 'Singapore', flag: '🇸🇬', currency: 'SGD', suffixes: ['.SI'], commission: { rate: 0.0025, min: 5 }, withholding: 0 },
+  CA: { delay: 15, zh: '加股', en: 'Canada', flag: '🇨🇦', currency: 'CAD', suffixes: ['.TO', '.V'], commission: { rate: 0.0025, min: 20 }, withholding: 0.25 },
+  AU: { delay: 20, zh: '澳股', en: 'Australia', flag: '🇦🇺', currency: 'AUD', suffixes: ['.AX'], commission: { rate: 0.0025, min: 40 }, withholding: 0.3 },
+  SG: { delay: 10, zh: '星股', en: 'Singapore', flag: '🇸🇬', currency: 'SGD', suffixes: ['.SI'], commission: { rate: 0.0025, min: 45 }, withholding: 0 },
   IN: {
     delay: 15, zh: '印度股', en: 'India', flag: '🇮🇳', currency: 'INR', suffixes: ['.NS', '.BO'], commission: { rate: 0.003, min: 100 },
     // STT 0.1% both ways on delivery trades; stamp duty 0.015% on buys.
