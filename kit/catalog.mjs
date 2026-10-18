@@ -101,13 +101,23 @@ export const asiaMonthOf = ms => new Date(ms + 8 * 3_600_000).toISOString().slic
 // fallback (TheSportsDB) can refuse the proxy: a CPBL month the proxy can't
 // fill comes from TheSportsDB's day lists straight from the device (they
 // allow any site), the days from two weeks back to two weeks ahead.
+// Nothing read anywhere (the proxy and every day on the device refused) is
+// an error, never a month with no games: Sports said 沒有比賽 for 中華職棒
+// while both were down (2026-10-18).
 export async function asiaMonth(getJson, league, ym, { now = Date.now(), fetchJson = directJson } = {}) {
-  const data = await getJson(asiaMonthUrl(league, ym)).catch(() => null);
+  let down = null;
+  const data = await getJson(asiaMonthUrl(league, ym)).catch(error => ((down = error), null));
   const games = Array.isArray(data?.games) ? data.games : [];
-  if (league !== 'cpbl') return games;
+  if (!down && !Array.isArray(data?.games)) down = new Error(`${league} ${ym}: no list`);
+  if (league !== 'cpbl') {
+    if (down) throw down;
+    return games;
+  }
   if (games.length) return cpblFresh(games, now, fetchJson);
   const days = tsdbDays(ym, now);
-  const lists = await Promise.all(days.map(d => fetchJson(`${TSDB_DAY}?d=${d}&l=${TSDB_CPBL}`).then(x => parseTsdbDay(x, now)).catch(() => [])));
+  let failed = 0;
+  const lists = await Promise.all(days.map(d => fetchJson(`${TSDB_DAY}?d=${d}&l=${TSDB_CPBL}`).then(x => parseTsdbDay(x, now)).catch(() => (failed++, []))));
+  if (down && failed === days.length) throw down;
   return lists.flat().sort((x, y) => x.start.localeCompare(y.start));
 }
 
