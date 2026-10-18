@@ -36,6 +36,9 @@ export const EXTEND_WINDOW = 30 * DAY;
 // the sale money too, both as collateral; the 融券手續費 is 0.08% of the sale.
 export const SHORT_DEPOSIT = 0.9;
 export const SHORT_HANDLING = 0.0008;
+// The deposit on a 融券 sale of `value` (成交價款): 90% of it, the part
+// under NT$100 counted as NT$100 (TWSE 融資融券業務操作辦法 §49).
+export const shortDeposit = value => Math.max(0, Math.ceil((SHORT_DEPOSIT * value) / 100 - 1e-9) * 100);
 // Day trading (現股當沖), TWSE's 當日沖銷作業辦法: either way round (buying
 // then selling the same day, or selling first and buying back), the account
 // open three months with ten trades in the last year, or a credit account
