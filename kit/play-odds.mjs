@@ -590,11 +590,12 @@ export function comboCount(legs, sizes) {
 }
 
 // Combination sizes each mode buys for n legs: 一關 = every game on its own,
-// 全部過關 = all n together, 過關組合 = the chosen sizes.
+// 全部過關 = all n together, 過關組合 = the chosen sizes, 過1關 (each game
+// alone) to 過12關, as 台灣運彩 sells it (2 to 12 games).
 export function slipSizes(mode, n, chosen = []) {
   if (mode === 'single') return n >= 1 ? [1] : [];
   if (mode === 'parlay') return n >= 2 ? [n] : [];
-  return [...new Set(chosen)].filter(k => k >= 2 && k <= n).sort((a, b) => a - b);
+  return [...new Set(chosen)].filter(k => Number.isInteger(k) && k >= 1 && k <= n).sort((a, b) => a - b);
 }
 
 // Rule problems with a ticket, as codes the page turns into text.
@@ -611,8 +612,10 @@ export function slipErrors({ mode, legs, sizes, stake }) {
   const by = combosBySize(legs);
   if (mode !== 'single' && sizes.some(k => !(by[k] > 0))) errors.push('sameGame');
   if (mode === 'parlay' && n < 2) errors.push('parlayNeedsTwo');
-  if (mode === 'system' && n < 3) errors.push('systemNeedsThree');
-  if (mode === 'system' && n >= 3 && sizes.length === 0) errors.push('noSizes');
+  // 過關組合 takes 2 games or more (two picks of one game, 包牌, are one game).
+  const games = by.length - 1;
+  if (mode === 'system' && games < 2) errors.push('systemNeedsTwo');
+  if (mode === 'system' && games >= 2 && sizes.length === 0) errors.push('noSizes');
   if (!(stake >= SLIP_RULES.unit) || stake % SLIP_RULES.unit !== 0) errors.push('stakeUnit');
   // The house's rules on single picks (rules.mjs): locked ones can't be
   // bought, parlay-only ones need every combination to be big enough.
