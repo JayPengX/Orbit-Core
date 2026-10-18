@@ -1,7 +1,7 @@
 // Orbit Law's figures, notices and bills, matched to a question.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { matchFacts, matchNews, matchBills, expand, groundPrompt, groundOut } from '../law-ground.js';
+import { matchFacts, matchNews, matchBills, matchBudgets, budgetYear, expand, groundPrompt, groundOut } from '../law-ground.js';
 
 test('synonyms count both ways: 基本工資 finds 最低工資', () => {
   assert.match(expand('基本工資多少'), /最低工資/);
@@ -34,4 +34,24 @@ test('nothing matched: no block, nothing added to the answer', () => {
   const g = { facts: [], news: [], bills: [] };
   assert.equal(groundPrompt(g), '');
   assert.deepEqual(groundOut(g), {});
+});
+
+test('budgets: the year asked (民國 or western), else the 2 newest; progress only, never an amount', () => {
+  const budgets = [
+    { k: '115', title: '中華民國115年度中央政府總預算案', stage: '公布', last: '2026-01-20', flow: [['2025-08-28', '行政院函送'], ['2025-09-10', '一讀'], ['2026-01-10', '三讀'], ['2026-01-20', '公布']] },
+    { k: '116', title: '中華民國116年度中央政府總預算案', stage: '委員會審查', last: '2026-10-15', flow: [['2026-08-28', '行政院函送']] },
+    { k: '115-a1', title: '115年度中央政府總預算追加預算案', stage: '一讀', last: '2026-09-01', flow: [] }
+  ];
+  assert.equal(budgetYear('2027年預算'), '116');
+  assert.equal(budgetYear('116年度總預算'), '116');
+  assert.deepEqual(matchBudgets(budgets, '115年度總預算現在怎樣').map(b => b.k), ['115-a1', '115']);
+  assert.deepEqual(matchBudgets(budgets, '總預算審到哪了').map(b => b.k), ['116', '115-a1']);
+  assert.deepEqual(matchBudgets(budgets, '加班費怎麼算'), []);
+  const g = { facts: [], news: [], bills: [], budgets: matchBudgets(budgets, '115年度預算') };
+  const p = groundPrompt(g);
+  assert.match(p, /立法院進度/);
+  assert.match(p, /2026-01-10 三讀 → 2026-01-20 公布/);
+  assert.doesNotMatch(p, /行政院函送/, 'the last 3 steps only');
+  assert.match(p, /never give a budget figure/);
+  assert.deepEqual(groundOut(g).bills.map(b => [b.k, b.stage]), [['budget:115-a1', -1], ['budget:115', -1]]);
 });
