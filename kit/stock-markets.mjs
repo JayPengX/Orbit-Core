@@ -260,7 +260,7 @@ export const toTick = (price, tick, dir = 0) => {
   return +(f(price / tick - (dir > 0 ? 1e-9 : dir < 0 ? -1e-9 : 0)) * tick).toFixed(6);
 };
 
-// Daily price limits: how far from yesterday's close a price may go.
+// Daily price limits: how far from the last close (limitBase) a price may go.
 // Taiwan ±10%, but none in a first listing's first five trading days (TWSE
 // 初次上市股票首五個交易日無漲跌幅限制, TPEx's 初次上櫃 the same; quote.listed,
 // its listing day, from stock-ipo.mjs listedOn); mainland China ±10% (±20%
@@ -289,17 +289,30 @@ export function limitShare(quote, now = Date.now()) {
   if (quote.market === 'CN') return /^(688|300|301)\d{3}\./.test(quote.symbol || '') ? 0.2 : 0.1;
   return null;
 }
+// The price a day's limits are from (each exchange's 基準價, the last
+// close): yesterday's (quote.prev) while today's session trades (its lunch,
+// and Taiwan's after-hours hour to 14:30, included); once it's over, or
+// before the next opens, the last close itself (quote.price), which the
+// next session's limits are from.
+export function limitBase(quote, now = Date.now()) {
+  const s = quote?.session;
+  if (!s || !(quote.price > 0)) return quote?.prev;
+  const today = now >= s.start && quote.marketTime >= s.start;
+  const over = now >= s.end + (quote.market === 'TW' ? 3_600_000 : 0);
+  return today && !over ? quote.prev : quote.price;
+}
 export function priceLimits(quote, now = Date.now()) {
   if (!(quote?.prev > 0)) return null;
+  const base = limitBase(quote, now);
   const tick = x => tickSize(quote.market, quote.kind, x, quote.symbol);
   if (quote.market === 'JP' && (quote.kind === 'stock' || quote.kind === 'etf')) {
-    const w = bands(quote.prev, JP_LIMITS);
-    return { up: quote.prev + w, down: Math.max(tick(1), quote.prev - w) };
+    const w = bands(base, JP_LIMITS);
+    return { up: base + w, down: Math.max(tick(1), base - w) };
   }
   const share = limitShare(quote, now);
   if (!share) return null;
-  const up = quote.prev * (1 + share);
-  const down = quote.prev * (1 - share);
+  const up = base * (1 + share);
+  const down = base * (1 - share);
   return { up: toTick(up, tick(up), -1), down: toTick(down, tick(down), 1) };
 }
 

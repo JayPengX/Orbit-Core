@@ -144,3 +144,16 @@ test('Tokyo ticks (JPX): TOPIX500 on the finer table, other stocks on the ordina
   // Above ¥1 million the bands go on (JPX: ¥300,000 under ¥1.5 million ... ¥10 million from ¥50 million).
   assert.deepEqual(SM.priceLimits({ ...jpq('9999.T', 'stock', 1_200_000) }, t), { up: 1_500_000, down: 900_000 });
 });
+
+test("after the close, an order for the next session is held to the limits from today's close, not yesterday's", () => {
+  const kr = (now, more = {}) => ({ symbol: '005930.KS', name: 'Samsung', kind: 'stock', market: 'KR', currency: 'KRW', price: 120_000, prev: 100_000, marketTime: at('2026-10-13T15:30', 'Asia/Seoul'), tz: 'Asia/Seoul', session: { start: at('2026-10-13T09:00', 'Asia/Seoul'), end: at('2026-10-13T15:30', 'Asia/Seoul') }, got: now, ...more });
+  const during = at('2026-10-13T14:00', 'Asia/Seoul');
+  assert.deepEqual(SM.priceLimits(kr(during, { marketTime: during }), during), { up: 130_000, down: 70_000 });
+  const after = at('2026-10-13T18:00', 'Asia/Seoul');
+  assert.deepEqual(SM.priceLimits(kr(after), after), { up: 156_000, down: 84_000 });
+  // Shanghai at lunch: still today's; Tokyo the next morning before the open: yesterday's close.
+  const cn = { symbol: '600519.SS', kind: 'stock', market: 'CN', currency: 'CNY', price: 1650, prev: 1500, marketTime: at('2026-10-13T11:29', 'Asia/Shanghai'), session: { start: at('2026-10-13T09:30', 'Asia/Shanghai'), end: at('2026-10-13T15:00', 'Asia/Shanghai') } };
+  assert.equal(SM.limitBase(cn, at('2026-10-13T12:00', 'Asia/Shanghai')), 1500);
+  const jp = { symbol: '7203.T', kind: 'stock', market: 'JP', currency: 'JPY', price: 3000, prev: 2800, marketTime: at('2026-10-13T15:30', 'Asia/Tokyo'), session: { start: at('2026-10-14T09:00', 'Asia/Tokyo'), end: at('2026-10-14T15:30', 'Asia/Tokyo') } };
+  assert.deepEqual(SM.priceLimits(jp, at('2026-10-14T08:30', 'Asia/Tokyo')), { up: 3700, down: 2300 });
+});
