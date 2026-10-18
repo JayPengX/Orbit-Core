@@ -217,14 +217,19 @@ test("Taiwan's withholding: each combination over NT$5,000 taxed on its own; the
   assert.equal(prizeAfterTax(0), 0);
   // Two singles of NT$3,000 each: neither is taxed, though they add up past 5,000.
   const two = settleSlip({ legs: [{ odds: 3, result: 'won', gameId: 'a' }, { odds: 3, result: 'won', gameId: 'b' }], sizes: [1], stake: 1_000 });
-  assert.deepEqual(two, { gross: 6_000, net: 6_000 });
+  assert.deepEqual(two, { gross: 6_000, net: 6_000, taxed: 0 });
   const big = settleSlip({ legs: [{ odds: 10, result: 'won' }], sizes: [1], stake: 1_000 });
   assert.equal(big.net, 10_000 * 0.796);
+  assert.equal(big.taxed, 1);
+  // A 2-of-3 system: each combination taxed on its own (台灣運彩), so two of three over NT$5,000.
+  const sys = settleSlip({ legs: [{ odds: 3, result: 'won', gameId: 'a' }, { odds: 2, result: 'won', gameId: 'b' }, { odds: 2, result: 'won', gameId: 'c' }], sizes: [2], stake: 1_000 });
+  assert.equal(sys.taxed, 2, 'NT$6,000, 6,000 and 4,000: two over NT$5,000');
+  assert.equal(sys.net, 6_000 * 0.796 * 2 + 4_000);
   const cap = settleSlip({ legs: Array.from({ length: 6 }, (_, i) => ({ odds: 20, result: 'won', gameId: String(i) })), sizes: [6], stake: 1_000 });
   assert.equal(cap.gross, SLIP_RULES.maxPayout);
   assert.ok(Math.abs(cap.net - SLIP_RULES.maxPayout * 0.796) < 1e-6);
-  assert.deepEqual(settleSlip({ legs: [{ odds: 3, result: 'void' }], sizes: [1], stake: 100 }), { gross: 100, net: 100 }, 'a single called off: the stake back');
-  assert.deepEqual(settleSlip({ legs: [{ odds: 3, result: 'lost' }], sizes: [1], stake: 100 }), { gross: 0, net: 0 });
+  assert.deepEqual(settleSlip({ legs: [{ odds: 3, result: 'void' }], sizes: [1], stake: 100 }), { gross: 100, net: 100, taxed: 0 }, 'a single called off: the stake back');
+  assert.deepEqual(settleSlip({ legs: [{ odds: 3, result: 'lost' }], sizes: [1], stake: 100 }), { gross: 0, net: 0, taxed: 0 });
 });
 
 test('the odds math: combinations, exclusive picks, the expected payout against a brute force', () => {
@@ -233,8 +238,11 @@ test('the odds math: combinations, exclusive picks, the expected payout against 
   assert.deepEqual([choose(5, 2), choose(49, 6), choose(3, 4), choose(3, -1)], [10, 13_983_816, 0, 0]);
   assert.deepEqual(slipSizes('system', 4, [3, 2, 2, 5, 1]), [2, 3]);
   assert.deepEqual(slipSizes('parlay', 1), []);
-  assert.deepEqual(slipErrors({ mode: 'parlay', legs: [{ gameId: 'a' }, { gameId: 'a' }], sizes: [2], stake: 100 }), ['sameGame']);
-  assert.deepEqual(slipErrors({ mode: 'single', legs: [{}], sizes: [1], stake: 15 }), ['stakeUnit', 'ticketMin']);
+  assert.deepEqual(slipErrors({ mode: 'parlay', legs: [{ gameId: 'a', odds: 2 }, { gameId: 'a', odds: 2 }], sizes: [2], stake: 100 }), ['sameGame']);
+  assert.deepEqual(slipErrors({ mode: 'single', legs: [{ odds: 2 }], sizes: [1], stake: 15 }), ['stakeUnit', 'ticketMin']);
+  // Odds of 1.00 or less are never offered: such a pick can't be bought.
+  for (const odds of [1, 0.9, 0, undefined, 'x']) assert.deepEqual(slipErrors({ mode: 'single', legs: [{ odds }], sizes: [1], stake: 100 }), ['odds'], String(odds));
+  assert.deepEqual(slipErrors({ mode: 'single', legs: [{ odds: 1.01 }], sizes: [1], stake: 100 }), []);
   assert.ok(slipErrors({ mode: 'single', legs: [{ cap: 'prop' }], sizes: [1], stake: 2_000 }).includes('ticketCapped'));
   assert.ok(slipErrors({ mode: 'single', legs: Array.from({ length: 13 }, () => ({})), sizes: [1], stake: 100 }).includes('tooManyLegs'));
   assert.deepEqual(slipErrors({ mode: 'single', legs: [], sizes: [], stake: 100 }), ['empty']);
