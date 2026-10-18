@@ -236,7 +236,8 @@ test('定期定額: NT$100 on any day 1-31 (a short month its last day), NT$1 a 
   assert.equal(buy({ gross: 1_000_000, t: now }).commission, 1, 'flat, whatever the size');
   assert.equal(buy({ gross: 100_000, t: PLAN_FLAT_FEE_UNTIL }).commission, 142);
   assert.equal(buy({ gross: 300, t: PLAN_FLAT_FEE_UNTIL }).commission, 1);
-  assert.equal(buy({ gross: 100_000, t: now, market: 'US', currency: 'USD' }).commission, 100, 'elsewhere, the usual rate');
+  assert.equal(buy({ gross: 100_000, t: now, market: 'US', currency: 'USD' }).commission, 0.1, "the US's own plan fee (國泰: US$0.1 a buy)");
+  assert.equal(buy({ gross: 2_000_000, t: now, market: 'JP', currency: 'JPY' }).commission, 5000, 'elsewhere, the usual rate');
 });
 
 test("定期定額 in Taiwan: a limit order in the odd-lot session from its first match (09:10; 09:00 from 2026-12-07), the whole lots split off", async () => {

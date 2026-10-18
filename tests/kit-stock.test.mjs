@@ -187,10 +187,11 @@ test("what a trade costs: Taiwan's floored fees, minimums, discounts, the day tr
   assert.equal(cost({ gross: 0 }).total, 0);
   assert.deepEqual(cost({ gross: 10_000, kind: 'fund' }), { commission: 100, tax: 0, fee: 0, total: 100, taxRate: 0, feeRate: 0 });
   assert.equal(cost({ gross: 10_000, kind: 'fund', side: 'sell' }).total, 0);
-  // Abroad: to the cent.
-  const us = tradeCosts({ market: 'US', side: 'sell', kind: 'stock', gross: 10_000, currency: 'USD' });
+  // Abroad: to the cent (the US past 國泰's 2026 prices: 0.1%, US$3 least).
+  const t2027 = Date.parse('2027-02-01T00:00:00Z');
+  const us = tradeCosts({ market: 'US', side: 'sell', kind: 'stock', gross: 10_000, currency: 'USD', t: t2027 });
   assert.deepEqual([us.commission, us.fee, us.tax], [10, 0.21, 0]);
-  assert.equal(tradeCosts({ market: 'US', side: 'buy', kind: 'stock', gross: 100, currency: 'USD' }).commission, 3);
+  assert.equal(tradeCosts({ market: 'US', side: 'buy', kind: 'stock', gross: 100, currency: 'USD', t: t2027 }).commission, 3);
   const hk = tradeCosts({ market: 'HK', side: 'buy', kind: 'stock', gross: 100_000, currency: 'HKD' });
   assert.deepEqual([hk.commission, hk.tax, hk.fee], [250, 100, 8.5]);
   // A market not in the table: the generic rate.

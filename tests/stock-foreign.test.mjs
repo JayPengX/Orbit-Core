@@ -74,3 +74,37 @@ test('複委託 is cash only: no 融資 and no short on a foreign stock, credit 
   const btc = { symbol: 'BTC-USD', name: 'Bitcoin', kind: 'crypto', market: 'CRYPTO', currency: 'USD', price: 60_000, prev: 60_000, got: NOW, marketTime: NOW };
   assert.equal(place({ side: 'sell', type: 'market', qty: 0.01 }, btc).error, undefined);
 });
+
+test('US at 國泰 to 2026-12-31: a stock 0.08% with no minimum, an ETF US$3 a trade, a plan\'s buy US$0.1; then 0.1% at least US$3', () => {
+  const t = Date.parse('2026-11-01T00:00:00Z');
+  const cost = (kind, gross, more = {}) => SM.tradeCosts({ market: 'US', side: 'buy', kind, gross, currency: 'USD', t, ...more }).commission;
+  assert.deepEqual([cost('stock', 100), cost('stock', 10_000), cost('etf', 100), cost('etf', 10_000), cost('stock', 100, { plan: true })], [0.08, 8, 3, 3, 0.1]);
+  // Sales the same; the SEC fee as before.
+  assert.equal(SM.tradeCosts({ market: 'US', side: 'sell', kind: 'stock', gross: 10_000, currency: 'USD', t }).commission, 8);
+  const later = Date.parse('2027-01-02T00:00:00Z');
+  assert.deepEqual([cost('stock', 100, { t: later }), cost('etf', 10_000, { t: later })], [3, 10]);
+});
+
+test('plans: listed shares only in Taiwan and the US; a US one from US$10, bought in fractional shares, which sell down to 0.0001', () => {
+  assert.equal(SA.planAllowed({ market: 'JP', kind: 'stock' }), false);
+  assert.equal(SA.planAllowed({ market: 'US', kind: 'etf' }) && SA.planAllowed({ market: 'TW', kind: 'stock' }) && SA.planAllowed({ market: 'JP', kind: 'fund' }), true);
+  const acc = SA.newAccount(1_000_000, NOW - 800 * DAY, 'acc');
+  assert.equal(SA.setPlan(acc, { symbol: '7203.T', amount: 10_000, day: 5, market: 'JP', kind: 'stock' }).error, 'planMarket');
+  assert.deepEqual(SA.setPlan(acc, { symbol: 'AAPL', amount: 300, day: 5, market: 'US', kind: 'stock', twd: 32 }), { error: 'planAmount', min: 321 });
+  assert.equal(SA.planMinTWD('TW'), 100);
+  const plan = { id: 'p1', symbol: 'AAPL', amount: 3_000, day: 5, on: true, since: NOW - 40 * DAY, market: 'US', kind: 'stock', currency: 'USD', name: 'Apple' };
+  const run = { month: '2026-10', t: NOW };
+  const r = SA.runPlan(acc, plan, run, { price: 250, twd: 32 }, NOW);
+  assert.ok(r.fill, JSON.stringify(r.order));
+  // NT$3,000 at the dollar's spread: about US$93.5 for 0.37 shares (at the ask), US$0.1 the fee.
+  assert.ok(r.fill.qty > 0.37 && r.fill.qty < 0.38 && Math.abs(r.fill.qty * 1e4 - Math.round(r.fill.qty * 1e4)) < 1e-6, `${r.fill.qty}`);
+  assert.equal(r.fill.commission, 0.1);
+  const held = SA.replay(r.account, NOW).positions.AAPL;
+  assert.equal(held.qty, r.fill.qty, 'a fraction of a share is a holding');
+  const sell = SA.placeOrder(r.account, { side: 'sell', type: 'limit', limit: 250, qty: r.fill.qty }, { quote: us(), rates: RATES, valuation: OK, now: NOW + 1000, id: 's1' });
+  assert.equal(sell.error, undefined);
+  assert.equal(SA.placeOrder(r.account, { side: 'buy', type: 'limit', limit: 250, qty: 0.5 }, { quote: us(), rates: RATES, valuation: OK, now: NOW + 1000, id: 'b1' }).error, 'qtyStep');
+  // US$10 at least a buy; a Japanese stock's plan refused.
+  assert.equal(SA.runPlan(acc, { ...plan, amount: 200 }, run, { price: 250, twd: 32 }, NOW).order.reason, 'planMin');
+  assert.equal(SA.runPlan(acc, { ...plan, id: 'p2', symbol: '7203.T', market: 'JP', currency: 'JPY' }, run, { price: 3000, twd: 0.21 }, NOW).order.reason, 'planMarket');
+});

@@ -42,7 +42,9 @@ import {
   mixedLot,
   localDayOf,
   earlyCloseAt,
-  isSubBrokered
+  isSubBrokered,
+  fractional,
+  US_FRACTION
 } from '#kit/stock-markets.mjs';
 import { nextTradingStart, isTradingDay } from '#kit/stock-holidays.mjs';
 import { TD_MIN, tdRate, addMonths, tdInterest, incomeTaxes, lendable, LEND_RATE, LEND_RATE_MIN, LEND_RATE_MAX, LEND_LOT, LEND_RECALL, lendEnds, addWeekdays, lendFee } from '#kit/stock-savings.mjs';
@@ -412,7 +414,7 @@ function applyFill(s, e) {
     // sold only with 融資賣出; the rest are 現股, the account's own).
     if (buy && e.financed > 0) p.marginQty = (p.marginQty || 0) + left;
   }
-  if (Math.abs(p.qty) <= qtyStep(p.kind) / 2) delete s.positions[e.symbol];
+  if (Math.abs(p.qty) <= Math.min(qtyStep(p.kind), US_FRACTION) / 2) delete s.positions[e.symbol];
 }
 
 // Cash and shares not already promised to open orders.
@@ -537,8 +539,10 @@ export function triggerPrice(order, quote, now) {
   }
 }
 
-function checkQty(qty, kind) {
+// (A US stock's fractional shares, a plan's, sell to US_FRACTION.)
+function checkQty(qty, kind, sellFraction = false) {
   if (!(qty > 0)) return 'qty';
+  if (sellFraction) return Math.abs(Math.round(qty / US_FRACTION) * US_FRACTION - qty) > US_FRACTION * 1e-3 ? 'qtyStep' : null;
   if (Math.abs(roundQty(qty, kind) - qty) > qtyStep(kind) * 1e-3) return 'qtyStep';
   return null;
 }
@@ -577,7 +581,7 @@ export function placeOrder(account, req, { quote, rates, valuation, now = Date.n
   if (!quote) return { error: 'noQuote' };
   if (!isTradable(quote.kind)) return { error: 'notTradable' };
   const qty = Number(req.qty);
-  const qtyError = checkQty(qty, quote.kind);
+  const qtyError = checkQty(qty, quote.kind, side === 'sell' && fractional(quote.market, quote.kind));
   if (qtyError) return { error: qtyError };
   if (side !== 'buy' && side !== 'sell') return { error: 'side' };
   if (type === 'limit' && !(req.limit > 0)) return { error: 'limit' };
@@ -1931,14 +1935,31 @@ export const PLAN_MIN = 100;
 export const PLAN_DAY_MAX = 31;
 export const PLAN_FAIL_LIMIT = 3;
 export const PLAN_MAX_CATCHUP = 24;
-
-export function setPlan(account, { id, symbol, amount, day, on = true, name, kind, market, currency }, now = Date.now()) {
+// Listed shares by plan only in Taiwan and the US (國泰證券: 台股 and 美股
+// 定期定額; none abroad else, where whole board lots trade); a US one from
+// US$10 a buy (國泰, 2026), its NT$ exchanged first.
+export const PLAN_MARKETS = ['TW', 'US'];
+export const PLAN_MIN_LOCAL = { US: 10 };
+export const planAllowed = ({ market, kind } = {}) => !LISTED.has(kind) || PLAN_MARKETS.includes(market);
+const MARKET_CURRENCY = { US: 'USD' };
+// The least NT$ a plan's buy can be: NT$100, or what exchanges for US$10
+// at `twd` NT$ a dollar (a US one).
+export function planMinTWD(market, twd) {
+  const local = PLAN_MIN_LOCAL[market];
+  if (!local || !(twd > 0)) return PLAN_MIN;
+  const cur = MARKET_CURRENCY[market];
+  return Math.max(PLAN_MIN, Math.ceil(amountFor(BASE, cur, local, { [BASE]: 1, [cur]: twd }) - 1e-9));
+}
+// `twd`: NT$ a unit of its currency now, to hold a US plan to its US$10.
+export function setPlan(account, { id, symbol, amount, day, on = true, name, kind, market, currency, twd }, now = Date.now()) {
   // One plan a symbol: starting another changes the one there is.
   id ||= Object.values(account.plans || {}).find(p => p.on && p.symbol === symbol)?.id || randomId();
   amount = Math.round(Number(amount));
   day = Math.round(Number(day));
   const old = account.plans?.[id];
-  if (on && !(amount >= PLAN_MIN && amount <= MAX_START)) return { error: 'planAmount' };
+  if (on && market && kind && !planAllowed({ market, kind })) return { error: 'planMarket' };
+  const min = planMinTWD(market ?? old?.market, twd);
+  if (on && !(amount >= min && amount <= MAX_START)) return { error: 'planAmount', min };
   if (on && !(day >= 1 && day <= PLAN_DAY_MAX)) return { error: 'planDay' };
   const plan = { ...(old || {}), id, symbol: symbol ?? old?.symbol, amount: amount || old?.amount, day: day || old?.day, on, t: now, since: old?.since ?? now };
   for (const [k, v] of Object.entries({ name, kind, market, currency })) if (v) plan[k] = v;
@@ -2040,6 +2061,7 @@ export function runPlan(account, plan, run, { price, twd, at = run.t, quote }, n
     return { account: next, order: rejected, ...(ended ? { ended: true } : {}) };
   };
   if (!(price > 0) || !(twd > 0) || !meta.currency) return { account };
+  if (!planAllowed(meta)) return reject('planMarket');
   const avail = available(account, replay(account, now));
   if ((avail.cash[BASE] || 0) + EPS < plan.amount) return reject('funds');
   const rates = { [BASE]: 1, [meta.currency]: twd };
@@ -2050,13 +2072,18 @@ export function runPlan(account, plan, run, { price, twd, at = run.t, quote }, n
     if (!fx?.received) return reject('tooSmall');
     budget = fx.received;
   }
-  // Sized at the price it will actually pay (a market order's ask), with the plan's fee.
+  // A US buy from US$10 (PLAN_MIN_LOCAL).
+  if (budget + EPS < (PLAN_MIN_LOCAL[meta.market] ?? 0)) return reject('planMin');
+  // Sized at the price it will actually pay (a market order's ask), with the
+  // plan's fee: whole units, a US stock's in fractions (US_FRACTION).
   const ask = type === 'limit' ? price : marketFill(meta.market, meta.kind, 'buy', price);
   const costOf = q => estimate({ ...meta, side: 'buy', qty: q, price: ask, t: at, plan: true }).total;
-  let qty = roundQty(budget / ask, meta.kind);
+  const step = fractional(meta.market, meta.kind) ? US_FRACTION : qtyStep(meta.kind);
+  const units = q => (step === US_FRACTION ? +(Math.floor(q / step + 1e-6) * step).toFixed(4) : roundQty(q, meta.kind));
+  let qty = units(budget / ask);
   const first = qty > 0 ? costOf(qty) : 0;
-  if (first > budget) qty = roundQty((qty * budget) / first, meta.kind);
-  while (qty > 0 && costOf(qty) > budget + EPS) qty = roundQty(qty - (qtyStep(meta.kind) >= 1 ? 1 : qty * 0.001), meta.kind);
+  if (first > budget) qty = units((qty * budget) / first);
+  while (qty > 0 && costOf(qty) > budget + EPS) qty = units(qty - (step >= 1 || step === US_FRACTION ? step : qty * 0.001));
   if (!(qty > 0)) return reject('tooSmall');
   let next = account;
   if (fx) {

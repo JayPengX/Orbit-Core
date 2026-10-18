@@ -34,7 +34,7 @@
 // deps: { fsGet, fsWrite, read(url) -> JSON (the data proxy's route), now }.
 
 import { fetchQuotes, fetchBars, fxSymbol, useQuotesReader } from './kit/stock-quotes.mjs';
-import { triggerPrice, backfillPrice, closingMatch, planRuns, planOrderId, planFillBar, planOrderType, PLAN_DAY_MAX } from './kit/stock-account.mjs';
+import { triggerPrice, backfillPrice, closingMatch, planRuns, planOrderId, planFillBar, planOrderType, planAllowed, PLAN_DAY_MAX } from './kit/stock-account.mjs';
 import { ipoUrls, parseIpoList, ipoOpen, ipoDrawn, ipoWon, ipoDrawKey } from './kit/stock-ipo.mjs';
 import { tokenSecret } from './quadra-token.js';
 import { parseDoc, changeDoc } from './doc-store.js';
@@ -170,6 +170,8 @@ async function planFills(book, now) {
   const out = {};
   for (const [id, versions] of Object.entries(book.plans)) {
     const v = versions.at(-1);
+    // (Listed shares by plan in Taiwan and the US only: the kit's planAllowed.)
+    if (!planAllowed(v)) continue;
     const due = planRuns({ on: true, since: versions[0].seen, day: v.day }, now)
       .map(run => ({ ...run, terms: planAt(versions, run.t), oid: planOrderId({ id }, run.month) }))
       .filter(r => r.terms && !book.fills[r.oid]);
