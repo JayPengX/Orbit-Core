@@ -7,7 +7,6 @@
 //   今彩539      5 of 1-39                 NT$50    Mon-Sat 20:30
 //   3星彩        3 digits, in order        NT$25    Mon-Sat 20:30
 //   4星彩        4 digits, in order        NT$25    Mon-Sat 20:30
-//   38樂合彩     2-5 of 1-38, on 威力彩's first zone     NT$25 a combination
 //   39樂合彩     2-4 of 1-39, on 今彩539's draw          NT$25 a combination
 //   49樂合彩     2-4 of 1-49, on 大樂透's six numbers    NT$25 a combination
 //   賓果賓果     1-10 stars of 1-80, 20 drawn every 5 minutes 07:05-23:55, NT$25
@@ -15,8 +14,8 @@
 // Prizes follow Taiwan Lottery's tables: fixed prizes as printed, pool
 // prizes (威力彩's first two tiers, 大樂透's first four) from what that draw
 // actually paid per winner, shared with the real winners (a pool tier nobody
-// won pays its whole pool). The 樂合彩 tables are Taiwan Lottery's own (樂合彩 30/230/2,700/46,000 times the NT$25 on 38, 45/450/8,500
-// on 39, 50/500/8,000 on 49).
+// won pays its whole pool). The 樂合彩 tables are Taiwan Lottery's own (45/450/8,500 times the NT$25
+// on 39, 50/500/8,000 on 49; 38樂合彩 is gone, last drawn 2023-12-28).
 
 import { choose, prizeAfterTax } from '#kit/play-odds.mjs';
 
@@ -97,10 +96,6 @@ export const GAMES = {
     ],
     plays: { straight: { zh: '正彩', en: 'Straight', prize: 50_000 } }
   },
-  m38: {
-    zh: '38樂合彩', en: '38 Combo', price: 25, days: [1, 4], color: '#be123c', of: 'super638',
-    combo: { max: 38, drawn: 6, sizes: { 2: 750, 3: 5_750, 4: 67_500, 5: 1_150_000 } }
-  },
   m39: {
     zh: '39樂合彩', en: '39 Combo', price: 25, days: [1, 2, 3, 4, 5, 6], color: '#047857', of: 'daily539',
     combo: { max: 39, drawn: 5, sizes: { 2: 1_125, 3: 11_250, 4: 212_500 } }
@@ -129,7 +124,7 @@ export const GAMES = {
     sides: { size: 6, parity: 6, bullseye: 48 }
   }
 };
-export const GAME_ORDER = ['super638', 'lotto649', 'daily539', 'bingo', 'star3', 'star4', 'm38', 'm39', 'm49'];
+export const GAME_ORDER = ['super638', 'lotto649', 'daily539', 'bingo', 'star3', 'star4', 'm39', 'm49'];
 export const gameName = (id, lang = 'zh') => GAMES[id]?.[lang === 'en' ? 'en' : 'zh'] || id;
 
 // ---- Draw times ----------------------------------------------------------------------

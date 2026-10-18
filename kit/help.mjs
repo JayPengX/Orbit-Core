@@ -253,7 +253,7 @@ export const HELP = {
         '比賽結束由伺服器自動結算並通知你，App 關著也一樣；延期或取消的比賽算賠率 1.00，開賽 3 天後還沒結果的算無效。'
       ]],
       ['lottery', '彩券', [
-        '威力彩、大樂透、今彩539、3星彩、4星彩、38／39／49樂合彩和賓果賓果，照台灣彩券的規則和真實開獎對獎；晚上開獎的在開獎前半小時停售。威力彩前兩獎和大樂透前四獎照那期每注實際派彩，和真的中獎人一起分。',
+        '威力彩、大樂透、今彩539、3星彩、4星彩、39／49樂合彩和賓果賓果，照台灣彩券的規則和真實開獎對獎；晚上開獎的在開獎前半小時停售。威力彩前兩獎和大樂透前四獎照那期每注實際派彩，和真的中獎人一起分。',
         '刮刮樂 12 種（NT$100 到 2,000 各兩種），獎金表照台灣彩券 2026 年的卡；買的時候就決定中多少，刮開就知道。',
         '選號時快選補滿，+1／+5／+10 再加幾注；購買列一直在下面。中獎自動入帳並通知你。'
       ]],
@@ -286,7 +286,7 @@ export const HELP = {
         'The server settles each slip when its games are over and tells you, with the app closed too; a postponed or cancelled game counts at 1.00, and one still without a result three days after its start is void.'
       ]],
       ['lottery', 'Lottery', [
-        'Super Lotto 威力彩, Lotto 6/49 大樂透, Daily Cash 539, 3D and 4D, 38/39/49 樂合彩 and BINGO BINGO, checked against Taiwan Lottery’s rules and real draws; evening draws stop selling half an hour before. 威力彩’s top two prizes and 大樂透’s top four pay what that draw paid per winner, shared with the real winners.',
+        'Super Lotto 威力彩, Lotto 6/49 大樂透, Daily Cash 539, 3D and 4D, 39/49 樂合彩 and BINGO BINGO, checked against Taiwan Lottery’s rules and real draws; evening draws stop selling half an hour before. 威力彩’s top two prizes and 大樂透’s top four pay what that draw paid per winner, shared with the real winners.',
         '12 scratch cards (two at each price, NT$100 to 2,000), their prize tables Taiwan Lottery’s 2026 cards; the prize is fixed when a card is bought, and scratching shows it.',
         'Quick pick fills a line, +1/+5/+10 add more, and the buy bar stays in view. Wins are paid in automatically and you’re told.'
       ]],

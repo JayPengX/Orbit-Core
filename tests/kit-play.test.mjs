@@ -387,7 +387,8 @@ test('lottery tickets: checked, bought at their draw, settled once with the tax,
   assert.deepEqual(checkSelection('star4', { play: 'straight', digits: [7, 7, 7, 7] }), { ok: true });
   assert.deepEqual(checkSelection('bingo', { numbers: Array.from({ length: 11 }, (_, i) => i + 1) }), { error: 'numbers' });
   assert.deepEqual(checkSelection('bingo', { side: 'bullseye', bull: 81 }), { error: 'side' });
-  assert.deepEqual(checkSelection('m38', { numbers: [1, 2], size: 3 }), { error: 'numbers' });
+  assert.deepEqual(checkSelection('m39', { numbers: [1, 2], size: 3 }), { error: 'numbers' });
+  assert.ok(!GAMES.m38, '38樂合彩 is gone (last drawn 2023-12-28)');
   const now = new Date('2026-10-19T10:00:00Z'); // Monday 18:00 Taipei: tonight's 威力彩
   const acc = { ledger: [{ id: 'start', amount: 1_000, t: '' }], tickets: [] };
   const bought = buyTicket(acc, { id: 't1', game: 'super638', sel: { zones: [[1, 2, 3, 4, 5, 6], [7]] }, multiple: 3 }, now);
