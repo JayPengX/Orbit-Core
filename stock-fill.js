@@ -24,7 +24,9 @@
 // A monthly plan (定期定額) is kept the same way: its terms (symbol, day,
 // amount) and the moment first seen; each month's buy that falls due after
 // that is filled here at the first price on or after its day (the price
-// bars' open) and that moment's NT$ rate, as the order `plan:<id>:<month>`.
+// bars' open; a Taiwan stock's from the odd-lot session's first match, as a
+// limit order: the kit's planFillBar, planOrderType) and that moment's NT$
+// rate, as the order `plan:<id>:<month>`.
 //
 //   POST /stock { op: 'fill', orders: [order…], plans: [plan…] }  (a Securities session)
 //     → { fills: { orderId: { quote, t, twd } } }
@@ -32,7 +34,7 @@
 // deps: { fsGet, fsWrite, read(url) -> JSON (the data proxy's route), now }.
 
 import { fetchQuotes, fetchBars, fxSymbol, useQuotesReader } from './kit/stock-quotes.mjs';
-import { triggerPrice, backfillPrice, closingMatch, planRuns, planOrderId } from './kit/stock-account.mjs';
+import { triggerPrice, backfillPrice, closingMatch, planRuns, planOrderId, planFillBar, planOrderType, PLAN_DAY_MAX } from './kit/stock-account.mjs';
 import { ipoUrls, parseIpoList, ipoOpen, ipoDrawn, ipoWon, ipoDrawKey } from './kit/stock-ipo.mjs';
 import { tokenSecret } from './quadra-token.js';
 import { parseDoc, changeDoc } from './doc-store.js';
@@ -155,14 +157,15 @@ export function cleanPlan(p) {
   if (!p || !ID.test(String(p.id)) || !SYMBOL.test(String(p.symbol)) || p.on === false) return null;
   const day = Math.round(Number(p.day));
   const amount = Math.round(Number(p.amount));
-  if (!(day >= 1 && day <= 28) || !(amount > 0 && amount <= 1_000_000_000)) return null;
+  if (!(day >= 1 && day <= PLAN_DAY_MAX) || !(amount > 0 && amount <= 1_000_000_000)) return null;
   return { id: String(p.id), symbol: String(p.symbol), day, amount, currency: CURRENCY.test(String(p.currency)) ? String(p.currency) : undefined, market: String(p.market || ''), kind: String(p.kind || '') };
 }
 // The plan's terms in force at a moment: the latest version seen by then.
 export const planAt = (versions, t) => [...(versions || [])].reverse().find(v => v.seen <= t) || null;
 
 // Each kept plan's months due now and not filled: filled at the first bar
-// on or after the day (its open), at that moment's NT$ rate.
+// on or after the day (its open; a Taiwan stock's in the odd-lot session, a
+// limit order at that price), at that moment's NT$ rate.
 async function planFills(book, now) {
   const out = {};
   for (const [id, versions] of Object.entries(book.plans)) {
@@ -174,13 +177,14 @@ async function planFills(book, now) {
     const bars = await fetchBars(v.symbol, due[0].t - 86_400_000).catch(() => []);
     const cur = v.currency;
     const fx = cur && cur !== 'TWD' ? await fetchBars(fxSymbol(cur), due[0].t - 5 * 86_400_000).catch(() => []) : [];
+    const limit = planOrderType(v) === 'limit';
     for (const run of due) {
-      const bar = bars.find(b => b.t >= run.t && b.o > 0);
+      const bar = planFillBar(v, bars, run.t);
       if (!bar) break;
       let twd = !cur || cur === 'TWD' ? 1 : null;
       for (const b of fx) if (b.t <= bar.t && b.c > 0) twd = b.c;
       if (!(twd > 0)) continue;
-      out[run.oid] = { quote: bar.o, t: bar.t, twd, s: run.terms.symbol, side: 'buy', k: 'market', amt: run.terms.amount, plan: id };
+      out[run.oid] = { quote: bar.o, t: bar.t, twd, s: run.terms.symbol, side: 'buy', k: limit ? 'limit' : 'market', ...(limit ? { l: bar.o } : {}), amt: run.terms.amount, plan: id };
     }
   }
   return out;
