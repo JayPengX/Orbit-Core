@@ -154,6 +154,23 @@ function localParts(t, market) {
 }
 export const localDayOf = (t, market) => localParts(t, market).day;
 
+// When a dividend that went ex at `ex` is paid: on `payDay` (Yahoo's
+// calendarEvents.dividendDate, a date: 'YYYY-MM-DD' or its UTC midnight)
+// where it's known, else the market's usual DIV_PAY_DAYS later, moved to
+// its next trading day (a pay day is never a weekend or a holiday). At the
+// ex-date's own time of day.
+export function divPayDate(market, ex, payDay = null) {
+  const day = typeof payDay === 'number' && Number.isFinite(payDay) ? new Date(payDay).toISOString().slice(0, 10) : /^\d{4}-\d{2}-\d{2}$/.test(payDay || '') ? payDay : null;
+  const { day: exDay, minutes } = localParts(ex, market);
+  if (day && day >= exDay) {
+    const [y, m, d] = day.split('-').map(Number);
+    return zonedTime(y, m, d, Math.floor(minutes / 60), minutes % 60, 0, tzOf(market));
+  }
+  let t = ex + divPayDays(market) * 86_400_000;
+  for (let i = 0; i < 30 && !isTradingDay(market, localDayOf(t, market)); i++) t += 86_400_000;
+  return t;
+}
+
 // The price steps an exchange accepts, by price band:
 // - Taiwan (TWSE/TPEx), ETFs finer;
 // - US: a cent (a hundredth of a cent under US$1);

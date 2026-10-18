@@ -21,7 +21,7 @@ import {
   SHORT_INITIAL,
   currencyInfo,
   dealPrice,
-  divPayDays,
+  divPayDate,
   settleDate,
   marketFill,
   isOddLot,
@@ -1608,11 +1608,19 @@ function sharesAt(account, symbol, t) {
 // What puts shares of `symbol` in the account: a trade, or a 新股申購 won.
 const holdingEvents = (account, symbol) => account.events.filter(e => (e.type === 'fill' || e.type === 'ipowin') && e.symbol === symbol);
 
+// Yahoo's pay date for the dividend that went ex at `ex`: its fundamentals'
+// dividendDate when their exDividendDate (a UTC midnight) is that day.
+const utcDay = t => new Date(t).toISOString().slice(0, 10);
+const payDayOf = (market, ex, exDividendDate, dividendDate) => (exDividendDate > 0 && dividendDate > 0 && utcDay(exDividendDate) === localDayOf(ex, market) ? dividendDate : null);
+
 // Credits the dividends and applies the splits of `symbol` that happened
 // while it was held. Yahoo's dividend amounts are adjusted for later splits,
 // so each is scaled back to the shares of its own day. A dividend counts on
-// its ex-date (shares held then) and is paid on its market's usual pay day.
-export function applyCorporateActions(account, symbol, { dividends = [], splits = [] }, { rates, now = Date.now() }) {
+// its ex-date (shares held then) and is paid on its pay date: Yahoo's
+// (fundamentals' dividendDate, for the dividend that went ex on their
+// exDividendDate) where it's given, else its market's usual pay day, a
+// trading day (divPayDate).
+export function applyCorporateActions(account, symbol, { dividends = [], splits = [], exDividendDate = null, dividendDate = null }, { rates, now = Date.now() }) {
   const fills = holdingEvents(account, symbol);
   if (!fills.length) return { account, added: [] };
   const first = Math.min(...fills.map(e => e.t));
@@ -1647,7 +1655,7 @@ export function applyCorporateActions(account, symbol, { dividends = [], splits 
     const taxes = gross > 0 ? dividendTaxes(info.market, gross) : { withheld: 0, nhi: 0, net: gross };
     // Owed from the ex-date, paid some days later (until then it's pending).
     const event = {
-      id, type: 'div', t: d.date + divPayDays(info.market) * 86_400_000, ex: d.date, symbol, name: info.name, market: info.market, kind: info.kind, currency: info.currency,
+      id, type: 'div', t: divPayDate(info.market, d.date, payDayOf(info.market, d.date, exDividendDate, dividendDate)), ex: d.date, symbol, name: info.name, market: info.market, kind: info.kind, currency: info.currency,
       shares, perShare, gross, withheld: taxes.withheld, nhi: taxes.nhi, net: roundCash(taxes.net, info.currency), twd: rate
     };
     next = { ...next, events: [...next.events, event] };
