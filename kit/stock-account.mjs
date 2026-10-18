@@ -40,7 +40,8 @@ import {
   tradeCosts,
   lotProblem,
   mixedLot,
-  localDayOf
+  localDayOf,
+  earlyCloseAt
 } from '#kit/stock-markets.mjs';
 import { nextTradingStart, isTradingDay } from '#kit/stock-holidays.mjs';
 import { TD_MIN, tdRate, addMonths, tdInterest, incomeTaxes, lendable, LEND_RATE, LEND_RATE_MIN, LEND_RATE_MAX, LEND_LOT, LEND_RECALL, lendEnds, addWeekdays, lendFee } from '#kit/stock-savings.mjs';
@@ -547,13 +548,16 @@ export const GTC_DAYS = 30;
 // closing match to be known (to 14:30).
 export const CLOSE_DECIDE = 60 * 60_000;
 // When a day order placed now ends: the close of the session it's for (the
-// one under way, or the next one when the market is shut).
+// one under way, or the next one when the market is shut), or its early
+// close on a half day.
 export function dayOrderEnd(quote, now = Date.now()) {
   const s = quote?.session;
   if (!s || !(s.end > s.start)) return now + 86_400_000;
-  if (now < s.end && s.start - now < 20 * 3_600_000) return s.end;
+  const end = (start, close) => Math.min(close, earlyCloseAt(quote.market, start) ?? Infinity);
+  const close = end(s.start, s.end);
+  if (now < close && s.start - now < 20 * 3_600_000) return close;
   const start = nextTradingStart(quote.market, s.start, quote.tz, now);
-  return start + (s.end - s.start);
+  return end(start, start + (s.end - s.start));
 }
 // Orders past their end: expired, their cash or shares free again.
 export function expireOrders(account, now = Date.now()) {
