@@ -8,7 +8,7 @@ import { settleSlip, evaluateSlip, slipPayoutTable, slipOutlook, analyzeSlip, af
 import { cashOutState, CASHOUT_KEEP, CASHOUT_MAX_OPEN } from '../kit/play-cashout.mjs';
 import { houseRule, shadeLong, minLegsProblem, HOUSE_RULES, LONG_FROM } from '../kit/play-rules.mjs';
 import { GAMES, ticketPrize, parseDraw, cappedPrize, settleTicket, buyTicket, nextDraw, nextDraws, limits, drawTerm, tierName, closesAt, CLOSE_MS, checkSelection, betCount, expectedReturn, mergeTickets, addTickets, BINGO_DRAWS, GAME_ORDER } from '../kit/play-lottery.mjs';
-import { CARD_ORDER, face, facePays, tiersOf, drawPrize, buyScratch, revealScratch, expectedReturn as scratchReturn } from '../kit/play-scratch.mjs';
+import { CARDS, CARD_ORDER, face, facePays, tiersOf, drawPrize, buyScratch, revealScratch, expectedReturn as scratchReturn } from '../kit/play-scratch.mjs';
 import { propResult } from '../kit/play-props.mjs';
 import { parseOffers } from '../kit/play-offers.mjs';
 import { parseKambiInPlay } from '../kit/play-kambi.mjs';
@@ -730,8 +730,24 @@ test('draw times: sales close half an hour before 20:30, BINGO every five minute
   assert.ok(!GAMES.lotto1224 && !GAMES.lotto740);
 });
 
+test('scratch cards: Taiwan Lottery\'s own on sale, at their top prize and win rate; retired ones still scratch, never sold', () => {
+  // 台灣彩券 刮刮樂 (2026-10): price, top prize, 總中獎率.
+  const real = { lucky7: ['錢進888', 100, 800_000, 0.301], fruit: ['金磚疊疊樂', 200, 2_000_000, 0.35], beat: ['獎金對決', 200, 2_000_000, 0.33], numbers: ['金鑽999', 200, 2_000_000, 0.2755], million: ['樂刮$5,000', 500, 3_000_000, 0.3473] };
+  assert.deepEqual(CARD_ORDER, Object.keys(real));
+  for (const [id, [zh, price, top, win]] of Object.entries(real)) {
+    assert.deepEqual([CARDS[id].zh, CARDS[id].price, tiersOf(id).at(-1).prize], [zh, price, top], id);
+    assert.ok(Math.abs(tiersOf(id).reduce((s, t) => s + 1 / t.odds, 0) - win) < 0.001, `${id} wins`);
+    assert.ok(!/莊家|中獎號碼/.test(CARDS[id].how.zh), `${id}: the cards' own words (幸運號碼, 大力士分數)`);
+  }
+  const acc = { ledger: [{ id: 'start', amount: 10_000, t: '' }], tickets: [] };
+  for (const id of Object.keys(CARDS).filter(id => !CARD_ORDER.includes(id))) {
+    assert.ok(CARDS[id].retired, id);
+    assert.equal(buyScratch(acc, { id: 'r', card: id }).error, 'game', `${id} is not sold`);
+  }
+});
+
 test('scratch cards: every face pays exactly its prize, the prize taxed once over NT$5,000', () => {
-  for (const id of CARD_ORDER) {
+  for (const id of Object.keys(CARDS)) {
     const prizes = [0, ...new Set(tiersOf(id).map(t => t.prize))];
     for (const prize of prizes) for (let seed = 1; seed < 6; seed++) assert.equal(facePays(id, face(id, prize, seed * 7919)), prize, `${id} ${prize} ${seed}`);
     assert.ok(scratchReturn(id) > 0.5 && scratchReturn(id) < 0.85, id);

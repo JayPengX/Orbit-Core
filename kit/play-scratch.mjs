@@ -1,50 +1,72 @@
-// 刮刮樂: twelve instant scratch cards (two at each price) in the style of Taiwan Lottery's, played
-// with Quadra money. What a card wins is fixed the moment it's bought (the
-// device's crypto random number, by the card's prize table, like a printed
-// run of tickets); scratching only reveals it. The card's face is then laid
-// out to show exactly that result, the way its game reads.
+// 刮刮樂: Taiwan Lottery's instant scratch cards on sale (台灣彩券 刮刮樂
+// 遊戲介紹, 2026-10), the ones whose play a face here shows as the card
+// does, played with Quadra money. What a card wins is fixed the moment it's
+// bought (the device's crypto random number, by the card's prize table, like
+// a printed run of tickets); scratching only reveals it. The card's face is
+// then laid out to show exactly that result, the way its game reads.
 //
-// Each price has its own table, set to what Taiwan Lottery's cards on sale in
-// 2026 pay (今周刊's list of every card: payback, win rate, top prize): the
-// dearer the card, the more it pays back and the more often it wins.
+// Each card's table has its real top prize and win rate (台灣彩券's own
+// 總中獎率), and pays back what Taiwan Lottery's cards at its price do (今周刊's
+// list of every card): 63% at NT$100, 65% at 200, 70% at 500.
 //
-//   price    pays back   wins   top prize
-//   100      63%         33%    NT$50萬
-//   200      65%         33%    NT$200萬
-//   300      66%         36%    NT$300萬
-//   500      70%         41%    NT$500萬
-//   1000     74%         70%    NT$1,200萬   (half the price back is a prize)
-//   2000     75%         69%    NT$2,000萬
+//   card          price   wins     top prize
+//   錢進888        100     30.10%   NT$80萬
+//   金磚疊疊樂     200     35.00%   NT$200萬
+//   獎金對決       200     33.00%   NT$200萬
+//   金鑽999        200     27.55%   NT$200萬
+//   樂刮$5,000     500     34.73%   NT$300萬
+//
+// Cards no longer sold (`retired`: made-up ones, 2026-10) keep their table
+// and face, so one bought before still scratches; nobody can buy one.
 import { randomInt } from '#kit/play-lottery.mjs';
 import { seededRandom, prizeAfterTax } from '#kit/play-odds.mjs';
 
-// Prize tiers by price: multiples of the price and their odds (1 in N tickets).
+// Prize tiers by price (a card's own `table` first): multiples of the price
+// and their odds (1 in N tickets).
 const TABLES = {
-  100: [[1, 5.05], [2, 10.12], [5, 40], [10, 150], [20, 700], [100, 12_000], [1_000, 300_000], [5_000, 2_000_000]],
   200: [[1, 5.57], [2, 8.53], [5, 40], [10, 150], [20, 700], [100, 12_000], [1_000, 300_000], [10_000, 2_500_000]],
   300: [[1, 4.36], [2, 10.28], [5, 40], [10, 150], [20, 700], [100, 12_000], [1_000, 300_000], [10_000, 2_500_000]],
   500: [[1, 3.12], [2, 19.55], [5, 35], [10, 120], [20, 600], [100, 10_000], [1_000, 250_000], [10_000, 2_500_000]],
   1000: [[0.5, 2.85], [1, 3.93], [2, 14], [5, 60], [10, 200], [20, 900], [100, 20_000], [1_000, 400_000], [12_000, 3_000_000]],
   2000: [[0.5, 3.23], [1, 3.5], [2, 14], [5, 60], [10, 200], [20, 900], [100, 20_000], [1_000, 400_000], [10_000, 3_000_000]]
 };
-const tableOf = id => TABLES[CARDS[id].price];
+const tableOf = id => CARDS[id].table || TABLES[CARDS[id].price];
 
 export const CARDS = {
-  lucky7: { icon: '7️⃣', zh: '幸運7', en: 'Lucky 7', price: 100, color: '#dc2626', layout: 'symbol', symbol: '7', spots: 6, how: { zh: '刮出「7」就贏得它下面的獎金。', en: 'Uncover a 7 to win the prize under it.' } },
-  triple: { icon: '🎯', zh: '三個一樣', en: 'Match 3', price: 200, color: '#d97706', layout: 'match3', how: { zh: '刮出三個相同金額，就贏得該金額。', en: 'Uncover three of the same amount to win it.' } },
-  numbers: { icon: '🔢', zh: '對中發財', en: 'Lucky Numbers', price: 300, color: '#059669', layout: 'numbers', winning: 3, yours: 10, how: { zh: '「你的號碼」和「中獎號碼」任一相同，就贏得旁邊的獎金。', en: 'Any of your numbers matching a winning number wins the prize beside it.' } },
-  bingo: { icon: '🎱', zh: '賓果連線', en: 'Bingo Line', price: 500, color: '#7c3aed', layout: 'bingo', how: { zh: '開出的號碼在卡上連成一線（橫、直、斜），就贏得該線的獎金。', en: 'Called numbers making a line (across, down or diagonal) win that line’s prize.' } },
-  gold: { icon: '💰', zh: '金幣翻倍', en: 'Golden Coins', price: 1000, color: '#ca8a04', layout: 'symbol', symbol: '💰', spots: 10, multiplier: true, how: { zh: '刮出💰贏得它的獎金，再乘上左上角的倍數。', en: 'Each 💰 wins its prize, times the multiplier in the corner.' } },
-  million: { icon: '💵', zh: '億萬富翁', en: 'Millionaire', price: 2000, color: '#1d4ed8', layout: 'numbers', winning: 5, yours: 20, how: { zh: '「你的號碼」和「中獎號碼」任一相同，就贏得旁邊的獎金。頭獎 2,000 萬。', en: 'Match any winning number to win the prize beside it. Top prize NT$20 million.' } },
-  fruit: { icon: '🍒', zh: '水果盤', en: 'Fruit Slots', price: 100, color: '#e11d48', layout: 'slots', lines: 4, symbols: ['🍒', '🍋', '🍇', '🍉', '🍊', '🔔'], how: { zh: '任一橫排出現三個相同圖案，就贏得該排右邊的獎金。', en: 'Three of the same picture across a row wins that row’s prize.' } },
-  beat: { icon: '🃏', zh: '比大小', en: 'Beat It', price: 200, color: '#0284c7', layout: 'beat', rows: 6, how: { zh: '你的號碼比「莊家號碼」大，就贏得旁邊的獎金（一樣大不算）。', en: 'Any of your numbers bigger than the dealer’s wins the prize beside it (a tie doesn’t).' } },
-  treasure: { icon: '🗺️', zh: '尋寶地圖', en: 'Treasure Map', price: 300, color: '#b45309', layout: 'treasure', how: { zh: '挖出三個相同的寶物，就贏得圖例上它的獎金。', en: 'Dig up three of the same treasure to win its prize on the key.' } },
-  dice: { icon: '🎲', zh: '骰子對決', en: 'Dice Duel', price: 500, color: '#16a34a', layout: 'dice', rounds: 5, how: { zh: '每一局你的兩顆骰子點數加起來比莊家大，就贏得該局的獎金。', en: 'In each round, if your two dice add up to more than the dealer’s, you win that round’s prize.' } },
-  wheel: { icon: '🎡', zh: '幸運轉盤', en: 'Lucky Wheel', price: 1000, color: '#9333ea', layout: 'wheel', how: { zh: '刮開看指針停在哪一格，就贏得那一格的獎金。', en: 'See where the pointer stops: you win that slice.' } },
-  palace: { icon: '🏯', zh: '金殿老虎機', en: 'Palace Slots', price: 2000, color: '#a16207', layout: 'slots', lines: 5, symbols: ['7️⃣', '💎', '👑', '🔔', '⭐', '🍀'], how: { zh: '任一橫排出現三個相同圖案，就贏得該排右邊的獎金。頭獎 2,000 萬。', en: 'Three of the same picture across a row wins that row’s prize. Top prize NT$20 million.' } }
+  lucky7: {
+    icon: '8️⃣', zh: '錢進888', en: 'Money 888', price: 100, color: '#dc2626', layout: 'symbol', symbol: '8', spots: 8,
+    table: [[1, 7.07], [2, 7.92], [5, 40], [10, 150], [20, 700], [100, 12_000], [1_000, 300_000], [8_000, 2_000_000]],
+    how: { zh: '刮出任一個「8」，即得其對應的獎額。', en: 'Uncover any 8 to win the prize under it.' }
+  },
+  fruit: {
+    icon: '🧱', zh: '金磚疊疊樂', en: 'Gold Bricks', price: 200, color: '#ca8a04', layout: 'slots', lines: 6, symbols: ['1', '2', '3', '5', '7', '9'],
+    table: [[1, 4.55], [2, 10.28], [5, 40], [10, 150], [20, 700], [100, 12_000], [1_000, 300_000], [10_000, 2_500_000]],
+    how: { zh: '第1局至第6局，若任一局中刮出的數字皆相同，即得該局獎金（不可跨局對獎）。', en: 'In any of the 6 rounds, if the numbers are all the same, you win that round’s prize.' }
+  },
+  beat: {
+    icon: '💪', zh: '獎金對決', en: 'Prize Duel', price: 200, color: '#0284c7', layout: 'beat', rows: 6,
+    how: { zh: '若「您的分數」大於「大力士分數」，即得該局對應之獎金（一樣大不算）。', en: 'Any of your scores higher than the strongman’s wins that round’s prize (a tie doesn’t).' }
+  },
+  numbers: {
+    icon: '💎', zh: '金鑽999', en: 'Diamond 999', price: 200, color: '#059669', layout: 'numbers', winning: 3, yours: 10,
+    table: [[1, 14.18], [2, 5.82], [5, 40], [10, 150], [20, 700], [100, 12_000], [1_000, 300_000], [10_000, 2_500_000]],
+    how: { zh: '任一個「您的號碼」對中「幸運號碼」，即得該號碼對應的獎額。', en: 'Any of your numbers matching a lucky number wins the prize beside it.' }
+  },
+  million: {
+    icon: '💵', zh: '樂刮$5,000', en: 'Scratch $5,000', price: 500, color: '#1d4ed8', layout: 'numbers', winning: 5, yours: 20,
+    table: [[1, 5.18], [2, 8.66], [5, 35], [10, 120], [20, 600], [100, 10_000], [1_000, 250_000], [6_000, 2_500_000]],
+    how: { zh: '任一個「您的號碼」對中「幸運號碼」，即得該號碼對應的獎金。頭獎 300 萬。', en: 'Any of your numbers matching a lucky number wins the prize beside it. Top prize NT$3 million.' }
+  },
+  triple: { retired: true, icon: '🎯', zh: '三個一樣', en: 'Match 3', price: 200, color: '#d97706', layout: 'match3', how: { zh: '刮出三個相同金額，就贏得該金額。', en: 'Uncover three of the same amount to win it.' } },
+  bingo: { retired: true, icon: '🎱', zh: '賓果連線', en: 'Bingo Line', price: 500, color: '#7c3aed', layout: 'bingo', how: { zh: '開出的號碼在卡上連成一線（橫、直、斜），就贏得該線的獎金。', en: 'Called numbers making a line (across, down or diagonal) win that line’s prize.' } },
+  gold: { retired: true, icon: '💰', zh: '金幣翻倍', en: 'Golden Coins', price: 1000, color: '#ca8a04', layout: 'symbol', symbol: '💰', spots: 10, multiplier: true, how: { zh: '刮出💰贏得它的獎金，再乘上左上角的倍數。', en: 'Each 💰 wins its prize, times the multiplier in the corner.' } },
+  treasure: { retired: true, icon: '🗺️', zh: '尋寶地圖', en: 'Treasure Map', price: 300, color: '#b45309', layout: 'treasure', how: { zh: '挖出三個相同的寶物，就贏得圖例上它的獎金。', en: 'Dig up three of the same treasure to win its prize on the key.' } },
+  dice: { retired: true, icon: '🎲', zh: '骰子對決', en: 'Dice Duel', price: 500, color: '#16a34a', layout: 'dice', rounds: 5, how: { zh: '每一局你的兩顆骰子點數加起來比對手大，就贏得該局的獎金。', en: 'In each round, if your two dice add up to more than your opponent’s, you win that round’s prize.' } },
+  wheel: { retired: true, icon: '🎡', zh: '幸運轉盤', en: 'Lucky Wheel', price: 1000, color: '#9333ea', layout: 'wheel', how: { zh: '刮開看指針停在哪一格，就贏得那一格的獎金。', en: 'See where the pointer stops: you win that slice.' } },
+  palace: { retired: true, icon: '🏯', zh: '金殿老虎機', en: 'Palace Slots', price: 2000, color: '#a16207', layout: 'slots', lines: 5, symbols: ['7️⃣', '💎', '👑', '🔔', '⭐', '🍀'], how: { zh: '任一橫排出現三個相同圖案，就贏得該排右邊的獎金。', en: 'Three of the same picture across a row wins that row’s prize.' } }
 };
-// By price, the classic card first.
-export const CARD_ORDER = ['lucky7', 'fruit', 'triple', 'beat', 'numbers', 'treasure', 'bingo', 'dice', 'gold', 'wheel', 'million', 'palace'];
+// The cards on sale, by price.
+export const CARD_ORDER = ['lucky7', 'fruit', 'beat', 'numbers', 'million'];
 // Treasures on the map's key, cheapest tier first.
 const TREASURES = ['🐚', '🪙', '🗝️', '🏺', '📿', '💍', '👑', '💎', '🏆'];
 
@@ -99,7 +121,7 @@ export function face(id, prize, seed) {
   const rand = seeded(seed);
   const list = amounts(id);
   if (c.layout === 'symbol') {
-    const decoys = c.symbol === '7' ? ['🍒', '🔔', '🍋', '⭐', '🍀', '💎'] : ['🪙', '💎', '👑', '🏆', '⭐', '🍀'];
+    const decoys = c.multiplier ? ['🪙', '💎', '👑', '🏆', '⭐', '🍀'] : ['🍒', '🔔', '🍋', '⭐', '🍀', '💎'];
     let mult = 1;
     let base = prize;
     if (c.multiplier && prize) {
@@ -175,7 +197,7 @@ export function face(id, prize, seed) {
     return { kind: 'slots', rows: shuffle(rand, rows) };
   }
   if (c.layout === 'beat') {
-    // The dealer's number (6-17 of 1-20); winning rows above it, the rest at or under.
+    // The 大力士分數 (`dealer`, 6-17 of 1-20); winning rows above it, the rest at or under.
     const dealer = 6 + Math.floor(rand() * 12);
     const wins = prize ? split(rand, prize, list, 3) : [];
     const rows = wins.map(a => ({ n: dealer + 1 + Math.floor(rand() * (20 - dealer)), a }));
@@ -248,7 +270,7 @@ export function facePays(id, f) {
 // Buying: the cost now; the prize goes in once it's scratched (revealScratch).
 export function buyScratch(account, { id, card }, now = new Date(), { extra = 0, rand = cryptoRand, seed = randomInt(2 ** 31) } = {}) {
   const c = CARDS[card];
-  if (!c) return { error: 'game' };
+  if (!c || c.retired) return { error: 'game' };
   const own = account.ledger.reduce((s, e) => s + e.amount, 0);
   if (c.price > own + extra) return { error: 'funds' };
   const t = now.toISOString();
