@@ -80,3 +80,30 @@ test('融券 earns interest on its deposit and the sale money held (§51, 0.20% 
   assert.equal(s1.cash.TWD - s0.cash.TWD, 90_000 + held - 100_142 + Math.floor(owed), 'deposit, sale money and interest back, less the buyback');
   assert.equal(s1.positions['2330.TW'], undefined);
 });
+
+test('a Taiwan market or stop order holds, and counts against 當沖額度, at the limit-up (漲停價), as brokers count it', () => {
+  const acc = SA.newAccount(1_000_000, now - DAY, 'acc');
+  // Open: the day's limit-up from yesterday's close (95 × 1.1 = 104.5).
+  const open = SA.placeOrder(acc, { side: 'buy', type: 'stop', stop: 102, qty: 1000 }, { quote: tw(100, { prev: 95 }), rates, valuation: ok, now, id: 'b1' });
+  assert.equal(open.order.reserve, 104_500 + Math.floor(104_500 * 0.001425));
+  assert.equal(SA.limitUpFor({ type: 'market' }, tw(100, { prev: 95 }), now), 104.5);
+  // Shut: the next session's, from the last price (100 × 1.1).
+  const night = Date.parse('2026-10-13T14:00:00Z');
+  assert.equal(SA.requiredCash({ type: 'market', side: 'buy', qty: 1000, t: night }, tw(100, { prev: 95 }), night).reserve, 110_000 + Math.floor(110_000 * 0.001425), 'no 3% on top: the limit-up is the most');
+  // A limit order holds its limit; elsewhere, nothing changes.
+  assert.equal(SA.limitUpFor({ type: 'limit', limit: 99 }, tw(100, { prev: 95 }), now), null);
+  assert.equal(SA.limitUpFor({ type: 'market' }, { ...tw(100), market: 'US' }, now), null);
+  // A market order filled at once still pays only its price; the rest comes back.
+  const m = SA.placeOrder(acc, { side: 'buy', type: 'market', qty: 1000 }, { quote: tw(100, { prev: 95 }), rates, valuation: ok, now, id: 'b2' });
+  assert.equal(m.fill.price, 100.25);
+  assert.equal(SA.available(m.account, SA.replay(m.account, now)).cash.TWD, 1_000_000 - m.fill.total);
+  // 先賣後買: a market or stop sale counts at the limit-up too.
+  const trades = Array.from({ length: 10 }, (_, i) => ({ id: `t${i}`, type: 'fill', t: now - (i + 1) * 5 * DAY, orderId: `t${i}`, symbol: '2317.TW', name: 'X', kind: 'stock', market: 'TW', currency: 'TWD', side: 'buy', qty: 1, price: 100, gross: 100, total: 100, commission: 0, tax: 0, fee: 0, twd: 1 }));
+  const trader = { ...SA.newAccount(300_000, now - 200 * DAY, 'acc'), events: [{ id: 'd', type: 'deposit', t: now - 200 * DAY, currency: 'TWD', amount: 300_000 }, ...trades] };
+  const v = { ...ok, netWorth: 300_000 };
+  const sell = (req, id) => SA.placeOrder(trader, { side: 'sell', qty: 1000, ...req }, { quote: tw(520), rates, valuation: v, now, id });
+  assert.equal(sell({ type: 'limit', limit: 520 }, 'l').order.dayTradeTWD, 520_000);
+  assert.equal(sell({ type: 'market' }, 'm').order.dayTradeTWD, 572_000);
+  assert.equal(sell({ type: 'stop', stop: 500 }, 's').order.dayTradeTWD, 572_000);
+  assert.equal(SA.placeOrder(trader, { side: 'sell', qty: 1000, type: 'market' }, { quote: tw(560), rates, valuation: v, now, id: 'x' }).error, 'dayTradeLimit', '616,000 of 600,000');
+});
