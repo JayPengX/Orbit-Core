@@ -70,7 +70,7 @@ test('only the given articles reach Gemini, read from Orbit Law a day at the edg
   assert.doesNotMatch(prompt, /無行為能力/);
   assert.equal(sent.generationConfig.temperature, 0);
   assert.deepEqual(Object.keys(sent.generationConfig.response_schema.properties), ['answer', 'points', 'covered']);
-  assert.equal(laws.at(-1).init.cf.cacheTtl, 86_400);
+  assert.deepEqual(laws.at(-1).init.cf.cacheTtlByStatus, { '200-299': 86_400, 404: 60, '500-599': 0 });
   assert.ok(laws.at(-1).init.signal);
 });
 

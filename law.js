@@ -104,7 +104,7 @@ Rules:
 // The law as Orbit Law publishes it ({ p, n, m, a: [[kind, key, text]] }),
 // kept a day at the edge; null when there's no such law.
 async function readLaw(p) {
-  const res = await fetch(`${LAW_BASE}${p}.json`, { cf: { cacheTtlByStatus: { "200-299": 86_400, "404": 60, "500-599": 0 }, cacheEverything: true }, signal: AbortSignal.timeout(8000) });
+  const res = await fetch(`${LAW_BASE}${p}.json`, { cf: { cacheTtlByStatus: { '200-299': 86_400, 404: 60, '500-599': 0 }, cacheEverything: true }, signal: AbortSignal.timeout(8000) });
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`law ${res.status}`);
   const j = await res.json();
