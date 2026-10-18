@@ -17,7 +17,7 @@ const HOLD = {
   single: 1 - 1 / 1.158,
   treble: 1 - ((1 / 1.158) ** 3 * (1 + (1.85 ** 3 - 1) * 1.05)) / 1.85 ** 3,
   draw: 0.5, // 電腦彩券 pays back about half
-  scratch: 0.32 // 刮刮樂 63-75% back
+  scratch: 0.34 // 刮刮樂 63-70% back
 };
 const MARKET = 0.07 / 12; // a diversified portfolio, a month
 const TRADE_COST = 0.006; // Taiwan round trip: commission both ways and the sell tax
