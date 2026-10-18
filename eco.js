@@ -46,7 +46,7 @@
 //   POST   /eco { op: 'admin', token, action }        the store's clean-up
 
 import { retire } from './money.js';
-import { SLIP_RULES } from './kit/play-odds.mjs';
+import { VIP, vipStakes, vipTier, WELCOME, welcomeEarned } from './kit/plus.mjs';
 import { storeReady } from './doc-store.js';
 import { tokenSecret, signToken, readToken, seal, unseal, sessionLimited, SESSION_MS, REFRESH_MS, HANDOFF_MS } from './quadra-token.js';
 import { handleAdmin } from './eco-admin.js';
@@ -86,9 +86,6 @@ export const ECO_APPS = {
 // ('eco': pay, Plus, merges). An app can't write 'eco' entries; the related
 // add-ons (Orbit Sports, Hub, Orbit Class) write none.
 const ENTRY_APPS = new Set(['stock', 'odds']);
-// Whose entries are rebuilt by the app from its own data: a merge doesn't
-// copy them (the app republishes its merged ledger).
-const LEDGER_APPS = new Set(['odds']);
 
 // (D1 holds a row of up to 2 MB.)
 export const WALLET_MAX_LENGTH = 1_800_000;
@@ -249,24 +246,8 @@ export function rankEntries(wallet, now) {
 // tier's share of them is paid back once the month is over, on the first
 // read after it (`eco:vip:<month>`, kind 'vip', the tier in the note). Every
 // product keeps 14% or more of its stakes; the top rate is 1.5%.
-export const VIP = {
-  from: '2026-10',
-  tiers: [
-    { id: 'bronze', min: 10_000, back: 0.005 },
-    { id: 'silver', min: 50_000, back: 0.008 },
-    { id: 'gold', min: 150_000, back: 0.012 },
-    { id: 'black', min: 500_000, back: 0.015 }
-  ]
-};
-export function vipStakes(wallet, month) {
-  let sum = 0;
-  for (const e of wallet?.entries || []) {
-    if (e.app !== 'odds' || typeof e.t !== 'number' || taipeiMonth(e.t) !== month) continue;
-    if (e.kind === 'stake' || e.kind === 'lottery' || e.kind === 'refund') sum -= e.amount;
-  }
-  return Math.max(0, Math.round(sum));
-}
-export const vipTier = stakes => [...VIP.tiers].reverse().find(t => stakes >= t.min) ?? null;
+// (The table and a month's stakes are the kit's, plus.mjs: one copy.)
+export { VIP, vipStakes, vipTier };
 export function vipEntries(wallet, now) {
   const have = new Set((wallet?.entries || []).map(e => e.id));
   const month = taipeiMonth(now);
@@ -281,13 +262,13 @@ export function vipEntries(wallet, now) {
 }
 // The welcome offer: after the first paid bet in Play, a NT$WELCOME.bet free
 // bet (`eco:fb:welcome`, once per account; 7 days, like every free bet). A
-// paid bet is a ticket's worth at least (Play's smallest, SLIP_RULES
-// minTicket): an app may write a stake of its own (a spend), so a NT$0.01
-// one, or a free bet's NT$0.01 top-up, would buy NT$200 otherwise.
-export const WELCOME = { bet: 200, minStake: SLIP_RULES.minTicket };
+// qualifying bet is one stake of a ticket's worth at least (plus.mjs
+// welcomeEarned, the kit's rule): an app may write a stake of its own (a
+// spend), so a NT$0.01 one, or a free bet's top-up, would buy NT$200 otherwise.
+export { WELCOME };
 export function welcomeEntries(wallet, now) {
   const entries = wallet?.entries || [];
-  if (entries.some(e => e.id === 'eco:fb:welcome') || !entries.some(e => e.app === 'odds' && e.kind === 'stake' && e.amount <= -WELCOME.minStake)) return [];
+  if (entries.some(e => e.id === 'eco:fb:welcome') || !welcomeEarned(wallet)) return [];
   return [{ id: 'eco:fb:welcome', t: now, app: 'eco', kind: 'freebet', amount: 0, note: String(WELCOME.bet) }];
 }
 export { WEEK };
@@ -464,6 +445,18 @@ export const stamped = (entries, wallet, now) => {
   const have = new Set((wallet?.entries || []).map(e => e.id));
   return entries.map(e => (have.has(e.id) ? e : { ...e, t: now }));
 };
+
+// Settings and figures (newest wins) dated no later than this Worker's now:
+// a phone clock set ahead stamped them in the future, and then every later
+// change, from any device, lost to them (the server's time wins).
+const clampTimes = (map, now) => {
+  if (!isObj(map) || !Object.values(map).some(v => v?.t > now)) return map;
+  return Object.fromEntries(Object.entries(map).map(([k, v]) => [k, v?.t > now ? { ...v, t: now } : v]));
+};
+export function atMostNow(w, now) {
+  const [snap, settings] = [clampTimes(w?.snap, now), clampTimes(w?.settings, now)];
+  return !w || (snap === w.snap && settings === w.settings) ? w : { ...w, snap, settings };
+}
 
 // What a client may send to change the wallet.
 export function cleanPatch(patch) {
@@ -657,7 +650,8 @@ export async function handleEcoRequest(request, env, headers, ip, deps) {
           if (!isActive(w, claims)) return (refused = 'ECO_SESSION_MOVED'), w;
           // What falls due with the write comes with it (fixed ids: never
           // twice): the welcome bonus bet right after a first bet.
-          const patch = cleanPatch(body.wallet);
+          const patch = atMostNow(cleanPatch(body.wallet), now);
+          w = atMostNow(w, now);
           // A save of the app's data alone (nothing for the wallet, no
           // payday due, the app's last use noted within 10 minutes): the
           // wallet isn't rewritten (it was, whole, at every save: Words saves
@@ -1122,15 +1116,26 @@ async function ecoMerge(ctx) {
         }
       }
 
-  // Money: every entry except the ones an app rebuilds from its own data,
-  // under a new id so two passes' ids can't collide (the Worker's pay keeps
-  // its id: one month's pay is one entry, whichever pass it came through);
-  // shared cash figures whose app data didn't come along, as one entry each.
+  // Money: every entry, Play's too (since the lock-down an app can't write
+  // its winnings back, so its merged ledger can't bring them), under its own
+  // id: Play's slips and tickets and Securities' deposits are checked by it
+  // (`odds:stake-<slip>`, `x:<id>`), and the Worker's pay is one entry a
+  // month whichever pass it came through. An id this pass already has for a
+  // different entry is renamed; shared cash figures whose app data didn't
+  // come along, as one entry each.
   const carried = [];
   const settings = {};
+  const target = parseWallet((await deps.fsGet(env, WALLET_COLLECTION, targetId)).payload || '');
+  const held = new Map((target?.entries || []).map(e => [e.id, e]));
+  const same = (x, y) => x.amount === y.amount && x.t === y.t && x.app === y.app && x.kind === y.kind;
   for (const [k, src] of found.entries()) {
     const tag = `m${now.toString(36)}${k}`;
-    for (const e of src.wallet.entries) if (!LEDGER_APPS.has(e.app)) carried.push(e.id.startsWith('eco:') ? e : { ...e, id: `${tag}:${e.id}`.slice(0, 96) });
+    for (const e of src.wallet.entries) {
+      const had = held.get(e.id);
+      const entry = !had || e.id.startsWith('eco:') || same(had, e) ? e : { ...e, id: `${tag}:${e.id}`.slice(0, 96) };
+      if (!held.has(entry.id)) held.set(entry.id, entry);
+      carried.push(entry);
+    }
     for (const [app, s] of Object.entries(src.wallet.snap || {})) {
       // (Securities' cash is the Worker's own count; no other app's figure is money.)
       if (app !== 'stock' || !finite(s.cash) || src.data[app]) continue;
@@ -1139,7 +1144,16 @@ async function ecoMerge(ctx) {
     for (const [key, v] of Object.entries(src.wallet.settings || {})) if (!settings[key] || v.t > settings[key].t) settings[key] = v;
   }
   const mergedApps = [...new Set(found.flatMap(s => Object.keys(s.data)))];
-  const result = await updateWallet(env, deps, targetId, w => ({ ...mergeWallet(w, { entries: carried, settings, inbox: inboxAdd }), merged: { t: now, apps: mergedApps } }));
-  for (const src of found) await deleteAccount(env, deps, src.docId);
+  let result = await updateWallet(env, deps, targetId, w => ({ ...mergeWallet(w, { entries: carried, settings, inbox: inboxAdd }), merged: { t: now, apps: mergedApps } }));
+  // What this Worker still watches for a source (Play's slips and tickets,
+  // Securities' fills book) goes to this pass, then anything it paid the
+  // source meanwhile comes along too (the same ids: nothing twice).
+  for (const src of found) {
+    await deps.moveRecords?.(env, src.docId, targetId, now);
+    const late = parseWallet((await deps.fsGet(env, WALLET_COLLECTION, src.docId)).payload || '');
+    const fresh = (late?.entries || []).filter(e => !held.has(e.id));
+    if (fresh.length) result = await updateWallet(env, deps, targetId, w => mergeWallet(w, { entries: fresh }));
+    await deleteAccount(env, deps, src.docId);
+  }
   return json({ moved, wallet: publicWallet(result.wallet), walletTime: result.updateTime, pool: poolBalance(result.wallet) }, 200, headers);
 }

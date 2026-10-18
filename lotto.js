@@ -16,8 +16,9 @@
 // tables, so the same amount, never twice.
 import { GAMES, buyTicket, settleTicket, drawFor } from './kit/play-lottery.mjs';
 import { CARDS, drawPrize } from './kit/play-scratch.mjs';
+import { prizeAfterTax } from './kit/play-odds.mjs';
 import { updateWallet, poolBalance } from './eco.js';
-import { parseDoc, changeDoc } from './doc-store.js';
+import { parseDoc, changeDoc, moveOwned } from './doc-store.js';
 
 export const TICKET_COLLECTION = 'odds-tickets';
 export const TICKET_INDEX = '_index';
@@ -36,10 +37,13 @@ const BOTTOMLESS = { v: 1, created: '', ledger: [{ id: 'x', amount: 1e12 }], sli
 const cryptoUnit = () => crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32;
 const cryptoSeed = () => crypto.getRandomValues(new Uint32Array(1))[0] >>> 1;
 // A lottery prize over NT$5,000 is taxed (20% and 0.4% stamp duty), as Play's.
-const netPrize = gross => (gross > 5_000 ? Math.round(gross * 0.796) : gross);
+const netPrize = prizeAfterTax;
 
 const asIndex = index => (index && typeof index.due === 'object' ? index : { due: {} });
 const changeIndex = (env, deps, change) => changeDoc(env, deps, TICKET_COLLECTION, TICKET_INDEX, change, { read: asIndex }).then(r => r ?? null);
+// A pass merged into another: its tickets waiting for a draw go with its
+// money (eco.js merge), so a prize is paid to the pass that bought them.
+export const moveTickets = (env, deps, from, to) => moveOwned(env, deps, TICKET_COLLECTION, TICKET_INDEX, from, to);
 // Entries into the wallet with the cost checked against the pool at the
 // moment of writing; true when they're in.
 async function charge(env, deps, account, entries, cost) {
