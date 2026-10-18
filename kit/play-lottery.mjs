@@ -494,15 +494,22 @@ export function buyTicket(account, { id, game, sel, multiple = 1 }, now = new Da
   return { account: { ...account, updated: t, ledger: [...account.ledger, entry], tickets: [ticket, ...(account.tickets || [])] }, ticket };
 }
 
-// A drawn ticket settled: its prize (every bet and multiple) paid in, taxed
-// like any lottery prize over NT$5,000 (20% income tax, 0.4% stamp duty).
+// A drawn ticket settled: its prize (every bet and multiple) paid in. Tax is
+// withheld bet by bet (注), as Taiwan Lottery does: each bet's prize over
+// NT$5,000 loses 20% income tax and 0.4% stamp duty; bets of NT$5,000 or less
+// are paid whole, however many the ticket won (a 樂合彩 combination and each
+// of a multiple is a bet of its own).
 export function settleTicket(account, ticketId, draw, now = new Date()) {
   const ticket = (account.tickets || []).find(x => x.id === ticketId);
   if (!ticket || ticket.status !== 'open' || !draw) return account;
+  const g = GAMES[ticket.game];
   const r = ticketPrize(ticket, draw);
+  const multiple = ticket.multiple || 1;
   // BINGO's prize already counts its multiple (it's a multiple of the stake).
-  const gross = r.prize * (ticket.game === 'bingo' ? 1 : ticket.multiple || 1);
-  const net = prizeAfterTax(gross);
+  const gross = r.prize * (ticket.game === 'bingo' ? 1 : multiple);
+  // One bet's prize, and how many bets won it.
+  const each = g.combo ? g.combo.sizes[ticket.sel.size] : ticket.game === 'bingo' ? r.prize / multiple : r.prize;
+  const net = each ? Math.round(gross / each) * prizeAfterTax(each) : 0;
   const t = now.toISOString();
   const settled = { ...ticket, status: 'settled', prize: net, gross, tier: r.tier, detail: r.detail, drawn: summarize(draw), settledAt: t };
   const ledger = net > 0 && !account.ledger.some(e => e.id === `prize-${ticketId}`) ? [...account.ledger, { id: `prize-${ticketId}`, t, kind: 'prize', amount: net }] : account.ledger;

@@ -393,12 +393,26 @@ test('lottery tickets: checked, bought at their draw, settled once with the tax,
   assert.equal(bought.ticket.draw.date, '2026-10-19');
   assert.equal(bought.ticket.cost, 300);
   assert.equal(buyTicket({ ledger: [] }, { id: 't', game: 'super638', sel: { zones: [[1, 2, 3, 4, 5, 6], [7]] } }, now).error, 'funds');
-  // 3 × NT$150,000 (5 + the second zone): taxed as one prize of 450,000.
+  // 3 × NT$150,000 (5 + the second zone): each bet taxed, 3 × 119,400.
   const won = settleTicket(bought.account, 't1', { numbers: [1, 2, 3, 4, 5, 40], zone2: 7, pools: {} }, now);
   assert.equal(won.tickets[0].gross, 450_000);
   assert.equal(won.tickets[0].prize, 358_200);
   assert.equal(won.ledger.at(-1).amount, 358_200);
   assert.equal(settleTicket(won, 't1', { numbers: [1, 2, 3, 4, 5, 6], zone2: 7, pools: {} }, now), won, 'settled once');
+  // Tax is withheld bet by bet, never on the ticket's total: six 二合 of
+  // NT$1,250 (7,500 together) paid whole; a 三合 of NT$12,500 taxed on its own;
+  // ten BINGO multiples of NT$1,000 paid whole.
+  const pay = (game, sel, draw, multiple = 1) => {
+    const b = buyTicket({ ledger: [{ id: 'start', amount: 100_000, t: '' }], tickets: [] }, { id: 'x', game, sel, multiple }, now);
+    return settleTicket(b.account, 'x', draw, now).tickets[0];
+  };
+  const six = { numbers: [1, 2, 3, 4, 5, 6] };
+  const pairs = pay('m49', { numbers: [1, 2, 3, 30], size: 2 }, six, 2);
+  assert.deepEqual([pairs.gross, pairs.prize], [7_500, 7_500], 'six bets of NT$1,250: none taxed');
+  const triples = pay('m49', { numbers: [1, 2, 3, 4, 30], size: 3 }, six);
+  assert.deepEqual([triples.gross, triples.prize], [4 * 12_500, 4 * 9_950], 'four bets of NT$12,500, each taxed');
+  const stars = pay('bingo', { numbers: [41, 43, 45, 47] }, { numbers: Array.from({ length: 20 }, (_, i) => 41 + i * 2), bull: 79 }, 10);
+  assert.deepEqual([stars.gross, stars.prize], [10_000, 10_000], 'ten bets of NT$1,000: none taxed');
   const open = bought.account.tickets[0];
   const settled = won.tickets[0];
   assert.equal(mergeTickets([open], [settled])[0].status, 'settled');

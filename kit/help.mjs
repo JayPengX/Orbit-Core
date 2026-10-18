@@ -263,7 +263,7 @@ export const HELP = {
         '免費投注：Plus 會員每週一張和新手禮，在投注單上點一下就用在這張單（單場或一組串關），賠率要 1.50 以上（串關看總賠率），贏了只拿獎金、不退本金，7 天內有效。'
       ]],
       ['money', '錢怎麼算', [
-        '下注和買彩券從 Quadra 餘額扣款；派彩、兌現和彩券獎金都由伺服器入帳，並通知你。彩券獎金超過 NT$5,000 照規定扣 20% 所得稅和 0.4% 印花稅。',
+        '下注和買彩券從 Quadra 餘額扣款；派彩、兌現和彩券獎金都由伺服器入帳，並通知你。彩券獎金照規定每注計算：單注超過 NT$5,000 扣 20% 所得稅和 0.4% 印花稅。',
         '每個月的投注決定 VIP 等級，下個月回饋一部分，詳見 Quadra Pass 的說明。'
       ]]
     ],
@@ -296,7 +296,7 @@ export const HELP = {
         'Free bets (Plus’s weekly one and the welcome offer): one tap on the slip uses it on that slip (singles of one pick or one parlay), at odds of 1.50 or more (a parlay’s together); a win pays the winnings, not the stake; 7 days to use it.'
       ]],
       ['money', 'Money', [
-        'Bets and tickets come out of the Quadra balance; payouts, cash outs and prizes are paid in by the server, and you’re told. Lottery prizes over NT$5,000 have 20% income tax and 0.4% stamp duty withheld, by law.',
+        'Bets and tickets come out of the Quadra balance; payouts, cash outs and prizes are paid in by the server, and you’re told. Lottery prizes are taxed bet by bet, by law: each bet paying over NT$5,000 has 20% income tax and 0.4% stamp duty withheld.',
         'What you stake each month sets your VIP tier, and part of it comes back the month after: see the Quadra Pass’s guide.'
       ]]
     ]
