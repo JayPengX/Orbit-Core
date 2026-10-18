@@ -561,6 +561,8 @@ export function placeOrder(account, req, { quote, rates, valuation, now = Date.n
   // sales, forced or to cover, it splits itself.)
   const mixed = !req.forced && !req.cover && mixedLot(quote.market, quote.kind, qty);
   if (mixed) return { error: 'mixedLot', ...mixed };
+  // Taiwan's odd lots (盤中 and 盤後零股) take limit orders only (TWSE: 以限價為之).
+  if (!req.forced && !req.cover && type !== 'limit' && isOddLot(quote.market, quote.kind, qty)) return { error: 'oddLotLimit' };
   // China's T+1: shares bought today can be sold from the next trading day.
   if (side === 'sell' && quote.market === 'CN') {
     const today = localDayOf(now, 'CN');
