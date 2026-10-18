@@ -259,9 +259,9 @@ function pointsMarket(label, type, outs, sideOf) {
   return null;
 }
 
+// (Hockey's 60-minute winner is the board's own 不讓分, three ways.)
 function hockeyMarket(label, type, outs, sideOf, flip) {
-  if (label === 'Match Odds - Regular Time' && type === 'Match') return threeWay('regulation', 'regulation', outs, sideOf);
-  if (label === 'Both Teams To Score - Including Overtime and Penalty Shootout' && type === 'Yes/No') return yesNo('btts', 'btts', outs);
+  if (label === 'Both Teams To Score - Regular Time' && type === 'Yes/No') return yesNo('btts', 'btts', outs);
   return null;
 }
 

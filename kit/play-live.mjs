@@ -17,7 +17,7 @@
 // (kambi.mjs, parseKambiInPlay), the margin taken out.
 import { fitted, fitTeamRuns, TEAM_RUNS_DISPERSION, GOALS_DISPERSION, estimateLineOdds, round2 } from '#kit/play-odds.mjs';
 import { pointsModel, pointsMarkets, normalCdf, normalQuantile, SCORE_SPREAD } from '#kit/play-markets.mjs';
-import { isSoccer } from '#kit/play-teams.mjs';
+import { isSoccer, familyOf } from '#kit/play-teams.mjs';
 
 export const LIVE_OVERROUND = 1.16;
 // Polymarket's live winner price counts only with this much money behind it.
@@ -151,8 +151,8 @@ export function liveMarkets(dist, { sport, awayScore, homeScore, pm = null }) {
   const add = (kind, market, picks, extra = {}) => {
     for (const pick of picks) bets.push({ kind, market, ...extra, ...pick });
   };
-  // Winner.
-  if (isSoccer(sport)) {
+  // Winner: soccer's and hockey's (its 60 minutes', as 台灣運彩 sells it) three ways.
+  if (isSoccer(sport) || familyOf(sport) === 'hockey') {
     const home = chance(dist, (a, h) => h > a);
     const away = chance(dist, (a, h) => a > h);
     add('ml', 'ml', [
@@ -239,24 +239,16 @@ export function shareLeft(sport, period, clock) {
   return Math.min(1, ((n - period) * minutes * 60 + inPeriod) / whole);
 }
 
-// Hockey: each team's goals still to come, a share of its game mean; a tie at
-// the end goes to overtime, split by the teams' strength.
+// Hockey: each team's goals still to come in its 60 minutes, a share of its
+// game mean (every hockey market is on 60 minutes: a tie stays a tie).
 export function liveGoals({ means, awayScore, homeScore, share }) {
   const A = nbPmf(means.away * share, GOALS_DISPERSION, 15);
   const H = nbPmf(means.home * share, GOALS_DISPERSION, 15);
-  const homeExtra = means.home / (means.home + means.away);
   const out = [];
   for (let a = 0; a < A.length; a++) {
     for (let h = 0; h < H.length; h++) {
       const p = A[a] * H[h];
-      if (p < 1e-10) continue;
-      const fa = awayScore + a;
-      const fh = homeScore + h;
-      if (fa !== fh) out.push({ away: fa, home: fh, p });
-      else {
-        out.push({ away: fa, home: fh + 1, p: p * homeExtra });
-        out.push({ away: fa + 1, home: fh, p: p * (1 - homeExtra) });
-      }
+      if (p >= 1e-10) out.push({ away: awayScore + a, home: homeScore + h, p });
     }
   }
   return out;
