@@ -1,5 +1,6 @@
-// Orbit Law's /law-ask: a law's articles read here, Gemini's answer checked
-// against them, kept by the law's version, and a day's calls capped.
+// Orbit Law's /law-ask: a Pass of Orbit Law's, a law's articles read here,
+// Gemini's answer checked against them, kept by the law's version, and a
+// Pass's day capped.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeD1 } from './fake-d1.mjs';
@@ -23,17 +24,33 @@ globalThis.fetch = async (url, init) => {
 };
 const worker = (await import('../worker.js')).default;
 const { LAW_LIMITS, checkAnswer, citeKey, readAsk, forgetLawCounts } = await import('../law.js');
+const { signToken } = await import('../quadra-token.js');
 const ctx = { waitUntil: p => p };
 
 function fakeKV() {
   const m = new Map();
   return { m, get: async (k, o) => (m.has(k) ? (o?.type === 'json' ? JSON.parse(m.get(k)) : m.get(k)) : null), put: async (k, v) => void m.set(k, v) };
 }
-const envOf = () => ({ GEMINI_API_KEY: 'k', STORE: fakeD1(), RATE_LIMIT_KV: fakeKV() });
-let ipN = 0;
-const ask = (body, { origin = 'https://jaypengx.github.io', ip = `198.51.100.${++ipN}`, env = envOf() } = {}) =>
-  worker.fetch(new Request('https://proxy.test/law-ask', { method: 'POST', headers: { Origin: origin, 'CF-Connecting-IP': ip, 'Content-Type': 'application/json' }, body: typeof body === 'string' ? body : JSON.stringify(body) }), env, ctx);
+const envOf = () => ({ GEMINI_API_KEY: 'k', ECO_TOKEN_SECRET: 'test-secret', STORE: fakeD1(), RATE_LIMIT_KV: fakeKV() });
+// A session of the Pass `pass` in the app `a`, as the kit sends it (`qt=`).
+const qtOf = (pass, { a = 'law', e = Date.now() + 600_000 } = {}) => signToken('test-secret', { k: 'ses', d: pass, s: `s-${pass}`, a, e });
+let passN = 0;
+const ask = async (body, { origin = 'https://jaypengx.github.io', pass = `acct${++passN}`, qt, ip = '198.51.100.1', env = envOf() } = {}) => {
+  const token = qt === undefined ? await qtOf(pass) : qt;
+  const url = `https://proxy.test/law-ask?v=1${token ? `&qt=${encodeURIComponent(token)}` : ''}`;
+  return worker.fetch(new Request(url, { method: 'POST', headers: { Origin: origin, 'CF-Connecting-IP': ip, 'Content-Type': 'text/plain' }, body: typeof body === 'string' ? body : JSON.stringify(body) }), env, ctx);
+};
 const OK = { p: 'B0000001', arts: ['15-1', '15'], q: '誰可以聲請輔助宣告？', lang: 'zh' };
+
+test('no Pass of Orbit Law\'s is a 401 {error:"pass"}, before anything is read or asked', async () => {
+  const before = [laws.length, gemini.length];
+  for (const qt of [null, await qtOf('x', { a: 'stock' }), await qtOf('x', { e: Date.now() - 1 }), 'forged.token']) {
+    const r = await ask(OK, { qt });
+    assert.equal(r.status, 401);
+    assert.deepEqual(await r.json(), { error: 'pass' });
+  }
+  assert.deepEqual([laws.length, gemini.length], before);
+});
 
 test('the ask is checked before anything is read', async () => {
   for (const bad of [{ ...OK, p: 'b0000001' }, { ...OK, p: 'B000001' }, { ...OK, arts: [] }, { ...OK, arts: Array.from({ length: 9 }, (_, i) => String(i + 1)) }, { ...OK, arts: ['15之1'] }, { ...OK, lang: 'jp' }, { ...OK, q: 'x'.repeat(301) }, { ...OK, q: 5 }]) {
@@ -81,7 +98,7 @@ test('a point citing an article not given, or nothing, is dropped', async () => 
   assert.equal(j.covered, true);
   assert.deepEqual(j.law, { p: 'B0000001', n: '民法', m: '20250101' });
   assert.equal(j.cached, false);
-  assert.equal(j.left, LAW_LIMITS.perIp - 1);
+  assert.equal(j.left, LAW_LIMITS.perPass - 1);
   // No point left: not covered, whatever the model said.
   assert.deepEqual(checkAnswer({ answer: 'x', points: [{ text: 'y', cites: ['16'] }], covered: true }, ['15']), { answer: 'x', points: [], covered: false });
   assert.deepEqual(checkAnswer({ answer: 'x', points: [{ text: 'y', cites: ['15', '第16條'] }], covered: true }, ['15', '16']).points[0].cites, ['15', '16']);
@@ -90,17 +107,17 @@ test('a point citing an article not given, or nothing, is dropped', async () => 
 
 test('the same ask again is kept and free; a new version of the law asks again', async () => {
   const env = envOf();
-  const ip = '203.0.113.9';
-  const first = await (await ask({ ...OK, q: '誰可以 聲請？' }, { env, ip })).json();
+  const pass = 'kept';
+  const first = await (await ask({ ...OK, q: '誰可以 聲請？' }, { env, pass })).json();
   const calls = gemini.length;
-  const again = await (await ask({ ...OK, arts: ['15', '15-1'], q: ' 誰可以   聲請？ ' }, { env, ip })).json();
+  const again = await (await ask({ ...OK, arts: ['15', '15-1'], q: ' 誰可以   聲請？ ' }, { env, pass })).json();
   assert.equal(gemini.length, calls);
   assert.equal(again.cached, true);
   assert.equal(again.left, first.left);
   assert.deepEqual(again.points, first.points);
   LAW.m = '20260101';
   try {
-    const fresh = await (await ask({ ...OK, q: '誰可以 聲請？' }, { env, ip })).json();
+    const fresh = await (await ask({ ...OK, q: '誰可以 聲請？' }, { env, pass })).json();
     assert.equal(fresh.cached, false);
     assert.equal(gemini.length, calls + 1);
     assert.equal(fresh.left, first.left - 1);
@@ -109,40 +126,44 @@ test('the same ask again is kept and free; a new version of the law asks again',
   }
 });
 
-test('an address past 20 calls a day, or the day past 500, is a 429 {error:"cap", left:0}; kept answers still come', async () => {
+test('a Pass past 40 calls a day, or the day past 300, is a 429 {error:"cap", left:0}; kept answers still come; counted per Pass, not per address', async () => {
   forgetLawCounts();
   const env = envOf();
   const day = new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 10);
-  // A cached answer first, then the address's count at the cap.
-  const ip = '203.0.113.30';
-  assert.equal((await ask(OK, { env, ip })).status, 200);
-  await env.STORE.prepare("UPDATE law_day SET n = ?1 WHERE k LIKE '%|ip:%'").bind(LAW_LIMITS.perIp).run();
+  // A cached answer first (another address, the same Pass: the same count),
+  // then the Pass's count at the cap.
+  const pass = 'capped';
+  assert.equal((await ask(OK, { env, pass, ip: '203.0.113.29' })).status, 200);
+  assert.equal((await (await ask({ ...OK, q: 'two' }, { env, pass, ip: '203.0.113.30' })).json()).left, LAW_LIMITS.perPass - 2);
+  await env.STORE.prepare("UPDATE law_day SET n = ?1 WHERE k LIKE '%|ask:%'").bind(LAW_LIMITS.perPass).run();
   const before = gemini.length;
-  const capped = await ask({ ...OK, q: 'another' }, { env, ip });
+  const capped = await ask({ ...OK, q: 'another' }, { env, pass });
   assert.equal(capped.status, 429);
   assert.deepEqual(await capped.json(), { error: 'cap', left: 0 });
   assert.equal(capped.headers.get('Access-Control-Allow-Origin'), 'https://jaypengx.github.io');
-  const hit = await ask(OK, { env, ip });
+  const hit = await ask(OK, { env, pass });
   assert.equal(hit.status, 200);
   assert.deepEqual([(await hit.clone().json()).cached, (await hit.json()).left], [true, 0]);
-  // The day's in all: another address is turned away too.
+  // Another Pass on the same address has its own count…
+  assert.equal((await ask({ ...OK, q: 'own' }, { env, pass: 'other', ip: '203.0.113.30' })).status, 200);
+  // …until the day's in all is spent.
   await env.STORE.prepare('UPDATE law_day SET n = ?1 WHERE k = ?2').bind(LAW_LIMITS.perDay, `${day}|g`).run();
-  const other = await ask({ ...OK, q: 'third' }, { env, ip: '203.0.113.31' });
+  const other = await ask({ ...OK, q: 'third' }, { env, pass: 'third' });
   assert.equal(other.status, 429);
-  assert.equal(gemini.length, before);
-  // A capped address adds nothing to the day's count.
+  assert.equal(gemini.length, before + 1);
+  // A capped Pass adds nothing to the day's count.
   const g = await env.STORE.prepare('SELECT n FROM law_day WHERE k = ?1').bind(`${day}|g`).first();
   assert.equal(g.n, LAW_LIMITS.perDay + 1);
 });
 
 test('the count is spent only on a real call; a store that fails turns the ask away', async () => {
   const env = envOf();
-  const ip = '203.0.113.40';
-  await ask(OK, { env, ip });
-  for (let i = 0; i < 3; i++) assert.equal((await (await ask(OK, { env, ip })).json()).left, LAW_LIMITS.perIp - 1);
+  const pass = 'spent';
+  await ask(OK, { env, pass });
+  for (let i = 0; i < 3; i++) assert.equal((await (await ask(OK, { env, pass })).json()).left, LAW_LIMITS.perPass - 1);
   const broken = { ...envOf(), STORE: { prepare: () => ({ bind: () => ({ first: async () => { throw new Error('d1'); }, run: async () => { throw new Error('d1'); } }), run: async () => { throw new Error('d1'); } }) } };
   const before = gemini.length;
-  assert.equal((await ask(OK, { env: broken, ip: '203.0.113.41' })).status, 429);
+  assert.equal((await ask(OK, { env: broken })).status, 429);
   assert.equal(gemini.length, before);
 });
 

@@ -624,8 +624,6 @@ if (!live) await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.worker
 const stockDocs = new Map();
 await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(?!weather|push|transit|sports-proxy|data\/)/, async route => {
   const req = route.request();
-  // Orbit Law's answers: the real route with --live (it serves any localhost page).
-  if (live && new URL(req.url()).pathname === '/law-ask') return route.continue();
   const body = req.postDataJSON?.() || {};
   // Quadra Play's slips (settle.js): placing checks every pick's price on
   // today's real data with the Worker's own check (price.js); nothing settled.
