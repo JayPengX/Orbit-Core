@@ -107,3 +107,14 @@ test('a Taiwan market or stop order holds, and counts against 當沖額度, at t
   assert.equal(sell({ type: 'stop', stop: 500 }, 's').order.dayTradeTWD, 572_000);
   assert.equal(SA.placeOrder(trader, { side: 'sell', qty: 1000, type: 'market' }, { quote: tw(560), rates, valuation: v, now, id: 'x' }).error, 'dayTradeLimit', '616,000 of 600,000');
 });
+
+test('Taiwan odd lots take limit orders only (盤中 and 盤後零股: 以限價為之)', () => {
+  const acc = SA.newAccount(1_000_000, now - DAY, 'acc');
+  const buy = (req, at = now) => SA.placeOrder(acc, { side: 'buy', qty: 500, ...req }, { quote: tw(100), rates, valuation: ok, now: at, id: 'o' });
+  assert.equal(buy({ type: 'market' }).error, 'oddLotLimit');
+  assert.equal(buy({ type: 'stop', stop: 101 }).error, 'oddLotLimit');
+  assert.equal(buy({ type: 'market' }, Date.parse('2026-10-13T06:00:00Z')).error, 'oddLotLimit', '盤後零股 too');
+  assert.equal(buy({ type: 'limit', limit: 100 }).error, undefined);
+  assert.equal(SA.placeOrder(acc, { side: 'buy', qty: 1000, type: 'market' }, { quote: tw(100), rates, valuation: ok, now, id: 'w' }).error, undefined, 'whole lots: market is fine');
+  assert.equal(SA.placeOrder(acc, { side: 'buy', qty: 5, type: 'market' }, { quote: { ...tw(100), market: 'US', symbol: 'AAPL', currency: 'USD' }, rates: { TWD: 1, USD: 32 }, valuation: ok, now, id: 'u' }).error !== 'oddLotLimit', true);
+});
