@@ -161,3 +161,13 @@ test("a phone clock set ahead never holds a save back: what it did is counted at
   assert.equal(JSON.parse(d.store.get(`${VERIFIED_COLLECTION}/acct`)).adj?.[div.id], undefined);
   assert.equal(r2.cash, 100_000 - 32_000);
 });
+
+test('複委託 is cash only: a foreign purchase\'s loan and a foreign short sale never count', async () => {
+  const usFill = (id, side, price, qty, more = {}) => ({ ...fill(id, side, price, qty, T, { symbol: 'AAPL', market: 'US', currency: 'USD', twd: 32, ...more }) });
+  const acct = account([...start, { id: 'fx:u', type: 'fx', t: T - 1000, from: 'TWD', to: 'USD', amount: 32_000, received: 1000, twdFrom: 1, twdTo: 32 }]);
+  const buy = usFill('b1', 'buy', 100, 10, { financed: 500 });
+  assert.equal(await checkEvent({ id: 'loan:b1', type: 'borrow', t: T, currency: 'USD', amount: 500, rate: 0.075, symbol: 'AAPL' }, { ...acct, events: [...acct.events, buy] }, null, null, {}, { now: T }), 'bad');
+  const d = deps({ s1: { quote: 100, t: T, s: 'AAPL', side: 'sell', q: 5, k: 'limit', l: 100 } });
+  const r = await check(d, [acct.events[1], usFill('s1', 'sell', 100, 5, { quote: 100 })], T + 2000);
+  assert.deepEqual(r.refused, ['fill:s1']);
+});

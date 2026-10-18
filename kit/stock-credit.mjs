@@ -3,10 +3,10 @@
 // extend it), and day trading (現股當沖). Pure functions over the account
 // log; account.mjs applies them to orders and fills.
 //
-// The credit account gates margin and borrowed shorts in every market (as
-// a Taiwan broker's 複委託 would); the limit, the terms and 融券's deposit
-// are Taiwan's own. Margin elsewhere is lent and called by account.mjs's
-// rules (the US's Reg T and the like). A currency pair sold borrows nothing.
+// The credit account is Taiwan's: 融資 and 融券 on Taiwan stocks only. A
+// foreign stock (複委託) is cash only, no margin and no short (markets.mjs
+// isSubBrokered); a crypto short needs the credit account open too. A currency pair sold
+// borrows nothing.
 import { addMonths } from '#kit/stock-savings.mjs';
 import { localDayOf } from '#kit/stock-markets.mjs';
 import { isTradingDay } from '#kit/stock-holidays.mjs';

@@ -46,3 +46,31 @@ test('Stock Connect northbound shuts exactly when Hong Kong or the mainland does
   // 10-19: Hong Kong's 重陽 holiday; 10-08, the day after the mainland's Golden Week: open; HK's half day 12-24: open all day.
   assert.deepEqual([open('2026-10-19'), open('2026-10-08'), open('2026-12-24', '14:00')], [false, true, true]);
 });
+
+// A Tuesday 10:00 in New York, the US open.
+const NOW = at('2026-10-13T10:00');
+const usSession = { start: at('2026-10-13T09:30'), end: at('2026-10-13T16:00') };
+const us = (symbol = 'AAPL', price = 250, more = {}) => ({ symbol, name: symbol, kind: 'stock', market: 'US', currency: 'USD', price, prev: price, got: NOW, marketTime: NOW, session: usSession, tz: 'America/New_York', ...more });
+const RATES = { TWD: 1, USD: 32, HKD: 4, JPY: 0.21, CNY: 4.4, KRW: 0.023 };
+const OK = { margin: 'ok', netWorth: 5_000_000, assets: 5_000_000, debtTWD: 0, shortTWD: 0, positions: [] };
+// An account two years old with a credit account open and cash in each currency.
+const rich = () => {
+  const acc = SA.newAccount(1_000_000, NOW - 800 * DAY, 'acc');
+  const cash = Object.keys(RATES).filter(c => c !== 'TWD').map(c => ({ id: `deposit:${c}`, type: 'deposit', t: NOW - 700 * DAY, currency: c, amount: 1e9 }));
+  return { ...acc, events: [...acc.events, ...cash, { id: 'credit:1', type: 'credit', t: NOW - DAY, limit: 1_000_000 }] };
+};
+
+test('複委託 is cash only: no 融資 and no short on a foreign stock, credit account or not; Taiwan 融資 and a crypto short as before', () => {
+  assert.equal(SM.isSubBrokered('US') && SM.isSubBrokered('JP') && SM.isSubBrokered('INTL'), true);
+  assert.equal(SM.isSubBrokered('TW') || SM.isSubBrokered('CRYPTO') || SM.isSubBrokered('FX'), false);
+  const acc = rich();
+  const place = (req, quote) => SA.placeOrder(acc, req, { quote, rates: RATES, valuation: OK, now: NOW, id: 'o1' });
+  assert.equal(place({ side: 'buy', type: 'limit', limit: 250, qty: 10, margin: true }, us()).error, 'cashOnly');
+  assert.deepEqual(place({ side: 'sell', type: 'limit', limit: 250, qty: 10 }, us()), { error: 'cashOnly', have: 0 });
+  const tw = { symbol: '2330.TW', name: 'TSMC', kind: 'stock', market: 'TW', currency: 'TWD', price: 1000, prev: 1000, got: NOW, marketTime: Date.parse('2026-10-13T02:00:00Z'), tz: 'Asia/Taipei', session: { start: Date.parse('2026-10-13T01:00:00Z'), end: Date.parse('2026-10-13T05:30:00Z') } };
+  const r = SA.placeOrder(acc, { side: 'buy', type: 'limit', limit: 1000, qty: 1000, margin: true }, { quote: tw, rates: RATES, valuation: OK, now: Date.parse('2026-10-13T02:00:00Z'), id: 'o2' });
+  assert.equal(r.error, undefined);
+  assert.equal(r.order.margin, 0.6);
+  const btc = { symbol: 'BTC-USD', name: 'Bitcoin', kind: 'crypto', market: 'CRYPTO', currency: 'USD', price: 60_000, prev: 60_000, got: NOW, marketTime: NOW };
+  assert.equal(place({ side: 'sell', type: 'market', qty: 0.01 }, btc).error, undefined);
+});
