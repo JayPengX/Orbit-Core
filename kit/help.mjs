@@ -242,7 +242,7 @@ export const HELP = {
       ['tabs', '每個分頁', [
         '「首頁」：餘額（投注中的金額、現在的兌現價值和本月 VIP）、場中焦點、為你推薦（照你在 Orbit Sports 追蹤的球隊和聯賽，前三個可以一次串成一張）、焦點賽事、你的投注和彩券頭獎。',
         '「賽事」：選運動、聯賽和日期（台灣時間），或搜尋球隊和聯賽；點賠率加入投注單，點比賽看它的所有玩法（分頁、球員、更多）。冠軍盤和 F1 各一張。',
-        '「彩券」：8 種電腦彩券和 12 種刮刮樂。',
+        '「彩券」：8 種電腦彩券和台灣彩券正在賣的 5 種刮刮樂。',
         '「紀錄」：投注單（進行中、等待開賽、已結算）、彩券、戰績和統計分析。',
         '投注單不是分頁：有選項時，分頁列上方會出現投注單列（幾個選項、金額、最多拿回多少），點開確認送出。'
       ]],
@@ -253,8 +253,10 @@ export const HELP = {
         '比賽結束由伺服器自動結算並通知你，App 關著也一樣；取消的比賽算賠率 1.00（無效）；延期的比賽 48 小時內沒開打也是（棒球看當地的當天、美式足球看當週），中斷的比賽沒在同樣時間內打完，還沒有結果的選項無效。冰球每種玩法都只算 60 分鐘（不含延長賽和射門大賽），所以不讓分有和局。'
       ]],
       ['lottery', '彩券', [
-        '威力彩、大樂透、今彩539、3星彩、4星彩、39／49樂合彩和賓果賓果，照台灣彩券的規則和真實開獎對獎；晚上開獎的在開獎前半小時停售。威力彩前兩獎和大樂透前四獎照那期每注實際派彩，和真的中獎人一起分。',
-        '刮刮樂 12 種（NT$100 到 2,000 各兩種），獎金表照台灣彩券 2026 年的卡；買的時候就決定中多少，刮開就知道。',
+        '威力彩、大樂透、今彩539、3星彩、4星彩、39／49樂合彩和賓果賓果，照台灣彩券的規則和真實開獎對獎；晚上開獎的 20:00 截止。威力彩前兩獎和大樂透前四獎照那期每注實際派彩，和真的中獎人一起分，派彩公布後才入帳。',
+        '照台灣彩券的投注方式：威力彩、大樂透、今彩539 可以包牌（系統組合，最多 16 個號碼；威力彩第 2 區 2 到 8 個），樂合彩系統組合 3 到 10 個號碼；倍數只有樂合彩（最多 10 倍）、3星彩、4星彩和賓果賓果（最多 50 倍）；多期投注威力彩、大樂透、49樂合彩 2 到 10 期，賓果賓果 2 到 12 期，其他 2 到 24 期，每期一張、各自對獎。',
+        '真的彩券要自己去兌獎：開獎次日起三個月內，NT$5,000 以下在投注站，NT$500 萬以下在中國信託，更高要先預約。Quadra 不用兌獎，中獎自動入帳。',
+        '刮刮樂是台灣彩券正在賣的 5 種（錢進888、金磚疊疊樂、獎金對決、金鑽999、樂刮$5,000），照真的頭獎和總中獎率；買的時候就決定中多少，刮開就知道。',
         '選號時快選補滿，+1／+5／+10 再加幾注；購買列一直在下面。中獎自動入帳並通知你。'
       ]],
       ['boost', '串關加成、提前兌現、免費投注', [
@@ -275,7 +277,7 @@ export const HELP = {
       ['tabs', 'The tabs', [
         'Home: your balance (what’s in open bets, what they’d cash out for and this month’s VIP), live now, for you (from the teams and leagues you follow in Orbit Sports; its top three as one parlay), featured games, your bets and the lottery jackpots.',
         'Games: pick a sport, league and day (Taiwan time), or search teams and leagues; tap a price to add it to the slip, a game for all its markets (by tab, players, more). Outrights and F1 have a board each.',
-        'Lottery: 8 draw games and 12 scratch cards.',
+        'Lottery: 8 draw games and 5 of Taiwan Lottery’s scratch cards on sale.',
         'History: slips (in play, waiting, settled), tickets, wins and stats.',
         'The slip isn’t a tab: with picks on it, a bar above the tab bar shows how many, the stake and the most it pays; tap it to confirm and place.'
       ]],
@@ -286,8 +288,10 @@ export const HELP = {
         'The server settles each slip when its games are over and tells you, with the app closed too; a cancelled game counts at 1.00 (void), and so does a postponed one not started within 48 hours (baseball: that local day; American football: that week); a suspended game not finished in that time voids the picks it hadn’t decided yet. Every hockey market counts 60 minutes only (no overtime or shootout), so its winner has a draw.'
       ]],
       ['lottery', 'Lottery', [
-        'Super Lotto 威力彩, Lotto 6/49 大樂透, Daily Cash 539, 3D and 4D, 39/49 樂合彩 and BINGO BINGO, checked against Taiwan Lottery’s rules and real draws; evening draws stop selling half an hour before. 威力彩’s top two prizes and 大樂透’s top four pay what that draw paid per winner, shared with the real winners.',
-        '12 scratch cards (two at each price, NT$100 to 2,000), their prize tables Taiwan Lottery’s 2026 cards; the prize is fixed when a card is bought, and scratching shows it.',
+        'Super Lotto 威力彩, Lotto 6/49 大樂透, Daily Cash 539, 3 Star and 4 Star, 39/49 樂合彩 and BINGO BINGO, checked against Taiwan Lottery’s rules and real draws; evening draws stop selling at 20:00. 威力彩’s top two prizes and 大樂透’s top four pay what that draw paid per winner, shared with the real winners, once the payout is announced.',
+        'As Taiwan Lottery sells them: 威力彩, 大樂透 and 今彩539 take a system bet (包牌, up to 16 numbers; 2 to 8 in 威力彩’s second zone), 樂合彩 a system of 3 to 10 numbers; only 樂合彩 (up to ×10), 3 Star, 4 Star and BINGO (up to ×50) take a multiple; multi-draw is 2 to 10 draws on 威力彩, 大樂透 and 49樂合彩, 2 to 12 on BINGO and 2 to 24 on the rest, a ticket a draw, each checked on its own.',
+        'A real ticket is claimed in person within three months of the day after its draw: up to NT$5,000 at a retailer, up to NT$5 million at CTBC Bank, more by appointment. Quadra needs no claiming: prizes are paid in automatically.',
+        'The scratch cards are 5 Taiwan Lottery sells now (錢進888, 金磚疊疊樂, 獎金對決, 金鑽999, 樂刮$5,000), at their real top prize and win rate; the prize is fixed when a card is bought, and scratching shows it.',
         'Quick pick fills a line, +1/+5/+10 add more, and the buy bar stays in view. Wins are paid in automatically and you’re told.'
       ]],
       ['boost', 'Parlay boost, cash out, free bets', [
