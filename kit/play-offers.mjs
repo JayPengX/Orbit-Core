@@ -240,11 +240,10 @@ function soccerMarket(label, type, outs, sideOf, flip) {
 function baseballMarket(label, type, outs, sideOf) {
   if (label === 'Lead After 5 Innings' && type === 'Match') return threeWay('f5', 'f5', outs, sideOf);
   if (label === 'Total Runs - First 5 Innings' && type === 'Over/Under') return overUnder('f5total', outs, { family: 'baseball' });
-  // A run in the first inning: over 0.5 is yes.
+  // 單局大小 on the first inning (運彩's; no 首局得分 yes or no).
   if (label === 'Total Runs - Inning 1' && type === 'Over/Under') {
     const m = overUnder('total', outs, { family: 'baseball' });
-    if (!m || m.line !== 0.5) return null;
-    return { kind: 'firstinning', market: 'firstinning', cut: CUT.twoWay, picks: [{ side: 'yes', fair: m.picks[0].fair }, { side: 'no', fair: m.picks[1].fair }] };
+    return m && { ...m, kind: 'inningtotal', market: `itot|1|${m.line}`, period: 1, main: false };
   }
   return null;
 }

@@ -342,12 +342,13 @@ function marketOptions(game, base, markets, { real = false } = {}) {
         m,
         pick,
         // A handicap's line is each pick's own (its side's), a total's the market's.
-        settle: { lo: pick.lo, hi: pick.hi, score: pick.score, listed: m.listed, team: pick.team, ht: pick.ht, ft: pick.ft, ...(pick.line != null ? { line: pick.line } : m.line != null && m.kind !== 'total' ? { line: m.line } : {}) }
+        settle: { lo: pick.lo, hi: pick.hi, score: pick.score, listed: m.listed, team: pick.team, ht: pick.ht, ft: pick.ft, ...(m.period != null ? { period: m.period } : {}), ...(pick.line != null ? { line: pick.line } : m.line != null && m.kind !== 'total' ? { line: m.line } : {}) }
       };
       if (m.kind === 'runline') Object.assign(o, { runLine: pick.line, awayLine: m.awayLine, giver: m.giver });
       else if (HCAP_KINDS.has(m.kind)) Object.assign(o, { line: pick.line, awayLine: m.awayLine, giver: m.giver });
       if (m.kind === 'teamtotal') Object.assign(o, { team: m.team, teamLine: m.line });
-      if (m.kind === 'htotal' || m.kind === 'f5total' || m.kind === 'corners' || m.kind === 'tdtotal') Object.assign(o, { line: m.line });
+      if (m.kind === 'htotal' || m.kind === 'f5total' || m.kind === 'corners' || m.kind === 'tdtotal' || m.kind === 'inningtotal') Object.assign(o, { line: m.line });
+      if (m.period != null) o.period = m.period;
       if (m.kind === 'total') Object.assign(o, { totalLine: m.line, mainLine: m.main });
       out.push(o);
     }
