@@ -589,9 +589,10 @@ export function placeOrder(account, req, { quote, rates, valuation, now = Date.n
   if (band && type === 'limit' && (req.limit > band.up + EPS || req.limit < band.down - EPS)) return { error: 'priceLimit', ...band };
   const s = replay(account, now);
   const avail = available(account, s);
-  // Board lots (Japan 100, China's buys 100, Hong Kong each stock's own).
+  // Board lots (Japan 100, China's buys 100, Hong Kong each stock's own;
+  // one HKEX's list doesn't have can't be sized: lotUnknown).
   const lot = lotProblem(quote.market, quote.symbol, quote.kind, side, qty, Math.max(0, avail.qty[quote.symbol] || 0));
-  if (lot) return { error: 'lot', lot: lot.lot };
+  if (lot) return lot.unknown ? { error: 'lotUnknown' } : { error: 'lot', lot: lot.lot };
   // Taiwan: whole lots and odd lots go in separate orders. (The broker's own
   // sales, forced or to cover, it splits itself.)
   const mixed = !req.forced && !req.cover && mixedLot(quote.market, quote.kind, qty);

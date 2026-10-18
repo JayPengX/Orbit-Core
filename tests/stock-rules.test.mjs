@@ -305,3 +305,15 @@ test('借券: the fee day by day at each close (算頭不算尾, /365), an ask f
   assert.equal(day(pay.t), day(lendEnds({ t: now, renew: true })));
   assert.equal(pay.gross, Math.round((1000 * 50 * 0.012 * Math.round((lendEnds({ t: now, renew: true }) - now) / DAY)) / 365), 'each day at the close');
 });
+
+test("Hong Kong board lots: every HKEX security's own, from its List of Securities; one not on it refused (lotUnknown)", async () => {
+  const { hkLot, lotSize, lotProblem } = await import('../kit/stock-markets.mjs');
+  // HKEX: Tencent 100, HSBC 400, Xiaomi 200, Tracker Fund 500, CKH 500.
+  assert.deepEqual(['0700.HK', '0005.HK', '1810.HK', '2800.HK', '0001.HK'].map(hkLot), [100, 400, 200, 500, 500]);
+  assert.equal(lotSize('HK', '0005.HK', 'stock'), 400);
+  assert.deepEqual(lotProblem('HK', '0005.HK', 'stock', 'buy', 100), { lot: 400 });
+  assert.equal(lotProblem('HK', '0005.HK', 'stock', 'buy', 800), null);
+  assert.deepEqual(lotProblem('HK', '0007.HK', 'stock', 'buy', 100), { lot: null, unknown: true }, 'not listed');
+  const hk = { symbol: '0007.HK', name: 'X', kind: 'stock', market: 'HK', currency: 'HKD', price: 10, prev: 10, got: now, marketTime: now, tz: 'Asia/Hong_Kong' };
+  assert.equal(SA.placeOrder(SA.newAccount(1_000_000, now - DAY, 'acc'), { side: 'buy', type: 'limit', limit: 10, qty: 100 }, { quote: hk, rates: { TWD: 1, HKD: 4 }, valuation: ok, now, id: 'h' }).error, 'lotUnknown');
+});
