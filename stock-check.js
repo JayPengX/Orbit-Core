@@ -240,7 +240,9 @@ export async function checkEvent(e, account, wallet, read, issued = {}, ctx = {}
       const s = replay(account, e.t);
       const price = s.positions[lend.symbol]?.last || 0;
       const years = Math.max(0, e.t - lend.t) / (365 * DAY);
-      return e.net <= (lend.qty || 0) * price * 0.05 * years + 1 ? 'ok' : 'bad';
+      // (The shares lent as they are now: a split since multiplied them.)
+      const qty = s.lent[lend.id]?.qty ?? lend.qty ?? 0;
+      return e.net <= qty * price * 0.05 * years + 1 ? 'ok' : 'bad';
     }
     case 'deposit': {
       // Money from the pool only: the wallet's own entry, the same amount.
