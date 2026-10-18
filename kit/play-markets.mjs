@@ -430,6 +430,37 @@ function nb(mean, r, kMax = 30) {
   return pmf(mean, r, kMax);
 }
 
+// One inning's 單局大小 (0.5 and 1.5 runs) and 單局不讓分 (three ways: a
+// scoreless or level inning is 和) from each side's runs in it (pmfs).
+export function inningMarkets(inning, away, home) {
+  const out = [];
+  const runs = new Float64Array(away.length + home.length);
+  let a = 0;
+  let tie = 0;
+  for (let x = 0; x < away.length; x++) {
+    for (let y = 0; y < home.length; y++) {
+      const p = away[x] * home[y];
+      runs[x + y] += p;
+      if (x > y) a += p;
+      else if (x === y) tie += p;
+    }
+  }
+  for (const line of [0.5, 1.5]) {
+    const under = runs.reduce((s, p, n) => (n < line ? s + p : s), 0);
+    if (under < 0.04 || under > 0.96) continue;
+    out.push({ kind: 'inningtotal', market: `itot|${inning}|${line}`, period: inning, line, posted: line === 0.5, cut: CUT.twoWay, picks: [
+      { side: 'over', fair: 1 - under },
+      { side: 'under', fair: under }
+    ] });
+  }
+  out.push({ kind: 'inningml', market: `iml|${inning}`, period: inning, cut: CUT.threeWay, picks: [
+    { side: 'away', fair: a },
+    { side: 'draw', fair: tie },
+    { side: 'home', fair: 1 - a - tie }
+  ] });
+  return out;
+}
+
 export function baseballMarkets({ homeWin, total }) {
   if (!total) return [];
   const means = fitTeamRuns(homeWin, total.line, total.overFair);
@@ -454,10 +485,12 @@ export function baseballMarkets({ homeWin, total }) {
     }
   }
   out.push({ kind: 'margin', market: 'margin', cut: CUT.bands, picks: bands });
-  // First inning: a run scored in it (either team), a ninth of each team's game.
+  // 單局大小 and 單局不讓分 on the first inning (運彩's, in place of a
+  // 首局得分 yes or no): a ninth of each team's game.
   const r = TEAM_RUNS_DISPERSION / 9;
-  const none = nb(means.away / 9, r)[0] * nb(means.home / 9, r)[0];
-  out.push({ kind: 'firstinning', market: 'firstinning', cut: CUT.twoWay, picks: [{ side: 'yes', fair: 1 - none }, { side: 'no', fair: none }] });
+  const a1 = nb(means.away / 9, r);
+  const h1 = nb(means.home / 9, r);
+  out.push(...inningMarkets(1, a1, h1));
   // First five innings: a five-inning game, ties allowed.
   const A = nb((means.away * 5) / 9, (TEAM_RUNS_DISPERSION * 5) / 9);
   const H = nb((means.home * 5) / 9, (TEAM_RUNS_DISPERSION * 5) / 9);
@@ -470,6 +503,18 @@ export function baseballMarkets({ homeWin, total }) {
   const sh = 1 - nb(means.home / 9, r)[0];
   const awayFirst = sa / (1 - (1 - sa) * (1 - sh));
   out.push({ kind: 'nextrun', market: 'nextrun|1', line: 1, cut: CUT.twoWay, picks: [{ side: 'away', fair: awayFirst }, { side: 'home', fair: 1 - awayFirst }] });
+  // [1-5局]讓分: the favourite giving half a run and a run and a half.
+  const giver = means.away > means.home ? 'away' : 'home';
+  for (const l of [0.5, 1.5]) {
+    const awayLine = giver === 'away' ? -l : l;
+    let awayCover = 0;
+    for (let a = 0; a < A.length; a++) for (let h = 0; h < H.length; h++) if (a + awayLine > h) awayCover += A[a] * H[h];
+    if (awayCover < 0.04 || awayCover > 0.96) continue;
+    out.push({ kind: 'f5runline', market: `f5rl|${awayLine}`, awayLine, giver, posted: l === 0.5, cut: CUT.twoWay, picks: [
+      { side: 'away', fair: awayCover, line: awayLine },
+      { side: 'home', fair: 1 - awayCover, line: -awayLine }
+    ] });
+  }
   out.push({ kind: 'f5', market: 'f5', cut: CUT.threeWay, picks: [
     { side: 'away', fair: away },
     { side: 'draw', fair: tie },

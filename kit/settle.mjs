@@ -193,6 +193,24 @@ export function legResult(leg, outcome) {
       const ph = firstPeriods(h, periods);
       return win(leg.side === 'draw' ? pa === ph : leg.side === 'away' ? pa > ph : ph > pa);
     }
+    case 'f5runline': {
+      // [1-5局]讓分: the first five innings with the pick's line; a game
+      // called before five: the stake back.
+      if (a.length < 5 || h.length < 5) return outcome.status === 'final' ? 'void' : null;
+      const pa = firstPeriods(a, 5);
+      const ph = firstPeriods(h, 5);
+      return push(leg.side === 'away' ? pa + leg.line - ph : ph + leg.line - pa);
+    }
+    case 'inningtotal':
+    case 'inningml': {
+      // 單局大小 / 單局不讓分: one inning's runs (`period`, from 1).
+      const i = (leg.period ?? 1) - 1;
+      if (a.length <= i) return null;
+      const ra = Number(a[i]) || 0;
+      const rh = Number(h[i]) || 0;
+      if (leg.kind === 'inningtotal') return push(leg.side === 'over' ? ra + rh - leg.line : leg.line - ra - rh);
+      return win(leg.side === 'draw' ? ra === rh : leg.side === 'away' ? ra > rh : rh > ra);
+    }
     case 'firstinning': {
       if (!a.length) return null;
       const runs = firstPeriods(a, 1) + firstPeriods(h, 1);
