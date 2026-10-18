@@ -16,6 +16,8 @@
 // actually paid per winner, shared with the real winners (a pool tier nobody
 // won pays its whole pool). The 樂合彩 tables are Taiwan Lottery's own (45/450/8,500 times the NT$25
 // on 39, 50/500/8,000 on 49; 38樂合彩 is gone, last drawn 2023-12-28).
+// 今彩539's fixed prizes have a cap per draw (台灣彩券 獎金分配方式: each
+// tier NT$24,000,000; past it the tier is shared, rounded down to the NT$).
 
 import { choose, prizeAfterTax } from '#kit/play-odds.mjs';
 
@@ -63,11 +65,12 @@ export const GAMES = {
     zh: '今彩539', en: 'Daily Cash 539', price: 50, days: [1, 2, 3, 4, 5, 6], color: '#059669',
     zones: [{ n: 5, max: 39 }],
     api: { path: 'Daily539Result', list: 'daily539Res' },
+    // `cap`: the tier's total a draw (4 jackpots: NT$6,000,000 each, 2026-04-18).
     tiers: [
-      { key: 'jackpot', zh: '頭獎', en: 'Jackpot', hits: 5, prize: 8_000_000 },
-      { key: 'second', zh: '貳獎', en: '2nd', hits: 4, prize: 20_000 },
-      { key: 'third', zh: '參獎', en: '3rd', hits: 3, prize: 300 },
-      { key: 'fourth', zh: '肆獎', en: '4th', hits: 2, prize: 50 }
+      { key: 'jackpot', zh: '頭獎', en: 'Jackpot', hits: 5, prize: 8_000_000, cap: 24_000_000, shared: 'd539JackpotAssign' },
+      { key: 'second', zh: '貳獎', en: '2nd', hits: 4, prize: 20_000, cap: 24_000_000, shared: 'd539SecondAssign' },
+      { key: 'third', zh: '參獎', en: '3rd', hits: 3, prize: 300, cap: 24_000_000, shared: 'd539ThirdAssign' },
+      { key: 'fourth', zh: '肆獎', en: '4th', hits: 2, prize: 50, cap: 24_000_000, shared: 'd539FourthAssign' }
     ]
   },
   star3: {
@@ -218,8 +221,8 @@ export function parseDraw(gameId, record) {
   const size = record.drawNumberSize || [];
   const pools = {};
   for (const t of g.tiers || []) {
-    if (!t.pool || !record[t.pool]) continue;
-    const a = record[t.pool];
+    const a = record[t.pool ?? t.shared];
+    if (!a) continue;
     pools[t.key] = { perPrize: Number(a.perPrize) || 0, winners: Number(a.winnerCount) || 0, pool: (Number(a.prize) || 0) + (Number(a.lastPrize) || 0) };
   }
   // (Its 期別, the draw's number: 第 N 期 on a ticket and its result.)
@@ -242,6 +245,13 @@ export function parseBingo(record) {
 
 const hits = (a, b) => a.filter(x => b.includes(x)).length;
 
+// A capped fixed prize with `winners` real bets on it and `ours` more: the
+// printed prize, or the cap shared equally, rounded down (今彩539 獎金分配方式).
+export function cappedPrize(tier, winners = 0, ours = 1) {
+  if (!tier.cap) return tier.prize;
+  return Math.min(tier.prize, Math.floor(tier.cap / (Math.max(0, winners) + ours)));
+}
+
 // What one ticket wins on its draw: { prize, tier, detail }. Tickets are
 // { game, sel, bets } (bets: combinations or multiples bought).
 export function ticketPrize(ticket, draw) {
@@ -262,7 +272,9 @@ export function ticketPrize(ticket, draw) {
     const h = hits(sel.zones[0], draw.numbers);
     const sp = draw.special != null && sel.zones[0].includes(draw.special);
     const tier = g.tiers.find(t => t.hits === h && (t.sp == null || t.sp === sp));
-    return tier ? { prize: tier.pool ? pool(tier, tier.key) : tier.prize, tier: tier.key, detail: [h, sp ? 1 : 0] } : { prize: 0, tier: null, detail: [h, sp ? 1 : 0] };
+    // A capped tier: the draw's real winners and this ticket's bets share it.
+    const fixed = t => (t.cap ? cappedPrize(t, draw.pools?.[t.key]?.winners ?? 0, ticket.multiple || 1) : t.prize);
+    return tier ? { prize: tier.pool ? pool(tier, tier.key) : fixed(tier), tier: tier.key, detail: [h, sp ? 1 : 0] } : { prize: 0, tier: null, detail: [h, sp ? 1 : 0] };
   }
   if (g.digits) {
     // How many of the last digits match, in place (a ticket from before
