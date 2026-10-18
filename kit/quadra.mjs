@@ -1675,7 +1675,7 @@ export function money(x, { sign = false, cents = false } = {}) {
 // ---- Taiwan days -------------------------------------------------------------------------
 
 const TPE = 8 * 3_600_000;
-export const taipeiDay = (t = Date.now()) => new Date(t + TPE).toISOString().slice(0, 10);
+export const taipeiDay = (t = Date.now()) => new Date(new Date(t).getTime() + TPE).toISOString().slice(0, 10);
 
 // ---- Recommendations: one engine for every app -------------------------------------------
 //
