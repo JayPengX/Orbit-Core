@@ -134,6 +134,14 @@ export async function lottoCron(env, deps) {
       continue;
     }
     const { ticket, account } = kept;
+    // A game Play no longer sells (雙贏彩 and 大福彩, gone from Taiwan Lottery
+    // too) has no draw to wait for: the ticket's cost back, once.
+    if (!GAMES[ticket.game]) {
+      await updateWallet(env, deps, account, w => (w.entries.some(e => e.id === `odds:refund-${ticket.id}`) ? w : { ...w, entries: [...w.entries, { id: `odds:refund-${ticket.id}`, t: now, app: 'odds', kind: 'refund', amount: ticket.cost }] }));
+      await deps.fsDelete(env, TICKET_COLLECTION, key);
+      drop.add(key);
+      continue;
+    }
     const drawKey = `${ticket.game}|${ticket.draw.date}|${ticket.draw.slot ?? ''}`;
     if (!draws.has(drawKey)) draws.set(drawKey, (deps.drawFor || drawFor)(ticket.game, ticket.draw).catch(() => null));
     const draw = await draws.get(drawKey);

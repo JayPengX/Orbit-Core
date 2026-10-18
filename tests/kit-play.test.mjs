@@ -7,7 +7,7 @@ import { legResult, applyResults, topInning, runOrder, espnDates, sameSide, side
 import { settleSlip, evaluateSlip, slipPayoutTable, slipOutlook, analyzeSlip, afterTax, prizeAfterTax, SLIP_RULES, combosBySize, comboCount, slipErrors, slipSizes, choose, maskChance, exclusiveMasks, estimateLineOdds, estimateFuturesOdds, estimateF1Odds, devigPower, devigTwoWay, devigProportional, americanToProbability, boostRate, seededRandom, quantile, median } from '../kit/play-odds.mjs';
 import { cashOutState, CASHOUT_KEEP, CASHOUT_MAX_OPEN } from '../kit/play-cashout.mjs';
 import { houseRule, shadeLong, minLegsProblem, HOUSE_RULES, LONG_FROM } from '../kit/play-rules.mjs';
-import { GAMES, ticketPrize, settleTicket, buyTicket, nextDraw, checkSelection, betCount, boxWays, expectedReturn, mergeTickets, addTickets, HOUSE_SLOT, BINGO_DRAWS } from '../kit/play-lottery.mjs';
+import { GAMES, ticketPrize, settleTicket, buyTicket, nextDraw, checkSelection, betCount, boxWays, expectedReturn, mergeTickets, addTickets, BINGO_DRAWS, GAME_ORDER } from '../kit/play-lottery.mjs';
 import { CARD_ORDER, face, facePays, tiersOf, drawPrize, buyScratch, revealScratch, expectedReturn as scratchReturn } from '../kit/play-scratch.mjs';
 import { propResult } from '../kit/play-props.mjs';
 import { parseOffers } from '../kit/play-offers.mjs';
@@ -374,10 +374,6 @@ test("lottery prizes by Taiwan Lottery's tables, each game", () => {
   assert.equal(t('bingo', { side: 'small' }, bingo).prize, 0);
   assert.equal(t('bingo', { side: 'odd' }, bingo).prize, 150);
   assert.equal(t('bingo', { side: 'bullseye', bull: 79 }, bingo).prize, 1_200);
-  // 雙贏彩: all twelve or none pay the top prize.
-  assert.equal(t('lotto1224', { zones: [[13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]] }, { numbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] }).prize, 15_000_000);
-  assert.equal(t('lotto1224', { zones: [[1, 2, 3, 4, 5, 6, 13, 14, 15, 16, 17, 18]] }, { numbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] }).prize, 0);
-  assert.equal(t('lotto740', { zones: [[1, 2, 3, 30, 31, 32, 33]] }, { numbers: [1, 2, 3, 4, 5, 6, 7] }).prize, 200);
 });
 
 test('lottery tickets: checked, bought at their draw, settled once with the tax, merged settled-first', () => {
@@ -433,11 +429,12 @@ test('draw times: sales close half an hour before 20:30, BINGO every five minute
   assert.equal(nextDraw('bingo', at('2026-10-19T15:53:59Z')).slot, BINGO_DRAWS - 1, '23:55, the last');
   assert.equal(nextDraw('bingo', at('2026-10-19T15:54:00Z')).slot, BINGO_DRAWS - 1, 'a minute before the draw: still in it');
   assert.deepEqual(nextDraw('bingo', at('2026-10-19T15:54:01Z')), { date: '2026-10-20', slot: 0, at: at('2026-10-19T23:05:00Z') });
-  assert.equal(HOUSE_SLOT, 161, "20:30's BINGO draw");
   // What the fixed-prize tables pay back on average, as a real lottery's.
-  for (const id of ['daily539', 'lotto740', 'lotto1224']) assert.ok(expectedReturn(id) > 0.3 && expectedReturn(id) < 0.9, id);
+  for (const id of ['daily539']) assert.ok(expectedReturn(id) > 0.3 && expectedReturn(id) < 0.9, id);
   for (const stars of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) assert.ok(expectedReturn('bingo', { stars }) > 0.4 && expectedReturn('bingo', { stars }) < 0.9, `bingo ${stars}`);
-  assert.equal(Object.keys(GAMES).length, 11);
+  // 雙贏彩 (last drawn 2023-12-30) and 大福彩 (2019-04-27) are no longer sold.
+  assert.deepEqual(Object.keys(GAMES).sort(), [...GAME_ORDER].sort());
+  assert.ok(!GAMES.lotto1224 && !GAMES.lotto740);
 });
 
 test('scratch cards: every face pays exactly its prize, the prize taxed once over NT$5,000', () => {
