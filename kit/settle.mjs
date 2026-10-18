@@ -132,7 +132,9 @@ export function legResult(leg, outcome) {
     case 'btts':
       return win((away > 0 && home > 0) === (leg.side === 'yes'));
     case 'margin': {
-      // The picked team winning by lo to hi (no upper end when hi is null).
+      // The picked team winning by lo to hi (no upper end when hi is null);
+      // hockey's 和局 pick, a tie.
+      if (leg.side === 'draw') return win(away === home);
       const m = leg.team === 'home' ? home - away : away - home;
       return win(m >= leg.lo && (leg.hi == null || m <= leg.hi));
     }

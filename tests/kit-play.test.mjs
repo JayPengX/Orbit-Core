@@ -260,6 +260,8 @@ test("every hockey market is on 60 minutes (overtime and the shootout left out),
   assert.equal(legResult({ sport: 'nhl', kind: 'btts', side: 'yes' }, game(1, 0, { awayInnings: [0, 0, 0, 1], homeInnings: [0, 0, 0, 0] })), 'lost', '0-0 in 60 minutes');
   assert.equal(nhl({ kind: 'goalbands', lo: 0, hi: 4 }), 'won');
   assert.equal(nhl({ kind: 'margin', team: 'away', lo: 1, hi: 1 }), 'lost');
+  assert.equal(nhl({ kind: 'margin', side: 'draw', team: null, lo: 0, hi: 0 }), 'won', '勝分差 和局: level after 60 minutes');
+  assert.equal(legResult({ sport: 'nhl', kind: 'margin', side: 'draw', team: null, lo: 0, hi: 0 }, game(3, 1, { awayInnings: [1, 1, 1], homeInnings: [0, 1, 0] })), 'lost');
   assert.equal(nhl({ kind: 'oddeven', side: 'even' }), 'won');
   // Other sports: their whole game.
   assert.equal(legResult({ sport: 'nba', kind: 'total', side: 'over', line: 4.5 }, ot), 'won');
@@ -271,6 +273,12 @@ test("every hockey market is on 60 minutes (overtime and the shootout left out),
   assert.ok(Math.abs(w.away + w.draw + w.home - 1) < 1e-6 && w.draw > 0.15 && w.home > w.away);
   const kinds = new Set(goalMarkets(means, { family: 'hockey', totalLine: 6.5 }).map(m => m.kind));
   assert.ok(!kinds.has('regulation'), 'the 60-minute winner is the 不讓分 itself');
+  // 勝分差 covers every 60-minute result, 和局 included: its chances add up to one.
+  for (const fit of [means, fitHockey(0.55, { line: 5.5, overFair: 0.5 })]) {
+    const margin = goalMarkets(fit, { family: 'hockey', totalLine: 5.5 }).find(m => m.kind === 'margin');
+    assert.ok(Math.abs(margin.picks.reduce((x, p) => x + p.fair, 0) - 1) < 1e-6);
+    assert.ok(margin.picks.some(p => p.side === 'draw'));
+  }
   const liveWin = liveMarkets(liveGoals({ means, awayScore: 2, homeScore: 2, share: 0.1 }), { sport: 'nhl', awayScore: 2, homeScore: 2 }).filter(m => m.kind === 'ml');
   assert.deepEqual(liveWin.map(m => m.side), ['home', 'draw', 'away']);
   assert.ok(liveWin.find(m => m.side === 'draw').fair > 0.5, 'level late on: a tie the likeliest');
