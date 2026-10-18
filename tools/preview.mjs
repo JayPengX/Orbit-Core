@@ -987,7 +987,7 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
       const kids = [...el.children].filter(k => getComputedStyle(k).position !== 'absolute' && k.getBoundingClientRect().width);
       const text = el.textContent.trim();
       // A short label in lines of its own.
-      if (!el.children.length && text && text.length <= 24 && getComputedStyle(el).display !== 'block' && lines(el) > 1) out.push(`${name(el)} "${text}"`);
+      if (!el.children.length && text && text.length <= 24 && lines(el) > 1) out.push(`${name(el)} "${text}"`);
       // A row of things that wrapped.
       const cs = getComputedStyle(el);
       if (cs.display.includes('flex') && cs.flexDirection === 'row' && cs.flexWrap === 'wrap' && kids.length > 1 && kids.length <= 12) {
