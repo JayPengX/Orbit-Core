@@ -101,7 +101,11 @@ export const MARKETS = {
   },
   CN: {
     delay: 15, zh: '陸股', en: 'China A-shares', flag: '🇨🇳', currency: 'CNY', suffixes: ['.SS', '.SZ'], commission: { rate: 0.003, min: 50 },
-    sell: { stock: { tax: 0.0005 } }, withholding: 0.1
+    // Stock Connect northbound (HKEX fees, 2023-08-28): each way the
+    // exchange's handling fee 0.00341%, the CSRC's 0.002% and ChinaClear's
+    // transfer fee 0.001%; an ETF 0.004% only. Stamp duty 0.05% on sales.
+    buy: { stock: { fee: 0.0000641 }, etf: { fee: 0.00004 } },
+    sell: { stock: { tax: 0.0005, fee: 0.0000641 }, etf: { fee: 0.00004 } }, withholding: 0.1
   },
   KR: {
     delay: 20, zh: '韓股', en: 'Korea', flag: '🇰🇷', currency: 'KRW', suffixes: ['.KS', '.KQ'], commission: { rate: 0.003, min: 35000 },
@@ -282,11 +286,20 @@ export function newListing(listed, now = Date.now()) {
   }
   return n > 0;
 }
+// A mainland share's board: 'star' (STAR Market, Shanghai 688/689), 'chinext'
+// (ChiNext, Shenzhen 30xxxx) or 'main'. Through Stock Connect northbound,
+// STAR and ChiNext shares are bought by institutional professional
+// investors only (HKEX Stock Connect FAQ): a retail account can only sell them.
+export function cnBoard(symbol) {
+  if (/^68[89]\d{3}\.SS$/i.test(symbol || '')) return 'star';
+  if (/^30\d{4}\.SZ$/i.test(symbol || '')) return 'chinext';
+  return 'main';
+}
 export function limitShare(quote, now = Date.now()) {
   if (!quote || !['stock', 'etf', 'bond'].includes(quote.kind)) return null;
   if (quote.market === 'TW') return newListing(quote.listed, now) ? null : 0.1;
   if (quote.market === 'KR') return 0.3;
-  if (quote.market === 'CN') return /^(688|300|301)\d{3}\./.test(quote.symbol || '') ? 0.2 : 0.1;
+  if (quote.market === 'CN') return cnBoard(quote.symbol) === 'main' ? 0.1 : 0.2;
   return null;
 }
 // The price a day's limits are from (each exchange's 基準價, the last

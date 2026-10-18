@@ -157,3 +157,18 @@ test("after the close, an order for the next session is held to the limits from 
   const jp = { symbol: '7203.T', kind: 'stock', market: 'JP', currency: 'JPY', price: 3000, prev: 2800, marketTime: at('2026-10-13T15:30', 'Asia/Tokyo'), session: { start: at('2026-10-14T09:00', 'Asia/Tokyo'), end: at('2026-10-14T15:30', 'Asia/Tokyo') } };
   assert.deepEqual(SM.priceLimits(jp, at('2026-10-14T08:30', 'Asia/Tokyo')), { up: 3700, down: 2300 });
 });
+
+test('Stock Connect: STAR and ChiNext shares only sold, never bought (institutions only); fees both ways, stamp duty on sales', () => {
+  assert.deepEqual(['688981.SS', '689009.SS', '300750.SZ', '301269.SZ', '600519.SS', '000333.SZ'].map(SM.cnBoard), ['star', 'star', 'chinext', 'chinext', 'main', 'main']);
+  const t = at('2026-10-13T10:00', 'Asia/Shanghai');
+  const cn = symbol => ({ symbol, name: symbol, kind: 'stock', market: 'CN', currency: 'CNY', price: 100, prev: 100, got: t, marketTime: t, tz: 'Asia/Shanghai', session: { start: at('2026-10-13T09:30', 'Asia/Shanghai'), end: at('2026-10-13T15:00', 'Asia/Shanghai') } });
+  const place = (symbol, req, acc = rich()) => SA.placeOrder(acc, req, { quote: cn(symbol), rates: RATES, valuation: OK, now: t, id: 'c1' });
+  assert.deepEqual(place('300750.SZ', { side: 'buy', type: 'limit', limit: 100, qty: 100 }), { error: 'northboundBoard', board: 'chinext' });
+  assert.equal(place('688981.SS', { side: 'buy', type: 'limit', limit: 100, qty: 100 }).error, 'northboundBoard');
+  assert.equal(place('000333.SZ', { side: 'buy', type: 'limit', limit: 100, qty: 100 }).error, undefined);
+  // Held from before: it sells (the next day, T+1).
+  const held = { ...rich(), events: [...rich().events, { id: 'fill:old', type: 'fill', t: t - 3 * DAY, orderId: 'old', symbol: '300750.SZ', name: 'CATL', kind: 'stock', market: 'CN', currency: 'CNY', side: 'buy', qty: 100, price: 100, gross: 10_000, commission: 50, tax: 0, fee: 0, total: 10_050, twd: 4.4 }] };
+  assert.equal(place('300750.SZ', { side: 'sell', type: 'limit', limit: 100, qty: 100 }, held).error, undefined);
+  const cost = (side, kind) => SM.tradeCosts({ market: 'CN', side, kind, gross: 1_000_000, currency: 'CNY' });
+  assert.deepEqual([cost('buy', 'stock').fee, cost('sell', 'stock').fee, cost('sell', 'stock').tax, cost('buy', 'etf').fee, cost('sell', 'etf').tax], [64.1, 64.1, 500, 40, 0]);
+});
