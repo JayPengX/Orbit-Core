@@ -45,7 +45,8 @@ import {
   isSubBrokered,
   fractional,
   US_FRACTION,
-  limitOnly
+  limitOnly,
+  cnBoard
 } from '#kit/stock-markets.mjs';
 import { nextTradingStart, isTradingDay } from '#kit/stock-holidays.mjs';
 import { TD_MIN, tdRate, addMonths, tdInterest, incomeTaxes, lendable, LEND_RATE, LEND_RATE_MIN, LEND_RATE_MAX, LEND_LOT, LEND_RECALL, lendEnds, addWeekdays, lendFee } from '#kit/stock-savings.mjs';
@@ -611,6 +612,8 @@ export function placeOrder(account, req, { quote, rates, valuation, now = Date.n
   if (!req.forced && !req.cover && type !== 'limit' && limitOnly(quote.market)) return { error: 'limitOnly' };
   // Taiwan's odd lots (盤中 and 盤後零股) take limit orders only (TWSE: 以限價為之).
   if (!req.forced && !req.cover && type !== 'limit' && isOddLot(quote.market, quote.kind, qty)) return { error: 'oddLotLimit' };
+  // Stock Connect: STAR and ChiNext shares are bought by institutions only (cnBoard).
+  if (side === 'buy' && quote.market === 'CN' && cnBoard(quote.symbol) !== 'main') return { error: 'northboundBoard', board: cnBoard(quote.symbol) };
   // China's T+1: shares bought today can be sold from the next trading day.
   if (side === 'sell' && quote.market === 'CN') {
     const today = localDayOf(now, 'CN');
