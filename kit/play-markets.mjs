@@ -313,6 +313,8 @@ export function goalMarkets(means, { family, totalLine }) {
         }) });
       }
     }
+    // 勝分差 on 60 minutes has a 和局 too (台灣運彩's hockey 勝分差).
+    margins.push({ side: 'draw', team: null, lo: 0, hi: 0, fair: chance(grid, (a, h) => a === h) });
     out.push({ kind: 'margin', market: 'margin', cut: CUT.bands, picks: margins });
     const odd = chance(grid, (a, h) => (a + h) % 2 === 1);
     out.push({ kind: 'oddeven', market: 'oddeven', cut: CUT.twoWay, picks: [{ side: 'odd', fair: odd }, { side: 'even', fair: 1 - odd }] });
