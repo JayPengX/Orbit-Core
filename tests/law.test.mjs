@@ -69,11 +69,21 @@ const OK = { p: 'B0000001', arts: ['15-1', '15'], q: '誰可以聲請輔助宣�
 test('no Pass of Orbit Law\'s is a 401 {error:"pass"}, before anything is read or asked', async () => {
   const before = [laws.length, gemini.length];
   for (const qt of [null, await qtOf('x', { a: 'stock' }), await qtOf('x', { e: Date.now() - 1 }), 'forged.token']) {
-    const r = await ask(OK, { qt });
-    assert.equal(r.status, 401);
-    assert.deepEqual(await r.json(), { error: 'pass' });
+    for (const body of [{ mode: 'bill', bill: '202110000010000', lang: 'zh' }, { ...OK, mode: 'diff' }]) {
+      const r = await ask(body, { qt });
+      assert.equal(r.status, 401);
+      assert.deepEqual(await r.json(), { error: 'pass' });
+    }
   }
   assert.deepEqual([laws.length, gemini.length], before);
+});
+
+test('until the signed-in app is out, an article ask with no Pass is counted by address, 20 a day', async () => {
+  const { LAW_ASK_UNSIGNED } = await import('../law.js');
+  assert.equal(LAW_ASK_UNSIGNED, 20);
+  const r = await ask(OK, { qt: null });
+  assert.equal(r.status, 200);
+  assert.equal((await r.json()).left <= LAW_ASK_UNSIGNED, true);
 });
 
 test('the ask is checked before anything is read', async () => {
