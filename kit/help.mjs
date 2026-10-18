@@ -564,42 +564,58 @@ export const HELP = {
   beats: {
     zh: [
       ['what', 'Orbit Beats 是什麼', [
-        'Orbit 的節拍作曲：給它一組節拍片段（鼓、貝斯、旋律、Loop），它聽出速度和每段的角色，排成一首首新歌，用的都是你原本的聲音。全部在手機上算，什麼都不上傳；沒有網路也能用。'
+        'Orbit 的節拍作曲：給它一組節拍片段（鼓、貝斯、旋律、Loop），它聽出速度和每段的角色，排成一首首新歌。全部在手機上算，什麼都不上傳；沒有網路也能用。'
+      ]],
+      ['tabs', '每個分頁', [
+        '「做歌」：放片段，選情境（放鬆、熱血、律動、經典）或鼓的風格、首數，做出來的歌在這裡播。',
+        '「樂器」：用 App 自己的樂器做片段：鼓組（或打擊樂）或旋律，1、2 或 4 小節。鼓再點一下是重音、第三下拿掉；旋律可以一次放和弦。搖擺、復原、把第一小節複製到每一小節；「自動編」幫你起個頭。按「加進片段」，歌就用它；「♡ 收藏」留在收藏的片段裡，也能匯出 MIDI。',
+        '「即興」：每段片段一個打擊墊，配上用你的鼓打的節奏。Loop 從下一小節開始，再點一下停；單擊的對到你選的格子（16 分、8 分、拍或自由）。按「● 錄一段」，錄下來的就是一首歌，在「做歌」裡。',
+        '「歌單」：按 ♡ 留下的歌，在這支手機上；找歌名、節奏或調，四種排序，改名、分享、刪除，看到的一次下載成 zip。'
       ]],
       ['add', '放進片段', [
-        '三種方式：一段錄音（片段之間留 0.2 秒以上的安靜，會自動切開）；一整包取樣（一次選很多檔，每個檔各自切）；或直接用麥克風錄。WAV 最好，手機能播的格式（m4a、mp3…）也可以。',
-        '手機錄的安靜不是真的無聲：切出來的數量不對，到「切片」把「安靜門檻」調高（例如 -60 dB）。上次用的整組片段會留在這支手機上，下次打開就在。'
+        '一段錄音（片段之間留 0.2 秒以上的安靜，會自動切開）、一整包取樣，或用麥克風錄；WAV 最好，m4a、mp3 也可以。切出來的數量不對，到「切片」把「安靜門檻」調高（例如 -60 dB）。'
       ]],
       ['roles', '速度與角色', [
-        '速度從片段聽出來（70–190 BPM）；聽成一半或兩倍時，按 ½ 或 ×2，也可以直接輸入。每段的角色（Riff、樂句、貝斯、Hi-hat、過門、大鼓、808、小鼓、Tick、滾奏、不用）也是聽出來的，點片段可以試聽，選單可以改；改過的不會被重聽蓋掉。',
-        '至少要有一段 Riff 或樂句。每組片段的速度和你改過的角色會存在 Quadra Pass，換手機選同一組也在。'
+        '速度從片段聽出來；聽成一半或兩倍時按 ½ 或 ×2，也可以輸入或點拍子。每段的角色（Riff、樂句、貝斯、Hi-hat、過門、大鼓、808、小鼓、Tick、滾奏、不用）也是聽出來的，選單可以改，改過的不會被蓋掉。至少要有一段 Riff 或樂句。'
       ]],
       ['make', '做歌', [
-        '選首數、長度（小節）、鼓的風格（四拍、嘻哈、Trap、半速、碎拍、House、Dembow、Afrobeats）、人味（搖擺和時間的飄移），按「做歌」。每首有段落圖（前奏、主歌、副歌、間奏、橋段、尾奏），可以直接播、單首下載，或全部打包成 zip。',
-        '同一個種子做出同樣的歌。設定存在 Quadra Pass，每支手機都一樣。'
+        '20 種鼓的風格：四拍、嘻哈、Trap、半速、碎拍、House、Dembow、Afro、Drill、Boom Bap、Jersey、Amapiano、Lo-fi、放克、UK 車庫、D&B、雷鬼、Phonk、Baile、Techno。每首有段落圖（前奏、主歌、導歌、副歌、間奏、橋段、尾奏）。',
+        '「⋯」：變奏一首、換個鼓、編排（段落上移、重複、換段落、改小節數或拿掉）、分享、下載 WAV、下載分軌、匯出 MIDI。播放器播完接下一首、單曲重複或重複這一段。',
+        '「混音」預設打開；關掉的話，每段跟錄的一模一樣。'
+      ]],
+      ['pass', '存在 Quadra Pass 的', [
+        '設定、每組片段的速度和你改過的角色，和每種風格收藏了幾首；打開「依你的口味」，做歌就偏向你喜歡的。聲音本身不離開手機。'
       ]],
       ['money', '錢怎麼算', [
-        'Orbit Beats 免費，不碰錢，也不上傳你的聲音。帳戶、Quadra Plus 和錢的真相，都在右上角的 Quadra Pass 裡。'
+        'Orbit Beats 免費，不碰錢。帳戶、Quadra Plus 和錢的真相，都在右上角的 Quadra Pass 裡。'
       ]]
     ],
     en: [
       ['what', 'What Orbit Beats is', [
-        'Orbit’s beat maker: give it a set of beat pieces (drums, bass, melodies, loops) and it hears the tempo and what each piece is, then arranges them into new songs, using your sounds exactly as recorded. It all runs on the phone: nothing is uploaded, and it works offline.'
+        'Orbit’s beat maker: give it a set of beat pieces (drums, bass, melodies, loops) and it hears the tempo and what each piece is, then arranges them into new songs. It all runs on the phone: nothing is uploaded, and it works offline.'
+      ]],
+      ['tabs', 'The tabs', [
+        'Make: add pieces, pick a mood (Chill, Hype, Groove, Classic) or the drum styles and how many, and play the songs made.',
+        'Studio: pieces on the app’s own instruments: drums (or percussion) or melody, 1, 2 or 4 bars. Tap a drum again to accent it, a third time to take it out; melody notes can go in as chords. Swing, undo, bar 1 copied over every bar; Write one gives you a start. Add to pieces and the songs use it; ♡ Keep puts it in Kept clips, and it exports as MIDI too.',
+        'Jam: a pad for each piece, over a groove played on your own drums. A loop starts on the next bar and stops when tapped again; a one-shot lands on the grid you pick (16th, 8th, beat or free). Tap ● Record, and the take becomes a song in Make.',
+        'Library: the songs kept with ♡, on this phone; find one by name, groove or key, four orders, rename, share, remove, and download what’s shown in a zip.'
       ]],
       ['add', 'Adding pieces', [
-        'Three ways: one recording (0.2 s or more of silence between pieces, split for you); a whole sample pack (pick many files at once, each split the same way); or record with the microphone. WAV is best; anything the phone can play (m4a, mp3, …) works too.',
-        'A phone’s silence isn’t really silent: if the count is off, raise Silence below under Splitting (say to -60 dB). The last set of pieces stays on this phone and is there the next time.'
+        'One recording (0.2 s or more of silence between pieces, split for you), a whole sample pack, or the microphone; WAV is best, m4a and mp3 work too. If the count is off, raise Silence below under Splitting (say to -60 dB).'
       ]],
       ['roles', 'Tempo and roles', [
-        'The tempo is heard from the pieces (70–190 BPM); if it hears half or double, tap ½ or ×2, or type it. Each piece’s role (riff, phrase, bass, hats, fill, kick, 808, snare, tick, roll, not used) is heard too: tap a piece to hear it, and change its role in its menu; a role set by hand is never heard over.',
-        'At least one riff or phrase is needed. Each set’s tempo and the roles you set are kept on your Quadra Pass, so another phone with the same pieces has them.'
+        'The tempo is heard from the pieces; if it hears half or double, tap ½ or ×2, type it, or tap it in. Each piece’s role (riff, phrase, bass, hats, fill, kick, 808, snare, tick, roll, not used) is heard too; change it in its menu, and a role set by hand stays. At least one riff or phrase is needed.'
       ]],
       ['make', 'Making songs', [
-        'Pick how many, their length in bars, the drum styles (four-on-floor, hip-hop, trap, half-time, broken, house, dembow, afrobeats) and humanize (swing and timing drift), and make. Each song shows its sections (intro, verse, hook, break, bridge, outro); play it, download it, or get them all in a zip.',
-        'The same seed makes the same songs. Your settings are kept on your Quadra Pass, the same on every phone.'
+        '20 drum styles: four, hip-hop, trap, half, broken, house, dembow, afro, drill, boom bap, Jersey, amapiano, lo-fi, funk, UK garage, D&B, reggae, phonk, baile funk, techno. Each song shows its sections (intro, verse, pre-hook, hook, break, bridge, outro).',
+        '⋯: a variation, another groove, Arrange (move a section up, repeat it, change its kind or bars, or remove it), Share, Download WAV, Download stems, Export MIDI. The player goes on to the next song, repeats one, or repeats a section.',
+        'Mix is on by default; off, every piece plays exactly as recorded.'
+      ]],
+      ['pass', 'On your Quadra Pass', [
+        'Your settings, each set’s tempo and the roles you set, and how many songs you kept of each style; with Lean to your taste on, new songs lean to what you like. The sound itself never leaves the phone.'
       ]],
       ['money', 'Money', [
-        'Orbit Beats is free, moves no money and uploads none of your sounds. The account, Quadra Plus and the truth about the money are in the Quadra Pass, top right.'
+        'Orbit Beats is free and moves no money. The account, Quadra Plus and the truth about the money are in the Quadra Pass, top right.'
       ]]
     ]
   },
