@@ -766,9 +766,36 @@ const curlBin = url =>
   new Promise(resolve => {
     execFile('curl', ['-s', '-L', '-f', '-m', '20', url], { encoding: 'buffer', maxBuffer: 32 * 1024 * 1024 }, (err, stdout) => resolve(err ? null : stdout));
   });
+// A library from cdnjs (Leaflet) where cdnjs is out of reach (a container's
+// network rules): the same version's files from npm's package instead.
+const npmDirs = new Map();
+const fromNpm = url => {
+  const m = /^https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/([^/]+)\/([^/]+)\/(.+)$/.exec(url);
+  if (!m) return null;
+  const [, name, version, file] = m;
+  const key = `${name}@${version}`;
+  if (!npmDirs.has(key))
+    npmDirs.set(
+      key,
+      (async () => {
+        const dir = await mkdtemp(join(tmpdir(), 'npm-'));
+        const tgz = execFileSync('npm', ['pack', key, '--silent'], { cwd: dir, encoding: 'utf8' }).trim();
+        execFileSync('tar', ['xzf', tgz], { cwd: dir });
+        return join(dir, 'package');
+      })().catch(() => null)
+    );
+  return npmDirs.get(key).then(async dir => {
+    if (!dir) return null;
+    for (const f of [join('dist', file), join('dist', file.replace('.min.', '.')), file]) {
+      const body = await readFile(join(dir, f)).catch(() => null);
+      if (body) return body;
+    }
+    return null;
+  });
+};
 await context.route(/^https:\/\/(?!orbit-workers-proxy|sports-proxy|localhost[:/])/, async route => {
   const url = route.request().url();
-  const body = await curlBin(url);
+  const body = (await curlBin(url)) || (await fromNpm(url));
   if (!body) {
     if (DEBUG) console.log('failed', url.slice(0, 140));
     return route.abort();
