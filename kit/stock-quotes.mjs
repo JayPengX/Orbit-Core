@@ -264,7 +264,8 @@ export async function fetchChart(symbol, rangeKey = '1mo', { events = false } = 
 
 // Price bars since `since`, as fine as Yahoo keeps them: 5 minutes for the
 // last few days, 30 minutes for a month, an hour for two years, days after.
-export async function fetchBars(symbol, since) {
+// `prePost`: the US pre- and post-market's bars too.
+export async function fetchBars(symbol, since, { prePost = false } = {}) {
   const age = Date.now() - since;
   const day = 86_400_000;
   const [range, interval] = age < 5 * day ? ['5d', '5m'] : age < 28 * day ? ['1mo', '30m'] : age < 700 * day ? ['2y', '1h'] : ['max', '1d'];
@@ -277,7 +278,7 @@ export async function fetchBars(symbol, since) {
       return { t: b.t, o: b.o * k, h: b.h * k, l: b.l * k, c: b.c * k };
     }).filter(b => b.c > 0);
   }
-  const json = await getJson(`${YAHOO}/v8/finance/chart/${encodeURIComponent(symbol)}?range=${range}&interval=${interval}`);
+  const json = await getJson(`${YAHOO}/v8/finance/chart/${encodeURIComponent(symbol)}?range=${range}&interval=${interval}${prePost ? '&includePrePost=true' : ''}`);
   return parseChart(json)?.bars || [];
 }
 

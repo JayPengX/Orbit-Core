@@ -375,6 +375,35 @@ export function lotProblem(market, symbol, kind, side, qty, held = 0) {
 const LIMIT_ONLY = new Set(['HK']);
 export const limitOnly = market => LIMIT_ONLY.has(market);
 
+// US pre- and post-market through a Taiwan broker (富邦 from 2026-10-01,
+// 國泰 the same month): 04:00-09:30 and from the close to 18:00 New York
+// time (Taiwan 16:00-21:30 and 04:00-06:00 in summer), day limit orders only
+// (富邦: 僅接受當日限價委託). Minutes after midnight there.
+export const US_EXTENDED = { pre: [240, 570], post: [960, 1080] };
+// Which US session `t` is in: 'pre', 'regular', 'post' or null (shut: a
+// weekend, a holiday, the night). A half day's post-market from its 13:00 close.
+export function usSession(t) {
+  const { day, minutes } = localParts(t, 'US');
+  if (!isTradingDay('US', day)) return null;
+  const early = earlyClose('US', day);
+  const close = early ? Number(early.slice(0, 2)) * 60 + Number(early.slice(3)) : US_EXTENDED.post[0];
+  if (minutes >= US_EXTENDED.pre[0] && minutes < US_EXTENDED.pre[1]) return 'pre';
+  if (minutes >= US_EXTENDED.pre[1] && minutes < close) return 'regular';
+  if (minutes >= close && minutes < US_EXTENDED.post[1]) return 'post';
+  return null;
+}
+// When an extended-hours order placed at `t` ends: 18:00 New York time on
+// that US trading day, or the next one's once it's past.
+export function usExtendedEnd(t) {
+  let [y, m, d] = localParts(t, 'US').day.split('-').map(Number);
+  for (let i = 0; i < 15; i++, [y, m, d] = [...new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10).split('-').map(Number)]) {
+    const day = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const end = zonedTime(y, m, d, US_EXTENDED.post[1] / 60, 0, 0, tzOf('US'));
+    if (isTradingDay('US', day) && t < end) return end;
+  }
+  return t + 86_400_000;
+}
+
 // Lunch breaks, in the market's own time: no trading in between.
 const LUNCH = { JP: [690, 750], HK: [720, 780], CN: [690, 780], SG: [720, 780] };
 export function atLunch(market, t) {

@@ -46,7 +46,9 @@ import {
   fractional,
   US_FRACTION,
   limitOnly,
-  cnBoard
+  cnBoard,
+  usSession,
+  usExtendedEnd
 } from '#kit/stock-markets.mjs';
 import { nextTradingStart, isTradingDay } from '#kit/stock-holidays.mjs';
 import { TD_MIN, tdRate, addMonths, tdInterest, incomeTaxes, lendable, LEND_RATE, LEND_RATE_MIN, LEND_RATE_MAX, LEND_LOT, LEND_RECALL, lendEnds, addWeekdays, lendFee } from '#kit/stock-savings.mjs';
@@ -519,6 +521,8 @@ export function triggerPrice(order, quote, now) {
   // Taiwan's closing call auction (13:25-13:30): one match at 13:30, at the close.
   const closing = quote && closingMatch(order, quote, now);
   if (closing) return closing.price;
+  // (A US extended-hours order fills outside the regular session only on
+  // the pre- or post-market's own price bars: backfillPrice.)
   if (!quote || !isOpen(quote, now)) return null;
   if (isOddLot(order.market, order.kind, order.qty) && !oddLotOpen(now)) return null;
   if (quote.kind !== 'crypto' && quote.session && quote.marketTime < quote.session.start) return null;
@@ -608,6 +612,8 @@ export function placeOrder(account, req, { quote, rates, valuation, now = Date.n
   // sales, forced or to cover, it splits itself.)
   const mixed = !req.forced && !req.cover && mixedLot(quote.market, quote.kind, qty);
   if (mixed) return { error: 'mixedLot', ...mixed };
+  // US pre- and post-market (`ext`): a US stock or ETF, a day limit order only.
+  if (req.ext && (quote.market !== 'US' || !LISTED.has(quote.kind) || type !== 'limit' || req.tif === 'gtc')) return { error: 'extLimit' };
   // Hong Kong takes limit orders only (limitOnly; the broker's own sales aside).
   if (!req.forced && !req.cover && type !== 'limit' && limitOnly(quote.market)) return { error: 'limitOnly' };
   // Taiwan's odd lots (盤中 and 盤後零股) take limit orders only (TWSE: 以限價為之).
@@ -638,6 +644,7 @@ export function placeOrder(account, req, { quote, rates, valuation, now = Date.n
   };
   if (type === 'limit') order.limit = Number(req.limit);
   if (type === 'stop') order.stop = Number(req.stop);
+  if (req.ext) order.ext = true;
   if (req.forced) order.forced = true;
   // Sold to collect an overdraft the account didn't cover in time.
   if (req.cover) order.cover = true;
@@ -686,7 +693,8 @@ export function placeOrder(account, req, { quote, rates, valuation, now = Date.n
   // and brokers do by default); good-till-cancelled lasts GTC_DAYS. Crypto
   // and currency pairs never close, so theirs are GTC.
   if (!order.after) order.tif = req.tif === 'gtc' || quote.kind === 'crypto' || quote.kind === 'fx' ? 'gtc' : 'day';
-  order.expires = order.after ? order.after + 9 * 3_600_000 : order.tif === 'gtc' ? now + GTC_DAYS * 86_400_000 : dayOrderEnd(quote, now);
+  // (An extended-hours order lasts its day's post-market, to 18:00 New York time.)
+  order.expires = order.after ? order.after + 9 * 3_600_000 : order.tif === 'gtc' ? now + GTC_DAYS * 86_400_000 : order.ext ? usExtendedEnd(now) : dayOrderEnd(quote, now);
   // A Taiwan whole-lot day order is in its day's 13:30 closing match: it
   // lasts until that's known (CLOSE_DECIDE; Yahoo's Taiwan prices run 20
   // minutes behind), ending unmatched after it.
@@ -1011,6 +1019,9 @@ export function backfillPrice(order, bars, now = Date.now()) {
     }
     if (b.t < order.t) continue;
     if (odd && !oddLotOpen(b.t)) continue;
+    // A US stock's pre- and post-market bars (read with them) fill only an
+    // extended-hours order.
+    if (order.market === 'US' && LISTED.has(order.kind) && !order.ext && usSession(b.t) !== 'regular') continue;
     const buy = order.side === 'buy';
     if (order.type === 'market') return { t: b.t, price: b.o };
     if (order.type === 'limit') {
