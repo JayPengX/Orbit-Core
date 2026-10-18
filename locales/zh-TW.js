@@ -30,5 +30,6 @@ export default {
   ECO_SESSION_MOVED: 'Quadra 正在另一個 App 使用中。',
   ECO_HANDOFF_EXPIRED: '這個連結已過期，請用 Quadra Pass 登入。',
   ECO_NOTHING_TO_SHARE: '還沒有課表可以分享。',
-  ECO_SHARE_NOT_FOUND: '找不到這組金鑰，或已過期。'
+  ECO_SHARE_NOT_FOUND: '找不到這組金鑰，或已過期。',
+  WORKER_FAILED: '發生錯誤，請再試一次。'
 };

@@ -42,6 +42,7 @@
 
 import { weatherCheck } from './weather.js';
 import { tdxGet, tdxRequest } from './transit.js';
+import { bodyText } from './http.js';
 
 const enc = new TextEncoder();
 const b64u = bytes => {
@@ -237,7 +238,7 @@ export async function handlePush(request, env, headers, session, path) {
   if (!kv) return reply({ error: { message: 'Push isn’t set up here.' } }, 503);
   if (request.method !== 'POST') return reply({ error: { message: 'POST only' } }, 405);
   if (!session?.d || !APP_KEYS.has(session.a)) return reply({ error: { code: 'QUADRA_PASS_REQUIRED', message: 'Sign in with a Quadra Pass.' } }, 401);
-  const body = await request.json().catch(() => null);
+  const body = await bodyText(request, 1_000_000).then(JSON.parse).catch(() => null);
   if (path === '/push/prefs') {
     const prefs = cleanPrefs(body);
     // (Unchanged switches aren't written again: every KV write counts against the month's million.)

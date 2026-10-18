@@ -36,3 +36,31 @@ export function json(data, status, headers) {
     headers: { ...headers, 'Content-Type': 'application/json' }
   });
 }
+
+// A request's body as text, or null past `max` bytes: read as it comes and
+// stopped there (a client may send Cloudflare's 100 MB, more than an
+// isolate's 128 MB holds, and a crash takes every request in it along).
+export async function bodyText(request, max) {
+  if (Number(request.headers.get('Content-Length')) > max) return null;
+  if (!request.body) return '';
+  const reader = request.body.getReader();
+  const parts = [];
+  let n = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    n += value.byteLength;
+    if (n > max) {
+      reader.cancel().catch(() => {});
+      return null;
+    }
+    parts.push(value);
+  }
+  const out = new Uint8Array(n);
+  let at = 0;
+  for (const p of parts) {
+    out.set(p, at);
+    at += p.byteLength;
+  }
+  return new TextDecoder().decode(out);
+}

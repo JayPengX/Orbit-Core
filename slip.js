@@ -10,7 +10,7 @@
 import { checkedBatch } from './sports.js';
 import { paceOf } from './pace.js';
 import { sessionLimited, readToken, tokenSecret } from './quadra-token.js';
-import { json, LOCAL_ORIGIN } from './http.js';
+import { json, LOCAL_ORIGIN, bodyText } from './http.js';
 import { ASIA_HOST } from './asia-baseball.js';
 
 const ORIGIN = 'https://jaypengx.github.io';
@@ -147,11 +147,12 @@ export async function handleSlipScan(request, env, headers, ip, gemini) {
   const origin = request.headers.get('Origin') || '';
   if (origin !== ORIGIN && !LOCAL_ORIGIN.test(origin)) return json({ error: { message: 'Forbidden' } }, 403, headers);
   if (!env.GEMINI_API_KEY) return json({ error: { message: 'Not set up' } }, 503, headers);
-  const size = Number(request.headers.get('Content-Length') || 0);
-  if (size > SCAN.maxBase64 + 1000) return json({ error: { message: 'Too large' } }, 413, headers);
+  // (Read only up to what a picture can be, Content-Length or not.)
+  const text = await bodyText(request, SCAN.maxBase64 + 1000);
+  if (text == null) return json({ error: { message: 'Too large' } }, 413, headers);
   let body;
   try {
-    body = JSON.parse(await request.text());
+    body = JSON.parse(text);
   } catch {
     return json({ error: { message: 'Bad JSON' } }, 400, headers);
   }

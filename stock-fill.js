@@ -36,6 +36,7 @@ import { triggerPrice, backfillPrice, planRuns, planOrderId } from './kit/stock-
 import { IPO_URL, parseIpoList, ipoOpen, ipoDrawn, ipoWon, ipoDrawKey } from './kit/stock-ipo.mjs';
 import { tokenSecret } from './quadra-token.js';
 import { parseDoc, changeDoc } from './doc-store.js';
+import { bodyText } from './http.js';
 
 export const FILLS_COLLECTION = 'stock-fills';
 const MAX_ORDERS = 40;
@@ -301,7 +302,7 @@ export async function handleStock(request, env, headers, session, deps) {
   if (request.method !== 'POST') return json({ error: { message: 'POST only' } }, 405, headers);
   let body;
   try {
-    body = JSON.parse(await request.text());
+    body = JSON.parse(await bodyText(request, 1_000_000));
   } catch {
     return json({ error: { message: 'Bad body' } }, 400, headers);
   }
