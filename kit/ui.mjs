@@ -8,6 +8,7 @@
 // pitch, a map, a chart) stays the app's.
 //
 //   import { segmented, sheet, menu, toast, list, cell, search, toggle, empty, view } from '#kit/ui.mjs';
+//   and the premium layer: icons, tile, pageHead, heroCard, rowCard, tag, rail, stats, section.
 
 const reduced = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
@@ -258,4 +259,123 @@ export function settleSegs(root = document) {
       }
     })
   );
+}
+
+// ---- The premium layer (quadra.css "Premium layer"): Law's and Beats' look ----
+// Glyphs drawn on one 24-unit grid with round 2px strokes, for tiles, hero
+// cards and rows: icons.home, icons.spark… (a string of SVG).
+const g = (d, fill = false) => `<svg viewBox="0 0 24 24" ${fill ? 'fill="currentColor"' : 'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"'} aria-hidden="true">${d}</svg>`;
+export const icons = {
+  home: g('<path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z"/>'),
+  calendar: g('<rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/>'),
+  clock: g('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>'),
+  star: g('<path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/>'),
+  search: g('<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>'),
+  chart: g('<path d="M4 19h16M7 15l4-4 3 3 5-6"/>'),
+  bars: g('<path d="M6 20V11M12 20V5M18 20v-6"/>'),
+  bell: g('<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15zM10 20.5h4"/>'),
+  bus: g('<rect x="5" y="3.5" width="14" height="14" rx="3"/><path d="M5 11h14M8.5 20.5v-3M15.5 20.5v-3"/><circle cx="8.5" cy="14.5" r=".6"/><circle cx="15.5" cy="14.5" r=".6"/>'),
+  train: g('<rect x="6" y="3.5" width="12" height="13" rx="4"/><path d="M6 10.5h12M9 20.5l1.5-4M15 20.5l-1.5-4"/>'),
+  bike: g('<circle cx="6" cy="16" r="3.5"/><circle cx="18" cy="16" r="3.5"/><path d="M6 16l4-7h5l3 7M10 9 8.5 6H7M12 16l3-7"/>'),
+  map: g('<path d="M9 4.5 3.5 6.5v13l5.5-2 6 2 5.5-2v-13l-5.5 2-6-2zM9 4.5v13M15 6.5v13"/>'),
+  pin: g('<path d="M12 21s-6.5-6.2-6.5-11a6.5 6.5 0 0 1 13 0c0 4.8-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/>'),
+  ball: g('<circle cx="12" cy="12" r="8.5"/><path d="m12 7.5 3.8 2.8-1.5 4.4H9.7l-1.5-4.4zM12 3.5v4M20 10l-4.2.3M16.5 19.5l-2.2-4.8M7.5 19.5l2.2-4.8M4 10l4.2.3"/>'),
+  trophy: g('<path d="M8 4h8v5a4 4 0 0 1-8 0zM8 6H4.5c0 3 1.5 4.5 3.7 4.8M16 6h3.5c0 3-1.5 4.5-3.7 4.8M12 13v4M8.5 20.5h7M9.5 17h5v3.5h-5z"/>'),
+  tv: g('<rect x="3" y="5.5" width="18" height="12.5" rx="2.5"/><path d="M8 21h8M8.5 2.5 12 5.5l3.5-3"/>'),
+  book: g('<path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5zM5 19.5A1.5 1.5 0 0 0 6.5 21H19v-3M9 7.5h6"/>'),
+  ticket: g('<path d="M3.5 7.5A1.5 1.5 0 0 1 5 6h14a1.5 1.5 0 0 1 1.5 1.5V10a2 2 0 0 0 0 4v2.5A1.5 1.5 0 0 1 19 18H5a1.5 1.5 0 0 1-1.5-1.5V14a2 2 0 0 0 0-4zM9 10h6M9 14h6"/>'),
+  wallet: g('<path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3M4 7.5V17a2.5 2.5 0 0 0 2.5 2.5H20V8H6.5A2.5 2.5 0 0 1 4 7.5z"/><circle cx="16" cy="14" r="1.2"/>'),
+  coin: g('<circle cx="12" cy="12" r="8.5"/><path d="M14.5 9.5c-.5-1-1.5-1.5-2.5-1.5-1.4 0-2.5.8-2.5 2s1.1 1.6 2.5 2 2.5.8 2.5 2-1.1 2-2.5 2c-1 0-2-.5-2.5-1.5M12 6.5v11"/>'),
+  sun: g('<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>'),
+  cloud: g('<path d="M7 18.5a4.5 4.5 0 0 1-.4-9 6 6 0 0 1 11.4 1.6A3.8 3.8 0 0 1 17.5 18.5z"/>'),
+  rain: g('<path d="M7 15.5a4.5 4.5 0 0 1-.4-9 6 6 0 0 1 11.4 1.6 3.8 3.8 0 0 1-.5 7.4zM8 18.5l-1 2M12 18.5l-1 2M16 18.5l-1 2"/>'),
+  drop: g('<path d="M12 3.5s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/>'),
+  wind: g('<path d="M3 9h11a3 3 0 1 0-3-3M3 15h15a3 3 0 1 1-3 3M3 12h8"/>'),
+  user: g('<circle cx="12" cy="8" r="4"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/>'),
+  list: g('<path d="M9 6.5h11M9 12h11M9 17.5h11"/><circle cx="4.5" cy="6.5" r=".8"/><circle cx="4.5" cy="12" r=".8"/><circle cx="4.5" cy="17.5" r=".8"/>'),
+  grid: g('<rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/>'),
+  flame: g('<path d="M12 21a6.5 6.5 0 0 0 6.5-6.5c0-4-3-6-4-9.5-2 1.5-3 3.5-3 5.5-1-.5-2-1.5-2.3-3C7 9.5 5.5 12 5.5 14.5A6.5 6.5 0 0 0 12 21z"/>'),
+  check: g('<path d="m5 12.5 4.5 4.5L19 7.5"/>'),
+  plus: g('<path d="M12 5v14M5 12h14"/>'),
+  send: g('<path d="M12 19V5M6 11l6-6 6 6"/>'),
+  play: g('<path d="M8 5.5v13l10.5-6.5z"/>', true),
+  live: g('<circle cx="12" cy="12" r="2"/><path d="M8.5 8.5a5 5 0 0 0 0 7M15.5 8.5a5 5 0 0 1 0 7M5.6 5.6a9 9 0 0 0 0 12.8M18.4 5.6a9 9 0 0 1 0 12.8"/>'),
+  swap: g('<path d="M7 4 3.5 7.5 7 11M3.5 7.5h13M17 13l3.5 3.5L17 20M20.5 16.5h-13"/>'),
+  history: g('<path d="M4 12a8 8 0 1 0 2.3-5.6L4 8.5M4 4v4.5h4.5M12 8v4l3 2"/>'),
+  camera: g('<path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2.3L9.5 4.5h5L16.2 7h2.3A1.5 1.5 0 0 1 20 8.5v10a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5z"/><circle cx="12" cy="13" r="3.5"/>'),
+  pencil: g('<path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4"/>'),
+  key: g('<circle cx="8" cy="15" r="4"/><path d="m11 12 8.5-8.5M16 7l2.5 2.5M14 9l2 2"/>'),
+  backpack: g('<path d="M6 10a6 6 0 0 1 12 0v10a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1zM9.5 4.5V3.5h5v1M9 14h6v4H9z"/>'),
+  moon: g('<path d="M19 14.5A7.5 7.5 0 0 1 9.5 5 7.5 7.5 0 1 0 19 14.5z"/>'),
+  spark: g('<path d="M12 2.5c.5 3.8 2.2 6.4 6.6 7.4-4.4 1-6.1 3.6-6.6 7.4-.5-3.8-2.2-6.4-6.6-7.4 4.4-1 6.1-3.6 6.6-7.4zM19 15c.3 1.9 1.1 3 3 3.5-1.9.5-2.7 1.6-3 3.5-.3-1.9-1.1-3-3-3.5 1.9-.5 2.7-1.6 3-3.5z"/>', true),
+  target: g('<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r=".8"/>')
+};
+const glyph = x => (typeof x === 'string' && x.trim().startsWith('<svg') ? { html: x } : { text: x == null ? '' : String(x) });
+const tinted = (n, color) => (color && n.style.setProperty('--t', color), n);
+
+// A colour tile holding a glyph (an icons.x string, an emoji, an <img>).
+export function tile(icon, color = '', size = '') {
+  const t = tinted(h('span', { class: `q-tile${size ? ` ${size}` : ''}`, 'aria-hidden': 'true', ...(icon instanceof Node ? {} : glyph(icon)) }), color);
+  if (icon instanceof Node) t.append(icon);
+  return t;
+}
+// The page's own head: a small grey line over its large title.
+export function pageHead(title, { over = '', tint = false, trailing = null } = {}) {
+  return h('header', { class: 'q-page-head' }, [over ? h('p', { class: `q-over${tint ? ' tint' : ''}`, text: over }) : null, h('h1', { text: title }), trailing]);
+}
+// The one thing to do first, on the app's colour: { eyebrow, icon, title,
+// big, sub, pill, actions: [{ label, onClick, href, ghost }], href, onClick,
+// color, color2 } and any extra children (the app's own element).
+export function heroCard({ eyebrow = '', icon = '', title = '', big = '', sub = '', pill = '', actions = [], href = '', onClick = null, color = '', color2 = '' } = {}, children = []) {
+  const tag = href ? 'a' : onClick ? 'button' : 'div';
+  const c = h(tag, { class: `q-hero-card${tag === 'div' ? '' : ' q-press'}`, ...(href ? { href } : {}), ...(tag === 'button' ? { type: 'button', onclick: onClick } : {}) });
+  if (color) c.style.setProperty('--q-hc-b', color);
+  if (color2) c.style.setProperty('--q-hc-a', color2);
+  if (eyebrow || icon) c.append(h('span', { class: 'q-hc-eyebrow', html: `${icon || ''}<span></span>` }));
+  if (eyebrow) c.querySelector('.q-hc-eyebrow span').textContent = eyebrow;
+  if (big !== '') c.append(h('strong', { class: 'q-hc-big', text: big }));
+  if (title) c.append(h('strong', { class: 'q-hc-title', text: title }));
+  if (sub) c.append(h('p', { class: 'q-hc-sub', text: sub }));
+  if (pill) c.append(h('span', { class: 'q-hc-pill' }, [h('span', { text: pill }), h('i', { html: icons.send })]));
+  if (actions.length) c.append(h('div', { class: 'q-hc-row' }, actions.map(a => h(a.href ? 'a' : 'button', { class: `q-hc-btn${a.ghost ? ' ghost' : ''}`, ...(a.href ? { href: a.href } : { type: 'button', onclick: a.onClick }) }, [a.label]))));
+  for (const x of [].concat(children)) if (x) c.append(x);
+  return c;
+}
+// A card of rows: [{ icon, color, title, sub, value, tags, href, onClick,
+// chevron, trailing }]; a row with neither href nor onClick stays still.
+export function rowCard(rows) {
+  return h(
+    'div',
+    { class: 'q-rowcard' },
+    rows.filter(Boolean).map(r => {
+      const tag = r.href ? 'a' : r.onClick ? 'button' : 'div';
+      const row = h(tag, { class: `q-ritem${r.chevron ?? tag !== 'div' ? ' chevron' : ''}`, ...(r.href ? { href: r.href } : {}), ...(tag === 'button' ? { type: 'button', onclick: r.onClick } : {}) });
+      if (r.icon != null && r.icon !== '') row.append(tile(r.icon, r.color, r.size || ''));
+      row.append(h('span', { class: 'q-ritem-text' }, [h('span', { class: 'q-ritem-title', text: r.title }), r.sub ? h('small', { text: r.sub }) : null, r.tags?.length ? h('span', { class: 'q-tags' }, r.tags.map(t => tag_(t))) : null]));
+      if (r.value !== undefined && r.value !== '') row.append(h('span', { class: 'q-ritem-value', text: String(r.value) }));
+      if (r.trailing) row.append(r.trailing);
+      return row;
+    })
+  );
+}
+const tag_ = t => (typeof t === 'string' ? h('span', { class: 'q-tag', text: t }) : tinted(h('span', { class: `q-tag ${t.tone || ''}`.trim(), text: t.text }), t.color));
+// A tinted capsule: tag('直播', 'red') or tag('3 天', '', '#hex').
+export function tag(text, tone = '', color = '') {
+  return tag_({ text, tone: color ? `${tone} tint` : tone, color });
+}
+// Cards that scroll sideways to the screen's edge.
+export function rail(children, { small = false } = {}) {
+  return h('div', { class: `q-rail${small ? ' small' : ''}` }, children);
+}
+// Big numbers with their names: [{ label, value, icon, color, tint, href }].
+export function stats(items) {
+  const s = h('div', { class: 'q-stats' });
+  s.style.setProperty('--q-stats-n', String(Math.min(items.length, 3)));
+  for (const it of items) s.append(h(it.href ? 'a' : 'div', { class: 'q-stat', ...(it.href ? { href: it.href } : {}) }, [it.icon ? tile(it.icon, it.color, 'sm') : null, h('small', { text: it.label }), h('strong', { class: it.tint ? 'tint' : '', text: it.value })]));
+  return s;
+}
+// A section: a title, an optional link on its right, and its body.
+export function section(title, body, { more = '', moreHref = '', onMore = null } = {}) {
+  const head = h('div', { class: 'q-section-head' }, [h('h2', { text: title }), more ? h(moreHref ? 'a' : 'button', { ...(moreHref ? { href: moreHref } : { type: 'button', onclick: onMore }), text: more }) : null]);
+  return h('section', { class: 'q-section' }, [head, ...[].concat(body)]);
 }
