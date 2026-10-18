@@ -66,6 +66,16 @@ export function parseIpoList(json) {
   return out;
 }
 
+// A first listing's listing day (Taipei midnight) for `symbol` in the list
+// (parseIpoList), or null: 初上市 and 初上櫃 (創新板's and 第一上市's too), whose
+// shares trade with no daily price limit for their first five trading days
+// (stock-markets.mjs newListing; a cash offering's shares already trade).
+// Set it on the quote (quote.listed) so the order rules see it.
+export function listedOn(list, symbol) {
+  const s = (list || []).find(x => x.symbol === symbol && /初上/.test(x.kind) && x.list != null);
+  return s ? s.list : null;
+}
+
 // What an application holds: the shares at the offer price and the fee.
 export const ipoHold = s => Math.round(s.price * s.qty) + IPO_FEE;
 // Open for applications now (from the first day's 09:00 to the last day's 14:00, Taipei).

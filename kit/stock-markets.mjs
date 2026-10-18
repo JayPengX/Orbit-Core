@@ -202,25 +202,41 @@ export const toTick = (price, tick, dir = 0) => {
 };
 
 // Daily price limits: how far from yesterday's close a price may go.
-// Taiwan ±10%; mainland China ±10% (±20% on the STAR Market, 688xxx, and
-// ChiNext, 300xxx/301xxx); Korea ±30%; Japan a fixed yen amount by price
-// band. Orders outside them are refused by the exchange.
+// Taiwan ±10%, but none in a first listing's first five trading days (TWSE
+// 初次上市股票首五個交易日無漲跌幅限制, TPEx's 初次上櫃 the same; quote.listed,
+// its listing day, from stock-ipo.mjs listedOn); mainland China ±10% (±20%
+// on the STAR Market, 688xxx, and ChiNext, 300xxx/301xxx); Korea ±30%;
+// Japan a fixed yen amount by price band. Orders outside them are refused by the exchange.
 const JP_LIMITS = [[100, 30], [200, 50], [500, 80], [700, 100], [1000, 150], [1500, 300], [2000, 400], [3000, 500], [5000, 700], [7000, 1000], [10000, 1500], [15000, 3000], [20000, 4000], [30000, 5000], [50000, 7000], [70000, 10000], [100000, 15000], [150000, 30000], [200000, 40000], [300000, 50000], [500000, 70000], [700000, 100000], [1000000, 150000], [Infinity, 300000]];
-export function limitShare(quote) {
+export const NEW_LISTING_DAYS = 5;
+// Whether `now` is within the first NEW_LISTING_DAYS Taiwan trading days from
+// the listing day `listed` (that day the first).
+export function newListing(listed, now = Date.now()) {
+  if (!(listed > 0) || now < listed) return false;
+  const last = localDayOf(now, 'TW');
+  let n = 0;
+  for (let t = listed, i = 0; i < 40; t += 86_400_000, i++) {
+    const day = localDayOf(t, 'TW');
+    if (day > last) break;
+    if (isTradingDay('TW', day) && ++n > NEW_LISTING_DAYS) return false;
+  }
+  return n > 0;
+}
+export function limitShare(quote, now = Date.now()) {
   if (!quote || !['stock', 'etf', 'bond'].includes(quote.kind)) return null;
-  if (quote.market === 'TW') return 0.1;
+  if (quote.market === 'TW') return newListing(quote.listed, now) ? null : 0.1;
   if (quote.market === 'KR') return 0.3;
   if (quote.market === 'CN') return /^(688|300|301)\d{3}\./.test(quote.symbol || '') ? 0.2 : 0.1;
   return null;
 }
-export function priceLimits(quote) {
+export function priceLimits(quote, now = Date.now()) {
   if (!(quote?.prev > 0)) return null;
   const tick = x => tickSize(quote.market, quote.kind, x);
   if (quote.market === 'JP' && quote.kind === 'stock') {
     const w = bands(quote.prev, JP_LIMITS);
     return { up: quote.prev + w, down: Math.max(tick(1), quote.prev - w) };
   }
-  const share = limitShare(quote);
+  const share = limitShare(quote, now);
   if (!share) return null;
   const up = quote.prev * (1 + share);
   const down = quote.prev * (1 - share);

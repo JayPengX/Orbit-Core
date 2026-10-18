@@ -575,7 +575,7 @@ export function placeOrder(account, req, { quote, rates, valuation, now = Date.n
     const tick = tickSize(quote.market, quote.kind, x);
     if (!onTick(x, tick)) return { error: 'tick', tick };
   }
-  const band = priceLimits(quote);
+  const band = priceLimits(quote, now);
   if (band && type === 'limit' && (req.limit > band.up + EPS || req.limit < band.down - EPS)) return { error: 'priceLimit', ...band };
   const s = replay(account, now);
   const avail = available(account, s);
@@ -733,7 +733,7 @@ export function placeOrder(account, req, { quote, rates, valuation, now = Date.n
 // order, and after hours (盤後 matches at the close).
 export function limitUpFor(order, quote, now = Date.now()) {
   if (quote?.market !== 'TW' || order.type === 'limit' || order.after || (order.type === 'market' && afterHours(now))) return null;
-  return priceLimits(isOpen(quote, now) ? quote : { ...quote, prev: quote.price })?.up ?? null;
+  return priceLimits(isOpen(quote, now) ? quote : { ...quote, prev: quote.price }, now)?.up ?? null;
 }
 // The price an order's amount is counted at (額度, deposits): its limit, a
 // Taiwan market or stop order's limit-up, else the price.
