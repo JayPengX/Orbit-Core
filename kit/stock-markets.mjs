@@ -5,7 +5,7 @@
 // Wallet currencies. `spread`: what a Taiwan bank's online FX desk keeps on
 // each exchange, as a share of the amount (the gap between its buy and sell
 // rates, halved). `loanRate`: yearly interest on money borrowed in it.
-import { isTradingDay } from '#kit/stock-holidays.mjs';
+import { isTradingDay, earlyClose } from '#kit/stock-holidays.mjs';
 import { HK_LOT_TABLE } from '#kit/stock-hk-lots.mjs';
 
 export const CURRENCIES = {
@@ -169,6 +169,15 @@ function localParts(t, market) {
   return { day: `${p.year}-${p.month}-${p.day}`, minutes: Number(p.hour) * 60 + Number(p.minute) };
 }
 export const localDayOf = (t, market) => localParts(t, market).day;
+// The moment `t`'s day closes early in its market (a half day,
+// stock-holidays.mjs earlyClose), or null.
+export function earlyCloseAt(market, t) {
+  const day = localDayOf(t, market);
+  const hm = earlyClose(market, day);
+  if (!hm) return null;
+  const [y, m, d] = day.split('-').map(Number);
+  return zonedTime(y, m, d, Number(hm.slice(0, 2)), Number(hm.slice(3)), 0, tzOf(market));
+}
 
 // When a dividend that went ex at `ex` is paid: on `payDay` (Yahoo's
 // calendarEvents.dividendDate, a date: 'YYYY-MM-DD' or its UTC midnight)
@@ -585,6 +594,9 @@ export function isOpen(quote, now = Date.now()) {
   const s = quote.session;
   if (!(s && now >= s.start && now < s.end)) return false;
   if (atLunch(quote.market, now)) return false;
+  // A half day: shut from its early close, whatever the session says.
+  const early = earlyCloseAt(quote.market, now);
+  if (early != null && now >= early) return false;
   // Mainland shares are bought from abroad through Stock Connect, which
   // trades only when Hong Kong is open too.
   if (quote.market === 'CN' && !tradingDay('HK', localDayOf(now, 'HK'))) return false;

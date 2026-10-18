@@ -132,15 +132,34 @@ const LISTED = {
     2026: ['01-01', '01-02', '02-16', '02-17', '02-18', '02-19', '02-20', '02-23', '04-06', '05-01', '05-04', '05-05', '06-19', '09-25', '10-01', '10-02', '10-05', '10-06', '10-07'],
     2027: ['01-01', '02-05', '02-08', '02-09', '02-10', '02-11', '04-05', '05-03', '05-04', '05-05', '06-09', '09-15', '10-01', '10-04', '10-05', '10-06', '10-07']
   },
+  // 제헌절 (07-17) a public holiday again from 2026 (공휴일에 관한 법률, 2026),
+  // its Saturday in 2027 made up on 07-19; 현충일 gets no substitute (06-06-2027,
+  // a Sunday, isn't made up: 2027 월력요항).
   KR: {
-    2026: ['01-01', '02-16', '02-17', '02-18', '03-02', '05-01', '05-05', '05-25', '06-03', '08-17', '09-24', '09-25', '10-05', '10-09', '12-25', '12-31'],
-    2027: ['01-01', '02-08', '02-09', '03-01', '05-05', '05-13', '06-07', '08-16', '09-14', '09-15', '09-16', '10-04', '10-11', '12-27', '12-31']
+    2026: ['01-01', '02-16', '02-17', '02-18', '03-02', '05-01', '05-05', '05-25', '06-03', '07-17', '08-17', '09-24', '09-25', '10-05', '10-09', '12-25', '12-31'],
+    2027: ['01-01', '02-08', '02-09', '03-01', '05-05', '05-13', '07-19', '08-16', '09-14', '09-15', '09-16', '10-04', '10-11', '12-27', '12-31']
   },
   SG: {
     2026: ['01-01', '02-17', '02-18', '04-03', '05-01', '05-27', '06-01', '08-10', '11-09', '12-25'],
     2027: ['01-01', '02-08', '02-09', '03-10', '03-26', '05-17', '05-20', '08-09', '10-28', '12-27']
   }
 };
+
+// Half days: a market's close (local 'HH:MM') on a day it shuts early.
+// NYSE (Holidays & Trading Hours, 2026-2028): 13:00 the day after
+// Thanksgiving, and July 3 and Christmas Eve when they fall Monday to
+// Thursday (on a Friday each is the holiday observed, or next to it). HKEX
+// (circulars CT/075/25, CT/077/26): the eves of Lunar New Year, Christmas
+// and New Year, the morning session only (to 12:00).
+const EARLY = {
+  US: y => [shift(...nthWeekday(y, 11, 4, 4), 1), ...[[y, 7, 3], [y, 12, 24]].filter(d => dow(...d) >= 1 && dow(...d) <= 4)].map(d => [key(d), '13:00']),
+  HK: y => ({ 2026: ['02-16', '12-24', '12-31'], 2027: ['02-05', '12-24', '12-31'] })[y]?.map(md => [`${y}-${md}`, '12:00']) || []
+};
+export function earlyClose(market, day) {
+  const rule = EARLY[market];
+  if (!rule) return null;
+  return rule(Number(day.slice(0, 4))).find(([d]) => d === day)?.[1] ?? null;
+}
 
 // Which calendar each market (see markets.mjs) keeps.
 const CALENDAR = { TW: 'TW', US: 'US', JP: 'JP', HK: 'HK', CN: 'CN', KR: 'KR', UK: 'UK', FR: 'EU', NL: 'EU', ES: 'EU', DE: 'DE', IT: 'IT', CH: 'CH', DK: 'DK', CA: 'CA', AU: 'AU', SG: 'SG', METAL: 'US', FX: null, CRYPTO: null, INTL: null };
