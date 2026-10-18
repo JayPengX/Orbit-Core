@@ -2749,9 +2749,13 @@ dialog.q-moved::backdrop {
 }
 .q-recent-what {
   min-width: 0;
+  /* Two lines before it's cut (English names ran out on one at 320 px). */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: break-word;
 }
 
 .q-balance {
@@ -3156,13 +3160,12 @@ html:not([data-q-keys]) :is(:focus-visible, :focus):not(input, textarea, select)
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* A narrow phone: the figure a size smaller and its words on two lines
-   (每週免費投注 and "free a week" were cut at 320 px). */
+/* A narrow phone: each perk a row, its figure then its words on one line
+   (three tiles cut or wrapped their words at 320 px). */
 @media (max-width: 380px) {
-  .q-plus-perks { gap: 6px; }
-  .q-plus-perk { padding: 8px; align-content: start; grid-template-columns: minmax(0, 1fr); }
-  .q-plus-perk strong { font-size: 14px; }
-  .q-plus-perk small { white-space: normal; line-height: 1.25; overflow-wrap: break-word; }
+  .q-plus-perks { grid-auto-flow: row; gap: 6px; }
+  .q-plus-perk { grid-template-columns: 4.6em minmax(0, 1fr); align-items: baseline; gap: 8px; padding: 7px 10px; }
+  .q-plus-perk strong { font-size: 15px; }
 }
 .q-plus-status {
   font-size: 12.5px;
