@@ -904,6 +904,7 @@ async function ecoHandoff(ctx) {
   const { deps, headers, request, secret } = ctx;
   const c = await liveSession(ctx);
   if (!c) return deps.errorJson('ECO_TOKEN_INVALID', 401, headers, request);
+  if (sessionLimited(`h:${c.s}`, 10, 60_000, deps.now())) return deps.errorJson('RATE_LIMITED', 429, headers, request);
   return deps.json({ handoff: await seal(secret, { d: c.d, g: c.g, e: deps.now() + HANDOFF_MS }) }, 200, headers);
 }
 
@@ -923,6 +924,7 @@ async function ecoSignOutAll(ctx) {
   const { env, headers, deps, request } = ctx;
   const c = await liveSession(ctx);
   if (!c) return deps.errorJson('ECO_TOKEN_INVALID', 401, headers, request);
+  if (sessionLimited(`so:${c.s}`, 5, 60_000, deps.now())) return deps.errorJson('RATE_LIMITED', 429, headers, request);
   await updateWallet(env, deps, c.d, w => (gen(w) !== c.g ? w : { ...w, sec: { ...(w.sec || {}), gen: gen(w) + 1 }, live: null }));
   const res = await signIn({ ...ctx, app: c.a }, c.d);
   return res || deps.errorJson('ECO_SIGNED_OUT', 401, headers, request);
@@ -935,8 +937,11 @@ async function ecoRotate(ctx) {
   const { env, headers, deps, request } = ctx;
   const c = await liveSession(ctx);
   if (!c) return deps.errorJson('ECO_TOKEN_INVALID', 401, headers, request);
-  const old = await deps.fsGet(env, WALLET_COLLECTION, c.d);
-  const wallet = parseWallet(old.payload);
+  if (sessionLimited(`rot:${c.s}`, 5, 60_000, deps.now())) return deps.errorJson('RATE_LIMITED', 429, headers, request);
+  // Taken first (every device out): two rotates at once make one new pass,
+  // never two each holding the money.
+  const wallet = await claimAccount(env, deps, c.d, c.g);
+  if (!wallet) return deps.errorJson('ECO_SIGNED_OUT', 401, headers, request);
   const { passcode, docId } = await newPasscode(env, deps);
   for (const { collection } of Object.values(ECO_APPS)) {
     const d = await deps.fsGet(env, collection, c.d);
@@ -951,7 +956,7 @@ async function ecoRotate(ctx) {
       await deps.fsWrite(env, INBOX_COLLECTION, next, d.payload);
       (inbox[app] ||= []).push(next);
     }
-  await deps.fsWrite(env, WALLET_COLLECTION, docId, JSON.stringify({ ...wallet, inbox, sec: { gen: gen(wallet) + 1 }, live: null }), { exists: false });
+  await deps.fsWrite(env, WALLET_COLLECTION, docId, JSON.stringify({ ...wallet, inbox, sec: { gen: gen(wallet) }, live: null }), { exists: false });
   await deleteAccount(env, deps, c.d);
   return signIn({ ...ctx, app: c.a }, docId, { passcode });
 }
@@ -966,6 +971,7 @@ async function shareCreate(ctx) {
   const { env, headers, deps, request } = ctx;
   const c = await liveSession(ctx);
   if (!c) return deps.errorJson('ECO_TOKEN_INVALID', 401, headers, request);
+  if (sessionLimited(`sh:${c.s}`, 10, 60_000, deps.now())) return deps.errorJson('RATE_LIMITED', 429, headers, request);
   const doc = await deps.fsGet(env, ECO_APPS.orbit.collection, c.d);
   if (!doc.exists) return deps.errorJson('ECO_NOTHING_TO_SHARE', 404, headers, request);
   const key = deps.generateCode(8);
@@ -994,6 +1000,18 @@ async function shareRedeem(ctx) {
 }
 
 // ---- Storage ------------------------------------------------------------------------
+
+// An account taken by this request alone, for a rotate or a merge: its
+// generation moved on (every token of it stops) over the version read. The
+// wallet as taken, or null when another request took it first.
+async function claimAccount(env, deps, docId, g) {
+  let took = false;
+  const result = await updateWallet(env, deps, docId, w => {
+    took = gen(w) === g;
+    return took ? { ...w, sec: { ...(w.sec || {}), gen: g + 1 }, live: null } : w;
+  });
+  return took && result ? result.wallet : null;
+}
 
 // Read, change and write the wallet, again if another write got in between
 // (Firestore's updateTime precondition). null if there's no such account.
@@ -1095,7 +1113,9 @@ async function ecoMerge(ctx) {
   if (!sources.length || sources.length > MAX_MERGE_SOURCES) return errorJson('ECO_INVALID_SOURCES', 400, headers, request);
   const now = deps.now();
 
-  // Read every source first: nothing is written until they all check out.
+  // Read every source first: nothing but the sources' sign-out is written
+  // until they all check out (one not found leaves the others as they were,
+  // their devices signed out).
   const found = [];
   const seen = new Set([targetId]);
   for (const [i, raw] of sources.entries()) {
@@ -1105,7 +1125,10 @@ async function ecoMerge(ctx) {
     if (seen.has(docId)) continue;
     seen.add(docId);
     const w = await deps.fsGet(env, WALLET_COLLECTION, docId);
-    const wallet = w.exists ? parseWallet(w.payload) : null;
+    const read = w.exists ? parseWallet(w.payload) : null;
+    // Taken by this merge alone (its devices signed out): a pass merged into
+    // two at once brings its money to one of them, never both.
+    const wallet = read && (await claimAccount(env, deps, docId, gen(read)));
     if (!wallet) return json({ error: { code: 'ECO_SOURCE_NOT_FOUND', index: i, message: 'not found' } }, 404, headers);
     const data = {};
     for (const [name, cfg] of Object.entries(ECO_APPS)) {
@@ -1163,7 +1186,11 @@ async function ecoMerge(ctx) {
     for (const [key, v] of Object.entries(src.wallet.settings || {})) if (!settings[key] || v.t > settings[key].t) settings[key] = v;
   }
   const mergedApps = [...new Set(found.flatMap(s => Object.keys(s.data)))];
-  let result = await updateWallet(env, deps, targetId, w => ({ ...mergeWallet(w, { entries: carried, settings, inbox: inboxAdd }), merged: { t: now, apps: mergedApps } }));
+  // (This pass taken meanwhile, by a rotate or a merge into another: nothing
+  // lands on it and the sources stay, their money where it was.)
+  let ours = true;
+  let result = await updateWallet(env, deps, targetId, w => ((ours = gen(w) === c.g) ? { ...mergeWallet(w, { entries: carried, settings, inbox: inboxAdd }), merged: { t: now, apps: mergedApps } } : w));
+  if (!result || !ours) return errorJson('ECO_SIGNED_OUT', 401, headers, request);
   // What this Worker still watches for a source (Play's slips and tickets,
   // Securities' fills book) goes to this pass, then anything it paid the
   // source meanwhile comes along too (the same ids: nothing twice).

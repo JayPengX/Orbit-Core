@@ -240,6 +240,42 @@ test('merge: another pass into this one, then it is gone', async () => {
   assert.equal(legacy.status, 400);
 });
 
+// Reads that take a moment, as D1's do: two requests at once both read the same version.
+function slowReads(t) {
+  const get = t.deps.fsGet;
+  t.deps.fsGet = async (...args) => {
+    const doc = await get(...args);
+    await new Promise(r => setTimeout(r, 2));
+    return doc;
+  };
+}
+
+test('rotate twice at once: one new pass holds the money, never two', async () => {
+  const t = setup();
+  const acct = await newPass(t);
+  slowReads(t);
+  const [r1, r2] = await Promise.all([t.call('POST', '', { op: 'rotate', qt: acct.token }), t.call('POST', '', { op: 'rotate', qt: acct.token })]);
+  assert.deepEqual([r1.status, r2.status].sort(), [200, 401]);
+  const wallets = [...t.store.keys()].filter(k => k.startsWith(`${WALLET_COLLECTION}/`));
+  assert.equal(wallets.length, 1, 'one account left');
+});
+
+test('one pass merged into two at once: its money lands once', async () => {
+  const t = setup();
+  const a = await newPass(t);
+  const b = await newPass(t);
+  const src = await newPass(t);
+  const { updateWallet } = await import('../eco.js');
+  await updateWallet(t.env, t.deps, await t.deps.sha256Hex(src.passcode), w => ({ ...w, entries: [...w.entries, { id: 'odds:payout-gift', t: 1, app: 'odds', kind: 'payout', amount: 500 }] }));
+  slowReads(t);
+  const [ma, mb] = await Promise.all([a, b].map(x => t.call('POST', '', { op: 'merge', qt: x.token, sources: [{ passcode: src.passcode }] })));
+  assert.deepEqual([ma.status, mb.status].sort(), [200, 404]);
+  const holders = [ma, mb].filter(m => m.status === 200 && m.data.wallet.entries.some(e => e.id === 'odds:payout-gift'));
+  assert.equal(holders.length, 1);
+  const other = ma.status === 200 ? b : a;
+  assert.ok(!(await t.call('GET', t.qt(other.token))).data.wallet.entries.some(e => e.id === 'odds:payout-gift'));
+});
+
 test("merge since the lock-down: Play's winnings come along, and its watched slips, tickets, unrevealed scratch cards and records move to this pass", async () => {
   const t = setup();
   const { updateWallet } = await import('../eco.js');
