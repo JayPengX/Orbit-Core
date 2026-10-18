@@ -34,7 +34,7 @@ export const DATA = 'https://jaypengx.github.io/Orbit-Law/data/';
 export const LAW_LIMITS = { perPass: 40, chatPerPass: 30, perDay: 300, perMinute: 10, maxArts: 8, maxQ: 300, maxBody: 4096, billChars: 14_000 };
 export const PCODE = /^[A-Z]\d{7}$/;
 export const ART = /^\d{1,4}(-\d{1,3})?$/;
-const BILL = /^\d{6,24}$/;
+export const BILL = /^\d{6,24}$/;
 const LY = 'https://v2.ly.govapi.tw/bill/';
 const ANSWER_TTL_S = 180 * 86_400;
 const BILL_TTL_S = 30 * 86_400;
@@ -217,7 +217,9 @@ export async function readBill(id) {
       if (key) rows.push({ key, law: String(t.law_name || ''), old, now, added: Boolean(r['增訂']), note: String(r['說明'] || '') });
     }
   }
-  return { id, n: String(d['議案名稱'] || ''), by: String(d['提案單位/提案委員'] || ''), why: String(d['案由'] || ''), rows };
+  // (「…」，請審議案。 as Orbit Law shows it: …)
+  const n = String(d['議案名稱'] || '').replace(/^「(.+)」，請審議案。$/, '$1').replace(/，請審議案。$/, '');
+  return { id, n, by: String(d['提案單位/提案委員'] || ''), why: String(d['案由'] || ''), rows };
 }
 
 // The rows a prompt quotes: in order, while they fit in `max` characters.
@@ -232,7 +234,7 @@ export function billRows(rows, max) {
   }
   return out;
 }
-const rowText = r => `[key "${r.key}"] ${r.law} ${label(r.key, 'zh')}\n${r.old ? `現行: ${r.old}\n` : ''}${r.now ? `${r.added ? '增訂' : '修正'}: ${r.now}\n` : '(刪除)\n'}${r.note ? `說明: ${r.note}` : ''}`;
+export const rowText = r => `[key "${r.key}"] ${r.law} ${label(r.key, 'zh')}\n${r.old ? `現行: ${r.old}\n` : ''}${r.now ? `${r.added ? '增訂' : '修正'}: ${r.now}\n` : '(刪除)\n'}${r.note ? `說明: ${r.note}` : ''}`;
 
 const BILL_SCHEMA = {
   type: 'object',
@@ -292,7 +294,7 @@ Rules:
 
 // ---- The day's counts: D1 (STORE), or memory with no store (the tests) ----
 // One row a key a day: 'g' the day's calls in all, 'ask:<hash>' and
-// 'chat:<hash>' a Pass's.
+// 'chat:<hash>' a Pass's, 'gist' the day's new gists (law-gist.js).
 const memory = new Map();
 const ready = new WeakSet();
 async function table(env, day) {
@@ -312,15 +314,15 @@ export async function countOf(env, k, day) {
     return Infinity;
   }
 }
-async function addOne(env, k, day) {
+export async function addOne(env, k, day, by = 1) {
   if (!env.STORE) {
-    const n = (memory.get(`${day}|${k}`) || 0) + 1;
+    const n = (memory.get(`${day}|${k}`) || 0) + by;
     memory.set(`${day}|${k}`, n);
     return n;
   }
   try {
     await table(env, day);
-    const row = await env.STORE.prepare('INSERT INTO law_day (k, day, n) VALUES (?1, ?2, 1) ON CONFLICT (k) DO UPDATE SET n = n + 1 RETURNING n').bind(`${day}|${k}`, day).first();
+    const row = await env.STORE.prepare('INSERT INTO law_day (k, day, n) VALUES (?1, ?2, ?3) ON CONFLICT (k) DO UPDATE SET n = n + ?3 RETURNING n').bind(`${day}|${k}`, day, by).first();
     return Number(row?.n) || Infinity;
   } catch {
     return Infinity;
@@ -369,9 +371,9 @@ export const passKey = async (route, who, day) => `${route}:${(await sha256Hex(`
 // What every route here checks first, in order: POST, Orbit Law's origin,
 // whose asks they are (`who`: the Pass; null, not signed in), the body's
 // size, its JSON, the ask itself (`read`: the ask, or what's wrong with
-// it), 10 asks a minute, the guard's pace. → the ask, or the answer
-// turning it away.
-export async function opening(request, env, headers, { maxBody, read, who }) {
+// it), 10 asks a minute (`busy`: another count and limit), the guard's
+// pace. → the ask, or the answer turning it away.
+export async function opening(request, env, headers, { maxBody, read, who, busy = ['law:m', LAW_LIMITS.perMinute] }) {
   if (request.method !== 'POST') return fail('method', 405, headers);
   const origin = request.headers.get('Origin') || '';
   if (origin !== ORIGIN && !LOCAL_ORIGIN.test(origin)) return fail('origin', 403, headers);
@@ -386,7 +388,7 @@ export async function opening(request, env, headers, { maxBody, read, who }) {
   }
   const ask = read(body);
   if (typeof ask === 'string') return fail(ask, 400, headers);
-  if (sessionLimited(`law:m:${who}`, LAW_LIMITS.perMinute)) return fail('busy', 429, headers);
+  if (sessionLimited(`${busy[0]}:${who}`, busy[1])) return fail('busy', 429, headers);
   if ((await paceOf(env)).pace >= 2) return fail('paused', 503, headers);
   return ask;
 }

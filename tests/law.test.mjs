@@ -221,7 +221,7 @@ test('a bill is explained from its own 對照表 only, each change citing an art
     const r = await ask(BILL_ASK, { env, pass: 'bill' });
     assert.equal(r.status, 200);
     const j = await r.json();
-    assert.deepEqual(j, { answer: '放寬聲請人並設押金上限。', changes: [{ text: '押金最多兩個月', article: '421-1' }], who: ['房客', '房東', '監護人', '法院'], covered: true, bill: { id: '202110000010000', n: BILL.議案名稱, by: '本院委員甲等16人' }, cached: false, left: LAW_LIMITS.perPass - 1 });
+    assert.deepEqual(j, { answer: '放寬聲請人並設押金上限。', changes: [{ text: '押金最多兩個月', article: '421-1' }], who: ['房客', '房東', '監護人', '法院'], covered: true, bill: { id: '202110000010000', n: '民法部分條文修正草案', by: '本院委員甲等16人' }, cached: false, left: LAW_LIMITS.perPass - 1 });
     const sent = gemini.at(-1);
     const prompt = sent.contents[0].parts[0].text;
     assert.match(prompt, /\[key "15-1"\]/);
