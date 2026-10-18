@@ -3156,6 +3156,14 @@ html:not([data-q-keys]) :is(:focus-visible, :focus):not(input, textarea, select)
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* A narrow phone: the figure a size smaller and its words on two lines
+   (每週免費投注 and "free a week" were cut at 320 px). */
+@media (max-width: 380px) {
+  .q-plus-perks { gap: 6px; }
+  .q-plus-perk { padding: 8px; align-content: start; }
+  .q-plus-perk strong { font-size: 15px; }
+  .q-plus-perk small { white-space: normal; line-height: 1.25; overflow-wrap: anywhere; }
+}
 .q-plus-status {
   font-size: 12.5px;
   color: rgba(245, 241, 232, 0.66);
@@ -3211,7 +3219,8 @@ html:not([data-q-keys]) :is(:focus-visible, :focus):not(input, textarea, select)
   display: grid;
   gap: 4px;
 }
-.q-plus-perks {
+/* (The Plus page's list; the card's tiles are a span of the same name.) */
+ul.q-plus-perks {
   display: grid;
   gap: 0;
   margin: 0;
@@ -3221,13 +3230,13 @@ html:not([data-q-keys]) :is(:focus-visible, :focus):not(input, textarea, select)
   border-radius: var(--q-radius-sm);
   background: var(--q-surface);
 }
-.q-plus-perks li {
+ul.q-plus-perks li {
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 11px 14px;
 }
-.q-plus-perks li + li {
+ul.q-plus-perks li + li {
   border-top: 1px solid var(--q-divider);
 }
 .q-plus-perks .q-plus-glyph svg {
@@ -3503,6 +3512,11 @@ dialog {
 .q-pass .pass-guide { margin-top: 18px; }
 .q-pass .side-total > span small { display: block; font-size: 12px; font-weight: 600; }
 .q-pass-tabs .q-chip { padding: 0 13px; flex: none; }
+/* A narrow phone: the five tabs share the row (說明/Help was off its end at 320 px). */
+@media (max-width: 380px) {
+  .q-pass-tabs { gap: 6px; }
+  .q-pass-tabs .q-chip { flex: 1 0 auto; justify-content: center; padding: 0 8px; }
+}
 
 
 /* 除錯紀錄: its buttons under the switch, and a small red dot at the top while recording. */
