@@ -14,7 +14,7 @@
 // Prizes follow Taiwan Lottery's tables: fixed prizes as printed, pool
 // prizes (威力彩's first two tiers, 大樂透's first four) from what that draw
 // actually paid per winner, shared with the real winners (a pool tier nobody
-// won pays its whole pool). The 樂合彩 tables are Taiwan Lottery's own (45/450/8,500 times the NT$25
+// won pays its whole pool, and a won 頭獎 at least NT$2億 / NT$1億: 獎金分配方式). The 樂合彩 tables are Taiwan Lottery's own (45/450/8,500 times the NT$25
 // on 39, 50/500/8,000 on 49; 38樂合彩 is gone, last drawn 2023-12-28).
 // 今彩539's fixed prizes have a cap per draw (台灣彩券 獎金分配方式: each
 // tier NT$24,000,000; past it the tier is shared, rounded down to the NT$).
@@ -39,7 +39,7 @@ export const GAMES = {
     zones: [{ n: 6, max: 38, upTo: 16 }, { n: 1, max: 8, upTo: 8 }],
     api: { path: 'SuperLotto638Result', list: 'superLotto638Res' },
     tiers: [
-      { key: 'jackpot', zh: '頭獎', en: 'Jackpot', m: [6, 1], pool: 'super638JackpotAssign' },
+      { key: 'jackpot', zh: '頭獎', en: 'Jackpot', m: [6, 1], pool: 'super638JackpotAssign', floor: 200_000_000 },
       { key: 'second', zh: '貳獎', en: '2nd', m: [6, 0], pool: 'super638SecondAssign' },
       { key: 'third', zh: '參獎', en: '3rd', m: [5, 1], prize: 150_000 },
       { key: 'fourth', zh: '肆獎', en: '4th', m: [5, 0], prize: 20_000 },
@@ -57,7 +57,7 @@ export const GAMES = {
     special: true,
     api: { path: 'Lotto649Result', list: 'lotto649Res' },
     tiers: [
-      { key: 'jackpot', zh: '頭獎', en: 'Jackpot', hits: 6, pool: 'jackpotAssign' },
+      { key: 'jackpot', zh: '頭獎', en: 'Jackpot', hits: 6, pool: 'jackpotAssign', floor: 100_000_000 },
       { key: 'second', zh: '貳獎', en: '2nd', hits: 5, sp: true, pool: 'secondAssign' },
       { key: 'third', zh: '參獎', en: '3rd', hits: 5, sp: false, pool: 'thirdAssign' },
       { key: 'fourth', zh: '肆獎', en: '4th', hits: 4, sp: true, pool: 'fourthAssign' },
@@ -107,10 +107,13 @@ export const GAMES = {
   },
   m39: {
     zh: '39樂合彩', en: '39 Combo', price: 25, days: [1, 2, 3, 4, 5, 6], color: '#047857', of: 'daily539', multiple: 10, periods: 24,
+    // Its own results: the draw's per-bet prize (二合 paid 60倍, not 45, from 2026-10-12).
+    api: { path: '39M5Result', list: 'm539Res', assign: 'm539' },
     combo: { max: 39, drawn: 5, upTo: 10, sizes: { 2: 1_125, 3: 11_250, 4: 212_500 } }
   },
   m49: {
     zh: '49樂合彩', en: '49 Combo', price: 25, days: [2, 5], color: '#b45309', of: 'lotto649', multiple: 10, periods: 10,
+    api: { path: '49M6Result', list: 'm649Res', assign: 'm649' },
     combo: { max: 49, drawn: 6, upTo: 10, sizes: { 2: 1_250, 3: 12_500, 4: 200_000 } }
   },
   bingo: {
@@ -232,12 +235,20 @@ export function checkSelection(gameId, sel) {
 // ---- Results --------------------------------------------------------------------------
 //
 // A draw as the app keeps it: { numbers: [...], special?, zone2?, digits?,
-// pools?: { tierKey: { perPrize, winners, pool } }, order? }.
+// pools?: { tierKey: { perPrize, winners, pool } }, prizes? (樂合彩: size ->
+// a bet's prize), paid, order? }. `paid`: the draw's prizes are out (the
+// numbers come first; a pool or capped tier waits for them).
 
 export function parseDraw(gameId, record) {
   const g = GAMES[gameId];
   if (!record) return null;
   const size = record.drawNumberSize || [];
+  const paid = Object.entries(record).some(([k, a]) => k.endsWith('Assign') && (Number(a?.winnerCount) > 0 || Number(a?.perPrize) > 0));
+  if (g.combo) {
+    const each = ['', '', 'Two', 'Three', 'Four'];
+    const prizes = Object.fromEntries(Object.keys(g.combo.sizes).map(k => [k, Number(record[`${g.api.assign}${each[k]}Assign`]?.perPrize) || 0]).filter(([, v]) => v));
+    return { numbers: size.slice(0, g.combo.drawn).map(Number), prizes, paid };
+  }
   const pools = {};
   for (const t of g.tiers || []) {
     const a = record[t.pool ?? t.shared];
@@ -248,9 +259,9 @@ export function parseDraw(gameId, record) {
   const term = record.period ?? record.drawTerm;
   const t = term != null ? { term } : {};
   if (g.digits) return { digits: (record.drawNumberAppear || []).map(Number), ...t };
-  if (gameId === 'super638') return { numbers: size.slice(0, 6).map(Number), zone2: Number(size[6]), pools, ...t };
-  if (gameId === 'lotto649') return { numbers: size.slice(0, 6).map(Number), special: Number(size[6]), pools, ...t };
-  if (gameId === 'daily539') return { numbers: size.slice(0, 5).map(Number), pools, ...t };
+  if (gameId === 'super638') return { numbers: size.slice(0, 6).map(Number), zone2: Number(size[6]), pools, paid, ...t };
+  if (gameId === 'lotto649') return { numbers: size.slice(0, 6).map(Number), special: Number(size[6]), pools, paid, ...t };
+  if (gameId === 'daily539') return { numbers: size.slice(0, 5).map(Number), pools, paid, ...t };
   return null;
 }
 
@@ -272,7 +283,8 @@ export function cappedPrize(tier, winners = 0, ours = 1) {
 }
 
 // What one ticket wins on its draw: { prize, tier, detail, wins }, `wins`
-// the winning bets by tier, [{ tier, n, prize }] (prize a bet), best first.
+// the winning bets by tier, [{ tier, n, prize }] (prize a bet), best first;
+// { pending: true } while a pool or capped tier it won isn't paid out yet.
 // Tickets are { game, sel, bets } (bets: combinations or multiples bought).
 // A 包牌's bets are counted, not listed: of k numbers with h in the draw,
 // C(h, j) × C(k - h, n - j) bets hold j of them.
@@ -280,17 +292,19 @@ export function ticketPrize(ticket, draw) {
   const g = GAMES[ticket.game];
   const sel = ticket.sel;
   const mult = ticket.multiple || 1;
-  // A pool tier, shared with the real winners: our `ours` bets make more.
+  // A pool tier, shared with the real winners: our `ours` bets make more,
+  // rounded down (獎金分配方式: 計算至元，元以下無條件捨去).
   const pool = (tier, ours) => {
-    const p = draw.pools?.[tier.key];
-    if (!p) return tier.prize || 0;
-    return p.winners ? Math.round((p.perPrize * p.winners) / (p.winners + ours)) || p.perPrize : p.pool;
+    const p = draw.pools[tier.key];
+    const total = Math.max(p.winners ? p.perPrize * p.winners : p.pool, tier.floor || 0);
+    return Math.floor(total / (p.winners + ours));
   };
   const paying = (counts, detail) => {
     const wins = [];
     for (const t of g.tiers) {
       const n = counts(t);
       if (!n) continue;
+      if ((t.pool && !draw.pools?.[t.key]) || ((t.pool || t.cap) && draw.paid === false)) return { prize: 0, tier: null, detail, wins: [], pending: true };
       // A capped tier: the draw's real winners and this ticket's bets share it.
       const prize = t.pool ? pool(t, n * mult) : t.cap ? cappedPrize(t, draw.pools?.[t.key]?.winners ?? 0, n * mult) : t.prize;
       wins.push({ tier: t.key, n, prize });
@@ -328,7 +342,7 @@ export function ticketPrize(ticket, draw) {
     // wholly inside the draw wins the size's prize.
     const inside = hits(sel.numbers, draw.numbers);
     const wins = choose(inside, sel.size);
-    const each = g.combo.sizes[sel.size];
+    const each = draw.prizes?.[sel.size] || g.combo.sizes[sel.size];
     return { prize: wins * each, tier: wins ? `x${wins}` : null, detail: [inside], wins: wins ? [{ tier: `x${wins}`, n: wins, prize: each }] : [] };
   }
   if (ticket.game === 'bingo') {
@@ -414,7 +428,7 @@ export async function drawFor(gameId, draw) {
     const day = await bingoDay(draw.date);
     return parseBingo(day[draw.slot]);
   }
-  const source = g.of || gameId;
+  const source = g.api ? gameId : g.of;
   const record = (await monthDraws(source, draw.date.slice(0, 7))).get(draw.date);
   return parseDraw(source, record);
 }
@@ -474,6 +488,7 @@ export function settleTicket(account, ticketId, draw, now = new Date()) {
   const ticket = (account.tickets || []).find(x => x.id === ticketId);
   if (!ticket || ticket.status !== 'open' || !draw) return account;
   const r = ticketPrize(ticket, draw);
+  if (r.pending) return account;
   const multiple = ticket.multiple || 1;
   const gross = multiple * r.wins.reduce((s, w) => s + w.n * w.prize, 0);
   const net = multiple * r.wins.reduce((s, w) => s + w.n * prizeAfterTax(w.prize), 0);

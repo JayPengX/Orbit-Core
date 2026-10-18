@@ -76,6 +76,21 @@ test('多期: a ticket a draw, each charged, watched and paid on its own', async
   assert.deepEqual(doc(TICKET_COLLECTION, '_index').due, {});
 });
 
+test('a ticket whose pool tier is not paid out yet waits for it, and is paid when it is', async () => {
+  const now = { t: Date.parse('2026-10-13T04:00:00Z') }; // Tuesday: 大樂透
+  const { deps, doc } = setup(now, money);
+  await post(deps, { op: 'tickets', tickets: [{ id: 'pool00001', game: 'lotto649', sel: { zones: [[1, 2, 3, 4, 5, 6]] } }] });
+  deps.drawFor = async () => ({ numbers: [1, 2, 3, 4, 5, 6], special: 7, pools: {}, paid: false });
+  now.t = Date.parse('2026-10-13T12:40:00Z');
+  assert.equal((await lottoCron(env, deps)).settled, 0);
+  assert.ok(doc(TICKET_COLLECTION, `${ACCOUNT}_pool00001`), 'still watched');
+  assert.equal(doc(TICKET_COLLECTION, '_index').due[`${ACCOUNT}_pool00001`], now.t + 10 * 60_000);
+  deps.drawFor = async () => ({ numbers: [1, 2, 3, 4, 5, 6], special: 7, pools: { jackpot: { perPrize: 0, winners: 0, pool: 300_000_000 } }, paid: true });
+  now.t += 10 * 60_000;
+  assert.equal((await lottoCron(env, deps)).settled, 1);
+  assert.equal(doc(WALLET_COLLECTION, ACCOUNT).entries.find(e => e.id === 'odds:prize-pool00001').amount, Math.round(300_000_000 * 0.796));
+});
+
 test('a scratch card\'s prize is drawn by the Worker and paid once, when it is scratched', async () => {
   const now = { t: Date.parse('2026-10-12T04:00:00Z') };
   const { deps, doc } = setup(now, money);
