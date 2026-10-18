@@ -125,6 +125,10 @@ export function pushEndpoint(endpoint) {
   return url.protocol === 'https:' && !url.username && !url.password && (url.port === '' || url.port === '443') && PUSH_HOSTS.some(h => h.test(url.hostname));
 }
 
+// Each call out (a push service, ESPN, Yahoo) given up after this: one
+// that hangs mustn't hold up every notice after it in the cron's run.
+const UPSTREAM_MS = 8000;
+
 // Sends one message; 'gone' when the device has unsubscribed (404/410), or
 // its endpoint isn't a push service's (a record saved before that check).
 export async function sendPush(env, sub, message) {
@@ -132,7 +136,8 @@ export async function sendPush(env, sub, message) {
   const res = await fetch(sub.endpoint, {
     method: 'POST',
     headers: { Authorization: await vapidHeader(env, sub.endpoint), 'Content-Encoding': 'aes128gcm', 'Content-Type': 'application/octet-stream', TTL: '14400', Urgency: 'high' },
-    body: await encryptPush(sub, JSON.stringify(message))
+    body: await encryptPush(sub, JSON.stringify(message)),
+    signal: AbortSignal.timeout(UPSTREAM_MS)
   });
   if (res.status === 404 || res.status === 410) return 'gone';
   return res.ok ? 'sent' : `failed ${res.status} ${(await res.text().catch(() => '')).slice(0, 120)}`.trim();
@@ -302,7 +307,7 @@ export async function runCheck(check, lang, env) {
   }
   if (check.espn && check.session) {
     // A race: ESPN has no summary for a weekend; its day's board has each session and its order.
-    const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${check.espn}/scoreboard?dates=${check.day}`);
+    const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${check.espn}/scoreboard?dates=${check.day}`, { signal: AbortSignal.timeout(UPSTREAM_MS) });
     if (!res.ok) return null;
     const ev = (await res.json())?.events?.find(e => String(e.id) === check.event);
     const comp = ev?.competitions?.find(c => c?.type?.abbreviation === check.session);
@@ -320,7 +325,7 @@ export async function runCheck(check, lang, env) {
     return { body: result, result };
   }
   if (check.espn) {
-    const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${check.espn}/summary?event=${check.event}`);
+    const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${check.espn}/summary?event=${check.event}`, { signal: AbortSignal.timeout(UPSTREAM_MS) });
     if (!res.ok) return null;
     const comp = (await res.json())?.header?.competitions?.[0];
     if (comp?.status?.type?.state !== 'post') return null;
@@ -341,7 +346,7 @@ export async function runCheck(check, lang, env) {
     return { title: `${na} ${a?.score ?? ''} : ${h?.score ?? ''} ${nh}`, body: result, result };
   }
   if (check.yahoo) {
-    const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(check.yahoo)}?range=1d&interval=5m`, { headers: { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1' } });
+    const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(check.yahoo)}?range=1d&interval=5m`, { headers: { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1' }, signal: AbortSignal.timeout(UPSTREAM_MS) });
     if (!res.ok) return null;
     const price = (await res.json())?.chart?.result?.[0]?.meta?.regularMarketPrice;
     if (!Number.isFinite(price)) return null;
