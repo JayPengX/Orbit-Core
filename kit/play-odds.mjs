@@ -492,8 +492,11 @@ export function quantile(sorted, q) {
 
 // Taiwan Sports Lottery ticket rules: 1-12 games per ticket (never two picks
 // from one game), NT$10 units per combination, NT$100-100,000 per ticket,
-// payouts capped at NT$20 million per ticket. Any single combination paying
-// over NT$5,000 has 20% income tax and 0.4% stamp duty withheld.
+// payouts capped at NT$20 million per ticket. Tax, by 台灣運彩's rules
+// (115.6.8): §29 withholds 20% income tax from a combination whose 單注
+// (one NT$10 unit) wins over NT$5,000, so only at combined odds over 500;
+// §31 spares a member's (online account's) prizes the 4‰ stamp duty, and
+// Quadra Play is a member account. §18: prizes rounded to the dollar.
 export const SLIP_RULES = {
   maxLegs: 12,
   unit: 10,
@@ -502,10 +505,13 @@ export const SLIP_RULES = {
   maxPayout: 20_000_000,
   // A ticket with a pick the house prices alone, or a player's, costs at most this.
   capped: 1000,
+  // A 單注's prize over this is taxed.
   taxFree: 5000,
-  taxRate: 0.2,
-  stampRate: 0.004
+  taxRate: 0.2
 };
+// Taiwan Lottery's draw games and scratch cards: a bet's prize over NT$5,000
+// loses 20% income tax and 0.4% stamp duty.
+export const LOTTERY_TAX = { taxFree: 5000, rate: 0.204 };
 
 // Parlay boost: the winnings (payout less stake) of any winning combination
 // of 3 or more picks are raised by this share, by its size (7+ the most).
@@ -517,13 +523,17 @@ export const PARLAY_BOOST = [0, 0, 0, 0.05, 0.08, 0.12, 0.15, 0.2];
 export const boostRate = (size, x = 1) => (x > 0 ? (PARLAY_BOOST[Math.min(size, PARLAY_BOOST.length - 1)] || 0) * x : 0);
 const boosted = (stake, product, size, x) => stake * (1 + (product - 1) * (1 + (x > 0 && size >= 3 ? boostRate(size, x) : 0)));
 
-// What a winning combination actually pays out after Taiwan's withholding.
-export function afterTax(pay) {
-  return pay > SLIP_RULES.taxFree ? pay * (1 - SLIP_RULES.taxRate - SLIP_RULES.stampRate) : pay;
+// Whether a winning combination paying `pay` on `stake` is taxed: its 單注
+// (NT$10 of the stake) wins over NT$5,000 once rounded to the dollar (§18),
+// i.e. odds (boost included) over 500.
+export const slipTaxed = (pay, stake) => Math.round((pay * SLIP_RULES.unit) / stake) > SLIP_RULES.taxFree;
+// What a winning combination paying `pay` on `stake` pays after withholding.
+export function afterTax(pay, stake) {
+  return slipTaxed(pay, stake) ? pay * (1 - SLIP_RULES.taxRate) : pay;
 }
-// A lottery or scratch card prize after the same withholding, in whole NT$
+// A lottery or scratch card prize after its withholding, in whole NT$
 // (play-lottery.mjs, play-scratch.mjs).
-export const prizeAfterTax = gross => (gross > SLIP_RULES.taxFree ? Math.round(afterTax(gross)) : gross);
+export const prizeAfterTax = gross => (gross > LOTTERY_TAX.taxFree ? Math.round(gross * (1 - LOTTERY_TAX.rate)) : gross);
 
 export function choose(n, k) {
   if (k < 0 || k > n) return 0;
@@ -662,7 +672,7 @@ export function evaluateSlip({ legs, sizes, stake, boost = 0 }) {
 
 // What a ticket pays for every way its legs can land: index = bit mask of the
 // legs that won. Gross is capped per ticket; net also takes Taiwan's tax off
-// each combination over NT$5,000.
+// each combination whose NT$10 單注 wins over NT$5,000 (slipTaxed).
 export function slipPayoutTable({ legs, sizes, stake, boost = 0 }) {
   const n = legs.length;
   const sizeSet = new Set(sizes);
@@ -681,7 +691,7 @@ export function slipPayoutTable({ legs, sizes, stake, boost = 0 }) {
       if (!sizeSet.has(size)) continue;
       const pay = boosted(stake, product, size, boost);
       g += pay;
-      t += afterTax(pay);
+      t += afterTax(pay, stake);
     }
     if (g > SLIP_RULES.maxPayout) {
       t *= SLIP_RULES.maxPayout / g;
@@ -714,9 +724,9 @@ export function slipOutlook({ legs, sizes, stake, boost = 0 }) {
 // What a finished ticket pays. Each leg is 'won', 'lost' or 'void' (called
 // off: the lottery counts it at odds 1.00, so a single gets its stake back
 // and a parlay goes on without it). Gross is before tax, net after.
-// `taxed`: how many of the paying combinations are over SLIP_RULES.taxFree,
-// each withheld on its own as 台灣運彩 does (a ticket's tax is per
-// combination, never on the ticket's total).
+// `taxed`: how many of the paying combinations are taxed (slipTaxed), each
+// withheld on its own as 台灣運彩 does (per combination's 單注, never on
+// the ticket's total).
 export function settleSlip({ legs, sizes, stake, boost = 0 }) {
   const priced = legs.map(l => ({ gameId: l.gameId, odds: l.result === 'void' ? 1 : l.odds }));
   const { gross, net } = slipPayoutTable({ legs: priced, sizes, stake, boost });
@@ -729,7 +739,7 @@ export function settleSlip({ legs, sizes, stake, boost = 0 }) {
     let size = 0;
     let product = 1;
     for (let i = 0; i < priced.length; i++) if (pick & (1 << i)) (size++, (product *= priced[i].odds));
-    if (sizeSet.has(size) && boosted(stake, product, size, boost) > SLIP_RULES.taxFree) taxed++;
+    if (sizeSet.has(size) && slipTaxed(boosted(stake, product, size, boost), stake)) taxed++;
   }
   return { gross: gross[mask], net: net[mask], taxed };
 }
