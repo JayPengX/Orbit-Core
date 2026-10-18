@@ -36,7 +36,8 @@ const BOTTOMLESS = { v: 1, created: '', ledger: [{ id: 'x', amount: 1e12 }], sli
 // A crypto random number in [0, 1) and a 31-bit seed (the card's face).
 const cryptoUnit = () => crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32;
 const cryptoSeed = () => crypto.getRandomValues(new Uint32Array(1))[0] >>> 1;
-// A lottery prize over NT$5,000 is taxed (20% and 0.4% stamp duty), as Play's.
+// A lottery prize over NT$5,000 is taxed (20% and 0.4% stamp duty), as Play's
+// draw games and scratch cards are (LOTTERY_TAX).
 const netPrize = prizeAfterTax;
 
 const asIndex = index => (index && typeof index.due === 'object' ? index : { due: {} });

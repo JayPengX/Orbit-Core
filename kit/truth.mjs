@@ -21,9 +21,12 @@ export const PLAY = {
   cashOutKeep: 0.03,
   // Free bets: every pick at these odds or longer.
   freeMinOdds: 1.5,
-  // Winnings over NT$5,000 lose 20% tax and 0.4% stamp duty.
+  // 台灣運彩 §29: a combination whose NT$10 單注 wins over NT$5,000 (odds
+  // over 500) loses 20% income tax; §31: no 4‰ stamp duty for a member
+  // (online) account, which Play is.
   taxFree: 5_000,
-  tax: 0.204,
+  taxOdds: 500,
+  tax: 0.2,
   // 刮刮樂's payback by the card's price (its lib/scratch.mjs).
   scratch: [[100, 0.63], [200, 0.65], [300, 0.66], [500, 0.7], [1_000, 0.74], [2_000, 0.75]],
   // Draw games (威力彩, 大樂透, 今彩539…) pay back about half of what's staked.
