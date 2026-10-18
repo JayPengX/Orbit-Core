@@ -136,6 +136,7 @@ break it and say so in a line.
 | Orbit-Words | Vocabulary that catches what you don't know |
 | Orbit-Beats | Beats from your own drum kit |
 | Orbit-Slips | 台灣運彩 tickets tracked from a photo (no Pass) |
+| Orbit-Law | Taiwan's laws with linked references, and 立法院 bills by stage |
 | Quadra-Play | A Taiwan sportsbook and lottery, on play money |
 | Quadra-Securities | A Taiwan broker, on play money |
 

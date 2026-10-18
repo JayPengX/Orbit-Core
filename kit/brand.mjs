@@ -29,6 +29,7 @@ export const BRANDS = {
   match: { family: 'orbit', name: 'Orbit Sports', short: 'Sports', repo: 'Orbit-Sports', was: 'Quadra-Fixtures', from: '#fdba74', to: '#9a3412', ink: '#c2410c', color: '#ea580c', role: { zh: '賽程與比分', en: 'Scores and schedules' }, tag: { zh: '所有運動的賽程、比分與數據', en: 'Every sport, every match, every stat' } },
   slip: { family: 'orbit', name: 'Orbit Slips', short: 'Slips', repo: 'Orbit-Slips', from: '#fcd34d', to: '#78350f', ink: '#b45309', color: '#d97706', role: { zh: '運彩追蹤', en: 'Ticket tracker' }, tag: { zh: '買了的運彩，即時追蹤：比分、機率、現在價值', en: 'Your sports lottery tickets, followed live' } },
   beats: { family: 'orbit', name: 'Orbit Beats', short: 'Beats', repo: 'Orbit-Beats', from: '#f0abfc', to: '#701a75', ink: '#a21caf', color: '#c026d3', role: { zh: '節拍作曲', en: 'Beat maker' }, tag: { zh: '把你的節拍片段，排成一首首新歌', en: 'Your beat pieces, arranged into new songs' } },
+  law: { family: 'orbit', name: 'Orbit Law', short: 'Law', repo: 'Orbit-Law', from: '#a5b4fc', to: '#1e1b4b', ink: '#4338ca', color: '#4f46e5', role: { zh: '法規與法案', en: 'Laws and bills' }, tag: { zh: '台灣的法規，每個條號都能點；立法院的法案，走到哪一步一眼就懂。', en: 'Taiwan\'s laws with linked references, and 立法院 bills by stage' } },
   vocab: { family: 'orbit', name: 'Orbit Words', short: 'Words', repo: 'Orbit-Words', was: 'Quadra-Hub', from: '#f9a8d4', to: '#831843', ink: '#be185d', color: '#db2777', role: { zh: '英文單字', en: 'English words' }, tag: { zh: '背得住的英文單字：大考 6000 字，真人發音', en: 'English words that stay with you' } }
 };
 // Orbit Sports and Orbit Words were Quadra Fixtures and Quadra Hub; their
@@ -67,6 +68,8 @@ export const GLYPHS = {
   slip: (c, a = '#16a34a') => `<path d="M24 30 H104 V54 A10 10 0 0 0 104 74 V98 H24 V74 A10 10 0 0 0 24 54 Z" fill="none" stroke="${c}" stroke-width="10" stroke-linejoin="round"/><path d="M48 64 L60 76 L82 50" fill="none" stroke="${a}" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>`,
   // A waveform: five bars, the middle one tallest, a beat lit on it.
   beats: (c, a = '#f472b6') => `<path d="M24 52 V76 M44 38 V90 M64 22 V106 M84 38 V90 M104 52 V76" stroke="${c}" stroke-width="12" stroke-linecap="round"/><circle cx="64" cy="64" r="9" fill="${a}"/>`,
+  // A pair of scales: a post, a beam, two pans.
+  law: c => `<path d="M64 22 V100 M46 106 H82 M30 36 H98" fill="none" stroke="${c}" stroke-width="10" stroke-linecap="round"/><path d="M30 36 L16 70 M30 36 L44 70 M98 36 L84 70 M98 36 L112 70" fill="none" stroke="${c}" stroke-width="6" stroke-linecap="round"/><path d="M16 70 A14 14 0 0 0 44 70 Z M84 70 A14 14 0 0 0 112 70 Z" fill="${c}" stroke="${c}" stroke-width="4" stroke-linejoin="round"/>`,
   // The pass: a card with its chip.
   pass: (c, a = GOLD) => `<rect x="16" y="32" width="96" height="64" rx="12" fill="none" stroke="${c}" stroke-width="10"/><rect x="30" y="50" width="22" height="16" rx="4" fill="${a}"/><path d="M30 80 H72" stroke="${c}" stroke-width="8" stroke-linecap="round"/>`
 };
