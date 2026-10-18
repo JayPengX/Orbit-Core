@@ -66,8 +66,8 @@ item's failure alone.
 
 ## 3. The proxy (`orbit-workers-proxy`)
 
-`worker.js` routes; each route's work is in its own file. Placement is
-Taiwan.
+`worker.js` routes; each route's work is in its own file. No placement: it
+runs near each caller; only Gemini goes through `gemini-relay.js`, pinned to Taiwan.
 
 | Route | File | What |
 | --- | --- | --- |
