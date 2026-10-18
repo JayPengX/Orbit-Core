@@ -281,6 +281,8 @@ async function inTurns(items, n, work) {
   }));
   return out;
 }
+const TSDB_RETRY_MS = 1500;
+const pause = ms => new Promise(r => setTimeout(r, ms));
 async function fetchCpblTsdb(year, month, { from = Date.UTC(year, month - 1, 1), now = Date.now() } = {}) {
   let days = [];
   const last = Math.min(Date.UTC(year, month, 0), now + 14 * 24 * HOUR);
@@ -291,20 +293,22 @@ async function fetchCpblTsdb(year, month, { from = Date.UTC(year, month - 1, 1),
   // (reason kept): never an empty month served and cached as if the league
   // had no games (TheSportsDB can refuse this Worker's requests).
   const failures = [];
-  // Four at a time: a Worker call keeps only six connections open, and the
-  // rest of a batch needs some ("Response closed due to connection limit").
-  const lists = await inTurns(
-    days,
-    4,
-    d =>
-      fetch(`${TSDB}?d=${d}&l=${TSDB_CPBL}`, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(TIMEOUT), cf: { cacheTtl: d < over ? 7 * 86_400 : 600, cacheEverything: true } })
-        .then(r => {
-          if (!r.ok) throw new Error(`tsdb ${r.status}`);
-          return r.json();
-        })
-        .then(parseTsdbDay)
-        .catch(error => (failures.push(String(error.message || error)), []))
-  );
+  // Two at a time, a day turned away (429) asked once more after a pause:
+  // TheSportsDB's free key counts Cloudflare's shared addresses together, and
+  // four at a time had every day of a month refused (a 502 for CPBL's
+  // October and November, 2026-10-18). (A Worker call keeps only six
+  // connections open, and the rest of a batch needs some.)
+  const day = (d, again = true) =>
+    fetch(`${TSDB}?d=${d}&l=${TSDB_CPBL}`, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(TIMEOUT), cf: { cacheTtl: d < over ? 7 * 86_400 : 600, cacheEverything: true } }).then(async r => {
+      if (r.status === 429 && again) {
+        r.body?.cancel?.().catch(() => {});
+        await pause(TSDB_RETRY_MS);
+        return day(d, false);
+      }
+      if (!r.ok) throw new Error(`tsdb ${r.status}`);
+      return parseTsdbDay(await r.json());
+    });
+  const lists = await inTurns(days, 2, d => day(d).catch(error => (failures.push(String(error.message || error)), [])));
   if (days.length && failures.length === days.length) throw new Error(`${failures[0]} (every day)`);
   return lists.flat();
 }
@@ -312,6 +316,9 @@ async function fetchCpblTsdb(year, month, { from = Date.UTC(year, month - 1, 1),
 // can stop short of the month (October's games were missing from it while
 // the season still had a week to go, so Orbit Sports showed no schedule).
 async function cpbl(year, month, now = Date.now()) {
+  // December to February: no CPBL games (the season opens in March, 台灣大賽
+  // is over by early November), nothing to ask for.
+  if (month === 12 || month <= 2) return [];
   let ownError = '';
   const own = await fetchCpbl(year, month).catch(error => ((ownError = String(error.message || error)), null));
   if (!own) {

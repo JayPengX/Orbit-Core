@@ -72,6 +72,32 @@ test('CPBL: every source refusing is an error, never an empty month', async () =
   }
 });
 
+test('CPBL: a day TheSportsDB turns away (429) is asked once more; December asks nothing and is no games', async () => {
+  const { asiaBaseballResponse } = await import('../asia-baseball.js');
+  const real = globalThis.fetch;
+  const asked = new Map();
+  globalThis.fetch = async url => {
+    const u = String(url);
+    if (!u.includes('thesportsdb')) return new Response('no', { status: 404 });
+    asked.set(u, (asked.get(u) || 0) + 1);
+    if (asked.get(u) === 1) return new Response('slow down', { status: 429 });
+    return new Response(JSON.stringify({ events: [{ idEvent: '9', strTimestamp: '2026-11-01T09:05:00', strHomeTeam: 'CTBC Brothers', strAwayTeam: 'Uni-President Lions', strStatus: 'NS' }] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+  try {
+    const r = await asiaBaseballResponse(new URL('https://asia-baseball.quadra/cpbl/2026-11.json'));
+    assert.equal(r.status, 200);
+    assert.ok((await r.json()).games.length >= 1);
+    assert.ok([...asked.values()].every(n => n === 2));
+    asked.clear();
+    const dec = await asiaBaseballResponse(new URL('https://asia-baseball.quadra/cpbl/2026-12.json'));
+    assert.equal(dec.status, 200);
+    assert.deepEqual((await dec.json()).games, []);
+    assert.equal(asked.size, 0);
+  } finally {
+    globalThis.fetch = real;
+  }
+});
+
 test("CPBL's box score: its page's getlive answer as the app's box (sides, batters in order, pitchers' decisions, each at-bat's last pitch)", () => {
   assert.deepEqual(cpblBoxTarget(new URL('https://asia-baseball.quadra/cpbl/box/2026-290.json')), { year: 2026, sno: 290, kind: 'A' });
   assert.equal(cpblBoxTarget(new URL('https://asia-baseball.quadra/cpbl/2026-08.json')), null);
