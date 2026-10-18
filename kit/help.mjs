@@ -573,7 +573,7 @@ export const HELP = {
       ['tabs', '每個分頁', [
         '「做歌」：放片段，選情境（放鬆、熱血、律動、經典）或鼓的風格、首數，做出來的歌在這裡播。',
         '「樂器」：用 App 自己的樂器做片段：鼓組（或打擊樂）或旋律，1、2 或 4 小節。鼓再點一下是重音、第三下拿掉；旋律可以一次放和弦。搖擺、復原、把第一小節複製到每一小節；「自動編」幫你起個頭。按「加進片段」，歌就用它；「♡ 收藏」留在收藏的片段裡，也能匯出 MIDI。',
-        '「即興」：每段片段一個打擊墊，配上用你的鼓打的節奏。Loop 從下一小節開始，再點一下停；單擊的對到你選的格子（16 分、8 分、拍或自由）。按「● 錄一段」，錄下來的就是一首歌，在「做歌」裡。',
+        '「即興」：一打開就是「內建」的 16 個打擊墊（App 自己的樂團：鼓、Hi-hat、貝斯、和弦、旋律，同一個調），點節奏的標籤或 🎲 換一組；有了片段，「我的片段」就是你自己的片段，配上用你的鼓打的節奏。Loop 從下一小節開始，再點一下停；單擊的對到你選的格子（16 分、8 分、拍或自由）。按「● 錄一段」，錄下來的就是一首歌，在「做歌」裡。',
         '「歌單」：按 ♡ 留下的歌，在這支手機上；找歌名、節奏或調，四種排序，改名、分享、刪除，看到的一次下載成 zip。'
       ]],
       ['add', '放進片段', [
@@ -601,7 +601,7 @@ export const HELP = {
       ['tabs', 'The tabs', [
         'Make: add pieces, pick a mood (Chill, Hype, Groove, Classic) or the drum styles and how many, and play the songs made.',
         'Studio: pieces on the app’s own instruments: drums (or percussion) or melody, 1, 2 or 4 bars. Tap a drum again to accent it, a third time to take it out; melody notes can go in as chords. Swing, undo, bar 1 copied over every bar; Write one gives you a start. Add to pieces and the songs use it; ♡ Keep puts it in Kept clips, and it exports as MIDI too.',
-        'Jam: a pad for each piece, over a groove played on your own drums. A loop starts on the next bar and stops when tapped again; a one-shot lands on the grid you pick (16th, 8th, beat or free). Tap ● Record, and the take becomes a song in Make.',
+        'Jam: it opens on Built-in, 16 pads of the app’s own band (drums, hats, bass, chords and melody, in one key); a groove chip or 🎲 swaps the set. Once you have pieces, My clips plays your own pieces as pads, over a groove played on your own drums. A loop starts on the next bar and stops when tapped again; a one-shot lands on the grid you pick (16th, 8th, beat or free). Tap ● Record, and the take becomes a song in Make.',
         'Library: the songs kept with ♡, on this phone; find one by name, groove or key, four orders, rename, share, remove, and download what’s shown in a zip.'
       ]],
       ['add', 'Adding pieces', [
