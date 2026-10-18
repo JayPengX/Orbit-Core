@@ -17,6 +17,8 @@
 //   mlbGameFor(list, game)      the MLB game of an app's game ({ note, home, away })
 //   mlbGone(list, game, day, from)  whether an app's game to come won't be played (its series over)
 
+import { fold } from '#kit/names.mjs';
+
 // The whole postseason (every series from its first game, so one that's
 // over is known as over), about 60 KB.
 export const mlbPostseasonUrl = year => `https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameType=F,D,L,W&season=${year}`;
@@ -33,7 +35,7 @@ export function roundKey(text) {
 export const gameNumber = text => Number(/\bgame (\d+)/i.exec(String(text || ''))?.[1]) || 0;
 
 // A team's name compared plainly; "CLE/CWS" or "AL Champion" (a side not known yet) is no team.
-const plain = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+const plain = fold;
 const known = t => Boolean(t?.name) && !/\/|\bchampion\b|\bwinner\b|^tbd$/i.test(t.name);
 const side = t => (known(t) ? { name: t.name, id: String(t.id) } : null);
 

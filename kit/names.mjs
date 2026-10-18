@@ -5,6 +5,19 @@
 // matched to games (its titles use these names).
 import { normalizeTeamName } from '#kit/logos.mjs';
 
+// A name as it's compared: accents off, lower case, trimmed ("Pérez",
+// "PEREZ " and "Pérez" are one man; Rønnow is Ronnow, Müller Muller).
+// Every match by name, in every app, goes through this one.
+export function fold(s) {
+  return String(s ?? '')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    // The letters NFKD doesn't take apart.
+    .replace(/[øœæßđðłıþ]/g, c => ({ ø: 'o', œ: 'oe', æ: 'ae', ß: 'ss', đ: 'd', ð: 'd', ł: 'l', ı: 'i', þ: 'th' })[c])
+    .trim();
+}
+
 // [city, nickname] by ESPN's (and the lottery's) English name.
 const US = {
   mlb: {

@@ -21,6 +21,7 @@
 // Only broadcast.mjs imported (itself import-free): Shared-Data loads the
 // two alone (its pack of each recent game's video, sports/watch.json).
 import { eltaVodOf } from './sports-broadcast.mjs';
+import { fold } from './names.mjs';
 
 export const YT = 'https://www.youtube.com';
 export const LEAGUE_CHANNELS = {
@@ -113,7 +114,6 @@ export const videoUrl = id => `${YT}/watch?v=${id}`;
 
 // ---- Which video is the game's --------------------------------------------------------
 
-const fold = s => String(s || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/ø/g, 'o').replace(/ß/g, 'ss');
 // Words of a club's name that say nothing on their own.
 const GENERIC = new Set(['fc', 'cf', 'ac', 'as', 'sc', 'afc', 'cfc', 'ssc', 'us', 'rc', 'sv', 'vfb', 'vfl', 'tsg', 'fk', 'sk', 'club', 'de', 'la', 'le', 'the', 'and', 'of', 'united', 'city', 'real', 'sporting', 'athletic', 'football', 'calcio', 'olympique', 'stade', 'borussia', 'hotspur', 'albion', 'wanderers', 'county', 'town', 'rovers',
   // A city two clubs share (New York City FC, Red Bull New York; LAFC, LA

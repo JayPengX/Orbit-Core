@@ -621,6 +621,17 @@ test("names: a club with joining words in its name (Atlético de Madrid), and te
   assert.deepEqual(teamsByZh('Madrid'), []);
 });
 
+test('names: fold, one name however written (accents, case, spaces, the letters NFKD keeps whole)', async () => {
+  const { fold } = await import('../kit/names.mjs');
+  assert.equal(fold(' Pérez '), fold('PEREZ'));
+  assert.equal(fold('Rønnow'), 'ronnow');
+  assert.equal(fold('Müller'), 'muller');
+  assert.equal(fold('Łukasz Fabiański'), 'lukasz fabianski');
+  assert.equal(fold('Straße'), 'strasse');
+  assert.equal(fold('中信兄弟'), '中信兄弟');
+  assert.equal(fold(null), '');
+});
+
 test('pressSelector: every :active a press the kit sets, not one iOS puts on a scrolling finger', async () => {
   const kit = await import('../kit/quadra.mjs');
   assert.equal(kit.pressSelector('.card:active, .q-tab:active .q-tab-icon'), '.card[data-q-press], .q-tab[data-q-press] .q-tab-icon');
