@@ -371,25 +371,33 @@ if (typeof document !== 'undefined') {
 }
 
 const KEY = { refresh: 'quadra.refresh', account: 'quadra.account', wallet: 'quadra.wallet', aff: 'quadra.aff', dismiss: 'quadra.dismiss' };
-function readStore(key) {
+// This device's localStorage, never throwing (a private window, storage
+// full or blocked): a string, or a value as JSON (`fallback` when there's
+// none or it can't be read); null (or undefined) removes the key.
+export function readStore(key) {
   try {
     return localStorage.getItem(key);
   } catch {
     return null;
   }
 }
-function writeStore(key, value) {
+export function writeStore(key, value) {
   try {
     if (value == null) localStorage.removeItem(key);
     else localStorage.setItem(key, value);
   } catch {}
 }
-const readJson = (key, fallback) => {
+export const readJson = (key, fallback) => {
   try {
     return JSON.parse(readStore(key) || 'null') ?? fallback;
   } catch {
     return fallback;
   }
+};
+export const writeJson = (key, value, replacer) => {
+  try {
+    writeStore(key, value == null ? null : JSON.stringify(value, replacer));
+  } catch {}
 };
 
 // The signed-in account's id on this device (the first 16 characters of
