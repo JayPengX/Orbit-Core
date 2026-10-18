@@ -130,8 +130,10 @@ for (let f = opt('fixture', ''); f; f = opt('fixture', '')) {
   const i = f.lastIndexOf('=');
   fixtures.push([f.slice(0, i), resolve(f.slice(i + 1))]);
 }
-// --clock ISO: the page's time starts then (and runs on): a live session made up with --fixture, say.
+// --clock ISO: the page's time starts then (Taipei time, or the zone it names) (and runs on): a live session made up with --fixture, say.
 const clockAt = opt('clock', '');
+// (Taipei time unless it names its own zone: Z or ±hh:mm.)
+const clockTime = text => new Date(/([zZ]|[+-]\d\d:?\d\d)$/.test(text) ? text : `${text}+08:00`);
 const clicks = [];
 for (let c; (c = opt('click', null)); ) clicks.push(c);
 // --type 'selector=text': types into a field after the clicks (repeatable).
@@ -497,7 +499,7 @@ const contextOptions = {
   ignoreHTTPSErrors: true
 };
 const context = serve ? stub : persistent ? await playwright[engine].launchPersistentContext(await mkdtemp(join(tmpdir(), 'quadra-webkit-')), contextOptions) : await browser.newContext(contextOptions);
-if (clock && !serve) await context.clock.install({ time: new Date(`${clock}+08:00`) }).then(() => context.clock.resume());
+if (clock && !serve) await context.clock.install({ time: clockTime(clock) }).then(() => context.clock.resume());
 if (appId === 'weather' && !noGeo) {
   await context.grantPermissions(['geolocation']);
   await context.setGeolocation({ latitude: 25.034, longitude: 121.565 });
@@ -857,7 +859,7 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
   if (reopen) console.log(first ? `first opening${oldRoot ? ` (the app as of ${upgrade})` : ''}${flaky ? `, ${Math.round(flaky * 100)}% of answers failing` : ''}` : `second opening (storage kept)${netNow.offline ? ', offline' : netNow.slow ? `, every request ${netNow.slow} ms late` : ''}`);
   // A page of its own for each (a hash change alone doesn't reload).
   const page = await context.newPage();
-  if (clockAt) await page.clock.install({ time: new Date(clockAt) });
+  if (clockAt) await page.clock.install({ time: clockTime(clockAt) });
   page.on('console', m => m.type() === 'error' && errors.push(m.text()));
   page.on('pageerror', e => errors.push(String(e.stack || e)));
   page.on('requestfailed', r => DEBUG && console.log('request failed', r.failure()?.errorText, r.url().slice(0, 140)));
