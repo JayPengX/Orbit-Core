@@ -63,7 +63,7 @@ test('a pick is priced exactly as with everything read, reading only what can ch
     else if (kind === 'prop') assert.deepEqual(asked.sort(), ['league:epl', 'offers:7', 'players:epl_g'], id);
     else assert.deepEqual(asked.sort(), ['league:epl', 'offers:7'], id);
   }
-  for (const k of ['ml', 'total', 'runline', 'dc', 'score', 'prop']) assert.ok(kinds.has(k), k);
+  for (const k of ['ml', 'total', 'hcap3', 'dc', 'score', 'prop']) assert.ok(kinds.has(k), k);
 });
 
 test('a slip is accepted and refused as before, at the house\'s price and just past it', async () => {

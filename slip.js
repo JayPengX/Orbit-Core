@@ -87,8 +87,8 @@ Rules:
 - bought: the day the ticket was bought (購買日期 / 投注時間 / 交易時間, often in the ROC calendar: 民 115年 is 2026) as YYYY-MM-DD; null if not printed. The ticket may be old: its games may be long over.
 - date: the game's own date in Taiwan as YYYY-MM-DD only if printed next to the pick (a year-less date is the one nearest the day bought, else nearest today, never before the day bought); else null. The day bought is not the game's date.
 - kind: ml for 不讓分 / 獨贏 / 勝負 / 勝平負; spread for 讓分; total for 大小 / 總分; oddeven for 單雙. Anything else: other.
-- pick: for ml and spread, the chosen team exactly as written in teams, or "draw" for 和 / 平; for total "over" (大) or "under" (小); for oddeven "odd" (單) or "even" (雙).
-- line: for spread, the chosen team's handicap as a signed number (giving 1.5 points is -1.5, getting them is +1.5); for total, the total line; else null.
+- pick: for ml and spread, the chosen team exactly as written in teams, or "draw" for 和 / 平 / 讓分和; for total "over" (大) or "under" (小); for oddeven "odd" (單) or "even" (雙).
+- line: for spread, the chosen team's handicap as a signed number (giving 1.5 points is -1.5, getting them is +1.5); for soccer's 讓分和 (pick "draw" on a 讓分 line), the home team's handicap; for total, the total line; else null.
 - odds: the decimal odds printed for that pick.
 - combos: the ticket's combinations as N串M strings, e.g. ["單場"], ["4串1"], ["3串4"] or ["2串1","3串1"]. 全部過關 means every pick in one parlay: with 4 picks that is "4串1". Empty if not printed.
 - stakePer: the amount per combination (每組合投注金額 / 每組 / 每注; "全部過關(NTD700)" is 700) in NT$; null if not printed. total: the ticket's whole amount (總投注金額 / 總金額) in NT$; null if not printed.

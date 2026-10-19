@@ -163,3 +163,45 @@ test('set sports (tennis, volleyball, badminton, table tennis, esports): 讓盤,
   const { markets } = parseOffers(page, { sport: 'tennis', home: { en: 'A Player' }, away: { en: 'B Player' } });
   assert.deepEqual(markets.map(m => m.market).sort(), ['gh|3.5', 'gt|22.5', 'set1', 'setscore']);
 });
+
+test("soccer's 讓分 is 運彩's three ways on whole goals (主-1 / 讓分和 / 客+1), no half-goal two-way line; how it settles", () => {
+  const g = { id: 's', sport: 'epl', startUtc: '2026-10-20T11:30:00Z', home: { en: 'Arsenal' }, away: { en: 'Leeds United' }, draftKings: { home: 0.6, draw: 0.24, away: 0.16 }, total: { line: 2.5, overFair: 0.55 } };
+  const opts = gameOptions(g);
+  assert.ok(!opts.some(o => o.kind === 'runline'), 'no Asian handicap');
+  const h3 = opts.filter(o => o.kind === 'hcap3');
+  const markets = [...new Set(h3.map(o => o.market))];
+  assert.deepEqual(markets, ['h3|1', 'h3|2'], 'the home favourite 讓1分 and 讓2分');
+  for (const market of markets) {
+    const picks = h3.filter(o => o.market === market);
+    assert.deepEqual(picks.map(o => o.side), ['home', 'draw', 'away']);
+    assert.ok(Math.abs(picks.reduce((s, o) => s + o.fairChance, 0) - 1) < 1e-9);
+    // Priced at the three-way cut, as 不讓分 is.
+    const book = picks.reduce((s, o) => s + 1 / o.estOdds, 0);
+    assert.ok(Math.abs(book - 1.2) < 0.02, `${market} adds up to ${book}`);
+    assert.ok(picks.every(o => o.settle.line === picks[0].awayLine));
+  }
+  assert.equal(h3.filter(o => o.posted).map(o => o.market)[0], 'h3|1');
+  // The home favourite gives one: 2-0 is home's, 1-0 讓分和, 1-1 away's; never a refund.
+  const leg = side => ({ sport: 'epl', kind: 'hcap3', side, line: 1 });
+  assert.equal(legResult(leg('home'), game(0, 2)), 'won');
+  assert.equal(legResult(leg('home'), game(0, 1)), 'lost');
+  assert.equal(legResult(leg('draw'), game(0, 1)), 'won');
+  assert.equal(legResult(leg('away'), game(1, 1)), 'won');
+  assert.equal(legResult(leg('draw'), game(1, 1)), 'lost');
+  // An away favourite gives the goals: line −1 from its side.
+  const away = gameOptions({ ...g, draftKings: { home: 0.15, draw: 0.23, away: 0.62 } }).filter(o => o.kind === 'hcap3' && o.posted);
+  assert.equal(away[0].awayLine, -1);
+  assert.equal(legResult({ sport: 'epl', kind: 'hcap3', side: 'away', line: -1 }, game(3, 1)), 'won');
+  // Kambi's Asian handicap isn't read for soccer.
+  const ah = { criterion: { englishLabel: 'Asian Handicap' }, betOfferType: { englishName: 'Asian Handicap' }, outcomes: [{ type: 'OT_UNTYPED', odds: 1900, line: -1500, participant: 'Arsenal' }, { type: 'OT_UNTYPED', odds: 1900, line: 1500, participant: 'Leeds United' }] };
+  assert.equal(parseOffers({ events: [{ homeName: 'Arsenal', awayName: 'Leeds United' }], betOffers: [ah] }, g).markets.length, 0);
+});
+
+test('every football and basketball total sits on a half point, as 運彩 posts them (no push)', () => {
+  for (const [league, line, spread] of [['nfl', 44.5, 3.5], ['nba', 228.5, 6.5], ['wnba', 165.5, 4.5]]) {
+    const m = pointsModel(league, { homeWin: 0.6, spread: { awayLine: spread, awayFair: 0.5 }, total: { line, overFair: 0.5 } });
+    const totals = pointsMarkets(m, { spreadLine: spread, totalLine: line }).filter(x => x.kind === 'total');
+    assert.ok(totals.length >= 3, league);
+    for (const t of totals) assert.equal(Math.abs(t.line % 1), 0.5, `${league} ${t.line}`);
+  }
+});

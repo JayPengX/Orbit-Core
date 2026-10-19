@@ -36,7 +36,10 @@ export const ONE_SIDED_MARGIN = 1.1;
 
 // The labels of each family's whole-game markets, as Kambi writes them.
 const FULL = {
-  soccer: { total: /^Total Goals$/, spread: /^Asian Handicap$/, team: /^Total Goals by (.+)$/ },
+  // (No soccer spread: Kambi's is the Asian handicap, two ways on half and
+  // quarter goals; 台灣運彩's 讓分 is three ways on whole goals, markets.mjs
+  // soccerHandicaps.)
+  soccer: { total: /^Total Goals$/, team: /^Total Goals by (.+)$/ },
   baseball: { total: /^Total Runs$/, spread: /^Run Line$/, team: /^Total Runs by (.+)$/ },
   football: { total: /^Total Points - Including Overtime$/, spread: /^Point Spread - Including Overtime$/, team: /^Total Points by (.+) - Including Overtime$/ },
   basketball: { total: /^Total Points - Including Overtime$/, spread: /^Point Spread - Including Overtime$/, team: /^Total Points by (.+) - Including Overtime$/ },
