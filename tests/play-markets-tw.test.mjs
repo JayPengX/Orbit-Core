@@ -205,3 +205,18 @@ test('every football and basketball total sits on a half point, as 運彩 posts 
     for (const t of totals) assert.equal(Math.abs(t.line % 1), 0.5, `${league} ${t.line}`);
   }
 });
+
+test('運彩 two-way cut by sport (its boards, 2026-10-20): basketball and soccer about 1.17, baseball 1.158; basketball 讓分 a point apart', async () => {
+  const { houseCut, BASE_CUT } = await import('../kit/play-rules.mjs');
+  assert.equal(houseCut({ base: 'twoWay', sport: 'nba' }), 1.168);
+  assert.equal(houseCut({ base: 'twoWay', sport: 'epl' }), 1.17);
+  assert.equal(houseCut({ base: BASE_CUT.twoWay, sport: 'mlb' }), 1.158);
+  assert.equal(houseCut({ base: 'threeWay', sport: 'epl' }), 1.2);
+  assert.equal(houseCut({ base: 'live', sport: 'nba' }), BASE_CUT.live);
+  const nba = pointsModel('nba', { homeWin: 0.55, spread: { awayLine: 2.5, awayFair: 0.5 }, total: { line: 221.5, overFair: 0.5 } });
+  const lines = pointsMarkets(nba, { spreadLine: 2.5, totalLine: 221.5 }).filter(m => m.kind === 'runline').map(m => m.awayLine);
+  assert.deepEqual(lines, [0.5, 1.5, 2.5, 3.5, 4.5].filter(l => lines.includes(l)));
+  assert.ok(lines.includes(1.5) && lines.includes(3.5));
+  const nfl = pointsModel('nfl', { homeWin: 0.6, spread: { awayLine: 3.5, awayFair: 0.5 }, total: { line: 45.5, overFair: 0.5 } });
+  assert.deepEqual(pointsMarkets(nfl, { spreadLine: 3.5, totalLine: 45.5 }).filter(m => m.kind === 'runline').map(m => m.awayLine), [-2.5, 0.5, 3.5, 6.5, 9.5]);
+});

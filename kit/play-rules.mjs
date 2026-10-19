@@ -1,3 +1,4 @@
+import { familyOf } from '#kit/play-teams.mjs';
 // Quadra Play's rules, in the shared kit: Play and the Worker's settling (settle.mjs) use this one copy.
 // The house's rules for single options, shared by the bet slip and the
 // simulated crowd, so both play by exactly the same rules.
@@ -97,7 +98,12 @@ export function leagueTier(sport) {
 // markets), so each league's risk is paid for.
 export const TIER_CUT = { major: 1, minor: 1.02, thin: 1.03 };
 // The overround for one market: `base` a BASE_CUT key or an overround, `sport` its league's tier.
+// A two-way market by sport (運彩's own boards, 2026-10-20): basketball's
+// and soccer's 讓分, 大小 and 兩隊都進球 add up to about 1.17 (NBA 1.70/1.73,
+// 1.68/1.75; soccer 1.58/1.86, 1.65/1.78), baseball's 1.15 (MLB 2.23/1.43).
+export const TWO_WAY_BY_FAMILY = { basketball: 1.168, soccer: 1.17 };
 export function houseCut({ base = 'twoWay', sport = null } = {}) {
-  const k = typeof base === 'number' ? base : BASE_CUT[base];
+  let k = typeof base === 'number' ? base : BASE_CUT[base];
+  if (sport && k === BASE_CUT.twoWay) k = TWO_WAY_BY_FAMILY[familyOf(sport)] ?? k;
   return sport ? k * TIER_CUT[leagueTier(sport)] : k;
 }
