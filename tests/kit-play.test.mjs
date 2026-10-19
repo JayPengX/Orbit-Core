@@ -8,7 +8,7 @@ import { settleSlip, evaluateSlip, slipPayoutTable, slipOutlook, analyzeSlip, af
 import { cashOutState, CASHOUT_KEEP, CASHOUT_MAX_OPEN } from '../kit/play-cashout.mjs';
 import { houseRule, shadeLong, minLegsProblem, HOUSE_RULES, LONG_FROM } from '../kit/play-rules.mjs';
 import { GAMES, ticketPrize, parseDraw, cappedPrize, settleTicket, buyTicket, nextDraw, nextDraws, limits, drawTerm, tierName, closesAt, CLOSE_MS, checkSelection, betCount, expectedReturn, mergeTickets, addTickets, BINGO_DRAWS, GAME_ORDER } from '../kit/play-lottery.mjs';
-import { CARDS, CARD_ORDER, face, facePays, tiersOf, drawPrize, buyScratch, revealScratch, expectedReturn as scratchReturn } from '../kit/play-scratch.mjs';
+import { CARDS, CARD_ORDER, face, facePays, tiersOf, drawPrize, buyScratch, revealScratch, onSale, winRate as scratchWins, expectedReturn as scratchReturn } from '../kit/play-scratch.mjs';
 import { propResult } from '../kit/play-props.mjs';
 import { parseOffers } from '../kit/play-offers.mjs';
 import { parseKambiInPlay } from '../kit/play-kambi.mjs';
@@ -728,20 +728,76 @@ test('draw times: sales close half an hour before 20:30, BINGO every five minute
   assert.ok(!GAMES.lotto1224 && !GAMES.lotto740);
 });
 
-test('scratch cards: Taiwan Lottery\'s own on sale, at their top prize and win rate; retired ones still scratch, never sold', () => {
-  // 台灣彩券 刮刮樂 (2026-10): price, top prize, 總中獎率.
-  const real = { lucky7: ['錢進888', 100, 800_000, 0.301], fruit: ['金磚疊疊樂', 200, 2_000_000, 0.35], beat: ['獎金對決', 200, 2_000_000, 0.33], numbers: ['金鑽999', 200, 2_000_000, 0.2755], million: ['樂刮$5,000', 500, 3_000_000, 0.3473] };
-  assert.deepEqual(CARD_ORDER, Object.keys(real));
-  for (const [id, [zh, price, top, win]] of Object.entries(real)) {
-    assert.deepEqual([CARDS[id].zh, CARDS[id].price, tiersOf(id).at(-1).prize], [zh, price, top], id);
-    assert.ok(Math.abs(tiersOf(id).reduce((s, t) => s + 1 / t.odds, 0) - win) < 0.001, `${id} wins`);
-    assert.ok(!/莊家|中獎號碼/.test(CARDS[id].how.zh), `${id}: the cards' own words (幸運號碼, 大力士分數)`);
+test('scratch cards: every card Taiwan Lottery sells, at its real table, top prize, win rate and dates; retired ones still scratch, never sold', () => {
+  // 台灣彩券 刮刮樂 (on sale 2026-10-19): price, top prize, 總中獎率, 發行張數, 下市日期.
+  const real = {
+    lucky7: ['錢進888', 100, 800_000, 30.1, 6_063_200, '2027-02-18'], hi123: ['嗨刮123', 100, 300_000, 33.01, 4_080_000, '2026-12-15'],
+    gift: ['喜從天降', 200, 2_000_000, 30.4, 6_080_000, '2027-04-07'], fruit: ['金磚疊疊樂', 200, 2_000_000, 35, 6_079_300, '2027-03-15'],
+    battle: ['獎金大作戰', 200, 2_000_000, 33, 5_914_300, '2027-03-15'], double: ['好運樂加倍', 200, 2_000_000, 31, 6_046_600, '2027-03-02'],
+    ingot: ['金五吉', 200, 2_000_000, 32, 6_081_400, '2027-02-18'], beat: ['獎金對決', 200, 2_000_000, 33, 5_892_100, '2027-02-11'],
+    code: ['財富密碼', 200, 2_000_000, 32, 3_567_300, '2027-01-18'], goldlotto: ['刮刮金樂透', 200, 2_000_000, 31.6, 7_140_000, '2027-01-18'],
+    crazy10: ['狂刮10萬', 200, 100_000, 30.09, 4_590_000, '2027-01-04'], rising: ['財運高升', 200, 2_000_000, 31, 6_120_000, '2026-12-15'],
+    fafa: ['好運發發', 200, 88_000, 31.99, 4_080_000, '2026-12-02'], goal: ['點球成金', 200, 2_000_000, 32, 4_564_000, '2026-11-19'],
+    multiply: ['獎金倍倍樂', 200, 2_000_000, 31, 3_965_100, '2026-11-19'], numbers: ['金鑽999', 200, 2_000_000, 27.55, 4_080_000, '2026-11-05'],
+    touch: ['一觸即發', 200, 2_000_000, 34, 3_551_700, '2026-10-21'], hunter: ['獎金獵人', 200, 2_000_000, 30.1, 5_904_800, '2026-10-21'],
+    machine: ['無敵開獎機', 300, 3_000_000, 38.01, 6_603_400, '2027-03-02'], super777: ['無敵777', 300, 3_000_000, 36.01, 6_616_400, '2027-01-04'],
+    mjbingo: ['麻將大賓果', 300, 3_000_000, 36, 7_093_500, '2026-11-05'], ten: ['10來添金', 500, 5_000_000, 41, 4_000_000, '2027-04-07'],
+    million: ['樂刮$5,000', 500, 3_000_000, 34.73, 4_000_000, '2026-12-02'], mahjong: ['大麻將', 1000, 10_000_000, 70.14, 3_500_000, '2027-02-11']
+  };
+  assert.deepEqual([...CARD_ORDER].sort(), Object.keys(real).sort());
+  // By price, then the newest first.
+  for (let i = 1; i < CARD_ORDER.length; i++) {
+    const [a, b] = [CARDS[CARD_ORDER[i - 1]], CARDS[CARD_ORDER[i]]];
+    assert.ok(a.price < b.price || (a.price === b.price && a.since >= b.since), CARD_ORDER[i]);
   }
+  for (const [id, [zh, price, top, win, issued, until]] of Object.entries(real)) {
+    assert.deepEqual([CARDS[id].zh, CARDS[id].price, tiersOf(id).at(-1).prize, CARDS[id].issued, CARDS[id].until], [zh, price, top, issued, until], id);
+    assert.ok(Math.abs(scratchWins(id) * 100 - win) < 0.006, `${id} wins ${scratchWins(id)}`);
+    assert.ok(!/莊家|中獎號碼/.test(CARDS[id].how.zh), `${id}: the cards' own words (幸運號碼, 大力士分數)`);
+    assert.ok(onSale(id, new Date('2026-10-19T12:00:00+08:00')), id);
+    assert.ok(!onSale(id, new Date(`${until}T17:00:00+08:00`)), `${id} off sale at 17:00 on ${until}`);
+  }
+  // 大麻將's 3 × NT$1,000萬 and 20 × 100萬 in a run of 3,500,000.
+  assert.deepEqual(tiersOf('mahjong').slice(-2).map(t => Math.round(3_500_000 / t.odds)), [20, 3]);
   const acc = { ledger: [{ id: 'start', amount: 10_000, t: '' }], tickets: [] };
+  const now = new Date('2026-10-19T12:00:00+08:00');
+  assert.ok(buyScratch(acc, { id: 'm', card: 'mahjong' }, now).ticket, 'NT$1,000 cards are sold');
+  assert.equal(buyScratch(acc, { id: 'late', card: 'touch' }, new Date('2026-10-22T00:00:00+08:00')).error, 'game', 'not after its 下市日期');
   for (const id of Object.keys(CARDS).filter(id => !CARD_ORDER.includes(id))) {
     assert.ok(CARDS[id].retired, id);
-    assert.equal(buyScratch(acc, { id: 'r', card: id }).error, 'game', `${id} is not sold`);
+    assert.equal(buyScratch(acc, { id: 'r', card: id }, now).error, 'game', `${id} is not sold`);
   }
+});
+
+test('scratch cards: each game reads its own rule (a face that says otherwise pays otherwise)', () => {
+  const pays = (id, f) => facePays(id, { kind: 'games', pool: f.pool || null, games: [f.g] });
+  // 大麻將: a round wins only when every tile is among yours.
+  const round = { type: 'rounds', rounds: [{ items: ['一萬', '東'], a: 5_000 }] };
+  assert.equal(pays('mahjong', { pool: ['一萬', '東'], g: round }), 5_000);
+  assert.equal(pays('mahjong', { pool: ['一萬'], g: round }), 0);
+  // 無敵開獎機: by how many, one prize a round.
+  const count = { type: 'rounds', rounds: [{ items: [1, 2, 3], table: [[2, 500], [3, 5_000]] }] };
+  assert.equal(pays('machine', { pool: [1, 2, 3], g: count }), 5_000);
+  assert.equal(pays('machine', { pool: [1, 2], g: count }), 500);
+  // 獎金對決: a tie doesn't win.
+  assert.equal(pays('beat', { g: { type: 'duel', rows: [{ you: 20, them: 20, a: 500 }, { you: 21, them: 20, a: 300 }] } }), 300);
+  // 金五吉: the table by count; one ingot wins nothing.
+  const tally = { type: 'tally', need: '元寶', table: CARDS.ingot.games[0].table };
+  assert.equal(pays('ingot', { g: { ...tally, cells: ['元寶', '吉', '元寶', '元寶'] } }), 300);
+  assert.equal(pays('ingot', { g: { ...tally, cells: ['元寶', '吉'] } }), 0);
+  // 刮刮金樂透: 4 + 特別號 is 5,000, not 2,000 as well.
+  const lotto = { type: 'lotto', lotto: [1, 2, 3, 4, 5, 6], special: 7, table: CARDS.goldlotto.games[0].table };
+  assert.equal(pays('goldlotto', { pool: [1, 2, 3, 4, 7], g: lotto }), 5_000);
+  assert.equal(pays('goldlotto', { pool: [1, 2, 3, 4], g: lotto }), 2_000);
+  // 麻將大賓果: FREE counts; the table by lines.
+  const grid = { type: 'grid', size: 6, mode: 'pool', table: CARDS.mjbingo.games[0].table, cells: Array.from({ length: 36 }, (_, i) => (i < 6 ? (i === 2 ? null : `t${i}`) : `x${i}`)) };
+  assert.equal(pays('mjbingo', { pool: ['t0', 't1', 't3', 't4', 't5'], g: grid }), 300);
+  // 喜從天降: the 🎁 pays every amount in game 1.
+  const gift = { type: 'numbers', winning: [1, 2], bonus: { s: '🎁', all: true }, yours: [{ s: '🎁', a: 200 }, { n: 9, a: 200 }, { n: 8, a: 500 }] };
+  assert.equal(pays('gift', { g: gift }), 900);
+  // 一觸即發: a match wins the crossing; each 發 1,000.
+  const cross = { type: 'cross', yours: [5, 6], lucky: [6, 9], cells: [[200, 500], ['發', 300]], bonus: { s: '發', a: 1_000 } };
+  assert.equal(pays('touch', { g: cross }), 1_500);
 });
 
 test('scratch cards: every face pays exactly its prize, the prize taxed once over NT$5,000', () => {
@@ -751,8 +807,10 @@ test('scratch cards: every face pays exactly its prize, the prize taxed once ove
     assert.ok(scratchReturn(id) > 0.5 && scratchReturn(id) < 0.85, id);
     assert.equal(drawPrize(id, () => 0.999999), 0);
   }
+  // A card bought on the old made-up tables still shows what it won.
+  for (const [id, prize] of [['beat', 400], ['lucky7', 700], ['million', 2_500], ['fruit', 4_000], ['numbers', 1_800]]) assert.equal(facePays(id, face(id, prize, 11)), prize, id);
   const acc = { ledger: [{ id: 'start', amount: 10_000, t: '' }], tickets: [] };
-  const now = new Date('2026-10-18T00:00:00Z');
+  const now = new Date('2026-10-19T00:00:00Z');
   // A draw that lands on the top tier (the table's chances in order, the last one's start).
   const tiers = tiersOf('million');
   const top = tiers.slice(0, -1).reduce((s, t) => s + 1 / t.odds, 0) + 1e-12;

@@ -99,6 +99,13 @@ test('a scratch card\'s prize is drawn by the Worker and paid once, when it is s
   assert.equal(typeof ticket.prize, 'number');
   assert.equal(doc(WALLET_COLLECTION, ACCOUNT).entries.find(e => e.id === 'odds:lotto-scratch001').amount, -ticket.cost);
   assert.equal((await post(deps, { op: 'scratch', id: 'scratch002', card: 'palace' })).body.refused.problem, 'shape', 'a retired card is not sold');
+  assert.equal((await post(deps, { op: 'scratch', id: 'scratch003', card: 'mahjong' })).body.refused.problem, 'funds', '大麻將 (NT$1,000) is sold: refused only for the NT$900 left');
+  // 一觸即發 left the shops 2026-10-21 17:00 (Taiwan): sold until then, never after.
+  now.t = Date.parse('2026-10-21T08:59:00Z');
+  assert.ok((await post(deps, { op: 'scratch', id: 'scratch004', card: 'touch' })).body.ticket);
+  now.t = Date.parse('2026-10-21T09:00:00Z');
+  assert.equal((await post(deps, { op: 'scratch', id: 'scratch005', card: 'touch' })).body.refused.problem, 'shape', 'a card past its 下市日期 is not sold');
+  now.t = Date.parse('2026-10-12T04:00:00Z');
   const first = await post(deps, { op: 'reveal', id: 'scratch001' });
   assert.equal(first.body.prize, ticket.prize > 5000 ? Math.round(ticket.prize * 0.796) : ticket.prize);
   assert.equal((await post(deps, { op: 'reveal', id: 'scratch001' })).body.refused.problem, 'unknown');

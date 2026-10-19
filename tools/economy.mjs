@@ -10,6 +10,8 @@
 // Plus. The holds are the house's measured ones (see Quadra-Play's
 // rules.mjs, odds.mjs, lottery.mjs, scratch.mjs).
 
+import { CARD_ORDER, expectedReturn } from '../kit/play-scratch.mjs';
+
 const DAYS = 30;
 // Play: a two-way line priced at the lottery's 1.158 overround keeps 13.6% of
 // a single; a treble keeps about a third even with its 5% boost.
@@ -17,7 +19,9 @@ const HOLD = {
   single: 1 - 1 / 1.158,
   treble: 1 - ((1 / 1.158) ** 3 * (1 + (1.85 ** 3 - 1) * 1.05)) / 1.85 ** 3,
   draw: 0.5, // 電腦彩券 pays back about half
-  scratch: 0.34 // 刮刮樂 63-70% back
+  // 刮刮樂: the cards on sale (the kit's real tables) pay back 60-75%, a card
+  // bought as likely as any other.
+  scratch: 1 - CARD_ORDER.reduce((s, id) => s + expectedReturn(id), 0) / CARD_ORDER.length
 };
 const MARKET = 0.07 / 12; // a diversified portfolio, a month
 const TRADE_COST = 0.006; // Taiwan round trip: commission both ways and the sell tax
