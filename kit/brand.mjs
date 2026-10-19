@@ -160,3 +160,20 @@ export function cleanDev(x = {}) {
   return out;
 }
 
+
+// Each app's colour as quadra.css sets it under <html data-app="id"> (the
+// block between app-colours markers; tools/accent-css.mjs writes it): the
+// brand colour in light, halfway to its lighter `from` in dark. At no
+// specificity, so an app's own :root { --q-accent } still wins.
+const mix = (a, b) => `#${[1, 3, 5].map(i => Math.round((parseInt(a.slice(i, i + 2), 16) + parseInt(b.slice(i, i + 2), 16)) / 2).toString(16).padStart(2, '0')).join('')}`;
+export const accentOf = (id, dark = false) => (dark ? mix(BRANDS[id].color || BRANDS[id].ink, BRANDS[id].from) : BRANDS[id].color || BRANDS[id].ink);
+export function accentCss() {
+  const ids = Object.keys(BRANDS);
+  const rules = dark => ids.map(id => `:where(:root[data-app='${id}']${dark}) {\n  --q-accent: ${accentOf(id, Boolean(dark))};\n}`).join('\n');
+  return `${rules('')}\n@media (prefers-color-scheme: dark) {\n${rules(":not([data-theme='light'])").replace(/^/gm, '  ')}\n}\n${rules("[data-theme='dark']")}`;
+}
+
+// <html data-app="id">: the app's colour from the first paint (quadra.css).
+export function withApp(html, id) {
+  return html.replace(/<html\b([^>]*)>/i, (tag, attrs) => (/\sdata-app=/.test(attrs) ? tag.replace(/\sdata-app=(["'])[^"']*\1/, ` data-app="${id}"`) : `<html${attrs} data-app="${id}">`));
+}
