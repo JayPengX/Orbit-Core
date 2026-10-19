@@ -200,7 +200,7 @@
   // (The kit's watch skips its own first check, this one just made, and
   // waits for its answer: __bootCheck says 'boot' when this reload is under
   // way, 'none' when both versions were read and nothing is newer, 'watch'
-  // otherwise: a newer one found after the app had started, or a version
+  // otherwise: a newer one found with the app already on screen, or a version
   // not read. Then the watch looks again at once, so the first opening after
   // a deploy gets it, not the next one.)
   window.__bootChecked = Date.now();
@@ -216,7 +216,9 @@
       } catch (e) {}
     }
     if (!appNew && !kitNew) return got[0] && (got[1] || !kit.base) ? 'none' : 'watch';
-    if (window.__fxStarted) return 'watch';
+    // (An app already on screen leaves it to the watch; one still behind
+    // this loading screen is reloaded now, before anything shows.)
+    if (box.hidden) return 'watch';
     var flag = 'quadra.bootTo:' + location.pathname;
     var want = (appNew ? latest : current) + '|' + (kitLatest || '');
     var was = String(sessionStorage.getItem(flag) || '').split('#');

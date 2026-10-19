@@ -2973,6 +2973,17 @@ async function kitLatest() {
   }
 }
 
+// Whether the app may lift its loading screen: once boot.js's first update
+// check has answered (at most `max` ms: it gives up on version.json at 6 s),
+// true; false when that check is reloading the page onto a newer deploy (the
+// app then shows nothing, so a person never sees the old screen swapped out).
+export async function updateChecked(max = 7_000) {
+  const boot = globalThis.__bootCheck;
+  if (!boot?.then) return true;
+  const r = await Promise.race([boot.catch(() => 'watch'), new Promise(done => setTimeout(() => done('late'), max))]);
+  return r !== 'boot';
+}
+
 let watching = null;
 // `busy` is no longer waited on (kept so the apps' calls stay valid).
 export function watchUpdates({ current, key, cachePrefix, every = 15_000 } = {}) {
@@ -3024,7 +3035,7 @@ export function watchUpdates({ current, key, cachePrefix, every = 15_000 } = {})
       checking = false;
     }
   }
-  // boot.js's first look: a newer deploy it found after the app had started
+  // boot.js's first look: a newer deploy it found with the app already on screen
   // (or a version it couldn't read) is looked for again at once.
   const boot = globalThis.__bootCheck;
   if (boot?.then) boot.then(r => r !== 'boot' && r !== 'none' && check(true), () => check(true));
