@@ -8,7 +8,9 @@
 // pitch, a map, a chart) stays the app's.
 //
 //   import { segmented, sheet, menu, toast, list, cell, search, toggle, empty, view } from '#kit/ui.mjs';
-//   and the premium layer: icons, tile, pageHead, heroCard, rowCard, tag, rail, stats, section.
+//   and the premium layer: icons, tile, pageHead, heroCard, rowCard, tag, rail, stats, section;
+//   round 3: sectionHead, logoTile, matchCard, liveStrip, actionGrid, sheetHero, sheetFoot,
+//   confirm, stakeInput, ballRow, placeTile, schedLine, rideRow.
 
 const reduced = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
@@ -210,8 +212,11 @@ export function toggle({ checked = false, onChange = () => {}, label = '' } = {}
 }
 
 // ---- Nothing here ----
-export function empty({ icon = '', title = '', body = '', action = null } = {}) {
-  return h('div', { class: 'q-empty' }, [icon ? h('span', { class: 'q-empty-icon', 'aria-hidden': 'true', text: icon }) : null, title ? h('strong', { text: title }) : null, body ? h('p', { text: body }) : null, action]);
+// `icon` is a key of `icons` ('ticket': a 56px colour tile, `tint` its
+// colour) or anything else (an old emoji: the grey disc it always was).
+export function empty({ icon = '', tint = '', title = '', body = '', action = null } = {}) {
+  const mark = !icon ? null : isIcon(icon) ? tinted(h('span', { class: 'q-tile q-empty-tile', 'aria-hidden': 'true', html: icons[icon] }), tint) : h('span', { class: 'q-empty-icon', 'aria-hidden': 'true', text: icon });
+  return h('div', { class: 'q-empty' }, [mark, title ? h('strong', { text: title }) : null, body ? h('p', { text: body }) : null, action]);
 }
 
 // ---- A change of view, cross-faded where Safari can (View Transitions) ----
@@ -316,8 +321,13 @@ export const icons = {
   exchange: g('<path d="M4 8h14M14.5 4.5 18 8l-3.5 3.5M20 16H6M9.5 12.5 6 16l3.5 3.5"/>'),
   cup: g('<path d="M5 8h11v6a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5zM16 9.5h1.5a2.5 2.5 0 0 1 0 5H16M8 3.5v2M12 3.5v2M5 21h11"/>'),
   flag: g('<path d="M5.5 21V4M5.5 5h12l-2.5 4 2.5 4h-12"/>'),
-  target: g('<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r=".8"/>')
+  target: g('<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r=".8"/>'),
+  chevron: g('<path d="m9 5 7 7-7 7"/>'),
+  // Saved places (with home, pin and star above).
+  work: g('<rect x="3.5" y="7.5" width="17" height="12" rx="2.5"/><path d="M9 7.5V6a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 6v1.5M3.5 13h17M10.5 13v1.5h3V13"/>'),
+  school: g('<path d="m12 4.5 9 4.5-9 4.5L3 9zM7 11.5v4.2c0 1.2 2.2 2.3 5 2.3s5-1.1 5-2.3v-4.2M21 9v5"/>')
 };
+const isIcon = x => typeof x === 'string' && Object.hasOwn(icons, x);
 const glyph = x => (typeof x === 'string' && x.trim().startsWith('<svg') ? { html: x } : { text: x == null ? '' : String(x) });
 const tinted = (n, color) => (color && n.style.setProperty('--t', color), n);
 
@@ -386,4 +396,171 @@ export function stats(items) {
 export function section(title, body, { more = '', moreHref = '', onMore = null } = {}) {
   const head = h('div', { class: 'q-section-head' }, [h('h2', { text: title }), more ? h(moreHref ? 'a' : 'button', { ...(moreHref ? { href: moreHref } : { type: 'button', onclick: onMore }), text: more }) : null]);
   return h('section', { class: 'q-section' }, [head, ...[].concat(body)]);
+}
+
+// ---- Round 3 premium components (quadra.css "Premium components (round 3)") ----
+
+// A section's head: its title, a count beside it, a link to the rest on the
+// right. sectionHead('為你推薦', { count: 4, more: '全部', onMore }); the same
+// .q-section-head as section()'s, drawn 20px with a 44px tap target (.q-shd).
+export function sectionHead(title, { more = '', onMore = null, moreHref = '', count = null } = {}) {
+  const chev = h('span', { html: icons.chevron, style: { display: 'contents' } });
+  return h('div', { class: 'q-section-head q-shd' }, [
+    h('h2', { text: title }),
+    count != null && count !== '' ? h('span', { class: 'q-sh-count num', text: String(count) }) : null,
+    more ? h(moreHref ? 'a' : 'button', { class: 'q-sh-more', ...(moreHref ? { href: moreHref } : { type: 'button', onclick: onMore }) }, [more, chev]) : null
+  ]);
+}
+
+// A logo, the hero of its card: white rounded square, the image contained.
+// logoTile(src, { size: 40, alt, fallbackText, tint }). No src (or a broken
+// one) shows fallbackText on `tint` instead.
+export function logoTile(src, { size = 40, alt = '', fallbackText = '', tint = '' } = {}) {
+  const t = h('span', { class: 'q-logo' });
+  t.style.setProperty('--s', `${size}px`);
+  const text = () => {
+    t.className = 'q-logo text';
+    t.replaceChildren(String(fallbackText || alt || '').trim().slice(0, 1));
+    if (tint) t.style.setProperty('--t', tint);
+  };
+  if (src) {
+    const img = h('img', { src, alt, loading: 'lazy', decoding: 'async' });
+    if (fallbackText) img.addEventListener('error', text);
+    t.append(img);
+  } else if (fallbackText || alt) text();
+  return t;
+}
+
+// A match: its league and time, two sides, the prices in one equal row.
+// matchCard({ league, leagueLogo, when, live, tag, wide, sides: [{ logo, name,
+// score }], prices: [{ label, odds, onTap, selected, locked }], onOpen }).
+// Scores show as "2 : 1", else "VS". wide = a full-width card for a list.
+export function matchCard({ league = '', leagueLogo = '', when = '', live = false, tag = null, wide = false, sides = [], prices = [], onOpen = null } = {}) {
+  const [a = {}, b = {}] = sides;
+  const px = wide ? 40 : 48;
+  const side = s => h('div', { class: 'q-match-side' }, [logoTile(s.logo, { size: px, alt: s.name, fallbackText: s.name }), h('b', { text: s.name || '' })]);
+  const scored = a.score != null && b.score != null;
+  const t = tag ? (typeof tag === 'string' ? { text: tag } : tag) : null;
+  const card = h('article', { class: `q-match${live ? ' live' : ''}${wide ? ' wide' : ''}`, ...(onOpen ? { role: 'button', tabindex: '0', onclick: onOpen, onkeydown: e => e.key === 'Enter' && onOpen(e) } : {}) }, [
+    h('div', { class: 'q-match-top' }, [leagueLogo ? logoTile(leagueLogo, { size: 20, alt: league }) : null, h('span', { class: 'q-match-lg', text: league }), t ? tag_(t) : null, h('span', { class: 'q-match-when', text: when })]),
+    h('div', { class: 'q-match-teams' }, [side(a), h('div', { class: `q-match-mid num${scored ? '' : ' vs'}`, text: scored ? `${a.score} : ${b.score}` : 'VS' }), side(b)]),
+    prices.length
+      ? h(
+          'div',
+          { class: 'q-match-prices' },
+          prices.map(p => h('button', { class: 'q-price', type: 'button', 'aria-pressed': String(Boolean(p.selected)), ...(p.locked ? { disabled: true } : {}), onclick: e => (e.stopPropagation(), p.onTap?.(e)) }, [h('small', { text: p.label || '' }), h('b', { class: 'num', text: p.odds == null ? '' : String(p.odds) })]))
+        )
+      : null
+  ]);
+  return card;
+}
+
+// A compact rail of games on now: liveStrip([{ min, rows: [{ logo, name,
+// score }], onOpen }]); each card has the minute in red, then a row per side.
+export function liveStrip(items) {
+  return h(
+    'div',
+    { class: 'q-live-strip' },
+    items.map(it =>
+      h('button', { class: 'q-live-card', type: 'button', onclick: it.onOpen }, [
+        h('span', { class: 'q-live-min', text: it.min || '' }),
+        ...it.rows.flatMap(r => [logoTile(r.logo, { size: 28, alt: r.name, fallbackText: r.name }), h('b', { text: r.name || '' }), h('span', { class: 'num', text: r.score == null ? '' : String(r.score) })])
+      ])
+    )
+  );
+}
+
+// Quick actions as colour tiles: actionGrid([{ icon (an icons key), tint,
+// label, badge, onTap }]). A badge of 0 is not drawn.
+export function actionGrid(items) {
+  return h(
+    'div',
+    { class: 'q-actions-grid' },
+    items.map(it =>
+      h('button', { class: 'q-action', type: 'button', onclick: it.onTap }, [tile(icons[it.icon] || it.icon, it.tint), h('span', { text: it.label }), it.badge ? h('span', { class: 'q-badge', text: String(it.badge) }) : null])
+    )
+  );
+}
+
+// A hero inside a sheet, under its head: sheetHero({ eyebrow, big, sub, tint,
+// logos: [src], tags: [text] }). tint is a colour (default the accent).
+export function sheetHero({ eyebrow = '', big = '', sub = '', tint = '', logos = [], tags = [] } = {}) {
+  const c = h('div', { class: 'q-sheet-hero' }, [
+    logos.length ? h('div', { class: 'q-sh-logos' }, logos.map(l => logoTile(l, { size: 48 }))) : null,
+    eyebrow ? h('span', { class: 'q-sh-eyebrow', text: eyebrow }) : null,
+    big !== '' && big != null ? h('span', { class: 'q-sh-big', text: String(big) }) : null,
+    sub ? h('span', { class: 'q-sh-sub', text: sub }) : null,
+    tags.length ? h('div', { class: 'q-sh-row' }, tags.map(x => tag_(typeof x === 'string' ? { text: x } : x))) : null
+  ]);
+  return tinted(c, tint);
+}
+
+// The sticky action bar at a sheet's foot: sheetFoot({ summary: { small,
+// big }, button: { label, onClick, disabled, danger } }). .q-sheet-foot.q-sf.
+export function sheetFoot({ summary = null, button = {} } = {}) {
+  return h('div', { class: 'q-sheet-foot q-sf' }, [
+    summary ? h('div', { class: 'q-sf-sum' }, [h('small', { text: summary.small || '' }), h('b', { class: 'num', text: summary.big == null ? '' : String(summary.big) })]) : null,
+    h('button', { class: `q-btn ${button.danger ? 'danger' : 'primary'}`, type: 'button', ...(button.disabled ? { disabled: true } : {}), onclick: button.onClick, text: button.label || '' })
+  ]);
+}
+
+// A confirm dialog: confirm({ icon, tint, title, body, ok, cancel, danger })
+// resolves true or false. quadra.mjs's ask(); `icon` a key of `icons` shows
+// as a 56px colour tile, anything else (an emoji) as it always did.
+export async function confirm(opts = {}) {
+  return (await import('./quadra.mjs')).ask(opts);
+}
+
+// An amount to stake: stakeInput({ value, presets: [100, 500…], onChange,
+// currency }). The number is typed or one preset tapped; .value reads it.
+export function stakeInput({ value = 0, presets = [], onChange = () => {}, currency = 'NT$' } = {}) {
+  let cur = Number(value) || 0;
+  const input = h('input', { type: 'text', inputmode: 'numeric', autocomplete: 'off', 'aria-label': currency, value: String(cur) });
+  const btns = presets.map(p => h('button', { type: 'button', onclick: () => set(p, true) }, [Number(p).toLocaleString('en-US')]));
+  const paint = () => btns.forEach((b, i) => b.setAttribute('aria-pressed', String(presets[i] === cur)));
+  const set = (n, fromTap = false) => {
+    cur = Math.max(0, Math.floor(Number(n) || 0));
+    if (fromTap || document.activeElement !== input) input.value = String(cur);
+    paint();
+    onChange(cur);
+  };
+  input.addEventListener('input', () => set(input.value.replace(/\D/g, '')));
+  const root = h('div', { class: 'q-stake' }, [h('label', { class: 'q-stake-amt' }, [h('small', { text: currency }), input]), btns.length ? h('div', { class: 'q-stake-presets' }, btns) : null]);
+  root.style.setProperty('--n', String(btns.length || 5));
+  paint();
+  return Object.defineProperties(root, { value: { get: () => cur }, set: { value: n => set(n, true) } });
+}
+
+// Lottery balls: ballRow([5, 12, …], { special, hit: [numbers drawn], size }).
+// A null among the numbers is an empty ball, still to pick. `special` (one
+// number or a list) is drawn red after the rest.
+export function ballRow(nums, { special = [], hit = [], size = 28 } = {}) {
+  const row = h('div', { class: 'q-balls' });
+  if (size !== 28) row.style.setProperty('--b', `${size}px`);
+  const ball = (n, cls) => h('span', { class: `q-ball${cls ? ` ${cls}` : ''}${n == null ? ' empty' : ''}${hit.includes(n) ? ' hit' : ''}`, text: n == null ? '' : String(n) });
+  row.append(...nums.map(n => ball(n, '')), ...[].concat(special ?? []).map(n => ball(n, 'sp')));
+  return row;
+}
+
+// A saved place's tile: placeTile('home' | 'work' | 'school' | 'pin' | 'star'),
+// in its own colour (--q-place-*).
+export function placeTile(kind = 'pin', size = '') {
+  const k = ['home', 'work', 'school', 'pin', 'star'].includes(kind) ? kind : 'pin';
+  const t = tile(icons[k], '', size);
+  t.className += ` q-place ${k}`;
+  return t;
+}
+
+// A schedule as one wrapping line of whole tokens: schedLine(['17:10', '17:25',
+// …]). The first is the one to take (heavier); a token never splits.
+export function schedLine(tokens) {
+  return h('div', { class: 'q-sched' }, tokens.map(t => h('span', { text: String(t) })));
+}
+
+// A ride or plan row: the times over the full-width legs, a star at the
+// right: rideRow({ time, legs (a node), starred, onStar, onOpen }).
+export function rideRow({ time = '', legs = null, starred = false, onStar = null, onOpen = null, starLabel = '' } = {}) {
+  const row = h('div', { class: 'q-ride', ...(onOpen ? { role: 'button', tabindex: '0', onclick: onOpen } : {}) }, [h('div', { class: 'q-ride-time', text: time }), legs ? h('div', { class: 'q-ride-legs' }, [legs]) : null]);
+  if (onStar) row.append(h('button', { class: `q-ride-star${starred ? ' on' : ''}`, type: 'button', 'aria-pressed': String(Boolean(starred)), ...(starLabel ? { 'aria-label': starLabel } : {}), html: icons.star, onclick: e => (e.stopPropagation(), onStar(e)) }));
+  return row;
 }
