@@ -39,6 +39,20 @@ export function familyOf(sport) {
 }
 
 export const isSoccer = sport => familyOf(sport) === 'soccer';
+
+// The sports shown home side first, as their fans read them: soccer (and
+// rugby, handball, volleyball). Every US-style sport (baseball, basketball,
+// American football, hockey; and Asia's baseball leagues) lists the visitors
+// first ("Lakers @ Celtics"), and so does anything not known here.
+const HOME_FIRST = new Set(['soccer', 'rugby', 'handball', 'volleyball']);
+
+// A game's two sides in the order to show them: [first, second]. `game` has
+// `home` and `away` (a team, a name or a score: whatever the screen draws)
+// and the league key as `sport` (or the sport itself as `family`).
+export function sidesInOrder(game) {
+  const family = game?.family || familyOf(game?.sport) || game?.sport;
+  return HOME_FIRST.has(family) ? [game?.home, game?.away] : [game?.away, game?.home];
+}
 // Every club of a league we have a logo for, one name each (aliases dropped):
 // English names as the feeds write them. For games that show a team.
 const titleCase = key => key.replace(/\b[a-z]/g, c => c.toUpperCase());

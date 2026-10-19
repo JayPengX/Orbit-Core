@@ -43,6 +43,25 @@ Without `--live`, Transit uses made-up TDX around 新竹車站 and Weather its
 saved fixtures. `admin [view…]` opens the admin panel on twelve made-up
 accounts, never the owner's key. `DEBUG=1` lists every upstream fetch.
 
+## Service worker
+
+`kit/sw.js` is the one service worker for every app (the page kept first and
+refreshed behind it, `?v=` files from the cache, the rest network first,
+skipWaiting and clients.claim). An app's own `sw.js` can be two lines:
+
+```js
+self.QUADRA_SW = { cache: 'quadra-fixtures' };      // optional: what the deploy would stamp
+importScripts('../Shared-Proxy/kit/sw.js');          // and, for pictures, ../Shared-Proxy/kit/sw-images.js
+```
+
+`node tools/stamp.mjs <sw.js> --cache <name> --version <build> --assets <public dir> [--exclude data/,share/]`
+writes the cache name, build version and the list of files to keep into the
+`STAMP` line of the file it is given (a copy of `kit/sw.js`, or an app's
+`sw.js` that has the same `stamp:begin` / `stamp:end` lines). The cache is
+`<name>-<build>`; the activate step deletes the app's other versions only.
+Without a stamp the worker still runs (cache `quadra-app`, only `./` kept
+ahead). Nothing changes in the apps until one adopts it.
+
 ## Others
 
 | Tool | What |

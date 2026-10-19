@@ -228,6 +228,8 @@ Served from this repo's Pages, never copied. Each app's page carries
 | `play-*.mjs`, `stock-*.mjs` | Play's and Securities' pricing and ledgers, shared with the Worker |
 | `holidays.mjs` | Taiwan's days off |
 | `sw-images.js` | Other sites' pictures in one shared cache |
+| `sw.js` | The shared service worker, stamped per deploy by `tools/stamp.mjs` |
+| `lang.mjs`, `format.mjs` | `W`, `makeT`, `detectLang`; `money`, `pct`, `price`, `DASH` |
 
 **Securities' broker rules** follow Taiwan's real ones (`stock-credit.mjs`):
 現股當沖 either way round after 3 months with 10 trades or with a credit
