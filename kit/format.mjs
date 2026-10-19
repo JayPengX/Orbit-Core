@@ -5,7 +5,17 @@
 // or −NT$0 (quadra.mjs money() keeps the same rule for NT$ play money).
 //
 //   import { DASH, money, pct, price, num, compact, setFormatLocale } from '#kit/format.mjs';
-import { currencyInfo } from '#kit/stock-markets.mjs';
+// Each currency's symbol and decimals, as stock-markets.mjs CURRENCIES has
+// them (a test keeps them equal); kept here so an app that only shows NT$
+// doesn't load the markets' tables.
+export const SYMBOLS = {
+  TWD: ['NT$', 0], USD: ['US$', 2], JPY: ['¥', 0], HKD: ['HK$', 2], CNY: ['CN¥', 2], KRW: ['₩', 0], EUR: ['€', 2],
+  GBP: ['£', 2], CHF: ['CHF ', 2], DKK: ['kr ', 2], CAD: ['C$', 2], AUD: ['A$', 2], SGD: ['S$', 2], INR: ['₹', 2]
+};
+const currencyInfo = code => {
+  const [symbol, digits] = SYMBOLS[code || 'TWD'] || [`${code} `, 2];
+  return { symbol, digits };
+};
 
 // What stands in for a missing value.
 export const DASH = '—';

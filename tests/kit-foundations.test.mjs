@@ -274,3 +274,10 @@ test('listAssets: the page first, then its files; not the worker or version.json
   assert.deepEqual(await listAssets(dir), ['./', 'app.js', 'data/big.json', 'index.html', 'lib/a.mjs']);
   assert.deepEqual(await listAssets(dir, { exclude: ['data/'] }), ['./', 'app.js', 'index.html', 'lib/a.mjs']);
 });
+
+test('format: SYMBOLS match stock-markets CURRENCIES', async () => {
+  const { SYMBOLS } = await import('../kit/format.mjs');
+  const { CURRENCIES } = await import('../kit/stock-markets.mjs');
+  assert.deepEqual(Object.keys(SYMBOLS).sort(), Object.keys(CURRENCIES).sort());
+  for (const [k, c] of Object.entries(CURRENCIES)) assert.deepEqual(SYMBOLS[k], [c.symbol, c.digits], k);
+});
