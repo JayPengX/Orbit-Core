@@ -1428,6 +1428,23 @@ export function handleSports(request, env, ctx, headers, ip) {
   return handleSportsProxyRequest(request, env, headers, ip, ctx).catch(error => json({ error: { message: String(error?.message || error).slice(0, 200) } }, 500, headers));
 }
 
+// One of the proxy's own sources read for this Worker itself (sports-today.js
+// builds a day's scoreboards): through resolveOne, as a phone's read is (the
+// allowlist, the shared cache, the kept copies of a day over, the trims),
+// without a Pass's gate. Parsed JSON, or null when it couldn't be read.
+export async function readThrough(env, ctx, url, trim = null) {
+  refreshDev(env, ctx);
+  dataBucket = env.DATA || null;
+  const target = parseTarget(url);
+  if (!target) return null;
+  const r = await resolveOne(target, trimFor(trim, target), ctx).catch(error => ({ fetchError: error }));
+  if (r.fetchError || r.status !== 200 || !/json|javascript/i.test(r.contentType || '')) {
+    if (r.body?.cancel) r.body.cancel().catch(() => {});
+    return null;
+  }
+  return parsed(typeof r.body === 'string' || r.body instanceof ArrayBuffer || ArrayBuffer.isView(r.body) ? r.body : await new Response(r.body).arrayBuffer());
+}
+
 // Each minute from Thursday to Monday (UTC: every F1 weekend's sessions):
 // while an F1 session runs, every car's last lap kept (f1-live.js
 // sampleLive), so a phone opened late still has every lap; otherwise one

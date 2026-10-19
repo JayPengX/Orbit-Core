@@ -20,6 +20,7 @@
 //   GET/POST /play               Quadra Play's slips placed, cashed out and settled (settle.js)
 //   POST  /stock                 Quadra Securities' orders filled at the proxy's own quote (stock-fill.js)
 //   GET   /sports-proxy          the data proxy for Sports, Play and Securities (sports.js)
+//   GET   /sports-today          Orbit Sports' day of scoreboards in one answer, built on demand (sports-today.js)
 //   GET   /data/…                the family's data in R2: packs, the mirror, bus packs (data.js)
 //   GET   /config                the developer settings
 //
@@ -54,6 +55,7 @@ import { paceOf } from './pace.js';
 import { beat, tellOwner, systemReport, tell, billNotice, OPS_DOC } from './ops.js';
 import { applyScale } from './capacity.js';
 import { handleSports, sportsCron, useDevSettings } from './sports.js';
+import { handleToday } from './sports-today.js';
 import { isAllowedOrigin, corsHeaders, json, LOCAL_ORIGIN, bodyText } from './http.js';
 import { handleData } from './data.js';
 import { handleStock, moveBook } from './stock-fill.js';
@@ -1110,6 +1112,11 @@ const builderProxy = env => async (url, trim = '') => {
   const res = await handleSports(new Request(ask), env, inPlace, {}, 'worker');
   return res.ok ? res.json() : null;
 };
+// Each league's season bounds (Shared-Data's sports/bounds.json), read in place.
+const seasonBounds = async env => {
+  const res = await handleData(new Request('https://orbit-workers-proxy.quadra/data/sports/bounds.json'), env, inPlace, {}, 'worker', '/data/sports/bounds.json');
+  return res.ok ? (await res.json()).leagues : null;
+};
 const playDeps = env => ({ ...ECO_DEPS, read: readSource, prices: priceReads(env), livePrices: priceReads(env, 2), notify: (account, make) => notifyNow(env, account, 'odds', 'slip', make) });
 
 // ==== Routing ================================================================
@@ -1165,6 +1172,13 @@ async function route(request, env, ctx, headers, origin) {
   // The data proxy for Sports, Play and Securities (sports.js): its own
   // session gate and per-app limits.
   if (path === '/sports-proxy') return handleSports(request, env, ctx, headers, ip);
+  // Orbit Sports' day of scoreboards on one request (sports-today.js): public
+  // scores, so no Pass, but a page of ours or a local one (the origin, as the
+  // Gemini routes'); built on demand, kept 60 s at the edge, no cron.
+  if (path === '/sports-today') {
+    if (!isAllowedOrigin(origin)) return errorJson('FORBIDDEN_ORIGIN', 403, headers, request);
+    return handleToday(request, env, ctx, headers, ip, { bounds: () => seasonBounds(env) });
+  }
   // Slip Tracker's narrow door (slip.js): no pass, Asian baseball only, small caps.
   if (path === '/slip') return handleSlip(request, env, ctx, headers, ip);
   // …and its ticket photos, read by Gemini (no pass, a few a day).

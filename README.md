@@ -79,6 +79,7 @@ runs near each caller; only Gemini goes through `gemini-relay.js`, pinned to Tai
 | `/weather…` | `weather.js`, `weather-skill.js` | The blend for a ~1 km cell, the township, scoring sources hourly |
 | `/transit/…` | `transit.js` | TDX (allowlist `TDX_RULES`), map config, search, place, route; `/transit/status?sample=` (a session or the dev door only) |
 | `/sports-proxy` | `sports.js`, `asia-baseball.js`, `f1-live.js` | The data proxy (§3.1) |
+| `/sports-today` | `sports-today.js`, `kit/sports-espn.mjs` | Orbit Sports' day of scoreboards in one answer, built on demand (§3.1) |
 | `/gemini`, `/nl-edit` | `worker.js` | Orbit Class's photo import and plain-language edits (fixed prompts) |
 | `/slip`, `/slip-scan` | `slip.js` | Orbit Slips' ticket photo read (tight caps) |
 | `/law-ask` | `law.js` | Orbit Law's questions on 1-8 articles of a law: the text read from Orbit Law's data, every point cited and checked; answers kept in KV by the law's version; `mode: 'bill'` a bill explained from its 對照表 (立法院's API), each change citing a row's article, kept 30 days; `mode: 'diff'` an amendment explained from Orbit Law's `diff/<p>.json`, kept 180 days by version; a Pass of Orbit Law's, 40 Gemini calls a day a Pass and 300 in all with `/law-chat`'s (D1) |
@@ -123,6 +124,16 @@ on `SPORTS_PROXY_ALLOWED_HOSTS`. Two hosts are not real:
   `HIT`, `STALE`, `MISS` or `KEPT`.
 - **Kept on demand:** a finished game, or a day or month all over, is kept
   in R2 the first time it's read (`settleable`, `readKept`).
+- **A day in one answer** (`GET /sports-today?day=YYYY-MM-DD`, a Taiwan day,
+  `sports-today.js`): Orbit Sports' first screen, `{v, day, built, covered,
+  missed, events}`. Built when someone asks (no cron: nothing runs while
+  nobody opens the app) from the ESPN pages the phone reads, through the data
+  proxy's own read (`readThrough`: its cache and kept copies), and parsed by
+  the kit's `sports-espn.mjs` (one parser for the proxy and the phone). Kept
+  at the edge 60 s for today and tomorrow, 2 min for yesterday, an hour for
+  older days, 10 s when a league was missed; one build a day at a time in an
+  isolate. No Pass (public scores): our pages' or a local origin only. From
+  pace 2 it answers 503 `{error: 'paced'}` and the phone reads as before.
 
 ### 3.2 The family's data (`data.js`, `builders/`)
 
