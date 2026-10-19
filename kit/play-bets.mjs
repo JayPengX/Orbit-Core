@@ -110,10 +110,16 @@ export function f1Bets(f1, { now = new Date(), memo = {}, loadedAt = null } = {}
 
 // Single-source games: the typical DraftKings-Polymarket gap of that sport.
 export function fillTypicalMargins(bets) {
-  for (const sport of new Set(bets.map(b => b.sport))) {
-    const gaps = bets.filter(b => b.sport === sport && b.fairMargin != null).map(b => b.fairMargin);
-    const typical = median(gaps) ?? 0.02;
-    for (const b of bets) if (b.sport === sport && b.fairMargin == null && (b.kind === 'ml' || b.kind === 'total')) Object.assign(b, { fairMargin: typical, typicalMargin: true });
+  // (Each sport's bets gathered in one pass, in order: a full board's
+  // thousands of bets were read again for every sport.)
+  const bySport = new Map();
+  for (const b of bets) {
+    if (!bySport.has(b.sport)) bySport.set(b.sport, []);
+    bySport.get(b.sport).push(b);
+  }
+  for (const list of bySport.values()) {
+    const typical = median(list.filter(b => b.fairMargin != null).map(b => b.fairMargin)) ?? 0.02;
+    for (const b of list) if (b.fairMargin == null && (b.kind === 'ml' || b.kind === 'total')) Object.assign(b, { fairMargin: typical, typicalMargin: true });
   }
   return bets;
 }
