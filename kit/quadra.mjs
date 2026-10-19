@@ -33,6 +33,7 @@
 export { MIRROR_HOSTS, mirrorPath } from './mirror.mjs';
 import { BRANDS, FAMILIES, pathOf, appIcon, familyMark } from './brand.mjs';
 import { DEV, cleanDev } from './brand.mjs';
+import { icons } from './ui.mjs';
 
 export const ECO_URL = 'https://orbit-workers-proxy.pengzjay.workers.dev/eco';
 export const PROXY_URL = 'https://orbit-workers-proxy.pengzjay.workers.dev/sports-proxy';
@@ -2031,10 +2032,12 @@ export function accountButton(s, { extra = null } = {}) {
 // over an open sheet), Esc or a tap outside cancels.
 // `points`: short rows ([icon, title, line]) under the body, instead of a
 // paragraph that says the same.
-export function ask({ title, body = '', points = [], ok = '', cancel = '', danger = false, icon = '', lang = detectLang(), alertOnly = false } = {}) {
+export function ask({ title, body = '', points = [], ok = '', cancel = '', danger = false, icon = '', tint = '', lang = detectLang(), alertOnly = false } = {}) {
+  // `icon` a key of the kit's icons ('ticket'): a 56px colour tile (`tint`); anything else (an emoji) as before.
+  const named = typeof icon === 'string' && Object.hasOwn(icons, icon);
   const en = lang === 'en';
   return new Promise(resolve => {
-    const dialog = node('dialog', { class: `q-ask${danger ? ' danger' : ''}`, 'aria-labelledby': 'q-ask-title' });
+    const dialog = node('dialog', { class: `q-ask${danger ? ' danger' : ''}${named ? ' pro' : ''}`, 'aria-labelledby': 'q-ask-title' });
     let done = false;
     const finish = value => {
       if (done) return;
@@ -2049,7 +2052,7 @@ export function ask({ title, body = '', points = [], ok = '', cancel = '', dange
     const okBtn = node('button', { class: `q-btn ${danger ? 'danger' : 'primary'}`, type: 'button', text: ok || (alertOnly ? (en ? 'OK' : '好') : en ? 'Continue' : '繼續'), onclick: () => finish(true) });
     dialog.append(
       ...[
-      icon ? node('div', { class: 'q-ask-icon', 'aria-hidden': 'true', text: icon }) : null,
+      icon ? (named ? node('div', { class: 'q-ask-icon q-tile', 'aria-hidden': 'true', html: icons[icon], ...(tint ? { style: `--t:${tint}` } : {}) }) : node('div', { class: 'q-ask-icon', 'aria-hidden': 'true', text: icon })) : null,
       node('h2', { id: 'q-ask-title', class: 'q-ask-title', text: title }),
       body ? node('p', { class: 'q-ask-body', text: body }) : null,
       points.length
