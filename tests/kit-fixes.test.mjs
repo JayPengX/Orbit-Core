@@ -35,3 +35,14 @@ test('.q-actions sits trailing', () => {
   const css = readFileSync(new URL('../kit/quadra.css', import.meta.url), 'utf8');
   assert.match(css, /\.q-actions \{[^}]*margin-left: auto/);
 });
+
+test('app colours: quadra.css carries brand.mjs accentCss, each page its data-app', async () => {
+  const { accentCss, withApp, BRANDS } = await import('../kit/brand.mjs');
+  const css = readFileSync(new URL('../kit/quadra.css', import.meta.url), 'utf8');
+  assert.ok(css.includes(`/* app-colours */\n${accentCss()}\n/* /app-colours */`), 'run node tools/accent-css.mjs');
+  for (const id of Object.keys(BRANDS)) assert.match(css, new RegExp(`:root\\[data-app='${id}'\\]\\) \\{\\n  --q-accent: #[0-9a-f]{6};`));
+  for (const t of ['--q-up: var(--q-red)', '--q-down: var(--q-green)', '--q-win:', '--q-loss:', '--q-draw:', '--q-live:']) assert.ok(css.includes(t), t);
+  assert.equal(withApp('<html lang="zh-Hant" data-theme="dark">', 'transit'), '<html lang="zh-Hant" data-theme="dark" data-app="transit">');
+  assert.equal(withApp('<html data-app="x" lang="en">', 'law'), '<html data-app="law" lang="en">');
+  assert.equal(withApp('<!doctype html><html>', 'odds'), '<!doctype html><html data-app="odds">');
+});

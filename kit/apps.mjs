@@ -11,25 +11,26 @@ import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('../../', import.meta.url));
 // (Every kit module in the loader's import map, at the version noted: listed from the folder, the build tools left out.)
 import { KIT_TOOLS } from './preload.mjs';
+import { withApp } from './brand.mjs';
 const kitMods = (await (await import('node:fs/promises')).readdir(new URL('./', import.meta.url))).filter(f => f.endsWith('.mjs') && !KIT_TOOLS.includes(f)).sort();
 const loader = (await readFile(new URL('./loader.html', import.meta.url), 'utf8')).replace(/f=\[[^\]]*\]/, `f=[${kitMods.map(f => `'${f}'`).join(',')}]`);
 const block = name => loader.slice(loader.indexOf(`<!-- kit:${name}`), loader.indexOf(`<!-- /kit:${name} -->`) + `<!-- /kit:${name} -->`.length);
 export const HEAD = block('head');
 export const BOOT = block('boot');
 
-// Each app: its site folder, the kit modules it uses (by the name the app
+// Each app: its id (kit/brand.mjs; the page's <html data-app>), its site folder, the kit modules it uses (by the name the app
 // imports them as), and the copies the old sync left in it.
 const APPS = {
-  'Quadra-Securities': { site: 'public', mods: ['quadra'], copies: ['lib/quadra.mjs', 'quadra.css', 'boot.js', 'sw-images.js'] },
-  'Quadra-Play': { site: 'public', mods: ['quadra', 'logos', 'names', 'photos', 'catalog'], copies: ['lib/quadra.mjs', 'quadra.css', 'boot.js', 'sw-images.js', 'lib/logos.mjs', 'lib/names.mjs', 'lib/photos.mjs', 'lib/catalog.mjs'] },
-  'Orbit-Sports': { site: 'public', mods: ['quadra', 'logos', 'names', 'photos', 'catalog'], copies: ['lib/quadra.mjs', 'quadra.css', 'boot.js', 'sw-images.js', 'lib/logos.mjs', 'lib/names.mjs', 'lib/photos.mjs', 'lib/catalog.mjs'] },
-  'Orbit-Words': { site: 'public', mods: ['quadra'], copies: ['lib/quadra.mjs', 'quadra.css', 'boot.js', 'sw-images.js'] },
-  'Orbit-Weather': { site: 'public', mods: ['quadra'], copies: ['lib/quadra.mjs', 'quadra.css', 'boot.js'] },
-  'Orbit-Transit': { site: 'public', mods: ['quadra'], copies: ['lib/quadra.mjs', 'quadra.css', 'boot.js'] },
-  'Orbit-Class': { site: '.', mods: ['quadra'], copies: ['src/quadra.mjs', 'css/quadra.css'] },
-  'Orbit-Slips': { site: 'public', mods: ['quadra'], copies: [] },
-  'Orbit-Beats': { site: 'public', mods: ['quadra'], copies: [] },
-  'Orbit-Law': { site: 'public', mods: ['quadra'], copies: [] }
+  'Quadra-Securities': { id: 'stock', site: 'public', mods: ['quadra'], copies: ['lib/quadra.mjs', 'quadra.css', 'boot.js', 'sw-images.js'] },
+  'Quadra-Play': { id: 'odds', site: 'public', mods: ['quadra', 'logos', 'names', 'photos', 'catalog'], copies: ['lib/quadra.mjs', 'quadra.css', 'boot.js', 'sw-images.js', 'lib/logos.mjs', 'lib/names.mjs', 'lib/photos.mjs', 'lib/catalog.mjs'] },
+  'Orbit-Sports': { id: 'match', site: 'public', mods: ['quadra', 'logos', 'names', 'photos', 'catalog'], copies: ['lib/quadra.mjs', 'quadra.css', 'boot.js', 'sw-images.js', 'lib/logos.mjs', 'lib/names.mjs', 'lib/photos.mjs', 'lib/catalog.mjs'] },
+  'Orbit-Words': { id: 'vocab', site: 'public', mods: ['quadra'], copies: ['lib/quadra.mjs', 'quadra.css', 'boot.js', 'sw-images.js'] },
+  'Orbit-Weather': { id: 'weather', site: 'public', mods: ['quadra'], copies: ['lib/quadra.mjs', 'quadra.css', 'boot.js'] },
+  'Orbit-Transit': { id: 'transit', site: 'public', mods: ['quadra'], copies: ['lib/quadra.mjs', 'quadra.css', 'boot.js'] },
+  'Orbit-Class': { id: 'orbit', site: '.', mods: ['quadra'], copies: ['src/quadra.mjs', 'css/quadra.css'] },
+  'Orbit-Slips': { id: 'slip', site: 'public', mods: ['quadra'], copies: [] },
+  'Orbit-Beats': { id: 'beats', site: 'public', mods: ['quadra'], copies: [] },
+  'Orbit-Law': { id: 'law', site: 'public', mods: ['quadra'], copies: [] }
 };
 const CHECKOUT = `      - name: The shared kit (Shared-Proxy/kit), for the tests
         uses: actions/checkout@v4
@@ -75,7 +76,7 @@ function page(html, app) {
   };
   swap('head', HEAD, /<link rel="stylesheet" href="(?:\.\/)?(?:css\/)?quadra\.css[^"]*" ?\/?>/);
   swap('boot', BOOT, /<script src="\.\/boot\.js"><\/script>/);
-  return html;
+  return withApp(html, APPS[app].id);
 }
 
 for (const [app, cfg] of Object.entries(APPS)) {

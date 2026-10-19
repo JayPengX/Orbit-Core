@@ -1290,6 +1290,9 @@ if (typeof document !== 'undefined') document.body ? keepStatusStrip() : documen
 // asked at once anyway (wake), and a write from an app no longer live is
 // refused by the Worker whatever the beat.
 export function quadraSession(app, { lang = detectLang(), heartbeat = 120_000 } = {}) {
+  // The app's colour and meaning tokens (quadra.css) follow <html data-app>;
+  // kit/apps.mjs writes it into the page, this covers a page it hasn't yet.
+  if (typeof document !== 'undefined' && document.documentElement && !document.documentElement.dataset.app) document.documentElement.dataset.app = app;
   // Every app notes the kit's newest version for its next opening, also
   // the apps that don't watch for updates (watchUpdates puts it in place
   // at once).
