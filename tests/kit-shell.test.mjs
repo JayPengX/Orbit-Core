@@ -487,17 +487,20 @@ test('topActions on a phone: no help button, no refresh button, pull to refresh 
   const r = quadra.topActions(session(), { refresh: () => calls++, into });
   assert.deepEqual(ids(into), ['q-account'], 'only the account');
   assert.equal(r.help, null);
-  assert.equal(r.refresh.pull, true);
-  r.refresh.disabled = true; // an app that sets it while loading keeps working
-  r.refresh.click();
-  assert.equal(calls, 1);
+  assert.equal(r.refresh.hidden, true, 'a real button, kept hidden (apps look up #refresh)');
+  r.refresh.disabled = true; // an app that sets it while loading holds the pull off
+  doc.dispatch('touchstart', touch('touchstart', 100, 100));
+  doc.dispatch('touchmove', touch('touchmove', 100, 130));
+  doc.dispatch('touchmove', touch('touchmove', 100, 260));
+  doc.dispatch('touchend');
+  assert.equal(calls, 0);
   // The page is pulled: the app's refresh runs.
   r.refresh.disabled = false;
   doc.dispatch('touchstart', touch('touchstart', 100, 100));
   doc.dispatch('touchmove', touch('touchmove', 100, 130));
   doc.dispatch('touchmove', touch('touchmove', 100, 260));
   doc.dispatch('touchend');
-  assert.equal(calls, 2);
+  assert.equal(calls, 1);
   // Called again (the app redraws its bar): one listener, not two.
   quadra.topActions(session(), { refresh: () => calls++, into: bar() });
   assert.equal(doc.listeners.touchstart.length, 1);
