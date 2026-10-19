@@ -74,6 +74,9 @@ const f1Look = () => sampleLive(f1Log).then(r => process.env.DEBUG && console.lo
 f1Look();
 setInterval(f1Look, 60_000).unref();
 import { handleTransit } from '../transit.js';
+import { readPage, pageUrl } from '../law-page.js';
+import { request as httpsRequest } from 'node:https';
+import { constants as cryptoConstants } from 'node:crypto';
 import { upstream as transitFixtures } from '../tests/fixtures/transit/upstream.mjs';
 
 const require = createRequire(import.meta.url);
@@ -620,9 +623,30 @@ if (!live) await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.worker
   const res = await handleTransit(new Request(req.url()), transitEnv, cors, u.pathname, { session: { s: 'preview' }, fetchFn, cache: null });
   await route.fulfill({ status: res.status, contentType: 'application/json', headers: cors, body: await res.text() });
 });
+// Orbit Law's /law-page, read here (no Pass): the Worker's own reader, over
+// Node's https with legacy TLS renegotiation allowed (ppg.ly.gov.tw needs it).
+const legacyFetch = (url, init = {}) =>
+  new Promise((ok, no) => {
+    const r = httpsRequest(url, { method: 'GET', headers: init.headers, secureOptions: cryptoConstants.SSL_OP_LEGACY_SERVER_CONNECT, signal: init.signal }, res => {
+      const parts = [];
+      res.on('data', c => parts.push(c));
+      res.on('end', () => ok(new Response(res.statusCode === 204 || res.statusCode === 304 ? null : Buffer.concat(parts), { status: res.statusCode, headers: Object.entries(res.headers).flatMap(([k, v]) => (Array.isArray(v) ? v.map(x => [k, x]) : [[k, String(v)]])) })));
+      res.on('error', no);
+    });
+    r.on('error', no);
+    r.end();
+  });
+await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/law-page/, async route => {
+  const cors = { 'Access-Control-Allow-Origin': '*' };
+  const url = pageUrl(new URL(route.request().url()).searchParams.get('u'));
+  if (!url) return route.fulfill({ status: 400, contentType: 'application/json', headers: cors, body: '{"error":"host"}' });
+  const out = await readPage(url, legacyFetch).catch(() => ({ error: 'upstream', status: 0 }));
+  const status = out.error === 'host' ? 400 : out.error ? 502 : 200;
+  await route.fulfill({ status, contentType: 'application/json', headers: cors, body: JSON.stringify(out.error ? { error: out.error, status: out.status } : { ...out, cached: false }) });
+});
 // The /stock Worker's store for the run.
 const stockDocs = new Map();
-await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(?!weather|push|transit|sports-proxy|data\/)/, async route => {
+await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(?!weather|push|transit|sports-proxy|law-page|data\/)/, async route => {
   const req = route.request();
   const body = req.postDataJSON?.() || {};
   // Quadra Play's slips (settle.js): placing checks every pick's price on
