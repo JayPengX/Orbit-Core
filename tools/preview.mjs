@@ -194,6 +194,9 @@ const freezes = flag('freezes');
 // --profile: where the page's main thread spent its time until the loading
 // screen went (Chromium): each function's own time, the 15 largest.
 const profile = flag('profile');
+// --cpu N: (Chromium) the page's processor N times slower, about a phone's
+// (4 for an older iPhone), for speed runs.
+const cpu = Number(opt('cpu', 0));
 // --shuffle: what the page shows the moment the loading screen goes, against
 // what it shows at the end of --wait: anything that moved, came or went
 // after it lifted (a reshuffle the person sees). By each card's first line.
@@ -888,6 +891,7 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
   // A page of its own for each (a hash change alone doesn't reload).
   const page = await context.newPage();
   if (clockAt) await page.clock.install({ time: clockTime(clockAt) });
+  if (cpu > 1 && engine !== 'webkit') await (await context.newCDPSession(page)).send('Emulation.setCPUThrottlingRate', { rate: cpu });
   page.on('console', m => m.type() === 'error' && errors.push(m.text()));
   page.on('pageerror', e => errors.push(String(e.stack || e)));
   page.on('requestfailed', r => DEBUG && console.log('request failed', r.failure()?.errorText, r.url().slice(0, 140)));
@@ -951,7 +955,7 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
     console.log(`timing ${key}${hash ? `#${hash}` : ''}: loading screen gone after ${shown == null ? 'over 60 s' : `${shown} ms`}, first paint ${paint == null ? '?' : `${Math.round(paint)} ms`}, ${own.length} own files in ~${waves} waves (last asked at ${own.at(-1)?.at ?? 0} ms)`);
     if (DEBUG) for (const r of own) console.log(`  ${String(r.at).padStart(6)} ms  ${r.url.slice(0, 100)}`);
   }
-  if (cdp) {
+  const stopProfile = async () => {
     if (!timing) await page.waitForFunction(() => document.getElementById('loading')?.hidden ?? true, null, { timeout: 60_000, polling: 50 }).catch(() => {});
     const { profile: prof } = await cdp.send('Profiler.stop');
     const by = new Map();
@@ -963,8 +967,10 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
       by.set(k, (by.get(k) || 0) + (gaps[i + 1] ?? 0) / 1000);
     });
     const busy = [...by].filter(([k]) => !/^\((idle|program|garbage collector)\)/.test(k)).reduce((a, [, v]) => a + v, 0);
-    console.log(`profile ${key}: ${Math.round(busy)} ms of script until the loading screen went; the most:\n${[...by].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([k, v]) => `  ${String(Math.round(v)).padStart(5)} ms  ${k}`).join('\n')}`);
-  }
+    console.log(`profile ${key}: ${Math.round(busy)} ms of script ${clicks.length ? "from the first click" : "until the loading screen went"}; the most:\n${[...by].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([k, v]) => `  ${String(Math.round(v)).padStart(5)} ms  ${k}`).join('\n')}`);
+  };
+  // (With --click, until the clicks are done: what a tap costs.)
+  if (cdp && !clicks.length) await stopProfile();
   if (geoPath.length) {
     // (The clock moved on with it: each step is geoEvery of real time, so the page's pace is real.)
     const until = Date.now() + wait;
@@ -976,12 +982,15 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
     if (Date.now() < until) await page.waitForTimeout(until - Date.now());
   } else await page.waitForTimeout(wait);
   // The admin panel's views are tabs, not addresses: the one named, clicked.
+  // (With --click, the profile is of the clicks alone.)
+  if (cdp && clicks.length) await cdp.send('Profiler.stop').then(() => cdp.send('Profiler.start'));
   for (const sel of [...(key === 'admin' && hash ? [`[data-view="${hash}"]`] : []), ...clicks]) {
     // ('js:<code>': run on the page instead, e.g. a click on something the tab bar covers.)
     if (sel.startsWith('js:')) await page.evaluate(sel.slice(3)).catch(e => errors.push(`click ${sel}: ${e.message.split('\n')[0]}`));
     else await page.click(sel).catch(e => errors.push(`click ${sel}: ${e.message.split('\n')[0]}`));
     await page.waitForTimeout(2500);
   }
+  if (cdp && clicks.length) await stopProfile();
   for (const [sel, text] of typings) {
     await page.fill(sel, text).catch(e => errors.push(`type ${sel}: ${e.message.split('\n')[0]}`));
     await page.waitForTimeout(4000);
