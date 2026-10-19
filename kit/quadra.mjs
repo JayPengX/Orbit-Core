@@ -3757,20 +3757,26 @@ export function topActions(s, { help = null, refresh = null, extra = null, into 
   if (refresh) net.refresh = refresh;
   stopPull?.();
   stopPull = null;
-  if (refresh && globalThis.matchMedia?.('(pointer: coarse)').matches) {
-    // The finger's way: pull the page down. A stand-in for the button, so an app that sets refresh.disabled still works.
-    const none = () => {};
-    refreshBtn = { disabled: false, pull: true, click: () => refresh(), addEventListener: none, setAttribute: none, classList: { add: none, remove: none, toggle: none } };
-    stopPull = pullToRefresh(() => refresh(), { disabled: () => refreshBtn.disabled });
-  }
-  const refreshButton = refresh && !refreshBtn ? node('button', { class: 'q-icon-btn q-refresh', id: 'refresh', type: 'button', 'aria-label': en ? 'Refresh' : '重新整理', title: en ? 'Refresh' : '重新整理' }) : null;
+  const pull = Boolean(refresh && globalThis.matchMedia?.('(pointer: coarse)').matches);
+  // The button is always made (apps look up #refresh and set .disabled while
+  // they load); on a phone it's hidden and the page pulls down instead,
+  // held off while it's disabled.
+  const refreshButton = refresh ? node('button', { class: 'q-icon-btn q-refresh', id: 'refresh', type: 'button', 'aria-label': en ? 'Refresh' : '重新整理', title: en ? 'Refresh' : '重新整理' }) : null;
   if (refreshButton) {
     refreshButton.innerHTML = icon('refresh');
     refreshButton.addEventListener('click', () => refresh());
     refreshBtn = refreshButton;
   }
+  // (On a phone it waits hidden outside the bar, which it would otherwise widen.)
+  document.getElementById?.('refresh')?.remove();
+  if (pull) {
+    refreshButton.hidden = true;
+    refreshButton.style.display = 'none';
+    document.body?.append(refreshButton);
+  }
+  if (pull) stopPull = pullToRefresh(() => refresh(), { disabled: () => refreshButton.disabled });
   into.classList.add('q-actions');
-  into.replaceChildren(...[helpBtn, refreshButton, accountButton(s, { extra })].filter(Boolean));
+  into.replaceChildren(...[helpBtn, pull ? null : refreshButton, accountButton(s, { extra })].filter(Boolean));
   return { help: helpBtn, refresh: refreshBtn };
 }
 
