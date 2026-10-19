@@ -706,3 +706,36 @@ test('sheet(): a subtitle under the title, before the ✕; none by default', () 
   assert.ok(html.includes('</h2><small class="q-sheet-sub">&#60;b&#62;&#38;</small><button class="q-close"'));
   assert.equal(ui.sheetHtml({ title: 'T' }).includes('q-sheet-sub'), false);
 });
+
+test('navTitle: a collapsed title hidden with its tab lets the bar go (no intersection change comes), and asks again when shown', () => {
+  reset();
+  globalThis.IntersectionObserver = FakeIO;
+  globalThis.MutationObserver = FakeMO;
+  const ros = [];
+  globalThis.ResizeObserver = class {
+    constructor(cb) {
+      this.cb = cb;
+      ros.push(this);
+    }
+    observe() {}
+    disconnect() {}
+  };
+  try {
+    FakeIO.all.length = 0;
+    const h1 = ui.navTitle('彩券');
+    let shown = true;
+    h1.getClientRects = () => (shown ? [{}] : []);
+    const bar = () => body.querySelector('.q-navbar');
+    FakeIO.all.at(-1).cb([{ isIntersecting: false, boundingClientRect: { top: -60, bottom: -20, height: 40 }, rootBounds: { top: 0 } }]);
+    assert.equal(bar().classList.contains('on'), true, 'collapsed into the bar');
+    shown = false;
+    ros[0].cb();
+    assert.equal(bar().classList.contains('on'), false, 'its tab hidden: the bar no longer says 彩券');
+    const before = FakeIO.all.length;
+    shown = true;
+    ros[0].cb();
+    assert.equal(FakeIO.all.length, before + 1, 'shown again: watched afresh');
+  } finally {
+    delete globalThis.ResizeObserver;
+  }
+});
