@@ -33,7 +33,7 @@
 export { MIRROR_HOSTS, mirrorPath } from './mirror.mjs';
 import { BRANDS, FAMILIES, pathOf, appIcon, familyMark } from './brand.mjs';
 import { DEV, cleanDev } from './brand.mjs';
-import { icons, sheet as uiSheet, pullToRefresh, setSheetDetent } from './ui.mjs';
+import { icons, tile, sheet as uiSheet, pullToRefresh, setSheetDetent } from './ui.mjs';
 
 export const ECO_URL = 'https://orbit-workers-proxy.pengzjay.workers.dev/eco';
 export const PROXY_URL = 'https://orbit-workers-proxy.pengzjay.workers.dev/sports-proxy';
@@ -2842,7 +2842,8 @@ function notifyRows(s, note) {
   };
   const sub = node('small', { class: 'q-notice-sub', text: state() });
   const master = node('div', { class: 'q-notice-row master' }, [
-    node('span', { class: 'q-notice-icon', 'aria-hidden': 'true', text: '🔔' }),
+    // Notifications' own red tile, as iOS's Settings draws it (no emoji).
+    tile(icons.bell, 'var(--q-red)'),
     node('div', { class: 'q-notice-text' }, [node('strong', { text: T('系統通知', 'System notices') }), sub]),
     supported
       ? toggle(notifyOn(), T('系統通知', 'System notices'), async on => {
