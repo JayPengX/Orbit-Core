@@ -248,6 +248,11 @@
   --q-draw: var(--q-gray);
   --q-live: var(--q-red);
 }
+/* 綠漲紅跌 (the US way), where the reader chose it: <html data-updown="us">. */
+:where(:root[data-updown='us']) {
+  --q-up: var(--q-green);
+  --q-down: var(--q-red);
+}
 /* Dark: iOS's dark palette, black grouped background, lifted cells. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
