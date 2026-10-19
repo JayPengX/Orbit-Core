@@ -10,7 +10,9 @@
 //   import { segmented, sheet, menu, toast, list, cell, search, toggle, empty, view } from '#kit/ui.mjs';
 //   and the premium layer: icons, tile, pageHead, heroCard, rowCard, tag, rail, stats, section;
 //   round 3: sectionHead, logoTile, matchCard, liveStrip, actionGrid, sheetHero, sheetFoot,
-//   confirm, stakeInput, ballRow, placeTile, schedLine, rideRow.
+//   confirm, stakeInput, ballRow, placeTile, schedLine, rideRow;
+//   foundations: ready (lift the loading screen), and toast's action / batch and
+//   segmented's count (see each below).
 
 const reduced = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
@@ -42,15 +44,19 @@ export function tick() {
 }
 
 // ---- Segmented control ----
+// The badge's text: a count above 0 (99+ from a hundred), else nothing.
+export const segCount = n => (Number.isFinite(n) && n > 0 ? (n > 99 ? '99+' : String(Math.floor(n))) : '');
+const segBadge = n => (segCount(n) ? h('span', { class: 'q-seg-count', text: segCount(n) }) : null);
 // items: [{ id, label }]; value: the chosen id; onChange(id). The thumb
 // slides to the chosen one (--q-seg-i); a finger dragged along it moves
-// the choice with it, as iOS's does.
+// the choice with it, as iOS's does. An item may carry a `count` (a number):
+// a small badge after its label; 0, null and anything else are not drawn.
 export function segmented(items, { value = items[0]?.id, onChange = () => {}, big = false, label = '' } = {}) {
   const root = h('div', { class: `q-seg${big ? ' big' : ''}`, role: 'tablist', ...(label ? { 'aria-label': label } : {}) });
   root.style.setProperty('--q-seg-n', String(items.length));
   let current = value;
   const buttons = items.map((it, i) =>
-    h('button', { type: 'button', role: 'tab', 'data-id': it.id, onclick: () => choose(it.id) }, [it.label])
+    h('button', { type: 'button', role: 'tab', 'data-id': it.id, onclick: () => choose(it.id) }, [it.label, segBadge(it.count)])
   );
   const paint = () => {
     const i = Math.max(0, items.findIndex(it => it.id === current));
@@ -153,15 +159,81 @@ export function menu(anchor, items) {
 
 // ---- Toast ----
 // A glass capsule over the tab bar for a moment: text, { tone: 'bad', ms }.
-export function toast(text, { tone = '', ms = 2200 } = {}) {
+// `action: { label, onTap }` adds a button after the text (Undo, Open): a tap
+// runs onTap and closes the toast. `batch: key` stops toasts stacking: one
+// with the same key replaces the one shown, and the same text again while
+// it's still up shows ×2, ×3… (the time restarts). Without them it is as it
+// always was: one toast at a time, the newest.
+let lastToast = null;
+export function toast(text, { tone = '', ms = 2200, action = null, batch = '' } = {}) {
+  const prev = lastToast;
+  const again = Boolean(batch) && prev?.key === batch && prev.el.isConnected !== false && !prev.el.classList?.contains('out');
+  const n = again && prev.text === text ? prev.n + 1 : 1;
+  if (again) {
+    clearTimeout(prev.timer);
+    clearTimeout(prev.gone);
+    prev.el.remove();
+  }
   document.querySelector('.q-toast')?.remove();
-  const t = h('div', { class: `q-toast${tone ? ` ${tone}` : ''}`, role: 'status', text });
-  document.body.append(t);
-  setTimeout(() => {
+  const label = n > 1 ? `${text} ×${n}` : text;
+  const t = h('div', { class: `q-toast${tone ? ` ${tone}` : ''}`, role: 'status', ...(action || n > 1 ? {} : { text }) });
+  const mine = { el: t, key: batch, text, n, timer: 0, gone: 0 };
+  const close = () => {
+    clearTimeout(mine.timer);
     t.classList.add('out');
-    setTimeout(() => t.remove(), 320);
-  }, ms);
+    mine.gone = setTimeout(() => t.remove(), 320);
+  };
+  if (action || n > 1) {
+    t.append(h('span', { class: 'q-toast-text', text: label }));
+    if (action) {
+      t.append(
+        h('button', {
+          type: 'button',
+          class: 'q-toast-action',
+          text: action.label,
+          onclick: () => {
+            close();
+            action.onTap?.();
+          }
+        })
+      );
+    }
+  }
+  document.body.append(t);
+  mine.timer = setTimeout(close, ms);
+  lastToast = batch ? mine : null;
   return t;
+}
+
+// ---- Loading screen ----
+// Lifts the app's loading cover (#loading, drawn by boot.js) when its first
+// screen is ready: ready(firstScreen, { max }). firstScreen is a promise (or
+// a function returning one) for the data the first screen needs; the cover
+// goes when it settles (done or failed: a broken fetch still shows the
+// screen's own empty state) or after `max` ms, whichever comes first, so a
+// slow network never keeps the person on the logo. The cover fades for a
+// moment, then gets `hidden` (what the kit's scroll restore and the tests
+// watch for). Resolves once it is lifted; calling it again does nothing.
+export function ready(firstScreen, { max = 4000 } = {}) {
+  const lift = () => {
+    const box = document.getElementById('loading');
+    if (!box || box.hidden) return;
+    if (reduced() || typeof setTimeout !== 'function') return box.setAttribute('hidden', '');
+    box.classList.add('q-lift');
+    setTimeout(() => box.setAttribute('hidden', ''), 220);
+  };
+  let first;
+  try {
+    first = Promise.resolve(typeof firstScreen === 'function' ? firstScreen() : firstScreen).catch(() => {});
+  } catch {
+    first = Promise.resolve();
+  }
+  let timer;
+  const late = new Promise(done => (timer = setTimeout(done, max)));
+  return Promise.race([first, late]).then(() => {
+    clearTimeout(timer);
+    lift();
+  });
 }
 
 // ---- Lists ----
@@ -243,12 +315,13 @@ export function countTo(el, to, { from = Number(el.dataset.value) || 0, format =
 
 // A segmented control drawn as HTML (an app that redraws a card whole):
 // its thumb starts where it was (`from`) and slides to the choice the next
-// frame. segHtml([[id, label]…], on, { from, attr: id => attrs }) and, after
-// the HTML is in the page, settleSegs().
+// frame. segHtml([[id, label, count?]…], on, { from, attr: id => attrs }) and,
+// after the HTML is in the page, settleSegs(). A third entry is the count
+// badge, as segmented's `count`.
 export function segHtml(list, on, { from = on, attr = () => '', esc = s => String(s).replace(/[&<>"]/g, c => `&#${c.charCodeAt(0)};`) } = {}) {
   const i = Math.max(0, list.findIndex(([k]) => k === on));
   const j = Math.max(0, list.findIndex(([k]) => k === from));
-  return `<div class="q-seg" role="tablist" style="--q-seg-n:${list.length};--q-seg-i:${j}" data-to="${i}">${list.map(([k, name]) => `<button type="button" role="tab" aria-selected="${k === on}" ${attr(k)}>${esc(name)}</button>`).join('')}</div>`;
+  return `<div class="q-seg" role="tablist" style="--q-seg-n:${list.length};--q-seg-i:${j}" data-to="${i}">${list.map(([k, name, count]) => `<button type="button" role="tab" aria-selected="${k === on}" ${attr(k)}>${esc(name)}${segCount(count) ? `<span class="q-seg-count">${segCount(count)}</span>` : ''}</button>`).join('')}</div>`;
 }
 export function settleSegs(root = document) {
   // Each one's target read now: two calls in one redraw (an app settling

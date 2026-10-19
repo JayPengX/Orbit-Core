@@ -2813,7 +2813,7 @@ dialog.q-moved::backdrop {
   gap: 2px;
   padding: 16px 18px 18px;
   border-radius: var(--q-radius);
-  color: #fff;
+  color: #ffffff;
   background: radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--q-accent) 55%, transparent) 0%, transparent 60%), linear-gradient(135deg, #111827, color-mix(in srgb, var(--q-accent) 70%, #111827));
   box-shadow: var(--q-shadow);
 }
@@ -2928,7 +2928,7 @@ dialog.q-moved::backdrop {
   padding: 18px;
   border-radius: 20px;
   background: linear-gradient(135deg, color-mix(in srgb, var(--q-accent) 92%, #000), color-mix(in srgb, var(--q-accent) 60%, #0a0b0f));
-  color: #fff;
+  color: #ffffff;
 }
 .q-balance span {
   font-size: 13px;
@@ -3859,7 +3859,7 @@ html[data-q-turn] dialog[open] {
   border: 0;
   border-radius: 22px;
   background: radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--q-hc-glow) 55%, transparent), transparent 60%), linear-gradient(135deg, var(--q-hc-a), var(--q-hc-b));
-  color: #fff;
+  color: #ffffff;
   font: inherit;
   text-align: left;
   text-decoration: none;
@@ -3960,7 +3960,7 @@ html[data-q-turn] dialog[open] {
 }
 .q-hc-btn.ghost {
   background: rgba(255, 255, 255, 0.18);
-  color: #fff;
+  color: #ffffff;
 }
 
 .q-tile {
@@ -3972,7 +3972,7 @@ html[data-q-turn] dialog[open] {
   height: 40px;
   border-radius: 12px;
   background: linear-gradient(160deg, color-mix(in srgb, var(--t) 82%, #fff), var(--t) 60%);
-  color: #fff;
+  color: #ffffff;
   font-size: 20px;
   line-height: 1;
   box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.18);
@@ -4132,7 +4132,7 @@ div.q-ritem {
 }
 .q-tag.solid {
   background: var(--t);
-  color: #fff;
+  color: #ffffff;
 }
 
 .q-rail {
@@ -4385,7 +4385,7 @@ div.q-ritem {
 }
 .q-logo.text {
   background: var(--t);
-  color: #fff;
+  color: #ffffff;
   font: 700 calc(var(--s, 40px) * 0.42) / 1 var(--q-font);
   box-shadow: none;
 }
@@ -4495,7 +4495,7 @@ div.q-ritem {
 }
 .q-price[aria-pressed='true'] {
   background: var(--q-blue);
-  color: #fff;
+  color: #ffffff;
 }
 .q-price[aria-pressed='true'] small {
   color: rgba(255, 255, 255, 0.8);
@@ -4619,7 +4619,7 @@ div.q-ritem {
   padding: 16px;
   border-radius: 20px;
   background: linear-gradient(135deg, color-mix(in srgb, var(--t) 92%, #000), color-mix(in srgb, var(--t) 70%, #fff));
-  color: #fff;
+  color: #ffffff;
 }
 .q-sh-logos {
   display: flex;
@@ -4654,7 +4654,7 @@ div.q-ritem {
 }
 .q-sheet-hero .q-sh-row .q-tag {
   background: rgba(255, 255, 255, 0.18);
-  color: #fff;
+  color: #ffffff;
 }
 
 /* -- The sheet foot as a summary and one button (sheetFoot): .q-sheet-foot.q-sf -- */
@@ -4813,12 +4813,12 @@ div.q-ritem {
 }
 .q-ball.sp {
   background: var(--q-red);
-  color: #fff;
+  color: #ffffff;
 }
 .q-ball.hit {
   --t: var(--q-orange);
   background: var(--t);
-  color: #fff;
+  color: #ffffff;
 }
 .q-ball.empty {
   background: none;
@@ -4917,4 +4917,59 @@ div.q-ritem {
 }
 .q-tile.q-place.star {
   --t: var(--q-place-star);
+}
+
+/* ---- Foundations (design review) ----
+   - .q-toast-text / .q-toast-action: a toast's text and its button (ui.mjs toast's action);
+   - .q-seg-count: the small badge after a segmented label (segmented / segHtml count);
+   - .loading.q-lift: the loading cover fading as the first screen is ready (ui.mjs ready). */
+.q-toast-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.q-toast-action {
+  flex: none;
+  min-height: 28px;
+  margin: -4px -8px -4px 4px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--q-accent);
+  font: var(--q-t-subhead);
+  font-weight: 600;
+  cursor: pointer;
+}
+.q-toast-action:active {
+  opacity: 0.6;
+}
+.q-seg > button .q-seg-count {
+  display: inline-block;
+  min-width: 16px;
+  margin-inline-start: 5px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--q-fill-2);
+  color: var(--q-label-2);
+  font: var(--q-t-caption2);
+  font-weight: 600;
+  line-height: 16px;
+  text-align: center;
+  vertical-align: 1px;
+}
+.q-seg > button[aria-selected='true'] .q-seg-count,
+.q-seg > button[aria-pressed='true'] .q-seg-count {
+  background: var(--q-accent);
+  color: #ffffff;
+}
+.loading.q-lift {
+  opacity: 0;
+  transition: opacity 0.2s var(--q-ease);
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .loading.q-lift {
+    transition: none;
+  }
 }
