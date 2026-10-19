@@ -3703,15 +3703,16 @@ html[data-q-turn] dialog[open] {
   -webkit-tap-highlight-color: transparent;
 }
 /* In dark the accents brighten; the card keeps a deep colour so white type
-   stays readable. */
+   stays readable. :where() keeps this at one-class weight so an app that sets
+   its own --q-hc-a/b on its hero class still wins. */
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) .q-hero-card {
+  :where(:root:not([data-theme='light'])) .q-hero-card {
     --q-hc-a: color-mix(in srgb, var(--q-accent) 38%, #05070d);
     --q-hc-b: color-mix(in srgb, var(--q-accent) 72%, #05070d);
     --q-hc-glow: color-mix(in srgb, var(--q-accent) 60%, transparent);
   }
 }
-:root[data-theme='dark'] .q-hero-card {
+:where(:root[data-theme='dark']) .q-hero-card {
   --q-hc-a: color-mix(in srgb, var(--q-accent) 38%, #05070d);
   --q-hc-b: color-mix(in srgb, var(--q-accent) 72%, #05070d);
   --q-hc-glow: color-mix(in srgb, var(--q-accent) 60%, transparent);
