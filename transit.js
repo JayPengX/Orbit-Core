@@ -508,8 +508,9 @@ export function nearFirst(found, near, text) {
   const items = found.filter(i => all.includes(i));
   near = near.filter(i => all.includes(i));
   const close = all.filter(i => i.dist != null && i.dist <= NEAR_M).sort((a, b) => a.dist - b.dist);
-  // (A name typed whole, found near: those first among the near ones.)
-  const whole = close.filter(i => squash(i.name).includes(t));
+  // (A name typed whole, found near: those first among the near ones, the
+  // place called exactly that before the ones it is part of: 新竹高中 over 新竹高中214班.)
+  const whole = close.filter(i => squash(i.name).includes(t)).sort((a, b) => (squash(b.name) === t) - (squash(a.name) === t));
   const chains = new Set(close.map(i => stem(i.name)).filter(Boolean));
   const rest = [...items, ...near].filter(i => !(i.dist != null && i.dist > NEAR_M && chains.has(stem(i.name))));
   const seen = new Set();

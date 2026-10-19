@@ -491,6 +491,8 @@ test('place search: the near branches of a chain first, nearest first; the same 
   // (The name typed whole first among the near; 中壢店 gone, 錢都 being near; 涮涮鍋 another name.)
   assert.deepEqual(nearFirst(far, near, '錢都').map(i => i.id), ['c', 'd', 'e', 'a']);
   assert.deepEqual(nearFirst([{ id: 'x', name: '台北車站', dist: 70000 }], [], '台北車站').map(i => i.id), ['x']);
+  // The place named exactly what was typed first, though a part of it (a class, a hall) is a few metres nearer.
+  assert.deepEqual(nearFirst([], [{ id: 'k', name: '新竹高中214班', dist: 1390 }, { id: 's', name: '新竹高中', dist: 1430 }, { id: 'g', name: '新竹高中劍道館', dist: 1500 }], '新竹高中').map(i => i.id), ['s', 'k', 'g']);
 });
 
 test('place search: LaLaport is LaLaport, not its cinema, its car parks or a shop in it; two branches of a chain stay two; a shop asked by name stays', async () => {
