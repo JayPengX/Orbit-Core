@@ -151,19 +151,22 @@ jobs:
       # A deploy turns a Worker's workers.dev address and crons back on: while
       # the guard has the proxies stopped (the plan's amounts nearly used),
       # they go off again now, not at the guard's next run.
+      # (Read by Cloudflare's API with a time limit: wrangler's own read once
+      # hung half an hour and held every deploy behind it.)
       - name: Keep the guard's stop
         if: ${{ always() }}
         continue-on-error: true
+        timeout-minutes: 3
         run: |
-          state=$(npx --yes wrangler@4 kv key get guard:state --namespace-id 8b24d75fbe0a4a69aef0f35cb7a8d847 --remote 2>/dev/null || true)
+          state=$(curl -fsS --max-time 30 -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/storage/kv/namespaces/8b24d75fbe0a4a69aef0f35cb7a8d847/values/guard%3Astate" || true)
           stopped=$(printf '%s' "$state" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.parse(s).stopped?"yes":"no")}catch{console.log("no")}})')
           echo "stopped: $stopped"
           [ "$stopped" = "yes" ] || exit 0
           api="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts"
           for w in orbit-workers-proxy sports-proxy; do
             # (sports-proxy deleted from 2026-10-20: its calls fail, nothing to stop.)
-            curl -fsS -X DELETE -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$api/$w/subdomain" >/dev/null && echo "$w address off"
-            curl -fsS -X PUT -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H 'Content-Type: application/json' -d '[]' "$api/$w/schedules" >/dev/null && echo "$w crons off"
+            curl -fsS --max-time 30 -X DELETE -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$api/$w/subdomain" >/dev/null && echo "$w address off"
+            curl -fsS --max-time 30 -X PUT -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H 'Content-Type: application/json' -d '[]' "$api/$w/schedules" >/dev/null && echo "$w crons off"
           done
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
