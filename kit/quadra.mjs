@@ -429,6 +429,26 @@ async function persist(key, text) {
     prune();
   } catch {}
 }
+// The copies are written when the page is idle, a few at a time (the
+// newest of each key; one a turn where there's no idle time, as Safari),
+// not in a block in the middle of a tab tap: a full board's
+// hundreds of answers kept at once were a quarter second of a phone's time.
+const keeping = new Map();
+let keepTimer = 0;
+function keepLater(key, got) {
+  keeping.set(key, got);
+  if (keepTimer) return;
+  const idle = globalThis.requestIdleCallback ? f => globalThis.requestIdleCallback(f, { timeout: 4000 }) : f => setTimeout(() => f(null), 0);
+  const run = deadline => {
+    for (const [k, v] of keeping) {
+      keeping.delete(k);
+      persist(k, typeof v === 'string' ? v : JSON.stringify(v));
+      if (!deadline || deadline.timeRemaining() < 4) break;
+    }
+    keepTimer = keeping.size ? idle(run) || 1 : 0;
+  };
+  keepTimer = idle(run) || 1;
+}
 // Now and then (every 6 hours on this device, while it's idle), what's
 // older than a few days goes. It read every copy kept: at each app's open
 // it was a tenth to half a second of work, beside the app's own reads.
@@ -720,7 +740,7 @@ function keptJson(url, key, { ttl, keep }, read) {
     if (keep && (ttl >= LIVE_KEEP_MS || !(Date.now() - (keptAt.get(key) || 0) < LIVE_KEEP_MS))) {
       keptAt.set(key, Date.now());
       if (keptAt.size > 500) keptAt.delete(keptAt.keys().next().value);
-      setTimeout(() => persist(key, typeof got === 'string' ? got : JSON.stringify(got)), 0);
+      keepLater(key, got);
     }
     return data;
   })();
