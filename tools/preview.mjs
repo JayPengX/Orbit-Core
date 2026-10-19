@@ -155,6 +155,9 @@ const shotSel = opt('shot', null);
 const evals = [];
 for (let c; (c = opt('eval', null)); ) evals.push(c);
 const latency = Number(opt('latency', 0));
+// --version-latency ms: version.json (the app's and the kit's) answered that much later: a phone whose
+// app opens from its saved files before the update check answers.
+const versionLatency = Number(opt('version-latency', 0));
 const timing = flag('timing');
 // --requests: every call the page makes beyond its own files (the Worker, the
 // proxy, maps, fonts), with its method and, for a POST, its op: what an app
@@ -323,6 +326,7 @@ const server = (h2 && !serve ? (fn => createSecureServer(h2Cert(), fn)) : create
   if (serve && path === '/__ext') return external(req, res).catch(() => res.end());
   // Served: no service worker (it would keep the page from these answers).
   if (serve && path.endsWith('/sw.js')) return res.writeHead(404).end();
+  if (versionLatency && path.endsWith('/version.json')) await new Promise(r => setTimeout(r, versionLatency));
   // The kit's version.json is stamped only on Pages (kit/stamp.mjs): here
   // one the kit takes as the first it's seen (only noted, no reload).
   if (path === '/Shared-Proxy/kit/version.json' && !existsSync(join(served.root, 'Shared-Proxy/kit/version.json'))) return res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }).end('{"version":"local"}');
