@@ -15,6 +15,8 @@
 //   segmented's count (see each below).
 
 // { tab: 'ipo' } as data-tab="ipo" attributes (a builder's `data`, for taps wired by delegation).
+import { DASH, pct, price as fmtPrice } from '#kit/format.mjs';
+
 const dataProps = (data = null) => Object.fromEntries(Object.entries(data || {}).filter(([, v]) => v != null && v !== false).map(([k, v]) => [`data-${String(k).replace(/[^a-z0-9-]/gi, '')}`, v === true ? '' : String(v)]));
 const reduced = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
@@ -698,13 +700,25 @@ export function sectionHeadHtml(title, { more = '', moreTap = null, moreHref = '
 // A logo tile's broken image falls back to its letter (the DOM builder's
 // error handler): wireLogos(root) once the HTML is in the page.
 const logoLetter = (fallbackText, alt) => Array.from(String(fallbackText || alt || '').trim())[0] ?? '';
+// A src or a list of them, as the non-empty strings in order.
+const srcList = src => [].concat(src || []).filter(s => s && typeof s === 'string');
+// (A list's later URLs wait in data-srcs, a JSON array, for wireLogos.)
 export function logoTileHtml(src, { size = 40, alt = '', fallbackText = '', tint = '' } = {}) {
-  if (src) return `<span class="q-logo"${styleOf(['--s', `${size}px`])}><img src="${E(src)}" alt="${E(alt)}" loading="lazy" decoding="async"${fallbackText ? dataOf({ fallback: fallbackText, tint }) : ''}></span>`;
+  const [first, ...rest] = srcList(src);
+  if (first) return `<span class="q-logo"${styleOf(['--s', `${size}px`])}><img src="${E(first)}" alt="${E(alt)}" loading="lazy" decoding="async"${fallbackText ? dataOf({ fallback: fallbackText, tint }) : ''}${rest.length ? dataOf({ srcs: JSON.stringify(rest) }) : ''}></span>`;
   return fallbackText || alt ? `<span class="q-logo text"${styleOf(['--s', `${size}px`], ['--t', tint])}>${E(logoLetter(fallbackText, alt))}</span>` : `<span class="q-logo"${styleOf(['--s', `${size}px`])}></span>`;
 }
 export function wireLogos(root = document) {
   const fall = img => {
     const t = img.closest?.('.q-logo');
+    // The next URL of a list first, the letter once they are used up.
+    let rest = [];
+    try { rest = JSON.parse(img.getAttribute('data-srcs') || '[]'); } catch {}
+    if (rest.length) {
+      img.setAttribute('data-srcs', JSON.stringify(rest.slice(1)));
+      img.setAttribute('src', rest[0]);
+      return;
+    }
     if (!t || !img.hasAttribute('data-fallback')) return;
     t.className = 'q-logo text';
     t.replaceChildren(logoLetter(img.getAttribute('data-fallback'), ''));
@@ -734,8 +748,10 @@ export function liveStripHtml(items) {
 export function actionGridHtml(items) {
   return `<div class="q-actions-grid">${items.map(it => `<button class="q-action" type="button"${dataOf({ tap: it.tap, ...it.data })}>${tileHtml(icons[it.icon] || it.icon, it.tint)}<span>${E(it.label)}</span>${it.badge ? `<span class="q-badge">${E(it.badge)}</span>` : ''}</button>`).join('')}</div>`;
 }
-export function sheetHeroHtml({ eyebrow = '', big = '', sub = '', tint = '', logos = [], tags = [] } = {}) {
-  return `<div class="q-sheet-hero"${styleOf(['--t', tint])}>${logos.length ? `<div class="q-sh-logos">${logos.map(l => logoTileHtml(l, { size: 48 })).join('')}</div>` : ''}${eyebrow ? `<span class="q-sh-eyebrow">${E(eyebrow)}</span>` : ''}${big !== '' && big != null ? `<span class="q-sh-big">${E(big)}</span>` : ''}${sub ? `<span class="q-sh-sub">${E(sub)}</span>` : ''}${tags.length ? `<div class="q-sh-row">${tags.map(tagObjHtml).join('')}</div>` : ''}</div>`;
+// (logoHtml / statusHtml: trusted markup for the `logo` and `status` slots; status may also be a list of tags.)
+export function sheetHeroHtml({ eyebrow = '', big = '', sub = '', tint = '', logos = [], tags = [], logoHtml = '', status = null, statusHtml = '' } = {}) {
+  const st = statusHtml || (Array.isArray(status) ? status.map(tagObjHtml).join('') : '');
+  return `<div class="q-sheet-hero"${styleOf(['--t', tint])}>${logoHtml ? `<div class="q-sh-logos">${logoHtml}</div>` : logos.length ? `<div class="q-sh-logos">${logos.map(l => logoTileHtml(l, { size: 48 })).join('')}</div>` : ''}${eyebrow ? `<span class="q-sh-eyebrow">${E(eyebrow)}</span>` : ''}${big !== '' && big != null ? `<span class="q-sh-big">${E(big)}</span>` : ''}${sub ? `<span class="q-sh-sub">${E(sub)}</span>` : ''}${tags.length ? `<div class="q-sh-row">${tags.map(tagObjHtml).join('')}</div>` : ''}${st ? `<div class="q-sh-row q-sh-status">${st}</div>` : ''}</div>`;
 }
 // sheetFootHtml({ summary: { small, big }, button: { label, tap, disabled, danger } })
 export function sheetFootHtml({ summary = null, button = {} } = {}) {
@@ -757,6 +773,16 @@ export function openSheetHtml(html, { onClose = () => {} } = {}) {
   d.showModal();
   return { el: d, close: shut, setDetent: x => setSheetDetent(d, x) };
 }
+// movePillHtml(changePct, { solid, digits }); stockRowHtml({ logo, name, sub, spark, price, change, changePct, currency, open (a value → data-open), data })
+export function movePillHtml(changePct, { solid = true, digits = 2 } = {}) {
+  return `<span class="q-move ${moveTone(changePct, digits)}${solid ? ' solid' : ''}">${E(moveText(changePct, digits))}</span>`;
+}
+export function stockRowHtml({ logo = '', name = '', sub = '', spark = [], price = null, change = null, changePct = null, currency = '', open = null, data = null } = {}) {
+  const { tone } = stockMove({ spark, changePct, change });
+  const own = stockPill({ changePct, change, currency });
+  const chart = sparkSvg(spark, tone);
+  return `<div class="q-stock"${open != null ? ` role="button" tabindex="0"${dataOf({ open })}` : ''}${dataOf(data)}>${logoTileHtml(logo, { size: 40, alt: name, fallbackText: name })}<div class="q-stock-id"><b>${E(name)}</b>${sub ? `<small>${E(sub)}</small>` : ''}</div>${chart ? `<span class="q-stock-spark">${chart}</span>` : ''}<div class="q-stock-px"><b class="num">${E(stockPrice(price, currency))}</b>${own == null ? movePillHtml(changePct) : `<span class="q-move ${tone} solid">${E(own)}</span>`}</div></div>`;
+}
 export function ballRowHtml(nums, { special = [], hit = [], size = 28 } = {}) {
   const ball = (n, cls) => `<span class="${clsOf('q-ball', cls, n == null && 'empty', hit.includes(n) && 'hit')}">${n == null ? '' : E(n)}</span>`;
   return `<div class="q-balls"${size !== 28 ? styleOf(['--b', `${size}px`]) : ''}>${nums.map(n => ball(n, '')).join('')}${[].concat(special ?? []).map(n => ball(n, 'sp')).join('')}</div>`;
@@ -772,10 +798,12 @@ export function schedLineHtml(tokens) {
 export function rideRowHtml({ time = '', legsHtml = '', starred = false, star = null, open = null, starLabel = '' } = {}) {
   return `<div class="q-ride"${open != null ? ` role="button" tabindex="0"${dataOf({ open })}` : ''}><div class="q-ride-time">${E(time)}</div>${legsHtml ? `<div class="q-ride-legs">${legsHtml}</div>` : ''}${star != null ? `<button class="${clsOf('q-ride-star', starred && 'on')}" type="button" aria-pressed="${Boolean(starred)}"${starLabel ? ` aria-label="${E(starLabel)}"` : ''}${dataOf({ star })}>${icons.star}</button>` : ''}</div>`;
 }
-// stakeInputHtml({ value, presets, currency }): the presets are [data-preset="500"], the input is the app's to read.
-export function stakeInputHtml({ value = 0, presets = [], currency = 'NT$' } = {}) {
-  const cur = Number(value) || 0;
-  return `<div class="q-stake"${styleOf(['--n', presets.length || 5])}><label class="q-stake-amt"><small>${E(currency)}</small><input type="text" inputmode="numeric" autocomplete="off" aria-label="${E(currency)}" value="${cur}"></label>${presets.length ? `<div class="q-stake-presets">${presets.map(p => `<button type="button" aria-pressed="${Number(p) === cur}" data-preset="${E(p)}">${E(Number(p).toLocaleString('en-US'))}</button>`).join('')}</div>` : ''}</div>`;
+// stakeInputHtml({ value, presets, currency, decimals }): the presets are [data-preset="500"], the input is the app's to read
+// (with decimals it carries data-decimals, for the app's own typing filter).
+export function stakeInputHtml({ value = 0, presets = [], currency = 'NT$', decimals = 0 } = {}) {
+  const dp = stakeDp(decimals);
+  const cur = dp ? stakeNum(value, dp) : Number(value) || 0;
+  return `<div class="q-stake"${styleOf(['--n', presets.length || 5])}><label class="q-stake-amt"><small>${E(currency)}</small><input type="text" inputmode="${dp ? 'decimal' : 'numeric'}" autocomplete="off" aria-label="${E(currency)}" value="${stakeText(cur, dp)}"${dp ? ` data-decimals="${dp}"` : ''}></label>${presets.length ? `<div class="q-stake-presets">${presets.map(p => `<button type="button" aria-pressed="${dp ? stakeNum(p, dp) === cur : Number(p) === cur}" data-preset="${E(p)}">${E(stakeLabel(p, dp))}</button>`).join('')}</div>` : ''}</div>`;
 }
 
 // The taps of strings drawn by the twins, wired once on a container (it
@@ -947,7 +975,8 @@ export function sectionHead(title, { more = '', onMore = null, moreHref = '', co
 
 // A logo, the hero of its card: white rounded square, the image contained.
 // logoTile(src, { size: 40, alt, fallbackText, tint }). No src (or a broken
-// one) shows fallbackText on `tint` instead.
+// one) shows fallbackText on `tint` instead. `src` may be a list of URLs:
+// each is tried in turn on error, then fallbackText.
 export function logoTile(src, { size = 40, alt = '', fallbackText = '', tint = '' } = {}) {
   const t = h('span', { class: 'q-logo' });
   t.style.setProperty('--s', `${size}px`);
@@ -956,9 +985,11 @@ export function logoTile(src, { size = 40, alt = '', fallbackText = '', tint = '
     t.replaceChildren(logoLetter(fallbackText, alt));
     if (tint) t.style.setProperty('--t', tint);
   };
-  if (src) {
-    const img = h('img', { src, alt, loading: 'lazy', decoding: 'async' });
-    if (fallbackText) img.addEventListener('error', text);
+  const srcs = srcList(src);
+  if (srcs.length) {
+    const img = h('img', { src: srcs[0], alt, loading: 'lazy', decoding: 'async' });
+    let at = 0;
+    if (fallbackText || srcs.length > 1) img.addEventListener('error', () => (++at < srcs.length ? img.setAttribute('src', srcs[at]) : fallbackText && text()));
     t.append(img);
   } else if (fallbackText || alt) text();
   return t;
@@ -1017,13 +1048,17 @@ export function actionGrid(items) {
 
 // A hero inside a sheet, under its head: sheetHero({ eyebrow, big, sub, tint,
 // logos: [src], tags: [text] }). tint is a colour (default the accent).
-export function sheetHero({ eyebrow = '', big = '', sub = '', tint = '', logos = [], tags = [] } = {}) {
+// `logo` (a node, e.g. a logoTile) stands in for the logos list; `status`
+// (a list of tags, or a node) is a row of its own under the tags.
+export function sheetHero({ eyebrow = '', big = '', sub = '', tint = '', logos = [], tags = [], logo = null, status = null } = {}) {
+  const st = status instanceof Node ? [status] : [].concat(status || []).map(x => (x instanceof Node ? x : tag_(typeof x === 'string' ? { text: x } : x)));
   const c = h('div', { class: 'q-sheet-hero' }, [
-    logos.length ? h('div', { class: 'q-sh-logos' }, logos.map(l => logoTile(l, { size: 48 }))) : null,
+    logo ? h('div', { class: 'q-sh-logos' }, [logo]) : logos.length ? h('div', { class: 'q-sh-logos' }, logos.map(l => logoTile(l, { size: 48 }))) : null,
     eyebrow ? h('span', { class: 'q-sh-eyebrow', text: eyebrow }) : null,
     big !== '' && big != null ? h('span', { class: 'q-sh-big', text: String(big) }) : null,
     sub ? h('span', { class: 'q-sh-sub', text: sub }) : null,
-    tags.length ? h('div', { class: 'q-sh-row' }, tags.map(x => tag_(typeof x === 'string' ? { text: x } : x))) : null
+    tags.length ? h('div', { class: 'q-sh-row' }, tags.map(x => tag_(typeof x === 'string' ? { text: x } : x))) : null,
+    st.length ? h('div', { class: 'q-sh-row q-sh-status' }, st) : null
   ]);
   return tinted(c, tint);
 }
@@ -1045,23 +1080,86 @@ export async function confirm(opts = {}) {
 }
 
 // An amount to stake: stakeInput({ value, presets: [100, 500…], onChange,
-// currency }). The number is typed or one preset tapped; .value reads it.
-export function stakeInput({ value = 0, presets = [], onChange = () => {}, currency = 'NT$' } = {}) {
-  let cur = Number(value) || 0;
-  const input = h('input', { type: 'text', inputmode: 'numeric', autocomplete: 'off', 'aria-label': currency, value: String(cur) });
-  const btns = presets.map(p => h('button', { type: 'button', onclick: () => set(p, true) }, [Number(p).toLocaleString('en-US')]));
-  const paint = () => btns.forEach((b, i) => b.setAttribute('aria-pressed', String(presets[i] === cur)));
+// currency, decimals }). The number is typed or one preset tapped; .value
+// reads it. decimals (default 0: whole amounts) is the places a crypto or FX
+// amount keeps: what is typed, shown, a preset or set() stops there.
+const stakeDp = d => Math.min(8, Math.max(0, Math.floor(Number(d) || 0)));
+const stakeNum = (n, dp) => {
+  const x = Number(n);
+  return dp ? (x > 0 && Number.isFinite(x) ? Math.floor(x * 10 ** dp + 1e-7) / 10 ** dp : 0) : Math.max(0, Math.floor(x || 0));
+};
+const stakeText = (n, dp) => (dp ? n.toFixed(dp) : String(n));
+const stakeLabel = (p, dp) => Number(p).toLocaleString('en-US', dp ? { maximumFractionDigits: dp } : {});
+export function stakeInput({ value = 0, presets = [], onChange = () => {}, currency = 'NT$', decimals = 0 } = {}) {
+  const dp = stakeDp(decimals);
+  let cur = dp ? stakeNum(value, dp) : Number(value) || 0;
+  const input = h('input', { type: 'text', inputmode: dp ? 'decimal' : 'numeric', autocomplete: 'off', 'aria-label': currency, value: stakeText(cur, dp) });
+  const btns = presets.map(p => h('button', { type: 'button', onclick: () => set(p, true) }, [stakeLabel(p, dp)]));
+  const paint = () => btns.forEach((b, i) => b.setAttribute('aria-pressed', String(dp ? stakeNum(presets[i], dp) === cur : presets[i] === cur)));
   const set = (n, fromTap = false) => {
-    cur = Math.max(0, Math.floor(Number(n) || 0));
-    if (fromTap || document.activeElement !== input) input.value = String(cur);
+    cur = stakeNum(n, dp);
+    if (fromTap || document.activeElement !== input) input.value = stakeText(cur, dp);
     paint();
     onChange(cur);
   };
-  input.addEventListener('input', () => set(input.value.replace(/\D/g, '')));
+  input.addEventListener('input', () => {
+    if (!dp) return set(input.value.replace(/\D/g, ''));
+    // Digits and one point, at most `decimals` places; what is typed stays (a "0." too).
+    const [whole, ...frac] = input.value.replace(/[^\d.]/g, '').split('.');
+    const text = frac.length ? `${whole}.${frac.join('').slice(0, dp)}` : whole;
+    if (text !== input.value) input.value = text;
+    set(text);
+  });
   const root = h('div', { class: 'q-stake' }, [h('label', { class: 'q-stake-amt' }, [h('small', { text: currency }), input]), btns.length ? h('div', { class: 'q-stake-presets' }, btns) : null]);
   root.style.setProperty('--n', String(btns.length || 5));
   paint();
   return Object.defineProperties(root, { value: { get: () => cur }, set: { value: n => set(n, true) } });
+}
+
+// A move as a solid pill: movePill(changePct, { solid, digits }) with the
+// percent as a number (1.23 is +1.23%). Red up, green down, grey flat (the
+// Taiwan way: --q-up/--q-down/--q-flat); white text. A flat figure has no
+// sign (0.00%), a missing one is a dash. solid: false is the colour as text.
+const moveTone = (p, digits) => (Number.isFinite(p) ? (Math.abs(p) >= 0.5 * 10 ** -digits ? (p > 0 ? 'up' : 'down') : 'flat') : 'flat');
+const moveText = (p, digits) => (Number.isFinite(p) ? pct(p / 100, { digits }) : DASH);
+export function movePill(changePct, { solid = true, digits = 2 } = {}) {
+  return h('span', { class: `q-move ${moveTone(changePct, digits)}${solid ? ' solid' : ''}`, text: moveText(changePct, digits) });
+}
+
+// A stock in a list: stockRow({ logo, name, sub, spark: [numbers], price,
+// change, changePct, currency, onOpen | data }), 56px high. logo is a src (or
+// a list of them) for logoTile; price a number (format.mjs price, in
+// `currency`, default TWD) or text; a sparkline drawn from `spark` (2+
+// numbers) is coloured by the move; the pill under the price is movePill
+// (changePct in percent). `change` (the amount) only stands in when there's
+// no changePct: the pill shows it, coloured by its sign.
+const sparkSvg = (nums, tone) => {
+  const v = (nums || []).filter(Number.isFinite);
+  if (v.length < 2) return '';
+  const lo = Math.min(...v);
+  const span = Math.max(...v) - lo || 1;
+  const pts = v.map((n, i) => `${((i / (v.length - 1)) * 56).toFixed(1)},${(22 - ((n - lo) / span) * 20).toFixed(1)}`).join(' ');
+  return `<svg class="q-spark ${tone}" viewBox="0 0 56 24" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+};
+const stockMove = ({ spark, changePct, change }) => {
+  const x = Number.isFinite(changePct) ? changePct : Number.isFinite(change) ? change : null;
+  if (x != null) return { tone: moveTone(x, 2) };
+  const v = (spark || []).filter(Number.isFinite);
+  return { tone: v.length > 1 ? (v.at(-1) > v[0] ? 'up' : v.at(-1) < v[0] ? 'down' : 'flat') : 'flat' };
+};
+const stockPrice = (p, currency) => (typeof p === 'number' ? fmtPrice(p, currency || 'TWD') : p == null || p === '' ? DASH : String(p));
+const stockPill = ({ changePct, change, currency }) => (Number.isFinite(changePct) || change == null || change === '' ? null : typeof change === 'number' ? (change < 0 ? '−' : change > 0 ? '+' : '') + fmtPrice(Math.abs(change), currency || 'TWD') : String(change));
+export function stockRow({ logo = '', name = '', sub = '', spark = [], price = null, change = null, changePct = null, currency = '', onOpen = null, data = null } = {}) {
+  const { tone } = stockMove({ spark, changePct, change });
+  const own = stockPill({ changePct, change, currency });
+  const pill = own == null ? movePill(changePct) : h('span', { class: `q-move ${tone} solid`, text: own });
+  const chart = sparkSvg(spark, tone);
+  return h('div', { class: 'q-stock', ...(onOpen ? { role: 'button', tabindex: '0', onclick: onOpen, onkeydown: e => e.key === 'Enter' && onOpen(e) } : {}), ...dataProps(data) }, [
+    logoTile(logo, { size: 40, alt: name, fallbackText: name }),
+    h('div', { class: 'q-stock-id' }, [h('b', { text: name }), sub ? h('small', { text: sub }) : null]),
+    chart ? h('span', { class: 'q-stock-spark', html: chart }) : null,
+    h('div', { class: 'q-stock-px' }, [h('b', { class: 'num', text: stockPrice(price, currency) }), pill])
+  ]);
 }
 
 // Lottery balls: ballRow([5, 12, …], { special, hit: [numbers drawn], size }).
