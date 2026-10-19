@@ -1,44 +1,17 @@
-// Quadra Plus and free bets, the rules alone (no page, no storage): one copy
-// for the kit (quadra.mjs re-exports them) and the Worker, which checks a
-// placed slip's boost and free bet against the pass's wallet (settle.js).
-
-// ---- Quadra Plus ---------------------------------------------------------------------
+// Free bets and VIP, the rules alone (no page, no storage): one copy for the
+// kit (quadra.mjs re-exports them) and the Worker, which checks a placed
+// slip's free bet against the pass's wallet (settle.js).
 //
-// The one membership across Quadra: PLUS.fee a Taiwan month from the pool,
-// billed by the Worker (eco.js: `op: 'plus'`, renewal with the payday). The
-// first month someone ever joins is free. A month is a member's when the
-// wallet holds `eco:plus:<YYYY-MM>`, so every app reads the same answer, for
-// any past day too.
-//
-// Plus is a product that earns Quadra money, the way a sportsbook's or a
-// broker's membership does: every perk makes betting or trading cheaper or
-// bigger, so a member bets and trades more, and the house's cut and the
-// broker's costs on that extra play earn back more than the perks cost
-// (a NT$200 free bet is worth well under NT$100 to the bettor on average:
-// only its winnings come back, at the house's prices). Nothing in it pays
-// for saving or holding cash. The avatar and frame (Looks, below) are its
-// one perk outside the money.
-export const PLUS = {
-  fee: 490,
-  // The yearly plan: twelve months for the price of ten.
-  year: 4_900,
-  // Play: a NT$bonusBet free bet each week (the Worker's `eco:fb:<Monday>`;
-  // free bets take odds of 1.50 or longer, a parlay's all together), the parlay boost
-  // ×boost (Play's PARLAY_BOOST: 3+ picks, where the house's cut multiplies
-  // with every pick), and cash out keeps cashOutKeep instead of 3% (money
-  // back on the slip sooner, to bet again).
-  odds: { bonusBet: 200, boost: 1.5, cashOutKeep: 0.02 },
-  // Securities: commission at 2.8折 (×0.28, a Taiwan online broker's best
-  // rate; a fund's subscription fee too), FX spread ×0.5, margin loans
-  // loanCut a year cheaper: more trades, more currencies, more borrowed.
-  stock: { commission: 0.28, fxSpread: 0.5, loanCut: 0.01 }
-};
-export const plusMonth = t => new Date(t + 8 * 3_600_000).toISOString().slice(0, 7);
-export const plusMonths = wallet => new Set((wallet?.entries || []).filter(e => e.kind === 'plus' && e.app === 'eco').map(e => e.id.slice(9)));
-export const plusMember = (wallet, t = Date.now()) => (wallet?.entries || []).some(e => e.id === `eco:plus:${plusMonth(t)}` && e.app === 'eco');
+// Quadra Plus, the paid membership, was removed on 2026-10-20: its looks are
+// free for everyone, members were refunded what they had paid for the days
+// left (eco.js, `eco:plusrefund:v1`; a free trial month is never refunded),
+// and old `eco:plus:<month>` entries stay in the wallet as history.
 
-// A free bet is a token from Quadra: Plus's weekly bonus bet or the welcome
-// offer (the Worker's 'eco:fb:…', app 'eco', kind 'freebet', amount 0, its
+// A Taiwan month (YYYY-MM) of a time.
+const taipeiMonth = t => new Date(t + 8 * 3_600_000).toISOString().slice(0, 7);
+
+// A free bet is a token from Quadra: the welcome offer or an old weekly
+// bonus bet (the Worker's 'eco:fb:…', app 'eco', kind 'freebet', amount 0, its
 // value in the note). Play stakes one on one slip, and only the winnings
 // come back, never the stake. Play marks it spent with 'odds:fb-<token id>'
 // (a fixed id: spent once). Unspent tokens last FREEBET.days.
@@ -82,7 +55,7 @@ export const VIP = {
 export function vipStakes(wallet, month) {
   let sum = 0;
   for (const e of wallet?.entries || []) {
-    if (e.app !== 'odds' || typeof e.t !== 'number' || plusMonth(e.t) !== month) continue;
+    if (e.app !== 'odds' || typeof e.t !== 'number' || taipeiMonth(e.t) !== month) continue;
     if (e.kind === 'stake' || e.kind === 'lottery' || e.kind === 'refund') sum -= e.amount;
   }
   return Math.max(0, Math.round(sum));

@@ -1,15 +1,14 @@
 // The Quadra Pass sheet, the same in every app (accountSheet in quadra.mjs
 // opens it; loaded the first time it's opened). Five tabs:
 //   Pass   this account: the balance and statement, devices, notices, security
-//   Plus   Quadra Plus (join, go yearly, stop renewing, what it gave back) and
-//          a member's avatar and frame
+//   外觀   an avatar and a frame, free for everyone
 //   真相   how Quadra's money moves and how the house earns, in real numbers
 //          and this account's own record (truth.mjs)
 //   App    every app, Quadra's and Orbit's, when it was last used, a way in
 //   說明   every app's guide (help.mjs)
 // It was Quadra Hub's; Hub is Orbit Words now, and only learns words.
-import { APPS, FAMILIES, AVATARS, FRAMES, LOOK_STREAKS, lookOpen, plusStreak, PLUS, VIP, WELCOME, money, plusMember, plusCard, openPlus, plusPerks, plusReturns, plusTenure, freeBets, vipStatus, vipName, worthOf, WEALTH_RANKS, OVERDRAFT_RATE, ECONOMY, settingPatch, passAccount, appIcon, el as node } from '#kit/quadra.mjs';
-import { PLAY, STOCK, houseKeep, boostedKeep, freeBetWorth, roundTrip, plusMath, record, overdraftYear, vipShare } from './truth.mjs';
+import { APPS, FAMILIES, AVATARS, FRAMES, VIP, WELCOME, money, freeBets, vipStatus, vipName, worthOf, WEALTH_RANKS, OVERDRAFT_RATE, ECONOMY, settingPatch, passAccount, appIcon, el as node } from '#kit/quadra.mjs';
+import { PLAY, STOCK, houseKeep, boostedKeep, freeBetWorth, roundTrip, record, overdraftYear, vipShare } from './truth.mjs';
 import { HELP_ORDER, helpFor } from './help.mjs';
 import { sheet } from './ui.mjs';
 
@@ -20,25 +19,11 @@ export const STRINGS = {
     monthOut: '本月支出',
     passSince: '{date} 開戶 · 第 {n} 天',
     passDetails: '帳戶明細、通知與其他設定',
-    plusMonth: '本月回饋',
-    plusAll: '累計回饋',
-    monthsN: '{n} 個月',
-    plusTenure: '會員',
-    plusBackNote: '回饋是免費投注的面額和串關加成多給的獎金：面額不等於你實際拿到的錢。',
-    plusTitle: 'Quadra Plus',
     looksTitle: '頭像與頭像框',
-    plusSub: 'Play 和 Securities 的會員方案；它怎麼替 Quadra 賺錢，「真相」算給你看。',
-    plusManage: '管理',
-    streakNeed: '再連續訂閱 {n} 個月就能戴上',
     lookOn: '戴著',
-    lookStreak: '連續訂閱 {n} 個月',
-    streakNow: '已連續訂閱 {n} 個月',
-    streakSub: '連續訂閱解鎖限定頭像與頭像框；中斷一個月就從頭算。',
-    looksLocked: '✦ Plus 會員專屬',
-    looksLockedSub: '加入 Plus 就能自訂頭像和頭像框；會員停止時會隱藏，重新加入會回來。',
     avatarsTitle: '頭像',
     framesTitle: '頭像框',
-    looksSub: '戴上後，每個 Quadra App 的帳戶按鈕都看得到。',
+    looksSub: '全部免費。戴上後，每個 Quadra App 的帳戶按鈕都看得到。',
     failed: '沒有成功，請再試一次',
     devicesTitle: '裝置與安全',
     addDevice: '新增裝置（取得裝置代碼）',
@@ -72,10 +57,10 @@ export const STRINGS = {
     edgeLegs: '{n} 關串關',
     edgeSingleSub: '賠率背後的機率加起來 {cut} 倍',
     edgeBoost: '{n} 關串關加上串關加成',
-    edgeBoostSub: '加成只加在獎金上，抽成卻每關相乘；Plus 會員 {plus}',
+    edgeBoostSub: '加成只加在獎金上，抽成卻每關相乘',
     yourBets: '你的投注回收率',
     yourBetsSub: '投注 {staked}，拿回 {won}',
-    edgeFoot: '串關關數越多，莊家留得越多：所以 App 會用「加成」和「精選串關」推你多串幾關。每注 NT$10 中獎超過 {free}（賠率超過 {odds} 倍）還要扣 {tax} 所得稅；提前兌現時，每個還沒結果的選項先扣 {cut} 的莊家差價，整張再扣 {keep}（Plus {plus}）：串越多關、越早兌現，拿得越少。',
+    edgeFoot: '串關關數越多，莊家留得越多：所以 App 會用「加成」和「精選串關」推你多串幾關。每注 NT$10 中獎超過 {free}（賠率超過 {odds} 倍）還要扣 {tax} 所得稅；提前兌現時，每個還沒結果的選項先扣 {cut} 的莊家差價，整張再扣 {keep}：串越多關、越早兌現，拿得越少。',
     edgeSub: '每個賠率裡都藏著抽成：機率加起來超過 100%，多出來的就是莊家的。下面是每下注 NT$100，長期平均會被留下多少。',
     lotteryTitle: '彩券和刮刮樂',
     lotteryDraw: '電腦彩券（威力彩、大樂透、539…）',
@@ -96,29 +81,13 @@ export const STRINGS = {
     yourFreeSub: '面額，不是實際價值',
     freeFoot: '免費投注 7 天內過期，逼你快點用；VIP 每月歸零，月底差一點升級時，你會想多下一點。',
     freeSub: '送你的東西都有條件，條件是為了讓你下更多注。',
-    plusTruthTitle: 'Plus 為什麼存在',
-    plusFee: '月費',
-    plusFeeSub: '年繳每月 {yearly}，但一次付 12 個月',
-    plusBets: '每週免費投注，每月實際價值',
-    plusBetsSub: '面額每月 {face}；只有贏的獎金拿得回來',
-    plusTrades: '手續費折扣要交易幾次才回本',
-    timesN: '每月 {n} 次',
-    plusTradesSub: '每次 NT$100,000 買進再賣出省 {saved}：省錢的前提是你常常交易',
-    plusBoostRow: '串關加成 ×{x}，莊家少留',
-    plusBoostSub: '3 關、賠率 8.00 的串關；莊家還是留下三成以上',
-    yourPlus: '你付過的 Plus 月費',
-    yourPlusSub: '回饋面額累計 {back}',
-    plusFoot: '想想看：如果權益比月費值錢，Quadra 為什麼要賣？因為會員會比非會員多下注、多交易，多出來的抽成就是 Plus 的利潤。',
-    plusTruthSub: 'Plus 的每一項權益都讓下注和交易更便宜或更大。會員下得越多、交易越多，Quadra 賺的抽成和手續費就越多，遠超過權益的成本。',
     stockTitle: '交易成本',
     tripCost: 'NT$100,000 台股買進再賣出',
     tripCostSub: '手續費 {fee} + 證交稅 {tax}，一來一回 {share}',
-    tripPlus: 'Plus 會員同一筆',
-    tripPlusSub: '證交稅照收，只有手續費打折',
     tripMonth: '每週換股一次，一年的成本',
     tripMonthSub: '同樣 NT$100,000；不交易就是零',
     marginRate: '融資年利率',
-    marginRateSub: 'Plus {plus}：利率越低，越鼓勵你借錢投資，虧損也跟著放大',
+    marginRateSub: '借錢投資，賺的時候放大，虧的時候也放大',
     overdraftRow: '透支一年的利息',
     overdraftSub: '每月 {month}，複利；2 天內沒補足再扣 {penalty} 違約金並賣出持股',
     yourOd: '你付過的透支利息',
@@ -155,12 +124,17 @@ export const STRINGS = {
     frame_ruby: '紅寶石',
     frame_prism: '稜鏡',
     frame_celestial: '星穹',
-    trick_trial: '免費試用會自動續訂',
-    trickHow_trial: 'Plus 第一個月免費，之後每月自動扣 {fee}；很多人忘了取消。',
-    trick_yearly: '年繳「省兩個月」',
-    trickHow_yearly: '年繳 {year} 一次付清，取消也不退：省錢的代價是被綁住。',
-    trick_leave: '取消時告訴你會失去什麼',
-    trickHow_leave: '「之後沒有…」利用損失厭惡，讓你留下。',
+    trick_installment: '「每週只要」',
+    trickHow_installment: '信貸先講每週還多少，不先講總共多付多少；開辦費和利息加起來，看「總費用年百分率」才是真正的成本。',
+    frame_pearl: '珍珠',
+    frame_matcha: '抹茶',
+    frame_milktea: '奶茶',
+    frame_sunset: '夕陽',
+    frame_midnight: '午夜',
+    frame_forest: '森林',
+    frame_candy: '糖果',
+    frame_lava: '熔岩',
+    frame_skylantern: '天燈',
     trick_expire: '期限',
     trickHow_expire: '免費投注 7 天就過期，讓你沒想清楚就先下注。',
     trick_minodds: '最低賠率',
@@ -172,7 +146,7 @@ export const STRINGS = {
     trick_nearmiss: '差一點就中',
     trickHow_nearmiss: '刮刮樂的牌面常有兩個一樣、只差一個就中的組合，真的刮刮樂也這樣排，讓你覺得運氣快來了。',
     trick_notify: '通知與連續天數',
-    trickHow_notify: '每週 {bet} 到帳通知、連續紀錄，都是要你天天打開 App。Orbit Words 的單字連續天數也是，只是這次是為了讓你學會。',
+    trickHow_notify: '每週發薪通知、連續紀錄，都是要你天天打開 App。Orbit Words 的單字連續天數也是，只是這次是為了讓你學會。',
     rank_start: '起步',
     rank_saver: '小資族',
     rank_steady: '穩健',
@@ -189,7 +163,7 @@ export const STRINGS = {
     frameWorn: '頭像框已換上',
     frameOff: '已拿下頭像框',
     tab_pass: 'Pass',
-    tab_plus: 'Plus',
+    tab_looks: '外觀',
     tab_truth: '真相',
     tab_apps: 'App',
     tab_help: '說明',
@@ -203,25 +177,11 @@ export const STRINGS = {
     monthOut: 'Out this month',
     passSince: 'Opened {date} · day {n}',
     passDetails: 'Statement, notices and more settings',
-    plusMonth: 'Back this month',
-    plusAll: 'Back in all',
-    monthsN: '{n} months',
-    plusTenure: 'Member',
-    plusBackNote: 'What came back is free bets at face value and the extra parlay boost: face value isn’t money in your pocket.',
-    plusTitle: 'Quadra Plus',
     looksTitle: 'Avatar and frame',
-    plusSub: 'Play’s and Securities’ membership; how it earns Quadra money is worked out in Truth.',
-    plusManage: 'Manage',
-    streakNeed: '{n} more months in a row to wear this',
     lookOn: 'Wearing',
-    lookStreak: '{n} months in a row',
-    streakNow: '{n} months in a row',
-    streakSub: 'Stay a member to unlock the rarest avatars and frames; a month missed starts the count again.',
-    looksLocked: '✦ For Plus members',
-    looksLockedSub: 'Join Plus to pick an avatar and a frame; they’re hidden when the membership stops, and back if you join again.',
     avatarsTitle: 'Avatars',
     framesTitle: 'Frames',
-    looksSub: 'Worn on your account button in every Quadra app.',
+    looksSub: 'All free. Worn on your account button in every Quadra app.',
     failed: 'That didn’t work; please try again',
     devicesTitle: 'Devices and security',
     addDevice: 'Add a device (get a device code)',
@@ -255,10 +215,10 @@ export const STRINGS = {
     edgeLegs: 'A {n}-pick parlay',
     edgeSingleSub: 'The chances behind the odds add up to {cut}×',
     edgeBoost: 'A {n}-pick parlay with the boost',
-    edgeBoostSub: 'The boost adds to the winnings; the cut multiplies with every pick. Plus members: {plus}',
+    edgeBoostSub: 'The boost adds to the winnings; the cut multiplies with every pick',
     yourBets: 'What your bets paid back',
     yourBetsSub: 'Staked {staked}, back {won}',
-    edgeFoot: 'The more picks on a parlay, the more the house keeps, which is why the app pushes boosts and featured parlays. A combination whose NT$10 unit wins over {free} (odds over {odds}) loses {tax} income tax; cash out takes {cut} off each undecided pick’s chance, then keeps {keep} of the slip ({plus} with Plus): the more picks still to play, the less it pays.',
+    edgeFoot: 'The more picks on a parlay, the more the house keeps, which is why the app pushes boosts and featured parlays. A combination whose NT$10 unit wins over {free} (odds over {odds}) loses {tax} income tax; cash out takes {cut} off each undecided pick’s chance, then keeps {keep} of the slip: the more picks still to play, the less it pays.',
     edgeSub: 'Every price hides a cut: the chances behind the odds add up to more than 100%, and the extra is the house’s. Here’s what it keeps of every NT$100 staked, on average, over time.',
     lotteryTitle: 'Lottery and scratch cards',
     lotteryDraw: 'Number draws (Super Lotto, Lotto 6/49, 539…)',
@@ -279,29 +239,13 @@ export const STRINGS = {
     yourFreeSub: 'At face value, not what they’re worth',
     freeFoot: 'Free bets expire in 7 days, to hurry you; VIP tiers start again every month, so just short of the next one at the month’s end, you’ll want to bet a little more.',
     freeSub: 'Everything given away has terms, and the terms are there to make you bet more.',
-    plusTruthTitle: 'Why Plus exists',
-    plusFee: 'The fee',
-    plusFeeSub: '{yearly} a month yearly, but twelve months paid at once',
-    plusBets: 'The weekly free bets, really worth a month',
-    plusBetsSub: '{face} a month at face value; only winnings come back',
-    plusTrades: 'Trades for the commission discount to pay',
-    timesN: '{n} a month',
-    plusTradesSub: 'A NT$100,000 round trip saves {saved}: it only saves if you trade a lot',
-    plusBoostRow: 'Parlay boost ×{x}: less kept by the house',
-    plusBoostSub: 'A 3-pick parlay at 8.00; the house still keeps over 30%',
-    yourPlus: 'Plus fees you’ve paid',
-    yourPlusSub: '{back} back at face value',
-    plusFoot: 'Ask yourself: if the perks were worth more than the fee, why would Quadra sell it? Because members bet and trade more than everyone else, and the extra cut is Plus’s profit.',
-    plusTruthSub: 'Every Plus perk makes betting or trading cheaper or bigger. Members bet more and trade more, and the extra cuts and commissions Quadra earns are worth far more than the perks cost.',
     stockTitle: 'Trading costs',
     tripCost: 'NT$100,000 of a Taiwan stock, bought and sold',
     tripCostSub: 'Commission {fee} + transaction tax {tax}: {share} of it there and back',
-    tripPlus: 'The same trade with Plus',
-    tripPlusSub: 'The tax is the same; only the commission is cut',
     tripMonth: 'Switching stocks every week, for a year',
     tripMonthSub: 'The same NT$100,000; not trading costs nothing',
     marginRate: 'Margin interest a year',
-    marginRateSub: 'Plus {plus}: the cheaper borrowing is, the more it invites investing with borrowed money, and losses grow with it',
+    marginRateSub: 'Investing borrowed money makes gains bigger, and losses too',
     overdraftRow: 'A year of overdraft interest',
     overdraftSub: '{month} a month, compounded; not covered within 2 days, a {penalty} penalty and holdings sold',
     yourOd: 'Overdraft interest you’ve paid',
@@ -338,12 +282,17 @@ export const STRINGS = {
     frame_ruby: 'Ruby',
     frame_prism: 'Prism',
     frame_celestial: 'Celestial',
-    trick_trial: 'A free trial that renews itself',
-    trickHow_trial: 'Plus’s first month is free, then {fee} a month comes off by itself; plenty of people forget to cancel.',
-    trick_yearly: 'Yearly, “two months free”',
-    trickHow_yearly: '{year} paid at once and never refunded: the saving is the price of being tied in.',
-    trick_leave: 'Telling you what you’ll lose',
-    trickHow_leave: '“You lose…” on the way out uses loss aversion to keep you.',
+    trick_installment: '“Only so much a week”',
+    trickHow_installment: 'A loan leads with the weekly payment, not the total it costs; the fee and the interest together, the APR with fees, is the real price.',
+    frame_pearl: 'Pearl',
+    frame_matcha: 'Matcha',
+    frame_milktea: 'Milk tea',
+    frame_sunset: 'Sunset',
+    frame_midnight: 'Midnight',
+    frame_forest: 'Forest',
+    frame_candy: 'Candy',
+    frame_lava: 'Lava',
+    frame_skylantern: 'Sky lantern',
     trick_expire: 'Deadlines',
     trickHow_expire: 'Free bets expire in 7 days, so you bet before you’ve thought it through.',
     trick_minodds: 'Minimum odds',
@@ -355,7 +304,7 @@ export const STRINGS = {
     trick_nearmiss: 'Near misses',
     trickHow_nearmiss: 'Scratch card faces often show two of a kind, one short of a win, as real cards do, so luck feels close.',
     trick_notify: 'Notices and streaks',
-    trickHow_notify: 'The {bet} “it’s here” notice every week and streaks are there to have you open the app every day. Orbit Words’ streak is one too, only this time it’s to help you learn.',
+    trickHow_notify: 'The payday notice every week and streaks are there to have you open the app every day. Orbit Words’ streak is one too, only this time it’s to help you learn.',
     rank_start: 'Starter',
     rank_saver: 'Saver',
     rank_steady: 'Steady',
@@ -372,7 +321,7 @@ export const STRINGS = {
     frameWorn: 'Frame on',
     frameOff: 'Frame off',
     tab_pass: 'Pass',
-    tab_plus: 'Plus',
+    tab_looks: 'Looks',
     tab_truth: 'Truth',
     tab_apps: 'Apps',
     tab_help: 'Help',
@@ -381,7 +330,9 @@ export const STRINGS = {
     appsOrbitSub: 'Everyday tools: no money, the same Quadra Pass.'
   }
 };
-const TABS = ['pass', 'plus', 'truth', 'apps', 'help'];
+const TABS = ['pass', 'looks', 'truth', 'apps', 'help'];
+// Plus's tab is the looks' now (an old link or button still opens it).
+const TAB_ALIAS = { plus: 'looks' };
 
 // ---- Small pieces ---------------------------------------------------------------------------
 
@@ -420,7 +371,7 @@ export function openPass(s, { extra = null, tab = 'pass', help = null } = {}) {
   toastBox = el('div', { class: 'toasts q-pass-toasts', 'aria-live': 'polite' });
   // Looks chosen here, until the write that carries them comes back.
   const pending = {};
-  const state = { tab: TABS.includes(tab) ? tab : 'pass', help: help || { app: s.app, topic: null }, locale, extra };
+  const state = { tab: TABS.includes(TAB_ALIAS[tab] || tab) ? TAB_ALIAS[tab] || tab : 'pass', help: help || { app: s.app, topic: null }, locale, extra };
   let account = null;
   const close = () => sh.close();
   const ctx = {
@@ -459,7 +410,7 @@ export function openPass(s, { extra = null, tab = 'pass', help = null } = {}) {
       account = passAccount(s, { extra: state.extra, close });
       return put(body, ...account.nodes);
     }
-    if (state.tab === 'plus') return put(body, plusSection(ctx), looksSection(ctx));
+    if (state.tab === 'looks') return put(body, looksSection(ctx));
     if (state.tab === 'truth') return renderTruth(body, ctx);
     if (state.tab === 'apps') return renderApps(body, ctx);
     renderHelp(body, ctx, state.help);
@@ -508,82 +459,25 @@ function renderHelp(box, { q, t, locale }, { app, topic }) {
   if (topic) setTimeout(() => box.querySelector(`#q-help-${topic}`)?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 50);
 }
 
-const plusSection = ({ q, t, locale }) => plusSectionOf(q, t, locale, q.wallet || {}, plusMember(q.wallet));
-function plusSectionOf(q, t, locale, w, member) {
-  const perks = plusPerks(locale);
-  const group = (app, title) => el('div', { class: 'perk-group' }, [el('small', { class: 'perk-h', text: title }), ...perks.filter(p => p[0] === app).map(([, a, b]) => el('div', { class: 'perk' }, [el('span', { class: 'perk-mark', 'aria-hidden': 'true', text: '✦' }), el('span', {}, [el('strong', { text: a }), el('small', { class: 'muted', text: b })])]))]);
-  const month = plusReturns(w);
-  const all = plusReturns(w, Date.now(), { all: true });
-  const back = member
-    ? el('div', { class: 'q-card pad plus-back' }, [
-        el('div', { class: 'stat-row three' }, [
-          el('div', { class: 'stat' }, [el('strong', { class: 'num', text: money(month.total) }), el('small', { text: t('plusMonth') })]),
-          el('div', { class: 'stat' }, [el('strong', { class: 'num', text: money(all.total) }), el('small', { text: t('plusAll') })]),
-          el('div', { class: 'stat' }, [el('strong', { class: 'num', text: t('monthsN', { n: plusTenure(w) }) }), el('small', { text: t('plusTenure') })])
-        ]),
-        el('small', { class: 'muted', text: t('plusBackNote') })
-      ])
-    : null;
-  return section(t('plusTitle'), el('div', { class: 'plus-box' }, [plusCard(q), back, el('div', { class: 'q-card pad perks' }, [group('odds', 'Quadra Play'), group('stock', 'Quadra Securities'), group('looks', t('looksTitle'))])]), {
-    sub: t('plusSub'),
-    action: el('button', { type: 'button', text: `${t('plusManage')} ›`, onclick: () => openPlus(q) })
-  });
-}
-
-// Avatars and frames: a member wears one (or none); anyone else sees them
-// locked, and a tap opens Plus. The rarest are for staying a member: each
-// streak's own row, locked (with how many months are left) until it's held.
-const looksSection = ({ q, t, wornOf, wear }) => looksSectionOf(q, t, q.wallet || {}, plusMember(q.wallet), wornOf, wear);
-function looksSectionOf(q, t, w, member, wornOf, wear) {
+// Avatars and frames, free for everyone: a tap wears one, a second tap
+// takes it off.
+function looksSection({ t, wornOf, wear }) {
   const avatar = wornOf('avatar');
   const frame = wornOf('frame');
   const glyph = AVATARS.find(a => a.id === avatar)?.glyph || '🙂';
-  const streak = plusStreak(w);
-  const pick = (key, item) => {
-    if (!member) return openPlus(q);
-    if (!lookOpen(w, item)) return toast(t('streakNeed', { n: item.streak - streak }));
-    wear(key, item.id === wornOf(key) ? null : item.id);
-  };
   const tile = (key, item, face) => {
-    const open = lookOpen(w, item);
-    const on = open && wornOf(key) === item.id;
-    const label = on ? t('lookOn') : key === 'frame' ? t(`frame_${item.id}`) : '';
-    return el('button', { class: `av-tile${on ? ' on' : ''}${open ? '' : ' locked'}`, type: 'button', 'aria-pressed': String(on), 'aria-label': [key === 'frame' ? t(`frame_${item.id}`) : item.glyph, item.streak && !open ? t('lookStreak', { n: item.streak }) : ''].filter(Boolean).join(' · '), onclick: () => pick(key, item) }, [face, el('small', { text: label })]);
+    const on = wornOf(key) === item.id;
+    const name = key === 'frame' ? t(`frame_${item.id}`) : item.glyph;
+    return el('button', { class: `av-tile${on ? ' on' : ''}`, type: 'button', 'aria-pressed': String(on), 'aria-label': name, onclick: () => wear(key, on ? null : item.id) }, [face, el('small', { text: on ? t('lookOn') : key === 'frame' ? name : '' })]);
   };
   const faces = {
     avatar: a => el('span', { class: 'av-glyph', 'aria-hidden': 'true', text: a.glyph }),
     frame: f => el('span', { class: `fr-preview q-framed q-frame-${f.id}${frame === f.id ? ' on' : ''}`, 'aria-hidden': 'true', text: glyph })
   };
-  // Every look anyone member wears, then a row per streak.
-  const rows = (key, list) => [
-    el(
-      'div',
-      { class: 'av-grid' },
-      list.filter(x => !x.streak).map(x => tile(key, x, faces[key](x)))
-    ),
-    ...LOOK_STREAKS.map(n => {
-      const items = list.filter(x => x.streak === n);
-      if (!items.length) return null;
-      const held = member && streak >= n;
-      return el('div', { class: 'av-tier' }, [
-        el('small', { class: `av-tier-h${held ? ' held' : ''}`, text: `${held ? '✓' : '🔒'} ${t('lookStreak', { n })}` }),
-        el(
-          'div',
-          { class: 'av-grid' },
-          items.map(x => tile(key, x, faces[key](x)))
-        )
-      ]);
-    })
-  ];
+  const grid = (key, list) => el('div', { class: 'av-grid' }, list.map(x => tile(key, x, faces[key](x))));
   return section(
     t('looksTitle'),
-    el('div', { class: 'q-card pad looks' }, [
-      member ? el('p', { class: 'av-streak' }, [el('strong', { class: 'num', text: t('streakNow', { n: streak }) }), el('small', { class: 'muted', text: t('streakSub') })]) : el('button', { class: 'looks-lock', type: 'button', onclick: () => openPlus(q) }, [el('strong', { text: t('looksLocked') }), el('small', { text: t('looksLockedSub') })]),
-      el('small', { class: 'lv-h', text: t('avatarsTitle') }),
-      ...rows('avatar', AVATARS),
-      el('small', { class: 'lv-h', text: t('framesTitle') }),
-      ...rows('frame', FRAMES)
-    ]),
+    el('div', { class: 'q-card pad looks' }, [el('small', { class: 'lv-h', text: t('avatarsTitle') }), grid('avatar', AVATARS), el('small', { class: 'lv-h', text: t('framesTitle') }), grid('frame', FRAMES)]),
     { sub: t('looksSub') }
   );
 }
@@ -595,12 +489,9 @@ function renderTruth(box, { t, state }) {
   const r = record(w);
   const s = r.sides;
   const legs = [1, 2, 3, 5, 7];
-  const plus = plusMath();
-  const plusBoost = PLUS.odds.boost;
   // A 3-pick parlay at 2.00 each (8.00): what the boost gives back of the cut.
   const parlay = { legs: 3, odds: 8 };
   const trip = roundTrip(100_000);
-  const tripPlus = roundTrip(100_000, true);
   const vip = vipStatus(w);
   put(
     box,
@@ -622,10 +513,10 @@ function renderTruth(box, { t, state }) {
       facts(
         [
           ...legs.map(n => row(n === 1 ? t('edgeSingle') : t('edgeLegs', { n }), pct(houseKeep(n)), n === 1 ? t('edgeSingleSub', { cut: PLAY.cut }) : '')),
-          row(t('edgeBoost', { n: parlay.legs }), pct(boostedKeep(parlay.legs, parlay.odds)), t('edgeBoostSub', { plus: pct(boostedKeep(parlay.legs, parlay.odds, plusBoost)) })),
+          row(t('edgeBoost', { n: parlay.legs }), pct(boostedKeep(parlay.legs, parlay.odds)), t('edgeBoostSub')),
           r.staked > 0 ? row(t('yourBets'), r.betBack == null ? '—' : pct(r.betBack), t('yourBetsSub', { staked: money(r.staked), won: money(r.won) }), r.won >= r.staked ? 'up' : 'down') : null
         ],
-        t('edgeFoot', { tax: pct(PLAY.tax, 0), free: money(PLAY.taxFree), odds: PLAY.taxOdds, keep: pct(PLAY.cashOutKeep, 0), plus: pct(PLUS.odds.cashOutKeep, 0), cut: `${pct(PLAY.cashOutLegCut.pre, 0)}–${pct(PLAY.cashOutLegCut.live, 0)}` })
+        t('edgeFoot', { tax: pct(PLAY.tax, 0), free: money(PLAY.taxFree), odds: PLAY.taxOdds, keep: pct(PLAY.cashOutKeep, 0), cut: `${pct(PLAY.cashOutLegCut.pre, 0)}–${pct(PLAY.cashOutLegCut.live, 0)}` })
       ),
       { sub: t('edgeSub') }
     ),
@@ -655,27 +546,12 @@ function renderTruth(box, { t, state }) {
       { sub: t('freeSub') }
     ),
     section(
-      t('plusTruthTitle'),
-      facts(
-        [
-          row(t('plusFee'), money(plus.fee), t('plusFeeSub', { yearly: money(plus.yearly) })),
-          row(t('plusBets'), money(plus.betsWorth), t('plusBetsSub', { face: money(plus.betsFace) })),
-          row(t('plusTrades'), t('timesN', { n: plus.tradesToBreakEven }), t('plusTradesSub', { saved: money(plus.savedPerTrade) })),
-          row(t('plusBoostRow', { x: plusBoost }), pct(boostedKeep(parlay.legs, parlay.odds) - boostedKeep(parlay.legs, parlay.odds, plusBoost)), t('plusBoostSub')),
-          r.plusPaid > 0 ? row(t('yourPlus'), money(r.plusPaid), t('yourPlusSub', { back: money(plusReturns(w, Date.now(), { all: true }).total) })) : null
-        ],
-        t('plusFoot')
-      ),
-      { sub: t('plusTruthSub') }
-    ),
-    section(
       t('stockTitle'),
       facts(
         [
           row(t('tripCost'), money(trip.total), t('tripCostSub', { fee: money(trip.fee), tax: money(trip.tax), share: pct(trip.share, 2) })),
-          row(t('tripPlus'), money(tripPlus.total), t('tripPlusSub')),
           row(t('tripMonth'), money(trip.total * 4 * 12), t('tripMonthSub')),
-          row(t('marginRate'), pct(STOCK.loanRate), t('marginRateSub', { plus: pct(STOCK.loanRate - PLUS.stock.loanCut) })),
+          row(t('marginRate'), pct(STOCK.loanRate), t('marginRateSub')),
           row(t('overdraftRow'), pct(overdraftYear()), t('overdraftSub', { month: pct(OVERDRAFT_RATE, 0), penalty: pct(STOCK.penalty, 0) })),
           r.od > 0 ? row(t('yourOd'), money(r.od), '', 'down') : null
         ],
@@ -688,14 +564,14 @@ function renderTruth(box, { t, state }) {
       el(
         'div',
         { class: 'q-card list tricks' },
-        TRICKS.map(id => el('div', { class: 'trick' }, [el('strong', { text: t(`trick_${id}`) }), el('small', { class: 'muted', text: t(`trickHow_${id}`, { fee: money(PLUS.fee), year: money(PLUS.year), bet: money(PLUS.odds.bonusBet) }) })]))
+        TRICKS.map(id => el('div', { class: 'trick' }, [el('strong', { text: t(`trick_${id}`) }), el('small', { class: 'muted', text: t(`trickHow_${id}`) })]))
       ),
       { sub: t('tricksSub') }
     ),
     section(t('ranksTitle'), ranksCard(t, w), { sub: t('ranksSub') })
   );
 }
-const TRICKS = ['trial', 'yearly', 'leave', 'expire', 'minodds', 'boost', 'vip', 'nearmiss', 'notify'];
+const TRICKS = ['installment', 'expire', 'minodds', 'boost', 'vip', 'nearmiss', 'notify'];
 const sideRow = (icon, label, value, sub, cls = '') => el('div', { class: `side-row ${cls}` }, [el('span', { class: 'side-icon', 'aria-hidden': 'true', text: icon }), el('span', { class: 'side-text' }, [el('strong', { text: label }), el('small', { class: 'muted', text: sub })]), el('strong', { class: 'num', text: value })]);
 
 // 財富等級: every level and its one-time reward, and where the account is.

@@ -252,10 +252,9 @@ test('sheetVerdict: close, expand, shrink, settle', () => {
   assert.equal(v({ dy: 150, raw: 150, detent: 'large' }), 'close', 'a sheet opened large closes');
 });
 
-test('there is one sheet: Plus and the Pass are built by it', () => {
+test('there is one sheet: the Pass is built by it', () => {
   const q = readFileSync(new URL('../kit/quadra.mjs', import.meta.url), 'utf8');
   const p = readFileSync(new URL('../kit/pass.mjs', import.meta.url), 'utf8');
-  assert.match(q, /uiSheet\(\{ title: 'Quadra Plus'/);
   assert.match(p, /= sheet\(\{/);
   for (const [name, src] of [['quadra.mjs', q], ['pass.mjs', p]]) assert.doesNotMatch(src, /(?:node|el)\('dialog', \{ class: '(?:q-sheet|`q-sheet)/, `${name} draws no private sheet`);
 });

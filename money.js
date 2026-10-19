@@ -5,7 +5,7 @@
 //   given   what the system paid in: opening money, monthly pay, wealth-rank
 //           rewards, and the rest (VIP cashback, admin grants, rebases)
 //   quadra  what Quadra earned, signed: Play's settled bets from the house's
-//           side (stakes kept less payouts), Plus fees and overdraft interest
+//           side (stakes kept less payouts), old Plus fees (less the refund) and overdraft interest
 //   own     what players made themselves (Securities and anything else):
 //           worth less given, less what Play and the fees moved
 //
@@ -20,11 +20,12 @@ import { changeDoc } from './doc-store.js';
 
 export const LEDGER = ['quadra-config', 'ledger'];
 const RESET_ID = 'eco:rebase:v3';
+const LOAN_KINDS = new Set(['loan', 'loanfee', 'loanpay', 'loanlate', 'loangar', 'loanoff']);
 const num = v => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
 
 export function sidesOf(wallet) {
   const gave = { start: 0, pay: 0, rank: 0, other: 0 };
-  const fees = { plus: 0, od: 0 };
+  const fees = { plus: 0, od: 0, loan: 0 };
   let play = 0;
   let atStake = 0;
   const entries = wallet?.entries || [];
@@ -37,8 +38,10 @@ export function sidesOf(wallet) {
       if (e.kind === 'start' || e.kind === 'grant' || String(e.id).startsWith(RESET_ID)) gave.start += a;
       else if (e.kind === 'pay') gave.pay += a;
       else if (e.kind === 'rank') gave.rank += a;
-      else if (e.kind === 'rebase' || e.kind === 'vip' || e.kind === 'admin') gave.other += a;
-      else if (e.kind === 'plus') fees.plus -= a;
+      else if (e.kind === 'rebase' || e.kind === 'vip' || e.kind === 'admin' || e.kind === 'relief') gave.other += a;
+      // A loan's money in and out: net of what's paid back, its fee, interest and late charges (less while one is still owed).
+      else if (LOAN_KINDS.has(e.kind)) fees.loan -= a;
+      else if (e.kind === 'plus' || e.kind === 'plusrefund') fees.plus -= a;
       else if (e.kind === 'od') fees.od -= a;
     } else if (e.app === 'odds') {
       if (e.kind === 'start') gave.start += a;
@@ -53,7 +56,7 @@ export function sidesOf(wallet) {
   const worth = pool + num(wallet?.snap?.stock?.holdings) + atStake;
   const given = gave.start + gave.pay + gave.rank + gave.other;
   // Quadra's side from the house's view: above 0 when it kept more.
-  const quadra = fees.plus + fees.od - play;
+  const quadra = fees.plus + fees.od + fees.loan - play;
   const own = worth - given + quadra;
   const r = n => Math.round(n);
   const markets = (pl, sign) => Object.fromEntries(Object.entries(pl && typeof pl === 'object' ? pl : {}).filter(([, v]) => Number.isFinite(v)).map(([k, v]) => [k, r(sign * v)]));
@@ -62,7 +65,7 @@ export function sidesOf(wallet) {
     given: r(given),
     gave: Object.fromEntries(Object.entries(gave).map(([k, v]) => [k, r(v)])),
     quadra: r(quadra),
-    fees: { plus: r(fees.plus), od: r(fees.od) },
+    fees: { plus: r(fees.plus), od: r(fees.od), loan: r(fees.loan) },
     play: r(-play),
     // Play by sport from the house's side (a player's loss is Quadra's earning).
     playBy: markets(wallet?.snap?.odds?.pl, -1),

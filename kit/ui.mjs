@@ -97,7 +97,7 @@ export function segmented(items, { value = items[0]?.id, onChange = () => {}, bi
 }
 
 // ---- Sheet ----
-// THE sheet (Plus and the Pass are this too): a dialog from the foot,
+// THE sheet (the Pass is this too): a dialog from the foot,
 //   sheet({ title, body, onClose, cls, lead, trailing, detent, foot, closeLabel, label })
 // title (text, or a node), centred; lead: a node on its left (a ☆ say);
 // trailing: a node on its right in place of the ✕ (a Done: its button

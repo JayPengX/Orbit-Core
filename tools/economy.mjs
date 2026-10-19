@@ -110,7 +110,7 @@ export const SETTINGS = {
   // NT$43,300 a month, a Taiwan salary). More is borrowed, never given: a
   // 信貸 repaid from the pay (kit/loan.mjs), its interest and fees a sink;
   // relief only for someone with nothing.
-  v12: { name: 'Now (v12): NT$200,000 start, NT$10,000 a week', start: 200_000, pay: () => Math.round((10_000 * 52) / 12), effortRate: 0, effortCap: 0, plus: 490, shop: true, vip: true, v6: true, noRewardsPay: true, plusCfg: PLUS_V11, catalog: true }
+  v12: { name: 'Now (v12): NT$200,000 start, NT$10,000 a week, no Plus', start: 200_000, pay: () => Math.round((10_000 * 52) / 12), effortRate: 0, effortCap: 0, plus: 0, shop: true, vip: true, v6: true, noRewardsPay: true, plusCfg: PLUS_V11, catalog: true }
 };
 const BOOST = { price: 150, cap: 200 };
 const FREEBET_RETURN = 0.45;

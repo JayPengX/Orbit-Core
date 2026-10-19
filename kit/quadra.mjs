@@ -13,7 +13,7 @@
 //   Orbit Beats         beats   beat pieces arranged into songs (was Passion Beats)
 //
 // The names, colours and marks are brand.mjs's. The Quadra Pass (the
-// account, Plus, the truth about the money, every app and its guide) is the
+// account, its looks, the truth about the money, every app and its guide) is the
 // sheet behind every app's account button (pass.mjs).
 //
 // One account works everywhere: the Quadra Pass, a 10-character code for
@@ -33,7 +33,7 @@
 export { MIRROR_HOSTS, mirrorPath } from './mirror.mjs';
 import { BRANDS, FAMILIES, pathOf, appIcon, familyMark } from './brand.mjs';
 import { DEV, cleanDev } from './brand.mjs';
-import { icons, tile, sheet as uiSheet, pullToRefresh, setSheetDetent, segmented } from './ui.mjs';
+import { icons, tile, pullToRefresh, setSheetDetent, segmented } from './ui.mjs';
 
 export const ECO_URL = 'https://orbit-workers-proxy.pengzjay.workers.dev/eco';
 export const PROXY_URL = 'https://orbit-workers-proxy.pengzjay.workers.dev/sports-proxy';
@@ -135,7 +135,7 @@ export const WEALTH_RANKS = [
 ];
 // Where the money came from and went (all time, NT$): what the system gave
 // (opening money, pay, level rewards, resets, VIP cashback), the account
-// against Quadra (Play's settled bets less Plus fees and overdraft interest:
+// against Quadra (Play's settled bets less fees, loan costs and overdraft interest:
 // a surplus when it has won more than it lost and paid), and its own result
 // (markets, savings: worth less the other two). A bet still open is in the
 // worth, as money at stake, and in neither side until it's settled.
@@ -148,7 +148,7 @@ export const WEALTH_RANKS = [
 const RESET_ID = 'eco:rebase:v3';
 export function moneySides(wallet) {
   const gave = { start: 0, pay: 0, rank: 0, other: 0 };
-  // Play's settled bets (payouts less stakes) and what Quadra charges (Plus
+  // Play's settled bets (payouts less stakes) and what Quadra charges (old Plus
   // fees, overdraft interest); a bet still open is neither yet: it's money
   // at stake, still the account's.
   let play = 0;
@@ -169,7 +169,7 @@ export function moneySides(wallet) {
       else if (e.kind === 'rank') gave.rank += a;
       // (A correction or prize from the admin page: money Quadra gave, either way.)
       else if (e.kind === 'rebase' || e.kind === 'vip' || e.kind === 'admin' || e.kind === 'relief') gave.other += a;
-      else if (e.kind === 'plus' || e.kind === 'od') fees -= a;
+      else if (e.kind === 'plus' || e.kind === 'plusrefund' || e.kind === 'od') fees -= a;
       else if (LOAN_KINDS.has(e.kind)) loanFlow += a;
     } else if (e.app === 'odds') {
       if (e.kind === 'start') gave.start += a;
@@ -198,101 +198,36 @@ export const overdraft = wallet => Math.max(0, -poolBalance(wallet));
 import { PAY_WEEK, LOAN, RELIEF, loans, activeLoan, loanOwed, payoffAmount, debtOf, credit, canBorrow, loanOffer, maxFor, dueCount, reliefCheck, openStakes, nextPayday as nextWeekPayday } from './loan.mjs';
 export { LOAN, RELIEF, loans, activeLoan, loanOwed, payoffAmount, debtOf, credit, canBorrow, loanOffer, reliefCheck };
 const LOAN_KINDS = new Set(['loan', 'loanfee', 'loanpay', 'loanlate', 'loanbad', 'loangar', 'loanoff']);
-// Quadra Plus and free bets: plus.mjs, shared with the Worker.
-import { PLUS, plusMonth, plusMonths, plusMember, FREEBET, freeBetValue, freeBets, VIP, vipStakes, vipTier, WELCOME, welcomeEarned } from './plus.mjs';
-export { PLUS, plusMonths, plusMember, FREEBET, freeBetValue, freeBets, VIP, vipStakes, vipTier, WELCOME, welcomeEarned };
-// A charge the balance couldn't cover (eco.js `eco:plusfail:<month>`) after
-// the last paid month: the membership lapsed and won't renew until joined again.
-export const plusLapsed = wallet => {
-  const entries = wallet?.entries || [];
-  const last = [...plusMonths(wallet)].sort().at(-1);
-  return Boolean(last) && entries.some(e => e.app === 'eco' && e.id?.startsWith('eco:plusfail:') && e.id.slice(13) > last);
-};
-// Renewing next month (the member hasn't left).
-export const plusRenewing = wallet => wallet?.settings?.plus?.value?.on === true && !plusLapsed(wallet);
-export const plusTried = wallet => plusMonths(wallet).size > 0;
-export const plusPlan = wallet => (wallet?.settings?.plus?.value?.plan === 'year' ? 'year' : 'month');
-// The last month already paid for (YYYY-MM), or null.
-export const plusUntil = wallet => [...plusMonths(wallet)].sort().at(-1) ?? null;
+// Free bets and VIP: plus.mjs, shared with the Worker.
+import { FREEBET, freeBetValue, freeBets, VIP, vipStakes, vipTier, WELCOME, welcomeEarned } from './plus.mjs';
+export { FREEBET, freeBetValue, freeBets, VIP, vipStakes, vipTier, WELCOME, welcomeEarned };
+const taipeiMonth = t => new Date(t + TPE).toISOString().slice(0, 7);
 
-// ---- Looks: Plus's avatar and frame ----------------------------------------------------
+// ---- Looks: an avatar and a frame, free for everyone ------------------------------------
 //
 // The account button in every app can wear an avatar (the wallet setting
-// `avatar`: { id }) and a frame around it (`frame`: { id }), chosen in
-// the Quadra Pass sheet (Plus). They’re Plus’s: shown only while the account is a member, and
-// back as they were if it joins again. Some are for staying a member:
-// `streak` is how many Taiwan months in a row (this one included) the
-// account must have held Plus. A month missed starts the count again, and a
-// look worn beyond it is hidden until the streak is back.
-// Months held in a row up to `now`'s (0 when not a member now). A yearly
-// plan's months count as they arrive, not all at once.
-export function plusStreak(wallet, now = Date.now()) {
-  const held = plusMonths(wallet);
-  let n = 0;
-  for (let m = plusMonth(now); held.has(m) && n < 1200; n++) {
-    const [y, mo] = m.split('-').map(Number);
-    m = mo === 1 ? `${y - 1}-12` : `${y}-${String(mo - 1).padStart(2, '0')}`;
-  }
-  return n;
-}
-export const LOOK_STREAKS = [3, 6, 12];
+// `avatar`: { id }) and a frame around it (`frame`: { id }), chosen in the
+// Quadra Pass sheet (外觀). Every one is open to every account (they were
+// Plus's until Plus ended, 2026-10-20).
 export const AVATARS = [
-  { id: 'sprout', glyph: '🌱' },
-  { id: 'fox', glyph: '🦊' },
-  { id: 'panda', glyph: '🐼' },
-  { id: 'lion', glyph: '🦁' },
-  { id: 'dragon', glyph: '🐉' },
-  { id: 'unicorn', glyph: '🦄' },
-  { id: 'crown', glyph: '👑' },
-  { id: 'cat', glyph: '🐱' },
-  { id: 'dog', glyph: '🐶' },
-  { id: 'frog', glyph: '🐸' },
-  { id: 'penguin', glyph: '🐧' },
-  { id: 'rocket', glyph: '🚀' },
-  { id: 'rainbow', glyph: '🌈' },
-  { id: 'fire', glyph: '🔥' },
-  { id: 'gem', glyph: '💎' },
-  { id: 'star', glyph: '✦' },
-  { id: 'tiger', glyph: '🐯' },
-  { id: 'eagle', glyph: '🦅' },
-  { id: 'trophy', glyph: '🏆' },
-  { id: 'owl', glyph: '🦉' },
-  { id: 'octopus', glyph: '🐙' },
-  { id: 'whale', glyph: '🐳' },
-  { id: 'butterfly', glyph: '🦋' },
-  { id: 'cactus', glyph: '🌵' },
-  { id: 'sun', glyph: '🌞' },
-  { id: 'ball', glyph: '⚽' },
-  { id: 'chart', glyph: '📈' },
-  // For staying a member.
-  { id: 'wolf', glyph: '🐺', streak: 3 },
-  { id: 'shark', glyph: '🦈', streak: 3 },
-  { id: 'bolt', glyph: '⚡', streak: 3 },
-  { id: 'peacock', glyph: '🦚', streak: 6 },
-  { id: 'planet', glyph: '🪐', streak: 6 },
-  { id: 'drake', glyph: '🐲', streak: 6 },
-  { id: 'comet', glyph: '☄️', streak: 12 },
-  { id: 'galaxy', glyph: '🌌', streak: 12 },
-  { id: 'trident', glyph: '🔱', streak: 12 }
+  ...[
+    ['sprout', '🌱'], ['fox', '🦊'], ['panda', '🐼'], ['lion', '🦁'], ['dragon', '🐉'], ['unicorn', '🦄'], ['crown', '👑'], ['cat', '🐱'], ['dog', '🐶'], ['frog', '🐸'],
+    ['penguin', '🐧'], ['rocket', '🚀'], ['rainbow', '🌈'], ['fire', '🔥'], ['gem', '💎'], ['star', '✦'], ['tiger', '🐯'], ['eagle', '🦅'], ['trophy', '🏆'], ['owl', '🦉'],
+    ['octopus', '🐙'], ['whale', '🐳'], ['butterfly', '🦋'], ['cactus', '🌵'], ['sun', '🌞'], ['ball', '⚽'], ['chart', '📈'], ['wolf', '🐺'], ['shark', '🦈'], ['bolt', '⚡'],
+    ['peacock', '🦚'], ['planet', '🪐'], ['drake', '🐲'], ['comet', '☄️'], ['galaxy', '🌌'], ['trident', '🔱'],
+    // Taiwan's own, and more everyday faces.
+    ['boba', '🧋'], ['dumpling', '🥟'], ['mango', '🥭'], ['lantern', '🏮'], ['mountain', '🏔️'], ['train', '🚄'], ['bike', '🚲'], ['baseball', '⚾'], ['basketball', '🏀'], ['koala', '🐨'],
+    ['rabbit', '🐰'], ['bear', '🐻'], ['monkey', '🐵'], ['chick', '🐤'], ['turtle', '🐢'], ['dolphin', '🐬'], ['dino', '🦖'], ['guitar', '🎸'], ['headphones', '🎧'], ['game', '🎮'],
+    ['camera', '📷'], ['moon', '🌙'], ['clover', '🍀'], ['cherry', '🌸'], ['coffee', '☕'], ['bull', '🐂']
+  ].map(([id, glyph]) => ({ id, glyph }))
 ];
 export const FRAMES = [
-  ...['bronze', 'silver', 'jade', 'gold', 'neon', 'aurora', 'sakura', 'ocean', 'ember', 'mint'].map(id => ({ id })),
-  // For staying a member (the long ones turn).
-  { id: 'sapphire', streak: 3 },
-  { id: 'ruby', streak: 3 },
-  { id: 'legend', streak: 6 },
-  { id: 'prism', streak: 6 },
-  { id: 'mythic', streak: 12 },
-  { id: 'celestial', streak: 12 }
-];
-// Whether this account may wear `item` now: a member, long enough.
-export const lookOpen = (wallet, item, now = Date.now()) => plusMember(wallet, now) && plusStreak(wallet, now) >= (item?.streak || 0);
-const worn = (wallet, key, list, now) => {
-  const item = list.find(x => x.id === setting(wallet, key, null)?.id);
-  return item && lookOpen(wallet, item, now) ? item : null;
-};
-export const avatarOf = (wallet, now = Date.now()) => worn(wallet, 'avatar', AVATARS, now);
-export const frameOf = (wallet, now = Date.now()) => worn(wallet, 'frame', FRAMES, now);
+  'bronze', 'silver', 'jade', 'gold', 'neon', 'aurora', 'sakura', 'ocean', 'ember', 'mint', 'sapphire', 'ruby', 'legend', 'prism', 'mythic', 'celestial',
+  'pearl', 'matcha', 'milktea', 'sunset', 'midnight', 'forest', 'candy', 'lava', 'skylantern'
+].map(id => ({ id }));
+const worn = (wallet, key, list) => list.find(x => x.id === setting(wallet, key, null)?.id) || null;
+export const avatarOf = wallet => worn(wallet, 'avatar', AVATARS);
+export const frameOf = wallet => worn(wallet, 'frame', FRAMES);
 
 // ---- VIP: free tiers by what's played, with cashback -----------------------------------
 //
@@ -301,7 +236,7 @@ export const frameOf = (wallet, now = Date.now()) => worn(wallet, 'frame', FRAME
 // This month so far: stakes, tier, the cashback it's heading for, the next
 // tier and what's left to reach it; and last month's cashback if paid.
 export function vipStatus(wallet, now = Date.now()) {
-  const month = plusMonth(now);
+  const month = taipeiMonth(now);
   const stakes = vipStakes(wallet, month);
   const tier = vipTier(stakes);
   const next = VIP.tiers.find(t => stakes < t.min) ?? null;
@@ -1566,8 +1501,6 @@ function makeSession(app, { lang, heartbeat }) {
       if (res.same) res.wallet = wallet;
       return res;
     });
-  // Quadra Plus: join (on) or leave (off); the Worker bills it.
-  s.plus = (on, plan = 'month') => withToken(qt => call('POST', '', { op: 'plus', qt, on: Boolean(on), plan })).then(absorb);
   // 信貸 and 急難紓困 (loan.mjs): the Worker checks and writes them.
   s.loan = (action, body = {}) => withToken(qt => call('POST', '', { op: 'loan', qt, action, ...body })).then(res => (absorb(res), res));
   s.relief = () => withToken(qt => call('POST', '', { op: 'relief', qt })).then(res => (absorb(res), res));
@@ -1611,8 +1544,6 @@ function makeSession(app, { lang, heartbeat }) {
     // The loading screen's line (boot.js): signed in, the app's data next.
     globalThis.__bootStep?.('', 0.8);
     loop();
-    setTimeout(() => plusNotices(s), 1200);
-    s.on('wallet', () => plusNotices(s));
     setTimeout(() => offerNotices(s), 2500);
     // The first reply: what the app merges its own copy with (never the
     // session itself: an app that took the session for the reply saw "no
@@ -1727,6 +1658,7 @@ const KIND = {
   lottery: ['彩券', 'Lottery ticket'],
   prize: ['彩券獎金', 'Lottery prize'],
   plus: ['Quadra Plus 月費', 'Quadra Plus'],
+  plusrefund: ['Quadra Plus 退費', 'Quadra Plus refund'],
   rebase: ['經濟調整', 'Economy reset'],
   rank: ['財富等級獎勵', 'Wealth level reward'],
   od: ['透支利息', 'Overdraft interest'],
@@ -1911,7 +1843,6 @@ const ERR = {
   ECO_CREATE_CLOSED: ['Quadra Pass 由擁有者發放，請向分享給你的人索取。', 'Quadra Passes are handed out by their owner: ask the person who shared Quadra with you.'],
   ECO_PAIR_NOT_FOUND: ['這組裝置代碼無效或已過期（10 分鐘內、只能用一次）。', 'That device code isn’t valid or has expired (10 minutes, once).'],
   RATE_LIMITED: ['嘗試太多次，請稍後再試。', 'Too many tries. Please wait a little.'],
-  ECO_PLUS_FUNDS: ['Quadra 餘額不足以支付本月會費。', 'Your Quadra balance doesn’t cover this month’s fee.'],
   ECO_LOAN_FUNDS: ['餘額不足以一次還清。', 'Your balance doesn’t cover paying it all off.'],
   ECO_LOAN_NONE: ['沒有未還清的信貸。', 'There’s no loan to pay off.'],
   ECO_LOAN_REFUSED: ['銀行婉拒了這筆申請。', 'The bank turned this application down.'],
@@ -2062,7 +1993,7 @@ const PERSON_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" 
 export function accountButton(s, { extra = null } = {}) {
   const btn = node('button', { class: 'q-account', type: 'button', 'aria-label': s.lang === 'en' ? 'Quadra Pass' : 'Quadra Pass 帳戶', title: BRAND.pass });
   const dot = node('span', { class: 'q-account-dot', 'aria-hidden': 'true' });
-  // The avatar worn (a Plus member's), else the person.
+  // The avatar worn, else the person.
   const paint = () => {
     const a = avatarOf(s.wallet);
     const f = frameOf(s.wallet);
@@ -2074,7 +2005,6 @@ export function accountButton(s, { extra = null } = {}) {
     else btn.innerHTML = PERSON_SVG;
     btn.append(dot);
     btn.classList.toggle('signed', Boolean(s.wallet));
-    btn.classList.toggle('plus', plusMember(s.wallet));
   };
   paint();
   s.on('wallet', paint);
@@ -2137,11 +2067,6 @@ export function ask({ title, body = '', points = [], ok = '', cancel = '', dange
 }
 export const tell = (opts = {}) => ask({ ...opts, alertOnly: true }).then(() => undefined);
 
-// The 1st of next Taiwan month (Plus renews then).
-export function nextMonthStart(now = Date.now()) {
-  const d = new Date(now + TPE);
-  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1) - TPE;
-}
 // The next payday: next Monday 00:00 Taiwan time.
 export const nextPayday = (now = Date.now()) => nextWeekPayday(now);
 const mdText = t => {
@@ -2204,279 +2129,11 @@ function detailsCard(s) {
       : null
   ].filter(Boolean));
 }
-// ---- Quadra Plus on screen --------------------------------------------------------
-//
-// What joining costs now: free the first time, else the rest of the month's
-// share of the fee (the Worker's own rule, eco.js plusJoinEntry).
-export function plusJoinPrice(wallet, now = Date.now()) {
-  if (!plusTried(wallet)) return 0;
-  const d = new Date(now + TPE);
-  const days = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
-  const left = days - d.getUTCDate() + 1;
-  return Math.max(10, Math.round((PLUS.fee * left) / days / 10) * 10);
-}
-export function plusPerks(lang = 'zh') {
-  const en = lang === 'en';
-  const pct = x => `${Math.round(x * 1000) / 10}%`;
-  const o = PLUS.odds;
-  return [
-    ['odds', en ? `A ${money(o.bonusBet)} free bet every week` : `每週 ${money(o.bonusBet)} 免費投注`, en ? `One ${money(o.bonusBet)} free bet each Monday (4 or 5 a month); keep what it wins` : `每週一送 1 張 ${money(o.bonusBet)}（一個月 4 到 5 張），贏了獎金歸你`],
-    ['odds', en ? `Parlay boost ×${o.boost}` : `串關加成 ×${o.boost}`, en ? 'Every winning combination of 3 picks or more' : '3 關以上每個贏的組合'],
-    ['odds', en ? 'Better cash out' : '提前兌現更划算', en ? `Keeps ${pct(o.cashOutKeep)} instead of 3%` : `只扣 ${pct(o.cashOutKeep)}，一般扣 3%`],
-    ['stock', en ? `Commission ${pct(1 - PLUS.stock.commission)} off` : `證券手續費 ${Math.round(PLUS.stock.commission * 100) / 10} 折`, en ? 'Every market, every order' : '所有市場、每一筆委託'],
-    ['stock', en ? 'FX at half the spread' : '換匯點差減半', en ? 'Every currency' : '所有幣別'],
-    ['stock', en ? `Margin ${pct(PLUS.stock.loanCut)} cheaper` : `融資利率少 ${pct(PLUS.stock.loanCut)}`, en ? 'On every new loan, every currency' : '每筆新借款、所有幣別'],
-    ['looks', en ? 'Your avatar and frame' : '自訂頭像與頭像框', en ? 'Chosen in the Quadra Pass, shown in every app while you’re a member; stay 3, 6 or 12 months in a row for the rarest' : '在 Quadra Pass 挑選，會員期間所有 App 都看得到；連續訂閱 3、6、12 個月解鎖限定款']
-  ];
-}
-// What Plus gave back, at face value, from the wallet: the weekly bonus
-// bets received (not the welcome offer) and what Play's bigger parlay boost
-// added (kind 'plusboost'). This Taiwan month, or (all) every month up to it.
-export function plusReturns(wallet, now = Date.now(), { all = false } = {}) {
-  const month = plusMonth(now);
-  const counts = m => (all ? m <= month : m === month);
-  let boosts = 0;
-  let bets = 0;
-  for (const e of wallet?.entries || []) {
-    if (typeof e.t !== 'number' || !counts(plusMonth(e.t))) continue;
-    if (e.kind === 'plusboost' && e.amount > 0) boosts += e.amount;
-    if (e.app === 'eco' && e.kind === 'freebet' && /^eco:fb:\d{4}-/.test(e.id || '')) bets += freeBetValue(e);
-  }
-  return { boosts: Math.round(boosts), bets, total: Math.round(boosts) + bets };
-}
-// Months a member so far (a yearly plan's later months don't count yet).
-export const plusTenure = (wallet, now = Date.now()) => [...plusMonths(wallet)].filter(m => m <= plusMonth(now)).length;
-
-// Plus's notices, once each per device (a banner in the app; the kit's
-// notify): the week's bonus bet when it arrives, and, in the last three
-// Taiwan days before a renewal, what it will charge and what it gave back,
-// with where to stop it (the free month included, so nobody is surprised).
-// A notice said once for the whole pass, not once per app: home-screen apps
-// each have storage of their own, so this device's mark alone let every app
-// say it again. The ids already said ride on the pass (settings.seen, the
-// last 40) as well as on the device; true the first time, then false.
-const saidHere = [];
-export function sayOnce(s, id) {
-  const held = s?.wallet?.settings?.seen?.value;
-  const said = [...new Set([...(Array.isArray(held) ? held : []), ...saidHere])];
-  if (readStore(`quadra.seen:${id}`) || said.includes(id)) return false;
-  writeStore(`quadra.seen:${id}`, '1');
-  // (Two in a row, before the pass answers the first: both go up.)
-  saidHere.push(id);
-  s?.write?.({ wallet: { settings: { seen: { value: [...said, id].slice(-40), t: Date.now() } } } }).catch(() => null);
-  return true;
-}
-export function plusNotices(s, now = Date.now()) {
-  const w = s.wallet;
-  if (!w) return;
-  const en = s.lang === 'en';
-  const T = (zh, e) => (en ? e : zh);
-  // A renewal the balance couldn't cover: said once.
-  const failed = (w.entries || []).filter(e => e.app === 'eco' && e.id?.startsWith('eco:plusfail:')).at(-1);
-  if (failed && plusLapsed(w) && readStore('quadra.seen.plusfail') !== failed.id && sayOnce(s, failed.id)) {
-    notify(s, { title: T('✦ Plus 扣款失敗，會員已停止', '✦ Plus payment failed; membership stopped'), body: T(`餘額不足 ${money(PLUS.fee)}。補足後到 Plus 重新加入。`, `Your balance didn’t cover ${money(PLUS.fee)}. Join again from Plus once it does.`), tag: failed.id, kind: 'plus' });
-  }
-  if (!plusMember(w, now)) return;
-  const week = (w.entries || []).find(e => e.app === 'eco' && e.id === `eco:fb:${taipeiDay(weekMonday(now))}`);
-  if (week && readStore('quadra.seen.fb') !== week.id && sayOnce(s, week.id)) {
-    notify(s, { title: T(`✦ 本週 ${money(freeBetValue(week))} 免費投注到了`, `✦ Your ${money(freeBetValue(week))} free bet is here`), body: T('在 Play 的投注單上點一下就能用，7 天內有效。', 'Tap it on a slip in Play; it lasts 7 days.'), tag: week.id, kind: 'plus' });
-  }
-  const month = plusMonth(now);
-  const next = new Date(nextMonthStart(now) + TPE);
-  const daysLeft = Math.ceil((nextMonthStart(now) - now) / 86_400_000);
-  const yearly = plusPlan(w) === 'year';
-  // A yearly plan renews after its last paid month; a monthly one every month.
-  const due = plusRenewing(w) && daysLeft <= 3 && (!yearly || plusUntil(w) === month);
-  const key = `quadra.seen.renew:${month}`;
-  if (!due || readStore(key) || !sayOnce(s, `plus-renew:${month}`)) return;
-  const fee = yearly ? PLUS.year : PLUS.fee;
-  const back = plusReturns(w, now);
-  const trial = (w.entries || []).some(e => e.id === `eco:plus:${month}` && e.note === 'trial');
-  const date = `${next.getUTCMonth() + 1}/1`;
-  notify(s, {
-    title: trial ? T(`✦ Plus 免費試用到本月底，${date} 起 ${money(fee)}`, `✦ Your free Plus month ends; ${money(fee)} from ${date}`) : T(`✦ Plus 將在 ${date} 續訂 ${money(fee)}`, `✦ Plus renews on ${date} for ${money(fee)}`),
-    body: T(`本月回饋 ${money(back.total)} · 可在 Plus › 管理會員取消`, `${money(back.total)} back this month · stop under Plus › Manage`),
-    tag: key,
-    kind: 'plus'
-  });
-}
-// The Monday (Taiwan) a moment's week starts.
-function weekMonday(t) {
-  const d = new Date(t + TPE);
-  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - ((d.getUTCDay() + 6) % 7)) - TPE;
-}
-const PLUS_MARK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.6 6.9 6.9 2.6-6.9 2.6L12 21.5l-2.6-6.9L2.5 12l6.9-2.6z"/></svg>';
-function plusGlyph() {
-  const i = node('span', { class: 'q-plus-glyph' });
-  i.innerHTML = PLUS_MARK;
-  return i;
-}
-// The membership as a card: a member's status, or what it gives and costs.
-export function plusCard(s, { compact = false } = {}) {
-  const en = s.lang === 'en';
-  const T = (zh, e) => (en ? e : zh);
-  const member = plusMember(s.wallet);
-  const renewing = plusRenewing(s.wallet);
-  const next = new Date(nextMonthStart() + TPE);
-  const nextText = `${next.getUTCMonth() + 1}/1`;
-  const price = plusJoinPrice(s.wallet);
-  const until = plusUntil(s.wallet);
-  const untilText = until ? `${until.slice(0, 4)}/${Number(until.slice(5))}` : '';
-  const back = member ? plusReturns(s.wallet).total : 0;
-  const pct = x => `${Math.round(x * 100)}%`;
-  // The perks as tiles (a figure over a word or two), never a sentence that wraps;
-  // a member with this month's return sees that instead.
-  const perks = [
-    [money(PLUS.odds.bonusBet), T('每週免費投注', 'free a week')],
-    member ? null : [`×${PLUS.odds.boost}`, T('串關加成', 'parlay boost')],
-    [T(`${Math.round(PLUS.stock.commission * 100) / 10} 折`, pct(1 - PLUS.stock.commission)), T('證券手續費', 'off fees')]
-  ].filter(Boolean);
-  const pitch = member && back > 0
-    ? node('span', { class: 'q-plus-pitch', text: T(`本月會員回饋 ${money(back)}`, `Plus gave you ${money(back)} this month`) })
-    : node('span', { class: 'q-plus-perks' }, perks.map(([v, k]) => node('span', { class: 'q-plus-perk' }, [node('strong', { text: v }), node('small', { text: k })])));
-  const status = member
-    ? plusPlan(s.wallet) === 'year'
-      ? T(`年繳會員 · 有效至 ${untilText}`, `Yearly member · through ${untilText}`)
-      : renewing
-        ? T(`會員 · ${nextText} 續訂 ${money(PLUS.fee)}`, `Member · renews ${nextText} for ${money(PLUS.fee)}`)
-        : T(`會員 · 用到本月底`, 'Member · until the end of the month')
-    : price === 0
-      ? T(`本月免費 · 年繳只要 ${money(Math.round(PLUS.year / 12))}/月`, `Free this month · ${money(Math.round(PLUS.year / 12))}/mo yearly`)
-      : T(`年繳 ${money(PLUS.year)}，省下兩個月`, `${money(PLUS.year)} a year: two months free`);
-  return node('button', { class: `q-plus-card${member ? ' member' : ''}${compact ? ' compact' : ''}`, type: 'button', onclick: () => openPlus(s) }, [
-    node('span', { class: 'q-plus-top' }, [plusGlyph(), node('span', { class: 'q-plus-word', text: 'QUADRA PLUS' }), node('span', { class: 'q-plus-go', text: member ? T('管理', 'Manage') : price === 0 ? T('免費試用', 'Try free') : T('加入', 'Join') })]),
-    compact ? null : pitch,
-    node('span', { class: 'q-plus-status', text: status })
-  ].filter(Boolean));
-}
-// The membership sheet: the perks, the price, join or leave.
-export function openPlus(s) {
-  const en = s.lang === 'en';
-  const T = (zh, e) => (en ? e : zh);
-  let dialog = null;
-  const note = node('p', { class: 'q-sheet-note', role: 'status' });
-  const body = node('div', { class: 'q-plus-body' });
-  // The plan picked: yearly unless a free month is on offer.
-  let plan = plusTried(s.wallet) ? 'year' : 'month';
-  const paint = () => {
-    const member = plusMember(s.wallet);
-    const renewing = plusRenewing(s.wallet);
-    const price = plusJoinPrice(s.wallet);
-    const next = new Date(nextMonthStart() + TPE);
-    const nextText = T(`${next.getUTCMonth() + 1} 月 1 日`, `${next.getUTCMonth() + 1}/1`);
-    const run = (label, fn, cls) =>
-      node('button', {
-        class: cls,
-        type: 'button',
-        text: label,
-        onclick: async event => {
-          const b = event.currentTarget;
-          b.disabled = true;
-          note.textContent = '';
-          try {
-            await fn();
-            paint();
-          } catch (e) {
-            note.textContent = errorText(e, s.lang);
-            b.disabled = false;
-          }
-        }
-      });
-    // Joining charges the pass: asked first, with what it costs from here on.
-    const join = async () => {
-      const yearly = plan === 'year';
-      const title = yearly ? T(`年繳 ${money(PLUS.year)} 加入 Plus？`, `Join Plus yearly for ${money(PLUS.year)}?`) : price === 0 ? T('免費試用 Plus？', 'Try Plus free?') : T(`月繳加入 Plus，本月 ${money(price)}？`, `Join Plus monthly, ${money(price)} this month?`);
-      const body = yearly
-        ? T('一次付清，用 12 個月，之後每年自動續約，隨時可以取消。', 'Paid once for 12 months, then renews yearly; cancel any time.')
-        : price === 0
-          ? T(`本月免費；${nextText}起每月 ${money(PLUS.fee)}，隨時可以取消。`, `Free this month; ${money(PLUS.fee)} a month from ${nextText}, cancel any time.`)
-          : T(`${nextText}起每月 ${money(PLUS.fee)} 自動續訂，隨時可以取消。`, `Then ${money(PLUS.fee)} a month from ${nextText}, cancel any time.`);
-      if (!(await ask({ lang: s.lang, icon: '✦', title, body, ok: yearly || price ? T('付款加入', 'Pay and join') : T('開始試用', 'Start trial'), cancel: T('先不要', 'Not now') }))) return;
-      await s.plus(true, plan);
-    };
-    const saving = PLUS.fee * 12 - PLUS.year;
-    const planPick = node('div', { class: 'q-plus-plans', role: 'radiogroup' }, [
-      ['year', T('年繳', 'Yearly'), `${money(PLUS.year)}`, T(`每月只要 ${money(Math.round(PLUS.year / 12))} · 省 ${money(saving)}`, `${money(Math.round(PLUS.year / 12))}/mo · save ${money(saving)}`), T('最划算', 'Best value')],
-      ['month', T('月繳', 'Monthly'), `${money(PLUS.fee)}`, price === 0 ? T('本月免費試用', 'This month free') : T('隨時取消', 'Cancel any time'), '']
-    ].map(([key, name, amount, sub, badge]) =>
-      node('button', { class: `q-plus-plan${plan === key ? ' on' : ''}`, type: 'button', role: 'radio', 'aria-checked': String(plan === key), onclick: () => ((plan = key), paint()) }, [
-        badge ? node('span', { class: 'q-plus-badge', text: badge }) : null,
-        node('span', { class: 'q-plus-plan-name', text: name }),
-        node('strong', { class: 'num', text: amount }),
-        node('small', { text: sub })
-      ].filter(Boolean))
-    ));
-    // Stopping is one confirmation away, with what it gave back and what
-    // stays or stops, so the choice is an informed one.
-    const leave = async () => {
-      const month = plusReturns(s.wallet);
-      const ever = plusReturns(s.wallet, Date.now(), { all: true });
-      const points = [
-        ['✓', T('會保留', 'You keep'), T('已付的月份、還沒用的免費投注', 'Months paid, free bets not yet used')],
-        ['✕', T('之後沒有', 'You lose'), T(`每週 ${money(PLUS.odds.bonusBet)} 免費投注、串關加成、手續費折扣、頭像與頭像框`, `The ${money(PLUS.odds.bonusBet)} weekly free bet, the parlay boost, the commission discount, your avatar and frame`)]
-      ];
-      const body = T(`本月回饋 ${money(month.total)} · 累計 ${money(ever.total)}`, `${money(month.total)} back this month · ${money(ever.total)} in all`);
-      if (!(await ask({ lang: s.lang, icon: '✦', title: T('取消自動續訂？', 'Stop renewing?'), body, points, ok: T('取消續訂', 'Stop renewing'), cancel: T('保留會員', 'Keep Plus') }))) return;
-      await s.plus(false);
-    };
-    const until = plusUntil(s.wallet);
-    const untilText = until ? T(`${until.slice(0, 4)} 年 ${Number(until.slice(5))} 月底`, `the end of ${until}`) : '';
-    const yearly = plusPlan(s.wallet) === 'year';
-    const cta = member
-      ? [
-          node('p', { class: 'q-plus-state', text: yearly ? T(`你是年繳會員，權益有效至 ${untilText}${renewing ? '，到期自動續約一年' : ''}。`, `You're a yearly member through ${untilText}${renewing ? ', renewing for another year' : ''}.`) : renewing ? T(`你是 Plus 會員。${nextText}從 Quadra 餘額續訂 ${money(PLUS.fee)}。`, `You're a Plus member. It renews ${nextText} for ${money(PLUS.fee)} from your Quadra balance.`) : T(`會員權益用到本月底，${nextText}不會扣款。`, `Your perks last to the end of the month; nothing is charged ${nextText}.`) }),
-          yearly ? null : run(T(`升級年繳 · ${money(PLUS.year)}，再省 ${money(PLUS.fee * 12 - PLUS.year)}`, `Go yearly · ${money(PLUS.year)}, save ${money(PLUS.fee * 12 - PLUS.year)}`), () => s.plus(true, 'year'), 'q-plus-cta'),
-          renewing ? null : run(T('恢復自動續訂', 'Turn renewal back on'), () => s.plus(true, plusPlan(s.wallet)), 'q-plus-cta'),
-          node('details', { class: 'q-plus-manage' }, [node('summary', { text: T('管理會員', 'Manage membership') }), renewing ? run(T('取消自動續訂', 'Stop renewing'), leave, 'q-plus-quiet') : node('p', { class: 'q-plus-fine', text: T('已取消自動續訂。', 'Renewal is off.') })])
-        ].filter(Boolean)
-      : [
-          planPick,
-          run(plan === 'year' ? T(`年繳加入 · ${money(PLUS.year)}`, `Join yearly · ${money(PLUS.year)}`) : price === 0 ? T('免費試用到月底', 'Try it free this month') : T(`月繳加入 · 本月 ${money(price)}`, `Join monthly · ${money(price)} this month`), join, 'q-plus-cta'),
-          node('p', { class: 'q-plus-fine', text: plan === 'year' ? T('十二個月立即生效，每年自動續約。', 'Twelve months from now, renews yearly.') : price === 0 ? T(`本月免費。${nextText}起每月 ${money(PLUS.fee)}，從 Quadra 餘額扣款。`, `Free this month. From ${nextText}, ${money(PLUS.fee)} a month from your Quadra balance.`) : T(`本月依剩下天數計費，之後每月 1 日 ${money(PLUS.fee)}。`, `This month by the days left, then ${money(PLUS.fee)} on the 1st.`) })
-        ];
-    const perks = plusPerks(s.lang);
-    const group = (app, title) =>
-      node('div', { class: 'q-plus-group' }, [
-        node('h3', { class: 'q-sheet-h', text: title }),
-        node('ul', { class: 'q-plus-perks' }, perks.filter(p => p[0] === app).map(([, a, b]) => node('li', {}, [plusGlyph(), node('span', {}, [node('strong', { text: a }), node('small', { text: b })])])))
-      ]);
-    // A member sees what Plus gave back this month; anyone else, the price.
-    const back = plusReturns(s.wallet);
-    body.replaceChildren(
-      node('div', { class: `q-plus-hero${member ? ' member' : ''}` }, [
-        node('span', { class: 'q-plus-top' }, [plusGlyph(), node('span', { class: 'q-plus-word', text: 'QUADRA PLUS' })]),
-        member
-          ? node('strong', { class: 'q-plus-price num', text: money(back.total) })
-          : node('strong', { class: 'q-plus-price num', text: `${money(Math.round(PLUS.year / 12))}` }),
-        node('span', { class: 'q-plus-per', text: member ? T('本月回饋給你（免費投注＋串關加成）', 'Back to you this month (free bets + parlay boost)') : T('每月起 · 一個會員，所有 Quadra App', 'a month, yearly · one membership, every Quadra app') }),
-        // A member's three figures: the fee, how long, everything so far.
-        member
-          ? node('div', { class: 'q-plus-stats' }, [
-              [T('月費', 'Fee'), money(PLUS.fee)],
-              [T('會員', 'Member'), T(`第 ${plusTenure(s.wallet)} 個月`, `Month ${plusTenure(s.wallet)}`)],
-              [T('累計回饋', 'In all'), money(plusReturns(s.wallet, Date.now(), { all: true }).total)]
-            ].map(([k, v]) => node('div', {}, [node('small', { text: k }), node('strong', { class: 'num', text: v })])))
-          : null
-      ]),
-      group('odds', 'Quadra Play'),
-      group('stock', 'Quadra Securities'),
-      group('looks', T('頭像與頭像框', 'Looks')),
-      ...cta,
-      node('p', { class: 'q-plus-fine', text: T('每月 1 日從 Quadra 餘額自動扣款，沒打開 App 也照扣；餘額不足扣款失敗，會員就停止。取消後用到期滿，已付不退費。價格含 5% 營業稅。', 'Charged from your Quadra balance on the 1st of every month, whether or not you open an app; a charge the balance can’t cover fails and the membership stops. Cancelling keeps what’s paid; nothing is refunded. Prices include 5% VAT.') })
-    );
-  };
-  paint();
-  const repaint = () => dialog?.open && paint();
-  s.on('wallet', repaint);
-  // (The kit's one sheet: its ✕, Escape, a tap outside and a swipe all slide it away.)
-  dialog = uiSheet({ title: 'Quadra Plus', body: [body, note], cls: 'q-plus-sheet', closeLabel: T('關閉', 'Close') }).el;
-  return dialog;
-}
-
 // The Quadra Pass sheet, in every app (the account button, #help= links; its
-// 說明 tab is the one place the guide lives now): Pass (this account), Plus, 真相 (how the money
-// moves), App (every app) and 說明 (every app's guide). Loaded when first
-// opened (pass.mjs). tab: 'pass' | 'plus' | 'truth' | 'apps' | 'help';
+// 說明 tab is the one place the guide lives now): Pass (this account), 外觀
+// (avatar and frame), 真相 (how the money moves), App (every app) and 說明
+// (every app's guide). Loaded when first opened (pass.mjs). tab: 'pass' |
+// 'looks' | 'truth' | 'apps' | 'help';
 // help: { app, topic } for the guide to open on.
 export async function accountSheet(s, { extra = null, tab = 'pass', help = null } = {}) {
   const { openPass } = await import('./pass.mjs');
@@ -2890,7 +2547,6 @@ export const NOTICE_KINDS = {
   odds: [
     ['slip', '投注單結算', 'Slip settled', '投注單的比賽全部結束、算好派彩時。', 'When every game on a slip is over and it’s paid.'],
     ['ticket', '彩券中獎', 'Lottery win', '電腦彩券開獎、你的彩券中獎時。', 'When a draw is out and your ticket won.'],
-    ['plus', 'Plus 免費投注與續訂', 'Plus free bet and renewal', 'Plus 每週免費投注入帳，和續訂前三天的提醒。', 'When Plus’s weekly free bet arrives, and three days before it renews.']
   ],
   vocab: [
     ['streak', '連續練習快斷了', 'Streak ending', '今天還沒練習單字，連續天數今晚就會歸零時。', 'When you haven’t practised today and your streak ends tonight.']
