@@ -5195,6 +5195,401 @@ div.q-ritem {
   margin-top: 8px;
 }
 
+/* ---- Home parts (r4) ----
+   - .q-ring: a progress ring with its label centred (ui.mjs progressRing);
+   - .q-stack / .q-pass: Wallet-style cards, peeking until a tap spreads them (passStack);
+   - .q-tl: a vertical day, coloured blocks and a red now-line (dayTimeline);
+   - .q-cal: a month grid, Sunday first, streak dots and today ringed (monthCalendar);
+   - .q-panels / .q-panel: a two-column grid of small data tiles (panelGrid);
+   - .q-league: a 56px logo over a name, for a rail (leagueTile).
+   Colours come from --t on the part (default the accent); dark mode follows the tokens. */
+.q-ring {
+  --s: 56px;
+  position: relative;
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: var(--s);
+  height: var(--s);
+  color: var(--q-label);
+}
+.q-ring.tinted {
+  color: var(--t);
+}
+.q-ring-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.q-ring-track {
+  stroke: color-mix(in srgb, var(--t, var(--q-accent)) 20%, transparent);
+}
+.q-ring-arc {
+  stroke: var(--t, var(--q-accent));
+  transition: stroke-dasharray 0.5s var(--q-ease);
+}
+.q-ring-txt {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  max-width: 76%;
+  text-align: center;
+}
+.q-ring-l {
+  font: 700 calc(var(--s) * 0.26) / 1.1 var(--q-font);
+  font-variant-numeric: tabular-nums;
+}
+.q-ring-s {
+  color: var(--q-label-2);
+  font: var(--q-t-caption2);
+}
+.q-ring.tinted .q-ring-s {
+  color: inherit;
+  opacity: 0.75;
+}
+.q-stack {
+  --peek: 56px;
+  --ph: 132px;
+  --gap: 10px;
+  position: relative;
+  height: calc((var(--n) - 1) * var(--peek) + var(--ph));
+  transition: height 0.4s var(--q-ease);
+}
+.q-stack.spread {
+  height: calc(var(--n) * var(--ph) + (var(--n) - 1) * var(--gap));
+}
+.q-pass {
+  --t: var(--q-accent);
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: var(--i);
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  height: var(--ph);
+  margin: 0;
+  padding: 14px 16px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 22px;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--t) 92%, #fff), color-mix(in srgb, var(--t) 78%, #000));
+  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.14);
+  color: #ffffff;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  transform: translateY(calc(var(--i) * var(--peek)));
+  transition: transform 0.4s var(--q-ease);
+  -webkit-tap-highlight-color: transparent;
+}
+.q-stack.spread .q-pass {
+  transform: translateY(calc(var(--i) * (var(--ph) + var(--gap))));
+}
+.q-pass:active {
+  filter: brightness(0.96);
+}
+.q-pass-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: calc(var(--peek) - 28px);
+}
+.q-pass-id {
+  display: grid;
+  min-width: 0;
+}
+.q-pass-id strong {
+  overflow: hidden;
+  font: var(--q-t-headline);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.q-pass-id small {
+  overflow: hidden;
+  font: var(--q-t-footnote);
+  opacity: 0.8;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.q-pass-big {
+  flex: none;
+  font: 700 20px/25px var(--q-font);
+  font-variant-numeric: tabular-nums;
+}
+.q-pass-more {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.q-pass-logos {
+  display: flex;
+  gap: 6px;
+}
+.q-pass .q-tag {
+  background: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+}
+.q-tl {
+  --hrs: 10;
+  --q-hour: 64px;
+  position: relative;
+  height: calc(var(--hrs) * var(--q-hour));
+  margin: 8px 0;
+}
+.q-tl-hours {
+  position: absolute;
+  inset: 0 0 0 0;
+}
+.q-tl-h {
+  position: absolute;
+  inset: var(--tl-top) 0 auto 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--q-label-2);
+  font: var(--q-t-caption);
+  font-variant-numeric: tabular-nums;
+  line-height: 16px;
+  transform: translateY(-50%);
+}
+.q-tl-h::after {
+  content: '';
+  flex: 1;
+  border-top: 0.5px solid var(--q-sep);
+}
+.q-tl-h {
+  width: 100%;
+}
+.q-tl-blocks {
+  position: absolute;
+  inset: 0 0 0 56px;
+}
+.q-tl-b {
+  --t: var(--q-accent);
+  position: absolute;
+  top: var(--tl-top);
+  left: calc(100% * var(--c, 0) / var(--n, 1));
+  width: calc(100% / var(--n, 1) - 4px);
+  height: calc(var(--tl-h) - 2px);
+  min-height: 22px;
+  box-sizing: border-box;
+  display: grid;
+  align-content: start;
+  gap: 1px;
+  margin-top: 1px;
+  padding: 6px 10px 6px 12px;
+  overflow: hidden;
+  border-radius: 10px;
+  border-inline-start: 4px solid var(--t);
+  background: color-mix(in srgb, var(--t) 16%, var(--q-surface));
+  color: var(--q-label);
+}
+.q-tl-b strong {
+  overflow: hidden;
+  font: var(--q-t-subhead);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.q-tl-b span {
+  overflow: hidden;
+  color: var(--q-label-2);
+  font: var(--q-t-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.q-tl-b.short {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-block: 2px;
+}
+.q-tl-b.on {
+  outline: 2px solid var(--t);
+  background: color-mix(in srgb, var(--t) 28%, var(--q-surface));
+}
+.q-tl-now {
+  position: absolute;
+  inset: var(--tl-top) 0 auto 0;
+  height: 2px;
+  margin-top: -1px;
+  background: var(--q-red);
+  pointer-events: none;
+  transition: top 0.4s var(--q-ease);
+}
+.q-tl-now[hidden] {
+  display: none;
+}
+.q-tl-now::before {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: 50px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--q-red);
+}
+.q-cal {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  row-gap: 4px;
+  justify-items: center;
+}
+.q-cal-w {
+  color: var(--q-label-2);
+  font: var(--q-t-footnote);
+  font-weight: 500;
+  line-height: 28px;
+}
+.q-cal-d {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--q-label);
+  font: var(--q-t-subhead);
+  font-variant-numeric: tabular-nums;
+  -webkit-tap-highlight-color: transparent;
+}
+button.q-cal-d {
+  cursor: pointer;
+}
+.q-cal-d {
+  position: relative;
+  z-index: 0;
+}
+.q-cal-d::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--q-fill-4);
+}
+.q-cal-d.m-done::after {
+  background: var(--t, var(--q-accent));
+}
+.q-cal-d.m-done {
+  color: #ffffff;
+  font-weight: 600;
+}
+.q-cal-d.m-part::after {
+  background: color-mix(in srgb, var(--t, var(--q-accent)) 28%, transparent);
+}
+.q-cal-d.m-part {
+  color: var(--t, var(--q-accent));
+  font-weight: 600;
+}
+.q-cal-d.today::after {
+  box-shadow: 0 0 0 2px var(--q-surface), 0 0 0 4px var(--t, var(--q-accent));
+}
+.q-cal-d.today {
+  font-weight: 700;
+}
+.q-panels {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.q-panel {
+  --t: var(--q-accent);
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  min-width: 0;
+  padding: 14px 16px;
+  border-radius: 20px;
+  background: var(--q-surface);
+  color: var(--q-label);
+}
+.q-panel-l {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--q-label-2);
+  font: var(--q-t-footnote);
+  font-weight: 500;
+}
+.q-panel-l > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.q-panel-l i {
+  display: inline-grid;
+  flex: none;
+  color: var(--t);
+  font-style: normal;
+}
+.q-panel-l svg {
+  width: 16px;
+  height: 16px;
+}
+.q-panel-v {
+  overflow: hidden;
+  font: var(--q-t-title2);
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.q-panel-s {
+  color: var(--q-label-2);
+  font: var(--q-t-footnote);
+}
+.q-league {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  width: 76px;
+  min-height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--q-label);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.q-league:active {
+  opacity: 0.6;
+}
+.q-league strong {
+  max-width: 100%;
+  overflow: hidden;
+  font: var(--q-t-footnote);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.q-league small {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--q-label-2);
+  font: var(--q-t-caption2);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (prefers-reduced-motion: reduce) {
+  .q-ring-arc,
+  .q-stack,
+  .q-pass,
+  .q-tl-now {
+    transition: none;
+  }
+}
+
 /* ---- Foundations (design review) ----
    - .q-toast-text / .q-toast-action: a toast's text and its button (ui.mjs toast's action);
    - .q-seg-count: the small badge after a segmented label (segmented / segHtml count);

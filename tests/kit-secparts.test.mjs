@@ -410,8 +410,9 @@ test('stockRow inside wireTaps', () => {
 // ---- CSS ----
 test('CSS: Securities parts sits just before Foundations, and defines what the parts use', () => {
   const a = cssText.indexOf('/* ---- Securities parts ----');
-  const b = cssText.indexOf('/* ---- Foundations (design review)');
-  assert.ok(a > 0 && b > a && cssText.indexOf('/* ---- ', a + 5) === b);
+  // (Home parts (r4) now sits between it and Foundations.)
+  const b = cssText.indexOf('/* ---- ', a + 5);
+  assert.ok(a > 0 && b > a && ["Home parts (r4)", 'Foundations (design review)'].some(n => cssText.startsWith(`/* ---- ${n}`, b)));
   const sec = cssText.slice(a, b);
   for (const c of ['.q-move.solid', '.q-stock', '.q-stock-id', '.q-stock-spark', '.q-spark.up', '.q-stock-px', '.q-ask-mark.ico', '.q-sh-status']) assert.ok(sec.includes(c), c);
   for (const v of ['--q-up', '--q-down', '--q-flat']) assert.ok(sec.includes(`var(${v})`) && cssText.includes(`${v}:`), v);
