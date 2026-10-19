@@ -419,3 +419,24 @@ test('CSS: Securities parts sits just before Foundations, and defines what the p
   const open = (sec.match(/{/g) || []).length;
   assert.equal(open, (sec.match(/}/g) || []).length, 'balanced');
 });
+
+// ---- additions: live price, keyboard, letter fallback ----
+test('stockRow: price carries data-q-live; Space opens too; every logo failing shows the letter', () => {
+  let opened = 0;
+  const r = ui.stockRow({ logo: ['a.png', 'b.png'], name: '台積電', price: 10, onOpen: () => opened++ });
+  assert.equal(r.children[2].children[0].hasAttribute('data-q-live'), true);
+  const sp = r.dispatch('keydown', { key: ' ' });
+  r.dispatch('keydown', { key: 'Enter' });
+  r.dispatch('keydown', { key: 'a' });
+  assert.equal(opened, 2);
+  assert.equal(sp.defaultPrevented, true);
+  const img = r.children[0].children[0];
+  img.dispatch('error');
+  img.dispatch('error');
+  assert.equal(r.children[0].className, 'q-logo text');
+  assert.equal(r.children[0].textContent, '台');
+  const html = ui.stockRowHtml({ logo: ['a.png', 'b.png'], name: 'Zed', price: 10, open: 'z' });
+  assert.ok(html.includes('<b class="num" data-q-live>10.00</b>') || /<b class="num" data-q-live>[^<]+<\/b>/.test(html));
+  assert.ok(html.includes('data-fallback="Zed"') && html.includes('data-srcs='), 'wireLogos ends on the letter');
+  assert.equal(ui.stockRowHtml({ name: 'Q' }).includes('role='), false);
+});
