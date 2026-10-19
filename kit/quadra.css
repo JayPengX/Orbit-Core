@@ -4193,3 +4193,620 @@ div.q-ritem {
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
 }
+
+/* ==== Premium components (round 3) ====
+   Additive: new class names, or a modifier on an old one (.q-shd, .q-sf,
+   .pro, .q-empty-tile); nothing above changes for markup that predates them.
+   - .q-section-head.q-shd / .q-sh-count / .q-sh-more: a head with a count and a 44px link;
+   - .q-logo: a team or company logo, the hero of its card;
+   - .q-match, .q-price, .q-live-strip, .q-actions-grid: home and game cards;
+   - .q-sheet-hero, .q-sheet-foot.q-sf: a sheet's hero and its sticky action bar;
+   - .q-ask.pro, .q-empty-tile: the dialog and the empty state with an icon tile;
+   - .q-stake, .q-balls: an amount to stake, lottery balls;
+   - .q-sched, .q-ride, .q-chips.wrap, .q-rail.peek, .q-place: Transit's rows and place tiles. */
+:root {
+  --q-logo-bg: #ffffff;
+  /* Saved places: their own brand colours. */
+  --q-place-home: #ff9500;
+  --q-place-work: #6155f5;
+  --q-place-school: #0a84ff;
+  --q-place-pin: #ff383c;
+  --q-place-star: #f5b301;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --q-logo-bg: var(--q-grouped-3);
+  }
+}
+:root[data-theme='dark'] {
+  --q-logo-bg: var(--q-grouped-3);
+}
+@keyframes q-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* -- Section head with a count and a link (sectionHead) -- */
+.q-section-head.q-shd {
+  justify-content: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 0 4px 10px;
+}
+.q-section-head.q-shd h2 {
+  font: 700 20px/1.2 var(--q-font);
+  text-overflow: clip;
+}
+.q-sh-count {
+  color: var(--q-label-2);
+  font: 500 15px/1 var(--q-font);
+}
+.q-section-head.q-shd .q-sh-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 44px;
+  margin: -12px 0 -12px auto;
+  padding: 0 0 0 12px;
+  color: var(--q-blue);
+  font: 500 15px/1 var(--q-font);
+}
+.q-sh-more svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* -- A logo (logoTile): a white rounded square, the image contained -- */
+.q-logo {
+  --t: var(--q-indigo);
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: var(--s, 40px);
+  height: var(--s, 40px);
+  border-radius: calc(var(--s, 40px) * 0.28);
+  background: var(--q-logo-bg);
+  box-shadow: inset 0 0 0 0.5px var(--q-sep);
+  overflow: hidden;
+}
+.q-logo img {
+  width: 78%;
+  height: 78%;
+  object-fit: contain;
+}
+.q-logo.text {
+  background: var(--t);
+  color: #fff;
+  font: 700 calc(var(--s, 40px) * 0.42) / 1 var(--q-font);
+  box-shadow: none;
+}
+
+/* -- A match (matchCard) and its price buttons -- */
+.q-match {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 280px;
+  padding: 14px 14px 12px;
+  border-radius: 20px;
+  background: var(--q-surface);
+  box-sizing: border-box;
+  scroll-snap-align: start;
+  color: var(--q-label);
+  font-family: var(--q-font);
+}
+.q-rail > .q-match {
+  width: auto;
+}
+.q-rail > .q-match:only-child,
+.q-match.wide {
+  width: auto;
+}
+.q-match-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 20px;
+  color: var(--q-label-2);
+  font: 500 13px/1.2 var(--q-font);
+}
+.q-match-lg {
+  min-width: 0;
+}
+.q-match-when {
+  margin-left: auto;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.q-match.live .q-match-when {
+  color: var(--q-red);
+  font-weight: 600;
+}
+.q-match-teams {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+.q-match.wide .q-match-teams {
+  min-height: 64px;
+}
+.q-match-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.q-match-side b {
+  display: -webkit-box;
+  overflow: hidden;
+  font: 600 15px/1.25 var(--q-font);
+  text-align: center;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow-wrap: anywhere;
+}
+.q-match-mid {
+  min-width: 56px;
+  font: 700 26px/1 var(--q-font);
+  text-align: center;
+}
+.q-match-mid.vs {
+  color: var(--q-label-2);
+  font: 600 13px/1 var(--q-font);
+}
+.q-match-prices {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 6px;
+}
+.q-price {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 48px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--q-fill);
+  color: var(--q-label);
+  font-family: var(--q-font);
+}
+.q-price small {
+  color: var(--q-label-2);
+  font: 500 11px/1 var(--q-font);
+}
+.q-price b {
+  font: 700 17px/1 var(--q-font);
+  font-variant-numeric: tabular-nums;
+}
+.q-price[aria-pressed='true'] {
+  background: var(--q-blue);
+  color: #fff;
+}
+.q-price[aria-pressed='true'] small {
+  color: rgba(255, 255, 255, 0.8);
+}
+.q-price:disabled {
+  opacity: 0.4;
+}
+
+/* -- Games on now (liveStrip) -- */
+.q-live-strip {
+  display: flex;
+  gap: 8px;
+  margin: 0 calc(-1 * var(--q-margin));
+  padding: 0 var(--q-margin);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: var(--q-margin);
+  scrollbar-width: none;
+}
+.q-live-strip::-webkit-scrollbar {
+  display: none;
+}
+.q-live-card {
+  flex: none;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px 8px;
+  width: 200px;
+  min-height: 96px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--q-surface);
+  box-sizing: border-box;
+  color: var(--q-label);
+  font-family: var(--q-font);
+  text-align: left;
+  scroll-snap-align: start;
+}
+.q-live-card .q-live-min {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--q-red);
+  font: 600 12px/1 var(--q-font);
+}
+.q-live-card .q-live-min::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--q-red);
+  animation: q-pulse 1.6s infinite;
+}
+.q-live-card b {
+  overflow: hidden;
+  font: 600 15px/1.2 var(--q-font);
+  white-space: nowrap;
+  text-overflow: clip;
+}
+.q-live-card .num {
+  font: 700 20px/1 var(--q-font);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* -- Quick actions as colour tiles (actionGrid) -- */
+.q-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+}
+.q-action {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 76px;
+  padding: 8px 4px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--q-surface);
+  color: var(--q-label);
+  font: 500 13px/1.2 var(--q-font);
+}
+.q-action .q-tile {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+}
+.q-action .q-tile svg {
+  width: 20px;
+  height: 20px;
+}
+.q-action .q-badge {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  font: 600 11px/18px var(--q-font);
+}
+@media (max-width: 340px) {
+  .q-action {
+    min-height: 68px;
+    font-size: 12px;
+  }
+}
+
+/* -- A hero inside a sheet (sheetHero) -- */
+.q-sheet-hero {
+  --t: var(--q-blue);
+  margin: 4px 0 16px;
+  padding: 16px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--t) 92%, #000), color-mix(in srgb, var(--t) 70%, #fff));
+  color: #fff;
+}
+.q-sh-logos {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.q-sheet-hero .q-sh-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: 600 13px/1.2 var(--q-font);
+  opacity: 0.85;
+}
+.q-sheet-hero .q-sh-big {
+  display: block;
+  margin-top: 6px;
+  font: 800 34px/1.1 var(--q-font);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.q-sheet-hero .q-sh-sub {
+  display: block;
+  margin-top: 4px;
+  font: 500 14px/1.35 var(--q-font);
+  opacity: 0.9;
+}
+.q-sheet-hero .q-sh-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.q-sheet-hero .q-sh-row .q-tag {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+/* -- The sheet foot as a summary and one button (sheetFoot): .q-sheet-foot.q-sf -- */
+.q-sheet-foot.q-sf {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.q-sf .q-sf-sum {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.q-sf .q-sf-sum small {
+  color: var(--q-label-2);
+  font: 500 12px/1.2 var(--q-font);
+}
+.q-sf .q-sf-sum b {
+  font: 700 20px/1.1 var(--q-font);
+  white-space: nowrap;
+}
+.q-sheet-foot.q-sf .q-btn {
+  flex: 1;
+  min-height: 50px;
+  border-radius: 14px;
+  font: 600 17px/1 var(--q-font);
+}
+.q-sheet-foot.q-sf .q-btn:disabled {
+  background: var(--q-fill);
+  color: var(--q-label-2);
+}
+
+/* -- A dialog headed by an icon tile (ask / confirm with a named icon) -- */
+.q-ask.pro {
+  width: min(340px, calc(100vw - 48px));
+  padding: 24px;
+  border-radius: 24px;
+}
+.q-ask.pro .q-ask-icon.q-tile {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 14px;
+  border-radius: 16px;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--t) 82%, #fff), var(--t) 60%);
+  font-size: 0;
+}
+.q-ask.pro.danger .q-ask-icon.q-tile {
+  --t: var(--q-red);
+}
+.q-ask.pro .q-ask-icon svg {
+  width: 30px;
+  height: 30px;
+}
+.q-ask.pro .q-ask-title {
+  font: 700 20px/1.25 var(--q-font);
+}
+.q-ask.pro .q-ask-body {
+  margin-top: 8px;
+  color: var(--q-label-2);
+  font: 400 15px/1.4 var(--q-font);
+}
+.q-ask.pro .q-ask-actions {
+  grid-template-columns: 1fr 1fr;
+  grid-auto-flow: row;
+  gap: 10px;
+}
+.q-ask.pro .q-ask-actions .q-btn {
+  min-height: 50px;
+  border-radius: 14px;
+}
+
+/* -- Nothing here, with an icon tile (empty({ icon: 'ticket' })) -- */
+.q-empty .q-empty-tile {
+  width: 56px;
+  height: 56px;
+  margin-bottom: 10px;
+  border-radius: 16px;
+}
+.q-empty .q-empty-tile svg {
+  width: 30px;
+  height: 30px;
+}
+
+/* -- An amount to stake (stakeInput) -- */
+.q-stake {
+  padding: 14px;
+  border-radius: 16px;
+  background: var(--q-surface);
+}
+.q-stake-amt {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font: 700 28px/1 var(--q-font);
+}
+.q-stake-amt small {
+  color: var(--q-label-2);
+  font: 600 15px/1 var(--q-font);
+}
+.q-stake-amt input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  outline: 0;
+}
+.q-stake-presets {
+  display: grid;
+  grid-template-columns: repeat(var(--n, 5), minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 12px;
+}
+.q-stake-presets button {
+  min-height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: var(--q-fill);
+  color: var(--q-label);
+  font: 600 15px/1 var(--q-font);
+  font-variant-numeric: tabular-nums;
+}
+.q-stake-presets button[aria-pressed='true'] {
+  background: var(--q-label);
+  color: var(--q-bg);
+}
+@media (max-width: 340px) {
+  .q-stake {
+    --n: 3;
+  }
+  .q-stake-presets {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* -- Lottery balls (ballRow) -- */
+.q-balls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.q-ball {
+  display: grid;
+  place-items: center;
+  width: var(--b, 28px);
+  height: var(--b, 28px);
+  border-radius: 50%;
+  background: var(--q-fill);
+  color: var(--q-label);
+  font: 700 13px/1 var(--q-font);
+  font-variant-numeric: tabular-nums;
+}
+.q-ball.sp {
+  background: var(--q-red);
+  color: #fff;
+}
+.q-ball.hit {
+  --t: var(--q-orange);
+  background: var(--t);
+  color: #fff;
+}
+.q-ball.empty {
+  background: none;
+  box-shadow: inset 0 0 0 1.5px var(--q-sep);
+}
+
+/* -- Transit: a schedule as one wrapping line of whole tokens (schedLine) -- */
+.q-sched {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  color: var(--q-label-2);
+  font: 500 13px/18px var(--q-font);
+}
+.q-sched > * {
+  white-space: nowrap;
+}
+.q-sched > :first-child {
+  color: var(--q-label);
+  font-weight: 600;
+}
+
+/* -- Transit: a ride or plan row, times over full-width legs, a star at the right (rideRow) -- */
+.q-ride {
+  position: relative;
+  padding: 12px 58px 12px 16px;
+  background: var(--q-surface);
+}
+.q-ride-time {
+  font: 600 17px/1.25 var(--q-font);
+  font-variant-numeric: tabular-nums;
+}
+.q-ride-legs {
+  margin-top: 6px;
+}
+.q-ride-star {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--q-label-3);
+}
+.q-ride-star::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+}
+.q-ride-star svg {
+  width: 22px;
+  height: 22px;
+}
+.q-ride-star.on {
+  color: var(--q-place-star);
+}
+.q-ride-star.on svg {
+  fill: currentColor;
+}
+
+/* -- Chips that wrap, with a leading label; a rail that peeks the next card -- */
+.q-chips.wrap {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  overflow: visible;
+}
+.q-chips-l {
+  color: var(--q-label-2);
+  font: 500 13px/1.2 var(--q-font);
+}
+.q-rail.peek {
+  grid-auto-columns: max(136px, calc((100% - 20px) / 2.3));
+  padding-inline-end: calc(var(--q-margin) + 6px);
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+}
+
+/* -- Saved places' tiles (placeTile): the kit's tile in the place's colour -- */
+.q-tile.q-place.home {
+  --t: var(--q-place-home);
+}
+.q-tile.q-place.work {
+  --t: var(--q-place-work);
+}
+.q-tile.q-place.school {
+  --t: var(--q-place-school);
+}
+.q-tile.q-place.pin {
+  --t: var(--q-place-pin);
+}
+.q-tile.q-place.star {
+  --t: var(--q-place-star);
+}
