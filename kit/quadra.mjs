@@ -926,7 +926,13 @@ function sheetSwipe() {
       const s = e.target.closest?.('dialog.q-sheet[open]');
       sheet = null;
       if (!s || e.touches.length !== 1 || s.scrollTop > 0 || s.classList.contains('q-leaving')) return;
-      if (e.target.closest('input, textarea, select, [contenteditable], .q-chips, .ot-scroll-chips, .leaflet-container')) return;
+      if (e.target.closest('input, textarea, select, [contenteditable], .q-chips, .ot-scroll-chips, .leaflet-container, [data-no-sheet-swipe]')) return;
+      // A box inside the sheet that scrolls (a list, a timeline): the finger is its, not the sheet's.
+      for (let n = e.target; n && n !== s; n = n.parentElement) {
+        if (n.scrollTop > 0) return;
+        const oy = globalThis.getComputedStyle?.(n).overflowY || '';
+        if (/auto|scroll/.test(oy) && n.scrollHeight > n.clientHeight + 1) return;
+      }
       sheet = s;
       [x0, y0, dy, dragging] = [e.touches[0].clientX, e.touches[0].clientY, 0, false];
       trail = [[e.timeStamp, 0]];
