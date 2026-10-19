@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { handleEcoRequest, mergeWallet, poolBalance, cleanPatch, emptyWallet, paydayEntries, payFor, worthOf, PAY_MONTH, REBASE, OVERDRAFT_RATE, plusJoinEntry, plusJoinEntries, plusMember, plusLapsed, plusBonusEntries, bonusBetId, vipEntries, vipStakes, vipTier, welcomeEntries, VIP, PAY, PLUS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, ECO_APPS, rankEntries, RANKS } from '../eco.js';
+import { handleEcoRequest, mergeWallet, poolBalance, cleanPatch, emptyWallet, paydayEntries, worthOf, REBASE, OVERDRAFT_RATE, plusJoinEntry, plusJoinEntries, plusMember, plusLapsed, plusBonusEntries, bonusBetId, vipEntries, vipStakes, vipTier, welcomeEntries, VIP, PAY, PLUS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, ECO_APPS, rankEntries, RANKS } from '../eco.js';
 import { planClean, tidyWallet } from '../eco-admin.js';
 
 function setup() {
@@ -192,18 +192,23 @@ test('device code: signs in another device once, within ten minutes', async () =
   assert.equal((await t.call('POST', '', { op: 'pair-redeem', code: late.data.code, app: 'match' })).status, 404);
 });
 
-test('payday: once a month, from the cut-over on', () => {
+test('payday: monthly in October 2026, then every Monday from the 19th, back pay included', () => {
+  const pays = (w, now) => paydayEntries(w, now).filter(e => e.kind === 'pay').map(e => e.id);
   const oct = Date.UTC(2026, 9, 7, 3);
-  const due = paydayEntries({ entries: [] }, oct).map(e => e.id);
-  assert.deepEqual(due, ['eco:pay:2026-10']);
-  assert.equal(paydayEntries({ entries: [] }, oct)[0].amount, 6_000);
-  assert.deepEqual(paydayEntries({ entries: [...due.map(id => ({ id, amount: 6_000 })), { id: 'eco:rebase:v3', t: 1, app: 'eco', kind: 'rebase', amount: 0 }] }, oct), []);
-  assert.deepEqual(paydayEntries({ entries: [] }, Date.UTC(2026, 8, 20)), []);
-  // Back pay: months nobody opened an app are paid the next time.
-  const made = Date.UTC(2026, 8, 1);
-  assert.deepEqual(paydayEntries({ created: made, entries: [{ id: 'eco:pay:2026-10', amount: 6_000 }, { id: 'eco:rebase:v3', t: 1, app: 'eco', kind: 'rebase', amount: 0 }] }, Date.UTC(2027, 0, 5)).map(e => e.id), ['eco:pay:2026-11', 'eco:pay:2026-12', 'eco:pay:2027-01']);
-  // Not for months before the pass was made.
-  assert.deepEqual(paydayEntries({ created: Date.UTC(2026, 11, 3), entries: [] }, Date.UTC(2027, 0, 5)).map(e => e.id), ['eco:pay:2026-12', 'eco:pay:2027-01']);
+  assert.deepEqual(pays({ created: oct, entries: [] }, oct), ['eco:pay:2026-10']);
+  assert.equal(paydayEntries({ created: oct, entries: [] }, oct).find(e => e.kind === 'pay').amount, 6_000);
+  // From Monday 19 Oct (Taipei), NT$10,000 a week; October's monthly pay isn't paid twice.
+  const tue = Date.UTC(2026, 9, 20, 3);
+  assert.deepEqual(pays({ created: oct, entries: [{ id: 'eco:pay:2026-10', t: 1, app: 'eco', kind: 'pay', amount: 6_000 }] }, tue), ['eco:wpay:2026-10-19']);
+  assert.equal(paydayEntries({ created: oct, entries: [] }, tue).find(e => e.id === 'eco:wpay:2026-10-19').amount, 10_000);
+  // Back pay: every Monday nobody opened an app, paid the next time; no monthly pay after October.
+  assert.deepEqual(pays({ created: oct, entries: [{ id: 'eco:pay:2026-10', t: 1, app: 'eco', kind: 'pay', amount: 6_000 }] }, Date.UTC(2026, 10, 3, 3)), ['eco:wpay:2026-10-19', 'eco:wpay:2026-10-26', 'eco:wpay:2026-11-02']);
+  // A pass made after the switch: weekly pay from its own week, never monthly.
+  const made = Date.UTC(2026, 10, 4, 3);
+  assert.deepEqual(pays({ created: made, entries: [] }, Date.UTC(2026, 10, 10, 3)), ['eco:wpay:2026-11-02', 'eco:wpay:2026-11-09']);
+  // Sunday 23:30 Taipei is still last week; Monday 00:00 is payday.
+  assert.deepEqual(pays({ created: made, entries: [] }, Date.UTC(2026, 10, 8, 15, 30)), ['eco:wpay:2026-11-02']);
+  assert.deepEqual(pays({ created: made, entries: [] }, Date.UTC(2026, 10, 8, 16, 0)), ['eco:wpay:2026-11-02', 'eco:wpay:2026-11-09']);
 });
 
 test('rotate: a new pass holds everything, every other device is out', async () => {
@@ -489,7 +494,7 @@ test('Quadra Plus: rejoining costs the rest of the month; a short pool does not 
   // 17 of 31 days left: about NT$270.
   assert.equal(e.amount, -270);
   assert.equal(plusJoinEntry({ entries: [] }, oct15).amount, 0);
-  const broke = { settings: { plus: { value: { on: true }, t: 1 } }, entries: [{ id: 'eco:plus:2026-10', t: 1, app: 'eco', kind: 'plus', amount: 0 }, { id: 'eco:rebase:v3', t: 1, app: 'eco', kind: 'rebase', amount: 0 }, { id: 'x', t: 1, app: 'odds', amount: -16_500 }] };
+  const broke = { settings: { plus: { value: { on: true }, t: 1 } }, entries: [{ id: 'eco:plus:2026-10', t: 1, app: 'eco', kind: 'plus', amount: 0 }, { id: 'eco:rebase:v3', t: 1, app: 'eco', kind: 'rebase', amount: 0 }, { id: 'x', t: 1, app: 'odds', amount: -300_000 }] };
   assert.ok(!paydayEntries({ ...broke, created: oct15 }, Date.UTC(2026, 10, 2)).some(x => x.kind === 'plus'));
   const ok = { ...broke, entries: broke.entries.slice(0, 2) };
   assert.ok(paydayEntries({ ...ok, created: oct15 }, Date.UTC(2026, 10, 2)).some(x => x.id === 'eco:plus:2026-11'));
@@ -537,17 +542,15 @@ test('Quadra Plus yearly on top of a month already held starts next month', () =
 });
 
 test('the pay is fixed, like a salary: the same however much the account holds', () => {
-  assert.equal(PAY_MONTH, 6_000);
-  assert.equal(payFor(0), 6_000);
-  assert.equal(payFor(5_000_000), 6_000);
+  assert.equal(PAY.week, 10_000);
+  assert.equal(PAY.start, 200_000);
   // Worth still counts Securities' holdings, not only cash.
   const w = { entries: [{ id: 'a', t: 1, app: 'odds', amount: 20_000 }, { id: 'eco:rebase:v3', t: 1, app: 'eco', kind: 'rebase', amount: 0 }], snap: { stock: { cash: 5_000, held: 300_000, t: 1 } } };
   assert.equal(worthOf(w), 325_000);
-  const oct = Date.UTC(2026, 9, 3);
-  assert.equal(paydayEntries({ ...w, created: oct }, oct).find(e => e.kind === 'pay').amount, 6_000);
-  // Back pay: every month in full.
-  const back = paydayEntries({ entries: [{ id: 'x', t: 1, app: 'odds', amount: 36_000 }, { id: 'eco:rebase:v3', t: 1, app: 'eco', kind: 'rebase', amount: 0 }], created: oct }, Date.UTC(2027, 0, 5)).filter(e => e.kind === 'pay');
-  assert.deepEqual(back.map(e => e.amount), [6_000, 6_000, 6_000, 6_000]);
+  const mon = Date.UTC(2026, 10, 2, 3);
+  const rich = { ...w, created: mon, snap: { stock: { cash: 5_000_000, held: 9_000_000, t: 1 } } };
+  assert.equal(paydayEntries(rich, mon).find(e => e.kind === 'pay').amount, 10_000);
+  assert.equal(paydayEntries({ ...w, created: mon }, mon).find(e => e.kind === 'pay').amount, 10_000);
 });
 
 test('the reset: accounts that opened with NT$110,000 come down to NT$30,000 once; cash may go below zero', () => {
@@ -568,11 +571,23 @@ test('the reset: accounts that opened with NT$110,000 come down to NT$30,000 onc
   assert.ok(!paydayEntries({ v2: 1, entries: [{ id: 'eco:start', t: 1, app: 'eco', kind: 'start', amount: 30_000 }] }, oct).some(e => e.id === REBASE.id));
 });
 
-test('a new pass today opens with NT$30,000 and no reset', async () => {
+test('a new pass today opens with NT$200,000, no reset and no top-up', async () => {
   const t = setup();
   const acct = await newPass(t, 'odds');
-  assert.equal(acct.wallet.entries.find(e => e.id === 'eco:start').amount, 30_000);
-  assert.ok(!acct.wallet.entries.some(e => e.id === REBASE.id));
+  assert.equal(acct.wallet.entries.find(e => e.id === 'eco:start').amount, 200_000);
+  assert.ok(!acct.wallet.entries.some(e => e.id === REBASE.id || e.id === 'eco:topup:v12'));
+});
+
+test('accounts that opened with NT$30,000 are raised to NT$200,000 once; nothing is ever taken', () => {
+  const now = Date.UTC(2026, 9, 20, 3);
+  const top = w => paydayEntries(w, now).filter(e => e.id === 'eco:topup:v12').map(e => e.amount);
+  assert.deepEqual(top({ v2: 1, created: 1, entries: [{ id: 'eco:start', t: 1, app: 'eco', kind: 'start', amount: 30_000 }] }), [170_000]);
+  // Reset from NT$110,000 to NT$30,000 (now or before): the same NT$170,000.
+  assert.deepEqual(top({ v2: 1, created: 1, entries: [{ id: 'eco:start', t: 1, app: 'eco', kind: 'start', amount: 110_000 }] }), [170_000]);
+  assert.deepEqual(top({ created: 1, entries: [{ id: 'eco:rebase:v3', t: 1, app: 'eco', kind: 'rebase', amount: -80_000 }] }), [170_000]);
+  // Once only, and never for a new account.
+  assert.deepEqual(top({ v2: 1, created: 1, entries: [{ id: 'eco:start', t: 1, app: 'eco', kind: 'start', amount: 30_000 }, { id: 'eco:topup:v12', t: 2, app: 'eco', kind: 'start', amount: 170_000 }] }), []);
+  assert.deepEqual(top({ v2: 1, created: now, entries: [{ id: 'eco:start', t: 1, app: 'eco', kind: 'start', amount: 200_000 }] }), []);
 });
 
 test('Plus: a NT$200 bonus bet each week a member opens an app, from the Worker only', () => {
@@ -650,7 +665,7 @@ test('Quadra Plus bills every month like a subscription: months away charged on 
   const due = paydayEntries({ settings: on, created: Date.UTC(2026, 9, 1), entries: base }, jan);
   assert.deepEqual(due.filter(e => e.kind === 'plus').map(e => [e.id, e.amount]), [['eco:plus:2026-11', -PLUS.fee], ['eco:plus:2026-12', -PLUS.fee], ['eco:plus:2027-01', -PLUS.fee]]);
   // A pool that can't cover a month: that charge fails and the rest isn't tried.
-  const broke = [...base.slice(0, 2), { id: 'x', t: 1, app: 'odds', amount: -17_700 }];
+  const broke = [...base.slice(0, 2), { id: 'x', t: 1, app: 'odds', amount: -300_000 }];
   const w = { settings: on, created: Date.UTC(2026, 9, 1), entries: broke };
   const nov = paydayEntries(w, Date.UTC(2026, 10, 2));
   assert.ok(!nov.some(e => e.kind === 'plus'));
@@ -998,4 +1013,31 @@ test("a session writes its own app's data only: never another app's save or figu
   assert.equal(posted.status, 403);
   // Its own: saved.
   assert.equal((await t.call('PATCH', `${t.qt(acct.token)}&app=vocab`, { payload: 'gz1:mine' })).status, 200);
+});
+
+test('op loan and relief: the Worker signs only what the account qualifies for', async () => {
+  const t = setup();
+  t.advance(Date.UTC(2026, 10, 4, 4) - 1_700_000_000_000);
+  const acct = await newPass(t);
+  // A brand-new pass waits 4 weeks for a loan.
+  const early = await t.call('POST', '', { op: 'loan', qt: acct.token, action: 'borrow', amount: 100_000, weeks: 52 });
+  assert.equal(early.status, 409);
+  assert.equal(early.data.error.why, 'new');
+  t.advance(29 * 86_400_000);
+  const fresh = await t.call('POST', '', { op: 'refresh', refresh: acct.refresh, app: 'stock', claim: true });
+  const qt = fresh.data.token;
+  const before = fresh.data.pool;
+  const big = await t.call('POST', '', { op: 'loan', qt, action: 'borrow', amount: 900_000, weeks: 52 });
+  assert.equal(big.data.error.why, 'amount');
+  const ok = await t.call('POST', '', { op: 'loan', qt, action: 'borrow', amount: 100_000, weeks: 52 });
+  assert.equal(ok.status, 200);
+  assert.equal(ok.data.pool, before + 100_000 - 3_000);
+  // An app can't write the Worker's loan entries itself.
+  assert.equal(cleanPatch({ entries: [{ id: 'eco:loanoff:x', t: 1, app: 'stock', kind: 'loanoff', amount: 0 }] }).entries.length, 0);
+  const off = await t.call('POST', '', { op: 'loan', qt, action: 'payoff' });
+  assert.equal(off.status, 200);
+  assert.equal(off.data.pool, before - 3_000 - 2_000);
+  // Relief: not with NT$200,000 in the account.
+  const relief = await t.call('POST', '', { op: 'relief', qt });
+  assert.equal(relief.data.error.why, 'worth');
 });

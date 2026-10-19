@@ -397,7 +397,9 @@ test("Taiwan's day of a moment, the same in every kit module", async () => {
   assert.equal(taipeiDay(Date.parse('2026-10-17T16:00:00Z')), '2026-10-18');
   assert.equal(iso(nextPayday(Date.parse('2026-12-31T15:59:59Z'))), '2026-12-31T16:00:00.000Z');
   assert.equal(iso(nextPayday(Date.parse('2026-12-31T16:00:00Z'))), '2027-01-31T16:00:00.000Z');
-  if (q) assert.equal(q.nextPayday(Date.parse('2026-12-31T15:59:59Z')), nextPayday(Date.parse('2026-12-31T15:59:59Z')));
+  if (q) assert.equal(q.nextMonthStart(Date.parse('2026-12-31T15:59:59Z')), nextPayday(Date.parse('2026-12-31T15:59:59Z')));
+  // Quadra's own payday is weekly: next Monday 00:00 Taipei.
+  if (q) assert.equal(iso(q.nextPayday(Date.parse('2026-10-21T04:00:00Z'))), '2026-10-25T16:00:00.000Z');
 });
 
 test("Securities' own paydays stop where Quadra's begin, each month once", () => {

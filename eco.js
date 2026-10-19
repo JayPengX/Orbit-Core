@@ -53,6 +53,7 @@ import { VIP, vipStakes, vipTier, WELCOME, welcomeEarned } from './kit/plus.mjs'
 import { storeReady } from './doc-store.js';
 import { tokenSecret, signToken, readToken, seal, unseal, sessionLimited, SESSION_MS, REFRESH_MS, HANDOFF_MS } from './quadra-token.js';
 import { handleAdmin } from './eco-admin.js';
+import { PAY_WEEK, WEEKLY_FROM, weekStart, mondayId, debtOf, activeLoan, loanOffer, loanEntries, loanDue, payoffAmount, reliefCheck, reliefEntry, openStakes } from './kit/loan.mjs';
 
 export const ECO_PASSCODE_LENGTH = 10;
 export const ECO_PASSCODE_PATTERN = /^[2-9A-HJ-NP-Z]{10}$/;
@@ -111,33 +112,47 @@ export function emptyWallet(now = Date.now()) {
   return { v: 1, created: now, entries: [], snap: {}, settings: {}, apps: {}, inbox: {} };
 }
 
-// ---- One pool, one monthly pay -------------------------------------------------
+// ---- One pool, one weekly pay ---------------------------------------------------
 //
 // The Worker pays everyone's income into the pool: one fixed pay each Taiwan
-// month (from the 1st), on the first sign-in or refresh that month; a month
-// nobody opened an app is paid the next time (back pay, for every month since
-// the pass was made, from 2026-10). A pass made since v2 also gets its
-// opening money here.
+// week (from Monday 00:00), on the first sign-in or refresh that week; a week
+// nobody opened an app is paid the next time (back pay). Until 2026-10 it was
+// monthly (`eco:pay:<month>`); weekly pay (`eco:wpay:<Monday>`) runs from
+// WEEKLY_FROM. A pass made since v2 also gets its opening money here.
 //
-// The economy (tools/economy.mjs has the numbers): a fixed monthly pay, the
-// same for every account whatever it holds, like a salary (v10, 2026-10;
-// v7-v9 paid 8,000 / 4,000 / 1,500 / 500 by what the account was worth,
-// which paid saving less and losing more). A regular bettor ends a month a
-// little behind, an investor or a saver grows by it; the house's cut, the
-// broker's costs, interest and penalties are the sinks.
+// The economy (tools/economy.mjs has the numbers): NT$200,000 to open and a
+// fixed NT$10,000 a week, the same for every account whatever it holds, like
+// a salary (v12, 2026-10-19; v10-v11 paid NT$30,000 and NT$6,000 a month).
+// Money beyond that is borrowed (信貸, kit/loan.mjs: repaid from the pay) or
+// relief for someone with nothing (急難紓困); the house's cut, the broker's
+// costs, interest and penalties are the sinks.
 export const PAY_MONTH = 6_000;
-export const PAY = { start: 30_000, month: PAY_MONTH };
+export const PAY = { start: 200_000, week: PAY_WEEK, month: PAY_MONTH };
+export { WEEKLY_FROM };
+// The opening money before v12, which the reset below brought accounts to.
+const OLD_START = 30_000;
 // The reset for accounts made before this economy: their opening money
 // (NT$110,000, from the Worker or, before v2, from Securities and Play)
-// comes down to the new NT$30,000, once, as `eco:rebase:v3`. It can take the
+// comes down to NT$30,000, once, as `eco:rebase:v3`. It can take the
 // cash below zero: that's an overdraft, and it's fine (see below).
 export const REBASE = { id: 'eco:rebase:v3', amount: -80_000 };
 const rebaseDue = wallet => {
   const start = (wallet?.entries || []).find(e => e.id === 'eco:start');
   // Before v2 the opening money was the apps' own (Securities' cash, Play's
   // ledger): any such account has something in the pool.
-  return start ? start.amount > PAY.start : !wallet?.v2 && ((wallet?.entries || []).length > 0 || Object.keys(wallet?.snap || {}).length > 0);
+  return start ? start.amount > OLD_START && start.amount !== PAY.start : !wallet?.v2 && ((wallet?.entries || []).length > 0 || Object.keys(wallet?.snap || {}).length > 0);
 };
+// v12's opening money for accounts that opened with NT$30,000 (an
+// `eco:start` below PAY.start, or the reset): the difference, once, as
+// `eco:topup:v12` (kind 'start'). It never takes anything.
+export const TOPUP_ID = 'eco:topup:v12';
+export function topupEntries(wallet, now) {
+  const entries = wallet?.entries || [];
+  if (entries.some(e => e.id === TOPUP_ID)) return [];
+  const start = entries.find(e => e.id === 'eco:start');
+  const opened = entries.some(e => e.id === REBASE.id) ? OLD_START : start ? start.amount : null;
+  return opened != null && opened < PAY.start ? [{ id: TOPUP_ID, t: now, app: 'eco', kind: 'start', amount: PAY.start - opened }] : [];
+}
 // The reset assumed NT$110,000. An account that opened with less (only
 // Securities' NT$100,000, or only Play's NT$10,000) came out below
 // NT$30,000: `eco:rebase:v3fix` gives the difference back, once, when
@@ -167,7 +182,8 @@ export const OVERDRAFT_RATE = 0.01;
 const finiteOr0 = v => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
 // (Securities' holdings at what was paid for them, the Worker's count: a
 // figure a phone sends can't raise a rank.)
-export const worthOf = wallet => poolBalance(wallet) + finiteOr0(wallet?.snap?.stock?.held);
+// A loan still owed counts against it: borrowed money is nobody's worth.
+export const worthOf = (wallet, now = Date.now()) => poolBalance(wallet) + finiteOr0(wallet?.snap?.stock?.held) - debtOf(wallet, now);
 export const payFor = () => PAY.month;
 export const PAY_FROM_MONTH = '2026-10';
 const TPE = 8 * 3_600_000;
@@ -177,12 +193,7 @@ const nextMonth = m => {
   return mo === 12 ? `${y + 1}-01` : `${y}-${String(mo + 1).padStart(2, '0')}`;
 };
 export const taipeiMonth = t => new Date(t + TPE).toISOString().slice(0, 7);
-// The Monday (Taipei) a moment's week starts, as a UTC timestamp.
-export function weekStart(t) {
-  const d = new Date(t + TPE);
-  const day = (d.getUTCDay() + 6) % 7;
-  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - day) - TPE;
-}
+export { weekStart };
 
 // The pay entries due now that the wallet doesn't have yet.
 export function paydayEntries(wallet, now) {
@@ -202,12 +213,23 @@ export function paydayEntries(wallet, now) {
   // what the reset made.
   const owed = -(poolBalance(wallet) + out.reduce((sum, e) => sum + e.amount, 0)) - free;
   if (owed >= 100 && month >= PAY_FROM_MONTH && !have.has(`eco:od:${month}`)) out.push({ id: `eco:od:${month}`, t: now, app: 'eco', kind: 'od', amount: -Math.round(owed * OVERDRAFT_RATE) });
-  const made = Number.isFinite(wallet.created) ? taipeiMonth(Math.min(wallet.created, now)) : month;
-  let m = made > PAY_FROM_MONTH ? made : PAY_FROM_MONTH;
-  // Each month's pay, back pay for the months nobody opened an app.
-  for (let n = 0; m <= month && n < 120; n++, m = nextMonth(m)) {
-    if (!have.has(`eco:pay:${m}`)) out.push({ id: `eco:pay:${m}`, t: now, app: 'eco', kind: 'pay', amount: payFor() });
+  out.push(...topupEntries({ ...wallet, entries: [...(wallet.entries || []), ...out] }, now));
+  const created = Number.isFinite(wallet.created) ? Math.min(wallet.created, now) : now;
+  // Each month's pay before weekly pay, back pay for the months nobody opened an app.
+  if (created < WEEKLY_FROM) {
+    const last = taipeiMonth(WEEKLY_FROM - 1);
+    let m = taipeiMonth(created) > PAY_FROM_MONTH ? taipeiMonth(created) : PAY_FROM_MONTH;
+    for (let n = 0; m <= month && m <= last && n < 120; n++, m = nextMonth(m)) {
+      if (!have.has(`eco:pay:${m}`)) out.push({ id: `eco:pay:${m}`, t: now, app: 'eco', kind: 'pay', amount: payFor() });
+    }
   }
+  // Each week's pay from WEEKLY_FROM (or the week the pass was made), back pay too.
+  for (let w = weekStart(Math.max(created, WEEKLY_FROM)), n = 0; w <= now && n < 520; w += WEEK, n++) {
+    const id = `eco:wpay:${mondayId(w)}`;
+    if (!have.has(id)) out.push({ id, t: now, app: 'eco', kind: 'pay', amount: PAY.week });
+  }
+  // The loan's installments come out of the pay (kit/loan.mjs loanDue).
+  out.push(...loanDue(wallet, poolBalance({ ...wallet, entries: [...(wallet.entries || []), ...out] }), now));
   // The renewal follows the pay, so the pay can cover it; a month already
   // held isn't charged.
   out.push(...plusRenewal({ ...wallet, entries: [...(wallet.entries || []), ...out] }, now));
@@ -240,7 +262,7 @@ export const RANKS = [
 ];
 export function rankEntries(wallet, now) {
   const have = new Set((wallet?.entries || []).map(e => e.id));
-  const worth = worthOf(wallet);
+  const worth = worthOf(wallet, now);
   return RANKS.filter(r => r.reward > 0 && worth >= r.min && !have.has(`eco:rank:${r.id}`)).map(r => ({ id: `eco:rank:${r.id}`, t: now, app: 'eco', kind: 'rank', amount: r.reward, note: r.id }));
 }
 
@@ -564,6 +586,8 @@ const OPS = {
   'share-create': shareCreate,
   'share-redeem': shareRedeem,
   plus: ecoPlus,
+  loan: ecoLoan,
+  relief: ecoRelief,
   admin: ctx => handleAdmin(ctx)
 };
 
@@ -866,6 +890,75 @@ async function ecoPlus(ctx) {
   if (!result) return deps.errorJson('ECO_SIGNED_OUT', 401, headers, request);
   if (refused) return deps.json({ error: { code: refused, message: refused }, live: liveOf(result.wallet) }, refused === 'ECO_SIGNED_OUT' ? 401 : 409, headers);
   return deps.json({ wallet: publicWallet(result.wallet), walletTime: result.updateTime, pool: poolBalance(result.wallet), member: plusMember(result.wallet, now) }, 200, headers);
+}
+
+// The Worker's one way to change the wallet for an op: paid up first, then
+// `change(paid)` gives the entries to add (or a refusal code). Only the live
+// app can do it.
+async function walletOp(ctx, limitKey, change) {
+  const { env, deps, headers, request, body, secret } = ctx;
+  const now = deps.now();
+  const c = await readToken(secret, body.qt, 'ses', now);
+  if (!c) return deps.errorJson('ECO_TOKEN_INVALID', 401, headers, request);
+  if (sessionLimited(`${limitKey}:${c.s}`, 10, 60_000, now)) return deps.errorJson('RATE_LIMITED', 429, headers, request);
+  let refused = null;
+  let extra = {};
+  const result = await updateWallet(
+    env,
+    deps,
+    c.d,
+    w => {
+      refused = null;
+      if (gen(w) !== c.g) return (refused = 'ECO_SIGNED_OUT'), w;
+      if (!isActive(w, c)) return (refused = 'ECO_SESSION_MOVED'), w;
+      const paid = mergeWallet(w, { entries: paydayEntries(w, now) });
+      const r = change(paid, now);
+      extra = r.extra || {};
+      if (r.refused) return (refused = r.refused), w;
+      const done = mergeWallet(paid, { entries: r.entries });
+      // A loan settled can reach a level: its reward with it.
+      return mergeWallet(done, { entries: rankEntries(done, now) });
+    },
+    { skipIf: () => refused }
+  );
+  if (!result) return deps.errorJson('ECO_SIGNED_OUT', 401, headers, request);
+  if (refused) return deps.json({ error: { code: refused, message: refused, ...extra }, live: liveOf(result.wallet) }, refused === 'ECO_SIGNED_OUT' ? 401 : 409, headers);
+  return deps.json({ wallet: publicWallet(result.wallet), walletTime: result.updateTime, pool: poolBalance(result.wallet), ...extra }, 200, headers);
+}
+
+// 信貸 (kit/loan.mjs has the rules): { op: 'loan', qt, action: 'borrow',
+// amount, weeks } signs a loan the account qualifies for (the money in,
+// the 開辦費 out); { action: 'payoff' } clears the active one from the
+// balance (with 提前清償違約金 in the first year, or what's owed in 催收).
+async function ecoLoan(ctx) {
+  const { body } = ctx;
+  return walletOp(ctx, 'loan', (w, now) => {
+    if (body.action === 'borrow') {
+      const offer = loanOffer(w, finite(body.amount), finite(body.weeks), now);
+      if (!offer.ok) return { refused: 'ECO_LOAN_REFUSED', extra: { why: offer.why, ...(offer.max != null ? { max: offer.max } : {}), ...(offer.until ? { until: offer.until } : {}) } };
+      return { entries: loanEntries(offer, now), extra: { loan: offer } };
+    }
+    if (body.action === 'payoff') {
+      const loan = activeLoan(w);
+      if (!loan) return { refused: 'ECO_LOAN_NONE' };
+      const amount = payoffAmount(loan, now);
+      if (poolBalance(w) < amount) return { refused: 'ECO_LOAN_FUNDS', extra: { need: amount } };
+      return { entries: [{ id: `eco:loanoff:${loan.id}`, t: now, app: 'eco', kind: 'loanoff', amount: -amount }] };
+    }
+    return { refused: 'ECO_LOAN_ACTION' };
+  });
+}
+
+// 急難紓困: { op: 'relief', qt } pays RELIEF.amount to an account with
+// nothing (cash, stocks at cost and open bets under RELIEF.under), on the
+// kit's conditions (kit/loan.mjs reliefCheck).
+async function ecoRelief(ctx) {
+  return walletOp(ctx, 'relief', (w, now) => {
+    const worth = poolBalance(w) + finiteOr0(w?.snap?.stock?.held) + openStakes(w);
+    const check = reliefCheck(w, worth, now);
+    if (!check.ok) return { refused: 'ECO_RELIEF_REFUSED', extra: { why: check.why, ...(check.until ? { until: check.until } : {}) } };
+    return { entries: [reliefEntry(now)] };
+  });
 }
 
 // A device code: 8 characters, good for PAIR_MS and once, to sign in on

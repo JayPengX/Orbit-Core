@@ -168,7 +168,7 @@ included), then wiped whole. `private/` is never served.
   under a version check (`doc-store.js`). Each app's data is in its own
   collection under the same id.
 - **Ops:** login, refresh, read/patch/delete, device codes, `#qh=`
-  hand-offs between apps, Plus, sign out everywhere, rotate, merge passes,
+  hand-offs between apps, Plus, loans and relief, sign out everywhere, rotate, merge passes,
   Class's share keys, admin.
 - **Signing out wipes the device** (`wipeDevice`).
 
@@ -177,8 +177,15 @@ included), then wiped whole. `private/` is never served.
 The model is `node tools/economy.mjs`; the numbers live in `eco.js` and
 the kit's `quadra.mjs` (the same tables in both).
 
-- **Opening:** NT$30,000.
-- **Pay:** NT$6,000 on the 1st of every Taiwan month.
+- **Opening:** NT$200,000 (older accounts raised once, `eco:topup:v12`).
+- **Pay:** NT$10,000 every Monday, Taiwan time (monthly NT$6,000 until
+  October 2026).
+- **信貸** (`kit/loan.mjs`, `op: 'loan'`): NT$100k limit growing to 22×
+  monthly pay, 6–16% by record, NT$3,000 fee, 1–5 years, repaid from each
+  Monday's pay. 3 late → 催收: all due, balance taken, a third of each pay;
+  a year's ban after. Debt counts against worth.
+- **急難紓困** (`op: 'relief'`): NT$5,000 under NT$2,000 worth, every 13
+  weeks, 3 a year.
 - **財富等級:** one-time rewards as worth crosses 50k to 20M.
 - **Plus:** NT$490 a month or NT$4,900 a year.
   - Play: a NT$200 weekly free bet, the boost ×1.5, cash out keeps 2%.

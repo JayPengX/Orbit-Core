@@ -66,7 +66,7 @@ export const STRINGS = {
     sideYouSub: '投資的漲跌、省下的',
     sideWorth: '你現在的身價',
     sideAtStake: '含投注中 {v}',
-    sidesSub: '你的錢只有三方：系統發的（開戶金、每月固定 {pay} 薪水、財富等級獎勵），和 Quadra 的輸贏（可正可負），和你自己的成績。',
+    sidesSub: '你的錢只有三方：系統發的（開戶金、每週固定 {pay} 薪水、財富等級獎勵），和 Quadra 的輸贏（可正可負），和你自己的成績。',
     edgeTitle: '莊家優勢',
     edgeSingle: '單場',
     edgeLegs: '{n} 關串關',
@@ -249,7 +249,7 @@ export const STRINGS = {
     sideYouSub: 'Markets up and down, money saved',
     sideWorth: 'What you’re worth now',
     sideAtStake: 'incl. {v} at stake',
-    sidesSub: 'Your money has three sides: what the system gave (the opening money, a fixed {pay} pay each month, wealth level rewards), you against Quadra (either way), and your own result.',
+    sidesSub: 'Your money has three sides: what the system gave (the opening money, a fixed {pay} pay each week, wealth level rewards), you against Quadra (either way), and your own result.',
     edgeTitle: 'The house edge',
     edgeSingle: 'A single',
     edgeLegs: 'A {n}-pick parlay',
@@ -615,7 +615,7 @@ function renderTruth(box, { t, state }) {
         sideRow('🙋', t('sideYou'), money(s.own, { sign: true }), t('sideYouSub'), s.own >= 0 ? 'up' : 'down'),
         el('div', { class: 'side-total' }, [el('span', {}, [document.createTextNode(t('sideWorth')), s.atStake > 0 ? el('small', { class: 'muted', text: t('sideAtStake', { v: money(s.atStake) }) }) : null]), el('strong', { class: 'num', text: money(s.worth) })])
       ]),
-      { sub: t('sidesSub', { pay: money(ECONOMY.monthly) }) }
+      { sub: t('sidesSub', { pay: money(ECONOMY.weekly) }) }
     ),
     section(
       t('edgeTitle'),
