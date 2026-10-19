@@ -11,6 +11,7 @@
 //   and the premium layer: icons, tile, pageHead, heroCard, rowCard, tag, rail, stats, section;
 //   round 3: sectionHead, logoTile, matchCard, liveStrip, actionGrid, sheetHero, sheetFoot,
 //   confirm, stakeInput, ballRow, placeTile, schedLine, rideRow;
+//   r4 home parts: progressRing, passStack, dayTimeline, monthCalendar, panelGrid, leagueTile;
 //   foundations: ready (lift the loading screen), and toast's action / batch and
 //   segmented's count (see each below).
 
@@ -1210,4 +1211,288 @@ export function rideRow({ time = '', legs = null, starred = false, onStar = null
   const row = h('div', { class: 'q-ride', ...(onOpen ? { role: 'button', tabindex: '0', onclick: onOpen } : {}) }, [h('div', { class: 'q-ride-time', text: time }), legs ? h('div', { class: 'q-ride-legs' }, [legs]) : null]);
   if (onStar) row.append(h('button', { class: `q-ride-star${starred ? ' on' : ''}`, type: 'button', 'aria-pressed': String(Boolean(starred)), ...(starLabel ? { 'aria-label': starLabel } : {}), html: icons.star, onclick: e => (e.stopPropagation(), onStar(e)) }));
   return row;
+}
+
+// ---- Home parts (r4): ring, pass stack, day timeline, month calendar, panels, league tile ----
+// (quadra.css "Home parts (r4)"; notes in roadmap/kit-handoffs/r4-parts.md.)
+const clamp01 = v => (Number.isFinite(Number(v)) ? Math.min(1, Math.max(0, Number(v))) : 0);
+const pad2 = n => String(n).padStart(2, '0');
+// An icon slot: an icons key or an svg string is a glyph, anything else text.
+const iconHtml = x => (isIcon(x) ? icons[x] : glyphHtml(x ?? ''));
+
+// -- Progress ring --
+const ringSvg = (v, size, stroke) => {
+  const r = (size - stroke) / 2;
+  const c = size / 2;
+  const arc = v > 0 ? `<circle class="q-ring-arc" cx="${c}" cy="${c}" r="${r}" fill="none" stroke-width="${stroke}" stroke-linecap="round" pathLength="100" stroke-dasharray="${+(v * 100).toFixed(2)} 100" transform="rotate(-90 ${c} ${c})"/>` : '';
+  return `<svg class="q-ring-svg" viewBox="0 0 ${size} ${size}" aria-hidden="true"><circle class="q-ring-track" cx="${c}" cy="${c}" r="${r}" fill="none" stroke-width="${stroke}"/>${arc}</svg>`;
+};
+const ringParts = (value, { size = 56, stroke = 6, label, sub = '' } = {}) => {
+  const v = clamp01(value);
+  return { v, size: Math.max(16, Number(size) || 56), stroke: Math.max(1, Number(stroke) || 6), label: label ?? `${Math.round(v * 100)}%`, sub };
+};
+// progressRing(0.7, { size: 56, stroke: 6, label: '70%', sub: '', tint }): value 0..1 (clamped);
+// label centred (default the percent), sub a small line under it.
+export function progressRing(value, opts = {}) {
+  const p = ringParts(value, opts);
+  const root = h('div', { class: clsOf('q-ring', opts.tint && 'tinted'), role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(Math.round(p.v * 100)), html: ringSvg(p.v, p.size, p.stroke) }, [h('span', { class: 'q-ring-txt' }, [h('b', { class: 'q-ring-l', text: String(p.label) }), p.sub ? h('small', { class: 'q-ring-s', text: String(p.sub) }) : null])]);
+  root.style.setProperty('--s', `${p.size}px`);
+  if (opts.tint) root.style.setProperty('--t', opts.tint);
+  return root;
+}
+export function progressRingHtml(value, opts = {}) {
+  const p = ringParts(value, opts);
+  return `<div class="${clsOf('q-ring', opts.tint && 'tinted')}" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(p.v * 100)}"${styleOf(['--s', `${p.size}px`], ['--t', opts.tint])}>${ringSvg(p.v, p.size, p.stroke)}<span class="q-ring-txt"><b class="q-ring-l">${E(p.label)}</b>${p.sub ? `<small class="q-ring-s">${E(p.sub)}</small>` : ''}</span></div>`;
+}
+
+// -- Pass stack (Wallet-style) --
+// Collapsed: each card shows its top `peek` px, the next over it. A tap
+// spreads them; a tap on a spread card opens it (onOpen(item, i)) and folds
+// the stack; a tap outside, or Escape, folds it. One card: a tap opens it.
+const passBody = (it, logosHtml, tagsHtml) => `<span class="q-pass-head"><span class="q-pass-id"><strong>${E(it.title ?? '')}</strong>${it.sub ? `<small>${E(it.sub)}</small>` : ''}</span>${it.big != null && it.big !== '' ? `<b class="q-pass-big">${E(it.big)}</b>` : ''}</span>${logosHtml || tagsHtml ? `<span class="q-pass-more">${logosHtml ? `<span class="q-pass-logos">${logosHtml}</span>` : ''}${tagsHtml}</span>` : ''}`;
+export function passStack(items, { peek = 56, onOpen = null } = {}) {
+  const list = items || [];
+  const stack = h('div', { class: 'q-stack', role: 'list' });
+  stack.style.setProperty('--n', String(list.length));
+  stack.style.setProperty('--peek', `${Number(peek) || 56}px`);
+  let off = null;
+  const folded = () => {
+    stack.classList.remove('spread');
+    off?.();
+  };
+  const arm = () => {
+    const away = e => (!stack.isConnected || e.target?.closest?.('.q-stack') !== stack) && folded();
+    const key = e => e.key === 'Escape' && folded();
+    document.addEventListener('click', away);
+    document.addEventListener('keydown', key);
+    off = () => (document.removeEventListener('click', away), document.removeEventListener('keydown', key), (off = null));
+  };
+  list.forEach((it, i) => {
+    const logos = (it.logos || []).map(s => logoTile(s, { size: 28 }));
+    const card = h('button', { class: 'q-pass', type: 'button', ...dataProps(it.data) });
+    card.style.setProperty('--i', String(i));
+    if (it.tint) card.style.setProperty('--t', it.tint);
+    card.append(h('span', { class: 'q-pass-head' }, [h('span', { class: 'q-pass-id' }, [h('strong', { text: it.title ?? '' }), it.sub ? h('small', { text: it.sub }) : null]), it.big != null && it.big !== '' ? h('b', { class: 'q-pass-big', text: String(it.big) }) : null]));
+    if (logos.length || it.tags?.length) card.append(h('span', { class: 'q-pass-more' }, [logos.length ? h('span', { class: 'q-pass-logos' }, logos) : null, ...(it.tags || []).map(t => tag_(t))]));
+    card.addEventListener('click', () => {
+      if (list.length > 1 && !stack.classList.contains('spread')) return stack.classList.add('spread'), arm();
+      folded();
+      (it.onOpen || onOpen)?.(it, i);
+    });
+    stack.append(card);
+  });
+  return stack;
+}
+export function passStackHtml(items, { peek = 56 } = {}) {
+  const list = items || [];
+  const cards = list.map((it, i) => `<button class="q-pass" type="button" data-pass="${E(it.id ?? i)}"${dataOf(it.data)}${styleOf(['--i', String(i)], ['--t', it.tint])}>${passBody(it, joinHtml((it.logos || []).map(s => logoTileHtml(s, { size: 28 }))), (it.tags || []).map(tagObjHtml).join(''))}</button>`);
+  return `<div class="q-stack" role="list"${styleOf(['--n', String(list.length)], ['--peek', `${Number(peek) || 56}px`])}>${cards.join('')}</div>`;
+}
+// The twin's behaviour, once on a container: wirePassStacks(root, { open(id, el, i) }). Returns off().
+export function wirePassStacks(root, { open = null } = {}) {
+  const click = e => {
+    const card = e.target?.closest?.('.q-pass');
+    const stack = card?.closest?.('.q-stack');
+    if (stack && root.contains(stack)) {
+      const n = stack.querySelectorAll('.q-pass').length;
+      if (n > 1 && !stack.classList.contains('spread')) return stack.classList.add('spread');
+      stack.classList.remove('spread');
+      return open?.(card.getAttribute('data-pass'), card, [...stack.querySelectorAll('.q-pass')].indexOf(card));
+    }
+    for (const s of root.querySelectorAll('.q-stack.spread')) s.classList.remove('spread');
+  };
+  const key = e => e.key === 'Escape' && [...root.querySelectorAll('.q-stack.spread')].forEach(s => s.classList.remove('spread'));
+  root.addEventListener('click', click);
+  document.addEventListener('keydown', key);
+  const away = e => !root.contains(e.target) && [...root.querySelectorAll('.q-stack.spread')].forEach(s => s.classList.remove('spread'));
+  document.addEventListener('click', away);
+  return () => (root.removeEventListener('click', click), document.removeEventListener('keydown', key), document.removeEventListener('click', away));
+}
+
+// -- Day timeline --
+// 'HH:MM' as minutes since midnight (NaN when it isn't one).
+export const clockMin = s => {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(s ?? '').trim());
+  return m && +m[1] <= 24 && +m[2] < 60 ? +m[1] * 60 + +m[2] : NaN;
+};
+// A time's place in the range as a percent (0 at `from`, 100 at `to`).
+export const timelinePct = (min, from, to) => ((min - from) / (to - from)) * 100;
+const dateMin = d => d.getHours() * 60 + d.getMinutes();
+// The now-line's percent for a Date, or null outside the range.
+export function nowPct(date, from = '07:00', to = '17:00') {
+  const f = clockMin(from), t = clockMin(to), m = dateMin(date);
+  return t > f && m >= f && m <= t ? timelinePct(m, f, t) : null;
+}
+// Blocks clipped to the range, side by side where they overlap:
+// [{ ...block, s, e (minutes), top, height (percent), col, cols }].
+export function timelineLayout(blocks, from = '07:00', to = '17:00') {
+  const f = clockMin(from), t = clockMin(to);
+  if (!(t > f)) return [];
+  const out = (blocks || []).map(b => ({ ...b, s: Math.max(f, clockMin(b.start)), e: Math.min(t, clockMin(b.end)) })).filter(b => b.e > b.s).sort((a, b) => a.s - b.s || a.e - b.e);
+  let cluster = [], end = -1;
+  const close = () => {
+    const cols = Math.max(1, ...cluster.map(b => b.col + 1));
+    cluster.forEach(b => (b.cols = cols));
+    cluster = [];
+  };
+  const colEnds = [];
+  for (const b of out) {
+    if (b.s >= end) (close(), (colEnds.length = 0));
+    let c = colEnds.findIndex(x => x <= b.s);
+    if (c < 0) c = colEnds.length;
+    colEnds[c] = b.e;
+    b.col = c;
+    cluster.push(b);
+    end = Math.max(end, b.e);
+    b.top = timelinePct(b.s, f, t);
+    b.height = timelinePct(b.e, f, t) - b.top;
+  }
+  close();
+  return out;
+}
+const tlHours = (f, t) => {
+  const hs = [];
+  for (let m = Math.ceil(f / 60) * 60; m <= t; m += 60) hs.push({ label: `${pad2(m / 60)}:00`, top: timelinePct(m, f, t) });
+  return hs;
+};
+const pctS = n => `${+n.toFixed(3)}%`;
+const nowOf = now => (typeof now === 'function' ? now() : now instanceof Date ? (b => new Date(now.getTime() + (Date.now() - b)))(tlBoot(now)) : new Date());
+// (A given Date is the clock's start: it moves on from there.)
+const boots = new WeakMap();
+const tlBoot = d => (boots.has(d) || boots.set(d, Date.now()), boots.get(d));
+// (tlBoot runs before the second Date.now(): the first call reads zero elapsed.)
+const onNow = (b, m) => m >= b.s && m < b.e;
+// Calls run() at each minute's turn while alive() says so; returns stop().
+const minuteLoop = (alive, run) => {
+  let t = null, stopped = false;
+  const stop = () => (stopped = true, clearTimeout(t));
+  const next = () => {
+    t = setTimeout(() => {
+      if (stopped) return;
+      if (!alive()) return stop();
+      run();
+      next();
+    }, 60000 - (Date.now() % 60000) + 20);
+    t?.unref?.();
+  };
+  next();
+  return stop;
+};
+// dayTimeline(blocks, { from: '07:00', to: '17:00', now: new Date() }): hours down the left, blocks
+// placed by time (--tl-top / --tl-h percents), a red now-line that moves each minute while
+// the element is in the page (el.stop() ends it early). The block's `title` / `sub`; `tint` its colour.
+export function dayTimeline(blocks, { from = '07:00', to = '17:00', now = new Date() } = {}) {
+  const f = clockMin(from), t = clockMin(to);
+  const lay = timelineLayout(blocks, from, to);
+  const root = h('div', { class: 'q-tl', role: 'list' });
+  root.style.setProperty('--hrs', String(Math.max(1, (t - f) / 60)));
+  const hours = h('div', { class: 'q-tl-hours', 'aria-hidden': 'true' }, tlHours(f, t).map(x => { const s = h('span', { class: 'q-tl-h', text: x.label }); s.style.setProperty('--tl-top', pctS(x.top)); return s; }));
+  const layer = h('div', { class: 'q-tl-blocks' });
+  const els = lay.map(b => {
+    const el = h('div', { class: clsOf('q-tl-b', b.e - b.s < 35 && 'short'), role: 'listitem' }, [h('strong', { text: b.title ?? '' }), b.sub ? h('span', { text: b.sub }) : null]);
+    el.style.setProperty('--tl-top', pctS(b.top));
+    el.style.setProperty('--tl-h', pctS(b.height));
+    el.style.setProperty('--c', String(b.col));
+    el.style.setProperty('--n', String(b.cols));
+    if (b.tint) el.style.setProperty('--t', b.tint);
+    layer.append(el);
+    return el;
+  });
+  const line = h('div', { class: 'q-tl-now', 'aria-hidden': 'true' });
+  const paint = () => {
+    const d = nowOf(now), p = nowPct(d, from, to), m = dateMin(d);
+    line.style.setProperty('--tl-top', p == null ? '0%' : pctS(p));
+    line.hidden = p == null;
+    lay.forEach((b, i) => els[i].classList.toggle('on', p != null && onNow(b, m)));
+  };
+  root.append(hours, layer, line);
+  paint();
+  // (Built before it is mounted: a few minutes' grace, then it lets go once removed.)
+  let seen = false, waits = 0;
+  root.stop = minuteLoop(() => (root.isConnected ? (seen = true) : !seen && ++waits < 3), paint);
+  return root;
+}
+export function dayTimelineHtml(blocks, { from = '07:00', to = '17:00', now = new Date() } = {}) {
+  const f = clockMin(from), t = clockMin(to);
+  const d = nowOf(now), p = nowPct(d, from, to), m = dateMin(d);
+  const items = timelineLayout(blocks, from, to).map(b => `<div class="${clsOf('q-tl-b', b.e - b.s < 35 && 'short', p != null && onNow(b, m) && 'on')}" role="listitem" data-s="${b.s}" data-e="${b.e}"${styleOf(['--tl-top', pctS(b.top)], ['--tl-h', pctS(b.height)], ['--c', String(b.col)], ['--n', String(b.cols)], ['--t', b.tint])}><strong>${E(b.title ?? '')}</strong>${b.sub ? `<span>${E(b.sub)}</span>` : ''}</div>`);
+  const hours = tlHours(f, t).map(x => `<span class="q-tl-h"${styleOf(['--tl-top', pctS(x.top)])}>${x.label}</span>`);
+  return `<div class="q-tl" role="list" data-from="${E(from)}" data-to="${E(to)}"${styleOf(['--hrs', String(Math.max(1, (t - f) / 60))])}><div class="q-tl-hours" aria-hidden="true">${hours.join('')}</div><div class="q-tl-blocks">${items.join('')}</div><div class="q-tl-now" aria-hidden="true"${p == null ? ' hidden' : ''}${styleOf(['--tl-top', pctS(p ?? 0)])}></div></div>`;
+}
+// Moves the now-lines of twin timelines inside `root` each minute; off() stops.
+export function wireTimelines(root, { now = () => new Date() } = {}) {
+  const paint = () => {
+    const d = now(), m = dateMin(d);
+    for (const tl of root.querySelectorAll('.q-tl[data-from]')) {
+      const p = nowPct(d, tl.getAttribute('data-from'), tl.getAttribute('data-to'));
+      const line = tl.querySelector('.q-tl-now');
+      if (line) (line.style.setProperty('--tl-top', pctS(p ?? 0)), (line.hidden = p == null));
+      for (const b of tl.querySelectorAll('.q-tl-b[data-s]')) b.classList.toggle('on', p != null && m >= +b.getAttribute('data-s') && m < +b.getAttribute('data-e'));
+    }
+  };
+  paint();
+  return minuteLoop(() => root.isConnected !== false, paint);
+}
+
+// -- Month calendar --
+const WEEK = { zh: ['日', '一', '二', '三', '四', '五', '六'], en: ['S', 'M', 'T', 'W', 'T', 'F', 'S'] };
+// month is 1..12. offset: blank cells before the 1st (Sunday-first week).
+export function monthGrid(year, month) {
+  const first = new Date(Date.UTC(year, month - 1, 1));
+  return { offset: first.getUTCDay(), days: new Date(Date.UTC(year, month, 0)).getUTCDate() };
+}
+const isoDay = (y, m, d) => `${y}-${pad2(m)}-${pad2(d)}`;
+const todayKey = t => (t instanceof Date ? isoDay(t.getFullYear(), t.getMonth() + 1, t.getDate()) : typeof t === 'string' && t ? t : todayKey(new Date()));
+const calLang = lang => lang || (/^en/i.test(globalThis.document?.documentElement?.lang || '') ? 'en' : 'zh');
+const calParts = ({ year, month, marks = {}, today, lang } = {}) => {
+  const g = monthGrid(year, month);
+  const tk = todayKey(today);
+  return { ...g, tk, week: WEEK[calLang(lang)] || WEEK.zh, days_: Array.from({ length: g.days }, (_, i) => { const key = isoDay(year, month, i + 1); const mark = marks?.[key]; return { d: i + 1, key, mark: mark ? String(mark).replace(/[^\w-]/g, '') : '', today: key === tk }; }) };
+};
+// monthCalendar({ year, month (1..12), marks: { 'YYYY-MM-DD': 'done' | 'part' | any word }, today, onPick(key) | data }).
+// today: a Date or 'YYYY-MM-DD' (default now). Marks are `.m-<word>`; done is a filled dot, part a soft one.
+export function monthCalendar({ year, month, marks = {}, today, lang, onPick = null, data = null } = {}) {
+  const p = calParts({ year, month, marks, today, lang });
+  const root = h('div', { class: 'q-cal', role: 'group', 'aria-label': `${year}-${pad2(month)}` });
+  root.style.setProperty('--off', String(p.offset));
+  root.append(...p.week.map(w => h('span', { class: 'q-cal-w', 'aria-hidden': 'true', text: w })));
+  for (const d of p.days_) {
+    const cls = clsOf('q-cal-d', d.mark && `m-${d.mark}`, d.today && 'today');
+    const props = { class: cls, 'aria-label': d.key + (d.mark ? ` ${d.mark}` : ''), ...(d.today ? { 'aria-current': 'date' } : {}), text: String(d.d) };
+    const el = onPick || data ? h('button', { type: 'button', ...props, ...dataProps(data), 'data-day': d.key, onclick: () => onPick?.(d.key) }) : h('span', props);
+    if (d.d === 1) el.style.setProperty('grid-column-start', String(p.offset + 1));
+    root.append(el);
+  }
+  return root;
+}
+export function monthCalendarHtml({ year, month, marks = {}, today, lang, pick = null, data = null } = {}) {
+  const p = calParts({ year, month, marks, today, lang });
+  const days = p.days_.map(d => {
+    const cls = clsOf('q-cal-d', d.mark && `m-${E(d.mark)}`, d.today && 'today');
+    const common = `class="${cls}" aria-label="${E(d.key + (d.mark ? ` ${d.mark}` : ''))}"${d.today ? ' aria-current="date"' : ''}${d.d === 1 ? styleOf(['grid-column-start', String(p.offset + 1)]) : ''}`;
+    return pick != null || data ? `<button type="button" ${common} data-pick="${E(d.key)}"${dataOf(data)}>${d.d}</button>` : `<span ${common}>${d.d}</span>`;
+  });
+  return `<div class="q-cal" role="group" aria-label="${year}-${pad2(month)}"${styleOf(['--off', String(p.offset)])}>${p.week.map(w => `<span class="q-cal-w" aria-hidden="true">${E(w)}</span>`).join('')}${days.join('')}</div>`;
+}
+
+// -- Panel grid --
+// panelGrid([{ label, big, sub, icon (an icons key / svg / text), tint }]): two columns of tiles.
+export function panelGrid(items) {
+  return h('div', { class: 'q-panels' }, (items || []).map(it => {
+    const el = h('div', { class: 'q-panel' }, [h('span', { class: 'q-panel-l' }, [it.icon ? h('i', { 'aria-hidden': 'true', html: iconHtml(it.icon) }) : null, h('span', { text: it.label ?? '' })]), h('b', { class: 'q-panel-v', text: String(it.big ?? '') }), it.sub ? h('small', { class: 'q-panel-s', text: it.sub }) : null]);
+    if (it.tint) el.style.setProperty('--t', it.tint);
+    return el;
+  }));
+}
+export function panelGridHtml(items) {
+  return `<div class="q-panels">${(items || []).map(it => `<div class="q-panel"${styleOf(['--t', it.tint])}><span class="q-panel-l">${it.icon ? `<i aria-hidden="true">${iconHtml(it.icon)}</i>` : ''}<span>${E(it.label ?? '')}</span></span><b class="q-panel-v">${E(it.big ?? '')}</b>${it.sub ? `<small class="q-panel-s">${E(it.sub)}</small>` : ''}</div>`).join('')}</div>`;
+}
+
+// -- League tile --
+// leagueTile({ logo (src or list), name, sub, onOpen | data }): a 56px logo over the name; for a rail.
+export function leagueTile({ logo = '', name = '', sub = '', onOpen = null, data = null } = {}) {
+  return h('button', { class: 'q-league', type: 'button', ...dataProps(data), ...(onOpen ? { onclick: onOpen } : {}) }, [logoTile(logo, { size: 56, alt: name, fallbackText: name }), h('strong', { text: name }), sub ? h('small', { text: sub }) : null]);
+}
+export function leagueTileHtml({ logo = '', name = '', sub = '', open = null, data = null } = {}) {
+  return `<button class="q-league" type="button"${open != null ? ` data-open="${E(open)}"` : ''}${dataOf(data)}>${logoTileHtml(logo, { size: 56, alt: name, fallbackText: name })}<strong>${E(name)}</strong>${sub ? `<small>${E(sub)}</small>` : ''}</button>`;
 }
