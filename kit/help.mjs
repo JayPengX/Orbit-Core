@@ -629,7 +629,7 @@ export const HELP = {
         'Orbit 的大眾運輸 App：全台公車、台鐵、高鐵、捷運和 YouBike，路線規劃、到站時間和導航都在一起。到站時間和規劃都是即時的，所以需要網路。'
       ]],
       ['tabs', '每個分頁', [
-        '「地圖」：YouBike 站（下面一排是離你最近的五站）、每個公車站和台鐵、高鐵、捷運站；點任何一個看它的車、班次或剩幾台。找地點（連鎖店從離你最近的分店排起）或點地圖上的地方，按「路線」規劃怎麼去。釘選的地點（家、公司⋯）也標在地圖上，點一下就能規劃去那裡。',
+        '「地圖」：像 Apple 地圖，下面一張卡片可以往上拉或往下拉。卡片裡有搜尋、常用（家、公司⋯點一下就規劃去那裡）、建議（該出發的行程）、最近找過的和附近的 YouBike。地圖上有 YouBike 站、每個公車站和台鐵、高鐵、捷運站；點任何一個看它的車、班次或剩幾台。找地點（連鎖店從離你最近的分店排起）或點地圖上的地方，按「路線」規劃怎麼去。',
         '「交通」：常用和釘選的行程接下來怎麼走（點一下就導航），釘選的公車、火車和地點；每條公車都寫著下一班什麼時候到（沒有車在路上時，是時刻表的下一班）。',
         '「查時刻」：台鐵、高鐵站到站（自動找最快的轉乘），附票價和今天的誤點；公車用號碼或站名找，每條路線都寫著離你最近那一站的下一班，點開看每一站現在的車，或任一天的時刻表。都可以 ☆ 釘選。',
         '「我的」：地點、行程（可以設時間、每週固定幾天，回程自動有）、釘選的公車和火車（可以分組）、交通方式的偏好（不搭哪些、每 30 分鐘換 YouBike、TPASS、導航時走路騎車交給 Google 地圖還是 Apple 地圖），和各城市的捷運路網圖。'
@@ -656,7 +656,7 @@ export const HELP = {
         'Orbit’s public transport app: Taiwan’s buses, railways, high-speed rail, metros and YouBike, with trip plans, arrivals and navigation in one place. Arrivals and plans are live, so it needs the connection.'
       ]],
       ['tabs', 'The tabs', [
-        'Map: YouBike stations (the five nearest you along the bottom), every bus stop, and railway, high-speed rail and metro stations; tap any for its buses, trains or bikes. Find a place (a chain’s branches nearest you first) or tap one on the map, then Route to plan the way there. Your pinned places (home, work…) are on the map too; tap one to plan a trip there.',
+        'Map: as in Apple Maps, a card at the foot you pull up or down. In it: search, Favorites (home, work…; tap one to plan the way there), For you (a trip it’s time to leave for), Recents and Nearby (the YouBike stations near you). On the map: YouBike stations, every bus stop, and railway, high-speed rail and metro stations; tap any for its buses, trains or bikes. Find a place (a chain’s branches nearest you first) or tap one on the map, then Route to plan the way there.',
         'Transit: your saved and pinned trips’ next ways to go (a tap navigates), and your pinned buses, trains and places; every bus says when its next one comes (the timetable’s next when none is on its way).',
         'Times: railway and high-speed rail station to station (changing wherever it’s faster), with fares and today’s delays; buses by number or stop name, each route with its next bus at its stop nearest you, opening to every stop’s buses now or any day’s timetable. ☆ pins any of them.',
         'Me: places, trips (at a time, on set weekdays; the way back comes by itself), pinned buses and trains (in groups), how you like to travel (what not to take, swapping YouBike every 30 minutes, TPASS, whether walks and rides go to Google Maps or Apple Maps), and each city’s metro map.'
