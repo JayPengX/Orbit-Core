@@ -217,6 +217,8 @@ Served from this repo's Pages, never copied. Each app's page carries
 | `quadra.mjs` | The core: the session, `proxyJson`/`packJson`, the economy tables, Plus/VIP, notices, `installGate`, `watchUpdates`, `onlineOnly`, `keepOffline`, `mayLocate`, `tabBar`, `topActions`, `fitNumbers`, `rank` (recommendations), `rec` (除錯紀錄), iPhone behaviour |
 | `quadra.css` | The design system (iOS 27 tokens, Liquid Glass, springs, every control) |
 | `ui.mjs` | Builders: `segmented`, `sheet`, `menu`, `toast`, `list`/`cell`, `search`, `toggle`, `empty`, `view`, `countTo` |
+| `ui.mjs` icons (added) | `share`, `trash`, `x`, `bank`, `lock`, `exchange`, `cup`, `flag` join the set (`send`, `key`, `swap`, `spark` already existed); apps read `kitUI.icons?.x`, never import |
+| `quadra.css` pieces (added) | `.q-switch.on` (= aria-checked), `.q-sheet-foot` (sticky primary-button footer at a sheet's bottom, safe-area aware), `.q-fig` (grid of captioned bold figures with hairlines, children `small` over `b`) |
 | `boot.js` | The loading screen and the version check |
 | `brand.mjs` | Families, names, colours, marks, repos, `RENAMED`, `DEV` |
 | `pass.mjs`, `help.mjs`, `truth.mjs` | The Pass sheet; every app's guide; 真相 (the house's real numbers) |
