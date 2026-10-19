@@ -256,13 +256,46 @@ export function hockeyGrid(means) {
   const rest = (1 - tie * HOCKEY_TIE_LIFT) / (1 - tie);
   return grid.map(x => ({ ...x, p: x.p * (x.away === x.home ? HOCKEY_TIE_LIFT : rest) }));
 }
+// The fits below ask for a lifted grid's chances a thousand times a game:
+// summed straight off the two teams' goal counts, cell by cell in
+// hockeyGrid's order (the same sums to the last bit), with no grid built.
+// `line`: also the chance of a final total (a tie's deciding goal in it)
+// over the line, and of it landing on the line.
+function hockeySums(means, line) {
+  const A = pmf(means.away);
+  const H = pmf(means.home);
+  let tie = 0;
+  for (let a = 0; a < A.length; a++) {
+    const p = A[a] * H[a];
+    if (p > 1e-9) tie += p;
+  }
+  const rest = (1 - tie * HOCKEY_TIE_LIFT) / (1 - tie);
+  let home = 0;
+  let draw = 0;
+  let over = 0;
+  let push = 0;
+  for (let a = 0; a < A.length; a++)
+    for (let h = 0; h < H.length; h++) {
+      const raw = A[a] * H[h];
+      if (!(raw > 1e-9)) continue;
+      const p = raw * (a === h ? HOCKEY_TIE_LIFT : rest);
+      if (h > a) home += p;
+      else if (a === h) draw += p;
+      if (line != null) {
+        const final = a + h + (a === h ? 1 : 0);
+        if (final === line) push += p;
+        else if (final > line) over += p;
+      }
+    }
+  return { home, draw, over, push };
+}
 function splitFor(mean, homeWin) {
   let lo = 0.1;
   let hi = 0.9;
   for (let i = 0; i < 40; i++) {
     const s = (lo + hi) / 2;
-    const g = hockeyGrid({ home: mean * s, away: mean * (1 - s) });
-    const win = chance(g, (a, h) => h > a) + chance(g, (a, h) => h === a) * s;
+    const g = hockeySums({ home: mean * s, away: mean * (1 - s) });
+    const win = g.home + g.draw * s;
     if (win < homeWin) lo = s;
     else hi = s;
   }
@@ -275,10 +308,8 @@ function hockeyFor(homeWin, total) {
     // the line as often as the book says.
     const over = m => {
       const s = splitFor(m, homeWin);
-      const g = hockeyGrid({ home: m * s, away: m * (1 - s) });
-      const final = (a, h) => a + h + (a === h ? 1 : 0);
-      const push = chance(g, (a, h) => final(a, h) === total.line);
-      return chance(g, (a, h) => final(a, h) > total.line) / (1 - push || 1);
+      const g = hockeySums({ home: m * s, away: m * (1 - s) }, total.line);
+      return g.over / (1 - g.push || 1);
     };
     let lo = mean * 0.6;
     let hi = mean;
