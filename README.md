@@ -98,8 +98,8 @@ runs near each caller; only Gemini goes through `gemini-relay.js`, pinned to Tai
   curl -H 'Origin: http://localhost:8123' 'https://orbit-workers-proxy.pengzjay.workers.dev/sports-proxy?url=<encoded>&app=match'
   ```
 
-- **Crons:** even minutes (notices, Kambi, builders at :16, weather
-  scoring, capacity); odd minutes (Play's settling, the lottery). Add work
+- **Crons:** even minutes (notices, Kambi, builders at :16 and Play's board
+  every ten minutes at :08…:58, weather scoring, capacity); odd minutes (Play's settling, the lottery). Add work
   to these, not new Cron Triggers.
 - **The proxy is the only one adding money:**
   - `eco.js appEntries` takes only spending from apps, dated by the Worker.
@@ -132,6 +132,7 @@ changes, writing a file only when it changed (`builders/store.js`):
 
 | Builder | Writes | When (UTC) |
 | --- | --- | --- |
+| `play.js` | `play/board.json`: Play's home board (games of the next 72 h priced with the kit's own code, 為你推薦's candidates, the jackpots; shape in `kit/play-boardfile.mjs`), written every run, a minute at the edge | every ten minutes (:08, :18 … :58); parked from pace 1 (phones read their leagues themselves) |
 | `sports.js` | `sports/<league>/<year>.json`, `days.json`, `bounds.json` | daily 16:00 |
 | `watch.js` | `sports/watch.json` (hourly), the season archive (daily 20:00) | hourly / daily |
 | `winprob.js` | `winprob/…` | daily 23:00 |
@@ -225,7 +226,7 @@ Served from this repo's Pages, never copied. Each app's page carries
 | `pass-sync.mjs` | An app's payload kept in step with the Pass's copy (read and merged before any write; once per return, none under 10 s away, an unchanged copy not merged again); Words, Weather, Slips |
 | `catalog.mjs`, `logos.mjs`, `names.mjs`, `photos.mjs` | Leagues; logos; Chinese team names; studio headshots |
 | `f1live.mjs`, `postseason.mjs`, `sports-*.mjs` | F1 sessions; MLB's postseason; highlights, broadcast, win probability (also run by builders) |
-| `play-*.mjs`, `stock-*.mjs` | Play's and Securities' pricing and ledgers, shared with the Worker |
+| `play-*.mjs`, `stock-*.mjs` | Play's and Securities' pricing and ledgers, shared with the Worker (`play-boardfile.mjs`: the home board's file, packed by the Worker and read by Play) |
 | `holidays.mjs` | Taiwan's days off |
 | `sw-images.js` | Other sites' pictures in one shared cache |
 | `sw.js` | The shared service worker, stamped per deploy by `tools/stamp.mjs` |

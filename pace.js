@@ -26,5 +26,6 @@ export async function paceOf(env, now = Date.now()) {
 export const forgetPace = () => (memo = { at: 0, v: null });
 
 // The builders that run at a pace: none past 1; at 1 only what phones would miss.
+// (Not 'play': Play's board only hastens what a phone can read itself, so it waits.)
 export const KEEP_AT_PACE_1 = new Set(['watch', 'asia', 'cpbl', 'sports']);
 export const builderAllowed = (pace, name) => pace === 0 || (pace === 1 && KEEP_AT_PACE_1.has(name));
