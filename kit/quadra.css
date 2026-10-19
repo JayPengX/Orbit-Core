@@ -1768,6 +1768,18 @@ button,
   background: color-mix(in srgb, var(--q-accent) 14%, transparent);
   color: var(--q-accent);
 }
+/* Dark: the accent lifted toward white on a stronger wash, so a deep accent
+   (Law's indigo, an app's own darker one) still reads on black. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .q-chip:is([aria-pressed='true'], [aria-selected='true'], .on) {
+    background: color-mix(in srgb, var(--q-accent) 24%, transparent);
+    color: color-mix(in srgb, var(--q-accent) 62%, #fff);
+  }
+}
+:root[data-theme='dark'] .q-chip:is([aria-pressed='true'], [aria-selected='true'], .on) {
+  background: color-mix(in srgb, var(--q-accent) 24%, transparent);
+  color: color-mix(in srgb, var(--q-accent) 62%, #fff);
+}
 
 /* ---- Segmented control: a capsule track, a raised thumb that slides on a
    spring (kit/ui.mjs segmented sets --q-seg-i and --q-seg-n) ---- */
