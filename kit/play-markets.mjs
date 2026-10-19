@@ -34,10 +34,10 @@ export const TD_PER_POINT = 0.11;
 // American football: 運彩 doesn't sell one); `td`: 達陣數大小 sold.
 export const SCORE_SPREAD = {
   nfl: { margin: 13.5, total: 10.5, bands: null, step: 3, td: TD_PER_POINT },
-  nba: { margin: 12.5, total: 18, bands: BASKETBALL_BANDS, bands6: BASKETBALL_BANDS6, step: 4 },
-  wnba: { margin: 11, total: 14, bands: BASKETBALL_BANDS, bands6: BASKETBALL_BANDS6, step: 4 },
+  nba: { margin: 12.5, total: 18, bands: BASKETBALL_BANDS, bands6: BASKETBALL_BANDS6, step: 4, spreadStep: 1 },
+  wnba: { margin: 11, total: 14, bands: BASKETBALL_BANDS, bands6: BASKETBALL_BANDS6, step: 4, spreadStep: 1 },
   // EuroLeague: shorter games (40 minutes), lower scoring than the NBA.
-  euroleague: { margin: 11, total: 15, bands: BASKETBALL_BANDS, bands6: BASKETBALL_BANDS6, step: 4 }
+  euroleague: { margin: 11, total: 15, bands: BASKETBALL_BANDS, bands6: BASKETBALL_BANDS6, step: 4, spreadStep: 1 }
 };
 
 export function normalCdf(z) {
@@ -97,8 +97,10 @@ export function pointsMarkets(m, { spreadLine, totalLine }) {
   // Spreads: DraftKings' line (as a half point) and 1 and 2 steps either side.
   // No line posted: the half point nearest the expected margin (away covers below it).
   const main = spreadLine != null ? (spreadLine % 1 ? spreadLine : spreadLine + 0.5) : half(m.margin);
+  // Basketball's 讓分 a point apart, as 運彩's (−1.5 / −2.5 / −3.5, 2026-10-20).
+  const spreadStep = m.spec.spreadStep ?? step;
   for (const d of [-2, -1, 0, 1, 2]) {
-    const awayLine = round2(main + d * step);
+    const awayLine = round2(main + d * spreadStep);
     if (Math.abs(awayLine) < 0.5) continue;
     const awayCover = normalCdf((awayLine - m.margin) / m.marginSd);
     if (awayCover < 0.04 || awayCover > 0.96) continue;
