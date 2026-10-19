@@ -386,18 +386,15 @@ test("IPO subscriptions: TWSE's list, the window, the draw and what comes back",
 test("Taiwan's day of a moment, the same in every kit module", async () => {
   const q = await import('../kit/quadra.mjs').catch(() => null);
   const { taipeiDate } = await import('../kit/play-lottery.mjs');
-  const { plusMonth } = await import('../kit/plus.mjs');
   for (const t of [Date.parse('2026-10-17T15:59:59.999Z'), Date.parse('2026-10-17T16:00:00Z'), Date.parse('2026-12-31T16:00:00Z'), Date.parse('2027-01-01T00:00:00Z')]) {
     const day = taipeiDay(t);
     assert.equal(twDay(t), day);
     assert.equal(taipeiDate(t), day);
-    assert.equal(plusMonth(t), day.slice(0, 7));
     if (q) assert.equal(q.taipeiDay(t), day);
   }
   assert.equal(taipeiDay(Date.parse('2026-10-17T16:00:00Z')), '2026-10-18');
   assert.equal(iso(nextPayday(Date.parse('2026-12-31T15:59:59Z'))), '2026-12-31T16:00:00.000Z');
   assert.equal(iso(nextPayday(Date.parse('2026-12-31T16:00:00Z'))), '2027-01-31T16:00:00.000Z');
-  if (q) assert.equal(q.nextMonthStart(Date.parse('2026-12-31T15:59:59Z')), nextPayday(Date.parse('2026-12-31T15:59:59Z')));
   // Quadra's own payday is weekly: next Monday 00:00 Taipei.
   if (q) assert.equal(iso(q.nextPayday(Date.parse('2026-10-21T04:00:00Z'))), '2026-10-25T16:00:00.000Z');
 });
@@ -492,23 +489,6 @@ test('day trading sold first (當日沖銷作業辦法): three months open with 
   assert.equal(C.dayTradeUsed(first.account, now + 1), 500_000);
   assert.equal(sell(first.account, 200, now + 1).error, 'dayTradeLimit', 'NT$700,000 of NT$600,000');
   assert.equal(C.dayTradeUsed(first.account, now + DAY_MS), 0, 'a new day, a new limit');
-});
-
-test("Plus's half FX spread goes by the exchange's own month, not today's", () => {
-  const plusMonth = Date.parse('2026-09-10T02:00:00Z');
-  const now = Date.parse('2026-10-18T02:00:00Z');
-  SA.usePlus({ months: new Set(['2026-09']), fxSpread: 0.5, commission: 1, loanCut: 0 });
-  try {
-    const rates = { TWD: 1, USD: 32 };
-    const then = SA.quoteExchange('TWD', 'USD', 32_000, rates, true, plusMonth);
-    const today = SA.quoteExchange('TWD', 'USD', 32_000, rates, true, now);
-    assert.equal(then.spread, today.spread / 2);
-    const acc = SA.newAccount(100_000, plusMonth - DAY_MS, 'acc');
-    const r = SA.exchange(acc, { from: 'TWD', to: 'USD', amount: 32_000 }, { rates, now: plusMonth, id: 'x' });
-    assert.equal(r.event.spread, then.spread, 'an exchange dated in a Plus month has its half spread');
-  } finally {
-    SA.usePlus(null);
-  }
 });
 
 test("a dividend's pay date: Yahoo's own where it has one, else the usual delay moved to the next trading day", async () => {

@@ -15,7 +15,7 @@
 // itself is never in the repo). Clearing the hash turns this off.
 
 import { systemReport, alertAccount, tell, OPS_DOC } from './ops.js';
-import { newPasscode, updateWallet, deleteAccount, ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, PAIR_MS, ECO_LIMITS, parseWallet, poolBalance, plusMember, plusLapsed, taipeiMonth, gen, emptyWallet } from './eco.js';
+import { newPasscode, updateWallet, deleteAccount, ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, PAIR_MS, ECO_LIMITS, parseWallet, poolBalance, gen, emptyWallet } from './eco.js';
 import { sendPush, dueLists } from './push.js';
 import { KAMBI_COLLECTION } from './kambi.js';
 import { usage as transitUsage, CAPS as TRANSIT_CAPS, TDX_POINTS, tdxPoints, tdxGuard } from './transit.js';
@@ -81,7 +81,7 @@ const keep = () => new Set([WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTIO
 // stays inside the Worker's limits.
 const PER_CALL = 1500;
 
-// A wallet as the apps write it now (`now`: for the looks, a Plus member's):
+// A wallet as the apps write it now:
 //   - entries only of the apps that move money (Securities, Play) and the
 //     Worker's own. Orbit Words (once Rewards: word points, games, missions,
 //     its shop and points catalogue) and Orbit Sports write none any more: theirs
@@ -92,12 +92,11 @@ const PER_CALL = 1500;
 //     goes);
 //   - no settings that nothing reads (RETIRED_SETTINGS, every app's activity
 //     counts `act:<app>` for the old missions, Hub's affinity `aff:vocab`),
-//     and an avatar or frame only on a Plus member's pass;
+//     (looks stay: they're free for everyone since Plus ended);
 //   - no fields of older versions (`links`, an entry's `peer`).
 // Returns the wallet and what went: { wallet, gone: { entries, money, settings, looks } }.
 export const RETIRED_SETTINGS = ['oddsWeeklyLimit', 'orbitFollow', 'bests:vocab', 'hub:cleanup:v1', 'aff:vocab'];
 const MONEY_APPS = new Set(['eco', 'stock', 'odds']);
-const LOOKS = ['avatar', 'frame'];
 export function tidyWallet(w, now) {
   const { links, ...rest } = w;
   const gone = { entries: 0, money: 0, settings: 0, looks: 0 };
@@ -113,11 +112,9 @@ export function tidyWallet(w, now) {
   }
   gone.money = Math.round(gone.money * 100) / 100;
   if (gone.money) entries.push({ id: 'eco:rebase:hub', t: now, app: 'eco', kind: 'rebase', amount: gone.money, note: 'hub' });
-  const member = plusMember(rest, now);
   const settings = {};
   for (const [k, v] of Object.entries(rest.settings || {})) {
     if (RETIRED_SETTINGS.includes(k) || k.startsWith('act:')) gone.settings++;
-    else if (LOOKS.includes(k) && !member) gone.looks++;
     else settings[k] = v;
   }
   return { wallet: { ...rest, entries, settings }, gone };
@@ -152,7 +149,7 @@ export async function handleAdmin({ env, deps, headers, request, ip, body }) {
   // (10 minutes), so its owner signs in and sets a new pass.
   if (body.action === 'wallets') return deps.json({ wallets: await walletList(env, deps) }, 200, headers);
   // The panel's other views and tools (adminTools below): an overview,
-  // one account in full, money and Plus by hand, signing an account out,
+  // one account in full, money by hand, signing an account out,
   // a never-used pass removed, notices, the sources' health.
   if (ADMIN_TOOLS[body.action]) {
     try {
@@ -235,7 +232,6 @@ async function walletList(env, deps) {
       entries: wallet?.entries?.length || 0,
       balance: wallet ? poolBalance(wallet) : null,
       gen: wallet ? gen(wallet) : null,
-      plus: wallet ? plusMember(wallet, now) : false,
       updateTime: w.updateTime
     };
   });
@@ -316,7 +312,7 @@ function summary(plan) {
     wouldDelete: byCollection,
     wouldTidyWallets: plan.tidy.length,
     // What the tidy takes out: entries, the NT$ they moved (kept in each
-    // balance as `eco:rebase:hub`), settings, and looks of non-members.
+    // balance as `eco:rebase:hub`) and settings.
     wouldRetire: plan.retired
   };
 }
@@ -371,7 +367,7 @@ const HEALTH = [
 ];
 
 export const ADMIN_TOOLS = {
-  // The whole pass at a glance: accounts, who's active, Plus, the money, each
+  // The whole pass at a glance: accounts, who’s active, the money, each
   // app's users, the last 14 days' sign-ups and last uses.
   async overview({ env, deps }) {
     const now = deps.now();
@@ -403,7 +399,6 @@ export const ADMIN_TOOLS = {
       used: list.filter(x => lastUsed(x.w)).length,
       active: { day: active(DAY), week: active(7 * DAY), month: active(30 * DAY) },
       newWeek: list.filter(x => now - (x.w.created || 0) < 7 * DAY).length,
-      plus: list.filter(x => plusMember(x.w, now)).length,
       money: { total: Math.round(balances.reduce((a, b) => a + b, 0)), overdrawn: balances.filter(b => b < 0).length, top: Math.round(Math.max(0, ...balances)) },
       apps,
       flows,
@@ -412,14 +407,13 @@ export const ADMIN_TOOLS = {
       lastSeen: byDay(lastUsed)
     };
   },
-  // One account in full: its apps, money, Plus, settings, the last records, its notices.
+  // One account in full: its apps, money, settings, the last records, its notices.
   async wallet({ env, deps, body }) {
     const hit = await findWallet(env, deps, body.wallet);
     if (!hit) return notFound;
     const { id, wallet } = hit;
     const now = deps.now();
     const pushes = (await pushRecords(env, `push:${id}:`).catch(() => [])).map(r => r.app);
-    const plusMonths = wallet.entries.filter(e => e.app === 'eco' && e.id?.startsWith('eco:plus:')).map(e => e.id.slice(9)).sort();
     return {
       ref: id.slice(0, 8),
       created: wallet.created || null,
@@ -427,7 +421,6 @@ export const ADMIN_TOOLS = {
       gen: gen(wallet),
       balance: poolBalance(wallet),
       apps: appsOf(wallet),
-      plus: { member: plusMember(wallet, now), renewing: wallet.settings?.plus?.value?.on === true, plan: wallet.settings?.plus?.value?.plan || null, lapsed: plusLapsed(wallet), months: plusMonths.slice(-24) },
       entries: wallet.entries.length,
       recent: [...wallet.entries].sort((a, b) => (b.t || 0) - (a.t || 0)).slice(0, 200).map(e => ({ id: e.id, t: e.t, app: e.app, kind: e.kind, amount: e.amount, note: e.note || '', undone: wallet.entries.some(x => x.id === `eco:undo:${e.id}`) })),
       snaps: Object.fromEntries(Object.entries(wallet.snap || {}).map(([k, v]) => [k, typeof v?.cash === 'number' ? v.cash : null])),
@@ -447,29 +440,6 @@ export const ADMIN_TOOLS = {
     const entry = { id: `eco:admin:${now}`, t: now, app: 'eco', kind: 'admin', amount, note };
     const res = await updateWallet(env, deps, hit.id, w => ({ ...w, entries: [...w.entries, entry] }));
     return { ok: true, entry, balance: poolBalance(res.wallet) };
-  },
-  // Plus by hand: `months` free months from this one (any already held kept);
-  // `stop`: no renewal (what's paid runs out).
-  async plus({ env, deps, body }) {
-    const hit = await findWallet(env, deps, body.wallet);
-    if (!hit) return notFound;
-    const now = deps.now();
-    if (body.stop) {
-      const res = await updateWallet(env, deps, hit.id, w => ({ ...w, settings: { ...(w.settings || {}), plus: { value: { ...(w.settings?.plus?.value || {}), on: false, t: now }, t: now } } }));
-      return { ok: true, renewing: false, member: plusMember(res.wallet, now) };
-    }
-    const n = Math.max(1, Math.min(12, Math.floor(Number(body.months) || 0)));
-    const res = await updateWallet(env, deps, hit.id, w => {
-      const have = new Set(w.entries.map(e => e.id));
-      const add = [];
-      for (let m = taipeiMonth(now), i = 0; i < n; i++) {
-        if (!have.has(`eco:plus:${m}`)) add.push({ id: `eco:plus:${m}`, t: now, app: 'eco', kind: 'plus', amount: 0, note: 'gift' });
-        const [y, mo] = m.split('-').map(Number);
-        m = mo === 12 ? `${y + 1}-01` : `${y}-${String(mo + 1).padStart(2, '0')}`;
-      }
-      return add.length ? { ...w, entries: [...w.entries, ...add] } : w;
-    });
-    return { ok: true, member: plusMember(res.wallet, now) };
   },
   // Every device signed out (the pass still works: they sign in again).
   async signout({ env, deps, body }) {

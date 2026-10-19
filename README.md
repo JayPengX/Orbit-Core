@@ -168,7 +168,7 @@ included), then wiped whole. `private/` is never served.
   under a version check (`doc-store.js`). Each app's data is in its own
   collection under the same id.
 - **Ops:** login, refresh, read/patch/delete, device codes, `#qh=`
-  hand-offs between apps, Plus, loans and relief, sign out everywhere, rotate, merge passes,
+  hand-offs between apps, loans and relief, sign out everywhere, rotate, merge passes,
   Class's share keys, admin.
 - **Signing out wipes the device** (`wipeDevice`).
 
@@ -187,11 +187,10 @@ the kit's `quadra.mjs` (the same tables in both).
 - **急難紓困** (`op: 'relief'`): NT$5,000 under NT$2,000 worth, every 13
   weeks, 3 a year.
 - **財富等級:** one-time rewards as worth crosses 50k to 20M.
-- **Plus:** NT$490 a month or NT$4,900 a year.
-  - Play: a NT$200 weekly free bet, the boost ×1.5, cash out keeps 2%.
-  - Securities: commission ×0.28, half the FX spread, loans 1 point
-    cheaper, 2% on cash.
-  - Looks: an avatar and a frame.
+- **Looks:** an avatar and a frame, free for everyone (the Pass's 外觀 tab).
+- **Quadra Plus ended 2026-10-20.** Old `eco:plus:*` months stay as history;
+  `eco:plusrefund:v1` gave back what was paid for the days left (a free
+  trial refunds nothing).
 - **VIP cashback:** 0.5–1.5% of a month's gaming stakes.
 - **Overdraft:** 1% a month.
 
@@ -233,9 +232,9 @@ Served from this repo's Pages, never copied. Each app's page carries
 
 | Module | What |
 | --- | --- |
-| `quadra.mjs` | The core: the session, `proxyJson`/`packJson`, the economy tables, Plus/VIP, notices, `installGate`, `watchUpdates`, `onlineOnly`, `keepOffline`, `mayLocate`, `tabBar`, `topActions`, `fitNumbers`, `rank` (recommendations), `rec` (除錯紀錄), iPhone behaviour |
+| `quadra.mjs` | The core: the session, `proxyJson`/`packJson`, the economy tables, VIP, looks, notices, `installGate`, `watchUpdates`, `onlineOnly`, `keepOffline`, `mayLocate`, `tabBar`, `topActions`, `fitNumbers`, `rank` (recommendations), `rec` (除錯紀錄), iPhone behaviour |
 | `quadra.css` | The design system (iOS 27 tokens, Liquid Glass, springs, every control) |
-| `ui.mjs` | Builders: `segmented`, `sheet` (the one sheet: `detent`, `foot`, `lead`, `trailing`; Plus and the Pass are it), `menu`, `toast`, `list`/`cell`, `search`, `toggle`, `empty`, `navTitle` (collapsing large title), `pullToRefresh`, `view`, `countTo`; and an HTML-string twin of each (`emptyHtml`, `cellHtml`, `sheetHtml`… with `wireTaps` for their `data-*` taps) |
+| `ui.mjs` | Builders: `segmented`, `sheet` (the one sheet: `detent`, `foot`, `lead`, `trailing`; the Pass is it), `menu`, `toast`, `list`/`cell`, `search`, `toggle`, `empty`, `navTitle` (collapsing large title), `pullToRefresh`, `view`, `countTo`; and an HTML-string twin of each (`emptyHtml`, `cellHtml`, `sheetHtml`… with `wireTaps` for their `data-*` taps) |
 | `ui.mjs` icons (added) | `share`, `trash`, `x`, `bank`, `lock`, `exchange`, `cup`, `flag` join the set (`send`, `key`, `swap`, `spark` already existed); apps read `kitUI.icons?.x`, never import |
 | `quadra.css` pieces (added) | `.q-switch.on` (= aria-checked), `.q-sheet-foot` (sticky primary-button footer at a sheet's bottom, safe-area aware), `.q-fig` (grid of captioned bold figures with hairlines, children `small` over `b`) |
 | `boot.js` | The loading screen and the version check |

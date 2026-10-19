@@ -99,19 +99,6 @@ export function newAccount(start = START_AMOUNT, now = Date.now(), id = randomId
 const byTime = (a, b) => a.t - b.t || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 const add = (map, key, amount) => (map[key] = (map[key] || 0) + amount);
 
-// ---- Quadra Plus ---------------------------------------------------------------
-//
-// A member (quadra.mjs PLUS.stock) pays part of the commission and FX spread
-// and borrows cheaper, each by the moment the trade, exchange or loan is
-// made. The app keeps `months` current from the wallet (usePlus); with
-// none, nothing here changes anything.
-const PLUS_NONE = { months: new Set(), commission: 1, fxSpread: 1, loanCut: 0 };
-let plus = PLUS_NONE;
-export function usePlus(settings) {
-  plus = settings ? { ...PLUS_NONE, ...settings } : PLUS_NONE;
-}
-export const plusAt = (t = Date.now()) => plus.months.has(taipeiDay(t).slice(0, 7));
-
 // ---- Replay ------------------------------------------------------------------
 
 function accrue(s, t) {
@@ -476,7 +463,7 @@ export const firstTrade = account => account?.welcome === true && !traded(accoun
 export function estimate({ market, kind, currency, side, qty, price, t = Date.now(), dayTrade = false, first = false, plan = false }) {
   const deal = dealPrice(market, side, price);
   const gross = roundCash(deal * qty, currency);
-  const cost = (q, g) => tradeCosts({ market, side, kind, gross: g, currency, discount: first ? 0 : plusAt(t) ? plus.commission : 1, oddLot: isOddLot(market, kind, q), dayTrade, t, plan });
+  const cost = (q, g) => tradeCosts({ market, side, kind, gross: g, currency, discount: first ? 0 : 1, oddLot: isOddLot(market, kind, q), dayTrade, t, plan });
   const mixed = mixedLot(market, kind, qty);
   let costs = cost(qty, gross);
   if (mixed) {
@@ -1049,12 +1036,12 @@ export function fillFromHistory(account, orderId, { t, price }, twd, now = Date.
 // ---- Currency exchange -------------------------------------------------------
 
 export function fxSpread(from, to, fxOpen = true, t = Date.now()) {
-  return Math.max(currencyInfo(from).spread, currencyInfo(to).spread) * (fxOpen ? 1 : CLOSED_FX_MULTIPLIER) * (plusAt(t) ? plus.fxSpread : 1);
+  return Math.max(currencyInfo(from).spread, currencyInfo(to).spread) * (fxOpen ? 1 : CLOSED_FX_MULTIPLIER);
 }
 
 // What `amount` of `from` buys in `to` at `t`: the middle rate less the
-// spread (Plus's half spread if `t` is a Plus month: a bank charges the
-// spread of the moment of the exchange, never of today), rounded down to
+// spread (a bank charges the spread of the moment of the exchange, never
+// of today), rounded down to
 // the currency's smallest unit.
 export function quoteExchange(from, to, amount, rates, fxOpen = true, t = Date.now()) {
   if (!rates?.[from] || !rates?.[to] || from === to || !(amount > 0)) return null;
@@ -1364,8 +1351,8 @@ function currencyExposure(s, positions, rates) {
 
 // ---- Loans -------------------------------------------------------------------
 
-// The yearly rate a loan taken now carries (Quadra Plus: less).
-export const loanRateAt = (currency, t = Date.now()) => Math.max(0, currencyInfo(currency).loanRate - (plusAt(t) ? plus.loanCut : 0));
+// The yearly rate a loan taken now carries.
+export const loanRateAt = currency => currencyInfo(currency).loanRate;
 export function borrow(account, { currency, amount }, { valuation, rates, now = Date.now(), id = randomId() }) {
   amount = roundCash(Number(amount), currency);
   if (!(amount > 0)) return { error: 'amount' };
@@ -2302,7 +2289,7 @@ export const startIncome = (account, now = Date.now()) => (account.income ? acco
 //
 // With a Quadra Pass this account's NT$ cash is the shared money pool (see
 // quadra.mjs): money the other apps put in or took out (Play's bets and
-// winnings, Quadra's pay and Plus) arrives here as NT$ deposits with
+// winnings, Quadra's pay) arrives here as NT$ deposits with
 // fixed ids ('x:<entry id>', `pool: true`), counted as money put in or taken
 // out rather than as return. What this account shares back is its own part:
 // its NT$ cash less those deposits.

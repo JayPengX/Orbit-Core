@@ -215,20 +215,6 @@ test('a device keeps its sign-in and the account id, never the pass', () => {
   assert.ok(kit.DEVICE_CODE_PATTERN.test('ABCD2345'));
 });
 
-test('Quadra Plus: a month is a member’s when the Worker billed it; joining is free once', () => {
-  const oct = Date.UTC(2026, 9, 10, 4);
-  const w = { entries: [{ id: 'eco:plus:2026-10', t: 1, app: 'eco', kind: 'plus', amount: 0 }], settings: { plus: { value: { on: true }, t: 1 } } };
-  assert.equal(kit.plusMember(w, oct), true);
-  assert.equal(kit.plusMember(w, Date.UTC(2026, 10, 2)), false);
-  assert.equal(kit.plusRenewing(w), true);
-  assert.deepEqual([...kit.plusMonths(w)], ['2026-10']);
-  // An app's own entry never counts.
-  assert.equal(kit.plusMember({ entries: [{ id: 'eco:plus:2026-10', app: 'odds', kind: 'plus' }] }, oct), false);
-  assert.equal(kit.plusJoinPrice({ entries: [] }, oct), 0);
-  // 22 of 31 days left.
-  assert.equal(kit.plusJoinPrice(w, oct), 350);
-});
-
 test('the pay: fixed, whatever the account holds', () => {
   assert.equal(kit.paydayFor({ entries: [] }), 10_000);
   assert.equal(kit.paydayFor({ entries: [{ id: 'a', amount: 60_000, app: 'odds' }] }), 10_000);
@@ -451,19 +437,19 @@ test('CPBL: a month the proxy can\'t fill comes from TheSportsDB\'s day lists on
   assert.equal((await asiaMonth(async () => ({ games: [{ id: 'x' }] }), 'cpbl', '2026-10', { now, fetchJson })).length, 1);
 });
 
-test('Plus: the weekly bonus bet is a free bet; what Plus gave back this month', () => {
+test('free bets: only the Worker’s tokens count; an old Plus boost still reads in the statement', () => {
   const t = Date.UTC(2026, 9, 7, 4);
   const w = { entries: [
-    { id: 'eco:plus:2026-10', t, app: 'eco', kind: 'plus', amount: -290 },
     { id: 'eco:fb:2026-10-05', t, app: 'eco', kind: 'freebet', amount: 0, note: '100' },
     // An app can't mint one: only the Worker's ('eco') count.
-    { id: 'eco:fb:fake', t, app: 'odds', kind: 'freebet', amount: 0, note: '500' },
-    { id: 'odds:plus-s1', t, app: 'odds', kind: 'plusboost', amount: 42 },
-    { id: 'odds:plus-old', t: Date.UTC(2026, 8, 20), app: 'odds', kind: 'plusboost', amount: 99 }
+    { id: 'eco:fb:fake', t, app: 'odds', kind: 'freebet', amount: 0, note: '500' }
   ] };
   assert.deepEqual(kit.freeBets(w, t).map(x => [x.id, x.value]), [['eco:fb:2026-10-05', 100]]);
-  assert.deepEqual(kit.plusReturns(w, t), { boosts: 42, bets: 100, total: 142 });
   assert.match(kit.describeEntry({ app: 'odds', kind: 'plusboost', amount: 42 }), /Plus/);
+  assert.match(kit.describeEntry({ app: 'eco', kind: 'plusrefund', amount: 190 }), /Plus/);
+  // Plus is gone from the kit.
+  assert.equal(kit.PLUS, undefined);
+  assert.equal(kit.openPlus, undefined);
 });
 
 test('VIP in the kit: the same tiers as the Worker, this month so far', async () => {
@@ -511,12 +497,10 @@ test('pictures: national sides get flags, names in either order', async () => {
   for (const key of ['kleague', 'euroleague', 'npb', 'cpbl']) assert.ok(L.leagueLogo(key), key);
 });
 
-test('the kit and the Worker agree on the pay and Plus; the statement skips free bet tokens', async () => {
+test('the kit and the Worker agree on the pay; the statement skips free bet tokens', async () => {
   const eco = await import('../eco.js');
   assert.equal(kit.ECONOMY.weekly, eco.PAY.week);
   assert.equal(kit.ECONOMY.start, eco.PAY.start);
-  assert.equal(kit.PLUS.fee, eco.PLUS.fee);
-  assert.equal(kit.PLUS.year, eco.PLUS.year);
   const now = Date.UTC(2026, 9, 10);
   const w = { entries: [{ id: 'eco:pay:2026-10', t: now - 2, app: 'eco', kind: 'pay', amount: 8_000 }, { id: 'eco:fb:welcome', t: now - 1, app: 'eco', kind: 'freebet', amount: 0, note: '200' }] };
   const d = kit.accountDetails(w, 'en', now);
@@ -524,61 +508,17 @@ test('the kit and the Worker agree on the pay and Plus; the statement skips free
   assert.equal(d.count, 1);
 });
 
-test('Plus hooks: tenure, returns since joining, the weekly free bet and renewal notices once each', () => {
-  const plus = m => ({ id: `eco:plus:${m}`, t: Date.UTC(2026, 7, 1), app: 'eco', kind: 'plus', amount: -490 });
-  // Friday 30 Oct 2026, noon in Taiwan: the week of Monday the 26th, 2 days before the renewal.
-  const now = Date.UTC(2026, 9, 30, 4);
-  const w = {
-    entries: [plus('2026-09'), plus('2026-10'), { id: 'eco:fb:2026-10-26', t: now - 3_600_000, app: 'eco', kind: 'freebet', amount: 0, note: '200' }, { id: 'eco:fb:welcome', t: now, app: 'eco', kind: 'freebet', amount: 0, note: '200' }],
-    settings: { plus: { value: { on: true, plan: 'month' }, t: 1 } }
-  };
-  assert.equal(kit.plusTenure(w, now), 2);
-  const r = kit.plusReturns(w, now);
-  // The welcome offer isn't Plus's.
-  assert.deepEqual([r.bets, r.total], [200, 200]);
-  assert.equal(kit.plusReturns(w, now, { all: true }).total, 200);
-  const s = { wallet: w, lang: 'zh', app: 'odds' };
-  // Said once for the whole pass: marked on the device and on the pass.
-  const wrote = [];
-  kit.plusNotices({ ...s, write: x => (wrote.push(x), Promise.resolve()) }, now);
-  assert.equal(localStorage.getItem('quadra.seen:eco:fb:2026-10-26'), '1');
-  assert.equal(localStorage.getItem('quadra.seen:plus-renew:2026-10'), '1');
-  assert.deepEqual(wrote.at(-1).wallet.settings.seen.value, ['eco:fb:2026-10-26', 'plus-renew:2026-10']);
-  // Another app (its own storage) on a pass that already said it: nothing.
-  localStorage.removeItem('quadra.seen:eco:fb:2026-10-26');
-  assert.equal(kit.sayOnce({ wallet: { settings: { seen: { value: ['eco:fb:2026-10-26'], t: 1 } } } }, 'eco:fb:2026-10-26'), false);
-  assert.equal(kit.sayOnce({ wallet: { settings: { seen: { value: ['x:1'], t: 1 } } } }, 'x:1'), false);
-  assert.equal(kit.sayOnce({ wallet: { settings: {} } }, 'x:2'), true);
-  // Ten days earlier: no renewal reminder yet.
-  kit.plusNotices(s, Date.UTC(2026, 9, 20, 4));
-  assert.equal(localStorage.getItem('quadra.seen:plus-renew:2026-09'), null);
-  // Not renewing: no reminder next month.
-  kit.plusNotices({ ...s, wallet: { ...w, entries: [...w.entries, plus('2026-11')], settings: { plus: { value: { on: false }, t: 2 } } } }, Date.UTC(2026, 10, 29, 4));
-  assert.equal(localStorage.getItem('quadra.seen:plus-renew:2026-11'), null);
-});
-
-test('looks: an avatar and a frame show only while the account is a Plus member', () => {
+test('looks: an avatar and a frame for everyone, from the lists only', () => {
   const now = Date.UTC(2026, 9, 10);
-  const member = {
-    entries: [{ id: 'eco:plus:2026-10', t: now, app: 'eco', kind: 'plus', amount: -490 }],
-    settings: { avatar: { value: { id: 'panda' }, t: now }, frame: { value: { id: 'gold' }, t: now } }
-  };
-  assert.equal(kit.avatarOf(member, now).glyph, '🐼');
-  assert.equal(kit.frameOf(member, now).id, 'gold');
-  // Not a member (any more), or a look that isn't in the lists: none.
-  const expired = Date.UTC(2026, 10, 1);
-  assert.equal(kit.avatarOf(member, expired), null);
-  assert.equal(kit.frameOf(member, expired), null);
-  assert.equal(kit.avatarOf({ ...member, settings: { avatar: { value: { id: 'unlisted' }, t: now } } }, now), null);
-});
-
-test('Plus is about Play and Securities: perks that make betting and trading cheaper or bigger, and the looks', () => {
-  assert.deepEqual(Object.keys(kit.PLUS.odds).sort(), ['bonusBet', 'boost', 'cashOutKeep']);
-  assert.deepEqual(Object.keys(kit.PLUS.stock).sort(), ['commission', 'fxSpread', 'loanCut']);
-  assert.ok(kit.PLUS.odds.boost > 1);
-  const perks = kit.plusPerks('en');
-  assert.deepEqual([...new Set(perks.map(p => p[0]))], ['odds', 'stock', 'looks']);
-  assert.ok(perks.every(p => p[1] && p[2]));
+  const w = { entries: [], settings: { avatar: { value: { id: 'panda' }, t: now }, frame: { value: { id: 'gold' }, t: now } } };
+  assert.equal(kit.avatarOf(w).glyph, '🐼');
+  assert.equal(kit.frameOf(w).id, 'gold');
+  assert.equal(kit.avatarOf({ ...w, settings: { avatar: { value: { id: 'boba' }, t: now } } }).glyph, '🧋');
+  assert.equal(kit.avatarOf({ ...w, settings: { avatar: { value: { id: 'unlisted' }, t: now } } }), null);
+  // Every id once, and more of them than Plus had.
+  for (const list of [kit.AVATARS, kit.FRAMES]) assert.equal(new Set(list.map(x => x.id)).size, list.length);
+  assert.ok(kit.AVATARS.length >= 50 && kit.FRAMES.length >= 25);
+  assert.ok([...kit.AVATARS, ...kit.FRAMES].every(x => !x.streak));
 });
 
 test('where the money came from: an account older than the shared wallet, its opening money in the apps, reset to 30,000', () => {
@@ -628,31 +568,6 @@ test('signing out wipes every app’s keys on this device, keeping only its lang
   assert.deepEqual([...store.keys()].sort(), ['quadra.lang', 'quadra.safeBottom']);
   assert.equal(tabStore.size, 0);
   assert.equal(kit.storedAccount(), '');
-});
-
-test('looks for staying a member: the streak is months held in a row up to now, a gap starts it again', () => {
-  const plus = months => ({ entries: months.map(m => ({ id: `eco:plus:${m}`, app: 'eco', kind: 'plus', amount: -490 })), settings: {} });
-  const now = Date.UTC(2026, 9, 15);
-  assert.equal(kit.plusStreak(plus(['2026-08', '2026-09', '2026-10']), now), 3);
-  assert.equal(kit.plusStreak(plus(['2025-11', '2025-12', '2026-01', '2026-10']), now), 1);
-  // A year paid ahead counts as its months arrive.
-  assert.equal(kit.plusStreak(plus(['2026-10', '2026-11', '2026-12']), now), 1);
-  assert.equal(kit.plusStreak(plus(['2026-09']), now), 0);
-  // Across a new year.
-  assert.equal(kit.plusStreak(plus(['2025-12', '2026-01']), Date.UTC(2026, 0, 10)), 2);
-  const wolf = kit.AVATARS.find(a => a.id === 'wolf');
-  const fox = kit.AVATARS.find(a => a.id === 'fox');
-  const two = { ...plus(['2026-09', '2026-10']), settings: { avatar: { value: { id: 'wolf' }, t: 1 } } };
-  assert.equal(kit.lookOpen(two, fox, now), true);
-  assert.equal(kit.lookOpen(two, wolf, now), false);
-  assert.equal(kit.avatarOf(two, now), null);
-  const three = { ...plus(['2026-08', '2026-09', '2026-10']), settings: two.settings };
-  assert.equal(kit.avatarOf(three, now)?.id, 'wolf');
-  // Every look has a different id, every streak one of LOOK_STREAKS.
-  for (const list of [kit.AVATARS, kit.FRAMES]) {
-    assert.equal(new Set(list.map(x => x.id)).size, list.length);
-    for (const x of list) if (x.streak) assert.ok(kit.LOOK_STREAKS.includes(x.streak));
-  }
 });
 
 test("names: a club with joining words in its name (Atlético de Madrid), and teams found by their Chinese names (皇家 → Real Madrid)", async () => {

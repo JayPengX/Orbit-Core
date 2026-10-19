@@ -18,7 +18,7 @@ import * as src from './kit/play-sources.mjs';
 import { boardBets, futureBets, liveBets, legOf } from './kit/play-bets.mjs';
 import { comboCount, slipSizes, slipErrors } from './kit/play-odds.mjs';
 import { LIVE_MIN_LIQUIDITY } from './kit/play-live.mjs';
-import { plusMember, PLUS, freeBets } from './kit/plus.mjs';
+import { freeBets } from './kit/plus.mjs';
 import { cashOutState, CASHOUT_KEEP } from './kit/play-cashout.mjs';
 
 // How much better than the house's a price may be: rounding to the cent,
@@ -102,9 +102,9 @@ export async function checkSlip(slip, wallet, deps, now = new Date(), reads = nu
   if (!['single', 'parlay', 'system'].includes(slip.mode)) return { problem: 'mode' };
   const want = slipSizes(slip.mode, n, slip.sizes);
   if (want.length !== slip.sizes.length || want.some((k, i) => k !== slip.sizes[i])) return { problem: 'sizes' };
-  // The parlay boost: a member's (PLUS.odds.boost) or the usual; none on singles.
+  // The parlay boost: the usual (×1) for everyone since Quadra Plus ended; none on singles.
   const boost = Number(slip.boost) || 0;
-  if (slip.mode === 'single' ? boost : boost > (plusMember(wallet, now.getTime()) ? PLUS.odds.boost : 1)) return { problem: 'boost' };
+  if (slip.mode === 'single' ? boost : boost > 1) return { problem: 'boost' };
   // The money: every combination at the stake; a free bet's token unspent
   // and worth what it says, its odds long enough, the rest from the balance.
   const checked = await Promise.all(legs.map(leg => housePick(leg, now, once).catch(() => ({ unread: true }))));
@@ -172,7 +172,7 @@ async function houseChance(leg, now, once) {
 export async function cashOutQuote(slip, wallet, deps, now = new Date(), reads = null) {
   if (slip.free) return { value: null, reason: 'free' };
   const once = reads ?? useReads(deps);
-  const keep = plusMember(wallet, now.getTime()) ? PLUS.odds.cashOutKeep : CASHOUT_KEEP;
+  const keep = CASHOUT_KEEP;
   const chances = await Promise.all(slip.legs.map(leg => (leg.result ? null : houseChance(leg, now, once).catch(() => null))));
   return cashOutState({ ...slip, status: 'open' }, chances, { keep });
 }

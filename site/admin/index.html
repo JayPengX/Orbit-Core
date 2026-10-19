@@ -67,7 +67,6 @@
   tbody tr.tap:hover { background: var(--q-surface-2); }
   .tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; background: var(--q-sunken); color: var(--q-muted); }
   .tag.on { background: color-mix(in srgb, var(--q-good) 16%, transparent); color: var(--q-good); }
-  .tag.plus { background: color-mix(in srgb, #d4a017 22%, transparent); color: #b8860b; }
   .tag.bad { background: color-mix(in srgb, var(--q-bad) 14%, transparent); color: var(--q-bad); }
   .chips { display: flex; gap: 6px; flex-wrap: wrap; }
   .chips button { padding: 7px 12px; font-size: 13.5px; border-radius: 999px; }
@@ -196,7 +195,7 @@
 <main>
   <p class="kicker">QUADRA</p>
   <h1>管理</h1>
-  <p class="lede">帳戶、Quadra Pass、Plus、即時資料的速度、每晚的資料、部署、通知和資料來源，都在這裡。只有持有管理金鑰的人能用。</p>
+  <p class="lede">帳戶、Quadra Pass、即時資料的速度、每晚的資料、部署、通知和資料來源，都在這裡。只有持有管理金鑰的人能用。</p>
 
   <section id="gate" class="card">
     <h2 style="margin-top:0">管理金鑰</h2>
@@ -246,7 +245,6 @@
           <button data-filter="all" aria-pressed="true">全部</button>
           <button data-filter="used" aria-pressed="false">使用中</button>
           <button data-filter="unused" aria-pressed="false">未使用</button>
-          <button data-filter="plus" aria-pressed="false">Plus</button>
           <button data-filter="neg" aria-pressed="false">透支</button>
           <button data-filter="idle" aria-pressed="false">30 天沒用</button>
         </div>
@@ -255,7 +253,7 @@
         <div class="tablewrap"><table id="wallets" hidden><thead><tr>
           <th data-sort="ref">代號</th><th data-sort="state">狀態</th><th data-sort="apps" class="wide">App</th><th data-sort="created" class="wide">建立</th><th data-sort="lastUsed">最後使用</th><th data-sort="balance" class="right">餘額</th>
         </tr></thead><tbody></tbody></table></div>
-        <p class="muted" style="margin:10px 0 0">點一列打開帳戶：看明細、調整金額、撤銷紀錄、送 Plus、登出所有裝置、產生找回代碼、清除某個 App 的資料、匯出、重置或刪除。</p>
+        <p class="muted" style="margin:10px 0 0">點一列打開帳戶：看明細、調整金額、撤銷紀錄、登出所有裝置、產生找回代碼、清除某個 App 的資料、匯出、重置或刪除。</p>
       </div>
     </section>
 
@@ -428,7 +426,7 @@ let token = store.get();
 const APPS = { stock: 'Quadra 證券', odds: 'Quadra Play', match: 'Orbit Sports', vocab: 'Orbit Words', orbit: 'Orbit Class', weather: 'Orbit Weather', transit: 'Orbit Transit', slip: 'Orbit Slips', beats: 'Orbit Beats' };
 const appName = a => APPS[a] || a;
 // A record's kind in words (the key itself when it's one not named here).
-const KINDS = { start: '開戶金', pay: '月薪', grant: '補發', rank: '排名獎', rebase: '重算', vip: 'VIP', admin: '手動調整', plus: 'Plus 月費', od: '透支利息', stake: '下注', payout: '派彩', win: '派彩', refund: '退款', cashout: '提前兌現', lottery: '彩券', prize: '彩券獎金', undo: '撤銷' };
+const KINDS = { start: '開戶金', pay: '月薪', grant: '補發', rank: '排名獎', rebase: '重算', vip: 'VIP', admin: '手動調整', plus: 'Plus 月費', plusrefund: 'Plus 退費', loan: '信貸撥款', loanfee: '信貸開辦費', loanpay: '信貸還款', loanlate: '信貸遲延', loanbad: '信貸催收', loangar: '催收扣薪', loanoff: '信貸清償', relief: '急難紓困', od: '透支利息', stake: '下注', payout: '派彩', win: '派彩', refund: '退款', cashout: '提前兌現', lottery: '彩券', prize: '彩券獎金', undo: '撤銷' };
 const kindName = k => KINDS[k] || k;
 
 const WHY = {
@@ -540,7 +538,6 @@ async function loadOverview() {
       tile('帳戶', o.accounts.toLocaleString(), `${o.used} 個用過`),
       tile('今天使用', o.active.day.toLocaleString(), `7 天 ${o.active.week} · 30 天 ${o.active.month}`),
       tile('這週新帳戶', o.newWeek.toLocaleString()),
-      tile('Plus 會員', o.plus.toLocaleString(), o.used ? `${Math.round((o.plus / o.used) * 100)}% 的使用者` : ''),
       tile('流通中的錢', money(o.money.total), `最多 ${money(o.money.top)}`),
       tile('透支帳戶', o.money.overdrawn.toLocaleString())
     );
@@ -584,13 +581,12 @@ let wallets = [];
 let filter = 'all';
 let sortKey = 'lastUsed';
 let sortDir = -1;
-const stateOf = w => (w.plus ? 'Plus' : w.lastUsed ? '使用中' : '未使用');
+const stateOf = w => (w.lastUsed ? '使用中' : '未使用');
 const keyOf = (w, k) => (k === 'state' ? stateOf(w) : k === 'apps' ? w.apps.length : k === 'created' || k === 'lastUsed' ? Date.parse(w[k] || 0) || 0 : w[k] ?? '');
 const FILTERS = {
   all: () => true,
   used: w => w.lastUsed,
   unused: w => !w.lastUsed,
-  plus: w => w.plus,
   neg: w => w.balance < 0,
   idle: w => w.lastUsed && Date.now() - Date.parse(w.lastUsed) > 30 * 86_400_000
 };
@@ -611,7 +607,7 @@ function drawWallets() {
     ...rows.map(w =>
       el('tr', { class: 'tap', onclick: () => openAccount(w.ref) }, [
         el('td', { class: 'num', text: w.ref }),
-        el('td', {}, [el('span', { class: `tag${w.plus ? ' plus' : w.lastUsed ? ' on' : ''}`, text: stateOf(w) })]),
+        el('td', {}, [el('span', { class: `tag${w.lastUsed ? ' on' : ''}`, text: stateOf(w) })]),
         el('td', { class: 'wide', text: w.apps.length ? w.apps.map(appName).join('、') : '—' }),
         el('td', { class: 'wide', text: fmtDay(w.created) }),
         el('td', { text: ago(w.lastUsed ? Date.parse(w.lastUsed) : 0) }),
@@ -696,13 +692,10 @@ function action(title, text, controls, run) {
   return box;
 }
 function drawAccount(a) {
-  const plusText = a.plus.member ? `會員${a.plus.renewing ? ' · 自動續訂' : ' · 不續訂'}${a.plus.plan ? `（${a.plus.plan === 'year' ? '年繳' : '月繳'}）` : ''}` : a.plus.lapsed ? '已失效（扣款失敗）' : '不是會員';
   const facts = el('dl', { class: 'kv' }, [
     ['餘額', money(a.balance)],
     ['建立', fmt(a.created)],
     ['最後使用', `${fmt(a.lastUsed)}（${ago(a.lastUsed)}）`],
-    ['Plus', plusText],
-    ['Plus 月份', a.plus.months.length ? a.plus.months.slice(-6).join('、') : '—'],
     ['App', a.apps.length ? a.apps.map(x => `${appName(x.app)}（${ago(x.last)}）`).join('、') : '還沒用過'],
     ['通知', a.pushes.length ? a.pushes.map(appName).join('、') : '沒有訂閱'],
     ['登入世代', String(a.gen)],
@@ -723,17 +716,6 @@ function drawAccount(a) {
     return `已入帳，餘額 ${money(r.balance)}`;
   });
   grantBtn.onclick = () => grant.run(grantBtn);
-  // Plus.
-  const months = el('select', {}, [1, 2, 3, 6, 12].map(n => el('option', { value: String(n), text: `${n} 個月` })));
-  const giveBtn = el('button', { class: 'primary', text: '送 Plus' });
-  const stopBtn = el('button', { text: '停止續訂' });
-  const plus = action('Plus', '送免費的月份（從這個月起，已有的月份不重複），或停止自動續訂（已付的月份照常）。', [[months, giveBtn], [stopBtn]], async kind => {
-    const r = kind === 'stop' ? await admin('plus', { wallet: a.ref, stop: true }) : await admin('plus', { wallet: a.ref, months: Number(months.value) });
-    setTimeout(reload, 900);
-    return kind === 'stop' ? '已停止續訂' : r.member ? '已送出，現在是會員' : '已送出';
-  });
-  giveBtn.onclick = () => plus.run(giveBtn, 'give');
-  stopBtn.onclick = () => plus.run(stopBtn, 'stop');
   // Signing out.
   const outBtn = el('button', { text: '登出所有裝置' });
   const signout = action('登出所有裝置', 'Pass 還能用：每台裝置要重新登入。手機遺失或 Pass 外流時用。', [outBtn], async () => {
@@ -843,7 +825,7 @@ function drawAccount(a) {
     el('h3', { text: '帳戶' }),
     facts,
     el('h3', { text: '操作' }),
-    el('div', { class: 'actions' }, [grant, plus, signout, recover, pushTest, exporter, clear, remove, reset, del].filter(Boolean)),
+    el('div', { class: 'actions' }, [grant, signout, recover, pushTest, exporter, clear, remove, reset, del].filter(Boolean)),
     el('h3', { text: `最近的紀錄（${a.recent.length} / ${a.entries}）` }),
     records
   );
@@ -954,7 +936,7 @@ async function loadMoney() {
     const g = all.gave || {};
     flow('mo-given', [['開戶金', n(g, 'start')], ['月薪', n(g, 'pay')], ['財富等級獎勵', n(g, 'rank')], ['其他', n(g, 'other'), 'VIP 回饋、補發'], ['刪除的帳戶還回', -n(gone, 'worth'), `${n(gone, 'accounts')} 個`]].filter(r => r[1]), { total: ['淨發出', net] });
     flow('mo-where', [['系統淨發出', net], ['Quadra 賺走', -n(all, 'quadra')], ['市場', n(all, 'own')]], { total: ['流通中', n(live, 'worth')] });
-    flow('mo-quadra', [...byMarket(all.playBy, n(all, 'play'), SPORT_NAMES, ['Play 未分類', '還沒同步的帳戶']), ...[['Plus 月費', n(all.fees, 'plus')], ['透支利息', n(all.fees, 'od')]].filter(r => r[1])], { total: ['合計', n(all, 'quadra')] });
+    flow('mo-quadra', [...byMarket(all.playBy, n(all, 'play'), SPORT_NAMES, ['Play 未分類', '還沒同步的帳戶']), ...[['Plus 月費（扣掉退費）', n(all.fees, 'plus')], ['透支利息', n(all.fees, 'od')], ['信貸（淨）', n(all.fees, 'loan')]].filter(r => r[1])], { total: ['合計', n(all, 'quadra')] });
     flow('mo-own', byMarket(all.stockBy, n(all, 'own'), MARKET_NAMES, ['其他', '股利、利息、匯兌']), { total: ['合計', n(all, 'own')] });
     $('mo-note').textContent = `帳戶刪除時，剩下的錢還給系統（透支的帳戶，欠的由系統吸收）；它讓 Quadra 賺的和在市場賺賠的照樣留在帳上。Quadra 這邊玩家輸的是正數、贏走的是負數；未結算的注單不算。各市場由 Play 和 Securities 打開時回報，還沒打開過新版的帳戶算在「未分類／其他」。刪除的帳戶${gone.since ? `從 ${fmtDay(gone.since)} 起` : '從現在起'}記錄。${fmt(m.at)} 更新。`;
   } catch (e) {

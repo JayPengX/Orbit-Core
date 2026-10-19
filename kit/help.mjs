@@ -8,7 +8,7 @@
 //   …       what's particular to it (a few topics)
 //   money   「錢怎麼算」: how it touches the one Quadra wallet
 // (The Quadra Pass's own guide: what, tabs, devices, one, net, notify, safe,
-// plus, vip, money.)
+// looks, vip, money.)
 //
 // HELP[app][lang] = [[topic id, title, [paragraphs]], …]
 
@@ -20,11 +20,11 @@ export const HELP = {
       ['what', 'Quadra Pass 是什麼', [
         'Quadra Pass 是你在所有 App 的帳號：Quadra 的 Securities、Play，和 Orbit 的 Class、Weather、Transit、Sports、Words。每個 App 都用它登入，資料都存在它裡面，每台裝置都一樣。',
         '通行碼是一組 10 個字的代碼，由分享 Quadra 給你的人發給你，App 裡不能自己建立。它就是帳號的鑰匙：知道它的人就能用，所以不要給別人。它只在拿到或更換時顯示一次，裝置上不會保存，請記在安全的地方。',
-        '每個 App 右上角的帳戶按鈕（人像，Plus 會員是自己的頭像）打開 Quadra Pass。'
+        '每個 App 右上角的帳戶按鈕（人像，或你挑的頭像）打開 Quadra Pass。'
       ]],
       ['tabs', '每個分頁', [
         'Pass：Quadra 餘額、開戶日、本月收入與支出、下次發薪和最近明細；下面是這個 App 自己的設定（有的話）、新增裝置、通知、除錯紀錄和帳戶安全。',
-        'Plus：加入或管理 Quadra Plus、它回饋了多少，和會員的頭像與頭像框。',
+        '外觀：挑一個頭像和頭像框，全部免費，每個 App 的帳戶按鈕都看得到。',
         '真相：用真實的數字和你自己的紀錄，算錢從哪裡來、莊家和券商怎麼賺；最下面是財富等級。',
         'App：每個 Quadra 和 Orbit 的 App、上次什麼時候用、它的說明，和打開它。',
         '說明：每個 App 怎麼用，就是這裡。'
@@ -50,12 +50,9 @@ export const HELP = {
         '伺服器只保存通行碼的雜湊值；裝置上只有會過期、可以撤銷的登入憑證，不會有通行碼本身。',
         'Pass 的「帳戶安全」可以「登出其他所有裝置」（這台保持登入），或「更換通行碼」：舊的立刻失效、其他裝置登出，新的只顯示一次，要輸入它的最後 5 個字確認記好了。忘記通行碼時，在還登入的裝置更換一組就好。'
       ]],
-      ['plus', 'Quadra Plus 會員', [
-        '一個會員，用在 Play 和 Securities。月繳 NT$490：第一次加入的那個月免費，之後再加入，當月按剩下的天數計費。年繳 NT$4,900 一次付 12 個月，每月約 NT$408、省 NT$980。從 Quadra 餘額扣款，在 Quadra Pass 的「Plus」加入；會員的帳戶按鈕有金色 ✦。',
-        'Play：每週一張 NT$200 免費投注（那一週打開任何 App 就入帳，沒打開的週不補）、3 關以上每個贏的組合串關加成 ×1.5、提前兌現只扣 2%（一般 3%）。Securities：所有市場手續費 2.8 折、換匯點差減半、新的融資利率少 1%。所有權益都讓下注和交易更便宜或更大；它怎麼替 Quadra 賺錢，「真相」算給你看。',
-        '頭像與頭像框：會員在「Plus」挑選，每個 App 的帳戶按鈕都看得到；連續訂閱 3、6、12 個月解鎖限定款，中斷一個月就從頭算。會員停止時會隱藏，重新加入會回來。',
-        '每月 1 日從餘額扣款，沒打開 App 的月份也照扣（下次打開時補扣）；年繳每年續約一次，餘額不夠一年就改成按月扣。餘額不足扣款失敗，會員就停止，要重新加入。每週免費投注入帳和續訂前三天都會通知你。「Plus」頁顯示本月和累計回饋了多少（面額）。',
-        '想停：「Plus」›「管理」›「管理會員」›「取消自動續訂」，權益用到期滿；已付不退費，價格含 5% 營業稅。免費投注照運彩業者的規則：賠率 1.50 以上（串關看總賠率）、不能提前兌現、7 天內用完，贏了只拿獎金、不退本金。'
+      ['looks', '頭像與頭像框', [
+        '在 Quadra Pass 的「外觀」挑頭像和頭像框，全部免費、隨時換；戴上後每個 App 的帳戶按鈕都看得到。再點一次就拿下。',
+        'Quadra Plus 會員已在 2026-10-20 取消：付費會員按剩下的天數退費到 Quadra 餘額，免費試用的月份不退。以前會員專屬的頭像和頭像框現在大家都能用，還多了新款。'
       ]],
       ['vip', 'VIP 投注回饋與新手禮', [
         'VIP 不用加入也不用付費：每個月在 Play 的投注（運彩、彩券、刮刮樂，退款不算）決定當月等級，下個月第一次打開任何 App 時回饋當月投注額的一部分：銅卡 NT$10,000 起 0.5%、銀卡 NT$50,000 起 0.8%、金卡 NT$150,000 起 1.2%、黑卡 NT$500,000 起 1.5%。Play 首頁的餘額卡上看得到本月等級和離下一級還差多少。',
@@ -63,7 +60,7 @@ export const HELP = {
       ]],
       ['money', '錢怎麼算', [
         '所有 App 共用一個新台幣錢包。新帳號開戶金 NT$200,000；每週一固定發薪 NT$10,000，跟薪水一樣，存多存少都一樣。系統發的錢只有這些：開戶金、週薪、財富等級獎勵（身價第一次到達一個等級時送一次，小資族 NT$1,000 到億萬大亨 NT$30,000）、Play 的 VIP 回饋，和真的一無所有時的急難紓困。週薪在那週第一次打開任何 App 時入帳，沒打開的週下次補發。',
-        '「真相」把你的錢分成三方：系統發的、和 Quadra 的輸贏（Play 的輸贏，扣掉 Plus 月費和透支利息），和你自己的成績（投資的漲跌）。',
+        '「真相」把你的錢分成三方：系統發的、和 Quadra 的輸贏（Play 的輸贏，扣掉透支利息和信貸利息），和你自己的成績（投資的漲跌）。',
         '餘額可以是負的（透支），每月計息 1%。就像交割款沒付，2 天內沒補足就是違約交割：扣透支金額 7% 的違約金、自動賣出持股補足，而且 5 年內不能融資、融券。自己先賣就沒事。融資借來的錢只能留在 Securities 買賣，不能拿去 Play 或補透支。',
         'Securities 投資、Play 下注和買彩券；Orbit 的 App 都不用錢。錢只存在 Quadra Pass，不能在帳號之間轉。'
       ]],
@@ -78,11 +75,11 @@ export const HELP = {
       ['what', 'What the Quadra Pass is', [
         'The Quadra Pass is your account in every app: Quadra’s Securities and Play, and Orbit’s Class, Weather, Transit, Sports and Words. Each signs in with it and keeps its data on it, the same on every device.',
         'The pass is a 10-character code, given to you by whoever shared Quadra with you: it can’t be made in an app. It’s the key to the account: anyone who knows it can use it, so keep it to yourself. It’s shown only when you get it or change it and never kept on a device: write it down somewhere safe.',
-        'The account button at the top right of every app (a person, or a Plus member’s own avatar) opens the Quadra Pass.'
+        'The account button at the top right of every app (a person, or the avatar you picked) opens the Quadra Pass.'
       ]],
       ['tabs', 'Each tab', [
         'Pass: the Quadra balance, when it was opened, this month’s money in and out, the next pay and the latest entries; below them this app’s own settings (if it has any), adding a device, notifications, the debug log and security.',
-        'Plus: join or manage Quadra Plus, what it gave back, and a member’s avatar and frame.',
+        'Looks: pick an avatar and a frame, all free, shown on your account button in every app.',
         'Truth: where the money comes from and how the house and the broker earn, in real numbers and your own record; wealth levels at the foot.',
         'App: every Quadra and Orbit app, when you last used it, its guide and a way in.',
         'Help: how every app works, here.'
@@ -108,12 +105,9 @@ export const HELP = {
         'The server keeps only a hash of the pass; devices keep only sign-ins that expire and can be revoked, never the pass itself.',
         'Pass’s Security can sign out every other device (this one stays in) or change the pass: the old one stops at once and other devices sign out, and the new one is shown once, closed only when you type its last 5 characters. Forgot it? Change it from a device that’s still signed in.'
       ]],
-      ['plus', 'Quadra Plus', [
-        'One membership for Play and Securities. Monthly is NT$490: the first month you ever join is free, and joining again later charges this month by the days left. Yearly is NT$4,900 for 12 months at once, about NT$408 a month, NT$980 less. It comes from the Quadra balance; join in the Quadra Pass’s Plus tab, and a member’s account button has a gold ✦.',
-        'Play: a NT$200 free bet each week (it arrives the week you open any app; a week you miss isn’t made up), the parlay boost ×1.5 on every winning combination of 3 picks or more, and cash out keeps 2% instead of 3%. Securities: commission at 28% of the usual rate in every market, half the FX spread, and new margin loans 1 point cheaper. Every perk makes betting or trading cheaper or bigger; how it earns Quadra money is worked out in Truth.',
-        'Avatars and frames: a member picks them in Plus, shown on the account button in every app; 3, 6 and 12 months in a row unlock the rarest, and a month missed starts the count again. They’re hidden when the membership stops and come back when you join again.',
-        'It’s charged from your balance on the 1st of every month, including months you didn’t open an app (charged when you’re back); yearly renews once a year, by the month if the balance can’t cover a year. If the balance can’t cover a charge, it fails and the membership stops until you join again. You’re told when each weekly free bet arrives and three days before a renewal. The Plus tab shows what it gave back this month and in all (face value).',
-        'To stop: Plus › Manage › Manage membership › Stop renewing; the perks last to the end of what’s paid. Nothing is refunded, and prices include 5% VAT. Free bets follow a sportsbook’s terms: odds of 1.50 or more (a parlay’s taken together), no cash out, used within 7 days, and a win pays the winnings, not the stake.'
+      ['looks', 'Avatars and frames', [
+        'Pick an avatar and a frame in the Quadra Pass’s Looks tab: all free, change them any time, worn on your account button in every app. Tap again to take one off.',
+        'Quadra Plus ended on 2026-10-20: paying members got the days left refunded to the Quadra balance; a free trial month isn’t refunded. The looks that were for members are everyone’s now, with new ones added.'
       ]],
       ['vip', 'VIP cashback and welcome offers', [
         'VIP is free and needs no sign-up: what you stake in Play in a month (bets, lottery and scratch cards; refunds don’t count) sets that month’s tier, and a share of it comes back the first time you open any app the next month: Bronze from NT$10,000 0.5%, Silver from NT$50,000 0.8%, Gold from NT$150,000 1.2%, Black from NT$500,000 1.5%. Play’s balance card shows this month’s tier and what’s left to the next.',
@@ -121,7 +115,7 @@ export const HELP = {
       ]],
       ['money', 'Money', [
         'Every app shares one NT$ wallet. A new pass opens with NT$200,000; every Monday pays a fixed NT$10,000, like a salary: the same however much you hold. The system gives money only as the opening money, the pay, wealth level rewards (paid once, the first time what you’re worth reaches a level: NT$1,000 for Saver up to NT$30,000 for Tycoon), Play’s VIP cashback, and emergency relief for someone with nothing. The pay comes the first time that week you open any app; a week you miss is paid when you’re back.',
-        'Truth splits your money three ways: what the system gave, your result against Quadra (Play’s wins and losses, less Plus fees and overdraft interest), and your own result (your investments).',
+        'Truth splits your money three ways: what the system gave, your result against Quadra (Play’s wins and losses, less overdraft and loan interest), and your own result (your investments).',
         'The balance can go below zero (an overdraft) at 1% a month. Like an unpaid settlement, if it isn’t covered within 2 days it’s a default: a 7% penalty on what’s owed, holdings sold for it, and no margin or short selling for 5 years. Sell something first and none of that happens. Money borrowed on margin stays in Securities for trading: it can’t be bet in Play or cover an overdraft.',
         'Securities invests, Play bets and sells lottery tickets; the Orbit apps don’t use money. Money lives on the Quadra Pass only and can’t move between passes.'
       ]],
@@ -180,8 +174,7 @@ export const HELP = {
       ]],
       ['fees', '費用', [
         '台股手續費 0.1425%（最低 NT$20，折扣後也一樣；零股最低 NT$1），賣出另收 0.3% 證交稅（ETF 0.1%、債券 ETF 2026 年底前免稅、之後 0.1%，當沖 0.15% 到 2027 年底），元以下無條件捨去；美股、日股等海外市場照複委託常見網路費率；共同基金透過基金平台申購，收 1% 申購手續費，贖回不收費。股利照各國規定預扣稅。',
-        '換匯用市場中間價加減銀行價差；週末外匯休市時價差加倍。融資按天計息。新手禮：第一筆交易免手續費（稅和規費照收）。',
-        'Quadra Plus 會員手續費（含基金申購手續費）2.8 折、點差減半、融資利率少 1%：交易越多、借越多，省越多，這正是它要你做的事。'
+        '換匯用市場中間價加減銀行價差；週末外匯休市時價差加倍。融資按天計息。新手禮：第一筆交易免手續費（稅和規費照收）。'
       ]],
       ['money', '錢怎麼算', [
         'Securities 的新台幣就是 Quadra 餘額：買進時從錢包出去，賣出時回來。月薪和其他 App 的錢都會以新台幣存入，算投入的本金，不算報酬。',
@@ -235,8 +228,7 @@ export const HELP = {
       ]],
       ['fees', 'Fees', [
         'Taiwan commission is 0.1425% (at least NT$20 even after discounts; odd lots at least NT$1), plus 0.3% tax on sales (ETFs 0.1%, bond ETFs none until the end of 2026 and 0.1% after, day trades 0.15% until the end of 2027), rounded down to the dollar; overseas markets at common online sub-brokerage rates; mutual funds are bought through a fund platform at a 1% subscription fee, with nothing on redeeming. Dividends have each country’s withholding.',
-        'Exchanges are at the mid-market rate plus or minus a bank’s spread, doubled while FX markets are shut. Margin interest accrues daily. Welcome offer: your first trade pays no commission (taxes and fees as usual).',
-        'Quadra Plus members pay 28% of the commission (fund subscription fees too), half the FX spread and margin 1 point cheaper: the more you trade and borrow, the more you save, which is exactly what it wants you to do.'
+        'Exchanges are at the mid-market rate plus or minus a bank’s spread, doubled while FX markets are shut. Margin interest accrues daily. Welcome offer: your first trade pays no commission (taxes and fees as usual).'
       ]],
       ['money', 'Money', [
         'Securities’ NT$ is the Quadra balance: buying spends from it, selling returns to it. The monthly pay and the other apps’ money arrive as NT$ deposits, counted as money put in, not as return.',
@@ -272,9 +264,9 @@ export const HELP = {
         '選號時快選補滿，+1／+5／+10 再加幾注；購買列一直在下面。中獎自動入帳並通知你。'
       ]],
       ['boost', '串關加成、提前兌現、免費投注', [
-        '串關加成：3 個選項以上每個贏的組合多給獎金，3 個 +5%、4 個 +8%、5 個 +12%、6 個 +15%、7 個以上 +20%（Plus 會員 ×1.5）。',
-        '提前兌現（Quadra 自己的服務，真正的運彩買了就不能取消或兌現）：比賽還沒結束也能先把投注單換成現金。每個還沒結果的選項先扣莊家的差價（賽前 4%、場中 6%），整張再扣 3%（Plus 2%）；串越多、越早兌現拿得越少，兌現永遠不會比留著值錢。某個選項現在沒有報價、同一場有兩個未定的選項，或用了免費投注時，不能兌現。',
-        '免費投注：Plus 會員每週一張和新手禮，在投注單上點一下就用在這張單（單場或一組串關），賠率要 1.50 以上（串關看總賠率），贏了只拿獎金、不退本金，7 天內有效。'
+        '串關加成：3 個選項以上每個贏的組合多給獎金，3 個 +5%、4 個 +8%、5 個 +12%、6 個 +15%、7 個以上 +20%。',
+        '提前兌現（Quadra 自己的服務，真正的運彩買了就不能取消或兌現）：比賽還沒結束也能先把投注單換成現金。每個還沒結果的選項先扣莊家的差價（賽前 4%、場中 6%），整張再扣 3%；串越多、越早兌現拿得越少，兌現永遠不會比留著值錢。某個選項現在沒有報價、同一場有兩個未定的選項，或用了免費投注時，不能兌現。',
+        '免費投注（新手禮）：在投注單上點一下就用在這張單（單場或一組串關），賠率要 1.50 以上（串關看總賠率），贏了只拿獎金、不退本金，7 天內有效。'
       ]],
       ['money', '錢怎麼算', [
         '下注和買彩券從 Quadra 餘額扣款；派彩、兌現和彩券獎金都由伺服器入帳，並通知你。彩券獎金照規定每注計算：單注超過 NT$5,000 扣 20% 所得稅和 0.4% 印花稅。',
@@ -307,9 +299,9 @@ export const HELP = {
         'Quick pick fills a line, +1/+5/+10 add more, and the buy bar stays in view. Wins are paid in automatically and you’re told.'
       ]],
       ['boost', 'Parlay boost, cash out, free bets', [
-        'The parlay boost adds to every winning combination of 3 picks or more: 3 picks +5%, 4 +8%, 5 +12%, 6 +15%, 7 or more +20% (×1.5 for Quadra Plus).',
-        'Cash out (Quadra’s own extra: a real 運彩 bet can’t be cancelled or cashed out) turns a slip into cash before its games end. Each undecided pick first gives up the house’s margin (4% before its game, 6% in play), then 3% of the whole is kept (2% for Plus): the more picks and the earlier, the less it pays, and cashing out is never worth more than holding on. It pauses while a pick has no price, two undecided picks are on one game, or the slip used a free bet.',
-        'Free bets (Plus’s weekly one and the welcome offer): one tap on the slip uses it on that slip (singles of one pick or one parlay), at odds of 1.50 or more (a parlay’s together); a win pays the winnings, not the stake; 7 days to use it.'
+        'The parlay boost adds to every winning combination of 3 picks or more: 3 picks +5%, 4 +8%, 5 +12%, 6 +15%, 7 or more +20%.',
+        'Cash out (Quadra’s own extra: a real 運彩 bet can’t be cancelled or cashed out) turns a slip into cash before its games end. Each undecided pick first gives up the house’s margin (4% before its game, 6% in play), then 3% of the whole is kept: the more picks and the earlier, the less it pays, and cashing out is never worth more than holding on. It pauses while a pick has no price, two undecided picks are on one game, or the slip used a free bet.',
+        'Free bets (the welcome offer): one tap on the slip uses it on that slip (singles of one pick or one parlay), at odds of 1.50 or more (a parlay’s together); a win pays the winnings, not the stake; 7 days to use it.'
       ]],
       ['money', 'Money', [
         'Bets and tickets come out of the Quadra balance; payouts, cash outs and prizes are paid in by the server, and you’re told. Lottery prizes are taxed bet by bet, by law: each bet paying over NT$5,000 has 20% income tax and 0.4% stamp duty withheld.',
@@ -410,7 +402,7 @@ export const HELP = {
         '每答對一題 2 XP，第一次精熟一個字再加 15 XP。累計積分決定等級（Lv 2 要 100 XP、Lv 5 要 1,600、Lv 10 要 8,100、Lv 20 要 36,100），每幾級換一個稱號：新手、學徒、好手、高手、達人、大師、傳奇、神話。積分只是你的學習紀錄，不能換任何東西。'
       ]],
       ['money', '錢怎麼算', [
-        'Orbit Words 不用錢，也不發錢：練單字永遠免費。帳戶、Quadra Plus、頭像和錢的真相，都在每個 App 右上角的 Quadra Pass 裡。'
+        'Orbit Words 不用錢，也不發錢：練單字永遠免費。帳戶、頭像和錢的真相，都在每個 App 右上角的 Quadra Pass 裡。'
       ]]
     ],
     en: [
@@ -437,7 +429,7 @@ export const HELP = {
         'Each right answer earns 2 XP and a word’s first mastery 15 more. Total XP sets your level (Lv 2 at 100 XP, Lv 5 at 1,600, Lv 10 at 8,100, Lv 20 at 36,100), with a new title every few levels: Rookie, Apprentice, Skilled, Expert, Master, Grandmaster, Legend, Mythic. XP is only a record of learning; it buys nothing.'
       ]],
       ['money', 'Money', [
-        'Orbit Words uses no money and pays none: learning is always free. Your account, Quadra Plus, looks and the truth about money are in the Quadra Pass at the top right of every app.'
+        'Orbit Words uses no money and pays none: learning is always free. Your account, looks and the truth about money are in the Quadra Pass at the top right of every app.'
       ]]
     ]
   },
@@ -553,7 +545,7 @@ export const HELP = {
         '派彩照台灣運彩的規則：組合裡每注 NT$10 的獎金超過 NT$5,000（賠率超過 500 倍）才預扣 20% 所得稅；打平或比賽取消算 1.00。足球算 90 分鐘、冰球算 60 分鐘（不含延長賽）；中職、日職、韓職和局時不讓分退款。'
       ]],
       ['money', '錢怎麼算', [
-        'Orbit Slips 不賣彩券，也不碰錢：只是幫你看已經買的注單。帳戶、Quadra Plus 和錢的真相，都在右上角的 Quadra Pass 裡。'
+        'Orbit Slips 不賣彩券，也不碰錢：只是幫你看已經買的注單。帳戶、頭像和錢的真相，都在右上角的 Quadra Pass 裡。'
       ]]
     ],
     en: [
@@ -573,7 +565,7 @@ export const HELP = {
         'Payouts follow Taiwan Sports Lottery’s rules: 20% income tax only on a combination whose NT$10 unit wins over NT$5,000 (odds over 500); a push or a game called off counts 1.00. Soccer is on 90 minutes, hockey on 60 (no overtime); a tied CPBL, NPB or KBO game returns a moneyline pick.'
       ]],
       ['money', 'Money', [
-        'Orbit Slips sells nothing and moves no money: it only follows tickets you’ve bought. The account, Quadra Plus and the truth about the money are in the Quadra Pass, top right.'
+        'Orbit Slips sells nothing and moves no money: it only follows tickets you’ve bought. The account, looks and the truth about the money are in the Quadra Pass, top right.'
       ]]
     ]
   },
@@ -603,7 +595,7 @@ export const HELP = {
         '設定、每組片段的速度和你改過的角色，和每種風格收藏了幾首；打開「依你的口味」，做歌就偏向你喜歡的。聲音本身不離開手機。'
       ]],
       ['money', '錢怎麼算', [
-        'Orbit Beats 免費，不碰錢。帳戶、Quadra Plus 和錢的真相，都在右上角的 Quadra Pass 裡。'
+        'Orbit Beats 免費，不碰錢。帳戶、頭像和錢的真相，都在右上角的 Quadra Pass 裡。'
       ]]
     ],
     en: [
@@ -631,7 +623,7 @@ export const HELP = {
         'Your settings, each set’s tempo and the roles you set, and how many songs you kept of each style; with Lean to your taste on, new songs lean to what you like. The sound itself never leaves the phone.'
       ]],
       ['money', 'Money', [
-        'Orbit Beats is free and moves no money. The account, Quadra Plus and the truth about the money are in the Quadra Pass, top right.'
+        'Orbit Beats is free and moves no money. The account, looks and the truth about the money are in the Quadra Pass, top right.'
       ]]
     ]
   },

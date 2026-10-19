@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { handleEcoRequest, mergeWallet, poolBalance, cleanPatch, emptyWallet, paydayEntries, worthOf, REBASE, OVERDRAFT_RATE, plusJoinEntry, plusJoinEntries, plusMember, plusLapsed, plusBonusEntries, bonusBetId, vipEntries, vipStakes, vipTier, welcomeEntries, VIP, PAY, PLUS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, ECO_APPS, rankEntries, RANKS } from '../eco.js';
+import { handleEcoRequest, mergeWallet, poolBalance, cleanPatch, emptyWallet, paydayEntries, worthOf, REBASE, OVERDRAFT_RATE, plusRefund, plusRefundEntries, PLUS_END, PLUS_REFUND_ID, vipEntries, vipStakes, vipTier, welcomeEntries, VIP, PAY, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, ECO_APPS, rankEntries, RANKS } from '../eco.js';
 import { planClean, tidyWallet } from '../eco-admin.js';
 
 function setup() {
@@ -398,7 +398,7 @@ test('clean-up: only Quadra data stays, and wallets lose retired settings', asyn
   assert.deepEqual(again.gone, { entries: 0, money: 0, settings: 0, looks: 0 });
 });
 
-test('the clean retires what no app writes any more: Hub entries (their money kept), voucher markers, settings, non-members’ looks', () => {
+test('the clean retires what no app writes any more: Hub entries (their money kept), voucher markers, settings (looks stay: they’re free)', () => {
   const at = Date.UTC(2026, 9, 1);
   const now = Date.UTC(2026, 9, 2);
   const vocab = (id, kind, amount, extra = {}) => ({ id, t: at, app: 'vocab', kind, amount, ...extra });
@@ -436,11 +436,9 @@ test('the clean retires what no app writes any more: Hub entries (their money ke
   assert.equal(poolBalance(clean), poolBalance(wallet));
   // A Plus month bought with points is a month like any.
   assert.equal(clean.entries[1].note, undefined);
-  assert.deepEqual(Object.keys(clean.settings).sort(), ['aff:odds', 'plus']);
-  assert.deepEqual(gone, { entries: 9, money: -1_050, settings: 4, looks: 2 });
-  // A member keeps the looks; a second clean changes nothing.
-  const member = { ...wallet, entries: [...wallet.entries, { id: 'eco:plus:2026-10', t: at, app: 'eco', kind: 'plus', amount: -490 }] };
-  assert.equal(tidyWallet(member, now).wallet.settings.avatar.value.id, 'cat');
+  assert.deepEqual(Object.keys(clean.settings).sort(), ['aff:odds', 'avatar', 'frame', 'plus']);
+  assert.deepEqual(gone, { entries: 9, money: -1_050, settings: 4, looks: 0 });
+  // A second clean changes nothing.
   assert.deepEqual(tidyWallet(clean, now).wallet, clean);
 });
 
@@ -454,91 +452,10 @@ test('admin scan reports what the clean would retire before changing a wallet', 
   wallet.entries.push({ id: 'vocab:g:old', t: 1, app: 'vocab', kind: 'game', amount: 0, xp: 20 }, { id: 'vocab:shop:boost:a', t: 2, app: 'vocab', kind: 'shop', amount: -150 });
   await t.deps.fsWrite(env, WALLET_COLLECTION, doc.id, JSON.stringify(wallet));
   const plan = await planClean(env, t.deps);
-  assert.deepEqual(plan.retired, { entries: 2, money: -150, settings: 1, looks: 1 });
+  assert.deepEqual(plan.retired, { entries: 2, money: -150, settings: 1, looks: 0 });
   assert.equal(plan.tidy.length, 1);
   assert.equal(plan.tidy[0].wallet.entries.some(e => e.app === 'vocab'), false);
   assert.equal(JSON.parse((await t.deps.fsList(env, WALLET_COLLECTION))[0].payload).entries.some(e => e.app === 'vocab'), true);
-});
-
-test('Quadra Plus: the first month free, renewal from the pool, leaving keeps the paid month', async () => {
-  const t = setup();
-  const acct = await newPass(t, 'odds');
-  const join = await t.call('POST', '', { op: 'plus', qt: acct.token, on: true });
-  assert.equal(join.status, 200);
-  assert.equal(join.data.member, true);
-  const first = join.data.wallet.entries.find(e => e.kind === 'plus');
-  assert.equal(first.amount, 0, 'the first month is on the house');
-  assert.equal(first.note, 'trial');
-  // Joining again the same month changes nothing.
-  const again = await t.call('POST', '', { op: 'plus', qt: acct.token, on: true });
-  assert.equal(again.data.wallet.entries.filter(e => e.kind === 'plus').length, 1);
-  // Next month: renewed on the first read, after the pay.
-  t.advance(32 * 86_400_000);
-  const read = await t.call('POST', '', { op: 'refresh', refresh: acct.refresh, app: 'odds', claim: true });
-  const plus = read.data.wallet.entries.filter(e => e.kind === 'plus');
-  assert.equal(plus.length, 2);
-  assert.equal(plus[1].amount, -PLUS.fee);
-  // Leaving: no renewal later, the paid month stays.
-  const leave = await t.call('POST', '', { op: 'plus', qt: read.data.token, on: false });
-  assert.equal(leave.data.member, true);
-  t.advance(32 * 86_400_000);
-  const later = await t.call('POST', '', { op: 'refresh', refresh: read.data.refresh, app: 'odds', claim: true });
-  assert.equal(later.data.wallet.entries.filter(e => e.kind === 'plus').length, 2);
-});
-
-test('Quadra Plus: rejoining costs the rest of the month; a short pool does not renew or join', () => {
-  const oct15 = Date.UTC(2026, 9, 15, 4);
-  const had = { entries: [{ id: 'eco:plus:2026-08', t: 1, app: 'eco', kind: 'plus', amount: 0 }] };
-  const e = plusJoinEntry(had, oct15);
-  assert.equal(e.id, 'eco:plus:2026-10');
-  // 17 of 31 days left: about NT$270.
-  assert.equal(e.amount, -270);
-  assert.equal(plusJoinEntry({ entries: [] }, oct15).amount, 0);
-  const broke = { settings: { plus: { value: { on: true }, t: 1 } }, entries: [{ id: 'eco:plus:2026-10', t: 1, app: 'eco', kind: 'plus', amount: 0 }, { id: 'eco:rebase:v3', t: 1, app: 'eco', kind: 'rebase', amount: 0 }, { id: 'x', t: 1, app: 'odds', amount: -300_000 }] };
-  assert.ok(!paydayEntries({ ...broke, created: oct15 }, Date.UTC(2026, 10, 2)).some(x => x.kind === 'plus'));
-  const ok = { ...broke, entries: broke.entries.slice(0, 2) };
-  assert.ok(paydayEntries({ ...ok, created: oct15 }, Date.UTC(2026, 10, 2)).some(x => x.id === 'eco:plus:2026-11'));
-  assert.equal(plusMember(ok, oct15), true);
-  assert.equal(plusMember(ok, Date.UTC(2026, 10, 2)), false);
-});
-
-test('Quadra Plus: only the live app can join, and an app cannot write the entry itself', async () => {
-  const t = setup();
-  const acct = await newPass(t, 'stock');
-  await t.call('POST', '', { op: 'refresh', refresh: acct.refresh, app: 'odds', claim: true });
-  const moved = await t.call('POST', '', { op: 'plus', qt: acct.token, on: true });
-  assert.equal(moved.data.error.code, 'ECO_SESSION_MOVED');
-  assert.deepEqual(cleanPatch({ entries: [{ id: 'eco:plus:2026-10', t: 1, app: 'eco', kind: 'plus', amount: 0 }, { id: 'eco:plus:2026-11', t: 1, app: 'odds', kind: 'plus', amount: 0 }] }).entries, []);
-});
-
-test('Quadra Plus yearly: twelve months paid at once, renewed by the year', async () => {
-  const t = setup();
-  const acct = await newPass(t, 'stock');
-  const join = await t.call('POST', '', { op: 'plus', qt: acct.token, on: true, plan: 'year' });
-  assert.equal(join.status, 200);
-  const plus = join.data.wallet.entries.filter(e => e.kind === 'plus');
-  assert.equal(plus.length, 12);
-  assert.equal(plus.reduce((s, e) => s + e.amount, 0), -PLUS.year);
-  assert.equal(join.data.wallet.settings.plus.value.plan, 'year');
-  // Eleven months on: nothing new is charged.
-  t.advance(11 * 31 * 86_400_000 - 40 * 86_400_000);
-  const mid = await t.call('POST', '', { op: 'login', passcode: acct.passcode, app: 'stock' });
-  assert.equal(mid.data.wallet.entries.filter(e => e.kind === 'plus').length, 12);
-  // Past the year: another year.
-  t.advance(80 * 86_400_000);
-  const later = await t.call('POST', '', { op: 'login', passcode: acct.passcode, app: 'stock' });
-  const after = later.data.wallet.entries.filter(e => e.kind === 'plus');
-  assert.ok(after.length >= 24 - 2, `renewed: ${after.length}`);
-  assert.equal(after.filter(e => e.amount === -PLUS.year).length, 2);
-});
-
-test('Quadra Plus yearly on top of a month already held starts next month', () => {
-  const oct = Date.UTC(2026, 9, 10, 4);
-  const w = { entries: [{ id: 'eco:plus:2026-10', t: 1, app: 'eco', kind: 'plus', amount: 0 }] };
-  const e = plusJoinEntries(w, oct, 'year');
-  assert.equal(e[0].id, 'eco:plus:2026-11');
-  assert.equal(e.at(-1).id, 'eco:plus:2027-10');
-  assert.equal(e[0].amount, -PLUS.year);
 });
 
 test('the pay is fixed, like a salary: the same however much the account holds', () => {
@@ -590,26 +507,6 @@ test('accounts that opened with NT$30,000 are raised to NT$200,000 once; nothing
   assert.deepEqual(top({ v2: 1, created: now, entries: [{ id: 'eco:start', t: 1, app: 'eco', kind: 'start', amount: 200_000 }] }), []);
 });
 
-test('Plus: a NT$200 bonus bet each week a member opens an app, from the Worker only', () => {
-  // Wednesday 2026-10-07, Taiwan: the week of Monday the 5th.
-  const now = Date.UTC(2026, 9, 7, 4);
-  assert.equal(bonusBetId(now), 'eco:fb:2026-10-05');
-  // Sunday 23:30 Taiwan is still that week; Monday 00:30 is the next.
-  assert.equal(bonusBetId(Date.UTC(2026, 9, 11, 15, 30)), 'eco:fb:2026-10-05');
-  assert.equal(bonusBetId(Date.UTC(2026, 9, 11, 16, 30)), 'eco:fb:2026-10-12');
-  const member = { entries: [{ id: 'eco:plus:2026-10', t: 1, app: 'eco', kind: 'plus', amount: -290 }] };
-  assert.deepEqual(plusBonusEntries(member, now), [{ id: 'eco:fb:2026-10-05', t: now, app: 'eco', kind: 'freebet', amount: 0, note: '200' }]);
-  assert.deepEqual(plusBonusEntries({ entries: [...member.entries, ...plusBonusEntries(member, now)] }, now), []);
-  assert.deepEqual(plusBonusEntries({ entries: [] }, now), []);
-  // Comes with the month's payday for a member, and never from an app.
-  const due = paydayEntries({ ...member, created: now, entries: [...member.entries, { id: 'eco:pay:2026-10', t: 1, app: 'eco', kind: 'pay', amount: 6000 }] }, now);
-  assert.ok(due.some(e => e.id === 'eco:fb:2026-10-05'));
-  assert.equal(cleanPatch({ entries: [{ id: 'eco:fb:2026-10-05', t: now, app: 'odds', kind: 'freebet', amount: 0, note: '100' }] }).entries.length, 0);
-  // Joining brings this week's with it.
-  const joined = plusJoinEntries({ entries: [] }, now);
-  assert.equal(plusBonusEntries({ entries: joined }, now).length, 1);
-});
-
 test('VIP: last month\'s gaming stakes set its tier, and its cashback is paid once the month is over', () => {
   const oct = m => Date.UTC(2026, 9, m, 4);
   const w = { entries: [
@@ -655,31 +552,6 @@ test('welcome: a NT$200 free bet after the first paid bet, once; a write brings 
   const s = await t.call('PATCH', `${t.qt(b.token)}&app=odds`, { wallet: { entries: [{ id: 'odds:stake-cheap', t: 1_700_000_100_000, app: 'odds', kind: 'stake', amount: -0.01 }] } });
   assert.equal(s.status, 200);
   assert.ok(!s.data.wallet.entries.some(e => e.id === 'eco:fb:welcome'));
-});
-
-test('Quadra Plus bills every month like a subscription: months away charged on return; a failed charge lapses it', () => {
-  const on = { plus: { value: { on: true }, t: 1 } };
-  const base = [{ id: 'eco:plus:2026-10', t: 1, app: 'eco', kind: 'plus', amount: 0, note: 'trial' }, { id: 'eco:rebase:v3', t: 1, app: 'eco', kind: 'rebase', amount: 0 }, { id: 'eco:pay:2026-10', t: 1, app: 'eco', kind: 'pay', amount: 6_000 }];
-  // Away November and December, back in January: three months billed after their pay.
-  const jan = Date.UTC(2027, 0, 5);
-  const due = paydayEntries({ settings: on, created: Date.UTC(2026, 9, 1), entries: base }, jan);
-  assert.deepEqual(due.filter(e => e.kind === 'plus').map(e => [e.id, e.amount]), [['eco:plus:2026-11', -PLUS.fee], ['eco:plus:2026-12', -PLUS.fee], ['eco:plus:2027-01', -PLUS.fee]]);
-  // A pool that can't cover a month: that charge fails and the rest isn't tried.
-  const broke = [...base.slice(0, 2), { id: 'x', t: 1, app: 'odds', amount: -300_000 }];
-  const w = { settings: on, created: Date.UTC(2026, 9, 1), entries: broke };
-  const nov = paydayEntries(w, Date.UTC(2026, 10, 2));
-  assert.ok(!nov.some(e => e.kind === 'plus'));
-  const fail = nov.find(e => e.kind === 'plusfail');
-  assert.equal(fail.id, 'eco:plusfail:2026-11');
-  const lapsed = { ...w, entries: [...broke, ...nov] };
-  assert.equal(plusLapsed(lapsed), true);
-  // Lapsed: no retry next month, even with money.
-  const rich = { ...lapsed, entries: [...lapsed.entries, { id: 'y', t: 2, app: 'odds', amount: 50_000 }] };
-  assert.ok(!paydayEntries(rich, Date.UTC(2026, 11, 2)).some(e => e.kind === 'plus' || e.kind === 'plusfail'));
-  // Joining again starts it over (the rest of the month at its share).
-  const back = plusJoinEntries(rich, Date.UTC(2026, 11, 2));
-  assert.ok(back[0].amount < 0);
-  assert.equal(plusLapsed({ entries: [...rich.entries, ...back] }), false);
 });
 
 test('wealth levels: each level reached pays its reward once, from what the account is worth', () => {
@@ -750,7 +622,7 @@ test('passes are handed out by the owner: no one makes one from an app; the owne
   }
 });
 
-test('the admin panel: an overview, an account in full, money and Plus by hand, sign-out, an unused pass taken back', async () => {
+test('the admin panel: an overview, an account in full, money by hand, sign-out, an unused pass taken back', async () => {
   const t = setup();
   const admin = (action, extra = {}) => t.call('POST', '', { op: 'admin', token: 'o'.repeat(40), action, ...extra });
   const acct = await newPass(t);
@@ -778,11 +650,8 @@ test('the admin panel: an overview, an account in full, money and Plus by hand, 
   assert.equal(g.status, 200);
   assert.equal(g.data.balance, acct.pool + 500);
   assert.equal((await admin('grant', { wallet: ref, amount: -200, note: '更正' })).data.balance, acct.pool + 300);
-  // Plus: three free months, then no renewal.
-  const p = await admin('plus', { wallet: ref, months: 3 });
-  assert.equal(p.data.member, true);
-  assert.equal((await admin('wallet', { wallet: ref })).data.plus.months.length, 3);
-  assert.equal((await admin('plus', { wallet: ref, stop: true })).data.renewing, false);
+  // Plus is gone: no tool gives it.
+  assert.notEqual((await admin('plus', { wallet: ref, months: 3 })).status, 200);
   // Every device signed out: the session stops working.
   assert.equal((await t.call('GET', `${t.qt(acct.token)}&app=stock`)).status, 200);
   assert.equal((await admin('signout', { wallet: ref })).status, 200);
@@ -1040,4 +909,32 @@ test('op loan and relief: the Worker signs only what the account qualifies for',
   // Relief: not with NT$200,000 in the account.
   const relief = await t.call('POST', '', { op: 'relief', qt });
   assert.equal(relief.data.error.why, 'worth');
+});
+
+test('Quadra Plus ended: what was paid for the days left comes back once; a free trial refunds nothing', async () => {
+  const mo = (m, amount, extra = {}) => ({ id: `eco:plus:${m}`, t: 1, app: 'eco', kind: 'plus', amount, ...extra });
+  // October in full (NT$490): 12 of its 31 days are after the end (20 Oct, Taipei).
+  assert.equal(plusRefund({ entries: [mo('2026-09', -490), mo('2026-10', -490)] }), Math.round((490 * 12) / 31));
+  // A free trial month paid nothing, so nothing comes back; nor a gift.
+  assert.equal(plusRefund({ entries: [mo('2026-10', 0, { note: 'trial' })] }), 0);
+  assert.equal(plusRefund({ entries: [mo('2026-10', 0, { note: 'gift' })] }), 0);
+  assert.deepEqual(plusRefundEntries({ entries: [mo('2026-10', 0, { note: 'trial' })] }, PLUS_END + 1), []);
+  // Joined on 15 Oct (Taipei) for the 17 days left: 12 of those 17 come back.
+  const join = { ...mo('2026-10', -270), t: Date.UTC(2026, 9, 15, 2) };
+  assert.equal(plusRefund({ entries: [join] }), Math.round((270 * 12) / 17));
+  // A year from September: NT$4,900 over 12 months; 10 of them after the end, and 12 days of October.
+  const t = Date.UTC(2026, 8, 3);
+  const year = ['2026-09', '2026-10', '2026-11', '2026-12', '2027-01', '2027-02', '2027-03', '2027-04', '2027-05', '2027-06', '2027-07', '2027-08'].map((m, i) => ({ ...mo(m, i ? 0 : -4_900, { note: 'year' }), t }));
+  assert.equal(plusRefund({ entries: year }), Math.round((4_900 / 12) * (10 + 12 / 31)));
+  // Paid with the payday, once, and only by the Worker.
+  const w = { v2: 1, created: Date.UTC(2026, 8, 1), entries: [{ id: 'eco:start', t: 1, app: 'eco', kind: 'start', amount: 200_000 }, { id: 'eco:topup:v12', t: 1, app: 'eco', kind: 'start', amount: 0 }, mo('2026-10', -490)], snap: {}, settings: {} };
+  const now = PLUS_END + 3_600_000;
+  const due = paydayEntries(w, now).filter(e => e.kind === 'plusrefund');
+  assert.deepEqual(due, [{ id: PLUS_REFUND_ID, t: now, app: 'eco', kind: 'plusrefund', amount: 190 }]);
+  assert.deepEqual(paydayEntries(mergeWallet(w, { entries: due }), now).filter(e => e.kind === 'plusrefund'), []);
+  assert.equal(cleanPatch({ entries: [{ id: PLUS_REFUND_ID, t: now, app: 'odds', kind: 'plusrefund', amount: 9_999 }] }).entries.length, 0);
+  // No more joining.
+  const tt = setup();
+  const acct = await newPass(tt);
+  assert.notEqual((await tt.call('POST', '', { op: 'plus', qt: acct.token, on: true })).status, 200);
 });

@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} };
-const { PLAY, houseKeep, boostedKeep, freeBetWorth, roundTrip, plusMath, record, overdraftYear, vipShare } = await import('../kit/truth.mjs');
+const { PLAY, houseKeep, boostedKeep, freeBetWorth, roundTrip, record, overdraftYear, vipShare } = await import('../kit/truth.mjs');
 const { HELP, HELP_ORDER, parseHelpHash } = await import('../kit/help.mjs');
 const kit = await import('#kit/quadra.mjs');
 const brand = await import('../kit/brand.mjs');
@@ -14,20 +14,14 @@ test('truth: what the house keeps, what boosts and free bets are worth, what tra
   assert.equal(Math.round(houseKeep(1) * 1000), 136);
   assert.equal(Math.round(houseKeep(3) * 1000), 356);
   assert.ok(houseKeep(7) > 4 * houseKeep(1));
-  // The boost gives back a little of the cut; Plus's a little more, never all of it.
+  // The boost gives back a little of the cut, never all of it.
   const plain = boostedKeep(3, 8);
-  const plus = boostedKeep(3, 8, kit.PLUS.odds.boost);
-  assert.ok(plus < plain && plain < houseKeep(3) && plus > 0.3);
+  assert.ok(plain < houseKeep(3) && plain > 0.3);
   assert.equal(freeBetWorth(200), 86);
   assert.ok(freeBetWorth(200, PLAY.freeMinOdds) < freeBetWorth(200));
   assert.deepEqual(roundTrip(100_000), { fee: 284, tax: 300, total: 584, share: 0.00584 });
-  assert.equal(roundTrip(100_000, true).fee, 2 * Math.floor(100_000 * 0.001425 * kit.PLUS.stock.commission));
   // The commission minimum still applies.
   assert.equal(roundTrip(1_000).fee, 40);
-  const m = plusMath();
-  assert.equal(m.fee, kit.PLUS.fee);
-  assert.ok(m.betsWorth < m.betsFace && m.betsWorth < m.fee);
-  assert.equal(m.tradesToBreakEven, Math.ceil(kit.PLUS.fee / m.savedPerTrade));
   assert.ok(overdraftYear() > 0.12 && overdraftYear() < 0.13);
   assert.ok(kit.VIP.tiers.every(t => vipShare(t) < 0.15));
 });
@@ -62,9 +56,13 @@ test('the Pass sheet: every string in both languages; every tab named', async ()
   const src = readFileSync(new URL('../kit/pass.mjs', import.meta.url), 'utf8');
   const { STRINGS } = await import('../kit/pass.mjs');
   assert.deepEqual(Object.keys(STRINGS.en).sort(), Object.keys(STRINGS.zh).sort());
-  for (const tab of ['pass', 'plus', 'truth', 'apps', 'help']) assert.ok(STRINGS.zh[`tab_${tab}`] && STRINGS.en[`tab_${tab}`], tab);
+  for (const tab of ['pass', 'looks', 'truth', 'apps', 'help']) assert.ok(STRINGS.zh[`tab_${tab}`] && STRINGS.en[`tab_${tab}`], tab);
   for (const key of new Set([...src.matchAll(/\bt\('([A-Za-z_]+)'/g)].map(m => m[1]))) assert.ok(key in STRINGS.zh, key);
   assert.doesNotMatch(JSON.stringify(STRINGS), /Quadra Hub|Fixtures/);
+  // Every frame has a name in both languages and its own style; Plus is gone from the sheet.
+  const css = readFileSync(new URL('../kit/quadra.css', import.meta.url), 'utf8');
+  for (const { id } of kit.FRAMES) assert.ok(STRINGS.zh[`frame_${id}`] && STRINGS.en[`frame_${id}`] && css.includes(`.q-frame-${id} {`), id);
+  assert.doesNotMatch(src, /openPlus|plusMember|PLUS\./);
 });
 
 test('the brand: Quadra is where the money is, Orbit the everyday tools; ids never change', () => {

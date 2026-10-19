@@ -345,9 +345,9 @@ export function applyResults(account, slipId, results, now = new Date(), finals 
       return { gross, payout: slip.free ? Math.max(0, Math.round(net) - (slip.freeValue ?? slip.stake)) : Math.round(net) };
     };
     const { gross, payout } = settle(slip.boost ?? 0);
-    // What Quadra Plus's bigger parlay boost added (a member's slip keeps
-    // boost PLUS.odds.boost) is paid as its own entry ('plus-<slip>', kind
-    // 'plusboost'), so the statement and the Plus sheet show what it gave.
+    // What Quadra Plus's bigger parlay boost added (an old member's slip
+    // keeps its boost of 1.5; Plus ended 2026-10-20) is paid as its own
+    // entry ('plus-<slip>', kind 'plusboost'), so the statement shows it.
     const extra = slip.boost > 1 ? Math.max(0, payout - settle(1).payout) : 0;
     updated = { ...updated, status: 'settled', settledAt: now.toISOString(), gross: Math.round(gross), payout };
     // (A slip refunded while it was lost, then found on another device, has
