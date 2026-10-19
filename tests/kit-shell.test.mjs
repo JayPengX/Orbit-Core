@@ -693,3 +693,16 @@ test('openSheetHtml: wires a dialog written as a string like sheet() does', () =
   assert.equal(fired, 1);
   globalThis.document.createElement = t => new FakeEl(t);
 });
+
+test('sheet(): a subtitle under the title, before the ✕; none by default', () => {
+  reset();
+  const s = ui.sheet({ title: 'T', subtitle: '2330 · 台股' });
+  assert.equal(s.head.children[1].tag, 'h2');
+  assert.equal(s.head.children[2].className, 'q-sheet-sub');
+  assert.equal(s.head.children[2].textContent, '2330 · 台股');
+  assert.ok(s.head.children[3].classList.contains('q-close'), 'the ✕ stays last');
+  assert.equal(ui.sheet({ title: 'T' }).head.children.length, 3);
+  const html = ui.sheetHtml({ title: 'T', subtitle: '<b>&' });
+  assert.ok(html.includes('</h2><small class="q-sheet-sub">&#60;b&#62;&#38;</small><button class="q-close"'));
+  assert.equal(ui.sheetHtml({ title: 'T' }).includes('q-sheet-sub'), false);
+});

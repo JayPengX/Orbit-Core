@@ -144,7 +144,7 @@ export function bindSheet(d, { onClose = () => {} } = {}) {
   });
   return shut;
 }
-export function sheet({ title = '', body = [], onClose = () => {}, cls = '', lead = null, trailing = null, detent = '', foot = null, closeLabel = '關閉', label = '' } = {}) {
+export function sheet({ title = '', body = [], onClose = () => {}, cls = '', lead = null, trailing = null, detent = '', foot = null, closeLabel = '關閉', label = '', subtitle = '' } = {}) {
   const d = h('dialog', { class: `q-sheet ${cls}`.trim(), 'aria-label': label || (typeof title === 'string' ? title : '') || null });
   if (foot) d.classList.add('q-has-foot');
   if (DETENTS.includes(detent)) {
@@ -152,7 +152,7 @@ export function sheet({ title = '', body = [], onClose = () => {}, cls = '', lea
     if (detent === 'medium') d.setAttribute('data-expandable', '');
   }
   const close = h('button', { class: 'q-close', type: 'button', 'aria-label': closeLabel, 'data-q-close': '', text: '✕' });
-  const head = h('div', { class: 'q-sheet-head' }, [lead || h('span'), h('h2', {}, [title]), trailing || close]);
+  const head = h('div', { class: 'q-sheet-head' }, [lead || h('span'), h('h2', {}, [title]), subtitle ? h('small', { class: 'q-sheet-sub', text: String(subtitle) }) : null, trailing || close]);
   d.append(head, ...[].concat(body).filter(Boolean));
   if (foot) d.append(foot);
   const shut = bindSheet(d, { onClose });
@@ -774,12 +774,12 @@ export function sheetHeroHtml({ eyebrow = '', big = '', sub = '', tint = '', log
 export function sheetFootHtml({ summary = null, button = {} } = {}) {
   return `<div class="q-sheet-foot q-sf">${summary ? `<div class="q-sf-sum"><small>${E(summary.small || '')}</small><b class="num">${summary.big == null ? '' : E(summary.big)}</b></div>` : ''}<button class="${clsOf('q-btn', button.danger ? 'danger' : 'primary')}" type="button"${button.disabled ? ' disabled' : ''}${dataOf({ tap: button.tap })}>${E(button.label || '')}</button></div>`;
 }
-// sheetHtml({ title, bodyHtml, cls, leadHtml, trailingHtml, footHtml, detent, closeLabel, label }): the dialog's markup;
+// sheetHtml({ title, subtitle, bodyHtml, cls, leadHtml, trailingHtml, footHtml, detent, closeLabel, label }): the dialog's markup;
 // openSheetHtml(html, { onClose }) puts it in the page, opens it and wires it as sheet() does.
-export function sheetHtml({ title = '', bodyHtml = '', cls = '', leadHtml = '', trailingHtml = '', footHtml = '', detent = '', closeLabel = '關閉', label = '' } = {}) {
+export function sheetHtml({ title = '', bodyHtml = '', cls = '', leadHtml = '', trailingHtml = '', footHtml = '', detent = '', closeLabel = '關閉', label = '', subtitle = '' } = {}) {
   const d = DETENTS.includes(detent) ? ` data-detent="${detent}"${detent === 'medium' ? ' data-expandable' : ''}` : '';
   const name = label || title;
-  return `<dialog class="${clsOf('q-sheet', E(cls), footHtml && 'q-has-foot')}"${d}${name ? ` aria-label="${E(name)}"` : ''}><div class="q-sheet-head">${leadHtml || '<span></span>'}<h2>${E(title)}</h2>${trailingHtml || `<button class="q-close" type="button" aria-label="${E(closeLabel)}" data-q-close>✕</button>`}</div>${joinHtml(bodyHtml)}${footHtml}</dialog>`;
+  return `<dialog class="${clsOf('q-sheet', E(cls), footHtml && 'q-has-foot')}"${d}${name ? ` aria-label="${E(name)}"` : ''}><div class="q-sheet-head">${leadHtml || '<span></span>'}<h2>${E(title)}</h2>${subtitle ? `<small class="q-sheet-sub">${E(subtitle)}</small>` : ''}${trailingHtml || `<button class="q-close" type="button" aria-label="${E(closeLabel)}" data-q-close>✕</button>`}</div>${joinHtml(bodyHtml)}${footHtml}</dialog>`;
 }
 export function openSheetHtml(html, { onClose = () => {} } = {}) {
   const t = document.createElement('template');
@@ -798,7 +798,7 @@ export function stockRowHtml({ logo = '', name = '', sub = '', spark = [], price
   const { tone } = stockMove({ spark, changePct, change });
   const own = stockPill({ changePct, change, currency });
   const chart = sparkSvg(spark, tone);
-  return `<div class="q-stock"${open != null ? ` role="button" tabindex="0"${dataOf({ open })}` : ''}${dataOf(data)}>${logoTileHtml(logo, { size: 40, alt: name, fallbackText: name })}<div class="q-stock-id"><b>${E(name)}</b>${sub ? `<small>${E(sub)}</small>` : ''}</div>${chart ? `<span class="q-stock-spark">${chart}</span>` : ''}<div class="q-stock-px"><b class="num">${E(stockPrice(price, currency))}</b>${own == null ? movePillHtml(changePct) : `<span class="q-move ${tone} solid">${E(own)}</span>`}</div></div>`;
+  return `<div class="q-stock"${open != null ? ` role="button" tabindex="0"${dataOf({ open })}` : ''}${dataOf(data)}>${logoTileHtml(logo, { size: 40, alt: name, fallbackText: name })}<div class="q-stock-id"><b>${E(name)}</b>${sub ? `<small>${E(sub)}</small>` : ''}</div>${chart ? `<span class="q-stock-spark">${chart}</span>` : ''}<div class="q-stock-px"><b class="num" data-q-live>${E(stockPrice(price, currency))}</b>${own == null ? movePillHtml(changePct) : `<span class="q-move ${tone} solid">${E(own)}</span>`}</div></div>`;
 }
 export function ballRowHtml(nums, { special = [], hit = [], size = 28 } = {}) {
   const ball = (n, cls) => `<span class="${clsOf('q-ball', cls, n == null && 'empty', hit.includes(n) && 'hit')}">${n == null ? '' : E(n)}</span>`;
@@ -1171,11 +1171,11 @@ export function stockRow({ logo = '', name = '', sub = '', spark = [], price = n
   const own = stockPill({ changePct, change, currency });
   const pill = own == null ? movePill(changePct) : h('span', { class: `q-move ${tone} solid`, text: own });
   const chart = sparkSvg(spark, tone);
-  return h('div', { class: 'q-stock', ...(onOpen ? { role: 'button', tabindex: '0', onclick: onOpen, onkeydown: e => e.key === 'Enter' && onOpen(e) } : {}), ...dataProps(data) }, [
+  return h('div', { class: 'q-stock', ...(onOpen ? { role: 'button', tabindex: '0', onclick: onOpen, onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { if (e.key === ' ') e.preventDefault?.(); onOpen(e); } } } : {}), ...dataProps(data) }, [
     logoTile(logo, { size: 40, alt: name, fallbackText: name }),
     h('div', { class: 'q-stock-id' }, [h('b', { text: name }), sub ? h('small', { text: sub }) : null]),
     chart ? h('span', { class: 'q-stock-spark', html: chart }) : null,
-    h('div', { class: 'q-stock-px' }, [h('b', { class: 'num', text: stockPrice(price, currency) }), pill])
+    h('div', { class: 'q-stock-px' }, [h('b', { class: 'num', 'data-q-live': '', text: stockPrice(price, currency) }), pill])
   ]);
 }
 
@@ -1227,22 +1227,24 @@ const ringSvg = (v, size, stroke) => {
   const arc = v > 0 ? `<circle class="q-ring-arc" cx="${c}" cy="${c}" r="${r}" fill="none" stroke-width="${stroke}" stroke-linecap="round" pathLength="100" stroke-dasharray="${+(v * 100).toFixed(2)} 100" transform="rotate(-90 ${c} ${c})"/>` : '';
   return `<svg class="q-ring-svg" viewBox="0 0 ${size} ${size}" aria-hidden="true"><circle class="q-ring-track" cx="${c}" cy="${c}" r="${r}" fill="none" stroke-width="${stroke}"/>${arc}</svg>`;
 };
-const ringParts = (value, { size = 56, stroke = 6, label, sub = '' } = {}) => {
-  const v = clamp01(value);
-  return { v, size: Math.max(16, Number(size) || 56), stroke: Math.max(1, Number(stroke) || 6), label: label ?? `${Math.round(v * 100)}%`, sub };
+const ringParts = (value, { size = 56, stroke = 6, label, sub = '', done = false, doneCheck = false } = {}) => {
+  const v = done === true ? 1 : clamp01(value);
+  const check = done === true || (doneCheck === true && v >= 1);
+  return { v, check, size: Math.max(16, Number(size) || 56), stroke: Math.max(1, Number(stroke) || 6), label: label ?? `${Math.round(v * 100)}%`, sub };
 };
 // progressRing(0.7, { size: 56, stroke: 6, label: '70%', sub: '', tint }): value 0..1 (clamped);
-// label centred (default the percent), sub a small line under it.
+// label centred (default the percent), sub a small line under it. `done: true` (or value >= 1 with
+// `doneCheck: true`): the ring full and a check glyph centred in place of the label.
 export function progressRing(value, opts = {}) {
   const p = ringParts(value, opts);
-  const root = h('div', { class: clsOf('q-ring', opts.tint && 'tinted'), role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(Math.round(p.v * 100)), html: ringSvg(p.v, p.size, p.stroke) }, [h('span', { class: 'q-ring-txt' }, [h('b', { class: 'q-ring-l', text: String(p.label) }), p.sub ? h('small', { class: 'q-ring-s', text: String(p.sub) }) : null])]);
+  const root = h('div', { class: clsOf('q-ring', opts.tint && 'tinted', p.check && 'done'), role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(Math.round(p.v * 100)), html: ringSvg(p.v, p.size, p.stroke) }, [h('span', { class: 'q-ring-txt' }, [p.check ? h('i', { class: 'q-ring-check', 'aria-hidden': 'true', html: icons.check }) : h('b', { class: 'q-ring-l', text: String(p.label) }), p.sub ? h('small', { class: 'q-ring-s', text: String(p.sub) }) : null])]);
   root.style.setProperty('--s', `${p.size}px`);
   if (opts.tint) root.style.setProperty('--t', opts.tint);
   return root;
 }
 export function progressRingHtml(value, opts = {}) {
   const p = ringParts(value, opts);
-  return `<div class="${clsOf('q-ring', opts.tint && 'tinted')}" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(p.v * 100)}"${styleOf(['--s', `${p.size}px`], ['--t', opts.tint])}>${ringSvg(p.v, p.size, p.stroke)}<span class="q-ring-txt"><b class="q-ring-l">${E(p.label)}</b>${p.sub ? `<small class="q-ring-s">${E(p.sub)}</small>` : ''}</span></div>`;
+  return `<div class="${clsOf('q-ring', opts.tint && 'tinted', p.check && 'done')}" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(p.v * 100)}"${styleOf(['--s', `${p.size}px`], ['--t', opts.tint])}>${ringSvg(p.v, p.size, p.stroke)}<span class="q-ring-txt">${p.check ? `<i class="q-ring-check" aria-hidden="true">${icons.check}</i>` : `<b class="q-ring-l">${E(p.label)}</b>`}${p.sub ? `<small class="q-ring-s">${E(p.sub)}</small>` : ''}</span></div>`;
 }
 
 // -- Pass stack (Wallet-style) --
@@ -1444,48 +1446,76 @@ export function monthGrid(year, month) {
 const isoDay = (y, m, d) => `${y}-${pad2(m)}-${pad2(d)}`;
 const todayKey = t => (t instanceof Date ? isoDay(t.getFullYear(), t.getMonth() + 1, t.getDate()) : typeof t === 'string' && t ? t : todayKey(new Date()));
 const calLang = lang => lang || (/^en/i.test(globalThis.document?.documentElement?.lang || '') ? 'en' : 'zh');
-const calParts = ({ year, month, marks = {}, today, lang } = {}) => {
-  const g = monthGrid(year, month);
+const calParts = ({ year, month, marks = {}, today, lang, last } = {}) => {
   const tk = todayKey(today);
-  return { ...g, tk, week: WEEK[calLang(lang)] || WEEK.zh, days_: Array.from({ length: g.days }, (_, i) => { const key = isoDay(year, month, i + 1); const mark = marks?.[key]; return { d: i + 1, key, mark: mark ? String(mark).replace(/[^\w-]/g, '') : '', today: key === tk }; }) };
+  const cell = (key, d) => { const mark = marks?.[key]; return { d, key, mark: mark ? String(mark).replace(/[^\w-]/g, '') : '', today: key === tk }; };
+  const week = WEEK[calLang(lang)] || WEEK.zh;
+  const n = Math.floor(Number(last));
+  if (n >= 1) {
+    const [ty, tm, td] = tk.split('-').map(Number);
+    const end = Date.UTC(ty, tm - 1, td);
+    const days_ = Array.from({ length: n }, (_, i) => { const t = new Date(end - (n - 1 - i) * 864e5); return cell(isoDay(t.getUTCFullYear(), t.getUTCMonth() + 1, t.getUTCDate()), t.getUTCDate()); });
+    return { offset: new Date(end - (n - 1) * 864e5).getUTCDay(), days: n, tk, week, days_, label: `last ${n}` };
+  }
+  const g = monthGrid(year, month);
+  return { ...g, tk, week, label: `${year}-${pad2(month)}`, days_: Array.from({ length: g.days }, (_, i) => cell(isoDay(year, month, i + 1), i + 1)) };
 };
 // monthCalendar({ year, month (1..12), marks: { 'YYYY-MM-DD': 'done' | 'part' | any word }, today, onPick(key) | data }).
+// `last: N` instead of year/month: the trailing N days ending today, in Sunday-first week rows (leading blanks).
 // today: a Date or 'YYYY-MM-DD' (default now). Marks are `.m-<word>`; done is a filled dot, part a soft one.
-export function monthCalendar({ year, month, marks = {}, today, lang, onPick = null, data = null } = {}) {
-  const p = calParts({ year, month, marks, today, lang });
-  const root = h('div', { class: 'q-cal', role: 'group', 'aria-label': `${year}-${pad2(month)}` });
+export function monthCalendar({ year, month, marks = {}, today, lang, onPick = null, data = null, last = null } = {}) {
+  const p = calParts({ year, month, marks, today, lang, last });
+  const root = h('div', { class: 'q-cal', role: 'group', 'aria-label': p.label });
   root.style.setProperty('--off', String(p.offset));
   root.append(...p.week.map(w => h('span', { class: 'q-cal-w', 'aria-hidden': 'true', text: w })));
-  for (const d of p.days_) {
+  for (const [i, d] of p.days_.entries()) {
     const cls = clsOf('q-cal-d', d.mark && `m-${d.mark}`, d.today && 'today');
     const props = { class: cls, 'aria-label': d.key + (d.mark ? ` ${d.mark}` : ''), ...(d.today ? { 'aria-current': 'date' } : {}), text: String(d.d) };
     const el = onPick || data ? h('button', { type: 'button', ...props, ...dataProps(data), 'data-day': d.key, onclick: () => onPick?.(d.key) }) : h('span', props);
-    if (d.d === 1) el.style.setProperty('grid-column-start', String(p.offset + 1));
+    if (i === 0) el.style.setProperty('grid-column-start', String(p.offset + 1));
     root.append(el);
   }
   return root;
 }
-export function monthCalendarHtml({ year, month, marks = {}, today, lang, pick = null, data = null } = {}) {
-  const p = calParts({ year, month, marks, today, lang });
-  const days = p.days_.map(d => {
+export function monthCalendarHtml({ year, month, marks = {}, today, lang, pick = null, data = null, last = null } = {}) {
+  const p = calParts({ year, month, marks, today, lang, last });
+  const days = p.days_.map((d, i) => {
     const cls = clsOf('q-cal-d', d.mark && `m-${E(d.mark)}`, d.today && 'today');
-    const common = `class="${cls}" aria-label="${E(d.key + (d.mark ? ` ${d.mark}` : ''))}"${d.today ? ' aria-current="date"' : ''}${d.d === 1 ? styleOf(['grid-column-start', String(p.offset + 1)]) : ''}`;
+    const common = `class="${cls}" aria-label="${E(d.key + (d.mark ? ` ${d.mark}` : ''))}"${d.today ? ' aria-current="date"' : ''}${i === 0 ? styleOf(['grid-column-start', String(p.offset + 1)]) : ''}`;
     return pick != null || data ? `<button type="button" ${common} data-pick="${E(d.key)}"${dataOf(data)}>${d.d}</button>` : `<span ${common}>${d.d}</span>`;
   });
-  return `<div class="q-cal" role="group" aria-label="${year}-${pad2(month)}"${styleOf(['--off', String(p.offset)])}>${p.week.map(w => `<span class="q-cal-w" aria-hidden="true">${E(w)}</span>`).join('')}${days.join('')}</div>`;
+  return `<div class="q-cal" role="group" aria-label="${E(p.label)}"${styleOf(['--off', String(p.offset)])}>${p.week.map(w => `<span class="q-cal-w" aria-hidden="true">${E(w)}</span>`).join('')}${days.join('')}</div>`;
 }
 
 // -- Panel grid --
-// panelGrid([{ label, big, sub, icon (an icons key / svg / text), tint }]): two columns of tiles.
+// panelGrid([{ label, big, sub, icon (an icons key / svg / text), tint, unit, level, art, data, onOpen }]): two columns of tiles.
+// unit: a <small> right after the big number ('°', 'mm'); level: a small tag (a string or { text, tone }); art: a node
+// (or trusted HTML) drawn beside the big value, e.g. a sparkline; data: data-* attributes; onOpen makes the tile a
+// role=button (Enter/Space too). The twin: `open` (a value) makes it role=button tabindex=0 data-open, for wireTaps.
+const panelTone = t => (typeof t === 'object' && t && t.tone ? String(t.tone).replace(/[^\w-]/g, '') : '');
+const panelLevel = t => (typeof t === 'object' && t ? t.text : t);
+const hasLevel = t => { const x = panelLevel(t); return x != null && x !== ''; };
 export function panelGrid(items) {
   return h('div', { class: 'q-panels' }, (items || []).map(it => {
-    const el = h('div', { class: 'q-panel' }, [h('span', { class: 'q-panel-l' }, [it.icon ? h('i', { 'aria-hidden': 'true', html: iconHtml(it.icon) }) : null, h('span', { text: it.label ?? '' })]), h('b', { class: 'q-panel-v', text: String(it.big ?? '') }), it.sub ? h('small', { class: 'q-panel-s', text: it.sub }) : null]);
+    const lv = hasLevel(it.level) ? h('span', { class: clsOf('q-panel-lv', panelTone(it.level)), text: String(panelLevel(it.level)) }) : null;
+    const big = h('b', { class: 'q-panel-v' }, [String(it.big ?? ''), it.unit != null && it.unit !== '' ? h('small', { class: 'q-panel-u', text: String(it.unit) }) : null]);
+    const art = it.art == null || it.art === '' ? null : typeof it.art === 'string' ? h('span', { class: 'q-panel-art', 'aria-hidden': 'true', html: it.art }) : h('span', { class: 'q-panel-art', 'aria-hidden': 'true' }, [it.art]);
+    const el = h('div', { class: 'q-panel', ...(it.onOpen ? { role: 'button', tabindex: '0', onclick: it.onOpen, onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { if (e.key === ' ') e.preventDefault?.(); it.onOpen(e); } } } : {}), ...dataProps(it.data) }, [
+      h('span', { class: 'q-panel-l' }, [it.icon ? h('i', { 'aria-hidden': 'true', html: iconHtml(it.icon) }) : null, h('span', { text: it.label ?? '' }), lv]),
+      art ? h('div', { class: 'q-panel-row' }, [big, art]) : big,
+      it.sub ? h('small', { class: 'q-panel-s', text: it.sub }) : null
+    ]);
     if (it.tint) el.style.setProperty('--t', it.tint);
     return el;
   }));
 }
 export function panelGridHtml(items) {
-  return `<div class="q-panels">${(items || []).map(it => `<div class="q-panel"${styleOf(['--t', it.tint])}><span class="q-panel-l">${it.icon ? `<i aria-hidden="true">${iconHtml(it.icon)}</i>` : ''}<span>${E(it.label ?? '')}</span></span><b class="q-panel-v">${E(it.big ?? '')}</b>${it.sub ? `<small class="q-panel-s">${E(it.sub)}</small>` : ''}</div>`).join('')}</div>`;
+  return `<div class="q-panels">${(items || []).map(it => {
+    const lv = hasLevel(it.level) ? `<span class="${clsOf('q-panel-lv', E(panelTone(it.level)))}">${E(panelLevel(it.level))}</span>` : '';
+    const big = `<b class="q-panel-v">${E(it.big ?? '')}${it.unit != null && it.unit !== '' ? `<small class="q-panel-u">${E(it.unit)}</small>` : ''}</b>`;
+    const art = typeof it.art === 'string' && it.art ? `<span class="q-panel-art" aria-hidden="true">${it.art}</span>` : '';
+    return `<div class="q-panel"${it.open != null ? ` role="button" tabindex="0"${dataOf({ open: it.open })}` : ''}${dataOf(it.data)}${styleOf(['--t', it.tint])}><span class="q-panel-l">${it.icon ? `<i aria-hidden="true">${iconHtml(it.icon)}</i>` : ''}<span>${E(it.label ?? '')}</span>${lv}</span>${art ? `<div class="q-panel-row">${big}${art}</div>` : big}${it.sub ? `<small class="q-panel-s">${E(it.sub)}</small>` : ''}</div>`;
+  }).join('')}</div>`;
 }
 
 // -- League tile --

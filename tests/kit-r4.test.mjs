@@ -457,3 +457,80 @@ test('CSS: Home parts (r4) sits just before Foundations and styles what the part
   assert.ok(!/#[0-9a-f]{3,8}\b/i.test(sec.replace(/#fff(fff)?\b|#000\b/gi, '')), 'colours are tokens (white aside)');
   assert.ok(sec.includes('min-height: 44px'));
 });
+
+// ---- additions: panel tiles, trailing calendar, done ring ----
+test('panelGrid: unit, level, art, data, onOpen (and the twin: open, art as HTML)', () => {
+  let opened = 0;
+  const art = new FakeEl('svg');
+  const items = [{ label: '雨量', big: '12', unit: 'mm', level: { text: '偏多', tone: 'up' }, art, data: { k: 'rain' }, onOpen: () => opened++ }, { label: 'UV', big: '3', level: '低', art: '<svg class="spk"></svg>' }, { label: '平', big: '1' }];
+  const g = ui.panelGrid(items);
+  const [a, b, c] = withCls(g, 'q-panel');
+  assert.equal(withCls(a, 'q-panel-v')[0].textContent, '12mm');
+  assert.equal(withCls(a, 'q-panel-u')[0].tag, 'small');
+  assert.equal(withCls(a, 'q-panel-lv')[0].className, 'q-panel-lv up');
+  assert.equal(withCls(b, 'q-panel-lv')[0].className, 'q-panel-lv');
+  assert.equal(a.getAttribute('data-k'), 'rain');
+  assert.equal(a.getAttribute('role'), 'button');
+  assert.equal(a.getAttribute('tabindex'), '0');
+  a.dispatch('click');
+  a.dispatch('keydown', { key: 'Enter' });
+  const sp = a.dispatch('keydown', { key: ' ' });
+  assert.equal(opened, 3);
+  assert.equal(sp.defaultPrevented, true, 'Space does not scroll');
+  assert.equal(withCls(a, 'q-panel-art')[0].children[0], art);
+  assert.ok(withCls(b, 'q-panel-art')[0].innerHTML.includes('spk'));
+  assert.equal(c.getAttribute('role'), null);
+  assert.equal(withCls(c, 'q-panel-row').length + withCls(c, 'q-panel-lv').length, 0, 'a plain tile is as before');
+  const html = ui.panelGridHtml([{ ...items[0], art: '<i class="x"></i>', open: 'rain' }, items[1], { label: '<x>', big: '1', unit: '<u>', level: '<l>' }]);
+  assert.ok(html.includes('role="button" tabindex="0" data-open="rain" data-k="rain"'));
+  assert.ok(html.includes('<small class="q-panel-u">mm</small>') && html.includes('<i class="x"></i>') && html.includes('q-panel-lv up'));
+  assert.ok(html.includes('&#60;u&#62;') && html.includes('&#60;l&#62;') && !html.includes('<u>'));
+  const twinDom = ui.panelGrid([{ ...items[0], art: '<i class="x"></i>' }, items[1], { label: '<x>', big: '1', unit: '<u>', level: '<l>' }]);
+  assert.deepEqual(sorted(classesOfHtml(html)), sorted(classesOfTree(twinDom)));
+});
+
+test('monthCalendar: last N days ending today, Sunday-first rows, blanks, marks, pick; twin matches', () => {
+  const opts = { last: 35, today: '2026-10-19', lang: 'en', marks: { '2026-10-19': 'done', '2026-09-15': 'part' } };
+  const c = ui.monthCalendar(opts);
+  const days = withCls(c, 'q-cal-d');
+  assert.equal(days.length, 35);
+  assert.equal(days[0].getAttribute('data-day') ?? days[0].getAttribute('aria-label').split(' ')[0], '2026-09-15');
+  assert.equal(px(c, '--off'), '2', '2026-09-15 is a Tuesday');
+  assert.equal(px(days[0], 'grid-column-start'), '3');
+  assert.equal(days.at(-1).textContent, '19');
+  assert.ok(days.at(-1).classList.contains('today') && days.at(-1).classList.contains('m-done'));
+  assert.ok(days[0].classList.contains('m-part'));
+  assert.equal(days[16].textContent, '1', 'rolls over the month');
+  assert.equal(withCls(c, 'q-cal-w').length, 7, 'weekday header kept');
+  const picked = [];
+  const pc = ui.monthCalendar({ ...opts, onPick: k => picked.push(k) });
+  withCls(pc, 'q-cal-d')[34].dispatch('click');
+  assert.deepEqual(picked, ['2026-10-19']);
+  const html = ui.monthCalendarHtml(opts);
+  assert.equal((html.match(/q-cal-d/g) || []).length, 35);
+  assert.ok(html.includes('grid-column-start:3') && html.includes('--off:2'));
+  assert.deepEqual(sorted(classesOfHtml(html)), sorted(classesOfTree(c)));
+  assert.equal(withCls(ui.monthCalendar({ last: 1, today: '2026-03-01' }), 'q-cal-d').length, 1);
+});
+
+test('progressRing: done fills the ring and centres a check instead of the label', () => {
+  const r = ui.progressRing(0.2, { done: true, label: '20%', size: 48 });
+  assert.ok(r.classList.contains('done'));
+  assert.equal(r.getAttribute('aria-valuenow'), '100');
+  assert.match(r.innerHTML, /stroke-dasharray="100 100"/);
+  assert.equal(withCls(r, 'q-ring-l').length, 0);
+  assert.ok(withCls(r, 'q-ring-check')[0].innerHTML.includes('<svg'));
+  assert.equal(withCls(ui.progressRing(1), 'q-ring-check').length, 0, 'value 1 alone is as before');
+  assert.equal(withCls(ui.progressRing(1, { doneCheck: true }), 'q-ring-check').length, 1);
+  assert.equal(withCls(ui.progressRing(0.9, { doneCheck: true }), 'q-ring-check').length, 0);
+  const html = ui.progressRingHtml(0.2, { done: true });
+  assert.ok(html.includes('q-ring done') && html.includes('q-ring-check') && !html.includes('q-ring-l'));
+  assert.deepEqual(sorted(classesOfHtml(html)), sorted(classesOfTree(ui.progressRing(0.2, { done: true }))));
+  assert.ok(ui.progressRingHtml(1, { doneCheck: true }).includes('q-ring-check'));
+});
+
+test('CSS: panel parts, ring check, stock flash (calm under reduced motion), sheet subtitle', () => {
+  for (const sel of ['.q-panel-u', '.q-panel-lv', '.q-panel-art', '.q-ring-check', '.q-sheet-sub', '[data-q-live].q-flash-up', '[data-q-live].q-flash-down']) assert.ok(css.includes(sel), sel);
+  assert.ok(/@keyframes q-flash-up[\s\S]*--q-up/.test(css) && /@keyframes q-flash-down[\s\S]*--q-down/.test(css));
+  assert.ok(/prefers-reduced-motion: reduce\)\s*\{\s*\[data-q-live\]\.q-flash-up/.test(css));
+});
