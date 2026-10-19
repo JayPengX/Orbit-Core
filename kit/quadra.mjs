@@ -3690,11 +3690,17 @@ export function tabBar({ tabs, onSelect, hash = id => `#${id}`, nav = document.g
         // A tab the person chose fades in, as iOS 26's do (never the first
         // one: the page opens still). Opacity only: a transform would make
         // the panel hold its fixed children for the moment.
+        // (Started by the Web Animations API where there is one: the class taken
+        // off and put back needed a layout of the whole panel first, before the
+        // app had even drawn it, on every tab tap.)
         if (on && panel && changed && !first && !reducedMotion()) {
-          panel.classList.remove('q-panel-in');
-          void panel.offsetWidth;
-          panel.classList.add('q-panel-in');
-          panel.addEventListener('animationend', () => panel.classList.remove('q-panel-in'), { once: true });
+          if (typeof panel.animate === 'function') panel.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 240, easing: 'cubic-bezier(0.32, 0.72, 0, 1)' });
+          else {
+            panel.classList.remove('q-panel-in');
+            void panel.offsetWidth;
+            panel.classList.add('q-panel-in');
+            panel.addEventListener('animationend', () => panel.classList.remove('q-panel-in'), { once: true });
+          }
         }
       }
       // Only a change of tab moves the address (the first paint leaves it:
