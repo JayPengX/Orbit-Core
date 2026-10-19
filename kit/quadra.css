@@ -262,6 +262,10 @@ body {
   background-color: var(--q-page);
   color: var(--q-text);
 }
+/* No browser page margin (an app's own body margin still wins). */
+:where(body) {
+  margin: 0;
+}
 ::selection {
   background: color-mix(in srgb, var(--q-accent) 28%, transparent);
 }
@@ -1596,7 +1600,7 @@ button,
   text-overflow: ellipsis;
 }
 .q-section-head a,
-.q-section-head button {
+.q-section-head button:not(.q-tag) {
   flex: none;
   border: 0;
   background: none;
@@ -1618,6 +1622,9 @@ button,
   gap: 8px;
   overflow-x: auto;
   scrollbar-width: none;
+}
+/* (Its padding gives way to an app's own: a rail of chips bleeding to the edge.) */
+:where(.q-chips) {
   padding: 2px 0 4px;
 }
 .q-chips::-webkit-scrollbar {
@@ -4040,7 +4047,7 @@ div.q-ritem {
   scroll-snap-align: start;
   min-width: 0;
 }
-.q-rail.small {
+:where(.q-rail.small) {
   --q-rail-w: 148px;
 }
 
@@ -4137,6 +4144,14 @@ div.q-ritem {
   flex-wrap: wrap;
   gap: 4px 6px;
   margin-top: 2px;
+}
+/* One line of tags: what doesn't fit is cut off at the edge. */
+.q-tags.one-line {
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+.q-tags.one-line > * {
+  flex: none;
 }
 /* A row's right-hand stack: a value over a tag or a small line (holdings). */
 .q-ritem-end {
