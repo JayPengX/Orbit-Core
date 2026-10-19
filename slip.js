@@ -84,7 +84,8 @@ Rules:
 - sport: soccer (足球), baseball (棒球), basketball (籃球), football (美式足球), hockey (冰球), or other.
 - league: the competition, as one of: ${SCAN_LEAGUES.join(', ')} (MLB=mlb, 中職=cpbl, 日職=npb, 韓職=kbo, NBA=nba, 英超=epl, 西甲=laliga, 義甲=seriea, 德甲=bundesliga, 法甲=ligue1, 歐冠=ucl, 歐霸=uel, 歐協聯=uecl, 英冠=championship, 荷甲=eredivisie, 美職足=mls, 日職聯=jleague, 世界盃=worldcup). If only the sport is printed, your best guess from the teams (e.g. Chelsea and Everton: epl), or other.
 - teams: the two teams exactly as printed (Chinese as on the ticket), away/guest (客) first, home (主) second when the ticket says which; else in printed order. teamsEn: your best English names for the same two teams (e.g. "New York Yankees", "Manchester City"), or the printed text if unsure.
-- date: the game's own date in Taiwan as YYYY-MM-DD only if printed next to the pick (a year-less date is the one nearest today); else null. The purchase date (購買日期, often in the ROC calendar: 民 115年 is 2026) is not the game's date.
+- bought: the day the ticket was bought (購買日期 / 投注時間 / 交易時間, often in the ROC calendar: 民 115年 is 2026) as YYYY-MM-DD; null if not printed. The ticket may be old: its games may be long over.
+- date: the game's own date in Taiwan as YYYY-MM-DD only if printed next to the pick (a year-less date is the one nearest the day bought, else nearest today, never before the day bought); else null. The day bought is not the game's date.
 - kind: ml for 不讓分 / 獨贏 / 勝負 / 勝平負; spread for 讓分; total for 大小 / 總分; oddeven for 單雙. Anything else: other.
 - pick: for ml and spread, the chosen team exactly as written in teams, or "draw" for 和 / 平; for total "over" (大) or "under" (小); for oddeven "odd" (單) or "even" (雙).
 - line: for spread, the chosen team's handicap as a signed number (giving 1.5 points is -1.5, getting them is +1.5); for total, the total line; else null.
@@ -115,6 +116,7 @@ const SCAN_SCHEMA = {
         required: ['sport', 'league', 'teams', 'teamsEn', 'kind', 'pick', 'odds']
       }
     },
+    bought: { type: 'string', nullable: true },
     combos: { type: 'array', items: { type: 'string' } },
     stakePer: { type: 'number', nullable: true },
     total: { type: 'number', nullable: true }
