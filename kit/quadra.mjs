@@ -2055,7 +2055,14 @@ export function accountButton(s, { extra = null } = {}) {
 // title, body, ok }) resolves once closed. A centred card over the page (and
 // over an open sheet), Esc or a tap outside cancels.
 // `points`: short rows ([icon, title, line]) under the body, instead of a
-// paragraph that says the same.
+// paragraph that says the same. A point may also be { icon, text, tint }: icon
+// a key of the kit's icons, drawn as a small tinted icon, then one line of text.
+const isIconPoint = p => p != null && typeof p === 'object' && !Array.isArray(p);
+const iconPoint = ({ icon, text = '', tint = '' }) =>
+  node('li', { class: 'q-ask-icon-point' }, [
+    node('span', { class: 'q-ask-mark ico', 'aria-hidden': 'true', ...(Object.hasOwn(icons, icon) ? { html: icons[icon] } : { text: icon == null ? '' : String(icon) }), ...(tint ? { style: `--t:${tint}` } : {}) }),
+    node('span', {}, [node('strong', { text })])
+  ]);
 export function ask({ title, body = '', points = [], ok = '', cancel = '', danger = false, icon = '', tint = '', lang = detectLang(), alertOnly = false } = {}) {
   // `icon` a key of the kit's icons ('ticket'): a 56px colour tile (`tint`); anything else (an emoji) as before.
   const named = typeof icon === 'string' && Object.hasOwn(icons, icon);
@@ -2080,7 +2087,7 @@ export function ask({ title, body = '', points = [], ok = '', cancel = '', dange
       node('h2', { id: 'q-ask-title', class: 'q-ask-title', text: title }),
       body ? node('p', { class: 'q-ask-body', text: body }) : null,
       points.length
-        ? node('ul', { class: 'q-ask-points' }, points.map(([mark, head, line]) => node('li', {}, [node('span', { class: 'q-ask-mark', 'aria-hidden': 'true', text: mark }), node('span', {}, [node('strong', { text: head }), line ? node('small', { text: line }) : null].filter(Boolean))])))
+        ? node('ul', { class: 'q-ask-points' }, points.map(point => (isIconPoint(point) ? iconPoint(point) : (([mark, head, line]) => node('li', {}, [node('span', { class: 'q-ask-mark', 'aria-hidden': 'true', text: mark }), node('span', {}, [node('strong', { text: head }), line ? node('small', { text: line }) : null].filter(Boolean))]))(point))))
         : null,
       node('div', { class: 'q-ask-actions' }, [
         alertOnly ? null : node('button', { class: 'q-btn', type: 'button', text: cancel || (en ? 'Cancel' : '取消'), onclick: () => finish(false) }),

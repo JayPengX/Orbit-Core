@@ -5085,6 +5085,114 @@ div.q-ritem {
   --t: var(--q-place-star);
 }
 
+/* ---- Securities parts ----
+   - .q-move (.up|.down|.flat, .solid): a move as a pill (movePill), red up / green down (Taiwan);
+   - .q-stock: a stock row (stockRow): logo, name over sub, .q-spark, price over a .q-move;
+   - .q-ask-mark.ico: a confirm point's tinted icon (ask points: { icon, text });
+   - .q-sh-status: a sheet hero's status row (sheetHero status). */
+.q-move {
+  --c: var(--q-flat);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 64px;
+  padding: 0 8px;
+  border-radius: 7px;
+  color: var(--c);
+  font: 600 13px/22px var(--q-font);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.q-move.up {
+  --c: var(--q-up);
+}
+.q-move.down {
+  --c: var(--q-down);
+}
+.q-move.solid {
+  background: var(--c);
+  color: #ffffff;
+}
+.q-stock {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 8px 0;
+  color: inherit;
+  text-align: left;
+}
+.q-stock[role='button'] {
+  cursor: pointer;
+}
+.q-stock-id {
+  display: grid;
+  min-width: 0;
+}
+.q-stock-id b {
+  overflow: hidden;
+  font: 600 16px/22px var(--q-font);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.q-stock-id small {
+  overflow: hidden;
+  color: var(--q-label-2);
+  font: var(--q-t-footnote);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.q-stock-spark {
+  display: block;
+  width: 56px;
+  height: 24px;
+}
+.q-spark {
+  display: block;
+  width: 100%;
+  height: 100%;
+  color: var(--q-flat);
+}
+.q-spark.up {
+  color: var(--q-up);
+}
+.q-spark.down {
+  color: var(--q-down);
+}
+.q-stock-px {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  min-width: 72px;
+}
+.q-stock-px b {
+  font: 600 16px/20px var(--q-font);
+  font-variant-numeric: tabular-nums;
+}
+.q-stock-px .q-move {
+  min-width: 0;
+  font-size: 12px;
+  line-height: 18px;
+}
+@media (max-width: 340px) {
+  .q-stock-spark {
+    display: none;
+  }
+}
+.q-ask-mark.ico {
+  --t: var(--q-accent);
+  background: color-mix(in srgb, var(--t) 16%, transparent);
+  color: var(--t);
+}
+.q-ask-mark.ico svg {
+  width: 20px;
+  height: 20px;
+}
+.q-sheet-hero .q-sh-status {
+  margin-top: 8px;
+}
+
 /* ---- Foundations (design review) ----
    - .q-toast-text / .q-toast-action: a toast's text and its button (ui.mjs toast's action);
    - .q-seg-count: the small badge after a segmented label (segmented / segHtml count);
