@@ -109,8 +109,9 @@ export function pointsMarkets(m, { spreadLine, totalLine }) {
   }
   if (m.total != null) {
     const mainTotal = totalLine != null ? (totalLine % 1 ? totalLine : totalLine + 0.5) : half(m.total);
+    // (Whole steps, so every total stays on a half point as 運彩's do: no push.)
     for (const d of [-2, -1, 0, 1, 2]) {
-      const line = round2(mainTotal + d * step * 1.5);
+      const line = round2(mainTotal + d * Math.round(step * 1.5));
       const over = 1 - normalCdf((line - m.total) / m.totalSd);
       if (over < 0.04 || over > 0.96) continue;
       out.push({ kind: 'total', market: `total|${line}`, line, posted: d === 0, main: d === 0, steps: Math.abs(d), cut: CUT.twoWay, picks: [
@@ -329,6 +330,28 @@ export function hockeyWinner(means) {
   return { away: chance(grid, (a, h) => a > h), draw: chance(grid, (a, h) => a === h), home: chance(grid, (a, h) => h > a) };
 }
 
+// Soccer's 讓分 as 台灣運彩 sells it: three ways on whole goals, never a
+// half-goal two-way line. The favourite 讓1分 wins it by two or more, by
+// exactly one it's 讓分和, anything else goes to the other side (主-1 / 和 /
+// 客+1); 讓2分 for a big favourite. `line` is the away side's (−1: the away
+// team gives one), as every handicap's is; the posted one is the most even.
+export const SOCCER_HCAP_LINES = [1, 2];
+export function soccerHandicaps(grid, favourite) {
+  const out = [];
+  for (const n of SOCCER_HCAP_LINES) {
+    const awayLine = favourite === 'away' ? -n : n;
+    const away = chance(grid, (a, h) => a + awayLine > h);
+    const draw = chance(grid, (a, h) => a + awayLine === h);
+    const picks = [{ side: 'home', fair: 1 - away - draw }, { side: 'draw', fair: draw }, { side: 'away', fair: away }];
+    if (picks.some(p => p.fair < 0.04)) continue;
+    out.push({ kind: 'hcap3', market: `h3|${awayLine}`, line: awayLine, awayLine, giver: favourite, cut: CUT.threeWay, picks });
+  }
+  const even = m => Math.max(...m.picks.map(p => p.fair));
+  const main = out.reduce((best, m) => (!best || even(m) < even(best) ? m : best), null);
+  for (const m of out) m.posted = m === main;
+  return out;
+}
+
 // Hockey's 正確進球數: 0 to 8 goals in 60 minutes, then 9 or more.
 export const GOAL_COUNTS = [...Array.from({ length: 9 }, (_, k) => [k, k]), [9, null]];
 
@@ -338,19 +361,20 @@ export function goalMarkets(means, { family, totalLine }) {
   const out = [];
   const grid = family === 'hockey' ? hockeyGrid(means) : goalGrid(means);
   const favourite = means.away > means.home ? 'away' : 'home';
-  const lines = family === 'hockey' ? [1.5, 2.5] : [0.5, 1.5, 2.5];
-  // Handicaps: the favourite giving goals, and taking them for hockey's puck line.
-  for (const line of lines) {
-    for (const giver of family === 'hockey' ? [favourite, favourite === 'away' ? 'home' : 'away'] : [favourite]) {
-      const awayLine = giver === 'away' ? -line : line;
-      const awayCover = chance(grid, (a, h) => a + awayLine > h);
-      if (awayCover < 0.04 || awayCover > 0.96) continue;
-      out.push({ kind: 'runline', market: `rl|${awayLine}`, awayLine, giver, posted: line === lines[0] && giver === favourite, cut: CUT.twoWay, picks: [
-        { side: 'away', fair: awayCover, line: awayLine },
-        { side: 'home', fair: 1 - awayCover, line: -awayLine }
-      ] });
+  if (family === 'hockey') {
+    // The puck line: the favourite giving goals, and taking them.
+    for (const line of [1.5, 2.5]) {
+      for (const giver of [favourite, favourite === 'away' ? 'home' : 'away']) {
+        const awayLine = giver === 'away' ? -line : line;
+        const awayCover = chance(grid, (a, h) => a + awayLine > h);
+        if (awayCover < 0.04 || awayCover > 0.96) continue;
+        out.push({ kind: 'runline', market: `rl|${awayLine}`, awayLine, giver, posted: line === 1.5 && giver === favourite, cut: CUT.twoWay, picks: [
+          { side: 'away', fair: awayCover, line: awayLine },
+          { side: 'home', fair: 1 - awayCover, line: -awayLine }
+        ] });
+      }
     }
-  }
+  } else out.push(...soccerHandicaps(grid, favourite));
   // 單隊大小: each team's goals.
   for (const team of ['away', 'home']) {
     for (const line of family === 'hockey' ? [1.5, 2.5, 3.5] : [0.5, 1.5, 2.5]) {

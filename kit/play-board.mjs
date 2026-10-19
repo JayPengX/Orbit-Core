@@ -346,6 +346,7 @@ function marketOptions(game, base, markets, { real = false } = {}) {
       };
       if (m.kind === 'runline') Object.assign(o, { runLine: pick.line, awayLine: m.awayLine, giver: m.giver });
       else if (HCAP_KINDS.has(m.kind)) Object.assign(o, { line: pick.line, awayLine: m.awayLine, giver: m.giver });
+      else if (m.kind === 'hcap3') Object.assign(o, { awayLine: m.awayLine, giver: m.giver });
       if (m.kind === 'teamtotal') Object.assign(o, { team: m.team, teamLine: m.line });
       if (m.kind === 'htotal' || m.kind === 'f5total' || m.kind === 'corners' || m.kind === 'tdtotal' || m.kind === 'inningtotal') Object.assign(o, { line: m.line });
       if (m.period != null) o.period = m.period;

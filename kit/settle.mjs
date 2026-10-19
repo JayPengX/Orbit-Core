@@ -125,6 +125,12 @@ export function legResult(leg, outcome) {
     case 'sethcap':
       // 讓分, and a set sport's 讓盤 on the sets won.
       return push(leg.side === 'away' ? away + leg.line - home : home + leg.line - away);
+    case 'hcap3': {
+      // Soccer's three-way 讓分: the away side's whole-goal line on the score;
+      // level after it is 讓分和 (the draw pick), never a refund.
+      const d = away + leg.line - home;
+      return win(leg.side === 'draw' ? d === 0 : leg.side === 'away' ? d > 0 : d < 0);
+    }
     case 'gametotal':
     case 'gamehcap': {
       // A set sport's 大小 and 讓局 on every set's games (points, for
