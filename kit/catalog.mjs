@@ -104,7 +104,12 @@ export const asiaMonthOf = ms => new Date(ms + 8 * 3_600_000).toISOString().slic
 // Nothing read anywhere (the proxy and every day on the device refused) is
 // an error, never a month with no games: Sports said 沒有比賽 for 中華職棒
 // while both were down (2026-10-18).
-export async function asiaMonth(getJson, league, ym, { now = Date.now(), fetchJson = directJson } = {}) {
+// (`useDirectReader(read)`: another reader of those day lists, `null` the plain one: the Worker
+// building Play's board reads none, not eighty day lists asked of TheSportsDB every ten minutes.)
+let direct = null;
+export const useDirectReader = reader => (direct = reader);
+const directly = url => (direct ? direct(url) : directJson(url));
+export async function asiaMonth(getJson, league, ym, { now = Date.now(), fetchJson = directly } = {}) {
   let down = null;
   const data = await getJson(asiaMonthUrl(league, ym)).catch(error => ((down = error), null));
   const games = Array.isArray(data?.games) ? data.games : [];

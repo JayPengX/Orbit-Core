@@ -25,7 +25,7 @@
 //
 // The crons (scheduled, below): notices, Kambi, the weather's scoring and
 // capacity on the even minutes; Play's slips and lottery on the odd ones; F1's
-// laps each minute Thursday to Monday; the family's data hourly (builders/). Every route but /eco's sign-in needs a
+// laps each minute Thursday to Monday; the family's data (builders/: Play's board every ten minutes, the rest hourly or daily). Every route but /eco's sign-in needs a
 // Quadra Pass session (`qt=`); CORS and JSON answers come from http.js. It
 // runs in Taiwan ([placement], wrangler.toml), where the people and most
 // sources are. The Quadra Pass is the only way anything is saved.
@@ -1202,8 +1202,8 @@ async function route(request, env, ctx, headers, origin) {
     return json({ error: { message: 'check=gemini|system' } }, 400, headers);
   }
   // A builder's job now (builders/run.js), by hand: Bearer DATA_PUSH_SECRET
-  // (Shared-Proxy's build.yml). ?job=watch|cutouts|buses, or
-  // ?only=asia|cpbl|sports|photos|winprob; &full=1 a full watch run.
+  // (Shared-Proxy's build.yml). ?job=watch|cutouts|buses|play, or
+  // ?only=asia|cpbl|sports|photos|winprob|play; &full=1 a full watch run.
   if (path === '/data/build' && request.method === 'POST') {
     if (!env.DATA_PUSH_SECRET || request.headers.get('Authorization') !== `Bearer ${env.DATA_PUSH_SECRET}`) return errorJson('FORBIDDEN_ORIGIN', 403, headers, request);
     const q = new URL(request.url).searchParams;

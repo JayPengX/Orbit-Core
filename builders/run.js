@@ -3,6 +3,9 @@
 // read here and, where the data proxy has a trim or a cache, through its
 // route in place. Each runs as often as its data changes, and no more:
 //
+//   :08 :18 :28 :38 :48 :58   Quadra Play's home board, every ten
+//                minutes (odds move; paced off from pace 1: a phone then
+//                reads its leagues itself, as it did before the board)
 //   :16 hourly   watch links (light: what's new; in full at 20 UTC: the
 //                season, older highlights, Apple TV)
 //   :20 hourly   a few cutouts
@@ -26,18 +29,22 @@ import { runAsia, ASIA_HOUR } from './asia.js';
 import { runSports, SPORTS_HOUR } from './sports.js';
 import { runPhotos, runCutouts, PHOTOS_HOUR } from './photos.js';
 import { runBuses } from './buses.js';
+import { runPlay } from './play.js';
 
 export const WINPROB_HOUR = 23;
 
 // `proxy(url, trim)`: a read through the data proxy's route (its trims and edge cache), its JSON or null.
 // One job a run (each run its own 30 s of CPU: the whole hour's work in one
 // went past it, 2026-10-13), each on its own even minute of the hour.
-export const SLOTS = { 16: 'watch', 20: 'cutouts', 22: 'daily', 24: 'buses' };
+// Play's board takes the six minutes ending in 8, none of which another job (or the cron's own
+// every-ten-minutes work: the guard's tick, Weather's scoring at :10, the capacity check at :20) has.
+export const PLAY_MINUTES = [8, 18, 28, 38, 48, 58];
+export const SLOTS = { 16: 'watch', 20: 'cutouts', 22: 'daily', 24: 'buses', ...Object.fromEntries(PLAY_MINUTES.map(m => [m, 'play'])) };
 
 // `proxy(url, trim)`: a read through the data proxy's route (its trims and edge cache), its JSON or null.
 // `pace` (pace.js): at 1 only what phones would miss runs, from 2 nothing
 // (a job asked for by hand, `only`, runs whatever the pace).
-export async function runBuilders(env, { proxy, now = Date.now(), job = SLOTS[new Date(now).getUTCMinutes()], full, only, pace = 0, log = console.log } = {}) {
+export async function runBuilders(env, { proxy, now = Date.now(), job = SLOTS[new Date(now).getUTCMinutes()], full, only, pace = 0, log = console.log, lottery } = {}) {
   if (!env.DATA || (!job && !only)) return { off: env.DATA ? 'no job this minute' : 'no data bucket' };
   const store = r2Store(env.DATA);
   const hour = new Date(now).getUTCHours();
@@ -53,6 +60,7 @@ export async function runBuilders(env, { proxy, now = Date.now(), job = SLOTS[ne
   if (job === 'watch') await step('watch', () => runWatch({ store, proxy, now, until: now + 8 * 60_000, full }));
   if (job === 'cutouts') await step('cutouts', () => runCutouts({ store, now }));
   if (job === 'buses') await step('buses', () => runBuses({ store, env, now, until: now + 6 * 60_000 }));
+  if (job === 'play' || only === 'play') await step('play', () => runPlay(env, { store, proxy, now, log, lottery }));
   // (By hand, POST /data/build: one of the daily ones now.)
   if (only === 'asia') await step('asia', () => runAsia({ store, now }));
   if (only === 'cpbl') await step('cpbl', () => runCpbl({ store, now }));
