@@ -83,6 +83,8 @@ test('components build their markup', () => {
   assert.match(m.className, /q-match live/);
   assert.equal(m.find('q-match-mid').textContent, '2 : 1');
   assert.equal(ui.matchCard({ sides: [{ name: 'A' }, { name: 'B' }] }).find('q-match-mid').textContent, 'VS');
+  assert.equal(ui.matchCard({ tag: { text: '', tone: 'orange' }, sides: [{ name: 'A' }, { name: 'B' }] }).find('q-tag'), null, 'a tag with no text is no capsule');
+  assert.doesNotMatch(ui.matchCardHtml({ tag: { text: '', tone: 'orange' }, sides: [{ name: 'A' }, { name: 'B' }] }), /q-tag/);
 
   assert.equal(ui.liveStrip([{ min: "45'", rows: [{ name: 'A', score: 1 }, { name: 'B', score: 0 }] }]).className, 'q-live-strip');
   const grid = ui.actionGrid([{ icon: 'live', tint: 'red', label: '場中', badge: 0 }, { icon: 'ticket', label: '彩券', badge: 3 }]);
