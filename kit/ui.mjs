@@ -31,10 +31,12 @@ export function h(tag, props = {}, children = []) {
   return n;
 }
 
-// A haptic tick where the phone gives one (iOS: a switch's own; elsewhere a
-// short vibration where allowed).
+// A haptic tick where the phone gives one: the kit's own (globalThis.
+// quadraHaptic, iOS's switch trick) and a short vibration where allowed
+// (Android; iOS has none, so it's never felt twice).
 export function tick() {
   try {
+    globalThis.quadraHaptic?.();
     globalThis.navigator?.vibrate?.(8);
   } catch {}
 }

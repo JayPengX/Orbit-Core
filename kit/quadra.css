@@ -697,6 +697,7 @@ button,
   align-items: center;
   gap: 8px;
   flex: none;
+  margin-left: auto;
 }
 .q-actions:has(> :nth-child(2)) {
   gap: 0;
