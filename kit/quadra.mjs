@@ -1704,7 +1704,9 @@ export const settingPatch = (key, value) => ({ settings: { [key]: { value, t: Da
 export function money(x, { sign = false, cents = false } = {}) {
   const v = Number(x) || 0;
   const body = Math.abs(v).toLocaleString('en-US', { maximumFractionDigits: cents ? 2 : 0, minimumFractionDigits: 0 });
-  return `${v < 0 ? '−' : sign && v > 0 ? '+' : ''}NT$${body}`;
+  // What rounds to nothing carries no sign: never +NT$0 or −NT$0.
+  const zero = !/[1-9]/.test(body);
+  return `${zero ? '' : v < 0 ? '−' : sign && v > 0 ? '+' : ''}NT$${body}`;
 }
 
 // ---- Taiwan days -------------------------------------------------------------------------
