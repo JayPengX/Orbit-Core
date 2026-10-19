@@ -62,10 +62,16 @@ export const HELP = {
         '新手禮：在 Play 第一次用自己的錢下注後，送一張 NT$200 免費投注（7 天內有效）；在 Securities 的第一筆交易免手續費（稅和規費照收）。'
       ]],
       ['money', '錢怎麼算', [
-        '所有 App 共用一個新台幣錢包。新帳號開戶金 NT$30,000；每個月 1 日固定發薪 NT$6,000，跟薪水一樣，存多存少都一樣。系統發的錢只有這些：開戶金、月薪、財富等級獎勵（身價第一次到達一個等級時送一次，小資族 NT$1,000 到億萬大亨 NT$30,000），和 Play 的 VIP 回饋。月薪在那個月第一次打開任何 App 時入帳，沒打開的月份下次補發。',
+        '所有 App 共用一個新台幣錢包。新帳號開戶金 NT$200,000；每週一固定發薪 NT$10,000，跟薪水一樣，存多存少都一樣。系統發的錢只有這些：開戶金、週薪、財富等級獎勵（身價第一次到達一個等級時送一次，小資族 NT$1,000 到億萬大亨 NT$30,000）、Play 的 VIP 回饋，和真的一無所有時的急難紓困。週薪在那週第一次打開任何 App 時入帳，沒打開的週下次補發。',
         '「真相」把你的錢分成三方：系統發的、和 Quadra 的輸贏（Play 的輸贏，扣掉 Plus 月費和透支利息），和你自己的成績（投資的漲跌）。',
         '餘額可以是負的（透支），每月計息 1%。就像交割款沒付，2 天內沒補足就是違約交割：扣透支金額 7% 的違約金、自動賣出持股補足，而且 5 年內不能融資、融券。自己先賣就沒事。融資借來的錢只能留在 Securities 買賣，不能拿去 Play 或補透支。',
         'Securities 投資、Play 下注和買彩券；Orbit 的 App 都不用錢。錢只存在 Quadra Pass，不能在帳號之間轉。'
+      ]],
+      ['loan', '信貸與急難紓困', [
+        '信貸跟銀行一樣：開戶滿 4 週可以申請（週薪改制前的帳戶不用等），一次一筆。額度從 NT$100,000 起，每準時還清一筆加 NT$50,000，最多是月薪的 22 倍（約 NT$950,000，DBR 22 倍）；每週還款不能超過週薪的一半。年利率 12% 起，每筆準時還清少 1%（最低 6%），每次逾期加 1%（最高 16%）。開辦費 NT$3,000 從撥款扣除，簽約前會看到總費用年百分率。',
+        '期數 1、2、3 或 5 年，每週一發薪後自動扣款；1 年內提前還清收剩餘本金 2% 的違約金。扣款失敗就逾期並計違約金和遲延利息，餘額一夠就自動補扣。',
+        '逾期 3 期轉催收：全部到期（喪失期限利益），帳戶裡的錢先抵銷，之後每週薪水扣三分之一（強制執行），利息照算到還清為止。聯徵紀錄保留到還清後 1 年，期間不能再借，之後利率 16%、額度回到 NT$100,000。借來的錢不算身價，不會讓你升財富等級。',
+        '急難紓困：現金、股票（成本）和投注中的錢合計低於 NT$2,000、沒有催收中的信貸、離發薪日超過 2 天，可以申請一次 NT$5,000。每 13 週一次、一年最多 3 次，會留在紀錄上。'
       ]]
     ],
     en: [
@@ -114,10 +120,16 @@ export const HELP = {
         'Welcome offers: your first bet in Play with your own money brings a NT$200 free bet (7 days), and your first trade in Securities pays no commission (taxes and fees as usual).'
       ]],
       ['money', 'Money', [
-        'Every app shares one NT$ wallet. A new pass opens with NT$30,000; the 1st of every month pays a fixed NT$6,000, like a salary: the same however much you hold. The system gives money only as the opening money, the pay, wealth level rewards (paid once, the first time what you’re worth reaches a level: NT$1,000 for Saver up to NT$30,000 for Tycoon) and Play’s VIP cashback. The pay comes the first time that month you open any app; a month you miss is paid when you’re back.',
+        'Every app shares one NT$ wallet. A new pass opens with NT$200,000; every Monday pays a fixed NT$10,000, like a salary: the same however much you hold. The system gives money only as the opening money, the pay, wealth level rewards (paid once, the first time what you’re worth reaches a level: NT$1,000 for Saver up to NT$30,000 for Tycoon), Play’s VIP cashback, and emergency relief for someone with nothing. The pay comes the first time that week you open any app; a week you miss is paid when you’re back.',
         'Truth splits your money three ways: what the system gave, your result against Quadra (Play’s wins and losses, less Plus fees and overdraft interest), and your own result (your investments).',
         'The balance can go below zero (an overdraft) at 1% a month. Like an unpaid settlement, if it isn’t covered within 2 days it’s a default: a 7% penalty on what’s owed, holdings sold for it, and no margin or short selling for 5 years. Sell something first and none of that happens. Money borrowed on margin stays in Securities for trading: it can’t be bet in Play or cover an overdraft.',
         'Securities invests, Play bets and sells lottery tickets; the Orbit apps don’t use money. Money lives on the Quadra Pass only and can’t move between passes.'
+      ]],
+      ['loan', 'Loans and relief', [
+        'A personal loan works like a bank’s: after 4 weeks (accounts from before weekly pay don’t wait), one at a time. The limit starts at NT$100,000, grows NT$50,000 with each loan repaid on time, up to 22 months of pay (about NT$950,000, Taiwan’s DBR 22 rule), and an installment can’t take more than half the weekly pay. The rate starts at 12% a year, 1 point less per clean loan (6% at best) and 1 point more per late installment (16% at most). A NT$3,000 set-up fee comes off the money, and the APR with fees is shown before you sign.',
+        'Terms of 1, 2, 3 or 5 years, taken every Monday after the pay; paying off within a year costs 2% of what’s left. A missed installment is late, with charges, and is taken as soon as the balance covers it.',
+        'Three late and it goes to collection: the whole loan falls due, the balance is taken toward it, then a third of every weekly pay until it’s paid, with interest running. The record lasts a year after it’s paid: no loans, then 16% and a NT$100,000 limit. Borrowed money isn’t worth, so it never raises your wealth level.',
+        'Emergency relief: with cash, stocks (at cost) and open bets together under NT$2,000, no loan in collection, and payday more than 2 days away, you can get NT$5,000 once. Once every 13 weeks, 3 times a year at most, and it stays on your record.'
       ]]
     ]
   },

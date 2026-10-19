@@ -66,7 +66,7 @@ test('account details: this month in and out, latest entries first', () => {
   assert.equal(d.out, -200);
   assert.equal(d.count, 2);
   assert.equal(d.recent[0].amount, -200);
-  assert.match(d.recent[1].text, /Quadra · 每月薪水/);
+  assert.match(d.recent[1].text, /Quadra · 薪水/);
 });
 
 test('proxyJson batches requests made together and remembers answers', async () => {
@@ -230,10 +230,11 @@ test('Quadra Plus: a month is a member’s when the Worker billed it; joining is
 });
 
 test('the pay: fixed, whatever the account holds', () => {
-  assert.equal(kit.paydayFor({ entries: [] }), 6_000);
-  assert.equal(kit.paydayFor({ entries: [{ id: 'a', amount: 60_000, app: 'odds' }] }), 6_000);
-  assert.equal(kit.paydayFor({ entries: [], snap: { stock: { cash: 50_000, holdings: 500_000, t: 1 } } }), 6_000);
-  assert.match(kit.paydayText('zh', Date.UTC(2026, 9, 5)), /NT\$6,000/);
+  assert.equal(kit.paydayFor({ entries: [] }), 10_000);
+  assert.equal(kit.paydayFor({ entries: [{ id: 'a', amount: 60_000, app: 'odds' }] }), 10_000);
+  assert.equal(kit.paydayFor({ entries: [], snap: { stock: { cash: 50_000, holdings: 500_000, t: 1 } } }), 10_000);
+  // Wednesday 21 Oct: next Monday the 26th.
+  assert.equal(kit.paydayText('zh', Date.UTC(2026, 9, 21, 4)), '下次發薪 NT$10,000 · 10/26（一）');
 });
 
 test('free bets: only current Quadra-issued tokens are spent once and last a week', () => {
@@ -512,7 +513,8 @@ test('pictures: national sides get flags, names in either order', async () => {
 
 test('the kit and the Worker agree on the pay and Plus; the statement skips free bet tokens', async () => {
   const eco = await import('../eco.js');
-  assert.equal(kit.ECONOMY.monthly, eco.PAY_MONTH);
+  assert.equal(kit.ECONOMY.weekly, eco.PAY.week);
+  assert.equal(kit.ECONOMY.start, eco.PAY.start);
   assert.equal(kit.PLUS.fee, eco.PLUS.fee);
   assert.equal(kit.PLUS.year, eco.PLUS.year);
   const now = Date.UTC(2026, 9, 10);
