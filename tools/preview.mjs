@@ -851,7 +851,8 @@ await context.route(/^https:\/\/(?!orbit-workers-proxy|sports-proxy|localhost[:/
   // By the bytes first (Commons serves an .svg's PNG rendering), else by the name.
   const magic = body.subarray(0, 4).toString('hex');
   const type = magic === '89504e47' ? 'image/png' : magic.startsWith('ffd8') ? 'image/jpeg' : /\.svg/.test(url) ? 'image/svg+xml' : /\.png/.test(url) ? 'image/png' : /\.jpe?g/.test(url) ? 'image/jpeg' : /\.css|fonts\.googleapis/.test(url) ? 'text/css' : /\.m?js/.test(url) ? 'text/javascript' : 'application/octet-stream';
-  await route.fulfill({ status: 200, contentType: type, body });
+  // (Open to any page, as these hosts are: an OSRM ride's shape is read by fetch, not an <img>.)
+  await route.fulfill({ status: 200, contentType: /^\s*[[{]/.test(body.subarray(0, 8).toString()) ? 'application/json' : type, headers: { 'Access-Control-Allow-Origin': '*' }, body });
 });
 // The family's data (the proxy's /data/, R2): the real files, as a phone reads them.
 await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/data\//, async route => {

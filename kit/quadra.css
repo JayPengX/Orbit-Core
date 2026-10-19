@@ -5145,6 +5145,23 @@ div.q-ritem {
 .q-stock[role='button'] {
   cursor: pointer;
 }
+/* Stock rows in a card: inset like .q-ritem, hairlines after the logo, a press. */
+.q-rowcard > .q-stock {
+  position: relative;
+  padding: 8px 12px;
+  -webkit-tap-highlight-color: transparent;
+}
+.q-rowcard > .q-stock + .q-stock::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 64px;
+  right: 0;
+  border-top: var(--q-hairline) solid var(--q-sep);
+}
+.q-rowcard > .q-stock[role='button']:active {
+  background: var(--q-fill-4);
+}
 .q-stock-id {
   display: grid;
   min-width: 0;
