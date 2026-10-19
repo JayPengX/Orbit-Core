@@ -21,6 +21,12 @@ on:
     - cron: '17 3 20 10 *'
   workflow_dispatch:
 
+# One deploy at a time; pushes made while one runs wait as one (the latest),
+# not a queue of each. Never cancelled midway: a Worker half-deployed is worse.
+concurrency:
+  group: 'workers'
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
