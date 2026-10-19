@@ -769,7 +769,7 @@ export function matchCardHtml({ league = '', leagueLogo = '', when = '', live = 
   const px = wide ? 40 : 48;
   const side = s => `<div class="q-match-side">${logoTileHtml(s.logo, { size: px, alt: s.name, fallbackText: s.name })}<b>${E(s.name || '')}</b></div>`;
   const scored = a.score != null && b.score != null;
-  return `<article class="${clsOf('q-match', live && 'live', wide && 'wide')}"${open != null ? ` role="button" tabindex="0"${dataOf({ open })}` : ''}><div class="q-match-top">${leagueLogo ? logoTileHtml(leagueLogo, { size: 20, alt: league }) : ''}<span class="q-match-lg">${E(league)}</span>${tag ? tagObjHtml(tag) : ''}<span class="q-match-when">${E(when)}</span></div><div class="q-match-teams">${side(a)}<div class="${clsOf('q-match-mid num', !scored && 'vs')}">${scored ? `${E(a.score)} : ${E(b.score)}` : 'VS'}</div>${side(b)}</div>${
+  return `<article class="${clsOf('q-match', live && 'live', wide && 'wide')}"${open != null ? ` role="button" tabindex="0"${dataOf({ open })}` : ''}><div class="q-match-top">${leagueLogo ? logoTileHtml(leagueLogo, { size: 20, alt: league }) : ''}<span class="q-match-lg">${E(league)}</span>${(typeof tag === 'string' ? tag : tag?.text) ? tagObjHtml(tag) : ''}<span class="q-match-when">${E(when)}</span></div><div class="q-match-teams">${side(a)}<div class="${clsOf('q-match-mid num', !scored && 'vs')}">${scored ? `${E(a.score)} : ${E(b.score)}` : 'VS'}</div>${side(b)}</div>${
     prices.length ? `<div class="q-match-prices">${prices.map(p => `<button class="q-price" type="button" aria-pressed="${Boolean(p.selected)}"${p.locked ? ' disabled' : ''}${dataOf({ tap: p.tap })}><small>${E(p.label || '')}</small><b class="num">${p.odds == null ? '' : E(p.odds)}</b></button>`).join('')}</div>` : ''
   }</article>`;
 }
@@ -1038,9 +1038,10 @@ export function matchCard({ league = '', leagueLogo = '', when = '', live = fals
   const px = wide ? 40 : 48;
   const side = s => h('div', { class: 'q-match-side' }, [logoTile(s.logo, { size: px, alt: s.name, fallbackText: s.name }), h('b', { text: s.name || '' })]);
   const scored = a.score != null && b.score != null;
+  // (A tag with no text shows nothing: never an empty capsule.)
   const t = tag ? (typeof tag === 'string' ? { text: tag } : tag) : null;
   const card = h('article', { class: `q-match${live ? ' live' : ''}${wide ? ' wide' : ''}`, ...(onOpen ? { role: 'button', tabindex: '0', onclick: onOpen, onkeydown: e => e.key === 'Enter' && onOpen(e) } : {}) }, [
-    h('div', { class: 'q-match-top' }, [leagueLogo ? logoTile(leagueLogo, { size: 20, alt: league }) : null, h('span', { class: 'q-match-lg', text: league }), t ? tag_(t) : null, h('span', { class: 'q-match-when', text: when })]),
+    h('div', { class: 'q-match-top' }, [leagueLogo ? logoTile(leagueLogo, { size: 20, alt: league }) : null, h('span', { class: 'q-match-lg', text: league }), t?.text ? tag_(t) : null, h('span', { class: 'q-match-when', text: when })]),
     h('div', { class: 'q-match-teams' }, [side(a), h('div', { class: `q-match-mid num${scored ? '' : ' vs'}`, text: scored ? `${a.score} : ${b.score}` : 'VS' }), side(b)]),
     prices.length
       ? h(
