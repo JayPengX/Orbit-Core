@@ -11,6 +11,7 @@
 import { APPS, FAMILIES, AVATARS, FRAMES, LOOK_STREAKS, lookOpen, plusStreak, PLUS, VIP, WELCOME, money, plusMember, plusCard, openPlus, plusPerks, plusReturns, plusTenure, freeBets, vipStatus, vipName, worthOf, WEALTH_RANKS, OVERDRAFT_RATE, ECONOMY, settingPatch, passAccount, appIcon, el as node } from '#kit/quadra.mjs';
 import { PLAY, STOCK, houseKeep, boostedKeep, freeBetWorth, roundTrip, plusMath, record, overdraftYear, vipShare } from './truth.mjs';
 import { HELP_ORDER, helpFor } from './help.mjs';
+import { sheet } from './ui.mjs';
 
 export const STRINGS = {
   zh: {
@@ -413,7 +414,7 @@ export function openPass(s, { extra = null, tab = 'pass', help = null } = {}) {
   const dict = STRINGS[locale];
   const t = (key, vars = {}) => String(dict[key] ?? STRINGS.zh[key] ?? key).replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? '');
   open?.dialog.close();
-  const dialog = el('dialog', { class: 'q-sheet q-pass', 'aria-label': 'Quadra Pass' });
+  let dialog = null;
   const body = el('div', { class: 'q-pass-body' });
   const tabs = el('div', { class: 'q-chips q-pass-tabs', role: 'tablist' });
   toastBox = el('div', { class: 'toasts q-pass-toasts', 'aria-live': 'polite' });
@@ -421,7 +422,7 @@ export function openPass(s, { extra = null, tab = 'pass', help = null } = {}) {
   const pending = {};
   const state = { tab: TABS.includes(tab) ? tab : 'pass', help: help || { app: s.app, topic: null }, locale, extra };
   let account = null;
-  const close = () => dialog.close();
+  const close = () => sh.close();
   const ctx = {
     q: s,
     t,
@@ -463,24 +464,28 @@ export function openPass(s, { extra = null, tab = 'pass', help = null } = {}) {
     if (state.tab === 'apps') return renderApps(body, ctx);
     renderHelp(body, ctx, state.help);
   }
-  dialog.append(el('div', { class: 'q-sheet-head' }, [el('div', { class: 'q-pass-title' }, [el('img', { src: svgUrl(appIcon('pass')), alt: '', width: 28, height: 28 }), el('h2', { text: 'Quadra Pass' })]), el('button', { class: 'q-close', type: 'button', 'aria-label': t('close'), text: '×', onclick: close })]), tabs, body, toastBox);
-  const onWallet = () => dialog.open && !Object.keys(pending).length && state.tab !== 'pass' && state.tab !== 'help' && paint();
+  const onWallet = () => dialog?.open && !Object.keys(pending).length && state.tab !== 'pass' && state.tab !== 'help' && paint();
   s.on?.('wallet', onWallet);
-  document.body.append(dialog);
-  dialog.addEventListener('close', () => {
-    account?.stop();
-    dialog.remove();
-    if (open?.dialog === dialog) open = null;
-    // The address loses the guide it was opened on.
-    if (/(?:^|[#&])help=/.test(location.hash)) {
-      try {
-        history.replaceState(history.state, '', `${location.pathname}${location.search}`);
-      } catch {}
+  paint();
+  // The kit's one sheet (ui.mjs): ✕, Escape, a tap outside and a swipe all close it the same way.
+  const sh = sheet({
+    title: el('span', { class: 'q-pass-title' }, [el('img', { src: svgUrl(appIcon('pass')), alt: '', width: 28, height: 28 }), document.createTextNode('Quadra Pass')]),
+    label: 'Quadra Pass',
+    cls: 'q-pass',
+    closeLabel: t('close'),
+    body: [tabs, body, toastBox],
+    onClose() {
+      account?.stop();
+      if (open?.dialog === dialog) open = null;
+      // The address loses the guide it was opened on.
+      if (/(?:^|[#&])help=/.test(location.hash)) {
+        try {
+          history.replaceState(history.state, '', `${location.pathname}${location.search}`);
+        } catch {}
+      }
     }
   });
-  dialog.addEventListener('click', e => e.target === dialog && close());
-  paint();
-  dialog.showModal();
+  dialog = sh.el;
   open = { dialog, show };
   return dialog;
 }

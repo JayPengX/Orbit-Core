@@ -33,7 +33,7 @@
 export { MIRROR_HOSTS, mirrorPath } from './mirror.mjs';
 import { BRANDS, FAMILIES, pathOf, appIcon, familyMark } from './brand.mjs';
 import { DEV, cleanDev } from './brand.mjs';
-import { icons } from './ui.mjs';
+import { icons, sheet as uiSheet, pullToRefresh, setSheetDetent } from './ui.mjs';
 
 export const ECO_URL = 'https://orbit-workers-proxy.pengzjay.workers.dev/eco';
 export const PROXY_URL = 'https://orbit-workers-proxy.pengzjay.workers.dev/sports-proxy';
@@ -890,6 +890,17 @@ export function closeSheet(d, speed = 0) {
 }
 if (typeof globalThis !== 'undefined') globalThis.quadraCloseSheet = closeSheet;
 
+// Where a sheet's swipe comes to when the finger lets go: 'close' (down past 120 px
+// or flicked), 'expand' (a medium sheet pulled up: large), 'shrink' (a large sheet
+// that opened medium, pulled down: back to medium; a hard flick still closes it) or
+// 'settle' (springs back). dy: where the sheet is (rubber-banded); raw: the finger's
+// travel; speed: px/ms, down positive.
+export function sheetVerdict({ dy = 0, raw = 0, speed = 0, detent = '', expandable = false } = {}) {
+  if (expandable && detent === 'medium' && (raw < -40 || speed < -0.4)) return 'expand';
+  if (speed > -0.2 && (dy > 120 || (dy > 24 && speed > 0.5))) return expandable && detent === 'large' && speed < 1.2 ? 'shrink' : 'close';
+  return 'settle';
+}
+
 // A sheet swiped down from its top closes, as on iOS (a phone's bottom
 // sheets, dialog.q-sheet, and an iPad's card: it couldn't be swiped away
 // there, the owner 2026-10-18): it follows the finger and closes past 120 px or
@@ -932,8 +943,10 @@ function sheetSwipe() {
         // Up, or sideways: not a swipe down (the sheet scrolls, the list slides).
         if (Math.abs(x) > Math.abs(y) + 4) return void (sheet = null);
         if (y < -4) {
-          // (A sheet with more to show scrolls up; one that fits gives a little.)
-          if (sheet.scrollHeight > sheet.clientHeight + 1) return void (sheet = null);
+          // (A sheet with more to show scrolls up; one that fits gives a little;
+          // a medium one is pulled up to large first, as iOS's.)
+          const grows = sheet.hasAttribute('data-expandable') && sheet.getAttribute('data-detent') === 'medium';
+          if (!grows && sheet.scrollHeight > sheet.clientHeight + 1) return void (sheet = null);
           dragging = true;
           sheet.classList.add('q-dragging', 'q-risen');
           return;
@@ -968,12 +981,18 @@ function sheetSwipe() {
     s.classList.remove('q-dragging');
     const [[ta, ya], [tb, yb]] = [trail[0], trail.at(-1)];
     const speed = tb > ta ? (yb - ya) / (tb - ta) : 0;
-    if (speed > -0.2 && (dy > 120 || (dy > 24 && speed > 0.5))) {
+    const verdict = sheetVerdict({ dy, raw: yb, speed, detent: s.getAttribute('data-detent') || '', expandable: s.hasAttribute('data-expandable') });
+    if (verdict === 'close') {
       haptic();
       return closeSheet(s, speed);
     }
     s.classList.add('q-settle');
     s.style.transform = '';
+    // A medium sheet pulled up grows to large; one grown, pulled down, goes back.
+    if (verdict !== 'settle') {
+      haptic();
+      setSheetDetent(s, verdict === 'expand' ? 'large' : 'medium');
+    }
     setTimeout(() => s.classList.remove('q-settle'), 500);
   };
   document.addEventListener('touchend', end);
@@ -2291,8 +2310,7 @@ export function plusCard(s, { compact = false } = {}) {
 export function openPlus(s) {
   const en = s.lang === 'en';
   const T = (zh, e) => (en ? e : zh);
-  const dialog = node('dialog', { class: 'q-sheet q-plus-sheet' });
-  const close = () => dialog.close();
+  let dialog = null;
   const note = node('p', { class: 'q-sheet-note', role: 'status' });
   const body = node('div', { class: 'q-plus-body' });
   // The plan picked: yearly unless a free month is on offer.
@@ -2404,19 +2422,16 @@ export function openPlus(s) {
       node('p', { class: 'q-plus-fine', text: T('每月 1 日從 Quadra 餘額自動扣款，沒打開 App 也照扣；餘額不足扣款失敗，會員就停止。取消後用到期滿，已付不退費。價格含 5% 營業稅。', 'Charged from your Quadra balance on the 1st of every month, whether or not you open an app; a charge the balance can’t cover fails and the membership stops. Cancelling keeps what’s paid; nothing is refunded. Prices include 5% VAT.') })
     );
   };
-  dialog.append(node('div', { class: 'q-sheet-head' }, [node('h2', { text: 'Quadra Plus' }), node('button', { class: 'q-close', type: 'button', 'aria-label': T('關閉', 'Close'), text: '×', onclick: close })]), body, note);
   paint();
-  const repaint = () => dialog.open && paint();
+  const repaint = () => dialog?.open && paint();
   s.on('wallet', repaint);
-  document.body.append(dialog);
-  dialog.addEventListener('close', () => dialog.remove());
-  dialog.addEventListener('click', e => e.target === dialog && close());
-  dialog.showModal();
+  // (The kit's one sheet: its ✕, Escape, a tap outside and a swipe all slide it away.)
+  dialog = uiSheet({ title: 'Quadra Plus', body: [body, note], cls: 'q-plus-sheet', closeLabel: T('關閉', 'Close') }).el;
   return dialog;
 }
 
-// The Quadra Pass sheet, in every app (the account button, the ? of
-// topActions, #help= links): Pass (this account), Plus, 真相 (how the money
+// The Quadra Pass sheet, in every app (the account button, #help= links; its
+// 說明 tab is the one place the guide lives now): Pass (this account), Plus, 真相 (how the money
 // moves), App (every app) and 說明 (every app's guide). Loaded when first
 // opened (pass.mjs). tab: 'pass' | 'plus' | 'truth' | 'apps' | 'help';
 // help: { app, topic } for the guide to open on.
@@ -3709,25 +3724,45 @@ export function tabBar({ tabs, onSelect, hash = id => `#${id}`, nav = document.g
 }
 
 // topActions(s, { help, refresh, extra }): the top-right of every app, in
-// #top-actions: 說明 · 重新整理 (apps with live data) · the account.
-//   help(): opens the help (default: this app's guide in the Quadra Pass sheet).
-//   refresh(): reloads the app's data; the button (id="refresh") spins while
-//     it's disabled, so apps set refresh.disabled while loading.
+// #top-actions: the account, and nothing else but what the app asks for.
+//   refresh(): reloads the app's data (it may return a promise). On a touch
+//     screen that is pull-to-refresh, the page dragged down from its top (the
+//     kit's pullToRefresh), and no button; on a computer the button stays
+//     (id="refresh", it spins while it's disabled). Either way `refresh`
+//     in the result has a `disabled` an app sets while it loads: on a phone
+//     it holds off a pull, on a computer it spins the button.
+//   help(): only for an app with a help of its own: it keeps its 說明 button.
+//     Without it there's none: 說明 is a tab of the Quadra Pass sheet (the
+//     account button), opening on this app's guide.
+// Returns { help, refresh } (the buttons, or null, or refresh's stand-in).
+let stopPull = null;
 export function topActions(s, { help = null, refresh = null, extra = null, into = document.getElementById('top-actions') } = {}) {
   const en = s.lang === 'en';
-  const helpBtn = node('button', { class: 'q-icon-btn', id: 'help-button', type: 'button', 'aria-label': en ? 'Help' : '說明', title: en ? 'Help' : '說明' });
-  helpBtn.innerHTML = icon('help');
-  helpBtn.addEventListener('click', () => (help ? help() : openHelp(s)));
+  let helpBtn = null;
+  if (help) {
+    helpBtn = node('button', { class: 'q-icon-btn', id: 'help-button', type: 'button', 'aria-label': en ? 'Help' : '說明', title: en ? 'Help' : '說明' });
+    helpBtn.innerHTML = icon('help');
+    helpBtn.addEventListener('click', () => help());
+  }
   let refreshBtn = null;
   // (Also what runs when the connection comes back.)
   if (refresh) net.refresh = refresh;
-  if (refresh) {
-    refreshBtn = node('button', { class: 'q-icon-btn q-refresh', id: 'refresh', type: 'button', 'aria-label': en ? 'Refresh' : '重新整理', title: en ? 'Refresh' : '重新整理' });
-    refreshBtn.innerHTML = icon('refresh');
-    refreshBtn.addEventListener('click', () => refresh());
+  stopPull?.();
+  stopPull = null;
+  if (refresh && globalThis.matchMedia?.('(pointer: coarse)').matches) {
+    // The finger's way: pull the page down. A stand-in for the button, so an app that sets refresh.disabled still works.
+    const none = () => {};
+    refreshBtn = { disabled: false, pull: true, click: () => refresh(), addEventListener: none, setAttribute: none, classList: { add: none, remove: none, toggle: none } };
+    stopPull = pullToRefresh(() => refresh(), { disabled: () => refreshBtn.disabled });
+  }
+  const refreshButton = refresh && !refreshBtn ? node('button', { class: 'q-icon-btn q-refresh', id: 'refresh', type: 'button', 'aria-label': en ? 'Refresh' : '重新整理', title: en ? 'Refresh' : '重新整理' }) : null;
+  if (refreshButton) {
+    refreshButton.innerHTML = icon('refresh');
+    refreshButton.addEventListener('click', () => refresh());
+    refreshBtn = refreshButton;
   }
   into.classList.add('q-actions');
-  into.replaceChildren(...[helpBtn, refreshBtn, accountButton(s, { extra })].filter(Boolean));
+  into.replaceChildren(...[helpBtn, refreshButton, accountButton(s, { extra })].filter(Boolean));
   return { help: helpBtn, refresh: refreshBtn };
 }
 

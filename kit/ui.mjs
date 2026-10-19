@@ -14,6 +14,8 @@
 //   foundations: ready (lift the loading screen), and toast's action / batch and
 //   segmented's count (see each below).
 
+// { tab: 'ipo' } as data-tab="ipo" attributes (a builder's `data`, for taps wired by delegation).
+const dataProps = (data = null) => Object.fromEntries(Object.entries(data || {}).filter(([, v]) => v != null && v !== false).map(([k, v]) => [`data-${String(k).replace(/[^a-z0-9-]/gi, '')}`, v === true ? '' : String(v)]));
 const reduced = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 // An element: h('div', { class, onclick, … }, [children]). Text children
@@ -91,14 +93,28 @@ export function segmented(items, { value = items[0]?.id, onChange = () => {}, bi
 }
 
 // ---- Sheet ----
-// A sheet from the foot: { title, body (nodes), onClose, cls, actions }.
-// Returns { el, close }. Dragged down, it closes (quadra.mjs sheetSwipe);
-// so do the ✕, Escape and a tap on the dimmed page behind.
-export function sheet({ title = '', body = [], onClose = () => {}, cls = '', lead = null, closeLabel = '關閉' } = {}) {
-  const d = h('dialog', { class: `q-sheet ${cls}`.trim() });
-  const close = h('button', { class: 'q-close', type: 'button', 'aria-label': closeLabel, text: '✕', onclick: () => shut() });
-  const head = h('div', { class: 'q-sheet-head' }, [lead || h('span'), h('h2', { text: title }), close]);
-  d.append(head, ...[].concat(body).filter(Boolean));
+// THE sheet (Plus and the Pass are this too): a dialog from the foot,
+//   sheet({ title, body, onClose, cls, lead, trailing, detent, foot, closeLabel, label })
+// title (text, or a node), centred; lead: a node on its left (a ☆ say);
+// trailing: a node on its right in place of the ✕ (a Done: its button
+// calls close()); detent 'medium' (about half the screen, dragged up to
+// large) | 'large' (the screen less its top inset, as iOS's); foot: a node
+// stuck to the bottom above the safe area (sheetFoot()); body: nodes.
+// Returns { el, close, head, setDetent }. The ✕, Escape, a tap on the
+// dimmed page and a swipe down all close it the same way (quadra.mjs's
+// closeSheet: it slides to the foot), and onClose fires once.
+const DETENTS = ['medium', 'large'];
+// A sheet's size: 'medium' (half the screen) or 'large' (full less the top).
+// A sheet opened medium stays expandable (data-expandable), and the swipe in
+// quadra.mjs moves it between the two.
+export function setSheetDetent(d, detent) {
+  if (!DETENTS.includes(detent)) return;
+  d.setAttribute('data-detent', detent);
+}
+// Closing, wired onto any <dialog class="q-sheet">, one the app wrote as HTML
+// (sheetHtml) as well as the builder's. A [data-q-close] inside closes it.
+// Returns close().
+export function bindSheet(d, { onClose = () => {} } = {}) {
   let done = false;
   const shut = () => {
     if (done) return;
@@ -111,15 +127,34 @@ export function sheet({ title = '', body = [], onClose = () => {}, cls = '', lea
     d.remove();
     onClose();
   });
+  // Escape: the browser would drop it at once; it slides away like the rest.
+  d.addEventListener('cancel', e => {
+    e.preventDefault?.();
+    shut();
+  });
   d.addEventListener('click', e => {
     if (e.target === d) {
       const r = d.getBoundingClientRect();
       if (e.clientY < r.top || e.clientY > r.bottom || e.clientX < r.left || e.clientX > r.right) shut();
-    }
+    } else if (e.target?.closest?.('[data-q-close]')) shut();
   });
+  return shut;
+}
+export function sheet({ title = '', body = [], onClose = () => {}, cls = '', lead = null, trailing = null, detent = '', foot = null, closeLabel = '關閉', label = '' } = {}) {
+  const d = h('dialog', { class: `q-sheet ${cls}`.trim(), 'aria-label': label || (typeof title === 'string' ? title : '') || null });
+  if (foot) d.classList.add('q-has-foot');
+  if (DETENTS.includes(detent)) {
+    setSheetDetent(d, detent);
+    if (detent === 'medium') d.setAttribute('data-expandable', '');
+  }
+  const close = h('button', { class: 'q-close', type: 'button', 'aria-label': closeLabel, 'data-q-close': '', text: '✕' });
+  const head = h('div', { class: 'q-sheet-head' }, [lead || h('span'), h('h2', {}, [title]), trailing || close]);
+  d.append(head, ...[].concat(body).filter(Boolean));
+  if (foot) d.append(foot);
+  const shut = bindSheet(d, { onClose });
   document.body.append(d);
   d.showModal();
-  return { el: d, close: shut, head };
+  return { el: d, close: shut, head, setDetent: x => setSheetDetent(d, x) };
 }
 
 // ---- Menu ----
@@ -286,11 +321,212 @@ export function toggle({ checked = false, onChange = () => {}, label = '' } = {}
 }
 
 // ---- Nothing here ----
-// `icon` is a key of `icons` ('ticket': a 56px colour tile, `tint` its
-// colour) or anything else (an old emoji: the grey disc it always was).
+// empty({ icon, tint, title, body, action }): iOS's ContentUnavailableView, one
+// way everywhere. `icon` is a key of `icons` ('ticket': a 56px colour tile,
+// `tint` its colour, the app's accent unless given) or anything else (an old
+// emoji: the grey disc it always was). One line of title, an optional line
+// of body, one button: `action` is { label, onTap | href, data } (a .q-btn.primary;
+// `data`: data-* attributes for a tap wired by delegation) or a node the app made.
 export function empty({ icon = '', tint = '', title = '', body = '', action = null } = {}) {
-  const mark = !icon ? null : isIcon(icon) ? tinted(h('span', { class: 'q-tile q-empty-tile', 'aria-hidden': 'true', html: icons[icon] }), tint) : h('span', { class: 'q-empty-icon', 'aria-hidden': 'true', text: icon });
-  return h('div', { class: 'q-empty' }, [mark, title ? h('strong', { text: title }) : null, body ? h('p', { text: body }) : null, action]);
+  const mark = !icon ? null : isIcon(icon) ? tinted(h('span', { class: 'q-tile q-empty-tile', 'aria-hidden': 'true', html: icons[icon] }), tint || 'var(--q-accent)') : h('span', { class: 'q-empty-icon', 'aria-hidden': 'true', text: icon });
+  const button = action && !(action instanceof Node) ? h(action.href ? 'a' : 'button', { class: 'q-btn primary', ...(action.href ? { href: action.href } : { type: 'button', onclick: action.onTap }), ...dataProps(action.data), text: action.label || '' }) : action;
+  return h('div', { class: 'q-empty' }, [mark, title ? h('strong', { text: title }) : null, body ? h('p', { text: body }) : null, button]);
+}
+
+// ---- A large title that collapses into the bar (iOS's navigation title) ----
+// navTitle('賽程', { scroller }) is the 34pt title at a tab's top; scrolled
+// up under the top of the screen, a small centred title fades into a glass
+// bar there (.q-navbar, one for the page). For a tab that isn't the first:
+// the first tab has no large title (it opens straight onto content).
+// `scroller`: the element that scrolls, when it isn't the page. Returns the
+// <h1>: put it in the tab's panel, setTitle(text) renames it, and it lets go
+// of the bar by itself when it leaves the page (or dispose()).
+// Wide screens keep the bar where it was: there the title just scrolls away.
+let navbar = null;
+let navOwner = null;
+const navWatched = new Set();
+let navMO = null;
+const navBar = () => {
+  if (navbar?.isConnected) return navbar;
+  navbar = h('div', { class: 'q-navbar', 'aria-hidden': 'true' }, [h('span', { class: 'q-navbar-title' })]);
+  document.body.append(navbar);
+  return navbar;
+};
+// A title whose element left the page stops watching (one that was never put
+// in the page is let go of after a while).
+const navSweep = () => {
+  for (const w of [...navWatched]) {
+    if (w.el.isConnected) w.seen = true;
+    else if (w.seen) w.stop();
+  }
+  if (!navWatched.size) {
+    navMO?.disconnect();
+    navMO = null;
+  }
+};
+export function bindNavTitle(el, { scroller = null } = {}) {
+  if (typeof IntersectionObserver !== 'function') return Object.assign(el, { dispose() {}, setTitle: t => void (el.textContent = t) });
+  const token = {};
+  let io = null;
+  const set = on => {
+    const b = navBar();
+    if (on) {
+      navOwner = token;
+      b.firstChild.textContent = el.textContent;
+      b.classList.add('on');
+    } else if (navOwner === token) {
+      navOwner = null;
+      b.classList.remove('on');
+    }
+  };
+  const observe = () => {
+    io?.disconnect();
+    // The top of the screen to the bar's foot is where a title is "under".
+    const under = Math.max(0, Math.round((navBar().getBoundingClientRect().height || 44) - (scroller ? scroller.getBoundingClientRect().top : 0)));
+    io = new IntersectionObserver(
+      entries => {
+        const e = entries[entries.length - 1];
+        const r = e.boundingClientRect;
+        // Collapsed: gone off the top (not below the fold, not a hidden tab's empty box).
+        set(!e.isIntersecting && r.height > 0 && r.bottom <= (e.rootBounds ? e.rootBounds.top : under) + 1);
+      },
+      { root: scroller, rootMargin: `-${under}px 0px 0px 0px`, threshold: 0 }
+    );
+    io.observe(el);
+  };
+  const w = {
+    el,
+    seen: false,
+    stop() {
+      io?.disconnect();
+      io = null;
+      set(false);
+      navWatched.delete(w);
+      globalThis.removeEventListener?.('resize', observe);
+    }
+  };
+  navWatched.add(w);
+  if (!navMO && typeof MutationObserver === 'function') {
+    navMO = new MutationObserver(navSweep);
+    navMO.observe(document.body, { childList: true, subtree: true });
+  }
+  setTimeout(() => !w.seen && !el.isConnected && w.stop(), 10_000);
+  globalThis.addEventListener?.('resize', observe);
+  observe();
+  return Object.assign(el, {
+    dispose: w.stop,
+    setTitle(t) {
+      el.textContent = t;
+      if (navOwner === token) navBar().firstChild.textContent = t;
+    }
+  });
+}
+export function navTitle(title = '', { scroller = null } = {}) {
+  return bindNavTitle(h('h1', { class: 'q-nav-title', 'data-q-nav': '', text: title }), { scroller });
+}
+
+// ---- Pull to refresh (iOS's) ----
+// The finger dragged down from the top of the page: a glass spinner follows it
+// with a rubber band, a tick as it passes the threshold, and letting go then
+// calls onRefresh() (it may return a promise: the spinner turns until it
+// settles). Not while a sheet is open, a load is running (`disabled()`), or
+// the finger started in a sideways list, a field or a scrolled box. Returns
+// stop(). quadra.mjs's topActions does this for any app that has a refresh.
+const PTR_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 11.5a7.5 7.5 0 1 0-2.2 5.4"/><path d="M19.5 4.5v7h-7"/></svg>';
+// How far the spinner is drawn for a finger pulled `dy`: 1:1 at first, never past `max`.
+export const rubber = (dy, max = 90) => (dy > 0 ? max * (1 - Math.exp(-dy / max)) : 0);
+export function pullToRefresh(onRefresh, { threshold = 70, disabled = () => false, root = typeof document === 'undefined' ? null : document } = {}) {
+  if (!root || typeof onRefresh !== 'function') return () => {};
+  const top = () => (root.scrollingElement || root.documentElement || {}).scrollTop || 0;
+  const skip = 'input, textarea, select, [contenteditable], .q-chips, .leaflet-container, [data-no-ptr]';
+  let y0 = 0;
+  let x0 = 0;
+  let live = false;
+  let pulling = false;
+  let armed = false;
+  let busy = false;
+  let dot = null;
+  let base = 0;
+  // The spinner sits where the page's top row ends and comes down from there.
+  const place = show => {
+    if (!dot) return;
+    dot.style.transform = `translate(-50%, ${Math.round(base + show - 36)}px)`;
+    dot.style.opacity = String(Math.min(1, show / 30));
+  };
+  const scrolledBox = t => {
+    for (let n = t; n && n !== root.body && n !== root.documentElement; n = n.parentElement) {
+      if (n.scrollTop > 0 && /auto|scroll/.test(globalThis.getComputedStyle?.(n).overflowY || '')) return true;
+    }
+    return false;
+  };
+  const begin = e => {
+    live = false;
+    if (busy || disabled() || e.touches.length !== 1 || top() > 0) return;
+    if (root.querySelector('dialog[open], .loading:not([hidden])') || e.target.closest?.(skip) || scrolledBox(e.target)) return;
+    [x0, y0, live, pulling, armed] = [e.touches[0].clientX, e.touches[0].clientY, true, false, false];
+  };
+  const move = e => {
+    if (!live) return;
+    const dy = e.touches[0].clientY - y0;
+    const dx = e.touches[0].clientX - x0;
+    if (!pulling) {
+      // Sideways, up, or the page started to scroll: not a pull.
+      if (Math.abs(dx) > Math.abs(dy) + 4 || dy < -4 || top() > 0) return void (live = false);
+      if (dy < 8) return;
+      pulling = true;
+      base = root.querySelector('.q-appbar')?.getBoundingClientRect().bottom || 0;
+      dot = h('div', { class: 'q-ptr', 'aria-hidden': 'true', html: PTR_ICON });
+      root.body.append(dot);
+    }
+    if (e.cancelable) e.preventDefault();
+    const pulled = dy - 8;
+    place(rubber(pulled));
+    dot.style.setProperty('--r', `${Math.round(Math.min(1, pulled / threshold) * 270)}deg`);
+    if (pulled >= threshold !== armed) {
+      armed = pulled >= threshold;
+      dot.classList.toggle('armed', armed);
+      if (armed) tick();
+    }
+  };
+  const retract = () => {
+    const d = dot;
+    dot = null;
+    if (!d) return;
+    d.classList.remove('hold');
+    d.classList.add('out');
+    d.style.opacity = '0';
+    setTimeout(() => d.remove(), 260);
+  };
+  const end = () => {
+    const d = dot;
+    const go = live && pulling && armed && d;
+    live = false;
+    pulling = false;
+    if (!go) return retract();
+    busy = true;
+    d.classList.add('hold');
+    place(48);
+    d.style.opacity = '1';
+    const t0 = Date.now();
+    const done = () => setTimeout(() => ((busy = false), retract()), Math.max(0, 600 - (Date.now() - t0)));
+    try {
+      Promise.resolve(onRefresh()).then(done, done);
+    } catch {
+      done();
+    }
+  };
+  root.addEventListener('touchstart', begin, { passive: true });
+  root.addEventListener('touchmove', move, { passive: false });
+  root.addEventListener('touchend', end);
+  root.addEventListener('touchcancel', end);
+  return () => {
+    root.removeEventListener('touchstart', begin);
+    root.removeEventListener('touchmove', move);
+    root.removeEventListener('touchend', end);
+    root.removeEventListener('touchcancel', end);
+    dot?.remove();
+    dot = null;
+  };
 }
 
 // ---- A change of view, cross-faded where Safari can (View Transitions) ----
@@ -339,6 +575,228 @@ export function settleSegs(root = document) {
       }
     })
   );
+}
+
+// ---- HTML-string twins: the builders for apps that draw with template strings ----
+// Every builder above has one here (segHtml's pattern): same classes, same
+// structure, returned as a string, every text escaped. A string can't hold a
+// handler, so where the DOM builder takes onClick/onTap/onOpen the twin takes
+// a value that it writes as a data-attribute:
+//   tap -> data-tap   open -> data-open   star -> data-star   more -> data-more
+//   (a sheet's ✕ is [data-q-close]; a switch is aria-checked, a stake's
+//   preset data-preset). The app wires them once on the container:
+//     wireTaps(root, { tap: (value, el, e) => …, open: (value, el) => … })
+//   (a click on the nearest [data-tap] / [data-open], Enter too on a
+//   role="button"; a price button inside an open card wins over the card.)
+// Children (…Html options, arrays of strings) are markup already made by
+// these or by the app; anything else is text and escaped here.
+export const escHtml = s => String(s ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
+const E = escHtml;
+const joinHtml = x => [].concat(x ?? []).filter(Boolean).join('');
+// A CSS value in a style="" (a colour, a length, var(…)): nothing that could end the declaration.
+const cssv = v => String(v).replace(/[;{}<>"'\\]/g, '');
+const styleOf = (...pairs) => {
+  const s = pairs.filter(([, v]) => v !== '' && v != null && v !== false).map(([k, v]) => `${k}:${E(cssv(v))}`).join(';');
+  return s ? ` style="${s}"` : '';
+};
+const dataOf = (data = {}) => Object.entries(data || {}).filter(([, v]) => v != null && v !== false).map(([k, v]) => ` data-${String(k).replace(/[^a-z0-9-]/gi, '')}="${v === true ? '' : E(v)}"`).join('');
+const clsOf = (...c) => c.filter(Boolean).join(' ');
+// An svg string (the kit's icons) as it is, anything else as text.
+const glyphHtml = x => (typeof x === 'string' && x.trim().startsWith('<svg') ? x : E(x));
+const elOf = (href, tap, base) => (href ? ['a', ` href="${E(href)}"`] : tap != null ? ['button', ` type="button"${dataOf(base)}`] : ['div', '']);
+
+export function tileHtml(icon, color = '', size = '') {
+  return `<span class="${clsOf('q-tile', size && E(size))}" aria-hidden="true"${styleOf(['--t', color])}>${glyphHtml(icon)}</span>`;
+}
+const tagObjHtml = t => {
+  const o = typeof t === 'string' ? { text: t } : t;
+  return `<span class="${clsOf('q-tag', o.tone && E(o.tone))}"${styleOf(['--t', o.color])}>${E(o.text)}</span>`;
+};
+// tagHtml('直播', 'red') or tagHtml('3 天', '', '#hex').
+export function tagHtml(text, tone = '', color = '') {
+  return tagObjHtml({ text, tone: color ? `${tone} tint` : tone, color });
+}
+export function emptyHtml({ icon = '', tint = '', title = '', body = '', action = null } = {}) {
+  const mark = !icon ? '' : isIcon(icon) ? `<span class="q-tile q-empty-tile" aria-hidden="true"${styleOf(['--t', tint || 'var(--q-accent)'])}>${icons[icon]}</span>` : `<span class="q-empty-icon" aria-hidden="true">${E(icon)}</span>`;
+  const button = !action ? '' : typeof action === 'string' ? action : action.href ? `<a class="q-btn primary" href="${E(action.href)}"${dataOf(action.data)}>${E(action.label)}</a>` : `<button class="q-btn primary" type="button"${dataOf({ tap: action.tap, ...action.data })}>${E(action.label)}</button>`;
+  return `<div class="q-empty">${mark}${title ? `<strong>${E(title)}</strong>` : ''}${body ? `<p>${E(body)}</p>` : ''}${button}</div>`;
+}
+// cellHtml({ icon, tint, title, sub, value, chevron, tap, danger, href, trailingHtml }).
+export function cellHtml({ icon = null, tint = '', title = '', sub = '', value = '', chevron = false, tap = null, danger = false, href = '', trailingHtml = '' } = {}) {
+  const [tag, at] = elOf(href, tap, { tap });
+  return `<${tag} class="${clsOf('q-cell', chevron && 'chevron', danger && 'danger')}"${at}>${icon ? `<span class="q-cell-icon" aria-hidden="true"${styleOf(['--q-cell-tint', tint])}>${glyphHtml(icon)}</span>` : ''}<span class="q-cell-text"><span>${E(title)}</span>${sub ? `<small>${E(sub)}</small>` : ''}</span>${value !== '' && value != null ? `<span class="q-cell-value">${E(value)}</span>` : ''}${trailingHtml}</${tag}>`;
+}
+export function listHtml(rowsHtml, { head = '', foot = '', big = false } = {}) {
+  return `<section class="q-list-group">${head ? `<h3 class="${clsOf('q-list-head', big && 'big')}">${E(head)}</h3>` : ''}<div class="q-list">${joinHtml(rowsHtml)}</div>${foot ? `<p class="q-list-foot">${E(foot)}</p>` : ''}</section>`;
+}
+// searchHtml: its ✕ is [data-clear] (the app empties the input).
+export function searchHtml({ placeholder = '搜尋', value = '', label = placeholder } = {}) {
+  return `<label class="q-search"><input type="search" placeholder="${E(placeholder)}" aria-label="${E(label)}" enterkeyhint="search" autocomplete="off" autocorrect="off" spellcheck="false" value="${E(value)}"><button class="q-search-clear" type="button" aria-label="清除" data-clear>✕</button></label>`;
+}
+// toggleHtml({ checked, label, tap }): the app flips aria-checked on its tap.
+export function toggleHtml({ checked = false, label = '', tap = null } = {}) {
+  return `<button class="q-switch" type="button" role="switch" aria-checked="${Boolean(checked)}"${label ? ` aria-label="${E(label)}"` : ''}${dataOf({ tap })}></button>`;
+}
+export function pageHeadHtml(title, { over = '', tint = false, trailingHtml = '' } = {}) {
+  return `<header class="q-page-head">${over ? `<p class="${clsOf('q-over', tint && 'tint')}">${E(over)}</p>` : ''}<h1>${E(title)}</h1>${trailingHtml}</header>`;
+}
+// navTitleHtml(title), then wireNavTitles(root, { scroller }) once it's in the page.
+export function navTitleHtml(title = '') {
+  return `<h1 class="q-nav-title" data-q-nav>${E(title)}</h1>`;
+}
+export function wireNavTitles(root = document, { scroller = null } = {}) {
+  for (const el of root.querySelectorAll('[data-q-nav]:not([data-q-bound])')) {
+    el.setAttribute('data-q-bound', '');
+    bindNavTitle(el, { scroller });
+  }
+}
+// heroCardHtml({ eyebrow, icon (svg), title, big, sub, pill, actions: [{ label, tap, href, ghost }], tap, href, color, color2 }, childrenHtml)
+export function heroCardHtml({ eyebrow = '', icon = '', title = '', big = '', sub = '', pill = '', actions = [], href = '', tap = null, color = '', color2 = '' } = {}, childrenHtml = '') {
+  const [tag, at] = elOf(href, tap, { tap });
+  return `<${tag} class="${clsOf('q-hero-card', tag !== 'div' && 'q-press')}"${at}${styleOf(['--q-hc-b', color], ['--q-hc-a', color2])}>${eyebrow || icon ? `<span class="q-hc-eyebrow">${icon || ''}<span>${E(eyebrow)}</span></span>` : ''}${big !== '' && big != null ? `<strong class="q-hc-big">${E(big)}</strong>` : ''}${title ? `<strong class="q-hc-title">${E(title)}</strong>` : ''}${sub ? `<p class="q-hc-sub">${E(sub)}</p>` : ''}${pill ? `<span class="q-hc-pill"><span>${E(pill)}</span><i>${icons.send}</i></span>` : ''}${
+    actions.length
+      ? `<div class="q-hc-row">${actions
+          .map(a => {
+            const [t2, at2] = a.href ? ['a', ` href="${E(a.href)}"`] : ['button', ` type="button"${dataOf({ tap: a.tap })}`];
+            return `<${t2} class="${clsOf('q-hc-btn', a.ghost && 'ghost')}"${at2}>${E(a.label)}</${t2}>`;
+          })
+          .join('')}</div>`
+      : ''
+  }${joinHtml(childrenHtml)}</${tag}>`;
+}
+// rowCardHtml([{ icon, color, size, title, sub, value, tags, href, tap, chevron, trailingHtml }])
+export function rowCardHtml(rows) {
+  return `<div class="q-rowcard">${rows
+    .filter(Boolean)
+    .map(r => {
+      const [tag, at] = elOf(r.href, r.tap, { tap: r.tap });
+      return `<${tag} class="${clsOf('q-ritem', (r.chevron ?? tag !== 'div') && 'chevron')}"${at}>${r.icon != null && r.icon !== '' ? tileHtml(r.icon, r.color, r.size || '') : ''}<span class="q-ritem-text"><span class="q-ritem-title">${E(r.title)}</span>${r.sub ? `<small>${E(r.sub)}</small>` : ''}${r.tags?.length ? `<span class="q-tags">${r.tags.map(tagObjHtml).join('')}</span>` : ''}</span>${r.value !== undefined && r.value !== '' ? `<span class="q-ritem-value">${E(r.value)}</span>` : ''}${r.trailingHtml || ''}</${tag}>`;
+    })
+    .join('')}</div>`;
+}
+export function railHtml(childrenHtml, { small = false } = {}) {
+  return `<div class="${clsOf('q-rail', small && 'small')}">${joinHtml(childrenHtml)}</div>`;
+}
+export function statsHtml(items) {
+  return `<div class="q-stats"${styleOf(['--q-stats-n', Math.min(items.length, 3)])}>${items
+    .map(it => {
+      const tag = it.href ? 'a' : 'div';
+      return `<${tag} class="q-stat"${it.href ? ` href="${E(it.href)}"` : ''}>${it.icon ? tileHtml(it.icon, it.color, 'sm') : ''}<small>${E(it.label)}</small><strong${it.tint ? ' class="tint"' : ''}>${E(it.value)}</strong></${tag}>`;
+    })
+    .join('')}</div>`;
+}
+// sectionHtml(title, bodyHtml, { more, moreHref, moreTap })
+export function sectionHtml(title, bodyHtml, { more = '', moreHref = '', moreTap = null } = {}) {
+  const link = !more ? '' : moreHref ? `<a href="${E(moreHref)}">${E(more)}</a>` : `<button type="button"${dataOf({ more: moreTap })}>${E(more)}</button>`;
+  return `<section class="q-section"><div class="q-section-head"><h2>${E(title)}</h2>${link}</div>${joinHtml(bodyHtml)}</section>`;
+}
+export function sectionHeadHtml(title, { more = '', moreTap = null, moreHref = '', count = null, data = null } = {}) {
+  const chev = `<span style="display:contents">${icons.chevron}</span>`;
+  const link = !more ? '' : moreHref ? `<a class="q-sh-more" href="${E(moreHref)}"${dataOf(data)}>${E(more)}${chev}</a>` : `<button class="q-sh-more" type="button"${dataOf({ more: moreTap, ...data })}>${E(more)}${chev}</button>`;
+  return `<div class="q-section-head q-shd"><h2>${E(title)}</h2>${count != null && count !== '' ? `<span class="q-sh-count num">${E(count)}</span>` : ''}${link}</div>`;
+}
+// A logo tile's broken image falls back to its letter (the DOM builder's
+// error handler): wireLogos(root) once the HTML is in the page.
+const logoLetter = (fallbackText, alt) => Array.from(String(fallbackText || alt || '').trim())[0] ?? '';
+export function logoTileHtml(src, { size = 40, alt = '', fallbackText = '', tint = '' } = {}) {
+  if (src) return `<span class="q-logo"${styleOf(['--s', `${size}px`])}><img src="${E(src)}" alt="${E(alt)}" loading="lazy" decoding="async"${fallbackText ? dataOf({ fallback: fallbackText, tint }) : ''}></span>`;
+  return fallbackText || alt ? `<span class="q-logo text"${styleOf(['--s', `${size}px`], ['--t', tint])}>${E(logoLetter(fallbackText, alt))}</span>` : `<span class="q-logo"${styleOf(['--s', `${size}px`])}></span>`;
+}
+export function wireLogos(root = document) {
+  const fall = img => {
+    const t = img.closest?.('.q-logo');
+    if (!t || !img.hasAttribute('data-fallback')) return;
+    t.className = 'q-logo text';
+    t.replaceChildren(logoLetter(img.getAttribute('data-fallback'), ''));
+    if (img.getAttribute('data-tint')) t.style.setProperty('--t', img.getAttribute('data-tint'));
+  };
+  // (An image that already failed before this ran.)
+  for (const img of root.querySelectorAll('.q-logo img[data-fallback]')) if (img.complete && img.naturalWidth === 0) fall(img);
+  if (root.__quadraLogos) return;
+  root.__quadraLogos = true;
+  root.addEventListener('error', e => e.target?.tagName === 'IMG' && fall(e.target), true);
+}
+// matchCardHtml({ league, leagueLogo, when, live, tag, wide, sides: [{ logo, name, score }], prices: [{ label, odds, tap, selected, locked }], open })
+export function matchCardHtml({ league = '', leagueLogo = '', when = '', live = false, tag = null, wide = false, sides = [], prices = [], open = null } = {}) {
+  const [a = {}, b = {}] = sides;
+  const px = wide ? 40 : 48;
+  const side = s => `<div class="q-match-side">${logoTileHtml(s.logo, { size: px, alt: s.name, fallbackText: s.name })}<b>${E(s.name || '')}</b></div>`;
+  const scored = a.score != null && b.score != null;
+  return `<article class="${clsOf('q-match', live && 'live', wide && 'wide')}"${open != null ? ` role="button" tabindex="0"${dataOf({ open })}` : ''}><div class="q-match-top">${leagueLogo ? logoTileHtml(leagueLogo, { size: 20, alt: league }) : ''}<span class="q-match-lg">${E(league)}</span>${tag ? tagObjHtml(tag) : ''}<span class="q-match-when">${E(when)}</span></div><div class="q-match-teams">${side(a)}<div class="${clsOf('q-match-mid num', !scored && 'vs')}">${scored ? `${E(a.score)} : ${E(b.score)}` : 'VS'}</div>${side(b)}</div>${
+    prices.length ? `<div class="q-match-prices">${prices.map(p => `<button class="q-price" type="button" aria-pressed="${Boolean(p.selected)}"${p.locked ? ' disabled' : ''}${dataOf({ tap: p.tap })}><small>${E(p.label || '')}</small><b class="num">${p.odds == null ? '' : E(p.odds)}</b></button>`).join('')}</div>` : ''
+  }</article>`;
+}
+// liveStripHtml([{ min, rows: [{ logo, name, score }], open }])
+export function liveStripHtml(items) {
+  return `<div class="q-live-strip">${items.map(it => `<button class="q-live-card" type="button"${dataOf({ open: it.open })}><span class="q-live-min">${E(it.min || '')}</span>${it.rows.map(r => `${logoTileHtml(r.logo, { size: 28, alt: r.name, fallbackText: r.name })}<b>${E(r.name || '')}</b><span class="num">${r.score == null ? '' : E(r.score)}</span>`).join('')}</button>`).join('')}</div>`;
+}
+// actionGridHtml([{ icon (an icons key), tint, label, badge, tap | data: { tab: 'ipo' } }])
+export function actionGridHtml(items) {
+  return `<div class="q-actions-grid">${items.map(it => `<button class="q-action" type="button"${dataOf({ tap: it.tap, ...it.data })}>${tileHtml(icons[it.icon] || it.icon, it.tint)}<span>${E(it.label)}</span>${it.badge ? `<span class="q-badge">${E(it.badge)}</span>` : ''}</button>`).join('')}</div>`;
+}
+export function sheetHeroHtml({ eyebrow = '', big = '', sub = '', tint = '', logos = [], tags = [] } = {}) {
+  return `<div class="q-sheet-hero"${styleOf(['--t', tint])}>${logos.length ? `<div class="q-sh-logos">${logos.map(l => logoTileHtml(l, { size: 48 })).join('')}</div>` : ''}${eyebrow ? `<span class="q-sh-eyebrow">${E(eyebrow)}</span>` : ''}${big !== '' && big != null ? `<span class="q-sh-big">${E(big)}</span>` : ''}${sub ? `<span class="q-sh-sub">${E(sub)}</span>` : ''}${tags.length ? `<div class="q-sh-row">${tags.map(tagObjHtml).join('')}</div>` : ''}</div>`;
+}
+// sheetFootHtml({ summary: { small, big }, button: { label, tap, disabled, danger } })
+export function sheetFootHtml({ summary = null, button = {} } = {}) {
+  return `<div class="q-sheet-foot q-sf">${summary ? `<div class="q-sf-sum"><small>${E(summary.small || '')}</small><b class="num">${summary.big == null ? '' : E(summary.big)}</b></div>` : ''}<button class="${clsOf('q-btn', button.danger ? 'danger' : 'primary')}" type="button"${button.disabled ? ' disabled' : ''}${dataOf({ tap: button.tap })}>${E(button.label || '')}</button></div>`;
+}
+// sheetHtml({ title, bodyHtml, cls, leadHtml, trailingHtml, footHtml, detent, closeLabel, label }): the dialog's markup;
+// openSheetHtml(html, { onClose }) puts it in the page, opens it and wires it as sheet() does.
+export function sheetHtml({ title = '', bodyHtml = '', cls = '', leadHtml = '', trailingHtml = '', footHtml = '', detent = '', closeLabel = '關閉', label = '' } = {}) {
+  const d = DETENTS.includes(detent) ? ` data-detent="${detent}"${detent === 'medium' ? ' data-expandable' : ''}` : '';
+  const name = label || title;
+  return `<dialog class="${clsOf('q-sheet', E(cls), footHtml && 'q-has-foot')}"${d}${name ? ` aria-label="${E(name)}"` : ''}><div class="q-sheet-head">${leadHtml || '<span></span>'}<h2>${E(title)}</h2>${trailingHtml || `<button class="q-close" type="button" aria-label="${E(closeLabel)}" data-q-close>✕</button>`}</div>${joinHtml(bodyHtml)}${footHtml}</dialog>`;
+}
+export function openSheetHtml(html, { onClose = () => {} } = {}) {
+  const t = document.createElement('template');
+  t.innerHTML = html.trim();
+  const d = t.content.firstElementChild;
+  const shut = bindSheet(d, { onClose });
+  document.body.append(d);
+  d.showModal();
+  return { el: d, close: shut, setDetent: x => setSheetDetent(d, x) };
+}
+export function ballRowHtml(nums, { special = [], hit = [], size = 28 } = {}) {
+  const ball = (n, cls) => `<span class="${clsOf('q-ball', cls, n == null && 'empty', hit.includes(n) && 'hit')}">${n == null ? '' : E(n)}</span>`;
+  return `<div class="q-balls"${size !== 28 ? styleOf(['--b', `${size}px`]) : ''}>${nums.map(n => ball(n, '')).join('')}${[].concat(special ?? []).map(n => ball(n, 'sp')).join('')}</div>`;
+}
+export function placeTileHtml(kind = 'pin', size = '') {
+  const k = ['home', 'work', 'school', 'pin', 'star'].includes(kind) ? kind : 'pin';
+  return `<span class="${clsOf('q-tile', size && E(size), 'q-place', k)}" aria-hidden="true">${icons[k]}</span>`;
+}
+export function schedLineHtml(tokens) {
+  return `<div class="q-sched">${tokens.map(t => `<span>${E(t)}</span>`).join('')}</div>`;
+}
+// rideRowHtml({ time, legsHtml, starred, star (a value → data-star: the app wires the button), open, starLabel })
+export function rideRowHtml({ time = '', legsHtml = '', starred = false, star = null, open = null, starLabel = '' } = {}) {
+  return `<div class="q-ride"${open != null ? ` role="button" tabindex="0"${dataOf({ open })}` : ''}><div class="q-ride-time">${E(time)}</div>${legsHtml ? `<div class="q-ride-legs">${legsHtml}</div>` : ''}${star != null ? `<button class="${clsOf('q-ride-star', starred && 'on')}" type="button" aria-pressed="${Boolean(starred)}"${starLabel ? ` aria-label="${E(starLabel)}"` : ''}${dataOf({ star })}>${icons.star}</button>` : ''}</div>`;
+}
+// stakeInputHtml({ value, presets, currency }): the presets are [data-preset="500"], the input is the app's to read.
+export function stakeInputHtml({ value = 0, presets = [], currency = 'NT$' } = {}) {
+  const cur = Number(value) || 0;
+  return `<div class="q-stake"${styleOf(['--n', presets.length || 5])}><label class="q-stake-amt"><small>${E(currency)}</small><input type="text" inputmode="numeric" autocomplete="off" aria-label="${E(currency)}" value="${cur}"></label>${presets.length ? `<div class="q-stake-presets">${presets.map(p => `<button type="button" aria-pressed="${Number(p) === cur}" data-preset="${E(p)}">${E(Number(p).toLocaleString('en-US'))}</button>`).join('')}</div>` : ''}</div>`;
+}
+
+// The taps of strings drawn by the twins, wired once on a container (it
+// stays valid whenever the app redraws what's inside): wireTaps(root,
+// { tap(value, el, event), open, star, more, preset }). The nearest of those
+// attributes wins, so a price button inside a card that opens is the price's.
+// Enter does the same on a role="button". Returns off().
+export function wireTaps(root, handlers) {
+  const keys = Object.keys(handlers).filter(k => typeof handlers[k] === 'function');
+  const sel = keys.map(k => `[data-${k}]`).join(',');
+  const fire = e => {
+    const hit = e.target?.closest?.(sel);
+    if (!hit || !root.contains(hit)) return;
+    const key = keys.find(k => hit.hasAttribute(`data-${k}`));
+    handlers[key](hit.getAttribute(`data-${key}`), hit, e);
+  };
+  const click = e => fire(e);
+  const enter = e => e.key === 'Enter' && e.target?.getAttribute?.('role') === 'button' && fire(e);
+  root.addEventListener('click', click);
+  root.addEventListener('keydown', enter);
+  return () => (root.removeEventListener('click', click), root.removeEventListener('keydown', enter));
 }
 
 // ---- The premium layer (quadra.css "Premium layer"): Law's and Beats' look ----
@@ -476,14 +934,14 @@ export function section(title, body, { more = '', moreHref = '', onMore = null }
 // ---- Round 3 premium components (quadra.css "Premium components (round 3)") ----
 
 // A section's head: its title, a count beside it, a link to the rest on the
-// right. sectionHead('為你推薦', { count: 4, more: '全部', onMore }); the same
+// right. sectionHead('為你推薦', { count: 4, more: '全部', onMore | data: { tab: 'all' } }); the same
 // .q-section-head as section()'s, drawn 20px with a 44px tap target (.q-shd).
-export function sectionHead(title, { more = '', onMore = null, moreHref = '', count = null } = {}) {
+export function sectionHead(title, { more = '', onMore = null, moreHref = '', count = null, data = null } = {}) {
   const chev = h('span', { html: icons.chevron, style: { display: 'contents' } });
   return h('div', { class: 'q-section-head q-shd' }, [
     h('h2', { text: title }),
     count != null && count !== '' ? h('span', { class: 'q-sh-count num', text: String(count) }) : null,
-    more ? h(moreHref ? 'a' : 'button', { class: 'q-sh-more', ...(moreHref ? { href: moreHref } : { type: 'button', onclick: onMore }) }, [more, chev]) : null
+    more ? h(moreHref ? 'a' : 'button', { class: 'q-sh-more', ...(moreHref ? { href: moreHref } : { type: 'button', onclick: onMore }), ...dataProps(data) }, [more, chev]) : null
   ]);
 }
 
@@ -495,7 +953,7 @@ export function logoTile(src, { size = 40, alt = '', fallbackText = '', tint = '
   t.style.setProperty('--s', `${size}px`);
   const text = () => {
     t.className = 'q-logo text';
-    t.replaceChildren(String(fallbackText || alt || '').trim().slice(0, 1));
+    t.replaceChildren(logoLetter(fallbackText, alt));
     if (tint) t.style.setProperty('--t', tint);
   };
   if (src) {
@@ -546,13 +1004,13 @@ export function liveStrip(items) {
 }
 
 // Quick actions as colour tiles: actionGrid([{ icon (an icons key), tint,
-// label, badge, onTap }]). A badge of 0 is not drawn.
+// label, badge, onTap | data: { tab: 'ipo' } }]). A badge of 0 is not drawn.
 export function actionGrid(items) {
   return h(
     'div',
     { class: 'q-actions-grid' },
     items.map(it =>
-      h('button', { class: 'q-action', type: 'button', onclick: it.onTap }, [tile(icons[it.icon] || it.icon, it.tint), h('span', { text: it.label }), it.badge ? h('span', { class: 'q-badge', text: String(it.badge) }) : null])
+      h('button', { class: 'q-action', type: 'button', onclick: it.onTap, ...dataProps(it.data) }, [tile(icons[it.icon] || it.icon, it.tint), h('span', { text: it.label }), it.badge ? h('span', { class: 'q-badge', text: String(it.badge) }) : null])
     )
   );
 }

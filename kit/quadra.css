@@ -1724,7 +1724,7 @@ button,
   box-shadow: none;
 }
 
-/* ---- Chips: capsules, the chosen one filled with the label's colour ---- */
+/* ---- Chips: capsules, the chosen one the app's colour on a wash of it (black stays for text) ---- */
 .q-chips {
   display: flex;
   gap: 8px;
@@ -1760,8 +1760,8 @@ button,
   transition-duration: 0.12s;
 }
 .q-chip:is([aria-pressed='true'], [aria-selected='true'], .on) {
-  background: var(--q-label);
-  color: var(--q-grouped-2);
+  background: color-mix(in srgb, var(--q-accent) 14%, transparent);
+  color: var(--q-accent);
 }
 
 /* ---- Segmented control: a capsule track, a raised thumb that slides on a
@@ -3567,7 +3567,7 @@ dialog {
 .q-pass-title { display: flex; align-items: center; gap: 10px; }
 .q-pass-title img { border-radius: 8px; }
 .q-pass-tabs { position: sticky; top: -1px; z-index: 2; margin: 0 calc(-1 * var(--q-margin)) 12px; padding: 8px var(--q-margin); background: var(--q-sheet); overflow-x: auto; flex-wrap: nowrap; }
-.q-pass-tabs .q-chip[aria-selected='true'] { background: var(--accent); color: #fff; border-color: transparent; }
+.q-pass-tabs .q-chip[aria-selected='true'] { background: var(--accent-wash); color: var(--accent); }
 .q-pass-body { display: grid; gap: 4px; }
 .q-pass .q-section { margin-top: 14px; }
 .q-pass .q-section-head h2 { font-size: 17px; font-weight: 800; margin: 0 0 8px; }
@@ -4900,6 +4900,172 @@ div.q-ritem {
   padding-inline-end: calc(var(--q-margin) + 6px);
   -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
   mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+}
+
+/* ==== Shell (design review): one sheet with detents and a foot, a chosen
+   chip, an accent empty state, the collapsing large title, pull to refresh ====
+   Additive. The chosen chip itself is the Chips rule above (accent on a wash);
+   markup: ui.mjs sheet({ detent, foot }), empty(), navTitle(), pullToRefresh(). */
+
+/* -- A sheet with a foot (sheet({ foot })): the foot is the sheet's bottom edge,
+   above the safe area, and stays there when the content is short -- */
+.q-sheet.q-has-foot[open] {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 0;
+}
+.q-sheet.q-has-foot > .q-sheet-foot {
+  margin-top: auto;
+  margin-bottom: 0;
+}
+.q-sheet.q-has-foot > :nth-last-child(2) {
+  margin-bottom: 16px;
+}
+/* (Its ✕ is drawn 36px; the finger's target is 44.) */
+.q-sheet-head .q-close {
+  position: relative;
+}
+.q-sheet-head .q-close::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+}
+/* A title that is a mark and a name (the Pass): centred as a text title is. */
+.q-sheet-head h2 .q-pass-title {
+  justify-content: center;
+}
+
+/* -- Detents (sheet({ detent })): medium is about half the screen, large the
+   screen less its top inset. A medium one is dragged up to large (quadra.mjs
+   sheetSwipe sets data-detent); on a phone, large meets the screen's sides -- */
+.q-sheet[data-detent='medium'] {
+  height: min(52dvh, 900px);
+}
+.q-sheet[data-detent='large'] {
+  height: min(calc(100dvh - var(--q-top) - 10px), 900px);
+  max-height: none;
+}
+/* (Not while closing or under a finger: their own transitions stay.) */
+.q-sheet[data-detent]:not(.q-leaving):not(.q-dragging) {
+  transition: height var(--q-dur-smooth) var(--q-spring-smooth), width 0.3s var(--q-ease), margin-bottom 0.3s var(--q-ease), border-radius 0.3s var(--q-ease), transform 0.36s var(--q-spring-snappy);
+}
+@media (max-width: 719px) {
+  dialog.q-sheet[data-detent='large'] {
+    width: 100vw;
+    margin: auto auto 0;
+    border-radius: var(--q-r-sheet) var(--q-r-sheet) 0 0;
+  }
+}
+
+/* -- Nothing here (empty()): an accent tile, one line, one button -- */
+.q-empty .q-empty-tile {
+  --t: var(--q-accent);
+}
+.q-empty strong {
+  max-width: 100%;
+  text-wrap: balance;
+}
+
+/* -- A large title that collapses into a small centred one in a glass bar
+   (navTitle). The bar is only on a phone's or tablet's screen; on a wide
+   one the title just scrolls away -- */
+.q-nav-title {
+  margin: 0;
+  padding: 4px var(--q-margin, 16px) 8px;
+  font: var(--q-t-large);
+  letter-spacing: 0.01em;
+  text-wrap: balance;
+}
+.q-navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 49;
+  display: none;
+  place-items: center;
+  box-sizing: border-box;
+  height: calc(var(--q-top) + 44px);
+  padding: var(--q-top) 72px 0;
+  background: var(--q-glass);
+  -webkit-backdrop-filter: var(--q-glass-blur);
+  backdrop-filter: var(--q-glass-blur);
+  box-shadow: inset 0 -0.5px 0 var(--q-sep);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+.q-navbar.on {
+  opacity: 1;
+}
+.q-navbar-title {
+  max-width: 100%;
+  overflow: hidden;
+  font: var(--q-t-headline);
+  letter-spacing: -0.025em;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+@media (max-width: 720px) {
+  .q-navbar {
+    display: grid;
+  }
+}
+:root.q-touch .q-navbar {
+  display: grid;
+}
+
+/* -- Pull to refresh (pullToRefresh): a glass spinner that follows the finger -- */
+.q-ptr {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  z-index: 55;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--q-glass-strong);
+  -webkit-backdrop-filter: var(--q-glass-blur);
+  backdrop-filter: var(--q-glass-blur);
+  box-shadow: var(--q-glass-rim), var(--q-glass-drop);
+  color: var(--q-label-2);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -36px);
+  will-change: transform, opacity;
+}
+.q-ptr svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transform: rotate(var(--r, 0deg));
+}
+.q-ptr.armed {
+  color: var(--q-accent);
+}
+.q-ptr.hold,
+.q-ptr.out {
+  transition: transform 0.3s var(--q-spring-snappy), opacity 0.25s;
+}
+.q-ptr.hold svg {
+  animation: q-turn 0.9s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .q-sheet[data-detent]:not(.q-leaving):not(.q-dragging),
+  .q-navbar,
+  .q-ptr.hold,
+  .q-ptr.out {
+    transition: none;
+  }
+  .q-ptr.hold svg {
+    animation: none;
+  }
 }
 
 /* -- Saved places' tiles (placeTile): the kit's tile in the place's colour -- */
