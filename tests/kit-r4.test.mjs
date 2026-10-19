@@ -209,14 +209,14 @@ test('passStack: one card per item, ordered, peek and count as variables', () =>
   const s = ui.passStack(passes(), { peek: 48 });
   assert.equal(px(s, '--n'), '3');
   assert.equal(px(s, '--peek'), '48px');
-  const cards = withCls(s, 'q-pass');
+  const cards = withCls(s, 'q-wpass');
   assert.equal(cards.length, 3);
   assert.deepEqual(cards.map(c => px(c, '--i')), ['0', '1', '2']);
   assert.equal(px(cards[0], '--t'), '#ff9500');
   assert.equal(cards[0].getAttribute('data-id'), 'p1');
-  assert.equal(withCls(cards[0], 'q-pass-big')[0].textContent, 'NT$200');
-  assert.equal(withCls(cards[0], 'q-pass-more').length, 1);
-  assert.equal(withCls(cards[2], 'q-pass-more').length, 0, 'no logos or tags, no row');
+  assert.equal(withCls(cards[0], 'q-wpass-big')[0].textContent, 'NT$200');
+  assert.equal(withCls(cards[0], 'q-wpass-more').length, 1);
+  assert.equal(withCls(cards[2], 'q-wpass-more').length, 0, 'no logos or tags, no row');
   assert.equal(ui.passStack(passes()).style.props['--peek'], '56px');
 });
 
@@ -225,7 +225,7 @@ test('passStack: a tap spreads; a tap on a spread card opens it and folds; outsi
   const opened = [];
   const s = ui.passStack(passes(), { onOpen: (it, i) => opened.push([it.title, i]) });
   body.append(s);
-  const [c0, c1] = withCls(s, 'q-pass');
+  const [c0, c1] = withCls(s, 'q-wpass');
   c1.dispatch('click');
   assert.ok(s.classList.contains('spread'));
   assert.deepEqual(opened, [], 'the first tap only spreads');
@@ -249,7 +249,7 @@ test('passStack: a card\'s own onOpen wins; one card opens at once', () => {
   const got = [];
   const s = ui.passStack([{ title: 'a', onOpen: () => got.push('own') }], { onOpen: () => got.push('stack') });
   body.append(s);
-  withCls(s, 'q-pass')[0].dispatch('click');
+  withCls(s, 'q-wpass')[0].dispatch('click');
   assert.deepEqual(got, ['own']);
   assert.ok(!s.classList.contains('spread'));
 });
@@ -451,7 +451,7 @@ test('CSS: Home parts (r4) sits just before Foundations and styles what the part
   const b = rawCss.indexOf('/* ---- Foundations (design review)');
   assert.ok(a > 0 && b > a && rawCss.indexOf('/* ---- ', a + 5) === b);
   const sec = rawCss.slice(a, b);
-  for (const c of ['.q-ring', '.q-ring-track', '.q-ring-arc', '.q-ring-l', '.q-stack', '.q-stack.spread', '.q-pass', '.q-pass-head', '.q-pass-big', '.q-tl', '.q-tl-h', '.q-tl-b', '.q-tl-b.on', '.q-tl-now', '.q-cal', '.q-cal-w', '.q-cal-d', '.q-cal-d.m-done', '.q-cal-d.m-part', '.q-cal-d.today', '.q-panels', '.q-panel', '.q-panel-v', '.q-league']) assert.ok(sec.includes(`${c} {`) || sec.includes(`${c},`), c);
+  for (const c of ['.q-ring', '.q-ring-track', '.q-ring-arc', '.q-ring-l', '.q-stack', '.q-stack.spread', '.q-wpass', '.q-wpass-head', '.q-wpass-big', '.q-tl', '.q-tl-h', '.q-tl-b', '.q-tl-b.on', '.q-tl-now', '.q-cal', '.q-cal-w', '.q-cal-d', '.q-cal-d.m-done', '.q-cal-d.m-part', '.q-cal-d.today', '.q-panels', '.q-panel', '.q-panel-v', '.q-league']) assert.ok(sec.includes(`${c} {`) || sec.includes(`${c},`), c);
   assert.equal((sec.match(/{/g) || []).length, (sec.match(/}/g) || []).length, 'balanced braces');
   assert.ok(sec.includes('prefers-reduced-motion'));
   assert.ok(!/#[0-9a-f]{3,8}\b/i.test(sec.replace(/#fff(fff)?\b|#000\b/gi, '')), 'colours are tokens (white aside)');
@@ -533,4 +533,11 @@ test('CSS: panel parts, ring check, stock flash (calm under reduced motion), she
   for (const sel of ['.q-panel-u', '.q-panel-lv', '.q-panel-art', '.q-ring-check', '.q-sheet-sub', '[data-q-live].q-flash-up', '[data-q-live].q-flash-down']) assert.ok(css.includes(sel), sel);
   assert.ok(/@keyframes q-flash-up[\s\S]*--q-up/.test(css) && /@keyframes q-flash-down[\s\S]*--q-down/.test(css));
   assert.ok(/prefers-reduced-motion: reduce\)\s*\{\s*\[data-q-live\]\.q-flash-up/.test(css));
+});
+
+test('the pass stack never styles .q-pass (the Quadra Pass sheet is a dialog.q-pass)', () => {
+  const css = readFileSync(new URL('../kit/quadra.css', import.meta.url), 'utf8');
+  const sheetStart = css.indexOf('/* ---- The Quadra Pass sheet');
+  const outside = css.slice(0, sheetStart) + css.slice(css.indexOf('/* ---- Home parts (r4)'));
+  assert.doesNotMatch(outside, /(^|[\s,}])\.q-pass(?![-\w])/m);
 });

@@ -5202,7 +5202,7 @@ div.q-ritem {
 
 /* ---- Home parts (r4) ----
    - .q-ring: a progress ring with its label centred (ui.mjs progressRing);
-   - .q-stack / .q-pass: Wallet-style cards, peeking until a tap spreads them (passStack);
+   - .q-stack / .q-wpass: Wallet-style cards, peeking until a tap spreads them (passStack);
    - .q-tl: a vertical day, coloured blocks and a red now-line (dayTimeline);
    - .q-cal: a month grid, Sunday first, streak dots and today ringed (monthCalendar);
    - .q-panels / .q-panel: a two-column grid of small data tiles (panelGrid);
@@ -5264,7 +5264,7 @@ div.q-ritem {
 .q-stack.spread {
   height: calc(var(--n) * var(--ph) + (var(--n) - 1) * var(--gap));
 }
-.q-pass {
+.q-wpass {
   --t: var(--q-accent);
   position: absolute;
   inset: 0 0 auto;
@@ -5288,52 +5288,52 @@ div.q-ritem {
   transition: transform 0.4s var(--q-ease);
   -webkit-tap-highlight-color: transparent;
 }
-.q-stack.spread .q-pass {
+.q-stack.spread .q-wpass {
   transform: translateY(calc(var(--i) * (var(--ph) + var(--gap))));
 }
-.q-pass:active {
+.q-wpass:active {
   filter: brightness(0.96);
 }
-.q-pass-head {
+.q-wpass-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
   min-height: calc(var(--peek) - 28px);
 }
-.q-pass-id {
+.q-wpass-id {
   display: grid;
   min-width: 0;
 }
-.q-pass-id strong {
+.q-wpass-id strong {
   overflow: hidden;
   font: var(--q-t-headline);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.q-pass-id small {
+.q-wpass-id small {
   overflow: hidden;
   font: var(--q-t-footnote);
   opacity: 0.8;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.q-pass-big {
+.q-wpass-big {
   flex: none;
   font: 700 20px/25px var(--q-font);
   font-variant-numeric: tabular-nums;
 }
-.q-pass-more {
+.q-wpass-more {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
 }
-.q-pass-logos {
+.q-wpass-logos {
   display: flex;
   gap: 6px;
 }
-.q-pass .q-tag {
+.q-wpass .q-tag {
   background: rgba(255, 255, 255, 0.22);
   color: #ffffff;
 }
@@ -5589,7 +5589,7 @@ button.q-cal-d {
 @media (prefers-reduced-motion: reduce) {
   .q-ring-arc,
   .q-stack,
-  .q-pass,
+  .q-wpass,
   .q-tl-now {
     transition: none;
   }

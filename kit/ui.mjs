@@ -1251,7 +1251,7 @@ export function progressRingHtml(value, opts = {}) {
 // Collapsed: each card shows its top `peek` px, the next over it. A tap
 // spreads them; a tap on a spread card opens it (onOpen(item, i)) and folds
 // the stack; a tap outside, or Escape, folds it. One card: a tap opens it.
-const passBody = (it, logosHtml, tagsHtml) => `<span class="q-pass-head"><span class="q-pass-id"><strong>${E(it.title ?? '')}</strong>${it.sub ? `<small>${E(it.sub)}</small>` : ''}</span>${it.big != null && it.big !== '' ? `<b class="q-pass-big">${E(it.big)}</b>` : ''}</span>${logosHtml || tagsHtml ? `<span class="q-pass-more">${logosHtml ? `<span class="q-pass-logos">${logosHtml}</span>` : ''}${tagsHtml}</span>` : ''}`;
+const passBody = (it, logosHtml, tagsHtml) => `<span class="q-wpass-head"><span class="q-wpass-id"><strong>${E(it.title ?? '')}</strong>${it.sub ? `<small>${E(it.sub)}</small>` : ''}</span>${it.big != null && it.big !== '' ? `<b class="q-wpass-big">${E(it.big)}</b>` : ''}</span>${logosHtml || tagsHtml ? `<span class="q-wpass-more">${logosHtml ? `<span class="q-wpass-logos">${logosHtml}</span>` : ''}${tagsHtml}</span>` : ''}`;
 export function passStack(items, { peek = 56, onOpen = null } = {}) {
   const list = items || [];
   const stack = h('div', { class: 'q-stack', role: 'list' });
@@ -1271,11 +1271,11 @@ export function passStack(items, { peek = 56, onOpen = null } = {}) {
   };
   list.forEach((it, i) => {
     const logos = (it.logos || []).map(s => logoTile(s, { size: 28 }));
-    const card = h('button', { class: 'q-pass', type: 'button', ...dataProps(it.data) });
+    const card = h('button', { class: 'q-wpass', type: 'button', ...dataProps(it.data) });
     card.style.setProperty('--i', String(i));
     if (it.tint) card.style.setProperty('--t', it.tint);
-    card.append(h('span', { class: 'q-pass-head' }, [h('span', { class: 'q-pass-id' }, [h('strong', { text: it.title ?? '' }), it.sub ? h('small', { text: it.sub }) : null]), it.big != null && it.big !== '' ? h('b', { class: 'q-pass-big', text: String(it.big) }) : null]));
-    if (logos.length || it.tags?.length) card.append(h('span', { class: 'q-pass-more' }, [logos.length ? h('span', { class: 'q-pass-logos' }, logos) : null, ...(it.tags || []).map(t => tag_(t))]));
+    card.append(h('span', { class: 'q-wpass-head' }, [h('span', { class: 'q-wpass-id' }, [h('strong', { text: it.title ?? '' }), it.sub ? h('small', { text: it.sub }) : null]), it.big != null && it.big !== '' ? h('b', { class: 'q-wpass-big', text: String(it.big) }) : null]));
+    if (logos.length || it.tags?.length) card.append(h('span', { class: 'q-wpass-more' }, [logos.length ? h('span', { class: 'q-wpass-logos' }, logos) : null, ...(it.tags || []).map(t => tag_(t))]));
     card.addEventListener('click', () => {
       if (list.length > 1 && !stack.classList.contains('spread')) return stack.classList.add('spread'), arm();
       folded();
@@ -1287,19 +1287,19 @@ export function passStack(items, { peek = 56, onOpen = null } = {}) {
 }
 export function passStackHtml(items, { peek = 56 } = {}) {
   const list = items || [];
-  const cards = list.map((it, i) => `<button class="q-pass" type="button" data-pass="${E(it.id ?? i)}"${dataOf(it.data)}${styleOf(['--i', String(i)], ['--t', it.tint])}>${passBody(it, joinHtml((it.logos || []).map(s => logoTileHtml(s, { size: 28 }))), (it.tags || []).map(tagObjHtml).join(''))}</button>`);
+  const cards = list.map((it, i) => `<button class="q-wpass" type="button" data-pass="${E(it.id ?? i)}"${dataOf(it.data)}${styleOf(['--i', String(i)], ['--t', it.tint])}>${passBody(it, joinHtml((it.logos || []).map(s => logoTileHtml(s, { size: 28 }))), (it.tags || []).map(tagObjHtml).join(''))}</button>`);
   return `<div class="q-stack" role="list"${styleOf(['--n', String(list.length)], ['--peek', `${Number(peek) || 56}px`])}>${cards.join('')}</div>`;
 }
 // The twin's behaviour, once on a container: wirePassStacks(root, { open(id, el, i) }). Returns off().
 export function wirePassStacks(root, { open = null } = {}) {
   const click = e => {
-    const card = e.target?.closest?.('.q-pass');
+    const card = e.target?.closest?.('.q-wpass');
     const stack = card?.closest?.('.q-stack');
     if (stack && root.contains(stack)) {
-      const n = stack.querySelectorAll('.q-pass').length;
+      const n = stack.querySelectorAll('.q-wpass').length;
       if (n > 1 && !stack.classList.contains('spread')) return stack.classList.add('spread');
       stack.classList.remove('spread');
-      return open?.(card.getAttribute('data-pass'), card, [...stack.querySelectorAll('.q-pass')].indexOf(card));
+      return open?.(card.getAttribute('data-pass'), card, [...stack.querySelectorAll('.q-wpass')].indexOf(card));
     }
     for (const s of root.querySelectorAll('.q-stack.spread')) s.classList.remove('spread');
   };
