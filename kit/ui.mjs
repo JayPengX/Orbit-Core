@@ -398,10 +398,26 @@ export function bindNavTitle(el, { scroller = null } = {}) {
     );
     io.observe(el);
   };
+  // A title hidden with its tab (display:none while already scrolled off) gets
+  // no intersection change, so the bar would keep its name: its box going
+  // lets the bar go, its box coming back asks again (scrolled off or not).
+  let boxed = true;
+  const ro =
+    typeof ResizeObserver === 'function'
+      ? new ResizeObserver(() => {
+          const now = el.getClientRects().length > 0;
+          if (now === boxed) return;
+          boxed = now;
+          if (!now) set(false);
+          else observe();
+        })
+      : null;
+  ro?.observe(el);
   const w = {
     el,
     seen: false,
     stop() {
+      ro?.disconnect();
       io?.disconnect();
       io = null;
       set(false);
