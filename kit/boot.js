@@ -197,9 +197,14 @@
         return null;
       });
   };
-  // (The kit's watch skips its own first check, this one just made.)
+  // (The kit's watch skips its own first check, this one just made, and
+  // waits for its answer: __bootCheck says 'boot' when this reload is under
+  // way, 'none' when both versions were read and nothing is newer, 'watch'
+  // otherwise: a newer one found after the app had started, or a version
+  // not read. Then the watch looks again at once, so the first opening after
+  // a deploy gets it, not the next one.)
   window.__bootChecked = Date.now();
-  Promise.all([read('./version.json'), kit.base ? read(kit.base + 'version.json') : null]).then(function (got) {
+  window.__bootCheck = Promise.all([read('./version.json'), kit.base ? read(kit.base + 'version.json') : null]).then(function (got) {
     var latest = got[0];
     var kitLatest = got[1];
     var appNew = latest && latest !== current;
@@ -210,17 +215,19 @@
         localStorage.setItem('quadra.kit', kitLatest);
       } catch (e) {}
     }
-    if ((!appNew && !kitNew) || window.__fxStarted) return;
+    if (!appNew && !kitNew) return got[0] && (got[1] || !kit.base) ? 'none' : 'watch';
+    if (window.__fxStarted) return 'watch';
     var flag = 'quadra.bootTo:' + location.pathname;
     var want = (appNew ? latest : current) + '|' + (kitLatest || '');
     var was = String(sessionStorage.getItem(flag) || '').split('#');
     var tries = was[0] === want ? Number(was[1]) || 0 : 0;
-    if (tries >= 3) return;
+    if (tries >= 3) return 'none';
     sessionStorage.setItem(flag, want + '#' + (tries + 1));
     window.__bootUpdating = true;
     dropCache(function () {
       if (appNew) location.replace(location.pathname + '?v=' + encodeURIComponent(latest) + (tries ? '&r=' + tries : '') + location.hash);
       else location.reload();
     });
+    return 'boot';
   });
 })();

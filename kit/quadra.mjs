@@ -3118,7 +3118,11 @@ export function watchUpdates({ current, key, cachePrefix, every = 15_000 } = {})
       checking = false;
     }
   }
-  check();
+  // boot.js's first look: a newer deploy it found after the app had started
+  // (or a version it couldn't read) is looked for again at once.
+  const boot = globalThis.__bootCheck;
+  if (boot?.then) boot.then(r => r !== 'boot' && r !== 'none' && check(true), () => check(true));
+  else check();
   channel?.addEventListener('message', () => check(true));
   document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && check());
   globalThis.addEventListener?.('focus', () => check());

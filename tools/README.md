@@ -34,7 +34,7 @@ node tools/preview.mjs sports --live --width 375
 | `--upgrade <date\|ref>` | The old version, then today's, in one storage |
 | `--flaky <share>`, `--net offline\|slow[:ms]` | Failing or missing network |
 | `--shuffle` | What moved after the loading screen lifted |
-| `--timing`, `--requests`, `--profile`, `--latency ms`, `--h2`, `--root dir` | Speed: when it opened, every call, the CPU profile, a phone's latency, a deploy's build |
+| `--timing`, `--requests`, `--profile`, `--latency ms`, `--version-latency ms`, `--h2`, `--root dir` | Speed: when it opened, every call, the CPU profile, a phone's latency, a deploy's build |
 | `--clock ISO`, `--fixture host/path=file` | A made-up time (Taipei unless it ends in Z or ±hh:mm) or answer |
 | `--serve [--port 8123]` | Serve it for the iOS Simulator (`xcrun simctl openurl booted http://localhost:8123/<Repo>/`) |
 | `--no-geo` | (Weather) refuse the position |
