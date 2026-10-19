@@ -3389,6 +3389,8 @@ html:not([data-q-keys]) :is(:focus-visible, :focus):not(input, textarea, select)
 /* (The Plus page's list; the card's tiles are a span of the same name.) */
 ul.q-plus-perks {
   display: grid;
+  grid-auto-flow: row; /* not the card's tiles' columns (one character a line above 380 px) */
+  grid-auto-columns: auto;
   gap: 0;
   margin: 0;
   padding: 0;

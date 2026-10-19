@@ -450,11 +450,19 @@ export function pullToRefresh(onRefresh, { threshold = 70, disabled = () => fals
   let busy = false;
   let dot = null;
   let base = 0;
-  // The spinner sits where the page's top row ends and comes down from there.
-  const place = show => {
+  // The page (its <main>) comes down with the finger, as iOS's does, and the
+  // spinner shows in the gap it leaves under the top row.
+  let page = null;
+  const shift = (y, ease = false) => {
+    if (!page) return;
+    page.style.transition = ease ? 'transform 0.26s cubic-bezier(0.2, 0.8, 0.2, 1)' : 'none';
+    page.style.transform = y ? `translateY(${Math.round(y)}px)` : '';
+  };
+  const place = (show, ease = false) => {
     if (!dot) return;
-    dot.style.transform = `translate(-50%, ${Math.round(base + show - 36)}px)`;
+    dot.style.transform = `translate(-50%, ${Math.round(base + Math.max(0, show / 2 - 18))}px)`;
     dot.style.opacity = String(Math.min(1, show / 30));
+    shift(show, ease);
   };
   const scrolledBox = t => {
     for (let n = t; n && n !== root.body && n !== root.documentElement; n = n.parentElement) {
@@ -478,6 +486,7 @@ export function pullToRefresh(onRefresh, { threshold = 70, disabled = () => fals
       if (dy < 8) return;
       pulling = true;
       base = root.querySelector('.q-appbar')?.getBoundingClientRect().bottom || 0;
+      page = root.querySelector('main');
       dot = h('div', { class: 'q-ptr', 'aria-hidden': 'true', html: PTR_ICON });
       root.body.append(dot);
     }
@@ -498,7 +507,12 @@ export function pullToRefresh(onRefresh, { threshold = 70, disabled = () => fals
     d.classList.remove('hold');
     d.classList.add('out');
     d.style.opacity = '0';
-    setTimeout(() => d.remove(), 260);
+    shift(0, true);
+    const p = page;
+    setTimeout(() => {
+      d.remove();
+      if (p && !dot) p.style.transition = '';
+    }, 260);
   };
   const end = () => {
     const d = dot;
@@ -508,7 +522,7 @@ export function pullToRefresh(onRefresh, { threshold = 70, disabled = () => fals
     if (!go) return retract();
     busy = true;
     d.classList.add('hold');
-    place(48);
+    place(48, true);
     d.style.opacity = '1';
     const t0 = Date.now();
     const done = () => setTimeout(() => ((busy = false), retract()), Math.max(0, 600 - (Date.now() - t0)));
@@ -527,6 +541,7 @@ export function pullToRefresh(onRefresh, { threshold = 70, disabled = () => fals
     root.removeEventListener('touchmove', move);
     root.removeEventListener('touchend', end);
     root.removeEventListener('touchcancel', end);
+    shift(0);
     dot?.remove();
     dot = null;
   };
