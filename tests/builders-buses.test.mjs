@@ -31,7 +31,8 @@ test('bus packs on R2: only a city over six days old is rebuilt, its timetables 
       if (path.includes('Schedule')) each([{ RouteUID: 'R1', RouteName: { Zh_tw: '182' }, Direction: 0, Timetables: [{ ServiceDay: { Monday: 1 }, StopTimes: [{ StopUID: 'S1', StopSequence: 1, DepartureTime: '07:05' }] }] }]);
     }
   };
-  const r = await runBuses({ store, env: {}, now, tdx });
+  // (Its time budget on the real clock: the run checks Date.now against it.)
+  const r = await runBuses({ store, env: {}, now, tdx, until: Date.now() + 60_000 });
   assert.deepEqual(r.built, ['Hsinchu']);
   const pack = await store.json('bus/Hsinchu.json');
   assert.deepEqual(pack.routes[0].sched[0][3], [[2, 425]]);
