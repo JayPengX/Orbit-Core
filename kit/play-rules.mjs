@@ -55,7 +55,22 @@ function priceLock(kind, odds) {
 export const eventMinLegs = o => o.eventMinLegs ?? o.m?.minLegs ?? o.game?.minLegs ?? null;
 export function withRules(o) {
   const estOdds = shadeLong(o.kind, o.estOdds);
-  return Object.assign(o, { estOdds }, houseRule(o.kind, estOdds, { event: eventMinLegs(o) }));
+  const event = eventMinLegs(o);
+  const guess = event > 0 ? null : estimatedMinLegs(o);
+  return Object.assign(o, { estOdds }, houseRule(o.kind, estOdds, { event: event ?? guess }), guess ? { minLegsEst: true } : {});
+}
+// 運彩's usual 限關 where a game's own isn't known: an estimate (2026-10-20,
+// the owner chose it), read off 運彩's own boards that morning. Every market
+// of a game carries the game's number; games on today (Taipei) were 1 (MLB's
+// ALCS game, NHL's this morning), games on a later day 2 (NBA, NHL, EuroCup,
+// the Championship and J-League tomorrow, nearly all), championships 1. So a
+// game is 限2關 until its day comes, then a single; championships, F1 and
+// games in play are singles. null: no minimum.
+const taipeiDay = t => new Date(t + 8 * 3_600_000).toISOString().slice(0, 10);
+export function estimatedMinLegs(o, now = Date.now()) {
+  if (OUTRIGHT.has(o?.kind) || /^live\|/.test(String(o?.id || '')) || o?.live) return null;
+  const start = Date.parse(o?.start ?? o?.game?.startUtc ?? '');
+  return Number.isFinite(start) && taipeiDay(start) > taipeiDay(now) ? 2 : null;
 }
 
 // The fewest games any combination on a ticket has: every one of its
