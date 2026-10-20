@@ -1117,7 +1117,8 @@ const seasonBounds = async env => {
   const res = await handleData(new Request('https://orbit-workers-proxy.quadra/data/sports/bounds.json'), env, inPlace, {}, 'worker', '/data/sports/bounds.json');
   return res.ok ? (await res.json()).leagues : null;
 };
-const playDeps = env => ({ ...ECO_DEPS, read: readSource, prices: priceReads(env), livePrices: priceReads(env, 2), notify: (account, make) => notifyNow(env, account, 'odds', 'slip', make) });
+// (OpenF1, a race's flags, through the proxy's route: its cache answers when OpenF1 turns the shared address away.)
+const playDeps = env => ({ ...ECO_DEPS, read: url => (url.startsWith('https://api.openf1.org/') ? priceReads(env).read(url).catch(() => null) : readSource(url)), prices: priceReads(env), livePrices: priceReads(env, 2), notify: (account, make) => notifyNow(env, account, 'odds', 'slip', make) });
 
 // ==== Routing ================================================================
 

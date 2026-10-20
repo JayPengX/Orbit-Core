@@ -380,7 +380,8 @@ const HEALTH = [
   ['Polymarket', 'https://gamma-api.polymarket.com/events?limit=1&closed=false', 'Play、Sports：預測市場機率'],
   ['OpenF1', 'https://api.openf1.org/v1/sessions?session_key=latest', 'Sports、Play：F1 賽段、勝率'],
   ['NLSC 地點', 'https://api.nlsc.gov.tw/other/TownVillagePointQuery1/121.5645/25.0341', 'Weather、Transit：所在的鄉鎮'],
-  ['資料（R2）', 'https://orbit-workers-proxy.pengzjay.workers.dev/data/sports/nba/days.json', '所有 App：每晚建好的資料'],
+  // (Read from the bucket itself: a Worker asking its own workers.dev address gets a 404.)
+  ['資料（R2）', 'r2:sports/nba/days.json', '所有 App：每晚建好的資料'],
   ['台灣彩券', 'https://api.taiwanlottery.com/TLCAPIWeB/Lottery/LatestResult', 'Play 彩券：開獎號碼、對獎']
 ];
 
@@ -802,13 +803,20 @@ export const ADMIN_TOOLS = {
     if (!['watch', 'watch-full', 'cutouts', 'buses', 'asia', 'cpbl', 'sports', 'photos', 'winprob'].includes(job)) return { error: 'ECO_UNKNOWN_OP', status: 400 };
     return deps.build(env, job);
   },
-  async health() {
+  async health({ env } = {}) {
     const one = async ([name, url, use]) => {
       const t = Date.now();
+      if (url.startsWith('r2:')) {
+        // The file there and when it was last built (late past two days).
+        const obj = await env?.DATA?.head(url.slice(3)).catch(() => null);
+        const built = obj?.uploaded ? new Date(obj.uploaded).getTime() : 0;
+        return { name, use, ok: !!obj, status: obj ? 200 : 404, ms: Date.now() - t, built, late: !!built && Date.now() - built > 2 * DAY };
+      }
       try {
         const res = await fetch(url, { headers: { 'User-Agent': 'curl/8.4.0' }, signal: AbortSignal.timeout(8000) });
         await res.arrayBuffer();
-        return { name, use, ok: res.ok, status: res.status, ms: Date.now() - t };
+        // A 429 is the source turning the shared address away for a while: the proxy answers its kept copy meanwhile.
+        return { name, use, ok: res.ok, status: res.status, ms: Date.now() - t, busy: res.status === 429 };
       } catch (e) {
         return { name, use, ok: false, status: 0, ms: Date.now() - t, error: String(e?.name || e) };
       }

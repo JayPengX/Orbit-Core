@@ -180,7 +180,7 @@
   .gate-mark, .mark { display: block; overflow: hidden; border-radius: 22%; }
   .gate-mark { width: 64px; height: 64px; margin: 0 auto; }
   .gate-mark img, .mark img { display: block; width: 100%; height: 100%; }
-  .topbar { position: sticky; top: 0; z-index: 6; display: flex; align-items: center; gap: 10px; margin: 0 -16px; padding: calc(env(safe-area-inset-top) + 10px) 16px 10px; background: color-mix(in srgb, var(--q-page) 88%, transparent); -webkit-backdrop-filter: saturate(1.8) blur(20px); backdrop-filter: saturate(1.8) blur(20px); }
+  .topbar { position: sticky; top: 0; z-index: 6; display: flex; align-items: center; gap: 10px; margin: 0 -16px; padding: calc(env(safe-area-inset-top) + 10px) 16px 10px; background: color-mix(in srgb, var(--q-page) 94%, transparent); box-shadow: 0 0.5px 0 var(--q-sep); -webkit-backdrop-filter: saturate(1.8) blur(20px); backdrop-filter: saturate(1.8) blur(20px); }
   .mark { width: 36px; height: 36px; flex: none; }
   .omni, .field-search { flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 0 12px; border-radius: 12px; background: var(--q-fill-3); }
   .omni input, .field-search input { flex: 1 1 0; min-width: 0; padding: 10px 0; border-radius: 0; background: none; }
@@ -891,7 +891,7 @@ function healthSummary() {
     const beats = Array.isArray(r.beats) ? r.beats : [];
     const now = Date.now();
     const failed = beats.filter(b => !b.ok).length;
-    const late = beats.filter(b => b.ok && now - b.at > (JOBS[b.job]?.[1] || 120) * 60_000).length;
+    const late = beats.filter(b => b.ok && isLate(b, now)).length;
     setHealth('jobs', failed ? 'bad' : late ? 'warn' : beats.length ? 'ok' : 'wait', failed ? `${failed} 個失敗` : late ? `${late} 個比平常晚` : `${beats.length} 個都正常`, failed ? `${failed} 個排程失敗` : late ? `${late} 個排程晚了` : '');
     const missing = Object.values(r.secrets || {}).filter(v => !v).length + Object.values(r.bindings || {}).filter(v => !v).length;
     // (FIREBASE_PRIVATE_KEY is retiring: its absence is fine.)
@@ -899,8 +899,8 @@ function healthSummary() {
     setHealth('secrets', real > 0 ? 'bad' : 'ok', real > 0 ? `${real} 個沒設定` : '都設定好了', real > 0 ? `${real} 個金鑰沒設定` : '');
   }, e => setHealth('guard', 'bad', e.message, '讀不到系統狀態'));
   admin('health').then(h => {
-    const down = h.checks.filter(c => !c.ok), slow = h.checks.filter(c => c.ok && c.ms > 2500);
-    setHealth('sources', down.length ? 'bad' : slow.length ? 'warn' : 'ok', down.length ? `${down.map(c => c.name).join('、')} 沒回應` : slow.length ? `${slow.length} 個很慢` : `${h.checks.length} 個都正常`, down.length ? `${down.length} 個資料來源沒回應` : '');
+    const down = h.checks.filter(c => !c.ok && !c.busy), slow = h.checks.filter(c => c.busy || c.late || (c.ok && c.ms > 2500));
+    setHealth('sources', down.length ? 'bad' : slow.length ? 'warn' : 'ok', down.length ? `${down.map(c => c.name).join('、')} 沒回應` : slow.length ? `${slow.map(c => c.name).join('、')} ${slow.some(c => c.busy) ? '限流中' : '慢'}` : `${h.checks.length} 個都正常`, down.length ? `${down.length} 個資料來源沒回應` : '');
   }, () => setHealth('sources', 'warn', '沒檢查到'));
   deployRuns().then(runs => {
     const bad = runs.filter(r => r.run && runDot(r.run) === 'bad');
@@ -1519,7 +1519,11 @@ async function loadHealth() {
     const h = await admin('health');
     $('health').replaceChildren(
       ...h.checks.map(c =>
-        el('li', {}, [el('span', { class: `dot${!c.ok ? ' bad' : c.ms > 2500 ? ' slow' : ''}` }), el('span', {}, [c.name, ...(c.use ? [el('small', { text: c.use })] : [])]), el('span', { class: 'muted num', text: c.ok ? `${c.ms} ms` : `失敗 ${c.status || c.error || ''}` })])
+        el('li', {}, [
+          el('span', { class: `dot${c.busy || c.late || (c.ok && c.ms > 2500) ? ' slow' : !c.ok ? ' bad' : ''}` }),
+          el('span', {}, [c.name, ...(c.use ? [el('small', { text: c.busy ? `${c.use}・限流中，App 用快取` : c.built ? `${c.use}・${ago(c.built)}建好` : c.use })] : [])]),
+          el('span', { class: 'muted num', text: c.busy ? '限流' : c.ok ? `${c.ms} ms` : `失敗 ${c.status || c.error || ''}` })
+        ])
       )
     );
   } catch (e) {
@@ -1710,6 +1714,9 @@ const BILL_NAME = { requests: 'Workers 請求', cpuMs: 'Workers CPU', kvRead: 'K
 const PACE_WORD = ['照設定', '放慢 ×2，可以等的建置暫停', '放慢 ×4，建置全停，每個人讀取減半', '放慢 ×8，讀取剩四分之一'];
 // Each job: its name, and how long between runs before it's late.
 const JOBS = { kambi: ['Kambi 比分', 10], notices: ['通知', 10], settle: ['Play 結算', 15], lottery: ['彩券開獎', 15], alerts: ['帳單警示', 30], f1: ['F1 圈速（週四到週一）', 10], 'weather-skill': ['天氣評分（每小時）', 120], capacity: ['容量（每 6 小時）', 420], 'build:watch': ['建置：精華連結（每小時）', 120], 'build:cutouts': ['建置：去背照片（每小時）', 120], 'build:buses': ['建置：公車（每小時）', 120], 'build:daily': ['建置：每日（賽程、CPBL、照片、勝率）', 120] };
+// F1's laps run Thursday to Monday, UTC (worker.js's F1_DAYS): the other days it rests, never late.
+const restsToday = (b, now) => b.job === 'f1' && ![0, 1, 4, 5, 6].includes(new Date(now).getUTCDay());
+const isLate = (b, now) => !restsToday(b, now) && now - b.at > (JOBS[b.job]?.[1] || 120) * 60_000;
 const SECRET_GROUPS = [
   ['登入與管理', ['ECO_TOKEN_SECRET', 'ECO_ADMIN_TOKEN', 'DATA_PUSH_SECRET']],
   ['Google', ['GEMINI_API_KEY', 'GOOGLE_MAPS_KEY', 'GOOGLE_MAPS_BROWSER_KEY', 'GOOGLE_WEATHER_KEY']],
@@ -1742,7 +1749,9 @@ async function loadSystem() {
       tile('警示', g ? ['沒有', '過 50%', '過 75%', '過 90%'][g.alert || 0] : '—', r.told?.at ? `上次通知 ${ago(r.told.at)}` : '還沒通知過'),
       tile('本期', g?.period ? `${fmtDay(g.period.start)} 起` : '—', g?.period ? `到 ${fmtDay(g.period.end)}，每月 13 日續約` : '')
     );
-    $('sys-pace').textContent = `現在：${PACE_WORD[r.pace.pace] || ''}。${g?.error ? ` 讀取失敗：${g.error}` : ''}`;
+    // (Only when it says something the 節流 tile doesn't: slowed down, or the bill unread.)
+    $('sys-pace').textContent = [r.pace.pace ? `現在：${PACE_WORD[r.pace.pace] || ''}。` : '', g?.error ? `讀取失敗：${g.error}` : ''].join(' ').trim();
+    $('sys-pace').hidden = !$('sys-pace').textContent;
     $('alert-note').textContent = r.alertAccount ? `警示送到帳戶 ${r.alertAccount}（它第一個開了通知的 App）：用量過 50%、75%、90%，節流改變，或代理停了。` : '還沒設定：輸入你的 Quadra Pass，用量過 50%、75%、90%、節流改變或代理停了，就會通知你開了通知的 App。';
     const now = Date.now();
     const beats = Array.isArray(r.beats) ? r.beats : [];
@@ -1751,9 +1760,10 @@ async function loadSystem() {
     $('beats').replaceChildren(
       ...(beats.length
         ? beats.map(b => {
-            const [name, late] = JOBS[b.job] || [b.job, 120];
-            const old = now - b.at > late * 60_000;
-            return checkRow(!b.ok ? 'bad' : old ? 'slow' : '', name, `${ago(b.at)}${b.ok ? '' : ` · 連續失敗 ${b.fails} 次${b.okAt ? `，上次成功 ${ago(b.okAt)}` : ''}`}${b.note ? ` · ${noteText(b.note).slice(0, 120)}` : ''}`, b.ms >= 1000 ? `${(b.ms / 1000).toFixed(1)} 秒` : `${b.ms} ms`);
+            const [name] = JOBS[b.job] || [b.job];
+            const resting = restsToday(b, now);
+            const old = isLate(b, now);
+            return checkRow(!b.ok ? 'bad' : old ? 'slow' : '', name, `${resting ? '今天休息・' : ''}${ago(b.at)}${b.ok ? '' : ` · 連續失敗 ${b.fails} 次${b.okAt ? `，上次成功 ${ago(b.okAt)}` : ''}`}${b.note ? ` · ${noteText(b.note).slice(0, 120)}` : ''}`, b.ms >= 1000 ? `${(b.ms / 1000).toFixed(1)} 秒` : `${b.ms} ms`);
           })
         : [checkRow('slow', '還沒有紀錄', '排程跑過之後就會出現')])
     );
