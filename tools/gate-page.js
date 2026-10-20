@@ -120,7 +120,8 @@
       const own = [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim());
       // A title or a name (a heading, bold, or a *title / *name box) that broke onto a second line.
       const titled = /^H[1-4]$|^STRONG$|^B$/.test(el.tagName) || /title|name|head|label/i.test(el.className?.baseVal ?? el.className);
-      if (titled && !el.children.length && tx.length <= 30 && cs.display !== 'inline' && lines(el) > 1) out.wraps.push(`${name(el)} "${tx.slice(0, 30)}"`);
+      // (.q-wrapped: the kit shrank it to 72% and it still didn't fit, so two balanced lines, by design.)
+      if (titled && !el.children.length && tx.length <= 30 && cs.display !== 'inline' && !el.classList.contains('q-wrapped') && lines(el) > 1) out.wraps.push(`${name(el)} "${tx.slice(0, 30)}"`);
       // An ellipsis or clipped edge on text the element holds itself.
       if (own && /hidden|clip/.test(cs.overflowX) && el.scrollWidth > el.clientWidth + 1) out.cut.push(`${name(el)} "${tx.slice(0, 30)}"`);
       // (A summary clamped to its lines is the design; a name clamped is a cut.)
