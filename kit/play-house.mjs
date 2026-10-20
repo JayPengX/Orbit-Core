@@ -117,10 +117,11 @@ async function readStrengths(sport, path, getJson) {
   // which would carry into the season's first weeks as this season's record.
   const regular = ['basketball', 'baseball', 'hockey', 'football'].includes(familyOf(sport));
   const query = extra => [regular ? 'seasontype=2' : '', extra].filter(Boolean).join('&');
-  const now = await getJson(`${url}${query('') ? `?${query('')}` : ''}`).catch(() => null);
+  // (Trimmed by the proxy to the names and records read here: a table was up to 3 MB.)
+  const now = await getJson(`${url}${query('') ? `?${query('')}` : ''}`, 'espn-standings').catch(() => null);
   const year = Number(now?.seasons?.[0]?.year ?? now?.season?.year ?? now?.children?.[0]?.standings?.season);
   // Last season's only refines the table: never worth holding the board for.
-  const before = Number.isFinite(year) && year > 2000 ? await Promise.race([getJson(`${url}?${query(`season=${year - 1}`)}`).catch(() => null), new Promise(r => setTimeout(r, BEFORE_WAIT_MS, null))]) : null;
+  const before = Number.isFinite(year) && year > 2000 ? await Promise.race([getJson(`${url}?${query(`season=${year - 1}`)}`, 'espn-standings').catch(() => null), new Promise(r => setTimeout(r, BEFORE_WAIT_MS, null))]) : null;
   return strengths(sport, parseStandings(now), parseStandings(before));
 }
 
