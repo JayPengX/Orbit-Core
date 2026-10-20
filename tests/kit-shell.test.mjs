@@ -603,8 +603,9 @@ test('twins carry the DOM builders\' classes', () => {
 });
 
 test('the twins mirror the DOM builders\' text and flags', () => {
-  assert.match(ui.logoTileHtml('a.png', { fallbackText: 'AB', tint: 'red' }), /data-fallback="AB" data-tint="red"/);
-  assert.match(ui.logoTileHtml('', { fallbackText: '蒙札', tint: 'red', size: 24 }), /class="q-logo text" style="--s:24px;--t:red">蒙</);
+  assert.match(ui.logoTileHtml('a.png', { fallbackText: 'AB', tint: 'red' }), /data-fallback="team" data-tint="red"/);
+  assert.match(ui.logoTileHtml('a.png', { kind: 'person' }), /data-fallback="person"/);
+  assert.match(ui.logoTileHtml('', { fallbackText: '蒙札', tint: 'red', size: 24 }), /class="q-logo text" role="img" aria-label="蒙札" style="--s:24px;--t:red"><svg/);
 });
 
 test('sheet(): a subtitle under the title, before the ✕; none by default', () => {

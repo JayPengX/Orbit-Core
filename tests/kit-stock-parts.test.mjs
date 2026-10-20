@@ -223,7 +223,7 @@ test('stakeInput: presets respect decimals', () => {
 });
 
 // ---- logoTile with a list ----
-test('logoTile: a list of URLs is tried in order, then the letter', () => {
+test('logoTile: a list of URLs is tried in order, then a picture of its kind (never a letter)', () => {
   const t = ui.logoTile(['a.png', 'b.png'], { fallbackText: '台積電' });
   const img = t.children[0];
   assert.equal(img.getAttribute('src'), 'a.png');
@@ -232,24 +232,24 @@ test('logoTile: a list of URLs is tried in order, then the letter', () => {
   assert.equal(t.className, 'q-logo');
   img.dispatch('error');
   assert.equal(t.className, 'q-logo text');
-  assert.equal(t.textContent, '台');
+  assert.equal(t.innerHTML, ui.icons.shield);
+  assert.equal(ui.logoTile([], { kind: 'person' }).innerHTML, ui.icons.user);
 });
 
 test('logoTile: one string and an empty list behave as before', () => {
   const one = ui.logoTile('a.png', { fallbackText: 'A' });
   one.children[0].dispatch('error');
   assert.equal(one.className, 'q-logo text');
-  assert.equal(ui.logoTile('a.png').children[0].listeners.error, undefined, 'no handler without a fallback');
   assert.equal(ui.logoTile([], { fallbackText: 'Z' }).className, 'q-logo text');
-  assert.equal(ui.logoTile([], {}).children.length, 0);
+  assert.equal(ui.logoTile([], {}).className, 'q-logo text', 'nothing at all: still a picture, never an empty box');
   const noFall = ui.logoTile(['a.png', 'b.png']);
   noFall.children[0].dispatch('error');
   noFall.children[0].dispatch('error');
-  assert.equal(noFall.className, 'q-logo', 'no fallbackText: the image stays');
+  assert.equal(noFall.className, 'q-logo text', 'no fallbackText: the picture of its kind, not a broken image');
 });
 
 test('logoTileHtml + wireLogos: the same walk', () => {
-  assert.equal(ui.logoTileHtml('a.png', { fallbackText: 'A' }), '<span class="q-logo" style="--s:40px"><img src="a.png" alt="" loading="lazy" decoding="async" data-fallback="A" data-tint=""></span>');
+  assert.equal(ui.logoTileHtml('a.png', { fallbackText: 'A' }), '<span class="q-logo" style="--s:40px"><img src="a.png" alt="" loading="lazy" decoding="async" data-fallback="team" data-tint=""></span>');
   const html = ui.logoTileHtml(['a.png', 'b&c.png'], { fallbackText: '台', tint: '#123' });
   assert.ok(html.includes('src="a.png"') && html.includes('data-srcs="[&#34;b&#38;c.png&#34;]"'));
   assert.equal(ui.logoTileHtml([], { fallbackText: 'Z' }), ui.logoTileHtml('', { fallbackText: 'Z' }));
@@ -384,7 +384,7 @@ test('stockRowHtml: the same structure, escaped, data-open', () => {
   const dom = ui.stockRow({ ...opts, onOpen: () => {} });
   assert.deepEqual(sorted(classesOfTree(dom)), sorted(classesOfHtml(html)));
   const plain = ui.stockRowHtml({ name: 'B', data: { code: 'x"y' } });
-  assert.ok(plain.includes('data-code="x&#34;y"') && !plain.includes('role='));
+  assert.ok(plain.includes('data-code="x&#34;y"') && !plain.includes('role="button"'));
 });
 
 // ---- CSS ----
@@ -401,7 +401,7 @@ test('CSS: Securities parts sits just before Foundations, and defines what the p
 });
 
 // ---- additions: live price, keyboard, letter fallback ----
-test('stockRow: price carries data-q-live; Space opens too; every logo failing shows the letter', () => {
+test('stockRow: price carries data-q-live; Space opens too; every logo failing shows a company picture', () => {
   let opened = 0;
   const r = ui.stockRow({ logo: ['a.png', 'b.png'], name: '台積電', price: 10, onOpen: () => opened++ });
   assert.equal(r.children[2].children[0].hasAttribute('data-q-live'), true);
@@ -414,9 +414,9 @@ test('stockRow: price carries data-q-live; Space opens too; every logo failing s
   img.dispatch('error');
   img.dispatch('error');
   assert.equal(r.children[0].className, 'q-logo text');
-  assert.equal(r.children[0].textContent, '台');
+  assert.equal(r.children[0].innerHTML, ui.icons.bank);
   const html = ui.stockRowHtml({ logo: ['a.png', 'b.png'], name: 'Zed', price: 10, open: 'z' });
   assert.ok(html.includes('<b class="num" data-q-live>10.00</b>') || /<b class="num" data-q-live>[^<]+<\/b>/.test(html));
-  assert.ok(html.includes('data-fallback="Zed"') && html.includes('data-srcs='), 'wireLogos ends on the letter');
-  assert.equal(ui.stockRowHtml({ name: 'Q' }).includes('role='), false);
+  assert.ok(html.includes('data-fallback="company"') && html.includes('data-srcs='), 'wireLogos ends on the picture');
+  assert.equal(ui.stockRowHtml({ name: 'Q' }).includes('role="button"'), false);
 });

@@ -247,7 +247,10 @@ test('leagueTile: 56px logo over the name', () => {
   assert.equal(t.children[1].textContent, 'NBA');
   t.dispatch('click');
   assert.equal(opened, 1);
-  assert.equal(withCls(ui.leagueTile({ name: '英超' }), 'q-logo')[0].textContent, '英', 'no logo: the first letter');
+  const none = withCls(ui.leagueTile({ name: '英超' }), 'q-logo')[0];
+  assert.equal(none.className, 'q-logo text', 'no logo: a picture of its kind, never a letter');
+  assert.equal(none.textContent, '');
+  assert.match(none.innerHTML, /<svg/);
 });
 
 // ---- CSS ----
