@@ -232,7 +232,7 @@ export const CARDS = {
   million: {
     icon: '💵', zh: '樂刮$5,000', en: 'Scratch $5,000', price: 500, color: '#1d4ed8', since: '2026-06-02', until: '2026-12-02', issued: 4_000_000,
     prizes: [[500, 1_120_000], [1_000, 85_088], [2_000, 24_000], [5_000, 159_936], [100_000, 12], [3_000_000, 2]],
-    games: [{ type: 'numbers', of: [1, 40], winning: 5, yours: 20, bonus: { s: '$', a: 5_000 } }],
+    games: [{ type: 'numbers', of: [1, 40], winning: 4, yours: 20, bonus: { s: '$', a: 5_000 } }],
     how: { zh: '任一個「您的號碼」對中「幸運號碼」，即得該號碼對應的獎金；或刮中一個「$」，即得獎金5,000元。', en: 'Any of your numbers matching a lucky number wins the prize beside it; a $ wins NT$5,000.' }
   },
   mahjong: {
