@@ -377,18 +377,21 @@
     <!-- 金流 -->
     <section data-pane="money" hidden>
       <div class="row spread"><h2>金流</h2><button id="mo-load" class="small">重新整理</button></div>
-      <p class="muted">所有帳戶的「真相」加起來，分三方：系統（發錢，刪除的帳戶把剩下的錢還回來）、Quadra（莊家和費用賺的）、市場（玩家投資賺賠的）。三方加起來就是現在流通的錢。</p>
+      <p class="muted">所有帳戶的「真相」加起來，分四方：系統（發錢，刪除的帳戶把剩下的錢還回來）、Quadra（莊家和費用賺的）、政府（收稅、發急難紓困）、市場（玩家投資賺賠的）。四方加起來就是現在流通的錢。</p>
       <p id="mo-error" class="error"></p>
       <div id="mo" hidden>
         <div class="tiles" id="mo-tiles"></div>
         <p class="eq" id="mo-eq"></p>
         <div class="twocol" style="margin-top:6px">
-          <div><h3>三方對帳</h3><div class="card"><ul class="flow" id="mo-where"></ul></div></div>
+          <div><h3>四方對帳</h3><div class="card"><ul class="flow" id="mo-where"></ul></div></div>
           <div><h3>系統</h3><div class="card"><ul class="flow" id="mo-given"></ul></div></div>
         </div>
         <div class="twocol">
           <div><h3>Quadra：莊家和費用賺的</h3><div class="card"><ul class="flow" id="mo-quadra"></ul></div></div>
           <div><h3>市場：玩家投資賺的</h3><div class="card"><ul class="flow" id="mo-own"></ul></div></div>
+        </div>
+        <div class="twocol">
+          <div><h3>政府：收的稅和發的補助</h3><div class="card"><ul class="flow" id="mo-gov"></ul></div></div>
         </div>
         <p class="muted" id="mo-note"></p>
       </div>
@@ -926,16 +929,21 @@ async function loadMoney() {
     // System: what it issued, less what deleted accounts paid back (their
     // worth when deleted; an overdrawn one's debt the system eats).
     const net = n(all, 'given') - n(gone, 'worth');
+    // The government's take across accounts (taxes less 急難紓困; money.js gov is the player's side).
+    const govTake = -n(all.gov, 'net');
     $('mo-tiles').replaceChildren(
       tile('系統淨發出', big(net), gone.accounts ? `還回 ${big(n(gone, 'worth'))}` : `${n(live, 'accounts')} 個帳戶`),
       tile('Quadra 賺', big(n(all, 'quadra')), n(all, 'quadra') >= 0 ? '莊家和費用淨收' : '玩家從 Play 贏走'),
+      tile('政府收', big(govTake), `稅 ${big(n(all.gov?.paid, 'sports') + n(all.gov?.paid, 'lottery') + n(all.gov?.paid, 'trade') + n(all.gov?.paid, 'withheld') + n(all.gov?.paid, 'nhi'))} · 紓困 ${big(n(all.gov?.got, 'relief'))}`),
       tile('市場', big(n(all, 'own')), n(all, 'own') >= 0 ? '玩家投資淨賺' : '玩家投資淨賠'),
       tile('流通中', big(n(live, 'worth')), n(live, 'atStake') ? `下注中 ${big(n(live, 'atStake'))}` : '現有帳戶的身價')
     );
-    $('mo-eq').textContent = `系統淨發出 ${big(net)} − Quadra 賺 ${big(n(all, 'quadra'))} ${n(all, 'own') < 0 ? '−' : '+'} 市場 ${big(Math.abs(n(all, 'own')))} = 流通中 ${big(n(live, 'worth'))}`;
+    $('mo-eq').textContent = `系統淨發出 ${big(net)} − Quadra 賺 ${big(n(all, 'quadra'))} − 政府收 ${big(govTake)} ${n(all, 'own') < 0 ? '−' : '+'} 市場 ${big(Math.abs(n(all, 'own')))} = 流通中 ${big(n(live, 'worth'))}`;
     const g = all.gave || {};
     flow('mo-given', [['開戶金', n(g, 'start')], ['月薪', n(g, 'pay')], ['財富等級獎勵', n(g, 'rank')], ['其他', n(g, 'other'), 'VIP 回饋、補發'], ['刪除的帳戶還回', -n(gone, 'worth'), `${n(gone, 'accounts')} 個`]].filter(r => r[1]), { total: ['淨發出', net] });
-    flow('mo-where', [['系統淨發出', net], ['Quadra 賺走', -n(all, 'quadra')], ['市場', n(all, 'own')]], { total: ['流通中', n(live, 'worth')] });
+    flow('mo-where', [['系統淨發出', net], ['Quadra 賺走', -n(all, 'quadra')], ['政府收走', -govTake, '稅減去急難紓困'], ['市場', n(all, 'own')]], { total: ['流通中', n(live, 'worth')] });
+    const gp = all.gov?.paid || {};
+    flow('mo-gov', [['運彩中獎所得稅', n(gp, 'sports')], ['彩券中獎稅', n(gp, 'lottery'), '所得稅與印花稅'], ['證券交易稅', n(gp, 'trade')], ['股利與利息扣繳', n(gp, 'withheld'), '含外國政府'], ['二代健保補充保費', n(gp, 'nhi')], ['急難紓困', -n(all.gov?.got, 'relief'), '發給玩家']].filter(r => r[1]), { total: ['政府淨收', govTake] });
     flow('mo-quadra', [...byMarket(all.playBy, n(all, 'play'), SPORT_NAMES, ['Play 未分類', '還沒同步的帳戶']), ...[['Plus 月費（扣掉退費）', n(all.fees, 'plus')], ['透支利息', n(all.fees, 'od')], ['信貸（淨）', n(all.fees, 'loan')]].filter(r => r[1])], { total: ['合計', n(all, 'quadra')] });
     flow('mo-own', byMarket(all.stockBy, n(all, 'own'), MARKET_NAMES, ['其他', '股利、利息、匯兌']), { total: ['合計', n(all, 'own')] });
     $('mo-note').textContent = `帳戶刪除時，剩下的錢還給系統（透支的帳戶，欠的由系統吸收）；它讓 Quadra 賺的和在市場賺賠的照樣留在帳上。Quadra 這邊玩家輸的是正數、贏走的是負數；未結算的注單不算。各市場由 Play 和 Securities 打開時回報，還沒打開過新版的帳戶算在「未分類／其他」。刪除的帳戶${gone.since ? `從 ${fmtDay(gone.since)} 起` : '從現在起'}記錄。${fmt(m.at)} 更新。`;
