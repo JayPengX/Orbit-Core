@@ -53,6 +53,8 @@
     location.reload();
   };
   q('[data-act=skip]').onclick = function () {
+    // (Opened now: the kit doesn't hold it for pictures.)
+    box.setAttribute('data-now', '1');
     box.hidden = true;
   };
 

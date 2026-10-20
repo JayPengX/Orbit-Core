@@ -4,8 +4,9 @@
 //
 //   lift      the loading screen lifted before the first screen was ready
 //             (a skeleton or "載入中" still showing, or under half the text
-//             it settles on), or never lifted
-//   stall     the main thread blocked 250 ms or more (a frozen screen)
+//             it settles on, or pictures still loading), or never lifted
+//   stall     the main thread blocked 500 ms or more at half speed (--cpu 2,
+//             about a recent iPhone's): a frozen screen
 //   errors    a script error
 //   blank     a screen with nothing on it
 //   pictures  an image that failed to load (an empty logo)
@@ -56,7 +57,7 @@ for (const app of apps)
 const preview = new URL('./preview.mjs', import.meta.url).pathname;
 const one = run =>
   new Promise(done => {
-    const a = [preview, run.app, '--gate', '--live', '--width', String(run.width), '--out', join(out, 'shots'), '--wait', '7000', ...(run.dark ? ['--dark'] : []), ...(run.taps ? ['--taps'] : [])];
+    const a = [preview, run.app, '--gate', '--live', '--width', String(run.width), '--out', join(out, 'shots'), '--wait', '7000', '--cpu', '2', ...(run.dark ? ['--dark'] : []), ...(run.taps ? ['--taps'] : [])];
     execFile(process.execPath, a, { maxBuffer: 64 * 1024 * 1024, timeout: 600_000 }, (err, stdout) => {
       const line = String(stdout || '').split('\n').find(l => l.startsWith('gate: '));
       if (!line) return done({ ...run, crashed: String(err?.message || stdout || 'no result').split('\n').slice(0, 3).join(' ') });
@@ -74,9 +75,10 @@ const faults = r => {
   else {
     const early = [...r.lift.skels, ...r.lift.loading];
     if (early.length) f.push(['lift', at, `lifted at ${r.lift.t} ms with ${early.join(', ')} still showing`, first]);
+    else if (r.lift.waiting >= 2) f.push(['lift', at, `lifted at ${r.lift.t} ms with ${r.lift.waiting} of ${r.lift.pics} pictures still loading`, first]);
     else if (r.end && r.end.chars > 150 && r.lift.chars < r.end.chars * 0.5) f.push(['lift', at, `lifted at ${r.lift.t} ms with ${r.lift.chars} of ${r.end.chars} characters on screen`, first]);
   }
-  for (const [t, ms] of r.longs || []) if (ms >= 250) f.push(['stall', at, `main thread blocked ${ms} ms at ${t} ms`, first]);
+  for (const [t, ms] of r.longs || []) if (ms >= 500) f.push(['stall', at, `main thread blocked ${ms} ms at ${t} ms`, first]);
   for (const e of r.pageErrors || []) f.push(['errors', at, e, first]);
   for (const tab of r.tabs || []) for (const kind of ['blank', 'pictures', 'overflow', 'wraps', 'cut', 'letters', 'slots', 'halfEmpty', 'bareEmpty', 'loading', 'dead']) for (const what of tab[kind] || []) f.push([kind, `${at} #${tab.id}`, what, tab.shot]);
   return f;
