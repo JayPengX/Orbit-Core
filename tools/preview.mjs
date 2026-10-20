@@ -987,8 +987,22 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
       const k = `${f.functionName || '(anonymous)'} ${f.url.split('/').pop().replace(/\?.*/, '')}${f.url ? `:${f.lineNumber + 1}` : ''}`;
       by.set(k, (by.get(k) || 0) + (gaps[i + 1] ?? 0) / 1000);
     });
+    // (A browser call that tops the list, such as a layout read, named with who called it.)
+    const parent = new Map();
+    for (const n of prof.nodes) for (const c of n.children || []) parent.set(c, n);
+    const callers = new Map();
+    prof.samples.forEach((id, i) => {
+      const n = node.get(id);
+      if (n.callFrame.url || /^\(/.test(n.callFrame.functionName)) return;
+      const p = parent.get(id)?.callFrame;
+      if (!p) return;
+      const k = `${n.callFrame.functionName} ← ${p.functionName || '(anonymous)'} ${p.url.split('/').pop().replace(/\?.*/, '')}:${p.lineNumber + 1}`;
+      callers.set(k, (callers.get(k) || 0) + (gaps[i + 1] ?? 0) / 1000);
+    });
     const busy = [...by].filter(([k]) => !/^\((idle|program|garbage collector)\)/.test(k)).reduce((a, [, v]) => a + v, 0);
     console.log(`profile ${key}: ${Math.round(busy)} ms of script ${clicks.length ? "from the first click" : "until the loading screen went"}; the most:\n${[...by].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([k, v]) => `  ${String(Math.round(v)).padStart(5)} ms  ${k}`).join('\n')}`);
+    const top = [...callers].sort((a, b) => b[1] - a[1]).filter(([, v]) => v >= 20).slice(0, 8);
+    if (top.length) console.log(`browser calls by caller:\n${top.map(([k, v]) => `  ${String(Math.round(v)).padStart(5)} ms  ${k}`).join('\n')}`);
   };
   // (With --click, until the clicks are done: what a tap costs.)
   if (cdp && !clicks.length) await stopProfile();
@@ -1009,6 +1023,7 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
     const order = [...tabs.filter(t => t.on), ...tabs.filter(t => !t.on)];
     for (const [i, t] of (order.length ? order : [{ id: 'start' }]).entries()) {
       if (i) {
+        (result.tapAt ||= []).push([`tab #${t.id}`, await page.evaluate(() => Math.round(performance.now())).catch(() => 0)]);
         await page.click(`.q-tab[data-tab="${t.id}"]`).catch(() => {});
         await page.waitForTimeout(3000);
       }
@@ -1027,6 +1042,8 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
           const at = await page.evaluate(w => globalThis.__gate.buttons(60).indexOf(w), want);
           if (at < 0) continue;
           const before = await page.evaluate(() => globalThis.__gate.print());
+          // (When each tap came, so a freeze can be pinned on the tap before it.)
+          (result.tapAt ||= []).push([`#${t.id} "${want}"`, await page.evaluate(() => Math.round(performance.now())).catch(() => 0)]);
           const tapped = await page.locator(`[data-gate="${at}"]`).first().tap({ timeout: 2000 }).then(() => true, () => page.locator(`[data-gate="${at}"]`).first().click({ timeout: 2000 }).then(() => true, () => false));
           if (!tapped) continue;
           found.tapped++;

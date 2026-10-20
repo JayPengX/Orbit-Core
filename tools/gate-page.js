@@ -72,15 +72,16 @@
       if (r.width && r.top < innerHeight && r.bottom > 0 && getComputedStyle(p).visibility !== 'hidden') chars += n.textContent.trim().length;
     }
     let waiting = 0;
+    const late = [];
     for (const img of document.querySelectorAll('img')) {
       const r = img.getBoundingClientRect();
       if (!r.width || r.top >= innerHeight || r.bottom <= 0 || img.closest('#loading')) continue;
       pics++;
-      if (!img.complete) waiting++;
+      if (!img.complete) waiting++, late.push(String(img.getAttribute('src')).slice(0, 90));
     }
     const skels = [...document.querySelectorAll(SKELETON)].filter(seen).filter(el => el.getBoundingClientRect().top < innerHeight);
     const loading = [...document.querySelectorAll('body *')].filter(el => !el.children.length && LOADING.test(text(el)) && seen(el));
-    return { t: Math.round(performance.now() - t0), chars, pics, waiting, skels: skels.slice(0, 4).map(name), loading: loading.slice(0, 3).map(el => `${name(el)} "${text(el)}"`) };
+    return { t: Math.round(performance.now() - t0), chars, pics, waiting, late: late.slice(0, 3), skels: skels.slice(0, 4).map(name), loading: loading.slice(0, 3).map(el => `${name(el)} "${text(el)}"`) };
   };
   gate.screenNow = screenNow;
   // The lift: #loading hidden (Orbit Class: its booting class gone).

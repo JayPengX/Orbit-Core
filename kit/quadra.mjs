@@ -3150,6 +3150,10 @@ function keepStrips() {
   let queued = false;
   const restore = () => {
     queued = false;
+    // (Every strip measured first, then every one scrolled: a measure after a
+    // scroll lays the page out again, which was most of a league switch's
+    // freeze in Sports on a phone.)
+    const moves = [];
     for (const k of kept.values()) {
       // The strip still in the page: not redrawn, nothing to do (and nothing measured).
       if (k.el?.isConnected) continue;
@@ -3162,14 +3166,19 @@ function keepStrips() {
       if (el.scrollLeft !== 0) continue;
       const item = k.text == null ? null : [...el.children].find(c => c.textContent === k.text);
       if (!item) continue;
-      el.scrollLeft += item.getBoundingClientRect().left - el.getBoundingClientRect().left - k.at;
+      const b = el.getBoundingClientRect();
+      let by = item.getBoundingClientRect().left - b.left - k.at;
       const pick = el.querySelector(chosen);
       if (pick && pick.textContent !== k.pick) {
+        // (Where the newly chosen chip lands after that scroll.)
         const a = pick.getBoundingClientRect();
-        const b = el.getBoundingClientRect();
-        if (a.left < b.left || a.right > b.right) el.scrollLeft += a.left < b.left ? a.left - b.left - 12 : a.right - b.right + 12;
+        const left = a.left - by;
+        const right = a.right - by;
+        if (left < b.left || right > b.right) by += left < b.left ? left - b.left - 12 : right - b.right + 12;
       }
+      moves.push([el, by]);
     }
+    for (const [el, by] of moves) el.scrollLeft += by;
   };
   // Right after the redraw (before it's painted), so the strip never shows at its start.
   new MutationObserver(() => {
@@ -3223,7 +3232,8 @@ watchKeyboard();
 // The loading screen lifts onto a finished screen, pictures included, in
 // every app: when the app hides #loading with logos, faces or covers on the
 // first screen still on their way, the kit keeps it up until they're in
-// (at most 1.5 s more), so they don't pop in one by one after it lifted.
+// (at most 1.5 s more, counting ones drawn while it waits), so they don't
+// pop in one by one after it lifted.
 // Only the first lift, and never after "Open anyway" (boot.js) or offline.
 function liftOnPictures() {
   const box = typeof document === 'undefined' ? null : document.getElementById('loading');
@@ -3235,16 +3245,47 @@ function liftOnPictures() {
     seen.disconnect();
     if (box.dataset.now || globalThis.navigator?.onLine === false) return;
     const h = globalThis.innerHeight || 800;
-    const waiting = [...document.images].filter(img => {
-      if (img.complete || img.closest('#loading')) return false;
-      const r = img.getBoundingClientRect();
-      return r.width > 0 && r.bottom > 0 && r.top < h;
-    });
-    if (!waiting.length) return;
+    // (Each on-screen picture still coming, counted once; those added during the hold count too.)
+    const pending = new Set();
+    const look = () => {
+      for (const img of document.images) {
+        if (pending.has(img) || img.complete || img.closest('#loading')) continue;
+        const r = img.getBoundingClientRect();
+        if (r.width > 0 && r.bottom > 0 && r.top < h) {
+          pending.add(img);
+          const settle = () => (pending.delete(img), pending.size || queueMicrotask(lookAgain));
+          img.addEventListener('load', settle, { once: true });
+          img.addEventListener('error', settle, { once: true });
+        }
+      }
+    };
+    look();
+    if (!pending.size) return;
     // (Back up before the next paint: the screen never shows half-drawn in between.)
     box.removeAttribute('hidden');
-    const each = waiting.map(img => new Promise(done => (img.addEventListener('load', done, { once: true }), img.addEventListener('error', done, { once: true }))));
-    Promise.race([Promise.all(each), new Promise(done => setTimeout(done, 1500))]).then(() => box.setAttribute('hidden', ''));
+    let lifted = false;
+    const lift = () => {
+      if (lifted) return;
+      lifted = true;
+      added.disconnect();
+      clearTimeout(cap);
+      box.setAttribute('hidden', '');
+    };
+    // (The last picture in: one more look before lifting, for any added since.)
+    function lookAgain() {
+      if (lifted) return;
+      look();
+      if (!pending.size) lift();
+    }
+    // (Looked at once a frame, however many changes: each look measures every picture.)
+    let queued = false;
+    const added = new MutationObserver(() => {
+      if (lifted || queued) return;
+      queued = true;
+      requestAnimationFrame(() => ((queued = false), lifted || look()));
+    });
+    added.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['src'] });
+    const cap = setTimeout(lift, 1500);
   });
   seen.observe(box, { attributes: true, attributeFilter: ['hidden'] });
 }
