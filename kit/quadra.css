@@ -5082,7 +5082,11 @@ html.q-kb .q-kb-dock {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* .q-fit-wrap: a line that shrinks the same way and wraps only when 72% can't fit it. */
+/* .q-fit-wrap: a line that shrinks the same way and wraps only when 72% can't fit it,
+   into lines of even length. */
+.q-wrapped {
+  text-wrap: balance;
+}
 .q-fit-wrap:not(.q-wrapped) {
   white-space: nowrap;
   overflow: hidden;

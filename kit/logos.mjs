@@ -147,15 +147,19 @@ const ESPN_LEAGUE = {
   nhl: 'teamlogos/leagues/500/nhl.png', f1: 'teamlogos/leagues/500/f1.png',
   nbl: 'teamlogos/leagues/500/nbl.png'
 };
+// ESPN's resizer at 128 px: a tenth of the 500 px original's bytes (19 KB for
+// the NBA's), so a first screen's league logos are in before the loading
+// screen lifts, even on a slow line.
+const espnSmall = path => `https://a.espncdn.com/combiner/i?img=/i/${path}&w=128&h=128`;
 // The league's own logo (light backgrounds: the apps show it on a white disc), or null.
 export function leagueLogo(key, dark = false) {
   // The lion alone: ESPN's own resizer crops the top of its logo, clear of
   // the "Premier League" wordmark.
   if (key === 'epl') return 'https://a.espncdn.com/combiner/i?img=/i/leaguelogos/soccer/500/23.png&w=128&h=80&scale=crop&location=origin';
-  if (ESPN_LEAGUE[key]) return `https://a.espncdn.com/i/${dark ? ESPN_LEAGUE[key].replace('/500/', '/500-dark/') : ESPN_LEAGUE[key]}`;
+  if (ESPN_LEAGUE[key]) return espnSmall(dark ? ESPN_LEAGUE[key].replace('/500/', '/500-dark/') : ESPN_LEAGUE[key]);
   // TheSportsDB's badge.
   if (LEAGUE_BADGE[key]) return `${SPORTSDB}/league/badge/${LEAGUE_BADGE[key]}.png/small`;
-  return SOCCER_LOGO[key] ? `https://a.espncdn.com/i/leaguelogos/soccer/500/${SOCCER_LOGO[key]}.png` : null;
+  return SOCCER_LOGO[key] ? espnSmall(`leaguelogos/soccer/500/${SOCCER_LOGO[key]}.png`) : null;
 }
 
 // 2026 F1 grid: each driver's team and its colour, for the driver badges.
