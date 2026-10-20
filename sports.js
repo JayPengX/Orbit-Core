@@ -154,6 +154,12 @@ const CACHE_ODDS = { tier: 'odds', fresh: 10 * SECOND, stale: 0 };
 // F1's live timing: a few seconds, shared by everyone watching.
 const CACHE_F1_LIVE = { tier: 'f1-live', fresh: 4 * SECOND, stale: 0 };
 const CACHE_F1_LAPS = { tier: 'f1-live', fresh: 15 * SECOND, stale: 0 };
+// OpenF1 (a race's sessions, race control, laps, pits): read only once a
+// session is over (it's closed while one runs), so minutes old is new
+// enough. It turns away an address asking more than about 30 a minute, and
+// the proxy's address is shared with every other Worker: a refusal answers
+// the copy kept here (up to a day), never nothing (健康 showed 429, 2026-10-20).
+const CACHE_OPENF1 = { tier: 'openf1', fresh: 5 * MINUTE, stale: DAY };
 const CACHE_SCHEDULE = { tier: 'schedule', fresh: 10 * MINUTE, stale: DAY };
 const CACHE_SEASON = { tier: 'season', fresh: 3 * MINUTE, stale: 30 * MINUTE };
 const CACHE_STANDINGS = { tier: 'standings', fresh: 30 * MINUTE, stale: DAY };
@@ -271,7 +277,7 @@ function cachePolicyFor(url) {
     case 'api.jolpi.ca':
       return CACHE_STANDINGS;
     case 'api.openf1.org':
-      return CACHE_ODDS;
+      return CACHE_OPENF1;
     case 'clob.polymarket.com':
       return CACHE_ODDS;
     case 'gamma-api.polymarket.com':
