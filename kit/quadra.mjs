@@ -140,7 +140,8 @@ const rankName = (id, i) => {
   return r ? (i ? r.en : r.zh) : OLD_RANK_NAMES[id]?.[i] || id;
 };
 // Where the money came from and went (all time, NT$): what the system gave
-// (opening money, pay, level rewards, resets, VIP cashback), the account
+// (opening money, pay, level rewards, resets, VIP cashback), the government
+// (govOf: relief less taxes), the account
 // against Quadra (Play's settled bets less fees, loan costs and overdraft interest:
 // a surplus when it has won more than it lost and paid), and its own result
 // (markets, savings: worth less the other two). A bet still open is in the
@@ -152,6 +153,23 @@ const rankName = (id, i) => {
 // (`eco:rebase:v3fix`, for an account that had less than 110,000) brought
 // that to the NT$30,000 everyone opens with: all of it is opening money.
 const RESET_ID = 'eco:rebase:v3';
+// 政府: what the government took and gave (all time, whole NT$). Taken: 運彩's
+// 20% income tax on a big combination and the lottery's 20% tax and 0.4%
+// stamp duty on a prize over NT$5,000 (Play's `snap.odds.gov`), 證交稅 and
+// other trade taxes, tax withheld on dividends and interest (a foreign
+// government's too) and 二代健保's supplementary premium (Securities'
+// `snap.stock.gov`); given: 急難紓困 (the Worker's `relief` entries). The
+// apps report their figures as they sync; one not opened since shows 0.
+const nn = v => Math.max(0, Math.round(finiteOr0(v)));
+export function govOf(wallet) {
+  const odds = wallet?.snap?.odds?.gov || {};
+  const stock = wallet?.snap?.stock?.gov || {};
+  const paid = { sports: nn(odds.sports), lottery: nn(odds.lottery), trade: nn(stock.trade), withheld: nn(stock.withheld), nhi: nn(stock.nhi) };
+  const got = { relief: Math.round((wallet?.entries || []).filter(e => e.app === 'eco' && e.kind === 'relief').reduce((sum, e) => sum + finiteOr0(e.amount), 0)) };
+  const paidTotal = Object.values(paid).reduce((a, b) => a + b, 0);
+  const gotTotal = got.relief;
+  return { paid, got, paidTotal, gotTotal, net: gotTotal - paidTotal };
+}
 export function moneySides(wallet) {
   const gave = { start: 0, pay: 0, rank: 0, other: 0 };
   // Play's settled bets (payouts less stakes) and what Quadra charges (old Plus
@@ -174,7 +192,7 @@ export function moneySides(wallet) {
       else if (e.kind === 'pay') gave.pay += a;
       else if (e.kind === 'rank') gave.rank += a;
       // (A correction or prize from the admin page: money Quadra gave, either way.)
-      else if (e.kind === 'rebase' || e.kind === 'vip' || e.kind === 'admin' || e.kind === 'relief') gave.other += a;
+      else if (e.kind === 'rebase' || e.kind === 'vip' || e.kind === 'admin') gave.other += a;
       else if (e.kind === 'plus' || e.kind === 'plusrefund' || e.kind === 'od') fees -= a;
       else if (LOAN_KINDS.has(e.kind)) loanFlow += a;
     } else if (e.app === 'odds') {
@@ -186,12 +204,15 @@ export function moneySides(wallet) {
   }
   fees += debtOf(wallet) - loanFlow;
   const given = gave.start + gave.pay + gave.rank + gave.other;
+  // The government's side: relief in, taxes out (govOf). Play's winnings came
+  // in after tax, so Play's side counts them before it.
+  const gov = govOf(wallet);
   // Against Quadra, signed: above 0 when Play has paid out more than the
   // account lost there and paid in fees (a surplus), below when Quadra kept more.
-  const quadra = play - fees;
+  const quadra = play + gov.paid.sports + gov.paid.lottery - fees;
   // The worth counts money at stake: it's still the account's until settled.
   const worth = worthOf(wallet) + atStake;
-  return { gave, given, quadra, fees, playNet: play, atStake, took: Math.max(0, -quadra), worth, own: worth - given - quadra };
+  return { gave, given, quadra, fees, playNet: play, atStake, took: Math.max(0, -quadra), worth, gov, own: worth - given - quadra - gov.net };
 }
 // The weekly pay: fixed, whatever the account holds (eco.js PAY.week).
 export const paydayFor = () => ECONOMY.weekly;

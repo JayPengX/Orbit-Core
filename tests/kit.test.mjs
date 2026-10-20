@@ -683,3 +683,21 @@ test('taipeiDay takes a number, an ISO string or a Date', () => {
   assert.equal(kit.taipeiDay(new Date(t).toISOString()), '2026-10-18');
   assert.equal(kit.taipeiDay(new Date(t)), '2026-10-18');
 });
+
+test('政府: taxes the apps report and relief, a side of its own; the four sides add up to the worth', () => {
+  const start = { id: 'eco:start', app: 'eco', kind: 'start', amount: 200_000 };
+  const w = {
+    entries: [start, { id: 'odds:stake-a', app: 'odds', kind: 'stake', amount: -1_000 }, { id: 'odds:payout-a', app: 'odds', kind: 'payout', amount: 48_010 }, { id: 'eco:relief:2026-11-02', app: 'eco', kind: 'relief', amount: 5_000 }],
+    snap: { odds: { gov: { sports: 11_990, lottery: 2_040 } }, stock: { cash: -50_000, holdings: 60_000, gov: { trade: 300, withheld: 90, nhi: 0 } } }
+  };
+  const g = kit.govOf(w);
+  assert.deepEqual(g.paid, { sports: 11_990, lottery: 2_040, trade: 300, withheld: 90, nhi: 0 });
+  assert.deepEqual([g.paidTotal, g.gotTotal, g.net], [14_420, 5_000, -9_420]);
+  const s = kit.moneySides(w);
+  // Play's side is before tax (relief isn't the system's).
+  assert.equal(s.quadra, 48_010 - 1_000 + 14_030);
+  assert.equal(s.gave.other, 0);
+  assert.equal(s.given + s.quadra + s.gov.net + s.own, s.worth);
+  // Nothing reported, junk ignored.
+  assert.equal(kit.govOf({ snap: { odds: { gov: { sports: 'x', lottery: -5 } } } }).paidTotal, 0);
+});

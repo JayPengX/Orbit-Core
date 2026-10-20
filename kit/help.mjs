@@ -25,7 +25,7 @@ export const HELP = {
       ['tabs', '每個分頁', [
         'Pass：Quadra 餘額、開戶日、本月收入與支出、下次發薪和最近明細；下面是這個 App 自己的設定（有的話）、新增裝置、通知、除錯紀錄和帳戶安全。',
         '外觀：挑一個頭像和頭像框，全部免費，每個 App 的帳戶按鈕都看得到。',
-        '真相：用真實的數字和你自己的紀錄，算錢從哪裡來、莊家和券商怎麼賺；最下面是財富等級。',
+        '真相：用真實的數字和你自己的紀錄，算錢從哪裡來、莊家、券商和政府各拿多少；最下面是財富等級。',
         'App：每個 Quadra 和 Orbit 的 App、上次什麼時候用、它的說明，和打開它。',
         '說明：每個 App 怎麼用，就是這裡。'
       ]],
@@ -60,7 +60,7 @@ export const HELP = {
       ]],
       ['money', '錢怎麼算', [
         '所有 App 共用一個新台幣錢包。新帳號開戶金 NT$200,000；每週一固定發薪 NT$10,000，跟薪水一樣，存多存少都一樣。系統發的錢只有這些：開戶金、週薪、財富等級獎勵（身價第一次到達一個等級時送一次：NT$30 萬小資族 NT$3,000、50 萬穩健 NT$5,000、百萬 NT$10,000、300 萬富裕 NT$20,000、千萬 NT$50,000、一億 NT$100,000；舊等級領過的獎勵會抵掉）、Play 的 VIP 回饋，和真的一無所有時的急難紓困。週薪在那週第一次打開任何 App 時入帳，沒打開的週下次補發。',
-        '「真相」把你的錢分成三方：系統發的、和 Quadra 的輸贏（Play 的輸贏，扣掉透支利息和信貸利息），和你自己的成績（投資的漲跌）。',
+        '「真相」把你的錢分成四方：系統發的、和 Quadra 的輸贏（Play 的稅前輸贏，扣掉透支利息和信貸利息）、政府（中獎稅、證交稅、股利扣繳和二代健保，減去急難紓困），和你自己的成績（投資的漲跌）。',
         '餘額可以是負的（透支），每月計息 1%。就像交割款沒付，2 天內沒補足就是違約交割：扣透支金額 7% 的違約金、自動賣出持股補足，而且 5 年內不能融資、融券。自己先賣就沒事。融資借來的錢只能留在 Securities 買賣，不能拿去 Play 或補透支。',
         'Securities 投資、Play 下注和買彩券；Orbit 的 App 都不用錢。錢只存在 Quadra Pass，不能在帳號之間轉。'
       ]],
@@ -80,7 +80,7 @@ export const HELP = {
       ['tabs', 'Each tab', [
         'Pass: the Quadra balance, when it was opened, this month’s money in and out, the next pay and the latest entries; below them this app’s own settings (if it has any), adding a device, notifications, the debug log and security.',
         'Looks: pick an avatar and a frame, all free, shown on your account button in every app.',
-        'Truth: where the money comes from and how the house and the broker earn, in real numbers and your own record; wealth levels at the foot.',
+        'Truth: where the money comes from and what the house, the broker and the government take, in real numbers and your own record; wealth levels at the foot.',
         'App: every Quadra and Orbit app, when you last used it, its guide and a way in.',
         'Help: how every app works, here.'
       ]],
@@ -115,7 +115,7 @@ export const HELP = {
       ]],
       ['money', 'Money', [
         'Every app shares one NT$ wallet. A new pass opens with NT$200,000; every Monday pays a fixed NT$10,000, like a salary: the same however much you hold. The system gives money only as the opening money, the pay, wealth level rewards (paid once, the first time what you’re worth reaches a level: NT$3,000 at NT$300,000, then NT$5,000 at 500,000, NT$10,000 at a million, NT$20,000 at 3 million, NT$50,000 at 10 million and NT$100,000 at 100 million; rewards from the old levels count towards them), Play’s VIP cashback, and emergency relief for someone with nothing. The pay comes the first time that week you open any app; a week you miss is paid when you’re back.',
-        'Truth splits your money three ways: what the system gave, your result against Quadra (Play’s wins and losses, less overdraft and loan interest), and your own result (your investments).',
+        'Truth splits your money four ways: what the system gave, your result against Quadra (Play’s wins and losses before tax, less overdraft and loan interest), the government (prize tax, transaction tax, dividend withholding and the NHI premium, less emergency relief), and your own result (your investments).',
         'The balance can go below zero (an overdraft) at 1% a month. Like an unpaid settlement, if it isn’t covered within 2 days it’s a default: a 7% penalty on what’s owed, holdings sold for it, and no margin or short selling for 5 years. Sell something first and none of that happens. Money borrowed on margin stays in Securities for trading: it can’t be bet in Play or cover an overdraft.',
         'Securities invests, Play bets and sells lottery tickets; the Orbit apps don’t use money. Money lives on the Quadra Pass only and can’t move between passes.'
       ]],

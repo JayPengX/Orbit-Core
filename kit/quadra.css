@@ -3433,6 +3433,23 @@ dialog {
 .q-pass .sides .side-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-top: 1px solid var(--q-divider, var(--q-border)); }
 .q-pass .sides .side-row:first-child { border-top: 0; }
 .q-pass .side-icon { font-size: 22px; flex: none; }
+.q-pass .gov { overflow: hidden; }
+.q-pass .gov-tiles { padding: 14px 10px; gap: 8px; }
+.q-pass .gov-tile { padding: 10px 4px; border-radius: 14px; background: var(--q-sunken); }
+.q-pass .gov-tile strong { font-size: 16px; }
+.q-pass .gov-tile.up strong { color: var(--q-good); }
+.q-pass .gov-tile.down strong { color: var(--q-bad); }
+.q-pass .gov-row { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-top: 1px solid var(--q-divider, var(--q-border)); }
+.q-pass .gov-row.none { opacity: 0.55; }
+.q-pass .gov-text { display: grid; gap: 3px; flex: 1; min-width: 0; }
+.q-pass .gov-text small { font-size: 12px; line-height: 1.4; }
+.q-pass .gov-text .meter { height: 5px; margin-top: 3px; }
+.q-pass .gov-row > .num { flex: none; font-size: 14.5px; }
+.q-pass .gov-row.paid > .num { color: var(--q-bad); }
+.q-pass .gov-row.got > .num { color: var(--q-good); }
+.q-pass .gov-row.none > .num { color: var(--q-muted); }
+.q-pass .meter.good > i { background: var(--q-good); }
+.q-pass .meter.bad > i { background: var(--q-bad); }
 .q-pass .side-text { display: grid; flex: 1; min-width: 0; }
 .q-pass .side-text small { font-size: 12px; }
 .q-pass .side-row.took > .num { color: var(--q-bad); }

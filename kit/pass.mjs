@@ -46,12 +46,32 @@ export const STRINGS = {
     sideGod: '系統發的',
     sideGodSub: '開戶金 {start} · 薪水 {pay} · 等級獎勵 {rank} · 其他 {other}',
     sideQuadra: '和 Quadra 的輸贏',
-    sideQuadraSub: 'Play 輸贏，扣月費和利息 {fees}',
+    sideQuadraSub: 'Play 稅前輸贏，扣利息和費用 {fees}',
+    sideGov: '政府',
+    sideGovSub: '繳稅 {paid} · 補助 {got}',
     sideYou: '你自己的成績',
     sideYouSub: '投資的漲跌、省下的',
     sideWorth: '你現在的身價',
     sideAtStake: '含投注中 {v}',
-    sidesSub: '你的錢只有三方：系統發的（開戶金、每週固定 {pay} 薪水、財富等級獎勵），和 Quadra 的輸贏（可正可負），和你自己的成績。',
+    sidesSub: '你的錢只有四方：系統發的（開戶金、每週固定 {pay} 薪水、財富等級獎勵），和 Quadra 的輸贏（可正可負），政府（收稅、發補助），和你自己的成績。',
+    govTitle: '政府',
+    govSub: '政府也在你的錢裡：中獎、交易、領股利都要繳稅，真的撐不下去時發急難紓困。',
+    govPaid: '繳給政府',
+    govGot: '政府給你',
+    govNet: '淨額',
+    gov_sports: '運彩中獎所得稅',
+    govSub_sports: '單注獎金超過 NT$5,000 扣 20%',
+    gov_lottery: '彩券中獎稅',
+    govSub_lottery: '每注超過 NT$5,000 扣 20% 所得稅與 0.4% 印花稅',
+    gov_trade: '證券交易稅',
+    govSub_trade: '賣出才收：股票 0.3%、ETF 0.1%，海外市場的交易稅也在這',
+    gov_withheld: '股利與利息扣繳',
+    govSub_withheld: '美股股利預扣 30% 等，外國政府收的也算',
+    gov_nhi: '二代健保補充保費',
+    govSub_nhi: '單筆股利或利息達 NT$20,000 扣 2.11%',
+    gov_relief: '急難紓困',
+    govSub_relief: '身價低於 NT$2,000 才能申請，每 13 週一次',
+    govFoot: '上面「和 Quadra 的輸贏」和「你自己的成績」都是稅前的數字，稅單獨算在政府這一方。Play 和 Securities 同步後才會更新。',
     edgeTitle: '莊家優勢',
     edgeSingle: '單場',
     edgeLegs: '{n} 關串關',
@@ -197,12 +217,32 @@ export const STRINGS = {
     sideGod: 'The system gave',
     sideGodSub: 'Opening {start} · pay {pay} · level rewards {rank} · other {other}',
     sideQuadra: 'You vs Quadra',
-    sideQuadraSub: 'Play won or lost, less fees {fees}',
+    sideQuadraSub: 'Play won or lost before tax, less interest and fees {fees}',
+    sideGov: 'The government',
+    sideGovSub: 'Taxes {paid} · help {got}',
     sideYou: 'Your own result',
     sideYouSub: 'Markets up and down, money saved',
     sideWorth: 'What you’re worth now',
     sideAtStake: 'incl. {v} at stake',
-    sidesSub: 'Your money has three sides: what the system gave (the opening money, a fixed {pay} pay each week, wealth level rewards), you against Quadra (either way), and your own result.',
+    sidesSub: 'Your money has four sides: what the system gave (the opening money, a fixed {pay} pay each week, wealth level rewards), you against Quadra (either way), the government (taxes and help), and your own result.',
+    govTitle: 'The government',
+    govSub: 'The government is in your money too: winnings, trades and dividends are taxed, and emergency relief is there when you really can’t get by.',
+    govPaid: 'Paid to it',
+    govGot: 'Given to you',
+    govNet: 'Net',
+    gov_sports: 'Sports lottery income tax',
+    govSub_sports: '20% off a single combination winning over NT$5,000',
+    gov_lottery: 'Lottery prize tax',
+    govSub_lottery: '20% income tax and 0.4% stamp duty on each prize over NT$5,000',
+    gov_trade: 'Securities transaction tax',
+    govSub_trade: 'Only on a sale: 0.3% on shares, 0.1% on ETFs, overseas trade taxes too',
+    gov_withheld: 'Dividend and interest withholding',
+    govSub_withheld: 'Such as 30% on US dividends: a foreign government’s counts too',
+    gov_nhi: 'NHI supplementary premium',
+    govSub_nhi: '2.11% off a single dividend or interest payment of NT$20,000 or more',
+    gov_relief: 'Emergency relief',
+    govSub_relief: 'Only when you’re worth under NT$2,000, once every 13 weeks',
+    govFoot: '“You vs Quadra” and your own result above are before tax; the taxes are the government’s side alone. They update when Play and Securities sync.',
     edgeTitle: 'The house edge',
     edgeSingle: 'A single',
     edgeLegs: 'A {n}-pick parlay',
@@ -488,12 +528,14 @@ function renderTruth(box, { t, state }) {
         sideRow('🌤️', t('sideGod'), money(s.given), t('sideGodSub', { start: money(s.gave.start), pay: money(s.gave.pay), rank: money(s.gave.rank), other: money(s.gave.other) })),
         // Against Quadra, either way: green when Play has paid out more than
         // was lost there and paid in fees, red when Quadra kept more.
-        sideRow('🏛️', t('sideQuadra'), money(s.quadra, { sign: true }), t('sideQuadraSub', { fees: money(s.fees) }), s.quadra >= 0 ? 'up' : 'down'),
+        sideRow('🎲', t('sideQuadra'), money(s.quadra, { sign: true }), t('sideQuadraSub', { fees: money(s.fees) }), s.quadra >= 0 ? 'up' : 'down'),
+        sideRow('🏛️', t('sideGov'), money(s.gov.net, { sign: true }), t('sideGovSub', { paid: money(s.gov.paidTotal), got: money(s.gov.gotTotal) }), s.gov.net >= 0 ? 'up' : 'down'),
         sideRow('🙋', t('sideYou'), money(s.own, { sign: true }), t('sideYouSub'), s.own >= 0 ? 'up' : 'down'),
         el('div', { class: 'side-total' }, [el('span', {}, [document.createTextNode(t('sideWorth')), s.atStake > 0 ? el('small', { class: 'muted', text: t('sideAtStake', { v: money(s.atStake) }) }) : null]), el('strong', { class: 'num', text: money(s.worth) })])
       ]),
       { sub: t('sidesSub', { pay: money(ECONOMY.weekly) }) }
     ),
+    section(t('govTitle'), govCard(t, s.gov), { sub: t('govSub') }),
     section(
       t('edgeTitle'),
       facts(
@@ -559,6 +601,29 @@ function renderTruth(box, { t, state }) {
 }
 const TRICKS = ['installment', 'expire', 'minodds', 'boost', 'vip', 'nearmiss', 'notify'];
 const sideRow = (icon, label, value, sub, cls = '') => el('div', { class: `side-row ${cls}` }, [el('span', { class: 'side-icon', 'aria-hidden': 'true', text: icon }), el('span', { class: 'side-text' }, [el('strong', { text: label }), el('small', { class: 'muted', text: sub })]), el('strong', { class: 'num', text: value })]);
+
+// 政府: three tiles (paid, given, net), then every tax and payment with a bar
+// for its share.
+const GOV_ICONS = { sports: '🏟️', lottery: '🎟️', trade: '📈', withheld: '🌐', nhi: '🏥', relief: '🆘' };
+function govCard(t, g) {
+  const items = [...Object.entries(g.paid).map(([k, v]) => [k, v, 'paid']), ...Object.entries(g.got).map(([k, v]) => [k, v, 'got'])];
+  const most = Math.max(1, ...items.map(([, v]) => v));
+  return el('div', { class: 'q-card gov' }, [
+    el('div', { class: 'stat-row three gov-tiles' }, [
+      el('div', { class: 'stat gov-tile down' }, [el('strong', { class: 'num', text: money(g.paidTotal) }), el('small', { text: t('govPaid') })]),
+      el('div', { class: 'stat gov-tile up' }, [el('strong', { class: 'num', text: money(g.gotTotal) }), el('small', { text: t('govGot') })]),
+      el('div', { class: `stat gov-tile ${g.net >= 0 ? 'up' : 'down'}` }, [el('strong', { class: 'num', text: money(g.net, { sign: true }) }), el('small', { text: t('govNet') })])
+    ]),
+    ...items.map(([k, v, side]) =>
+      el('div', { class: `gov-row ${side}${v ? '' : ' none'}` }, [
+        el('span', { class: 'side-icon', 'aria-hidden': 'true', text: GOV_ICONS[k] }),
+        el('span', { class: 'gov-text' }, [el('strong', { text: t(`gov_${k}`) }), el('small', { class: 'muted', text: t(`govSub_${k}`) }), bar(v, most, side === 'got' ? 'good' : 'bad')]),
+        el('strong', { class: 'num', text: v ? `${side === 'got' ? '+' : '−'}${money(v)}` : money(0) })
+      ])
+    ),
+    el('p', { class: 'facts-foot', text: t('govFoot') })
+  ]);
+}
 
 // 財富等級: every level and its one-time reward, and where the account is.
 function ranksCard(t, w, locale) {
