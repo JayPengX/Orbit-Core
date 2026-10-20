@@ -822,3 +822,13 @@ test('scratch cards: every face pays exactly its prize, the prize taxed once ove
   assert.equal(revealScratch(after, 'c1', now), after);
   assert.equal(buyScratch({ ledger: [] }, { id: 'x', card: 'million' }, now).error, 'funds');
 });
+
+test('a ticket whose tax would take more than its winnings can’t be bought', () => {
+  // NT$28,630 at 1.08 pays NT$30,920, less 20%: NT$24,736, under the bet.
+  assert.deepEqual(slipErrors({ mode: 'single', legs: [{ odds: 1.08 }], sizes: [1], stake: 28_630 }), ['taxLoss']);
+  // Under NT$5,000 it's untaxed; at 1.5 a win still comes out ahead.
+  assert.deepEqual(slipErrors({ mode: 'single', legs: [{ odds: 1.08 }], sizes: [1], stake: 4_000 }), []);
+  assert.deepEqual(slipErrors({ mode: 'single', legs: [{ odds: 1.5 }], sizes: [1], stake: 10_000 }), []);
+  // A parlay at 1.1 × 1.1 = 1.21: taxed whole, a loss.
+  assert.deepEqual(slipErrors({ mode: 'parlay', legs: [{ odds: 1.1, gameId: 'a' }, { odds: 1.1, gameId: 'b' }], sizes: [2], stake: 10_000 }), ['taxLoss']);
+});
