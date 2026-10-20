@@ -143,7 +143,7 @@ test('a game not over is looked at again later; a parlay with a pick lost settle
   now.t = Date.parse(START) + 4 * 3_600_000;
   const run = await settleCron(env, deps);
   assert.equal(run.settled, 0);
-  assert.equal(doc(OPEN_COLLECTION, OPEN_INDEX).due[`${ACCOUNT}_slipwin01`], now.t + 15 * 60_000);
+  assert.equal(doc(OPEN_COLLECTION, OPEN_INDEX).due[`${ACCOUNT}_slipwin01`], now.t + 3 * 60_000);
   // A parlay: the Cubs pick lost, the other game tomorrow.
   const s2 = setup(now);
   wallet(s2.store, [{ id: 'odds:stake-parlay001', t: 1, app: 'odds', kind: 'stake', amount: -100 }]);
@@ -218,8 +218,13 @@ test('only a Play session, and only sane slips', async () => {
 test('a slip is looked at when its soonest undecided game should be over', () => {
   const now = Date.parse('2026-10-10T20:00:00Z');
   const s = slip('slipwin01', [leg('home'), { ...leg('home'), sport: 'epl', start: '2026-10-11T14:00:00Z' }]);
-  assert.equal(nextLook(s, now), Date.parse(START) + 3.3 * 3_600_000 + 10 * 60_000);
-  assert.equal(nextLook({ ...s, legs: [{ ...s.legs[0], result: 'won' }, s.legs[1]] }, now), Date.parse('2026-10-11T14:00:00Z') + 2.1 * 3_600_000 + 10 * 60_000);
+  assert.equal(nextLook(s, now), Date.parse(START) + 2.4 * 3_600_000 + 5 * 60_000);
+  assert.equal(nextLook({ ...s, legs: [{ ...s.legs[0], result: 'won' }, s.legs[1]] }, now), Date.parse('2026-10-11T14:00:00Z') + 1.85 * 3_600_000 + 5 * 60_000);
+  // Past that: every 3 minutes until it's final; long after (put off), every 15.
+  const over = Date.parse(START) + 2.6 * 3_600_000;
+  assert.equal(nextLook(s, over), over + 3 * 60_000);
+  const long = Date.parse(START) + 7 * 3_600_000;
+  assert.equal(nextLook(s, long), long + 15 * 60_000);
 });
 
 test('a slip is placed through the Worker: checked, its stake taken, watched; all or none', async () => {
