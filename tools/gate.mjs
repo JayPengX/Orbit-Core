@@ -43,7 +43,8 @@ const flag = name => {
   args.splice(i, 1);
   return true;
 };
-const jobs = Number(opt('jobs', 4));
+// (Two at a time: more on a 4-core machine slows each page into freezes that aren't the app's.)
+const jobs = Number(opt('jobs', 2));
 const out = resolve(opt('out', '/tmp/quadra-gate'));
 const taps = !flag('no-taps');
 const quick = flag('quick');
@@ -53,11 +54,13 @@ const runs = [];
 for (const app of apps)
   for (const width of quick ? [390] : [320, 390])
     for (const dark of quick ? [false] : [false, true]) runs.push({ app, width, dark, taps: taps && width === 390 && !dark });
+// English, the longer words, at the narrowest screen.
+if (!quick) for (const app of apps) runs.push({ app, width: 320, dark: false, lang: 'en' });
 
 const preview = new URL('./preview.mjs', import.meta.url).pathname;
 const one = run =>
   new Promise(done => {
-    const a = [preview, run.app, '--gate', '--live', '--width', String(run.width), '--out', join(out, 'shots'), '--wait', '7000', '--cpu', '2', ...(run.dark ? ['--dark'] : []), ...(run.taps ? ['--taps'] : [])];
+    const a = [preview, run.app, '--gate', '--live', '--width', String(run.width), '--out', join(out, 'shots'), '--wait', '7000', '--cpu', '2', ...(run.dark ? ['--dark'] : []), ...(run.lang ? ['--lang', run.lang] : []), ...(run.taps ? ['--taps'] : [])];
     execFile(process.execPath, a, { maxBuffer: 64 * 1024 * 1024, timeout: 600_000 }, (err, stdout) => {
       const line = String(stdout || '').split('\n').find(l => l.startsWith('gate: '));
       if (!line) return done({ ...run, crashed: String(err?.message || stdout || 'no result').split('\n').slice(0, 3).join(' ') });
@@ -68,10 +71,11 @@ const one = run =>
 // What failed in one run, as [kind, where, what, shot].
 const faults = r => {
   const f = [];
-  const at = `${r.app} ${r.width}${r.dark ? ' dark' : ''}`;
+  const at = `${r.app} ${r.width}${r.dark ? ' dark' : ''}${r.lang && r.lang !== 'zh' ? ` ${r.lang}` : ''}`;
   if (r.crashed) return [['crash', at, r.crashed, '']];
   const first = r.tabs?.[0]?.shot || '';
-  if (!r.lift) f.push(['lift', at, 'the loading screen never lifted', first]);
+  // (Never lifted: what's under it isn't on screen, so only that.)
+  if (!r.lift) return [['lift', at, 'the loading screen never lifted', first]];
   else {
     const early = [...r.lift.skels, ...r.lift.loading];
     if (early.length) f.push(['lift', at, `lifted at ${r.lift.t} ms with ${early.join(', ')} still showing`, first]);
@@ -93,7 +97,7 @@ await Promise.all(
       const r = await one(run);
       results.push(r);
       const n = faults(r).length;
-      console.log(`${n ? 'FAIL' : 'pass'} ${r.app} ${r.width}${r.dark ? ' dark' : ''}${n ? ` (${n})` : ''}`);
+      console.log(`${n ? 'FAIL' : 'pass'} ${r.app} ${r.width}${r.dark ? ' dark' : ''}${r.lang ? ` ${r.lang}` : ''}${n ? ` (${n})` : ''}`);
     }
   })
 );

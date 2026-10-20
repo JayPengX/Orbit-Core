@@ -3648,7 +3648,8 @@ div.q-ritem {
 .q-rail {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: var(--q-rail-w, min(78%, 300px));
+  /* (Cards that all fit share the width: one card is never a lone half.) */
+  grid-auto-columns: minmax(var(--q-rail-w, min(78%, 300px)), 1fr);
   gap: 12px;
   margin: 0 calc(-1 * var(--q-margin));
   padding: 2px var(--q-margin) 8px;
@@ -4422,10 +4423,15 @@ div.q-ritem {
    one the title just scrolls away -- */
 .q-nav-title {
   margin: 0;
-  padding: 4px var(--q-margin, 16px) 8px;
+  /* (Level with the page's content: every tab's page already keeps the
+     screen's margin; its own 16 px each side set it 32 px in, in five apps.) */
+  padding: 4px 0 8px;
   font: var(--q-t-large);
   letter-spacing: 0.01em;
-  text-wrap: balance;
+  /* One line, shrunk to fit (quadra.mjs fitNames), as iOS's large title. */
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .q-navbar {
   position: fixed;
@@ -5068,6 +5074,12 @@ html.q-kb .q-kb-dock {
 .q-fit {
   display: block;
   min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* .q-fit-wrap: a line that shrinks the same way and wraps only when 72% can't fit it. */
+.q-fit-wrap:not(.q-wrapped) {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
