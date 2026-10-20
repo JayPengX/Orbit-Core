@@ -73,7 +73,7 @@ const SCAN = { perMinute: 2, perHour: 6, perDay: 12, passPerMinute: 3, passPerDa
 export const SCAN_LIMITS = SCAN;
 const SCAN_MODELS = ['gemini-3.5-flash-lite', 'gemini-3.7-flash'];
 const SCAN_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-export const SCAN_LEAGUES = ['mlb', 'cpbl', 'npb', 'kbo', 'nba', 'wnba', 'nbl', 'nfl', 'ncaaf', 'nhl', 'epl', 'laliga', 'seriea', 'bundesliga', 'ligue1', 'ucl', 'uel', 'uecl', 'championship', 'eredivisie', 'scotland', 'mls', 'jleague', 'ligamx', 'brasileirao', 'facup', 'nationsleague', 'worldcup', 'other'];
+export const SCAN_LEAGUES = ['mlb', 'cpbl', 'npb', 'kbo', 'nba', 'wnba', 'nbl', 'nfl', 'ncaaf', 'nhl', 'epl', 'laliga', 'seriea', 'bundesliga', 'ligue1', 'ucl', 'uel', 'uecl', 'championship', 'eredivisie', 'scotland', 'mls', 'jleague', 'ligamx', 'brasileirao', 'facup', 'leaguecup', 'communityshield', 'copadelrey', 'coppaitalia', 'dfbpokal', 'coupedefrance', 'supercup', 'nationsleague', 'worldcup', 'other'];
 
 function scanPrompt(todayIso) {
   return `The picture is a Taiwan Sports Lottery (台灣運彩) betting ticket: a printed slip from a shop, or a screenshot of the lottery's app or site. Read every pick on it and return JSON matching the schema. Today in Taiwan is ${todayIso}.
@@ -82,7 +82,7 @@ Rules:
 - isSlip: false if the picture is not a sports lottery ticket (then picks is empty).
 - One entry in picks per game picked, in the order printed. A printed line like "<足球> 1179 切爾西 @ 艾佛頓" then "不讓分 切爾西 2.10" is one pick: <足球> is the sport, 1179 the lottery's game number, the team before @ is the away team and the one after @ the home team, then the market, the chosen side and its odds.
 - sport: soccer (足球), baseball (棒球), basketball (籃球), football (美式足球), hockey (冰球), or other.
-- league: the competition, as one of: ${SCAN_LEAGUES.join(', ')} (MLB=mlb, 中職=cpbl, 日職=npb, 韓職=kbo, NBA=nba, 英超=epl, 西甲=laliga, 義甲=seriea, 德甲=bundesliga, 法甲=ligue1, 歐冠=ucl, 歐霸=uel, 歐協聯=uecl, 英冠=championship, 荷甲=eredivisie, 美職足=mls, 日職聯=jleague, 世界盃=worldcup). If only the sport is printed, your best guess from the teams (e.g. Chelsea and Everton: epl), or other.
+- league: the competition, as one of: ${SCAN_LEAGUES.join(', ')} (MLB=mlb, 中職=cpbl, 日職=npb, 韓職=kbo, NBA=nba, 英超=epl, 西甲=laliga, 義甲=seriea, 德甲=bundesliga, 法甲=ligue1, 歐冠=ucl, 歐霸=uel, 歐協聯=uecl, 英冠=championship, 荷甲=eredivisie, 美職足=mls, 日職聯=jleague, 英足總盃=facup, 英聯盃=leaguecup, 社區盾=communityshield, 國王盃=copadelrey, 義大利盃=coppaitalia, 德國盃=dfbpokal, 法國盃=coupedefrance, 歐洲超級盃=supercup, 世界盃=worldcup). If only the sport is printed, your best guess from the teams (e.g. Chelsea and Everton: epl), or other.
 - teams: the two teams exactly as printed (Chinese as on the ticket), away/guest (客) first, home (主) second when the ticket says which; else in printed order. teamsEn: your best English names for the same two teams (e.g. "New York Yankees", "Manchester City"), or the printed text if unsure.
 - bought: the day the ticket was bought (購買日期 / 投注時間 / 交易時間, often in the ROC calendar: 民 115年 is 2026) as YYYY-MM-DD; null if not printed. The ticket may be old: its games may be long over.
 - date: the game's own date in Taiwan as YYYY-MM-DD only if printed next to the pick (a year-less date is the one nearest the day bought, else nearest today, never before the day bought); else null. The day bought is not the game's date.
