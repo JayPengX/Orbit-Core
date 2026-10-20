@@ -1,0 +1,34 @@
+# One-off (2026-10-20): count the Passes that still need each one-time wallet
+# fix. Counts only. Removed once read.
+name: Wallet check (one-off)
+on:
+  push:
+    branches: [claude/wallet-check]
+jobs:
+  count:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: The account
+        run: |
+          id=$(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" https://api.cloudflare.com/client/v4/accounts | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.parse(s).result[0].id)}catch{console.log("")}})')
+          echo "CLOUDFLARE_ACCOUNT_ID=$id" >> "$GITHUB_ENV"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      - name: Count
+        run: |
+          q() { npx --yes wrangler@4 d1 execute quadra-store --remote --json --command "$1" 2>/dev/null; }
+          {
+            echo '['
+            q "SELECT coll, id, payload FROM docs WHERE coll = 'eco-wallets'"; echo ','
+            q "SELECT coll, id, payload FROM docs WHERE coll = 'odds-open'"; echo ','
+            q "SELECT coll, id, '' AS payload FROM docs WHERE coll IN ('stock-study-accounts', 'stock-verified')"
+            echo ']'
+          } | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const a=JSON.parse(s).flat();require("fs").writeFileSync(process.env.RUNNER_TEMP+"/rows.json",JSON.stringify(a))})'
+          node tools/once/wallet-markers.mjs "$RUNNER_TEMP/rows.json"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
