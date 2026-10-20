@@ -638,7 +638,17 @@ export function slipErrors({ mode, legs, sizes, stake }) {
   if (combos > 0 && cost < SLIP_RULES.minTicket) errors.push('ticketMin');
   if (cost > SLIP_RULES.maxTicket) errors.push('ticketMax');
   else if (cost > SLIP_RULES.capped && legs.some(l => l.cap)) errors.push('ticketCapped');
+  // A win must never pay back less than the bet: a ticket whose tax would
+  // take more than its winnings can't be bought (Jay, 2026-10-20). Singles
+  // are a ticket each; any other ticket is judged with every pick won.
+  if (!errors.length && taxLoss({ mode, legs, sizes, stake, cost })) errors.push('taxLoss');
   return errors;
+}
+
+function taxLoss({ mode, legs, sizes, stake, cost }) {
+  if (mode === 'single') return legs.some(l => afterTax(Math.min(SLIP_RULES.maxPayout, toDollar(stake * l.odds))) < stake);
+  const won = slipPayoutTable({ legs, sizes, stake }).net.at(-1);
+  return won < cost;
 }
 
 // Everything about one ticket, exactly: every way the legs can land (2^n, at
