@@ -657,8 +657,8 @@ function dayTradeRate(rules, kind, t = Date.now()) {
 // What a trade of `gross` (price × quantity, in the market's currency) costs
 // on top: commission, taxes, exchange fees. Taiwan's brokers and tax office
 // drop the fractions of a dollar; elsewhere it's to the cent.
-// `discount`: the share of the commission charged (Quadra Plus: 0.5), the
-// minimum included.
+// `discount`: the share of the commission charged (0 for the welcome
+// offer's first trade, else 1), the minimum included.
 // `oddLot`: a Taiwan odd-lot trade (its own, lower minimum); `dayTrade`: a
 // Taiwan stock sold the same day it was bought (half the tax): true for all
 // of it, or the share of it that's day-traded (§2-2: 同數量, only the

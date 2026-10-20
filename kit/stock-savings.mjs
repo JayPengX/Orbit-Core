@@ -91,8 +91,6 @@ export const LEND_LOT = 1_000;
 export const LEND_RECALL = 3;
 export const LEND_TERM_MONTHS = 6;
 export const LEND_RENEWALS = 2;
-// (The term as days, before it was six months: kept for older callers.)
-export const LEND_TERM_DAYS = 180;
 // When a contract ends by itself: six months on, twelve or eighteen with
 // its renewals (`renew`: the lender agreed to them).
 export const lendEnds = lend => addMonths(lend.t, LEND_TERM_MONTHS * (1 + (lend.renew ? LEND_RENEWALS : 0)));
