@@ -54,11 +54,16 @@ export const SETTLED_COLLECTION = 'odds-settled';
 export const OPEN_INDEX = '_index';
 const MIN = 60_000;
 const HOUR = 60 * MIN;
-// How long a game of each kind usually lasts, start to final (the phone's
-// old guess for its notice), and a margin for the result to be posted.
-export const GAME_HOURS = { baseball: 3.3, football: 3.5, basketball: 2.6, hockey: 2.7, soccer: 2.1, sets: 2.5, racing: 2.2 };
-const MARGIN = 10 * MIN;
-const AGAIN = 15 * MIN;
+// How soon a game of each kind can be over, start to final (a quick one's
+// length), and a margin for the result to be posted: first looked at then,
+// then every few minutes until it's final, so a slip is paid within minutes
+// of the final (as Orbit Sports shows it), not up to an hour after. A game
+// still undecided long after (put off, a source down) is looked at less often.
+export const GAME_HOURS = { baseball: 2.4, football: 2.9, basketball: 2, hockey: 2.2, soccer: 1.85, sets: 1.5, racing: 1.6 };
+const MARGIN = 5 * MIN;
+const AGAIN = 3 * MIN;
+const LATE_AGAIN = 15 * MIN;
+const LATE_AFTER = 6 * HOUR;
 // A championship (future) is looked at every 6 hours.
 const FUTURE_AGAIN = 6 * HOUR;
 // From here on a slip is placed through the Worker (op 'place', its price
@@ -114,8 +119,8 @@ export function nextLook(slip, now, again = AGAIN) {
       next = Math.min(next, now + FUTURE_AGAIN);
       continue;
     }
-    const end = start + (GAME_HOURS[familyOf(leg.sport)] ?? 3) * HOUR + MARGIN;
-    next = Math.min(next, end > now ? end : now + again);
+    const end = start + (GAME_HOURS[familyOf(leg.sport)] ?? 2.5) * HOUR + MARGIN;
+    next = Math.min(next, end > now ? end : now + (again && now - start > LATE_AFTER ? Math.max(again, LATE_AGAIN) : again));
   }
   return Number.isFinite(next) ? next : now;
 }
