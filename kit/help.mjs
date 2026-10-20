@@ -258,7 +258,7 @@ export const HELP = {
         '威力彩、大樂透、今彩539、3星彩、4星彩、39／49樂合彩和賓果賓果，照台灣彩券的規則和真實開獎對獎；晚上開獎的 20:00 截止。威力彩前兩獎和大樂透前四獎照那期每注實際派彩，和真的中獎人一起分，派彩公布後才入帳。',
         '照台灣彩券的投注方式：威力彩、大樂透、今彩539 可以包牌（系統組合，最多 16 個號碼；威力彩第 2 區 2 到 8 個），樂合彩系統組合 3 到 10 個號碼；倍數只有樂合彩（最多 10 倍）、3星彩、4星彩和賓果賓果（最多 50 倍）；多期投注威力彩、大樂透、49樂合彩 2 到 10 期，賓果賓果 2 到 12 期，其他 2 到 24 期，每期一張、各自對獎。',
         '真的彩券要自己去兌獎：開獎次日起三個月內，NT$5,000 以下在投注站，NT$500 萬以下在中國信託，更高要先預約。Quadra 不用兌獎，中獎自動入帳。',
-        '刮刮樂是台灣彩券正在賣的 5 種（錢進888、金磚疊疊樂、獎金對決、金鑽999、樂刮$5,000），照真的頭獎和總中獎率；買的時候就決定中多少，刮開就知道。',
+        '刮刮樂是台灣彩券正在賣的每一種，照真的獎金結構和總中獎率；買的時候就決定中多少，刮開就知道。',
         '選號時快選補滿，+1／+5／+10 再加幾注；購買列一直在下面。中獎自動入帳並通知你。'
       ]],
       ['boost', '串關加成、提前兌現、免費投注', [
@@ -293,7 +293,7 @@ export const HELP = {
         'Super Lotto 威力彩, Lotto 6/49 大樂透, Daily Cash 539, 3 Star and 4 Star, 39/49 樂合彩 and BINGO BINGO, checked against Taiwan Lottery’s rules and real draws; evening draws stop selling at 20:00. 威力彩’s top two prizes and 大樂透’s top four pay what that draw paid per winner, shared with the real winners, once the payout is announced.',
         'As Taiwan Lottery sells them: 威力彩, 大樂透 and 今彩539 take a system bet (包牌, up to 16 numbers; 2 to 8 in 威力彩’s second zone), 樂合彩 a system of 3 to 10 numbers; only 樂合彩 (up to ×10), 3 Star, 4 Star and BINGO (up to ×50) take a multiple; multi-draw is 2 to 10 draws on 威力彩, 大樂透 and 49樂合彩, 2 to 12 on BINGO and 2 to 24 on the rest, a ticket a draw, each checked on its own.',
         'A real ticket is claimed in person within three months of the day after its draw: up to NT$5,000 at a retailer, up to NT$5 million at CTBC Bank, more by appointment. Quadra needs no claiming: prizes are paid in automatically.',
-        'The scratch cards are 5 Taiwan Lottery sells now (錢進888, 金磚疊疊樂, 獎金對決, 金鑽999, 樂刮$5,000), at their real top prize and win rate; the prize is fixed when a card is bought, and scratching shows it.',
+        'The scratch cards are every one Taiwan Lottery sells now, at their real prize table and win rate; the prize is fixed when a card is bought, and scratching shows it.',
         'Quick pick fills a line, +1/+5/+10 add more, and the buy bar stays in view. Wins are paid in automatically and you’re told.'
       ]],
       ['boost', 'Parlay boost, cash out, free bets', [

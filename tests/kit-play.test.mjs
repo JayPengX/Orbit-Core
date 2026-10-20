@@ -732,8 +732,9 @@ test('draw times: sales close half an hour before 20:30, BINGO every five minute
 });
 
 test('scratch cards: every card Taiwan Lottery sells, at its real table, top prize, win rate and dates; retired ones still scratch, never sold', () => {
-  // 台灣彩券 刮刮樂 (on sale 2026-10-19): price, top prize, 總中獎率, 發行張數, 下市日期.
+  // 台灣彩券 刮刮樂 (on sale 2026-10-20): price, top prize, 總中獎率, 發行張數, 下市日期.
   const real = {
+    golddice: ['金骰子', 100, 500_000, 34.02, 6_120_000, '2027-04-20'], rolling: ['好運強強滾', 200, 2_000_000, 35, 6_055_100, '2027-04-20'],
     lucky7: ['錢進888', 100, 800_000, 30.1, 6_063_200, '2027-02-18'], hi123: ['嗨刮123', 100, 300_000, 33.01, 4_080_000, '2026-12-15'],
     gift: ['喜從天降', 200, 2_000_000, 30.4, 6_080_000, '2027-04-07'], fruit: ['金磚疊疊樂', 200, 2_000_000, 35, 6_079_300, '2027-03-15'],
     battle: ['獎金大作戰', 200, 2_000_000, 33, 5_914_300, '2027-03-15'], double: ['好運樂加倍', 200, 2_000_000, 31, 6_046_600, '2027-03-02'],

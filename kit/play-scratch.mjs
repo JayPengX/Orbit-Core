@@ -9,8 +9,8 @@
 // the way the real card's games read (its 玩法說明).
 //
 //   price    cards (newest first)
-//   100      錢進888, 嗨刮123
-//   200      喜從天降, 金磚疊疊樂, 獎金大作戰, 好運樂加倍, 金五吉, 獎金對決,
+//   100      金骰子, 錢進888, 嗨刮123
+//   200      好運強強滾, 喜從天降, 金磚疊疊樂, 獎金大作戰, 好運樂加倍, 金五吉, 獎金對決,
 //            財富密碼, 刮刮金樂透, 狂刮10萬, 財運高升, 好運發發, 點球成金,
 //            獎金倍倍樂, 金鑽999, 一觸即發, 獎金獵人
 //   300      無敵開獎機, 無敵777, 麻將大賓果
@@ -49,6 +49,18 @@ const COUNT_ROUND = (size, table) => ({ size, table });
 // and, when its games are checked against one set of numbers or tiles, that
 // set (`pool`: how many, out of what, and what the card calls it).
 export const CARDS = {
+  golddice: {
+    icon: '🎲', zh: '金骰子', en: 'Gold Dice', price: 100, color: '#0891b2', since: '2026-10-20', until: '2027-04-20', issued: 6_120_000,
+    prizes: [[100, 1_012_210], [200, 872_120], [500, 195_786], [800, 1_123], [1_000, 618], [2_000, 156], [5_000, 29], [10_000, 28], [50_000, 22], [500_000, 5]],
+    games: [{ type: 'duel', rows: 5, max: 6, dice: true }],
+    how: { zh: '任一局中，若「您的骰子」點數大於「對手的骰子」，即得該局獎金（不可跨局對獎）。', en: 'In any of the 5 rounds, your die higher than your opponent’s wins that round’s prize (a tie doesn’t).' }
+  },
+  rolling: {
+    icon: '🦀', zh: '好運強強滾', en: 'Lucky Rolling', price: 200, color: '#db2777', since: '2026-10-20', until: '2027-04-20', issued: 6_055_100,
+    prizes: [[200, 1_029_411], [300, 697_523], [500, 193_896], [1_000, 184_101], [2_000, 12_068], [5_000, 2_178], [10_000, 215], [50_000, 145], [2_000_000, 5]],
+    games: [{ type: 'match', k: 3, n: 16, syms: [['蛋', 200], ['香菇', 300], ['玉米', 500], ['魚板', 1_000], ['牛排', 2_000], ['魚', 5_000], ['蝦', 10_000], ['螃蟹', 50_000], ['元寶', 2_000_000]] }],
+    how: { zh: '刮開刮區後，若刮出3個相同符號，即得上表中獎方式對應的獎金。', en: 'Three of the same symbol win its prize on the table.' }
+  },
   lucky7: {
     icon: '8️⃣', zh: '錢進888', en: 'Money 888', price: 100, color: '#dc2626', since: '2026-08-18', until: '2027-02-18', issued: 6_063_200,
     prizes: [[100, 1_067_726], [200, 425_850], [300, 97_060], [400, 52_210], [500, 121_321], [800, 44_431], [1_000, 9_421], [1_600, 6_781], [8_000, 173], [80_000, 10], [800_000, 4]],
@@ -240,7 +252,7 @@ export const CARDS = {
 };
 // The cards on sale, by price, then the newest first (Taiwan Lottery's own
 // order: its 期數).
-export const CARD_ORDER = ['lucky7', 'hi123', 'gift', 'fruit', 'battle', 'double', 'ingot', 'beat', 'code', 'goldlotto', 'crazy10', 'rising', 'fafa', 'goal', 'multiply', 'numbers', 'touch', 'hunter', 'machine', 'super777', 'mjbingo', 'ten', 'million', 'mahjong'];
+export const CARD_ORDER = ['golddice', 'lucky7', 'hi123', 'rolling', 'gift', 'fruit', 'battle', 'double', 'ingot', 'beat', 'code', 'goldlotto', 'crazy10', 'rising', 'fafa', 'goal', 'multiply', 'numbers', 'touch', 'hunter', 'machine', 'super777', 'mjbingo', 'ten', 'million', 'mahjong'];
 // Sold now: on sale and not past its 下市日期 (sales close 17:00 Taiwan time).
 export const onSale = (id, now = new Date()) => {
   const c = CARDS[id];
@@ -409,11 +421,27 @@ const GAMES = {
     }
   },
   // `k` of the same: amounts (three alike win it) or, with `a`, symbols (any
-  // `k` alike win `a`).
+  // `k` alike win `a`), or with `syms`, symbols each with its own amount (the
+  // table: `k` alike win that symbol's).
   match: {
-    slots: s => [s.a ? { values: [s.a] } : {}],
+    slots: s => [s.a ? { values: [s.a] } : s.syms ? { values: s.syms.map(x => x[1]) } : {}],
     build: (s, parts, { rand, list }) => {
       const p = parts[0];
+      if (s.syms) {
+        const win = p ? s.syms.find(x => x[1] === p.a)[0] : null;
+        const cells = win ? times(s.k, () => win) : [];
+        const counts = new Map(win ? [[win, s.k]] : []);
+        const names = s.syms.map(x => x[0]);
+        let guard = 0;
+        while (cells.length < s.n) {
+          if (++guard > 500) retry();
+          const v = pickOf(rand, names);
+          if (v === win || (counts.get(v) || 0) >= s.k - 1) continue;
+          counts.set(v, (counts.get(v) || 0) + 1);
+          cells.push(v);
+        }
+        return { k: s.k, syms: s.syms, cells: shuffle(rand, cells) };
+      }
       const pool = s.a ? (s.of === 'mahjong' ? MAHJONG : s.of) : list;
       const cells = p ? times(s.k, () => (s.a ? pickOf(rand, pool) : p.a)) : [];
       if (s.a && p) cells.fill(cells[0]);
@@ -432,6 +460,7 @@ const GAMES = {
       const counts = new Map();
       for (const v of g.cells) counts.set(v, (counts.get(v) || 0) + 1);
       const hit = [...counts].filter(([, n]) => n >= g.k);
+      if (g.syms) return hit.reduce((t, [v]) => t + (g.syms.find(x => x[0] === v)?.[1] || 0), 0);
       return g.a ? (hit.length ? g.a : 0) : hit.reduce((t, [v]) => t + v, 0);
     }
   },
@@ -470,10 +499,12 @@ const GAMES = {
     },
     pays: g => g.rows.reduce((t, r) => t + (sameAll(r.s) && (!g.need || r.s[0] === g.need) ? r.a * (r.x || 1) : 0), 0)
   },
-  // 您的分數 against 大力士分數, a round each: higher wins (a tie doesn't).
+  // 您的分數 against 大力士分數 (`dice`: 您的骰子 against 對手的骰子, 1-6), a
+  // round each: higher wins (a tie doesn't).
   duel: {
     slots: s => times(s.rows, i => ({ i })),
     build: (s, parts, { rand, list }) => ({
+      ...(s.dice ? { dice: true } : {}),
       rows: times(s.rows, i => {
         const p = parts.find(p => p.i === i);
         if (p) {
