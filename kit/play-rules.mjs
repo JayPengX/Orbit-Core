@@ -20,7 +20,15 @@ export const HOUSE_RULES = {
   lockHigh: 30,
   lockHighExotic: 150,
   // F1 and championships: under this, locked.
-  lockLowOutright: 1.12
+  lockLowOutright: 1.12,
+  // A win must never pay back less than the bet once the 20% tax takes the
+  // whole payout (play-odds.mjs afterTax; Jay, 2026-10-20: "design it so
+  // those bets couldn't even be placed"). Under 1.25 (= 1 / 0.8) a pick is
+  // 限2關, as 運彩 sells its short favourites (a 1.16 was 限2關 on its
+  // board); under 1.12 it's locked, so any two picks make at least
+  // 1.12 × 1.12 = 1.2544.
+  shortTwo: 1.25,
+  lockLow: 1.12
 };
 // Past this price an ordinary market's odds pay only LONG_SHARE of the rest.
 export const LONG_FROM = 6;
@@ -41,13 +49,15 @@ export function shadeLong(kind, odds) {
 // { lock: 'low' | 'high' | null, minLegs } for an option at `odds` (shaded
 // already); `event`: its game's or market's own 限關 (投注規範 §21), else 1.
 export function houseRule(kind, odds, { event = null } = {}) {
-  const minLegs = event > 0 ? Math.max(1, Math.round(event)) : 1;
+  const own = event > 0 ? Math.max(1, Math.round(event)) : 1;
+  const minLegs = odds > 0 && odds < HOUSE_RULES.shortTwo ? Math.max(2, own) : own;
   return { lock: priceLock(kind, odds), minLegs };
 }
 function priceLock(kind, odds) {
   const r = HOUSE_RULES;
   if (!(odds > 0)) return null;
-  if (OUTRIGHT.has(kind)) return odds < r.lockLowOutright ? 'low' : null;
+  if (odds < Math.max(r.lockLow, OUTRIGHT.has(kind) ? r.lockLowOutright : 0)) return 'low';
+  if (OUTRIGHT.has(kind)) return null;
   return odds >= (EXOTIC.has(kind) ? r.lockHighExotic : r.lockHigh) ? 'high' : null;
 }
 // The board's option priced by the house's rules: its long price shaded, then

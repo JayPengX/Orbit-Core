@@ -461,12 +461,14 @@ test('prices from chances: never under 1.01, the long end capped, the books\' ma
   assert.equal(median([]), null);
 });
 
-test("the house's rules: no 限關 by price (運彩 §21), the long end locked and shaded", () => {
-  for (const odds of [1.01, 1.03, 1.05, 1.2, 1.25]) assert.deepEqual(houseRule('ml', odds), { lock: null, minLegs: 1 }, `${odds}: a single`);
+test("the house's rules: short prices 限2關 or locked (the tax), the long end locked and shaded", () => {
+  for (const odds of [1.01, 1.05, 1.11]) assert.equal(houseRule('ml', odds).lock, 'low', `${odds}: locked`);
+  for (const odds of [1.12, 1.2]) assert.deepEqual(houseRule('ml', odds), { lock: null, minLegs: 2 }, `${odds}: 限2關`);
+  assert.deepEqual(houseRule('ml', 1.25), { lock: null, minLegs: 1 });
   assert.deepEqual(houseRule('ml', 30), { lock: 'high', minLegs: 1 });
   assert.deepEqual(houseRule('score', 30), { lock: null, minLegs: 1 }, 'many-outcome markets go to 150');
-  assert.deepEqual(houseRule('f1', 1.1), { lock: 'low', minLegs: 1 });
-  assert.deepEqual(houseRule('f1', 1.2), { lock: null, minLegs: 1 });
+  assert.deepEqual(houseRule('f1', 1.1), { lock: 'low', minLegs: 2 });
+  assert.deepEqual(houseRule('f1', 1.2), { lock: null, minLegs: 2 });
   assert.deepEqual(houseRule('f1', 200), { lock: null, minLegs: 1 });
   assert.deepEqual(houseRule('ml', NaN), { lock: null, minLegs: 1 });
   assert.equal(shadeLong('ml', LONG_FROM), LONG_FROM);
@@ -474,7 +476,7 @@ test("the house's rules: no 限關 by price (運彩 §21), the long end locked a
   assert.equal(shadeLong('score', 16), 16);
   assert.equal(minLegsProblem([{ minLegs: 3 }, {}], [2]), 3);
   assert.equal(minLegsProblem([{ minLegs: 2 }, {}], [2]), 0);
-  assert.deepEqual(Object.keys(HOUSE_RULES).sort(), ['lockHigh', 'lockHighExotic', 'lockLowOutright']);
+  assert.deepEqual(Object.keys(HOUSE_RULES).sort(), ['lockHigh', 'lockHighExotic', 'lockLow', 'lockLowOutright', 'shortTwo']);
 });
 
 // ---- Cash out --------------------------------------------------------------------
@@ -823,12 +825,13 @@ test('scratch cards: every face pays exactly its prize, the prize taxed once ove
   assert.equal(buyScratch({ ledger: [] }, { id: 'x', card: 'million' }, now).error, 'funds');
 });
 
-test('a ticket whose tax would take more than its winnings can’t be bought', () => {
-  // NT$28,630 at 1.08 pays NT$30,920, less 20%: NT$24,736, under the bet.
-  assert.deepEqual(slipErrors({ mode: 'single', legs: [{ odds: 1.08 }], sizes: [1], stake: 28_630 }), ['taxLoss']);
-  // Under NT$5,000 it's untaxed; at 1.5 a win still comes out ahead.
-  assert.deepEqual(slipErrors({ mode: 'single', legs: [{ odds: 1.08 }], sizes: [1], stake: 4_000 }), []);
-  assert.deepEqual(slipErrors({ mode: 'single', legs: [{ odds: 1.5 }], sizes: [1], stake: 10_000 }), []);
-  // A parlay at 1.1 × 1.1 = 1.21: taxed whole, a loss.
-  assert.deepEqual(slipErrors({ mode: 'parlay', legs: [{ odds: 1.1, gameId: 'a' }, { odds: 1.1, gameId: 'b' }], sizes: [2], stake: 10_000 }), ['taxLoss']);
+test('a short price can’t lose to the tax: 限2關 under 1.25, locked under 1.12', () => {
+  assert.deepEqual(houseRule('ml', 1.43), { lock: null, minLegs: 1 });
+  assert.deepEqual(houseRule('ml', 1.25), { lock: null, minLegs: 1 });
+  assert.deepEqual(houseRule('ml', 1.16), { lock: null, minLegs: 2 });
+  assert.deepEqual(houseRule('ml', 1.16, { event: 3 }), { lock: null, minLegs: 3 });
+  assert.equal(houseRule('ml', 1.08).lock, 'low');
+  assert.equal(houseRule('f1', 1.11).lock, 'low');
+  // The worst two-pick parlay still pays back its bet after the tax.
+  assert.ok(afterTax(10_000 * 1.12 * 1.12) >= 10_000);
 });

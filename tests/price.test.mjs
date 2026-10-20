@@ -55,7 +55,7 @@ test('a pick is priced exactly as with everything read, reading only what can ch
     const leg = { id, gameId: game.id, sport: 'epl' };
     const h = await housePick(leg, NOW, once);
     assert.deepEqual(same(h), same(readingEverything(id)), id);
-    const kind = h.bet?.kind ?? 'gone';
+    const kind = h.bet?.kind ?? (id.includes('|prop|') ? 'prop' : 'gone');
     kinds.add(kind);
     // The winner: the league's board alone. Another of the game's markets:
     // its own markets too. A player's pick: its players as well.
