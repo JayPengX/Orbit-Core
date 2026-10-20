@@ -534,7 +534,7 @@ export const HELP = {
       ]],
       ['add', '新增注單', [
         '「拍注單自動填入」：拍注單或截圖，Gemini 讀出每一場、玩法和賠率，對到真的比賽後填進下面，確認後再儲存；對不到的會列出來讓你手動加。比賽已經打完的舊注單也可以拍：照購買日期找到當時的比賽，直接用最終比分結算，記在當時的日子。每個帳戶一天可以掃 30 張。',
-        '手動新增：選聯盟和日期（昨天到後天），點比賽選玩法（不讓分、讓分、大小、單雙；足球和冰球的不讓分有和局，足球整數讓分有讓分和），每一邊都標出運彩大概的賠率；輸入注單上的賠率，會算出公平價和彩券的抽成。過關方式（單場、N串1、N串M）和每組金額填好就能儲存。'
+        '手動新增：選聯盟（盃賽和社區盾也有）和日期（昨天到後天，或「更早」選以前任何一天補登舊注單），點比賽選玩法（不讓分、讓分、大小、單雙；足球和冰球的不讓分有和局，足球整數讓分有讓分和），每一邊都標出運彩大概的賠率；輸入注單上的賠率，會算出公平價和彩券的抽成；不記得就留空，用收盤盤口估計的賠率，標「估」。過關方式（單場、N串1、N串M）和每組金額填好就能儲存。'
       ]],
       ['live', '比賽中', [
         '每場的圓圈：現在會中是綠色、不會中是紅色，進行中會跳動；結束後打勾、打叉或退回。每張注單：全中可得（稅後）、現在價值（從現在起平均拿回多少）、有派彩的機率，和開賽前的機率做比較。',
@@ -554,7 +554,7 @@ export const HELP = {
       ]],
       ['add', 'Adding a ticket', [
         'Scan a ticket: a photo or screenshot, read by Gemini; each game, market and price is matched to a real game and filled in for you to check before saving; any it can’t place are listed to add by hand. An old ticket works too: its games are found from the day it was bought, settled on their final scores and kept on that day. 30 scans a day an account.',
-        'By hand: pick the league and day (yesterday to the day after tomorrow), tap a game and its market (moneyline, spread, total, odd/even; soccer’s and hockey’s moneyline have a draw, and soccer’s whole-goal spread a handicap draw); each side shows the lottery’s likely price; type the ticket’s odds to see the fair price and the cut. Set the kind (single, N-leg parlay, system) and the stake per combination, and save.'
+        'By hand: pick the league (cups and the Community Shield too) and day (yesterday to the day after tomorrow, or Earlier for any past day, to add an old ticket), tap a game and its market (moneyline, spread, total, odd/even; soccer’s and hockey’s moneyline have a draw, and soccer’s whole-goal spread a handicap draw); each side shows the lottery’s likely price; type the ticket’s odds to see the fair price and the cut, or leave them empty for an estimate from the closing lines, marked est. Set the kind (single, N-leg parlay, system) and the stake per combination, and save.'
       ]],
       ['live', 'While it plays', [
         'Each pick’s ring: green when it would win now, red when not, pulsing while live; a tick, a cross or a return once decided. Each ticket: the payout if all land (after tax), what it’s worth now (the average payout from here), the chance of any payout, against where it stood before the games.',
