@@ -37,7 +37,8 @@
       return start.apply(this, a);
     };
   } catch {}
-  addEventListener('error', e => gate.errors.push(String(e.message || e.error || 'error').slice(0, 160)));
+  // (The browser's ResizeObserver loop notice is no script error: nothing breaks.)
+  addEventListener('error', e => /ResizeObserver loop/.test(e.message) || gate.errors.push(String(e.message || e.error || 'error').slice(0, 160)));
   addEventListener('unhandledrejection', e => gate.errors.push(`rejection: ${String(e.reason?.message || e.reason).slice(0, 160)}`));
 
   const seen = el => {

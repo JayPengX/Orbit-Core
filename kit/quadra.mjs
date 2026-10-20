@@ -3266,7 +3266,7 @@ export function fitNames(root = document) {
     const key = `${w}|${el.textContent}|${el.getAttribute('aria-pressed') || el.getAttribute('aria-selected') || ''}`;
     if (el.dataset.qFitKey === key) continue;
     // (.q-fit-wrap: a sentence more than a name, measured on one line, wrapped only when shrinking can't fit it.)
-    const wraps = el.classList.contains('q-fit-wrap');
+    const wraps = el.matches('.q-fit-wrap, .q-match-side b');
     if (wraps) el.classList.remove('q-wrapped');
     const cs = getComputedStyle(el);
     if (!wraps && !el.classList.contains('q-fit') && cs.whiteSpace !== 'nowrap') continue;

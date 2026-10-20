@@ -3978,6 +3978,10 @@ div.q-ritem {
   -webkit-box-orient: vertical;
   overflow-wrap: anywhere;
 }
+/* (A team's name shrinks to one line first; two lines only when it must: fitNames.) */
+.q-match-side b:not(.q-wrapped) {
+  white-space: nowrap;
+}
 .q-match-mid {
   min-width: 56px;
   font: 700 26px/1 var(--q-font);
