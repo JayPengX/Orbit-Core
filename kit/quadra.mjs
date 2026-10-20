@@ -122,17 +122,23 @@ const finiteOr0 = v => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
 export const worthOf = (wallet, now = Date.now()) => poolBalance(wallet) + finiteOr0(wallet?.snap?.stock?.holdings) - debtOf(wallet, now);
 // 財富等級: what the account is worth (worthOf) puts it on a level; the
 // first time it reaches one, Quadra's economy pays the level's reward once
-// (eco.js RANKS, the same table: `eco:rank:<id>`).
+// (eco.js RANKS, the same table: `eco:rank:<id>`; scaled 2026-10-20 to the
+// NT$200,000 start, old levels' rewards counting towards the new).
 export const WEALTH_RANKS = [
-  { id: 'start', min: 0, reward: 0, icon: '🌱' },
-  { id: 'saver', min: 50_000, reward: 1_000, icon: '🪙' },
-  { id: 'steady', min: 100_000, reward: 2_000, icon: '💼' },
-  { id: 'comfort', min: 250_000, reward: 3_000, icon: '🏡' },
-  { id: 'wealthy', min: 500_000, reward: 5_000, icon: '💎' },
-  { id: 'rich', min: 1_000_000, reward: 8_000, icon: '🏦' },
-  { id: 'multi', min: 5_000_000, reward: 15_000, icon: '👑' },
-  { id: 'tycoon', min: 20_000_000, reward: 30_000, icon: '🚀' }
+  { id: 'start', min: 0, reward: 0, icon: '🌱', zh: '起步', en: 'Starter' },
+  { id: 'thrifty', min: 300_000, reward: 3_000, icon: '🪙', zh: '小資族', en: 'Saver' },
+  { id: 'solid', min: 500_000, reward: 5_000, icon: '💼', zh: '穩健', en: 'Steady' },
+  { id: 'welloff', min: 1_000_000, reward: 10_000, icon: '🏡', zh: '百萬身價', en: 'Millionaire' },
+  { id: 'affluent', min: 3_000_000, reward: 20_000, icon: '💎', zh: '富裕', en: 'Wealthy' },
+  { id: 'tenmil', min: 10_000_000, reward: 50_000, icon: '👑', zh: '千萬富翁', en: 'Ten-millionaire' },
+  { id: 'hundredmil', min: 100_000_000, reward: 100_000, icon: '🚀', zh: '億萬大亨', en: 'Tycoon' }
 ];
+// The levels before 2026-10-20 (their rewards stay in the statement).
+const OLD_RANK_NAMES = { saver: ['小資族（舊）', 'Saver (old)'], steady: ['穩健（舊）', 'Steady (old)'], comfort: ['小康（舊）', 'Comfortable (old)'], wealthy: ['富裕（舊）', 'Wealthy (old)'], rich: ['有錢人（舊）', 'Rich (old)'], multi: ['千萬富翁（舊）', 'Multi-millionaire (old)'], tycoon: ['億萬大亨（舊）', 'Tycoon (old)'] };
+const rankName = (id, i) => {
+  const r = WEALTH_RANKS.find(x => x.id === id);
+  return r ? (i ? r.en : r.zh) : OLD_RANK_NAMES[id]?.[i] || id;
+};
 // Where the money came from and went (all time, NT$): what the system gave
 // (opening money, pay, level rewards, resets, VIP cashback), the account
 // against Quadra (Play's settled bets less fees, loan costs and overdraft interest:
@@ -1698,7 +1704,8 @@ export function describeEntry(e, lang = 'zh') {
   const what = NAMED[e.id]?.[i] || KIND[e.kind]?.[i] || e.kind;
   const from = e.app === 'eco' ? 'Quadra' : APPS[e.app]?.short || e.app;
   const peer = e.peer ? ` ${e.peer}` : '';
-  return `${from} · ${what}${peer}${e.note ? ` · ${e.note}` : ''}`;
+  const note = e.kind === 'rank' && e.app === 'eco' && e.note ? rankName(e.note, i) : e.note;
+  return `${from} · ${what}${peer}${note ? ` · ${note}` : ''}`;
 }
 
 export const setting = (wallet, key, fallback = null) => wallet?.settings?.[key]?.value ?? fallback;

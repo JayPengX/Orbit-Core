@@ -186,7 +186,8 @@ the kit's `quadra.mjs` (the same tables in both).
   a year's ban after. Debt counts against worth.
 - **急難紓困** (`op: 'relief'`): NT$5,000 under NT$2,000 worth, every 13
   weeks, 3 a year.
-- **財富等級:** one-time rewards as worth crosses 50k to 20M.
+- **財富等級:** one-time rewards as worth crosses 300k to 100M (scaled 2026-10-20;
+  the old 50k–20M levels' rewards count towards the new ones).
 - **Looks:** an avatar and a frame, free for everyone (the Pass's 外觀 tab).
 - **Quadra Plus ended 2026-10-20.** Old `eco:plus:*` months stay as history;
   `eco:plusrefund:v1` gave back what was paid for the days left (a free

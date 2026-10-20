@@ -501,6 +501,10 @@ test('the kit and the Worker agree on the pay; the statement skips free bet toke
   const eco = await import('../eco.js');
   assert.equal(kit.ECONOMY.weekly, eco.PAY.week);
   assert.equal(kit.ECONOMY.start, eco.PAY.start);
+  assert.deepEqual(kit.WEALTH_RANKS.map(r => [r.id, r.min, r.reward]), eco.RANKS.map(r => [r.id, r.min, r.reward]));
+  assert.ok(kit.WEALTH_RANKS[1].min > kit.ECONOMY.start, 'the opening money alone reaches no level');
+  assert.match(kit.describeEntry({ app: 'eco', kind: 'rank', note: 'welloff', amount: 10_000 }), /百萬身價/);
+  assert.match(kit.describeEntry({ app: 'eco', kind: 'rank', note: 'saver', amount: 1_000 }, 'en'), /Saver \(old\)/);
   const now = Date.UTC(2026, 9, 10);
   const w = { entries: [{ id: 'eco:pay:2026-10', t: now - 2, app: 'eco', kind: 'pay', amount: 8_000 }, { id: 'eco:fb:welcome', t: now - 1, app: 'eco', kind: 'freebet', amount: 0, note: '200' }] };
   const d = kit.accountDetails(w, 'en', now);
