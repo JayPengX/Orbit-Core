@@ -3250,18 +3250,42 @@ function liftOnPictures() {
 }
 liftOnPictures();
 
-// Names that must stay on one line (a long law, a team, a legislator): any
-// .q-fit in any app is shrunk just enough to fit its box (--q-fit, down to
-// 0.72), redone as the page changes or turns. Nothing to call.
+// Names that must stay on one line (a long law, a team, a fund, a large
+// title, English's longer words): any .q-fit, and the kit's own one-line
+// names (a row's title, a large title, a stock's or a team's name), are
+// shrunk just enough to fit their box (down to 72%) before any ellipsis,
+// redone as the page changes or turns. Nothing to call.
+const FIT = '.q-fit, .q-fit-wrap, .q-ritem-title, .q-nav-title, .q-seg > button, .q-stock-id b, .q-match-side b, .q-league strong';
 export function fitNames(root = document) {
-  for (const el of root.querySelectorAll?.('.q-fit') || []) {
-    if (!el.clientWidth) continue;
+  // (Every box read first, then every size set: one layout, not one a name.)
+  const todo = [];
+  for (const el of root.querySelectorAll?.(FIT) || []) {
+    const w = el.clientWidth;
+    if (!w) continue;
+    // (A choice set in bold is wider: its own key.)
+    const key = `${w}|${el.textContent}|${el.getAttribute('aria-pressed') || el.getAttribute('aria-selected') || ''}`;
+    if (el.dataset.qFitKey === key) continue;
+    // (.q-fit-wrap: a sentence more than a name, measured on one line, wrapped only when shrinking can't fit it.)
+    const wraps = el.classList.contains('q-fit-wrap');
+    if (wraps) el.classList.remove('q-wrapped');
+    const cs = getComputedStyle(el);
+    if (!wraps && !el.classList.contains('q-fit') && cs.whiteSpace !== 'nowrap') continue;
     // (Its own size noted once, whatever rule set it; the shrink is inline, so no rule outranks it.)
-    const base = Number(el.dataset.qFit) || parseFloat(getComputedStyle(el).fontSize);
-    el.dataset.qFit = String(base);
+    const base = Number(el.dataset.qFit) || parseFloat(cs.fontSize);
     const was = parseFloat(el.style.fontSize) / base || 1;
-    const need = el.scrollWidth / was;
-    const k = Math.max(0.72, Math.min(1, (el.clientWidth - 1) / need));
+    // (The text against the room inside the padding: only the text scales.)
+    const pad = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+    const k = Math.min(1, (w - pad - 1) / ((el.scrollWidth - pad) / was));
+    todo.push([el, key, base, was, wraps && k < 0.72 ? 'wrap' : Math.max(0.72, k)]);
+  }
+  for (const [el, key, base, was, k] of todo) {
+    el.dataset.qFit = String(base);
+    el.dataset.qFitKey = key;
+    if (k === 'wrap') {
+      el.classList.add('q-wrapped');
+      el.style.fontSize = '';
+      continue;
+    }
     if (Math.abs(k - was) > 0.01) el.style.fontSize = k === 1 ? '' : `${(base * k).toFixed(2)}px`;
   }
 }
@@ -3271,7 +3295,8 @@ function watchNames() {
   let frame = 0;
   const soon = () => (frame ||= requestAnimationFrame(() => ((frame = 0), fitNames())));
   const start = () => {
-    new MutationObserver(soon).observe(document.body, { childList: true, subtree: true, characterData: true });
+    // (A tab or sheet shown again counts too: a name drawn while hidden had no box to fit.)
+    new MutationObserver(soon).observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['hidden', 'open', 'aria-selected', 'aria-pressed'] });
     globalThis.addEventListener('resize', soon);
     soon();
   };

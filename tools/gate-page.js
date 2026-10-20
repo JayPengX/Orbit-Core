@@ -47,6 +47,14 @@
     const cs = getComputedStyle(el);
     return cs.visibility !== 'hidden' && cs.display !== 'none' && Number(cs.opacity) > 0.05;
   };
+  // Seen, decoration included (a letter tile is aria-hidden yet in plain view).
+  const shown = el => {
+    if (!el.isConnected || el.closest('[hidden], #loading, dialog:not([open])')) return false;
+    const r = el.getBoundingClientRect();
+    if (!r.width || !r.height || r.bottom < 0 || r.top > innerHeight * 4) return false;
+    const cs = getComputedStyle(el);
+    return cs.visibility !== 'hidden' && cs.display !== 'none' && Number(cs.opacity) > 0.05;
+  };
   const name = el => `${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ''}${[...el.classList].slice(0, 3).map(c => `.${c}`).join('')}`;
   const text = el => (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
   const SKELETON = '.q-skel, .skeleton, .skel, .shimmer, [class*="skeleton"], [class*="-skel"], [aria-busy="true"], .q-spinner, .spinner';
@@ -118,6 +126,7 @@
       // A logo, badge, face or flag drawn as letters: a small square box with
       // one to five letters (a ticker) and no picture in it.
       const r = el.getBoundingClientRect();
+      // (Letters shown are letters seen, aria-hidden or not.)
       const kind = /logo|badge|crest|avatar|face|flag|headshot|photo|team|mono/i.test(el.className?.baseVal ?? el.className);
       if ((kind || el.matches('.q-logo.text')) && r.width >= 14 && r.width <= 96 && Math.abs(r.width - r.height) <= r.width * 0.25 && /^[\p{L}\p{N}.-]{1,5}$/u.test(tx) && /\p{L}/u.test(tx) && !el.querySelector('img, svg, canvas, video') && !/url\(/.test(cs.backgroundImage)) out.letters.push(`${name(el)} "${tx}"`);
       // An empty state that is only a sentence.
@@ -128,6 +137,13 @@
       if (!el.children.length && LOADING.test(tx)) out.loading.push(`${name(el)} "${tx}"`);
     }
     for (const el of document.querySelectorAll(SKELETON)) if (seen(el)) out.loading.push(name(el));
+    for (const el of document.querySelectorAll('[aria-hidden="true"], [aria-hidden="true"] *')) {
+      if (el.closest('svg') || !shown(el)) continue;
+      const tx = text(el);
+      const r = el.getBoundingClientRect();
+      const cs = getComputedStyle(el);
+      if (/logo|badge|crest|avatar|face|flag|headshot|photo|team|mono|tile/i.test(el.className?.baseVal ?? el.className) && r.width >= 14 && r.width <= 96 && Math.abs(r.width - r.height) <= r.width * 0.25 && /^[\p{L}\p{N}.-]{1,5}$/u.test(tx) && /\p{L}/u.test(tx) && !el.querySelector('img, svg, canvas, video') && !/url\(/.test(cs.backgroundImage)) out.letters.push(`${name(el)} "${tx}"`);
+    }
     // Grids: a last row with a hole, and cards stretched far past what they hold.
     for (const el of all) {
       const cs = getComputedStyle(el);
