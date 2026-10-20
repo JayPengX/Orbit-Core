@@ -6,7 +6,7 @@ import { legResult, touchdowns, kambiSets, decidedSetMatch, decidedTeamGame, par
 import { pointsModel, pointsMarkets, BASKETBALL_BANDS, fitHockey, goalMarkets, baseballMarkets, setMarkets, setChance, matchFromSet } from '../kit/play-markets.mjs';
 import { parseOffers } from '../kit/play-offers.mjs';
 import { gameOptions } from '../kit/play-board.mjs';
-import { houseRule, withRules } from '../kit/play-rules.mjs';
+import { houseRule, withRules, estimatedMinLegs } from '../kit/play-rules.mjs';
 
 const game = (away, home, extra = {}) => ({ status: 'final', awayScore: away, homeScore: home, awayInnings: [], homeInnings: [], ...extra });
 const sum = picks => picks.reduce((s, p) => s + p.fair, 0);
@@ -117,6 +117,16 @@ test("限2關 / 限3關: only a game's or market's own minimum (運彩 §21), ne
   assert.ok(ruled.filter(o => !o.lock).every(o => o.minLegs === 3), "the game's 限3關 on every market");
   assert.equal(withRules({ kind: 'ml', estOdds: 1.1, eventMinLegs: 2, m: { minLegs: 3 } }).minLegs, 2, "the pick's own first");
   assert.equal(withRules({ kind: 'score', estOdds: 9, m: { minLegs: 3 }, game: { minLegs: 1 } }).minLegs, 3, "then the market's, then the game's");
+  // None known: 運彩's usual pattern, an estimate: 限2關 until the game's day (Taipei), then singles.
+  const now = Date.parse('2026-10-19T23:20:00Z'); // 07:20 on the 20th in Taipei
+  assert.equal(estimatedMinLegs({ kind: 'ml', start: '2026-10-20T00:08:00Z' }, now), null, "today's game: a single");
+  assert.equal(estimatedMinLegs({ kind: 'ml', start: '2026-10-20T15:59:00Z' }, now), null, 'still today in Taipei');
+  assert.equal(estimatedMinLegs({ kind: 'total', start: '2026-10-20T19:00:00Z' }, now), 2, "tomorrow's game: 限2關");
+  assert.equal(estimatedMinLegs({ kind: 'future', start: '2026-11-01T00:00:00Z' }, now), null, 'championships: singles');
+  assert.equal(estimatedMinLegs({ id: 'live|x|ml|home', kind: 'ml', start: '2026-10-21T00:00:00Z' }, now), null, 'in play: singles');
+  const later = withRules({ kind: 'ml', estOdds: 1.8, start: new Date(Date.now() + 3 * 86_400_000).toISOString() });
+  assert.deepEqual([later.minLegs, later.minLegsEst], [2, true], 'marked as estimated');
+  assert.equal(withRules({ kind: 'ml', estOdds: 1.8, start: new Date(Date.now() + 3 * 86_400_000).toISOString(), game: { minLegs: 1 } }).minLegs, 1, "the game's own wins over the estimate");
 });
 
 test('set sports (tennis, volleyball, badminton, table tennis, esports): 讓盤, 正確比數 and 單盤不讓分 priced from the match, Kambi\'s read, each settled from the sets', () => {

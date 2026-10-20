@@ -88,7 +88,7 @@ test('trimmed: only picks the home names from the pick alone, none of the market
   // Nothing of the pricing's workings, and a pick says of itself only what its id doesn't.
   const text = JSON.stringify(board);
   for (const gone of ['"cut"', '"fairMargin"', '"errKey"', '"typicalMargin"', '"gameId"', '"draftKings"', '"polymarket"', '"market"', '"kind"']) assert.ok(!text.includes(gone), gone);
-  for (const g of board.games) for (const p of g.p) if (p.i.startsWith('ml|') && g.sport !== 'nhl') assert.deepEqual(Object.keys(p).filter(k => !['tag', 'cap', 'lock', 'minLegs'].includes(k)).sort(), ['estOdds', 'fairChance', 'i'], p.i);
+  for (const g of board.games) for (const p of g.p) if (p.i.startsWith('ml|') && g.sport !== 'nhl') assert.deepEqual(Object.keys(p).filter(k => !['tag', 'cap', 'lock', 'minLegs', 'minLegsEst'].includes(k)).sort(), ['estOdds', 'fairChance', 'i'], p.i);
   // (Hockey's winner says it is settled on the 60 minutes.)
   assert.deepEqual(board.games.find(g => g.sport === 'nhl').p.find(p => p.i === 'ml|home').settle, { threeWay: true });
   // Small: about a hundred bytes a pick.
