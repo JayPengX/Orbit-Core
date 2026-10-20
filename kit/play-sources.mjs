@@ -1189,7 +1189,8 @@ export async function loadLeagueTeams(sport) {
   const url = `${ESPN}/${path}/teams?limit=1000`;
   let teams = await storedTeams(url);
   if (!teams) {
-    const data = await getJson(url).catch(() => null);
+    // (Trimmed by the proxy to each club's names and logo: a twentieth of ESPN's list.)
+    const data = await getJson(url, 'espn-teams').catch(() => null);
     teams = (data?.sports?.[0]?.leagues?.[0]?.teams ?? [])
       .map(x => x.team)
       .filter(t => t?.displayName && t.logos?.[0]?.href)

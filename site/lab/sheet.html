@@ -57,6 +57,8 @@
   </div>
 </div>
 
+<!-- The built kit's modules import each other as #kit/… (kit/stamp.mjs). -->
+<script type="importmap">{"imports":{"#kit/":"../kit/"}}</script>
 <script type="module">
   import { closeSheet } from '../kit/quadra.mjs';
   const rows = (n, word) => Array.from({ length: n }, (_, i) => `<div class="row">${word} ${i + 1}</div>`).join('');
