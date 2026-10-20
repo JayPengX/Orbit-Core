@@ -3249,7 +3249,7 @@ function liftOnPictures() {
     const pending = new Set();
     const look = () => {
       for (const img of document.images) {
-        if (pending.has(img) || img.complete || img.closest('#loading')) continue;
+        if (pending.has(img) || img.complete || img.closest('#loading, [hidden]')) continue;
         const r = img.getBoundingClientRect();
         if (r.width > 0 && r.bottom > 0 && r.top < h) {
           pending.add(img);
@@ -3301,6 +3301,8 @@ export function fitNames(root = document) {
   // (Every box read first, then every size set: one layout, not one a name.)
   const todo = [];
   for (const el of root.querySelectorAll?.(FIT) || []) {
+    // (A hidden tab's names wait for it to be shown: measuring them would lay it out.)
+    if (el.closest('[hidden]')) continue;
     const w = el.clientWidth;
     if (!w) continue;
     // (A choice set in bold is wider: its own key.)
@@ -3653,6 +3655,7 @@ const reducedMotion = () => globalThis.matchMedia?.('(prefers-reduced-motion: re
 export function tabBar({ tabs, onSelect, hash = id => `#${id}`, nav = document.getElementById('tabs'), label: ariaLabel = '' } = {}) {
   const buttons = new Map();
   const places = {};
+  const visited = new Set();
   let current = null;
   nav.classList.add('q-tabbar');
   nav.setAttribute('role', 'tablist');
@@ -3745,14 +3748,21 @@ export function tabBar({ tabs, onSelect, hash = id => `#${id}`, nav = document.g
         if (b.getAttribute('aria-selected') !== String(on)) b.setAttribute('aria-selected', String(on));
         if (b.tabIndex !== (on ? 0 : -1)) b.tabIndex = on ? 0 : -1;
         const panel = document.getElementById(`panel-${tid}`);
+        // (.q-tabpanel: hidden without dropping its drawing, quadra.css, so its
+        // pictures are there at once when it's chosen again, never redrawn blank.)
+        if (panel && !panel.classList.contains('q-tabpanel')) panel.classList.add('q-tabpanel');
         if (panel && panel.hidden !== !on) panel.hidden = !on;
-        // A tab the person chose fades in, as iOS 26's do (never the first
-        // one: the page opens still). Opacity only: a transform would make
-        // the panel hold its fixed children for the moment.
+        // A tab the person chose fades in the first time, as iOS 26's do (never
+        // the first one: the page opens still); after that it's simply there:
+        // a fade on every tap faded its logos in again each time (Jay
+        // 2026-10-20: "images flashes every time I switch tab"). Opacity only:
+        // a transform would make the panel hold its fixed children for the moment.
         // (Started by the Web Animations API where there is one: the class taken
         // off and put back needed a layout of the whole panel first, before the
         // app had even drawn it, on every tab tap.)
-        if (on && panel && changed && !first && !reducedMotion()) {
+        const firstVisit = on && changed && !visited.has(tid);
+        if (on) visited.add(tid);
+        if (on && panel && firstVisit && !first && !reducedMotion()) {
           if (typeof panel.animate === 'function') panel.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 240, easing: 'cubic-bezier(0.32, 0.72, 0, 1)' });
           else {
             panel.classList.remove('q-panel-in');

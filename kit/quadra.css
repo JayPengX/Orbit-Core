@@ -2374,7 +2374,27 @@ input[type='checkbox'][switch] {
   }
 }
 
-/* ---- A tab chosen fades in (kit tabBar; never the first) ---- */
+/* ---- A tab not chosen (kit tabBar): out of sight and taking no room, but
+   kept drawn where the browser can (content-visibility), its pictures still
+   decoded: chosen again, it's there at once. Elsewhere, display: none. ---- */
+@supports (content-visibility: hidden) {
+  .q-tabpanel[hidden] {
+    display: block !important;
+    content-visibility: hidden;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
+}
+
+/* ---- A tab chosen fades in the first time (kit tabBar; never the first) ---- */
 .q-panel-in {
   animation: q-panel-in 0.24s var(--q-ease) both;
 }
