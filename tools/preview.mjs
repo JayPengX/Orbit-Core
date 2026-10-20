@@ -193,7 +193,8 @@ const reopen = flag('reopen') || Boolean(upgrade) || Boolean(net);
 const freezes = flag('freezes');
 // --profile: where the page's main thread spent its time until the loading
 // screen went (Chromium): each function's own time, the 15 largest.
-const profile = flag('profile');
+const profileFor = Number(opt('profile-for', 0));
+const profile = flag('profile') || profileFor > 0;
 // --cpu N: (Chromium) the page's processor N times slower, about a phone's
 // (4 for an older iPhone), for speed runs.
 const cpu = Number(opt('cpu', 0));
@@ -975,6 +976,8 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
   }
   const stopProfile = async () => {
     if (!timing) await page.waitForFunction(() => document.getElementById('loading')?.hidden ?? true, null, { timeout: 60_000, polling: 50 }).catch(() => {});
+    // (--profile-for ms: on that long after the start, for a freeze that comes later.)
+    if (profileFor) await page.waitForTimeout(Math.max(0, profileFor - (Date.now() - started)));
     const { profile: prof } = await cdp.send('Profiler.stop');
     const by = new Map();
     const node = new Map(prof.nodes.map(n => [n.id, n]));
