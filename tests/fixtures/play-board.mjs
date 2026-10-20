@@ -46,7 +46,9 @@ export function gamesOf(key, from, to, scale = 1) {
 }
 
 // ESPN's event, as the `espn-board` trim leaves it.
-function espnEvent(g, i, family) {
+// (A game whose time has come is under way, as ESPN says it: `late` keeps one to come still.)
+function espnEvent(g, i, family, now = Infinity, late = new Set()) {
+  const state = g.start <= now && !late.has(g.home) ? 'in' : 'pre';
   const lines = FAMILY_LINES[family];
   const soccer = family === 'soccer';
   const draw = soccer ? 0.27 - 0.4 * (g.p - 0.5) ** 2 : 0;
@@ -65,17 +67,17 @@ function espnEvent(g, i, family) {
     id: `${g.key}${i}`,
     date,
     season: { type: 2 },
-    status: { type: { state: 'pre', completed: false } },
-    competitions: [{ date, timeValid: true, neutralSite: false, status: { type: { state: 'pre', completed: false } }, competitors: [{ homeAway: 'home', team: team(g.home, 1) }, { homeAway: 'away', team: team(g.away, 2) }], odds }]
+    status: { type: { state, completed: false } },
+    competitions: [{ date, timeValid: true, neutralSite: false, status: { type: { state, completed: false } }, competitors: [{ homeAway: 'home', team: team(g.home, 1) }, { homeAway: 'away', team: team(g.away, 2) }], odds }]
   };
 }
 
 // Kambi's list view, trimmed: events with their winner and (basketball, baseball) total.
-function kambiEvents(list) {
+function kambiEvents(list, now = Infinity, late = new Set()) {
   const o = (type, odds, extra = {}) => ({ type, odds, status: 'OPEN', ...extra });
   return {
     events: list.map((g, i) => ({
-      event: { id: 1_000_000 + i, name: `${g.away} - ${g.home}`, homeName: g.home, awayName: g.away, start: new Date(g.start).toISOString(), state: 'NOT_STARTED', group: '' },
+      event: { id: 1_000_000 + i, name: `${g.away} - ${g.home}`, homeName: g.home, awayName: g.away, start: new Date(g.start).toISOString(), state: g.start <= now && !late.has(g.home) ? 'STARTED' : 'NOT_STARTED', group: '' },
       betOffers: [
         { criterion: { englishLabel: 'Match' }, betOfferType: { englishName: 'Match' }, outcomes: [o('OT_ONE', Math.round(1000 / (g.p * 0.95))), o('OT_TWO', Math.round(1000 / ((1 - g.p) * 0.95)))] },
         { criterion: { englishLabel: 'Total' }, betOfferType: { englishName: 'Over/Under' }, outcomes: [o('OT_OVER', 1910, { line: 8500 }), o('OT_UNDER', 1910, { line: 8500 })] }
@@ -86,7 +88,8 @@ function kambiEvents(list) {
 
 // The sources of the board as the proxy answers them, from `now`: `proxy(url, trim)` → JSON or null.
 // `down`: a predicate on a URL that answers null (a source that can't be read).
-export function fakeSources({ now, scale = 1, down = () => false, f1 = false } = {}) {
+// `late`: home sides whose game is past its time but hasn't begun.
+export function fakeSources({ now, scale = 1, down = () => false, f1 = false, late = new Set() } = {}) {
   const from = now - 12 * 3_600_000;
   const to = now + 16 * 86_400_000;
   const calls = [];
@@ -112,7 +115,7 @@ export function fakeSources({ now, scale = 1, down = () => false, f1 = false } =
         const ym = new Date(g.start).toISOString().replace(/-/g, '').slice(0, dates.length);
         return ym === dates;
       });
-      return { events: list.map((g, i) => espnEvent(g, i, family)) };
+      return { events: list.map((g, i) => espnEvent(g, i, family, now, late)) };
     }
     if (u.hostname === 'site.api.espn.com') return null; // standings: the house reads none
     if (u.hostname === 'eu-offering-api.kambicdn.com' && u.pathname.includes('formula_1')) {
@@ -126,7 +129,7 @@ export function fakeSources({ now, scale = 1, down = () => false, f1 = false } =
       if (!which) return { events: [] };
       const [key, kind] = which.split(':');
       // An ESPN league's own Kambi list prices nothing here (DraftKings does); a Kambi-only league's is its schedule.
-      return kind === 'kambi' ? kambiEvents(gamesOf(key, from, to, scale)) : { events: [] };
+      return kind === 'kambi' ? kambiEvents(gamesOf(key, from, to, scale), now, late) : { events: [] };
     }
     if (u.hostname === 'asia-baseball.quadra') {
       const [league, ym] = u.pathname.slice(1).replace('.json', '').split('/');

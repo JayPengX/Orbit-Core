@@ -130,7 +130,12 @@ export function fillTypicalMargins(bets) {
 // named by the caller after.
 export function boardBets(data, { optionsOf = gameOptions, name = (game, o) => o, now = new Date(), memo = {} } = {}) {
   const bets = [];
-  for (const game of data.games) for (const o of optionsOf(game)) bets.push(name(game, o));
+  for (const game of data.games)
+    for (const o of optionsOf(game)) {
+      const bet = name(game, o);
+      // (A game past its time that hasn't begun: sold until then, as a race's late qualifying; play-sources.mjs lotteryGames.)
+      bets.push(game.lateUntil ? { ...bet, waitsUntil: game.lateUntil } : bet);
+    }
   if (data.f1) bets.push(...f1Bets(data.f1, { now, memo, loadedAt: data.loadedAt }));
   return withHouseRules(fillTypicalMargins(bets));
 }

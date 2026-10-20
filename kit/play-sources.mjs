@@ -88,11 +88,42 @@ export function nextMatchweek(games) {
 }
 
 // What the page lists: every game the sources have that hasn't started yet
-// and starts within DAYS_AHEAD, in start order.
-export function lotteryGames(games, now) {
+// and starts within DAYS_AHEAD, in start order. `late`: the ids of games past
+// their listed start that haven't begun (stillToCome), kept on sale before
+// the game with `lateUntil`: sold until then, as a race's late qualifying.
+export function lotteryGames(games, now, late = null) {
   const t = now.getTime();
-  return games.filter(g => Date.parse(g.startUtc) > t && Date.parse(g.startUtc) <= t + DAYS_AHEAD * DAY_MS).sort((a, b) => a.startUtc.localeCompare(b.startUtc));
+  return games
+    .filter(g => (Date.parse(g.startUtc) > t || (late?.has(g.id) && Date.parse(g.startUtc) > t - LATE_MS)) && Date.parse(g.startUtc) <= t + DAYS_AHEAD * DAY_MS)
+    .map(g => (Date.parse(g.startUtc) > t ? g : { ...g, lateUntil: Math.min(Date.parse(g.startUtc) + LATE_MS, t + LATE_HOLD_MS) }))
+    .sort((a, b) => a.startUtc.localeCompare(b.startUtc));
 }
+
+// A game past its listed start that hasn't begun (an NBA game's intro, a
+// first pitch held back): still sold before the game, up to 45 minutes past
+// its time, while ESPN's live scoreboard (seconds old, never the board's
+// two-minute copy) says it's still to come. Each read holds it for 2 minutes
+// (lateUntil); the next read asks again. Leagues without an ESPN scoreboard
+// (the Asian schedules) stop at the listed time, as before.
+export const LATE_MS = 45 * 60_000;
+const LATE_HOLD_MS = 2 * 60_000;
+export async function stillToCome(games, now) {
+  const t = now.getTime();
+  const late = games.filter(g => Date.parse(g.startUtc) <= t && Date.parse(g.startUtc) > t - LATE_MS && ESPN_PATH[g.sport]);
+  if (!late.length) return new Set();
+  const pre = new Map();
+  await Promise.all(
+    [...new Set(late.map(g => g.sport))].map(sport =>
+      getJson(`${ESPN}/${ESPN_PATH[sport]}/scoreboard`)
+        .then(d => pre.set(sport, (d?.events || []).map(e => e.competitions?.[0]).filter(c => c?.status?.type?.state === 'pre')))
+        .catch(() => {})
+    )
+  );
+  const side = (c, ha) => c.competitors?.find(x => x.homeAway === ha)?.team?.displayName;
+  return new Set(late.filter(g => (pre.get(g.sport) || []).some(c => Math.abs(Date.parse(c.date) - Date.parse(g.startUtc)) < 3 * 3_600_000 && sidesMatch(side(c, 'home'), side(c, 'away'), g.home?.en ?? g.home, g.away?.en ?? g.away))).map(g => g.id));
+}
+// (The board's games with the late ones confirmed.)
+const onSale = async (games, now) => lotteryGames(games, now, await stillToCome(games, now));
 
 // Championship markets. Polymarket lists next season's market before this
 // one ends, so the lowest year in the title wins.
@@ -832,7 +863,7 @@ export async function loadOdds(now = new Date(), onProgress) {
   const race = await f1Race(f1, f1Espn, f1Kambi, now);
   return {
     loadedAt: now.toISOString(),
-    games: lotteryGames(mergeGames([...mlbDk, ...eplDk], [...parsePolymarketMlb(mlbPm, now), ...parsePolymarketEpl(eplPm, now)], { scheduled: new Set([results[0].status === 'fulfilled' && 'mlb', results[2].status === 'fulfilled' && 'epl'].filter(Boolean)) }), now),
+    games: await onSale(mergeGames([...mlbDk, ...eplDk], [...parsePolymarketMlb(mlbPm, now), ...parsePolymarketEpl(eplPm, now)], { scheduled: new Set([results[0].status === 'fulfilled' && 'mlb', results[2].status === 'fulfilled' && 'epl'].filter(Boolean)) }), now),
     f1: race,
     futures: [...parseFutures(mlbPm, 'mlb'), ...parseFutures(eplPm, 'epl'), ...(nbaInSeason(now) ? parseFutures(nbaPm, 'nba') : [])]
   };
@@ -1145,11 +1176,11 @@ export async function loadExtraLeagues(now = new Date(), onPart) {
 }
 // One of those leagues' games on the board.
 async function extraLeague(key, now) {
-  if (!KAMBI_LEAGUES.includes(key)) return lotteryGames(mergeGames(await fetchLeague(key, now), []), now);
+  if (!KAMBI_LEAGUES.includes(key)) return onSale(mergeGames(await fetchLeague(key, now), []), now);
   const [p, s] = await Promise.allSettled([fetchKambiLeague(key, now, getJson), fetchSchedule(key, now)]);
   const priced = p.status === 'fulfilled' ? p.value : [];
   const scheduled = mergeGames((s.status === 'fulfilled' ? s.value : []).filter(g => !pricedByKambi(g, priced)), []);
-  return lotteryGames([...priced, ...scheduled], now);
+  return onSale([...priced, ...scheduled], now);
 }
 
 // One league's games on the board, as loadOdds and loadExtraLeagues list
@@ -1159,7 +1190,7 @@ export async function loadLeague(key, now = new Date()) {
   const [dk, pm] = await Promise.allSettled([fetchMonths(key, LEAGUES[key].path, now), fetchPolymarketEvents(POLYMARKET_TAG[key], 'polymarket-events')]);
   if (dk.status === 'rejected' && pm.status === 'rejected') throw dk.reason;
   const pmGames = pm.status === 'fulfilled' ? (key === 'mlb' ? parsePolymarketMlb : parsePolymarketEpl)(pm.value, now) : [];
-  return lotteryGames(mergeGames(dk.status === 'fulfilled' ? dk.value : [], pmGames, { scheduled: new Set(dk.status === 'fulfilled' ? [key] : []) }), now);
+  return onSale(mergeGames(dk.status === 'fulfilled' ? dk.value : [], pmGames, { scheduled: new Set(dk.status === 'fulfilled' ? [key] : []) }), now);
 }
 
 // One championship market (a pick's `market`), as loadOdds and
