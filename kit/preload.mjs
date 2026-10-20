@@ -12,19 +12,15 @@
 // starts as the app loads (Transit and Weather wait for the holidays before
 // their first screen), while a kit file's dynamic import stays lazy (the
 // Pass sheet's pass.mjs). The links are written by the page with
-// QUADRA_KIT.url (the kit version this device has noted, as the import
-// map's; Weather's own link to the holidays had no version, so on a phone
-// they were fetched twice). A kit module reached only by a
-// kit file's relative import is stamped with the kit's own version
-// (kit/stamp.mjs), the same address once the device has noted that version;
-// on a device that hasn't (its first visit) it isn't preloaded, so nothing
-// is fetched twice.
+// QUADRA_KIT.url (each file's hash as this device noted it, the import
+// map's own address; Weather's own link to the holidays had no version, so
+// on a phone they were fetched twice).
 import { readFile } from 'node:fs/promises';
 import { join, dirname, resolve, basename } from 'node:path';
 
 // The kit's build and dev tools: in the folder, never served (stamp.mjs
 // leaves them out of the site) nor in an app's import map (apps.mjs).
-export const KIT_TOOLS = ['apps.mjs', 'link.mjs', 'loader.html', 'preload.mjs', 'stamp.mjs'];
+export const KIT_TOOLS = ['apps.mjs', 'hash.mjs', 'link.mjs', 'loader.html', 'preload.mjs', 'stamp-app.mjs', 'stamp.mjs'];
 
 const STATIC = /(?:^|[\s;}])(?:import|export)\s[^'"]*?from\s*['"]([^'"?]+)['"]|(?:^|[\s;])import\s*['"]([^'"?]+)['"]/g;
 const DYNAMIC_KIT = /\bimport\(\s*['"](#kit\/[^'"?]+)['"]\s*\)/g;
@@ -57,13 +53,14 @@ export async function kitGraph(entries, kitDir) {
   return found;
 }
 
-// The page's <script> writing the links (after kit:head, which defines QUADRA_KIT and preloads quadra.mjs and brand.mjs).
+// The page's <script> writing the links (after kit:head, which defines
+// QUADRA_KIT and preloads quadra.mjs and brand.mjs), each at the address the
+// import map gives it (QUADRA_KIT.url): the built kit's files import each
+// other through the map too (kit/stamp.mjs), so every one can be preloaded.
 export async function kitPreloads(entries, kitDir) {
   const found = await kitGraph(entries, kitDir);
   for (const done of ['quadra.mjs', 'brand.mjs']) found.delete(done);
-  const mapped = [...found].filter(([, m]) => m).map(([n]) => n).sort();
-  const relative = [...found].filter(([, m]) => !m).map(([n]) => n).sort();
-  if (!mapped.length && !relative.length) return '';
-  const list = a => `[${a.map(n => `'${n}'`).join(',')}]`;
-  return `<script>${list(mapped)}.concat(QUADRA_KIT.version?${list(relative)}:[]).forEach(function(f){document.write('<link rel="modulepreload" href="'+QUADRA_KIT.url(f)+'">')})</script>`;
+  const names = [...found.keys()].sort();
+  if (!names.length) return '';
+  return `<script>[${names.map(n => `'${n}'`).join(',')}].forEach(function(f){document.write('<link rel="modulepreload" href="'+QUADRA_KIT.url(f)+'">')})</script>`;
 }

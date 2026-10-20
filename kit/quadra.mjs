@@ -371,13 +371,34 @@ function cachePayload(app, account, payload) {
 // (JSON sent as plain text, and saves as a POST: a request the browser sends
 // at once, where a JSON content type, a PATCH or a DELETE is asked about
 // first, a second request and a round trip before every save.)
+//
+// A weak connection: a request that gets no answer in time (or is lost on the
+// way) is sent again once, on a fresh connection, a moment later, instead of
+// one wait of 25 s that left the app on "—" (a save on weak 4G hung for
+// minutes). Each try has 10 s plus a second for every 20 KB it sends (a big
+// save on a slow upload still gets there). Every call can be sent twice: the
+// Worker's entries have fixed ids and a write sets the whole payload.
+// Without a connection at all it isn't tried (the app's next sync sends it).
+export const callWait = bytes => 10_000 + Math.round(bytes / 20);
+export const CALL_RETRY_MS = 1_500;
 async function call(method, query = '', body) {
-  const res = await fetch(`${ECO_URL}${query}`, {
-    method,
-    headers: body ? { 'Content-Type': 'text/plain;charset=UTF-8' } : {},
-    body: body ? JSON.stringify(body) : undefined,
-    signal: AbortSignal.timeout(25_000)
-  });
+  const text = body ? JSON.stringify(body) : undefined;
+  if (globalThis.navigator?.onLine === false) throw Object.assign(new Error('offline'), { code: 'OFFLINE' });
+  let res;
+  for (let tries = 0; ; tries++) {
+    try {
+      res = await fetch(`${ECO_URL}${query}`, {
+        method,
+        headers: body ? { 'Content-Type': 'text/plain;charset=UTF-8' } : {},
+        body: text,
+        signal: AbortSignal.timeout(callWait(text?.length || 0))
+      });
+      break;
+    } catch (error) {
+      if (tries >= 1 || globalThis.navigator?.onLine === false) throw error;
+      await new Promise(done => setTimeout(done, CALL_RETRY_MS));
+    }
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const error = new Error(data?.error?.message || `HTTP ${res.status}`);
@@ -496,7 +517,7 @@ export function clearData() {
 // how the device itself is set up stays: its language and its screen's
 // safe area, and the kit's version (the app files stay cached, so the
 // sign-in screen opens offline).
-const DEVICE_KEYS = new Set(['quadra.lang', 'quadra.safeBottom', 'quadra.kit']);
+const DEVICE_KEYS = new Set(['quadra.lang', 'quadra.safeBottom', 'quadra.kit', 'quadra.kitFiles']);
 export function wipeDevice() {
   for (const store of [globalThis.localStorage, globalThis.sessionStorage]) {
     try {
@@ -2921,26 +2942,33 @@ export function phoneOnlyGate(app, { lang = detectLang(), qr = '' } = {}) {
 // app's own start has finished), every `every` ms, whenever the page comes
 // back into view, gets focus or comes online, and as soon as any other open
 // Quadra page has found an update (a BroadcastChannel). A newer deploy is put
-// in place straight away: the place on the page kept (rememberPlace), the old
-// cached files dropped, the new page loaded. A reload that came back on the
+// in place straight away: the place on the page kept (rememberPlace), the new
+// page loaded (cached files kept: each file's address is its content's, so
+// only what changed downloads again). A reload that came back on the
 // old page (GitHub's CDN a moment behind the deploy) is tried again a few
 // seconds later, not left for the next launch.
 // The kit, loaded from one place for every app (kit/loader.html), has its
 // own version. kitLatest() notes the newest one for the next page load
-// (quadra.kit, which the loader reads) and says whether this page runs an
-// older one: 'kit:<version>', or null when it's current. The first version
-// seen on a device is only noted: that page already runs the latest.
+// and each file's hash (quadra.kit and quadra.kitFiles, which the loader
+// reads) and says whether this page runs an older one: 'kit:<version>', or
+// null when it's current. The first version seen on a device is only noted:
+// that page already runs the latest (or the hashes its deploy baked in).
 const KIT = () => globalThis.QUADRA_KIT;
 async function kitLatest() {
   const kit = KIT();
   if (!kit?.base) return null;
   try {
     const res = await fetch(`${kit.base}version.json?t=${Date.now()}`, { cache: 'no-store' });
-    const latest = res.ok ? (await res.json())?.version : null;
-    if (!latest || latest === kit.version) return null;
-    localStorage.setItem('quadra.kit', latest);
-    if (!kit.version) {
+    const got = res.ok ? await res.json() : null;
+    const latest = got?.version;
+    if (!latest) return null;
+    if (readStore('quadra.kit') !== latest) writeStore('quadra.kit', latest);
+    const files = got.files ? JSON.stringify({ version: latest, files: got.files }) : null;
+    if (files && readStore('quadra.kitFiles') !== files) writeStore('quadra.kitFiles', files);
+    if (latest === kit.version) return null;
+    if (!kit.version || kit.noted === false) {
       kit.version = latest;
+      kit.noted = true;
       return null;
     }
     return `kit:${latest}`;
@@ -2982,11 +3010,11 @@ export function sounding() {
 }
 
 let watching = null;
-export function watchUpdates({ current, key, cachePrefix, every = 15_000 } = {}) {
+export function watchUpdates({ current, key, every = 15_000 } = {}) {
   if (!current || current === 'dev' || typeof document === 'undefined') return;
   // Started already (by the kit itself, or an earlier call): one watch a page.
   if (watching) return;
-  watching = { current, key, cachePrefix };
+  watching = { current, key };
   let checking = false;
   let retry = 0;
   const channel = globalThis.BroadcastChannel ? new BroadcastChannel('quadra-updates') : null;
@@ -3009,7 +3037,9 @@ export function watchUpdates({ current, key, cachePrefix, every = 15_000 } = {})
     // Only the kit changed: the same page again, its loader now on the new
     // kit (the app's own files are still current).
     if (latest.startsWith('kit:')) return location.reload();
-    if (globalThis.caches && cachePrefix) for (const name of await caches.keys()) if (name.startsWith(cachePrefix)) await caches.delete(name);
+    // (The files kept on the phone stay: every one is kept under its own
+    // hash, so the new page asks only for the ones that changed. They were
+    // all dropped here, and every update downloaded the whole app again.)
     const reg = await navigator.serviceWorker?.getRegistration?.(location.pathname);
     await reg?.update?.().catch(() => {});
     location.replace(`${location.pathname}?v=${encodeURIComponent(latest)}${location.hash}`);
@@ -3046,13 +3076,11 @@ export function watchUpdates({ current, key, cachePrefix, every = 15_000 } = {})
   // (Not while the app is out of sight: coming back asks at once.)
   setInterval(() => document.visibilityState !== 'hidden' && check(), every);
 }
-// Every app's page starts the watch as the kit loads: its build-version and
-// its cached files' prefix (the loading screen's data-cache), the same ones
-// it passes to watchUpdates later (that call then finds it running).
+// Every app's page starts the watch as the kit loads: its build-version, the
+// same one it passes to watchUpdates later (that call then finds it running).
 if (typeof document !== 'undefined' && typeof location !== 'undefined') {
   const current = document.querySelector('meta[name="build-version"]')?.content;
-  const cachePrefix = document.getElementById('loading')?.getAttribute('data-cache') || '';
-  if (current) watchUpdates({ current, key: `quadra.page:${location.pathname}`, cachePrefix });
+  if (current) watchUpdates({ current, key: `quadra.page:${location.pathname}` });
   // Back from an update's reload: the scroll put back once the app lifts its loading screen, in every app.
   const box = document.getElementById('loading');
   let placed = false;

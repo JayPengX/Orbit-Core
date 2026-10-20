@@ -564,6 +564,8 @@
   <div class="sheet-body" id="acct-body"></div>
 </dialog>
 
+<!-- The built kit's modules import each other as #kit/… (kit/stamp.mjs). -->
+<script type="importmap">{"imports":{"#kit/":"../kit/"}}</script>
 <script type="module">
 import { DEV, DEV_GROUPS, cleanDev, BRANDS, appIcon, familyMark } from '../kit/brand.mjs';
 import { icons, tileHtml, heroCardHtml, escHtml } from '../kit/ui.mjs';

@@ -8,15 +8,14 @@
 //   the same way.
 // - Checks version.json (the app's and the kit's) while the app's files
 //   load: a newer deploy than this page (meta build-version) or a newer kit
-//   is loaded straight away in one reload, its old cached files dropped
-//   (data-cache, the service worker's cache prefix), before anything starts.
+//   is loaded straight away in one reload, before anything starts.
 //   The kit's watchUpdates keeps the page current after.
 // - When the app fails to start (an error: an installed app whose cached
 //   page mixed an old version's files with a new one's), mends itself once
 //   in ten minutes: its cached files dropped, the latest deploy loaded from
-//   the network. Otherwise (or still failing, or 15 s) a way out: reload,
-//   or open anyway. The app says it started with window.__fxStarted and
-//   hides #loading itself (the kit does).
+//   the network. Otherwise (or still failing, or 15 s with nothing more
+//   arriving) a way out: reload, or open anyway. The app says it started
+//   with window.__fxStarted and hides #loading itself (the kit does).
 (function () {
   // A phone or a tablet (an iPad says Macintosh, with touch): the phone's
   // frame, set before the first paint (quadra.css .q-touch).
@@ -169,14 +168,27 @@
   window.addEventListener('error', function () {
     if (!started()) broke();
   });
-  setTimeout(function () {
-    if (!started()) fail();
-  }, 15000);
+  // Not started after 15 s: the way out, unless the app's files are still
+  // arriving (a slow connection's first opening takes longer than that, and
+  // a reload there only started it over). Then it waits while they come, up
+  // to a minute.
+  var seen = -1;
+  var stuck = function () {
+    if (started()) return;
+    var now = files();
+    if (now > seen && performance.now() < 60000) {
+      seen = now;
+      return setTimeout(stuck, 4000);
+    }
+    fail();
+  };
+  setTimeout(stuck, 15000);
 
   // A newer deploy than this page (or a newer kit): load it now, before the
-  // app starts, both in one reload (the kit's version noted for the loader,
-  // quadra.kit). A reload that came back on the old page (the CDN a moment
-  // behind) is tried again, up to 3 times a session.
+  // app starts, both in one reload (the kit's version and file hashes noted
+  // for the loader, quadra.kit and quadra.kitFiles). A reload that came back
+  // on the old page (the CDN a moment behind) is tried again, up to 3 times a
+  // session.
   var meta = document.querySelector('meta[name="build-version"]');
   var current = meta && meta.content;
   if (!current || current === 'dev' || !window.fetch) return;
@@ -191,7 +203,7 @@
         return r.ok ? r.json() : null;
       })
       .then(function (v) {
-        return (v && v.version) || null;
+        return v && v.version ? v : null;
       })
       .catch(function () {
         return null;
@@ -205,14 +217,20 @@
   // a deploy gets it, not the next one.)
   window.__bootChecked = Date.now();
   window.__bootCheck = Promise.all([read('./version.json'), kit.base ? read(kit.base + 'version.json') : null]).then(function (got) {
-    var latest = got[0];
-    var kitLatest = got[1];
+    var latest = got[0] && got[0].version;
+    var kitLatest = got[1] && got[1].version;
     var appNew = latest && latest !== current;
-    // A kit newer than this page's (the first one seen on a device is only noted: it's what loaded).
-    var kitNew = kitLatest && kit.version && kitLatest !== kit.version;
-    if (kitLatest && kitLatest !== kit.version) {
+    // A kit newer than this page's (the first one seen on a device is only
+    // noted: it's what loaded, or close to it, the hashes the app's deploy
+    // baked in).
+    var kitNew = kitLatest && kit.version && kit.noted !== false && kitLatest !== kit.version;
+    // Noted for the next opening: the version and each file's hash (the
+    // loader's addresses, so only the files that changed are fetched).
+    if (kitLatest) {
       try {
-        localStorage.setItem('quadra.kit', kitLatest);
+        if (localStorage.getItem('quadra.kit') !== kitLatest) localStorage.setItem('quadra.kit', kitLatest);
+        var files = got[1].files ? JSON.stringify({ version: kitLatest, files: got[1].files }) : null;
+        if (files && localStorage.getItem('quadra.kitFiles') !== files) localStorage.setItem('quadra.kitFiles', files);
       } catch (e) {}
     }
     if (!appNew && !kitNew) return got[0] && (got[1] || !kit.base) ? 'none' : 'watch';
@@ -226,10 +244,11 @@
     if (tries >= 3) return 'none';
     sessionStorage.setItem(flag, want + '#' + (tries + 1));
     window.__bootUpdating = true;
-    dropCache(function () {
-      if (appNew) location.replace(location.pathname + '?v=' + encodeURIComponent(latest) + (tries ? '&r=' + tries : '') + location.hash);
-      else location.reload();
-    });
+    // (The files the phone kept stay: each is kept under its own hash, so
+    // the new page fetches only what changed. They were all dropped here
+    // first, and every update downloaded the whole app again.)
+    if (appNew) location.replace(location.pathname + '?v=' + encodeURIComponent(latest) + (tries ? '&r=' + tries : '') + location.hash);
+    else location.reload();
     return 'boot';
   });
 })();

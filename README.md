@@ -229,6 +229,15 @@ Served from this repo's Pages, never copied. Each app's page carries
 `node kit/apps.mjs` refreshes the snippets; `node kit/link.mjs` links
 `<app>/.kit` for tests.
 
+**Addresses by content.** The kit's deploy (`kit/stamp.mjs`) and every
+app's (`scripts/stamp-version.mjs` → `kit/stamp-app.mjs`) minify each script
+and stylesheet and give it its own content hash (`?v=<hash>`, `kit/hash.mjs`),
+so a phone downloads only the files a push changed (each push re-downloaded
+the whole kit or app before). The kit's `version.json` lists every file's
+hash; the device notes them (`quadra.kitFiles`) and the loader asks for each
+file at its hash. Built kit files import each other as `#kit/…`, through the
+import map, so a file has one address whichever loader a page carries.
+
 | Module | What |
 | --- | --- |
 | `quadra.mjs` | The core: the session, `proxyJson`/`packJson`, the economy tables, VIP, looks, notices, `installGate`, `watchUpdates`, `onlineOnly`, `keepOffline`, `mayLocate`, `tabBar`, `topActions`, `fitNumbers`, `rank` (recommendations), `rec` (除錯紀錄), iPhone behaviour |
