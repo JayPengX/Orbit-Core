@@ -3220,6 +3220,36 @@ function watchKeyboard() {
 }
 watchKeyboard();
 
+// The loading screen lifts onto a finished screen, pictures included, in
+// every app: when the app hides #loading with logos, faces or covers on the
+// first screen still on their way, the kit keeps it up until they're in
+// (at most 1.5 s more), so they don't pop in one by one after it lifted.
+// Only the first lift, and never after "Open anyway" (boot.js) or offline.
+function liftOnPictures() {
+  const box = typeof document === 'undefined' ? null : document.getElementById('loading');
+  if (!box || box.hidden || typeof MutationObserver === 'undefined') return;
+  let done = false;
+  const seen = new MutationObserver(() => {
+    if (done || !box.hidden) return;
+    done = true;
+    seen.disconnect();
+    if (box.dataset.now || globalThis.navigator?.onLine === false) return;
+    const h = globalThis.innerHeight || 800;
+    const waiting = [...document.images].filter(img => {
+      if (img.complete || img.closest('#loading')) return false;
+      const r = img.getBoundingClientRect();
+      return r.width > 0 && r.bottom > 0 && r.top < h;
+    });
+    if (!waiting.length) return;
+    // (Back up before the next paint: the screen never shows half-drawn in between.)
+    box.removeAttribute('hidden');
+    const each = waiting.map(img => new Promise(done => (img.addEventListener('load', done, { once: true }), img.addEventListener('error', done, { once: true }))));
+    Promise.race([Promise.all(each), new Promise(done => setTimeout(done, 1500))]).then(() => box.setAttribute('hidden', ''));
+  });
+  seen.observe(box, { attributes: true, attributeFilter: ['hidden'] });
+}
+liftOnPictures();
+
 // Names that must stay on one line (a long law, a team, a legislator): any
 // .q-fit in any app is shrunk just enough to fit its box (--q-fit, down to
 // 0.72), redone as the page changes or turns. Nothing to call.
