@@ -23,6 +23,10 @@ const SCAN_MODELS = ['gemini-3.5-flash-lite', 'gemini-3.7-flash'];
 const SCAN_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 export const SCAN_LEAGUES = ['mlb', 'cpbl', 'npb', 'kbo', 'nba', 'wnba', 'nbl', 'nfl', 'ncaaf', 'nhl', 'epl', 'laliga', 'seriea', 'bundesliga', 'ligue1', 'ucl', 'uel', 'uecl', 'championship', 'eredivisie', 'scotland', 'mls', 'jleague', 'ligamx', 'brasileirao', 'facup', 'leaguecup', 'communityshield', 'copadelrey', 'coppaitalia', 'dfbpokal', 'coupedefrance', 'supercup', 'nationsleague', 'worldcup', 'f1', 'other'];
 
+// What a pick can be: the four main markets, the lottery's others (Slips'
+// board.mjs, as the kit settles them), F1's winner.
+export const SCAN_KINDS = ['ml', 'spread', 'total', 'oddeven', 'teamtotal', 'half', 'hrunline', 'htotal', 'q1', 'tdtotal', 'corners', 'f5', 'f5runline', 'f5total', 'firstinning', 'inningml', 'inningtotal', 'nextrun', 'regulation', 'dc', 'btts', 'score', 'htft', 'margin', 'goalbands', 'goalcount', 'inning', 'f1', 'other'];
+
 function scanPrompt(todayIso) {
   return `The picture is a Taiwan Sports Lottery (台灣運彩) betting ticket: a printed slip from a shop, or a screenshot of the lottery's app or site. Read every pick on it and return JSON matching the schema. Today in Taiwan is ${todayIso}.
 
@@ -35,9 +39,10 @@ Rules:
 - teams: the two teams exactly as printed (Chinese as on the ticket), away/guest (客) first, home (主) second when the ticket says which; else in printed order. teamsEn: your best English names for the same two teams (e.g. "New York Yankees", "Manchester City"), or the printed text if unsure.
 - bought: the day the ticket was bought (購買日期 / 投注時間 / 交易時間, often in the ROC calendar: 民 115年 is 2026) as YYYY-MM-DD; null if not printed. The ticket may be old: its games may be long over.
 - date: the game's own date in Taiwan as YYYY-MM-DD only if printed next to the pick (a year-less date is the one nearest the day bought, else nearest today, never before the day bought); else null. The day bought is not the game's date.
-- kind: ml for 不讓分 / 獨贏 / 勝負 / 勝平負; spread for 讓分; total for 大小 / 總分; oddeven for 單雙. F1: f1 for 冠軍 / 優勝 / 獨贏 (the race's or the season's winner). Anything else: other.
-- pick: for F1, the chosen driver exactly as written in teams; for ml and spread, the chosen team exactly as written in teams, or "draw" for 和 / 平 / 讓分和; for total "over" (大) or "under" (小); for oddeven "odd" (單) or "even" (雙).
-- line: for spread, the chosen team's handicap as a signed number (giving 1.5 points is -1.5, getting them is +1.5); for soccer's 讓分和 (pick "draw" on a 讓分 line), the home team's handicap; for total, the total line; else null.
+- kind: ml for 不讓分 / 獨贏 / 勝負 / 勝平負; spread for 讓分; total for 大小 / 總分; oddeven for 單雙. The lottery's other markets: teamtotal 主隊大小 / 客隊大小 (單隊總分); half 半場不讓分 (上半場勝負); hrunline 半場讓分; htotal 半場大小; q1 第一節不讓分; tdtotal 達陣數大小; corners 角球數大小; f5 [1-5局]不讓分 (前五局勝負); f5runline [1-5局]讓分; f5total [1-5局]大小; firstinning 首局得分; inningml 單局不讓分 ([第N局]不讓分); inningtotal 單局大小 ([第N局]大小); nextrun 第一分 / 首分 (誰先得分); regulation 不讓分（60 分鐘）; dc 雙勝 (雙重機會); btts 兩隊是否都進球; score 正確比數 / 波膽; htft 半/全場 (半全場); margin 勝分差; goalbands 總進球數; goalcount 正確進球數; inning 得分最高單局. F1: f1 for 冠軍 / 優勝 / 獨贏 (the race's or the season's winner). Anything else: other.
+- pick: for F1, the chosen driver exactly as written in teams; for ml, spread, half, hrunline, q1, f5, f5runline, inningml, regulation and nextrun, the chosen team exactly as written in teams, or "draw" for 和 / 平 / 讓分和 (nextrun: "none" for 無); for total, teamtotal, htotal, f5total, inningtotal, corners and tdtotal "over" (大) or "under" (小); for oddeven "odd" (單) or "even" (雙); for btts and firstinning "yes" (是) or "no" (否); for dc the two results as "home|draw", "home|away" or "draw|away" (主 home, 客 away, 和 draw); for htft the half-time then full-time result as "home/draw" (each home, draw or away); for score the home team's score first as "2-1", or "other" for 其他; for margin the team that wins by it as written in teams, or "draw"; for goalbands and goalcount the goals as printed ("0-1", "2", "7+"); for inning the inning number ("3"), or "tie" for 一樣多.
+- line: for spread, hrunline and f5runline, the chosen team's handicap as a signed number (giving 1.5 points is -1.5, getting them is +1.5); for soccer's 讓分和 (pick "draw" on a 讓分 line), the home team's handicap; for total, teamtotal, htotal, f5total, inningtotal, corners and tdtotal, the line; else null.
+- team: for teamtotal, the team whose total it is exactly as written in teams; else null. band: for margin, the winning margin as printed ("1-2", "3+", "6"); else null. period: for inningml and inningtotal, the inning (第3局 is 3); else null.
 - odds: the decimal odds printed for that pick.
 - combos: the ticket's combinations as N串M strings, e.g. ["單場"], ["4串1"], ["3串4"] or ["2串1","3串1"]. 全部過關 means every pick in one parlay: with 4 picks that is "4串1". Empty if not printed.
 - stakePer: the amount per combination (每組合投注金額 / 每組 / 每注; "全部過關(NTD700)" is 700) in NT$; null if not printed. total: the ticket's whole amount (總投注金額 / 總金額) in NT$; null if not printed.
@@ -57,8 +62,11 @@ const SCAN_SCHEMA = {
           teams: { type: 'array', items: { type: 'string' } },
           teamsEn: { type: 'array', items: { type: 'string' } },
           date: { type: 'string', nullable: true },
-          kind: { type: 'string', enum: ['ml', 'spread', 'total', 'oddeven', 'f1', 'other'] },
+          kind: { type: 'string', enum: SCAN_KINDS },
           event: { type: 'string', nullable: true },
+          team: { type: 'string', nullable: true },
+          band: { type: 'string', nullable: true },
+          period: { type: 'number', nullable: true },
           pick: { type: 'string' },
           line: { type: 'number', nullable: true },
           odds: { type: 'number', nullable: true }
