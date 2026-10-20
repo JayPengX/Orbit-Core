@@ -96,9 +96,10 @@ export const STRINGS = {
     tricksTitle: '讓你一直玩的設計',
     tricksSub: '這些手法在真實的博弈、券商和訂閱服務都看得到，Quadra 也用了。',
     ranksTitle: '財富等級',
-    ranksSub: '身價（錢包加上 Securities 的持股）第一次到達一個等級，系統送一次等級獎勵。',
+    ranksSub: '身價（錢包加上 Securities 的持股，扣掉信貸）第一次到達一個等級，系統送一次等級獎勵。開戶金 NT$200,000 是起步，存下或賺到 NT$100,000 才到下一級。',
     rankNext: '還差 {v} 到「{rank}」',
     rankPaid: '已送 {v}',
+    rankCredited: '已達成，舊等級獎勵抵用',
     usedToday: '今天用過',
     usedDaysAgo: '{n} 天前用過',
     statusStock: '現金 {cash} · 持股 {held}',
@@ -147,14 +148,6 @@ export const STRINGS = {
     trickHow_nearmiss: '刮刮樂的牌面常有兩個一樣、只差一個就中的組合，真的刮刮樂也這樣排，讓你覺得運氣快來了。',
     trick_notify: '通知與連續天數',
     trickHow_notify: '每週發薪通知、連續紀錄，都是要你天天打開 App。Orbit Words 的單字連續天數也是，只是這次是為了讓你學會。',
-    rank_start: '起步',
-    rank_saver: '小資族',
-    rank_steady: '穩健',
-    rank_comfort: '小康',
-    rank_wealthy: '富裕',
-    rank_rich: '有錢人',
-    rank_multi: '千萬富翁',
-    rank_tycoon: '億萬大亨',
     helpTitle: '說明',
     close: '關閉',
     openApp: '打開 {app}',
@@ -254,9 +247,10 @@ export const STRINGS = {
     tricksTitle: 'Designs that keep you playing',
     tricksSub: 'Real betting sites, brokers and subscriptions use these; so does Quadra.',
     ranksTitle: 'Wealth levels',
-    ranksSub: 'The first time what you’re worth (your wallet and Securities holdings) reaches a level, the system pays its reward once.',
+    ranksSub: 'The first time what you’re worth (your wallet and Securities holdings, less a loan) reaches a level, the system pays its reward once. The NT$200,000 you open with is the start; NT$100,000 saved or earned reaches the next.',
     rankNext: '{v} more to {rank}',
     rankPaid: '{v} paid',
+    rankCredited: 'Reached; old level rewards counted',
     usedToday: 'Used today',
     usedDaysAgo: 'Used {n} days ago',
     statusStock: 'Cash {cash} · holdings {held}',
@@ -305,14 +299,6 @@ export const STRINGS = {
     trickHow_nearmiss: 'Scratch card faces often show two of a kind, one short of a win, as real cards do, so luck feels close.',
     trick_notify: 'Notices and streaks',
     trickHow_notify: 'The payday notice every week and streaks are there to have you open the app every day. Orbit Words’ streak is one too, only this time it’s to help you learn.',
-    rank_start: 'Starter',
-    rank_saver: 'Saver',
-    rank_steady: 'Steady',
-    rank_comfort: 'Comfortable',
-    rank_wealthy: 'Wealthy',
-    rank_rich: 'Rich',
-    rank_multi: 'Multi-millionaire',
-    rank_tycoon: 'Tycoon',
     helpTitle: 'Help',
     close: 'Close',
     openApp: 'Open {app}',
@@ -568,26 +554,28 @@ function renderTruth(box, { t, state }) {
       ),
       { sub: t('tricksSub') }
     ),
-    section(t('ranksTitle'), ranksCard(t, w), { sub: t('ranksSub') })
+    section(t('ranksTitle'), ranksCard(t, w, state.locale), { sub: t('ranksSub') })
   );
 }
 const TRICKS = ['installment', 'expire', 'minodds', 'boost', 'vip', 'nearmiss', 'notify'];
 const sideRow = (icon, label, value, sub, cls = '') => el('div', { class: `side-row ${cls}` }, [el('span', { class: 'side-icon', 'aria-hidden': 'true', text: icon }), el('span', { class: 'side-text' }, [el('strong', { text: label }), el('small', { class: 'muted', text: sub })]), el('strong', { class: 'num', text: value })]);
 
 // 財富等級: every level and its one-time reward, and where the account is.
-function ranksCard(t, w) {
+function ranksCard(t, w, locale) {
   const worth = worthOf(w);
   let at = 0;
   while (at + 1 < WEALTH_RANKS.length && worth >= WEALTH_RANKS[at + 1].min) at++;
   const next = WEALTH_RANKS[at + 1];
-  const paid = id => (w?.entries || []).some(e => e.app === 'eco' && e.id === `eco:rank:${id}`);
+  // What a level paid (less if the old levels' rewards counted towards it); undefined: not yet.
+  const paidOf = id => (w?.entries || []).find(e => e.app === 'eco' && e.id === `eco:rank:${id}`)?.amount;
+  const paid = id => paidOf(id) != null;
   return el('div', { class: 'q-card list ranks' }, [
-    next ? el('div', { class: 'rank-progress' }, [el('small', { class: 'muted', text: t('rankNext', { v: money(next.min - worth), rank: t(`rank_${next.id}`) }) }), bar(worth - WEALTH_RANKS[at].min, next.min - WEALTH_RANKS[at].min, 'accent')]) : null,
+    next ? el('div', { class: 'rank-progress' }, [el('small', { class: 'muted', text: t('rankNext', { v: money(next.min - worth), rank: next[locale === 'en' ? 'en' : 'zh'] }) }), bar(worth - WEALTH_RANKS[at].min, next.min - WEALTH_RANKS[at].min, 'accent')]) : null,
     ...WEALTH_RANKS.map((rk, i) =>
       el('div', { class: `rank-row${i === at ? ' current' : i < at ? ' passed' : ''}` }, [
         el('span', { class: 'rank-icon', text: rk.icon }),
-        el('span', { class: 'rank-name' }, [el('strong', { text: t(`rank_${rk.id}`) }), el('small', { class: 'num muted', text: rk.min ? money(rk.min) : '—' })]),
-        rk.reward ? el('span', { class: `rank-reward num${paid(rk.id) ? ' paid' : ''}`, text: paid(rk.id) ? t('rankPaid', { v: money(rk.reward) }) : `+${money(rk.reward)}` }) : null
+        el('span', { class: 'rank-name' }, [el('strong', { text: rk[locale === 'en' ? 'en' : 'zh'] }), el('small', { class: 'num muted', text: rk.min ? money(rk.min) : '—' })]),
+        rk.reward ? el('span', { class: `rank-reward num${paid(rk.id) ? ' paid' : ''}`, text: paid(rk.id) ? (paidOf(rk.id) > 0 ? t('rankPaid', { v: money(paidOf(rk.id)) }) : t('rankCredited')) : `+${money(rk.reward)}` }) : null
       ])
     )
   ]);

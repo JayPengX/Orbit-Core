@@ -555,16 +555,35 @@ test('welcome: a NT$200 free bet after the first paid bet, once; a write brings 
 });
 
 test('wealth levels: each level reached pays its reward once, from what the account is worth', () => {
-  const now = Date.UTC(2026, 9, 7, 3);
+  const now = Date.UTC(2026, 9, 21, 3);
   const at = (amount, holdings = 0, extra = []) => ({ entries: [{ id: 'eco:start', amount }, ...extra], snap: { stock: { cash: 0, held: holdings } } });
-  assert.deepEqual(rankEntries(at(40_000), now), []);
-  // 60,000 in cash and 50,000 in shares: worth 110,000, two levels at once.
-  assert.deepEqual(rankEntries(at(60_000, 50_000), now).map(e => [e.id, e.amount, e.kind]), [['eco:rank:saver', 1_000, 'rank'], ['eco:rank:steady', 2_000, 'rank']]);
+  // The opening money alone is the start: no level, no reward.
+  assert.deepEqual(rankEntries(at(200_000), now), []);
+  assert.deepEqual(rankEntries(at(290_000), now), []);
+  // 350,000 in cash and 200,000 in shares: worth 550,000, two levels at once.
+  assert.deepEqual(rankEntries(at(350_000, 200_000), now).map(e => [e.id, e.amount, e.kind]), [['eco:rank:thrifty', 3_000, 'rank'], ['eco:rank:solid', 5_000, 'rank']]);
   // Paid already, or fallen back: nothing again.
-  assert.deepEqual(rankEntries(at(120_000, 0, [{ id: 'eco:rank:saver', amount: 1_000 }, { id: 'eco:rank:steady', amount: 2_000 }]), now), []);
-  assert.equal(RANKS.length, 8);
+  assert.deepEqual(rankEntries(at(600_000, 0, [{ id: 'eco:rank:thrifty', app: 'eco', kind: 'rank', amount: 3_000 }, { id: 'eco:rank:solid', app: 'eco', kind: 'rank', amount: 5_000 }]), now), []);
+  assert.equal(RANKS.length, 7);
   // In the payday's entries, after the pay.
-  assert.ok(paydayEntries({ entries: [{ id: 'eco:start', amount: 45_000 }, { id: 'eco:rebase:v3', t: 1, app: 'eco', kind: 'rebase', amount: 0 }] }, now).some(e => e.id === 'eco:rank:saver'));
+  assert.ok(paydayEntries({ entries: [{ id: 'eco:start', amount: 295_000 }, { id: 'eco:rebase:v3', t: 1, app: 'eco', kind: 'rebase', amount: 0 }] }, now).some(e => e.id === 'eco:rank:thrifty'));
+});
+
+test('wealth levels rescaled: what the old levels paid counts towards the new rewards, never paid twice', () => {
+  const now = Date.UTC(2026, 9, 21, 3);
+  const old = (id, amount) => ({ id: `eco:rank:${id}`, t: 1, app: 'eco', kind: 'rank', amount });
+  // Opened at 200,000: the old saver and steady paid 3,000 between them.
+  const w = { entries: [{ id: 'eco:start', amount: 310_000 }, old('saver', 1_000), old('steady', 2_000)] };
+  // So the first new level pays nothing more, but is reached.
+  assert.deepEqual(rankEntries(w, now).map(e => [e.id, e.amount]), [['eco:rank:thrifty', 0]]);
+  const w2 = { entries: [...w.entries, ...rankEntries(w, now), { id: 'win', amount: 200_000 }] };
+  assert.deepEqual(rankEntries(w2, now).map(e => [e.id, e.amount]), [['eco:rank:solid', 5_000]]);
+  // A rich old account: 19,000 from the old levels up to a million, spread over the new ones.
+  const rich = { entries: [{ id: 'eco:start', amount: 1_200_000 }, old('saver', 1_000), old('steady', 2_000), old('comfort', 3_000), old('wealthy', 5_000), old('rich', 8_000)] };
+  assert.deepEqual(rankEntries(rich, now).map(e => [e.id, e.amount]), [['eco:rank:thrifty', 0], ['eco:rank:solid', 0], ['eco:rank:welloff', 0]]);
+  // 19,000 against 18,000 of new rewards: 1,000 still counts against the next.
+  const richer = { entries: [...rich.entries, ...rankEntries(rich, now), { id: 'win', amount: 2_000_000 }] };
+  assert.deepEqual(rankEntries(richer, now).map(e => [e.id, e.amount]), [['eco:rank:affluent', 19_000]]);
 });
 
 test('the reset made right: an account that opened with less than 110,000 gets the difference once, and pays no interest on what the reset owes', async () => {

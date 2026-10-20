@@ -241,26 +241,43 @@ export function paydayEntries(wallet, now) {
 
 // ---- 財富等級: wealth levels and their one-time rewards -----------------------------
 //
-// What the account is worth (the pool and Securities' holdings) puts it on a
-// level; the first time it reaches one, the economy pays that level's reward
-// once (`eco:rank:<id>`, kind 'rank'): the third kind of money the system
-// itself gives, with the opening money and the monthly pay. Falling back
-// keeps what was paid; reaching a level again pays nothing. The same table as
-// the kit's WEALTH_RANKS.
+// What the account is worth (the pool and Securities' holdings, less a
+// loan's debt) puts it on a level; the first time it reaches one, the
+// economy pays that level's reward once (`eco:rank:<id>`, kind 'rank'). Falling
+// back keeps what was paid; reaching a level again pays nothing. The same
+// table as the kit's WEALTH_RANKS.
+//
+// Scaled 2026-10-20 to NT$200,000 opening money and NT$10,000 a week (the
+// owner: "財富等級 need adjustment"): a new pass starts at 起步, and the first
+// level is NT$100,000 of real gains away (about ten weeks' pay saved). The
+// old table's levels (50,000 to 20M, `eco:rank:saver`…) were nearly all
+// reached by the opening money alone; what they paid stays and counts
+// towards the new rewards (OLD_RANKS), so no wealth is rewarded twice.
 export const RANKS = [
   { id: 'start', min: 0, reward: 0 },
-  { id: 'saver', min: 50_000, reward: 1_000 },
-  { id: 'steady', min: 100_000, reward: 2_000 },
-  { id: 'comfort', min: 250_000, reward: 3_000 },
-  { id: 'wealthy', min: 500_000, reward: 5_000 },
-  { id: 'rich', min: 1_000_000, reward: 8_000 },
-  { id: 'multi', min: 5_000_000, reward: 15_000 },
-  { id: 'tycoon', min: 20_000_000, reward: 30_000 }
+  { id: 'thrifty', min: 300_000, reward: 3_000 },
+  { id: 'solid', min: 500_000, reward: 5_000 },
+  { id: 'welloff', min: 1_000_000, reward: 10_000 },
+  { id: 'affluent', min: 3_000_000, reward: 20_000 },
+  { id: 'tenmil', min: 10_000_000, reward: 50_000 },
+  { id: 'hundredmil', min: 100_000_000, reward: 100_000 }
 ];
+const OLD_RANKS = new Set(['saver', 'steady', 'comfort', 'wealthy', 'rich', 'multi', 'tycoon'].map(id => `eco:rank:${id}`));
 export function rankEntries(wallet, now) {
-  const have = new Set((wallet?.entries || []).map(e => e.id));
+  const entries = wallet?.entries || [];
+  const have = new Set(entries.map(e => e.id));
   const worth = worthOf(wallet, now);
-  return RANKS.filter(r => r.reward > 0 && worth >= r.min && !have.has(`eco:rank:${r.id}`)).map(r => ({ id: `eco:rank:${r.id}`, t: now, app: 'eco', kind: 'rank', amount: r.reward, note: r.id }));
+  // What the old levels paid, less what new ones have already taken from it.
+  let credit = entries.filter(e => e.app === 'eco' && e.kind === 'rank' && OLD_RANKS.has(e.id)).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+  for (const r of RANKS) if (have.has(`eco:rank:${r.id}`)) credit -= r.reward - (Number(entries.find(e => e.id === `eco:rank:${r.id}`)?.amount) || 0);
+  const out = [];
+  for (const r of RANKS) {
+    if (!(r.reward > 0) || worth < r.min || have.has(`eco:rank:${r.id}`)) continue;
+    const used = Math.min(Math.max(0, credit), r.reward);
+    credit -= used;
+    out.push({ id: `eco:rank:${r.id}`, t: now, app: 'eco', kind: 'rank', amount: r.reward - used, note: r.id });
+  }
+  return out;
 }
 
 // ---- VIP cashback and the welcome offer ---------------------------------------------
