@@ -4,8 +4,7 @@
 //
 // Old `eco:plus:<month>` entries stay in the wallet as history.
 
-// A Taiwan month (YYYY-MM) of a time.
-const taipeiMonth = t => new Date(t + 8 * 3_600_000).toISOString().slice(0, 7);
+import { twMonth } from './format.mjs';
 
 // A free bet is a token from Quadra: the welcome offer or an old weekly
 // bonus bet (the Worker's 'eco:fb:…', app 'eco', kind 'freebet', amount 0, its
@@ -52,7 +51,7 @@ export const VIP = {
 export function vipStakes(wallet, month) {
   let sum = 0;
   for (const e of wallet?.entries || []) {
-    if (e.app !== 'odds' || typeof e.t !== 'number' || taipeiMonth(e.t) !== month) continue;
+    if (e.app !== 'odds' || typeof e.t !== 'number' || twMonth(e.t) !== month) continue;
     if (e.kind === 'stake' || e.kind === 'lottery' || e.kind === 'refund') sum -= e.amount;
   }
   return Math.max(0, Math.round(sum));

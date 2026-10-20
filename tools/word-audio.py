@@ -1,7 +1,7 @@
-# Recordings for Quadra Rewards' words in Microsoft's neural voice (the one
+# Recordings for Orbit Words' words in Microsoft's neural voice (the one
 # the level 4-6 clips use: en-US-JennyNeural), for every word that has none.
 #   pip install edge-tts
-#   python3 tools/word-audio.py ../Quadra-Rewards/public/data [voice]
+#   python3 tools/word-audio.py ../Orbit-Words/public/data [voice]
 # In the Claude Code container, edge-tts (aiohttp + certifi) needs the proxy's
 # CA: append /root/.ccr/ca-bundle.crt to certifi.where()'s file first.
 import asyncio, json, os, sys

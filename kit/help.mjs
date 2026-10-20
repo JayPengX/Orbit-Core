@@ -1,6 +1,6 @@
 // The help centre: how every app works, in one place: the Quadra Pass
 // sheet's 說明 tab, in every app (pass.mjs). A page opens it with
-// #help=<app> (helpUrl in quadra.mjs), or #help=<app>:<topic> for one topic.
+// #help=<app>, or #help=<app>:<topic> for one topic.
 //
 // Every app's guide has the same shape, in the same words:
 //   what    「X 是什麼」: its part in Quadra, in two or three lines
@@ -685,9 +685,4 @@ export const HELP = {
 
 export function helpFor(app, lang = 'zh') {
   return HELP[app]?.[lang === 'en' ? 'en' : 'zh'] || [];
-}
-// '#help=stock:orders' → { app: 'stock', topic: 'orders' }.
-export function parseHelpHash(hash) {
-  const m = /(?:^|[#&])help=([a-z]+)(?::([a-z0-9]+))?/.exec(String(hash || ''));
-  return m && HELP[m[1]] ? { app: m[1], topic: m[2] || null } : null;
 }

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { r2Store, memoryBucket } from '../builders/store.js';
+import { r2Store } from '../builders/store.js';
+import { memoryBucket } from './fixtures/bucket.mjs';
 
 test('store: JSON written once, the same again costs nothing; gz packed and unpacked', async () => {
   const bucket = memoryBucket();

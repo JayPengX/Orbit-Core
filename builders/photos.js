@@ -1,8 +1,7 @@
 // Players' photo lists, for the kit's photos.mjs: each football league's own
 // studio photos (builders/official-photos.js; the Premier League's here),
 // FotMob's faces for the rest, TheSportsDB's cutouts for whoever's left. Built
-// by the proxy (builders/run.js) into the family's data (R2). Was part of
-// Shared-Data's mirror.mjs and cutouts.mjs.
+// by the proxy (builders/run.js) into the family's data (R2).
 //
 // Lean: squads change with transfers, so each day's run refreshes a few
 // lists in turn (every list about weekly), not every list every night;
@@ -347,20 +346,3 @@ export async function runCutouts({ store, now = Date.now(), sleep, search }) {
   await store.put('sports/cutouts/pending.json', { built: new Date(now).toISOString().slice(0, 10), names: got.left });
   return { asked: got.asked, left: got.left.length };
 }
-
-// The players whose photo isn't the silhouette. A failed read (no tag) keeps
-// the player: a photo that may be there isn't dropped for a failed read.
-export async function withPhotos(players, tag, silhouette, at = 16) {
-  const out = new Array(players.length);
-  let next = 0;
-  await Promise.all(
-    Array.from({ length: at }, async () => {
-      while (next < players.length) {
-        const i = next++;
-        out[i] = (await tag(players[i][1])) !== silhouette;
-      }
-    })
-  );
-  return players.filter((_, i) => out[i]);
-}
-

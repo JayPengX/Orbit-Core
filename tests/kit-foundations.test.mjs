@@ -13,7 +13,7 @@ import { stampSw, listAssets } from '../tools/stamp.mjs';
 const rawCss = readFileSync(new URL('../kit/quadra.css', import.meta.url), 'utf8');
 const swText = readFileSync(new URL('../kit/sw.js', import.meta.url), 'utf8');
 
-// A just-enough DOM (see kit-premium.test.mjs) with classList, remove and a body.
+// A just-enough DOM (see kit-components.test.mjs) with classList, remove and a body.
 class FakeNode {}
 class FakeEl extends FakeNode {
   constructor(tag) {

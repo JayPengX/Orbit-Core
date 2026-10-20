@@ -18,7 +18,7 @@
 //
 // What a finished game is (its box score, a day or month of them) isn't
 // built at all: the data proxy keeps it the first time anyone reads it
-// (sports.js). Nothing is built on GitHub any more (Shared-Data retired).
+// (sports.js).
 
 import { r2Store } from './store.js';
 import { builderAllowed } from '../pace.js';

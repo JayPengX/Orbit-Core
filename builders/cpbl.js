@@ -1,8 +1,7 @@
 // CPBL's tables, for Orbit Sports' 排名 tab and its match sheets: the half on
 // now, the other half and the whole year (上半季, 下半季, 全年). ESPN has no
 // CPBL. Built once a day by the proxy (builders/run.js, 15:17 UTC: 23:17 in
-// Taiwan, after the night's games) into the family's data (R2). Was
-// Shared-Data's cpbl.mjs (GitHub, 04:30 Taiwan); the same reading.
+// Taiwan, after the night's games) into the family's data (R2).
 //
 // From the league's own page (cpbl.com.tw/standings/season: the half on now,
 // with home, away, streak and last ten) where it answers (its CDN turned

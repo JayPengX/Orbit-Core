@@ -37,6 +37,12 @@ export function json(data, status, headers) {
   });
 }
 
+// A text's SHA-256 as hex.
+export async function sha256Hex(text) {
+  const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(d), b => b.toString(16).padStart(2, '0')).join('');
+}
+
 // A request's body as text, or null past `max` bytes: read as it comes and
 // stopped there (a client may send Cloudflare's 100 MB, more than an
 // isolate's 128 MB holds, and a crash takes every request in it along).

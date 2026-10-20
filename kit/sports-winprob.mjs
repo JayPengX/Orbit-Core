@@ -4,8 +4,8 @@
 // A game's win probability from Polymarket's market on it, where ESPN draws
 // none (soccer, MLB while it's on, CPBL): its moneyline's price, every two
 // minutes from the start. The app reads it for a game on now; a finished
-// game's is read once by Shared-Data (winprob.mjs there) and kept there for
-// good. No imports: Shared-Data loads this file alone.
+// game's is read once by the winprob builder and kept in R2 for
+// good. No imports: the builder loads this file alone.
 //
 //   polymarketLine(league, { start, home, away }, getJson)   (English names)
 //     → { source: 'polymarket', points: [{ t, home, draw? }] } | null
@@ -129,7 +129,7 @@ export function mergeHistories(series) {
   return points.slice(0, end).map(p => ({ t: p.t, home: Math.round(p.home * 1000) / 1000, ...(p.draw != null ? { draw: Math.round(p.draw * 1000) / 1000 } : {}) }));
 }
 
-// A finished game's line, kept in Shared-Data (winprob.mjs there) while
+// A finished game's line, kept in R2 (builders/winprob.js) while
 // the app can show the game: its league's current season, and before the
 // next one's regular season its playoffs. A month's games in one file,
 // winprob/<league>/<YYYY-MM>.json (the start's UTC month): { games: { key:
@@ -140,7 +140,7 @@ export const PM_PACK = 'winprob';
 export const gameKey = (league, { id, start, home }) => (league === 'cpbl' ? `${new Date(start).toISOString().slice(0, 10)}-${plain(home?.en || home?.name).split(' ').at(-1)}` : String(id));
 export const monthPath = (league, start) => `${PM_PACK}/${league}/${new Date(start).toISOString().slice(0, 7)}.json`;
 // What the app asks for: the month's file with the version of its meaning.
-// When the lines' meaning changes (Shared-Data's LINE: F1 lines read again,
+// When the lines' meaning changes (LINE: F1 lines read again,
 // a race once marked { none } drawn), this goes up, so a phone's kept copy
 // (the kit keeps a pack 6 hours and opens on it) is asked afresh on the
 // app's next open instead of being waited out.
@@ -405,7 +405,7 @@ export async function raceNow(start, getJson) {
     .slice(0, SHOWN);
   return drivers.length ? { source: 'polymarket', market: market.slug, drivers } : null;
 }
-// A finished race's line as kept in Shared-Data (winprob/f1/<YYYY-MM>.json,
+// A finished race's line as kept in R2 (winprob/f1/<YYYY-MM>.json,
 // keyed by the race's UTC day): { m, d: [names], by, t0?, b?, e?, p: [[lap | minutes, ‰…]] }
 // (b, e: raceEvents' bands and events).
 export const raceKey = start => new Date(start).toISOString().slice(0, 10);

@@ -1,4 +1,4 @@
-// Round 3's premium components: they exist, import without a DOM, their
+// The kit's cards and tiles (sectionHead, logoTile, matchCard…): they exist, import without a DOM, their
 // classes are in the stylesheet, and empty/confirm keep an emoji icon working.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -45,7 +45,7 @@ globalThis.Node = FakeNode;
 globalThis.document = { createElement: t => new FakeEl(t), createTextNode: s => String(s) };
 
 test('every new export exists', () => {
-  for (const name of ['sectionHead', 'logoTile', 'matchCard', 'liveStrip', 'actionGrid', 'sheetHero', 'sheetFoot', 'confirm', 'stakeInput', 'ballRow', 'placeTile', 'schedLine', 'rideRow']) {
+  for (const name of ['sectionHead', 'logoTile', 'matchCard', 'liveStrip', 'actionGrid', 'sheetHero', 'sheetFoot', 'confirm', 'stakeInput', 'ballRow', 'placeTile']) {
     assert.equal(typeof ui[name], 'function', name);
   }
   for (const name of ['work', 'school', 'chevron']) assert.match(ui.icons[name], /^<svg/, `icons.${name}`);
@@ -53,7 +53,7 @@ test('every new export exists', () => {
 });
 
 test('the stylesheet has each new class, and keeps the old section-head rules', () => {
-  const classes = ['q-shd', 'q-sh-count', 'q-sh-more', 'q-logo', 'q-match', 'q-match-top', 'q-match-teams', 'q-match-side', 'q-match-mid', 'q-match-prices', 'q-price', 'q-live-strip', 'q-live-card', 'q-live-min', 'q-actions-grid', 'q-action', 'q-sheet-hero', 'q-sh-eyebrow', 'q-sh-big', 'q-sh-sub', 'q-sh-row', 'q-sf', 'q-sf-sum', 'pro', 'q-empty-tile', 'q-stake', 'q-stake-amt', 'q-stake-presets', 'q-balls', 'q-ball', 'q-sched', 'q-ride', 'q-ride-star', 'q-chips-l', 'peek', 'q-place'];
+  const classes = ['q-shd', 'q-sh-count', 'q-sh-more', 'q-logo', 'q-match', 'q-match-top', 'q-match-teams', 'q-match-side', 'q-match-mid', 'q-match-prices', 'q-price', 'q-live-strip', 'q-live-card', 'q-live-min', 'q-actions-grid', 'q-action', 'q-sheet-hero', 'q-sh-eyebrow', 'q-sh-big', 'q-sh-sub', 'q-sh-row', 'q-sf', 'q-sf-sum', 'pro', 'q-empty-tile', 'q-stake', 'q-stake-amt', 'q-stake-presets', 'q-balls', 'q-ball', 'q-place'];
   for (const c of classes) assert.match(css, new RegExp(`\\.${c}(?![\\w-])`), `.${c}`);
   assert.match(css, /\.q-section-head button:not\(\.q-tag\)/, 'the old head button rule keeps :not(.q-tag)');
   assert.match(rawCss, /Premium components \(round 3\)/);
@@ -84,7 +84,6 @@ test('components build their markup', () => {
   assert.equal(m.find('q-match-mid').textContent, '2 : 1');
   assert.equal(ui.matchCard({ sides: [{ name: 'A' }, { name: 'B' }] }).find('q-match-mid').textContent, 'VS');
   assert.equal(ui.matchCard({ tag: { text: '', tone: 'orange' }, sides: [{ name: 'A' }, { name: 'B' }] }).find('q-tag'), null, 'a tag with no text is no capsule');
-  assert.doesNotMatch(ui.matchCardHtml({ tag: { text: '', tone: 'orange' }, sides: [{ name: 'A' }, { name: 'B' }] }), /q-tag/);
 
   assert.equal(ui.liveStrip([{ min: "45'", rows: [{ name: 'A', score: 1 }, { name: 'B', score: 0 }] }]).className, 'q-live-strip');
   const grid = ui.actionGrid([{ icon: 'live', tint: 'red', label: '場中', badge: 0 }, { icon: 'ticket', label: '彩券', badge: 3 }]);
@@ -108,8 +107,6 @@ test('components build their markup', () => {
 
   assert.match(ui.placeTile('school').className, /q-tile.*q-place school/);
   assert.match(ui.placeTile('nope').className, /pin/);
-  assert.equal(ui.schedLine(['17:10', '17:25']).children.length, 2);
-  assert.ok(ui.rideRow({ time: '17:10', onStar() {} }).find('q-ride-star'));
   assert.ok(ui.stakeInput({ presets: [100, 500], value: 500 }).find('q-stake-presets'));
 });
 

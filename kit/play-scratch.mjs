@@ -256,7 +256,6 @@ export const tiersOf = id => {
   return TABLES[c.price].map(([mult, odds]) => ({ prize: mult * c.price, odds }));
 };
 export const topPrize = id => tiersOf(id).at(-1).prize;
-export const winRate = id => tiersOf(id).reduce((s, t) => s + 1 / t.odds, 0);
 export const expectedReturn = id => tiersOf(id).reduce((s, t) => s + t.prize / t.odds, 0) / CARDS[id].price;
 
 // The prize a new card holds: one uniform draw against the table.

@@ -1,27 +1,10 @@
-# Optional: only needed if you deploy this worker with the Wrangler CLI
-# instead of the Cloudflare dashboard's online editor (see README, which
-# documents both paths for each feature).
-#
-# CLI path:
-#   npx wrangler login
-#   npx wrangler deploy
-#   npx wrangler secret put GEMINI_API_KEY
-#   npx wrangler secret put ECO_TOKEN_SECRET
-#   npx wrangler kv namespace create RATE_LIMIT_KV
-#     (then uncomment the [[kv_namespaces]] block below with the printed id)
-#
-# CI path (.github/workflows/deploy.yml deploys this file with Wrangler on
-# every push to main that touches worker.js, locales/, or either wrangler
-# file): a
-# `wrangler deploy` pushes THIS FILE's [vars]/[[kv_namespaces]] as the
-# worker's whole config, replacing whatever's live on Cloudflare - it does
-# not merge with dashboard-made changes. Before ever relying on that
-# workflow, fill in the real values below (the kv_namespaces block if you
-# use RATE_LIMIT_KV) to match what's already
-# live, or the first automated deploy will overwrite them with the
-# placeholders below. Secrets (GEMINI_API_KEY etc., set via `wrangler
-# secret put` or the dashboard) are stored separately and are NOT touched
-# by a plain `wrangler deploy` - only [vars] and bindings live here.
+# The proxy's Worker. deploy.yml deploys this file with Wrangler on every
+# push to main that touches what the Workers run (*.js, builders/, kit/,
+# locales/, either wrangler toml). A deploy pushes THIS FILE's [vars] and
+# bindings as the Worker's whole config, replacing whatever is live on
+# Cloudflare: it does not merge with dashboard-made changes. Secrets
+# (GEMINI_API_KEY, ECO_TOKEN_SECRET, …) are stored separately, set in the
+# dashboard or with `wrangler secret put`, and a deploy never touches them.
 name = "orbit-workers-proxy"
 # ^ Must match the Worker's actual name in the Cloudflare dashboard exactly -
 # `wrangler deploy` targets whatever's named here, and a mismatch silently
@@ -60,9 +43,9 @@ WEATHER_DEV = "on"
 # page may read without a Quadra Pass, rate-limited. "off" closes it.
 SPORTS_DEV = "on"
 
-# GEMINI_API_KEY (for /gemini, /nl-edit, /vocab-ai) and ECO_TOKEN_SECRET
-# (the Pass's sign-ins) are Secrets, not [vars] - see the CLI commands
-# above, or the dashboard's Settings -> Variables and Secrets. The Pass's
+# GEMINI_API_KEY (for /gemini and /nl-edit) and ECO_TOKEN_SECRET
+# (the Pass's sign-ins) are Secrets, not [vars] (the dashboard's Settings ->
+# Variables and Secrets). The Pass's
 # store is D1 (doc-store.js; the [[d1_databases]] binding STORE is added by
 # deploy.yml). FIREBASE_PRIVATE_KEY stays a secret only until 2026-12-05:
 # sign-ins made before ECO_TOKEN_SECRET (2026-10-05, 60 days) were signed
@@ -118,7 +101,7 @@ new_sqlite_classes = ["F1Log"]
 [triggers]
 crons = ["*/2 * * * *", "1-59/2 * * * *"]
 
-# The bill's guard (quota-guard): woken every ten minutes (its clock is a
+# The bill's guard (quota-guard): woken every five minutes (its clock is a
 # Durable Object's alarm; this only starts it again should it stop).
 [[services]]
 binding = "GUARD"

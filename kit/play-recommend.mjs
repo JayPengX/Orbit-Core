@@ -2,8 +2,7 @@
 // Recommendations, shown on each pick rather than in a separate list. Every
 // pick is judged by the same number the whole page uses, its average back per
 // NT$100 (its chance of winning x the lottery's odds), against the other
-// picks on offer. The simulated crowd's value hunters pick from the same
-// recommendations, so both sides see the same "good" bets.
+// picks on offer.
 //
 // A pick gets at most one tag, first that fits:
 // - value 划算: among the best returns of the lot (top 10%);

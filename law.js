@@ -22,7 +22,7 @@
 // The rest of Orbit Law's AI (law-chat.js) shares this file's pieces: the
 // opening checks, the law's text, the day's counts, the KV cache and the
 // cite check.
-import { json, LOCAL_ORIGIN, bodyText } from './http.js';
+import { json, LOCAL_ORIGIN, bodyText, sha256Hex } from './http.js';
 import { groundFor, groundKey, groundOut, groundPrompt } from './law-ground.js';
 import { paceOf } from './pace.js';
 import { sessionLimited } from './quadra-token.js';
@@ -42,11 +42,6 @@ const BILL_TTL_S = 30 * 86_400;
 const DIFF_TTL_S = 180 * 86_400;
 export const twDay = (now = Date.now()) => new Date(now + 8 * 3_600_000).toISOString().slice(0, 10);
 export const fail = (error, status, headers, more) => json({ error, ...more }, status, headers);
-
-export async function sha256Hex(text) {
-  const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
-  return Array.from(new Uint8Array(d), b => b.toString(16).padStart(2, '0')).join('');
-}
 
 // '15-1' as the law writes it: 第15條之1 (Article 15-1).
 export const label = (key, lang) => {

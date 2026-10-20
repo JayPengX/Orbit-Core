@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { photoList, laligaSquads, bundesligaSquad, serieaSquad, ligue1Squad, officialPhotos, smallSerieA } from '../builders/official-photos.js';
+import { photoList, laligaSquads, bundesligaSquad, serieaSquad, ligue1Squad, smallSerieA } from '../builders/official-photos.js';
 
 test('each player under every name; a shared name or a stand-in picture left out', () => {
   const list = photoList([
@@ -40,15 +40,6 @@ test("Serie A's squad page: each player's picture, made small", () => {
 test("Ligue 1's club summary: each player's bust picture", () => {
   const sum = { championships: { 1: { playersData: { p1: { playerIdentity: { firstName: 'Jordan', lastName: 'Teze', assets: { bustPictures: { medium: 'https://s3/teze-400x300.png' } } } } } } } };
   assert.deepEqual(ligue1Squad(sum), [{ names: ['Jordan Teze'], url: 'https://s3/teze-400x300.png' }]);
-});
-
-test("a league that can't be read is carried over; one read is written", async () => {
-  const written = [];
-  const carried = [];
-  const many = Array.from({ length: 320 }, (_, i) => ({ names: [`Player ${i}`], url: `https://x/${i}.png` }));
-  await officialPhotos({ leagues: { good: async () => many, down: async () => null }, write: async (k, p) => written.push([k, p.length]), carry: async path => (carried.push(path), true) });
-  assert.deepEqual(written, [['good', 320]]);
-  assert.deepEqual(carried, ['sports/down/photos.json']);
 });
 
 test("ESPN's short names find a league's legal ones, club by club", async () => {

@@ -1,7 +1,7 @@
 // 信貸 and 急難紓困 (kit/loan.mjs), with the Worker's payday (eco.js).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { LOAN, RELIEF, schedule, totalApr, loanOffer, loanEntries, loanDue, activeLoan, loanOwed, payoffAmount, credit, debtOf, maxFor, reliefCheck, weekStart, WEEK, PAY_WEEK } from '../kit/loan.mjs';
+import { LOAN, RELIEF, schedule, totalApr, loanOffer, loanEntries, activeLoan, loanOwed, payoffAmount, credit, debtOf, maxFor, reliefCheck, weekStart, WEEK, PAY_WEEK } from '../kit/loan.mjs';
 import { paydayEntries, poolBalance, mergeWallet, worthOf, rankEntries } from '../eco.js';
 
 // Wednesday 4 Nov 2026, noon Taipei; the account is from before weekly pay.

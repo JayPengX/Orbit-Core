@@ -1,4 +1,4 @@
-// Design review fixes: money() never signs a zero, tick() uses the kit's own
+// money() never signs a zero, tick() uses the kit's own
 // haptic, and the top buttons sit trailing.
 import test from 'node:test';
 import assert from 'node:assert/strict';

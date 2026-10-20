@@ -1,7 +1,8 @@
 import { familyOf } from '#kit/play-teams.mjs';
+import { twDay } from '#kit/format.mjs';
 // Quadra Play's rules, in the shared kit: Play and the Worker's settling (settle.mjs) use this one copy.
 // The house's rules for single options, shared by the bet slip and the
-// simulated crowd, so both play by exactly the same rules.
+// Worker's settling, so both play by exactly the same rules.
 //
 // 限2關 / 限3關 is 運彩's, set per game or per market (投注規範 §21), never by
 // price: a pick carries one only when its game's or market's own minimum is
@@ -76,11 +77,10 @@ export function withRules(o) {
 // the Championship and J-League tomorrow, nearly all), championships 1. So a
 // game is 限2關 until its day comes, then a single; championships, F1 and
 // games in play are singles. null: no minimum.
-const taipeiDay = t => new Date(t + 8 * 3_600_000).toISOString().slice(0, 10);
 export function estimatedMinLegs(o, now = Date.now()) {
   if (OUTRIGHT.has(o?.kind) || /^live\|/.test(String(o?.id || '')) || o?.live) return null;
   const start = Date.parse(o?.start ?? o?.game?.startUtc ?? '');
-  return Number.isFinite(start) && taipeiDay(start) > taipeiDay(now) ? 2 : null;
+  return Number.isFinite(start) && twDay(start) > twDay(now) ? 2 : null;
 }
 
 // The fewest games any combination on a ticket has: every one of its

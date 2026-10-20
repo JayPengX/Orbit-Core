@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { beat, beats, news, billNotice, tellOwner, systemReport, dataFolders, TOLD_KEY, OPS_DOC } from '../ops.js';
 import { fakeD1 } from './fake-d1.mjs';
-import { memoryBucket } from '../builders/store.js';
+import { memoryBucket } from './fixtures/bucket.mjs';
 
 const fakeKv = (init = {}) => {
   const m = new Map(Object.entries(init));

@@ -1,12 +1,12 @@
 // The Quadra Pass sheet's numbers and guides (truth.mjs, help.mjs, pass.mjs),
-// and the brand (brand.mjs): moved here from Quadra Hub, now Orbit Words.
+// and the brand (brand.mjs).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} };
 const { PLAY, houseKeep, boostedKeep, freeBetWorth, roundTrip, record, overdraftYear, vipShare } = await import('../kit/truth.mjs');
-const { HELP, HELP_ORDER, parseHelpHash } = await import('../kit/help.mjs');
+const { HELP, HELP_ORDER } = await import('../kit/help.mjs');
 const kit = await import('#kit/quadra.mjs');
 const brand = await import('../kit/brand.mjs');
 
@@ -48,8 +48,6 @@ test('help covers every app in both languages; every string exists in both', () 
     assert.ok(HELP[app].zh.length && HELP[app].zh.length === HELP[app].en.length, app);
     HELP[app].zh.forEach((s, i) => assert.equal(s[0], HELP[app].en[i][0]));
   }
-  assert.deepEqual(parseHelpHash('#help=stock:orders'), { app: 'stock', topic: 'orders' });
-  assert.equal(parseHelpHash('#words'), null);
 });
 
 test('the Pass sheet: every string in both languages; every tab named', async () => {
@@ -75,7 +73,6 @@ test('the brand: Quadra is where the money is, Orbit the everyday tools; ids nev
   assert.equal(kit.APPS.match.path, '/Orbit-Sports/');
   assert.equal(kit.APPS.vocab.path, '/Orbit-Words/');
   for (const id of [...Object.keys(kit.APPS), 'pass']) for (const shape of ['rounded', 'square', 'maskable']) assert.match(brand.appIcon(id, { shape }), /^<svg [^>]*viewBox="0 0 512 512"/);
-  assert.match(kit.helpUrl('stock', 'orders'), /^\/Quadra-Securities\/#help=stock:orders$/);
 });
 
 test('the family page (site/index.html) links where the kit does: regenerate it after a rename', () => {

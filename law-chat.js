@@ -17,9 +17,9 @@
 // answers in all (law.js). A first question is kept in KV 30 days: its plan
 // by the question, its answer by the versions (m) of the laws found too, so
 // a new version asks again. Follow-ups aren't kept (they rarely repeat).
-import { json } from './http.js';
+import { json, sha256Hex } from './http.js';
 import { groundFor, groundKey, groundOut, groundPrompt, hasGround } from './law-ground.js';
-import { LAW_LIMITS, PCODE, ART, fail, twDay, sha256Hex, citeKey, cited, label, readData, readList, readLaw, opening, passOf, passKey, spend, countOf, kept, keep, modelJson } from './law.js';
+import { LAW_LIMITS, PCODE, ART, fail, twDay, citeKey, cited, label, readData, readList, readLaw, opening, passOf, passKey, spend, countOf, kept, keep, modelJson } from './law.js';
 
 export const CHAT_LIMITS = { maxQ: 500, maxTurns: 6, maxTurn: 1500, maxPins: 2, maxArts: 14, maxChars: 14_000, maxLaws: 8, maxBuckets: 16, maxBody: 40_000 };
 const CHAT_TTL_S = 30 * 86_400;

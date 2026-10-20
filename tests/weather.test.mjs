@@ -5,11 +5,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  airForecast, parseGoogleAir, googleAirBody, parseAirHistory,
+  airForecast, parseGoogleAir, googleAirBody,
   weatherStatus, handleWeather, scrub, cellOf, nearestStation, townIds, airArea, parseCwaTown, cwaAt, parseGoogleDay, parseGoogleHour,
-  blend, buildCell, GOOGLE_DAILY_CALLS, twDate, parseVillage, whereIs, addAirReading, briefText, rainPhrase, weatherCheck, noteRecent, cellForecast, FRESH_WAIT_MS, advise, adviceWindow, parseCwaWarnings, aqiLevel, uvLevel, num, DEFAULT_WEIGHTS
+  blend, buildCell, GOOGLE_DAILY_CALLS, parseVillage, whereIs, addAirReading, briefText, rainPhrase, weatherCheck, noteRecent, cellForecast, FRESH_WAIT_MS, advise, adviceWindow, parseCwaWarnings, aqiLevel, uvLevel, num, DEFAULT_WEIGHTS
 , popStep, keepJson, keptJson, KV_EVERY_MS, googleAllowed } from '../weather.js';
 import { STATIONS } from '../weather-stations.js';
+import { twDay } from '../kit/format.mjs';
 import { upstream as fixtureUpstream } from './fixtures/weather/upstream.mjs';
 
 const fx = name => JSON.parse(readFileSync(new URL(`./fixtures/weather/${name}.json`, import.meta.url), 'utf8'));
@@ -388,12 +389,12 @@ test('samples are a fixed list, cached in KV', async () => {
     assert.ok(!j.body.includes('g-secret-key-123'));
   }
   assert.equal(calls, 1);
-  assert.equal(await kv.get(`weather:google:${twDate(Date.now())}`), '1', 'a Google sample counts under the cap');
+  assert.equal(await kv.get(`weather:google:${twDay(Date.now())}`), '1', 'a Google sample counts under the cap');
 });
 
 test('a Google sample past the daily cap asks nobody', async () => {
   const kv = memKv();
-  await kv.put(`weather:google:${twDate(Date.now())}`, String(GOOGLE_DAILY_CALLS));
+  await kv.put(`weather:google:${twDay(Date.now())}`, String(GOOGLE_DAILY_CALLS));
   let calls = 0;
   const fetchFn = async () => (calls++, answer(200, { ok: 1 }));
   const r = await handleWeather(new Request('https://w.example/weather/status?sample=google-days'), { ...env, RATE_LIMIT_KV: kv }, {}, '/weather/status', { fetchFn });
@@ -486,7 +487,6 @@ test('AQI: each site\'s last 48 hours, and the nearest one\'s in the answer', as
   // The cron's readings (the owner wants no more history than that).
   assert.equal(resp.air.history.length, 2);
   assert.deepEqual(Object.keys(resp.air.history[0]), ['t', 'aqi', 'pm25']);
-  assert.deepEqual(parseAirHistory([{ datacreationdate: '2026-10-02 21:00', aqi: '36', 'pm2.5': '12' }, { datacreationdate: '', aqi: '1' }]), [[Date.parse('2026-10-02T21:00:00+08:00'), 36, 12]]);
 });
 
 test('air: Google hours pulled toward the station, days blended with MOENV, Google alone past it', () => {

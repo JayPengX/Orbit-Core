@@ -1,13 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { withPhotos, plNames, fotmobTeams, fotmobNames, fotmobReader, fotmobLeague, runPhotos, jobsOf, PHOTO_JOBS, clubMatches, sameNameish } from '../builders/photos.js';
-
-test("a player NBA.com shows as its silhouette is left out; a failed read keeps them", async () => {
-  const players = [['Jaden Akins', 1643022], ['Pacôme Dadiet', 1642359], ['Someone', 9]];
-  const tags = { 1643022: '"sil"', 1642359: '"face"', 9: '' };
-  const kept = await withPhotos(players, async id => tags[id], '"sil"');
-  assert.deepEqual(kept.map(p => p[0]), ['Pacôme Dadiet', 'Someone']);
-});
+import { plNames, fotmobTeams, fotmobNames, fotmobReader, fotmobLeague, runPhotos, jobsOf, PHOTO_JOBS, clubMatches, sameNameish } from '../builders/photos.js';
 
 test("the Premier League's players under each name ESPN may use, trialists left out", () => {
   const list = [
@@ -80,7 +73,8 @@ test("a league's faces from FotMob: every club's squad; a league FotMob couldn't
 test('the photo lists in turn: a few a day, every one about weekly; a list unread keeps the last', async () => {
   assert.equal(new Set(Array.from({ length: Math.ceil(PHOTO_JOBS.length / 4) }, (_, d) => jobsOf(d * 86_400_000)).flat()).size, PHOTO_JOBS.length);
   assert.ok(PHOTO_JOBS.length / 4 <= 7);
-  const { r2Store, memoryBucket } = await import('../builders/store.js');
+  const { r2Store } = await import('../builders/store.js');
+  const { memoryBucket } = await import('./fixtures/bucket.mjs');
   const store = r2Store(memoryBucket({ 'sports/laliga/photos.json': { built: 'x', players: [['Kept', 'u']] } }));
   const real = globalThis.fetch;
   globalThis.fetch = async () => new Response('', { status: 500 });

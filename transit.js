@@ -32,6 +32,8 @@
 // README, §3.3).
 
 import { cleanDev } from './kit/devconfig.mjs';
+import { twDay } from './kit/format.mjs';
+import { kvJson, kvPut } from './weather.js';
 
 export const TDX_BASE = 'https://tdx.transportdata.tw/api/';
 export const TDX_AUTH = 'https://tdx.transportdata.tw/auth/realms/TDXConnect/protocol/openid-connect/token';
@@ -115,7 +117,6 @@ export const tally = (env, key, n = 1, now = Date.now(), ctx = null) => spend(en
 // `tdx:b:2026-10-11`, `tdx:a:2026-10-11` (the admin panel's 用量).
 export const TDX_POINTS = { month: 200, basic: 1500, advanced: 200 };
 export const tdxKind = path => (String(path).startsWith('basic/') ? 'b' : 'a');
-const twDay = now => new Date(now + 8 * HOUR).toISOString().slice(0, 10);
 export async function tallyTdx(env, path, now = Date.now(), ctx = null) {
   await tally(env, 'tdx', 1, now, ctx);
   await tally(env, `tdx:${tdxKind(path)}:${twDay(now)}`, 1, now, ctx);
@@ -135,19 +136,6 @@ export async function flushUse(env, now = Date.now()) {
 
 // ---- KV ------------------------------------------------------------------------------
 
-async function kvJson(env, key) {
-  try {
-    const v = env.RATE_LIMIT_KV && (await env.RATE_LIMIT_KV.get(key));
-    return v ? JSON.parse(v) : null;
-  } catch {
-    return null;
-  }
-}
-async function kvPut(env, key, value, ttlS) {
-  try {
-    if (env.RATE_LIMIT_KV) await env.RATE_LIMIT_KV.put(key, JSON.stringify(value), { expirationTtl: Math.max(60, ttlS) });
-  } catch {}
-}
 
 // ---- TDX -----------------------------------------------------------------------------
 

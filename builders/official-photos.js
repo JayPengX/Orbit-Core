@@ -1,5 +1,5 @@
 // Football leagues' own player photos: the studio half-body each league shoots
-// of its players (the Premier League's are mirror.mjs plPhotos), for the kit's
+// of its players (the Premier League's are builders/photos.js plPhotos), for the kit's
 // photos.mjs, so a footballer looks like an NBA player does, not a face cut
 // out of a circle (FotMob's, kept as the last resort). Each league's own site:
 //   - LaLiga: its public API (the key its site sends), every club's squad;
@@ -239,26 +239,6 @@ export const mlsSquad = items =>
   }));
 
 export const OFFICIAL = { laliga: laligaPeople, bundesliga: bundesligaPeople, seriea: serieaPeople, ligue1: ligue1People, mls: mlsPeople };
-// Each league's list, written; or carried over (`carry`) when it can't be read.
-// `espn`: each club's names as ESPN has them ('<league>:<team id>' → [names],
-// builders/photos.js), `same` the name fit (builders/photos.js sameNameish).
-export async function officialPhotos({ write, carry, leagues = OFFICIAL, espn = new Map(), same = null } = {}) {
-  for (const [key, read] of Object.entries(leagues)) {
-    const people = await read().catch(() => null);
-    const players = people ? photoList(people) : [];
-    if (people && same) {
-      const taken = new Set(players.map(([n]) => nameKey(n)));
-      const clubs = [...espn].filter(([k]) => k.startsWith(`${key}:`)).map(([, names]) => names);
-      for (const [name, url] of clubFits(people.filter(p => !/\/default|defaultAssets/i.test(p.url || '')), clubs, same)) if (!taken.has(nameKey(name))) taken.add(nameKey(name)) && players.push([name, url]);
-    }
-    if (players.length < 300) {
-      console.log(`${key} photos: left out (${players.length} names)${(await carry(`sports/${key}/photos.json`)) ? ', carried' : ''}`);
-      continue;
-    }
-    await write(key, players);
-    console.log(`${key} photos: ${people.filter(p => p.url).length} players, ${players.length} names`);
-  }
-}
 
 // ---- TheSportsDB's cutouts, for everyone the leagues' lists don't have ----
 // Each player in these competitions' squads (ESPN's names) without an

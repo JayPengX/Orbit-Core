@@ -189,13 +189,6 @@ export const ODDS_ERROR = {
   futureOther: { rel: 0.2, checked: false }
 };
 
-// Margin of the average amount back (fair chance x odds x 100), from the
-// fair chance's margin (absolute, may be null) and the odds' (relative).
-export function backMargin(fairChance, fairMargin, odds, oddsRel) {
-  const relFair = fairMargin ? fairMargin / fairChance : 0;
-  return fairChance * odds * 100 * Math.hypot(relFair, oddsRel || 0);
-}
-
 // Middle value of a list (null when empty).
 export function median(values) {
   if (values.length === 0) return null;

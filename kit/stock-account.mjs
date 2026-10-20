@@ -52,6 +52,7 @@ import {
   usExtendedEnd
 } from '#kit/stock-markets.mjs';
 import { nextTradingStart, isTradingDay } from '#kit/stock-holidays.mjs';
+import { twDay } from '#kit/format.mjs';
 import { TD_MIN, tdRate, addMonths, tdInterest, incomeTaxes, lendable, LEND_RATE, LEND_RATE_MIN, LEND_RATE_MAX, LEND_LOT, LEND_RECALL, lendEnds, addWeekdays, lendFee } from '#kit/stock-savings.mjs';
 import { BONDS, couponDates } from '#kit/stock-bonds.mjs';
 import { creditAccount, creditUsed, dayTradeBuyFirst, dayTradeSellFirst, dayTradeRoom, termDue, afterHours, closingAuction, shortDeposit, SHORT_HANDLING, SHORT_INTEREST } from '#kit/stock-credit.mjs';
@@ -75,10 +76,8 @@ export function randomId() {
   return Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10);
 }
 
-// Taiwan date (YYYY-MM-DD) of a moment. Taiwan has no daylight saving time.
-export function taipeiDay(t) {
-  return new Date(t + 8 * 3_600_000).toISOString().slice(0, 10);
-}
+// Taiwan date (YYYY-MM-DD) of a moment.
+export const taipeiDay = twDay;
 
 // start 0: an account funded by the Quadra pool alone (a pass that got its
 // opening money from Quadra itself).
@@ -2238,12 +2237,10 @@ export function applyCashInterest(account, now = Date.now()) {
 //
 // No adding money by hand: like a salary, new NT$ arrives on its own on the
 // 1st of every month (00:00 Taiwan time), paid when the app is opened: the
-// same ECONOMY.monthly (NT$5,000) for every account (Quadra's economy;
-// it used to be 3% of a chosen start). Each payday is a deposit with a fixed id (pay:YYYY-MM), paid
-// once however many devices catch up on it. `income.since`: when paydays
+// same ECONOMY.monthly (NT$5,000) for every account. Each payday is a
+// deposit with a fixed id (pay:YYYY-MM), paid once however many devices catch up on it. `income.since`: when paydays
 // began (the account's opening, or when an older account first got them).
 
-export const INCOME_RATE = 0.03;
 const TPE = 8 * 3_600_000;
 
 // Dividends owed (past their ex-date) but not paid yet.
@@ -2362,9 +2359,6 @@ export function ownCash(account, s, now = Date.now()) {
   const pooled = account.events.filter(e => e.pool && e.t <= now).reduce((sum, e) => sum + e.amount, 0);
   return Math.round((cash - pooled) * 100) / 100;
 }
-
-// Without the pool (a pass unlinked from this device).
-export const stripPool = account => (account ? { ...account, events: account.events.filter(e => !e.pool) } : account);
 
 // Another, separate account folded in (the Quadra merge tool): both logs,
 // with the second's fixed ids ('deposit:start', 'pay:…', 'int:…') renamed so

@@ -164,8 +164,8 @@ const reset = () => {
 
 // ---- exports ----
 test('every new export exists', () => {
-  for (const name of ['bindSheet', 'setSheetDetent', 'navTitle', 'bindNavTitle', 'pullToRefresh', 'rubber', 'escHtml', 'wireTaps', 'wireLogos', 'wireNavTitles', 'openSheetHtml', 'sheetHtml']) assert.equal(typeof ui[name], 'function', name);
-  for (const name of ['tile', 'tag', 'cell', 'list', 'search', 'toggle', 'empty', 'pageHead', 'heroCard', 'rowCard', 'rail', 'stats', 'section', 'sectionHead', 'logoTile', 'matchCard', 'liveStrip', 'actionGrid', 'sheetHero', 'sheetFoot', 'stakeInput', 'ballRow', 'placeTile', 'schedLine', 'rideRow', 'navTitle']) {
+  for (const name of ['bindSheet', 'setSheetDetent', 'navTitle', 'bindNavTitle', 'pullToRefresh', 'rubber', 'escHtml', 'wireLogos', 'wireNavTitles', 'heroCardHtml']) assert.equal(typeof ui[name], 'function', name);
+  for (const name of ['tile', 'tag', 'empty', 'stats', 'section', 'sectionHead', 'logoTile', 'sheetHero', 'placeTile', 'navTitle']) {
     assert.equal(typeof ui[`${name}Html`], 'function', `${name}Html`);
   }
   assert.equal(typeof quadra.sheetVerdict, 'function');
@@ -281,7 +281,6 @@ test('actionGrid and sectionHead take data-* attributes, in both forms', () => {
   assert.equal(grid.children[0].getAttribute('data-tab'), 'ipo');
   assert.equal(grid.children[0].getAttribute('data-n'), '3');
   assert.equal(grid.children[1].hasAttribute('data-tab'), false);
-  assert.match(ui.actionGridHtml([{ icon: 'live', label: 'x', data: { tab: 'ipo' } }]), /<button class="q-action" type="button" data-tab="ipo">/);
   const head = ui.sectionHead('t', { more: '全部', data: { tab: 'all' } });
   assert.equal(head.find('q-sh-more').getAttribute('data-tab'), 'all');
   assert.match(ui.sectionHeadHtml('t', { more: '全部', data: { tab: 'all' } }), /class="q-sh-more" type="button" data-tab="all"/);
@@ -560,31 +559,16 @@ test('escHtml and the twins escape every text', () => {
   assert.equal(ui.escHtml(`<a href="x">&'`), '&#60;a href=&#34;x&#34;&#62;&#38;&#39;');
   assert.equal(ui.escHtml(null), '');
   noRaw(ui.emptyHtml({ icon: '🎫', title: evil, body: evil, action: { label: evil, tap: evil } }), 'emptyHtml');
-  noRaw(ui.cellHtml({ title: evil, sub: evil, value: evil, tap: evil, icon: evil }), 'cellHtml');
-  noRaw(ui.listHtml([], { head: evil, foot: evil }), 'listHtml');
   noRaw(ui.tileHtml(evil), 'tileHtml');
   noRaw(ui.tagHtml(evil, evil), 'tagHtml');
-  noRaw(ui.pageHeadHtml(evil, { over: evil }), 'pageHeadHtml');
   noRaw(ui.navTitleHtml(evil), 'navTitleHtml');
   noRaw(ui.heroCardHtml({ eyebrow: evil, title: evil, big: evil, sub: evil, pill: evil, tap: evil, actions: [{ label: evil, tap: evil }] }), 'heroCardHtml');
-  noRaw(ui.rowCardHtml([{ title: evil, sub: evil, value: evil, tags: [evil, { text: evil, tone: evil }], tap: evil, href: evil }]), 'rowCardHtml');
   noRaw(ui.statsHtml([{ label: evil, value: evil, href: evil }]), 'statsHtml');
   noRaw(ui.sectionHtml(evil, '', { more: evil, moreHref: evil }), 'sectionHtml');
   noRaw(ui.sectionHeadHtml(evil, { more: evil, count: evil, data: { a: evil } }), 'sectionHeadHtml');
   noRaw(ui.logoTileHtml(evil, { alt: evil, fallbackText: evil }), 'logoTileHtml');
   noRaw(ui.logoTileHtml('', { alt: '<u>"x"</u>' }) + ui.escHtml('<u>"x"</u>'), 'logoTileHtml letter');
-  noRaw(ui.matchCardHtml({ league: evil, when: evil, tag: evil, sides: [{ name: evil, score: evil }, { name: evil, score: evil }], prices: [{ label: evil, odds: evil, tap: evil }], open: evil }), 'matchCardHtml');
-  noRaw(ui.liveStripHtml([{ min: evil, rows: [{ name: evil, score: evil }], open: evil }]), 'liveStripHtml');
-  noRaw(ui.actionGridHtml([{ icon: 'live', label: evil, badge: evil, tap: evil, data: { a: evil } }]), 'actionGridHtml');
   noRaw(ui.sheetHeroHtml({ eyebrow: evil, big: evil, sub: evil, tags: [evil] }), 'sheetHeroHtml');
-  noRaw(ui.sheetFootHtml({ summary: { small: evil, big: evil }, button: { label: evil, tap: evil } }), 'sheetFootHtml');
-  noRaw(ui.sheetHtml({ title: evil, cls: evil, closeLabel: evil }), 'sheetHtml');
-  noRaw(ui.ballRowHtml([evil, null], { special: evil }), 'ballRowHtml');
-  noRaw(ui.schedLineHtml([evil]), 'schedLineHtml');
-  noRaw(ui.rideRowHtml({ time: evil, star: evil, open: evil, starLabel: evil }), 'rideRowHtml');
-  noRaw(ui.stakeInputHtml({ presets: [evil], currency: evil }), 'stakeInputHtml');
-  noRaw(ui.searchHtml({ placeholder: evil, value: evil }), 'searchHtml');
-  noRaw(ui.toggleHtml({ label: evil, tap: evil }), 'toggleHtml');
 });
 
 test('a colour or length can not end its style declaration', () => {
@@ -595,7 +579,7 @@ test('a colour or length can not end its style declaration', () => {
 });
 
 test('data attributes: names are cleaned, values escaped', () => {
-  const out = ui.actionGridHtml([{ icon: 'live', label: 'x', data: { 'a b"c': 'v"w' } }]);
+  const out = ui.sectionHeadHtml('t', { more: 'm', data: { 'a b"c': 'v"w' } });
   assert.match(out, / data-abc="v&#34;w"/);
 });
 
@@ -607,90 +591,20 @@ test('twins carry the DOM builders\' classes', () => {
     ['empty tile', () => ui.empty({ icon: 'ticket', title: 't', body: 'b', action: { label: 'go', onTap() {} } }), () => ui.emptyHtml({ icon: 'ticket', title: 't', body: 'b', action: { label: 'go', tap: 1 } })],
     ['empty emoji', () => ui.empty({ icon: '🎫', title: 't' }), () => ui.emptyHtml({ icon: '🎫', title: 't' })],
     ['empty link', () => ui.empty({ title: 't', action: { label: 'go', href: '#' } }), () => ui.emptyHtml({ title: 't', action: { label: 'go', href: '#' } })],
-    ['cell', () => ui.cell({ icon: '<svg></svg>', title: 't', sub: 's', value: 'v', chevron: true, danger: true, onClick() {}, trailing: new FakeEl('i') }), () => ui.cellHtml({ icon: '<svg></svg>', title: 't', sub: 's', value: 'v', chevron: true, danger: true, tap: 1, trailingHtml: '<i></i>' })],
-    ['list', () => ui.list([ui.cell({ title: 'a' })], { head: 'h', foot: 'f', big: true }), () => ui.listHtml([ui.cellHtml({ title: 'a' })], { head: 'h', foot: 'f', big: true })],
-    ['search', () => ui.search({}), () => ui.searchHtml({})],
-    ['toggle', () => ui.toggle({}), () => ui.toggleHtml({})],
-    ['pageHead', () => ui.pageHead('t', { over: 'o', tint: true }), () => ui.pageHeadHtml('t', { over: 'o', tint: true })],
-    ['heroCard', () => ui.heroCard({ eyebrow: 'e', icon: '<svg></svg>', title: 't', big: '1', sub: 's', pill: 'p', actions: [{ label: 'a', onClick() {} }, { label: 'b', ghost: true, href: '#' }], onClick() {} }), () => ui.heroCardHtml({ eyebrow: 'e', icon: '<svg></svg>', title: 't', big: '1', sub: 's', pill: 'p', actions: [{ label: 'a', tap: 1 }, { label: 'b', ghost: true, href: '#' }], tap: 1 })],
-    ['rowCard', () => ui.rowCard([{ icon: 'x', color: 'red', title: 't', sub: 's', value: 'v', tags: ['a', { text: 'b', tone: 'red' }], onClick() {} }, { title: 'u' }]), () => ui.rowCardHtml([{ icon: 'x', color: 'red', title: 't', sub: 's', value: 'v', tags: ['a', { text: 'b', tone: 'red' }], tap: 1 }, { title: 'u' }])],
-    ['rail', () => ui.rail([], { small: true }), () => ui.railHtml('', { small: true })],
     ['stats', () => ui.stats([{ label: 'l', value: 'v', icon: 'x', tint: true, href: '#' }]), () => ui.statsHtml([{ label: 'l', value: 'v', icon: 'x', tint: true, href: '#' }])],
     ['section', () => ui.section('t', [], { more: 'm', onMore() {} }), () => ui.sectionHtml('t', '', { more: 'm', moreTap: 1 })],
     ['sectionHead', () => ui.sectionHead('t', { more: 'm', count: 3, onMore() {} }), () => ui.sectionHeadHtml('t', { more: 'm', count: 3, moreTap: 1 })],
     ['logo img', () => ui.logoTile('a.png', { size: 32 }), () => ui.logoTileHtml('a.png', { size: 32 })],
     ['logo text', () => ui.logoTile('', { fallbackText: '蒙札' }), () => ui.logoTileHtml('', { fallbackText: '蒙札' })],
-    ['matchCard', () => ui.matchCard({ league: 'L', leagueLogo: 'l.png', when: 'w', live: true, wide: true, tag: '直播', sides: [{ name: 'A', score: 1 }, { name: 'B', score: 2 }], prices: [{ label: '主', odds: 2, onTap() {} }], onOpen() {} }), () => ui.matchCardHtml({ league: 'L', leagueLogo: 'l.png', when: 'w', live: true, wide: true, tag: '直播', sides: [{ name: 'A', score: 1 }, { name: 'B', score: 2 }], prices: [{ label: '主', odds: 2, tap: 1 }], open: 1 })],
-    ['matchCard vs', () => ui.matchCard({ sides: [{ name: 'A' }, { name: 'B' }] }), () => ui.matchCardHtml({ sides: [{ name: 'A' }, { name: 'B' }] })],
-    ['liveStrip', () => ui.liveStrip([{ min: "45'", rows: [{ name: 'A', score: 1 }], onOpen() {} }]), () => ui.liveStripHtml([{ min: "45'", rows: [{ name: 'A', score: 1 }], open: 1 }])],
-    ['actionGrid', () => ui.actionGrid([{ icon: 'live', label: 'x', badge: 2, onTap() {} }]), () => ui.actionGridHtml([{ icon: 'live', label: 'x', badge: 2, tap: 1 }])],
     ['sheetHero', () => ui.sheetHero({ eyebrow: 'e', big: 'b', sub: 's', logos: ['a.png'], tags: ['t'] }), () => ui.sheetHeroHtml({ eyebrow: 'e', big: 'b', sub: 's', logos: ['a.png'], tags: ['t'] })],
-    ['sheetFoot', () => ui.sheetFoot({ summary: { small: 's', big: 'b' }, button: { label: 'ok', danger: true } }), () => ui.sheetFootHtml({ summary: { small: 's', big: 'b' }, button: { label: 'ok', danger: true } })],
-    ['ballRow', () => ui.ballRow([1, null], { special: 7, hit: [1], size: 32 }), () => ui.ballRowHtml([1, null], { special: 7, hit: [1], size: 32 })],
-    ['placeTile', () => ui.placeTile('work', 'sm'), () => ui.placeTileHtml('work', 'sm')],
-    ['schedLine', () => ui.schedLine(['17:10']), () => ui.schedLineHtml(['17:10'])],
-    ['rideRow', () => ui.rideRow({ time: 't', legs: new FakeEl('i'), starred: true, onStar() {}, onOpen() {} }), () => ui.rideRowHtml({ time: 't', legsHtml: '<i></i>', starred: true, star: 1, open: 1 })],
-    ['stakeInput', () => ui.stakeInput({ presets: [100, 500], value: 500 }), () => ui.stakeInputHtml({ presets: [100, 500], value: 500 })]
+    ['placeTile', () => ui.placeTile('work', 'sm'), () => ui.placeTileHtml('work', 'sm')]
   ];
   for (const [name, dom, html] of cases) assert.deepEqual(sorted(classesOfHtml(html())), sorted(classesOfTree(dom())), name);
-  // The sheet (a dialog) too.
-  reset();
-  const s = ui.sheet({ title: 't', cls: 'mine', detent: 'medium', foot: ui.sheetFoot({ button: { label: 'ok' } }), body: [new FakeEl('p')] });
-  assert.deepEqual(sorted(classesOfHtml(ui.sheetHtml({ title: 't', cls: 'mine', detent: 'medium', footHtml: ui.sheetFootHtml({ button: { label: 'ok' } }), bodyHtml: '<p></p>' }))), sorted(classesOfTree(s.el)), 'sheet');
 });
 
 test('the twins mirror the DOM builders\' text and flags', () => {
-  assert.match(ui.matchCardHtml({ sides: [{ name: 'A', score: 2 }, { name: 'B', score: 1 }] }), /q-match-mid num">2 : 1</);
-  assert.match(ui.matchCardHtml({ sides: [{ name: 'A' }, { name: 'B' }] }), /q-match-mid num vs">VS</);
-  assert.match(ui.matchCardHtml({ sides: [{}, {}], prices: [{ label: 'x', odds: 1.5, selected: true, locked: true, tap: 'p1' }] }), /aria-pressed="true" disabled data-tap="p1"/);
-  assert.match(ui.matchCardHtml({ sides: [{}, {}], open: 'g1' }), /role="button" tabindex="0" data-open="g1"/);
-  assert.doesNotMatch(ui.actionGridHtml([{ icon: 'live', label: 'x', badge: 0 }]), /q-badge/);
   assert.match(ui.logoTileHtml('a.png', { fallbackText: 'AB', tint: 'red' }), /data-fallback="AB" data-tint="red"/);
   assert.match(ui.logoTileHtml('', { fallbackText: '蒙札', tint: 'red', size: 24 }), /class="q-logo text" style="--s:24px;--t:red">蒙</);
-  assert.match(ui.stakeInputHtml({ presets: [100, 500], value: 500 }), /aria-pressed="false" data-preset="100"[^>]*>100<\/button><button type="button" aria-pressed="true" data-preset="500"/);
-  assert.match(ui.toggleHtml({ checked: true, tap: 'x' }), /aria-checked="true" data-tap="x"/);
-  assert.match(ui.sheetHtml({ title: 't', detent: 'large' }), /data-detent="large"/);
-  assert.doesNotMatch(ui.sheetHtml({ title: 't', detent: 'large' }), /data-expandable/);
-  assert.match(ui.sheetHtml({ title: 't', detent: 'medium', trailingHtml: '<b>Done</b>' }), /data-detent="medium" data-expandable[\s\S]*<b>Done<\/b>/);
-  assert.doesNotMatch(ui.sheetHtml({ title: 't', trailingHtml: '<b>Done</b>' }), /q-close/);
-});
-
-test('wireTaps: the nearest data attribute wins, Enter works on a role=button, off() unhooks', () => {
-  const root = new FakeEl('div');
-  root.isConnected = true;
-  root.contains = () => true;
-  const hits = [];
-  const off = ui.wireTaps(root, { tap: (v, el) => hits.push(['tap', v]), open: v => hits.push(['open', v]) });
-  const card = new FakeEl('article');
-  card.attrs = { 'data-open': 'g1', role: 'button' };
-  const price = new FakeEl('button');
-  price.attrs = { 'data-tap': 'p1' };
-  card.append(price);
-  root.append(card);
-  root.dispatch('click', { target: price });
-  root.dispatch('click', { target: card });
-  root.dispatch('click', { target: root });
-  root.dispatch('keydown', { target: card, key: 'Enter' });
-  root.dispatch('keydown', { target: price, key: 'Enter' });
-  assert.deepEqual(hits, [['tap', 'p1'], ['open', 'g1'], ['open', 'g1']]);
-  off();
-  root.dispatch('click', { target: price });
-  assert.equal(hits.length, 3);
-});
-
-test('openSheetHtml: wires a dialog written as a string like sheet() does', () => {
-  reset();
-  closed.length = 0;
-  const d = new FakeEl('dialog');
-  globalThis.document.createElement = t => (t === 'template' ? Object.assign(new FakeEl('template'), { content: { get firstElementChild() { return d; } } }) : new FakeEl(t));
-  let fired = 0;
-  const s = ui.openSheetHtml('<dialog class="q-sheet"></dialog>', { onClose: () => fired++ });
-  assert.equal(s.el, d);
-  assert.equal(d.open, true);
-  d.dispatch('cancel');
-  assert.deepEqual(closed, [d]);
-  assert.equal(fired, 1);
-  globalThis.document.createElement = t => new FakeEl(t);
 });
 
 test('sheet(): a subtitle under the title, before the ✕; none by default', () => {
@@ -701,9 +615,6 @@ test('sheet(): a subtitle under the title, before the ✕; none by default', () 
   assert.equal(s.head.children[2].textContent, '2330 · 台股');
   assert.ok(s.head.children[3].classList.contains('q-close'), 'the ✕ stays last');
   assert.equal(ui.sheet({ title: 'T' }).head.children.length, 3);
-  const html = ui.sheetHtml({ title: 'T', subtitle: '<b>&' });
-  assert.ok(html.includes('</h2><small class="q-sheet-sub">&#60;b&#62;&#38;</small><button class="q-close"'));
-  assert.equal(ui.sheetHtml({ title: 'T' }).includes('q-sheet-sub'), false);
 });
 
 test('navTitle: a collapsed title hidden with its tab lets the bar go (no intersection change comes), and asks again when shown', () => {

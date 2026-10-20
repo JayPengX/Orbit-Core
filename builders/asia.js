@@ -6,7 +6,7 @@
 // TheSportsDB one at a time (cpblMonthWhole, ~45 s) and keeps the month
 // whole in R2, at the mirror's address, which the data proxy answers from
 // (sports.js readKept) until the month's next game begins. A month over is
-// kept for good. Was part of Shared-Data's mirror.mjs (asia.mjs).
+// kept for good.
 
 import { CATALOG, asiaMonthUrl, asiaMonthOf, TSDB_DAY, TSDB_CPBL, parseTsdbDay } from '../kit/catalog.mjs';
 import { mirrorPath } from '../kit/mirror.mjs';

@@ -30,7 +30,7 @@ const plain = s =>
 // ESPN's headshots can be a season old (a player traded in the summer still in
 // his old team's shirt), and it has none for footballers; a league's own site
 // has this season's, a studio half-body. Its players come from the nightly
-// packs (Shared-Data's sports/<league>/photos.json), read once: NBA.com's and
+// packs (the family's sports/<league>/photos.json), read once: NBA.com's and
 // the Premier League's as [name, id, 'o'?] ('o' a photo on the league's older
 // path); LaLiga's, the Bundesliga's, Serie A's and Ligue 1's as [name, url].
 // A player found there gets that photo first.
@@ -77,7 +77,7 @@ export function ownPhoto(name, league) {
   return null;
 }
 
-// Every football league's and cup's faces, from FotMob (Shared-Data's
+// Every football league's and cup's faces, from FotMob (the family's
 // sports/<league>/faces.json, [[name, id]…]: each club's squad now, a studio
 // cutout each): after the league's own photo, before a search by name. A
 // league's list is read the first time one of its players is drawn (not all

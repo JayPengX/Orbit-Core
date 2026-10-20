@@ -15,7 +15,8 @@ test("a season's game days: from its start across both year packs, as Taipei dat
 
 test('season packs on R2: the months over kept from the last pack, ESPN read only from ten days back; the index and days written', async () => {
   const { runSports } = await import('../builders/sports.js');
-  const { r2Store, memoryBucket } = await import('../builders/store.js');
+  const { r2Store } = await import('../builders/store.js');
+  const { memoryBucket } = await import('./fixtures/bucket.mjs');
   const now = Date.parse('2026-10-13T16:17:00Z');
   const ev = (id, date, state) => ({ id, date, status: { type: { state, completed: state === 'post' } }, competitions: [{ date, competitors: [] }], links: ['dropped'] });
   const store = r2Store(memoryBucket({ 'sports/mlb/2026.json': { leagues: [], events: [ev('1', '2026-04-02T23:00Z', 'post'), ev('2', '2026-09-01T23:00Z', 'post')] } }));

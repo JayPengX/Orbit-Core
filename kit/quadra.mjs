@@ -7,10 +7,10 @@
 //   Orbit Class         orbit   the class schedule
 //   Orbit Weather       weather one forecast, pinned places
 //   Orbit Transit       transit the map, buses, trains and metros
-//   Orbit Sports        match   scores, schedules and stats (was Quadra Fixtures)
-//   Orbit Words         vocab   English words (was Quadra Hub)
-//   Orbit Slips         slip    台灣運彩 tickets followed live (was Slip Tracker)
-//   Orbit Beats         beats   beat pieces arranged into songs (was Passion Beats)
+//   Orbit Sports        match   scores, schedules and stats
+//   Orbit Words         vocab   English words
+//   Orbit Slips         slip    台灣運彩 tickets followed live
+//   Orbit Beats         beats   beat pieces arranged into songs
 //
 // The names, colours and marks are brand.mjs's. The Quadra Pass (the
 // account, its looks, the truth about the money, every app and its guide) is the
@@ -114,7 +114,6 @@ export const ECONOMY = {
   weekly: PAY_WEEK
 };
 
-const finiteOr0 = v => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
 // What the account is worth: the pool and Securities' holdings, less what a
 // loan still owes (borrowed money is nobody's worth).
 export const worthOf = (wallet, now = Date.now()) => poolBalance(wallet) + finiteOr0(wallet?.snap?.stock?.holdings) - debtOf(wallet, now);
@@ -153,6 +152,7 @@ const rankName = (id, i) => {
 const RESET_ID = 'eco:rebase:v3';
 // 政府 (kit/gov.mjs): the same figures the admin page adds up.
 import { govOf } from './gov.mjs';
+import { twDay, twMonth, finiteOr0 } from './format.mjs';
 export { govOf };
 export function moneySides(wallet) {
   const gave = { start: 0, pay: 0, rank: 0, other: 0 };
@@ -212,7 +212,6 @@ const LOAN_KINDS = new Set(['loan', 'loanfee', 'loanpay', 'loanlate', 'loanbad',
 // Free bets and VIP: plus.mjs, shared with the Worker.
 import { FREEBET, freeBetValue, freeBets, VIP, vipStakes, vipTier, WELCOME, welcomeEarned } from './plus.mjs';
 export { FREEBET, freeBetValue, freeBets, VIP, vipStakes, vipTier, WELCOME, welcomeEarned };
-const taipeiMonth = t => new Date(t + TPE).toISOString().slice(0, 7);
 
 // ---- Looks: an avatar and a frame, free for everyone ------------------------------------
 //
@@ -246,7 +245,7 @@ export const frameOf = wallet => worn(wallet, 'frame', FRAMES);
 // This month so far: stakes, tier, the cashback it's heading for, the next
 // tier and what's left to reach it; and last month's cashback if paid.
 export function vipStatus(wallet, now = Date.now()) {
-  const month = taipeiMonth(now);
+  const month = twMonth(now);
   const stakes = vipStakes(wallet, month);
   const tier = vipTier(stakes);
   const next = VIP.tiers.find(t => stakes < t.min) ?? null;
@@ -1287,7 +1286,7 @@ export function quadraSession(app, { lang = detectLang(), heartbeat = 120_000 } 
   // (A page that watches already asks with every check.)
   if (typeof document !== 'undefined') setTimeout(() => watching || kitLatest(), 4000);
   const made = makeSession(app, { lang, heartbeat });
-  // A link to a guide (#help=<app>:<topic>, helpUrl) opens the Quadra Pass
+  // A link to a guide (#help=<app>:<topic>) opens the Quadra Pass
   // sheet on it, once the app's first screen is up.
   const help = typeof location !== 'undefined' && /(?:^|[#&])help=([a-z]+)(?::([a-z0-9]+))?/.exec(location.hash);
   if (help && typeof document !== 'undefined') setTimeout(() => !document.querySelector('dialog[open]') && openHelp(made, help[1], help[2] || null), 800);
@@ -1713,7 +1712,7 @@ export function money(x, { sign = false, cents = false } = {}) {
 // ---- Taiwan days -------------------------------------------------------------------------
 
 const TPE = 8 * 3_600_000;
-export const taipeiDay = (t = Date.now()) => new Date(new Date(t).getTime() + TPE).toISOString().slice(0, 10);
+export const taipeiDay = (t = Date.now()) => twDay(t);
 
 // ---- Recommendations: one engine for every app -------------------------------------------
 //
@@ -1826,9 +1825,6 @@ function hash01(text) {
 }
 
 // ---- Help: every app's guide, in the Quadra Pass sheet (help.mjs) ------------------------
-
-// An app's guide: that app, opening the sheet on it (#help=<app>:<topic>).
-export const helpUrl = (app, topic = '') => appUrl(app, `help=${app}${topic ? `:${topic}` : ''}`);
 
 // ---- Screens -----------------------------------------------------------------------------
 
@@ -3249,25 +3245,16 @@ steadyTabBar();
 // app goes on with what the phone kept (every read answers its saved copy
 // when the network fails); a tap tries again. Back on, the capsule goes
 // and the app's own refresh runs (topActions' refresh) once.
-// netState() 'online' | 'offline' | 'slow'; onNet(fn(next, was)).
+// netState() 'online' | 'offline' | 'slow'.
 const NET_SLOW_MS = 5000;
-const net = { state: 'online', waiting: new Map(), lastOk: Date.now(), fails: 0, subs: new Set(), refresh: null, timer: 0, id: 0, only: null, reached: false, hadReached: false };
+const net = { state: 'online', waiting: new Map(), lastOk: Date.now(), fails: 0, refresh: null, timer: 0, id: 0, only: null, reached: false, hadReached: false };
 export const netState = () => net.state;
-export function onNet(fn) {
-  net.subs.add(fn);
-  return () => net.subs.delete(fn);
-}
 function setNet(next) {
   if (next === net.state) return;
   const was = net.state;
   net.state = next;
   rec('net', { next, was });
   paintNet();
-  for (const fn of net.subs) {
-    try {
-      fn(next, was);
-    } catch {}
-  }
   // Back on: the app's refresh; an online-only app that opened with no connection (its first screen never read) opens again.
   if (next === 'offline') net.hadReached = net.reached;
   if (next === 'online' && was === 'offline') setTimeout(() => (net.only && !net.hadReached ? location.reload() : net.refresh?.()), 0);
@@ -3769,7 +3756,6 @@ const REC_KEY = 'quadra.rec';
 const REC_ON = 'quadra.recOn';
 const REC_MAX = 2_000_000;
 const recLast = new Map();
-let recSaving = 0;
 const secret = /^(pass|passcode|token|secret|auth|authorization|password|apikey|api_key)$/i;
 const recClean = x => JSON.parse(JSON.stringify(x ?? null, (k, v) => (secret.test(k) ? undefined : v)));
 export const recOn = () => {

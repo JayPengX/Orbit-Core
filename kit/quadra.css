@@ -9,17 +9,11 @@
    Apps build on these tokens and the q- components (kit/ui.mjs makes the
    ones that move); they don't restyle them. */
 :root {
-  --quadra-stock: #0d9488;
-  --quadra-odds: #2563eb;
-  --quadra-match: #ea580c;
-  --quadra-vocab: #7c3aed;
-  --quadra-orbit: #0ea5e9;
   /* San Francisco (and PingFang for Chinese) on Apple's devices; the
      nearest system face elsewhere. Rounded for big numbers. */
   --q-font: -apple-system, BlinkMacSystemFont, system-ui, 'SF Pro Text', 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', 'Segoe UI', sans-serif;
   --q-font-rounded: ui-rounded, 'SF Pro Rounded', var(--q-font);
   --q-font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
-  --quadra-font: var(--q-font);
 
   /* The iOS 26/27 palette, light. */
   --q-red: #ff383c;
@@ -90,7 +84,6 @@
   --q-t-title3: 600 20px/25px var(--q-font);
   --q-t-headline: 600 17px/22px var(--q-font);
   --q-t-body: 400 17px/22px var(--q-font);
-  --q-t-callout: 400 16px/21px var(--q-font);
   --q-t-subhead: 400 15px/20px var(--q-font);
   --q-t-footnote: 400 13px/18px var(--q-font);
   --q-t-caption: 400 12px/16px var(--q-font);
@@ -105,8 +98,6 @@
   --q-dur-smooth: 0.5s;
   --q-dur-snappy: 0.34s;
   --q-dur-bouncy: 0.55s;
-  --q-dur-quick: 0.25s;
-  --q-spring: var(--q-spring-snappy);
   --q-ease: cubic-bezier(0.32, 0.72, 0, 1);
 
   /* The names the apps were built on, now iOS's own. */
@@ -127,10 +118,7 @@
   --q-shadow: 0 1px 2px rgba(0, 0, 0, 0.03), 0 8px 24px -12px rgba(0, 0, 0, 0.1);
   --q-radius: var(--q-r-card);
   --q-radius-sm: 16px;
-  --quadra-radius: var(--q-r-card);
-  --q-bar: var(--q-glass);
   --q-fill: var(--q-fill-3);
-  --q-gap: var(--q-margin);
   color-scheme: light dark;
 }
 /* The app's colour: a default at no specificity, so each app's own
@@ -571,8 +559,6 @@ body {
 
 /* ---- Type: iOS's text styles, for any element ---- */
 .q-large-title { font: var(--q-t-large); letter-spacing: 0.01em; }
-.q-label-2 { color: var(--q-label-2); }
-.q-label-3 { color: var(--q-label-3); }
 
 /* ---- Liquid Glass, for anything that floats ---- */
 .q-glass {
@@ -2875,36 +2861,6 @@ dialog.q-moved::backdrop {
   font: 700 19px/1 ui-monospace, 'SF Mono', Menlo, monospace;
   letter-spacing: 0.08em;
 }
-.q-app {
-  display: grid;
-  justify-items: center;
-  gap: 6px;
-  padding: 10px 2px;
-  border-radius: 14px;
-  color: var(--q-text-2);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  text-align: center;
-  text-decoration: none;
-}
-.q-app img {
-  width: 44px;
-  height: 44px;
-  border-radius: 11px;
-  box-shadow: var(--q-shadow-sm);
-}
-.q-app span {
-  max-width: 100%;
-  letter-spacing: -0.02em;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.q-app.here {
-  background: var(--q-accent-wash);
-  color: var(--q-accent);
-}
 
 /* ---- Devices, a new pass shown once, and in-app notices ---- */
 .q-device {
@@ -3865,7 +3821,7 @@ div.q-ritem {
    - .q-sheet-hero, .q-sheet-foot.q-sf: a sheet's hero and its sticky action bar;
    - .q-ask.pro, .q-empty-tile: the dialog and the empty state with an icon tile;
    - .q-stake, .q-balls: an amount to stake, lottery balls;
-   - .q-sched, .q-ride, .q-chips.wrap, .q-rail.peek, .q-place: Transit's rows and place tiles. */
+   - .q-chips.wrap, .q-place: wrapping chips and place tiles. */
 :root {
   --q-logo-bg: #ffffff;
   /* Saved places: their own brand colours. */
@@ -4379,81 +4335,12 @@ div.q-ritem {
   box-shadow: inset 0 0 0 1.5px var(--q-sep);
 }
 
-/* -- Transit: a schedule as one wrapping line of whole tokens (schedLine) -- */
-.q-sched {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px 14px;
-  color: var(--q-label-2);
-  font: 500 13px/18px var(--q-font);
-}
-.q-sched > * {
-  white-space: nowrap;
-}
-.q-sched > :first-child {
-  color: var(--q-label);
-  font-weight: 600;
-}
-
-/* -- Transit: a ride or plan row, times over full-width legs, a star at the right (rideRow) -- */
-.q-ride {
-  position: relative;
-  padding: 12px 58px 12px 16px;
-  background: var(--q-surface);
-}
-.q-ride-time {
-  font: 600 17px/1.25 var(--q-font);
-  font-variant-numeric: tabular-nums;
-}
-.q-ride-legs {
-  margin-top: 6px;
-}
-.q-ride-star {
-  position: absolute;
-  top: 10px;
-  right: 12px;
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: none;
-  color: var(--q-label-3);
-}
-.q-ride-star::after {
-  content: '';
-  position: absolute;
-  inset: -4px;
-}
-.q-ride-star svg {
-  width: 22px;
-  height: 22px;
-}
-.q-ride-star.on {
-  color: var(--q-place-star);
-}
-.q-ride-star.on svg {
-  fill: currentColor;
-}
-
-/* -- Chips that wrap, with a leading label; a rail that peeks the next card -- */
+/* -- Chips that wrap -- */
 .q-chips.wrap {
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   overflow: visible;
-}
-.q-chips-l {
-  color: var(--q-label-2);
-  font: 500 13px/1.2 var(--q-font);
-}
-.q-rail.peek {
-  grid-auto-columns: max(136px, calc((100% - 20px) / 2.3));
-  padding-inline-end: calc(var(--q-margin) + 6px);
-  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
-  mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
 }
 
 /* ==== Shell (design review): one sheet with detents and a foot, a chosen
@@ -4766,8 +4653,6 @@ div.q-ritem {
 
 /* ---- Home parts (r4) ----
    - .q-ring: a progress ring with its label centred (ui.mjs progressRing);
-   - .q-stack / .q-wpass: Wallet-style cards, peeking until a tap spreads them (passStack);
-   - .q-tl: a vertical day, coloured blocks and a red now-line (dayTimeline);
    - .q-cal: a month grid, Sunday first, streak dots and today ringed (monthCalendar);
    - .q-panels / .q-panel: a two-column grid of small data tiles (panelGrid);
    - .q-league: a 56px logo over a name, for a rail (leagueTile).
@@ -4816,191 +4701,6 @@ div.q-ritem {
 .q-ring.tinted .q-ring-s {
   color: inherit;
   opacity: 0.75;
-}
-.q-stack {
-  --peek: 56px;
-  --ph: 132px;
-  --gap: 10px;
-  position: relative;
-  height: calc((var(--n) - 1) * var(--peek) + var(--ph));
-  transition: height 0.4s var(--q-ease);
-}
-.q-stack.spread {
-  height: calc(var(--n) * var(--ph) + (var(--n) - 1) * var(--gap));
-}
-.q-wpass {
-  --t: var(--q-accent);
-  position: absolute;
-  inset: 0 0 auto;
-  z-index: var(--i);
-  display: grid;
-  align-content: start;
-  gap: 12px;
-  height: var(--ph);
-  margin: 0;
-  padding: 14px 16px;
-  overflow: hidden;
-  border: 0;
-  border-radius: 22px;
-  background: linear-gradient(160deg, color-mix(in srgb, var(--t) 92%, #fff), color-mix(in srgb, var(--t) 78%, #000));
-  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.14);
-  color: #ffffff;
-  font: inherit;
-  text-align: start;
-  cursor: pointer;
-  transform: translateY(calc(var(--i) * var(--peek)));
-  transition: transform 0.4s var(--q-ease);
-  -webkit-tap-highlight-color: transparent;
-}
-.q-stack.spread .q-wpass {
-  transform: translateY(calc(var(--i) * (var(--ph) + var(--gap))));
-}
-.q-wpass:active {
-  filter: brightness(0.96);
-}
-.q-wpass-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  min-height: calc(var(--peek) - 28px);
-}
-.q-wpass-id {
-  display: grid;
-  min-width: 0;
-}
-.q-wpass-id strong {
-  overflow: hidden;
-  font: var(--q-t-headline);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.q-wpass-id small {
-  overflow: hidden;
-  font: var(--q-t-footnote);
-  opacity: 0.8;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.q-wpass-big {
-  flex: none;
-  font: 700 20px/25px var(--q-font);
-  font-variant-numeric: tabular-nums;
-}
-.q-wpass-more {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-}
-.q-wpass-logos {
-  display: flex;
-  gap: 6px;
-}
-.q-wpass .q-tag {
-  background: rgba(255, 255, 255, 0.22);
-  color: #ffffff;
-}
-.q-tl {
-  --hrs: 10;
-  --q-hour: 64px;
-  position: relative;
-  height: calc(var(--hrs) * var(--q-hour));
-  margin: 8px 0;
-}
-.q-tl-hours {
-  position: absolute;
-  inset: 0 0 0 0;
-}
-.q-tl-h {
-  position: absolute;
-  inset: var(--tl-top) 0 auto 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--q-label-2);
-  font: var(--q-t-caption);
-  font-variant-numeric: tabular-nums;
-  line-height: 16px;
-  transform: translateY(-50%);
-}
-.q-tl-h::after {
-  content: '';
-  flex: 1;
-  border-top: 0.5px solid var(--q-sep);
-}
-.q-tl-h {
-  width: 100%;
-}
-.q-tl-blocks {
-  position: absolute;
-  inset: 0 0 0 56px;
-}
-.q-tl-b {
-  --t: var(--q-accent);
-  position: absolute;
-  top: var(--tl-top);
-  left: calc(100% * var(--c, 0) / var(--n, 1));
-  width: calc(100% / var(--n, 1) - 4px);
-  height: calc(var(--tl-h) - 2px);
-  min-height: 22px;
-  box-sizing: border-box;
-  display: grid;
-  align-content: start;
-  gap: 1px;
-  margin-top: 1px;
-  padding: 6px 10px 6px 12px;
-  overflow: hidden;
-  border-radius: 10px;
-  border-inline-start: 4px solid var(--t);
-  background: color-mix(in srgb, var(--t) 16%, var(--q-surface));
-  color: var(--q-label);
-}
-.q-tl-b strong {
-  overflow: hidden;
-  font: var(--q-t-subhead);
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.q-tl-b span {
-  overflow: hidden;
-  color: var(--q-label-2);
-  font: var(--q-t-caption);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.q-tl-b.short {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding-block: 2px;
-}
-.q-tl-b.on {
-  outline: 2px solid var(--t);
-  background: color-mix(in srgb, var(--t) 28%, var(--q-surface));
-}
-.q-tl-now {
-  position: absolute;
-  inset: var(--tl-top) 0 auto 0;
-  height: 2px;
-  margin-top: -1px;
-  background: var(--q-red);
-  pointer-events: none;
-  transition: top 0.4s var(--q-ease);
-}
-.q-tl-now[hidden] {
-  display: none;
-}
-.q-tl-now::before {
-  content: '';
-  position: absolute;
-  top: -4px;
-  left: 50px;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--q-red);
 }
 .q-cal {
   display: grid;
@@ -5151,10 +4851,7 @@ button.q-cal-d {
   white-space: nowrap;
 }
 @media (prefers-reduced-motion: reduce) {
-  .q-ring-arc,
-  .q-stack,
-  .q-wpass,
-  .q-tl-now {
+  .q-ring-arc {
     transition: none;
   }
 }

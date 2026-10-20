@@ -8,12 +8,10 @@
 // pitch, a map, a chart) stays the app's.
 //
 //   import { segmented, sheet, menu, toast, list, cell, search, toggle, empty, view } from '#kit/ui.mjs';
-//   and the premium layer: icons, tile, pageHead, heroCard, rowCard, tag, rail, stats, section;
-//   round 3: sectionHead, logoTile, matchCard, liveStrip, actionGrid, sheetHero, sheetFoot,
-//   confirm, stakeInput, ballRow, placeTile, schedLine, rideRow;
-//   r4 home parts: progressRing, passStack, dayTimeline, monthCalendar, panelGrid, leagueTile;
-//   foundations: ready (lift the loading screen), and toast's action / batch and
-//   segmented's count (see each below).
+//   and icons, tile, pageHead, rowCard, tag, rail, stats, section, sectionHead, logoTile,
+//   matchCard, liveStrip, actionGrid, sheetHero, sheetFoot, confirm, stakeInput, stockRow,
+//   ballRow, placeTile, progressRing, monthCalendar, panelGrid, leagueTile, ready (lift the
+//   loading screen); toast's action / batch and segmented's count (see each below).
 
 // { tab: 'ipo' } as data-tab="ipo" attributes (a builder's `data`, for taps wired by delegation).
 // (By path, not #kit/: a page whose import map predates format.mjs still loads ui.mjs.)
@@ -116,7 +114,7 @@ export function setSheetDetent(d, detent) {
   d.setAttribute('data-detent', detent);
 }
 // Closing, wired onto any <dialog class="q-sheet">, one the app wrote as HTML
-// (sheetHtml) as well as the builder's. A [data-q-close] inside closes it.
+// as well as the builder's. A [data-q-close] inside closes it.
 // Returns close().
 export function bindSheet(d, { onClose = () => {} } = {}) {
   let done = false;
@@ -570,20 +568,6 @@ export function view(change) {
   document.startViewTransition(change);
 }
 
-// ---- A number that counts to its new value (iOS's numericText) ----
-export function countTo(el, to, { from = Number(el.dataset.value) || 0, format = n => Math.round(n).toLocaleString(), ms = 600 } = {}) {
-  el.dataset.value = String(to);
-  if (reduced() || from === to) return void (el.textContent = format(to));
-  const t0 = performance.now();
-  const step = t => {
-    const p = Math.min(1, (t - t0) / ms);
-    const e = 1 - Math.pow(1 - p, 3);
-    el.textContent = format(from + (to - from) * e);
-    if (p < 1) requestAnimationFrame(step);
-  };
-  requestAnimationFrame(step);
-}
-
 // A segmented control drawn as HTML (an app that redraws a card whole):
 // its thumb starts where it was (`from`) and slides to the choice the next
 // frame. segHtml([[id, label, count?]…], on, { from, attr: id => attrs }) and,
@@ -613,16 +597,10 @@ export function settleSegs(root = document) {
 }
 
 // ---- HTML-string twins: the builders for apps that draw with template strings ----
-// Every builder above has one here (segHtml's pattern): same classes, same
-// structure, returned as a string, every text escaped. A string can't hold a
-// handler, so where the DOM builder takes onClick/onTap/onOpen the twin takes
-// a value that it writes as a data-attribute:
-//   tap -> data-tap   open -> data-open   star -> data-star   more -> data-more
-//   (a sheet's ✕ is [data-q-close]; a switch is aria-checked, a stake's
-//   preset data-preset). The app wires them once on the container:
-//     wireTaps(root, { tap: (value, el, e) => …, open: (value, el) => … })
-//   (a click on the nearest [data-tap] / [data-open], Enter too on a
-//   role="button"; a price button inside an open card wins over the card.)
+// Same classes and structure as the DOM builder, returned as a string, every
+// text escaped. A string can't hold a handler, so where the DOM builder takes
+// onClick/onTap/onOpen the twin takes a value that it writes as a data-attribute
+// (tap -> data-tap, open -> data-open); the app wires them on the container.
 // Children (…Html options, arrays of strings) are markup already made by
 // these or by the app; anything else is text and escaped here.
 export const escHtml = s => String(s ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
@@ -656,25 +634,6 @@ export function emptyHtml({ icon = '', tint = '', title = '', body = '', action 
   const button = !action ? '' : typeof action === 'string' ? action : action.href ? `<a class="q-btn primary" href="${E(action.href)}"${dataOf(action.data)}>${E(action.label)}</a>` : `<button class="q-btn primary" type="button"${dataOf({ tap: action.tap, ...action.data })}>${E(action.label)}</button>`;
   return `<div class="q-empty">${mark}${title ? `<strong>${E(title)}</strong>` : ''}${body ? `<p>${E(body)}</p>` : ''}${button}</div>`;
 }
-// cellHtml({ icon, tint, title, sub, value, chevron, tap, danger, href, trailingHtml }).
-export function cellHtml({ icon = null, tint = '', title = '', sub = '', value = '', chevron = false, tap = null, danger = false, href = '', trailingHtml = '' } = {}) {
-  const [tag, at] = elOf(href, tap, { tap });
-  return `<${tag} class="${clsOf('q-cell', chevron && 'chevron', danger && 'danger')}"${at}>${icon ? `<span class="q-cell-icon" aria-hidden="true"${styleOf(['--q-cell-tint', tint])}>${glyphHtml(icon)}</span>` : ''}<span class="q-cell-text"><span>${E(title)}</span>${sub ? `<small>${E(sub)}</small>` : ''}</span>${value !== '' && value != null ? `<span class="q-cell-value">${E(value)}</span>` : ''}${trailingHtml}</${tag}>`;
-}
-export function listHtml(rowsHtml, { head = '', foot = '', big = false } = {}) {
-  return `<section class="q-list-group">${head ? `<h3 class="${clsOf('q-list-head', big && 'big')}">${E(head)}</h3>` : ''}<div class="q-list">${joinHtml(rowsHtml)}</div>${foot ? `<p class="q-list-foot">${E(foot)}</p>` : ''}</section>`;
-}
-// searchHtml: its ✕ is [data-clear] (the app empties the input).
-export function searchHtml({ placeholder = '搜尋', value = '', label = placeholder } = {}) {
-  return `<label class="q-search"><input type="search" placeholder="${E(placeholder)}" aria-label="${E(label)}" enterkeyhint="search" autocomplete="off" autocorrect="off" spellcheck="false" value="${E(value)}"><button class="q-search-clear" type="button" aria-label="清除" data-clear>✕</button></label>`;
-}
-// toggleHtml({ checked, label, tap }): the app flips aria-checked on its tap.
-export function toggleHtml({ checked = false, label = '', tap = null } = {}) {
-  return `<button class="q-switch" type="button" role="switch" aria-checked="${Boolean(checked)}"${label ? ` aria-label="${E(label)}"` : ''}${dataOf({ tap })}></button>`;
-}
-export function pageHeadHtml(title, { over = '', tint = false, trailingHtml = '' } = {}) {
-  return `<header class="q-page-head">${over ? `<p class="${clsOf('q-over', tint && 'tint')}">${E(over)}</p>` : ''}<h1>${E(title)}</h1>${trailingHtml}</header>`;
-}
 // navTitleHtml(title), then wireNavTitles(root, { scroller }) once it's in the page.
 export function navTitleHtml(title = '') {
   return `<h1 class="q-nav-title" data-q-nav>${E(title)}</h1>`;
@@ -698,19 +657,6 @@ export function heroCardHtml({ eyebrow = '', icon = '', title = '', big = '', su
           .join('')}</div>`
       : ''
   }${joinHtml(childrenHtml)}</${tag}>`;
-}
-// rowCardHtml([{ icon, color, size, title, sub, value, tags, href, tap, chevron, trailingHtml }])
-export function rowCardHtml(rows) {
-  return `<div class="q-rowcard">${rows
-    .filter(Boolean)
-    .map(r => {
-      const [tag, at] = elOf(r.href, r.tap, { tap: r.tap });
-      return `<${tag} class="${clsOf('q-ritem', (r.chevron ?? tag !== 'div') && 'chevron')}"${at}>${r.icon != null && r.icon !== '' ? tileHtml(r.icon, r.color, r.size || '') : ''}<span class="q-ritem-text"><span class="q-ritem-title">${E(r.title)}</span>${r.sub ? `<small>${E(r.sub)}</small>` : ''}${r.tags?.length ? `<span class="q-tags">${r.tags.map(tagObjHtml).join('')}</span>` : ''}</span>${r.value !== undefined && r.value !== '' ? `<span class="q-ritem-value">${E(r.value)}</span>` : ''}${r.trailingHtml || ''}</${tag}>`;
-    })
-    .join('')}</div>`;
-}
-export function railHtml(childrenHtml, { small = false } = {}) {
-  return `<div class="${clsOf('q-rail', small && 'small')}">${joinHtml(childrenHtml)}</div>`;
 }
 export function statsHtml(items) {
   return `<div class="q-stats"${styleOf(['--q-stats-n', Math.min(items.length, 3)])}>${items
@@ -763,48 +709,10 @@ export function wireLogos(root = document) {
   root.__quadraLogos = true;
   root.addEventListener('error', e => e.target?.tagName === 'IMG' && fall(e.target), true);
 }
-// matchCardHtml({ league, leagueLogo, when, live, tag, wide, sides: [{ logo, name, score }], prices: [{ label, odds, tap, selected, locked }], open })
-export function matchCardHtml({ league = '', leagueLogo = '', when = '', live = false, tag = null, wide = false, sides = [], prices = [], open = null } = {}) {
-  const [a = {}, b = {}] = sides;
-  const px = wide ? 40 : 48;
-  const side = s => `<div class="q-match-side">${logoTileHtml(s.logo, { size: px, alt: s.name, fallbackText: s.name })}<b>${E(s.name || '')}</b></div>`;
-  const scored = a.score != null && b.score != null;
-  return `<article class="${clsOf('q-match', live && 'live', wide && 'wide')}"${open != null ? ` role="button" tabindex="0"${dataOf({ open })}` : ''}><div class="q-match-top">${leagueLogo ? logoTileHtml(leagueLogo, { size: 20, alt: league }) : ''}<span class="q-match-lg">${E(league)}</span>${(typeof tag === 'string' ? tag : tag?.text) ? tagObjHtml(tag) : ''}<span class="q-match-when">${E(when)}</span></div><div class="q-match-teams">${side(a)}<div class="${clsOf('q-match-mid num', !scored && 'vs')}">${scored ? `${E(a.score)} : ${E(b.score)}` : 'VS'}</div>${side(b)}</div>${
-    prices.length ? `<div class="q-match-prices">${prices.map(p => `<button class="q-price" type="button" aria-pressed="${Boolean(p.selected)}"${p.locked ? ' disabled' : ''}${dataOf({ tap: p.tap })}><small>${E(p.label || '')}</small><b class="num">${p.odds == null ? '' : E(p.odds)}</b></button>`).join('')}</div>` : ''
-  }</article>`;
-}
-// liveStripHtml([{ min, rows: [{ logo, name, score }], open }])
-export function liveStripHtml(items) {
-  return `<div class="q-live-strip">${items.map(it => `<button class="q-live-card" type="button"${dataOf({ open: it.open })}><span class="q-live-min">${E(it.min || '')}</span>${it.rows.map(r => `${logoTileHtml(r.logo, { size: 28, alt: r.name, fallbackText: r.name })}<b>${E(r.name || '')}</b><span class="num">${r.score == null ? '' : E(r.score)}</span>`).join('')}</button>`).join('')}</div>`;
-}
-// actionGridHtml([{ icon (an icons key), tint, label, badge, tap | data: { tab: 'ipo' } }])
-export function actionGridHtml(items) {
-  return `<div class="q-actions-grid">${items.map(it => `<button class="q-action" type="button"${dataOf({ tap: it.tap, ...it.data })}>${tileHtml(icons[it.icon] || it.icon, it.tint)}<span>${E(it.label)}</span>${it.badge ? `<span class="q-badge">${E(it.badge)}</span>` : ''}</button>`).join('')}</div>`;
-}
 // (logoHtml / statusHtml: trusted markup for the `logo` and `status` slots; status may also be a list of tags.)
 export function sheetHeroHtml({ eyebrow = '', big = '', sub = '', tint = '', logos = [], tags = [], logoHtml = '', status = null, statusHtml = '' } = {}) {
   const st = statusHtml || (Array.isArray(status) ? status.map(tagObjHtml).join('') : '');
   return `<div class="q-sheet-hero"${styleOf(['--t', tint])}>${logoHtml ? `<div class="q-sh-logos">${logoHtml}</div>` : logos.length ? `<div class="q-sh-logos">${logos.map(l => logoTileHtml(l, { size: 48 })).join('')}</div>` : ''}${eyebrow ? `<span class="q-sh-eyebrow">${E(eyebrow)}</span>` : ''}${big !== '' && big != null ? `<span class="q-sh-big">${E(big)}</span>` : ''}${sub ? `<span class="q-sh-sub">${E(sub)}</span>` : ''}${tags.length ? `<div class="q-sh-row">${tags.map(tagObjHtml).join('')}</div>` : ''}${st ? `<div class="q-sh-row q-sh-status">${st}</div>` : ''}</div>`;
-}
-// sheetFootHtml({ summary: { small, big }, button: { label, tap, disabled, danger } })
-export function sheetFootHtml({ summary = null, button = {} } = {}) {
-  return `<div class="q-sheet-foot q-sf">${summary ? `<div class="q-sf-sum"><small>${E(summary.small || '')}</small><b class="num">${summary.big == null ? '' : E(summary.big)}</b></div>` : ''}<button class="${clsOf('q-btn', button.danger ? 'danger' : 'primary')}" type="button"${button.disabled ? ' disabled' : ''}${dataOf({ tap: button.tap })}>${E(button.label || '')}</button></div>`;
-}
-// sheetHtml({ title, subtitle, bodyHtml, cls, leadHtml, trailingHtml, footHtml, detent, closeLabel, label }): the dialog's markup;
-// openSheetHtml(html, { onClose }) puts it in the page, opens it and wires it as sheet() does.
-export function sheetHtml({ title = '', bodyHtml = '', cls = '', leadHtml = '', trailingHtml = '', footHtml = '', detent = '', closeLabel = '關閉', label = '', subtitle = '' } = {}) {
-  const d = DETENTS.includes(detent) ? ` data-detent="${detent}"${detent === 'medium' ? ' data-expandable' : ''}` : '';
-  const name = label || title;
-  return `<dialog class="${clsOf('q-sheet', E(cls), footHtml && 'q-has-foot')}"${d}${name ? ` aria-label="${E(name)}"` : ''}><div class="q-sheet-head">${leadHtml || '<span></span>'}<h2>${E(title)}</h2>${subtitle ? `<small class="q-sheet-sub">${E(subtitle)}</small>` : ''}${trailingHtml || `<button class="q-close" type="button" aria-label="${E(closeLabel)}" data-q-close>✕</button>`}</div>${joinHtml(bodyHtml)}${footHtml}</dialog>`;
-}
-export function openSheetHtml(html, { onClose = () => {} } = {}) {
-  const t = document.createElement('template');
-  t.innerHTML = html.trim();
-  const d = t.content.firstElementChild;
-  const shut = bindSheet(d, { onClose });
-  document.body.append(d);
-  d.showModal();
-  return { el: d, close: shut, setDetent: x => setSheetDetent(d, x) };
 }
 // movePillHtml(changePct, { solid, digits }); stockRowHtml({ logo, name, sub, spark, price, change, changePct, currency, open (a value → data-open), data })
 export function movePillHtml(changePct, { solid = true, digits = 2 } = {}) {
@@ -816,48 +724,9 @@ export function stockRowHtml({ logo = '', name = '', sub = '', spark = [], price
   const chart = sparkSvg(spark, tone);
   return `<div class="q-stock"${open != null ? ` role="button" tabindex="0"${dataOf({ open })}` : ''}${dataOf(data)}>${logoTileHtml(logo, { size: 40, alt: name, fallbackText: name })}<div class="q-stock-id"><b>${E(name)}</b>${sub ? `<small>${E(sub)}</small>` : ''}</div>${chart ? `<span class="q-stock-spark">${chart}</span>` : ''}<div class="q-stock-px"><b class="num" data-q-live>${E(stockPrice(price, currency))}</b>${own == null ? movePillHtml(changePct) : `<span class="q-move ${tone} solid">${E(own)}</span>`}</div></div>`;
 }
-export function ballRowHtml(nums, { special = [], hit = [], size = 28 } = {}) {
-  const ball = (n, cls) => `<span class="${clsOf('q-ball', cls, n == null && 'empty', hit.includes(n) && 'hit')}">${n == null ? '' : E(n)}</span>`;
-  return `<div class="q-balls"${size !== 28 ? styleOf(['--b', `${size}px`]) : ''}>${nums.map(n => ball(n, '')).join('')}${[].concat(special ?? []).map(n => ball(n, 'sp')).join('')}</div>`;
-}
 export function placeTileHtml(kind = 'pin', size = '') {
   const k = ['home', 'work', 'school', 'pin', 'star'].includes(kind) ? kind : 'pin';
   return `<span class="${clsOf('q-tile', size && E(size), 'q-place', k)}" aria-hidden="true">${icons[k]}</span>`;
-}
-export function schedLineHtml(tokens) {
-  return `<div class="q-sched">${tokens.map(t => `<span>${E(t)}</span>`).join('')}</div>`;
-}
-// rideRowHtml({ time, legsHtml, starred, star (a value → data-star: the app wires the button), open, starLabel })
-export function rideRowHtml({ time = '', legsHtml = '', starred = false, star = null, open = null, starLabel = '' } = {}) {
-  return `<div class="q-ride"${open != null ? ` role="button" tabindex="0"${dataOf({ open })}` : ''}><div class="q-ride-time">${E(time)}</div>${legsHtml ? `<div class="q-ride-legs">${legsHtml}</div>` : ''}${star != null ? `<button class="${clsOf('q-ride-star', starred && 'on')}" type="button" aria-pressed="${Boolean(starred)}"${starLabel ? ` aria-label="${E(starLabel)}"` : ''}${dataOf({ star })}>${icons.star}</button>` : ''}</div>`;
-}
-// stakeInputHtml({ value, presets, currency, decimals }): the presets are [data-preset="500"], the input is the app's to read
-// (with decimals it carries data-decimals, for the app's own typing filter).
-export function stakeInputHtml({ value = 0, presets = [], currency = 'NT$', decimals = 0 } = {}) {
-  const dp = stakeDp(decimals);
-  const cur = dp ? stakeNum(value, dp) : Number(value) || 0;
-  return `<div class="q-stake"${styleOf(['--n', presets.length || 5])}><label class="q-stake-amt"><small>${E(currency)}</small><input type="text" inputmode="${dp ? 'decimal' : 'numeric'}" autocomplete="off" aria-label="${E(currency)}" value="${stakeText(cur, dp)}"${dp ? ` data-decimals="${dp}"` : ''}></label>${presets.length ? `<div class="q-stake-presets">${presets.map(p => `<button type="button" aria-pressed="${dp ? stakeNum(p, dp) === cur : Number(p) === cur}" data-preset="${E(p)}">${E(stakeLabel(p, dp))}</button>`).join('')}</div>` : ''}</div>`;
-}
-
-// The taps of strings drawn by the twins, wired once on a container (it
-// stays valid whenever the app redraws what's inside): wireTaps(root,
-// { tap(value, el, event), open, star, more, preset }). The nearest of those
-// attributes wins, so a price button inside a card that opens is the price's.
-// Enter does the same on a role="button". Returns off().
-export function wireTaps(root, handlers) {
-  const keys = Object.keys(handlers).filter(k => typeof handlers[k] === 'function');
-  const sel = keys.map(k => `[data-${k}]`).join(',');
-  const fire = e => {
-    const hit = e.target?.closest?.(sel);
-    if (!hit || !root.contains(hit)) return;
-    const key = keys.find(k => hit.hasAttribute(`data-${k}`));
-    handlers[key](hit.getAttribute(`data-${key}`), hit, e);
-  };
-  const click = e => fire(e);
-  const enter = e => e.key === 'Enter' && e.target?.getAttribute?.('role') === 'button' && fire(e);
-  root.addEventListener('click', click);
-  root.addEventListener('keydown', enter);
-  return () => (root.removeEventListener('click', click), root.removeEventListener('keydown', enter));
 }
 
 // ---- The premium layer (quadra.css "Premium layer"): Law's and Beats' look ----
@@ -936,24 +805,6 @@ export function tile(icon, color = '', size = '') {
 export function pageHead(title, { over = '', tint = false, trailing = null } = {}) {
   return h('header', { class: 'q-page-head' }, [over ? h('p', { class: `q-over${tint ? ' tint' : ''}`, text: over }) : null, h('h1', { text: title }), trailing]);
 }
-// The one thing to do first, on the app's colour: { eyebrow, icon, title,
-// big, sub, pill, actions: [{ label, onClick, href, ghost }], href, onClick,
-// color, color2 } and any extra children (the app's own element).
-export function heroCard({ eyebrow = '', icon = '', title = '', big = '', sub = '', pill = '', actions = [], href = '', onClick = null, color = '', color2 = '' } = {}, children = []) {
-  const tag = href ? 'a' : onClick ? 'button' : 'div';
-  const c = h(tag, { class: `q-hero-card${tag === 'div' ? '' : ' q-press'}`, ...(href ? { href } : {}), ...(tag === 'button' ? { type: 'button', onclick: onClick } : {}) });
-  if (color) c.style.setProperty('--q-hc-b', color);
-  if (color2) c.style.setProperty('--q-hc-a', color2);
-  if (eyebrow || icon) c.append(h('span', { class: 'q-hc-eyebrow', html: `${icon || ''}<span></span>` }));
-  if (eyebrow) c.querySelector('.q-hc-eyebrow span').textContent = eyebrow;
-  if (big !== '') c.append(h('strong', { class: 'q-hc-big', text: big }));
-  if (title) c.append(h('strong', { class: 'q-hc-title', text: title }));
-  if (sub) c.append(h('p', { class: 'q-hc-sub', text: sub }));
-  if (pill) c.append(h('span', { class: 'q-hc-pill' }, [h('span', { text: pill }), h('i', { html: icons.send })]));
-  if (actions.length) c.append(h('div', { class: 'q-hc-row' }, actions.map(a => h(a.href ? 'a' : 'button', { class: `q-hc-btn${a.ghost ? ' ghost' : ''}`, ...(a.href ? { href: a.href } : { type: 'button', onclick: a.onClick }) }, [a.label]))));
-  for (const x of [].concat(children)) if (x) c.append(x);
-  return c;
-}
 // A card of rows: [{ icon, color, title, sub, value, tags, href, onClick,
 // chevron, trailing }]; a row with neither href nor onClick stays still.
 export function rowCard(rows) {
@@ -993,7 +844,7 @@ export function section(title, body, { more = '', moreHref = '', onMore = null }
   return h('section', { class: 'q-section' }, [head, ...[].concat(body)]);
 }
 
-// ---- Round 3 premium components (quadra.css "Premium components (round 3)") ----
+// ---- More components (quadra.css "Premium components (round 3)") ----
 
 // A section's head: its title, a count beside it, a link to the rest on the
 // right. sectionHead('為你推薦', { count: 4, more: '全部', onMore | data: { tab: 'all' } }); the same
@@ -1217,22 +1068,7 @@ export function placeTile(kind = 'pin', size = '') {
   return t;
 }
 
-// A schedule as one wrapping line of whole tokens: schedLine(['17:10', '17:25',
-// …]). The first is the one to take (heavier); a token never splits.
-export function schedLine(tokens) {
-  return h('div', { class: 'q-sched' }, tokens.map(t => h('span', { text: String(t) })));
-}
-
-// A ride or plan row: the times over the full-width legs, a star at the
-// right: rideRow({ time, legs (a node), starred, onStar, onOpen }).
-export function rideRow({ time = '', legs = null, starred = false, onStar = null, onOpen = null, starLabel = '' } = {}) {
-  const row = h('div', { class: 'q-ride', ...(onOpen ? { role: 'button', tabindex: '0', onclick: onOpen } : {}) }, [h('div', { class: 'q-ride-time', text: time }), legs ? h('div', { class: 'q-ride-legs' }, [legs]) : null]);
-  if (onStar) row.append(h('button', { class: `q-ride-star${starred ? ' on' : ''}`, type: 'button', 'aria-pressed': String(Boolean(starred)), ...(starLabel ? { 'aria-label': starLabel } : {}), html: icons.star, onclick: e => (e.stopPropagation(), onStar(e)) }));
-  return row;
-}
-
-// ---- Home parts (r4): ring, pass stack, day timeline, month calendar, panels, league tile ----
-// (quadra.css "Home parts (r4)"; notes in roadmap/kit-handoffs/r4-parts.md.)
+// ---- Home parts: ring, month calendar, panels, league tile (quadra.css "Home parts (r4)") ----
 const clamp01 = v => (Number.isFinite(Number(v)) ? Math.min(1, Math.max(0, Number(v))) : 0);
 const pad2 = n => String(n).padStart(2, '0');
 // An icon slot: an icons key or an svg string is a glyph, anything else text.
@@ -1259,199 +1095,6 @@ export function progressRing(value, opts = {}) {
   root.style.setProperty('--s', `${p.size}px`);
   if (opts.tint) root.style.setProperty('--t', opts.tint);
   return root;
-}
-export function progressRingHtml(value, opts = {}) {
-  const p = ringParts(value, opts);
-  return `<div class="${clsOf('q-ring', opts.tint && 'tinted', p.check && 'done')}" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(p.v * 100)}"${styleOf(['--s', `${p.size}px`], ['--t', opts.tint])}>${ringSvg(p.v, p.size, p.stroke)}<span class="q-ring-txt">${p.check ? `<i class="q-ring-check" aria-hidden="true">${icons.check}</i>` : `<b class="q-ring-l">${E(p.label)}</b>`}${p.sub ? `<small class="q-ring-s">${E(p.sub)}</small>` : ''}</span></div>`;
-}
-
-// -- Pass stack (Wallet-style) --
-// Collapsed: each card shows its top `peek` px, the next over it. A tap
-// spreads them; a tap on a spread card opens it (onOpen(item, i)) and folds
-// the stack; a tap outside, or Escape, folds it. One card: a tap opens it.
-const passBody = (it, logosHtml, tagsHtml) => `<span class="q-wpass-head"><span class="q-wpass-id"><strong>${E(it.title ?? '')}</strong>${it.sub ? `<small>${E(it.sub)}</small>` : ''}</span>${it.big != null && it.big !== '' ? `<b class="q-wpass-big">${E(it.big)}</b>` : ''}</span>${logosHtml || tagsHtml ? `<span class="q-wpass-more">${logosHtml ? `<span class="q-wpass-logos">${logosHtml}</span>` : ''}${tagsHtml}</span>` : ''}`;
-export function passStack(items, { peek = 56, onOpen = null } = {}) {
-  const list = items || [];
-  const stack = h('div', { class: 'q-stack', role: 'list' });
-  stack.style.setProperty('--n', String(list.length));
-  stack.style.setProperty('--peek', `${Number(peek) || 56}px`);
-  let off = null;
-  const folded = () => {
-    stack.classList.remove('spread');
-    off?.();
-  };
-  const arm = () => {
-    const away = e => (!stack.isConnected || e.target?.closest?.('.q-stack') !== stack) && folded();
-    const key = e => e.key === 'Escape' && folded();
-    document.addEventListener('click', away);
-    document.addEventListener('keydown', key);
-    off = () => (document.removeEventListener('click', away), document.removeEventListener('keydown', key), (off = null));
-  };
-  list.forEach((it, i) => {
-    const logos = (it.logos || []).map(s => logoTile(s, { size: 28 }));
-    const card = h('button', { class: 'q-wpass', type: 'button', ...dataProps(it.data) });
-    card.style.setProperty('--i', String(i));
-    if (it.tint) card.style.setProperty('--t', it.tint);
-    card.append(h('span', { class: 'q-wpass-head' }, [h('span', { class: 'q-wpass-id' }, [h('strong', { text: it.title ?? '' }), it.sub ? h('small', { text: it.sub }) : null]), it.big != null && it.big !== '' ? h('b', { class: 'q-wpass-big', text: String(it.big) }) : null]));
-    if (logos.length || it.tags?.length) card.append(h('span', { class: 'q-wpass-more' }, [logos.length ? h('span', { class: 'q-wpass-logos' }, logos) : null, ...(it.tags || []).map(t => tag_(t))]));
-    card.addEventListener('click', () => {
-      if (list.length > 1 && !stack.classList.contains('spread')) return stack.classList.add('spread'), arm();
-      folded();
-      (it.onOpen || onOpen)?.(it, i);
-    });
-    stack.append(card);
-  });
-  return stack;
-}
-export function passStackHtml(items, { peek = 56 } = {}) {
-  const list = items || [];
-  const cards = list.map((it, i) => `<button class="q-wpass" type="button" data-pass="${E(it.id ?? i)}"${dataOf(it.data)}${styleOf(['--i', String(i)], ['--t', it.tint])}>${passBody(it, joinHtml((it.logos || []).map(s => logoTileHtml(s, { size: 28 }))), (it.tags || []).map(tagObjHtml).join(''))}</button>`);
-  return `<div class="q-stack" role="list"${styleOf(['--n', String(list.length)], ['--peek', `${Number(peek) || 56}px`])}>${cards.join('')}</div>`;
-}
-// The twin's behaviour, once on a container: wirePassStacks(root, { open(id, el, i) }). Returns off().
-export function wirePassStacks(root, { open = null } = {}) {
-  const click = e => {
-    const card = e.target?.closest?.('.q-wpass');
-    const stack = card?.closest?.('.q-stack');
-    if (stack && root.contains(stack)) {
-      const n = stack.querySelectorAll('.q-wpass').length;
-      if (n > 1 && !stack.classList.contains('spread')) return stack.classList.add('spread');
-      stack.classList.remove('spread');
-      return open?.(card.getAttribute('data-pass'), card, [...stack.querySelectorAll('.q-wpass')].indexOf(card));
-    }
-    for (const s of root.querySelectorAll('.q-stack.spread')) s.classList.remove('spread');
-  };
-  const key = e => e.key === 'Escape' && [...root.querySelectorAll('.q-stack.spread')].forEach(s => s.classList.remove('spread'));
-  root.addEventListener('click', click);
-  document.addEventListener('keydown', key);
-  const away = e => !root.contains(e.target) && [...root.querySelectorAll('.q-stack.spread')].forEach(s => s.classList.remove('spread'));
-  document.addEventListener('click', away);
-  return () => (root.removeEventListener('click', click), document.removeEventListener('keydown', key), document.removeEventListener('click', away));
-}
-
-// -- Day timeline --
-// 'HH:MM' as minutes since midnight (NaN when it isn't one).
-export const clockMin = s => {
-  const m = /^(\d{1,2}):(\d{2})$/.exec(String(s ?? '').trim());
-  return m && +m[1] <= 24 && +m[2] < 60 ? +m[1] * 60 + +m[2] : NaN;
-};
-// A time's place in the range as a percent (0 at `from`, 100 at `to`).
-export const timelinePct = (min, from, to) => ((min - from) / (to - from)) * 100;
-const dateMin = d => d.getHours() * 60 + d.getMinutes();
-// The now-line's percent for a Date, or null outside the range.
-export function nowPct(date, from = '07:00', to = '17:00') {
-  const f = clockMin(from), t = clockMin(to), m = dateMin(date);
-  return t > f && m >= f && m <= t ? timelinePct(m, f, t) : null;
-}
-// Blocks clipped to the range, side by side where they overlap:
-// [{ ...block, s, e (minutes), top, height (percent), col, cols }].
-export function timelineLayout(blocks, from = '07:00', to = '17:00') {
-  const f = clockMin(from), t = clockMin(to);
-  if (!(t > f)) return [];
-  const out = (blocks || []).map(b => ({ ...b, s: Math.max(f, clockMin(b.start)), e: Math.min(t, clockMin(b.end)) })).filter(b => b.e > b.s).sort((a, b) => a.s - b.s || a.e - b.e);
-  let cluster = [], end = -1;
-  const close = () => {
-    const cols = Math.max(1, ...cluster.map(b => b.col + 1));
-    cluster.forEach(b => (b.cols = cols));
-    cluster = [];
-  };
-  const colEnds = [];
-  for (const b of out) {
-    if (b.s >= end) (close(), (colEnds.length = 0));
-    let c = colEnds.findIndex(x => x <= b.s);
-    if (c < 0) c = colEnds.length;
-    colEnds[c] = b.e;
-    b.col = c;
-    cluster.push(b);
-    end = Math.max(end, b.e);
-    b.top = timelinePct(b.s, f, t);
-    b.height = timelinePct(b.e, f, t) - b.top;
-  }
-  close();
-  return out;
-}
-const tlHours = (f, t) => {
-  const hs = [];
-  for (let m = Math.ceil(f / 60) * 60; m <= t; m += 60) hs.push({ label: `${pad2(m / 60)}:00`, top: timelinePct(m, f, t) });
-  return hs;
-};
-const pctS = n => `${+n.toFixed(3)}%`;
-const nowOf = now => (typeof now === 'function' ? now() : now instanceof Date ? (b => new Date(now.getTime() + (Date.now() - b)))(tlBoot(now)) : new Date());
-// (A given Date is the clock's start: it moves on from there.)
-const boots = new WeakMap();
-const tlBoot = d => (boots.has(d) || boots.set(d, Date.now()), boots.get(d));
-// (tlBoot runs before the second Date.now(): the first call reads zero elapsed.)
-const onNow = (b, m) => m >= b.s && m < b.e;
-// Calls run() at each minute's turn while alive() says so; returns stop().
-const minuteLoop = (alive, run) => {
-  let t = null, stopped = false;
-  const stop = () => (stopped = true, clearTimeout(t));
-  const next = () => {
-    t = setTimeout(() => {
-      if (stopped) return;
-      if (!alive()) return stop();
-      run();
-      next();
-    }, 60000 - (Date.now() % 60000) + 20);
-    t?.unref?.();
-  };
-  next();
-  return stop;
-};
-// dayTimeline(blocks, { from: '07:00', to: '17:00', now: new Date() }): hours down the left, blocks
-// placed by time (--tl-top / --tl-h percents), a red now-line that moves each minute while
-// the element is in the page (el.stop() ends it early). The block's `title` / `sub`; `tint` its colour.
-export function dayTimeline(blocks, { from = '07:00', to = '17:00', now = new Date() } = {}) {
-  const f = clockMin(from), t = clockMin(to);
-  const lay = timelineLayout(blocks, from, to);
-  const root = h('div', { class: 'q-tl', role: 'list' });
-  root.style.setProperty('--hrs', String(Math.max(1, (t - f) / 60)));
-  const hours = h('div', { class: 'q-tl-hours', 'aria-hidden': 'true' }, tlHours(f, t).map(x => { const s = h('span', { class: 'q-tl-h', text: x.label }); s.style.setProperty('--tl-top', pctS(x.top)); return s; }));
-  const layer = h('div', { class: 'q-tl-blocks' });
-  const els = lay.map(b => {
-    const el = h('div', { class: clsOf('q-tl-b', b.e - b.s < 35 && 'short'), role: 'listitem' }, [h('strong', { text: b.title ?? '' }), b.sub ? h('span', { text: b.sub }) : null]);
-    el.style.setProperty('--tl-top', pctS(b.top));
-    el.style.setProperty('--tl-h', pctS(b.height));
-    el.style.setProperty('--c', String(b.col));
-    el.style.setProperty('--n', String(b.cols));
-    if (b.tint) el.style.setProperty('--t', b.tint);
-    layer.append(el);
-    return el;
-  });
-  const line = h('div', { class: 'q-tl-now', 'aria-hidden': 'true' });
-  const paint = () => {
-    const d = nowOf(now), p = nowPct(d, from, to), m = dateMin(d);
-    line.style.setProperty('--tl-top', p == null ? '0%' : pctS(p));
-    line.hidden = p == null;
-    lay.forEach((b, i) => els[i].classList.toggle('on', p != null && onNow(b, m)));
-  };
-  root.append(hours, layer, line);
-  paint();
-  // (Built before it is mounted: a few minutes' grace, then it lets go once removed.)
-  let seen = false, waits = 0;
-  root.stop = minuteLoop(() => (root.isConnected ? (seen = true) : !seen && ++waits < 3), paint);
-  return root;
-}
-export function dayTimelineHtml(blocks, { from = '07:00', to = '17:00', now = new Date() } = {}) {
-  const f = clockMin(from), t = clockMin(to);
-  const d = nowOf(now), p = nowPct(d, from, to), m = dateMin(d);
-  const items = timelineLayout(blocks, from, to).map(b => `<div class="${clsOf('q-tl-b', b.e - b.s < 35 && 'short', p != null && onNow(b, m) && 'on')}" role="listitem" data-s="${b.s}" data-e="${b.e}"${styleOf(['--tl-top', pctS(b.top)], ['--tl-h', pctS(b.height)], ['--c', String(b.col)], ['--n', String(b.cols)], ['--t', b.tint])}><strong>${E(b.title ?? '')}</strong>${b.sub ? `<span>${E(b.sub)}</span>` : ''}</div>`);
-  const hours = tlHours(f, t).map(x => `<span class="q-tl-h"${styleOf(['--tl-top', pctS(x.top)])}>${x.label}</span>`);
-  return `<div class="q-tl" role="list" data-from="${E(from)}" data-to="${E(to)}"${styleOf(['--hrs', String(Math.max(1, (t - f) / 60))])}><div class="q-tl-hours" aria-hidden="true">${hours.join('')}</div><div class="q-tl-blocks">${items.join('')}</div><div class="q-tl-now" aria-hidden="true"${p == null ? ' hidden' : ''}${styleOf(['--tl-top', pctS(p ?? 0)])}></div></div>`;
-}
-// Moves the now-lines of twin timelines inside `root` each minute; off() stops.
-export function wireTimelines(root, { now = () => new Date() } = {}) {
-  const paint = () => {
-    const d = now(), m = dateMin(d);
-    for (const tl of root.querySelectorAll('.q-tl[data-from]')) {
-      const p = nowPct(d, tl.getAttribute('data-from'), tl.getAttribute('data-to'));
-      const line = tl.querySelector('.q-tl-now');
-      if (line) (line.style.setProperty('--tl-top', pctS(p ?? 0)), (line.hidden = p == null));
-      for (const b of tl.querySelectorAll('.q-tl-b[data-s]')) b.classList.toggle('on', p != null && m >= +b.getAttribute('data-s') && m < +b.getAttribute('data-e'));
-    }
-  };
-  paint();
-  return minuteLoop(() => root.isConnected !== false, paint);
 }
 
 // -- Month calendar --
@@ -1495,21 +1138,12 @@ export function monthCalendar({ year, month, marks = {}, today, lang, onPick = n
   }
   return root;
 }
-export function monthCalendarHtml({ year, month, marks = {}, today, lang, pick = null, data = null, last = null } = {}) {
-  const p = calParts({ year, month, marks, today, lang, last });
-  const days = p.days_.map((d, i) => {
-    const cls = clsOf('q-cal-d', d.mark && `m-${E(d.mark)}`, d.today && 'today');
-    const common = `class="${cls}" aria-label="${E(d.key + (d.mark ? ` ${d.mark}` : ''))}"${d.today ? ' aria-current="date"' : ''}${i === 0 ? styleOf(['grid-column-start', String(p.offset + 1)]) : ''}`;
-    return pick != null || data ? `<button type="button" ${common} data-pick="${E(d.key)}"${dataOf(data)}>${d.d}</button>` : `<span ${common}>${d.d}</span>`;
-  });
-  return `<div class="q-cal" role="group" aria-label="${E(p.label)}"${styleOf(['--off', String(p.offset)])}>${p.week.map(w => `<span class="q-cal-w" aria-hidden="true">${E(w)}</span>`).join('')}${days.join('')}</div>`;
-}
 
 // -- Panel grid --
 // panelGrid([{ label, big, sub, icon (an icons key / svg / text), tint, unit, level, art, data, onOpen }]): two columns of tiles.
 // unit: a <small> right after the big number ('°', 'mm'); level: a small tag (a string or { text, tone }); art: a node
 // (or trusted HTML) drawn beside the big value, e.g. a sparkline; data: data-* attributes; onOpen makes the tile a
-// role=button (Enter/Space too). The twin: `open` (a value) makes it role=button tabindex=0 data-open, for wireTaps.
+// role=button (Enter/Space too). The twin: `open` (a value) makes it role=button tabindex=0 data-open.
 const panelTone = t => (typeof t === 'object' && t && t.tone ? String(t.tone).replace(/[^\w-]/g, '') : '');
 const panelLevel = t => (typeof t === 'object' && t ? t.text : t);
 const hasLevel = t => { const x = panelLevel(t); return x != null && x !== ''; };
@@ -1540,7 +1174,4 @@ export function panelGridHtml(items) {
 // leagueTile({ logo (src or list), name, sub, onOpen | data }): a 56px logo over the name; for a rail.
 export function leagueTile({ logo = '', name = '', sub = '', onOpen = null, data = null } = {}) {
   return h('button', { class: 'q-league', type: 'button', ...dataProps(data), ...(onOpen ? { onclick: onOpen } : {}) }, [logoTile(logo, { size: 56, alt: name, fallbackText: name }), h('strong', { text: name }), sub ? h('small', { text: sub }) : null]);
-}
-export function leagueTileHtml({ logo = '', name = '', sub = '', open = null, data = null } = {}) {
-  return `<button class="q-league" type="button"${open != null ? ` data-open="${E(open)}"` : ''}${dataOf(data)}>${logoTileHtml(logo, { size: 56, alt: name, fallbackText: name })}<strong>${E(name)}</strong>${sub ? `<small>${E(sub)}</small>` : ''}</button>`;
 }

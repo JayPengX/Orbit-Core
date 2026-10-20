@@ -2,8 +2,7 @@
 // Sports can show them. Built once a day by the proxy (builders/run.js) into
 // the family's data (R2): a game over doesn't change, so its line is read
 // once (Polymarket's market on it, where ESPN draws none) and kept, never
-// read again; let go with its season (season.js). Was Shared-Data's
-// winprob.mjs; the same logic, its files in R2.
+// read again; let go with its season (season.js).
 //
 // Efficient: Polymarket's pages (~11 MB each) are read through the data
 // proxy's route in place, trimmed and kept in its edge cache (the phones'

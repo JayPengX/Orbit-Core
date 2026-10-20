@@ -1,8 +1,7 @@
 // Taiwan's bus routes and timetables (one compact pack a city), each line's
 // shape and where.json (which packs and YouBike cities are near each point),
 // for Orbit Transit to work out a trip's buses on the phone. Built by the
-// proxy (builders/run.js) into the family's data (R2). Was Shared-Data's
-// build.mjs, shapes.mjs and where.mjs (GitHub, weekly).
+// proxy (builders/run.js) into the family's data (R2).
 //
 // Lean, and within a Worker's memory: TDX is read a small page at a time and
 // each page made compact at once (a big city's timetables are tens of MB as
