@@ -727,7 +727,7 @@ export function stockRowHtml({ logo = '', name = '', sub = '', spark = [], price
   const { tone } = stockMove({ spark, changePct, change });
   const own = stockPill({ changePct, change, currency });
   const chart = sparkSvg(spark, tone);
-  return `<div class="q-stock"${open != null ? ` role="button" tabindex="0"${dataOf({ open })}` : ''}${dataOf(data)}>${logoTileHtml(logo, { size: 40, alt: name, fallbackText: name, kind: 'company' })}<div class="q-stock-id"><b>${E(name)}</b>${sub ? `<small>${E(sub)}</small>` : ''}</div>${chart ? `<span class="q-stock-spark">${chart}</span>` : ''}<div class="q-stock-px"><b class="num" data-q-live>${E(stockPrice(price, currency))}</b>${own == null ? movePillHtml(changePct) : `<span class="q-move ${tone} solid">${E(own)}</span>`}</div></div>`;
+  return `<div class="q-stock"${open != null ? ` role="button" tabindex="0"${dataOf({ open })}` : ''}${dataOf(data)}>${logoTileHtml(logo, { size: 40, alt: name, fallbackText: name, kind: 'company' })}<div class="q-stock-id"><b class="q-fit">${E(name)}</b>${sub ? `<small>${E(sub)}</small>` : ''}</div>${chart ? `<span class="q-stock-spark">${chart}</span>` : ''}<div class="q-stock-px"><b class="num" data-q-live>${E(stockPrice(price, currency))}</b>${own == null ? movePillHtml(changePct) : `<span class="q-move ${tone} solid">${E(own)}</span>`}</div></div>`;
 }
 export function placeTileHtml(kind = 'pin', size = '') {
   const k = ['home', 'work', 'school', 'pin', 'star'].includes(kind) ? kind : 'pin';
@@ -1064,7 +1064,7 @@ export function stockRow({ logo = '', name = '', sub = '', spark = [], price = n
   const chart = sparkSvg(spark, tone);
   return h('div', { class: 'q-stock', ...(onOpen ? { role: 'button', tabindex: '0', onclick: onOpen, onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { if (e.key === ' ') e.preventDefault?.(); onOpen(e); } } } : {}), ...dataProps(data) }, [
     logoTile(logo, { size: 40, alt: name, fallbackText: name, kind: 'company' }),
-    h('div', { class: 'q-stock-id' }, [h('b', { text: name }), sub ? h('small', { text: sub }) : null]),
+    h('div', { class: 'q-stock-id' }, [h('b', { class: 'q-fit', text: name }), sub ? h('small', { text: sub }) : null]),
     chart ? h('span', { class: 'q-stock-spark', html: chart }) : null,
     h('div', { class: 'q-stock-px' }, [h('b', { class: 'num', 'data-q-live': '', text: stockPrice(price, currency) }), pill])
   ]);

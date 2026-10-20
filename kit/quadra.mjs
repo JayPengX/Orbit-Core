@@ -3225,11 +3225,14 @@ watchKeyboard();
 // 0.72), redone as the page changes or turns. Nothing to call.
 export function fitNames(root = document) {
   for (const el of root.querySelectorAll?.('.q-fit') || []) {
-    const was = Number(el.style.getPropertyValue('--q-fit')) || 1;
     if (!el.clientWidth) continue;
+    // (Its own size noted once, whatever rule set it; the shrink is inline, so no rule outranks it.)
+    const base = Number(el.dataset.qFit) || parseFloat(getComputedStyle(el).fontSize);
+    el.dataset.qFit = String(base);
+    const was = parseFloat(el.style.fontSize) / base || 1;
     const need = el.scrollWidth / was;
     const k = Math.max(0.72, Math.min(1, (el.clientWidth - 1) / need));
-    if (Math.abs(k - was) > 0.01) el.style.setProperty('--q-fit', k.toFixed(3));
+    if (Math.abs(k - was) > 0.01) el.style.fontSize = k === 1 ? '' : `${(base * k).toFixed(2)}px`;
   }
 }
 function watchNames() {

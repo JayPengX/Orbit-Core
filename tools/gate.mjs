@@ -7,6 +7,8 @@
 //             it settles on), or never lifted
 //   stall     the main thread blocked 250 ms or more (a frozen screen)
 //   errors    a script error
+//   blank     a screen with nothing on it
+//   pictures  an image that failed to load (an empty logo)
 //   overflow  wider than the screen; the page sliding sideways
 //   wraps     a title or name broken onto a second line
 //   cut       an ellipsis or a clipped edge on text
@@ -76,7 +78,7 @@ const faults = r => {
   }
   for (const [t, ms] of r.longs || []) if (ms >= 250) f.push(['stall', at, `main thread blocked ${ms} ms at ${t} ms`, first]);
   for (const e of r.pageErrors || []) f.push(['errors', at, e, first]);
-  for (const tab of r.tabs || []) for (const kind of ['overflow', 'wraps', 'cut', 'letters', 'slots', 'halfEmpty', 'bareEmpty', 'loading', 'dead']) for (const what of tab[kind] || []) f.push([kind, `${at} #${tab.id}`, what, tab.shot]);
+  for (const tab of r.tabs || []) for (const kind of ['blank', 'pictures', 'overflow', 'wraps', 'cut', 'letters', 'slots', 'halfEmpty', 'bareEmpty', 'loading', 'dead']) for (const what of tab[kind] || []) f.push([kind, `${at} #${tab.id}`, what, tab.shot]);
   return f;
 };
 
