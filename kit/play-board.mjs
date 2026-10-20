@@ -415,8 +415,6 @@ export function gameOptions(game) {
   // Players' markets (props.mjs), only where ESPN's box score settles them:
   // Kambi's, and the model's for every player and number Kambi leaves out.
   if (LEAGUES[game.sport]?.path) out.push(...propOptions(game, base, gameProps(game, blend.probs)));
-  // Odd or even: a coin flip at a full cut, no longer sold.
-  for (let i = out.length - 1; i >= 0; i--) if (out[i].kind === 'oddeven') out.splice(i, 1);
   for (const o of out) withRules(o);
   // The books far apart on the game: locked until they agree (blendOutcomes).
   if (blend.disputed) for (const o of out) o.lock = 'check';

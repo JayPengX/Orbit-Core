@@ -83,9 +83,6 @@ export const familyOfSport = sport => sport;
 // price still has most of the news it will get.
 export const SOLD_DAYS = 14;
 
-// The catalogue entry for one of Play's keys.
-export const byBetKey = Object.fromEntries(Object.entries(CATALOG).filter(([, l]) => l.bet).map(([key, l]) => [l.bet, { key, ...l }]));
-
 // ---- Asian baseball (NPB, KBO, CPBL) -------------------------------------------------
 //
 // The sports proxy gathers these from the leagues' own sites (Shared-Proxy's

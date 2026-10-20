@@ -5,7 +5,7 @@
 // - hockey and soccer: each team's goals follow the goals model;
 // - baseball: the per-team runs model the other MLB markets use.
 // From the score model come the spreads and totals either side of
-// DraftKings' line, odd/even, winning margin bands, first half, both teams
+// DraftKings' line, winning margin bands, first half, both teams
 // to score, correct score, first inning and first five innings.
 //
 // Cuts: two-way markets at the lottery's measured MLB cut (1.158). Three-way,
@@ -121,7 +121,6 @@ export function pointsMarkets(m, { spreadLine, totalLine }) {
         { side: 'under', fair: 1 - over }
       ] });
     }
-    out.push({ kind: 'oddeven', market: 'oddeven', cut: CUT.twoWay, picks: [{ side: 'odd', fair: 0.5 }, { side: 'even', fair: 0.5 }] });
   }
   if (m.total != null) {
     // 單隊總分: each team's points, the total split by the margin; a team's
@@ -415,8 +414,6 @@ export function goalMarkets(means, { family, totalLine }) {
     // 勝分差 on 60 minutes has a 和局 too (台灣運彩's hockey 勝分差).
     margins.push({ side: 'draw', team: null, lo: 0, hi: 0, fair: chance(grid, (a, h) => a === h) });
     out.push({ kind: 'margin', market: 'margin', cut: CUT.bands, picks: margins });
-    const odd = chance(grid, (a, h) => (a + h) % 2 === 1);
-    out.push({ kind: 'oddeven', market: 'oddeven', cut: CUT.twoWay, picks: [{ side: 'odd', fair: odd }, { side: 'even', fair: 1 - odd }] });
     return out;
   } else {
     const yes = chance(grid, (a, h) => a > 0 && h > 0);
@@ -476,8 +473,6 @@ export function goalMarkets(means, { family, totalLine }) {
     const bands = [[0, 1], [2, 3], [4, 6], [7, null]];
     out.push({ kind: 'goalbands', market: 'goalbands', cut: CUT.bands, picks: bands.map(([lo, hi]) => ({ side: `${lo}`, lo, hi, fair: chance(grid, (a, h) => a + h >= lo && (hi == null || a + h <= hi)) })) });
   }
-  const odd = chance(grid, (a, h) => (a + h) % 2 === 1);
-  out.push({ kind: 'oddeven', market: 'oddeven', cut: CUT.twoWay, picks: [{ side: 'odd', fair: odd }, { side: 'even', fair: 1 - odd }] });
   return out;
 }
 
@@ -528,8 +523,6 @@ export function baseballMarkets({ homeWin, total }) {
     return s;
   };
   const out = [];
-  const odd = at((a, h) => (a + h) % 2 === 1);
-  out.push({ kind: 'oddeven', market: 'oddeven', cut: CUT.twoWay, picks: [{ side: 'odd', fair: odd }, { side: 'even', fair: 1 - odd }] });
   // Winning margin: each team by 1, 2, 3-4, 5+.
   const bands = [];
   for (const team of ['home', 'away']) {

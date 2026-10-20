@@ -72,9 +72,8 @@ test('the brand: Quadra is where the money is, Orbit the everyday tools; ids nev
   assert.equal(kit.APPS.match.name, 'Orbit Sports');
   assert.equal(kit.APPS.vocab.name, 'Orbit Words');
   assert.ok(Object.values(kit.APPS).every(a => a.related === (a.family === 'orbit')));
-  // Until the repos are renamed, links go where the apps are.
-  assert.equal(kit.APPS.match.path, brand.RENAMED ? '/Orbit-Sports/' : '/Quadra-Fixtures/');
-  assert.equal(kit.APPS.vocab.path, brand.RENAMED ? '/Orbit-Words/' : '/Quadra-Hub/');
+  assert.equal(kit.APPS.match.path, '/Orbit-Sports/');
+  assert.equal(kit.APPS.vocab.path, '/Orbit-Words/');
   for (const id of [...Object.keys(kit.APPS), 'pass']) for (const shape of ['rounded', 'square', 'maskable']) assert.match(brand.appIcon(id, { shape }), /^<svg [^>]*viewBox="0 0 512 512"/);
   assert.match(kit.helpUrl('stock', 'orders'), /^\/Quadra-Securities\/#help=stock:orders$/);
 });

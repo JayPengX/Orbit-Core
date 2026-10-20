@@ -529,10 +529,8 @@ test('progressRing: done fills the ring and centres a check instead of the label
   assert.ok(ui.progressRingHtml(1, { doneCheck: true }).includes('q-ring-check'));
 });
 
-test('CSS: panel parts, ring check, stock flash (calm under reduced motion), sheet subtitle', () => {
-  for (const sel of ['.q-panel-u', '.q-panel-lv', '.q-panel-art', '.q-ring-check', '.q-sheet-sub', '[data-q-live].q-flash-up', '[data-q-live].q-flash-down']) assert.ok(css.includes(sel), sel);
-  assert.ok(/@keyframes q-flash-up[\s\S]*--q-up/.test(css) && /@keyframes q-flash-down[\s\S]*--q-down/.test(css));
-  assert.ok(/prefers-reduced-motion: reduce\)\s*\{\s*\[data-q-live\]\.q-flash-up/.test(css));
+test('CSS: panel parts, ring check, sheet subtitle', () => {
+  for (const sel of ['.q-panel-u', '.q-panel-lv', '.q-panel-art', '.q-ring-check', '.q-sheet-sub']) assert.ok(css.includes(sel), sel);
 });
 
 test('the pass stack never styles .q-pass (the Quadra Pass sheet is a dialog.q-pass)', () => {

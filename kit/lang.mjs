@@ -4,15 +4,13 @@
 // phone's), a word-pair helper for short labels, and `makeT` for an app's
 // string tables.
 //
-//   import { lang, en, W, makeT, detectLang } from '#kit/lang.mjs';
+//   import { lang, en, W, makeT } from '#kit/lang.mjs';
 //   W('今天', 'Today');
 //   const t = makeT({ zh: { hello: '你好 {name}' }, en: { hello: 'Hello {name}' } });
 //   t('hello', { name: 'Amy' });
 
-// The one language detector is quadra.mjs's (a saved choice, else the phone's;
-// 'zh' or 'en'): re-exported so there is a single implementation.
+// The one language detector is quadra.mjs's (a saved choice, else the phone's; 'zh' or 'en').
 import { detectLang } from '#kit/quadra.mjs';
-export { detectLang };
 
 // The language of this page. Under Node (the tests) Chinese, as the apps are written.
 export const lang = typeof document === 'undefined' ? 'zh' : detectLang();

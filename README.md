@@ -81,7 +81,7 @@ runs near each caller; only Gemini goes through `gemini-relay.js`, pinned to Tai
 | `/sports-proxy` | `sports.js`, `asia-baseball.js`, `f1-live.js` | The data proxy (§3.1) |
 | `/sports-today` | `sports-today.js`, `kit/sports-espn.mjs` | Orbit Sports' day of scoreboards in one answer, built on demand (§3.1) |
 | `/gemini`, `/nl-edit` | `worker.js` | Orbit Class's photo import and plain-language edits (fixed prompts) |
-| `/slip`, `/slip-scan` | `slip.js` | Orbit Slips' ticket photo read (tight caps) |
+| `/slip-scan` | `slip.js` | Orbit Slips' ticket photo read (tight caps) |
 | `/law-ask` | `law.js` | Orbit Law's questions on 1-8 articles of a law: the text read from Orbit Law's data, every point cited and checked; answers kept in KV by the law's version; `mode: 'bill'` a bill explained from its 對照表 (立法院's API), each change citing a row's article, kept 30 days; `mode: 'diff'` an amendment explained from Orbit Law's `diff/<p>.json`, kept 180 days by version; a Pass of Orbit Law's, 40 Gemini calls a day a Pass and 300 in all with `/law-chat`'s (D1) |
 | `/law-chat` | `law-chat.js` | Orbit Law's 問法律: a plan, the articles found in Orbit Law's lists and full-text index (14 at most), an answer from those only, every point's cites checked; a Pass of Orbit Law's, 30 turns a day a Pass; first questions kept in KV 30 days. Both `/law-chat` and `/law-ask` (with a question) are grounded by `law-ground.js`: Orbit Law's `ai/facts.json` (official figures such as 最低工資), `ai/news.json` (agencies' notices, top 3), `bills/items.json` (立法院 stages, up to 5) and `ly/budget.json` (budget progress on a 預算 question: the year asked, else the 2 newest), each read hourly and left out when missing; the answer adds `notices` and `bills` |
 | `/law-page` | `law-page.js` | GET `?u=` a government page (gov.tw and its subdomains, www.edu.tw; https; redirects only on those) read inside Orbit Law: `{url, type:'html', html}` in its own charset (Big5 too), scripts/styles/handlers taken out, 2 MB at most, or `{url, type:'pdf'|'file', size}`; Cloudflare's cache only (judicial rulings 30 days, else a day); a Pass of Orbit Law's, 500 fresh reads a day |
@@ -189,9 +189,7 @@ the kit's `quadra.mjs` (the same tables in both).
 - **財富等級:** one-time rewards as worth crosses 300k to 100M (scaled 2026-10-20;
   the old 50k–20M levels' rewards count towards the new ones).
 - **Looks:** an avatar and a frame, free for everyone (the Pass's 外觀 tab).
-- **Quadra Plus ended 2026-10-20.** Old `eco:plus:*` months stay as history;
-  `eco:plusrefund:v1` gave back what was paid for the days left (a free
-  trial refunds nothing).
+- **Old `eco:plus:*` and `eco:plusrefund:v1` entries** stay in wallets as history.
 - **VIP cashback:** 0.5–1.5% of a month's gaming stakes.
 - **Overdraft:** 1% a month.
 
@@ -239,7 +237,7 @@ Served from this repo's Pages, never copied. Each app's page carries
 | `ui.mjs` icons (added) | `share`, `trash`, `x`, `bank`, `lock`, `exchange`, `cup`, `flag` join the set (`send`, `key`, `swap`, `spark` already existed); apps read `kitUI.icons?.x`, never import |
 | `quadra.css` pieces (added) | `.q-switch.on` (= aria-checked), `.q-sheet-foot` (sticky primary-button footer at a sheet's bottom, safe-area aware), `.q-fig` (grid of captioned bold figures with hairlines, children `small` over `b`) |
 | `boot.js` | The loading screen and the version check |
-| `brand.mjs` | Families, names, colours, marks, repos, `RENAMED`, `DEV` |
+| `brand.mjs` | Families, names, colours, marks, repos, `DEV` |
 | `pass.mjs`, `help.mjs`, `truth.mjs` | The Pass sheet; every app's guide; 真相 (the house's real numbers) |
 | `pass-sync.mjs` | An app's payload kept in step with the Pass's copy (read and merged before any write; once per return, none under 10 s away, an unchanged copy not merged again); Words, Weather, Slips |
 | `catalog.mjs`, `logos.mjs`, `names.mjs`, `photos.mjs` | Leagues; logos; Chinese team names; studio headshots |

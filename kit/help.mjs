@@ -51,8 +51,7 @@ export const HELP = {
         'Pass 的「帳戶安全」可以「登出其他所有裝置」（這台保持登入），或「更換通行碼」：舊的立刻失效、其他裝置登出，新的只顯示一次，要輸入它的最後 5 個字確認記好了。忘記通行碼時，在還登入的裝置更換一組就好。'
       ]],
       ['looks', '頭像與頭像框', [
-        '在 Quadra Pass 的「外觀」挑頭像和頭像框，全部免費、隨時換；戴上後每個 App 的帳戶按鈕都看得到。再點一次就拿下。',
-        'Quadra Plus 會員已在 2026-10-20 取消：付費會員按剩下的天數退費到 Quadra 餘額，免費試用的月份不退。以前會員專屬的頭像和頭像框現在大家都能用，還多了新款。'
+        '在 Quadra Pass 的「外觀」挑頭像和頭像框，全部免費、隨時換；戴上後每個 App 的帳戶按鈕都看得到。再點一次就拿下。'
       ]],
       ['vip', 'VIP 投注回饋與新手禮', [
         'VIP 不用加入也不用付費：每個月在 Play 的投注（運彩、彩券、刮刮樂，退款不算）決定當月等級，下個月第一次打開任何 App 時回饋當月投注額的一部分：銅卡 NT$10,000 起 0.5%、銀卡 NT$50,000 起 0.8%、金卡 NT$150,000 起 1.2%、黑卡 NT$500,000 起 1.5%。Play 首頁的餘額卡上看得到本月等級和離下一級還差多少。',
@@ -106,8 +105,7 @@ export const HELP = {
         'Pass’s Security can sign out every other device (this one stays in) or change the pass: the old one stops at once and other devices sign out, and the new one is shown once, closed only when you type its last 5 characters. Forgot it? Change it from a device that’s still signed in.'
       ]],
       ['looks', 'Avatars and frames', [
-        'Pick an avatar and a frame in the Quadra Pass’s Looks tab: all free, change them any time, worn on your account button in every app. Tap again to take one off.',
-        'Quadra Plus ended on 2026-10-20: paying members got the days left refunded to the Quadra balance; a free trial month isn’t refunded. The looks that were for members are everyone’s now, with new ones added.'
+        'Pick an avatar and a frame in the Quadra Pass’s Looks tab: all free, change them any time, worn on your account button in every app. Tap again to take one off.'
       ]],
       ['vip', 'VIP cashback and welcome offers', [
         'VIP is free and needs no sign-up: what you stake in Play in a month (bets, lottery and scratch cards; refunds don’t count) sets that month’s tier, and a share of it comes back the first time you open any app the next month: Bronze from NT$10,000 0.5%, Silver from NT$50,000 0.8%, Gold from NT$150,000 1.2%, Black from NT$500,000 1.5%. Play’s balance card shows this month’s tier and what’s left to the next.',

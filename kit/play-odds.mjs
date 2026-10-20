@@ -21,8 +21,6 @@ function fitStore() {
     const store = globalThis.localStorage;
     const saved = JSON.parse(store?.getItem(FITS_KEY) || 'null');
     if (saved?.v === FITS_V && Array.isArray(saved.list)) for (const [key, value] of saved.list) fits.set(key, Object.freeze(value));
-    // (Team runs were kept apart before 2026-10-15.)
-    store?.removeItem('oddsStudy.teamRuns');
   } catch {}
   return fits;
 }
@@ -515,8 +513,8 @@ export const LOTTERY_TAX = { taxFree: 5000, rate: 0.204 };
 
 // Parlay boost: the winnings (payout less stake) of any winning combination
 // of 3 or more picks are raised by this share, by its size (7+ the most).
-// A slip keeps its `boost` multiplier from when it was bought: 1 (an old
-// Quadra Plus slip's 1.5 still settles at it). Even boosted, a parlay keeps
+// A slip keeps its `boost` multiplier from when it was bought: 1 (an older slip's
+// boost still settles at the one it was bought with). Even boosted, a parlay keeps
 // most of the house's cut: every pick carries its own (about 15%), and they
 // multiply.
 export const PARLAY_BOOST = [0, 0, 0, 0.05, 0.08, 0.12, 0.15, 0.2];

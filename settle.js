@@ -66,8 +66,7 @@ const LATE_AGAIN = 15 * MIN;
 const LATE_AFTER = 6 * HOUR;
 // A championship (future) is looked at every 6 hours.
 const FUTURE_AGAIN = 6 * HOUR;
-// From here on a slip is placed through the Worker (op 'place', its price
-// checked); one staked before is only watched (op 'open').
+// A slip is placed through the Worker (op 'place', its price checked).
 export const PLACE_SINCE = LOCK_SINCE;
 // How long a live pick waits before it's priced again and placed.
 export const LIVE_DELAY_MS = 5_000;
@@ -256,10 +255,6 @@ export async function handlePlay(request, env, headers, session, deps) {
       await watchSlips(env, deps, account, clean, now);
       return json({ placed: clean.map(x => x.id), wallet: paid.wallet }, 200, headers);
     }
-    // Slips placed before the lock-down were handed over once each (op
-    // 'open'); none was left waiting when it closed (2026-10-14: a slip handed
-    // over could name any picks, so it pays nothing now).
-    if (body.op === 'open') return json({ watching: 0, added: 0 }, 200, headers);
     if (body.op === 'cashout') {
       // Cashed out here: the value checked against the house's own now
       // (price.js cashOutQuote), the slip marked cashed in 'open' (never

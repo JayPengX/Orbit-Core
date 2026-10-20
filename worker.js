@@ -8,7 +8,7 @@
 //                                app's data (eco.js)
 //   POST  /gemini                Orbit Class's AI schedule-photo import
 //   POST  /nl-edit               Orbit Class's natural-language edits
-//   GET   /slip, POST /slip-scan Slip Tracker's game lists and ticket photos (slip.js)
+//   POST  /slip-scan             Slip Tracker's ticket photos (slip.js)
 //   POST  /law-ask               Orbit Law's questions on a law's articles (law.js)
 //   POST  /law-chat              Orbit Law's 問法律, answered from the articles it finds (law-chat.js)
 //   GET   /law-page              A government page (gov.tw) read inside Orbit Law (law-page.js)
@@ -31,7 +31,7 @@
 // runs in Taiwan ([placement], wrangler.toml), where the people and most
 // sources are. The Quadra Pass is the only way anything is saved.
 
-import { handleSlip, handleSlipScan } from './slip.js';
+import { handleSlipScan } from './slip.js';
 import { handleLawAsk } from './law.js';
 import { handleLawChat } from './law-chat.js';
 import { handleLawGist } from './law-gist.js';
@@ -1180,9 +1180,7 @@ async function route(request, env, ctx, headers, origin) {
     if (!isAllowedOrigin(origin)) return errorJson('FORBIDDEN_ORIGIN', 403, headers, request);
     return handleToday(request, env, ctx, headers, ip, { bounds: () => seasonBounds(env) });
   }
-  // Slip Tracker's narrow door (slip.js): no pass, Asian baseball only, small caps.
-  if (path === '/slip') return handleSlip(request, env, ctx, headers, ip);
-  // …and its ticket photos, read by Gemini (no pass, a few a day).
+  // Orbit Slips' ticket photos, read by Gemini (a few a day).
   if (path === '/slip-scan') return handleSlipScan(request, env, headers, ip, (model, parts, schema) => proxyGeminiRequest(model, parts, schema, env, headers, ctx, 'slip-scan'));
   // Orbit Law's questions (law.js) and its 問法律 (law-chat.js): a Quadra
   // Pass of Orbit Law's, its origin only, a day's caps a Pass in D1.

@@ -251,15 +251,6 @@ test('a slip is placed through the Worker: checked, its stake taken, watched; al
   assert.equal((await post(deps, { op: 'place', slips: [slip('bigslip001', [later], { stake: 5000, cost: 5000 })] })).body.refused.problem, 'funds');
 });
 
-test('op open watches nothing any more, a stake from before the lock-down or not (only placed slips are watched)', async () => {
-  const now = { t: Date.parse('2026-10-13T20:00:00Z') };
-  const { store, deps, doc } = setup(now);
-  wallet(store, [{ id: 'odds:stake-sneaky0001', t: 1, app: 'odds', kind: 'stake', amount: -100 }]);
-  const r = await post(deps, { op: 'open', slips: [slip('sneaky0001', [leg('home')])] });
-  assert.equal(r.body.added, 0);
-  assert.equal(doc(OPEN_COLLECTION, `${ACCOUNT}_sneaky0001`), null);
-});
-
 test('the dev door checks a slip\'s prices and places nothing; without it, no pass, no answer', async () => {
   const { deps, doc } = setup({ t: Date.parse('2026-10-13T20:00:00Z') });
   deps.checkSlip = async () => ({ ok: true });

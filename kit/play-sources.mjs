@@ -829,14 +829,11 @@ export async function loadOdds(now = new Date(), onProgress) {
   );
   if (results.every(r => r.status === 'rejected')) throw results[0].reason;
   const [mlbDk, mlbPm, eplDk, eplPm, f1, nbaPm, f1Espn, f1Kambi] = results.map(r => (r.status === 'fulfilled' ? r.value : []));
-  // MotoGP is no longer sold (open bets still settle from its results).
-  const moto = null;
   const race = await f1Race(f1, f1Espn, f1Kambi, now);
   return {
     loadedAt: now.toISOString(),
     games: lotteryGames(mergeGames([...mlbDk, ...eplDk], [...parsePolymarketMlb(mlbPm, now), ...parsePolymarketEpl(eplPm, now)], { scheduled: new Set([results[0].status === 'fulfilled' && 'mlb', results[2].status === 'fulfilled' && 'epl'].filter(Boolean)) }), now),
     f1: race,
-    moto,
     futures: [...parseFutures(mlbPm, 'mlb'), ...parseFutures(eplPm, 'epl'), ...(nbaInSeason(now) ? parseFutures(nbaPm, 'nba') : [])]
   };
 }

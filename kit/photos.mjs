@@ -108,9 +108,6 @@ export async function faceFor(name, league) {
 }
 
 // ---- The device's copy ----------------------------------------------------------------
-// v3: v2 kept "none" for a lookup that had failed (TheSportsDB's limit hit
-// while browsing): those players stayed faceless for a week. v1 held
-// Wikipedia's pictures, which aren't kept any more.
 const STORE = 'fx.pics.v3';
 const FOUND_MS = 60 * 86_400_000;
 const NONE_MS = 7 * 86_400_000;
@@ -118,8 +115,6 @@ let cache = null;
 function load() {
   if (cache) return cache;
   try {
-    globalThis.localStorage?.removeItem('fx.pics.v1');
-    globalThis.localStorage?.removeItem('fx.pics.v2');
     cache = JSON.parse(globalThis.localStorage?.getItem(STORE) || '{}') || {};
   } catch {
     cache = {};

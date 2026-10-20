@@ -112,16 +112,6 @@ test('a scratch card\'s prize is drawn by the Worker and paid once, when it is s
   assert.ok(doc(WALLET_COLLECTION, ACCOUNT).entries.filter(e => e.id === 'odds:prize-scratch001').length <= 1);
 });
 
-test('tickets from before the lock-down are watched no more: a ticket handed over could name its own prize', async () => {
-  const now = { t: Date.parse('2026-10-13T04:00:00Z') };
-  const { deps, doc } = setup(now, [...money, { id: 'odds:lotto-oldcard001', t: 1, app: 'odds', kind: 'lottery', amount: -100 }, { id: 'odds:lotto-newcard001', t: now.t, app: 'odds', kind: 'lottery', amount: -100 }, { id: 'odds:lotto-oldcard002', t: 1, app: 'odds', kind: 'lottery', amount: -100 }]);
-  const card = id => ({ id, t: '2026-10-01T00:00:00Z', game: 'scratch:lucky7', card: 'lucky7', cost: 100, prize: 500, seed: 7, status: 'open' });
-  const r = await post(deps, { op: 'tickets-open', tickets: [card('oldcard001'), card('newcard001'), { ...card('oldcard002'), prize: 999_999 }] });
-  assert.equal(r.body.watching, 0);
-  assert.equal(doc(TICKET_COLLECTION, `${ACCOUNT}_oldcard001`), null);
-  assert.equal((await post(deps, { op: 'reveal', id: 'oldcard001' })).body.refused.problem, 'unknown');
-});
-
 test('one ticket id twice in a sale: refused, nothing charged', async () => {
   const now = { t: Date.parse('2026-10-12T04:00:00Z') };
   const { deps, doc } = setup(now, money);

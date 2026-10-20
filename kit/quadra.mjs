@@ -29,8 +29,6 @@
 // one left behind stops refreshing and shows where Quadra is open, with a
 // button to continue there. Links between the apps carry the sign-in along.
 
-// The mirror's addresses (kit/mirror.mjs), for the builders and older callers.
-export { MIRROR_HOSTS, mirrorPath } from './mirror.mjs';
 import { BRANDS, FAMILIES, pathOf, appIcon, familyMark } from './brand.mjs';
 import { DEV, cleanDev } from './brand.mjs';
 import { icons, tile, pullToRefresh, setSheetDetent, segmented } from './ui.mjs';
@@ -158,8 +156,8 @@ import { govOf } from './gov.mjs';
 export { govOf };
 export function moneySides(wallet) {
   const gave = { start: 0, pay: 0, rank: 0, other: 0 };
-  // Play's settled bets (payouts less stakes) and what Quadra charges (old Plus
-  // fees, overdraft interest); a bet still open is neither yet: it's money
+  // Play's settled bets (payouts less stakes) and what Quadra charges (overdraft
+  // interest, old fees); a bet still open is neither yet: it's money
   // at stake, still the account's.
   let play = 0;
   let fees = 0;
@@ -220,8 +218,7 @@ const taipeiMonth = t => new Date(t + TPE).toISOString().slice(0, 7);
 //
 // The account button in every app can wear an avatar (the wallet setting
 // `avatar`: { id }) and a frame around it (`frame`: { id }), chosen in the
-// Quadra Pass sheet (外觀). Every one is open to every account (they were
-// Plus's until Plus ended, 2026-10-20).
+// Quadra Pass sheet (外觀). Every one is open to every account.
 export const AVATARS = [
   ...[
     ['sprout', '🌱'], ['fox', '🦊'], ['panda', '🐼'], ['lion', '🦁'], ['dragon', '🐉'], ['unicorn', '🦄'], ['crown', '👑'], ['cat', '🐱'], ['dog', '🐶'], ['frog', '🐸'],
@@ -537,36 +534,6 @@ export async function workerJson(path, query, { timeout = 8000, body = null } = 
     return null;
   }
 }
-// The same, for an answer that comes in lines (JSON, one a line): each one
-// to `onLine` as it arrives, the last one returned (null on a failure).
-export async function workerLines(path, query, { timeout = 8000, body = null, onLine = () => {} } = {}) {
-  try {
-    const init = body == null ? {} : { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body };
-    const res = await signedFetch(`${ECO_URL.replace(/\/eco$/, path)}?${query || 'v=1'}`, { ...init, signal: AbortSignal.timeout(timeout) });
-    if (!res.ok) return null;
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let rest = '';
-    let last = null;
-    const take = text => {
-      const x = JSON.parse(text);
-      last = x;
-      onLine(x);
-    };
-    for (;;) {
-      const { done, value } = await reader.read();
-      rest += decoder.decode(value || new Uint8Array(), { stream: !done });
-      const parts = rest.split('\n');
-      rest = parts.pop();
-      for (const part of parts) if (part.trim()) take(part);
-      if (done) break;
-    }
-    if (rest.trim()) take(rest);
-    return last;
-  } catch {
-    return null;
-  }
-}
 // Which app asks: the proxy counts each app's asks apart (Securities' quotes
 // left running never use up Sports' minute).
 const appParam = () => (dataSession?.app ? `&app=${dataSession.app}` : '');
@@ -692,7 +659,7 @@ const RETRY_MS = 15_000;
 // (`alone`: never in a batch, which answers only when its slowest read is
 // in: a league's table waited on its playoffs' game days, 2026-10-15.)
 export function proxyJson(url, { ttl = 60_000, trim = '', persist: keep = true, timeout = 20_000, mirror = true, alone = false } = {}) {
-  return keptJson(url, dataKey(url, trim), { ttl, keep }, () => (!mirror || mirrorGone.has(`${trim}!${url}`) ? fetchOne(url, trim, timeout, '&mirror=0') : alone ? fetchOne(url, trim, timeout) : enqueue(url, trim, timeout)));
+  return keptJson(url, dataKey(url, trim), { ttl, keep }, () => (!mirror ? fetchOne(url, trim, timeout, '&mirror=0') : alone ? fetchOne(url, trim, timeout) : enqueue(url, trim, timeout)));
 }
 // The family's data (the proxy's /data/, kept in R2 on Cloudflare; built at
 // night and through the day): what doesn't change in a day (a league's
@@ -710,11 +677,6 @@ export function packJson(path, { ttl = 3 * 3_600_000, timeout = 30_000 } = {}) {
     if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
     return res.text();
   });
-}
-// A read that must come from its source, never a kept copy: the session's.
-const mirrorGone = new Set();
-export function unmirror(url, trim = '') {
-  mirrorGone.add(`${trim}!${url}`);
 }
 // A live read (asked every few seconds) is kept on the device at most once a
 // minute: each copy is a whole answer's write (an MLB game's is 0.9 MB).
@@ -2663,7 +2625,6 @@ export async function syncPrefs(s) {
       const t = mine.t || Date.now();
       const { t: _, ...value } = mine;
       await s.write({ wallet: { settings: { notify: { value, t } } } }).catch(() => null);
-      if (!mine.t) writeStore(PREFS_KEY, JSON.stringify({ ...mine, t }));
     }
     // The Worker's copy, once per change.
     const now = notifyPrefs();
@@ -3021,7 +2982,6 @@ export function sounding() {
 }
 
 let watching = null;
-// `busy` is no longer waited on (kept so the apps' calls stay valid).
 export function watchUpdates({ current, key, cachePrefix, every = 15_000 } = {}) {
   if (!current || current === 'dev' || typeof document === 'undefined') return;
   // Started already (by the kit itself, or an earlier call): one watch a page.

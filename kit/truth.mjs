@@ -68,7 +68,7 @@ export function roundTrip(amount) {
 // overdraft interest, and the three sides of the money (the kit's
 // moneySides).
 export function record(wallet) {
-  const r = { staked: 0, won: 0, tickets: 0, prizes: 0, plusPaid: 0, plusBets: 0, od: 0, vip: 0, freeBets: 0 };
+  const r = { staked: 0, won: 0, tickets: 0, prizes: 0, plusPaid: 0, od: 0, vip: 0, freeBets: 0 };
   for (const e of wallet?.entries || []) {
     const a = Number(e.amount) || 0;
     if (e.app === 'odds') {

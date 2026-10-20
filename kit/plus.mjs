@@ -2,10 +2,7 @@
 // kit (quadra.mjs re-exports them) and the Worker, which checks a placed
 // slip's free bet against the pass's wallet (settle.js).
 //
-// Quadra Plus, the paid membership, was removed on 2026-10-20: its looks are
-// free for everyone, members were refunded what they had paid for the days
-// left (eco.js, `eco:plusrefund:v1`; a free trial month is never refunded),
-// and old `eco:plus:<month>` entries stay in the wallet as history.
+// Old `eco:plus:<month>` entries stay in the wallet as history.
 
 // A Taiwan month (YYYY-MM) of a time.
 const taipeiMonth = t => new Date(t + 8 * 3_600_000).toISOString().slice(0, 7);
