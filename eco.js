@@ -388,6 +388,10 @@ export function plusRefundEntries(wallet, now) {
 // dropped), once. One that was: its payout is over 400× its cost (taxed odds
 // over 500, less 20%); an untaxed one is at most 500×, so the 400–500 band
 // is taken as taxed and left alone. Cash outs are no prize and aren't taxed.
+// A charge that would leave the slip paying back less than it cost is never
+// made (the owner: "loading to tax is just too broken", refund it and take
+// it off the record): one already made is taken back by an
+// `eco:untax-<slip>` mark (amount 0), and mergeWallet drops the charge.
 export const TAX_SLIP_FROM = Date.UTC(2026, 9, 20, 4, 32, 36);
 const msOf = t => (typeof t === 'number' ? t : new Date(t).getTime());
 export function backTaxEntries(wallet, now) {
@@ -396,14 +400,23 @@ export function backTaxEntries(wallet, now) {
   const have = new Set(entries.map(e => e.id));
   const cost = new Map(entries.filter(e => e.app === 'odds' && e.kind === 'stake' && typeof e.id === 'string' && e.id.startsWith('odds:stake-')).map(e => [e.id.slice(11), -Number(e.amount) || 0]));
   const out = [];
+  const loses = (paid, tax, c) => c > 0 && paid - tax < c;
   for (const e of entries) {
+    if (e.app === 'odds' && e.kind === 'tax' && typeof e.id === 'string' && e.id.startsWith('odds:tax-')) {
+      const id = e.id.slice(9);
+      const paid = Number(entries.find(x => x.id === `odds:payout-${id}`)?.amount) || 0;
+      if (!have.has(`eco:untax-${id}`) && loses(paid, -Number(e.amount) || 0, cost.get(id) || 0)) out.push({ id: `eco:untax-${id}`, t: now, app: 'eco', kind: 'untax', amount: 0 });
+      continue;
+    }
     if (e.app !== 'odds' || e.kind !== 'payout' || typeof e.id !== 'string' || !e.id.startsWith('odds:payout-')) continue;
     const id = e.id.slice(12);
     const paid = Number(e.amount) || 0;
-    if (paid <= SLIP_RULES.taxFree || !(msOf(e.t) < TAX_SLIP_FROM) || have.has(`odds:tax-${id}`)) continue;
+    if (paid <= SLIP_RULES.taxFree || !(msOf(e.t) < TAX_SLIP_FROM) || have.has(`odds:tax-${id}`) || have.has(`eco:untax-${id}`)) continue;
     const c = cost.get(id) || 0;
     if (c > 0 && paid > 400 * c) continue;
-    out.push({ id: `odds:tax-${id}`, t: now, app: 'odds', kind: 'tax', amount: -Math.floor(paid * SLIP_RULES.taxRate + 1e-9) });
+    const tax = Math.floor(paid * SLIP_RULES.taxRate + 1e-9);
+    if (loses(paid, tax, c)) continue;
+    out.push({ id: `odds:tax-${id}`, t: now, app: 'odds', kind: 'tax', amount: -tax });
   }
   return out;
 }
@@ -519,6 +532,9 @@ export function mergeWallet(a, b) {
   if (!b) return base;
   const entries = new Map(base.entries.map(e => [e.id, e]));
   for (const e of b.entries || []) if (!entries.has(e.id)) entries.set(e.id, e);
+  // A back-charged sports tax taken back (`eco:untax-<slip>`) leaves no trace
+  // of the charge, from this Worker or a phone's copy of it.
+  for (const id of entries.keys()) if (id.startsWith('eco:untax-')) entries.delete(`odds:tax-${id.slice(10)}`);
   const inbox = { ...(base.inbox || {}) };
   for (const [app, ids] of Object.entries(b.inbox || {})) inbox[app] = [...new Set([...(inbox[app] || []), ...ids])];
   const created = Math.min(base.created ?? Infinity, b.created ?? Infinity);

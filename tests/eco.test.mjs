@@ -958,14 +958,16 @@ test('Quadra Plus ended: what was paid for the days left comes back once; a free
   assert.notEqual((await tt.call('POST', '', { op: 'plus', qt: acct.token, on: true })).status, 200);
 });
 
-test('運彩 tax back charged: an untaxed payout over NT$5,000 from before the whole-slip rule pays its 20% once', () => {
+test('運彩 tax back charged: an untaxed payout over NT$5,000 from before the whole-slip rule pays its 20% once, never turning a win into a loss', () => {
   const before = TAX_SLIP_FROM - 3_600_000;
   const at = TAX_SLIP_FROM + 60_000;
   const e = (id, kind, amount, t = before) => ({ id, t, app: 'odds', kind, amount });
   const wallet = {
     entries: [
-      // NT$28,630 at 1.08: paid NT$30,920 untaxed, owes 6,184.
-      e('odds:stake-a', 'stake', -28_630), e('odds:payout-a', 'payout', 30_920),
+      // NT$5,000 at 2.0: paid NT$10,000 untaxed, owes 2,000.
+      e('odds:stake-a', 'stake', -5_000), e('odds:payout-a', 'payout', 10_000),
+      // NT$28,630 at 1.08: 20% would leave less than the bet, so nothing.
+      e('odds:stake-g', 'stake', -28_630), e('odds:payout-g', 'payout', 30_920),
       // NT$3,000: under the line, nothing.
       e('odds:stake-b', 'stake', -1_000), e('odds:payout-b', 'payout', 3_000),
       // NT$100 at 600, taxed then (48,000 = 480× its cost): left alone.
@@ -978,9 +980,19 @@ test('運彩 tax back charged: an untaxed payout over NT$5,000 from before the w
   };
   assert.deepEqual(backTaxEntries(wallet, before), []);
   const out = backTaxEntries(wallet, at);
-  assert.deepEqual(out, [{ id: 'odds:tax-a', t: at, app: 'odds', kind: 'tax', amount: -6_184 }]);
+  assert.deepEqual(out, [{ id: 'odds:tax-a', t: at, app: 'odds', kind: 'tax', amount: -2_000 }]);
   // Once.
   assert.deepEqual(backTaxEntries({ entries: [...wallet.entries, ...out] }, at + 1), []);
   // The sweep adds it.
   assert.ok(paydayEntries({ ...wallet, created: before }, at).some(x => x.id === 'odds:tax-a'));
+  // A losing charge already made is taken back: marked, then dropped from the wallet, the money back.
+  const charged = { ...emptyWallet(), entries: [...wallet.entries, e('odds:tax-g', 'tax', -6_184, at)] };
+  const mark = backTaxEntries(charged, at + 2).filter(x => x.kind === 'untax');
+  assert.deepEqual(mark, [{ id: 'eco:untax-g', t: at + 2, app: 'eco', kind: 'untax', amount: 0 }]);
+  const fixed = mergeWallet(charged, { entries: mark });
+  assert.ok(!fixed.entries.some(x => x.id === 'odds:tax-g'));
+  assert.equal(poolBalance(fixed), poolBalance({ entries: wallet.entries }));
+  // A phone's copy of the charge doesn't bring it back; the sweep doesn't either.
+  assert.ok(!mergeWallet(fixed, { entries: [e('odds:tax-g', 'tax', -6_184, at)] }).entries.some(x => x.id === 'odds:tax-g'));
+  assert.ok(!backTaxEntries(fixed, at + 3).some(x => x.id.endsWith('-g')));
 });
