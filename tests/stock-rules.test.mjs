@@ -95,7 +95,7 @@ test('a Taiwan market or stop order holds, and counts against 當沖額度, at t
   assert.equal(SA.limitUpFor({ type: 'market' }, { ...tw(100), market: 'US' }, now), null);
   // A market order filled at once still pays only its price; the rest comes back.
   const m = SA.placeOrder(acc, { side: 'buy', type: 'market', qty: 1000 }, { quote: tw(100, { prev: 95 }), rates, valuation: ok, now, id: 'b2' });
-  assert.equal(m.fill.price, 100.25);
+  assert.equal(m.fill.price, 100.5);
   assert.equal(SA.available(m.account, SA.replay(m.account, now)).cash.TWD, 1_000_000 - m.fill.total);
   // 先賣後買: a market or stop sale counts at the limit-up too.
   const trades = Array.from({ length: 10 }, (_, i) => ({ id: `t${i}`, type: 'fill', t: now - (i + 1) * 5 * DAY, orderId: `t${i}`, symbol: '2317.TW', name: 'X', kind: 'stock', market: 'TW', currency: 'TWD', side: 'buy', qty: 1, price: 100, gross: 100, total: 100, commission: 0, tax: 0, fee: 0, twd: 1 }));
@@ -326,4 +326,17 @@ test("複委託: an online order's minimum at Taiwan brokers (¥3,000, €35, £
   assert.equal(buy('JP', 'JPY', 2_000_000), 5_000, 'the rate past the minimum');
   assert.equal(dividendTaxes('JP', 10_000).withheld, 1_532);
   assert.equal(dividendTaxes('FR', 100).withheld, 25);
+});
+
+test('without 當沖 a share bought today sells only tomorrow; older shares sell today', () => {
+  const now = Date.parse('2026-10-13T03:00:00Z');
+  let acc = SA.newAccount(1_000_000, now - 400 * 86_400_000, 'nodt');
+  const q = { symbol: '2330.TW', market: 'TW', kind: 'stock', currency: 'TWD', price: 100, prev: 100, marketTime: now };
+  const old = { id: 'f0', type: 'fill', t: now - 5 * 86_400_000, orderId: 'o0', side: 'buy', symbol: '2330.TW', name: 'TSMC', market: 'TW', kind: 'stock', currency: 'TWD', qty: 1000, price: 100, gross: 100_000, commission: 142, tax: 0, fee: 0, total: 100_142, twd: 1, settle: now };
+  const fresh = { ...old, id: 'f1', orderId: 'o1', t: now - 3_600_000 };
+  acc = { ...acc, events: [...acc.events, old, fresh] };
+  const ok = { margin: 'ok' };
+  const sell = qty => SA.placeOrder(acc, { side: 'sell', type: 'limit', limit: 105, qty }, { quote: q, rates: { TWD: 1 }, valuation: ok, now, id: `s${qty}` });
+  assert.equal(sell(2000).error, 'dayTradeNeeded');
+  assert.equal(sell(1000).error, undefined);
 });

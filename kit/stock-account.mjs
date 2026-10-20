@@ -31,6 +31,7 @@ import {
   priceLimits,
   tickSize,
   dividendTaxes,
+  nhiPremium,
   isOpen,
   isTradable,
   isShortable,
@@ -228,9 +229,21 @@ function applyEvent(s, e) {
       // lent out (借券: the borrower returns the split's number, TWSE's
       // 借券 rules for 除權) all times the ratio (a lent lot's price over it: its fee the same); what
       // was paid is the same.
+      // A Taiwan 配股 (`par`: its shares' NT$10 face value) gives whole shares
+      // only: the fraction is paid in cash at par, and the new shares at par
+      // are dividend income, NHI's 2.11% from NT$20,000 (公司法 §240,
+      // 二代健保 股利所得).
       case 'split': {
         const p = s.positions[e.symbol];
-        if (p) {
+        if (p && e.par && p.qty > 0) {
+          const whole = Math.floor(p.qty * e.ratio + EPS);
+          add(s.cash, BASE, (e.cash || 0) - (e.nhi || 0));
+          s.dividends += e.cash || 0;
+          s.paid.nhi += e.nhi || 0;
+          if (p.marginQty > 0) p.marginQty = Math.floor(p.marginQty * e.ratio + EPS);
+          if (p.last > 0) p.last /= e.ratio;
+          p.qty = whole;
+        } else if (p) {
           p.qty *= e.ratio;
           if (p.marginQty > 0) p.marginQty *= e.ratio;
           if (p.last > 0) p.last /= e.ratio;
@@ -463,7 +476,7 @@ export const firstTrade = account => account?.welcome === true && !traded(accoun
 export function estimate({ market, kind, currency, side, qty, price, t = Date.now(), dayTrade = false, first = false, plan = false }) {
   const deal = dealPrice(market, side, price);
   const gross = roundCash(deal * qty, currency);
-  const cost = (q, g) => tradeCosts({ market, side, kind, gross: g, currency, discount: first ? 0 : 1, oddLot: isOddLot(market, kind, q), dayTrade, t, plan });
+  const cost = (q, g) => tradeCosts({ market, side, kind, gross: g, qty: q, currency, discount: first ? 0 : 1, oddLot: isOddLot(market, kind, q), dayTrade, t, plan });
   const mixed = mixedLot(market, kind, qty);
   let costs = cost(qty, gross);
   if (mixed) {
@@ -690,6 +703,13 @@ export function placeOrder(account, req, { quote, rates, valuation, now = Date.n
   if (order.tif === 'day' && atClosingAuction(order)) order.expires += CLOSE_DECIDE;
   if (side === 'sell') {
     const have = Math.max(0, avail.qty[quote.symbol] || 0);
+    // Shares bought today sell today only as a 現股當沖 (dayTradeBuyFirst:
+    // 3 months open and 10 trades, or a credit account); before that a
+    // broker refuses the sale until tomorrow (TWSE 現股當日沖銷交易作業要點).
+    if (quote.market === 'TW' && !req.forced && !req.cover && !dayTradeBuyFirst(account, now)) {
+      const today = boughtToday(account, quote.symbol, now);
+      if (today > EPS && qty > Math.max(0, have - today) + EPS) return { error: 'dayTradeNeeded', have: Math.max(0, have - today) };
+    }
     const short = qty - have;
     if (short > EPS) {
       // Selling more than is held sells the rest short; never abroad (複委託
@@ -821,13 +841,25 @@ export function dayTradeShare(account, order, at) {
   return Math.min(order.qty, Math.max(0, bought - sold)) / order.qty;
 }
 
+// Shares of `symbol` bought on Taiwan's day of `at`: what can't be sold
+// again before tomorrow without 當沖 (the day's sales were of older shares).
+function boughtToday(account, symbol, at) {
+  const day = localDayOf(at, 'TW');
+  let qty = 0;
+  for (const e of account.events) if (e.type === 'fill' && e.side === 'buy' && e.symbol === symbol && e.t <= at && localDayOf(e.t, 'TW') === day) qty += e.qty;
+  return qty;
+}
+
 // Fills `order` at `price`. The fill is dated `at` (a past moment when it's
 // found in the price history); cash and shares are checked as of `now`.
 function fillOrder(account, order, price, rates, now, at = now) {
   // A market (or triggered stop) order crosses the spread: it buys at the
   // ask and sells at the bid. A limit order fills at its price or better.
   const quote = price;
-  if (order.type !== 'limit') price = marketFill(order.market, order.kind, order.side, price);
+  // (Taiwan's single-price matches, the 13:30 closing auction and 14:30
+  // 盤後定價, fill everyone at that one price: nothing to cross.)
+  const single = order.after || (atClosingAuction(order) && closingAuction(at)?.match <= at);
+  if (order.type !== 'limit' && !single) price = marketFill(order.market, order.kind, order.side, price);
   else price = order.side === 'buy' ? Math.min(price, order.limit) : Math.max(price, order.limit);
   // A Taiwan stock sold the day it was bought pays the day-trade tax (half),
   // once the account may day trade buying first (3 months open, 10 trades in
@@ -1660,7 +1692,7 @@ function sharesAt(account, symbol, t) {
     if (e.symbol !== symbol) continue;
     if (e.type === 'fill') qty += e.side === 'buy' ? e.qty : -e.qty;
     else if (e.type === 'ipowin' && applied.has(`${e.code}:${e.draw}`)) qty += e.qty;
-    else if (e.type === 'split') qty *= e.ratio;
+    else if (e.type === 'split') qty = e.par && qty > 0 ? Math.floor(qty * e.ratio + EPS) : qty * e.ratio;
   }
   return Math.abs(qty) > EPS ? qty : 0;
 }
@@ -1692,6 +1724,13 @@ export function applyCorporateActions(account, symbol, { dividends = [], splits 
     if (sp.date <= first || sp.date > now || have.has(id) || !(sp.ratio > 0) || sp.ratio === 1) continue;
     if (!sharesAt(next, symbol, sp.date)) continue;
     const event = { id, type: 'split', t: sp.date, symbol, ratio: sp.ratio };
+    // A Taiwan 配股 (a ratio like 1.05): whole shares, the fraction in cash
+    // at the NT$10 par, NHI on the new shares at par (replay).
+    const held = sharesAt(next, symbol, sp.date);
+    if (info.market === 'TW' && sp.ratio > 1 && !Number.isInteger(sp.ratio) && held > 0) {
+      const whole = Math.floor(held * sp.ratio + EPS);
+      Object.assign(event, { par: 10, cash: Math.floor((held * sp.ratio - whole) * 10 + EPS), nhi: nhiPremium((whole - held) * 10) });
+    }
     next = { ...next, events: [...next.events, event] };
     added.push(event);
     // An order waiting from before it is deleted, as a Taiwan broker deletes
@@ -1711,11 +1750,11 @@ export function applyCorporateActions(account, symbol, { dividends = [], splits 
     const gross = roundCash(shares * perShare, info.currency);
     if (!gross) continue;
     // A short position pays the dividend to the lender, untaxed.
-    const taxes = gross > 0 ? dividendTaxes(info.market, gross) : { withheld: 0, nhi: 0, net: gross };
+    const taxes = gross > 0 ? dividendTaxes(info.market, gross, symbol) : { withheld: 0, nhi: 0, fee: 0, net: gross };
     // Owed from the ex-date, paid some days later (until then it's pending).
     const event = {
       id, type: 'div', t: divPayDate(info.market, d.date, payDayOf(info.market, d.date, exDividendDate, dividendDate)), ex: d.date, symbol, name: info.name, market: info.market, kind: info.kind, currency: info.currency,
-      shares, perShare, gross, withheld: taxes.withheld, nhi: taxes.nhi, net: roundCash(taxes.net, info.currency), twd: rate
+      shares, perShare, gross, withheld: taxes.withheld, nhi: taxes.nhi, ...(taxes.fee ? { fee: taxes.fee } : {}), net: roundCash(taxes.net, info.currency), twd: rate
     };
     next = { ...next, events: [...next.events, event] };
     added.push(event);

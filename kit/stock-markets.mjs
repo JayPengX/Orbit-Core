@@ -12,11 +12,11 @@ import { TOPIX500, JP_ETF_UNITS } from '#kit/stock-jp-lists.mjs';
 export const CURRENCIES = {
   TWD: { symbol: 'NT$', digits: 0, spread: 0, loanRate: 0.065, zh: '新台幣', en: 'Taiwan dollar', flag: '🇹🇼' },
   USD: { symbol: 'US$', digits: 2, spread: 0.002, loanRate: 0.075, zh: '美元', en: 'US dollar', flag: '🇺🇸' },
-  JPY: { symbol: '¥', digits: 0, spread: 0.003, loanRate: 0.03, zh: '日圓', en: 'Japanese yen', flag: '🇯🇵' },
-  HKD: { symbol: 'HK$', digits: 2, spread: 0.003, loanRate: 0.07, zh: '港幣', en: 'Hong Kong dollar', flag: '🇭🇰' },
-  CNY: { symbol: 'CN¥', digits: 2, spread: 0.004, loanRate: 0.05, zh: '人民幣', en: 'Chinese yuan', flag: '🇨🇳' },
+  JPY: { symbol: '¥', digits: 0, spread: 0.006, loanRate: 0.03, zh: '日圓', en: 'Japanese yen', flag: '🇯🇵' },
+  HKD: { symbol: 'HK$', digits: 2, spread: 0.005, loanRate: 0.07, zh: '港幣', en: 'Hong Kong dollar', flag: '🇭🇰' },
+  CNY: { symbol: 'CN¥', digits: 2, spread: 0.005, loanRate: 0.05, zh: '人民幣', en: 'Chinese yuan', flag: '🇨🇳' },
   KRW: { symbol: '₩', digits: 0, spread: 0.008, loanRate: 0.06, zh: '韓元', en: 'Korean won', flag: '🇰🇷' },
-  EUR: { symbol: '€', digits: 2, spread: 0.003, loanRate: 0.06, zh: '歐元', en: 'Euro', flag: '🇪🇺' },
+  EUR: { symbol: '€', digits: 2, spread: 0.004, loanRate: 0.06, zh: '歐元', en: 'Euro', flag: '🇪🇺' },
   GBP: { symbol: '£', digits: 2, spread: 0.0035, loanRate: 0.07, zh: '英鎊', en: 'British pound', flag: '🇬🇧' },
   CHF: { symbol: 'CHF ', digits: 2, spread: 0.0035, loanRate: 0.04, zh: '瑞士法郎', en: 'Swiss franc', flag: '🇨🇭' },
   // Yahoo has no DKK/TWD pair: priced through US$ (USDDKK=X).
@@ -90,6 +90,9 @@ export const MARKETS = {
     plan: { flat: 0.1, flatUntil: US_FEE_PROMO_UNTIL, rate: 0.001, min: 3 },
     // The SEC's Section 31 fee on sales: US$20.60 per million from 2026-04-04.
     sell: { all: { fee: 0.0000206 } },
+    // FINRA's Trading Activity Fee on sales: US$0.000166 a share, at most
+    // US$8.30 a trade, rounded up to the cent (FINRA By-Laws Schedule A §1).
+    taf: { perShare: 0.000166, max: 8.3 },
     withholding: 0.3
   },
   JP: { delay: 20, zh: '日股', en: 'Japan', flag: '🇯🇵', currency: 'JPY', suffixes: ['.T'], commission: { rate: 0.0025, min: 3000 }, withholding: 0.15315 },
@@ -297,7 +300,9 @@ export function cnBoard(symbol) {
 }
 export function limitShare(quote, now = Date.now()) {
   if (!quote || !['stock', 'etf', 'bond'].includes(quote.kind)) return null;
-  if (quote.market === 'TW') return newListing(quote.listed, now) ? null : 0.1;
+  // A Taiwan bond ETF (all of them hold foreign bonds) has no daily limit:
+  // TWSE's 國外成分證券ETF trade without one.
+  if (quote.market === 'TW') return newListing(quote.listed, now) || quote.kind === 'bond' ? null : 0.1;
   if (quote.market === 'KR') return 0.3;
   if (quote.market === 'CN') return cnBoard(quote.symbol) === 'main' ? 0.1 : 0.2;
   return null;
@@ -466,6 +471,8 @@ export const settleDays = (market, t = Date.now()) => (EUROPE_T1.has(market) && 
 const tradingDay = (market, day) => isTradingDay(market, day);
 // The moment a trade at `t` settles: n of the market's business days later,
 // at the end of that day in the market's own time.
+// Days a market doesn't trade but still settles (TWSE: 市場無交易，僅辦理結算交割).
+const SETTLE_ONLY = { TW: new Set(['2026-02-12', '2026-02-13']) };
 export function settleDate(market, t) {
   let n = settleDays(market, t);
   if (!n) return t;
@@ -477,7 +484,7 @@ export function settleDate(market, t) {
     [y, m, d] = [next.getUTCFullYear(), next.getUTCMonth() + 1, next.getUTCDate()];
     day = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
     const w = next.getUTCDay();
-    if (w !== 0 && w !== 6 && tradingDay(market, day)) n--;
+    if (w !== 0 && w !== 6 && (tradingDay(market, day) || SETTLE_ONLY[market]?.has(day))) n--;
   }
   return zonedTime(y, m, d, 23, 59, 59, tz);
 }
@@ -500,10 +507,17 @@ const HALF_SPREAD = { US: 0.0001, TW: 0, JP: 0.0005, HK: 0.0005, CN: 0.0005, KR:
 export function marketSlip(market, kind, price) {
   if (MARKETS[market]?.spread) return 0;
   const tick = tickSize(market, kind, price) || 0;
+  // Taiwan trades only on its ticks (營業細則 §62): the ask is a whole tick
+  // above the last price, the bid a whole tick below.
+  if (market === 'TW') return tick;
   return Math.max(tick / 2, price * (HALF_SPREAD[market] ?? 0.001));
 }
 // What a market order fills at, from the last price.
-export const marketFill = (market, kind, side, price) => (side === 'buy' ? price + marketSlip(market, kind, price) : Math.max(0, price - marketSlip(market, kind, price)));
+export function marketFill(market, kind, side, price) {
+  const p = side === 'buy' ? price + marketSlip(market, kind, price) : Math.max(0, price - marketSlip(market, kind, price));
+  // (Taiwan's ticks are whole cents at the least.)
+  return market === 'TW' ? Math.round(p * 100) / 100 : p;
+}
 
 // Taiwan's intraday odd-lot session (盤中零股): to 13:30, matched by call
 // auction; an order of fewer than 1,000 shares (or a part that isn't whole
@@ -656,7 +670,7 @@ function dayTradeRate(rules, kind, t = Date.now()) {
 // selling (redeeming) costs nothing, with no exchange fee or tax.
 export const FUND_FEE = 0.01;
 
-export function tradeCosts({ market, side, kind, gross, currency, discount = 1, oddLot = false, dayTrade = false, t = Date.now(), plan = false }) {
+export function tradeCosts({ market, side, kind, gross, qty = 0, currency, discount = 1, oddLot = false, dayTrade = false, t = Date.now(), plan = false }) {
   const m = MARKETS[market] || MARKETS.INTL;
   const round = m.floorFees ? x => Math.floor(x) : x => roundCash(x, currency);
   if (kind === 'fund') {
@@ -677,7 +691,8 @@ export function tradeCosts({ market, side, kind, gross, currency, discount = 1, 
   const { fee: feeRate } = rules;
   const taxRate = dayShare ? dayShare * dayRate + (1 - dayShare) * rules.tax : rules.tax;
   const tax = round(gross * taxRate);
-  const fee = round(gross * feeRate);
+  const taf = side === 'sell' && m.taf && qty > 0 && gross > 0 ? Math.min(m.taf.max, Math.ceil(qty * m.taf.perShare * 100 - 1e-9) / 100) : 0;
+  const fee = taf ? roundCash(round(gross * feeRate) + taf, currency) : round(gross * feeRate);
   return { commission, tax, fee, total: commission + tax + fee, taxRate, feeRate };
 }
 
@@ -697,11 +712,20 @@ export const NHI_THRESHOLD = 20_000;
 export const NHI_CAP = 10_000_000;
 export const nhiPremium = gross => (gross >= NHI_THRESHOLD ? Math.round(Math.min(gross, NHI_CAP) * NHI_RATE) : 0);
 
-export function dividendTaxes(market, gross) {
+// Hong Kong's H-shares (companies incorporated in mainland China) withhold
+// China's 10% on dividends (國家稅務總局 國稅函〔2008〕897號); other Hong Kong
+// stocks withhold nothing.
+export const H_SHARES = new Set(['0168.HK', '0386.HK', '0390.HK', '0728.HK', '0753.HK', '0857.HK', '0902.HK', '0914.HK', '0939.HK', '0998.HK', '1088.HK', '1186.HK', '1211.HK', '1288.HK', '1336.HK', '1339.HK', '1398.HK', '1658.HK', '1800.HK', '1919.HK', '2238.HK', '2318.HK', '2328.HK', '2333.HK', '2601.HK', '2628.HK', '2899.HK', '3328.HK', '3968.HK', '3988.HK', '6030.HK', '6690.HK', '6837.HK', '6886.HK']);
+// A Taiwan company's cash dividend arrives by bank transfer less its NT$10
+// 匯費 (the company's transfer fee, taken from each payment).
+export const TW_DIV_REMIT_FEE = 10;
+export function dividendTaxes(market, gross, symbol = '') {
   const m = MARKETS[market] || MARKETS.INTL;
-  const withheld = roundCash(gross * (m.withholding || 0), m.currency || 'USD');
+  const rate = market === 'HK' && H_SHARES.has(String(symbol).toUpperCase()) ? 0.1 : m.withholding || 0;
+  const withheld = roundCash(gross * rate, m.currency || 'USD');
   const nhi = m.nhi ? nhiPremium(gross) : 0;
-  return { withheld, nhi, net: gross - withheld - nhi };
+  const fee = market === 'TW' ? Math.min(TW_DIV_REMIT_FEE, Math.max(0, gross - withheld - nhi)) : 0;
+  return { withheld, nhi, fee, net: gross - withheld - nhi - fee };
 }
 
 // Margin: how much of a holding's value can be borrowed against (its loan

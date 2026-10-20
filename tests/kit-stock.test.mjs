@@ -101,8 +101,9 @@ test("settlement: n of the market's own business days, at the end of that day in
   // Taiwan T+2 over a weekend, and over 國慶日補假 (Fri 2026-10-09).
   assert.equal(iso(at(['TW', '2026-10-16T03:00:00Z'])), '2026-10-20T15:59:59.000Z');
   assert.equal(iso(at(['TW', '2026-10-08T03:00:00Z'])), '2026-10-13T15:59:59.000Z');
-  // TWSE's own days before Lunar New Year (2026-02-12, 13) and the holiday week.
-  assert.equal(iso(at(['TW', '2026-02-11T03:00:00Z'])), '2026-02-24T15:59:59.000Z');
+  // TWSE's days before Lunar New Year (2026-02-12, 13) trade nothing but
+  // still settle (市場無交易，僅辦理結算交割): Feb 11's trades settle Feb 13.
+  assert.equal(iso(at(['TW', '2026-02-11T03:00:00Z'])), '2026-02-13T15:59:59.000Z');
   // The US T+1 over Thanksgiving, in EST.
   assert.equal(iso(at(['US', '2026-11-25T15:00:00Z'])), '2026-11-28T04:59:59.000Z');
   // Across the end of daylight saving (the US's 2026-11-01, the UK's 2026-10-25).
@@ -149,6 +150,8 @@ test("Taiwan's ticks and daily limits, at each band's edges", () => {
   assert.deepEqual(lim(10, 'stock', 'CN', '688001.SS'), { up: 12, down: 8 });
   assert.equal(lim(100, 'stock', 'US', 'AAPL'), null);
   assert.equal(priceLimits({ prev: 0, market: 'TW', kind: 'stock' }), null);
+  // A Taiwan bond ETF holds foreign bonds: TWSE gives it no daily limit.
+  assert.equal(lim(40, 'bond', 'TW', '00679B.TWO'), null);
 });
 
 test('a price rounded to its tick is on it, in every market that has one', () => {
@@ -192,6 +195,10 @@ test("what a trade costs: Taiwan's floored fees, minimums, discounts, the day tr
   const us = tradeCosts({ market: 'US', side: 'sell', kind: 'stock', gross: 10_000, currency: 'USD', t: t2027 });
   assert.deepEqual([us.commission, us.fee, us.tax], [10, 0.21, 0]);
   assert.equal(tradeCosts({ market: 'US', side: 'buy', kind: 'stock', gross: 100, currency: 'USD', t: t2027 }).commission, 3);
+  // FINRA's TAF on a US sale: US$0.000166 a share, rounded up, US$8.30 at most.
+  assert.equal(tradeCosts({ market: 'US', side: 'sell', kind: 'stock', gross: 10_000, qty: 100, currency: 'USD', t: t2027 }).fee, 0.23);
+  assert.equal(tradeCosts({ market: 'US', side: 'sell', kind: 'stock', gross: 100_000, qty: 100_000, currency: 'USD', t: t2027 }).fee, 10.36);
+  assert.equal(tradeCosts({ market: 'US', side: 'buy', kind: 'stock', gross: 10_000, qty: 100, currency: 'USD', t: t2027 }).fee, 0);
   const hk = tradeCosts({ market: 'HK', side: 'buy', kind: 'stock', gross: 100_000, currency: 'HKD' });
   assert.deepEqual([hk.commission, hk.tax, hk.fee], [250, 100, 8.5]);
   // A market not in the table: the generic rate.
@@ -199,9 +206,14 @@ test("what a trade costs: Taiwan's floored fees, minimums, discounts, the day tr
 });
 
 test('dividends, interest and lending fees: withholding and the health premium at their thresholds', () => {
-  assert.deepEqual(dividendTaxes('TW', 19_999), { withheld: 0, nhi: 0, net: 19_999 });
-  assert.deepEqual(dividendTaxes('TW', 20_000), { withheld: 0, nhi: 422, net: 19_578 });
-  assert.deepEqual(dividendTaxes('US', 100), { withheld: 30, nhi: 0, net: 70 });
+  // (A Taiwan dividend also arrives less the company's NT$10 匯費.)
+  assert.deepEqual(dividendTaxes('TW', 19_999), { withheld: 0, nhi: 0, fee: 10, net: 19_989 });
+  assert.deepEqual(dividendTaxes('TW', 20_000), { withheld: 0, nhi: 422, fee: 10, net: 19_568 });
+  assert.equal(dividendTaxes('TW', 6).net, 0);
+  assert.deepEqual(dividendTaxes('US', 100), { withheld: 30, nhi: 0, fee: 0, net: 70 });
+  // Hong Kong: nothing, but an H-share withholds China's 10%.
+  assert.equal(dividendTaxes('HK', 1_000, '0700.HK').withheld, 0);
+  assert.equal(dividendTaxes('HK', 1_000, '0939.HK').withheld, 100);
   // 健保署: to the dollar, 角 rounded half up (20,030 × 2.11% = 422.633: 423), on at most NT$10 million
   // (its own example: 9,366,000 × 2.11% = 197,622.6 → 197,623).
   assert.equal(dividendTaxes('TW', 20_030).nhi, 423);
@@ -262,9 +274,11 @@ test('a symbol to its market and kind; what a broker lends against', () => {
   assert.equal(collateralRate('stock', 'CN', '600519.SS'), 0);
   assert.equal(collateralRate('crypto', 'CRYPTO'), 0);
   assert.equal(collateralRate('govbond', 'BOND'), 0.9);
-  // A market order pays half the spread, at least half a tick; never below zero.
-  assert.equal(marketFill('TW', 'stock', 'buy', 100), 100.25);
-  assert.equal(marketFill('TW', 'stock', 'sell', 100), 99.75);
+  // A market order pays half the spread, at least half a tick; never below
+  // zero. Taiwan's fills stay on its ticks: a whole tick.
+  assert.equal(marketFill('TW', 'stock', 'buy', 100), 100.5);
+  assert.equal(marketFill('TW', 'stock', 'sell', 100), 99.5);
+  assert.equal(marketFill('TW', 'etf', 'buy', 45.3), 45.31);
   assert.equal(marketFill('METAL', 'metal', 'buy', 100), 100);
   assert.ok(marketFill('US', 'stock', 'sell', 0.00001) >= 0);
 });
@@ -445,6 +459,25 @@ test('a split multiplies the shares lent out and the 融資 shares, and deletes 
   assert.equal(available(account, s).qty['2330.TW'], 2000, 'the shares not lent, none held by the deleted order');
   const o = account.orders.find(x => x.id === 'o1');
   assert.deepEqual([o.status, o.reason], ['cancelled', 'split']);
+});
+
+test('a Taiwan 配股 gives whole shares, the fraction in cash at par, and NHI on the new shares at par', () => {
+  const t0 = Date.parse('2026-03-02T01:00:00Z');
+  const at = t0 + 10 * DAY_MS;
+  const run = (qty, ratio) => {
+    let acc = SA.newAccount(10_000_000, t0 - DAY_MS, 'acc');
+    acc = { ...acc, events: [...acc.events, twFill('b1', t0, qty, 100)] };
+    const { account, added } = SA.applyCorporateActions(acc, '2330.TW', { splits: [{ date: at, ratio }] }, { rates: { TWD: 1 }, now: at + DAY_MS });
+    return { added: added[0], s: SA.replay(account, at + DAY_MS), before: SA.replay(acc, at + DAY_MS) };
+  };
+  const a = run(2345, 1.05);
+  assert.equal(a.s.positions['2330.TW'].qty, 2462);
+  assert.deepEqual([a.added.cash, a.added.nhi], [2, 0]);
+  assert.equal(a.s.cash.TWD - a.before.cash.TWD, 2);
+  const b = run(20_000, 1.2);
+  assert.equal(b.s.positions['2330.TW'].qty, 24_000);
+  assert.deepEqual([b.added.cash, b.added.nhi], [0, 844]);
+  assert.equal(b.s.cash.TWD - b.before.cash.TWD, -844);
 });
 
 test('interest on cash: one rule with deposits and lending (over NT$20,000 withheld 10%, NT$20,000 or more the 2.11% NHI)', () => {
