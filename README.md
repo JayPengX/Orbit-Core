@@ -309,7 +309,7 @@ the kit.
 ## Open
 
 - **Waiting on the owner:**
-  - phone alerts for the bill (admin → 系統 → 警示通知: your pass,
+  - phone alerts for the bill (admin → 健康 → 警示通知: your pass,
     設定, 測試);
   - a $5.01 usage email in Cloudflare → Notifications;
   - check the plan renews on the 13th (`PERIOD_DAY`);

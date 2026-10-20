@@ -21,20 +21,13 @@
 // `quadra-config/ledger` (retired), and its worth counts as returned.
 
 import { changeDoc } from './doc-store.js';
+import { govOf } from './kit/gov.mjs';
 
 export const LEDGER = ['quadra-config', 'ledger'];
 const RESET_ID = 'eco:rebase:v3';
 const LOAN_KINDS = new Set(['loan', 'loanfee', 'loanpay', 'loanlate', 'loangar', 'loanoff']);
-// The government's side of one account (the kit's govOf, the same rules).
-const whole = v => (typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.round(v)) : 0);
-export function govOf(wallet) {
-  const odds = wallet?.snap?.odds?.gov || {};
-  const stock = wallet?.snap?.stock?.gov || {};
-  const paid = { sports: whole(odds.sports), lottery: whole(odds.lottery), trade: whole(stock.trade), withheld: whole(stock.withheld), nhi: whole(stock.nhi) };
-  const got = { relief: Math.round((wallet?.entries || []).filter(e => e.app === 'eco' && e.kind === 'relief').reduce((sum, e) => sum + num(e.amount), 0)) };
-  const paidTotal = Object.values(paid).reduce((a, b) => a + b, 0);
-  return { paid, got, paidTotal, gotTotal: got.relief, net: got.relief - paidTotal };
-}
+// The government's side of one account: the kit's own govOf (kit/gov.mjs), so the two always agree.
+export { govOf };
 const num = v => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
 
 export function sidesOf(wallet) {
