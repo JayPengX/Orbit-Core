@@ -345,23 +345,15 @@ export function applyResults(account, slipId, results, now = new Date(), finals 
   let updated = { ...slip, legs };
   let ledger = account.ledger;
   if (legs.every(leg => leg.result) || dead) {
-    const settle = boost => {
-      const { gross, net } = settleSlip({ legs, sizes: slip.sizes, stake: slip.stake, boost });
-      // A free bet pays what it won, less the stake it never cost.
-      return { gross, payout: slip.free ? Math.max(0, Math.round(net) - (slip.freeValue ?? slip.stake)) : Math.round(net) };
-    };
-    const { gross, payout } = settle(slip.boost ?? 0);
-    // What Quadra Plus's bigger parlay boost added (an old member's slip
-    // keeps its boost of 1.5; Plus ended 2026-10-20) is paid as its own
-    // entry ('plus-<slip>', kind 'plusboost'), so the statement shows it.
-    const extra = slip.boost > 1 ? Math.max(0, payout - settle(1).payout) : 0;
+    const { gross, net } = settleSlip({ legs, sizes: slip.sizes, stake: slip.stake, boost: slip.boost ?? 0 });
+    // A free bet pays what it won, less the stake it never cost.
+    const payout = slip.free ? Math.max(0, Math.round(net) - (slip.freeValue ?? slip.stake)) : Math.round(net);
     updated = { ...updated, status: 'settled', settledAt: now.toISOString(), gross: Math.round(gross), payout };
     // (A slip refunded while it was lost, then found on another device, has
     // had its cost back already.)
     const refunded = ledger.some(e => e.id === `refund-${slip.id}`) ? slip.cost : 0;
     if (!ledger.some(e => e.id === `payout-${slip.id}`)) {
-      ledger = [...ledger, { id: `payout-${slip.id}`, t: now.toISOString(), kind: 'payout', amount: payout - extra - refunded, slipId: slip.id }];
-      if (extra) ledger = [...ledger, { id: `plus-${slip.id}`, t: now.toISOString(), kind: 'plusboost', amount: extra, slipId: slip.id }];
+      ledger = [...ledger, { id: `payout-${slip.id}`, t: now.toISOString(), kind: 'payout', amount: payout - refunded, slipId: slip.id }];
     }
   }
   return touched({ ...account, ledger, slips: account.slips.map(s => (s.id === slipId ? updated : s)) }, now);

@@ -44,7 +44,7 @@
 
 import { storeReady, parseDoc, changeDoc, moveOwned } from './doc-store.js';
 import { readOutcomes, legResult, applyResults, finalOf, familyOf, LEAGUES, voidAt, NOT_STARTED_MS } from './kit/settle.mjs';
-import { updateWallet, WALLET_COLLECTION, parseWallet, poolBalance, LOCK_SINCE } from './eco.js';
+import { updateWallet, WALLET_COLLECTION, parseWallet, poolBalance } from './eco.js';
 import { checkSlip, useReads, cashOutQuote, cashOutOk } from './price.js';
 import { handleLotto } from './lotto.js';
 import { watchKambi, KAMBI_COLLECTION } from './kambi.js';
@@ -66,8 +66,6 @@ const LATE_AGAIN = 15 * MIN;
 const LATE_AFTER = 6 * HOUR;
 // A championship (future) is looked at every 6 hours.
 const FUTURE_AGAIN = 6 * HOUR;
-// A slip is placed through the Worker (op 'place', its price checked).
-export const PLACE_SINCE = LOCK_SINCE;
 // How long a live pick waits before it's priced again and placed.
 export const LIVE_DELAY_MS = 5_000;
 // A cron run (its own invocation: on the $5 plan 10,000 fetches and 30 s of

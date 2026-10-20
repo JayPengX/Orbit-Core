@@ -24,7 +24,6 @@ import { changeDoc } from './doc-store.js';
 import { govOf } from './kit/gov.mjs';
 
 export const LEDGER = ['quadra-config', 'ledger'];
-const RESET_ID = 'eco:rebase:v3';
 const LOAN_KINDS = new Set(['loan', 'loanfee', 'loanpay', 'loanlate', 'loangar', 'loanoff']);
 // The government's side of one account: the kit's own govOf (kit/gov.mjs), so the two always agree.
 export { govOf };
@@ -38,11 +37,10 @@ export function sidesOf(wallet) {
   const entries = wallet?.entries || [];
   const ids = new Set(entries.map(e => e.id));
   const open = e => e.kind === 'stake' && typeof e.id === 'string' && e.id.startsWith('odds:stake-') && !ids.has(`odds:payout-${e.id.slice(11)}`) && !ids.has(`odds:refund-${e.id.slice(11)}`);
-  if (entries.some(e => e.id === RESET_ID) && !entries.some(e => e.id === 'eco:start')) gave.start += num(wallet?.snap?.stock?.opened ?? 100_000);
   for (const e of entries) {
     const a = num(e.amount);
     if (e.app === 'eco') {
-      if (e.kind === 'start' || e.kind === 'grant' || String(e.id).startsWith(RESET_ID)) gave.start += a;
+      if (e.kind === 'start' || e.kind === 'grant') gave.start += a;
       else if (e.kind === 'pay') gave.pay += a;
       else if (e.kind === 'rank') gave.rank += a;
       else if (e.kind === 'rebase' || e.kind === 'vip' || e.kind === 'admin') gave.other += a;

@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { handleEcoRequest, mergeWallet, poolBalance, cleanPatch, emptyWallet, paydayEntries, worthOf, REBASE, OVERDRAFT_RATE, plusRefund, plusRefundEntries, PLUS_END, PLUS_REFUND_ID, backTaxEntries, TAX_SLIP_FROM, vipEntries, vipStakes, vipTier, welcomeEntries, VIP, PAY, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, ECO_APPS, rankEntries, RANKS } from '../eco.js';
+import { handleEcoRequest, mergeWallet, poolBalance, cleanPatch, emptyWallet, paydayEntries, worthOf, OVERDRAFT_RATE, vipEntries, vipStakes, vipTier, welcomeEntries, VIP, PAY, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, ECO_APPS, rankEntries, RANKS } from '../eco.js';
 import { planClean, tidyWallet } from '../eco-admin.js';
 
 function setup() {
@@ -192,18 +192,16 @@ test('device code: signs in another device once, within ten minutes', async () =
   assert.equal((await t.call('POST', '', { op: 'pair-redeem', code: late.data.code, app: 'match' })).status, 404);
 });
 
-test('payday: monthly in October 2026, then every Monday from the 19th, back pay included', () => {
+test('payday: every Monday from 19 Oct 2026, back pay included', () => {
   const pays = (w, now) => paydayEntries(w, now).filter(e => e.kind === 'pay').map(e => e.id);
   const oct = Date.UTC(2026, 9, 7, 3);
-  assert.deepEqual(pays({ created: oct, entries: [] }, oct), ['eco:pay:2026-10']);
-  assert.equal(paydayEntries({ created: oct, entries: [] }, oct).find(e => e.kind === 'pay').amount, 6_000);
-  // From Monday 19 Oct (Taipei), NT$10,000 a week; October's monthly pay isn't paid twice.
+  assert.deepEqual(pays({ created: oct, entries: [] }, oct), []);
   const tue = Date.UTC(2026, 9, 20, 3);
-  assert.deepEqual(pays({ created: oct, entries: [{ id: 'eco:pay:2026-10', t: 1, app: 'eco', kind: 'pay', amount: 6_000 }] }, tue), ['eco:wpay:2026-10-19']);
+  assert.deepEqual(pays({ created: oct, entries: [] }, tue), ['eco:wpay:2026-10-19']);
   assert.equal(paydayEntries({ created: oct, entries: [] }, tue).find(e => e.id === 'eco:wpay:2026-10-19').amount, 10_000);
-  // Back pay: every Monday nobody opened an app, paid the next time; no monthly pay after October.
-  assert.deepEqual(pays({ created: oct, entries: [{ id: 'eco:pay:2026-10', t: 1, app: 'eco', kind: 'pay', amount: 6_000 }] }, Date.UTC(2026, 10, 3, 3)), ['eco:wpay:2026-10-19', 'eco:wpay:2026-10-26', 'eco:wpay:2026-11-02']);
-  // A pass made after the switch: weekly pay from its own week, never monthly.
+  // Back pay: every Monday nobody opened an app, paid the next time.
+  assert.deepEqual(pays({ created: oct, entries: [] }, Date.UTC(2026, 10, 3, 3)), ['eco:wpay:2026-10-19', 'eco:wpay:2026-10-26', 'eco:wpay:2026-11-02']);
+  // A pass made later: weekly pay from its own week.
   const made = Date.UTC(2026, 10, 4, 3);
   assert.deepEqual(pays({ created: made, entries: [] }, Date.UTC(2026, 10, 10, 3)), ['eco:wpay:2026-11-02', 'eco:wpay:2026-11-09']);
   // Sunday 23:30 Taipei is still last week; Monday 00:00 is payday.
@@ -462,7 +460,7 @@ test('the pay is fixed, like a salary: the same however much the account holds',
   assert.equal(PAY.week, 10_000);
   assert.equal(PAY.start, 200_000);
   // Worth still counts Securities' holdings, not only cash.
-  const w = { entries: [{ id: 'a', t: 1, app: 'odds', amount: 20_000 }, { id: 'eco:rebase:v3', t: 1, app: 'eco', kind: 'rebase', amount: 0 }], snap: { stock: { cash: 5_000, held: 300_000, t: 1 } } };
+  const w = { entries: [{ id: 'a', t: 1, app: 'odds', amount: 20_000 }], snap: { stock: { cash: 5_000, held: 300_000, t: 1 } } };
   assert.equal(worthOf(w), 325_000);
   const mon = Date.UTC(2026, 10, 2, 3);
   const rich = { ...w, created: mon, snap: { stock: { cash: 5_000_000, held: 9_000_000, t: 1 } } };
@@ -470,41 +468,10 @@ test('the pay is fixed, like a salary: the same however much the account holds',
   assert.equal(paydayEntries({ ...w, created: mon }, mon).find(e => e.kind === 'pay').amount, 10_000);
 });
 
-test('the reset: accounts that opened with NT$110,000 come down to NT$30,000 once; cash may go below zero', () => {
-  const oct = Date.UTC(2026, 9, 3);
-  const old = { v2: 1, entries: [{ id: 'eco:start', t: 1, app: 'eco', kind: 'start', amount: 110_000 }, { id: 'odds:stake-1', t: 2, app: 'odds', kind: 'stake', amount: -100_000 }], snap: { stock: { cash: 0, held: 60_000, t: 1 } } };
-  const due = paydayEntries(old, oct);
-  assert.equal(due[0].id, REBASE.id);
-  assert.equal(due[0].amount, -80_000);
-  assert.equal(due.find(e => e.kind === 'pay').amount, 6_000);
-  // Overdrawn only by the reset: no interest on it.
-  assert.ok(!due.some(e => e.kind === 'od'));
-  // Once only.
-  const after = { ...old, entries: [...old.entries, ...due] };
-  assert.deepEqual(paydayEntries(after, oct), []);
-  // Before v2: an account with money in the pool from the apps themselves.
-  assert.equal(paydayEntries({ entries: [], snap: { stock: { cash: 100_000, t: 1 } } }, oct)[0].id, REBASE.id);
-  // A pass made in this economy never gets it.
-  assert.ok(!paydayEntries({ v2: 1, entries: [{ id: 'eco:start', t: 1, app: 'eco', kind: 'start', amount: 30_000 }] }, oct).some(e => e.id === REBASE.id));
-});
-
-test('a new pass today opens with NT$200,000, no reset and no top-up', async () => {
+test('a new pass today opens with NT$200,000', async () => {
   const t = setup();
   const acct = await newPass(t, 'odds');
   assert.equal(acct.wallet.entries.find(e => e.id === 'eco:start').amount, 200_000);
-  assert.ok(!acct.wallet.entries.some(e => e.id === REBASE.id || e.id === 'eco:topup:v12'));
-});
-
-test('accounts that opened with NT$30,000 are raised to NT$200,000 once; nothing is ever taken', () => {
-  const now = Date.UTC(2026, 9, 20, 3);
-  const top = w => paydayEntries(w, now).filter(e => e.id === 'eco:topup:v12').map(e => e.amount);
-  assert.deepEqual(top({ v2: 1, created: 1, entries: [{ id: 'eco:start', t: 1, app: 'eco', kind: 'start', amount: 30_000 }] }), [170_000]);
-  // Reset from NT$110,000 to NT$30,000 (now or before): the same NT$170,000.
-  assert.deepEqual(top({ v2: 1, created: 1, entries: [{ id: 'eco:start', t: 1, app: 'eco', kind: 'start', amount: 110_000 }] }), [170_000]);
-  assert.deepEqual(top({ created: 1, entries: [{ id: 'eco:rebase:v3', t: 1, app: 'eco', kind: 'rebase', amount: -80_000 }] }), [170_000]);
-  // Once only, and never for a new account.
-  assert.deepEqual(top({ v2: 1, created: 1, entries: [{ id: 'eco:start', t: 1, app: 'eco', kind: 'start', amount: 30_000 }, { id: 'eco:topup:v12', t: 2, app: 'eco', kind: 'start', amount: 170_000 }] }), []);
-  assert.deepEqual(top({ v2: 1, created: now, entries: [{ id: 'eco:start', t: 1, app: 'eco', kind: 'start', amount: 200_000 }] }), []);
 });
 
 test('VIP: last month\'s gaming stakes set its tier, and its cashback is paid once the month is over', () => {
@@ -566,7 +533,7 @@ test('wealth levels: each level reached pays its reward once, from what the acco
   assert.deepEqual(rankEntries(at(600_000, 0, [{ id: 'eco:rank:thrifty', app: 'eco', kind: 'rank', amount: 3_000 }, { id: 'eco:rank:solid', app: 'eco', kind: 'rank', amount: 5_000 }]), now), []);
   assert.equal(RANKS.length, 7);
   // In the payday's entries, after the pay.
-  assert.ok(paydayEntries({ entries: [{ id: 'eco:start', amount: 295_000 }, { id: 'eco:rebase:v3', t: 1, app: 'eco', kind: 'rebase', amount: 0 }] }, now).some(e => e.id === 'eco:rank:thrifty'));
+  assert.ok(paydayEntries({ entries: [{ id: 'eco:start', amount: 295_000 }] }, now).some(e => e.id === 'eco:rank:thrifty'));
 });
 
 test('wealth levels rescaled: what the old levels paid counts towards the new rewards, never paid twice', () => {
@@ -584,30 +551,6 @@ test('wealth levels rescaled: what the old levels paid counts towards the new re
   // 19,000 against 18,000 of new rewards: 1,000 still counts against the next.
   const richer = { entries: [...rich.entries, ...rankEntries(rich, now), { id: 'win', amount: 2_000_000 }] };
   assert.deepEqual(rankEntries(richer, now).map(e => [e.id, e.amount]), [['eco:rank:affluent', 19_000]]);
-});
-
-test('the reset made right: an account that opened with less than 110,000 gets the difference once, and pays no interest on what the reset owes', async () => {
-  const { rebaseFix, REBASE_FIX_ID, OD_BACK_ID } = await import('../eco.js');
-  const oct = Date.UTC(2026, 9, 20);
-  const reset = { id: 'eco:rebase:v3', t: 1, app: 'eco', kind: 'rebase', amount: -80_000 };
-  // Securities' 100,000 only: 10,000 back, once Securities has said so.
-  assert.deepEqual(rebaseFix({ entries: [reset], snap: { stock: { cash: 0, t: 1 } } }), []);
-  assert.equal(rebaseFix({ entries: [reset], snap: { stock: { cash: 0, opened: 100_000, t: 1 } } })[0].amount, 10_000);
-  // Both apps' (110,000), a bigger start, or a new account: nothing.
-  assert.deepEqual(rebaseFix({ entries: [reset, { id: 'odds:start', t: 1, app: 'odds', kind: 'start', amount: 10_000 }], snap: { stock: { opened: 100_000, t: 1 } } }), []);
-  assert.deepEqual(rebaseFix({ entries: [reset], snap: { stock: { opened: 500_000, t: 1 } } }), []);
-  assert.deepEqual(rebaseFix({ entries: [{ id: 'eco:start', t: 1, app: 'eco', kind: 'start', amount: 30_000 }, reset], snap: { stock: { opened: 0, t: 1 } } }), []);
-  // In payday: the fix, the interest charged on the reset's part given back, no new interest on it.
-  const w = { created: oct, entries: [reset, { id: 'eco:pay:2026-10', t: 1, app: 'eco', kind: 'pay', amount: 8_000 }, { id: 'eco:od:2026-10', t: 1, app: 'eco', kind: 'od', amount: -466 }], snap: { stock: { cash: 0, opened: 100_000, t: 1 } } };
-  const out = paydayEntries(w, Date.UTC(2026, 10, 3));
-  assert.equal(out.find(e => e.id === REBASE_FIX_ID).amount, 10_000);
-  assert.equal(out.find(e => e.id === OD_BACK_ID).amount, 466);
-  assert.ok(!out.some(e => e.id === 'eco:od:2026-11'));
-  // Owing more than the reset made: interest on the rest only.
-  const deep = paydayEntries({ ...w, entries: [...w.entries, { id: 'x', t: 1, app: 'stock', amount: -100_000 }] }, Date.UTC(2026, 10, 3));
-  assert.equal(deep.find(e => e.id === 'eco:od:2026-11').amount, -Math.round((80_000 - 8_000 + 100_000 + 466 - 10_000 - 466 - 80_000) * 0.01));
-  // Given once.
-  assert.ok(!paydayEntries({ ...w, entries: [...w.entries, ...out] }, Date.UTC(2026, 10, 4)).some(e => e.id === REBASE_FIX_ID || e.id === OD_BACK_ID));
 });
 
 test('setting ECO_TOKEN_SECRET signs nobody out: tokens signed the old way (from the Firebase key) still read', async () => {
@@ -726,7 +669,7 @@ test('the admin panel: an account found by its pass, a record undone, one app cl
   assert.ok(other.token);
 });
 
-test('the lock-down: an app adds no money to the pool (the Worker does); a slip from before refunded once, only its stake', async () => {
+test('the lock-down: an app adds no money to the pool (the Worker does), not even a refund', async () => {
   const t = setup();
   // (The clock after the lock-down.)
   t.advance(Date.parse('2026-10-13T00:00:00Z') - 1_700_000_000_000);
@@ -746,8 +689,7 @@ test('the lock-down: an app adds no money to the pool (the Worker does); a slip 
   assert.ok(w.data.wallet.entries.filter(e => e.id.startsWith('odds:stake-')).every(e => e.t > before));
   const r0 = await send([{ id: 'odds:refund-old', t: 3, app: 'odds', kind: 'refund', amount: 300 }]);
   assert.equal(r0.data.pool, acct.pool - 600);
-  // A stake really in the wallet from before: its stake back, once, at its
-  // stake; never more, never a newer slip's.
+  // Not even for a stake really in the wallet from before.
   const doc = t.store.get(`eco-wallets/${acct.docId}`);
   const wallet = JSON.parse(doc.payload);
   wallet.entries.push({ id: 'odds:stake-older', t: before, app: 'odds', kind: 'stake', amount: -300 });
@@ -756,8 +698,7 @@ test('the lock-down: an app adds no money to the pool (the Worker does); a slip 
     { id: 'odds:refund-older', t: 3, app: 'odds', kind: 'refund', amount: 300 },
     { id: 'odds:refund-new', t: 3, app: 'odds', kind: 'refund', amount: 300 }
   ]);
-  assert.equal(r.data.pool, acct.pool - 600);
-  assert.equal((await send([{ id: 'odds:refund-older', t: 4, app: 'odds', kind: 'refund', amount: 9_000 }])).data.pool, acct.pool - 600);
+  assert.equal(r.data.pool, acct.pool - 900);
 });
 
 test('a save and an inbox drop as a plain POST (one request, no preflight): the same as PATCH and DELETE; a drop never deletes more', async () => {
@@ -930,69 +871,3 @@ test('op loan and relief: the Worker signs only what the account qualifies for',
   assert.equal(relief.data.error.why, 'worth');
 });
 
-test('Quadra Plus ended: what was paid for the days left comes back once; a free trial refunds nothing', async () => {
-  const mo = (m, amount, extra = {}) => ({ id: `eco:plus:${m}`, t: 1, app: 'eco', kind: 'plus', amount, ...extra });
-  // October in full (NT$490): 12 of its 31 days are after the end (20 Oct, Taipei).
-  assert.equal(plusRefund({ entries: [mo('2026-09', -490), mo('2026-10', -490)] }), Math.round((490 * 12) / 31));
-  // A free trial month paid nothing, so nothing comes back; nor a gift.
-  assert.equal(plusRefund({ entries: [mo('2026-10', 0, { note: 'trial' })] }), 0);
-  assert.equal(plusRefund({ entries: [mo('2026-10', 0, { note: 'gift' })] }), 0);
-  assert.deepEqual(plusRefundEntries({ entries: [mo('2026-10', 0, { note: 'trial' })] }, PLUS_END + 1), []);
-  // Joined on 15 Oct (Taipei) for the 17 days left: 12 of those 17 come back.
-  const join = { ...mo('2026-10', -270), t: Date.UTC(2026, 9, 15, 2) };
-  assert.equal(plusRefund({ entries: [join] }), Math.round((270 * 12) / 17));
-  // A year from September: NT$4,900 over 12 months; 10 of them after the end, and 12 days of October.
-  const t = Date.UTC(2026, 8, 3);
-  const year = ['2026-09', '2026-10', '2026-11', '2026-12', '2027-01', '2027-02', '2027-03', '2027-04', '2027-05', '2027-06', '2027-07', '2027-08'].map((m, i) => ({ ...mo(m, i ? 0 : -4_900, { note: 'year' }), t }));
-  assert.equal(plusRefund({ entries: year }), Math.round((4_900 / 12) * (10 + 12 / 31)));
-  // Paid with the payday, once, and only by the Worker.
-  const w = { v2: 1, created: Date.UTC(2026, 8, 1), entries: [{ id: 'eco:start', t: 1, app: 'eco', kind: 'start', amount: 200_000 }, { id: 'eco:topup:v12', t: 1, app: 'eco', kind: 'start', amount: 0 }, mo('2026-10', -490)], snap: {}, settings: {} };
-  const now = PLUS_END + 3_600_000;
-  const due = paydayEntries(w, now).filter(e => e.kind === 'plusrefund');
-  assert.deepEqual(due, [{ id: PLUS_REFUND_ID, t: now, app: 'eco', kind: 'plusrefund', amount: 190 }]);
-  assert.deepEqual(paydayEntries(mergeWallet(w, { entries: due }), now).filter(e => e.kind === 'plusrefund'), []);
-  assert.equal(cleanPatch({ entries: [{ id: PLUS_REFUND_ID, t: now, app: 'odds', kind: 'plusrefund', amount: 9_999 }] }).entries.length, 0);
-  // No more joining.
-  const tt = setup();
-  const acct = await newPass(tt);
-  assert.notEqual((await tt.call('POST', '', { op: 'plus', qt: acct.token, on: true })).status, 200);
-});
-
-test('運彩 tax back charged: an untaxed payout over NT$5,000 from before the whole-slip rule pays its 20% once, never turning a win into a loss', () => {
-  const before = TAX_SLIP_FROM - 3_600_000;
-  const at = TAX_SLIP_FROM + 60_000;
-  const e = (id, kind, amount, t = before) => ({ id, t, app: 'odds', kind, amount });
-  const wallet = {
-    entries: [
-      // NT$5,000 at 2.0: paid NT$10,000 untaxed, owes 2,000.
-      e('odds:stake-a', 'stake', -5_000), e('odds:payout-a', 'payout', 10_000),
-      // NT$28,630 at 1.08: 20% would leave less than the bet, so nothing.
-      e('odds:stake-g', 'stake', -28_630), e('odds:payout-g', 'payout', 30_920),
-      // NT$3,000: under the line, nothing.
-      e('odds:stake-b', 'stake', -1_000), e('odds:payout-b', 'payout', 3_000),
-      // NT$100 at 600, taxed then (48,000 = 480× its cost): left alone.
-      e('odds:stake-c', 'stake', -100), e('odds:payout-c', 'payout', 48_000),
-      // Settled under the new rule: already taxed.
-      e('odds:stake-d', 'stake', -5_000), e('odds:payout-d', 'payout', 8_000, at),
-      // A cash out isn't a prize.
-      e('odds:stake-f', 'stake', -5_000), e('odds:payout-f', 'cashout', 9_000)
-    ]
-  };
-  assert.deepEqual(backTaxEntries(wallet, before), []);
-  const out = backTaxEntries(wallet, at);
-  assert.deepEqual(out, [{ id: 'odds:tax-a', t: at, app: 'odds', kind: 'tax', amount: -2_000 }]);
-  // Once.
-  assert.deepEqual(backTaxEntries({ entries: [...wallet.entries, ...out] }, at + 1), []);
-  // The sweep adds it.
-  assert.ok(paydayEntries({ ...wallet, created: before }, at).some(x => x.id === 'odds:tax-a'));
-  // A losing charge already made is taken back: marked, then dropped from the wallet, the money back.
-  const charged = { ...emptyWallet(), entries: [...wallet.entries, e('odds:tax-g', 'tax', -6_184, at)] };
-  const mark = backTaxEntries(charged, at + 2).filter(x => x.kind === 'untax');
-  assert.deepEqual(mark, [{ id: 'eco:untax-g', t: at + 2, app: 'eco', kind: 'untax', amount: 0 }]);
-  const fixed = mergeWallet(charged, { entries: mark });
-  assert.ok(!fixed.entries.some(x => x.id === 'odds:tax-g'));
-  assert.equal(poolBalance(fixed), poolBalance({ entries: wallet.entries }));
-  // A phone's copy of the charge doesn't bring it back; the sweep doesn't either.
-  assert.ok(!mergeWallet(fixed, { entries: [e('odds:tax-g', 'tax', -6_184, at)] }).entries.some(x => x.id === 'odds:tax-g'));
-  assert.ok(!backTaxEntries(fixed, at + 3).some(x => x.id.endsWith('-g')));
-});
