@@ -342,29 +342,27 @@ test('a free bet pays only its winnings; a slip refunded while lost has had its 
   assert.equal(plus.slips[0].payout, 853);
 });
 
-test("台灣運彩's withholding (115.6.8): 20% only when a combination's NT$10 單注 wins over NT$5,000 (odds over 500), no stamp duty for a member", () => {
-  // §29: per 單注, not per combination: NT$1,000 at 6.0 pays NT$6,000 whole.
-  assert.equal(afterTax(6_000, 1_000), 6_000);
-  assert.deepEqual(settleSlip({ legs: [{ odds: 6, result: 'won' }], sizes: [1], stake: 1_000 }), { gross: 6_000, net: 6_000, taxed: 0 });
-  // Odds of exactly 500: a 單注 wins NT$5,000, not over it.
-  assert.equal(afterTax(50_000, 100), 50_000);
-  // NT$100 at 600: a 單注 wins NT$6,000, so 20% (§31: no 4‰ stamp duty for a member).
-  assert.equal(afterTax(60_000, 100), 48_000);
+test("Sports tax is per ticket: 20% off a slip whose whole prize is over NT$5,000, cents dropped, no stamp duty for a member", () => {
+  // NT$1,000 at 6.0 pays NT$6,000: one slip over NT$5,000, so taxed (Jay: "one slip is one slip").
+  assert.equal(afterTax(6_000), 4_800);
+  assert.deepEqual(settleSlip({ legs: [{ odds: 6, result: 'won' }], sizes: [1], stake: 1_000 }), { gross: 6_000, net: 4_800, taxed: 1 });
+  // Exactly NT$5,000 is not over it; NT$5,001 is.
+  assert.equal(afterTax(5_000), 5_000);
+  assert.equal(afterTax(5_001), 4_001);
   // The tax's cents are dropped, not rounded: 60,003 × 20% = 12,000.6 → 12,000.
-  assert.equal(afterTax(60_003, 100), 48_003);
-  assert.deepEqual(settleSlip({ legs: [{ odds: 600, result: 'won' }], sizes: [1], stake: 100 }), { gross: 60_000, net: 48_000, taxed: 1 });
-  // A parlay at 20 × 30 = 600: taxed; its 2-pick combinations of a system each judged on their own.
-  const par = settleSlip({ legs: [{ odds: 20, result: 'won', gameId: 'a' }, { odds: 30, result: 'won', gameId: 'b' }], sizes: [2], stake: 10 });
-  assert.deepEqual(par, { gross: 6_000, net: 4_800, taxed: 1 });
-  const sys = settleSlip({ legs: [{ odds: 20, result: 'won', gameId: 'a' }, { odds: 30, result: 'won', gameId: 'b' }, { odds: 10, result: 'won', gameId: 'c' }], sizes: [2], stake: 100 });
-  assert.equal(sys.taxed, 1, '600 taxed; 200 and 300 not');
-  assert.equal(sys.net, 60_000 * 0.8 + 20_000 + 30_000);
-  // The boost counts: a 3-pick parlay at 7.9 × 7.9 × 7.9 ≈ 493 is untaxed, but ≈ 517 with the 5% boost.
-  assert.equal(settleSlip({ legs: [7.9, 7.9, 7.9].map((odds, i) => ({ odds, result: 'won', gameId: String(i) })), sizes: [3], stake: 100 }).taxed, 0);
-  assert.equal(settleSlip({ legs: [7.9, 7.9, 7.9].map((odds, i) => ({ odds, result: 'won', gameId: String(i) })), sizes: [3], stake: 100, boost: 1 }).taxed, 1);
+  assert.equal(afterTax(60_003), 48_003);
+  // A big stake at short odds is taxed too: NT$28,630 at 1.08 pays NT$30,920.
+  assert.deepEqual(settleSlip({ legs: [{ odds: 1.08, result: 'won' }], sizes: [1], stake: 28_630 }), { gross: 30_920, net: 24_736, taxed: 1 });
+  // A system ticket is taxed on its total, not combination by combination.
+  const sys = settleSlip({ legs: [{ odds: 2, result: 'won', gameId: 'a' }, { odds: 3, result: 'won', gameId: 'b' }, { odds: 2, result: 'won', gameId: 'c' }], sizes: [2], stake: 500 });
+  assert.equal(sys.gross, 3_000 + 2_000 + 3_000, 'every combination under NT$5,000, the ticket over it');
+  assert.equal(sys.taxed, 1);
+  assert.equal(sys.net, sys.gross - Math.floor(sys.gross * 0.2));
+  // Small slips stay whole.
+  assert.deepEqual(settleSlip({ legs: [{ odds: 3, result: 'won' }], sizes: [1], stake: 1_000 }), { gross: 3_000, net: 3_000, taxed: 0 });
   // The settle path pays the same, rounded to the dollar (§18).
   const paid = applyResults(acct([{ ...slipOf([{ odds: 6, gameId: 'a' }]), stake: 1_000, cost: 1_000 }]), 's1', ['won'], new Date('2026-10-02T00:00:00Z'));
-  assert.deepEqual(paid.ledger.map(e => [e.id, e.amount]), [['payout-s1', 6_000]]);
+  assert.deepEqual(paid.ledger.map(e => [e.id, e.amount]), [['payout-s1', 4_800]]);
   const long = applyResults(acct([slipOf([{ odds: 600.55, gameId: 'a' }])]), 's1', ['won'], new Date('2026-10-02T00:00:00Z'));
   assert.equal(long.slips[0].payout, 48_044, 'NT$60,055 less 20%: 48,044');
   // Draw games and scratch cards (Taiwan Lottery) still lose 20.4% over NT$5,000 a bet.
