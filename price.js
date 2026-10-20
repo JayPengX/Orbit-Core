@@ -75,7 +75,8 @@ export async function housePick(leg, now, once) {
   const games = await once(`league:${leg.sport}`, () => src.loadLeague(leg.sport, now));
   const game = games.find(g => g.id === leg.gameId);
   if (!game) return { gone: true };
-  if (Date.parse(game.startUtc) <= t) return { started: true };
+  // (Listed only while it's to come: a game past its time is listed while ESPN says it hasn't begun, lateUntil.)
+  if (Date.parse(game.startUtc) <= t && !(game.lateUntil > t)) return { started: true };
   const plain = boardBets({ games: [game] }, { now }).find(b => b.id === leg.id);
   // With the game's own markets and its players' numbers (Play reads them
   // when the game is opened): the house's richer prices. Only what can

@@ -51,7 +51,8 @@ export function parseKambiEvents(data, sport, now = new Date(), { unpriced = fal
   const games = [];
   for (const item of data?.events || []) {
     const e = item.event;
-    if (!e || e.state !== 'NOT_STARTED' || Date.parse(e.start) <= now.getTime()) continue;
+    // (Past its time but not begun, for up to 45 minutes: kept for the board to decide, play-sources.mjs stillToCome.)
+    if (!e || e.state !== 'NOT_STARTED' || Date.parse(e.start) <= now.getTime() - 45 * 60_000) continue;
     if (!e.homeName || !e.awayName) continue;
     const offers = item.betOffers || [];
     const match = matchOffer(offers);
