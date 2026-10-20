@@ -382,7 +382,17 @@ export function bindNavTitle(el, { scroller = null } = {}) {
       b.classList.remove('on');
     }
   };
+  // (Measured at the next frame, never mid-render: a title built while the app
+  // is still drawing forced a layout each time, over a second of a league
+  // switch in Sports on a phone. Any number of titles: one layout a frame.)
+  let frame = 0;
   const observe = () => {
+    if (typeof requestAnimationFrame !== 'function') return measure();
+    cancelAnimationFrame(frame);
+    frame = requestAnimationFrame(measure);
+  };
+  const measure = () => {
+    frame = 0;
     io?.disconnect();
     // The top of the screen to the bar's foot is where a title is "under".
     const under = Math.max(0, Math.round((navBar().getBoundingClientRect().height || 44) - (scroller ? scroller.getBoundingClientRect().top : 0)));
@@ -416,6 +426,7 @@ export function bindNavTitle(el, { scroller = null } = {}) {
     el,
     seen: false,
     stop() {
+      if (frame) cancelAnimationFrame(frame);
       ro?.disconnect();
       io?.disconnect();
       io = null;

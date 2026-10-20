@@ -79,10 +79,12 @@ const faults = r => {
   else {
     const early = [...r.lift.skels, ...r.lift.loading];
     if (early.length) f.push(['lift', at, `lifted at ${r.lift.t} ms with ${early.join(', ')} still showing`, first]);
-    else if (r.lift.waiting >= 2) f.push(['lift', at, `lifted at ${r.lift.t} ms with ${r.lift.waiting} of ${r.lift.pics} pictures still loading`, first]);
+    else if (r.lift.waiting >= 2) f.push(['lift', at, `lifted at ${r.lift.t} ms with ${r.lift.waiting} of ${r.lift.pics} pictures still loading${r.lift.late?.length ? ` (${r.lift.late.join(', ')})` : ''}`, first]);
     else if (r.end && r.end.chars > 150 && r.lift.chars < r.end.chars * 0.5) f.push(['lift', at, `lifted at ${r.lift.t} ms with ${r.lift.chars} of ${r.end.chars} characters on screen`, first]);
   }
-  for (const [t, ms] of r.longs || []) if (ms >= 500) f.push(['stall', at, `main thread blocked ${ms} ms at ${t} ms`, first]);
+  // (After the first screen, pinned on the tap or tab change just before it.)
+  const after = t => (r.tapAt || []).filter(([, at]) => at <= t).at(-1)?.[0];
+  for (const [t, ms] of r.longs || []) if (ms >= 500) f.push(['stall', at, `main thread blocked ${ms} ms at ${t} ms${after(t) ? ` after ${after(t)}` : ''}`, first]);
   for (const e of r.pageErrors || []) f.push(['errors', at, e, first]);
   for (const tab of r.tabs || []) for (const kind of ['blank', 'pictures', 'overflow', 'wraps', 'cut', 'letters', 'slots', 'halfEmpty', 'bareEmpty', 'loading', 'dead']) for (const what of tab[kind] || []) f.push([kind, `${at} #${tab.id}`, what, tab.shot]);
   return f;
