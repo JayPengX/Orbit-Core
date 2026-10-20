@@ -201,6 +201,14 @@ const cpu = Number(opt('cpu', 0));
 // what it shows at the end of --wait: anything that moved, came or went
 // after it lifted (a reshuffle the person sees). By each card's first line.
 const shuffle = flag('shuffle');
+// --gate: the quality gate's look (tools/gate.mjs): what showed when the
+// loading screen lifted, the main thread's stalls, then every tab in turn
+// (tapped in the tab bar) checked for overflow, wrapped titles, letter
+// logos, holes in grids, half-empty cards, bare empty text and leftover
+// loading; a shot of each. Prints one `gate: {json}` line.
+const gate = flag('gate');
+// --taps (with --gate): every button on each tab tapped once (nothing that spends, deletes or signs out).
+const gateTaps = flag('taps');
 // --serve [--port 8123]: no browser of its own; the app is served signed in
 // with the same made-up account and answers, for another browser to open
 // (the iOS Simulator's Safari: http://localhost:8123/<repo>/). The page's
@@ -531,6 +539,7 @@ if (freezes)
     };
     setTimeout(tick, 0);
   });
+if (gate) await context.addInitScript({ path: new URL('./gate-page.js', import.meta.url).pathname });
 if (shuffle)
   await context.addInitScript(() => {
     // (Transit's map too: its markers in view, by kind, and the strip of YouBike stations along its bottom.)
@@ -990,6 +999,50 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
     }
     if (Date.now() < until) await page.waitForTimeout(until - Date.now());
   } else await page.waitForTimeout(wait);
+  if (gate) {
+    const base = join(out, `${key}${lang !== 'zh' ? `-${lang}` : ''}-${width}${dark ? '-dark' : ''}`);
+    const result = { app: key, width, dark, lang, lift: await page.evaluate(() => globalThis.__gate?.lift ?? null), end: await page.evaluate(() => globalThis.__gate?.screenNow()), tabs: [] };
+    const tabs = await page.$$eval('.q-tab[data-tab]', bs => bs.filter(b => !b.hidden && b.offsetWidth).map(b => ({ id: b.dataset.tab, on: b.getAttribute('aria-selected') === 'true' })));
+    const order = [...tabs.filter(t => t.on), ...tabs.filter(t => !t.on)];
+    for (const [i, t] of (order.length ? order : [{ id: 'start' }]).entries()) {
+      if (i) {
+        await page.click(`.q-tab[data-tab="${t.id}"]`).catch(() => {});
+        await page.waitForTimeout(3000);
+      }
+      const shot = `${base}-${t.id}.png`;
+      await page.screenshot({ path: shot });
+      const found = { id: t.id, shot, ...(await page.evaluate(() => globalThis.__gate.check()).catch(e => ({ error: e.message.split('\n')[0] }))) };
+      result.tabs.push(found);
+      // Each button tapped once: one that changes nothing is dead on the first
+      // tap; a "next" that keeps the same track restarted it instead.
+      if (gateTaps) {
+        found.dead = [];
+        found.tapped = 0;
+        const labels = await page.evaluate(() => globalThis.__gate.buttons()).catch(() => []);
+        const home = await page.evaluate(() => location.href);
+        for (const want of labels) {
+          const at = await page.evaluate(w => globalThis.__gate.buttons(60).indexOf(w), want);
+          if (at < 0) continue;
+          const before = await page.evaluate(() => globalThis.__gate.print());
+          const tapped = await page.locator(`[data-gate="${at}"]`).first().tap({ timeout: 2000 }).then(() => true, () => page.locator(`[data-gate="${at}"]`).first().click({ timeout: 2000 }).then(() => true, () => false));
+          if (!tapped) continue;
+          found.tapped++;
+          await page.waitForTimeout(900);
+          const after = await page.evaluate(() => globalThis.__gate.print());
+          if (['dom', 'dialogs', 'where', 'media'].every(k => before[k] === after[k])) found.dead.push(`"${want}" did nothing`);
+          else if (/下一首|下一個|下一曲|next/i.test(want) && before.track && before.track === after.track && before.media.split('|')[0] === after.media.split('|')[0]) found.dead.push(`"${want}" kept the same track`);
+          // Back to where the tab was: sheets and menus closed, the address and the tab put back.
+          await page.keyboard.press('Escape').catch(() => {});
+          await page.evaluate(() => globalThis.__gate.calm()).catch(() => {});
+          if ((await page.evaluate(() => location.href).catch(() => home)) !== home) await page.goBack({ timeout: 3000 }).catch(() => {});
+          if (t.id !== 'start' && (await page.evaluate(() => document.querySelector('.q-tab[aria-selected=true]')?.dataset.tab).catch(() => t.id)) !== t.id) await page.click(`.q-tab[data-tab="${t.id}"]`).catch(() => {});
+          await page.waitForTimeout(300);
+        }
+      }
+    }
+    Object.assign(result, await page.evaluate(() => ({ longs: globalThis.__gate.longs, pageErrors: globalThis.__gate.errors })));
+    console.log(`gate: ${JSON.stringify(result)}`);
+  }
   // The admin panel's views are tabs, not addresses: the one named, clicked.
   // (With --click, the profile is of the clicks alone.)
   if (cdp && clicks.length) await cdp.send('Profiler.stop').then(() => cdp.send('Profiler.start'));

@@ -329,7 +329,8 @@ export function toggle({ checked = false, onChange = () => {}, label = '' } = {}
 // emoji: the grey disc it always was). One line of title, an optional line
 // of body, one button: `action` is { label, onTap | href, data } (a .q-btn.primary;
 // `data`: data-* attributes for a tap wired by delegation) or a node the app made.
-export function empty({ icon = '', tint = '', title = '', body = '', action = null } = {}) {
+// (No icon given: the list's own, so an empty state is never a bare sentence.)
+export function empty({ icon = 'list', tint = '', title = '', body = '', action = null } = {}) {
   const mark = !icon ? null : isIcon(icon) ? tinted(h('span', { class: 'q-tile q-empty-tile', 'aria-hidden': 'true', html: icons[icon] }), tint || 'var(--q-accent)') : h('span', { class: 'q-empty-icon', 'aria-hidden': 'true', text: icon });
   const button = action && !(action instanceof Node) ? h(action.href ? 'a' : 'button', { class: 'q-btn primary', ...(action.href ? { href: action.href } : { type: 'button', onclick: action.onTap }), ...dataProps(action.data), text: action.label || '' }) : action;
   return h('div', { class: 'q-empty' }, [mark, title ? h('strong', { text: title }) : null, body ? h('p', { text: body }) : null, button]);
@@ -629,7 +630,7 @@ const tagObjHtml = t => {
 export function tagHtml(text, tone = '', color = '') {
   return tagObjHtml({ text, tone: color ? `${tone} tint` : tone, color });
 }
-export function emptyHtml({ icon = '', tint = '', title = '', body = '', action = null } = {}) {
+export function emptyHtml({ icon = 'list', tint = '', title = '', body = '', action = null } = {}) {
   const mark = !icon ? '' : isIcon(icon) ? `<span class="q-tile q-empty-tile" aria-hidden="true"${styleOf(['--t', tint || 'var(--q-accent)'])}>${icons[icon]}</span>` : `<span class="q-empty-icon" aria-hidden="true">${E(icon)}</span>`;
   const button = !action ? '' : typeof action === 'string' ? action : action.href ? `<a class="q-btn primary" href="${E(action.href)}"${dataOf(action.data)}>${E(action.label)}</a>` : `<button class="q-btn primary" type="button"${dataOf({ tap: action.tap, ...action.data })}>${E(action.label)}</button>`;
   return `<div class="q-empty">${mark}${title ? `<strong>${E(title)}</strong>` : ''}${body ? `<p>${E(body)}</p>` : ''}${button}</div>`;
@@ -676,16 +677,20 @@ export function sectionHeadHtml(title, { more = '', moreTap = null, moreHref = '
   const link = !more ? '' : moreHref ? `<a class="q-sh-more" href="${E(moreHref)}"${dataOf(data)}>${E(more)}${chev}</a>` : `<button class="q-sh-more" type="button"${dataOf({ more: moreTap, ...data })}>${E(more)}${chev}</button>`;
   return `<div class="q-section-head q-shd"><h2>${E(title)}</h2>${count != null && count !== '' ? `<span class="q-sh-count num">${E(count)}</span>` : ''}${link}</div>`;
 }
-// A logo tile's broken image falls back to its letter (the DOM builder's
-// error handler): wireLogos(root) once the HTML is in the page.
-const logoLetter = (fallbackText, alt) => Array.from(String(fallbackText || alt || '').trim())[0] ?? '';
+// A logo tile with no picture (none known, or every URL broken) shows a
+// picture of its kind on its tint, never a letter: a shield for a team (the
+// default), a face's outline for a person, a cup for a league, columns for a
+// company, a flag. kind: 'team' | 'person' | 'league' | 'company' | 'flag'.
+// (wireLogos(root) once the HTML is in the page, for the HTML builder.)
+const LOGO_KINDS = { team: 'shield', person: 'user', league: 'trophy', company: 'bank', flag: 'flag' };
+const logoMark = kind => icons[LOGO_KINDS[kind] || 'shield'] || icons.shield;
 // A src or a list of them, as the non-empty strings in order.
 const srcList = src => [].concat(src || []).filter(s => s && typeof s === 'string');
 // (A list's later URLs wait in data-srcs, a JSON array, for wireLogos.)
-export function logoTileHtml(src, { size = 40, alt = '', fallbackText = '', tint = '' } = {}) {
+export function logoTileHtml(src, { size = 40, alt = '', fallbackText = '', tint = '', kind = 'team' } = {}) {
   const [first, ...rest] = srcList(src);
-  if (first) return `<span class="q-logo"${styleOf(['--s', `${size}px`])}><img src="${E(first)}" alt="${E(alt)}" loading="lazy" decoding="async"${fallbackText ? dataOf({ fallback: fallbackText, tint }) : ''}${rest.length ? dataOf({ srcs: JSON.stringify(rest) }) : ''}></span>`;
-  return fallbackText || alt ? `<span class="q-logo text"${styleOf(['--s', `${size}px`], ['--t', tint])}>${E(logoLetter(fallbackText, alt))}</span>` : `<span class="q-logo"${styleOf(['--s', `${size}px`])}></span>`;
+  if (first) return `<span class="q-logo"${styleOf(['--s', `${size}px`])}><img src="${E(first)}" alt="${E(alt)}" loading="lazy" decoding="async"${dataOf({ fallback: kind, tint })}${rest.length ? dataOf({ srcs: JSON.stringify(rest) }) : ''}></span>`;
+  return `<span class="q-logo text" role="img" aria-label="${E(alt || fallbackText)}"${styleOf(['--s', `${size}px`], ['--t', tint])}>${logoMark(kind)}</span>`;
 }
 export function wireLogos(root = document) {
   const fall = img => {
@@ -698,13 +703,13 @@ export function wireLogos(root = document) {
       img.setAttribute('src', rest[0]);
       return;
     }
-    if (!t || !img.hasAttribute('data-fallback')) return;
+    if (!t) return;
     t.className = 'q-logo text';
-    t.replaceChildren(logoLetter(img.getAttribute('data-fallback'), ''));
+    t.innerHTML = logoMark(img.getAttribute('data-fallback'));
     if (img.getAttribute('data-tint')) t.style.setProperty('--t', img.getAttribute('data-tint'));
   };
   // (An image that already failed before this ran.)
-  for (const img of root.querySelectorAll('.q-logo img[data-fallback]')) if (img.complete && img.naturalWidth === 0) fall(img);
+  for (const img of root.querySelectorAll('.q-logo img')) if (img.complete && img.naturalWidth === 0) fall(img);
   if (root.__quadraLogos) return;
   root.__quadraLogos = true;
   root.addEventListener('error', e => e.target?.tagName === 'IMG' && fall(e.target), true);
@@ -722,7 +727,7 @@ export function stockRowHtml({ logo = '', name = '', sub = '', spark = [], price
   const { tone } = stockMove({ spark, changePct, change });
   const own = stockPill({ changePct, change, currency });
   const chart = sparkSvg(spark, tone);
-  return `<div class="q-stock"${open != null ? ` role="button" tabindex="0"${dataOf({ open })}` : ''}${dataOf(data)}>${logoTileHtml(logo, { size: 40, alt: name, fallbackText: name })}<div class="q-stock-id"><b>${E(name)}</b>${sub ? `<small>${E(sub)}</small>` : ''}</div>${chart ? `<span class="q-stock-spark">${chart}</span>` : ''}<div class="q-stock-px"><b class="num" data-q-live>${E(stockPrice(price, currency))}</b>${own == null ? movePillHtml(changePct) : `<span class="q-move ${tone} solid">${E(own)}</span>`}</div></div>`;
+  return `<div class="q-stock"${open != null ? ` role="button" tabindex="0"${dataOf({ open })}` : ''}${dataOf(data)}>${logoTileHtml(logo, { size: 40, alt: name, fallbackText: name, kind: 'company' })}<div class="q-stock-id"><b>${E(name)}</b>${sub ? `<small>${E(sub)}</small>` : ''}</div>${chart ? `<span class="q-stock-spark">${chart}</span>` : ''}<div class="q-stock-px"><b class="num" data-q-live>${E(stockPrice(price, currency))}</b>${own == null ? movePillHtml(changePct) : `<span class="q-move ${tone} solid">${E(own)}</span>`}</div></div>`;
 }
 export function placeTileHtml(kind = 'pin', size = '') {
   const k = ['home', 'work', 'school', 'pin', 'star'].includes(kind) ? kind : 'pin';
@@ -785,6 +790,7 @@ export const icons = {
   exchange: g('<path d="M4 8h14M14.5 4.5 18 8l-3.5 3.5M20 16H6M9.5 12.5 6 16l3.5 3.5"/>'),
   cup: g('<path d="M5 8h11v6a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5zM16 9.5h1.5a2.5 2.5 0 0 1 0 5H16M8 3.5v2M12 3.5v2M5 21h11"/>'),
   flag: g('<path d="M5.5 21V4M5.5 5h12l-2.5 4 2.5 4h-12"/>'),
+  shield: g('<path d="M12 3.5 5 6v5.5c0 4.4 3 7.8 7 9 4-1.2 7-4.6 7-9V6z"/>'),
   target: g('<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r=".8"/>'),
   chevron: g('<path d="m9 5 7 7-7 7"/>'),
   // Saved places (with home, pin and star above).
@@ -862,21 +868,23 @@ export function sectionHead(title, { more = '', onMore = null, moreHref = '', co
 // logoTile(src, { size: 40, alt, fallbackText, tint }). No src (or a broken
 // one) shows fallbackText on `tint` instead. `src` may be a list of URLs:
 // each is tried in turn on error, then fallbackText.
-export function logoTile(src, { size = 40, alt = '', fallbackText = '', tint = '' } = {}) {
+export function logoTile(src, { size = 40, alt = '', fallbackText = '', tint = '', kind = 'team' } = {}) {
   const t = h('span', { class: 'q-logo' });
   t.style.setProperty('--s', `${size}px`);
-  const text = () => {
+  const mark = () => {
     t.className = 'q-logo text';
-    t.replaceChildren(logoLetter(fallbackText, alt));
+    t.setAttribute('role', 'img');
+    t.setAttribute('aria-label', alt || fallbackText);
+    t.innerHTML = logoMark(kind);
     if (tint) t.style.setProperty('--t', tint);
   };
   const srcs = srcList(src);
   if (srcs.length) {
     const img = h('img', { src: srcs[0], alt, loading: 'lazy', decoding: 'async' });
     let at = 0;
-    if (fallbackText || srcs.length > 1) img.addEventListener('error', () => (++at < srcs.length ? img.setAttribute('src', srcs[at]) : fallbackText && text()));
+    img.addEventListener('error', () => (++at < srcs.length ? img.setAttribute('src', srcs[at]) : mark()));
     t.append(img);
-  } else if (fallbackText || alt) text();
+  } else mark();
   return t;
 }
 
@@ -895,14 +903,28 @@ export function matchCard({ league = '', leagueLogo = '', when = '', live = fals
     h('div', { class: 'q-match-top' }, [leagueLogo ? logoTile(leagueLogo, { size: 20, alt: league }) : null, h('span', { class: 'q-match-lg', text: league }), t?.text ? tag_(t) : null, h('span', { class: 'q-match-when', text: when })]),
     h('div', { class: 'q-match-teams' }, [side(a), h('div', { class: `q-match-mid num${scored ? '' : ' vs'}`, text: scored ? `${a.score} : ${b.score}` : 'VS' }), side(b)]),
     prices.length
-      ? h(
-          'div',
-          { class: 'q-match-prices' },
-          prices.map(p => h('button', { class: 'q-price', type: 'button', 'aria-pressed': String(Boolean(p.selected)), ...(p.locked ? { disabled: true } : {}), onclick: e => (e.stopPropagation(), p.onTap?.(e)) }, [h('small', { text: p.label || '' }), h('b', { class: 'num', text: p.odds == null ? '' : String(p.odds) })]))
-        )
+      ? prices.some(p => p.locked)
+        ? lockedRow()
+        : h(
+            'div',
+            { class: 'q-match-prices' },
+            prices.map(p => h('button', { class: 'q-price', type: 'button', 'aria-pressed': String(Boolean(p.selected)), onclick: e => (e.stopPropagation(), p.onTap?.(e)) }, [h('small', { text: p.label || '' }), h('b', { class: 'num', text: p.odds == null ? '' : String(p.odds) })]))
+          )
       : null
   ]);
   return card;
+}
+
+// A market that can't be bet right now: one calm bar across the whole row
+// (a lock and 暫停投注), never some prices open beside locked ones. Any
+// price of a market locked locks the market (matchCard does this itself).
+// lockedRow({ text }) / lockedRowHtml({ text }).
+const lockText = () => (globalThis.document?.documentElement.lang || 'zh').startsWith('zh') ? '暫停投注' : 'Betting paused';
+export function lockedRow({ text = lockText() } = {}) {
+  return h('div', { class: 'q-locked-row', role: 'status', html: `${icons.lock}<span>${E(text)}</span>` });
+}
+export function lockedRowHtml({ text = lockText() } = {}) {
+  return `<div class="q-locked-row" role="status">${icons.lock}<span>${E(text)}</span></div>`;
 }
 
 // A compact rail of games on now: liveStrip([{ min, rows: [{ logo, name,
@@ -1041,7 +1063,7 @@ export function stockRow({ logo = '', name = '', sub = '', spark = [], price = n
   const pill = own == null ? movePill(changePct) : h('span', { class: `q-move ${tone} solid`, text: own });
   const chart = sparkSvg(spark, tone);
   return h('div', { class: 'q-stock', ...(onOpen ? { role: 'button', tabindex: '0', onclick: onOpen, onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { if (e.key === ' ') e.preventDefault?.(); onOpen(e); } } } : {}), ...dataProps(data) }, [
-    logoTile(logo, { size: 40, alt: name, fallbackText: name }),
+    logoTile(logo, { size: 40, alt: name, fallbackText: name, kind: 'company' }),
     h('div', { class: 'q-stock-id' }, [h('b', { text: name }), sub ? h('small', { text: sub }) : null]),
     chart ? h('span', { class: 'q-stock-spark', html: chart }) : null,
     h('div', { class: 'q-stock-px' }, [h('b', { class: 'num', 'data-q-live': '', text: stockPrice(price, currency) }), pill])

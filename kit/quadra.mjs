@@ -3180,6 +3180,73 @@ function keepStrips() {
 }
 keepStrips();
 
+// The on-screen keyboard, in every app, nothing to call. iOS lays the
+// keyboard over the page without shrinking it, then slides the whole screen
+// up to show the field: a sheet's foot and its fields went under the keys,
+// a search at the top was pushed off the screen. The kit follows the visible
+// part of the screen (visualViewport) and writes it as CSS variables on
+// <html>: --q-kb (how much the keys cover at the foot), --q-vvh (the height
+// still seen); .q-kb while the keys are up. quadra.css lifts open sheets
+// above the keys and fits them to what's left, hides the tab bar, and
+// anything marked .q-kb-dock (a bar that belongs on top of the keys) sits
+// there. A focused field is brought into view inside its own scroller, and
+// the screen's slide put back when it only hid the top.
+function watchKeyboard() {
+  const vv = globalThis.visualViewport;
+  if (typeof document === 'undefined' || !vv || globalThis.__quadraKeyboard) return;
+  globalThis.__quadraKeyboard = true;
+  const root = document.documentElement;
+  let frame = 0;
+  const typing = () => {
+    const el = document.activeElement;
+    return Boolean(el && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable) && !/^(checkbox|radio|range|button|submit|color|file)$/.test(el.type));
+  };
+  const apply = () => {
+    frame = 0;
+    const kb = Math.max(0, Math.round(globalThis.innerHeight - vv.height - vv.offsetTop));
+    const up = kb > 80 && typing();
+    root.style.setProperty('--q-kb', `${up ? kb : 0}px`);
+    root.style.setProperty('--q-vvh', `${Math.round(vv.height)}px`);
+    root.classList.toggle('q-kb', up);
+    // The field itself in view, inside its sheet or list (not the whole screen sliding).
+    if (up) document.activeElement?.scrollIntoView?.({ block: 'nearest' });
+  };
+  const soon = () => (frame ||= requestAnimationFrame(apply));
+  vv.addEventListener('resize', soon);
+  vv.addEventListener('scroll', soon);
+  document.addEventListener('focusin', () => setTimeout(soon, 60));
+  document.addEventListener('focusout', () => setTimeout(soon, 60));
+  apply();
+}
+watchKeyboard();
+
+// Names that must stay on one line (a long law, a team, a legislator): any
+// .q-fit in any app is shrunk just enough to fit its box (--q-fit, down to
+// 0.72), redone as the page changes or turns. Nothing to call.
+export function fitNames(root = document) {
+  for (const el of root.querySelectorAll?.('.q-fit') || []) {
+    const was = Number(el.style.getPropertyValue('--q-fit')) || 1;
+    if (!el.clientWidth) continue;
+    const need = el.scrollWidth / was;
+    const k = Math.max(0.72, Math.min(1, (el.clientWidth - 1) / need));
+    if (Math.abs(k - was) > 0.01) el.style.setProperty('--q-fit', k.toFixed(3));
+  }
+}
+function watchNames() {
+  if (typeof document === 'undefined' || typeof MutationObserver === 'undefined' || globalThis.__quadraFit) return;
+  globalThis.__quadraFit = true;
+  let frame = 0;
+  const soon = () => (frame ||= requestAnimationFrame(() => ((frame = 0), fitNames())));
+  const start = () => {
+    new MutationObserver(soon).observe(document.body, { childList: true, subtree: true, characterData: true });
+    globalThis.addEventListener('resize', soon);
+    soon();
+  };
+  if (document.body) start();
+  else document.addEventListener('DOMContentLoaded', start, { once: true });
+}
+watchNames();
+
 // Where the person was (the scroll), kept across a reload for an update and
 // put back by restorePlace() once the app has painted.
 const PLACE_KEY = 'quadra.place';

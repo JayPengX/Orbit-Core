@@ -3899,6 +3899,16 @@ div.q-ritem {
   font: 700 calc(var(--s, 40px) * 0.42) / 1 var(--q-font);
   box-shadow: none;
 }
+/* (No picture: its kind's own, never a letter: ui.mjs logoMark.) */
+.q-logo.text svg {
+  width: 54%;
+  height: 54%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 
 /* -- A match (matchCard) and its price buttons -- */
 .q-match {
@@ -4976,4 +4986,89 @@ button.q-cal-d {
 }
 .q-ring.done.tinted .q-ring-check {
   color: inherit;
+}
+
+/* ---- The on-screen keyboard (quadra.mjs watchKeyboard: --q-kb, --q-vvh,
+   html.q-kb while it's up) ---- */
+/* An open sheet sits on the keys and fits what's left of the screen, its
+   fields never under them. */
+html.q-kb dialog.q-sheet[open] {
+  max-height: calc(var(--q-vvh) - 16px);
+  margin-bottom: calc(var(--q-kb) + 8px);
+}
+@media (max-width: 719px) {
+  html.q-kb dialog.q-sheet.q-full[open] {
+    margin-bottom: var(--q-kb);
+  }
+}
+/* The tab bar waits behind the keys, not floating on them. */
+html.q-kb .q-tabbar {
+  visibility: hidden;
+}
+/* A bar that belongs on top of the keys (a composer, a search's results bar). */
+html.q-kb .q-kb-dock {
+  bottom: var(--q-kb) !important;
+}
+
+/* ---- A market that can't be bet now (ui.mjs lockedRow): one bar across
+   the row, never half its prices locked ---- */
+.q-locked-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 48px;
+  border-radius: 12px;
+  background: var(--q-fill-3);
+  color: var(--q-label-2);
+  font: 600 14px/1 var(--q-font);
+}
+.q-locked-row svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ---- Grids that never leave a hole: the kit's panels, and any app grid
+   marked .q-even (2 columns) or .q-even3 (3): a lone last card spans the
+   row, two left in a row of three share it ---- */
+.q-panels > :last-child:nth-child(odd),
+.q-even > :last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+.q-even {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.q-even3 {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+}
+.q-even3 > * {
+  grid-column: span 2;
+}
+.q-even3 > :last-child:nth-child(3n + 1) {
+  grid-column: 1 / -1;
+}
+.q-even3 > :nth-last-child(2):nth-child(3n + 1),
+.q-even3 > :last-child:nth-child(3n + 2) {
+  grid-column: span 3;
+}
+/* Cards in a row are as tall as the tallest, so what each holds is spread
+   down it, not left in its top half. */
+.q-panels > .q-panel,
+.q-even > *,
+.q-even3 > * {
+  align-content: space-between;
+}
+
+/* ---- A name on one line (quadra.mjs fitNames): .q-fit shrinks its text,
+   down to 72%, rather than wrap or cut ---- */
+.q-fit {
+  display: block;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  font-size: calc(1em * var(--q-fit, 1));
 }
