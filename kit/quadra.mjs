@@ -3012,6 +3012,27 @@ export async function updateChecked(max = 7_000) {
   return r !== 'boot';
 }
 
+// Sound playing (an app's <audio> or <video>, on the page or not): an update waits for it to stop,
+// never cutting the music off (Beats in the background, back on the screen). Each element is noted as it
+// plays; the music paused or ended, the next check updates.
+const media = new Set();
+if (typeof HTMLMediaElement !== 'undefined') {
+  const play = HTMLMediaElement.prototype.play;
+  HTMLMediaElement.prototype.play = function (...args) {
+    media.add(this);
+    return play.apply(this, args);
+  };
+}
+export function sounding() {
+  for (const m of media) if (m.paused || m.ended) media.delete(m);
+  if (media.size) return true;
+  try {
+    return globalThis.navigator?.mediaSession?.playbackState === 'playing';
+  } catch {
+    return false;
+  }
+}
+
 let watching = null;
 // `busy` is no longer waited on (kept so the apps' calls stay valid).
 export function watchUpdates({ current, key, cachePrefix, every = 15_000 } = {}) {
@@ -3023,6 +3044,8 @@ export function watchUpdates({ current, key, cachePrefix, every = 15_000 } = {})
   let retry = 0;
   const channel = globalThis.BroadcastChannel ? new BroadcastChannel('quadra-updates') : null;
   async function apply(latest) {
+    // (Music playing: not now. The check every few seconds, or the next opening, updates once it stops.)
+    if (sounding()) return;
     // The same deploy tried again at most 6 times in the session, 5 s apart.
     const flag = `${key || 'quadra'}.reloadedTo`;
     const [was, tries = 0, at = 0] = String(sessionStorage.getItem(flag) || '').split('|');
