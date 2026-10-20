@@ -28,6 +28,8 @@ globalThis.fetch = async url => {
 };
 const kit = await import('../kit/quadra.mjs');
 const settle = () => new Promise(r => setTimeout(r, 5));
+// Saves and wipes finish after the read answers; a slow runner needs more than one settle.
+const until = async ok => { for (let i = 0; i < 100 && !(await ok()); i++) await settle(); };
 const kept = () => [...(stores.get('quadra-data-v1') || new Map()).keys()];
 
 test('a good read is kept on the device; a fresh read that fails answers that copy, whatever failed', async () => {
@@ -76,7 +78,8 @@ test('a read within its ttl is answered from memory; a failed one is held, not a
 test("the family's packs: read from R2, kept under their old address, a missing pack a failure", async () => {
   answer = url => (url.endsWith('/sports/mlb/2026.json') ? new Response('{"season":2026}') : new Response('', { status: 404 }));
   assert.deepEqual(await kit.packJson('sports/mlb/2026.json'), { season: 2026 });
-  await settle();
+  const old = k => k.includes(encodeURIComponent('https://jaypengx.github.io/Shared-Data/sports/mlb/2026.json'));
+  await until(() => kept().some(old));
   assert.ok(kept().some(k => k.includes(encodeURIComponent('https://jaypengx.github.io/Shared-Data/sports/mlb/2026.json'))));
   await assert.rejects(kit.packJson('sports/zzz/2026.json'), /404/);
 });
@@ -84,7 +87,7 @@ test("the family's packs: read from R2, kept under their old address, a missing 
 test('signing out wipes the device but its language, safe area and kit version', async () => {
   for (const k of ['quadra.lang', 'quadra.safeBottom', 'quadra.kit', 'quadra.refresh', 'quadra.account', 'quadra.wallet', 'fx.day.v4']) localStorage.setItem(k, '1');
   kit.wipeDevice();
-  await settle();
+  await until(() => !stores.has('quadra-data-v1'));
   assert.deepEqual([...local.keys()].sort(), ['quadra.kit', 'quadra.lang', 'quadra.safeBottom']);
   assert.equal(stores.has('quadra-data-v1'), false);
 });
