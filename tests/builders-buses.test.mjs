@@ -15,7 +15,8 @@ test('shapes: a multi-part line split into its parts, simplified within 12 m, en
 
 test('bus packs on R2: only a city over six days old is rebuilt, its timetables made compact a page at a time', async () => {
   const { runBuses } = await import('../builders/buses.js');
-  const { r2Store, memoryBucket } = await import('../builders/store.js');
+  const { r2Store } = await import('../builders/store.js');
+  const { memoryBucket } = await import('./fixtures/bucket.mjs');
   const now = Date.parse('2026-10-20T16:17:00Z');
   const fresh = new Date(now - 86_400_000).toISOString();
   const old = new Date(now - 8 * 86_400_000).toISOString();
@@ -40,7 +41,8 @@ test('bus packs on R2: only a city over six days old is rebuilt, its timetables 
 
 test("a bus pack read wrong (TDX's answer not a list, or no routes) is never written over the good one", async () => {
   const { runBuses, tdxClient, CITIES } = await import('../builders/buses.js');
-  const { r2Store, memoryBucket } = await import('../builders/store.js');
+  const { r2Store } = await import('../builders/store.js');
+  const { memoryBucket } = await import('./fixtures/bucket.mjs');
   const now = Date.parse('2026-10-20T16:17:00Z');
   const fresh = new Date(now - 86_400_000).toISOString();
   const cities = Object.fromEntries(CITIES.map(c => [c, { routes: 120, bytes: 1, built: c === 'Hsinchu' ? new Date(now - 8 * 86_400_000).toISOString() : fresh }]));
@@ -54,7 +56,8 @@ test("a bus pack read wrong (TDX's answer not a list, or no routes) is never wri
 
 test("where.json: a YouBike city that fails half way marks nothing, never its stations under the next city's name", async () => {
   const { buildWhere } = await import('../builders/buses.js');
-  const { r2Store, memoryBucket } = await import('../builders/store.js');
+  const { r2Store } = await import('../builders/store.js');
+  const { memoryBucket } = await import('./fixtures/bucket.mjs');
   const store = r2Store(memoryBucket({}));
   const tdx = {
     pages: async (path, top, each) => {

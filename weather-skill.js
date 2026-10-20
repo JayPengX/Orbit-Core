@@ -16,7 +16,8 @@
 // each, moved at most 0.1 a day, written to `weather:weights` (which every
 // /weather blend reads). Until 3 days of scores exist, the starting weights.
 
-import { HOUR, kvJson, kvPut, getJson, cwaUrl, nearestStation, parseCwaObs, parseCwaRain, twDate, DEFAULT_WEIGHTS, airSites, addAirReading } from './weather.js';
+import { HOUR, kvJson, kvPut, getJson, cwaUrl, nearestStation, parseCwaObs, parseCwaRain, DEFAULT_WEIGHTS, airSites, addAirReading } from './weather.js';
+import { twDay } from './kit/format.mjs';
 
 export const SCORE_CELLS = 6;
 export const RAINED_MM = 0.5;
@@ -48,7 +49,7 @@ export function scoreHour(sk, { rain, obs }, now) {
         const lead = T - s.at;
         if (!h || lead < 0 || lead >= 24 * HOUR) continue;
         const bucket = lead < 6 * HOUR ? 'short' : 'long';
-        SOURCES.forEach((src, i) => h[1 + i] != null && add(sk.days, twDate(T), 'pop', bucket, src, (h[1 + i] / 100 - rained) ** 2));
+        SOURCES.forEach((src, i) => h[1 + i] != null && add(sk.days, twDay(T), 'pop', bucket, src, (h[1 + i] / 100 - rained) ** 2));
       }
       sk.lastRain = T;
     }
@@ -61,12 +62,12 @@ export function scoreHour(sk, { rain, obs }, now) {
         const lead = T - s.at;
         if (!h || lead < 0 || lead >= 24 * HOUR) continue;
         const bucket = lead < 6 * HOUR ? 'short' : 'long';
-        SOURCES.forEach((src, i) => h[3 + i] != null && add(sk.days, twDate(T), 'temp', bucket, src, Math.abs(h[3 + i] - obs.temp)));
+        SOURCES.forEach((src, i) => h[3 + i] != null && add(sk.days, twDay(T), 'temp', bucket, src, Math.abs(h[3 + i] - obs.temp)));
       }
       sk.lastTemp = T;
     }
   }
-  const oldest = twDate(now - KEEP_DAYS * 86_400_000);
+  const oldest = twDay(now - KEEP_DAYS * 86_400_000);
   for (const d of Object.keys(sk.days)) if (d < oldest) delete sk.days[d];
   return sk;
 }
@@ -154,7 +155,7 @@ export async function weatherCron(env, { fetchFn = fetch, now = Date.now() } = {
   const skills = [];
   for (const cell of cells) skills.push(await scoreCell(env, cell, { fetchFn, now }).catch(() => null));
   const prev = (await kvJson(env, 'weather:weights')) || { ...DEFAULT_WEIGHTS };
-  const today = twDate(now);
+  const today = twDay(now);
   let weights = null;
   if (prev.date !== today) {
     const sum = summarize(skills.filter(Boolean));

@@ -6,8 +6,7 @@
 //          and this account's own record (truth.mjs)
 //   App    every app, Quadra's and Orbit's, when it was last used, a way in
 //   說明   every app's guide (help.mjs)
-// It was Quadra Hub's; Hub is Orbit Words now, and only learns words.
-import { APPS, FAMILIES, AVATARS, FRAMES, VIP, WELCOME, money, freeBets, vipStatus, vipName, worthOf, WEALTH_RANKS, OVERDRAFT_RATE, ECONOMY, settingPatch, passAccount, appIcon, el as node } from '#kit/quadra.mjs';
+import { APPS, AVATARS, FRAMES, VIP, WELCOME, money, freeBets, vipStatus, vipName, worthOf, WEALTH_RANKS, OVERDRAFT_RATE, ECONOMY, settingPatch, passAccount, appIcon, el as node } from '#kit/quadra.mjs';
 import { PLAY, STOCK, houseKeep, boostedKeep, freeBetWorth, roundTrip, record, overdraftYear, vipShare } from './truth.mjs';
 import { HELP_ORDER, helpFor } from './help.mjs';
 import { sheet } from './ui.mjs';

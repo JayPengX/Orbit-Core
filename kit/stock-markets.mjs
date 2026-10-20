@@ -431,20 +431,6 @@ export function marketHalt(spx, now = Date.now()) {
   }
   return halt;
 }
-// A US stock's Limit Up-Limit Down band (LULD Plan, as amended), its share
-// either side of the reference price (the last 5 minutes' average): Tier 1
-// (S&P 500, Russell 1000, some ETPs) 5% over US$3, Tier 2 10%; US$0.75-3
-// 20%; under US$0.75 the lesser of US$0.15 or 75%; doubled from 15:35 for
-// Tier 1, and for Tier 2 at US$3 or under. Prices outside it pause the stock
-// 5 minutes (which Yahoo's 5-minute bars can't show: the band is for the
-// app to show).
-export function luldBand(price, { tier = 1, t = Date.now() } = {}) {
-  if (!(price > 0)) return null;
-  const share = price > 3 ? (tier === 1 ? 0.05 : 0.1) : price >= 0.75 ? 0.2 : Math.min(0.15 / price, 0.75);
-  const { minutes } = localParts(t, 'US');
-  const late = minutes >= 935 && minutes < 960 && (tier === 1 || price <= 3);
-  return late ? share * 2 : share;
-}
 
 // Lunch breaks, in the market's own time: no trading in between.
 const LUNCH = { JP: [690, 750], HK: [720, 780], CN: [690, 780], SG: [720, 780] };

@@ -37,7 +37,13 @@ node tools/preview.mjs sports --live --width 375
 | `--timing`, `--requests`, `--profile`, `--latency ms`, `--version-latency ms`, `--h2`, `--root dir` | Speed: when it opened, every call, the CPU profile, a phone's latency, a deploy's build |
 | `--clock ISO`, `--fixture host/path=file` | A made-up time (Taipei unless it ends in Z or ±hh:mm) or answer |
 | `--serve [--port 8123]` | Serve it for the iOS Simulator (`xcrun simctl openurl booted http://localhost:8123/<Repo>/`) |
-| `--no-geo` | (Weather) refuse the position |
+| `--type "<selector>=text"` | Fill a field after the clicks (repeatable) |
+| `--geo lat,lon`, `--geo-path "lat,lon;…" --geo-every ms`, `--no-geo` | Where the phone is (Transit's default is 新竹車站), moving during `--wait`, or refusing the position |
+| `--safari` | Opened in Safari, not from the home screen: the install screen |
+| `--signed-out` | The sign-in screen, as a new device sees it |
+| `--entry '{json}'`, `--snap '{json}'` | Add a wallet entry (an economy scenario); start with this wallet snap (e.g. Play's open slips) |
+| `--fake-yahoo` | Made-up Yahoo prices, for when Yahoo answers 429 |
+| `--freezes` | Report main-thread stalls while it runs |
 
 Without `--live`, Transit uses made-up TDX around 新竹車站 and Weather its
 saved fixtures. `admin [view…]` opens the admin panel on twelve made-up
@@ -66,7 +72,9 @@ ahead). Nothing changes in the apps until one adopts it.
 
 | Tool | What |
 | --- | --- |
-| `node tools/economy.mjs` | Each kind of user over a year, old settings against new |
+| `node tools/economy.mjs` | Each kind of user over a year, and what the house keeps |
+| `node tools/accent-css.mjs` | Write each app's accent colours (`kit/brand.mjs`) into `kit/quadra.css`; run after changing a brand colour |
+| `node tools/stamp.mjs` | Stamp a service worker for a deploy (see above) |
 | `node tools/leagues-audit.mjs [--sport soccer] [--json]` | Every catalogue league against its sources today |
 | `node tools/hk-lots.mjs [file.xlsx]` | Every HKEX security's board lot into `kit/stock-hk-lots.mjs` (HKEX's List of Securities); run it now and then for new listings |
 | `node tools/jp-lists.mjs` | TOPIX500 (Tokyo's finer ticks) and every Tokyo ETF's trading unit into `kit/stock-jp-lists.mjs` (JPX's files; needs `pdftotext`); run it after TOPIX's October review |

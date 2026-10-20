@@ -18,8 +18,7 @@
 // ESPN FC's) play only there and aren't taken. CPBL's: ELTA's (its games'
 // 全場精華), then the league's own.
 //
-// Only broadcast.mjs imported (itself import-free): Shared-Data loads the
-// two alone (its pack of each recent game's video, sports/watch.json).
+// The builders' pack of each recent game's video is sports/watch.json.
 import { eltaVodOf } from './sports-broadcast.mjs';
 import { fold } from './names.mjs';
 
@@ -194,7 +193,7 @@ const NOT_HIGHLIGHTS = /every play|reaction|preview|press conference|post-?match
 // Highlights" names both sides, the game and highlights: it was picked over
 // the game's own, 2026-10-13).
 const PART_OF_GAME = /\b(\d+(st|nd|rd|th)|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|extra) (inning|quarter|period)s?\b|\binnings?\b|\bfull (top|bottom|bot)\b|\b(final|last) (\d+|three|two) outs?\b|\bfinal out\b/i;
-// (The leagues played in innings, quarters or periods, by key: this file is Shared-Data's too, which reads no league list.)
+// (The leagues played in innings, quarters or periods, by key: this file reads no league list.)
 const TIMED = new Set(['mlb', 'cpbl', 'npb', 'kbo', 'nba', 'wnba', 'nbl', 'nhl', 'nfl', 'ncaaf']);
 // How official a channel is for a game: 0 the league's, 1 a side's, 2 an
 // English rights holder's, 3 an NBA game's full-game channel;
@@ -284,14 +283,14 @@ export function pickHighlights(videos, e, now = Date.now()) {
 
 // A game's key, as the pack and the device keep it.
 export const watchKey = e => `${e.league}:${e.id}:${e.sessionKey || ''}`;
-// Shared-Data's pack (sports/watch.json, built every few hours): each recent
+// The family's pack (sports/watch.json, built every few hours): each recent
 // game's highlights and whether ELTA has its whole game ({ games: { key:
 // { hl?: { id, channel, length, official }, elta?: 1 } } }), set by the app.
 let pack = null;
 export const setWatchPack = p => {
   if (p?.games) pack = p;
 };
-// Shared-Data's season of them, a month a file (sports/watch/<league>/<YYYY-MM>.json,
+// The season of them, a month a file (sports/watch/<league>/<YYYY-MM>.json,
 // the same entries, carried for the season: a game's links never change),
 // for a game the recent pack has let go: read when such a game is opened.
 export const WATCH_DAYS = 10;

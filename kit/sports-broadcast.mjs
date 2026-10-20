@@ -10,6 +10,8 @@
 // it carries), and Apple TV's Taiwan storefront: MLS there, its MLB Friday
 // Night Baseball not (that room isn't in the Taiwan store). Rights change:
 // keep this list current.
+import { twDay } from './format.mjs';
+
 export const CHECKED = '2026-10';
 
 // ELTA's sports schedule (in its app: 直播節目表), for a game ELTA carries on
@@ -260,7 +262,6 @@ export function eltaPrograms(programs, e, sides, others = [], sidesOf = null) {
 // A game whose hour isn't set yet (timeTbd: a play-off's next game): ELTA's
 // program of it, the same two sides that day in Taiwan, gives it. ESPN can
 // be a day behind ELTA in setting it. ms, or null.
-const twDay = ms => new Date(ms + 8 * 3_600_000).toISOString().slice(0, 10);
 // Else, ELTA's one unnamed program that day (【on ELTA 季後賽】) not near a
 // game of the league whose hour is set, when this is the day's one game of
 // the league still without its hour (`others`: the games known).
@@ -372,7 +373,7 @@ export function broadcastsFor(e, programs, { sides = [], others = [], prefer = '
 // appRedirect mapping), when ELTA puts it up: the next day for some leagues
 // (the NBA, 歐國聯), weeks later for others (英超, 歐冠). A new season is a new
 // page: the pages are found each night by their titles on ELTA.tv's sports
-// index (Shared-Data's sports/elta-pages.json, `eltaPages`), so nothing here
+// index (the family's sports/elta-pages.json, `eltaPages`), so nothing here
 // changes from year to year. ELTA_VOD: October 2026's, until that's read.
 export const ELTA_REPLAY_HOURS = 48;
 // How ELTA writes a game: football's home side first ("曼聯 VS 曼城" at Old
@@ -431,7 +432,7 @@ export function eltaPages(index) {
   }
   return out;
 }
-// The pages read (Shared-Data's sports/elta-pages.json, as eltaPages): the
+// The pages read (the family's sports/elta-pages.json, as eltaPages): the
 // app's, set once read (tv.mjs).
 let knownPages = null;
 export const useEltaPages = index => (knownPages = index?.length ? eltaPages(index) : null);

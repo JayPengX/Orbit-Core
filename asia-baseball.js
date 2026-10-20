@@ -16,7 +16,6 @@
 import { parseTsdbDay, TSDB_DAY, TSDB_CPBL } from './kit/catalog.mjs';
 
 export const ASIA_HOST = 'asia-baseball.quadra';
-export const ASIA_LEAGUES = ['npb', 'kbo', 'cpbl'];
 
 // Each club: the source's name -> English (the logo tables' spelling) and Taiwan's name.
 const NPB_TEAMS = {

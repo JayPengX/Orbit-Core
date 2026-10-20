@@ -1,6 +1,6 @@
 // The Securities parts: stakeInput decimals, logoTile with a list of URLs,
 // confirm points with icons, sheetHero logo/status, stockRow and movePill
-// (and their HTML twins). The fake DOM is kit-shell.test.mjs's.
+// (and their HTML twin). The fake DOM is kit-shell.test.mjs's.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -222,14 +222,6 @@ test('stakeInput: presets respect decimals', () => {
   assert.equal(a.getAttribute('aria-pressed'), 'true');
 });
 
-test('stakeInputHtml: decimals, and unchanged without', () => {
-  const plain = ui.stakeInputHtml({ value: 500, presets: [100, 500] });
-  assert.ok(plain.includes('inputmode="numeric"') && plain.includes('value="500"') && !plain.includes('data-decimals'));
-  const fx = ui.stakeInputHtml({ value: 1.5, presets: [1.5, 2], decimals: 2 });
-  assert.ok(fx.includes('inputmode="decimal"') && fx.includes('value="1.50"') && fx.includes('data-decimals="2"'));
-  assert.ok(fx.includes('aria-pressed="true" data-preset="1.5"'));
-});
-
 // ---- logoTile with a list ----
 test('logoTile: a list of URLs is tried in order, then the letter', () => {
   const t = ui.logoTile(['a.png', 'b.png'], { fallbackText: '台積電' });
@@ -393,18 +385,6 @@ test('stockRowHtml: the same structure, escaped, data-open', () => {
   assert.deepEqual(sorted(classesOfTree(dom)), sorted(classesOfHtml(html)));
   const plain = ui.stockRowHtml({ name: 'B', data: { code: 'x"y' } });
   assert.ok(plain.includes('data-code="x&#34;y"') && !plain.includes('role='));
-});
-
-test('stockRow inside wireTaps', () => {
-  const root = new FakeEl('div');
-  root.contains = () => true;
-  const seen = [];
-  ui.wireTaps(root, { open: v => seen.push(v) });
-  const row = new FakeEl('div');
-  row.attrs['data-open'] = '2330';
-  root.append(row);
-  root.dispatch('click', { target: row });
-  assert.deepEqual(seen, ['2330']);
 });
 
 // ---- CSS ----

@@ -205,7 +205,7 @@ test('US pre- and post-market (富邦, 國泰): 04:00-09:30 and to 18:00 New Yor
   assert.equal(fills[o.id].quote, 250.5);
 });
 
-test('US circuit breakers: the S&P 500 down 7% halts every US stock 15 minutes (not from 15:25), down 20% the rest of the day; LULD bands', async () => {
+test('US circuit breakers: the S&P 500 down 7% halts every US stock 15 minutes (not from 15:25), down 20% the rest of the day', async () => {
   const spx = (points, price) => ({ symbol: '^GSPC', prev: 6000, price, marketTime: points.at(-1)[0], line: points });
   // Down 7.5% at 11:00: halted to 11:15, then trading again though still down.
   const p1 = [[at('2026-10-13T10:00'), 5800], [at('2026-10-13T11:00'), 5550]];
@@ -220,6 +220,4 @@ test('US circuit breakers: the S&P 500 down 7% halts every US stock 15 minutes (
   const r = SA.placeOrder(rich(), { side: 'buy', type: 'market', qty: 1 }, { quote: q, rates: RATES, valuation: OK, now: at('2026-10-13T11:05'), id: 'h1', halt });
   assert.equal(r.fill, null);
   assert.ok(SA.processOrders(r.account, new Map([['AAPL', q]]), RATES, at('2026-10-13T11:20')).filled.length === 1, 'filled once it reopens');
-  // LULD: Tier 1 5% over US$3, Tier 2 10%, 20% from US$0.75, doubled in the last 25 minutes.
-  assert.deepEqual([SM.luldBand(250, { t: at('2026-10-13T11:00') }), SM.luldBand(250, { tier: 2, t: at('2026-10-13T11:00') }), SM.luldBand(2, { t: at('2026-10-13T11:00') }), SM.luldBand(0.5, { t: at('2026-10-13T11:00') }), SM.luldBand(250, { t: at('2026-10-13T15:40') }), SM.luldBand(250, { tier: 2, t: at('2026-10-13T15:40') })], [0.05, 0.1, 0.2, 0.3, 0.1, 0.1]);
 });

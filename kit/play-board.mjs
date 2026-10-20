@@ -1,9 +1,7 @@
 // Every priced option of a game, the one place a board is built. The page
-// adds names to these for you, and the simulated crowd bets on exactly the
-// same options (real games, and the typical weeks of sports with nothing on
-// today, which are made-up games run through this same code). One pricing
-// path, so nothing can be cheaper to bet on in the simulator than on the page
-// or the other way round.
+// adds names to these for you, and the Worker's board (builders/play.js)
+// builds the same options. One pricing path, so a bet is priced the same
+// wherever it is made.
 //
 // An option: { id, gameId, sport, kind, side, market, fairChance, fairMargin,
 // errKey, cut, estOdds, posted, lock, minLegs, ... } plus the fields its kind
@@ -425,49 +423,6 @@ export function gameOptions(game) {
   return game.scoreOnly ? out.filter(o => !PART_KINDS.has(o.kind)) : out;
 }
 const PART_KINDS = new Set(['htft', 'htotal', 'hrunline', 'f5', 'f5total', 'f5runline', 'q1', 'half', 'regulation', 'firstinning', 'inningtotal', 'inningml', 'inning', 'nextrun', 'tdtotal']);
-
-// ---- The simulated crowd's pool ----------------------------------------------
-
-// Where each option sits on its game's shared result: the winner and every
-// handicap of a game on one number line (the away side's slice first), every
-// total line on another (under first), so one game's markets agree; other
-// markets stacked in order within their own.
-function resultSlice(o, probs) {
-  const game = `${o.sport}|${o.gameId}`;
-  if (o.kind === 'ml') {
-    const lo = { away: 0, draw: probs.away ?? 0, home: (probs.away ?? 0) + (probs.draw ?? 0) }[o.side];
-    return { key: `${game}|side`, outLo: lo, outHi: lo + o.fairChance };
-  }
-  if (o.kind === 'runline') {
-    const away = o.side === 'away' ? o.fairChance : 1 - o.fairChance;
-    return { key: `${game}|side`, outLo: o.side === 'away' ? 0 : away, outHi: o.side === 'away' ? away : 1 };
-  }
-  // A podium finish: its own yes-or-no draw, not stacked with the others.
-  if (o.kind === 'f1podium') return { key: `${game}|${o.market}`, outLo: 0, outHi: o.fairChance };
-  if (o.kind === 'dc') {
-    // Two results of three on the winner's line (away, draw, home); away or
-    // home wraps round it (from home's start, past 1, to away's end).
-    const a = probs.away ?? 0;
-    const d = probs.draw ?? 0;
-    const slice = { 'draw|away': [0, a + d], 'home|draw': [a, 1], 'home|away': [a + d, a] }[o.side];
-    return { key: `${game}|side`, outLo: slice[0], outHi: slice[1] };
-  }
-  if (o.kind === 'total' || o.kind === 'teamtotal' || o.kind === 'htotal' || o.kind === 'f5total') {
-    const over = o.side === 'over' ? o.fairChance : 1 - o.fairChance;
-    return { key: `${game}|${o.kind}${o.kind === 'teamtotal' ? `|${o.team}` : ''}`, outLo: o.side === 'under' ? 0 : 1 - over, outHi: o.side === 'under' ? 1 - over : 1 };
-  }
-  return { key: `${game}|${o.market ?? o.kind}` };
-}
-
-// A board's options as the crowd's pool: what's on sale (locked options and
-// live ones dropped), at `oddsOf(option)` (the estimate by default).
-export function crowdPool(options, oddsOf = o => o.estOdds) {
-  const winners = new Map();
-  for (const o of options) if (o.kind === 'ml') winners.set(o.gameId, { ...(winners.get(o.gameId) ?? {}), [o.side]: o.fairChance });
-  return options
-    .filter(o => !o.lock && !o.live && o.fairChance > 0)
-    .map(o => ({ gameId: o.gameId, kind: o.kind, market: o.market ?? o.kind, fairChance: o.fairChance, odds: oddsOf(o), minLegs: o.minLegs ?? 1, ...resultSlice(o, winners.get(o.gameId) ?? {}) }));
-}
 
 // ---- F1: 前三名 (podium) --------------------------------------------------------
 

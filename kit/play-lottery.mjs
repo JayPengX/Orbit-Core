@@ -25,9 +25,9 @@
 // 50. 多期 2-10 on 威力彩, 大樂透 and 49樂合彩, 2-12 on BINGO, 2-24 on the rest.
 
 import { choose, prizeAfterTax } from '#kit/play-odds.mjs';
+import { twDay } from '#kit/format.mjs';
 
 export const API = 'https://api.taiwanlottery.com/TLCAPIWeB/Lottery';
-const TPE = 8 * 3_600_000;
 const DAY = 86_400_000;
 
 // ---- The games -------------------------------------------------------------------
@@ -145,7 +145,7 @@ export const limits = id => ({ multiple: GAMES[id]?.multiple || 1, periods: GAME
 
 // ---- Draw times ----------------------------------------------------------------------
 
-export const taipeiDate = t => new Date(t + TPE).toISOString().slice(0, 10);
+export const taipeiDate = twDay;
 const taipeiDow = date => new Date(`${date}T00:00:00Z`).getUTCDay();
 const at = (date, hhmm) => Date.parse(`${date}T${hhmm}:00+08:00`);
 // Sales for an evening draw close half an hour before it.

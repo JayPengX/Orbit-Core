@@ -43,6 +43,7 @@
 // never in the answer.
 
 import { STATIONS } from './weather-stations.js';
+import { twDay } from './kit/format.mjs';
 
 export const GOOGLE = 'https://weather.googleapis.com/v1/';
 export const GOOGLE_AIR = 'https://airquality.googleapis.com/v1/';
@@ -107,8 +108,8 @@ export function km(aLat, aLon, bLat, bLon) {
   return 6371 * Math.hypot(x, y);
 }
 export const cellOf = (lat, lon) => `${(Math.round(lat * 100) / 100).toFixed(2)},${(Math.round(lon * 100) / 100).toFixed(2)}`;
-// Taiwan has one zone and no summer time.
-export const twDate = ms => new Date(ms + 8 * HOUR).toISOString().slice(0, 10);
+// Taiwan has one zone and no summer time. (eco-admin.js reads it as twDate.)
+export const twDate = twDay;
 export const twHour = ms => new Date(ms + 8 * HOUR).getUTCHours();
 const twClock = ms => new Date(ms + 8 * HOUR).toISOString().slice(11, 16);
 const twParse = s => (s ? Date.parse(String(s).replace(' ', 'T').replace(/\//g, '-') + '+08:00') : null);
@@ -351,14 +352,14 @@ export function airForecast(air, gHours, now) {
   // A day's value: its worst hour (as MOENV's daily forecast means it).
   const gDay = {};
   for (const h of out.hours) {
-    const d = twDate(h.t);
+    const d = twDay(h.t);
     gDay[d] = Math.max(gDay[d] ?? 0, h.aqi);
   }
   const mDay = Object.fromEntries((air?.forecast?.days || []).filter(d => d.aqi != null).map(d => [d.date, d]));
-  const dates = [...new Set([...Object.keys(gDay), ...Object.keys(mDay)])].filter(d => d >= twDate(now)).sort();
+  const dates = [...new Set([...Object.keys(gDay), ...Object.keys(mDay)])].filter(d => d >= twDay(now)).sort();
   for (const date of dates) {
     // A partial first day (the evening left) says little of the day: MOENV's.
-    const hoursOf = out.hours.filter(h => twDate(h.t) === date).length;
+    const hoursOf = out.hours.filter(h => twDay(h.t) === date).length;
     const g = hoursOf >= 6 ? gDay[date] ?? null : null;
     const v = blend({ moenv: mDay[date]?.aqi ?? null, google: g }, AIR_WEIGHTS);
     if (v == null) continue;
@@ -404,7 +405,7 @@ export function parseCwaTown(j3, j1w) {
     for (const x of halves(name)) {
       const v = num(x.v[field]);
       if (v == null) continue;
-      fn(day(twDate(x.t)), v, twHour(x.t) >= 6 && twHour(x.t) < 18, x);
+      fn(day(twDay(x.t)), v, twHour(x.t) >= 6 && twHour(x.t) < 18, x);
     }
   };
   const mx = (a2, b) => (a2 == null ? b : Math.max(a2, b));
@@ -415,7 +416,7 @@ export function parseCwaTown(j3, j1w) {
   take('最低體感溫度', 'MinApparentTemperature', (d, v) => (d.feelsLo = mn(d.feelsLo, v)));
   take('紫外線指數', 'UVIndex', (d, v) => (d.uv = mx(d.uv, v)));
   take('12小時降雨機率', 'ProbabilityOfPrecipitation', (d, v, isDay) => (isDay ? (d.popDay = v) : (d.popNight = v)));
-  for (const x of halves('天氣現象')) if (twHour(x.t) >= 6 && twHour(x.t) < 18) day(twDate(x.t)).text = x.v.Weather || null;
+  for (const x of halves('天氣現象')) if (twHour(x.t) >= 6 && twHour(x.t) < 18) day(twDay(x.t)).text = x.v.Weather || null;
   return out;
 }
 
@@ -536,8 +537,8 @@ export function parseAir(sites, forecast, lat, lon, county) {
     at: twParse(best.publishtime),
     forecast: {
       area,
-      today: fc(twDate(now)),
-      tomorrow: fc(twDate(now + 24 * HOUR)),
+      today: fc(twDay(now)),
+      tomorrow: fc(twDay(now + 24 * HOUR)),
       days: [...new Set((forecast || []).filter(x => x.area === area).map(x => x.forecastdate))].sort().map(date => ({ date, ...fc(date) }))
     }
   };
@@ -555,7 +556,7 @@ export async function kvJson(env, key) {
 }
 export async function kvPut(env, key, value, ttlS) {
   try {
-    if (env.RATE_LIMIT_KV) await env.RATE_LIMIT_KV.put(key, JSON.stringify(value), { expirationTtl: ttlS });
+    if (env.RATE_LIMIT_KV) await env.RATE_LIMIT_KV.put(key, JSON.stringify(value), { expirationTtl: Math.max(60, ttlS) });
   } catch {}
 }
 
@@ -622,7 +623,7 @@ async function shared(env, key, freshMs, make, now, defer = null) {
 // (The writes one after another, each the newest count: a smaller one never lands last.)
 const tallies = new WeakMap(); // the KV namespace → { key, n, put }
 export async function googleAllowed(env, now, calls = 4, defer = null) {
-  const key = `weather:google:${twDate(now)}`;
+  const key = `weather:google:${twDay(now)}`;
   const read = Number(await kvJson(env, key)) || 0;
   const kv = env.RATE_LIMIT_KV;
   const mine = kv && tallies.get(kv)?.key === key ? tallies.get(kv) : null;
@@ -681,14 +682,6 @@ export function addAirReading(hist, sites, now) {
     out.sites[s.sitename] = list.sort((a, b) => a[0] - b[0]);
   }
   return out;
-}
-
-// MOENV's AQI history rows (aqx_p_488) → [[t, aqi, pm25]…], oldest first.
-export function parseAirHistory(j) {
-  return (Array.isArray(j) ? j : j?.records || [])
-    .map(r => [twParse(r.datacreationdate), num(r.aqi), num(r['pm2.5'])])
-    .filter(([t, a]) => t && a != null)
-    .sort((a, b) => a[0] - b[0]);
 }
 
 // ---- The place: NLSC's point query (縣市 and 鄉鎮市區; the 村里 isn't used) -------------------------------------------------
@@ -857,7 +850,7 @@ export function headline(resp, now) {
   const rain = rainPhrase(resp.hours, now, 12, tz);
   if (rain) parts.push(rain);
   const evening = hourIn(now, tz) >= 18;
-  const date = evening ? twDate(now + 24 * HOUR) : twDate(now);
+  const date = evening ? twDay(now + 24 * HOUR) : twDay(now);
   const d = resp.days?.find(x => x.date === date);
   if (d?.hi != null) parts.push(`${evening ? '明天' : '今天'}最高 ${Math.round(d.hi)}°${d.lo != null ? `、最低 ${Math.round(d.lo)}°` : ''}`);
   return parts.length ? parts.join('，') + '。' : '';
@@ -871,7 +864,7 @@ export function briefText(resp, now) {
   const parts = [];
   const rain = rainPhrase(resp.hours, now, 14, tz);
   if (rain) parts.push(rain);
-  const d = resp.days?.find(x => x.date === twDate(now)) || resp.days?.[0];
+  const d = resp.days?.find(x => x.date === twDay(now)) || resp.days?.[0];
   const temps = d?.hi != null ? `${Math.round(d.hi)}°${d.lo != null ? ` / ${Math.round(d.lo)}°` : ''}` : '';
   const sun = resp.advice?.find(a => a.kind === 'sun' && a.level !== 'none');
   if (sun) parts.push(`UV ${hourIn(sun.why.from, tz)}–${hourIn(sun.why.to, tz)} 點${sun.level}`);
@@ -918,8 +911,8 @@ const atClock = (date, clock) => Date.parse(`${date}T${clock}:00+08:00`);
 // The window advice is for: today's school hours, or tomorrow's once today's
 // are over.
 export function adviceWindow(now, w = ADVICE.window) {
-  let date = twDate(now);
-  if (now >= atClock(date, w.to)) date = twDate(now + 24 * HOUR);
+  let date = twDay(now);
+  if (now >= atClock(date, w.to)) date = twDay(now + 24 * HOUR);
   return { date, from: Math.max(now - (now % HOUR), atClock(date, w.from)), to: atClock(date, w.to) };
 }
 
@@ -972,8 +965,8 @@ export function advise(resp, now, w = ADVICE.window) {
 
 // What the day holds for ordinary plans: the commute, the best hours
 // outside, laundry, the window, sleep, washing the car. Short sentences.
-const hoursIn = (resp, date, from, to, now) => resp.hours.filter(h => twDate(h.t) === date && twHour(h.t) >= from && twHour(h.t) < to && h.t + HOUR > now);
-const dayWord = (date, now) => (date === twDate(now) ? '今天' : date === twDate(now + 24 * HOUR) ? '明天' : wd(date));
+const hoursIn = (resp, date, from, to, now) => resp.hours.filter(h => twDay(h.t) === date && twHour(h.t) >= from && twHour(h.t) < to && h.t + HOUR > now);
+const dayWord = (date, now) => (date === twDay(now) ? '今天' : date === twDay(now + 24 * HOUR) ? '明天' : wd(date));
 const maxPop = list => list.reduce((a, h) => Math.max(a, h.pop ?? 0), 0);
 // A day's best 2 hours to run (6–20時; earlier is dark): { date, from, feels, pop, cost }.
 export const RUN_OK = 45;
@@ -993,7 +986,6 @@ export function bestRun(resp, date, now, aqiBad = 0) {
 }
 
 export function lifeAdvice(out, resp, now, win) {
-  const tz = resp.tz;
   // The commute: 7–9 and 17–19 on the advice day.
   const am = hoursIn(resp, win.date, 7, 9, now);
   const pm = hoursIn(resp, win.date, 17, 19, now);
@@ -1007,8 +999,8 @@ export function lifeAdvice(out, resp, now, win) {
   // Running: the best 2 hours (6–20時) of today and tomorrow — dry, not
   // hot (16–24° feels best), low UV, no thunder, the air fine.
   const aqiBad = (resp.air?.aqi ?? 0) > ADVICE.mask.aqi ? 40 : 0;
-  const tomorrow = twDate(Date.parse(`${win.date}T12:00:00+08:00`) + 24 * HOUR);
-  const today = twDate(now);
+  const tomorrow = twDay(Date.parse(`${win.date}T12:00:00+08:00`) + 24 * HOUR);
+  const today = twDay(now);
   const runToday = bestRun(resp, today, now, aqiBad);
   const runTomorrow = bestRun(resp, today === win.date ? tomorrow : win.date, now, aqiBad);
   const runs = [runToday, runTomorrow].filter(Boolean);
@@ -1048,7 +1040,7 @@ export function lifeAdvice(out, resp, now, win) {
   }
   // A change in the lows: tomorrow against today.
   const dToday = (resp.days || []).find(d => d.date === today);
-  const dNext = (resp.days || []).find(d => d.date === twDate(now + 24 * HOUR));
+  const dNext = (resp.days || []).find(d => d.date === twDay(now + 24 * HOUR));
   if (dToday?.lo != null && dNext?.lo != null) {
     const diff = Math.round(dNext.lo - dToday.lo);
     if (diff <= -4) out.push({ kind: 'temp', level: 'yes', text: `降溫：明早 ${Math.round(dNext.lo)}°，低 ${-diff}°`, why: { diff } });
@@ -1071,8 +1063,8 @@ export function lifeAdvice(out, resp, now, win) {
     else if (air.aqi > ADVICE.mask.aqi) out.push({ kind: 'window', level: 'bad', text: '開窗：空氣差，關窗', why: { aqi: air.aqi } });
   }
   // Sleep: tonight 23–5 (or the night now, before 6).
-  const night = twHour(now) < 6 ? twDate(now - 24 * HOUR) : twDate(now);
-  const sleepHours = resp.hours.filter(h => h.t + HOUR > now && ((twDate(h.t) === night && twHour(h.t) >= 23) || (twDate(h.t) === twDate(Date.parse(`${night}T12:00:00+08:00`) + 24 * HOUR) && twHour(h.t) < 5)));
+  const night = twHour(now) < 6 ? twDay(now - 24 * HOUR) : twDay(now);
+  const sleepHours = resp.hours.filter(h => h.t + HOUR > now && ((twDay(h.t) === night && twHour(h.t) >= 23) || (twDay(h.t) === twDay(Date.parse(`${night}T12:00:00+08:00`) + 24 * HOUR) && twHour(h.t) < 5)));
   const nf = sleepHours.map(h => h.feels ?? h.temp).filter(v => v != null);
   if (nf.length) {
     const v = Math.round(nf.reduce((a, b) => a + b, 0) / nf.length);
@@ -1081,7 +1073,7 @@ export function lifeAdvice(out, resp, now, win) {
     out.push({ kind: 'sleep', level: v >= 28 ? 'hot' : v < 16 ? 'cold' : 'none', text: `睡覺：今晚 ${v}°，${how}`, why: { feels: v } });
   }
   // Washing the car: the next 3 days dry.
-  const next3 = (resp.days || []).filter(d => d.date > twDate(now)).slice(0, 3);
+  const next3 = (resp.days || []).filter(d => d.date > twDay(now)).slice(0, 3);
   if (next3.length === 3 && next3.every(d => d.pop != null && d.pop < 30) && (h0?.pop ?? 0) < 30) out.push({ kind: 'carwash', level: 'good', text: '洗車：3 天不下雨', why: {} });
 }
 
@@ -1421,7 +1413,7 @@ export async function cellsReport(env, now) {
     const steps = hours.slice(1).map((h, i) => h.t - hours[i].t).filter(d => d !== HOUR).length;
     cells.push({ ageMin: Math.round((now - hit.at) / MIN), sources: hit.sources, hours: hours.length, first: hours[0] ? new Date(hours[0].t).toISOString() : null, notHourly: steps, blank: Object.fromEntries(Object.entries(blank).map(([k, v]) => [k, `${v.length}: ${v.slice(0, 12).join(',')}`])), days: (hit.resp.days || []).length, airHourly: hit.resp.air?.hourly?.length ?? null, airHistory: hit.resp.air?.history?.length ?? null, far: hit.parts?.far ? Math.round((now - hit.parts.far.at) / MIN) : null, farHours: hit.parts?.far?.v?.length ?? null, farPartial: Boolean(hit.parts?.far?.partial), farError: hit.parts?.far?.error || null, last: hours.length ? new Date(hours[hours.length - 1].t).toISOString() : null });
   }
-  return { at: now, googleCallsToday: Number(await kvJson(env, `weather:google:${twDate(now)}`)) || 0, cap: GOOGLE_DAILY_CALLS, cells };
+  return { at: now, googleCallsToday: Number(await kvJson(env, `weather:google:${twDay(now)}`)) || 0, cap: GOOGLE_DAILY_CALLS, cells };
 }
 
 // The status page and its samples: Cloudflare's cache only (KV without one).

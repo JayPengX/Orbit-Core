@@ -1,4 +1,4 @@
-// Slip Tracker's door (/slip-scan): its origin and its limits.
+// Orbit Slips' door (/slip-scan): its origin and its limits.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 

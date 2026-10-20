@@ -9,7 +9,8 @@ import { incomeTaxes, tdInterest, addMonths, fullMonths, addWeekdays, lendFee, T
 import { pastClose, afterHours, termDue, creditCheck, CREDIT_TIERS } from '../kit/stock-credit.mjs';
 import { BONDS, priceAt, couponDates, curveYield, bondSession } from '../kit/stock-bonds.mjs';
 import { rocDay, parseIpoList, ipoWon, ipoOpen, ipoDrawn, ipoBackAt, ipoListAt, ipoBackEvent, ipoWinEvent, ipoApplyEvent, ipoHold, IPO_FEE } from '../kit/stock-ipo.mjs';
-import { twHoliday, twDay } from '../kit/holidays.mjs';
+import { twHoliday } from '../kit/holidays.mjs';
+import { twDay } from '../kit/format.mjs';
 
 const iso = t => new Date(t).toISOString();
 

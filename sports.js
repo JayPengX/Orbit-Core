@@ -658,7 +658,7 @@ function nextText(html) {
 
 // An ELTA.tv sports video page's episodes, newest first, as it lists them:
 // { episodes: [{ id, title }] } ("10/6 美聯分區賽G2 白襪 VS 守護者"). The
-// newest 120 here (a season's page lists ~2,000: Shared-Data's watch.mjs
+// newest 120 here (a season's page lists ~2,000: the watch builder
 // reads it whole, `limit` Infinity, and keeps each game's for the season).
 const TRIM_ELTA_VOD = 'eltavod';
 export function trimEltaVod(html, limit = 120) {

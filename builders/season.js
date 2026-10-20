@@ -1,4 +1,4 @@
-// Which games' data Shared-Data keeps: the owner's rule (2026-10-12).
+// Which games' data the family keeps (R2): the owner's rule (2026-10-12).
 //
 // A league's season is kept whole (every game's and race's result, box score,
 // watch links, win probability, tables, players' and teams' numbers, the
@@ -12,6 +12,8 @@
 // (ESPN's scoreboard unread) wipes nothing.
 //
 // Every builder (builders/*.js) asks here.
+
+import { twDay } from '../kit/format.mjs';
 
 export const DAY = 86_400_000;
 // The last season began at most a year and a bit before this one.
@@ -58,7 +60,6 @@ export const keptFrom = season => (season?.begun === false || season?.begun == n
 // yet (playoffs: ESPN's season end; a cup's: its final's date), else its
 // last game scheduled; a season over (ESPN not yet on the next): the next
 // one's schedule. `events`: the season packs' ({ date, season }).
-const taipei = t => new Date(t + 8 * 3_600_000).toISOString().slice(0, 10);
 const off = ev => /postponed|canceled|cancelled|abandoned/i.test((ev?.status?.type || ev?.competitions?.[0]?.status?.type || {}).name || '');
 export function seasonBounds(events, season, end = NaN, now = Date.now()) {
   const list = (events || []).filter(ev => startOf(ev) && !off(ev));
@@ -66,5 +67,5 @@ export function seasonBounds(events, season, end = NaN, now = Date.now()) {
   const last = (pick = () => true) => Math.max(-Infinity, ...list.filter(pick).map(startOf));
   let to = Math.max(Number.isFinite(end) ? end : -Infinity, last(ev => ev?.season?.year === season?.year));
   if (to < now) to = Math.max(to, last());
-  return { from: Number.isFinite(first) ? taipei(first) : null, to: Number.isFinite(to) ? taipei(to) : null };
+  return { from: Number.isFinite(first) ? twDay(first) : null, to: Number.isFinite(to) ? twDay(to) : null };
 }

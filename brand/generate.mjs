@@ -54,9 +54,10 @@ async function png(svg, size, path) {
   await page.setContent(`<html><body style="margin:0;background:transparent"><img style="width:${size}px;height:${size}px;display:block" src="data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}"></body></html>`);
   await page.screenshot({ path, omitBackground: true, type: 'png' });
 }
-async function cards(id, dir) {
+async function cards(id, dir, formats = Object.keys(FORMATS)) {
   await mkdir(dir.replace(/[^/]*$/, ''), { recursive: true });
-  for (const [format, { w, h, file }] of Object.entries(FORMATS)) {
+  for (const format of formats) {
+    const { w, h, file } = FORMATS[format];
     await page.setViewportSize({ width: w, height: h });
     await page.setContent(shareCard(id, format), { waitUntil: 'load' });
     await page.evaluate(() => document.fonts.ready);
@@ -146,8 +147,8 @@ async function writeManifest(id, place) {
   });
   await writeFile(place.manifest, JSON.stringify(m, null, 2) + '\n');
 }
-// Pictures the old brand left behind.
-const RETIRED = ['og-image.jpg', 'og-image-square.jpg', 'og-image.png', 'og-image-square.png', 'og-card.jpg', 'og-card-square.jpg', 'icons/icon.svg'];
+// Files no page links any more.
+const RETIRED = ['og-image.jpg', 'og-image-square.jpg', 'og-image.png', 'og-image-square.png', 'og-card.jpg', 'og-card-square.jpg', 'icons/icon.svg', 'icons/favicon-16.png', 'share/story.jpg'];
 
 const only = process.argv.slice(2);
 for (const id of Object.keys(BRANDS)) {
@@ -162,7 +163,7 @@ for (const id of Object.keys(BRANDS)) {
   await writeFile(`${site}favicon.svg`, appIcon(id));
   for (const [file, size] of Object.entries({ 'apple-touch-icon.png': 180, 'icon-192.png': 192, 'icon-512.png': 512 })) await png(appIcon(id, { shape: 'square' }), size, `${site}icons/${file}`);
   await png(appIcon(id, { shape: 'maskable' }), 512, `${site}icons/maskable-512.png`);
-  for (const size of [32, 16]) await png(appIcon(id), size, `${site}icons/favicon-${size}.png`);
+  await png(appIcon(id), 32, `${site}icons/favicon-32.png`);
   await cards(id, `${site}share/`);
   for (const old of RETIRED) await rm(`${site}${old}`, { force: true });
   await writePage(id, place);
@@ -170,19 +171,15 @@ for (const id of Object.keys(BRANDS)) {
   console.log('wrote', id, BRANDS[id].name, '->', place.dir);
 }
 
-// The family's own: both marks, the pass, their cards (site/brand/).
+// The family's own: both marks and the pass, with the pass's cards (site/brand/).
 if (!only.length || only.includes('site')) {
   const out = `${here}site/brand/`;
   await mkdir(out, { recursive: true });
   for (const f of Object.keys(FAMILIES)) {
     await writeFile(`${out}family-${f}.svg`, familyMark(f));
-    await png(familyMark(f), 512, `${out}family-${f}-512.png`);
-    await png(familyMark(f, { shape: 'square' }), 180, `${out}family-${f}-180.png`);
-    await cards(`family:${f}`, `${out}family-${f}-`);
   }
   await writeFile(`${out}pass.svg`, appIcon('pass'));
-  await png(appIcon('pass', { shape: 'square' }), 180, `${out}pass-180.png`);
-  await cards('pass', `${out}pass-`);
+  await cards('pass', `${out}pass-`, ['og', 'x']);
   for (const id of Object.keys(BRANDS)) await writeFile(`${out}${id}.svg`, appIcon(id));
   await writeFile(`${here}site/index.html`, homePage());
   console.log('wrote site/brand and site/index.html', PASS.name);

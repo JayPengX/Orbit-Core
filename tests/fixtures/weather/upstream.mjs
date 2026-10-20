@@ -4,7 +4,6 @@
 import { readFileSync } from 'node:fs';
 
 export const fx = name => JSON.parse(readFileSync(new URL(`./${name}.json`, import.meta.url), 'utf8'));
-export const FIXTURE_NOW = Date.parse('2026-10-02T11:46:00Z');
 const answer = (status, body) => ({ ok: status < 400, status, text: async () => (typeof body === 'string' ? body : JSON.stringify(body)) });
 
 export function upstream(log = [], { shift = 0, failPages = [] } = {}) {

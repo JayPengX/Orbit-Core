@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { legResult, touchdowns, kambiSets, decidedSetMatch, decidedTeamGame, parseKambiLiveData } from '../kit/settle.mjs';
-import { pointsModel, pointsMarkets, BASKETBALL_BANDS, fitHockey, goalMarkets, baseballMarkets, setMarkets, setChance, matchFromSet } from '../kit/play-markets.mjs';
+import { pointsModel, pointsMarkets, BASKETBALL_BANDS, fitHockey, goalMarkets, baseballMarkets } from '../kit/play-markets.mjs';
 import { parseOffers } from '../kit/play-offers.mjs';
 import { gameOptions } from '../kit/play-board.mjs';
 import { houseRule, withRules, estimatedMinLegs } from '../kit/play-rules.mjs';
@@ -130,17 +130,7 @@ test("限2關 / 限3關: a game's or market's own minimum (運彩 §21), and 2 f
   assert.equal(withRules({ kind: 'ml', estOdds: 1.8, start: new Date(Date.now() + 3 * 86_400_000).toISOString(), game: { minLegs: 1 } }).minLegs, 1, "the game's own wins over the estimate");
 });
 
-test('set sports (tennis, volleyball, badminton, table tennis, esports): 讓盤, 正確比數 and 單盤不讓分 priced from the match, Kambi\'s read, each settled from the sets', () => {
-  assert.ok(Math.abs(matchFromSet(setChance(0.7, 3), 3) - 0.7) < 1e-9);
-  for (const bestOf of [3, 5]) {
-    const markets = setMarkets({ homeWin: 0.7, bestOf });
-    const score = markets.find(m => m.kind === 'setscore');
-    assert.equal(score.picks.length, bestOf === 3 ? 4 : 6);
-    assert.ok(Math.abs(sum(score.picks) - 1) < 1e-9);
-    const home = score.picks.filter(p => Number(p.score.split('-')[0]) > Number(p.score.split('-')[1]));
-    assert.ok(Math.abs(sum(home) - 0.7) < 1e-9, 'the home side wins as often as the match says');
-    assert.ok(markets.filter(m => m.kind === 'sethcap').every(m => m.giver === 'home' && m.awayLine > 0));
-  }
+test('set sports (tennis, volleyball, badminton, table tennis, esports): Kambi\'s read, each settled from the sets', () => {
   // Kambi's live data: each set's games, -1 for one not played; best of the entries.
   const live = { sets: { home: [6, 6, 5, -1, -1], away: [3, 7, 7, -1, -1] } };
   assert.deepEqual(kambiSets(live), { home: [6, 6, 5], away: [3, 7, 7], bestOf: 5 });

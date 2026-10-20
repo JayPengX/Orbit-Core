@@ -149,10 +149,6 @@ export async function moveBook(env, deps, from, to, now) {
   await writeBook(env, deps, to, book, now);
   await deps.fsDelete(env, FILLS_COLLECTION, from);
 }
-// The fills issued for an account (stock-check.js reads them).
-export async function issuedFills(env, account, fsGet) {
-  return readBook(await fsGet(env, FILLS_COLLECTION, account).catch(() => null)).fills;
-}
 
 // A plan as the phone hands it (on ones only).
 export function cleanPlan(p) {

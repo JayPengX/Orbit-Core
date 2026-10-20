@@ -74,23 +74,6 @@ export const PLAN = {
   d1RowsWritten: 50_000_000,
   d1Bytes: 5_000_000_000
 };
-export const PLAN_ZH = {
-  requests: 'Workers 請求',
-  cpuMs: 'Workers CPU（毫秒）',
-  kvRead: 'KV 讀取',
-  kvWrite: 'KV 寫入',
-  kvDelete: 'KV 刪除',
-  kvList: 'KV 列出',
-  kvBytes: 'KV 儲存（位元組）',
-  doRequests: 'Durable Objects 請求',
-  doBytes: 'Durable Objects 儲存（位元組）',
-  r2ClassA: 'R2 寫入（A 類）',
-  r2ClassB: 'R2 讀取（B 類）',
-  r2Bytes: 'R2 儲存（位元組）',
-  d1RowsRead: 'D1 讀取列數',
-  d1RowsWritten: 'D1 寫入列數',
-  d1Bytes: 'D1 儲存（位元組）'
-};
 // R2's operations by class (developers.cloudflare.com/r2/pricing): reads
 // are Class B, deletes free, anything else counted as Class A (the dearer).
 export const R2_CLASS_B = new Set(['HeadBucket', 'HeadObject', 'GetObject', 'UsageSummary', 'GetBucketEncryption', 'GetBucketLocation', 'GetBucketCors', 'GetBucketLifecycleConfiguration']);

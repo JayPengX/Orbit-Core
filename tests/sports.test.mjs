@@ -266,7 +266,7 @@ test('one proxy: /sports-proxy answers with the Worker\'s CORS (its cache header
 });
 
 test('a game over is kept in R2 the first time anyone reads it; after that it comes from there, the source never asked again; a game on is never kept', async () => {
-  const { memoryBucket } = await import('../builders/store.js');
+  const { memoryBucket } = await import('./fixtures/bucket.mjs');
   const bucket = memoryBucket();
   const env = { DATA: bucket };
   const ask = url => worker.fetch(new Request(url, { headers: { Origin: 'https://jaypengx.github.io' } }), env, ctx);

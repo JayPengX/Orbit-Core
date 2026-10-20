@@ -1,6 +1,6 @@
 // The family's data as the builders see it (builders/*.js, run by the
 // proxy's crons): R2's files (data.js serves them at /data/), read and
-// written by path. What was Shared-Data's `site/` on disk.
+// written by path.
 //
 // A file is written only when its bytes changed (each keeps its SHA-256 in
 // R2's metadata), so a builder that writes all it built costs a write only
@@ -83,33 +83,4 @@ export function r2Store(bucket) {
     }
   };
   return store;
-}
-
-// A bucket in memory, R2's shape (tests, and a builder run in Node).
-export function memoryBucket(init = {}) {
-  const m = new Map(Object.entries(init).map(([k, v]) => [k, { b: v instanceof Uint8Array ? v : enc.encode(typeof v === 'string' ? v : JSON.stringify(v)), meta: {} }]));
-  const obj = (k, v) => ({ key: k, size: v.b.length, customMetadata: v.meta, arrayBuffer: async () => v.b.slice().buffer, text: async () => dec.decode(v.b), json: async () => JSON.parse(dec.decode(v.b)), etag: '' });
-  return {
-    m,
-    async get(k) {
-      const v = m.get(k);
-      return v ? obj(k, v) : null;
-    },
-    async head(k) {
-      const v = m.get(k);
-      return v ? obj(k, v) : null;
-    },
-    async put(k, b, o = {}) {
-      m.set(k, { b: new Uint8Array(b), meta: o.customMetadata || {} });
-    },
-    async delete(k) {
-      m.delete(k);
-    },
-    async list({ prefix = '', cursor, limit = 1000 } = {}) {
-      const keys = [...m.keys()].filter(k => k.startsWith(prefix)).sort();
-      const at = cursor ? Number(cursor) : 0;
-      const page = keys.slice(at, at + limit);
-      return { objects: page.map(k => obj(k, m.get(k))), truncated: at + limit < keys.length, cursor: String(at + limit) };
-    }
-  };
 }

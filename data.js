@@ -2,9 +2,7 @@
 // What doesn't change in a day (a league's season, the mirror's copies, watch
 // links, win probability, photo lists, the bus packs, shapes, where.json),
 // kept in R2 (bucket quadra-data, binding DATA) and served by the proxy at
-// /data/<path>, the paths Shared-Data's GitHub Pages site had. Moved from
-// there (the owner, 2026-10-13: everything on Cloudflare while the $5 plan
-// is paid), carried over as built, nothing read from its sources again.
+// /data/<path> (everything on Cloudflare while the $5 plan is paid).
 //
 //   GET  /data/<path>        a file: the edge cache in Taiwan first (one R2
 //                            read serves everyone for a few minutes), then R2

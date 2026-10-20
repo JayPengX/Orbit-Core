@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { paceOf, forgetPace, builderAllowed } from '../pace.js';
 import { runBuilders } from '../builders/run.js';
-import { memoryBucket } from '../builders/store.js';
+import { memoryBucket } from './fixtures/bucket.mjs';
 
 const kvWith = v => ({ get: async (k, o) => (k === 'guard:pace' && v ? (o?.type === 'json' ? v : JSON.stringify(v)) : null) });
 

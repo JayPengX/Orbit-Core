@@ -2,7 +2,7 @@
 // season's games come from here, not through the data proxy (a season's page
 // is 6 MB: parsing them froze phones). Built each night by the proxy
 // (builders/run.js, 16:17 UTC: midnight in Taiwan) into the family's data
-// (R2). Was Shared-Data's sports.mjs; the same reading.
+// (R2).
 //
 // Lean: a league-year's months already over are kept from its last pack, ESPN
 // read only from the month ten days back (and any earlier month with a game
@@ -19,6 +19,7 @@
 
 import { CATALOG, asiaMonthUrl } from '../kit/catalog.mjs';
 import { mirrorPath } from '../kit/mirror.mjs';
+import { twDay } from '../kit/format.mjs';
 import { asiaBaseballResponse } from '../asia-baseball.js';
 import { keptFrom, seasonBounds, seasonState, yearSeason } from './season.js';
 import { within } from './within.js';
@@ -90,7 +91,7 @@ export function seasonDays(events, start = NaN) {
     const t = Date.parse(e.date || '');
     const state = e.status?.type || e.competitions?.[0]?.status?.type || {};
     if (!Number.isFinite(t) || t < from || /postponed|canceled|cancelled|abandoned/i.test(state.name || state.description || '')) continue;
-    days.add(new Date(t + 8 * 3_600_000).toISOString().slice(0, 10));
+    days.add(twDay(t));
   }
   return [...days].sort();
 }
@@ -122,7 +123,6 @@ export async function asiaBounds(league, asiaMonth, now = Date.now()) {
     return { games: [], t: NaN };
   };
   const y = new Date(now + 8 * 3_600_000).getUTCFullYear();
-  const day = t => new Date(t + 8 * 3_600_000).toISOString().slice(0, 10);
   const now0 = await firstOf(y);
   const from = yearSeason(now0.games, now).begun ? now0.t : (await firstOf(y - 1)).t;
   let last = Date.UTC(y, 10, 30);
@@ -133,10 +133,10 @@ export async function asiaBounds(league, asiaMonth, now = Date.now()) {
       break;
     }
   }
-  if (Number.isFinite(from)) return { from: day(from), to: day(last) };
+  if (Number.isFinite(from)) return { from: twDay(from), to: twDay(last) };
   // Its lists unread from here (CPBL's site turns servers away): the
   // calendar's, from March of the kept year (no season opens earlier).
-  return { from: `${yearSeason([], now).begun ? y : y - 1}-03-01`, to: day(last) };
+  return { from: `${yearSeason([], now).begun ? y : y - 1}-03-01`, to: twDay(last) };
 }
 
 export const SPORTS_HOUR = 16;

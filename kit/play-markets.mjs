@@ -587,62 +587,6 @@ export function baseballMarkets({ homeWin, total }) {
   return out;
 }
 
-// ---- Set sports: tennis, volleyball, badminton, table tennis, esports ----------
-//
-// 台灣運彩 sells these (網球: 不讓分, 讓分, 大小, 單盤不讓分, 正確比數, and
-// the like for the rest). From the match's win chance alone, each set an
-// equal chance: 讓盤 on the sets (the favourite giving 1.5, and 2.5 in a best
-// of five), 正確比數 in sets and 單盤不讓分 (the first set). 大小 and 讓局 on
-// games or points need a bookmaker's line (Kambi's); settled by settle.mjs.
-// The chance of winning a best-of-n match from each set's chance p.
-export function matchFromSet(p, bestOf) {
-  const need = Math.ceil(bestOf / 2);
-  let s = 0;
-  for (let k = 0; k < need; k++) s += choose(need - 1 + k, k) * p ** need * (1 - p) ** k;
-  return s;
-}
-const choose = (n, k) => {
-  let c = 1;
-  for (let i = 1; i <= k; i++) c = (c * (n - k + i)) / i;
-  return c;
-};
-// Each set's chance that gives the match's.
-export function setChance(homeWin, bestOf) {
-  let lo = 0;
-  let hi = 1;
-  for (let i = 0; i < 50; i++) {
-    const mid = (lo + hi) / 2;
-    if (matchFromSet(mid, bestOf) < homeWin) lo = mid;
-    else hi = mid;
-  }
-  return (lo + hi) / 2;
-}
-export function setMarkets({ homeWin, bestOf = 3 }) {
-  if (!(homeWin > 0 && homeWin < 1) || !(bestOf % 2)) return [];
-  const p = setChance(homeWin, bestOf);
-  const need = Math.ceil(bestOf / 2);
-  const out = [];
-  // 正確比數: home-away in sets, every score there can be.
-  const scores = [];
-  for (let k = 0; k < need; k++) scores.push({ home: need, away: k, fair: choose(need - 1 + k, k) * p ** need * (1 - p) ** k });
-  for (let k = need - 1; k >= 0; k--) scores.push({ home: k, away: need, fair: choose(need - 1 + k, k) * (1 - p) ** need * p ** k });
-  out.push({ kind: 'setscore', market: 'setscore', cut: CUT.score, listed: scores.map(x => `${x.home}-${x.away}`), picks: scores.map(x => ({ side: `${x.home}-${x.away}`, score: `${x.home}-${x.away}`, fair: x.fair })) });
-  // 讓盤: the favourite giving 1.5 sets (and 2.5 in a best of five).
-  const giver = homeWin >= 0.5 ? 'home' : 'away';
-  for (const l of bestOf >= 5 ? [1.5, 2.5] : [1.5]) {
-    const awayLine = giver === 'away' ? -l : l;
-    const awayCover = scores.reduce((s, x) => (x.away + awayLine > x.home ? s + x.fair : s), 0);
-    if (awayCover < 0.04 || awayCover > 0.96) continue;
-    out.push({ kind: 'sethcap', market: `sh|${awayLine}`, awayLine, giver, posted: l === 1.5, cut: CUT.twoWay, picks: [
-      { side: 'away', fair: awayCover, line: awayLine },
-      { side: 'home', fair: 1 - awayCover, line: -awayLine }
-    ] });
-  }
-  // 單盤不讓分: the first set.
-  out.push({ kind: 'set1', market: 'set1', cut: CUT.twoWay, picks: [{ side: 'away', fair: 1 - p }, { side: 'home', fair: p }] });
-  return out;
-}
-
 // Odds for one pick of a market at its cut (`k`: the house's cut for this
 // market, its base cut when not given; many-outcome markets price every
 // pick at the cut, others never more than halfway to certain).

@@ -125,7 +125,8 @@ test("shareOut: a video on two games is the one begun last before it went up; th
 
 test('a run on R2: the recent pack written, the season\'s archive kept as it was when nothing new is found, no source refused twice', async () => {
   const { runWatch } = await import('../builders/watch.js');
-  const { r2Store, memoryBucket } = await import('../builders/store.js');
+  const { r2Store } = await import('../builders/store.js');
+  const { memoryBucket } = await import('./fixtures/bucket.mjs');
   const now = Date.parse('2026-10-13T12:00:00Z');
   const t = Date.parse('2026-09-20T01:00:00Z');
   const store = r2Store(
@@ -156,7 +157,8 @@ test('a run on R2: the recent pack written, the season\'s archive kept as it was
 
 test('an hourly run reads only the last two US days from ESPN and the months its games are in; a full run is the daily one', async () => {
   const { runWatch, FULL_HOUR } = await import('../builders/watch.js');
-  const { r2Store, memoryBucket } = await import('../builders/store.js');
+  const { r2Store } = await import('../builders/store.js');
+  const { memoryBucket } = await import('./fixtures/bucket.mjs');
   const now = Date.parse('2026-10-13T12:00:00Z');
   const store = r2Store(memoryBucket({ 'sports/watch/index.json': { checked: 3, leagues: { mlb: { months: ['2026-04', '2026-10'] } } }, 'sports/watch/_pending.json': { games: [] }, 'sports/watch.json': { games: {} } }));
   const asked = [];
@@ -178,7 +180,8 @@ test('an hourly run reads only the last two US days from ESPN and the months its
 
 test("Apple TV in the daily run: the clubs' pages too, each game's page read once, an older game's page kept in its month for good", async () => {
   const { runWatch, APPLE_MLS, APPLE_SEARCH } = await import('../builders/watch.js');
-  const { r2Store, memoryBucket } = await import('../builders/store.js');
+  const { r2Store } = await import('../builders/store.js');
+  const { memoryBucket } = await import('./fixtures/bucket.mjs');
   const now = Date.parse('2026-10-15T20:00:00Z');
   const ev = (id, date, state) => ({ id, date, season: { year: 2026 }, competitions: [{ status: { type: { state } }, competitors: [{ homeAway: 'home', team: { id: '1', abbreviation: 'ATL', displayName: 'Atlanta United FC' }, score: '1' }, { homeAway: 'away', team: { id: '2', abbreviation: 'MIA', displayName: 'Inter Miami CF' }, score: '0' }] }] });
   const store = r2Store(memoryBucket({ 'sports/watch/_pending.json': { games: [] }, 'sports/watch.json': { games: {} }, 'sports/mls/2026.json': { events: [ev('700', '2026-03-01T00:30Z', 'post'), ev('701', '2026-08-17T00:30Z', 'post'), ev('702', '2026-10-25T23:30Z', 'pre'), ev('703', '2026-10-31T17:00Z', 'pre')] } }));
@@ -223,7 +226,8 @@ test("Apple TV in the daily run: the clubs' pages too, each game's page read onc
 
 test('win probability on R2: a game kept is never read again, Polymarket only through the proxy, a month let go goes', async () => {
   const { runWinprob } = await import('../builders/winprob.js');
-  const { r2Store, memoryBucket } = await import('../builders/store.js');
+  const { r2Store } = await import('../builders/store.js');
+  const { memoryBucket } = await import('./fixtures/bucket.mjs');
   const now = Date.parse('2026-10-13T23:17:00Z');
   const store = r2Store(memoryBucket({ 'winprob/index.json': { leagues: { epl: { months: ['2026-09'] } } }, 'winprob/epl/2026-09.json': { games: { k1: { t: Date.parse('2026-09-20T14:00:00Z'), none: 'polymarket' } } } }));
   const proxied = [];
@@ -241,7 +245,8 @@ test('win probability on R2: a game kept is never read again, Polymarket only th
 
 test("an hourly run keeps a game found days ago in the recent pack for its ten days (NLCS Game 4's video was a search two days on)", async () => {
   const { runWatch } = await import('../builders/watch.js');
-  const { r2Store, memoryBucket } = await import('../builders/store.js');
+  const { r2Store } = await import('../builders/store.js');
+  const { memoryBucket } = await import('./fixtures/bucket.mjs');
   const now = Date.parse('2026-10-18T04:00:00Z');
   const at = Date.parse('2026-10-16T00:00:00Z');
   const old = Date.parse('2026-10-06T00:00:00Z');

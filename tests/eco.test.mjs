@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { handleEcoRequest, mergeWallet, poolBalance, cleanPatch, emptyWallet, paydayEntries, worthOf, OVERDRAFT_RATE, vipEntries, vipStakes, vipTier, welcomeEntries, VIP, PAY, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, ECO_APPS, rankEntries, RANKS } from '../eco.js';
+import { handleEcoRequest, mergeWallet, poolBalance, cleanPatch, emptyWallet, paydayEntries, worthOf, vipEntries, vipStakes, vipTier, welcomeEntries, VIP, PAY, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, ECO_APPS, rankEntries, RANKS } from '../eco.js';
 import { planClean, tidyWallet } from '../eco-admin.js';
 
 function setup() {

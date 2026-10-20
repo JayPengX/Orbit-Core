@@ -4,7 +4,7 @@
 // one: whatever rounds to nothing prints bare (NT$0, 0.00%), never +NT$0
 // or −NT$0 (quadra.mjs money() keeps the same rule for NT$ play money).
 //
-//   import { DASH, money, pct, price, num, compact, setFormatLocale } from '#kit/format.mjs';
+//   import { DASH, money, pct, price, num, compact, setFormatLocale, twDay, twMonth, finiteOr0 } from '#kit/format.mjs';
 // Each currency's symbol and decimals, as stock-markets.mjs CURRENCIES has
 // them (a test keeps them equal); kept here so an app that only shows NT$
 // doesn't load the markets' tables.
@@ -89,3 +89,17 @@ export function compact(n) {
   if (a >= 1e4) return `${s}${nf(0, 0).format(a / 1e3)}K`;
   return `${s}${nf(0, a < 10 ? 2 : 0).format(a)}`;
 }
+
+// Taiwan's calendar day of a time: 'YYYY-MM-DD' ('' for no time at all: an
+// invalid date or text is no day, never a thrown error). A date-time string
+// counts as its moment. Taiwan has no daylight saving time.
+export function twDay(t) {
+  if (typeof t === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
+  const ms = t instanceof Date ? t.getTime() : typeof t === 'string' ? Date.parse(t) : Number(t);
+  return Number.isFinite(ms) ? new Date(ms + 8 * 3_600_000).toISOString().slice(0, 10) : '';
+}
+// Its month, 'YYYY-MM'.
+export const twMonth = t => twDay(t).slice(0, 7);
+
+// A finite number as it is, anything else 0.
+export const finiteOr0 = v => (typeof v === 'number' && Number.isFinite(v) ? v : 0);

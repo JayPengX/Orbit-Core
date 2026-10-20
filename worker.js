@@ -8,7 +8,7 @@
 //                                app's data (eco.js)
 //   POST  /gemini                Orbit Class's AI schedule-photo import
 //   POST  /nl-edit               Orbit Class's natural-language edits
-//   POST  /slip-scan             Slip Tracker's ticket photos (slip.js)
+//   POST  /slip-scan             Orbit Slips' ticket photos (slip.js)
 //   POST  /law-ask               Orbit Law's questions on a law's articles (law.js)
 //   POST  /law-chat              Orbit Law's 問法律, answered from the articles it finds (law-chat.js)
 //   GET   /law-page              A government page (gov.tw) read inside Orbit Law (law-page.js)
@@ -52,11 +52,11 @@ import { weatherCron, skillReport } from './weather-skill.js';
 import { handleTransit, tally } from './transit.js';
 import { readDev, capacityCron } from './eco-admin.js';
 import { paceOf } from './pace.js';
-import { beat, tellOwner, systemReport, tell, billNotice, OPS_DOC } from './ops.js';
+import { beat, tellOwner, systemReport } from './ops.js';
 import { applyScale } from './capacity.js';
 import { handleSports, sportsCron, useDevSettings } from './sports.js';
 import { handleToday } from './sports-today.js';
-import { isAllowedOrigin, corsHeaders, json, LOCAL_ORIGIN, bodyText } from './http.js';
+import { isAllowedOrigin, corsHeaders, json, LOCAL_ORIGIN, bodyText, sha256Hex } from './http.js';
 import { handleData } from './data.js';
 import { handleStock, moveBook } from './stock-fill.js';
 import { runBuilders, SLOTS as BUILD_SLOTS } from './builders/run.js';
@@ -1012,12 +1012,6 @@ function generateCode(length) {
 
 // Codes are random (never chosen by a person), so a plain SHA-256 is enough:
 // a leak of the database never hands over a working pass.
-async function sha256Hex(text) {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
-  return Array.from(new Uint8Array(digest))
-    .map(byte => byte.toString(16).padStart(2, '0'))
-    .join('');
-}
 
 // ---- /eco: the Quadra Pass (see eco.js) ------------------------------------
 // The Pass's store (doc-store.js): D1.
@@ -1112,7 +1106,7 @@ const builderProxy = env => async (url, trim = '') => {
   const res = await handleSports(new Request(ask), env, inPlace, {}, 'worker');
   return res.ok ? res.json() : null;
 };
-// Each league's season bounds (Shared-Data's sports/bounds.json), read in place.
+// Each league's season bounds (sports/bounds.json in the family's data), read in place.
 const seasonBounds = async env => {
   const res = await handleData(new Request('https://orbit-workers-proxy.quadra/data/sports/bounds.json'), env, inPlace, {}, 'worker', '/data/sports/bounds.json');
   return res.ok ? (await res.json()).leagues : null;

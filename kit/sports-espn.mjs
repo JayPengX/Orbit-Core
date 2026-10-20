@@ -1,9 +1,9 @@
 // ---- kit/sports-espn.mjs: ESPN's scoreboards as Orbit Sports' events ----
 // The one parser from ESPN's scoreboard JSON to the event the cards draw
-// (Orbit Sports' lib/espn.mjs parseScoreboard and what it needs: status,
-// sides, series, round, stage, the favourite's chance, a game's live fields),
-// copied from the app verbatim, so the proxy (sports-today.js: today's
-// scoreboards built once for every phone) and the phone parse alike. Pure:
+// (parseScoreboard and what it needs: status, sides, series, round, stage,
+// the favourite's chance, a game's live fields). Orbit Sports imports it
+// (lib/espn.mjs) and so does the proxy (sports-today.js: today's scoreboards
+// built once for every phone), so the phone and the proxy parse alike. Pure:
 // no page, no clock, no network.
 //
 //   event   { id, league, kind, name, enName, short, start, status, venue, tv,

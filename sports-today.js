@@ -10,7 +10,7 @@
 // its own on, localEvent), each `slimEvent`ed (what is empty or follows from
 // another field is left out; `unslimEvent` puts it back). A league with no
 // game that day has no list. `covered` are the leagues read (or out of season,
-// by Shared-Data's sports/bounds.json, as the phone leaves them out); `missed`
+// by the family's sports/bounds.json, as the phone leaves them out); `missed`
 // the ones a page of which couldn't be read (the phone reads those itself,
 // with no events here). A league this route doesn't read (CPBL: its own site)
 // is in neither: the phone reads it as before. Live scores stay the phone's
@@ -26,6 +26,7 @@
 // served, a new build isn't (503 { error: 'paced' }: the phone reads as it did).
 import { paceOf } from './pace.js';
 import { json } from './http.js';
+import { twDay } from './kit/format.mjs';
 import { sessionLimited } from './quadra-token.js';
 import { readThrough } from './sports.js';
 import { LEAGUES, espnDaysOf, scoreboardUrl, eventsOfPages, slimEvent } from './kit/sports-espn.mjs';
@@ -38,14 +39,12 @@ const DAY_MS = 86_400_000;
 // its own site, by the phone).
 export const TODAY_LEAGUES = () => Object.keys(LEAGUES).filter(k => LEAGUES[k].espn);
 
-// Taiwan's date of a moment (UTC+8, no summer time).
-export const taipeiDay = ms => new Date(ms + 8 * 3_600_000).toISOString().slice(0, 10);
 const dayNumber = day => Date.parse(`${day}T00:00:00Z`) / DAY_MS;
 // A real date, within a year of today (a day nobody opens is not built).
 export function validDay(day, now = Date.now()) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day || '')) return false;
   const n = dayNumber(day);
-  return Number.isFinite(n) && new Date(n * DAY_MS).toISOString().slice(0, 10) === day && Math.abs(n - dayNumber(taipeiDay(now))) <= 366;
+  return Number.isFinite(n) && new Date(n * DAY_MS).toISOString().slice(0, 10) === day && Math.abs(n - dayNumber(twDay(now))) <= 366;
 }
 
 // How long a day's answer is kept (the edge's `ttl`; the phone's browser
@@ -54,12 +53,12 @@ export function validDay(day, now = Date.now()) {
 // in Taiwan's morning); older days don't change.
 export function keepFor(day, now = Date.now(), partial = false) {
   if (partial) return { ttl: 10, browser: 0 };
-  const from = dayNumber(day) - dayNumber(taipeiDay(now));
+  const from = dayNumber(day) - dayNumber(twDay(now));
   if (from >= 0) return from <= 1 ? { ttl: 60, browser: 15 } : { ttl: 600, browser: 60 };
   return from === -1 ? { ttl: 120, browser: 30 } : { ttl: 3600, browser: 300 };
 }
 
-// Each league's season bounds (Shared-Data's sports/bounds.json, { league: { from, to } }):
+// Each league's season bounds (the family's sports/bounds.json, { league: { from, to } }):
 // no day outside them is read (as the phone does). Read through `deps.bounds`,
 // at most every 10 minutes; null when unknown (everything is read).
 let boundsMemo = { at: 0, v: null };
@@ -79,7 +78,7 @@ export const forgetBounds = () => (boundsMemo = { at: 0, v: null });
 // One league's events of the day: its ESPN pages read (a race weekend's
 // current page on today, as the phone reads it), parsed. null: not read.
 async function leagueOf(league, day, now, read) {
-  const dates = LEAGUES[league].kind === 'field' && day === taipeiDay(now) ? [] : espnDaysOf(day);
+  const dates = LEAGUES[league].kind === 'field' && day === twDay(now) ? [] : espnDaysOf(day);
   const pages = await Promise.all((dates.length ? dates : [null]).map(d => read(scoreboardUrl(league, d))));
   const events = eventsOfPages(league, dates, pages);
   return events && !events.unread ? events : null;

@@ -242,9 +242,9 @@ import map, so a file has one address whichever loader a page carries.
 | --- | --- |
 | `quadra.mjs` | The core: the session, `proxyJson`/`packJson`, the economy tables, VIP, looks, notices, `installGate`, `watchUpdates`, `onlineOnly`, `keepOffline`, `mayLocate`, `tabBar`, `topActions`, `fitNumbers`, `rank` (recommendations), `rec` (除錯紀錄), iPhone behaviour |
 | `quadra.css` | The design system (iOS 27 tokens, Liquid Glass, springs, every control) |
-| `ui.mjs` | Builders: `segmented`, `sheet` (the one sheet: `detent`, `foot`, `lead`, `trailing`; the Pass is it), `menu`, `toast`, `list`/`cell`, `search`, `toggle`, `empty`, `navTitle` (collapsing large title), `pullToRefresh`, `view`, `countTo`; and an HTML-string twin of each (`emptyHtml`, `cellHtml`, `sheetHtml`… with `wireTaps` for their `data-*` taps) |
-| `ui.mjs` icons (added) | `share`, `trash`, `x`, `bank`, `lock`, `exchange`, `cup`, `flag` join the set (`send`, `key`, `swap`, `spark` already existed); apps read `kitUI.icons?.x`, never import |
-| `quadra.css` pieces (added) | `.q-switch.on` (= aria-checked), `.q-sheet-foot` (sticky primary-button footer at a sheet's bottom, safe-area aware), `.q-fig` (grid of captioned bold figures with hairlines, children `small` over `b`) |
+| `ui.mjs` | Builders: `segmented`, `sheet` (the one sheet: `detent`, `foot`, `lead`, `trailing`; the Pass is it), `menu`, `toast`, `list`/`cell`, `search`, `toggle`, `empty`, `navTitle` (collapsing large title), `pullToRefresh`, `view`, the cards and tiles (`tile`, `tag`, `rowCard`, `stats`, `section`, `logoTile`, `matchCard`, `stockRow`, `progressRing`, `monthCalendar`, `panelGrid`…); and HTML-string twins of some (`emptyHtml`, `tileHtml`, `statsHtml`, `stockRowHtml`…) |
+| `ui.mjs` icons | `share`, `trash`, `x`, `bank`, `lock`, `exchange`, `cup`, `flag` join the set (`send`, `key`, `swap`, `spark` already existed); apps read `kitUI.icons?.x`, never import |
+| `quadra.css` pieces | `.q-switch.on` (= aria-checked), `.q-sheet-foot` (sticky primary-button footer at a sheet's bottom, safe-area aware), `.q-fig` (grid of captioned bold figures with hairlines, children `small` over `b`) |
 | `boot.js` | The loading screen and the version check |
 | `brand.mjs` | Families, names, colours, marks, repos, `DEV` |
 | `pass.mjs`, `help.mjs`, `truth.mjs` | The Pass sheet; every app's guide; 真相 (the house's real numbers) |
@@ -253,9 +253,13 @@ import map, so a file has one address whichever loader a page carries.
 | `f1live.mjs`, `postseason.mjs`, `sports-*.mjs` | F1 sessions; MLB's postseason; highlights, broadcast, win probability (also run by builders) |
 | `play-*.mjs`, `stock-*.mjs` | Play's and Securities' pricing and ledgers, shared with the Worker (`play-boardfile.mjs`: the home board's file, packed by the Worker and read by Play) |
 | `holidays.mjs` | Taiwan's days off |
+| `plus.mjs`, `loan.mjs`, `gov.mjs` | VIP, free bets and the welcome offer; 信貸 and relief; what the government took and gave one account |
+| `settle.mjs` | Settling Play's slips, shared with the Worker (`settle.js`) |
+| `devconfig.mjs`, `mirror.mjs`, `photo-urls.mjs` | `DEV` for the Workers; the nightly mirror's addresses; photos' addresses alone |
+| `apps.mjs`, `link.mjs`, `preload.mjs`, `stamp.mjs`, `stamp-app.mjs`, `hash.mjs` | Build tools, never served: refresh the apps' snippets; link `.kit`; the first-screen modulepreload lists; the kit's and each app's content-hashed build |
 | `sw-images.js` | Other sites' pictures in one shared cache |
 | `sw.js` | The shared service worker, stamped per deploy by `tools/stamp.mjs` |
-| `lang.mjs`, `format.mjs` | `W`, `makeT`, `detectLang`; `money`, `pct`, `price`, `DASH` |
+| `lang.mjs`, `format.mjs` | `W`, `makeT`, `detectLang`; `money`, `pct`, `price`, `DASH`, `twDay` (Taiwan's date) |
 
 **Securities' broker rules** follow Taiwan's real ones (`stock-credit.mjs`):
 現股當沖 either way round after 3 months with 10 trades or with a credit
@@ -288,12 +292,13 @@ Slip-Tracker) are small redirect repos.
 | Tool | What |
 | --- | --- |
 | `node tools/preview.mjs <app>` | The app at phone size with real data (`--live`, `--width 375`, `--lang en`, `--click`, `--eval`, `--store`, `--webkit`, `--reopen`, `--serve`…; `tools/README.md`). Prints `wraps:`, `cut:`, `scrolls sideways:` |
-| `node tools/economy.mjs` | The economy on paper, old settings against new |
+| `node tools/economy.mjs` | The economy on paper: each kind of user over a year |
 | `node tools/leagues-audit.mjs` | Every catalogue league against its sources |
 | `node tools/hk-lots.mjs` | Hong Kong board lots for Securities, from HKEX |
 | `node tools/jp-lists.mjs` | Tokyo's TOPIX500 and ETF trading units for Securities, from JPX |
 | `node tools/espn.mjs <path>` | The shape of an ESPN answer |
 | `node tools/issue-passes.mjs` | Issue passes (the owner) |
+| `node tools/stamp.mjs`, `node tools/accent-css.mjs` | Stamp a service worker for a deploy; write each app's accent colours into `quadra.css` |
 
 `npm test` covers the Pass, money, push, the data proxy, F1, Asian
 baseball, Kambi, transit, weather, the builders, the guard and pacing, and
@@ -312,20 +317,3 @@ the kit.
 | `push.js` checks | The apps that schedule them, `NOTICE_KINDS` |
 | `quadra.css` or the frame | Every app at 375 px, light and dark |
 | `brand.mjs` | `node brand/generate.mjs` |
-
-## Open
-
-- **Waiting on the owner:**
-  - phone alerts for the bill (admin → 健康 → 警示通知: your pass,
-    設定, 測試);
-  - a $5.01 usage email in Cloudflare → Notifications;
-  - check the plan renews on the 13th (`PERIOD_DAY`);
-  - delete the archived Shared-Data repo and the Firebase project
-    (orbit-project-76897; its backup is in R2);
-  - revoke the old `MATCH_FIND_DISPATCH_TOKEN`.
-- **Scheduled:** the old `sports-proxy` Worker is deleted on 2026-10-20;
-  `FIREBASE_PRIVATE_KEY` comes off on 2026-12-06.
-- **Kept off `main`:** Transit's bus stops drawn from the packs, until
-  their sides match TDX's.
-- **Not yet seen on a phone:** Securities' proxy back-fills and plan buys;
-  Play's 5-second live-bet wait.

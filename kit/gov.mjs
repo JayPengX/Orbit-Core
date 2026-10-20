@@ -9,7 +9,8 @@
 // (Securities' `snap.stock.gov`); given: 急難紓困 (the Worker's `relief`
 // entries). The apps report their figures as they sync; one not opened
 // since shows 0.
-const finiteOr0 = v => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+import { finiteOr0 } from './format.mjs';
+
 const nn = v => Math.max(0, Math.round(finiteOr0(v)));
 export function govOf(wallet) {
   const odds = wallet?.snap?.odds?.gov || {};

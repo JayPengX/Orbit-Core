@@ -8,7 +8,8 @@ import { settleSlip, evaluateSlip, slipPayoutTable, slipOutlook, analyzeSlip, af
 import { cashOutState, CASHOUT_KEEP, CASHOUT_MAX_OPEN } from '../kit/play-cashout.mjs';
 import { houseRule, shadeLong, minLegsProblem, HOUSE_RULES, LONG_FROM } from '../kit/play-rules.mjs';
 import { GAMES, ticketPrize, parseDraw, cappedPrize, settleTicket, buyTicket, nextDraw, nextDraws, limits, drawTerm, tierName, closesAt, CLOSE_MS, checkSelection, betCount, expectedReturn, mergeTickets, addTickets, BINGO_DRAWS, GAME_ORDER } from '../kit/play-lottery.mjs';
-import { CARDS, CARD_ORDER, face, facePays, tiersOf, drawPrize, buyScratch, revealScratch, onSale, winRate as scratchWins, expectedReturn as scratchReturn } from '../kit/play-scratch.mjs';
+import { CARDS, CARD_ORDER, face, facePays, tiersOf, drawPrize, buyScratch, revealScratch, onSale, expectedReturn as scratchReturn } from '../kit/play-scratch.mjs';
+const scratchWins = id => tiersOf(id).reduce((s, t) => s + 1 / t.odds, 0);
 import { propResult } from '../kit/play-props.mjs';
 import { parseOffers } from '../kit/play-offers.mjs';
 import { parseKambiInPlay } from '../kit/play-kambi.mjs';

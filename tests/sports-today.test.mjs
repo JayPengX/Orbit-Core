@@ -23,14 +23,15 @@ globalThis.fetch = async input => {
 };
 const worker = (await import('../worker.js')).default;
 const { forgetPace } = await import('../pace.js');
-const { taipeiDay, keepFor, validDay, forgetBounds, TODAY_LEAGUES, buildDay, TODAY_V } = await import('../sports-today.js');
+const { keepFor, validDay, forgetBounds, TODAY_LEAGUES, buildDay, TODAY_V } = await import('../sports-today.js');
 const espn = await import('../kit/sports-espn.mjs');
+const { twDay } = await import('../kit/format.mjs');
 const { LEAGUES, parseScoreboard, localEvent, slimEvent, unslimEvent, espnDaysOf } = espn;
 
 const ctx = { waitUntil: p => p };
 const DAY = 86_400_000;
-const today = taipeiDay(Date.now());
-const dayOf = n => taipeiDay(Date.now() + n * DAY);
+const today = twDay(Date.now());
+const dayOf = n => twDay(Date.now() + n * DAY);
 let who = 0;
 const ask = (day, { origin = 'https://jaypengx.github.io', env = {}, ip } = {}) =>
   worker.fetch(new Request(`https://proxy.test/sports-today${day === undefined ? '' : `?day=${day}`}`, { headers: { ...(origin ? { Origin: origin } : {}), 'CF-Connecting-IP': ip || `10.1.0.${++who}` } }), env, ctx);
@@ -143,7 +144,7 @@ test('read while one is still kept: no read again; past its time: built again; a
 
 test('how long a day is kept: a minute for today and tomorrow, longer for the days past, a moment when a league is missed', () => {
   const now = Date.parse('2026-10-19T03:00:00Z');
-  assert.equal(taipeiDay(now), '2026-10-19');
+  assert.equal(twDay(now), '2026-10-19');
   assert.deepEqual(keepFor('2026-10-19', now), { ttl: 60, browser: 15 });
   assert.deepEqual(keepFor('2026-10-20', now), { ttl: 60, browser: 15 });
   assert.equal(keepFor('2026-10-21', now).ttl, 600);
@@ -151,7 +152,7 @@ test('how long a day is kept: a minute for today and tomorrow, longer for the da
   assert.equal(keepFor('2026-10-10', now).ttl, 3600);
   assert.deepEqual(keepFor('2026-10-19', now, true), { ttl: 10, browser: 0 });
   // Taiwan's day, whatever the hour in UTC: 17:00Z is already tomorrow there.
-  assert.equal(taipeiDay(Date.parse('2026-10-19T17:00:00Z')), '2026-10-20');
+  assert.equal(twDay(Date.parse('2026-10-19T17:00:00Z')), '2026-10-20');
   assert.ok(validDay('2026-10-19', now) && !validDay('2026-02-30', now) && !validDay('2026-10-1', now) && !validDay('2024-01-01', now) && !validDay(undefined, now));
 });
 
@@ -186,7 +187,7 @@ test('the origin: a page of ours or a local one; any other, or none, is refused;
   assert.equal(statuses.filter(s => s === 429).length, 2);
 });
 
-test("a league out of season (Shared-Data's bounds) isn't read, as the phone leaves it out", async () => {
+test("a league out of season (the family's bounds) isn't read, as the phone leaves it out", async () => {
   fresh();
   const bounds = { mlb: { from: '2027-03-01', to: '2027-11-01' }, nba: { from: '2020-01-01', to: '2099-01-01' } };
   const built = await buildDay(today, {
