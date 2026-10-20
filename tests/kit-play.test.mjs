@@ -327,17 +327,17 @@ test('a slip is paid once, when every pick is decided or the moment nothing left
   assert.equal(applyResults(a, 'nope', ['won'], now), a);
 });
 
-test('a free bet pays only its winnings; a slip refunded while lost has had its cost back; Plus\'s bigger boost is its own entry', () => {
+test('a free bet pays only its winnings; a slip refunded while lost has had its cost back; a boost is paid in the payout', () => {
   const now = new Date('2026-10-18T00:00:00Z');
   const free = applyResults(acct([slipOf([{ odds: 2.5, gameId: 'a' }], { free: true, freeValue: 100, cost: 0 })]), 's1', ['won'], now);
   assert.equal(free.ledger[0].amount, 150);
   assert.equal(applyResults(acct([slipOf([{ odds: 2.5, gameId: 'a' }], { free: true, freeValue: 100 })]), 's1', ['lost'], now).ledger[0].amount, 0);
   const refunded = { ...acct([slipOf([{ odds: 2, gameId: 'a' }])]), ledger: [{ id: 'refund-s1', t: '2026-10-02T00:00:00.000Z', kind: 'refund', amount: 100 }] };
   assert.equal(applyResults(refunded, 's1', ['won'], now).ledger.at(-1).amount, 100, 'won 200, less the 100 refunded');
-  // Three picks: the 5% boost on the winnings, ×1.5 for a member: 7.5%.
+  // Three picks, a slip's boost of 1.5 (7.5% on the winnings): one payout.
   const legs = [{ odds: 2, gameId: 'a' }, { odds: 2, gameId: 'b' }, { odds: 2, gameId: 'c' }];
   const plus = applyResults(acct([slipOf(legs, { boost: 1.5 })]), 's1', ['won', 'won', 'won'], now);
-  assert.deepEqual(plus.ledger.map(e => [e.id, e.amount]), [['payout-s1', 835], ['plus-s1', 18]]);
+  assert.deepEqual(plus.ledger.map(e => [e.id, e.amount]), [['payout-s1', 853]]);
   // (852.5, rounded half up to the NT$ as 運彩 §18 says.)
   assert.equal(plus.slips[0].payout, 853);
 });

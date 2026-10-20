@@ -2302,7 +2302,7 @@ export function nextPayday(t) {
 
 // Paydays due up to `now` and not yet paid, added as deposits.
 // From this Taiwan month on, pay comes from Quadra itself into the pool
-// (Shared-Proxy's eco.js, PAY_FROM_MONTH), whichever app is opened.
+// (Shared-Proxy's eco.js weekly pay), whichever app is opened.
 export const INCOME_UNTIL_MONTH = '2026-10';
 
 export function applyIncome(account, now = Date.now()) {

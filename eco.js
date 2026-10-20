@@ -53,7 +53,6 @@ import { VIP, vipStakes, vipTier, WELCOME, welcomeEarned } from './kit/plus.mjs'
 import { storeReady } from './doc-store.js';
 import { tokenSecret, signToken, readToken, seal, unseal, sessionLimited, SESSION_MS, REFRESH_MS, HANDOFF_MS } from './quadra-token.js';
 import { handleAdmin } from './eco-admin.js';
-import { SLIP_RULES } from './kit/play-odds.mjs';
 import { PAY_WEEK, WEEKLY_FROM, weekStart, mondayId, debtOf, activeLoan, loanOffer, loanEntries, loanDue, payoffAmount, reliefCheck, reliefEntry, openStakes } from './kit/loan.mjs';
 
 export const ECO_PASSCODE_LENGTH = 10;
@@ -127,56 +126,10 @@ export function emptyWallet(now = Date.now()) {
 // Money beyond that is borrowed (信貸, kit/loan.mjs: repaid from the pay) or
 // relief for someone with nothing (急難紓困); the house's cut, the broker's
 // costs, interest and penalties are the sinks.
-export const PAY_MONTH = 6_000;
-export const PAY = { start: 200_000, week: PAY_WEEK, month: PAY_MONTH };
+export const PAY = { start: 200_000, week: PAY_WEEK };
 export { WEEKLY_FROM };
-// The opening money before v12, which the reset below brought accounts to.
-const OLD_START = 30_000;
-// The reset for accounts made before this economy: their opening money
-// (NT$110,000, from the Worker or, before v2, from Securities and Play)
-// comes down to NT$30,000, once, as `eco:rebase:v3`. It can take the
-// cash below zero: that's an overdraft, and it's fine (see below).
-export const REBASE = { id: 'eco:rebase:v3', amount: -80_000 };
-const rebaseDue = wallet => {
-  const start = (wallet?.entries || []).find(e => e.id === 'eco:start');
-  // Before v2 the opening money was the apps' own (Securities' cash, Play's
-  // ledger): any such account has something in the pool.
-  return start ? start.amount > OLD_START && start.amount !== PAY.start : !wallet?.v2 && ((wallet?.entries || []).length > 0 || Object.keys(wallet?.snap || {}).length > 0);
-};
-// v12's opening money for accounts that opened with NT$30,000 (an
-// `eco:start` below PAY.start, or the reset): the difference, once, as
-// `eco:topup:v12` (kind 'start'). It never takes anything.
-export const TOPUP_ID = 'eco:topup:v12';
-export function topupEntries(wallet, now) {
-  const entries = wallet?.entries || [];
-  if (entries.some(e => e.id === TOPUP_ID)) return [];
-  const start = entries.find(e => e.id === 'eco:start');
-  const opened = entries.some(e => e.id === REBASE.id) ? OLD_START : start ? start.amount : null;
-  return opened != null && opened < PAY.start ? [{ id: TOPUP_ID, t: now, app: 'eco', kind: 'start', amount: PAY.start - opened }] : [];
-}
-// The reset assumed NT$110,000. An account that opened with less (only
-// Securities' NT$100,000, or only Play's NT$10,000) came out below
-// NT$30,000: `eco:rebase:v3fix` gives the difference back, once, when
-// Securities has reported its own opening money (`snap.stock.opened`; Play's
-// is its `odds:start` entry). It never takes anything.
-const OLD_OPENING = 110_000;
-export const REBASE_FIX_ID = 'eco:rebase:v3fix';
-export function rebaseFix(wallet) {
-  const entries = wallet?.entries || [];
-  const has = id => entries.some(e => e.id === id);
-  const opened = finite(wallet?.snap?.stock?.opened);
-  if (!has(REBASE.id) || has('eco:start') || has(REBASE_FIX_ID) || opened == null) return [];
-  const play = entries.filter(e => e.id === 'odds:start').reduce((sum, e) => sum + e.amount, 0);
-  const amount = Math.round(OLD_OPENING - opened - play);
-  return amount > 0 ? [{ id: REBASE_FIX_ID, t: Date.now(), app: 'eco', kind: 'rebase', amount }] : [];
-}
-// The reset can take the cash below zero; that part of an overdraft is
-// Quadra's doing, so it costs nothing (`resetOwed`), and what was charged
-// on it before is given back once (`eco:odback:v3`, an 'od' entry).
-const resetOwed = wallet => ((wallet?.entries || []).some(e => e.id === REBASE.id) ? -REBASE.amount : 0);
-export const OD_BACK_ID = 'eco:odback:v3';
 // An overdraft (the pool below zero) costs OVERDRAFT_RATE a month, charged
-// with the month's pay on what was owed then, as `eco:od:<month>`:
+// on the month's first read on what was owed then, as `eco:od:<month>`:
 // cheaper to sell something (or borrow on margin in Securities) than to sit
 // on it.
 export const OVERDRAFT_RATE = 0.01;
@@ -185,8 +138,6 @@ const finiteOr0 = v => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
 // figure a phone sends can't raise a rank.)
 // A loan still owed counts against it: borrowed money is nobody's worth.
 export const worthOf = (wallet, now = Date.now()) => poolBalance(wallet) + finiteOr0(wallet?.snap?.stock?.held) - debtOf(wallet, now);
-export const payFor = () => PAY.month;
-export const PAY_FROM_MONTH = '2026-10';
 const TPE = 8 * 3_600_000;
 const WEEK = 7 * 86_400_000;
 const nextMonth = m => {
@@ -201,29 +152,11 @@ export function paydayEntries(wallet, now) {
   const have = new Set((wallet.entries || []).map(e => e.id));
   const out = [];
   if (wallet.v2 && !have.has('eco:start')) out.push({ id: 'eco:start', t: now, app: 'eco', kind: 'start', amount: PAY.start });
-  if (!have.has(REBASE.id) && rebaseDue(wallet)) out.push({ id: REBASE.id, t: now, app: 'eco', kind: 'rebase', amount: REBASE.amount });
-  out.push(...rebaseFix({ ...wallet, entries: [...(wallet.entries || []), ...out] }).map(e => ({ ...e, t: now })));
-  const free = resetOwed({ entries: [...(wallet.entries || []), ...out] });
-  if (free && !have.has(OD_BACK_ID)) {
-    // Each month's interest as it would have been without the reset's part.
-    const back = (wallet.entries || []).filter(e => e.app === 'eco' && e.kind === 'od' && e.amount < 0).reduce((sum, e) => sum - e.amount - Math.round(Math.max(0, -e.amount / OVERDRAFT_RATE - free) * OVERDRAFT_RATE), 0);
-    if (back > 0) out.push({ id: OD_BACK_ID, t: now, app: 'eco', kind: 'od', amount: back });
-  }
   const month = taipeiMonth(now);
-  // This month's overdraft interest, on what's owed before the pay, less
-  // what the reset made.
-  const owed = -(poolBalance(wallet) + out.reduce((sum, e) => sum + e.amount, 0)) - free;
-  if (owed >= 100 && month >= PAY_FROM_MONTH && !have.has(`eco:od:${month}`)) out.push({ id: `eco:od:${month}`, t: now, app: 'eco', kind: 'od', amount: -Math.round(owed * OVERDRAFT_RATE) });
-  out.push(...topupEntries({ ...wallet, entries: [...(wallet.entries || []), ...out] }, now));
+  // This month's overdraft interest, on what's owed before the pay.
+  const owed = -(poolBalance(wallet) + out.reduce((sum, e) => sum + e.amount, 0));
+  if (owed >= 100 && !have.has(`eco:od:${month}`)) out.push({ id: `eco:od:${month}`, t: now, app: 'eco', kind: 'od', amount: -Math.round(owed * OVERDRAFT_RATE) });
   const created = Number.isFinite(wallet.created) ? Math.min(wallet.created, now) : now;
-  // Each month's pay before weekly pay, back pay for the months nobody opened an app.
-  if (created < WEEKLY_FROM) {
-    const last = taipeiMonth(WEEKLY_FROM - 1);
-    let m = taipeiMonth(created) > PAY_FROM_MONTH ? taipeiMonth(created) : PAY_FROM_MONTH;
-    for (let n = 0; m <= month && m <= last && n < 120; n++, m = nextMonth(m)) {
-      if (!have.has(`eco:pay:${m}`)) out.push({ id: `eco:pay:${m}`, t: now, app: 'eco', kind: 'pay', amount: payFor() });
-    }
-  }
   // Each week's pay from WEEKLY_FROM (or the week the pass was made), back pay too.
   for (let w = weekStart(Math.max(created, WEEKLY_FROM)), n = 0; w <= now && n < 520; w += WEEK, n++) {
     const id = `eco:wpay:${mondayId(w)}`;
@@ -231,10 +164,6 @@ export function paydayEntries(wallet, now) {
   }
   // The loan's installments come out of the pay (kit/loan.mjs loanDue).
   out.push(...loanDue(wallet, poolBalance({ ...wallet, entries: [...(wallet.entries || []), ...out] }), now));
-  // Quadra Plus ended: what was paid for the time left comes back, once.
-  out.push(...plusRefundEntries(wallet, now));
-  // The sports tax moved to the whole slip: what earlier payouts still owe, once.
-  out.push(...backTaxEntries(wallet, now));
   // VIP cashback on the months before this one, and the welcome bonus bet.
   out.push(...vipEntries(wallet, now), ...welcomeEntries(wallet, now));
   // Level rewards for wealth levels reached (after the pay that may reach one).
@@ -317,110 +246,6 @@ export function welcomeEntries(wallet, now) {
 }
 export { WEEK };
 
-// ---- Quadra Plus, ended ------------------------------------------------------------
-//
-// The paid membership ended at PLUS_END (2026-10-20 00:00 Taipei; the owner:
-// "remove Plus completely", and "don't refund free trial"). Its looks are
-// free for everyone (the kit), old `eco:plus:<month>` entries stay as
-// history, and each pass gets back once what it had paid for the time left
-// (`eco:plusrefund:v1`, kind 'plusrefund'): a month's charge by the share of
-// the days it covered that fall after the end, a yearly plan's fee spread
-// over its months the same way. A free trial month (amount 0) paid nothing,
-// so it refunds nothing.
-export const PLUS_END = Date.UTC(2026, 9, 19, 16);
-export const PLUS_REFUND_ID = 'eco:plusrefund:v1';
-const PLUS_FEE = 490;
-const DAY_MS = 86_400_000;
-function monthDays(m) {
-  const [y, mo] = m.split('-').map(Number);
-  return new Date(Date.UTC(y, mo, 0)).getUTCDate();
-}
-// A month's span in ms (Taipei), and its overlap with [PLUS_END, ∞).
-const monthStart = m => Date.UTC(Number(m.slice(0, 4)), Number(m.slice(5, 7)) - 1, 1) - TPE;
-const after = (from, to) => Math.max(0, to - Math.max(from, PLUS_END));
-export function plusRefund(wallet) {
-  const months = (wallet?.entries || []).filter(e => e.app === 'eco' && e.kind === 'plus' && typeof e.id === 'string' && /^eco:plus:\d{4}-\d{2}$/.test(e.id));
-  let back = 0;
-  // A yearly plan: the entries one payment wrote (same time, note 'year'),
-  // the fee on the first; each month's share is the fee over them.
-  const years = new Map();
-  for (const e of months) {
-    if (e.note === 'year') {
-      const g = years.get(e.t) || [];
-      g.push(e);
-      years.set(e.t, g);
-      continue;
-    }
-    const paid = -Number(e.amount) || 0;
-    if (paid <= 0) continue;
-    const m = e.id.slice(9);
-    const end = monthStart(m) + monthDays(m) * DAY_MS;
-    // A full fee covers the month; a join's part fee, from the day it was paid.
-    const from = paid >= PLUS_FEE ? monthStart(m) : Math.max(monthStart(m), Math.floor((e.t + TPE) / DAY_MS) * DAY_MS - TPE);
-    if (end > from) back += (paid * after(from, end)) / (end - from);
-  }
-  for (const g of years.values()) {
-    const paid = -g.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-    if (paid <= 0) continue;
-    for (const e of g) {
-      const m = e.id.slice(9);
-      const from = monthStart(m);
-      const end = from + monthDays(m) * DAY_MS;
-      back += ((paid / g.length) * after(from, end)) / (end - from);
-    }
-  }
-  return Math.round(back);
-}
-export function plusRefundEntries(wallet, now) {
-  if (now < PLUS_END || (wallet?.entries || []).some(e => e.id === PLUS_REFUND_ID)) return [];
-  const amount = plusRefund(wallet);
-  return amount > 0 ? [{ id: PLUS_REFUND_ID, t: now, app: 'eco', kind: 'plusrefund', amount }] : [];
-}
-
-// ---- 運彩 tax, back charged -----------------------------------------------------
-//
-// From TAX_SLIP_FROM (the Worker deploy of 2026-10-20 04:32:36Z) a slip whose
-// whole prize is over NT$5,000 loses 20% of it (kit/play-odds.mjs afterTax;
-// the owner: "one slip is one slip", then "make sure it back charge as
-// well"). Before, only a combination whose NT$10 單注 won over NT$5,000
-// (odds over 500) was taxed. Each earlier payout over NT$5,000 that wasn't
-// taxed is charged its 20% now (`odds:tax-<slip>`, kind 'tax', cents
-// dropped), once. One that was: its payout is over 400× its cost (taxed odds
-// over 500, less 20%); an untaxed one is at most 500×, so the 400–500 band
-// is taken as taxed and left alone. Cash outs are no prize and aren't taxed.
-// A charge that would leave the slip paying back less than it cost is never
-// made (the owner: "loading to tax is just too broken", refund it and take
-// it off the record): one already made is taken back by an
-// `eco:untax-<slip>` mark (amount 0), and mergeWallet drops the charge.
-export const TAX_SLIP_FROM = Date.UTC(2026, 9, 20, 4, 32, 36);
-const msOf = t => (typeof t === 'number' ? t : new Date(t).getTime());
-export function backTaxEntries(wallet, now) {
-  if (now < TAX_SLIP_FROM) return [];
-  const entries = wallet?.entries || [];
-  const have = new Set(entries.map(e => e.id));
-  const cost = new Map(entries.filter(e => e.app === 'odds' && e.kind === 'stake' && typeof e.id === 'string' && e.id.startsWith('odds:stake-')).map(e => [e.id.slice(11), -Number(e.amount) || 0]));
-  const out = [];
-  const loses = (paid, tax, c) => c > 0 && paid - tax < c;
-  for (const e of entries) {
-    if (e.app === 'odds' && e.kind === 'tax' && typeof e.id === 'string' && e.id.startsWith('odds:tax-')) {
-      const id = e.id.slice(9);
-      const paid = Number(entries.find(x => x.id === `odds:payout-${id}`)?.amount) || 0;
-      if (!have.has(`eco:untax-${id}`) && loses(paid, -Number(e.amount) || 0, cost.get(id) || 0)) out.push({ id: `eco:untax-${id}`, t: now, app: 'eco', kind: 'untax', amount: 0 });
-      continue;
-    }
-    if (e.app !== 'odds' || e.kind !== 'payout' || typeof e.id !== 'string' || !e.id.startsWith('odds:payout-')) continue;
-    const id = e.id.slice(12);
-    const paid = Number(e.amount) || 0;
-    if (paid <= SLIP_RULES.taxFree || !(msOf(e.t) < TAX_SLIP_FROM) || have.has(`odds:tax-${id}`) || have.has(`eco:untax-${id}`)) continue;
-    const c = cost.get(id) || 0;
-    if (c > 0 && paid > 400 * c) continue;
-    const tax = Math.floor(paid * SLIP_RULES.taxRate + 1e-9);
-    if (loses(paid, tax, c)) continue;
-    out.push({ id: `odds:tax-${id}`, t: now, app: 'odds', kind: 'tax', amount: -tax });
-  }
-  return out;
-}
-
 const isObj = v => Boolean(v) && typeof v === 'object' && !Array.isArray(v);
 const str = (v, max) => (typeof v === 'string' ? v.slice(0, max) : undefined);
 const finite = v => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
@@ -461,20 +286,10 @@ function cleanStamped(map, maxKeys, maxValue) {
 
 // The lock-down (the owner, 2026-10-12): no app adds money to the pool; this
 // Worker does (Play's payouts, cash outs and prizes: settle.js, lotto.js).
-// An app's entries are what it spends (0 or less). The one exception: a Play
-// slip from before the lock-down whose picks every device lost, refunded once
-// (its stake back, refundLost), as long as the Worker never paid it.
+// An app's entries are what it spends (0 or less). (Securities' record from
+// before it: stock-check.js.)
 export const LOCK_SINCE = Date.parse('2026-10-12T09:00:00Z');
-export function appEntries(entries, wallet) {
-  const have = new Map((wallet?.entries || []).map(e => [e.id, e]));
-  return entries.filter(e => {
-    if (e.amount <= 0) return true;
-    if (e.app !== 'odds' || e.kind !== 'refund') return false;
-    const slip = /^odds:refund-(.+)$/.exec(e.id)?.[1];
-    const stake = slip ? have.get(`odds:stake-${slip}`) : null;
-    return Boolean(stake && stake.t < LOCK_SINCE && Math.abs(e.amount + stake.amount) < 0.01 && !have.has(`odds:payout-${slip}`));
-  });
-}
+export const appEntries = entries => entries.filter(e => e.amount <= 0);
 
 // An app's figures (snap): its own key only. Securities' cash, holdings'
 // cost and opening money are the Worker's (stock-check.js `stock`, from the
@@ -707,7 +522,7 @@ export async function handleEcoRequest(request, env, headers, ip, deps) {
           // wallet isn't rewritten (it was, whole, at every save: Words saves
           // at each answer).
           if (!patch.entries.length && !Object.keys(patch.snap).length && !Object.keys(patch.settings).length && !stock && now - (w.apps?.[app]?.last || 0) < TOUCH_EVERY_MS && !paydayEntries(w, now).length) return w;
-          const merged = mergeWallet(w, { ...patch, entries: stamped(appEntries(patch.entries, w), w, now), snap: appSnap(patch.snap, app, w, stock, now) });
+          const merged = mergeWallet(w, { ...patch, entries: stamped(appEntries(patch.entries), w, now), snap: appSnap(patch.snap, app, w, stock, now) });
           return touchApp(mergeWallet(merged, { entries: paydayEntries(merged, now) }), app, now);
         },
         { skipIf: () => refused }
