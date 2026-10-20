@@ -9,10 +9,8 @@
 <style>
   :root { --q-accent: #2563eb; }
   body { margin: 0; background: var(--q-page); color: var(--q-text); font-family: var(--q-font); }
-  main { width: min(980px, 100%); margin: 0 auto; padding: calc(var(--q-top, 0px) + 20px) 16px 80px; box-sizing: border-box; }
-  h1 { font-size: 28px; margin: 6px 2px 4px; }
-  .kicker { color: var(--q-accent); font-weight: 700; font-size: 14px; margin: 0 2px; }
-  .lede { color: var(--q-muted); margin: 4px 2px 16px; line-height: 1.5; }
+  main { width: min(980px, 100%); margin: 0 auto; box-sizing: border-box; }
+ color: var(--q-muted); margin: 4px 2px 16px; line-height: 1.5; }
   h2 { font-size: 20px; margin: 24px 2px 10px; }
   h3 { font-size: 16px; margin: 18px 0 8px; }
   .card { border: 0; border-radius: var(--q-r-card); background: var(--q-surface); padding: 16px 18px; }
@@ -33,21 +31,18 @@
   a.button { display: inline-block; font-weight: 600; border: 0; border-radius: 999px; background: var(--q-fill-2); color: var(--q-accent); text-decoration: none; white-space: nowrap; }
   button:disabled { opacity: 0.5; cursor: default; }
   .muted { color: var(--q-muted); font-size: 14px; }
-  .error { color: var(--q-bad); font-weight: 600; min-height: 1.2em; margin: 8px 0 0; }
+  .error { color: var(--q-bad); font-weight: 600; margin: 8px 0 0; }
+  .error:empty, .ok:empty { display: none; }
   .ok { color: var(--q-good); font-weight: 600; margin: 8px 0 0; }
   .nowrap { white-space: nowrap; }
   .num { font-variant-numeric: tabular-nums; }
-  /* Views */
-  .tabs { position: sticky; top: 0; z-index: 2; display: flex; gap: 4px; padding: 4px; margin: 8px 0 4px; border-radius: 999px; background: var(--q-fill, var(--q-surface-2)); overflow-x: auto; scrollbar-width: none; }
-  .tabs::-webkit-scrollbar { display: none; }
-  .tabs button { flex: 1 0 auto; border: 0; background: none; border-radius: 999px; padding: 9px 16px; color: var(--q-label); font-weight: 500; }
-  .tabs button[aria-pressed='true'] { background: var(--q-elevated); color: var(--q-label); box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12), 0 3px 1px rgba(0, 0, 0, 0.04); }
   /* Figures */
-  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+  .card .tiles { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
   .tile { padding: 12px 14px; border-radius: 16px; background: var(--q-fill-4); min-width: 0; }
   .tile small { display: block; color: var(--q-muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .tile strong { display: block; font-size: 24px; font-weight: 800; margin-top: 2px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .tile em { display: block; font-style: normal; color: var(--q-muted); font-size: 12px; margin-top: 2px; white-space: nowrap; }
+  .tile em { display: block; overflow: hidden; font-style: normal; color: var(--q-muted); font-size: 12px; margin-top: 2px; white-space: nowrap; text-overflow: ellipsis; }
   .chart { width: 100%; height: auto; display: block; }
   .legend { display: flex; gap: 14px; font-size: 13px; color: var(--q-muted); margin-top: 6px; }
   .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
@@ -95,7 +90,7 @@
   .code { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 26px; font-weight: 800; letter-spacing: 0.12em; margin: 10px 0 4px; }
   .passes { margin: 14px 0 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
   .passes li { padding: 8px 10px; border-radius: 10px; background: var(--q-surface-2); font-family: ui-monospace, SFMono-Regular, monospace; font-size: 14px; }
-  .checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .checks { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
   .checks li { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: var(--q-surface-2); }
   .checks .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--q-good); flex: none; }
   .checks .dot.bad { background: var(--q-bad); }
@@ -103,12 +98,13 @@
   .checks span:nth-child(2) { flex: 1; font-weight: 600; min-width: 0; }
   .checks small { display: block; font-weight: 400; font-size: 12px; color: var(--q-muted); overflow-wrap: anywhere; }
   /* The account sheet */
-  dialog.sheet { width: min(720px, 100vw); max-height: 92vh; margin: auto auto 0; border: 0; padding: 0; border-radius: 22px 22px 0 0; background: var(--q-page); color: var(--q-text); box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.3); }
+  dialog.sheet { width: min(720px, 100vw); max-width: 100vw; max-height: 92vh; margin: auto auto 0; border: 0; padding: 0; border-radius: 22px 22px 0 0; background: var(--q-page); color: var(--q-text); box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.3); }
   @media (min-width: 760px) { dialog.sheet { margin: auto; border-radius: 22px; } }
   dialog.sheet::backdrop { background: rgba(0, 0, 0, 0.45); }
   .sheet-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 18px; background: var(--q-page); border-bottom: 1px solid var(--q-divider); }
   .sheet-head h2 { margin: 0; font-size: 19px; }
   .sheet-body { padding: 4px 18px 28px; }
+  @media (max-width: 420px) { .sheet-body { padding-inline: 12px; } .recs .q-ritem { padding-inline: 10px; gap: 10px; } .recs .q-ritem-value { font-size: 14px; } }
   .kv { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; font-size: 14px; }
   .kv dt { color: var(--q-muted); }
   .kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
@@ -121,28 +117,15 @@
   .action .error:empty, .action .ok:empty { display: none; }
   .action h3 { margin: 0 0 4px; font-size: 15px; }
   .action p.muted { margin: 0 0 10px; }
-  /* Wide screens: the views down the side, the page beside them. */
-  @media (min-width: 900px) {
-    main { width: min(1180px, 100%); }
-    #panel { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 28px; align-items: start; }
-    .tabs { position: sticky; top: 16px; flex-direction: column; border-radius: 18px; padding: 6px; margin: 18px 0 0; }
-    .tabs button { flex: none; text-align: left; border-radius: 12px; }
-  }
-  .tabs button .ic { margin-right: 8px; }
-  /* A phone: every view at once, a grid (a scrolling row hid the first). */
-  @media (max-width: 899px) {
-    .tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-radius: 16px; overflow: visible; }
-    .tabs button { padding: 9px 4px; border-radius: 12px; font-size: 13px; white-space: nowrap; }
-    .tabs button .ic { display: none; }
-  }
   /* The title and its note on the left, the button at the top right: never the button on a line below. */
   .pane-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin: 18px 2px 10px; }
   .pane-head > div { flex: 1 1 0; min-width: 0; }
   .pane-head > button { flex: none; }
   .pane-head h2 { margin: 0; }
-  /* The checks as a grid of equal buttons (three rows of pills of every width before). */
-  .checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
-  .checks button { padding-inline: 10px; }
+  /* Rows: one column on a phone, two side by side when wide; the check and build buttons a grid. */
+  @media (min-width: 700px) { ul.checks { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  #sys-actions { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+  #sys-actions button { padding-inline: 10px; }
   .pane-head .muted { margin: 2px 0 0; }
   /* 開發: the settings */
   .set-group { margin-top: 12px; }
@@ -180,6 +163,7 @@
   .links a::after { content: '↗'; color: var(--q-muted); font-weight: 400; }
   .links a:hover { background: var(--q-sunken); }
   .twocol { display: grid; gap: 12px; }
+  .twocol > * { min-width: 0; }
   @media (min-width: 760px) { .twocol { grid-template-columns: 1fr 1fr; align-items: start; } }
   .prices { display: grid; gap: 8px; margin-top: 10px; }
   .price { display: grid; gap: 6px; padding: 10px 12px; border-radius: 12px; background: var(--q-surface-2); }
@@ -188,196 +172,248 @@
   .price label { display: grid; gap: 3px; min-width: 0; }
   .price label small { color: var(--q-muted); font-size: 11.5px; white-space: nowrap; }
   .price input { width: 100%; box-sizing: border-box; padding: 8px 10px; font-size: 15px; text-align: right; }
+  /* ---- The panel's shell: a top bar with one search, the views as a tab bar ---- */
+  main { padding: 0 16px calc(96px + env(safe-area-inset-bottom)); }
+  .gate { max-width: 440px; margin: 18vh auto 0; text-align: center; }
+  .gate h2 { margin: 12px 0 4px; }
+  .gate .row { margin-top: 14px; }
+  .gate-mark, .mark { display: block; overflow: hidden; border-radius: 22%; }
+  .gate-mark { width: 64px; height: 64px; margin: 0 auto; }
+  .gate-mark img, .mark img { display: block; width: 100%; height: 100%; }
+  .topbar { position: sticky; top: 0; z-index: 6; display: flex; align-items: center; gap: 10px; margin: 0 -16px; padding: calc(env(safe-area-inset-top) + 10px) 16px 10px; background: color-mix(in srgb, var(--q-page) 88%, transparent); -webkit-backdrop-filter: saturate(1.8) blur(20px); backdrop-filter: saturate(1.8) blur(20px); }
+  .mark { width: 36px; height: 36px; flex: none; }
+  .omni, .field-search { flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 0 12px; border-radius: 12px; background: var(--q-fill-3); }
+  .omni input, .field-search input { flex: 1 1 0; min-width: 0; padding: 10px 0; border-radius: 0; background: none; }
+  .omni input:focus, .field-search input:focus { outline: none; }
+  .omni:focus-within, .field-search:focus-within { box-shadow: 0 0 0 3px color-mix(in srgb, var(--q-accent) 30%, transparent); }
+  .omni-ic svg, .field-search > span svg { display: block; width: 18px; height: 18px; color: var(--q-muted); }
+  .icon-btn { display: grid; place-items: center; flex: none; width: 38px; height: 38px; padding: 0; }
+  .icon-btn svg { width: 20px; height: 20px; }
+  .icon-btn.spin svg { animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .omni-out { position: absolute; left: 12px; right: 12px; top: calc(100% - 4px); max-height: min(70vh, 560px); overflow: auto; padding: 6px; border-radius: 18px; background: var(--q-elevated); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28), 0 0 0 0.5px var(--q-divider); }
+  .omni-out h4 { margin: 8px 10px 4px; color: var(--q-muted); font-size: 12px; font-weight: 600; }
+  .hit { display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px 10px; border-radius: 12px; background: none; color: var(--q-text); font-weight: 600; text-align: left; white-space: normal; }
+  .hit > span:not(.q-tile) { flex: 1 1 0; min-width: 0; }
+  .hit small { display: block; overflow: hidden; color: var(--q-muted); font-size: 12.5px; font-weight: 400; white-space: nowrap; text-overflow: ellipsis; }
+  .hit em { flex: none; font-style: normal; color: var(--q-muted); font-variant-numeric: tabular-nums; }
+  .hit:hover, .hit.on { background: var(--q-fill-3); }
+  .omni-out .empty { padding: 14px 10px; color: var(--q-muted); }
+  /* A phone: the views in a tab bar at the bottom, icon over name. */
+  .tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); padding: 6px 4px calc(env(safe-area-inset-bottom) + 6px); background: color-mix(in srgb, var(--q-page) 88%, transparent); -webkit-backdrop-filter: saturate(1.8) blur(20px); backdrop-filter: saturate(1.8) blur(20px); border-top: 0.5px solid var(--q-divider); }
+  .tabs button { position: relative; display: grid; justify-items: center; gap: 3px; padding: 4px 0; border-radius: 10px; background: none; color: var(--q-muted); font-size: 10.5px; font-weight: 600; }
+  .tabs button i { display: block; width: 24px; height: 24px; }
+  .tabs button i svg { width: 24px; height: 24px; }
+  .tabs button[aria-pressed='true'] { color: var(--q-accent); }
+  .badge { position: absolute; top: 0; left: calc(50% + 6px); min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: var(--q-bad); color: #fff; font: 700 10.5px/16px var(--q-font); box-sizing: border-box; }
+  @media (min-width: 900px) {
+    main { width: min(1200px, 100%); padding-bottom: 60px; }
+    #panel { display: grid; grid-template-columns: 200px minmax(0, 1fr); column-gap: 28px; align-items: start; }
+    .topbar { grid-column: 1 / -1; }
+    .tabs { position: sticky; top: 76px; display: grid; grid-template-columns: 1fr; gap: 2px; padding: 0; border: 0; background: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+    .tabs button { display: flex; align-items: center; gap: 12px; padding: 10px 12px; font-size: 15px; color: var(--q-text); }
+    .tabs button i, .tabs button i svg { width: 20px; height: 20px; }
+    .tabs button[aria-pressed='true'] { background: var(--q-fill-3); color: var(--q-accent); }
+    .badge { position: static; margin-left: auto; }
+  }
+  /* Section heads: a title, a count, a link to the view. */
+  .sec-head { display: flex; align-items: baseline; gap: 8px; margin: 24px 2px 10px; }
+  .sec-head h2 { margin: 0; font-size: 20px; }
+  .sec-head .count { color: var(--q-muted); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .sec-head .legend { margin: 0 0 0 auto; }
+  .more { margin-left: auto; padding: 4px 0; background: none; font-size: 15px; font-weight: 500; }
+  /* 總覽: the status card on the panel's colour. */
+  .ov { padding-top: 6px; }
+  .q-hero-card.ok { --q-accent: #16a34a; }
+  .q-hero-card.warn { --q-accent: #d97706; }
+  .q-hero-card.bad { --q-accent: #dc2626; }
+  .hero-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .hero-chips button { padding: 6px 12px; font-size: 13px; background: rgba(255, 255, 255, 0.2); color: #fff; }
+  .kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+  @media (min-width: 700px) { .kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  .kpi { position: relative; display: grid; align-content: start; gap: 2px; min-width: 0; padding: 12px 14px 10px; border-radius: 18px; background: var(--q-surface); color: var(--q-text); text-align: left; font-weight: 400; white-space: normal; }
+  .kpi .q-tile { margin-bottom: 6px; }
+  .kpi small { overflow: hidden; color: var(--q-muted); font-size: 13px; white-space: nowrap; text-overflow: ellipsis; }
+  .kpi strong { overflow: hidden; font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .kpi em { overflow: hidden; color: var(--q-muted); font-size: 12px; font-style: normal; white-space: nowrap; text-overflow: ellipsis; }
+  .kpi em.up { color: var(--q-good); }
+  .kpi svg.spark { position: absolute; top: 14px; right: 12px; width: 56px; height: 26px; }
+  .acct-list .q-rowcard + .q-rowcard { margin-top: 10px; }
+  .q-ritem .av { --t: #64748b; display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 12px; background: linear-gradient(160deg, color-mix(in srgb, var(--t) 80%, #fff), var(--t) 60%); color: #fff; font: 700 13px/1 ui-monospace, SFMono-Regular, monospace; letter-spacing: -0.02em; }
+  .q-ritem .mono { font-family: ui-monospace, SFMono-Regular, monospace; }
+  .q-ritem .apps { display: flex; gap: 3px; margin-top: 3px; }
+  .app-ic { display: block; flex: none; width: 16px; height: 16px; overflow: hidden; border-radius: 22%; }
+  .q-ritem-value.neg { color: var(--q-bad); }
+  .q-ritem b { font-weight: 700; }
+  .q-ritem-value.big { color: var(--q-text); font-weight: 700; }
+  .q-ritem-value.big.neg { color: var(--q-bad); }
+  .q-ritem .q-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
+  .health-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  @media (min-width: 700px) { .health-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  .hcell { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 12px; border-radius: 16px; background: var(--q-surface); color: var(--q-text); font-weight: 400; text-align: left; white-space: normal; }
+  .hcell > span:last-child { flex: 1 1 0; min-width: 0; }
+  .hcell b { display: block; overflow: hidden; font-size: 14px; font-weight: 650; white-space: nowrap; text-overflow: ellipsis; }
+  .hcell small { display: block; overflow: hidden; color: var(--q-muted); font-size: 12px; white-space: nowrap; text-overflow: ellipsis; }
+  .hcell .st { position: relative; }
+  .hcell .st::after { content: ''; position: absolute; right: -3px; bottom: -3px; width: 12px; height: 12px; border: 2px solid var(--q-surface); border-radius: 50%; background: var(--q-good); }
+  .hcell .st.warn::after { background: #d4a017; }
+  .hcell .st.bad::after { background: var(--q-bad); }
+  .hcell .st.wait::after { background: var(--q-fill-2); }
+  .econ-top { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .econ-top div { min-width: 0; }
+  .econ-top small { display: block; color: var(--q-muted); font-size: 12.5px; }
+  .econ-top strong { display: block; overflow: hidden; font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .spark-wrap { margin: 10px 0 2px; }
+  .econ { display: grid; gap: 0; margin: 6px 0 0; padding: 0; list-style: none; }
+  .econ li { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; grid-template-rows: auto auto; column-gap: 10px; align-items: center; padding: 8px 0; border-top: 0.5px solid var(--q-divider); }
+  .econ li:first-child { border-top: 0; }
+  .econ .q-tile { grid-row: 1 / span 2; }
+  .econ .nm { overflow: hidden; font-weight: 600; font-size: 14.5px; white-space: nowrap; text-overflow: ellipsis; }
+  .econ .nm small { margin-left: 6px; color: var(--q-muted); font-size: 12px; font-weight: 400; }
+  .econ .v { font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+  .econ .dv { grid-column: 2 / -1; position: relative; height: 6px; border-radius: 3px; background: var(--q-fill-4); }
+  .econ .dv::before { content: ''; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--q-divider); }
+  .econ .dv i { position: absolute; top: 0; bottom: 0; border-radius: 3px; }
+  .econ .dv i.in { left: 50%; background: var(--q-good); }
+  .econ .dv i.out { right: 50%; background: var(--q-bad); }
+  .kpis.two { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 0; }
+  .credit { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
+  @media (min-width: 700px) { .credit { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  .app-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 10px; }
+  .app-card { display: grid; grid-template-columns: 34px minmax(0, 1fr); column-gap: 10px; align-items: center; padding: 12px; border-radius: 16px; background: var(--q-surface); min-width: 0; }
+  .app-card .app-ic { grid-row: 1 / span 2; width: 34px; height: 34px; }
+  .app-card b { overflow: hidden; font-size: 14px; white-space: nowrap; text-overflow: ellipsis; }
+  .app-card small { color: var(--q-muted); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .app-card .meter { grid-column: 1 / -1; height: 5px; margin-top: 9px; border-radius: 3px; background: var(--q-fill-4); overflow: hidden; }
+  .app-card .meter i { display: block; height: 100%; border-radius: 3px; background: var(--c, var(--q-accent)); }
+  .empty-card { display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 18px; background: var(--q-surface); color: var(--q-muted); }
+  /* 帳戶 */
+  .acct-tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 8px; }
+  .acct-tools .field-search { flex-basis: 260px; }
+  .seg { display: flex; flex: none; padding: 2px; border-radius: 10px; background: var(--q-fill-3); }
+  .seg button { padding: 7px 12px; border-radius: 8px; background: none; color: var(--q-text); font-size: 14px; font-weight: 500; }
+  .seg button[aria-pressed='true'] { background: var(--q-elevated); box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12); font-weight: 600; }
+  #filters { margin-top: 12px; }
+  .chips button b { margin-left: 5px; font-weight: 500; opacity: 0.75; font-variant-numeric: tabular-nums; }
+  .stats-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 12px 0; }
+  .stats-strip div { min-width: 0; padding: 10px 12px; border-radius: 14px; background: var(--q-surface); }
+  .stats-strip small { display: block; overflow: hidden; color: var(--q-muted); font-size: 12px; white-space: nowrap; text-overflow: ellipsis; }
+  .stats-strip strong { display: block; overflow: hidden; font-size: 17px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  @media (max-width: 380px) { .stats-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .foot-row { margin-top: 14px; }
+  /* The account sheet */
+  .acct-hero { margin-top: 12px; }
+  .acct-hero .q-hc-big { font-variant-numeric: tabular-nums; }
+  .facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+  .facts div { min-width: 0; padding: 10px 12px; border-radius: 14px; background: var(--q-surface); }
+  .facts small { display: block; color: var(--q-muted); font-size: 12px; white-space: nowrap; }
+  .facts strong { display: block; overflow: hidden; font-size: 15px; font-variant-numeric: tabular-nums; white-space: nowrap; text-overflow: ellipsis; }
+  .acts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 4px; }
+  .act { display: grid; justify-items: center; gap: 6px; padding: 10px 2px; border-radius: 14px; background: var(--q-surface); color: var(--q-text); font-size: 12px; font-weight: 600; white-space: normal; text-align: center; line-height: 1.2; }
+  .act[aria-expanded='true'] { box-shadow: 0 0 0 2px var(--q-accent); }
+  .act.dangerous span:last-child { color: var(--q-bad); }
+  .act-pane .action { margin-top: 10px; }
+  .loan-card { margin-top: 10px; padding: 14px; border-radius: 18px; background: var(--q-surface); }
+  .loan-card .row { justify-content: space-between; }
+  .loan-meter { height: 8px; margin: 10px 0 6px; border-radius: 4px; background: var(--q-fill-4); overflow: hidden; }
+  .loan-meter i { display: block; height: 100%; border-radius: 4px; background: var(--q-good); }
+  .rec-filters { margin: 4px 0 8px; }
+  .recs .q-ritem-value.pos, .q-ritem-value.pos { color: var(--q-good); }
+  .recs .q-ritem-value.neg { color: var(--q-bad); }
+  .recs .undone .q-ritem-title { text-decoration: line-through; opacity: 0.6; }
+  .recs .undo { width: 32px; height: 32px; }
+  .recs .undo svg { width: 17px; height: 17px; }
+  details.note { margin-top: 10px; }
+  details.note summary { color: var(--q-muted); font-size: 14px; cursor: pointer; }
+  /* 工具 */
+  .tool { margin-top: 12px; }
+  .tool-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+  .tool-head > div { flex: 1 1 0; min-width: 0; }
+  .tool-head h3 { margin: 2px 0 2px; }
+  .tool-head p { margin: 0; }
+  .tool-head i { --t: var(--q-accent); display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 12px; background: linear-gradient(160deg, color-mix(in srgb, var(--t) 82%, #fff), var(--t) 60%); color: #fff; }
+  .tool-head i svg { width: 22px; height: 22px; }
+  .tool-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
   [hidden] { display: none !important; }
 </style>
 </head>
 <body>
 <main>
-  <p class="kicker">QUADRA</p>
-  <h1>管理</h1>
-  <p class="lede">帳戶、Quadra Pass、即時資料的速度、每晚的資料、部署、通知和資料來源，都在這裡。只有持有管理金鑰的人能用。</p>
-
-  <section id="gate" class="card">
-    <h2 style="margin-top:0">管理金鑰</h2>
-    <p class="muted">打開桌面上的「Quadra 管理金鑰.txt」，複製裡面那一行貼在這裡。這台裝置會記住它。</p>
-    <div class="row"><input id="key" class="grow" type="password" autocomplete="off" placeholder="貼上管理金鑰" /><button id="enter" class="primary">進入</button></div>
+  <section id="gate" class="card gate">
+    <span class="gate-mark" id="gate-mark"></span>
+    <h2>Quadra 管理</h2>
+    <p class="muted">貼上「Quadra 管理金鑰.txt」裡的那一行。這台裝置會記住它。</p>
+    <div class="row"><input id="key" class="grow" type="password" autocomplete="off" placeholder="管理金鑰" /><button id="enter" class="primary">進入</button></div>
     <p id="gate-error" class="error"></p>
   </section>
 
   <div id="panel" hidden>
+    <header class="topbar">
+      <span class="mark" id="mark" aria-hidden="true"></span>
+      <label class="omni"><span class="omni-ic" id="omni-ic" aria-hidden="true"></span><input id="omni" type="search" autocomplete="off" spellcheck="false" enterkeyhint="search" placeholder="搜尋帳戶或功能" aria-label="搜尋" /></label>
+      <button id="refresh" class="icon-btn" aria-label="重新整理" title="重新整理"></button>
+      <div class="omni-out" id="omni-out" hidden></div>
+    </header>
     <nav class="tabs" id="tabs">
-      <button data-view="overview" aria-pressed="true"><span class="ic">◎</span>總覽</button>
-      <button data-view="accounts" aria-pressed="false"><span class="ic">◉</span>帳戶</button>
-      <button data-view="issue" aria-pressed="false"><span class="ic">✦</span>發放 Pass</button>
-      <button data-view="money" aria-pressed="false"><span class="ic">¤</span>金流</button>
-      <button data-view="dev" aria-pressed="false"><span class="ic">⚙︎</span>開發</button>
-      <button data-view="data" aria-pressed="false"><span class="ic">⇅</span>系統</button>
-      <button data-view="ops" aria-pressed="false"><span class="ic">◔</span>通知與用量</button>
-      <button data-view="clean" aria-pressed="false"><span class="ic">✕</span>資料整理</button>
+      <button data-view="overview" aria-pressed="true"><i data-ic="grid"></i><span>總覽</span></button>
+      <button data-view="accounts" aria-pressed="false"><i data-ic="user"></i><span>帳戶</span></button>
+      <button data-view="money" aria-pressed="false"><i data-ic="coin"></i><span>金流</span></button>
+      <button data-view="health" aria-pressed="false"><i data-ic="live"></i><span>健康</span><b class="badge" id="health-badge" hidden></b></button>
+      <button data-view="usage" aria-pressed="false"><i data-ic="chart"></i><span>用量</span></button>
+      <button data-view="dev" aria-pressed="false"><i data-ic="target"></i><span>設定</span></button>
+      <button data-view="tools" aria-pressed="false"><i data-ic="key"></i><span>工具</span></button>
     </nav>
     <div class="content">
 
     <!-- 總覽 -->
     <section data-pane="overview">
-      <div class="row spread"><h2>總覽</h2><button id="ov-load" class="small">重新整理</button></div>
       <p id="ov-error" class="error"></p>
-      <div id="ov" hidden>
-        <div class="tiles" id="ov-tiles"></div>
-        <div class="card" style="margin-top:12px">
-          <div class="row spread"><strong>最近 14 天</strong><span class="legend"><span><i style="background:var(--q-accent)"></i>新帳戶</span><span><i style="background:#16a34a"></i>最後使用</span></span></div>
-          <svg id="ov-chart" class="chart" viewBox="0 0 700 200" role="img" aria-label="最近 14 天的新帳戶和最後使用"></svg>
+      <div id="ov" class="ov" hidden>
+        <div id="ov-hero"></div>
+        <div class="kpis" id="ov-kpis"></div>
+        <div class="sec-head"><h2>需要注意</h2><span class="count" id="ov-attn-n"></span></div>
+        <div id="ov-attn"></div>
+        <div class="sec-head"><h2>健康</h2><button class="more" data-go="health">全部</button></div>
+        <div class="health-grid" id="ov-health"></div>
+        <div class="sec-head"><h2>這週的錢</h2><button class="more" data-go="money">金流</button></div>
+        <div class="card">
+          <div class="econ-top" id="ov-econ-top"></div>
+          <div class="spark-wrap"><svg id="ov-flow" class="chart" viewBox="0 0 700 120" role="img" aria-label="每天流入和流出"></svg></div>
+          <ul class="econ" id="ov-econ"></ul>
         </div>
-        <h3>各 App</h3>
-        <div class="card tablewrap"><table id="ov-apps"><thead><tr><th>App</th><th class="right">用過的帳戶</th><th class="right">這週用過</th></tr></thead><tbody></tbody></table></div>
-        <h3>這週的錢（各 App · 種類）</h3>
-        <div class="card tablewrap"><table id="ov-flows"><thead><tr><th>來源</th><th class="right">筆數</th><th class="right wide">進</th><th class="right wide">出</th><th class="right">淨額</th></tr></thead><tbody></tbody></table></div>
+        <div class="credit" id="ov-credit"></div>
+        <div class="sec-head"><h2>政府</h2><button class="more" data-go="money" data-to="mo-gov">明細</button></div>
+        <div class="kpis two" id="ov-gov"></div>
+        <div class="sec-head"><h2>各 App</h2></div>
+        <div class="app-grid" id="ov-apps"></div>
+        <div class="sec-head"><h2>最近 14 天</h2><span class="legend"><span><i style="background:var(--q-accent)"></i>新帳戶</span><span><i style="background:var(--q-good)"></i>最後使用</span></span></div>
+        <div class="card"><svg id="ov-chart" class="chart" viewBox="0 0 700 200" role="img" aria-label="最近 14 天的新帳戶和最後使用"></svg></div>
+        <div class="twocol">
+          <div><div class="sec-head"><h2>錢最多</h2></div><div id="ov-rich"></div></div>
+          <div><div class="sec-head"><h2>最新帳戶</h2></div><div id="ov-new"></div></div>
+        </div>
       </div>
     </section>
 
     <!-- 帳戶 -->
     <section data-pane="accounts" hidden>
-      <div class="row spread"><h2>帳戶</h2><div class="row"><button id="csv" class="small">下載 CSV</button><button id="load" class="small">重新整理</button></div></div>
-      <div class="card">
-        <div class="row"><input id="search" class="grow" type="search" placeholder="搜尋帳戶代號或 App" autocomplete="off" /></div>
-        <div class="row" style="margin-top:10px"><input id="find-pass" class="grow" autocomplete="off" placeholder="用 Quadra Pass 找帳戶" /><button id="find" class="small">找</button></div>
-        <p id="find-error" class="error"></p>
-        <div class="chips" id="filters" style="margin-top:10px">
-          <button data-filter="all" aria-pressed="true">全部</button>
-          <button data-filter="used" aria-pressed="false">使用中</button>
-          <button data-filter="unused" aria-pressed="false">未使用</button>
-          <button data-filter="neg" aria-pressed="false">透支</button>
-          <button data-filter="idle" aria-pressed="false">30 天沒用</button>
-        </div>
-        <p id="wallets-sum" class="muted" style="margin:10px 0 0">載入中…</p>
-        <p id="wallets-error" class="error"></p>
-        <div class="tablewrap"><table id="wallets" hidden><thead><tr>
-          <th data-sort="ref">代號</th><th data-sort="state">狀態</th><th data-sort="apps" class="wide">App</th><th data-sort="created" class="wide">建立</th><th data-sort="lastUsed">最後使用</th><th data-sort="balance" class="right">餘額</th>
-        </tr></thead><tbody></tbody></table></div>
-        <p class="muted" style="margin:10px 0 0">點一列打開帳戶：看明細、調整金額、撤銷紀錄、登出所有裝置、產生找回代碼、清除某個 App 的資料、匯出、重置或刪除。</p>
-      </div>
-    </section>
-
-    <!-- 發放 -->
-    <section data-pane="issue" hidden>
-      <h2>發放 Quadra Pass</h2>
-      <div class="card">
-        <p class="muted">每一組都是全新的 Quadra Pass，誰先用它登入就是誰的。發出去之前先複製或下載保存：這裡只顯示這一次。</p>
-        <div class="row"><input id="count" type="number" min="1" max="500" value="10" /><span class="muted">組</span><button id="issue" class="primary">發放</button></div>
-        <p id="issue-error" class="error"></p>
-        <div id="issued" hidden>
-          <div class="row"><strong id="issued-n"></strong><button id="copy" class="small">全部複製</button><button id="download" class="small">下載清單</button></div>
-          <ol id="passes" class="passes"></ol>
+      <div class="acct-tools">
+        <label class="field-search"><span id="search-ic" aria-hidden="true"></span><input id="search" type="search" placeholder="代號、App 或 Pass" autocomplete="off" spellcheck="false" enterkeyhint="search" /></label>
+        <div class="seg" id="sort" role="group" aria-label="排序">
+          <button data-sort="lastUsed" aria-pressed="true">最近</button><button data-sort="balance" aria-pressed="false">餘額</button><button data-sort="created" aria-pressed="false">最新</button>
         </div>
       </div>
-      <h2>找回帳戶</h2>
-      <div class="card">
-        <p class="muted">有人弄丟了 Quadra Pass：在「帳戶」找到他的帳戶代號貼在這裡（或直接打開那個帳戶），產生一組 10 分鐘有效的裝置代碼給他登入，再請他在帳戶裡設定新的 Pass。</p>
-        <div class="row"><input id="ref" class="grow" autocomplete="off" placeholder="帳戶代號" /><button id="recover" class="primary">產生代碼</button></div>
-        <p id="recover-error" class="error"></p>
-        <div id="recovered" hidden><div id="device-code" class="code"></div><p id="device-exp" class="muted"></p></div>
-      </div>
-    </section>
-
-    <!-- 通知與來源 -->
-    <section data-pane="ops" hidden>
-      <div class="row spread"><h2>通知</h2><button id="push-load" class="small">重新整理</button></div>
-      <p id="push-error" class="error"></p>
-      <div class="tiles" id="push-tiles"></div>
-      <div class="card tablewrap" style="margin-top:12px"><table id="push-apps"><thead><tr><th>App</th><th class="right">訂閱通知的帳戶</th></tr></thead><tbody></tbody></table></div>
-      <div class="card tablewrap" style="margin-top:12px"><table id="push-list"><thead><tr><th>帳戶</th><th>App</th><th class="right">最後送出</th></tr></thead><tbody></tbody></table><p id="push-note" class="muted"></p></div>
-      <h2>廣播通知</h2>
-      <div class="card">
-        <p class="muted">送一則通知給某個 App（或所有 App）訂閱通知的每個人：公告、維修、活動。一次最多 500 台裝置。</p>
-        <div class="row"><select id="bc-app"></select><input id="bc-title" class="grow" maxlength="60" placeholder="標題" /></div>
-        <div class="row" style="margin-top:10px"><input id="bc-body" class="grow" maxlength="200" placeholder="內容" /><button id="bc-send" class="primary">送出</button></div>
-        <p id="bc-error" class="error"></p>
-        <p id="bc-ok" class="ok"></p>
-      </div>
-      <div class="row spread"><h2>Google 帳單</h2><button id="bill-load" class="small">重新整理</button></div>
-      <p class="muted">Gemini、地圖、地點搜尋、路線、天氣：本月用了多少、估計花多少，和你輸入的餘額還剩多少。Google 沒有提供預付餘額的 API，所以餘額要手動輸入（每次加值後再輸入一次，從輸入那刻起算）；花費是依下面的價格估算，以 Google Cloud 帳單為準。</p>
-      <p id="bill-error" class="error"></p>
-      <div class="card">
-        <div class="tiles" id="bill-tiles"></div>
-        <div class="tablewrap" style="margin-top:12px"><table id="bill-rows"><thead><tr><th>服務</th><th class="right">本月 / 免費</th><th class="right">估計</th></tr></thead><tbody></tbody></table></div>
-        <div class="row" style="margin-top:14px"><input id="bill-balance" type="number" min="0" step="1" placeholder="現在的餘額（NT$）" class="grow" /><button id="bill-save" class="primary">儲存餘額</button></div>
-        <p id="bill-ok" class="ok"></p>
-        <details style="margin-top:10px"><summary class="muted" style="cursor:pointer">價格（美元；超過免費額度後每 1,000 次、Gemini 每 100 萬 token）與匯率</summary>
-          <div id="bill-prices" class="prices"></div>
-          <div class="row" style="margin-top:10px"><span class="muted">1 USD =</span><input id="bill-rate" type="number" min="1" step="0.1" style="width:90px" /><span class="muted">NT$</span><button id="bill-prices-save" class="small">儲存價格</button></div>
-        </details>
-      </div>
-      <div class="row spread"><h2>用量</h2><button id="use-load" class="small">重新整理</button></div>
-      <p class="muted">Worker 用掉多少額度：Google（Orbit Transit 的這個月、Orbit Weather 的今天）和 TDX。</p>
-      <p id="use-error" class="error"></p>
-      <div class="tiles" id="use-tiles"></div>
-      <div class="card" style="margin-top:12px">
-        <div><strong>TDX 點數（每月 200 點）</strong><p class="muted" style="margin:2px 0 0">基本 1,500 次 1 點 · 進階 200 次 1 點</p></div>
-        <div class="tiles" id="tdx-tiles" style="margin-top:10px"></div>
-        <svg id="tdx-chart" class="chart" viewBox="0 0 360 150" role="img" aria-label="每天的 TDX 點數" style="margin-top:12px"></svg>
-        <div class="tablewrap"><table id="tdx-days"><thead><tr><th>日期</th><th class="right">基本</th><th class="right">進階</th><th class="right">點數</th></tr></thead><tbody></tbody></table></div>
-        <p class="muted" id="tdx-note" style="margin:10px 0 0"></p>
-      </div>
-      <div class="row spread"><h2>資料來源</h2><button id="health-load" class="small">檢查</button></div>
-      <p class="muted">每個 App 讀的公開來源各問一次：有沒有回應、多快。</p>
-      <p id="health-error" class="error"></p>
-      <ul id="health" class="checks"></ul>
-    </section>
-
-    <!-- 開發 -->
-    <section data-pane="dev" hidden>
-      <div class="pane-head"><div><h2>開發</h2><p class="muted">即時資料多快更新、要不要用每晚的副本。代理一分鐘內套用，App 打開時或幾分鐘內套用。</p></div><button id="dev-load" class="small">重新讀取</button></div>
-      <p id="dev-error" class="error"></p>
-      <div class="card">
-        <strong>現在的延遲（比賽進行中，比 ESPN 晚多久）</strong>
-        <div class="lag" id="dev-lag"></div>
-        <p class="muted" style="margin:10px 0 0">ESPN 本身大約每 10 秒更新一次（實測，繞過它的快取也不會更快），這部分改不了；後面全是我們的：代理保留的秒數，加上 App 多久問一次。</p>
-      </div>
-      <div class="card" id="cap">
-        <div class="row spread"><strong>容量：人數和額度</strong><button id="cap-load" class="small">重新估算</button></div>
-        <p id="cap-error" class="error"></p>
-        <div class="tiles" id="cap-tiles"></div>
-        <ul class="flow stack" id="cap-plans" style="margin-top:8px"></ul>
-        <p class="muted" id="cap-note" style="margin:8px 0 0"></p>
-        <p class="muted" id="cap-bill" style="margin:8px 0 0"></p>
-      </div>
-      <div id="dev-sets"></div>
-      <div class="savebar"><span id="dev-state" class="muted">載入中…</span><div class="row"><button id="dev-defaults" class="small">全部恢復預設</button><button id="dev-save" class="primary" disabled>儲存</button></div></div>
-      <p id="dev-ok" class="ok"></p>
-    </section>
-
-    <!-- 系統 -->
-    <section data-pane="data" hidden>
-      <div class="pane-head"><div><h2>帳單與節流</h2><p class="muted">Cloudflare $5 方案：照本期速度推估整個月，推估到 60%、80%、90% 就一步步放慢；任何一項真的用到 90% 就停代理到下個週期，不會多付一毛。</p></div><button id="sys-load" class="small">重新整理</button></div>
-      <p id="sys-error" class="error"></p>
-      <div class="tiles" id="sys-tiles"></div>
-      <p class="muted" id="sys-pace" style="margin:10px 0 0"></p>
-      <div class="card" style="margin-top:12px">
-        <strong>警示通知</strong>
-        <p class="muted" id="alert-note" style="margin:6px 0 10px"></p>
-        <div class="row"><input id="alert-pass" placeholder="你的 Quadra Pass" autocomplete="off" spellcheck="false" style="flex:1 1 0;min-width:0" /><button id="alert-save" class="small" style="flex:none">設定</button><button id="alert-test" class="small" style="flex:none">測試</button></div>
-        <p id="alert-ok" class="ok"></p>
-      </div>
-      <div class="pane-head"><div><h2>排程工作</h2><p class="muted">每個排程工作最近一次跑的時間、結果、花多久。黃色是比平常晚。</p></div></div>
-      <ul class="checks" id="beats"></ul>
-      <div class="pane-head"><div><h2>檢查與建置</h2><p class="muted">Gemini：經台灣中繼送一個很小的請求。建置：不管節流，現在跑一次。</p></div></div>
-      <div class="checks" id="sys-actions"></div>
-      <p class="muted" id="sys-out" style="overflow-wrap:anywhere"></p>
-      <div class="twocol" style="margin-top:12px">
-        <div class="card"><div class="row spread"><strong>R2 資料</strong><span class="muted" id="r2-sum"></span></div><ul class="checks" id="r2" style="margin-top:8px"></ul></div>
-        <div class="card"><div class="row spread"><strong>D1 資料庫</strong><span class="muted" id="d1-sum"></span></div><ul class="checks" id="d1" style="margin-top:8px"></ul></div>
-      </div>
-      <div class="pane-head"><div><h2>金鑰與綁定</h2><p class="muted">只看有沒有設定，看不到內容。公開的設定（網址、帳號 ID）不放金鑰。</p></div></div>
-      <ul class="checks" id="secrets"></ul>
-      <div class="pane-head"><div><h2>部署</h2><p class="muted">每個 repo 最近一次部署。</p></div></div>
-      <ul class="runs" id="deploys"></ul>
-      <div class="pane-head"><div><h2>連結</h2></div></div>
-      <div class="links" id="links"></div>
+      <p id="find-error" class="error"></p>
+      <div class="chips" id="filters"></div>
+      <div class="stats-strip" id="wallets-sum"></div>
+      <p id="wallets-error" class="error"></p>
+      <div id="wallets" class="acct-list"></div>
+      <div class="row foot-row"><button id="csv" class="small">下載 CSV</button></div>
     </section>
 
     <!-- 金流 -->
     <section data-pane="money" hidden>
-      <div class="row spread"><h2>金流</h2><button id="mo-load" class="small">重新整理</button></div>
-      <p class="muted">所有帳戶的「真相」加起來，分四方：系統（發錢，刪除的帳戶把剩下的錢還回來）、Quadra（莊家和費用賺的）、政府（收稅、發急難紓困）、市場（玩家投資賺賠的）。四方加起來就是現在流通的錢。</p>
+      <div class="pane-head"><div><h2>金流</h2><p class="muted">系統發的、Quadra 賺的、政府收的和發的、市場賺賠的，四方加起來就是流通中的錢。</p></div></div>
       <p id="mo-error" class="error"></p>
       <div id="mo" hidden>
         <div class="tiles" id="mo-tiles"></div>
@@ -391,36 +427,146 @@
           <div><h3>市場：玩家投資賺的</h3><div class="card"><ul class="flow" id="mo-own"></ul></div></div>
         </div>
         <div class="twocol">
-          <div><h3>政府：收的稅和發的補助</h3><div class="card"><ul class="flow" id="mo-gov"></ul></div></div>
+          <div><h3>政府：稅和補助</h3><div class="card"><ul class="flow" id="mo-gov"></ul></div></div>
+          <div><h3>繳稅最多的帳戶</h3><div id="mo-taxed"></div></div>
         </div>
-        <p class="muted" id="mo-note"></p>
+        <details class="note"><summary>怎麼算</summary><p class="muted" id="mo-note"></p></details>
       </div>
     </section>
 
-    <!-- 資料整理 -->
-    <section data-pane="clean" hidden>
-      <h2>資料整理</h2>
+    <!-- 健康 -->
+    <section data-pane="health" hidden>
+      <div class="pane-head"><div><h2>帳單與節流</h2><p class="muted">Cloudflare $5 方案：推估到 60%、80%、90% 逐步放慢，任何一項用到 90% 就停代理到下個週期。</p></div></div>
+      <p id="sys-error" class="error"></p>
+      <div class="tiles" id="sys-tiles"></div>
+      <p class="muted" id="sys-pace" style="margin:10px 0 0"></p>
+      <div class="pane-head"><div><h2>資料來源</h2></div><button id="health-load" class="small">檢查</button></div>
+      <p id="health-error" class="error"></p>
+      <ul id="health" class="checks"></ul>
+      <div class="pane-head"><div><h2>排程工作</h2><p class="muted">黃色是比平常晚，紅色是失敗。</p></div></div>
+      <ul class="checks" id="beats"></ul>
+      <div class="pane-head"><div><h2>部署</h2></div></div>
+      <ul class="runs" id="deploys"></ul>
+      <div class="pane-head"><div><h2>檢查與建置</h2><p class="muted">不管節流，現在跑一次。</p></div></div>
+      <div class="checks" id="sys-actions"></div>
+      <p class="muted" id="sys-out" style="overflow-wrap:anywhere"></p>
+      <div class="twocol" style="margin-top:12px">
+        <div class="card"><div class="row spread"><strong>R2 資料</strong><span class="muted" id="r2-sum"></span></div><ul class="checks" id="r2" style="margin-top:8px"></ul></div>
+        <div class="card"><div class="row spread"><strong>D1 資料庫</strong><span class="muted" id="d1-sum"></span></div><ul class="checks" id="d1" style="margin-top:8px"></ul></div>
+      </div>
+      <div class="pane-head"><div><h2>金鑰與綁定</h2><p class="muted">只看有沒有設定。</p></div></div>
+      <ul class="checks" id="secrets"></ul>
+      <div class="card" style="margin-top:18px">
+        <strong>警示通知</strong>
+        <p class="muted" id="alert-note" style="margin:6px 0 10px"></p>
+        <div class="row"><input id="alert-pass" placeholder="你的 Quadra Pass" autocomplete="off" spellcheck="false" style="flex:1 1 0;min-width:0" /><button id="alert-save" class="small" style="flex:none">設定</button><button id="alert-test" class="small" style="flex:none">測試</button></div>
+        <p id="alert-ok" class="ok"></p>
+      </div>
+      <div class="pane-head"><div><h2>連結</h2></div></div>
+      <div class="links" id="links"></div>
+    </section>
+
+    <!-- 用量 -->
+    <section data-pane="usage" hidden>
+      <div class="pane-head"><div><h2>Google 帳單</h2><p class="muted">Google 沒有預付餘額的 API：每次加值後輸入一次餘額，花費依下面的價格估算。</p></div></div>
+      <p id="bill-error" class="error"></p>
       <div class="card">
-        <p class="muted">只留 Quadra 的資料：Quadra Pass 之前的舊集合、沒有帳戶的 App 資料、沒人指向的收件匣、過期的代碼、帳戶已刪除的通知訂閱，以及錢包裡沒有 App 再讀的東西。先「掃描」看會動到什麼，再「整理」。</p>
+        <div class="tiles" id="bill-tiles"></div>
+        <div class="tablewrap" style="margin-top:12px"><table id="bill-rows"><thead><tr><th>服務</th><th class="right">本月 / 免費</th><th class="right">估計</th></tr></thead><tbody></tbody></table></div>
+        <div class="row" style="margin-top:14px"><input id="bill-balance" type="number" min="0" step="1" placeholder="現在的餘額（NT$）" class="grow" /><button id="bill-save" class="primary">儲存餘額</button></div>
+        <p id="bill-ok" class="ok"></p>
+        <details style="margin-top:10px"><summary class="muted" style="cursor:pointer">價格與匯率</summary>
+          <div id="bill-prices" class="prices"></div>
+          <div class="row" style="margin-top:10px"><span class="muted">1 USD =</span><input id="bill-rate" type="number" min="1" step="0.1" style="width:90px" /><span class="muted">NT$</span><button id="bill-prices-save" class="small">儲存價格</button></div>
+        </details>
+      </div>
+      <div class="pane-head"><div><h2>Worker 額度</h2></div></div>
+      <p id="use-error" class="error"></p>
+      <div class="tiles" id="use-tiles"></div>
+      <div class="card" style="margin-top:12px">
+        <div><strong>TDX 點數（每月 200 點）</strong><p class="muted" style="margin:2px 0 0">基本 1,500 次 1 點 · 進階 200 次 1 點</p></div>
+        <div class="tiles" id="tdx-tiles" style="margin-top:10px"></div>
+        <svg id="tdx-chart" class="chart" viewBox="0 0 360 150" role="img" aria-label="每天的 TDX 點數" style="margin-top:12px"></svg>
+        <details class="note"><summary>每天的明細</summary>
+          <div class="tablewrap"><table id="tdx-days"><thead><tr><th>日期</th><th class="right">基本</th><th class="right">進階</th><th class="right">點數</th></tr></thead><tbody></tbody></table></div>
+          <p class="muted" id="tdx-note" style="margin:10px 0 0"></p>
+        </details>
+      </div>
+    </section>
+
+    <!-- 設定 -->
+    <section data-pane="dev" hidden>
+      <div class="pane-head"><div><h2>即時資料的速度</h2><p class="muted">代理一分鐘內套用，App 幾分鐘內套用。</p></div></div>
+      <p id="dev-error" class="error"></p>
+      <div class="card">
+        <strong>比賽進行中，比 ESPN 晚多久</strong>
+        <div class="lag" id="dev-lag"></div>
+      </div>
+      <div class="card" id="cap">
+        <div class="row spread"><strong>容量：人數和額度</strong><button id="cap-load" class="small">重新估算</button></div>
+        <p id="cap-error" class="error"></p>
+        <div class="tiles" id="cap-tiles"></div>
+        <ul class="flow stack" id="cap-plans" style="margin-top:8px"></ul>
+        <details class="note"><summary>說明</summary><p class="muted" id="cap-note" style="margin:8px 0 0"></p><p class="muted" id="cap-bill" style="margin:8px 0 0"></p></details>
+      </div>
+      <div id="dev-sets"></div>
+      <div class="savebar"><span id="dev-state" class="muted">載入中…</span><div class="row"><button id="dev-defaults" class="small">恢復預設</button><button id="dev-save" class="primary" disabled>儲存</button></div></div>
+      <p id="dev-ok" class="ok"></p>
+    </section>
+
+    <!-- 工具 -->
+    <section data-pane="tools" hidden>
+      <div class="tool-grid" id="tool-grid"></div>
+      <div class="card tool" id="tool-issue">
+        <div class="tool-head"><i data-ic="ticket" style="--t:#2563eb"></i><div><h3>發放 Quadra Pass</h3><p class="muted">誰先登入就是誰的。這裡只顯示這一次，先複製或下載。</p></div></div>
+        <div class="row"><input id="count" type="number" min="1" max="500" value="10" /><span class="muted">組</span><button id="issue" class="primary">發放</button></div>
+        <p id="issue-error" class="error"></p>
+        <div id="issued" hidden>
+          <div class="row" style="margin-top:10px"><strong id="issued-n"></strong><button id="copy" class="small">全部複製</button><button id="download" class="small">下載清單</button></div>
+          <ol id="passes" class="passes"></ol>
+        </div>
+      </div>
+      <div class="card tool" id="tool-recover">
+        <div class="tool-head"><i data-ic="lock" style="--t:#0d9488"></i><div><h3>找回帳戶</h3><p class="muted">產生 10 分鐘有效的裝置代碼給他登入，再請他設定新的 Pass。</p></div></div>
+        <div class="row"><input id="ref" class="grow" autocomplete="off" placeholder="帳戶代號" /><button id="recover" class="primary">產生代碼</button></div>
+        <p id="recover-error" class="error"></p>
+        <div id="recovered" hidden><div id="device-code" class="code"></div><p id="device-exp" class="muted"></p></div>
+      </div>
+      <div class="card tool" id="tool-notify">
+        <div class="tool-head"><i data-ic="bell" style="--t:#ea580c"></i><div><h3>廣播通知</h3><p class="muted">送給某個 App（或全部）訂閱通知的每個人，一次最多 500 台。</p></div></div>
+        <p id="push-error" class="error"></p>
+        <div class="tiles" id="push-tiles"></div>
+        <div class="row" style="margin-top:12px"><select id="bc-app"></select><input id="bc-title" class="grow" maxlength="60" placeholder="標題" /></div>
+        <div class="row" style="margin-top:10px"><input id="bc-body" class="grow" maxlength="200" placeholder="內容" /><button id="bc-send" class="primary">送出</button></div>
+        <p id="bc-error" class="error"></p>
+        <p id="bc-ok" class="ok"></p>
+        <details class="note"><summary>訂閱的帳戶</summary>
+          <div class="tablewrap"><table id="push-apps"><thead><tr><th>App</th><th class="right">訂閱的帳戶</th></tr></thead><tbody></tbody></table></div>
+          <div class="tablewrap" style="margin-top:8px"><table id="push-list"><thead><tr><th>帳戶</th><th>App</th><th class="right">最後送出</th></tr></thead><tbody></tbody></table></div>
+          <p id="push-note" class="muted"></p>
+        </details>
+      </div>
+      <div class="card tool" id="tool-clean">
+        <div class="tool-head"><i data-ic="trash" style="--t:#64748b"></i><div><h3>資料整理</h3><p class="muted">只留 Quadra 的資料：舊集合、沒有帳戶的資料、過期的代碼、已刪帳戶的訂閱。先掃描再整理。</p></div></div>
         <div class="row"><button id="scan">掃描</button><button id="clean" class="danger" disabled>整理</button></div>
         <p id="clean-error" class="error"></p>
         <p id="clean-ok" class="ok"></p>
         <div id="scan-out" hidden class="tablewrap" style="margin-top:12px"><table><thead><tr><th>集合</th><th class="right">文件</th><th class="right">會刪除</th></tr></thead><tbody></tbody></table><p id="scan-more" class="muted"></p></div>
       </div>
+      <p style="margin-top:22px"><button id="forget" class="danger">在這台裝置登出管理</button></p>
     </section>
-
-    <p style="margin-top:28px"><button id="forget">在這台裝置登出管理</button></p>
     </div>
   </div>
 </main>
 
 <dialog id="acct" class="sheet" aria-labelledby="acct-title">
-  <div class="sheet-head"><h2 id="acct-title">帳戶</h2><button id="acct-close" class="small" aria-label="關閉">關閉</button></div>
+  <div class="sheet-head"><h2 id="acct-title">帳戶</h2><button id="acct-close" class="icon-btn" aria-label="關閉"></button></div>
   <div class="sheet-body" id="acct-body"></div>
 </dialog>
 
 <script type="module">
-import { DEV, DEV_GROUPS, cleanDev } from '../kit/brand.mjs';
+import { DEV, DEV_GROUPS, cleanDev, BRANDS, appIcon, familyMark } from '../kit/brand.mjs';
+import { icons, tileHtml, heroCardHtml, escHtml } from '../kit/ui.mjs';
 const ECO_URL = 'https://orbit-workers-proxy.pengzjay.workers.dev/eco';
 const KEY = 'quadra.admin';
 const $ = id => document.getElementById(id);
@@ -479,16 +625,38 @@ const until = t => {
 };
 const pretty = p => `${p.slice(0, 5)}-${p.slice(5)}`;
 const busy = async (btn, fn) => {
-  const was = btn.textContent;
+  const was = btn.innerHTML;
   btn.disabled = true;
-  try { return await fn(); } finally { btn.disabled = false; btn.textContent = was; }
+  try { return await fn(); } finally { btn.disabled = false; btn.innerHTML = was; }
 };
+
+// ---- Pictures: the kit's glyphs, the apps' own icons, a colour per account ----
+const ic = name => icons[name] || '';
+// (As pictures: an inline icon's gradients go blank wherever another copy sits in a hidden view.)
+const svgUrl = svg => `data:image/svg+xml,${encodeURIComponent(svg)}`;
+const APP_SRC = Object.fromEntries(Object.keys(BRANDS).map(id => [id, svgUrl(appIcon(id))]));
+const appIc = id => (BRANDS[id] ? `<img class="app-ic" src="${APP_SRC[id]}" alt="${escHtml(appName(id))}" title="${escHtml(appName(id))}">` : '');
+const refColor = ref => `hsl(${parseInt(String(ref).slice(0, 4), 16) % 360} 52% 46%)`;
+for (const i of document.querySelectorAll('i[data-ic]')) i.innerHTML = ic(i.dataset.ic);
+$('mark').innerHTML = $('gate-mark').innerHTML = `<img src="${svgUrl(familyMark('quadra'))}" alt="">`;
+$('omni-ic').innerHTML = $('search-ic').innerHTML = ic('search');
+$('refresh').innerHTML = ic('history');
+$('acct-close').innerHTML = ic('x');
+// A line of values as a small chart (its area under it), for a figure's trend.
+function spark(values, color = 'var(--q-accent)') {
+  const v = values.length ? values : [0];
+  const max = Math.max(1, ...v), W = 56, H = 26;
+  const pts = v.map((n, i) => [(i / Math.max(1, v.length - 1)) * W, H - 2 - (n / max) * (H - 4)]);
+  const line = pts.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`).join('');
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" aria-hidden="true"><path d="${line}L${W} ${H}L0 ${H}Z" fill="${color}" fill-opacity=".14"/><path d="${line}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}
 
 // ---- Gate ----
 function open() {
   $('gate').hidden = true;
   $('panel').hidden = false;
-  show('overview');
+  const want = location.hash.slice(1);
+  show(VIEWS[want] ? want : 'overview');
 }
 $('enter').onclick = async () => {
   token = $('key').value.trim();
@@ -507,17 +675,51 @@ $('forget').onclick = () => {
   location.reload();
 };
 
-// ---- Views ----
+// ---- Views (the address keeps the one open: #health opens on it) ----
+const VIEWS = {
+  overview: () => loadOverview(),
+  accounts: () => loadWallets(),
+  money: () => loadMoney(),
+  health: () => Promise.all([loadSystem(), loadHealth()]),
+  usage: () => Promise.all([loadBilling(), loadUsage()]),
+  dev: () => loadDev(),
+  tools: () => loadPushes()
+};
 const loaded = new Set();
-function show(view) {
+let view = 'overview';
+function show(next, { reload = false } = {}) {
+  view = VIEWS[next] ? next : 'overview';
   for (const b of $('tabs').querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.view === view));
   for (const s of document.querySelectorAll('[data-pane]')) s.hidden = s.dataset.pane !== view;
-  if (!loaded.has(view)) {
-    loaded.add(view);
-    ({ overview: loadOverview, money: loadMoney, accounts: loadWallets, dev: loadDev, data: () => loadSystem(), ops: () => (loadPushes(), loadBilling(), loadUsage(), loadHealth()) })[view]?.();
-  }
+  history.replaceState(null, '', `#${view}`);
+  if (reload) loaded.delete(view);
+  if (loaded.has(view)) return Promise.resolve();
+  loaded.add(view);
+  return Promise.resolve(VIEWS[view]()).catch(() => {});
 }
-$('tabs').onclick = e => e.target.dataset.view && show(e.target.dataset.view);
+$('tabs').onclick = e => {
+  const b = e.target.closest('button[data-view]');
+  if (b) show(b.dataset.view), scrollTo({ top: 0 });
+};
+$('refresh').onclick = async () => {
+  const b = $('refresh');
+  if (b.classList.contains('spin')) return;
+  b.classList.add('spin');
+  for (let i = sessionStorage.length - 1; i >= 0; i--) if (sessionStorage.key(i)?.startsWith('quadra.admin.gh:')) sessionStorage.removeItem(sessionStorage.key(i));
+  await show(view, { reload: true });
+  b.classList.remove('spin');
+};
+// Taps anywhere: an account opens its sheet, a link to a view opens the view.
+document.addEventListener('click', e => {
+  const a = e.target.closest('[data-acct]');
+  if (a) return openAccount(a.dataset.acct);
+  const g = e.target.closest('[data-go]');
+  if (g) {
+    show(g.dataset.go);
+    const to = g.dataset.to && $(g.dataset.to);
+    to ? setTimeout(() => to.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50) : scrollTo({ top: 0 });
+  }
+});
 
 // ---- 總覽 ----
 // A tile's figure on one line: a wide one shrinks (to 60% at most) once it's on the page.
@@ -527,38 +729,184 @@ const fitFigure = n => {
   const base = parseFloat(getComputedStyle(n).fontSize);
   n.style.fontSize = `${Math.max(base * 0.6, Math.floor((base * n.clientWidth * 10) / n.scrollWidth) / 10)}px`;
 };
+const fitAll = root => requestAnimationFrame(() => root.querySelectorAll('.kpi strong, .econ-top strong, .stats-strip strong, .facts strong').forEach(fitFigure));
 const tile = (label, value, sub = '') => {
   const figure = el('strong', { text: value });
   requestAnimationFrame(() => fitFigure(figure));
   return el('div', { class: 'tile' }, [el('small', { text: label }), figure, sub ? el('em', { text: sub }) : null]);
 };
+// A figure as a card: its icon, name, number, a note and its trend.
+const kpi = ({ icon, color, label, value, sub = '', up = false, trend = null, go = '' }) =>
+  `<${go ? `button type="button" data-go="${go}"` : 'div'} class="kpi">${tileHtml(ic(icon), color, 'sm')}${trend ? spark(trend, color) : ''}<small>${escHtml(label)}</small><strong>${escHtml(value)}</strong>${sub ? `<em class="${up ? 'up' : ''}">${escHtml(sub)}</em>` : ''}</${go ? 'button' : 'div'}>`;
+// An account as a row: its colour, its reference, where it stands, its money.
+const LOAN_TAG = { bad: ['催收', 'red'], late: ['逾期', 'orange'], on: ['信貸', 'blue'] };
+function acctItem(w, { value = w.shown ?? money(w.balance), sub, compact = false } = {}) {
+  const tags = [
+    w.balance < 0 ? `<span class="q-tag red">透支</span>` : '',
+    w.loan ? `<span class="q-tag ${LOAN_TAG[w.loan][1]}">${LOAN_TAG[w.loan][0]}</span>` : '',
+    w.reliefs ? `<span class="q-tag indigo">紓困 ×${w.reliefs}</span>` : '',
+    !w.last && !w.lastUsed ? `<span class="q-tag">未使用</span>` : ''
+  ].join('');
+  const apps = compact ? '' : (w.apps || []).map(appIc).join('');
+  const last = w.last || (w.lastUsed ? Date.parse(w.lastUsed) : 0);
+  return `<button class="q-ritem chevron" type="button" data-acct="${escHtml(w.ref)}"><span class="av" style="--t:${refColor(w.ref)}">${escHtml(w.ref.slice(0, 2).toUpperCase())}</span><span class="q-ritem-text"><span class="q-ritem-title mono">${escHtml(w.ref)}</span><small>${escHtml(sub ?? [last ? ago(last) : '還沒人用', w.loan && w.owed ? `欠 ${wan(w.owed)}` : ''].filter(Boolean).join(' · '))}</small>${tags ? `<span class="q-tags">${tags}</span>` : ''}${apps ? `<span class="apps">${apps}</span>` : ''}</span><span class="q-ritem-value big ${w.red ?? w.balance < 0 ? 'neg' : ''}">${escHtml(value)}</span></button>`;
+}
+// A sum in 萬 for a short line (欠 8.4萬).
+const wan = v => (Math.abs(v) >= 1e4 ? `${(v / 1e4).toLocaleString(undefined, { maximumFractionDigits: 1 })}萬` : Math.round(v).toLocaleString());
+const acctCard = (list, opts) => `<div class="q-rowcard">${list.map(w => acctItem(w, opts)).join('')}</div>`;
+const emptyCard = (icon, text) => `<div class="empty-card">${tileHtml(ic(icon), 'var(--q-good)', 'sm')}<span>${escHtml(text)}</span></div>`;
+// The week's money by what moved it (flows: `app:kind`), into accounts and out of them.
+const ECON = [
+  ['薪水', 'work', '#16a34a', k => k === 'eco:pay'],
+  ['開戶金', 'wallet', '#0ea5e9', k => /^(eco|odds):(start|grant)$/.test(k)],
+  ['財富等級', 'trophy', '#d97706', k => k === 'eco:rank'],
+  ['VIP 回饋', 'star', '#a855f7', k => k === 'eco:vip'],
+  ['急難紓困', 'spark', '#db2777', k => k === 'eco:relief'],
+  ['信貸撥款', 'bank', '#2563eb', k => k === 'eco:loan'],
+  ['信貸還款', 'bank', '#4f46e5', k => /^eco:loan(pay|off|gar|bad)$/.test(k)],
+  ['信貸費用', 'bank', '#7c3aed', k => /^eco:loan(fee|late)$/.test(k)],
+  ['Play 下注', 'ticket', '#1d4ed8', k => /^odds:(stake|lottery)$/.test(k)],
+  ['Play 派彩', 'coin', '#0891b2', k => k.startsWith('odds:')],
+  ['證券', 'chart', '#0d9488', k => k.startsWith('stock:')],
+  ['手動調整', 'pencil', '#64748b', k => k === 'eco:admin'],
+  ['其他', 'list', '#94a3b8', () => true]
+];
+function econRows(flows) {
+  const rows = ECON.map(([name, icon, color]) => ({ name, icon, color, in: 0, out: 0, n: 0 }));
+  for (const [k, v] of Object.entries(flows || {})) {
+    const r = rows[ECON.findIndex(c => c[3](k))];
+    r.in += v.in;
+    r.out += v.out;
+    r.n += v.n;
+  }
+  return rows.filter(r => r.n).sort((a, b) => b.in + b.out - (a.in + a.out));
+}
+function drawEcon(o) {
+  const rows = econRows(o.flows);
+  const tin = rows.reduce((a, r) => a + r.in, 0), tout = rows.reduce((a, r) => a + r.out, 0);
+  $('ov-econ-top').innerHTML = [['進帳戶', big(tin), 'pos'], ['出帳戶', big(tout), 'neg'], ['淨額', big(tin - tout), tin >= tout ? 'pos' : 'neg']].map(([k, v, c]) => `<div><small>${k}</small><strong class="${c}">${escHtml(v)}</strong></div>`).join('');
+  const max = Math.max(1, ...rows.map(r => Math.max(r.in, r.out)));
+  $('ov-econ').innerHTML = rows.length
+    ? rows.map(r => `<li>${tileHtml(ic(r.icon), r.color, 'sm')}<span class="nm">${escHtml(r.name)}<small>${r.n} 筆</small></span><span class="v ${r.in - r.out >= 0 ? 'pos' : 'neg'}">${escHtml(signed(Math.round(r.in - r.out)))}</span><span class="dv">${r.out ? `<i class="out" style="width:${Math.max(1, (r.out / max) * 50)}%"></i>` : ''}${r.in ? `<i class="in" style="width:${Math.max(1, (r.in / max) * 50)}%"></i>` : ''}</span></li>`).join('')
+    : `<li class="muted" style="display:block">這週沒有金流。</li>`;
+  // Each day: in above the line, out below.
+  const W = 700, mid = 60, bw = W / o.days.length;
+  const m = Math.max(1, ...o.daily.in, ...o.daily.out);
+  let svg = `<line x1="0" x2="${W}" y1="${mid}" y2="${mid}" stroke="currentColor" stroke-opacity=".15"/>`;
+  o.days.forEach((d, i) => {
+    const a = (o.daily.in[i] / m) * (mid - 6), b = (o.daily.out[i] / m) * (mid - 6);
+    svg += `<rect x="${i * bw + bw * 0.2}" y="${mid - a}" width="${bw * 0.6}" height="${a}" rx="3" fill="var(--q-good)"><title>${d} 進 ${money(o.daily.in[i])}</title></rect><rect x="${i * bw + bw * 0.2}" y="${mid}" width="${bw * 0.6}" height="${b}" rx="3" fill="var(--q-bad)" fill-opacity=".8"><title>${d} 出 ${money(o.daily.out[i])}</title></rect>`;
+  });
+  $('ov-flow').innerHTML = svg;
+  const L = o.loans || {}, R = o.relief || {};
+  $('ov-credit').innerHTML = [
+    kpi({ icon: 'bank', color: '#2563eb', label: '信貸放款中', value: `${L.active || 0} 筆`, sub: `未還 ${big(L.owed || 0)}`, go: 'accounts' }),
+    kpi({ icon: 'clock', color: '#d97706', label: '逾期', value: `${L.late || 0} 筆`, sub: `已還 ${big(L.repaid || 0)}` }),
+    kpi({ icon: 'flag', color: '#dc2626', label: '催收', value: `${L.bad || 0} 筆`, sub: L.bad ? '每週扣三分之一薪水' : '沒有' }),
+    kpi({ icon: 'spark', color: '#db2777', label: '急難紓困（30 天）', value: `${R.month || 0} 次`, sub: `共 ${R.total || 0} 次 · ${big(R.paid || 0)}` })
+  ].join('');
+  // 政府, all time: what it took (its biggest tax named) and its net.
+  const G = o.gov || {};
+  const topTax = GOV_ROWS.filter(r => r[2] === 'paid').sort((a, b) => (G.paid?.[b[0]] || 0) - (G.paid?.[a[0]] || 0))[0];
+  $('ov-gov').innerHTML = [
+    kpi({ icon: 'bank', color: '#475569', label: '繳給政府', value: big(G.paidTotal || 0), sub: G.paidTotal ? `最多是${topTax[4]}` : 'Play、Securities 同步後', go: 'money' }),
+    kpi({ icon: 'exchange', color: '#475569', label: '政府淨收', value: big(-(G.net || 0)), sub: `發出紓困 ${big(G.gotTotal || 0)}`, go: 'money' })
+  ].join('');
+}
+// The health of everything behind the apps, as cells; each problem also a chip on the status card.
+const health = { cells: {}, issues: [] };
+const HEALTH_CELLS = [
+  ['guard', '帳單保護', 'lock'],
+  ['pace', '用量推估', 'chart'],
+  ['jobs', '排程工作', 'clock'],
+  ['sources', '資料來源', 'live'],
+  ['deploys', '部署', 'send'],
+  ['secrets', '金鑰與綁定', 'key']
+];
+const TONE = { ok: 'var(--q-good)', warn: '#d97706', bad: 'var(--q-bad)', wait: '#94a3b8' };
+function setHealth(k, tone, value, issue = '') {
+  health.cells[k] = { tone, value, issue };
+  drawHealth();
+}
+function drawHealth() {
+  $('ov-health').innerHTML = HEALTH_CELLS.map(([k, name, icon]) => {
+    const c = health.cells[k] || { tone: 'wait', value: '檢查中…' };
+    return `<button type="button" class="hcell" data-go="health"><span class="st ${c.tone}">${tileHtml(ic(icon), TONE[c.tone], 'sm')}</span><span><b>${escHtml(name)}</b><small>${escHtml(c.value)}</small></span></button>`;
+  }).join('');
+  const bad = Object.values(health.cells).filter(c => c.tone === 'bad' || c.tone === 'warn');
+  $('health-badge').hidden = !bad.length;
+  $('health-badge').textContent = bad.length;
+  drawHero();
+}
+let ovData = null;
+function drawHero() {
+  const o = ovData;
+  if (!o) return;
+  const chips = [
+    ...Object.values(health.cells).filter(c => c.issue).map(c => [c.issue, 'health', c.tone]),
+    ...(o.attention.length ? [[`${o.attention.length} 個帳戶要處理`, 'overview', 'warn', 'ov-attn']] : [])
+  ];
+  const tone = chips.some(c => c[2] === 'bad') ? 'bad' : chips.length ? 'warn' : 'ok';
+  const waiting = Object.keys(health.cells).length < HEALTH_CELLS.length;
+  const html = heroCardHtml({ eyebrow: waiting ? '檢查中' : tone === 'ok' ? '一切正常' : '要注意', icon: ic(tone === 'ok' ? 'check' : 'bell'), title: tone === 'ok' ? (waiting ? '帳戶和金流都正常' : '所有系統都正常運作') : `${chips.length} 件事要注意`, sub: `${o.accounts.toLocaleString()} 個帳戶 · 今天 ${o.active.day} 人使用 · 流通 ${big(o.money.total)}` }, chips.length ? `<div class="hero-chips">${chips.map(([t, go, , to]) => `<button type="button" data-go="${go}"${to ? ` data-to="${to}"` : ''}>${escHtml(t)}</button>`).join('')}</div>` : '');
+  $('ov-hero').innerHTML = html;
+  $('ov-hero').firstElementChild.classList.add(tone);
+}
 async function loadOverview() {
   $('ov-error').textContent = '';
+  health.cells = {};
   try {
     const o = await admin('overview');
+    ovData = o;
     $('ov').hidden = false;
-    $('ov-tiles').replaceChildren(
-      tile('帳戶', o.accounts.toLocaleString(), `${o.used} 個用過`),
-      tile('今天使用', o.active.day.toLocaleString(), `7 天 ${o.active.week} · 30 天 ${o.active.month}`),
-      tile('這週新帳戶', o.newWeek.toLocaleString()),
-      tile('流通中的錢', money(o.money.total), `最多 ${money(o.money.top)}`),
-      tile('透支帳戶', o.money.overdrawn.toLocaleString())
-    );
+    const weekIn = Object.values(o.flows).reduce((a, v) => a + v.in - v.out, 0);
+    $('ov-kpis').innerHTML = [
+      kpi({ icon: 'user', color: '#2563eb', label: '帳戶', value: o.accounts.toLocaleString(), sub: o.newWeek ? `這週 +${o.newWeek}` : `${o.used} 個用過`, up: o.newWeek > 0, trend: o.signups, go: 'accounts' }),
+      kpi({ icon: 'live', color: '#16a34a', label: '今天使用', value: o.active.day.toLocaleString(), sub: `7 天 ${o.active.week} · 30 天 ${o.active.month}`, trend: o.lastSeen }),
+      kpi({ icon: 'coin', color: '#d97706', label: '流通中的錢', value: big(o.money.total), sub: `最多 ${big(o.money.top)}`, go: 'money' }),
+      kpi({ icon: 'exchange', color: weekIn >= 0 ? '#0d9488' : '#dc2626', label: '這週淨流入', value: big(weekIn), sub: o.money.overdrawn ? `${o.money.overdrawn} 個透支` : '沒有透支', trend: o.days.map((_, i) => Math.max(0, o.daily.in[i] - o.daily.out[i])), go: 'money' })
+    ].join('');
+    $('ov-attn-n').textContent = o.attention.length || '';
+    $('ov-attn').innerHTML = o.attention.length ? acctCard(o.attention) : emptyCard('check', '沒有透支、逾期或催收的帳戶');
+    drawEcon(o);
+    const appRows = Object.entries(o.apps).sort((a, b) => b[1].users - a[1].users);
+    $('ov-apps').innerHTML = appRows.map(([a, v]) => `<div class="app-card" style="--c:${BRANDS[a]?.color || 'var(--q-accent)'}">${appIc(a)}<b>${escHtml(BRANDS[a]?.short || appName(a))}</b><small>${v.users} 人 · 這週 ${v.week}</small><span class="meter"><i style="width:${v.users ? Math.max(3, (v.week / v.users) * 100) : 0}%"></i></span></div>`).join('');
     drawChart(o);
-    $('ov-apps').tBodies[0].replaceChildren(...Object.entries(o.apps).sort((a, b) => b[1].users - a[1].users).map(([a, v]) => el('tr', {}, [el('td', { text: appName(a) }), el('td', { class: 'right', text: v.users }), el('td', { class: 'right', text: v.week })])));
-    const flows = Object.entries(o.flows).sort((a, b) => b[1].in + b[1].out - (a[1].in + a[1].out));
-    $('ov-flows').tBodies[0].replaceChildren(
-      ...(flows.length
-        ? flows.map(([k, v]) => {
-            const [a, kind] = k.split(':');
-            const net = v.in - v.out;
-            return el('tr', {}, [el('td', { text: `${a === 'eco' ? 'Quadra' : appName(a)} · ${kindName(kind)}` }), el('td', { class: 'right', text: v.n }), el('td', { class: 'right pos wide', text: money(v.in) }), el('td', { class: 'right neg wide', text: money(v.out) }), el('td', { class: `right ${net >= 0 ? 'pos' : 'neg'}`, text: money(net) })]);
-          })
-        : [el('tr', {}, [el('td', { colspan: '5', class: 'muted', text: '這週沒有金流。' })])])
-    );
+    $('ov-rich').innerHTML = acctCard(o.richest, { compact: true });
+    $('ov-new').innerHTML = acctCard(o.newest.map(w => ({ ...w, shown: fmtDay(w.created) })), { compact: true, sub: null });
+    fitAll($('ov'));
+    drawHealth();
+    healthSummary();
   } catch (e) {
     $('ov-error').textContent = e.message;
   }
+}
+// The health cells from the proxy's own report, the sources and the deploys (each as it answers).
+function healthSummary() {
+  admin('system').then(r => {
+    const g = r.guard;
+    setHealth('guard', !g ? 'warn' : g.stopped ? 'bad' : g.armed ? 'ok' : 'warn', !g ? '還沒跑過' : g.stopped ? '代理已停' : g.armed ? '運作中' : '沒啟動', !g ? '' : g.stopped ? '代理已停（帳單保護）' : g.armed ? '' : '帳單保護沒啟動');
+    const p = g?.paceTop;
+    setHealth('pace', p == null ? 'wait' : p >= 0.9 ? 'bad' : p >= 0.6 || r.pace.pace ? 'warn' : 'ok', p == null ? '—' : `月底 ${pct(p)}${r.pace.pace ? ` · 節流 ${r.pace.pace} 級` : ''}`, p >= 0.6 || r.pace.pace ? `用量推估 ${pct(p || 0)}` : '');
+    const beats = Array.isArray(r.beats) ? r.beats : [];
+    const now = Date.now();
+    const failed = beats.filter(b => !b.ok).length;
+    const late = beats.filter(b => b.ok && now - b.at > (JOBS[b.job]?.[1] || 120) * 60_000).length;
+    setHealth('jobs', failed ? 'bad' : late ? 'warn' : beats.length ? 'ok' : 'wait', failed ? `${failed} 個失敗` : late ? `${late} 個比平常晚` : `${beats.length} 個都正常`, failed ? `${failed} 個排程失敗` : late ? `${late} 個排程晚了` : '');
+    const missing = Object.values(r.secrets || {}).filter(v => !v).length + Object.values(r.bindings || {}).filter(v => !v).length;
+    // (FIREBASE_PRIVATE_KEY is retiring: its absence is fine.)
+    const real = missing - (r.secrets?.FIREBASE_PRIVATE_KEY ? 0 : 1);
+    setHealth('secrets', real > 0 ? 'bad' : 'ok', real > 0 ? `${real} 個沒設定` : '都設定好了', real > 0 ? `${real} 個金鑰沒設定` : '');
+  }, e => setHealth('guard', 'bad', e.message, '讀不到系統狀態'));
+  admin('health').then(h => {
+    const down = h.checks.filter(c => !c.ok), slow = h.checks.filter(c => c.ok && c.ms > 2500);
+    setHealth('sources', down.length ? 'bad' : slow.length ? 'warn' : 'ok', down.length ? `${down.map(c => c.name).join('、')} 沒回應` : slow.length ? `${slow.length} 個很慢` : `${h.checks.length} 個都正常`, down.length ? `${down.length} 個資料來源沒回應` : '');
+  }, () => setHealth('sources', 'warn', '沒檢查到'));
+  deployRuns().then(runs => {
+    const bad = runs.filter(r => r.run && runDot(r.run) === 'bad');
+    const going = runs.filter(r => r.run && runDot(r.run) === 'run');
+    setHealth('deploys', bad.length ? 'bad' : runs.every(r => !r.run) ? 'wait' : 'ok', bad.length ? `${bad.map(r => r.name).join('、')} 失敗` : going.length ? `${going.length} 個進行中` : `${runs.filter(r => r.run).length} 個都成功`, bad.length ? `${bad.length} 個部署失敗` : '');
+  });
 }
 function drawChart(o) {
   const svg = $('ov-chart');
@@ -571,53 +919,64 @@ function drawChart(o) {
     const x = pad + i * bw;
     const a = o.signups[i], b = o.lastSeen[i];
     out += `<rect x="${x + bw * 0.14}" y="${y(a)}" width="${bw * 0.34}" height="${H - 30 - y(a)}" rx="3" fill="var(--q-accent)"><title>${d} 新帳戶 ${a}</title></rect>`;
-    out += `<rect x="${x + bw * 0.52}" y="${y(b)}" width="${bw * 0.34}" height="${H - 30 - y(b)}" rx="3" fill="#16a34a"><title>${d} 最後使用 ${b}</title></rect>`;
+    out += `<rect x="${x + bw * 0.52}" y="${y(b)}" width="${bw * 0.34}" height="${H - 30 - y(b)}" rx="3" fill="var(--q-good)"><title>${d} 最後使用 ${b}</title></rect>`;
     if ((n - 1 - i) % 2 === 0) out += `<text x="${x + bw / 2}" y="${H - 6}" text-anchor="middle" font-size="18" fill="currentColor" fill-opacity=".6">${Number(d.slice(5, 7))}/${Number(d.slice(8))}</text>`;
   });
   out += `<text x="${pad}" y="18" font-size="18" fill="currentColor" fill-opacity=".6">最多 ${max}</text>`;
   svg.innerHTML = out;
 }
-$('ov-load').onclick = () => busy($('ov-load'), loadOverview);
 
 // ---- 帳戶 ----
 let wallets = [];
 let filter = 'all';
 let sortKey = 'lastUsed';
-let sortDir = -1;
-const stateOf = w => (w.lastUsed ? '使用中' : '未使用');
-const keyOf = (w, k) => (k === 'state' ? stateOf(w) : k === 'apps' ? w.apps.length : k === 'created' || k === 'lastUsed' ? Date.parse(w[k] || 0) || 0 : w[k] ?? '');
+const lastOf = w => (w.lastUsed ? Date.parse(w.lastUsed) : 0);
 const FILTERS = {
-  all: () => true,
-  used: w => w.lastUsed,
-  unused: w => !w.lastUsed,
-  neg: w => w.balance < 0,
-  idle: w => w.lastUsed && Date.now() - Date.parse(w.lastUsed) > 30 * 86_400_000
+  all: ['全部', () => true],
+  week: ['這週用過', w => Date.now() - lastOf(w) < 7 * 86_400_000],
+  unused: ['未使用', w => !w.lastUsed],
+  neg: ['透支', w => w.balance < 0],
+  loan: ['信貸', w => w.loan],
+  late: ['逾期／催收', w => w.loan === 'late' || w.loan === 'bad'],
+  relief: ['紓困過', w => w.reliefs],
+  idle: ['30 天沒用', w => w.lastUsed && Date.now() - lastOf(w) > 30 * 86_400_000]
 };
+const SORTS = { lastUsed: lastOf, balance: w => w.balance ?? -Infinity, created: w => Date.parse(w.created || 0) || 0 };
+// A Quadra Pass as typed (10 letters and digits, a dash or spaces anywhere).
+const asPass = q => {
+  const c = q.toUpperCase().replace(/[\s-]/g, '');
+  return /^[A-Z0-9]{10}$/.test(c) ? c : '';
+};
+const matches = (w, q) => !q || w.ref.toLowerCase().includes(q) || w.apps.some(a => a.includes(q) || appName(a).toLowerCase().includes(q));
 function drawWallets() {
   const q = $('search').value.trim().toLowerCase();
-  const rows = wallets
-    .filter(FILTERS[filter])
-    .filter(w => !q || w.ref.toLowerCase().includes(q) || w.apps.some(a => a.includes(q) || appName(a).toLowerCase().includes(q)))
-    .sort((a, b) => {
-      const x = keyOf(a, sortKey), y = keyOf(b, sortKey);
-      return (x > y ? 1 : x < y ? -1 : 0) * sortDir;
-    });
-  const used = wallets.filter(w => w.lastUsed).length;
-  $('wallets-sum').textContent = `共 ${wallets.length} 個帳戶 · ${used} 個用過 · ${wallets.length - used} 個還沒人用 · 顯示 ${rows.length} 個`;
-  $('wallets').hidden = false;
-  for (const th of $('wallets').tHead.querySelectorAll('th[data-sort]')) th.setAttribute('aria-sort', th.dataset.sort === sortKey ? (sortDir > 0 ? 'ascending' : 'descending') : 'none');
-  $('wallets').tBodies[0].replaceChildren(
-    ...rows.map(w =>
-      el('tr', { class: 'tap', onclick: () => openAccount(w.ref) }, [
-        el('td', { class: 'num', text: w.ref }),
-        el('td', {}, [el('span', { class: `tag${w.lastUsed ? ' on' : ''}`, text: stateOf(w) })]),
-        el('td', { class: 'wide', text: w.apps.length ? w.apps.map(appName).join('、') : '—' }),
-        el('td', { class: 'wide', text: fmtDay(w.created) }),
-        el('td', { text: ago(w.lastUsed ? Date.parse(w.lastUsed) : 0) }),
-        el('td', { class: `right ${w.balance < 0 ? 'neg' : ''}`, text: money(w.balance) })
-      ])
-    )
+  const base = wallets.filter(w => matches(w, q));
+  $('filters').replaceChildren(
+    ...Object.entries(FILTERS).map(([k, [name, f]]) => {
+      const n = base.filter(f).length;
+      return k !== 'all' && !n && filter !== k ? null : el('button', { 'data-filter': k, 'aria-pressed': String(filter === k) }, [name, el('b', { text: String(n) })]);
+    }).filter(Boolean)
   );
+  const rows = base.filter(FILTERS[filter][1]).sort((a, b) => SORTS[sortKey](b) - SORTS[sortKey](a));
+  const used = wallets.filter(w => w.lastUsed).length;
+  $('wallets-sum').innerHTML = [['帳戶', wallets.length.toLocaleString()], ['用過', used.toLocaleString()], ['透支', String(wallets.filter(w => w.balance < 0).length)], ['總餘額', big(wallets.reduce((a, w) => a + (w.balance || 0), 0))]].map(([k, v]) => `<div><small>${k}</small><strong>${escHtml(v)}</strong></div>`).join('');
+  const pass = asPass(q);
+  $('wallets').innerHTML = rows.length
+    ? acctCard(rows, {})
+    : pass
+      ? `<button type="button" class="empty-card" id="find-go" style="width:100%">${tileHtml(ic('key'), '#0d9488', 'sm')}<span>用這組 Quadra Pass 找帳戶</span></button>`
+      : emptyCard('search', '沒有符合的帳戶');
+  $('find-go')?.addEventListener('click', () => findPass(pass));
+  fitAll($('wallets-sum'));
+}
+async function findPass(pass) {
+  $('find-error').textContent = '';
+  try {
+    const { ref } = await admin('find', { passcode: pass });
+    openAccount(ref);
+  } catch (e) {
+    $('find-error').textContent = e.message;
+  }
 }
 async function loadWallets() {
   $('wallets-error').textContent = '';
@@ -628,41 +987,104 @@ async function loadWallets() {
     $('wallets-error').textContent = e.message;
   }
 }
-$('load').onclick = () => busy($('load'), loadWallets);
 $('search').oninput = drawWallets;
+$('search').addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  const pass = asPass($('search').value);
+  if (pass && !wallets.some(w => matches(w, $('search').value.trim().toLowerCase()))) findPass(pass);
+});
 $('filters').onclick = e => {
-  if (!e.target.dataset.filter) return;
-  filter = e.target.dataset.filter;
-  for (const b of $('filters').querySelectorAll('button')) b.setAttribute('aria-pressed', String(b === e.target));
+  const b = e.target.closest('[data-filter]');
+  if (!b) return;
+  filter = b.dataset.filter;
   drawWallets();
 };
-$('wallets').tHead.onclick = e => {
-  const k = e.target.dataset.sort;
-  if (!k) return;
-  sortDir = k === sortKey ? -sortDir : k === 'ref' || k === 'state' ? 1 : -1;
-  sortKey = k;
+$('sort').onclick = e => {
+  const b = e.target.closest('[data-sort]');
+  if (!b) return;
+  sortKey = b.dataset.sort;
+  for (const x of $('sort').querySelectorAll('button')) x.setAttribute('aria-pressed', String(x === b));
   drawWallets();
 };
 $('csv').onclick = () => {
-  const head = ['代號', '狀態', 'App', '建立', '最後使用', '餘額', '紀錄筆數'];
-  const rows = wallets.map(w => [w.ref, stateOf(w), w.apps.map(appName).join(' / '), w.created || '', w.lastUsed || '', w.balance ?? '', w.entries]);
+  const head = ['代號', '狀態', 'App', '建立', '最後使用', '餘額', '紀錄筆數', '信貸', '未還', '紓困次數', '繳稅'];
+  const rows = wallets.map(w => [w.ref, w.lastUsed ? '使用中' : '未使用', w.apps.map(appName).join(' / '), w.created || '', w.lastUsed || '', w.balance ?? '', w.entries, w.loan ? LOAN_TAG[w.loan][0] : '', w.owed || '', w.reliefs || '', w.tax || '']);
   const text = '﻿' + [head, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
   const a = el('a', { href: URL.createObjectURL(new Blob([text], { type: 'text/csv' })), download: `Quadra 帳戶 ${new Date().toISOString().slice(0, 10)}.csv` });
   a.click();
 };
 
-$('find').onclick = () =>
-  busy($('find'), async () => {
-    $('find-error').textContent = '';
-    try {
-      const { ref } = await admin('find', { passcode: $('find-pass').value });
-      $('find-pass').value = '';
-      openAccount(ref);
-    } catch (e) {
-      $('find-error').textContent = e.message;
-    }
-  });
-$('find-pass').addEventListener('keydown', e => e.key === 'Enter' && $('find').click());
+// ---- One search for everything: accounts, a pass, an app, a view or a tool ----
+const PLACES = [
+  ['總覽', 'overview', 'grid', '#2563eb', '首頁 狀態 overview'],
+  ['帳戶', 'accounts', 'user', '#2563eb', '使用者 accounts users'],
+  ['金流', 'money', 'coin', '#d97706', '錢 經濟 對帳 money economy'],
+  ['健康', 'health', 'live', '#16a34a', '系統 排程 資料來源 部署 金鑰 r2 d1 帳單保護 節流 health cron'],
+  ['用量', 'usage', 'chart', '#7c3aed', 'google 帳單 tdx 額度 usage billing'],
+  ['設定', 'dev', 'target', '#64748b', '速度 開發 容量 dev config'],
+  ['發放 Quadra Pass', 'tools', 'ticket', '#2563eb', '發 pass 新帳戶 issue', 'tool-issue'],
+  ['找回帳戶', 'tools', 'lock', '#0d9488', '裝置代碼 遺失 recover', 'tool-recover'],
+  ['廣播通知', 'tools', 'bell', '#ea580c', '通知 推播 broadcast push', 'tool-notify'],
+  ['資料整理', 'tools', 'trash', '#64748b', '清理 掃描 clean', 'tool-clean']
+];
+let omniHits = [];
+let omniOn = 0;
+async function omniDraw() {
+  const raw = $('omni').value.trim();
+  const q = raw.toLowerCase();
+  const out = $('omni-out');
+  if (!q) return (out.hidden = true);
+  if (!wallets.length) await loadWallets();
+  const hits = [];
+  const pass = asPass(raw);
+  if (pass) hits.push({ group: 'Quadra Pass', html: `${tileHtml(ic('key'), '#0d9488', 'sm')}<span>用這組 Pass 找帳戶<small>${escHtml(pretty(pass))}</small></span>`, run: () => findPass(pass).then(() => $('find-error').textContent && (show('accounts'), ($('search').value = raw), drawWallets())) });
+  const accts = wallets.filter(w => matches(w, q)).sort((a, b) => lastOf(b) - lastOf(a));
+  for (const w of accts.slice(0, 6)) hits.push({ group: '帳戶', html: `<span class="av" style="--t:${refColor(w.ref)};width:32px;height:32px;border-radius:9px;display:grid;place-items:center;color:#fff;font:700 12px ui-monospace,monospace;background:${refColor(w.ref)}">${escHtml(w.ref.slice(0, 2).toUpperCase())}</span><span><span class="mono">${escHtml(w.ref)}</span><small>${escHtml(w.apps.map(appName).join('、') || '還沒用過')}</small></span><em>${escHtml(money(w.balance))}</em>`, run: () => openAccount(w.ref) });
+  if (accts.length > 6) hits.push({ group: '帳戶', html: `${tileHtml(ic('list'), '#64748b', 'sm')}<span>全部 ${accts.length} 個符合的帳戶</span>`, run: () => (show('accounts'), ($('search').value = raw), drawWallets()) });
+  if (/^[0-9a-f]{6,8}$/.test(q) && !accts.length) hits.push({ group: '帳戶', html: `${tileHtml(ic('user'), '#64748b', 'sm')}<span>打開帳戶 ${escHtml(q)}</span>`, run: () => openAccount(q) });
+  for (const [k, n] of Object.entries(APPS)) if (n.toLowerCase().includes(q) || k.includes(q)) hits.push({ group: 'App', html: `${appIc(k).replace('app-ic', 'app-ic" style="width:32px;height:32px')}<span>${escHtml(n)} 的帳戶<small>${wallets.filter(w => w.apps.includes(k)).length} 個用過</small></span>`, run: () => (show('accounts'), ($('search').value = n), drawWallets()) });
+  for (const [name, go, icon, color, words, to] of [...PLACES].sort((a, b) => b[0].toLowerCase().includes(q) - a[0].toLowerCase().includes(q))) if (name.toLowerCase().includes(q) || words.includes(q)) hits.push({ group: '功能', html: `${tileHtml(ic(icon), color, 'sm')}<span>${escHtml(name)}</span>`, run: () => { show(go); const t = to && $(to); t ? setTimeout(() => t.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50) : scrollTo({ top: 0 }); } });
+  omniHits = hits;
+  omniOn = 0;
+  let group = '';
+  out.innerHTML = hits.length
+    ? hits.map((h, i) => `${h.group !== group ? `<h4>${escHtml((group = h.group))}</h4>` : ''}<button type="button" class="hit${i === omniOn ? ' on' : ''}" data-hit="${i}">${h.html}</button>`).join('')
+    : `<p class="empty">找不到「${escHtml(raw)}」</p>`;
+  out.hidden = false;
+}
+const omniPick = i => {
+  const h = omniHits[i];
+  if (!h) return;
+  $('omni').value = '';
+  $('omni-out').hidden = true;
+  $('omni').blur();
+  h.run();
+};
+$('omni').oninput = () => omniDraw();
+$('omni').addEventListener('focus', () => $('omni').value && omniDraw());
+$('omni').addEventListener('keydown', e => {
+  const out = $('omni-out');
+  if (e.key === 'Escape') return ($('omni').value = '', (out.hidden = true), $('omni').blur());
+  if (e.key === 'Enter') return omniPick(omniOn);
+  if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+  e.preventDefault();
+  omniOn = (omniOn + (e.key === 'ArrowDown' ? 1 : -1) + omniHits.length) % Math.max(1, omniHits.length);
+  out.querySelectorAll('.hit').forEach((b, i) => b.classList.toggle('on', i === omniOn));
+});
+$('omni-out').addEventListener('click', e => {
+  const b = e.target.closest('[data-hit]');
+  if (b) omniPick(Number(b.dataset.hit));
+});
+document.addEventListener('pointerdown', e => !e.target.closest('.topbar') && ($('omni-out').hidden = true));
+// "/" anywhere (not typing): the search.
+document.addEventListener('keydown', e => {
+  if (e.key !== '/' || /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName) || $('panel').hidden) return;
+  e.preventDefault();
+  $('omni').focus();
+});
+
+// ---- 工具: a row of shortcuts to each tool ----
+$('tool-grid').innerHTML = PLACES.filter(p => p[5]).map(([name, , icon, color, , to]) => `<button type="button" class="act" data-go="tools" data-to="${to}">${tileHtml(ic(icon), color, 'sm')}<span>${escHtml(name.replace('Quadra ', ''))}</span></button>`).join('');
 
 // ---- 一個帳戶 ----
 const dialog = $('acct');
@@ -694,24 +1116,39 @@ function action(title, text, controls, run) {
   };
   return box;
 }
+// A record's kind as a picture.
+const KIND_IC = { start: ['wallet', '#0ea5e9'], grant: ['wallet', '#0ea5e9'], pay: ['work', '#16a34a'], rank: ['trophy', '#d97706'], vip: ['star', '#a855f7'], relief: ['spark', '#db2777'], admin: ['pencil', '#64748b'], rebase: ['swap', '#64748b'], od: ['exchange', '#dc2626'], plus: ['star', '#7c3aed'], plusrefund: ['star', '#7c3aed'], stake: ['ticket', '#1d4ed8'], lottery: ['target', '#1d4ed8'], payout: ['coin', '#0891b2'], win: ['coin', '#0891b2'], prize: ['target', '#0891b2'], refund: ['history', '#64748b'], cashout: ['swap', '#0891b2'], plusboost: ['coin', '#7c3aed'] };
+const kindIc = k => (k.startsWith('loan') || k === 'loan' ? ['bank', '#2563eb'] : KIND_IC[k] || ['list', '#94a3b8']);
+const REC_FILTERS = { all: ['全部', () => true], in: ['進', e => e.amount > 0], out: ['出', e => e.amount < 0], loan: ['信貸', e => e.kind.startsWith('loan')], play: ['Play', e => e.app === 'odds'], eco: ['Quadra', e => e.app === 'eco'] };
 function drawAccount(a) {
-  const facts = el('dl', { class: 'kv' }, [
-    ['餘額', money(a.balance)],
-    ['建立', fmt(a.created)],
-    ['最後使用', `${fmt(a.lastUsed)}（${ago(a.lastUsed)}）`],
-    ['App', a.apps.length ? a.apps.map(x => `${appName(x.app)}（${ago(x.last)}）`).join('、') : '還沒用過'],
-    ['通知', a.pushes.length ? a.pushes.map(appName).join('、') : '沒有訂閱'],
-    ['登入世代', String(a.gen)],
-    ['紀錄', `${a.entries} 筆`],
-    ['設定', a.settings.length ? a.settings.join('、') : '—']
-  ].flatMap(([k, v]) => [el('dt', { text: k }), el('dd', { text: v })]));
-
   const reload = () => openAccount(a.ref);
-  // Money by hand.
+  const tags = [a.balance < 0 ? '透支' : '', a.loan ? LOAN_TAG[a.loan][0] : '', a.reliefs ? `紓困 ×${a.reliefs}` : '', a.lastUsed ? '' : '未使用'].filter(Boolean);
+  const hero = el('div', { class: 'acct-hero' });
+  hero.innerHTML = heroCardHtml({ eyebrow: '餘額', icon: ic('wallet'), big: money(a.balance), sub: a.apps.length ? `${a.apps.length} 個 App · ${ago(a.lastUsed)}用過` : '還沒用過', color: refColor(a.ref) }, tags.length ? `<div class="hero-chips">${tags.map(t => `<button type="button" tabindex="-1">${escHtml(t)}</button>`).join('')}</div>` : '');
+  const facts = el('div', { class: 'facts' });
+  facts.innerHTML = [['建立', fmtDay(a.created)], ['紀錄', `${a.entries} 筆`], ['通知', a.pushes.length ? `${a.pushes.length} 個 App` : '沒訂閱'], ['登入世代', String(a.gen)], ['設定', `${a.settings.length} 項`], ['收件匣', `${Object.values(a.inbox || {}).reduce((x, y) => x + y, 0)} 則`]].map(([k, v]) => `<div><small>${k}</small><strong>${escHtml(v)}</strong></div>`).join('');
+  const apps = el('div', { class: 'app-grid' });
+  apps.innerHTML = [...a.apps].sort((x, y) => (y.last || 0) - (x.last || 0)).map(x => `<div class="app-card" style="--c:${BRANDS[x.app]?.color || 'var(--q-accent)'}">${appIc(x.app)}<b>${escHtml(BRANDS[x.app]?.short || appName(x.app))}</b><small>${escHtml(ago(x.last))}</small></div>`).join('');
+  // 信貸: the one being paid (or in 催收) and how many are settled.
+  const open = a.loans?.find(l => !l.settled);
+  const done = (a.loans || []).filter(l => l.settled).length;
+  const loanBox = a.loans?.length ? el('div', { class: 'loan-card' }) : null;
+  if (loanBox)
+    loanBox.innerHTML = open
+      ? `<div class="row"><strong>信貸 ${escHtml(money(open.principal))}</strong><span class="q-tag ${LOAN_TAG[a.loan]?.[1] || 'blue'}">${escHtml(LOAN_TAG[a.loan]?.[0] || '信貸')}</span></div><div class="loan-meter"><i style="width:${Math.min(100, (open.paid / open.weeks) * 100)}%"></i></div><div class="row muted"><span>已繳 ${open.paid} / ${open.weeks} 期 · 年利率 ${(open.apr * 100).toFixed(1)}%</span><span>未還 ${escHtml(money(open.owed))}</span></div>${open.lates ? `<p class="muted" style="margin:6px 0 0">遲繳 ${open.lates} 次${open.bad ? '，已轉催收' : ''}</p>` : ''}${done ? `<p class="muted" style="margin:6px 0 0">之前 ${done} 筆已清償</p>` : ''}`
+      : `<div class="row"><strong>信貸</strong><span class="q-tag green">都已清償</span></div><p class="muted" style="margin:6px 0 0">${done} 筆，最近一筆 ${escHtml(fmtDay(a.loans.at(-1).t))}</p>`;
+
+  // 政府: what this account paid and got (as its 真相 shows it).
+  const G = a.gov || {};
+  const govRows = GOV_ROWS.map(([k, , side, icon, short]) => [short, side === 'got' ? G.got?.[k] || 0 : -(G.paid?.[k] || 0), icon]).filter(r => r[1]);
+  const govBox = govRows.length ? el('div', { class: 'q-rowcard', style: 'margin-top:10px' }) : null;
+  if (govBox) govBox.innerHTML = govRows.map(([name, v, icon]) => `<div class="q-ritem">${tileHtml(ic(icon), v > 0 ? '#16a34a' : '#475569', 'sm')}<span class="q-ritem-text"><span class="q-ritem-title">${escHtml(name)}</span></span><span class="q-ritem-value ${v > 0 ? 'pos' : 'neg'}">${escHtml(signed(v))}</span></div>`).join('') + `<div class="q-ritem"><span class="q-ritem-text"><span class="q-ritem-title"><b>政府淨額</b></span></span><span class="q-ritem-value big">${escHtml(signed(G.net || 0))}</span></div>`;
+
+  // The actions, each a button; its form opens under the row of buttons.
   const amt = el('input', { type: 'number', step: '1', class: 'grow', placeholder: '金額（負數為扣款）' });
   const note = el('input', { class: 'grow', placeholder: '原因（必填）', maxlength: '60' });
   const grantBtn = el('button', { class: 'primary', text: '入帳' });
-  const grant = action('調整金額', '更正、補償或獎金：原因寫進帳戶紀錄，本人看得到；正數加錢、負數扣錢。', [[amt], [note, grantBtn]], async () => {
+  const grant = action('調整金額', '', [[amt], [note, grantBtn]], async () => {
     const v = Number(amt.value);
     if (!confirm(`${v >= 0 ? '加' : '扣'} ${money(Math.abs(v))} 給帳戶 ${a.ref}？\n原因：${note.value}`)) return '已取消';
     const r = await admin('grant', { wallet: a.ref, amount: v, note: note.value });
@@ -719,39 +1156,35 @@ function drawAccount(a) {
     return `已入帳，餘額 ${money(r.balance)}`;
   });
   grantBtn.onclick = () => grant.run(grantBtn);
-  // Signing out.
   const outBtn = el('button', { text: '登出所有裝置' });
-  const signout = action('登出所有裝置', 'Pass 還能用：每台裝置要重新登入。手機遺失或 Pass 外流時用。', [outBtn], async () => {
+  const signout = action('登出所有裝置', 'Pass 還能用，每台裝置要重新登入。', [outBtn], async () => {
     if (!confirm(`登出帳戶 ${a.ref} 的所有裝置？`)) return '已取消';
     await admin('signout', { wallet: a.ref });
     return '已登出所有裝置';
   });
   outBtn.onclick = () => signout.run(outBtn);
-  // A device code.
-  const codeBtn = el('button', { text: '產生裝置代碼' });
+  const codeBtn = el('button', { class: 'primary', text: '產生裝置代碼' });
   const codeOut = el('div', { class: 'code' });
-  const recover = action('找回帳戶', '10 分鐘有效：他在任何 App 的登入畫面輸入，再到帳戶設定新的 Pass。', [codeBtn], async () => {
+  const recover = action('找回帳戶', '10 分鐘有效：在登入畫面輸入，再設定新的 Pass。', [codeBtn], async () => {
     const r = await admin('device-code', { wallet: a.ref });
     codeOut.textContent = r.code;
     return `${new Date(r.exp).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false })} 前有效`;
   });
   recover.append(codeOut);
   codeBtn.onclick = () => recover.run(codeBtn);
-  // A test notice.
   const pushApp = el('select', { class: 'grow' }, a.pushes.map(x => el('option', { value: x, text: appName(x) })));
-  const pushBtn = el('button', { text: '送測試通知' });
+  const pushBtn = el('button', { text: '送出' });
   const pushTest = a.pushes.length
-    ? action('測試通知', '送一則測試通知到這個帳戶訂閱的裝置。', [pushApp, pushBtn], async () => {
+    ? action('測試通知', '', [pushApp, pushBtn], async () => {
         const r = await admin('push-test', { wallet: a.ref, app: pushApp.value });
         return r.ok ? '已送出' : `沒送到（${r.result}）`;
       })
     : null;
   if (pushTest) pushBtn.onclick = () => pushTest.run(pushBtn);
-  // Reset, at its owner's request.
   const pass = el('input', { class: 'grow', placeholder: '本人的 Quadra Pass', autocomplete: 'off' });
   const keepBoxes = Object.entries(APPS).map(([k, n]) => el('label', { class: 'keep' }, [el('input', { type: 'checkbox', value: k }), el('span', { text: `保留 ${n}` })]));
-  const resetBtn = el('button', { class: 'danger', text: '重置帳戶' });
-  const reset = action('重置帳戶', '本人要求時（要他的 Pass）：保留 Pass 和勾選的 App 資料，其他全部重來（新的錢包、其他 App 的資料刪除、所有裝置登出）。無法復原。', [pass, resetBtn], async () => {
+  const resetBtn = el('button', { class: 'danger', text: '重置' });
+  const reset = action('重置帳戶', '本人要求時（要他的 Pass）：保留 Pass 和勾選的 App，其他重來。無法復原。', [pass, resetBtn], async () => {
     const keep = keepBoxes.map(l => l.querySelector('input')).filter(i => i.checked).map(i => i.value);
     if (!confirm(`重置帳戶 ${a.ref}？保留：${keep.length ? keep.map(appName).join('、') : '無'}。無法復原。`)) return '已取消';
     const r = await admin('reset', { passcode: pass.value, keep });
@@ -760,10 +1193,9 @@ function drawAccount(a) {
   });
   reset.insertBefore(el('div', { class: 'keeps' }, keepBoxes), reset.querySelector('.row'));
   resetBtn.onclick = () => reset.run(resetBtn);
-  // Taking an unused pass back.
   const removeBtn = el('button', { class: 'danger', text: '收回這組 Pass' });
   const remove = !a.lastUsed
-    ? action('收回未使用的 Pass', '還沒人用過：收回後這組 Pass 就不能登入。', [removeBtn], async () => {
+    ? action('收回未使用的 Pass', '收回後這組 Pass 就不能登入。', [removeBtn], async () => {
         if (!confirm(`收回帳戶 ${a.ref}？這組 Pass 會失效。`)) return '已取消';
         await admin('remove', { wallet: a.ref });
         setTimeout(() => (dialog.close(), loadWallets()), 700);
@@ -771,12 +1203,10 @@ function drawAccount(a) {
       })
     : null;
   if (remove) removeBtn.onclick = () => remove.run(removeBtn);
-
-  // One app's data cleared.
   const clearApp = el('select', { class: 'grow' }, a.apps.map(x => el('option', { value: x.app, text: appName(x.app) })));
-  const clearBtn = el('button', { class: 'danger', text: '清除資料' });
+  const clearBtn = el('button', { class: 'danger', text: '清除' });
   const clear = a.apps.length
-    ? action('清除某個 App 的資料', '只刪這個 App 的資料（和它的收件匣），錢包和其他 App 不動；所有裝置登出，免得舊資料被傳回來。無法復原。', [clearApp, clearBtn], async () => {
+    ? action('清除某個 App 的資料', '錢包和其他 App 不動，所有裝置登出。無法復原。', [clearApp, clearBtn], async () => {
         if (!confirm(`清除帳戶 ${a.ref} 在 ${appName(clearApp.value)} 的資料？無法復原。`)) return '已取消';
         await admin('clear-app', { wallet: a.ref, app: clearApp.value });
         setTimeout(reload, 900);
@@ -784,27 +1214,48 @@ function drawAccount(a) {
       })
     : null;
   if (clear) clearBtn.onclick = () => clear.run(clearBtn);
-  // An export.
-  const exportBtn = el('button', { text: '下載帳戶資料' });
-  const exporter = action('匯出', '錢包和每個 App 的資料，原樣存成一個 JSON 檔（備份，或本人要求時給他）。', [exportBtn], async () => {
+  const exportBtn = el('button', { class: 'primary', text: '下載 JSON' });
+  const exporter = action('匯出', '錢包和每個 App 的資料，原樣存成一個檔。', [exportBtn], async () => {
     const r = await admin('export', { wallet: a.ref });
     el('a', { href: URL.createObjectURL(new Blob([JSON.stringify(r, null, 2)], { type: 'application/json' })), download: `Quadra 帳戶 ${a.ref} ${new Date().toISOString().slice(0, 10)}.json` }).click();
     return '已下載';
   });
   exportBtn.onclick = () => exporter.run(exportBtn);
-  // Deleting the account.
   const confirmRef = el('input', { class: 'grow', autocomplete: 'off', placeholder: `輸入 ${a.ref} 確認` });
-  const delBtn = el('button', { class: 'danger', text: '刪除帳戶' });
-  const del = action('刪除帳戶', '整個帳戶永久刪除：Pass 失效、錢包和所有 App 的資料、收件匣、分享碼、裝置代碼和通知訂閱都刪掉。無法復原，建議先匯出。', [confirmRef, delBtn], async () => {
+  const delBtn = el('button', { class: 'danger', text: '刪除' });
+  const del = action('刪除帳戶', 'Pass、錢包、所有 App 的資料和通知都刪掉。無法復原，建議先匯出。', [confirmRef, delBtn], async () => {
     if (!confirm(`永久刪除帳戶 ${a.ref}（餘額 ${money(a.balance)}）？無法復原。`)) return '已取消';
     const r = await admin('delete', { wallet: a.ref, confirm: confirmRef.value.trim() });
     setTimeout(() => (dialog.close(), loadWallets(), loaded.delete('overview')), 900);
     return `已刪除帳戶 ${r.ref}${r.pushes ? `、${r.pushes} 個通知訂閱` : ''}${r.shares ? `、${r.shares} 個分享碼` : ''}`;
   });
   delBtn.onclick = () => del.run(delBtn);
-  // A record undone.
+  const ACTS = [
+    ['調整金額', 'pencil', '#2563eb', grant],
+    ['裝置代碼', 'key', '#0d9488', recover],
+    ['登出裝置', 'lock', '#64748b', signout],
+    ['測試通知', 'bell', '#ea580c', pushTest],
+    ['匯出', 'share', '#4f46e5', exporter],
+    ['清除 App', 'x', '#d97706', clear],
+    ['收回 Pass', 'x', '#dc2626', remove],
+    ['重置', 'history', '#dc2626', reset],
+    ['刪除', 'trash', '#dc2626', del]
+  ].filter(x => x[3]);
+  const pane = el('div', { class: 'act-pane' });
+  const acts = el('div', { class: 'acts' });
+  acts.innerHTML = ACTS.map(([name, icon, color], i) => `<button type="button" class="act${color === '#dc2626' ? ' dangerous' : ''}" data-act="${i}" aria-expanded="false">${tileHtml(ic(icon), color, 'sm')}<span>${escHtml(name)}</span></button>`).join('');
+  acts.onclick = e => {
+    const b = e.target.closest('[data-act]');
+    if (!b) return;
+    const on = b.getAttribute('aria-expanded') !== 'true';
+    for (const x of acts.children) x.setAttribute('aria-expanded', String(on && x === b));
+    pane.replaceChildren(...(on ? [ACTS[Number(b.dataset.act)][3]] : []));
+    if (on) setTimeout(() => pane.firstChild?.querySelector('input, select, button')?.focus({ preventScroll: true }), 30);
+  };
+
+  // The records: a picture for each kind, filtered by what they are.
   const undo = async (e, btn) => {
-    if (!confirm(`撤銷這筆 ${money(e.amount)}（${e.app}:${e.kind}）？會記一筆相反金額的更正。`)) return;
+    if (!confirm(`撤銷這筆 ${money(e.amount)}（${kindName(e.kind)}）？會記一筆相反金額的更正。`)) return;
     await busy(btn, async () => {
       try {
         await admin('undo', { wallet: a.ref, entry: e.id });
@@ -814,24 +1265,46 @@ function drawAccount(a) {
       }
     });
   };
-  const records = el('div', { class: 'tablewrap' }, [
-    el('table', {}, [
-      el('thead', {}, [el('tr', {}, ['時間', '來源', '種類', '金額', '備註', ''].map((h, i) => el('th', { class: i === 3 ? 'right' : i === 1 || i === 4 ? 'wide' : null, text: h })))]),
-      el('tbody', {}, a.recent.length ? a.recent.map(e => {
-        const btn = e.amount && !e.undone && !e.id?.startsWith('eco:undo:') ? el('button', { class: 'small', text: '撤銷' }) : null;
-        if (btn) btn.onclick = () => undo(e, btn);
-        return el('tr', {}, [el('td', { text: fmtShort(e.t) }), el('td', { class: 'wide', text: e.app === 'eco' ? 'Quadra' : appName(e.app) }), el('td', { text: kindName(e.kind), title: e.kind }), el('td', { class: `right ${e.amount > 0 ? 'pos' : e.amount < 0 ? 'neg' : ''}`, text: e.amount ? money(e.amount) : '—' }), el('td', { class: 'wide', text: e.note }), el('td', {}, [e.undone ? el('span', { class: 'tag', text: '已撤銷' }) : btn])]);
-      }) : [el('tr', {}, [el('td', { colspan: '6', class: 'muted', text: '沒有紀錄。' })])])
-    ])
-  ]);
+  let recFilter = 'all';
+  const recChips = el('div', { class: 'chips rec-filters' });
+  const recList = el('div', { class: 'recs' });
+  const drawRecs = () => {
+    recChips.replaceChildren(...Object.entries(REC_FILTERS).map(([k, [name, f]]) => {
+      const n = a.recent.filter(f).length;
+      return k !== 'all' && !n ? null : el('button', { 'aria-pressed': String(recFilter === k), onclick: () => ((recFilter = k), drawRecs()) }, [name, el('b', { text: String(n) })]);
+    }).filter(Boolean));
+    const rows = a.recent.filter(REC_FILTERS[recFilter][1]);
+    const card = el('div', { class: 'q-rowcard' });
+    card.replaceChildren(...(rows.length ? rows.map(e => {
+      const [icon, color] = kindIc(e.kind);
+      const item = el('div', { class: `q-ritem${e.undone ? ' undone' : ''}` });
+      item.innerHTML = `${tileHtml(ic(icon), color, 'sm')}<span class="q-ritem-text"><span class="q-ritem-title">${escHtml(kindName(e.kind))}${e.app !== 'eco' ? ` · ${escHtml(BRANDS[e.app]?.short || appName(e.app))}` : ''}</span><small>${escHtml([fmtShort(e.t), /^[\d|.:-]+$/.test(e.note) ? '' : e.note].filter(Boolean).join(' · '))}</small></span><span class="q-ritem-value ${e.amount > 0 ? 'pos' : e.amount < 0 ? 'neg' : ''}">${escHtml(e.amount ? signed(e.amount) : '—')}</span>`;
+      if (e.undone) item.append(el('span', { class: 'q-tag', text: '已撤銷' }));
+      else if (e.amount && !e.id?.startsWith('eco:undo:')) {
+        const btn = el('button', { class: 'icon-btn undo', 'aria-label': '撤銷', title: '撤銷' });
+        btn.innerHTML = ic('history');
+        btn.onclick = () => undo(e, btn);
+        item.append(btn);
+      }
+      return item;
+    }) : [el('div', { class: 'q-ritem' }, [el('span', { class: 'muted', text: '沒有紀錄。' })])]));
+    recList.replaceChildren(card);
+  };
+  drawRecs();
   $('acct-body').replaceChildren(
-    el('h3', { text: '帳戶' }),
+    hero,
     facts,
-    el('h3', { text: '操作' }),
-    el('div', { class: 'actions' }, [grant, signout, recover, pushTest, exporter, clear, remove, reset, del].filter(Boolean)),
-    el('h3', { text: `最近的紀錄（${a.recent.length} / ${a.entries}）` }),
-    records
+    ...(a.apps.length ? [el('div', { class: 'sec-head' }, [el('h2', { text: 'App' })]), apps] : []),
+    ...(loanBox ? [loanBox] : []),
+    ...(govBox ? [el('div', { class: 'sec-head' }, [el('h2', { text: '政府' })]), govBox] : []),
+    el('div', { class: 'sec-head' }, [el('h2', { text: '操作' })]),
+    acts,
+    pane,
+    el('div', { class: 'sec-head' }, [el('h2', { text: '紀錄' }), el('span', { class: 'count', text: a.recent.length < a.entries ? `${a.recent.length} / ${a.entries}` : String(a.entries) })]),
+    recChips,
+    recList
   );
+  fitAll($('acct-body'));
 }
 
 // ---- 發放 ----
@@ -888,6 +1361,8 @@ const MARKET_NAMES = {"TW":"台股","US":"美股","JP":"日股","HK":"港股","C
 // Big sums in 萬 so a tile never cuts them short.
 const big = v => (v == null ? '—' : Math.abs(v) >= 1e5 ? `${v < 0 ? '−' : ''}NT$${(Math.abs(v) / 1e4).toLocaleString(undefined, { maximumFractionDigits: Math.abs(v) >= 1e6 ? 0 : 1 })}萬` : money(v));
 const signed = v => (v > 0 ? `+${money(v)}` : money(v));
+// 政府's lines (kit/gov.mjs): what it took, what it gave.
+const GOV_ROWS = [['sports', '運彩中獎所得稅', 'paid', 'ticket', '運彩稅'], ['lottery', '彩券中獎稅與印花稅', 'paid', 'target', '彩券稅'], ['trade', '證券交易稅', 'paid', 'chart', '證交稅'], ['withheld', '股利與利息扣繳', 'paid', 'bank', '股利扣繳'], ['nhi', '二代健保補充保費', 'paid', 'plus', '二代健保'], ['relief', '急難紓困', 'got', 'spark', '紓困']];
 function sumSides(a = {}, b = {}) {
   const out = { ...a };
   for (const [k, v] of Object.entries(b || {})) {
@@ -934,7 +1409,7 @@ async function loadMoney() {
     $('mo-tiles').replaceChildren(
       tile('系統淨發出', big(net), gone.accounts ? `還回 ${big(n(gone, 'worth'))}` : `${n(live, 'accounts')} 個帳戶`),
       tile('Quadra 賺', big(n(all, 'quadra')), n(all, 'quadra') >= 0 ? '莊家和費用淨收' : '玩家從 Play 贏走'),
-      tile('政府收', big(govTake), `稅 ${big(n(all.gov?.paid, 'sports') + n(all.gov?.paid, 'lottery') + n(all.gov?.paid, 'trade') + n(all.gov?.paid, 'withheld') + n(all.gov?.paid, 'nhi'))} · 紓困 ${big(n(all.gov?.got, 'relief'))}`),
+      tile('政府收', big(govTake), `稅減紓困`),
       tile('市場', big(n(all, 'own')), n(all, 'own') >= 0 ? '玩家投資淨賺' : '玩家投資淨賠'),
       tile('流通中', big(n(live, 'worth')), n(live, 'atStake') ? `下注中 ${big(n(live, 'atStake'))}` : '現有帳戶的身價')
     );
@@ -944,6 +1419,11 @@ async function loadMoney() {
     flow('mo-where', [['系統淨發出', net], ['Quadra 賺走', -n(all, 'quadra')], ['政府收走', -govTake, '稅減去急難紓困'], ['市場', n(all, 'own')]], { total: ['流通中', n(live, 'worth')] });
     const gp = all.gov?.paid || {};
     flow('mo-gov', [['運彩中獎所得稅', n(gp, 'sports')], ['彩券中獎稅', n(gp, 'lottery'), '所得稅與印花稅'], ['證券交易稅', n(gp, 'trade')], ['股利與利息扣繳', n(gp, 'withheld'), '含外國政府'], ['二代健保補充保費', n(gp, 'nhi')], ['急難紓困', -n(all.gov?.got, 'relief'), '發給玩家']].filter(r => r[1]), { total: ['政府淨收', govTake] });
+    if (!n(all.gov, 'paidTotal') && !n(all.gov, 'gotTotal')) $('mo-gov').innerHTML = '<li class="muted" style="display:block">還沒有稅或紓困（Play 和 Securities 同步後就會出現）。</li>';
+    if (!wallets.length) await loadWallets();
+    const taxed = wallets.filter(w => w.tax > 0).sort((a, b) => b.tax - a.tax).slice(0, 5);
+    $('mo-taxed').innerHTML = taxed.length ? acctCard(taxed.map(w => ({ ...w, shown: `−${money(w.tax)}`, red: true })), { compact: true }) : emptyCard('check', '還沒有人繳稅');
+    // (Play's side before the prize tax: the tax is the government's.)
     flow('mo-quadra', [...byMarket(all.playBy, n(all, 'play'), SPORT_NAMES, ['Play 未分類', '還沒同步的帳戶']), ...[['Plus 月費（扣掉退費）', n(all.fees, 'plus')], ['透支利息', n(all.fees, 'od')], ['信貸（淨）', n(all.fees, 'loan')]].filter(r => r[1])], { total: ['合計', n(all, 'quadra')] });
     flow('mo-own', byMarket(all.stockBy, n(all, 'own'), MARKET_NAMES, ['其他', '股利、利息、匯兌']), { total: ['合計', n(all, 'own')] });
     $('mo-note').textContent = `帳戶刪除時，剩下的錢還給系統（透支的帳戶，欠的由系統吸收）；它讓 Quadra 賺的和在市場賺賠的照樣留在帳上。Quadra 這邊玩家輸的是正數、贏走的是負數；未結算的注單不算。各市場由 Play 和 Securities 打開時回報，還沒打開過新版的帳戶算在「未分類／其他」。刪除的帳戶${gone.since ? `從 ${fmtDay(gone.since)} 起` : '從現在起'}記錄。${fmt(m.at)} 更新。`;
@@ -951,7 +1431,6 @@ async function loadMoney() {
     $('mo-error').textContent = e.message;
   }
 }
-$('mo-load').onclick = () => busy($('mo-load'), loadMoney);
 
 // ---- 通知與來源 ----
 async function loadPushes() {
@@ -996,7 +1475,6 @@ async function loadUsage() {
     $('use-error').textContent = e.message;
   }
 }
-$('use-load').onclick = () => busy($('use-load'), loadUsage);
 // TDX's points: this month's against the plan, where the month ends at this rate, each day.
 function drawTdx(t, now) {
   if (!t) return;
@@ -1049,7 +1527,6 @@ async function loadHealth() {
     $('health-error').textContent = e.message;
   }
 }
-$('push-load').onclick = () => busy($('push-load'), loadPushes);
 $('health-load').onclick = () => busy($('health-load'), loadHealth);
 
 // ---- 資料整理 ----
@@ -1140,7 +1617,6 @@ async function loadDev() {
     $('dev-error').textContent = e.message;
   }
 }
-$('dev-load').onclick = () => busy($('dev-load'), loadDev);
 // ---- 容量 (capacity.js) ----
 const n0 = v => Math.round(v || 0).toLocaleString();
 const SKU_ZH = { maps: '地圖載入', autocomplete: '地點搜尋', details: '地點位置', detailsPro: '地點名稱', textSearch: '搜尋補充', routes: '路線規劃' };
@@ -1214,7 +1690,7 @@ $('dev-save').onclick = () =>
 
 // ---- 系統 (ops.js) ----
 const GH = 'https://api.github.com/repos/JayPengX/';
-const REPOS = [['Shared-Proxy', 'Workers 與共用套件'], ['Orbit-Sports', 'Orbit Sports'], ['Quadra-Play', 'Quadra Play'], ['Quadra-Securities', 'Quadra 證券'], ['Orbit-Words', 'Orbit Words'], ['Orbit-Class', 'Orbit Class'], ['Orbit-Weather', 'Orbit Weather'], ['Orbit-Transit', 'Orbit Transit']];
+const REPOS = [['Shared-Proxy', 'Workers 與共用套件'], ['Orbit-Sports', 'Orbit Sports'], ['Quadra-Play', 'Quadra Play'], ['Quadra-Securities', 'Quadra 證券'], ['Orbit-Words', 'Orbit Words'], ['Orbit-Class', 'Orbit Class'], ['Orbit-Weather', 'Orbit Weather'], ['Orbit-Transit', 'Orbit Transit'], ['Orbit-Beats', 'Orbit Beats'], ['Orbit-Slips', 'Orbit Slips'], ['Orbit-Law', 'Orbit Law']];
 const getJ = async (url, ms = 8000) => { const r = await fetch(url, { signal: AbortSignal.timeout(ms), cache: 'no-store' }); if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); };
 // GitHub's open API: 60 reads an hour from here, kept two minutes.
 async function gh(path) {
@@ -1296,19 +1772,20 @@ async function loadSystem() {
   } catch (e) {
     $('sys-error').textContent = e.message;
   }
-  const rows = await Promise.all(
+  const runs = await deployRuns();
+  $('deploys').replaceChildren(...runs.map(({ name, run, error }) => (run ? runRow(run, `${name} · ${run.name}`) : el('li', {}, [el('span', { class: 'dot off' }), el('span', { text: name }), el('small', { text: error || '沒有紀錄' })]))));
+}
+// Each repo's latest run (GitHub's open API, kept two minutes): { name, run } or { name, error }.
+const deployRuns = () =>
+  Promise.all(
     REPOS.map(async ([repo, name]) => {
       try {
-        const run = ((await gh(`${repo}/actions/runs?per_page=1`)).workflow_runs || [])[0];
-        return run ? runRow(run, `${name} · ${run.name}`) : el('li', {}, [el('span', { class: 'dot off' }), el('span', { text: name }), el('small', { text: '沒有紀錄' })]);
+        return { name, run: ((await gh(`${repo}/actions/runs?per_page=1`)).workflow_runs || [])[0] || null };
       } catch (e) {
-        return el('li', {}, [el('span', { class: 'dot off' }), el('span', { text: name }), el('small', { text: e.message })]);
+        return { name, run: null, error: e.message };
       }
     })
   );
-  $('deploys').replaceChildren(...rows);
-}
-$('sys-load').onclick = () => busy($('sys-load'), () => { for (let i = sessionStorage.length - 1; i >= 0; i--) { const k = sessionStorage.key(i); if (k?.startsWith('quadra.admin.gh:')) sessionStorage.removeItem(k); } return loadSystem(); });
 $('alert-save').onclick = () =>
   busy($('alert-save'), async () => {
     $('alert-ok').textContent = $('sys-error').textContent = '';
@@ -1453,7 +1930,6 @@ async function saveBilling(balance, keepSince) {
   bill.saved = await admin('billing-set', { billing: { balance, month: bill.month, base: total - since, rate, prices } });
   drawBilling();
 }
-$('bill-load').onclick = () => busy($('bill-load'), loadBilling);
 $('bill-save').onclick = () =>
   busy($('bill-save'), async () => {
     $('bill-error').textContent = $('bill-ok').textContent = '';

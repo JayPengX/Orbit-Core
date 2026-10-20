@@ -38,7 +38,7 @@ import { icons, tile, pullToRefresh, setSheetDetent, segmented } from './ui.mjs'
 export const ECO_URL = 'https://orbit-workers-proxy.pengzjay.workers.dev/eco';
 export const PROXY_URL = 'https://orbit-workers-proxy.pengzjay.workers.dev/sports-proxy';
 
-// The developer settings (devconfig.mjs, the admin panel's 開發): how often
+// The developer settings (devconfig.mjs, the admin panel's 設定): how often
 // live data is read again, the switches. The device's copy at once, the
 // Worker's read every five minutes behind it (a change reaches an open app
 // within minutes, a reopened one at once).
@@ -153,23 +153,9 @@ const rankName = (id, i) => {
 // (`eco:rebase:v3fix`, for an account that had less than 110,000) brought
 // that to the NT$30,000 everyone opens with: all of it is opening money.
 const RESET_ID = 'eco:rebase:v3';
-// 政府: what the government took and gave (all time, whole NT$). Taken: 運彩's
-// 20% income tax on a big combination and the lottery's 20% tax and 0.4%
-// stamp duty on a prize over NT$5,000 (Play's `snap.odds.gov`), 證交稅 and
-// other trade taxes, tax withheld on dividends and interest (a foreign
-// government's too) and 二代健保's supplementary premium (Securities'
-// `snap.stock.gov`); given: 急難紓困 (the Worker's `relief` entries). The
-// apps report their figures as they sync; one not opened since shows 0.
-const nn = v => Math.max(0, Math.round(finiteOr0(v)));
-export function govOf(wallet) {
-  const odds = wallet?.snap?.odds?.gov || {};
-  const stock = wallet?.snap?.stock?.gov || {};
-  const paid = { sports: nn(odds.sports), lottery: nn(odds.lottery), trade: nn(stock.trade), withheld: nn(stock.withheld), nhi: nn(stock.nhi) };
-  const got = { relief: Math.round((wallet?.entries || []).filter(e => e.app === 'eco' && e.kind === 'relief').reduce((sum, e) => sum + finiteOr0(e.amount), 0)) };
-  const paidTotal = Object.values(paid).reduce((a, b) => a + b, 0);
-  const gotTotal = got.relief;
-  return { paid, got, paidTotal, gotTotal, net: gotTotal - paidTotal };
-}
+// 政府 (kit/gov.mjs): the same figures the admin page adds up.
+import { govOf } from './gov.mjs';
+export { govOf };
 export function moneySides(wallet) {
   const gave = { start: 0, pay: 0, rank: 0, other: 0 };
   // Play's settled bets (payouts less stakes) and what Quadra charges (old Plus
