@@ -147,10 +147,10 @@ const ESPN_LEAGUE = {
   nhl: 'teamlogos/leagues/500/nhl.png', f1: 'teamlogos/leagues/500/f1.png',
   nbl: 'teamlogos/leagues/500/nbl.png'
 };
-// ESPN's resizer at 128 px: a tenth of the 500 px original's bytes (19 KB for
-// the NBA's), so a first screen's league logos are in before the loading
-// screen lifts, even on a slow line.
-const espnSmall = path => `https://a.espncdn.com/combiner/i?img=/i/${path}&w=128&h=128`;
+// ESPN's resizer at 192 px, sharp to 64 px on a 3x screen, for a third of
+// the 500 px original's bytes (the NBA's: 19 KB to 7 KB), so a first
+// screen's league logos are in before the loading screen lifts.
+const espnSmall = path => `https://a.espncdn.com/combiner/i?img=/i/${path}&w=192&h=192`;
 // The league's own logo (light backgrounds: the apps show it on a white disc), or null.
 export function leagueLogo(key, dark = false) {
   // The lion alone: ESPN's own resizer crops the top of its logo, clear of
@@ -329,6 +329,16 @@ function noteDrawn(url, img) {
   }, 500);
 }
 
+// An ESPN logo (500 px, 20-60 KB) as drawn: through ESPN's resizer at 192
+// px, a third of the bytes, so a first screen's logos come in with it. (The
+// address everywhere else stays the original: what's remembered, its dark
+// version.)
+const ESPN_500 = /^https:\/\/a\.espncdn\.com\/i\/((?:teamlogos|leaguelogos)\/[\w/-]+\/500(?:-dark)?\/[\w-]+\.png)$/;
+export const small = url => {
+  const m = typeof url === 'string' && url.match(ESPN_500);
+  return m ? `https://a.espncdn.com/combiner/i?img=/i/${m[1]}&w=192&h=192` : url;
+};
+
 export function logoPicture(light, dark, cls, fallback, { guess = false } = {}) {
   if (!light || knownBad(light)) return fallback();
   const img = document.createElement('img');
@@ -342,7 +352,7 @@ export function logoPicture(light, dark, cls, fallback, { guess = false } = {}) 
   // The dark-screen version only if it hasn't failed before (ESPN has none for some: Falkirk's 500-dark is a 404).
   if (dark && !knownBad(dark)) {
     const source = document.createElement('source');
-    Object.assign(source, { srcset: dark, media: '(prefers-color-scheme: dark)' });
+    Object.assign(source, { srcset: small(dark), media: '(prefers-color-scheme: dark)' });
     picture.append(source);
   }
   picture.append(img);
@@ -356,11 +366,11 @@ export function logoPicture(light, dark, cls, fallback, { guess = false } = {}) 
     img.style.opacity = '0';
     // The dark-screen version missing: the ordinary one instead, at once (never the initial).
     const source = picture.querySelector('source');
-    if (source && img.currentSrc && img.currentSrc === new URL(dark, location.href).href) {
+    if (source && img.currentSrc && img.currentSrc === new URL(small(dark), location.href).href) {
       logoBad.set(dark, Date.now());
       source.remove();
       img.removeAttribute('src');
-      img.src = light;
+      img.src = small(light);
       return;
     }
     if (tries >= (guess ? 0 : RETRY_MS.length)) {
@@ -373,13 +383,13 @@ export function logoPicture(light, dark, cls, fallback, { guess = false } = {}) 
       if (!picture.isConnected) return;
       // The same address again (TheSportsDB refuses any extra ?query).
       img.removeAttribute('src');
-      img.src = light;
+      img.src = small(light);
     };
     const wait = RETRY_MS[tries++];
     if (navigator.onLine === false) addEventListener('online', again, { once: true });
     else setTimeout(again, wait);
   });
-  img.src = light;
+  img.src = small(light);
   return picture;
 }
 
