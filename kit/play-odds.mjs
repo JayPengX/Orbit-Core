@@ -529,9 +529,10 @@ const boosted = (stake, product, size, x) => toDollar(stake * (1 + (product - 1)
 // (NT$10 of the stake) wins over NT$5,000 once rounded to the dollar (§18),
 // i.e. odds (boost included) over 500.
 export const slipTaxed = (pay, stake) => Math.round((pay * SLIP_RULES.unit) / stake) > SLIP_RULES.taxFree;
-// What a winning combination paying `pay` on `stake` pays after withholding.
+// What a winning combination paying `pay` on `stake` pays after withholding;
+// the tax's cents are dropped (台灣運彩: 若有小數點位數，將無條件捨去).
 export function afterTax(pay, stake) {
-  return slipTaxed(pay, stake) ? pay - toDollar(pay * SLIP_RULES.taxRate) : pay;
+  return slipTaxed(pay, stake) ? pay - Math.floor(pay * SLIP_RULES.taxRate + 1e-9) : pay;
 }
 // A lottery or scratch card prize after its withholding, in whole NT$
 // (play-lottery.mjs, play-scratch.mjs).

@@ -350,6 +350,8 @@ test("台灣運彩's withholding (115.6.8): 20% only when a combination's NT$10 
   assert.equal(afterTax(50_000, 100), 50_000);
   // NT$100 at 600: a 單注 wins NT$6,000, so 20% (§31: no 4‰ stamp duty for a member).
   assert.equal(afterTax(60_000, 100), 48_000);
+  // The tax's cents are dropped, not rounded: 60,003 × 20% = 12,000.6 → 12,000.
+  assert.equal(afterTax(60_003, 100), 48_003);
   assert.deepEqual(settleSlip({ legs: [{ odds: 600, result: 'won' }], sizes: [1], stake: 100 }), { gross: 60_000, net: 48_000, taxed: 1 });
   // A parlay at 20 × 30 = 600: taxed; its 2-pick combinations of a system each judged on their own.
   const par = settleSlip({ legs: [{ odds: 20, result: 'won', gameId: 'a' }, { odds: 30, result: 'won', gameId: 'b' }], sizes: [2], stake: 10 });
