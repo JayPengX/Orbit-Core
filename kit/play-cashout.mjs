@@ -8,7 +8,7 @@
 // before its game, in play, where prices move fastest), then every way those
 // picks can still land weighed by those chances, times what the slip would
 // pay then (tax, the payout cap and its parlay boost included), less what
-// the house keeps on top (CASHOUT_KEEP; less for Quadra Plus). So a parlay's
+// the house keeps on top (CASHOUT_KEEP). So a parlay's
 // offer drops with each pick still to play (the cut compounds), a slip all
 // but won is still bought back under its payout, and nothing is ever worth
 // more cashed out than held.

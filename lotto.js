@@ -112,9 +112,6 @@ export async function handleLotto(body, env, account, deps, now) {
     await deps.fsDelete(env, TICKET_COLLECTION, key);
     return { prize, ...(result ? { wallet: result.wallet } : {}) };
   }
-  // Tickets bought before the lock-down were handed over once each; closed
-  // 2026-10-14 (a ticket handed over could name its own numbers or prize).
-  if (body.op === 'tickets-open') return { watching: 0 };
   return null;
 }
 

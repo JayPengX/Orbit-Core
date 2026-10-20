@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 test('a fit is made once per inputs, kept on the device, and read back on the next open', async t => {
-  const saved = new Map([['oddsStudy.teamRuns', '{"v":2,"list":[]}']]);
+  const saved = new Map();
   globalThis.localStorage = { getItem: k => saved.get(k) ?? null, setItem: (k, v) => saved.set(k, v), removeItem: k => saved.delete(k) };
   t.after(() => delete globalThis.localStorage);
   t.mock.timers.enable({ apis: ['setTimeout'] });
@@ -14,8 +14,7 @@ test('a fit is made once per inputs, kept on the device, and read back on the ne
   assert.equal(odds.fitTeamRuns(0.58, 8.5, 0.5), first);
   assert.ok(Object.isFrozen(first));
   assert.notEqual(odds.fitTeamRuns(0.59, 8.5, 0.5), first);
-  // The old key goes; the fits are written once the board is priced.
-  assert.equal(saved.has('oddsStudy.teamRuns'), false);
+  // The fits are written once the board is priced.
   t.mock.timers.tick(2000);
   const list = JSON.parse(saved.get('play.fits')).list;
   assert.deepEqual(new Map(list).get('runs|0.58|8.5|0.5|4'), { ...first });

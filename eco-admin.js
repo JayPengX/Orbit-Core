@@ -11,8 +11,8 @@
 //     keys, share keys of the old follow-style shape;
 //   - in every wallet, what no app writes or reads any more (tidyWallet).
 //
-// The token is checked against ADMIN_TOKEN_HASH (its SHA-256; the token
-// itself is never in the repo). Clearing the hash turns this off.
+// The token is checked against the Worker's secret ECO_ADMIN_TOKEN (by its
+// SHA-256; the token itself is never in the repo). Without the secret, no one gets in.
 
 import { systemReport, alertAccount, tell, OPS_DOC } from './ops.js';
 import { newPasscode, updateWallet, deleteAccount, ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, PAIR_MS, ECO_LIMITS, parseWallet, poolBalance, gen, emptyWallet } from './eco.js';
@@ -75,7 +75,6 @@ export async function capacityCron(env, deps) {
   return { scale: p.scale, week: p.users.week, expected: p.users.expected, changed: !same };
 }
 
-export const ADMIN_TOKEN_HASH = '';
 export const RETIRED_COLLECTIONS = ['orbit-schedules', 'eco-links', 'stock-study-leagues'];
 // (A function: eco.js and this file import each other.)
 const keep = () => new Set([WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, KAMBI_COLLECTION, CONFIG_COLLECTION, ...Object.values(ECO_APPS).map(a => a.collection)]);
@@ -125,11 +124,10 @@ export function tidyWallet(w, now) {
 export async function handleAdmin({ env, deps, headers, request, ip, body }) {
   const limited = await deps.rateLimitResponse(env, ip, 'eco:admin', ECO_LIMITS.admin, headers, request);
   if (limited) return limited;
-  // The owner's token: ADMIN_TOKEN_HASH (its SHA-256, in this file) or the
-  // Worker's secret ECO_ADMIN_TOKEN (set by tools/issue-passes.mjs).
+  // The owner's token: the Worker's secret ECO_ADMIN_TOKEN (set by tools/issue-passes.mjs).
   const token = typeof body.token === 'string' ? body.token : '';
   const hash = token.length >= 32 ? await deps.sha256Hex(token) : '';
-  const owner = hash && ((ADMIN_TOKEN_HASH && hash === ADMIN_TOKEN_HASH) || (env.ECO_ADMIN_TOKEN && hash === (await deps.sha256Hex(env.ECO_ADMIN_TOKEN))));
+  const owner = hash && env.ECO_ADMIN_TOKEN && hash === (await deps.sha256Hex(env.ECO_ADMIN_TOKEN));
   if (!owner) return deps.errorJson('FORBIDDEN', 403, headers, request);
   // Passes to hand out: `issue` { count } makes up to 100 new ones (no one
   // signed in on them yet) and answers their codes, once.

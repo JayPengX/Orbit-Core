@@ -41,7 +41,7 @@ export const STRINGS = {
     moreSettings: '通知、帳戶明細和其他設定',
     devicesSub: '通行碼只在建立或更換時顯示一次；裝置上只有可以撤銷的登入。',
     truthTitle: 'Quadra 的真相',
-    truthLead: '這裡用真實的數字，和你自己的紀錄，說明錢從哪裡來、往哪裡去，以及莊家、券商和會員方案怎麼從你身上賺錢。知道了，才是自己在做決定。',
+    truthLead: '這裡用真實的數字，和你自己的紀錄，說明錢從哪裡來、往哪裡去，以及莊家和券商怎麼從你身上賺錢。知道了，才是自己在做決定。',
     sidesTitle: '錢從哪裡來',
     sideGod: '系統發的',
     sideGodSub: '開戶金 {start} · 薪水 {pay} · 等級獎勵 {rank} · 其他 {other}',
@@ -212,7 +212,7 @@ export const STRINGS = {
     moreSettings: 'Notices, statement and other settings',
     devicesSub: 'Your pass is shown only when it’s made or changed; devices keep only sign-ins that can be revoked.',
     truthTitle: 'The truth about Quadra',
-    truthLead: 'Real numbers and your own record: where your money comes from and goes, and how the house, the broker and the membership earn from you. Knowing it is how your choices become your own.',
+    truthLead: 'Real numbers and your own record: where your money comes from and goes, and how the house and the broker earn from you. Knowing it is how your choices become your own.',
     sidesTitle: 'Where your money comes from',
     sideGod: 'The system gave',
     sideGodSub: 'Opening {start} · pay {pay} · level rewards {rank} · other {other}',
@@ -357,8 +357,6 @@ export const STRINGS = {
   }
 };
 const TABS = ['pass', 'looks', 'truth', 'apps', 'help'];
-// Plus's tab is the looks' now (an old link or button still opens it).
-const TAB_ALIAS = { plus: 'looks' };
 
 // ---- Small pieces ---------------------------------------------------------------------------
 
@@ -397,7 +395,7 @@ export function openPass(s, { extra = null, tab = 'pass', help = null } = {}) {
   toastBox = el('div', { class: 'toasts q-pass-toasts', 'aria-live': 'polite' });
   // Looks chosen here, until the write that carries them comes back.
   const pending = {};
-  const state = { tab: TABS.includes(TAB_ALIAS[tab] || tab) ? TAB_ALIAS[tab] || tab : 'pass', help: help || { app: s.app, topic: null }, locale, extra };
+  const state = { tab: TABS.includes(tab) ? tab : 'pass', help: help || { app: s.app, topic: null }, locale, extra };
   let account = null;
   const close = () => sh.close();
   const ctx = {

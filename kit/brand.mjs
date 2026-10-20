@@ -32,14 +32,12 @@ export const BRANDS = {
   law: { family: 'orbit', name: 'Orbit Law', short: 'Law', repo: 'Orbit-Law', from: '#a5b4fc', to: '#1e1b4b', ink: '#4338ca', color: '#4f46e5', role: { zh: '法規與法案', en: 'Laws and bills' }, tag: { zh: '台灣的法規，每個條號都能點；立法院的法案，走到哪一步一眼就懂。', en: 'Taiwan\'s laws with linked references, and 立法院 bills by stage' } },
   vocab: { family: 'orbit', name: 'Orbit Words', short: 'Words', repo: 'Orbit-Words', was: 'Quadra-Hub', from: '#f9a8d4', to: '#831843', ink: '#be185d', color: '#db2777', role: { zh: '英文單字', en: 'English words' }, tag: { zh: '背得住的英文單字：大考 6000 字，真人發音', en: 'English words that stay with you' } }
 };
-// Orbit Sports and Orbit Words were Quadra Fixtures and Quadra Hub; their
-// repos were renamed on 2026-10-03, so RENAMED is on and every app links to
-// the new addresses. `was` is the old one (tools/moved/ can forward it).
-export const RENAMED = true;
+// Orbit Sports and Orbit Words were Quadra Fixtures and Quadra Hub (renamed
+// 2026-10-03). `was` is the old repo name (brand/ and tools/moved/ forward it).
 export const SITE_URL = 'https://jaypengx.github.io';
 export const pathOf = id => {
   const b = BRANDS[id];
-  return b ? `/${RENAMED || !b.was ? b.repo : b.was}/` : '/';
+  return b ? `/${b.repo}/` : '/';
 };
 // Where an app will live (the new repo), for its links shared outside.
 export const homeOf = id => `${SITE_URL}/${BRANDS[id].repo}/`;

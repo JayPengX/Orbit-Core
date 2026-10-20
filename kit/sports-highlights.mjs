@@ -317,12 +317,9 @@ export async function loadWatchMonth(e, readPack, now = Date.now()) {
 }
 export const watchOf = e => (e ? pack?.games?.[watchKey(e)] || (e.start ? months.get(watchMonthPath(e))?.[watchKey(e)] : null) || null : null);
 // Found ones kept on the device too (a game opened before the pack had it).
-// (v3: titles' days checked, so v2's another day's video is let go.)
-// (v4: v3's could hold an inning's cut picked for an MLB game, 2026-10-13.)
 const KEPT = 'fx.highlights.v4';
 function kept() {
   try {
-    localStorage.removeItem('fx.highlights.v2');
     return JSON.parse(localStorage.getItem(KEPT) || '{}') || {};
   } catch {
     return {};

@@ -72,8 +72,7 @@ globalThis.document = {
 const ui = await import('../kit/ui.mjs');
 const toasts = () => body.children.filter(c => c.className.split(' ').includes('q-toast'));
 
-test('lang: W, en, makeT, and the one detectLang', () => {
-  assert.equal(lang.detectLang, quadra.detectLang);
+test('lang: W, en, makeT', () => {
   assert.equal(lang.lang, 'zh');
   assert.equal(lang.en, false);
   assert.equal(lang.W('今天', 'Today'), '今天');
