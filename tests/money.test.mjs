@@ -57,3 +57,17 @@ test("sidesOf agrees with the Pass's 真相 (kit moneySides), Quadra from the ho
   assert.equal(s.own, Math.round(k.own));
   assert.equal(s.atStake, Math.round(k.atStake));
 });
+
+test('sidesOf: the government, as the Pass counts it, added up with the rest', async () => {
+  const { moneySides } = await import('../kit/quadra.mjs');
+  const w = { ...wallet, entries: [...wallet.entries, { id: 'eco:relief:2026-11-02', t: 1, app: 'eco', kind: 'relief', amount: 5_000 }], snap: { ...wallet.snap, odds: { ...(wallet.snap?.odds || {}), gov: { sports: 1_200, lottery: 40 } }, stock: { ...(wallet.snap?.stock || {}), gov: { trade: 300, withheld: 0, nhi: 21 } } } };
+  const k = moneySides(w);
+  const s = sidesOf(w);
+  assert.deepEqual(s.gov, k.gov);
+  assert.deepEqual([s.gov.paidTotal, s.gov.gotTotal, s.gov.net], [1_561, 5_000, 3_439]);
+  assert.equal(s.quadra, Math.round(-k.quadra));
+  assert.equal(s.own, Math.round(k.own));
+  assert.equal(s.given - s.quadra + s.gov.net + s.own, s.worth);
+  // Added up across accounts like any side.
+  assert.equal(addSides(sidesOf(w), sidesOf(w)).gov.paid.sports, 2_400);
+});
