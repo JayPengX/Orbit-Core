@@ -83,7 +83,7 @@
 
   // Every fault on the screen now.
   gate.check = () => {
-    const out = { overflow: [], wraps: [], cut: [], letters: [], slots: [], halfEmpty: [], bareEmpty: [], loading: [] };
+    const out = { blank: [], pictures: [], overflow: [], wraps: [], cut: [], letters: [], slots: [], halfEmpty: [], bareEmpty: [], loading: [] };
     const all = [...document.querySelectorAll('body *')].filter(seen);
     const clippedBy = el => {
       for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) if (/auto|scroll|hidden|clip/.test(getComputedStyle(p).overflowX)) return true;
@@ -110,12 +110,13 @@
       if (titled && !el.children.length && tx.length <= 30 && cs.display !== 'inline' && lines(el) > 1) out.wraps.push(`${name(el)} "${tx.slice(0, 30)}"`);
       // An ellipsis or clipped edge on text the element holds itself.
       if (own && /hidden|clip/.test(cs.overflowX) && el.scrollWidth > el.clientWidth + 1) out.cut.push(`${name(el)} "${tx.slice(0, 30)}"`);
-      if (own && cs.webkitLineClamp && cs.webkitLineClamp !== 'none' && el.scrollHeight > el.clientHeight + 2) out.cut.push(`${name(el)} clamped "${tx.slice(0, 30)}"`);
+      // (A summary clamped to its lines is the design; a name clamped is a cut.)
+      if (own && (titled || tx.length <= 40) && cs.webkitLineClamp && cs.webkitLineClamp !== 'none' && el.scrollHeight > el.clientHeight + 2) out.cut.push(`${name(el)} clamped "${tx.slice(0, 30)}"`);
       // A logo, badge, face or flag drawn as letters: a small square box with
-      // one to three letters and no picture in it.
+      // one to five letters (a ticker) and no picture in it.
       const r = el.getBoundingClientRect();
       const kind = /logo|badge|crest|avatar|face|flag|headshot|photo|team|mono/i.test(el.className?.baseVal ?? el.className);
-      if ((kind || el.matches('.q-logo.text')) && r.width >= 14 && r.width <= 96 && Math.abs(r.width - r.height) <= r.width * 0.25 && /^[\p{L}]{1,3}$/u.test(tx) && !el.querySelector('img, svg, canvas, video') && !/url\(/.test(cs.backgroundImage)) out.letters.push(`${name(el)} "${tx}"`);
+      if ((kind || el.matches('.q-logo.text')) && r.width >= 14 && r.width <= 96 && Math.abs(r.width - r.height) <= r.width * 0.25 && /^[\p{L}\p{N}.-]{1,5}$/u.test(tx) && /\p{L}/u.test(tx) && !el.querySelector('img, svg, canvas, video') && !/url\(/.test(cs.backgroundImage)) out.letters.push(`${name(el)} "${tx}"`);
       // An empty state that is only a sentence.
       if (!el.children.length && tx.length < 70 && /^(目前|今天|今日|這裡|尚|還|此)?(沒有|無|暫無|尚無|還沒有|未有)|^(No|Nothing|None|Not yet)\b/i.test(tx) && !el.closest('.q-empty, button, [role=button], option, select, .q-toast, dialog, .q-sheet')) {
         const box = el.parentElement;
@@ -152,6 +153,9 @@
         if ((bottom - kr.top + pad) / kr.height < 0.55) out.halfEmpty.push(`${name(k)} in ${name(el)} (${Math.round(bottom - kr.top)} of ${Math.round(kr.height)} px used)`);
       }
     }
+    // A screen with nothing on it, and pictures that failed (an empty logo circle).
+    if (screenNow().chars < 15) out.blank.push(`${location.hash || 'start'}: nothing on the screen`);
+    for (const img of document.querySelectorAll('img')) if (seen(img) && img.complete && !img.naturalWidth && img.getBoundingClientRect().top < innerHeight * 2) out.pictures.push(`${name(img.parentElement)} ${String(img.getAttribute('src')).slice(0, 80)}`);
     for (const k of Object.keys(out)) out[k] = [...new Set(out[k])].slice(0, 8);
     return out;
   };
@@ -166,6 +170,8 @@
     const out = [];
     for (const el of document.querySelectorAll('button, [role=button], a[href^="#"], [data-open], summary')) {
       if (out.length >= max) break;
+      // (What's already chosen, tapped again, rightly does nothing: a picked chip, the segment on, 我的位置 following.)
+      if (el.matches('[aria-pressed=true], [aria-selected=true], [aria-current]:not([aria-current=false]), .active, .on, .selected')) continue;
       if (!seen(el) || el.disabled || el.getAttribute('aria-disabled') === 'true' || el.closest('#tabs, .q-tabbar, dialog, .q-sheet, [role=dialog]')) continue;
       const r = el.getBoundingClientRect();
       if (r.top > innerHeight - 70 || r.bottom < 0 || r.width < 12) continue;

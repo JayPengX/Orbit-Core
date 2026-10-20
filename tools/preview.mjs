@@ -1034,7 +1034,12 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
           // Back to where the tab was: sheets and menus closed, the address and the tab put back.
           await page.keyboard.press('Escape').catch(() => {});
           await page.evaluate(() => globalThis.__gate.calm()).catch(() => {});
-          if ((await page.evaluate(() => location.href).catch(() => home)) !== home) await page.goBack({ timeout: 3000 }).catch(() => {});
+          // (Never back past the app: a hash put back in place, another page reopened.)
+          const now = await page.evaluate(() => location.href).catch(() => '');
+          if (now !== home) {
+            if (now.split('#')[0] === home.split('#')[0]) await page.evaluate(h => (location.hash = new URL(h).hash || '#'), home).catch(() => {});
+            else await page.goto(home).then(() => page.waitForTimeout(5000), () => {});
+          }
           if (t.id !== 'start' && (await page.evaluate(() => document.querySelector('.q-tab[aria-selected=true]')?.dataset.tab).catch(() => t.id)) !== t.id) await page.click(`.q-tab[data-tab="${t.id}"]`).catch(() => {});
           await page.waitForTimeout(300);
         }

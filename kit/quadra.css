@@ -5064,11 +5064,11 @@ html.q-kb .q-kb-dock {
 }
 
 /* ---- A name on one line (quadra.mjs fitNames): .q-fit shrinks its text,
-   down to 72%, rather than wrap or cut ---- */
+   down to 72%, rather than wrap or cut (the size set inline) ---- */
 .q-fit {
   display: block;
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
-  font-size: calc(1em * var(--q-fit, 1));
+  text-overflow: ellipsis;
 }
