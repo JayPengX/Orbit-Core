@@ -979,6 +979,8 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
     // (--profile-for ms: on that long after the start, for a freeze that comes later.)
     if (profileFor) await page.waitForTimeout(Math.max(0, profileFor - (Date.now() - started)));
     const { profile: prof } = await cdp.send('Profiler.stop');
+    // (PROFILE_OUT=file: the whole profile saved, for DevTools or a closer look.)
+    if (process.env.PROFILE_OUT) await import('node:fs/promises').then(fs => fs.writeFile(process.env.PROFILE_OUT, JSON.stringify(prof)));
     const by = new Map();
     const node = new Map(prof.nodes.map(n => [n.id, n]));
     const gaps = prof.timeDeltas;
