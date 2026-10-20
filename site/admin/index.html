@@ -575,7 +575,7 @@ let token = store.get();
 const APPS = { stock: 'Quadra 證券', odds: 'Quadra Play', match: 'Orbit Sports', vocab: 'Orbit Words', orbit: 'Orbit Class', weather: 'Orbit Weather', transit: 'Orbit Transit', slip: 'Orbit Slips', beats: 'Orbit Beats' };
 const appName = a => APPS[a] || a;
 // A record's kind in words (the key itself when it's one not named here).
-const KINDS = { start: '開戶金', pay: '月薪', grant: '補發', rank: '排名獎', rebase: '重算', vip: 'VIP', admin: '手動調整', plus: 'Plus 月費', plusrefund: 'Plus 退費', loan: '信貸撥款', loanfee: '信貸開辦費', loanpay: '信貸還款', loanlate: '信貸遲延', loanbad: '信貸催收', loangar: '催收扣薪', loanoff: '信貸清償', relief: '急難紓困', od: '透支利息', stake: '下注', payout: '派彩', win: '派彩', refund: '退款', cashout: '提前兌現', lottery: '彩券', prize: '彩券獎金', undo: '撤銷' };
+const KINDS = { start: '開戶金', pay: '月薪', grant: '補發', rank: '排名獎', rebase: '重算', vip: 'VIP', admin: '手動調整', plus: 'Plus 月費', plusrefund: 'Plus 退費', loan: '信貸撥款', loanfee: '信貸開辦費', loanpay: '信貸還款', loanlate: '信貸遲延', loanbad: '信貸催收', loangar: '催收扣薪', loanoff: '信貸清償', relief: '急難紓困', od: '透支利息', stake: '下注', payout: '派彩', tax: '運彩稅補扣', win: '派彩', refund: '退款', cashout: '提前兌現', lottery: '彩券', prize: '彩券獎金', undo: '撤銷' };
 const kindName = k => KINDS[k] || k;
 
 const WHY = {
@@ -1117,7 +1117,7 @@ function action(title, text, controls, run) {
   return box;
 }
 // A record's kind as a picture.
-const KIND_IC = { start: ['wallet', '#0ea5e9'], grant: ['wallet', '#0ea5e9'], pay: ['work', '#16a34a'], rank: ['trophy', '#d97706'], vip: ['star', '#a855f7'], relief: ['spark', '#db2777'], admin: ['pencil', '#64748b'], rebase: ['swap', '#64748b'], od: ['exchange', '#dc2626'], plus: ['star', '#7c3aed'], plusrefund: ['star', '#7c3aed'], stake: ['ticket', '#1d4ed8'], lottery: ['target', '#1d4ed8'], payout: ['coin', '#0891b2'], win: ['coin', '#0891b2'], prize: ['target', '#0891b2'], refund: ['history', '#64748b'], cashout: ['swap', '#0891b2'], plusboost: ['coin', '#7c3aed'] };
+const KIND_IC = { start: ['wallet', '#0ea5e9'], grant: ['wallet', '#0ea5e9'], pay: ['work', '#16a34a'], rank: ['trophy', '#d97706'], vip: ['star', '#a855f7'], relief: ['spark', '#db2777'], admin: ['pencil', '#64748b'], rebase: ['swap', '#64748b'], od: ['exchange', '#dc2626'], plus: ['star', '#7c3aed'], plusrefund: ['star', '#7c3aed'], stake: ['ticket', '#1d4ed8'], lottery: ['target', '#1d4ed8'], payout: ['coin', '#0891b2'], tax: ['ticket', '#dc2626'], win: ['coin', '#0891b2'], prize: ['target', '#0891b2'], refund: ['history', '#64748b'], cashout: ['swap', '#0891b2'], plusboost: ['coin', '#7c3aed'] };
 const kindIc = k => (k.startsWith('loan') || k === 'loan' ? ['bank', '#2563eb'] : KIND_IC[k] || ['list', '#94a3b8']);
 const REC_FILTERS = { all: ['全部', () => true], in: ['進', e => e.amount > 0], out: ['出', e => e.amount < 0], loan: ['信貸', e => e.kind.startsWith('loan')], play: ['Play', e => e.app === 'odds'], eco: ['Quadra', e => e.app === 'eco'] };
 function drawAccount(a) {

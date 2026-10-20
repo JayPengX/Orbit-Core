@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { handleEcoRequest, mergeWallet, poolBalance, cleanPatch, emptyWallet, paydayEntries, worthOf, REBASE, OVERDRAFT_RATE, plusRefund, plusRefundEntries, PLUS_END, PLUS_REFUND_ID, vipEntries, vipStakes, vipTier, welcomeEntries, VIP, PAY, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, ECO_APPS, rankEntries, RANKS } from '../eco.js';
+import { handleEcoRequest, mergeWallet, poolBalance, cleanPatch, emptyWallet, paydayEntries, worthOf, REBASE, OVERDRAFT_RATE, plusRefund, plusRefundEntries, PLUS_END, PLUS_REFUND_ID, backTaxEntries, TAX_SLIP_FROM, vipEntries, vipStakes, vipTier, welcomeEntries, VIP, PAY, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, ECO_APPS, rankEntries, RANKS } from '../eco.js';
 import { planClean, tidyWallet } from '../eco-admin.js';
 
 function setup() {
@@ -956,4 +956,31 @@ test('Quadra Plus ended: what was paid for the days left comes back once; a free
   const tt = setup();
   const acct = await newPass(tt);
   assert.notEqual((await tt.call('POST', '', { op: 'plus', qt: acct.token, on: true })).status, 200);
+});
+
+test('運彩 tax back charged: an untaxed payout over NT$5,000 from before the whole-slip rule pays its 20% once', () => {
+  const before = TAX_SLIP_FROM - 3_600_000;
+  const at = TAX_SLIP_FROM + 60_000;
+  const e = (id, kind, amount, t = before) => ({ id, t, app: 'odds', kind, amount });
+  const wallet = {
+    entries: [
+      // NT$28,630 at 1.08: paid NT$30,920 untaxed, owes 6,184.
+      e('odds:stake-a', 'stake', -28_630), e('odds:payout-a', 'payout', 30_920),
+      // NT$3,000: under the line, nothing.
+      e('odds:stake-b', 'stake', -1_000), e('odds:payout-b', 'payout', 3_000),
+      // NT$100 at 600, taxed then (48,000 = 480× its cost): left alone.
+      e('odds:stake-c', 'stake', -100), e('odds:payout-c', 'payout', 48_000),
+      // Settled under the new rule: already taxed.
+      e('odds:stake-d', 'stake', -5_000), e('odds:payout-d', 'payout', 8_000, at),
+      // A cash out isn't a prize.
+      e('odds:stake-f', 'stake', -5_000), e('odds:payout-f', 'cashout', 9_000)
+    ]
+  };
+  assert.deepEqual(backTaxEntries(wallet, before), []);
+  const out = backTaxEntries(wallet, at);
+  assert.deepEqual(out, [{ id: 'odds:tax-a', t: at, app: 'odds', kind: 'tax', amount: -6_184 }]);
+  // Once.
+  assert.deepEqual(backTaxEntries({ entries: [...wallet.entries, ...out] }, at + 1), []);
+  // The sweep adds it.
+  assert.ok(paydayEntries({ ...wallet, created: before }, at).some(x => x.id === 'odds:tax-a'));
 });

@@ -73,7 +73,7 @@ export function record(wallet) {
     const a = Number(e.amount) || 0;
     if (e.app === 'odds') {
       if (e.kind === 'stake' || e.kind === 'refund') r.staked -= a;
-      else if (e.kind === 'payout' || e.kind === 'cashout' || e.kind === 'plusboost') r.won += a;
+      else if (e.kind === 'payout' || e.kind === 'cashout' || e.kind === 'plusboost' || e.kind === 'tax') r.won += a;
       else if (e.kind === 'lottery') r.tickets -= a;
       else if (e.kind === 'prize') r.prizes += a;
     } else if (e.app === 'eco') {
