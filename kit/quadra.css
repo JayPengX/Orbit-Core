@@ -3982,6 +3982,32 @@ div.q-ritem {
 .q-match.wide .q-match-teams {
   min-height: 64px;
 }
+/* Each side over its own price (Jay 2026-10-20: "not centered and weird"):
+   two prices, the sides on the same two columns with VS on the seam
+   between them; three (home, draw, away), the same three columns, VS over
+   the draw. */
+.q-match:has(.q-match-prices > :nth-child(2):last-child) .q-match-teams {
+  position: relative;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+.q-match:has(.q-match-prices > :nth-child(2):last-child) .q-match-side {
+  padding-inline: 16px;
+}
+.q-match:has(.q-match-prices > :nth-child(2):last-child) .q-match-mid {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  min-width: 0;
+  transform: translate(-50%, -50%);
+}
+.q-match:has(.q-match-prices > :nth-child(3):last-child) .q-match-teams {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.q-match:has(.q-match-prices > :nth-child(3):last-child) .q-match-mid {
+  min-width: 0;
+}
 .q-match-side {
   display: flex;
   flex-direction: column;
