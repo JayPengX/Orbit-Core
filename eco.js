@@ -534,7 +534,7 @@ export function mergeWallet(a, b) {
   for (const e of b.entries || []) if (!entries.has(e.id)) entries.set(e.id, e);
   // A back-charged sports tax taken back (`eco:untax-<slip>`) leaves no trace
   // of the charge, from this Worker or a phone's copy of it.
-  for (const id of entries.keys()) if (id.startsWith('eco:untax-')) entries.delete(`odds:tax-${id.slice(10)}`);
+  for (const id of [...entries.keys()]) if (typeof id === 'string' && id.startsWith('eco:untax-')) entries.delete(`odds:tax-${id.slice(10)}`);
   const inbox = { ...(base.inbox || {}) };
   for (const [app, ids] of Object.entries(b.inbox || {})) inbox[app] = [...new Set([...(inbox[app] || []), ...ids])];
   const created = Math.min(base.created ?? Infinity, b.created ?? Infinity);
