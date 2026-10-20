@@ -1687,6 +1687,7 @@ const KIND = {
   relief: ['急難紓困', 'Emergency relief'],
   stake: ['下注', 'Bet'],
   payout: ['彩金', 'Winnings'],
+  tax: ['運彩中獎稅補扣', 'Sports tax, back charged'],
   refund: ['退款', 'Refund'],
   lottery: ['彩券', 'Lottery ticket'],
   prize: ['彩券獎金', 'Lottery prize'],

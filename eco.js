@@ -53,6 +53,7 @@ import { VIP, vipStakes, vipTier, WELCOME, welcomeEarned } from './kit/plus.mjs'
 import { storeReady } from './doc-store.js';
 import { tokenSecret, signToken, readToken, seal, unseal, sessionLimited, SESSION_MS, REFRESH_MS, HANDOFF_MS } from './quadra-token.js';
 import { handleAdmin } from './eco-admin.js';
+import { SLIP_RULES } from './kit/play-odds.mjs';
 import { PAY_WEEK, WEEKLY_FROM, weekStart, mondayId, debtOf, activeLoan, loanOffer, loanEntries, loanDue, payoffAmount, reliefCheck, reliefEntry, openStakes } from './kit/loan.mjs';
 
 export const ECO_PASSCODE_LENGTH = 10;
@@ -232,6 +233,8 @@ export function paydayEntries(wallet, now) {
   out.push(...loanDue(wallet, poolBalance({ ...wallet, entries: [...(wallet.entries || []), ...out] }), now));
   // Quadra Plus ended: what was paid for the time left comes back, once.
   out.push(...plusRefundEntries(wallet, now));
+  // The sports tax moved to the whole slip: what earlier payouts still owe, once.
+  out.push(...backTaxEntries(wallet, now));
   // VIP cashback on the months before this one, and the welcome bonus bet.
   out.push(...vipEntries(wallet, now), ...welcomeEntries(wallet, now));
   // Level rewards for wealth levels reached (after the pay that may reach one).
@@ -372,6 +375,37 @@ export function plusRefundEntries(wallet, now) {
   if (now < PLUS_END || (wallet?.entries || []).some(e => e.id === PLUS_REFUND_ID)) return [];
   const amount = plusRefund(wallet);
   return amount > 0 ? [{ id: PLUS_REFUND_ID, t: now, app: 'eco', kind: 'plusrefund', amount }] : [];
+}
+
+// ---- 運彩 tax, back charged -----------------------------------------------------
+//
+// From TAX_SLIP_FROM (the Worker deploy of 2026-10-20 04:32:36Z) a slip whose
+// whole prize is over NT$5,000 loses 20% of it (kit/play-odds.mjs afterTax;
+// the owner: "one slip is one slip", then "make sure it back charge as
+// well"). Before, only a combination whose NT$10 單注 won over NT$5,000
+// (odds over 500) was taxed. Each earlier payout over NT$5,000 that wasn't
+// taxed is charged its 20% now (`odds:tax-<slip>`, kind 'tax', cents
+// dropped), once. One that was: its payout is over 400× its cost (taxed odds
+// over 500, less 20%); an untaxed one is at most 500×, so the 400–500 band
+// is taken as taxed and left alone. Cash outs are no prize and aren't taxed.
+export const TAX_SLIP_FROM = Date.UTC(2026, 9, 20, 4, 32, 36);
+const msOf = t => (typeof t === 'number' ? t : new Date(t).getTime());
+export function backTaxEntries(wallet, now) {
+  if (now < TAX_SLIP_FROM) return [];
+  const entries = wallet?.entries || [];
+  const have = new Set(entries.map(e => e.id));
+  const cost = new Map(entries.filter(e => e.app === 'odds' && e.kind === 'stake' && typeof e.id === 'string' && e.id.startsWith('odds:stake-')).map(e => [e.id.slice(11), -Number(e.amount) || 0]));
+  const out = [];
+  for (const e of entries) {
+    if (e.app !== 'odds' || e.kind !== 'payout' || typeof e.id !== 'string' || !e.id.startsWith('odds:payout-')) continue;
+    const id = e.id.slice(12);
+    const paid = Number(e.amount) || 0;
+    if (paid <= SLIP_RULES.taxFree || !(msOf(e.t) < TAX_SLIP_FROM) || have.has(`odds:tax-${id}`)) continue;
+    const c = cost.get(id) || 0;
+    if (c > 0 && paid > 400 * c) continue;
+    out.push({ id: `odds:tax-${id}`, t: now, app: 'odds', kind: 'tax', amount: -Math.floor(paid * SLIP_RULES.taxRate + 1e-9) });
+  }
+  return out;
 }
 
 const isObj = v => Boolean(v) && typeof v === 'object' && !Array.isArray(v);
