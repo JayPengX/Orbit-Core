@@ -197,3 +197,18 @@ test('a single-price match (after hours, a fund NAV) counts at that price, no sp
   assert.deepEqual(r.refused, []);
   assert.equal(r.cash, 100_000 - after.total);
 });
+
+test('a future: issued fills count, and its expiry only at TAIFEX final settlement price', async () => {
+  const sym = 'TMF202610.TF';
+  const expiry = Date.parse('2026-10-21T13:30:00+08:00');
+  const d = deps({ f1: { quote: 46_000, t: T, s: sym, side: 'buy', q: 1, k: 'market' } });
+  const read = d.read;
+  d.read = async url => (url.startsWith('https://taifex.quadra/') ? { date: '2026-10-21', settle: {}, margin: {}, final: { 202610: 46_650 } } : read(url));
+  const base = { type: 'fill', symbol: sym, name: '微台指 10月', kind: 'fut', market: 'TAIFEX', currency: 'TWD', qty: 1, commission: 25, tax: 46, fee: 0, twd: 1 };
+  const buy = { ...base, id: 'fill:f1', orderId: 'f1', t: T, side: 'buy', price: 46_001, quote: 46_000, gross: 46_001, total: 46_001 + 71 };
+  const settle = (id, price) => ({ ...base, id, orderId: null, maturity: true, t: expiry, side: 'sell', price, quote: price, gross: price, commission: 0, tax: 47, total: price - 47 });
+  const r = await check(d, [buy, settle('mature:x', 47_000), settle(`mature:${sym}`, 46_650)], expiry + 3_600_000);
+  assert.deepEqual(r.refused, ['mature:x']);
+  // Margin back, the gain (649 points × NT$10) in, the costs out.
+  assert.equal(r.cash, 100_000 - 71 + 649 * 10 - 47);
+});

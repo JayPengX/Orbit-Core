@@ -39,16 +39,17 @@
 // owed. Borrowed money can't leave Securities.
 //
 // deps: { read(url) -> JSON, fsGet, fsWrite }.
-import { replay, ownCash, applyFills, planOrderType } from './kit/stock-account.mjs';
+import { replay, ownCash, applyFills, planOrderType, futMargin } from './kit/stock-account.mjs';
 import { unpack } from './kit/stock-codec.mjs';
 import { BONDS } from './kit/stock-bonds.mjs';
-import { marketFill, dealPrice, currencyInfo, isSubBrokered, cbMaturity } from './kit/stock-markets.mjs';
+import { marketFill, dealPrice, currencyInfo, isSubBrokered, cbMaturity, futureOf, futureExpiry } from './kit/stock-markets.mjs';
 import { fxSymbol } from './kit/stock-quotes.mjs';
 import { readFillsBook, decideFills, ipoList, ipoDraw, ipoKeyOf } from './stock-fill.js';
 import { parseDoc } from './doc-store.js';
 import { IPO_FEE, IPO_WIN_FEE, ipoOpen, ipoDrawn, ipoBackAt, ipoListAt } from './kit/stock-ipo.mjs';
 
 export const VERIFIED_COLLECTION = 'stock-verified';
+const TAIFEX_URL = 'https://taifex.quadra/fut.json';
 const YAHOO = 'https://query1.finance.yahoo.com';
 const MIN = 60_000;
 const DAY = 86_400_000;
@@ -174,6 +175,19 @@ export async function checkEvent(e, account, wallet, read, issued = {}, ctx = {}
         const held = replay(account, e.t).positions[e.symbol]?.qty || 0;
         return e.price <= 100 + 1e-9 && e.qty <= held + 1e-6 ? 'ok' : 'bad';
       }
+      // A future held to its expiry: TAIFEX's final settlement price, then, closing what was held.
+      if (e.kind === 'fut' && e.maturity) {
+        const f = futureOf(e.symbol);
+        const due = futureExpiry(e.symbol);
+        if (!f || !due || e.t !== due || e.t > now || ctx.used?.has(`maturity:${e.symbol}`)) return 'bad';
+        const held = replay(account, e.t).positions[e.symbol]?.qty || 0;
+        if ((e.side === 'sell' ? held : -held) + 1e-6 < e.qty) return 'bad';
+        const final = (await read(TAIFEX_URL))?.final?.[`${f.year}${String(f.month).padStart(2, '0')}`];
+        if (!(final > 0)) return now - e.t > 30 * DAY ? 'bad' : 'later';
+        return near(e.price, final, 1e-9) ? 'ok' : 'bad';
+      }
+      // (A future fills only here: TAIFEX's prices aren't in Yahoo's history.)
+      if (e.kind === 'fut') return 'bad';
       // Found on the phone: at the worst price traded since its moment.
       const bars = await since(read, e.symbol, e.t - 10 * MIN, now);
       if (!bars) return now - e.t > 60 * DAY ? 'bad' : 'later';
@@ -340,6 +354,14 @@ const worthTWD = (s, rates) =>
 function affordable(counted, e) {
   const s = replay(counted, e.t);
   const unit = Math.max(1, Math.abs(e.total) * 0.005);
+  // A future: closing always; opening only with the maintenance margin of all
+  // the futures then held left in the account's NT$.
+  if (e.kind === 'fut') {
+    const after = replay({ ...counted, events: [...counted.events, e] }, e.t);
+    if (Math.abs(after.positions[e.symbol]?.qty || 0) <= Math.abs(s.positions[e.symbol]?.qty || 0) + 1e-9) return true;
+    const need = Object.values(after.positions).reduce((sum, p) => sum + (p.kind === 'fut' ? Math.abs(p.qty) * futMargin(p.symbol)[1] : 0), 0);
+    return (after.cash.TWD || 0) + 1 >= need;
+  }
   const abroad = isSubBrokered(e.market) && e.kind !== 'fx';
   if (e.side === 'buy') return (s.cash[e.currency] || 0) + (abroad ? 0 : e.financed || 0) + unit >= e.total;
   const held = Math.max(0, s.positions[e.symbol]?.qty || 0);

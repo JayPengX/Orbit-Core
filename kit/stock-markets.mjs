@@ -166,6 +166,9 @@ export const MARKETS = {
   // platform at the day's NAV (SITCA's, fund-nav.js): `.TWF` after the
   // fund's 基金統編. The subscription fee is tradeCosts' FUND_FEE.
   TWFUND: { delay: 0, zh: '基金', en: 'Fund', flag: '🗂️', currency: null, suffixes: ['.TWF'], commission: { rate: 0, min: 0 }, withholding: 0 },
+  // TAIFEX's index futures (期貨): margin, not the contract's value, is put
+  // up; costs per contract (FUTURES' fee) and the 期交稅 (FUT_TAX).
+  TAIFEX: { delay: 20, zh: '期貨', en: 'Futures', flag: '📉', currency: 'TWD', suffixes: ['.TF'], commission: { rate: 0, min: 0 }, withholding: 0 },
   // Anywhere else search turns up: a generic sub-brokerage rate.
   INTL: { zh: '其他市場', en: 'Other markets', flag: '🌐', currency: null, suffixes: [], commission: { rate: 0.003, min: 0 }, withholding: 0.2 }
 };
@@ -182,7 +185,7 @@ export const DIV_PAY_DAYS = {
 export const divPayDays = market => DIV_PAY_DAYS[market] ?? 21;
 
 // Each market's own clock, for its days (settlement, lunch breaks, T+1).
-export const MARKET_TZ = { TW: 'Asia/Taipei', US: 'America/New_York', JP: 'Asia/Tokyo', HK: 'Asia/Hong_Kong', CN: 'Asia/Shanghai', KR: 'Asia/Seoul', UK: 'Europe/London', FR: 'Europe/Paris', DE: 'Europe/Berlin', NL: 'Europe/Amsterdam', IT: 'Europe/Rome', ES: 'Europe/Madrid', CH: 'Europe/Zurich', DK: 'Europe/Copenhagen', CA: 'America/Toronto', AU: 'Australia/Sydney', SG: 'Asia/Singapore', IN: 'Asia/Kolkata', BOND: 'Asia/Taipei', METAL: 'Asia/Taipei', TWFUND: 'Asia/Taipei' };
+export const MARKET_TZ = { TW: 'Asia/Taipei', US: 'America/New_York', JP: 'Asia/Tokyo', HK: 'Asia/Hong_Kong', CN: 'Asia/Shanghai', KR: 'Asia/Seoul', UK: 'Europe/London', FR: 'Europe/Paris', DE: 'Europe/Berlin', NL: 'Europe/Amsterdam', IT: 'Europe/Rome', ES: 'Europe/Madrid', CH: 'Europe/Zurich', DK: 'Europe/Copenhagen', CA: 'America/Toronto', AU: 'Australia/Sydney', SG: 'Asia/Singapore', IN: 'Asia/Kolkata', BOND: 'Asia/Taipei', METAL: 'Asia/Taipei', TWFUND: 'Asia/Taipei', TAIFEX: 'Asia/Taipei' };
 const tzOf = market => MARKET_TZ[market] || 'Asia/Taipei';
 // A moment's local date and minutes after midnight in a market.
 function localParts(t, market) {
@@ -255,6 +258,8 @@ export function jpTickTable(kind, symbol) {
   return inTopix500(symbol) ? JP_FINE : JP_OTHER;
 }
 export function tickSize(market, kind, price, symbol = null) {
+  // 臺股期貨 and its smaller ones: a whole index point.
+  if (market === 'TAIFEX') return 1;
   if (market === 'TW') {
     if (kind === 'etf' || kind === 'bond') return price < 50 ? 0.01 : 0.05;
     // A convertible bond, by price per NT$100 of face (TPEx 轉換公司債升降單位).
@@ -513,7 +518,7 @@ export const lunchOf = market => LUNCH[market] || null;
 // 2027-10-11). Crypto, passbook metals and forex here settle at once. Sale
 // proceeds can buy again right away (the broker nets them), but can't leave
 // the market (be exchanged) until settled.
-export const SETTLE_DAYS = { TW: 2, US: 1, CA: 1, IN: 1, CN: 1, JP: 2, HK: 2, KR: 2, UK: 2, FR: 2, DE: 2, NL: 2, IT: 2, ES: 2, CH: 2, DK: 2, AU: 2, SG: 2, BOND: 1, CRYPTO: 0, METAL: 0, FX: 0, TWFUND: 3 };
+export const SETTLE_DAYS = { TW: 2, US: 1, CA: 1, IN: 1, CN: 1, JP: 2, HK: 2, KR: 2, UK: 2, FR: 2, DE: 2, NL: 2, IT: 2, ES: 2, CH: 2, DK: 2, AU: 2, SG: 2, BOND: 1, CRYPTO: 0, METAL: 0, FX: 0, TWFUND: 3, TAIFEX: 0 };
 export const T1_EUROPE = Date.UTC(2027, 9, 11);
 const EUROPE_T1 = new Set(['UK', 'FR', 'DE', 'NL', 'IT', 'ES', 'CH', 'DK']);
 export const settleDays = (market, t = Date.now()) => (EUROPE_T1.has(market) && t >= T1_EUROPE ? 1 : SETTLE_DAYS[market] ?? 2);
@@ -560,7 +565,7 @@ export function marketSlip(market, kind, price) {
   const tick = tickSize(market, kind, price) || 0;
   // Taiwan trades only on its ticks (營業細則 §62): the ask is a whole tick
   // above the last price, the bid a whole tick below.
-  if (market === 'TW') return tick;
+  if (market === 'TW' || market === 'TAIFEX') return tick;
   return Math.max(tick / 2, price * (HALF_SPREAD[market] ?? 0.001));
 }
 // What a market order fills at, from the last price.
@@ -639,6 +644,52 @@ export function fundCutoff(t) {
   return t;
 }
 
+// TAIFEX's TAIEX futures: a contract month each (`TX202611.TF`). `mult`: NT$
+// a point; `fee`: an online broker's commission a contract, each way.
+// Margins (保證金) are TAIFEX's, read with its prices (FUT_MARGIN the
+// fallback, NT$ a contract, initial and maintenance).
+export const FUTURES = {
+  TX: { zh: '台指期', en: 'TAIEX futures', mult: 200, fee: 50 },
+  MTX: { zh: '小台指', en: 'Mini-TAIEX futures', mult: 50, fee: 25 },
+  TMF: { zh: '微台指', en: 'Micro TAIEX futures', mult: 10, fee: 12 }
+};
+export const FUT_MARGIN = { TX: [701_000, 538_000], MTX: [175_250, 134_500], TMF: [35_050, 26_900] };
+// 期貨交易稅: 0.002% of the contract's value, each way, to the dollar.
+export const FUT_TAX = 0.00002;
+const FUT_RE = /^(TX|MTX|TMF)(\d{4})(\d{2})\.TF$/;
+export const isFuture = symbol => FUT_RE.test(symbol || '');
+export function futureOf(symbol) {
+  const m = FUT_RE.exec(symbol || '');
+  return m ? { code: m[1], year: Number(m[2]), month: Number(m[3]), ...FUTURES[m[1]] } : null;
+}
+export const futMult = symbol => futureOf(symbol)?.mult ?? 1;
+// A contract month's last trading day (and final settlement): its third
+// Wednesday, the next business day when that's a holiday; it trades to 13:30.
+export function futureExpiry(symbol) {
+  const f = futureOf(symbol);
+  if (!f) return null;
+  const first = new Date(Date.UTC(f.year, f.month - 1, 1)).getUTCDay();
+  let d = 1 + ((3 - first + 7) % 7) + 14;
+  for (let i = 0; i < 10; i++, d++) {
+    const day = `${f.year}-${String(f.month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    if (tradingDay('TW', day)) return Date.parse(`${day}T13:30:00+08:00`);
+  }
+  return null;
+}
+// The contract months trading at `t`, nearest first: this month's until its
+// expiry, then the next ones (TAIFEX lists more; these two are where the trading is).
+export function futureMonths(code, t = Date.now(), n = 2) {
+  const now = new Date(t + 8 * 3_600_000);
+  let [y, m] = [now.getUTCFullYear(), now.getUTCMonth() + 1];
+  const out = [];
+  for (let i = 0; i < 6 && out.length < n; i++) {
+    const symbol = `${code}${y}${String(m).padStart(2, '0')}.TF`;
+    if (futureExpiry(symbol) > t) out.push(symbol);
+    [y, m] = m === 12 ? [y + 1, 1] : [y, m + 1];
+  }
+  return out;
+}
+
 // Passbook metals: the page's own instruments, priced from the futures.
 export const METALS = {
   XAU: { future: 'GC=F', zh: '黃金存摺', en: 'Gold passbook', unitZh: '公克', unitEn: 'g' },
@@ -654,6 +705,7 @@ export function kindOf(type, symbol, hint) {
   if (isCb(symbol)) return 'cb';
   if (isWarrant(symbol)) return 'warrant';
   if (isTwFund(symbol)) return 'fund';
+  if (isFuture(symbol)) return 'fut';
   switch (String(type || '').toUpperCase()) {
     case 'ETF':
       return /^\d{4,6}B\.TWO?$/.test(symbol) ? 'bond' : 'etf';
@@ -676,10 +728,10 @@ export function kindOf(type, symbol, hint) {
 // broker's sub-brokerage, and that is cash only, no 融資 and no borrowed
 // short (元大 複委託說明: 不得信用交易). (The FSC's 複委託外幣融資, US index
 // stocks only, was approved 2026-08 but isn't in force: 2027 Q2 at the earliest.)
-const LOCAL_MARKETS = new Set(['TW', 'TWFUND', 'CRYPTO', 'METAL', 'BOND', 'FX']);
+const LOCAL_MARKETS = new Set(['TW', 'TWFUND', 'TAIFEX', 'CRYPTO', 'METAL', 'BOND', 'FX']);
 export const isSubBrokered = market => Boolean(market) && !LOCAL_MARKETS.has(market);
 
-export const TRADABLE_KINDS = new Set(['stock', 'etf', 'bond', 'fund', 'crypto', 'metal', 'govbond', 'fx', 'cb', 'warrant']);
+export const TRADABLE_KINDS = new Set(['stock', 'etf', 'bond', 'fund', 'crypto', 'metal', 'govbond', 'fx', 'cb', 'warrant', 'fut']);
 // What can be sold short (borrowed and sold): listed shares, crypto and
 // currency pairs (selling EUR/USD bets on the euro falling).
 export const SHORTABLE_KINDS = new Set(['stock', 'etf', 'bond', 'crypto', 'fx']);
@@ -743,9 +795,18 @@ function dayTradeRate(rules, kind, t = Date.now()) {
 // selling (redeeming) costs nothing, with no exchange fee or tax.
 export const FUND_FEE = 0.01;
 
-export function tradeCosts({ market, side, kind, gross, qty = 0, currency, discount = 1, oddLot = false, dayTrade = false, t = Date.now(), plan = false }) {
+// A future's `gross` is its points times contracts; `symbol` names the
+// contract (its NT$ a point and commission): the broker's fee a contract and
+// the 期交稅 on the contract's value, to the dollar.
+export function tradeCosts({ market, side, kind, gross, qty = 0, currency, discount = 1, oddLot = false, dayTrade = false, t = Date.now(), plan = false, symbol = '' }) {
   const m = MARKETS[market] || MARKETS.INTL;
   const round = m.floorFees ? x => Math.floor(x) : x => roundCash(x, currency);
+  if (kind === 'fut') {
+    const f = futureOf(symbol) || FUTURES.TX;
+    const commission = Math.round(f.fee * qty * discount);
+    const tax = Math.round(gross * f.mult * FUT_TAX);
+    return { commission, tax, fee: 0, total: commission + tax, taxRate: FUT_TAX, feeRate: 0 };
+  }
   if (kind === 'fund') {
     const commission = side === 'buy' && gross > 0 ? round(gross * FUND_FEE * discount) : 0;
     return { commission, tax: 0, fee: 0, total: commission, taxRate: 0, feeRate: 0 };

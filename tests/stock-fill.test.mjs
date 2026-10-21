@@ -338,3 +338,17 @@ test('a Taiwan fund fills at the NAV of the first cutoff after the proxy saw it,
   nav = { nav: 13.4, prev: 13.21, date: '2026-10-22' };
   assert.equal((await ask()).fills.order0900.quote, 13.4);
 });
+
+test('a future fills at the live index plus its basis at the last settlement', async () => {
+  const at = s => Date.parse(`${s}+08:00`);
+  const t = at('2026-10-21T10:00:00');
+  const meta = { symbol: '^TWII', regularMarketPrice: 46_500, chartPreviousClose: 46_300, currency: 'TWD', instrumentType: 'INDEX', exchangeTimezoneName: 'Asia/Taipei', regularMarketTime: t / 1000 - 60, currentTradingPeriod: { regular: { start: at('2026-10-21T09:00:00') / 1000, end: at('2026-10-21T13:30:00') / 1000 } } };
+  const read = async url =>
+    url.startsWith('https://taifex.quadra/')
+      ? { date: '2026-10-20', settle: { TX202611: 46_510 }, margin: { TX: [701_000, 538_000] }, final: {} }
+      : { spark: { result: [{ symbol: '^TWII', response: [{ meta, timestamp: [], indicators: { quote: [{ close: [] }] } }] }] } };
+  const order = cleanOrder({ id: 'order0950', symbol: 'TX202611.TF', side: 'buy', type: 'market', qty: 1, t: t - 1000, market: 'TAIFEX', kind: 'fut', currency: 'TWD' });
+  const { fills } = await decideFills([order], { read, now: t });
+  // 46,500 + (46,510 − 46,300).
+  assert.deepEqual(fills, { order0950: { quote: 46_710, t, twd: 1 } });
+});
