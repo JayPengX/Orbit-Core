@@ -8,7 +8,7 @@ import { mkdtemp, mkdir, writeFile, readFile, readdir, cp } from 'node:fs/promis
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { hashFiles } from '../kit/hash.mjs';
+import { hashFiles, servedHash } from '../kit/hash.mjs';
 import { stampApp } from '../kit/stamp-app.mjs';
 import { KIT_TOOLS } from '../kit/preload.mjs';
 
@@ -45,15 +45,17 @@ test("an app's deploy: every reference stamped with its file's hash, the page's 
   const page = await readFile(join(root, 'index.html'), 'utf8');
   const app = await readFile(join(root, 'app.mjs'), 'utf8');
   assert.match(page, /content="build1"/);
-  assert.match(page, /href="\.\/styles\.css\?v=[0-9a-f]{10}"/);
-  assert.match(page, /src="\.\/app\.mjs\?v=[0-9a-f]{10}"/);
-  assert.match(page, /<link rel="modulepreload" href="\.\/lib\/a\.mjs\?v=[0-9a-f]{10}" \/>/);
+  assert.match(page, /href="\.\/styles\.css\?v=[0-9a-f]{12}"/);
+  assert.match(page, /src="\.\/app\.mjs\?v=[0-9a-f]{12}"/);
+  assert.match(page, /<link rel="modulepreload" href="\.\/lib\/a\.mjs\?v=[0-9a-f]{12}" \/>/);
   assert.ok(page.includes(`('../Shared-Proxy/kit/',${JSON.stringify(kit)})`), 'the kit hashes baked in');
-  assert.match(app, /from"\.\/lib\/a\.mjs\?v=[0-9a-f]{10}"/);
-  assert.match(app, /import"\.\/lib\/side\.mjs\?v=[0-9a-f]{10}"/);
+  assert.match(app, /from"\.\/lib\/a\.mjs\?v=[0-9a-f]{12}"/);
+  assert.match(app, /import"\.\/lib\/side\.mjs\?v=[0-9a-f]{12}"/);
   assert.ok(!app.includes('a note'), 'minified');
-  assert.match(await readFile(join(root, 'lib/a.mjs'), 'utf8'), /from"\.\.\/b\.mjs\?v=[0-9a-f]{10}"/);
+  assert.match(await readFile(join(root, 'lib/a.mjs'), 'utf8'), /from"\.\.\/b\.mjs\?v=[0-9a-f]{12}"/);
   assert.deepEqual(JSON.parse(await readFile(join(root, 'version.json'), 'utf8')), { version: 'build1' });
+  // Each file's address is the hash of exactly what's served (what kit/sw.js checks).
+  assert.ok(page.includes(`./app.mjs?v=${servedHash(app)}`), "app.mjs's address is its served text's hash");
 });
 
 test("the built kit: minified, its files import each other through the map, every file's hash listed", async () => {
@@ -66,6 +68,7 @@ test("the built kit: minified, its files import each other through the map, ever
   assert.deepEqual(Object.keys(files).sort(), built.filter(f => /\.(m?js|css)$/.test(f)));
   for (const name of built.filter(f => f.endsWith('.mjs'))) {
     const text = await readFile(join(out, 'kit', name), 'utf8');
+    assert.equal(files[name], servedHash(text), `${name}'s hash is its served text's`);
     assert.ok(!/(?:from|import\(|import)\s*['"]\.\//.test(text), `${name} still imports by ./`);
     for (const m of text.matchAll(/(?:from|import\(|import)\s*['"]#kit\/([^'"?]+)['"]/g)) assert.ok(built.includes(m[1]), `${name} → ${m[1]}`);
   }

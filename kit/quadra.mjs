@@ -3019,6 +3019,10 @@ export function watchUpdates({ current, key, every = 15_000 } = {}) {
   async function apply(latest) {
     // (Music playing: not now. The check every few seconds, or the next opening, updates once it stops.)
     if (sounding()) return;
+    // (Out of sight: never. All the apps share one site, so one app finding
+    // a new kit told every other app, and Beats playing in the background
+    // reloaded and stopped (2026-10-21). Coming back on screen checks at once.)
+    if (document.visibilityState === 'hidden') return;
     // The same deploy tried again at most 6 times in the session, 5 s apart.
     const flag = `${key || 'quadra'}.reloadedTo`;
     const [was, tries = 0, at = 0] = String(sessionStorage.getItem(flag) || '').split('|');
@@ -3032,6 +3036,8 @@ export function watchUpdates({ current, key, every = 15_000 } = {}) {
     }
     sessionStorage.setItem(flag, `${latest}|${n + 1}|${Date.now()}`);
     rememberPlace();
+    // (Leaving: what the page still had on the way fails as the page goes, and says nothing of the network.)
+    globalThis.__bootUpdating = true;
     // Only the kit changed: the same page again, its loader now on the new
     // kit (the app's own files are still current).
     if (latest.startsWith('kit:')) return location.reload();
@@ -3071,6 +3077,8 @@ export function watchUpdates({ current, key, every = 15_000 } = {}) {
   globalThis.addEventListener?.('focus', () => check());
   globalThis.addEventListener?.('online', () => check(true));
   globalThis.addEventListener?.('pageshow', () => check());
+  // A part of the app that didn't load (a screen's module the CDN answered with another version): a newer deploy looked for at once.
+  globalThis.addEventListener?.('unhandledrejection', e => /import|module/i.test(String(e?.reason?.message || e?.reason || '')) && check(true));
   // (Not while the app is out of sight: coming back asks at once.)
   setInterval(() => document.visibilityState !== 'hidden' && check(), every);
 }
@@ -3672,7 +3680,7 @@ export const slowByNature = url => {
     return false;
   }
 };
-const net = { state: 'online', waiting: new Map(), lastOk: Date.now(), fails: 0, refresh: null, timer: 0, id: 0, only: null, reached: false, hadReached: false };
+const net = { state: 'online', waiting: new Map(), lastOk: Date.now(), probing: 0, fails: 0, refresh: null, timer: 0, id: 0, only: null, reached: false, hadReached: false };
 export const netState = () => net.state;
 function setNet(next) {
   if (next === net.state) return;
@@ -3692,19 +3700,42 @@ function setNet(next) {
 }
 // The rule: the phone says it's offline, or twice nothing was reached since
 // the last answer (a phone on Wi-Fi without internet says it's online): off.
-// A request waiting over 5 s with nothing answered meanwhile: slow.
-export function netVerdict({ onLine = true, fails = 0, waitingSince = [], lastOk = 0, now = Date.now() } = {}) {
+// Slow only on evidence about the connection itself: a request waiting over
+// 5 s with nothing answered meanwhile is first put to the probe (a tiny file
+// from GitHub Pages); only when that too is still waiting after 3 s is it
+// slow. A slow Worker, ESPN or AI answer on a fast connection said 網路連線很慢
+// (the owner on 300 Mbps, 2026-10-21): now the probe answers at once and the
+// app just waits for that one answer (noted in 除錯紀錄 as 'slow', by address).
+const PROBE_SLOW_MS = 3000;
+// Away this long: coming back refreshes the app (watchNet).
+const RESUME_AFTER_MS = 60_000;
+export function netVerdict({ onLine = true, fails = 0, waitingSince = [], lastOk = 0, probing = 0, now = Date.now() } = {}) {
   if (onLine === false || fails >= 2) return 'offline';
-  return waitingSince.some(t => now - t > NET_SLOW_MS) && now - lastOk > NET_SLOW_MS ? 'slow' : 'online';
+  const waiting = waitingSince.some(t => now - t > NET_SLOW_MS) && now - lastOk > NET_SLOW_MS;
+  return waiting && probing && now - probing > PROBE_SLOW_MS ? 'slow' : 'online';
 }
 function judgeNet() {
-  setNet(netVerdict({ onLine: globalThis.navigator?.onLine, fails: net.fails, waitingSince: [...net.waiting.values()], lastOk: net.lastOk }));
+  const now = Date.now();
+  const waits = [...net.waiting.values()];
+  // Something has waited long with nothing answered: the probe asked (and judged again once it's had its 3 s).
+  if (!net.probing && waits.some(t => now - t > NET_SLOW_MS) && now - net.lastOk > NET_SLOW_MS) {
+    probeNet();
+    setTimeout(judgeNet, PROBE_SLOW_MS + 50);
+  }
+  setNet(netVerdict({ onLine: globalThis.navigator?.onLine, fails: net.fails, waitingSince: waits, lastOk: net.lastOk, probing: net.probing, now }));
 }
 // One small ask that never comes from a copy: the kit's version.
 function probeNet() {
   const base = globalThis.QUADRA_KIT?.base;
-  if (!base) return;
-  globalThis.fetch(`${base}version.json?net=${Date.now()}`, { cache: 'no-store', signal: AbortSignal.timeout(8000) }).catch(() => {});
+  if (!base || net.probing) return;
+  net.probing = Date.now();
+  globalThis
+    .fetch(`${base}version.json?net=${Date.now()}`, { cache: 'no-store', signal: AbortSignal.timeout(8000) })
+    .catch(() => {})
+    .finally(() => {
+      net.probing = 0;
+      judgeNet();
+    });
 }
 function paintNet() {
   if (typeof document === 'undefined') return;
@@ -3806,16 +3837,56 @@ function watchNet() {
   };
   let probedAt = 0;
   const probeSoon = () => Date.now() - probedAt > 5000 && ((probedAt = Date.now()), probeNet());
+  // Requests that fail as the page goes (an update's reload) or that were
+  // under way while the phone put the app away (iOS cuts them: "Load
+  // failed" on coming back) say nothing of the network: an update showed
+  // 沒有網路連線 over the app, and so did every return to it. Those ask the
+  // probe instead.
+  let leaving = false;
+  let shownAt = 0;
+  let hiddenAt = 0;
+  // Back after a while away (or out of the browser's back-forward cache):
+  // what failed meanwhile forgotten, and the app's own refresh run once, so
+  // a screen that broke while the phone slept comes back by itself instead
+  // of only after the app was closed and opened again.
+  const resume = () => {
+    net.fails = 0;
+    judgeNet();
+    setTimeout(() => net.refresh?.(), 400);
+  };
+  addEventListener('pagehide', () => (leaving = true));
+  addEventListener('pageshow', event => {
+    leaving = false;
+    if (event.persisted) resume();
+  });
+  document.addEventListener?.('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') return void (hiddenAt = Date.now());
+    shownAt = Date.now();
+    if (hiddenAt && shownAt - hiddenAt > RESUME_AFTER_MS) resume();
+  });
+  // Which request was slow, for 除錯紀錄 (its site and path, never its query).
+  const noteSlow = (url, at, error) => {
+    const ms = Date.now() - at;
+    if (ms < NET_SLOW_MS) return;
+    let where = '';
+    try {
+      const u = new URL(url, location.href);
+      where = u.host + u.pathname;
+    } catch {}
+    rec('slow', { where, ms, failed: error ? error.name || 'error' : undefined, net: net.state });
+  };
   window.fetch = (input, init) => {
     const url = typeof input === 'string' ? input : input?.url || String(input);
     if (own(url)) return real(input, init);
     const k = ++net.id;
+    const at = Date.now();
     // (An AI's answer takes its time: never read as a slow connection; its failure still counts.)
     if (!slowByNature(url)) net.waiting.set(k, Date.now());
     if (net.state === 'online') setTimeout(judgeNet, NET_SLOW_MS + 50);
     return real(input, init).then(
       res => {
         net.waiting.delete(k);
+        noteSlow(url, at);
         net.lastOk = Date.now();
         net.reached = true;
         net.fails = 0;
@@ -3824,11 +3895,14 @@ function watchNet() {
       },
       error => {
         net.waiting.delete(k);
+        noteSlow(url, at, error);
         // Given up on by the app (a sheet closed): says nothing of the network. A time limit run out: slow at best.
         // Another site's refusal reads the same as no network (TheSportsDB's 429 has no CORS header: the
         // browser calls it a failed request, and two put an online-only app behind 沒有網路連線, 2026-10-17):
         // only the family's own (the proxy, the kit's probe) count; another's asks the probe instead.
-        if (error?.name !== 'AbortError' && error?.name !== 'TimeoutError') ours(url) ? (net.fails += 1) : probeSoon();
+        if (leaving || globalThis.__bootUpdating) throw error;
+        const cut = document.visibilityState === 'hidden' || at <= shownAt + 1000;
+        if (error?.name !== 'AbortError' && error?.name !== 'TimeoutError') ours(url) && !cut ? (net.fails += 1) : probeSoon();
         judgeNet();
         throw error;
       }

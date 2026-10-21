@@ -22,9 +22,9 @@ for (const tool of KIT_TOOLS) await rm(join(dest, tool), { force: true });
 
 const texts = new Map();
 for (const name of await readdir(dest)) if (/\.(m?js|css)$/.test(name)) texts.set(name, await readFile(join(dest, name), 'utf8'));
-// (No stamps inside: a kit file's hash is its own text's alone.)
+// (No stamps inside: a kit file's hash is its own served text's alone.)
 const LOCAL = /((?:from|import\(|import)\s*['"])\.\/([^'"?/]+\.m?js)(['"])/g;
-const { files, hashes } = await hashFiles(texts, { refs: () => [] });
-for (const [name, text] of files) await writeFile(join(dest, name), text.replace(LOCAL, (_, before, file, after) => `${before}#kit/${file}${after}`));
+const { files, hashes } = await hashFiles(texts, { refs: () => [], finish: text => text.replace(LOCAL, (_, before, file, after) => `${before}#kit/${file}${after}`) });
+for (const [name, text] of files) await writeFile(join(dest, name), text);
 await writeFile(join(dest, 'version.json'), JSON.stringify({ version, files: Object.fromEntries([...hashes].sort()) }) + '\n');
 console.log('kit', version, '->', dest, `(${hashes.size} files)`);

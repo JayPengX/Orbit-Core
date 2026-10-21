@@ -12,10 +12,15 @@ test('off: the phone says so, or twice nothing reached since the last answer', (
   assert.equal(netVerdict({ onLine: true, fails: 1, lastOk: now, now }), 'online');
 });
 
-test('slow: a request waiting over 5 s with nothing answered meanwhile; never while answers come', () => {
-  assert.equal(netVerdict({ waitingSince: [now - 6000], lastOk: now - 6000, now }), 'slow');
-  assert.equal(netVerdict({ waitingSince: [now - 4000], lastOk: now - 6000, now }), 'online');
-  // One slow read while others answer: the network is fine.
+test("slow: only when the probe too waits: a slow server on a fast connection isn't a slow connection", () => {
+  const long = { waitingSince: [now - 6000], lastOk: now - 6000, now };
+  // A request waiting over 5 s, nothing else answered: the probe is asked first, and that's no claim yet.
+  assert.equal(netVerdict(long), 'online');
+  assert.equal(netVerdict({ ...long, probing: now - 1000 }), 'online');
+  // The probe (a tiny file) still waiting after 3 s: the connection is slow.
+  assert.equal(netVerdict({ ...long, probing: now - 3500 }), 'slow');
+  assert.equal(netVerdict({ waitingSince: [now - 4000], lastOk: now - 6000, probing: now - 3500, now }), 'online');
+  // One slow read while others answer (the probe answered): the network is fine.
   assert.equal(netVerdict({ waitingSince: [now - 9000], lastOk: now - 1000, now }), 'online');
   assert.equal(netVerdict({ now }), 'online');
 });
