@@ -12,7 +12,7 @@ test('judgments: 3 for each article found they cite, the 案由 sharing the ques
 });
 
 test('釋字 and 憲判字 by the articles they read and their name', () => {
-  const rows = [['s748', '2017-05-24', '釋字第748號', '同婚案', '民法未使相同性別二人得成立婚姻關係是否違憲', ['B0000001:972'], [], []], ['j111-10', '2022-01-01', '111年憲判字第10號', '其他', '', ['A0000001:8'], [], []]];
+  const rows = [['s748', '2017-05-24', '同婚案', '民法未使相同性別二人得成立婚姻關係是否違憲', ['B0000001:972'], [], []], ['j111-10', '2022-01-01', '其他', '', ['A0000001:8'], [], []]];
   assert.deepEqual(matchCons(rows, ['B0000001:972'], '同性可以結婚嗎').map(r => r.jid), ['s748']);
   assert.deepEqual(matchCons(rows, [], '同性婚姻 婚姻關係 違憲').map(r => r.jid), ['s748']);
 });
