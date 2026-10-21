@@ -221,6 +221,55 @@ export function matchRules(rows, text, cites) {
     .map(([, r]) => ({ id: r[0], n: r[1], agency: String(r[2] || ''), d: String(r[3] || ''), url: /^https:\/\//.test(r[4]) ? r[4] : '' }));
 }
 
+// The ministries' rule sites (one software: SearchAllResultList, LawContent), as build-agency.mjs lists them.
+export const RULE_SITES = [
+  ['MOE', '教育部', 'https://edu.law.moe.gov.tw'],
+  ['MOA', '農業部', 'https://law.moa.gov.tw'],
+  ['MOENV', '環境部', 'https://oaout.moenv.gov.tw/law'],
+  ['MOF', '財政部', 'https://law-out.mof.gov.tw'],
+  ['HAKKALAW', '客委會', 'https://law.hakka.gov.tw'],
+  ['NSTC', '國科會', 'https://law.nstc.gov.tw']
+];
+const VENDOR_PAGE = /^https:\/\/[\w.-]+\.gov\.tw\/(?:[\w-]+\/)?LawContent\.aspx\?id=\w+/;
+// A rule's name the question gives (高級中等學校訂定學生服裝儀容規定之原則): the longest run ending as one does.
+export function ruleTitle(text) {
+  const asked = String(text || '').replace(/(?:怎麼|怎樣|如何|是否|有沒有|有哪些|是什麼|什麼|內容|全文|可不可以|可以|能不能|嗎|呢|裡面|中的|中有)/g, '，');
+  const all = asked.match(/[㐀-鿿（）()、]{6,60}(?:要點|注意事項|原則|須知|規定|基準|規範|作業程序|實施計畫)/g) || [];
+  const best = all.sort((a, b) => b.length - a.length)[0] || '';
+  return best.replace(/^(?:請問|想問|我想問|關於|依照|根據|依)/, '');
+}
+const unent = t => t.replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n))).replace(/&amp;/g, '&');
+// A search page's rows: [{ id, name }].
+export function vendorHits(html) {
+  return [...String(html || '').matchAll(/href="LawContent\.aspx\?id=(\w+)[^"]*"[^>]*>([\s\S]*?)<\/a>/g)].map(m => ({ id: m[1], name: unent(m[2].replace(/<[^>]+>/g, '')).trim() })).filter(r => r.name);
+}
+// A rule page's text (agency.mjs vendorText's rule).
+export function vendorText(html) {
+  const m = String(html || '').match(/id="ctl00_cp_content_divLawContent\d*"[^>]*>([\s\S]*?)<\/div>/);
+  return m ? unent(m[1].replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '')).trim() : '';
+}
+async function page(url) {
+  try {
+    const res = await fetch(url, { cf: { cacheTtlByStatus: { '200-299': 86_400, 404: 60, '500-599': 0 }, cacheEverything: true }, signal: AbortSignal.timeout(6000) });
+    return res.ok ? await res.text() : '';
+  } catch {
+    return '';
+  }
+}
+// The rule of that name on the ministries' sites (asked of all at once), with its text; null if none has it.
+export async function liveRule(title) {
+  const want = hanPairs(title);
+  const found = await Promise.all(RULE_SITES.map(async ([code, agency, base]) => vendorHits(await page(`${base}/SearchAllResultList.aspx?KW=${encodeURIComponent(title)}`)).map(r => ({ ...r, code, agency, base }))));
+  const best = found
+    .flat()
+    .map(r => [r.name === title ? 1e3 : shared(r.name, want) / Math.max(want.size, hanPairs(r.name).size), r])
+    .filter(([s]) => s >= 0.7)
+    .sort((a, b) => b[0] - a[0])[0]?.[1];
+  if (!best) return null;
+  const url = `${best.base}/LawContent.aspx?id=${best.id}`;
+  return { id: `${best.code}:${best.id}`, n: best.name, agency: best.agency, d: '', url, text: cut(vendorText(await page(url)), MORE_LIMITS.ruleChars) };
+}
+
 // ---- The reader's own --------------------------------------------------------------------
 
 const LY_ONLY = /修法|草案|立委|表決|投票|三讀|二讀|一讀|進度|議程|預算|法案/;
@@ -260,9 +309,17 @@ export async function moreFor(text, articles, { mine = null, items = [], today =
   const cases = LY_ONLY.test(text) ? [] : [...cons, ...matchRulings(rulings?.rulings, cites, text)].slice(0, MORE_LIMITS.cases);
   const texts = await Promise.all(cases.slice(0, MORE_LIMITS.caseTexts + cons.length).map(c => caseText(c.jid)));
   texts.forEach((t, i) => (cases[i].gist = t));
-  const rules = matchRules(rulesF?.rules, text, cites);
+  let rules = matchRules(rulesF?.rules, text, cites);
   const ruleTexts = await Promise.all(rules.map(r => readOne(`agency/text/${textFile(r.id)}.json`)));
   ruleTexts.forEach((j, i) => (rules[i].text = typeof j?.t === 'string' ? cut(j.t, MORE_LIMITS.ruleChars) : ''));
+  // A rule asked by its name that the nightly build hasn't reached: found on its ministry's site now.
+  const title = ruleTitle(text);
+  if (title && !rules.some(r => r.n === title && r.text)) {
+    const live = await liveRule(title);
+    if (live) rules = [live, ...rules.filter(r => r.n !== live.n)].slice(0, MORE_LIMITS.rules);
+  }
+  // A rule kept by name only: its text read from its page now.
+  await Promise.all(rules.filter(r => !r.text && VENDOR_PAGE.test(r.url)).slice(0, 2).map(async r => (r.text = cut(vendorText(await page(r.url)), MORE_LIMITS.ruleChars))));
   const persons = await Promise.all(people.map(p => readOne(`ly/person/${p.id}.json`)));
   people.forEach((p, i) => (p.bills = (persons[i]?.bills || []).filter(Array.isArray).slice(0, 5)));
   const meets = matchMeets(agendaF?.meets, text, lawNames, today);

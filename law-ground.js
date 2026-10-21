@@ -17,7 +17,7 @@
 // bills. A file not there yet (or unreadable) is simply left out.
 import { DATA } from './law.js';
 
-export const GROUND_LIMITS = { news: 3, newsMin: 4, bills: 5, budgets: 2, factChars: 600, newsChars: 300 };
+export const GROUND_LIMITS = { news: 3, newsMin: 6, bills: 5, budgets: 2, factChars: 600, newsChars: 300 };
 export const STAGES = ['提案', '一讀', '委員會', '審查完畢', '協商', '二讀', '三讀', '公布'];
 const HOUR_MS = 3_600_000;
 
@@ -68,7 +68,8 @@ export function matchFacts(facts, text) {
 }
 
 // The notices that match best: a shared pair of characters counts 2 in the
-// title and 0.25 in the text; a score of 4 at least, the newer first on a tie.
+// title and 0.25 in the text; a score of 6 at least, with 2 of the title's
+// pairs (two common words, 相關 and 交易, are no match), newer first on a tie.
 export function matchNews(news, text, max = GROUND_LIMITS.news) {
   const want = hanPairs(expand(text));
   if (!want.size) return [];
@@ -76,9 +77,10 @@ export function matchNews(news, text, max = GROUND_LIMITS.news) {
   for (const n of Array.isArray(news) ? news : []) {
     if (!Array.isArray(n) || typeof n[2] !== 'string') continue;
     let s = 0;
-    for (const p of hanPairs(n[2])) if (want.has(p)) s += 2;
+    let title = 0;
+    for (const p of hanPairs(n[2])) if (want.has(p)) ((s += 2), title++);
     for (const p of hanPairs(n[4])) if (want.has(p)) s += 0.25;
-    if (s >= GROUND_LIMITS.newsMin) scored.push([s, n]);
+    if (s >= GROUND_LIMITS.newsMin && title >= 2) scored.push([s, n]);
   }
   return scored
     .sort((a, b) => b[0] - a[0] || String(b[1][0]).localeCompare(String(a[1][0])))
@@ -112,7 +114,8 @@ export function matchBills(items, text, max = GROUND_LIMITS.bills) {
 }
 
 // The budgets a budget question is about: those of the 年度 it names (116,
-// 116年, 2027 → 116; the k or the title), else the 2 newest by their last step.
+// 116年, 2027 → 116; the k or the title), else the newest 年度's (its 總預算
+// first): never past years unless asked.
 const BUDGET_WORDS = /預算/;
 export function budgetYear(text) {
   const t = String(text || '');
@@ -131,7 +134,12 @@ export function matchBudgets(budgets, text) {
     const of = list.filter(b => b.k === y || b.k.startsWith(`${y}`) || b.title.includes(`${y}年`));
     if (of.length) return of.sort(newer);
   }
-  return [...list].sort(newer).slice(0, GROUND_LIMITS.budgets);
+  const yearOf = b => Number(String(b.k).match(/^\d{3}/)?.[0] || 0);
+  const top = Math.max(...list.map(yearOf));
+  return list
+    .filter(b => yearOf(b) === top)
+    .sort((a, b) => a.k.length - b.k.length || newer(a, b))
+    .slice(0, GROUND_LIMITS.budgets);
 }
 
 // ---- What the model and the reader get -------------------------------------------------
@@ -187,7 +195,10 @@ const billLine = b => {
 // Orbit Law's files (each one left out when it isn't there).
 export async function groundFor(text) {
   const [f, n, b, y] = await Promise.all(['ai/facts.json', 'ai/news.json', 'bills/items.json', 'ly/budget.json'].map(p => readGround(p)));
-  return { facts: matchFacts(f?.facts, text), news: matchNews(n?.news, text), bills: matchBills(b?.items, text), budgets: matchBudgets(y?.budgets, text) };
+  const budgets = matchBudgets(y?.budgets, text);
+  // (A budget question gets the budgets, not every bill whose name says 預算; a law it names still brings its bills.)
+  const bills = matchBills(b?.items, text).filter(x => !budgets.length || (lawOf(x.n).length >= 3 && text.includes(lawOf(x.n))));
+  return { facts: matchFacts(f?.facts, text), news: matchNews(n?.news, text), bills, budgets };
 }
 
 const budgetsOf = g => g?.budgets || [];

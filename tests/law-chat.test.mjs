@@ -157,7 +157,7 @@ test('a plan, then an answer from the articles found only; a cite to anything el
   assert.equal(j.covered, true);
   assert.deepEqual(j.sources, [{ p: 'B0000001', n: '民法', key: '456' }]);
   assert.deepEqual([j.next, j.followups, j.cached, j.left], [['保留租約與收據'], ['房東不還押金怎麼辦？'], false, LAW_LIMITS.chatPerPass - 1]);
-  assert.deepEqual(Object.keys(j).sort(), ['agency', 'answer', 'cached', 'cited', 'consequences', 'covered', 'followups', 'left', 'next', 'points', 'sources']);
+  assert.deepEqual(Object.keys(j).sort(), ['agency', 'answer', 'cached', 'cited', 'consequences', 'covered', 'facts', 'followups', 'left', 'next', 'points', 'sources', 'timeline', 'verdict']);
 });
 
 test('names resolve exactly, by short name, by prefix, then among the regulations; the authority article comes along', async () => {
