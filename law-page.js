@@ -9,13 +9,14 @@
 // a day); 500 fresh reads a Pass a day (a cached one is free).
 // Orbit Law's nightly build, with its key (X-Build-Key = the secret
 // LAW_BUILD_KEY) in place of a Pass, reads the county 法規 sites that serve
-// only Taiwan (law-hosts.js) here, from Taiwan through gemini-relay.
+// only Taiwan (law-hosts.js) here, from Taiwan through gemini-relay (720 a
+// minute: a page a second for each of the 12 sites).
 import { json, LOCAL_ORIGIN } from './http.js';
 import { fail, twDay, passOf, passKey, countOf, addOne } from './law.js';
 import { sessionLimited } from './quadra-token.js';
 import { twOnly, buildKeyOk } from './law-hosts.js';
 
-export const PAGE_LIMITS = { perPass: 500, perMinute: 60, buildPerMinute: 120, hops: 5, timeoutMs: 20_000, maxHtml: 2 * 1024 * 1024, maxBytes: 6 * 1024 * 1024 };
+export const PAGE_LIMITS = { perPass: 500, perMinute: 60, buildPerMinute: 720, hops: 5, timeoutMs: 20_000, maxHtml: 2 * 1024 * 1024, maxBytes: 6 * 1024 * 1024 };
 const ORIGIN = 'https://jaypengx.github.io';
 const LONG = new Set(['judgment.judicial.gov.tw', 'cons.judicial.gov.tw']);
 const UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
