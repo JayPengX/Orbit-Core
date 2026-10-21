@@ -21,7 +21,7 @@ export function corsHeaders(origin, colo) {
     'Access-Control-Allow-Origin': isAllowedOrigin(origin) ? origin : 'null',
     'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Expose-Headers': 'X-Worker-Colo, X-Transit-Cache, X-Transit-Age, X-Sports-Proxy-Cache, X-Sports-Proxy-Cache-Tier, X-Sports-Proxy-Age, X-Sports-Proxy-Final',
+    'Access-Control-Expose-Headers': 'X-Worker-Colo, X-Transit-Cache, X-Transit-Age, X-Sports-Proxy-Cache, X-Sports-Proxy-Cache-Tier, X-Sports-Proxy-Age, X-Sports-Proxy-Final, Server-Timing',
     // Browsers keep a preflight this long (Chrome caps it at 2 hours): the
     // apps' JSON writes don't each cost a second Worker request.
     'Access-Control-Max-Age': '86400',
