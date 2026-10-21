@@ -10,9 +10,9 @@ export const TW_ONLY_HOSTS = new Set([
   'ptlaw.pthg.gov.tw', // 屏東縣
   'law.taitung.gov.tw', // 臺東縣
   'glrs.hl.gov.tw', // 花蓮縣
-  'law.klcg.gov.tw', // 基隆市
-  'law.hsinchu.gov.tw', // 新竹縣
-  'law.nantou.gov.tw', // 南投縣
+  'exlaw.klcg.gov.tw', // 基隆市
+  'hclaw.hsinchu.gov.tw', // 新竹縣
+  'glrs.nantou.gov.tw', // 南投縣
   'law.cyhg.gov.tw', // 嘉義縣
   'law.penghu.gov.tw' // 澎湖縣
 ]);
