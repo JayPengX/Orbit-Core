@@ -51,7 +51,9 @@ import {
   limitOnly,
   cnBoard,
   usSession,
-  usExtendedEnd
+  usExtendedEnd,
+  fundCutoff,
+  FUND_NAV_WAIT
 } from '#kit/stock-markets.mjs';
 import { nextTradingStart, isTradingDay } from '#kit/stock-holidays.mjs';
 import { twDay } from '#kit/format.mjs';
@@ -703,6 +705,14 @@ export function placeOrder(account, req, { quote, rates, valuation, now = Date.n
     order.expiry = true;
     order.tif = 'day';
   }
+  // A Taiwan fund (境內基金) is bought or redeemed at the NAV of its cutoff's
+  // day (fundCutoff), known only that evening: a market order, never a
+  // price, waiting a few days for that NAV to come out.
+  if (quote.market === 'TWFUND') {
+    if (type !== 'market' && !req.forced && !req.cover) return { error: 'navOnly' };
+    order.after = fundCutoff(now);
+    order.tif = 'day';
+  }
   // How long it lasts: a day order ends with its session (what exchanges
   // and brokers do by default); good-till-cancelled lasts GTC_DAYS. Crypto
   // and currency pairs never close, so theirs are GTC.
@@ -711,6 +721,7 @@ export function placeOrder(account, req, { quote, rates, valuation, now = Date.n
   order.expires = order.after ? order.after + 9 * 3_600_000 : order.tif === 'gtc' ? now + GTC_DAYS * 86_400_000 : order.ext ? usExtendedEnd(now) : dayOrderEnd(quote, now);
   // (A settlement placed after its day, the app closed then: at the close it settled at.)
   if (order.expiry) order.expires = Math.max(order.expires, now + 86_400_000);
+  if (quote.market === 'TWFUND') order.expires = order.after + FUND_NAV_WAIT;
   // A Taiwan whole-lot day order is in its day's 13:30 closing match: it
   // lasts until that's known (CLOSE_DECIDE; Yahoo's Taiwan prices run 20
   // minutes behind), ending unmatched after it.

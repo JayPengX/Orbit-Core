@@ -162,6 +162,10 @@ export const MARKETS = {
   // Currency pairs (外匯): EUR/USD is bought and sold in US$, a unit per
   // euro. No commission; the dealer's spread each way, like a forex broker.
   FX: { delay: 0, zh: '外匯', en: 'Forex', flag: '💱', currency: null, suffixes: [], commission: { rate: 0, min: 0 }, spread: 0.0002, withholding: 0 },
+  // Taiwan's own mutual funds (境內基金), bought and redeemed through a fund
+  // platform at the day's NAV (SITCA's, fund-nav.js): `.TWF` after the
+  // fund's 基金統編. The subscription fee is tradeCosts' FUND_FEE.
+  TWFUND: { delay: 0, zh: '基金', en: 'Fund', flag: '🗂️', currency: null, suffixes: ['.TWF'], commission: { rate: 0, min: 0 }, withholding: 0 },
   // Anywhere else search turns up: a generic sub-brokerage rate.
   INTL: { zh: '其他市場', en: 'Other markets', flag: '🌐', currency: null, suffixes: [], commission: { rate: 0.003, min: 0 }, withholding: 0.2 }
 };
@@ -178,7 +182,7 @@ export const DIV_PAY_DAYS = {
 export const divPayDays = market => DIV_PAY_DAYS[market] ?? 21;
 
 // Each market's own clock, for its days (settlement, lunch breaks, T+1).
-export const MARKET_TZ = { TW: 'Asia/Taipei', US: 'America/New_York', JP: 'Asia/Tokyo', HK: 'Asia/Hong_Kong', CN: 'Asia/Shanghai', KR: 'Asia/Seoul', UK: 'Europe/London', FR: 'Europe/Paris', DE: 'Europe/Berlin', NL: 'Europe/Amsterdam', IT: 'Europe/Rome', ES: 'Europe/Madrid', CH: 'Europe/Zurich', DK: 'Europe/Copenhagen', CA: 'America/Toronto', AU: 'Australia/Sydney', SG: 'Asia/Singapore', IN: 'Asia/Kolkata', BOND: 'Asia/Taipei', METAL: 'Asia/Taipei' };
+export const MARKET_TZ = { TW: 'Asia/Taipei', US: 'America/New_York', JP: 'Asia/Tokyo', HK: 'Asia/Hong_Kong', CN: 'Asia/Shanghai', KR: 'Asia/Seoul', UK: 'Europe/London', FR: 'Europe/Paris', DE: 'Europe/Berlin', NL: 'Europe/Amsterdam', IT: 'Europe/Rome', ES: 'Europe/Madrid', CH: 'Europe/Zurich', DK: 'Europe/Copenhagen', CA: 'America/Toronto', AU: 'Australia/Sydney', SG: 'Asia/Singapore', IN: 'Asia/Kolkata', BOND: 'Asia/Taipei', METAL: 'Asia/Taipei', TWFUND: 'Asia/Taipei' };
 const tzOf = market => MARKET_TZ[market] || 'Asia/Taipei';
 // A moment's local date and minutes after midnight in a market.
 function localParts(t, market) {
@@ -509,7 +513,7 @@ export const lunchOf = market => LUNCH[market] || null;
 // 2027-10-11). Crypto, passbook metals and forex here settle at once. Sale
 // proceeds can buy again right away (the broker nets them), but can't leave
 // the market (be exchanged) until settled.
-export const SETTLE_DAYS = { TW: 2, US: 1, CA: 1, IN: 1, CN: 1, JP: 2, HK: 2, KR: 2, UK: 2, FR: 2, DE: 2, NL: 2, IT: 2, ES: 2, CH: 2, DK: 2, AU: 2, SG: 2, BOND: 1, CRYPTO: 0, METAL: 0, FX: 0 };
+export const SETTLE_DAYS = { TW: 2, US: 1, CA: 1, IN: 1, CN: 1, JP: 2, HK: 2, KR: 2, UK: 2, FR: 2, DE: 2, NL: 2, IT: 2, ES: 2, CH: 2, DK: 2, AU: 2, SG: 2, BOND: 1, CRYPTO: 0, METAL: 0, FX: 0, TWFUND: 3 };
 export const T1_EUROPE = Date.UTC(2027, 9, 11);
 const EUROPE_T1 = new Set(['UK', 'FR', 'DE', 'NL', 'IT', 'ES', 'CH', 'DK']);
 export const settleDays = (market, t = Date.now()) => (EUROPE_T1.has(market) && t >= T1_EUROPE ? 1 : SETTLE_DAYS[market] ?? 2);
@@ -616,6 +620,25 @@ export function marketOf(symbol, kind) {
   return SUFFIX_MARKET.find(([s]) => s === suffix)?.[1] || (/^\.[A-Z]$/.test(suffix) ? 'US' : 'INTL');
 }
 
+// A Taiwan fund (境內基金): its 基金統編 and `.TWF`.
+export const isTwFund = symbol => /^[A-Za-z0-9]{2,12}\.TWF$/.test(symbol || '');
+// A fund order's cutoff (申購/買回截止): the day's NAV for orders in by
+// 15:30 on a Taiwan business day (the fund platforms' 境內基金 cutoff), else
+// the next business day's. The order fills at the NAV dated that day.
+export const FUND_CUTOFF = '15:30';
+// How long a fund order waits for its day's NAV (SITCA's comes out that
+// evening, or the next morning) before it ends unfilled.
+export const FUND_NAV_WAIT = 4 * 86_400_000;
+export function fundCutoff(t) {
+  let day = localDayOf(t, 'TWFUND');
+  for (let i = 0; i < 40; i++) {
+    const at = Date.parse(`${day}T${FUND_CUTOFF}:00+08:00`);
+    if (t < at && tradingDay('TW', day)) return at;
+    day = localDayOf(at + 12 * 3_600_000, 'TWFUND');
+  }
+  return t;
+}
+
 // Passbook metals: the page's own instruments, priced from the futures.
 export const METALS = {
   XAU: { future: 'GC=F', zh: '黃金存摺', en: 'Gold passbook', unitZh: '公克', unitEn: 'g' },
@@ -630,6 +653,7 @@ export function kindOf(type, symbol, hint) {
   if (METALS[symbol]) return 'metal';
   if (isCb(symbol)) return 'cb';
   if (isWarrant(symbol)) return 'warrant';
+  if (isTwFund(symbol)) return 'fund';
   switch (String(type || '').toUpperCase()) {
     case 'ETF':
       return /^\d{4,6}B\.TWO?$/.test(symbol) ? 'bond' : 'etf';
@@ -652,7 +676,7 @@ export function kindOf(type, symbol, hint) {
 // broker's sub-brokerage, and that is cash only, no 融資 and no borrowed
 // short (元大 複委託說明: 不得信用交易). (The FSC's 複委託外幣融資, US index
 // stocks only, was approved 2026-08 but isn't in force: 2027 Q2 at the earliest.)
-const LOCAL_MARKETS = new Set(['TW', 'CRYPTO', 'METAL', 'BOND', 'FX']);
+const LOCAL_MARKETS = new Set(['TW', 'TWFUND', 'CRYPTO', 'METAL', 'BOND', 'FX']);
 export const isSubBrokered = market => Boolean(market) && !LOCAL_MARKETS.has(market);
 
 export const TRADABLE_KINDS = new Set(['stock', 'etf', 'bond', 'fund', 'crypto', 'metal', 'govbond', 'fx', 'cb', 'warrant']);

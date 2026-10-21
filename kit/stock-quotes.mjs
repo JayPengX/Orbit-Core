@@ -5,7 +5,7 @@
 // data route in place). Quotes come 20 to a request from
 // /v7/finance/spark (with the day's price line), charts, dividends and
 // splits from /v8/finance/chart, and symbol search from /v1/finance/search.
-import { BASE, METALS, GRAMS_PER_OUNCE, kindOf, marketOf, normalizeCurrency } from './stock-markets.mjs';
+import { BASE, METALS, GRAMS_PER_OUNCE, FUND_CUTOFF, isTwFund, kindOf, marketOf, normalizeCurrency } from './stock-markets.mjs';
 import { BONDS, ISSUERS, CURVE_SYMBOLS, bondQuote, bondLine, curveOf } from './stock-bonds.mjs';
 
 export const PROXY_URL = 'https://orbit-workers-proxy.pengzjay.workers.dev';
@@ -19,6 +19,7 @@ const SPARK_BATCH = 20;
 // seconds (orders fill at a price under a minute old), longer charts half an
 // hour, company numbers an hour, searches a day.
 export function ttlFor(url) {
+  if (url.startsWith(FUND_NAV)) return 10 * 60_000;
   if (url.includes('/v1/finance/search')) return 24 * 3_600_000;
   if (url.includes('/v10/finance/quoteSummary')) return 3_600_000;
   const range = /[?&]range=([^&]+)/.exec(url)?.[1] || '1d';
@@ -34,6 +35,54 @@ const getJson = url => {
   const ttl = ttlFor(url);
   return reader(url, { ttl, persist: ttl > 60_000 || url.includes('/v8/finance/chart/'), timeout: 15_000 });
 };
+
+// Taiwan's funds' NAVs (境內基金): the proxy's copy of SITCA's daily list
+// (fund-nav.js), by 基金統編, FUND_BATCH to a request. A fund is
+// `${統編}.TWF`; its price is the NAV dated `date` (that day's, out in the
+// evening), as of the cutoff it answers (FUND_CUTOFF).
+const FUND_NAV = 'https://funds.quadra/nav.json?codes=';
+const FUND_BATCH = 40;
+export function fundQuote(symbol, f) {
+  if (!f || !(f.nav > 0)) return null;
+  const prev = f.prev > 0 ? f.prev : f.nav;
+  const marketTime = Date.parse(`${f.date}T${FUND_CUTOFF}:00+08:00`);
+  return {
+    symbol,
+    name: f.name,
+    shortName: f.name,
+    kind: 'fund',
+    market: 'TWFUND',
+    currency: normalizeCurrency(f.currency).currency,
+    price: f.nav,
+    prev,
+    change: f.nav - prev,
+    pct: prev ? f.nav / prev - 1 : 0,
+    dayHigh: null,
+    dayLow: null,
+    high52: null,
+    low52: null,
+    volume: null,
+    exchange: f.company || '',
+    tz: 'Asia/Taipei',
+    marketTime,
+    session: null,
+    line: [[marketTime - 86_400_000, prev], [marketTime, f.nav]]
+  };
+}
+async function fetchFundQuotes(symbols) {
+  const codes = symbols.map(s => s.slice(0, -4));
+  const out = new Map();
+  const batches = [];
+  for (let i = 0; i < codes.length; i += FUND_BATCH) batches.push(codes.slice(i, i + FUND_BATCH));
+  const results = await Promise.allSettled(batches.map(b => getJson(FUND_NAV + b.map(encodeURIComponent).join(','))));
+  for (const r of results)
+    if (r.status === 'fulfilled')
+      for (const [code, f] of Object.entries(r.value?.funds || {})) {
+        const q = fundQuote(`${code}.TWF`, f);
+        if (q) out.set(q.symbol, q);
+      }
+  return { out, failed: results.filter(r => r.status === 'rejected').length, batches: batches.length };
+}
 
 // The FX symbol for a currency's price in NT$ (USDTWD=X: NT$ per US$).
 export const fxSymbol = currency => `${currency}${BASE}=X`;
@@ -148,7 +197,7 @@ function upstreamSymbols(symbols) {
       set.add(fxSymbol('USD'));
     } else if (BONDS[s]) {
       if (BONDS[s].live) for (const c of CURVE_SYMBOLS) set.add(c);
-    } else if (s !== BASE) set.add(s);
+    } else if (s !== BASE && !isTwFund(s)) set.add(s);
   }
   return [...set];
 }
@@ -157,6 +206,8 @@ function upstreamSymbols(symbols) {
 // Symbols Yahoo doesn't know are simply missing.
 export async function fetchQuotes(symbols, { range = '1d', interval = '5m' } = {}) {
   const wanted = upstreamSymbols(symbols).sort();
+  const funds = [...new Set(symbols.filter(isTwFund))].sort();
+  const fundRead = funds.length ? fetchFundQuotes(funds) : null;
   const batches = [];
   for (let i = 0; i < wanted.length; i += SPARK_BATCH) batches.push(wanted.slice(i, i + SPARK_BATCH));
   const results = await Promise.allSettled(
@@ -166,6 +217,7 @@ export async function fetchQuotes(symbols, { range = '1d', interval = '5m' } = {
   );
   const out = new Map();
   let failed = 0;
+  let asked = batches.length;
   for (const r of results) {
     if (r.status === 'fulfilled') for (const [k, v] of parseSpark(r.value)) out.set(k, v);
     else failed++;
@@ -178,7 +230,13 @@ export async function fetchQuotes(symbols, { range = '1d', interval = '5m' } = {
     const q = liveBondQuote(s, out);
     if (q) out.set(s, q);
   }
-  if (failed && failed === batches.length) throw new Error('quotes unavailable');
+  if (fundRead) {
+    const f = await fundRead;
+    for (const [k, v] of f.out) out.set(k, v);
+    failed += f.failed;
+    asked += f.batches;
+  }
+  if (failed && failed === asked) throw new Error('quotes unavailable');
   // When it was read (an order waiting for a fresh price checks it).
   const got = Date.now();
   for (const q of out.values()) q.got = got;
@@ -246,6 +304,11 @@ export async function fetchChart(symbol, rangeKey = '1mo', { events = false } = 
     const points = bondLine(bond, times, t => (bond.live ? curveFromLines(lines, t) : curveOf(bond.issuer)));
     return { quote, points, bars: [], dividends: [], splits: [] };
   }
+  // A fund: its NAV and the day's before (SITCA's list has only those two).
+  if (isTwFund(symbol)) {
+    const quote = (await fetchQuotes([symbol])).get(symbol) || null;
+    return quote && { quote, points: quote.line, bars: [], dividends: [], splits: [] };
+  }
   if (METALS[symbol]) {
     const [future, usd] = await Promise.all([fetchChart(METALS[symbol].future, rangeKey), fetchChart(fxSymbol('USD'), rangeKey)]);
     if (!future || !usd) return null;
@@ -268,6 +331,7 @@ export async function fetchChart(symbol, rangeKey = '1mo', { events = false } = 
 export async function fetchBars(symbol, since, { prePost = false } = {}) {
   const age = Date.now() - since;
   const day = 86_400_000;
+  if (isTwFund(symbol)) return [];
   const [range, interval] = age < 5 * day ? ['5d', '5m'] : age < 28 * day ? ['1mo', '30m'] : age < 700 * day ? ['2y', '1h'] : ['max', '1d'];
   if (METALS[symbol]) {
     const [future, usd] = await Promise.all([fetchBars(METALS[symbol].future, since), fetchBars(fxSymbol('USD'), since)]);
@@ -284,6 +348,7 @@ export async function fetchBars(symbol, since, { prePost = false } = {}) {
 
 // Dividends and splits since `since` (ms): the account credits them.
 export async function fetchCorporateActions(symbol, since) {
+  if (isTwFund(symbol)) return { dividends: [], splits: [] };
   const years = (Date.now() - since) / (365.25 * 86_400_000);
   const range = years < 0.9 ? '1y' : years < 4.5 ? '5y' : 'max';
   const [r, interval] = [range, range === 'max' ? '1mo' : range === '5y' ? '1wk' : '1d'];

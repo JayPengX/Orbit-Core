@@ -315,3 +315,26 @@ test('a US market-wide halt (the S&P 500 down 7% in the last 15 minutes) fills n
   assert.deepEqual((await decideFills([order], { read: readAt(5500), now })).fills, {});
   assert.deepEqual((await decideFills([order], { read: readAt(5990), now })).fills, { order0001: { quote: 250, t: now } });
 });
+
+test('a Taiwan fund fills at the NAV of the first cutoff after the proxy saw it, whatever the phone says', async () => {
+  const at = s => Date.parse(`${s}+08:00`);
+  const docs = new Map();
+  let clock = at('2026-10-21T20:00:00');
+  let nav = { nav: 13.21, prev: 13.2, date: '2026-10-21' };
+  const deps = {
+    json: (data, status) => new Response(JSON.stringify(data), { status }),
+    errorJson: (code, status) => new Response(JSON.stringify({ error: { code } }), { status }),
+    fsGet: async (env, c, id) => (docs.has(`${c}/${id}`) ? { exists: true, payload: docs.get(`${c}/${id}`) } : { exists: false }),
+    fsWrite: async (env, c, id, payload) => void docs.set(`${c}/${id}`, payload),
+    now: () => clock,
+    read: async url => (url.startsWith('https://funds.quadra/') ? { funds: { '00526748A': { name: '兆豐ESG', company: '兆豐投信', currency: 'TWD', ...nav } } } : { spark: { result: [] } })
+  };
+  // Placed "before today's cutoff" by a phone that first asks once today's NAV is out.
+  const order = { id: 'order0900', symbol: '00526748A.TWF', side: 'buy', type: 'market', qty: 100, t: at('2026-10-21T10:00:00'), after: at('2026-10-21T15:30:00'), expires: at('2026-10-25T15:30:00'), market: 'TWFUND', kind: 'fund', currency: 'TWD' };
+  const ask = () => handleStock(new Request('https://x/stock', { method: 'POST', body: JSON.stringify({ op: 'fill', orders: [order] }) }), {}, {}, { a: 'stock', d: 'acc' }, deps).then(r => r.json());
+  assert.deepEqual((await ask()).fills, {}, 'today\'s NAV is already known: not that one');
+  // Tomorrow evening, tomorrow's NAV.
+  clock = at('2026-10-22T19:00:00');
+  nav = { nav: 13.4, prev: 13.21, date: '2026-10-22' };
+  assert.equal((await ask()).fills.order0900.quote, 13.4);
+});

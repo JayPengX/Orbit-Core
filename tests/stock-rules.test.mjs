@@ -398,3 +398,39 @@ test('權證 and 牛熊證: by the 張, their ticks, 0.1% tax, no margin or shor
   assert.ok(o.expiry && o.expires > now);
   assert.equal(place({ side: 'sell', type: 'market', qty: 2000, expiry: last + 60_000 }).error, 'side', 'only at a 13:30 close');
 });
+
+test('境內基金: bought at the NAV of the 15:30 cutoff, market orders only', async () => {
+  const M = await import('../kit/stock-markets.mjs');
+  const Q = await import('../kit/stock-quotes.mjs');
+  assert.equal(M.kindOf('', '00526748A.TWF'), 'fund');
+  assert.equal(M.marketOf('00526748A.TWF', 'fund'), 'TWFUND');
+  assert.ok(!M.isSubBrokered('TWFUND'));
+  const at = s => Date.parse(`${s}+08:00`);
+  // Before the cutoff: today's; after it: the next business day's (a Friday's: Monday's).
+  assert.equal(M.fundCutoff(at('2026-10-21T10:00:00')), at('2026-10-21T15:30:00'));
+  assert.equal(M.fundCutoff(at('2026-10-21T15:30:00')), at('2026-10-22T15:30:00'));
+  assert.equal(M.fundCutoff(at('2026-10-16T16:00:00')), at('2026-10-19T15:30:00'));
+  assert.equal(M.fundCutoff(at('2026-10-23T16:00:00')), at('2026-10-27T15:30:00'), '光復節 observed on the Monday');
+  const f = { name: '兆豐ESG', company: '兆豐投信', currency: 'TWD', nav: 13.21, prev: 13.2, date: '2026-10-20' };
+  const q = Q.fundQuote('00526748A.TWF', f);
+  assert.equal(q.market, 'TWFUND');
+  assert.equal(q.kind, 'fund');
+  assert.equal(q.marketTime, at('2026-10-20T15:30:00'));
+  const now = at('2026-10-21T10:00:00');
+  const acc = SA.newAccount(1_000_000, now - 400 * DAY, 'f');
+  const place = (req, t = now) => SA.placeOrder(acc, req, { quote: q, rates: { TWD: 1 }, valuation: ok, now: t, id: 'f1' });
+  assert.equal(place({ side: 'buy', type: 'limit', limit: 13, qty: 100 }).error, 'navOnly');
+  const r = place({ side: 'buy', type: 'market', qty: 1000.5 });
+  assert.equal(r.error, undefined);
+  assert.equal(r.fill, null, 'never at yesterday\'s NAV');
+  const o = r.account.orders.at(-1);
+  assert.equal(o.after, at('2026-10-21T15:30:00'));
+  assert.equal(o.expires, o.after + M.FUND_NAV_WAIT);
+  // Yesterday's NAV doesn't fill it; today's (out that evening) does, at the NAV.
+  assert.equal(SA.triggerPrice(o, q, at('2026-10-21T18:00:00')), null);
+  const today = Q.fundQuote('00526748A.TWF', { ...f, nav: 13.5, prev: 13.21, date: '2026-10-21' });
+  assert.equal(SA.triggerPrice(o, today, at('2026-10-21T20:00:00')), 13.5);
+  // The fee: 1% to subscribe, nothing to redeem.
+  assert.equal(M.tradeCosts({ market: 'TWFUND', side: 'buy', kind: 'fund', gross: 10_000, currency: 'TWD' }).total, 100);
+  assert.equal(M.tradeCosts({ market: 'TWFUND', side: 'sell', kind: 'fund', gross: 10_000, currency: 'TWD' }).total, 0);
+});
