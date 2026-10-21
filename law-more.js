@@ -8,7 +8,7 @@
 //   ly/votes.json    { names, votes: [[id, date, 議題, agenda, yes, no, abstain, laws]] }
 //                    (yes/no/abstain: places in names);
 //   ly/agenda.json   { meets: [{ id, title, room, days: [{ d, from, to }], why, bills }] };
-//   cons/index.json  { items: [[id, date, label, 案名, 爭點, ['p:key'], refs, bills]] } and
+//   cons/index.json  { items: [[id, date, 案名, 爭點, ['p:key'], refs, bills]] } and
 //                    cons/<id>.json { main, reason }: 大法官解釋 (s748) and 憲法判決 (j111-10);
 //   agency/all.json  { rules: [[id, name, agency, date, url, ['p:key'], [p]]] } and
 //   agency/text/<file>.json { t }: ministries' 行政規則.
@@ -105,14 +105,14 @@ export function matchCons(rows, cites, text, max = 2) {
   const scored = [];
   for (const r of Array.isArray(rows) ? rows : []) {
     if (!Array.isArray(r) || !CONS_ID.test(String(r[0]))) continue;
-    let s = shared(`${r[3] || ''} ${r[4] || ''}`, want) * 0.75;
-    for (const c of r[5] || []) if (arts.has(c)) s += 3;
+    let s = shared(`${r[2] || ''} ${r[3] || ''}`, want) * 0.75;
+    for (const c of r[4] || []) if (arts.has(c)) s += 3;
     if (s >= 3) scored.push([s, r]);
   }
   return scored
     .sort((a, b) => b[0] - a[0] || String(b[1][1]).localeCompare(String(a[1][1])))
     .slice(0, max)
-    .map(([, r]) => ({ jid: r[0], d: String(r[1] || ''), t: String(r[3] || r[4] || ''), label: String(r[2] || ''), cites: (r[5] || []).slice(0, 8) }));
+    .map(([, r]) => ({ jid: r[0], d: String(r[1] || ''), t: String(r[2] || r[3] || ''), cites: (r[4] || []).slice(0, 8) }));
 }
 
 async function caseText(jid) {
