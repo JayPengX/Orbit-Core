@@ -42,7 +42,7 @@
 import { replay, ownCash, applyFills, planOrderType, futMargin } from './kit/stock-account.mjs';
 import { unpack } from './kit/stock-codec.mjs';
 import { BONDS } from './kit/stock-bonds.mjs';
-import { marketFill, dealPrice, currencyInfo, isSubBrokered, cbMaturity, futureOf, futureExpiry } from './kit/stock-markets.mjs';
+import { marketFill, dealPrice, currencyInfo, isSubBrokered, cbMaturity, futureOf, futureExpiry, optionOf, optionExpiry, optionIntrinsic, unitMult } from './kit/stock-markets.mjs';
 import { fxSymbol } from './kit/stock-quotes.mjs';
 import { readFillsBook, decideFills, ipoList, ipoDraw, ipoKeyOf } from './stock-fill.js';
 import { parseDoc } from './doc-store.js';
@@ -118,17 +118,18 @@ export function fillPrice({ k, l, side, one = false }, quote, market, kind) {
 }
 
 // A fill's money: the price times the shares, the costs only taking from it.
+// (An option's price is in points: NT$50 each.)
 function fillMoneyOk(e) {
   if (!(e.qty > 0) || !(e.price > 0)) return false;
-  const gross = e.price * e.qty;
+  const gross = e.price * e.qty * unitMult(e.symbol);
   const unit = 10 ** -(currencyInfo(e.currency).digits ?? 2);
   if (Number.isFinite(e.gross) && !near(e.gross, gross, Math.max(unit, gross * 1e-9) + 1e-9)) return false;
   return e.side === 'sell' ? e.total <= gross + unit : e.total >= gross - unit;
 }
 // The fill counted at another price: the same shares, the costs as they were.
 const repriced = (e, price) => {
-  const diff = (price - e.price) * e.qty;
-  return { price, gross: price * e.qty, total: e.total + diff };
+  const diff = (price - e.price) * e.qty * unitMult(e.symbol);
+  return { price, gross: price * e.qty * unitMult(e.symbol), total: e.total + diff };
 };
 
 // One event checked: 'ok', 'bad' (left out for good), 'later' (the data to
@@ -139,6 +140,19 @@ export async function checkEvent(e, account, wallet, read, issued = {}, ctx = {}
   const now = ctx.now ?? Date.now();
   switch (e.type) {
     case 'fill': {
+      // An option held to its expiry: what it's worth at TAIFEX's final price
+      // (nothing, often), then, on what was held, less only the 期交稅.
+      if (e.kind === 'opt' && e.maturity) {
+        const o = optionOf(e.symbol);
+        const due = optionExpiry(e.symbol);
+        if (!o || !due || e.t !== due || e.t > now || e.side !== 'sell' || ctx.used?.has(`maturity:${e.symbol}`)) return 'bad';
+        const held = replay(account, e.t).positions[e.symbol]?.qty || 0;
+        if (!(e.qty > 0) || e.qty > held + 1e-6) return 'bad';
+        const final = (await read(TAIFEX_URL))?.final?.[`${o.year}${String(o.month).padStart(2, '0')}`];
+        if (!(final > 0)) return now - e.t > 30 * DAY ? 'bad' : 'later';
+        const gross = optionIntrinsic(e.symbol, final) * e.qty * o.mult;
+        return near(e.price, optionIntrinsic(e.symbol, final), 1e-9) && near(e.gross, gross, 0.5) && e.total <= gross + 0.5 && e.total >= 0 ? 'ok' : 'bad';
+      }
       if (!fillMoneyOk(e)) return 'bad';
       const mine = e.orderId ? issued[e.orderId] : null;
       if (mine) {
@@ -186,8 +200,8 @@ export async function checkEvent(e, account, wallet, read, issued = {}, ctx = {}
         if (!(final > 0)) return now - e.t > 30 * DAY ? 'bad' : 'later';
         return near(e.price, final, 1e-9) ? 'ok' : 'bad';
       }
-      // (A future fills only here: TAIFEX's prices aren't in Yahoo's history.)
-      if (e.kind === 'fut') return 'bad';
+      // (A future or option fills only here: TAIFEX's prices aren't in Yahoo's history.)
+      if (e.kind === 'fut' || e.kind === 'opt') return 'bad';
       // Found on the phone: at the worst price traded since its moment.
       const bars = await since(read, e.symbol, e.t - 10 * MIN, now);
       if (!bars) return now - e.t > 60 * DAY ? 'bad' : 'later';

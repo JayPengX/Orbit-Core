@@ -258,8 +258,8 @@ export function jpTickTable(kind, symbol) {
   return inTopix500(symbol) ? JP_FINE : JP_OTHER;
 }
 export function tickSize(market, kind, price, symbol = null) {
-  // 臺股期貨 and its smaller ones: a whole index point.
-  if (market === 'TAIFEX') return 1;
+  // 臺股期貨 and its smaller ones: a whole index point; an option by its premium.
+  if (market === 'TAIFEX') return kind === 'opt' ? optionTick(price) : 1;
   if (market === 'TW') {
     if (kind === 'etf' || kind === 'bond') return price < 50 ? 0.01 : 0.05;
     // A convertible bond, by price per NT$100 of face (TPEx 轉換公司債升降單位).
@@ -690,6 +690,47 @@ export function futureMonths(code, t = Date.now(), n = 2) {
   return out;
 }
 
+// TAIFEX's TAIEX options (臺指選擇權, TXO), monthly: `TXO202611C46500.TF`,
+// a call (C) or put (P) at a strike, NT$50 a point of premium. Bought only
+// (paid in full; writing one, which needs margin, isn't offered). They
+// expire with the futures of their month, settling in cash at the same final
+// price (the intrinsic value, if any). Costs: the broker's fee a contract and
+// the 期交稅 (0.1% of the premium paid or received).
+export const OPTION = { code: 'TXO', zh: '台指選', en: 'TAIEX option', mult: 50, fee: 25 };
+export const OPT_TAX = 0.001;
+// Strikes every 100 points (TAIFEX lists 50s near the money too; 100s are enough here).
+export const OPT_STEP = 100;
+const OPT_RE = /^TXO(\d{4})(\d{2})([CP])(\d{3,6})\.TF$/;
+export const isOption = symbol => OPT_RE.test(symbol || '');
+export function optionOf(symbol) {
+  const m = OPT_RE.exec(symbol || '');
+  return m ? { ...OPTION, year: Number(m[1]), month: Number(m[2]), right: m[3], strike: Number(m[4]) } : null;
+}
+export const optionSymbol = (month, right, strike) => `TXO${month}${right}${strike}.TF`;
+// NT$ a point of price: 50 for an option, 1 for anything priced per unit.
+export const unitMult = symbol => (isOption(symbol) ? OPTION.mult : 1);
+// Its month's final settlement (the futures', the same day and price).
+export function optionExpiry(symbol) {
+  const o = optionOf(symbol);
+  return o ? futureExpiry(`TX${o.year}${String(o.month).padStart(2, '0')}.TF`) : null;
+}
+// What it pays at a settlement price: max(0, the index past the strike), in points.
+export function optionIntrinsic(symbol, at) {
+  const o = optionOf(symbol);
+  if (!o || !(at > 0)) return 0;
+  return Math.max(0, o.right === 'C' ? at - o.strike : o.strike - at);
+}
+// The months listed at `t` (yyyymm), nearest first, like futureMonths.
+export const optionMonths = (t = Date.now(), n = 2) => futureMonths('TX', t, n).map(s => s.slice(2, 8));
+// TAIFEX's premium ticks (臺指選擇權 升降單位).
+export function optionTick(price) {
+  if (price < 10) return 0.1;
+  if (price < 50) return 0.5;
+  if (price < 500) return 1;
+  if (price < 1000) return 5;
+  return 10;
+}
+
 // Passbook metals: the page's own instruments, priced from the futures.
 export const METALS = {
   XAU: { future: 'GC=F', zh: '黃金存摺', en: 'Gold passbook', unitZh: '公克', unitEn: 'g' },
@@ -706,6 +747,7 @@ export function kindOf(type, symbol, hint) {
   if (isWarrant(symbol)) return 'warrant';
   if (isTwFund(symbol)) return 'fund';
   if (isFuture(symbol)) return 'fut';
+  if (isOption(symbol)) return 'opt';
   switch (String(type || '').toUpperCase()) {
     case 'ETF':
       return /^\d{4,6}B\.TWO?$/.test(symbol) ? 'bond' : 'etf';
@@ -731,7 +773,7 @@ export function kindOf(type, symbol, hint) {
 const LOCAL_MARKETS = new Set(['TW', 'TWFUND', 'TAIFEX', 'CRYPTO', 'METAL', 'BOND', 'FX']);
 export const isSubBrokered = market => Boolean(market) && !LOCAL_MARKETS.has(market);
 
-export const TRADABLE_KINDS = new Set(['stock', 'etf', 'bond', 'fund', 'crypto', 'metal', 'govbond', 'fx', 'cb', 'warrant', 'fut']);
+export const TRADABLE_KINDS = new Set(['stock', 'etf', 'bond', 'fund', 'crypto', 'metal', 'govbond', 'fx', 'cb', 'warrant', 'fut', 'opt']);
 // What can be sold short (borrowed and sold): listed shares, crypto and
 // currency pairs (selling EUR/USD bets on the euro falling).
 export const SHORTABLE_KINDS = new Set(['stock', 'etf', 'bond', 'crypto', 'fx']);
@@ -806,6 +848,12 @@ export function tradeCosts({ market, side, kind, gross, qty = 0, currency, disco
     const commission = Math.round(f.fee * qty * discount);
     const tax = Math.round(gross * f.mult * FUT_TAX);
     return { commission, tax, fee: 0, total: commission + tax, taxRate: FUT_TAX, feeRate: 0 };
+  }
+  // An option's `gross` is its premium in NT$ (points × 50 × contracts).
+  if (kind === 'opt') {
+    const commission = Math.round(OPTION.fee * qty * discount);
+    const tax = Math.round(gross * OPT_TAX);
+    return { commission, tax, fee: 0, total: commission + tax, taxRate: OPT_TAX, feeRate: 0 };
   }
   if (kind === 'fund') {
     const commission = side === 'buy' && gross > 0 ? round(gross * FUND_FEE * discount) : 0;

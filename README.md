@@ -314,7 +314,7 @@ the kit.
 | A Cloudflare product or cron | `guard.js` `PLAN` |
 | `f1-live.js` | Sports' F1 board, Play's F1 settling |
 | `fund-nav.js` | Securities' 境內基金 NAVs (SITCA) |
-| `taifex.js` | Securities' 期貨: TAIFEX settlements, margins, finals |
+| `taifex.js` | Securities' 期貨 and 選擇權: TAIFEX settlements (TX/MTX/TMF, TXO), margins, finals |
 | `eco.js` money rules | The kit's tables, `truth.mjs`, `help.mjs`, `tools/economy.mjs` |
 | `push.js` checks | The apps that schedule them, `NOTICE_KINDS` |
 | `quadra.css` or the frame | Every app at 375 px, light and dark |
