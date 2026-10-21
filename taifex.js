@@ -54,14 +54,24 @@ export function parseFinals(text) {
 }
 
 // TXO's day-session (一般) settlement prices from DailyMarketReportOpt, which
-// answers CSV (a BOM, a header row in Chinese) whatever is asked for: the
+// answers JSON to some clients and CSV (a BOM, a header row in Chinese) to
+// others, whatever is asked for, so both are read: the
 // monthly contracts only, strikes on 100s within OPT_SPAN of `settle`'s
 // TX month (all of them when that's missing).
+const OPT_KEYS = ['Contract', 'ContractMonth(Week)', 'StrikePrice', 'CallPut', 'SettlementPrice', 'TradingSession'];
 export function parseOptions(text, settle = {}) {
-  const lines = String(text || '').replace(/^\uFEFF/, '').split(/\r?\n/).filter(Boolean);
+  text = String(text || '').replace(/^\uFEFF/, '');
+  if (text.trimStart().startsWith('[')) {
+    let rows = [];
+    try {
+      rows = JSON.parse(text);
+    } catch {}
+    text = [OPT_KEYS.join(','), ...(Array.isArray(rows) ? rows : []).map(r => OPT_KEYS.map(k => String(r[k] ?? '').replace(/,/g, '')).join(','))].join('\n');
+  }
+  const lines = text.split(/\r?\n/).filter(Boolean);
   const head = (lines[0] || '').split(',').map(s => s.trim());
   const col = name => head.indexOf(name);
-  const [code, month, strike, right, price, session] = ['契約', '到期月份(週別)', '履約價', '買賣權', '結算價', '交易時段'].map(col);
+  const [code, month, strike, right, price, session] = ['契約', '到期月份(週別)', '履約價', '買賣權', '結算價', '交易時段'].map((name, i) => (col(name) < 0 ? col(OPT_KEYS[i]) : col(name)));
   const opt = {};
   if ([code, month, strike, right, price, session].some(i => i < 0)) return opt;
   for (const line of lines.slice(1)) {

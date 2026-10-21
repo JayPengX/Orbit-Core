@@ -27,5 +27,9 @@ test('TAIFEX: TXO monthly day-session settlements near the money, and the option
     '20261020,TEO,202611,2900,買權,-,-,-,-,0,40,0,-,-,-,-,,一般'
   ].join('\r\n');
   assert.deepEqual(parseOptions(csv, { TX202611: 46510 }), { 202611: { C: { 46500: 412 }, P: { 46500: 398 } } });
+  // The same answered as JSON (as it is to the Worker).
+  const row = (m, k, cp, p, session = '一般') => ({ Date: '20261020', Contract: 'TXO', 'ContractMonth(Week)': m, StrikePrice: String(k), CallPut: cp, SettlementPrice: String(p), TradingSession: session });
+  const json = JSON.stringify([row('202611', 46500, '買權', 412), row('202611', 46500, '賣權', 398), row('202610W4', 46500, '買權', 90), row('202611', 46500, '買權', 415, '盤後')]);
+  assert.deepEqual(parseOptions(json, { TX202611: 46510 }), { 202611: { C: { 46500: 412 }, P: { 46500: 398 } } });
   assert.deepEqual(parseMargins([{ Contract: '臺指選擇權風險保證金(A)值', InitialMargin: '187000', MaintenanceMargin: '143000' }], { '臺指選擇權風險保證金(A)值': 'A' }), { A: [187000, 143000] });
 });
