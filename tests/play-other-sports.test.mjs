@@ -134,6 +134,9 @@ test('golf 冠軍: the next tournaments from Kambi, settled on ESPN\'s leaderboa
   assert.equal(boards[0].slug, 'golf:pga:20261022:Butterfield Bermuda Championship');
   assert.equal(boards[0].teams.length, 30);
   assert.ok(Math.abs(boards[0].teams.reduce((a, t) => a + t.fair, 0) - 1) < 1e-6);
+  // Never longer than Kambi's own price.
+  const { futureBets } = await import('../kit/play-bets.mjs');
+  for (const b of futureBets(boards)) assert.ok(b.estOdds <= b.futureTeam.book + 1e-9, b.teamEn);
   const board = { events: [{ name: 'Butterfield Bermuda Championship', date: '2026-10-22T04:00Z', status: { type: { completed: true, name: 'STATUS_FINAL' } }, competitions: [{ competitors: [{ order: 2, athlete: { displayName: 'Ben James' } }, { order: 1, athlete: { displayName: 'Player B' } }] }] }] };
   const t = Date.parse('2026-10-22T12:00:00Z');
   assert.deepEqual(golfResult(board, 'Butterfield Bermuda Championship', t), { status: 'final', winner: 'Player B' });
