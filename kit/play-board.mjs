@@ -363,7 +363,7 @@ export function gameOptions(game) {
   // A game settled from its final score alone (schedules.mjs): nothing on a part of it.
   return game.scoreOnly ? out.filter(o => !PART_KINDS.has(o.kind)) : out;
 }
-const PART_KINDS = new Set(['htft', 'htotal', 'hrunline', 'f5', 'f5total', 'f5runline', 'q1', 'half', 'regulation', 'firstinning', 'inningtotal', 'inningml', 'inning', 'nextrun', 'tdtotal', 'qrunline', 'qtotal', 'topperiod', 'raceto', 'hdc', 'hscore', 'firstgoal', 'lastgoal', 'higherhalf', 'hits', 'teamhits']);
+const PART_KINDS = new Set(['htft', 'htotal', 'hrunline', 'f5', 'f5total', 'f5runline', 'q1', 'half', 'regulation', 'firstinning', 'inningtotal', 'inningml', 'inning', 'nextrun', 'tdtotal', 'qrunline', 'qtotal', 'topperiod', 'raceto', 'hdc', 'hscore', 'firstgoal', 'lastgoal', 'nextgoal', 'hoddeven', 'higherhalf', 'hits', 'teamhits']);
 
 // ---- F1: 前三名 (podium) --------------------------------------------------------
 

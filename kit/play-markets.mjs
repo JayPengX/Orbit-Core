@@ -242,6 +242,8 @@ function quarterMarkets(m, q) {
   // A quarter's points: a quarter of the total, half its spread.
   const qMean = m.total / 4;
   const qSd = m.totalSd / 2;
+  // 半場單雙 (American football's): even money, as the game's.
+  if (spec.td) out.push({ kind: 'hoddeven', market: 'hoddeven', cut: CUT.twoWay, picks: [{ side: 'odd', fair: 0.5 }, { side: 'even', fair: 0.5 }] });
   if (spec.qtotal) {
     for (const d of [-1, 0, 1]) {
       const line = round2(half(qMean) + d * step);
@@ -298,7 +300,18 @@ function pmf(mean, r = GOALS_DISPERSION, kMax = 15) {
 }
 
 // Final scores [{ away, home, p }] from each team's mean goals.
+// (Kept for the means asked: a game's markets ask for the same halves more than once.)
+const grids = new Map();
 export function goalGrid(means, share = 1) {
+  const key = `${means.away}|${means.home}|${share}`;
+  const hit = grids.get(key);
+  if (hit) return hit;
+  if (grids.size > 300) grids.clear();
+  const grid = buildGrid(means, share);
+  grids.set(key, grid);
+  return grid;
+}
+function buildGrid(means, share) {
   const A = pmf(means.away * share);
   const H = pmf(means.home * share);
   const out = [];
@@ -551,6 +564,8 @@ export function goalMarkets(means, { family, totalLine }) {
 // 得分較高半場 and 不讓分/兩隊是否都進球; hockey's 單節 (the first period's)
 // 不讓分 and 大小 and 得分最高單節.
 // (Eleven and 其他: twelve buttons, even rows of 2, 3 or 4.)
+// 下一球: the goals after the first sold before the game.
+export const NEXT_GOALS = [2, 3];
 export const HALF_SCORES = ['1-0', '0-0', '0-1', '2-0', '1-1', '0-2', '2-1', '2-2', '1-2', '3-0', '0-3'];
 function moreGoalMarkets(means, grid, family, totalLine) {
   const out = [];
@@ -563,6 +578,7 @@ function moreGoalMarkets(means, grid, family, totalLine) {
   const res = (a, h) => (h > a ? 0 : a === h ? 1 : 2);
   const RES = ['home', 'draw', 'away'];
   const goals = { home: new Float64Array(top + 1), away: new Float64Array(top + 1) };
+  const totals = new Float64Array(40);
   const withTotal = new Float64Array(6);
   const withBoth = new Float64Array(6);
   let odd = 0;
@@ -570,6 +586,7 @@ function moreGoalMarkets(means, grid, family, totalLine) {
   for (const { away: a, home: h, p } of grid) {
     if ((a + h) % 2) odd += p;
     if (a + h === 0) none += p;
+    totals[Math.min(a + h, 39)] += p;
     goals.home[Math.min(h, top)] += p;
     goals.away[Math.min(a, top)] += p;
     const r = res(a, h) * 2;
@@ -632,6 +649,14 @@ function moreGoalMarkets(means, grid, family, totalLine) {
   const homeShare = means.home / (means.home + means.away);
   for (const kind of ['firstgoal', 'lastgoal'])
     out.push({ kind, market: kind, cut: CUT.threeWay, picks: [{ side: 'home', fair: (1 - none) * homeShare }, { side: 'none', fair: none }, { side: 'away', fair: (1 - none) * (1 - homeShare) }] });
+  // 下一球: the 2nd and 3rd goals the same way; none when the game has fewer.
+  for (const n of NEXT_GOALS) {
+    const fewer = totals.slice(0, n).reduce((x, p) => x + p, 0);
+    out.push({ kind: 'nextgoal', market: `ng|${n}`, line: n, cut: CUT.threeWay, picks: [{ side: 'home', fair: (1 - fewer) * homeShare }, { side: 'none', fair: fewer }, { side: 'away', fair: (1 - fewer) * (1 - homeShare) }] });
+  }
+  // 半場單雙: the first half's goals odd or even.
+  const hOdd = firstTotals.reduce((x, p, n) => (n % 2 ? x + p : x), 0);
+  out.push({ kind: 'hoddeven', market: 'hoddeven', cut: CUT.twoWay, picks: [{ side: 'odd', fair: hOdd }, { side: 'even', fair: 1 - hOdd }] });
   // 得分較高半場: the halves' goals (the second has more of them).
   let firstMore = 0;
   let same = 0;
