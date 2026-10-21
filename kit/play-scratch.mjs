@@ -41,7 +41,7 @@ const pad = n => String(n).padStart(2, '0');
 const TWO = Array.from({ length: 30 }, (_, i) => pad(i + 1));
 
 // The 18 rounds of 大麻將 (its pyramids, left to right): tiles and prize.
-const MAHJONG_ROUNDS = [[1, 500], [3, 5_000], [5, 100_000], [6, 1_000_000], [7, 10_000_000], [1, 500], [2, 1_000], [3, 1_500], [1, 500], [3, 1_500], [3, 2_000], [4, 5_000], [1, 500], [2, 1_000], [2, 1_500], [3, 2_000], [4, 10_000], [5, 50_000]];
+const MAHJONG_ROUNDS = [[1, 500], [3, 5_000], [5, 100_000], [6, 1_000_000], [7, 10_000_000], [1, 500], [2, 1_000], [3, 1_500], [1, 500], [2, 1_500], [3, 2_000], [4, 5_000], [1, 500], [2, 1_000], [2, 1_500], [3, 2_000], [4, 10_000], [5, 50_000]];
 const COUNT_ROUND = (size, table) => ({ size, table });
 
 // A card: its name, price, sale dates, the run (`issued`) and its prizes
@@ -225,7 +225,7 @@ export const CARDS = {
       { type: 'rows', sizes: [3, 3, 3], symbols: ['🔔', '🎲', '🪙', 'BAR', '◇10'], need: '◇10' },
       { type: 'spots', n: 1, fixed: 500, win: { '⑩': 1 }, decoys: ['⑧', '⑥'] },
       { type: 'sum', rows: 2, target: 10 },
-      { type: 'tally', n: 5, need: '10', k: 3, decoys: ['20', '30', '40', '50', '80'] }
+      { type: 'tally', n: 6, need: '10', k: 3, decoys: ['20', '30', '40', '50', '80'] }
     ],
     how: { zh: '1. 刮出任一個「10」或「💰」，即得其對應的獎金。2. 任一局中刮出3個「◇10」，即得該局獎金（不可跨局對獎）。3. 刮出一個「⑩」，即得獎金500元。4. 任一局中，若2個數字相加為10，即得該局獎金（不可跨局對獎）。5. 刮出3個「10」，即得該獎金。', en: '1. Any 10 or 💰 wins the prize under it. 2. A round of three ◇10 wins its prize. 3. A ⑩ wins NT$500. 4. A round whose two numbers add up to 10 wins its prize. 5. Three 10s win the prize.' }
   },
