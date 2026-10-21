@@ -60,6 +60,8 @@ const jobs = Number(opt('jobs', 2));
 const out = resolve(opt('out', '/tmp/quadra-gate'));
 const taps = !flag('no-taps');
 const quick = flag('quick');
+// --tablet: the iPad sign-in runs too, with --quick.
+const tablet = flag('tablet');
 // --quick --dark: 390 dark only (the white check).
 const darkOnly = flag('dark');
 const ALL = ['sports', 'play', 'securities', 'words', 'orbit', 'weather', 'transit', 'slips', 'beats', 'law'];
@@ -70,11 +72,14 @@ for (const app of apps)
     for (const dark of quick ? [darkOnly] : [false, true]) runs.push({ app, width, dark, taps: taps && width === 390 && !dark });
 // English, the longer words, at the narrowest screen.
 if (!quick) for (const app of apps) runs.push({ app, width: 320, dark: false, lang: 'en' });
+// The sign-in screen on an iPad, both ways round, its fields typed in (Jay
+// 2026-10-21: it flickered with the keys up). One app: the screen is the kit's.
+if (!quick || tablet) for (const [width, height] of [[1180, 820], [820, 1180]]) runs.push({ app: apps[0], width, height, dark: false, taps: true, signedOut: true });
 
 const preview = new URL('./preview.mjs', import.meta.url).pathname;
 const one = run =>
   new Promise(done => {
-    const a = [preview, run.app, '--gate', '--live', '--width', String(run.width), '--out', join(out, 'shots'), '--wait', '7000', '--cpu', '2', ...(run.dark ? ['--dark'] : []), ...(run.lang ? ['--lang', run.lang] : []), ...(run.taps ? ['--taps'] : [])];
+    const a = [preview, run.app, '--gate', '--live', '--width', String(run.width), '--out', join(out, 'shots'), '--wait', '7000', '--cpu', '2', ...(run.dark ? ['--dark'] : []), ...(run.lang ? ['--lang', run.lang] : []), ...(run.taps ? ['--taps'] : []), ...(run.height ? ['--height', String(run.height), '--device', 'ipad'] : []), ...(run.signedOut ? ['--signed-out'] : [])];
     execFile(process.execPath, a, { maxBuffer: 64 * 1024 * 1024, timeout: 600_000 }, (err, stdout) => {
       const line = String(stdout || '').split('\n').find(l => l.startsWith('gate: '));
       if (!line) return done({ ...run, crashed: String(err?.message || stdout || 'no result').split('\n').slice(0, 3).join(' ') });
@@ -85,7 +90,7 @@ const one = run =>
 // What failed in one run, as [kind, where, what, shot].
 const faults = r => {
   const f = [];
-  const at = `${r.app} ${r.width}${r.dark ? ' dark' : ''}${r.lang && r.lang !== 'zh' ? ` ${r.lang}` : ''}`;
+  const at = `${r.app} ${r.width}${r.height ? `×${r.height}` : ''}${r.signedOut ? ' signed out' : ''}${r.dark ? ' dark' : ''}${r.lang && r.lang !== 'zh' ? ` ${r.lang}` : ''}`;
   if (r.crashed) return [['crash', at, r.crashed, '']];
   const first = r.tabs?.[0]?.shot || '';
   // (Never lifted: what's under it isn't on screen, so only that.)

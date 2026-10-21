@@ -5080,6 +5080,12 @@ html.q-kb dialog.q-sheet[open] {
     margin-bottom: var(--q-kb);
   }
 }
+/* The sign-in screen with the keys up: its form from the top, the rest of
+   it scrolling above the keys (centred, the field sat under them on an iPad). */
+html.q-kb .q-gate {
+  place-items: start center;
+  padding-bottom: calc(var(--q-kb) + 28px);
+}
 /* The tab bar waits behind the keys, not floating on them. */
 html.q-kb .q-tabbar {
   visibility: hidden;
