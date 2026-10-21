@@ -123,7 +123,7 @@
 
   // Every fault on the screen now.
   gate.check = () => {
-    const out = { blank: [], pictures: [], overflow: [], wraps: [], cut: [], letters: [], slots: [], halfEmpty: [], bareEmpty: [], loading: [], orphan: [], tables: [], sheets: [], old: [], header: [], scroll: [], white: [], english: [] };
+    const out = { blank: [], pictures: [], overflow: [], wraps: [], cut: [], letters: [], slots: [], halfEmpty: [], bareEmpty: [], loading: [], orphan: [], tables: [], sheets: [], old: [], header: [], scroll: [], white: [], english: [], narrow: [], railcut: [], gap: [] };
     const all = [...document.querySelectorAll('body *')].filter(seen);
     const clippedBy = el => {
       for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) if (/auto|scroll|hidden|clip/.test(getComputedStyle(p).overflowX)) return true;
@@ -200,6 +200,41 @@
         }
         const pad = parseFloat(getComputedStyle(k).paddingBottom) || 0;
         if ((bottom - kr.top + pad) / kr.height < 0.55) out.halfEmpty.push(`${name(k)} in ${name(el)} (${Math.round(bottom - kr.top)} of ${Math.round(kr.height)} px used)`);
+      }
+    }
+    // A tablet (700 px and up): the page kept to a phone's column with bare
+    // sides, a rail cut off short of the column's edge, or a tall empty band
+    // down the middle of the screen (Jay 2026-10-21, iPad "so many blank").
+    if (innerWidth >= 700) {
+      const open = document.querySelector('dialog[open], .q-sheet[open]');
+      const leaves = all.filter(el => {
+        if (open ? !open.contains(el) : el.closest('dialog')) return false;
+        if (el.closest('.q-tabbar, .q-accessory, .q-statusbar, .q-appbar, #loading')) return false;
+        const cs = getComputedStyle(el);
+        if (cs.position === 'fixed' || cs.visibility === 'hidden' || +cs.opacity === 0) return false;
+        if (el.matches('img, svg, canvas, video, button, input, [role=button]')) return true;
+        return [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim());
+      });
+      const boxes = leaves.map(el => el.getBoundingClientRect()).filter(r => r.width && r.height && r.bottom > 0 && r.top < innerHeight);
+      if (!open && boxes.length > 4) {
+        const left = Math.min(...boxes.map(r => r.left));
+        const right = Math.max(...boxes.map(r => r.right));
+        if (right - left < innerWidth * 0.72) out.narrow.push(`content ${Math.round(left)}–${Math.round(right)} of ${innerWidth} px`);
+        // (Bands only between things on screen, not under the last one: a short page ends.)
+        const ys = boxes.map(r => [Math.max(0, r.top), Math.min(innerHeight, r.bottom)]).sort((a, b) => a[0] - b[0]);
+        let reach = ys[0][1];
+        for (const [top, bottom] of ys.slice(1)) {
+          if (top - reach > innerHeight * 0.25) out.gap.push(`${Math.round(top - reach)} px empty at ${Math.round(reach)} px`);
+          reach = Math.max(reach, bottom);
+        }
+      }
+      for (const el of all) {
+        const cs = getComputedStyle(el);
+        if (!/auto|scroll/.test(cs.overflowX) || el.scrollWidth <= el.clientWidth + 8 || el.closest('dialog, .q-sheet, .q-tabbar')) continue;
+        const r = el.getBoundingClientRect();
+        if (r.height < 60 || r.top > innerHeight || r.bottom < 0 || el.closest('.q-split')) continue;
+        // (A rail that stops well short of the screen's edge, its cards cut mid-way there.)
+        if (r.right < innerWidth - 72) out.railcut.push(`${name(el)} ${Math.round(r.left)}–${Math.round(r.right)} of ${innerWidth} px`);
       }
     }
     // A row of pills or chips wrapped with one left alone on its last line.

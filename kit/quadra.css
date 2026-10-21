@@ -5337,3 +5337,63 @@ html.q-kb .q-kb-docked {
     animation: none;
   }
 }
+
+/* ---- Every screen, phone to iPad (Jay 2026-10-21: "iPad just so many
+   blank"): one content column that grows with the screen, rails that run
+   to the column's edge showing whole cards, and side-by-side sections
+   where there's room. An app's page wraps its content in .q-col (or sets
+   max-width: var(--q-col) and padding-inline: var(--q-gutter) itself).
+   - phone (to 699 px): the screen's width, 16 px in from each side;
+   - iPad portrait and split view (700+): 32 px in, rails of 3 (small 5);
+   - iPad landscape (1100+): up to 1240 px, 40 px in, rails of 4 (small 7).
+   Inside .q-col, --q-margin is the gutter, so whatever bleeds to the edge
+   (a rail) still meets it; sheets keep the phone's 16 px. ---- */
+:root {
+  --q-col: 640px;
+  --q-gutter: 16px;
+}
+@media (min-width: 700px) {
+  :root {
+    --q-col: 1240px;
+    --q-gutter: 32px;
+    --q-rail-n: 3;
+    --q-rail-small-n: 5;
+  }
+}
+@media (min-width: 1100px) {
+  :root {
+    --q-gutter: 40px;
+    --q-rail-n: 4;
+    --q-rail-small-n: 7;
+  }
+}
+.q-col {
+  --q-margin: var(--q-gutter);
+  width: 100%;
+  max-width: var(--q-col);
+  margin-inline: auto;
+  padding-inline: max(var(--q-gutter), env(safe-area-inset-left)) max(var(--q-gutter), env(safe-area-inset-right));
+  box-sizing: border-box;
+}
+.q-sheet {
+  --q-margin: 16px;
+}
+@media (min-width: 700px) {
+  /* Whole cards across the column; the next one peeks into the gutter. */
+  .q-rail {
+    grid-auto-columns: minmax(calc((100% - (var(--q-rail-n) - 1) * 12px) / var(--q-rail-n)), 1fr);
+  }
+  :where(.q-rail.small) {
+    --q-rail-n: var(--q-rail-small-n);
+  }
+  .q-sheet .q-rail {
+    --q-rail-n: 2;
+  }
+  /* Two sections side by side (.q-split > two children); one under the other on a phone. */
+  .q-split {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 28px;
+    align-items: start;
+  }
+}
