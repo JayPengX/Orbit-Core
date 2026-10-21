@@ -410,6 +410,9 @@
       done.push(id);
       gate.typedSoFar = done;
       // (Where a person would tap it: on the screen, scrolled to if it wasn't.)
+      // (A field in a folded card is typed in once the fold is tapped open, as a person would.)
+      const folded = [];
+      for (let d = el.closest('details:not([open])'); d; d = d.parentElement?.closest('details:not([open])')) (folded.push(d), (d.open = true));
       let r = el.getBoundingClientRect();
       if (r.top < 0 || r.bottom > innerHeight) el.scrollIntoView({ block: 'center' });
       // (An iPad's keys, with their bar, take about half the screen; a phone's 40%.)
@@ -444,6 +447,7 @@
       if (!document.documentElement.classList.contains('q-kb')) out.push(`${id}: the kit didn't see the keyboard`);
       el.blur();
       gate.keys(0);
+      for (const d of folded) d.open = false;
       await wait(200);
     }
     return out;

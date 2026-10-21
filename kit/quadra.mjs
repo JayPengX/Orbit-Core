@@ -3282,7 +3282,11 @@ function watchKeyboard() {
       if (cs.position === 'fixed' || p.matches('dialog[open]')) break;
     }
     const top = vv.offsetTop + 8;
-    const bottom = globalThis.innerHeight - kb - 12;
+    let bottom = globalThis.innerHeight - kb - 12;
+    // (A sheet's own bar at its foot, buy/sell or place, stays up over its content: the field goes above it too.)
+    const foot = el.closest('dialog')?.querySelector('.q-sheet-foot');
+    const fr = foot && !foot.contains(el) && foot.getBoundingClientRect();
+    if (fr?.height && fr.top < bottom + 12) bottom = Math.min(bottom, fr.top - 8);
     const r = el.getBoundingClientRect();
     const by = r.bottom > bottom ? Math.min(r.bottom - bottom, r.top - top) : r.top < top ? r.top - top : 0;
     if (by) scroller(el).scrollBy?.({ top: by });
