@@ -47,6 +47,156 @@ export function tick() {
   } catch {}
 }
 
+// ---- A strip of days (Orbit Sports' and Quadra Play's, one copy) ----
+// dayStrip(s, opts): a row of day chips (the weekday or 今天 over the date)
+// and a 📅 for any day, in a bar the app pins under the status bar
+// (.q-day-bar; it takes the page's colour once stuck). `s` is the strip's
+// own record, kept by the app ({} the first time): the strip is made once
+// and changed in place on every draw after (a new row under a finger made
+// it jump on iPhone, a new date input closed iOS's open picker).
+//   days: the days shown ('YYYY-MM-DD', in order); current: the day chosen;
+//   onPick(day): a day chosen (a tap, 📅); label(day) / sub(day): a chip's
+//   two lines; today; cls(day): more classes for a chip (month-start);
+//   clamp(day): the day 📅's date becomes (the nearest with games, inside
+//   the bounds); bounds {from, to}: 📅's limits; follow: every new day to
+//   the middle, a tapped one too; pickLabel: 📅's name.
+// Returns the strip (.q-day-strip-wrap) to put in the bar.
+const CAL_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16.5" rx="3"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/><path d="M7.5 13.5h2M11 13.5h2M14.5 13.5h2M7.5 17h2M11 17h2"/></svg>';
+export function dayStrip(s, { days = [], current = null, onPick = () => {}, label = d => d, sub = () => '', today = '', cls = () => '', clamp = d => d, bounds = null, follow = false, pickLabel = '' } = {}) {
+  if (!s.row) {
+    s.row = h('div', { class: 'q-chips q-day-strip day-strip' });
+    // A tap: the chip shows it at once, the page follows off the tap's stack.
+    s.pick = d => {
+      for (const chip of s.row.children) chip.setAttribute('aria-pressed', String(chip.dataset.day === d));
+      s.tapped = true;
+      requestAnimationFrame(() => setTimeout(() => s.onPick(d)));
+    };
+    // Any day: the browser's own picker, its day taken the moment it's chosen
+    // (the page behind changes, the picker stays open on iPhone).
+    s.input = h('input', { class: 'q-day-pick-input day-pick-input', type: 'date', 'aria-label': pickLabel });
+    s.input.addEventListener('change', () => {
+      if (!s.input.value) return;
+      const d = s.clamp(s.input.value);
+      if (d && d !== s.current) s.onPick(d);
+    });
+    // Closed: it shows the day picked (one past the bounds, which iOS lets through, shows where it came to).
+    s.input.addEventListener('blur', () => daySync(s));
+    s.wrap = h('div', { class: 'q-day-strip-wrap day-strip-wrap' }, [s.row, h('label', { class: 'q-chip q-day-pick day-pick', title: pickLabel }, [h('span', { class: 'day-pick-icon', 'aria-hidden': 'true', html: CAL_ICON }), s.input])]);
+  }
+  Object.assign(s, { onPick, bounds, clamp });
+  // Back on the page after another view: on its day at once.
+  if (!s.row.isConnected) (s.shown = false), (s.reveal = 'center');
+  // Other days (a sport picked, midnight, the language): the chips made again
+  // inside the same row, the day first in view kept where it was.
+  const key = `${today}|${days.join()}|${days.map(d => label(d) + sub(d)).join()}`;
+  if (key !== s.key) {
+    const anchor = s.row.isConnected && s.row.clientWidth ? firstDayInView(s.row) : null;
+    s.row.replaceChildren(...days.map(d => h('button', { class: `q-chip day${d === today ? ' is-today' : ''}${cls(d) ? ` ${cls(d)}` : ''}`, type: 'button', 'aria-pressed': String(d === current), 'data-day': d, onclick: () => s.pick(d) }, [h('span', { text: label(d) }), h('small', { class: 'num', text: sub(d) })])));
+    s.key = key;
+    const again = anchor && s.row.querySelector(`[data-day="${anchor.day}"]`);
+    if (again) s.row.scrollLeft += again.getBoundingClientRect().left - s.row.getBoundingClientRect().left - anchor.at;
+    else s.reveal ??= 'center';
+  }
+  for (const chip of s.row.children) chip.setAttribute('aria-pressed', String(chip.dataset.day === current));
+  // A day chosen elsewhere (📅, a swipe): brought into view; one tapped on the
+  // strip is in view already and stays where it is, unless `follow`.
+  if (current !== s.current) {
+    if (s.current !== undefined && (!s.tapped || follow)) s.reveal ??= 'center';
+    s.current = current;
+  }
+  s.tapped = false;
+  if (s.current != null && !s.shown) s.reveal ??= 'center';
+  // (The input never touched while it's open: iOS's picker would close.)
+  if (document.activeElement !== s.input) daySync(s);
+  if (s.reveal) dayReveal(s);
+  return s.wrap;
+}
+// dayStrip's record: the next draw brings the chosen day to the middle.
+export const dayRecenter = s => void (s.reveal = 'center');
+function daySync(s) {
+  const v = s.clamp(s.current || new Date().toISOString().slice(0, 10)) || '';
+  if (s.input.value !== v) s.input.value = v;
+  for (const [k, b] of [['min', s.bounds?.from], ['max', s.bounds?.to]]) b ? s.input.setAttribute(k, b) : s.input.removeAttribute(k);
+}
+function firstDayInView(row) {
+  const left = row.getBoundingClientRect().left;
+  const chip = [...row.children].find(c => c.getBoundingClientRect().right > left + 1);
+  return chip ? { day: chip.dataset.day, at: chip.getBoundingClientRect().left - left } : null;
+}
+// The chosen chip to the middle of the row once the row has a width (drawn
+// under the loading screen it has none): at once the first time, gently after.
+function dayReveal(s) {
+  const go = () => {
+    const chip = s.row.querySelector('[aria-pressed="true"]');
+    if (!chip || !s.row.isConnected || !s.row.clientWidth) return false;
+    s.row.scrollTo({ left: chip.offsetLeft - s.row.offsetLeft - s.row.clientWidth / 2 + chip.clientWidth / 2, behavior: s.shown ? 'smooth' : 'auto' });
+    s.reveal = null;
+    s.shown = true;
+    return true;
+  };
+  requestAnimationFrame(() => {
+    if (go() || typeof ResizeObserver === 'undefined' || s.waiting) return;
+    s.waiting = new ResizeObserver(() => s.row.clientWidth && (s.waiting.disconnect(), (s.waiting = null), s.reveal && go()));
+    s.waiting.observe(s.row);
+  });
+}
+// A swipe across a page (not across a row that scrolls sideways, a field or
+// the strip): step(+1 | -1) goes a day either way and says whether it did;
+// the page follows the finger and the new day slides in (.q-day-swipe).
+export function daySwipe(panel, step) {
+  if (!panel) return;
+  panel.classList.add('q-day-swipe');
+  let start = null;
+  const sideways = node => {
+    for (let n = node; n && n !== panel; n = n.parentElement) {
+      if (n.matches?.('input, select, textarea, .q-day-bar, .day-bar, [data-noswipe]')) return true;
+      if (n.scrollWidth > n.clientWidth + 2 && /auto|scroll/.test(getComputedStyle(n).overflowX)) return true;
+    }
+    return false;
+  };
+  const settle = () => {
+    panel.classList.remove('swiping');
+    panel.style.removeProperty('--swipe');
+  };
+  panel.addEventListener('touchstart', ev => {
+    start = ev.touches.length === 1 && !document.querySelector('dialog[open]') && !sideways(ev.target) ? { x: ev.touches[0].clientX, y: ev.touches[0].clientY, at: Date.now(), lock: null } : null;
+  }, { passive: true });
+  panel.addEventListener('touchmove', ev => {
+    if (!start) return;
+    const dx = ev.touches[0].clientX - start.x;
+    const dy = ev.touches[0].clientY - start.y;
+    if (start.lock == null && Math.hypot(dx, dy) > 10) start.lock = Math.abs(dx) > Math.abs(dy) * 1.3 ? 'x' : 'y';
+    if (start.lock !== 'x') return;
+    ev.preventDefault();
+    panel.classList.add('swiping');
+    panel.style.setProperty('--swipe', `${Math.round(dx * 0.45)}px`);
+  }, { passive: false });
+  panel.addEventListener('touchend', ev => {
+    const s = start;
+    start = null;
+    if (!s || s.lock !== 'x') return settle();
+    const dx = (ev.changedTouches?.[0]?.clientX ?? s.x) - s.x;
+    const fast = Math.abs(dx) > 30 && Date.now() - s.at < 250;
+    const dir = Math.abs(dx) > 70 || fast ? (dx < 0 ? 1 : -1) : 0;
+    settle();
+    if (!dir || !step(dir)) return;
+    panel.classList.remove('day-in-next', 'day-in-prev');
+    void panel.offsetWidth;
+    panel.classList.add(dir > 0 ? 'day-in-next' : 'day-in-prev');
+    clearTimeout(panel.swipeTimer);
+    panel.swipeTimer = setTimeout(() => panel.classList.remove('day-in-next', 'day-in-prev'), 320);
+  }, { passive: true });
+  panel.addEventListener('touchcancel', () => ((start = null), settle()), { passive: true });
+}
+// A day bar stuck under the status bar takes the page's colour (.stuck); at
+// rest it has none. Every .q-day-bar, nothing to call.
+if (typeof document !== 'undefined' && !globalThis.__quadraDayBars) {
+  globalThis.__quadraDayBars = true;
+  globalThis.addEventListener?.('scroll', () => {
+    for (const bar of document.querySelectorAll('.q-day-bar')) if (bar.isConnected && bar.offsetParent) bar.classList.toggle('stuck', globalThis.scrollY > 0 && bar.getBoundingClientRect().top <= parseFloat(getComputedStyle(bar).top) + 0.5);
+  }, { passive: true });
+}
+
 // ---- Segmented control ----
 // The badge's text: a count above 0 (99+ from a hundred), else nothing.
 export const segCount = n => (Number.isFinite(n) && n > 0 ? (n > 99 ? '99+' : String(Math.floor(n))) : '');
@@ -939,14 +1089,22 @@ export function logoTile(src, { size = 40, alt = '', fallbackText = '', tint = '
 // Scores show as "2 : 1", else "VS". wide = a full-width card for a list.
 export function matchCard({ league = '', leagueLogo = '', when = '', live = false, tag = null, wide = false, sides = [], prices = [], onOpen = null } = {}) {
   const [a = {}, b = {}] = sides;
-  const px = wide ? 40 : 48;
+  // (The logos large in their tiles: Jay 2026-10-21, "small and weird".)
+  const px = wide ? 48 : 52;
   const side = s => h('div', { class: 'q-match-side' }, [logoTile(s.logo, { size: px, alt: s.name, fallbackText: s.name }), h('b', { text: s.name || '' })]);
   const scored = a.score != null && b.score != null;
   // (A tag with no text shows nothing: never an empty capsule.)
   const t = tag ? (typeof tag === 'string' ? { text: tag } : tag) : null;
-  const card = h('article', { class: `q-match${live ? ' live' : ''}${wide ? ' wide' : ''}`, ...(onOpen ? { role: 'button', tabindex: '0', onclick: onOpen, onkeydown: e => e.key === 'Enter' && onOpen(e) } : {}) }, [
-    h('div', { class: 'q-match-top' }, [leagueLogo ? logoTile(leagueLogo, { size: 20, alt: league }) : null, h('span', { class: 'q-match-lg', text: league }), t?.text ? tag_(t) : null, h('span', { class: 'q-match-when', text: when })]),
-    h('div', { class: 'q-match-teams' }, [side(a), h('div', { class: `q-match-mid num${scored ? '' : ' vs'}`, text: scored ? `${a.score} : ${b.score}` : 'VS' }), side(b)]),
+  const top = Boolean(league || leagueLogo || t?.text);
+  const card = h('article', { class: `q-match${live ? ' live' : ''}${wide ? ' wide' : ''}${top ? '' : ' no-top'}`, ...(onOpen ? { role: 'button', tabindex: '0', onclick: onOpen, onkeydown: e => e.key === 'Enter' && onOpen(e) } : {}) }, [
+    // A head only with a league or a tag beside the time; with neither, the
+    // time (完賽, 第3節) sits under the score, never alone over an empty band.
+    top ? h('div', { class: 'q-match-top' }, [leagueLogo ? logoTile(leagueLogo, { size: 20, alt: league }) : null, h('span', { class: 'q-match-lg', text: league }), t?.text ? tag_(t) : null, h('span', { class: 'q-match-when', text: when })]) : null,
+    h('div', { class: 'q-match-teams' }, [
+      side(a),
+      h('div', { class: `q-match-mid num${scored ? '' : ' vs'}` }, [h('span', { class: 'q-match-score', text: scored ? `${a.score} : ${b.score}` : 'VS' }), !top && when ? h('small', { class: 'q-match-when', text: when }) : null]),
+      side(b)
+    ]),
     prices.length
       ? prices.some(p => p.locked)
         ? lockedRow()

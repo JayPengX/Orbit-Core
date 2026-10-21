@@ -3923,8 +3923,8 @@ div.q-ritem {
   overflow: hidden;
 }
 .q-logo img {
-  width: 78%;
-  height: 78%;
+  width: 86%;
+  height: 86%;
   object-fit: contain;
 }
 .q-logo.text {
@@ -4046,9 +4046,19 @@ div.q-ritem {
   font: 700 26px/1 var(--q-font);
   text-align: center;
 }
-.q-match-mid.vs {
+.q-match-mid > span {
+  display: block;
+}
+.q-match-mid.vs > .q-match-score {
   color: var(--q-label-2);
   font: 600 13px/1 var(--q-font);
+}
+/* No head: the time under the score. */
+.q-match-mid > .q-match-when {
+  display: block;
+  margin: 6px 0 0;
+  color: var(--q-label-2);
+  font: 600 13px/1.2 var(--q-font);
 }
 .q-match-prices {
   display: grid;
@@ -5156,20 +5166,156 @@ html.q-kb .q-kb-docked {
   text-overflow: ellipsis;
 }
 
-/* A logo's tone on a dark screen (quadra.mjs toneLogos): a dark one-colour
-   mark drawn white; a dark one in colours on a light disc, the one place a
-   light plate stays, so no logo vanishes into the dark. */
+/* A logo's tone on a dark screen (quadra.mjs toneLogos): a dark mark in one
+   colour drawn white; a dark one in colours on a lighter glass tile (never
+   white: Jay), so no logo vanishes into the dark. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) img[data-q-tone='mono'] {
     filter: brightness(0) invert(1);
   }
   :root:not([data-theme='light']) :is(.q-logo, .league-badge, .logo):not(:has(.q-logo, .league-badge, .logo)):has(> img[data-q-tone='color'], > * > img[data-q-tone='color'], > * > * > img[data-q-tone='color']) {
-    background: rgba(255, 255, 255, 0.92);
+    background: rgba(255, 255, 255, 0.2);
   }
 }
 :root[data-theme='dark'] img[data-q-tone='mono'] {
   filter: brightness(0) invert(1);
 }
 :root[data-theme='dark'] :is(.q-logo, .league-badge, .logo):not(:has(.q-logo, .league-badge, .logo)):has(> img[data-q-tone='color'], > * > img[data-q-tone='color'], > * > * > img[data-q-tone='color']) {
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* ---- A strip of days (ui.mjs dayStrip, daySwipe): pinned under the status
+   bar in a .q-day-bar, the chosen day in the accent, 📅 for any day ---- */
+.q-day-bar {
+  position: sticky;
+  top: var(--q-top);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 calc(-1 * max(16px, env(safe-area-inset-left))) 6px;
+  padding: 6px max(16px, env(safe-area-inset-left)) 8px;
+}
+.q-day-bar[hidden] {
+  display: none;
+}
+.q-day-bar::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: calc(-1 * var(--q-top)) 0 0;
+  background: var(--q-page);
+  opacity: 0;
+  transition: opacity 0.2s;
+  box-shadow: inset 0 -0.5px 0 var(--q-sep);
+  pointer-events: none;
+}
+.q-day-bar.stuck::before {
+  opacity: 1;
+}
+.q-day-strip-wrap {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.q-day-bar .q-day-strip {
+  flex: 1 1 auto;
+  min-width: 0;
+  gap: 4px;
+  margin: 0;
+  padding-inline: 6px;
+  scroll-padding-inline: 6px;
+  scroll-snap-type: none;
+  overscroll-behavior-x: contain;
+  -webkit-mask-image: linear-gradient(90deg, transparent, black 14px, black calc(100% - 14px), transparent);
+  mask-image: linear-gradient(90deg, transparent, black 14px, black calc(100% - 14px), transparent);
+}
+.q-day-bar .q-day-strip .q-chip.day {
+  flex: none;
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  min-width: 50px;
+  min-height: 54px;
+  padding: 6px;
+  border-radius: 16px;
+  background: none;
+  color: var(--q-label);
+}
+.q-day-bar .q-day-strip .q-chip.day > span {
+  color: var(--q-label-2);
+  font: 600 12px/1.1 var(--q-font);
+}
+.q-day-bar .q-day-strip .q-chip.day small {
+  color: var(--q-label);
+  font: 700 16px/1.1 var(--q-font);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  opacity: 1;
+}
+.q-day-bar .q-day-strip .q-chip.day.is-today > span,
+.q-day-bar .q-day-strip .q-chip.day.is-today small {
+  color: var(--accent, var(--q-accent));
+}
+.q-day-bar .q-day-strip .q-chip.day[aria-pressed='true'] {
+  background: var(--accent, var(--q-accent));
+}
+.q-day-bar .q-day-strip .q-chip.day[aria-pressed='true'] > span,
+.q-day-bar .q-day-strip .q-chip.day[aria-pressed='true'] small {
+  color: #ffffff;
+}
+.q-day-bar .q-day-strip .q-chip.day.month-start:not([aria-pressed='true']) {
+  border-radius: 0 16px 16px 0;
+  box-shadow: inset 1.5px 0 0 var(--q-sep);
+}
+.q-day-bar .q-day-pick {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border-radius: 50%;
+  overflow: hidden;
+}
+.q-day-pick-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.q-day-swipe.swiping > :not(.q-day-bar) {
+  transform: translateX(var(--swipe, 0));
+  opacity: 0.85;
+}
+.q-day-swipe.day-in-next > :not(.q-day-bar) {
+  animation: q-day-in-next 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.q-day-swipe.day-in-prev > :not(.q-day-bar) {
+  animation: q-day-in-prev 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes q-day-in-next {
+  from {
+    transform: translateX(36px);
+    opacity: 0;
+  }
+}
+@keyframes q-day-in-prev {
+  from {
+    transform: translateX(-36px);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .q-day-swipe.day-in-next > *,
+  .q-day-swipe.day-in-prev > * {
+    animation: none;
+  }
 }
