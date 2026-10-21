@@ -71,3 +71,25 @@ test('500 fresh reads a Pass a day', async () => {
   assert.equal(r.status, 429);
   assert.equal((await r.json()).error, 'cap');
 });
+
+test('the build key reads a Taiwan-only county site, from Taiwan; nothing else gets in without a Pass', async () => {
+  const { twOnly, buildKeyOk } = await import('../law-hosts.js');
+  const KEY = 'k'.repeat(32);
+  const page = 'https://law.tycg.gov.tw/LawContent.aspx?id=GL000133';
+  assert.equal(twOnly(page), true);
+  for (const bad of ['https://law.moj.gov.tw/LawContent.aspx?id=1', 'https://law.tycg.gov.tw/Admin.aspx', 'http://law.tycg.gov.tw/LawContent.aspx', 'https://law.tycg.gov.tw:444/LawContent.aspx']) assert.equal(twOnly(bad), false, bad);
+  assert.equal(buildKeyOk(KEY, KEY), true);
+  assert.equal(buildKeyOk('short', 'short'), false, 'no short secret');
+  assert.equal(buildKeyOk('', undefined), false, 'no secret, no door');
+  const via = [];
+  const env = { LAW_BUILD_KEY: KEY, GEMINI_RELAY: { fetch: async u => (via.push(u), html('<p>規則</p>')) } };
+  const keyed = (u, key) => new Request(`https://proxy.test/law-page?v=1&u=${encodeURIComponent(u)}`, { headers: key ? { 'X-Build-Key': key } : {} });
+  const direct = async () => html('<p>direct</p>');
+  assert.equal((await handleLawPage(keyed(page), env, null, {}, null, direct)).status, 401, 'no key');
+  assert.equal((await handleLawPage(keyed(page, 'x'.repeat(32)), env, null, {}, null, direct)).status, 401, 'wrong key');
+  assert.equal((await handleLawPage(keyed('https://law.moj.gov.tw/LawClass/LawAll.aspx', KEY), env, null, {}, null, direct)).status, 401, 'key only opens those sites');
+  const ok = await handleLawPage(keyed(page, KEY), env, null, {}, null, direct);
+  assert.equal(ok.status, 200);
+  assert.match((await ok.json()).html, /規則/);
+  assert.match(via[0], /^https:\/\/gemini-relay\/\?to=https%3A%2F%2Flaw\.tycg\.gov\.tw/);
+});

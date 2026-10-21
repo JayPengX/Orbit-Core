@@ -7,11 +7,15 @@
 // 2 MB at most; a PDF or another file: { url, type: 'pdf' | 'file', size }.
 // Nothing stored but Cloudflare's cache (judicial rulings 30 days, the rest
 // a day); 500 fresh reads a Pass a day (a cached one is free).
+// Orbit Law's nightly build, with its key (X-Build-Key = the secret
+// LAW_BUILD_KEY) in place of a Pass, reads the county 法規 sites that serve
+// only Taiwan (law-hosts.js) here, from Taiwan through gemini-relay.
 import { json, LOCAL_ORIGIN } from './http.js';
 import { fail, twDay, passOf, passKey, countOf, addOne } from './law.js';
 import { sessionLimited } from './quadra-token.js';
+import { twOnly, buildKeyOk } from './law-hosts.js';
 
-export const PAGE_LIMITS = { perPass: 500, perMinute: 60, hops: 5, timeoutMs: 20_000, maxHtml: 2 * 1024 * 1024, maxBytes: 6 * 1024 * 1024 };
+export const PAGE_LIMITS = { perPass: 500, perMinute: 60, buildPerMinute: 120, hops: 5, timeoutMs: 20_000, maxHtml: 2 * 1024 * 1024, maxBytes: 6 * 1024 * 1024 };
 const ORIGIN = 'https://jaypengx.github.io';
 const LONG = new Set(['judgment.judicial.gov.tw', 'cons.judicial.gov.tw']);
 const UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
@@ -135,24 +139,30 @@ export async function handleLawPage(request, env, ctx, headers, session, fetchFn
   const origin = request.headers.get('Origin') || '';
   if (origin && origin !== ORIGIN && !LOCAL_ORIGIN.test(origin)) return fail('origin', 403, headers);
   const pass = passOf(session);
-  if (!pass) return fail('pass', 401, headers);
-  const url = pageUrl(new URL(request.url).searchParams.get('u'));
+  const raw = new URL(request.url).searchParams.get('u');
+  const build = !pass && twOnly(raw) && buildKeyOk(request.headers.get('X-Build-Key'), env?.LAW_BUILD_KEY);
+  if (!pass && !build) return fail('pass', 401, headers);
+  const url = pageUrl(raw);
   if (!url) return fail('host', 400, headers);
-  if (sessionLimited(`law:page:${pass}`, PAGE_LIMITS.perMinute)) return fail('busy', 429, headers);
+  if (sessionLimited(build ? 'law:build' : `law:page:${pass}`, build ? PAGE_LIMITS.buildPerMinute : PAGE_LIMITS.perMinute)) return fail('busy', 429, headers);
+  // A site that serves only Taiwan is read from there (when the relay is bound).
+  const via = twOnly(url) && env?.GEMINI_RELAY ? (u, init) => env.GEMINI_RELAY.fetch(`https://gemini-relay/?to=${encodeURIComponent(u)}`, init) : fetchFn;
 
   const cache = edge();
   const key = cacheKey(url);
   const hit = cache && (await cache.match(key).catch(() => null));
   if (hit) return json({ ...(await hit.json()), cached: true }, 200, headers);
 
-  const day = twDay();
-  const who = await passKey('page', pass, day);
-  if ((await countOf(env, who, day)) >= PAGE_LIMITS.perPass) return fail('cap', 429, headers, { left: 0 });
-  await addOne(env, who, day);
+  if (!build) {
+    const day = twDay();
+    const who = await passKey('page', pass, day);
+    if ((await countOf(env, who, day)) >= PAGE_LIMITS.perPass) return fail('cap', 429, headers, { left: 0 });
+    await addOne(env, who, day);
+  }
 
   let out;
   try {
-    out = await readPage(url, fetchFn);
+    out = await readPage(url, via);
   } catch {
     return fail('upstream', 502, headers, { status: 0 });
   }
