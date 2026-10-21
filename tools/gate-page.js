@@ -211,7 +211,9 @@
         if (open ? !open.contains(el) : el.closest('dialog')) return false;
         if (el.closest('.q-tabbar, .q-accessory, .q-statusbar, .q-appbar, #loading')) return false;
         const cs = getComputedStyle(el);
-        if (cs.position === 'fixed' || cs.visibility === 'hidden' || +cs.opacity === 0) return false;
+        if (cs.visibility === 'hidden' || +cs.opacity === 0) return false;
+        // (Nothing pinned to the screen: a mini player or a bar is not the page.)
+        for (let p = el; p && p !== document.body; p = p.parentElement) if (/fixed|sticky/.test(getComputedStyle(p).position)) return false;
         if (el.matches('img, svg, canvas, video, button, input, [role=button]')) return true;
         return [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim());
       });
