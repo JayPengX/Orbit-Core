@@ -1555,7 +1555,6 @@ function makeSession(app, { lang, heartbeat }) {
     // The loading screen's line (boot.js): signed in, the app's data next.
     globalThis.__bootStep?.('', 0.8);
     loop();
-    setTimeout(() => offerNotices(s), 2500);
     // The first reply: what the app merges its own copy with (never the
     // session itself: an app that took the session for the reply saw "no
     // data" and saved over the pass).
@@ -2500,6 +2499,8 @@ export async function schedulePush(s, items) {
   const storeKey = `quadra.push.list.${s.app}`;
   // Turned off: the Worker's list emptied too (once).
   if (!notifyOn()) {
+    // (Something of the person's own to send, and the pass wants notices: this phone asked, once.)
+    if (items.some(x => x && kindOn(s.app, x.kind))) offerNotices(s);
     if (readStore(storeKey) && readStore(storeKey) !== '[]' && (await pushPost(s, 'schedule', { items: [] }))) writeStore(storeKey, '[]');
     return;
   }
@@ -2593,13 +2594,15 @@ export const NOTICE_KINDS = {
 const PREFS_KEY = 'quadra.notify.prefs';
 const cleanPrefs = v => ({
   ...(typeof v?.on === 'boolean' ? { on: v.on } : {}),
+  // (The ask closed once, anywhere: never asked again, in any app or on any device.)
+  ...(v?.quiet === true ? { quiet: true } : {}),
   off: [...new Set((Array.isArray(v?.off) ? v.off : []).filter(k => typeof k === 'string' && /^[a-z]+:[a-z]+$/.test(k)))].sort()
 });
 export function notifyPrefs() {
   const saved = readJson(PREFS_KEY, null);
   return saved && typeof saved === 'object' ? { ...cleanPrefs(saved), t: Number(saved.t) || 0 } : { off: [], t: 0 };
 }
-const samePrefs = (a, b) => a.on === b.on && a.off.join() === b.off.join();
+const samePrefs = (a, b) => a.on === b.on && Boolean(a.quiet) === Boolean(b.quiet) && a.off.join() === b.off.join();
 function savePrefs(next, s) {
   const prefs = { ...cleanPrefs(next), t: Date.now() };
   writeStore(PREFS_KEY, JSON.stringify(prefs));
@@ -2649,12 +2652,14 @@ export async function syncPrefs(s) {
 
 // Notices were turned on for the pass (on another device or in another
 // app), but the phone hasn't been asked here yet: a banner offers it (the
-// phone asks only after a tap). Not again for a week once closed.
+// phone asks only after a tap) once this app has a notice of the person's
+// own to send (a team followed, a reminder set), never as the app opens.
+// Once per app on a device, ever; closed, never again anywhere (Jay
+// 2026-10-21: "keep giving me in app notification to turn on notification").
 function offerNotices(s) {
   if (typeof document === 'undefined' || !s.pass || !('Notification' in globalThis)) return;
-  if (notifyPrefs().on !== true || Notification.permission !== 'default') return;
-  const last = Number(readStore('quadra.notify.offered')) || 0;
-  if (Date.now() - last < 7 * 86_400_000) return;
+  if (notifyPrefs().on !== true || notifyPrefs().quiet || Notification.permission !== 'default') return;
+  if (readStore('quadra.notify.offered') || bannerEl?.isConnected) return;
   const T = (zh, e) => (s.lang === 'en' ? e : zh);
   bannerEl?.remove();
   const el = node('div', { class: 'q-banner q-banner-ask', role: 'dialog', 'aria-label': T('開啟通知', 'Turn on notices'), style: `--q-accent:${APPS[s.app].color}` }, [
@@ -2663,12 +2668,13 @@ function offerNotices(s) {
     node('button', { class: 'q-banner-go', type: 'button', text: T('允許', 'Allow') }),
     node('button', { class: 'q-banner-x', type: 'button', 'aria-label': T('關閉', 'Close'), text: '×' })
   ]);
-  const gone = () => {
-    writeStore('quadra.notify.offered', String(Date.now()));
+  writeStore('quadra.notify.offered', String(Date.now()));
+  const gone = (quiet = false) => {
+    if (quiet) savePrefs({ ...notifyPrefs(), quiet: true }, s);
     el.classList.add('out');
     setTimeout(() => el.remove(), 250);
   };
-  el.querySelector('.q-banner-x').addEventListener('click', gone);
+  el.querySelector('.q-banner-x').addEventListener('click', () => gone(true));
   el.querySelector('.q-banner-go').addEventListener('click', async () => {
     const p = await Notification.requestPermission().catch(() => 'denied');
     if (p === 'granted') enablePush(s, true);
