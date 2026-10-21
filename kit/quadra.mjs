@@ -3240,8 +3240,17 @@ function watchKeyboard() {
     root.style.setProperty('--q-vvh', `${Math.round(vv.height)}px`);
     root.classList.toggle('q-kb', up);
     for (const d of document.querySelectorAll('.q-kb-docked')) if (!up || !d.contains(document.activeElement)) d.classList.remove('q-kb-docked');
-    if (up) lift(document.activeElement, kb);
+    // Once per field and keyboard, never on every scroll or resize it causes
+    // itself: lifting on each one fought iOS's own slide, which answered with
+    // another, and the screen flickered (Jay 2026-10-21, iPad sign-in).
+    const el = document.activeElement;
+    if (!up) lifted = null;
+    else if (!lifted || lifted.el !== el || Math.abs(lifted.kb - kb) > 60) {
+      lifted = { el, kb };
+      lift(el, kb);
+    }
   };
+  let lifted = null;
   // The field in what's left above the keys. One in a bar fixed at the
   // foot (a composer, a stake bar) rides on the keys with its bar; any
   // other is scrolled into view inside its own scroller (a sheet, a list,

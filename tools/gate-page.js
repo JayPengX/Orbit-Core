@@ -375,11 +375,24 @@
       // (Where a person would tap it: on the screen, scrolled to if it wasn't.)
       let r = el.getBoundingClientRect();
       if (r.top < 0 || r.bottom > innerHeight) el.scrollIntoView({ block: 'center' });
-      const keysPx = Math.round(innerHeight * 0.4);
+      // (An iPad's keys, with their bar, take about half the screen; a phone's 40%.)
+      const keysPx = Math.round(innerHeight * (innerWidth >= 700 ? 0.5 : 0.4));
       const x0 = scrollX;
       el.focus({ preventScroll: true });
       gate.keys(keysPx);
-      await wait(450);
+      // (Watched while it settles: a field that keeps moving back and forth is a flickering screen.)
+      const tops = [];
+      for (let i = 0; i < 9; i++) {
+        await wait(50);
+        tops.push(Math.round(el.getBoundingClientRect().top));
+      }
+      let turns = 0;
+      for (let i = 2, dir = 0; i < tops.length; i++) {
+        const d = Math.sign(tops[i] - tops[i - 1]);
+        if (d && dir && d !== dir) turns++;
+        if (d) dir = d;
+      }
+      if (turns >= 2) out.push(`${id}: the screen jumps back and forth as the keys come up (${tops.join(' → ')})`);
       r = el.getBoundingClientRect();
       const above = innerHeight - keysPx;
       const fs = parseFloat(getComputedStyle(el).fontSize);
