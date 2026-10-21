@@ -246,13 +246,33 @@
       const y = m && Number(m[1] || m[2]);
       if (y && y <= year - 2) out.old.push(`${name(el)} "${tx.slice(0, 30)}"`);
     }
+    // (The rules that paint a box's background, last first, named in the fault.)
+    const paintedBy = el => {
+      const hits = [];
+      const walk = (rules, file) => {
+        for (const r of rules) {
+          if (r.cssRules && !r.selectorText) {
+            if (!r.media || matchMedia(r.media.mediaText).matches) walk(r.cssRules, file);
+          } else if (r.selectorText && (r.style?.background || r.style?.backgroundColor)) {
+            try {
+              if (el.matches(r.selectorText)) hits.push(`${file} ${r.selectorText.slice(0, 60)}: ${(r.style.backgroundColor || r.style.background).slice(0, 40)}`);
+            } catch {}
+          }
+        }
+      };
+      for (const sh of document.styleSheets) try { walk(sh.cssRules, (sh.href || 'inline').split('/').pop().split('?')[0]); } catch {}
+      return el.style.background || el.style.backgroundColor ? `; by inline ${el.style.background || el.style.backgroundColor}` : hits.length ? `; by ${hits.slice(-2).reverse().join(' | ')}` : '';
+    };
     // White in dark mode: a box painted near-white (a logo tile, a button) on a dark screen.
     if (matchMedia('(prefers-color-scheme: dark)').matches) {
       for (const el of all) {
         const m = /rgba?\((\d+), (\d+), (\d+)(?:, ([\d.]+))?\)/.exec(getComputedStyle(el).backgroundColor);
         if (!m || (m[4] !== undefined && Number(m[4]) < 0.6) || Math.min(m[1], m[2], m[3]) < 225) continue;
+        // (A plate under artwork with no dark version, a lottery's or a company's logo, is kept: only ESPN's and NBA's have one.)
+        const pic = el.tagName === 'IMG' ? el : el.querySelector('img');
+        if (pic && !/espncdn\.com|cdn\.nba\.com/.test(pic.currentSrc || pic.src)) continue;
         const r = el.getBoundingClientRect();
-        if (r.width >= 24 && r.height >= 24 && r.top < innerHeight * 2) out.white.push(`${name(el)} ${Math.round(r.width)}×${Math.round(r.height)}`);
+        if (r.width >= 24 && r.height >= 24 && r.top < innerHeight * 2) out.white.push(`${name(el)} ${Math.round(r.width)}×${Math.round(r.height)}${paintedBy(el)}`);
       }
     }
     // (Which rule locked it: named in the fault.)

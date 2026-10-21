@@ -737,6 +737,8 @@ export function logoTileHtml(src, { size = 40, alt = '', fallbackText = '', tint
 }
 export function wireLogos(root = document) {
   const fall = img => {
+    // (Its dark-screen version missing: quadra.mjs darkLogos put the ordinary one back.)
+    if (img.dataset?.qDarkFailed) return;
     const t = img.closest?.('.q-logo');
     // The next URL of a list first, the letter once they are used up.
     let rest = [];

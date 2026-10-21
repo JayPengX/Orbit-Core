@@ -3417,6 +3417,69 @@ function watchNames() {
 }
 watchNames();
 
+// Logos on a dark screen, in every app: an ESPN team or league logo drawn
+// on a dark tile is swapped for ESPN's own dark-screen version (500-dark:
+// the white lion, the light wordmark) and back when the screen goes light,
+// so no app needs a white plate behind its logos (Jay 2026-10-21: "hate the
+// white in dark mode"). A logo still on a light plate keeps its own; one
+// with no dark version (Falkirk) goes back at once, and is remembered.
+const ESPN_LOGO = /^https:\/\/a\.espncdn\.com\/(?:i\/|combiner\/i\?img=\/i\/)(?:teamlogos|leaguelogos)\/(?!countries\/)[\w/-]*\/500\//;
+const noDark = new Set();
+export function darkLogos(root = document) {
+  const de = document.documentElement;
+  const dark = de.dataset.theme === 'dark' || (de.dataset.theme !== 'light' && Boolean(globalThis.matchMedia?.('(prefers-color-scheme: dark)').matches));
+  const plateLight = img => {
+    for (let p = img.parentElement, i = 0; p && i < 3; p = p.parentElement, i++) {
+      const m = /rgba?\((\d+), (\d+), (\d+)(?:, ([\d.]+))?\)/.exec(getComputedStyle(p).backgroundColor);
+      if (!m || (m[4] !== undefined && Number(m[4]) < 0.5)) continue;
+      return Math.min(m[1], m[2], m[3]) > 200;
+    }
+    return false;
+  };
+  for (const img of root.querySelectorAll?.('img[src*="espncdn.com"]') || []) {
+    const light = img.dataset.qLight;
+    if (dark && !light) {
+      const src = img.getAttribute('src') || '';
+      // (A <picture> picks its own dark version.)
+      if (!ESPN_LOGO.test(src) || noDark.has(src) || img.closest('[hidden], picture') || plateLight(img)) continue;
+      img.dataset.qLight = src;
+      img.setAttribute('src', src.replace('/500/', '/500-dark/'));
+    } else if (!dark && light) {
+      delete img.dataset.qLight;
+      img.setAttribute('src', light);
+    }
+  }
+}
+// (Called by ui.mjs wireLogos before any fallback: the dark version failed, the ordinary one instead.)
+export function darkLogoFailed(img) {
+  const light = img.dataset?.qLight;
+  if (!light || !(img.getAttribute('src') || '').includes('/500-dark/')) return false;
+  noDark.add(light);
+  delete img.dataset.qLight;
+  // (Told to the logo fallbacks, which see this same error: not theirs.)
+  img.dataset.qDarkFailed = '1';
+  setTimeout(() => delete img.dataset.qDarkFailed, 0);
+  img.setAttribute('src', light);
+  return true;
+}
+function watchDarkLogos() {
+  if (typeof document === 'undefined' || typeof MutationObserver === 'undefined' || globalThis.__quadraDarkLogos) return;
+  globalThis.__quadraDarkLogos = true;
+  let frame = 0;
+  const soon = () => (frame ||= requestAnimationFrame(() => ((frame = 0), darkLogos())));
+  const start = () => {
+    new MutationObserver(soon).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['src', 'hidden'] });
+    new MutationObserver(soon).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    globalThis.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change', soon);
+    // (One that fails before wireLogos runs: the ordinary one.)
+    document.addEventListener('error', e => e.target?.tagName === 'IMG' && darkLogoFailed(e.target), true);
+    soon();
+  };
+  if (document.body) start();
+  else document.addEventListener('DOMContentLoaded', start, { once: true });
+}
+watchDarkLogos();
+
 // Where the person was (the scroll), kept across a reload for an update and
 // put back by restorePlace() once the app has painted.
 const PLACE_KEY = 'quadra.place';
