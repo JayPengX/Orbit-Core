@@ -3444,7 +3444,8 @@ function swapLogos(root, dark) {
     }
     return false;
   };
-  for (const img of root.querySelectorAll?.('img[src*="espncdn.com"]') || []) {
+  // (ESPN's, and the kit's own purple lion wherever an app draws it: matchCard, liveStrip, a chip.)
+  for (const img of root.querySelectorAll?.('img[src*="espncdn.com"], img[src*="/img/epl.png"], img[data-q-light]') || []) {
     const light = img.dataset.qLight;
     if (dark && !light) {
       const src = img.getAttribute('src') || '';
