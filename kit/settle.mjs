@@ -317,6 +317,16 @@ export function legResult(leg, outcome) {
       const two = (Number(a[1]) || 0) + (Number(h[1]) || 0);
       return win(leg.side === (one > two ? 'first' : one === two ? 'tie' : 'second'));
     }
+    case 'nextgoal':
+      // 下一球: the side that scored the game's Nth goal (90 minutes); 'none', fewer.
+      if (!outcome.goalOrder) return null;
+      return win(leg.side === (outcome.goalOrder[leg.line - 1] ?? 'none'));
+    case 'hoddeven': {
+      // 半場單雙: the first half's score (a soccer half, two quarters).
+      if (!a.length && !h.length) return null;
+      const n = halfPeriods(leg.sport);
+      return win((firstPeriods(a, n) + firstPeriods(h, n)) % 2 === (leg.side === 'odd' ? 1 : 0));
+    }
     case 'firstgoal':
     case 'lastgoal': {
       // 第一球 / 最後進球球隊 in 90 minutes; 'none' in a 0-0.

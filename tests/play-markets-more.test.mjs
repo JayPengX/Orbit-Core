@@ -115,3 +115,20 @@ test('ESPN\'s soccer scoreboard: halves and goal order from its goals; MLB\'s hi
   assert.deepEqual([b.awayHits, b.homeHits], [6, 9]);
   assert.deepEqual(runOrder([{ scoringPlay: true, awayScore: 0, homeScore: 3 }]), ['home', 'home', 'home']);
 });
+
+test('下一球 (the 2nd and 3rd goals) and 半場單雙', () => {
+  const m = goalMarkets(fitGoals(0.5, 0.25), { family: 'soccer' });
+  const next = m.filter(x => x.kind === 'nextgoal');
+  assert.deepEqual(next.map(x => x.line), [2, 3]);
+  for (const x of next) assert.ok(Math.abs(sum(x.picks) - 1) < 1e-6);
+  // Fewer goals than the third more often than fewer than the second.
+  assert.ok(next[1].picks.find(p => p.side === 'none').fair > next[0].picks.find(p => p.side === 'none').fair);
+  assert.ok(m.some(x => x.kind === 'hoddeven'));
+  const s = game(1, 2, { awayInnings: [1, 0], homeInnings: [0, 2], goalOrder: ['away', 'home', 'home'] });
+  assert.equal(legResult({ sport: 'epl', kind: 'nextgoal', line: 2, side: 'home' }, s), 'won');
+  assert.equal(legResult({ sport: 'epl', kind: 'nextgoal', line: 4, side: 'none' }, s), 'won');
+  assert.equal(legResult({ sport: 'epl', kind: 'hoddeven', side: 'odd' }, s), 'won');
+  assert.equal(legResult({ sport: 'nfl', kind: 'hoddeven', side: 'even' }, game(20, 24, { awayInnings: [7, 3, 7, 3], homeInnings: [7, 7, 3, 7] })), 'won');
+  const nfl = pointsModel('nfl', { homeWin: 0.6, spread: { awayLine: 3.5, awayFair: 0.5 }, total: { line: 45.5, overFair: 0.5 } });
+  assert.ok(pointsMarkets(nfl, { spreadLine: 3.5, totalLine: 45.5 }).some(x => x.kind === 'hoddeven'));
+});
