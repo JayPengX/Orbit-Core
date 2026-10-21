@@ -59,12 +59,14 @@ const jobs = Number(opt('jobs', 2));
 const out = resolve(opt('out', '/tmp/quadra-gate'));
 const taps = !flag('no-taps');
 const quick = flag('quick');
+// --quick --dark: 390 dark only (the white check).
+const darkOnly = flag('dark');
 const ALL = ['sports', 'play', 'securities', 'words', 'orbit', 'weather', 'transit', 'slips', 'beats', 'law'];
 const apps = args.length ? args : ALL;
 const runs = [];
 for (const app of apps)
   for (const width of quick ? [390] : [320, 390])
-    for (const dark of quick ? [false] : [false, true]) runs.push({ app, width, dark, taps: taps && width === 390 && !dark });
+    for (const dark of quick ? [darkOnly] : [false, true]) runs.push({ app, width, dark, taps: taps && width === 390 && !dark });
 // English, the longer words, at the narrowest screen.
 if (!quick) for (const app of apps) runs.push({ app, width: 320, dark: false, lang: 'en' });
 
