@@ -360,3 +360,16 @@ test('興櫃: no daily limit, limit orders only, no closing auction, margin, sho
   assert.equal(order({ side: 'sell', type: 'limit', limit: 33, qty: 1000 }).error, 'noDayTrade');
   assert.equal(order({ side: 'sell', type: 'limit', limit: 33, qty: 2000 }).error, 'noDayTrade');
 });
+
+test('可轉債: by the 張 of 1,000 units, its own ticks, ±10%, no tax to 2026, no margin or short', async () => {
+  const M = await import('../kit/stock-markets.mjs');
+  assert.equal(M.kindOf('EQUITY', '12561.TWO'), 'cb');
+  assert.equal(M.kindOf('EQUITY', '6488.TWO'), 'stock');
+  assert.deepEqual([M.tickSize('TW', 'cb', 105), M.tickSize('TW', 'cb', 180), M.tickSize('TW', 'cb', 1200)], [0.05, 1, 5]);
+  assert.deepEqual(M.lotProblem('TW', '12561.TWO', 'cb', 'buy', 500), { lot: 1000 });
+  assert.equal(M.lotProblem('TW', '12561.TWO', 'cb', 'buy', 2000), null);
+  assert.equal(M.limitShare({ kind: 'cb', market: 'TW', symbol: '12561.TWO' }), 0.1);
+  const sell = t => M.tradeCosts({ market: 'TW', side: 'sell', kind: 'cb', gross: 105_000, currency: 'TWD', t }).tax;
+  assert.deepEqual([sell(Date.parse('2026-12-31T12:00:00+08:00')), sell(Date.parse('2027-01-02T12:00:00+08:00'))], [0, 105]);
+  assert.ok(M.isTradable('cb') && !M.isShortable('cb') && M.collateralRate('cb', 'TW', '12561.TWO') === 0);
+});

@@ -36,6 +36,7 @@ import {
   isTradable,
   isShortable,
   isEmerging,
+  cbMaturity,
   qtyStep,
   roundCash,
   roundQty,
@@ -1811,6 +1812,23 @@ export function applyBondCashflows(account, symbol, { rates, now = Date.now() })
     }
   }
   return { account: next, added };
+}
+
+// A Taiwan convertible bond held to its maturity (cbMaturity): repaid at
+// face, 100 a unit (NT$100,000 a 張), with no costs, on the day.
+export function applyCbMaturity(account, symbol, { now = Date.now() } = {}) {
+  const maturity = cbMaturity(symbol);
+  const id = `mature:${symbol}`;
+  if (!maturity || now < maturity || account.events.some(e => e.id === id)) return { account, added: [] };
+  const info = account.events.find(e => e.type === 'fill' && e.symbol === symbol);
+  const qty = info ? sharesAt(account, symbol, maturity) : 0;
+  if (!(qty > 0)) return { account, added: [] };
+  const total = qty * 100;
+  const event = {
+    id, type: 'fill', maturity: true, t: maturity, orderId: null, symbol, name: info.name, kind: 'cb', market: 'TW',
+    currency: 'TWD', side: 'sell', qty, price: 100, quote: 100, gross: total, commission: 0, tax: 0, fee: 0, total, twd: 1
+  };
+  return { account: { ...account, events: [...account.events, event] }, added: [event] };
 }
 
 // ---- History: net worth over time, benchmarks --------------------------------
