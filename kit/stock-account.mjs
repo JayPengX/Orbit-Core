@@ -682,7 +682,7 @@ export function placeOrder(account, req, { quote, rates, valuation, now = Date.n
   // from 13:40, 盤後定價 from 14:00), limit or market orders, matched once at
   // 14:30 at the close; what doesn't match ends with the day. Before its
   // session takes orders, one is refused (afterHoursWait: from when).
-  if (quote.market === 'TW' && !req.forced) {
+  if (quote.market === 'TW' && !req.forced && req.expiry == null) {
     const after = afterHours(now, isOddLot(quote.market, quote.kind, qty));
     if (after && type !== 'stop') {
       if (now < after.from && !req.cover) return { error: 'afterHoursWait', from: after.from };
@@ -693,12 +693,24 @@ export function placeOrder(account, req, { quote, rates, valuation, now = Date.n
     const c = closingAuction(now);
     if (type === 'market' && !req.cover && c && now < c.match && atClosingAuction(order)) return { error: 'closingAuction', match: c.match };
   }
+  // A warrant held to its last trading day: sold at that day's close, as
+  // its expiry settles it (isWarrant). `expiry` is that day's 13:30 match.
+  if (req.expiry != null) {
+    const at = Number(req.expiry);
+    const close = new Date(at + 8 * 3_600_000);
+    if (quote.kind !== 'warrant' || side !== 'sell' || !(at > 0) || close.getUTCHours() !== 13 || close.getUTCMinutes() !== 30) return { error: 'side' };
+    order.after = at;
+    order.expiry = true;
+    order.tif = 'day';
+  }
   // How long it lasts: a day order ends with its session (what exchanges
   // and brokers do by default); good-till-cancelled lasts GTC_DAYS. Crypto
   // and currency pairs never close, so theirs are GTC.
   if (!order.after) order.tif = req.tif === 'gtc' || quote.kind === 'crypto' || quote.kind === 'fx' ? 'gtc' : 'day';
   // (An extended-hours order lasts its day's post-market, to 18:00 New York time.)
   order.expires = order.after ? order.after + 9 * 3_600_000 : order.tif === 'gtc' ? now + GTC_DAYS * 86_400_000 : order.ext ? usExtendedEnd(now) : dayOrderEnd(quote, now);
+  // (A settlement placed after its day, the app closed then: at the close it settled at.)
+  if (order.expiry) order.expires = Math.max(order.expires, now + 86_400_000);
   // A Taiwan whole-lot day order is in its day's 13:30 closing match: it
   // lasts until that's known (CLOSE_DECIDE; Yahoo's Taiwan prices run 20
   // minutes behind), ending unmatched after it.

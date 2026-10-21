@@ -373,3 +373,28 @@ test('可轉債: by the 張 of 1,000 units, its own ticks, ±10%, no tax to 2026
   assert.deepEqual([sell(Date.parse('2026-12-31T12:00:00+08:00')), sell(Date.parse('2027-01-02T12:00:00+08:00'))], [0, 105]);
   assert.ok(M.isTradable('cb') && !M.isShortable('cb') && M.collateralRate('cb', 'TW', '12561.TWO') === 0);
 });
+
+test('權證 and 牛熊證: by the 張, their ticks, 0.1% tax, no margin or short; held to its last day, sold at that close', async () => {
+  const M = await import('../kit/stock-markets.mjs');
+  for (const s of ['030001.TW', '03001P.TW', '72479U.TWO', '70006C.TWO']) assert.equal(M.kindOf('EQUITY', s), 'warrant', s);
+  for (const s of ['0050.TW', '00679B.TWO', '020020.TW', '910322.TW', '2330.TW']) assert.notEqual(M.kindOf('EQUITY', s), 'warrant', s);
+  assert.deepEqual([1.23, 7, 12, 60, 120, 600].map(p => M.tickSize('TW', 'warrant', p)), [0.01, 0.05, 0.1, 0.5, 1, 5]);
+  assert.equal(M.tradeCosts({ market: 'TW', side: 'sell', kind: 'warrant', gross: 10_000, currency: 'TWD' }).tax, 10);
+  assert.equal(M.limitShare({ kind: 'warrant', market: 'TW', symbol: '030001.TW' }), null);
+  assert.ok(M.isTradable('warrant') && !M.isShortable('warrant') && M.collateralRate('warrant', 'TW', '030001.TW') === 0);
+  const now = Date.parse('2026-10-13T03:00:00Z');
+  const q = { symbol: '030001.TW', market: 'TW', kind: 'warrant', currency: 'TWD', price: 1.2, prev: 1.1, marketTime: now };
+  let acc = SA.newAccount(1_000_000, now - 400 * 86_400_000, 'w');
+  const fill = { id: 'f1', type: 'fill', t: now - 5 * 86_400_000, orderId: 'o1', side: 'buy', symbol: '030001.TW', name: '友達台新6A購01', market: 'TW', kind: 'warrant', currency: 'TWD', qty: 2000, price: 1, gross: 2000, commission: 20, tax: 0, fee: 0, total: 2020, twd: 1, settle: now - 3 * 86_400_000 };
+  acc = { ...acc, events: [...acc.events, fill] };
+  const ok = { margin: 'ok' };
+  const place = req => SA.placeOrder(acc, req, { quote: q, rates: { TWD: 1 }, valuation: ok, now, id: 'x' });
+  assert.equal(place({ side: 'buy', type: 'market', qty: 500 }).error, 'lot');
+  const last = Date.parse('2026-10-20T13:30:00+08:00');
+  const r = place({ side: 'sell', type: 'market', qty: 2000, expiry: last });
+  assert.equal(r.error, undefined);
+  const o = r.account.orders.at(-1);
+  assert.equal(o.after, last);
+  assert.ok(o.expiry && o.expires > now);
+  assert.equal(place({ side: 'sell', type: 'market', qty: 2000, expiry: last + 60_000 }).error, 'side', 'only at a 13:30 close');
+});
