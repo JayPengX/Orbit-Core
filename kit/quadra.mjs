@@ -3275,13 +3275,15 @@ function liftOnPictures() {
     seen.disconnect();
     if (box.dataset.now || globalThis.navigator?.onLine === false) return;
     const h = globalThis.innerHeight || 800;
-    // (Each on-screen picture still coming, counted once; those added during the hold count too.)
+    // (Each on-screen picture still coming, counted once; those added during the hold count too. One further along a rail is lazy: it loads as it scrolls in.)
     const pending = new Set();
     const look = () => {
+      // (Dark logos swapped now, not a frame later: the white lion is what's waited for.)
+      darkLogos();
       for (const img of document.images) {
         if (pending.has(img) || img.complete || img.closest('#loading, [hidden]')) continue;
         const r = img.getBoundingClientRect();
-        if (r.width > 0 && r.bottom > 0 && r.top < h) {
+        if (r.width > 0 && r.bottom > 0 && r.top < h && r.right > 0 && r.left < (globalThis.innerWidth || 400)) {
           pending.add(img);
           const settle = () => (pending.delete(img), pending.size || queueMicrotask(lookAgain));
           img.addEventListener('load', settle, { once: true });
@@ -3423,9 +3425,17 @@ const ESPN_LOGO = /^https:\/\/a\.espncdn\.com\/(?:i\/|combiner\/i\?img=\/i\/)(?:
 // (The Premier League's purple lion, the kit's or an app's copy: its white one beside it.)
 const EPL_LION = /\/img\/epl\.png(\?.*)?$/;
 const noDark = new Set();
-export function darkLogos(root = document) {
+const darkIn = new Set();
+const darkNow = () => {
   const de = document.documentElement;
-  const dark = de.dataset.theme === 'dark' || (de.dataset.theme !== 'light' && Boolean(globalThis.matchMedia?.('(prefers-color-scheme: dark)').matches));
+  return de.dataset.theme === 'dark' || (de.dataset.theme !== 'light' && Boolean(globalThis.matchMedia?.('(prefers-color-scheme: dark)').matches));
+};
+export function darkLogos(root = document) {
+  const dark = darkNow();
+  swapLogos(root, dark);
+  if (typeof OffscreenCanvas === 'function' && typeof createImageBitmap === 'function') toneLogos(root, dark);
+}
+function swapLogos(root, dark) {
   const plateLight = img => {
     for (let p = img.parentElement, i = 0; p && i < 3; p = p.parentElement, i++) {
       const m = /rgba?\((\d+), (\d+), (\d+)(?:, ([\d.]+))?\)/.exec(getComputedStyle(p).backgroundColor);
@@ -3442,18 +3452,20 @@ export function darkLogos(root = document) {
       const to = ESPN_LOGO.test(src) ? src.replace('/500/', '/500-dark/') : EPL_LION.test(src) ? src.replace(EPL_LION, '/img/epl-dark.png$1') : '';
       if (!to || noDark.has(src) || img.closest('[hidden], picture:has(source)') || plateLight(img)) continue;
       img.dataset.qLight = src;
+      // (One already shown once comes straight from the cache: not held back as a lazy one.)
+      if (darkIn.has(to)) img.loading = 'eager';
       img.setAttribute('src', to);
     } else if (!dark && light) {
       delete img.dataset.qLight;
       img.setAttribute('src', light);
     }
   }
-  if (typeof OffscreenCanvas === 'function' && typeof createImageBitmap === 'function') toneLogos(root, dark);
 }
 // A logo's own tone on a dark screen, read from its pixels once (the hosts
-// answer CORS): a dark mark in one colour (歐冠's star ball, Ligue 1's grey)
-// is drawn white (data-q-tone="mono"); a dark one in colours gets a light
-// disc ("color"); any other stays as it is. Remembered by address.
+// answer CORS): a dark mark in one colour with no light parts (歐冠's star
+// ball, Ligue 1's grey) is drawn white (data-q-tone="mono"); a dark one in
+// colours gets a lighter glass tile ("color"); any other, one with light
+// parts of its own, stays as it is. Remembered by address.
 const LOGO_HOST = /^https:\/\/(a\.espncdn\.com|r2\.thesportsdb\.com|www\.thesportsdb\.com|cdn\.nba\.com)\//;
 const tones = new Map();
 const toneOf = async url => {
@@ -3471,20 +3483,25 @@ const toneOf = async url => {
       let count = 0;
       let lum = 0;
       let sat = 0;
+      let light = 0;
       for (let i = 0; i < px.length; i += 4) {
         if (px[i + 3] < 140) continue;
         const [r, gr, b] = [px[i] / 255, px[i + 1] / 255, px[i + 2] / 255];
         const max = Math.max(r, gr, b);
         const min = Math.min(r, gr, b);
         count++;
-        lum += 0.2126 * r + 0.7152 * gr + 0.0722 * b;
+        const l = 0.2126 * r + 0.7152 * gr + 0.0722 * b;
+        lum += l;
+        if (l > 0.55) light++;
         sat += max ? (max - min) / max : 0;
       }
       // (A picture with a solid background, a photo: nothing to do.)
       if (!count || count > n * n * 0.92) return '';
       lum /= count;
       sat /= count;
-      return lum >= 0.33 ? '' : sat < 0.25 ? 'mono' : 'color';
+      // (A logo with light parts of its own, a white outline, a cream crest, shows as it is:
+      // whitened, the Spurs' became a blank blob.)
+      return lum >= 0.33 || light / count > 0.06 ? '' : sat < 0.25 ? 'mono' : 'color';
     } catch {
       return '';
     }
@@ -3503,7 +3520,8 @@ const toneLogos = (root, dark) => {
       delete img.dataset.qToneOf;
       continue;
     }
-    if (img.dataset.qToneOf === src) continue;
+    // (Read once it's in, from the cache: never a second download beside the picture's own.)
+    if (img.dataset.qToneOf === src || !img.complete) continue;
     img.dataset.qToneOf = src;
     toneOf(src).then(t => {
       if (img.dataset.qToneOf !== src) return;
@@ -3530,13 +3548,27 @@ function watchDarkLogos() {
   let frame = 0;
   const soon = () => (frame ||= requestAnimationFrame(() => ((frame = 0), darkLogos())));
   const start = () => {
-    new MutationObserver(soon).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['src', 'hidden'] });
+    // (A logo just added swapped at once, before it's laid out: a lazy one only ever fetches the dark version.)
+    const added = records => {
+      const dark = darkNow();
+      if (dark) for (const r of records) for (const n of r.addedNodes) if (n.nodeType === 1) swapLogos(n.tagName === 'IMG' ? n.parentElement || n : n, dark);
+      soon();
+    };
+    new MutationObserver(added).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['src', 'hidden'] });
     new MutationObserver(soon).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     globalThis.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change', soon);
     // (One that fails before wireLogos runs: the ordinary one.)
     document.addEventListener('error', e => e.target?.tagName === 'IMG' && darkLogoFailed(e.target), true);
     // (A <picture> settles on its source when it loads: its tone read then.)
-    document.addEventListener('load', e => e.target?.tagName === 'IMG' && e.target.dataset.qToneOf !== e.target.currentSrc && soon(), true);
+    document.addEventListener(
+      'load',
+      e => {
+        if (e.target?.tagName !== 'IMG') return;
+        if (e.target.dataset.qLight) darkIn.add(e.target.getAttribute('src'));
+        if (e.target.dataset.qToneOf !== e.target.currentSrc) soon();
+      },
+      true
+    );
     soon();
   };
   if (document.body) start();

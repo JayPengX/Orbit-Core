@@ -863,9 +863,13 @@ const fromNpm = url => {
     return null;
   });
 };
+// (Each address fetched once, as a phone's cache keeps a logo drawn again: here
+// every request is routed, so the browser's own cache never sees it.)
+const outside = new Map();
 await context.route(/^https:\/\/(?!orbit-workers-proxy|sports-proxy|localhost[:/])/, async route => {
   const url = route.request().url();
-  const body = (await curlBin(url)) || (await fromNpm(url));
+  if (!outside.has(url)) outside.set(url, Promise.resolve(curlBin(url)).then(async b => b || (await fromNpm(url))));
+  const body = await outside.get(url);
   if (!body) {
     if (DEBUG) console.log('failed', url.slice(0, 140));
     return route.abort();
@@ -873,8 +877,10 @@ await context.route(/^https:\/\/(?!orbit-workers-proxy|sports-proxy|localhost[:/
   // By the bytes first (Commons serves an .svg's PNG rendering), else by the name.
   const magic = body.subarray(0, 4).toString('hex');
   const type = magic === '89504e47' ? 'image/png' : magic.startsWith('ffd8') ? 'image/jpeg' : /\.svg/.test(url) ? 'image/svg+xml' : /\.png/.test(url) ? 'image/png' : /\.jpe?g/.test(url) ? 'image/jpeg' : /\.css|fonts\.googleapis/.test(url) ? 'text/css' : /\.m?js/.test(url) ? 'text/javascript' : 'application/octet-stream';
-  // (Open to any page, as these hosts are: an OSRM ride's shape is read by fetch, not an <img>.)
-  await route.fulfill({ status: 200, contentType: /^\s*[[{]/.test(body.subarray(0, 8).toString()) ? 'application/json' : type, headers: { 'Access-Control-Allow-Origin': '*' }, body });
+  // (Open to any page, as these hosts are: an OSRM ride's shape is read by fetch, not an <img>.
+  // A picture kept as a phone keeps it (ESPN's are cached for hours): drawn again, it's there.)
+  const json = /^\s*[[{]/.test(body.subarray(0, 8).toString());
+  await route.fulfill({ status: 200, contentType: json ? 'application/json' : type, headers: { 'Access-Control-Allow-Origin': '*', ...(/^image\//.test(type) && !json ? { 'Cache-Control': 'max-age=3600' } : {}) }, body });
 });
 // The family's data (the proxy's /data/, R2): the real files, as a phone reads them.
 await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/data\//, async route => {

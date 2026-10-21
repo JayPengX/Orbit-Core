@@ -84,22 +84,25 @@
     const walk = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     for (let n; (n = walk.nextNode()); ) {
       const p = n.parentElement;
-      if (!p || !n.textContent.trim() || p.closest('#loading, #tabs, .q-tabbar, script, style')) continue;
+      if (!p || !n.textContent.trim() || p.closest('#loading, #tabs, .q-tabbar, script, style, [hidden]')) continue;
       const r = p.getBoundingClientRect();
       if (r.width && r.top < innerHeight && r.bottom > 0 && getComputedStyle(p).visibility !== 'hidden') chars += n.textContent.trim().length;
     }
     let waiting = 0;
     const late = [];
+    lateEls = [];
     for (const img of document.querySelectorAll('img')) {
       const r = img.getBoundingClientRect();
-      if (!r.width || r.top >= innerHeight || r.bottom <= 0 || img.closest('#loading')) continue;
+      // (Not a hidden tab's: kept laid out, content-visibility: hidden, never loaded till shown.)
+      if (!r.width || r.top >= innerHeight || r.bottom <= 0 || r.left >= innerWidth || r.right <= 0 || img.closest('#loading, [hidden]')) continue;
       pics++;
-      if (!img.complete) waiting++, late.push(String(img.getAttribute('src')).slice(0, 90));
+      if (!img.complete) waiting++, late.push(String(img.getAttribute('src')).slice(0, 90)), lateEls.push(img);
     }
     const skels = [...document.querySelectorAll(SKELETON)].filter(seen).filter(el => el.getBoundingClientRect().top < innerHeight);
     const loading = [...document.querySelectorAll('body *')].filter(el => !el.children.length && LOADING.test(text(el)) && seen(el));
     return { t: Math.round(performance.now() - t0), chars, pics, waiting, late: late.slice(0, 3), skels: skels.slice(0, 4).map(name), loading: loading.slice(0, 3).map(el => `${name(el)} "${text(el)}"`) };
   };
+  let lateEls = [];
   gate.screenNow = screenNow;
   // The lift: #loading hidden (Orbit Class: its booting class gone).
   const watch = setInterval(() => {
@@ -107,7 +110,14 @@
     const classOpen = !box && document.body && !document.body.classList.contains('orbit-booting') && document.readyState !== 'loading' && document.querySelector('main, #app');
     if ((box && (box.hidden || getComputedStyle(box).display === 'none')) || classOpen) {
       clearInterval(watch);
-      gate.lift = screenNow();
+      const at = screenNow();
+      // (A logo drawn again as it lifted, already loaded once, comes from a phone's cache at
+      // once; here every picture is fetched through the preview: one still out 200 ms on is late.)
+      const els = lateEls;
+      setTimeout(() => {
+        const still = els.filter(img => !img.complete && img.isConnected);
+        gate.lift = { ...at, waiting: still.length, late: still.slice(0, 3).map(img => String(img.getAttribute('src')).slice(0, 90)) };
+      }, 200);
     }
   }, 25);
 
