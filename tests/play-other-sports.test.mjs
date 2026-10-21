@@ -117,3 +117,28 @@ test('a Kambi group that is only "Matches" reads as the competition above it', a
   data.events[0].event.path = ['cricket', 'international_twenty20__w_', 'matches'];
   assert.equal(parseKambiEvents(data, 'cricket', new Date('2029-12-31T00:00:00Z'))[0].group, 'International Twenty20 (W)');
 });
+
+test('golf 冠軍: the next tournaments from Kambi, settled on ESPN\'s leaderboard', async () => {
+  const { parseKambiGolf } = await import('../kit/play-sources.mjs');
+  const { golfResult, readOutcomes, legResult } = await import('../kit/settle.mjs');
+  const offer = { criterion: { englishLabel: 'Finishing Position' }, from: 1, to: 1, outcomes: Array.from({ length: 30 }, (_, i) => ({ participant: `Player ${String.fromCharCode(65 + i)}`, odds: 5000 + i * 4000, status: 'OPEN' })) };
+  const ev = (id, name, path, start, offers = [offer]) => ({ event: { id, name, path, start, state: 'NOT_STARTED' }, betOffers: offers });
+  const list = { events: [
+    ev(1, 'Butterfield Bermuda Championship 2026', ['golf', 'pga_tour', 'butterfield_bermuda_championship'], '2026-10-22T10:35:00Z'),
+    ev(2, 'Winner without Ben James (Butterfield Bermuda Championship 2026)', ['golf', 'pga_tour', 'x'], '2026-10-22T10:35:00Z'),
+    ev(3, 'Stifel Charity Classic 2026', ['golf', 'champions_tour', 'x'], '2026-10-23T11:00:00Z'),
+    ev(4, 'Genesis Championship 2026', ['golf', 'dp_world_tour', 'x'], '2026-12-01T00:00:00Z')
+  ] };
+  const boards = parseKambiGolf(list, new Date('2026-10-21T00:00:00Z'));
+  assert.deepEqual(boards.map(b => b.key), ['golf1']);
+  assert.equal(boards[0].slug, 'golf:pga:20261022:Butterfield Bermuda Championship');
+  assert.equal(boards[0].teams.length, 30);
+  assert.ok(Math.abs(boards[0].teams.reduce((a, t) => a + t.fair, 0) - 1) < 1e-6);
+  const board = { events: [{ name: 'Butterfield Bermuda Championship', date: '2026-10-22T04:00Z', status: { type: { completed: true, name: 'STATUS_FINAL' } }, competitions: [{ competitors: [{ order: 2, athlete: { displayName: 'Ben James' } }, { order: 1, athlete: { displayName: 'Player B' } }] }] }] };
+  const t = Date.parse('2026-10-22T12:00:00Z');
+  assert.deepEqual(golfResult(board, 'Butterfield Bermuda Championship', t), { status: 'final', winner: 'Player B' });
+  const leg = { id: 'g', kind: 'future', market: 'golf1', team: 'Player B', eventSlug: boards[0].slug };
+  const out = await readOutcomes([leg], { read: url => (url.includes('golf/pga/scoreboard') ? board : null), now: new Date('2026-10-26T00:00:00Z') });
+  assert.equal(legResult(leg, out.get('g')), 'won');
+  assert.equal(legResult({ ...leg, team: 'Player C' }, out.get('g')), 'lost');
+});

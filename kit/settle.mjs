@@ -671,6 +671,22 @@ export function parseEspnPole(data, startUtc) {
   return name ? { status: 'final', pole: name } : { status: 'pending' };
 }
 
+// A golf tournament's winner from an ESPN golf scoreboard: the event of that
+// name (or the tour's one event that week), once final, its first place;
+// called off void; null while it's on or not listed.
+export function golfResult(data, name, t) {
+  const events = (data?.events || []).filter(e => Math.abs(Date.parse(e.date) - t) < 5 * DAY_MS);
+  const named = events.filter(e => sideScore(e.name, name) >= 2);
+  const event = named[0] ?? (events.length === 1 ? events[0] : null);
+  if (!event) return null;
+  const type = event.status?.type || {};
+  if (VOID_STATUS.test(type.name || '') || POSTPONED.test(type.name || '')) return { status: 'void' };
+  if (!type.completed) return null;
+  const first = (event.competitions?.[0]?.competitors || []).find(c => Number(c.order) === 1);
+  const winner = first?.athlete?.displayName;
+  return winner ? { status: 'final', winner } : null;
+}
+
 // A championship's winner once Polymarket has resolved the market.
 export function parseFutureResult(events) {
   const event = events?.[0];
@@ -959,6 +975,20 @@ export async function readOutcomes(legs, { read, keptKambi = async () => null, n
   await Promise.all(
     legs.map(async leg => {
       if (leg.kind === 'future') {
+        // A golf tournament's winner: ESPN's leaderboard (its first day, or the
+        // next: a tour's week is filed under its own dates).
+        if (/^golf:/.test(leg.eventSlug || '')) {
+          const [, tour, day, ...rest] = leg.eventSlug.split(':');
+          const t = Date.parse(`${day.slice(0, 4)}-${day.slice(4, 6)}-${day.slice(6, 8)}T12:00:00Z`);
+          for (const d of [0, 1, 3]) {
+            const data = await page(`${ESPN}/golf/${tour}/scoreboard?dates=${yyyymmdd(new Date(t + d * DAY_MS))}`);
+            const result = data && golfResult(data, rest.join(':'), t);
+            if (result) return out.set(leg.id, result);
+          }
+          // Not played (called off) or no answer two weeks on: the stake back.
+          if (now.getTime() - t > 14 * DAY_MS) out.set(leg.id, { status: 'void' });
+          return;
+        }
         if (!leg.eventSlug) return;
         const events = await page(`${GAMMA}/events?slug=${encodeURIComponent(leg.eventSlug)}`);
         if (events) out.set(leg.id, parseFutureResult(events));

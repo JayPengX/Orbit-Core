@@ -155,8 +155,8 @@ const loads = url =>
 // official headshot, for players the feed didn't give an id for. Checked to
 // exist before it's used.
 const ESPN_SEARCH = 'https://site.web.api.espn.com/apis/common/v3/search?type=player&limit=6&query=';
-const SEARCH_SPORT = { racing: 'racing', soccer: 'soccer', basketball: 'basketball', baseball: 'baseball', football: 'football', hockey: 'hockey', tennis: 'tennis', mma: 'mma' };
-const HEADSHOT_FOLDER = { racing: 'rpm', soccer: 'soccer', basketball: 'nba', baseball: 'mlb', football: 'nfl', hockey: 'nhl', tennis: 'tennis', mma: 'mma' };
+const SEARCH_SPORT = { racing: 'racing', soccer: 'soccer', basketball: 'basketball', baseball: 'baseball', football: 'football', hockey: 'hockey', tennis: 'tennis', mma: 'mma', golf: 'golf' };
+const HEADSHOT_FOLDER = { racing: 'rpm', soccer: 'soccer', basketball: 'nba', baseball: 'mlb', football: 'nfl', hockey: 'nhl', tennis: 'tennis', mma: 'mma', golf: 'golf' };
 export async function espnSearchPhoto(name, sport, fetchJson = defaultJson, check = loads) {
   if (!SEARCH_SPORT[sport]) return '';
   // (A failed search throws: findPhoto keeps nothing, and asks again later.)
@@ -174,11 +174,11 @@ export async function espnSearchPhoto(name, sport, fetchJson = defaultJson, chec
 // their name and sport match. Its thumbnails are often casual pictures, so
 // only the cutout counts.
 const TSDB_SEARCH = 'https://www.thesportsdb.com/api/v1/json/123/searchplayers.php?p=';
-const TSDB_SPORT = { soccer: 'Soccer', baseball: 'Baseball', basketball: 'Basketball', football: 'American Football', hockey: 'Ice Hockey', racing: 'Motorsport', tennis: 'Tennis', badminton: 'Badminton', tabletennis: 'Table Tennis', snooker: 'Snooker', darts: 'Darts' };
+const TSDB_SPORT = { soccer: 'Soccer', baseball: 'Baseball', basketball: 'Basketball', football: 'American Football', hockey: 'Ice Hockey', racing: 'Motorsport', tennis: 'Tennis', badminton: 'Badminton', tabletennis: 'Table Tennis', snooker: 'Snooker', darts: 'Darts', golf: 'Golf' };
 // The sports whose players seldom have a studio picture to be had (a
 // badminton or snooker player): with no cutout, their country's flag
 // (TheSportsDB's nationality), never an initial.
-const FLAG_SPORTS = new Set(['tennis', 'badminton', 'tabletennis', 'snooker', 'darts']);
+const FLAG_SPORTS = new Set(['tennis', 'badminton', 'tabletennis', 'snooker', 'darts', 'golf']);
 // Its free key takes about 30 searches a minute: they go one at a time, 2.1 s
 // apart, so a roster opened (or a few teams flicked through) never hits the
 // limit; one that does pauses the queue a minute. A failed search throws.

@@ -244,7 +244,7 @@ export const teamZh = (key, name, sport = '') => teamNameZh(key, name, sport)?.f
 // this phone (useTranslator, warm). Until a name comes back it shows as it
 // was. For Play and Orbit Slips alike (teamNameZh reads it).
 // The sports whose sides are players (a pair in doubles), not clubs.
-export const PLAYER_SPORTS = new Set(['tennis', 'badminton', 'tabletennis', 'snooker', 'darts', 'mma']);
+export const PLAYER_SPORTS = new Set(['tennis', 'badminton', 'tabletennis', 'snooker', 'darts', 'mma', 'golf']);
 const sportOf = key => CATALOG[key]?.sport ?? key;
 export const isPlayerSport = key => PLAYER_SPORTS.has(sportOf(key));
 // Every player's name seen (teamNameZh of a player sport), for a page that

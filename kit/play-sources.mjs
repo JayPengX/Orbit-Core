@@ -786,12 +786,51 @@ export function parseFutures(events, sport, markets = FUTURES.filter(f => f.spor
   return out;
 }
 
-// The championships found by search, loaded in the background.
+// The championships found by search, loaded in the background (and golf's
+// tournaments, Kambi's).
 export async function loadExtraFutures(now = new Date()) {
-  const results = await Promise.allSettled(
-    EXTRA_FUTURES.map(market => getJson(`${GAMMA}/public-search?q=${encodeURIComponent(market.query)}&limit_per_type=8&events_status=active`).then(d => parseFutures(d?.events || [], market.sport, [market])))
-  );
+  const results = await Promise.allSettled([
+    ...EXTRA_FUTURES.map(market => getJson(`${GAMMA}/public-search?q=${encodeURIComponent(market.query)}&limit_per_type=8&events_status=active`).then(d => parseFutures(d?.events || [], market.sport, [market]))),
+    loadGolfFutures(now)
+  ]);
   return pruneFutures(results.flatMap(r => (r.status === 'fulfilled' ? r.value : [])), now);
+}
+
+// 高爾夫 冠軍 (運彩 sells golf's tournament winner only): each tour's next
+// tournament from Kambi's list, its winner prices, before the first tee
+// (within a week). Settled on ESPN's leaderboard (settle.mjs golfResult): the
+// slug is golf:<ESPN tour>:<first day>:<name>. The PGA Tour and its majors,
+// the DP World Tour and the LPGA.
+export const GOLF_TOURS = { pga_tour: 'pga', the_majors: 'pga', dp_world_tour: 'eur', lpga_tour: 'lpga' };
+const KAMBI_GOLF_LIST = `${KAMBI}/listView/golf/all/all/all/competitions.json?lang=en_GB&market=GB&useCombined=true`;
+export function parseKambiGolf(list, now = new Date()) {
+  const out = [];
+  for (const item of list?.events || []) {
+    const e = item.event;
+    const path = (e?.path || []).map(p => (typeof p === 'string' ? p : p.termKey));
+    const tour = GOLF_TOURS[path[1]];
+    if (!e || !tour || e.state !== 'NOT_STARTED' || !/\b20\d\d$/.test(e.name || '')) continue;
+    const start = Date.parse(e.start);
+    if (!(start > now.getTime()) || start - now.getTime() > 7 * DAY_MS) continue;
+    const offer = (item.betOffers || []).find(o => o.criterion?.englishLabel === 'Finishing Position' && o.from === 1 && o.to === 1 && !o.suspended);
+    const players = (offer?.outcomes || []).filter(o => o.odds > 1000 && o.participant && (o.status ?? 'OPEN') === 'OPEN').map(o => ({ name: o.participant, raw: 1000 / o.odds }));
+    if (players.length < 20) continue;
+    const fair = devigPower(players.map(p => p.raw));
+    const name = e.name.replace(/\s*\b20\d\d$/, '');
+    out.push({
+      key: `golf${e.id}`,
+      sport: 'golf',
+      slug: `golf:${tour}:${yyyymmdd(new Date(start))}:${name}`,
+      season: name,
+      title: name,
+      startUtc: new Date(start).toISOString(),
+      teams: players.map((p, i) => ({ name: { en: p.name, zh: teamZh('golf', p.name) }, fair: fair[i] })).sort((a, b) => b.fair - a.fair)
+    });
+  }
+  return out;
+}
+export async function loadGolfFutures(now = new Date()) {
+  return parseKambiGolf(await getJson(KAMBI_GOLF_LIST, 'kambi-events'), now);
 }
 
 // Championship boards with only who can still win (kit/play-alive.mjs): each
@@ -1239,6 +1278,7 @@ export async function loadFuture(key, now = new Date()) {
     if (tagged.sport === 'nba' && !nbaInSeason(now)) return null;
     return (await pruneFutures(parseFutures(await fetchPolymarketEvents(POLYMARKET_TAG[tagged.sport], 'polymarket-events'), tagged.sport, [tagged]), now))[0] ?? null;
   }
+  if (/^golf\d+$/.test(key)) return (await loadGolfFutures(now)).find(f => f.key === key) ?? null;
   const extra = EXTRA_FUTURES.find(f => f.key === key);
   if (!extra) return null;
   const d = await getJson(`${GAMMA}/public-search?q=${encodeURIComponent(extra.query)}&limit_per_type=8&events_status=active`);
