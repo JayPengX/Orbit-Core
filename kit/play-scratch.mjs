@@ -253,10 +253,10 @@ export const CARDS = {
 // The cards on sale, by price, then the newest first (Taiwan Lottery's own
 // order: its 期數).
 export const CARD_ORDER = ['golddice', 'lucky7', 'hi123', 'rolling', 'gift', 'fruit', 'battle', 'double', 'ingot', 'beat', 'code', 'goldlotto', 'crazy10', 'rising', 'fafa', 'goal', 'multiply', 'numbers', 'touch', 'hunter', 'machine', 'super777', 'mjbingo', 'ten', 'million', 'mahjong'];
-// Sold now: on sale and not past its 下市日期 (sales close 17:00 Taiwan time).
+// Sold now: on sale from its 上市日期 and not past its 下市日期 (sales close 17:00 Taiwan time).
 export const onSale = (id, now = new Date()) => {
   const c = CARDS[id];
-  return !!c && !c.retired && CARD_ORDER.includes(id) && (!c.until || now < new Date(`${c.until}T17:00:00+08:00`));
+  return !!c && !c.retired && CARD_ORDER.includes(id) && (!c.since || now >= new Date(`${c.since}T00:00:00+08:00`)) && (!c.until || now < new Date(`${c.until}T17:00:00+08:00`));
 };
 // Treasures on the map's key, cheapest tier first.
 const TREASURES = ['🐚', '🪙', '🗝️', '🏺', '📿', '💍', '👑', '💎', '🏆'];

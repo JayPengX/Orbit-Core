@@ -75,3 +75,24 @@ test('the family page (site/index.html) links where the kit does: regenerate it 
   const links = [...page.matchAll(/class="app" href="([^"]+)"/g)].map(m => m[1]).sort();
   assert.deepEqual(links, Object.values(kit.APPS).map(a => a.path).sort());
 });
+
+test('真相: 刮刮樂 paybacks come from the cards on sale (no NT$2,000 row when none is sold)', async () => {
+  const { scratchBacks } = await import('../kit/truth.mjs');
+  const rows = scratchBacks(new Date('2026-10-21T12:00:00+08:00'));
+  assert.deepEqual(rows.map(r => r[0]), [100, 200, 300, 500, 1000]);
+  for (const [, lo, hi] of rows) assert.ok(lo >= 0.55 && hi <= 0.8 && lo <= hi);
+});
+
+test('真相: the owner\'s off-the-record test slip and a lottery refund stay out of the bets record', async () => {
+  const { record } = await import('../kit/truth.mjs');
+  const w = { entries: [
+    { id: 'odds:stake-a', t: '2026-10-20T01:00:00Z', app: 'odds', kind: 'stake', amount: -28_630 },
+    { id: 'odds:payout-a', t: '2026-10-20T05:00:00Z', app: 'odds', kind: 'payout', amount: 30_920 },
+    { id: 'odds:stake-b', t: '2026-10-20T01:00:00Z', app: 'odds', kind: 'stake', amount: -1_000 },
+    { id: 'odds:payout-b', t: '2026-10-20T05:00:00Z', app: 'odds', kind: 'payout', amount: 1_800 },
+    { id: 'odds:lotto-c', t: '2026-10-20T01:00:00Z', app: 'odds', kind: 'lottery', amount: -100 },
+    { id: 'odds:refund-c', t: '2026-10-20T02:00:00Z', app: 'odds', kind: 'refund', amount: 100 }
+  ] };
+  const r = record(w);
+  assert.deepEqual([r.staked, r.won, r.tickets, r.prizes], [1_000, 1_800, 0, 0]);
+});

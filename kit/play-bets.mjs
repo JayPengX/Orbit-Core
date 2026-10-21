@@ -83,7 +83,10 @@ export function futureBets(futures) {
       const odds = estimateFuturesOdds(market.teams.map(team => team.fair), FUTURES_OVERROUND[market.key] ?? FUTURES_OVERROUND[market.sport] ?? FUTURES_OVERROUND.other);
       return market.teams.map((team, i) => ({
         id: `fut|${market.key}|${team.name.en}`,
-        gameId: `fut|${market.key}`,
+        // One sport's championships are one game: a pennant and the World
+        // Series (or a driver's and his team's title) go together, so a parlay
+        // takes one of them, never both at independent odds.
+        gameId: `fut|${market.sport}`,
         kind: 'future',
         market: market.key,
         sport: market.sport,

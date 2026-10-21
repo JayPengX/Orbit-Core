@@ -221,3 +221,19 @@ test('運彩 two-way cut by sport (its boards, 2026-10-20): basketball and socce
   const nfl = pointsModel('nfl', { homeWin: 0.6, spread: { awayLine: 3.5, awayFair: 0.5 }, total: { line: 45.5, overFair: 0.5 } });
   assert.deepEqual(pointsMarkets(nfl, { spreadLine: 3.5, totalLine: 45.5 }).filter(m => m.kind === 'runline').map(m => m.awayLine), [-2.5, 0.5, 3.5, 6.5, 9.5]);
 });
+
+test('a pennant and the World Series (one sport\'s championships) never go in one parlay', async () => {
+  const { futureBets } = await import('../kit/play-bets.mjs');
+  const { slipErrors } = await import('../kit/play-odds.mjs');
+  const teams = [{ name: { en: 'Brewers' }, fair: 0.4 }, { name: { en: 'Rays' }, fair: 0.3 }, { name: { en: 'Guardians' }, fair: 0.3 }];
+  const bets = futureBets([{ key: 'mlb_ws', sport: 'mlb', teams }, { key: 'mlb_nl', sport: 'mlb', teams }, { key: 'nba_west', sport: 'nba', teams }]);
+  const pick = (m, t) => ({ ...bets.find(b => b.market === m && b.teamEn === t), odds: 2 });
+  assert.deepEqual(slipErrors({ mode: 'parlay', legs: [pick('mlb_ws', 'Brewers'), pick('mlb_nl', 'Brewers')], sizes: [2], stake: 100 }), ['sameGame']);
+  assert.deepEqual(slipErrors({ mode: 'parlay', legs: [pick('mlb_ws', 'Brewers'), pick('nba_west', 'Rays')], sizes: [2], stake: 100 }), []);
+});
+
+test('corners settle on 90 minutes: a match that went to extra time is void', () => {
+  const leg = { sport: 'epl', kind: 'corners', side: 'over', line: 9.5 };
+  assert.equal(legResult(leg, game(1, 1, { corners: 'void' })), 'void');
+  assert.equal(legResult(leg, game(1, 1, { corners: { home: 6, away: 5 } })), 'won');
+});
