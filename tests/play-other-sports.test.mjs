@@ -145,3 +145,9 @@ test('golf 冠軍: the next tournaments from Kambi, settled on ESPN\'s leaderboa
   assert.equal(legResult(leg, out.get('g')), 'won');
   assert.equal(legResult({ ...leg, team: 'Player C' }, out.get('g')), 'lost');
 });
+
+test("the translator's second endpoint (client=gtx) answer read as one text", async () => {
+  const { gtxText } = await import('../sports.js');
+  assert.equal(gtxText(JSON.stringify([[['納克羅斯拉勒；', 'Knack Roeselare; ', null], ['軸吉貝爾坦', 'Axis Guibertin', null]], null, 'en'])), '納克羅斯拉勒；軸吉貝爾坦');
+  assert.equal(gtxText('nope'), '');
+});
