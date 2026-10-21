@@ -35,6 +35,7 @@ import {
   isOpen,
   isTradable,
   isShortable,
+  isEmerging,
   qtyStep,
   roundCash,
   roundQty,
@@ -490,7 +491,8 @@ export function estimate({ market, kind, currency, side, qty, price, t = Date.no
 // A Taiwan whole-lot order of a listed stock, ETF or bond ETF: it goes
 // through the closing call auction (stock-credit.mjs closingAuction).
 const LISTED = new Set(['stock', 'etf', 'bond']);
-const atClosingAuction = order => order.market === 'TW' && LISTED.has(order.kind) && !order.after && !isOddLot(order.market, order.kind, order.qty);
+// (Not an emerging-board stock: 興櫃 is traded by negotiation, isEmerging.)
+const atClosingAuction = order => order.market === 'TW' && LISTED.has(order.kind) && !order.after && !isOddLot(order.market, order.kind, order.qty) && !isEmerging(order.symbol);
 // One match at the close: a buy whose limit is at or above it, a sell at or
 // below, a market order at it; a stop order waits.
 const crossAt = (order, close) => (order.type === 'limit' ? ((order.side === 'buy' ? order.limit >= close : order.limit <= close) ? close : null) : order.type === 'market' ? close : null);
@@ -616,7 +618,7 @@ export function placeOrder(account, req, { quote, rates, valuation, now = Date.n
   // US pre- and post-market (`ext`): a US stock or ETF, a day limit order only.
   if (req.ext && (quote.market !== 'US' || !LISTED.has(quote.kind) || type !== 'limit' || req.tif === 'gtc')) return { error: 'extLimit' };
   // Hong Kong takes limit orders only (limitOnly; the broker's own sales aside).
-  if (!req.forced && !req.cover && type !== 'limit' && limitOnly(quote.market)) return { error: 'limitOnly' };
+  if (!req.forced && !req.cover && type !== 'limit' && limitOnly(quote.market, quote.symbol)) return { error: 'limitOnly' };
   // Taiwan's odd lots (盤中 and 盤後零股) take limit orders only (TWSE: 以限價為之).
   if (!req.forced && !req.cover && type !== 'limit' && isOddLot(quote.market, quote.kind, qty)) return { error: 'oddLotLimit' };
   // Stock Connect: STAR and ChiNext shares are bought by institutions only (cnBoard).
@@ -705,15 +707,17 @@ export function placeOrder(account, req, { quote, rates, valuation, now = Date.n
     // Shares bought today sell today only as a 現股當沖 (dayTradeBuyFirst:
     // 3 months open and 10 trades, or a credit account); before that a
     // broker refuses the sale until tomorrow (TWSE 現股當日沖銷交易作業要點).
-    if (quote.market === 'TW' && !req.forced && !req.cover && !dayTradeBuyFirst(account, now)) {
+    // An emerging-board stock (興櫃) is never day-traded: today's shares sell tomorrow.
+    const noDayTrade = isEmerging(quote.symbol);
+    if (quote.market === 'TW' && !req.forced && !req.cover && (noDayTrade || !dayTradeBuyFirst(account, now))) {
       const today = boughtToday(account, quote.symbol, now);
-      if (today > EPS && qty > Math.max(0, have - today) + EPS) return { error: 'dayTradeNeeded', have: Math.max(0, have - today) };
+      if (today > EPS && qty > Math.max(0, have - today) + EPS) return { error: noDayTrade ? 'noDayTrade' : 'dayTradeNeeded', have: Math.max(0, have - today) };
     }
     const short = qty - have;
     if (short > EPS) {
       // Selling more than is held sells the rest short; never abroad (複委託
       // is cash only: a foreign stock sells only what's held).
-      if (!isShortable(quote.kind)) return { error: 'shares', have };
+      if (!isShortable(quote.kind, quote.symbol)) return { error: 'shares', have };
       if (isSubBrokered(quote.market) && quote.kind !== 'fx') return { error: 'cashOnly', have };
       if (!valuation) return { error: 'noValuation' };
       if (valuation.margin !== 'ok') return { error: 'margin' };
@@ -882,7 +886,7 @@ function fillOrder(account, order, price, rates, now, at = now) {
       const rejected = { ...order, status: 'rejected', reason: 'funds', rev: order.rev + 1, done: now };
       return { account: updateOrder(account, rejected), order: rejected, fill: null, error: 'funds', need: est.total - lent, have };
     }
-  } else if (order.side === 'sell' && (!order.short || !isShortable(order.kind))) {
+  } else if (order.side === 'sell' && (!order.short || !isShortable(order.kind, order.symbol))) {
     const held = Math.min(...moments.map(tt => replay(account, tt).positions[order.symbol]?.qty || 0));
     if (held + EPS < order.qty) {
       const rejected = { ...order, status: 'rejected', reason: 'shares', rev: order.rev + 1, done: now };

@@ -340,3 +340,23 @@ test('without 當沖 a share bought today sells only tomorrow; older shares sell
   assert.equal(sell(2000).error, 'dayTradeNeeded');
   assert.equal(sell(1000).error, undefined);
 });
+
+test('興櫃: no daily limit, limit orders only, no closing auction, margin, short or day trade', async () => {
+  const M = await import('../kit/stock-markets.mjs');
+  const now = Date.parse('2026-10-13T03:00:00Z');
+  const q = { symbol: '1260.TWO', market: 'TW', kind: 'stock', currency: 'TWD', price: 32, prev: 20, marketTime: now };
+  assert.ok(M.isEmerging('1260.TWO') && !M.isEmerging('2330.TW') && !M.isEmerging('6488.TWO'));
+  assert.equal(M.priceLimits(q, now), null);
+  assert.equal(M.collateralRate('stock', 'TW', '1260.TWO'), 0);
+  assert.ok(!M.isShortable('stock', '1260.TWO') && M.isShortable('stock', '6488.TWO'));
+  let acc = SA.newAccount(1_000_000, now - 400 * 86_400_000, 'esb');
+  const ok = { margin: 'ok' };
+  const order = (req, a = acc) => SA.placeOrder(a, req, { quote: q, rates: { TWD: 1 }, valuation: ok, now, id: `x${Math.random()}` });
+  assert.equal(order({ side: 'buy', type: 'market', qty: 1000 }).error, 'limitOnly');
+  assert.equal(order({ side: 'buy', type: 'limit', limit: 40, qty: 1000 }).error, undefined, 'a price 100% over yesterday is fine');
+  // Bought today: sells tomorrow, even for an account that may 當沖.
+  const fill = { id: 'f1', type: 'fill', t: now - 3_600_000, orderId: 'o1', side: 'buy', symbol: '1260.TWO', name: '富味鄉', market: 'TW', kind: 'stock', currency: 'TWD', qty: 1000, price: 32, gross: 32_000, commission: 45, tax: 0, fee: 0, total: 32_045, twd: 1, settle: now + 2 * 86_400_000 };
+  acc = { ...acc, events: [...acc.events, fill] };
+  assert.equal(order({ side: 'sell', type: 'limit', limit: 33, qty: 1000 }).error, 'noDayTrade');
+  assert.equal(order({ side: 'sell', type: 'limit', limit: 33, qty: 2000 }).error, 'noDayTrade');
+});
