@@ -38,7 +38,9 @@ export const SPORTS = {
   rugby: { zh: '橄欖球', en: 'Rugby', icon: '🏉' },
   futsal: { zh: '五人制足球', en: 'Futsal', icon: '⚽' },
   mma: { zh: '綜合格鬥', en: 'MMA', icon: '🥊' },
-  cricket: { zh: '板球', en: 'Cricket', icon: '🏏' }
+  cricket: { zh: '板球', en: 'Cricket', icon: '🏏' },
+  // 冠軍 only: a tournament's winner (play-sources.mjs loadGolfFutures).
+  golf: { zh: '高爾夫', en: 'Golf', icon: '⛳' }
 };
 
 
