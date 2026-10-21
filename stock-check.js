@@ -13,7 +13,8 @@
 //             account had then. Any other fill (one found on
 //             the phone in the price history) counts at the worst price the
 //             market traded since its moment, so no moment chosen after the
-//             fact can win anything; a bond's only at its maturity.
+//             fact can win anything; a bond's (and a 可轉債's) only at its
+//             maturity, at face.
 //   fx        at most the market's rate at its moment (the last 5-minute
 //             close), less the narrowest spread; one saved later than 5
 //             minutes after, the worst rate since its moment
@@ -41,7 +42,7 @@
 import { replay, ownCash, applyFills, planOrderType } from './kit/stock-account.mjs';
 import { unpack } from './kit/stock-codec.mjs';
 import { BONDS } from './kit/stock-bonds.mjs';
-import { marketFill, dealPrice, currencyInfo, isSubBrokered } from './kit/stock-markets.mjs';
+import { marketFill, dealPrice, currencyInfo, isSubBrokered, cbMaturity } from './kit/stock-markets.mjs';
 import { fxSymbol } from './kit/stock-quotes.mjs';
 import { readFillsBook, decideFills, ipoList, ipoDraw, ipoKeyOf } from './stock-fill.js';
 import { parseDoc } from './doc-store.js';
@@ -163,6 +164,13 @@ export async function checkEvent(e, account, wallet, read, issued = {}, ctx = {}
         if (!e.maturity || !bond || e.side !== 'sell' || ctx.used?.has(`maturity:${e.symbol}`) || !(e.t >= bond.maturity) || e.t > now) return 'bad';
         const held = replay(account, e.t).positions[e.symbol]?.qty || 0;
         return e.price <= (bond.face || 100) + 1e-9 && e.qty <= held + 1e-6 ? 'ok' : 'bad';
+      }
+      // A Taiwan convertible bond repaid at its maturity: face (100), then, on what was held.
+      if (e.kind === 'cb' && e.maturity) {
+        const due = cbMaturity(e.symbol);
+        if (!due || e.side !== 'sell' || ctx.used?.has(`maturity:${e.symbol}`) || e.t < due || e.t > now) return 'bad';
+        const held = replay(account, e.t).positions[e.symbol]?.qty || 0;
+        return e.price <= 100 + 1e-9 && e.qty <= held + 1e-6 ? 'ok' : 'bad';
       }
       // Found on the phone: at the worst price traded since its moment.
       const bars = await since(read, e.symbol, e.t - 10 * MIN, now);

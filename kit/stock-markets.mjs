@@ -63,6 +63,9 @@ export function normalizeCurrency(code) {
 // Tax rates that end on a date in law (證券交易稅條例 §2-1, §2-2): the
 // first moment (Taiwan time) they no longer apply.
 export const BOND_ETF_TAX_FREE_UNTIL = Date.parse('2027-01-01T00:00:00+08:00');
+// Corporate bonds (可轉債 among them) pay no securities transaction tax to
+// 2026-12-31 (證券交易稅條例 §2-1), 0.1% after.
+export const CORP_BOND_TAX_FREE_UNTIL = Date.parse('2027-01-01T00:00:00+08:00');
 export const DAY_TRADE_TAX_UNTIL = Date.parse('2028-01-01T00:00:00+08:00');
 export const PLAN_FLAT_FEE_UNTIL = Date.parse('2027-01-01T00:00:00+08:00');
 // 國泰證券's US prices to 2026-12-31 (經濟日報 2026-01-06): a stock 0.08%
@@ -80,7 +83,7 @@ export const MARKETS = {
     // 國泰, 元大 and 永豐 to 2026-12-31 (money101, 2026-08); then the plan
     // rate brokers post, 0.1425% with a NT$1 minimum (國票 點點投 Q13).
     plan: { flat: 1, flatUntil: PLAN_FLAT_FEE_UNTIL, rate: 0.001425, min: 1 },
-    sell: { stock: { tax: 0.003, dayTrade: 0.0015, dayTradeUntil: DAY_TRADE_TAX_UNTIL }, etf: { tax: 0.001 }, bond: { tax: 0, until: BOND_ETF_TAX_FREE_UNTIL, after: 0.001 } },
+    sell: { stock: { tax: 0.003, dayTrade: 0.0015, dayTradeUntil: DAY_TRADE_TAX_UNTIL }, etf: { tax: 0.001 }, bond: { tax: 0, until: BOND_ETF_TAX_FREE_UNTIL, after: 0.001 }, cb: { tax: 0, until: CORP_BOND_TAX_FREE_UNTIL, after: 0.001 } },
     withholding: 0, nhi: true
   },
   US: {
@@ -250,6 +253,8 @@ export function jpTickTable(kind, symbol) {
 export function tickSize(market, kind, price, symbol = null) {
   if (market === 'TW') {
     if (kind === 'etf' || kind === 'bond') return price < 50 ? 0.01 : 0.05;
+    // A convertible bond, by price per NT$100 of face (TPEx 轉換公司債升降單位).
+    if (kind === 'cb') return price < 150 ? 0.05 : price < 1000 ? 1 : 5;
     return price < 10 ? 0.01 : price < 50 ? 0.05 : price < 100 ? 0.1 : price < 500 ? 0.5 : price < 1000 ? 1 : 5;
   }
   if (market === 'US') return price < 1 ? 0.0001 : 0.01;
@@ -299,6 +304,7 @@ export function cnBoard(symbol) {
   return 'main';
 }
 export function limitShare(quote, now = Date.now()) {
+  if (quote?.kind === 'cb') return 0.1;
   if (!quote || !['stock', 'etf', 'bond'].includes(quote.kind)) return null;
   if (isEmerging(quote.symbol)) return null;
   // A Taiwan bond ETF (all of them hold foreign bonds) has no daily limit:
@@ -357,6 +363,9 @@ export function hkLot(symbol) {
 }
 // (An HK symbol not on HKEX's list: 1 here; lotProblem refuses its orders.)
 export function lotSize(market, symbol, kind) {
+  // A convertible bond trades by the 張: NT$100,000 of face, priced per
+  // NT$100, so 1,000 units a lot (no odd lots).
+  if (kind === 'cb') return 1000;
   if (!['stock', 'etf', 'bond'].includes(kind)) return 1;
   if (market === 'JP' && kind === 'stock') return 100;
   if (market === 'JP' && kind === 'etf') return jpEtfUnit(symbol);
@@ -386,9 +395,10 @@ export const limitOnly = (market, symbol = '') => LIMIT_ONLY.has(market) || isEm
 // negotiation with their recommending brokers rather than matched by the
 // exchange: no daily limit, limit orders only, no closing auction, no
 // 融資/融券 and no day trading (當沖). The board's stocks, written by
-// tools/tw-emerging.mjs (each code a base-36 gap from the one before).
+// tools/tw-boards.mjs (each code a base-36 gap from the one before).
 export const TW_EMERGING = 'z0,9,2,m,1e,3t,36,d9,4u,4,3,3,1,as,2p,h,2,1,4z,2,4b,k,1v,a,7r,34,a,8,u,b,y,c5,2,1h,2,e,8,3,6i,2y,7,9,6,6,5,3,2,c,2,3r,8,6,r,4g,1j,78,6,2,6,8,5,4,q,fm,4,4k,8,ac,l,6,13,a,a,p,i,3,4,6,6,4,4,1,1,7,8,3,3,9,4,b,b,1,c,4,1,9,2,9,1,5,8,3,1,5,e,8,1,2,2,e,6,5,3,1,6,4,2,5,3,h,5,4,2,1,6,4,1,a,2,2,2,1,1,1,1,1,1,5,1,1,5,1,6,3,5,1,1,1,7,1,6,3,1,8,2,1,3,4,5,1,6,d,1,3,2,3,6,1,3,2,3,3,1,1,6,4,9,4,9,1,3,1,2,1,4,3,3,2,3,4,bk,3,1,3,5,g,c,1g,9,e,l,7,3,1,4,c,5,7,5,c,1q,h,g,4,1,3,9,5,1,1,3,2,4,2,5,3,3,4,2,2,2,1,2,1,1,1,7,2,3,3,2,2,1,1,4,1,6,1,1,3,7,5,2,1,8,2,3,2,1,1,3,1,3,1,2,3,1,1,1,1,1,2,1,3,1,2,1,1,1,2,1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,1,2,3,2,2,1,1,1,1,2,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1,1,3,3,1,1,1,1,1,2,1,1,3,1,1,1,2t,14,l,3h,1i,v,g,e,2r,f1,qm'; // 2026-10-21, 366 stocks
 let emerging = null;
+let cbs = null;
 export function isEmerging(symbol) {
   const m = /^(\d{4})\.TWO$/i.exec(symbol || '');
   if (!m) return false;
@@ -398,6 +408,26 @@ export function isEmerging(symbol) {
     for (const gap of TW_EMERGING.split(',')) if (gap) emerging.add((code += parseInt(gap, 36)));
   }
   return emerging.has(Number(m[1]));
+}
+
+// Taiwan's convertible bonds (可轉債, TPEx; a five-digit code, the issuer's
+// four and the issue's number): quoted per NT$100 of face, a 張 of 1,000
+// units, ±10% a day, no margin or short; repaid at face (100) on maturity,
+// the date its issue data gives (TW_CB, tools/tw-boards.mjs: code:YYMMDD).
+// (Most pay no coupon; conversion into shares and the holder's put are not
+// offered here: a bond is sold, or held to maturity.)
+export const TW_CB = '11011:291210,12561:281008,12951:291029,13166:271227,13382:281201,14363:270827,14364:280318,14381:291219,14664:280620,14722:280529,14723:280617,14743:280331,15142:300113,15364:270812,15602:290903,15952:290902,15984:280303,16095:290930,16231:290716,17172:310608,17272:311020,17813:270924,17863:280801,19094:261220,20344:291002,21043:281013,22013:280525,22211:290911,22283:270829,22331:290123,22363:310210,22471:280626,22472:280630,23031:310807,23032:310903,23161:311021,23291:290318,23511:280617,23742:310202,24023:281119,24271:281213,24394:270710,24395:270722,24423:271129,24424:271225,24552:290123,24553:290127,24643:290907,24672:290109,24673:290122,24762:270126,24867:290723,25283:291231,25284:300117,25303:280623,25304:280630,25483:291002,25484:291018,26417:270726,26418:300806,26461:310929,26462:310930,27271:280329,27323:270126,27324:281208,27431:280828,27451:290105,27531:281009,27532:281020,27551:280115,27561:270530,27562:290923,30062:291002,30112:290326,30134:271018,30165:270726,30166:290818,30285:310724,30286:310929,30321:281113,30322:301125,30336:270601,30337:290911,30371:301103,30401:280630,30454:300224,30455:300225,30811:290812,30812:290813,30954:280225,31222:270503,31352:290505,31413:270520,31414:310807,31415:290922,31494:290831,31882:280620,32071:270325,32191:290825,32571:291101,32609:290918,32723:290307,32843:280915,32943:290618,33035:291126,33121:270625,33133:271129,33225:270902,33245:290731,33246:310302,33247:310316,33466:271127,33571:261031,33621:290716,33763:290823,33902:280221,34163:270125,34793:270122,34834:270522,34843:280424,34913:310609,35122:290818,35161:271018,35181:270815,35221:261218,35265:270214,35266:290129,35267:300724,35431:281226,35482:270108,35483:300225,35513:281028,35642:270903,35833:290730,35834:290922,35872:310204,35914:271122,36053:270806,36054:290706,36173:280616,36805:310508,36806:310521,36841:281028,36872:281002,36873:281003,36913:270830,37075:300820,37151:290121,37152:290324,37171:290121,41135:301027,41136:310320,41236:280426,41237:280427,41238:310504,41239:310514,41295:300529,41372:270812,41645:300620,41684:280918,41903:270711,41904:290630,41981:291021,44163:270930,44383:280930,44391:280303,44421:280728,45031:290513,45102:280226,45415:310921,45416:310922,45491:271107,45554:280609,45581:280828,45663:261127,45691:280115,45721:270716,45811:280815,47148:290504,47223:281001,47224:290526,47393:261028,47394:301217,47491:290528,47602:290522,47642:290805,47721:281127,49231:290129,49311:290529,49675:310818,49731:290821,49793:271209,49794:271225,52011:281015,52121:291015,52441:290925,52452:271218,52635:270304,52844:290505,52845:290511,52892:290701,52912:290729,53064:261108,53096:301212,53097:281215,53211:270304,53887:281206,54391:300909,54501:280321,54573:270306,54642:290525,55344:310311,55362:290804,55363:290817,56087:271217,60152:290105,61011:290129,61012:290130,61041:270826,61112:270910,61171:270527,61172:280528,61255:270621,61263:261130,61343:290720,61506:270307,61565:280625,61635:281016,61743:291002,61777:280625,61794:270828,61828:290927,61843:270306,61876:290702,61894:281110,61907:281106,61973:271015,61993:290120,61994:290121,62075:280826,62076:280905,62093:281023,62194:281016,62236:310615,62433:270625,62695:270802,62696:270802,62746:311029,62822:280613,62843:261214,62854:291013,62855:291023,64251:271015,64324:270816,64383:291013,64693:280728,64724:310401,64725:310415,64774:270721,64775:281009,65096:270703,65101:290105,65152:290205,65331:280908,65381:300626,65461:270605,65462:290609,65463:290630,65472:290319,65521:261025,65702:290814,65761:290325,65843:290702,65851:261026,65852:261027,65914:280827,66034:290504,66163:280920,66241:290705,66292:270913,66451:271204,66642:271119,66702:281226,66801:290902,66831:290810,66931:290724,67062:271025,67531:270625,67681:271031,67711:280508,67962:281222,68032:310521,68211:280815,68301:270815,68351:271101,68401:270527,68431:280804,68461:300313,68462:300325,68541:280227,68621:290313,68631:271015,68692:290724,68701:291205,68702:291205,68732:300529,68741:271104,68901:281128,68902:281210,68941:290309,69031:290724,69032:290807,69041:281226,69131:290319,69571:281002,69821:280723,69822:280804,74022:280902,75561:280812,75562:280815,76101:290520,76311:290826,77131:281020,77381:291016,77431:290910,80212:310120,80213:311020,80273:270713,80282:300122,80426:281216,80506:271122,80541:290722,80746:290514,80872:280502,80914:270815,80924:270311,80962:290702,80963:290714,81042:270111,81114:290428,81473:271003,81551:300110,81552:310803,81553:310813,81714:271112,81715:271114,82102:290126,82103:290203,82221:290910,82711:290505,82993:310206,83742:271115,84041:281003,84113:300801,84221:271122,84222:300407,84223:311006,84312:290105,84332:270524,84333:270527,84381:290805,84423:290724,84424:290930,84624:290508,84672:270530,84673:270531,84762:290421,84781:270715,84881:261219,84891:271209,89277:270816,89278:270821,89365:290817,89366:290828,89965:311012,89966:311022,98026:271115,99063:280227,99332:290723,99353:271014,99392:291029,99412:281120,99587:271028,99588:271108'; // 2026-10-21, 384 bonds
+export const isCb = symbol => /^[1-9]\d{4}\.TWO$/i.test(symbol || '');
+// Its maturity (the day, Taipei midnight), or null when the table doesn't have it.
+export function cbMaturity(symbol) {
+  if (!cbs) {
+    cbs = new Map();
+    for (const item of TW_CB.split(',')) {
+      const [code, d] = item.split(':');
+      if (d) cbs.set(code, Date.parse(`20${d.slice(0, 2)}-${d.slice(2, 4)}-${d.slice(4, 6)}T00:00:00+08:00`));
+    }
+  }
+  return isCb(symbol) ? cbs.get(symbol.slice(0, 5)) ?? null : null;
 }
 
 // US pre- and post-market through a Taiwan broker (富邦 from 2026-10-01,
@@ -587,6 +617,7 @@ export const GRAMS_PER_OUNCE = 31.1034768;
 export function kindOf(type, symbol, hint) {
   if (hint) return hint;
   if (METALS[symbol]) return 'metal';
+  if (isCb(symbol)) return 'cb';
   switch (String(type || '').toUpperCase()) {
     case 'ETF':
       return /^\d{4,6}B\.TWO?$/.test(symbol) ? 'bond' : 'etf';
@@ -612,7 +643,7 @@ export function kindOf(type, symbol, hint) {
 const LOCAL_MARKETS = new Set(['TW', 'CRYPTO', 'METAL', 'BOND', 'FX']);
 export const isSubBrokered = market => Boolean(market) && !LOCAL_MARKETS.has(market);
 
-export const TRADABLE_KINDS = new Set(['stock', 'etf', 'bond', 'fund', 'crypto', 'metal', 'govbond', 'fx']);
+export const TRADABLE_KINDS = new Set(['stock', 'etf', 'bond', 'fund', 'crypto', 'metal', 'govbond', 'fx', 'cb']);
 // What can be sold short (borrowed and sold): listed shares, crypto and
 // currency pairs (selling EUR/USD bets on the euro falling).
 export const SHORTABLE_KINDS = new Set(['stock', 'etf', 'bond', 'crypto', 'fx']);

@@ -171,3 +171,21 @@ test('複委託 is cash only: a foreign purchase\'s loan and a foreign short sal
   const r = await check(d, [acct.events[1], usFill('s1', 'sell', 100, 5, { quote: 100 })], T + 2000);
   assert.deepEqual(r.refused, ['fill:s1']);
 });
+
+test('a 可轉債 held to maturity is repaid at face, once, on what was held; never more', async () => {
+  const { cbMaturity } = await import('../kit/stock-markets.mjs');
+  const { applyCbMaturity } = await import('../kit/stock-account.mjs');
+  const due = cbMaturity('12561.TWO');
+  assert.ok(due > T);
+  const d = deps({ c1: { quote: 98, t: T, s: '12561.TWO', side: 'buy', q: 1000, k: 'market' } });
+  const price = fillPrice({ k: 'market', side: 'buy' }, 98, 'TW', 'cb');
+  const buy = { ...fill('c1', 'buy', price, 1000), quote: 98, symbol: '12561.TWO', name: '鮮活果汁一KY', kind: 'cb' };
+  const { added } = applyCbMaturity(account([...start, buy]), '12561.TWO', { now: due + 1000 });
+  assert.equal(added.length, 1);
+  const mature = added[0];
+  assert.deepEqual([mature.price, mature.qty, mature.total, mature.t], [100, 1000, 100_000, due]);
+  assert.equal(applyCbMaturity(account([...start, buy, mature]), '12561.TWO', { now: due + 1000 }).added.length, 0, 'once');
+  const forged = [{ ...mature, id: 'x:rich', price: 120, gross: 120_000, total: 120_000 }, { ...mature, id: 'x:early', t: due - 86_400_000 }];
+  const r = await check(d, [buy, mature, ...forged], due + 2000);
+  assert.deepEqual(r.refused.sort(), ['x:early', 'x:rich']);
+});
