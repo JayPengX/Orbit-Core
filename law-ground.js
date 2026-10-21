@@ -3,8 +3,10 @@
 //   ai/facts.json   { facts: [{ id, k: [keywords], t, text, now, next, law, src: [urls] }] }:
 //                   figures the government announced (最低工資 and the like);
 //   ai/news.json    { news: [[date, agency, title, url, text]] }: agencies' notices;
-//   ly/budget.json  { budgets: [{ k, title, stage, first, last, flow: [[date, step]], … }] }:
-//                   the 總預算, 追加 and 特別 budgets' progress (no amounts);
+//   ly/budget.json  { budgets: [{ k, title, stage, first, last, flow: [[date, step]],
+//                   money? }] }: the 總預算, 追加 and 特別 budgets' progress, and a
+//                   yearly one's amounts in 千元 (total, asked, prev, cut, fn: 政事,
+//                   top: the biggest 主管, cuts: the biggest cuts; cut null until passed);
 //   bills/items.json { items: [{ k, n, stage 0-7, held, dropped, passed, pub, open, u, by: [[party, n]]] }:
 //                   the 立法院's bills and where each one is.
 // A question gets the facts whose keywords it (or the reader's last turn)
@@ -139,9 +141,30 @@ const cut = (s, n) => {
   return t.length > n ? `${t.slice(0, n)}…` : t;
 };
 const urls = v => (Array.isArray(v) ? v : []).filter(u => typeof u === 'string' && /^https?:\/\//.test(u));
+// 千元 → 億元 as people say it (one decimal); '' when it isn't a number.
+export const yi = n => (Number.isFinite(n) ? `${(n / 100_000).toLocaleString('en-US', { maximumFractionDigits: 1 })}億元` : '');
+const pairs = (v, n) => (Array.isArray(v) ? v : []).filter(x => Array.isArray(x) && typeof x[0] === 'string' && Number.isFinite(x[1])).slice(0, n);
+export function budgetMoney(m) {
+  if (!m || typeof m !== 'object') return '';
+  const parts = [];
+  const total = m.total ?? m.asked;
+  if (Number.isFinite(total)) parts.push(`${m.passed ? '法定預算' : '預算案'}歲出 ${yi(total)}`);
+  if (m.passed && Number.isFinite(m.asked)) parts.push(`原送預算案 ${yi(m.asked)}`);
+  if (Number.isFinite(m.cut)) parts.push(`立法院刪減 ${yi(m.cut)}`);
+  if (Number.isFinite(m.prev)) parts.push(`上年度 ${yi(m.prev)}`);
+  if (Number.isFinite(m.rev)) parts.push(`歲入 ${yi(m.rev)}`);
+  const fn = pairs(m.fn, 8);
+  if (fn.length) parts.push(`政事別：${fn.map(([n, a]) => `${cut(n, 20)} ${yi(a)}`).join('、')}`);
+  const top = pairs(m.top, 5);
+  if (top.length) parts.push(`最大的主管：${top.map(([n, a, p]) => `${cut(n, 20)} ${yi(a)}${Number.isFinite(p) ? `（上年 ${yi(p)}）` : ''}`).join('、')}`);
+  const cuts = pairs(m.cuts, 5);
+  if (cuts.length) parts.push(`刪最多：${cuts.map(([n, a]) => `${cut(n, 20)} ${yi(a)}`).join('、')}`);
+  return parts.join('；');
+}
 const budgetLine = b => {
   const flow = (Array.isArray(b.flow) ? b.flow : []).filter(x => Array.isArray(x)).slice(-3).map(([d, step]) => `${cut(d, 10)} ${cut(step, 60)}`).join(' → ');
-  return `「${cut(b.title, 120)}」進度：${cut(b.stage, 40)}${b.last ? `；最近 ${cut(b.last, 10)}` : ''}${flow ? `；最近幾步：${flow}` : ''}（只有進度，沒有金額）`;
+  const money = budgetMoney(b.money);
+  return `「${cut(b.title, 120)}」進度：${cut(b.stage, 40)}${b.last ? `；最近 ${cut(b.last, 10)}` : ''}${flow ? `；最近幾步：${flow}` : ''}${money ? `；金額：${money}` : '（只有進度，沒有金額）'}`;
 };
 const factLine = f => {
   const parts = [`${f.d ? `${cut(f.d, 10)} ` : ''}「${cut(f.t, 80)}」${cut(f.text, GROUND_LIMITS.factChars)}`];
@@ -171,7 +194,7 @@ const budgetsOf = g => g?.budgets || [];
 export const hasGround = g => Boolean(g && (g.facts.length || g.news.length || g.bills.length || budgetsOf(g).length));
 
 // What changes the answer: a fingerprint for the kept answers' keys.
-export const groundKey = g => (hasGround(g) ? [...g.facts.map(f => `${f.id}=${f.now ?? ''}>${f.next ?? ''}`), ...g.news.map(n => n[3]), ...g.bills.map(b => `${b.k}@${b.stage}${b.u ?? ''}`), ...budgetsOf(g).map(b => `budget:${b.k}@${b.last ?? ''}`)].join('|') : '');
+export const groundKey = g => (hasGround(g) ? [...g.facts.map(f => `${f.id}=${f.now ?? ''}>${f.next ?? ''}`), ...g.news.map(n => n[3]), ...g.bills.map(b => `${b.k}@${b.stage}${b.u ?? ''}`), ...budgetsOf(g).map(b => `budget:${b.k}@${b.last ?? ''}${b.money ? `$${b.money.total ?? ''}/${b.money.cut ?? ''}` : ''}`)].join('|') : '');
 
 // The prompt's blocks, and its rule (empty when nothing matched).
 export function groundPrompt(g) {
@@ -186,7 +209,7 @@ About these:
 - Prefer the official figures over a notice when they differ; a 將來 figure is not in force yet, so say from when it applies.
 - These are not articles: never put them in cites. Use them in answer (and next) only.
 - A bill is not law until it is 三讀 and 公布: say its stage plainly.
-- A budget line has its progress only, no amounts: never give a budget figure.
+- A budget's amounts are only those its line gives (in 億元): quote them exactly; a line without amounts has none, so never give a figure for it. 凍結 isn't in the data.
 
 `;
 }

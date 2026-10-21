@@ -1,7 +1,7 @@
 // Orbit Law's figures, notices and bills, matched to a question.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { matchFacts, matchNews, matchBills, matchBudgets, budgetYear, expand, groundPrompt, groundOut } from '../law-ground.js';
+import { matchFacts, matchNews, matchBills, matchBudgets, budgetYear, budgetMoney, expand, groundPrompt, groundOut } from '../law-ground.js';
 
 test('synonyms count both ways: 基本工資 finds 最低工資', () => {
   assert.match(expand('基本工資多少'), /最低工資/);
@@ -52,6 +52,7 @@ test('budgets: the year asked (民國 or western), else the 2 newest; progress o
   assert.match(p, /立法院進度/);
   assert.match(p, /2026-01-10 三讀 → 2026-01-20 公布/);
   assert.doesNotMatch(p, /行政院函送/, 'the last 3 steps only');
-  assert.match(p, /never give a budget figure/);
+  assert.match(p, /never give a figure for it/);
+  assert.equal(budgetMoney({ passed: true, total: 300_000_000, asked: 310_000_000, cut: 10_000_000, top: [['國防部主管', 50_000_000, 48_000_000]] }), '法定預算歲出 3,000億元；原送預算案 3,100億元；立法院刪減 100億元；最大的主管：國防部主管 500億元（上年 480億元）');
   assert.deepEqual(groundOut(g).bills.map(b => [b.k, b.stage]), [['budget:115-a1', -1], ['budget:115', -1]]);
 });
