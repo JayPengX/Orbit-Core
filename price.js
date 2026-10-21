@@ -18,17 +18,11 @@ import * as src from './kit/play-sources.mjs';
 import { boardBets, futureBets, liveBets, legOf } from './kit/play-bets.mjs';
 import { comboCount, slipSizes, slipErrors } from './kit/play-odds.mjs';
 import { LIVE_MIN_LIQUIDITY } from './kit/play-live.mjs';
-import { freeBets } from './kit/plus.mjs';
-import { cashOutState, CASHOUT_KEEP } from './kit/play-cashout.mjs';
 
 // How much better than the house's a price may be: rounding to the cent,
 // and a board read a moment before this one.
 export const PRICE_SLACK = 0.01;
 export const priceOk = (asked, house) => asked <= house * (1 + PRICE_SLACK) + 0.005;
-// A free bet's ticket: one pick, or a parlay (Play's freeShape).
-export const freeShape = (mode, n) => mode === 'parlay' || (mode === 'single' && n === 1);
-// Free bets take odds of this or longer, a parlay's all together (Play's FREE_MIN_ODDS).
-export const FREE_MIN_ODDS = 1.5;
 
 // The reads of one check: each URL once, through the deps.
 export function useReads(deps) {
@@ -103,11 +97,12 @@ export async function checkSlip(slip, wallet, deps, now = new Date(), reads = nu
   if (!['single', 'parlay', 'system'].includes(slip.mode)) return { problem: 'mode' };
   const want = slipSizes(slip.mode, n, slip.sizes);
   if (want.length !== slip.sizes.length || want.some((k, i) => k !== slip.sizes[i])) return { problem: 'sizes' };
-  // The parlay boost: the usual (×1) for everyone since Quadra Plus ended; none on singles.
-  const boost = Number(slip.boost) || 0;
-  if (slip.mode === 'single' ? boost : boost > 1) return { problem: 'boost' };
-  // The money: every combination at the stake; a free bet's token unspent
-  // and worth what it says, its odds long enough, the rest from the balance.
+  // No parlay boost and no free bets since 2026-10-21: a 台灣運彩 ticket
+  // pays its odds, and is paid for in full (a slip bought before keeps its
+  // boost when it settles).
+  if (Number(slip.boost)) return { problem: 'boost' };
+  if (slip.free) return { problem: 'free' };
+  // The money: every combination at the stake.
   const checked = await Promise.all(legs.map(leg => housePick(leg, now, once).catch(() => ({ unread: true }))));
   if (checked.some(c => c.unread)) return { problem: 'unread' };
   const moved = [];
@@ -119,18 +114,8 @@ export async function checkSlip(slip, wallet, deps, now = new Date(), reads = nu
   if (moved.length) return { problem: 'moved', moved };
   // The house's rules on its own bets now (locks, parlay-only picks, the ticket's limits).
   const house = checked.map((c, i) => ({ ...c.bet, odds: Number(legs[i].odds) }));
-  const free = slip.free ? freeBets(wallet, now.getTime()).find(x => x.id === slip.free) : null;
-  if (slip.free) {
-    // Only on one pick or a parlay, as Play offers it: on several singles or
-    // a system the token's value would be staked on every combination.
-    if (!freeShape(slip.mode, n)) return { problem: 'freeShape' };
-    if (!free || Number(slip.freeValue) !== free.value) return { problem: 'free' };
-    if (legs.reduce((x, l) => x * Number(l.odds), 1) < FREE_MIN_ODDS - 1e-9) return { problem: 'freeOdds' };
-    // (The token's value and the top-up are the stake, exactly: Play's placeFreeSlip.)
-    if (Math.abs(slip.stake - free.value - slip.cost) > 0.005 || slip.cost < 0) return { problem: 'cost' };
-  } else if (Math.abs(comboCount(house, slip.sizes) * slip.stake - slip.cost) > 0.01) return { problem: 'cost' };
-  // (A free bet's stake is its token's value and the top-up: not the stake unit's.)
-  const errors = slipErrors({ mode: slip.mode, legs: house, sizes: slip.sizes, stake: slip.stake }).filter(e => !(slip.free && (e === 'stakeUnit' || e === 'ticketMin')));
+  if (Math.abs(comboCount(house, slip.sizes) * slip.stake - slip.cost) > 0.01) return { problem: 'cost' };
+  const errors = slipErrors({ mode: slip.mode, legs: house, sizes: slip.sizes, stake: slip.stake });
   if (errors.length) return { problem: errors[0] };
   // The picks as the slip keeps them: the house's own bets (what settling
   // reads), at the price asked; only the names and pictures the phone's.
@@ -142,40 +127,3 @@ export function keptLeg(leg, bet) {
   return { ...own, label: own.label ?? text(leg.label, 160), shortLabel: own.shortLabel ?? text(leg.shortLabel, 80), matchup: own.matchup ?? text(leg.matchup, 160), odds: Number(leg.odds), ...(text(leg.logo, 400) ? { logo: text(leg.logo, 400) } : {}) };
 }
 
-// ---- Cash out ------------------------------------------------------------------
-//
-// A slip's cash-out value worked out here as Play does (play-cashout.mjs
-// cashOutState), with each undecided pick's chance from the house's board
-// now: its own bet before its game, the same market on the live board once
-// it's under way (Play's currentBet), the richer of the two reads.
-const FALLBACK_MARGIN = 0.1;
-const lineOf = b => b.totalLine ?? b.runLine ?? b.teamLine ?? null;
-async function houseChance(leg, now, once) {
-  const t = now.getTime();
-  if (leg.kind === 'future' || !leg.start || Date.parse(leg.start) > t) {
-    const h = await housePick(leg, now, once);
-    return h.bet ? { p: h.bet.fairChance > 0 && h.bet.fairChance < 1 ? h.bet.fairChance : (1 / h.odds) * (1 - FALLBACK_MARGIN), live: false } : null;
-  }
-  const data = await once(`live:${leg.sport}`, () => src.loadLive(now, LIVE_MIN_LIQUIDITY, { only: [leg.sport] }));
-  const board = liveBets(data);
-  const game = board.games.find(g => g.sport === leg.sport && g.away.en === leg.away && g.home.en === leg.home);
-  if (!game) return null;
-  // (The winner is never the game's own markets': not read for it.)
-  const offers = game.kambiId && leg.kind !== 'ml' ? await once(`offers:live:${game.kambiId}`, () => src.loadGameOffers(game, { live: true }).catch(() => null)) : null;
-  const same = b => b.gameId === game.id && b.kind === leg.kind && b.side === leg.side && (leg.kind === 'ml' || lineOf(b) === leg.line) && (leg.kind !== 'teamtotal' || b.team === leg.team);
-  const bets = [board.bets.find(same), offers ? liveBets(data, { offersOf: g => (g.id === game.id ? offers : null) }).bets.find(same) : null].filter(usable);
-  if (!bets.length) return null;
-  const p = Math.max(...bets.map(b => (b.fairChance > 0 && b.fairChance < 1 ? b.fairChance : (1 / b.estOdds) * (1 - FALLBACK_MARGIN))));
-  return { p, live: true };
-}
-
-// { value, reason } as Play shows it (value null: paused), for this slip now.
-export async function cashOutQuote(slip, wallet, deps, now = new Date(), reads = null) {
-  if (slip.free) return { value: null, reason: 'free' };
-  const once = reads ?? useReads(deps);
-  const keep = CASHOUT_KEEP;
-  const chances = await Promise.all(slip.legs.map(leg => (leg.result ? null : houseChance(leg, now, once).catch(() => null))));
-  return cashOutState({ ...slip, status: 'open' }, chances, { keep });
-}
-// A value asked for is the house's or less (live prices move by the second: 2%).
-export const cashOutOk = (asked, house) => house != null && asked >= 1 && asked <= house * 1.02 + 1;

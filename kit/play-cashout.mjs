@@ -1,3 +1,5 @@
+// Unused since 2026-10-21 (no cash out: 台灣運彩 has none); kept only so an
+// older Play page still loading it doesn't break. Remove once phones have moved on.
 // Cash out: an open slip sold back to the house before its games are over,
 // priced the way a sportsbook prices it (2026-10-11, the owner: "more
 // realistically, greedy").

@@ -5,22 +5,14 @@
 // functions, tested directly.
 import { VIP, FREEBET, OVERDRAFT_RATE, moneySides } from '#kit/quadra.mjs';
 
-// ---- Quadra Play's prices (its lib/rules.mjs, odds.mjs, cashout.mjs) ---------------------
+// ---- Quadra Play's prices (its lib/rules.mjs, odds.mjs) ---------------------
 //
 // Every two-way market (win, totals, lines) is priced at a 1.158 overround,
 // as Taiwan Sports Lottery was measured pricing them: the chances behind
 // the odds add up to 115.8%.
 export const PLAY = {
   cut: 1.158,
-  // The parlay boost on the winnings of a winning combination, by its size
-  // (3 picks and up), the same for everyone.
-  parlayBoost: [0, 0, 0, 0.05, 0.08, 0.12, 0.15, 0.2],
-  // Cash out: each undecided pick's chance cut by the house's margin (before
-  // its game, in play), then this kept of the slip's worth.
-  cashOutLegCut: { pre: 0.04, live: 0.06 },
-  cashOutKeep: 0.03,
-  // Free bets: every pick at these odds or longer.
-  freeMinOdds: 1.5,
+  // No parlay boost, cash out or free bets since 2026-10-21 (台灣運彩 has none).
   // A slip whose whole prize is over NT$5,000 loses 20% income tax; a
   // member (online) account, which Play is, pays no 4‰ stamp duty.
   taxFree: 5_000,
@@ -32,15 +24,6 @@ export const PLAY = {
 };
 // What the house keeps of a parlay of `legs` two-way picks, on average.
 export const houseKeep = (legs = 1, cut = PLAY.cut) => 1 - cut ** -legs;
-// The same with the parlay boost on a slip at decimal odds `odds` (the
-// product), boost ×`x` (1 by default).
-export function boostedKeep(legs, odds, x = 1, cut = PLAY.cut) {
-  const boost = (PLAY.parlayBoost[Math.min(legs, PLAY.parlayBoost.length - 1)] || 0) * x;
-  return 1 - (1 + (odds - 1) * (1 + boost)) / (odds * cut ** legs);
-}
-// What a free bet of `face` is worth to the bettor on average, staked on a
-// single at `odds`: only the winnings come back, at the house's chances.
-export const freeBetWorth = (face, odds = 2, cut = PLAY.cut) => Math.round((face * (odds - 1)) / (odds * cut));
 
 // ---- Quadra Securities' costs (its lib/markets.mjs, Taiwan) -----------------------------
 export const STOCK = {

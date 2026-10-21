@@ -272,7 +272,8 @@ export function livePoints({ sport, pre, awayScore, homeScore, left }) {
     marginSd: spec.margin * root,
     total: full.total == null ? null : awayScore + homeScore + full.total * left,
     totalSd: spec.total * root,
-    spec: { ...spec, step: Math.max(1, round2(spec.step * root)) }
+    // (Whole-point steps: every line stays on a half point, as 運彩's do; 119.4 was shown.)
+    spec: { ...spec, step: Math.max(1, Math.round(spec.step * root)) }
   };
   // A level score at the end goes to overtime: even.
   const below = normalCdf((-0.5 - m.margin) / m.marginSd);

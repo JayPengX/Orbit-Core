@@ -787,11 +787,49 @@ export function parseFutures(events, sport, markets = FUTURES.filter(f => f.spor
 }
 
 // The championships found by search, loaded in the background.
-export async function loadExtraFutures() {
+export async function loadExtraFutures(now = new Date()) {
   const results = await Promise.allSettled(
     EXTRA_FUTURES.map(market => getJson(`${GAMMA}/public-search?q=${encodeURIComponent(market.query)}&limit_per_type=8&events_status=active`).then(d => parseFutures(d?.events || [], market.sport, [market])))
   );
-  return results.flatMap(r => (r.status === 'fulfilled' ? r.value : []));
+  return pruneFutures(results.flatMap(r => (r.status === 'fulfilled' ? r.value : [])), now);
+}
+
+// Championship boards with only who can still win (kit/play-alive.mjs): each
+// league's table read once (the same trimmed one the house's prices read),
+// MLB's postseason, F1's points and races left. A league whose table can't
+// be read keeps its board as Polymarket has it (closed markets already off).
+const aliveKit = import('#kit/play-alive.mjs').catch(() => null);
+const STANDINGS = 'https://site.api.espn.com/apis/v2/sports';
+const TITLE_BY_TABLE = new Set(['epl', 'laliga', 'seriea', 'bundesliga', 'ligue1']);
+const PLAYOFF_BY_TABLE = new Set(['mlb', 'nba', 'nhl', 'nfl', 'wnba', 'mls']);
+export async function pruneFutures(futures, now = new Date(), f1Season = null) {
+  const k = await aliveKit;
+  if (!k?.withoutOut || !futures?.length) return futures || [];
+  const table = sport => {
+    const regular = ['basketball', 'baseball', 'hockey', 'football'].includes(familyOf(sport));
+    return getJson(`${STANDINGS}/${LEAGUES[sport].path}/standings${regular ? '?seasontype=2' : ''}`, 'espn-standings').catch(() => null);
+  };
+  const known = new Map();
+  const of = async market => {
+    const sport = market.sport;
+    if (known.has(market.key)) return known.get(market.key);
+    let verdict = null;
+    if (sport === 'f1') {
+      const season = f1Season?.events ? f1Season : await (reader.packJson ? reader.packJson(`sports/f1/${now.getUTCFullYear()}.json`) : Promise.reject(new Error('no packs'))).catch(() => getJson(`${ESPN}/racing/f1/scoreboard?dates=${now.getUTCFullYear()}`)).catch(() => null);
+      const standings = await getJson(`${STANDINGS}/racing/f1/standings`, 'espn-standings').catch(() => null);
+      const out = standings && season?.events ? k.f1Out(standings, k.f1Left(season)) : null;
+      verdict = out ? (market.key === 'f1constructors' ? out.teams : out.drivers) : null;
+    } else if (TITLE_BY_TABLE.has(sport)) verdict = k.leagueTitleOut(await table(sport));
+    else if (PLAYOFF_BY_TABLE.has(sport)) {
+      const clinch = k.clinchedOut(await table(sport));
+      const post = sport === 'mlb' ? await getJson(`https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameType=F,D,L,W&season=${now.getUTCFullYear()}`).catch(() => null) : null;
+      verdict = k.joinOut(clinch, post ? k.mlbSeriesOut(post) : null);
+    }
+    known.set(market.key, verdict);
+    return verdict;
+  };
+  const pruned = await Promise.all(futures.map(async m => k.withoutOut(m, await of(m).catch(() => null))));
+  return pruned.filter(Boolean);
 }
 
 // ---- Merge --------------------------------------------------------------------
@@ -865,7 +903,7 @@ export async function loadOdds(now = new Date(), onProgress) {
     loadedAt: now.toISOString(),
     games: await onSale(mergeGames([...mlbDk, ...eplDk], [...parsePolymarketMlb(mlbPm, now), ...parsePolymarketEpl(eplPm, now)], { scheduled: new Set([results[0].status === 'fulfilled' && 'mlb', results[2].status === 'fulfilled' && 'epl'].filter(Boolean)) }), now),
     f1: race,
-    futures: [...parseFutures(mlbPm, 'mlb'), ...parseFutures(eplPm, 'epl'), ...(nbaInSeason(now) ? parseFutures(nbaPm, 'nba') : [])]
+    futures: await pruneFutures([...parseFutures(mlbPm, 'mlb'), ...parseFutures(eplPm, 'epl'), ...(nbaInSeason(now) ? parseFutures(nbaPm, 'nba') : [])], now, f1Espn)
   };
 }
 
@@ -1199,12 +1237,12 @@ export async function loadFuture(key, now = new Date()) {
   const tagged = FUTURES.find(f => f.key === key);
   if (tagged) {
     if (tagged.sport === 'nba' && !nbaInSeason(now)) return null;
-    return parseFutures(await fetchPolymarketEvents(POLYMARKET_TAG[tagged.sport], 'polymarket-events'), tagged.sport, [tagged])[0] ?? null;
+    return (await pruneFutures(parseFutures(await fetchPolymarketEvents(POLYMARKET_TAG[tagged.sport], 'polymarket-events'), tagged.sport, [tagged]), now))[0] ?? null;
   }
   const extra = EXTRA_FUTURES.find(f => f.key === key);
   if (!extra) return null;
   const d = await getJson(`${GAMMA}/public-search?q=${encodeURIComponent(extra.query)}&limit_per_type=8&events_status=active`);
-  return parseFutures(d?.events || [], extra.sport, [extra])[0] ?? null;
+  return (await pruneFutures(parseFutures(d?.events || [], extra.sport, [extra]), now))[0] ?? null;
 }
 
 // A league's clubs, logos and nicknames from ESPN's team list (for the

@@ -34,17 +34,19 @@ function fairOf(outcomes) {
 // on them taken off instead.
 export const ONE_SIDED_MARGIN = 1.1;
 
-// The labels of each family's whole-game markets, as Kambi writes them.
+// The labels of each family's whole-game markets, as Kambi writes them. A
+// team's name never holds " - ": "Total Points by Spurs - 2nd Half - Including
+// Overtime" is a half's, not the game's (it put a 67.5 among 110s).
 const FULL = {
   // (No soccer spread: Kambi's is the Asian handicap, two ways on half and
   // quarter goals; 台灣運彩's 讓分 is three ways on whole goals, markets.mjs
   // soccerHandicaps.)
-  soccer: { total: /^Total Goals$/, team: /^Total Goals by (.+)$/ },
-  baseball: { total: /^Total Runs$/, spread: /^Run Line$/, team: /^Total Runs by (.+)$/ },
-  football: { total: /^Total Points - Including Overtime$/, spread: /^Point Spread - Including Overtime$/, team: /^Total Points by (.+) - Including Overtime$/ },
-  basketball: { total: /^Total Points - Including Overtime$/, spread: /^Point Spread - Including Overtime$/, team: /^Total Points by (.+) - Including Overtime$/ },
+  soccer: { total: /^Total Goals$/, team: /^Total Goals by ((?:(?! - ).)+)$/ },
+  baseball: { total: /^Total Runs$/, spread: /^Run Line$/, team: /^Total Runs by ((?:(?! - ).)+)$/ },
+  football: { total: /^Total Points - Including Overtime$/, spread: /^Point Spread - Including Overtime$/, team: /^Total Points by ((?:(?! - ).)+) - Including Overtime$/ },
+  basketball: { total: /^Total Points - Including Overtime$/, spread: /^Point Spread - Including Overtime$/, team: /^Total Points by ((?:(?! - ).)+) - Including Overtime$/ },
   // Hockey's lines on 60 minutes, as 台灣運彩 settles them (settle.mjs).
-  hockey: { total: /^Total Goals - Regular Time$/, spread: /^Puck Line - Regular Time$/, team: /^Total Goals by (.+) - Regular Time$/ }
+  hockey: { total: /^Total Goals - Regular Time$/, spread: /^Puck Line - Regular Time$/, team: /^Total Goals by ((?:(?! - ).)+) - Regular Time$/ }
 };
 
 // The game's markets and players' markets: { markets, props } (markets in
@@ -98,8 +100,11 @@ function dedupe(markets) {
 }
 
 // Kambi lists up to 50 lines of a football total; the board shows the
-// LINES_SHOWN nearest an even price of each line market (each team's own).
-export const LINES_SHOWN = 7;
+// LINES_SHOWN nearest an even price of each line market (each team's own):
+// the main line and two either side, the same ladder the house's own lines
+// make (play-markets.mjs pointsMarkets), so a game reads alike whoever prices
+// it (seven read as a wall of alternates on a live NBA 讓分).
+export const LINES_SHOWN = 5;
 const LINE_KINDS = new Set(['total', 'runline', 'teamtotal', 'gametotal', 'gamehcap', 'htotal', 'corners', 'f5total']);
 function fewLines(markets) {
   const groups = new Map();

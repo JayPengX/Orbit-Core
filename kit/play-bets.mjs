@@ -2,10 +2,10 @@
 // without names. One copy for Play (app.js names each bet: chip, label,
 // shortLabel, matchup) and the Worker, which prices a placed bet again with
 // it and refuses one sold better than this (Shared-Proxy settle.js).
-import { gameOptions, offerOptions, f1Podium, f1Markets, f1PoleFromWinner, f1PoleModel } from '#kit/play-board.mjs';
-import { estimateF1Odds, f1Phase, estimateFuturesOdds, FUTURES_OVERROUND, ODDS_ERROR, median, estimateLineOdds, MLB_MARKET_OVERROUND } from '#kit/play-odds.mjs';
+import { gameOptions, offerOptions } from '#kit/play-board.mjs';
+import { estimateF1Odds, f1Phase, estimateFuturesOdds, FUTURES_OVERROUND, ODDS_ERROR, median } from '#kit/play-odds.mjs';
 import { withRules, houseCut } from '#kit/play-rules.mjs';
-import { f1Driver, normalizeTeamName, familyOf, teamZh } from '#kit/play-teams.mjs';
+import { f1Driver, familyOf, teamZh } from '#kit/play-teams.mjs';
 import { inningsLeft, liveBaseball, liveSoccer, liveGoals, livePoints, fitGoals, liveMarkets, liveOdds, pregameRuns, nextRunChances, nextRunOdds, LIVE_THREE_WAY } from '#kit/play-live.mjs';
 import { fitHockey } from '#kit/play-markets.mjs';
 
@@ -16,11 +16,11 @@ export function withHouseRules(bets) {
   return bets;
 }
 
-// The next race's bets: the winner, the podium, top six and ten, teammates
-// head to head, the winning team, pole until qualifying starts, and the
-// safety car, VSC and red flag. `memo` keeps the 40,000 drawn races for
-// these prices (f1Markets) between calls. Sets f1.phase.
-export function f1Bets(f1, { now = new Date(), memo = {}, loadedAt = null } = {}) {
+// The next race's bets: its winner (冠軍) alone, as 台灣運彩 sells F1 (no
+// podium, top six or ten, teammates, team, pole or safety-car markets:
+// those were removed 2026-10-21; a slip already holding one still settles).
+// Sets f1.phase.
+export function f1Bets(f1, { now = new Date() } = {}) {
   const bets = [];
   // Before or after qualifying (said beside the prices; the math is the same).
   const phase = f1Phase(now, { qualifyingUtc: f1.qualifyingUtc, raceUtc: f1.startUtc });
@@ -40,70 +40,6 @@ export function f1Bets(f1, { now = new Date(), memo = {}, loadedAt = null } = {}
       // Never longer than the bookmaker's own price (2026-10's 美國站: Gasly 301 at Kambi, 500 here from the devigged chance).
       estOdds: Math.min(estimateF1Odds(d.fair), d.book > 1 ? d.book : Infinity)
     });
-  }
-  // 前三名: the same drivers finishing in the top three.
-  const winners = bets.filter(b => b.kind === 'f1');
-  f1Podium(winners.map(b => ({ fair: b.fairChance, odds: b.estOdds }))).forEach((p, i) => {
-    const w = winners[i];
-    bets.push({ ...w, id: `f1pod|${w.driverEn}`, gameId: `f1pod|${w.driverEn}`, kind: 'f1podium', market: `f1podium|${w.driverEn}`, fairChance: p.fair, estOdds: p.odds, errKey: 'extra', lock: p.lock, minLegs: p.minLegs });
-  });
-  // Top six, top ten, teammates head to head and the winning team.
-  const field = winners.map(b => ({ fair: b.fairChance, odds: b.estOdds, team: b.driver.team }));
-  // (40,000 drawn races: once for these prices, not on every redraw.)
-  const fieldKey = JSON.stringify(field);
-  if (memo.key !== fieldKey) Object.assign(memo, { key: fieldKey, more: f1Markets(field) });
-  const more = memo.more;
-  for (const [key, list] of [['f1top6', more.top6], ['f1top10', more.top10]])
-    list.forEach((p, i) => {
-      const w = winners[i];
-      bets.push({ ...w, id: `${key}|${w.driverEn}`, gameId: `${key}|${w.driverEn}`, kind: key, market: `${key}|${w.driverEn}`, fairChance: p.fair, estOdds: p.odds, errKey: 'extra', lock: p.lock, minLegs: p.minLegs });
-    });
-  for (const p of more.h2h) {
-    const w = winners[p.driver];
-    const r = winners[p.rival];
-    const pair = [w.driverEn, r.driverEn].sort().join('|');
-    bets.push({ ...w, id: `f1h2h|${w.driverEn}|${r.driverEn}`, gameId: `f1h2h|${pair}`, kind: 'f1h2h', market: `f1h2h|${pair}`, rival: r.driverEn, rivalDriver: r.driver, settle: { rival: r.driverEn }, fairChance: p.fair, estOdds: p.odds, errKey: 'extra', lock: p.lock, minLegs: p.minLegs });
-  }
-  for (const p of more.teams) {
-    bets.push({ id: `f1team|${p.team}`, gameId: 'f1team', kind: 'f1team', sport: 'f1', market: 'f1team', start: f1.startUtc, team: p.team, fairChance: p.fair, estOdds: p.odds, errKey: 'extra', lock: p.lock, minLegs: p.minLegs });
-  }
-  // 排位賽第一 (pole position), until qualifying starts: our own estimate
-  // (the season's qualifying form and the race winner's chances), with
-  // Polymarket's or Kambi's prices counted as far as they're traded and
-  // tell the drivers apart (board.mjs f1PoleModel).
-  if (f1.qualifyingUtc && (Date.parse(f1.qualifyingUtc) > now.getTime() || f1.qualifyingWaits)) {
-    const model = f1PoleModel({ form: f1.qualiForm || [], winners: f1.drivers || [], market: f1.pole });
-    const pole = model.drivers.length ? model.drivers : f1PoleFromWinner(f1.drivers);
-    for (const d of pole) {
-      const w = winners.find(b => normalizeTeamName(b.driverEn) === normalizeTeamName(d.name));
-      bets.push({
-        id: `f1pole|${d.name}`,
-        gameId: 'f1pole',
-        kind: 'f1pole',
-        sport: 'f1',
-        market: 'f1pole',
-        start: f1.qualifyingUtc,
-        // (Its qualifying late: sold for 2 minutes from the read that saw it hadn't begun; the next read says again.)
-        ...(f1.qualifyingWaits ? { waitsUntil: Date.parse(loadedAt || '') + 2 * 60_000 || now.getTime() + 2 * 60_000 } : {}),
-        driverEn: d.name,
-        driver: w?.driver ?? f1Driver(d.name),
-        poleSource: model.marketWeight >= 0.5 ? f1.pole?.source ?? 'model' : 'model',
-        fairChance: d.fair,
-        fairMargin: null,
-        errKey: f1.pole ? `f1Pre${d.fair < 0.01 ? 'Longshot' : ''}` : 'extra',
-        estOdds: estimateF1Odds(d.fair)
-      });
-    }
-  }
-  // Safety car, virtual safety car, red flag: yes or no, priced like a
-  // two-way game line.
-  for (const key of ['sc', 'vsc', 'red']) {
-    const flag = f1.flags?.[key];
-    if (!flag) continue;
-    for (const pick of ['yes', 'no']) {
-      const fair = pick === 'yes' ? flag.fair : 1 - flag.fair;
-      bets.push({ id: `f1${key}|${pick}`, gameId: `f1${key}`, kind: `f1${key}`, sport: 'f1', market: `f1${key}`, start: f1.startUtc, pick, settle: { pick }, flagSource: flag.source, fairChance: fair, estOdds: estimateLineOdds(fair, MLB_MARKET_OVERROUND), errKey: 'extra' });
-    }
   }
   return bets;
 }
@@ -136,7 +72,7 @@ export function boardBets(data, { optionsOf = gameOptions, name = (game, o) => o
       // (A game past its time that hasn't begun: sold until then, as a race's late qualifying; play-sources.mjs lotteryGames.)
       bets.push(game.lateUntil ? { ...bet, waitsUntil: game.lateUntil } : bet);
     }
-  if (data.f1) bets.push(...f1Bets(data.f1, { now, memo, loadedAt: data.loadedAt }));
+  if (data.f1) bets.push(...f1Bets(data.f1, { now }));
   return withHouseRules(fillTypicalMargins(bets));
 }
 

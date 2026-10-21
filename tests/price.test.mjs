@@ -111,22 +111,13 @@ test("a live pick's check reads its own league's live pages alone, not every lea
   assert.ok(asked.some(u => u.includes('baseball/mlb')) && asked.some(u => u.includes('soccer/eng.1')));
 });
 
-// A free bet is a single pick's or a parlay's, as Play offers it: on a
-// single of several picks or a system, the token's value would be staked on
-// every combination (a NT$200 token on twelve singles: NT$2,400 staked).
-test('a free bet only on one pick or a parlay: never every combination at the token\'s value', async () => {
+// No free bets and no parlay boost (2026-10-21): a 台灣運彩 ticket is paid
+// for in full and pays its odds.
+test('a free bet or a boost on a new slip is refused', async () => {
   const wallet = { entries: [{ id: 'eco:fb:welcome', t: NOW.getTime(), app: 'eco', kind: 'freebet', amount: 0, note: '200' }] };
   const legs = ['epl_g|ml|draw', 'epl_g|tot|2.5|over'].map(id => readingEverything(id)).map(h => ({ ...legOf(h.bet), odds: h.odds }));
-  const free = { free: 'eco:fb:welcome', freeValue: 200, stake: 200, cost: 0 };
-  const one = await checkSlip({ mode: 'single', sizes: [1], legs: [legs[0]], ...free }, wallet, null, NOW, reads().once);
-  assert.equal(one.ok, true, JSON.stringify(one));
-  // A top-up is the stake past the token, exactly: 200.49 staked for nothing is refused.
-  const topped = await checkSlip({ mode: 'single', sizes: [1], legs: [legs[0]], ...free, stake: 300, cost: 100 }, wallet, null, NOW, reads().once);
-  assert.equal(topped.ok, true, JSON.stringify(topped));
-  const sliver = await checkSlip({ mode: 'single', sizes: [1], legs: [legs[0]], ...free, stake: 200.49, cost: 0 }, wallet, null, NOW, reads().once);
-  assert.equal(sliver.problem, 'cost');
-  const singles = await checkSlip({ mode: 'single', sizes: [1], legs, ...free }, wallet, null, NOW, reads().once);
-  assert.equal(singles.problem, 'freeShape');
-  const parlay = await checkSlip({ mode: 'parlay', sizes: [2], legs, ...free }, wallet, null, NOW, reads().once);
-  assert.notEqual(parlay.problem, 'freeShape');
+  const free = await checkSlip({ mode: 'single', sizes: [1], legs: [legs[0]], free: 'eco:fb:welcome', freeValue: 200, stake: 200, cost: 0 }, wallet, null, NOW, reads().once);
+  assert.equal(free.problem, 'free');
+  const boosted = await checkSlip({ mode: 'parlay', sizes: [2], legs, boost: 1, stake: 100, cost: 100 }, wallet, null, NOW, reads().once);
+  assert.equal(boosted.problem, 'boost');
 });

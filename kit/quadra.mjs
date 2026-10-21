@@ -255,12 +255,8 @@ export function vipStatus(wallet, now = Date.now()) {
 // The tier's name alone (a medal emoji before it read as clip art, the owner 2026-10-18).
 export const vipName = (tier, lang = 'zh') => (tier ? (lang === 'en' ? tier.en : tier.zh) : '');
 
-// The welcome offer (WELCOME, plus.mjs; eco.js gives it): the first paid bet
-// in Play brings a NT$WELCOME.bet free bet (`eco:fb:welcome`), once. Still to come?
-export const welcomeDue = wallet => {
-  const entries = wallet?.entries || [];
-  return !entries.some(e => e.id === 'eco:fb:welcome') && !welcomeEarned(wallet);
-};
+// The welcome offer ended 2026-10-21 (no free bets at 台灣運彩): never due.
+export const welcomeDue = () => false;
 
 // ---- Free bets: plus.mjs (FREEBET, freeBetValue, freeBets) ---------------------------
 
