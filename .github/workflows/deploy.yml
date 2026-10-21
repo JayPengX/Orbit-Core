@@ -34,6 +34,7 @@ jobs:
       HAS_TOKEN_SECRET: ${{ secrets.ECO_TOKEN_SECRET != '' }}
       HAS_ADMIN_TOKEN: ${{ secrets.ECO_ADMIN_TOKEN != '' }}
       HAS_PUSH_SECRET: ${{ secrets.DATA_PUSH_SECRET != '' }}
+      HAS_LAW_BUILD_KEY: ${{ secrets.LAW_BUILD_KEY != '' }}
     steps:
       # The account: the deploy token's own (one), so it needn't be a secret.
       - name: The account
@@ -130,6 +131,14 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           DATA_PUSH_SECRET: ${{ secrets.DATA_PUSH_SECRET }}
+      # Orbit Law's build key (law-hosts.js: /law-page reads the Taiwan-only
+      # county 法規 sites for its nightly build; the same secret is Orbit-Law's).
+      - name: Orbit Law's build key on the proxy
+        if: ${{ env.HAS_LAW_BUILD_KEY == 'true' }}
+        run: printf '%s' "$LAW_BUILD_KEY" | npx --yes wrangler@4 secret put LAW_BUILD_KEY
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          LAW_BUILD_KEY: ${{ secrets.LAW_BUILD_KEY }}
       # The owner's admin token (tools/issue-passes.mjs makes it and keeps it
       # on the owner's computer): handing out passes, /eco op 'admin'.
       - name: Owner's admin token on the eco Worker
