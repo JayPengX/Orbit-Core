@@ -434,3 +434,49 @@ test('境內基金: bought at the NAV of the 15:30 cutoff, market orders only', 
   assert.equal(M.tradeCosts({ market: 'TWFUND', side: 'buy', kind: 'fund', gross: 10_000, currency: 'TWD' }).total, 100);
   assert.equal(M.tradeCosts({ market: 'TWFUND', side: 'sell', kind: 'fund', gross: 10_000, currency: 'TWD' }).total, 0);
 });
+
+test('台指期: margin held, not the contract value; gains and losses in NT$ a point; settled at expiry', async () => {
+  const M = await import('../kit/stock-markets.mjs');
+  const at = s => Date.parse(`${s}+08:00`);
+  const now = at('2026-10-21T10:00:00');
+  const sym = 'MTX202611.TF';
+  assert.equal(M.kindOf('', sym), 'fut');
+  assert.equal(M.futureExpiry(sym), at('2026-11-18T13:30:00'));
+  const q = (price, more = {}) => ({ symbol: sym, name: '小台指 11月', kind: 'fut', market: 'TAIFEX', currency: 'TWD', price, prev: price, got: now, marketTime: now, tz: 'Asia/Taipei', margin: [175_250, 134_500], session: { start: at('2026-10-21T09:00:00'), end: at('2026-10-21T13:30:00') }, ...more });
+  let acc = SA.newAccount(300_000, now - 400 * DAY, 'fut');
+  const place = (req, price, t = now, a = acc) => SA.placeOrder(a, { type: 'market', ...req }, { quote: q(price), rates: { TWD: 1 }, valuation: ok, now: t, id: `o${t}${req.side}${req.qty}` });
+  // Two contracts need NT$350,500 of margin: too much; one is fine.
+  assert.equal(place({ side: 'buy', qty: 2 }, 46_000).error, 'funds');
+  const r = place({ side: 'buy', qty: 1 }, 46_000);
+  assert.equal(r.error, undefined);
+  acc = r.account;
+  const fill = r.fill;
+  // Bought at a point over (the market order's tick), costs only: NT$25 + 期交稅.
+  assert.equal(fill.price, 46_001);
+  assert.equal(fill.total - fill.gross, 25 + Math.round(46_001 * 50 * 0.00002));
+  let s = SA.replay(acc, now);
+  assert.equal(SA.available(acc, s).cash.TWD, s.cash.TWD - 175_250, 'its margin held');
+  // Up 100 points: NT$5,000 on paper.
+  const v = SA.valuate(s, new Map([[sym, q(46_101)]]), { TWD: 1 });
+  assert.equal(v.futTWD, 5_000);
+  assert.equal(v.netWorth, s.cash.TWD + 5_000);
+  // Sold (closing): no margin needed, the gain paid.
+  const before = s.cash.TWD;
+  const c = place({ side: 'sell', qty: 1 }, 46_101, now + 60_000);
+  assert.equal(c.error, undefined);
+  s = SA.replay(c.account, now + 60_000);
+  assert.equal(s.positions[sym], undefined);
+  assert.equal(Math.round(s.cash.TWD - before), (46_100 - 46_001) * 50 - 25 - Math.round(46_100 * 50 * 0.00002));
+  // Selling first opens a short, with its margin; held to expiry, settled at TAIFEX's final price.
+  const sh = place({ side: 'sell', qty: 1 }, 46_000, now + 120_000, c.account);
+  assert.equal(sh.error, undefined);
+  assert.equal(SA.replay(sh.account, now + 120_000).positions[sym].qty, -1);
+  const done = SA.applyFutExpiry(sh.account, sym, 45_000, { now: at('2026-11-18T14:00:00') });
+  assert.equal(done.added.length, 1);
+  assert.equal(done.added[0].side, 'buy');
+  const end = SA.replay(done.account, at('2026-11-18T14:00:00'));
+  assert.equal(end.positions[sym], undefined);
+  assert.equal(Math.round(end.cash.TWD - SA.replay(sh.account, now + 120_000).cash.TWD), (45_999 - 45_000) * 50 - Math.round(45_000 * 50 * 0.00002));
+  // After its last 13:30, no new orders.
+  assert.equal(place({ side: 'buy', qty: 1 }, 46_000, at('2026-11-18T13:31:00')).error, 'futExpired');
+});

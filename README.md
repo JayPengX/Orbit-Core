@@ -78,7 +78,7 @@ runs near each caller; only Gemini goes through `gemini-relay.js`, pinned to Tai
 | `/push/…` | `push.js` | Subscriptions, scheduled notices, checks (an ESPN final, a Yahoo price, weather, a bus) |
 | `/weather…` | `weather.js`, `weather-skill.js` | The blend for a ~1 km cell, the township, scoring sources hourly |
 | `/transit/…` | `transit.js` | TDX (allowlist `TDX_RULES`), map config, search, place, route; `/transit/status?sample=` (a session or the dev door only) |
-| `/sports-proxy` | `sports.js`, `asia-baseball.js`, `f1-live.js`, `fund-nav.js` | The data proxy (§3.1) |
+| `/sports-proxy` | `sports.js`, `asia-baseball.js`, `f1-live.js`, `fund-nav.js`, `taifex.js` | The data proxy (§3.1) |
 | `/sports-today` | `sports-today.js`, `kit/sports-espn.mjs` | Orbit Sports' day of scoreboards in one answer, built on demand (§3.1) |
 | `/gemini`, `/nl-edit` | `worker.js` | Orbit Class's photo import and plain-language edits (fixed prompts) |
 | `/slip-scan` | `slip.js` | Orbit Slips' ticket photo read (tight caps) |
@@ -314,6 +314,7 @@ the kit.
 | A Cloudflare product or cron | `guard.js` `PLAN` |
 | `f1-live.js` | Sports' F1 board, Play's F1 settling |
 | `fund-nav.js` | Securities' 境內基金 NAVs (SITCA) |
+| `taifex.js` | Securities' 期貨: TAIFEX settlements, margins, finals |
 | `eco.js` money rules | The kit's tables, `truth.mjs`, `help.mjs`, `tools/economy.mjs` |
 | `push.js` checks | The apps that schedule them, `NOTICE_KINDS` |
 | `quadra.css` or the frame | Every app at 375 px, light and dark |

@@ -17,6 +17,7 @@ import { readToken, sessionLimited } from './quadra-token.js';
 import { BRANDS } from './kit/brand.mjs';
 import { ASIA_HOST, asiaBaseballResponse, asiaTarget, cpblBoxTarget } from './asia-baseball.js';
 import { FUND_HOST, fundNavResponse } from './fund-nav.js';
+import { TAIFEX_HOST, taifexResponse } from './taifex.js';
 import { F1_LIVE_HOST, f1LiveResponse, doLog, sampleLive } from './f1-live.js';
 import { cleanDev } from './kit/devconfig.mjs';
 import { json, LOCAL_ORIGIN } from './http.js';
@@ -85,7 +86,9 @@ const SPORTS_PROXY_ALLOWED_HOSTS = [
   F1_LIVE_HOST,
   // Nor this: Taiwan's funds' daily NAVs from SITCA's open data (fund-nav.js),
   // Securities' 基金.
-  FUND_HOST
+  FUND_HOST,
+  // Nor this: TAIFEX's futures settlement prices and margins (taifex.js), Securities' 期貨.
+  TAIFEX_HOST
 ];
 const ELTA_PATH = '/production/json/program_list/sports_live_program_list.json';
 // Per signed-in session and app, a minute, in memory (cache hits included). Looking
@@ -311,6 +314,8 @@ function cachePolicyFor(url) {
       return asiaPolicy(url);
     // A fund's NAV comes out once a day, in the evening.
     case FUND_HOST:
+    // (TAIFEX's settlement prices too: once a day, after the close.)
+    case TAIFEX_HOST:
       return CACHE_SCHEDULE;
     case F1_LIVE_HOST:
       // A finished session from F1's archive (f1-live.js /session.json): it doesn't change.
@@ -1022,6 +1027,8 @@ async function fetchUpstream(upstreamUrl, trim) {
       ? await f1LiveResponse(upstreamUrl, { log: f1Log })
       : upstreamUrl.hostname === FUND_HOST
       ? await fundNavResponse(upstreamUrl)
+      : upstreamUrl.hostname === TAIFEX_HOST
+      ? await taifexResponse(upstreamUrl)
       : YAHOO_HOSTS.has(upstreamUrl.hostname)
       ? await fetchYahoo(upstreamUrl)
       : upstreamUrl.hostname === 'clients5.google.com'

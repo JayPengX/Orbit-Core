@@ -162,7 +162,7 @@ export function earlyClose(market, day) {
 }
 
 // Which calendar each market (see markets.mjs) keeps.
-const CALENDAR = { TW: 'TW', US: 'US', JP: 'JP', HK: 'HK', CN: 'CN', KR: 'KR', UK: 'UK', FR: 'EU', NL: 'EU', ES: 'EU', DE: 'DE', IT: 'IT', CH: 'CH', DK: 'DK', CA: 'CA', AU: 'AU', SG: 'SG', METAL: 'US', TWFUND: 'TW', FX: null, CRYPTO: null, INTL: null };
+const CALENDAR = { TW: 'TW', US: 'US', JP: 'JP', HK: 'HK', CN: 'CN', KR: 'KR', UK: 'UK', FR: 'EU', NL: 'EU', ES: 'EU', DE: 'DE', IT: 'IT', CH: 'CH', DK: 'DK', CA: 'CA', AU: 'AU', SG: 'SG', METAL: 'US', TWFUND: 'TW', TAIFEX: 'TW', FX: null, CRYPTO: null, INTL: null };
 export const calendarOf = market => CALENDAR[market] ?? null;
 
 const cache = new Map();
