@@ -149,7 +149,7 @@ export async function checkEvent(e, account, wallet, read, issued = {}, ctx = {}
         // (A written one is assigned: bought back at that value.)
         const held = replay(account, e.t).positions[e.symbol]?.qty || 0;
         if (!(e.qty > 0) || e.qty > (e.side === 'sell' ? held : -held) + 1e-6) return 'bad';
-        const final = (await read(TAIFEX_URL))?.final?.[`${o.year}${String(o.month).padStart(2, '0')}`];
+        const final = (await read(TAIFEX_URL))?.final?.[o.series];
         if (!(final > 0)) return now - e.t > 30 * DAY ? 'bad' : 'later';
         const gross = optionIntrinsic(e.symbol, final) * e.qty * o.mult;
         const money = e.side === 'sell' ? e.total <= gross + 0.5 && e.total >= 0 : e.total >= gross - 0.5;

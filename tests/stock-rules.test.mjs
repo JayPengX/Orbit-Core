@@ -582,3 +582,27 @@ test('TAIEX options written: the premium in, TAIFEX margin held, bought back or 
   assert.equal(end.positions[put], undefined);
   assert.equal(SA.available(done.account, end).cash.TWD, end.cash.TWD);
 });
+
+test('TAIEX weekly options: each series by its Wednesday or Friday, priced on the futures it expires with', async () => {
+  const M = await import('../kit/stock-markets.mjs');
+  const Q = await import('../kit/stock-quotes.mjs');
+  const at = s => Date.parse(`${s}+08:00`);
+  // TAIFEX's own: 10/12 for the 2nd Friday (10/9 a holiday), the 5th Wednesday of September, the monthly.
+  assert.equal(M.seriesExpiry('202610F2'), at('2026-10-12T13:30:00'));
+  assert.equal(M.seriesExpiry('202609W5'), at('2026-09-30T13:30:00'));
+  assert.equal(M.seriesExpiry('202610'), at('2026-10-21T13:30:00'));
+  const sym = 'TXO202610W4C46500.TF';
+  assert.deepEqual([M.optionOf(sym).series, M.optionOf(sym).week, M.optionExpiry(sym)], ['202610W4', 'W4', at('2026-10-28T13:30:00')]);
+  // (After October's 3rd Wednesday, the weeklies are on November's futures.)
+  assert.equal(M.seriesFuture('202610W4'), '202611');
+  assert.equal(M.seriesFuture('202610W2'), '202610');
+  const t = at('2026-10-22T10:00:00');
+  assert.deepEqual(M.optionWeeklies(t), ['202610F4', '202610W4', '202610F5', '202611W1']);
+  // With TAIFEX's table: only the weeklies it lists.
+  assert.deepEqual(M.optionExpiries(t, { opt: { '202610F4': {}, '202610W4': {} } }), ['202610F4', '202610W4', '202611', '202612']);
+  const taiex = { symbol: '^TWII', price: 46_400, prev: 46_300, marketTime: t, line: [] };
+  const table = { date: '2026-10-21', settle: { TX202611: 46_500 }, opt: { '202610W4': { C: { 46_500: 300 }, P: {} } }, final: {} };
+  const q = Q.optQuote(sym, taiex, table);
+  assert.equal(q.name, '台指選 10/28週 46500 買權');
+  assert.ok(q.price > 0 && q.price < 600);
+});
