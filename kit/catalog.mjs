@@ -36,7 +36,8 @@ export const SPORTS = {
   darts: { zh: '飛鏢', en: 'Darts', icon: '🎯' },
   handball: { zh: '手球', en: 'Handball', icon: '🤾' },
   rugby: { zh: '橄欖球', en: 'Rugby', icon: '🏉' },
-  futsal: { zh: '五人制足球', en: 'Futsal', icon: '⚽' }
+  futsal: { zh: '五人制足球', en: 'Futsal', icon: '⚽' },
+  mma: { zh: '綜合格鬥', en: 'MMA', icon: '🥊' }
 };
 
 
@@ -107,6 +108,9 @@ export const CATALOG = {
   rugbyunion: kambiSport('rugby', 'rugby_union', '聯合式橄欖球', 'Rugby union', null, 'rugbyunion'),
   rugbyleague: kambiSport('rugby', 'rugby_league', '聯盟式橄欖球', 'Rugby league', null, 'rugbyleague'),
   futsal: kambiSport('futsal', 'futsal', '五人制足球', 'Futsal'),
+  // 綜合格鬥: UFC's cards, Kambi's prices (勝負, a draw void), each bout's
+  // winner from ESPN's card (settle.mjs boutResult). Kambi lists UFC only.
+  ufc: { ...kambiSport('mma', 'ufc_mma', 'UFC', 'UFC', /^ufc_mma\/ufc/, 'ufc'), results: 'mma/ufc' },
   // Racing
   f1: { sport: 'racing', kind: 'field', data: 'espn', espn: 'racing/f1', zh: 'F1 一級方程式', en: 'Formula 1', bet: 'f1', top: true, standings: true }
 };
