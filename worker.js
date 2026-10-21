@@ -793,6 +793,26 @@ const NL_EDIT_SCHEDULE_EDIT_SCHEMA = {
   required: ['day', 'period', 'key']
 };
 
+// One 調課: the class in period aPeriod on aDate and the one in bPeriod on
+// bDate trade places, those two dates only (Orbit Class's classSwaps, as
+// {a: {date, p}, b: {date, p}}).
+const NL_EDIT_CLASS_SWAP_SCHEMA = {
+  type: 'object',
+  properties: {
+    aDate: { type: 'string' },
+    aPeriod: { type: 'integer' },
+    bDate: { type: 'string' },
+    bPeriod: { type: 'integer' }
+  },
+  required: ['aDate', 'aPeriod', 'bDate', 'bPeriod']
+};
+// A subject's icon: one of the context's iconChoices, or "" for the app's own pick.
+const NL_EDIT_SUBJECT_ICON_SCHEMA = {
+  type: 'object',
+  properties: { subject: { type: 'string' }, icon: { type: 'string' } },
+  required: ['subject', 'icon']
+};
+
 // Sparse patch, not full-state: an earlier revision of this schema had the
 // model echo back the COMPLETE new value of every editable field - classes,
 // weeklySchedule day-by-day, bellTimes, breakTimes, countdownEvents -
@@ -845,7 +865,16 @@ const NL_EDIT_RESPONSE_SCHEMA = {
     countdownEventsChanged: { type: 'boolean' },
     countdownEvents: GEMINI_COUNTDOWN_EVENTS_SCHEMA,
     reverseWeekChanged: { type: 'boolean' },
-    reverseWeek: { type: 'boolean' }
+    reverseWeek: { type: 'boolean' },
+    // 調課 (one day's two periods traded, by date), the subjects' icons and
+    // 自動刪除過期倒數: everything else the app itself can change (Jay
+    // 2026-10-21: "AI settings has to be able to do anything the apps can").
+    classSwapsChanged: { type: 'boolean' },
+    classSwaps: { type: 'array', items: NL_EDIT_CLASS_SWAP_SCHEMA },
+    subjectIconsChanged: { type: 'boolean' },
+    subjectIcons: { type: 'array', items: NL_EDIT_SUBJECT_ICON_SCHEMA },
+    pruneCountdownsChanged: { type: 'boolean' },
+    pruneCountdowns: { type: 'boolean' }
   },
   required: [
     'status',
@@ -860,7 +889,13 @@ const NL_EDIT_RESPONSE_SCHEMA = {
     'countdownEventsChanged',
     'countdownEvents',
     'reverseWeekChanged',
-    'reverseWeek'
+    'reverseWeek',
+    'classSwapsChanged',
+    'classSwaps',
+    'subjectIconsChanged',
+    'subjectIcons',
+    'pruneCountdownsChanged',
+    'pruneCountdowns'
   ]
 };
 
@@ -888,7 +923,13 @@ function buildNlEditPrompt(text, context) {
   "countdownEventsChanged": false,
   "countdownEvents": [],
   "reverseWeekChanged": false,
-  "reverseWeek": false
+  "reverseWeek": false,
+  "classSwapsChanged": false,
+  "classSwaps": [],
+  "subjectIconsChanged": false,
+  "subjectIcons": [],
+  "pruneCountdownsChanged": false,
+  "pruneCountdowns": false
 }
 
 THE SINGLE MOST IMPORTANT RULE: this is a PATCH, not a copy of the schedule. List a class in "classUpserts" only if you are adding it or changing one of its fields; list a key in "deletedClassKeys" only if the instruction removes that class entirely; list an entry in "scheduleEdits" only for a (day, period) cell whose class actually changes. Never include a class, cell, break time, or countdown event just because it already exists - every one the instruction doesn't touch must be left out of the result entirely, never repeated back. This is also why "bellTimesChanged"/"breakTimesChanged"/"countdownEventsChanged"/"reverseWeekChanged" exist: leave the flag false (and its matching field empty/false) whenever the instruction doesn't touch that field at all; set the flag true, and only then fill in the field, when it does. The result is shown to the user as a diff against the current data before anything is saved, so anything you include here that the instruction didn't actually ask for shows up as a confusing, unwanted line in that diff.
@@ -898,6 +939,11 @@ Field shapes and meaning:
 - "deletedClassKeys": keys (from the context below) of classes the instruction removes entirely. Also add a "scheduleEdits" entry with "key": "" for every cell in the context that still references a deleted key, so nothing is left pointing at a class that no longer exists.
 - "scheduleEdits": one entry per (day, period) cell whose class actually changes, as {day, period, key} - "key": "" clears that period (makes it free that day). Only list a cell here if the class it should now hold is different from what the context below already shows there. Moving a class is two entries (clear its old cell, set its new one); swapping two classes is two entries (each cell gets the other's key).
 - "bellTimes"/"breakTimes"/"countdownEvents"/"reverseWeek": each has a matching *Changed boolean (see above). When the instruction adds, removes, or edits ANY period/break/event/the odd-even split, set that one flag true and give the COMPLETE new value of that whole field, in order (not a partial patch within it) - e.g. adding one bell period still means the complete "bellTimes" array including the new one; adding one break time still means the complete "breakTimes" array including the new one, and so on. "bellTimes" is the list of [start, end] 24-hour time strings ("HH:MM"), one per period, in the same order "scheduleEdits"' period numbers use. Adding a period means appending a new [start, end] pair; removing or reordering a period shifts every later period's index - when that happens, also add "scheduleEdits" entries for whatever classes sat in those later periods, moving each to its new index (and clearing its old one), so nothing silently ends up in the wrong period. "breakTimes" is named special/break times (e.g. 午休, 打掃時間, 就寢時間) as {name, start, end} - independent of "bellTimes"/the schedule, not tied to any period index. "countdownEvents" is named date-range events (e.g. 段考, 校慶) as {name, startDate, endDate} ("YYYY-MM-DD" each, the same day for a single-day event).
+
+調課 (one-off period swaps on real dates), subject icons, and old countdowns:
+- "classSwaps" (with "classSwapsChanged"): a 調課 trades the classes of two periods on specific calendar dates only, never the weekly schedule (e.g. "明天第三節跟後天第一節調課", "10/24 的數學跟 10/25 的英文對調", "取消下週一的調課"). Each entry is {aDate, aPeriod, bDate, bPeriod}: dates "YYYY-MM-DD", periods 0-based like everywhere else; the two may be the same date. Work out real dates from the context's "today" ("明天", "下週二", "這週五"), and the periods from the weekly schedule of each date's weekday (e.g. "週四的數學" is whichever period holds 數學 on that Thursday). When anything about 調課 changes, set "classSwapsChanged" true and give the COMPLETE new list: every swap already in the context's "classSwaps" that stays, plus the new ones, minus any removed. A 調課 request never touches "scheduleEdits" (that's the permanent weekly schedule).
+- "subjectIcons" (with "subjectIconsChanged"): the icon shown for a subject (e.g. "數學的圖示換成計算機", "國文用羽毛筆"). Each entry is {subject, icon}: "subject" exactly as a class's subject is written in the context (one half of a "/" split counts as its own subject); "icon" one of the context's "iconChoices" keys that best matches what was asked, or "" to go back to the app's automatic icon. List only the subjects whose icon changes.
+- "pruneCountdowns" (with "pruneCountdownsChanged"): the setting that deletes a countdown event automatically once it's over ("過期的倒數自動刪掉" true, "不要自動刪" false); the current value is the context's "pruneCountdowns".
 
 單雙週分堂課 (odd/even-week split classes): ONE class entry can alternate between two different subject/teacher pairs depending on whether the real-world week is 單週 (odd) or 雙週 (even) - this is a single "classUpserts" entry (never two, and never two "scheduleEdits" cells) whose "subject" and/or "teacher" string is written as "單週內容/雙週內容", the two halves joined by a "/" (a full-width "／" means the same thing - normalize it to "/"). Example: {"subject": "國文/公民", "teacher": "李老師/陳老師"} is one slot that shows 國文 taught by 李老師 on 單週 weeks and 公民 taught by 陳老師 on 雙週 weeks; "location" is never split this way, it's the same room either week. Recognizing, creating, and editing these:
   - An existing class already has this split if its subject or teacher (in the context below) contains "/". The part before "/" is what shows on 單週, the part after is 雙週.
@@ -913,7 +959,7 @@ Numbers may be Chinese or Arabic, and several periods may be packed together ("�
 Read the instruction the way a colleague would, not a compiler: it may be indirect, colloquial, or point at its target through context instead of naming it outright - e.g. "把國文課挪到早自習後面" means move it to whichever period immediately follows whatever's named/labeled 早自習 in the given context; "這兩堂對調" without the word "交換" still means swap them; "把雙週那半改掉" implicitly means the class in question already has a 單/雙週 split (see above) and only that half changes. Work out the concrete edit a reasonable teacher would mean from the wording and the context you were given, rather than requiring the instruction to spell out mechanics literally. This reasoning is about READING the instruction, not about inventing content: still never invent a day, period, subject, teacher, location, time, or event that neither the instruction nor the given context actually supports.
 
 Decide "status":
-- "ok": the instruction maps cleanly onto a change (or several - see below) to the data below, using only days/periods/classes/times that make sense given the context (and, for a multi-part instruction, given the effect of any earlier part already applied - e.g. moving a class out of a slot and then putting a different class into that now-empty slot is a perfectly ordinary two-part instruction, not a conflict). Fill in only whichever of "classUpserts"/"deletedClassKeys"/"scheduleEdits"/the four *Changed fields the patch actually needs - leave every other field/flag empty/false.
+- "ok": the instruction maps cleanly onto a change (or several - see below) to the data below, using only days/periods/classes/times that make sense given the context (and, for a multi-part instruction, given the effect of any earlier part already applied - e.g. moving a class out of a slot and then putting a different class into that now-empty slot is a perfectly ordinary two-part instruction, not a conflict). Fill in only whichever of "classUpserts"/"deletedClassKeys"/"scheduleEdits"/the *Changed fields the patch actually needs - leave every other field/flag empty/false.
 - "unclear": after actually reasoning through the wording and context as above, the instruction (or any part of it, if it describes several changes) still has multiple equally plausible readings with nothing to prefer one over another, is contradictory, or does not describe an edit to this data at all. This is not the same as "phrased indirectly" - reserve "unclear" for genuine ambiguity, not for instructions that merely require a little inference to resolve. Leave every field/flag empty/false (i.e. no actual change). Briefly explain why in "reason" (Traditional Chinese, one short sentence).
 - "not_found": the instruction is clear about what it wants, but names a day, period, class, break time, or countdown event that does not exist in the given context at the point it's referenced. Leave every field/flag empty/false. Briefly explain in "reason" (Traditional Chinese, one short sentence).
 
@@ -955,7 +1001,15 @@ function readNlEditContext(context) {
     return null;
   if (breakTimes.some(entry => !entry || typeof entry !== 'object')) return null;
   if (countdownEvents.some(entry => !entry || typeof entry !== 'object')) return null;
-  return { weeklySchedule, classes, bellTimes, breakTimes, countdownEvents, reverseWeek };
+  const out = { weeklySchedule, classes, bellTimes, breakTimes, countdownEvents, reverseWeek };
+  // Optional, for 調課, icons and the prune setting: passed through when they're the right shape.
+  const { today, classSwaps, subjectIcons, iconChoices, pruneCountdowns } = context;
+  if (typeof today === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(today)) out.today = today;
+  if (Array.isArray(classSwaps) && classSwaps.every(entry => entry && typeof entry === 'object')) out.classSwaps = classSwaps;
+  if (subjectIcons && typeof subjectIcons === 'object' && !Array.isArray(subjectIcons) && Object.values(subjectIcons).every(v => typeof v === 'string')) out.subjectIcons = subjectIcons;
+  if (Array.isArray(iconChoices) && iconChoices.every(v => typeof v === 'string')) out.iconChoices = iconChoices;
+  if (typeof pruneCountdowns === 'boolean') out.pruneCountdowns = pruneCountdowns;
+  return out;
 }
 
 async function handleNlEditRequest(request, env, headers, ip, ctx, session = null) {
