@@ -3202,13 +3202,20 @@ keepStrips();
 // anything marked .q-kb-dock (a bar that belongs on top of the keys) sits
 // there, as does a bar fixed at the foot holding the field (.q-kb-docked).
 // A focused field is brought into view inside its own scroller, and the
-// screen's slide put back when it only hid the top.
+// screen's slide put back when it only hid the top. A home-screen app on a
+// newer iOS shrinks the page instead (innerHeight drops with the keys, the
+// visible part no smaller than it): the keys are seen by the page's height
+// against its height before typing, at the same width, so the tab bar still
+// waits behind them and the composer still rides on them (--q-kb stays the
+// part the keys cover, 0 there, since the page's foot is already on them).
 function watchKeyboard() {
   const vv = globalThis.visualViewport;
   if (typeof document === 'undefined' || !vv || globalThis.__quadraKeyboard) return;
   globalThis.__quadraKeyboard = true;
   const root = document.documentElement;
   let frame = 0;
+  // The page's height before any typing, at this width (an iPhone turned resets it).
+  let full = 0, fullW = 0;
   const typing = () => {
     const el = document.activeElement;
     return Boolean(el && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable) && !/^(checkbox|radio|range|button|submit|color|file)$/.test(el.type));
@@ -3216,7 +3223,11 @@ function watchKeyboard() {
   const apply = () => {
     frame = 0;
     const kb = Math.max(0, Math.round(globalThis.innerHeight - vv.height - vv.offsetTop));
-    const up = kb > 80 && typing();
+    const now = typing();
+    if (fullW !== globalThis.innerWidth) ((fullW = globalThis.innerWidth), (full = 0));
+    full = now ? Math.max(full, globalThis.innerHeight) : globalThis.innerHeight;
+    const shrunk = full ? full - globalThis.innerHeight : 0;
+    const up = (kb > 80 || shrunk > 80) && now;
     root.style.setProperty('--q-kb', `${up ? kb : 0}px`);
     root.style.setProperty('--q-vvh', `${Math.round(vv.height)}px`);
     root.classList.toggle('q-kb', up);
@@ -3259,6 +3270,7 @@ function watchKeyboard() {
   const soon = () => (frame ||= requestAnimationFrame(apply));
   vv.addEventListener('resize', soon);
   vv.addEventListener('scroll', soon);
+  globalThis.addEventListener?.('resize', soon);
   document.addEventListener('focusin', () => setTimeout(soon, 60));
   document.addEventListener('focusout', () => setTimeout(soon, 60));
   apply();
@@ -3650,6 +3662,16 @@ steadyTabBar();
 // and the app's own refresh runs (topActions' refresh) once.
 // netState() 'online' | 'offline' | 'slow'.
 const NET_SLOW_MS = 5000;
+// The proxy's AI routes (Gemini at work for 5 to 30 s): their wait says nothing of the network.
+const AI_ROUTES = /\/(law-chat|law-ask|law-gist|gemini|nl-edit|slip-scan)(\?|$)/;
+export const slowByNature = url => {
+  try {
+    const u = new URL(url, globalThis.location?.href);
+    return u.hostname.endsWith('.workers.dev') && AI_ROUTES.test(u.pathname + (u.search ? '?' : ''));
+  } catch {
+    return false;
+  }
+};
 const net = { state: 'online', waiting: new Map(), lastOk: Date.now(), fails: 0, refresh: null, timer: 0, id: 0, only: null, reached: false, hadReached: false };
 export const netState = () => net.state;
 function setNet(next) {
@@ -3788,7 +3810,8 @@ function watchNet() {
     const url = typeof input === 'string' ? input : input?.url || String(input);
     if (own(url)) return real(input, init);
     const k = ++net.id;
-    net.waiting.set(k, Date.now());
+    // (An AI's answer takes its time: never read as a slow connection; its failure still counts.)
+    if (!slowByNature(url)) net.waiting.set(k, Date.now());
     if (net.state === 'online') setTimeout(judgeNet, NET_SLOW_MS + 50);
     return real(input, init).then(
       res => {
