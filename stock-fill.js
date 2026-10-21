@@ -34,7 +34,7 @@
 // deps: { fsGet, fsWrite, read(url) -> JSON (the data proxy's route), now }.
 
 import { fetchQuotes, fetchBars, fxSymbol, useQuotesReader } from './kit/stock-quotes.mjs';
-import { marketHalt, SPX } from './kit/stock-markets.mjs';
+import { marketHalt, SPX, isTwFund, fundCutoff, FUND_NAV_WAIT } from './kit/stock-markets.mjs';
 import { triggerPrice, backfillPrice, closingMatch, planRuns, planOrderId, planFillBar, planOrderType, planAllowed, PLAN_DAY_MAX } from './kit/stock-account.mjs';
 import { ipoUrls, parseIpoList, ipoOpen, ipoDrawn, ipoWon, ipoDrawKey } from './kit/stock-ipo.mjs';
 import { tokenSecret } from './quadra-token.js';
@@ -192,7 +192,17 @@ async function planFills(book, now) {
 
 // An order's terms as first seen: `t` the moment this Worker saw it (`lk`,
 // from when its bars were last looked at, is added by its first look).
-const termsOf = (o, now) => ({ symbol: o.symbol, side: o.side, type: o.type, qty: o.qty, limit: o.limit, stop: o.stop, after: o.after, expires: o.expires, market: o.market, kind: o.kind, currency: o.currency, ...(o.ext ? { ext: true } : {}), t: now });
+// A Taiwan fund's is the NAV of the first cutoff after this Worker saw it,
+// whatever the phone says (a phone that asks once the NAV is out gets the
+// next day's, never one already known).
+const termsOf = (o, now) => {
+  const terms = { symbol: o.symbol, side: o.side, type: o.type, qty: o.qty, limit: o.limit, stop: o.stop, after: o.after, expires: o.expires, market: o.market, kind: o.kind, currency: o.currency, ...(o.ext ? { ext: true } : {}), t: now };
+  if (isTwFund(o.symbol)) {
+    const after = fundCutoff(now);
+    Object.assign(terms, { market: 'TWFUND', kind: 'fund', type: 'market', limit: undefined, stop: undefined, after, expires: after + FUND_NAV_WAIT });
+  }
+  return terms;
+};
 
 // From when an order's bars still need looking at: a bar back from its last
 // look (the newest bar then was still forming), never before it was seen.

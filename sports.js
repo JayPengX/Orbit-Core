@@ -16,6 +16,7 @@ import { paceOf } from './pace.js';
 import { readToken, sessionLimited } from './quadra-token.js';
 import { BRANDS } from './kit/brand.mjs';
 import { ASIA_HOST, asiaBaseballResponse, asiaTarget, cpblBoxTarget } from './asia-baseball.js';
+import { FUND_HOST, fundNavResponse } from './fund-nav.js';
 import { F1_LIVE_HOST, f1LiveResponse, doLog, sampleLive } from './f1-live.js';
 import { cleanDev } from './kit/devconfig.mjs';
 import { json, LOCAL_ORIGIN } from './http.js';
@@ -81,7 +82,10 @@ const SPORTS_PROXY_ALLOWED_HOSTS = [
   // Worker from the leagues' own sites (asia-baseball.js).
   ASIA_HOST,
   // Not a real host either: F1's own live timing, one snapshot (f1-live.js).
-  F1_LIVE_HOST
+  F1_LIVE_HOST,
+  // Nor this: Taiwan's funds' daily NAVs from SITCA's open data (fund-nav.js),
+  // Securities' 基金.
+  FUND_HOST
 ];
 const ELTA_PATH = '/production/json/program_list/sports_live_program_list.json';
 // Per signed-in session and app, a minute, in memory (cache hits included). Looking
@@ -305,6 +309,9 @@ function cachePolicyFor(url) {
       return url.pathname === '/watch' ? CACHE_YT_VIDEO : CACHE_YT_SEARCH;
     case ASIA_HOST:
       return asiaPolicy(url);
+    // A fund's NAV comes out once a day, in the evening.
+    case FUND_HOST:
+      return CACHE_SCHEDULE;
     case F1_LIVE_HOST:
       // A finished session from F1's archive (f1-live.js /session.json): it doesn't change.
       if (url.pathname === '/session.json' || url.pathname === '/circuit.json') return CACHE_STANDINGS;
@@ -985,6 +992,8 @@ async function fetchUpstream(upstreamUrl, trim) {
       ? await asiaBaseballResponse(upstreamUrl)
       : upstreamUrl.hostname === F1_LIVE_HOST
       ? await f1LiveResponse(upstreamUrl, { log: f1Log })
+      : upstreamUrl.hostname === FUND_HOST
+      ? await fundNavResponse(upstreamUrl)
       : YAHOO_HOSTS.has(upstreamUrl.hostname)
       ? await fetchYahoo(upstreamUrl)
       : upstreamUrl.hostname === 'clients5.google.com'
