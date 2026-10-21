@@ -263,7 +263,8 @@ export async function decideFills(orders, { read, now = Date.now() }) {
     if (!(Number.isFinite(price) && price > 0)) continue;
     // (Taiwan's closing and after-hours matches are one price for all: the close.)
     const one = o.after || closingMatch(o, q, now)?.price != null;
-    fills[o.id] = { quote: o.lk != null && o.type === 'limit' && !one ? o.limit : price, t: now, ...rate };
+    // (`one`: kept, so the check prices it as the kit does: no spread crossed.)
+    fills[o.id] = { quote: o.lk != null && o.type === 'limit' && !one ? o.limit : price, t: now, ...rate, ...(one ? { one: true } : {}) };
   }
   return { fills, looked };
 }

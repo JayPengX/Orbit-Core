@@ -189,3 +189,11 @@ test('a 可轉債 held to maturity is repaid at face, once, on what was held; ne
   const r = await check(d, [buy, mature, ...forged], due + 2000);
   assert.deepEqual(r.refused.sort(), ['x:early', 'x:rich']);
 });
+
+test('a single-price match (after hours, a fund NAV) counts at that price, no spread crossed', async () => {
+  const d = deps({ a1: { ...issuedFill('a1', 'buy', 1005, 10), one: true } });
+  const after = { ...fill('a1', 'buy', 1005, 10), quote: 1005 };
+  const r = await check(d, [after], T + 2000);
+  assert.deepEqual(r.refused, []);
+  assert.equal(r.cash, 100_000 - after.total);
+});

@@ -109,8 +109,10 @@ const bondOf = symbol => BONDS[symbol] || Object.values(BONDS).find(b => b.id ==
 // The price the kit's own rule makes of a quote (fillOrder: a market or
 // stop order crosses the spread, a limit fills at its price or better; then
 // the market's own spread, estimate's dealPrice).
-export function fillPrice({ k, l, side }, quote, market, kind) {
-  const p = k === 'limit' && Number.isFinite(l) ? (side === 'buy' ? Math.min(quote, l) : Math.max(quote, l)) : marketFill(market, kind, side, quote);
+// `one`: a single-price match (Taiwan's closing and after-hours matches, a
+// fund's NAV): everyone at that one price, no spread crossed.
+export function fillPrice({ k, l, side, one = false }, quote, market, kind) {
+  const p = k === 'limit' && Number.isFinite(l) ? (side === 'buy' ? Math.min(quote, l) : Math.max(quote, l)) : one ? quote : marketFill(market, kind, side, quote);
   return dealPrice(market, side, p);
 }
 
@@ -149,7 +151,7 @@ export async function checkEvent(e, account, wallet, read, issued = {}, ctx = {}
           // (A plan's month: the kit's own order for it, a Taiwan stock's a limit at the
           // quote, whatever a fill issued before that rule recorded.)
           const rule = mine.plan ? { k: planOrderType(e), l: mine.quote } : { k: mine.k, l: mine.l };
-          const want = fillPrice({ ...rule, side: e.side }, mine.quote, e.market, e.kind);
+          const want = fillPrice({ ...rule, side: e.side, one: Boolean(mine.one) }, mine.quote, e.market, e.kind);
           if (!near(e.price, want, 1e-9 * Math.max(1, want) + 1e-9)) return 'bad';
         } else if (e.side === 'buy' ? e.price < mine.quote * (1 - 1e-9) : e.price > mine.quote * (1 + 1e-9)) return 'bad';
         if (e.currency === 'TWD' || !e.currency) return (e.twd ?? 1) === 1 ? 'ok' : 'bad';
