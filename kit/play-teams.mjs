@@ -13,7 +13,7 @@ export { teamZh, teamNameZh } from '#kit/names.mjs';
 // its first price (`book`), or a `kambi` list alone (its schedule and prices).
 export const LEAGUES = Object.fromEntries(
   Object.values(CATALOG)
-    .filter(l => l.bet && l.odds)
+    .filter(l => l.bet && l.odds && l.sold !== false)
     .map(l => {
       const league = { family: familyOfSport(l.sport) };
       if (l.odds === 'espn') {
