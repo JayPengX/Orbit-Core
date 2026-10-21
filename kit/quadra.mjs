@@ -3424,6 +3424,8 @@ watchNames();
 // white in dark mode"). A logo still on a light plate keeps its own; one
 // with no dark version (Falkirk) goes back at once, and is remembered.
 const ESPN_LOGO = /^https:\/\/a\.espncdn\.com\/(?:i\/|combiner\/i\?img=\/i\/)(?:teamlogos|leaguelogos)\/(?!countries\/)[\w/-]*\/500\//;
+// (The Premier League's purple lion, the kit's or an app's copy: its white one beside it.)
+const EPL_LION = /\/img\/epl\.png(\?.*)?$/;
 const noDark = new Set();
 export function darkLogos(root = document) {
   const de = document.documentElement;
@@ -3440,20 +3442,84 @@ export function darkLogos(root = document) {
     const light = img.dataset.qLight;
     if (dark && !light) {
       const src = img.getAttribute('src') || '';
-      // (A <picture> picks its own dark version.)
-      if (!ESPN_LOGO.test(src) || noDark.has(src) || img.closest('[hidden], picture') || plateLight(img)) continue;
+      // (A <picture> with a dark source picks its own.)
+      const to = ESPN_LOGO.test(src) ? src.replace('/500/', '/500-dark/') : EPL_LION.test(src) ? src.replace(EPL_LION, '/img/epl-dark.png$1') : '';
+      if (!to || noDark.has(src) || img.closest('[hidden], picture:has(source)') || plateLight(img)) continue;
       img.dataset.qLight = src;
-      img.setAttribute('src', src.replace('/500/', '/500-dark/'));
+      img.setAttribute('src', to);
     } else if (!dark && light) {
       delete img.dataset.qLight;
       img.setAttribute('src', light);
     }
   }
+  if (typeof OffscreenCanvas === 'function' && typeof createImageBitmap === 'function') toneLogos(root, dark);
 }
+// A logo's own tone on a dark screen, read from its pixels once (the hosts
+// answer CORS): a dark mark in one colour (歐冠's star ball, Ligue 1's grey)
+// is drawn white (data-q-tone="mono"); a dark one in colours gets a light
+// disc ("color"); any other stays as it is. Remembered by address.
+const LOGO_HOST = /^https:\/\/(a\.espncdn\.com|r2\.thesportsdb\.com|www\.thesportsdb\.com|cdn\.nba\.com)\//;
+const tones = new Map();
+const toneOf = async url => {
+  if (tones.has(url)) return tones.get(url);
+  const job = (async () => {
+    try {
+      const res = await fetch(url, { mode: 'cors', credentials: 'omit' });
+      if (!res.ok) return '';
+      const bmp = await createImageBitmap(await res.blob());
+      const n = 48;
+      const c = new OffscreenCanvas(n, n);
+      const g = c.getContext('2d', { willReadFrequently: true });
+      g.drawImage(bmp, 0, 0, n, n);
+      const px = g.getImageData(0, 0, n, n).data;
+      let count = 0;
+      let lum = 0;
+      let sat = 0;
+      for (let i = 0; i < px.length; i += 4) {
+        if (px[i + 3] < 140) continue;
+        const [r, gr, b] = [px[i] / 255, px[i + 1] / 255, px[i + 2] / 255];
+        const max = Math.max(r, gr, b);
+        const min = Math.min(r, gr, b);
+        count++;
+        lum += 0.2126 * r + 0.7152 * gr + 0.0722 * b;
+        sat += max ? (max - min) / max : 0;
+      }
+      // (A picture with a solid background, a photo: nothing to do.)
+      if (!count || count > n * n * 0.92) return '';
+      lum /= count;
+      sat /= count;
+      return lum >= 0.33 ? '' : sat < 0.25 ? 'mono' : 'color';
+    } catch {
+      return '';
+    }
+  })();
+  tones.set(url, job);
+  return job;
+};
+const toneLogos = (root, dark) => {
+  for (const img of root.querySelectorAll?.('img') || []) {
+    const src = img.currentSrc || img.getAttribute('src') || '';
+    // (A logo host's, or any picture in a logo's tile: an app's own, Sports' lion.)
+    // (A hidden tab's keep theirs, read when shown: nothing to lay out now.)
+    if (dark && img.closest('[hidden]')) continue;
+    if (!dark || !src || !(LOGO_HOST.test(src) || (img.closest('.q-logo, .league-badge, .logo') && new URL(src, location.href).origin === location.origin))) {
+      delete img.dataset.qTone;
+      delete img.dataset.qToneOf;
+      continue;
+    }
+    if (img.dataset.qToneOf === src) continue;
+    img.dataset.qToneOf = src;
+    toneOf(src).then(t => {
+      if (img.dataset.qToneOf !== src) return;
+      if (t) img.dataset.qTone = t;
+      else delete img.dataset.qTone;
+    });
+  }
+};
 // (Called by ui.mjs wireLogos before any fallback: the dark version failed, the ordinary one instead.)
 export function darkLogoFailed(img) {
   const light = img.dataset?.qLight;
-  if (!light || !(img.getAttribute('src') || '').includes('/500-dark/')) return false;
+  if (!light || !/\/500-dark\/|epl-dark\.png/.test(img.getAttribute('src') || '')) return false;
   noDark.add(light);
   delete img.dataset.qLight;
   // (Told to the logo fallbacks, which see this same error: not theirs.)
@@ -3473,6 +3539,8 @@ function watchDarkLogos() {
     globalThis.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change', soon);
     // (One that fails before wireLogos runs: the ordinary one.)
     document.addEventListener('error', e => e.target?.tagName === 'IMG' && darkLogoFailed(e.target), true);
+    // (A <picture> settles on its source when it loads: its tone read then.)
+    document.addEventListener('load', e => e.target?.tagName === 'IMG' && e.target.dataset.qToneOf !== e.target.currentSrc && soon(), true);
     soon();
   };
   if (document.body) start();

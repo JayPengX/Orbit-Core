@@ -151,12 +151,14 @@ const ESPN_LEAGUE = {
 // the 500 px original's bytes (the NBA's: 19 KB to 7 KB), so a first
 // screen's league logos are in before the loading screen lifts.
 const espnSmall = path => `https://a.espncdn.com/combiner/i?img=/i/${path}&w=192&h=192`;
-// The league's own logo (light backgrounds: the apps show it on a white disc), or null.
+// The league's own logo, or null; `dark`: its version for a dark screen
+// (ESPN's 500-dark, the white lion), or null where there's none.
 export function leagueLogo(key, dark = false) {
-  // The lion alone: ESPN's own resizer crops the top of its logo, clear of
-  // the "Premier League" wordmark.
-  if (key === 'epl') return 'https://a.espncdn.com/combiner/i?img=/i/leaguelogos/soccer/500/23.png&w=128&h=80&scale=crop&location=origin';
+  // The lion alone, cut whole from ESPN's logo clear of its wordmark (the
+  // purple one; on a dark screen the white one).
+  if (key === 'epl') return new URL(dark ? './img/epl-dark.png' : './img/epl.png', import.meta.url).href;
   if (ESPN_LEAGUE[key]) return espnSmall(dark ? ESPN_LEAGUE[key].replace('/500/', '/500-dark/') : ESPN_LEAGUE[key]);
+  if (dark) return SOCCER_LOGO[key] ? espnSmall(`leaguelogos/soccer/500-dark/${SOCCER_LOGO[key]}.png`) : null;
   // TheSportsDB's badge.
   if (LEAGUE_BADGE[key]) return `${SPORTSDB}/league/badge/${LEAGUE_BADGE[key]}.png/small`;
   return SOCCER_LOGO[key] ? espnSmall(`leaguelogos/soccer/500/${SOCCER_LOGO[key]}.png`) : null;
@@ -339,6 +341,12 @@ export const small = url => {
   return m ? `https://a.espncdn.com/combiner/i?img=/i/${m[1]}&w=192&h=192` : url;
 };
 
+// A league's logo as drawn everywhere (a chip, a tile, a rail, a title):
+// its dark-screen version on a dark screen, so no place shows the light one
+// there (Jay 2026-10-21: the purple lion on a dark 英超 chip).
+export function leaguePicture(key, cls, fallback) {
+  return logoPicture(leagueLogo(key), leagueLogo(key, true), cls, fallback);
+}
 export function logoPicture(light, dark, cls, fallback, { guess = false } = {}) {
   if (!light || knownBad(light)) return fallback();
   const img = document.createElement('img');

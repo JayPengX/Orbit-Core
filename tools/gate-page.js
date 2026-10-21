@@ -271,6 +271,8 @@
         // (A plate under artwork with no dark version, a lottery's or a company's logo, is kept: only ESPN's and NBA's have one.)
         const pic = el.tagName === 'IMG' ? el : el.querySelector('img');
         if (pic && !/espncdn\.com|cdn\.nba\.com/.test(pic.currentSrc || pic.src)) continue;
+        // (The kit's light disc under a dark logo in colours, with no dark version: on purpose.)
+        if (el.querySelector('img[data-q-tone="color"]')) continue;
         const r = el.getBoundingClientRect();
         if (r.width >= 24 && r.height >= 24 && r.top < innerHeight * 2) out.white.push(`${name(el)} ${Math.round(r.width)}×${Math.round(r.height)}${paintedBy(el)}`);
       }
