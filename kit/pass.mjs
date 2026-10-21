@@ -6,8 +6,8 @@
 //          and this account's own record (truth.mjs)
 //   App    every app, Quadra's and Orbit's, when it was last used, a way in
 //   說明   every app's guide (help.mjs)
-import { APPS, AVATARS, FRAMES, VIP, WELCOME, money, freeBets, vipStatus, vipName, worthOf, WEALTH_RANKS, OVERDRAFT_RATE, ECONOMY, settingPatch, passAccount, appIcon, el as node } from '#kit/quadra.mjs';
-import { PLAY, STOCK, houseKeep, boostedKeep, freeBetWorth, roundTrip, record, overdraftYear, vipShare } from './truth.mjs';
+import { APPS, AVATARS, FRAMES, VIP, money, vipStatus, vipName, worthOf, WEALTH_RANKS, OVERDRAFT_RATE, ECONOMY, settingPatch, passAccount, appIcon, el as node } from '#kit/quadra.mjs';
+import { PLAY, STOCK, houseKeep, roundTrip, record, overdraftYear, vipShare } from './truth.mjs';
 import { HELP_ORDER, helpFor } from './help.mjs';
 import { sheet } from './ui.mjs';
 
@@ -75,11 +75,9 @@ export const STRINGS = {
     edgeSingle: '單場',
     edgeLegs: '{n} 關串關',
     edgeSingleSub: '賠率背後的機率加起來 {cut} 倍',
-    edgeBoost: '{n} 關串關加上串關加成',
-    edgeBoostSub: '加成只加在獎金上，抽成卻每關相乘',
     yourBets: '你的投注回收率',
     yourBetsSub: '投注 {staked}，拿回 {won}',
-    edgeFoot: '串關關數越多，莊家留得越多：所以 App 會用「加成」和「精選串關」推你多串幾關。每張彩金超過 {free} 還要扣 {tax} 所得稅；提前兌現時，每個還沒結果的選項先扣 {cut} 的莊家差價，整張再扣 {keep}：串越多關、越早兌現，拿得越少。',
+    edgeFoot: '串關關數越多，莊家留得越多：抽成每關相乘。每張彩金超過 {free} 還要扣 {tax} 所得稅。跟台灣運彩一樣，下注後不能取消、不能提前兌現，也沒有加成或免費投注。',
     edgeSub: '每個賠率裡都藏著抽成：機率加起來超過 100%，多出來的就是莊家的。下面是每下注 NT$100，長期平均會被留下多少。',
     lotteryTitle: '彩券和刮刮樂',
     lotteryDraw: '電腦彩券（威力彩、大樂透、539…）',
@@ -91,14 +89,10 @@ export const STRINGS = {
     lotteryFoot: '刮刮樂最常開出的是「中回本」（獎金等於票價）和只差一個的牌面，讓你覺得快中了、再買一張；越貴的卡回收率越高，是要讓你買貴的。',
     lotterySub: '每 NT$100 長期平均拿回多少。',
     freeTitle: '「免費」的東西',
-    freeBet: '{v} 免費投注',
-    freeBetSub: '平均只值這麼多（押在賠率 2.00 的單場）：贏了只拿獎金不拿本金，還要賠率 {min} 以上（串關看總賠率）',
     vipSub: '投注 {min} 起；莊家每留下 NT$100，只還你 {per}',
     yourVip: '你本月的 VIP',
     yourVipSub: '本月投注 {stakes}，下個月回饋 {back}',
-    yourFree: '你收到的免費投注面額',
-    yourFreeSub: '面額，不是實際價值',
-    freeFoot: '免費投注 7 天內過期，逼你快點用；VIP 每月歸零，月底差一點升級時，你會想多下一點。',
+    freeFoot: 'VIP 每月歸零，月底差一點升級時，你會想多下一點。',
     freeSub: '送你的東西都有條件，條件是為了讓你下更多注。',
     stockTitle: '交易成本',
     tripCost: 'NT$100,000 台股買進再賣出',
@@ -123,7 +117,6 @@ export const STRINGS = {
     usedDaysAgo: '{n} 天前用過',
     statusStock: '現金 {cash} · 持股 {held}',
     statusStakes: '本月投注 {v}',
-    statusFree: '{n} 張免費投注',
     neverUsed: '還沒用過',
     guide: '說明',
     open: '打開',
@@ -155,12 +148,6 @@ export const STRINGS = {
     frame_candy: '糖果',
     frame_lava: '熔岩',
     frame_skylantern: '天燈',
-    trick_expire: '期限',
-    trickHow_expire: '免費投注 7 天就過期，讓你沒想清楚就先下注。',
-    trick_minodds: '最低賠率',
-    trickHow_minodds: '免費投注要求賠率 1.50 以上（串關看總賠率）：推你去押冷門、串更多關，莊家留得更多。',
-    trick_boost: '串關加成',
-    trickHow_boost: '「7 關 +20%」聽起來很多，但 7 關的抽成是單場的四倍以上。',
     trick_vip: 'VIP 等級',
     trickHow_vip: '每月歸零的等級，讓你在月底為了升級多下注；回饋只是抽成的一小部分。',
     trick_nearmiss: '差一點就中',
@@ -246,11 +233,9 @@ export const STRINGS = {
     edgeSingle: 'A single',
     edgeLegs: 'A {n}-pick parlay',
     edgeSingleSub: 'The chances behind the odds add up to {cut}×',
-    edgeBoost: 'A {n}-pick parlay with the boost',
-    edgeBoostSub: 'The boost adds to the winnings; the cut multiplies with every pick',
     yourBets: 'What your bets paid back',
     yourBetsSub: 'Staked {staked}, back {won}',
-    edgeFoot: 'The more picks on a parlay, the more the house keeps, which is why the app pushes boosts and featured parlays. A slip paying over {free} loses {tax} income tax; cash out takes {cut} off each undecided pick’s chance, then keeps {keep} of the slip: the more picks still to play, the less it pays.',
+    edgeFoot: 'The more picks on a parlay, the more the house keeps: the cut multiplies with every pick. A slip paying over {free} loses {tax} income tax. As at Taiwan Sports Lottery, a bet can’t be cancelled or cashed out, and there are no boosts or free bets.',
     edgeSub: 'Every price hides a cut: the chances behind the odds add up to more than 100%, and the extra is the house’s. Here’s what it keeps of every NT$100 staked, on average, over time.',
     lotteryTitle: 'Lottery and scratch cards',
     lotteryDraw: 'Number draws (Super Lotto, Lotto 6/49, 539…)',
@@ -262,14 +247,10 @@ export const STRINGS = {
     lotteryFoot: 'The commonest scratch card wins are “your money back” (a prize the size of the price) and faces one short of a win, so another card feels due; dearer cards pay back more, to sell you the dearer ones.',
     lotterySub: 'What comes back of every NT$100, on average, over time.',
     freeTitle: 'The “free” things',
-    freeBet: 'A {v} free bet',
-    freeBetSub: 'What it’s worth on average (on a single at 2.00): a win pays the winnings, not the stake, and the odds must be {min} or longer (a parlay’s all together)',
     vipSub: 'From {min} staked; for every NT$100 the house keeps, {per} comes back',
     yourVip: 'Your VIP this month',
     yourVipSub: 'Staked {stakes} this month: {back} back next month',
-    yourFree: 'Free bets you were given',
-    yourFreeSub: 'At face value, not what they’re worth',
-    freeFoot: 'Free bets expire in 7 days, to hurry you; VIP tiers start again every month, so just short of the next one at the month’s end, you’ll want to bet a little more.',
+    freeFoot: 'VIP tiers start again every month, so just short of the next one at the month’s end, you’ll want to bet a little more.',
     freeSub: 'Everything given away has terms, and the terms are there to make you bet more.',
     stockTitle: 'Trading costs',
     tripCost: 'NT$100,000 of a Taiwan stock, bought and sold',
@@ -294,7 +275,6 @@ export const STRINGS = {
     usedDaysAgo: 'Used {n} days ago',
     statusStock: 'Cash {cash} · holdings {held}',
     statusStakes: 'Staked this month {v}',
-    statusFree: '{n} free bets',
     neverUsed: 'Not used yet',
     guide: 'Guide',
     open: 'Open',
@@ -326,12 +306,6 @@ export const STRINGS = {
     frame_candy: 'Candy',
     frame_lava: 'Lava',
     frame_skylantern: 'Sky lantern',
-    trick_expire: 'Deadlines',
-    trickHow_expire: 'Free bets expire in 7 days, so you bet before you’ve thought it through.',
-    trick_minodds: 'Minimum odds',
-    trickHow_minodds: 'Free bets need odds of 1.50 or longer (a parlay’s all together): long shots and longer parlays, where the house keeps more.',
-    trick_boost: 'The parlay boost',
-    trickHow_boost: '“+20% on 7 picks” sounds like a lot; the cut on 7 picks is over four times a single’s.',
     trick_vip: 'VIP tiers',
     trickHow_vip: 'Tiers that start again every month make you bet more at the month’s end to reach one; the cashback is a sliver of the cut.',
     trick_nearmiss: 'Near misses',
@@ -512,8 +486,6 @@ function renderTruth(box, { t, state }) {
   const r = record(w);
   const s = r.sides;
   const legs = [1, 2, 3, 5, 7];
-  // A 3-pick parlay at 2.00 each (8.00): what the boost gives back of the cut.
-  const parlay = { legs: 3, odds: 8 };
   const trip = roundTrip(100_000);
   const vip = vipStatus(w);
   put(
@@ -538,10 +510,9 @@ function renderTruth(box, { t, state }) {
       facts(
         [
           ...legs.map(n => row(n === 1 ? t('edgeSingle') : t('edgeLegs', { n }), pct(houseKeep(n)), n === 1 ? t('edgeSingleSub', { cut: PLAY.cut }) : '')),
-          row(t('edgeBoost', { n: parlay.legs }), pct(boostedKeep(parlay.legs, parlay.odds)), t('edgeBoostSub')),
           r.staked > 0 ? row(t('yourBets'), r.betBack == null ? '—' : pct(r.betBack), t('yourBetsSub', { staked: money(r.staked), won: money(r.won) }), r.won >= r.staked ? 'up' : 'down') : null
         ],
-        t('edgeFoot', { tax: pct(PLAY.tax, 0), free: money(PLAY.taxFree), keep: pct(PLAY.cashOutKeep, 0), cut: `${pct(PLAY.cashOutLegCut.pre, 0)}–${pct(PLAY.cashOutLegCut.live, 0)}` })
+        t('edgeFoot', { tax: pct(PLAY.tax, 0), free: money(PLAY.taxFree) })
       ),
       { sub: t('edgeSub') }
     ),
@@ -561,10 +532,8 @@ function renderTruth(box, { t, state }) {
       t('freeTitle'),
       facts(
         [
-          row(t('freeBet', { v: money(WELCOME.bet) }), money(freeBetWorth(WELCOME.bet)), t('freeBetSub', { min: PLAY.freeMinOdds.toFixed(2) })),
           ...VIP.tiers.map(tier => row(vipName(tier, state.locale), pct(tier.back), t('vipSub', { min: money(tier.min), per: money(Math.round(vipShare(tier) * 100)) }))),
-          vip.tier ? row(t('yourVip'), vipName(vip.tier, state.locale), t('yourVipSub', { stakes: money(vip.stakes), back: money(vip.back) })) : null,
-          r.freeBets > 0 ? row(t('yourFree'), money(r.freeBets), t('yourFreeSub')) : null
+          vip.tier ? row(t('yourVip'), vipName(vip.tier, state.locale), t('yourVipSub', { stakes: money(vip.stakes), back: money(vip.back) })) : null
         ],
         t('freeFoot')
       ),
@@ -596,7 +565,7 @@ function renderTruth(box, { t, state }) {
     section(t('ranksTitle'), ranksCard(t, w, state.locale), { sub: t('ranksSub') })
   );
 }
-const TRICKS = ['installment', 'expire', 'minodds', 'boost', 'vip', 'nearmiss', 'notify'];
+const TRICKS = ['installment', 'vip', 'nearmiss', 'notify'];
 const sideRow = (icon, label, value, sub, cls = '') => el('div', { class: `side-row ${cls}` }, [el('span', { class: 'side-icon', 'aria-hidden': 'true', text: icon }), el('span', { class: 'side-text' }, [el('strong', { text: label }), el('small', { class: 'muted', text: sub })]), el('strong', { class: 'num', text: value })]);
 
 // 政府: three tiles (paid, given, net), then every tax and payment with a bar
@@ -657,8 +626,7 @@ function renderApps(box, { q, t, locale, state, openHelp }) {
     stock: () => (w.snap?.stock ? t('statusStock', { cash: money(w.snap.stock.cash || 0), held: money(w.snap.stock.holdings || 0) }) : ''),
     odds: () => {
       const v = vipStatus(w);
-      const bets = freeBets(w).length;
-      return [t('statusStakes', { v: money(v.stakes) }), v.tier ? vipName(v.tier, locale) : '', bets ? t('statusFree', { n: bets }) : ''].filter(Boolean).join(' · ');
+      return [t('statusStakes', { v: money(v.stakes) }), v.tier ? vipName(v.tier, locale) : ''].filter(Boolean).join(' · ');
     }
   };
   const card = ([id, a]) => {

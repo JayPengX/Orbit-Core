@@ -5,20 +5,15 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} };
-const { PLAY, houseKeep, boostedKeep, freeBetWorth, roundTrip, record, overdraftYear, vipShare } = await import('../kit/truth.mjs');
+const { houseKeep, roundTrip, record, overdraftYear, vipShare } = await import('../kit/truth.mjs');
 const { HELP, HELP_ORDER } = await import('../kit/help.mjs');
 const kit = await import('#kit/quadra.mjs');
 const brand = await import('../kit/brand.mjs');
 
-test('truth: what the house keeps, what boosts and free bets are worth, what trading costs', () => {
+test('truth: what the house keeps, what trading costs', () => {
   assert.equal(Math.round(houseKeep(1) * 1000), 136);
   assert.equal(Math.round(houseKeep(3) * 1000), 356);
   assert.ok(houseKeep(7) > 4 * houseKeep(1));
-  // The boost gives back a little of the cut, never all of it.
-  const plain = boostedKeep(3, 8);
-  assert.ok(plain < houseKeep(3) && plain > 0.3);
-  assert.equal(freeBetWorth(200), 86);
-  assert.ok(freeBetWorth(200, PLAY.freeMinOdds) < freeBetWorth(200));
   assert.deepEqual(roundTrip(100_000), { fee: 284, tax: 300, total: 584, share: 0.00584 });
   // The commission minimum still applies.
   assert.equal(roundTrip(1_000).fee, 40);

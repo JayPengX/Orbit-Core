@@ -1,11 +1,10 @@
 // Play's money in the kit: each pick settled from its result (settle.mjs),
 // a slip paid once (applyResults, settleSlip), its odds math (play-odds.mjs),
-// cash out (play-cashout.mjs), the lottery and scratch cards.
+// the lottery and scratch cards.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { legResult, applyResults, voidAt, lateOutcome, decidedSoFar, parseEspnResults, readOutcomes, topInning, runOrder, espnDates, sameSide, sideScore, sideOfGame, sidesMatch, parseOpenF1Flags, parseFutureResult, futureTeamName, asiaResult, teamCorners } from '../kit/settle.mjs';
 import { settleSlip, evaluateSlip, slipPayoutTable, slipOutlook, analyzeSlip, afterTax, prizeAfterTax, SLIP_RULES, combosBySize, comboCount, slipErrors, slipSizes, choose, maskChance, exclusiveMasks, estimateLineOdds, estimateFuturesOdds, estimateF1Odds, devigPower, devigTwoWay, devigProportional, americanToProbability, boostRate, seededRandom, quantile, median } from '../kit/play-odds.mjs';
-import { cashOutState, CASHOUT_KEEP, CASHOUT_MAX_OPEN } from '../kit/play-cashout.mjs';
 import { houseRule, shadeLong, minLegsProblem, HOUSE_RULES, LONG_FROM } from '../kit/play-rules.mjs';
 import { GAMES, ticketPrize, parseDraw, cappedPrize, settleTicket, buyTicket, nextDraw, nextDraws, limits, drawTerm, tierName, closesAt, CLOSE_MS, checkSelection, betCount, expectedReturn, mergeTickets, addTickets, BINGO_DRAWS, GAME_ORDER } from '../kit/play-lottery.mjs';
 import { CARDS, CARD_ORDER, face, facePays, tiersOf, drawPrize, buyScratch, revealScratch, onSale, expectedReturn as scratchReturn } from '../kit/play-scratch.mjs';
@@ -478,28 +477,6 @@ test("the house's rules: short prices 限2關 or locked (the tax), the long end 
   assert.equal(minLegsProblem([{ minLegs: 3 }, {}], [2]), 3);
   assert.equal(minLegsProblem([{ minLegs: 2 }, {}], [2]), 0);
   assert.deepEqual(Object.keys(HOUSE_RULES).sort(), ['lockHigh', 'lockHighExotic', 'lockLow', 'lockLowOutright', 'shortTwo']);
-});
-
-// ---- Cash out --------------------------------------------------------------------
-
-test('cash out: paused when it should be, and never worth more than holding the slip', () => {
-  const legs = [{ odds: 2, gameId: 'a' }, { odds: 2.5, gameId: 'b' }, { odds: 1.8, gameId: 'c', result: 'won' }];
-  const slip = { id: 's', status: 'open', legs, sizes: [3], stake: 100 };
-  assert.deepEqual(cashOutState({ ...slip, free: true }, [0.5, 0.4, null]), { value: null, reason: 'free' });
-  assert.equal(cashOutState({ ...slip, status: 'settled' }, []).reason, 'done');
-  assert.equal(cashOutState(slip, [0.5, null, null]).reason, 'noPrice');
-  assert.equal(cashOutState(slip, [0.5, 1, null]).reason, 'noPrice', 'a chance of 1 is no price');
-  assert.deepEqual(cashOutState({ ...slip, legs: [{ odds: 2, gameId: 'a' }, { odds: 2, gameId: 'a' }], sizes: [1] }, [0.5, 0.5]), { value: null, reason: 'sameGame', leg: 1 });
-  const many = { ...slip, legs: Array.from({ length: CASHOUT_MAX_OPEN + 1 }, (_, i) => ({ odds: 2, gameId: String(i) })) };
-  assert.equal(cashOutState(many, many.legs.map(() => 0.5)).reason, 'tooMany');
-  // Worth: the fair hold value (both open legs at their fair chances), less the cuts and the keep.
-  const p = [0.5, 0.4];
-  const hold = p[0] * p[1] * settleSlip({ legs: [{ odds: 2, result: 'won' }, { odds: 2.5, result: 'won' }, { odds: 1.8, result: 'won' }], sizes: [3], stake: 100 }).net;
-  const { value } = cashOutState(slip, [p[0], { p: p[1], live: true }, null]);
-  assert.equal(value, Math.floor(0.5 * 0.96 * 0.4 * 0.94 * 900 * (1 - CASHOUT_KEEP) + 1e-6));
-  assert.ok(value < hold);
-  // A Plus member keeps more of it.
-  assert.ok(cashOutState(slip, [0.5, 0.4, null], { keep: 0.02 }).value > cashOutState(slip, [0.5, 0.4, null]).value);
 });
 
 // ---- The lottery -----------------------------------------------------------------

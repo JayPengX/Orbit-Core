@@ -471,16 +471,12 @@ test('VIP in the kit: the same tiers as the Worker, this month so far', async ()
   assert.equal(kit.vipStatus({ entries: [] }, now).tier, null);
   assert.equal(kit.vipName(v.tier, 'en'), 'Silver');
   assert.equal(kit.WELCOME.bet, eco.WELCOME.bet);
-  assert.equal(kit.welcomeDue({ entries: [] }), true);
+  assert.equal(kit.welcomeDue({ entries: [] }), false);
   assert.equal(kit.welcomeDue(w), false);
-  // Still to come after a stake under a ticket's worth (the Worker gives it only at NT$100: the two agree).
-  const { SLIP_RULES } = await import('../kit/play-odds.mjs');
-  assert.equal(kit.WELCOME.minStake, SLIP_RULES.minTicket);
-  for (const amount of [-0.01, -99.99, -100]) {
-    const one = { entries: [{ id: 'odds:stake-s', t: now, app: 'odds', kind: 'stake', amount }] };
-    assert.equal(kit.welcomeDue(one), eco.welcomeEntries(one, now).length === 0, String(amount));
-    assert.equal(kit.welcomeDue(one), amount > -100, String(amount));
-  }
+  // The welcome offer has ended: never due, never given.
+  const one = { entries: [{ id: 'odds:stake-s', t: now, app: 'odds', kind: 'stake', amount: -500 }] };
+  assert.equal(kit.welcomeDue(one), false);
+  assert.deepEqual(eco.welcomeEntries(one, now), []);
 });
 
 test('pictures: national sides get flags, names in either order', async () => {

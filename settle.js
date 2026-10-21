@@ -26,7 +26,7 @@
 // sees the other's state (a cash out finds the slip settled and is given its
 // result instead).
 //
-//   POST /play?qt=T { op: 'cashout', id, value }     { cashedOut, wallet } or { settled: record }
+//   POST /play?qt=T { op: 'cashout', id, value }     { refused: { problem: 'closed' } } (no cash out since 2026-10-21)
 //                      or { refused: { problem: 'moved', value } } (the house's value now, null: paused)
 //   POST /play?qt=T { op: 'ack', ids }               records Play has applied
 //   GET  /play?qt=T                                  { settled: { id: record } }
@@ -45,7 +45,7 @@
 import { storeReady, parseDoc, changeDoc, moveOwned } from './doc-store.js';
 import { readOutcomes, legResult, applyResults, finalOf, familyOf, LEAGUES, voidAt, NOT_STARTED_MS } from './kit/settle.mjs';
 import { updateWallet, WALLET_COLLECTION, parseWallet, poolBalance } from './eco.js';
-import { checkSlip, useReads, cashOutQuote, cashOutOk } from './price.js';
+import { checkSlip, useReads } from './price.js';
 import { handleLotto } from './lotto.js';
 import { watchKambi, KAMBI_COLLECTION } from './kambi.js';
 
@@ -254,40 +254,10 @@ export async function handlePlay(request, env, headers, session, deps) {
       return json({ placed: clean.map(x => x.id), wallet: paid.wallet }, 200, headers);
     }
     if (body.op === 'cashout') {
-      // Cashed out here: the value checked against the house's own now
-      // (price.js cashOutQuote), the slip marked cashed in 'open' (never
-      // settled too), the payout written by the Worker (the ledger's id, kind
-      // 'cashout'). Settled first: its result stands.
-      const id = String(body.id || '');
-      const asked = Math.floor(Number(body.value));
-      if (!SLIP_ID.test(id)) return errorJson('INVALID_JSON', 400, headers, request);
-      const key = keyOf(account, id);
-      for (let attempt = 0; attempt < 3; attempt++) {
-        const doc = await deps.fsGet(env, OPEN_COLLECTION, key);
-        const open = parseDoc(doc);
-        if (!open || open.state !== 'open') {
-          const records = await deps.fsGet(env, SETTLED_COLLECTION, account);
-          const record = parseDoc(records)?.slips?.[id] || null;
-          if (record?.settled || open?.state === 'settling') return json({ settled: record || { settled: true, pending: true } }, 200, headers);
-          return json({ refused: { problem: 'unknown' } }, 200, headers);
-        }
-        const wdoc = await deps.fsGet(env, WALLET_COLLECTION, account);
-        const wallet = wdoc.exists ? parseWallet(wdoc.payload) : null;
-        const quote = await (deps.cashOutQuote || cashOutQuote)(open.slip, wallet, deps.prices, new Date(now));
-        if (!cashOutOk(asked, quote.value)) return json({ refused: { problem: 'moved', value: quote.value, reason: quote.reason || '' } }, 200, headers);
-        try {
-          await deps.fsWrite(env, OPEN_COLLECTION, key, JSON.stringify({ ...open, state: 'cashed', at: now, value: asked }), { updateTime: doc.updateTime });
-        } catch (error) {
-          if (error.precondition) continue;
-          throw error;
-        }
-        const paid = await updateWallet(env, deps, account, w => (w.entries.some(e => e.id === `odds:payout-${id}`) ? w : { ...w, entries: [...w.entries, { id: `odds:payout-${id}`, t: now, app: 'odds', kind: 'cashout', amount: asked }] }));
-        await changeRecords(env, deps, account, records => ({ ...records, [id]: { ...recordOf(open.slip, now), settled: true, cashedOut: true, payout: asked } }));
-        // (Left marked cashed: the cron drops it and its place in the index
-        // when it next comes due, and never settles it.)
-        return json({ cashedOut: asked, wallet: paid?.wallet }, 200, headers);
-      }
-      return errorJson('RATE_LIMITED', 429, headers, request);
+      // No cash out (提前兌現): 台灣運彩 never buys a ticket back, so neither
+      // does Play since 2026-10-21. A slip cashed before then is still paid
+      // by the cron (payCashOut).
+      return json({ refused: { problem: 'closed' } }, 200, headers);
     }
     if (body.op === 'ack') {
       const ids = new Set((Array.isArray(body.ids) ? body.ids : []).map(String).slice(0, 200));

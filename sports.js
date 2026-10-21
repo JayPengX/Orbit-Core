@@ -427,10 +427,12 @@ export function trimEspnTeams(data) {
 // Opt-in (`&trim=espn-standings`) for a league's table (Play's house prices,
 // kit/play-house.mjs parseStandings): each team's name and its record
 // (wins, losses, ties, games, share), the season, and the tables' nesting,
-// in ESPN's own shape. A table carries dozens of stats and notes per team:
+// in ESPN's own shape; with points, ESPN's clinch mark ('e': out) and the
+// table's name, which Play's 冠軍 boards read to drop who can't win
+// (kit/play-alive.mjs), and a driver's name for F1's table. A table carries dozens of stats and notes per team:
 // the ones Play reads on its first open were several MB.
 const TRIM_ESPN_STANDINGS = 'espn-standings';
-const STANDING_STATS = new Set(['wins', 'losses', 'ties', 'otLosses', 'gamesPlayed', 'winPercent']);
+const STANDING_STATS = new Set(['wins', 'losses', 'ties', 'otLosses', 'gamesPlayed', 'winPercent', 'points', 'championshipPts', 'clincher']);
 export function trimEspnStandings(data) {
   const node = n => {
     if (!n || typeof n !== 'object') return undefined;
@@ -439,12 +441,14 @@ export function trimEspnStandings(data) {
       out.standings = {
         season: n.standings.season,
         entries: (n.standings.entries || []).map(e => ({
-          team: { displayName: e?.team?.displayName },
-          stats: (e?.stats || []).filter(x => STANDING_STATS.has(x?.name) || STANDING_STATS.has(x?.type)).map(x => ({ name: x.name, type: x.type, value: x.value }))
+          ...(e?.team ? { team: { displayName: e.team.displayName ?? e.team.name } } : {}),
+          ...(e?.athlete ? { athlete: { displayName: e.athlete.displayName } } : {}),
+          stats: (e?.stats || []).filter(x => STANDING_STATS.has(x?.name) || STANDING_STATS.has(x?.type)).map(x => (x.name === 'clincher' ? { name: x.name, value: x.value, displayValue: x.displayValue } : { name: x.name, type: x.type, value: x.value }))
         }))
       };
     }
     if (Array.isArray(n.children)) out.children = n.children.map(node);
+    if (typeof n.name === 'string') out.name = n.name;
     return out;
   };
   if (!data || typeof data !== 'object') return data;

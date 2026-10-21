@@ -55,7 +55,7 @@ export const HELP = {
       ]],
       ['vip', 'VIP 投注回饋與新手禮', [
         'VIP 不用加入也不用付費：每個月在 Play 的投注（運彩、彩券、刮刮樂，退款不算）決定當月等級，下個月第一次打開任何 App 時回饋當月投注額的一部分：銅卡 NT$10,000 起 0.5%、銀卡 NT$50,000 起 0.8%、金卡 NT$150,000 起 1.2%、黑卡 NT$500,000 起 1.5%。Play 首頁的餘額卡上看得到本月等級和離下一級還差多少。',
-        '新手禮：在 Play 第一次用自己的錢下注後，送一張 NT$200 免費投注（7 天內有效）；在 Securities 的第一筆交易免手續費（稅和規費照收）。'
+        '新手禮：在 Securities 的第一筆交易免手續費（稅和規費照收）。'
       ]],
       ['money', '錢怎麼算', [
         '所有 App 共用一個新台幣錢包。新帳號開戶金 NT$200,000；每週一固定發薪 NT$10,000，跟薪水一樣，存多存少都一樣。系統發的錢只有這些：開戶金、週薪、財富等級獎勵（身價第一次到達一個等級時送一次：NT$30 萬小資族 NT$3,000、50 萬穩健 NT$5,000、百萬 NT$10,000、300 萬富裕 NT$20,000、千萬 NT$50,000、一億 NT$100,000；舊等級領過的獎勵會抵掉）、Play 的 VIP 回饋，和真的一無所有時的急難紓困。週薪在那週第一次打開任何 App 時入帳，沒打開的週下次補發。',
@@ -109,7 +109,7 @@ export const HELP = {
       ]],
       ['vip', 'VIP cashback and welcome offers', [
         'VIP is free and needs no sign-up: what you stake in Play in a month (bets, lottery and scratch cards; refunds don’t count) sets that month’s tier, and a share of it comes back the first time you open any app the next month: Bronze from NT$10,000 0.5%, Silver from NT$50,000 0.8%, Gold from NT$150,000 1.2%, Black from NT$500,000 1.5%. Play’s balance card shows this month’s tier and what’s left to the next.',
-        'Welcome offers: your first bet in Play with your own money brings a NT$200 free bet (7 days), and your first trade in Securities pays no commission (taxes and fees as usual).'
+        'Welcome offer: your first trade in Securities pays no commission (taxes and fees as usual).'
       ]],
       ['money', 'Money', [
         'Every app shares one NT$ wallet. A new pass opens with NT$200,000; every Monday pays a fixed NT$10,000, like a salary: the same however much you hold. The system gives money only as the opening money, the pay, wealth level rewards (paid once, the first time what you’re worth reaches a level: NT$3,000 at NT$300,000, then NT$5,000 at 500,000, NT$10,000 at a million, NT$20,000 at 3 million, NT$50,000 at 10 million and NT$100,000 at 100 million; rewards from the old levels count towards them), Play’s VIP cashback, and emergency relief for someone with nothing. The pay comes the first time that week you open any app; a week you miss is paid when you’re back.',
@@ -242,7 +242,7 @@ export const HELP = {
         '運彩賠率由 DraftKings、Kambi、Polymarket 的價格去掉抽成，再照運彩實際的抽成定價；還沒有人開盤的比賽由 Quadra 自己估。彩券用台灣彩券的真實開獎號碼。'
       ]],
       ['tabs', '每個分頁', [
-        '「首頁」：餘額（投注中的金額、現在的兌現價值和本月 VIP）、場中焦點、為你推薦（照你在 Orbit Sports 追蹤的球隊和聯賽，前三個可以一次串成一張）、焦點賽事、你的投注和彩券頭獎。',
+        '「首頁」：餘額（投注中的金額和本月 VIP）、場中焦點、為你推薦（照你在 Orbit Sports 追蹤的球隊和聯賽，前三個可以一次串成一張）、焦點賽事、你的投注和彩券頭獎。',
         '「賽事」：選運動、聯賽和日期（台灣時間），或搜尋球隊和聯賽；點賠率加入投注單，點比賽看它的所有玩法（分頁、球員、更多）。冠軍盤和 F1 各一張。',
         '「彩券」：8 種電腦彩券和台灣彩券正在賣的 5 種刮刮樂。',
         '「紀錄」：投注單（進行中、等待開賽、已結算）、彩券、戰績和統計分析。',
@@ -261,13 +261,12 @@ export const HELP = {
         '刮刮樂是台灣彩券正在賣的每一種，照真的獎金結構和總中獎率；買的時候就決定中多少，刮開就知道。',
         '選號時快選補滿，+1／+5／+10 再加幾注；購買列一直在下面。中獎自動入帳並通知你。'
       ]],
-      ['boost', '串關加成、提前兌現、免費投注', [
-        '串關加成：3 個選項以上每個贏的組合多給獎金，3 個 +5%、4 個 +8%、5 個 +12%、6 個 +15%、7 個以上 +20%。',
-        '提前兌現（Quadra 自己的服務，真正的運彩買了就不能取消或兌現）：比賽還沒結束也能先把投注單換成現金。每個還沒結果的選項先扣莊家的差價（賽前 4%、場中 6%），整張再扣 3%；串越多、越早兌現拿得越少，兌現永遠不會比留著值錢。某個選項現在沒有報價、同一場有兩個未定的選項，或用了免費投注時，不能兌現。',
-        '免費投注（新手禮）：在投注單上點一下就用在這張單（單場或一組串關），賠率要 1.50 以上（串關看總賠率），贏了只拿獎金、不退本金，7 天內有效。'
+      ['final', '買了就算數', [
+        '跟台灣運彩一樣：投注單買了就不能取消、修改或提前兌現，照買的時候的賠率結算；沒有串關加成，也沒有免費投注。',
+        '冠軍玩法只列還有機會的隊伍和車手：被淘汰、季後賽出局或積分已追不上的，會自動從看板拿掉。'
       ]],
       ['money', '錢怎麼算', [
-        '下注和買彩券從 Quadra 餘額扣款；派彩、兌現和彩券獎金都由伺服器入帳，並通知你。彩券獎金照規定每注計算：單注超過 NT$5,000 扣 20% 所得稅和 0.4% 印花稅。',
+        '下注和買彩券從 Quadra 餘額扣款；派彩和彩券獎金都由伺服器入帳，並通知你。彩券獎金照規定每注計算：單注超過 NT$5,000 扣 20% 所得稅和 0.4% 印花稅。',
         '每個月的投注決定 VIP 等級，下個月回饋一部分，詳見 Quadra Pass 的說明。'
       ]]
     ],
@@ -277,7 +276,7 @@ export const HELP = {
         'Odds come from DraftKings’, Kambi’s and Polymarket’s prices with their margins taken out, then priced at the cuts the sports lottery really takes; a game nobody prices yet is priced by Quadra itself. The lottery uses Taiwan Lottery’s real draws.'
       ]],
       ['tabs', 'The tabs', [
-        'Home: your balance (what’s in open bets, what they’d cash out for and this month’s VIP), live now, for you (from the teams and leagues you follow in Orbit Sports; its top three as one parlay), featured games, your bets and the lottery jackpots.',
+        'Home: your balance (what’s in open bets and this month’s VIP), live now, for you (from the teams and leagues you follow in Orbit Sports; its top three as one parlay), featured games, your bets and the lottery jackpots.',
         'Games: pick a sport, league and day (Taiwan time), or search teams and leagues; tap a price to add it to the slip, a game for all its markets (by tab, players, more). Outrights and F1 have a board each.',
         'Lottery: 8 draw games and 5 of Taiwan Lottery’s scratch cards on sale.',
         'History: slips (in play, waiting, settled), tickets, wins and stats.',
@@ -296,13 +295,12 @@ export const HELP = {
         'The scratch cards are every one Taiwan Lottery sells now, at their real prize table and win rate; the prize is fixed when a card is bought, and scratching shows it.',
         'Quick pick fills a line, +1/+5/+10 add more, and the buy bar stays in view. Wins are paid in automatically and you’re told.'
       ]],
-      ['boost', 'Parlay boost, cash out, free bets', [
-        'The parlay boost adds to every winning combination of 3 picks or more: 3 picks +5%, 4 +8%, 5 +12%, 6 +15%, 7 or more +20%.',
-        'Cash out (Quadra’s own extra: a real 運彩 bet can’t be cancelled or cashed out) turns a slip into cash before its games end. Each undecided pick first gives up the house’s margin (4% before its game, 6% in play), then 3% of the whole is kept: the more picks and the earlier, the less it pays, and cashing out is never worth more than holding on. It pauses while a pick has no price, two undecided picks are on one game, or the slip used a free bet.',
-        'Free bets (the welcome offer): one tap on the slip uses it on that slip (singles of one pick or one parlay), at odds of 1.50 or more (a parlay’s together); a win pays the winnings, not the stake; 7 days to use it.'
+      ['final', 'A bet is final', [
+        'As at Taiwan Sports Lottery: a slip can’t be cancelled, changed or cashed out once bought, and settles at the odds it was bought at; there’s no parlay boost and no free bet.',
+        'Outright boards list only who can still win: a team knocked out or out of the play-offs, or a driver who can no longer catch the leader on points, comes off the board by itself.'
       ]],
       ['money', 'Money', [
-        'Bets and tickets come out of the Quadra balance; payouts, cash outs and prizes are paid in by the server, and you’re told. Lottery prizes are taxed bet by bet, by law: each bet paying over NT$5,000 has 20% income tax and 0.4% stamp duty withheld.',
+        'Bets and tickets come out of the Quadra balance; payouts and prizes are paid in by the server, and you’re told. Lottery prizes are taxed bet by bet, by law: each bet paying over NT$5,000 has 20% income tax and 0.4% stamp duty withheld.',
         'What you stake each month sets your VIP tier, and part of it comes back the month after: see the Quadra Pass’s guide.'
       ]]
     ]

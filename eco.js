@@ -49,7 +49,7 @@
 //   POST   /eco { op: 'admin', token, action }        the store's clean-up
 
 import { retire } from './money.js';
-import { VIP, vipStakes, vipTier, WELCOME, welcomeEarned } from './kit/plus.mjs';
+import { VIP, vipStakes, vipTier, WELCOME } from './kit/plus.mjs';
 import { storeReady } from './doc-store.js';
 import { tokenSecret, signToken, readToken, seal, unseal, sessionLimited, SESSION_MS, REFRESH_MS, HANDOFF_MS } from './quadra-token.js';
 import { handleAdmin } from './eco-admin.js';
@@ -233,16 +233,12 @@ export function vipEntries(wallet, now) {
   }
   return out;
 }
-// The welcome offer: after the first paid bet in Play, a NT$WELCOME.bet free
-// bet (`eco:fb:welcome`, once per account; 7 days, like every free bet). A
-// qualifying bet is one stake of a ticket's worth at least (plus.mjs
-// welcomeEarned, the kit's rule): an app may write a stake of its own (a
-// spend), so a NT$0.01 one, or a free bet's top-up, would buy NT$200 otherwise.
+// The welcome offer ended 2026-10-21: 台灣運彩 gives no free bets, so Play
+// takes none (price.js refuses one). Old `eco:fb:welcome` tokens stay in the
+// wallet as history, never spent.
 export { WELCOME };
-export function welcomeEntries(wallet, now) {
-  const entries = wallet?.entries || [];
-  if (entries.some(e => e.id === 'eco:fb:welcome') || !welcomeEarned(wallet)) return [];
-  return [{ id: 'eco:fb:welcome', t: now, app: 'eco', kind: 'freebet', amount: 0, note: String(WELCOME.bet) }];
+export function welcomeEntries() {
+  return [];
 }
 export { WEEK };
 

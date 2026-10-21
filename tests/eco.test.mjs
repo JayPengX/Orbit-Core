@@ -499,26 +499,15 @@ test('VIP: last month\'s gaming stakes set its tier, and its cashback is paid on
   assert.ok(VIP.tiers.every(t => t.back <= 0.015));
 });
 
-test('welcome: a NT$200 free bet after the first paid bet, once; a write brings it at once', async () => {
-  const now = Date.UTC(2026, 9, 7, 4);
-  assert.deepEqual(welcomeEntries({ entries: [] }, now), []);
-  assert.deepEqual(welcomeEntries({ entries: [{ id: 'odds:stake-f', t: now, app: 'odds', kind: 'stake', amount: 0 }] }, now), []);
-  // A stake smaller than a ticket (one an app wrote itself, or a free bet's top-up) isn't a paid bet.
-  for (const amount of [-0.01, -10, -99.99]) assert.deepEqual(welcomeEntries({ entries: [{ id: 'odds:stake-s', t: now, app: 'odds', kind: 'stake', amount }] }, now), [], String(amount));
-  assert.equal(welcomeEntries({ entries: [{ id: 'odds:stake-s', t: now, app: 'odds', kind: 'stake', amount: -100 }] }, now).length, 1);
+test('no welcome free bet any more (台灣運彩 gives none): a first paid bet brings nothing', async () => {
+  const now = Date.UTC(2026, 9, 21, 4);
   const bet = { id: 'odds:stake-a', t: now, app: 'odds', kind: 'stake', amount: -500 };
-  assert.deepEqual(welcomeEntries({ entries: [bet] }, now), [{ id: 'eco:fb:welcome', t: now, app: 'eco', kind: 'freebet', amount: 0, note: '200' }]);
-  assert.deepEqual(welcomeEntries({ entries: [bet, ...welcomeEntries({ entries: [bet] }, now)] }, now), []);
+  assert.deepEqual(welcomeEntries({ entries: [bet] }, now), []);
   const t = setup();
   const acct = await newPass(t, 'odds');
   const w = await t.call('PATCH', `${t.qt(acct.token)}&app=odds`, { wallet: { entries: [{ ...bet, t: 1_700_000_100_000 }] } });
   assert.equal(w.status, 200);
-  assert.ok(w.data.wallet.entries.some(e => e.id === 'eco:fb:welcome' && e.app === 'eco'));
-  // A self-written NT$0.01 stake from a new Pass: no free bet.
-  const b = await newPass(t, 'odds');
-  const s = await t.call('PATCH', `${t.qt(b.token)}&app=odds`, { wallet: { entries: [{ id: 'odds:stake-cheap', t: 1_700_000_100_000, app: 'odds', kind: 'stake', amount: -0.01 }] } });
-  assert.equal(s.status, 200);
-  assert.ok(!s.data.wallet.entries.some(e => e.id === 'eco:fb:welcome'));
+  assert.ok(!w.data.wallet.entries.some(e => e.id === 'eco:fb:welcome'));
 });
 
 test('wealth levels: each level reached pays its reward once, from what the account is worth', () => {
