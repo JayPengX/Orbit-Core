@@ -238,12 +238,12 @@ export const HELP = {
   odds: {
     zh: [
       ['what', 'Quadra Play 是什麼', [
-        'Quadra 玩樂的地方：照台灣運動彩券的玩法、賠率和規則下注，還有台灣彩券的電腦彩券和刮刮樂。棒球、籃球、足球、美式足球、冰球和 F1，每場比賽、冠軍盤和球員都有。',
+        'Quadra 玩樂的地方：照台灣運動彩券的玩法、賠率和規則下注，還有台灣彩券的電腦彩券和刮刮樂。棒球、籃球、足球、美式足球、冰球和 F1，每場比賽和冠軍盤都有；跟運彩一樣，沒有球員玩法。',
         '運彩賠率由 DraftKings、Kambi、Polymarket 的價格去掉抽成，再照運彩實際的抽成定價；還沒有人開盤的比賽由 Quadra 自己估。彩券用台灣彩券的真實開獎號碼。'
       ]],
       ['tabs', '每個分頁', [
         '「首頁」：餘額（投注中的金額和本月 VIP）、場中焦點、為你推薦（照你在 Orbit Sports 追蹤的球隊和聯賽，前三個可以一次串成一張）、焦點賽事、你的投注和彩券頭獎。',
-        '「賽事」：選運動、聯賽和日期（台灣時間），或搜尋球隊和聯賽；點賠率加入投注單，點比賽看它的所有玩法（分頁、球員、更多）。冠軍盤和 F1 各一張。',
+        '「賽事」：選運動、聯賽和日期（台灣時間），或搜尋球隊和聯賽；點賠率加入投注單，點比賽看它的所有玩法（分頁、更多）。冠軍盤和 F1 各一張。',
         '「彩券」：8 種電腦彩券和台灣彩券正在賣的 5 種刮刮樂。',
         '「紀錄」：投注單（進行中、等待開賽、已結算）、彩券、戰績和統計分析。',
         '投注單不是分頁：有選項時，分頁列上方會出現投注單列（幾個選項、金額、最多拿回多少），點開確認送出。'
@@ -272,12 +272,12 @@ export const HELP = {
     ],
     en: [
       ['what', 'What Quadra Play is', [
-        'Quadra’s place to play: bets with Taiwan Sports Lottery’s markets, odds and rules, and Taiwan Lottery’s draw games and scratch cards. Baseball, basketball, soccer, American football, hockey and F1: every game, outrights and players.',
+        'Quadra’s place to play: bets with Taiwan Sports Lottery’s markets, odds and rules, and Taiwan Lottery’s draw games and scratch cards. Baseball, basketball, soccer, American football, hockey and F1: every game and outrights; no player markets, as at the sports lottery.',
         'Odds come from DraftKings’, Kambi’s and Polymarket’s prices with their margins taken out, then priced at the cuts the sports lottery really takes; a game nobody prices yet is priced by Quadra itself. The lottery uses Taiwan Lottery’s real draws.'
       ]],
       ['tabs', 'The tabs', [
         'Home: your balance (what’s in open bets and this month’s VIP), live now, for you (from the teams and leagues you follow in Orbit Sports; its top three as one parlay), featured games, your bets and the lottery jackpots.',
-        'Games: pick a sport, league and day (Taiwan time), or search teams and leagues; tap a price to add it to the slip, a game for all its markets (by tab, players, more). Outrights and F1 have a board each.',
+        'Games: pick a sport, league and day (Taiwan time), or search teams and leagues; tap a price to add it to the slip, a game for all its markets (by tab, more). Outrights and F1 have a board each.',
         'Lottery: 8 draw games and 5 of Taiwan Lottery’s scratch cards on sale.',
         'History: slips (in play, waiting, settled), tickets, wins and stats.',
         'The slip isn’t a tab: with picks on it, a bar above the tab bar shows how many, the stake and the most it pays; tap it to confirm and place.'

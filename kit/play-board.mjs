@@ -31,9 +31,7 @@ import { fitGoals } from '#kit/play-live.mjs';
 import { houseCut, houseRule, withRules, shadeLong } from '#kit/play-rules.mjs';
 import { withModelLines } from '#kit/play-lines.mjs';
 import { LEAGUES, familyOf, isSoccer } from '#kit/play-teams.mjs';
-import { modelProps, teamScores, atLeast, MODEL_CUT } from '#kit/play-propmodel.mjs';
-import { normPlayer } from '#kit/play-props.mjs';
-import { playerByName } from '#kit/play-players.mjs';
+import { atLeast } from '#kit/play-propmodel.mjs';
 
 // Lines besides the lottery's own: totals this many either side of the main
 // line, team totals this many, run lines up to 4.5 runs either way.
@@ -221,70 +219,14 @@ function fallbackOptions(game, base, probs) {
   return marketOptions(game, base, markets);
 }
 
-// The game's players' picks: Kambi's first, then the model's (propmodel.mjs)
-// for every player, number and line Kambi doesn't price; each with the
-// player's picture when ESPN's roster has them.
-// A player's picture from the roster, and whether it's only ESPN's guess by id.
-const photoOf = (players, name) => {
-  const p = playerByName(players, name);
-  return { photo: p?.photo ?? null, photoGuessed: Boolean(p?.guessed) };
-};
-function gameProps(game, probs) {
-  const players = game.players ?? null;
-  const kambi = game.offers?.props ?? [];
-  const key = p => `${p.stat}|${p.line ?? ''}|${normPlayer(p.player)}|${p.side}`;
-  const seen = new Set(kambi.map(key));
-  let model = [];
-  if (players?.length) {
-    const family = familyOf(game.sport);
-    let scores = null;
-    if (family === 'soccer' && probs.draw != null) scores = fitGoals(probs.home, probs.away);
-    else scores = teamScores(family, { total: game.total?.line, spread: game.spread?.awayLine ?? null, homeWin: probs.home / (probs.home + probs.away) });
-    model = modelProps(game.sport, players, scores, { preseason: Boolean(game.preseason) }).filter(p => !seen.has(key(p)));
-  }
-  return [...kambi, ...model].map(p => ({ ...p, ...photoOf(players, p.player) }));
-}
-
-// A game's own Kambi markets and players alone (a live game's: the page
+// A game's own Kambi markets alone (a live game's: the page
 // prices its winner and main lines itself), with the house's rules on each.
 export function offerOptions(game, offers, extra = {}) {
   const base = { gameId: game.id, game, sport: game.sport, start: game.startUtc, ...extra };
-  const out = [...marketOptions(game, base, offers.markets || [], { real: true }), ...(LEAGUES[game.sport]?.path ? propOptions(game, base, offers.props || []) : [])];
+  // No players' markets: 台灣運彩 sells none (its 玩法 list, 2026).
+  const out = marketOptions(game, base, offers.markets || [], { real: true });
   for (const o of out) withRules(o);
   return out;
-}
-
-// One option per player pick, at the two-way cut; a ticket with one is
-// capped (SLIP_RULES.capped).
-function propOptions(game, base, props) {
-  const k = houseCut({ base: 'twoWay', sport: game.sport });
-  const modelCut = houseCut({ base: MODEL_CUT, sport: game.sport });
-  return props.map(p => {
-    const key = `${p.stat}|${p.line ?? ''}|${p.player}`;
-    const cut = p.model ? modelCut : k;
-    return {
-      ...base,
-      id: `${game.id}|prop|${key}|${p.side}`,
-      kind: 'prop',
-      side: p.side,
-      market: `prop|${key}`,
-      group: `${p.stat}|${p.line ?? ''}`,
-      stat: p.stat,
-      propLine: p.line,
-      player: p.player,
-      posted: !p.model,
-      real: !p.model,
-      photo: p.photo ?? null,
-      photoGuessed: Boolean(p.photoGuessed),
-      fairChance: p.fair,
-      fairMargin: p.model ? 0.06 : p.sided ? 0.04 : 0.02,
-      errKey: 'extra',
-      cut,
-      estOdds: estimateLineOdds(p.fair, cut),
-      cap: 'prop',
-      settle: { stat: p.stat, line: p.line, player: p.player }
-    };
-  });
 }
 
 // Every side market of a game (markets.mjs).
@@ -410,9 +352,7 @@ export function gameOptions(game) {
     for (let i = out.length - 1; i >= 0; i--) if (out[i].kind !== 'ml' && kinds.has(out[i].kind)) out.splice(i, 1);
     out.push(...real);
   }
-  // Players' markets (props.mjs), only where ESPN's box score settles them:
-  // Kambi's, and the model's for every player and number Kambi leaves out.
-  if (LEAGUES[game.sport]?.path) out.push(...propOptions(game, base, gameProps(game, blend.probs)));
+  // No players' markets (offerOptions): 台灣運彩 sells none.
   for (const o of out) withRules(o);
   // The books far apart on the game: locked until they agree (blendOutcomes).
   if (blend.disputed) for (const o of out) o.lock = 'check';

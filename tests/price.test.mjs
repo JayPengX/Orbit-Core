@@ -63,7 +63,10 @@ test('a pick is priced exactly as with everything read, reading only what can ch
     else if (kind === 'prop') assert.deepEqual(asked.sort(), ['league:epl', 'offers:7', 'players:epl_g'], id);
     else assert.deepEqual(asked.sort(), ['league:epl', 'offers:7'], id);
   }
-  for (const k of ['ml', 'total', 'hcap3', 'dc', 'score', 'prop']) assert.ok(kinds.has(k), k);
+  for (const k of ['ml', 'total', 'hcap3', 'dc', 'score']) assert.ok(kinds.has(k), k);
+  // 台灣運彩 sells no players' markets: none on the board, an old one's id gone.
+  assert.ok(!kinds.has('prop'));
+  assert.equal((await housePick({ id: `${game.id}|prop|goals||Bukayo Saka|yes`, gameId: game.id, sport: 'epl' }, NOW, reads().once)).bet ?? null, null);
 });
 
 test('a slip is accepted and refused as before, at the house\'s price and just past it', async () => {
