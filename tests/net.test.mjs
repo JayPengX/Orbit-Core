@@ -40,3 +40,12 @@ test('location: iOS asked unprompted once per app, again only on a tap; granted 
     if (saved.navigator) Object.defineProperty(globalThis, 'navigator', saved.navigator);
   }
 });
+
+test('an AI answer\'s wait is never read as a slow connection; the rest of the proxy is', async () => {
+  const { slowByNature } = await import('../kit/quadra.mjs');
+  assert.ok(slowByNature('https://orbit-workers-proxy.pengzjay.workers.dev/law-chat?v=1&qt=x'));
+  assert.ok(slowByNature('https://orbit-workers-proxy.pengzjay.workers.dev/law-ask'));
+  assert.ok(!slowByNature('https://orbit-workers-proxy.pengzjay.workers.dev/law-page?u=x'));
+  assert.ok(!slowByNature('https://orbit-workers-proxy.pengzjay.workers.dev/weather'));
+  assert.ok(!slowByNature('https://example.com/law-chat'));
+});
