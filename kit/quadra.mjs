@@ -3865,7 +3865,36 @@ function watchNet() {
   // what failed meanwhile forgotten, and the app's own refresh run once, so
   // a screen that broke while the phone slept comes back by itself instead
   // of only after the app was closed and opened again.
+  //
+  // A page whose own code failed since it opened (an error nothing caught: a
+  // screen half drawn, a timer stopped) starts again instead, in place (the
+  // place kept, nothing downloaded again), at most once in 30 minutes, never
+  // over music: what only a full restart of the app fixed before.
+  let broken = 0;
+  addEventListener('error', e => {
+    if (e?.filename && String(e.filename).startsWith(location.origin)) broken += 1;
+  });
+  addEventListener('unhandledrejection', e => {
+    const r = e?.reason;
+    if (r instanceof Error && !['AbortError', 'TimeoutError'].includes(r.name) && !/load failed|failed to fetch|networkerror|network|offline/i.test(`${r.message} ${r.code || ''}`)) broken += 1;
+  });
+  const reboot = () => {
+    if (!broken || sounding()) return false;
+    try {
+      const key = `quadra.reboot:${location.pathname}`;
+      if (Date.now() - Number(sessionStorage.getItem(key) || 0) < 30 * 60_000) return false;
+      sessionStorage.setItem(key, String(Date.now()));
+    } catch {
+      return false;
+    }
+    rec('reboot', { errors: broken });
+    rememberPlace();
+    globalThis.__bootUpdating = true;
+    location.reload();
+    return true;
+  };
   const resume = () => {
+    if (reboot()) return;
     net.fails = 0;
     judgeNet();
     setTimeout(() => net.refresh?.(), 400);
@@ -3881,15 +3910,17 @@ function watchNet() {
     if (hiddenAt && shownAt - hiddenAt > RESUME_AFTER_MS) resume();
   });
   // Which request was slow, for 除錯紀錄 (its site and path, never its query).
-  const noteSlow = (url, at, error) => {
+  // With the Worker's own time (Server-Timing), the rest being the way there and back.
+  const noteSlow = (url, at, error, res) => {
     const ms = Date.now() - at;
     if (ms < NET_SLOW_MS) return;
+    const server = Number(/(?:^|,)\s*w;dur=(\d+)/.exec(res?.headers?.get?.('Server-Timing') || '')?.[1]) || undefined;
     let where = '';
     try {
       const u = new URL(url, location.href);
       where = u.host + u.pathname;
     } catch {}
-    rec('slow', { where, ms, failed: error ? error.name || 'error' : undefined, net: net.state });
+    rec('slow', { where, ms, server, failed: error ? error.name || 'error' : undefined, net: net.state });
   };
   window.fetch = (input, init) => {
     const url = typeof input === 'string' ? input : input?.url || String(input);
@@ -3902,7 +3933,7 @@ function watchNet() {
     return real(input, init).then(
       res => {
         net.waiting.delete(k);
-        noteSlow(url, at);
+        noteSlow(url, at, null, res);
         net.lastOk = Date.now();
         net.reached = true;
         net.fails = 0;
