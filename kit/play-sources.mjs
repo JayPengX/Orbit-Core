@@ -824,7 +824,7 @@ export function parseKambiGolf(list, now = new Date()) {
       season: name,
       title: name,
       startUtc: new Date(start).toISOString(),
-      teams: players.map((p, i) => ({ name: { en: p.name, zh: teamZh('golf', p.name) }, fair: fair[i] })).sort((a, b) => b.fair - a.fair)
+      teams: players.map((p, i) => ({ name: { en: p.name, zh: teamZh('golf', p.name) }, fair: fair[i], book: Math.round(100 / p.raw) / 100 })).sort((a, b) => b.fair - a.fair)
     });
   }
   return out;
