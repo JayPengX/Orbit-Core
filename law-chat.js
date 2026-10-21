@@ -64,7 +64,7 @@ export function readChat(body) {
     if (!Array.isArray(x.arts) || !x.arts.length || x.arts.length > LAW_LIMITS.maxArts || !x.arts.every(a => typeof a === 'string' && ART.test(a))) return 'pin';
     pins.push({ p: x.p, arts: [...new Set(x.arts)] });
   }
-  return { q, history: turns, pin: pins, mine, lang };
+  return { q, history: turns, pin: pins, mine, lang, stream: body.stream === true };
 }
 
 // ---- 1. Plan ---------------------------------------------------------------------
@@ -271,14 +271,17 @@ const ANSWER = {
   type: 'object',
   properties: {
     covered: { type: 'boolean' },
+    verdict: { type: 'string' },
     answer: { type: 'string' },
+    facts: { type: 'array', items: { type: 'object', properties: { k: { type: 'string' }, v: { type: 'string' } }, required: ['k', 'v'] } },
+    timeline: { type: 'array', items: { type: 'object', properties: { d: { type: 'string' }, t: { type: 'string' } }, required: ['d', 't'] } },
     points: POINTS,
     consequences: POINTS,
     agency: { type: 'object', properties: { name: { type: 'string' }, cites }, required: ['name', 'cites'] },
     next: strings,
     followups: strings
   },
-  required: ['covered', 'answer', 'points', 'next', 'followups']
+  required: ['covered', 'verdict', 'answer', 'points', 'next', 'followups']
 };
 
 export function answerPrompt(chat, articles, nameOf, ground = null, more = null) {
@@ -298,13 +301,18 @@ ${chat.q}
 
 Rules:
 - Every legal rule you rely on must come from the material above. Don't cite or rely on any law, rule or case not given, and never invent a case number, an article or a figure. You may reason from the given rules to the reader's facts, as a lawyer would.
-- answer: answer the question itself first, in 2 to 6 plain sentences. When the reader describes their own situation, make the call: apply the rules to their facts and say who is likely in the right, what they can claim or must pay, the likely penalty or outcome (ranges exactly as the articles state them), and what it turns on. Say which assumption you made and which missing fact would change the answer. Don't just restate the articles. When the question is about bills, legislators, votes, budgets or meetings, answer it directly from those lines.
-- points: up to 6, the legal reasoning step by step, each a short statement; its cites lists the cite of every article, rule or case it rests on, exactly as given in quotes (e.g. "B0000001:184", a case's id, a rule's id). Never a point without a cite, never a cite not listed above.
+- The reader skims on a phone: be brief and concrete. Never mention a database, "the material", "the data given" or what you were or weren't given; speak of the law itself.
+- verdict: the answer in one short line a reader gets at a glance (at most 22 Chinese characters or 12 English words), e.g. 「房東不能扣光押金」「有罪風險高：最重 7 年」「116 年度總預算：排入院會」.
+- facts: up to 4 key facts as label and value, each value at most 14 characters (a date, a stage, an amount, a penalty range, a deadline), e.g. { k: "最重刑度", v: "7 年有期徒刑" }, { k: "時效", v: "2 年" }; leave it empty when none.
+- timeline: for a question about progress (a bill, a budget, a case's steps), up to 5 steps in order as { d: date as given, t: what happened, at most 16 characters }; otherwise empty. Only the current cycle (the newest year or term given) unless the reader asks about an older one.
+- answer: then 1 to 3 plain sentences (at most 120 Chinese characters) that explain the verdict. When the reader describes their own situation, make the call: apply the rules to their facts and say who is likely in the right, what they can claim or must pay, the likely penalty or outcome (ranges exactly as the articles state them), and what it turns on. Say which assumption you made and which missing fact would change the answer. Don't just restate the articles. When the question is about bills, legislators, votes, budgets or meetings, answer it directly from those lines.
+- points: up to 5, the legal reasoning step by step, each one short sentence (at most 40 Chinese characters); its cites lists the cite of every article, rule or case it rests on, exactly as given in quotes (e.g. "B0000001:184", a case's id, a rule's id). Never a point without a cite, never a cite not listed above.
 - consequences: penalties, fines, damages or remedies exactly as the articles state them, each with its cites; leave it empty when none apply.
 - Similar cases: when a given court case is like the reader's, use it in a point (cite it) to say how the court decided and why; say it's a comparable case, not their case.
-- agency: the competent authority, only if a given article names it (its name as written there, and that article's cite); otherwise leave it out.
-- next: up to 4 concrete steps for the reader (evidence to keep, who to write to, deadlines from the articles, where to file); never a law that isn't above.
-- followups: up to 3 short questions the reader may ask next.
+- agency: the one specific authority the reader should deal with (e.g. 臺北市政府勞動局), only if a given article names it; never a generic one like 直轄市、縣（市）主管機關 (its name as written there, and that article's cite); otherwise leave it out.
+- Do the work yourself: answer what the reader would otherwise have to look up (which cities, which agency, how much, by when) from what is given. Never tell them to check, look up, consult or verify something elsewhere, and never send them to a lawyer unless the case truly needs one in court.
+- next: only concrete steps the reader can take now, naming the actual office, form, deadline or amount from what is given (e.g. 「30 日內向勞工局申請調解」); leave it empty rather than give generic advice. Each at most 24 Chinese characters (evidence to keep, who to write to, deadlines from the articles, where to file); never a law that isn't above.
+- followups: up to 3 questions the reader may ask next, each at most 14 Chinese characters (6 English words).
 - covered: true when the material lets you give a reasoned answer, even by applying general articles (e.g. 民法 第184條) to the facts. Set it false only when nothing above bears on the question; then say plainly what's missing, and next may suggest a lawyer or 法律扶助基金會.
 - Don't add a disclaimer; the app shows one.
 - Write everything in ${en ? 'plain English' : 'Traditional Chinese as used in Taiwan (繁體中文)'}.`;
@@ -336,15 +344,22 @@ export function checkChat(raw, articles, lang, grounded = false, others = []) {
   const a = raw?.agency;
   const agencyCites = (Array.isArray(a?.cites) ? a.cites : []).map(chatCite).filter(c => given.has(c));
   const name = typeof a?.name === 'string' ? a.name.trim() : '';
-  const named = name && agencyCites.length && (lang === 'en' || articles.some(x => agencyCites.includes(`${x.p}:${x.key}`) && x.text.includes(name)));
+  // (A generic one, 直轄市、縣（市）主管機關, tells the reader nothing: left out.)
+  const generic = /直轄市|縣\s*[（(]\s*市|各級|主管機關$/.test(name);
+  const named = name && !generic && agencyCites.length && (lang === 'en' || articles.some(x => agencyCites.includes(`${x.p}:${x.key}`) && x.text.includes(name)));
   const covered = raw?.covered === true && (points.length > 0 || grounded);
   const fallback = NOT_COVERED[lang];
   // (The model's own answer when it stands: covered, or it said it isn't.)
   const own = (covered || raw?.covered === false) && typeof raw?.answer === 'string' ? raw.answer.trim() : '';
   const answer = own || fallback.answer;
   const used = new Set([...points, ...consequences].flatMap(p => p.cites).concat(named ? agencyCites : []));
+  const short = (v, n) => (typeof v === 'string' ? v.trim().slice(0, n) : '');
+  const pairs = (v, a, b, max, n) => (Array.isArray(v) ? v : []).map(x => ({ [a]: short(x?.[a], n), [b]: short(x?.[b], n * 2) })).filter(x => x[a] && x[b]).slice(0, max);
   return {
     covered,
+    verdict: covered || raw?.covered === false ? short(raw?.verdict, 60) : '',
+    facts: covered ? pairs(raw?.facts, 'k', 'v', 4, 16) : [],
+    timeline: covered ? pairs(raw?.timeline, 'd', 't', 6, 20) : [],
     answer,
     points,
     consequences,
@@ -365,7 +380,25 @@ export async function handleLawChat(request, env, ctx, headers, session, gemini)
   const pass = passOf(session);
   const chat = await opening(request, env, headers, { maxBody: CHAT_LIMITS.maxBody, read: readChat, who: pass });
   if (chat instanceof Response) return chat;
+  if (!chat.stream) return answerChat(chat, pass, env, ctx, headers, gemini);
+  // Streamed (the app asks so): a line as each step starts, then the answer's
+  // own line with its status, so the reader sees the work, not a stalled wait.
+  const { readable, writable } = new TransformStream();
+  const w = writable.getWriter();
+  const enc = new TextEncoder();
+  const line = o => w.write(enc.encode(`${JSON.stringify(o)}\n`)).catch(() => {});
+  const done = (async () => {
+    line({ stage: 'find' });
+    const res = await answerChat(chat, pass, env, ctx, headers, gemini, stage => line(stage));
+    line({ status: res.status, ...(await res.json().catch(() => ({ error: 'upstream' }))) });
+    await w.close().catch(() => {});
+  })();
+  ctx?.waitUntil?.(done);
+  return new Response(readable, { status: 200, headers: { ...headers, 'Content-Type': 'application/x-ndjson', 'Cache-Control': 'no-store' } });
+}
 
+// The answer as a Response; `stage` hears each step ({ stage: 'found' | 'write', … }).
+async function answerChat(chat, pass, env, ctx, headers, gemini, stage = () => {}) {
   const day = twDay();
   const who = await passKey('chat', pass, day);
   const left = n => Math.max(0, LAW_LIMITS.chatPerPass - n);
@@ -390,11 +423,13 @@ export async function handleLawChat(request, env, ctx, headers, session, gemini)
       if (first) keep(env, ctx, planKey, plan, CHAT_TTL_S);
     }
     const articles = await find(chat, plan);
+    stage({ stage: 'found', arts: articles.length, laws: [...new Set(articles.map(a => a.n))].slice(0, 3) });
     // A question about bills: those of the laws found too, when it named none.
     const items = (await readGround('bills/items.json'))?.items || [];
     if (!ground.bills.length && BILL_WORDS.test(chat.q)) ground.bills = matchBills(items, `${chat.q} ${[...new Set(articles.map(a => a.n))].join(' ')}`);
     const more = await moreFor(`${asked} ${plan.terms.join(' ')}`, articles, { mine: chat.mine, items, today: day });
     const grounded = hasGround(ground) || hasMore(more);
+    stage({ stage: 'write', cases: more.cases.length, rules: more.rules.length });
     const extra = { ...groundOut(ground), ...moreOut(more) };
     const versions = [...new Set(articles.map(a => `${a.p}@${a.m}`))].sort().join(',');
     const answerKey = first && `law:chat:v2:${await sha256Hex([chat.q, pin, chat.lang, versions, groundKey(ground), moreKey(more)].join('|'))}`;

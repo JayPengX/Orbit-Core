@@ -1,7 +1,7 @@
 // What /law-chat finds besides the articles: judgments, 釋字, 行政規則, legislators, votes, meetings, the reader's own.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { matchRulings, matchCons, judgmentGist, readMine, asksMine, matchVotes, matchMeets, matchRules, caseLabel } from '../law-more.js';
+import { matchRulings, matchCons, judgmentGist, readMine, asksMine, matchVotes, matchMeets, matchRules, caseLabel, ruleTitle, vendorHits, vendorText } from '../law-more.js';
 
 test('judgments: 3 for each article found they cite, the 案由 sharing the question; 3 at least, newer first', () => {
   const rows = [['TPSV,114,台上,1,20250101,1', '2025-01-01', '請求返還押金', ['B0000001:456']], ['TPSV,114,台上,2,20260101,1', '2026-01-01', '請求返還押金', ['B0000001:456']], ['TPSM,115,台上,3,20260101,1', '2026-01-01', '加重詐欺', ['C0000001:339']], ['bad', '', '押金', []]];
@@ -45,4 +45,12 @@ test('meetings: only on a question about when, coming ones, soonest first', () =
 test('行政規則: by their name\'s pairs and the articles they rest on', () => {
   const rows = [['教育部:1', '高級中等學校輔導學生會及其他相關自治組織運作注意事項', '教育部', '2024-01-01', 'https://edu.law.moe.gov.tw/LawContent.aspx?id=1', [], []], ['教育部:2', '校園安全注意事項', '教育部', '2024-01-01', '', [], []]];
   assert.deepEqual(matchRules(rows, '高中學生會可以自己選會長嗎？學生自治組織', []).map(r => r.id), ['教育部:1']);
+});
+
+test('a rule named in the question, found on a ministry site and read', () => {
+  assert.equal(ruleTitle('高級中等學校訂定學生服裝儀容規定之原則有哪些？'), '高級中等學校訂定學生服裝儀容規定之原則');
+  assert.equal(ruleTitle('請問高級中等學校輔導學生會及其他相關自治組織運作注意事項怎麼規定'), '高級中等學校輔導學生會及其他相關自治組織運作注意事項');
+  assert.equal(ruleTitle('加班費怎麼算'), '');
+  assert.deepEqual(vendorHits('<a href="LawContent.aspx?id=GL002011&amp;kw=x" title="t"><span>高級中等學校訂定學生服裝儀容規定之原則</span></a>'), [{ id: 'GL002011', name: '高級中等學校訂定學生服裝儀容規定之原則' }]);
+  assert.equal(vendorText('<div id="ctl00_cp_content_divLawContent1">一、目的。<br>二、範圍&amp;對象。</div>'), '一、目的。\n二、範圍&對象。');
 });
