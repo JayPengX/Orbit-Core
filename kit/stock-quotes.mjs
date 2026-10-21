@@ -133,6 +133,8 @@ export function futQuote(symbol, taiex, table) {
   };
 }
 const readTaifex = () => getJson(TAIFEX_URL);
+// TAIFEX's table itself (a month's final settlement price after its contract is gone).
+export const fetchFutTable = readTaifex;
 
 // The FX symbol for a currency's price in NT$ (USDTWD=X: NT$ per US$).
 export const fxSymbol = currency => `${currency}${BASE}=X`;
