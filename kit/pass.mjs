@@ -8,6 +8,7 @@
 //   說明   every app's guide (help.mjs)
 import { APPS, AVATARS, FRAMES, VIP, money, vipStatus, vipName, worthOf, WEALTH_RANKS, OVERDRAFT_RATE, ECONOMY, settingPatch, passAccount, appIcon, el as node } from '#kit/quadra.mjs';
 import { PLAY, STOCK, houseKeep, roundTrip, record, overdraftYear, vipShare } from './truth.mjs';
+import { LOAN, RELIEF, PAY_WEEK, schedule, totalApr, debtOf } from './loan.mjs';
 import { HELP_ORDER, helpFor } from './help.mjs';
 import { sheet } from './ui.mjs';
 
@@ -59,9 +60,9 @@ export const STRINGS = {
     govGot: '政府給你',
     govNet: '淨額',
     gov_sports: '運彩中獎所得稅',
-    govSub_sports: '每張彩金超過 NT$5,000 扣 20%',
+    govSub_sports: '每張彩金超過 {free} 扣 {tax}',
     gov_lottery: '彩券中獎稅',
-    govSub_lottery: '每注超過 NT$5,000 扣 20% 所得稅與 0.4% 印花稅',
+    govSub_lottery: '每注超過 {free} 扣 {tax} 所得稅與 0.4% 印花稅',
     gov_trade: '證券交易稅',
     govSub_trade: '賣出才收：股票 0.3%、ETF 0.1%，海外市場的交易稅也在這',
     gov_withheld: '股利與利息扣繳',
@@ -69,7 +70,7 @@ export const STRINGS = {
     gov_nhi: '二代健保補充保費',
     govSub_nhi: '單筆股利或利息達 NT$20,000 扣 2.11%',
     gov_relief: '急難紓困',
-    govSub_relief: '身價低於 NT$2,000 才能申請，每 13 週一次',
+    govSub_relief: '身價低於 {under} 才能申請，一次 {amount}，每 {weeks} 週一次、一年最多 {year} 次',
     govFoot: '上面「和 Quadra 的輸贏」和「你自己的成績」都是稅前的數字，稅單獨算在政府這一方。Play 和 Securities 同步後才會更新。',
     edgeTitle: '莊家優勢',
     edgeSingle: '單場',
@@ -88,15 +89,17 @@ export const STRINGS = {
     yourTicketsSub: '買了 {paid}，中了 {won}',
     lotteryFoot: '刮刮樂最常開出的是「中回本」（獎金等於票價）和只差一個的牌面，讓你覺得快中了、再買一張；越貴的卡回收率越高，是要讓你買貴的。',
     lotterySub: '每 NT$100 長期平均拿回多少。',
-    freeTitle: '「免費」的東西',
+    freeTitle: 'VIP 回饋',
     vipSub: '投注 {min} 起；莊家每留下 NT$100，只還你 {per}',
     yourVip: '你本月的 VIP',
     yourVipSub: '本月投注 {stakes}，下個月回饋 {back}',
     freeFoot: 'VIP 每月歸零，月底差一點升級時，你會想多下一點。',
-    freeSub: '送你的東西都有條件，條件是為了讓你下更多注。',
+    freeSub: 'Play 唯一還會還你的錢：每月照投注量退一點。免費投注、加成、提前兌現和 Quadra Plus 都已取消，跟台灣運彩一樣。',
     stockTitle: '交易成本',
     tripCost: 'NT$100,000 台股買進再賣出',
     tripCostSub: '手續費 {fee} + 證交稅 {tax}，一來一回 {share}',
+    tripDay: '同一天買進賣出（當沖）',
+    tripDaySub: '證交稅減半為 {tax}，一來一回仍要 {share}；天天當沖，成本很快就比賺的多',
     tripMonth: '每週換股一次，一年的成本',
     tripMonthSub: '同樣 NT$100,000；不交易就是零',
     marginRate: '融資年利率',
@@ -109,7 +112,7 @@ export const STRINGS = {
     tricksTitle: '讓你一直玩的設計',
     tricksSub: '這些手法在真實的博弈、券商和訂閱服務都看得到，Quadra 也用了。',
     ranksTitle: '財富等級',
-    ranksSub: '身價（錢包加上 Securities 的持股，扣掉信貸）第一次到達一個等級，系統送一次等級獎勵。開戶金 NT$200,000 是起步，存下或賺到 NT$100,000 才到下一級。',
+    ranksSub: '身價（錢包加上 Securities 的持股，扣掉信貸）第一次到達一個等級，系統送一次等級獎勵。開戶金 {start} 是起步，到 {next} 是下一級。',
     rankNext: '還差 {v} 到「{rank}」',
     rankPaid: '已送 {v}',
     rankCredited: '已達成，舊等級獎勵抵用',
@@ -137,6 +140,22 @@ export const STRINGS = {
     frame_ruby: '紅寶石',
     frame_prism: '稜鏡',
     frame_celestial: '星穹',
+    loanTitle: '信貸',
+    loanSub: '缺錢時可以借，但借錢有成本：開辦費、利息，晚還還有違約金。',
+    loanFee: '開辦費',
+    loanFeeSub: '借多少都先收這筆',
+    loanRate: '年利率',
+    loanRateSub: '第一次 {start}；準時還款越久越低，最低 {best}',
+    loanCost: '借 {amount}、{weeks} 週還完',
+    loanCostSub: '每週還 {each}，多付右邊這些；總費用年百分率 {apr}',
+    loanEarly: '提前清償',
+    loanEarlySub: '{weeks} 週內還清，剩下的本金再收 {fee}',
+    loanLate: '遲繳',
+    loanLateSub: '連續 {misses} 週沒還就違約：薪水扣 {garnish}，{ban} 週內不能再借',
+    loanCap: '最多能借',
+    loanCapSub: '每週還款不能超過薪水 {pay} 的 {share}',
+    yourLoan: '你還欠',
+    loanFoot: '「每週只要」聽起來很少，乘上週數才是真正的價錢。',
     trick_installment: '「每週只要」',
     trickHow_installment: '信貸先講每週還多少，不先講總共多付多少；開辦費和利息加起來，看「總費用年百分率」才是真正的成本。',
     frame_pearl: '珍珠',
@@ -217,9 +236,9 @@ export const STRINGS = {
     govGot: 'Given to you',
     govNet: 'Net',
     gov_sports: 'Sports lottery income tax',
-    govSub_sports: '20% off each slip paying over NT$5,000',
+    govSub_sports: '{tax} off each slip paying over {free}',
     gov_lottery: 'Lottery prize tax',
-    govSub_lottery: '20% income tax and 0.4% stamp duty on each prize over NT$5,000',
+    govSub_lottery: '{tax} income tax and 0.4% stamp duty on each prize over {free}',
     gov_trade: 'Securities transaction tax',
     govSub_trade: 'Only on a sale: 0.3% on shares, 0.1% on ETFs, overseas trade taxes too',
     gov_withheld: 'Dividend and interest withholding',
@@ -227,7 +246,7 @@ export const STRINGS = {
     gov_nhi: 'NHI supplementary premium',
     govSub_nhi: '2.11% off a single dividend or interest payment of NT$20,000 or more',
     gov_relief: 'Emergency relief',
-    govSub_relief: 'Only when you’re worth under NT$2,000, once every 13 weeks',
+    govSub_relief: 'Only when you’re worth under {under}: {amount}, once every {weeks} weeks, {year} times a year at most',
     govFoot: '“You vs Quadra” and your own result above are before tax; the taxes are the government’s side alone. They update when Play and Securities sync.',
     edgeTitle: 'The house edge',
     edgeSingle: 'A single',
@@ -246,15 +265,17 @@ export const STRINGS = {
     yourTicketsSub: 'Spent {paid}, won {won}',
     lotteryFoot: 'The commonest scratch card wins are “your money back” (a prize the size of the price) and faces one short of a win, so another card feels due; dearer cards pay back more, to sell you the dearer ones.',
     lotterySub: 'What comes back of every NT$100, on average, over time.',
-    freeTitle: 'The “free” things',
+    freeTitle: 'VIP cashback',
     vipSub: 'From {min} staked; for every NT$100 the house keeps, {per} comes back',
     yourVip: 'Your VIP this month',
     yourVipSub: 'Staked {stakes} this month: {back} back next month',
     freeFoot: 'VIP tiers start again every month, so just short of the next one at the month’s end, you’ll want to bet a little more.',
-    freeSub: 'Everything given away has terms, and the terms are there to make you bet more.',
+    freeSub: 'The only money Play still gives back: a little of each month’s stakes. Free bets, boosts, cash out and Quadra Plus are gone, as at Taiwan Sports Lottery.',
     stockTitle: 'Trading costs',
     tripCost: 'NT$100,000 of a Taiwan stock, bought and sold',
     tripCostSub: 'Commission {fee} + transaction tax {tax}: {share} of it there and back',
+    tripDay: 'Bought and sold the same day (day trade)',
+    tripDaySub: 'Half the tax, {tax}, still {share} there and back; day trades every day soon cost more than they make',
     tripMonth: 'Switching stocks every week, for a year',
     tripMonthSub: 'The same NT$100,000; not trading costs nothing',
     marginRate: 'Margin interest a year',
@@ -267,7 +288,7 @@ export const STRINGS = {
     tricksTitle: 'Designs that keep you playing',
     tricksSub: 'Real betting sites, brokers and subscriptions use these; so does Quadra.',
     ranksTitle: 'Wealth levels',
-    ranksSub: 'The first time what you’re worth (your wallet and Securities holdings, less a loan) reaches a level, the system pays its reward once. The NT$200,000 you open with is the start; NT$100,000 saved or earned reaches the next.',
+    ranksSub: 'The first time what you’re worth (your wallet and Securities holdings, less a loan) reaches a level, the system pays its reward once. The {start} you open with is the start; {next} is the next level.',
     rankNext: '{v} more to {rank}',
     rankPaid: '{v} paid',
     rankCredited: 'Reached; old level rewards counted',
@@ -296,6 +317,22 @@ export const STRINGS = {
     frame_prism: 'Prism',
     frame_celestial: 'Celestial',
     trick_installment: '“Only so much a week”',
+    loanTitle: 'Loans',
+    loanSub: 'You can borrow when short, but borrowing costs: a fee, interest, and penalties when late.',
+    loanFee: 'Fee',
+    loanFeeSub: 'Charged on any loan, whatever its size',
+    loanRate: 'Yearly rate',
+    loanRateSub: '{start} the first time; lower the longer you pay on time, down to {best}',
+    loanCost: 'Borrow {amount} over {weeks} weeks',
+    loanCostSub: '{each} a week, and this much more in all; APR with the fee {apr}',
+    loanEarly: 'Paying off early',
+    loanEarlySub: 'Within {weeks} weeks, {fee} of what’s left on top',
+    loanLate: 'Paying late',
+    loanLateSub: '{misses} weeks missed is a default: {garnish} of your pay taken, no loans for {ban} weeks',
+    loanCap: 'Most you can borrow',
+    loanCapSub: 'A weekly payment can’t be more than {share} of your {pay} pay',
+    yourLoan: 'You still owe',
+    loanFoot: '“Only so much a week” sounds small; times the weeks is the real price.',
     trickHow_installment: 'A loan leads with the weekly payment, not the total it costs; the fee and the interest together, the APR with fees, is the real price.',
     frame_pearl: 'Pearl',
     frame_matcha: 'Matcha',
@@ -487,6 +524,7 @@ function renderTruth(box, { t, state }) {
   const s = r.sides;
   const legs = [1, 2, 3, 5, 7];
   const trip = roundTrip(100_000);
+  const dayTrip = roundTrip(100_000, { dayTrade: true });
   const vip = vipStatus(w);
   put(
     box,
@@ -505,6 +543,7 @@ function renderTruth(box, { t, state }) {
       { sub: t('sidesSub', { pay: money(ECONOMY.weekly) }) }
     ),
     section(t('govTitle'), govCard(t, s.gov), { sub: t('govSub') }),
+    section(t('loanTitle'), loanCard(t, w), { sub: t('loanSub') }),
     section(
       t('edgeTitle'),
       facts(
@@ -544,6 +583,7 @@ function renderTruth(box, { t, state }) {
       facts(
         [
           row(t('tripCost'), money(trip.total), t('tripCostSub', { fee: money(trip.fee), tax: money(trip.tax), share: pct(trip.share, 2) })),
+          row(t('tripDay'), money(dayTrip.total), t('tripDaySub', { tax: pct(STOCK.dayTradeTax, 2), share: pct(dayTrip.share, 2) })),
           row(t('tripMonth'), money(trip.total * 4 * 12), t('tripMonthSub')),
           row(t('marginRate'), pct(STOCK.loanRate), t('marginRateSub')),
           row(t('overdraftRow'), pct(overdraftYear()), t('overdraftSub', { month: pct(OVERDRAFT_RATE, 0), penalty: pct(STOCK.penalty, 0) })),
@@ -562,7 +602,7 @@ function renderTruth(box, { t, state }) {
       ),
       { sub: t('tricksSub') }
     ),
-    section(t('ranksTitle'), ranksCard(t, w, state.locale), { sub: t('ranksSub') })
+    section(t('ranksTitle'), ranksCard(t, w, state.locale), { sub: t('ranksSub', { start: money(ECONOMY.start), next: money(WEALTH_RANKS[1].min) }) })
   );
 }
 const TRICKS = ['installment', 'vip', 'nearmiss', 'notify'];
@@ -583,12 +623,37 @@ function govCard(t, g) {
     ...items.map(([k, v, side]) =>
       el('div', { class: `gov-row ${side}${v ? '' : ' none'}` }, [
         el('span', { class: 'side-icon', 'aria-hidden': 'true', text: GOV_ICONS[k] }),
-        el('span', { class: 'gov-text' }, [el('strong', { text: t(`gov_${k}`) }), el('small', { class: 'muted', text: t(`govSub_${k}`) }), bar(v, most, side === 'got' ? 'good' : 'bad')]),
+        el('span', { class: 'gov-text' }, [el('strong', { text: t(`gov_${k}`) }), el('small', { class: 'muted', text: t(`govSub_${k}`, GOV_SUB) }), bar(v, most, side === 'got' ? 'good' : 'bad')]),
         el('strong', { class: 'num', text: v ? `${side === 'got' ? '+' : '−'}${money(v)}` : money(0) })
       ])
     ),
     el('p', { class: 'facts-foot', text: t('govFoot') })
   ]);
+}
+
+// Every number in a tax's or 紓困's line, from the rules themselves.
+const GOV_SUB = { free: money(PLAY.taxFree), tax: pct(PLAY.tax, 0), under: money(RELIEF.under), amount: money(RELIEF.amount), weeks: RELIEF.everyWeeks, year: RELIEF.perYear };
+
+// 信貸: what borrowing costs, a typical loan worked through (NT$100,000 over
+// a year at the first rate), and what this account still owes.
+function loanCard(t, w) {
+  const amount = LOAN.base;
+  const weeks = LOAN.terms[0];
+  const plan = schedule(amount, LOAN.apr.start, weeks);
+  const paid = plan.rows.reduce((sum, r) => sum + r.amount, 0);
+  const owed = debtOf(w);
+  return facts(
+    [
+      row(t('loanFee'), money(LOAN.fee), t('loanFeeSub')),
+      row(t('loanRate'), `${pct(LOAN.apr.best, 0)}–${pct(LOAN.apr.max, 0)}`, t('loanRateSub', { start: pct(LOAN.apr.start, 0), best: pct(LOAN.apr.best, 0) })),
+      row(t('loanCost', { amount: money(amount), weeks }), money(paid - amount + LOAN.fee), t('loanCostSub', { each: money(plan.installment), extra: money(paid - amount + LOAN.fee), apr: pct(totalApr(amount, LOAN.apr.start, weeks), 1) })),
+      row(t('loanEarly'), pct(LOAN.earlyFee, 0), t('loanEarlySub', { weeks: LOAN.earlyWeeks, fee: pct(LOAN.earlyFee, 0) })),
+      row(t('loanLate'), `${LOAN.missesToDefault}×`, t('loanLateSub', { misses: LOAN.missesToDefault, garnish: `${Math.round(LOAN.garnish * 100)}%`, ban: LOAN.banWeeks })),
+      row(t('loanCap'), money(LOAN.cap), t('loanCapSub', { share: pct(LOAN.shareOfPay, 0), pay: money(PAY_WEEK) })),
+      owed > 0 ? row(t('yourLoan'), money(owed), '', 'down') : null
+    ],
+    t('loanFoot')
+  );
 }
 
 // 財富等級: every level and its one-time reward, and where the account is.
