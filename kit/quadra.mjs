@@ -3230,27 +3230,34 @@ function watchKeyboard() {
   };
   const apply = () => {
     frame = 0;
-    const kb = Math.max(0, Math.round(globalThis.innerHeight - vv.height - vv.offsetTop));
     const now = typing();
     if (fullW !== globalThis.innerWidth) ((fullW = globalThis.innerWidth), (full = 0));
     full = now ? Math.max(full, globalThis.innerHeight) : globalThis.innerHeight;
     const shrunk = full ? full - globalThis.innerHeight : 0;
-    const up = (kb > 80 || shrunk > 80) && now;
-    root.style.setProperty('--q-kb', `${up ? kb : 0}px`);
-    root.style.setProperty('--q-vvh', `${Math.round(vv.height)}px`);
+    // The keys' own height (iOS's slide doesn't change it) and what they cover at the foot.
+    const keys = Math.max(0, Math.round(globalThis.innerHeight - vv.height));
+    const up = (keys > 80 || shrunk > 80) && now;
+    // Held while the same field is typed in: iOS's slide (vv.offsetTop) moves
+    // as the page answers it, and a sheet lifted by each new reading moved,
+    // iOS slid again, and the screen flickered (Jay 2026-10-21, an iPad on
+    // its side: the sign-in and Play's stake). Read again for another field,
+    // or keys that really changed height (more than 60px).
+    const el = document.activeElement;
+    if (!up) held = null;
+    else if (!held || held.el !== el || Math.abs(held.keys - keys) > 60) {
+      held = { el, keys, kb: Math.max(0, Math.round(globalThis.innerHeight - vv.height - vv.offsetTop)), vvh: Math.round(vv.height), lift: true };
+    }
+    root.style.setProperty('--q-kb', `${held ? held.kb : 0}px`);
+    root.style.setProperty('--q-vvh', `${held ? held.vvh : Math.round(vv.height)}px`);
     root.classList.toggle('q-kb', up);
     for (const d of document.querySelectorAll('.q-kb-docked')) if (!up || !d.contains(document.activeElement)) d.classList.remove('q-kb-docked');
-    // Once per field and keyboard, never on every scroll or resize it causes
-    // itself: lifting on each one fought iOS's own slide, which answered with
-    // another, and the screen flickered (Jay 2026-10-21, iPad sign-in).
-    const el = document.activeElement;
-    if (!up) lifted = null;
-    else if (!lifted || lifted.el !== el || Math.abs(lifted.kb - kb) > 60) {
-      lifted = { el, kb };
-      lift(el, kb);
+    // (Lifted once per field and keys, never on the scrolls and resizes it causes itself.)
+    if (held?.lift) {
+      held.lift = false;
+      lift(el, held.kb);
     }
   };
-  let lifted = null;
+  let held = null;
   // The field in what's left above the keys. One in a bar fixed at the
   // foot (a composer, a stake bar) rides on the keys with its bar; any
   // other is scrolled into view inside its own scroller (a sheet, a list,
