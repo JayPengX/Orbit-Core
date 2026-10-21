@@ -226,3 +226,18 @@ test('an option: issued fills count at NT$50 a point, and its expiry only at wha
   assert.deepEqual(r.refused, ['mature:x']);
   assert.equal(r.cash, 100_000 - 30_180 + 65_000 - 65);
 });
+
+test('an option written: its premium in only with the margin behind it, and assigned at expiry at what it is worth', async () => {
+  const sym = 'TXO202610P46000.TF';
+  const expiry = Date.parse('2026-10-21T13:30:00+08:00');
+  const d = deps({ w1: { quote: 300, t: T, s: sym, side: 'sell', q: 1, k: 'market' }, w2: { quote: 300, t: T + 1000, s: sym, side: 'sell', q: 1, k: 'market' } });
+  const read = d.read;
+  d.read = async url => (url.startsWith('https://taifex.quadra/') ? { date: '2026-10-21', settle: {}, margin: {}, final: { 202610: 45_800 } } : read(url));
+  const base = { type: 'fill', symbol: sym, name: '台指選 10月 46000 賣權', kind: 'opt', market: 'TAIFEX', currency: 'TWD', qty: 1, fee: 0, twd: 1 };
+  // One written (NT$100,000 covers its 72,000 + premium); a second wouldn't fit.
+  const sell = (id, t) => ({ ...base, id: `fill:${id}`, orderId: id, t, side: 'sell', price: 299, quote: 300, gross: 14_950, commission: 25, tax: 15, total: 14_910, im: 177_000 });
+  const assign = { ...base, id: `mature:${sym}`, orderId: null, maturity: true, t: expiry, side: 'buy', price: 200, quote: 45_800, gross: 10_000, commission: 0, tax: 10, total: 10_010 };
+  const r = await check(d, [sell('w1', T), sell('w2', T + 1000), assign], expiry + 3_600_000);
+  assert.deepEqual(r.refused, ['fill:w2']);
+  assert.equal(r.cash, 100_000 + 14_910 - 10_010);
+});

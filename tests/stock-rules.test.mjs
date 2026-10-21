@@ -495,7 +495,7 @@ test('台指選擇權: bought in full at NT$50 a point, sold back only, settled 
   const q = (price, more = {}) => ({ symbol: sym, name: '台指選 11月 46500 買權', kind: 'opt', market: 'TAIFEX', currency: 'TWD', price, prev: price, got: now, marketTime: now, tz: 'Asia/Taipei', session: { start: at('2026-10-21T09:00:00'), end: at('2026-10-21T13:30:00') }, ...more });
   let acc = SA.newAccount(100_000, now - 400 * DAY, 'opt');
   const place = (req, price, t = now, a = acc) => SA.placeOrder(a, { type: 'market', ...req }, { quote: q(price), rates: { TWD: 1 }, valuation: ok, now: t, id: `o${t}${req.side}${req.qty}` });
-  // Writing (selling one not held) isn't offered.
+  // Writing one (selling one not held) needs its margin free: NT$100,000 is short of A's NT$187,000.
   assert.equal(place({ side: 'sell', qty: 1 }, 300).error, 'optNoWrite');
   // Seven at 300 is NT$105,000: too much; two is fine, at a tick over.
   assert.equal(place({ side: 'buy', qty: 7 }, 300).error, 'funds');
@@ -531,4 +531,54 @@ test('台指選擇權: bought in full at NT$50 a point, sold back only, settled 
   assert.equal(SA.replay(gone.account, at('2026-11-18T14:00:00')).positions[put], undefined);
   // After its last 13:30, no new orders.
   assert.equal(place({ side: 'buy', qty: 1 }, 300, at('2026-11-18T13:31:00')).error, 'futExpired');
+});
+
+test('TAIEX options written: the premium in, TAIFEX margin held, bought back or assigned', async () => {
+  const M = await import('../kit/stock-markets.mjs');
+  const at = s => Date.parse(`${s}+08:00`);
+  const now = at('2026-10-21T10:00:00');
+  const sym = 'TXO202611C46500.TF';
+  const values = { A: [187_000, 143_000], B: [94_000, 72_000] };
+  // 500 points out of the money: NT$25,000 off A.
+  assert.equal(M.optWriteMargin(sym, 300, 46_000, values), 300 * 50 + 187_000 - 25_000);
+  // Far out of the money: never under B.
+  assert.equal(M.optWriteMargin(sym, 10, 42_000, values), 10 * 50 + 94_000);
+  assert.equal(M.optWriteMargin(sym, 300, 46_000, values, true), 300 * 50 + 143_000 - 25_000);
+  const q = (price, more = {}) => ({ symbol: sym, name: '台指選 11月 46500 買權', kind: 'opt', market: 'TAIFEX', currency: 'TWD', price, prev: price, got: now, marketTime: now, tz: 'Asia/Taipei', session: { start: at('2026-10-21T09:00:00'), end: at('2026-10-21T13:30:00') }, index: 46_000, optMargin: values, ...more });
+  let acc = SA.newAccount(500_000, now - 400 * DAY, 'optw');
+  const place = (req, price, t = now, a = acc, more = {}) => SA.placeOrder(a, { type: 'market', ...req }, { quote: q(price, more), rates: { TWD: 1 }, valuation: ok, now: t, id: `w${t}${req.side}${req.qty}` });
+  // Four need 4 × 162,000 past the premium: too much; two fit.
+  assert.equal(place({ side: 'sell', qty: 4 }, 300).error, 'optNoWrite');
+  const w = place({ side: 'sell', qty: 2 }, 300);
+  assert.equal(w.error, undefined);
+  assert.equal(w.fill.price, 299);
+  assert.equal(w.fill.im, 177_000);
+  acc = w.account;
+  let s = SA.replay(acc, now);
+  assert.equal(s.cash.TWD, 500_000 + w.fill.total);
+  assert.equal(s.positions[sym].qty, -2);
+  assert.equal(SA.available(acc, s).cash.TWD, s.cash.TWD - 2 * 177_000);
+  // Up to 320: NT$32,000 to buy back, the margin still held; no borrowing fee.
+  const v = SA.valuate(SA.replay(acc, now + 30 * DAY), new Map([[sym, q(320)]]), { TWD: 1 });
+  const pos = v.positions.find(p => p.symbol === sym);
+  assert.deepEqual([pos.short, pos.valueTWD, pos.borrowFee], [true, -32_000, 0]);
+  assert.equal(v.netWorth, s.cash.TWD - 32_000);
+  assert.equal(v.futMarginTWD, 2 * 177_000);
+  assert.equal(v.futCall, false);
+  // Bought back: the margin's free again.
+  const b = place({ side: 'buy', qty: 2 }, 320, now + 60_000);
+  assert.equal(b.error, undefined);
+  s = SA.replay(b.account, now + 60_000);
+  assert.equal(s.positions[sym], undefined);
+  assert.equal(SA.available(b.account, s).cash.TWD, s.cash.TWD);
+  // A put written in the money and assigned at expiry: bought back at what it's worth.
+  const put = 'TXO202611P46500.TF';
+  const p = SA.placeOrder(b.account, { type: 'market', side: 'sell', qty: 1 }, { quote: { ...q(600), symbol: put }, rates: { TWD: 1 }, valuation: ok, now: now + 120_000, id: 'wput' });
+  assert.equal(p.error, undefined);
+  assert.equal(p.fill.im, 600 * 50 + 187_000);
+  const done = SA.applyOptExpiry(p.account, put, 46_000, { now: at('2026-11-18T14:00:00') });
+  assert.deepEqual([done.added[0].side, done.added[0].price, done.added[0].gross, done.added[0].total], ['buy', 500, 25_000, 25_025]);
+  const end = SA.replay(done.account, at('2026-11-18T14:00:00'));
+  assert.equal(end.positions[put], undefined);
+  assert.equal(SA.available(done.account, end).cash.TWD, end.cash.TWD);
 });
