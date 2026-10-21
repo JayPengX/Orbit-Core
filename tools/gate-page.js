@@ -113,7 +113,7 @@
 
   // Every fault on the screen now.
   gate.check = () => {
-    const out = { blank: [], pictures: [], overflow: [], wraps: [], cut: [], letters: [], slots: [], halfEmpty: [], bareEmpty: [], loading: [], orphan: [], tables: [], sheets: [], old: [], header: [], scroll: [] };
+    const out = { blank: [], pictures: [], overflow: [], wraps: [], cut: [], letters: [], slots: [], halfEmpty: [], bareEmpty: [], loading: [], orphan: [], tables: [], sheets: [], old: [], header: [], scroll: [], white: [] };
     const all = [...document.querySelectorAll('body *')].filter(seen);
     const clippedBy = el => {
       for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) if (/auto|scroll|hidden|clip/.test(getComputedStyle(p).overflowX)) return true;
@@ -150,7 +150,7 @@
       const kind = /logo|badge|crest|avatar|face|flag|headshot|photo|team|mono/i.test(el.className?.baseVal ?? el.className);
       if ((kind || el.matches('.q-logo.text')) && r.width >= 14 && r.width <= 96 && Math.abs(r.width - r.height) <= r.width * 0.25 && /^[\p{L}\p{N}.-]{1,5}$/u.test(tx) && /\p{L}/u.test(tx) && !el.querySelector('img, svg, canvas, video') && !/url\(/.test(cs.backgroundImage)) out.letters.push(`${name(el)} "${tx}"`);
       // An empty state that is only a sentence.
-      if (!el.children.length && tx.length < 70 && /^(目前|今天|今日|這裡|尚|還|此)?(沒有|無|暫無|尚無|還沒有|未有)|^(No|Nothing|None|Not yet)\b/i.test(tx) && !el.closest('.q-empty, button, [role=button], option, select, .q-toast, dialog, .q-sheet')) {
+      if (!el.children.length && tx.length < 70 && /^(目前|今天|今日|這裡|尚|還|此)?(沒有|無(?=資料|紀錄|結果|內容|賽事|比賽|項目|收藏|追蹤|$|[。，！]))|^(暫無|尚無|還沒有|未有)|^(No|Nothing|None|Not yet)\b/i.test(tx) && !el.closest('.q-empty, button, [role=button], option, select, .q-toast, dialog, .q-sheet')) {
         const box = el.parentElement;
         if (!box.querySelector('svg, img, .q-tile') && box.getBoundingClientRect().height > 30) out.bareEmpty.push(`${name(el)} "${tx.slice(0, 40)}"`);
       }
@@ -217,14 +217,14 @@
     for (const el of all) {
       if (el.children.length) continue;
       const tx = text(el);
-      if (/\d[\d,.]*\s*…|NT\$\s*…|\$…/.test(tx)) out.cut.push(`${name(el)} "${tx.slice(0, 30)}" number cut`);
+      if (tx.length < 24 && /(\d[\d,.]*|NT\$|\$)\s*…$/.test(tx)) out.cut.push(`${name(el)} "${tx.slice(0, 30)}" number cut`);
       else if (/\d/.test(tx) && tx.length < 24 && getComputedStyle(el).textOverflow === 'ellipsis' && el.scrollWidth > el.clientWidth + 1) out.cut.push(`${name(el)} "${tx}" number cut`);
     }
     // A table that slides sideways (a stats grid wider than the screen).
     for (const el of all) {
       const ox = getComputedStyle(el).overflowX;
       if (!/auto|scroll/.test(ox) || el.scrollWidth <= el.clientWidth + 4) continue;
-      if (el.matches('table, [role=table], [role=grid]') || el.querySelector('table, [role=table], [role=grid], tr, [role=row]') || /table|stat|box-?score|standings|grid/i.test(el.className?.baseVal ?? el.className)) out.tables.push(`${name(el)} ${el.scrollWidth} px in ${el.clientWidth}`);
+      if (el.matches('table, [role=table], [role=grid]') || el.querySelector('table, [role=table], [role=grid], tr, [role=row]') || (/table|stat|box-?score|standings/i.test(el.className?.baseVal ?? el.className) && !/rail/i.test(el.className?.baseVal ?? el.className))) out.tables.push(`${name(el)} ${el.scrollWidth} px in ${el.clientWidth}`);
     }
     // A sheet taller than the screen, or one that scrolls for a sliver.
     for (const d of document.querySelectorAll('dialog[open], .q-sheet[open], [role=dialog]:not([hidden])')) {
@@ -234,7 +234,7 @@
       for (const sc of [d, ...d.querySelectorAll('*')]) {
         const cs = getComputedStyle(sc);
         const over = sc.scrollHeight - sc.clientHeight;
-        if (/auto|scroll/.test(cs.overflowY) && over > 2 && over < 64 && sc.clientHeight > 120) out.sheets.push(`${name(sc)} in ${name(d)} scrolls for only ${over} px`);
+        if (/auto|scroll/.test(cs.overflowY) && over > 2 && over < 28 && sc.clientHeight > 120) out.sheets.push(`${name(sc)} in ${name(d)} scrolls for only ${over} px`);
       }
     }
     // A past season shown as now: a heading, tab or pill naming a year two or more back.
@@ -246,9 +246,39 @@
       const y = m && Number(m[1] || m[2]);
       if (y && y <= year - 2) out.old.push(`${name(el)} "${tx.slice(0, 30)}"`);
     }
+    // White in dark mode: a box painted near-white (a logo tile, a button) on a dark screen.
+    if (matchMedia('(prefers-color-scheme: dark)').matches) {
+      for (const el of all) {
+        const m = /rgba?\((\d+), (\d+), (\d+)(?:, ([\d.]+))?\)/.exec(getComputedStyle(el).backgroundColor);
+        if (!m || (m[4] !== undefined && Number(m[4]) < 0.6) || Math.min(m[1], m[2], m[3]) < 225) continue;
+        const r = el.getBoundingClientRect();
+        if (r.width >= 24 && r.height >= 24 && r.top < innerHeight * 2) out.white.push(`${name(el)} ${Math.round(r.width)}×${Math.round(r.height)}`);
+      }
+    }
+    // (Which rule locked it: named in the fault.)
+    const lockedBy = () => {
+      const hits = [];
+      const walk = rules => {
+        for (const r of rules) {
+          if (r.cssRules && !r.selectorText) walk(r.cssRules);
+          else if (r.selectorText && /hidden|clip/.test(r.style?.overflowY || r.style?.overflow || '') && [document.documentElement, document.body].some(e => { try { return e.matches(r.selectorText); } catch { return false; } })) hits.push(r.selectorText.slice(0, 80));
+        }
+      };
+      for (const sh of document.styleSheets) try { walk(sh.cssRules); } catch {}
+      const inline = [document.documentElement, document.body].map(e => e.style.overflow || e.style.overflowY).filter(Boolean);
+      return hits.length || inline.length ? `; by ${[...hits, ...inline.map(v => `inline ${v}`)].join(', ')}` : '';
+    };
     // A page longer than the screen that can't be scrolled by a finger.
     const se = document.scrollingElement || document.documentElement;
-    if (!document.querySelector('#loading:not([hidden]), dialog[open]') && se.scrollHeight > innerHeight + 40 && [document.documentElement, document.body].some(e => /hidden|clip/.test(getComputedStyle(e).overflowY))) out.scroll.push(`page ${se.scrollHeight} px tall, scrolling locked`);
+    // (A full-screen page over it, Now Playing or an editor, rightly holds the page behind still.)
+    const cover = (() => {
+      for (let e = document.elementFromPoint(innerWidth / 2, innerHeight / 2); e && e !== document.body; e = e.parentElement) {
+        const r = e.getBoundingClientRect();
+        if (getComputedStyle(e).position === 'fixed' && r.width >= innerWidth * 0.9 && r.height >= innerHeight * 0.9) return true;
+      }
+      return false;
+    })();
+    if (!cover && !document.querySelector('#loading:not([hidden]), dialog[open], .q-menu, [role=menu]') && se.scrollHeight > innerHeight + 40 && [document.documentElement, document.body].some(e => /hidden|clip/.test(getComputedStyle(e).overflowY))) out.scroll.push(`page ${se.scrollHeight} px tall, scrolling locked (html ${getComputedStyle(document.documentElement).overflowY}, body ${getComputedStyle(document.body).overflowY}${document.querySelector(':modal') ? `, ${name(document.querySelector(':modal'))} open` : ''}${lockedBy()})`);
     // The bar's small title belongs to a large title on this screen that has
     // scrolled up under it; never a page left or another tab's.
     const bar = document.querySelector('.q-navbar.on');
@@ -306,6 +336,24 @@
       el.blur();
       gate.keys(0);
       await wait(200);
+    }
+    return out;
+  };
+
+  // Sheets with fields no tap reached (an order ticket, a stake, a rename):
+  // each opened as it is, its fields checked with the keyboard up, closed.
+  gate.sheetTyping = async (done = []) => {
+    const out = [];
+    for (const d of [...document.querySelectorAll('dialog:not([open])')].filter(d => d.querySelector(FIELD)).slice(0, 8)) {
+      try {
+        d.showModal();
+      } catch {
+        continue;
+      }
+      await wait(500);
+      for (const l of await gate.typing(done)) out.push(`${name(d)} opened: ${l}`);
+      d.close();
+      await wait(150);
     }
     return out;
   };

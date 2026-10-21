@@ -23,6 +23,7 @@
 //   orphan    a wrapped row of pills with one left alone on its last line
 //   tables    a stats table that slides sideways
 //   sheets    a sheet taller than the screen, or one that scrolls for a sliver
+//   white     (dark) a near-white box: a logo tile or a button glaring
 //   scroll    a page longer than the screen that won't scroll
 //   header    the top bar naming a page left or another tab
 //   old       a season two or more years back shown as current
@@ -96,7 +97,7 @@ const faults = r => {
   const after = t => (r.tapAt || []).filter(([, at]) => at <= t).at(-1)?.[0];
   for (const [t, ms] of r.longs || []) if (ms >= 500) f.push(['stall', at, `main thread blocked ${ms} ms at ${t} ms${after(t) ? ` after ${after(t)}` : ''}`, first]);
   for (const e of r.pageErrors || []) f.push(['errors', at, e, first]);
-  for (const tab of r.tabs || []) for (const kind of ['blank', 'pictures', 'overflow', 'wraps', 'cut', 'letters', 'slots', 'halfEmpty', 'bareEmpty', 'loading', 'dead', 'typing', 'orphan', 'tables', 'sheets', 'old', 'header', 'scroll']) for (const what of tab[kind] || []) f.push([kind, `${at} #${tab.id}`, what, tab.shot]);
+  for (const tab of r.tabs || []) for (const kind of ['blank', 'pictures', 'overflow', 'wraps', 'cut', 'letters', 'slots', 'halfEmpty', 'bareEmpty', 'loading', 'dead', 'typing', 'orphan', 'tables', 'sheets', 'old', 'header', 'scroll', 'white']) for (const what of tab[kind] || []) f.push([kind, `${at} #${tab.id}`, what, tab.shot]);
   return f;
 };
 
