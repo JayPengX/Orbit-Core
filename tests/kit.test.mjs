@@ -667,6 +667,50 @@ test("中場休息 counts down from the half's last play, by the league's break"
   assert.equal(kit.halftimeEnd('t:2'), null);
 });
 
+test('every break counts down by its rule: quarters, innings, timeouts', async () => {
+  const nba = { sport: 'basketball', league: 'nba' };
+  assert.deepEqual(kit.breakOf({ ...nba, status: { state: 'in', name: 'STATUS_END_PERIOD', period: 1 } })?.seconds, 130);
+  assert.equal(kit.breakOf({ ...nba, status: { state: 'in', name: 'STATUS_HALFTIME', period: 2 } })?.kind, 'half');
+  // 76ers at Knicks, 2026-10-20: a team's timeout on the scoreboard's last play, 75 s from its own clock.
+  const to = kit.breakOf({ ...nba, status: { state: 'in', name: 'STATUS_IN_PROGRESS', period: 1 }, live: { lastType: 'Full Timeout', lastId: '401909089112' } });
+  assert.deepEqual([to.kind, to.seconds, to.play], ['timeout', 75, '401909089112']);
+  assert.equal(kit.breakOf({ ...nba, status: { state: 'in', name: 'STATUS_IN_PROGRESS', period: 1 }, live: { lastType: 'Substitution' } }), null);
+  assert.equal(kit.breakOf({ sport: 'basketball', league: 'euroleague', status: { state: 'in', name: 'STATUS_END_PERIOD', period: 3 } }).seconds, 120);
+  assert.equal(kit.breakOf({ sport: 'football', league: 'nfl', status: { state: 'in', name: 'STATUS_END_PERIOD', period: 2 } }).kind, 'half');
+  assert.equal(kit.breakOf({ sport: 'hockey', league: 'nhl', status: { state: 'in', name: 'STATUS_END_PERIOD', period: 1 } }).seconds, 1080);
+  assert.equal(kit.breakOf({ sport: 'hockey', league: 'nhl', status: { state: 'in', name: 'STATUS_END_PERIOD', period: 3 } }), null);
+  assert.equal(kit.breakOf({ sport: 'baseball', league: 'mlb', status: { state: 'in', name: 'STATUS_IN_PROGRESS', period: 3 }, live: { half: 'mid' } }).seconds, 135);
+  assert.equal(kit.breakOf({ sport: 'baseball', league: 'mlb', post: true, status: { state: 'in', period: 3 }, live: { half: 'end' } }).seconds, 190);
+  assert.equal(kit.breakOf({ sport: 'baseball', league: 'mlb', status: { state: 'in', period: 3 }, live: { half: 'top' } }), null);
+  assert.equal(kit.breakOf({ sport: 'soccer', league: 'epl', status: { state: 'in', name: 'STATUS_SECOND_HALF' } }), null);
+  assert.equal(kit.breakOf({ ...nba, status: { state: 'in', name: 'STATUS_END_PERIOD', delayed: true } }), null);
+  // The timeout's end from its own play, not the latest one after it.
+  const summary = { plays: [{ id: '7', wallclock: '2026-10-20T23:24:42Z' }, { id: '8', wallclock: '2026-10-20T23:24:50Z' }] };
+  kit.watchBreak('t:to', { seconds: 75, read: async () => summary, play: '7' });
+  await new Promise(r => setTimeout(r, 0));
+  assert.equal(kit.halftimeEnd('t:to'), Date.parse('2026-10-20T23:24:42Z') + 75_000);
+  // The NBA's mandatory timeouts: a period's first two, 3:15 on national TV (76ers at Knicks on NBC, 2026-10-20); a third 1:15.
+  const plays = [
+    { id: '1', period: { number: 2 }, type: { text: 'Full Timeout' }, wallclock: '2026-10-21T00:00:31Z' },
+    { id: '2', period: { number: 2 }, type: { text: 'Jump Shot' }, wallclock: '2026-10-21T00:04:00Z' },
+    { id: '3', period: { number: 2 }, type: { text: 'Official Timeout' }, wallclock: '2026-10-21T00:08:00Z' },
+    { id: '4', period: { number: 2 }, type: { text: 'Full Timeout' }, wallclock: '2026-10-21T00:12:00Z' }
+  ];
+  const national = { header: { competitions: [{ broadcasts: [{ type: { shortName: 'TV' }, isNational: true }] }] }, plays };
+  const nbaTo = kit.breakOf({ ...nba, status: { state: 'in', period: 2 }, live: { lastType: 'Full Timeout', lastId: '1' } });
+  kit.watchBreak('t:m1', { ...nbaTo, read: async () => national });
+  kit.watchBreak('t:m3', { ...nbaTo, play: '4', read: async () => national });
+  kit.watchBreak('t:m1l', { ...nbaTo, read: async () => ({ plays }) });
+  await new Promise(r => setTimeout(r, 0));
+  assert.equal(kit.halftimeEnd('t:m1'), Date.parse('2026-10-21T00:00:31Z') + 195_000);
+  assert.equal(kit.halftimeEnd('t:m3'), Date.parse('2026-10-21T00:12:00Z') + 75_000);
+  assert.equal(kit.halftimeEnd('t:m1l'), Date.parse('2026-10-21T00:00:31Z') + 165_000);
+  // An inning break: the summary says Mid.
+  kit.watchBreak('t:inn', { seconds: 135, read: async () => ({ header: { competitions: [{ status: { type: { name: 'STATUS_IN_PROGRESS', shortDetail: 'Mid 1st' } } }] }, plays: [{ wallclock: '2026-10-20T00:13:41Z' }] }), test: /^(mid|end)/i });
+  await new Promise(r => setTimeout(r, 0));
+  assert.equal(kit.halftimeEnd('t:inn'), Date.parse('2026-10-20T00:13:41Z') + 135_000);
+});
+
 test('a live number pops only when it changed, and never in the first seconds', () => {
   assert.equal(kit.liveChanged('t:a', '1-0', 10_000), false);
   assert.equal(kit.liveChanged('t:a', '1-0', 11_000), false);

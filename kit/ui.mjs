@@ -347,6 +347,24 @@ export function empty({ icon = 'list', tint = '', title = '', body = '', action 
 // Wide screens keep the bar where it was: there the title just scrolls away.
 let navbar = null;
 let navOwner = null;
+let navOwnerEl = null;
+// The bar's title only while its own title is on the page and shown: a
+// tab switched or a title gone with no observer telling (an iPhone switching
+// tabs kept 賽事's "F1 一級方程式" over 轉播, 2026-10-21) lets go at the next scroll or frame.
+let navCheckFrame = 0;
+const navCheck = () => {
+  navCheckFrame = 0;
+  if (!navOwner || !navbar) return;
+  const el = navOwnerEl;
+  if (!el?.isConnected || !el.getClientRects().length) {
+    navOwner = null;
+    navOwnerEl = null;
+    navbar.classList.remove('on');
+  }
+};
+const navSoon = () => {
+  if (navOwner && !navCheckFrame && typeof requestAnimationFrame === 'function') navCheckFrame = requestAnimationFrame(navCheck);
+};
 const navWatched = new Set();
 let navMO = null;
 const navBar = () => {
@@ -375,10 +393,12 @@ export function bindNavTitle(el, { scroller = null } = {}) {
     const b = navBar();
     if (on) {
       navOwner = token;
+      navOwnerEl = el;
       b.firstChild.textContent = el.textContent;
       b.classList.add('on');
     } else if (navOwner === token) {
       navOwner = null;
+      navOwnerEl = null;
       b.classList.remove('on');
     }
   };
@@ -437,7 +457,8 @@ export function bindNavTitle(el, { scroller = null } = {}) {
   };
   navWatched.add(w);
   if (!navMO && typeof MutationObserver === 'function') {
-    navMO = new MutationObserver(navSweep);
+    globalThis.addEventListener?.('scroll', navSoon, { passive: true });
+    navMO = new MutationObserver(() => (navSweep(), navSoon()));
     navMO.observe(document.body, { childList: true, subtree: true });
   }
   setTimeout(() => !w.seen && !el.isConnected && w.stop(), 10_000);

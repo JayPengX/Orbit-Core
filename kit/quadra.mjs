@@ -4101,17 +4101,93 @@ export const halftimeEnd = key => halftimeEnds.get(String(key)) ?? null;
 // summary of it), then ticking. A summary not yet at the break (a cached
 // copy from before the whistle) is asked again 20 s later.
 export function watchHalftime(key, { sport, league = '', read }) {
-  key = String(key);
   const minutes = halftimeMinutes(sport, league);
-  if (!minutes || halftimeEnds.has(key) || Date.now() - (halftimeAsked.get(key) || 0) < 20_000) return halftimeEnd(key);
+  return minutes ? watchBreak(key, { seconds: minutes * 60, read, test: /HALFTIME|^HT$|^half/i }) : null;
+}
+
+// ---- Every break, timeouts too: the same countdown -------------------------------------------
+// A game stopped by its rules: half-time, a period or quarter over, the
+// break between innings, a timeout (a team's, the officials' TV one), the
+// two-minute warning. Its length is the league's rule; its start the
+// stopping play's clock on the wall in ESPN's summary. (No countdown for a
+// stop with no set length: an injury, a review, a rain delay.)
+//   basketball  NBA: 2:10 between quarters and before overtime; a period's
+//               first two timeouts are its mandatory ones, 2:45 (3:15 on
+//               national TV), any more 1:15 (Rule 5); FIBA (EuroLeague,
+//               NBL): 2:00, 60 s.
+//   football    NFL: 2:00 between quarters, a timeout and the two-minute
+//               warning on TV 2:00; half-time 13 min (college 20).
+//   hockey      NHL: an intermission 18 min (15 before a play-off overtime), a timeout 30 s.
+//   soccer      half-time 15 min, 5 before extra time, 1 at its half.
+//   baseball    MLB: the inning break and a pitching change 2:15 (3:10 in the play-offs).
+const BREAK_SECONDS = {
+  basketball: { half: 900, period: 130, timeout: 75 },
+  football: { half: 780, period: 120, timeout: 120, warning: 120 },
+  hockey: { period: 1080, overtime: 900, timeout: 30 },
+  soccer: { half: 900, extra: 300, etHalf: 60 },
+  baseball: { inning: 135, pitching: 135 }
+};
+const BREAK_LEAGUE = { euroleague: { period: 120, timeout: 60 }, nbl: { period: 120, timeout: 60 }, ncaaf: { half: 1200 }, 'college-football': { half: 1200 } };
+const BREAK_POST = { baseball: { inning: 190, pitching: 190 } };
+// The break a game is in now, from its status ({ name: ESPN's code, period,
+// short }) and the last play ({ lastType, lastId, half }), or null.
+// `post`: a play-off game. { kind, seconds, test, play } (test: what the
+// summary's status says during it; play: the stopping play's id).
+export function breakOf({ sport, league = '', status = {}, live = {}, post = false }) {
+  if (status.state && status.state !== 'in') return null;
+  if (status.delayed) return null;
+  const len = { ...BREAK_SECONDS[sport], ...BREAK_LEAGUE[league], ...(post ? BREAK_POST[sport] : null) };
+  const code = `${status.name || ''}`;
+  const n = Number(status.period) || 0;
+  const pick = (kind, test, play = '') => (len[kind] ? { kind, seconds: len[kind], test, play } : null);
+  if (/HALFTIME_ET|HALF_TIME_ET/.test(code)) return pick('etHalf', /HALF/i);
+  if (/HALFTIME/.test(code)) return pick('half', /HALFTIME|^HT$|^half/i);
+  if (sport === 'soccer' && /END_OF_REGULATION|END_REGULATION|END_OF_REGULAR/.test(code)) return pick('extra', /END/i);
+  if (/END_PERIOD|END_OF_PERIOD/.test(code) || (sport !== 'baseball' && /^end of/i.test(status.short || ''))) {
+    if (sport === 'football' && n === 2) return pick('half', /END|HALF/i);
+    if (sport === 'hockey' && n >= 3) return post ? pick('overtime', /END/i) : null;
+    if (sport !== 'baseball') return pick('period', /END/i);
+  }
+  if (sport === 'baseball' && (live.half === 'mid' || live.half === 'end')) return pick('inning', /^(mid|end)/i);
+  const last = `${live.lastType || ''}`;
+  if (/two.minute warning/i.test(last)) return pick('warning', /./, live.lastId);
+  if (sport === 'baseball' && /pitching change/i.test(last)) return pick('pitching', /./, live.lastId);
+  if (/timeout/i.test(last) && !/end (of )?timeout/i.test(last)) {
+    const b = pick('timeout', /./, live.lastId);
+    return b && league === 'nba' ? { ...b, mandatory: { first: 2, local: 165, national: 195 } } : b;
+  }
+  return null;
+}
+// The break's countdown: its end found once (read: () => ESPN's summary of
+// the game), then ticking with the half-time ones (the same beat, the same
+// halftimeAttrs on what shows it). `play`: the stopping play's id (its own
+// clock, not the latest); `test`: the summary's status says the break (a
+// copy from before it isn't taken, and is asked again 20 s later).
+// `mandatory`: { first, local, national }: a period's first timeouts run
+// longer (the NBA's TV ones), national TV longer still (the summary says
+// which, and which timeout of its period this is).
+const isTimeout = p => /timeout/i.test(p?.type?.text || '') && !/end (of )?timeout/i.test(p?.type?.text || '');
+function breakSeconds(summary, own, seconds, mandatory) {
+  if (!mandatory || !own) return seconds;
+  const plays = summary?.plays || [];
+  const at = plays.indexOf(own);
+  const n = plays.slice(0, at + 1).filter(p => isTimeout(p) && p?.period?.number === own?.period?.number).length;
+  if (!n || n > mandatory.first) return seconds;
+  const national = (summary?.header?.competitions?.[0]?.broadcasts || []).some(b => b?.isNational && /tv/i.test(b?.type?.shortName || ''));
+  return national ? mandatory.national : mandatory.local;
+}
+export function watchBreak(key, { seconds, read, test = /./, play = '', mandatory = null }) {
+  key = String(key);
+  if (!seconds || halftimeEnds.has(key) || Date.now() - (halftimeAsked.get(key) || 0) < 20_000) return halftimeEnd(key);
   halftimeAsked.set(key, Date.now());
   Promise.resolve()
     .then(read)
     .then(summary => {
       const status = summary?.header?.competitions?.[0]?.status?.type || {};
-      const start = halftimeStartOf(summary);
-      if (!start || !/HALFTIME|^HT$|^half/i.test(`${status.name || ''} ${status.shortDetail || ''}`.trim())) return;
-      halftimeEnds.set(key, start + minutes * 60_000);
+      const own = play ? [...(summary?.plays || []), ...(summary?.drives?.current?.plays || []), ...(summary?.drives?.previous || []).flatMap(d => d?.plays || [])].find(p => String(p?.id) === String(play)) : null;
+      const start = own ? Date.parse(own.wallclock || '') : play ? null : halftimeStartOf(summary);
+      if (!Number.isFinite(start) || !start || (!play && !test.test(`${status.name || ''} ${status.shortDetail || ''}`.trim()) && !test.test(status.shortDetail || ''))) return;
+      halftimeEnds.set(key, start + breakSeconds(summary, own, seconds, mandatory) * 1000);
       try {
         localStorage.setItem(HALFTIME_KEY, JSON.stringify(Object.fromEntries(halftimeEnds)));
       } catch {}
