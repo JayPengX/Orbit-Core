@@ -27,6 +27,8 @@ export const LEAGUES = Object.fromEntries(
         // month lists (Asian baseball).
         if (l.data === 'asia') league.schedule = { asia: l.asia };
       }
+      // Results from an ESPN scoreboard though the prices are Kambi's (UFC).
+      if (l.results) league.results = l.results;
       for (const k of ['logo', 'icon', 'badge', 'top']) if (l[k] !== undefined) league[k] = l[k];
       return [l.bet, league];
     })
@@ -702,6 +704,28 @@ export function parseOpenF1Flags(messages) {
   };
 }
 
+// A bout's result from an ESPN card (mma scoreboard): its winner 1-0, a
+// draw or no contest void (勝負 is two ways), called off void; null while
+// it's still to come or under way, or not on this card.
+export function boutResult(data, home, away) {
+  for (const event of data?.events || []) {
+    for (const c of event.competitions || []) {
+      const [a, b] = c.competitors || [];
+      if (!a || !b) continue;
+      const order = sidesMatch(a.athlete?.displayName, b.athlete?.displayName, home, away);
+      if (!order) continue;
+      const [h, w] = order === 'same' ? [a, b] : [b, a];
+      const type = c.status?.type || {};
+      if (VOID_STATUS.test(type.name || '') || POSTPONED.test(type.name || '')) return { status: 'void' };
+      if (!type.completed) return type.state === 'in' ? { status: 'pending', state: 'in', homeScore: 0, awayScore: 0, detail: '' } : null;
+      if (h.winner === true) return { status: 'final', homeScore: 1, awayScore: 0 };
+      if (w.winner === true) return { status: 'final', homeScore: 0, awayScore: 1 };
+      return { status: 'void' };
+    }
+  }
+  return null;
+}
+
 // ESPN files games under the US Eastern date.
 export function espnDates(startUtc) {
   const t = Date.parse(startUtc);
@@ -836,7 +860,9 @@ export const SCORE_SPORTS = {
   darts: { hours: 0, sells: ['ml'] },
   handball: { hours: 2.5, sells: ['ml'] },
   rugby: { hours: 3, sells: ['ml'] },
-  futsal: { hours: 2.5, sells: ['ml', 'total'] }
+  futsal: { hours: 2.5, sells: ['ml', 'total'] },
+  // Settled from ESPN's card (boutResult), never Kambi's live data.
+  mma: { hours: 0, sells: ['ml'] }
 };
 export { THREE_WAY_SPORTS };
 
@@ -973,7 +999,7 @@ export async function readOutcomes(legs, { read, keptKambi = async () => null, n
       const league = LEAGUES[leg.sport];
       // Tennis and UFC are no longer sold (2026-10-11): a pick still open on
       // one is void, its stake back.
-      if (!league && ['atp', 'wta', 'ufc'].includes(leg.sport)) return out.set(leg.id, { status: 'void' });
+      if (!league && ['atp', 'wta'].includes(leg.sport)) return out.set(leg.id, { status: 'void' });
       // Asian baseball from the league's own list (a game Kambi didn't price):
       // the final score in its month's list.
       if (league?.schedule?.asia && !leg.kambiId) {
@@ -981,6 +1007,23 @@ export async function readOutcomes(legs, { read, keptKambi = async () => null, n
         const games = await asiaMonth(page, league.schedule.asia, asiaMonthOf(t)).catch(() => []);
         const g = games.find(x => Math.abs(Date.parse(x.start) - t) < 12 * 3_600_000 && sidesMatch(x.home?.en, x.away?.en, leg.home, leg.away) === 'same');
         if (g) out.set(leg.id, asiaResult(g));
+        return;
+      }
+      // A fight: its winner on ESPN's card (the card's day, or the day either
+      // side of it: a card is filed under its own local date).
+      if (league?.results && league.family === 'mma') {
+        const t = Date.parse(leg.start);
+        const days = [...new Set([-1, 0, 1].flatMap(d => espnDates(new Date(t + d * DAY_MS).toISOString())))];
+        let card = false;
+        for (const date of days) {
+          const data = await page(`${ESPN}/${league.results}/scoreboard?dates=${date}`);
+          const result = data && boutResult(data, leg.home, leg.away);
+          if (result) return out.set(leg.id, result);
+          if (data?.events?.some(e => Math.abs(Date.parse(e.date) - t) < 2 * DAY_MS && e.status?.type?.completed)) card = true;
+        }
+        // The card is over without this bout (called off, a fighter out), or
+        // no card at all a week on: the stake back.
+        if (card || now.getTime() - t > 7 * DAY_MS) out.set(leg.id, { status: 'void' });
         return;
       }
       // Kambi's sports: the result from the match's own live data, once the

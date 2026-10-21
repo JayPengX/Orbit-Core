@@ -155,8 +155,8 @@ const loads = url =>
 // official headshot, for players the feed didn't give an id for. Checked to
 // exist before it's used.
 const ESPN_SEARCH = 'https://site.web.api.espn.com/apis/common/v3/search?type=player&limit=6&query=';
-const SEARCH_SPORT = { racing: 'racing', soccer: 'soccer', basketball: 'basketball', baseball: 'baseball', football: 'football', hockey: 'hockey', tennis: 'tennis' };
-const HEADSHOT_FOLDER = { racing: 'rpm', soccer: 'soccer', basketball: 'nba', baseball: 'mlb', football: 'nfl', hockey: 'nhl', tennis: 'tennis' };
+const SEARCH_SPORT = { racing: 'racing', soccer: 'soccer', basketball: 'basketball', baseball: 'baseball', football: 'football', hockey: 'hockey', tennis: 'tennis', mma: 'mma' };
+const HEADSHOT_FOLDER = { racing: 'rpm', soccer: 'soccer', basketball: 'nba', baseball: 'mlb', football: 'nfl', hockey: 'nhl', tennis: 'tennis', mma: 'mma' };
 export async function espnSearchPhoto(name, sport, fetchJson = defaultJson, check = loads) {
   if (!SEARCH_SPORT[sport]) return '';
   // (A failed search throws: findPhoto keeps nothing, and asks again later.)

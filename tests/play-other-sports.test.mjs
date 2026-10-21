@@ -66,3 +66,25 @@ test('a women\'s national side reads as one', () => {
   assert.equal(countryName('Belgium (W)'), '比利時(女)');
   assert.equal(teamZh('volleyball', 'Poland'), '波蘭');
 });
+
+test('UFC: Kambi prices, the winner from ESPN card, a draw void', async () => {
+  const { CATALOG } = await import('../kit/catalog.mjs');
+  const { LEAGUES, boutResult, readOutcomes } = await import('../kit/settle.mjs');
+  assert.equal(CATALOG.ufc.sport, 'mma');
+  assert.equal(LEAGUES.ufc.results, 'mma/ufc');
+  const bout = (x, y, wx, wy, name = 'STATUS_FINAL', completed = true) => ({ events: [{ date: '2026-10-17T21:00Z', status: { type: { completed: true } }, competitions: [{ status: { type: { name, completed, state: completed ? 'post' : 'pre' } }, competitors: [{ athlete: { displayName: x }, winner: wx }, { athlete: { displayName: y }, winner: wy }] }] }] });
+  assert.deepEqual(boutResult(bout('SuYoung You', 'Cody Chovancek', true, false), 'SuYoung You', 'Cody Chovancek'), { status: 'final', homeScore: 1, awayScore: 0 });
+  assert.deepEqual(boutResult(bout('Cody Chovancek', 'SuYoung You', false, true), 'SuYoung You', 'Cody Chovancek'), { status: 'final', homeScore: 1, awayScore: 0 });
+  assert.deepEqual(boutResult(bout('A Fighter', 'B Fighter', false, false), 'A Fighter', 'B Fighter'), { status: 'void' });
+  assert.equal(boutResult(bout('A Fighter', 'B Fighter', false, false, 'STATUS_SCHEDULED', false), 'A Fighter', 'B Fighter'), null);
+  assert.equal(boutResult(bout('A Fighter', 'B Fighter', true, false), 'C Other', 'D Other'), null);
+  const card = bout('Cody Chovancek', 'SuYoung You', false, true);
+  const leg = { id: 'l1', sport: 'ufc', kind: 'ml', kambiId: 1, home: 'SuYoung You', away: 'Cody Chovancek', start: '2026-10-17T21:00:00Z' };
+  const read = url => (url.includes('mma/ufc/scoreboard?dates=20261017') ? card : { events: [] });
+  const out = await readOutcomes([leg], { read, now: new Date('2026-10-18T06:00:00Z') });
+  assert.equal(out.get('l1').status, 'final');
+  assert.equal(out.get('l1').homeScore, 1);
+  // The card over without the bout: void.
+  const gone = await readOutcomes([{ ...leg, home: 'X Nobody', away: 'Y Nobody' }], { read, now: new Date('2026-10-18T06:00:00Z') });
+  assert.equal(gone.get('l1').status, 'void');
+});
