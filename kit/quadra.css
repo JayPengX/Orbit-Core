@@ -3490,6 +3490,17 @@ html[data-q-turn] dialog[open] {
   text-decoration: none;
   cursor: pointer;
 }
+/* Dark: the hero's button is glass, never a white slab (the owner, 2026-10-21). */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .q-hc-btn:not(.ghost) {
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
+  }
+}
+:root[data-theme='dark'] .q-hc-btn:not(.ghost) {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
 .q-hc-btn.ghost {
   background: rgba(255, 255, 255, 0.18);
   color: #ffffff;
