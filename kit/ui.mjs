@@ -356,7 +356,8 @@ const navCheck = () => {
   navCheckFrame = 0;
   if (!navOwner || !navbar) return;
   const el = navOwnerEl;
-  if (!el?.isConnected || !el.getClientRects().length) {
+  // (A hidden tab stays laid out, content-visibility: hidden: [hidden] says it's gone.)
+  if (!el?.isConnected || !el.getClientRects().length || el.closest('[hidden]')) {
     navOwner = null;
     navOwnerEl = null;
     navbar.classList.remove('on');
@@ -375,7 +376,13 @@ const navBar = () => {
 };
 // A title whose element left the page stops watching (one that was never put
 // in the page is let go of after a while).
-const navSweep = () => {
+// A title in a tab or page that was hidden lets the bar go; shown again, it
+// asks afresh. (Hidden tabs stay laid out, content-visibility: hidden, so
+// their pictures don't flash: a title there keeps its box and its "scrolled
+// off" state, and the bar kept a pushed page's or another tab's name, F1
+// 一級方程式 over the scores, Jay 2026-10-21.)
+const navSweep = records => {
+  if (records?.some(r => r.type === 'attributes')) for (const w of navWatched) w.recheck();
   for (const w of [...navWatched]) {
     if (w.el.isConnected) w.seen = true;
     else if (w.seen) w.stop();
@@ -421,7 +428,7 @@ export function bindNavTitle(el, { scroller = null } = {}) {
         const e = entries[entries.length - 1];
         const r = e.boundingClientRect;
         // Collapsed: gone off the top (not below the fold, not a hidden tab's empty box).
-        set(!e.isIntersecting && r.height > 0 && r.bottom <= (e.rootBounds ? e.rootBounds.top : under) + 1);
+        set(!e.isIntersecting && r.height > 0 && r.bottom <= (e.rootBounds ? e.rootBounds.top : under) + 1 && !el.closest('[hidden]'));
       },
       { root: scroller, rootMargin: `-${under}px 0px 0px 0px`, threshold: 0 }
     );
@@ -445,6 +452,10 @@ export function bindNavTitle(el, { scroller = null } = {}) {
   const w = {
     el,
     seen: false,
+    recheck() {
+      if (el.closest('[hidden]')) set(false);
+      else if (el.isConnected) observe();
+    },
     stop() {
       if (frame) cancelAnimationFrame(frame);
       ro?.disconnect();
@@ -458,8 +469,8 @@ export function bindNavTitle(el, { scroller = null } = {}) {
   navWatched.add(w);
   if (!navMO && typeof MutationObserver === 'function') {
     globalThis.addEventListener?.('scroll', navSoon, { passive: true });
-    navMO = new MutationObserver(() => (navSweep(), navSoon()));
-    navMO.observe(document.body, { childList: true, subtree: true });
+    navMO = new MutationObserver(records => (navSweep(records), navSoon()));
+    navMO.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden'] });
   }
   setTimeout(() => !w.seen && !el.isConnected && w.stop(), 10_000);
   globalThis.addEventListener?.('resize', observe);
@@ -521,7 +532,7 @@ export function pullToRefresh(onRefresh, { threshold = 70, disabled = () => fals
   const begin = e => {
     live = false;
     if (busy || disabled() || e.touches.length !== 1 || top() > 0) return;
-    if (root.querySelector('dialog[open], .loading:not([hidden])') || e.target.closest?.(skip) || scrolledBox(e.target)) return;
+    if (root.querySelector('dialog[open], #loading:not([hidden])') || e.target.closest?.(skip) || scrolledBox(e.target)) return;
     [x0, y0, live, pulling, armed] = [e.touches[0].clientX, e.touches[0].clientY, true, false, false];
   };
   const move = e => {

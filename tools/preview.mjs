@@ -1036,6 +1036,9 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
       // Each button tapped once: one that changes nothing is dead on the first
       // tap; a "next" that keeps the same track restarted it instead.
       if (gateTaps) {
+        // (Each field checked once, on the tab or in the sheet a tap opened.)
+        found.typing = await page.evaluate(d => globalThis.__gate.typing(d), (result.typed ||= [])).catch(e => [`keyboard check: ${e.message.split('\n')[0]}`]);
+        result.typed = await page.evaluate(() => globalThis.__gate.typedSoFar).catch(() => result.typed);
         found.dead = [];
         found.tapped = 0;
         const labels = await page.evaluate(() => globalThis.__gate.buttons()).catch(() => []);
@@ -1052,6 +1055,13 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
           await page.waitForTimeout(900);
           const after = await page.evaluate(() => globalThis.__gate.print());
           if (['dom', 'dialogs', 'where', 'media'].every(k => before[k] === after[k])) found.dead.push(`"${want}" did nothing`);
+          // What the tap opened (a sheet, a game or player page, 紀錄), looked at as closely as the tab.
+          if (['dom', 'dialogs', 'where'].some(k => before[k] !== after[k])) {
+            const deep = await page.evaluate(() => globalThis.__gate.check()).catch(() => ({}));
+            for (const [kind, lines] of Object.entries(deep)) for (const l of lines || []) if (!(found[kind] ||= []).some(x => x === l || x.endsWith(`: ${l}`))) found[kind].push(`after "${want}": ${l}`);
+          }
+          if (after.fields > before.fields) found.typing.push(...(await page.evaluate(d => globalThis.__gate.typing(d), result.typed).catch(e => [`keyboard check: ${e.message.split('\n')[0]}`])).map(l => `after "${want}": ${l}`));
+          if (after.fields > before.fields) result.typed = await page.evaluate(() => globalThis.__gate.typedSoFar).catch(() => result.typed);
           else if (/下一首|下一個|下一曲|next/i.test(want) && before.track && before.track === after.track && before.media.split('|')[0] === after.media.split('|')[0]) found.dead.push(`"${want}" kept the same track`);
           // Back to where the tab was: sheets and menus closed, the address and the tab put back.
           await page.keyboard.press('Escape').catch(() => {});
@@ -1064,6 +1074,8 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
           }
           if (t.id !== 'start' && (await page.evaluate(() => document.querySelector('.q-tab[aria-selected=true]')?.dataset.tab).catch(() => t.id)) !== t.id) await page.click(`.q-tab[data-tab="${t.id}"]`).catch(() => {});
           await page.waitForTimeout(300);
+          // Back again: nothing of where it went left on the screen (the top bar's name).
+          for (const l of (await page.evaluate(() => globalThis.__gate.check().header).catch(() => [])) || []) if (!(found.header ||= []).some(x => x.endsWith(l))) found.header.push(`back from "${want}": ${l}`);
         }
       }
     }
