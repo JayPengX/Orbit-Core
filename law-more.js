@@ -218,8 +218,10 @@ export function matchRules(rows, text, cites) {
   return scored
     .sort((a, b) => b[0] - a[0] || String(b[1][3]).localeCompare(String(a[1][3])))
     .slice(0, MORE_LIMITS.rules)
-    .map(([, r]) => ({ id: r[0], n: r[1], agency: String(r[2] || ''), d: String(r[3] || ''), url: /^https:\/\//.test(r[4]) ? r[4] : '' }));
+    .map(([, r]) => ({ id: r[0], n: r[1], agency: String(r[2] || ''), d: String(r[3] || ''), url: /^https:\/\//.test(r[4]) ? r[4] : '', dir: r.dir || 'agency' }));
 }
+// The cities' 地方法規 (local/all.json: [id, name, city, date, url, laws]) as rule rows.
+export const localRows = rows => (Array.isArray(rows) ? rows.filter(Array.isArray).map(r => Object.assign([r[0], r[1], r[2], r[3], r[4], [], r[5] || []], { dir: 'local' })) : []);
 
 // The ministries' rule sites (one software: SearchAllResultList, LawContent), as build-agency.mjs lists them.
 export const RULE_SITES = [
@@ -300,7 +302,7 @@ export async function moreFor(text, articles, { mine = null, items = [], today =
   const ps = [...new Set(articles.map(a => a.p))];
   const lawNames = [...new Set(articles.map(a => a.n))];
   const own = mine && asksMine(text) ? mine : null;
-  const [rulings, peopleF, votesF, agendaF, rulesF, consF] = await Promise.all(['rulings/all.json', 'ly/people.json', 'ly/votes.json', 'ly/agenda.json', 'agency/all.json', 'cons/index.json'].map(p => readGround(p)));
+  const [rulings, peopleF, votesF, agendaF, rulesF, consF, localF] = await Promise.all(['rulings/all.json', 'ly/people.json', 'ly/votes.json', 'ly/agenda.json', 'agency/all.json', 'cons/index.json', 'local/all.json'].map(p => readGround(p)));
   const people = matchPeople(peopleF?.people, text, own?.people || []);
   const partyOf = new Map((peopleF?.people || []).map(p => [p.n, p.party]));
   const votes = votesF ? matchVotes(votesF, text, ps, people) : [];
@@ -309,9 +311,10 @@ export async function moreFor(text, articles, { mine = null, items = [], today =
   const cases = LY_ONLY.test(text) ? [] : [...cons, ...matchRulings(rulings?.rulings, cites, text)].slice(0, MORE_LIMITS.cases);
   const texts = await Promise.all(cases.slice(0, MORE_LIMITS.caseTexts + cons.length).map(c => caseText(c.jid)));
   texts.forEach((t, i) => (cases[i].gist = t));
-  let rules = matchRules(rulesF?.rules, text, cites);
-  const ruleTexts = await Promise.all(rules.map(r => readOne(`agency/text/${textFile(r.id)}.json`)));
-  ruleTexts.forEach((j, i) => (rules[i].text = typeof j?.t === 'string' ? cut(j.t, MORE_LIMITS.ruleChars) : ''));
+  // The ministries' 行政規則 and the cities' 地方法規, one list; a text kept on the site is read from there.
+  let rules = matchRules([...(rulesF?.rules || []), ...localRows(localF?.rules)], text, cites);
+  const ruleTexts = await Promise.all(rules.map(r => readOne(`${r.dir}/text/${textFile(r.id)}.json`)));
+  ruleTexts.forEach((j, i) => ((rules[i].text = typeof j?.t === 'string' ? cut(j.t, MORE_LIMITS.ruleChars) : ''), (rules[i].kept = Boolean(rules[i].text))));
   // A rule asked by its name that the nightly build hasn't reached: found on its ministry's site now.
   const title = ruleTitle(text);
   if (title && !rules.some(r => r.n === title && r.text)) {
@@ -363,7 +366,7 @@ export function moreOut(m) {
   if (!hasMore(m)) return {};
   const out = {};
   if (m.cases.length) out.cases = m.cases.map(c => ({ jid: c.jid, d: c.d, t: cut(c.t, 60), no: caseLabel(c.jid, c.label) }));
-  if (m.rules.length) out.rules = m.rules.map(r => ({ id: r.id, n: r.n, agency: r.agency, d: r.d, url: r.url, text: Boolean(r.text) }));
+  if (m.rules.length) out.rules = m.rules.map(r => ({ id: r.id, n: r.n, agency: r.agency, d: r.d, url: r.url, text: Boolean(r.kept), ...(r.dir === 'local' ? { dir: 'local' } : {}) }));
   if (m.people.length) out.people = m.people.map(p => ({ id: String(p.id), n: p.n, party: p.party || '' }));
   if (m.votes.length) out.votes = m.votes.map(v => ({ id: v.id, d: v.d, t: cut(v.t, 80) }));
   if (m.meets.length) out.meets = m.meets.map(x => ({ id: x.id, t: x.t, d: x.d }));
