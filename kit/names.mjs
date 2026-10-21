@@ -260,7 +260,7 @@ export const shortPlayer = name =>
     .join('/');
 // The other sports whose sides get their Chinese here (clubs, national
 // teams). Esports' teams keep their own names (T1, Gen.G), as Taiwan writes them.
-export const SIDE_SPORTS = new Set(['volleyball']);
+export const SIDE_SPORTS = new Set(['volleyball', 'cricket']);
 
 // Players whose Chinese Taiwan's press settled on, by their name's words in
 // any order (Kambi writes Asian names either way round).
@@ -298,7 +298,10 @@ const SURNAME = {
 const WORDS = {
   atp: 'ATP', wta: 'WTA', 'atp doubles': 'ATP 雙打', 'wta doubles': 'WTA 雙打', 'men singles': '男單', 'women singles': '女單', 'men doubles': '男雙',
   'women doubles': '女雙', 'mixed doubles': '混雙', 'grand slam': '大滿貫', 'australian open': '澳網', 'french open': '法網', wimbledon: '溫網',
-  'us open': '美網', 'davis cup': '台維斯盃', 'billie jean king cup': '比莉珍金盃', 'united cup': '聯合盃', olympics: '奧運'
+  'us open': '美網', 'davis cup': '台維斯盃', 'billie jean king cup': '比莉珍金盃', 'united cup': '聯合盃', olympics: '奧運',
+  'international one day': '國際一日賽', 'international twenty20': '國際 T20', 'international twenty20 (w)': '女子國際 T20',
+  'international one day (w)': '女子國際一日賽', 'indian premier league': 'IPL 印度超級聯賽', 't20 big bash': '澳洲大狂歡聯賽', sa20: 'SA20',
+  'the hundred': '百球賽', 'pakistan super league': '巴基斯坦超級聯賽', 'caribbean premier league': '加勒比超級聯賽'
 };
 
 const pfold = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/ł/g, 'l').replace(/\s+/g, ' ').trim();

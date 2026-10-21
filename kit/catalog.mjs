@@ -37,7 +37,8 @@ export const SPORTS = {
   handball: { zh: '手球', en: 'Handball', icon: '🤾' },
   rugby: { zh: '橄欖球', en: 'Rugby', icon: '🏉' },
   futsal: { zh: '五人制足球', en: 'Futsal', icon: '⚽' },
-  mma: { zh: '綜合格鬥', en: 'MMA', icon: '🥊' }
+  mma: { zh: '綜合格鬥', en: 'MMA', icon: '🥊' },
+  cricket: { zh: '板球', en: 'Cricket', icon: '🏏' }
 };
 
 
@@ -110,7 +111,11 @@ export const CATALOG = {
   futsal: kambiSport('futsal', 'futsal', '五人制足球', 'Futsal'),
   // 綜合格鬥: UFC's cards, Kambi's prices (勝負, a draw void), each bout's
   // winner from ESPN's card (settle.mjs boutResult). Kambi lists UFC only.
-  ufc: { ...kambiSport('mma', 'ufc_mma', 'UFC', 'UFC', /^ufc_mma\/ufc/, 'ufc'), results: 'mma/ufc' },
+  ufc: { ...kambiSport('mma', 'ufc_mma', 'UFC', 'UFC', /^ufc_mma\/ufc/, 'ufc'), results: 'mma/ufc/scoreboard' },
+  // 板球: the one-day and T20 internationals (men's and women's) and the big
+  // T20 leagues, Kambi's 勝負 (a tie or no result void; Tests, which can be
+  // drawn, aren't sold), the winner from ESPN's scorepanel.
+  cricket: { ...kambiSport('cricket', 'cricket', '板球', 'Cricket', /^cricket\/(international_(one_day|twenty20)|indian_premier_league|t20_big_bash(\/|$)|sa20|the_hundred|pakistan_super_league|caribbean_premier_league)/), results: 'cricket/scorepanel' },
   // Racing
   f1: { sport: 'racing', kind: 'field', data: 'espn', espn: 'racing/f1', zh: 'F1 一級方程式', en: 'Formula 1', bet: 'f1', top: true, standings: true }
 };
