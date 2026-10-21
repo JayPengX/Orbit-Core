@@ -4,6 +4,10 @@
 // pricing modules), and this account's own record in the wallet. Pure
 // functions, tested directly.
 import { VIP, FREEBET, OVERDRAFT_RATE, moneySides } from '#kit/quadra.mjs';
+import { MARKETS, CURRENCIES } from './stock-markets.mjs';
+import { BASE_CUT } from './play-rules.mjs';
+import { SLIP_RULES } from './play-odds.mjs';
+import { DEFAULT_PENALTY } from './stock-account.mjs';
 
 // ---- Quadra Play's prices (its lib/rules.mjs, odds.mjs) ---------------------
 //
@@ -11,12 +15,12 @@ import { VIP, FREEBET, OVERDRAFT_RATE, moneySides } from '#kit/quadra.mjs';
 // as Taiwan Sports Lottery was measured pricing them: the chances behind
 // the odds add up to 115.8%.
 export const PLAY = {
-  cut: 1.158,
+  cut: BASE_CUT.twoWay,
   // No parlay boost, cash out or free bets since 2026-10-21 (台灣運彩 has none).
   // A slip whose whole prize is over NT$5,000 loses 20% income tax; a
-  // member (online) account, which Play is, pays no 4‰ stamp duty.
-  taxFree: 5_000,
-  tax: 0.2,
+  // member (online) account, which Play is, pays no 4‰ stamp duty. (Play's own rules.)
+  taxFree: SLIP_RULES.taxFree,
+  tax: SLIP_RULES.taxRate,
   // 刮刮樂's payback by the card's price (its lib/scratch.mjs).
   scratch: [[100, 0.63], [200, 0.65], [300, 0.66], [500, 0.7], [1_000, 0.74], [2_000, 0.75]],
   // Draw games (威力彩, 大樂透, 今彩539…) pay back about half of what's staked.
@@ -25,22 +29,25 @@ export const PLAY = {
 // What the house keeps of a parlay of `legs` two-way picks, on average.
 export const houseKeep = (legs = 1, cut = PLAY.cut) => 1 - cut ** -legs;
 
-// ---- Quadra Securities' costs (its lib/markets.mjs, Taiwan) -----------------------------
+// ---- Quadra Securities' costs (the kit's market table, Taiwan) -----------------------------
+// Read from the rules Securities itself trades by, so this page can't fall behind them.
+const TW = MARKETS.TW;
 export const STOCK = {
-  commission: 0.001425,
-  commissionMin: 20,
-  // Securities transaction tax on a sale (ETFs 0.1%).
-  tax: 0.003,
+  commission: TW.commission.rate,
+  commissionMin: TW.commission.min,
+  // Securities transaction tax on a sale (ETFs 0.1%); a 當沖 (sold the day it was bought) pays half.
+  tax: TW.sell.stock.tax,
+  dayTradeTax: Date.now() < TW.sell.stock.dayTradeUntil ? TW.sell.stock.dayTrade : TW.sell.stock.tax,
   // Yearly margin interest on NT$.
-  loanRate: 0.065,
+  loanRate: CURRENCIES.TWD.loanRate,
   // A default on an overdraft: this share of what's owed.
-  penalty: 0.07
+  penalty: DEFAULT_PENALTY
 };
 // A Taiwan stock bought and sold for `amount`: commission both ways and
 // the tax on the sale.
-export function roundTrip(amount) {
+export function roundTrip(amount, { dayTrade = false } = {}) {
   const fee = Math.max(STOCK.commissionMin, Math.floor(amount * STOCK.commission));
-  const tax = Math.floor(amount * STOCK.tax);
+  const tax = Math.floor(amount * (dayTrade ? STOCK.dayTradeTax : STOCK.tax));
   return { fee: fee * 2, tax, total: fee * 2 + tax, share: (fee * 2 + tax) / amount };
 }
 
