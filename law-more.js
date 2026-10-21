@@ -50,12 +50,12 @@ const KIND = { M: '刑事', V: '民事', A: '行政' };
 export const caseLabel = (jid, label = '') => {
   if (CONS_ID.test(jid)) return label || (jid[0] === 's' ? `司法院釋字第${jid.slice(1)}號` : `憲法法庭${jid.slice(1).replace('-', '年憲判字第')}號`);
   const [head, y, w, n] = String(jid).split(',');
-  return `${courtName(jid)}${head.startsWith('JCC') ? '' : KIND[head[3]] || ''} ${y}年度${w}字第${n}號`;
+  return `${courtName(jid)}${head.startsWith('TPS') ? KIND[head[3]] || '' : ''} ${y}年度${w}字第${n}號`;
 };
 
 // The judgments most like the question: 3 for each article found they cite
-// (1 for a law found), and the pairs their 案由 shares with the question;
-// 3 at least, the newer first on a tie.
+// (1/4 for a law found), and 1.5 for each pair their 案由 shares with the
+// question; 4 at least (two articles, or one and its 案由), newer first on a tie.
 export function matchRulings(rows, cites, text, max = MORE_LIMITS.cases) {
   const arts = new Set(cites);
   const laws = new Set(cites.map(c => c.split(':')[0]));
@@ -67,7 +67,7 @@ export function matchRulings(rows, cites, text, max = MORE_LIMITS.cases) {
     let s = 0;
     for (const c of cs) s += arts.has(c) ? 3 : laws.has(String(c).split(':')[0]) ? 0.25 : 0;
     s += shared(r[2], want) * 1.5;
-    if (s >= 3) scored.push([s, r]);
+    if (s >= 4) scored.push([s, r]);
   }
   return scored
     .sort((a, b) => b[0] - a[0] || String(b[1][1]).localeCompare(String(a[1][1])))
@@ -202,7 +202,7 @@ export function matchMeets(meets, text, lawNames, today) {
 // ---- 行政規則 -------------------------------------------------------------------------
 
 // The rules the question is about: its pairs in their names (2 each), an
-// article found that they rest on (3), a law found (0.5); 4 at least.
+// article found that they rest on (3), a law found (0.5); 6 at least.
 export function matchRules(rows, text, cites) {
   const arts = new Set(cites);
   const laws = new Set(cites.map(c => c.split(':')[0]));
@@ -213,7 +213,7 @@ export function matchRules(rows, text, cites) {
     let s = shared(r[1], want) * 2;
     for (const c of r[5] || []) if (arts.has(c)) s += 3;
     for (const p of r[6] || []) if (laws.has(p)) s += 0.5;
-    if (s >= 4) scored.push([s, r]);
+    if (s >= 6) scored.push([s, r]);
   }
   return scored
     .sort((a, b) => b[0] - a[0] || String(b[1][3]).localeCompare(String(a[1][3])))
@@ -223,6 +223,7 @@ export function matchRules(rows, text, cites) {
 
 // ---- The reader's own --------------------------------------------------------------------
 
+const LY_ONLY = /修法|草案|立委|表決|投票|三讀|二讀|一讀|進度|議程|預算|法案/;
 const MINE_WORDS = /我(的|追蹤|關注|收藏|存的|標記)|追蹤的|收藏的|書籤|my |i follow|followed|saved|bookmark/i;
 // What the reader follows and marked ({ laws: [p], items: [k], people: [id],
 // marks: ['p:key'] }), checked; a string is what's wrong with it.
@@ -255,7 +256,8 @@ export async function moreFor(text, articles, { mine = null, items = [], today =
   const partyOf = new Map((peopleF?.people || []).map(p => [p.n, p.party]));
   const votes = votesF ? matchVotes(votesF, text, ps, people) : [];
   const cons = matchCons(consF?.items, cites, text);
-  const cases = [...cons, ...matchRulings(rulings?.rulings, cites, text)].slice(0, MORE_LIMITS.cases);
+  // (A question about the 立法院's work gets no judgments: they'd be noise there.)
+  const cases = LY_ONLY.test(text) ? [] : [...cons, ...matchRulings(rulings?.rulings, cites, text)].slice(0, MORE_LIMITS.cases);
   const texts = await Promise.all(cases.slice(0, MORE_LIMITS.caseTexts + cons.length).map(c => caseText(c.jid)));
   texts.forEach((t, i) => (cases[i].gist = t));
   const rules = matchRules(rulesF?.rules, text, cites);
