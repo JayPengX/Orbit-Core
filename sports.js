@@ -970,16 +970,41 @@ export function emptyTranslation(text) {
 
 // The translate endpoint: the text goes in a POST body (a GET mixes in
 // simplified characters for zh-TW, and long texts don't fit an address).
+// Google often answers the proxy's own address with nothing (busy, or
+// holding Cloudflare off: Play's snooker players and Belgian clubs stayed in
+// English, 2026-10-21): then Google's other public endpoint (client=gtx,
+// translate.googleapis.com), its segments joined into the first one's shape.
 async function translateUpstream(upstreamUrl) {
   const url = new URL(upstreamUrl.toString());
   const q = url.searchParams.get('q') || '';
   url.searchParams.delete('q');
-  return fetch(url.toString(), {
-    method: 'POST',
-    headers: { 'User-Agent': BROWSER_UA, 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
-    body: new URLSearchParams({ q }).toString(),
-    signal: AbortSignal.timeout(SPORTS_PROXY_UPSTREAM_TIMEOUT_MS)
-  });
+  const post = (to, extra = {}) =>
+    fetch(to, {
+      method: 'POST',
+      headers: { 'User-Agent': BROWSER_UA, 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+      body: new URLSearchParams({ q, ...extra }).toString(),
+      signal: AbortSignal.timeout(SPORTS_PROXY_UPSTREAM_TIMEOUT_MS)
+    });
+  const first = await post(url.toString()).catch(() => null);
+  if (first?.status === 200) {
+    const text = await first.text();
+    if (!emptyTranslation(text)) return new Response(text, { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8' } });
+  }
+  const gtx = new URL('https://translate.googleapis.com/translate_a/single?client=gtx&dt=t');
+  gtx.searchParams.set('sl', url.searchParams.get('sl') || 'auto');
+  gtx.searchParams.set('tl', url.searchParams.get('tl') || 'zh-TW');
+  const second = await post(gtx.toString()).catch(() => null);
+  const out = second?.status === 200 ? gtxText(await second.text()) : '';
+  return new Response(JSON.stringify([out]), { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8' } });
+}
+// client=gtx's answer ([[["譯文", "source", …], …], …]): its text, joined.
+export function gtxText(text) {
+  try {
+    const got = JSON.parse(text);
+    return Array.isArray(got?.[0]) ? got[0].map(seg => (Array.isArray(seg) && typeof seg[0] === 'string' ? seg[0] : '')).join('') : '';
+  } catch {
+    return '';
+  }
 }
 
 // Fetches `upstreamUrl`, applies the optional trim, and saves a 200 into the
