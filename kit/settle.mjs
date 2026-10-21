@@ -250,6 +250,7 @@ export function legResult(leg, outcome) {
     case 'corners': {
       // Soccer's corners, from ESPN's team stats.
       if (!outcome.corners) return null;
+      if (outcome.corners === 'void') return 'void';
       const n = outcome.corners.home + outcome.corners.away;
       return push(leg.side === 'over' ? n - leg.line : leg.line - n);
     }
@@ -960,7 +961,9 @@ export async function readOutcomes(legs, { read, keptKambi = async () => null, n
       let found = null;
       for (const date of espnDates(leg.start)) {
         const data = await page(`${ESPN}/${path}/scoreboard?dates=${date}`);
-        found = (data && parseEspnResults(data, leg.sport).find(g => sameGame(g, want))) || null;
+        // A doubleheader's two games both match within the window: the one nearest the leg's start.
+        const near = g => Math.abs(Date.parse(g.startUtc) - Date.parse(want.startUtc));
+        found = (data && parseEspnResults(data, leg.sport).filter(g => sameGame(g, want)).sort((a, b) => near(a) - near(b))[0]) || null;
         if (found) break;
       }
       // Put off (or moved off its day): the same two teams played again
@@ -999,7 +1002,9 @@ export async function readOutcomes(legs, { read, keptKambi = async () => null, n
           const prop = /AET|PEN|EXTRA|SHOOTOUT/i.test(status) && isSoccer(leg.sport) ? { status: 'void' } : propOutcome(leg, summary);
           if (prop) out.set(leg.id, { ...game, prop });
         } else {
-          const corners = teamCorners(summary);
+          // Corners settle on 90 minutes too: ESPN's count can't leave extra time out, so a tie that went on is void.
+          const status = summary.header?.competitions?.[0]?.status?.type?.name || '';
+          const corners = /AET|PEN|EXTRA|SHOOTOUT/i.test(status) ? 'void' : teamCorners(summary);
           if (corners) out.set(leg.id, { ...game, corners });
         }
         return;

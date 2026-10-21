@@ -735,7 +735,8 @@ test('scratch cards: every card Taiwan Lottery sells, at its real table, top pri
     assert.deepEqual([CARDS[id].zh, CARDS[id].price, tiersOf(id).at(-1).prize, CARDS[id].issued, CARDS[id].until], [zh, price, top, issued, until], id);
     assert.ok(Math.abs(scratchWins(id) * 100 - win) < 0.006, `${id} wins ${scratchWins(id)}`);
     assert.ok(!/莊家|中獎號碼/.test(CARDS[id].how.zh), `${id}: the cards' own words (幸運號碼, 大力士分數)`);
-    assert.ok(onSale(id, new Date('2026-10-19T12:00:00+08:00')), id);
+    assert.ok(onSale(id, new Date('2026-10-21T12:00:00+08:00')), id);
+    assert.ok(!onSale(id, new Date(`${CARDS[id].since}T00:00:00+08:00`) - 1), `${id} not before its 上市日期 ${CARDS[id].since}`);
     assert.ok(!onSale(id, new Date(`${until}T17:00:00+08:00`)), `${id} off sale at 17:00 on ${until}`);
   }
   // 大麻將's 3 × NT$1,000萬 and 20 × 100萬 in a run of 3,500,000.

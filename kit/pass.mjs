@@ -7,7 +7,7 @@
 //   App    every app, Quadra's and Orbit's, when it was last used, a way in
 //   說明   every app's guide (help.mjs)
 import { APPS, AVATARS, FRAMES, VIP, money, vipStatus, vipName, worthOf, WEALTH_RANKS, OVERDRAFT_RATE, ECONOMY, settingPatch, passAccount, appIcon, el as node } from '#kit/quadra.mjs';
-import { PLAY, STOCK, houseKeep, roundTrip, record, overdraftYear, vipShare } from './truth.mjs';
+import { PLAY, STOCK, houseKeep, roundTrip, scratchBacks, record, overdraftYear, vipShare } from './truth.mjs';
 import { LOAN, RELIEF, PAY_WEEK, schedule, totalApr, debtOf } from './loan.mjs';
 import { HELP_ORDER, helpFor } from './help.mjs';
 import { sheet } from './ui.mjs';
@@ -75,14 +75,14 @@ export const STRINGS = {
     edgeTitle: '莊家優勢',
     edgeSingle: '單場',
     edgeLegs: '{n} 關串關',
-    edgeSingleSub: '賠率背後的機率加起來 {cut} 倍',
+    edgeSingleSub: '賠率背後的機率加起來 {cut} 倍（籃球、足球約 {high} 倍，不讓分三項 {three} 倍）',
     yourBets: '你的投注回收率',
     yourBetsSub: '投注 {staked}，拿回 {won}',
     edgeFoot: '串關關數越多，莊家留得越多：抽成每關相乘。每張彩金超過 {free} 還要扣 {tax} 所得稅。跟台灣運彩一樣，下注後不能取消、不能提前兌現，也沒有加成或免費投注。',
     edgeSub: '每個賠率裡都藏著抽成：機率加起來超過 100%，多出來的就是莊家的。下面是每下注 NT$100，長期平均會被留下多少。',
     lotteryTitle: '彩券和刮刮樂',
     lotteryDraw: '電腦彩券（威力彩、大樂透、539…）',
-    lotteryDrawSub: '一半拿去當獎金，另一半是彩券的收入和公益金',
+    lotteryDrawSub: '一半多一點拿去當獎金，其餘是彩券的收入和公益金',
     scratchAt: '{price} 刮刮樂',
     scratchKeeps: '每張平均留下 {v}',
     yourTickets: '你的彩券回收率',
@@ -251,14 +251,14 @@ export const STRINGS = {
     edgeTitle: 'The house edge',
     edgeSingle: 'A single',
     edgeLegs: 'A {n}-pick parlay',
-    edgeSingleSub: 'The chances behind the odds add up to {cut}×',
+    edgeSingleSub: 'The chances behind the odds add up to {cut}× (basketball and soccer about {high}×, a three-way winner {three}×)',
     yourBets: 'What your bets paid back',
     yourBetsSub: 'Staked {staked}, back {won}',
     edgeFoot: 'The more picks on a parlay, the more the house keeps: the cut multiplies with every pick. A slip paying over {free} loses {tax} income tax. As at Taiwan Sports Lottery, a bet can’t be cancelled or cashed out, and there are no boosts or free bets.',
     edgeSub: 'Every price hides a cut: the chances behind the odds add up to more than 100%, and the extra is the house’s. Here’s what it keeps of every NT$100 staked, on average, over time.',
     lotteryTitle: 'Lottery and scratch cards',
     lotteryDraw: 'Number draws (Super Lotto, Lotto 6/49, 539…)',
-    lotteryDrawSub: 'Half goes to prizes; the rest is the lottery’s takings and good causes',
+    lotteryDrawSub: 'A little over half goes to prizes; the rest is the lottery’s takings and good causes',
     scratchAt: 'A {price} scratch card',
     scratchKeeps: 'Keeps {v} of each card on average',
     yourTickets: 'What your tickets paid back',
@@ -548,7 +548,7 @@ function renderTruth(box, { t, state }) {
       t('edgeTitle'),
       facts(
         [
-          ...legs.map(n => row(n === 1 ? t('edgeSingle') : t('edgeLegs', { n }), pct(houseKeep(n)), n === 1 ? t('edgeSingleSub', { cut: PLAY.cut }) : '')),
+          ...legs.map(n => row(n === 1 ? t('edgeSingle') : t('edgeLegs', { n }), pct(houseKeep(n)), n === 1 ? t('edgeSingleSub', { cut: PLAY.cut, high: PLAY.cutHigh, three: PLAY.threeWay }) : '')),
           r.staked > 0 ? row(t('yourBets'), r.betBack == null ? '—' : pct(r.betBack), t('yourBetsSub', { staked: money(r.staked), won: money(r.won) }), r.won >= r.staked ? 'up' : 'down') : null
         ],
         t('edgeFoot', { tax: pct(PLAY.tax, 0), free: money(PLAY.taxFree) })
@@ -560,7 +560,7 @@ function renderTruth(box, { t, state }) {
       facts(
         [
           row(t('lotteryDraw'), pct(PLAY.draw, 0), t('lotteryDrawSub')),
-          ...PLAY.scratch.map(([price, back]) => row(t('scratchAt', { price: money(price) }), pct(back, 0), t('scratchKeeps', { v: money(Math.round(price * (1 - back))) }))),
+          ...scratchBacks().map(([price, lo, hi]) => row(t('scratchAt', { price: money(price) }), Math.round(lo * 100) === Math.round(hi * 100) ? pct(lo, 0) : `${Math.round(lo * 100)}–${pct(hi, 0)}`, t('scratchKeeps', { v: money(Math.round(price * (1 - (lo + hi) / 2))) }))),
           r.tickets > 0 ? row(t('yourTickets'), r.ticketBack == null ? '—' : pct(r.ticketBack), t('yourTicketsSub', { paid: money(r.tickets), won: money(r.prizes) }), r.prizes >= r.tickets ? 'up' : 'down') : null
         ],
         t('lotteryFoot')
