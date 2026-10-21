@@ -884,15 +884,18 @@ export function sectionHeadHtml(title, { more = '', moreTap = null, moreHref = '
 // default), a face's outline for a person, a cup for a league, columns for a
 // company, a flag. kind: 'team' | 'person' | 'league' | 'company' | 'flag'.
 // (wireLogos(root) once the HTML is in the page, for the HTML builder.)
+// (`none`: no picture at all, its place kept: a player with no photo or flag
+// to be had, where Jay wants nothing rather than a stand-in.)
 const LOGO_KINDS = { team: 'shield', person: 'user', league: 'trophy', company: 'bank', flag: 'flag' };
-const logoMark = kind => icons[LOGO_KINDS[kind] || 'shield'] || icons.shield;
+const logoMark = kind => (kind === 'none' ? '' : icons[LOGO_KINDS[kind] || 'shield'] || icons.shield);
+const markClass = kind => (kind === 'none' ? 'q-logo none' : 'q-logo text');
 // A src or a list of them, as the non-empty strings in order.
 const srcList = src => [].concat(src || []).filter(s => s && typeof s === 'string');
 // (A list's later URLs wait in data-srcs, a JSON array, for wireLogos.)
 export function logoTileHtml(src, { size = 40, alt = '', fallbackText = '', tint = '', kind = 'team' } = {}) {
   const [first, ...rest] = srcList(src);
   if (first) return `<span class="q-logo"${styleOf(['--s', `${size}px`])}><img src="${E(first)}" alt="${E(alt)}" loading="lazy" decoding="async"${dataOf({ fallback: kind, tint })}${rest.length ? dataOf({ srcs: JSON.stringify(rest) }) : ''}></span>`;
-  return `<span class="q-logo text" role="img" aria-label="${E(alt || fallbackText)}"${styleOf(['--s', `${size}px`], ['--t', tint])}>${logoMark(kind)}</span>`;
+  return `<span class="${markClass(kind)}" role="img" aria-label="${E(alt || fallbackText)}"${styleOf(['--s', `${size}px`], ['--t', tint])}>${logoMark(kind)}</span>`;
 }
 export function wireLogos(root = document) {
   const fall = img => {
@@ -908,7 +911,7 @@ export function wireLogos(root = document) {
       return;
     }
     if (!t) return;
-    t.className = 'q-logo text';
+    t.className = markClass(img.getAttribute('data-fallback'));
     t.innerHTML = logoMark(img.getAttribute('data-fallback'));
     if (img.getAttribute('data-tint')) t.style.setProperty('--t', img.getAttribute('data-tint'));
   };
@@ -1076,7 +1079,7 @@ export function logoTile(src, { size = 40, alt = '', fallbackText = '', tint = '
   const t = h('span', { class: 'q-logo' });
   t.style.setProperty('--s', `${size}px`);
   const mark = () => {
-    t.className = 'q-logo text';
+    t.className = markClass(kind);
     t.setAttribute('role', 'img');
     t.setAttribute('aria-label', alt || fallbackText);
     t.innerHTML = logoMark(kind);
@@ -1094,13 +1097,13 @@ export function logoTile(src, { size = 40, alt = '', fallbackText = '', tint = '
 
 // A match: its league and time, two sides, the prices in one equal row.
 // matchCard({ league, leagueLogo, when, live, tag, wide, sides: [{ logo, name,
-// score }], prices: [{ label, odds, onTap, selected, locked }], onOpen }).
+// score, kind (logoTile's) }], prices: [{ label, odds, onTap, selected, locked }], onOpen }).
 // Scores show as "2 : 1", else "VS". wide = a full-width card for a list.
 export function matchCard({ league = '', leagueLogo = '', when = '', live = false, tag = null, wide = false, sides = [], prices = [], onOpen = null } = {}) {
   const [a = {}, b = {}] = sides;
   // (The logos large in their tiles: Jay 2026-10-21, "small and weird".)
   const px = wide ? 48 : 52;
-  const side = s => h('div', { class: 'q-match-side' }, [logoTile(s.logo, { size: px, alt: s.name, fallbackText: s.name }), h('b', { text: s.name || '' })]);
+  const side = s => h('div', { class: 'q-match-side' }, [logoTile(s.logo, { size: px, alt: s.name, fallbackText: s.name, kind: s.kind }), h('b', { text: s.name || '' })]);
   const scored = a.score != null && b.score != null;
   // (A tag with no text shows nothing: never an empty capsule.)
   const t = tag ? (typeof tag === 'string' ? { text: tag } : tag) : null;
@@ -1148,7 +1151,7 @@ export function liveStrip(items) {
     items.map(it =>
       h('button', { class: 'q-live-card', type: 'button', onclick: it.onOpen }, [
         h('span', { class: 'q-live-min', text: it.min || '' }),
-        ...it.rows.flatMap(r => [logoTile(r.logo, { size: 28, alt: r.name, fallbackText: r.name }), h('b', { text: r.name || '' }), h('span', { class: 'num', text: r.score == null ? '' : String(r.score) })])
+        ...it.rows.flatMap(r => [logoTile(r.logo, { size: 28, alt: r.name, fallbackText: r.name, kind: r.kind }), h('b', { text: r.name || '' }), h('span', { class: 'num', text: r.score == null ? '' : String(r.score) })])
       ])
     )
   );

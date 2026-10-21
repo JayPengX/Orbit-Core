@@ -7,7 +7,7 @@
 // The kit's copy (Shared-Proxy/kit/photos.mjs), synced into Orbit Sports and Play
 // as lib/photos.mjs: never edit an app's copy.
 import { CATALOG } from '#kit/catalog.mjs';
-import { logoPicture, f1Driver, f1Constructor } from '#kit/logos.mjs';
+import { logoPicture, f1Driver, f1Constructor, flagUrl, countryCode } from '#kit/logos.mjs';
 import { fold } from '#kit/names.mjs';
 import * as kit from '#kit/quadra.mjs';
 
@@ -155,8 +155,8 @@ const loads = url =>
 // official headshot, for players the feed didn't give an id for. Checked to
 // exist before it's used.
 const ESPN_SEARCH = 'https://site.web.api.espn.com/apis/common/v3/search?type=player&limit=6&query=';
-const SEARCH_SPORT = { racing: 'racing', soccer: 'soccer', basketball: 'basketball', baseball: 'baseball', football: 'football', hockey: 'hockey' };
-const HEADSHOT_FOLDER = { racing: 'rpm', soccer: 'soccer', basketball: 'nba', baseball: 'mlb', football: 'nfl', hockey: 'nhl' };
+const SEARCH_SPORT = { racing: 'racing', soccer: 'soccer', basketball: 'basketball', baseball: 'baseball', football: 'football', hockey: 'hockey', tennis: 'tennis' };
+const HEADSHOT_FOLDER = { racing: 'rpm', soccer: 'soccer', basketball: 'nba', baseball: 'mlb', football: 'nfl', hockey: 'nhl', tennis: 'tennis' };
 export async function espnSearchPhoto(name, sport, fetchJson = defaultJson, check = loads) {
   if (!SEARCH_SPORT[sport]) return '';
   // (A failed search throws: findPhoto keeps nothing, and asks again later.)
@@ -174,7 +174,11 @@ export async function espnSearchPhoto(name, sport, fetchJson = defaultJson, chec
 // their name and sport match. Its thumbnails are often casual pictures, so
 // only the cutout counts.
 const TSDB_SEARCH = 'https://www.thesportsdb.com/api/v1/json/123/searchplayers.php?p=';
-const TSDB_SPORT = { soccer: 'Soccer', baseball: 'Baseball', basketball: 'Basketball', football: 'American Football', hockey: 'Ice Hockey', racing: 'Motorsport', tennis: 'Tennis', badminton: 'Badminton', tabletennis: 'Table Tennis' };
+const TSDB_SPORT = { soccer: 'Soccer', baseball: 'Baseball', basketball: 'Basketball', football: 'American Football', hockey: 'Ice Hockey', racing: 'Motorsport', tennis: 'Tennis', badminton: 'Badminton', tabletennis: 'Table Tennis', snooker: 'Snooker', darts: 'Darts' };
+// The sports whose players seldom have a studio picture to be had (a
+// badminton or snooker player): with no cutout, their country's flag
+// (TheSportsDB's nationality), never an initial.
+const FLAG_SPORTS = new Set(['tennis', 'badminton', 'tabletennis', 'snooker', 'darts']);
 // Its free key takes about 30 searches a minute: they go one at a time, 2.1 s
 // apart, so a roster opened (or a few teams flicked through) never hits the
 // limit; one that does pauses the queue a minute. A failed search throws.
@@ -204,7 +208,9 @@ export async function tsdbCutout(name, sport, fetchJson = defaultJson, { paced =
   const list = data?.player || [];
   const want = plain(name);
   const hit = list.find(p => p.strSport === TSDB_SPORT[sport] && plain(p.strPlayer) === want && p.strCutout);
-  return hit ? hit.strCutout : '';
+  if (hit) return hit.strCutout;
+  const from = FLAG_SPORTS.has(sport) && list.find(p => p.strSport === TSDB_SPORT[sport] && plain(p.strPlayer) === want && p.strNationality);
+  return from ? flagUrl(countryCode(from.strNationality)) || '' : '';
 }
 
 async function defaultJson(url) {
