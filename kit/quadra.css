@@ -5229,8 +5229,15 @@ html.q-kb .q-kb-docked {
   scroll-padding-inline: 6px;
   scroll-snap-type: none;
   overscroll-behavior-x: contain;
-  -webkit-mask-image: linear-gradient(90deg, transparent, black 14px, black calc(100% - 14px), transparent);
-  mask-image: linear-gradient(90deg, transparent, black 14px, black calc(100% - 14px), transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, black var(--q-fade-before, 0px), black calc(100% - var(--q-fade-after, 0px)), transparent);
+  mask-image: linear-gradient(90deg, transparent, black var(--q-fade-before, 0px), black calc(100% - var(--q-fade-after, 0px)), transparent);
+}
+/* (A fade only on a side with more days to scroll to: none at the start, the first chip whole.) */
+.q-day-bar .q-day-strip.q-more-before {
+  --q-fade-before: 14px;
+}
+.q-day-bar .q-day-strip.q-more-after {
+  --q-fade-after: 14px;
 }
 .q-day-bar .q-day-strip .q-chip.day {
   flex: none;

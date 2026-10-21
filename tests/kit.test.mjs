@@ -741,3 +741,11 @@ test('政府: taxes the apps report and relief, a side of its own; the four side
   // Nothing reported, junk ignored.
   assert.equal(kit.govOf({ snap: { odds: { gov: { sports: 'x', lottery: -5 } } } }).paidTotal, 0);
 });
+
+test('every EuroLeague and K League club Play sells has a Chinese name (Jay 2026-10-21)', async () => {
+  const { teamZh } = await import('../kit/names.mjs');
+  const { TEAM_BADGES } = await import('../kit/logos.mjs').catch(() => ({}));
+  const el = ['Virtus Bologna', 'Hapoel Tel Aviv', 'Anadolu Efes', 'BC Dubai', 'Real Madrid Baloncesto', 'Maccabi Tel Aviv', 'Saski Baskonia', 'Milano', 'KK Crvena Zvezda Belgrade', 'Partizan Belgrade', 'ASVEL Lyon-Villeurbanne', 'Žalgiris Kaunas', 'Fenerbahce SK', 'Olympiacos BC', 'Valencia Basket Club', 'Paris Basket', ...Object.keys(TEAM_BADGES?.euroleague || {})];
+  for (const n of el) assert.match(teamZh('euroleague', n, 'basketball'), /\p{Script=Han}/u, n);
+  for (const n of ['Bucheon FC 1995', ...Object.keys(TEAM_BADGES?.kleague || {})]) assert.match(teamZh('kleague', n, 'soccer'), /\p{Script=Han}/u, n);
+});
