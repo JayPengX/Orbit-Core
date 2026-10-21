@@ -32,12 +32,15 @@ export const TD_PER_POINT = 0.11;
 // Each league's spread of the final margin and total (points), from the usual
 // size of results against the closing line. `bands`: its 勝分差 (none for
 // American football: 運彩 doesn't sell one); `td`: 達陣數大小 sold.
+// `basket`: the rest of 運彩's basketball list (半場讓分, 單節讓分 and
+// 大小, 得分最高單節, 先得X分, 不讓分/大小); `qtotal`: 單節大小 alone (NFL).
+const BASKET = { hrl: true, qspread: true, qtotal: true, top: 4, race: 20, combo: true };
 export const SCORE_SPREAD = {
-  nfl: { margin: 13.5, total: 10.5, bands: null, step: 3, td: TD_PER_POINT },
-  nba: { margin: 12.5, total: 18, bands: BASKETBALL_BANDS, bands6: BASKETBALL_BANDS6, step: 4, spreadStep: 1 },
-  wnba: { margin: 11, total: 14, bands: BASKETBALL_BANDS, bands6: BASKETBALL_BANDS6, step: 4, spreadStep: 1 },
+  nfl: { margin: 13.5, total: 10.5, bands: null, step: 3, td: TD_PER_POINT, qtotal: true },
+  nba: { margin: 12.5, total: 18, bands: BASKETBALL_BANDS, bands6: BASKETBALL_BANDS6, step: 4, spreadStep: 1, ...BASKET },
+  wnba: { margin: 11, total: 14, bands: BASKETBALL_BANDS, bands6: BASKETBALL_BANDS6, step: 4, spreadStep: 1, ...BASKET },
   // EuroLeague: shorter games (40 minutes), lower scoring than the NBA.
-  euroleague: { margin: 11, total: 15, bands: BASKETBALL_BANDS, bands6: BASKETBALL_BANDS6, step: 4, spreadStep: 1 }
+  euroleague: { margin: 11, total: 15, bands: BASKETBALL_BANDS, bands6: BASKETBALL_BANDS6, step: 4, spreadStep: 1, ...BASKET, race: 15 }
 };
 
 export function normalCdf(z) {
@@ -168,10 +171,10 @@ export function pointsMarkets(m, { spreadLine, totalLine }) {
   if (m.spec.bands6) marginMarket('margin6', m.spec.bands6);
   // First half: half the margin, a tie as likely as a whole point either way.
   const h = { margin: m.margin / 2, marginSd: m.marginSd / Math.SQRT2 };
-  if (m.spec.td) {
-    // 半場讓分 (American football): the first half's margin around its middle.
+  if (m.spec.td || m.spec.hrl) {
+    // 半場讓分 (American football's, basketball's): the first half's margin around its middle.
     for (const d of [-1, 0, 1]) {
-      const awayLine = round2(half(h.margin) + d * step);
+      const awayLine = round2(half(h.margin) + d * (m.spec.spreadStep ?? step));
       if (Math.abs(awayLine) < 0.5) continue;
       const awayCover = normalCdf((awayLine - h.margin) / h.marginSd);
       if (awayCover < 0.04 || awayCover > 0.96) continue;
@@ -180,6 +183,8 @@ export function pointsMarkets(m, { spreadLine, totalLine }) {
         { side: 'home', fair: 1 - awayCover, line: -awayLine }
       ] });
     }
+  }
+  if (m.spec.td) {
     // 達陣數大小: the game's touchdowns (overtime's too), Poisson on the total.
     if (m.total != null) {
       const mean = m.total * m.spec.td;
@@ -212,6 +217,70 @@ export function pointsMarkets(m, { spreadLine, totalLine }) {
     { side: 'draw', fair: qTie },
     { side: 'home', fair: qHome }
   ] });
+  out.push(...quarterMarkets(m, q));
+  return out;
+}
+
+// 運彩's other points markets: 單雙 (a total's last digit, even money), 第一節
+// 讓分 and 大小, 得分最高單節, 先得X分 and 不讓分/大小 (each as its spec sells).
+function quarterMarkets(m, q) {
+  const out = [{ kind: 'oddeven', market: 'oddeven', cut: CUT.twoWay, picks: [{ side: 'odd', fair: 0.5 }, { side: 'even', fair: 0.5 }] }];
+  const spec = m.spec;
+  const step = spec.spreadStep ?? spec.step;
+  if (spec.qspread) {
+    for (const d of [-1, 0, 1]) {
+      const awayLine = round2(half(q.margin) + d * step);
+      const awayCover = normalCdf((awayLine - q.margin) / q.marginSd);
+      if (awayCover < 0.04 || awayCover > 0.96) continue;
+      out.push({ kind: 'qrunline', market: `qrl|1|${awayLine}`, period: 1, awayLine, giver: awayLine < 0 ? 'away' : 'home', posted: d === 0, cut: CUT.twoWay, picks: [
+        { side: 'away', fair: awayCover, line: awayLine },
+        { side: 'home', fair: 1 - awayCover, line: -awayLine }
+      ] });
+    }
+  }
+  if (m.total == null) return out;
+  // A quarter's points: a quarter of the total, half its spread.
+  const qMean = m.total / 4;
+  const qSd = m.totalSd / 2;
+  if (spec.qtotal) {
+    for (const d of [-1, 0, 1]) {
+      const line = round2(half(qMean) + d * step);
+      const over = 1 - normalCdf((line - qMean) / qSd);
+      if (over < 0.04 || over > 0.96) continue;
+      out.push({ kind: 'qtotal', market: `qtot|1|${line}`, period: 1, line, posted: d === 0, cut: CUT.twoWay, picks: [
+        { side: 'over', fair: over },
+        { side: 'under', fair: 1 - over }
+      ] });
+    }
+  }
+  if (spec.top) {
+    // 得分最高單節: four alike quarters (whole points), each the highest as
+    // often; a shared highest is 平手.
+    const pts = [];
+    for (let k = Math.floor(qMean - 5 * qSd); k <= qMean + 5 * qSd; k++) pts.push(normalCdf((k + 0.5 - qMean) / qSd) - normalCdf((k - 0.5 - qMean) / qSd));
+    let below = 0;
+    let alone = 0;
+    for (const p of pts) {
+      alone += p * below ** (spec.top - 1);
+      below += p;
+    }
+    out.push({ kind: 'topperiod', market: 'topperiod', cut: CUT.bands, picks: [...Array.from({ length: spec.top }, (_, i) => ({ side: String(i + 1), fair: alone })), { side: 'tie', fair: 1 - spec.top * alone }] });
+  }
+  if (spec.race) {
+    // 先得X分: who leads when about 2X points are in (a share of the game's margin).
+    const f = Math.min(1, (2 * spec.race) / m.total);
+    const home = 1 - normalCdf(-(m.margin * f) / (m.marginSd * Math.sqrt(f)));
+    out.push({ kind: 'raceto', market: `race|${spec.race}`, line: spec.race, cut: CUT.twoWay, picks: [{ side: 'away', fair: 1 - home }, { side: 'home', fair: home }] });
+  }
+  if (spec.combo) {
+    // 不讓分/大小: the winner and the main total together (taken as apart).
+    const line = half(m.total);
+    const over = 1 - normalCdf((line - m.total) / m.totalSd);
+    const home = 1 - normalCdf(-m.margin / m.marginSd);
+    const picks = [];
+    for (const [side, w] of [['home', home], ['away', 1 - home]]) for (const [ou, o] of [['over', over], ['under', 1 - over]]) picks.push({ side: `${side}|${ou}`, fair: w * o });
+    out.push({ kind: 'mltotal', market: `mltot|${line}`, line, cut: CUT.bands, picks });
+  }
   return out;
 }
 
@@ -376,6 +445,7 @@ export function goalMarkets(means, { family, totalLine }) {
       }
     }
   } else out.push(...soccerHandicaps(grid, favourite));
+  out.push(...moreGoalMarkets(means, grid, family, totalLine));
   // 單隊大小: each team's goals.
   for (const team of ['away', 'home']) {
     for (const line of family === 'hockey' ? [1.5, 2.5, 3.5] : [0.5, 1.5, 2.5]) {
@@ -476,6 +546,105 @@ export function goalMarkets(means, { family, totalLine }) {
   return out;
 }
 
+// 運彩's other goals markets, soccer's and hockey's: 單雙, 主(客)隊正確進球數,
+// 不讓分/大小; soccer's 半場雙勝, 上半場正確比數, 第一球, 最後進球球隊,
+// 得分較高半場 and 不讓分/兩隊是否都進球; hockey's 單節 (the first period's)
+// 不讓分 and 大小 and 得分最高單節.
+// (Eleven and 其他: twelve buttons, even rows of 2, 3 or 4.)
+export const HALF_SCORES = ['1-0', '0-0', '0-1', '2-0', '1-1', '0-2', '2-1', '2-2', '1-2', '3-0', '0-3'];
+function moreGoalMarkets(means, grid, family, totalLine) {
+  const out = [];
+  const hockey = family === 'hockey';
+  const line = hockey ? (totalLine != null ? (totalLine % 1 ? totalLine : totalLine + 0.5) : 5.5) : 2.5;
+  const top = hockey ? 4 : 3;
+  // One pass over the scores (a board prices hundreds of games): 單雙, each
+  // side's goals (capped at `top`, the last band's), the result with the total
+  // and with both scoring.
+  const res = (a, h) => (h > a ? 0 : a === h ? 1 : 2);
+  const RES = ['home', 'draw', 'away'];
+  const goals = { home: new Float64Array(top + 1), away: new Float64Array(top + 1) };
+  const withTotal = new Float64Array(6);
+  const withBoth = new Float64Array(6);
+  let odd = 0;
+  let none = 0;
+  for (const { away: a, home: h, p } of grid) {
+    if ((a + h) % 2) odd += p;
+    if (a + h === 0) none += p;
+    goals.home[Math.min(h, top)] += p;
+    goals.away[Math.min(a, top)] += p;
+    const r = res(a, h) * 2;
+    withTotal[r + (a + h > line ? 0 : 1)] += p;
+    withBoth[r + (a > 0 && h > 0 ? 0 : 1)] += p;
+  }
+  out.push({ kind: 'oddeven', market: 'oddeven', cut: CUT.twoWay, picks: [{ side: 'odd', fair: odd }, { side: 'even', fair: 1 - odd }] });
+  for (const team of ['home', 'away'])
+    out.push({ kind: 'teamgoals', market: `tg|${team}`, team, cut: CUT.bands, picks: Array.from({ length: top + 1 }, (_, lo) => ({ side: `${team}|${lo}`, team, lo, hi: lo === top ? null : lo, fair: goals[team][lo] })) });
+  const combo = (kind, sides, cells) => RES.flatMap((r, i) => sides.map((x, j) => ({ side: `${r}|${x}`, fair: cells[i * 2 + j] })));
+  out.push({ kind: 'mltotal', market: `mltot|${line}`, line, cut: CUT.bands, picks: combo('mltotal', ['over', 'under'], withTotal) });
+  if (hockey) {
+    // A period: a third of the game's goals (ties as they fall, no lift).
+    const p1 = goalGrid(means, 1 / 3);
+    const result = new Float64Array(3);
+    const per = new Float64Array(40);
+    for (const { away: a, home: h, p } of p1) {
+      result[res(a, h)] += p;
+      per[Math.min(a + h, 39)] += p;
+    }
+    out.push({ kind: 'q1', market: 'q1', cut: CUT.threeWay, picks: [{ side: 'away', fair: result[2] }, { side: 'draw', fair: result[1] }, { side: 'home', fair: result[0] }] });
+    for (const l of [0.5, 1.5, 2.5]) {
+      const over = per.reduce((s, p, n) => (n > l ? s + p : s), 0);
+      if (over < 0.04 || over > 0.96) continue;
+      out.push({ kind: 'qtotal', market: `qtot|1|${l}`, period: 1, line: l, posted: l === 1.5, cut: CUT.twoWay, picks: [{ side: 'over', fair: over }, { side: 'under', fair: 1 - over }] });
+    }
+    // 得分最高單節: three alike periods; a shared highest is 平手.
+    let below = 0;
+    let alone = 0;
+    for (const p of per) {
+      alone += p * below ** 2;
+      below += p;
+    }
+    out.push({ kind: 'topperiod', market: 'topperiod', cut: CUT.bands, picks: [...['1', '2', '3'].map(side => ({ side, fair: alone })), { side: 'tie', fair: 1 - 3 * alone }] });
+    return out;
+  }
+  out.push({ kind: 'mlbtts', market: 'mlbtts', cut: CUT.bands, picks: combo('mlbtts', ['yes', 'no'], withBoth) });
+  // The halves: 45% of the goals before the break.
+  const first = goalGrid(means, 0.45);
+  const second = goalGrid(means, 0.55);
+  const fh = new Float64Array(3);
+  const firstTotals = new Float64Array(40);
+  const secondTotals = new Float64Array(40);
+  const halfScore = new Map();
+  for (const { away: a, home: h, p } of first) {
+    fh[res(a, h)] += p;
+    firstTotals[Math.min(a + h, 39)] += p;
+    halfScore.set(`${h}-${a}`, p);
+  }
+  for (const { away: a, home: h, p } of second) secondTotals[Math.min(a + h, 39)] += p;
+  out.push({ kind: 'hdc', market: 'hdc', cut: CUT.twoWay, picks: [
+    { side: 'home|draw', fair: fh[0] + fh[1] },
+    { side: 'home|away', fair: fh[0] + fh[2] },
+    { side: 'draw|away', fair: fh[1] + fh[2] }
+  ] });
+  const listed = HALF_SCORES.map(score => ({ side: score, score, fair: halfScore.get(score) ?? 0 }));
+  out.push({ kind: 'hscore', market: 'hscore', cut: CUT.score, listed: HALF_SCORES, picks: [...listed, { side: 'other', score: 'other', fair: 1 - listed.reduce((s, x) => s + x.fair, 0) }] });
+  // 第一球 and 最後進球球隊: each goal the home side's as often as its share
+  // of the goals; none in a 0-0.
+  const homeShare = means.home / (means.home + means.away);
+  for (const kind of ['firstgoal', 'lastgoal'])
+    out.push({ kind, market: kind, cut: CUT.threeWay, picks: [{ side: 'home', fair: (1 - none) * homeShare }, { side: 'none', fair: none }, { side: 'away', fair: (1 - none) * (1 - homeShare) }] });
+  // 得分較高半場: the halves' goals (the second has more of them).
+  let firstMore = 0;
+  let same = 0;
+  let below = 0;
+  for (let n = 0; n < 40; n++) {
+    firstMore += firstTotals[n] * below;
+    same += firstTotals[n] * secondTotals[n];
+    below += secondTotals[n];
+  }
+  out.push({ kind: 'higherhalf', market: 'higherhalf', cut: CUT.threeWay, picks: [{ side: 'first', fair: firstMore }, { side: 'tie', fair: same }, { side: 'second', fair: 1 - firstMore - same }] });
+  return out;
+}
+
 // ---- Baseball ---------------------------------------------------------------------
 
 function nb(mean, r, kMax = 30) {
@@ -513,7 +682,12 @@ export function inningMarkets(inning, away, home) {
   return out;
 }
 
-export function baseballMarkets({ homeWin, total }) {
+// 安打數大小: MLB's hits, about 8.3 a team on 4.45 runs, more with the
+// runs expected (to the 0.6th power); spread as MLB's (a team's sd about 3.2).
+export const HITS = { perTeam: 8.3, runs: 4.45, power: 0.6, dispersion: 36 };
+// 先得X分: the first to this many runs.
+export const RACE_RUNS = 3;
+export function baseballMarkets({ homeWin, total }, { hits = false, race = false } = {}) {
   if (!total) return [];
   const means = fitTeamRuns(homeWin, total.line, total.overFair);
   const { grid, size } = scoreGrid(means.home, means.away);
@@ -535,6 +709,11 @@ export function baseballMarkets({ homeWin, total }) {
     }
   }
   out.push({ kind: 'margin', market: 'margin', cut: CUT.bands, picks: bands });
+  // 單雙 at evens: the grid has no ties (extra innings), which would make an
+  // odd total far likelier than MLB's near half.
+  out.push({ kind: 'oddeven', market: 'oddeven', cut: CUT.twoWay, picks: [{ side: 'odd', fair: 0.5 }, { side: 'even', fair: 0.5 }] });
+  if (hits) out.push(...hitsMarkets(means));
+  if (race) out.push(raceMarket(means, RACE_RUNS));
   // 單局大小 and 單局不讓分 on the first inning (運彩's, in place of a
   // 首局得分 yes or no): a ninth of each team's game.
   const r = TEAM_RUNS_DISPERSION / 9;
@@ -585,6 +764,59 @@ export function baseballMarkets({ homeWin, total }) {
     ] });
   }
   return out;
+}
+
+// 安打數大小 and 主(客)隊安打數大小 around each one's middle.
+function hitsMarkets(means) {
+  const out = [];
+  const pmfOf = team => nb(HITS.perTeam * (means[team] / HITS.runs) ** HITS.power, HITS.dispersion, 40);
+  const A = pmfOf('away');
+  const H = pmfOf('home');
+  const both = new Float64Array(A.length + H.length);
+  for (let a = 0; a < A.length; a++) for (let h = 0; h < H.length; h++) both[a + h] += A[a] * H[h];
+  const lines = (dist, kind, market, extra) => {
+    const mean = dist.reduce((s, p, n) => s + p * n, 0);
+    for (const d of [-1, 0, 1]) {
+      const line = half(mean) + d;
+      const over = dist.reduce((s, p, n) => (n > line ? s + p : s), 0);
+      if (over < 0.04 || over > 0.96) continue;
+      out.push({ kind, market: `${market}|${line}`, line, posted: d === 0, cut: CUT.twoWay, ...extra, picks: [{ side: 'over', fair: over, ...extra }, { side: 'under', fair: 1 - over, ...extra }] });
+    }
+  };
+  lines(both, 'hits', 'hits', {});
+  for (const team of ['away', 'home']) lines(team === 'away' ? A : H, 'teamhits', `th|${team}`, { team });
+  return out;
+}
+// 先得X分: half-inning by half-inning (the away side first), each side's runs
+// in one a ninth of its game's; neither there after nine is 無.
+function raceMarket(means, x) {
+  const r = TEAM_RUNS_DISPERSION / 9;
+  const A = nb(means.away / 9, r, x);
+  const H = nb(means.home / 9, r, x);
+  let state = new Map([['0|0', 1]]);
+  let away = 0;
+  let home = 0;
+  for (let inning = 0; inning < 9; inning++) {
+    for (const bat of ['away', 'home']) {
+      const next = new Map();
+      const pmf = bat === 'away' ? A : H;
+      for (const [key, p] of state) {
+        const [a, h] = key.split('|').map(Number);
+        let left = 1;
+        for (let k = 0; k < pmf.length && left > 1e-12; k++) {
+          const q = k === pmf.length - 1 ? left : pmf[k];
+          left -= q;
+          const na = bat === 'away' ? a + k : a;
+          const nh = bat === 'home' ? h + k : h;
+          if (na >= x) away += p * q;
+          else if (nh >= x) home += p * q;
+          else next.set(`${na}|${nh}`, (next.get(`${na}|${nh}`) ?? 0) + p * q);
+        }
+      }
+      state = next;
+    }
+  }
+  return { kind: 'raceto', market: `race|${x}`, line: x, cut: CUT.threeWay, picks: [{ side: 'away', fair: away }, { side: 'none', fair: 1 - away - home }, { side: 'home', fair: home }] };
 }
 
 // Odds for one pick of a market at its cut (`k`: the house's cut for this
