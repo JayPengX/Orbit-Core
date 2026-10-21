@@ -1179,7 +1179,8 @@ async function route(request, env, ctx, headers, origin) {
   // Orbit Law's questions (law.js) and its 問法律 (law-chat.js): a Quadra
   // Pass of Orbit Law's, its origin only, a day's caps a Pass in D1.
   // (Gemini's first model, Flash-Lite: a few seconds' work.)
-  const lawGemini = feature => (parts, schema) => proxyGeminiRequest(GEMINI_ALLOWED_MODELS[0], parts, schema, env, headers, ctx, feature, 25_000);
+  // (/law-chat's answer asks for Flash by name: reasoning on the reader's facts, 40 s at most.)
+  const lawGemini = feature => (parts, schema, model = GEMINI_ALLOWED_MODELS[0]) => proxyGeminiRequest(GEMINI_ALLOWED_MODELS.includes(model) ? model : GEMINI_ALLOWED_MODELS[0], parts, schema, env, headers, ctx, feature, model === GEMINI_ALLOWED_MODELS[0] ? 25_000 : 40_000);
   if (path === '/law-ask') return handleLawAsk(request, env, ctx, headers, await sessionOf(request, env), lawGemini('law-ask'));
   if (path === '/law-chat') return handleLawChat(request, env, ctx, headers, await sessionOf(request, env), lawGemini('law-chat'));
   // …and its summaries for cards (law-gist.js): the same Pass, shared and kept, a day's cap in all.

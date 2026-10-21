@@ -35,11 +35,11 @@ const LAWS = {
   N0030002: { n: '勞動基準法施行細則', m: '20240301', a: [['A', '7', '勞動契約應約定工作場所及應從事之工作。']] }
 };
 
-// Orbit Law's full-text index of the laws (index.json's order), as its build writes it.
+// Orbit Law's full-text index of the laws then the regulations (index.json's, then orders.json's order), as its build writes it.
 const { bigrams, bucketOf } = await import('../law-chat.js');
 function buildText() {
   const buckets = new Map();
-  INDEX.forEach((r, li) => {
+  [...INDEX, ...ORDERS].forEach((r, li) => {
     let ai = 0;
     for (const [kind, , text] of LAWS[r[0]]?.a || []) {
       if (kind !== 'A') continue;
@@ -69,6 +69,7 @@ let answer = {
   followups: ['房東不還押金怎麼辦？']
 };
 const GROUND = {};
+const JUDGMENTS = {};
 let geminiStatus = 200;
 let textStatus = 200;
 globalThis.fetch = async (url, init) => {
@@ -79,6 +80,7 @@ globalThis.fetch = async (url, init) => {
     gemini.push({ kind, prompt: sent.contents[0].parts[0].text });
     return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(kind === 'plan' ? plan : answer) }] } }] }), { status: geminiStatus });
   }
+  if (u.startsWith('https://judgment.judicial.gov.tw/')) return JUDGMENTS[decodeURIComponent(u.split('id=')[1])] ? new Response(JUDGMENTS[decodeURIComponent(u.split('id=')[1])]) : new Response('', { status: 404 });
   if (!u.startsWith(DATA)) throw new Error(`unexpected fetch ${u}`);
   const path = u.slice(DATA.length);
   reads.push(path);
@@ -128,7 +130,7 @@ test('no Pass of Orbit Law\'s is a 401 {error:"pass"}, before anything is read o
 test('the chat is checked before anything is read', async () => {
   const ok = { ...Q, history: [{ role: 'user', text: 'a' }, { role: 'model', text: 'b', cites: ['B0000001:456'] }], pin: [{ p: 'B0000001', arts: ['456'] }] };
   assert.equal(typeof readChat(ok), 'object');
-  for (const bad of [{ ...Q, q: '' }, { ...Q, q: 'x'.repeat(501) }, { ...Q, lang: 'jp' }, { ...Q, history: Array(7).fill({ role: 'user', text: 'a' }) }, { ...Q, history: [{ role: 'system', text: 'a' }] }, { ...Q, history: [{ role: 'user', text: 'x'.repeat(1501) }] }, { ...Q, history: [{ role: 'model', text: 'a', cites: ['民法:456'] }] }, { ...Q, pin: [{ p: 'B0000001', arts: ['456'] }, { p: 'B0000001', arts: ['1'] }, { p: 'B0000001', arts: ['2'] }] }, { ...Q, pin: [{ p: 'B0000001', arts: Array.from({ length: 9 }, (_, i) => String(i + 1)) }] }]) {
+  for (const bad of [{ ...Q, q: '' }, { ...Q, q: 'x'.repeat(501) }, { ...Q, lang: 'jp' }, { ...Q, history: Array(7).fill({ role: 'user', text: 'a' }) }, { ...Q, history: [{ role: 'system', text: 'a' }] }, { ...Q, history: [{ role: 'user', text: 'x'.repeat(1501) }] }, { ...Q, history: [{ role: 'model', text: 'a', cites: ['x'.repeat(61)] }] }, { ...Q, mine: { laws: 'B0000001' } }, { ...Q, mine: 3 }, { ...Q, pin: [{ p: 'B0000001', arts: ['456'] }, { p: 'B0000001', arts: ['1'] }, { p: 'B0000001', arts: ['2'] }] }, { ...Q, pin: [{ p: 'B0000001', arts: Array.from({ length: 9 }, (_, i) => String(i + 1)) }] }]) {
     assert.equal(typeof readChat(bad), 'string', JSON.stringify(bad).slice(0, 80));
   }
   const before = [reads.length, gemini.length];
@@ -155,7 +157,7 @@ test('a plan, then an answer from the articles found only; a cite to anything el
   assert.equal(j.covered, true);
   assert.deepEqual(j.sources, [{ p: 'B0000001', n: '民法', key: '456' }]);
   assert.deepEqual([j.next, j.followups, j.cached, j.left], [['保留租約與收據'], ['房東不還押金怎麼辦？'], false, LAW_LIMITS.chatPerPass - 1]);
-  assert.deepEqual(Object.keys(j).sort(), ['agency', 'answer', 'cached', 'consequences', 'covered', 'followups', 'left', 'next', 'points', 'sources']);
+  assert.deepEqual(Object.keys(j).sort(), ['agency', 'answer', 'cached', 'cited', 'consequences', 'covered', 'followups', 'left', 'next', 'points', 'sources']);
 });
 
 test('names resolve exactly, by short name, by prefix, then among the regulations; the authority article comes along', async () => {
@@ -355,4 +357,60 @@ test('without Orbit Law\'s figures (not published yet), a chat is as before', as
   assert.equal(r.status, 200);
   assert.equal(j.notices, undefined);
   assert.equal(j.bills, undefined);
+});
+
+test('a regulation\'s article found by its words reaches the answer (the index runs on past the laws)', async () => {
+  plan = { laws: [], terms: ['工作場所'], arts: [] };
+  try {
+    await chat({ q: '公司可以隨便調我的工作地點嗎？', lang: 'zh' });
+    assert.match(lastOf('answer'), /\[cite "N0030002:7"\] 「勞動基準法施行細則」第7條/);
+  } finally {
+    plan = { laws: ['民法'], terms: ['押金', '返還'], arts: [{ law: '民法', key: '第423條' }] };
+  }
+});
+
+test('similar judgments, 行政規則, legislators, votes, meetings and the reader\'s own follows ground the answer, cited and linked', async () => {
+  const { forgetGround } = await import('../law-ground.js');
+  const jid = 'TPSV,114,台上,2031,20260514,1';
+  GROUND['rulings/all.json'] = { rulings: [[jid, '2026-05-14', '請求返還押金', ['B0000001:456', 'B0000001:455']], ['TPSM,115,台上,1,20260101,1', '2026-01-01', '加重詐欺', ['C0000001:339']]] };
+  JUDGMENTS[jid] = '<div class="htmlcontent"><div>主文</div><div>上訴駁回。</div><div>理由</div><div>一、押金應於租賃關係終止、承租人返還租賃物後返還。</div></div><div id="JudrelaLaw"></div>';
+  GROUND['agency/all.json'] = { rules: [['教育部:FL001', '房屋租賃押金返還注意事項', '教育部', '2025-01-01', 'https://edu.law.moe.gov.tw/LawContent.aspx?id=FL001', ['B0000001:456'], ['B0000001']], ['教育部:FL002', '校園安全注意事項', '教育部', '2025-01-01', 'https://x.gov.tw/', [], []]] };
+  GROUND['agency/text/____FL001.json'] = { t: '一、出租人應於租期屆滿返還押金。' };
+  GROUND['ly/people.json'] = { people: [{ id: 1261, n: '吳春城', party: '台灣民眾黨', area: '全國不分區', counts: { bills: 153, cosign: 67, votes: 665, clips: 81 } }, { id: 9, n: '王小明', party: '民進黨' }] };
+  GROUND['ly/person/1261.json'] = { bills: [['2021', '2025-01-03', '民法第四百五十六條修正草案', '交付審查']] };
+  GROUND['ly/votes.json'] = { names: ['吳春城', '王小明'], votes: [['v1', '2026-08-27', '民法第四百五十六條修正動議', 'a1', [0], [1], [], ['B0000001']], ['v2', '2026-08-01', '其他', 'a2', [1], [], [], ['N0030001']]] };
+  GROUND['ly/agenda.json'] = { meets: [{ id: 'm1', title: '司法及法制委員會審查民法部分條文修正草案', days: [{ d: '2099-01-02' }], why: '審查民法', bills: [] }, { id: 'm0', title: '民法', days: [{ d: '2000-01-01' }], why: '' }] };
+  GROUND['bills/items.json'] = { items: [{ k: '11:01126', n: '民法', stage: 2, u: '2026-10-01' }] };
+  forgetGround();
+  answer = { ...answer, points: [...answer.points, { text: '法院認為押金應返還', cites: [jid] }, { text: '注意事項', cites: ['教育部:FL001'] }, { text: '沒給的判決', cites: ['TPSV,100,台上,1,20200101,1'] }] };
+  try {
+    const r = await chat({ q: '房東不還押金，吳春城對民法押金修法怎麼投票？什麼時候審查？我追蹤的法案進度？', lang: 'zh', mine: { items: ['11:01126'], people: [], laws: [], marks: [] } });
+    assert.equal(r.status, 200);
+    const j = await r.json();
+    const p = lastOf('answer');
+    assert.match(p, /\[cite "TPSV,114,台上,2031,20260514,1"\] 最高法院民事 114年度台上字第2031號/);
+    assert.match(p, /主文：上訴駁回。／理由：一、押金應於租賃關係終止/);
+    assert.doesNotMatch(p, /加重詐欺/);
+    assert.match(p, /\[cite "教育部:FL001"\] 教育部「房屋租賃押金返還注意事項」/);
+    assert.match(p, /出租人應於租期屆滿返還押金/);
+    assert.doesNotMatch(p, /校園安全/);
+    assert.match(p, /吳春城（台灣民眾黨/);
+    assert.match(p, /最近提案：2025-01-03「民法第四百五十六條修正草案」/);
+    assert.match(p, /表決「民法第四百五十六條修正動議」：未通過，贊成 1（台灣民眾黨1）、反對 1（民進黨1）、棄權 0；吳春城贊成/);
+    assert.doesNotMatch(p, /表決「其他」/);
+    assert.match(p, /2099-01-02「司法及法制委員會審查民法部分條文修正草案」/);
+    assert.match(p, /追蹤的法案「民法」進度：委員會/);
+    assert.deepEqual(j.points.map(x => x.cites[0]), ['B0000001:456', jid, '教育部:FL001']);
+    assert.deepEqual(j.cited, [jid, '教育部:FL001']);
+    assert.deepEqual(j.cases.map(c => [c.jid, c.no]), [[jid, '最高法院民事 114年度台上字第2031號']]);
+    assert.deepEqual(j.rules.map(x => [x.id, x.text]), [['教育部:FL001', true]]);
+    assert.deepEqual(j.people, [{ id: '1261', n: '吳春城', party: '台灣民眾黨' }]);
+    assert.deepEqual(j.votes.map(v => v.id), ['v1']);
+    assert.deepEqual(j.meets.map(m => m.id), ['m1']);
+  } finally {
+    for (const k of Object.keys(GROUND)) delete GROUND[k];
+    delete JUDGMENTS[jid];
+    answer.points = answer.points.slice(0, 3);
+    forgetGround();
+  }
 });

@@ -1,16 +1,21 @@
 // ---- law-chat.js: POST /law-chat, Orbit Law's 問法律 ----
 // A question in plain words, with up to 6 turns before it and up to 2 laws'
 // articles the reader has open: { q, history: [{ role: 'user' | 'model',
-// text, cites?: ['p:key'] }], pin?: [{ p, arts }], lang: 'zh' | 'en' }.
-// Answered only from articles this Worker read itself from Orbit Law's data:
+// text, cites?: ['p:key'] }], pin?: [{ p, arts }], mine?: { laws, items,
+// people, marks } (what the reader follows and marked), lang: 'zh' | 'en' }.
+// Answered only from what this Worker read itself from Orbit Law's data:
 //   1. plan: a cheap call guesses the laws, the legal terms and articles;
 //   2. find: the names looked up in Orbit Law's lists (exact, short, then a
-//      prefix), the terms in its full-text index (16 bucket files at most);
-//      the pinned articles, the last answer's cites, the planned articles
-//      and the best hits, 14 articles and 14,000 characters at most;
-//   3. answer: from those articles only;
-//   4. guard: a point or consequence citing anything else is dropped (as
-//      checkAnswer), and so is an agency no given article names.
+//      prefix), the terms in its full-text index over the laws and the
+//      regulations (16 bucket files at most); the pinned articles, the last
+//      answer's cites, the planned articles and the best hits, 14 articles
+//      and 14,000 characters at most; then (law-ground.js, law-more.js) the
+//      figures, notices, bills, budgets, similar judgments, 行政規則,
+//      legislators, votes and meetings the question is about;
+//   3. answer: a stronger model applies them to the reader's facts (who is
+//      likely right, what follows, what to do), citing what it rests on;
+//   4. guard: a point or consequence citing anything not given is dropped
+//      (as checkAnswer), and so is an agency no given article names.
 //
 // A Quadra Pass of Orbit Law's (worker.js reads it): 30 turns a day a Pass
 // (a turn's plan counts with its answer), in /law-ask's day of Gemini
@@ -19,10 +24,15 @@
 // a new version asks again. Follow-ups aren't kept (they rarely repeat).
 import { json, sha256Hex } from './http.js';
 import { groundFor, groundKey, groundOut, groundPrompt, hasGround } from './law-ground.js';
+import { moreFor, moreKey, moreOut, morePrompt, moreCites, hasMore, readMine } from './law-more.js';
+import { matchBills, readGround } from './law-ground.js';
 import { LAW_LIMITS, PCODE, ART, fail, twDay, citeKey, cited, label, readData, readList, readLaw, opening, passOf, passKey, spend, countOf, kept, keep, modelJson } from './law.js';
 
 export const CHAT_LIMITS = { maxQ: 500, maxTurns: 6, maxTurn: 1500, maxPins: 2, maxArts: 14, maxChars: 14_000, maxLaws: 8, maxBuckets: 16, maxBody: 40_000 };
 const CHAT_TTL_S = 30 * 86_400;
+const BILL_WORDS = /修法|修正|草案|立法院|立委|三讀|二讀|一讀|法案|進度|提案|bill/i;
+// The answer's model: Gemini's second (Flash), for the reasoning; the plan stays on the first.
+export const ANSWER_MODEL = 'gemini-3.7-flash';
 const CITE = /^([A-Z]\d{7}):(\d{1,4}(?:-\d{1,3})?)$/;
 
 // ---- The ask --------------------------------------------------------------------
@@ -32,6 +42,8 @@ const cleanText = t => (typeof t === 'string' ? t.replace(/\s+/g, ' ').trim() : 
 export function readChat(body) {
   if (!body || typeof body !== 'object') return 'bad';
   const { history = [], pin = [], lang = 'zh' } = body;
+  const mine = readMine(body.mine);
+  if (typeof mine === 'string') return mine;
   const q = cleanText(body.q);
   if (!q || q.length > CHAT_LIMITS.maxQ) return 'q';
   if (lang !== 'zh' && lang !== 'en') return 'lang';
@@ -41,8 +53,9 @@ export function readChat(body) {
     const text = cleanText(t?.text);
     const cites = t?.cites ?? [];
     if ((t?.role !== 'user' && t?.role !== 'model') || !text || text.length > CHAT_LIMITS.maxTurn) return 'history';
-    if (!Array.isArray(cites) || cites.length > CHAT_LIMITS.maxArts || !cites.every(c => typeof c === 'string' && CITE.test(c))) return 'history';
-    turns.push({ role: t.role, text, cites: [...new Set(cites)] });
+    if (!Array.isArray(cites) || cites.length > CHAT_LIMITS.maxArts * 2 || !cites.every(c => typeof c === 'string' && c.length <= 60)) return 'history';
+    // (A judgment's or a rule's id is cited too: only the articles' carry over.)
+    turns.push({ role: t.role, text, cites: [...new Set(cites.filter(c => CITE.test(c)))] });
   }
   if (!Array.isArray(pin) || pin.length > CHAT_LIMITS.maxPins) return 'pin';
   const pins = [];
@@ -51,7 +64,7 @@ export function readChat(body) {
     if (!Array.isArray(x.arts) || !x.arts.length || x.arts.length > LAW_LIMITS.maxArts || !x.arts.every(a => typeof a === 'string' && ART.test(a))) return 'pin';
     pins.push({ p: x.p, arts: [...new Set(x.arts)] });
   }
-  return { q, history: turns, pin: pins, lang };
+  return { q, history: turns, pin: pins, mine, lang };
 }
 
 // ---- 1. Plan ---------------------------------------------------------------------
@@ -215,11 +228,15 @@ export async function find(chat, plan) {
   const laws = await readList('index.json');
   const row = resolver(laws);
   const resolved = (await Promise.all(plan.laws.map(row))).filter(Boolean);
-  const named = new Set(resolved.map(r => laws.byP.get(r[0])).filter(i => i != null));
+  // The index's places: the laws, then the regulations (as the build lists them).
+  const orders = await readList('orders.json');
+  const rows = [...laws.rows, ...orders.rows];
+  const placeOf = p => laws.byP.get(p) ?? (orders.byP.has(p) ? laws.rows.length + orders.byP.get(p) : null);
+  const named = new Set(resolved.map(r => placeOf(r[0])).filter(i => i != null));
   const planned = await Promise.all(plan.arts.map(async a => ({ p: (await row(a.law))?.[0], key: a.key })));
   const last = [...chat.history].reverse().find(t => t.role === 'model');
   const wants = [...chat.pin.flatMap(x => x.arts.map(key => ({ p: x.p, key }))), ...(last?.cites || []).map(c => ({ p: c.split(':')[0], key: c.split(':')[1] })), ...planned.filter(a => a.p)];
-  const hits = (await textHits(plan.terms, named)).slice(0, CHAT_LIMITS.maxArts).map(id => ({ p: laws.rows[Math.floor(id / PER_LAW)]?.[0], ord: id % PER_LAW }));
+  const hits = (await textHits(plan.terms, named)).slice(0, CHAT_LIMITS.maxArts).map(id => ({ p: rows[Math.floor(id / PER_LAW)]?.[0], ord: id % PER_LAW }));
   const all = [...wants, ...hits.filter(h => h.p)];
   // The laws' text, the first 8 laws asked for (a law not there is skipped).
   const ps = [...new Set(all.map(a => a.p))].slice(0, CHAT_LIMITS.maxLaws);
@@ -264,12 +281,12 @@ const ANSWER = {
   required: ['covered', 'answer', 'points', 'next', 'followups']
 };
 
-export function answerPrompt(chat, articles, nameOf, ground = null) {
+export function answerPrompt(chat, articles, nameOf, ground = null, more = null) {
   const body = articles.map(a => `[cite "${a.p}:${a.key}"] 「${a.n}」${label(a.key, 'zh')}\n${a.text}`).join('\n\n');
   const before = turnsText(chat, nameOf, CHAT_LIMITS.maxTurn);
   const en = chat.lang === 'en';
-  const g = groundPrompt(ground);
-  return `You answer a member of the public's question about Taiwan's law using ONLY the articles quoted below${g ? ' and the official figures, notices and bills after them' : ''}. Return JSON matching the schema.
+  const g = groundPrompt(ground) + morePrompt(more);
+  return `You are a careful Taiwanese lawyer answering a member of the public about Taiwan's law, from ONLY the material quoted below (Orbit Law's own data: articles${g ? ', and the rules, court cases, figures, notices, bills, legislators, votes and meetings after them' : ''}). Return JSON matching the schema.
 
 Articles:
 ${body || '(none found)'}
@@ -280,15 +297,16 @@ ${chat.q}
 >>>
 
 Rules:
-- Use only the articles above${g ? ' (and the figures, notices and bills given)' : ''}. No other law, regulation, court ruling or outside knowledge of the law; don't fill gaps.
-- answer: 2 to 4 sentences in plain words.${g ? '\n- covered: true also when the official figures, notices or bills given answer it (points may then be empty).' : ''}
-- points: up to 6, each a short statement; its cites lists the cite of every article it rests on, exactly as given in quotes (e.g. "B0000001:15-1"). Never a point without a cite, never a cite not listed above.
-- consequences: penalties and fines exactly as the articles state them, each with its cites; leave it empty when none apply.
+- Every legal rule you rely on must come from the material above. Don't cite or rely on any law, rule or case not given, and never invent a case number, an article or a figure. You may reason from the given rules to the reader's facts, as a lawyer would.
+- answer: answer the question itself first, in 2 to 6 plain sentences. When the reader describes their own situation, make the call: apply the rules to their facts and say who is likely in the right, what they can claim or must pay, the likely penalty or outcome (ranges exactly as the articles state them), and what it turns on. Say which assumption you made and which missing fact would change the answer. Don't just restate the articles. When the question is about bills, legislators, votes, budgets or meetings, answer it directly from those lines.
+- points: up to 6, the legal reasoning step by step, each a short statement; its cites lists the cite of every article, rule or case it rests on, exactly as given in quotes (e.g. "B0000001:184", a case's id, a rule's id). Never a point without a cite, never a cite not listed above.
+- consequences: penalties, fines, damages or remedies exactly as the articles state them, each with its cites; leave it empty when none apply.
+- Similar cases: when a given court case is like the reader's, use it in a point (cite it) to say how the court decided and why; say it's a comparable case, not their case.
 - agency: the competent authority, only if a given article names it (its name as written there, and that article's cite); otherwise leave it out.
-- next: up to 4 practical steps; general, no cites needed, but never a law that isn't above.
+- next: up to 4 concrete steps for the reader (evidence to keep, who to write to, deadlines from the articles, where to file); never a law that isn't above.
 - followups: up to 3 short questions the reader may ask next.
-- covered: true only when these articles answer the question. If they don't (or only partly), set covered to false and say plainly in answer that these laws don't directly address it; next may suggest asking a lawyer or 法律扶助基金會.
-- This is general information, not legal advice: don't tell the reader what to do in their own case or predict how a case will end.
+- covered: true when the material lets you give a reasoned answer, even by applying general articles (e.g. 民法 第184條) to the facts. Set it false only when nothing above bears on the question; then say plainly what's missing, and next may suggest a lawyer or 法律扶助基金會.
+- Don't add a disclaimer; the app shows one.
 - Write everything in ${en ? 'plain English' : 'Traditional Chinese as used in Taiwan (繁體中文)'}.`;
 }
 
@@ -309,10 +327,12 @@ const strs = (v, max) => (Array.isArray(v) ? v : []).filter(x => typeof x === 's
 // only with a given article's cite, in its text when it's in Chinese. No
 // point left, not covered (and the model's answer, then unsupported, is
 // replaced). sources: the candidates the answer still cites.
-export function checkChat(raw, articles, lang, grounded = false) {
-  const given = new Set(articles.map(a => `${a.p}:${a.key}`));
-  const points = cited(raw?.points, given, chatCite, 6);
-  const consequences = cited(raw?.consequences, given, chatCite, 6);
+export function checkChat(raw, articles, lang, grounded = false, others = []) {
+  const extra = new Set(others);
+  const given = new Set([...articles.map(a => `${a.p}:${a.key}`), ...extra]);
+  const norm = c => (extra.has(String(c ?? '').trim()) ? String(c).trim() : chatCite(c));
+  const points = cited(raw?.points, given, norm, 6);
+  const consequences = cited(raw?.consequences, given, norm, 6);
   const a = raw?.agency;
   const agencyCites = (Array.isArray(a?.cites) ? a.cites : []).map(chatCite).filter(c => given.has(c));
   const name = typeof a?.name === 'string' ? a.name.trim() : '';
@@ -331,7 +351,9 @@ export function checkChat(raw, articles, lang, grounded = false) {
     agency: named ? name : null,
     next: strs(raw?.next, 4).length ? strs(raw?.next, 4) : covered ? [] : fallback.next,
     followups: strs(raw?.followups, 3),
-    sources: articles.filter(x => used.has(`${x.p}:${x.key}`)).map(x => ({ p: x.p, n: x.n, key: x.key }))
+    sources: articles.filter(x => used.has(`${x.p}:${x.key}`)).map(x => ({ p: x.p, n: x.n, key: x.key })),
+    // (The judgments and rules it cites: their ids, drawn from the answer's cases and rules.)
+    cited: [...extra].filter(c => used.has(c))
   };
 }
 
@@ -354,8 +376,8 @@ export async function handleLawChat(request, env, ctx, headers, session, gemini)
   const pin = JSON.stringify(chat.pin.map(x => [x.p, [...x.arts].sort()]));
   try {
     // (The question and the reader's last turn: what the figures, notices and bills are matched by.)
-    const ground = await groundFor([chat.q, chat.history.filter(t => t.role === 'user').at(-1)?.text || ''].join(' '));
-    const extra = groundOut(ground);
+    const asked = [chat.q, chat.history.filter(t => t.role === 'user').at(-1)?.text || ''].join(' ');
+    const ground = await groundFor(asked);
     const laws = await readList('index.json');
     const names = new Map(laws.rows.map(r => [r[0], r[1]]));
     const nameOf = p => names.get(p) || '';
@@ -368,18 +390,24 @@ export async function handleLawChat(request, env, ctx, headers, session, gemini)
       if (first) keep(env, ctx, planKey, plan, CHAT_TTL_S);
     }
     const articles = await find(chat, plan);
+    // A question about bills: those of the laws found too, when it named none.
+    const items = (await readGround('bills/items.json'))?.items || [];
+    if (!ground.bills.length && BILL_WORDS.test(chat.q)) ground.bills = matchBills(items, `${chat.q} ${[...new Set(articles.map(a => a.n))].join(' ')}`);
+    const more = await moreFor(`${asked} ${plan.terms.join(' ')}`, articles, { mine: chat.mine, items, today: day });
+    const grounded = hasGround(ground) || hasMore(more);
+    const extra = { ...groundOut(ground), ...moreOut(more) };
     const versions = [...new Set(articles.map(a => `${a.p}@${a.m}`))].sort().join(',');
-    const answerKey = first && `law:chat:v1:${await sha256Hex([chat.q, pin, chat.lang, versions, groundKey(ground)].join('|'))}`;
+    const answerKey = first && `law:chat:v2:${await sha256Hex([chat.q, pin, chat.lang, versions, groundKey(ground), moreKey(more)].join('|'))}`;
     const hit = answerKey && (await kept(env, answerKey));
     const leftNow = async () => left(used ?? (await countOf(env, who, day)));
     if (hit) return json({ ...hit, ...extra, cached: true, left: await leftNow() }, 200, headers);
     let out;
     // Nothing found: not covered, without the answer's call.
-    if (!articles.length && !hasGround(ground)) out = checkChat({ covered: false }, [], chat.lang);
+    if (!articles.length && !grounded) out = checkChat({ covered: false }, [], chat.lang);
     else {
       if (!env.GEMINI_API_KEY) return fail('setup', 503, headers);
       if (!(await turn())) return fail('cap', 429, headers, { left: 0 });
-      out = checkChat(await modelJson(gemini, answerPrompt(chat, articles, nameOf, ground), ANSWER), articles, chat.lang, hasGround(ground));
+      out = checkChat(await modelJson((parts, schema) => gemini(parts, schema, ANSWER_MODEL), answerPrompt(chat, articles, nameOf, ground, more), ANSWER), articles, chat.lang, grounded, moreCites(more));
     }
     if (answerKey) keep(env, ctx, answerKey, out, CHAT_TTL_S);
     return json({ ...out, ...extra, cached: false, left: await leftNow() }, 200, headers);
