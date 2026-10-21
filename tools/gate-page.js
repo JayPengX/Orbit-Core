@@ -123,7 +123,7 @@
 
   // Every fault on the screen now.
   gate.check = () => {
-    const out = { blank: [], pictures: [], overflow: [], wraps: [], cut: [], letters: [], slots: [], halfEmpty: [], bareEmpty: [], loading: [], orphan: [], tables: [], sheets: [], old: [], header: [], scroll: [], white: [] };
+    const out = { blank: [], pictures: [], overflow: [], wraps: [], cut: [], letters: [], slots: [], halfEmpty: [], bareEmpty: [], loading: [], orphan: [], tables: [], sheets: [], old: [], header: [], scroll: [], white: [], english: [] };
     const all = [...document.querySelectorAll('body *')].filter(seen);
     const clippedBy = el => {
       for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) if (/auto|scroll|hidden|clip/.test(getComputedStyle(p).overflowX)) return true;
@@ -229,6 +229,33 @@
       const tx = text(el);
       if (tx.length < 24 && /(\d[\d,.]*|NT\$|\$)\s*…$/.test(tx)) out.cut.push(`${name(el)} "${tx.slice(0, 30)}" number cut`);
       else if (/\d/.test(tx) && tx.length < 24 && getComputedStyle(el).textOverflow === 'ellipsis' && el.scrollWidth > el.clientWidth + 1) out.cut.push(`${name(el)} "${tx}" number cut`);
+    }
+    // The chosen chip of a scrolling row under its edge fade or past its edge (Jay 2026-10-21: the
+    // first day blurred and cut). A mask's fade is read off its gradient's first and last black stops.
+    for (const row of all) {
+      const cs = getComputedStyle(row);
+      const mask = cs.maskImage || cs.webkitMaskImage || '';
+      if (!/gradient/.test(mask) || row.scrollWidth <= row.clientWidth + 1) continue;
+      const stops = [...mask.matchAll(/(?:black|rgb\(0, 0, 0\))\s+(?:calc\(100% - )?([\d.]+)px/g)].map(m => Number(m[1]));
+      const [before = 0, after = 0] = [stops[0], stops.at(-1)];
+      const r = row.getBoundingClientRect();
+      for (const chip of row.querySelectorAll('[aria-pressed="true"], [aria-selected="true"], .on, .active')) {
+        const c = chip.getBoundingClientRect();
+        if (c.width && (c.left < r.left + before - 1 || c.right > r.right - after + 1)) out.cut.push(`${name(chip)} "${text(chip).slice(0, 20)}" chosen, under the edge`);
+      }
+    }
+    // A team left in English on a Chinese page (Jay 2026-10-21: "some team names are not
+    // translated"): a name in a match card or a team's row, Latin letters only, not an
+    // abbreviation (NBA, LAL) or a person (a driver's or player's name has its own row).
+    if (/^zh/.test(document.documentElement.lang || 'zh')) {
+      const seenNames = new Set();
+      for (const el of all) {
+        if (el.children.length || !el.closest('.q-match-side, [class*="team"]') || el.closest('[class*="player"], [class*="driver"], [class*="athlete"], input, textarea')) continue;
+        const tx = text(el);
+        if (!/^[A-Za-zÀ-ž][A-Za-zÀ-ž0-9 .'’&-]{3,}$/.test(tx) || /^[A-Z0-9 .&-]+$/.test(tx) || seenNames.has(tx)) continue;
+        seenNames.add(tx);
+        out.english.push(`${name(el)} "${tx.slice(0, 40)}"`);
+      }
     }
     // A table that slides sideways (a stats grid wider than the screen).
     for (const el of all) {

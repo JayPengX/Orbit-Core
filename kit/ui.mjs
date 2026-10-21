@@ -81,6 +81,14 @@ export function dayStrip(s, { days = [], current = null, onPick = () => {}, labe
     });
     // Closed: it shows the day picked (one past the bounds, which iOS lets through, shows where it came to).
     s.input.addEventListener('blur', () => daySync(s));
+    // (The edges fade only where there's more to scroll: the first chip, chosen, is never faded or cut.)
+    s.edges = () => {
+      const r = s.row;
+      r.classList.toggle('q-more-before', r.scrollLeft > 1);
+      r.classList.toggle('q-more-after', r.scrollLeft + r.clientWidth < r.scrollWidth - 1);
+    };
+    s.row.addEventListener('scroll', s.edges, { passive: true });
+    if (typeof ResizeObserver !== 'undefined') new ResizeObserver(s.edges).observe(s.row);
     s.wrap = h('div', { class: 'q-day-strip-wrap day-strip-wrap' }, [s.row, h('label', { class: 'q-chip q-day-pick day-pick', title: pickLabel }, [h('span', { class: 'day-pick-icon', 'aria-hidden': 'true', html: CAL_ICON }), s.input])]);
   }
   Object.assign(s, { onPick, bounds, clamp });
@@ -109,6 +117,7 @@ export function dayStrip(s, { days = [], current = null, onPick = () => {}, labe
   // (The input never touched while it's open: iOS's picker would close.)
   if (document.activeElement !== s.input) daySync(s);
   if (s.reveal) dayReveal(s);
+  s.edges();
   return s.wrap;
 }
 // dayStrip's record: the next draw brings the chosen day to the middle.
