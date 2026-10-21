@@ -212,3 +212,17 @@ test('a future: issued fills count, and its expiry only at TAIFEX final settleme
   // Margin back, the gain (649 points × NT$10) in, the costs out.
   assert.equal(r.cash, 100_000 - 71 + 649 * 10 - 47);
 });
+
+test('an option: issued fills count at NT$50 a point, and its expiry only at what it is worth at TAIFEX final price', async () => {
+  const sym = 'TXO202610C46000.TF';
+  const expiry = Date.parse('2026-10-21T13:30:00+08:00');
+  const d = deps({ o1: { quote: 300, t: T, s: sym, side: 'buy', q: 2, k: 'market' } });
+  const read = d.read;
+  d.read = async url => (url.startsWith('https://taifex.quadra/') ? { date: '2026-10-21', settle: {}, margin: {}, final: { 202610: 46_650 } } : read(url));
+  const base = { type: 'fill', symbol: sym, name: '台指選 10月 46000 買權', kind: 'opt', market: 'TAIFEX', currency: 'TWD', qty: 2, fee: 0, twd: 1 };
+  const buy = { ...base, id: 'fill:o1', orderId: 'o1', t: T, side: 'buy', price: 301, quote: 300, gross: 30_100, commission: 50, tax: 30, total: 30_180 };
+  const settle = (id, price) => ({ ...base, id, orderId: null, maturity: true, t: expiry, side: 'sell', price, quote: 46_650, gross: price * 100, commission: 0, tax: Math.round(price * 100 * 0.001), total: price * 100 - Math.round(price * 100 * 0.001) });
+  const r = await check(d, [buy, settle('mature:x', 700), settle(`mature:${sym}`, 650)], expiry + 3_600_000);
+  assert.deepEqual(r.refused, ['mature:x']);
+  assert.equal(r.cash, 100_000 - 30_180 + 65_000 - 65);
+});

@@ -352,3 +352,17 @@ test('a future fills at the live index plus its basis at the last settlement', a
   // 46,500 + (46,510 − 46,300).
   assert.deepEqual(fills, { order0950: { quote: 46_710, t, twd: 1 } });
 });
+
+test('an option fills at its Black-76 price: the live index plus the basis, at the volatility its settlement implies', async () => {
+  const at = s => Date.parse(`${s}+08:00`);
+  const t = at('2026-10-21T10:00:00');
+  const meta = { symbol: '^TWII', regularMarketPrice: 46_500, chartPreviousClose: 46_300, currency: 'TWD', instrumentType: 'INDEX', exchangeTimezoneName: 'Asia/Taipei', regularMarketTime: t / 1000 - 60, currentTradingPeriod: { regular: { start: at('2026-10-21T09:00:00') / 1000, end: at('2026-10-21T13:30:00') / 1000 } } };
+  const table = { date: '2026-10-20', settle: { TX202611: 46_510 }, margin: {}, final: {}, opt: { 202611: { C: { 46_500: 412 }, P: { 46_500: 398 } } } };
+  const read = async url => (url.startsWith('https://taifex.quadra/') ? table : { spark: { result: [{ symbol: '^TWII', response: [{ meta, timestamp: [], indicators: { quote: [{ close: [] }] } }] }] } });
+  const order = cleanOrder({ id: 'opt1', symbol: 'TXO202611C46500.TF', side: 'buy', type: 'market', qty: 1, t: t - 1000, market: 'TAIFEX', kind: 'opt', currency: 'TWD' });
+  const { fills } = await decideFills([order], { read, now: t });
+  // The index 200 points up from the settlement's day (the futures at 46,710): about half of that more.
+  const q = fills.opt1.quote;
+  assert.ok(q > 480 && q < 540, String(q));
+  assert.equal(q, Math.round(q));
+});

@@ -5,7 +5,7 @@
 // data route in place). Quotes come 20 to a request from
 // /v7/finance/spark (with the day's price line), charts, dividends and
 // splits from /v8/finance/chart, and symbol search from /v1/finance/search.
-import { BASE, METALS, GRAMS_PER_OUNCE, FUND_CUTOFF, isTwFund, isFuture, futureOf, kindOf, marketOf, normalizeCurrency } from './stock-markets.mjs';
+import { BASE, METALS, GRAMS_PER_OUNCE, FUND_CUTOFF, isTwFund, isFuture, futureOf, isOption, optionOf, optionTick, optionExpiry, OPTION, kindOf, marketOf, normalizeCurrency } from './stock-markets.mjs';
 import { BONDS, ISSUERS, CURVE_SYMBOLS, bondQuote, bondLine, curveOf } from './stock-bonds.mjs';
 
 export const PROXY_URL = 'https://orbit-workers-proxy.pengzjay.workers.dev';
@@ -133,6 +133,99 @@ export function futQuote(symbol, taiex, table) {
   };
 }
 const readTaifex = () => getJson(TAIFEX_URL);
+// TAIFEX's options (臺指選擇權): no live prices either. Each is priced by
+// Black-76 on its month's futures price (the live index plus that month's
+// basis), at the volatility its last settlement price implies (that day's
+// futures settlement, the time then left), to its tick, never under what
+// it's worth exercised.
+const YEAR = 365 * 86_400_000;
+function normCdf(x) {
+  // (Abramowitz and Stegun 26.2.17.)
+  const k = 1 / (1 + 0.2316419 * Math.abs(x));
+  const d = Math.exp((-x * x) / 2) / Math.sqrt(2 * Math.PI);
+  const p = d * k * (0.31938153 + k * (-0.356563782 + k * (1.781477937 + k * (-1.821255978 + k * 1.330274429))));
+  return x >= 0 ? 1 - p : p;
+}
+export function black76(right, F, K, T, vol) {
+  const intrinsic = Math.max(0, right === 'C' ? F - K : K - F);
+  if (!(T > 0) || !(vol > 0)) return intrinsic;
+  const sd = vol * Math.sqrt(T);
+  const d1 = (Math.log(F / K) + (sd * sd) / 2) / sd;
+  const d2 = d1 - sd;
+  return right === 'C' ? F * normCdf(d1) - K * normCdf(d2) : K * normCdf(-d2) - F * normCdf(-d1);
+}
+// The volatility at which Black-76 gives `price` (bisection), or null.
+export function impliedVol(right, F, K, T, price) {
+  const intrinsic = Math.max(0, right === 'C' ? F - K : K - F);
+  if (!(T > 0) || !(price > intrinsic)) return null;
+  let [lo, hi] = [0.001, 5];
+  if (black76(right, F, K, T, hi) < price) return null;
+  for (let i = 0; i < 60; i++) {
+    const mid = (lo + hi) / 2;
+    if (black76(right, F, K, T, mid) < price) lo = mid;
+    else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+const toTick = x => {
+  const tick = optionTick(x);
+  return Math.max(0.1, Math.round(Math.round(x / tick) * tick * 10) / 10);
+};
+// One option's price from the index at `t` (index points), or null.
+export function optPricer(symbol, taiex, table) {
+  const o = optionOf(symbol);
+  if (!o || !taiex || !table?.date) return null;
+  const month = `${o.year}${String(o.month).padStart(2, '0')}`;
+  const settle = table.opt?.[month]?.[o.right]?.[o.strike];
+  const fut = `TX${month}.TF`;
+  const F0 = table.settle?.[`TX${month}`];
+  const basis = futBasis(fut, taiex, table);
+  const expiry = optionExpiry(symbol);
+  if (!(settle > 0) || !(F0 > 0) || basis === null || !expiry) return null;
+  // (The settlement's moment: the table's day at 13:45.)
+  const T0 = (expiry - Date.parse(`${table.date}T13:45:00+08:00`)) / YEAR;
+  // (Deep in the money with no time value left: the intrinsic, at a floor volatility.)
+  const vol = impliedVol(o.right, F0, o.strike, T0, settle) ?? 0.05;
+  return { basis, settle, month, price: (index, t) => {
+    const F = index + basis;
+    const intrinsic = Math.max(0, o.right === 'C' ? F - o.strike : o.strike - F);
+    return toTick(Math.max(intrinsic, black76(o.right, F, o.strike, (expiry - t) / YEAR, vol)));
+  } };
+}
+export function optQuote(symbol, taiex, table) {
+  const o = optionOf(symbol);
+  const pricer = optPricer(symbol, taiex, table);
+  if (!pricer) return null;
+  const t = taiex.marketTime || Date.now();
+  const price = pricer.price(taiex.price, t);
+  const prev = Number.isFinite(taiex.prev) ? pricer.price(taiex.prev, t) : price;
+  const name = `${OPTION.zh} ${o.month}月 ${o.strike} ${o.right === 'C' ? '買權' : '賣權'}`;
+  return {
+    ...taiex,
+    symbol,
+    name,
+    shortName: name,
+    kind: 'opt',
+    market: 'TAIFEX',
+    currency: BASE,
+    price,
+    prev,
+    change: Math.round((price - prev) * 10) / 10,
+    pct: prev ? price / prev - 1 : 0,
+    dayHigh: null,
+    dayLow: null,
+    high52: null,
+    low52: null,
+    volume: null,
+    exchange: 'TAIFEX',
+    right: o.right,
+    strike: o.strike,
+    underlying: Math.round(taiex.price + pricer.basis),
+    settle: pricer.settle,
+    ...(table.final?.[pricer.month] ? { final: table.final[pricer.month] } : {}),
+    line: (taiex.line || []).map(([tt, c]) => [tt, pricer.price(c, tt)])
+  };
+}
 // TAIFEX's table itself (a month's final settlement price after its contract is gone).
 export const fetchFutTable = readTaifex;
 
@@ -249,7 +342,7 @@ function upstreamSymbols(symbols) {
       set.add(fxSymbol('USD'));
     } else if (BONDS[s]) {
       if (BONDS[s].live) for (const c of CURVE_SYMBOLS) set.add(c);
-    } else if (isFuture(s)) set.add(TAIEX);
+    } else if (isFuture(s) || isOption(s)) set.add(TAIEX);
     else if (s !== BASE && !isTwFund(s)) set.add(s);
   }
   return [...set];
@@ -262,7 +355,8 @@ export async function fetchQuotes(symbols, { range = '1d', interval = '5m' } = {
   const funds = [...new Set(symbols.filter(isTwFund))].sort();
   const fundRead = funds.length ? fetchFundQuotes(funds) : null;
   const futs = symbols.filter(isFuture);
-  const futRead = futs.length ? readTaifex().catch(() => null) : null;
+  const opts = symbols.filter(isOption);
+  const futRead = futs.length || opts.length ? readTaifex().catch(() => null) : null;
   const batches = [];
   for (let i = 0; i < wanted.length; i += SPARK_BATCH) batches.push(wanted.slice(i, i + SPARK_BATCH));
   const results = await Promise.allSettled(
@@ -290,6 +384,10 @@ export async function fetchQuotes(symbols, { range = '1d', interval = '5m' } = {
     const taiex = out.get(TAIEX);
     for (const s of futs) {
       const q = table && taiex && futQuote(s, taiex, table);
+      if (q) out.set(s, q);
+    }
+    for (const s of opts) {
+      const q = table && taiex && optQuote(s, taiex, table);
       if (q) out.set(s, q);
     }
     if (!symbols.includes(TAIEX)) out.delete(TAIEX);
@@ -376,6 +474,16 @@ export async function fetchChart(symbol, rangeKey = '1mo', { events = false } = 
     const shift = ([t, c]) => [t, c + quote.basis];
     return { quote, points: chart.points.map(shift), bars: (chart.bars || []).map(b => ({ ...b, o: b.o + quote.basis, h: b.h + quote.basis, l: b.l + quote.basis, c: b.c + quote.basis })), dividends: [], splits: [] };
   }
+  // An option: priced along the index's chart (its history approximated, at today's volatility).
+  if (isOption(symbol)) {
+    const [chart, table] = await Promise.all([fetchChart(TAIEX, rangeKey), readTaifex()]);
+    const pricer = chart && optPricer(symbol, chart.quote, table);
+    const quote = pricer && optQuote(symbol, chart.quote, table);
+    if (!quote) return null;
+    const expiry = optionExpiry(symbol);
+    const points = chart.points.filter(([t]) => t < expiry).map(([t, c]) => [t, pricer.price(c, t)]);
+    return { quote, points, bars: [], dividends: [], splits: [] };
+  }
   // A fund: its NAV and the day's before (SITCA's list has only those two).
   if (isTwFund(symbol)) {
     const quote = (await fetchQuotes([symbol])).get(symbol) || null;
@@ -403,7 +511,7 @@ export async function fetchChart(symbol, rangeKey = '1mo', { events = false } = 
 export async function fetchBars(symbol, since, { prePost = false } = {}) {
   const age = Date.now() - since;
   const day = 86_400_000;
-  if (isTwFund(symbol)) return [];
+  if (isTwFund(symbol) || isOption(symbol)) return [];
   if (isFuture(symbol)) {
     const [bars, quotes] = await Promise.all([fetchBars(TAIEX, since), fetchQuotes([symbol])]);
     const basis = quotes.get(symbol)?.basis;
@@ -425,7 +533,7 @@ export async function fetchBars(symbol, since, { prePost = false } = {}) {
 
 // Dividends and splits since `since` (ms): the account credits them.
 export async function fetchCorporateActions(symbol, since) {
-  if (isTwFund(symbol) || isFuture(symbol)) return { dividends: [], splits: [] };
+  if (isTwFund(symbol) || isFuture(symbol) || isOption(symbol)) return { dividends: [], splits: [] };
   const years = (Date.now() - since) / (365.25 * 86_400_000);
   const range = years < 0.9 ? '1y' : years < 4.5 ? '5y' : 'max';
   const [r, interval] = [range, range === 'max' ? '1mo' : range === '5y' ? '1wk' : '1d'];

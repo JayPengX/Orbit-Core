@@ -56,7 +56,10 @@ import {
   FUND_NAV_WAIT,
   futureOf,
   futureExpiry,
-  FUT_MARGIN
+  FUT_MARGIN,
+  OPTION,
+  optionExpiry,
+  optionIntrinsic
 } from '#kit/stock-markets.mjs';
 import { nextTradingStart, isTradingDay } from '#kit/stock-holidays.mjs';
 import { twDay } from '#kit/format.mjs';
@@ -547,7 +550,8 @@ export const firstTrade = account => account?.welcome === true && !traded(accoun
 // and minimum. `plan`: a monthly plan's buy (its own fee).
 export function estimate({ market, kind, currency, side, qty, price, t = Date.now(), dayTrade = false, first = false, plan = false, symbol = '' }) {
   const deal = dealPrice(market, side, price);
-  const gross = roundCash(deal * qty, currency);
+  // (An option's price is in points, NT$50 each.)
+  const gross = roundCash(deal * qty * (kind === 'opt' ? OPTION.mult : 1), currency);
   const cost = (q, g) => tradeCosts({ market, side, kind, gross: g, qty: q, currency, discount: first ? 0 : 1, oddLot: isOddLot(market, kind, q), dayTrade, t, plan, symbol });
   const mixed = mixedLot(market, kind, qty);
   let costs = cost(qty, gross);
@@ -795,6 +799,12 @@ export function placeOrder(account, req, { quote, rates, valuation, now = Date.n
   // lasts until that's known (CLOSE_DECIDE; Yahoo's Taiwan prices run 20
   // minutes behind), ending unmatched after it.
   if (order.tif === 'day' && atClosingAuction(order)) order.expires += CLOSE_DECIDE;
+  if (quote.kind === 'opt' && !req.forced) {
+    // An option trades to its month's last day's 13:30, and is only bought
+    // and sold back here (writing one isn't offered).
+    if (!(now < optionExpiry(quote.symbol))) return { error: 'futExpired' };
+    if (side === 'sell' && qty > Math.max(0, avail.qty[quote.symbol] || 0) + EPS) return { error: 'optNoWrite', have: Math.max(0, avail.qty[quote.symbol] || 0) };
+  }
   if (quote.kind === 'fut') {
     // A future trades to its last day's 13:30; then TAIFEX settles it.
     if (!req.forced && !(now < futureExpiry(quote.symbol))) return { error: 'futExpired' };
@@ -1418,15 +1428,17 @@ export function valuate(s, quotes, rates) {
     const r = rate(p.currency);
     if (r === null) out.missingRates.push(p.currency);
     if (!q) out.stale.push(p.symbol);
-    const price = q?.price ?? p.last ?? Math.abs(p.cost / p.qty);
-    const value = price * p.qty;
+    // (An option's price is in points: NT$ OPTION.mult each.)
+    const m = p.kind === 'opt' ? OPTION.mult : 1;
+    const price = q?.price ?? p.last ?? Math.abs(p.cost / p.qty / m);
+    const value = price * p.qty * m;
     const valueTWD = value * (r ?? 0);
     const fee = (p.borrowFee || 0) * (r ?? 0);
     const pl = valueTWD - p.costTWD - fee;
     // Today's move, in NT$ at today's rate (a position opened today moves
     // from its own price, not yesterday's close).
-    const from = q ? (p.first > (q.session?.start ?? Infinity) ? Math.abs(p.cost / p.qty) : q.prev) : price;
-    const day = (price - from) * p.qty * (r ?? 0);
+    const from = q ? (p.first > (q.session?.start ?? Infinity) ? Math.abs(p.cost / p.qty / m) : q.prev) : price;
+    const day = (price - from) * p.qty * m * (r ?? 0);
     dayChange += day;
     if (p.qty > 0) {
       longTWD += valueTWD;
@@ -1441,7 +1453,7 @@ export function valuate(s, quotes, rates) {
       short: p.qty < 0,
       quote: q || null,
       price,
-      avg: Math.abs(p.cost / p.qty),
+      avg: Math.abs(p.cost / p.qty / m),
       value,
       valueTWD,
       pl,
@@ -1997,6 +2009,26 @@ export function applyFutExpiry(account, symbol, final, { now = Date.now() } = {}
   return { account: { ...account, events: [...account.events, event] }, added: [event] };
 }
 
+// An option held at its expiry: settled in cash at what it's worth at
+// TAIFEX's final price (`final`), sold at that (no commission, the 期交稅 on
+// what it pays); one that pays nothing just ends (sold at 0).
+export function applyOptExpiry(account, symbol, final, { now = Date.now() } = {}) {
+  const expiry = optionExpiry(symbol);
+  const id = `mature:${symbol}`;
+  if (!expiry || now < expiry || !(final > 0) || account.events.some(e => e.id === id)) return { account, added: [] };
+  const held = replay(account, expiry).positions[symbol];
+  if (!held || held.qty <= EPS) return { account, added: [] };
+  const qty = held.qty;
+  const price = optionIntrinsic(symbol, final);
+  const gross = price * qty * OPTION.mult;
+  const tax = Math.round(gross * tradeCosts({ market: 'TAIFEX', side: 'sell', kind: 'opt', gross: 1, qty: 0, currency: BASE }).taxRate);
+  const event = {
+    id, type: 'fill', maturity: true, t: expiry, orderId: null, symbol, name: held.name, kind: 'opt', market: 'TAIFEX',
+    currency: BASE, side: 'sell', qty, price, quote: final, gross, commission: 0, tax, fee: 0, total: gross - tax, twd: 1
+  };
+  return { account: { ...account, events: [...account.events, event] }, added: [event] };
+}
+
 // ---- History: net worth over time, benchmarks --------------------------------
 
 // Net worth at the end of each of `days`, rebuilt from the log and each
@@ -2031,7 +2063,9 @@ export function netWorthSeries(account, days, priceAt, rateAt) {
       const r = rateAt(p.currency, t);
       if (!r) ok = false;
       const fee = p.borrowFee + (p.qty < 0 && t > p.feeLast && !p.credit && !p.dayShort ? (-p.cost * SHORT_FEE * (t - p.feeLast)) / YEAR_MS : 0);
-      nw += p.qty * (priceAt(p.symbol, t) ?? p.last) * (r || 0) - (fee || 0) * (r || 0);
+      const at = priceAt(p.symbol, t) ?? p.last;
+      // (A future is worth its gain since its mark, its margin being in the cash; an option NT$50 a point.)
+      nw += (p.kind === 'fut' ? (at - p.mark) * (p.mult || 1) * p.qty : p.qty * at * (p.kind === 'opt' ? OPTION.mult : 1)) * (r || 0) - (fee || 0) * (r || 0);
       // 融券: the deposit and the sale money the broker holds are the account's (as valuate counts them).
       if (p.qty < 0) {
         const held = (p.shortDeposit || 0) + (p.shortHeld || 0);
