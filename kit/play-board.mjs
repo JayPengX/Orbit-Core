@@ -234,7 +234,8 @@ function sideOptions(game, base, probs) {
   const family = familyOf(game.sport);
   const homeWin = probs.home / (probs.home + probs.away);
   let markets = [];
-  if (family === 'baseball') markets = baseballMarkets({ homeWin, total: game.total });
+  // 安打數大小 settles from ESPN's MLB box (hits), 先得X分 from its scoring plays.
+  if (family === 'baseball') markets = baseballMarkets({ homeWin, total: game.total }, { hits: game.sport === 'mlb', race: Boolean(LEAGUES[game.sport]?.path) });
   else if (family === 'football' || family === 'basketball') {
     const model = pointsModel(game.sport, { homeWin, spread: game.spread, total: game.total });
     if (model) markets = pointsMarkets(model, { spreadLine: game.spread?.awayLine ?? null, totalLine: game.total?.line ?? null });
@@ -260,7 +261,7 @@ function optionId(game, m, pick) {
   return `${game.id}|${m.kind}|${m.market}|${pick.side}`;
 }
 // Handicaps besides the game's own run line (半場讓分, [1-5局]讓分, 讓盤, 讓局): `line` is the pick's.
-export const HCAP_KINDS = new Set(['hrunline', 'f5runline', 'sethcap', 'gamehcap']);
+export const HCAP_KINDS = new Set(['hrunline', 'qrunline', 'f5runline', 'sethcap', 'gamehcap']);
 function marketOptions(game, base, markets, { real = false } = {}) {
   const out = [];
   for (const m of markets) {
@@ -287,8 +288,8 @@ function marketOptions(game, base, markets, { real = false } = {}) {
       if (m.kind === 'runline') Object.assign(o, { runLine: pick.line, awayLine: m.awayLine, giver: m.giver });
       else if (HCAP_KINDS.has(m.kind)) Object.assign(o, { line: pick.line, awayLine: m.awayLine, giver: m.giver });
       else if (m.kind === 'hcap3') Object.assign(o, { awayLine: m.awayLine, giver: m.giver });
-      if (m.kind === 'teamtotal') Object.assign(o, { team: m.team, teamLine: m.line });
-      if (m.kind === 'htotal' || m.kind === 'f5total' || m.kind === 'corners' || m.kind === 'tdtotal' || m.kind === 'inningtotal') Object.assign(o, { line: m.line });
+      if (m.kind === 'teamtotal' || m.kind === 'teamhits') Object.assign(o, { team: m.team, teamLine: m.line });
+      if (m.kind === 'htotal' || m.kind === 'f5total' || m.kind === 'corners' || m.kind === 'tdtotal' || m.kind === 'inningtotal' || m.kind === 'qtotal' || m.kind === 'hits') Object.assign(o, { line: m.line });
       if (m.period != null) o.period = m.period;
       if (m.kind === 'total') Object.assign(o, { totalLine: m.line, mainLine: m.main });
       out.push(o);
@@ -362,7 +363,7 @@ export function gameOptions(game) {
   // A game settled from its final score alone (schedules.mjs): nothing on a part of it.
   return game.scoreOnly ? out.filter(o => !PART_KINDS.has(o.kind)) : out;
 }
-const PART_KINDS = new Set(['htft', 'htotal', 'hrunline', 'f5', 'f5total', 'f5runline', 'q1', 'half', 'regulation', 'firstinning', 'inningtotal', 'inningml', 'inning', 'nextrun', 'tdtotal']);
+const PART_KINDS = new Set(['htft', 'htotal', 'hrunline', 'f5', 'f5total', 'f5runline', 'q1', 'half', 'regulation', 'firstinning', 'inningtotal', 'inningml', 'inning', 'nextrun', 'tdtotal', 'qrunline', 'qtotal', 'topperiod', 'raceto', 'hdc', 'hscore', 'firstgoal', 'lastgoal', 'higherhalf', 'hits', 'teamhits']);
 
 // ---- F1: 前三名 (podium) --------------------------------------------------------
 

@@ -256,6 +256,83 @@ export function legResult(leg, outcome) {
     case 'inning':
       if (!a.length) return null;
       return win(topInning(a, h) === leg.inning);
+    case 'qrunline':
+    case 'qtotal': {
+      // 單節讓分 / 單節大小: one period's (`period`, from 1) score.
+      const i = (leg.period ?? 1) - 1;
+      if (a.length <= i || h.length <= i) return null;
+      const pa = Number(a[i]) || 0;
+      const ph = Number(h[i]) || 0;
+      if (leg.kind === 'qtotal') return push(leg.side === 'over' ? pa + ph - leg.line : leg.line - pa - ph);
+      return push(leg.side === 'away' ? pa + leg.line - ph : ph + leg.line - pa);
+    }
+    case 'topperiod': {
+      // 得分最高單節: the regulation period with the most points or goals
+      // (overtime's aside); a shared highest is 平手 ('tie').
+      const n = familyOf(leg.sport) === 'hockey' ? 3 : 4;
+      if (a.length < n || h.length < n) return null;
+      const per = Array.from({ length: n }, (_, i) => (Number(a[i]) || 0) + (Number(h[i]) || 0));
+      const most = Math.max(...per);
+      const at = per.flatMap((x, i) => (x === most ? [String(i + 1)] : []));
+      return win(leg.side === (at.length === 1 ? at[0] : 'tie'));
+    }
+    case 'raceto': {
+      // 先得X分: the side whose count reached the line first; 'none', neither.
+      if (!outcome.runOrder) return null;
+      const n = { away: 0, home: 0 };
+      let first = 'none';
+      for (const side of outcome.runOrder) if (++n[side] >= leg.line) {
+        first = side;
+        break;
+      }
+      return win(leg.side === first);
+    }
+    case 'mltotal':
+    case 'mlbtts': {
+      // 不讓分/大小 and 不讓分/兩隊是否都進球: the result and the other, both right.
+      const [res, other] = String(leg.side).split('|');
+      const result = away > home ? 'away' : away === home ? 'draw' : 'home';
+      const ok = leg.kind === 'mltotal' ? (away + home > leg.line) === (other === 'over') : (away > 0 && home > 0) === (other === 'yes');
+      return win(result === res && ok);
+    }
+    case 'teamgoals': {
+      // 主(客)隊正確進球數: one side's goals in its band.
+      const n = leg.team === 'away' ? away : home;
+      return win(n >= leg.lo && (leg.hi == null || n <= leg.hi));
+    }
+    case 'hdc':
+    case 'hscore': {
+      // 半場雙勝 and 上半場正確比數: the first half's score.
+      if (!a.length || !h.length) return null;
+      const pa = Number(a[0]) || 0;
+      const ph = Number(h[0]) || 0;
+      if (leg.kind === 'hdc') return win(leg.side.split('|').includes(pa > ph ? 'away' : pa === ph ? 'draw' : 'home'));
+      const half = `${ph}-${pa}`;
+      return win(leg.score === 'other' ? !(leg.listed || []).includes(half) : leg.score === half);
+    }
+    case 'higherhalf': {
+      // 得分較高半場: the half with more goals (90 minutes), or 'tie'.
+      if (a.length < 2 || h.length < 2) return null;
+      const one = (Number(a[0]) || 0) + (Number(h[0]) || 0);
+      const two = (Number(a[1]) || 0) + (Number(h[1]) || 0);
+      return win(leg.side === (one > two ? 'first' : one === two ? 'tie' : 'second'));
+    }
+    case 'firstgoal':
+    case 'lastgoal': {
+      // 第一球 / 最後進球球隊 in 90 minutes; 'none' in a 0-0.
+      if (!outcome.goalOrder) return null;
+      const scorer = (leg.kind === 'firstgoal' ? outcome.goalOrder[0] : outcome.goalOrder.at(-1)) ?? 'none';
+      return win(leg.side === scorer);
+    }
+    case 'hits':
+    case 'teamhits': {
+      // 安打數大小 and 主(客)隊安打數大小, from the box score's hits.
+      const ha = Number(outcome.awayHits);
+      const hh = Number(outcome.homeHits);
+      if (!Number.isFinite(ha) || !Number.isFinite(hh)) return null;
+      const n = leg.kind === 'hits' ? ha + hh : leg.team === 'away' ? ha : hh;
+      return push(leg.side === 'over' ? n - leg.line : leg.line - n);
+    }
     default:
       return null;
   }
@@ -458,6 +535,27 @@ export function touchdowns(plays) {
   return (plays || []).filter(p => p?.type?.abbreviation === 'TD' || /touchdown/i.test(p?.type?.text || '')).length;
 }
 
+// A soccer game's goals from its scoreboard's events (ESPN's `details`:
+// the side credited, own goals included, and the minute): each side's
+// goals a half (then extra time's) and the 90 minutes' in order. null when
+// they don't add up to the score.
+export function soccerGoals(comp, away, home) {
+  const side = { [away.team?.id]: 'away', [home.team?.id]: 'home' };
+  const out = { away: [0, 0], home: [0, 0], order: [] };
+  for (const d of comp.details || []) {
+    if (!d.scoringPlay || d.shootout) continue;
+    const who = side[d.team?.id];
+    const minute = parseInt(d.clock?.displayValue ?? '', 10);
+    if (!who || !Number.isFinite(minute)) return null;
+    const part = minute <= 45 ? 0 : minute <= 90 ? 1 : 2;
+    for (const s of ['away', 'home']) while (out[s].length <= part) out[s].push(0);
+    out[who][part]++;
+    if (part < 2) out.order.push(who);
+  }
+  const all = s => out[s].reduce((n, x) => n + x, 0);
+  return all('away') === Number(away.score) && all('home') === Number(home.score) ? out : null;
+}
+
 // Every game on an ESPN scoreboard with how it stands: 'final', 'void'
 // (called off) or 'pending', and for baseball the runs of each inning.
 export function parseEspnResults(data, sport) {
@@ -472,10 +570,16 @@ export function parseEspnResults(data, sport) {
     const type = comp.status?.type || {};
     const name = type.name || '';
     const status = VOID_STATUS.test(name) ? 'void' : type.completed && type.state === 'post' ? 'final' : 'pending';
+    // Each side's period scores; a soccer scoreboard's from its goals when
+    // ESPN gives none (its halves, then extra time), with their order.
+    const goals = isSoccer(sport) ? soccerGoals(comp, away, home) : null;
+    const lines = side => (side.linescores?.length ? side.linescores.map(l => Number(l.value) || 0) : goals?.[side.homeAway] ?? []);
+    const awayLines = lines(away);
+    const homeLines = lines(home);
     // Soccer settles on 90 minutes: a tie that went to extra time (or
     // penalties) counts its two halves only.
-    const halves = side => (side.linescores || []).slice(0, 2).reduce((sum, l) => sum + (Number(l.value) || 0), 0);
-    const ninety = isSoccer(sport) && /AET|PEN|EXTRA|SHOOTOUT/i.test(type.name || '') && (away.linescores?.length ?? 0) >= 2 && (home.linescores?.length ?? 0) >= 2;
+    const halves = list => list.slice(0, 2).reduce((sum, n) => sum + n, 0);
+    const ninety = isSoccer(sport) && /AET|PEN|EXTRA|SHOOTOUT/i.test(type.name || '') && awayLines.length >= 2 && homeLines.length >= 2;
     games.push({
       sport,
       espnId: event.id,
@@ -483,10 +587,13 @@ export function parseEspnResults(data, sport) {
       away: away.team.displayName,
       home: home.team.displayName,
       status,
-      awayScore: ninety ? halves(away) : Number(away.score),
-      homeScore: ninety ? halves(home) : Number(home.score),
-      awayInnings: (away.linescores || []).map(l => Number(l.value) || 0),
-      homeInnings: (home.linescores || []).map(l => Number(l.value) || 0),
+      awayScore: ninety ? halves(awayLines) : Number(away.score),
+      homeScore: ninety ? halves(homeLines) : Number(home.score),
+      awayInnings: awayLines,
+      homeInnings: homeLines,
+      ...(goals ? { goalOrder: goals.order } : {}),
+      // Baseball's hits (安打數大小).
+      ...(Number.isFinite(away.hits) && Number.isFinite(home.hits) ? { awayHits: away.hits, homeHits: home.hits } : {}),
       // Where a game in progress is: 'in', ESPN's short detail ("Top 7th",
       // "Q3 5:21", "67'") and the period number.
       state: type.state ?? null,
@@ -866,10 +973,12 @@ export async function readOutcomes(legs, { read, keptKambi = async () => null, n
       if (!game) return;
       // 第N分 needs the order the runs came in: the game's scoring plays;
       // a player's pick their box score; corners the teams' stats.
-      if ((leg.kind === 'nextrun' || leg.kind === 'prop' || leg.kind === 'corners' || leg.kind === 'tdtotal') && game.status === 'final') {
+      if ((leg.kind === 'nextrun' || leg.kind === 'raceto' || leg.kind === 'prop' || leg.kind === 'corners' || leg.kind === 'tdtotal') && game.status === 'final') {
         const summary = await page(`${ESPN}/${path}/summary?event=${game.espnId}`);
         if (!summary) return;
-        if (leg.kind === 'nextrun') out.set(leg.id, { ...game, runOrder: runOrder(summary.plays) });
+        if (leg.kind === 'nextrun' || leg.kind === 'raceto') {
+          if (Array.isArray(summary.plays)) out.set(leg.id, { ...game, runOrder: runOrder(summary.plays) });
+        }
         else if (leg.kind === 'tdtotal') {
           if (Array.isArray(summary.scoringPlays)) out.set(leg.id, { ...game, touchdowns: touchdowns(summary.scoringPlays) });
         }

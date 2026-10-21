@@ -36,7 +36,7 @@ export const LONG_FROM = 6;
 export const LONG_SHARE = 0.85;
 
 // Markets whose outcomes are many and long by design.
-const EXOTIC = new Set(['score', 'margin', 'inning', 'nextrun', 'htft', 'goalbands', 'goalcount', 'f1podium', 'f1top', 'setscore', 'prop']);
+const EXOTIC = new Set(['score', 'margin', 'inning', 'nextrun', 'htft', 'goalbands', 'goalcount', 'f1podium', 'f1top', 'setscore', 'prop', 'hscore', 'teamgoals', 'topperiod', 'mltotal', 'mlbtts']);
 // Priced one by one: only a runaway favourite is held back.
 const OUTRIGHT = new Set(['f1', 'f1pole', 'future', 'f1team']);
 
