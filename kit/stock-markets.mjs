@@ -690,8 +690,10 @@ export function futureMonths(code, t = Date.now(), n = 2) {
   return out;
 }
 
-// TAIFEX's TAIEX options (臺指選擇權, TXO), monthly: `TXO202611C46500.TF`,
-// a call (C) or put (P) at a strike, NT$50 a point of premium. Bought (paid
+// TAIFEX's TAIEX options (臺指選擇權, TXO), monthly (`TXO202611C46500.TF`)
+// and weekly (週選擇權: `TXO202610W4C46500.TF`, the month's 4th Wednesday;
+// `…F5…`, its 5th Friday), a call (C) or put (P) at a strike, NT$50 a point
+// of premium. Bought (paid
 // in full) or written (sold to open: the premium comes in and a margin is
 // held, optWriteMargin). They expire with the futures of their month,
 // settling in cash at the same final price (the intrinsic value, if any).
@@ -699,21 +701,77 @@ export function futureMonths(code, t = Date.now(), n = 2) {
 // paid or received).
 export const OPTION = { code: 'TXO', zh: '台指選', en: 'TAIEX option', mult: 50, fee: 25 };
 export const OPT_TAX = 0.001;
-// Strikes every 100 points (TAIFEX lists 50s near the money too; 100s are enough here).
+// Strikes every 100 points, and every 50 within OPT_FINE of the money (TAIFEX's).
 export const OPT_STEP = 100;
-const OPT_RE = /^TXO(\d{4})(\d{2})([CP])(\d{3,6})\.TF$/;
+export const OPT_FINE = 1000;
+const OPT_RE = /^TXO(\d{4})(\d{2})([WF][1-5])?([CP])(\d{3,6})\.TF$/;
 export const isOption = symbol => OPT_RE.test(symbol || '');
+// `series`: TAIFEX's 到期月份(週別), yyyymm or yyyymm + its week (W4, F5);
+// `week`: that week, or null for a monthly.
 export function optionOf(symbol) {
   const m = OPT_RE.exec(symbol || '');
-  return m ? { ...OPTION, year: Number(m[1]), month: Number(m[2]), right: m[3], strike: Number(m[4]) } : null;
+  return m ? { ...OPTION, year: Number(m[1]), month: Number(m[2]), week: m[3] || null, series: `${m[1]}${m[2]}${m[3] || ''}`, right: m[4], strike: Number(m[5]) } : null;
 }
-export const optionSymbol = (month, right, strike) => `TXO${month}${right}${strike}.TF`;
+export const optionSymbol = (series, right, strike) => `TXO${series}${right}${strike}.TF`;
+// A series' last trading day (and final settlement), 13:30: a monthly's is
+// its futures'; a weekly's the month's nth Wednesday (W) or Friday (F), the
+// next business day when that's a holiday.
+export function seriesExpiry(series) {
+  const m = /^(\d{4})(\d{2})(?:([WF])([1-5]))?$/.exec(series || '');
+  if (!m) return null;
+  if (!m[3]) return futureExpiry(`TX${m[1]}${m[2]}.TF`);
+  const [y, mo] = [Number(m[1]), Number(m[2])];
+  const first = new Date(Date.UTC(y, mo - 1, 1)).getUTCDay();
+  const weekday = m[3] === 'W' ? 3 : 5;
+  const nominal = 1 + ((weekday - first + 7) % 7) + 7 * (Number(m[4]) - 1);
+  for (let i = 0; i < 10; i++) {
+    const day = new Date(Date.UTC(y, mo - 1, nominal + i)).toISOString().slice(0, 10);
+    if (tradingDay('TW', day)) return Date.parse(`${day}T13:30:00+08:00`);
+  }
+  return null;
+}
+// The weekly series that may be listed at `t` (TAIFEX lists each up to about
+// two weeks ahead): every Wednesday but the 3rd (the monthly's) and every
+// Friday within WEEKLY_AHEAD days, not yet expired, nearest first.
+const WEEKLY_AHEAD = 14;
+export function optionWeeklies(t = Date.now()) {
+  const out = [];
+  const today = new Date(t + 8 * 3_600_000);
+  for (let i = 0; i <= WEEKLY_AHEAD; i++) {
+    const d = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() + i));
+    const wd = d.getUTCDay();
+    if (wd !== 3 && wd !== 5) continue;
+    const n = Math.ceil(d.getUTCDate() / 7);
+    if (wd === 3 && n === 3) continue;
+    const series = `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}${wd === 3 ? 'W' : 'F'}${n}`;
+    if (seriesExpiry(series) > t) out.push(series);
+  }
+  return out.sort((a, b) => seriesExpiry(a) - seriesExpiry(b));
+}
+// The series to show at `t`: the weeklies, then the two nearest months, by
+// expiry; with TAIFEX's table (`table.opt`), the weeklies it has prices for.
+export const optionExpiries = (t = Date.now(), table = null) =>
+  [...new Set([...optionWeeklies(t).filter(w => !table?.opt || table.opt[w]), ...futureMonths('TX', t, 2).map(s => s.slice(2, 8))])].sort((a, b) => seriesExpiry(a) - seriesExpiry(b));
+// The TX month whose futures price a series is priced on: the first that
+// expires with it or after.
+export function seriesFuture(series, t = Date.now()) {
+  const m = /^(\d{4})(\d{2})/.exec(series || '');
+  if (!m) return null;
+  let [y, mo] = [Number(m[1]), Number(m[2])];
+  const due = seriesExpiry(series);
+  for (let i = 0; i < 3; i++) {
+    const month = `${y}${String(mo).padStart(2, '0')}`;
+    if (futureExpiry(`TX${month}.TF`) >= due) return month;
+    [y, mo] = mo === 12 ? [y + 1, 1] : [y, mo + 1];
+  }
+  return null;
+}
 // NT$ a point of price: 50 for an option, 1 for anything priced per unit.
 export const unitMult = symbol => (isOption(symbol) ? OPTION.mult : 1);
 // Its month's final settlement (the futures', the same day and price).
 export function optionExpiry(symbol) {
   const o = optionOf(symbol);
-  return o ? futureExpiry(`TX${o.year}${String(o.month).padStart(2, '0')}.TF`) : null;
+  return o ? seriesExpiry(o.series) : null;
 }
 // What it pays at a settlement price: max(0, the index past the strike), in points.
 export function optionIntrinsic(symbol, at) {

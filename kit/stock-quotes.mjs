@@ -5,7 +5,7 @@
 // data route in place). Quotes come 20 to a request from
 // /v7/finance/spark (with the day's price line), charts, dividends and
 // splits from /v8/finance/chart, and symbol search from /v1/finance/search.
-import { BASE, METALS, GRAMS_PER_OUNCE, FUND_CUTOFF, isTwFund, isFuture, futureOf, isOption, optionOf, optionTick, optionExpiry, OPTION, kindOf, marketOf, normalizeCurrency } from './stock-markets.mjs';
+import { BASE, METALS, GRAMS_PER_OUNCE, FUND_CUTOFF, isTwFund, isFuture, futureOf, isOption, optionOf, optionTick, optionExpiry, seriesFuture, OPTION, kindOf, marketOf, normalizeCurrency } from './stock-markets.mjs';
 import { BONDS, ISSUERS, CURVE_SYMBOLS, bondQuote, bondLine, curveOf } from './stock-bonds.mjs';
 
 export const PROXY_URL = 'https://orbit-workers-proxy.pengzjay.workers.dev';
@@ -175,10 +175,12 @@ const toTick = x => {
 export function optPricer(symbol, taiex, table) {
   const o = optionOf(symbol);
   if (!o || !taiex || !table?.date) return null;
-  const month = `${o.year}${String(o.month).padStart(2, '0')}`;
+  // (A weekly's settlement is under its series; its futures, the month it expires in or the next.)
+  const month = o.series;
   const settle = table.opt?.[month]?.[o.right]?.[o.strike];
-  const fut = `TX${month}.TF`;
-  const F0 = table.settle?.[`TX${month}`];
+  const fm = seriesFuture(o.series);
+  const fut = `TX${fm}.TF`;
+  const F0 = table.settle?.[`TX${fm}`];
   const basis = futBasis(fut, taiex, table);
   const expiry = optionExpiry(symbol);
   if (!(settle > 0) || !(F0 > 0) || basis === null || !expiry) return null;
@@ -199,7 +201,9 @@ export function optQuote(symbol, taiex, table) {
   const t = taiex.marketTime || Date.now();
   const price = pricer.price(taiex.price, t);
   const prev = Number.isFinite(taiex.prev) ? pricer.price(taiex.prev, t) : price;
-  const name = `${OPTION.zh} ${o.month}月 ${o.strike} ${o.right === 'C' ? '買權' : '賣權'}`;
+  // (A weekly by its day: 台指選 10/28週.)
+  const due = new Date(optionExpiry(symbol) + 8 * 3_600_000);
+  const name = `${OPTION.zh} ${o.week ? `${due.getUTCMonth() + 1}/${due.getUTCDate()}週` : `${o.month}月`} ${o.strike} ${o.right === 'C' ? '買權' : '賣權'}`;
   return {
     ...taiex,
     symbol,
