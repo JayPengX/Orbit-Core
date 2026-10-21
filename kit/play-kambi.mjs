@@ -41,6 +41,14 @@ function fairThree(one, cross, two) {
   return { home, draw, away };
 }
 
+// The match's competition: Kambi's group, or the one above it where the
+// group is only "Matches" or "Series" (cricket's: "International One Day").
+const groupOf = e => {
+  // (The proxy's trim keeps the path as termKeys: international_twenty20__w_.)
+  const title = key => String(key).replace(/__w_$/, ' (W)').split('_').filter(Boolean).map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
+  const names = (Array.isArray(e.path) ? e.path : []).map(p => (typeof p === 'string' ? title(p) : p?.englishName ?? p?.name)).filter(Boolean);
+  return /^(matches|series)$/i.test(e.group || '') && names.length > 1 ? names[names.length - 2] : e.group || '';
+};
 // A match of a competition 台灣運彩 sells (the league's `only`, catalog.mjs):
 // Kambi's path as termKeys (the proxy's trim) or as its own records.
 export const pathOf = e => (e?.path || []).map(p => (typeof p === 'string' ? p : p?.termKey)).join('/');
@@ -82,7 +90,7 @@ export function parseKambiEvents(data, sport, now = new Date(), { unpriced = fal
       spread: null,
       book: 'kambi',
       kambiId: e.id,
-      group: e.group || '',
+      group: groupOf(e),
       // The women's draws and leagues (their names read as women's, names.mjs).
       ...(/(^|\/)(wta|[a-z_]*women[a-z_]*|[a-z_]*__w_)(\/|$)/.test(pathOf(e)) ? { women: true } : {}),
       // Soccer from Kambi settles on the final score alone: no halves.
@@ -152,7 +160,7 @@ export function parseKambiInPlay(data, sport) {
       startUtc: new Date(e.start).toISOString(),
       away: e.awayName,
       home: e.homeName,
-      group: e.group || '',
+      group: groupOf(e),
       ml: three ?? (win ? { home: win[0], away: win[1] } : null),
       spread: null,
       total: null

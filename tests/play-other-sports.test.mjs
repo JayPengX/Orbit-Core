@@ -71,7 +71,7 @@ test('UFC: Kambi prices, the winner from ESPN card, a draw void', async () => {
   const { CATALOG } = await import('../kit/catalog.mjs');
   const { LEAGUES, boutResult, readOutcomes } = await import('../kit/settle.mjs');
   assert.equal(CATALOG.ufc.sport, 'mma');
-  assert.equal(LEAGUES.ufc.results, 'mma/ufc');
+  assert.equal(LEAGUES.ufc.results, 'mma/ufc/scoreboard');
   const bout = (x, y, wx, wy, name = 'STATUS_FINAL', completed = true) => ({ events: [{ date: '2026-10-17T21:00Z', status: { type: { completed: true } }, competitions: [{ status: { type: { name, completed, state: completed ? 'post' : 'pre' } }, competitors: [{ athlete: { displayName: x }, winner: wx }, { athlete: { displayName: y }, winner: wy }] }] }] });
   assert.deepEqual(boutResult(bout('SuYoung You', 'Cody Chovancek', true, false), 'SuYoung You', 'Cody Chovancek'), { status: 'final', homeScore: 1, awayScore: 0 });
   assert.deepEqual(boutResult(bout('Cody Chovancek', 'SuYoung You', false, true), 'SuYoung You', 'Cody Chovancek'), { status: 'final', homeScore: 1, awayScore: 0 });
@@ -87,4 +87,33 @@ test('UFC: Kambi prices, the winner from ESPN card, a draw void', async () => {
   // The card over without the bout: void.
   const gone = await readOutcomes([{ ...leg, home: 'X Nobody', away: 'Y Nobody' }], { read, now: new Date('2026-10-18T06:00:00Z') });
   assert.equal(gone.get('l1').status, 'void');
+});
+
+test('cricket: one-day and T20 internationals and the big leagues, the winner from ESPN, a draw or no result void', async () => {
+  const { CATALOG } = await import('../kit/catalog.mjs');
+  const { winnerResult, readOutcomes } = await import('../kit/settle.mjs');
+  const only = CATALOG.cricket.only;
+  for (const p of ['cricket/international_one_day/matches', 'cricket/international_twenty20__w_/matches', 'cricket/indian_premier_league', 'cricket/t20_big_bash']) assert.ok(only.test(p), p);
+  for (const p of ['cricket/international_test_cricket/matches', 'cricket/south_africa/pro20_cup', 'cricket/t20_womens_big_bash']) assert.ok(!only.test(p), p);
+  const panel = (x, y, wx, wy, state = 'post', date = '2026-10-22T08:00Z') => ({ scores: [{ events: [{ date, competitions: [{ status: { type: { state } }, competitors: [{ team: { displayName: x }, winner: wx }, { team: { displayName: y }, winner: wy }] }] }] }] });
+  assert.deepEqual(winnerResult(panel('Sri Lanka', 'England', 'false', 'true'), 'Sri Lanka', 'England', '2026-10-22T08:00:00Z'), { status: 'final', homeScore: 0, awayScore: 1 });
+  assert.deepEqual(winnerResult(panel('Sri Lanka', 'England', 'false', 'false'), 'Sri Lanka', 'England', '2026-10-22T08:00:00Z'), { status: 'void' });
+  assert.equal(winnerResult(panel('Sri Lanka', 'England', 'false', 'true'), 'Sri Lanka', 'England', '2026-10-25T08:00:00Z'), null);
+  assert.equal(winnerResult(panel('Sri Lanka', 'England', 'false', 'false', 'in'), 'Sri Lanka', 'England', '2026-10-22T08:00:00Z').state, 'in');
+  const leg = { id: 'c', sport: 'cricket', kind: 'ml', kambiId: 2, home: 'Sri Lanka', away: 'England', start: '2026-10-22T08:00:00Z' };
+  const read = url => (url.includes('cricket/scorepanel?dates=20261022') ? panel('Sri Lanka', 'England', 'true', 'false') : { scores: [] });
+  assert.equal((await readOutcomes([leg], { read, now: new Date('2026-10-22T20:00:00Z') })).get('c').homeScore, 1);
+  // Nothing listed yet a day on: no answer (not void).
+  assert.equal((await readOutcomes([{ ...leg, home: 'Nepal', away: 'Oman' }], { read, now: new Date('2026-10-23T20:00:00Z') })).has('c'), false);
+});
+
+test('a Kambi group that is only "Matches" reads as the competition above it', async () => {
+  const { parseKambiEvents } = await import('../kit/play-kambi.mjs');
+  const offer = { betOfferType: { englishName: 'Match' }, criterion: { englishLabel: 'Match Odds' }, outcomes: [{ type: 'OT_ONE', odds: 1500, status: 'OPEN' }, { type: 'OT_TWO', odds: 2500, status: 'OPEN' }] };
+  const path = [{ englishName: 'Cricket', termKey: 'cricket' }, { englishName: 'International One Day', termKey: 'international_one_day' }, { englishName: 'Matches', termKey: 'matches' }];
+  const data = { events: [{ event: { id: 1, state: 'NOT_STARTED', homeName: 'Sri Lanka', awayName: 'England', start: '2030-01-01T08:00:00Z', group: 'Matches', path }, betOffers: [offer] }] };
+  assert.equal(parseKambiEvents(data, 'cricket', new Date('2029-12-31T00:00:00Z'))[0].group, 'International One Day');
+  // Trimmed by the proxy: termKeys.
+  data.events[0].event.path = ['cricket', 'international_twenty20__w_', 'matches'];
+  assert.equal(parseKambiEvents(data, 'cricket', new Date('2029-12-31T00:00:00Z'))[0].group, 'International Twenty20 (W)');
 });
