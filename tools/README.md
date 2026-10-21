@@ -53,20 +53,15 @@ accounts, never the owner's key. `DEBUG=1` lists every upstream fetch.
 
 `kit/sw.js` is the one service worker for every app (the page kept first and
 refreshed behind it, `?v=` files from the cache, the rest network first,
-skipWaiting and clients.claim). An app's own `sw.js` can be two lines:
+skipWaiting and clients.claim; every file under its own hash checked against
+it, since Pages' CDN ignores `?v=`). An app's `sw.js` is its settings, then
+the kit's (the options are at the top of `kit/sw.js`):
 
 ```js
-self.QUADRA_SW = { cache: 'quadra-fixtures' };      // optional: what the deploy would stamp
-importScripts('../Shared-Proxy/kit/sw.js');          // and, for pictures, ../Shared-Proxy/kit/sw-images.js
+self.QUADRA_SW = { cache: 'orbit-law-v1', title: 'Orbit Law' };
+importScripts('../Shared-Proxy/kit/sw-images.js');   // pictures from other sites, when it shows them
+importScripts('../Shared-Proxy/kit/sw.js');
 ```
-
-`node tools/stamp.mjs <sw.js> --cache <name> --version <build> --assets <public dir> [--exclude data/,share/]`
-writes the cache name, build version and the list of files to keep into the
-`STAMP` line of the file it is given (a copy of `kit/sw.js`, or an app's
-`sw.js` that has the same `stamp:begin` / `stamp:end` lines). The cache is
-`<name>-<build>`; the activate step deletes the app's other versions only.
-Without a stamp the worker still runs (cache `quadra-app`, only `./` kept
-ahead). Nothing changes in the apps until one adopts it.
 
 ## Others
 
@@ -74,7 +69,6 @@ ahead). Nothing changes in the apps until one adopts it.
 | --- | --- |
 | `node tools/economy.mjs` | Each kind of user over a year, and what the house keeps |
 | `node tools/accent-css.mjs` | Write each app's accent colours (`kit/brand.mjs`) into `kit/quadra.css`; run after changing a brand colour |
-| `node tools/stamp.mjs` | Stamp a service worker for a deploy (see above) |
 | `node tools/leagues-audit.mjs [--sport soccer] [--json]` | Every catalogue league against its sources today |
 | `node tools/hk-lots.mjs [file.xlsx]` | Every HKEX security's board lot into `kit/stock-hk-lots.mjs` (HKEX's List of Securities); run it now and then for new listings |
 | `node tools/tw-boards.mjs` | Every 興櫃 stock (`TW_EMERGING`) and listed 可轉債 with its maturity (`TW_CB`) into `kit/stock-markets.mjs`, from TPEx open data; run it now and then |

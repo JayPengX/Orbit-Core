@@ -9,6 +9,12 @@
 // its text), so a change reaches every file that leads to it and nothing
 // else. Files that import each other (a cycle) share one hash.
 //
+// A file on its own is addressed by the hash of exactly what is served (12
+// hex digits), so a phone can tell a file from the wrong one under its
+// address: GitHub Pages' CDN ignores the ?v= part, and for a while after a
+// deploy it can answer a new address with the old file (kit/sw.js checks
+// each one). A cycle's shared hash (10 digits) can't be checked that way.
+//
 // The files are also minified first (whitespace and syntax; names kept, so
 // an error still says where it was): a third less to download.
 //
@@ -16,6 +22,7 @@
 //   texts:  Map<path, text> of every file that can be referred to
 //   refs:   (text, path) → [{ start, end, target }] the references in a text
 //           (end: just after the path; the ?v= goes there) to other paths
+//   finish: (text, path) → text, the served text from the stamped one (the kit's #kit/ imports)
 //   →       files: Map<path, text> stamped; hashes: Map<path, hash>
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
@@ -24,7 +31,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-export const hashOf = text => createHash('sha256').update(text).digest('hex').slice(0, 10);
+export const hashOf = (text, n = 10) => createHash('sha256').update(text).digest('hex').slice(0, n);
+// The address of a file served as `text` (what kit/sw.js checks it against).
+export const servedHash = text => hashOf(text, 12);
 
 const ESBUILD = '0.24.0';
 let esbuild = null;
@@ -50,7 +59,7 @@ export async function minify(text, path) {
   return transformSync(text, { loader, minifyWhitespace: true, minifySyntax: true, legalComments: 'none', charset: 'utf8' }).code;
 }
 
-export async function hashFiles(texts, { refs, minify: shrink = true }) {
+export async function hashFiles(texts, { refs, minify: shrink = true, finish = text => text }) {
   const paths = [...texts.keys()];
   const src = new Map();
   for (const p of paths) src.set(p, shrink ? await minify(texts.get(p), p) : texts.get(p));
@@ -98,11 +107,11 @@ export async function hashFiles(texts, { refs, minify: shrink = true }) {
       next += `${text.slice(at, r.end)}?v=${h}`;
       at = r.end;
     }
-    return next + text.slice(at);
+    return finish(next + text.slice(at), p);
   };
   for (const group of order) {
-    // A cycle: one hash for all of them, of their texts with everything outside it stamped.
-    const h = hashOf(group.map(p => `${p}\n${stamp(p)}`).join('\n\0'));
+    // On its own: the hash of what's served. A cycle: one hash for all of them, of their texts with everything outside it stamped.
+    const h = group.length === 1 ? servedHash(stamp(group[0])) : hashOf(group.map(p => `${p}\n${stamp(p)}`).join('\n\0'));
     for (const p of group) hashes.set(p, h);
     for (const p of group) out.set(p, stamp(p));
   }

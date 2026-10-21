@@ -1,5 +1,5 @@
 // The foundations: lang, format, sidesInOrder, ready, toast's action and batch,
-// segmented's count, the shared service worker and its stamp.
+// segmented's count, the shared service worker.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -8,7 +8,7 @@ import * as lang from '../kit/lang.mjs';
 import * as quadra from '../kit/quadra.mjs';
 import * as fmt from '../kit/format.mjs';
 import { sidesInOrder } from '../kit/play-teams.mjs';
-import { stampSw, listAssets } from '../tools/stamp.mjs';
+import { webcrypto, createHash } from 'node:crypto';
 
 const rawCss = readFileSync(new URL('../kit/quadra.css', import.meta.url), 'utf8');
 const swText = readFileSync(new URL('../kit/sw.js', import.meta.url), 'utf8');
@@ -214,30 +214,26 @@ test('the stylesheet has the Foundations section and its classes', () => {
   assert.doesNotMatch(css.slice(css.indexOf('.q-toast-text')), /#[0-9a-fA-F]{3,8}\b(?<!#ffffff)/);
 });
 
-test('stampSw writes the version and files into the STAMP line only', () => {
-  const out = stampSw(swText, { cache: 'orbit-weather', version: 'abc123', assets: ['./', 'app.js', 'lib/x.mjs'] });
-  assert.match(out, /const STAMP = \{ ?cache: 'orbit-weather', version: 'abc123', assets: \['\.\/', 'app\.js', 'lib\/x\.mjs'\] ?\};/);
-  assert.equal(out.split('\n').length, swText.split('\n').length);
-  assert.equal(stampSw(out, { cache: 'orbit-weather', version: 'abc123', assets: ['./', 'app.js', 'lib/x.mjs'] }), out, 'stamping again is the same');
-  assert.throws(() => stampSw(swText, { cache: "bad'name" }));
-  assert.throws(() => stampSw('no markers', { cache: 'x' }));
-  assert.ok(!/\bimport\s/.test(swText.replace(/\/\/.*$/gm, '')), 'a classic script');
-});
-
-test('the stamped worker installs, cleans only its own old caches, and answers', async () => {
-  const stamped = stampSw(swText, { cache: 'app-a', version: 'v2', assets: ['./', 'app.js', 'gone.js'] });
+// The worker as an app runs it (its settings, then kit/sw.js), in a made-up
+// browser: caches by name, and a network that answers from `net` (a path →
+// text, or a function of the try).
+function runWorker(settings, net = {}) {
   const listeners = {};
-  const store = new Map([['app-a-v1', new Map()], ['app-b-v1', new Map()], ['quadra-images-v1', new Map()]]);
-  const cache = name => ({
-    add: async u => {
-      if (u === 'gone.js') throw new Error('404');
-      store.get(name).set(u, 1);
-    },
-    addAll: async us => us.forEach(u => store.get(name).set(u, 1)),
-    keys: async () => [],
-    put: async () => {}
-  });
+  const store = new Map([['app-a-v1', new Map()], ['app-a-data', new Map()], ['app-b-v1', new Map()], ['quadra-images-v1', new Map()]]);
+  const cacheOf = name => {
+    if (!store.has(name)) store.set(name, new Map());
+    const m = store.get(name);
+    const key = r => (typeof r === 'string' ? new URL(r, 'https://x.test/App/').href : r.url);
+    return {
+      addAll: async us => us.forEach(u => m.set(key(u), new Response('page'))),
+      keys: async (u, o) => [...m.keys()].filter(k => !u || (o?.ignoreSearch ? k.split('?')[0] === u : k === u)).map(url => ({ url })),
+      put: async (r, res) => m.set(key(r), res),
+      delete: async r => m.delete(key(r)),
+      match: async r => m.get(key(r))?.clone()
+    };
+  };
   const self = {
+    QUADRA_SW: settings,
     addEventListener: (k, f) => (listeners[k] = f),
     skipWaiting: async () => (self.skipped = true),
     clients: { claim: async () => (self.claimed = true) },
@@ -245,33 +241,76 @@ test('the stamped worker installs, cleans only its own old caches, and answers',
     registration: { scope: 'https://x.test/App/' }
   };
   const caches = {
-    open: async n => (store.has(n) || store.set(n, new Map()), cache(n)),
+    open: async n => cacheOf(n),
     keys: async () => [...store.keys()],
     delete: async n => store.delete(n),
-    match: async () => undefined
+    match: async r => {
+      for (const n of store.keys()) {
+        const hit = await cacheOf(n).match(r);
+        if (hit) return hit;
+      }
+    }
   };
-  vm.runInNewContext(stamped, { self, caches, URL, Promise, setTimeout, fetch: async () => ({}) });
+  const asked = [];
+  const fetch = async (r, init) => {
+    const url = typeof r === 'string' ? r : r.url;
+    const path = new URL(url).pathname;
+    asked.push({ path, cache: init?.cache });
+    const body = typeof net[path] === 'function' ? net[path](asked.filter(a => a.path === path).length) : net[path];
+    if (body == null) throw new TypeError('Load failed');
+    return new Response(body, { status: 200 });
+  };
+  vm.runInNewContext(readFileSync(new URL('../kit/sw.js', import.meta.url), 'utf8'), { self, caches, URL, Request, Response, Promise, setTimeout: f => setTimeout(f, 0), fetch, crypto: webcrypto, Uint8Array });
+  const go = async url => {
+    let answer;
+    const work = [];
+    listeners.fetch({ request: new Request(url), respondWith: p => (answer = p), waitUntil: p => work.push(p) });
+    const res = await answer;
+    await Promise.all(work);
+    return res;
+  };
+  return { listeners, store, asked, go, self };
+}
+const served = text => createHash('sha256').update(text).digest('hex').slice(0, 12);
+
+test("the worker installs, and drops only this app's old caches (its data kept)", async () => {
+  const w = runWorker({ cache: 'app-a-v2', spare: ['app-a-data'] });
   let work;
-  await listeners.install({ waitUntil: p => (work = p) });
+  w.listeners.install({ waitUntil: p => (work = p) });
   await work;
-  assert.ok(self.skipped);
-  assert.deepEqual([...store.get('app-a-v2').keys()].sort(), ['./', 'app.js'], 'a missing file is skipped, not fatal');
-  await listeners.activate({ waitUntil: p => (work = p) });
+  assert.ok(w.self.skipped);
+  w.listeners.activate({ waitUntil: p => (work = p) });
   await work;
-  assert.ok(self.claimed);
-  assert.deepEqual([...store.keys()].sort(), ['app-a-v2', 'app-b-v1', 'quadra-images-v1'], 'only this app\'s old version went');
+  assert.ok(w.self.claimed);
+  assert.deepEqual([...w.store.keys()].sort(), ['app-a-data', 'app-a-v2', 'app-b-v1', 'quadra-images-v1']);
+  assert.ok(!/\bimport\s/.test(readFileSync(new URL('../kit/sw.js', import.meta.url), 'utf8').replace(/\/\/.*$/gm, '')), 'a classic script');
 });
 
-test('listAssets: the page first, then its files; not the worker or version.json', async () => {
-  const { mkdtemp, writeFile, mkdir } = await import('node:fs/promises');
-  const { tmpdir } = await import('node:os');
-  const { join } = await import('node:path');
-  const dir = await mkdtemp(join(tmpdir(), 'stamp-'));
-  await mkdir(join(dir, 'lib'));
-  await mkdir(join(dir, 'data'));
-  for (const f of ['index.html', 'app.js', 'sw.js', 'version.json', 'app.js.map', 'lib/a.mjs', 'data/big.json', 'notes.txt']) await writeFile(join(dir, f), '');
-  assert.deepEqual(await listAssets(dir), ['./', 'app.js', 'data/big.json', 'index.html', 'lib/a.mjs']);
-  assert.deepEqual(await listAssets(dir, { exclude: ['data/'] }), ['./', 'app.js', 'index.html', 'lib/a.mjs']);
+test("a file under its hash is kept only when it's that file: the CDN's old copy is asked again, never kept", async () => {
+  const fresh = 'export const a = 2;';
+  const old = 'export const a = 1;';
+  const url = `https://x.test/App/app.mjs?v=${served(fresh)}`;
+  // The CDN on the old file for two tries, then the new one.
+  let w = runWorker({ cache: 'app-a-v2' }, { '/App/app.mjs': n => (n <= 2 ? old : fresh) });
+  let res = await w.go(url);
+  assert.equal(await res.text(), fresh);
+  assert.equal(w.asked[1].cache, 'reload', "asked again past the browser's cache");
+  assert.equal(await (await w.store.get('app-a-v2').get(url)).text(), fresh);
+  // Still the old one after every try: a 503, and nothing kept.
+  w = runWorker({ cache: 'app-a-v2' }, { '/App/app.mjs': old });
+  res = await w.go(url);
+  assert.equal(res.status, 503);
+  assert.equal(w.store.get('app-a-v2')?.has(url) || false, false);
+  // An address without a file hash (an old deploy's, the kit's version) is taken as it comes.
+  w = runWorker({ cache: 'app-a-v2' }, { '/App/x.mjs': old });
+  assert.equal(await (await w.go('https://x.test/App/x.mjs?v=abc123')).text(), old);
+});
+
+test("an app's own routes: its data kept-first, its samples answered its way", async () => {
+  const w = runWorker({ cache: 'app-a-v2', route: (r, u) => (u.pathname.includes('/data/') ? 'pageFirst' : u.pathname.includes('/samples/') ? Promise.resolve(new Response('mine')) : null) }, { '/App/data/a.json': '{"a":1}' });
+  assert.equal(await (await w.go('https://x.test/App/samples/kick.wav')).text(), 'mine');
+  assert.equal(await (await w.go('https://x.test/App/data/a.json')).text(), '{"a":1}');
+  assert.ok(w.store.get('app-a-v2').has('https://x.test/App/data/a.json'));
 });
 
 test('format: SYMBOLS match stock-markets CURRENCIES', async () => {

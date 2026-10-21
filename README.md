@@ -258,7 +258,7 @@ import map, so a file has one address whichever loader a page carries.
 | `devconfig.mjs`, `mirror.mjs`, `photo-urls.mjs` | `DEV` for the Workers; the nightly mirror's addresses; photos' addresses alone |
 | `apps.mjs`, `link.mjs`, `preload.mjs`, `stamp.mjs`, `stamp-app.mjs`, `hash.mjs` | Build tools, never served: refresh the apps' snippets; link `.kit`; the first-screen modulepreload lists; the kit's and each app's content-hashed build |
 | `sw-images.js` | Other sites' pictures in one shared cache |
-| `sw.js` | The shared service worker, stamped per deploy by `tools/stamp.mjs` |
+| `sw.js` | The one service worker every app imports (its settings in its own `sw.js`); keeps a file only when it matches its address's hash |
 | `lang.mjs`, `format.mjs` | `W`, `makeT`, `detectLang`; `money`, `pct`, `price`, `DASH`, `twDay` (Taiwan's date) |
 
 **Securities' broker rules** follow Taiwan's real ones (`stock-credit.mjs`):
@@ -298,7 +298,7 @@ Slip-Tracker) are small redirect repos.
 | `node tools/jp-lists.mjs` | Tokyo's TOPIX500 and ETF trading units for Securities, from JPX |
 | `node tools/espn.mjs <path>` | The shape of an ESPN answer |
 | `node tools/issue-passes.mjs` | Issue passes (the owner) |
-| `node tools/stamp.mjs`, `node tools/accent-css.mjs` | Stamp a service worker for a deploy; write each app's accent colours into `quadra.css` |
+| `node tools/accent-css.mjs` | Write each app's accent colours into `quadra.css` |
 
 `npm test` covers the Pass, money, push, the data proxy, F1, Asian
 baseball, Kambi, transit, weather, the builders, the guard and pacing, and
