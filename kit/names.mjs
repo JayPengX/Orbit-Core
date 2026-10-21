@@ -104,7 +104,7 @@ const CLUBS = {
   deportivo: '拉科魯尼亞', 'deportivo la coruna': '拉科魯尼亞', malaga: '馬拉加', 'racing santander': '桑坦德競技', frosinone: '弗洛西諾內',
   'hamburg sv': '漢堡', 'paderborn 07': '帕德博恩', paderborn: '帕德博恩', 'sv elversberg': '埃爾弗斯貝格', 'schalke 04': '沙爾克 04', schalke: '沙爾克 04',
   'aj auxerre': '歐塞爾', 'le havre ac': '勒哈佛', 'le havre': '勒哈佛', 'le mans': '勒芒', troyes: '特魯瓦',
-  'aek athens': 'AEK 雅典', 'feyenoord rotterdam': '費耶諾德', feyenoord: '費耶諾德', 'lask linz': 'LASK 林茲', 'sabah': '薩巴', 'slovan bratislava': '布拉提斯拉瓦斯洛萬', 'viking': '維京',
+  'aek athens': '雅典', 'feyenoord rotterdam': '費耶諾德', feyenoord: '費耶諾德', 'lask linz': '林茲', 'sabah': '薩巴', 'slovan bratislava': '布拉提斯拉瓦斯洛萬', 'viking': '維京',
   'ararat armenia': '阿拉拉特亞美尼亞', anderlecht: '安德萊赫特', ferencvaros: '費倫茨瓦羅斯', 'hapoel be er': '貝爾謝巴夏普爾', 'hapoel beer sheva': '貝爾謝巴夏普爾', 'jagiellonia bialystok': '比亞維斯托克', 'lech poznan': '波茲南萊赫', 'levski sofia': '索非亞列夫斯基', lillestrom: '利勒斯特倫', 'nec nijmegen': '奈梅亨', 'nk celje': '采列', 'ofi crete': '克里特 OFI', 'omonia nicosia': '尼科西亞奧摩尼亞', 'rb salzburg': '薩爾斯堡', 'sk sturm graz': '格拉茨風暴', 'sturm graz': '格拉茨風暴', torreense: '托倫斯', 'viktoria plzen': '比爾森勝利',
   agf: '奧胡斯', 'ajax amsterdam': '阿賈克斯', 'borac banja luka': '巴尼亞盧卡博拉茨', 'cska sofia': '索非亞中央陸軍', 'csu craiova': '克拉約瓦大學', egnatia: '埃格納蒂亞', kobenhavn: '哥本哈根', lugano: '盧加諾', midtjylland: '中日德蘭', thun: '圖恩', twente: '特溫特', 'hajduk split': '斯普利特哈伊杜克', 'heart of midlothian': '哈茨', hearts: '哈茨', 'iberia 1999': '伊比利亞 1999', 'inter d escaldes': '埃斯卡爾德斯國際', jablonec: '亞布洛內茨', 'kaa gent': '根特', gent: '根特', 'kauno zalgiris': '考納斯薩爾基里斯', 'kups kuopio': '庫奧皮奧', 'lincoln red imps': '林肯紅魔', 'mjallby aif': '米爾比', mjallby: '米爾比', panathinaikos: '帕納辛奈克斯', riga: '里加', 'sk brann': '布蘭', brann: '布蘭', 'sint truidense': '聖特雷登', trabzonspor: '特拉布宗',
   aberdeen: '阿伯丁', dundee: '登地', 'dundee united': '登地聯', falkirk: '福爾柯克', hibernian: '希伯尼安', kilmarnock: '基爾馬諾克', motherwell: '馬瑟韋爾', 'st johnstone': '聖約翰斯通', 'st mirren': '聖米倫', livingston: '利文斯頓', 'ross county': '羅斯郡',
@@ -260,7 +260,7 @@ export const shortPlayer = name =>
     .join('/');
 // The other sports whose sides get their Chinese here (clubs, national
 // teams). Esports' teams keep their own names (T1, Gen.G), as Taiwan writes them.
-export const SIDE_SPORTS = new Set(['volleyball', 'cricket']);
+export const SIDE_SPORTS = new Set(['volleyball', 'cricket', 'handball', 'rugby', 'futsal', 'esports']);
 
 // Players whose Chinese Taiwan's press settled on, by their name's words in
 // any order (Kambi writes Asian names either way round).
@@ -299,6 +299,8 @@ const WORDS = {
   atp: 'ATP', wta: 'WTA', 'atp doubles': 'ATP 雙打', 'wta doubles': 'WTA 雙打', 'men singles': '男單', 'women singles': '女單', 'men doubles': '男雙',
   'women doubles': '女雙', 'mixed doubles': '混雙', 'grand slam': '大滿貫', 'australian open': '澳網', 'french open': '法網', wimbledon: '溫網',
   'us open': '美網', 'davis cup': '台維斯盃', 'billie jean king cup': '比莉珍金盃', 'united cup': '聯合盃', olympics: '奧運',
+  'champions league': '歐洲冠軍聯賽', 'champions league qualification': '歐洲冠軍聯賽資格賽', 'european league': '歐洲聯賽', 'european cup': '歐洲盃',
+  'world championship': '世界錦標賽', 'world cup': '世界盃', 'northern ireland open': '北愛爾蘭公開賽', 'premier league': '超級聯賽',
   'international one day': '國際一日賽', 'international twenty20': '國際 T20', 'international twenty20 (w)': '女子國際 T20',
   'international one day (w)': '女子國際一日賽', 'indian premier league': 'IPL 印度超級聯賽', 't20 big bash': '澳洲大狂歡聯賽', sa20: 'SA20',
   'the hundred': '百球賽', 'pakistan super league': '巴基斯坦超級聯賽', 'caribbean premier league': '加勒比超級聯賽'
@@ -378,9 +380,21 @@ const usable = s => hasZh(s) && !/[A-Za-z]/.test(s);
 // A player as Google gives them: the surname (after its last ·), the whole
 // of an East Asian name (written as one).
 const pick = (s, kind) => (kind === 'p' ? clean(s).split(/[·・‧]/).at(-1).trim() : clean(s));
+// A club's name as asked: without its letters-only abbreviations and
+// numbers ("UGD Stip", "KS Vive Tauron Kielce": Google kept them in Latin
+// letters and the whole answer was turned down).
+const teamAsk = q => String(q).replace(/(^|\s)[A-Z]{2,4}(?=\s|$)/g, ' ').replace(/(^|\s)\d+(?=\s|$)/g, ' ').replace(/\s+/g, ' ').trim() || q;
 async function readOne(q, kind, women) {
+  if (kind !== 'p') q = teamAsk(q);
   for (const hon of kind === 'p' ? (women ? ['Ms. ', 'Mr. '] : ['Mr. ', 'Ms. ']) : ['']) {
     const got = pick(await ask(`${hon}${q}`, 'zh-TW', 'en').catch(() => ''), kind);
+    if (usable(got)) return got;
+  }
+  // A whole name Google leaves in Latin letters ("Pornpawee Chochuwong"):
+  // the surname alone, which is all a row shows.
+  const last = kind === 'p' && surnameOf(q);
+  if (last && last !== q) {
+    const got = pick(await ask(`${women ? 'Ms. ' : 'Mr. '}${last}`, 'zh-TW', 'en').catch(() => ''), kind);
     if (usable(got)) return got;
   }
   return null;
@@ -389,7 +403,7 @@ async function readChunk(chunk) {
   const out = new Map();
   const kind = chunk[0].kind;
   const hon = kind === 'p' ? (chunk[0].women ? 'Ms. ' : 'Mr. ') : '';
-  const got = String((await ask(chunk.map(x => `${hon}${x.q}`).join('; '), 'zh-TW', 'en').catch(() => '')) || '')
+  const got = String((await ask(chunk.map(x => `${hon}${kind === 'p' ? x.q : teamAsk(x.q)}`).join('; '), 'zh-TW', 'en').catch(() => '')) || '')
     .split(/[;；]/)
     .map(s => pick(s, kind))
     .filter(Boolean);
