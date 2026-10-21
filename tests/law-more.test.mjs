@@ -1,7 +1,7 @@
 // What /law-chat finds besides the articles: judgments, 釋字, 行政規則, legislators, votes, meetings, the reader's own.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { matchRulings, matchCons, judgmentGist, readMine, asksMine, matchVotes, matchMeets, matchRules, caseLabel, ruleTitle, vendorHits, vendorText } from '../law-more.js';
+import { matchRulings, matchCons, judgmentGist, readMine, asksMine, matchVotes, matchMeets, matchRules, caseLabel, ruleTitle, vendorHits, vendorText, localRows } from '../law-more.js';
 
 test('judgments: 3 for each article found they cite, the 案由 sharing the question; 3 at least, newer first', () => {
   const rows = [['TPSV,114,台上,1,20250101,1', '2025-01-01', '請求返還押金', ['B0000001:456']], ['TPSV,114,台上,2,20260101,1', '2026-01-01', '請求返還押金', ['B0000001:456']], ['TPSM,115,台上,3,20260101,1', '2026-01-01', '加重詐欺', ['C0000001:339']], ['bad', '', '押金', []]];
@@ -53,4 +53,11 @@ test('a rule named in the question, found on a ministry site and read', () => {
   assert.equal(ruleTitle('加班費怎麼算'), '');
   assert.deepEqual(vendorHits('<a href="LawContent.aspx?id=GL002011&amp;kw=x" title="t"><span>高級中等學校訂定學生服裝儀容規定之原則</span></a>'), [{ id: 'GL002011', name: '高級中等學校訂定學生服裝儀容規定之原則' }]);
   assert.equal(vendorText('<div id="ctl00_cp_content_divLawContent1">一、目的。<br>二、範圍&amp;對象。</div>'), '一、目的。\n二、範圍&對象。');
+});
+
+test('a city 自治條例 is found with the ministries rules, its text read from local/', () => {
+  const rows = [...localRows([['NTPC:1C0130046', '新北市營業衛生管理自治條例', '新北市', '2026-10-21', 'https://web.law.ntpc.gov.tw/a', ['L0040001']]]), ['MOE:GL1', '學生會注意事項', '教育部', '', '', [], []]];
+  const [r] = matchRules(rows, '新北市營業衛生管理自治條例罰多少', []);
+  assert.deepEqual([r.id, r.agency, r.dir], ['NTPC:1C0130046', '新北市', 'local']);
+  assert.equal(matchRules(rows, '學生會注意事項', [])[0].dir, 'agency');
 });
