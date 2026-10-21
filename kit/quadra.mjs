@@ -3366,11 +3366,46 @@ export function fitNames(root = document) {
     if (Math.abs(k - was) > 0.01) el.style.fontSize = k === 1 ? '' : `${(base * k).toFixed(2)}px`;
   }
 }
+// A wrapped row of pills (.q-balance) never leaves one alone on its last
+// line: the row is narrowed just enough that the last line takes two or
+// more, as text-wrap: balance does for words (Law's quick questions came
+// out 4 + 1). Redone with the names.
+export function balanceRows(root = document) {
+  for (const el of root.querySelectorAll?.('.q-balance') || []) {
+    if (el.closest('[hidden]')) continue;
+    const full = el.parentElement?.clientWidth || 0;
+    const key = `${full}|${el.childElementCount}|${el.textContent.length}`;
+    if (!full || el.dataset.qBal === key) continue;
+    el.dataset.qBal = key;
+    el.style.maxWidth = '';
+    const rows = () => {
+      const tops = [...el.children].filter(k => k.offsetWidth).map(k => k.offsetTop);
+      const n = new Map();
+      for (const t of tops) n.set(t, (n.get(t) || 0) + 1);
+      return [...n].sort((x, y) => x[0] - y[0]).map(([, c]) => c);
+    };
+    const was = rows();
+    if (was.length < 2 || was.at(-1) > 1) continue;
+    // (The widest that leaves the last line two or more, as many lines as before.)
+    let lo = full * 0.5;
+    let hi = el.offsetWidth;
+    let best = 0;
+    for (let i = 0; i < 7; i++) {
+      const mid = (lo + hi) / 2;
+      el.style.maxWidth = `${Math.round(mid)}px`;
+      const now = rows();
+      if (now.length > was.length) lo = mid;
+      else if (now.at(-1) > 1) ((best = mid), (lo = mid));
+      else hi = mid;
+    }
+    el.style.maxWidth = best ? `${Math.round(best)}px` : '';
+  }
+}
 function watchNames() {
   if (typeof document === 'undefined' || typeof MutationObserver === 'undefined' || globalThis.__quadraFit) return;
   globalThis.__quadraFit = true;
   let frame = 0;
-  const soon = () => (frame ||= requestAnimationFrame(() => ((frame = 0), fitNames())));
+  const soon = () => (frame ||= requestAnimationFrame(() => ((frame = 0), fitNames(), balanceRows())));
   const start = () => {
     // (A tab or sheet shown again counts too: a name drawn while hidden had no box to fit.)
     new MutationObserver(soon).observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['hidden', 'open', 'aria-selected', 'aria-pressed'] });
