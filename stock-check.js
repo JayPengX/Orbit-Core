@@ -42,7 +42,7 @@
 import { replay, ownCash, applyFills, planOrderType, futMargin } from './kit/stock-account.mjs';
 import { unpack } from './kit/stock-codec.mjs';
 import { BONDS } from './kit/stock-bonds.mjs';
-import { marketFill, dealPrice, currencyInfo, isSubBrokered, cbMaturity, futureOf, futureExpiry, optionOf, optionExpiry, optionIntrinsic, unitMult } from './kit/stock-markets.mjs';
+import { marketFill, dealPrice, currencyInfo, isSubBrokered, cbMaturity, futureOf, futureExpiry, optionOf, optionExpiry, optionIntrinsic, unitMult, OPTION, OPT_MARGIN } from './kit/stock-markets.mjs';
 import { fxSymbol } from './kit/stock-quotes.mjs';
 import { readFillsBook, decideFills, ipoList, ipoDraw, ipoKeyOf } from './stock-fill.js';
 import { parseDoc } from './doc-store.js';
@@ -145,13 +145,15 @@ export async function checkEvent(e, account, wallet, read, issued = {}, ctx = {}
       if (e.kind === 'opt' && e.maturity) {
         const o = optionOf(e.symbol);
         const due = optionExpiry(e.symbol);
-        if (!o || !due || e.t !== due || e.t > now || e.side !== 'sell' || ctx.used?.has(`maturity:${e.symbol}`)) return 'bad';
+        if (!o || !due || e.t !== due || e.t > now || ctx.used?.has(`maturity:${e.symbol}`)) return 'bad';
+        // (A written one is assigned: bought back at that value.)
         const held = replay(account, e.t).positions[e.symbol]?.qty || 0;
-        if (!(e.qty > 0) || e.qty > held + 1e-6) return 'bad';
+        if (!(e.qty > 0) || e.qty > (e.side === 'sell' ? held : -held) + 1e-6) return 'bad';
         const final = (await read(TAIFEX_URL))?.final?.[`${o.year}${String(o.month).padStart(2, '0')}`];
         if (!(final > 0)) return now - e.t > 30 * DAY ? 'bad' : 'later';
         const gross = optionIntrinsic(e.symbol, final) * e.qty * o.mult;
-        return near(e.price, optionIntrinsic(e.symbol, final), 1e-9) && near(e.gross, gross, 0.5) && e.total <= gross + 0.5 && e.total >= 0 ? 'ok' : 'bad';
+        const money = e.side === 'sell' ? e.total <= gross + 0.5 && e.total >= 0 : e.total >= gross - 0.5;
+        return near(e.price, optionIntrinsic(e.symbol, final), 1e-9) && near(e.gross, gross, 0.5) && money ? 'ok' : 'bad';
       }
       if (!fillMoneyOk(e)) return 'bad';
       const mine = e.orderId ? issued[e.orderId] : null;
@@ -368,12 +370,18 @@ const worthTWD = (s, rates) =>
 function affordable(counted, e) {
   const s = replay(counted, e.t);
   const unit = Math.max(1, Math.abs(e.total) * 0.005);
-  // A future: closing always; opening only with the maintenance margin of all
-  // the futures then held left in the account's NT$.
-  if (e.kind === 'fut') {
+  // A future, or an option written (sold past what's held): closing always;
+  // opening only with the maintenance margin of all the futures and written
+  // options then held left in the account's NT$ (a written option's at its
+  // least: its premium's value and TAIFEX's B; the index isn't known here).
+  const writes = e.kind === 'opt' && e.side === 'sell' && Math.max(0, s.positions[e.symbol]?.qty || 0) + 1e-6 < e.qty;
+  if (e.kind === 'fut' || writes) {
     const after = replay({ ...counted, events: [...counted.events, e] }, e.t);
     if (Math.abs(after.positions[e.symbol]?.qty || 0) <= Math.abs(s.positions[e.symbol]?.qty || 0) + 1e-9) return true;
-    const need = Object.values(after.positions).reduce((sum, p) => sum + (p.kind === 'fut' ? Math.abs(p.qty) * futMargin(p.symbol)[1] : 0), 0);
+    const need = Object.values(after.positions).reduce(
+      (sum, p) => sum + (p.kind === 'fut' ? Math.abs(p.qty) * futMargin(p.symbol)[1] : p.kind === 'opt' && p.qty < 0 ? -p.qty * ((p.last || 0) * OPTION.mult + OPT_MARGIN.B[1]) : 0),
+      0
+    );
     return (after.cash.TWD || 0) + 1 >= need;
   }
   const abroad = isSubBrokered(e.market) && e.kind !== 'fx';

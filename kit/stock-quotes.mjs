@@ -221,6 +221,9 @@ export function optQuote(symbol, taiex, table) {
     right: o.right,
     strike: o.strike,
     underlying: Math.round(taiex.price + pricer.basis),
+    // (The index, for a written option's margin: what it's out of the money by.)
+    index: taiex.price,
+    ...(table.optMargin?.A ? { optMargin: table.optMargin } : {}),
     settle: pricer.settle,
     ...(table.final?.[pricer.month] ? { final: table.final[pricer.month] } : {}),
     line: (taiex.line || []).map(([tt, c]) => [tt, pricer.price(c, tt)])

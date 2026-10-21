@@ -691,11 +691,12 @@ export function futureMonths(code, t = Date.now(), n = 2) {
 }
 
 // TAIFEX's TAIEX options (臺指選擇權, TXO), monthly: `TXO202611C46500.TF`,
-// a call (C) or put (P) at a strike, NT$50 a point of premium. Bought only
-// (paid in full; writing one, which needs margin, isn't offered). They
-// expire with the futures of their month, settling in cash at the same final
-// price (the intrinsic value, if any). Costs: the broker's fee a contract and
-// the 期交稅 (0.1% of the premium paid or received).
+// a call (C) or put (P) at a strike, NT$50 a point of premium. Bought (paid
+// in full) or written (sold to open: the premium comes in and a margin is
+// held, optWriteMargin). They expire with the futures of their month,
+// settling in cash at the same final price (the intrinsic value, if any).
+// Costs: the broker's fee a contract and the 期交稅 (0.1% of the premium
+// paid or received).
 export const OPTION = { code: 'TXO', zh: '台指選', en: 'TAIEX option', mult: 50, fee: 25 };
 export const OPT_TAX = 0.001;
 // Strikes every 100 points (TAIFEX lists 50s near the money too; 100s are enough here).
@@ -722,6 +723,22 @@ export function optionIntrinsic(symbol, at) {
 }
 // The months listed at `t` (yyyymm), nearest first, like futureMonths.
 export const optionMonths = (t = Date.now(), n = 2) => futureMonths('TX', t, n).map(s => s.slice(2, 8));
+// TAIFEX's risk margin values for a written option, NT$ a contract
+// [initial, maintenance] (風險保證金 A and B; read with its prices, these the fallback).
+export const OPT_MARGIN = { A: [187_000, 143_000], B: [94_000, 72_000] };
+// A written option's margin a contract, NT$ (TAIFEX 臺指選擇權保證金: 權利金
+// 市值 + max(A值 − 價外值, B值)): its premium's value now, plus A less what it's
+// out of the money by (in NT$, at the index), never under B. `maint`: the
+// maintenance level.
+export function optWriteMargin(symbol, price, index, values = null, maint = false) {
+  const o = optionOf(symbol);
+  if (!o) return 0;
+  const i = maint ? 1 : 0;
+  const A = values?.A?.[i] || OPT_MARGIN.A[i];
+  const B = values?.B?.[i] || OPT_MARGIN.B[i];
+  const otm = index > 0 ? Math.max(0, o.right === 'C' ? o.strike - index : index - o.strike) : 0;
+  return Math.round(price * OPTION.mult + Math.max(A - otm * OPTION.mult, B));
+}
 // TAIFEX's premium ticks (臺指選擇權 升降單位).
 export function optionTick(price) {
   if (price < 10) return 0.1;

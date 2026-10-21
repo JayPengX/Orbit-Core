@@ -59,7 +59,8 @@ import {
   FUT_MARGIN,
   OPTION,
   optionExpiry,
-  optionIntrinsic
+  optionIntrinsic,
+  optWriteMargin
 } from '#kit/stock-markets.mjs';
 import { nextTradingStart, isTradingDay } from '#kit/stock-holidays.mjs';
 import { twDay } from '#kit/format.mjs';
@@ -117,7 +118,7 @@ function accrue(s, t) {
   if (t > s.cashLast && cash > 0) s.cashInterest += (cash * CASH_RATE * (t - s.cashLast)) / YEAR_MS;
   s.cashLast = Math.max(s.cashLast, t);
   for (const p of Object.values(s.positions)) {
-    if (p.qty < 0 && t > p.feeLast && !p.credit && !p.dayShort) p.borrowFee += (-p.cost * SHORT_FEE * (t - p.feeLast)) / YEAR_MS;
+    if (p.qty < 0 && t > p.feeLast && !p.credit && !p.dayShort && p.kind !== 'opt') p.borrowFee += (-p.cost * SHORT_FEE * (t - p.feeLast)) / YEAR_MS;
     // 融券: the deposit and sale money held earn the account interest.
     if (p.qty < 0 && t > p.feeLast && p.credit) p.shortInterest = (p.shortInterest || 0) + (((p.shortDeposit || 0) + (p.shortHeld || 0)) * SHORT_INTEREST * (t - p.feeLast)) / YEAR_MS;
     p.feeLast = Math.max(p.feeLast ?? t, t);
@@ -355,6 +356,8 @@ function applyFill(s, e) {
     symbol: e.symbol, name: e.name, kind: e.kind, market: e.market, currency: e.currency, qty: 0, cost: 0, costTWD: 0, first: e.t, borrowFee: 0, feeLast: e.t
   });
   p.last = e.price;
+  // (A written option's margin a contract: its latest fill's.)
+  if (e.kind === 'opt' && e.im > 0) p.im = e.im;
   let left = e.qty;
   // First, whatever this trade closes: a sale of shares held, or a purchase
   // that buys back a short.
@@ -440,8 +443,20 @@ export function futOpening(held, side, qty) {
   const dir = side === 'buy' ? 1 : -1;
   return held * dir < 0 ? Math.max(0, qty - Math.abs(held)) : qty;
 }
-// The initial margin the account's futures hold, NT$.
-export const futMarginHeld = s => Object.values(s.positions).reduce((sum, p) => sum + (p.kind === 'fut' ? Math.abs(p.qty) * (p.im || futMargin(p.symbol)[0]) : 0), 0);
+// How many of a sale of `qty` options write new ones (the rest sell what's
+// held and not already promised to an open sale).
+export function optWriting(account, s, symbol, qty, avail = available(account, s)) {
+  return Math.max(0, qty - Math.max(0, avail.qty[symbol] || 0));
+}
+// The margin buying back `qty` of a written option frees, NT$.
+export function optFreed(s, symbol, qty) {
+  const p = s.positions[symbol];
+  return p?.kind === 'opt' && p.qty < 0 ? Math.min(qty, -p.qty) * (p.im || 0) : 0;
+}
+// The margin the account's futures and written options hold, NT$ (each at
+// its latest fill's margin a contract).
+export const futMarginHeld = s =>
+  Object.values(s.positions).reduce((sum, p) => sum + (p.kind === 'fut' ? Math.abs(p.qty) * (p.im || futMargin(p.symbol)[0]) : p.kind === 'opt' && p.qty < 0 ? -p.qty * (p.im || optWriteMargin(p.symbol, p.last || 0, 0)) : 0), 0);
 // A futures fill: no contract value changes hands, only the costs; what
 // it closes pays its gain or loss since the position's price (`mark`, its
 // average), in NT$ at the contract's NT$ a point. `entry` is the same
@@ -508,8 +523,10 @@ export function available(account, s) {
     if (o.side === 'buy') cash[o.currency] = (cash[o.currency] || 0) - (o.reserve || 0);
     else {
       qty[o.symbol] = (qty[o.symbol] || 0) - o.qty;
-      // A 融券 order waiting holds its 90% deposit.
+      // A 融券 order waiting holds its 90% deposit; a sale opening a future
+      // or writing an option, its margin.
       if (o.deposit) cash[o.currency] = (cash[o.currency] || 0) - o.deposit;
+      if (o.reserve) cash[o.currency] = (cash[o.currency] || 0) - o.reserve;
     }
   }
   return { cash, qty };
@@ -799,11 +816,24 @@ export function placeOrder(account, req, { quote, rates, valuation, now = Date.n
   // lasts until that's known (CLOSE_DECIDE; Yahoo's Taiwan prices run 20
   // minutes behind), ending unmatched after it.
   if (order.tif === 'day' && atClosingAuction(order)) order.expires += CLOSE_DECIDE;
-  if (quote.kind === 'opt' && !req.forced) {
-    // An option trades to its month's last day's 13:30, and is only bought
-    // and sold back here (writing one isn't offered).
-    if (!(now < optionExpiry(quote.symbol))) return { error: 'futExpired' };
-    if (side === 'sell' && qty > Math.max(0, avail.qty[quote.symbol] || 0) + EPS) return { error: 'optNoWrite', have: Math.max(0, avail.qty[quote.symbol] || 0) };
+  if (quote.kind === 'opt') {
+    // An option trades to its month's last day's 13:30.
+    if (!req.forced && !(now < optionExpiry(quote.symbol))) return { error: 'futExpired' };
+    // Selling more than is held writes the rest (賣出開倉): the premium comes
+    // in and the margin a contract is held (optWriteMargin), so what has to
+    // be free is the margin less the premium, and the costs.
+    const write = side === 'sell' ? optWriting(account, s, quote.symbol, qty, avail) : 0;
+    if (write > EPS) {
+      const ref = order.type === 'limit' ? Math.min(order.limit, quote.price) : quote.price;
+      const im = optWriteMargin(quote.symbol, ref, quote.index, quote.optMargin);
+      const est = estimate({ market: quote.market, kind: 'opt', currency: BASE, side, qty, price: ref, symbol: quote.symbol });
+      const reserve = Math.max(0, Math.round(write * (im - ref * OPTION.mult) + est.costs));
+      const have = avail.cash[BASE] || 0;
+      if (!req.forced && reserve > have + EPS) return { error: 'optNoWrite', need: reserve, have: Math.max(0, have), currency: BASE };
+      order.reserve = reserve;
+      order.im = im;
+      order.write = write;
+    }
   }
   if (quote.kind === 'fut') {
     // A future trades to its last day's 13:30; then TAIFEX settles it.
@@ -817,6 +847,8 @@ export function placeOrder(account, req, { quote, rates, valuation, now = Date.n
     if (!req.forced && reserve > have + EPS) return { error: 'funds', need: reserve, have: Math.max(0, have), currency: BASE };
     order.reserve = reserve;
     order.im = im;
+  } else if (quote.kind === 'opt' && side === 'sell') {
+    // (Sold back or written: checked above.)
   } else if (side === 'sell') {
     const have = Math.max(0, avail.qty[quote.symbol] || 0);
     // Shares bought today sell today only as a 現股當沖 (dayTradeBuyFirst:
@@ -878,7 +910,9 @@ export function placeOrder(account, req, { quote, rates, valuation, now = Date.n
     // The most it can cost: a limit order at its limit, a stop order at its
     // stop or the price, a market order at the price (plus a margin while it
     // waits for the market to open).
-    const { reserve } = requiredCash(order, quote, now);
+    // (Buying back written options frees their margin.)
+    const freed = quote.kind === 'opt' ? optFreed(s, quote.symbol, qty) : 0;
+    const reserve = Math.max(0, requiredCash(order, quote, now).reserve - freed);
     const have = avail.cash[quote.currency] || 0;
     if (reserve > have + EPS) return { error: 'funds', need: reserve, have: Math.max(0, have), currency: quote.currency };
     order.reserve = reserve;
@@ -993,6 +1027,7 @@ function fillOrder(account, order, price, rates, now, at = now) {
   // A fill found in the past must have fitted the cash (or shares) at that
   // moment and still fit today's.
   const moments = at < now ? [at, now] : [now];
+  let writeIm = 0;
   if (order.kind === 'fut') {
     // A future: the margin for what it opens, and its costs, free then and now.
     if (!order.forced) {
@@ -1004,9 +1039,25 @@ function fillOrder(account, order, price, rates, now, at = now) {
         return { account: updateOrder(account, rejected), order: rejected, fill: null, error: 'funds', need, have };
       }
     }
+  } else if (order.kind === 'opt' && order.side === 'sell') {
+    // An option sold: what's held is sold back, the rest written, its margin
+    // less the premium (and the costs) free then and now.
+    const held = Math.max(0, Math.min(...moments.map(tt => replay(account, tt).positions[order.symbol]?.qty || 0)));
+    const write = Math.max(0, order.qty - held);
+    if (write > EPS) {
+      writeIm = order.im || optWriteMargin(order.symbol, est.price, 0);
+      const have = Math.min(...moments.map(tt => (available(account, replay(account, tt)).cash[BASE] || 0))) + (order.reserve || 0);
+      const need = Math.round(write * (writeIm - est.price * OPTION.mult) + est.costs);
+      if (!order.forced && need > have + EPS) {
+        const rejected = { ...order, status: 'rejected', reason: 'funds', rev: order.rev + 1, done: now };
+        return { account: updateOrder(account, rejected), order: rejected, fill: null, error: 'funds', need, have };
+      }
+    }
   } else if (order.side === 'buy' && !order.forced) {
-    // This order's own hold is released as it fills.
-    const have = Math.min(...moments.map(tt => (available(account, replay(account, tt)).cash[order.currency] || 0))) + (order.reserve || 0);
+    // This order's own hold is released as it fills (and buying back written
+    // options, their margin).
+    const freed = order.kind === 'opt' ? Math.min(...moments.map(tt => optFreed(replay(account, tt), order.symbol, order.qty))) : 0;
+    const have = Math.min(...moments.map(tt => (available(account, replay(account, tt)).cash[order.currency] || 0))) + (order.reserve || 0) + freed;
     const lent = order.margin ? marginLoan(order.market, order.currency, est.gross, est.total, order.margin) : 0;
     if (est.total - lent > have + EPS) {
       const rejected = { ...order, status: 'rejected', reason: 'funds', rev: order.rev + 1, done: now };
@@ -1045,6 +1096,7 @@ function fillOrder(account, order, price, rates, now, at = now) {
   if (order.cover) fill.cover = true;
   if (order.credit) fill.credit = true;
   if (order.im) fill.im = order.im;
+  if (writeIm) fill.im = writeIm;
   if (order.dayShort) fill.dayShort = true;
   if (est.handling) fill.handling = est.handling;
   if (order.after) fill.after = true;
@@ -1404,8 +1456,33 @@ export function valuate(s, quotes, rates) {
   let futTWD = 0;
   let futMarginTWD = 0;
   let futMaintTWD = 0;
+  // Written options: what buying them back costs now (their premium came
+  // into the cash; their margin is held there, with the futures').
+  let optShortTWD = 0;
+  // The initial margin the risk indicator measures against.
+  let futInitTWD = 0;
   for (const p of Object.values(s.positions)) {
     const q = quotes?.get?.(p.symbol);
+    if (p.kind === 'opt' && p.qty < 0) {
+      if (!q) out.stale.push(p.symbol);
+      const m = OPTION.mult;
+      const avg = Math.abs(p.cost / p.qty / m);
+      const price = q?.price ?? p.last ?? avg;
+      const value = price * p.qty * m;
+      const pl = value - p.costTWD;
+      const from = q ? (p.first > (q.session?.start ?? Infinity) ? avg : q.prev) : price;
+      const day = (price - from) * p.qty * m;
+      optShortTWD -= value;
+      futMarginTWD += -p.qty * (p.im || optWriteMargin(p.symbol, price, q?.index, q?.optMargin));
+      // (Against the equity, which has their cost to buy back taken off: the margin past the premium.)
+      futInitTWD += -p.qty * (optWriteMargin(p.symbol, price, q?.index, q?.optMargin) - price * m);
+      futMaintTWD += -p.qty * (optWriteMargin(p.symbol, price, q?.index, q?.optMargin, true) - price * m);
+      dayChange += day;
+      out.positions.push({
+        ...p, short: true, quote: q || null, price, avg, value, valueTWD: value, pl, plLocal: pl, plPct: p.costTWD ? pl / Math.abs(p.costTWD) : 0, dayTWD: day, dayPct: q ? q.pct : 0
+      });
+      continue;
+    }
     if (p.kind === 'fut') {
       if (!q) out.stale.push(p.symbol);
       const price = q?.price ?? p.last ?? p.mark;
@@ -1417,6 +1494,7 @@ export function valuate(s, quotes, rates) {
       const [im, mm] = futMargin(p.symbol, q);
       futTWD += open;
       futMarginTWD += Math.abs(p.qty) * (p.im || im);
+      futInitTWD += Math.abs(p.qty) * (p.im || im);
       futMaintTWD += Math.abs(p.qty) * mm;
       dayChange += day;
       out.positions.push({
@@ -1479,7 +1557,7 @@ export function valuate(s, quotes, rates) {
   const lentByPos = {};
   for (const l of Object.values(s.lent || {})) lentByPos[l.symbol] = (lentByPos[l.symbol] || 0) + l.qty;
   for (const p of out.positions) p.lent = lentByPos[p.symbol] || 0;
-  const netWorth = assets + receivable + savedTWD - owed;
+  const netWorth = assets + receivable + savedTWD - owed - optShortTWD;
   for (const p of out.positions) p.weight = assets ? Math.abs(p.valueTWD) / assets : 0;
   out.positions.sort((a, b) => Math.abs(b.valueTWD) - Math.abs(a.valueTWD));
   out.cash.sort((a, b) => (a.currency === BASE ? -1 : b.currency === BASE ? 1 : b.twd - a.twd));
@@ -1493,14 +1571,16 @@ export function valuate(s, quotes, rates) {
     savedTWD,
     lent: Object.values(s.lent || {}).sort((a, b) => a.t - b.t),
     lendIncome: s.lendIncome || 0,
-    holdingsTWD: longTWD - shortTWD + futTWD,
+    holdingsTWD: longTWD - shortTWD + futTWD - optShortTWD,
     // Futures: their open gain or loss, margin held, and whether the account's
     // NT$ (with that) is under the maintenance margin (保證金追繳) or a quarter
     // of the initial (風險指標 25%: the broker closes them, futRisk).
     futTWD,
     futMarginTWD,
-    futCall: futMarginTWD > 0 && (s.cash[BASE] || 0) + futTWD < futMaintTWD,
-    futRisk: futMarginTWD > 0 && (s.cash[BASE] || 0) + futTWD < futMarginTWD * 0.25,
+    // (Written options count in both: their margin, and what buying them back costs.)
+    optShortTWD,
+    futCall: futMarginTWD > 0 && (s.cash[BASE] || 0) + futTWD - optShortTWD < futMaintTWD,
+    futRisk: futMarginTWD > 0 && (s.cash[BASE] || 0) + futTWD - optShortTWD < futInitTWD * 0.25,
     longTWD,
     shortTWD,
     assets,
@@ -2011,20 +2091,22 @@ export function applyFutExpiry(account, symbol, final, { now = Date.now() } = {}
 
 // An option held at its expiry: settled in cash at what it's worth at
 // TAIFEX's final price (`final`), sold at that (no commission, the 期交稅 on
-// what it pays); one that pays nothing just ends (sold at 0).
+// what it pays); one that pays nothing just ends (sold at 0). A written one
+// is assigned: bought back at that value (its margin freed).
 export function applyOptExpiry(account, symbol, final, { now = Date.now() } = {}) {
   const expiry = optionExpiry(symbol);
   const id = `mature:${symbol}`;
   if (!expiry || now < expiry || !(final > 0) || account.events.some(e => e.id === id)) return { account, added: [] };
   const held = replay(account, expiry).positions[symbol];
-  if (!held || held.qty <= EPS) return { account, added: [] };
-  const qty = held.qty;
+  if (!held || Math.abs(held.qty) <= EPS) return { account, added: [] };
+  const side = held.qty > 0 ? 'sell' : 'buy';
+  const qty = Math.abs(held.qty);
   const price = optionIntrinsic(symbol, final);
   const gross = price * qty * OPTION.mult;
-  const tax = Math.round(gross * tradeCosts({ market: 'TAIFEX', side: 'sell', kind: 'opt', gross: 1, qty: 0, currency: BASE }).taxRate);
+  const tax = Math.round(gross * tradeCosts({ market: 'TAIFEX', side, kind: 'opt', gross: 1, qty: 0, currency: BASE }).taxRate);
   const event = {
     id, type: 'fill', maturity: true, t: expiry, orderId: null, symbol, name: held.name, kind: 'opt', market: 'TAIFEX',
-    currency: BASE, side: 'sell', qty, price, quote: final, gross, commission: 0, tax, fee: 0, total: gross - tax, twd: 1
+    currency: BASE, side, qty, price, quote: final, gross, commission: 0, tax, fee: 0, total: side === 'sell' ? gross - tax : gross + tax, twd: 1
   };
   return { account: { ...account, events: [...account.events, event] }, added: [event] };
 }
@@ -2062,7 +2144,7 @@ export function netWorthSeries(account, days, priceAt, rateAt) {
     for (const p of Object.values(s.positions)) {
       const r = rateAt(p.currency, t);
       if (!r) ok = false;
-      const fee = p.borrowFee + (p.qty < 0 && t > p.feeLast && !p.credit && !p.dayShort ? (-p.cost * SHORT_FEE * (t - p.feeLast)) / YEAR_MS : 0);
+      const fee = p.borrowFee + (p.qty < 0 && t > p.feeLast && !p.credit && !p.dayShort && p.kind !== 'opt' ? (-p.cost * SHORT_FEE * (t - p.feeLast)) / YEAR_MS : 0);
       const at = priceAt(p.symbol, t) ?? p.last;
       // (A future is worth its gain since its mark, its margin being in the cash; an option NT$50 a point.)
       nw += (p.kind === 'fut' ? (at - p.mark) * (p.mult || 1) * p.qty : p.qty * at * (p.kind === 'opt' ? OPTION.mult : 1)) * (r || 0) - (fee || 0) * (r || 0);
