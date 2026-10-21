@@ -300,6 +300,7 @@ export function cnBoard(symbol) {
 }
 export function limitShare(quote, now = Date.now()) {
   if (!quote || !['stock', 'etf', 'bond'].includes(quote.kind)) return null;
+  if (isEmerging(quote.symbol)) return null;
   // A Taiwan bond ETF (all of them hold foreign bonds) has no daily limit:
   // TWSE's 國外成分證券ETF trade without one.
   if (quote.market === 'TW') return newListing(quote.listed, now) || quote.kind === 'bond' ? null : 0.1;
@@ -376,9 +377,28 @@ export function lotProblem(market, symbol, kind, side, qty, held = 0) {
 
 // Markets that take limit orders only: Hong Kong (HKEX's continuous
 // session takes limit, enhanced limit and special limit orders, no market
-// order; its auctions at-auction limit orders).
+// order; its auctions at-auction limit orders), and Taiwan's emerging board
+// (興櫃: a price is asked of the recommending broker, 議價).
 const LIMIT_ONLY = new Set(['HK']);
-export const limitOnly = market => LIMIT_ONLY.has(market);
+export const limitOnly = (market, symbol = '') => LIMIT_ONLY.has(market) || isEmerging(symbol);
+
+// Taiwan's emerging board (興櫃, TPEx): stocks not yet listed, traded by
+// negotiation with their recommending brokers rather than matched by the
+// exchange: no daily limit, limit orders only, no closing auction, no
+// 融資/融券 and no day trading (當沖). The board's stocks, written by
+// tools/tw-emerging.mjs (each code a base-36 gap from the one before).
+export const TW_EMERGING = 'z0,9,2,m,1e,3t,36,d9,4u,4,3,3,1,as,2p,h,2,1,4z,2,4b,k,1v,a,7r,34,a,8,u,b,y,c5,2,1h,2,e,8,3,6i,2y,7,9,6,6,5,3,2,c,2,3r,8,6,r,4g,1j,78,6,2,6,8,5,4,q,fm,4,4k,8,ac,l,6,13,a,a,p,i,3,4,6,6,4,4,1,1,7,8,3,3,9,4,b,b,1,c,4,1,9,2,9,1,5,8,3,1,5,e,8,1,2,2,e,6,5,3,1,6,4,2,5,3,h,5,4,2,1,6,4,1,a,2,2,2,1,1,1,1,1,1,5,1,1,5,1,6,3,5,1,1,1,7,1,6,3,1,8,2,1,3,4,5,1,6,d,1,3,2,3,6,1,3,2,3,3,1,1,6,4,9,4,9,1,3,1,2,1,4,3,3,2,3,4,bk,3,1,3,5,g,c,1g,9,e,l,7,3,1,4,c,5,7,5,c,1q,h,g,4,1,3,9,5,1,1,3,2,4,2,5,3,3,4,2,2,2,1,2,1,1,1,7,2,3,3,2,2,1,1,4,1,6,1,1,3,7,5,2,1,8,2,3,2,1,1,3,1,3,1,2,3,1,1,1,1,1,2,1,3,1,2,1,1,1,2,1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,1,2,3,2,2,1,1,1,1,2,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1,1,3,3,1,1,1,1,1,2,1,1,3,1,1,1,2t,14,l,3h,1i,v,g,e,2r,f1,qm'; // 2026-10-21, 366 stocks
+let emerging = null;
+export function isEmerging(symbol) {
+  const m = /^(\d{4})\.TWO$/i.exec(symbol || '');
+  if (!m) return false;
+  if (!emerging) {
+    emerging = new Set();
+    let code = 0;
+    for (const gap of TW_EMERGING.split(',')) if (gap) emerging.add((code += parseInt(gap, 36)));
+  }
+  return emerging.has(Number(m[1]));
+}
 
 // US pre- and post-market through a Taiwan broker (富邦 from 2026-10-01,
 // 國泰 the same month): 04:00-09:30 and from the close to 18:00 New York
@@ -596,7 +616,7 @@ export const TRADABLE_KINDS = new Set(['stock', 'etf', 'bond', 'fund', 'crypto',
 // What can be sold short (borrowed and sold): listed shares, crypto and
 // currency pairs (selling EUR/USD bets on the euro falling).
 export const SHORTABLE_KINDS = new Set(['stock', 'etf', 'bond', 'crypto', 'fx']);
-export const isShortable = kind => SHORTABLE_KINDS.has(kind);
+export const isShortable = (kind, symbol = '') => SHORTABLE_KINDS.has(kind) && !isEmerging(symbol);
 // Yearly fee for borrowing what's sold short, on the value it was sold at.
 export const SHORT_FEE = 0.03;
 // Opening a short needs assets of at least this much of all that's owed
@@ -729,6 +749,7 @@ export const COLLATERAL = { stock: 0.5, etf: 0.5, bond: 0.7, govbond: 0.9, fund:
 const NO_MARGIN_MARKETS = new Set(['CN', 'IN']);
 export function collateralRate(kind, market, symbol = '') {
   if (!(kind in COLLATERAL)) return 0;
+  if (isEmerging(symbol)) return 0;
   if (kind !== 'stock' && kind !== 'etf') return COLLATERAL[kind];
   if (NO_MARGIN_MARKETS.has(market)) return 0;
   if (market === 'TW') return /\.TWO$/i.test(symbol) ? 0.5 : 0.6;
