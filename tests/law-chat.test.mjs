@@ -384,7 +384,7 @@ test('similar judgments, 行政規則, legislators, votes, meetings and the read
   forgetGround();
   answer = { ...answer, points: [...answer.points, { text: '法院認為押金應返還', cites: [jid] }, { text: '注意事項', cites: ['教育部:FL001'] }, { text: '沒給的判決', cites: ['TPSV,100,台上,1,20200101,1'] }] };
   try {
-    const r = await chat({ q: '房東不還押金，吳春城對民法押金修法怎麼投票？什麼時候審查？我追蹤的法案進度？', lang: 'zh', mine: { items: ['11:01126'], people: [], laws: [], marks: [] } });
+    const r = await chat({ q: '房東不還押金，吳春城怎麼看民法押金？什麼時候開會？我追蹤的有更新嗎？', lang: 'zh', mine: { items: ['11:01126'], people: [], laws: [], marks: [] } });
     assert.equal(r.status, 200);
     const j = await r.json();
     const p = lastOf('answer');
