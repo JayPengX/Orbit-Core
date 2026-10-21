@@ -24,12 +24,28 @@ export const SPORTS = {
   basketball: { zh: '籃球', en: 'Basketball', icon: '🏀' },
   football: { zh: '美式足球', en: 'Football', icon: '🏈' },
   hockey: { zh: '冰球', en: 'Hockey', icon: '🏒' },
-  racing: { zh: '賽車', en: 'Racing', icon: '🏎️' }
+  racing: { zh: '賽車', en: 'Racing', icon: '🏎️' },
+  // The sports 台灣運彩 sells besides the leagues (its 玩法 list,
+  // article.sportslottery.com.tw/zh-tw/innovation/1, read 2026-10-21).
+  tennis: { zh: '網球', en: 'Tennis', icon: '🎾' },
+  volleyball: { zh: '排球', en: 'Volleyball', icon: '🏐' },
+  badminton: { zh: '羽球', en: 'Badminton', icon: '🏸' },
+  tabletennis: { zh: '桌球', en: 'Table tennis', icon: '🏓' },
+  esports: { zh: '電子競技', en: 'Esports', icon: '🎮' },
+  snooker: { zh: '撞球', en: 'Snooker', icon: '🎱' },
+  darts: { zh: '飛鏢', en: 'Darts', icon: '🎯' },
+  handball: { zh: '手球', en: 'Handball', icon: '🤾' },
+  rugby: { zh: '橄欖球', en: 'Rugby', icon: '🏉' },
+  futsal: { zh: '五人制足球', en: 'Futsal', icon: '⚽' }
 };
 
 
 const espn = (sport, path, zh, en, bet, extra = {}) => ({ sport, kind: 'match', data: 'espn', espn: path, zh, en, bet, odds: bet ? 'espn' : undefined, ...extra });
 const soccer = (path, zh, en, bet, extra = {}) => espn('soccer', `soccer/${path}`, zh, en, bet, extra);
+// A sport Kambi alone lists and prices (its schedule, prices and results):
+// `only` the competitions 台灣運彩 sells, as Kambi's path (its termKeys, joined
+// with /), so a satellite tour or a betting-only league never reaches the board.
+const kambiSport = (sport, path, zh, en, only, bet = sport) => ({ sport, kind: 'match', data: 'kambi', kambi: path, zh, en, bet, odds: 'kambi', ...(only ? { only } : {}) });
 
 export const CATALOG = {
   // Baseball
@@ -71,9 +87,33 @@ export const CATALOG = {
   // The big tournaments: every few years, the board fills when one is on.
   worldcup: soccer('fifa.world', '世界盃', 'FIFA World Cup', 'worldcup', { cup: true, logo: 4, standings: true }),
   nationsleague: soccer('uefa.nations', '歐國聯', 'Nations League', 'nationsleague', { cup: true, logo: 2395, kambi: 'football/uefa_nations_league', standings: true }),
+  // The set sports (settle.mjs SET_RULES), from Kambi. Tennis: the tours and
+  // the Slams, not the Challengers, ITF or UTR events. Table tennis: WTT and
+  // ITTF, not the betting leagues (Czech Liga Pro, TT Cup). Esports: the two
+  // games 運彩 lists, League of Legends and Counter-Strike, their top events
+  // (Worlds, MSI, the major leagues; the Majors, IEM, BLAST, PGL, ESL).
+  tennis: kambiSport('tennis', 'tennis', '網球', 'Tennis', /^tennis\/(atp|wta|grand_slam|australian_open|french_open|wimbledon|us_open|davis_cup|billie_jean|united_cup|olympic|laver_cup|hopman)/),
+  volleyball: kambiSport('volleyball', 'volleyball', '排球', 'Volleyball'),
+  badminton: kambiSport('badminton', 'badminton', '羽球', 'Badminton'),
+  tabletennis: kambiSport('tabletennis', 'table_tennis', '桌球', 'Table tennis', /^table_tennis\/(wtt|ittf|world|olympic)/),
+  esports: kambiSport('esports', 'esports', '電子競技', 'Esports', /^esports\/(league_of_legends\/(world_championship|msi|mid_season|lck|lpl|lec|lcs|lta|lcp|pcs)|cs2\/(major|iem|blast|pgl|esl))/),
+  // The sports 運彩 sells the winner of (不讓分; futsal its 大小 too), from
+  // Kambi, settled on the last score Kambi had (settle.mjs SCORE_SPORTS).
+  // Handball and futsal can end level: three ways, as soccer (Kambi's rugby
+  // winner is two ways, a draw void).
+  snooker: kambiSport('snooker', 'snooker', '撞球', 'Snooker'),
+  darts: kambiSport('darts', 'darts', '飛鏢', 'Darts'),
+  handball: kambiSport('handball', 'handball', '手球', 'Handball'),
+  rugbyunion: kambiSport('rugby', 'rugby_union', '聯合式橄欖球', 'Rugby union', null, 'rugbyunion'),
+  rugbyleague: kambiSport('rugby', 'rugby_league', '聯盟式橄欖球', 'Rugby league', null, 'rugbyleague'),
+  futsal: kambiSport('futsal', 'futsal', '五人制足球', 'Futsal'),
   // Racing
   f1: { sport: 'racing', kind: 'field', data: 'espn', espn: 'racing/f1', zh: 'F1 一級方程式', en: 'Formula 1', bet: 'f1', top: true, standings: true }
 };
+
+// The sports besides soccer whose winner is three ways (a level score its
+// own outcome, 和): handball and futsal.
+export const THREE_WAY_SPORTS = new Set(['handball', 'futsal']);
 
 // Play's kind of markets for a sport.
 export const familyOfSport = sport => sport;

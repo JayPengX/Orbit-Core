@@ -254,14 +254,17 @@ const HOME_NATIONS = { england: ['英格蘭', 'England'], scotland: ['蘇格蘭'
 let regionNames = null;
 // A country's name in the reader's language ("Netherlands" → 荷蘭), or the name as given.
 export function countryName(name, lang = 'zh') {
-  const key = normalizeTeamName(name);
-  if (!key) return name || '';
-  if (HOME_NATIONS[key]) return HOME_NATIONS[key][lang === 'en' ? 1 : 0];
+  const full = normalizeTeamName(name);
+  if (!full) return name || '';
+  // A women's side ("Belgium (W)", "Japan Women"): 比利時(女).
+  const key = full.replace(/\s+(women|w)$/, '');
+  const women = key !== full && lang !== 'en' ? '(女)' : '';
+  if (HOME_NATIONS[key]) return HOME_NATIONS[key][lang === 'en' ? 1 : 0] + women;
   const code = COUNTRY_CODES[key];
   if (!code || lang === 'en') return name;
   try {
     regionNames ||= new Intl.DisplayNames(['zh-TW'], { type: 'region' });
-    return regionNames.of(code) || name;
+    return regionNames.of(code) ? regionNames.of(code) + women : name;
   } catch {
     return name;
   }
@@ -272,7 +275,8 @@ export function countryFlag(name) {
   return code ? String.fromCodePoint(...[...code.slice(0, 2)].map(c => 0x1f1e6 + c.charCodeAt(0) - 65)) : null;
 }
 // A national team's (or a country's) code, or null: "India", "England", "South Africa Women".
-export const countryCode = name => COUNTRY_CODES[normalizeTeamName(name).replace(/\s+(women|men|u\d+|a)$/, '')] ?? null;
+// ("Belgium (W)", Kambi's women's side, too.)
+export const countryCode = name => COUNTRY_CODES[normalizeTeamName(name).replace(/\s+(women|men|u\d+|a|w)$/, '')] ?? null;
 
 // A round flag picture for a nation code (circle-flags, hot-linkable SVGs).
 export const flagUrl = code => (code ? `https://cdn.jsdelivr.net/gh/HatScripts/circle-flags@2.7.0/flags/${code.toLowerCase()}.svg` : null);

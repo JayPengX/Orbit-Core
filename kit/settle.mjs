@@ -3,7 +3,7 @@
 // games end (settle.js). Pure: a pick's result from its game's outcome, and
 // a slip paid once every pick is decided (the ledger's fixed ids,
 // 'payout-<slip>', so the phone and the Worker can never pay it twice).
-import { CATALOG, familyOfSport, asiaMonth, asiaMonthOf } from '#kit/catalog.mjs';
+import { CATALOG, familyOfSport, asiaMonth, asiaMonthOf, THREE_WAY_SPORTS } from '#kit/catalog.mjs';
 import { f1Driver, normalizeTeamName } from '#kit/logos.mjs';
 import { f1Outcome } from '#kit/f1live.mjs';
 import { settleSlip } from '#kit/play-odds.mjs';
@@ -117,7 +117,7 @@ export function legResult(leg, outcome) {
       // level after 12 innings; a hockey winner bought two-way before it was
       // three) is a result not on offer: void, as 台灣運彩 rules (無效投注
       // Q&A; 投注規範 32(七)). Soccer's and hockey's (`threeWay`) have a draw.
-      if (leg.side !== 'draw' && away === home && familyOf(leg.sport) && !isSoccer(leg.sport) && !leg.threeWay) return 'void';
+      if (leg.side !== 'draw' && away === home && familyOf(leg.sport) && !isSoccer(leg.sport) && !leg.threeWay && !THREE_WAY_SPORTS.has(familyOf(leg.sport))) return 'void';
       return win(leg.side === 'draw' ? away === home : leg.side === 'away' ? away > home : home > away);
     case 'total':
       return push(leg.side === 'over' ? away + home - leg.line : leg.line - away - home);
@@ -803,7 +803,8 @@ export function setOver(sport, i, bestOf, home, away) {
 }
 // A set sport's result once a side has won the match's sets, or null: the
 // sets won as the score, each set's games as the periods.
-export function decidedSetMatch(live, sport) {
+// The sets each side has won so far ({ home, away, sets }), or null.
+export function setsWon(live, sport) {
   const s = kambiSets(live);
   if (!s || !s.bestOf) return null;
   let home = 0;
@@ -813,10 +814,31 @@ export function decidedSetMatch(live, sport) {
     const done = i < s.home.length - 1 || setOver(sport, i, s.bestOf, h, a);
     if (done && h !== a) h > a ? home++ : away++;
   });
+  return { home, away, sets: s };
+}
+export function decidedSetMatch(live, sport) {
+  const won = setsWon(live, sport);
+  if (!won) return null;
+  const { home, away, sets: s } = won;
   const need = Math.ceil(s.bestOf / 2);
   if (home < need && away < need) return null;
   return { status: 'final', homeScore: home, awayScore: away, homeInnings: s.home, awayInnings: s.away };
 }
+
+// The sports sold on their winner alone (catalog.mjs), settled on Kambi's
+// last score: once Kambi has dropped the match, or (hours, the sports with
+// a clock) that long past the start with the score still (a level one
+// too where it can end level, THREE_WAY_SPORTS, and rugby's). Snooker and darts are first to a
+// number of frames or sets Kambi doesn't say: only the dropped match counts.
+// `sells`: the markets 運彩 has for it (its 玩法 list), the board's only ones.
+export const SCORE_SPORTS = {
+  snooker: { hours: 0, sells: ['ml'] },
+  darts: { hours: 0, sells: ['ml'] },
+  handball: { hours: 2.5, sells: ['ml'] },
+  rugby: { hours: 3, sells: ['ml'] },
+  futsal: { hours: 2.5, sells: ['ml', 'total'] }
+};
+export { THREE_WAY_SPORTS };
 
 // How long a score must stay the same before a finished-looking game counts as over.
 export const KAMBI_QUIET_MS = 30 * 60_000;
@@ -830,8 +852,14 @@ const TIE_INNINGS = { npb: 12, cpbl: 12, kbo: 11 };
 export function decidedTeamGame(live, sport, start, now = new Date(), { ended = false } = {}) {
   const family = LEAGUES[sport]?.family;
   // A set sport: over once a side has won its sets.
-  if (live && SET_SPORTS.has(family ?? sport)) return decidedSetMatch(live, family ?? sport);
-  if (!live || (family !== 'baseball' && family !== 'basketball' && family !== 'soccer')) return null;
+  // (Esports' maps have no end score to read: once Kambi has dropped the
+  // match, its maps won.)
+  if (live && SET_SPORTS.has(family ?? sport)) {
+    const sets = decidedSetMatch(live, family ?? sport);
+    if (sets || (family ?? sport) !== 'esports' || !ended || live.score.home === live.score.away) return sets;
+    return { status: 'final', homeScore: live.score.home, awayScore: live.score.away, homeInnings: [], awayInnings: [] };
+  }
+  if (!live || (family !== 'baseball' && family !== 'basketball' && family !== 'soccer' && !SCORE_SPORTS[family])) return null;
   const { home, away } = live.score;
   const n = live.periods.home.length;
   const t = now.getTime();
@@ -839,6 +867,13 @@ export function decidedTeamGame(live, sport, start, now = new Date(), { ended = 
   // The score's own timestamp when it's a sensible one; if not, a generous
   // time after the start.
   const changed = live.changedAt && live.changedAt >= began && live.changedAt <= t + 3_600_000 ? live.changedAt : null;
+  const rule = SCORE_SPORTS[family];
+  if (rule) {
+    // (Rugby's level score counts too: its winner is void then, legResult.)
+    const still = changed ? t - changed >= KAMBI_QUIET_MS : true;
+    const over = (ended || (rule.hours && still && began && t - began >= rule.hours * 3_600_000)) && (THREE_WAY_SPORTS.has(family) || family === 'rugby' || home !== away);
+    return over ? { status: 'final', homeScore: home, awayScore: away, homeInnings: [], awayInnings: [] } : null;
+  }
   const quiet = ended || (changed ? t - changed >= KAMBI_QUIET_MS : began && t - began >= (family === 'baseball' ? 5 : 3.5) * 3_600_000);
   let over = false;
   if (family === 'baseball') over = n >= 9 && quiet && (home !== away || n >= (TIE_INNINGS[sport] ?? 99));
@@ -867,8 +902,11 @@ export function kambiUnresolvable(leg, entry, now = new Date(), watchReachable =
 }
 
 // A Kambi match in play as an outcome still pending: the score so far.
-export function kambiInPlay(live) {
-  return { status: 'pending', state: 'in', homeScore: live.score.home, awayScore: live.score.away, detail: '' };
+export function kambiInPlay(live, sport) {
+  // (A set sport's score: its sets won, not the game's points.)
+  const family = LEAGUES[sport]?.family ?? sport;
+  const sets = SET_SPORTS.has(family) ? setsWon(live, family) : null;
+  return { status: 'pending', state: 'in', homeScore: sets ? sets.home : live.score.home, awayScore: sets ? sets.away : live.score.away, detail: '' };
 }
 
 // Outcomes for slip legs that have started: legId -> outcome (see legResult).
