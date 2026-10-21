@@ -396,9 +396,11 @@ label,
 [role='button'] {
   touch-action: pan-x pan-y;
 }
-/* While the loading screen is up the page behind it doesn't scroll. */
-html:has(.loading:not([hidden])),
-html:has(.loading:not([hidden])) body {
+/* While the loading screen is up the page behind it doesn't scroll. (#loading
+   only: an app's own .loading, Beats' jam pads warming up, a sheet's list
+   on its way, froze the whole page, Jay 2026-10-21 "can't scroll".) */
+html:has(#loading:not([hidden])),
+html:has(#loading:not([hidden])) body {
   overflow: hidden;
   overscroll-behavior: none;
 }
@@ -5064,6 +5066,10 @@ html.q-kb .q-tabbar {
 /* A bar that belongs on top of the keys (a composer, a search's results bar). */
 html.q-kb .q-kb-dock {
   bottom: var(--q-kb) !important;
+}
+/* A bar fixed at the foot whose field is being typed in (a composer): on the keys. */
+html.q-kb .q-kb-docked {
+  bottom: calc(var(--q-kb) + 8px) !important;
 }
 
 /* ---- A market that can't be bet now (ui.mjs lockedRow): one bar across

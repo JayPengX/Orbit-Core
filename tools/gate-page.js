@@ -41,6 +41,23 @@
   addEventListener('error', e => /ResizeObserver loop/.test(e.message) || gate.errors.push(String(e.message || e.error || 'error').slice(0, 160)));
   addEventListener('unhandledrejection', e => gate.errors.push(`rejection: ${String(e.reason?.message || e.reason).slice(0, 160)}`));
 
+  // The on-screen keyboard, as iOS lays it: over the page, the layout left
+  // as it was, only the visible part (visualViewport) shorter. Chromium has
+  // no keyboard, so the gate stands one in: gate.keys(px) raises it.
+  let keys = 0;
+  try {
+    const real = globalThis.visualViewport;
+    const vv = new EventTarget();
+    for (const [k, get] of Object.entries({ height: () => innerHeight - keys, width: () => innerWidth, offsetTop: () => 0, offsetLeft: () => 0, pageTop: () => scrollY, pageLeft: () => scrollX, scale: () => 1 })) Object.defineProperty(vv, k, { get });
+    vv.onresize = vv.onscroll = null;
+    real?.addEventListener('resize', () => vv.dispatchEvent(new Event('resize')));
+    real?.addEventListener('scroll', () => vv.dispatchEvent(new Event('scroll')));
+    Object.defineProperty(globalThis, 'visualViewport', { configurable: true, get: () => vv });
+    gate.keys = px => {
+      keys = px;
+      vv.dispatchEvent(new Event('resize'));
+    };
+  } catch {}
   const seen = el => {
     if (!el.isConnected || el.closest('[hidden], [aria-hidden="true"], #loading, svg, dialog:not([open])')) return false;
     const r = el.getBoundingClientRect();
@@ -96,7 +113,7 @@
 
   // Every fault on the screen now.
   gate.check = () => {
-    const out = { blank: [], pictures: [], overflow: [], wraps: [], cut: [], letters: [], slots: [], halfEmpty: [], bareEmpty: [], loading: [] };
+    const out = { blank: [], pictures: [], overflow: [], wraps: [], cut: [], letters: [], slots: [], halfEmpty: [], bareEmpty: [], loading: [], orphan: [], tables: [], sheets: [], old: [], header: [], scroll: [] };
     const all = [...document.querySelectorAll('body *')].filter(seen);
     const clippedBy = el => {
       for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) if (/auto|scroll|hidden|clip/.test(getComputedStyle(p).overflowX)) return true;
@@ -175,10 +192,121 @@
         if ((bottom - kr.top + pad) / kr.height < 0.55) out.halfEmpty.push(`${name(k)} in ${name(el)} (${Math.round(bottom - kr.top)} of ${Math.round(kr.height)} px used)`);
       }
     }
+    // A row of pills or chips wrapped with one left alone on its last line.
+    for (const el of all) {
+      const cs = getComputedStyle(el);
+      if (!cs.display.includes('flex') || cs.flexWrap !== 'wrap' || cs.flexDirection.startsWith('column')) continue;
+      const kids = [...el.children].filter(k => k.getBoundingClientRect().width && getComputedStyle(k).position !== 'absolute');
+      if (kids.length < 3) continue;
+      const rows = new Map();
+      for (const k of kids) {
+        const top = Math.round(k.getBoundingClientRect().top / 6);
+        rows.set(top, (rows.get(top) || 0) + 1);
+      }
+      const counts = [...rows].sort((a, b) => a[0] - b[0]).map(([, n]) => n);
+      if (counts.length >= 2 && counts.at(-1) === 1 && counts.at(-2) >= 2) out.orphan.push(`${name(el)}: ${counts.join(' + ')} in rows, "${text(kids.at(-1)).slice(0, 20)}" alone`);
+    }
+    // A short label (a pill, a status, a price) broken onto two lines.
+    for (const el of all) {
+      if (el.children.length || el.closest('p, li, .q-wrapped, button[aria-label], svg') && el.closest('p, li')) continue;
+      const tx = text(el);
+      if (!tx || tx.length > 10 || el.classList.contains('q-wrapped') || (el.parentElement && text(el.parentElement).length > 60 && getComputedStyle(el).display === 'inline')) continue;
+      if (lines(el) > 1) out.wraps.push(`${name(el)} "${tx}" on two lines`);
+    }
+    // A number cut short: an ellipsis on a price, a score or a count.
+    for (const el of all) {
+      if (el.children.length) continue;
+      const tx = text(el);
+      if (/\d[\d,.]*\s*…|NT\$\s*…|\$…/.test(tx)) out.cut.push(`${name(el)} "${tx.slice(0, 30)}" number cut`);
+      else if (/\d/.test(tx) && tx.length < 24 && getComputedStyle(el).textOverflow === 'ellipsis' && el.scrollWidth > el.clientWidth + 1) out.cut.push(`${name(el)} "${tx}" number cut`);
+    }
+    // A table that slides sideways (a stats grid wider than the screen).
+    for (const el of all) {
+      const ox = getComputedStyle(el).overflowX;
+      if (!/auto|scroll/.test(ox) || el.scrollWidth <= el.clientWidth + 4) continue;
+      if (el.matches('table, [role=table], [role=grid]') || el.querySelector('table, [role=table], [role=grid], tr, [role=row]') || /table|stat|box-?score|standings|grid/i.test(el.className?.baseVal ?? el.className)) out.tables.push(`${name(el)} ${el.scrollWidth} px in ${el.clientWidth}`);
+    }
+    // A sheet taller than the screen, or one that scrolls for a sliver.
+    for (const d of document.querySelectorAll('dialog[open], .q-sheet[open], [role=dialog]:not([hidden])')) {
+      if (!shown(d)) continue;
+      const r = d.getBoundingClientRect();
+      if (r.height > innerHeight + 1 || r.top < -1) out.sheets.push(`${name(d)} ${Math.round(r.height)} px tall on a ${innerHeight} px screen`);
+      for (const sc of [d, ...d.querySelectorAll('*')]) {
+        const cs = getComputedStyle(sc);
+        const over = sc.scrollHeight - sc.clientHeight;
+        if (/auto|scroll/.test(cs.overflowY) && over > 2 && over < 64 && sc.clientHeight > 120) out.sheets.push(`${name(sc)} in ${name(d)} scrolls for only ${over} px`);
+      }
+    }
+    // A past season shown as now: a heading, tab or pill naming a year two or more back.
+    const year = new Date().getFullYear();
+    for (const el of all) {
+      if (el.children.length) continue;
+      const tx = text(el);
+      const m = /(?:^|\D)(20\d\d)(?:[-–/](?:20)?\d\d)?\s*(?:賽季|球季|季|season|Season)|(?:賽季|球季|Season)\s*(20\d\d)/.exec(tx);
+      const y = m && Number(m[1] || m[2]);
+      if (y && y <= year - 2) out.old.push(`${name(el)} "${tx.slice(0, 30)}"`);
+    }
+    // A page longer than the screen that can't be scrolled by a finger.
+    const se = document.scrollingElement || document.documentElement;
+    if (!document.querySelector('#loading:not([hidden]), dialog[open]') && se.scrollHeight > innerHeight + 40 && [document.documentElement, document.body].some(e => /hidden|clip/.test(getComputedStyle(e).overflowY))) out.scroll.push(`page ${se.scrollHeight} px tall, scrolling locked`);
+    // The bar's small title belongs to a large title on this screen that has
+    // scrolled up under it; never a page left or another tab's.
+    const bar = document.querySelector('.q-navbar.on');
+    if (bar && shown(bar)) {
+      const t = text(bar);
+      const owner = [...document.querySelectorAll('[data-q-nav], .q-nav-title')].find(h => h.isConnected && !h.closest('[hidden], dialog:not([open])') && text(h) === t && h.getBoundingClientRect().bottom <= bar.getBoundingClientRect().bottom + 2 && h.getClientRects().length);
+      if (!owner) out.header.push(`bar says "${t.slice(0, 20)}" with no such title above it`);
+    }
     // A screen with nothing on it, and pictures that failed (an empty logo circle).
     if (screenNow().chars < 15) out.blank.push(`${location.hash || 'start'}: nothing on the screen`);
     for (const img of document.querySelectorAll('img')) if (seen(img) && img.complete && !img.naturalWidth && img.getBoundingClientRect().top < innerHeight * 2) out.pictures.push(`${name(img.parentElement)} ${String(img.getAttribute('src')).slice(0, 80)}`);
     for (const k of Object.keys(out)) out[k] = [...new Set(out[k])].slice(0, 8);
+    return out;
+  };
+
+  // The keyboard check: every field you can type in on the screen now (in
+  // the open sheet, when one is), tapped as a person does and the keyboard
+  // raised. iOS slides the whole screen up to show a field the keys would
+  // cover, pushing the top off the edge, and zooms in on text under 16px;
+  // so a field must sit in what's left above the keys, uncovered, at 16px,
+  // with nothing pushed sideways. Lines by field.
+  const FIELD = 'input:not([type=checkbox], [type=radio], [type=range], [type=button], [type=submit], [type=reset], [type=color], [type=file], [type=hidden], [readonly], [disabled]), textarea:not([readonly], [disabled]), [contenteditable=""], [contenteditable=true]';
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  gate.typing = async (done = []) => {
+    const out = [];
+    gate.typedSoFar = done;
+    if (!gate.keys) return out;
+    const sheet = [...document.querySelectorAll('dialog[open], [role=dialog]:not([hidden])')].filter(seen).at(-1);
+    const fields = [...(sheet || document).querySelectorAll(FIELD)].filter(el => seen(el) && (sheet || !el.closest('dialog, [role=dialog]')));
+    for (const el of fields.slice(0, 6)) {
+      const id = `${name(el)}${el.placeholder ? ` "${el.placeholder.slice(0, 20)}"` : ''}`;
+      if (done.includes(id)) continue;
+      done.push(id);
+      gate.typedSoFar = done;
+      // (Where a person would tap it: on the screen, scrolled to if it wasn't.)
+      let r = el.getBoundingClientRect();
+      if (r.top < 0 || r.bottom > innerHeight) el.scrollIntoView({ block: 'center' });
+      const keysPx = Math.round(innerHeight * 0.4);
+      const x0 = scrollX;
+      el.focus({ preventScroll: true });
+      gate.keys(keysPx);
+      await wait(450);
+      r = el.getBoundingClientRect();
+      const above = innerHeight - keysPx;
+      const fs = parseFloat(getComputedStyle(el).fontSize);
+      if (fs < 16) out.push(`${id}: text ${fs}px, iOS zooms in`);
+      if (r.bottom > above + 2) out.push(`${id}: under the keyboard (${Math.round(r.bottom - above)} px), iOS slides the screen up`);
+      else if (r.top < -2) out.push(`${id}: above the screen's top`);
+      else {
+        const at = document.elementFromPoint(Math.min(innerWidth - 2, Math.max(2, r.left + Math.min(24, r.width / 2))), Math.max(1, Math.min(above - 1, r.top + r.height / 2)));
+        if (at && at !== el && !el.contains(at) && !at.contains(el) && !at.closest('label')?.contains(el)) out.push(`${id}: covered by ${name(at)}`);
+      }
+      if (document.documentElement.scrollWidth > innerWidth + 1 || scrollX !== x0) out.push(`${id}: the page slid sideways`);
+      if (!document.documentElement.classList.contains('q-kb')) out.push(`${id}: the kit didn't see the keyboard`);
+      el.blur();
+      gate.keys(0);
+      await wait(200);
+    }
     return out;
   };
 
@@ -210,7 +338,8 @@
     dialogs: document.querySelectorAll('dialog[open], [role=dialog]:not([hidden]), .q-menu, .q-toast').length,
     where: location.href + '|' + Math.round(scrollY) + '|' + document.querySelector('.q-tab[aria-selected=true]')?.dataset.tab,
     media: media() + '|' + gate.sounds,
-    track: navigator.mediaSession?.metadata?.title || ''
+    track: navigator.mediaSession?.metadata?.title || '',
+    fields: [...document.querySelectorAll(FIELD)].filter(seen).length
   });
   gate.calm = () => {
     for (const d of document.querySelectorAll('dialog[open]')) d.close?.();

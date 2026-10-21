@@ -3198,8 +3198,9 @@ keepStrips();
 // still seen); .q-kb while the keys are up. quadra.css lifts open sheets
 // above the keys and fits them to what's left, hides the tab bar, and
 // anything marked .q-kb-dock (a bar that belongs on top of the keys) sits
-// there. A focused field is brought into view inside its own scroller, and
-// the screen's slide put back when it only hid the top.
+// there, as does a bar fixed at the foot holding the field (.q-kb-docked).
+// A focused field is brought into view inside its own scroller, and the
+// screen's slide put back when it only hid the top.
 function watchKeyboard() {
   const vv = globalThis.visualViewport;
   if (typeof document === 'undefined' || !vv || globalThis.__quadraKeyboard) return;
@@ -3217,8 +3218,41 @@ function watchKeyboard() {
     root.style.setProperty('--q-kb', `${up ? kb : 0}px`);
     root.style.setProperty('--q-vvh', `${Math.round(vv.height)}px`);
     root.classList.toggle('q-kb', up);
-    // The field itself in view, inside its sheet or list (not the whole screen sliding).
-    if (up) document.activeElement?.scrollIntoView?.({ block: 'nearest' });
+    for (const d of document.querySelectorAll('.q-kb-docked')) if (!up || !d.contains(document.activeElement)) d.classList.remove('q-kb-docked');
+    if (up) lift(document.activeElement, kb);
+  };
+  // The field in what's left above the keys. One in a bar fixed at the
+  // foot (a composer, a stake bar) rides on the keys with its bar; any
+  // other is scrolled into view inside its own scroller (a sheet, a list,
+  // the page) by just enough, measured against the visible part, since
+  // the browser's own scrollIntoView doesn't know the keys are there. Then
+  // the screen's slide is put back: iOS slid it up to show the field,
+  // pushing the top off the edge, and the field now shows without it.
+  const scroller = el => {
+    for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+      const o = getComputedStyle(p).overflowY;
+      if (/auto|scroll/.test(o) && p.scrollHeight > p.clientHeight + 1) return p;
+    }
+    return document.scrollingElement || root;
+  };
+  const lift = (el, kb) => {
+    if (!el?.getBoundingClientRect) return;
+    for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+      const cs = getComputedStyle(p);
+      // (A bar at the foot: fixed, its lower edge in the screen's lower part, not a full-height panel.)
+      const pr = cs.position === 'fixed' && p.getBoundingClientRect();
+      if (pr && pr.bottom > globalThis.innerHeight * 0.6 && pr.height < globalThis.innerHeight * 0.5) return void p.classList.add('q-kb-docked');
+      if (cs.position === 'fixed' || p.matches('dialog[open]')) break;
+    }
+    const top = vv.offsetTop + 8;
+    const bottom = globalThis.innerHeight - kb - 12;
+    const r = el.getBoundingClientRect();
+    const by = r.bottom > bottom ? Math.min(r.bottom - bottom, r.top - top) : r.top < top ? r.top - top : 0;
+    if (by) scroller(el).scrollBy?.({ top: by });
+    if (vv.offsetTop > 0) {
+      const after = el.getBoundingClientRect();
+      if (after.top >= 0 && after.bottom <= globalThis.innerHeight - kb) globalThis.scrollTo?.(globalThis.scrollX, globalThis.scrollY - vv.offsetTop);
+    }
   };
   const soon = () => (frame ||= requestAnimationFrame(apply));
   vv.addEventListener('resize', soon);
