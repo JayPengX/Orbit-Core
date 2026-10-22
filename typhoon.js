@@ -46,12 +46,15 @@ const pos = s => {
 export function parseLamps(text) {
   const out = {};
   let days = [];
-  for (const part of String(text || '').split(/[，。；]/)) {
-    const named = [...part.matchAll(/[今明後]\((\d{1,2})\)日/g)].map(m => Number(m[1]));
+  // (A sentence's days hold for all its parts: 今(22)日…，明(23)日…，蘭嶼、新北市…(橙色燈號).)
+  for (const sentence of String(text || '').split(/[。；]/)) {
+    const named = [...sentence.matchAll(/[今明後]\((\d{1,2})\)日/g)].map(m => Number(m[1]));
     if (named.length) days = named;
-    const m = /平均風\s*(\d+)\s*級以上或陣風\s*(\d+)\s*級以上/.exec(part);
-    if (!m) continue;
-    for (const c of COUNTIES) if (tai(part).includes(c)) for (const dom of days.length ? days : [null]) (out[c] ||= []).push({ dom, wind: Number(m[1]), gust: Number(m[2]) });
+    for (const part of sentence.split('，')) {
+      const m = /平均風\s*(\d+)\s*級以上或陣風\s*(\d+)\s*級以上/.exec(part);
+      if (!m) continue;
+      for (const c of COUNTIES) if (tai(part).includes(c)) for (const dom of days.length ? days : [null]) (out[c] ||= []).push({ dom, wind: Number(m[1]), gust: Number(m[2]) });
+    }
   }
   return out;
 }
@@ -66,17 +69,20 @@ export function parseTyphoonCap(xml, now = Date.now()) {
   const point = (block, at) => {
     const p = pos(tag(block, 'position'));
     const r = Number(tag(block, 'radius_of_15mps'));
-    return p ? { t: Date.parse(tag(block, 'time') || at) || null, ...p, r7: Number.isFinite(r) ? r : null } : null;
+    const v = Number(tag(block, 'max_winds'));
+    return p ? { t: Date.parse(tag(block, 'time') || at) || null, ...p, r7: Number.isFinite(r) ? r : null, v: Number.isFinite(v) ? v : null } : null;
   };
   const analysis = tag(s, 'analysis');
   const track = [analysis, ...[...s.matchAll(/<prediction>([\s\S]*?)<\/prediction>/g)].map(m => m[1])].filter(Boolean).map(b => point(b)).filter(p => p?.t);
+  // The land it covers: the warning's county areas, and its words (陸上：宜蘭、花蓮、恆春半島…).
   const areas = section(s, '警戒區域及事項');
-  const land = /陸上[:：]([^。]*)/.exec(areas)?.[1] || '';
+  const land = tai(/陸上[:：]([^。]*)/.exec(areas)?.[1] || '');
+  const named = [...s.matchAll(/<areaDesc>([^<]+)<\/areaDesc>/g)].map(m => tai(m[1]));
   return {
     name: tag(s, 'cwa_typhoon_name') || null,
     nameEn: tag(s, 'typhoon_name') || null,
     warning: head,
-    land: COUNTIES.filter(c => tai(land).includes(c)),
+    land: COUNTIES.filter(c => named.includes(c) || land.includes(c) || new RegExp(`${c.slice(0, 2)}(?![市縣])`).test(land)),
     lamps: parseLamps(section(s, '強風特報')),
     track,
     at: Date.parse(tag(s, 'sent') || '') || now,
@@ -111,13 +117,26 @@ export function parseDgpa(html) {
   return { at: when, counties };
 }
 
-// The official words, a sentence each: [{ text, off: 'all'|'class'|'work'|null }].
+// What one of the page's sentences says: 'all' | 'class' | 'work' (closed),
+// 'open' (照常, 未達…標準, 尚未列入警戒區), or 'wait' (尚未宣布消息). The page
+// words it several ways: 停止上班、停止上課; 已達停止上班及上課標準; 未達停止
+// 上班、已達停止上課標準; 照常上班、停止上課; 12:00起停止上班….
+export function offOf(x) {
+  const s = String(x || '');
+  if (/尚未宣布/.test(s)) return 'wait';
+  const none = /未達停止上班及上課標準/.test(s);
+  const work = !none && (/已達停止上班/.test(s) || (/停止(上班|辦公)/.test(s) && !/未達停止上班/.test(s)));
+  const school = !none && (/已達停止(上班及)?上課/.test(s) || (/停止上課/.test(s) && !/未達停止上課|未達停止上班及上課/.test(s)));
+  return work && school ? 'all' : school ? 'class' : work ? 'work' : 'open';
+}
+
+// The official words, a sentence each: [{ text, off }] (offOf's).
 export function officialLines(text) {
   return String(text || '')
     .split(/[。\n]/)
     .map(x => x.trim())
-    .filter(x => /上班|上課/.test(x) && !/^\d+\./.test(x))
-    .map(x => ({ text: x, off: /停止上班/.test(x) && /停止上課/.test(x) ? 'all' : /停止上課/.test(x) ? 'class' : /停止上班/.test(x) ? 'work' : null }));
+    .filter(x => /上班|上課|辦公|宣布|警戒區/.test(x) && !/^\d+\./.test(x))
+    .map(x => ({ text: x, off: offOf(x) }));
 }
 
 // Beaufort from km/h (CWA's scale).
@@ -131,35 +150,63 @@ const km = (a, b) => {
   const h = Math.sin(dLat / 2) ** 2 + Math.cos((a.lat * Math.PI) / 180) * Math.cos((b.lat * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(h));
 };
-// The storm circle (7級) over the place at some hour between from and to,
-// along the track (hourly between its points; nothing past its last).
-export function circleReaches(track, at, from, to) {
-  const pts = (track || []).filter(p => p.t != null && p.r7 != null).sort((a, b) => a.t - b.t);
-  for (let i = 0; i < pts.length - 1; i++) {
-    const [a, b] = [pts[i], pts[i + 1]];
-    for (let t = Math.max(a.t, from); t <= Math.min(b.t, to); t += HOUR) {
-      const k = (t - a.t) / (b.t - a.t);
-      const p = { lat: a.lat + (b.lat - a.lat) * k, lon: a.lon + (b.lon - a.lon) * k };
-      if (km(p, at) <= a.r7 + (b.r7 - a.r7) * k) return true;
-    }
+// The storm at an hour: between the track's points, and on past the last
+// one at its last pace for up to a day (its circle and strength held).
+export function stormAt(track, t) {
+  const pts = (track || []).filter(p => p.t != null).sort((a, b) => a.t - b.t);
+  if (!pts.length || t < pts[0].t) return null;
+  let i = pts.findIndex(p => p.t >= t);
+  if (i === -1) {
+    const [a, b] = pts.length > 1 ? pts.slice(-2) : [pts[0], pts[0]];
+    if (t - b.t > 24 * HOUR) return null;
+    const k = b.t > a.t ? (t - b.t) / (b.t - a.t) : 0;
+    return { lat: b.lat + (b.lat - a.lat) * k, lon: b.lon + (b.lon - a.lon) * k, r7: b.r7, v: b.v };
   }
-  return false;
+  if (i === 0) return pts[0];
+  const [a, b] = [pts[i - 1], pts[i]];
+  const k = (t - a.t) / (b.t - a.t);
+  const mix = (x, y) => (x == null ? y : y == null ? x : x + (y - x) * k);
+  return { lat: mix(a.lat, b.lat), lon: mix(a.lon, b.lon), r7: mix(a.r7, b.r7), v: mix(a.v, b.v) };
 }
+
+// The storm circle's (7級) nearest edge to a place over the hours from..to,
+// in km (below 0: inside it), and the storm's strength then (m/s).
+export function circleEdge(track, at, from, to) {
+  let best = null;
+  for (let t = from; t <= to; t += HOUR) {
+    const p = stormAt(track, t);
+    if (!p) continue;
+    const edge = km(p, at) - (p.r7 ?? 0);
+    if (!best || edge < best.edge) best = { edge, v: p.v };
+  }
+  return best;
+}
+export const circleReaches = (track, at, from, to) => (circleEdge(track, at, from, to)?.edge ?? Infinity) <= 0;
+
+// Taiwan's main island, for how near the storm comes to it at all (its
+// county seats).
+const MAIN = [[25.131, 121.744], [25.0375, 121.5637], [25.0123, 121.4654], [24.9937, 121.301], [24.8066, 120.9686], [24.827, 121.0128], [24.565, 120.8205], [24.1618, 120.6469], [24.0758, 120.544], [23.9025, 120.6906], [23.699, 120.5263], [23.4801, 120.4491], [23.4588, 120.2925], [22.9917, 120.1849], [22.623, 120.3014], [22.6829, 120.488], [24.7303, 121.7631], [23.9913, 121.6197], [22.7559, 121.1504]].map(([lat, lon]) => ({ lat, lon }));
 
 // The day asked about: today until 10:00 (announced by then), else tomorrow.
 export const targetDay = now => (new Date(now + TW).getUTCHours() < 10 ? twDate(now) : twDate(now + 24 * HOUR));
 
-// The chance, 5–95 in steps of 5: how near the place's worst hour comes to
-// the rule's bar (the higher of wind/7級, gusts/10級, the lamps, rain/350 mm),
-// on a curve that is even at 90% of the bar; well under it (≤25) unless the
-// storm circle is forecast over the place or the warning covers the county.
-export function dayOffChance({ wind, gust, lampWind, lampGust, mm, land, reach }) {
-  const windScore = Math.max((wind ?? 0) / 7, (gust ?? 0) / 10, lampWind ? 0.9 * Math.max(lampWind / 7, lampGust / 10) : 0);
-  const r = Math.max(windScore, (mm ?? 0) / 350);
-  const l = 1 / (1 + Math.exp(-8 * (r - 0.9)));
-  const p = land || reach ? 15 + 80 * l : Math.min(25, 50 * l);
-  return Math.min(95, Math.max(5, Math.round(p / 5) * 5));
+// The chance a county closes on the day, fitted to what counties decided
+// for 68 storms, 2019-08 to 2026-09 (4,671 county-days of storms near
+// Taiwan; 人事行政總處's archive): a logistic curve on the storm circle's
+// nearest edge to the place and to the main island, the storm's strength,
+// the day's peak gust and its rain (CWA's stations then; the forecast now).
+// Checked on storms it wasn't fitted on: what it calls 20% closed about one
+// time in five. 1–99, never rounded to steps.
+const FIT = { k: -7.6913, edge: 0.0644, inside: 0.374, v: 1.0683, gust: 4.412, rain: 2.5424, island: -0.6472 };
+const clip = (x, lo, hi) => Math.min(hi, Math.max(lo, x));
+export function dayOffChance({ edge, islandEdge, vmax, gust, mm }) {
+  const e = clip(edge ?? 600, -300, 600);
+  const z = FIT.k + FIT.edge * (e / 100) + FIT.inside * (clip(-(edge ?? 600), 0, 300) / 100) + FIT.v * (((vmax ?? 0) * 1.9438) / 100) + FIT.gust * ((gust ?? 0) / 30) + FIT.rain * (Math.log1p(Math.max(0, mm ?? 0)) / Math.log1p(350)) + FIT.island * (clip(islandEdge ?? 600, -300, 600) / 100);
+  return Math.min(99, Math.max(1, Math.round(100 / (1 + Math.exp(-z)))));
 }
+
+// A Beaufort level's lowest gust (m/s), for the 強風 lamps' 陣風 N 級.
+const BFT_MS = [0, 0.3, 1.6, 3.4, 5.5, 8, 10.8, 13.9, 17.2, 20.8, 24.5, 28.5, 32.7];
 
 // The answer's `dayOff` for a place (the forecast's hours, its county; `at` its position).
 export function dayOffFor(resp, ty, dgpa, now, at = null) {
@@ -169,29 +216,35 @@ export function dayOffFor(resp, ty, dgpa, now, at = null) {
   const date = targetDay(now);
   const storm = { name: ty.name, nameEn: ty.nameEn, warning: ty.warning, date };
   const said = dgpa?.counties?.[county];
-  if (said && !/無停班停課/.test(said)) return { ...storm, official: { lines: officialLines(said), at: dgpa.at } };
+  if (said && !/無停班停課/.test(said) && officialLines(said).length) return { ...storm, official: { lines: officialLines(said), at: dgpa.at } };
   const start = Date.parse(`${date}T00:00:00+08:00`);
-  const from = Math.max(now, start);
   const to = start + 24 * HOUR;
-  const hours = (resp.hours || []).filter(h => h.t >= from - HOUR && h.t < to);
+  // The day's hours (today's: those still ahead).
+  const hours = (resp.hours || []).filter(h => h.t >= Math.max(now, start) - HOUR && h.t < to);
   if (!hours.length) return null;
-  const top = k => {
+  const peak = k => {
     const v = hours.map(h => h.wind?.[k]).filter(x => x != null);
-    return v.length ? beaufortKmh(Math.max(...v)) : null;
+    return v.length ? Math.max(...v) : null;
   };
-  // Rain: the 24 hours from the day's start (or now).
-  const mm = Math.round((resp.hours || []).filter(h => h.t >= from - HOUR && h.t < from + 23 * HOUR).reduce((a, h) => a + (h.mm || 0), 0));
+  const mm = Math.round(hours.reduce((a, h) => a + (h.mm || 0), 0));
   const dom = twDom(start);
   const lamp = (ty.lamps?.[county] || []).filter(x => x.dom === dom || (x.dom == null && date === twDate(ty.at))).sort((a, b) => b.gust - a.gust)[0];
+  // The day's peak gust (m/s): the forecast's, or the lamp's lowest when CWA says more.
+  const gust = Math.max((peak('gust') ?? 0) / 3.6, lamp ? BFT_MS[Math.min(12, lamp.gust)] : 0);
+  const here = at ? circleEdge(ty.track, at, start, to) : null;
+  const island = MAIN.reduce((best, p) => {
+    const c = circleEdge(ty.track, p, start, to);
+    return c && (!best || c.edge < best.edge) ? c : best;
+  }, null);
   const why = {
-    wind: top('speed'),
-    gust: top('gust'),
+    wind: beaufortKmh(peak('speed')),
+    gust: Math.max(beaufortKmh(peak('gust')) ?? 0, lamp?.gust ?? 0) || null,
     mm,
     land: ty.land.includes(county),
-    reach: at ? circleReaches(ty.track, at, from, to) : false,
-    ...(lamp ? { lampWind: lamp.wind, lampGust: lamp.gust } : {})
+    reach: (here?.edge ?? Infinity) <= 0
   };
-  return { ...storm, chance: dayOffChance(why), why };
+  const chance = dayOffChance({ edge: here?.edge, islandEdge: island?.edge, vmax: here?.v ?? island?.v, gust, mm });
+  return { ...storm, chance, why };
 }
 
 // ---- Reads (kept shared in KV by the caller's `shared`) ------------------------------
@@ -205,15 +258,42 @@ async function text(fetchFn, url, timeout = 5000) {
   return new TextDecoder(/big5/i.test(cs) ? 'big5' : 'utf-8').decode(buf);
 }
 
-// The typhoon in force now, or null.
-export async function readTyphoon(fetchFn, now = Date.now()) {
+// CWA's track forecast (W-C0034-005) for a storm: its last fix, then each
+// forecast hour out to 5 days (the warning's CAP has only a day ahead).
+export function parseTrack(j, ty) {
+  const all = j?.records?.TropicalCyclones?.TropicalCyclone || [];
+  const tc = all.find(c => (ty.name && c.CwaTyphoonName === ty.name) || (ty.nameEn && String(c.TyphoonName).toUpperCase() === String(ty.nameEn).toUpperCase()));
+  if (!tc) return null;
+  const pt = (f, t) => {
+    const lat = Number(f.CoordinateLatitude);
+    const lon = Number(f.CoordinateLongitude);
+    const r = Number(f.Circle15ms?.Radius);
+    const v = Number(f.MaxWindSpeed);
+    return Number.isFinite(lat) && Number.isFinite(lon) && t ? { t, lat, lon, r7: Number.isFinite(r) ? r : 0, v: Number.isFinite(v) ? v : null } : null;
+  };
+  const last = (tc.AnalysisData?.Fix || []).at(-1);
+  const fc = (tc.ForecastData?.Fix || []).map(f => pt(f, Date.parse(f.InitialTime) + Number(f.ForecastHour) * HOUR));
+  const track = [last && pt(last, Date.parse(last.DateTime)), ...fc].filter(Boolean);
+  return track.length > 1 ? track : null;
+}
+
+// The typhoon in force now, or null; `trackUrl`: CWA's track forecast,
+// which replaces the warning's day-ahead track when it reads.
+export async function readTyphoon(fetchFn, now = Date.now(), trackUrl = null) {
   const hit = feedTyphoon(await text(fetchFn, NCDR_FEED));
   if (!hit) return null;
   const u = new URL(hit.href);
   if (u.protocol !== 'https:' || u.hostname !== NCDR_HOST) return null;
   const ty = parseTyphoonCap(await text(fetchFn, u.href), now);
   // (A warning not renewed for 6 hours past its end is over.)
-  return ty && (!ty.expires || ty.expires + 6 * HOUR > now) ? ty : null;
+  if (!ty || (ty.expires && ty.expires + 6 * HOUR <= now)) return null;
+  if (trackUrl) {
+    const track = await text(fetchFn, trackUrl)
+      .then(t => parseTrack(JSON.parse(t), ty))
+      .catch(() => null);
+    if (track) ty.track = track;
+  }
+  return ty;
 }
 
 // 人事行政總處's page, from Taiwan (the relay) when it's bound.

@@ -1444,7 +1444,7 @@ async function cachedText(env, key, ttl, make) {
 async function withDayOff(env, resp, at, fetchFn, ctx, now = Date.now()) {
   if (!resp?.place?.county) return resp;
   const defer = ctx?.waitUntil ? p => ctx.waitUntil(p) : null;
-  const ty = await shared(env, 'weather:typhoon', 10 * MIN, () => readTyphoon(fetchFn, now), now, defer);
+  const ty = await shared(env, 'weather:typhoon', 10 * MIN, () => readTyphoon(fetchFn, now, env.CWA_KEY ? cwaUrl(env, 'W-C0034-005') : null), now, defer);
   if (!ty?.data) return resp;
   const dg = await shared(env, 'weather:dgpa', 5 * MIN, () => readDgpa(env, fetchFn), now, defer);
   const dayOff = dayOffFor(resp, ty.data, dg?.data, now, at);

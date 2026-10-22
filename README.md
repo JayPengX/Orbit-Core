@@ -76,7 +76,7 @@ runs near each caller; only Gemini goes through `gemini-relay.js`, pinned to Tai
 | `/stock` | `stock-fill.js`, `stock-check.js` | Securities' fills; replaying the account on each save |
 | `/kambi` | `kambi.js` | Kambi matches' last live data, kept for settling |
 | `/push/…` | `push.js` | Subscriptions, scheduled notices, checks (an ESPN final, a Yahoo price, weather, a bus) |
-| `/weather…` | `weather.js`, `weather-skill.js`, `typhoon.js` | The blend for a ~1 km cell, the township, scoring sources hourly; while CWA has a typhoon warning out (NCDR's open CAP feed, every 10 minutes), `dayOff`: the county's 停班停課 from 人事行政總處's page (through `gemini-relay`, every 5 minutes), else a chance from the rule's bars (7級 wind, 10級 gusts, 350 mm, the storm circle, the land warning) |
+| `/weather…` | `weather.js`, `weather-skill.js`, `typhoon.js` | The blend for a ~1 km cell, the township, scoring sources hourly; while CWA has a typhoon warning out (NCDR's open CAP feed, every 10 minutes), `dayOff`: the county's 停班停課 from 人事行政總處's page (through `gemini-relay`, every 5 minutes), else a chance fitted to the counties' real decisions (68 storms, 2019–2026): the storm circle's edge from CWA's 5-day track (`W-C0034-005`), the storm's strength, the day's peak gust (the 強風 lamps when higher) and rain |
 | `/transit/…` | `transit.js` | TDX (allowlist `TDX_RULES`), map config, search, place, route; `/transit/status?sample=` (a session or the dev door only) |
 | `/sports-proxy` | `sports.js`, `asia-baseball.js`, `f1-live.js`, `fund-nav.js`, `taifex.js` | The data proxy (§3.1) |
 | `/sports-today` | `sports-today.js`, `kit/sports-espn.mjs` | Orbit Sports' day of scoreboards in one answer, built on demand (§3.1) |
