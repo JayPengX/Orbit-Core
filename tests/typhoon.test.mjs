@@ -213,3 +213,19 @@ test('without Google: the sun worked out, and 體感 from the station', async ()
   assert.equal(apparentTemp(21.7, 88, 9.7), 23.3);
   assert.equal(apparentTemp(21.7, null, 9.7), null);
 });
+
+test("without Google: CWA's hours fill the word, wind and dew point", async () => {
+  const { assemble, parseCwaTown, dewPoint } = await import('../weather.js');
+  const read = n => JSON.parse(readFileSync(new URL(`./fixtures/weather/${n}`, import.meta.url), 'utf8'));
+  const fc = parseCwaTown(read('cwa-town-3d.json'), read('cwa-town-1w.json'));
+  const t0 = Date.parse('2026-10-02T19:00:00+08:00');
+  const { resp } = assemble({ cell: '25.03,121.56', now: t0, google: null, cwa: { county: '臺北市', town: '信義區', forecast: fc, station: { name: 'x', km: 1, temp: 27, humidity: 85, wind: { dir: 40, speed: 20, gust: null }, at: t0, vis: 21 } }, air: null, warnings: [] });
+  const h = resp.hours[0];
+  assert.equal(h.condition.text, '短暫陣雨');
+  assert.equal(h.wind.dir, 90);
+  assert.equal(h.day, false);
+  assert.ok(h.dew != null);
+  assert.equal(resp.now.vis, 21);
+  assert.equal(resp.now.dew, dewPoint(27, 85));
+  assert.ok(resp.days[0].day.condition.text);
+});

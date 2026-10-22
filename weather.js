@@ -414,6 +414,9 @@ export function parseCwaTown(j3, j1w) {
     humidity: pts(a?.el, '相對濕度', 'RelativeHumidity'),
     pop: pts(a?.el, '3小時降雨機率', 'ProbabilityOfPrecipitation'),
     weather: (a?.el['天氣現象'] || []).map(x => ({ t: x.t, end: x.end, text: x.v.Weather || '', code: x.v.WeatherCode || null })),
+    dew: pts(a?.el, '露點溫度', 'DewPoint'),
+    windSpeed: pts(a?.el, '風速', 'WindSpeed'),
+    windDir: (a?.el['風向'] || []).map(x => ({ t: x.t, end: x.end, v: windDeg(x.v.WindDirection) })).filter(x => x.v != null),
     days: {}
   };
   const halves = name => w?.el[name] || [];
@@ -433,7 +436,12 @@ export function parseCwaTown(j3, j1w) {
   take('最低體感溫度', 'MinApparentTemperature', (d, v) => (d.feelsLo = mn(d.feelsLo, v)));
   take('紫外線指數', 'UVIndex', (d, v) => (d.uv = mx(d.uv, v)));
   take('12小時降雨機率', 'ProbabilityOfPrecipitation', (d, v, isDay) => (isDay ? (d.popDay = v) : (d.popNight = v)));
-  for (const x of halves('天氣現象')) if (twHour(x.t) >= 6 && twHour(x.t) < 18) day(twDay(x.t)).text = x.v.Weather || null;
+  // (The day's half, else its night's: today's evening still has a word.)
+  for (const x of halves('天氣現象')) {
+    const d = day(twDay(x.t));
+    if (twHour(x.t) >= 6 && twHour(x.t) < 18) d.text = x.v.Weather || d.text;
+    else d.text ||= x.v.Weather || null;
+  }
   return out;
 }
 
@@ -449,6 +457,16 @@ export function cwaAt(series, t) {
   return best ? best.v : null;
 }
 
+const visKm = d => {
+  const m = /(\d+(?:\.\d+)?)/.exec(String(d ?? ''));
+  return m && !/^-9/.test(String(d)) ? (/^</.test(String(d)) ? 0 : Number(m[1])) : null;
+};
+// CWA's wind words as degrees (偏東風 → 90).
+const WIND_DIR = { 偏北: 0, 東北: 45, 偏東: 90, 東南: 135, 偏南: 180, 西南: 225, 偏西: 270, 西北: 315 };
+const windDeg = t => {
+  const k = Object.keys(WIND_DIR).find(x => String(t || '').startsWith(x));
+  return k == null ? null : WIND_DIR[k];
+};
 const wgsOf = s => s.GeoInfo?.Coordinates?.find(c => c.CoordinateName === 'WGS84') || {};
 // One station's latest observation (O-A0001-001 / O-A0003-001).
 export function parseCwaObs(j) {
@@ -464,6 +482,8 @@ export function parseCwaObs(j) {
     pressure: num(e.AirPressure),
     wind: { dir: num(e.WindDirection), speed: r1(num(e.WindSpeed) == null ? null : num(e.WindSpeed) * 3.6), gust: r1(num(e.GustInfo?.PeakGustSpeed) == null ? null : num(e.GustInfo.PeakGustSpeed) * 3.6) },
     weather: e.Weather && e.Weather !== '-99' ? e.Weather : null,
+    // (km: a manned station's band, its lower end; '>30' → 30.)
+    vis: visKm(e.VisibilityDescription),
     uv: num(e.UVIndex),
     hi: num(e.DailyExtreme?.DailyHigh?.TemperatureInfo?.AirTemperature),
     lo: num(e.DailyExtreme?.DailyLow?.TemperatureInfo?.AirTemperature),
@@ -761,6 +781,12 @@ export function sunUp(lat, lon, t) {
   const alt = Math.asin(Math.sin(lat * rad) * Math.sin(dec) + Math.cos(lat * rad) * Math.cos(dec) * Math.cos(ha));
   return alt > -0.833 * rad;
 }
+// The dew point from the air and its humidity (Magnus).
+export function dewPoint(temp, humidity) {
+  if (temp == null || !humidity) return null;
+  const a = Math.log(humidity / 100) + (17.27 * temp) / (237.7 + temp);
+  return Math.round(((237.7 * a) / (17.27 - a)) * 10) / 10;
+}
 // 體感溫度 as CWA works it out (Steadman's apparent temperature: the air, its
 // moisture, the wind), for "now" when Google's isn't there.
 export function apparentTemp(temp, humidity, windKmh) {
@@ -793,6 +819,16 @@ export function assemble({ cell, now, google, cwa, air, warnings, weights = DEFA
       day: g.day ?? sun(g.t)
     };
     if (out.humidity == null) out.humidity = cwaAt(fc?.humidity, g.t);
+    // (Google's hour missing: CWA's word, wind and dew point for it.)
+    if (!out.condition) {
+      const wx = (fc?.weather || []).find(x => x.t <= g.t && g.t < (x.end ?? x.t + 3 * HOUR));
+      if (wx?.text) out.condition = { code: null, text: wx.text, icon: null };
+    }
+    if (!out.wind) {
+      const ms = cwaAt(fc?.windSpeed, g.t);
+      if (ms != null) out.wind = { dir: cwaAt(fc?.windDir, g.t), speed: r1(ms * 3.6), gust: null };
+    }
+    if (out.dew == null) out.dew = cwaAt(fc?.dew, g.t);
     bySource.hours.push({ t: g.t, pop: popBy, temp: tempBy });
     return out;
   });
@@ -836,9 +872,9 @@ export function assemble({ cell, now, google, cwa, air, warnings, weights = DEFA
     uv: g?.uv ?? cwa?.uvStation?.uv ?? null,
     wind: g?.wind ?? st?.wind ?? null,
     pressure: g?.pressure ?? st?.pressure ?? null,
-    vis: g?.vis ?? null,
+    vis: g?.vis ?? [st, cwa?.uvStation].find(x => x?.vis != null && x.km <= 25)?.vis ?? null,
     cloud: g?.cloud ?? null,
-    dew: g?.dew ?? null,
+    dew: g?.dew ?? dewPoint(measured ?? st?.temp ?? null, st?.humidity ?? null),
     day: g?.day ?? sun(now),
     condition: g?.condition ?? (st?.weather ? { code: null, text: st.weather, icon: null } : null),
     rain1h: cwa?.gauge?.h1 ?? null,
