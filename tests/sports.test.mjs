@@ -112,6 +112,21 @@ test("a formula1.com driver or team page comes trimmed to its grids of figures",
   assert.deepEqual(grids, [[['Season Position', '1st'], ['Season Points', '302']], [['Date of Birth', '25/08/2006']]]);
 });
 
+test("RotoWire's NBA lineups page comes trimmed to each side's five and who may not play", async () => {
+  const { trimRotowireNba } = await import('../sports.js');
+  const player = (pos, full, short, inj = '') => `<li class="lineup__player is-pct-play-100" title="x"><div class="lineup__pos" >${pos}</div><a title="${full}" href="/p">${short}</a>${inj ? `<span class="lineup__inj">${inj}</span>` : ''}</li>`;
+  const side = (k, status, five, out) => `<ul class="lineup__list is-${k}"><li class="lineup__status is-${status}"><div class="dot"></div>Lineup</li>${five.map(p => player(...p)).join('')}<li class="lineup__title is-middle">MAY NOT PLAY</li>${out.map(p => player(...p)).join('')}</ul>`;
+  const five = ['PG', 'SG', 'SF', 'PF', 'C'].map((p, i) => [p, `Player ${i}`, `P. ${i}`]);
+  const html = `<div class="lineup is-nba" data-lnum="1"><div class="lineup__time">10:30 PM ET</div><a class="lineup__mteam is-visit white">\n  Trail Blazers  <span class="lineup__wl">(1-0)</span></a><a class="lineup__mteam is-home white">Suns <span>(0-1)</span></a>${side('visit', 'expected', five, [['C', "De'Andre Ayton", 'D. Ayton', 'GTD']])}${side('home', 'confirmed', five, [])}</div>`;
+  const { games } = trimRotowireNba(html);
+  assert.equal(games.length, 1);
+  assert.equal(games[0].away.team, 'Trail Blazers');
+  assert.equal(games[0].away.lineup, 'expected');
+  assert.equal(games[0].home.lineup, 'confirmed');
+  assert.deepEqual(games[0].away.starters[0], { pos: 'PG', name: 'Player 0' });
+  assert.deepEqual(games[0].away.out, [{ pos: 'C', name: "De'Andre Ayton", status: 'GTD' }]);
+});
+
 test('an old copy is answered when its fresh read is slow, and a source turning the proxy away is a failure to ask again', async () => {
   const url = 'https://site.api.espn.com/apis/site/v2/sports/basketball/slow/teams/9/schedule';
   store.set(url, new Response(JSON.stringify({ old: true }), { headers: { 'Content-Type': 'application/json', 'X-Sports-Proxy-Stored-At': String(Date.now() - 2 * 3600_000) } }));
