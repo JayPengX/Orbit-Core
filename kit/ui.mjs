@@ -15,7 +15,7 @@
 
 // { tab: 'ipo' } as data-tab="ipo" attributes (a builder's `data`, for taps wired by delegation).
 // (By path, not #kit/: a page whose import map predates format.mjs still loads ui.mjs.)
-import { DASH, pct, price as fmtPrice, twDay } from './format.mjs';
+import { DASH, pct, price as fmtPrice, twDay, addDays as dayAdd } from './format.mjs';
 
 const dataProps = (data = null) => Object.fromEntries(Object.entries(data || {}).filter(([, v]) => v != null && v !== false).map(([k, v]) => [`data-${String(k).replace(/[^a-z0-9-]/gi, '')}`, v === true ? '' : String(v)]));
 const reduced = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -66,7 +66,6 @@ export function tick() {
 //   one too; pickLabel: 📅's name; lang: 'zh' | 'en' (the page's).
 // Returns the strip (.q-day-strip-wrap) to put in the bar.
 const dayLang = lang => lang || (/^en/i.test(globalThis.document?.documentElement?.lang || '') ? 'en' : 'zh');
-const dayAdd = (d, n) => new Date(Date.parse(`${d}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 // Taiwan's today, 'YYYY-MM-DD'.
 export const dayToday = () => twDay(Date.now());
 // The days from `from` to `to` ('YYYY-MM-DD', both kept), in order.

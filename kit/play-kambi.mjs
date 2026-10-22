@@ -9,15 +9,8 @@ import { LEAGUES, normalizeTeamName, teamZh } from '#kit/play-teams.mjs';
 import { housePrices } from '#kit/play-house.mjs';
 
 // Reading a match's live data and deciding it: the shared kit's (settle.mjs), as the Worker settles.
-import { kambiLiveDataUrl, kambiPeriods, parseKambiLiveData, KAMBI_QUIET_MS, decidedTeamGame } from '#kit/settle.mjs';
-export { kambiLiveDataUrl, kambiPeriods, parseKambiLiveData, KAMBI_QUIET_MS, decidedTeamGame };
-export const KAMBI = 'https://eu-offering-api.kambicdn.com/offering/v2018/ub';
-
-export function kambiUrl(path, kind = 'matches') {
-  const parts = path.split('/');
-  while (parts.length < 4) parts.push('all');
-  return `${KAMBI}/listView/${parts.join('/')}/${kind}.json?lang=en_GB&market=GB&useCombined=true`;
-}
+import { KAMBI, kambiUrl, kambiLiveDataUrl, kambiPeriods, parseKambiLiveData, KAMBI_QUIET_MS, decidedTeamGame } from '#kit/settle.mjs';
+export { KAMBI, kambiUrl, kambiLiveDataUrl, kambiPeriods, parseKambiLiveData, KAMBI_QUIET_MS, decidedTeamGame };
 
 const outcome = (offer, type) => offer.outcomes.find(o => o.type === type);
 // The whole game's winner (with overtime: NHL's regular-time 1X2 isn't it).
