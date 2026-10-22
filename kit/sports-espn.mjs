@@ -73,7 +73,9 @@ export function parseStatus(s) {
 // counts the moment it's final). Only what the rules settle exactly:
 // basketball's last regulation period (or an overtime) ended with the
 // scores apart; MLB's middle of the 9th or later with the home side
-// ahead (it doesn't bat), or the end of an inning from the 9th apart.
+// ahead (it doesn't bat), or the end of an inning from the 9th apart, or
+// the home side ahead in the bottom of the 9th or later (a walk-off ends it
+// there).
 const REGULATION = { basketball: 4 };
 export function overByRule(status, away, home, league) {
   if (!status || status.state !== 'in' || status.void) return status;
@@ -89,7 +91,7 @@ export function overByRule(status, away, home, league) {
     const regulation = sport === 'basketball' && /half/i.test(`${status.detail} ${status.short}`) ? 2 : REGULATION[sport];
     over = ended && n >= regulation;
   } else if (sport === 'baseball' && league === 'mlb') {
-    const m = /^(mid|middle|end)\b\D*(\d+)/i.exec(status.short || status.detail || '');
+    const m = /^(mid|middle|end|bot|bottom)\b\D*(\d+)/i.exec(status.short || status.detail || '');
     const inning = Number(m?.[2]) || n;
     over = Boolean(m) && inning >= 9 && (/^end/i.test(m[1]) || h > a);
   }

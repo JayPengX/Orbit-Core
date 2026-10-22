@@ -19,7 +19,9 @@
 // A notice: { at: ms, title, body, tag, url, kind } and, for news that isn't known
 // ahead, a check the Worker makes at `at` (and again every 15 minutes until
 // it has the answer, or 8 hours have passed, or `until`):
-//   check: { espn: 'football/nfl', event: '401…' }            a game's final score
+//   check: { espn: 'football/nfl', event: '401…' }            a game's final score,
+//          asked every run (each 2 minutes), and told as soon as the score
+//          says it's over (overNow), not when ESPN gets round to 'post'
 //   check: { yahoo: '2330.TW', op: 'above'|'below', price }  a price reached
 //   check: { weather: { lat, lon, kind: 'brief'|'rain' } }   Orbit Weather's
 //          morning brief, or a rain alert when the next 2 hours turn wet
@@ -43,6 +45,7 @@
 import { weatherCheck } from './weather.js';
 import { tdxGet, tdxRequest } from './transit.js';
 import { bodyText } from './http.js';
+import { LEAGUES, parseStatus, overByRule } from './kit/sports-espn.mjs';
 
 const enc = new TextEncoder();
 const b64u = bytes => {
@@ -151,6 +154,8 @@ const HOLD_MS = 8 * 3_600_000;
 const CHECK_EVERY = 15 * 60_000;
 // A bus comes in minutes: every run (the cron's 2 minutes).
 const BUS_EVERY = 60_000;
+// A game's final too (the owner: told the moment it ends): its `at` left
+// where it is, so it's due at every run and the list isn't written again.
 // Runs are 2 minutes apart: told up to a minute early rather than late.
 const BUS_EARLY = 60;
 const cleanText = (x, n) => String(x ?? '').slice(0, n);
@@ -328,7 +333,8 @@ export async function runCheck(check, lang, env) {
     const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${check.espn}/summary?event=${check.event}`, { signal: AbortSignal.timeout(UPSTREAM_MS) });
     if (!res.ok) return null;
     const comp = (await res.json())?.header?.competitions?.[0];
-    if (comp?.status?.type?.state !== 'post') return null;
+    const early = overNow(comp, check.espn);
+    if (comp?.status?.type?.state !== 'post' && !early) return null;
     const side = h => comp.competitors?.find(c => c.homeAway === h);
     const name = c => c?.team?.shortDisplayName || c?.team?.name || c?.team?.displayName || c?.athlete?.shortName || '';
     const [a, h] = [side('away'), side('home')];
@@ -336,7 +342,7 @@ export async function runCheck(check, lang, env) {
     const T = (zh, en) => (lang === 'en' ? en : zh);
     const type = comp.status.type;
     // Called off: no score, just what happened.
-    if (!type.completed) {
+    if (!type.completed && !early) {
       const result = /postpon|delay|suspend/i.test(type.name || '') ? T('延賽', 'Postponed') : /cancel/i.test(type.name || '') ? T('比賽取消', 'Canceled') : T('比賽結束', 'Final');
       return { body: result, result };
     }
@@ -356,6 +362,18 @@ export async function runCheck(check, lang, env) {
   return null;
 }
 
+// A game ESPN still has 'in' that its score says is over: it keeps one
+// for minutes at "End of 4th" or "Mid 9th" before its 'post' (the owner's
+// rule: never wait on a stale feed). The kit's rule (overByRule), the one
+// the app and Play's settling use: only what the rules settle exactly.
+const LEAGUE_OF = Object.fromEntries(Object.entries(LEAGUES).filter(([, l]) => l.espn).map(([k, l]) => [l.espn, k]));
+export function overNow(comp, espn) {
+  const league = LEAGUE_OF[espn];
+  if (!league || comp?.status?.type?.state !== 'in') return false;
+  const side = h => comp.competitors?.find(c => c.homeAway === h);
+  return overByRule(parseStatus(comp.status), side('away'), side('home'), league).state === 'post';
+}
+
 // What's due, sent: each list's notices up to now (a check that has no
 // answer yet waits 15 minutes more), and the lists' next times.
 export async function sendDue(env, now = Date.now()) {
@@ -364,10 +382,18 @@ export async function sendDue(env, now = Date.now()) {
   await moveOldDue(kv);
   let sent = 0;
   const prefsOf = {};
+  // One ask a run for the same check (a game many follow is asked once).
+  const asked = new Map();
+  const ask = (check, lang) => {
+    const k = `${lang}|${JSON.stringify(check)}`;
+    if (!asked.has(k)) asked.set(k, runCheck(check, lang, env).catch(() => null));
+    return asked.get(k);
+  };
   for (const [key, next] of await dueLists(kv)) {
     if (next > now + 60_000) continue;
     const record = await kv.get(key, 'json');
     if (!record?.sub) continue;
+    const was = JSON.stringify(record);
     const keep = [];
     let gone = false;
     // push:<account>:<app>
@@ -383,9 +409,9 @@ export async function sendDue(env, now = Date.now()) {
       }
       let message = { title: item.title, body: item.body, tag: item.tag, url: item.url };
       if (item.check) {
-        const found = await runCheck(item.check, record.lang, env).catch(() => null);
+        const found = await ask(item.check, record.lang);
         if (!found) {
-          if (now < (item.until || item.firstAt || item.at) + (item.until ? 0 : HOLD_MS)) keep.push({ ...item, firstAt: item.firstAt || item.at, at: now + (item.check.bus ? BUS_EVERY : CHECK_EVERY) });
+          if (now < (item.until || item.firstAt || item.at) + (item.until ? 0 : HOLD_MS)) keep.push({ ...item, firstAt: item.firstAt || item.at, at: item.check.espn ? item.at : now + (item.check.bus ? BUS_EVERY : CHECK_EVERY) });
           continue;
         }
         // (A check's title can hold the app's own: "{title} 31° / 25°" keeps "家 今天天氣".)
@@ -402,7 +428,8 @@ export async function sendDue(env, now = Date.now()) {
     if (gone) await kv.delete(key);
     else {
       record.items = keep.sort((a, b) => a.at - b.at);
-      await putRecord(kv, key, record);
+      // (A game not over yet changes nothing: not written again each run.)
+      if (JSON.stringify(record) !== was) await putRecord(kv, key, record);
     }
   }
   return { sent };
