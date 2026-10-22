@@ -4,7 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { legResult, applyResults, voidAt, lateOutcome, decidedSoFar, parseEspnResults, readOutcomes, topInning, runOrder, espnDates, sameSide, sideScore, sideOfGame, sidesMatch, parseOpenF1Flags, parseFutureResult, futureTeamName, asiaResult, teamCorners } from '../kit/settle.mjs';
-import { settleSlip, evaluateSlip, slipPayoutTable, slipOutlook, analyzeSlip, afterTax, prizeAfterTax, SLIP_RULES, combosBySize, comboCount, slipErrors, slipSizes, choose, maskChance, exclusiveMasks, estimateLineOdds, estimateFuturesOdds, estimateF1Odds, devigPower, devigTwoWay, devigProportional, americanToProbability, boostRate, seededRandom, quantile, median } from '../kit/play-odds.mjs';
+import { settleSlip, slipPayoutTable, afterTax, prizeAfterTax, SLIP_RULES, combosBySize, comboCount, slipErrors, slipSizes, choose, estimateLineOdds, estimateFuturesOdds, estimateF1Odds, devigPower, devigProportional, americanToProbability, boostRate, quantile, median } from '../kit/play-odds.mjs';
 import { houseRule, shadeLong, minLegsProblem, HOUSE_RULES, LONG_FROM } from '../kit/play-rules.mjs';
 import { GAMES, ticketPrize, parseDraw, cappedPrize, settleTicket, buyTicket, nextDraw, nextDraws, limits, drawTerm, tierName, closesAt, CLOSE_MS, checkSelection, betCount, expectedReturn, mergeTickets, addTickets, BINGO_DRAWS, GAME_ORDER } from '../kit/play-lottery.mjs';
 import { CARDS, CARD_ORDER, face, facePays, tiersOf, drawPrize, buyScratch, revealScratch, onSale, expectedReturn as scratchReturn } from '../kit/play-scratch.mjs';
@@ -377,7 +377,7 @@ test("Sports tax is per ticket: 20% off a slip whose whole prize is over NT$5,00
   assert.deepEqual(settleSlip({ legs: [{ odds: 3, result: 'lost' }], sizes: [1], stake: 100 }), { gross: 0, net: 0, taxed: 0 });
 });
 
-test('the odds math: combinations, exclusive picks, the expected payout against a brute force', () => {
+test('the odds math: combinations, the 過關 sizes', () => {
   assert.deepEqual(combosBySize([{ gameId: 'a' }, { gameId: 'a' }, { gameId: 'b' }]), [1, 3, 2]);
   assert.equal(comboCount([{}, {}, {}, {}], [2, 3]), 6 + 4);
   assert.deepEqual([choose(5, 2), choose(49, 6), choose(3, 4), choose(3, -1)], [10, 13_983_816, 0, 0]);
@@ -409,31 +409,6 @@ test('the odds math: combinations, exclusive picks, the expected payout against 
   assert.ok(slipErrors({ mode: 'single', legs: [{ cap: 'prop' }], sizes: [1], stake: 2_000 }).includes('ticketCapped'));
   assert.ok(slipErrors({ mode: 'single', legs: Array.from({ length: 13 }, () => ({})), sizes: [1], stake: 100 }).includes('tooManyLegs'));
   assert.deepEqual(slipErrors({ mode: 'single', legs: [], sizes: [], stake: 100 }), ['empty']);
-  // Both sides of one market: one draw, at most one wins.
-  const both = [{ gameId: 'g', market: 'ml', fairChance: 0.6, odds: 1.5 }, { gameId: 'g', market: 'ml', fairChance: 0.4, odds: 2.2 }];
-  assert.deepEqual(exclusiveMasks(both), [3]);
-  assert.equal(maskChance(both, 3), 0);
-  assert.ok(Math.abs(maskChance(both, 0)) < 1e-12);
-  // Expected payout: every way the legs land, by hand.
-  const rand = seededRandom(11);
-  for (let k = 0; k < 200; k++) {
-    const n = 1 + Math.floor(rand() * 5);
-    const legs = Array.from({ length: n }, (_, i) => ({ gameId: `g${i}`, odds: 1.2 + rand() * 6, fairChance: 0.1 + rand() * 0.8 }));
-    const sizes = [1 + Math.floor(rand() * n)];
-    const stake = 10 * (1 + Math.floor(rand() * 300));
-    let expectedNet = 0;
-    for (let won = 0; won < 1 << n; won++) {
-      let p = 1;
-      for (let i = 0; i < n; i++) p *= won & (1 << i) ? legs[i].fairChance : 1 - legs[i].fairChance;
-      expectedNet += p * settleSlip({ legs: legs.map((l, i) => ({ ...l, result: won & (1 << i) ? 'won' : 'lost' })), sizes, stake }).net;
-    }
-    const e = evaluateSlip({ legs, sizes, stake });
-    assert.ok(Math.abs(e.expectedNet - expectedNet) < 1e-6 * Math.max(1, expectedNet));
-    assert.ok(Math.abs(slipOutlook({ legs, sizes, stake }).mean - expectedNet) < 1e-6 * Math.max(1, expectedNet));
-    assert.ok(Math.abs(analyzeSlip({ legs, sizes, stake }).expectedNet - expectedNet) < 1e-6 * Math.max(1, expectedNet));
-    assert.ok(Math.abs(e.byHits.reduce((s, r) => s + r.chance, 0) - 1) < 1e-9);
-    assert.equal(slipPayoutTable({ legs, sizes, stake }).gross[(1 << n) - 1], e.best);
-  }
   assert.deepEqual([boostRate(2), boostRate(3), boostRate(7), boostRate(12), boostRate(3, 1.5), boostRate(3, 0)], [0, 0.05, 0.2, 0.2, 0.07500000000000001, 0]);
 });
 
@@ -451,8 +426,6 @@ test('prices from chances: never under 1.01, the long end capped, the books\' ma
   assert.equal(americanToProbability(100), 0.5);
   assert.equal(americanToProbability(0), null);
   assert.equal(americanToProbability('x'), null);
-  assert.equal(devigTwoWay(0.55, 0.55), 0.5);
-  assert.equal(devigTwoWay(0, 0.5), null);
   assert.deepEqual(devigProportional([0.5, 0.3, 0.3]).map(x => Math.round(x * 1e6) / 1e6), [0.454545, 0.272727, 0.272727]);
   assert.ok(Math.abs(devigPower([0.6, 0.3, 0.2]).reduce((s, p) => s + p, 0) - 1) < 1e-9);
   assert.deepEqual(devigPower([0, 0]), [0, 0]);

@@ -29,7 +29,7 @@
 // → sports/apple-mls.json: Apple TV's MLS games read so far ({ built, events:
 // { id: { id, url, start, teams } } }), each game's page read once.
 
-import { CATALOG, asiaMonthOf, asiaMonthUrl } from '../kit/catalog.mjs';
+import { CATALOG, ESPN_SITE as SITE, asiaMonthOf, asiaMonthUrl } from '../kit/catalog.mjs';
 import { teamNameZh } from '../kit/names.mjs';
 import * as HL from '../kit/sports-highlights.mjs';
 import { BROADCAST, eltaVodsOf, eltaVodUrl, eltaEpisode, eltaSessionEpisode, parseEltaIndex, eltaPages } from '../kit/sports-broadcast.mjs';
@@ -39,7 +39,6 @@ import { asiaBaseballResponse } from '../asia-baseball.js';
 import { keeps, keptFrom, seasonBegun, seasonState, yearSeason } from './season.js';
 import { within } from './within.js';
 
-const SITE = 'https://site.api.espn.com/apis/site/v2/sports';
 const DAY = 86_400_000;
 const KEEP = 10 * DAY;
 const HL_DAYS = 4 * DAY;

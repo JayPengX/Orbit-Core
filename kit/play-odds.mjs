@@ -69,12 +69,6 @@ export function americanToProbability(american) {
   return a > 0 ? 100 / (a + 100) : -a / (-a + 100);
 }
 
-// Removes a two-way book's margin by proportional rescaling.
-export function devigTwoWay(pA, pB) {
-  if (!(pA > 0) || !(pB > 0)) return null;
-  return pA / (pA + pB);
-}
-
 // Same, for any number of outcomes (soccer's home/draw/away).
 export function devigProportional(probabilities) {
   if (!probabilities.every(p => p > 0)) return null;
@@ -254,11 +248,6 @@ export function lotteryTotalLines(line, overFair, r = MLB_TOTAL_DISPERSION) {
   return [main - 1, main, main + 1].filter(l => l > 0).map(l => ({ line: l, over: totalOverChance(l, mu, r), main: l === main }));
 }
 
-// Every two-way MLB market the lottery posts (win, totals, run lines, team
-// totals) adds up to about this in implied chance: 81 markets, 10 games on
-// 2026-09-25 ranged 1.143-1.173.
-export const MLB_MARKET_OVERROUND = 1.158;
-
 // MLB run lines (讓分). The lottery posts DraftKings' 1.5-run line and the
 // 2.5 line on the same side, but doesn't use DraftKings' chances: it pulls
 // them toward 50/50 (so the side likelier to cover is underpriced: usually the
@@ -420,24 +409,6 @@ export function overround(oddsList) {
   return oddsList.reduce((s, o) => s + 1 / o, 0);
 }
 
-// The house's take on a market: the share of all money bet it keeps when
-// bets come in balanced, 1 - 1 / sum(1 / odds). At every price = fair odds / 1.15
-// that's 13%. `rels` are each price's relative margin; the take's margin
-// follows from them (d take = d overround / overround^2).
-export function houseTake(odds, rels = []) {
-  const total = odds.reduce((s, o) => s + 1 / o, 0);
-  const spread = odds.reduce((s, o, i) => s + (rels[i] ?? 0) / o, 0);
-  return { take: 1 - 1 / total, margin: spread / total ** 2 };
-}
-
-// Legs are independent games, so chances and odds both multiply.
-export function combineParlay(legs) {
-  return legs.reduce(
-    (acc, leg) => ({ odds: acc.odds * leg.odds, fairChance: acc.fairChance * leg.fairChance }),
-    { odds: 1, fairChance: 1 }
-  );
-}
-
 // Fair chance of every outcome for one game ({away, home} or {away, draw, home})
 // from whichever books price it, averaged: Kambi's first, DraftKings',
 // Polymarket's; the house's own only when none does. Two bookmakers far apart
@@ -560,33 +531,6 @@ export function combosBySize(legs) {
   }
   return poly;
 }
-// Picks that rule each other out: the same game and the same market (both
-// sides of a line, two winners of one race). They're one draw, not
-// independent: at most one of them wins. Masks of such groups (2+ legs).
-export function exclusiveMasks(legs) {
-  const groups = new Map();
-  legs.forEach((leg, i) => {
-    if (leg.gameId == null) return;
-    const key = `${leg.gameId}|${leg.market ?? ''}`;
-    groups.set(key, (groups.get(key) ?? 0) | (1 << i));
-  });
-  return [...groups.values()].filter(m => m & (m - 1));
-}
-// The chance of exactly the legs in `won` winning.
-export function maskChance(legs, won, groups = exclusiveMasks(legs)) {
-  let p = 1;
-  let grouped = 0;
-  for (const g of groups) {
-    grouped |= g;
-    const hit = won & g;
-    if (hit & (hit - 1)) return 0;
-    let sum = 0;
-    for (let i = 0; i < legs.length; i++) if (g & (1 << i)) sum += legs[i].fairChance;
-    p *= hit ? legs[Math.log2(hit)].fairChance : Math.max(0, 1 - sum);
-  }
-  for (let i = 0; i < legs.length; i++) if (!(grouped & (1 << i))) p *= won & (1 << i) ? legs[i].fairChance : 1 - legs[i].fairChance;
-  return p;
-}
 export function comboCount(legs, sizes) {
   const by = combosBySize(legs);
   return sizes.reduce((s, k) => s + (by[k] ?? 0), 0);
@@ -632,40 +576,6 @@ export function slipErrors({ mode, legs, sizes, stake }) {
   return errors;
 }
 
-// Everything about one ticket, exactly: every way the legs can land (2^n, at
-// most 4,096), and for each one every winning combination, taxed one by one.
-// Fair chances are treated as independent (different games).
-export function evaluateSlip({ legs, sizes, stake, boost = 0 }) {
-  const n = legs.length;
-  const combos = comboCount(legs, sizes);
-  const cost = combos * stake;
-  const table = slipPayoutTable({ legs, sizes, stake, boost });
-  const byHits = Array.from({ length: n + 1 }, (_, hits) => ({ hits, chance: 0, min: Infinity, max: 0 }));
-  let expected = 0;
-  let expectedNet = 0;
-  let anyPayout = 0;
-  let profit = 0;
-  let best = 0;
-  const groups = exclusiveMasks(legs);
-  for (let won = 0; won < 1 << n; won++) {
-    const chance = maskChance(legs, won, groups);
-    let m = 0;
-    for (let i = 0; i < n; i++) if (won & (1 << i)) m++;
-    const gross = table.gross[won];
-    const net = table.net[won];
-    expected += chance * gross;
-    expectedNet += chance * net;
-    if (gross > 0) anyPayout += chance;
-    if (net > cost) profit += chance;
-    if (gross > best) best = gross;
-    const row = byHits[m];
-    row.chance += chance;
-    row.min = Math.min(row.min, gross);
-    row.max = Math.max(row.max, gross);
-  }
-  return { combos, cost, best, expected, expectedNet, anyPayout, profit, byHits };
-}
-
 // What a ticket pays for every way its legs can land: index = bit mask of the
 // legs that won. Gross is capped per ticket; net takes Taiwan's tax off the
 // ticket's whole prize when it is over NT$5,000 (slipTaxed).
@@ -693,24 +603,6 @@ export function slipPayoutTable({ legs, sizes, stake, boost = 0 }) {
   return { gross, net };
 }
 
-// A ticket's outlook when bought: average payout after tax, its spread
-// (standard deviation) and the chance of any payout, over every way its legs
-// can land. Used to tell luck from the lottery's cut in the slip history.
-export function slipOutlook({ legs, sizes, stake, boost = 0 }) {
-  const { net } = slipPayoutTable({ legs, sizes, stake, boost });
-  const groups = exclusiveMasks(legs);
-  let mean = 0;
-  let square = 0;
-  let any = 0;
-  for (let won = 0; won < net.length; won++) {
-    const chance = maskChance(legs, won, groups);
-    mean += chance * net[won];
-    square += chance * net[won] ** 2;
-    if (net[won] > 0) any += chance;
-  }
-  return { mean, sd: Math.sqrt(Math.max(0, square - mean * mean)), any };
-}
-
 // What a finished ticket pays. Each leg is 'won', 'lost' or 'void' (called
 // off: the lottery counts it at odds 1.00, so a single gets its stake back
 // and a parlay goes on without it). Gross is before tax, net after.
@@ -724,82 +616,3 @@ export function settleSlip({ legs, sizes, stake, boost = 0 }) {
   return { gross: gross[mask], net: net[mask], taxed };
 }
 
-// A deep look at one ticket, all exact except the one-year outlook:
-// - every result (legs won) with its chance and after-tax payout;
-// - where each NT$100 goes: the lottery's cut, the tax, what comes back;
-// - each leg's own value and what the ticket would return without it;
-// - how rare the top payout is, and which results still make a profit;
-// - the heartbreak: the chance of missing by exactly one pick, and by which.
-export function analyzeSlip({ legs, sizes, stake, boost = 0 }) {
-  const n = legs.length;
-  const { gross, net } = slipPayoutTable({ legs, sizes, stake, boost });
-  const cost = comboCount(legs, sizes) * stake;
-  const chance = new Float64Array(1 << n);
-  const groups = exclusiveMasks(legs);
-  for (let won = 0; won < 1 << n; won++) {
-    chance[won] = maskChance(legs, won, groups);
-  }
-  let expectedGross = 0;
-  let expectedNet = 0;
-  let second = 0;
-  let paid = 0;
-  let profit = 0;
-  const byHits = Array.from({ length: n + 1 }, (_, hits) => ({ hits, chance: 0, min: Infinity, max: 0, profit: false }));
-  for (let won = 0; won < 1 << n; won++) {
-    const p = chance[won];
-    expectedGross += p * gross[won];
-    expectedNet += p * net[won];
-    second += p * net[won] * net[won];
-    if (gross[won] > 0) paid += p;
-    if (net[won] > cost) profit += p;
-    let hits = 0;
-    for (let i = 0; i < n; i++) if (won & (1 << i)) hits++;
-    const row = byHits[hits];
-    row.chance += p;
-    row.min = Math.min(row.min, net[won]);
-    row.max = Math.max(row.max, net[won]);
-    if (net[won] > cost) row.profit = true;
-  }
-  const all = (1 << n) - 1;
-  // Fewest legs won that can still show a profit.
-  const profitFrom = byHits.find(r => r.profit)?.hits ?? null;
-  // Each leg on its own (odds x chance) and the ticket without it.
-  const backPer100 = cost > 0 ? (expectedNet / cost) * 100 : 0;
-  const legInfo = legs.map((leg, i) => {
-    const rest = legs.filter((_, j) => j !== i);
-    const restSizes = [...new Set(sizes.map(k => Math.min(k, rest.length)))].filter(k => k >= 1);
-    const without = rest.length && restSizes.length ? evaluateSlip({ legs: rest, sizes: restSizes, stake }) : null;
-    return {
-      fairOdds: 1 / leg.fairChance,
-      value: leg.fairChance * leg.odds * 100,
-      without: without && without.cost > 0 ? (without.expectedNet / without.cost) * 100 : null
-    };
-  });
-  const weakest = legInfo.reduce((w, l, i) => (l.value < legInfo[w].value ? i : w), 0);
-
-  // One game short: exactly one pick lost, and which pick it was.
-  const lone = legs.map((_, i) => chance[all & ~(1 << i)]);
-  const nearMiss = n > 1 ? lone.reduce((x, y) => x + y, 0) : 0;
-  return {
-    cost,
-    combos: cost / stake,
-    expectedGross,
-    expectedNet,
-    backPer100,
-    sd: Math.sqrt(Math.max(0, second - expectedNet * expectedNet)),
-    // Per NT$100: the lottery's cut, the tax, and what comes back.
-    per100: cost > 0 ? { take: 100 - (expectedGross / cost) * 100, tax: ((expectedGross - expectedNet) / cost) * 100, back: backPer100 } : null,
-    paid,
-    profit,
-    profitFrom,
-    top: { chance: chance[all], net: net[all], gross: gross[all] },
-    // After-tax payout for every result (bit i set: leg i won), for draws.
-    net,
-    byHits,
-    legs: legInfo,
-    weakest,
-    // Chance each pick is the only one that lost, and of any one-short result.
-    lone,
-    nearMiss
-  };
-}

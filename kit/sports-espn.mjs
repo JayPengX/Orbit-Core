@@ -18,7 +18,7 @@
 // `localEvent(event, lang)` on the raw one. The proxy also sends it
 // `slimEvent`ed (what is empty or follows from another field left out;
 // `unslimEvent` puts it back exactly).
-import { CATALOG } from '#kit/catalog.mjs';
+import { CATALOG, ESPN_SITE, yyyymmdd } from '#kit/catalog.mjs';
 import { BROADCAST } from '#kit/sports-broadcast.mjs';
 import { teamLogo, raceName, countryName, countryCode, NBA_ID } from '#kit/logos.mjs';
 import { teamNameZh } from '#kit/names.mjs';
@@ -44,8 +44,8 @@ export const LEAGUES = Object.fromEntries(
     })
 );
 
-export const SITE = 'https://site.api.espn.com/apis/site/v2/sports';
-export const yyyymmdd = date => date.toISOString().slice(0, 10).replaceAll('-', '');
+export const SITE = ESPN_SITE;
+export { yyyymmdd };
 
 // ---- Parsing: statuses and sides --------------------------------------------------
 

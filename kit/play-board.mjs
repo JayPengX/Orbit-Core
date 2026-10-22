@@ -28,10 +28,9 @@ import {
 } from '#kit/play-odds.mjs';
 import { pointsModel, pointsMarkets, goalMarkets, fitHockey, hockeyWinner, baseballMarkets, marketOdds } from '#kit/play-markets.mjs';
 import { fitGoals } from '#kit/play-live.mjs';
-import { houseCut, houseRule, withRules, shadeLong } from '#kit/play-rules.mjs';
+import { houseCut, houseRule, withRules } from '#kit/play-rules.mjs';
 import { withModelLines } from '#kit/play-lines.mjs';
 import { LEAGUES, familyOf, isSoccer } from '#kit/play-teams.mjs';
-import { atLeast } from '#kit/play-propmodel.mjs';
 
 // Lines besides the lottery's own: totals this many either side of the main
 // line, team totals this many, run lines up to 4.5 runs either way.
@@ -367,77 +366,6 @@ const PART_KINDS = new Set(['htft', 'htotal', 'hrunline', 'f5', 'f5total', 'f5ru
 
 // ---- F1: 前三名 (podium) --------------------------------------------------------
 
-// Pole position from the race winner's chances when no market prices it:
-// the same order, a little sharper (qualifying is pace alone, no strategy or
-// incidents; the pole sitter goes on to win about 45% of races).
-export const POLE_SHARPEN = 1.2;
-export function f1PoleFromWinner(drivers) {
-  const w = drivers.map(d => Math.max(0, d.fair) ** POLE_SHARPEN);
-  const sum = w.reduce((a, b) => a + b, 0) || 1;
-  return drivers.map((d, i) => ({ name: d.name, fair: w[i] / sum }));
-}
-
-// Pole position, our own estimate, and how far to trust a market's (Polymarket
-// opens its pole market days before qualifying with next to nothing traded:
-// every one of the first fifteen near 8%, a board the house would lose on).
-//   form     each driver's qualifying places in the season's last sessions,
-//            newest first ([{ name, places: [1, 3, …] }]): strength by how
-//            near the front, recent ones counting most
-//   winners  the race winner's chances (the bookmakers' board, liquid)
-//   market   { drivers: [{ name, fair }], volume } or null
-// The estimate is half form, half the winner board (form alone without one);
-// the market counts as much as it's traded (all of it from $100k) and as it
-// tells the drivers apart (none when it's flat).
-const nameKey = n => {
-  const s = String(n || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-  const last = s.includes(',') ? s.split(',')[0] : s.split(/\s+/).at(-1);
-  return last.replace(/[^a-z]/g, '');
-};
-export const POLE_FORM = { sessions: 6, decay: 0.75, spread: 2.2, sharpen: 1.5, marketFull: 100_000 };
-export function f1PoleModel({ form = [], winners = [], market = null } = {}) {
-  const C = POLE_FORM;
-  const names = new Map();
-  for (const d of [...winners, ...form, ...(market?.drivers || [])]) if (!names.has(nameKey(d.name))) names.set(nameKey(d.name), d.name);
-  const norm = m => {
-    const sum = [...m.values()].reduce((a, b) => a + b, 0);
-    return sum > 0 ? new Map([...m].map(([k, v]) => [k, v / sum])) : null;
-  };
-  // Form: each session's place as a weight (1st 1, falling away), newest first.
-  const fm = new Map();
-  for (const d of form) {
-    const places = (d.places || []).slice(0, C.sessions);
-    let w = 0;
-    let s = 0;
-    places.forEach((q, i) => {
-      if (!(q > 0)) return;
-      const r = C.decay ** i;
-      w += r;
-      s += r * Math.exp(-(q - 1) / C.spread);
-    });
-    if (w) fm.set(nameKey(d.name), (s / w) ** C.sharpen);
-  }
-  const fromForm = norm(fm);
-  const fromWin = winners.length ? norm(new Map(f1PoleFromWinner(winners).map(d => [nameKey(d.name), d.fair]))) : null;
-  const keys = [...names.keys()];
-  let model = new Map(keys.map(k => [k, fromForm && fromWin ? 0.5 * (fromForm.get(k) || 0) + 0.5 * (fromWin.get(k) || 0) : (fromForm || fromWin)?.get(k) || 0]));
-  if (![...model.values()].some(v => v > 0)) model = null;
-  // The market's weight: traded, and telling the drivers apart.
-  let w = 0;
-  const mk = market?.drivers?.length ? norm(new Map(market.drivers.map(d => [nameKey(d.name), d.fair]))) : null;
-  if (mk) {
-    const n = mk.size;
-    const top = Math.max(...mk.values());
-    const sharp = Math.max(0, Math.min(1, (top * n - 1) / 3));
-    const traded = Math.max(0, Math.min(1, (Number(market.volume) || 0) / C.marketFull));
-    // (A bookmaker's own board, volume Infinity, is a price set by people
-    // who'd lose on it: taken whole.)
-    w = !model || market.volume === Infinity ? 1 : sharp * traded;
-  }
-  const out = keys.map(k => ({ name: names.get(k), fair: (model?.get(k) || 0) * (1 - w) + (mk?.get(k) || 0) * w }));
-  const sum = out.reduce((a, d) => a + d.fair, 0) || 1;
-  return { drivers: out.map(d => ({ ...d, fair: d.fair / sum })).filter(d => d.fair > 0).sort((a, b) => b.fair - a.fair), marketWeight: w };
-}
-
 // Each driver's chance of a top-three finish from the win chances (Harville:
 // second place goes as the win chances of the rest, and so on), priced to
 // return what the race's winner board does on average (the lottery takes
@@ -470,68 +398,30 @@ export function f1Podium(drivers) {
   });
 }
 
-// More F1 markets from the same win chances: each driver's chance of a top
-// six or top ten finish, of beating their teammate, and each team's chance
-// of the win. Finishing orders are drawn by Harville (the next place goes as
-// the win chances of the drivers left), 40,000 times with a fixed seed, so
-// the board is the same on every device. Priced like the podium: to return
-// what the winner board does on average, at most 500.
-export function f1Markets(drivers, { runs = 40_000, seed = 7 } = {}) {
-  const n = drivers.length;
-  const p = drivers.map(d => Math.max(1e-6, d.fair));
-  let a = seed >>> 0;
-  const rand = () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-  const top6 = new Float64Array(n);
-  const top10 = new Float64Array(n);
-  const place = new Int32Array(n);
-  const teams = [...new Set(drivers.map(d => d.team).filter(Boolean))];
-  const pairs = teams.map(team => drivers.map((d, i) => (d.team === team ? i : -1)).filter(i => i >= 0)).filter(x => x.length === 2);
-  const ahead = pairs.map(() => 0);
-  const left = new Float64Array(n);
-  for (let r = 0; r < runs; r++) {
-    left.set(p);
-    let total = p.reduce((x, y) => x + y, 0);
-    for (let pos = 0; pos < n; pos++) {
-      let u = rand() * total;
-      let k = 0;
-      while (k < n - 1 && (left[k] === 0 || (u -= left[k]) > 0)) k++;
-      if (left[k] === 0) k = left.findIndex(v => v > 0);
-      place[k] = pos;
-      total -= left[k];
-      left[k] = 0;
-      if (pos < 6) top6[k]++;
-      if (pos < 10) top10[k]++;
-    }
-    pairs.forEach(([i, j], x) => place[i] < place[j] && ahead[x]++);
-  }
-  const sum = p.reduce((x, y) => x + y, 0) || 1;
-  const back = drivers.reduce((s, d) => s + (d.fair / sum) * d.fair * d.odds, 0);
-  const price = (fair, kind) => {
-    const odds = Math.min(500, Math.max(1.01, Math.round((back / Math.min(0.995, fair)) * 100) / 100));
-    return { fair: Math.min(0.995, fair), odds, ...houseRule(kind, odds) };
-  };
-  // Yes-or-no markets (a teammate ahead, a top six, a top ten) at a two-way
-  // market's cut, as every sport's two-way lines are: the outright board's
-  // 20% made a 95% favourite 1.01 and locked it, and its rival long.
-  const twoWay = houseCut({ base: 'twoWay' });
-  const line = (fair, kind) => {
-    const f = Math.min(0.995, fair);
-    const odds = shadeLong(kind, Math.min(500, estimateLineOdds(f, twoWay)));
-    return { fair: f, odds, ...houseRule(kind, odds) };
-  };
-  return {
-    top6: drivers.map((d, i) => line(top6[i] / runs, 'f1top6')),
-    top10: drivers.map((d, i) => line(top10[i] / runs, 'f1top10')),
-    h2h: pairs.flatMap(([i, j], x) => {
-      const pi = ahead[x] / runs;
-      return [{ driver: i, rival: j, ...line(pi, 'f1h2h') }, { driver: j, rival: i, ...line(1 - pi, 'f1h2h') }];
-    }),
-    teams: teams.map(team => price(drivers.reduce((s, d) => s + (d.team === team ? d.fair / sum : 0), 0), 'f1team')).map((x, k) => ({ team: teams[k], ...x }))
-  };
+// ---- Counts: P(X >= k), negative binomial (the corners line) ----
+
+function logFact(n) {
+  let s = 0;
+  for (let i = 2; i <= n; i++) s += Math.log(i);
+  return s;
+}
+// P(X >= k) for a negative binomial with mean m (r: dispersion; huge: Poisson).
+function atLeast(m, k, r = 1e6) {
+  if (k <= 0) return 1;
+  if (!(m > 0)) return 0;
+  const p = r / (r + m);
+  let below = 0;
+  for (let i = 0; i < k; i++) below += Math.exp(logGamma(i + r) - logGamma(r) - logFact(i) + r * Math.log(p) + i * Math.log(1 - p));
+  return Math.max(0, Math.min(1, 1 - below));
+}
+function logGamma(x) {
+  // Lanczos.
+  const g = 7;
+  const c = [0.99999999999980993, 676.5203681218851, -1259.1392167224028, 771.32342877765313, -176.61502916214059, 12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7];
+  if (x < 0.5) return Math.log(Math.PI / Math.sin(Math.PI * x)) - logGamma(1 - x);
+  x -= 1;
+  let a = c[0];
+  const t = x + g + 0.5;
+  for (let i = 1; i < g + 2; i++) a += c[i] / (x + i);
+  return 0.5 * Math.log(2 * Math.PI) + (x + 0.5) * Math.log(t) - t + Math.log(a);
 }

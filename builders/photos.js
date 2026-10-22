@@ -16,11 +16,10 @@
 // sports/cutouts/photos.json ({ built, players, none }) and
 // sports/cutouts/pending.json ({ built, names }).
 
-import { CATALOG } from '../kit/catalog.mjs';
+import { CATALOG, ESPN_SITE as SITE } from '../kit/catalog.mjs';
 import { OFFICIAL, photoList, clubFits, nameKey, CUTOUT_LEAGUES, pendingNames, cutouts } from './official-photos.js';
 import { within } from './within.js';
 
-const SITE = 'https://site.api.espn.com/apis/site/v2/sports';
 
 // The Premier League's own photos (ESPN has none for footballers: its soccer
 // headshots answer 404). The league's API lists this season's players with

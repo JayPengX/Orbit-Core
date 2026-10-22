@@ -17,7 +17,6 @@ export function normalizeTeamName(name) {
     .trim();
 }
 
-
 // ---- Team logos ------------------------------------------------------------------
 
 // ESPN's logo files: MLB by abbreviation, soccer clubs by ESPN id.
@@ -345,12 +344,6 @@ export const small = url => {
   return m ? `https://a.espncdn.com/combiner/i?img=/i/${m[1]}&w=192&h=192` : url;
 };
 
-// A league's logo as drawn everywhere (a chip, a tile, a rail, a title):
-// its dark-screen version on a dark screen, so no place shows the light one
-// there (Jay 2026-10-21: the purple lion on a dark 英超 chip).
-export function leaguePicture(key, cls, fallback) {
-  return logoPicture(leagueLogo(key), leagueLogo(key, true), cls, fallback);
-}
 export function logoPicture(light, dark, cls, fallback, { guess = false } = {}) {
   if (!light || knownBad(light)) return fallback();
   const img = document.createElement('img');

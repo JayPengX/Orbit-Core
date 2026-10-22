@@ -17,14 +17,13 @@
 // A league-year with a month that can't be read isn't written (the last
 // pack stays). A year no longer kept goes.
 
-import { CATALOG, asiaMonthUrl } from '../kit/catalog.mjs';
+import { CATALOG, ESPN_SITE as SITE, asiaMonthUrl } from '../kit/catalog.mjs';
 import { mirrorPath } from '../kit/mirror.mjs';
 import { twDay } from '../kit/format.mjs';
 import { asiaBaseballResponse } from '../asia-baseball.js';
 import { keptFrom, seasonBounds, seasonState, yearSeason } from './season.js';
 import { within } from './within.js';
 
-const SITE = 'https://site.api.espn.com/apis/site/v2/sports';
 const DAY = 86_400_000;
 
 // What no app reads of a scoreboard (the heavy part of it).

@@ -168,15 +168,6 @@ export const eltaDays = programs => {
   return days.length ? { from: days[0], to: days.at(-1) } : null;
 };
 
-// Two names for one side ("里茲聯" and "利茲聯", "海盜" and "匹茲堡海盜"): two
-// characters in a row in common.
-export function zhSame(a, b) {
-  const [x, y] = [String(a || ''), String(b || '')];
-  if (!x || !y) return false;
-  if (x.includes(y) || y.includes(x)) return true;
-  for (let i = 0; i < x.length - 1; i++) if (y.includes(x.slice(i, i + 2))) return true;
-  return false;
-}
 // How alike two ways of writing a side are, 0 to 1: the characters they
 // share in order, against the shorter one. ELTA's names are often not ours:
 // 波赫 for 波士尼亞與赫塞哥維納 and 波圖 for 波爾圖 (1), 帕弗斯 for 帕福斯

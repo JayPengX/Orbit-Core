@@ -12,14 +12,13 @@
 // → winprob/<league>/<YYYY-MM>.json ({ games: { key: line | { none } } }, the
 // format the kit's sports-winprob.mjs reads) and winprob/index.json.
 
-import { CATALOG, asiaMonthUrl, asiaMonthOf } from '../kit/catalog.mjs';
+import { CATALOG, ESPN_SITE as SITE, asiaMonthUrl, asiaMonthOf } from '../kit/catalog.mjs';
 import { mirrorPath } from '../kit/mirror.mjs';
 import { polymarketLine, packLine, gameKey, PM_LEAGUE, PM_PACK, raceLine, raceLaps, raceEvents, packRace, raceKey } from '../kit/sports-winprob.mjs';
 import { asiaBaseballResponse } from '../asia-baseball.js';
 import { seasonState, yearSeason, keeps, keptFrom } from './season.js';
 import { within } from './within.js';
 
-const SITE = 'https://site.api.espn.com/apis/site/v2/sports';
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 // A game's market can take a while to settle; two days on without one, none.

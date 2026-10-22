@@ -1238,15 +1238,6 @@ export function backfillPrice(order, bars, now = Date.now()) {
   return null;
 }
 
-// Fills an open order at a price found in the history, dated then. `twd`:
-// NT$ per unit of its currency at that moment.
-export function fillFromHistory(account, orderId, { t, price }, twd, now = Date.now()) {
-  const order = account.orders.find(o => o.id === orderId && o.status === 'open');
-  if (!order || !(twd > 0)) return { account };
-  const r = fillOrder(account, order, price, { [order.currency]: twd }, now, Math.min(t, now));
-  return { account: r.account, fill: r.fill, order: r.order };
-}
-
 // ---- Currency exchange -------------------------------------------------------
 
 export function fxSpread(from, to, fxOpen = true, t = Date.now()) {

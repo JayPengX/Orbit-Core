@@ -78,6 +78,36 @@ export const CATALOG = {
 // Play's kind of markets for a sport.
 export const familyOfSport = sport => sport;
 
+// Every league Play prices (`sold: true`: only those it still sells; the
+// rest stay for settling older slips): its kind of markets (family) and
+// where its games and odds come from: an ESPN `path` (its schedule and
+// results) with Kambi's list as its first price (`book`), or a `kambi` list
+// alone (its schedule and prices; Asian baseball also its league's month
+// lists, `schedule`). Keyed by Play's key (`bet`). One table for Play's
+// board (play-teams.mjs) and the settling (settle.mjs).
+export function playLeagues({ sold = false } = {}) {
+  return Object.fromEntries(
+    Object.values(CATALOG)
+      .filter(l => l.bet && l.odds && (!sold || l.sold !== false))
+      .map(l => {
+        const league = { family: familyOfSport(l.sport) };
+        if (l.odds === 'espn') {
+          league.path = l.espn;
+          if (l.kambi) league.book = l.kambi;
+        } else {
+          league.kambi = l.kambi;
+          if (l.data === 'asia') league.schedule = { asia: l.asia };
+        }
+        for (const k of ['logo', 'icon', 'badge', 'top']) if (l[k] !== undefined) league[k] = l[k];
+        return [l.bet, league];
+      })
+  );
+}
+
+// ESPN's site API (scoreboards, summaries, teams) and its dates (YYYYMMDD, UTC).
+export const ESPN_SITE = 'https://site.api.espn.com/apis/site/v2/sports';
+export const yyyymmdd = date => date.toISOString().slice(0, 10).replaceAll('-', '');
+
 // How far ahead Play sells a game (and Orbit Sports shows its 投注): one reach
 // for every league and every price, a bookmaker's or the house's own (Play's
 // house.mjs). Two weeks: the next two soccer matchweeks (an international

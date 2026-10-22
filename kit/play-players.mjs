@@ -1,18 +1,16 @@
 // The players of one game, from ESPN: each team's roster (who's on it, their
 // headshot, an injury) and their season numbers (soccer: on the roster; the
 // other sports: the league's list of every player's season, read once a
-// league). Play's own model prices players' markets from these
-// (propmodel.mjs) wherever Kambi doesn't, and Kambi's players get their
-// pictures from them.
+// league). Kambi's players get their pictures from them.
 //
 // A player: { id, name, side: 'home' | 'away', pos, photo, out, gp, totals }
 // with `totals` the season's numbers under the board's stat names
 // (props.mjs), `gp` the games they're over.
 import { LEAGUES, familyOf } from '#kit/play-teams.mjs';
-import { normPlayer } from '#kit/play-props.mjs';
 import { espnHeadshot, smallPhoto } from '#kit/photo-urls.mjs';
 
-export const ESPN_SITE = 'https://site.api.espn.com/apis/site/v2/sports';
+import { ESPN_SITE } from '#kit/catalog.mjs';
+export { ESPN_SITE };
 export const ESPN_COMMON = 'https://site.api.espn.com/apis/common/v3/sports';
 export const rosterUrl = (path, teamId) => `${ESPN_SITE}/${path}/teams/${encodeURIComponent(teamId)}/roster`;
 // ESPN answers at most 1,000 players a page (asked for more, it sends 25).
@@ -177,17 +175,3 @@ export async function loadGamePlayers(game, getJson) {
   return players;
 }
 
-// A player of the game by name (Kambi's spelling): same name, else the same
-// last name and first initial.
-export function playerByName(players, name) {
-  if (!players?.length) return null;
-  const key = normPlayer(name);
-  const same = players.find(p => normPlayer(p.name) === key);
-  if (same) return same;
-  const words = key.split(' ');
-  const near = players.filter(p => {
-    const w = normPlayer(p.name).split(' ');
-    return w.at(-1) === words.at(-1) && w[0]?.[0] === words[0]?.[0];
-  });
-  return near.length === 1 ? near[0] : null;
-}
