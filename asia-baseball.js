@@ -7,7 +7,7 @@
 //   KBO   koreabaseball.com's monthly schedule list (a POST answered in JSON rows)
 //   CPBL  TheSportsDB's day lists (CPBL's own site turns addresses outside Taiwan away)
 //
-// Served by the sports proxy as if from `https://asia-baseball.quadra/<league>/<YYYY-MM>.json`,
+// Served by the sports proxy as if from `https://asia-baseball.orbit/<league>/<YYYY-MM>.json`,
 // so the apps read it through proxyJson like any other list:
 //   { league, month, games: [{ id, start, home: { en, zh }, away, homeScore,
 //     awayScore, state: 'pre' | 'in' | 'post' | 'void', venue }] }
@@ -15,7 +15,7 @@
 
 import { parseTsdbDay, TSDB_DAY, TSDB_CPBL } from './kit/catalog.mjs';
 
-export const ASIA_HOST = 'asia-baseball.quadra';
+export const ASIA_HOST = 'asia-baseball.orbit';
 
 // Each club: the source's name -> English (the logo tables' spelling) and Taiwan's name.
 const NPB_TEAMS = {

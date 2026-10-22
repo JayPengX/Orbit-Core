@@ -1,6 +1,6 @@
 // ---- kit/lang.mjs: the reader's language, the same in every app ----
 // What each app kept its own copy of (Weather's lang.mjs, Words' and
-// Securities' i18n.mjs): the language picked in any Quadra app (else the
+// Securities' i18n.mjs): the language picked in any Orbit app (else the
 // phone's), a word-pair helper for short labels, and `makeT` for an app's
 // string tables.
 //
@@ -9,8 +9,8 @@
 //   const t = makeT({ zh: { hello: '你好 {name}' }, en: { hello: 'Hello {name}' } });
 //   t('hello', { name: 'Amy' });
 
-// The one language detector is quadra.mjs's (a saved choice, else the phone's; 'zh' or 'en').
-import { detectLang } from '#kit/quadra.mjs';
+// The one language detector is orbit.mjs's (a saved choice, else the phone's; 'zh' or 'en').
+import { detectLang } from '#kit/orbit.mjs';
 
 // The language of this page. Under Node (the tests) Chinese, as the apps are written.
 export const lang = typeof document === 'undefined' ? 'zh' : detectLang();

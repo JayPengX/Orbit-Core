@@ -1,5 +1,5 @@
-// ---- quadra-token.js ----
-// Signed Quadra Pass tokens, shared by both Workers (worker.js's /eco signs
+// ---- orbit-token.js ----
+// Signed Orbit Pass tokens, shared by both Workers (worker.js's /eco signs
 // them, sports.js only checks them).
 //
 // A token is `<body>.<sig>`: body is base64url JSON, sig its HMAC-SHA256
@@ -56,7 +56,7 @@ const earlier = new Map();
 const derivedOf = new Map();
 export async function tokenSecret(env) {
   const k = env.FIREBASE_PRIVATE_KEY || '';
-  if (k && !derivedOf.has(k)) derivedOf.set(k, b64url(new Uint8Array(await crypto.subtle.digest('SHA-256', enc.encode(`quadra-token:${k}`)))));
+  if (k && !derivedOf.has(k)) derivedOf.set(k, b64url(new Uint8Array(await crypto.subtle.digest('SHA-256', enc.encode(`orbit-token:${k}`)))));
   const derived = k ? derivedOf.get(k) : '';
   if (!env.ECO_TOKEN_SECRET) return derived;
   if (derived && derived !== env.ECO_TOKEN_SECRET) earlier.set(env.ECO_TOKEN_SECRET, derived);
@@ -101,7 +101,7 @@ export async function readToken(secret, token, kind, now = Date.now()) {
 export const HANDOFF_MS = 3 * 60_000;
 
 async function sealKey(secret) {
-  const raw = await crypto.subtle.digest('SHA-256', enc.encode(`quadra-seal:${secret}`));
+  const raw = await crypto.subtle.digest('SHA-256', enc.encode(`orbit-seal:${secret}`));
   return crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
 }
 
@@ -128,7 +128,7 @@ export async function unseal(secret, text) {
 // ---- A limiter that never touches KV --------------------------------------------
 //
 // Requests carrying a valid token are counted per session in the isolate's
-// memory only: the token already proves a real Quadra Pass is behind them, so
+// memory only: the token already proves a real Orbit Pass is behind them, so
 // the per-IP KV counters (a KV write per busy minute per IP) aren't needed.
 const counts = new Map();
 export function sessionLimited(sid, limit, windowMs = 60_000, now = Date.now()) {

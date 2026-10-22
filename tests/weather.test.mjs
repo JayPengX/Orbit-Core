@@ -265,7 +265,7 @@ test('CWA warnings for the county', () => {
   assert.ok(w[0].from < w[0].to);
 });
 
-test('/weather: a Quadra Pass session, a place or where the IP says', async () => {
+test('/weather: a Orbit Pass session, a place or where the IP says', async () => {
   const e = { ...env, RATE_LIMIT_KV: memKv() };
   const get = (q, opts) => handleWeather(new Request('https://w.example/weather' + q), e, {}, '/weather', { fetchFn: upstream(), cf: undefined, session: { s: 'x' }, ...opts });
   assert.equal((await get('?lat=25.03&lon=121.56', { session: null })).status, 401);

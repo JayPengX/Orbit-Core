@@ -1,4 +1,4 @@
-// Quadra's loading screen and first update check, shared by every app (a
+// Orbit's loading screen and first update check, shared by every app (a
 // classic script, loaded right after <div id="loading"> so it runs before
 // the app's modules): the kit's copy, synced as public/boot.js. Never edit
 // an app's copy.
@@ -21,7 +21,7 @@
 //   window.__fxStarted and hides #loading itself (the kit does).
 (function () {
   // A phone or a tablet (an iPad says Macintosh, with touch): the phone's
-  // frame, set before the first paint (quadra.css .q-touch).
+  // frame, set before the first paint (orbit.css .q-touch).
   var ua = navigator.userAgent || '';
   if (/iPhone|iPad|iPod|Android/i.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) document.documentElement.classList.add('q-touch');
   // The Worker's connection (DNS, TCP, TLS: two or three round trips on a
@@ -45,7 +45,7 @@
   box.innerHTML =
     '<div class="q-boot-box">' +
     '<img class="q-boot-logo" alt="" width="72" height="72">' +
-    '<p class="q-boot-brand">' + (/^Orbit/.test(title) ? 'ORBIT' : 'QUADRA') + '</p>' +
+    '<p class="q-boot-brand">' + 'ORBIT' + '</p>' +
     '<p class="q-boot-title"></p>' +
     '<div class="q-boot-bar" aria-hidden="true"><i></i></div>' +
     '<p class="q-boot-step"></p>' +
@@ -77,7 +77,7 @@
   };
   paint();
   step.textContent = L('載入中…', 'Loading…');
-  var countKey = 'quadra.bootFiles:' + location.pathname;
+  var countKey = 'orbit.bootFiles:' + location.pathname;
   var expected = 0;
   try {
     expected = Number(localStorage.getItem(countKey)) || 0;
@@ -220,7 +220,7 @@
   // Tries this session for this page (its version): mended and reloaded
   // up to 5 times, further apart each time (the CDN keeps a file at most
   // 10 minutes; it's usually seconds).
-  var healKey = 'quadra.bootHeal:' + location.pathname;
+  var healKey = 'orbit.bootHeal:' + location.pathname;
   var healWait = [0, 4000, 12000, 30000, 60000];
   var tried = function () {
     try {
@@ -279,7 +279,7 @@
   var broke = function (message) {
     fail(typeof message === 'string' ? message : '');
   };
-  window.__quadraFail = window.__fxFail = window.__oddsFail = window.__stockFail = broke;
+  window.__orbitFail = window.__fxFail = window.__oddsFail = window.__stockFail = broke;
   // Before it starts: an error in its code (an old file with a new one), or
   // one of its own scripts that didn't come (the service worker's 503 for a
   // file the CDN hasn't updated yet). (A picture, or another site's script
@@ -323,7 +323,7 @@
 
   // A newer deploy than this page (or a newer kit): load it now, before the
   // app starts, both in one reload (the kit's version and file hashes noted
-  // for the loader, quadra.kit and quadra.kitFiles). A reload that came back
+  // for the loader, orbit.kit and orbit.kitFiles). A reload that came back
   // on the old page (the CDN a moment behind) is tried again, up to 3 times a
   // session.
   var meta = document.querySelector('meta[name="build-version"]');
@@ -333,7 +333,7 @@
   setTimeout(function () {
     if (ctl) ctl.abort();
   }, 6000);
-  var kit = window.QUADRA_KIT || {};
+  var kit = window.ORBIT_KIT || {};
   var read = function (url) {
     return fetch(url + '?t=' + Date.now(), { cache: 'no-store', signal: ctl && ctl.signal })
       .then(function (r) {
@@ -365,16 +365,16 @@
     // loader's addresses, so only the files that changed are fetched).
     if (kitLatest) {
       try {
-        if (localStorage.getItem('quadra.kit') !== kitLatest) localStorage.setItem('quadra.kit', kitLatest);
+        if (localStorage.getItem('orbit.kit') !== kitLatest) localStorage.setItem('orbit.kit', kitLatest);
         var files = got[1].files ? JSON.stringify({ version: kitLatest, files: got[1].files }) : null;
-        if (files && localStorage.getItem('quadra.kitFiles') !== files) localStorage.setItem('quadra.kitFiles', files);
+        if (files && localStorage.getItem('orbit.kitFiles') !== files) localStorage.setItem('orbit.kitFiles', files);
       } catch (e) {}
     }
     if (!appNew && !kitNew) return got[0] && (got[1] || !kit.base) ? 'none' : 'watch';
     // (An app already on screen leaves it to the watch; one still behind
     // this loading screen is reloaded now, before anything shows.)
     if (box.hidden) return 'watch';
-    var flag = 'quadra.bootTo:' + location.pathname;
+    var flag = 'orbit.bootTo:' + location.pathname;
     var want = (appNew ? latest : current) + '|' + (kitLatest || '');
     var was = String(sessionStorage.getItem(flag) || '').split('#');
     var tries = was[0] === want ? Number(was[1]) || 0 : 0;

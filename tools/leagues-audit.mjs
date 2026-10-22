@@ -42,7 +42,7 @@ const now = Date.now();
 async function fixtures(key, l) {
   if (l.data === 'asia') {
     const months = [-1, 0, 1].map(d => new Date(Date.UTC(new Date(now).getUTCFullYear(), new Date(now).getUTCMonth() + d, 1)).toISOString().slice(0, 7));
-    const lists = await Promise.all(months.map(async m => JSON.parse(await (await asiaBaseballResponse(new URL(`https://asia-baseball.quadra/${l.asia}/${m}.json`))).text()).games || []));
+    const lists = await Promise.all(months.map(async m => JSON.parse(await (await asiaBaseballResponse(new URL(`https://asia-baseball.orbit/${l.asia}/${m}.json`))).text()).games || []));
     const games = lists.flat();
     const next = games.filter(g => Date.parse(g.start) > now).sort((a, b) => a.start.localeCompare(b.start))[0];
     return { n: games.length, next: next?.start };

@@ -1,10 +1,10 @@
-// Quadra's money as a whole, for the admin page: the same four sides the
-// Securities' 真相 shows one account (kit/quadra.mjs moneySides), added up over
+// Orbit's money as a whole, for the admin page: the same four sides the
+// Securities' 真相 shows one account (kit/orbit.mjs moneySides), added up over
 // every account, plus what deleted accounts took with them.
 //
 //   given   what the system paid in: opening money, weekly pay, wealth-rank
 //           rewards, and the rest (admin grants, rebases)
-//   quadra  what Quadra earned, signed: Play's settled bets from the house's
+//   orbit  what Orbit earned, signed: Play's settled bets from the house's
 //           side (stakes kept less payouts), overdraft interest and loan costs
 //   gov     the government, from the player's side: 急難紓困 in, less every
 //           tax out (Play's `snap.odds.gov`: sports and lottery prize tax;
@@ -60,20 +60,20 @@ export function sidesOf(wallet) {
   const worth = pool + num(wallet?.snap?.stock?.holdings) + atStake;
   const given = gave.start + gave.pay + gave.rank + gave.other;
   const gov = govOf(wallet);
-  // Quadra's side from the house's view: above 0 when it kept more. Play's
+  // Orbit's side from the house's view: above 0 when it kept more. Play's
   // payouts came in after tax: the tax was the government's, not the house's.
-  const quadra = fees.od + fees.loan - play - gov.paid.sports - gov.paid.lottery;
-  const own = worth - given + quadra - gov.net;
+  const orbit = fees.od + fees.loan - play - gov.paid.sports - gov.paid.lottery;
+  const own = worth - given + orbit - gov.net;
   const r = n => Math.round(n);
   const markets = (pl, sign) => Object.fromEntries(Object.entries(pl && typeof pl === 'object' ? pl : {}).filter(([, v]) => Number.isFinite(v)).map(([k, v]) => [k, r(sign * v)]));
   return {
     accounts: 1,
     given: r(given),
     gave: Object.fromEntries(Object.entries(gave).map(([k, v]) => [k, r(v)])),
-    quadra: r(quadra),
+    orbit: r(orbit),
     fees: { od: r(fees.od), loan: r(fees.loan) },
     play: r(-play),
-    // Play by sport from the house's side (a player's loss is Quadra's earning).
+    // Play by sport from the house's side (a player's loss is Orbit's earning).
     playBy: markets(wallet?.snap?.odds?.pl, -1),
     gov,
     own: r(own),
@@ -94,7 +94,7 @@ export function addSides(a = {}, b = {}) {
 }
 
 // An account deleted for good: its sides added to the retired ledger, so
-// the totals still hold what it was given, what Quadra earned from it and
+// the totals still hold what it was given, what Orbit earned from it and
 // what it made, and its worth counts as returned to the system.
 export async function retire(env, deps, wallet) {
   if (!wallet) return;

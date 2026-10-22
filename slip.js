@@ -1,7 +1,7 @@
 // ---- slip.js: /slip-scan, Orbit Slips' ticket photo read (jaypengx.github.io/Orbit-Slips) ----
 
 import { paceOf } from './pace.js';
-import { sessionLimited, readToken, tokenSecret } from './quadra-token.js';
+import { sessionLimited, readToken, tokenSecret } from './orbit-token.js';
 import { json, LOCAL_ORIGIN, bodyText } from './http.js';
 
 const ORIGIN = 'https://jaypengx.github.io';
@@ -14,7 +14,7 @@ const twDay = (now = Date.now()) => new Date(now + 8 * 3_600_000).toISOString().
 // Google is busy. Tight because there's no Pass: 2 a minute, 6 an hour and
 // 12 a day an address, and 150 a day in all, counted in D1 every time (a
 // failed count turns the ask away). Stopped from the guard's pace 2.
-// Scans: with a Quadra Pass (qt, Orbit Slips' session) counted per account,
+// Scans: with a Orbit Pass (qt, Orbit Slips' session) counted per account,
 // 3 a minute and 30 a day; without one, per address as before. 400 a day in
 // all (Gemini's flash-lite: well under a dollar).
 const SCAN = { perMinute: 2, perHour: 6, perDay: 12, passPerMinute: 3, passPerDay: 30, dayCap: 400, maxBase64: 2_000_000 };
@@ -123,7 +123,7 @@ export async function handleSlipScan(request, env, headers, ip, gemini) {
   const qt = typeof body.qt === 'string' ? body.qt : new URL(request.url).searchParams.get('qt');
   if (qt) {
     const claims = await readToken(await tokenSecret(env), qt, 'ses');
-    if (!claims) return json({ error: { code: 'QUADRA_PASS_REQUIRED', message: 'Sign in with a Quadra Pass.' } }, 401, headers);
+    if (!claims) return json({ error: { code: 'ORBIT_PASS_REQUIRED', message: 'Sign in with a Orbit Pass.' } }, 401, headers);
     if (sessionLimited(`scan:pm:${claims.d}`, SCAN.passPerMinute) || sessionLimited(`scan:pd:${claims.d}`, SCAN.passPerDay, 86_400_000)) return json({ error: { message: 'Too many requests' } }, 429, headers);
   } else if (sessionLimited(`scan:m:${ip}`, SCAN.perMinute) || sessionLimited(`scan:h:${ip}`, SCAN.perHour, 3_600_000) || sessionLimited(`scan:d:${ip}`, SCAN.perDay, 86_400_000)) return json({ error: { message: 'Too many requests' } }, 429, headers);
   if ((await countScan(env)) > SCAN.dayCap) return json({ error: { message: 'Busy today' } }, 503, headers);

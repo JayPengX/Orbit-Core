@@ -1,5 +1,5 @@
 // 信貸 and 急難紓困, the rules alone (no page, no storage): one copy for the
-// kit (quadra.mjs re-exports them) and the Worker (eco.js), which alone
+// kit (orbit.mjs re-exports them) and the Worker (eco.js), which alone
 // writes the entries. Modelled on how a Taiwan bank and a 社會局 work:
 //
 // 信貸 (an unsecured personal loan, LOAN):

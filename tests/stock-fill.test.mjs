@@ -1,4 +1,4 @@
-// Quadra Securities' orders filled by the proxy (stock-fill.js).
+// Orbit Securities' orders filled by the proxy (stock-fill.js).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { decideFills, handleStock, cleanOrder, FILLS_COLLECTION } from '../stock-fill.js';
@@ -327,7 +327,7 @@ test('a Taiwan fund fills at the NAV of the first cutoff after the proxy saw it,
     fsGet: async (env, c, id) => (docs.has(`${c}/${id}`) ? { exists: true, payload: docs.get(`${c}/${id}`) } : { exists: false }),
     fsWrite: async (env, c, id, payload) => void docs.set(`${c}/${id}`, payload),
     now: () => clock,
-    read: async url => (url.startsWith('https://funds.quadra/') ? { funds: { '00526748A': { name: '兆豐ESG', company: '兆豐投信', currency: 'TWD', ...nav } } } : { spark: { result: [] } })
+    read: async url => (url.startsWith('https://funds.orbit/') ? { funds: { '00526748A': { name: '兆豐ESG', company: '兆豐投信', currency: 'TWD', ...nav } } } : { spark: { result: [] } })
   };
   // Placed "before today's cutoff" by a phone that first asks once today's NAV is out.
   const order = { id: 'order0900', symbol: '00526748A.TWF', side: 'buy', type: 'market', qty: 100, t: at('2026-10-21T10:00:00'), after: at('2026-10-21T15:30:00'), expires: at('2026-10-25T15:30:00'), market: 'TWFUND', kind: 'fund', currency: 'TWD' };
@@ -344,7 +344,7 @@ test('a future fills at the live index plus its basis at the last settlement', a
   const t = at('2026-10-21T10:00:00');
   const meta = { symbol: '^TWII', regularMarketPrice: 46_500, chartPreviousClose: 46_300, currency: 'TWD', instrumentType: 'INDEX', exchangeTimezoneName: 'Asia/Taipei', regularMarketTime: t / 1000 - 60, currentTradingPeriod: { regular: { start: at('2026-10-21T09:00:00') / 1000, end: at('2026-10-21T13:30:00') / 1000 } } };
   const read = async url =>
-    url.startsWith('https://taifex.quadra/')
+    url.startsWith('https://taifex.orbit/')
       ? { date: '2026-10-20', settle: { TX202611: 46_510 }, margin: { TX: [701_000, 538_000] }, final: {} }
       : { spark: { result: [{ symbol: '^TWII', response: [{ meta, timestamp: [], indicators: { quote: [{ close: [] }] } }] }] } };
   const order = cleanOrder({ id: 'order0950', symbol: 'TX202611.TF', side: 'buy', type: 'market', qty: 1, t: t - 1000, market: 'TAIFEX', kind: 'fut', currency: 'TWD' });
@@ -358,7 +358,7 @@ test('an option fills at its Black-76 price: the live index plus the basis, at t
   const t = at('2026-10-21T10:00:00');
   const meta = { symbol: '^TWII', regularMarketPrice: 46_500, chartPreviousClose: 46_300, currency: 'TWD', instrumentType: 'INDEX', exchangeTimezoneName: 'Asia/Taipei', regularMarketTime: t / 1000 - 60, currentTradingPeriod: { regular: { start: at('2026-10-21T09:00:00') / 1000, end: at('2026-10-21T13:30:00') / 1000 } } };
   const table = { date: '2026-10-20', settle: { TX202611: 46_510 }, margin: {}, final: {}, opt: { 202611: { C: { 46_500: 412 }, P: { 46_500: 398 } } } };
-  const read = async url => (url.startsWith('https://taifex.quadra/') ? table : { spark: { result: [{ symbol: '^TWII', response: [{ meta, timestamp: [], indicators: { quote: [{ close: [] }] } }] }] } });
+  const read = async url => (url.startsWith('https://taifex.orbit/') ? table : { spark: { result: [{ symbol: '^TWII', response: [{ meta, timestamp: [], indicators: { quote: [{ close: [] }] } }] }] } });
   const order = cleanOrder({ id: 'opt1', symbol: 'TXO202611C46500.TF', side: 'buy', type: 'market', qty: 1, t: t - 1000, market: 'TAIFEX', kind: 'opt', currency: 'TWD' });
   const { fills } = await decideFills([order], { read, now: t });
   // The index 200 points up from the settlement's day (the futures at 46,710): about half of that more.

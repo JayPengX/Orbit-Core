@@ -149,7 +149,7 @@ const clearOfMinuteEdge = async () => {
 };
 
 test("each app's asks are counted apart: one app's busy minute never stops another's", async () => {
-  const { signToken } = await import('../quadra-token.js');
+  const { signToken } = await import('../orbit-token.js');
   const env = { ECO_TOKEN_SECRET: 'test-secret' };
   const qt = await signToken('test-secret', { k: 'ses', d: 'd1', s: 'apps-test', e: Date.now() + 3_600_000 });
   const ask = app => worker.fetch(new Request(`https://proxy.test/sports-proxy?batch=1&u=${encodeURIComponent('https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/standings')}&app=${app}&qt=${qt}`, { headers: { Origin: 'https://jaypengx.github.io' } }), env, ctx);

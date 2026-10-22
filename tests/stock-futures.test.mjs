@@ -70,7 +70,7 @@ test('the proxy fills a stock future at its live stock plus the basis', async ()
   const t = at('2026-10-22T10:00:00');
   const meta = { symbol: '2330.TW', regularMarketPrice: 2400, chartPreviousClose: 2380, currency: 'TWD', instrumentType: 'EQUITY', exchangeTimezoneName: 'Asia/Taipei', regularMarketTime: t / 1000 - 60, currentTradingPeriod: { regular: { start: at('2026-10-22T09:00:00') / 1000, end: at('2026-10-22T13:30:00') / 1000 } } };
   const read = async url =>
-    url.startsWith('https://taifex.quadra/')
+    url.startsWith('https://taifex.orbit/')
       ? { date: '2026-10-21', settle: { CDF202611: 2407 }, margin: {}, ssfRate: { CDF: [0.135, 0.1035] }, final: {} }
       : { spark: { result: [{ symbol: '2330.TW', response: [{ meta, timestamp: [], indicators: { quote: [{ close: [] }] } }] }] } };
   const order = cleanOrder({ id: 'ssf1', symbol: 'CDF202611.TF', side: 'buy', type: 'market', qty: 1, t: t - 1000, market: 'TAIFEX', kind: 'fut', currency: 'TWD' });

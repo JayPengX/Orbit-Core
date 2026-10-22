@@ -1,10 +1,10 @@
 // ---- worker.js ----
-// orbit-workers-proxy: the one proxy, every app's server side (Quadra
+// orbit-workers-proxy: the one proxy, every app's server side (Orbit
 // Securities and Play, Orbit Sports, Transit, Weather, Words and Class).
 // Routed by path, each route's work in its own file:
 //
-//   GET/POST/PATCH/DELETE /eco   the Quadra Pass: one account and one NT$
-//                                money pool for every Quadra app, and each
+//   GET/POST/PATCH/DELETE /eco   the Orbit Pass: one account and one NT$
+//                                money pool for every Orbit app, and each
 //                                app's data (eco.js)
 //   POST  /gemini                Orbit Class's AI schedule-photo import
 //   POST  /nl-edit               Orbit Class's natural-language edits
@@ -18,7 +18,7 @@
 //   GET   /weather/…             Orbit Weather's blended forecast (weather.js)
 //   GET   /transit/…             Orbit Transit's map, places, routes and TDX data (transit.js)
 //   GET/POST /play               Quadra Play's slips placed, cashed out and settled (settle.js)
-//   POST  /stock                 Quadra Securities' orders filled at the proxy's own quote (stock-fill.js)
+//   POST  /stock                 Orbit Securities' orders filled at the proxy's own quote (stock-fill.js)
 //   GET   /sports-proxy          the data proxy for Sports, Play and Securities (sports.js)
 //   GET   /sports-today          Orbit Sports' day of scoreboards in one answer, built on demand (sports-today.js)
 //   GET   /data/…                the family's data in R2: packs, the mirror, bus packs (data.js)
@@ -27,9 +27,9 @@
 // The crons (scheduled, below): notices, Kambi, the weather's scoring and
 // capacity on the even minutes; Play's slips and lottery on the odd ones; F1's
 // laps each minute Thursday to Monday; the family's data (builders/: Play's board every ten minutes, the rest hourly or daily). Every route but /eco's sign-in needs a
-// Quadra Pass session (`qt=`); CORS and JSON answers come from http.js. It
+// Orbit Pass session (`qt=`); CORS and JSON answers come from http.js. It
 // runs in Taiwan ([placement], wrangler.toml), where the people and most
-// sources are. The Quadra Pass is the only way anything is saved.
+// sources are. The Orbit Pass is the only way anything is saved.
 
 import { handleSlipScan } from './slip.js';
 import { handleLawAsk } from './law.js';
@@ -40,7 +40,7 @@ import en from './locales/en.js';
 import zhTW from './locales/zh-TW.js';
 import { handleEcoRequest, LOCK_SINCE } from './eco.js';
 import { checkStock } from './stock-check.js';
-import { readToken, tokenSecret, signToken, sessionLimited, READ_GRACE_MS } from './quadra-token.js';
+import { readToken, tokenSecret, signToken, sessionLimited, READ_GRACE_MS } from './orbit-token.js';
 import { handleKambiRequest, refreshKambiWatch, fetchKambiLive } from './kambi.js';
 import { handlePush, sendDue, notifyNow } from './push.js';
 import { handlePlay, settleCron, moveSlips } from './settle.js';
@@ -150,8 +150,8 @@ async function readJsonBody(request, max = BODY_MAX) {
 // but that cost a KV write per busy minute per IP and kept running the
 // account into KV's free-tier daily caps (1,000 writes, 100,000 reads),
 // which emailed the owner and broke every feature that stores in KV.
-// The guard that matters is the Quadra Pass: the routes worth abusing need
-// one, and those count per session (quadra-token.js sessionLimited).
+// The guard that matters is the Orbit Pass: the routes worth abusing need
+// one, and those count per session (orbit-token.js sessionLimited).
 // Under that, a per-isolate count still stops a single client's flood, and
 // Cloudflare's own daily request cap is the backstop.
 const RATE_WINDOW_MS = 60 * 60 * 1000;
@@ -214,7 +214,7 @@ async function isDailyGlobalCapped(env, feature, limit) {
 // ALLOWED_ORIGINS. This costs every real caller nothing - every route this
 // applies to is a POST with a JSON body, which browsers always treat as a
 // CORS "non-simple" request and always attach a real Origin header to,
-// preflight included - so a legitimate call from Orbit/Orbit Vocab's own
+// preflight included - so a legitimate call from Orbit Words' own
 // already-working pages is completely unaffected; only a bare
 // script/curl call (no Origin at all) or a request from some OTHER site
 // embedding a fetch to this Worker (a real Origin, just not an allowed
@@ -711,7 +711,7 @@ async function handleGeminiRequest(request, env, headers, ip, ctx, session = nul
   if (request.method === 'GET') return json({ ok: true }, 200, headers);
   if (request.method !== 'POST') return errorJson('POST_ONLY', 405, headers, request);
 
-  // Signed in with a Quadra Pass (required): counted per session in memory.
+  // Signed in with a Orbit Pass (required): counted per session in memory.
   if (!session) return errorJson('ECO_TOKEN_INVALID', 401, headers, request);
   if (sessionLimited(`g:${session.s}`, GEMINI_RATE_LIMIT, 3_600_000)) return errorJson('RATE_LIMITED', 429, headers, request);
   if (await isDailyGlobalCapped(env, 'gemini', GEMINI_DAILY_GLOBAL_CAP)) {
@@ -1051,7 +1051,7 @@ async function handleNlEditRequest(request, env, headers, ip, ctx, session = nul
   );
 }
 
-// ==== The Quadra Pass's store: D1 (doc-store.js) =============================
+// ==== The Orbit Pass's store: D1 (doc-store.js) =============================
 //
 // Every document has one string field, `payload`; only this Worker reads or
 // writes it.
@@ -1067,7 +1067,7 @@ function generateCode(length) {
 // Codes are random (never chosen by a person), so a plain SHA-256 is enough:
 // a leak of the database never hands over a working pass.
 
-// ---- /eco: the Quadra Pass (see eco.js) ------------------------------------
+// ---- /eco: the Orbit Pass (see eco.js) ------------------------------------
 // The Pass's store (doc-store.js): D1.
 const DOCS = docStore();
 const ECO_DEPS = {
@@ -1135,34 +1135,34 @@ const inPlace = { waitUntil: p => p?.catch?.(() => {}), passThroughOnException()
 // (`within`: every read on a copy at most that many seconds old; a live bet's second look.)
 const priceReads = (env, within) => ({
   read: async (url, trim = '') => {
-    const ask = `https://orbit-workers-proxy.quadra/sports-proxy?url=${encodeURIComponent(url)}&app=odds${trim ? `&trim=${encodeURIComponent(trim)}` : ''}${within != null ? `&within=${within}` : ''}&qt=${encodeURIComponent(await sportsToken(env))}`;
+    const ask = `https://orbit-workers-proxy.orbit/sports-proxy?url=${encodeURIComponent(url)}&app=odds${trim ? `&trim=${encodeURIComponent(trim)}` : ''}${within != null ? `&within=${within}` : ''}&qt=${encodeURIComponent(await sportsToken(env))}`;
     const res = await handleSports(new Request(ask), env, inPlace, {}, 'worker');
     if (!res.ok) throw new Error(`proxy ${res.status}`);
     return res.json();
   },
   // The family's data, read in place (data.js: R2, else Pages while moving).
   pack: async path => {
-    const res = await handleData(new Request(`https://orbit-workers-proxy.quadra/data/${path}`), env, inPlace, {}, 'worker', `/data/${path}`);
+    const res = await handleData(new Request(`https://orbit-workers-proxy.orbit/data/${path}`), env, inPlace, {}, 'worker', `/data/${path}`);
     if (!res.ok) throw new Error(`pack ${res.status}`);
     return res.json();
   }
 });
 // Securities' quotes read as the phone reads them: the data proxy's route in place (its cache).
 const stockReads = env => async url => {
-  const ask = `https://orbit-workers-proxy.quadra/sports-proxy?url=${encodeURIComponent(url)}&app=stock&qt=${encodeURIComponent(await sportsToken(env, 'stock'))}`;
+  const ask = `https://orbit-workers-proxy.orbit/sports-proxy?url=${encodeURIComponent(url)}&app=stock&qt=${encodeURIComponent(await sportsToken(env, 'stock'))}`;
   const res = await handleSports(new Request(ask), env, inPlace, {}, 'worker');
   if (!res.ok) throw new Error(`proxy ${res.status}`);
   return res.json();
 };
 // The builders' reads through the data proxy's route, as Orbit Sports' (its trims, its cache).
 const builderProxy = env => async (url, trim = '') => {
-  const ask = `https://orbit-workers-proxy.quadra/sports-proxy?url=${encodeURIComponent(url)}&app=match${trim ? `&trim=${encodeURIComponent(trim)}` : ''}&qt=${encodeURIComponent(await sportsToken(env, 'match'))}`;
+  const ask = `https://orbit-workers-proxy.orbit/sports-proxy?url=${encodeURIComponent(url)}&app=match${trim ? `&trim=${encodeURIComponent(trim)}` : ''}&qt=${encodeURIComponent(await sportsToken(env, 'match'))}`;
   const res = await handleSports(new Request(ask), env, inPlace, {}, 'worker');
   return res.ok ? res.json() : null;
 };
 // Each league's season bounds (sports/bounds.json in the family's data), read in place.
 const seasonBounds = async env => {
-  const res = await handleData(new Request('https://orbit-workers-proxy.quadra/data/sports/bounds.json'), env, inPlace, {}, 'worker', '/data/sports/bounds.json');
+  const res = await handleData(new Request('https://orbit-workers-proxy.orbit/data/sports/bounds.json'), env, inPlace, {}, 'worker', '/data/sports/bounds.json');
   return res.ok ? (await res.json()).leagues : null;
 };
 // (OpenF1, a race's flags, through the proxy's route: its cache answers when OpenF1 turns the shared address away.)
@@ -1182,7 +1182,7 @@ const F1_DAYS = new Set([0, 1, 4, 5, 6]);
 // The developer settings as GET /config answers them: kept a minute in
 // Cloudflare's cache (one read of the store a minute, however many ask).
 async function devBody(env, ctx) {
-  const key = new Request('https://orbit-config.quadra/dev');
+  const key = new Request('https://orbit-config.orbit/dev');
   const hit = await caches.default.match(key);
   if (hit) return hit.text();
   // Paced by the bill's guard (pace.js): every live refresh `slow` times slower.
@@ -1195,9 +1195,9 @@ async function devBody(env, ctx) {
 // …which the sports proxy's cache times follow (sports.js), read at most once a minute.
 useDevSettings((env, ctx) => devBody(env, ctx).then(JSON.parse));
 
-// The Quadra Pass session a request carries (`qt=`), or null. (`grace`: a
+// The Orbit Pass session a request carries (`qt=`), or null. (`grace`: a
 // session run out that long ago still counts: Weather's and Transit's public
-// reads, as the data proxy's, quadra-token.js READ_GRACE_MS.)
+// reads, as the data proxy's, orbit-token.js READ_GRACE_MS.)
 async function sessionOf(request, env, grace = 0) {
   const qt = new URL(request.url).searchParams.get('qt');
   return qt ? readToken(await tokenSecret(env), qt, 'ses', Date.now() - grace) : null;
@@ -1214,7 +1214,7 @@ async function route(request, env, ctx, headers, origin) {
     return errorJson('FORBIDDEN_ORIGIN', 403, headers, request);
   }
 
-  // Orbit Class's AI features need a Quadra Pass session (`qt=`).
+  // Orbit Class's AI features need a Orbit Pass session (`qt=`).
   if (path === '/gemini' || path === '/nl-edit') {
     const session = await sessionOf(request, env);
     return path === '/gemini' ? handleGeminiRequest(request, env, headers, ip, ctx, session) : handleNlEditRequest(request, env, headers, ip, ctx, session);
@@ -1232,7 +1232,7 @@ async function route(request, env, ctx, headers, origin) {
   }
   // Orbit Slips' ticket photos, read by Gemini (a few a day).
   if (path === '/slip-scan') return handleSlipScan(request, env, headers, ip, (model, parts, schema) => proxyGeminiRequest(model, parts, schema, env, headers, ctx, 'slip-scan'));
-  // Orbit Law's questions (law.js) and its 問法律 (law-chat.js): a Quadra
+  // Orbit Law's questions (law.js) and its 問法律 (law-chat.js): a Orbit
   // Pass of Orbit Law's, its origin only, a day's caps a Pass in D1.
   // (Gemini's first model, Flash-Lite: a few seconds' work.)
   // (/law-chat's answer asks for Flash by name: reasoning on the reader's facts, 40 s at most.)
@@ -1284,14 +1284,14 @@ async function route(request, env, ctx, headers, origin) {
     return new Response(body, { headers: { ...headers, 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=60' } });
   }
   if (path === '/kambi') {
-    // A Quadra Pass session only, counted per session in memory.
+    // A Orbit Pass session only, counted per session in memory.
     const session = await sessionOf(request, env);
     if (!session) return errorJson('ECO_TOKEN_INVALID', 401, headers, request);
     const deps = { ...KAMBI_DEPS, rateLimitResponse: async () => (sessionLimited(`k:${session.s}`, 60) ? errorJson('RATE_LIMITED', 429, headers, request) : null) };
     return handleKambiRequest(request, env, headers, ip, deps);
   }
-  // Quadra Play's slips settled here (settle.js): a Quadra Pass session of Play's.
-  // Quadra Securities' orders filled here (stock-fill.js): a Securities session.
+  // Quadra Play's slips settled here (settle.js): a Orbit Pass session of Play's.
+  // Orbit Securities' orders filled here (stock-fill.js): a Securities session.
   if (path === '/stock') {
     const session = await sessionOf(request, env);
     if (session && sessionLimited(`st:${session.s}`, 30)) return errorJson('RATE_LIMITED', 429, headers, request);
@@ -1305,13 +1305,13 @@ async function route(request, env, ctx, headers, origin) {
     if (dev && sessionLimited(`pl:dev:${ip}`, 10)) return errorJson('RATE_LIMITED', 429, headers, request);
     return handlePlay(request, env, headers, session, { ...playDeps(env), dev });
   }
-  // Web Push (push.js): here, where the Quadra Pass tokens can be read.
+  // Web Push (push.js): here, where the Orbit Pass tokens can be read.
   if (path.startsWith('/push/')) {
     const session = await sessionOf(request, env);
     if (session && sessionLimited(`p:${session.s}`, 30)) return errorJson('RATE_LIMITED', 429, headers, request);
     return handlePush(request, env, headers, session, path);
   }
-  // Orbit Weather (weather.js): a Quadra Pass session for the forecast and
+  // Orbit Weather (weather.js): a Orbit Pass session for the forecast and
   // the place; the township list, the keys' check and the skill are open.
   // Or a local dev page (localhost: the preview's --live, timing the
   // forecast on real data), as Transit's: no account, 30 asks a minute an
@@ -1324,7 +1324,7 @@ async function route(request, env, ctx, headers, origin) {
     const session = signed || (dev ? { s: 'dev', dev: true } : null);
     return handleWeather(request, env, headers, path, { session, ctx, limited: () => sessionLimited(dev ? `w:dev:${ip}` : `w:${session?.s}`, 30) });
   }
-  // Orbit Transit (transit.js): a Quadra Pass session for everything but
+  // Orbit Transit (transit.js): a Orbit Pass session for everything but
   // the usage page. Or a local dev page (localhost, http or https: the
   // preview's --live, testing on today's real buses and trains): transit
   // data only, no account, 300 asks a minute an address (a search is dozens); Google's paid asks
@@ -1372,7 +1372,7 @@ export default {
   },
 
   // The cron (wrangler.toml [triggers]): the notices that are due (push.js),
-  // and the latest score of each Kambi match Quadra Sportsbook has bets on
+  // and the latest score of each Kambi match Orbit Sportsbook has bets on
   // (kambi.js).
   async scheduled(event, env, ctx) {
     const tick = new Date(event.scheduledTime || Date.now());

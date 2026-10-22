@@ -248,7 +248,7 @@ const who = a => {
 // comp: ESPN's competition; status: its status; sport: Orbit Sports' sport key.
 export function liveOf(comp, status, sport) {
   const s = comp?.situation || {};
-  // The last play's kind and id too: a timeout on now (quadra.mjs breakOf) and its own clock.
+  // The last play's kind and id too: a timeout on now (orbit.mjs breakOf) and its own clock.
   const live = { lastPlay: s.lastPlay?.text || '', ...(s.lastPlay?.type?.text ? { lastType: s.lastPlay.type.text, lastId: String(s.lastPlay.id ?? '') } : {}) };
   if (sport === 'baseball' && (s.balls != null || s.outs != null)) {
     Object.assign(live, {

@@ -21,9 +21,9 @@ test('SITCA NAVs: by 基金統編, newest day with the one before, listed ETFs l
 });
 
 test('/nav.json: at most 40 codes, unknown columns an error', async () => {
-  const bad = await fundNavResponse(new URL('https://funds.quadra/nav.json?codes='), async () => new Response(CSV));
+  const bad = await fundNavResponse(new URL('https://funds.orbit/nav.json?codes='), async () => new Response(CSV));
   assert.equal(bad.status, 400);
-  const broken = await fundNavResponse(new URL('https://funds.quadra/nav.json?codes=00526748A'), async () => new Response('a,b\n1,2'));
+  const broken = await fundNavResponse(new URL('https://funds.orbit/nav.json?codes=00526748A'), async () => new Response('a,b\n1,2'));
   assert.equal(broken.status, 502);
 });
 

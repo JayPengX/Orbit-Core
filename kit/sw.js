@@ -1,10 +1,10 @@
-// The Quadra apps' one service worker: keeps the page's own files so the
+// The Orbit apps' one service worker: keeps the page's own files so the
 // app opens without a connection and can be installed. Anything on other
 // sites (scores, prices, news) is never touched here (pictures: the kit's
 // sw-images.js, imported before this by the apps that show them).
 //
 // An app's sw.js is its settings, then this file:
-//   self.QUADRA_SW = { cache: 'orbit-law-v1', title: 'Orbit Law' };
+//   self.ORBIT_SW = { cache: 'orbit-law-v1', title: 'Orbit Law' };
 //   importScripts('../Shared-Proxy/kit/sw.js');
 // cache: this app's cache (a new name drops the old one); prefix: what every
 // version of its name starts with (the cache without its vN, by default), so
@@ -30,8 +30,8 @@
 // is never kept: it's asked again past the browser's cache, and while the
 // CDN still has the old one the page gets a 503 (boot.js then waits for the
 // update to finish, and loads it).
-const SW = { spare: [], route: () => null, prune: () => true, ...(self.QUADRA_SW || {}) };
-const CACHE = SW.cache || 'quadra-app';
+const SW = { spare: [], route: () => null, prune: () => true, ...(self.ORBIT_SW || {}) };
+const CACHE = SW.cache || 'orbit-app';
 const PREFIX = SW.prefix || CACHE.replace(/v\d+$/, '');
 
 self.addEventListener('install', event => {
@@ -81,7 +81,7 @@ async function fetchTrue(request) {
     const res = await fetch(request.url, { cache: 'reload', credentials: 'same-origin' }).catch(() => null);
     if (res && (await isTrue(request.url, res))) return res;
   }
-  return new Response('', { status: 503, statusText: 'Update not ready', headers: { 'X-Quadra-Stale': '1' } });
+  return new Response('', { status: 503, statusText: 'Update not ready', headers: { 'X-Orbit-Stale': '1' } });
 }
 
 async function keep(request, response) {
@@ -199,7 +199,7 @@ self.addEventListener('message', event => {
   );
 });
 
-// A tap on a Quadra notice (quadra.mjs notify): opens (or focuses) the app where it points.
+// A tap on a Orbit notice (orbit.mjs notify): opens (or focuses) the app where it points.
 self.addEventListener('notificationclick', event => {
   event.notification.close();
   const url = new URL(event.notification.data?.url || './', self.registration.scope).href;
@@ -222,5 +222,5 @@ self.addEventListener('push', event => {
     data = { title: event.data?.text() || '' };
   }
   const icon = new URL('./icons/icon-192.png', self.registration.scope).href;
-  event.waitUntil(self.registration.showNotification(data.title || SW.title || 'Quadra', { body: data.body || '', tag: data.tag || undefined, icon, badge: icon, data: { url: data.url || self.registration.scope } }));
+  event.waitUntil(self.registration.showNotification(data.title || SW.title || 'Orbit', { body: data.body || '', tag: data.tag || undefined, icon, badge: icon, data: { url: data.url || self.registration.scope } }));
 });

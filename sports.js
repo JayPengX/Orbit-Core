@@ -1,19 +1,19 @@
 // ---- sports.js: /sports-proxy, the data proxy ----
 // One of the Worker's routes (worker.js routes it, beside /eco, /transit,
 // /weather…): a host-allowlisted pass-through to the public sources Orbit
-// Sports, Quadra Play and Quadra Securities read (ESPN, MLB, Jolpica,
+// Sports, Quadra Play and Orbit Securities read (ESPN, MLB, Jolpica,
 // Polymarket, Kambi, Yahoo, ELTA, YouTube, formula1.com, F1's live timing,
 // the Asian leagues), with the shared edge cache by tier, trims and batches.
 // It and the F1 lap log's cron (sportsCron) run in the same Worker as the
 // rest (the owner, 2026-10-13: one proxy). The old address
 // (sports-proxy.pengzjay.workers.dev) is retired (deploy.yml).
 //
-// A Quadra Pass is required: every request carries `qt=<session token>`
+// A Orbit Pass is required: every request carries `qt=<session token>`
 // (from /eco), checked with ECO_TOKEN_SECRET and counted per session and app
 // in this isolate's memory, never in KV. A localhost page without one is let
 // in by the dev door (SPORTS_DEV).
 import { paceOf } from './pace.js';
-import { readToken, sessionLimited, READ_GRACE_MS } from './quadra-token.js';
+import { readToken, sessionLimited, READ_GRACE_MS } from './orbit-token.js';
 import { BRANDS } from './kit/brand.mjs';
 import { ASIA_HOST, asiaBaseballResponse, asiaTarget, cpblBoxTarget, useCpblRelay } from './asia-baseball.js';
 import { FUND_HOST, fundNavResponse } from './fund-nav.js';
@@ -1433,7 +1433,7 @@ const browserMaxAge = policy => Math.min(policy.fresh, 600);
 
 // The dev door (as worker.js's for transit): a page served from localhost
 // (the preview tool testing on the real proxy, its cache and its limits) may
-// read without a Quadra Pass, a session's limit for each app at an address. SPORTS_DEV = "off"
+// read without a Orbit Pass, a session's limit for each app at an address. SPORTS_DEV = "off"
 // (wrangler.toml [vars]) closes it.
 // Which app asks (the kit says): each app's asks are counted apart, so one
 // left running in the background never uses up another's minute. Only the
@@ -1452,7 +1452,7 @@ async function checkSession(env, requestParams, headers, weight = 1, request = n
     return { session: { s: `ip:${ip}`, dev, open: !env.ECO_TOKEN_SECRET } };
   }
   const session = await readToken(env.ECO_TOKEN_SECRET, requestParams.get('qt') || '', 'ses', Date.now() - READ_GRACE_MS);
-  if (!session) return { error: json({ error: { code: 'QUADRA_PASS_REQUIRED', message: 'Sign in with a Quadra Pass.' } }, 401, headers) };
+  if (!session) return { error: json({ error: { code: 'ORBIT_PASS_REQUIRED', message: 'Sign in with a Orbit Pass.' } }, 401, headers) };
   // (Paced by the bill's guard: a share of the usual, pace.js.)
   const limit = Math.max(60, Math.round(SESSION_RATE_LIMIT * (await paceOf(env)).reads));
   for (let i = 0; i < weight; i++) if (sessionLimited(`${app}:${session.s}`, limit)) return { error: tooMany(headers) };
@@ -1559,7 +1559,7 @@ async function handleSportsProxyRequest(request, env, headers, ip, ctx) {
   const upstreamUrl = parseTarget(target);
   if (!upstreamUrl) return json({ error: { message: target ? 'Host not allowed' : 'Missing or invalid url' } }, 400, headers);
 
-  // The Quadra Pass gate (see the top of this file).
+  // The Orbit Pass gate (see the top of this file).
   const gate = await checkSession(env, requestParams, headers, 1, request, ip);
   if (gate.error) return gate.error;
   const trim = trimFor(requestParams.get('trim'), upstreamUrl);

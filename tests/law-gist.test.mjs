@@ -42,7 +42,7 @@ globalThis.fetch = async (url, init) => {
 const worker = (await import('../worker.js')).default;
 const { GIST_LIMITS, readGist, checkGists, gistParts } = await import('../law-gist.js');
 const { forgetLawCounts } = await import('../law.js');
-const { signToken } = await import('../quadra-token.js');
+const { signToken } = await import('../orbit-token.js');
 const ctx = { waitUntil: p => p };
 
 function fakeKV() {

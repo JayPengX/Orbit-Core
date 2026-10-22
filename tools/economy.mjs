@@ -1,4 +1,4 @@
-// Quadra's economy on paper: where the money comes from (faucets), where it
+// Orbit's economy on paper: where the money comes from (faucets), where it
 // goes (sinks), for a few kinds of user, month by month for a year.
 //
 //   node tools/economy.mjs            the current settings (v12)
@@ -43,7 +43,7 @@ const FREEBET_RETURN = 0.45; // a free bet returns its winnings only: about 45% 
 // hold, the lottery's and scratch cards'), what it gives back to bring play
 // in (promotions: free bets, the points catalogue), and what it
 // earns besides (Securities' commission). A real sportsbook spends 20-30% of
-// its gaming take on promotions; Quadra's should stay under that and never
+// its gaming take on promotions; Orbit's should stay under that and never
 // turn a product into a loss.
 const CUT = 1.158;
 const ODDS = 1.85;

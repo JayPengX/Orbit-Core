@@ -1,8 +1,8 @@
 // Share cards (link previews and stories) for each app, its family and the
-// Quadra Pass, as HTML pages brand/generate.mjs photographs. The marks,
+// Orbit Pass, as HTML pages brand/generate.mjs photographs. The marks,
 // names and colours are the kit's (kit/brand.mjs).
 import { execFileSync } from 'node:child_process';
-import { BRANDS, FAMILIES, PASS, appIcon, familyMark, homeOf } from '../kit/brand.mjs';
+import { BRANDS, FAMILY, PASS, appIcon, familyMark, homeOf } from '../kit/brand.mjs';
 
 // The cards' fonts (Inter, Noto Sans TC), cut by Google Fonts to the
 // characters a card uses and put inside it, so the picture never waits on
@@ -47,24 +47,20 @@ const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
 // Whose card: an app id or 'pass' (Orbit Class's own id is 'orbit').
 function subject(id) {
   const a = id === 'pass' ? PASS : BRANDS[id];
-  return { family: a.family, name: a.name, icon: appIcon(id), from: a.from, to: a.to, tag: a.tag, url: id === 'pass' ? 'jaypengx.github.io/Shared-Proxy' : homeOf(id).replace(/^https:\/\//, '').replace(/\/$/, '') };
+  return { name: a.name, icon: appIcon(id), from: a.from, to: a.to, tag: a.tag, url: id === 'pass' ? 'jaypengx.github.io/Shared-Proxy' : homeOf(id).replace(/^https:\/\//, '').replace(/\/$/, '') };
 }
 
 export function shareCard(id, format = 'og') {
   const { w, h } = FORMATS[format];
   const s = subject(id);
-  const fam = FAMILIES[s.family];
+  const fam = FAMILY;
   const stacked = format === 'square';
-  // The family's own sign, big and faint behind the card: Quadra's four
-  // tiles, Orbit's ring.
-  const motif =
-    s.family === 'quadra'
-      ? `<svg class="motif" viewBox="0 0 512 512"><rect x="96" y="96" width="150" height="150" rx="38" fill="#fff" fill-opacity=".06"/><rect x="266" y="96" width="150" height="150" rx="38" fill="${fam.accent}" fill-opacity=".22"/><rect x="96" y="266" width="150" height="150" rx="38" fill="#fff" fill-opacity=".06"/><rect x="266" y="266" width="150" height="150" rx="38" fill="#fff" fill-opacity=".06"/></svg>`
-      : `<svg class="motif" viewBox="0 0 512 512"><ellipse cx="256" cy="256" rx="236" ry="86" transform="rotate(-24 256 256)" fill="none" stroke="#fff" stroke-opacity=".14" stroke-width="6"/><circle cx="472" cy="160" r="12" fill="#fff" fill-opacity=".5"/></svg>`;
-  const badge = `<div class="badge"><img src="${b64(familyMark(s.family))}">${s.family === 'quadra' ? 'QUADRA' : 'ORBIT'}</div>`;
+  // The family's own sign, big and faint behind the card: its ring.
+  const motif = `<svg class="motif" viewBox="0 0 512 512"><ellipse cx="256" cy="256" rx="236" ry="86" transform="rotate(-24 256 256)" fill="none" stroke="#fff" stroke-opacity=".14" stroke-width="6"/><circle cx="472" cy="160" r="12" fill="#fff" fill-opacity=".5"/></svg>`;
+  const badge = `<div class="badge"><img src="${b64(familyMark())}">ORBIT</div>`;
   const motifCss = stacked ? 'width:1100px;right:-380px;top:-300px' : 'width:980px;right:-300px;top:-200px';
   return `<!doctype html><html><head><meta charset="utf-8">
-<style>${fontCss(`${s.name}${s.tag.en}${s.tag.zh}${s.url}${fam.tag.en}QUADRAORBIT`)}
+<style>${fontCss(`${s.name}${s.tag.en}${s.tag.zh}${s.url}${fam.tag.en}ORBIT`)}
 *{box-sizing:border-box;margin:0}
 body{width:${w}px;height:${h}px;overflow:hidden;position:relative;color:#fff;font-family:Inter,'Noto Sans TC',system-ui,sans-serif;
   background:radial-gradient(${Math.round(w * 0.9)}px ${Math.round(h * 0.9)}px at 0% 0%, ${s.from}cc, transparent 70%),linear-gradient(${stacked ? 160 : 125}deg, ${s.to} 0%, #020617 88%)}
@@ -80,6 +76,6 @@ h1{font-weight:900;font-size:${stacked ? 112 : format === 'x' ? 84 : 92}px;line-
 .foot span{white-space:nowrap}${stacked ? '.foot{flex-direction:column;align-items:flex-start;gap:10px}' : ''}
 </style></head><body>${motif}
 <div class="wrap"><img class="icon" src="${b64(s.icon)}"><div>${badge}<h1>${esc(s.name)}</h1><p class="en">${esc(s.tag.en)}</p><p class="zh">${esc(s.tag.zh)}</p></div></div>
-<div class="foot"><span>${esc(s.url)}</span><span>${s.family === 'quadra' ? '' : esc(fam.tag.en)}</span></div>
+<div class="foot"><span>${esc(s.url)}</span><span>${esc(fam.tag.en)}</span></div>
 </body></html>`;
 }

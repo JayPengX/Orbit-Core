@@ -194,7 +194,7 @@ export function parseKambiLive(data) {
 // on after Kambi drops them (a few hours after the end). Sportsbook tells it
 // which matches to watch, and reads its copy when Kambi's is gone.
 export const KAMBI_WATCH_URL = 'https://orbit-workers-proxy.pengzjay.workers.dev/kambi';
-// The Quadra session token, when signed in (counted per session, not per IP).
+// The Orbit session token, when signed in (counted per session, not per IP).
 let tokenOf = () => '';
 export const useKambiToken = fn => (tokenOf = fn);
 const signed = url => (tokenOf() ? `${url}${url.includes('?') ? '&' : '?'}qt=${encodeURIComponent(tokenOf())}` : url);

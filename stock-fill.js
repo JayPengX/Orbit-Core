@@ -1,4 +1,4 @@
-// ---- stock-fill.js: /stock, Quadra Securities' orders filled here ----
+// ---- stock-fill.js: /stock, Orbit Securities' orders filled here ----
 // The owner, 2026-10-14: Securities' orders are filled by the proxy, as
 // Play's bets are placed and settled by it. The phone places an order (the
 // kit's placeOrder: it holds its cash or shares and waits); then it asks
@@ -37,7 +37,7 @@ import { fetchQuotes, fetchBars, fxSymbol, useQuotesReader } from './kit/stock-q
 import { marketHalt, SPX, isTwFund, fundCutoff, FUND_NAV_WAIT } from './kit/stock-markets.mjs';
 import { triggerPrice, backfillPrice, closingMatch, planRuns, planOrderId, planFillBar, planOrderType, planAllowed, PLAN_DAY_MAX } from './kit/stock-account.mjs';
 import { ipoUrls, parseIpoList, ipoOpen, ipoDrawn, ipoWon, ipoDrawKey } from './kit/stock-ipo.mjs';
-import { tokenSecret } from './quadra-token.js';
+import { tokenSecret } from './orbit-token.js';
 import { parseDoc, changeDoc } from './doc-store.js';
 import { bodyText } from './http.js';
 

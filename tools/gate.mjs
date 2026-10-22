@@ -61,7 +61,7 @@ const flag = name => {
 };
 // (Two at a time: more on a 4-core machine slows each page into freezes that aren't the app's.)
 const jobs = Number(opt('jobs', 2));
-const out = resolve(opt('out', '/tmp/quadra-gate'));
+const out = resolve(opt('out', '/tmp/orbit-gate'));
 const taps = !flag('no-taps');
 const quick = flag('quick');
 // --tablet: only the iPad runs (every app portrait and landscape, and the sign-in).

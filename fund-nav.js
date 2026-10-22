@@ -4,7 +4,7 @@
 // stock-quotes.mjs), the phone and the fills here alike.
 //
 // Served by the sports proxy as if from
-// `https://funds.quadra/nav.json?codes=00526748A,00512527` (at most 40),
+// `https://funds.orbit/nav.json?codes=00526748A,00512527` (at most 40),
 // each fund by its 基金統編 (a share class's own; SITCA's 基金代號 is only
 // unique within its company). Listed ETFs, priced on the exchange, are left out:
 //   { funds: { code: { name, company, currency, nav, prev, date } } }
@@ -15,7 +15,7 @@
 // by the fund's name and checked by the 基金統編 Anue keeps with it:
 //   { code, points: [[ms, nav], …] (ten years, daily), profile: { … } }
 
-export const FUND_HOST = 'funds.quadra';
+export const FUND_HOST = 'funds.orbit';
 const NAV_CSV = 'https://www.sitca.org.tw/MemberK0000/F/03/nav.csv';
 const MAX_CODES = 40;
 const KEEP_MS = 10 * 60_000;

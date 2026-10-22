@@ -1,6 +1,6 @@
 # Shared-Proxy
 
-The server side, the shared kit and the brand of every Quadra and Orbit
+The server side, the shared kit and the brand of every Orbit
 app. The apps are static sites on GitHub Pages; everything server-side is
 here, on Cloudflare.
 
@@ -8,7 +8,7 @@ Rules for working on any of it: `docs/TRUTH.md` (one page).
 
 | App | Kit id | Repo |
 | --- | --- | --- |
-| Quadra Securities | `stock` | Quadra-Securities |
+| Orbit Securities | `stock` | Orbit-Securities |
 | Quadra Play | `odds` | Quadra-Play |
 | Orbit Class | `orbit` | Orbit-Class |
 | Orbit Weather | `weather` | Orbit-Weather |
@@ -28,7 +28,7 @@ phones (home-screen apps)  ──  each app's static files + the kit (#kit/…, 
    │  memory → Cache Storage → localStorage (versioned keys)
    ▼
 orbit-workers-proxy (one Worker, Taiwan)
-   /eco      the Quadra Pass: accounts, wallet, app data (D1)
+   /eco      the Orbit Pass: accounts, wallet, app data (D1)
    /play     Play's bets placed, settled, paid; lottery (cron)
    /stock    Securities' orders filled at the proxy's quote
    /push     notices while an app is closed (KV + cron)
@@ -111,8 +111,8 @@ runs near each caller; only Gemini goes through `gemini-relay.js`, pinned to Tai
 
 `?url=<encoded>&app=<kit id>&qt=` passes an upstream through if its host is
 on `SPORTS_PROXY_ALLOWED_HOSTS`. Two hosts are not real:
-`asia-baseball.quadra` (NPB, KBO, CPBL from their own sites) and
-`f1-live.quadra` (F1's live timing: `now.json`, `session.json`,
+`asia-baseball.orbit` (NPB, KBO, CPBL from their own sites) and
+`f1-live.orbit` (F1's live timing: `now.json`, `session.json`,
 `laps.json`, `circuit.json`; a Durable Object `F1Log` logs laps).
 
 - **Trims** (`&trim=`) return only what an app reads (Polymarket, Kambi,
@@ -154,13 +154,13 @@ changes, writing a file only when it changed (`builders/store.js`):
 A season is kept whole until the next season's first game (preseason
 included), then wiped whole. `private/` is never served.
 
-## 4. The Quadra Pass (`/eco`)
+## 4. The Orbit Pass (`/eco`)
 
 - **A pass** is a random 10-character code, stored only as its SHA-256.
   Passes are issued by the owner (admin page or `tools/issue-passes.mjs`);
   there's no sign-up.
 - **Devices never keep the pass:** a refresh token (60 days) and a short
-  session token (`quadra-token.js`, HMAC under `ECO_TOKEN_SECRET`).
+  session token (`orbit-token.js`, HMAC under `ECO_TOKEN_SECRET`).
 - **One app at a time:** the last to claim is live; others get
   `409 ECO_SESSION_MOVED`.
 - **The store (D1):** the wallet (`entries` with fixed ids, `snap` per
@@ -175,7 +175,7 @@ included), then wiped whole. `private/` is never served.
 ## 5. The economy
 
 The model is `node tools/economy.mjs`; the numbers live in `eco.js` and
-the kit's `quadra.mjs` (the same tables in both).
+the kit's `orbit.mjs` (the same tables in both).
 
 Money is shown only in Securities (its 資金 tab: pay, 信貸, 紓困, 財富等級,
 真相); the Pass sheet is the account and the family, never money.
@@ -233,17 +233,17 @@ app's (`scripts/stamp-version.mjs` → `kit/stamp-app.mjs`) minify each script
 and stylesheet and give it its own content hash (`?v=<hash>`, `kit/hash.mjs`),
 so a phone downloads only the files a push changed (each push re-downloaded
 the whole kit or app before). The kit's `version.json` lists every file's
-hash; the device notes them (`quadra.kitFiles`) and the loader asks for each
+hash; the device notes them (`orbit.kitFiles`) and the loader asks for each
 file at its hash. Built kit files import each other as `#kit/…`, through the
 import map, so a file has one address whichever loader a page carries.
 
 | Module | What |
 | --- | --- |
-| `quadra.mjs` | The core: the session, `proxyJson`/`packJson`, the economy tables, looks, notices, `installGate`, `watchUpdates`, `onlineOnly`, `keepOffline`, `mayLocate`, `tabBar`, `topActions`, `fitNumbers`, `rank` (recommendations), `rec` (除錯紀錄), iPhone behaviour |
-| `quadra.css` | The design system (iOS 27 tokens, Liquid Glass, springs, every control) |
+| `orbit.mjs` | The core: the session, `proxyJson`/`packJson`, the economy tables, looks, notices, `installGate`, `watchUpdates`, `onlineOnly`, `keepOffline`, `mayLocate`, `tabBar`, `topActions`, `fitNumbers`, `rank` (recommendations), `rec` (除錯紀錄), iPhone behaviour |
+| `orbit.css` | The design system (iOS 27 tokens, Liquid Glass, springs, every control) |
 | `ui.mjs` | Builders: `segmented`, `sheet` (the one sheet: `detent`, `foot`, `lead`, `trailing`; the Pass is it), `menu`, `toast`, `list`/`cell`, `search`, `toggle`, `empty`, `navTitle` (collapsing large title), `pullToRefresh`, `view`, the cards and tiles (`tile`, `tag`, `rowCard`, `stats`, `section`, `logoTile`, `matchCard`, `stockRow`, `progressRing`, `monthCalendar`, `panelGrid`…), the one date selector of every app (`dayBar`/`dayStrip` + `daySwipe`, `dayStep`, `dayList`, `dayTop`/`dayNum`: a sticky strip of day chips, 📅 for any day, a swipe for the next); and HTML-string twins of some (`emptyHtml`, `tileHtml`, `statsHtml`, `stockRowHtml`…) |
 | `ui.mjs` icons | `share`, `trash`, `x`, `bank`, `lock`, `exchange`, `cup`, `flag` join the set (`send`, `key`, `swap`, `spark` already existed); apps read `kitUI.icons?.x`, never import |
-| `quadra.css` pieces | `.q-switch.on` (= aria-checked), `.q-sheet-foot` (sticky primary-button footer at a sheet's bottom, safe-area aware), `.q-fig` (grid of captioned bold figures with hairlines, children `small` over `b`) |
+| `orbit.css` pieces | `.q-switch.on` (= aria-checked), `.q-sheet-foot` (sticky primary-button footer at a sheet's bottom, safe-area aware), `.q-fig` (grid of captioned bold figures with hairlines, children `small` over `b`) |
 | `boot.js` | The loading screen and the version check |
 | `brand.mjs` | Families, names, colours, marks, repos, `DEV` |
 | `pass.mjs`, `help.mjs` | The Pass sheet (account, looks, apps, guides: no money); every app's guide |
@@ -297,7 +297,7 @@ Slip-Tracker) are small redirect repos.
 | `node tools/jp-lists.mjs` | Tokyo's TOPIX500 and ETF trading units for Securities, from JPX |
 | `node tools/espn.mjs <path>` | The shape of an ESPN answer |
 | `node tools/issue-passes.mjs` | Issue passes (the owner) |
-| `node tools/accent-css.mjs` | Write each app's accent colours into `quadra.css` |
+| `node tools/accent-css.mjs` | Write each app's accent colours into `orbit.css` |
 
 `npm test` covers the Pass, money, push, the data proxy, F1, Asian
 baseball, Kambi, transit, weather, the builders, the guard and pacing, and
@@ -316,5 +316,5 @@ the kit.
 | `taifex.js` | Securities' 期貨 and 選擇權: TAIFEX settlements (TX/MTX/TMF, TXO), margins, finals |
 | `eco.js` money rules | The kit's tables, Securities' `lib/truth.mjs` and 資金 tab, `help.mjs`, `tools/economy.mjs` |
 | `push.js` checks | The apps that schedule them, `NOTICE_KINDS` |
-| `quadra.css` or the frame | Every app at 375 px, light and dark |
+| `orbit.css` or the frame | Every app at 375 px, light and dark |
 | `brand.mjs` | `node brand/generate.mjs` |

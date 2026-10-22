@@ -26,11 +26,11 @@ globalThis.fetch = async url => {
   asked.push(String(url));
   return answer(String(url));
 };
-const kit = await import('../kit/quadra.mjs');
+const kit = await import('../kit/orbit.mjs');
 const settle = () => new Promise(r => setTimeout(r, 5));
 // Saves and wipes finish after the read answers; a slow runner needs more than one settle.
 const until = async ok => { for (let i = 0; i < 100 && !(await ok()); i++) await settle(); };
-const kept = () => [...(stores.get('quadra-data-v1') || new Map()).keys()];
+const kept = () => [...(stores.get('orbit-data-v1') || new Map()).keys()];
 
 test('a good read is kept on the device; a fresh read that fails answers that copy, whatever failed', async () => {
   const url = 'https://example.test/league.json';
@@ -44,7 +44,7 @@ test('a good read is kept on the device; a fresh read that fails answers that co
     answer = bad;
     assert.deepEqual(await kit.proxyJson(url, { ttl: 1, alone: true }), { games: [1, 2, 3] });
     await settle();
-    const copy = await (await caches.open('quadra-data-v1')).match(kept()[0]);
+    const copy = await (await caches.open('orbit-data-v1')).match(kept()[0]);
     assert.deepEqual(await copy.json(), { games: [1, 2, 3] }, 'the good copy is never saved over');
   }
 });
@@ -85,11 +85,11 @@ test("the family's packs: read from R2, kept under their old address, a missing 
 });
 
 test('signing out wipes the device but its language, safe area and kit version', async () => {
-  for (const k of ['quadra.lang', 'quadra.safeBottom', 'quadra.kit', 'quadra.refresh', 'quadra.account', 'quadra.wallet', 'fx.day.v4']) localStorage.setItem(k, '1');
+  for (const k of ['orbit.lang', 'orbit.safeBottom', 'orbit.kit', 'orbit.refresh', 'orbit.account', 'orbit.wallet', 'fx.day.v4']) localStorage.setItem(k, '1');
   kit.wipeDevice();
-  await until(() => !stores.has('quadra-data-v1'));
-  assert.deepEqual([...local.keys()].sort(), ['quadra.kit', 'quadra.lang', 'quadra.safeBottom']);
-  assert.equal(stores.has('quadra-data-v1'), false);
+  await until(() => !stores.has('orbit-data-v1'));
+  assert.deepEqual([...local.keys()].sort(), ['orbit.kit', 'orbit.lang', 'orbit.safeBottom']);
+  assert.equal(stores.has('orbit-data-v1'), false);
 });
 
 // ESPN's core API refuses the proxy (403, 2026-10-22): read from the device itself.

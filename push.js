@@ -1,5 +1,5 @@
 // ---- push.js ----
-// Quadra's notices while an app is closed (Web Push), routed by worker.js.
+// Orbit's notices while an app is closed (Web Push), routed by worker.js.
 //
 // A phone (an iPhone above all) stops a home-screen app as soon as it's in
 // the background, so an app can't tell anyone anything itself once it's
@@ -40,7 +40,7 @@
 // one list of the keys finds what's due, and no one key every phone rewrites
 // loses another's time), `push:prefs:<account>` the switches,
 // `push:vapid` the Worker's own key pair (made on first use). One device a
-// person an app: the one that subscribed last (Quadra runs one live session
+// person an app: the one that subscribed last (Orbit runs one live session
 // an account anyway).
 //
 // The message is encrypted for the device (RFC 8291, aes128gcm) and signed
@@ -95,7 +95,7 @@ export async function vapidKeys(env) {
 async function vapidHeader(env, endpoint) {
   const { pub, key } = await vapidKeys(env);
   const head = b64u(enc.encode(JSON.stringify({ typ: 'JWT', alg: 'ES256' })));
-  const body = b64u(enc.encode(JSON.stringify({ aud: new URL(endpoint).origin, exp: Math.floor(Date.now() / 1000) + 12 * 3600, sub: 'mailto:quadra@jaypengx.github.io' })));
+  const body = b64u(enc.encode(JSON.stringify({ aud: new URL(endpoint).origin, exp: Math.floor(Date.now() / 1000) + 12 * 3600, sub: 'mailto:orbit@jaypengx.github.io' })));
   const sig = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, enc.encode(`${head}.${body}`));
   return `vapid t=${head}.${body}.${b64u(sig)}, k=${pub}`;
 }
@@ -256,7 +256,7 @@ export async function handlePush(request, env, headers, session, path) {
   if (path === '/push/key') return reply({ key: (await vapidKeys(env)).pub });
   if (!kv) return reply({ error: { message: 'Push isn’t set up here.' } }, 503);
   if (request.method !== 'POST') return reply({ error: { message: 'POST only' } }, 405);
-  if (!session?.d || !APP_KEYS.has(session.a)) return reply({ error: { code: 'QUADRA_PASS_REQUIRED', message: 'Sign in with a Quadra Pass.' } }, 401);
+  if (!session?.d || !APP_KEYS.has(session.a)) return reply({ error: { code: 'ORBIT_PASS_REQUIRED', message: 'Sign in with a Orbit Pass.' } }, 401);
   const body = await bodyText(request, 1_000_000).then(JSON.parse).catch(() => null);
   if (path === '/push/prefs') {
     const prefs = cleanPrefs(body);

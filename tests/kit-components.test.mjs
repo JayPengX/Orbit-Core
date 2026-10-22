@@ -4,11 +4,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as ui from '../kit/ui.mjs';
-import * as quadra from '../kit/quadra.mjs';
+import * as orbit from '../kit/orbit.mjs';
 
-const rawCss = readFileSync(new URL('../kit/quadra.css', import.meta.url), 'utf8');
+const rawCss = readFileSync(new URL('../kit/orbit.css', import.meta.url), 'utf8');
 const css = rawCss.replace(/\/\*[\s\S]*?\*\//g, '');
-const quadraSrc = readFileSync(new URL('../kit/quadra.mjs', import.meta.url), 'utf8');
+const orbitSrc = readFileSync(new URL('../kit/orbit.mjs', import.meta.url), 'utf8');
 
 // A just-enough DOM for h(): elements with a class, attributes and children.
 class FakeNode {}
@@ -49,7 +49,7 @@ test('every new export exists', () => {
     assert.equal(typeof ui[name], 'function', name);
   }
   for (const name of ['work', 'school', 'chevron']) assert.match(ui.icons[name], /^<svg/, `icons.${name}`);
-  assert.equal(typeof quadra.ask, 'function');
+  assert.equal(typeof orbit.ask, 'function');
 });
 
 test('the stylesheet has each new class, and keeps the old section-head rules', () => {
@@ -121,7 +121,7 @@ test('empty(): an icon name is a tile, anything else renders as before', () => {
 });
 
 test('ask/confirm: a named icon is a tile, an emoji keeps its old markup', () => {
-  assert.match(quadraSrc, /Object\.hasOwn\(icons, icon\)/);
-  assert.match(quadraSrc, /named \? ' pro' : ''/);
-  assert.match(quadraSrc, /class: 'q-ask-icon', 'aria-hidden': 'true', text: icon/, 'the emoji branch is unchanged');
+  assert.match(orbitSrc, /Object\.hasOwn\(icons, icon\)/);
+  assert.match(orbitSrc, /named \? ' pro' : ''/);
+  assert.match(orbitSrc, /class: 'q-ask-icon', 'aria-hidden': 'true', text: icon/, 'the emoji branch is unchanged');
 });

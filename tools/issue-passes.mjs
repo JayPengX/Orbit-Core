@@ -1,13 +1,13 @@
-// Quadra Passes to hand out yourself (nobody can make one in an app any more).
+// Orbit Passes to hand out yourself (nobody can make one in an app any more).
 //
 //   node tools/issue-passes.mjs [count]        (300 by default)
 //
 // The first time, it makes your admin token: a random one, kept only on this
-// computer (Desktop/Quadra 管理金鑰.txt, readable by you alone; the admin
+// computer (Desktop/Orbit 管理金鑰.txt, readable by you alone; the admin
 // page, Shared-Proxy/admin/, takes it too), put on GitHub as the
 // secret ECO_ADMIN_TOKEN, and deployed to the eco Worker (it waits for that).
 // Then it asks the Worker for the passes, 100 at a time, and writes them to
-// ~/Documents/Quadra Passes <date>.txt as they come: nothing goes in a repo,
+// ~/Documents/Orbit Passes <date>.txt as they come: nothing goes in a repo,
 // and the codes aren't printed here. Each pass is new, with no one signed in
 // on it; whoever signs in with it first has it.
 import { execFileSync } from 'node:child_process';
@@ -19,7 +19,7 @@ import { join } from 'node:path';
 const ECO_URL = 'https://orbit-workers-proxy.pengzjay.workers.dev/eco';
 const REPO = 'JayPengX/Shared-Proxy';
 const count = Math.max(1, Math.floor(Number(process.argv[2]) || 300));
-const tokenFile = join(homedir(), 'Desktop', 'Quadra 管理金鑰.txt');
+const tokenFile = join(homedir(), 'Desktop', 'Orbit 管理金鑰.txt');
 const sh = (cmd, args, input) => execFileSync(cmd, args, { input, stdio: [input ? 'pipe' : 'ignore', 'pipe', 'inherit'] }).toString().trim();
 
 let token = existsSync(tokenFile) ? readFileSync(tokenFile, 'utf8').trim().split('\n')[0].trim() : '';
@@ -37,8 +37,8 @@ if (!token) {
 }
 
 const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ').replace(':', '');
-const out = join(homedir(), 'Documents', `Quadra Passes ${stamp}.txt`);
-writeFileSync(out, `Quadra Passes, made ${new Date().toLocaleString('zh-TW')}\n\n`, { mode: 0o600 });
+const out = join(homedir(), 'Documents', `Orbit Passes ${stamp}.txt`);
+writeFileSync(out, `Orbit Passes, made ${new Date().toLocaleString('zh-TW')}\n\n`, { mode: 0o600 });
 let made = 0;
 while (made < count) {
   const ask = Math.min(100, count - made);

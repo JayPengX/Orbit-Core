@@ -1,7 +1,7 @@
 // The connection's rule (kit netVerdict): off, slow or fine, as every app's capsule and cover say.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { netVerdict, mayLocate } from '../kit/quadra.mjs';
+import { netVerdict, mayLocate } from '../kit/orbit.mjs';
 
 const now = 1_000_000;
 
@@ -47,7 +47,7 @@ test('location: iOS asked unprompted once per app, again only on a tap; granted 
 });
 
 test('an AI answer\'s wait is never read as a slow connection; the rest of the proxy is', async () => {
-  const { slowByNature } = await import('../kit/quadra.mjs');
+  const { slowByNature } = await import('../kit/orbit.mjs');
   assert.ok(slowByNature('https://orbit-workers-proxy.pengzjay.workers.dev/law-chat?v=1&qt=x'));
   assert.ok(slowByNature('https://orbit-workers-proxy.pengzjay.workers.dev/law-ask'));
   assert.ok(!slowByNature('https://orbit-workers-proxy.pengzjay.workers.dev/law-page?u=x'));

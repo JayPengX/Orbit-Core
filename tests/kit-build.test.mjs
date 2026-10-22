@@ -40,7 +40,7 @@ test("an app's deploy: every reference stamped with its file's hash, the page's 
   await writeFile(join(root, 'lib/side.mjs'), 'globalThis.side = 1;\n');
   await writeFile(join(root, 'b.mjs'), 'export const b = 1;\n');
   await writeFile(join(root, 'styles.css'), 'body { color: red; }\n');
-  const kit = { version: 'k1', files: { 'quadra.mjs': 'abc' } };
+  const kit = { version: 'k1', files: { 'orbit.mjs': 'abc' } };
   await stampApp({ root, version: 'build1', kit });
   const page = await readFile(join(root, 'index.html'), 'utf8');
   const app = await readFile(join(root, 'app.mjs'), 'utf8');

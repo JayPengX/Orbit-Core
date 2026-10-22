@@ -12,7 +12,7 @@
 // starts as the app loads (Transit and Weather wait for the holidays before
 // their first screen), while a kit file's dynamic import stays lazy (the
 // Pass sheet's pass.mjs). The links are written by the page with
-// QUADRA_KIT.url (each file's hash as this device noted it, the import
+// ORBIT_KIT.url (each file's hash as this device noted it, the import
 // map's own address; Weather's own link to the holidays had no version, so
 // on a phone they were fetched twice).
 import { readFile } from 'node:fs/promises';
@@ -54,13 +54,13 @@ export async function kitGraph(entries, kitDir) {
 }
 
 // The page's <script> writing the links (after kit:head, which defines
-// QUADRA_KIT and preloads quadra.mjs and brand.mjs), each at the address the
-// import map gives it (QUADRA_KIT.url): the built kit's files import each
+// ORBIT_KIT and preloads orbit.mjs and brand.mjs), each at the address the
+// import map gives it (ORBIT_KIT.url): the built kit's files import each
 // other through the map too (kit/stamp.mjs), so every one can be preloaded.
 export async function kitPreloads(entries, kitDir) {
   const found = await kitGraph(entries, kitDir);
-  for (const done of ['quadra.mjs', 'brand.mjs']) found.delete(done);
+  for (const done of ['orbit.mjs', 'brand.mjs']) found.delete(done);
   const names = [...found.keys()].sort();
   if (!names.length) return '';
-  return `<script>[${names.map(n => `'${n}'`).join(',')}].forEach(function(f){document.write('<link rel="modulepreload" href="'+QUADRA_KIT.url(f)+'">')})</script>`;
+  return `<script>[${names.map(n => `'${n}'`).join(',')}].forEach(function(f){document.write('<link rel="modulepreload" href="'+ORBIT_KIT.url(f)+'">')})</script>`;
 }

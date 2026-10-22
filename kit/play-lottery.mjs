@@ -1,4 +1,4 @@
-// 彩券: Taiwan Lottery's computer-drawn games, played with Quadra money and
+// 彩券: Taiwan Lottery's computer-drawn games, played with Orbit money and
 // settled against the real draws (Taiwan Lottery's public results API,
 // which sends CORS headers, so the browser reads it directly).
 //

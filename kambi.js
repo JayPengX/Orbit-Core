@@ -1,4 +1,4 @@
-// /kambi: the last score of Kambi matches Quadra Sportsbook has bets on.
+// /kambi: the last score of Kambi matches Orbit Sportsbook has bets on.
 //
 // Kambi (the odds feed behind Play's Asian baseball, EuroLeague and K
 // League) never says

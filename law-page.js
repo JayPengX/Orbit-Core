@@ -13,7 +13,7 @@
 // minute: a page a second for each of the 12 sites).
 import { json, LOCAL_ORIGIN } from './http.js';
 import { fail, twDay, passOf, passKey, countOf, addOne } from './law.js';
-import { sessionLimited } from './quadra-token.js';
+import { sessionLimited } from './orbit-token.js';
 import { twOnly, buildKeyOk } from './law-hosts.js';
 
 export const PAGE_LIMITS = { perPass: 500, perMinute: 60, buildPerMinute: 720, hops: 5, timeoutMs: 20_000, maxHtml: 2 * 1024 * 1024, maxBytes: 6 * 1024 * 1024 };
@@ -134,7 +134,7 @@ const cacheKey = url => `https://law-page.cache/v1?u=${encodeURIComponent(url)}`
 const ttlOf = url => (LONG.has(new URL(url).hostname) ? 30 * 86_400 : 86_400);
 const edge = () => (typeof caches !== 'undefined' && caches.default) || null;
 
-// session: the request's Quadra Pass session (worker.js), or null.
+// session: the request's Orbit Pass session (worker.js), or null.
 export async function handleLawPage(request, env, ctx, headers, session, fetchFn = fetch) {
   if (request.method !== 'GET') return fail('method', 405, headers);
   const origin = request.headers.get('Origin') || '';

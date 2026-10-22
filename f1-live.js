@@ -9,9 +9,9 @@
 // subscribe, and the first answer is the whole state. One snapshot a call
 // (the stream is closed after it), cached a few seconds for everyone.
 //
-// Served by the sports proxy as if from `https://f1-live.quadra/now.json`.
+// Served by the sports proxy as if from `https://f1-live.orbit/now.json`.
 
-export const F1_LIVE_HOST = 'f1-live.quadra';
+export const F1_LIVE_HOST = 'f1-live.orbit';
 const BASE = 'https://livetiming.formula1.com/signalrcore';
 const TOPICS = ['SessionInfo', 'SessionStatus', 'TrackStatus', 'LapCount', 'ExtrapolatedClock', 'DriverList', 'TimingData', 'TimingAppData', 'TimingStats', 'RaceControlMessages', 'WeatherData', 'Position.z', 'LapSeries', 'PitStopSeries'];
 const RS = '\x1e';

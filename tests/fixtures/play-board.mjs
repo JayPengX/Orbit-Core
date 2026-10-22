@@ -131,7 +131,7 @@ export function fakeSources({ now, scale = 1, down = () => false, f1 = false, la
       // An ESPN league's own Kambi list prices nothing here (DraftKings does); a Kambi-only league's is its schedule.
       return kind === 'kambi' ? kambiEvents(gamesOf(key, from, to, scale), now, late) : { events: [] };
     }
-    if (u.hostname === 'asia-baseball.quadra') {
+    if (u.hostname === 'asia-baseball.orbit') {
       const [league, ym] = u.pathname.slice(1).replace('.json', '').split('/');
       const key = Object.entries(LEAGUES).find(([, l]) => l.schedule?.asia === league)?.[0];
       const games = gamesOf(key, from - 60 * 86_400_000, to, scale).filter(g => new Date(g.start + 8 * 3_600_000).toISOString().slice(0, 7) === ym);

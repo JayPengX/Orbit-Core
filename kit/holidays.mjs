@@ -3,7 +3,7 @@
 // their place (補假), for every app that plans a
 // school or work day: Orbit Class (no classes, no class notices), Weather
 // (no 到學校 advice), Transit (no commute picked for you). Weekends are off
-// anyway and aren't listed. Quadra Securities keeps the exchange's own
+// anyway and aren't listed. Orbit Securities keeps the exchange's own
 // calendar (TWSE also closes the two days before Lunar New Year, which
 // aren't days off for anyone else).
 //

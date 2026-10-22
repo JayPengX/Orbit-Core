@@ -5,9 +5,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as ui from '../kit/ui.mjs';
-import * as quadra from '../kit/quadra.mjs';
+import * as orbit from '../kit/orbit.mjs';
 
-const rawCss = readFileSync(new URL('../kit/quadra.css', import.meta.url), 'utf8');
+const rawCss = readFileSync(new URL('../kit/orbit.css', import.meta.url), 'utf8');
 const css = rawCss.replace(/\/\*[\s\S]*?\*\//g, '');
 
 // ---- A just-enough DOM ----
@@ -154,7 +154,7 @@ Object.assign(doc, {
 globalThis.Node = FakeNode;
 globalThis.document = doc;
 const closed = [];
-globalThis.quadraCloseSheet = d => (closed.push(d), d.close());
+globalThis.orbitCloseSheet = d => (closed.push(d), d.close());
 
 const reset = () => {
   for (const c of body.children) if (c instanceof FakeEl) connect(c, false);
@@ -168,7 +168,7 @@ test('every new export exists', () => {
   for (const name of ['tile', 'tag', 'empty', 'stats', 'section', 'sectionHead', 'logoTile', 'sheetHero', 'placeTile', 'navTitle']) {
     assert.equal(typeof ui[`${name}Html`], 'function', `${name}Html`);
   }
-  assert.equal(typeof quadra.sheetVerdict, 'function');
+  assert.equal(typeof orbit.sheetVerdict, 'function');
 });
 
 // ---- the sheet ----
@@ -222,7 +222,7 @@ test('sheet(): the ✕, Escape and a tap on the backdrop close it the same way, 
     if (how === 'backdrop') {
       d.dispatch('click', { clientX: 10, clientY: 20 });
     }
-    assert.deepEqual(closed, [d], `${how} slides it away (quadraCloseSheet)`);
+    assert.deepEqual(closed, [d], `${how} slides it away (orbitCloseSheet)`);
     assert.equal(fired, 1, `${how}: onClose once`);
     assert.equal(d.isConnected, false, 'removed');
     s.close();
@@ -238,7 +238,7 @@ test('sheet(): the ✕, Escape and a tap on the backdrop close it the same way, 
 });
 
 test('sheetVerdict: close, expand, shrink, settle', () => {
-  const v = quadra.sheetVerdict;
+  const v = orbit.sheetVerdict;
   assert.equal(v({ dy: 150, raw: 150 }), 'close');
   assert.equal(v({ dy: 40, raw: 40, speed: 0.8 }), 'close', 'a flick');
   assert.equal(v({ dy: 30, raw: 30 }), 'settle');
@@ -253,10 +253,10 @@ test('sheetVerdict: close, expand, shrink, settle', () => {
 });
 
 test('there is one sheet: the Pass is built by it', () => {
-  const q = readFileSync(new URL('../kit/quadra.mjs', import.meta.url), 'utf8');
+  const q = readFileSync(new URL('../kit/orbit.mjs', import.meta.url), 'utf8');
   const p = readFileSync(new URL('../kit/pass.mjs', import.meta.url), 'utf8');
   assert.match(p, /= sheet\(\{/);
-  for (const [name, src] of [['quadra.mjs', q], ['pass.mjs', p]]) assert.doesNotMatch(src, /(?:node|el)\('dialog', \{ class: '(?:q-sheet|`q-sheet)/, `${name} draws no private sheet`);
+  for (const [name, src] of [['orbit.mjs', q], ['pass.mjs', p]]) assert.doesNotMatch(src, /(?:node|el)\('dialog', \{ class: '(?:q-sheet|`q-sheet)/, `${name} draws no private sheet`);
 });
 
 // ---- empty ----
@@ -389,7 +389,7 @@ test('rubber(): 1:1 at first, never past the max', () => {
 test('pull to refresh: past the threshold it ticks once and refreshes on release; short of it, nothing', async () => {
   const root = withTouchRoot();
   let ticks = 0;
-  globalThis.quadraHaptic = () => ticks++;
+  globalThis.orbitHaptic = () => ticks++;
   let calls = 0;
   let release;
   const stop = ui.pullToRefresh(() => (calls++, new Promise(r => (release = r))));
@@ -426,7 +426,7 @@ test('pull to refresh: past the threshold it ticks once and refreshes on release
   assert.equal(calls, 2);
   stop();
   assert.equal((root.listeners.touchstart || []).length, 0, 'stop() unhooks');
-  delete globalThis.quadraHaptic;
+  delete globalThis.orbitHaptic;
 });
 
 test('pull to refresh: not from a scrolled page, a sheet, a sideways list, sideways, up, or while disabled', () => {
@@ -482,7 +482,7 @@ test('topActions on a phone: no help button, no refresh button, pull to refresh 
   globalThis.matchMedia = q => ({ matches: /coarse/.test(q) });
   let calls = 0;
   const into = bar();
-  const r = quadra.topActions(session(), { refresh: () => calls++, into });
+  const r = orbit.topActions(session(), { refresh: () => calls++, into });
   assert.deepEqual(ids(into), ['q-account'], 'only the account');
   assert.equal(r.help, null);
   assert.equal(r.refresh.hidden, true, 'a real button, kept hidden (apps look up #refresh)');
@@ -500,7 +500,7 @@ test('topActions on a phone: no help button, no refresh button, pull to refresh 
   doc.dispatch('touchend');
   assert.equal(calls, 1);
   // Called again (the app redraws its bar): one listener, not two.
-  quadra.topActions(session(), { refresh: () => calls++, into: bar() });
+  orbit.topActions(session(), { refresh: () => calls++, into: bar() });
   assert.equal(doc.listeners.touchstart.length, 1);
   delete globalThis.matchMedia;
 });
@@ -509,14 +509,14 @@ test('topActions on a computer keeps the refresh button; an app help() keeps its
   reset();
   globalThis.matchMedia = q => ({ matches: false });
   const into = bar();
-  const r = quadra.topActions(session(), { refresh() {}, into });
+  const r = orbit.topActions(session(), { refresh() {}, into });
   assert.deepEqual(ids(into), ['refresh', 'q-account']);
   assert.ok(r.refresh.classList.contains('q-refresh'));
   const own = bar();
-  quadra.topActions(session(), { help() {}, into: own });
+  orbit.topActions(session(), { help() {}, into: own });
   assert.deepEqual(ids(own), ['help-button', 'q-account']);
   const plain = bar();
-  quadra.topActions(session(), { into: plain });
+  orbit.topActions(session(), { into: plain });
   assert.deepEqual(ids(plain), ['q-account'], 'the Pass sheet has the guide');
   delete globalThis.matchMedia;
 });
@@ -528,7 +528,7 @@ test('the Pass sheet has a 說明 tab for every app', async () => {
   // (An app without a guide of its own opens the Pass's general one: renderHelp falls back to 'pass'.)
   assert.match(src, /const at = HELP_ORDER\.includes\(app\) \? app : 'pass'/);
   assert.ok(help.HELP_ORDER.includes('pass'));
-  for (const id of ['stock', 'odds', 'vocab', 'orbit', 'weather', 'transit', 'beats']) assert.ok(help.HELP_ORDER.includes(id) && quadra.APPS[id], `${id} has a guide`);
+  for (const id of ['stock', 'odds', 'vocab', 'orbit', 'weather', 'transit', 'beats']) assert.ok(help.HELP_ORDER.includes(id) && orbit.APPS[id], `${id} has a guide`);
 });
 
 // ---- the stylesheet ----

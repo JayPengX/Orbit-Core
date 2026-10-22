@@ -1,4 +1,4 @@
-// Quadra Securities' prices from Yahoo Finance's public endpoints, in the
+// Orbit Securities' prices from Yahoo Finance's public endpoints, in the
 // kit so the phone and the proxy (stock-fill.js: orders filled at the
 // proxy's own quote) read them with one code: the reader is handed in
 // (useQuotesReader: the phone's is the kit's proxyJson; the proxy's, its
@@ -42,9 +42,9 @@ const getJson = url => {
 // (fund-nav.js), by 基金統編, FUND_BATCH to a request. A fund is
 // `${統編}.TWF`; its price is the NAV dated `date` (that day's, out in the
 // evening), as of the cutoff it answers (FUND_CUTOFF).
-const FUND_NAV = 'https://funds.quadra/nav.json?codes=';
+const FUND_NAV = 'https://funds.orbit/nav.json?codes=';
 // A fund's ten years of NAVs and its profile (fund-nav.js /hist.json: Anue's, checked by 統編).
-const FUND_HIST = 'https://funds.quadra/hist.json?code=';
+const FUND_HIST = 'https://funds.orbit/hist.json?code=';
 const readFundHist = symbol => getJson(FUND_HIST + encodeURIComponent(symbol.slice(0, -4))).catch(() => null);
 const FUND_BATCH = 40;
 
@@ -163,7 +163,7 @@ async function fetchFundQuotes(symbols) {
 // basis (正逆價差) at the last settlement: its settlement price less that
 // day's close of what it's on. The proxy's copy of TAIFEX's table
 // (taifex.js): settlement prices, margins and final settlements.
-const TAIFEX_URL = 'https://taifex.quadra/fut.json';
+const TAIFEX_URL = 'https://taifex.orbit/fut.json';
 const TAIEX = '^TWII';
 const taipeiDate = t => new Date(t + 8 * 3_600_000).toISOString().slice(0, 10);
 // How far a contract stands above (below) what it's on, or null. `under`:

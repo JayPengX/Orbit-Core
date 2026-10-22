@@ -1,7 +1,7 @@
 // ---- stock-check.js ----
-// Quadra Securities' cash, counted by this Worker (the owner's lock-down,
+// Orbit Securities' cash, counted by this Worker (the owner's lock-down,
 // 2026-10-12: no app adds money to the pool; the proxy does; and 2026-10-14:
-// Quadra's money impossible to exploit). Securities keeps its whole
+// Orbit's money impossible to exploit). Securities keeps its whole
 // brokerage on the phone and saves it to the pass; when it does, the Worker
 // replays the account with Securities' own code (the kit's stock-account)
 // and checks every event that adds money before it counts:
@@ -49,7 +49,7 @@ import { parseDoc } from './doc-store.js';
 import { IPO_FEE, IPO_WIN_FEE, ipoOpen, ipoDrawn, ipoBackAt, ipoListAt } from './kit/stock-ipo.mjs';
 
 export const VERIFIED_COLLECTION = 'stock-verified';
-const TAIFEX_URL = 'https://taifex.quadra/fut.json';
+const TAIFEX_URL = 'https://taifex.orbit/fut.json';
 const YAHOO = 'https://query1.finance.yahoo.com';
 const MIN = 60_000;
 const DAY = 86_400_000;

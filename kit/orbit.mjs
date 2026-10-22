@@ -1,8 +1,8 @@
-// The kit: what every app shares, Quadra's and Orbit's. It lives in
+// The kit: what every app shares, Orbit's and Orbit's. It lives in
 // Shared-Proxy/kit/ and is served from Shared-Proxy's GitHub Pages; every
 // app loads it from there (kit/loader.html), so one push changes it for all.
 //
-//   Quadra Securities   stock   where money lives and grows
+//   Orbit Securities   stock   where money lives and grows
 //   Quadra Play         odds    sports betting and the lottery
 //   Orbit Class         orbit   the class schedule
 //   Orbit Weather       weather one forecast, pinned places
@@ -12,11 +12,11 @@
 //   Orbit Slips         slip    台灣運彩 tickets followed live
 //   Orbit Beats         beats   beat pieces arranged into songs
 //
-// The names, colours and marks are brand.mjs's. The Quadra Pass (the
+// The names, colours and marks are brand.mjs's. The Orbit Pass (the
 // account, its looks, the truth about the money, every app and its guide) is the
 // sheet behind every app's account button (pass.mjs).
 //
-// One account works everywhere: the Quadra Pass, a 10-character code for
+// One account works everywhere: the Orbit Pass, a 10-character code for
 // Shared-Proxy's /eco. It is required: every app opens on a sign-in screen
 // until the device is signed in, and the data proxy only answers signed-in
 // apps. A device keeps a revocable sign-in, never the pass; another device
@@ -26,10 +26,10 @@
 //
 // One app at a time: the app in use is the account's live one. Opening
 // another app (or the same app on another device) makes that one live; the
-// one left behind stops refreshing and shows where Quadra is open, with a
+// one left behind stops refreshing and shows where Orbit is open, with a
 // button to continue there. Links between the apps carry the sign-in along.
 
-import { BRANDS, FAMILIES, pathOf, appIcon, familyMark } from './brand.mjs';
+import { BRANDS, FAMILY, pathOf, appIcon, familyMark } from './brand.mjs';
 import { DEV, cleanDev } from './brand.mjs';
 import { icons, tile, pullToRefresh, setSheetDetent, h as node } from './ui.mjs';
 
@@ -41,7 +41,7 @@ export const PROXY_URL = 'https://orbit-workers-proxy.pengzjay.workers.dev/sport
 // Worker's read every five minutes behind it (a change reaches an open app
 // within minutes, a reopened one at once).
 const DEV_URL = 'https://orbit-workers-proxy.pengzjay.workers.dev/config';
-const DEV_KEY = 'quadra.dev';
+const DEV_KEY = 'orbit.dev';
 let devNow = (() => {
   try {
     return cleanDev(JSON.parse(localStorage.getItem(DEV_KEY) || '{}'));
@@ -89,13 +89,12 @@ export function everyDev(key, fn) {
   return () => ((stopped = true), clearTimeout(timer));
 }
 export const SITE = 'https://jaypengx.github.io';
-export const BRAND = { name: 'Quadra', pass: 'Quadra Pass' };
-export { BRANDS, FAMILIES, appIcon, familyMark };
+export const BRAND = { name: 'Orbit', pass: 'Orbit Pass' };
+export { BRANDS, FAMILY, appIcon, familyMark };
 
-// Every app, by the id it stores under. `related`: an Orbit app, outside the
-// money pool.
+// Every app, by the id it stores under.
 export const APPS = Object.fromEntries(
-  Object.entries(BRANDS).map(([id, b]) => [id, { name: b.name, short: b.short, family: b.family, path: pathOf(id), color: b.color, related: b.family === 'orbit', role: b.role }])
+  Object.entries(BRANDS).map(([id, b]) => [id, { name: b.name, short: b.short, path: pathOf(id), color: b.color, role: b.role }])
 );
 export const appName = app => APPS[app]?.name || app;
 
@@ -105,7 +104,7 @@ export const appName = app => APPS[app]?.name || app;
 // a new pass opens with NT$200,000; every Monday (Taiwan time) pays a fixed
 // NT$10,000, the same for every account, like a salary (eco.js pays it,
 // back pay for weeks nobody came). With the wealth level rewards and 急難紓困
-// for someone with nothing, those are the only money Quadra gives; more is
+// for someone with nothing, those are the only money Orbit gives; more is
 // borrowed (信貸, loan.mjs) and repaid from the pay. All of it is shown in
 // Securities (its 資金 tab: pay, 信貸, 紓困, 財富等級, 真相); the Pass itself
 // is the account and the family, never money.
@@ -118,7 +117,7 @@ export const ECONOMY = {
 // loan still owes (borrowed money is nobody's worth).
 export const worthOf = (wallet, now = Date.now()) => poolBalance(wallet) + finiteOr0(wallet?.snap?.stock?.holdings) - debtOf(wallet, now);
 // 財富等級: what the account is worth (worthOf) puts it on a level; the
-// first time it reaches one, Quadra's economy pays the level's reward once
+// first time it reaches one, Orbit's economy pays the level's reward once
 // (eco.js RANKS, the same table: `eco:rank:<id>`).
 export const WEALTH_RANKS = [
   { id: 'start', min: 0, reward: 0, icon: '🌱', zh: '起步', en: 'Starter' },
@@ -136,7 +135,7 @@ const rankName = (id, i) => {
 // Where the money came from and went (all time, NT$): what the system gave
 // (opening money, pay, level rewards, the owner's grants), the government
 // (govOf: relief less taxes), the account
-// against Quadra (Play's settled bets less fees, loan costs and overdraft interest:
+// against Orbit (Play's settled bets less fees, loan costs and overdraft interest:
 // a surplus when it has won more than it lost and paid), and its own result
 // (markets, savings: worth less the other two). A bet still open is in the
 // worth, as money at stake, and in neither side until it's settled.
@@ -146,14 +145,14 @@ import { twDay, finiteOr0 } from './format.mjs';
 export { govOf };
 export function moneySides(wallet) {
   const gave = { start: 0, pay: 0, rank: 0, other: 0 };
-  // Play's settled bets (payouts less stakes) and what Quadra charges (overdraft
+  // Play's settled bets (payouts less stakes) and what Orbit charges (overdraft
   // interest); a bet still open is neither yet: it's money
   // at stake, still the account's.
   let play = 0;
   let fees = 0;
   let atStake = 0;
   // A loan: what came in less what went back; with what's still owed, the
-  // difference is its cost (interest and fees), charged by Quadra's bank.
+  // difference is its cost (interest and fees), charged by Orbit's bank.
   let loanFlow = 0;
   const entries = wallet?.entries || [];
   const ids = new Set(entries.map(e => e.id));
@@ -164,7 +163,7 @@ export function moneySides(wallet) {
       if (e.kind === 'start') gave.start += a;
       else if (e.kind === 'pay') gave.pay += a;
       else if (e.kind === 'rank') gave.rank += a;
-      // (A correction or prize from the admin page: money Quadra gave, either way.)
+      // (A correction or prize from the admin page: money Orbit gave, either way.)
       else if (e.kind === 'rebase' || e.kind === 'admin') gave.other += a;
       else if (e.kind === 'od') fees -= a;
       else if (LOAN_KINDS.has(e.kind)) loanFlow += a;
@@ -180,12 +179,12 @@ export function moneySides(wallet) {
   // The government's side: relief in, taxes out (govOf). Play's winnings came
   // in after tax, so Play's side counts them before it.
   const gov = govOf(wallet);
-  // Against Quadra, signed: above 0 when Play has paid out more than the
-  // account lost there and paid in fees (a surplus), below when Quadra kept more.
-  const quadra = play + gov.paid.sports + gov.paid.lottery - fees;
+  // Against Orbit, signed: above 0 when Play has paid out more than the
+  // account lost there and paid in fees (a surplus), below when Orbit kept more.
+  const orbit = play + gov.paid.sports + gov.paid.lottery - fees;
   // The worth counts money at stake: it's still the account's until settled.
   const worth = worthOf(wallet) + atStake;
-  return { gave, given, quadra, fees, playNet: play, atStake, took: Math.max(0, -quadra), worth, gov, own: worth - given - quadra - gov.net };
+  return { gave, given, orbit, fees, playNet: play, atStake, took: Math.max(0, -orbit), worth, gov, own: worth - given - orbit - gov.net };
 }
 // The weekly pay: fixed, whatever the account holds (eco.js PAY.week).
 export const paydayFor = () => ECONOMY.weekly;
@@ -202,7 +201,7 @@ const LOAN_KINDS = new Set(['loan', 'loanfee', 'loanpay', 'loanlate', 'loanbad',
 //
 // The account button in every app can wear an avatar (the wallet setting
 // `avatar`: { id }) and a frame around it (`frame`: { id }), chosen in the
-// Quadra Pass sheet (外觀). Every one is open to every account.
+// Orbit Pass sheet (外觀). Every one is open to every account.
 export const AVATARS = [
   ...[
     ['sprout', '🌱'], ['fox', '🦊'], ['panda', '🐼'], ['lion', '🦁'], ['dragon', '🐉'], ['unicorn', '🦄'], ['crown', '👑'], ['cat', '🐱'], ['dog', '🐶'], ['frog', '🐸'],
@@ -227,7 +226,7 @@ export const frameOf = wallet => worn(wallet, 'frame', FRAMES);
 
 export function detectLang() {
   try {
-    const saved = localStorage.getItem('quadra.lang');
+    const saved = localStorage.getItem('orbit.lang');
     if (saved === 'zh' || saved === 'en') return saved;
   } catch {}
   const langs = globalThis.navigator?.languages || [globalThis.navigator?.language || 'zh-TW'];
@@ -253,14 +252,14 @@ export const formatPass = code => (code && code.length === 10 ? `${code.slice(0,
 // shown once when it's made, and that's all.
 
 // Keyboard or touch: the focus ring shows only after a key that moves focus
-// (quadra.css), never for focus a tap or the code put somewhere.
+// (orbit.css), never for focus a tap or the code put somewhere.
 if (typeof document !== 'undefined') {
   const root = document.documentElement;
   document.addEventListener('keydown', e => ['Tab', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key) && root.setAttribute('data-q-keys', ''), true);
   document.addEventListener('pointerdown', () => root.removeAttribute('data-q-keys'), true);
 }
 
-const KEY = { refresh: 'quadra.refresh', account: 'quadra.account', wallet: 'quadra.wallet', aff: 'quadra.aff', dismiss: 'quadra.dismiss' };
+const KEY = { refresh: 'orbit.refresh', account: 'orbit.account', wallet: 'orbit.wallet', aff: 'orbit.aff', dismiss: 'orbit.dismiss' };
 // This device's localStorage, never throwing (a private window, storage
 // full or blocked): a string, or a value as JSON (`fallback` when there's
 // none or it can't be read); null (or undefined) removes the key.
@@ -314,7 +313,7 @@ function cacheWallet(account, wallet) {
 // The app's own data as last read or written on this device (under the
 // account), so a cold start paints at once, before the Worker answers.
 // Only small ones (Securities keeps its own compressed copy).
-const payloadKey = app => `quadra.payload.${app}`;
+const payloadKey = app => `orbit.payload.${app}`;
 export function cachedPayload(app, account = storedAccount()) {
   const saved = readJson(payloadKey(app), null);
   return saved && account && saved.account === account ? saved.payload : null;
@@ -392,12 +391,12 @@ export function randomId() {
 //     request, and a first paint asks for about 28 lists at once. A batch
 //     that fails is asked again one by one.
 //
-// The session token comes from the app's quadraSession (the last one made).
+// The session token comes from the app's orbitSession (the last one made).
 let dataSession = null;
-const DATA_CACHE = 'quadra-data-v1';
+const DATA_CACHE = 'orbit-data-v1';
 const DATA_KEEP_MS = 4 * 86_400_000;
 const memory = new Map();
-const dataKey = (url, trim) => `https://quadra.data/${trim ? `${trim}!` : ''}${encodeURIComponent(url)}`;
+const dataKey = (url, trim) => `https://orbit.data/${trim ? `${trim}!` : ''}${encodeURIComponent(url)}`;
 const hasCaches = () => typeof caches !== 'undefined' && typeof Response !== 'undefined';
 async function persisted(key) {
   if (!hasCaches()) return null;
@@ -441,7 +440,7 @@ function keepLater(key, got) {
 // Now and then (every 6 hours on this device, while it's idle), what's
 // older than a few days goes. It read every copy kept: at each app's open
 // it was a tenth to half a second of work, beside the app's own reads.
-const PRUNED_KEY = 'quadra.dataPruned';
+const PRUNED_KEY = 'orbit.dataPruned';
 const PRUNE_EVERY_MS = 6 * 3_600_000;
 let prunedAt = 0;
 function prune() {
@@ -468,14 +467,14 @@ export function clearData() {
   memory.clear();
   if (hasCaches()) caches.delete(DATA_CACHE).catch(() => {});
 }
-// Signed out: nothing of the account stays on this device. The Quadra apps
+// Signed out: nothing of the account stays on this device. The Orbit apps
 // share one origin, so every app's keys in this storage go (the account,
 // the wallet, each app's copy and its own settings; a home-screen app on a
 // phone has storage of its own), this tab's too, and the kept data. Only
 // how the device itself is set up stays: its language and its screen's
 // safe area, and the kit's version (the app files stay cached, so the
 // sign-in screen opens offline).
-const DEVICE_KEYS = new Set(['quadra.lang', 'quadra.safeBottom', 'quadra.kit', 'quadra.kitFiles']);
+const DEVICE_KEYS = new Set(['orbit.lang', 'orbit.safeBottom', 'orbit.kit', 'orbit.kitFiles']);
 export function wipeDevice() {
   for (const store of [globalThis.localStorage, globalThis.sessionStorage]) {
     try {
@@ -490,7 +489,7 @@ export function wipeDevice() {
 export const peekJson = (url, { trim = '' } = {}) => persisted(dataKey(url, trim));
 
 // (`read`: a data proxy read, which takes a session run out up to 6 hours
-// (quadra-token.js READ_GRACE_MS): the token kept on the device goes at once,
+// (orbit-token.js READ_GRACE_MS): the token kept on the device goes at once,
 // not after the sign-in's round trip, when the app opens again after a while.)
 async function dataToken(renew = false, read = false) {
   const s = dataSession;
@@ -736,7 +735,7 @@ function keptJson(url, key, { ttl, keep }, read) {
 
 // ---- The session ---------------------------------------------------------------------
 //
-// const q = quadraSession('odds');
+// const q = orbitSession('odds');
 // q.on('wallet', w => ...)      the wallet changed (pool, settings…)
 // q.on('active', live => ...)   true: this app is the live one; false: paused
 // q.on('claim', c => ...)      every claim's end (opening, coming back,
@@ -752,14 +751,14 @@ function keptJson(url, key, { ttl, keep }, read) {
 // q.write({ payload, wallet })  only while live
 // q.proxy(url, extra)           the data proxy's address for `url`, signed in
 
-// No two-finger zoom in any Quadra app. iOS ignores the viewport's
+// No two-finger zoom in any Orbit app. iOS ignores the viewport's
 // user-scalable=no in Safari and doesn't honour touch-action for pinches
 // everywhere, so the pinch itself is stopped: its gesture events (Safari),
 // a move with two fingers down (every touch browser) and ctrl+wheel (a
 // trackpad pinch). One finger still scrolls and every tap still works.
 function noZoom() {
-  if (typeof document === 'undefined' || document.__quadraNoZoom) return;
-  document.__quadraNoZoom = true;
+  if (typeof document === 'undefined' || document.__orbitNoZoom) return;
+  document.__orbitNoZoom = true;
   const stop = e => e.cancelable && e.preventDefault();
   for (const type of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(type, stop, { passive: false });
   document.addEventListener('touchmove', e => e.touches && e.touches.length > 1 && stop(e), { passive: false });
@@ -787,7 +786,7 @@ export function haptic() {
 }
 // Also as a global: an app that calls it this way still opens on a device
 // whose kit is an older one (an import of a name the old kit lacks would not).
-if (typeof globalThis !== 'undefined') globalThis.quadraHaptic = haptic;
+if (typeof globalThis !== 'undefined') globalThis.orbitHaptic = haptic;
 
 // A sheet closing slides to the foot as its dimming fades, as iOS's (its ✕,
 // a tap outside, a swipe): it leaves at the finger's own speed (`speed`,
@@ -830,7 +829,7 @@ export function closeSheet(d, speed = 0) {
   d.addEventListener('transitionend', e => e.target === d && e.propertyName === 'transform' && shut());
   setTimeout(shut, ms + 60);
 }
-if (typeof globalThis !== 'undefined') globalThis.quadraCloseSheet = closeSheet;
+if (typeof globalThis !== 'undefined') globalThis.orbitCloseSheet = closeSheet;
 
 // Where a sheet's swipe comes to when the finger lets go: 'close' (down past 120 px
 // or flicked), 'expand' (a medium sheet pulled up: large), 'shrink' (a large sheet
@@ -850,8 +849,8 @@ export function sheetVerdict({ dy = 0, raw = 0, speed = 0, detent = '', expandab
 // touch), else springs back. Not from a field or a sideways list, and not
 // while the sheet is scrolled (that finger scrolls it).
 function sheetSwipe() {
-  if (typeof document === 'undefined' || document.__quadraSheetSwipe) return;
-  document.__quadraSheetSwipe = true;
+  if (typeof document === 'undefined' || document.__orbitSheetSwipe) return;
+  document.__orbitSheetSwipe = true;
   let sheet = null;
   let y0 = 0;
   let x0 = 0;
@@ -954,8 +953,8 @@ sheetSwipe();
 // there from where that control's thumb last was (a control is known by
 // its options' words), so a redraw still moves like iOS's.
 function segThumbs() {
-  if (typeof document === 'undefined' || typeof MutationObserver === 'undefined' || document.__quadraSegs) return;
-  document.__quadraSegs = true;
+  if (typeof document === 'undefined' || typeof MutationObserver === 'undefined' || document.__orbitSegs) return;
+  document.__orbitSegs = true;
   const last = new Map();
   const keyOf = seg => seg.dataset.key || [...seg.children].map(b => b.textContent.trim()).join('|');
   const fit = seg => {
@@ -997,8 +996,8 @@ segThumbs();
 
 // A search field's ✕ (.q-search-clear, the kit's): the field emptied as if
 // typed away (its own input event, so the app's search runs), and kept for typing.
-if (typeof document !== 'undefined' && !document.__quadraSearchClear) {
-  document.__quadraSearchClear = true;
+if (typeof document !== 'undefined' && !document.__orbitSearchClear) {
+  document.__orbitSearchClear = true;
   document.addEventListener('click', e => {
     const x = e.target.closest?.('.q-search-clear');
     const input = x?.closest('.q-search')?.querySelector('input');
@@ -1011,7 +1010,7 @@ if (typeof document !== 'undefined' && !document.__quadraSearchClear) {
 }
 
 // A phone or a tablet: html.q-touch, so a tablet gets a phone's frame (no
-// brand header, the tabs at the bottom; quadra.css). boot.js sets it earlier
+// brand header, the tabs at the bottom; orbit.css). boot.js sets it earlier
 // in the apps that load it.
 if (typeof document !== 'undefined' && isPhoneOrTablet()) document.documentElement.classList.add('q-touch');
 
@@ -1024,8 +1023,8 @@ if (typeof document !== 'undefined' && isPhoneOrTablet()) document.documentEleme
 export const PRESS_DELAY = 90;
 export const pressSelector = sel => sel.replace(/:active\b/g, '[data-q-press]');
 function pressOnlyWhenPressed() {
-  if (typeof document === 'undefined' || document.__quadraPress || !document.documentElement.classList.contains('q-touch')) return;
-  document.__quadraPress = true;
+  if (typeof document === 'undefined' || document.__orbitPress || !document.documentElement.classList.contains('q-touch')) return;
+  document.__orbitPress = true;
   const done = new WeakSet();
   let sheets = -1;
   const fixRules = rules => {
@@ -1094,7 +1093,7 @@ function pressOnlyWhenPressed() {
 }
 pressOnlyWhenPressed();
 
-// The solid strip under the phone's status bar (see .q-statusbar in quadra.css).
+// The solid strip under the phone's status bar (see .q-statusbar in orbit.css).
 function statusStrip() {
   if (typeof document === 'undefined' || !document.body || document.querySelector('.q-statusbar')) return;
   const bar = document.createElement('div');
@@ -1105,7 +1104,7 @@ function statusStrip() {
 // A phone turned sideways: every app's screens are drawn for a phone held
 // upright (the owner, 2026-10-10), and iOS can't lock a web app's
 // orientation, so the page turns back against the phone: it stays upright
-// on the glass as if the phone hadn't turned (quadra.css html[data-q-turn]).
+// on the glass as if the phone hadn't turned (orbit.css html[data-q-turn]).
 // Only a phone (its short side 520 px or less); a tablet turns as it likes.
 function uprightTurn() {
   if (typeof document === 'undefined' || document.documentElement.dataset.qTurnOn) return;
@@ -1256,8 +1255,8 @@ if (typeof document !== 'undefined') document.body ? keepStatusStrip() : documen
 // one) every 2 minutes: a read of the pass each time; back on screen it's
 // asked at once anyway (wake), and a write from an app no longer live is
 // refused by the Worker whatever the beat.
-export function quadraSession(app, { lang = detectLang(), heartbeat = 120_000 } = {}) {
-  // The app's colour and meaning tokens (quadra.css) follow <html data-app>;
+export function orbitSession(app, { lang = detectLang(), heartbeat = 120_000 } = {}) {
+  // The app's colour and meaning tokens (orbit.css) follow <html data-app>;
   // kit/apps.mjs writes it into the page, this covers a page it hasn't yet.
   if (typeof document !== 'undefined' && document.documentElement && !document.documentElement.dataset.app) document.documentElement.dataset.app = app;
   // Every app notes the kit's newest version for its next opening, also
@@ -1266,7 +1265,7 @@ export function quadraSession(app, { lang = detectLang(), heartbeat = 120_000 } 
   // (A page that watches already asks with every check.)
   if (typeof document !== 'undefined') setTimeout(() => watching || kitLatest(), 4000);
   const made = makeSession(app, { lang, heartbeat });
-  // A link to a guide (#help=<app>:<topic>) opens the Quadra Pass
+  // A link to a guide (#help=<app>:<topic>) opens the Orbit Pass
   // sheet on it, once the app's first screen is up.
   const help = typeof location !== 'undefined' && /(?:^|[#&])help=([a-z]+)(?::([a-z0-9]+))?/.exec(location.hash);
   if (help && typeof document !== 'undefined') setTimeout(() => !document.querySelector('dialog[open]') && openHelp(made, help[1], help[2] || null), 800);
@@ -1284,9 +1283,9 @@ function makeSession(app, { lang, heartbeat }) {
   // with it rather than after a sign-in round trip (every opening of a
   // home-screen app iOS had closed waited on one: Weather's forecast a second
   // or more later). Taken only for the account signed in here and well inside
-  // its 20 minutes (quadra-token.js SESSION_MS); the refresh token beside it
+  // its 20 minutes (orbit-token.js SESSION_MS); the refresh token beside it
   // is the stronger key already. Gone with the account (signedOut, wipeDevice).
-  const tokenKey = `quadra.token:${app}`;
+  const tokenKey = `orbit.token:${app}`;
   // (One older, up to 6 hours, still reads public data through the proxy: readToken.)
   let keptRead = ['', 0];
   try {
@@ -1531,7 +1530,7 @@ function makeSession(app, { lang, heartbeat }) {
     if (started) return s.first || {};
     // Every app behind the same two doors (Jay, 2026-10-18): on a phone, the
     // home screen only (installGate, its page covered and nothing started),
-    // then a Quadra Pass (signInGate below). An app that asked first is
+    // then a Orbit Pass (signInGate below). An app that asked first is
     // covered once.
     if (typeof document !== 'undefined' && installGate(app, lang)) return new Promise(() => {});
     started = true;
@@ -1618,7 +1617,7 @@ async function takeHandoff(app) {
     globalThis.history?.replaceState(globalThis.history.state, '', `${loc.pathname}${loc.search}${parts.length ? `#${parts.join('&')}` : ''}`);
   } catch {}
   try {
-    sessionStorage.setItem('quadra.visit', '1');
+    sessionStorage.setItem('orbit.visit', '1');
   } catch {}
   if (k !== 'qh') return null;
   try {
@@ -1679,7 +1678,7 @@ const KIND = {
 export function describeEntry(e, lang = 'zh') {
   const i = lang === 'en' ? 1 : 0;
   const what = KIND[e.kind]?.[i] || e.kind;
-  const from = e.app === 'eco' ? 'Quadra' : APPS[e.app]?.short || e.app;
+  const from = e.app === 'eco' ? 'Orbit' : APPS[e.app]?.short || e.app;
   const peer = e.peer ? ` ${e.peer}` : '';
   const note = e.kind === 'rank' && e.app === 'eco' && e.note ? rankName(e.note, i) : e.note;
   return `${from} · ${what}${peer}${note ? ` · ${note}` : ''}`;
@@ -1810,7 +1809,7 @@ function hash01(text) {
   return ((h >>> 0) % 1000) / 1000;
 }
 
-// ---- Help: every app's guide, in the Quadra Pass sheet (help.mjs) ------------------------
+// ---- Help: every app's guide, in the Orbit Pass sheet (help.mjs) ------------------------
 
 // ---- Screens -----------------------------------------------------------------------------
 
@@ -1828,8 +1827,8 @@ function passInput(label) {
   return input;
 }
 const ERR = {
-  SYNC_PASSCODE_NOT_FOUND: ['找不到這組通行碼。', 'No Quadra Pass has this code.'],
-  ECO_CREATE_CLOSED: ['Quadra Pass 由擁有者發放，請向分享給你的人索取。', 'Quadra Passes are handed out by their owner: ask the person who shared Quadra with you.'],
+  SYNC_PASSCODE_NOT_FOUND: ['找不到這組通行碼。', 'No Orbit Pass has this code.'],
+  ECO_CREATE_CLOSED: ['Orbit Pass 由擁有者發放，請向分享給你的人索取。', 'Orbit Passes are handed out by their owner: ask the person who shared Orbit with you.'],
   ECO_PAIR_NOT_FOUND: ['這組裝置代碼無效或已過期（10 分鐘內、只能用一次）。', 'That device code isn’t valid or has expired (10 minutes, once).'],
   RATE_LIMITED: ['嘗試太多次，請稍後再試。', 'Too many tries. Please wait a little.'],
   ECO_LOAN_FUNDS: ['餘額不足以一次還清。', 'Your balance doesn’t cover paying it all off.'],
@@ -1842,13 +1841,13 @@ const ERR = {
 export const errorText = (error, lang) => {
   const e = ERR[error?.code];
   if (e) return lang === 'en' ? e[1] : e[0];
-  return lang === 'en' ? 'Couldn’t reach Quadra. Check the connection and try again.' : '無法連線到 Quadra，請檢查網路後再試一次。';
+  return lang === 'en' ? 'Couldn’t reach Orbit. Check the connection and try again.' : '無法連線到 Orbit，請檢查網路後再試一次。';
 };
 
-// Quadra's own screens (sign-in, install, "in use elsewhere") always sit on
+// Orbit's own screens (sign-in, install, "in use elsewhere") always sit on
 // top of everything: each is a modal <dialog> on the browser's top layer,
 // where no z-index of an app can reach it, and if an app opens a sheet of
-// its own while one is up, the Quadra screen is put back on top at once.
+// its own while one is up, the Orbit screen is put back on top at once.
 // Esc doesn't close them.
 const onTop = new Set();
 let topWatch = null;
@@ -1915,16 +1914,16 @@ function signInGate(s) {
           done(() => s.login(code));
         }
       },
-      [node('label', { class: 'q-gate-label', text: en ? 'Your Quadra Pass or a device code' : 'Quadra Pass 或裝置代碼' }), input, error, enter]
+      [node('label', { class: 'q-gate-label', text: en ? 'Your Orbit Pass or a device code' : 'Orbit Pass 或裝置代碼' }), input, error, enter]
     );
     const gate = node('dialog', { class: 'q-gate', 'aria-modal': 'true', style: `--q-accent:${a.color}` }, [
       node('div', { class: 'q-gate-box' }, [
         node('img', { class: 'q-gate-icon', src: './favicon.svg', alt: '', width: '72', height: '72' }),
-        node('p', { class: 'q-gate-brand', text: a.family === 'orbit' ? 'ORBIT' : 'QUADRA' }),
+        node('p', { class: 'q-gate-brand', text: 'ORBIT' }),
         node('h1', { class: 'q-gate-title', text: a.name }),
-        node('p', { class: 'q-gate-lede', text: en ? 'Sign in with your Quadra Pass: one account for every Quadra and Orbit app.' : '用 Quadra Pass 登入：所有 Quadra 和 Orbit 的 App 共用一個帳戶。' }),
+        node('p', { class: 'q-gate-lede', text: en ? 'Sign in with your Orbit Pass: one account for every Orbit app.' : '用 Orbit Pass 登入：所有 Orbit 的 App 共用一個帳戶。' }),
         form,
-        node('p', { class: 'q-gate-note', text: en ? 'No Quadra Pass yet? Ask the person who shared Quadra with you for one.' : '還沒有 Quadra Pass？請向分享 Quadra 給你的人索取。' }),
+        node('p', { class: 'q-gate-note', text: en ? 'No Orbit Pass yet? Ask the person who shared Orbit with you for one.' : '還沒有 Orbit Pass？請向分享 Orbit 給你的人索取。' }),
         node('p', { class: 'q-gate-note', text: en ? 'Signed in on another device? Its Account sheet gives a device code for this one.' : '已在其他裝置登入？在那裡的「帳戶」取得裝置代碼，就能在這裡登入。' })
       ])
     ]);
@@ -1936,7 +1935,7 @@ function signInGate(s) {
   });
 }
 
-// "Quadra is open in another app": this one waits.
+// "Orbit is open in another app": this one waits.
 let movedEl = null;
 function showMoved(s) {
   if (movedEl || typeof document === 'undefined') return;
@@ -1946,7 +1945,7 @@ function showMoved(s) {
   movedEl = node('dialog', { class: 'q-moved', 'aria-modal': 'true' }, [
     node('div', { class: 'q-moved-box' }, [
       node('p', { class: 'q-moved-title', text: same ? (en ? 'Open on another device' : '已在其他裝置使用') : en ? `In use in ${where}` : `正在 ${where} 使用中` }),
-      node('p', { class: 'q-moved-text', text: en ? 'Quadra runs in one app at a time. This one paused so nothing gets out of step.' : 'Quadra 一次只在一個 App 使用，這裡先暫停，資料才不會互相覆蓋。' }),
+      node('p', { class: 'q-moved-text', text: en ? 'Orbit runs in one app at a time. This one paused so nothing gets out of step.' : 'Orbit 一次只在一個 App 使用，這裡先暫停，資料才不會互相覆蓋。' }),
       node('button', {
         class: 'q-btn primary block',
         type: 'button',
@@ -1976,11 +1975,11 @@ function hideMoved() {
 // own settings).
 
 // extra(): the app's own settings for the sheet (an element), optional.
-// The button is the account's badge (a person in the Quadra mark's colours),
+// The button is the account's badge (a person in the Orbit mark's colours),
 // never the balance: the balance lives inside the sheet.
 const PERSON_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="4"/><path d="M4.5 20.5c1.2-4 4.2-6 7.5-6s6.3 2 7.5 6"/></svg>';
 export function accountButton(s, { extra = null } = {}) {
-  const btn = node('button', { class: 'q-account', type: 'button', 'aria-label': s.lang === 'en' ? 'Quadra Pass' : 'Quadra Pass 帳戶', title: BRAND.pass });
+  const btn = node('button', { class: 'q-account', type: 'button', 'aria-label': s.lang === 'en' ? 'Orbit Pass' : 'Orbit Pass 帳戶', title: BRAND.pass });
   const dot = node('span', { class: 'q-account-dot', 'aria-hidden': 'true' });
   // The avatar worn, else the person.
   const paint = () => {
@@ -2001,7 +2000,7 @@ export function accountButton(s, { extra = null } = {}) {
   return btn;
 }
 
-// ---- Dialogs: Quadra's own, never the browser's alert/confirm ---------------------------
+// ---- Dialogs: Orbit's own, never the browser's alert/confirm ---------------------------
 //
 // ask({ title, body, ok, cancel, danger }) resolves true or false; tell({
 // title, body, ok }) resolves once closed. A centred card over the page (and
@@ -2056,7 +2055,7 @@ export function ask({ title, body = '', points = [], ok = '', cancel = '', dange
 }
 export const tell = (opts = {}) => ask({ ...opts, alertOnly: true }).then(() => undefined);
 
-// The Quadra Pass sheet, in every app (the account button, #help= links; its
+// The Orbit Pass sheet, in every app (the account button, #help= links; its
 // 說明 tab is the one place the guide lives now): Pass (this account), 外觀
 // (avatar and frame), App (every app) and 說明 (every app's guide). Never
 // money: that's Securities'. Loaded when first opened (pass.mjs). tab:
@@ -2077,7 +2076,7 @@ function accountCard(s) {
   const since = Number.isFinite(created) ? new Date(created).toLocaleDateString(en ? 'en-US' : 'zh-TW', { year: 'numeric', month: 'short', day: 'numeric' }) : '';
   const days = since ? Math.max(1, Math.round((Date.now() - created) / 86_400_000)) : 0;
   return node('div', { class: 'q-card-hero' }, [
-    node('div', { class: 'q-hero-top' }, [node('span', { class: 'q-hero-brand', text: 'QUADRA PASS' })]),
+    node('div', { class: 'q-hero-top' }, [node('span', { class: 'q-hero-brand', text: 'ORBIT PASS' })]),
     node('span', { class: 'q-hero-label', text: en ? 'Account' : '帳號' }),
     node('strong', { class: 'q-hero-balance num', text: accountNumber(s.pass) }),
     node('span', { class: 'q-hero-sub', text: since ? (en ? `Opened ${since} · day ${days}` : `${since} 開戶 · 第 ${days} 天`) : '' })
@@ -2154,7 +2153,7 @@ export function passAccount(s, { extra = null, close = () => {} } = {}) {
       act(
         T('在這台裝置登出', 'Sign out on this device'),
         async () => {
-          if (!(await ask({ lang: s.lang, icon: '👋', title: T('在這台裝置登出？', 'Sign out on this device?'), body: T('這台裝置上的資料會全部清除，都保留在 Quadra Pass。', 'Everything on this device is wiped; it all stays on your Quadra Pass.'), ok: T('登出', 'Sign out') }))) return;
+          if (!(await ask({ lang: s.lang, icon: '👋', title: T('在這台裝置登出？', 'Sign out on this device?'), body: T('這台裝置上的資料會全部清除，都保留在 Orbit Pass。', 'Everything on this device is wiped; it all stays on your Orbit Pass.'), ok: T('登出', 'Sign out') }))) return;
           s.signOut();
           location.reload();
         },
@@ -2189,7 +2188,7 @@ export function showNewPass(s, passcode) {
     });
     const box = node('dialog', { class: 'q-gate q-newpass', style: `--q-accent:${APPS[s.app].color}` }, [
       node('div', { class: 'q-gate-box' }, [
-        node('p', { class: 'q-gate-brand', text: 'QUADRA PASS' }),
+        node('p', { class: 'q-gate-brand', text: 'ORBIT PASS' }),
         node('h1', { class: 'q-gate-title', text: T('這是你的新通行碼', 'This is your new pass') }),
         node('div', { class: 'q-pass-code' }, [node('strong', { class: 'num', text: shown }), copy]),
         node('p', { class: 'q-gate-lede', text: T('只會顯示這一次，請記在安全的地方。', 'Shown only once: keep it somewhere safe.') }),
@@ -2245,16 +2244,16 @@ export async function enablePush(s, force = false) {
     if (!reg?.pushManager) return false;
     // The Worker's key, asked once a day (it was asked at every list change).
     const day = new Date().toDateString();
-    const kept = readJson('quadra.push.key', null);
+    const kept = readJson('orbit.push.key', null);
     const key = kept?.day === day && kept.key ? kept.key : (await fetch(`${PUSH_URL}/key`).then(r => r.json())).key;
-    if (key && !(kept?.day === day && kept.key === key)) writeStore('quadra.push.key', JSON.stringify({ key, day }));
+    if (key && !(kept?.day === day && kept.key === key)) writeStore('orbit.push.key', JSON.stringify({ key, day }));
     let sub = await reg.pushManager.getSubscription();
     // One made with another key is replaced.
     const own = sub?.options?.applicationServerKey ? btoa(String.fromCharCode(...new Uint8Array(sub.options.applicationServerKey))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '') === key : true;
     if (sub && !own) await sub.unsubscribe().catch(() => {});
     if (!sub || !own) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(key) });
     const mark = `${sub.endpoint}|${new Date().toDateString()}`;
-    const storeKey = `quadra.push.sub.${s.app}`;
+    const storeKey = `orbit.push.sub.${s.app}`;
     if (!force && readStore(storeKey) === mark) return true;
     if (await pushPost(s, 'subscribe', { sub: sub.toJSON(), lang: s.lang })) writeStore(storeKey, mark);
     return true;
@@ -2267,7 +2266,7 @@ export async function enablePush(s, force = false) {
 // whole list each time (it replaces the last); sent only when it changed.
 export async function schedulePush(s, items) {
   if (!s?.app) return;
-  const storeKey = `quadra.push.list.${s.app}`;
+  const storeKey = `orbit.push.list.${s.app}`;
   // Turned off: the Worker's list emptied too (once).
   if (!notifyOn()) {
     // (Something of the person's own to send, and the pass wants notices: this phone asked, once.)
@@ -2282,7 +2281,7 @@ export async function schedulePush(s, items) {
     .sort((a, b) => a.at - b.at)
     .slice(0, 60);
   const text = JSON.stringify(list);
-  if (readStore(storeKey) === text && readStore(`quadra.push.sub.${s.app}`)) return;
+  if (readStore(storeKey) === text && readStore(`orbit.push.sub.${s.app}`)) return;
   if (!(await enablePush(s))) return;
   const before = readStore(storeKey);
   if (await pushPost(s, 'schedule', { items: list })) {
@@ -2299,16 +2298,16 @@ function keepPushed(app, listText) {
   const now = Date.now();
   let kept = {};
   try {
-    kept = JSON.parse(readStore(`quadra.push.sent.${app}`) || '{}') || {};
+    kept = JSON.parse(readStore(`orbit.push.sent.${app}`) || '{}') || {};
     for (const x of JSON.parse(listText || '[]')) if (x?.tag && x.at <= now) kept[x.tag] = x.at;
   } catch {}
-  writeStore(`quadra.push.sent.${app}`, JSON.stringify(Object.fromEntries(Object.entries(kept).filter(([, at]) => at > now - PUSHED_MS))));
+  writeStore(`orbit.push.sent.${app}`, JSON.stringify(Object.fromEntries(Object.entries(kept).filter(([, at]) => at > now - PUSHED_MS))));
 }
 function pushedHere(app, key) {
   try {
     const now = Date.now();
-    if (JSON.parse(readStore(`quadra.push.list.${app}`) || '[]').some(x => x.tag === key)) return true;
-    const at = JSON.parse(readStore(`quadra.push.sent.${app}`) || '{}')[key];
+    if (JSON.parse(readStore(`orbit.push.list.${app}`) || '[]').some(x => x.tag === key)) return true;
+    const at = JSON.parse(readStore(`orbit.push.sent.${app}`) || '{}')[key];
     return Number.isFinite(at) && at > now - PUSHED_MS;
   } catch {
     return false;
@@ -2358,11 +2357,11 @@ export const NOTICE_KINDS = {
 // The switches belong to the pass, not the device: the wallet setting
 // `notify` ({ on, off: ['stock:alert', …] }, newest wins), so every app and
 // every device follows the same ones (apps on a phone's home screen don't
-// even share storage). This device keeps a copy (`quadra.notify.prefs`, with
+// even share storage). This device keeps a copy (`orbit.notify.prefs`, with
 // the time it was set) for when it's offline, and sends a newer one up when
 // its app is the live one. `on` is "system notices wanted"; each device (and,
 // on an iPhone, each app) still has to be allowed once by the phone.
-const PREFS_KEY = 'quadra.notify.prefs';
+const PREFS_KEY = 'orbit.notify.prefs';
 const cleanPrefs = v => ({
   ...(typeof v?.on === 'boolean' ? { on: v.on } : {}),
   // (The ask closed once, anywhere: never asked again, in any app or on any device.)
@@ -2416,7 +2415,7 @@ export async function syncPrefs(s) {
     // The Worker's copy, once per change.
     const now = notifyPrefs();
     const text = JSON.stringify({ on: now.on !== false, off: now.off });
-    if (readStore('quadra.push.prefs') !== text && (await pushPost(s, 'prefs', JSON.parse(text)))) writeStore('quadra.push.prefs', text);
+    if (readStore('orbit.push.prefs') !== text && (await pushPost(s, 'prefs', JSON.parse(text)))) writeStore('orbit.push.prefs', text);
   })().finally(() => (syncingPrefs = null));
   return syncingPrefs;
 }
@@ -2430,16 +2429,16 @@ export async function syncPrefs(s) {
 function offerNotices(s) {
   if (typeof document === 'undefined' || !s.pass || !('Notification' in globalThis)) return;
   if (notifyPrefs().on !== true || notifyPrefs().quiet || Notification.permission !== 'default') return;
-  if (readStore('quadra.notify.offered') || bannerEl?.isConnected) return;
+  if (readStore('orbit.notify.offered') || bannerEl?.isConnected) return;
   const T = (zh, e) => (s.lang === 'en' ? e : zh);
   bannerEl?.remove();
   const el = node('div', { class: 'q-banner q-banner-ask', role: 'dialog', 'aria-label': T('開啟通知', 'Turn on notices'), style: `--q-accent:${APPS[s.app].color}` }, [
     node('img', { src: './favicon.svg', alt: '' }),
-    node('div', {}, [node('strong', { text: T('在這裡也開啟通知？', 'Notices here too?') }), node('span', { text: T(`你的 Quadra Pass 開啟了通知，${APPS[s.app].short} 在這台裝置還需要允許一次。`, `Your Quadra Pass has notices on; ${APPS[s.app].short} on this device needs allowing once.`) })]),
+    node('div', {}, [node('strong', { text: T('在這裡也開啟通知？', 'Notices here too?') }), node('span', { text: T(`你的 Orbit Pass 開啟了通知，${APPS[s.app].short} 在這台裝置還需要允許一次。`, `Your Orbit Pass has notices on; ${APPS[s.app].short} on this device needs allowing once.`) })]),
     node('button', { class: 'q-banner-go', type: 'button', text: T('允許', 'Allow') }),
     node('button', { class: 'q-banner-x', type: 'button', 'aria-label': T('關閉', 'Close'), text: '×' })
   ]);
-  writeStore('quadra.notify.offered', String(Date.now()));
+  writeStore('orbit.notify.offered', String(Date.now()));
   const gone = (quiet = false) => {
     if (quiet) savePrefs({ ...notifyPrefs(), quiet: true }, s);
     el.classList.add('out');
@@ -2519,7 +2518,7 @@ function notifyRows(s, note) {
   );
   return [
     node('div', { class: 'q-rows' }, [master]),
-    node('p', { class: 'q-notice-note', text: T('通知設定跟著 Quadra Pass：在每個 App、每台裝置都一樣。', 'Notice settings follow your Quadra Pass: the same in every app, on every device.') }),
+    node('p', { class: 'q-notice-note', text: T('通知設定跟著 Orbit Pass：在每個 App、每台裝置都一樣。', 'Notice settings follow your Orbit Pass: the same in every app, on every device.') }),
     node('div', { class: 'q-rows q-notice-kinds' }, groups)
   ];
 }
@@ -2532,7 +2531,7 @@ export async function notify(s, { title, body = '', tag = '', hash = '', kind = 
   if (tag) shown.add(key);
   // One the Worker sends (or already sent) this device as a phone notice
   // (schedulePush, push on here): no banner on top of it.
-  if (tag && notifyOn() && readStore(`quadra.push.sub.${s.app}`) && pushedHere(s.app, key)) return;
+  if (tag && notifyOn() && readStore(`orbit.push.sub.${s.app}`) && pushedHere(s.app, key)) return;
   if (typeof document !== 'undefined' && document.visibilityState === 'visible') return queueBanner(s, { title, body, hash });
   if (!notifyOn()) return;
   const options = { body, tag: key, icon: './icons/icon-192.png', badge: './icons/icon-192.png', data: { url: `${APPS[s.app].path}${hash ? `#${hash}` : ''}` } };
@@ -2643,7 +2642,7 @@ export function installGate(app, lang = detectLang()) {
   const gate = node('dialog', { class: 'q-gate q-install', 'aria-modal': 'true', style: `--q-accent:${APPS[app].color}` }, [
     node('div', { class: 'q-gate-box' }, [
       node('img', { class: 'q-gate-icon', src: './favicon.svg', alt: '', width: '72', height: '72' }),
-      node('p', { class: 'q-gate-brand', text: APPS[app].family === 'orbit' ? 'ORBIT' : 'QUADRA' }),
+      node('p', { class: 'q-gate-brand', text: 'ORBIT' }),
       node('h1', { class: 'q-gate-title', text: en ? `Add ${name} to your home screen` : `把 ${name} 加入主畫面` }),
       node(
         'ol',
@@ -2682,7 +2681,7 @@ export function phoneOnlyGate(app, { lang = detectLang(), qr = '' } = {}) {
   const gate = node('dialog', { class: 'q-gate q-phone-only', 'aria-modal': 'true', style: `--q-accent:${APPS[app].color}` }, [
     node('div', { class: 'q-gate-box' }, [
       node('img', { class: 'q-gate-icon', src: './favicon.svg', alt: '', width: '72', height: '72' }),
-      node('p', { class: 'q-gate-brand', text: APPS[app].family === 'orbit' ? 'ORBIT' : 'QUADRA' }),
+      node('p', { class: 'q-gate-brand', text: 'ORBIT' }),
       node('h1', { class: 'q-gate-title', text: en ? `${name} is made for your phone` : `${name} 是手機 App` }),
       node('p', { class: 'q-gate-lede', text: en ? 'It lives in your pocket, beside your day. Open it on your phone:' : '課表跟著你一整天，所以只在手機上使用。用手機打開：' }),
       qrBox,
@@ -2692,8 +2691,8 @@ export function phoneOnlyGate(app, { lang = detectLang(), qr = '' } = {}) {
         'ol',
         { class: 'q-steps' },
         (en
-          ? ['Scan the code with your phone’s camera (or open the link on it).', 'Add it to the home screen: Share → “Add to Home Screen” on iPhone, ⋮ → “Install app” on Android.', 'Sign in with your Quadra Pass or a device code: your schedule is already there.']
-          : ['用手機相機掃描上面的條碼（或在手機打開連結）。', '加入主畫面：iPhone 點「分享」→「加入主畫面」；Android 點 ⋮ →「安裝應用程式」。', '用 Quadra Pass 或裝置代碼登入，課表就在裡面。']
+          ? ['Scan the code with your phone’s camera (or open the link on it).', 'Add it to the home screen: Share → “Add to Home Screen” on iPhone, ⋮ → “Install app” on Android.', 'Sign in with your Orbit Pass or a device code: your schedule is already there.']
+          : ['用手機相機掃描上面的條碼（或在手機打開連結）。', '加入主畫面：iPhone 點「分享」→「加入主畫面」；Android 點 ⋮ →「安裝應用程式」。', '用 Orbit Pass 或裝置代碼登入，課表就在裡面。']
         ).map(t => node('li', { text: t }))
       )
     ])
@@ -2704,13 +2703,13 @@ export function phoneOnlyGate(app, { lang = detectLang(), qr = '' } = {}) {
   return true;
 }
 
-// Keeps every open Quadra page on the latest deploy, at once, whatever the
+// Keeps every open Orbit page on the latest deploy, at once, whatever the
 // person is doing (the owner's rule: an update never waits for a sheet to
 // close or a relaunch). version.json is read as soon as the kit loads (this
 // module starts the watch itself from the page's build-version, before the
 // app's own start has finished), every `every` ms, whenever the page comes
 // back into view, gets focus or comes online, and as soon as any other open
-// Quadra page has found an update (a BroadcastChannel). A newer deploy is put
+// Orbit page has found an update (a BroadcastChannel). A newer deploy is put
 // in place straight away: the place on the page kept (rememberPlace), the new
 // page loaded (cached files kept: each file's address is its content's, so
 // only what changed downloads again). A reload that came back on the
@@ -2718,11 +2717,11 @@ export function phoneOnlyGate(app, { lang = detectLang(), qr = '' } = {}) {
 // seconds later, not left for the next launch.
 // The kit, loaded from one place for every app (kit/loader.html), has its
 // own version. kitLatest() notes the newest one for the next page load
-// and each file's hash (quadra.kit and quadra.kitFiles, which the loader
+// and each file's hash (orbit.kit and orbit.kitFiles, which the loader
 // reads) and says whether this page runs an older one: 'kit:<version>', or
 // null when it's current. The first version seen on a device is only noted:
 // that page already runs the latest (or the hashes its deploy baked in).
-const KIT = () => globalThis.QUADRA_KIT;
+const KIT = () => globalThis.ORBIT_KIT;
 async function kitLatest() {
   const kit = KIT();
   if (!kit?.base) return null;
@@ -2731,9 +2730,9 @@ async function kitLatest() {
     const got = res.ok ? await res.json() : null;
     const latest = got?.version;
     if (!latest) return null;
-    if (readStore('quadra.kit') !== latest) writeStore('quadra.kit', latest);
+    if (readStore('orbit.kit') !== latest) writeStore('orbit.kit', latest);
     const files = got.files ? JSON.stringify({ version: latest, files: got.files }) : null;
-    if (files && readStore('quadra.kitFiles') !== files) writeStore('quadra.kitFiles', files);
+    if (files && readStore('orbit.kitFiles') !== files) writeStore('orbit.kitFiles', files);
     if (latest === kit.version) return null;
     if (!kit.version || kit.noted === false) {
       kit.version = latest;
@@ -2788,7 +2787,7 @@ export function watchUpdates({ current, key, every = 15_000 } = {}) {
   watching = { current, key };
   let checking = false;
   let retry = 0;
-  const channel = globalThis.BroadcastChannel ? new BroadcastChannel('quadra-updates') : null;
+  const channel = globalThis.BroadcastChannel ? new BroadcastChannel('orbit-updates') : null;
   async function apply(latest) {
     // (Music playing: not now. The check every few seconds, or the next opening, updates once it stops.)
     if (sounding()) return;
@@ -2797,7 +2796,7 @@ export function watchUpdates({ current, key, every = 15_000 } = {}) {
     // reloaded and stopped (2026-10-21). Coming back on screen checks at once.)
     if (document.visibilityState === 'hidden') return;
     // The same deploy tried again at most 6 times in the session, 5 s apart.
-    const flag = `${key || 'quadra'}.reloadedTo`;
+    const flag = `${key || 'orbit'}.reloadedTo`;
     const [was, tries = 0, at = 0] = String(sessionStorage.getItem(flag) || '').split('|');
     const n = was === latest ? Number(tries) || 0 : 0;
     if (n >= 6) return;
@@ -2859,12 +2858,12 @@ export function watchUpdates({ current, key, every = 15_000 } = {}) {
 // same one it passes to watchUpdates later (that call then finds it running).
 if (typeof document !== 'undefined' && typeof location !== 'undefined') {
   const current = document.querySelector('meta[name="build-version"]')?.content;
-  if (current) watchUpdates({ current, key: `quadra.page:${location.pathname}` });
+  if (current) watchUpdates({ current, key: `orbit.page:${location.pathname}` });
   // Back from an update's reload: the scroll put back once the app lifts its loading screen, in every app.
   const box = document.getElementById('loading');
   let placed = false;
   try {
-    placed = Boolean(sessionStorage.getItem('quadra.place'));
+    placed = Boolean(sessionStorage.getItem('orbit.place'));
   } catch {}
   if (box && placed && typeof MutationObserver !== 'undefined') {
     const seen = new MutationObserver(() => {
@@ -2890,8 +2889,8 @@ if (typeof document !== 'undefined' && typeof location !== 'undefined') {
 // the one the person scrolled away from never pulled back. Every app,
 // every strip, nothing to call.
 function keepStrips() {
-  if (typeof document === 'undefined' || typeof MutationObserver === 'undefined' || globalThis.__quadraStrips) return;
-  globalThis.__quadraStrips = true;
+  if (typeof document === 'undefined' || typeof MutationObserver === 'undefined' || globalThis.__orbitStrips) return;
+  globalThis.__orbitStrips = true;
   const kept = new Map();
   const host = el => el.parentElement?.closest('[id]') || document.body;
   const classOf = el => (typeof el.className === 'string' ? el.className.trim().split(/\s+/).filter(c => !/^(is-|on$|active$|open$|stuck$)/.test(c)).sort().join('.') : '');
@@ -2943,8 +2942,8 @@ function keepStrips() {
       const h = k.hostId ? document.getElementById(k.hostId) : document.body;
       if (!h) continue;
       const el = likes(h, k.tag, k.cls)[k.index];
-      if (!el || el.__quadraKept === k || !sideways(el)) continue;
-      el.__quadraKept = k;
+      if (!el || el.__orbitKept === k || !sideways(el)) continue;
+      el.__orbitKept = k;
       k.el = el;
       if (el.scrollLeft !== 0) continue;
       const item = k.text == null ? null : [...el.children].find(c => c.textContent === k.text);
@@ -2978,7 +2977,7 @@ keepStrips();
 // a search at the top was pushed off the screen. The kit follows the visible
 // part of the screen (visualViewport) and writes it as CSS variables on
 // <html>: --q-kb (how much the keys cover at the foot), --q-vvh (the height
-// still seen); .q-kb while the keys are up. quadra.css lifts open sheets
+// still seen); .q-kb while the keys are up. orbit.css lifts open sheets
 // above the keys and fits them to what's left, hides the tab bar, and
 // anything marked .q-kb-dock (a bar that belongs on top of the keys) sits
 // there, as does a bar fixed at the foot holding the field (.q-kb-docked).
@@ -2991,8 +2990,8 @@ keepStrips();
 // part the keys cover, 0 there, since the page's foot is already on them).
 function watchKeyboard() {
   const vv = globalThis.visualViewport;
-  if (typeof document === 'undefined' || !vv || globalThis.__quadraKeyboard) return;
-  globalThis.__quadraKeyboard = true;
+  if (typeof document === 'undefined' || !vv || globalThis.__orbitKeyboard) return;
+  globalThis.__orbitKeyboard = true;
   const root = document.documentElement;
   let frame = 0;
   // The page's height before any typing, at this width (an iPhone turned resets it).
@@ -3219,8 +3218,8 @@ export function balanceRows(root = document) {
   }
 }
 function watchNames() {
-  if (typeof document === 'undefined' || typeof MutationObserver === 'undefined' || globalThis.__quadraFit) return;
-  globalThis.__quadraFit = true;
+  if (typeof document === 'undefined' || typeof MutationObserver === 'undefined' || globalThis.__orbitFit) return;
+  globalThis.__orbitFit = true;
   let frame = 0;
   const soon = () => (frame ||= requestAnimationFrame(() => ((frame = 0), fitNames(), balanceRows())));
   const start = () => {
@@ -3390,8 +3389,8 @@ export function darkLogoFailed(img) {
   return true;
 }
 function watchDarkLogos() {
-  if (typeof document === 'undefined' || typeof MutationObserver === 'undefined' || globalThis.__quadraDarkLogos) return;
-  globalThis.__quadraDarkLogos = true;
+  if (typeof document === 'undefined' || typeof MutationObserver === 'undefined' || globalThis.__orbitDarkLogos) return;
+  globalThis.__orbitDarkLogos = true;
   let frame = 0;
   const soon = () => (frame ||= requestAnimationFrame(() => ((frame = 0), darkLogos())));
   const start = () => {
@@ -3425,7 +3424,7 @@ watchDarkLogos();
 
 // Where the person was (the scroll), kept across a reload for an update and
 // put back by restorePlace() once the app has painted.
-const PLACE_KEY = 'quadra.place';
+const PLACE_KEY = 'orbit.place';
 export function rememberPlace() {
   try {
     sessionStorage.setItem(PLACE_KEY, JSON.stringify({ path: location.pathname, hash: location.hash, y: Math.round(globalThis.scrollY || 0), t: Date.now() }));
@@ -3441,7 +3440,7 @@ export function restorePlace() {
 
 // The fixed tab bar keeps clear of the iPhone's home indicator even when iOS
 // reports no safe area after a resume (the largest inset seen is a floor).
-const SAFE_KEY = 'quadra.safeBottom';
+const SAFE_KEY = 'orbit.safeBottom';
 function steadyTabBar() {
   if (typeof window === 'undefined' || typeof document === 'undefined' || !window.getComputedStyle) return;
   const root = document.documentElement;
@@ -3546,7 +3545,7 @@ function judgeNet() {
 }
 // One small ask that never comes from a copy: the kit's version.
 function probeNet() {
-  const base = globalThis.QUADRA_KIT?.base;
+  const base = globalThis.ORBIT_KIT?.base;
   if (!base || net.probing) return;
   net.probing = Date.now();
   globalThis
@@ -3634,8 +3633,8 @@ function paintCover() {
   document.body.append(cover);
 }
 function watchNet() {
-  if (typeof window === 'undefined' || window.__quadraNet || typeof window.fetch !== 'function') return;
-  window.__quadraNet = true;
+  if (typeof window === 'undefined' || window.__orbitNet || typeof window.fetch !== 'function') return;
+  window.__orbitNet = true;
   const real = window.fetch.bind(window);
   const own = url => {
     try {
@@ -3650,7 +3649,7 @@ function watchNet() {
   const ours = url => {
     try {
       const u = new URL(url, location.href);
-      return u.origin === location.origin || u.hostname.endsWith('.workers.dev') || (globalThis.QUADRA_KIT?.base && u.href.startsWith(new URL(globalThis.QUADRA_KIT.base, location.href).href));
+      return u.origin === location.origin || u.hostname.endsWith('.workers.dev') || (globalThis.ORBIT_KIT?.base && u.href.startsWith(new URL(globalThis.ORBIT_KIT.base, location.href).href));
     } catch {
       return true;
     }
@@ -3685,7 +3684,7 @@ function watchNet() {
   const reboot = () => {
     if (!broken || sounding()) return false;
     try {
-      const key = `quadra.reboot:${location.pathname}`;
+      const key = `orbit.reboot:${location.pathname}`;
       if (Date.now() - Number(sessionStorage.getItem(key) || 0) < 30 * 60_000) return false;
       sessionStorage.setItem(key, String(Date.now()));
     } catch {
@@ -3931,7 +3930,7 @@ export function tabBar({ tabs, onSelect, hash = id => `#${id}`, nav = document.g
         if (b.getAttribute('aria-selected') !== String(on)) b.setAttribute('aria-selected', String(on));
         if (b.tabIndex !== (on ? 0 : -1)) b.tabIndex = on ? 0 : -1;
         const panel = document.getElementById(`panel-${tid}`);
-        // (.q-tabpanel: hidden without dropping its drawing, quadra.css, so its
+        // (.q-tabpanel: hidden without dropping its drawing, orbit.css, so its
         // pictures are there at once when it's chosen again, never redrawn blank.)
         if (panel && !panel.classList.contains('q-tabpanel')) panel.classList.add('q-tabpanel');
         if (panel && panel.hidden !== !on) panel.hidden = !on;
@@ -4004,7 +4003,7 @@ export function tabBar({ tabs, onSelect, hash = id => `#${id}`, nav = document.g
 //     in the result has a `disabled` an app sets while it loads: on a phone
 //     it holds off a pull, on a computer it spins the button.
 //   help(): only for an app with a help of its own: it keeps its 說明 button.
-//     Without it there's none: 說明 is a tab of the Quadra Pass sheet (the
+//     Without it there's none: 說明 is a tab of the Orbit Pass sheet (the
 //     account button), opening on this app's guide.
 // Returns { help, refresh } (the buttons, or null, or refresh's stand-in).
 let stopPull = null;
@@ -4107,12 +4106,12 @@ export function watchFit(selector, { roots = null } = {}) {
 // Transit a trip's plans and the bikes round them, before they're ranked).
 // The last of each kind is always kept, in memory only, so 複製 right after
 // something looks wrong has it, with nothing switched on first. With 記錄
-// on (Quadra Pass → 除錯紀錄; it stays on until switched off), every one is
+// on (Orbit Pass → 除錯紀錄; it stays on until switched off), every one is
 // kept on this device, with the app's errors and the screens opened, up to
 // about 2 MB, oldest gone first. Nothing leaves the device unless copied or
 // shared, and never the pass, a token or a key (left out by name).
-const REC_KEY = 'quadra.rec';
-const REC_ON = 'quadra.recOn';
+const REC_KEY = 'orbit.rec';
+const REC_ON = 'orbit.recOn';
 const REC_MAX = 2_000_000;
 const recLast = new Map();
 const secret = /^(pass|passcode|token|secret|auth|authorization|password|apikey|api_key)$/i;
@@ -4186,7 +4185,7 @@ export function recDump(app = dataSession?.app || '') {
     {
       app,
       at: new Date().toISOString(),
-      kit: globalThis.QUADRA_KIT?.version || '',
+      kit: globalThis.ORBIT_KIT?.version || '',
       page: typeof location !== 'undefined' ? location.pathname + location.hash : '',
       ua: typeof navigator !== 'undefined' ? navigator.userAgent : '',
       installed: typeof matchMedia !== 'undefined' && matchMedia('(display-mode: standalone)').matches,
@@ -4256,7 +4255,7 @@ function recRows(s, note) {
 // never a redraw (an element with halftimeAttrs).
 const HALFTIME_MIN = { soccer: 15, basketball: 15, football: 13 };
 const HALFTIME_LEAGUE_MIN = { ncaaf: 20, 'college-football': 20, 'football/college-football': 20 };
-const HALFTIME_KEY = 'quadra.halftime';
+const HALFTIME_KEY = 'orbit.halftime';
 export const halftimeMinutes = (sport, league = '') => HALFTIME_LEAGUE_MIN[league] ?? HALFTIME_MIN[sport] ?? null;
 export function halftimeStartOf(summary) {
   const drives = summary?.drives || {};
@@ -4413,8 +4412,8 @@ export function liveChanged(key, text, now = globalThis.performance?.now?.() ?? 
   return before != null && before !== text && /\d/.test(before) && /\d/.test(text) && now > LIVE_QUIET_MS;
 }
 function watchLive() {
-  if (typeof document === 'undefined' || typeof MutationObserver === 'undefined' || document.__quadraLive) return;
-  document.__quadraLive = true;
+  if (typeof document === 'undefined' || typeof MutationObserver === 'undefined' || document.__orbitLive) return;
+  document.__orbitLive = true;
   const pop = el => {
     if (reducedMotion() || document.hidden) return;
     el.classList.remove('q-bump');

@@ -8,7 +8,7 @@
 import { writeFile, readFile, mkdir, rm, access } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { execSync } from 'node:child_process';
-import { BRANDS, FAMILIES, PASS, appIcon, familyMark, homeOf, pathOf } from '../kit/brand.mjs';
+import { BRANDS, FAMILY, PASS, appIcon, familyMark, homeOf, pathOf } from '../kit/brand.mjs';
 import { FORMATS, shareCard } from './marks.mjs';
 
 // The global one, or a Mac's in ~/.local/opt/playwright (as tools/preview.mjs).
@@ -34,17 +34,14 @@ const exists = p =>
 const ABOUT = {
   vocab: '大考中心 6000 字（一到六級），每個字都有真人發音；記憶模型替你安排複習，背過的字不再忘。'
 };
-// Where an app's files are: its folder here (the old name until the repo is
-// renamed), its site folder, and how its page names files (Orbit Class is
+// Where an app's files are: its folder here, its site folder, and how its page names files (Orbit Class is
 // built by Vite: no ./, and a ?v= the build fills in).
 async function placeOf(id) {
   const b = BRANDS[id];
-  for (const dir of [b.repo, b.was].filter(Boolean)) {
-    if (!(await exists(`${root}${dir}`))) continue;
-    if (id === 'orbit') return { dir, site: `${root}${dir}/public/`, page: `${root}${dir}/index.html`, manifest: `${root}${dir}/public/manifest.json`, href: f => `${f}?v=__APP_VERSION__` };
-    return { dir, site: `${root}${dir}/public/`, page: `${root}${dir}/public/index.html`, manifest: `${root}${dir}/public/manifest.webmanifest`, href: f => `./${f}` };
-  }
-  return null;
+  const dir = b.repo;
+  if (!(await exists(`${root}${dir}`))) return null;
+  if (id === 'orbit') return { dir, site: `${root}${dir}/public/`, page: `${root}${dir}/index.html`, manifest: `${root}${dir}/public/manifest.json`, href: f => `${f}?v=__APP_VERSION__` };
+  return { dir, site: `${root}${dir}/public/`, page: `${root}${dir}/public/index.html`, manifest: `${root}${dir}/public/manifest.webmanifest`, href: f => `./${f}` };
 }
 
 const browser = await chromium.launch();
@@ -69,7 +66,7 @@ const esc = t => String(t).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replac
 // The page's name, icons and link-preview tags, as one block.
 function headBlock(id, { href, description, xhtml }) {
   const b = BRANDS[id];
-  const fam = FAMILIES[b.family];
+  const fam = FAMILY;
   const home = homeOf(id);
   const end = xhtml ? ' />' : '>';
   const alt = `${b.name} — ${b.tag.zh}`;
@@ -171,13 +168,11 @@ for (const id of Object.keys(BRANDS)) {
   console.log('wrote', id, BRANDS[id].name, '->', place.dir);
 }
 
-// The family's own: both marks and the pass, with the pass's cards (site/brand/).
+// The family's own: its mark and the pass, with the pass's cards (site/brand/).
 if (!only.length || only.includes('site')) {
   const out = `${here}site/brand/`;
   await mkdir(out, { recursive: true });
-  for (const f of Object.keys(FAMILIES)) {
-    await writeFile(`${out}family-${f}.svg`, familyMark(f));
-  }
+  await writeFile(`${out}family-orbit.svg`, familyMark());
   await writeFile(`${out}pass.svg`, appIcon('pass'));
   await cards('pass', `${out}pass-`, ['og', 'x']);
   for (const id of Object.keys(BRANDS)) await writeFile(`${out}${id}.svg`, appIcon(id));
@@ -186,22 +181,22 @@ if (!only.length || only.includes('site')) {
 }
 await browser.close();
 
-// The family's home (Shared-Proxy's Pages root): both families, every app.
+// The family's home (Shared-Proxy's Pages root): every app.
 function homePage() {
   const home = 'https://jaypengx.github.io/Shared-Proxy/';
   const card = id => {
     const b = BRANDS[id];
     return `<a class="app" href="${pathOf(id)}"><img src="brand/${id}.svg" alt="" width="64" height="64"><span><strong>${esc(b.name)}</strong><small>${esc(b.tag.zh)}</small><small class="en">${esc(b.tag.en)}</small></span></a>`;
   };
-  const family = f => `<section><h2><img src="brand/family-${f}.svg" alt="" width="36" height="36">${FAMILIES[f].name}<small>${esc(FAMILIES[f].tag.zh)}</small></h2><div class="apps">${Object.keys(BRANDS).filter(id => BRANDS[id].family === f).map(card).join('')}</div></section>`;
+  const family = `<section><h2><img src="brand/family-orbit.svg" alt="" width="36" height="36">${FAMILY.name}<small>${esc(FAMILY.tag.zh)}</small></h2><div class="apps">${Object.keys(BRANDS).map(card).join('')}</div></section>`;
   const og = (k, v) => `<meta property="og:${k}" content="${esc(v)}">`;
   return `<!doctype html>
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Quadra & Orbit</title>
-<meta name="description" content="Quadra：投資與娛樂，一個帳戶。Orbit：每天用得到的小工具。全部用同一個 Quadra Pass。">
+<title>Orbit</title>
+<meta name="description" content="Orbit：每天用得到的 App，全部用同一個 Orbit Pass。">
 <link rel="icon" href="brand/pass.svg" type="image/svg+xml">
-${og('type', 'website')}${og('site_name', 'Quadra')}${og('title', 'Quadra & Orbit')}${og('description', 'Quadra：投資與娛樂。Orbit：每天用得到的小工具。一個 Quadra Pass。')}${og('url', home)}${og('image', `${home}brand/pass-og.jpg`)}${og('image:width', 1200)}${og('image:height', 630)}
+${og('type', 'website')}${og('site_name', 'Orbit')}${og('title', 'Orbit')}${og('description', 'Orbit：每天用得到的 App，一個 Orbit Pass。')}${og('url', home)}${og('image', `${home}brand/pass-og.jpg`)}${og('image:width', 1200)}${og('image:height', 630)}
 <meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="${home}brand/pass-x.jpg">
 <style>
 :root{color-scheme:light dark;--bg:#f4f5f8;--card:#fff;--text:#0f172a;--muted:#64748b;--line:#e2e8f0}
@@ -217,8 +212,8 @@ h2{display:flex;align-items:center;gap:10px;font-size:22px;margin:32px 0 12px}h2
 .app small{color:var(--muted);font-size:13px}.app small.en{font-size:12px}
 footer{margin-top:40px;color:var(--muted);font-size:13px}
 </style></head><body><main>
-<header><img src="brand/pass.svg" alt=""><div><h1>Quadra Pass</h1><p>${esc(PASS.tag.zh)} · ${esc(PASS.tag.en)}</p></div></header>
-${family('quadra')}${family('orbit')}
+<header><img src="brand/pass.svg" alt=""><div><h1>Orbit Pass</h1><p>${esc(PASS.tag.zh)} · ${esc(PASS.tag.en)}</p></div></header>
+${family}
 <footer>Shared-Proxy: the Workers, the kit every app loads (kit/) and these marks (brand/).</footer>
 </main></body></html>
 `;

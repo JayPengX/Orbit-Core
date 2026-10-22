@@ -5,12 +5,12 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import * as lang from '../kit/lang.mjs';
-import * as quadra from '../kit/quadra.mjs';
+import * as orbit from '../kit/orbit.mjs';
 import * as fmt from '../kit/format.mjs';
 import { sidesInOrder } from '../kit/play-teams.mjs';
 import { webcrypto, createHash } from 'node:crypto';
 
-const rawCss = readFileSync(new URL('../kit/quadra.css', import.meta.url), 'utf8');
+const rawCss = readFileSync(new URL('../kit/orbit.css', import.meta.url), 'utf8');
 const swText = readFileSync(new URL('../kit/sw.js', import.meta.url), 'utf8');
 
 // A just-enough DOM (see kit-components.test.mjs) with classList, remove and a body.
@@ -97,10 +97,10 @@ test('format: DASH, and a zero never carries a sign', () => {
   assert.equal(fmt.money(-500, 'TWD'), '−NT$500');
   for (const x of [0, 0.4, -0.4, -0.49, 1e-9, -0]) {
     assert.equal(fmt.money(x, 'TWD', { sign: true }), 'NT$0', `${x}`);
-    // The same rule as quadra.mjs money() (NT$ play money).
-    assert.equal(fmt.money(x, 'TWD', { sign: true }), quadra.money(x, { sign: true }), `quadra ${x}`);
+    // The same rule as orbit.mjs money() (NT$ play money).
+    assert.equal(fmt.money(x, 'TWD', { sign: true }), orbit.money(x, { sign: true }), `orbit ${x}`);
   }
-  assert.equal(fmt.money(-0.5, 'TWD'), quadra.money(-0.5));
+  assert.equal(fmt.money(-0.5, 'TWD'), orbit.money(-0.5));
   assert.equal(fmt.money(0.004, 'USD', { sign: true }), 'US$0.00');
   assert.equal(fmt.money(-3.2, 'EUR'), '−€3.20');
   assert.equal(fmt.pct(0.0123), '+1.23%');
@@ -244,7 +244,7 @@ test('the stylesheet has the Foundations section and its classes', () => {
 // text, or a function of the try).
 function runWorker(settings, net = {}) {
   const listeners = {};
-  const store = new Map([['app-a-v1', new Map()], ['app-a-data', new Map()], ['app-b-v1', new Map()], ['quadra-images-v1', new Map()]]);
+  const store = new Map([['app-a-v1', new Map()], ['app-a-data', new Map()], ['app-b-v1', new Map()], ['orbit-images-v1', new Map()]]);
   const cacheOf = name => {
     if (!store.has(name)) store.set(name, new Map());
     const m = store.get(name);
@@ -258,7 +258,7 @@ function runWorker(settings, net = {}) {
     };
   };
   const self = {
-    QUADRA_SW: settings,
+    ORBIT_SW: settings,
     addEventListener: (k, f) => (listeners[k] = f),
     skipWaiting: async () => (self.skipped = true),
     clients: { claim: async () => (self.claimed = true) },
@@ -307,7 +307,7 @@ test("the worker installs, and drops only this app's old caches (its data kept)"
   w.listeners.activate({ waitUntil: p => (work = p) });
   await work;
   assert.ok(w.self.claimed);
-  assert.deepEqual([...w.store.keys()].sort(), ['app-a-data', 'app-a-v2', 'app-b-v1', 'quadra-images-v1']);
+  assert.deepEqual([...w.store.keys()].sort(), ['app-a-data', 'app-a-v2', 'app-b-v1', 'orbit-images-v1']);
   assert.ok(!/\bimport\s/.test(readFileSync(new URL('../kit/sw.js', import.meta.url), 'utf8').replace(/\/\/.*$/gm, '')), 'a classic script');
 });
 

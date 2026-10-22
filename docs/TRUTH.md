@@ -1,6 +1,6 @@
 # The rulebook
 
-How to work on the Quadra and Orbit apps. Every repo's `CLAUDE.md` points
+How to work on the Orbit apps. Every repo's `CLAUDE.md` points
 here. These are strong defaults, not laws: weigh each against speed and
 use judgement. When a rule gets in the way of a clearly better result,
 break it and say so in a line.
@@ -70,7 +70,7 @@ break it and say so in a line.
   the whole app.
 - **One rule, one function**, used by every view that shows it (Sports'
   `onAir`, `sessionStatus`), so screens can't disagree.
-- **UI from the kit** (`quadra.css`, `ui.mjs`: tab bar, sheets, segmented,
+- **UI from the kit** (`orbit.css`, `ui.mjs`: tab bar, sheets, segmented,
   lists, toasts, `ask` / `tell`). Draw your own only for what is truly the
   app's (a pitch, a map, a chart).
 - **Ids never change with a name**: storage keys, cache names and the
@@ -98,7 +98,7 @@ break it and say so in a line.
   (`tools/preview.mjs --live`).
 - **Secrets** live only as GitHub or Cloudflare secrets, never in a repo.
   Passes are issued by the owner.
-- **Quadra's money:** only the proxy adds money, on its own terms. A price,
+- **Orbit's money:** only the proxy adds money, on its own terms. A price,
   perk or payout change runs through `node tools/economy.mjs` first.
   Close any exploit with a test that tries it.
 
@@ -138,7 +138,7 @@ break it and say so in a line.
 | Orbit-Slips | 台灣運彩 tickets tracked from a photo (no Pass) |
 | Orbit-Law | Taiwan's laws with linked references, and 立法院 bills by stage |
 | Quadra-Play | A Taiwan sportsbook and lottery, on play money |
-| Quadra-Securities | A Taiwan broker, on play money |
+| Orbit-Securities | A Taiwan broker, on play money |
 
 Folder-Link is a separate Windows tool with its own notes.
 

@@ -2,7 +2,7 @@
 // and the stocks' and ETFs' (股票期貨, ETF期貨: the kit's TW_SSF): each
 // contract month's latest settlement price, the margins, and the final
 // settlement prices, from TAIFEX's open data and its download page.
-// Served by the sports proxy as if from `https://taifex.quadra/fut.json`:
+// Served by the sports proxy as if from `https://taifex.orbit/fut.json`:
 //   { date: 'YYYY-MM-DD', settle: { TX202611: 46510, CDF202611: 2431, … },
 //     margin: { TX: [initial, maintenance], NYF: […] (an ETF's), … },
 //     ssfRate: { CDF: [initial, maintenance] (of the contract's value), … },
@@ -18,7 +18,7 @@
 
 import { seriesFuture, stockFutureCodes } from './kit/stock-markets.mjs';
 
-export const TAIFEX_HOST = 'taifex.quadra';
+export const TAIFEX_HOST = 'taifex.orbit';
 const OPENAPI = 'https://openapi.taifex.com.tw/v1';
 const FINALS = 'https://www.taifex.com.tw/cht/5/fSPDataDown';
 const CODES = new Set(['TX', 'MTX', 'TMF', ...stockFutureCodes()]);
