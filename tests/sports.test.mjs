@@ -486,6 +486,24 @@ test("FotMob for football's 數據領先: only a league's or team's page and its
   assert.deepEqual(stat.list[0], { id: 0, name: 'P0', teamId: 1, teamName: 'X', value: 4, sub: 10, games: 4, mins: 300, rank: 1 });
 });
 
+test("FotMob's team page: its own league's table and its games too (a club opened from a cup whose league ESPN lacks)", async () => {
+  const { trimFotmobPage } = await import('../sports.js');
+  const row = (id, name, idx) => ({ id, name, shortName: name, idx, played: 10, wins: 8, draws: 1, losses: 1, scoresStr: '27-9', goalConDiff: 18, pts: 25, qualColor: idx === 1 ? '#FFD908' : null, pageUrl: 'x' });
+  const page = trimFotmobPage({
+    details: { id: 2182, type: 'team', selectedSeason: '2026/2027' },
+    table: [
+      { data: { leagueId: 73, leagueName: 'Europa League', ccode: 'INT', table: { all: [row(1, 'Other', 1)] } } },
+      { data: { leagueId: 196, leagueName: 'Ekstraklasa', ccode: 'POL', legend: [{ title: 'Relegation', color: '#FF4646', indices: [16, 17] }], table: { all: [row(8020, 'Górnik Zabrze', 1), row(2182, 'Lech Poznań', 2)] } } }
+    ],
+    stats: { teamId: '2182', primaryLeagueId: 196, players: [] },
+    fixtures: { allFixtures: { fixtures: [{ id: 9, pageUrl: 'x', home: { id: 2182, name: 'Lech Poznań', score: 6 }, away: { id: 8245, name: 'Korona Kielce', score: 1 }, tournament: { name: 'Ekstraklasa', leagueId: 196 }, status: { utcTime: '2026-10-18T15:30:00.000Z', finished: true, started: true, cancelled: false, reason: { short: 'FT' } } }] } }
+  });
+  assert.deepEqual(page.home.league, { id: 196, name: 'Ekstraklasa', ccode: 'POL' });
+  assert.deepEqual(page.home.table.map(r => [r.id, r.pos, r.pts]), [[8020, 1, 25], [2182, 2, 25]]);
+  assert.deepEqual(page.home.zones, [{ title: 'Relegation', color: '#FF4646', at: [16, 17] }]);
+  assert.deepEqual(page.home.games[0], { id: 9, league: 196, comp: 'Ekstraklasa', home: { id: 2182, name: 'Lech Poznań', score: 6 }, away: { id: 8245, name: 'Korona Kielce', score: 1 }, at: '2026-10-18T15:30:00.000Z', timeTbd: false, started: true, finished: true, cancelled: false, live: false, clock: '', reason: 'FT' });
+});
+
 test('FotMob: its two hosts only for those pages', async () => {
   const { handleSports } = await import('../sports.js');
   const ask = async target => (await handleSports(new Request(`https://x.dev/sports-proxy?url=${encodeURIComponent(target)}`), {}, { waitUntil() {} }, {}, '1.2.3.4')).status;
