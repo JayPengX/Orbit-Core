@@ -501,7 +501,7 @@ test("FotMob's team page: its own league's table and its games too (a club opene
   assert.deepEqual(page.home.league, { id: 196, name: 'Ekstraklasa', ccode: 'POL' });
   assert.deepEqual(page.home.table.map(r => [r.id, r.pos, r.pts]), [[8020, 1, 25], [2182, 2, 25]]);
   assert.deepEqual(page.home.zones, [{ title: 'Relegation', color: '#FF4646', at: [16, 17] }]);
-  assert.deepEqual(page.home.games[0], { id: 9, league: 196, comp: 'Ekstraklasa', home: { id: 2182, name: 'Lech Poznań', score: 6 }, away: { id: 8245, name: 'Korona Kielce', score: 1 }, at: '2026-10-18T15:30:00.000Z', timeTbd: false, started: true, finished: true, cancelled: false, live: false, clock: '', reason: 'FT' });
+  assert.deepEqual(page.home.games[0], { id: 9, league: 196, comp: 'Ekstraklasa', home: { id: 2182, name: 'Lech Poznań', score: 6 }, away: { id: 8245, name: 'Korona Kielce', score: 1 }, at: '2026-10-18T15:30:00.000Z', dateTbd: false, timeTbd: false, started: true, finished: true, cancelled: false, live: false, clock: '', reason: 'FT' });
 });
 
 test('FotMob: its two hosts only for those pages', async () => {
