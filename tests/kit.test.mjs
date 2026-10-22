@@ -402,7 +402,7 @@ test('CPBL: a game the proxy still has as to come, hours after its start, takes 
   assert.deepEqual(asked.map(u => u.match(/d=([\d-]+)/)[1]), ['2026-10-17']);
 });
 
-test('CPBL: a month the proxy can\'t fill comes from TheSportsDB\'s day lists on the device', async () => {
+test('CPBL: a month the proxy can\'t read comes from TheSportsDB\'s day lists on the device', async () => {
   const { asiaMonth, tsdbDays } = await import('../kit/catalog.mjs');
   const now = Date.parse('2026-09-30T04:00:00Z');
   assert.equal(tsdbDays('2026-10', now).length, 14);
@@ -418,8 +418,10 @@ test('CPBL: a month the proxy can\'t fill comes from TheSportsDB\'s day lists on
   const games = await asiaMonth(refused, 'cpbl', '2026-10', { now, fetchJson });
   assert.equal(asked.length, 14);
   assert.deepEqual(games.map(g => [g.start, g.home.zh, g.away.en, g.state]), [['2026-10-02T10:35:00.000Z', '富邦悍將', 'Wei Chuan Dragons', 'pre']]);
-  // An empty month from the proxy too; other leagues never.
-  assert.equal((await asiaMonth(async () => ({ games: [] }), 'cpbl', '2026-10', { now, fetchJson })).length, 1);
+  // An empty month the proxy read is the month (no game days asked on the device); other leagues never fall back.
+  asked.length = 0;
+  assert.equal((await asiaMonth(async () => ({ games: [] }), 'cpbl', '2026-11', { now, fetchJson })).length, 0);
+  assert.equal(asked.length, 0);
   await assert.rejects(asiaMonth(refused, 'npb', '2026-10', { now, fetchJson }), /502/);
   // Both down (the proxy, every day on the device): an error, not 沒有比賽.
   await assert.rejects(asiaMonth(refused, 'cpbl', '2026-10', { now, fetchJson: refused }), /502/);
