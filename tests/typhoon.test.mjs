@@ -139,6 +139,17 @@ test('a place: the official word first, else the chance with its reasons', () =>
   const today = dayOffFor(place('新竹市'), ty, page({ 新竹市: '今天照常上班、照常上課。' }), NOW, HSINCHU);
   assert.equal(typeof today.chance, 'number');
   assert.deepEqual(today.local.lines, [{ text: '今天照常上班、照常上課', off: 'open' }]);
+  // A forecast without gusts or rain amounts (Google's hours missing): left
+  // out, not read as calm and dry.
+  const bare = { place: { county: '新竹縣' }, hours: hours(Date.parse('2026-10-22T02:00:00Z'), 48, { wind: null, mm: null }) };
+  const known = dayOffFor(place('新竹縣', { wind: { speed: 40, gust: 75 }, mm: 2 }), ty, null, NOW, HSINCHU);
+  const blind = dayOffFor(bare, ty, null, NOW, HSINCHU);
+  assert.equal(blind.why.mm, null);
+  assert.equal(blind.why.gust, null);
+  // (Without the rain the curve rests on the track and the lamps: lower than a
+  // wet forecast's, far above calling it calm and dry.)
+  assert.ok(blind.chance > dayOffChance({ edge: 0, islandEdge: 0, vmax: 51, gust: 0, mm: 0 }), `${blind.chance}`);
+  assert.ok(known.chance > 0);
   // On its own forecast track (heading this way) the circle reaches 新竹 tomorrow.
   assert.equal(dayOffFor(place('新竹市'), ty, null, NOW, HSINCHU).why.reach, true);
   // No warning, or abroad: nothing.

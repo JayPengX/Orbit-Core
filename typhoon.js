@@ -197,21 +197,42 @@ export const targetDay = now => (new Date(now + TW).getUTCHours() < 10 ? twDate(
 // the day's peak gust and its rain (CWA's stations then; the forecast now).
 // Checked on storms it wasn't fitted on: what it calls 20% closed about one
 // time in five. 1–99, never rounded to steps.
-const FIT = { k: -7.6913, edge: 0.0644, inside: 0.374, v: 1.0683, gust: 4.412, rain: 2.5424, island: -0.6472 };
-// Once neighbours have announced (county seats within 75 km): the same fit
-// with the share of them that closed, from the archive's final pages. Mixed
-// with the first by how many of them have announced so far.
-const FIT_NEAR = { k: -6.9982, edge: 0.0059, inside: 0.1157, v: 0.5935, gust: 2.1137, rain: 1.5224, island: -0.4118, near: 6.1854 };
+// One fit per set of inputs the forecast has (a cell without Google's
+// hours has no gust or rain for the day: those fits leave them out rather
+// than read them as calm and dry), each with and without the neighbours'
+// share. The `Near` fits: the share of neighbours (county seats within
+// 75 km) that closed, from the archive's final pages, mixed in by how many
+// of them have announced so far.
+const FITS = {
+  full: {k: -7.6913, edge: 0.0644, inside: 0.374, v: 1.0683, gust: 4.412, rain: 2.5424, island: -0.6472},
+  fullNear: {k: -6.9982, edge: 0.0059, inside: 0.1157, v: 0.5935, gust: 2.1137, rain: 1.5224, island: -0.4118, near: 6.1854},
+  noRain: {k: -6.6805, edge: -0.022, inside: 0.4879, v: 0.5436, gust: 5.0268, island: -0.5634},
+  noRainNear: {k: -6.6199, edge: 0.0894, inside: 0.2989, v: 0.3332, gust: 2.3624, island: -0.445, near: 6.3334},
+  noGust: {k: -6.4202, edge: 0.2465, inside: 0.6651, v: 0.9876, rain: 3.1661, island: -0.8723},
+  noGustNear: {k: -6.3507, edge: 0.0554, inside: 0.1713, v: 0.5652, rain: 1.6936, island: -0.5211, near: 6.3503},
+  track: {k: -4.6298, edge: 0.0994, inside: 0.7927, v: 0.1861, island: -0.7393},
+  trackNear: {k: -5.7964, edge: 0.1297, inside: 0.3822, v: 0.2421, island: -0.5388, near: 6.5595}
+};
 export const NEIGHBOURS = {"基隆市": ["臺北市", "新北市", "桃園市", "宜蘭縣"], "臺北市": ["基隆市", "新北市", "桃園市", "新竹市", "新竹縣", "宜蘭縣"], "新北市": ["基隆市", "臺北市", "桃園市", "新竹市", "新竹縣", "宜蘭縣"], "桃園市": ["基隆市", "臺北市", "新北市", "新竹市", "新竹縣", "苗栗縣", "宜蘭縣"], "新竹市": ["臺北市", "新北市", "桃園市", "新竹縣", "苗栗縣"], "新竹縣": ["臺北市", "新北市", "桃園市", "新竹市", "苗栗縣"], "苗栗縣": ["桃園市", "新竹市", "新竹縣", "臺中市", "彰化縣", "南投縣"], "臺中市": ["苗栗縣", "彰化縣", "南投縣", "雲林縣"], "彰化縣": ["苗栗縣", "臺中市", "南投縣", "雲林縣", "嘉義市", "嘉義縣"], "南投縣": ["苗栗縣", "臺中市", "彰化縣", "雲林縣", "嘉義市", "嘉義縣"], "雲林縣": ["臺中市", "彰化縣", "南投縣", "嘉義市", "嘉義縣"], "嘉義市": ["彰化縣", "南投縣", "雲林縣", "嘉義縣", "臺南市"], "嘉義縣": ["彰化縣", "南投縣", "雲林縣", "嘉義市", "臺南市", "澎湖縣"], "臺南市": ["嘉義市", "嘉義縣", "高雄市", "屏東縣"], "高雄市": ["臺南市", "屏東縣"], "屏東縣": ["臺南市", "高雄市", "臺東縣"], "宜蘭縣": ["基隆市", "臺北市", "新北市", "桃園市"], "花蓮縣": [], "臺東縣": ["屏東縣"], "澎湖縣": ["嘉義縣"], "金門縣": [], "連江縣": []};
 const clip = (x, lo, hi) => Math.min(hi, Math.max(lo, x));
-const logit = (f, { edge, islandEdge, vmax, gust, mm }) => f.k + f.edge * (clip(edge ?? 600, -300, 600) / 100) + f.inside * (clip(-(edge ?? 600), 0, 300) / 100) + f.v * (((vmax ?? 0) * 1.9438) / 100) + f.gust * ((gust ?? 0) / 30) + f.rain * (Math.log1p(Math.max(0, mm ?? 0)) / Math.log1p(350)) + f.island * (clip(islandEdge ?? 600, -300, 600) / 100);
-// `near`: { closed, open, of } — the neighbours that announced each way, of how many.
+const logit = (f, { edge, islandEdge, vmax, gust, mm }) =>
+  f.k +
+  f.edge * (clip(edge ?? 600, -300, 600) / 100) +
+  f.inside * (clip(-(edge ?? 600), 0, 300) / 100) +
+  f.v * (((vmax ?? 0) * 1.9438) / 100) +
+  (f.gust ?? 0) * ((gust ?? 0) / 30) +
+  (f.rain ?? 0) * (Math.log1p(Math.max(0, mm ?? 0)) / Math.log1p(350)) +
+  f.island * (clip(islandEdge ?? 600, -300, 600) / 100);
+// `near`: { closed, open, of } — the neighbours that announced each way, of
+// how many. A gust or rain of null: not in the forecast (not 0).
 export function dayOffChance(x, near = null) {
-  let z = logit(FIT, x);
+  const set = x.gust != null && x.mm != null ? 'full' : x.gust != null ? 'noRain' : x.mm != null ? 'noGust' : 'track';
+  let z = logit(FITS[set], x);
   const told = near ? near.closed + near.open : 0;
   if (told) {
     const w = told / near.of;
-    z = (1 - w) * z + w * (logit(FIT_NEAR, x) + FIT_NEAR.near * (near.closed / told));
+    const f = FITS[`${set}Near`];
+    z = (1 - w) * z + w * (logit(f, x) + f.near * (near.closed / told));
   }
   return Math.min(99, Math.max(1, Math.round(100 / (1 + Math.exp(-z)))));
 }
@@ -259,11 +280,13 @@ export function dayOffFor(resp, ty, dgpa, now, at = null) {
     const v = hours.map(h => h.wind?.[k]).filter(x => x != null);
     return v.length ? Math.max(...v) : null;
   };
-  const mm = Math.round(hours.reduce((a, h) => a + (h.mm || 0), 0));
+  // (Rain: null when the forecast has no amounts for the day.)
+  const mm = hours.some(h => h.mm != null) ? Math.round(hours.reduce((a, h) => a + (h.mm || 0), 0)) : null;
   const dom = twDom(start);
   const lamp = (ty.lamps?.[county] || []).filter(x => x.dom === dom || (x.dom == null && date === twDate(ty.at))).sort((a, b) => b.gust - a.gust)[0];
   // The day's peak gust (m/s): the forecast's, or the lamp's lowest when CWA says more.
-  const gust = Math.max((peak('gust') ?? 0) / 3.6, lamp ? BFT_MS[Math.min(12, lamp.gust)] : 0);
+  // (null when neither has one.)
+  const gust = peak('gust') == null && !lamp ? null : Math.max((peak('gust') ?? 0) / 3.6, lamp ? BFT_MS[Math.min(12, lamp.gust)] : 0);
   const here = at ? circleEdge(ty.track, at, start, to) : null;
   const island = MAIN.reduce((best, p) => {
     const c = circleEdge(ty.track, p, start, to);
