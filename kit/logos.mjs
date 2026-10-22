@@ -135,11 +135,15 @@ export function teamLogo(sport, name, dark = false) {
 const SOCCER_LOGO = {
   epl: 23, laliga: 15, seriea: 12, bundesliga: 10, ligue1: 9, ucl: 2, uel: 2310, uecl: 20296,
   scotland: 45, mls: 19, jleague: 2199, facup: 40, nationsleague: 2395, worldcup: 4,
-  championship: 24, eredivisie: 11, ligamx: 22, brasileirao: 85
+  championship: 24, eredivisie: 11, brasileirao: 85
 };
-// TheSportsDB's league badges.
+// TheSportsDB's league badges. (Liga MX's is its own today, the light
+// "LIGA MX" one that reads on a light or a dark tile: ESPN's is still the old
+// Liga Bancomer wordmark, dark blue, which all but vanished on a dark tile;
+// Jay 2026-10-22.)
 const LEAGUE_BADGE = {
-  npb: 'lk85rg1575038781', kbo: 'qfr1hx1589707979', cpbl: 'c3vetj1655924198', euroleague: '7xjtuy1554397263', kleague: 'zaw2cj1628430843'
+  npb: 'lk85rg1575038781', kbo: 'qfr1hx1589707979', cpbl: 'c3vetj1655924198', euroleague: '7xjtuy1554397263', kleague: 'zaw2cj1628430843',
+  ligamx: 'mav5rx1686157960'
 };
 // ESPN's other league logos.
 const ESPN_LEAGUE = {
