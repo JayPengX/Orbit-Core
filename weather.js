@@ -44,7 +44,7 @@
 
 import { STATIONS } from './weather-stations.js';
 import { twDay } from './kit/format.mjs';
-import { readTyphoon, readDgpa, dayOffFor } from './typhoon.js';
+import { COUNTIES, readTyphoon, readDgpa, readSeatRain, dayOffFor } from './typhoon.js';
 
 export const GOOGLE = 'https://weather.googleapis.com/v1/';
 export const GOOGLE_AIR = 'https://airquality.googleapis.com/v1/';
@@ -1439,15 +1439,25 @@ async function cachedText(env, key, ttl, make) {
 // ---- Route ---------------------------------------------------------------------------
 
 // The typhoon day off (typhoon.js) on a place's answer, while CWA has a
-// typhoon warning out: the warning read every 5 minutes, the 人事行政總處
-// page every 3 while there is one (both kept in KV for everyone).
+// typhoon warning out: one number per county, the same for every place in
+// it, from sources kept in KV for everyone (none with a daily cap of ours):
+// the warning every 5 minutes, the 人事行政總處 page every 3, the seats'
+// rain forecast every 30, CWA's rain warnings every 30.
 async function withDayOff(env, resp, at, fetchFn, ctx, now = Date.now()) {
   if (!resp?.place?.county) return resp;
   const defer = ctx?.waitUntil ? p => ctx.waitUntil(p) : null;
-  const ty = await shared(env, 'weather:typhoon', 5 * MIN, () => readTyphoon(fetchFn, now, env.CWA_KEY ? cwaUrl(env, 'W-C0034-005') : null), now, defer);
-  if (!ty?.data) return resp;
-  const dg = await shared(env, 'weather:dgpa', 3 * MIN, () => readDgpa(env, fetchFn), now, defer);
-  const dayOff = dayOffFor(resp, ty.data, dg?.data, now, at);
+  // All 22 counties at once, every 3 minutes, kept for every place's answer.
+  const all = await shared(env, 'weather:dayoff', 3 * MIN, async () => {
+    const ty = await shared(env, 'weather:typhoon', 5 * MIN, () => readTyphoon(fetchFn, now, env.CWA_KEY ? cwaUrl(env, 'W-C0034-005') : null), now, defer);
+    if (!ty?.data) return {};
+    const [dg, rain, warn] = await Promise.all([
+      shared(env, 'weather:dgpa', 3 * MIN, () => readDgpa(env, fetchFn), now, defer),
+      shared(env, 'weather:dayoff:rain', 30 * MIN, () => readSeatRain(fetchFn), now, defer),
+      env.CWA_KEY ? shared(env, 'weather:cwa:warn', 30 * MIN, () => getJson(fetchFn, cwaUrl(env, 'W-C0033-001'), env), now, defer) : null
+    ]);
+    return Object.fromEntries(COUNTIES.map(c => [c, dayOffFor(c, ty.data, dg?.data, now, rain?.data, warn?.data)]).filter(([, v]) => v));
+  }, now, defer);
+  const dayOff = all?.data?.[resp.place.county.replace(/台/g, '臺')];
   return dayOff ? { ...resp, dayOff } : resp;
 }
 

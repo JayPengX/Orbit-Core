@@ -183,9 +183,13 @@ export function circleEdge(track, at, from, to) {
 }
 export const circleReaches = (track, at, from, to) => (circleEdge(track, at, from, to)?.edge ?? Infinity) <= 0;
 
+// Each county's seat: where its chance is worked out, once for the whole
+// county (the decision is county-wide, so every place in it shows one number).
+export const SEATS = {"基隆市": [25.131, 121.744], "臺北市": [25.0375, 121.5637], "新北市": [25.0123, 121.4654], "桃園市": [24.9937, 121.301], "新竹市": [24.8066, 120.9686], "新竹縣": [24.827, 121.0128], "苗栗縣": [24.565, 120.8205], "臺中市": [24.1618, 120.6469], "彰化縣": [24.0758, 120.544], "南投縣": [23.9025, 120.6906], "雲林縣": [23.699, 120.5263], "嘉義市": [23.4801, 120.4491], "嘉義縣": [23.4588, 120.2925], "臺南市": [22.9917, 120.1849], "高雄市": [22.623, 120.3014], "屏東縣": [22.6829, 120.488], "宜蘭縣": [24.7303, 121.7631], "花蓮縣": [23.9913, 121.6197], "臺東縣": [22.7559, 121.1504], "澎湖縣": [23.5655, 119.5863], "金門縣": [24.4368, 118.3186], "連江縣": [26.1505, 119.9499]};
+const seat = c => ({ lat: SEATS[c][0], lon: SEATS[c][1] });
 // Taiwan's main island, for how near the storm comes to it at all (its
 // county seats).
-const MAIN = [[25.131, 121.744], [25.0375, 121.5637], [25.0123, 121.4654], [24.9937, 121.301], [24.8066, 120.9686], [24.827, 121.0128], [24.565, 120.8205], [24.1618, 120.6469], [24.0758, 120.544], [23.9025, 120.6906], [23.699, 120.5263], [23.4801, 120.4491], [23.4588, 120.2925], [22.9917, 120.1849], [22.623, 120.3014], [22.6829, 120.488], [24.7303, 121.7631], [23.9913, 121.6197], [22.7559, 121.1504]].map(([lat, lon]) => ({ lat, lon }));
+const MAIN = COUNTIES.filter(c => !['澎湖縣', '金門縣', '連江縣'].includes(c)).map(seat);
 
 // The day asked about: today until 10:00 (announced by then), else tomorrow.
 export const targetDay = now => (new Date(now + TW).getUTCHours() < 10 ? twDate(now) : twDate(now + 24 * HOUR));
@@ -250,10 +254,31 @@ function linesOf(dgpa, county) {
   return officialLines(said).map(l => ({ ...l, date: /明天|明日/.test(l.text) ? next : day, scoped: /^[^\d\s][^:：]{0,40}[:：]/.test(l.text) }));
 }
 
-// The answer's `dayOff` for a place (the forecast's hours, its county; `at` its position).
-export function dayOffFor(resp, ty, dgpa, now, at = null) {
-  if (!ty || !resp) return null;
-  const county = tai(resp.place?.county || '');
+// CWA's rain warnings (W-C0033-001) for a county over the day, as the least
+// rain they mean (mm in a day: 大雨 80, 豪雨 200, 大豪雨 350, 超大豪雨 500).
+const twTime = x => { const v = String(x || '').replace(' ', 'T').replace(/\//g, '-'); return Date.parse(/[+Z]/.test(v.slice(10)) ? v : `${v}+08:00`); };
+const RAIN_FLOOR = [['超大豪雨', 500], ['大豪雨', 350], ['豪雨', 200], ['大雨', 80]];
+export function rainFloor(warn, county, from, to) {
+  let mm = null;
+  for (const loc of warn?.records?.location || []) {
+    if (tai(loc.locationName) !== county) continue;
+    for (const h of loc.hazardConditions?.hazards || []) {
+      const [a, b] = [h.validTime?.startTime, h.validTime?.endTime].map(twTime);
+      if (!(a < to && b > from)) continue;
+      const hit = RAIN_FLOOR.find(([w]) => String(h.info?.phenomena || '').includes(w));
+      if (hit) mm = Math.max(mm ?? 0, hit[1]);
+    }
+  }
+  return mm;
+}
+
+// The county's `dayOff` for the day: the same for every place in it. Worked
+// out at its seat from the storm's track, CWA's 強風 lamps (the day's gust),
+// the day's forecast rain at the seat (`rain`: { county: { date: mm } }),
+// floored by CWA's rain warnings (`warn`), and its neighbours' word.
+export function dayOffFor(county, ty, dgpa, now, rain = null, warn = null) {
+  if (!ty) return null;
+  county = tai(county || '');
   if (!COUNTIES.includes(county)) return null;
   const date = targetDay(now);
   const storm = { name: ty.name, nameEn: ty.nameEn, warning: ty.warning, date };
@@ -273,28 +298,23 @@ export function dayOffFor(resp, ty, dgpa, now, at = null) {
   }
   const start = Date.parse(`${date}T00:00:00+08:00`);
   const to = start + 24 * HOUR;
-  // The day's hours (today's: those still ahead).
-  const hours = (resp.hours || []).filter(h => h.t >= Math.max(now, start) - HOUR && h.t < to);
-  if (!hours.length) return null;
-  const peak = k => {
-    const v = hours.map(h => h.wind?.[k]).filter(x => x != null);
-    return v.length ? Math.max(...v) : null;
-  };
-  // (Rain: null when the forecast has no amounts for the day.)
-  const mm = hours.some(h => h.mm != null) ? Math.round(hours.reduce((a, h) => a + (h.mm || 0), 0)) : null;
   const dom = twDom(start);
   const lamp = (ty.lamps?.[county] || []).filter(x => x.dom === dom || (x.dom == null && date === twDate(ty.at))).sort((a, b) => b.gust - a.gust)[0];
-  // The day's peak gust (m/s): the forecast's, or the lamp's lowest when CWA says more.
-  // (null when neither has one.)
-  const gust = peak('gust') == null && !lamp ? null : Math.max((peak('gust') ?? 0) / 3.6, lamp ? BFT_MS[Math.min(12, lamp.gust)] : 0);
-  const here = at ? circleEdge(ty.track, at, start, to) : null;
+  // The day's peak gust (m/s): the middle of the lamp's 陣風 level (null
+  // without a lamp: left out, not read as calm).
+  const gust = lamp ? (BFT_MS[Math.min(12, lamp.gust)] + (BFT_MS[lamp.gust + 1] ?? BFT_MS[12] + 4)) / 2 : null;
+  // The day's rain: the forecast at the seat, or more when CWA warns of more (null: unknown).
+  const fc = rain?.[county]?.[date];
+  const floor = rainFloor(warn, county, start, to);
+  const mm = fc == null && floor == null ? null : Math.round(Math.max(fc ?? 0, floor ?? 0));
+  const here = circleEdge(ty.track, seat(county), start, to);
   const island = MAIN.reduce((best, p) => {
     const c = circleEdge(ty.track, p, start, to);
     return c && (!best || c.edge < best.edge) ? c : best;
   }, null);
   const why = {
-    wind: beaufortKmh(peak('speed')),
-    gust: Math.max(beaufortKmh(peak('gust')) ?? 0, lamp?.gust ?? 0) || null,
+    wind: lamp?.wind || null,
+    gust: lamp?.gust || null,
     mm,
     land: ty.land.includes(county),
     reach: (here?.edge ?? Infinity) <= 0,
@@ -357,4 +377,21 @@ export async function readTyphoon(fetchFn, now = Date.now(), trackUrl = null) {
 export async function readDgpa(env, fetchFn) {
   const via = env?.GEMINI_RELAY ? (u, init) => env.GEMINI_RELAY.fetch(`https://gemini-relay/?to=${encodeURIComponent(u)}`, init) : fetchFn;
   return parseDgpa(await text(via, DGPA_NDS));
+}
+
+// The forecast's rain for each county seat by Taiwan day (Open-Meteo, one
+// ask for all 22): { county: { date: mm } }.
+export async function readSeatRain(fetchFn) {
+  const names = Object.keys(SEATS);
+  const q = k => names.map(c => SEATS[c][k]).join(',');
+  const res = await fetchFn(`https://api.open-meteo.com/v1/forecast?latitude=${q(0)}&longitude=${q(1)}&daily=precipitation_sum&forecast_days=3&timezone=Asia%2FTaipei`, { signal: AbortSignal.timeout(8000) });
+  if (!res.ok) throw new Error(`${res.status}`);
+  const all = await res.json();
+  if (!Array.isArray(all) || all.length !== names.length) throw new Error('shape');
+  const out = {};
+  names.forEach((c, i) => {
+    const d = all[i]?.daily || {};
+    out[c] = Object.fromEntries((d.time || []).map((t, j) => [t, d.precipitation_sum?.[j]]).filter(([, v]) => v != null));
+  });
+  return out;
 }
