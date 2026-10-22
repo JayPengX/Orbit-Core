@@ -19,7 +19,7 @@
 // even. Cut like every other price (rules.mjs houseCut).
 import { normalizeTeamName, isSoccer, familyOf } from '#kit/play-teams.mjs';
 // The same side under two spellings: the shared kit's (settle.mjs).
-import { sameSide, sideScore, sideOfGame, sidesMatch, THREE_WAY_SPORTS } from '#kit/settle.mjs';
+import { sameSide, sideScore, sideOfGame, sidesMatch } from '#kit/settle.mjs';
 export { sameSide, sideScore, sideOfGame, sidesMatch };
 
 const ESPN_STANDINGS = 'https://site.api.espn.com/apis/v2/sports';
@@ -90,7 +90,7 @@ export function housePrices(sport, away, home, table, { neutral = false, preseas
   const s = name => clamp(table?.get(normalizeTeamName(name)) ?? table?.unranked ?? 0.5);
   const edge = neutral ? 0 : HOME_EDGE[sport] ?? FAMILY_EDGE[familyOf(sport)] ?? 0.2;
   const p = clamp(sigmoid((logit(s(home)) - logit(s(away)) + edge) * (preseason ? PRESEASON_PULL : 1)));
-  if (!isSoccer(sport) && !THREE_WAY_SPORTS.has(familyOf(sport))) return { away: 1 - p, home: p };
+  if (!isSoccer(sport)) return { away: 1 - p, home: p };
   const draw = DRAW_EVEN - DRAW_FALL * (p - 0.5) ** 2;
   return { away: (1 - draw) * (1 - p), draw, home: (1 - draw) * p };
 }

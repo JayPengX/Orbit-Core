@@ -9,7 +9,7 @@ import { LEAGUES, normalizeTeamName, teamZh } from '#kit/play-teams.mjs';
 import { housePrices } from '#kit/play-house.mjs';
 
 // Reading a match's live data and deciding it: the shared kit's (settle.mjs), as the Worker settles.
-import { kambiLiveDataUrl, kambiPeriods, parseKambiLiveData, KAMBI_QUIET_MS, decidedTeamGame, THREE_WAY_SPORTS, SET_SPORTS, setsWon } from '#kit/settle.mjs';
+import { kambiLiveDataUrl, kambiPeriods, parseKambiLiveData, KAMBI_QUIET_MS, decidedTeamGame } from '#kit/settle.mjs';
 export { kambiLiveDataUrl, kambiPeriods, parseKambiLiveData, KAMBI_QUIET_MS, decidedTeamGame };
 export const KAMBI = 'https://eu-offering-api.kambicdn.com/offering/v2018/ub';
 
@@ -41,19 +41,6 @@ function fairThree(one, cross, two) {
   return { home, draw, away };
 }
 
-// The match's competition: Kambi's group, or the one above it where the
-// group is only "Matches" or "Series" (cricket's: "International One Day").
-const groupOf = e => {
-  // (The proxy's trim keeps the path as termKeys: international_twenty20__w_.)
-  const title = key => String(key).replace(/__w_$/, ' (W)').split('_').filter(Boolean).map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
-  const names = (Array.isArray(e.path) ? e.path : []).map(p => (typeof p === 'string' ? title(p) : p?.englishName ?? p?.name)).filter(Boolean);
-  return /^(matches|series)$/i.test(e.group || '') && names.length > 1 ? names[names.length - 2] : e.group || '';
-};
-// A match of a competition 台灣運彩 sells (the league's `only`, catalog.mjs):
-// Kambi's path as termKeys (the proxy's trim) or as its own records.
-export const pathOf = e => (e?.path || []).map(p => (typeof p === 'string' ? p : p?.termKey)).join('/');
-const sold = (e, sport) => !LEAGUES[sport]?.only || LEAGUES[sport].only.test(pathOf(e));
-
 // Upcoming matches of one league: games shaped like the rest of the page's
 // ({ id, sport, startUtc, away, home, draftKings: fair win chances, total,
 // spread }), with `book: 'kambi'`. `unpriced`: a match Kambi lists without a
@@ -66,13 +53,12 @@ export function parseKambiEvents(data, sport, now = new Date(), { unpriced = fal
     const e = item.event;
     // (Past its time but not begun, for up to 45 minutes: kept for the board to decide, play-sources.mjs stillToCome.)
     if (!e || e.state !== 'NOT_STARTED' || Date.parse(e.start) <= now.getTime() - 45 * 60_000) continue;
-    if (!e.homeName || !e.awayName || !sold(e, sport)) continue;
+    if (!e.homeName || !e.awayName) continue;
     const offers = item.betOffers || [];
     const match = matchOffer(offers);
     // Two-way winner; a three-way one (a draw after regulation) is split
     // between the two, but soccer keeps its draw.
-    // (So do handball, rugby and futsal: they can end level too.)
-    const soccer = LEAGUES[sport]?.family === 'soccer' || THREE_WAY_SPORTS.has(LEAGUES[sport]?.family);
+    const soccer = LEAGUES[sport]?.family === 'soccer';
     const three = soccer && match && fairThree(outcome(match, 'OT_ONE'), outcome(match, 'OT_CROSS'), outcome(match, 'OT_TWO'));
     const win = three ? [three.home, three.away] : match && !soccer && fairPair(outcome(match, 'OT_ONE'), outcome(match, 'OT_TWO'));
     if (!win && !unpriced) continue;
@@ -90,9 +76,7 @@ export function parseKambiEvents(data, sport, now = new Date(), { unpriced = fal
       spread: null,
       book: 'kambi',
       kambiId: e.id,
-      group: groupOf(e),
-      // The women's draws and leagues (their names read as women's, names.mjs).
-      ...(/(^|\/)(wta|[a-z_]*women[a-z_]*|[a-z_]*__w_)(\/|$)/.test(pathOf(e)) ? { women: true } : {}),
+      group: e.group || '',
       // Soccer from Kambi settles on the final score alone: no halves.
       ...(soccer ? { scoreOnly: true } : {})
     };
@@ -142,7 +126,7 @@ export function parseKambiInPlay(data, sport) {
   const games = [];
   for (const item of data?.events || []) {
     const e = item.event;
-    if (!e || e.state !== 'STARTED' || !e.homeName || !e.awayName || !sold(e, sport)) continue;
+    if (!e || e.state !== 'STARTED' || !e.homeName || !e.awayName) continue;
     const offers = item.betOffers || [];
     // Hockey's winner is its 60 minutes' (regular time), three ways.
     const hockey = family === 'hockey';
@@ -151,16 +135,15 @@ export function parseKambiInPlay(data, sport) {
     const two = outcome(match || { outcomes: [] }, 'OT_TWO');
     // Soccer's live winner has a draw: all three open, or none sold.
     const cross = outcome(match || { outcomes: [] }, 'OT_CROSS');
-    const threeFamily = family === 'soccer' || hockey || THREE_WAY_SPORTS.has(family);
-    const three = threeFamily && open(one) && open(cross) && open(two) ? fairThree(one, cross, two) : null;
-    const win = !threeFamily && open(one) && open(two) ? fairPair(one, two) : null;
+    const three = (family === 'soccer' || hockey) && open(one) && open(cross) && open(two) ? fairThree(one, cross, two) : null;
+    const win = family !== 'soccer' && !hockey && open(one) && open(two) ? fairPair(one, two) : null;
     const game = {
       kambiId: e.id,
       sport,
       startUtc: new Date(e.start).toISOString(),
       away: e.awayName,
       home: e.homeName,
-      group: groupOf(e),
+      group: e.group || '',
       ml: three ?? (win ? { home: win[0], away: win[1] } : null),
       spread: null,
       total: null
@@ -178,9 +161,7 @@ export function parseKambiInPlay(data, sport) {
     const under = total && outcome(total, 'OT_UNDER');
     if (open(over) && open(under) && lineOk(over.line)) game.total = { line: over.line / 1000, overFair: fairPair(over, under)[0] };
     const live = item.liveData || {};
-    // A set sport's score is its sets won (Kambi's own is the game's points: 40-15).
-    const sets = SET_SPORTS.has(family) ? setsWon(live, family) : null;
-    const score = sets ? { home: sets.home, away: sets.away } : { home: Number(live.score?.home) || 0, away: Number(live.score?.away) || 0 };
+    const score = { home: Number(live.score?.home) || 0, away: Number(live.score?.away) || 0 };
     Object.assign(game, { homeScore: score.home, awayScore: score.away });
     if (league?.family === 'baseball') game.inningNo = kambiPeriods(live.score?.info).home.length || null;
     if (league?.family === 'basketball') game.quarter = Number(/(\d)/.exec(live.matchClock?.periodId || '')?.[1]) || null;

@@ -3,7 +3,7 @@
 // games end (settle.js). Pure: a pick's result from its game's outcome, and
 // a slip paid once every pick is decided (the ledger's fixed ids,
 // 'payout-<slip>', so the phone and the Worker can never pay it twice).
-import { CATALOG, familyOfSport, asiaMonth, asiaMonthOf, THREE_WAY_SPORTS } from '#kit/catalog.mjs';
+import { CATALOG, familyOfSport, asiaMonth, asiaMonthOf } from '#kit/catalog.mjs';
 import { f1Driver, normalizeTeamName } from '#kit/logos.mjs';
 import { f1Outcome } from '#kit/f1live.mjs';
 import { settleSlip } from '#kit/play-odds.mjs';
@@ -27,8 +27,6 @@ export const LEAGUES = Object.fromEntries(
         // month lists (Asian baseball).
         if (l.data === 'asia') league.schedule = { asia: l.asia };
       }
-      // Results from an ESPN scoreboard though the prices are Kambi's (UFC).
-      if (l.results) league.results = l.results;
       for (const k of ['logo', 'icon', 'badge', 'top']) if (l[k] !== undefined) league[k] = l[k];
       return [l.bet, league];
     })
@@ -119,7 +117,7 @@ export function legResult(leg, outcome) {
       // level after 12 innings; a hockey winner bought two-way before it was
       // three) is a result not on offer: void, as 台灣運彩 rules (無效投注
       // Q&A; 投注規範 32(七)). Soccer's and hockey's (`threeWay`) have a draw.
-      if (leg.side !== 'draw' && away === home && familyOf(leg.sport) && !isSoccer(leg.sport) && !leg.threeWay && !THREE_WAY_SPORTS.has(familyOf(leg.sport))) return 'void';
+      if (leg.side !== 'draw' && away === home && familyOf(leg.sport) && !isSoccer(leg.sport) && !leg.threeWay) return 'void';
       return win(leg.side === 'draw' ? away === home : leg.side === 'away' ? away > home : home > away);
     case 'total':
       return push(leg.side === 'over' ? away + home - leg.line : leg.line - away - home);
@@ -671,22 +669,6 @@ export function parseEspnPole(data, startUtc) {
   return name ? { status: 'final', pole: name } : { status: 'pending' };
 }
 
-// A golf tournament's winner from an ESPN golf scoreboard: the event of that
-// name (or the tour's one event that week), once final, its first place;
-// called off void; null while it's on or not listed.
-export function golfResult(data, name, t) {
-  const events = (data?.events || []).filter(e => Math.abs(Date.parse(e.date) - t) < 5 * DAY_MS);
-  const named = events.filter(e => sideScore(e.name, name) >= 2);
-  const event = named[0] ?? (events.length === 1 ? events[0] : null);
-  if (!event) return null;
-  const type = event.status?.type || {};
-  if (VOID_STATUS.test(type.name || '') || POSTPONED.test(type.name || '')) return { status: 'void' };
-  if (!type.completed) return null;
-  const first = (event.competitions?.[0]?.competitors || []).find(c => Number(c.order) === 1);
-  const winner = first?.athlete?.displayName;
-  return winner ? { status: 'final', winner } : null;
-}
-
 // A championship's winner once Polymarket has resolved the market.
 export function parseFutureResult(events) {
   const event = events?.[0];
@@ -719,35 +701,6 @@ export function parseOpenF1Flags(messages) {
     }
   };
 }
-
-// A bout's or a cricket match's result from ESPN (the mma scoreboard, the
-// cricket scorepanel): its winner 1-0; a draw, tie, no contest or no
-// result void (勝負 is two ways); called off void; null while it's still to
-// come or under way, or not listed. `near`: the start it must be within 18
-// hours of (the cricket panel lists a long match on each of its days).
-export function winnerResult(data, home, away, near = null) {
-  const events = data?.events ?? (data?.scores || []).flatMap(s => s.events || []);
-  for (const event of events) {
-    if (near && Math.abs(Date.parse(event.date) - Date.parse(near)) > 18 * 3_600_000) continue;
-    for (const c of event.competitions || []) {
-      const [a, b] = c.competitors || [];
-      if (!a || !b) continue;
-      const nameOf = x => x.athlete?.displayName ?? x.team?.displayName;
-      const order = sidesMatch(nameOf(a), nameOf(b), home, away);
-      if (!order) continue;
-      const [h, w] = order === 'same' ? [a, b] : [b, a];
-      const type = c.status?.type || {};
-      if (VOID_STATUS.test(type.name || '') || POSTPONED.test(type.name || '')) return { status: 'void' };
-      if (!(type.completed || type.state === 'post')) return type.state === 'in' ? { status: 'pending', state: 'in', homeScore: 0, awayScore: 0, detail: '' } : null;
-      const won = x => x.winner === true || x.winner === 'true';
-      if (won(h)) return { status: 'final', homeScore: 1, awayScore: 0 };
-      if (won(w)) return { status: 'final', homeScore: 0, awayScore: 1 };
-      return { status: 'void' };
-    }
-  }
-  return null;
-}
-export const boutResult = winnerResult;
 
 // ESPN files games under the US Eastern date.
 export function espnDates(startUtc) {
@@ -850,8 +803,7 @@ export function setOver(sport, i, bestOf, home, away) {
 }
 // A set sport's result once a side has won the match's sets, or null: the
 // sets won as the score, each set's games as the periods.
-// The sets each side has won so far ({ home, away, sets }), or null.
-export function setsWon(live, sport) {
+export function decidedSetMatch(live, sport) {
   const s = kambiSets(live);
   if (!s || !s.bestOf) return null;
   let home = 0;
@@ -861,34 +813,10 @@ export function setsWon(live, sport) {
     const done = i < s.home.length - 1 || setOver(sport, i, s.bestOf, h, a);
     if (done && h !== a) h > a ? home++ : away++;
   });
-  return { home, away, sets: s };
-}
-export function decidedSetMatch(live, sport) {
-  const won = setsWon(live, sport);
-  if (!won) return null;
-  const { home, away, sets: s } = won;
   const need = Math.ceil(s.bestOf / 2);
   if (home < need && away < need) return null;
   return { status: 'final', homeScore: home, awayScore: away, homeInnings: s.home, awayInnings: s.away };
 }
-
-// The sports sold on their winner alone (catalog.mjs), settled on Kambi's
-// last score: once Kambi has dropped the match, or (hours, the sports with
-// a clock) that long past the start with the score still (a level one
-// too where it can end level, THREE_WAY_SPORTS, and rugby's). Snooker and darts are first to a
-// number of frames or sets Kambi doesn't say: only the dropped match counts.
-// `sells`: the markets 運彩 has for it (its 玩法 list), the board's only ones.
-export const SCORE_SPORTS = {
-  snooker: { hours: 0, sells: ['ml'] },
-  darts: { hours: 0, sells: ['ml'] },
-  handball: { hours: 2.5, sells: ['ml'] },
-  rugby: { hours: 3, sells: ['ml'] },
-  futsal: { hours: 2.5, sells: ['ml', 'total'] },
-  // Settled from ESPN (winnerResult), never Kambi's live data.
-  mma: { hours: 0, sells: ['ml'] },
-  cricket: { hours: 0, sells: ['ml'] }
-};
-export { THREE_WAY_SPORTS };
 
 // How long a score must stay the same before a finished-looking game counts as over.
 export const KAMBI_QUIET_MS = 30 * 60_000;
@@ -902,14 +830,8 @@ const TIE_INNINGS = { npb: 12, cpbl: 12, kbo: 11 };
 export function decidedTeamGame(live, sport, start, now = new Date(), { ended = false } = {}) {
   const family = LEAGUES[sport]?.family;
   // A set sport: over once a side has won its sets.
-  // (Esports' maps have no end score to read: once Kambi has dropped the
-  // match, its maps won.)
-  if (live && SET_SPORTS.has(family ?? sport)) {
-    const sets = decidedSetMatch(live, family ?? sport);
-    if (sets || (family ?? sport) !== 'esports' || !ended || live.score.home === live.score.away) return sets;
-    return { status: 'final', homeScore: live.score.home, awayScore: live.score.away, homeInnings: [], awayInnings: [] };
-  }
-  if (!live || (family !== 'baseball' && family !== 'basketball' && family !== 'soccer' && !SCORE_SPORTS[family])) return null;
+  if (live && SET_SPORTS.has(family ?? sport)) return decidedSetMatch(live, family ?? sport);
+  if (!live || (family !== 'baseball' && family !== 'basketball' && family !== 'soccer')) return null;
   const { home, away } = live.score;
   const n = live.periods.home.length;
   const t = now.getTime();
@@ -917,13 +839,6 @@ export function decidedTeamGame(live, sport, start, now = new Date(), { ended = 
   // The score's own timestamp when it's a sensible one; if not, a generous
   // time after the start.
   const changed = live.changedAt && live.changedAt >= began && live.changedAt <= t + 3_600_000 ? live.changedAt : null;
-  const rule = SCORE_SPORTS[family];
-  if (rule) {
-    // (Rugby's level score counts too: its winner is void then, legResult.)
-    const still = changed ? t - changed >= KAMBI_QUIET_MS : true;
-    const over = (ended || (rule.hours && still && began && t - began >= rule.hours * 3_600_000)) && (THREE_WAY_SPORTS.has(family) || family === 'rugby' || home !== away);
-    return over ? { status: 'final', homeScore: home, awayScore: away, homeInnings: [], awayInnings: [] } : null;
-  }
   const quiet = ended || (changed ? t - changed >= KAMBI_QUIET_MS : began && t - began >= (family === 'baseball' ? 5 : 3.5) * 3_600_000);
   let over = false;
   if (family === 'baseball') over = n >= 9 && quiet && (home !== away || n >= (TIE_INNINGS[sport] ?? 99));
@@ -952,11 +867,8 @@ export function kambiUnresolvable(leg, entry, now = new Date(), watchReachable =
 }
 
 // A Kambi match in play as an outcome still pending: the score so far.
-export function kambiInPlay(live, sport) {
-  // (A set sport's score: its sets won, not the game's points.)
-  const family = LEAGUES[sport]?.family ?? sport;
-  const sets = SET_SPORTS.has(family) ? setsWon(live, family) : null;
-  return { status: 'pending', state: 'in', homeScore: sets ? sets.home : live.score.home, awayScore: sets ? sets.away : live.score.away, detail: '' };
+export function kambiInPlay(live) {
+  return { status: 'pending', state: 'in', homeScore: live.score.home, awayScore: live.score.away, detail: '' };
 }
 
 // Outcomes for slip legs that have started: legId -> outcome (see legResult).
@@ -975,20 +887,6 @@ export async function readOutcomes(legs, { read, keptKambi = async () => null, n
   await Promise.all(
     legs.map(async leg => {
       if (leg.kind === 'future') {
-        // A golf tournament's winner: ESPN's leaderboard (its first day, or the
-        // next: a tour's week is filed under its own dates).
-        if (/^golf:/.test(leg.eventSlug || '')) {
-          const [, tour, day, ...rest] = leg.eventSlug.split(':');
-          const t = Date.parse(`${day.slice(0, 4)}-${day.slice(4, 6)}-${day.slice(6, 8)}T12:00:00Z`);
-          for (const d of [0, 1, 3]) {
-            const data = await page(`${ESPN}/golf/${tour}/scoreboard?dates=${yyyymmdd(new Date(t + d * DAY_MS))}`);
-            const result = data && golfResult(data, rest.join(':'), t);
-            if (result) return out.set(leg.id, result);
-          }
-          // Not played (called off) or no answer two weeks on: the stake back.
-          if (now.getTime() - t > 14 * DAY_MS) out.set(leg.id, { status: 'void' });
-          return;
-        }
         if (!leg.eventSlug) return;
         const events = await page(`${GAMMA}/events?slug=${encodeURIComponent(leg.eventSlug)}`);
         if (events) out.set(leg.id, parseFutureResult(events));
@@ -1037,7 +935,7 @@ export async function readOutcomes(legs, { read, keptKambi = async () => null, n
       const league = LEAGUES[leg.sport];
       // Tennis and UFC are no longer sold (2026-10-11): a pick still open on
       // one is void, its stake back.
-      if (!league && ['atp', 'wta'].includes(leg.sport)) return out.set(leg.id, { status: 'void' });
+      if (!league && ['atp', 'wta', 'ufc'].includes(leg.sport)) return out.set(leg.id, { status: 'void' });
       // Asian baseball from the league's own list (a game Kambi didn't price):
       // the final score in its month's list.
       if (league?.schedule?.asia && !leg.kambiId) {
@@ -1045,23 +943,6 @@ export async function readOutcomes(legs, { read, keptKambi = async () => null, n
         const games = await asiaMonth(page, league.schedule.asia, asiaMonthOf(t)).catch(() => []);
         const g = games.find(x => Math.abs(Date.parse(x.start) - t) < 12 * 3_600_000 && sidesMatch(x.home?.en, x.away?.en, leg.home, leg.away) === 'same');
         if (g) out.set(leg.id, asiaResult(g));
-        return;
-      }
-      // A fight, a cricket match: its winner on ESPN's list (the day, or the
-      // day either side: a card is filed under its own local date).
-      if (league?.results) {
-        const t = Date.parse(leg.start);
-        const days = [...new Set([-1, 0, 1].flatMap(d => espnDates(new Date(t + d * DAY_MS).toISOString())))];
-        let card = false;
-        for (const date of days) {
-          const data = await page(`${ESPN}/${league.results}?dates=${date}`);
-          const result = data && winnerResult(data, leg.home, leg.away, league.family === 'cricket' ? leg.start : null);
-          if (result) return out.set(leg.id, result);
-          if (league.family === 'mma' && data?.events?.some(e => Math.abs(Date.parse(e.date) - t) < 2 * DAY_MS && e.status?.type?.completed)) card = true;
-        }
-        // A card over without this bout (called off, a fighter out), or
-        // nothing listed a week on: the stake back.
-        if (card || now.getTime() - t > 7 * DAY_MS) out.set(leg.id, { status: 'void' });
         return;
       }
       // Kambi's sports: the result from the match's own live data, once the

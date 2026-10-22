@@ -32,7 +32,6 @@ import { houseCut, houseRule, withRules, shadeLong } from '#kit/play-rules.mjs';
 import { withModelLines } from '#kit/play-lines.mjs';
 import { LEAGUES, familyOf, isSoccer } from '#kit/play-teams.mjs';
 import { atLeast } from '#kit/play-propmodel.mjs';
-import { SCORE_SPORTS, THREE_WAY_SPORTS } from '#kit/settle.mjs';
 
 // Lines besides the lottery's own: totals this many either side of the main
 // line, team totals this many, run lines up to 4.5 runs either way.
@@ -310,7 +309,7 @@ export function gameOptions(game) {
   // Hockey's 不讓分 is its 60 minutes' result, three ways, as 台灣運彩 sells
   // it: from the model fitted to the books' winner (overtime's included).
   const hockey = familyOf(game.sport) === 'hockey';
-  const threeWay = isSoccer(game.sport) || hockey || THREE_WAY_SPORTS.has(familyOf(game.sport));
+  const threeWay = isSoccer(game.sport) || hockey;
   const chances = hockey ? hockeyWinner(fitHockey(blend.probs.home / (blend.probs.home + blend.probs.away), game.total)) : blend.probs;
   const sides = threeWay ? ['home', 'draw', 'away'] : ['away', 'home'];
   // The winner at the lottery's cut (rules.mjs houseCut), the same for every
@@ -361,10 +360,6 @@ export function gameOptions(game) {
   // Priced by the house alone (no bookmaker yet: weeks out, preseason, a
   // cup's minnow): every market all the same, on a smaller ticket (SLIP_RULES.capped).
   if (blend.source === 'house') for (const o of out) o.cap = 'house';
-  // A sport 運彩 sells only a market or two of (snooker's winner, futsal's
-  // winner and total): those alone.
-  const sells = SCORE_SPORTS[familyOf(game.sport)]?.sells;
-  if (sells) return out.filter(o => sells.includes(o.kind));
   // A game settled from its final score alone (schedules.mjs): nothing on a part of it.
   return game.scoreOnly ? out.filter(o => !PART_KINDS.has(o.kind)) : out;
 }

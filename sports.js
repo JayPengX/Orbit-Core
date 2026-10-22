@@ -380,10 +380,7 @@ function trimKambi(data) {
       ? list.map(o => ({
           criterion: { englishLabel: o.criterion?.englishLabel },
           betOfferType: { englishName: o.betOfferType?.englishName },
-          // (A field's winner board, golf's: who, and which places it pays.)
-          ...(o.from != null ? { from: o.from, to: o.to } : {}),
-          ...(o.suspended ? { suspended: true } : {}),
-          outcomes: (o.outcomes || []).map(x => ({ type: x.type, odds: x.odds, line: x.line, status: x.status, ...(x.participant ? { participant: x.participant } : {}) }))
+          outcomes: (o.outcomes || []).map(x => ({ type: x.type, odds: x.odds, line: x.line, status: x.status }))
         }))
       : list;
   const live = d => d && { score: d.score, statistics: d.statistics?.sets ? { sets: d.statistics.sets } : undefined, matchClock: d.matchClock ? { periodId: d.matchClock.periodId, minute: d.matchClock.minute, running: d.matchClock.running } : undefined };

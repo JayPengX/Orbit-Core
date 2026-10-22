@@ -25,7 +25,7 @@ export const LEAGUES = Object.fromEntries(
         // month lists (Asian baseball).
         if (l.data === 'asia') league.schedule = { asia: l.asia };
       }
-      for (const k of ['logo', 'icon', 'badge', 'top', 'only', 'noPlay']) if (l[k] !== undefined) league[k] = l[k];
+      for (const k of ['logo', 'icon', 'badge', 'top']) if (l[k] !== undefined) league[k] = l[k];
       return [l.bet, league];
     })
 );

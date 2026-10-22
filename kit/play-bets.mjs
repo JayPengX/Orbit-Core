@@ -97,8 +97,7 @@ export function futureBets(futures) {
         fairChance: team.fair,
         fairMargin: null,
         errKey: ODDS_ERROR[`future_${market.key}`] ? (team.fair < 0.004 && market.sport !== 'nba' ? 'futureLongshot' : `future_${market.key}`) : 'futureOther',
-        // (Never longer than the bookmaker's own price, where the board has one: golf's, Kambi's.)
-        estOdds: team.book ? Math.min(odds[i], team.book) : odds[i]
+        estOdds: odds[i]
       }));
     })
   );
