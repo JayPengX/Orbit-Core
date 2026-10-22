@@ -15,7 +15,7 @@
 
 // { tab: 'ipo' } as data-tab="ipo" attributes (a builder's `data`, for taps wired by delegation).
 // (By path, not #kit/: a page whose import map predates format.mjs still loads ui.mjs.)
-import { DASH, pct, price as fmtPrice } from './format.mjs';
+import { DASH, pct, price as fmtPrice, twDay } from './format.mjs';
 
 const dataProps = (data = null) => Object.fromEntries(Object.entries(data || {}).filter(([, v]) => v != null && v !== false).map(([k, v]) => [`data-${String(k).replace(/[^a-z0-9-]/gi, '')}`, v === true ? '' : String(v)]));
 const reduced = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -47,22 +47,70 @@ export function tick() {
   } catch {}
 }
 
-// ---- A strip of days (Orbit Sports' and Quadra Play's, one copy) ----
+// ---- A strip of days: THE date selector of every app (one copy) ----
 // dayStrip(s, opts): a row of day chips (the weekday or 今天 over the date)
 // and a 📅 for any day, in a bar the app pins under the status bar
-// (.q-day-bar; it takes the page's colour once stuck). `s` is the strip's
-// own record, kept by the app ({} the first time): the strip is made once
-// and changed in place on every draw after (a new row under a finger made
-// it jump on iPhone, a new date input closed iOS's open picker).
+// (.q-day-bar; it takes the page's colour once stuck; dayBar makes the bar).
+// `s` is the strip's own record, kept by the app ({} the first time): the
+// strip is made once and changed in place on every draw after (a new row
+// under a finger made it jump on iPhone, a new date input closed iOS's
+// open picker). A swipe across the page goes a day either way (daySwipe,
+// dayStep).
 //   days: the days shown ('YYYY-MM-DD', in order); current: the day chosen;
 //   onPick(day): a day chosen (a tap, 📅); label(day) / sub(day): a chip's
-//   two lines; today; cls(day): more classes for a chip (month-start);
-//   clamp(day): the day 📅's date becomes (the nearest with games, inside
-//   the bounds); bounds {from, to}: 📅's limits; follow: every new day to
-//   the middle, a tapped one too; pickLabel: 📅's name.
+//   two lines (dayTop / dayNum unless given); today (Taiwan's unless given);
+//   cls(day): more classes for a chip (month-start unless given);
+//   clamp(day): the day 📅's date becomes (unless given: the first shown
+//   on or after it, else the last); bounds {from, to}: 📅's limits (the
+//   days' ends unless given); follow: every new day to the middle, a tapped
+//   one too; pickLabel: 📅's name; lang: 'zh' | 'en' (the page's).
 // Returns the strip (.q-day-strip-wrap) to put in the bar.
+const dayLang = lang => lang || (/^en/i.test(globalThis.document?.documentElement?.lang || '') ? 'en' : 'zh');
+const dayAdd = (d, n) => new Date(Date.parse(`${d}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
+// Taiwan's today, 'YYYY-MM-DD'.
+export const dayToday = () => twDay(Date.now());
+// The days from `from` to `to` ('YYYY-MM-DD', both kept), in order.
+export function dayList(from, to) {
+  const out = [];
+  for (let d = from; d && to && d <= to && out.length < 800; d = dayAdd(d, 1)) out.push(d);
+  return out;
+}
+// A chip's top line: 今天 / 明天 / 昨天, else the weekday (週三, Wed).
+export function dayTop(d, { today = dayToday(), lang } = {}) {
+  const zh = dayLang(lang) === 'zh';
+  if (d === today) return zh ? '今天' : 'Today';
+  if (d === dayAdd(today, 1)) return zh ? '明天' : 'Tmrw';
+  if (d === dayAdd(today, -1)) return zh ? '昨天' : 'Yday';
+  const wd = new Date(`${d}T12:00:00Z`).getUTCDay();
+  return zh ? `週${'日一二三四五六'[wd]}` : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][wd];
+}
+// Its date: 10/22 (26/1/3 in another year).
+export function dayNum(d, { today = dayToday() } = {}) {
+  const [y, m, n] = d.split('-').map(Number);
+  return `${y !== Number(today.slice(0, 4)) ? `${String(y).slice(2)}/` : ''}${m}/${n}`;
+}
+// The day before or after `current` among `days` (null at an end, or when it isn't one of them).
+export function dayStep(days, current, dir) {
+  const i = days.indexOf(current);
+  return i < 0 ? null : days[i + dir] ?? null;
+}
+// The bar the strip sits in, made once into s.bar: pinned under the status
+// bar (a page's), or `flat` where it sits in a sheet or a card. Every later
+// call changes the strip in place; the bar is the same node.
+export function dayBar(s, { flat = false, ...opts } = {}) {
+  const strip = dayStrip(s, opts);
+  s.bar ??= h('div', { class: `q-day-bar${flat ? ' flat' : ''}` });
+  if (strip.parentElement !== s.bar) s.bar.replaceChildren(strip);
+  return s.bar;
+}
 const CAL_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16.5" rx="3"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/><path d="M7.5 13.5h2M11 13.5h2M14.5 13.5h2M7.5 17h2M11 17h2"/></svg>';
-export function dayStrip(s, { days = [], current = null, onPick = () => {}, label = d => d, sub = () => '', today = '', cls = () => '', clamp = d => d, bounds = null, follow = false, pickLabel = '' } = {}) {
+export function dayStrip(s, { days = [], current = null, onPick = () => {}, label = null, sub = null, today = dayToday(), cls = null, clamp = null, bounds = null, follow = false, pickLabel = '', lang } = {}) {
+  label ??= d => dayTop(d, { today, lang });
+  sub ??= d => dayNum(d, { today });
+  cls ??= d => (d.endsWith('-01') ? 'month-start' : '');
+  clamp ??= v => days.find(d => d >= v) ?? days.at(-1) ?? v;
+  bounds ??= days.length ? { from: days[0], to: days.at(-1) } : null;
+  pickLabel ||= dayLang(lang) === 'zh' ? '選擇日期' : 'Pick a date';
   if (!s.row) {
     s.row = h('div', { class: 'q-chips q-day-strip day-strip' });
     // A tap: the chip shows it at once, the page follows off the tap's stack.
@@ -149,9 +197,10 @@ function dayReveal(s) {
     s.waiting.observe(s.row);
   });
 }
-// A swipe across a page (not across a row that scrolls sideways, a field or
-// the strip): step(+1 | -1) goes a day either way and says whether it did;
-// the page follows the finger and the new day slides in (.q-day-swipe).
+// A swipe across a page or a sheet's days (not across a row that scrolls
+// sideways, a field or the strip): step(+1 | -1) goes a day either way and
+// says whether it did; the page follows the finger and the new day slides
+// in (.q-day-swipe; the strip and a sheet's head stay put).
 export function daySwipe(panel, step) {
   if (!panel) return;
   panel.classList.add('q-day-swipe');
@@ -168,7 +217,9 @@ export function daySwipe(panel, step) {
     panel.style.removeProperty('--swipe');
   };
   panel.addEventListener('touchstart', ev => {
-    start = ev.touches.length === 1 && !document.querySelector('dialog[open]') && !sideways(ev.target) ? { x: ev.touches[0].clientX, y: ev.touches[0].clientY, at: Date.now(), lock: null } : null;
+    // (Not under a sheet: one open over the page has the finger; a panel inside that sheet swipes.)
+    const over = [...document.querySelectorAll('dialog[open]')].some(d => !d.contains(panel));
+    start = ev.touches.length === 1 && !over && !sideways(ev.target) ? { x: ev.touches[0].clientX, y: ev.touches[0].clientY, at: Date.now(), lock: null } : null;
   }, { passive: true });
   panel.addEventListener('touchmove', ev => {
     if (!start) return;
