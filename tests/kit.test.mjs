@@ -10,9 +10,8 @@ globalThis.sessionStorage = storage(tabStore);
 const kit = await import('../kit/orbit.mjs');
 
 test('the pool is every entry and every app figure', () => {
-  const w = { entries: [{ id: 'a', amount: 100, app: 'odds' }, { id: 'b', amount: -40, app: 'eco' }], snap: { stock: { cash: 1000, t: 1 } } };
+  const w = { entries: [{ id: 'a', amount: 100, app: 'stock' }, { id: 'b', amount: -40, app: 'eco' }], snap: { stock: { cash: 1000, t: 1 } } };
   assert.equal(kit.poolBalance(w), 1060);
-  assert.equal(kit.othersBalance(w, 'stock'), 60);
 });
 
 test('recommendations follow affinity, stay diverse, and learn from dismissals', () => {
@@ -199,7 +198,7 @@ test('a device keeps its sign-in and the account id, never the pass', () => {
 
 test('the pay: fixed, whatever the account holds', () => {
   assert.equal(kit.paydayFor({ entries: [] }), 10_000);
-  assert.equal(kit.paydayFor({ entries: [{ id: 'a', amount: 60_000, app: 'odds' }] }), 10_000);
+  assert.equal(kit.paydayFor({ entries: [{ id: 'a', amount: 60_000, app: 'eco' }] }), 10_000);
   assert.equal(kit.paydayFor({ entries: [], snap: { stock: { cash: 50_000, holdings: 500_000, t: 1 } } }), 10_000);
   // Wednesday 21 Oct (Taipei): next Monday the 26th, 00:00 Taipei.
   assert.equal(kit.nextPayday(Date.UTC(2026, 9, 21, 4)), Date.UTC(2026, 9, 25, 16));
@@ -278,7 +277,7 @@ test("a cold start uses its app's own kept token while it's young and the accoun
   assert.equal(await s.ensureToken({ renew: true }), 'new');
   assert.equal(JSON.parse(store.get('orbit.token:vocab')).t, 'new', 'the new one kept');
   // Another account's, too old, or another app's: a sign-in first.
-  for (const [app, kept] of [['weather', { account: 'ffffffffffffffff' }], ['transit', { ago: 13 * 60_000 }], ['orbit', { app: 'odds' }]]) {
+  for (const [app, kept] of [['weather', { account: 'ffffffffffffffff' }], ['transit', { ago: 13 * 60_000 }], ['orbit', { app: 'stock' }]]) {
     s = fresh(app, kept);
     assert.equal(await s.ensureToken(), 'new', app);
     assert.equal(calls[0], 'refresh', app);
@@ -458,27 +457,19 @@ test('looks: an avatar and a frame for everyone, from the lists only', () => {
   assert.ok([...kit.AVATARS, ...kit.FRAMES].every(x => !x.streak));
 });
 
-test('where the money came from: the system, Play, the government and the account itself', () => {
+test('where the money came from: the system, the bank, the government and the account itself', () => {
   // The opening money is the Worker's own entry; the pay and the owner's grants are the system's too.
   const paid = kit.moneySides({ entries: [{ id: 'eco:start', app: 'eco', kind: 'start', amount: 200_000 }, { id: 'eco:wpay:2026-10-19', app: 'eco', kind: 'pay', amount: 10_000 }, { id: 'eco:admin:1', app: 'eco', kind: 'admin', amount: 500 }], snap: {} });
   assert.deepEqual(paid.gave, { start: 200_000, pay: 10_000, rank: 0, other: 500 });
   assert.equal(paid.own, 0);
-  const fresh = kit.moneySides({ entries: [{ id: 'eco:start', app: 'eco', kind: 'start', amount: 30_000 }], snap: {} });
-  assert.deepEqual([fresh.gave.start, fresh.own], [30_000, 0]);
-  // Play: an open bet is money at stake (in the worth, on neither side); settled, it's against Orbit, either way.
   const start = { id: 'eco:start', app: 'eco', kind: 'start', amount: 30_000 };
-  const bet = { id: 'odds:stake-a', app: 'odds', kind: 'stake', amount: -500 };
-  const placed = kit.moneySides({ entries: [start, bet], snap: {} });
-  assert.deepEqual([placed.atStake, placed.orbit, placed.own, placed.worth], [500, 0, 0, 30_000]);
-  const won = kit.moneySides({ entries: [start, bet, { id: 'odds:payout-a', app: 'odds', kind: 'payout', amount: 1_200 }], snap: {} });
-  assert.deepEqual([won.atStake, won.orbit, won.own, won.worth], [0, 700, 0, 30_700]);
-  const lost = kit.moneySides({ entries: [start, bet, { id: 'odds:payout-a', app: 'odds', kind: 'payout', amount: 0 }, { id: 'eco:od:2026-10', app: 'eco', kind: 'od', amount: -490 }], snap: {} });
-  assert.deepEqual([lost.orbit, lost.fees, lost.own, lost.worth], [-990, 490, 0, 29_010]);
+  // Overdraft interest is Orbit's bank's.
+  const od = kit.moneySides({ entries: [start, { id: 'eco:od:2026-10', app: 'eco', kind: 'od', amount: -490 }], snap: {} });
+  assert.deepEqual([od.fees, od.own, od.worth], [490, 0, 29_510]);
   // Securities' gains are the account's own.
   const gain = kit.moneySides({ entries: [start], snap: { stock: { cash: -10_000, holdings: 12_000 } } });
-  assert.deepEqual([gain.orbit, gain.own], [0, 2_000]);
+  assert.deepEqual([gain.fees, gain.own], [0, 2_000]);
 });
-
 test('signing out wipes every app’s keys on this device, keeping only its language and safe area', () => {
   store.clear();
   for (const k of ['orbit.refresh', 'orbit.account', 'orbit.wallet', 'orbit.payload.odds', 'oddsStudy.account:abc', 'stockStudy.settings', 'classFocusData', 'orbit.notify.prefs', 'fx.day.v3']) store.set(k, 'x');
@@ -645,43 +636,20 @@ test('taipeiDay takes a number, an ISO string or a Date', () => {
   assert.equal(kit.taipeiDay(new Date(t)), '2026-10-18');
 });
 
-test('政府: taxes the apps report and relief, a side of its own; the four sides add up to the worth', () => {
+test('政府: the taxes Securities reports and relief, a side of its own; the four sides add up to the worth', () => {
   const start = { id: 'eco:start', app: 'eco', kind: 'start', amount: 200_000 };
   const w = {
-    entries: [start, { id: 'odds:stake-a', app: 'odds', kind: 'stake', amount: -1_000 }, { id: 'odds:payout-a', app: 'odds', kind: 'payout', amount: 48_010 }, { id: 'eco:relief:2026-11-02', app: 'eco', kind: 'relief', amount: 5_000 }],
-    snap: { odds: { gov: { sports: 11_990, lottery: 2_040 } }, stock: { cash: -50_000, holdings: 60_000, gov: { trade: 300, withheld: 90, nhi: 0 } } }
+    entries: [start, { id: 'eco:relief:2026-11-02', app: 'eco', kind: 'relief', amount: 5_000 }],
+    snap: { stock: { cash: -50_000, holdings: 60_000, gov: { trade: 300, withheld: 90, nhi: 0 } } }
   };
   const g = kit.govOf(w);
-  assert.deepEqual(g.paid, { sports: 11_990, lottery: 2_040, trade: 300, withheld: 90, nhi: 0 });
-  assert.deepEqual([g.paidTotal, g.gotTotal, g.net], [14_420, 5_000, -9_420]);
+  assert.deepEqual(g.paid, { trade: 300, withheld: 90, nhi: 0 });
+  assert.deepEqual([g.paidTotal, g.gotTotal, g.net], [390, 5_000, 4_610]);
   const s = kit.moneySides(w);
-  // Play's side is before tax (relief isn't the system's).
-  assert.equal(s.orbit, 48_010 - 1_000 + 14_030);
   assert.equal(s.gave.other, 0);
-  assert.equal(s.given + s.orbit + s.gov.net + s.own, s.worth);
+  assert.equal(s.given - s.fees + s.gov.net + s.own, s.worth);
   // Nothing reported, junk ignored.
-  assert.equal(kit.govOf({ snap: { odds: { gov: { sports: 'x', lottery: -5 } } } }).paidTotal, 0);
-});
-
-test('政府: Play’s sports tax counts only slips still in the wallet, never one taken off the record', () => {
-  const t = Date.parse('2026-10-20T02:47:00Z');
-  const entries = [
-    { id: 'odds:stake-a', t, app: 'odds', kind: 'stake', amount: -1_000 },
-    { id: 'odds:payout-a', t, app: 'odds', kind: 'payout', amount: 48_010 },
-    // The owner's off-record 1.08 test slip.
-    { id: 'odds:stake-x', t, app: 'odds', kind: 'stake', amount: -28_630 },
-    { id: 'odds:payout-x', t, app: 'odds', kind: 'payout', amount: 30_920 }
-  ];
-  // Slip b is gone from the account: its tax goes with it.
-  const w = { entries, snap: { odds: { gov: { sports: 20_453, lottery: 0, slips: { a: 11_990, b: 2_279, x: 6_184 } } } } };
-  assert.equal(kit.govOf(w).paid.sports, 11_990);
-  // Nor a back charge taken back (eco:untax-<slip>).
-  const untaxed = [...entries, { id: 'eco:untax-a', t, app: 'eco', kind: 'untax', amount: 0 }];
-  assert.equal(kit.govOf({ ...w, entries: untaxed }).paid.sports, 0);
-  // An older Play (the total alone) is taken at its word.
-  assert.equal(kit.govOf({ entries, snap: { odds: { gov: { sports: 14_269 } } } }).paid.sports, 14_269);
-  // A stake folded into a month's total after 400 days still counts.
-  assert.equal(kit.govOf({ entries: [{ id: 'fold:odds:stake:2025-09', app: 'odds', kind: 'stake', amount: -9 }], snap: w.snap }).paid.sports, 20_453);
+  assert.equal(kit.govOf({ snap: { stock: { gov: { trade: 'x', nhi: -5 } } } }).paidTotal, 0);
 });
 
 test('every EuroLeague and K League club Play sells has a Chinese name (Jay 2026-10-21)', async () => {

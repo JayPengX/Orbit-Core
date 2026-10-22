@@ -474,7 +474,6 @@ const wallet = {
   entries: [
     { id: 'eco:start', t: now - 120 * 86_400_000, app: 'eco', kind: 'start', amount: 110000 },
     { id: 'eco:pay:1', t: now - 20 * 86_400_000, app: 'eco', kind: 'pay', amount: 7000 },
-    { id: 'odds:s1', t: now - 86_400_000, app: 'odds', kind: 'stake', amount: -500 },
     ...extraEntries
   ],
   snap: snapStart,
@@ -706,8 +705,8 @@ if (key === 'admin') {
   const { createHash, randomBytes } = await import('node:crypto');
   const docs = new Map();
   const DAY = 86_400_000;
-  const APPS_USED = ['stock', 'odds', 'match', 'vocab', 'orbit', 'weather', 'transit'];
-  // Twelve accounts: made over the last 40 days, a few apps each, pay and play.
+  const APPS_USED = ['stock', 'match', 'vocab', 'orbit', 'weather', 'transit'];
+  // Twelve accounts: made over the last 40 days, a few apps each, and pay.
   for (let i = 0; i < 12; i++) {
     const made = now - (40 - i * 3) * DAY;
     const apps = Object.fromEntries(APPS_USED.filter((a, j) => (i + j) % 3 !== 0).map((a, j) => [a, { first: made, last: now - ((i * 7 + j) % 9) * DAY - i * 3_600_000 }]));
@@ -716,8 +715,6 @@ if (key === 'admin') {
     const entries = [
       { id: 'eco:start', t: made, app: 'eco', kind: 'start', amount: 200_000 },
       { id: 'eco:pay:2026-10-19', t: now - 1 * DAY, app: 'eco', kind: 'pay', amount: 10_000 },
-      ...Array.from({ length: i % 5 }, (_, k) => ({ id: `odds:stake-s${i}${k}`, t: now - k * DAY - i * 3_600_000, app: 'odds', kind: 'stake', amount: -2_000 * (k + 1) })),
-      ...Array.from({ length: i % 5 }, (_, k) => (k % 2 ? null : { id: `odds:payout-s${i}${k}`, t: now - k * DAY, app: 'odds', kind: 'payout', amount: 3_400 * (k + 1) })).filter(Boolean),
       ...(i % 4 === 0 ? [{ id: `eco:rank:${i}`, t: now - 2 * DAY, app: 'eco', kind: 'rank', amount: 20_000, note: 'L3' }] : []),
       ...(i % 3 === 0 ? [{ id: `eco:loan:${L}`, t: lt, app: 'eco', kind: 'loan', amount: 150_000, note: '150000|1200|104' }, { id: `eco:loanfee:${L}`, t: lt, app: 'eco', kind: 'loanfee', amount: -3_000 }, ...Array.from({ length: 4 }, (_, k) => ({ id: `eco:loanpay:${L}:${k + 1}`, t: lt + (k + 1) * 7 * DAY, app: 'eco', kind: 'loanpay', amount: -1_578 }))] : []),
       ...(i === 3 ? [{ id: `eco:loanlate:${L}:2`, t: now - 6 * DAY, app: 'eco', kind: 'loanlate', amount: -42 }] : []),
@@ -725,8 +722,8 @@ if (key === 'admin') {
       ...(i === 5 || i === 10 ? [{ id: `eco:relief:2026-10-19`, t: now - 2 * DAY, app: 'eco', kind: 'relief', amount: 5_000 }] : []),
       ...(i === 8 ? [{ id: 'eco:admin:1', t: now - 4 * DAY, app: 'eco', kind: 'admin', amount: -215_000, note: '更正重複入帳' }] : [])
     ];
-    // (Taxes as Play and Securities report them, on every other account.)
-    const snap = i % 2 ? {} : { odds: { gov: { sports: 1_200 * i, lottery: i % 4 ? 0 : 806 } }, stock: { gov: { trade: 450 + i * 37, withheld: i % 3 ? 0 : 1_350, nhi: i === 4 ? 422 : 0 } } };
+    // (Taxes as Securities reports them, on every other account.)
+    const snap = i % 2 ? {} : { stock: { gov: { trade: 450 + i * 37, withheld: i % 3 ? 0 : 1_350, nhi: i === 4 ? 422 : 0 } } };
     const w = { v: 1, v2: made, created: made, entries, snap, settings: {}, apps, inbox: {} };
     docs.set(`${WALLET_COLLECTION}/${createHash('sha256').update(`PREVIEW${i}`).digest('hex')}`, { payload: JSON.stringify(w), updateTime: new Date(made).toISOString() });
   }

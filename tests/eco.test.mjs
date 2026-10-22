@@ -93,20 +93,19 @@ test("an app cannot forge the Worker's own entries, and only the apps that move 
   const p = cleanPatch({
     entries: [
       { id: 'x', t: 1, app: 'eco', kind: 'xfer-in', amount: 1e6 },
-      { id: 'y', t: 1, app: 'odds', kind: 'payout', amount: 30 },
       { id: 'z', t: 1, app: 'stock', kind: 'dividend', amount: 5 },
       { id: 'vocab:w:1', t: 1, app: 'vocab', kind: 'words', amount: 0, xp: 40 },
       { id: 'vocab:shop:pack:toeic', t: 1, app: 'vocab', kind: 'shop', amount: -990 },
       { id: 'match:1', t: 1, app: 'match', kind: 'reward', amount: 30 }
     ]
   });
-  assert.deepEqual(p.entries.map(e => e.id), ['y', 'z']);
+  assert.deepEqual(p.entries.map(e => e.id), ['z']);
   assert.equal('xp' in p.entries[0], false);
 });
 
 test('wallet merge: entries by id, newest settings and figures', () => {
-  const a = mergeWallet(emptyWallet(10), { entries: [{ id: 'a', t: 2, app: 'odds', amount: 5 }], settings: { k: { value: 1, t: 1 } }, snap: { stock: { cash: 10, t: 1 } } });
-  const b = mergeWallet(a, { entries: [{ id: 'a', t: 2, app: 'odds', amount: 7 }, { id: 'b', t: 1, app: 'stock', amount: 3 }], settings: { k: { value: 2, t: 3 } }, snap: { stock: { cash: 4, t: 0 } } });
+  const a = mergeWallet(emptyWallet(10), { entries: [{ id: 'a', t: 2, app: 'stock', amount: 5 }], settings: { k: { value: 1, t: 1 } }, snap: { stock: { cash: 10, t: 1 } } });
+  const b = mergeWallet(a, { entries: [{ id: 'a', t: 2, app: 'stock', amount: 7 }, { id: 'b', t: 1, app: 'stock', amount: 3 }], settings: { k: { value: 2, t: 3 } }, snap: { stock: { cash: 4, t: 0 } } });
   assert.deepEqual(b.entries.map(e => e.id), ['b', 'a']);
   assert.equal(b.settings.k.value, 2);
   assert.equal(b.snap.stock.cash, 10);
@@ -122,12 +121,12 @@ test('there is no transfer between passes', async () => {
 test('one app at a time: another app claiming makes the first read-only', async () => {
   const t = setup();
   const acct = await newPass(t);
-  const play = await t.call('POST', '', { op: 'refresh', refresh: acct.refresh, app: 'odds', claim: true });
-  assert.equal(play.data.active, true);
-  assert.ok(play.data.refresh, 'the refresh token is renewed');
+  const words = await t.call('POST', '', { op: 'refresh', refresh: acct.refresh, app: 'vocab', claim: true });
+  assert.equal(words.data.active, true);
+  assert.ok(words.data.refresh, 'the refresh token is renewed');
   const read = await t.call('GET', t.qt(acct.token));
   assert.equal(read.data.active, false);
-  assert.equal(read.data.live.app, 'odds');
+  assert.equal(read.data.live.app, 'vocab');
   assert.equal(read.data.token, undefined);
   const write = await t.call('PATCH', `${t.qt(acct.token)}&app=stock`, { payload: 'gz1:x' });
   assert.equal(write.status, 409);
@@ -167,14 +166,14 @@ test('handoff: a sealed sign-in for a link, never the pass', async () => {
   const acct = await newPass(t);
   const h = await t.call('POST', '', { op: 'handoff', qt: acct.token });
   assert.equal(h.status, 200);
-  const r = await t.call('POST', '', { op: 'redeem', handoff: h.data.handoff, app: 'odds' });
+  const r = await t.call('POST', '', { op: 'redeem', handoff: h.data.handoff, app: 'vocab' });
   assert.equal(r.status, 200);
   assert.ok(r.data.refresh && r.data.token);
   assert.equal(r.data.passcode, undefined);
   assert.equal(r.data.active, true);
   t.advance(10 * 60_000);
-  assert.equal((await t.call('POST', '', { op: 'redeem', handoff: h.data.handoff, app: 'odds' })).status, 410);
-  assert.equal((await t.call('POST', '', { op: 'redeem', handoff: 'garbage', app: 'odds' })).status, 410);
+  assert.equal((await t.call('POST', '', { op: 'redeem', handoff: h.data.handoff, app: 'vocab' })).status, 410);
+  assert.equal((await t.call('POST', '', { op: 'redeem', handoff: 'garbage', app: 'vocab' })).status, 410);
 });
 
 test('device code: signs in another device once, within ten minutes', async () => {
@@ -211,7 +210,7 @@ test('rotate: a new pass holds everything, every other device is out', async () 
   const t = setup();
   const acct = await newPass(t);
   await t.call('PATCH', `${t.qt(acct.token)}&app=stock`, { payload: 'gz1:mine' });
-  const other = await t.call('POST', '', { op: 'login', passcode: acct.passcode, app: 'odds' });
+  const other = await t.call('POST', '', { op: 'login', passcode: acct.passcode, app: 'vocab' });
   const back = await t.call('POST', '', { op: 'refresh', refresh: acct.refresh, app: 'stock', claim: true });
   const r = await t.call('POST', '', { op: 'rotate', qt: back.data.token });
   assert.equal(r.status, 200);
@@ -219,7 +218,7 @@ test('rotate: a new pass holds everything, every other device is out', async () 
   assert.equal(r.data.payload, 'gz1:mine');
   assert.equal(r.data.pool, acct.pool);
   assert.equal((await t.call('POST', '', { op: 'login', passcode: acct.passcode, app: 'stock' })).status, 404);
-  assert.equal((await t.call('POST', '', { op: 'refresh', refresh: other.data.refresh, app: 'odds', claim: true })).status, 401);
+  assert.equal((await t.call('POST', '', { op: 'refresh', refresh: other.data.refresh, app: 'vocab', claim: true })).status, 401);
   assert.equal((await t.call('GET', `${t.qt(r.data.token)}&app=stock`)).data.payload, 'gz1:mine');
 });
 
@@ -267,14 +266,14 @@ test('one pass merged into two at once: its money lands once', async () => {
   const b = await newPass(t);
   const src = await newPass(t);
   const { updateWallet } = await import('../eco.js');
-  await updateWallet(t.env, t.deps, await t.deps.sha256Hex(src.passcode), w => ({ ...w, entries: [...w.entries, { id: 'odds:payout-gift', t: 1, app: 'odds', kind: 'payout', amount: 500 }] }));
+  await updateWallet(t.env, t.deps, await t.deps.sha256Hex(src.passcode), w => ({ ...w, entries: [...w.entries, { id: 'stock:gift', t: 1, app: 'stock', kind: 'fee', amount: -500 }] }));
   slowReads(t);
   const [ma, mb] = await Promise.all([a, b].map(x => t.call('POST', '', { op: 'merge', qt: x.token, sources: [{ passcode: src.passcode }] })));
   assert.deepEqual([ma.status, mb.status].sort(), [200, 404]);
-  const holders = [ma, mb].filter(m => m.status === 200 && m.data.wallet.entries.some(e => e.id === 'odds:payout-gift'));
+  const holders = [ma, mb].filter(m => m.status === 200 && m.data.wallet.entries.some(e => e.id === 'stock:gift'));
   assert.equal(holders.length, 1);
   const other = ma.status === 200 ? b : a;
-  assert.ok(!(await t.call('GET', t.qt(other.token))).data.wallet.entries.some(e => e.id === 'odds:payout-gift'));
+  assert.ok(!(await t.call('GET', t.qt(other.token))).data.wallet.entries.some(e => e.id === 'stock:gift'));
 });
 
 test("a phone clock set ahead never blocks a later save: a setting's time is the Worker's at the latest", async () => {
@@ -331,20 +330,20 @@ test('deleting the account removes everything', async () => {
 
 test('clean-up: only Orbit data stays, and wallets lose retired settings', async () => {
   const t = setup();
-  const acct = await newPass(t, 'odds');
-  await t.call('PATCH', `${t.qt(acct.token)}&app=odds`, { payload: 'gz1:mine', wallet: { settings: { oddsWeeklyLimit: { value: 2000, t: 1 }, 'act:odds': { value: {}, t: 1 } } } });
+  const acct = await newPass(t, 'vocab');
+  await t.call('PATCH', `${t.qt(acct.token)}&app=vocab`, { payload: 'gz1:mine', wallet: { settings: { 'bests:vocab': { value: 2000, t: 1 }, 'act:vocab': { value: {}, t: 1 } } } });
   const env = {};
-  await t.deps.fsWrite(env, ECO_APPS.odds.collection, 'oldhash', 'gz1:old');
+  await t.deps.fsWrite(env, ECO_APPS.vocab.collection, 'oldhash', 'gz1:old');
   await t.deps.fsWrite(env, 'orbit-schedules', 'ABCD2345', 'x');
-  await t.deps.fsWrite(env, INBOX_COLLECTION, 'nobody-odds-X', 'x');
+  await t.deps.fsWrite(env, INBOX_COLLECTION, 'nobody-vocab-X', 'x');
   await t.deps.fsWrite(env, SHARE_COLLECTION, 'KEYKEYKE', JSON.stringify({ link: 'L', exp: 1 }));
   await t.deps.fsWrite(env, 'someone-elses', 'doc', 'x');
   const plan = await planClean(env, t.deps);
   const del = plan.deletes.map(d => d.join('/')).sort();
-  assert.deepEqual(del, [`${INBOX_COLLECTION}/nobody-odds-X`, `${SHARE_COLLECTION}/KEYKEYKE`, `${ECO_APPS.odds.collection}/oldhash`, 'orbit-schedules/ABCD2345'].sort());
+  assert.deepEqual(del, [`${INBOX_COLLECTION}/nobody-vocab-X`, `${SHARE_COLLECTION}/KEYKEYKE`, `${ECO_APPS.vocab.collection}/oldhash`, 'orbit-schedules/ABCD2345'].sort());
   assert.equal(plan.tidy.length, 1);
-  assert.equal(plan.tidy[0].wallet.settings.oddsWeeklyLimit, undefined);
-  assert.equal(plan.tidy[0].wallet.settings['act:odds'], undefined);
+  assert.equal(plan.tidy[0].wallet.settings['bests:vocab'], undefined);
+  assert.equal(plan.tidy[0].wallet.settings['act:vocab'], undefined);
   // The admin op itself needs the token.
   assert.equal((await t.call('POST', '', { op: 'admin', token: 'wrong', action: 'scan' })).status, 403);
   const again = tidyWallet(plan.tidy[0].wallet, t.deps.now());
@@ -379,19 +378,19 @@ test('the clean retires what no app writes any more: Hub entries (their money ke
       'hub:cleanup:v1': { value: true, t: at },
       'act:stock': { value: { day: '2026-10-01' }, t: at },
       'aff:vocab': { value: {}, t: at },
-      'aff:odds': { value: { 'league:mlb': 1 }, t: at },
+      'aff:stock': { value: { 'league:mlb': 1 }, t: at },
       plus: { value: { on: false }, t: at }
     }
   };
   const { wallet: clean, gone } = tidyWallet(wallet, now);
-  // Every Hub entry goes; the NT$ they moved (240 paid, 1,290 spent) stays as one entry.
-  assert.deepEqual(clean.entries.map(e => e.id), ['eco:pay:2026-10', 'eco:plus:2026-09', 'odds:stake-1', 'eco:rebase:hub']);
-  assert.deepEqual(clean.entries.at(-1), { id: 'eco:rebase:hub', t: now, app: 'eco', kind: 'rebase', amount: -1_050, note: 'hub' });
+  // Every Hub and Play entry goes; the NT$ they moved (240 paid, 1,290 spent, 500 staked) stays as one entry.
+  assert.deepEqual(clean.entries.map(e => e.id), ['eco:pay:2026-10', 'eco:plus:2026-09', 'eco:rebase:hub']);
+  assert.deepEqual(clean.entries.at(-1), { id: 'eco:rebase:hub', t: now, app: 'eco', kind: 'rebase', amount: -1_550, note: 'hub' });
   assert.equal(poolBalance(clean), poolBalance(wallet));
   // A Plus month bought with points is a month like any.
   assert.equal(clean.entries[1].note, undefined);
-  assert.deepEqual(Object.keys(clean.settings).sort(), ['aff:odds', 'avatar', 'frame', 'plus']);
-  assert.deepEqual(gone, { entries: 9, money: -1_050, settings: 4, looks: 0 });
+  assert.deepEqual(Object.keys(clean.settings).sort(), ['aff:stock', 'avatar', 'frame', 'plus']);
+  assert.deepEqual(gone, { entries: 10, money: -1_550, settings: 4, looks: 0 });
   // A second clean changes nothing.
   assert.deepEqual(tidyWallet(clean, now).wallet, clean);
 });
@@ -416,7 +415,7 @@ test('the pay is fixed, like a salary: the same however much the account holds',
   assert.equal(PAY.week, 10_000);
   assert.equal(PAY.start, 200_000);
   // Worth still counts Securities' holdings, not only cash.
-  const w = { entries: [{ id: 'a', t: 1, app: 'odds', amount: 20_000 }], snap: { stock: { cash: 5_000, held: 300_000, t: 1 } } };
+  const w = { entries: [{ id: 'a', t: 1, app: 'eco', amount: 20_000 }], snap: { stock: { cash: 5_000, held: 300_000, t: 1 } } };
   assert.equal(worthOf(w), 325_000);
   const mon = Date.UTC(2026, 10, 2, 3);
   const rich = { ...w, created: mon, snap: { stock: { cash: 5_000_000, held: 9_000_000, t: 1 } } };
@@ -426,25 +425,8 @@ test('the pay is fixed, like a salary: the same however much the account holds',
 
 test('a new pass today opens with NT$200,000', async () => {
   const t = setup();
-  const acct = await newPass(t, 'odds');
+  const acct = await newPass(t, 'stock');
   assert.equal(acct.wallet.entries.find(e => e.id === 'eco:start').amount, 200_000);
-});
-
-test('no VIP cashback any more: a big month of stakes pays nothing back the month after', () => {
-  const oct = m => Date.UTC(2026, 9, m, 4);
-  const w = { created: oct(1), entries: [{ id: 'eco:start', t: oct(1), app: 'eco', kind: 'start', amount: 200_000 }, { id: 'odds:stake-a', t: oct(3), app: 'odds', kind: 'stake', amount: -600_000 }] };
-  const nov = Date.UTC(2026, 10, 2, 4);
-  assert.ok(paydayEntries(w, nov).every(e => !String(e.id).startsWith('eco:vip:')));
-});
-
-test('no welcome free bet any more (台灣運彩 gives none): a first paid bet brings nothing', async () => {
-  const now = Date.UTC(2026, 9, 21, 4);
-  const bet = { id: 'odds:stake-a', t: now, app: 'odds', kind: 'stake', amount: -500 };
-  const t = setup();
-  const acct = await newPass(t, 'odds');
-  const w = await t.call('PATCH', `${t.qt(acct.token)}&app=odds`, { wallet: { entries: [{ ...bet, t: 1_700_000_100_000 }] } });
-  assert.equal(w.status, 200);
-  assert.ok(!w.data.wallet.entries.some(e => e.id === 'eco:fb:welcome'));
 });
 
 test('wealth levels: each level reached pays its reward once, from what the account is worth', () => {
@@ -537,7 +519,7 @@ test('the admin panel: an account found by its pass, a record undone, one app cl
   const t = setup();
   const admin = (action, extra = {}) => t.call('POST', '', { op: 'admin', token: 'o'.repeat(40), action, ...extra });
   const acct = await newPass(t);
-  const other = await newPass(t, 'odds');
+  const other = await newPass(t, 'vocab');
   await t.call('PATCH', `${t.qt(acct.token)}&app=stock`, { payload: 'gz1:abc', wallet: { entries: [{ id: 'stock:1', t: 1, app: 'stock', kind: 'fee', amount: -30 }] } });
   // Found by the pass someone reads out (dashes and lower case all right).
   const found = await admin('find', { passcode: `${acct.passcode.slice(0, 5).toLowerCase()}-${acct.passcode.slice(5)}` });
@@ -582,30 +564,30 @@ test('the lock-down: an app adds no money to the pool (the Worker does), not eve
   const t = setup();
   // (The clock after the lock-down.)
   t.advance(Date.parse('2026-10-13T00:00:00Z') - 1_700_000_000_000);
-  const acct = await newPass(t, 'odds');
+  const acct = await newPass(t, 'stock');
   acct.docId = await t.deps.sha256Hex(acct.passcode);
-  const send = entries => t.call('PATCH', `${t.qt(acct.token)}&app=odds`, { wallet: { entries } });
+  const send = entries => t.call('PATCH', `${t.qt(acct.token)}&app=stock`, { wallet: { entries } });
   const before = Date.parse('2026-10-10T00:00:00Z');
   const w = await send([
-    { id: 'odds:payout-forged', t: 2, app: 'odds', kind: 'payout', amount: 1_000_000 },
-    { id: 'odds:prize-forged', t: 2, app: 'odds', kind: 'prize', amount: 50_000 },
-    { id: 'odds:stake-old', t: before, app: 'odds', kind: 'stake', amount: -300 },
-    { id: 'odds:stake-new', t: Date.parse('2026-10-13T00:00:00Z'), app: 'odds', kind: 'stake', amount: -300 }
+    { id: 'stock:payout-forged', t: 2, app: 'stock', kind: 'payout', amount: 1_000_000 },
+    { id: 'stock:prize-forged', t: 2, app: 'stock', kind: 'prize', amount: 50_000 },
+    { id: 'stock:stake-old', t: before, app: 'stock', kind: 'stake', amount: -300 },
+    { id: 'stock:stake-new', t: Date.parse('2026-10-13T00:00:00Z'), app: 'stock', kind: 'stake', amount: -300 }
   ]);
   assert.equal(w.status, 200);
   assert.equal(w.data.pool, acct.pool - 600);
   // The phone's date isn't the entry's: dated before the lock-down, it's still new.
-  assert.ok(w.data.wallet.entries.filter(e => e.id.startsWith('odds:stake-')).every(e => e.t > before));
-  const r0 = await send([{ id: 'odds:refund-old', t: 3, app: 'odds', kind: 'refund', amount: 300 }]);
+  assert.ok(w.data.wallet.entries.filter(e => e.id.startsWith('stock:stake-')).every(e => e.t > before));
+  const r0 = await send([{ id: 'stock:refund-old', t: 3, app: 'stock', kind: 'refund', amount: 300 }]);
   assert.equal(r0.data.pool, acct.pool - 600);
   // Not even for a stake really in the wallet from before.
   const doc = t.store.get(`eco-wallets/${acct.docId}`);
   const wallet = JSON.parse(doc.payload);
-  wallet.entries.push({ id: 'odds:stake-older', t: before, app: 'odds', kind: 'stake', amount: -300 });
+  wallet.entries.push({ id: 'stock:stake-older', t: before, app: 'stock', kind: 'stake', amount: -300 });
   t.store.set(`eco-wallets/${acct.docId}`, { ...doc, payload: JSON.stringify(wallet) });
   const r = await send([
-    { id: 'odds:refund-older', t: 3, app: 'odds', kind: 'refund', amount: 300 },
-    { id: 'odds:refund-new', t: 3, app: 'odds', kind: 'refund', amount: 300 }
+    { id: 'stock:refund-older', t: 3, app: 'stock', kind: 'refund', amount: 300 },
+    { id: 'stock:refund-new', t: 3, app: 'stock', kind: 'refund', amount: 300 }
   ]);
   assert.equal(r.data.pool, acct.pool - 900);
 });
@@ -702,43 +684,6 @@ test('a read or a wake claim that says which data it holds (since) gets { unchan
   const stale = await t.call('POST', '', { op: 'refresh', refresh: wake.data.refresh, app: 'vocab', claim: true, data: true, since: held, w: 'old' });
   assert.equal(stale.data.payload, 'v:2');
   assert.ok(stale.data.wallet && !stale.data.same);
-});
-
-test("a big wallet's old entries fold into monthly sums: the same balance and sums, the Pass's own and Securities' kept, and no paid slip can be paid again", async () => {
-  const { foldWallet, FOLD_AT, updateWallet } = await import('../eco.js');
-  const now = Date.parse('2027-12-01T00:00:00Z');
-  const DAY = 86_400_000;
-  const entries = [
-    { id: 'eco:start', t: now - 900 * DAY, app: 'eco', kind: 'start', amount: 100_000 },
-    { id: 'eco:plus:2026-01', t: now - 700 * DAY, app: 'eco', kind: 'plus', amount: -99 },
-    { id: 'stock:dep-1', t: now - 700 * DAY, app: 'stock', kind: 'deposit', amount: -5000 }
-  ];
-  // Slips: settled long ago (stake and payout), a lost one, and recent ones.
-  for (let i = 0; i < 3000; i++) {
-    const t = now - (900 - (i % 880)) * DAY;
-    entries.push({ id: `odds:stake-s${i}`, t, app: 'odds', kind: 'stake', amount: -100 });
-    if (i % 2) entries.push({ id: `odds:payout-s${i}`, t: t + DAY, app: 'odds', kind: 'payout', amount: 190 });
-  }
-  const w = { ...emptyWallet(now - 900 * DAY), entries };
-  const before = poolBalance(w);
-  const sums = x => x.entries.reduce((m, e) => ((m[`${e.app}:${e.kind}`] = Math.round(((m[`${e.app}:${e.kind}`] || 0) + e.amount) * 100) / 100), m), {});
-  const folded = foldWallet(w, now);
-  assert.ok(folded.entries.length < w.entries.length / 2, `${w.entries.length} → ${folded.entries.length}`);
-  assert.equal(poolBalance(folded), before);
-  assert.deepEqual(sums(folded), sums(w));
-  for (const id of ['eco:start', 'eco:plus:2026-01', 'stock:dep-1']) assert.ok(folded.entries.some(e => e.id === id), id);
-  // The settling guard (settle.js paySlip: pay only with the stake there and no payout yet) never opens again for a paid slip.
-  const have = new Set(folded.entries.map(e => e.id));
-  for (let i = 1; i < 3000; i += 2) assert.ok(!(have.has(`odds:stake-s${i}`) && !have.has(`odds:payout-s${i}`)), `slip s${i}`);
-  // Folding again changes nothing; a save to a wallet past FOLD_AT folds it and goes through.
-  assert.deepEqual(foldWallet(folded, now), folded);
-  const big = { ...w, entries: [...w.entries, ...Array.from({ length: 3000 }, (_, i) => ({ id: `odds:stake-x${i}`, t: now - 500 * DAY, app: 'odds', kind: 'stake', amount: -1 }))] };
-  assert.ok(JSON.stringify(big).length > FOLD_AT);
-  let doc = { exists: true, payload: JSON.stringify(big), updateTime: 'v1' };
-  const deps = { now: () => now, fsGet: async () => doc, fsWrite: async (env, c, id, text) => ((doc = { exists: true, payload: text, updateTime: 'v2' }), { updateTime: 'v2' }) };
-  const r = await updateWallet({}, deps, 'acct', x => ({ ...x, entries: [...x.entries, { id: 'odds:stake-new', t: now, app: 'odds', kind: 'stake', amount: -10 }] }));
-  assert.ok(doc.payload.length < FOLD_AT, `saved folded: ${doc.payload.length}`);
-  assert.equal(poolBalance(r.wallet), Math.round((poolBalance(big) - 10) * 100) / 100);
 });
 
 test("a session writes its own app's data only: never another app's save or figures", async () => {

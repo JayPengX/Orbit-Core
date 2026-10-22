@@ -1193,7 +1193,7 @@ button,
 
 /* ---- The dock (<html class="q-dock">): the tabs as one bar along the
    screen's foot instead of a capsule floating over the page, and the
-   accessory (Play's slip) a row joined to its top edge, so nothing hovers
+   accessory (an app's order bar) a row joined to its top edge, so nothing hovers
    over content: the page ends where the dock begins. Its surface is the
    page's own colour, never white in dark ---- */
 :root.q-dock {

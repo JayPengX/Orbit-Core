@@ -4,18 +4,16 @@
 //
 //   given   what the system paid in: opening money, weekly pay, wealth-rank
 //           rewards, and the rest (admin grants, rebases)
-//   orbit  what Orbit earned, signed: Play's settled bets from the house's
-//           side (stakes kept less payouts), overdraft interest and loan costs
+//   orbit   what Orbit earned: overdraft interest and loan costs
 //   gov     the government, from the player's side: 急難紓困 in, less every
-//           tax out (Play's `snap.odds.gov`: sports and lottery prize tax;
-//           Securities' `snap.stock.gov`: trade tax, withholding, 二代健保),
-//           all-time totals each app works out again from its whole history
-//   own     what players made themselves (Securities and anything else):
-//           worth less given, less what Play, the fees and the government moved
+//           tax out (Securities' `snap.stock.gov`: trade tax, withholding,
+//           二代健保), all-time totals it works out again from its whole history
+//   own     what players made themselves in the markets: worth less given,
+//           less what the fees and the government moved
 //
-// By market: Play sends its settled result per sport (`snap.odds.pl`) and
-// Securities its result per stock market (`snap.stock.pl`); what an account
-// hasn't sent yet shows as unsorted, so the markets always add up to the side.
+// By market: Securities sends its result per stock market (`snap.stock.pl`);
+// what an account hasn't sent yet shows as unsorted, so the markets always
+// add up to the side.
 //
 // A deleted account's money goes back to the system: its sides are kept in
 // `quadra-config/ledger` (retired), and its worth counts as returned.
@@ -32,37 +30,26 @@ const num = v => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
 export function sidesOf(wallet) {
   const gave = { start: 0, pay: 0, rank: 0, other: 0 };
   const fees = { od: 0, loan: 0 };
-  let play = 0;
-  let atStake = 0;
   const entries = wallet?.entries || [];
-  const ids = new Set(entries.map(e => e.id));
-  const open = e => e.kind === 'stake' && typeof e.id === 'string' && e.id.startsWith('odds:stake-') && !ids.has(`odds:payout-${e.id.slice(11)}`) && !ids.has(`odds:refund-${e.id.slice(11)}`);
   for (const e of entries) {
+    if (e.app !== 'eco') continue;
     const a = num(e.amount);
-    if (e.app === 'eco') {
-      if (e.kind === 'start') gave.start += a;
-      else if (e.kind === 'pay') gave.pay += a;
-      else if (e.kind === 'rank') gave.rank += a;
-      else if (e.kind === 'rebase' || e.kind === 'admin') gave.other += a;
-      // A loan's money in and out: net of what's paid back, its fee, interest and late charges (less while one is still owed).
-      else if (LOAN_KINDS.has(e.kind)) fees.loan -= a;
-      else if (e.kind === 'od') fees.od -= a;
-    } else if (e.app === 'odds') {
-      if (e.kind === 'start') gave.start += a;
-      else if (e.kind === 'grant') gave.other += a;
-      else if (open(e)) atStake -= a;
-      else play += a;
-    }
+    if (e.kind === 'start') gave.start += a;
+    else if (e.kind === 'pay') gave.pay += a;
+    else if (e.kind === 'rank') gave.rank += a;
+    else if (e.kind === 'rebase' || e.kind === 'admin') gave.other += a;
+    // A loan's money in and out: net of what's paid back, its fee, interest and late charges (less while one is still owed).
+    else if (LOAN_KINDS.has(e.kind)) fees.loan -= a;
+    else if (e.kind === 'od') fees.od -= a;
   }
   let pool = 0;
   for (const e of entries) pool += num(e.amount);
   for (const s of Object.values(wallet?.snap || {})) pool += num(s?.cash);
-  const worth = pool + num(wallet?.snap?.stock?.holdings) + atStake;
+  const worth = pool + num(wallet?.snap?.stock?.holdings);
   const given = gave.start + gave.pay + gave.rank + gave.other;
   const gov = govOf(wallet);
-  // Orbit's side from the house's view: above 0 when it kept more. Play's
-  // payouts came in after tax: the tax was the government's, not the house's.
-  const orbit = fees.od + fees.loan - play - gov.paid.sports - gov.paid.lottery;
+  // Orbit's side from the house's view: above 0 when it kept more.
+  const orbit = fees.od + fees.loan;
   const own = worth - given + orbit - gov.net;
   const r = n => Math.round(n);
   const markets = (pl, sign) => Object.fromEntries(Object.entries(pl && typeof pl === 'object' ? pl : {}).filter(([, v]) => Number.isFinite(v)).map(([k, v]) => [k, r(sign * v)]));
@@ -72,14 +59,10 @@ export function sidesOf(wallet) {
     gave: Object.fromEntries(Object.entries(gave).map(([k, v]) => [k, r(v)])),
     orbit: r(orbit),
     fees: { od: r(fees.od), loan: r(fees.loan) },
-    play: r(-play),
-    // Play by sport from the house's side (a player's loss is Orbit's earning).
-    playBy: markets(wallet?.snap?.odds?.pl, -1),
     gov,
     own: r(own),
     stockBy: markets(wallet?.snap?.stock?.pl, 1),
-    worth: r(worth),
-    atStake: r(atStake)
+    worth: r(worth)
   };
 }
 

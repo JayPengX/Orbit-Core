@@ -24,7 +24,7 @@
 //     with interest running at the loan's rate. Paying it all off ends it.
 //
 // 急難紓困 (one-off relief, RELIEF): NT$5,000 for someone with nothing:
-// cash, stocks at cost and open bets together under NT$2,000, nothing owed
+// cash and stocks at cost together under NT$2,000, nothing owed
 // in 催收, and the next payday more than 2 days away. At most once every
 // 13 weeks and 3 times a Taiwan year, and it stays on the record.
 //
@@ -267,8 +267,8 @@ export function loanDue(wallet, pool, now = Date.now()) {
 
 // ---- 急難紓困 ------------------------------------------------------------------------------
 
-// Can this account get relief now (`worth`: cash, stocks at cost and open
-// bets, less nothing: debts don't count, as at a 社會局).
+// Can this account get relief now (`worth`: cash and stocks at cost, less
+// nothing: debts don't count, as at a 社會局).
 export function reliefCheck(wallet, worth, now = Date.now()) {
   const got = ecoEntries(wallet).filter(e => e.kind === 'relief').sort((a, b) => a.t - b.t);
   const year = new Date(now + TPE).toISOString().slice(0, 4);
@@ -282,9 +282,3 @@ export function reliefCheck(wallet, worth, now = Date.now()) {
 }
 export const reliefEntry = now => ({ id: `eco:relief:${mondayId(now)}`, t: now, app: 'eco', kind: 'relief', amount: RELIEF.amount });
 
-// Play's money in bets still open (a stake with no payout or refund yet).
-export function openStakes(wallet) {
-  const entries = wallet?.entries || [];
-  const ids = new Set(entries.map(e => e.id));
-  return entries.filter(e => e.kind === 'stake' && typeof e.id === 'string' && e.id.startsWith('odds:stake-') && !ids.has(`odds:payout-${e.id.slice(11)}`) && !ids.has(`odds:refund-${e.id.slice(11)}`)).reduce((sum, e) => sum - e.amount, 0);
-}

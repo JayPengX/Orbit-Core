@@ -34,7 +34,7 @@ test('/stock: a Securities session only; what it filled is kept and answered the
   };
   const ask = (session, orders) => handleStock(new Request('https://x/stock', { method: 'POST', body: JSON.stringify({ op: 'fill', orders }) }), {}, {}, session, deps);
   const order = { id: 'order0001', symbol: 'AAPL', side: 'buy', type: 'market', qty: 1, t: now - 1000, market: 'US', kind: 'stock' };
-  assert.equal((await ask({ a: 'odds', d: 'acc' }, [order])).status, 401);
+  assert.equal((await ask({ a: 'vocab', d: 'acc' }, [order])).status, 401);
   const first = await (await ask({ a: 'stock', d: 'acc' }, [order])).json();
   assert.deepEqual(first.fills.order0001, { quote: 250, t: now });
   deps.now = () => now + 60_000;

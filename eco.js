@@ -1,7 +1,7 @@
 // ---- eco.js ----
 // /eco: the Orbit Pass, one account for every Orbit app (Orbit
-// Securities, Quadra Play, Orbit Sports, Orbit Words, and Orbit Class
-// beside them). Play money only.
+// Securities, with Orbit Sports, Orbit Words, Orbit Class and the rest
+// beside them). Practice money only.
 //
 // The pass is a 10-character code, stored only as its SHA-256 (the
 // account's document id), and typed only to sign in. Signing in gives the
@@ -14,7 +14,7 @@
 //       entries   money in or out of the pool, each with a fixed id, so the
 //                 same entry sent twice counts once
 //       snap      each app's latest figures, newest wins per app (Securities'
-//                 own cash, Play's money in open bets)
+//                 own cash and holdings)
 //       settings  newest wins per key (affinities, looks,
 //                 notice switches)
 //       apps      when each app was first and last opened
@@ -52,7 +52,7 @@ import { retire } from './money.js';
 import { storeReady } from './doc-store.js';
 import { tokenSecret, signToken, readToken, seal, unseal, sessionLimited, SESSION_MS, REFRESH_MS, HANDOFF_MS } from './orbit-token.js';
 import { handleAdmin } from './eco-admin.js';
-import { PAY_WEEK, weekStart, mondayId, debtOf, activeLoan, loanOffer, loanEntries, loanDue, payoffAmount, reliefCheck, reliefEntry, openStakes } from './kit/loan.mjs';
+import { PAY_WEEK, weekStart, mondayId, debtOf, activeLoan, loanOffer, loanEntries, loanDue, payoffAmount, reliefCheck, reliefEntry } from './kit/loan.mjs';
 
 export const ECO_PASSCODE_LENGTH = 10;
 export const ECO_PASSCODE_PATTERN = /^[2-9A-HJ-NP-Z]{10}$/;
@@ -66,36 +66,30 @@ const CODE8 = /^[2-9A-HJ-NP-Z]{8}$/;
 
 // Each app's data collection.
 //   stock  Orbit Securities
-//   odds   Quadra Play
 //   match  Orbit Sports, a related add-on: follows and services
 //   vocab  Orbit Words, a related add-on: word progress
 //   orbit  Orbit Class, a related add-on: its class schedule
 //   weather  Orbit Weather, a related add-on: its pinned places and settings
 //   transit  Orbit Transit, a related add-on: its bus groups, places and settings
-//   slip   Orbit Slips, a related add-on: the lottery tickets followed
 //   beats  Orbit Beats, a related add-on: its settings and each kit's tempo and roles
 //   law    Orbit Law, a related add-on: its followed laws, marks and settings
 export const ECO_APPS = {
   stock: { collection: 'stock-study-accounts', maxPayload: 1_000_000 },
-  odds: { collection: 'odds-study-accounts', maxPayload: 1_000_000 },
   vocab: { collection: 'vocab-progress-sync', maxPayload: 600_000 },
   match: { collection: 'match-find-settings', maxPayload: 100_000 },
   orbit: { collection: 'orbit-quadra', maxPayload: 200_000 },
   weather: { collection: 'orbit-weather', maxPayload: 50_000 },
   transit: { collection: 'orbit-transit', maxPayload: 200_000 },
-  slip: { collection: 'orbit-slip', maxPayload: 300_000 },
   beats: { collection: 'orbit-beats', maxPayload: 50_000 },
   law: { collection: 'orbit-law', maxPayload: 100_000 }
 };
-// Who can write entries: the apps that move money, and this Worker itself
-// ('eco': pay, loans, merges). An app can't write 'eco' entries; the related
+// Who can write entries: Securities, the one app that moves money, and this
+// Worker itself ('eco': pay, loans, merges). An app can't write 'eco' entries; the related
 // add-ons (Orbit Sports, Hub, Orbit Class) write none.
-const ENTRY_APPS = new Set(['stock', 'odds']);
+const ENTRY_APPS = new Set(['stock']);
 
 // (D1 holds a row of up to 2 MB.)
 export const WALLET_MAX_LENGTH = 1_800_000;
-// A wallet past this has its old entries folded into monthly sums (foldWallet).
-export const FOLD_AT = 600_000;
 const MAX_ENTRIES_PER_WRITE = 1000;
 const MAX_AMOUNT = 1_000_000_000;
 const MAX_MERGE_SOURCES = 12;
@@ -227,7 +221,7 @@ function cleanStamped(map, maxKeys, maxValue) {
 }
 
 // The lock-down (the owner, 2026-10-12): no app adds money to the pool; this
-// Worker does (Play's payouts, cash outs and prizes: settle.js, lotto.js).
+// Worker does.
 // An app's entries are what it spends (0 or less). (Securities' record from
 // before it: stock-check.js.)
 export const LOCK_SINCE = Date.parse('2026-10-12T09:00:00Z');
@@ -289,9 +283,6 @@ export function mergeWallet(a, b) {
   if (!b) return base;
   const entries = new Map(base.entries.map(e => [e.id, e]));
   for (const e of b.entries || []) if (!entries.has(e.id)) entries.set(e.id, e);
-  // A back-charged sports tax taken back (`eco:untax-<slip>`) leaves no trace
-  // of the charge, from this Worker or a phone's copy of it.
-  for (const id of [...entries.keys()]) if (typeof id === 'string' && id.startsWith('eco:untax-')) entries.delete(`odds:tax-${id.slice(10)}`);
   const inbox = { ...(base.inbox || {}) };
   for (const [app, ids] of Object.entries(b.inbox || {})) inbox[app] = [...new Set([...(inbox[app] || []), ...ids])];
   const created = Math.min(base.created ?? Infinity, b.created ?? Infinity);
@@ -697,11 +688,11 @@ async function ecoLoan(ctx) {
 }
 
 // 急難紓困: { op: 'relief', qt } pays RELIEF.amount to an account with
-// nothing (cash, stocks at cost and open bets under RELIEF.under), on the
+// nothing (cash and stocks at cost under RELIEF.under), on the
 // kit's conditions (kit/loan.mjs reliefCheck).
 async function ecoRelief(ctx) {
   return walletOp(ctx, 'relief', (w, now) => {
-    const worth = poolBalance(w) + finiteOr0(w?.snap?.stock?.held) + openStakes(w);
+    const worth = poolBalance(w) + finiteOr0(w?.snap?.stock?.held);
     const check = reliefCheck(w, worth, now);
     if (!check.ok) return { refused: 'ECO_RELIEF_REFUSED', extra: { why: check.why, ...(check.until ? { until: check.until } : {}) } };
     return { entries: [reliefEntry(now)] };
@@ -865,13 +856,7 @@ export async function updateWallet(env, deps, docId, change, { create = false, s
     let next = change(current || emptyWallet(deps.now()));
     // Nothing to write (refused, or no change).
     if (current && (skipIf() || next === current)) return { wallet: current, updateTime: doc.updateTime };
-    let text = JSON.stringify(next);
-    // Grown big (every bet, fee and prize is an entry): its old ones folded,
-    // so it never reaches the limit and stops saving.
-    if (text.length > FOLD_AT) {
-      next = foldWallet(next, deps.now());
-      text = JSON.stringify(next);
-    }
+    const text = JSON.stringify(next);
     if (text.length > WALLET_MAX_LENGTH) throw new Error('wallet too big');
     try {
       const written = await deps.fsWrite(env, WALLET_COLLECTION, docId, text, doc.exists ? { updateTime: doc.updateTime } : { exists: false });
@@ -881,38 +866,6 @@ export async function updateWallet(env, deps, docId, change, { create = false, s
     }
   }
   throw new Error('wallet busy, try again');
-}
-
-// Old entries as one a month for each app and kind (`fold:<app>:<kind>:<YYYY-MM>`,
-// its amount their sum, `n` how many): the balance and every app's and kind's
-// sums stay the same. Never folded: the Pass's own (eco:*: the start, old Plus
-// months, the welcome bet, an undo, a rebase: ids checks look up),
-// Securities' (its saves' deposits are checked against them), and Play's
-// until they're over 400 days old (a slip is paid only while its stake is in
-// the wallet, and never twice while its payout is: a season's futures are
-// settled within the year); anything else after 180 days.
-const FOLD_PLAY_MS = 400 * 86_400_000;
-const FOLD_MS = 180 * 86_400_000;
-export function foldWallet(w, now) {
-  const kept = [];
-  const folds = new Map();
-  for (const e of w.entries || []) {
-    const id = String(e?.id || '');
-    const age = now - (Number(e?.t) || now);
-    const foldable = e?.app && e.app !== 'eco' && e.app !== 'stock' && id !== 'odds:start' && Number.isFinite(e.amount) && age > (e.app === 'odds' ? FOLD_PLAY_MS : FOLD_MS);
-    if (!foldable && !id.startsWith('fold:')) {
-      kept.push(e);
-      continue;
-    }
-    const month = id.startsWith('fold:') ? id.split(':')[3] : new Date(Number(e.t) + 8 * 3_600_000).toISOString().slice(0, 7);
-    const key = id.startsWith('fold:') ? id : `fold:${e.app}:${e.kind || ''}:${month}`;
-    const f = folds.get(key) || { id: key, t: 0, app: e.app, kind: e.kind || '', amount: 0, n: 0 };
-    f.amount = Math.round((f.amount + e.amount) * 100) / 100;
-    f.n += id.startsWith('fold:') ? Number(e.n) || 0 : 1;
-    f.t = Math.max(f.t, Number(e.t) || 0);
-    folds.set(key, f);
-  }
-  return { ...w, entries: [...folds.values(), ...kept].sort((a, b) => (a.t || 0) - (b.t || 0)) };
 }
 
 // `retire`: deleted for good (not moved to another pass by a merge or a new
@@ -1000,11 +953,9 @@ async function ecoMerge(ctx) {
         }
       }
 
-  // Money: every entry, Play's too (since the lock-down an app can't write
-  // its winnings back, so its merged ledger can't bring them), under its own
-  // id: Play's slips and tickets and Securities' deposits are checked by it
-  // (`odds:stake-<slip>`, `x:<id>`), and the Worker's pay is one entry a
-  // month whichever pass it came through. An id this pass already has for a
+  // Money: every entry, under its own id: Securities' deposits are checked
+  // by it (`x:<id>`), and the Worker's pay is one entry a week whichever
+  // pass it came through. An id this pass already has for a
   // different entry is renamed; shared cash figures whose app data didn't
   // come along, as one entry each.
   const carried = [];
@@ -1033,8 +984,7 @@ async function ecoMerge(ctx) {
   let ours = true;
   let result = await updateWallet(env, deps, targetId, w => ((ours = gen(w) === c.g) ? { ...mergeWallet(w, { entries: carried, settings, inbox: inboxAdd }), merged: { t: now, apps: mergedApps } } : w));
   if (!result || !ours) return errorJson('ECO_SIGNED_OUT', 401, headers, request);
-  // What this Worker still watches for a source (Play's slips and tickets,
-  // Securities' fills book) goes to this pass, then anything it paid the
+  // What this Worker still watches for a source (Securities' fills book) goes to this pass, then anything it paid the
   // source meanwhile comes along too (the same ids: nothing twice).
   for (const src of found) {
     await deps.moveRecords?.(env, src.docId, targetId, now);
