@@ -205,3 +205,11 @@ test('reads: the CAP only from NCDR, the page through the relay', async () => {
   assert.equal((await readDgpa(env, fetchFn)).counties['臺北市'], '明天停止上班、停止上課。');
   assert.equal(relayed[0], `https://gemini-relay/?to=${encodeURIComponent(DGPA_NDS)}`);
 });
+
+test('without Google: the sun worked out, and 體感 from the station', async () => {
+  const { sunUp, apparentTemp } = await import('../weather.js');
+  assert.equal(sunUp(24.83, 121.01, Date.parse('2026-10-22T11:17:00Z')), false); // 19:17
+  assert.equal(sunUp(24.83, 121.01, Date.parse('2026-10-22T04:00:00Z')), true);
+  assert.equal(apparentTemp(21.7, 88, 9.7), 23.3);
+  assert.equal(apparentTemp(21.7, null, 9.7), null);
+});

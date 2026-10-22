@@ -745,9 +745,35 @@ export function blend(values, weights) {
 // graph, tip and notice takes this one number.
 export const popStep = v => (v == null || !Number.isFinite(Number(v)) ? null : Math.max(0, Math.min(100, Math.round(Number(v) / 10) * 10)));
 
+// Whether the sun is up at a place and time (Google says so when it answers;
+// without it, worked out: elevation above -0.833°, NOAA's approximation).
+export function sunUp(lat, lon, t) {
+  const rad = Math.PI / 180;
+  const d = t / 86_400_000 + 2440587.5 - 2451545;
+  const g = (357.529 + 0.98560028 * d) * rad;
+  const q = 280.459 + 0.98564736 * d;
+  const L = (q + 1.915 * Math.sin(g) + 0.02 * Math.sin(2 * g)) * rad;
+  const e = (23.439 - 0.00000036 * d) * rad;
+  const ra = Math.atan2(Math.cos(e) * Math.sin(L), Math.cos(L));
+  const dec = Math.asin(Math.sin(e) * Math.sin(L));
+  const gmst = (18.697374558 + 24.06570982441908 * d) % 24;
+  const ha = ((gmst * 15 + lon) * rad - ra);
+  const alt = Math.asin(Math.sin(lat * rad) * Math.sin(dec) + Math.cos(lat * rad) * Math.cos(dec) * Math.cos(ha));
+  return alt > -0.833 * rad;
+}
+// 體感溫度 as CWA works it out (Steadman's apparent temperature: the air, its
+// moisture, the wind), for "now" when Google's isn't there.
+export function apparentTemp(temp, humidity, windKmh) {
+  if (temp == null || humidity == null) return null;
+  const e = (humidity / 100) * 6.105 * Math.exp((17.27 * temp) / (237.7 + temp));
+  return Math.round((temp + 0.33 * e - 0.7 * ((windKmh ?? 0) / 3.6) - 4) * 10) / 10;
+}
+
 // → { resp: the one-truth answer, bySource: each source's values (KV only) }.
 export function assemble({ cell, now, google, cwa, air, warnings, weights = DEFAULT_WEIGHTS, partial = false }) {
   const bySource = { hours: [], days: [], now: null };
+  const [cLat, cLon] = String(cell || '').split(',').map(Number);
+  const sun = t => (Number.isFinite(cLat) && Number.isFinite(cLon) ? sunUp(cLat, cLon, t) : null);
   const fc = cwa?.forecast;
   const gHours = google?.hours || [];
   // The timeline: Google's 48 hours, or CWA's own points if Google failed.
@@ -763,7 +789,8 @@ export function assemble({ cell, now, google, cwa, air, warnings, weights = DEFA
       ...g,
       temp: r1(blend(tempBy, weights.temp)),
       feels: r1(blend({ google: g.feels ?? null, cwa: cFeels }, weights.temp)),
-      pop: popStep(pop)
+      pop: popStep(pop),
+      day: g.day ?? sun(g.t)
     };
     if (out.humidity == null) out.humidity = cwaAt(fc?.humidity, g.t);
     bySource.hours.push({ t: g.t, pop: popBy, temp: tempBy });
@@ -804,7 +831,7 @@ export function assemble({ cell, now, google, cwa, air, warnings, weights = DEFA
   const measured = st && st.temp != null && st.km <= 5 && now - st.at < 90 * MIN ? st.temp : null;
   const now_ = {
     temp: measured ?? g?.temp ?? st?.temp ?? null,
-    feels: g?.feels ?? null,
+    feels: g?.feels ?? apparentTemp(measured ?? st?.temp ?? null, st?.humidity ?? null, st?.wind?.speed ?? null),
     humidity: g?.humidity ?? st?.humidity ?? null,
     uv: g?.uv ?? cwa?.uvStation?.uv ?? null,
     wind: g?.wind ?? st?.wind ?? null,
@@ -812,7 +839,7 @@ export function assemble({ cell, now, google, cwa, air, warnings, weights = DEFA
     vis: g?.vis ?? null,
     cloud: g?.cloud ?? null,
     dew: g?.dew ?? null,
-    day: g?.day ?? null,
+    day: g?.day ?? sun(now),
     condition: g?.condition ?? (st?.weather ? { code: null, text: st.weather, icon: null } : null),
     rain1h: cwa?.gauge?.h1 ?? null,
     rainToday: cwa?.gauge?.today ?? g?.today?.mm ?? null,
