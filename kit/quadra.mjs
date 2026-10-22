@@ -674,8 +674,24 @@ const RETRY_MS = 15_000;
 // never a kept copy, asked on its own.
 // (`alone`: never in a batch, which answers only when its slowest read is
 // in: a league's table waited on its playoffs' game days, 2026-10-15.)
+// ESPN's core API turns the proxy away (403 on every path, 2026-10-22) but
+// answers a phone itself (open to any page): read from the device, kept
+// like any other.
+const DIRECT_HOSTS = new Set(['sports.core.api.espn.com']);
+const isDirect = url => {
+  try {
+    return DIRECT_HOSTS.has(new URL(url).hostname);
+  } catch {
+    return false;
+  }
+};
+async function fetchDirect(url, timeout) {
+  const res = await fetch(url, { signal: AbortSignal.timeout(timeout) });
+  if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
+  return res.text();
+}
 export function proxyJson(url, { ttl = 60_000, trim = '', persist: keep = true, timeout = 20_000, mirror = true, alone = false } = {}) {
-  return keptJson(url, dataKey(url, trim), { ttl, keep }, () => (!mirror ? fetchOne(url, trim, timeout, '&mirror=0') : alone ? fetchOne(url, trim, timeout) : enqueue(url, trim, timeout)));
+  return keptJson(url, dataKey(url, trim), { ttl, keep }, () => (isDirect(url) ? fetchDirect(url, timeout) : !mirror ? fetchOne(url, trim, timeout, '&mirror=0') : alone ? fetchOne(url, trim, timeout) : enqueue(url, trim, timeout)));
 }
 // The family's data (the proxy's /data/, kept in R2 on Cloudflare; built at
 // night and through the day): what doesn't change in a day (a league's
