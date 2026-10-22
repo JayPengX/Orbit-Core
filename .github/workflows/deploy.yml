@@ -44,8 +44,13 @@ jobs:
           echo "CLOUDFLARE_ACCOUNT_ID=$id" >> "$GITHUB_ENV"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      # main as it is now, never the commit that started the run: GitHub can
+      # deliver a push late (hours, out of order), and an old tree deployed
+      # after a newer one would take the live app back.
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
       # The family's data (R2 bucket quadra-data, in Asia-Pacific; data.js):
       # made once, and bound to the proxy when it's there. R2 has to be
       # turned on once in the dashboard (README §11); until then the proxy
