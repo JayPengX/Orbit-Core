@@ -859,3 +859,14 @@ test('op loan and relief: the Worker signs only what the account qualifies for',
   assert.equal(relief.data.error.why, 'worth');
 });
 
+
+test('a session run out still reads public data for READ_GRACE_MS, never past it', async () => {
+  const { signToken, readToken, READ_GRACE_MS } = await import('../quadra-token.js');
+  const secret = 'grace-test-secret';
+  const now = Date.now();
+  const ranOut = await signToken(secret, { k: 'ses', d: 'x', e: now - 3_600_000 });
+  assert.equal(await readToken(secret, ranOut, 'ses', now), null);
+  assert.ok(await readToken(secret, ranOut, 'ses', now - READ_GRACE_MS));
+  const long = await signToken(secret, { k: 'ses', d: 'x', e: now - READ_GRACE_MS - 60_000 });
+  assert.equal(await readToken(secret, long, 'ses', now - READ_GRACE_MS), null);
+});
