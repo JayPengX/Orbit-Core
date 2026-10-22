@@ -706,6 +706,24 @@ test('政府: taxes the apps report and relief, a side of its own; the four side
   assert.equal(kit.govOf({ snap: { odds: { gov: { sports: 'x', lottery: -5 } } } }).paidTotal, 0);
 });
 
+test('政府: Play’s sports tax counts only slips still in the wallet, never one taken off the record', () => {
+  const t = Date.parse('2026-10-20T02:47:00Z');
+  const entries = [
+    { id: 'odds:stake-a', t, app: 'odds', kind: 'stake', amount: -1_000 },
+    { id: 'odds:payout-a', t, app: 'odds', kind: 'payout', amount: 48_010 },
+    // The owner's off-record 1.08 test slip.
+    { id: 'odds:stake-x', t, app: 'odds', kind: 'stake', amount: -28_630 },
+    { id: 'odds:payout-x', t, app: 'odds', kind: 'payout', amount: 30_920 }
+  ];
+  // Slip b is gone from the account: its tax goes with it.
+  const w = { entries, snap: { odds: { gov: { sports: 20_453, lottery: 0, slips: { a: 11_990, b: 2_279, x: 6_184 } } } } };
+  assert.equal(kit.govOf(w).paid.sports, 11_990);
+  // An older Play (the total alone) is taken at its word.
+  assert.equal(kit.govOf({ entries, snap: { odds: { gov: { sports: 14_269 } } } }).paid.sports, 14_269);
+  // A stake folded into a month's total after 400 days still counts.
+  assert.equal(kit.govOf({ entries: [{ id: 'fold:odds:stake:2025-09', app: 'odds', kind: 'stake', amount: -9 }], snap: w.snap }).paid.sports, 20_453);
+});
+
 test('every EuroLeague and K League club Play sells has a Chinese name (Jay 2026-10-21)', async () => {
   const { teamZh } = await import('../kit/names.mjs');
   const { TEAM_BADGES } = await import('../kit/logos.mjs').catch(() => ({}));
