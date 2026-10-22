@@ -358,7 +358,7 @@ async function warmRead(env, req) {
 }
 async function warmWrite(env, req, body, at) {
   try {
-    await env.RATE_LIMIT_KV?.put(warmKey(req), body, { metadata: { at }, expirationTtl: req.rule.tier === 'live' ? 6 * 3600 : 14 * 86_400 });
+    await env.RATE_LIMIT_KV?.put(warmKey(req), body, { metadata: { at }, expirationTtl: req.rule.tier === 'live' ? 2 * 86_400 : 14 * 86_400 });
   } catch {}
 }
 // (A city asked: kept warm for the next half hour. Once each 5 minutes an isolate.)
