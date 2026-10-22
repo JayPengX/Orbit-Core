@@ -128,7 +128,7 @@ export const asiaMonthUrl = (league, ym) => `${ASIA_URL}/${league}/${ym}.json`;
 export const asiaMonthOf = ms => new Date(ms + 8 * 3_600_000).toISOString().slice(0, 7);
 // The month's games. CPBL's own site has stopped answering, and the proxy's
 // fallback (TheSportsDB) can refuse the proxy: a CPBL month the proxy can't
-// fill comes from TheSportsDB's day lists straight from the device (they
+// read (its 502) comes from TheSportsDB's day lists straight from the device (they
 // allow any site), the days from two weeks back to two weeks ahead.
 // Nothing read anywhere (the proxy and every day on the device refused) is
 // an error, never a month with no games: Sports said 沒有比賽 for 中華職棒
@@ -147,7 +147,11 @@ export async function asiaMonth(getJson, league, ym, { now = Date.now(), fetchJs
     if (down) throw down;
     return games;
   }
-  if (games.length) return cpblFresh(games, now, fetchJson);
+  // (The proxy's answer, games or none, is the month: it answers an empty
+  // one only when it read the days, a 502 when it couldn't. An empty
+  // off-season month read again here was TheSportsDB's days two at a time on
+  // every opening, 2-3 s on a phone's link.)
+  if (!down) return cpblFresh(games, now, fetchJson);
   const days = tsdbDays(ym, now);
   let failed = 0;
   const lists = await Promise.all(days.map(d => fetchJson(`${TSDB_DAY}?d=${d}&l=${TSDB_CPBL}`).then(x => parseTsdbDay(x, now)).catch(() => (failed++, []))));
