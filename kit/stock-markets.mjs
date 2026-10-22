@@ -6,6 +6,7 @@
 // each exchange, as a share of the amount (the gap between its buy and sell
 // rates, halved). `loanRate`: yearly interest on money borrowed in it.
 import { isTradingDay, earlyClose } from '#kit/stock-holidays.mjs';
+import { dayOffOn, TWSE } from '#kit/dayoff.mjs';
 import { HK_LOT_TABLE } from '#kit/stock-hk-lots.mjs';
 import { TOPIX500, JP_ETF_UNITS } from '#kit/stock-jp-lists.mjs';
 
@@ -1032,6 +1033,6 @@ export function isOpen(quote, now = Date.now()) {
   // trades only when Hong Kong is open too.
   if (quote.market === 'CN' && !tradingDay('HK', localDayOf(now, 'HK'))) return false;
   // (Taiwan's markets shut for a typhoon by 臺北市's word, whatever the session says.)
-  if (['TW', 'TAIFEX', 'TWFUND'].includes(quote.market) && !tradingDay(quote.market, localDayOf(now, quote.market))) return false;
+  if (['TW', 'TAIFEX', 'TWFUND'].includes(quote.market) && dayOffOn(localDayOf(now, 'TW'), TWSE, 'trade')) return false;
   return true;
 }
