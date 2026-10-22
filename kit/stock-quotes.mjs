@@ -93,13 +93,21 @@ export function misQuote(symbol, m, now = Date.now()) {
     line: [[at('09:00:00'), base], [marketTime, price]]
   };
 }
+// (TWSE turns some callers away for a while: then none asked for MIS_REST,
+// and never longer than MIS_WAIT keeps the rest of the quotes waiting.)
+const MIS_WAIT = 2_500;
+const MIS_REST = 10 * 60_000;
+let misRestUntil = 0;
 async function fetchMisQuotes(symbols) {
   const out = new Map();
+  if (Date.now() < misRestUntil) return out;
   const batches = [];
   for (let i = 0; i < symbols.length; i += MIS_BATCH) batches.push(symbols.slice(i, i + MIS_BATCH));
-  const results = await Promise.allSettled(batches.map(b => getJson(MIS_URL + b.map(misChannel).join('|'))));
+  const late = new Promise(resolve => setTimeout(() => resolve('late'), MIS_WAIT));
+  const results = await Promise.allSettled(batches.map(b => Promise.race([getJson(MIS_URL + b.map(misChannel).join('|')), late])));
+  if (results.every(r => r.status !== 'fulfilled' || r.value === 'late')) misRestUntil = Date.now() + MIS_REST;
   for (const r of results) {
-    if (r.status !== 'fulfilled') continue;
+    if (r.status !== 'fulfilled' || r.value === 'late') continue;
     for (const m of r.value?.msgArray || []) {
       const symbol = symbols.find(s => misChannel(s) === `${m.ex}_${m.c}.tw`.toLowerCase());
       const q = symbol && misQuote(symbol, m);
