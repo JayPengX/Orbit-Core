@@ -4,7 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { NEIGHBOURS, parseTrack, stormAt, circleEdge, offOf, feedTyphoon, parseTyphoonCap, parseLamps, parseDgpa, officialLines, dayOffChance, dayOffFor, circleReaches, beaufortKmh, targetDay, readTyphoon, readDgpa, DGPA_NDS } from '../typhoon.js';
+import { NEIGHBOURS, parseTrack, stormAt, circleEdge, offOf, feedTyphoon, parseTyphoonCap, parseLamps, parseDgpa, officialLines, dayOffChance, dayOffFor, circleReaches, beaufortKmh, targetDay, readTyphoon, readDgpa, readSeatRain, DGPA_NDS } from '../typhoon.js';
 
 const raw = name => readFileSync(new URL(`./fixtures/typhoon/${name}`, import.meta.url), 'utf8');
 const NOW = Date.parse('2026-10-22T02:10:00Z'); // 10:10 in Taiwan
@@ -12,8 +12,6 @@ const HOUR = 3_600_000;
 const HSINCHU = { lat: 24.8, lon: 120.97 };
 // A land warning: the same storm, its land areas filled in.
 const landCap = () => raw('warning-sea.cap').replace('<headline>海上颱風警報</headline>', '<headline>海上陸上颱風警報</headline>').replace('海上：巴士海峽', '陸上：臺東縣、屏東縣、新竹市。海上：巴士海峽');
-const hours = (from, n, h) => Array.from({ length: n }, (_, i) => ({ t: from + i * HOUR, mm: 0, wind: { speed: 20, gust: 30 }, ...h }));
-const place = (county, extra) => ({ place: { county, town: '東區' }, hours: hours(Date.parse('2026-10-22T02:00:00Z'), 48, extra) });
 
 test('the newest typhoon warning in the feed, and its CAP', () => {
   const hit = feedTyphoon(raw('feed.xml'));
@@ -96,65 +94,77 @@ test('the day asked about and the storm circle', () => {
   assert.ok(circleEdge(track, HSINCHU, 0, 10 * HOUR).edge < 0);
 });
 
-test('a place: the official word first, else the chance with its reasons', () => {
+test('a county: the official word first, else one chance for the whole county', () => {
   const ty = parseTyphoonCap(raw('warning-sea.cap'), NOW);
   const dg = parseDgpa(raw('dgpa.html'));
-  const off = dayOffFor(place('台北市'), ty, dg, NOW, HSINCHU);
+  const off = dayOffFor('台北市', ty, dg, NOW);
   assert.deepEqual(off.official.lines, [{ text: '明天停止上班、停止上課', off: 'all' }]);
   assert.equal(off.chance, undefined);
   // 新竹市 named nothing for tomorrow on a quiet page: the chance.
-  // (The storm held where it is now, far out at sea.)
+  // (The storm held where it is now, far out at sea; a dry day.)
   const far = { ...ty, track: ty.track.slice(0, 1) };
-  const calm = dayOffFor(place('新竹市'), far, { counties: {} }, NOW, HSINCHU);
+  const dry = { 新竹市: { '2026-10-23': 0 } };
+  const calm = dayOffFor('新竹市', far, { counties: {} }, NOW, dry);
   assert.equal(calm.date, '2026-10-23');
   assert.equal(calm.name, '薔琵');
-  assert.deepEqual(calm.why, { wind: 4, gust: 5, mm: 0, land: false, reach: false });
+  assert.deepEqual(calm.why, { wind: null, gust: null, mm: 0, land: false, reach: false });
   assert.ok(calm.chance <= 2, calm.chance);
-  // Under a land warning, the circle over it, gusts of 10級 and heavy rain tomorrow: high.
-  const near = { ...parseTyphoonCap(landCap(), NOW) };
+  // Under a land warning, the circle over it, 10級 gusts in the lamps and heavy rain tomorrow: high.
+  const near = { ...parseTyphoonCap(landCap(), NOW), lamps: { 新竹市: [{ dom: 23, wind: 7, gust: 10 }] } };
   near.track = [{ t: NOW, lat: 23.5, lon: 122.5, r7: 250, v: 45 }, { t: NOW + 30 * HOUR, lat: 24.9, lon: 121.0, r7: 250, v: 40 }];
-  const wild = dayOffFor(place('新竹市', { wind: { speed: 63, gust: 95 }, mm: 12 }), near, null, NOW, HSINCHU);
+  const wild = dayOffFor('新竹市', near, null, NOW, { 新竹市: { '2026-10-23': 150 } });
   assert.equal(wild.why.land, true);
   assert.equal(wild.why.reach, true);
   assert.equal(wild.why.gust, 10);
   assert.ok(wild.chance >= 80, wild.chance);
-  // The lamps' gusts count when CWA says more than the forecast.
-  const lamped = dayOffFor(place('新竹市'), { ...far, lamps: { 新竹市: [{ dom: 23, wind: 9, gust: 11 }] } }, null, NOW, HSINCHU);
+  // The lamps' gusts count.
+  const lamped = dayOffFor('新竹市', { ...far, lamps: { 新竹市: [{ dom: 23, wind: 9, gust: 11 }] } }, null, NOW, dry);
   assert.equal(lamped.why.gust, 11);
   assert.ok(lamped.chance > calm.chance);
+  // CWA's rain warning for the day floors the forecast's rain.
+  const warn = { records: { location: [{ locationName: '新竹市', hazardConditions: { hazards: [{ info: { phenomena: '豪雨', significance: '特報' }, validTime: { startTime: '2026-10-23 05:00:00', endTime: '2026-10-23 20:00:00' } }] } }] } };
+  assert.equal(dayOffFor('新竹市', far, null, NOW, dry, warn).why.mm, 200);
   // 尚未宣布消息 for the county: still the chance; a few towns' decisions go under it.
-  const pending = dayOffFor(place('臺東縣'), far, { at: 1, counties: { 臺東縣: '尚未宣布消息。 綠島鄉:今天下午停止上班、停止上課。' } }, NOW, HSINCHU);
+  const pending = dayOffFor('臺東縣', far, { at: 1, counties: { 臺東縣: '尚未宣布消息。 綠島鄉:今天下午停止上班、停止上課。' } }, NOW);
   assert.equal(typeof pending.chance, 'number');
   assert.deepEqual(pending.local.lines, [{ text: '綠島鄉:今天下午停止上班、停止上課', off: 'all' }]);
-  assert.equal(dayOffFor(place('新竹市'), far, { counties: { 新竹市: '尚未宣布消息' } }, NOW, HSINCHU).official, undefined);
+  assert.equal(dayOffFor('新竹市', far, { counties: { 新竹市: '尚未宣布消息' } }, NOW).official, undefined);
   // Neighbours deciding the day move it: closed up, open down; another day's
   // word for the county itself goes under the chance.
   const page = counties => ({ at: Date.parse('2026-10-22T20:00:00+08:00'), counties });
-  const alone = dayOffFor(place('新竹市'), ty, page({}), NOW, HSINCHU).chance;
-  const shut = dayOffFor(place('新竹市'), ty, page({ 新竹縣: '明天停止上班、停止上課。', 桃園市: '明天停止上班、停止上課。', 苗栗縣: '明天停止上班、停止上課。' }), NOW, HSINCHU);
-  const open = dayOffFor(place('新竹市'), ty, page({ 新竹縣: '明天照常上班、照常上課。', 桃園市: '明天照常上班、照常上課。' }), NOW, HSINCHU);
+  const alone = dayOffFor('新竹市', ty, page({}), NOW).chance;
+  const shut = dayOffFor('新竹市', ty, page({ 新竹縣: '明天停止上班、停止上課。', 桃園市: '明天停止上班、停止上課。', 苗栗縣: '明天停止上班、停止上課。' }), NOW);
+  const open = dayOffFor('新竹市', ty, page({ 新竹縣: '明天照常上班、照常上課。', 桃園市: '明天照常上班、照常上課。' }), NOW);
   assert.ok(shut.chance > alone + 10, `${shut.chance} vs ${alone}`);
   assert.equal(shut.why.nearClosed, 3);
   assert.ok(open.chance < alone, `${open.chance} vs ${alone}`);
-  const today = dayOffFor(place('新竹市'), ty, page({ 新竹市: '今天照常上班、照常上課。' }), NOW, HSINCHU);
+  const today = dayOffFor('新竹市', ty, page({ 新竹市: '今天照常上班、照常上課。' }), NOW);
   assert.equal(typeof today.chance, 'number');
   assert.deepEqual(today.local.lines, [{ text: '今天照常上班、照常上課', off: 'open' }]);
-  // A forecast without gusts or rain amounts (Google's hours missing): left
-  // out, not read as calm and dry.
-  const bare = { place: { county: '新竹縣' }, hours: hours(Date.parse('2026-10-22T02:00:00Z'), 48, { wind: null, mm: null }) };
-  const known = dayOffFor(place('新竹縣', { wind: { speed: 40, gust: 75 }, mm: 2 }), ty, null, NOW, HSINCHU);
-  const blind = dayOffFor(bare, ty, null, NOW, HSINCHU);
+  // No rain forecast and no lamp: left out, not read as calm and dry.
+  const blind = dayOffFor('新竹縣', ty, null, NOW);
   assert.equal(blind.why.mm, null);
   assert.equal(blind.why.gust, null);
-  // (Without the rain the curve rests on the track and the lamps: lower than a
-  // wet forecast's, far above calling it calm and dry.)
   assert.ok(blind.chance > dayOffChance({ edge: 0, islandEdge: 0, vmax: 51, gust: 0, mm: 0 }), `${blind.chance}`);
-  assert.ok(known.chance > 0);
   // On its own forecast track (heading this way) the circle reaches 新竹 tomorrow.
-  assert.equal(dayOffFor(place('新竹市'), ty, null, NOW, HSINCHU).why.reach, true);
+  assert.equal(dayOffFor('新竹市', ty, null, NOW).why.reach, true);
   // No warning, or abroad: nothing.
-  assert.equal(dayOffFor(place('新竹市'), null, null, NOW), null);
-  assert.equal(dayOffFor(place(null), ty, null, NOW), null);
+  assert.equal(dayOffFor('新竹市', null, null, NOW), null);
+  assert.equal(dayOffFor(null, ty, null, NOW), null);
+});
+
+test("the seats' rain: one ask for all 22, by Taiwan day", async () => {
+  let asked = 0;
+  const fetchFn = async url => {
+    asked++;
+    const n = new URL(url).searchParams.get('latitude').split(',').length;
+    return { ok: true, json: async () => Array.from({ length: n }, (_, i) => ({ daily: { time: ['2026-10-22', '2026-10-23'], precipitation_sum: [i, 10 + i] } })) };
+  };
+  const rain = await readSeatRain(fetchFn);
+  assert.equal(asked, 1);
+  assert.equal(Object.keys(rain).length, 22);
+  assert.equal(rain['基隆市']['2026-10-23'], 10);
+  await assert.rejects(readSeatRain(async () => ({ ok: true, json: async () => [] })));
 });
 
 test("CWA's track forecast: five days of the storm, its circle and strength", () => {
