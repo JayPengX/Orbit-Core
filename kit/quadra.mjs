@@ -1548,7 +1548,10 @@ function makeSession(app, { lang, heartbeat }) {
     return t && storedAccount() && Date.now() - at < 5.5 * 3_600_000 ? t : '';
   };
   // (`renew`: a new one now, whatever the age of this one: the proxy turned it away.)
-  s.ensureToken = async ({ renew = false } = {}) => {
+  // (`read`: for a public read that takes a run-out session (the data proxy,
+  // Weather, Transit): the one kept, up to 6 hours old, at once when there is one.)
+  s.ensureToken = async ({ renew = false, read = false } = {}) => {
+    if (read && !renew && s.readToken()) return s.readToken();
     if (renew) tokenAt = 0;
     await freshToken();
     return token;

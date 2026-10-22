@@ -40,7 +40,7 @@ import en from './locales/en.js';
 import zhTW from './locales/zh-TW.js';
 import { handleEcoRequest, LOCK_SINCE } from './eco.js';
 import { checkStock } from './stock-check.js';
-import { readToken, tokenSecret, signToken, sessionLimited } from './quadra-token.js';
+import { readToken, tokenSecret, signToken, sessionLimited, READ_GRACE_MS } from './quadra-token.js';
 import { handleKambiRequest, refreshKambiWatch, fetchKambiLive } from './kambi.js';
 import { handlePush, sendDue, notifyNow } from './push.js';
 import { handlePlay, settleCron, moveSlips } from './settle.js';
@@ -1195,10 +1195,12 @@ async function devBody(env, ctx) {
 // …which the sports proxy's cache times follow (sports.js), read at most once a minute.
 useDevSettings((env, ctx) => devBody(env, ctx).then(JSON.parse));
 
-// The Quadra Pass session a request carries (`qt=`), or null.
-async function sessionOf(request, env) {
+// The Quadra Pass session a request carries (`qt=`), or null. (`grace`: a
+// session run out that long ago still counts: Weather's and Transit's public
+// reads, as the data proxy's, quadra-token.js READ_GRACE_MS.)
+async function sessionOf(request, env, grace = 0) {
   const qt = new URL(request.url).searchParams.get('qt');
-  return qt ? readToken(await tokenSecret(env), qt, 'ses') : null;
+  return qt ? readToken(await tokenSecret(env), qt, 'ses', Date.now() - grace) : null;
 }
 
 // Every route, by path (fetch below answers anything that throws).
@@ -1317,7 +1319,7 @@ async function route(request, env, ctx, headers, origin) {
   // WEATHER_DEV = "off" (wrangler.toml [vars]) closes it.
   if (path === '/weather' || path.startsWith('/weather/')) {
     if (path === '/weather/skill') return new Response(JSON.stringify(await skillReport(env)), { headers: { ...headers, 'Content-Type': 'application/json' } });
-    const signed = await sessionOf(request, env);
+    const signed = await sessionOf(request, env, READ_GRACE_MS);
     const dev = !signed && env.WEATHER_DEV !== 'off' && LOCAL_ORIGIN.test(origin);
     const session = signed || (dev ? { s: 'dev', dev: true } : null);
     return handleWeather(request, env, headers, path, { session, ctx, limited: () => sessionLimited(dev ? `w:dev:${ip}` : `w:${session?.s}`, 30) });
@@ -1329,7 +1331,7 @@ async function route(request, env, ctx, headers, origin) {
   // stay under transit.js's monthly caps either way. TRANSIT_DEV = "off"
   // (wrangler.toml [vars]) closes it.
   if (path === '/transit' || path.startsWith('/transit/')) {
-    const signed = await sessionOf(request, env);
+    const signed = await sessionOf(request, env, READ_GRACE_MS);
     const dev = !signed && env.TRANSIT_DEV !== 'off' && LOCAL_ORIGIN.test(origin);
     const session = signed || (dev ? { s: 'dev', dev: true } : null);
     return handleTransit(request, env, headers, path, { session, ctx, limited: () => sessionLimited(dev ? `t:dev:${ip}` : `t:${session?.s}`, dev ? 300 : 90) });
