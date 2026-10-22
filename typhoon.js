@@ -379,19 +379,44 @@ export async function readDgpa(env, fetchFn) {
   return parseDgpa(await text(via, DGPA_NDS));
 }
 
-// The forecast's rain for each county seat by Taiwan day (Open-Meteo, one
-// ask for all 22): { county: { date: mm } }.
+// The forecast's rain for each county seat by Taiwan day: { county: { date: mm } }.
+// MET Norway's (no daily cap; 22 small asks), else Open-Meteo's (one ask for all 22).
 export async function readSeatRain(fetchFn) {
   const names = Object.keys(SEATS);
-  const q = k => names.map(c => SEATS[c][k]).join(',');
-  const res = await fetchFn(`https://api.open-meteo.com/v1/forecast?latitude=${q(0)}&longitude=${q(1)}&daily=precipitation_sum&forecast_days=3&timezone=Asia%2FTaipei`, { signal: AbortSignal.timeout(8000) });
-  if (!res.ok) throw new Error(`${res.status}`);
-  const all = await res.json();
-  if (!Array.isArray(all) || all.length !== names.length) throw new Error('shape');
+  try {
+    const all = await Promise.all(names.map(c => metNoRain(fetchFn, ...SEATS[c])));
+    return Object.fromEntries(names.map((c, i) => [c, all[i]]));
+  } catch {
+    const q = k => names.map(c => SEATS[c][k]).join(',');
+    const res = await fetchFn(`https://api.open-meteo.com/v1/forecast?latitude=${q(0)}&longitude=${q(1)}&daily=precipitation_sum&forecast_days=3&timezone=Asia%2FTaipei`, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) throw new Error(`${res.status}`);
+    const all = await res.json();
+    if (!Array.isArray(all) || all.length !== names.length) throw new Error('shape');
+    return Object.fromEntries(names.map((c, i) => {
+      const d = all[i]?.daily || {};
+      return [c, Object.fromEntries((d.time || []).map((t, j) => [t, d.precipitation_sum?.[j]]).filter(([, v]) => v != null))];
+    }));
+  }
+}
+
+// One place's rain by Taiwan day from MET Norway (hourly amounts, then 6-hourly).
+async function metNoRain(fetchFn, lat, lon) {
+  const res = await fetchFn(`https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=${lat.toFixed(2)}&lon=${lon.toFixed(2)}`, { headers: { 'User-Agent': 'OrbitWeather/1.0 github.com/JayPengX' }, signal: AbortSignal.timeout(8000) });
+  if (!res.ok) throw new Error(`met.no ${res.status}`);
+  const ts = (await res.json())?.properties?.timeseries;
+  if (!Array.isArray(ts) || !ts.length) throw new Error('met.no shape');
   const out = {};
-  names.forEach((c, i) => {
-    const d = all[i]?.daily || {};
-    out[c] = Object.fromEntries((d.time || []).map((t, j) => [t, d.precipitation_sum?.[j]]).filter(([, v]) => v != null));
-  });
+  let until = 0;
+  for (const p of ts) {
+    const t = Date.parse(p.time);
+    if (t < until) continue;
+    const one = p.data?.next_1_hours?.details?.precipitation_amount;
+    const six = p.data?.next_6_hours?.details?.precipitation_amount;
+    const [mm, span] = one != null ? [one, 1] : six != null ? [six, 6] : [null, 1];
+    until = t + span * HOUR;
+    if (mm == null) continue;
+    const d = twDate(t);
+    out[d] = Math.round(((out[d] || 0) + mm) * 10) / 10;
+  }
   return out;
 }

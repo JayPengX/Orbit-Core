@@ -153,18 +153,24 @@ test('a county: the official word first, else one chance for the whole county', 
   assert.equal(dayOffFor(null, ty, null, NOW), null);
 });
 
-test("the seats' rain: one ask for all 22, by Taiwan day", async () => {
+test("the seats' rain: MET Norway's by Taiwan day, else Open-Meteo's in one ask", async () => {
+  const hour = (time, mm, k = 'next_1_hours') => ({ time, data: { [k]: { details: { precipitation_amount: mm } } } });
+  const met = { properties: { timeseries: [hour('2026-10-22T15:00:00Z', 2), hour('2026-10-22T16:00:00Z', 3), hour('2026-10-23T12:00:00Z', 6, 'next_6_hours'), hour('2026-10-23T15:00:00Z', 9, 'next_6_hours'), hour('2026-10-23T18:00:00Z', 1, 'next_6_hours')] } };
+  const ok = j => ({ ok: true, json: async () => j });
+  const rain = await readSeatRain(async () => ok(met));
+  assert.equal(Object.keys(rain).length, 22);
+  // 15:00Z is 23:00 the 22nd in Taiwan; the 6-hourly ones overlapping a counted span are skipped.
+  assert.deepEqual(rain['基隆市'], { '2026-10-22': 2, '2026-10-23': 9, '2026-10-24': 1 });
   let asked = 0;
-  const fetchFn = async url => {
+  const fallback = async url => {
+    if (url.includes('met.no')) return { ok: false, status: 503 };
     asked++;
     const n = new URL(url).searchParams.get('latitude').split(',').length;
-    return { ok: true, json: async () => Array.from({ length: n }, (_, i) => ({ daily: { time: ['2026-10-22', '2026-10-23'], precipitation_sum: [i, 10 + i] } })) };
+    return ok(Array.from({ length: n }, (_, i) => ({ daily: { time: ['2026-10-22', '2026-10-23'], precipitation_sum: [i, 10 + i] } })));
   };
-  const rain = await readSeatRain(fetchFn);
+  assert.equal((await readSeatRain(fallback))['基隆市']['2026-10-23'], 10);
   assert.equal(asked, 1);
-  assert.equal(Object.keys(rain).length, 22);
-  assert.equal(rain['基隆市']['2026-10-23'], 10);
-  await assert.rejects(readSeatRain(async () => ({ ok: true, json: async () => [] })));
+  await assert.rejects(readSeatRain(async url => (url.includes('met.no') ? { ok: false, status: 503 } : ok([]))));
 });
 
 test("CWA's track forecast: five days of the storm, its circle and strength", () => {
