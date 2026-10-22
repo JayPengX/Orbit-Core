@@ -15,7 +15,7 @@
 import { paceOf } from './pace.js';
 import { readToken, sessionLimited, READ_GRACE_MS } from './quadra-token.js';
 import { BRANDS } from './kit/brand.mjs';
-import { ASIA_HOST, asiaBaseballResponse, asiaTarget, cpblBoxTarget } from './asia-baseball.js';
+import { ASIA_HOST, asiaBaseballResponse, asiaTarget, cpblBoxTarget, useCpblRelay } from './asia-baseball.js';
 import { FUND_HOST, fundNavResponse } from './fund-nav.js';
 import { TAIFEX_HOST, taifexResponse } from './taifex.js';
 import { F1_LIVE_HOST, f1LiveResponse, doLog, sampleLive } from './f1-live.js';
@@ -1550,6 +1550,7 @@ async function handleSportsProxyRequest(request, env, headers, ip, ctx) {
 export function handleSports(request, env, ctx, headers, ip) {
   refreshDev(env, ctx);
   f1Log ||= doLog(env.F1_LOG);
+  useCpblRelay(env.GEMINI_RELAY);
   dataBucket = env.DATA || null;
   return handleSportsProxyRequest(request, env, headers, ip, ctx).catch(error => json({ error: { message: String(error?.message || error).slice(0, 200) } }, 500, headers));
 }

@@ -169,14 +169,14 @@ async function fetchKbo(year, month) {
 // round its cookie check a few times: a browser's user agent, the redirects
 // followed by hand with the cookies kept. -> { page, html, cookie }.
 const BROWSER_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15';
-async function cpblPage(at) {
+async function cpblPage(at, fetchFn = fetch) {
   const jar = new Map();
   const keep = res => (res.headers.getSetCookie?.() || [res.headers.get('Set-Cookie') || '']).map(c => c.split(';')[0]).filter(c => c.includes('=')).forEach(c => jar.set(c.slice(0, c.indexOf('=')), c));
   const cookie = () => [...jar.values()].join('; ');
   let url = at;
   let page;
   for (let hop = 0; hop < 6; hop++) {
-    page = await fetch(url, { headers: { 'User-Agent': BROWSER_UA, Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', 'Accept-Language': 'zh-TW,zh;q=0.9,en;q=0.8', Cookie: cookie() }, redirect: 'manual', signal: AbortSignal.timeout(TIMEOUT) });
+    page = await fetchFn(url, { headers: { 'User-Agent': BROWSER_UA, Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', 'Accept-Language': 'zh-TW,zh;q=0.9,en;q=0.8', Cookie: cookie() }, redirect: 'manual', signal: AbortSignal.timeout(TIMEOUT) });
     keep(page);
     const next = page.status >= 300 && page.status < 400 && page.headers.get('Location');
     if (!next) break;
@@ -349,6 +349,52 @@ async function fetchCpblBox(year, sno, kind = 'A') {
   return parseCpblBox(data, year, sno);
 }
 
+// ---- CPBL's own list of today's games (its home page's getdetaillist) -----------
+//
+// `/cpbl/today.json` -> { games: [{ year, sno, kind, status, state, away: { zh,
+// score }, home }] }: the league's own word on each of today's games (Taiwan's
+// day), the moment one ends. cpbl.com.tw answers its dynamic pages only in
+// Taiwan (a 404 elsewhere, Cloudflare's addresses too), so the exchange is
+// made from gemini-relay (pinned there) when it's bound: the home page for
+// its cookies (and a form token if it has one), then the list.
+export const CPBL_TODAY = 'https://www.cpbl.com.tw/home/getdetaillist';
+// GameStatus: 1 to come, 4 line-ups out, 2 and 8 on, 3 over, 5 called off, 6 postponed, 7 suspended.
+const CPBL_STATE = { 1: 'pre', 4: 'pre', 2: 'in', 8: 'in', 3: 'post', 5: 'void', 6: 'void', 7: 'in' };
+export function parseCpblToday(data) {
+  const list = parseJson(data?.GameDetailJson) || [];
+  return (Array.isArray(list) ? list : []).map(g => ({
+    year: Number(g.Year) || null,
+    sno: Number(g.GameSno) || null,
+    kind: g.KindCode || 'A',
+    status: Number(g.GameStatus) || 0,
+    state: CPBL_STATE[Number(g.GameStatus)] || 'pre',
+    away: { zh: g.VisitingTeamName || '', score: Number(g.VisitingTotalScore) || 0 },
+    home: { zh: g.HomeTeamName || '', score: Number(g.HomeTotalScore) || 0 }
+  }));
+}
+// The exchange itself (run in the relay, or here without one): the raw answer as a Response.
+export async function cpblTodayExchange(fetchFn = fetch) {
+  const { page, html, cookie } = await cpblPage('https://www.cpbl.com.tw/', fetchFn);
+  if (!page.ok) return new Response(JSON.stringify({ error: `cpbl home ${page.status}` }), { status: 502 });
+  const token = /name="__RequestVerificationToken" type="hidden" value="([^"]+)"/.exec(html)?.[1];
+  return fetchFn(CPBL_TODAY, {
+    method: 'POST',
+    headers: { 'User-Agent': BROWSER_UA, 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', 'X-Requested-With': 'XMLHttpRequest', Cookie: cookie, Referer: 'https://www.cpbl.com.tw/', Origin: 'https://www.cpbl.com.tw' },
+    body: token ? `__RequestVerificationToken=${encodeURIComponent(token)}` : '',
+    signal: AbortSignal.timeout(TIMEOUT)
+  });
+}
+// The relay (env.GEMINI_RELAY) this Worker reaches Taiwan through, set by the sports proxy and the cron.
+let relay = null;
+export const useCpblRelay = binding => void (relay ||= binding || null);
+export async function cpblToday(via = relay) {
+  const res = via ? await via.fetch(`https://gemini-relay/?to=${encodeURIComponent(CPBL_TODAY)}`, { signal: AbortSignal.timeout(2 * TIMEOUT) }) : await cpblTodayExchange();
+  if (!res.ok) throw new Error(`cpbl today ${res.status}`);
+  const data = await res.json();
+  if (!data?.Success) throw new Error('cpbl today answer');
+  return parseCpblToday(data);
+}
+
 // `/<league>/<YYYY-MM>.json` -> { league, month } or null.
 export function asiaTarget(url) {
   const m = /^\/(npb|kbo|cpbl)\/(\d{4})-(\d{2})\.json$/.exec(url.pathname);
@@ -359,6 +405,13 @@ export function asiaTarget(url) {
 
 // The month's games as a Response (JSON), or an error Response.
 export async function asiaBaseballResponse(url) {
+  if (url.pathname === '/cpbl/today.json') {
+    try {
+      return new Response(JSON.stringify({ games: await cpblToday() }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    } catch (error) {
+      return new Response(JSON.stringify({ error: String(error.message || error) }), { status: 502, headers: { 'Content-Type': 'application/json' } });
+    }
+  }
   const box = cpblBoxTarget(url);
   if (box) {
     try {
