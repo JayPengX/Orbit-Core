@@ -10,12 +10,10 @@
 // and 人事行政總處's 停班停課 page (typhoon.js), for Orbit Weather. And
 // TheSportsDB's CPBL day list for a game's final (push.js): its free key
 // answers the proxy's shared addresses with 429 most of the time, so a
-// second way out. And CPBL's own list of today's games (asia-baseball.js
-// cpblToday), which cpbl.com.tw answers only in Taiwan.
+// second way out.
 import { twOnly } from './law-hosts.js';
 import { DGPA_NDS } from './typhoon.js';
 import { tsdbCpblDay } from './kit/catalog.mjs';
-import { CPBL_TODAY, cpblTodayExchange } from './asia-baseball.js';
 
 const GEMINI = 'https://generativelanguage.googleapis.com/';
 
@@ -26,8 +24,6 @@ export default {
       const pick = ['User-Agent', 'Accept', 'Accept-Language'].filter(h => request.headers.get(h)).map(h => [h, request.headers.get(h)]);
       return fetch(to, { headers: Object.fromEntries(pick), redirect: 'manual' });
     }
-    // CPBL's list of today's games (asia-baseball.js): the whole exchange made here, in Taiwan.
-    if (to === CPBL_TODAY && request.method === 'GET') return cpblTodayExchange();
     if (!to.startsWith(GEMINI)) return new Response('', { status: 400 });
     return fetch(to, { method: request.method, headers: { 'Content-Type': request.headers.get('Content-Type') || 'application/json' }, body: request.method === 'GET' ? undefined : request.body });
   }
