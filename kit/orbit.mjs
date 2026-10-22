@@ -132,57 +132,35 @@ const rankName = (id, i) => {
 };
 // Where the money came from and went (all time, NT$): what the system gave
 // (opening money, pay, level rewards, the owner's grants), the government
-// (govOf: relief less taxes), the account
-// against Orbit (Play's settled bets less fees, loan costs and overdraft interest:
-// a surplus when it has won more than it lost and paid), and its own result
-// (markets, savings: worth less the other two). A bet still open is in the
-// worth, as money at stake, and in neither side until it's settled.
+// (govOf: relief less taxes), Orbit's bank (loan costs and overdraft
+// interest), and the account's own result (markets, savings: worth less the
+// other three).
 // 政府 (kit/gov.mjs): the same figures the admin page adds up.
 import { govOf } from './gov.mjs';
 import { twDay, finiteOr0 } from './format.mjs';
 export { govOf };
 export function moneySides(wallet) {
   const gave = { start: 0, pay: 0, rank: 0, other: 0 };
-  // Play's settled bets (payouts less stakes) and what Orbit charges (overdraft
-  // interest); a bet still open is neither yet: it's money
-  // at stake, still the account's.
-  let play = 0;
+  // What Orbit charges: overdraft interest, and a loan's cost (what came in
+  // less what went back, with what's still owed: its interest and fees).
   let fees = 0;
-  let atStake = 0;
-  // A loan: what came in less what went back; with what's still owed, the
-  // difference is its cost (interest and fees), charged by Orbit's bank.
   let loanFlow = 0;
-  const entries = wallet?.entries || [];
-  const ids = new Set(entries.map(e => e.id));
-  const open = e => e.kind === 'stake' && typeof e.id === 'string' && e.id.startsWith('odds:stake-') && !ids.has(`odds:payout-${e.id.slice(11)}`) && !ids.has(`odds:refund-${e.id.slice(11)}`);
-  for (const e of entries) {
+  for (const e of wallet?.entries || []) {
+    if (e.app !== 'eco') continue;
     const a = Number(e.amount) || 0;
-    if (e.app === 'eco') {
-      if (e.kind === 'start') gave.start += a;
-      else if (e.kind === 'pay') gave.pay += a;
-      else if (e.kind === 'rank') gave.rank += a;
-      // (A correction or prize from the admin page: money Orbit gave, either way.)
-      else if (e.kind === 'rebase' || e.kind === 'admin') gave.other += a;
-      else if (e.kind === 'od') fees -= a;
-      else if (LOAN_KINDS.has(e.kind)) loanFlow += a;
-    } else if (e.app === 'odds') {
-      if (e.kind === 'start') gave.start += a;
-      else if (e.kind === 'grant') gave.other += a;
-      else if (open(e)) atStake -= a;
-      else play += a;
-    }
+    if (e.kind === 'start') gave.start += a;
+    else if (e.kind === 'pay') gave.pay += a;
+    else if (e.kind === 'rank') gave.rank += a;
+    // (A correction or prize from the admin page: money Orbit gave, either way.)
+    else if (e.kind === 'rebase' || e.kind === 'admin') gave.other += a;
+    else if (e.kind === 'od') fees -= a;
+    else if (LOAN_KINDS.has(e.kind)) loanFlow += a;
   }
   fees += debtOf(wallet) - loanFlow;
   const given = gave.start + gave.pay + gave.rank + gave.other;
-  // The government's side: relief in, taxes out (govOf). Play's winnings came
-  // in after tax, so Play's side counts them before it.
   const gov = govOf(wallet);
-  // Against Orbit, signed: above 0 when Play has paid out more than the
-  // account lost there and paid in fees (a surplus), below when Orbit kept more.
-  const orbit = play + gov.paid.sports + gov.paid.lottery - fees;
-  // The worth counts money at stake: it's still the account's until settled.
-  const worth = worthOf(wallet) + atStake;
-  return { gave, given, orbit, fees, playNet: play, atStake, took: Math.max(0, -orbit), worth, gov, own: worth - given - orbit - gov.net };
+  const worth = worthOf(wallet);
+  return { gave, given, fees, worth, gov, own: worth - given + fees - gov.net };
 }
 // The weekly pay: fixed, whatever the account holds (eco.js PAY.week).
 export const paydayFor = () => ECONOMY.weekly;
@@ -191,8 +169,8 @@ export const paydayFor = () => ECONOMY.weekly;
 export const OVERDRAFT_RATE = 0.01;
 
 // 信貸 and 急難紓困: loan.mjs, shared with the Worker.
-import { PAY_WEEK, LOAN, RELIEF, loans, activeLoan, loanOwed, payoffAmount, debtOf, credit, canBorrow, loanOffer, maxFor, dueCount, reliefCheck, openStakes, nextPayday } from './loan.mjs';
-export { PAY_WEEK, LOAN, RELIEF, loans, activeLoan, loanOwed, payoffAmount, debtOf, credit, canBorrow, loanOffer, maxFor, dueCount, reliefCheck, openStakes, nextPayday };
+import { PAY_WEEK, LOAN, RELIEF, loans, activeLoan, loanOwed, payoffAmount, debtOf, credit, canBorrow, loanOffer, maxFor, dueCount, reliefCheck, nextPayday } from './loan.mjs';
+export { PAY_WEEK, LOAN, RELIEF, loans, activeLoan, loanOwed, payoffAmount, debtOf, credit, canBorrow, loanOffer, maxFor, dueCount, reliefCheck, nextPayday };
 const LOAN_KINDS = new Set(['loan', 'loanfee', 'loanpay', 'loanlate', 'loanbad', 'loangar', 'loanoff']);
 
 // ---- Looks: an avatar and a frame, free for everyone ------------------------------------
@@ -733,7 +711,7 @@ function keptJson(url, key, { ttl, keep }, read) {
 
 // ---- The session ---------------------------------------------------------------------
 //
-// const q = orbitSession('odds');
+// const q = orbitSession('stock');
 // q.on('wallet', w => ...)      the wallet changed (pool, settings…)
 // q.on('active', live => ...)   true: this app is the live one; false: paused
 // q.on('claim', c => ...)      every claim's end (opening, coming back,
@@ -1633,20 +1611,8 @@ export function poolBalance(wallet) {
   const entries = (wallet.entries || []).reduce((sum, e) => sum + e.amount, 0);
   return Math.round((entries + Object.values(wallet.snap || {}).reduce((sum, s) => sum + cash(s), 0)) * 100) / 100;
 }
-// The pool less `app`'s own part (an app with its own books shows its own
-// money plus this).
-export function othersBalance(wallet, app) {
-  if (!wallet) return 0;
-  const entries = (wallet.entries || []).filter(e => e.app !== app).reduce((sum, e) => sum + e.amount, 0);
-  const snaps = Object.entries(wallet.snap || {})
-    .filter(([name]) => name !== app)
-    .reduce((sum, [, s]) => sum + cash(s), 0);
-  return Math.round((entries + snaps) * 100) / 100;
-}
-
 const KIND = {
   start: ['開戶金', 'Opening money'],
-  grant: ['零用金', 'Allowance'],
   pay: ['薪水', 'Pay'],
   rebase: ['經濟調整', 'Adjustment'],
   loan: ['信貸撥款', 'Loan paid out'],
@@ -1657,20 +1623,8 @@ const KIND = {
   loangar: ['催收：薪資扣押', 'Collection: pay garnished'],
   loanoff: ['信貸清償', 'Loan paid off'],
   relief: ['急難紓困', 'Emergency relief'],
-  stake: ['下注', 'Bet'],
-  payout: ['彩金', 'Winnings'],
-  tax: ['運彩中獎稅補扣', 'Sports tax, back charged'],
-  refund: ['退款', 'Refund'],
-  lottery: ['彩券', 'Lottery ticket'],
-  prize: ['彩券獎金', 'Lottery prize'],
   rank: ['財富等級獎勵', 'Wealth level reward'],
   od: ['透支利息', 'Overdraft interest'],
-  cashout: ['提前兌現', 'Cash out'],
-  freebet: ['免費投注', 'Free bet'],
-  plusboost: ['✦ Plus 串關加成', '✦ Plus parlay boost'],
-  welcome: ['新手禮', 'Welcome offer'],
-  'xfer-in': ['轉入', 'Transfer in'],
-  'xfer-out': ['轉出', 'Transfer out'],
   merge: ['合併帶入', 'Carried over']
 };
 export function describeEntry(e, lang = 'zh') {

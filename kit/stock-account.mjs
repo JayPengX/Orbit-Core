@@ -1,4 +1,4 @@
-// The practice brokerage account. Play money only.
+// The practice brokerage account. Practice money only.
 //
 // The account is a log: immutable events (deposits, exchanges, fills,
 // dividends, splits, loans) plus orders, whose status moves forward (open →
@@ -1165,7 +1165,7 @@ export function processOrders(account, quotes, rates, now = Date.now(), { halt =
 }
 
 // The proxy's fills (the owner, 2026-10-14: Securities' orders filled by the
-// proxy, as Play's bets are): { orderId: { quote, t, twd } } from its own fresh
+// proxy): { orderId: { quote, t, twd } } from its own fresh
 // quote (Shared-Proxy stock-fill.js), each applied to its open order at
 // that price and moment; the account's own rules (cash, shares, the
 // spread, costs) as fillOrder has them. Orders it hasn't filled stay open.
@@ -2627,8 +2627,8 @@ export const startIncome = (account, now = Date.now()) => (account.income ? acco
 // ---- The Orbit pool -----------------------------------------------------------
 //
 // With a Orbit Pass this account's NT$ cash is the shared money pool (see
-// orbit.mjs): money the other apps put in or took out (Play's bets and
-// winnings, Orbit's pay) arrives here as NT$ deposits with
+// orbit.mjs): money the Worker put in or took out (the pay, 信貸, 紓困,
+// overdraft interest) arrives here as NT$ deposits with
 // fixed ids ('x:<entry id>', `pool: true`), counted as money put in or taken
 // out rather than as return. What this account shares back is its own part:
 // its NT$ cash less those deposits.

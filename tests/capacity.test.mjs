@@ -14,13 +14,13 @@ test('estimateUsers: the next 30 days from the last two weeks of new passes', ()
 });
 
 test('few people: the owner\'s own numbers, untouched', () => {
-  const u = estimateUsers({ active: { day: 3, week: 5 }, apps: { match: { week: 5 }, odds: { week: 3 } }, newWeek: 1 });
+  const u = estimateUsers({ active: { day: 3, week: 5 }, apps: { match: { week: 5 }, stock: { week: 3 } }, newWeek: 1 });
   assert.equal(scaleFor(base, u.daily, u.growth), 1);
   assert.deepEqual(applyScale(base, 1), base);
 });
 
 test('many people: the live refreshes slowed together until the plan fits, never past their slowest', () => {
-  const u = estimateUsers({ active: { day: 300, week: 400 }, apps: { match: { week: 400 }, odds: { week: 250 }, transit: { week: 150 } }, newWeek: 0 });
+  const u = estimateUsers({ active: { day: 300, week: 400 }, apps: { match: { week: 400 }, stock: { week: 250 }, transit: { week: 150 } }, newWeek: 0 });
   const s = scaleFor(base, u.daily, u.growth);
   assert.ok(s > 1);
   const applied = applyScale(base, s);

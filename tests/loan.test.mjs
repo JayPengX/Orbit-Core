@@ -7,7 +7,7 @@ import { paydayEntries, poolBalance, mergeWallet, worthOf, rankEntries } from '.
 // Wednesday 4 Nov 2026, noon Taipei; the account opened 5 Oct (past the 4 weeks' wait).
 const T0 = Date.UTC(2026, 10, 4, 4);
 const DAY = 86_400_000;
-const base = (cash = 200_000) => ({ v2: 1, created: Date.UTC(2026, 9, 5), entries: [{ id: 'eco:start', t: 1, app: 'eco', kind: 'start', amount: 200_000 }, { id: 'seed', t: 1, app: 'odds', kind: 'stake', amount: cash - 200_000 }], snap: {}, settings: {} });
+const base = (cash = 200_000) => ({ v2: 1, created: Date.UTC(2026, 9, 5), entries: [{ id: 'eco:start', t: 1, app: 'eco', kind: 'start', amount: 200_000 }, { id: 'seed', t: 1, app: 'stock', kind: 'fee', amount: cash - 200_000 }], snap: {}, settings: {} });
 // Paid up to `now` (every Monday's pay and what the loan takes), like the Worker.
 const at = (w, now) => mergeWallet(w, { entries: paydayEntries(w, now) });
 const borrow = (w, amount, weeks, now = T0) => {
@@ -15,7 +15,7 @@ const borrow = (w, amount, weeks, now = T0) => {
   assert.ok(offer.ok, JSON.stringify(offer));
   return mergeWallet(w, { entries: loanEntries(offer, now) });
 };
-const spend = (w, amount, id = `spend-${amount}-${w.entries.length}`) => mergeWallet(w, { entries: [{ id, t: T0, app: 'odds', kind: 'stake', amount: -amount }] });
+const spend = (w, amount, id = `spend-${amount}-${w.entries.length}`) => mergeWallet(w, { entries: [{ id, t: T0, app: 'stock', kind: 'fee', amount: -amount }] });
 
 test('the schedule: equal weekly installments that clear the loan exactly', () => {
   const s = schedule(100_000, 0.12, 52);
@@ -79,7 +79,7 @@ test('a missed installment is late with a charge, collected when money arrives; 
   assert.equal(w.entries.filter(e => e.kind === 'loanlate').length, 1);
   assert.ok(w.entries.find(e => e.kind === 'loanlate').amount < 0);
   // Money comes in: the overdue one is taken at once.
-  w = mergeWallet(w, { entries: [{ id: 'win', t: mon + 2, app: 'odds', kind: 'payout', amount: 60_000 }] });
+  w = mergeWallet(w, { entries: [{ id: 'win', t: mon + 2, app: 'eco', kind: 'admin', amount: 60_000 }] });
   w = at(w, mon + 3);
   assert.equal(w.entries.filter(e => e.kind === 'loanpay').length, 1);
   assert.equal(activeLoan(w).bad, null);
@@ -107,7 +107,7 @@ test('催收: a third of every pay until it is paid, with interest; then a year 
   // Interest ran on what was owed.
   assert.ok(Number(gar[0].note) > owedAt - Math.round(PAY_WEEK / 3));
   // Paid off from the balance: settled, and the record bans new loans for a year.
-  w = mergeWallet(w, { entries: [{ id: 'win', t: 2, app: 'odds', kind: 'payout', amount: 200_000 }] });
+  w = mergeWallet(w, { entries: [{ id: 'win', t: 2, app: 'eco', kind: 'admin', amount: 200_000 }] });
   const loan = activeLoan(w);
   w = mergeWallet(w, { entries: [{ id: `eco:loanoff:${loan.id}`, t: mon + 3 * WEEK + 2, app: 'eco', kind: 'loanoff', amount: -payoffAmount(loan, mon + 3 * WEEK + 2) }] });
   assert.equal(activeLoan(w), null);

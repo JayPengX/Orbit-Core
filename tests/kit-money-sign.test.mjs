@@ -44,5 +44,5 @@ test('app colours: orbit.css carries brand.mjs accentCss, each page its data-app
   for (const t of ['--q-up: var(--q-red)', '--q-down: var(--q-green)', '--q-win:', '--q-loss:', '--q-draw:', '--q-live:']) assert.ok(css.includes(t), t);
   assert.equal(withApp('<html lang="zh-Hant" data-theme="dark">', 'transit'), '<html lang="zh-Hant" data-theme="dark" data-app="transit">');
   assert.equal(withApp('<html data-app="x" lang="en">', 'law'), '<html data-app="law" lang="en">');
-  assert.equal(withApp('<!doctype html><html>', 'odds'), '<!doctype html><html data-app="odds">');
+  assert.equal(withApp('<!doctype html><html>', 'stock'), '<!doctype html><html data-app="stock">');
 });

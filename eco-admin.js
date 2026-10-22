@@ -74,8 +74,9 @@ export async function capacityCron(env, deps) {
   return { scale: p.scale, week: p.users.week, expected: p.users.expected, changed: !same };
 }
 
-// (Play's slips, tickets and Kambi watch left with it for Longshot, 2026-10-22.)
-export const RETIRED_COLLECTIONS = ['orbit-schedules', 'eco-links', 'stock-study-leagues', 'odds-open', 'odds-settled', 'odds-tickets', 'kambi-results'];
+// (Play's saves, slips, tickets and Kambi watch, and Slips' saves, left with
+// them for Longshot, 2026-10-22.)
+export const RETIRED_COLLECTIONS = ['orbit-schedules', 'eco-links', 'stock-study-leagues', 'odds-open', 'odds-settled', 'odds-tickets', 'kambi-results', 'odds-study-accounts', 'orbit-slip'];
 // (A function: eco.js and this file import each other.)
 const keep = () => new Set([WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, CONFIG_COLLECTION, ...Object.values(ECO_APPS).map(a => a.collection)]);
 // The store's batches go 500 at a time; a call stops after this many so it
@@ -83,10 +84,10 @@ const keep = () => new Set([WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTIO
 const PER_CALL = 1500;
 
 // A wallet as the apps write it now:
-//   - entries only of the apps that move money (Securities, Play) and the
-//     Worker's own. Orbit Words (once Rewards: word points, games, missions,
-//     its shop and points catalogue) and Orbit Sports write none any more: theirs
-//     go, and the NT$ they moved stays in the balance as one entry,
+//   - entries only of Securities (the one app that moves money) and the
+//     Worker's own. Play (gone to Longshot), Orbit Words (once Rewards: word
+//     points, games, missions, its shop and points catalogue) and Orbit
+//     Sports write none any more: theirs go, and the NT$ they moved stays in the balance as one entry,
 //     `eco:rebase:hub`, so no account's money changes;
 //   - none of Securities' markers for points-catalogue vouchers ('stock:xs-');
 //   - a Plus month bought with points is a month like any (its 'points' note
@@ -97,7 +98,7 @@ const PER_CALL = 1500;
 //   - no fields of older versions (`links`, an entry's `peer`).
 // Returns the wallet and what went: { wallet, gone: { entries, money, settings, looks } }.
 export const RETIRED_SETTINGS = ['oddsWeeklyLimit', 'orbitFollow', 'bests:vocab', 'hub:cleanup:v1', 'aff:vocab'];
-const MONEY_APPS = new Set(['eco', 'stock', 'odds']);
+const MONEY_APPS = new Set(['eco', 'stock']);
 export function tidyWallet(w, now) {
   const { links, ...rest } = w;
   const gone = { entries: 0, money: 0, settings: 0, looks: 0 };
