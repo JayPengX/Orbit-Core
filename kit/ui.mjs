@@ -200,14 +200,14 @@ function dayReveal(s) {
 // A swipe across a page or a sheet's days (not across a row that scrolls
 // sideways, a field or the strip): step(+1 | -1) goes a day either way and
 // says whether it did; the page follows the finger and the new day slides
-// in (.q-day-swipe; the strip and a sheet's head stay put).
+// in (.q-day-swipe; the strip, a sheet's head and a .q-day-still stay put).
 export function daySwipe(panel, step) {
   if (!panel) return;
   panel.classList.add('q-day-swipe');
   let start = null;
   const sideways = node => {
     for (let n = node; n && n !== panel; n = n.parentElement) {
-      if (n.matches?.('input, select, textarea, .q-day-bar, .day-bar, [data-noswipe]')) return true;
+      if (n.matches?.('input, select, textarea, .q-seg, .q-day-bar, .day-bar, [data-noswipe]')) return true;
       if (n.scrollWidth > n.clientWidth + 2 && /auto|scroll/.test(getComputedStyle(n).overflowX)) return true;
     }
     return false;
