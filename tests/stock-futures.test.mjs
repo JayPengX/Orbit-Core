@@ -90,3 +90,12 @@ test('a warrant from TWSE’s own quotes: last trade, else the best bid, else th
   assert.equal(misQuote('030003.TW', { z: '-', y: '0.8', b: '-', a: '-' }).price, 0.8);
   assert.equal(misQuote('030004.TW', { z: '-', y: '-', b: '-', a: '-' }), null);
 });
+
+test('a convertible bond’s terms: maturity, conversion price, put, company', async () => {
+  const { cbTerms, cbMaturity } = await import('../kit/stock-markets.mjs');
+  const t = cbTerms('12561.TWO');
+  assert.equal(t.stock, '1256');
+  assert.ok(t.conversion > 0);
+  assert.equal(t.maturity, cbMaturity('12561.TWO'));
+  assert.equal(cbTerms('2330.TW'), null);
+});
