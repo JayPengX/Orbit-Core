@@ -198,15 +198,36 @@ export const targetDay = now => (new Date(now + TW).getUTCHours() < 10 ? twDate(
 // Checked on storms it wasn't fitted on: what it calls 20% closed about one
 // time in five. 1–99, never rounded to steps.
 const FIT = { k: -7.6913, edge: 0.0644, inside: 0.374, v: 1.0683, gust: 4.412, rain: 2.5424, island: -0.6472 };
+// Once neighbours have announced (county seats within 75 km): the same fit
+// with the share of them that closed, from the archive's final pages. Mixed
+// with the first by how many of them have announced so far.
+const FIT_NEAR = { k: -6.9982, edge: 0.0059, inside: 0.1157, v: 0.5935, gust: 2.1137, rain: 1.5224, island: -0.4118, near: 6.1854 };
+export const NEIGHBOURS = {"基隆市": ["臺北市", "新北市", "桃園市", "宜蘭縣"], "臺北市": ["基隆市", "新北市", "桃園市", "新竹市", "新竹縣", "宜蘭縣"], "新北市": ["基隆市", "臺北市", "桃園市", "新竹市", "新竹縣", "宜蘭縣"], "桃園市": ["基隆市", "臺北市", "新北市", "新竹市", "新竹縣", "苗栗縣", "宜蘭縣"], "新竹市": ["臺北市", "新北市", "桃園市", "新竹縣", "苗栗縣"], "新竹縣": ["臺北市", "新北市", "桃園市", "新竹市", "苗栗縣"], "苗栗縣": ["桃園市", "新竹市", "新竹縣", "臺中市", "彰化縣", "南投縣"], "臺中市": ["苗栗縣", "彰化縣", "南投縣", "雲林縣"], "彰化縣": ["苗栗縣", "臺中市", "南投縣", "雲林縣", "嘉義市", "嘉義縣"], "南投縣": ["苗栗縣", "臺中市", "彰化縣", "雲林縣", "嘉義市", "嘉義縣"], "雲林縣": ["臺中市", "彰化縣", "南投縣", "嘉義市", "嘉義縣"], "嘉義市": ["彰化縣", "南投縣", "雲林縣", "嘉義縣", "臺南市"], "嘉義縣": ["彰化縣", "南投縣", "雲林縣", "嘉義市", "臺南市", "澎湖縣"], "臺南市": ["嘉義市", "嘉義縣", "高雄市", "屏東縣"], "高雄市": ["臺南市", "屏東縣"], "屏東縣": ["臺南市", "高雄市", "臺東縣"], "宜蘭縣": ["基隆市", "臺北市", "新北市", "桃園市"], "花蓮縣": [], "臺東縣": ["屏東縣"], "澎湖縣": ["嘉義縣"], "金門縣": [], "連江縣": []};
 const clip = (x, lo, hi) => Math.min(hi, Math.max(lo, x));
-export function dayOffChance({ edge, islandEdge, vmax, gust, mm }) {
-  const e = clip(edge ?? 600, -300, 600);
-  const z = FIT.k + FIT.edge * (e / 100) + FIT.inside * (clip(-(edge ?? 600), 0, 300) / 100) + FIT.v * (((vmax ?? 0) * 1.9438) / 100) + FIT.gust * ((gust ?? 0) / 30) + FIT.rain * (Math.log1p(Math.max(0, mm ?? 0)) / Math.log1p(350)) + FIT.island * (clip(islandEdge ?? 600, -300, 600) / 100);
+const logit = (f, { edge, islandEdge, vmax, gust, mm }) => f.k + f.edge * (clip(edge ?? 600, -300, 600) / 100) + f.inside * (clip(-(edge ?? 600), 0, 300) / 100) + f.v * (((vmax ?? 0) * 1.9438) / 100) + f.gust * ((gust ?? 0) / 30) + f.rain * (Math.log1p(Math.max(0, mm ?? 0)) / Math.log1p(350)) + f.island * (clip(islandEdge ?? 600, -300, 600) / 100);
+// `near`: { closed, open, of } — the neighbours that announced each way, of how many.
+export function dayOffChance(x, near = null) {
+  let z = logit(FIT, x);
+  const told = near ? near.closed + near.open : 0;
+  if (told) {
+    const w = told / near.of;
+    z = (1 - w) * z + w * (logit(FIT_NEAR, x) + FIT_NEAR.near * (near.closed / told));
+  }
   return Math.min(99, Math.max(1, Math.round(100 / (1 + Math.exp(-z)))));
 }
 
 // A Beaufort level's lowest gust (m/s), for the 強風 lamps' 陣風 N 級.
 const BFT_MS = [0, 0.3, 1.6, 3.4, 5.5, 8, 10.8, 13.9, 17.2, 20.8, 24.5, 28.5, 32.7];
+
+// A county's lines on the page, each with its day (今天 or 明天 from the
+// page's own time) and whether it covers only some towns.
+function linesOf(dgpa, county) {
+  const said = dgpa?.counties?.[county];
+  if (!said || /無停班停課/.test(said)) return [];
+  const day = twDate(dgpa.at || Date.now());
+  const next = twDate(Date.parse(`${day}T12:00:00+08:00`) + 24 * HOUR);
+  return officialLines(said).map(l => ({ ...l, date: /明天|明日/.test(l.text) ? next : day, scoped: /^[^\d\s][^:：]{0,40}[:：]/.test(l.text) }));
+}
 
 // The answer's `dayOff` for a place (the forecast's hours, its county; `at` its position).
 export function dayOffFor(resp, ty, dgpa, now, at = null) {
@@ -215,14 +236,20 @@ export function dayOffFor(resp, ty, dgpa, now, at = null) {
   if (!COUNTIES.includes(county)) return null;
   const date = targetDay(now);
   const storm = { name: ty.name, nameEn: ty.nameEn, warning: ty.warning, date };
-  const said = dgpa?.counties?.[county];
-  // The county's own decision (a line for the whole county, not 尚未宣布)
-  // replaces the chance; lines for some towns only (綠島鄉:…) go under it.
-  const lines = said && !/無停班停課/.test(said) ? officialLines(said) : [];
-  const scoped = l => /^[^\d\s][^:：]{0,40}[:：]/.test(l.text);
-  if (lines.some(l => !scoped(l) && l.off !== 'wait')) return { ...storm, official: { lines, at: dgpa.at } };
-  const local = lines.filter(scoped);
+  // The county's own decision for the day (a line for the whole county, not
+  // 尚未宣布) replaces the chance; its other lines (some towns only, 綠島鄉:…;
+  // another day) go under it.
+  const lines = linesOf(dgpa, county);
+  if (lines.some(l => !l.scoped && l.date === date && l.off !== 'wait')) return { ...storm, official: { lines: lines.map(({ text, off }) => ({ text, off })), at: dgpa.at } };
+  const local = lines.filter(l => l.off !== 'wait').map(({ text, off }) => ({ text, off }));
   const towns = local.length ? { local: { lines: local, at: dgpa.at } } : {};
+  // Neighbours that have decided the day, each way.
+  const nearby = NEIGHBOURS[county] || [];
+  const near = { closed: 0, open: 0, of: nearby.length };
+  for (const c of nearby) {
+    const l = linesOf(dgpa, c).find(x => !x.scoped && x.date === date && x.off !== 'wait');
+    if (l) near[l.off === 'open' ? 'open' : 'closed']++;
+  }
   const start = Date.parse(`${date}T00:00:00+08:00`);
   const to = start + 24 * HOUR;
   // The day's hours (today's: those still ahead).
@@ -247,9 +274,10 @@ export function dayOffFor(resp, ty, dgpa, now, at = null) {
     gust: Math.max(beaufortKmh(peak('gust')) ?? 0, lamp?.gust ?? 0) || null,
     mm,
     land: ty.land.includes(county),
-    reach: (here?.edge ?? Infinity) <= 0
+    reach: (here?.edge ?? Infinity) <= 0,
+    ...(near.closed ? { nearClosed: near.closed } : {})
   };
-  const chance = dayOffChance({ edge: here?.edge, islandEdge: island?.edge, vmax: here?.v ?? island?.v, gust, mm });
+  const chance = dayOffChance({ edge: here?.edge, islandEdge: island?.edge, vmax: here?.v ?? island?.v, gust, mm }, near);
   return { ...storm, chance, why, ...towns };
 }
 

@@ -4,7 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { parseTrack, stormAt, circleEdge, offOf, feedTyphoon, parseTyphoonCap, parseLamps, parseDgpa, officialLines, dayOffChance, dayOffFor, circleReaches, beaufortKmh, targetDay, readTyphoon, readDgpa, DGPA_NDS } from '../typhoon.js';
+import { NEIGHBOURS, parseTrack, stormAt, circleEdge, offOf, feedTyphoon, parseTyphoonCap, parseLamps, parseDgpa, officialLines, dayOffChance, dayOffFor, circleReaches, beaufortKmh, targetDay, readTyphoon, readDgpa, DGPA_NDS } from '../typhoon.js';
 
 const raw = name => readFileSync(new URL(`./fixtures/typhoon/${name}`, import.meta.url), 'utf8');
 const NOW = Date.parse('2026-10-22T02:10:00Z'); // 10:10 in Taiwan
@@ -69,6 +69,10 @@ test('the chance: the fitted curve, smooth, 1–99', () => {
   // 山陀兒 2024-10-02 at 高雄 (closed; the model said 41%).
   assert.equal(dayOffChance({ edge: -352.5, islandEdge: -528.7, vmax: 25.7, gust: 29.4, mm: 258 }), 92);
   assert.equal(dayOffChance({ edge: -179.8, islandEdge: -179.8, vmax: 46.3, gust: 17.4, mm: 120.5 }), 41);
+  // Its neighbours (臺南市, 屏東縣) both closed: near certain; both open: low.
+  assert.ok(dayOffChance({ edge: -179.8, islandEdge: -179.8, vmax: 46.3, gust: 17.4, mm: 120.5 }, { closed: 2, open: 0, of: 2 }) >= 90);
+  assert.ok(dayOffChance({ edge: -179.8, islandEdge: -179.8, vmax: 46.3, gust: 17.4, mm: 120.5 }, { closed: 0, open: 2, of: 2 }) <= 10);
+  assert.deepEqual(NEIGHBOURS['高雄市'], ['臺南市', '屏東縣']);
   // A storm far off, a breezy day: next to nothing.
   assert.ok(dayOffChance({ edge: 500, islandEdge: 450, vmax: 40, gust: 12, mm: 5 }) <= 2);
   // Every input moves it a little (no steps).
@@ -123,6 +127,18 @@ test('a place: the official word first, else the chance with its reasons', () =>
   assert.equal(typeof pending.chance, 'number');
   assert.deepEqual(pending.local.lines, [{ text: '綠島鄉:今天下午停止上班、停止上課', off: 'all' }]);
   assert.equal(dayOffFor(place('新竹市'), far, { counties: { 新竹市: '尚未宣布消息' } }, NOW, HSINCHU).official, undefined);
+  // Neighbours deciding the day move it: closed up, open down; another day's
+  // word for the county itself goes under the chance.
+  const page = counties => ({ at: Date.parse('2026-10-22T20:00:00+08:00'), counties });
+  const alone = dayOffFor(place('新竹市'), ty, page({}), NOW, HSINCHU).chance;
+  const shut = dayOffFor(place('新竹市'), ty, page({ 新竹縣: '明天停止上班、停止上課。', 桃園市: '明天停止上班、停止上課。', 苗栗縣: '明天停止上班、停止上課。' }), NOW, HSINCHU);
+  const open = dayOffFor(place('新竹市'), ty, page({ 新竹縣: '明天照常上班、照常上課。', 桃園市: '明天照常上班、照常上課。' }), NOW, HSINCHU);
+  assert.ok(shut.chance > alone + 10, `${shut.chance} vs ${alone}`);
+  assert.equal(shut.why.nearClosed, 3);
+  assert.ok(open.chance < alone, `${open.chance} vs ${alone}`);
+  const today = dayOffFor(place('新竹市'), ty, page({ 新竹市: '今天照常上班、照常上課。' }), NOW, HSINCHU);
+  assert.equal(typeof today.chance, 'number');
+  assert.deepEqual(today.local.lines, [{ text: '今天照常上班、照常上課', off: 'open' }]);
   // On its own forecast track (heading this way) the circle reaches 新竹 tomorrow.
   assert.equal(dayOffFor(place('新竹市'), ty, null, NOW, HSINCHU).why.reach, true);
   // No warning, or abroad: nothing.
