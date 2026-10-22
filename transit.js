@@ -334,20 +334,82 @@ export const SLOW_MS = 3000;
 const keptFor = rule => Math.max(rule.stale, rule.tier === 'live' ? (/Bike/.test(rule.re.source) ? 30 : 10) * MIN : 0);
 const timeout = ms => (typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(ms) : undefined);
 
+// ---- YouBike kept warm --------------------------------------------------------------------
+//
+// Bikes are part of nearly every trip (Jay 2026-10-22: "bike is crucial"),
+// and a city's list missing from a colo's cache meant waiting on TDX, which
+// sometimes hangs: a trip held 30 s and more. So a city's stations and counts
+// are also kept in KV (one copy for every colo, with when it's from), and
+// the cron refreshes the counts of every city asked in the last half hour
+// each 2 minutes (the stations daily). An ask finds a copy at once; TDX is
+// asked behind it.
+const WARM = /^basic\/v2\/Bike\/(Station|Availability)\/City\/[A-Za-z]+$/;
+const WARM_ACTIVE = 'tdx:warm:active';
+export const WARM_FOR = 30 * MIN;
+const warmKey = req => `tdx:warm:${req.path}?${req.query}`;
+const warmMarked = new Map(); // raw path → when this isolate last marked it
+async function warmRead(env, req) {
+  try {
+    const r = await env.RATE_LIMIT_KV?.getWithMetadata(warmKey(req));
+    return r?.value ? { body: r.value, at: Number(r.metadata?.at) || 0 } : null;
+  } catch {
+    return null;
+  }
+}
+async function warmWrite(env, req, body, at) {
+  try {
+    await env.RATE_LIMIT_KV?.put(warmKey(req), body, { metadata: { at }, expirationTtl: req.rule.tier === 'live' ? 6 * 3600 : 14 * 86_400 });
+  } catch {}
+}
+// (A city asked: kept warm for the next half hour. Once each 5 minutes an isolate.)
+async function warmMark(env, raw, now) {
+  if (now - (warmMarked.get(raw) || 0) < 5 * MIN) return;
+  warmMarked.set(raw, now);
+  const list = (await kvJson(env, WARM_ACTIVE)) || {};
+  list[raw] = now;
+  for (const [k, t] of Object.entries(list)) if (now - t > WARM_FOR) delete list[k];
+  await kvPut(env, WARM_ACTIVE, list, 86_400);
+}
+// The cron (worker.js, the even minutes): each city asked lately, refreshed
+// once its copy is past its fresh time. → { 'Availability/City/Hsinchu': state }
+export async function warmBikes(env, deps = {}) {
+  const now = deps.now ?? Date.now();
+  const list = (await kvJson(env, WARM_ACTIVE)) || {};
+  const out = {};
+  for (const [raw, t] of Object.entries(list)) {
+    if (now - t > WARM_FOR) continue;
+    const got = await tdxGet(env, raw, { ...deps, now, warm: true });
+    out[raw.split('?')[0].split('/').slice(-3).join('/')] = got.state;
+  }
+  return out;
+}
+
 // One TDX answer, from the shared cache when it's fresh enough.
 // → { status, body (text), age (ms), state: 'hit' | 'miss' | 'stale' | 'busy' | 'error' }
-export async function tdxGet(env, raw, { fetchFn = fetch, cache = globalThis.caches?.default, ctx = null, now = Date.now() } = {}) {
+// `warm` (the cron's): refreshed when its copy is past its fresh time, else 'warm'.
+export async function tdxGet(env, raw, { fetchFn = fetch, cache = globalThis.caches?.default, ctx = null, now = Date.now(), warm = false } = {}) {
   const req = tdxRequest(raw);
   if (!req) return { status: 400, body: JSON.stringify({ code: 'TDX_NOT_ALLOWED' }), state: 'error' };
   const url = `${TDX_BASE}${req.path}?${req.query}`;
   const key = new Request(`https://transit-cache.quadra/${req.path}?${req.query}`);
+  const keepWarm = WARM.test(req.path);
+  const later = p => (ctx?.waitUntil ? ctx.waitUntil(p.catch(() => {})) : p.catch(() => {}));
+  if (keepWarm && !warm) later(warmMark(env, raw, now));
   let hit = null;
   try {
     hit = cache ? await cache.match(key) : null;
   } catch {}
-  const at = hit ? Number(hit.headers.get('X-Fetched-At')) || 0 : 0;
+  let at = hit ? Number(hit.headers.get('X-Fetched-At')) || 0 : 0;
+  let body = hit ? await hit.text() : null;
+  // (This colo's copy missing or past its stale time: KV's, when newer.)
+  if (keepWarm && (warm || !hit || now - at >= req.rule.stale)) {
+    const w = await warmRead(env, req);
+    if (w && (body == null || w.at > at)) [body, at] = [w.body, w.at];
+  }
   const age = now - at;
-  if (hit && age < (await freshOf(req.rule, env, req.path, now))) return { status: 200, body: await hit.text(), age, state: 'hit' };
+  const fresh = await freshOf(req.rule, env, req.path, now);
+  if (warm && body != null && age < Math.max(fresh, 90_000)) return { status: 200, age, state: 'warm' };
+  if (!warm && body != null && age < fresh) return { status: 200, body, age, state: 'hit' };
   const refresh = async () => {
     if (inflight.has(url)) return inflight.get(url);
     const p = (async () => {
@@ -370,44 +432,47 @@ export async function tdxGet(env, raw, { fetchFn = fetch, cache = globalThis.cac
       if (res.status === 429 && !Number(env.TDX_PER_SEC)) pace.until = now + 30_000;
       if (res.status === 401) resetTdxToken();
       if (!res.ok) return { status: res.status, state: 'error', why: (await res.text().catch(() => '')).slice(0, 160) };
-      const body = await res.text();
-      if (cache) {
-        const put = cache.put(key, new Response(body, { headers: { 'Content-Type': 'application/json; charset=utf-8', 'X-Fetched-At': String(now), 'Cache-Control': `public, max-age=${Math.ceil(keptFor(req.rule) / 1000)}` } })).catch(() => {});
-        if (ctx?.waitUntil) ctx.waitUntil(put);
-        else await put;
-      }
-      return { status: 200, body, age: 0, state: 'miss' };
+      const text = await res.text();
+      const puts = [];
+      if (cache) puts.push(cache.put(key, new Response(text, { headers: { 'Content-Type': 'application/json; charset=utf-8', 'X-Fetched-At': String(now), 'Cache-Control': `public, max-age=${Math.ceil(keptFor(req.rule) / 1000)}` } })).catch(() => {}));
+      if (keepWarm) puts.push(warmWrite(env, req, text, now));
+      const put = Promise.all(puts);
+      if (ctx?.waitUntil) ctx.waitUntil(put);
+      else await put;
+      return { status: 200, body: text, age: 0, state: 'miss' };
     })().finally(() => inflight.delete(url));
     inflight.set(url, p);
     return p;
   };
-  if (hit && age < req.rule.stale) {
+  if (warm) {
+    const got = await refresh().catch(err => ({ status: 502, state: 'error', why: String(err?.message || err) }));
+    return { status: got.status, age: 0, state: got.state };
+  }
+  if (body != null && age < req.rule.stale) {
     // At once, refreshed behind.
-    const p = refresh().catch(() => {});
-    if (ctx?.waitUntil) ctx.waitUntil(p);
-    return { status: 200, body: await hit.text(), age, state: 'stale' };
+    later(refresh());
+    return { status: 200, body, age, state: 'stale' };
   }
   let got;
   try {
-    // Past its stale time, a copy still kept (a live one up to 10 minutes):
-    // TDX given SLOW_MS, then that copy (with its age) and TDX's answer
-    // kept for the next ask. A slow TDX used to hold a card 12 s and more.
+    // Past its stale time, a copy still kept (a live one up to 10 minutes,
+    // YouBike's in KV): TDX given SLOW_MS, then that copy (with its age) and
+    // TDX's answer kept for the next ask. A slow TDX used to hold a card 12 s and more.
     const job = refresh();
-    if (hit) {
+    if (body != null) {
       const late = Symbol('late');
       got = await Promise.race([job, sleep(SLOW_MS).then(() => late)]);
       if (got === late) {
-        const p = job.catch(() => {});
-        if (ctx?.waitUntil) ctx.waitUntil(p);
-        return { status: 200, body: await hit.text(), age, state: 'stale' };
+        later(job);
+        return { status: 200, body, age, state: 'stale' };
       }
     } else got = await job;
   } catch (err) {
     got = { status: 502, state: 'error', why: String(err?.message || err).slice(0, 120) };
   }
   if (got.status === 200) return got;
-  // TDX busy or failing: the last copy, however old the cache still has it.
-  if (hit) return { status: 200, body: await hit.text(), age, state: 'stale' };
+  // TDX busy or failing: the last copy, however old the cache (or KV) still has it.
+  if (body != null) return { status: 200, body, age, state: 'stale' };
   const code = got.state === 'nokey' ? 'TDX_NO_KEY' : got.state === 'busy' || got.status === 429 ? 'TDX_BUSY' : 'TDX_FAILED';
   return { status: got.state === 'nokey' ? 503 : got.status === 429 || got.state === 'busy' ? 429 : 502, body: JSON.stringify({ code, upstream: got.status, why: got.why || '' }), state: got.state || 'error' };
 }

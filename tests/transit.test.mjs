@@ -4,14 +4,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  tdxRequest, tdxGet, SLOW_MS, tdxAccess, resetTdxToken, resetPace, resetTurns, resetMeter, spend, usage, flushUse, billingMonth, CAPS,
+  tdxRequest, tdxGet, warmBikes, SLOW_MS, tdxAccess, resetTdxToken, resetPace, resetTurns, resetMeter, spend, usage, flushUse, billingMonth, CAPS,
   parseGoogleRoutes, parseAutocomplete, nearFirst, parseNominatim, parsePlace, parseTdxRoutes, planSig, googleRouteBody, handleTransit, GOOGLE_ROUTE_FIELDS, tdxPoints, tdxGuard, onceName
 } from '../transit.js';
 
 const NOW = Date.parse('2026-10-03T01:00:00Z');
 const memKv = () => {
   const store = new Map();
-  return { store, get: async k => store.get(k) ?? null, put: async (k, v) => void store.set(k, v) };
+  const meta = new Map();
+  return {
+    store,
+    get: async k => store.get(k) ?? null,
+    getWithMetadata: async k => ({ value: store.get(k) ?? null, metadata: meta.get(k) ?? null }),
+    put: async (k, v, o) => void (store.set(k, v), meta.set(k, o?.metadata ?? null))
+  };
 };
 const memCache = () => {
   const store = new Map();
@@ -98,6 +104,42 @@ test('TDX answers are shared: fresh from the cache, stale while refreshing, the 
   assert.equal(JSON.parse(d.body).code, 'TDX_BUSY');
   const e = await tdxGet(env, path, { fetchFn, cache, now: NOW + 70_000 + 5 * 60_000 });
   assert.equal(e.status, 200);
+});
+
+test('YouBike is kept warm in KV: another colo answers at once from it while TDX hangs, and the cron refreshes the cities asked lately', async () => {
+  fresh();
+  const env = { TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 'secret', RATE_LIMIT_KV: memKv(), TDX_PER_MIN: '240' };
+  let n = 0;
+  let hang = false;
+  const fetchFn = async url => {
+    if (url.includes('token')) return json({ access_token: 'T', expires_in: 86400 });
+    n++;
+    if (hang) await new Promise(r => setTimeout(r, SLOW_MS + 1500));
+    return json([{ StationUID: 'KHH1', AvailableRentBikes: n }]);
+  };
+  const path = 'basic/v2/Bike/Availability/City/Kaohsiung';
+  const waits = [];
+  const ctx = { waitUntil: p => waits.push(p) };
+  await tdxGet(env, path, { fetchFn, cache: memCache(), now: NOW, ctx });
+  for (let i = 0; i < 3; i++) await Promise.all(waits);
+  // Another colo (an empty cache), TDX hanging: KV's copy at once.
+  hang = true;
+  const t0 = Date.now();
+  const other = await tdxGet(env, path, { fetchFn, cache: memCache(), now: NOW + 20_000, ctx });
+  assert.ok(Date.now() - t0 < 500, 'not waiting on TDX');
+  assert.equal(other.state, 'hit');
+  assert.equal(JSON.parse(other.body)[0].AvailableRentBikes, 1);
+  // Two minutes on, the cron: Kaohsiung was asked, so its counts are asked again and kept.
+  hang = false;
+  for (let i = 0; i < 3; i++) await Promise.all(waits);
+  const warmed = await warmBikes(env, { fetchFn, cache: memCache(), now: NOW + 2 * 60_000 });
+  assert.deepEqual(warmed, { 'Availability/City/Kaohsiung': 'miss' });
+  hang = true;
+  const third = await tdxGet(env, path, { fetchFn, cache: memCache(), now: NOW + 2 * 60_000 + 5000, ctx });
+  assert.equal(third.state, 'hit');
+  assert.ok(JSON.parse(third.body)[0].AvailableRentBikes > 1, 'the cron’s copy');
+  // Not asked for half an hour: no longer kept warm.
+  assert.deepEqual(await warmBikes(env, { fetchFn, cache: memCache(), now: NOW + 40 * 60_000 }), {});
 });
 
 test('TDX slow past a copy’s stale time: that copy after SLOW_MS (its age said), TDX’s answer kept for the next ask', async () => {
