@@ -182,6 +182,8 @@ async function cpblFresh(games, now, fetchJson) {
 // day). Clubs as the proxy names them (asia-baseball.js).
 export const TSDB_DAY = 'https://www.thesportsdb.com/api/v1/json/123/eventsday.php';
 export const TSDB_CPBL = '5111';
+// A CPBL day list's address, exactly (the relay's door for it, gemini-relay.js).
+export const tsdbCpblDay = url => typeof url === 'string' && url.startsWith(`${TSDB_DAY}?d=`) && new RegExp(`^\\?d=\\d{4}-\\d{2}-\\d{2}&l=${TSDB_CPBL}$`).test(url.slice(TSDB_DAY.length));
 export const CPBL_CLUBS = [
   ['CTBC Brothers', '中信兄弟'],
   ['Uni-President Lions', '統一7-ELEVEn獅'],

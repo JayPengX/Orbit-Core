@@ -361,8 +361,12 @@ export async function runCheck(check, lang, env) {
   }
   if (check.tsdb) {
     // (Kept at the edge a minute: every phone waiting on the day asks once a run.)
-    const res = await fetch(`${TSDB_DAY}?d=${check.day}&l=${TSDB_CPBL}`, { signal: AbortSignal.timeout(UPSTREAM_MS), cf: { cacheTtl: 60, cacheEverything: true } });
-    if (!res.ok) return null;
+    // (Its free key turns the proxy's shared addresses away, 429, most of the
+    // time: then from the relay, a Worker of its own pinned to Taiwan.)
+    const url = `${TSDB_DAY}?d=${check.day}&l=${TSDB_CPBL}`;
+    let res = await fetch(url, { signal: AbortSignal.timeout(UPSTREAM_MS), cf: { cacheTtl: 60, cacheEverything: true } }).catch(() => null);
+    if (!res?.ok && env?.GEMINI_RELAY) res = await env.GEMINI_RELAY.fetch(`https://gemini-relay/?to=${encodeURIComponent(url)}`, { signal: AbortSignal.timeout(UPSTREAM_MS) }).catch(() => null);
+    if (!res?.ok) return null;
     const e = (await res.json())?.events?.find(x => String(x.idEvent) === check.tsdb);
     const status = String(e?.strStatus || '').toUpperCase();
     const T = (zh, en) => (lang === 'en' ? en : zh);

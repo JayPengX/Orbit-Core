@@ -445,3 +445,19 @@ test("a CPBL game's final from TheSportsDB's day list (ESPN doesn't carry CPBL),
   }
   assert.ok(urls.every(u => u.includes('eventsday.php?d=2026-10-21&l=5111')));
 });
+
+test("a CPBL final when TheSportsDB turns the proxy away (429): asked again through the Taiwan relay", async () => {
+  const check = { tsdb: '2618131', day: '2026-10-21', names: ['味全龍', '中信兄弟'] };
+  const real = globalThis.fetch;
+  globalThis.fetch = async () => new Response('', { status: 429 });
+  const via = [];
+  const env = { GEMINI_RELAY: { fetch: async url => (via.push(String(url)), new Response(JSON.stringify({ events: [{ idEvent: '2618131', strStatus: 'FT', intHomeScore: '5', intAwayScore: '4' }] }), { status: 200 })) } };
+  try {
+    assert.equal((await runCheck(check, 'zh', env)).title, '味全龍 4 : 5 中信兄弟');
+    assert.equal(await runCheck(check, 'zh', {}), null);
+  } finally {
+    globalThis.fetch = real;
+  }
+  assert.equal(via.length, 1);
+  assert.ok(via[0].startsWith('https://gemini-relay/?to=' + encodeURIComponent('https://www.thesportsdb.com/api/v1/json/123/eventsday.php?d=2026-10-21&l=5111')));
+});

@@ -7,16 +7,20 @@
 // Hong Kong, where a caller's colo can be (wrangler.toml's history). No
 // address of its own: only the proxy reaches it. Also the county 法規 rule
 // pages that serve only Taiwan (law-hosts.js), for /law-page's build key;
-// and 人事行政總處's 停班停課 page (typhoon.js), for Orbit Weather.
+// and 人事行政總處's 停班停課 page (typhoon.js), for Orbit Weather. And
+// TheSportsDB's CPBL day list for a game's final (push.js): its free key
+// answers the proxy's shared addresses with 429 most of the time, so a
+// second way out.
 import { twOnly } from './law-hosts.js';
 import { DGPA_NDS } from './typhoon.js';
+import { tsdbCpblDay } from './kit/catalog.mjs';
 
 const GEMINI = 'https://generativelanguage.googleapis.com/';
 
 export default {
   async fetch(request) {
     const to = new URL(request.url).searchParams.get('to') || '';
-    if ((twOnly(to) || to === DGPA_NDS) && request.method === 'GET') {
+    if ((twOnly(to) || to === DGPA_NDS || tsdbCpblDay(to)) && request.method === 'GET') {
       const pick = ['User-Agent', 'Accept', 'Accept-Language'].filter(h => request.headers.get(h)).map(h => [h, request.headers.get(h)]);
       return fetch(to, { headers: Object.fromEntries(pick), redirect: 'manual' });
     }
