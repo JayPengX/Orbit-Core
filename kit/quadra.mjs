@@ -2976,10 +2976,12 @@ async function kitLatest() {
 }
 
 // Whether the app may lift its loading screen: once boot.js's first update
-// check has answered (at most `max` ms: it gives up on version.json at 6 s),
-// true; false when that check is reloading the page onto a newer deploy (the
-// app then shows nothing, so a person never sees the old screen swapped out).
-export async function updateChecked(max = 7_000) {
+// check has answered, true; false when that check is reloading the page onto
+// a newer deploy (the app then shows nothing, so a person never sees the old
+// screen swapped out). Waited for 0.8 s at most: version.json is a round
+// trip on every opening (1-2 s on a phone's link, up to 7 s on a bad one,
+// with the kept app ready long before); one later than that is the watch's.
+export async function updateChecked(max = 800) {
   const boot = globalThis.__bootCheck;
   if (!boot?.then) return true;
   const r = await Promise.race([boot.catch(() => 'watch'), new Promise(done => setTimeout(() => done('late'), max))]);
