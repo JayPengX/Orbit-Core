@@ -718,6 +718,9 @@ test('政府: Play’s sports tax counts only slips still in the wallet, never o
   // Slip b is gone from the account: its tax goes with it.
   const w = { entries, snap: { odds: { gov: { sports: 20_453, lottery: 0, slips: { a: 11_990, b: 2_279, x: 6_184 } } } } };
   assert.equal(kit.govOf(w).paid.sports, 11_990);
+  // Nor a back charge taken back (eco:untax-<slip>).
+  const untaxed = [...entries, { id: 'eco:untax-a', t, app: 'eco', kind: 'untax', amount: 0 }];
+  assert.equal(kit.govOf({ ...w, entries: untaxed }).paid.sports, 0);
   // An older Play (the total alone) is taken at its word.
   assert.equal(kit.govOf({ entries, snap: { odds: { gov: { sports: 14_269 } } } }).paid.sports, 14_269);
   // A stake folded into a month's total after 400 days still counts.
