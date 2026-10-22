@@ -1209,6 +1209,102 @@ button,
   }
 }
 
+/* ---- The dock (<html class="q-dock">): the tabs as one bar along the
+   screen's foot instead of a capsule floating over the page, and the
+   accessory (Play's slip) a row joined to its top edge, so nothing hovers
+   over content: the page ends where the dock begins. Its surface is the
+   page's own colour, never white in dark ---- */
+:root.q-dock {
+  --q-dock-bg: var(--q-page);
+  --q-dock-safe: max(env(safe-area-inset-bottom), var(--q-safe-bottom, 0px));
+}
+@media (max-width: 720px) {
+  :root.q-dock {
+    --q-bar-gap: 0px;
+    --q-nav: calc(52px + var(--q-dock-safe));
+  }
+  :root.q-dock .q-tabbar.q-tabbar {
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    padding: 0 max(8px, env(safe-area-inset-right)) var(--q-dock-safe) max(8px, env(safe-area-inset-left));
+    border-radius: 0;
+    background: var(--q-dock-bg);
+    box-shadow: inset 0 var(--q-hairline) 0 var(--q-sep);
+    transform: none;
+  }
+}
+:root.q-touch.q-dock {
+  --q-bar-gap: 0px;
+  --q-nav: calc(52px + var(--q-dock-safe));
+}
+:root.q-touch.q-dock .q-tabbar.q-tabbar {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: auto;
+  padding: 0 max(8px, env(safe-area-inset-right), calc((100vw - var(--q-tabs, 4) * 120px) / 2)) var(--q-dock-safe) max(8px, env(safe-area-inset-left), calc((100vw - var(--q-tabs, 4) * 120px) / 2));
+  border-radius: 0;
+  background: var(--q-dock-bg);
+  box-shadow: inset 0 var(--q-hairline) 0 var(--q-sep);
+  transform: none;
+}
+:root.q-dock .q-tabbar.q-tabbar::before,
+:root.q-dock .q-tabbar.q-tabbar::after {
+  display: none;
+}
+/* (Always its labels: the dock never shrinks while the page scrolls.) */
+:root.q-dock .q-tabbar.q-tabbar .q-tab {
+  min-height: 52px;
+  padding: 6px 2px 5px;
+}
+:root.q-dock .q-tabbar.q-tabbar .q-tab-label {
+  height: auto;
+  opacity: 1;
+}
+:root.q-dock .q-tabbar.q-tabbar .q-tab svg {
+  width: 24px;
+  height: 24px;
+}
+:root.q-dock .q-accessory {
+  left: 0;
+  bottom: var(--q-nav);
+  width: auto;
+  right: 0;
+  min-height: 0;
+  padding: 8px max(16px, env(safe-area-inset-right), calc((100vw - var(--q-tabs, 4) * 120px) / 2)) 8px max(16px, env(safe-area-inset-left), calc((100vw - var(--q-tabs, 4) * 120px) / 2));
+  border-radius: 0;
+  background: var(--q-dock-bg);
+  box-shadow: inset 0 var(--q-hairline) 0 var(--q-sep);
+  transform: none;
+  animation: q-dock-in var(--q-dur-smooth) var(--q-spring-smooth);
+}
+:root.q-dock .q-accessory:is(:active, [data-q-press]) {
+  transform: none;
+  background: color-mix(in srgb, var(--q-fill-3) 60%, var(--q-dock-bg));
+}
+@keyframes q-dock-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+/* (On a wide screen without the bottom tabs, the accessory stays a card.) */
+@media (min-width: 721px) {
+  :root.q-dock:not(.q-touch) .q-accessory,
+  :root.q-dock:not(.q-touch) .q-accessory:is(:active, [data-q-press]) {
+    left: 50%;
+    bottom: 18px;
+    right: auto;
+    width: min(calc(100vw - 32px), 560px);
+    border-radius: 28px;
+    background: var(--q-glass);
+    box-shadow: var(--q-glass-rim), var(--q-glass-drop);
+    transform: translateX(-50%);
+  }
+}
+
 /* ---- Sheets: up from the foot on a spring, floating inside the screen's
    edges with its deep corners, a grabber, a centred title between glass
    circles; dragged down to close (quadra.mjs sheetSwipe) ---- */
