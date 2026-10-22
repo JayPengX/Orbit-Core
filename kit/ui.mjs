@@ -62,7 +62,7 @@ export function tick() {
 //   cls(day): more classes for a chip (month-start unless given);
 //   clamp(day): the day 📅's date becomes (unless given: the first shown
 //   on or after it, else the last); bounds {from, to}: 📅's limits (the
-//   days' ends unless given); follow: every new day to the middle, a tapped
+//   days' ends unless given; null: none); follow: every new day to the middle, a tapped
 //   one too; pickLabel: 📅's name; lang: 'zh' | 'en' (the page's).
 // Returns the strip (.q-day-strip-wrap) to put in the bar.
 const dayLang = lang => lang || (/^en/i.test(globalThis.document?.documentElement?.lang || '') ? 'en' : 'zh');
@@ -104,12 +104,12 @@ export function dayBar(s, { flat = false, ...opts } = {}) {
   return s.bar;
 }
 const CAL_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16.5" rx="3"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/><path d="M7.5 13.5h2M11 13.5h2M14.5 13.5h2M7.5 17h2M11 17h2"/></svg>';
-export function dayStrip(s, { days = [], current = null, onPick = () => {}, label = null, sub = null, today = dayToday(), cls = null, clamp = null, bounds = null, follow = false, pickLabel = '', lang } = {}) {
+export function dayStrip(s, { days = [], current = null, onPick = () => {}, label = null, sub = null, today = dayToday(), cls = null, clamp = null, bounds, follow = false, pickLabel = '', lang } = {}) {
   label ??= d => dayTop(d, { today, lang });
   sub ??= d => dayNum(d, { today });
   cls ??= d => (d.endsWith('-01') ? 'month-start' : '');
   clamp ??= v => days.find(d => d >= v) ?? days.at(-1) ?? v;
-  bounds ??= days.length ? { from: days[0], to: days.at(-1) } : null;
+  if (bounds === undefined) bounds = days.length ? { from: days[0], to: days.at(-1) } : null;
   pickLabel ||= dayLang(lang) === 'zh' ? '選擇日期' : 'Pick a date';
   if (!s.row) {
     s.row = h('div', { class: 'q-chips q-day-strip day-strip' });
