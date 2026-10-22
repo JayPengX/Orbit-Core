@@ -278,10 +278,9 @@ function hockeyMarket() {
 function setSportMarket(label, type, outs, sideOf, flip, family, kHome, kAway) {
   if (/^Total (Games|Points)$/.test(label) && type === 'Over/Under') return overUnder('gametotal', outs, { family });
   if (/^(Game|Point) Handicap$/.test(label) && /Handicap/.test(type)) return handicap('gamehcap', outs, sideOf, family, kHome, kAway);
-  // (Esports' sets are its maps: Map Handicap, Correct Map Score, Map 1.)
-  if (/^(Set|Map) Handicap$/.test(label) && /Handicap/.test(type)) return handicap('sethcap', outs, sideOf, family, kHome, kAway);
-  if (/^(Set Betting|Correct Score|Correct Map Score)$/.test(label) && type === 'Correct Score') return correctScore('setscore', outs, flip);
-  if (/^(Set|Map) 1$/.test(label) && type === 'Match') return threeWay('set1', 'set1', outs, sideOf);
+  if (label === 'Set Handicap' && /Handicap/.test(type)) return handicap('sethcap', outs, sideOf, family, kHome, kAway);
+  if ((label === 'Set Betting' || label === 'Correct Score') && type === 'Correct Score') return correctScore('setscore', outs, flip);
+  if (label === 'Set 1' && type === 'Match') return threeWay('set1', 'set1', outs, sideOf);
   return null;
 }
 

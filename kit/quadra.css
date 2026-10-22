@@ -3933,11 +3933,6 @@ div.q-ritem {
   font: 700 calc(var(--s, 40px) * 0.42) / 1 var(--q-font);
   box-shadow: none;
 }
-/* No picture at all (kind none): its place kept, nothing drawn. */
-.q-logo.none {
-  background: transparent;
-  box-shadow: none;
-}
 /* (No picture: its kind's own, never a letter: ui.mjs logoMark.) */
 .q-logo.text svg {
   width: 54%;
