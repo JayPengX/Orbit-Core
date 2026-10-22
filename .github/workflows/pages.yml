@@ -55,7 +55,12 @@ jobs:
     if: needs.queue.outputs.go == 'true'
     runs-on: ubuntu-latest
     steps:
+      # main as it is now, never the commit that started the run: GitHub can
+      # deliver a push late (hours, out of order), and an old tree deployed
+      # after a newer one would take the live app back.
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -65,7 +70,7 @@ jobs:
         run: |
           mkdir -p _site
           if [ -d site ]; then cp -r site/. _site/; fi
-          node kit/stamp.mjs _site ${{ github.sha }}
+          node kit/stamp.mjs _site "$(git rev-parse HEAD)"
       - uses: actions/configure-pages@v5
         with:
           # Turns Pages on (Source: GitHub Actions) the first time, if the
