@@ -10,7 +10,7 @@ import { APPS, AVATARS, FRAMES, VIP, money, vipStatus, vipName, worthOf, WEALTH_
 import { PLAY, STOCK, houseKeep, roundTrip, scratchBacks, record, overdraftYear, vipShare } from './truth.mjs';
 import { LOAN, RELIEF, PAY_WEEK, schedule, totalApr, debtOf } from './loan.mjs';
 import { HELP_ORDER, helpFor } from './help.mjs';
-import { sheet } from './ui.mjs';
+import { sheet, section } from './ui.mjs';
 
 export const STRINGS = {
   zh: {
@@ -372,7 +372,6 @@ const TABS = ['pass', 'looks', 'truth', 'apps', 'help'];
 
 const el = node;
 const put = (box, ...kids) => box.replaceChildren(...kids.filter(k => k != null && k !== false));
-const section = (title, content, { sub = '', action = null } = {}) => el('section', { class: 'q-section' }, [el('div', { class: 'q-section-head' }, [el('h2', { text: title }), action]), sub ? el('p', { class: 'section-sub', text: sub }) : null, content]);
 const bar = (value, max, cls = '') => el('div', { class: `meter ${cls}` }, [el('i', { style: `width:${Math.min(100, max ? (value / max) * 100 : 0)}%` })]);
 let toastBox = null;
 function toast(text, kind = '') {

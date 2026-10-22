@@ -303,6 +303,36 @@ export function segmented(items, { value = items[0]?.id, onChange = () => {}, bi
   });
 }
 
+// The same control for a view that draws itself again on each pick:
+//   pickSeg([[id, label, count?] | { id, label, count }…], current, onPick, { cls, chips, seg, label })
+// A few (four, or up to seven with `seg`) are the capsule, its thumb sliding
+// from the last pick (remembered per cls, else per set of ids); more, or
+// `chips`, are the chips row that scrolls. Buttons are aria-pressed, and a
+// tap on the one already on does nothing.
+const lastPicks = new Map();
+export function pickSeg(options, current, onPick, { cls = '', chips = false, seg = false, label = '' } = {}) {
+  const list = options.map(o => (Array.isArray(o) ? { id: o[0], label: o[1], count: o[2] } : o));
+  const few = !chips && (list.length <= 4 || (seg && list.length <= 7));
+  const attrs = { class: `${few ? 'q-seg' : 'q-chips'} ${cls}`.trim(), role: 'group', ...(label ? { 'aria-label': label } : {}) };
+  const buttons = list.map(o =>
+    h('button', { type: 'button', ...(few ? {} : { class: 'q-chip' }), 'aria-pressed': String(o.id === current), onclick: () => o.id !== current && onPick(o.id) }, [o.label, segBadge(o.count)])
+  );
+  if (!few) return h('div', attrs, buttons);
+  const key = cls || list.map(o => o.id).join('|');
+  const at = id => Math.max(0, list.findIndex(o => o.id === id));
+  const from = lastPicks.has(key) ? lastPicks.get(key) : current;
+  lastPicks.set(key, current);
+  const to = String(at(current));
+  const root = h('div', { ...attrs, style: `--q-seg-n:${list.length};--q-seg-i:${at(from)}`, 'data-to': to }, buttons);
+  // (Not in the page yet: no slide, straight to the pick.)
+  queueMicrotask(() => {
+    if (root.isConnected) return settleSegs(root.parentNode);
+    root.style.setProperty('--q-seg-i', to);
+    root.removeAttribute('data-to');
+  });
+  return root;
+}
+
 // ---- Sheet ----
 // THE sheet (the Pass is this too): a dialog from the foot,
 //   sheet({ title, body, onClose, cls, lead, trailing, detent, foot, closeLabel, label })
@@ -539,10 +569,11 @@ export function toggle({ checked = false, onChange = () => {}, label = '' } = {}
 // of body, one button: `action` is { label, onTap | href, data } (a .q-btn.primary;
 // `data`: data-* attributes for a tap wired by delegation) or a node the app made.
 // (No icon given: the list's own, so an empty state is never a bare sentence.)
-export function empty({ icon = 'list', tint = '', title = '', body = '', action = null } = {}) {
+// cls: the app's own class beside .q-empty.
+export function empty({ icon = 'list', tint = '', title = '', body = '', action = null, cls = '' } = {}) {
   const mark = !icon ? null : isIcon(icon) ? tinted(h('span', { class: 'q-tile q-empty-tile', 'aria-hidden': 'true', html: icons[icon] }), tint || 'var(--q-accent)') : h('span', { class: 'q-empty-icon', 'aria-hidden': 'true', text: icon });
   const button = action && !(action instanceof Node) ? h(action.href ? 'a' : 'button', { class: 'q-btn primary', ...(action.href ? { href: action.href } : { type: 'button', onclick: action.onTap }), ...dataProps(action.data), text: action.label || '' }) : action;
-  return h('div', { class: 'q-empty' }, [mark, title ? h('strong', { text: title }) : null, body ? h('p', { text: body }) : null, button]);
+  return h('div', { class: cls ? `q-empty ${cls}` : 'q-empty' }, [mark, title ? h('strong', { text: title }) : null, body ? h('p', { text: body }) : null, button]);
 }
 
 // ---- A large title that collapses into the bar (iOS's navigation title) ----
@@ -823,13 +854,14 @@ export function view(change) {
 
 // A segmented control drawn as HTML (an app that redraws a card whole):
 // its thumb starts where it was (`from`) and slides to the choice the next
-// frame. segHtml([[id, label, count?]…], on, { from, attr: id => attrs }) and,
+// frame. segHtml([[id, label, count?]…], on, { from, attr: id => attrs, cls, pressed }) and,
 // after the HTML is in the page, settleSegs(). A third entry is the count
 // badge, as segmented's `count`.
-export function segHtml(list, on, { from = on, attr = () => '', esc = s => String(s).replace(/[&<>"]/g, c => `&#${c.charCodeAt(0)};`) } = {}) {
+export function segHtml(list, on, { from = on, attr = () => '', cls = '', pressed = false, esc = s => String(s).replace(/[&<>"]/g, c => `&#${c.charCodeAt(0)};`) } = {}) {
   const i = Math.max(0, list.findIndex(([k]) => k === on));
   const j = Math.max(0, list.findIndex(([k]) => k === from));
-  return `<div class="q-seg" role="tablist" style="--q-seg-n:${list.length};--q-seg-i:${j}" data-to="${i}">${list.map(([k, name, count]) => `<button type="button" role="tab" aria-selected="${k === on}" ${attr(k)}>${esc(name)}${segCount(count) ? `<span class="q-seg-count">${segCount(count)}</span>` : ''}</button>`).join('')}</div>`;
+  const pick = k => (pressed ? `aria-pressed="${k === on}"` : `role="tab" aria-selected="${k === on}"`);
+  return `<div class="${cls ? `q-seg ${cls}` : 'q-seg'}" role="${pressed ? 'group' : 'tablist'}" style="--q-seg-n:${list.length};--q-seg-i:${j}" data-to="${i}">${list.map(([k, name, count]) => `<button type="button" ${pick(k)} ${attr(k)}>${esc(name)}${segCount(count) ? `<span class="q-seg-count">${segCount(count)}</span>` : ''}</button>`).join('')}</div>`;
 }
 export function settleSegs(root = document) {
   // Each one's target read now: two calls in one redraw (an app settling
@@ -882,10 +914,10 @@ const tagObjHtml = t => {
 export function tagHtml(text, tone = '', color = '') {
   return tagObjHtml({ text, tone: color ? `${tone} tint` : tone, color });
 }
-export function emptyHtml({ icon = 'list', tint = '', title = '', body = '', action = null } = {}) {
+export function emptyHtml({ icon = 'list', tint = '', title = '', body = '', action = null, cls = '' } = {}) {
   const mark = !icon ? '' : isIcon(icon) ? `<span class="q-tile q-empty-tile" aria-hidden="true"${styleOf(['--t', tint || 'var(--q-accent)'])}>${icons[icon]}</span>` : `<span class="q-empty-icon" aria-hidden="true">${E(icon)}</span>`;
   const button = !action ? '' : typeof action === 'string' ? action : action.href ? `<a class="q-btn primary" href="${E(action.href)}"${dataOf(action.data)}>${E(action.label)}</a>` : `<button class="q-btn primary" type="button"${dataOf({ tap: action.tap, ...action.data })}>${E(action.label)}</button>`;
-  return `<div class="q-empty">${mark}${title ? `<strong>${E(title)}</strong>` : ''}${body ? `<p>${E(body)}</p>` : ''}${button}</div>`;
+  return `<div class="${clsOf('q-empty', cls)}">${mark}${title ? `<strong>${E(title)}</strong>` : ''}${body ? `<p>${E(body)}</p>` : ''}${button}</div>`;
 }
 // navTitleHtml(title), then wireNavTitles(root, { scroller }) once it's in the page.
 export function navTitleHtml(title = '') {
@@ -919,10 +951,10 @@ export function statsHtml(items) {
     })
     .join('')}</div>`;
 }
-// sectionHtml(title, bodyHtml, { more, moreHref, moreTap })
-export function sectionHtml(title, bodyHtml, { more = '', moreHref = '', moreTap = null } = {}) {
+// sectionHtml(title, bodyHtml, { more, moreHref, moreTap, cls })
+export function sectionHtml(title, bodyHtml, { more = '', moreHref = '', moreTap = null, cls = '' } = {}) {
   const link = !more ? '' : moreHref ? `<a href="${E(moreHref)}">${E(more)}</a>` : `<button type="button"${dataOf({ more: moreTap })}>${E(more)}</button>`;
-  return `<section class="q-section"><div class="q-section-head"><h2>${E(title)}</h2>${link}</div>${joinHtml(bodyHtml)}</section>`;
+  return `<section class="${clsOf('q-section', cls)}"><div class="q-section-head"><h2>${E(title)}</h2>${link}</div>${joinHtml(bodyHtml)}</section>`;
 }
 export function sectionHeadHtml(title, { more = '', moreTap = null, moreHref = '', count = null, data = null } = {}) {
   const chev = `<span style="display:contents">${icons.chevron}</span>`;
@@ -1099,9 +1131,14 @@ export function stats(items) {
   return s;
 }
 // A section: a title, an optional link on its right, and its body.
-export function section(title, body, { more = '', moreHref = '', onMore = null } = {}) {
-  const head = h('div', { class: 'q-section-head' }, [h('h2', { text: title }), more ? h(moreHref ? 'a' : 'button', { ...(moreHref ? { href: moreHref } : { type: 'button', onclick: onMore }), text: more }) : null]);
-  return h('section', { class: 'q-section' }, [head, ...[].concat(body)]);
+// shd: the 20px head of sectionHead() (with its count and chevron link);
+// action: a node put at the head's end; sub: a line under the head.
+export function section(title, body, { more = '', moreHref = '', onMore = null, cls = '', sub = '', action = null, shd = false, count = null } = {}) {
+  const head = shd
+    ? sectionHead(title, { more, moreHref, onMore, count })
+    : h('div', { class: 'q-section-head' }, [h('h2', { text: title }), more ? h(moreHref ? 'a' : 'button', { ...(moreHref ? { href: moreHref } : { type: 'button', onclick: onMore }), text: more }) : null]);
+  if (action) head.append(action);
+  return h('section', { class: cls ? `q-section ${cls}` : 'q-section' }, [head, sub ? h('p', { class: 'section-sub', text: sub }) : null, ...[].concat(body)]);
 }
 
 // ---- More components (quadra.css "Premium components (round 3)") ----
