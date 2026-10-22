@@ -97,30 +97,37 @@ export const CATALOG = {
   // games 運彩 lists, League of Legends and Counter-Strike, their top events
   // (Worlds, MSI, the major leagues; the Majors, IEM, BLAST, PGL, ESL).
   tennis: kambiSport('tennis', 'tennis', '網球', 'Tennis', /^tennis\/(atp|wta|grand_slam|australian_open|french_open|wimbledon|us_open|davis_cup|billie_jean|united_cup|olympic|laver_cup|hopman)/),
-  volleyball: kambiSport('volleyball', 'volleyball', '排球', 'Volleyball'),
-  badminton: kambiSport('badminton', 'badminton', '羽球', 'Badminton'),
+  volleyball: kambiSport('volleyball', 'volleyball', '排球', 'Volleyball', null),
+  badminton: kambiSport('badminton', 'badminton', '羽球', 'Badminton', null),
   tabletennis: kambiSport('tabletennis', 'table_tennis', '桌球', 'Table tennis', /^table_tennis\/(wtt|ittf|world|olympic)/),
   esports: kambiSport('esports', 'esports', '電子競技', 'Esports', /^esports\/(league_of_legends\/(world_championship|msi|mid_season|lck|lpl|lec|lcs|lta|lcp|pcs)|cs2\/(major|iem|blast|pgl|esl))/),
   // The sports 運彩 sells the winner of (不讓分; futsal its 大小 too), from
   // Kambi, settled on the last score Kambi had (settle.mjs SCORE_SPORTS).
   // Handball and futsal can end level: three ways, as soccer (Kambi's rugby
   // winner is two ways, a draw void).
-  snooker: kambiSport('snooker', 'snooker', '撞球', 'Snooker'),
-  darts: kambiSport('darts', 'darts', '飛鏢', 'Darts'),
-  handball: kambiSport('handball', 'handball', '手球', 'Handball'),
+  snooker: kambiSport('snooker', 'snooker', '撞球', 'Snooker', null),
+  darts: kambiSport('darts', 'darts', '飛鏢', 'Darts', null),
+  handball: kambiSport('handball', 'handball', '手球', 'Handball', null),
   rugbyunion: kambiSport('rugby', 'rugby_union', '聯合式橄欖球', 'Rugby union', null, 'rugbyunion'),
   rugbyleague: kambiSport('rugby', 'rugby_league', '聯盟式橄欖球', 'Rugby league', null, 'rugbyleague'),
-  futsal: kambiSport('futsal', 'futsal', '五人制足球', 'Futsal'),
+  futsal: kambiSport('futsal', 'futsal', '五人制足球', 'Futsal', null),
   // 綜合格鬥: UFC's cards, Kambi's prices (勝負, a draw void), each bout's
   // winner from ESPN's card (settle.mjs boutResult). Kambi lists UFC only.
   ufc: { ...kambiSport('mma', 'ufc_mma', 'UFC', 'UFC', /^ufc_mma\/ufc/, 'ufc'), results: 'mma/ufc/scoreboard' },
   // 板球: the one-day and T20 internationals (men's and women's) and the big
   // T20 leagues, Kambi's 勝負 (a tie or no result void; Tests, which can be
   // drawn, aren't sold), the winner from ESPN's scorepanel.
-  cricket: { ...kambiSport('cricket', 'cricket', '板球', 'Cricket', /^cricket\/(international_(one_day|twenty20)|indian_premier_league|t20_big_bash(\/|$)|sa20|the_hundred|pakistan_super_league|caribbean_premier_league)/), results: 'cricket/scorepanel' },
+  // (Internationals only: each side a country, its flag; a franchise club has no logo to show.)
+  cricket: { ...kambiSport('cricket', 'cricket', '板球', 'Cricket', /^cricket\/international_(one_day|twenty20)/), results: 'cricket/scorepanel' },
   // Racing
   f1: { sport: 'racing', kind: 'field', data: 'espn', espn: 'racing/f1', zh: 'F1 一級方程式', en: 'Formula 1', bet: 'f1', top: true, standings: true }
 };
+
+// Off Play's board (2026-10-22, Jay: "no logo… text wrap… I don't even know
+// what that is"): sides with no logo, photo or flag to show beside the name.
+// Kept in the catalogue for Orbit Slips (a real ticket's picks) and for
+// settling Play's slips already bought.
+for (const key of ['volleyball', 'badminton', 'tabletennis', 'esports', 'snooker', 'darts', 'handball', 'rugbyunion', 'rugbyleague', 'futsal']) CATALOG[key].noPlay = true;
 
 // The sports besides soccer whose winner is three ways (a level score its
 // own outcome, 和): handball and futsal.
