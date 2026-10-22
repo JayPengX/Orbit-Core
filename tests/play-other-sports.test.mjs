@@ -89,12 +89,12 @@ test('UFC: Kambi prices, the winner from ESPN card, a draw void', async () => {
   assert.equal(gone.get('l1').status, 'void');
 });
 
-test('cricket: one-day and T20 internationals and the big leagues, the winner from ESPN, a draw or no result void', async () => {
+test('cricket: one-day and T20 internationals only, the winner from ESPN, a draw or no result void', async () => {
   const { CATALOG } = await import('../kit/catalog.mjs');
   const { winnerResult, readOutcomes } = await import('../kit/settle.mjs');
   const only = CATALOG.cricket.only;
-  for (const p of ['cricket/international_one_day/matches', 'cricket/international_twenty20__w_/matches', 'cricket/indian_premier_league', 'cricket/t20_big_bash']) assert.ok(only.test(p), p);
-  for (const p of ['cricket/international_test_cricket/matches', 'cricket/south_africa/pro20_cup', 'cricket/t20_womens_big_bash']) assert.ok(!only.test(p), p);
+  for (const p of ['cricket/international_one_day/matches', 'cricket/international_twenty20__w_/matches']) assert.ok(only.test(p), p);
+  for (const p of ['cricket/international_test_cricket/matches', 'cricket/south_africa/pro20_cup', 'cricket/t20_womens_big_bash', 'cricket/indian_premier_league', 'cricket/t20_big_bash']) assert.ok(!only.test(p), p);
   const panel = (x, y, wx, wy, state = 'post', date = '2026-10-22T08:00Z') => ({ scores: [{ events: [{ date, competitions: [{ status: { type: { state } }, competitors: [{ team: { displayName: x }, winner: wx }, { team: { displayName: y }, winner: wy }] }] }] }] });
   assert.deepEqual(winnerResult(panel('Sri Lanka', 'England', 'false', 'true'), 'Sri Lanka', 'England', '2026-10-22T08:00:00Z'), { status: 'final', homeScore: 0, awayScore: 1 });
   assert.deepEqual(winnerResult(panel('Sri Lanka', 'England', 'false', 'false'), 'Sri Lanka', 'England', '2026-10-22T08:00:00Z'), { status: 'void' });
@@ -150,4 +150,13 @@ test("the translator's second endpoint (client=gtx) answer read as one text", as
   const { gtxText } = await import('../sports.js');
   assert.equal(gtxText(JSON.stringify([[['納克羅斯拉勒；', 'Knack Roeselare; ', null], ['軸吉貝爾坦', 'Axis Guibertin', null]], null, 'en'])), '納克羅斯拉勒；軸吉貝爾坦');
   assert.equal(gtxText('nope'), '');
+});
+
+test('Play sells a person against a person only with both their flags: no blank, no doubles pair', async () => {
+  const { espnFlags } = await import('../kit/play-sources.mjs');
+  const flags = espnFlags({ events: [{ groupings: [{ competitions: [{ competitors: [{ athlete: { displayName: 'Rinko Matsuda', flag: { href: 'jpn.png', alt: 'Japan' } } }, { athlete: { displayName: 'Mary Stoiana', flag: { href: 'usa.png' } } }] }] }] }] });
+  assert.equal(flags.get('rinko matsuda'), 'Japan');
+  const { LEAGUES } = await import('../kit/play-teams.mjs');
+  for (const key of ['volleyball', 'handball', 'esports', 'snooker']) assert.equal(LEAGUES[key].noPlay, true, key);
+  assert.ok(!LEAGUES.tennis.noPlay && !LEAGUES.ufc.noPlay && !LEAGUES.cricket.noPlay);
 });

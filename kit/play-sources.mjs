@@ -7,6 +7,7 @@
 // Worker's own reads when it checks a bet's price.
 let reader = { proxyJson: () => Promise.reject(new Error('no reader')), packJson: null };
 export const useReader = r => (reader = { ...reader, ...r });
+import { countryCode } from '#kit/logos.mjs';
 import { americanToProbability, devigProportional, devigPower } from '#kit/play-odds.mjs';
 import { normalizeTeamName, teamZh, LEAGUES, familyOf, isSoccer, rememberLogo, rememberTeams, hasTeams } from '#kit/play-teams.mjs';
 import { shareLeft } from '#kit/play-live.mjs';
@@ -21,7 +22,7 @@ import { loadGamePlayers } from '#kit/play-players.mjs';
 export const PROXY_URL = 'https://orbit-workers-proxy.pengzjay.workers.dev';
 // Reading results and the parsers both the phone and the Worker's settling
 // use: the shared kit's (settle.mjs), one copy.
-import { yyyymmdd, parseJsonArray, futureTeamName, sameGame, sidesMatch, parseOpenF1Flags, parseEspnResults, parseEspnRace, parseEspnPole, parseFutureResult, teamCorners, asiaResult, kambiUnresolvable, kambiInPlay, readOutcomes, F1_FLAG_KINDS } from '#kit/settle.mjs';
+import { yyyymmdd, espnDates, parseJsonArray, futureTeamName, sameGame, sidesMatch, parseOpenF1Flags, parseEspnResults, parseEspnRace, parseEspnPole, parseFutureResult, teamCorners, asiaResult, kambiUnresolvable, kambiInPlay, readOutcomes, F1_FLAG_KINDS } from '#kit/settle.mjs';
 export { futureTeamName, parseOpenF1Flags, parseEspnResults, parseEspnRace, parseEspnPole, parseFutureResult, teamCorners, asiaResult, kambiUnresolvable, kambiInPlay, F1_FLAG_KINDS };
 const ESPN = 'https://site.api.espn.com/apis/site/v2/sports';
 const GAMMA = 'https://gamma-api.polymarket.com';
@@ -803,7 +804,7 @@ export async function loadExtraFutures(now = new Date()) {
 // the DP World Tour and the LPGA.
 export const GOLF_TOURS = { pga_tour: 'pga', the_majors: 'pga', dp_world_tour: 'eur', lpga_tour: 'lpga' };
 const KAMBI_GOLF_LIST = `${KAMBI}/listView/golf/all/all/all/competitions.json?lang=en_GB&market=GB&useCombined=true`;
-export function parseKambiGolf(list, now = new Date()) {
+export function parseKambiGolf(list, now = new Date(), flags = null) {
   const out = [];
   for (const item of list?.events || []) {
     const e = item.event;
@@ -813,9 +814,12 @@ export function parseKambiGolf(list, now = new Date()) {
     const start = Date.parse(e.start);
     if (!(start > now.getTime()) || start - now.getTime() > 7 * DAY_MS) continue;
     const offer = (item.betOffers || []).find(o => o.criterion?.englishLabel === 'Finishing Position' && o.from === 1 && o.to === 1 && !o.suspended);
-    const players = (offer?.outcomes || []).filter(o => o.odds > 1000 && o.participant && (o.status ?? 'OPEN') === 'OPEN').map(o => ({ name: o.participant, raw: 1000 / o.odds }));
+    // (Its price shares from the whole field; on the board only the golfers
+    // ESPN's field shows with a flag: never a blank beside a name.)
+    const field = (offer?.outcomes || []).filter(o => o.odds > 1000 && o.participant && (o.status ?? 'OPEN') === 'OPEN').map(o => ({ name: o.participant, raw: 1000 / o.odds }));
+    const fieldFair = devigPower(field.map(p => p.raw));
+    const players = field.map((p, i) => ({ ...p, fair: fieldFair?.[i], flag: flags ? flags.get(faceKey(p.name)) : null })).filter(p => !flags || p.flag);
     if (players.length < 20) continue;
-    const fair = devigPower(players.map(p => p.raw));
     const name = e.name.replace(/\s*\b20\d\d$/, '');
     out.push({
       key: `golf${e.id}`,
@@ -824,13 +828,15 @@ export function parseKambiGolf(list, now = new Date()) {
       season: name,
       title: name,
       startUtc: new Date(start).toISOString(),
-      teams: players.map((p, i) => ({ name: { en: p.name, zh: teamZh('golf', p.name) }, fair: fair[i], book: Math.round(100 / p.raw) / 100 })).sort((a, b) => b.fair - a.fair)
+      teams: players.map(p => ({ name: { en: p.name, zh: teamZh('golf', p.name) }, fair: p.fair, book: Math.round(100 / p.raw) / 100, ...(p.flag ? { flag: p.flag } : {}) })).sort((a, b) => b.fair - a.fair)
     });
   }
   return out;
 }
 export async function loadGolfFutures(now = new Date()) {
-  return parseKambiGolf(await getJson(KAMBI_GOLF_LIST, 'kambi-events'), now);
+  const [list, ...fields] = await Promise.all([getJson(KAMBI_GOLF_LIST, 'kambi-events'), ...[...new Set(Object.values(GOLF_TOURS))].map(t => getJson(`${ESPN}/golf/${t}/scoreboard`).catch(() => null))]);
+  const flags = fields.reduce((m, d) => espnFlags(d, m), new Map());
+  return parseKambiGolf(list, now, flags);
 }
 
 // Championship boards with only who can still win (kit/play-alive.mjs): each
@@ -1149,10 +1155,10 @@ export async function loadLive(now = new Date(), minLiquidity = 5000, { also = [
   // `only`: these leagues alone, their pages, Kambi's lists and Polymarket only for MLB: the Worker's check of a live pick.)
   const espnLeague = key => ESPN_PATH[key] && !KAMBI_LEAGUES.includes(key);
   const leagues = only ? only.filter(espnLeague) : [...new Set([...liveLeagues(now), ...also.filter(espnLeague)])];
-  const kambiLeagues = only ? KAMBI_LEAGUES.filter(key => only.includes(key)) : KAMBI_LEAGUES;
+  const kambiLeagues = only ? KAMBI_LEAGUES.filter(key => only.includes(key)) : KAMBI_LEAGUES.filter(key => !LEAGUES[key].noPlay);
   const [espn, kambi, books] = await Promise.all([
     Promise.all(leagues.map(key => liveEspnPages(key, now).then(pages => (pages.forEach(d => notePregame(d, key)), dedupe(pages.flatMap(d => parseEspnLive(d, key))))).catch(() => []))),
-    Promise.all(kambiLeagues.map(key => getJson(kambiUrl(LEAGUES[key].kambi, 'in-play'), 'kambi-events').then(d => parseKambiInPlay(d, key)).catch(() => []))),
+    Promise.all(kambiLeagues.map(key => getJson(kambiUrl(LEAGUES[key].kambi, 'in-play'), 'kambi-events').then(d => withFlags(key, parseKambiInPlay(d, key))).catch(() => []))),
     // Kambi's live prices of the ESPN leagues on now.
     Promise.all(leagues.filter(key => LEAGUES[key]?.book).map(key => getJson(kambiUrl(LEAGUES[key].book, 'in-play'), 'kambi-events').then(d => parseKambiInPlay(d, key)).catch(() => [])))
   ]);
@@ -1248,7 +1254,7 @@ export async function loadExtraLeagues(now = new Date(), onPart) {
       onPart?.(listed);
       return listed;
     });
-  const results = await Promise.allSettled([...EXTRA_LEAGUES, ...KAMBI_LEAGUES].map(key => part(extraLeague(key, now))));
+  const results = await Promise.allSettled([...EXTRA_LEAGUES, ...KAMBI_LEAGUES.filter(key => !LEAGUES[key].noPlay)].map(key => part(extraLeague(key, now))));
   return results.flatMap(r => (r.status === 'fulfilled' ? r.value : []));
 }
 // One of those leagues' games on the board.
@@ -1257,7 +1263,48 @@ async function extraLeague(key, now) {
   const [p, s] = await Promise.allSettled([fetchKambiLeague(key, now, getJson), fetchSchedule(key, now)]);
   const priced = p.status === 'fulfilled' ? p.value : [];
   const scheduled = mergeGames((s.status === 'fulfilled' ? s.value : []).filter(g => !pricedByKambi(g, priced)), []);
-  return onSale([...priced, ...scheduled], now);
+  return onSale(await withFlags(key, [...priced, ...scheduled]), now);
+}
+
+// ---- Faces for the sports whose sides are people (tennis, UFC) ----------------------
+// Each player's or fighter's country (the name of ESPN's flag: Play draws it round) from ESPN's draws (the tours'
+// tournaments on now) or card, so a row always has a picture beside the
+// name (a headshot over it where one is found). A match whose two sides
+// aren't both on ESPN's list (a qualifier, a doubles pair) isn't sold: never
+// a blank beside a name (Jay 2026-10-22). Kept ten minutes.
+const FACE_LISTS = { tennis: ['tennis/atp', 'tennis/wta'], ufc: ['mma/ufc'] };
+const facesKept = new Map();
+const faceKey = name => normalizeTeamName(name).replace(/[^a-z ]/g, '').replace(/\s+/g, ' ').trim();
+export function espnFlags(data, into = new Map()) {
+  // (Only a country the kit can draw a flag for.)
+  const add = a => a?.displayName && countryCode(a.flag?.alt || '') && into.set(faceKey(a.displayName), a.flag.alt);
+  for (const e of data?.events || []) {
+    for (const c of [...(e.competitions || []), ...(e.groupings || []).flatMap(g => g.competitions || [])]) for (const x of c.competitors || []) add(x.athlete);
+  }
+  return into;
+}
+async function sideFlags(key, games) {
+  const dates = key === 'ufc' ? [...new Set(games.flatMap(g => espnDates(g.startUtc)))] : [''];
+  const urls = FACE_LISTS[key].flatMap(path => dates.map(d => `${ESPN}/${path}/scoreboard${d ? `?dates=${d}` : ''}`));
+  const id = urls.join('|');
+  const kept = facesKept.get(id);
+  if (kept && Date.now() - kept.at < 10 * 60_000) return kept.flags;
+  const flags = Promise.all(urls.map(u => getJson(u))).then(pages => pages.reduce((m, d) => espnFlags(d, m), new Map()));
+  facesKept.set(id, { at: Date.now(), flags });
+  flags.catch(() => facesKept.delete(id));
+  return flags;
+}
+const sideName = s => (typeof s === 'string' ? s : s?.en);
+export async function withFlags(key, games) {
+  if (!FACE_LISTS[key] || !games.length) return games;
+  const flags = await sideFlags(key, games).catch(() => null);
+  if (!flags) return [];
+  return games.flatMap(g => {
+    const [home, away] = [sideName(g.home), sideName(g.away)];
+    const hf = !/\//.test(home) && flags.get(faceKey(home));
+    const af = !/\//.test(away) && flags.get(faceKey(away));
+    return hf && af ? [{ ...g, homeFlag: hf, awayFlag: af }] : [];
+  });
 }
 
 // One league's games on the board, as loadOdds and loadExtraLeagues list
