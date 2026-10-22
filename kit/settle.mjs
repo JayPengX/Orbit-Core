@@ -711,6 +711,12 @@ export function asiaResult(g) {
 
 // ---- Kambi ----
 
+// A Kambi list (a league's or a sport's path, padded to four parts with 'all').
+export function kambiUrl(path, kind = 'matches') {
+  const parts = path.split('/');
+  while (parts.length < 4) parts.push('all');
+  return `${KAMBI}/listView/${parts.join('/')}/${kind}.json?lang=en_GB&market=GB&useCombined=true`;
+}
 export const kambiLiveDataUrl = id => `${KAMBI}/event/${encodeURIComponent(id)}/livedata.json?lang=en_GB&market=GB`;
 
 // Each period's score, home first ("0-1 | 2-0" for innings, "Q1: 11-16 | Q2: 22-24"

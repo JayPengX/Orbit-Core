@@ -100,6 +100,8 @@ export function twDay(t) {
 }
 // Its month, 'YYYY-MM'.
 export const twMonth = t => twDay(t).slice(0, 7);
+// The calendar day `n` days from a day ('YYYY-MM-DD'; n may be negative).
+export const addDays = (day, n) => new Date(Date.parse(`${day}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 
 // A finite number as it is, anything else 0.
 export const finiteOr0 = v => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
