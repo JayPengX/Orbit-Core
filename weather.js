@@ -156,8 +156,9 @@ export function scrub(text, env) {
 // mustn't hold a forecast, or the hourly scoring, open with it.
 const UPSTREAM_MS = 10_000;
 
-export async function getJson(fetchFn, url, env, body = null) {
-  const res = await fetchFn(url, body ? { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(UPSTREAM_MS) } : { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(UPSTREAM_MS) });
+// `edgeS`: a GET kept at Cloudflare's edge that long, shared by every cell asking the same thing.
+export async function getJson(fetchFn, url, env, body = null, edgeS = 0) {
+  const res = await fetchFn(url, body ? { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(UPSTREAM_MS) } : { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(UPSTREAM_MS), ...(edgeS ? { cf: { cacheTtl: edgeS, cacheEverything: true } } : {}) });
   const text = await res.text();
   if (!res.ok) throw new Error(scrub(`${res.status} ${text.slice(0, 160)}`, env));
   return JSON.parse(text);
@@ -491,6 +492,7 @@ export function parseCwaWarnings(j, county) {
   return out;
 }
 
+const CWA_EDGE_S = 300;
 async function fetchCwa(env, lat, lon, fetchFn) {
   const auto = nearestStation(lat, lon, 'a');
   const manned = nearestStation(lat, lon, 'm');
@@ -499,11 +501,13 @@ async function fetchCwa(env, lat, lon, fetchFn) {
   const place = [auto, manned, gauge].filter(Boolean).sort((a, b) => a.km - b.km)[0];
   if (!place || place.km > NEAR_KM) return null;
   const ids = townIds(place.county);
-  const obs = (set, s) => (s && s.km <= NEAR_KM ? getJson(fetchFn, cwaUrl(env, set, `&StationId=${s.id}`), env).catch(() => null) : null);
+  // (A station's readings and a township's forecast are the same for every cell near them:
+  // kept at the edge 5 minutes, CWA asked once for all of them.)
+  const obs = (set, s) => (s && s.km <= NEAR_KM ? getJson(fetchFn, cwaUrl(env, set, `&StationId=${s.id}`), env, null, CWA_EDGE_S).catch(() => null) : null);
   const town = ids ? `&LocationName=${encodeURIComponent(place.town)}` : '';
   const [j3, j1w, a, m, r] = await Promise.all([
-    ids ? getJson(fetchFn, cwaUrl(env, ids[0], town), env) : null,
-    ids ? getJson(fetchFn, cwaUrl(env, ids[1], town), env) : null,
+    ids ? getJson(fetchFn, cwaUrl(env, ids[0], town), env, null, CWA_EDGE_S) : null,
+    ids ? getJson(fetchFn, cwaUrl(env, ids[1], town), env, null, CWA_EDGE_S) : null,
     auto && manned && auto.id === manned.id ? null : obs('O-A0001-001', auto),
     obs('O-A0003-001', manned),
     obs('O-A0002-001', gauge)
