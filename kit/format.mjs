@@ -58,7 +58,8 @@ export function price(p, currency, { short = false } = {}) {
   const max = a >= 1000 ? (short ? 0 : 2) : a >= 10 ? (currencyInfo(currency).digits === 0 && a >= 100 ? 2 : 3) : a >= 0.01 ? 4 : 8;
   // NT$ prices with their two decimals too, as Taiwan's brokers show them
   // (2,550.00 · 325.50 · 67.30): a list's prices end in line.
-  const min = a >= 1 && (currencyInfo(currency).digits > 0 || currency === 'TWD') ? 2 : 0;
+  // (A NT$ price under 1 too: a warrant's 0.80, not 0.8.)
+  const min = (a >= 1 && currencyInfo(currency).digits > 0) || (currency === 'TWD' && a > 0) ? 2 : 0;
   return nf(Math.min(min, max), max).format(p);
 }
 
