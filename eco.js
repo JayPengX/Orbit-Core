@@ -49,7 +49,7 @@
 //   POST   /eco { op: 'admin', token, action }        the store's clean-up
 
 import { retire } from './money.js';
-import { VIP, vipStakes, vipTier, WELCOME } from './kit/plus.mjs';
+import { VIP, vipStakes, vipTier } from './kit/plus.mjs';
 import { storeReady } from './doc-store.js';
 import { tokenSecret, signToken, readToken, seal, unseal, sessionLimited, SESSION_MS, REFRESH_MS, HANDOFF_MS } from './quadra-token.js';
 import { handleAdmin } from './eco-admin.js';
@@ -164,8 +164,8 @@ export function paydayEntries(wallet, now) {
   }
   // The loan's installments come out of the pay (kit/loan.mjs loanDue).
   out.push(...loanDue(wallet, poolBalance({ ...wallet, entries: [...(wallet.entries || []), ...out] }), now));
-  // VIP cashback on the months before this one, and the welcome bonus bet.
-  out.push(...vipEntries(wallet, now), ...welcomeEntries(wallet, now));
+  // VIP cashback on the months before this one.
+  out.push(...vipEntries(wallet, now));
   // Level rewards for wealth levels reached (after the pay that may reach one).
   out.push(...rankEntries({ ...wallet, entries: [...(wallet.entries || []), ...out] }, now));
   return out;
@@ -232,13 +232,6 @@ export function vipEntries(wallet, now) {
     if (tier) out.push({ id: `eco:vip:${m}`, t: now, app: 'eco', kind: 'vip', amount: Math.floor(stakes * tier.back), note: tier.id });
   }
   return out;
-}
-// The welcome offer ended 2026-10-21: 台灣運彩 gives no free bets, so Play
-// takes none (price.js refuses one). Old `eco:fb:welcome` tokens stay in the
-// wallet as history, never spent.
-export { WELCOME };
-export function welcomeEntries() {
-  return [];
 }
 export { WEEK };
 
@@ -509,8 +502,6 @@ export async function handleEcoRequest(request, env, headers, ip, deps) {
           // Only the live app writes: an app the person has moved away from
           // must not overwrite what the live one did since.
           if (!isActive(w, claims)) return (refused = 'ECO_SESSION_MOVED'), w;
-          // What falls due with the write comes with it (fixed ids: never
-          // twice): the welcome bonus bet right after a first bet.
           const patch = atMostNow(cleanPatch(body.wallet), now);
           w = atMostNow(w, now);
           // A save of the app's data alone (nothing for the wallet, no

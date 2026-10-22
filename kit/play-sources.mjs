@@ -13,7 +13,7 @@ import { shareLeft } from '#kit/play-live.mjs';
 import { KAMBI, kambiUrl, parseKambiEvents, parseKambiInPlay, useKambiToken, fetchKambiLeague, watchKambiMatches, fetchKeptKambi } from '#kit/play-kambi.mjs';
 import { KAMBI_LEAGUES } from '#kit/play-teams.mjs';
 import { withHousePrices, loadStrengths } from '#kit/play-house.mjs';
-import { SOLD_DAYS, ASIA_URL, asiaMonth, asiaMonthOf } from '#kit/catalog.mjs';
+import { SOLD_DAYS, ASIA_URL, asiaMonth, asiaMonthOf, ESPN_SITE } from '#kit/catalog.mjs';
 import { parseAsiaSchedule } from '#kit/play-schedules.mjs';
 import { offersUrl, parseOffers } from '#kit/play-offers.mjs';
 import { loadGamePlayers } from '#kit/play-players.mjs';
@@ -23,7 +23,7 @@ export const PROXY_URL = 'https://orbit-workers-proxy.pengzjay.workers.dev';
 // use: the shared kit's (settle.mjs), one copy.
 import { yyyymmdd, parseJsonArray, futureTeamName, sameGame, sidesMatch, parseOpenF1Flags, parseEspnResults, parseEspnRace, parseEspnPole, parseFutureResult, teamCorners, asiaResult, kambiUnresolvable, kambiInPlay, readOutcomes, F1_FLAG_KINDS } from '#kit/settle.mjs';
 export { futureTeamName, parseOpenF1Flags, parseEspnResults, parseEspnRace, parseEspnPole, parseFutureResult, teamCorners, asiaResult, kambiUnresolvable, kambiInPlay, F1_FLAG_KINDS };
-const ESPN = 'https://site.api.espn.com/apis/site/v2/sports';
+const ESPN = ESPN_SITE;
 const GAMMA = 'https://gamma-api.polymarket.com';
 const POLYMARKET_TAG = { mlb: 100381, epl: 306, f1: 100389, nba: 745 };
 // Every game on the board starts within this many days (the kit's SOLD_DAYS),
@@ -50,13 +50,6 @@ export function taipeiDayKey(date) {
   return key;
 }
 
-// End of the day `days` after today, Taiwan time. MLB games are listed up to
-// the end of tomorrow (days = 1).
-export function lotteryWindowEnd(now, days = 1) {
-  const [y, m, d] = taipeiDayKey(now).split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, d + 1 + days) - TAIPEI_OFFSET_MS);
-}
-
 // The NBA only shows during its season: from opening night (the first
 // Tuesday on or after 19 October) to the end of June, after the Finals.
 export function nbaInSeason(now) {
@@ -65,26 +58,6 @@ export function nbaInSeason(now) {
   const opener = new Date(Date.UTC(year, 9, 19));
   opener.setUTCDate(19 + ((2 - opener.getUTCDay() + 7) % 7));
   return day >= opener.toISOString().slice(0, 10) || day <= `${year}-06-30`;
-}
-
-const MATCHWEEK_MAX_GAP_MS = 4 * DAY_MS;
-
-// Premier League games of the next matchweek. ESPN doesn't label rounds, but
-// every club plays once per round: from the next game, take games in order
-// until a club would play twice (or the fixtures stop for over 4 days).
-export function nextMatchweek(games) {
-  const sorted = [...games].sort((a, b) => a.startUtc.localeCompare(b.startUtc));
-  const clubs = new Set();
-  const week = [];
-  for (const game of sorted) {
-    const teams = [normalizeTeamName(game.away.en ?? game.away), normalizeTeamName(game.home.en ?? game.home)];
-    const last = week.at(-1);
-    if (teams.some(team => clubs.has(team))) break;
-    if (last && Date.parse(game.startUtc) - Date.parse(last.startUtc) > MATCHWEEK_MAX_GAP_MS) break;
-    teams.forEach(team => clubs.add(team));
-    week.push(game);
-  }
-  return week;
 }
 
 // What the page lists: every game the sources have that hasn't started yet
@@ -964,7 +937,6 @@ export const loadPlayers = game => loadGamePlayers(game, getJson);
 
 // ---- Results (for saved slips) ------------------------------------------------
 
-
 // Each league's ESPN path (its scoreboard), for the live boards.
 const ESPN_PATH = Object.fromEntries(Object.entries(LEAGUES).map(([key, league]) => [key, league.path]));
 
@@ -1292,7 +1264,6 @@ async function storeTeams(url, teams) {
     await cache?.put(url, new Response(JSON.stringify({ at: Date.now(), teams }), { headers: { 'content-type': 'application/json' } }));
   } catch {}
 }
-
 
 // The leagues whose clubs a championship market is about, for their logos
 // (findTeamLogo): the league itself, or for the UEFA competitions every

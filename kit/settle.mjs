@@ -3,34 +3,16 @@
 // games end (settle.js). Pure: a pick's result from its game's outcome, and
 // a slip paid once every pick is decided (the ledger's fixed ids,
 // 'payout-<slip>', so the phone and the Worker can never pay it twice).
-import { CATALOG, familyOfSport, asiaMonth, asiaMonthOf } from '#kit/catalog.mjs';
+import { playLeagues, asiaMonth, asiaMonthOf, ESPN_SITE, yyyymmdd } from '#kit/catalog.mjs';
+export { yyyymmdd };
 import { f1Driver, normalizeTeamName } from '#kit/logos.mjs';
 import { f1Outcome } from '#kit/f1live.mjs';
 import { settleSlip } from '#kit/play-odds.mjs';
 import { propResult, propOutcome } from '#kit/play-props.mjs';
 
-// Every league Play sells, from the shared catalogue: its kind of markets
-// (family) and where its games and odds come from: an ESPN `path` (its
-// schedule and results) with Kambi's list as its first price (`book`), or a
-// `kambi` list alone (its schedule and prices). (Play's teams.mjs LEAGUES.)
-export const LEAGUES = Object.fromEntries(
-  Object.values(CATALOG)
-    .filter(l => l.bet && l.odds)
-    .map(l => {
-      const league = { family: familyOfSport(l.sport) };
-      if (l.odds === 'espn') {
-        league.path = l.espn;
-        if (l.kambi) league.book = l.kambi;
-      } else {
-        league.kambi = l.kambi;
-        // Its own schedule besides Kambi's list (schedules.mjs): the league's
-        // month lists (Asian baseball).
-        if (l.data === 'asia') league.schedule = { asia: l.asia };
-      }
-      for (const k of ['logo', 'icon', 'badge', 'top']) if (l[k] !== undefined) league[k] = l[k];
-      return [l.bet, league];
-    })
-);
+// Every league Play has priced (the catalogue's, catalog.mjs playLeagues): those
+// no longer sold too, for their older slips.
+export const LEAGUES = playLeagues();
 export function familyOf(sport) {
   return sport === 'f1' ? 'racing' : LEAGUES[sport]?.family ?? null;
 }
@@ -451,7 +433,7 @@ export function applyResults(account, slipId, results, now = new Date(), finals 
 
 // ---- Outcomes: each pick's game, race or championship, read from its source ----
 
-export const ESPN = 'https://site.api.espn.com/apis/site/v2/sports';
+export const ESPN = ESPN_SITE;
 export const GAMMA = 'https://gamma-api.polymarket.com';
 export const OPENF1 = 'https://api.openf1.org/v1';
 export const KAMBI = 'https://eu-offering-api.kambicdn.com/offering/v2018/ub';
@@ -465,9 +447,6 @@ const VOID_STATUS = /CANCELED|CANCELLED|FORFEIT|ABANDONED/;
 const POSTPONED = /POSTPONED/;
 const SUSPENDED = /SUSPENDED/;
 
-export function yyyymmdd(date) {
-  return date.toISOString().slice(0, 10).replaceAll('-', '');
-}
 export function parseJsonArray(text) {
   if (Array.isArray(text)) return text;
   try {

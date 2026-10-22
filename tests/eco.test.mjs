@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { handleEcoRequest, mergeWallet, poolBalance, cleanPatch, emptyWallet, paydayEntries, worthOf, vipEntries, vipStakes, vipTier, welcomeEntries, VIP, PAY, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, ECO_APPS, rankEntries, RANKS } from '../eco.js';
+import { handleEcoRequest, mergeWallet, poolBalance, cleanPatch, emptyWallet, paydayEntries, worthOf, vipEntries, vipStakes, vipTier, VIP, PAY, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, ECO_APPS, rankEntries, RANKS } from '../eco.js';
 import { planClean, tidyWallet } from '../eco-admin.js';
 
 function setup() {
@@ -502,7 +502,6 @@ test('VIP: last month\'s gaming stakes set its tier, and its cashback is paid on
 test('no welcome free bet any more (台灣運彩 gives none): a first paid bet brings nothing', async () => {
   const now = Date.UTC(2026, 9, 21, 4);
   const bet = { id: 'odds:stake-a', t: now, app: 'odds', kind: 'stake', amount: -500 };
-  assert.deepEqual(welcomeEntries({ entries: [bet] }, now), []);
   const t = setup();
   const acct = await newPass(t, 'odds');
   const w = await t.call('PATCH', `${t.qt(acct.token)}&app=odds`, { wallet: { entries: [{ ...bet, t: 1_700_000_100_000 }] } });

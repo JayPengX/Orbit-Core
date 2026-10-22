@@ -1,5 +1,5 @@
 // Logos, flags and the F1 grid: the shared kit's (lib/logos.mjs).
-import { CATALOG, familyOfSport } from '#kit/catalog.mjs';
+import { playLeagues } from '#kit/catalog.mjs';
 import { normalizeTeamName, MLB_ABBR, NBA_ID, EPL_ESPN_ID, TEAM_BADGES, rememberLogo, teamLogo } from '#kit/logos.mjs';
 export { normalizeTeamName, rememberLogo, teamLogo, leagueLogo, teamBadge, f1Driver, f1Constructor, F1_NAMES_ZH, F1_PAGE, countryFlag, countryCode, flagUrl } from '#kit/logos.mjs';
 
@@ -7,28 +7,8 @@ export { normalizeTeamName, rememberLogo, teamLogo, leagueLogo, teamBadge, f1Dri
 // for the leagues it sells, the usual Taiwanese ones for the rest.
 export { teamZh, teamNameZh } from '#kit/names.mjs';
 
-// Every league Play sells, from the shared catalogue (catalog.mjs, the kit's
-// leagues.mjs): its kind of markets (family) and where its games and odds
-// come from: an ESPN `path` (its schedule and results) with Kambi's list as
-// its first price (`book`), or a `kambi` list alone (its schedule and prices).
-export const LEAGUES = Object.fromEntries(
-  Object.values(CATALOG)
-    .filter(l => l.bet && l.odds && l.sold !== false)
-    .map(l => {
-      const league = { family: familyOfSport(l.sport) };
-      if (l.odds === 'espn') {
-        league.path = l.espn;
-        if (l.kambi) league.book = l.kambi;
-      } else {
-        league.kambi = l.kambi;
-        // Its own schedule besides Kambi's list (schedules.mjs): the league's
-        // month lists (Asian baseball).
-        if (l.data === 'asia') league.schedule = { asia: l.asia };
-      }
-      for (const k of ['logo', 'icon', 'badge', 'top']) if (l[k] !== undefined) league[k] = l[k];
-      return [l.bet, league];
-    })
-);
+// Every league Play sells (the catalogue's, catalog.mjs playLeagues).
+export const LEAGUES = playLeagues({ sold: true });
 
 // On sale: every league in the catalogue.
 export const onSale = key => Boolean(LEAGUES[key]);

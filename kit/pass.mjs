@@ -370,12 +370,7 @@ const TABS = ['pass', 'looks', 'truth', 'apps', 'help'];
 
 // ---- Small pieces ---------------------------------------------------------------------------
 
-const el = (tag, props = {}, children = []) =>
-  node(
-    tag,
-    props,
-    [].concat(children).filter(c => c != null && c !== false)
-  );
+const el = node;
 const put = (box, ...kids) => box.replaceChildren(...kids.filter(k => k != null && k !== false));
 const section = (title, content, { sub = '', action = null } = {}) => el('section', { class: 'q-section' }, [el('div', { class: 'q-section-head' }, [el('h2', { text: title }), action]), sub ? el('p', { class: 'section-sub', text: sub }) : null, content]);
 const bar = (value, max, cls = '') => el('div', { class: `meter ${cls}` }, [el('i', { style: `width:${Math.min(100, max ? (value / max) * 100 : 0)}%` })]);

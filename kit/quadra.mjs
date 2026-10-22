@@ -31,7 +31,7 @@
 
 import { BRANDS, FAMILIES, pathOf, appIcon, familyMark } from './brand.mjs';
 import { DEV, cleanDev } from './brand.mjs';
-import { icons, tile, pullToRefresh, setSheetDetent, segmented } from './ui.mjs';
+import { icons, tile, pullToRefresh, setSheetDetent, segmented, h as node } from './ui.mjs';
 
 export const ECO_URL = 'https://orbit-workers-proxy.pengzjay.workers.dev/eco';
 export const PROXY_URL = 'https://orbit-workers-proxy.pengzjay.workers.dev/sports-proxy';
@@ -210,8 +210,8 @@ import { PAY_WEEK, LOAN, RELIEF, loans, activeLoan, loanOwed, payoffAmount, debt
 export { LOAN, RELIEF, loans, activeLoan, loanOwed, payoffAmount, debtOf, credit, canBorrow, loanOffer, reliefCheck };
 const LOAN_KINDS = new Set(['loan', 'loanfee', 'loanpay', 'loanlate', 'loanbad', 'loangar', 'loanoff']);
 // Free bets and VIP: plus.mjs, shared with the Worker.
-import { FREEBET, freeBetValue, freeBets, VIP, vipStakes, vipTier, WELCOME, welcomeEarned } from './plus.mjs';
-export { FREEBET, freeBetValue, freeBets, VIP, vipStakes, vipTier, WELCOME, welcomeEarned };
+import { FREEBET, VIP, vipStakes, vipTier } from './plus.mjs';
+export { FREEBET, VIP, vipStakes, vipTier };
 
 // ---- Looks: an avatar and a frame, free for everyone ------------------------------------
 //
@@ -254,11 +254,6 @@ export function vipStatus(wallet, now = Date.now()) {
 }
 // The tier's name alone (a medal emoji before it read as clip art, the owner 2026-10-18).
 export const vipName = (tier, lang = 'zh') => (tier ? (lang === 'en' ? tier.en : tier.zh) : '');
-
-// The welcome offer ended 2026-10-21 (no free bets at 台灣運彩): never due.
-export const welcomeDue = () => false;
-
-// ---- Free bets: plus.mjs (FREEBET, freeBetValue, freeBets) ---------------------------
 
 // ---- Language ------------------------------------------------------------------------
 
@@ -1839,18 +1834,7 @@ function hash01(text) {
 
 // ---- Screens -----------------------------------------------------------------------------
 
-const node = (tag, props = {}, children = []) => {
-  const el = document.createElement(tag);
-  for (const [key, value] of Object.entries(props)) {
-    if (value == null || value === false) continue;
-    if (key === 'text') el.textContent = value;
-    else if (key === 'html') el.innerHTML = value;
-    else if (key.startsWith('on')) el.addEventListener(key.slice(2), value);
-    else el.setAttribute(key, value === true ? '' : value);
-  }
-  for (const child of [].concat(children)) if (child) el.append(child);
-  return el;
-};
+// The kit's element helper (ui.mjs h), as the pages have always called it.
 export { node as el };
 
 const typedPass = text => cleanCode(text).replace(/[^2-9A-HJ-NP-Z]/g, '').slice(0, 10);

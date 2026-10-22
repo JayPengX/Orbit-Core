@@ -223,15 +223,6 @@ test('the pay: fixed, whatever the account holds', () => {
   assert.equal(kit.paydayText('zh', Date.UTC(2026, 9, 21, 4)), '下次發薪 NT$10,000 · 10/26（一）');
 });
 
-test('free bets: only current Quadra-issued tokens are spent once and last a week', () => {
-  const t = Date.UTC(2026, 9, 1);
-  const tok = (id, note, at = t, app = 'eco') => ({ id, t: at, app, kind: 'freebet', amount: 0, note });
-  const w = { entries: [tok('odds:fb:a', '100', t, 'odds'), tok('eco:fb:open', '200'), tok('eco:fb:used', '100'), tok('eco:fb:old', '100', t - 8 * 86_400_000), { id: 'odds:fb-eco:fb:used', t, app: 'odds', kind: 'freebet', amount: 0 }] };
-  assert.deepEqual(kit.freeBets(w, t).map(x => [x.id, x.value]), [['eco:fb:open', 200]]);
-  assert.deepEqual(kit.freeBets(w, t, ['eco:fb:open']), []);
-  assert.deepEqual(kit.freeBets(w, t + 8 * 86_400_000), []);
-});
-
 test('token requests made together share one sign-in call to the Worker', async () => {
   store.clear();
   const claims = Buffer.from(JSON.stringify({ k: 'ref', d: 'abcdef0123456789abcdef', s: 'S', g: 0, e: 9e15 })).toString('base64url');
@@ -437,14 +428,7 @@ test('CPBL: a month the proxy can\'t fill comes from TheSportsDB\'s day lists on
   assert.equal((await asiaMonth(async () => ({ games: [{ id: 'x' }] }), 'cpbl', '2026-10', { now, fetchJson })).length, 1);
 });
 
-test('free bets: only the Worker’s tokens count; an old Plus boost still reads in the statement', () => {
-  const t = Date.UTC(2026, 9, 7, 4);
-  const w = { entries: [
-    { id: 'eco:fb:2026-10-05', t, app: 'eco', kind: 'freebet', amount: 0, note: '100' },
-    // An app can't mint one: only the Worker's ('eco') count.
-    { id: 'eco:fb:fake', t, app: 'odds', kind: 'freebet', amount: 0, note: '500' }
-  ] };
-  assert.deepEqual(kit.freeBets(w, t).map(x => [x.id, x.value]), [['eco:fb:2026-10-05', 100]]);
+test('an old Plus boost still reads in the statement', () => {
   assert.match(kit.describeEntry({ app: 'odds', kind: 'plusboost', amount: 42 }), /Plus/);
   assert.match(kit.describeEntry({ app: 'eco', kind: 'plusrefund', amount: 190 }), /Plus/);
   // Plus is gone from the kit.
@@ -470,13 +454,6 @@ test('VIP in the kit: the same tiers as the Worker, this month so far', async ()
   assert.equal(v.paid.amount, 80);
   assert.equal(kit.vipStatus({ entries: [] }, now).tier, null);
   assert.equal(kit.vipName(v.tier, 'en'), 'Silver');
-  assert.equal(kit.WELCOME.bet, eco.WELCOME.bet);
-  assert.equal(kit.welcomeDue({ entries: [] }), false);
-  assert.equal(kit.welcomeDue(w), false);
-  // The welcome offer has ended: never due, never given.
-  const one = { entries: [{ id: 'odds:stake-s', t: now, app: 'odds', kind: 'stake', amount: -500 }] };
-  assert.equal(kit.welcomeDue(one), false);
-  assert.deepEqual(eco.welcomeEntries(one, now), []);
 });
 
 test('pictures: national sides get flags, names in either order', async () => {

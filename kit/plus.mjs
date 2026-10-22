@@ -1,33 +1,15 @@
-// Free bets and VIP, the rules alone (no page, no storage): one copy for the
-// kit (quadra.mjs re-exports them) and the Worker, which checks a placed
-// slip's free bet against the pass's wallet (settle.js).
+// VIP, the rules alone (no page, no storage): one copy for the kit
+// (quadra.mjs re-exports them) and the Worker (eco.js pays the cashback).
 //
 // Old `eco:plus:<month>` entries stay in the wallet as history.
 
 import { twMonth } from './format.mjs';
 
-// A free bet is a token from Quadra: the welcome offer or an old weekly
-// bonus bet (the Worker's 'eco:fb:…', app 'eco', kind 'freebet', amount 0, its
-// value in the note). Play stakes one on one slip, and only the winnings
-// come back, never the stake. Play marks it spent with 'odds:fb-<token id>'
-// (a fixed id: spent once). Unspent tokens last FREEBET.days.
-export const FREEBET = { days: 7, max: 500 };
-export const freeBetValue = e => {
-  const v = Number(e?.note);
-  return Number.isInteger(v) && v > 0 && v <= FREEBET.max && v % 10 === 0 ? v : 0;
-};
-// The tokens not yet spent or expired: [{ id, value, t, until }], soonest
-// to expire first.
-export function freeBets(wallet, now = Date.now(), spent = []) {
-  const entries = wallet?.entries || [];
-  const used = new Set(spent);
-  for (const e of entries) if (e.app === 'odds' && typeof e.id === 'string' && e.id.startsWith('odds:fb-')) used.add(e.id.slice(8));
-  return entries
-    .filter(e => e.kind === 'freebet' && e.app === 'eco' && typeof e.id === 'string' && e.id.startsWith('eco:fb:') && freeBetValue(e) && !used.has(e.id))
-    .map(e => ({ id: e.id, value: freeBetValue(e), t: e.t, until: e.t + FREEBET.days * 86_400_000 }))
-    .filter(x => x.until > now)
-    .sort((a, b) => a.until - b.until);
-}
+// A free bet was a token from Quadra (the welcome offer, old weekly bonus
+// bets: the Worker's 'eco:fb:…', kind 'freebet', its value in the note);
+// none since 2026-10-21 (台灣運彩 has none). The old ones stay in the wallet
+// as history, read at most FREEBET.max each (truth.mjs).
+export const FREEBET = { max: 500 };
 
 // ---- VIP: free tiers by what's played, with cashback -----------------------------------
 //
@@ -57,12 +39,3 @@ export function vipStakes(wallet, month) {
   return Math.max(0, Math.round(sum));
 }
 export const vipTier = stakes => [...VIP.tiers].reverse().find(t => stakes >= t.min) ?? null;
-
-// The welcome offer: the first paid bet in Play brings a NT$WELCOME.bet free
-// bet (`eco:fb:welcome`, the Worker's, once; quadra.mjs welcomeDue). A
-// qualifying bet, as a real sportsbook's welcome offer asks: one stake of
-// at least `minStake` (Play's smallest ticket, SLIP_RULES.minTicket), so a
-// NT$0.01 stake or a free bet's top-up doesn't buy NT$200.
-export const WELCOME = { bet: 200, minStake: 100 };
-// Whether a wallet's entries hold that qualifying bet.
-export const welcomeEarned = wallet => (wallet?.entries || []).some(e => e.app === 'odds' && e.kind === 'stake' && e.amount <= -WELCOME.minStake);
