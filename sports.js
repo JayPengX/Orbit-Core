@@ -207,8 +207,11 @@ const CACHE_YT_VIDEO = { tier: 'yt-video', fresh: 7 * DAY, stale: 7 * DAY };
 // Asian baseball by month: this month and next change with every score (a
 // minute); a past month only with a late fix.
 // This month's: read again after 2 minutes (each read is a page and a few
-// day lists), the last good copy answered for 6 hours if a read fails.
-const CACHE_ASIA_NOW = { tier: 'asia-now', fresh: 2 * MINUTE, stale: 6 * HOUR };
+// day lists), the last good copy answered for 3 days if a read fails
+// (TheSportsDB refused this Worker for all of October 2026: after 6 hours
+// every phone read the month's 14 day lists itself; the kit brings a kept
+// copy's unfinished games up to date from the device, catalog cpblFresh).
+const CACHE_ASIA_NOW = { tier: 'asia-now', fresh: 2 * MINUTE, stale: 3 * DAY };
 // A month over: its results don't change.
 const CACHE_ASIA_PAST = { tier: 'asia-past', fresh: 12 * HOUR, stale: 7 * DAY };
 // A CPBL game's box score: a game on changes with every pitch (its 15
