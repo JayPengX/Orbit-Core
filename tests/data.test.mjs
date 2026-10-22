@@ -109,18 +109,3 @@ test('private/ (the store\'s backup) is never served', async () => {
   assert.equal((await ask('/data/private/firestore-backup.jsonl.gz', {}, { DATA })).status, 404);
   assert.equal((await ask('/data/private%2Ffirestore-backup.jsonl.gz', {}, { DATA })).status, 404);
 });
-
-test("Play's board is served like the other built files, but kept a minute (then served stale while the next is read), not ten", async () => {
-  const DATA = fakeR2();
-  await DATA.put('play/board.json', enc('{"v":1,"built":"2026-10-19T08:08:00.000Z","games":[]}'));
-  await DATA.put('sports/mlb/days.json', enc('{"days":[]}'));
-  const res = await ask('/data/play/board.json', {}, { DATA });
-  assert.equal(res.status, 200);
-  assert.equal(res.headers.get('Content-Type'), 'application/json');
-  assert.equal(res.headers.get('Cache-Control'), 'public, max-age=60, stale-while-revalidate=300');
-  assert.equal(res.headers.get('Access-Control-Allow-Origin'), 'https://jaypengx.github.io');
-  assert.equal((await res.json()).v, 1);
-  assert.equal((await ask('/data/sports/mlb/days.json', {}, { DATA })).headers.get('Cache-Control'), 'public, max-age=600');
-  // Not built yet: a 404 (Play reads its leagues itself).
-  assert.equal((await ask('/data/play/board.json', {}, { DATA: fakeR2() })).status, 404);
-});

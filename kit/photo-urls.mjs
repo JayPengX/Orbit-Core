@@ -1,6 +1,5 @@
 // Photos' addresses alone (no page, no storage): ESPN's headshot by id and the
-// small size of a picture. photos.mjs re-exports them; Play's players (in the
-// Worker too, play-players.mjs) use them from here.
+// small size of a picture. photos.mjs re-exports them.
 import { CATALOG } from '#kit/catalog.mjs';
 
 export const CDN = 'https://a.espncdn.com/i/headshots';

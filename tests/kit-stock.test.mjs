@@ -400,11 +400,9 @@ test("IPO subscriptions: TWSE's list, the window, the draw and what comes back",
 
 test("Taiwan's day of a moment, the same in every kit module", async () => {
   const q = await import('../kit/orbit.mjs').catch(() => null);
-  const { taipeiDate } = await import('../kit/play-lottery.mjs');
   for (const t of [Date.parse('2026-10-17T15:59:59.999Z'), Date.parse('2026-10-17T16:00:00Z'), Date.parse('2026-12-31T16:00:00Z'), Date.parse('2027-01-01T00:00:00Z')]) {
     const day = taipeiDay(t);
     assert.equal(twDay(t), day);
-    assert.equal(taipeiDate(t), day);
     if (q) assert.equal(q.taipeiDay(t), day);
   }
   assert.equal(taipeiDay(Date.parse('2026-10-17T16:00:00Z')), '2026-10-18');

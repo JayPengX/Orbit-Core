@@ -22,13 +22,11 @@ export const BOOT = block('boot');
 // imports them as).
 const APPS = {
   'Orbit-Securities': { id: 'stock', site: 'public', mods: ['orbit'] },
-  'Quadra-Play': { id: 'odds', site: 'public', mods: ['orbit', 'logos', 'names', 'photos', 'catalog'] },
   'Orbit-Sports': { id: 'match', site: 'public', mods: ['orbit', 'logos', 'names', 'photos', 'catalog'] },
   'Orbit-Words': { id: 'vocab', site: 'public', mods: ['orbit'] },
   'Orbit-Weather': { id: 'weather', site: 'public', mods: ['orbit'] },
   'Orbit-Transit': { id: 'transit', site: 'public', mods: ['orbit'] },
   'Orbit-Class': { id: 'orbit', site: '.', mods: ['orbit'] },
-  'Orbit-Slips': { id: 'slip', site: 'public', mods: ['orbit'] },
   'Orbit-Beats': { id: 'beats', site: 'public', mods: ['orbit'] },
   'Orbit-Law': { id: 'law', site: 'public', mods: ['orbit'] }
 };

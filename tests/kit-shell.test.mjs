@@ -528,7 +528,7 @@ test('the Pass sheet has a 說明 tab for every app', async () => {
   // (An app without a guide of its own opens the Pass's general one: renderHelp falls back to 'pass'.)
   assert.match(src, /const at = HELP_ORDER\.includes\(app\) \? app : 'pass'/);
   assert.ok(help.HELP_ORDER.includes('pass'));
-  for (const id of ['stock', 'odds', 'vocab', 'orbit', 'weather', 'transit', 'beats']) assert.ok(help.HELP_ORDER.includes(id) && orbit.APPS[id], `${id} has a guide`);
+  for (const id of ['stock', 'match', 'vocab', 'orbit', 'weather', 'transit', 'beats']) assert.ok(help.HELP_ORDER.includes(id) && orbit.APPS[id], `${id} has a guide`);
 });
 
 // ---- the stylesheet ----

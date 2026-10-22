@@ -134,9 +134,6 @@
 :where(:root[data-app='stock']) {
   --q-accent: #0d9488;
 }
-:where(:root[data-app='odds']) {
-  --q-accent: #2563eb;
-}
 :where(:root[data-app='orbit']) {
   --q-accent: #0ea5e9;
 }
@@ -148,9 +145,6 @@
 }
 :where(:root[data-app='match']) {
   --q-accent: #ea580c;
-}
-:where(:root[data-app='slip']) {
-  --q-accent: #d97706;
 }
 :where(:root[data-app='beats']) {
   --q-accent: #c026d3;
@@ -165,9 +159,6 @@
   :where(:root[data-app='stock']:not([data-theme='light'])) {
     --q-accent: #1db4a4;
   }
-  :where(:root[data-app='odds']:not([data-theme='light'])) {
-    --q-accent: #4384f3;
-  }
   :where(:root[data-app='orbit']:not([data-theme='light'])) {
     --q-accent: #46bcf3;
   }
@@ -179,9 +170,6 @@
   }
   :where(:root[data-app='match']:not([data-theme='light'])) {
     --q-accent: #f48940;
-  }
-  :where(:root[data-app='slip']:not([data-theme='light'])) {
-    --q-accent: #eba52a;
   }
   :where(:root[data-app='beats']:not([data-theme='light'])) {
     --q-accent: #d869e8;
@@ -196,9 +184,6 @@
 :where(:root[data-app='stock'][data-theme='dark']) {
   --q-accent: #1db4a4;
 }
-:where(:root[data-app='odds'][data-theme='dark']) {
-  --q-accent: #4384f3;
-}
 :where(:root[data-app='orbit'][data-theme='dark']) {
   --q-accent: #46bcf3;
 }
@@ -210,9 +195,6 @@
 }
 :where(:root[data-app='match'][data-theme='dark']) {
   --q-accent: #f48940;
-}
-:where(:root[data-app='slip'][data-theme='dark']) {
-  --q-accent: #eba52a;
 }
 :where(:root[data-app='beats'][data-theme='dark']) {
   --q-accent: #d869e8;

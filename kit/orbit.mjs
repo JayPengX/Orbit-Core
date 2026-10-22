@@ -3,13 +3,11 @@
 // app loads it from there (kit/loader.html), so one push changes it for all.
 //
 //   Orbit Securities   stock   where money lives and grows
-//   Quadra Play         odds    sports betting and the lottery
 //   Orbit Class         orbit   the class schedule
 //   Orbit Weather       weather one forecast, pinned places
 //   Orbit Transit       transit the map, buses, trains and metros
 //   Orbit Sports        match   scores, schedules and stats
 //   Orbit Words         vocab   English words
-//   Orbit Slips         slip    台灣運彩 tickets followed live
 //   Orbit Beats         beats   beat pieces arranged into songs
 //
 // The names, colours and marks are brand.mjs's. The Orbit Pass (the
@@ -100,7 +98,7 @@ export const appName = app => APPS[app]?.name || app;
 
 // ---- The economy -------------------------------------------------------------------
 //
-// Balanced so money matters (Shared-Proxy/tools/economy.mjs has the model):
+// Balanced so money matters:
 // a new pass opens with NT$200,000; every Monday (Taiwan time) pays a fixed
 // NT$10,000, the same for every account, like a salary (eco.js pays it,
 // back pay for weeks nobody came). With the wealth level rewards and 急難紓困
@@ -1707,7 +1705,7 @@ export const taipeiDay = (t = Date.now()) => twDay(t);
 // life, so the model follows what the person does now. Each app keeps its
 // own map (and syncs its strongest keys to the wallet); ranking reads all
 // the apps' maps together, so a sector traded in Securities lifts its
-// stocks' news, and a team bet on in Play its games there.
+// stocks' news.
 //
 // Ranking: score = quality × (1 + affinity) + exploration, then a diversity
 // pass (maximal marginal relevance) so one team or sector doesn't fill the
@@ -2325,10 +2323,6 @@ export const NOTICE_KINDS = {
     ['pick', '今日推薦開賽', 'Today’s picks start', '今日推薦的每一場開始時。', 'When each of today’s picks starts.'],
     ['pickend', '今日推薦賽果', 'Today’s picks: final', '今日推薦的每一場結束，附上比分。', 'When each of today’s picks ends, with the score.']
   ],
-  odds: [
-    ['slip', '投注單結算', 'Slip settled', '投注單的比賽全部結束、算好派彩時。', 'When every game on a slip is over and it’s paid.'],
-    ['ticket', '彩券中獎', 'Lottery win', '電腦彩券開獎、你的彩券中獎時。', 'When a draw is out and your ticket won.'],
-  ],
   vocab: [
     ['streak', '連續練習快斷了', 'Streak ending', '今天還沒練習單字，連續天數今晚就會歸零時。', 'When you haven’t practised today and your streak ends tonight.']
   ],
@@ -2338,10 +2332,6 @@ export const NOTICE_KINDS = {
     ['order', '委託未成交', 'Order not filled', '委託到期失效、被取消，或定期定額這個月跳過時。', 'When an order lapses or is dropped, or a monthly plan skips a month.'],
     ['margin', '維持率與斷頭', 'Margin call', '維持率偏低，或融資、放空被強制處理時。', 'When margin runs low, or a loan or short is force-closed.'],
     ['income', '股利與利息', 'Dividends and interest', '除息、股利入帳、債券配息和活存利息入帳時。', 'When a holding goes ex-dividend, and when dividends, coupons or interest arrive.']
-  ],
-  slip: [
-    ['start', '注單比賽開打', 'A ticket’s game starts', '注單上的比賽開始時。', 'When a game on one of your tickets starts.'],
-    ['end', '注單比賽結束', 'A ticket’s game ends', '注單上的比賽結束，附上比分。', 'When a game on one of your tickets ends, with the score.']
   ],
   orbit: [['class', '上課提醒', 'Class reminder', '每堂課開始前 5 分鐘。', 'Five minutes before each class.']],
   weather: [
@@ -3012,7 +3002,7 @@ function watchKeyboard() {
     // Held while the same field is typed in: iOS's slide (vv.offsetTop) moves
     // as the page answers it, and a sheet lifted by each new reading moved,
     // iOS slid again, and the screen flickered (Jay 2026-10-21, an iPad on
-    // its side: the sign-in and Play's stake). Read again for another field,
+    // its side: the sign-in). Read again for another field,
     // or keys that really changed height (more than 60px).
     const el = document.activeElement;
     if (!up) held = null;
@@ -3490,7 +3480,7 @@ steadyTabBar();
 // netState() 'online' | 'offline' | 'slow'.
 const NET_SLOW_MS = 5000;
 // The proxy's AI routes (Gemini at work for 5 to 30 s): their wait says nothing of the network.
-const AI_ROUTES = /\/(law-chat|law-ask|law-gist|gemini|nl-edit|slip-scan)(\?|$)/;
+const AI_ROUTES = /\/(law-chat|law-ask|law-gist|gemini|nl-edit)(\?|$)/;
 export const slowByNature = url => {
   try {
     const u = new URL(url, globalThis.location?.href);
@@ -3591,8 +3581,8 @@ function paintNet() {
   box.querySelector('span').textContent = net.state === 'offline' ? (zh ? '沒有網路連線' : 'No internet connection') : zh ? '網路連線很慢' : 'Slow internet connection';
   document.documentElement.classList.add('q-net-on');
 }
-// An app whose every screen is live (Securities' prices and trades, Play's
-// odds, Transit's buses, Sports' scores): with no connection it isn't shown
+// An app whose every screen is live (Securities' prices and trades,
+// Transit's buses, Sports' scores): with no connection it isn't shown
 // on what the phone kept (an hour-old price or bus reads as now), but
 // covered: its mark, 沒有網路連線, why, and 重試. A slow connection never
 // covers it (the capsule says so; the answers come). Apps that are useful on
@@ -4049,7 +4039,7 @@ export function topActions(s, { help = null, refresh = null, extra = null, into 
 // a 64px box, which then showed 11,7… instead of shrinking. Text doesn't
 // narrow exactly with its size, −NT$1,052 at 13.2px still 75.9px in a 75px
 // box, so each one shrunk is checked again and stepped down until it fits.)
-// Play's and Securities' own copies were this; `node.__fit` is the text it
+// Securities' own copy was this; `node.__fit` is the text it
 // was last fitted for (watchFit).
 const textWidth = node => {
   const range = document.createRange();

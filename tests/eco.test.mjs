@@ -277,48 +277,6 @@ test('one pass merged into two at once: its money lands once', async () => {
   assert.ok(!(await t.call('GET', t.qt(other.token))).data.wallet.entries.some(e => e.id === 'odds:payout-gift'));
 });
 
-test("merge since the lock-down: Play's winnings come along, and its watched slips, tickets, unrevealed scratch cards and records move to this pass", async () => {
-  const t = setup();
-  const { updateWallet } = await import('../eco.js');
-  const { moveSlips, OPEN_COLLECTION, OPEN_INDEX, SETTLED_COLLECTION } = await import('../settle.js');
-  const { moveTickets, TICKET_COLLECTION, TICKET_INDEX } = await import('../lotto.js');
-  t.deps.moveRecords = async (env, from, to) => {
-    await moveSlips(env, t.deps, from, to);
-    await moveTickets(env, t.deps, from, to);
-  };
-  const a = await newPass(t, 'odds');
-  const b = await newPass(t, 'odds');
-  const [aId, bId] = [await t.deps.sha256Hex(a.passcode), await t.deps.sha256Hex(b.passcode)];
-  // On b: a slip staked and paid by the Worker (an app can't write a payout), one still open, a ticket waiting.
-  await updateWallet(t.env, t.deps, bId, w => ({ ...w, entries: [...w.entries, { id: 'odds:stake-slipaaaa1', t: 5, app: 'odds', kind: 'stake', amount: -100 }, { id: 'odds:payout-slipaaaa1', t: 6, app: 'odds', kind: 'payout', amount: 250 }, { id: 'odds:stake-slipbbbb2', t: 7, app: 'odds', kind: 'stake', amount: -100 }] }));
-  const put = (c, id, v) => t.deps.fsWrite(t.env, c, id, JSON.stringify(v));
-  await put(OPEN_COLLECTION, `${bId}_slipbbbb2`, { account: bId, state: 'open', slip: { id: 'slipbbbb2' }, t: 7 });
-  await put(OPEN_COLLECTION, OPEN_INDEX, { due: { [`${bId}_slipbbbb2`]: 99, other_x: 5 } });
-  await put(SETTLED_COLLECTION, bId, { slips: { slipaaaa1: { settled: true, payout: 250 } } });
-  await put(TICKET_COLLECTION, `${bId}_tickcccc3`, { account: bId, ticket: { id: 'tickcccc3' }, t: 8 });
-  await put(TICKET_COLLECTION, TICKET_INDEX, { due: { [`${bId}_tickcccc3`]: 50 } });
-  // A scratch card bought on b, not yet revealed (in no index).
-  await put(TICKET_COLLECTION, `${bId}_scrdddd4`, { account: bId, ticket: { id: 'scrdddd4', card: 'x', prize: 100 }, t: 9 });
-  const poolB = (await t.call('GET', `${t.qt(b.token)}&app=odds`)).data.pool;
-  const aa = await t.call('POST', '', { op: 'refresh', refresh: a.refresh, app: 'odds', claim: true });
-  const poolA = aa.data.pool;
-  const m = await t.call('POST', '', { op: 'merge', qt: aa.data.token, sources: [{ passcode: b.passcode }] });
-  assert.equal(m.status, 200);
-  const ids = m.data.wallet.entries.map(e => e.id);
-  for (const id of ['odds:stake-slipaaaa1', 'odds:payout-slipaaaa1', 'odds:stake-slipbbbb2']) assert.ok(ids.includes(id), id);
-  assert.equal(m.data.wallet.entries.filter(e => e.app === 'odds').reduce((s, e) => s + e.amount, 0), 50, 'the NT$250 won is there, once');
-  assert.ok(m.data.pool > poolA && poolB > 0);
-  const get = async (c, id) => JSON.parse((await t.deps.fsGet(t.env, c, id)).payload || 'null');
-  assert.equal(await get(OPEN_COLLECTION, `${bId}_slipbbbb2`), null);
-  assert.equal((await get(OPEN_COLLECTION, `${aId}_slipbbbb2`)).account, aId, 'settled later, paid to this pass');
-  assert.deepEqual(await get(OPEN_COLLECTION, OPEN_INDEX), { due: { other_x: 5, [`${aId}_slipbbbb2`]: 99 } });
-  assert.equal((await get(SETTLED_COLLECTION, aId)).slips.slipaaaa1.payout, 250);
-  assert.equal((await get(TICKET_COLLECTION, `${aId}_tickcccc3`)).account, aId);
-  assert.deepEqual(Object.keys((await get(TICKET_COLLECTION, TICKET_INDEX)).due), [`${aId}_tickcccc3`]);
-  assert.equal(await get(TICKET_COLLECTION, `${bId}_scrdddd4`), null);
-  assert.equal((await get(TICKET_COLLECTION, `${aId}_scrdddd4`)).account, aId, 'revealed on this pass, paid to it');
-});
-
 test("a phone clock set ahead never blocks a later save: a setting's time is the Worker's at the latest", async () => {
   const t = setup();
   const a = await newPass(t, 'vocab');

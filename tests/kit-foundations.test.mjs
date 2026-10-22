@@ -7,7 +7,7 @@ import vm from 'node:vm';
 import * as lang from '../kit/lang.mjs';
 import * as orbit from '../kit/orbit.mjs';
 import * as fmt from '../kit/format.mjs';
-import { sidesInOrder } from '../kit/play-teams.mjs';
+import { sidesInOrder } from '../kit/catalog.mjs';
 import { webcrypto, createHash } from 'node:crypto';
 
 const rawCss = readFileSync(new URL('../kit/orbit.css', import.meta.url), 'utf8');

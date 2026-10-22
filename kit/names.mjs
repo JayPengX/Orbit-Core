@@ -1,4 +1,4 @@
-// Teams in Chinese, as Taiwan writes them, for Orbit Sports and Play alike
+// Teams in Chinese, as Taiwan writes them, for Orbit Sports
 // (both load it from the kit, #kit/names.mjs). The American leagues are city + nickname (the lottery writes both,
 // "匹茲堡海盜"; a row has room for the nickname, "海盜"); clubs elsewhere one
 // name, whatever competition they play in. Also how ELTA's schedule is
@@ -148,7 +148,7 @@ function collegeZh(name) {
   return school ? COLLEGE[school] : null;
 }
 
-// Clubs of the leagues Play carries beyond Europe's big ones (2026-10: every
+// Clubs of the leagues carried beyond Europe's big ones (2026-10: every
 // club ESPN lists for each), by their English name as ESPN or Kambi write it
 // (normalized below, as CLUBS'). Soccer's go in with CLUBS, as clubs meet in
 // other competitions (Utrecht in the Europa League); a name two leagues share
@@ -176,7 +176,7 @@ const LEAGUE_BY_NAME = Object.fromEntries(Object.entries(LEAGUE_NAMES).map(([k, 
 
 const SOCCER = new Set(['soccer']);
 // A team in Chinese: { full, short }, or null when there's no Chinese name.
-// `key` is the league (Play's key; Orbit Sports' own is the same), `sport` its sport.
+// `key` is the league (the catalogue's `bet` key; Orbit Sports' own is the same), `sport` its sport.
 export function teamNameZh(key, name, sport = '') {
   if (!name) return null;
   const n = normalizeTeamName(name);
@@ -225,5 +225,5 @@ export function teamsByZh(query, most = 6) {
     .slice(0, most)
     .map(({ name, zh }) => ({ name, zh }));
 }
-// Play's form: the full name (the lottery's), or the name as it came.
+// The full name (the lottery's), or the name as it came.
 export const teamZh = (key, name, sport = '') => teamNameZh(key, name, sport)?.full ?? name;

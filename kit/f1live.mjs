@@ -1,9 +1,9 @@
 // F1's own timing (the sports proxy's f1-live.js: the live feed at
 // now.json, a finished session from F1's archive at session.json), read the
-// same way by Orbit Sports and Quadra Play: which session a reading is,
+// same way everywhere (Orbit Sports): which session a reading is,
 // whether it's over (a qualifying only after its last part: each part ends
-// with the chequered flag), and a session's order as an outcome Play's picks
-// settle on the moment it's over (ESPN's results came minutes to hours later).
+// with the chequered flag), and a session's order the moment it's over (ESPN's
+// results came minutes to hours later).
 //
 // Loaded with import() and a fallback (an older kit cached on a phone lacks it).
 

@@ -1,6 +1,6 @@
 // ---- worker.js ----
 // orbit-workers-proxy: the one proxy, every app's server side (Orbit
-// Securities and Play, Orbit Sports, Transit, Weather, Words and Class).
+// Securities, Orbit Sports, Transit, Weather, Words and Class).
 // Routed by path, each route's work in its own file:
 //
 //   GET/POST/PATCH/DELETE /eco   the Orbit Pass: one account and one NT$
@@ -8,30 +8,26 @@
 //                                app's data (eco.js)
 //   POST  /gemini                Orbit Class's AI schedule-photo import
 //   POST  /nl-edit               Orbit Class's natural-language edits
-//   POST  /slip-scan             Orbit Slips' ticket photos (slip.js)
 //   POST  /law-ask               Orbit Law's questions on a law's articles (law.js)
 //   POST  /law-chat              Orbit Law's 問法律, answered from the articles it finds (law-chat.js)
 //   GET   /law-page              A government page (gov.tw) read inside Orbit Law (law-page.js)
 //   POST  /law-gist              Orbit Law's shared one-line bill and law summaries (law-gist.js)
-//   GET   /kambi                 Kambi's live scores for Quadra Play (kambi.js)
 //   GET/POST /push/…             notices while an app is closed (push.js)
 //   GET   /weather/…             Orbit Weather's blended forecast (weather.js)
 //   GET   /transit/…             Orbit Transit's map, places, routes and TDX data (transit.js)
-//   GET/POST /play               Quadra Play's slips placed, cashed out and settled (settle.js)
 //   POST  /stock                 Orbit Securities' orders filled at the proxy's own quote (stock-fill.js)
-//   GET   /sports-proxy          the data proxy for Sports, Play and Securities (sports.js)
+//   GET   /sports-proxy          the data proxy for Sports and Securities (sports.js)
 //   GET   /sports-today          Orbit Sports' day of scoreboards in one answer, built on demand (sports-today.js)
 //   GET   /data/…                the family's data in R2: packs, the mirror, bus packs (data.js)
 //   GET   /config                the developer settings
 //
-// The crons (scheduled, below): notices, Kambi, the weather's scoring and
-// capacity on the even minutes; Play's slips and lottery on the odd ones; F1's
-// laps each minute Thursday to Monday; the family's data (builders/: Play's board every ten minutes, the rest hourly or daily). Every route but /eco's sign-in needs a
+// The crons (scheduled, below): notices, the weather's scoring and
+// capacity on the even minutes; F1's laps each minute Thursday to Monday;
+// the family's data (builders/: hourly or daily). Every route but /eco's sign-in needs a
 // Orbit Pass session (`qt=`); CORS and JSON answers come from http.js. It
 // runs in Taiwan ([placement], wrangler.toml), where the people and most
 // sources are. The Orbit Pass is the only way anything is saved.
 
-import { handleSlipScan } from './slip.js';
 import { handleLawAsk } from './law.js';
 import { handleLawChat } from './law-chat.js';
 import { handleLawGist } from './law-gist.js';
@@ -41,12 +37,7 @@ import zhTW from './locales/zh-TW.js';
 import { handleEcoRequest, LOCK_SINCE } from './eco.js';
 import { checkStock } from './stock-check.js';
 import { readToken, tokenSecret, signToken, sessionLimited, READ_GRACE_MS } from './orbit-token.js';
-import { handleKambiRequest, refreshKambiWatch, fetchKambiLive } from './kambi.js';
-import { handlePush, sendDue, notifyNow } from './push.js';
-import { handlePlay, settleCron, moveSlips } from './settle.js';
-import { lottoCron, moveTickets } from './lotto.js';
-import { asiaBaseballResponse, ASIA_HOST } from './asia-baseball.js';
-import { f1LiveResponse, F1_LIVE_HOST } from './f1-live.js';
+import { handlePush, sendDue } from './push.js';
 import { handleWeather } from './weather.js';
 import { weatherCron, skillReport } from './weather-skill.js';
 import { handleTransit, tally, warmBikes } from './transit.js';
@@ -1091,37 +1082,17 @@ const ECO_DEPS = {
   geminiCheck: env => geminiCheck(env),
   build: (env, job) => runBuilders(env, { proxy: builderProxy(env), now: Date.now(), ...(job === 'watch-full' ? { job: 'watch', full: true } : ['watch', 'cutouts', 'buses'].includes(job) ? { job } : { only: job }), log: () => {} }),
   // Securities' money counted here (stock-check.js), its market data read as the apps read it.
-  checkStock: (env, docId, payload, wallet) => checkStock(env, docId, payload, wallet, { read: url => priceReads(env).read(url), fsGet: DOCS.get, fsWrite: DOCS.write }, LOCK_SINCE),
+  checkStock: (env, docId, payload, wallet) => checkStock(env, docId, payload, wallet, { read: url => stockReads(env)(url), fsGet: DOCS.get, fsWrite: DOCS.write }, LOCK_SINCE),
   // A pass merged into another: what this Worker watches for it moves too.
   moveRecords: async (env, from, to, now) => {
     const deps = { fsGet: DOCS.get, fsWrite: DOCS.write, fsDelete: DOCS.delete, fsList: DOCS.list, now: () => Date.now() };
-    await moveSlips(env, deps, from, to);
-    await moveTickets(env, deps, from, to);
     await moveBook(env, deps, from, to, now);
   }
 };
 
-// /kambi (kambi.js): the same plumbing, and Kambi's live data.
-const KAMBI_DEPS = { ...ECO_DEPS, fsList: DOCS.list, fetchLive: fetchKambiLive };
-
-// /play (settle.js): the sources read directly (the Asian leagues' months
-// and F1's archive in this Worker, as the sports proxy serves them), and the
-// notice through push.js.
-async function readSource(url) {
-  try {
-    const u = new URL(url);
-    const res = u.hostname === ASIA_HOST ? await asiaBaseballResponse(u) : u.hostname === F1_LIVE_HOST ? (u.pathname === '/session.json' ? await f1LiveResponse(u) : null) : await fetch(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(8000) });
-    return res?.ok ? await res.json() : null;
-  } catch {
-    return null;
-  }
-}
-// A placed slip's prices are read as Play reads them: through the sports
-// proxy (its cache and trims; this Worker's own route, with a short session
-// of its own), the season packs from R2 (/data/).
 // (One short session of this Worker's own per app it reads for.)
 const workerTokens = new Map();
-async function sportsToken(env, app = 'odds') {
+async function sportsToken(env, app) {
   const had = workerTokens.get(app);
   if (had && had.until > Date.now() + 60_000) return had.value;
   const until = Date.now() + 10 * 60_000;
@@ -1132,21 +1103,6 @@ async function sportsToken(env, app = 'odds') {
 // (The sports proxy is this Worker's own route: called in place, its cache
 // writes kept within this call.)
 const inPlace = { waitUntil: p => p?.catch?.(() => {}), passThroughOnException() {} };
-// (`within`: every read on a copy at most that many seconds old; a live bet's second look.)
-const priceReads = (env, within) => ({
-  read: async (url, trim = '') => {
-    const ask = `https://orbit-workers-proxy.orbit/sports-proxy?url=${encodeURIComponent(url)}&app=odds${trim ? `&trim=${encodeURIComponent(trim)}` : ''}${within != null ? `&within=${within}` : ''}&qt=${encodeURIComponent(await sportsToken(env))}`;
-    const res = await handleSports(new Request(ask), env, inPlace, {}, 'worker');
-    if (!res.ok) throw new Error(`proxy ${res.status}`);
-    return res.json();
-  },
-  // The family's data, read in place (data.js: R2, else Pages while moving).
-  pack: async path => {
-    const res = await handleData(new Request(`https://orbit-workers-proxy.orbit/data/${path}`), env, inPlace, {}, 'worker', `/data/${path}`);
-    if (!res.ok) throw new Error(`pack ${res.status}`);
-    return res.json();
-  }
-});
 // Securities' quotes read as the phone reads them: the data proxy's route in place (its cache).
 const stockReads = env => async url => {
   const ask = `https://orbit-workers-proxy.orbit/sports-proxy?url=${encodeURIComponent(url)}&app=stock&qt=${encodeURIComponent(await sportsToken(env, 'stock'))}`;
@@ -1165,13 +1121,11 @@ const seasonBounds = async env => {
   const res = await handleData(new Request('https://orbit-workers-proxy.orbit/data/sports/bounds.json'), env, inPlace, {}, 'worker', '/data/sports/bounds.json');
   return res.ok ? (await res.json()).leagues : null;
 };
-// (OpenF1, a race's flags, through the proxy's route: its cache answers when OpenF1 turns the shared address away.)
-const playDeps = env => ({ ...ECO_DEPS, read: url => (url.startsWith('https://api.openf1.org/') ? priceReads(env).read(url).catch(() => null) : readSource(url)), prices: priceReads(env), livePrices: priceReads(env, 2), notify: (account, make) => notifyNow(env, account, 'odds', 'slip', make) });
 
 // ==== Routing ================================================================
 
 // wrangler.toml's second cron.
-const SETTLE_CRON = '1-59/2 * * * *';
+const ODD_CRON = '1-59/2 * * * *';
 // F1's lap log each minute Thursday to Monday (UTC), on both crons; the
 // family's data built on the even minutes its jobs have (builders/run.js SLOTS); the
 // bill's guard woken every ten minutes. (Crons of their own were registered
@@ -1220,7 +1174,7 @@ async function route(request, env, ctx, headers, origin) {
     return path === '/gemini' ? handleGeminiRequest(request, env, headers, ip, ctx, session) : handleNlEditRequest(request, env, headers, ip, ctx, session);
   }
   if (path === '/eco') return handleEcoRequest(request, env, headers, ip, ECO_DEPS);
-  // The data proxy for Sports, Play and Securities (sports.js): its own
+  // The data proxy for Sports and Securities (sports.js): its own
   // session gate and per-app limits.
   if (path === '/sports-proxy') return handleSports(request, env, ctx, headers, ip);
   // Orbit Sports' day of scoreboards on one request (sports-today.js): public
@@ -1230,8 +1184,6 @@ async function route(request, env, ctx, headers, origin) {
     if (!isAllowedOrigin(origin)) return errorJson('FORBIDDEN_ORIGIN', 403, headers, request);
     return handleToday(request, env, ctx, headers, ip, { bounds: () => seasonBounds(env) });
   }
-  // Orbit Slips' ticket photos, read by Gemini (a few a day).
-  if (path === '/slip-scan') return handleSlipScan(request, env, headers, ip, (model, parts, schema) => proxyGeminiRequest(model, parts, schema, env, headers, ctx, 'slip-scan'));
   // Orbit Law's questions (law.js) and its 問法律 (law-chat.js): a Orbit
   // Pass of Orbit Law's, its origin only, a day's caps a Pass in D1.
   // (Gemini's first model, Flash-Lite: a few seconds' work.)
@@ -1266,8 +1218,8 @@ async function route(request, env, ctx, headers, origin) {
     return json({ error: { message: 'check=gemini|system' } }, 400, headers);
   }
   // A builder's job now (builders/run.js), by hand: Bearer DATA_PUSH_SECRET
-  // (Shared-Proxy's build.yml). ?job=watch|cutouts|buses|play, or
-  // ?only=asia|cpbl|sports|photos|winprob|play; &full=1 a full watch run.
+  // (Shared-Proxy's build.yml). ?job=watch|cutouts|buses, or
+  // ?only=asia|cpbl|sports|photos|winprob; &full=1 a full watch run.
   if (path === '/data/build' && request.method === 'POST') {
     if (!env.DATA_PUSH_SECRET || request.headers.get('Authorization') !== `Bearer ${env.DATA_PUSH_SECRET}`) return errorJson('FORBIDDEN_ORIGIN', 403, headers, request);
     const q = new URL(request.url).searchParams;
@@ -1283,27 +1235,11 @@ async function route(request, env, ctx, headers, origin) {
     const body = await devBody(env, ctx);
     return new Response(body, { headers: { ...headers, 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=60' } });
   }
-  if (path === '/kambi') {
-    // A Orbit Pass session only, counted per session in memory.
-    const session = await sessionOf(request, env);
-    if (!session) return errorJson('ECO_TOKEN_INVALID', 401, headers, request);
-    const deps = { ...KAMBI_DEPS, rateLimitResponse: async () => (sessionLimited(`k:${session.s}`, 60) ? errorJson('RATE_LIMITED', 429, headers, request) : null) };
-    return handleKambiRequest(request, env, headers, ip, deps);
-  }
-  // Quadra Play's slips settled here (settle.js): a Orbit Pass session of Play's.
   // Orbit Securities' orders filled here (stock-fill.js): a Securities session.
   if (path === '/stock') {
     const session = await sessionOf(request, env);
     if (session && sessionLimited(`st:${session.s}`, 30)) return errorJson('RATE_LIMITED', 429, headers, request);
     return handleStock(request, env, headers, session, { json, errorJson, fsGet: DOCS.get, fsWrite: DOCS.write, now: () => Date.now(), read: url => stockReads(env)(url) });
-  }
-  if (path === '/play') {
-    const session = await sessionOf(request, env);
-    if (session && sessionLimited(`pl:${session.s}`, 30)) return errorJson('RATE_LIMITED', 429, headers, request);
-    // The dev door: a localhost page may have a slip's prices checked (nothing placed), 10 a minute an address.
-    const dev = !session && LOCAL_ORIGIN.test(origin);
-    if (dev && sessionLimited(`pl:dev:${ip}`, 10)) return errorJson('RATE_LIMITED', 429, headers, request);
-    return handlePlay(request, env, headers, session, { ...playDeps(env), dev });
   }
   // Web Push (push.js): here, where the Orbit Pass tokens can be read.
   if (path.startsWith('/push/')) {
@@ -1372,8 +1308,7 @@ export default {
   },
 
   // The cron (wrangler.toml [triggers]): the notices that are due (push.js),
-  // and the latest score of each Kambi match Orbit Sportsbook has bets on
-  // (kambi.js).
+  // F1's laps, the builders and the guard.
   async scheduled(event, env, ctx) {
     const tick = new Date(event.scheduledTime || Date.now());
     const min = tick.getUTCMinutes();
@@ -1384,23 +1319,15 @@ export default {
     // (The bill's pace, pace.js: what can wait waits.)
     const pace = (await paceOf(env)).pace;
     // The family's data (builders/), each job at its minute.
-    if (event.cron !== SETTLE_CRON && BUILD_SLOTS[min]) run(`build:${BUILD_SLOTS[min]}`, () => runBuilders(env, { proxy: builderProxy(env), now: tick.getTime(), pace, log: () => {} }));
+    if (event.cron !== ODD_CRON && BUILD_SLOTS[min]) run(`build:${BUILD_SLOTS[min]}`, () => runBuilders(env, { proxy: builderProxy(env), now: tick.getTime(), pace, log: () => {} }));
     // The bill's guard: its clock woken (started if it isn't); and what the
     // owner should hear of it (ops.js tellOwner: a higher alert, a stop, a new pace).
-    if (event.cron !== SETTLE_CRON && min % 10 === 0) {
+    if (event.cron !== ODD_CRON && min % 10 === 0) {
       if (env.GUARD) ctx.waitUntil(env.GUARD.fetch('https://quota-guard/tick').catch(() => {}));
       if (storeReady(env)) run('alerts', () => tellOwner(env, ECO_DEPS), r => (r.news ? r : null));
     }
-    // Odd minutes: Quadra Play's slips whose games should be over (settle.js),
-    // in an invocation of its own (its own fetches and CPU).
-    if (event.cron === SETTLE_CRON) {
-      // (Every run: a game is looked at every 2 minutes once it can be over;
-      // every fourth minute the lottery's tickets too, lotto.js.)
-      if (!storeReady(env)) return;
-      run('settle', () => settleCron(env, playDeps(env)), r => (r.looked ? r : null));
-      if (min % 4 === 3) run('lottery', () => lottoCron(env, playDeps(env)), r => (r.settled ? r : null));
-      return;
-    }
+    // Odd minutes: F1 only (above).
+    if (event.cron === ODD_CRON) return;
     run('notices', () => sendDue(env), r => (r.sent ? r : null));
     // Orbit Transit's YouBike: every city asked in the last half hour kept warm (transit.js warmBikes).
     run('bikes', () => warmBikes(env), () => null);
@@ -1409,6 +1336,5 @@ export default {
     if (!storeReady(env)) return;
     // The live refreshes by how many people there are (capacity.js), every 6 hours.
     if (min === 20 && tick.getUTCHours() % 6 === 0) run('capacity', () => capacityCron(env, ECO_DEPS));
-    run('kambi', () => refreshKambiWatch(env, KAMBI_DEPS), r => (r.checked || r.saved ? r : null));
   }
 };

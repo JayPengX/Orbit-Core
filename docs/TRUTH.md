@@ -99,7 +99,7 @@ break it and say so in a line.
 - **Secrets** live only as GitHub or Cloudflare secrets, never in a repo.
   Passes are issued by the owner.
 - **Orbit's money:** only the proxy adds money, on its own terms. A price,
-  perk or payout change runs through `node tools/economy.mjs` first.
+  perk or payout change is modelled in a test first.
   Close any exploit with a test that tries it.
 
 ## 6. Product principles
@@ -117,7 +117,7 @@ break it and say so in a line.
 - **Opens fast, never jumps.** Open on what the phone has and refresh
   behind it. The loading screen lifts once onto a finished screen, and
   nothing pops in after it. Live numbers fade in place. Live apps
-  (Securities, Play, Transit, Sports) cover themselves offline; the rest
+  (Securities, Transit, Sports) cover themselves offline; the rest
   open on what they kept.
 - **Less text.** No hints for what's obvious, no source names or back-end
   notes on screen. Automatic over buttons. Pictures for everything that
@@ -135,9 +135,7 @@ break it and say so in a line.
 | Orbit-Class | The class now and next; the timetable |
 | Orbit-Words | Vocabulary that catches what you don't know |
 | Orbit-Beats | Beats from your own drum kit |
-| Orbit-Slips | 台灣運彩 tickets tracked from a photo (no Pass) |
 | Orbit-Law | Taiwan's laws with linked references, and 立法院 bills by stage |
-| Quadra-Play | A Taiwan sportsbook and lottery, on play money |
 | Orbit-Securities | A Taiwan broker, on play money |
 
 Folder-Link is a separate Windows tool with its own notes.

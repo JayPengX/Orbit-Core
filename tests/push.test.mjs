@@ -91,8 +91,8 @@ test('a kind switched off in any app (or notices off) is never sent', async () =
   const now = Date.now();
   await post(stock, '/push/schedule', { items: [{ at: now + 10_000, title: '到價', kind: 'alert' }, { at: now + 20_000, title: '定期定額', kind: 'fill' }] });
   assert.equal(JSON.parse(kv.m.get('push:acct:stock')).items[0].kind, 'alert');
-  // Turned off in another app (Play's account sheet).
-  await post({ d: 'acct', a: 'odds' }, '/push/prefs', { on: true, off: ['stock:alert', 'bad key'] });
+  // Turned off in another app (Sports' account sheet).
+  await post({ d: 'acct', a: 'match' }, '/push/prefs', { on: true, off: ['stock:alert', 'bad key'] });
   assert.deepEqual(JSON.parse(kv.m.get('push:prefs:acct')), { on: true, off: ['stock:alert'] });
   const sent = [];
   const realFetch = globalThis.fetch;

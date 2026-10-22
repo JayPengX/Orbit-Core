@@ -9,14 +9,12 @@ Rules for working on any of it: `docs/TRUTH.md` (one page).
 | App | Kit id | Repo |
 | --- | --- | --- |
 | Orbit Securities | `stock` | Orbit-Securities |
-| Quadra Play | `odds` | Quadra-Play |
 | Orbit Class | `orbit` | Orbit-Class |
 | Orbit Weather | `weather` | Orbit-Weather |
 | Orbit Transit | `transit` | Orbit-Transit |
 | Orbit Sports | `match` | Orbit-Sports |
 | Orbit Words | `vocab` | Orbit-Words |
 | Orbit Beats | `beats` | Orbit-Beats |
-| Orbit Slips | `slip` | Orbit-Slips |
 
 Each lives at `https://jaypengx.github.io/<Repo>/`. The kit, the family's
 page and the admin page are this repo's Pages.
@@ -29,13 +27,12 @@ phones (home-screen apps)  ──  each app's static files + the kit (#kit/…, 
    ▼
 orbit-workers-proxy (one Worker, Taiwan)
    /eco      the Orbit Pass: accounts, wallet, app data (D1)
-   /play     Play's bets placed, settled, paid; lottery (cron)
    /stock    Securities' orders filled at the proxy's quote
    /push     notices while an app is closed (KV + cron)
    /weather  Google + CWA + MOENV blended (KV cells)
    /transit  TDX, Google Maps/Places/Routes
    /sports-proxy  ESPN, MLB, Jolpica, Polymarket, Kambi, Yahoo, ELTA, YouTube, F1 timing, Asian leagues
-   /gemini, /nl-edit, /slip-scan, /law-ask, /law-chat, /law-gist  Gemini via gemini-relay
+   /gemini, /nl-edit, /law-ask, /law-chat, /law-gist  Gemini via gemini-relay
    /data     the family's data in R2, built by builders/ on the cron
    /config   the owner's live speeds
 quota-guard  reads the bill every 5 minutes; paces, then stops the proxy at 90% of the $5 plan
@@ -72,16 +69,13 @@ runs near each caller; only Gemini goes through `gemini-relay.js`, pinned to Tai
 | Route | File | What |
 | --- | --- | --- |
 | `/eco` | `eco.js`, `eco-admin.js`, `money.js` | The Pass (§4); `op: 'admin'` is the owner's panel |
-| `/play` | `settle.js`, `price.js`, `lotto.js` | Play's slips re-priced and placed, cashed out, settled and paid; lottery and scratch cards |
 | `/stock` | `stock-fill.js`, `stock-check.js` | Securities' fills; replaying the account on each save |
-| `/kambi` | `kambi.js` | Kambi matches' last live data, kept for settling |
 | `/push/…` | `push.js` | Subscriptions, scheduled notices, checks (an ESPN final, a Yahoo price, weather, a bus) |
 | `/weather…` | `weather.js`, `weather-skill.js`, `typhoon.js` | The blend for a ~1 km cell, the township, scoring sources hourly; while CWA has a typhoon warning out (NCDR's open CAP feed, every 5 minutes), `dayOff`: one answer per county, worked out for all 22 every 3 minutes and shared by every place in it: the county's 停班停課 from 人事行政總處's page (through `gemini-relay`, every 3 minutes), else a chance fitted to the counties' real decisions (68 storms, 2019–2026) at the county seat: the storm circle's edge from CWA's 5-day track (`W-C0034-005`), the storm's strength, the 強風 lamps' gust, the day's rain (MET Norway at the seats, else Open-Meteo, every 30 minutes, floored by CWA's rain warnings) and the neighbours' announcements |
 | `/transit/…` | `transit.js` | TDX (allowlist `TDX_RULES`), map config, search, place, route; `/transit/status?sample=` (a session or the dev door only) |
 | `/sports-proxy` | `sports.js`, `asia-baseball.js`, `f1-live.js`, `fund-nav.js`, `taifex.js` | The data proxy (§3.1) |
 | `/sports-today` | `sports-today.js`, `kit/sports-espn.mjs` | Orbit Sports' day of scoreboards in one answer, built on demand (§3.1) |
 | `/gemini`, `/nl-edit` | `worker.js` | Orbit Class's photo import and plain-language edits (fixed prompts) |
-| `/slip-scan` | `slip.js` | Orbit Slips' ticket photo read (tight caps) |
 | `/law-ask` | `law.js` | Orbit Law's questions on 1-8 articles of a law: the text read from Orbit Law's data, every point cited and checked; answers kept in KV by the law's version; `mode: 'bill'` a bill explained from its 對照表 (立法院's API), each change citing a row's article, kept 30 days; `mode: 'diff'` an amendment explained from Orbit Law's `diff/<p>.json`, kept 180 days by version; a Pass of Orbit Law's, 40 Gemini calls a day a Pass and 300 in all with `/law-chat`'s (D1) |
 | `/law-chat` | `law-chat.js` | Orbit Law's 問法律: a plan, the articles found in Orbit Law's lists and full-text index (14 at most), an answer from those only, every point's cites checked; a Pass of Orbit Law's, 30 turns a day a Pass; first questions kept in KV 30 days. Both `/law-chat` and `/law-ask` (with a question) are grounded by `law-ground.js`: Orbit Law's `ai/facts.json` (official figures such as 最低工資), `ai/news.json` (agencies' notices, top 3), `bills/items.json` (立法院 stages, up to 5) and `ly/budget.json` (budget progress on a 預算 question: the year asked, else the 2 newest), each read hourly and left out when missing; the answer adds `notices` and `bills` |
 | `/law-page` | `law-page.js` | GET `?u=` a government page (gov.tw and its subdomains, www.edu.tw; https; redirects only on those) read inside Orbit Law: `{url, type:'html', html}` in its own charset (Big5 too), scripts/styles/handlers taken out, 2 MB at most, or `{url, type:'pdf'|'file', size}`; Cloudflare's cache only (judicial rulings 30 days, else a day); a Pass of Orbit Law's, 500 fresh reads a day |
@@ -99,12 +93,11 @@ runs near each caller; only Gemini goes through `gemini-relay.js`, pinned to Tai
   curl -H 'Origin: http://localhost:8123' 'https://orbit-workers-proxy.pengzjay.workers.dev/sports-proxy?url=<encoded>&app=match'
   ```
 
-- **Crons:** even minutes (notices, Kambi, builders at :16 and Play's board
-  every ten minutes at :08…:58, weather scoring, capacity); odd minutes (Play's settling, the lottery). Add work
+- **Crons:** even minutes (notices, builders at :16 and on, weather
+  scoring, capacity); F1's laps on both. Add work
   to these, not new Cron Triggers.
 - **The proxy is the only one adding money:**
   - `eco.js appEntries` takes only spending from apps, dated by the Worker.
-  - Play's picks settle on the house's own bets.
   - Securities' cash and cost are the Worker's (`stock-check.js`).
 
 ### 3.1 The data proxy (`/sports-proxy`)
@@ -143,7 +136,6 @@ changes, writing a file only when it changed (`builders/store.js`):
 
 | Builder | Writes | When (UTC) |
 | --- | --- | --- |
-| `play.js` | `play/board.json`: Play's home board (games of the next 72 h priced with the kit's own code, 為你推薦's candidates, the jackpots; shape in `kit/play-boardfile.mjs`), written every run, a minute at the edge | every ten minutes (:08, :18 … :58); parked from pace 1 (phones read their leagues themselves) |
 | `sports.js` | `sports/<league>/<year>.json`, `days.json`, `bounds.json` | daily 16:00 |
 | `watch.js` | `sports/watch.json` (hourly), the season archive (daily 20:00) | hourly / daily |
 | `winprob.js` | `winprob/…` | daily 23:00 |
@@ -174,8 +166,8 @@ included), then wiped whole. `private/` is never served.
 
 ## 5. The economy
 
-The model is `node tools/economy.mjs`; the numbers live in `eco.js` and
-the kit's `orbit.mjs` (the same tables in both).
+The numbers live in `eco.js` and the kit's `orbit.mjs` (the same tables
+in both).
 
 Money is shown only in Securities (its 資金 tab: pay, 信貸, 紓困, 財富等級,
 真相); the Pass sheet is the account and the family, never money.
@@ -192,9 +184,8 @@ Money is shown only in Securities (its 資金 tab: pay, 信貸, 紓困, 財富�
 - **Looks:** an avatar and a frame, free for everyone (the Pass's 外觀 tab).
 - **Overdraft:** 1% a month.
 
-Only Securities and Play write money entries, and `eco:` ids are the
-Worker's alone. A regular bettor stays about level; nobody but the market
-makes an account richer for free.
+Only Securities writes money entries, and `eco:` ids are the
+Worker's alone. Nobody but the market makes an account richer for free.
 
 ## 6. Notices (`/push`)
 
@@ -247,13 +238,12 @@ import map, so a file has one address whichever loader a page carries.
 | `boot.js` | The loading screen and the version check |
 | `brand.mjs` | Families, names, colours, marks, repos, `DEV` |
 | `pass.mjs`, `help.mjs` | The Pass sheet (account, looks, apps, guides: no money); every app's guide |
-| `pass-sync.mjs` | An app's payload kept in step with the Pass's copy (read and merged before any write; once per return, none under 10 s away, an unchanged copy not merged again); Words, Weather, Slips |
+| `pass-sync.mjs` | An app's payload kept in step with the Pass's copy (read and merged before any write; once per return, none under 10 s away, an unchanged copy not merged again); Words, Weather |
 | `catalog.mjs`, `logos.mjs`, `names.mjs`, `photos.mjs` | Leagues; logos; Chinese team names; studio headshots |
 | `f1live.mjs`, `postseason.mjs`, `sports-*.mjs` | F1 sessions; MLB's postseason; highlights, broadcast, win probability (also run by builders) |
-| `play-*.mjs`, `stock-*.mjs` | Play's and Securities' pricing and ledgers, shared with the Worker (`play-boardfile.mjs`: the home board's file, packed by the Worker and read by Play) |
+| `stock-*.mjs` | Securities' pricing and ledgers, shared with the Worker |
 | `holidays.mjs` | Taiwan's days off |
 | `loan.mjs`, `gov.mjs` | 信貸 and relief; what the government took and gave one account |
-| `settle.mjs` | Settling Play's slips, shared with the Worker (`settle.js`) |
 | `devconfig.mjs`, `mirror.mjs`, `photo-urls.mjs` | `DEV` for the Workers; the nightly mirror's addresses; photos' addresses alone |
 | `apps.mjs`, `link.mjs`, `preload.mjs`, `stamp.mjs`, `stamp-app.mjs`, `hash.mjs` | Build tools, never served: refresh the apps' snippets; link `.kit`; the first-screen modulepreload lists; the kit's and each app's content-hashed build |
 | `sw-images.js` | Other sites' pictures in one shared cache |
@@ -266,8 +256,9 @@ account; a daily 當沖額度 on what's sold first, twice net worth in NT$100,00
 steps, NT$500,000 to NT$50,000,000 (`dayTradeRoom`).
 
 **Brand:** `node brand/generate.mjs [id…|site]` writes every app's icons,
-share cards, manifest and page tags. Renamed repos (Passion-Beats,
-Slip-Tracker) are small redirect repos.
+share cards, manifest and page tags. Renamed repos (Passion-Beats) are small redirect
+repos. Play and Slips left the family on 2026-10-22: they are Longshot
+now, its own app and Worker (JayPengX/Longshot), nothing of theirs here.
 
 ## 9. Deploying and secrets
 
@@ -291,7 +282,6 @@ Slip-Tracker) are small redirect repos.
 | Tool | What |
 | --- | --- |
 | `node tools/preview.mjs <app>` | The app at phone size with real data (`--live`, `--width 375`, `--lang en`, `--click`, `--eval`, `--store`, `--webkit`, `--reopen`, `--serve`…; `tools/README.md`). Prints `wraps:`, `cut:`, `scrolls sideways:` |
-| `node tools/economy.mjs` | The economy on paper: each kind of user over a year |
 | `node tools/leagues-audit.mjs` | Every catalogue league against its sources |
 | `node tools/hk-lots.mjs` | Hong Kong board lots for Securities, from HKEX |
 | `node tools/jp-lists.mjs` | Tokyo's TOPIX500 and ETF trading units for Securities, from JPX |
@@ -307,14 +297,14 @@ the kit.
 
 | This | Also check |
 | --- | --- |
-| A league (`kit/catalog.mjs`) | Sports' `leagues.mjs`/`broadcast.mjs`, Play's `teams.mjs`, `builders/`, `tools/leagues-audit.mjs` |
+| A league (`kit/catalog.mjs`) | Sports' `leagues.mjs`/`broadcast.mjs`, `builders/`, `tools/leagues-audit.mjs` |
 | `proxyJson`, `packJson` | Every app's first paint; `sports.js`, `data.js` |
 | A trim | Every parser that reads it, and the builders |
 | A Cloudflare product or cron | `guard.js` `PLAN` |
-| `f1-live.js` | Sports' F1 board, Play's F1 settling |
+| `f1-live.js` | Sports' F1 board |
 | `fund-nav.js` | Securities' 境內基金 NAVs (SITCA) |
 | `taifex.js` | Securities' 期貨 and 選擇權: TAIFEX settlements (TX/MTX/TMF, TXO), margins, finals |
-| `eco.js` money rules | The kit's tables, Securities' `lib/truth.mjs` and 資金 tab, `help.mjs`, `tools/economy.mjs` |
+| `eco.js` money rules | The kit's tables, Securities' `lib/truth.mjs` and 資金 tab, `help.mjs` |
 | `push.js` checks | The apps that schedule them, `NOTICE_KINDS` |
 | `orbit.css` or the frame | Every app at 375 px, light and dark |
 | `brand.mjs` | `node brand/generate.mjs` |

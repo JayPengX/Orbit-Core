@@ -1,6 +1,5 @@
 // ---- stock-fill.js: /stock, Orbit Securities' orders filled here ----
-// The owner, 2026-10-14: Securities' orders are filled by the proxy, as
-// Play's bets are placed and settled by it. The phone places an order (the
+// The owner, 2026-10-14: Securities' orders are filled by the proxy. The phone places an order (the
 // kit's placeOrder: it holds its cash or shares and waits); then it asks
 // here for its open orders, and this Worker decides each with the kit's own
 // rule (triggerPrice: a market order now, a limit or stop once its price is

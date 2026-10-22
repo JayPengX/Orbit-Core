@@ -1,15 +1,14 @@
 // Every league in the shared catalogue (kit/catalog.mjs), checked against its
-// real sources: what Orbit Sports would list (schedule and scores) and what
-// Quadra Play could price, today. One line per league; a league with nothing
-// in either is flagged, so "every sport works" is checked rather than assumed.
+// real sources: what Orbit Sports would list (schedule and scores), today.
+// One line per league; a league with nothing is flagged, so "every sport
+// works" is checked rather than assumed.
 //
 //   node tools/leagues-audit.mjs [--sport soccer] [--json]
 //
 // Orbit Sports: ESPN's scoreboard (the whole year for races, tours and cards; the
 // season calendar's next game day otherwise), Kambi's list, or the Asian
-// baseball months (asia-baseball.js, run here). Play: ESPN events carrying
-// DraftKings odds, or Kambi matches with a winner price. Off-season leagues
-// show 0 and a note of their next game day when the calendar has one.
+// baseball months (asia-baseball.js, run here). Off-season leagues show 0
+// and a note of their next game day when the calendar has one.
 import { execFile } from 'node:child_process';
 import { CATALOG, SPORTS } from '../kit/catalog.mjs';
 import { asiaBaseballResponse } from '../asia-baseball.js';
@@ -74,21 +73,6 @@ async function fixtures(key, l) {
   return { n: events.length, next };
 }
 
-async function play(key, l) {
-  if (!l.bet) return { sold: false };
-  if (key === 'f1') return { sold: true, n: '(own board)' };
-  if (l.odds === 'kambi') {
-    const data = await get(kambiList(l.kambi));
-    const priced = (data?.events || []).filter(e => (e.betOffers || []).some(o => o.betOfferType?.englishName === 'Match'));
-    return { sold: true, n: priced.length, next: priced.map(e => e.event.start).sort()[0] };
-  }
-  const dates = [0, 1, 2, 3].map(d => ymd(now + d * 86_400_000));
-  const pages = await Promise.all(dates.map(d => get(`${SITE}/${l.espn}/scoreboard?dates=${d}&limit=200`)));
-  const seen = new Set();
-  const priced = pages.flatMap(p => p?.events || []).filter(e => !seen.has(e.id) && seen.add(e.id) && e.competitions?.[0]?.odds?.length);
-  return { sold: true, n: priced.length, next: priced.map(e => e.date).sort()[0] };
-}
-
 const rows = [];
 const keys = Object.keys(CATALOG).filter(k => !only || CATALOG[k].sport === only);
 for (let i = 0; i < keys.length; i += 6) {
@@ -97,8 +81,8 @@ for (let i = 0; i < keys.length; i += 6) {
     ...(await Promise.all(
       batch.map(async key => {
         const l = CATALOG[key];
-        const [fx, pl] = await Promise.all([fixtures(key, l).catch(e => ({ error: String(e) })), play(key, l).catch(e => ({ error: String(e) }))]);
-        return { key, sport: l.sport, source: l.data, fixtures: fx, play: pl };
+        const fx = await fixtures(key, l).catch(e => ({ error: String(e) }));
+        return { key, sport: l.sport, source: l.data, fixtures: fx };
       })
     ))
   );
@@ -108,8 +92,7 @@ else {
   const day = d => (d ? new Date(d).toISOString().slice(5, 16).replace('T', ' ') : '');
   for (const r of rows) {
     const fx = r.fixtures.error ? `ERROR ${r.fixtures.error}` : `${String(r.fixtures.n).padStart(4)} ${day(r.fixtures.next).padEnd(11)}`;
-    const pl = !r.play.sold ? 'not sold' : r.play.error ? `ERROR ${r.play.error}` : `${String(r.play.n).padStart(4)} priced ${day(r.play.next)}`;
-    const flag = !r.fixtures.n && (!r.play.sold || !r.play.n) ? '  <- nothing now' : '';
-    console.log(`${`${SPORTS[r.sport]?.icon || ''} ${r.key}`.padEnd(18)} ${r.source.padEnd(6)} fixtures ${fx}   play ${pl}${flag}`);
+    const flag = !r.fixtures.n ? '  <- nothing now' : '';
+    console.log(`${`${SPORTS[r.sport]?.icon || ''} ${r.key}`.padEnd(18)} ${r.source.padEnd(6)} fixtures ${fx}${flag}`);
   }
 }

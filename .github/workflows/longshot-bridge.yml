@@ -23,7 +23,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
-      LONGSHOT_REF: ${{ inputs.ref || 'longshot' }}
+      LONGSHOT_REF: ${{ inputs.ref || 'main' }}
     steps:
       - name: The account
         run: |
