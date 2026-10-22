@@ -76,10 +76,11 @@ export function parseStatus(s) {
 // ahead (it doesn't bat), or the end of an inning from the 9th apart, or
 // the home side ahead in the bottom of the 9th or later (a walk-off ends it
 // there).
+// (`league`: a catalogue key, Orbit Sports' or Quadra Play's: the same keys.)
 const REGULATION = { basketball: 4 };
 export function overByRule(status, away, home, league) {
   if (!status || status.state !== 'in' || status.void) return status;
-  const sport = LEAGUES[league]?.sport;
+  const sport = LEAGUES[league]?.sport ?? CATALOG[league]?.sport;
   const a = Number(away?.score);
   const h = Number(home?.score);
   if (!Number.isFinite(a) || !Number.isFinite(h) || a === h) return status;
@@ -97,6 +98,12 @@ export function overByRule(status, away, home, league) {
   }
   return over ? { ...status, state: 'post', completed: true, detail: 'Final', short: 'Final', byRule: true } : status;
 }
+
+// The soonest a game of each sport can be over, in minutes from its start: when
+// a final is first asked for (Orbit Sports' result notices, Play's settling),
+// then every 2 minutes. A quick game is under its usual length (a 2 h 20
+// baseball game, a blowout), so never that.
+export const SHORTEST_MIN = { soccer: 105, baseball: 110, basketball: 110, football: 160, hockey: 115, sets: 60, racing: 90 };
 
 const logoOf = team => team?.logo || team?.logos?.[0]?.href || null;
 // ESPN's F1 headshots (headshots/f1/) stopped in 2021 (a newer driver has

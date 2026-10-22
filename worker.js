@@ -1394,10 +1394,11 @@ export default {
     // Odd minutes: Quadra Play's slips whose games should be over (settle.js),
     // in an invocation of its own (its own fetches and CPU).
     if (event.cron === SETTLE_CRON) {
-      // (Every fourth minute the lottery's tickets instead, lotto.js: each run its own fetches.)
+      // (Every run: a game is looked at every 2 minutes once it can be over;
+      // every fourth minute the lottery's tickets too, lotto.js.)
       if (!storeReady(env)) return;
+      run('settle', () => settleCron(env, playDeps(env)), r => (r.looked ? r : null));
       if (min % 4 === 3) run('lottery', () => lottoCron(env, playDeps(env)), r => (r.settled ? r : null));
-      else run('settle', () => settleCron(env, playDeps(env)), r => (r.looked ? r : null));
       return;
     }
     run('notices', () => sendDue(env), r => (r.sent ? r : null));

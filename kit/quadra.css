@@ -4310,9 +4310,8 @@ div.q-ritem {
   color: var(--q-label-2);
   font: 400 15px/1.4 var(--q-font);
 }
+/* (Its buttons share the row evenly: one alone, as tell's 好, is the full width.) */
 .q-ask.pro .q-ask-actions {
-  grid-template-columns: 1fr 1fr;
-  grid-auto-flow: row;
   gap: 10px;
 }
 .q-ask.pro .q-ask-actions .q-btn {

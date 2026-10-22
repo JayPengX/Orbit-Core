@@ -10,7 +10,7 @@ const session = { d: ACCOUNT, s: 'sid', a: 'odds' };
 
 // An in-memory Firestore (updateTime preconditions as Firestore keeps them),
 // a scripted ESPN, and the notices sent.
-function setup(now, { final = true } = {}) {
+function setup(now, { final = true, status = null } = {}) {
   const store = new Map();
   let clock = 0;
   const k = (c, id) => `${c}/${id}`;
@@ -23,7 +23,7 @@ function setup(now, { final = true } = {}) {
         date: START,
         competitions: [
           {
-            status: { type: final ? { name: 'STATUS_FINAL', state: 'post', completed: true } : { name: 'STATUS_IN_PROGRESS', state: 'in', completed: false } },
+            status: status || { type: final ? { name: 'STATUS_FINAL', state: 'post', completed: true } : { name: 'STATUS_IN_PROGRESS', state: 'in', completed: false } },
             competitors: [
               { homeAway: 'away', score: '2', team: { displayName: 'Chicago Cubs' }, linescores: [] },
               { homeAway: 'home', score: '5', team: { displayName: 'Cincinnati Reds' }, linescores: [] }
@@ -143,7 +143,7 @@ test('a game not over is looked at again later; a parlay with a pick lost settle
   now.t = Date.parse(START) + 4 * 3_600_000;
   const run = await settleCron(env, deps);
   assert.equal(run.settled, 0);
-  assert.equal(doc(OPEN_COLLECTION, OPEN_INDEX).due[`${ACCOUNT}_slipwin01`], now.t + 3 * 60_000);
+  assert.equal(doc(OPEN_COLLECTION, OPEN_INDEX).due[`${ACCOUNT}_slipwin01`], now.t + 2 * 60_000);
   // A parlay: the Cubs pick lost, the other game tomorrow.
   const s2 = setup(now);
   wallet(s2.store, [{ id: 'odds:stake-parlay001', t: 1, app: 'odds', kind: 'stake', amount: -100 }]);
@@ -152,6 +152,35 @@ test('a game not over is looked at again later; a parlay with a pick lost settle
   await settleCron(env, s2.deps);
   assert.deepEqual(s2.doc(SETTLED_COLLECTION, ACCOUNT).slips.parlay001.results, ['lost', null]);
   assert.equal(s2.doc(SETTLED_COLLECTION, ACCOUNT).slips.parlay001.settled, true);
+});
+
+test('a game over by its score (home ahead at Mid 9th) settles before ESPN says final', async () => {
+  const now = { t: Date.parse(START) + 2 * 3_600_000 };
+  const { store, deps, doc } = setup(now, { status: { period: 9, type: { name: 'STATUS_IN_PROGRESS', state: 'in', completed: false, shortDetail: 'Mid 9th' } } });
+  wallet(store, [{ id: 'odds:stake-slipwin01', t: 1, app: 'odds', kind: 'stake', amount: -100 }]);
+  await watch(deps, [slip('slipwin01', [leg('home')])]);
+  assert.equal((await settleCron(env, deps)).settled, 1);
+  assert.deepEqual(doc(SETTLED_COLLECTION, ACCOUNT).slips.slipwin01.results, ['won']);
+  // Top of the 9th, home ahead: not over yet.
+  const s2 = setup(now, { status: { period: 9, type: { name: 'STATUS_IN_PROGRESS', state: 'in', completed: false, shortDetail: 'Top 9th' } } });
+  wallet(s2.store, [{ id: 'odds:stake-slipwin01', t: 1, app: 'odds', kind: 'stake', amount: -100 }]);
+  await watch(s2.deps, [slip('slipwin01', [leg('home')])]);
+  assert.equal((await settleCron(env, s2.deps)).settled, 0);
+});
+
+test('a phone that saw the game end has its slips looked at now, not on the next run', async () => {
+  const now = { t: Date.parse(START) + 30 * 60_000 };
+  const { store, deps, doc } = setup(now);
+  wallet(store, [{ id: 'odds:stake-slipwin01', t: 1, app: 'odds', kind: 'stake', amount: -100 }]);
+  await watch(deps, [slip('slipwin01', [leg('home')])]);
+  // Not due (too soon by the clock), but the game is final: settled at once.
+  assert.equal((await settleCron(env, deps)).looked, 0);
+  const r = await post(deps, { op: 'settle', ids: ['slipwin01', 'not a slip'] });
+  assert.equal(r.body.settled.slipwin01.payout, 180);
+  assert.equal(doc(WALLET_COLLECTION, ACCOUNT).entries.filter(e => e.id === 'odds:payout-slipwin01').length, 1);
+  // Asked again: nothing paid twice.
+  await post(deps, { op: 'settle', ids: ['slipwin01'] });
+  assert.equal(doc(WALLET_COLLECTION, ACCOUNT).entries.filter(e => e.id === 'odds:payout-slipwin01').length, 1);
 });
 
 test('a game never found is void 48 hours after its start (its local day, for baseball, at the least), not before', async () => {
@@ -191,14 +220,14 @@ test('only a Play session, and only sane slips', async () => {
   assert.equal(cleanSlip(slip('slipwin01', Array.from({ length: 21 }, () => leg('home')))), null);
 });
 
-test('a slip is looked at when its soonest undecided game should be over', () => {
+test('a slip is looked at from the soonest its undecided game can be over', () => {
   const now = Date.parse('2026-10-10T20:00:00Z');
   const s = slip('slipwin01', [leg('home'), { ...leg('home'), sport: 'epl', start: '2026-10-11T14:00:00Z' }]);
-  assert.equal(nextLook(s, now), Date.parse(START) + 2.4 * 3_600_000 + 5 * 60_000);
-  assert.equal(nextLook({ ...s, legs: [{ ...s.legs[0], result: 'won' }, s.legs[1]] }, now), Date.parse('2026-10-11T14:00:00Z') + 1.85 * 3_600_000 + 5 * 60_000);
-  // Past that: every 3 minutes until it's final; long after (put off), every 15.
-  const over = Date.parse(START) + 2.6 * 3_600_000;
-  assert.equal(nextLook(s, over), over + 3 * 60_000);
+  assert.equal(nextLook(s, now), Date.parse(START) + 110 * 60_000);
+  assert.equal(nextLook({ ...s, legs: [{ ...s.legs[0], result: 'won' }, s.legs[1]] }, now), Date.parse('2026-10-11T14:00:00Z') + 105 * 60_000);
+  // Past that: every 2 minutes until it's final; long after (put off), every 15.
+  const over = Date.parse(START) + 2 * 3_600_000;
+  assert.equal(nextLook(s, over), over + 2 * 60_000);
   const long = Date.parse(START) + 7 * 3_600_000;
   assert.equal(nextLook(s, long), long + 15 * 60_000);
 });

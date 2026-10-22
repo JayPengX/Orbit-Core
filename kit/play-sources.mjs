@@ -10,6 +10,7 @@ export const useReader = r => (reader = { ...reader, ...r });
 import { americanToProbability, devigProportional, devigPower } from '#kit/play-odds.mjs';
 import { normalizeTeamName, teamZh, LEAGUES, familyOf, isSoccer, rememberLogo, rememberTeams, hasTeams } from '#kit/play-teams.mjs';
 import { shareLeft } from '#kit/play-live.mjs';
+import { overByRule, parseStatus } from '#kit/sports-espn.mjs';
 import { KAMBI, kambiUrl, parseKambiEvents, parseKambiInPlay, useKambiToken, fetchKambiLeague, watchKambiMatches, fetchKeptKambi } from '#kit/play-kambi.mjs';
 import { KAMBI_LEAGUES } from '#kit/play-teams.mjs';
 import { withHousePrices, loadStrengths } from '#kit/play-house.mjs';
@@ -971,6 +972,9 @@ export function parseEspnLive(data, sport) {
     const away = side('away');
     const home = side('home');
     if (!away || !home) continue;
+    // Over by the score (End of 4th apart, Mid 9th home ahead): off 場中 at
+    // once, as the settling counts it final (settle.mjs parseEspnResults).
+    if (overByRule(parseStatus(comp.status), away, home, sport).state === 'post') continue;
     const game = {
       espnId: event.id,
       sport,
