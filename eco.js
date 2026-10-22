@@ -49,7 +49,6 @@
 //   POST   /eco { op: 'admin', token, action }        the store's clean-up
 
 import { retire } from './money.js';
-import { VIP, vipStakes, vipTier } from './kit/plus.mjs';
 import { storeReady } from './doc-store.js';
 import { tokenSecret, signToken, readToken, seal, unseal, sessionLimited, SESSION_MS, REFRESH_MS, HANDOFF_MS } from './quadra-token.js';
 import { handleAdmin } from './eco-admin.js';
@@ -140,10 +139,6 @@ const finiteOr0 = v => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
 export const worthOf = (wallet, now = Date.now()) => poolBalance(wallet) + finiteOr0(wallet?.snap?.stock?.held) - debtOf(wallet, now);
 const TPE = 8 * 3_600_000;
 const WEEK = 7 * 86_400_000;
-const nextMonth = m => {
-  const [y, mo] = m.split('-').map(Number);
-  return mo === 12 ? `${y + 1}-01` : `${y}-${String(mo + 1).padStart(2, '0')}`;
-};
 export const taipeiMonth = t => new Date(t + TPE).toISOString().slice(0, 7);
 export { weekStart };
 
@@ -164,8 +159,6 @@ export function paydayEntries(wallet, now) {
   }
   // The loan's installments come out of the pay (kit/loan.mjs loanDue).
   out.push(...loanDue(wallet, poolBalance({ ...wallet, entries: [...(wallet.entries || []), ...out] }), now));
-  // VIP cashback on the months before this one.
-  out.push(...vipEntries(wallet, now));
   // Level rewards for wealth levels reached (after the pay that may reach one).
   out.push(...rankEntries({ ...wallet, entries: [...(wallet.entries || []), ...out] }, now));
   return out;
@@ -212,27 +205,7 @@ export function rankEntries(wallet, now) {
   return out;
 }
 
-// ---- VIP cashback and the welcome offer ---------------------------------------------
-//
-// VIP (the kit's VIP, the same table): a Taiwan month's gaming stakes (Play's
-// bets and lottery and scratch tickets, less refunds) set its tier, and the
-// tier's share of them is paid back once the month is over, on the first
-// read after it (`eco:vip:<month>`, kind 'vip', the tier in the note). Every
-// product keeps 14% or more of its stakes; the top rate is 1.5%.
-// (The table and a month's stakes are the kit's, plus.mjs: one copy.)
-export { VIP, vipStakes, vipTier };
-export function vipEntries(wallet, now) {
-  const have = new Set((wallet?.entries || []).map(e => e.id));
-  const month = taipeiMonth(now);
-  const out = [];
-  for (let m = VIP.from, n = 0; m < month && n < 36; m = nextMonth(m), n++) {
-    if (have.has(`eco:vip:${m}`)) continue;
-    const stakes = vipStakes(wallet, m);
-    const tier = vipTier(stakes);
-    if (tier) out.push({ id: `eco:vip:${m}`, t: now, app: 'eco', kind: 'vip', amount: Math.floor(stakes * tier.back), note: tier.id });
-  }
-  return out;
-}
+// (VIP cashback is gone, 2026-10-22: the `eco:vip:<month>` entries already paid stay as history.)
 export { WEEK };
 
 const isObj = v => Boolean(v) && typeof v === 'object' && !Array.isArray(v);

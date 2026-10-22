@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { handleEcoRequest, mergeWallet, poolBalance, cleanPatch, emptyWallet, paydayEntries, worthOf, vipEntries, vipStakes, vipTier, VIP, PAY, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, ECO_APPS, rankEntries, RANKS } from '../eco.js';
+import { handleEcoRequest, mergeWallet, poolBalance, cleanPatch, emptyWallet, paydayEntries, worthOf, PAY, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, ECO_APPS, rankEntries, RANKS } from '../eco.js';
 import { planClean, tidyWallet } from '../eco-admin.js';
 
 function setup() {
@@ -474,29 +474,11 @@ test('a new pass today opens with NT$200,000', async () => {
   assert.equal(acct.wallet.entries.find(e => e.id === 'eco:start').amount, 200_000);
 });
 
-test('VIP: last month\'s gaming stakes set its tier, and its cashback is paid once the month is over', () => {
+test('no VIP cashback any more: a big month of stakes pays nothing back the month after', () => {
   const oct = m => Date.UTC(2026, 9, m, 4);
-  const w = { entries: [
-    { id: 'odds:stake-a', t: oct(3), app: 'odds', kind: 'stake', amount: -40_000 },
-    { id: 'odds:lotto-b', t: oct(4), app: 'odds', kind: 'lottery', amount: -15_000 },
-    { id: 'odds:refund-a', t: oct(5), app: 'odds', kind: 'refund', amount: 4_000 },
-    // Winnings, Securities and other months don't count.
-    { id: 'odds:payout-a', t: oct(6), app: 'odds', kind: 'payout', amount: 90_000 },
-    { id: 'odds:stake-sep', t: Date.UTC(2026, 8, 20), app: 'odds', kind: 'stake', amount: -900_000 },
-    { id: 'vocab:shop:x', t: oct(7), app: 'vocab', kind: 'shop', amount: -9_000 }
-  ] };
-  assert.equal(vipStakes(w, '2026-10'), 51_000);
-  assert.equal(vipTier(51_000).id, 'silver');
-  assert.equal(vipTier(9_999), null);
-  // Not during the month; on the first read after it, once.
-  assert.deepEqual(vipEntries(w, oct(20)), []);
+  const w = { created: oct(1), entries: [{ id: 'eco:start', t: oct(1), app: 'eco', kind: 'start', amount: 200_000 }, { id: 'odds:stake-a', t: oct(3), app: 'odds', kind: 'stake', amount: -600_000 }] };
   const nov = Date.UTC(2026, 10, 2, 4);
-  assert.deepEqual(vipEntries(w, nov), [{ id: 'eco:vip:2026-10', t: nov, app: 'eco', kind: 'vip', amount: 408, note: 'silver' }]);
-  assert.deepEqual(vipEntries({ entries: [...w.entries, ...vipEntries(w, nov)] }, nov), []);
-  // Months before VIP began are never paid.
-  assert.equal(VIP.from, '2026-10');
-  // Every rate stays well under the house's smallest cut (a single keeps 13.6%).
-  assert.ok(VIP.tiers.every(t => t.back <= 0.015));
+  assert.ok(paydayEntries(w, nov).every(e => !String(e.id).startsWith('eco:vip:')));
 });
 
 test('no welcome free bet any more (台灣運彩 gives none): a first paid bet brings nothing', async () => {

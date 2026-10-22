@@ -190,7 +190,7 @@ the kit's `quadra.mjs` (the same tables in both).
   the old 50k–20M levels' rewards count towards the new ones).
 - **Looks:** an avatar and a frame, free for everyone (the Pass's 外觀 tab).
 - **Old `eco:plus:*` and `eco:plusrefund:v1` entries** stay in wallets as history.
-- **VIP cashback:** 0.5–1.5% of a month's gaming stakes.
+- **Old `eco:vip:*` entries** (VIP cashback, gone 2026-10-22) stay in wallets as history.
 - **Overdraft:** 1% a month.
 
 Only Securities and Play write money entries, and `eco:` ids are the
@@ -240,7 +240,7 @@ import map, so a file has one address whichever loader a page carries.
 
 | Module | What |
 | --- | --- |
-| `quadra.mjs` | The core: the session, `proxyJson`/`packJson`, the economy tables, VIP, looks, notices, `installGate`, `watchUpdates`, `onlineOnly`, `keepOffline`, `mayLocate`, `tabBar`, `topActions`, `fitNumbers`, `rank` (recommendations), `rec` (除錯紀錄), iPhone behaviour |
+| `quadra.mjs` | The core: the session, `proxyJson`/`packJson`, the economy tables, looks, notices, `installGate`, `watchUpdates`, `onlineOnly`, `keepOffline`, `mayLocate`, `tabBar`, `topActions`, `fitNumbers`, `rank` (recommendations), `rec` (除錯紀錄), iPhone behaviour |
 | `quadra.css` | The design system (iOS 27 tokens, Liquid Glass, springs, every control) |
 | `ui.mjs` | Builders: `segmented`, `sheet` (the one sheet: `detent`, `foot`, `lead`, `trailing`; the Pass is it), `menu`, `toast`, `list`/`cell`, `search`, `toggle`, `empty`, `navTitle` (collapsing large title), `pullToRefresh`, `view`, the cards and tiles (`tile`, `tag`, `rowCard`, `stats`, `section`, `logoTile`, `matchCard`, `stockRow`, `progressRing`, `monthCalendar`, `panelGrid`…), the one date selector of every app (`dayBar`/`dayStrip` + `daySwipe`, `dayStep`, `dayList`, `dayTop`/`dayNum`: a sticky strip of day chips, 📅 for any day, a swipe for the next); and HTML-string twins of some (`emptyHtml`, `tileHtml`, `statsHtml`, `stockRowHtml`…) |
 | `ui.mjs` icons | `share`, `trash`, `x`, `bank`, `lock`, `exchange`, `cup`, `flag` join the set (`send`, `key`, `swap`, `spark` already existed); apps read `kitUI.icons?.x`, never import |
@@ -253,7 +253,7 @@ import map, so a file has one address whichever loader a page carries.
 | `f1live.mjs`, `postseason.mjs`, `sports-*.mjs` | F1 sessions; MLB's postseason; highlights, broadcast, win probability (also run by builders) |
 | `play-*.mjs`, `stock-*.mjs` | Play's and Securities' pricing and ledgers, shared with the Worker (`play-boardfile.mjs`: the home board's file, packed by the Worker and read by Play) |
 | `holidays.mjs` | Taiwan's days off |
-| `plus.mjs`, `loan.mjs`, `gov.mjs` | VIP, free bets and the welcome offer; 信貸 and relief; what the government took and gave one account |
+| `plus.mjs`, `loan.mjs`, `gov.mjs` | Old free bets (history); 信貸 and relief; what the government took and gave one account |
 | `settle.mjs` | Settling Play's slips, shared with the Worker (`settle.js`) |
 | `devconfig.mjs`, `mirror.mjs`, `photo-urls.mjs` | `DEV` for the Workers; the nightly mirror's addresses; photos' addresses alone |
 | `apps.mjs`, `link.mjs`, `preload.mjs`, `stamp.mjs`, `stamp-app.mjs`, `hash.mjs` | Build tools, never served: refresh the apps' snippets; link `.kit`; the first-screen modulepreload lists; the kit's and each app's content-hashed build |

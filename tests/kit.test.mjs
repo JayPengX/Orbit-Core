@@ -438,24 +438,9 @@ test('an old Plus boost still reads in the statement', () => {
   assert.equal(kit.openPlus, undefined);
 });
 
-test('VIP in the kit: the same tiers as the Worker, this month so far', async () => {
-  const eco = await import('../eco.js');
-  assert.deepEqual(kit.VIP.tiers.map(t => [t.id, t.min, t.back]), eco.VIP.tiers.map(t => [t.id, t.min, t.back]));
-  assert.equal(kit.VIP.from, eco.VIP.from);
-  const now = Date.UTC(2026, 9, 20, 4);
-  const w = { entries: [
-    { id: 'odds:stake-a', t: now, app: 'odds', kind: 'stake', amount: -60_000 },
-    { id: 'eco:vip:2026-09', t: now - 1, app: 'eco', kind: 'vip', amount: 80, note: 'bronze' }
-  ] };
-  const v = kit.vipStatus(w, now);
-  assert.equal(v.stakes, 60_000);
-  assert.equal(v.tier.id, 'silver');
-  assert.equal(v.back, 480);
-  assert.equal(v.next.id, 'gold');
-  assert.equal(v.toNext, 90_000);
-  assert.equal(v.paid.amount, 80);
-  assert.equal(kit.vipStatus({ entries: [] }, now).tier, null);
-  assert.equal(kit.vipName(v.tier, 'en'), 'Silver');
+test('no VIP in the kit (gone 2026-10-22)', () => {
+  assert.equal(kit.VIP, undefined);
+  assert.equal(kit.vipStatus, undefined);
 });
 
 test('pictures: national sides get flags, names in either order', async () => {

@@ -1,9 +1,9 @@
 // Quadra Truth: how the money in Quadra moves and how the house earns, in
-// real numbers: the kit's (the pay, loans, VIP, overdrafts), Play's and
+// real numbers: the kit's (the pay, loans, overdrafts), Play's and
 // Securities' own rules (mirrored below: those apps don't share their
 // pricing modules), and this account's own record in the wallet. Pure
 // functions, tested directly.
-import { VIP, FREEBET, OVERDRAFT_RATE, moneySides } from '#kit/quadra.mjs';
+import { FREEBET, OVERDRAFT_RATE, moneySides } from '#kit/quadra.mjs';
 import { MARKETS, CURRENCIES } from './stock-markets.mjs';
 import { BASE_CUT } from './play-rules.mjs';
 import { SLIP_RULES } from './play-odds.mjs';
@@ -119,7 +119,3 @@ export function record(wallet) {
 
 // The overdraft's yearly cost: OVERDRAFT_RATE a month, compounded.
 export const overdraftYear = () => (1 + OVERDRAFT_RATE) ** 12 - 1;
-// VIP cashback against the house's cut on the same stakes: what comes back
-// for every NT$100 the house keeps.
-export const vipShare = tier => tier.back / houseKeep(1);
-export { VIP };
