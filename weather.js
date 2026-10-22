@@ -44,6 +44,7 @@
 
 import { STATIONS } from './weather-stations.js';
 import { twDay } from './kit/format.mjs';
+import { readTyphoon, readDgpa, dayOffFor } from './typhoon.js';
 
 export const GOOGLE = 'https://weather.googleapis.com/v1/';
 export const GOOGLE_AIR = 'https://airquality.googleapis.com/v1/';
@@ -1436,6 +1437,19 @@ async function cachedText(env, key, ttl, make) {
 
 // ---- Route ---------------------------------------------------------------------------
 
+// The typhoon day off (typhoon.js) on a place's answer, while CWA has a
+// typhoon warning out: the warning read every 10 minutes, the 人事行政總處
+// page every 5 while there is one (both kept in KV for everyone).
+async function withDayOff(env, resp, at, fetchFn, ctx, now = Date.now()) {
+  if (!resp?.place?.county) return resp;
+  const defer = ctx?.waitUntil ? p => ctx.waitUntil(p) : null;
+  const ty = await shared(env, 'weather:typhoon', 10 * MIN, () => readTyphoon(fetchFn, now), now, defer);
+  if (!ty?.data) return resp;
+  const dg = await shared(env, 'weather:dgpa', 5 * MIN, () => readDgpa(env, fetchFn), now, defer);
+  const dayOff = dayOffFor(resp, ty.data, dg?.data, now, at);
+  return dayOff ? { ...resp, dayOff } : resp;
+}
+
 export async function handleWeather(request, env, headers, path, { session = null, limited = () => false, ctx = null, fetchFn = fetch, cf = request.cf, cache } = {}) {
   const send = (data, status = 200) => new Response(typeof data === 'string' ? data : JSON.stringify(data), { status, headers: { ...headers, 'Content-Type': 'application/json; charset=utf-8' } });
   if (request.method !== 'GET') return send({ code: 'GET_ONLY' }, 405);
@@ -1489,7 +1503,7 @@ export async function handleWeather(request, env, headers, path, { session = nul
     // the second, on the same request the moment it's in (the page asked
     // again every 2 s for it). Without a job to follow, one line.
     let rest = null;
-    const first = { ...(await cellForecast(env, ctx, lat, lon, { fetchFn, follow: q.get('lines') ? job => (rest = job) : null })), ...where };
+    const first = { ...(await withDayOff(env, await cellForecast(env, ctx, lat, lon, { fetchFn, follow: q.get('lines') ? job => (rest = job) : null }), { lat, lon }, fetchFn, ctx)), ...where };
     if (!rest) return send(first);
     const enc = new TextEncoder();
     const { readable, writable } = new TransformStream();
@@ -1497,7 +1511,7 @@ export async function handleWeather(request, env, headers, path, { session = nul
     const body = (async () => {
       await out.write(enc.encode(`${JSON.stringify(first)}\n`));
       const whole = await rest.catch(() => null);
-      if (whole) await out.write(enc.encode(`${JSON.stringify({ ...whole, ...where })}\n`));
+      if (whole) await out.write(enc.encode(`${JSON.stringify({ ...(await withDayOff(env, whole, { lat, lon }, fetchFn, ctx)), ...where })}\n`));
       await out.close();
     })().catch(() => out.abort().catch(() => {}));
     if (ctx?.waitUntil) ctx.waitUntil(body);
