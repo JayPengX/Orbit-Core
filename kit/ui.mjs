@@ -134,8 +134,21 @@ export function dayStrip(s, { days = [], current = null, onPick = () => {}, labe
       r.classList.toggle('q-more-before', r.scrollLeft > 1);
       r.classList.toggle('q-more-after', r.scrollLeft + r.clientWidth < r.scrollWidth - 1);
     };
+    // Whole days only: as many chips as fit, sharing the row's width (never one
+    // cut in half beside the 📅); the row comes to rest on a chip's edge.
+    s.fit = () => {
+      const r = s.row;
+      if (!r.clientWidth) return;
+      const cs = getComputedStyle(r);
+      const room = r.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      const gap = parseFloat(cs.columnGap) || 0;
+      const n = Math.max(1, Math.floor((room + gap) / (56 + gap)));
+      const w = `${Math.floor(((room - gap * (n - 1)) / n) * 10) / 10}px`;
+      if (r.style.getPropertyValue('--q-day-w') !== w) r.style.setProperty('--q-day-w', w);
+      s.edges();
+    };
     s.row.addEventListener('scroll', s.edges, { passive: true });
-    if (typeof ResizeObserver !== 'undefined') new ResizeObserver(s.edges).observe(s.row);
+    if (typeof ResizeObserver !== 'undefined') new ResizeObserver(s.fit).observe(s.row);
     s.wrap = h('div', { class: 'q-day-strip-wrap day-strip-wrap' }, [s.row, h('label', { class: 'q-chip q-day-pick day-pick', title: pickLabel }, [h('span', { class: 'day-pick-icon', 'aria-hidden': 'true', html: CAL_ICON }), s.input])]);
   }
   Object.assign(s, { onPick, bounds, clamp });

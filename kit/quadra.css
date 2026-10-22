@@ -5248,26 +5248,28 @@ html.q-kb .q-kb-docked {
   margin: 0;
   padding-inline: 6px;
   scroll-padding-inline: 6px;
-  scroll-snap-type: none;
+  scroll-snap-type: x mandatory;
   overscroll-behavior-x: contain;
   -webkit-mask-image: linear-gradient(90deg, transparent, black var(--q-fade-before, 0px), black calc(100% - var(--q-fade-after, 0px)), transparent);
   mask-image: linear-gradient(90deg, transparent, black var(--q-fade-before, 0px), black calc(100% - var(--q-fade-after, 0px)), transparent);
 }
 /* (A fade only on a side with more days to scroll to: none at the start, the first chip whole.) */
 .q-day-bar .q-day-strip.q-more-before {
-  --q-fade-before: 14px;
+  --q-fade-before: 6px;
 }
 .q-day-bar .q-day-strip.q-more-after {
-  --q-fade-after: 14px;
+  --q-fade-after: 6px;
 }
+/* Whole chips: dayStrip's fit() sets --q-day-w so a whole number of days fills the row. */
 .q-day-bar .q-day-strip .q-chip.day {
-  flex: none;
+  flex: 0 0 var(--q-day-w, auto);
+  scroll-snap-align: start;
   display: grid;
   justify-items: center;
   gap: 3px;
   min-width: 50px;
   min-height: 54px;
-  padding: 6px;
+  padding: 6px 4px;
   border-radius: 16px;
   background: none;
   color: var(--q-label);
