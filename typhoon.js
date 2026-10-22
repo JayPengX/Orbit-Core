@@ -246,12 +246,14 @@ const BFT_MS = [0, 0.3, 1.6, 3.4, 5.5, 8, 10.8, 13.9, 17.2, 20.8, 24.5, 28.5, 32
 
 // A county's lines on the page, each with its day (今天 or 明天 from the
 // page's own time) and whether it covers only some towns.
+// A line for some places only: '綠島鄉:…' (a name, no digits: 明天12:00起 is a time).
+const PLACE_RE = /^([^\d\s:：][^\d:：]{0,40})[:：]/;
 function linesOf(dgpa, county) {
   const said = dgpa?.counties?.[county];
   if (!said || /無停班停課/.test(said)) return [];
   const day = twDate(dgpa.at || Date.now());
   const next = twDate(Date.parse(`${day}T12:00:00+08:00`) + 24 * HOUR);
-  return officialLines(said).map(l => ({ ...l, date: /明天|明日/.test(l.text) ? next : day, scoped: /^[^\d\s][^:：]{0,40}[:：]/.test(l.text) }));
+  return officialLines(said).map(l => ({ ...l, date: /明天|明日/.test(l.text) ? next : day, scoped: PLACE_RE.test(l.text) }));
 }
 
 // CWA's rain warnings (W-C0033-001) for a county over the day, as the least
@@ -419,4 +421,49 @@ async function metNoRain(fetchFn, lat, lon) {
     out[d] = Math.round(((out[d] || 0) + mm) * 10) / 10;
   }
   return out;
+}
+
+// ---- A place's closures, for every app's calendar ----------------------------------
+
+// When a notice starts: 12:00起 / 下午04:00起 → 'HH:MM'; 下午 alone → '12:00',
+// 晚上 → '18:00'; a whole day → null.
+export function offFrom(text) {
+  const s = String(text || '').replace(PLACE_RE, '');
+  const m = /(上午|中午|下午|晚上)?\s*(\d{1,2})[:：時](\d{2})?\s*(?:分)?\s*起/.exec(s);
+  if (m) {
+    let h = Number(m[2]);
+    if (/下午|晚上/.test(m[1] || '') && h < 12) h += 12;
+    return `${String(h).padStart(2, '0')}:${m[3] || '00'}`;
+  }
+  if (/下午/.test(s)) return '12:00';
+  if (/晚上|夜間/.test(s)) return '18:00';
+  return null;
+}
+
+// The county's (and, given, the township's) word for each day on 人事行政總處's
+// page: { 'YYYY-MM-DD': { work: { off, from }, class: { off, from }, text } }.
+// A line for some towns counts only for the town it names exactly (綠島鄉:…);
+// one for a few schools (尖石鄉玉峰國民小學:…) is those schools', not the town's.
+// The town's own line wins over the county's for that town.
+export function closuresFor(dgpa, county, town = null) {
+  county = tai(county || '');
+  const days = {};
+  const short = s => tai(s).replace(/\s+/g, '');
+  const lines = linesOf(dgpa, county).filter(l => l.off !== 'wait');
+  const scopedTo = l => short(PLACE_RE.exec(l.text)?.[1] || '');
+  const mine = [...lines.filter(l => !l.scoped), ...(town ? lines.filter(l => l.scoped && scopedTo(l) === short(town)) : [])];
+  for (const l of mine) {
+    const from = offFrom(l.text);
+    const work = l.off === 'all' || l.off === 'work';
+    const school = l.off === 'all' || l.off === 'class';
+    days[l.date] = { work: { off: work, from: work ? from : null }, class: { off: school, from: school ? from : null }, text: l.text };
+  }
+  return days;
+}
+
+// The stock exchange's day (臺灣證券交易所's rule): closed all day when 臺北市
+// stops work for the morning or the whole day; a stop from the afternoon on
+// leaves the day's trading as it is.
+export function tradeClosed(day) {
+  return Boolean(day?.work?.off && (!day.work.from || day.work.from < '12:00'));
 }

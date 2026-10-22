@@ -46,7 +46,7 @@
 
 import { STATIONS } from './weather-stations.js';
 import { twDay } from './kit/format.mjs';
-import { COUNTIES, readTyphoon, readDgpa, readSeatRain, dayOffFor } from './typhoon.js';
+import { COUNTIES, readTyphoon, readDgpa, readSeatRain, dayOffFor, closuresFor, tradeClosed } from './typhoon.js';
 
 export const GOOGLE = 'https://weather.googleapis.com/v1/';
 export const GOOGLE_AIR = 'https://airquality.googleapis.com/v1/';
@@ -1583,6 +1583,27 @@ export async function handleWeather(request, env, headers, path, { session = nul
     }
     if (q.get('cells')) return send(await cellsReport(env, Date.now()));
     return send(await cachedText(env, 'weather:status', 600, async () => JSON.stringify(await weatherStatus(env, fetchFn))));
+  }
+  // A place's typhoon days off for every app's calendar (public, the
+  // government's own words; the page read at most every 3 minutes for
+  // everyone): ?county=&town=, or ?lat=&lon= (the nearest station's
+  // township). → { at, place, days: { date: { work, class, trade?, text } } }.
+  if (path === '/weather/dayoff') {
+    let county = q.get('county');
+    let town = q.get('town');
+    const lat = Number(q.get('lat'));
+    const lon = Number(q.get('lon'));
+    if (!county && q.get('lat') && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) {
+      const s = nearestStation(lat, lon, 'a') || nearestStation(lat, lon, 'm');
+      if (s && s.km <= NEAR_KM) ({ county, town } = s);
+    }
+    county = county ? county.replace(/台/g, '臺') : null;
+    if (!county || !COUNTIES.includes(county)) return send({ at: Date.now(), place: null, days: {} }, 200);
+    const now = Date.now();
+    const dg = await shared(env, 'weather:dgpa', 3 * MIN, () => readDgpa(env, fetchFn), now, ctx?.waitUntil ? p => ctx.waitUntil(p) : null);
+    const days = closuresFor(dg?.data, county, town);
+    if (county === '臺北市') for (const d of Object.values(days)) d.trade = { off: tradeClosed(d) };
+    return new Response(JSON.stringify({ at: dg?.data?.at ?? null, place: { county, town: town || null }, days }), { headers: { ...headers, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=60' } });
   }
   if (path === '/weather/places') {
     return new Response(JSON.stringify(townships()), { headers: { ...headers, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=86400' } });

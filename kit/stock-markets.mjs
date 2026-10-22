@@ -1031,5 +1031,7 @@ export function isOpen(quote, now = Date.now()) {
   // Mainland shares are bought from abroad through Stock Connect, which
   // trades only when Hong Kong is open too.
   if (quote.market === 'CN' && !tradingDay('HK', localDayOf(now, 'HK'))) return false;
+  // (Taiwan's markets shut for a typhoon by 臺北市's word, whatever the session says.)
+  if (['TW', 'TAIFEX', 'TWFUND'].includes(quote.market) && !tradingDay(quote.market, localDayOf(now, quote.market))) return false;
   return true;
 }
