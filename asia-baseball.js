@@ -377,19 +377,22 @@ export async function cpblTodayExchange(fetchFn = fetch) {
   const { page, html, cookie } = await cpblPage('https://www.cpbl.com.tw/', fetchFn);
   if (!page.ok) return new Response(JSON.stringify({ error: `cpbl home ${page.status}` }), { status: 502 });
   const token = /name="__RequestVerificationToken" type="hidden" value="([^"]+)"/.exec(html)?.[1];
-  return fetchFn(CPBL_TODAY, {
+  const res = await fetchFn(CPBL_TODAY, {
     method: 'POST',
     headers: { 'User-Agent': BROWSER_UA, 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', 'X-Requested-With': 'XMLHttpRequest', Cookie: cookie, Referer: 'https://www.cpbl.com.tw/', Origin: 'https://www.cpbl.com.tw' },
     body: token ? `__RequestVerificationToken=${encodeURIComponent(token)}` : '',
     signal: AbortSignal.timeout(TIMEOUT)
   });
+  // (A refusal says how far it got: the home page, its form token, its size.)
+  if (!res.ok) return new Response(JSON.stringify({ error: `cpbl list ${res.status} (home ${page.status}, token ${Boolean(token)}, ${html.length} B)` }), { status: 502 });
+  return res;
 }
 // The relay (env.GEMINI_RELAY) this Worker reaches Taiwan through, set by the sports proxy and the cron.
 let relay = null;
 export const useCpblRelay = binding => void (relay ||= binding || null);
 export async function cpblToday(via = relay) {
   const res = via ? await via.fetch(`https://gemini-relay/?to=${encodeURIComponent(CPBL_TODAY)}`, { signal: AbortSignal.timeout(2 * TIMEOUT) }) : await cpblTodayExchange();
-  if (!res.ok) throw new Error(`cpbl today ${res.status}`);
+  if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || `cpbl today ${res.status}`);
   const data = await res.json();
   if (!data?.Success) throw new Error('cpbl today answer');
   return parseCpblToday(data);
