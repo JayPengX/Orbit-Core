@@ -626,6 +626,7 @@ function fotmobHome(data) {
       home: side(f.home),
       away: side(f.away),
       at: f.status?.utcTime || '',
+      dateTbd: Boolean(f.status?.matchDateTbd),
       timeTbd: Boolean(f.status?.matchTimeTbd),
       started: Boolean(f.status?.started),
       finished: Boolean(f.status?.finished),
