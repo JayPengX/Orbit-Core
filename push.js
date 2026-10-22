@@ -22,9 +22,11 @@
 //   check: { espn: 'football/nfl', event: '401…' }            a game's final score,
 //          asked every run (each 2 minutes), and told as soon as the score
 //          says it's over (overNow), not when ESPN gets round to 'post'
-//   check: { tsdb: '2618131', day: '2026-10-21', names }  a CPBL game's final
-//          (ESPN doesn't carry CPBL; TheSportsDB's day list, the one Orbit
-//          Sports reads CPBL from), asked every run like ESPN's
+//   check: { tsdb: '2618131', day: '2026-10-21', names, clubs }  a CPBL game's
+//          final (ESPN doesn't carry CPBL): the league's own list of the day's
+//          games (cpbl.com.tw, from Taiwan through the relay), the clubs by
+//          their English names (kit CPBL_CLUBS); else TheSportsDB's day list,
+//          the one Orbit Sports reads CPBL from. Asked every run like ESPN's
 //   check: { yahoo: '2330.TW', op: 'above'|'below', price }  a price reached
 //   check: { weather: { lat, lon, kind: 'brief'|'rain' } }   Orbit Weather's
 //          morning brief, or a rain alert when the next 2 hours turn wet
@@ -49,7 +51,8 @@ import { weatherCheck } from './weather.js';
 import { tdxGet, tdxRequest } from './transit.js';
 import { bodyText } from './http.js';
 import { LEAGUES, parseStatus, overByRule } from './kit/sports-espn.mjs';
-import { TSDB_DAY, TSDB_CPBL } from './kit/catalog.mjs';
+import { TSDB_DAY, TSDB_CPBL, CPBL_CLUBS } from './kit/catalog.mjs';
+import { cpblToday } from './asia-baseball.js';
 
 const enc = new TextEncoder();
 const b64u = bytes => {
@@ -189,6 +192,7 @@ export function cleanItems(items, now = Date.now()) {
       if (/^\d{4,10}$/.test(String(c?.tsdb)) && /^\d{4}-\d{2}-\d{2}$/.test(String(c.day))) {
         item.check = { tsdb: String(c.tsdb), day: String(c.day) };
         if (Array.isArray(c.names) && c.names.length === 2) item.check.names = c.names.map(n => cleanText(n, 40));
+        if (Array.isArray(c.clubs) && c.clubs.length === 2 && c.clubs.every(n => CPBL_ZH[String(n).toLowerCase()])) item.check.clubs = c.clubs.map(String);
       }
       const w = c?.weather;
       if (w && Math.abs(w.lat) <= 90 && Math.abs(w.lon) <= 180 && ['brief', 'rain'].includes(w.kind)) item.check = { weather: { lat: Math.round(w.lat * 1e4) / 1e4, lon: Math.round(w.lon * 1e4) / 1e4, kind: w.kind } };
@@ -360,6 +364,23 @@ export async function runCheck(check, lang, env) {
     return { title: `${na} ${a?.score ?? ''} : ${h?.score ?? ''} ${nh}`, body: result, result };
   }
   if (check.tsdb) {
+    const T = (zh, en) => (lang === 'en' ? en : zh);
+    const told = (as, hs) => {
+      const [na, nh] = check.names || check.clubs || ['', ''];
+      const won = as > hs ? na : hs > as ? nh : null;
+      const result = won ? T(`${won} 贏了`, `${won} win`) : T('平手', 'Draw');
+      return { title: `${na} ${as} : ${hs} ${nh}`, body: result, result };
+    };
+    // The league's own word first (its day is Taiwan's; a game of another day isn't on its list).
+    const twDay = new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 10);
+    if (check.clubs && check.day === twDay) {
+      const [away, home] = check.clubs.map(n => CPBL_ZH[n.toLowerCase()]);
+      const g = (await cpblToday(env?.GEMINI_RELAY).catch(() => null))?.find(x => sameClub(x.away.zh, away) && sameClub(x.home.zh, home));
+      if (g?.status === 3) return told(g.away.score, g.home.score);
+      if (g?.status === 5) return { body: T('比賽取消', 'Canceled'), result: T('比賽取消', 'Canceled') };
+      if (g?.status === 6) return { body: T('延賽', 'Postponed'), result: T('延賽', 'Postponed') };
+      if (g) return null;
+    }
     // (Kept at the edge a minute: every phone waiting on the day asks once a run.)
     // (Its free key turns the proxy's shared addresses away, 429, most of the
     // time: then from the relay, a Worker of its own pinned to Taiwan.)
@@ -369,16 +390,12 @@ export async function runCheck(check, lang, env) {
     if (!res?.ok) return null;
     const e = (await res.json())?.events?.find(x => String(x.idEvent) === check.tsdb);
     const status = String(e?.strStatus || '').toUpperCase();
-    const T = (zh, en) => (lang === 'en' ? en : zh);
     if (/^(POST|PPD)/.test(status)) return { body: T('延賽', 'Postponed'), result: T('延賽', 'Postponed') };
     if (/^(CANC|ABD)/.test(status)) return { body: T('比賽取消', 'Canceled'), result: T('比賽取消', 'Canceled') };
     if (!/^(FT|AOT|AET)/.test(status)) return null;
     // (A side held scoreless is left empty.)
-    const [as, hs] = [Number(e.intAwayScore) || 0, Number(e.intHomeScore) || 0];
-    const [na, nh] = check.names || [e.strAwayTeam, e.strHomeTeam];
-    const won = as > hs ? na : hs > as ? nh : null;
-    const result = won ? T(`${won} 贏了`, `${won} win`) : T('平手', 'Draw');
-    return { title: `${na} ${as} : ${hs} ${nh}`, body: result, result };
+    check = check.names ? check : { ...check, names: [e.strAwayTeam, e.strHomeTeam] };
+    return told(Number(e.intAwayScore) || 0, Number(e.intHomeScore) || 0);
   }
   if (check.yahoo) {
     const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(check.yahoo)}?range=1d&interval=5m`, { headers: { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1' }, signal: AbortSignal.timeout(UPSTREAM_MS) });
@@ -390,6 +407,12 @@ export async function runCheck(check, lang, env) {
   }
   return null;
 }
+
+// CPBL's clubs: English (TheSportsDB's, the app's) to the league's own Chinese.
+const CPBL_ZH = Object.fromEntries(CPBL_CLUBS.map(([en, zh]) => [en.toLowerCase(), zh]));
+// (Matched on the club's name with its sponsor's letters left out: 統一7-ELEVEn獅, 統一獅.)
+const clubCore = t => String(t || '').replace(/[\sA-Za-z0-9-]/g, '');
+const sameClub = (a, b) => Boolean(a && b) && clubCore(a) === clubCore(b);
 
 // A game ESPN still has 'in' that its score says is over: it keeps one
 // for minutes at "End of 4th" or "Mid 9th" before its 'post' (the owner's
