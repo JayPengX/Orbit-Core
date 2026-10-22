@@ -49,7 +49,7 @@ import { asiaBaseballResponse, ASIA_HOST } from './asia-baseball.js';
 import { f1LiveResponse, F1_LIVE_HOST } from './f1-live.js';
 import { handleWeather } from './weather.js';
 import { weatherCron, skillReport } from './weather-skill.js';
-import { handleTransit, tally } from './transit.js';
+import { handleTransit, tally, warmBikes } from './transit.js';
 import { readDev, capacityCron } from './eco-admin.js';
 import { paceOf } from './pace.js';
 import { beat, tellOwner, systemReport } from './ops.js';
@@ -1402,6 +1402,8 @@ export default {
       return;
     }
     run('notices', () => sendDue(env), r => (r.sent ? r : null));
+    // Orbit Transit's YouBike: every city asked in the last half hour kept warm (transit.js warmBikes).
+    run('bikes', () => warmBikes(env), () => null);
     // Orbit Weather's scoring, once an hour (weather-skill.js).
     if (!pace && min === 10) run('weather-skill', () => weatherCron(env));
     if (!storeReady(env)) return;
