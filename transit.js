@@ -327,9 +327,11 @@ export async function freshOf(rule, env = null, path = '', now = Date.now()) {
 const inflight = new Map();
 // How long TDX gets when an older copy is there to answer with instead.
 export const SLOW_MS = 3000;
-// How long a copy stays in the cache: its stale time, a live one 10 minutes
-// (only ever an answer when TDX is slow or failing, with its age).
-const keptFor = rule => Math.max(rule.stale, rule.tier === 'live' ? 10 * MIN : 0);
+// How long a copy stays in the cache: its stale time, a live one 10 minutes,
+// YouBike's 30 (only ever an answer when TDX is slow or failing, with its age:
+// a station's place and its bikes half an hour ago beat a trip held up by a
+// TDX that hangs, 2026-10-22).
+const keptFor = rule => Math.max(rule.stale, rule.tier === 'live' ? (/Bike/.test(rule.re.source) ? 30 : 10) * MIN : 0);
 const timeout = ms => (typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(ms) : undefined);
 
 // One TDX answer, from the shared cache when it's fresh enough.
