@@ -41,6 +41,13 @@ const YT_HOST = 'www.youtube.com';
 // leagues' own sites show where ESPN has two (goals, assists). Always trimmed.
 const FOTMOB_HOST = 'www.fotmob.com';
 const FOTMOB_DATA_HOST = 'data.fotmob.com';
+// RotoWire's NBA lineups page (today's, ET): each side's five as expected
+// and then confirmed, hours before tip-off, and who may not play and why.
+// ESPN's core API marks starters only at tip-off now, and turns the Worker
+// away (403, 2026-10-22): Orbit Sports' 先發陣容 before a game. Only that
+// page (and tomorrow's), always trimmed.
+const ROTOWIRE_HOST = 'www.rotowire.com';
+const ROTOWIRE_NBA = '/basketball/nba-lineups.php';
 const SPORTS_PROXY_FETCH_USER_AGENT = 'Orbit-Sports-Bot/1.0 (+https://github.com/JayPengX/Orbit-Sports)';
 const SPORTS_PROXY_ALLOWED_HOSTS = [
   'site.api.espn.com',
@@ -78,6 +85,7 @@ const SPORTS_PROXY_ALLOWED_HOSTS = [
   F1_HOST,
   YT_HOST,
   FOTMOB_HOST,
+  ROTOWIRE_HOST,
   FOTMOB_DATA_HOST,
   // Not a real host: Asian baseball's schedules and scores, gathered by this
   // Worker from the leagues' own sites (asia-baseball.js).
@@ -308,6 +316,8 @@ function cachePolicyFor(url) {
     case ELTA_VOD_HOST:
     case F1_HOST:
       return CACHE_STANDINGS;
+    case ROTOWIRE_HOST:
+      return CACHE_LINEUP;
     case YT_HOST:
       return url.pathname === '/watch' ? CACHE_YT_VIDEO : CACHE_YT_SEARCH;
     case ASIA_HOST:
@@ -810,6 +820,38 @@ export function trimYtVideo(html) {
   };
 }
 
+// RotoWire's NBA lineups page as data: each game's sides by nickname
+// ("Trail Blazers"), each with its lineup's word (confirmed or expected),
+// its five ({ pos, name }, the full name) and who may not play ({ pos, name,
+// status }: Out, GTD, Ques, Doubt, Prob, OFS).
+const TRIM_ROTOWIRE = 'rotowire-nba';
+const htmlText = s => String(s || '').replace(/<[^>]*>/g, ' ').replace(/&amp;/g, '&').replace(/&#0?39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/\s+/g, ' ').trim();
+export function trimRotowireNba(html) {
+  const games = [];
+  for (const chunk of String(html || '').split(/class="lineup is-nba[" ]/).slice(1)) {
+    const nick = side => htmlText(new RegExp(`lineup__mteam is-${side}[^>]*>([\\s\\S]*?)<span`).exec(chunk)?.[1]);
+    const list = side => {
+      const m = new RegExp(`<ul class="lineup__list is-${side}"([\\s\\S]*?)</ul>`).exec(chunk);
+      if (!m) return null;
+      const body = m[1];
+      const cut = body.indexOf('lineup__title');
+      const players = [...body.matchAll(/<li class="lineup__player[^"]*"[^>]*>([\s\S]*?)<\/li>/g)].map(p => ({
+        at: p.index,
+        pos: htmlText(/lineup__pos[^>]*>([^<]*)/.exec(p[1])?.[1]),
+        name: htmlText(/<a[^>]*title="([^"]*)"/.exec(p[1])?.[1] || /<a[^>]*>([^<]*)/.exec(p[1])?.[1]),
+        status: htmlText(/lineup__inj[^>]*>([^<]*)/.exec(p[1])?.[1])
+      })).filter(p => p.name);
+      const starters = players.filter(p => cut < 0 || p.at < cut).slice(0, 5).map(({ pos, name, status }) => (status ? { pos, name, status } : { pos, name }));
+      const out = cut < 0 ? [] : players.filter(p => p.at > cut).map(({ pos, name, status }) => ({ pos, name, status }));
+      return { team: nick(side), lineup: /lineup__status is-(\w+)/.exec(body)?.[1] || '', starters, out };
+    };
+    const away = list('visit');
+    const home = list('home');
+    if (away?.team && home?.team) games.push({ time: htmlText(/lineup__time[^>]*>([^<]*)/.exec(chunk)?.[1]), away, home });
+  }
+  return { games };
+}
+
 // A formula1.com driver or team page's figures, as the page shows them: its
 // grids of label and value, in order ({ grids: [[[label, value], …], …] }),
 // e.g. the season's (position, points), its Grand Prix and Sprint numbers,
@@ -1035,7 +1077,7 @@ async function fetchUpstream(upstreamUrl, trim) {
         ? await translateUpstream(upstreamUrl)
         : await fetchAllowed(upstreamUrl, {
           // YouTube in English, past its cookie notice, as a browser sees it.
-          headers: upstreamUrl.hostname === YT_HOST ? { 'User-Agent': BROWSER_UA, 'Accept-Language': 'en-US,en;q=0.9', Cookie: 'SOCS=CAI; CONSENT=YES+' } : { 'User-Agent': SPORTS_PROXY_FETCH_USER_AGENT },
+          headers: upstreamUrl.hostname === YT_HOST ? { 'User-Agent': BROWSER_UA, 'Accept-Language': 'en-US,en;q=0.9', Cookie: 'SOCS=CAI; CONSENT=YES+' } : upstreamUrl.hostname === ROTOWIRE_HOST || upstreamUrl.hostname === 'sports.core.api.espn.com' ? { 'User-Agent': BROWSER_UA, Accept: '*/*' } : { 'User-Agent': SPORTS_PROXY_FETCH_USER_AGENT },
           signal: AbortSignal.timeout(SPORTS_PROXY_UPSTREAM_TIMEOUT_MS)
         });
   } catch (error) {
@@ -1055,6 +1097,7 @@ async function fetchUpstream(upstreamUrl, trim) {
       const out = (trim === TRIM_YT_SEARCH ? trimYtSearch : trimYtVideo)(new TextDecoder().decode(body));
       return out ? { status: 200, contentType: 'application/json', body: JSON.stringify(out) } : { status: 502, contentType: 'application/json', body: '' };
     }
+    if (trim === TRIM_ROTOWIRE) return { status: 200, contentType: 'application/json', body: JSON.stringify(trimRotowireNba(new TextDecoder().decode(body))) };
     if (trim === TRIM_F1PAGE) return { status: 200, contentType: 'application/json', body: JSON.stringify(trimF1Page(new TextDecoder().decode(body))) };
     if (trim) {
       try {
@@ -1157,6 +1200,7 @@ function cacheEntry(result, policy) {
 function trimFor(trimParam, upstreamUrl) {
   if (upstreamUrl.hostname === ELTA_HOST) return TRIM_ELTA;
   if (upstreamUrl.hostname === F1_HOST) return TRIM_F1PAGE;
+  if (upstreamUrl.hostname === ROTOWIRE_HOST) return TRIM_ROTOWIRE;
   if (upstreamUrl.hostname === ELTA_VOD_HOST) return TRIM_ELTA_VOD;
   if (upstreamUrl.hostname === FOTMOB_HOST) return TRIM_FOTMOB_PAGE;
   if (upstreamUrl.hostname === FOTMOB_DATA_HOST) return TRIM_FOTMOB_STAT;
@@ -1205,6 +1249,7 @@ function parseTarget(target) {
     if (u.hostname === ELTA_VOD_HOST && (!/^\/sports\/play\/1\/\d{1,6}$/.test(u.pathname) || u.search)) return null;
     // A search (its words, in English as seen from Taiwan) or a video's page, nothing else.
     if (u.hostname === YT_HOST && !(u.pathname === '/results' ? [...u.searchParams.keys()].every(k => ['search_query', 'hl', 'gl'].includes(k)) && (u.searchParams.get('search_query') || '').length > 0 && (u.searchParams.get('search_query') || '').length <= 200 : u.pathname === '/watch' && [...u.searchParams.keys()].join() === 'v' && /^[\w-]{11}$/.test(u.searchParams.get('v')))) return null;
+    if (u.hostname === ROTOWIRE_HOST && !(u.pathname === ROTOWIRE_NBA && (u.search === '' || u.search === '?date=tomorrow'))) return null;
     if (u.hostname === F1_HOST && !/^\/en\/(drivers|teams)\/[a-z-]+$/.test(u.pathname)) return null;
     if (u.hostname === FOTMOB_HOST && !(/^\/api\/data\/(leagues|teams)$/.test(u.pathname) && [...u.searchParams.keys()].join() === 'id' && /^\d{1,8}$/.test(u.searchParams.get('id')))) return null;
     if (u.hostname === FOTMOB_DATA_HOST && (!/^\/stats\/\d{1,8}\/season\/\d{1,8}\/[a-z0-9_]{2,60}\.json$/.test(u.pathname) || u.search)) return null;
