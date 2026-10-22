@@ -652,7 +652,7 @@ test('政府: the taxes Securities reports and relief, a side of its own; the fo
   assert.equal(kit.govOf({ snap: { stock: { gov: { trade: 'x', nhi: -5 } } } }).paidTotal, 0);
 });
 
-test('every EuroLeague and K League club Play sells has a Chinese name (Jay 2026-10-21)', async () => {
+test('every EuroLeague and K League club has a Chinese name (Jay 2026-10-21)', async () => {
   const { teamZh } = await import('../kit/names.mjs');
   const { TEAM_BADGES } = await import('../kit/logos.mjs').catch(() => ({}));
   const el = ['Virtus Bologna', 'Hapoel Tel Aviv', 'Anadolu Efes', 'BC Dubai', 'Real Madrid Baloncesto', 'Maccabi Tel Aviv', 'Saski Baskonia', 'Milano', 'KK Crvena Zvezda Belgrade', 'Partizan Belgrade', 'ASVEL Lyon-Villeurbanne', 'Žalgiris Kaunas', 'Fenerbahce SK', 'Olympiacos BC', 'Valencia Basket Club', 'Paris Basket', ...Object.keys(TEAM_BADGES?.euroleague || {})];

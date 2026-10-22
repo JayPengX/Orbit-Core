@@ -1192,11 +1192,11 @@ export function logoTile(src, { size = 40, alt = '', fallbackText = '', tint = '
   return t;
 }
 
-// A match: its league and time, two sides, the prices in one equal row.
+// A match: its league and time and two sides.
 // matchCard({ league, leagueLogo, when, live, tag, wide, sides: [{ logo, name,
-// score }], prices: [{ label, odds, onTap, selected, locked }], onOpen }).
+// score }], onOpen }).
 // Scores show as "2 : 1", else "VS". wide = a full-width card for a list.
-export function matchCard({ league = '', leagueLogo = '', when = '', live = false, tag = null, wide = false, sides = [], prices = [], onOpen = null } = {}) {
+export function matchCard({ league = '', leagueLogo = '', when = '', live = false, tag = null, wide = false, sides = [], onOpen = null } = {}) {
   const [a = {}, b = {}] = sides;
   // (The logos large in their tiles: Jay 2026-10-21, "small and weird".)
   const px = wide ? 48 : 52;
@@ -1213,30 +1213,9 @@ export function matchCard({ league = '', leagueLogo = '', when = '', live = fals
       side(a),
       h('div', { class: `q-match-mid num${scored ? '' : ' vs'}` }, [h('span', { class: 'q-match-score', text: scored ? `${a.score} : ${b.score}` : 'VS' }), !top && when ? h('small', { class: 'q-match-when', text: when }) : null]),
       side(b)
-    ]),
-    prices.length
-      ? prices.some(p => p.locked)
-        ? lockedRow()
-        : h(
-            'div',
-            { class: 'q-match-prices' },
-            prices.map(p => h('button', { class: 'q-price', type: 'button', 'aria-pressed': String(Boolean(p.selected)), onclick: e => (e.stopPropagation(), p.onTap?.(e)) }, [h('small', { text: p.label || '' }), h('b', { class: 'num', text: p.odds == null ? '' : String(p.odds) })]))
-          )
-      : null
+    ])
   ]);
   return card;
-}
-
-// A market that can't be bet right now: one calm bar across the whole row
-// (a lock and 暫停投注), never some prices open beside locked ones. Any
-// price of a market locked locks the market (matchCard does this itself).
-// lockedRow({ text }) / lockedRowHtml({ text }).
-const lockText = () => (globalThis.document?.documentElement.lang || 'zh').startsWith('zh') ? '暫停投注' : 'Betting paused';
-export function lockedRow({ text = lockText() } = {}) {
-  return h('div', { class: 'q-locked-row', role: 'status', html: `${icons.lock}<span>${E(text)}</span>` });
-}
-export function lockedRowHtml({ text = lockText() } = {}) {
-  return `<div class="q-locked-row" role="status">${icons.lock}<span>${E(text)}</span></div>`;
 }
 
 // A compact rail of games on now: liveStrip([{ min, rows: [{ logo, name,

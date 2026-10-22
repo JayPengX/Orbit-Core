@@ -53,7 +53,7 @@ test('every new export exists', () => {
 });
 
 test('the stylesheet has each new class, and keeps the old section-head rules', () => {
-  const classes = ['q-shd', 'q-sh-count', 'q-sh-more', 'q-logo', 'q-match', 'q-match-top', 'q-match-teams', 'q-match-side', 'q-match-mid', 'q-match-prices', 'q-price', 'q-live-strip', 'q-live-card', 'q-live-min', 'q-actions-grid', 'q-action', 'q-sheet-hero', 'q-sh-eyebrow', 'q-sh-big', 'q-sh-sub', 'q-sh-row', 'q-sf', 'q-sf-sum', 'pro', 'q-empty-tile', 'q-stake', 'q-stake-amt', 'q-stake-presets', 'q-balls', 'q-ball', 'q-place'];
+  const classes = ['q-shd', 'q-sh-count', 'q-sh-more', 'q-logo', 'q-match', 'q-match-top', 'q-match-teams', 'q-match-side', 'q-match-mid', 'q-live-strip', 'q-live-card', 'q-live-min', 'q-actions-grid', 'q-action', 'q-sheet-hero', 'q-sh-eyebrow', 'q-sh-big', 'q-sh-sub', 'q-sh-row', 'q-sf', 'q-sf-sum', 'pro', 'q-empty-tile', 'q-stake', 'q-stake-amt', 'q-stake-presets', 'q-balls', 'q-ball', 'q-place'];
   for (const c of classes) assert.match(css, new RegExp(`\\.${c}(?![\\w-])`), `.${c}`);
   assert.match(css, /\.q-section-head button:not\(\.q-tag\)/, 'the old head button rule keeps :not(.q-tag)');
   assert.match(rawCss, /Premium components \(round 3\)/);
@@ -79,7 +79,7 @@ test('components build their markup', () => {
   assert.equal(logo.style.props['--s'], '32px');
   assert.equal(ui.logoTile('', { size: 24, fallbackText: '蒙札' }).className, 'q-logo text');
 
-  const m = ui.matchCard({ league: '義甲', when: '明天', sides: [{ name: 'A', score: 2 }, { name: 'B', score: 1 }], prices: [{ label: '主', odds: 2.18 }], live: true });
+  const m = ui.matchCard({ league: '義甲', when: '明天', sides: [{ name: 'A', score: 2 }, { name: 'B', score: 1 }], live: true });
   assert.match(m.className, /q-match live/);
   assert.equal(m.find('q-match-mid').textContent, '2 : 1');
   assert.equal(ui.matchCard({ sides: [{ name: 'A' }, { name: 'B' }] }).find('q-match-mid').textContent, 'VS');
