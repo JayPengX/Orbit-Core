@@ -3527,8 +3527,14 @@ function swapLogos(root, dark) {
 // A logo's own tone on a dark screen, read from its pixels once (the hosts
 // answer CORS): a dark mark in one colour with no light parts (歐冠's star
 // ball, Ligue 1's grey) is drawn white (data-q-tone="mono"); a dark one in
-// colours gets a lighter glass tile ("color"); any other, one with light
-// parts of its own, stays as it is. Remembered by address.
+// colours is drawn brighter, its own colours lifted ("color"); one with a few
+// light parts but mostly lost against the dark tile (a dark blue wordmark
+// with a grey swoosh, the Warriors' navy disc) is lifted too ("lift"); any
+// other stays as it is. Never a light plate behind it (Jay: no white in dark
+// mode). Remembered by address.
+// (A colour's relative luminance, and the dark logo tile's: --q-grouped-3, #2c2c2e.)
+const rel = (...c) => c.map(v => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)).reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0);
+const TILE_L = rel(44 / 255, 44 / 255, 46 / 255);
 const LOGO_HOST = /^https:\/\/(a\.espncdn\.com|r2\.thesportsdb\.com|www\.thesportsdb\.com|cdn\.nba\.com)\//;
 const tones = new Map();
 const toneOf = async url => {
@@ -3547,6 +3553,15 @@ const toneOf = async url => {
       let lum = 0;
       let sat = 0;
       let light = 0;
+      // (Against the dark logo tile, by contrast ratio: lost under 1.7, weak under 3, strong from 4.5;
+      // edge: a pixel on the mark's outline, which is what the eye finds it by. Near-black parts
+      // aren't counted lost or weak: lifting can't bring them out.)
+      let lost = 0;
+      let weak = 0;
+      let strong = 0;
+      let edge = 0;
+      let edgeLost = 0;
+      const solid = i => i >= 0 && i < px.length && px[i + 3] >= 140;
       for (let i = 0; i < px.length; i += 4) {
         if (px[i + 3] < 140) continue;
         const [r, gr, b] = [px[i] / 255, px[i + 1] / 255, px[i + 2] / 255];
@@ -3557,14 +3572,26 @@ const toneOf = async url => {
         lum += l;
         if (l > 0.55) light++;
         sat += max ? (max - min) / max : 0;
+        const ratio = (Math.max(rel(r, gr, b), TILE_L) + 0.05) / (Math.min(rel(r, gr, b), TILE_L) + 0.05);
+        const liftable = max > 0.2;
+        if (ratio < 1.7 && liftable) lost++;
+        if (ratio < 3 && liftable) weak++;
+        if (ratio >= 4.5) strong++;
+        const x = (i / 4) % n;
+        if (x === 0 || x === n - 1 || !solid(i - 4) || !solid(i + 4) || !solid(i - n * 4) || !solid(i + n * 4)) {
+          edge++;
+          if (ratio < 1.7 && liftable) edgeLost++;
+        }
       }
       // (A picture with a solid background, a photo: nothing to do.)
       if (!count || count > n * n * 0.92) return '';
       lum /= count;
       sat /= count;
-      // (A logo with light parts of its own, a white outline, a cream crest, shows as it is:
-      // whitened, the Spurs' became a blank blob.)
-      return lum >= 0.33 || light / count > 0.06 ? '' : sat < 0.25 ? 'mono' : 'color';
+      // (A logo with light parts of its own, a white outline, a cream crest, isn't whitened:
+      // the Spurs' became a blank blob. Lifted only when most of it, outline and all, is lost
+      // on the tile, or almost none of it stands out: a dark blue wordmark beside a grey swoosh.)
+      if (lum >= 0.33 || light / count > 0.06) return (lost / count >= 0.45 && edgeLost / Math.max(edge, 1) >= 0.75) || (weak / count >= 0.7 && strong / count < 0.1) ? 'lift' : '';
+      return sat < 0.25 ? 'mono' : 'color';
     } catch {
       return '';
     }

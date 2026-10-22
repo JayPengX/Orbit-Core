@@ -5173,21 +5173,22 @@ html.q-kb .q-kb-docked {
 }
 
 /* A logo's tone on a dark screen (quadra.mjs toneLogos): a dark mark in one
-   colour drawn white; a dark one in colours on a lighter glass tile (never
-   white: Jay), so no logo vanishes into the dark. */
+   colour drawn white; a dark one in colours, or one mostly lost on the tile,
+   drawn brighter in its own colours (never a light plate: Jay), so no logo
+   vanishes into the dark. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) img[data-q-tone='mono'] {
     filter: brightness(0) invert(1);
   }
-  :root:not([data-theme='light']) :is(.q-logo, .league-badge, .logo):not(:has(.q-logo, .league-badge, .logo)):has(> img[data-q-tone='color'], > * > img[data-q-tone='color'], > * > * > img[data-q-tone='color']) {
-    background: rgba(255, 255, 255, 0.2);
+  :root:not([data-theme='light']) img:is([data-q-tone='color'], [data-q-tone='lift']) {
+    filter: brightness(1.8);
   }
 }
 :root[data-theme='dark'] img[data-q-tone='mono'] {
   filter: brightness(0) invert(1);
 }
-:root[data-theme='dark'] :is(.q-logo, .league-badge, .logo):not(:has(.q-logo, .league-badge, .logo)):has(> img[data-q-tone='color'], > * > img[data-q-tone='color'], > * > * > img[data-q-tone='color']) {
-  background: rgba(255, 255, 255, 0.2);
+:root[data-theme='dark'] img:is([data-q-tone='color'], [data-q-tone='lift']) {
+  filter: brightness(1.8);
 }
 
 /* ---- A strip of days (ui.mjs dayStrip, daySwipe): pinned under the status
