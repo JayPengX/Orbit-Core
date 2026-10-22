@@ -97,7 +97,8 @@ export function parseDgpa(html) {
   const at = /更新時間[:：]\s*(\d{4})\/(\d{1,2})\/(\d{1,2})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?/.exec(text);
   const when = at ? Date.UTC(+at[1], +at[2] - 1, +at[3], +at[4], +at[5], +(at[6] || 0)) - TW : null;
   const from = text.indexOf('縣市名稱');
-  const body = from >= 0 ? text.slice(from).split(/資料來源|更新時間/)[0] : text;
+  // (The page's numbered notes after the table, 1.若欲進入… 5.民間事業單位…, are not a county's words.)
+  const body = (from >= 0 ? text.slice(from) : text).split(/資料來源|更新時間|(?:^|\s)1\.\s*若欲|語音查詢/)[0];
   const counties = {};
   const re = new RegExp(`(${COUNTIES.join('|')}|${COUNTIES.map(c => c.replace('臺', '台')).join('|')})`, 'g');
   const hits = [...body.matchAll(re)];
@@ -115,7 +116,7 @@ export function officialLines(text) {
   return String(text || '')
     .split(/[。\n]/)
     .map(x => x.trim())
-    .filter(Boolean)
+    .filter(x => /上班|上課/.test(x) && !/^\d+\./.test(x))
     .map(x => ({ text: x, off: /停止上班/.test(x) && /停止上課/.test(x) ? 'all' : /停止上課/.test(x) ? 'class' : /停止上班/.test(x) ? 'work' : null }));
 }
 

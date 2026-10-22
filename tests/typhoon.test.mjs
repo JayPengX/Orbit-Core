@@ -45,7 +45,9 @@ test('the 人事行政總處 page, county by county', () => {
   assert.equal(d.at, Date.parse('2026-10-22T21:05:12+08:00'));
   assert.equal(d.counties['臺北市'], '明天停止上班、停止上課。');
   assert.equal(d.counties['新竹市'], '今天照常上班、照常上課。 明天停止上課。');
-  assert.match(d.counties['臺東縣'], /^蘭嶼鄉:明天停止上班、停止上課。 綠島鄉/);
+  assert.match(d.counties['臺東縣'], /^蘭嶼鄉:明天停止上班、停止上課。 綠島鄉:明天停止上班、停止上課。 ?(備註：?)?$/);
+  assert.equal(officialLines(d.counties['臺東縣']).length, 2);
+  assert.equal(officialLines('綠島鄉:今天下午停止上班、停止上課。 4.適用範圍為各級政府機關，其尚無停止上班之適用').length, 1);
   assert.deepEqual(parseDgpa('<table><tr><td>縣市名稱</td></tr><tr><td>無停班停課訊息。</td></tr></table>').counties, {});
   assert.deepEqual(officialLines('今天照常上班、照常上課。 明天停止上課。'), [{ text: '今天照常上班、照常上課', off: null }, { text: '明天停止上課', off: 'class' }]);
 });
