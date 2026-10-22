@@ -216,7 +216,13 @@ export function dayOffFor(resp, ty, dgpa, now, at = null) {
   const date = targetDay(now);
   const storm = { name: ty.name, nameEn: ty.nameEn, warning: ty.warning, date };
   const said = dgpa?.counties?.[county];
-  if (said && !/無停班停課/.test(said) && officialLines(said).length) return { ...storm, official: { lines: officialLines(said), at: dgpa.at } };
+  // The county's own decision (a line for the whole county, not 尚未宣布)
+  // replaces the chance; lines for some towns only (綠島鄉:…) go under it.
+  const lines = said && !/無停班停課/.test(said) ? officialLines(said) : [];
+  const scoped = l => /^[^\d\s][^:：]{0,40}[:：]/.test(l.text);
+  if (lines.some(l => !scoped(l) && l.off !== 'wait')) return { ...storm, official: { lines, at: dgpa.at } };
+  const local = lines.filter(scoped);
+  const towns = local.length ? { local: { lines: local, at: dgpa.at } } : {};
   const start = Date.parse(`${date}T00:00:00+08:00`);
   const to = start + 24 * HOUR;
   // The day's hours (today's: those still ahead).
@@ -244,7 +250,7 @@ export function dayOffFor(resp, ty, dgpa, now, at = null) {
     reach: (here?.edge ?? Infinity) <= 0
   };
   const chance = dayOffChance({ edge: here?.edge, islandEdge: island?.edge, vmax: here?.v ?? island?.v, gust, mm });
-  return { ...storm, chance, why };
+  return { ...storm, chance, why, ...towns };
 }
 
 // ---- Reads (kept shared in KV by the caller's `shared`) ------------------------------
