@@ -422,3 +422,26 @@ test('over from the score while ESPN still says in, only when nothing can change
   assert.equal(overNow(comp(2, { name: 'STATUS_END_PERIOD', shortDetail: 'End of 2nd Half' }, 1, 0), 'soccer/eng.1'), false, "soccer waits for ESPN's full time");
   assert.equal(overNow({ ...comp(9, { shortDetail: 'Mid 9th' }, 2, 4), status: { period: 9, type: { state: 'post' } } }, mlb), false);
 });
+
+test("a CPBL game's final from TheSportsDB's day list (ESPN doesn't carry CPBL), asked at every run", async () => {
+  const item = { at: Date.now() - 60_000, until: Date.now() + 3_600_000, title: '味全龍 vs 中信兄弟', body: '{result} · 中華職棒', tag: 'end:cpbl:cpbl-tsdb-2618131', kind: 'end', check: { tsdb: '2618131', day: '2026-10-21', names: ['味全龍', '中信兄弟'] } };
+  assert.deepEqual(cleanItems([item])[0].check, item.check);
+  assert.equal(cleanItems([{ ...item, check: { tsdb: 'x/../', day: '2026-10-21' } }])[0].check, undefined);
+  let status = '';
+  const urls = [];
+  const real = globalThis.fetch;
+  globalThis.fetch = async url => (urls.push(String(url)), new Response(JSON.stringify({ events: [{ idEvent: '2618131', strHomeTeam: 'CTBC Brothers', strAwayTeam: 'Wei Chuan Dragons', strStatus: status, intHomeScore: '5', intAwayScore: null }] }), { status: 200 }));
+  try {
+    status = 'NS';
+    assert.equal(await runCheck(item.check, 'zh', {}), null);
+    status = 'IN7';
+    assert.equal(await runCheck(item.check, 'zh', {}), null);
+    status = 'FT';
+    assert.deepEqual(await runCheck(item.check, 'zh', {}), { title: '味全龍 0 : 5 中信兄弟', body: '中信兄弟 贏了', result: '中信兄弟 贏了' });
+    status = 'POST';
+    assert.equal((await runCheck(item.check, 'en', {})).result, 'Postponed');
+  } finally {
+    globalThis.fetch = real;
+  }
+  assert.ok(urls.every(u => u.includes('eventsday.php?d=2026-10-21&l=5111')));
+});

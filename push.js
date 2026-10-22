@@ -22,6 +22,9 @@
 //   check: { espn: 'football/nfl', event: '401…' }            a game's final score,
 //          asked every run (each 2 minutes), and told as soon as the score
 //          says it's over (overNow), not when ESPN gets round to 'post'
+//   check: { tsdb: '2618131', day: '2026-10-21', names }  a CPBL game's final
+//          (ESPN doesn't carry CPBL; TheSportsDB's day list, the one Orbit
+//          Sports reads CPBL from), asked every run like ESPN's
 //   check: { yahoo: '2330.TW', op: 'above'|'below', price }  a price reached
 //   check: { weather: { lat, lon, kind: 'brief'|'rain' } }   Orbit Weather's
 //          morning brief, or a rain alert when the next 2 hours turn wet
@@ -46,6 +49,7 @@ import { weatherCheck } from './weather.js';
 import { tdxGet, tdxRequest } from './transit.js';
 import { bodyText } from './http.js';
 import { LEAGUES, parseStatus, overByRule } from './kit/sports-espn.mjs';
+import { TSDB_DAY, TSDB_CPBL } from './kit/catalog.mjs';
 
 const enc = new TextEncoder();
 const b64u = bytes => {
@@ -182,6 +186,10 @@ export function cleanItems(items, now = Date.now()) {
           if (zh.length) item.check.zh = Object.fromEntries(zh);
         }
       }
+      if (/^\d{4,10}$/.test(String(c?.tsdb)) && /^\d{4}-\d{2}-\d{2}$/.test(String(c.day))) {
+        item.check = { tsdb: String(c.tsdb), day: String(c.day) };
+        if (Array.isArray(c.names) && c.names.length === 2) item.check.names = c.names.map(n => cleanText(n, 40));
+      }
       const w = c?.weather;
       if (w && Math.abs(w.lat) <= 90 && Math.abs(w.lon) <= 180 && ['brief', 'rain'].includes(w.kind)) item.check = { weather: { lat: Math.round(w.lat * 1e4) / 1e4, lon: Math.round(w.lon * 1e4) / 1e4, kind: w.kind } };
       const b = c?.bus;
@@ -196,7 +204,7 @@ export function cleanItems(items, now = Date.now()) {
 
 // A notice of news that happens once: told once (by its tag), for 2 days.
 const TOLD_MS = 2 * 86_400_000;
-const onceOnly = x => Boolean(x.tag && (x.check?.espn || x.check?.yahoo));
+const onceOnly = x => Boolean(x.tag && (x.check?.espn || x.check?.tsdb || x.check?.yahoo));
 // What a sent notice is remembered by: news by its tag alone; anything else
 // by its tag and time (a game's start, a class at 10:00), so an app sending
 // its list again in the minutes after a start (its item still on it, not
@@ -351,6 +359,23 @@ export async function runCheck(check, lang, env) {
     const result = won ? T(`${won} 贏了`, `${won} win`) : as === hs ? T('平手', 'Draw') : T('比賽結束', 'Final');
     return { title: `${na} ${a?.score ?? ''} : ${h?.score ?? ''} ${nh}`, body: result, result };
   }
+  if (check.tsdb) {
+    // (Kept at the edge a minute: every phone waiting on the day asks once a run.)
+    const res = await fetch(`${TSDB_DAY}?d=${check.day}&l=${TSDB_CPBL}`, { signal: AbortSignal.timeout(UPSTREAM_MS), cf: { cacheTtl: 60, cacheEverything: true } });
+    if (!res.ok) return null;
+    const e = (await res.json())?.events?.find(x => String(x.idEvent) === check.tsdb);
+    const status = String(e?.strStatus || '').toUpperCase();
+    const T = (zh, en) => (lang === 'en' ? en : zh);
+    if (/^(POST|PPD)/.test(status)) return { body: T('延賽', 'Postponed'), result: T('延賽', 'Postponed') };
+    if (/^(CANC|ABD)/.test(status)) return { body: T('比賽取消', 'Canceled'), result: T('比賽取消', 'Canceled') };
+    if (!/^(FT|AOT|AET)/.test(status)) return null;
+    // (A side held scoreless is left empty.)
+    const [as, hs] = [Number(e.intAwayScore) || 0, Number(e.intHomeScore) || 0];
+    const [na, nh] = check.names || [e.strAwayTeam, e.strHomeTeam];
+    const won = as > hs ? na : hs > as ? nh : null;
+    const result = won ? T(`${won} 贏了`, `${won} win`) : T('平手', 'Draw');
+    return { title: `${na} ${as} : ${hs} ${nh}`, body: result, result };
+  }
   if (check.yahoo) {
     const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(check.yahoo)}?range=1d&interval=5m`, { headers: { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1' }, signal: AbortSignal.timeout(UPSTREAM_MS) });
     if (!res.ok) return null;
@@ -411,7 +436,7 @@ export async function sendDue(env, now = Date.now()) {
       if (item.check) {
         const found = await ask(item.check, record.lang);
         if (!found) {
-          if (now < (item.until || item.firstAt || item.at) + (item.until ? 0 : HOLD_MS)) keep.push({ ...item, firstAt: item.firstAt || item.at, at: item.check.espn ? item.at : now + (item.check.bus ? BUS_EVERY : CHECK_EVERY) });
+          if (now < (item.until || item.firstAt || item.at) + (item.until ? 0 : HOLD_MS)) keep.push({ ...item, firstAt: item.firstAt || item.at, at: item.check.espn || item.check.tsdb ? item.at : now + (item.check.bus ? BUS_EVERY : CHECK_EVERY) });
           continue;
         }
         // (A check's title can hold the app's own: "{title} 31° / 25°" keeps "家 今天天氣".)
