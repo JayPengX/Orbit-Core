@@ -25,6 +25,8 @@
 // while the forecast is under 30 minutes old (Google's own forecast refresh,
 // GOOGLE_FC_MS), and every 6 hours 8 more for hours 49–240; past the cap a cell is built without
 // Google (CWA alone, the last far hours kept).
+// Google's answers are kept per ~5 km square (GOOGLE_GRID), shared by every cell in it, and
+// the extras keep to the day's pace (googlePace), so the cap lasts the day.
 //
 // Keys (Worker secrets): GOOGLE_WEATHER_KEY, CWA_KEY, MOENV_KEY.
 //
@@ -66,6 +68,19 @@ export const FAR_MS = 6 * HOUR;
 // for the current conditions only (1 call, not 4) and keeps the forecast.
 export const GOOGLE_FC_MS = 30 * MIN;
 export const FAR_RETRY_MS = 30 * MIN;
+// Google's answers are shared by every cell in a GOOGLE_GRID square (0.05°,
+// about 5 km: its forecast doesn't change across a town, and a phone carried
+// about crosses a 1 km cell every few minutes): a cell finds the square's
+// copy (`weather:g:<square>`) and asks Google only when that's due too.
+export const GOOGLE_GRID = 0.05;
+export const gridOf = (lat, lon) => `${(Math.round(lat / GOOGLE_GRID) * GOOGLE_GRID).toFixed(2)},${(Math.round(lon / GOOGLE_GRID) * GOOGLE_GRID).toFixed(2)}`;
+// The extras (current conditions between forecasts, hours 49–240, the air
+// forecast, the status probe) keep to the day's pace: by each moment no more
+// than GOOGLE_SPARE_START of the cap plus the rest in step with Taiwan's
+// day, so a busy morning leaves the evening its forecasts. A forecast
+// refresh itself may use the whole cap.
+export const GOOGLE_SPARE_START = 0.25;
+export const googlePace = now => Math.floor(GOOGLE_DAILY_CALLS * (GOOGLE_SPARE_START + (1 - GOOGLE_SPARE_START) * (((now + 8 * HOUR) % 86_400_000) / 86_400_000)));
 export const DEFAULT_WEIGHTS = { pop: { google: 0.6, cwa: 0.4 }, temp: { google: 0.6, cwa: 0.4 } };
 
 export function googleUrl(env, path, lat, lon, extra = '', units = true) {
@@ -618,18 +633,18 @@ async function shared(env, key, freshMs, make, now, defer = null) {
 }
 
 // Today's Google calls, counted in KV: true while `calls` more fit under
-// the cap (and counts them). The count is also kept here (a KV write takes
+// the cap, or the day's pace for an extra (`spare`), and counts them. The count is also kept here (a KV write takes
 // a moment to be read back): two asks of one refresh, side by side, each
 // count, and the write can go behind the answer (`defer`).
 // (The writes one after another, each the newest count: a smaller one never lands last.)
 const tallies = new WeakMap(); // the KV namespace → { key, n, put }
-export async function googleAllowed(env, now, calls = 4, defer = null) {
+export async function googleAllowed(env, now, calls = 4, defer = null, spare = false) {
   const key = `weather:google:${twDay(now)}`;
   const read = Number(await kvJson(env, key)) || 0;
   const kv = env.RATE_LIMIT_KV;
   const mine = kv && tallies.get(kv)?.key === key ? tallies.get(kv) : null;
   const n = Math.max(read, mine?.n || 0);
-  if (n + calls > GOOGLE_DAILY_CALLS) return false;
+  if (n + calls > (spare ? Math.min(GOOGLE_DAILY_CALLS, googlePace(now)) : GOOGLE_DAILY_CALLS)) return false;
   // Kept 40 days: the admin panel's Google 帳單 adds a month of them (Weather is billed past 10,000 a month).
   if (!kv) return true;
   const t = { key, n: n + calls };
@@ -1176,8 +1191,12 @@ export function weekAdvice(out, resp, win) {
 // its air forecast) is left to the next build, the last of them used
 // meanwhile; the entry says so (`quick`) and cellForecast builds it whole behind the answer.
 // `defer`: the request's waitUntil, for KV's writes (behind the answer).
-export async function buildCell(env, lat, lon, { fetchFn = fetch, now = Date.now(), prev = null, quick = false, defer = null } = {}) {
+export async function buildCell(env, lat, lon, { fetchFn = fetch, now = Date.now(), prev: own = null, quick = false, defer = null } = {}) {
   const cell = cellOf(lat, lon);
+  // The square's Google parts, where newer than the cell's own.
+  const gKey = env.GOOGLE_WEATHER_KEY ? `weather:g:${gridOf(lat, lon)}` : null;
+  const square = gKey ? await keptJson(env, gKey) : null;
+  const prev = withSquare(own, square);
   const keep = part => (prev?.parts?.[part] && now - prev.parts[part].at < KEEP_MS ? prev.parts[part] : null);
   const settle = async (part, make) => {
     try {
@@ -1203,7 +1222,7 @@ export async function buildCell(env, lat, lon, { fetchFn = fetch, now = Date.now
   const deferred = quick && (farDue || gairDue);
   // (Counted beside the weather's calls: googleAllowed keeps its own tally.)
   const gairJob = wantGair
-    ? googleAllowed(env, now, 1, defer).then(ok =>
+    ? googleAllowed(env, now, 1, defer, true).then(ok =>
         ok
           ? fetchGoogleAir(env, lat, lon, fetchFn, now).then(
               v => ({ ok: true, v }),
@@ -1224,8 +1243,10 @@ export async function buildCell(env, lat, lon, { fetchFn = fetch, now = Date.now
     return r.state === 'ok' ? { ...r, at: gFc.at, fcAt: gFc.fcAt ?? gFc.at } : { state: 'ok', ...gFc };
   };
   const justBuilt = gFc && prev?.quick && now - prev.at < GOOGLE_FC_MS;
+  // Asked under FRESH_MS ago (this cell or another in its square): as it is.
+  const gFresh = prev?.parts?.google?.v && now - prev.parts.google.at < FRESH_MS && !wantFar ? prev.parts.google : null;
   const [google, cwa, aqi, aqf, warn, weights, aqiHist, gairRes] = await Promise.all([
-    !env.GOOGLE_WEATHER_KEY ? { state: 'off', v: null } : justBuilt && wantFar ? ((await googleAllowed(env, now, 10, defer)) ? farOnly() : { state: 'ok', ...gFc }) : gFc && !wantFar ? ((await googleAllowed(env, now, 1, defer)) ? googleNowOnly() : { state: 'ok', ...gFc }) : (await googleAllowed(env, now, wantFar ? 12 : 4, defer)) ? settle('google', () => fetchGoogle(env, lat, lon, fetchFn, !inTaiwan, wantFar)) : wantFar && (await googleAllowed(env, now, 4, defer)) ? settle('google', () => fetchGoogle(env, lat, lon, fetchFn, !inTaiwan)) : keep('google') ? { state: 'stale', ...keep('google') } : { state: 'capped', v: null },
+    !env.GOOGLE_WEATHER_KEY ? { state: 'off', v: null } : gFresh ? { state: 'ok', ...gFresh } : justBuilt && wantFar ? ((await googleAllowed(env, now, 10, defer, true)) ? farOnly() : { state: 'ok', ...gFc }) : gFc && !wantFar ? ((await googleAllowed(env, now, 1, defer, true)) ? googleNowOnly() : { state: 'ok', ...gFc }) : (await googleAllowed(env, now, wantFar ? 12 : 4, defer, wantFar)) ? settle('google', () => fetchGoogle(env, lat, lon, fetchFn, !inTaiwan, wantFar)) : wantFar && (await googleAllowed(env, now, 4, defer)) ? settle('google', () => fetchGoogle(env, lat, lon, fetchFn, !inTaiwan)) : keep('google') ? { state: 'stale', ...keep('google') } : { state: 'capped', v: null },
     env.CWA_KEY && inTaiwan ? settle('cwa', () => fetchCwa(env, lat, lon, fetchFn)) : { state: inTaiwan ? 'off' : 'n/a', v: null },
     env.MOENV_KEY && inTaiwan ? airSites(env, fetchFn, now, defer) : null,
     env.MOENV_KEY && inTaiwan ? shared(env, 'weather:moenv:aqf', 3 * HOUR, () => getJson(fetchFn, moenvUrl(env, 'aqf_p_01', '&limit=100'), env).then(j => (Array.isArray(j) ? j : j.records || []).map(f => ({ area: f.area, forecastdate: f.forecastdate, aqi: f.aqi, majorpollutant: f.majorpollutant }))), now, defer) : null,
@@ -1267,7 +1288,20 @@ export async function buildCell(env, lat, lon, { fetchFn = fetch, now = Date.now
   // The scoring needs the next 24 hours only.
   bySource.hours = bySource.hours.filter(h => h.t < now + 48 * HOUR);
   const nearOnly = google.v ? { ...google.v, far: undefined } : null;
-  return { at: now, ...(deferred ? { quick: true } : {}), resp, bySource, sources, parts: { google: google.state === 'ok' || google.state === 'stale' ? { at: google.at, fcAt: google.fcAt ?? google.at, v: nearOnly } : null, cwa: cwa.state === 'ok' || cwa.state === 'stale' ? { at: cwa.at, v: cwa.v } : null, far: far || null, gair: gair || null, gairOff: gairRes?.off ? now : gairNoted } };
+  const parts = { google: google.state === 'ok' || google.state === 'stale' ? { at: google.at, fcAt: google.fcAt ?? google.at, v: nearOnly } : null, cwa: cwa.state === 'ok' || cwa.state === 'stale' ? { at: cwa.at, v: cwa.v } : null, far: far || null, gair: gair || null, gairOff: gairRes?.off ? now : gairNoted };
+  // Anything new from Google goes to the square too (kept as long as the far hours are).
+  const newer = ['google', 'far', 'gair'].some(k => parts[k]?.at > (square?.parts?.[k]?.at ?? -1)) || (parts.gairOff ?? 0) > (square?.parts?.gairOff ?? 0);
+  if (gKey && newer) await keepJson(env, gKey, { at: now, parts: { google: parts.google, far: parts.far, gair: parts.gair, gairOff: parts.gairOff } }, 2 * 86_400, square, defer);
+  return { at: now, ...(deferred ? { quick: true } : {}), resp, bySource, sources, parts };
+}
+
+// A cell's last parts with its square's Google parts where those are newer.
+function withSquare(prev, square) {
+  if (!square?.parts) return prev;
+  const parts = { ...prev?.parts };
+  for (const k of ['google', 'far', 'gair']) if (square.parts[k] && !(parts[k]?.at >= square.parts[k].at)) parts[k] = square.parts[k];
+  if ((square.parts.gairOff ?? 0) > (parts.gairOff ?? 0)) parts.gairOff = square.parts.gairOff;
+  return { ...prev, parts };
 }
 
 // The cells people opened lately (`weather:recent`, cell → when), for the
@@ -1377,7 +1411,7 @@ for (const county of Object.keys(COUNTY_IDS)) {
 
 async function probe(env, source, fetchFn) {
   if (!env[KEYS[source]]) return { key: false, ok: false, note: 'not set' };
-  if (source === 'google' && !(await googleAllowed(env, Date.now(), 1))) return { key: true, ok: false, note: 'daily cap reached' };
+  if (source === 'google' && !(await googleAllowed(env, Date.now(), 1, null, true))) return { key: true, ok: false, note: 'daily cap reached' };
   const [url, good] = CHECKS[source](env);
   const t0 = Date.now();
   try {
@@ -1472,7 +1506,7 @@ export async function handleWeather(request, env, headers, path, { session = nul
       return send(
         await cachedText(env, `weather:sample:${sample}`, 3600, async () => {
           // (Google's samples are paid calls: they count under the day's cap.)
-          if (sample.startsWith('google') && !(await googleAllowed(env, Date.now(), 1, ctx?.waitUntil ? p => ctx.waitUntil(p) : null))) return JSON.stringify({ status: 429, body: 'GOOGLE_DAILY_CAP' });
+          if (sample.startsWith('google') && !(await googleAllowed(env, Date.now(), 1, ctx?.waitUntil ? p => ctx.waitUntil(p) : null, true))) return JSON.stringify({ status: 429, body: 'GOOGLE_DAILY_CAP' });
           const made = SAMPLES[sample](env);
           const [url, body] = Array.isArray(made) ? made : [made, null];
           const res = await fetchFn(url, body ? { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(UPSTREAM_MS) } : { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(UPSTREAM_MS) });

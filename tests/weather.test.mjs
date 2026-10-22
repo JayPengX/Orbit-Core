@@ -8,7 +8,7 @@ import {
   airForecast, parseGoogleAir, googleAirBody,
   weatherStatus, handleWeather, scrub, cellOf, nearestStation, townIds, airArea, parseCwaTown, cwaAt, parseGoogleDay, parseGoogleHour,
   blend, buildCell, GOOGLE_DAILY_CALLS, parseVillage, whereIs, addAirReading, briefText, rainPhrase, weatherCheck, noteRecent, cellForecast, FRESH_WAIT_MS, advise, adviceWindow, parseCwaWarnings, aqiLevel, uvLevel, num, DEFAULT_WEIGHTS
-, popStep, keepJson, keptJson, KV_EVERY_MS, googleAllowed } from '../weather.js';
+, popStep, keepJson, keptJson, KV_EVERY_MS, googleAllowed, googlePace, gridOf } from '../weather.js';
 import { STATIONS } from '../weather-stations.js';
 import { twDay } from '../kit/format.mjs';
 import { upstream as fixtureUpstream } from './fixtures/weather/upstream.mjs';
@@ -313,6 +313,41 @@ test("Google's count: two asks of one refresh side by side both count, the newes
   assert.equal(Number(store.get('weather:google:2026-10-02')), 5);
   assert.equal(await googleAllowed(e, NOW, GOOGLE_DAILY_CALLS - 5), true);
   assert.equal(await googleAllowed(e, NOW, 1), false, 'the cap counts what this Worker has asked, not only what KV says yet');
+});
+
+test("a cell in a square another cell just asked Google for asks Google nothing", async () => {
+  const kv = memKv();
+  const e = { ...env, RATE_LIMIT_KV: kv };
+  assert.equal(gridOf(25.034, 121.565), gridOf(25.041, 121.552));
+  await buildCell(e, 25.034, 121.565, { fetchFn: upstream(), now: NOW });
+  const used = Number(kv.store.get('weather:google:2026-10-02'));
+  const log = [];
+  const next = await buildCell(e, 25.041, 121.552, { fetchFn: upstream(log), now: NOW + 5 * 60_000 });
+  assert.ok(!log.some(p => p.startsWith('/v1/')), 'Google not asked again');
+  assert.equal(Number(kv.store.get('weather:google:2026-10-02')), used);
+  assert.equal(next.sources.google, 'ok');
+  assert.equal(next.resp.hours.length, 240, 'the far hours shared too');
+  assert.ok(log.length > 0, 'CWA still asked for its own stations');
+  // Past FRESH_MS: one cell's current conditions refresh serves both.
+  const log2 = [];
+  await buildCell(e, 25.041, 121.552, { fetchFn: upstream(log2), now: NOW + 20 * 60_000, prev: next });
+  assert.equal(log2.filter(p => p.startsWith('/v1/')).length, 1);
+  const log3 = [];
+  await buildCell(e, 25.034, 121.565, { fetchFn: upstream(log3), now: NOW + 22 * 60_000 });
+  assert.equal(log3.filter(p => p.startsWith('/v1/')).length, 0);
+});
+
+test("Google's extras keep to the day's pace; a forecast refresh may use the whole cap", async () => {
+  const midnight = Date.parse('2026-10-02T16:00:00Z'); // 00:00 in Taipei
+  assert.equal(googlePace(midnight), Math.floor(GOOGLE_DAILY_CALLS * 0.25));
+  assert.ok(googlePace(midnight + 12 * 3_600_000) > googlePace(midnight + 6 * 3_600_000));
+  assert.equal(googlePace(midnight - 1), GOOGLE_DAILY_CALLS - 1);
+  const kv = memKv();
+  const e = { RATE_LIMIT_KV: kv };
+  const morning = midnight + 8 * 3_600_000;
+  kv.store.set('weather:google:2026-10-03', String(googlePace(morning)));
+  assert.equal(await googleAllowed(e, morning, 1, null, true), false, 'an extra waits for the pace');
+  assert.equal(await googleAllowed(e, morning, 4), true, 'a forecast still asked');
 });
 
 test('the township list for the picker', async () => {
