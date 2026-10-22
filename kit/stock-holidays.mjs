@@ -10,6 +10,8 @@
 //     2027. Past those years they fall back to weekdays only.
 // Dates are the exchange's local calendar days, 'YYYY-MM-DD'.
 
+import { dayOffOn, TWSE } from '#kit/dayoff.mjs';
+
 const pad = n => String(n).padStart(2, '0');
 const ymd = (y, m, d) => `${y}-${pad(m)}-${pad(d)}`;
 const dow = (y, m, d) => new Date(Date.UTC(y, m - 1, d)).getUTCDay();
@@ -192,7 +194,8 @@ export function localDay(t, tz) {
 export function isTradingDay(market, day) {
   const [y, m, d] = day.split('-').map(Number);
   const w = dow(y, m, d);
-  return w !== 0 && w !== 6 && !isHoliday(market, day);
+  // (Taiwan's: a typhoon day too, by 臺北市's word: dayoff.mjs.)
+  return w !== 0 && w !== 6 && !isHoliday(market, day) && !(calendarOf(market) === 'TW' && dayOffOn(day, TWSE, 'trade'));
 }
 
 // The market's next holidays from `day` on (weekdays only), up to `n`.

@@ -229,3 +229,28 @@ test("without Google: CWA's hours fill the word, wind and dew point", async () =
   assert.equal(resp.now.dew, dewPoint(27, 85));
   assert.ok(resp.days[0].day.condition.text);
 });
+
+test("a place's closures for every app: county, its own town, the exchange's rule", async () => {
+  const { closuresFor, tradeClosed, offFrom } = await import('../typhoon.js');
+  const page = { at: Date.parse('2026-10-22T19:30:00+08:00'), counties: {
+    新竹縣: '明天停止上班、停止上課。 尖石鄉玉峰國民小學:今天下午04:00起停止上班、停止上課。',
+    臺東縣: '明天照常上班、照常上課。 綠島鄉:明天停止上班、停止上課。',
+    臺北市: '明天12:00起停止上班、停止上課。',
+    新北市: '明天照常上班、停止上課。'
+  } };
+  const hc = closuresFor(page, '新竹縣', '尖石鄉');
+  assert.deepEqual(Object.keys(hc), ['2026-10-23']); // the schools' line is not the town's
+  assert.equal(hc['2026-10-23'].class.off, true);
+  assert.equal(closuresFor(page, '臺東縣', '綠島鄉')['2026-10-23'].work.off, true);
+  assert.equal(closuresFor(page, '臺東縣', '臺東市')['2026-10-23'].work.off, false);
+  const tp = closuresFor(page, '台北市')['2026-10-23'];
+  assert.deepEqual(tp.work, { off: true, from: '12:00' });
+  assert.equal(tradeClosed(tp), false, 'an afternoon stop leaves the trading day');
+  assert.equal(tradeClosed(closuresFor({ ...page, counties: { 臺北市: '明天停止上班、停止上課。' } }, '臺北市')['2026-10-23']), true);
+  const nt = closuresFor(page, '新北市')['2026-10-23'];
+  assert.equal(nt.work.off, false);
+  assert.equal(nt.class.off, true);
+  assert.equal(offFrom('今天下午04:00起停止上班'), '16:00');
+  assert.equal(offFrom('明天停止上班'), null);
+  assert.deepEqual(closuresFor({ counties: { 臺北市: '尚未宣布消息' } }, '臺北市'), {});
+});

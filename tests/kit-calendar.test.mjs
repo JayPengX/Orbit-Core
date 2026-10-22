@@ -84,3 +84,22 @@ test("Taiwan's day of anything: a date-time string as its moment, nonsense as no
   assert.equal(twHoliday('2027-12-24').zh, '行憲紀念日補假');
   assert.equal(twWorkday('2027-12-27'), true);
 });
+
+test('a typhoon day: by each app\'s own place, the exchange by 臺北市', async () => {
+  const { keepDayOff, dayOffOn, TWSE, placeKey } = await import('../kit/dayoff.mjs');
+  const { isTradingDay } = await import('../kit/stock-holidays.mjs');
+  keepDayOff({ county: '新竹縣', town: '竹北市' }, { '2026-10-23': { work: { off: true, from: null }, class: { off: true, from: null } } });
+  assert.equal(dayOffOn('2026-10-23', { county: '新竹縣', town: '竹北市' }, 'class').zh, '颱風停課');
+  assert.equal(dayOffOn('2026-10-24', { county: '新竹縣', town: '竹北市' }, 'class'), null);
+  assert.equal(dayOffOn('2026-10-23', { county: '新竹市' }, 'class'), null, 'another place: not known, not closed');
+  assert.equal(placeKey({ county: '台北市' }), '臺北市|');
+  // 新竹 closed: the exchange trades; 臺北市 stops from the afternoon: it still trades; all day: it doesn't.
+  assert.equal(isTradingDay('TW', '2026-10-23'), true);
+  keepDayOff(TWSE, { '2026-10-23': { work: { off: true, from: '12:00' }, class: { off: true, from: '12:00' }, trade: { off: false } } });
+  assert.equal(isTradingDay('TW', '2026-10-23'), true);
+  assert.equal(dayOffOn('2026-10-23', TWSE, 'work').zh, '颱風停班（12:00 起）');
+  keepDayOff(TWSE, { '2026-10-23': { work: { off: true, from: null }, trade: { off: true } } });
+  assert.equal(isTradingDay('TW', '2026-10-23'), false);
+  assert.equal(isTradingDay('TAIFEX', '2026-10-23'), false);
+  assert.equal(isTradingDay('US', '2026-10-23'), true);
+});
