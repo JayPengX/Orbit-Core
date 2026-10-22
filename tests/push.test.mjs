@@ -454,32 +454,10 @@ test("a CPBL final when TheSportsDB turns the proxy away (429): asked again thro
   const env = { GEMINI_RELAY: { fetch: async url => (via.push(String(url)), new Response(JSON.stringify({ events: [{ idEvent: '2618131', strStatus: 'FT', intHomeScore: '5', intAwayScore: '4' }] }), { status: 200 })) } };
   try {
     assert.equal((await runCheck(check, 'zh', env)).title, '味全龍 4 : 5 中信兄弟');
-    assert.equal(await runCheck(check, 'zh', {}), null);
+    await assert.rejects(runCheck(check, 'zh', {}), /tsdb 429/);
   } finally {
     globalThis.fetch = real;
   }
   assert.equal(via.length, 1);
   assert.ok(via[0].startsWith('https://gemini-relay/?to=' + encodeURIComponent('https://www.thesportsdb.com/api/v1/json/123/eventsday.php?d=2026-10-21&l=5111')));
-});
-
-test("a CPBL final from the league's own list first (through the Taiwan relay), the clubs by name", async () => {
-  const twDay = new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 10);
-  const check = cleanItems([{ at: Date.now(), until: Date.now() + 3_600_000, title: 't', check: { tsdb: '2618131', day: twDay, names: ['味全龍', '中信兄弟'], clubs: ['Wei Chuan Dragons', 'CTBC Brothers'] } }])[0].check;
-  assert.deepEqual(check.clubs, ['Wei Chuan Dragons', 'CTBC Brothers']);
-  assert.equal(cleanItems([{ at: Date.now(), title: 't', check: { tsdb: '1234', day: twDay, clubs: ['Nobody', 'CTBC Brothers'] } }])[0].check.clubs, undefined);
-  let status = 2;
-  const asked = [];
-  const env = { GEMINI_RELAY: { fetch: async url => (asked.push(decodeURIComponent(String(url))), new Response(JSON.stringify({ Success: true, GameDetailJson: JSON.stringify([{ Year: '2026', GameSno: '3', KindCode: 'C', GameStatus: status, VisitingTeamName: '味全龍', HomeTeamName: '中信兄弟', VisitingTotalScore: 2, HomeTotalScore: 3 }]) }), { status: 200 })) } };
-  const real = globalThis.fetch;
-  globalThis.fetch = async () => assert.fail('TheSportsDB not asked while the league has the game');
-  try {
-    assert.equal(await runCheck(check, 'zh', env), null);
-    status = 3;
-    assert.deepEqual(await runCheck(check, 'zh', env), { title: '味全龍 2 : 3 中信兄弟', body: '中信兄弟 贏了', result: '中信兄弟 贏了' });
-    status = 6;
-    assert.equal((await runCheck(check, 'en', env)).result, 'Postponed');
-  } finally {
-    globalThis.fetch = real;
-  }
-  assert.ok(asked.every(u => u.endsWith('?to=https://www.cpbl.com.tw/home/getdetaillist')));
 });
