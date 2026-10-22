@@ -1,41 +1,13 @@
-// The Quadra Pass sheet's numbers and guides (truth.mjs, help.mjs, pass.mjs),
-// and the brand (brand.mjs).
+// The Quadra Pass sheet and its guides (help.mjs, pass.mjs), and the brand
+// (brand.mjs).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} };
-const { houseKeep, roundTrip, record, overdraftYear } = await import('../kit/truth.mjs');
 const { HELP, HELP_ORDER } = await import('../kit/help.mjs');
 const kit = await import('#kit/quadra.mjs');
 const brand = await import('../kit/brand.mjs');
-
-test('truth: what the house keeps, what trading costs', () => {
-  assert.equal(Math.round(houseKeep(1) * 1000), 136);
-  assert.equal(Math.round(houseKeep(3) * 1000), 356);
-  assert.ok(houseKeep(7) > 4 * houseKeep(1));
-  assert.deepEqual(roundTrip(100_000), { fee: 284, tax: 300, total: 584, share: 0.00584 });
-  // The commission minimum still applies.
-  assert.equal(roundTrip(1_000).fee, 40);
-  assert.ok(overdraftYear() > 0.12 && overdraftYear() < 0.13);
-});
-
-test('truth: this account’s own record from the wallet', () => {
-  const e = (app, kind, amount, extra = {}) => ({ id: `${app}:${kind}:${amount}`, t: 1, app, kind, amount, ...extra });
-  const w = {
-    entries: [
-      e('eco', 'start', 30_000), e('eco', 'pay', 6_000), e('eco', 'plus', -490), e('eco', 'od', -120), e('eco', 'vip', 80),
-      e('eco', 'freebet', 0, { note: '200' }), e('odds', 'stake', -1_000), e('odds', 'refund', 100), e('odds', 'payout', 450), e('odds', 'plusboost', 12),
-      e('odds', 'lottery', -300), e('odds', 'prize', 100)
-    ],
-    snap: {}
-  };
-  const r = record(w);
-  assert.deepEqual([r.staked, r.won, r.tickets, r.prizes, r.plusPaid, r.od, r.vip, r.freeBets], [900, 462, 300, 100, 490, 120, 80, 200]);
-  assert.equal(Math.round(r.betBack * 100), 51);
-  assert.equal(r.sides.given, 36_080);
-  assert.equal(record({ entries: [] }).betBack, null);
-});
 
 test('help covers every app in both languages; every string exists in both', () => {
   for (const app of HELP_ORDER) {
@@ -48,7 +20,9 @@ test('the Pass sheet: every string in both languages; every tab named', async ()
   const src = readFileSync(new URL('../kit/pass.mjs', import.meta.url), 'utf8');
   const { STRINGS } = await import('../kit/pass.mjs');
   assert.deepEqual(Object.keys(STRINGS.en).sort(), Object.keys(STRINGS.zh).sort());
-  for (const tab of ['pass', 'looks', 'truth', 'apps', 'help']) assert.ok(STRINGS.zh[`tab_${tab}`] && STRINGS.en[`tab_${tab}`], tab);
+  for (const tab of ['pass', 'looks', 'apps', 'help']) assert.ok(STRINGS.zh[`tab_${tab}`] && STRINGS.en[`tab_${tab}`], tab);
+  // The Pass is the account and the family: no money on it (money is Securities').
+  assert.doesNotMatch(src, /money\(|truth|worthOf|loanCard/);
   for (const key of new Set([...src.matchAll(/\bt\('([A-Za-z_]+)'/g)].map(m => m[1]))) assert.ok(key in STRINGS.zh, key);
   assert.doesNotMatch(JSON.stringify(STRINGS), /Quadra Hub|Fixtures/);
   // Every frame has a name in both languages and its own style; Plus is gone from the sheet.
@@ -73,25 +47,4 @@ test('the family page (site/index.html) links where the kit does: regenerate it 
   const page = readFileSync(new URL('../site/index.html', import.meta.url), 'utf8');
   const links = [...page.matchAll(/class="app" href="([^"]+)"/g)].map(m => m[1]).sort();
   assert.deepEqual(links, Object.values(kit.APPS).map(a => a.path).sort());
-});
-
-test('真相: 刮刮樂 paybacks come from the cards on sale (no NT$2,000 row when none is sold)', async () => {
-  const { scratchBacks } = await import('../kit/truth.mjs');
-  const rows = scratchBacks(new Date('2026-10-21T12:00:00+08:00'));
-  assert.deepEqual(rows.map(r => r[0]), [100, 200, 300, 500, 1000]);
-  for (const [, lo, hi] of rows) assert.ok(lo >= 0.55 && hi <= 0.8 && lo <= hi);
-});
-
-test('真相: the owner\'s off-the-record test slip and a lottery refund stay out of the bets record', async () => {
-  const { record } = await import('../kit/truth.mjs');
-  const w = { entries: [
-    { id: 'odds:stake-a', t: '2026-10-20T01:00:00Z', app: 'odds', kind: 'stake', amount: -28_630 },
-    { id: 'odds:payout-a', t: '2026-10-20T05:00:00Z', app: 'odds', kind: 'payout', amount: 30_920 },
-    { id: 'odds:stake-b', t: '2026-10-20T01:00:00Z', app: 'odds', kind: 'stake', amount: -1_000 },
-    { id: 'odds:payout-b', t: '2026-10-20T05:00:00Z', app: 'odds', kind: 'payout', amount: 1_800 },
-    { id: 'odds:lotto-c', t: '2026-10-20T01:00:00Z', app: 'odds', kind: 'lottery', amount: -100 },
-    { id: 'odds:refund-c', t: '2026-10-20T02:00:00Z', app: 'odds', kind: 'refund', amount: 100 }
-  ] };
-  const r = record(w);
-  assert.deepEqual([r.staked, r.won, r.tickets, r.prizes], [1_000, 1_800, 0, 0]);
 });

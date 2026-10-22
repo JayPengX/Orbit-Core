@@ -177,20 +177,19 @@ included), then wiped whole. `private/` is never served.
 The model is `node tools/economy.mjs`; the numbers live in `eco.js` and
 the kit's `quadra.mjs` (the same tables in both).
 
-- **Opening:** NT$200,000 (older accounts raised once, `eco:topup:v12`).
-- **Pay:** NT$10,000 every Monday, Taiwan time (monthly NT$6,000 until
-  October 2026).
+Money is shown only in Securities (its 資金 tab: pay, 信貸, 紓困, 財富等級,
+真相); the Pass sheet is the account and the family, never money.
+
+- **Opening:** NT$200,000.
+- **Pay:** NT$10,000 every Monday, Taiwan time.
 - **信貸** (`kit/loan.mjs`, `op: 'loan'`): NT$100k limit growing to 22×
   monthly pay, 6–16% by record, NT$3,000 fee, 1–5 years, repaid from each
   Monday's pay. 3 late → 催收: all due, balance taken, a third of each pay;
   a year's ban after. Debt counts against worth.
 - **急難紓困** (`op: 'relief'`): NT$5,000 under NT$2,000 worth, every 13
   weeks, 3 a year.
-- **財富等級:** one-time rewards as worth crosses 300k to 100M (scaled 2026-10-20;
-  the old 50k–20M levels' rewards count towards the new ones).
+- **財富等級:** one-time rewards as worth crosses 300k to 100M.
 - **Looks:** an avatar and a frame, free for everyone (the Pass's 外觀 tab).
-- **Old `eco:plus:*` and `eco:plusrefund:v1` entries** stay in wallets as history.
-- **Old `eco:vip:*` entries** (VIP cashback, gone 2026-10-22) stay in wallets as history.
 - **Overdraft:** 1% a month.
 
 Only Securities and Play write money entries, and `eco:` ids are the
@@ -247,13 +246,13 @@ import map, so a file has one address whichever loader a page carries.
 | `quadra.css` pieces | `.q-switch.on` (= aria-checked), `.q-sheet-foot` (sticky primary-button footer at a sheet's bottom, safe-area aware), `.q-fig` (grid of captioned bold figures with hairlines, children `small` over `b`) |
 | `boot.js` | The loading screen and the version check |
 | `brand.mjs` | Families, names, colours, marks, repos, `DEV` |
-| `pass.mjs`, `help.mjs`, `truth.mjs` | The Pass sheet; every app's guide; 真相 (the house's real numbers) |
+| `pass.mjs`, `help.mjs` | The Pass sheet (account, looks, apps, guides: no money); every app's guide |
 | `pass-sync.mjs` | An app's payload kept in step with the Pass's copy (read and merged before any write; once per return, none under 10 s away, an unchanged copy not merged again); Words, Weather, Slips |
 | `catalog.mjs`, `logos.mjs`, `names.mjs`, `photos.mjs` | Leagues; logos; Chinese team names; studio headshots |
 | `f1live.mjs`, `postseason.mjs`, `sports-*.mjs` | F1 sessions; MLB's postseason; highlights, broadcast, win probability (also run by builders) |
 | `play-*.mjs`, `stock-*.mjs` | Play's and Securities' pricing and ledgers, shared with the Worker (`play-boardfile.mjs`: the home board's file, packed by the Worker and read by Play) |
 | `holidays.mjs` | Taiwan's days off |
-| `plus.mjs`, `loan.mjs`, `gov.mjs` | Old free bets (history); 信貸 and relief; what the government took and gave one account |
+| `loan.mjs`, `gov.mjs` | 信貸 and relief; what the government took and gave one account |
 | `settle.mjs` | Settling Play's slips, shared with the Worker (`settle.js`) |
 | `devconfig.mjs`, `mirror.mjs`, `photo-urls.mjs` | `DEV` for the Workers; the nightly mirror's addresses; photos' addresses alone |
 | `apps.mjs`, `link.mjs`, `preload.mjs`, `stamp.mjs`, `stamp-app.mjs`, `hash.mjs` | Build tools, never served: refresh the apps' snippets; link `.kit`; the first-screen modulepreload lists; the kit's and each app's content-hashed build |
@@ -315,7 +314,7 @@ the kit.
 | `f1-live.js` | Sports' F1 board, Play's F1 settling |
 | `fund-nav.js` | Securities' 境內基金 NAVs (SITCA) |
 | `taifex.js` | Securities' 期貨 and 選擇權: TAIFEX settlements (TX/MTX/TMF, TXO), margins, finals |
-| `eco.js` money rules | The kit's tables, `truth.mjs`, `help.mjs`, `tools/economy.mjs` |
+| `eco.js` money rules | The kit's tables, Securities' `lib/truth.mjs` and 資金 tab, `help.mjs`, `tools/economy.mjs` |
 | `push.js` checks | The apps that schedule them, `NOTICE_KINDS` |
 | `quadra.css` or the frame | Every app at 375 px, light and dark |
 | `brand.mjs` | `node brand/generate.mjs` |

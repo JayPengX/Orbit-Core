@@ -192,13 +192,11 @@ test('device code: signs in another device once, within ten minutes', async () =
   assert.equal((await t.call('POST', '', { op: 'pair-redeem', code: late.data.code, app: 'match' })).status, 404);
 });
 
-test('payday: every Monday from 19 Oct 2026, back pay included', () => {
+test('payday: every Monday from the week the pass was made, back pay included', () => {
   const pays = (w, now) => paydayEntries(w, now).filter(e => e.kind === 'pay').map(e => e.id);
-  const oct = Date.UTC(2026, 9, 7, 3);
-  assert.deepEqual(pays({ created: oct, entries: [] }, oct), []);
-  const tue = Date.UTC(2026, 9, 20, 3);
-  assert.deepEqual(pays({ created: oct, entries: [] }, tue), ['eco:wpay:2026-10-19']);
-  assert.equal(paydayEntries({ created: oct, entries: [] }, tue).find(e => e.id === 'eco:wpay:2026-10-19').amount, 10_000);
+  const oct = Date.UTC(2026, 9, 20, 3);
+  assert.deepEqual(pays({ created: oct, entries: [] }, oct), ['eco:wpay:2026-10-19']);
+  assert.equal(paydayEntries({ created: oct, entries: [] }, oct).find(e => e.id === 'eco:wpay:2026-10-19').amount, 10_000);
   // Back pay: every Monday nobody opened an app, paid the next time.
   assert.deepEqual(pays({ created: oct, entries: [] }, Date.UTC(2026, 10, 3, 3)), ['eco:wpay:2026-10-19', 'eco:wpay:2026-10-26', 'eco:wpay:2026-11-02']);
   // A pass made later: weekly pay from its own week.
@@ -504,23 +502,6 @@ test('wealth levels: each level reached pays its reward once, from what the acco
   assert.equal(RANKS.length, 7);
   // In the payday's entries, after the pay.
   assert.ok(paydayEntries({ entries: [{ id: 'eco:start', amount: 295_000 }] }, now).some(e => e.id === 'eco:rank:thrifty'));
-});
-
-test('wealth levels rescaled: what the old levels paid counts towards the new rewards, never paid twice', () => {
-  const now = Date.UTC(2026, 9, 21, 3);
-  const old = (id, amount) => ({ id: `eco:rank:${id}`, t: 1, app: 'eco', kind: 'rank', amount });
-  // Opened at 200,000: the old saver and steady paid 3,000 between them.
-  const w = { entries: [{ id: 'eco:start', amount: 310_000 }, old('saver', 1_000), old('steady', 2_000)] };
-  // So the first new level pays nothing more, but is reached.
-  assert.deepEqual(rankEntries(w, now).map(e => [e.id, e.amount]), [['eco:rank:thrifty', 0]]);
-  const w2 = { entries: [...w.entries, ...rankEntries(w, now), { id: 'win', amount: 200_000 }] };
-  assert.deepEqual(rankEntries(w2, now).map(e => [e.id, e.amount]), [['eco:rank:solid', 5_000]]);
-  // A rich old account: 19,000 from the old levels up to a million, spread over the new ones.
-  const rich = { entries: [{ id: 'eco:start', amount: 1_200_000 }, old('saver', 1_000), old('steady', 2_000), old('comfort', 3_000), old('wealthy', 5_000), old('rich', 8_000)] };
-  assert.deepEqual(rankEntries(rich, now).map(e => [e.id, e.amount]), [['eco:rank:thrifty', 0], ['eco:rank:solid', 0], ['eco:rank:welloff', 0]]);
-  // 19,000 against 18,000 of new rewards: 1,000 still counts against the next.
-  const richer = { entries: [...rich.entries, ...rankEntries(rich, now), { id: 'win', amount: 2_000_000 }] };
-  assert.deepEqual(rankEntries(richer, now).map(e => [e.id, e.amount]), [['eco:rank:affluent', 19_000]]);
 });
 
 test('setting ECO_TOKEN_SECRET signs nobody out: tokens signed the old way (from the Firebase key) still read', async () => {

@@ -6,7 +6,7 @@ const wallet = {
   entries: [
     { id: 'eco:start', app: 'eco', kind: 'start', amount: 30000 },
     { id: 'eco:pay:2026-10', app: 'eco', kind: 'pay', amount: 6000 },
-    { id: 'eco:plus:2026-10', app: 'eco', kind: 'plus', amount: -490 },
+    { id: 'eco:od:2026-10', app: 'eco', kind: 'od', amount: -490 },
     { id: 'odds:stake-a', app: 'odds', kind: 'stake', amount: -1000 },
     { id: 'odds:payout-a', app: 'odds', kind: 'payout', amount: 400 },
     { id: 'odds:stake-b', app: 'odds', kind: 'stake', amount: -200 }
@@ -47,7 +47,7 @@ test('retire adds a deleted account to the ledger', async () => {
   assert.deepEqual(led.playBy, { nba: 1200 });
 });
 
-test("sidesOf agrees with the Pass's 真相 (kit moneySides), Quadra from the house's side", async () => {
+test("sidesOf agrees with Securities' 真相 (kit moneySides), Quadra from the house's side", async () => {
   const { moneySides } = await import('../kit/quadra.mjs');
   const k = moneySides(wallet);
   const s = sidesOf(wallet);

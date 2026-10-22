@@ -52,7 +52,7 @@ import { retire } from './money.js';
 import { storeReady } from './doc-store.js';
 import { tokenSecret, signToken, readToken, seal, unseal, sessionLimited, SESSION_MS, REFRESH_MS, HANDOFF_MS } from './quadra-token.js';
 import { handleAdmin } from './eco-admin.js';
-import { PAY_WEEK, WEEKLY_FROM, weekStart, mondayId, debtOf, activeLoan, loanOffer, loanEntries, loanDue, payoffAmount, reliefCheck, reliefEntry, openStakes } from './kit/loan.mjs';
+import { PAY_WEEK, weekStart, mondayId, debtOf, activeLoan, loanOffer, loanEntries, loanDue, payoffAmount, reliefCheck, reliefEntry, openStakes } from './kit/loan.mjs';
 
 export const ECO_PASSCODE_LENGTH = 10;
 export const ECO_PASSCODE_PATTERN = /^[2-9A-HJ-NP-Z]{10}$/;
@@ -115,18 +115,17 @@ export function emptyWallet(now = Date.now()) {
 //
 // The Worker pays everyone's income into the pool: one fixed pay each Taiwan
 // week (from Monday 00:00), on the first sign-in or refresh that week; a week
-// nobody opened an app is paid the next time (back pay). Until 2026-10 it was
-// monthly (`eco:pay:<month>`); weekly pay (`eco:wpay:<Monday>`) runs from
-// WEEKLY_FROM. A pass made since v2 also gets its opening money here.
+// nobody opened an app is paid the next time (back pay), as
+// `eco:wpay:<Monday>`. A new pass (v2) gets its opening money here too.
+// Securities shows all of it (its 資金 tab); the Pass shows no money.
 //
 // The economy (tools/economy.mjs has the numbers): NT$200,000 to open and a
 // fixed NT$10,000 a week, the same for every account whatever it holds, like
-// a salary (v12, 2026-10-19; v10-v11 paid NT$30,000 and NT$6,000 a month).
+// a salary.
 // Money beyond that is borrowed (信貸, kit/loan.mjs: repaid from the pay) or
 // relief for someone with nothing (急難紓困); the house's cut, the broker's
 // costs, interest and penalties are the sinks.
 export const PAY = { start: 200_000, week: PAY_WEEK };
-export { WEEKLY_FROM };
 // An overdraft (the pool below zero) costs OVERDRAFT_RATE a month, charged
 // on the month's first read on what was owed then, as `eco:od:<month>`:
 // cheaper to sell something (or borrow on margin in Securities) than to sit
@@ -152,8 +151,8 @@ export function paydayEntries(wallet, now) {
   const owed = -(poolBalance(wallet) + out.reduce((sum, e) => sum + e.amount, 0));
   if (owed >= 100 && !have.has(`eco:od:${month}`)) out.push({ id: `eco:od:${month}`, t: now, app: 'eco', kind: 'od', amount: -Math.round(owed * OVERDRAFT_RATE) });
   const created = Number.isFinite(wallet.created) ? Math.min(wallet.created, now) : now;
-  // Each week's pay from WEEKLY_FROM (or the week the pass was made), back pay too.
-  for (let w = weekStart(Math.max(created, WEEKLY_FROM)), n = 0; w <= now && n < 520; w += WEEK, n++) {
+  // Each week's pay from the week the pass was made, back pay too.
+  for (let w = weekStart(created), n = 0; w <= now && n < 520; w += WEEK, n++) {
     const id = `eco:wpay:${mondayId(w)}`;
     if (!have.has(id)) out.push({ id, t: now, app: 'eco', kind: 'pay', amount: PAY.week });
   }
@@ -170,14 +169,8 @@ export function paydayEntries(wallet, now) {
 // loan's debt) puts it on a level; the first time it reaches one, the
 // economy pays that level's reward once (`eco:rank:<id>`, kind 'rank'). Falling
 // back keeps what was paid; reaching a level again pays nothing. The same
-// table as the kit's WEALTH_RANKS.
-//
-// Scaled 2026-10-20 to NT$200,000 opening money and NT$10,000 a week (the
-// owner: "財富等級 need adjustment"): a new pass starts at 起步, and the first
-// level is NT$100,000 of real gains away (about ten weeks' pay saved). The
-// old table's levels (50,000 to 20M, `eco:rank:saver`…) were nearly all
-// reached by the opening money alone; what they paid stays and counts
-// towards the new rewards (OLD_RANKS), so no wealth is rewarded twice.
+// table as the kit's WEALTH_RANKS. A new pass starts at 起步; the first level
+// is NT$100,000 of real gains away (about ten weeks' pay saved).
 export const RANKS = [
   { id: 'start', min: 0, reward: 0 },
   { id: 'thrifty', min: 300_000, reward: 3_000 },
@@ -187,25 +180,12 @@ export const RANKS = [
   { id: 'tenmil', min: 10_000_000, reward: 50_000 },
   { id: 'hundredmil', min: 100_000_000, reward: 100_000 }
 ];
-const OLD_RANKS = new Set(['saver', 'steady', 'comfort', 'wealthy', 'rich', 'multi', 'tycoon'].map(id => `eco:rank:${id}`));
 export function rankEntries(wallet, now) {
-  const entries = wallet?.entries || [];
-  const have = new Set(entries.map(e => e.id));
+  const have = new Set((wallet?.entries || []).map(e => e.id));
   const worth = worthOf(wallet, now);
-  // What the old levels paid, less what new ones have already taken from it.
-  let credit = entries.filter(e => e.app === 'eco' && e.kind === 'rank' && OLD_RANKS.has(e.id)).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-  for (const r of RANKS) if (have.has(`eco:rank:${r.id}`)) credit -= r.reward - (Number(entries.find(e => e.id === `eco:rank:${r.id}`)?.amount) || 0);
-  const out = [];
-  for (const r of RANKS) {
-    if (!(r.reward > 0) || worth < r.min || have.has(`eco:rank:${r.id}`)) continue;
-    const used = Math.min(Math.max(0, credit), r.reward);
-    credit -= used;
-    out.push({ id: `eco:rank:${r.id}`, t: now, app: 'eco', kind: 'rank', amount: r.reward - used, note: r.id });
-  }
-  return out;
+  return RANKS.filter(r => r.reward > 0 && worth >= r.min && !have.has(`eco:rank:${r.id}`)).map(r => ({ id: `eco:rank:${r.id}`, t: now, app: 'eco', kind: 'rank', amount: r.reward, note: r.id }));
 }
 
-// (VIP cashback is gone, 2026-10-22: the `eco:vip:<month>` entries already paid stay as history.)
 export { WEEK };
 
 const isObj = v => Boolean(v) && typeof v === 'object' && !Array.isArray(v);

@@ -6,9 +6,9 @@
 //   what    「X 是什麼」: its part in Quadra, in two or three lines
 //   tabs    「每個分頁」: one line per tab, in the tab bar's order
 //   …       what's particular to it (a few topics)
-//   money   「錢怎麼算」: how it touches the one Quadra wallet
+//   money   「錢怎麼算」: how it touches the money (Securities' alone)
 // (The Quadra Pass's own guide: what, tabs, devices, one, net, notify, safe,
-// looks, welcome, money.)
+// looks, money.)
 //
 // HELP[app][lang] = [[topic id, title, [paragraphs]], …]
 
@@ -23,9 +23,8 @@ export const HELP = {
         '每個 App 右上角的帳戶按鈕（人像，或你挑的頭像）打開 Quadra Pass。'
       ]],
       ['tabs', '每個分頁', [
-        'Pass：Quadra 餘額、開戶日、本月收入與支出、下次發薪和最近明細；下面是這個 App 自己的設定（有的話）、新增裝置、通知、除錯紀錄和帳戶安全。',
+        'Pass：帳號和開戶日；下面是這個 App 自己的設定（有的話）、新增裝置、通知、除錯紀錄和帳戶安全。',
         '外觀：挑一個頭像和頭像框，全部免費，每個 App 的帳戶按鈕都看得到。',
-        '真相：用真實的數字和你自己的紀錄，算錢從哪裡來、莊家、券商和政府各拿多少；最下面是財富等級。',
         'App：每個 Quadra 和 Orbit 的 App、上次什麼時候用、它的說明，和打開它。',
         '說明：每個 App 怎麼用，就是這裡。'
       ]],
@@ -53,20 +52,8 @@ export const HELP = {
       ['looks', '頭像與頭像框', [
         '在 Quadra Pass 的「外觀」挑頭像和頭像框，全部免費、隨時換；戴上後每個 App 的帳戶按鈕都看得到。再點一次就拿下。'
       ]],
-      ['welcome', '新手禮', [
-        '新手禮：在 Securities 的第一筆交易免手續費（稅和規費照收）。'
-      ]],
-      ['money', '錢怎麼算', [
-        '所有 App 共用一個新台幣錢包。新帳號開戶金 NT$200,000；每週一固定發薪 NT$10,000，跟薪水一樣，存多存少都一樣。系統發的錢只有這些：開戶金、週薪、財富等級獎勵（身價第一次到達一個等級時送一次：NT$30 萬小資族 NT$3,000、50 萬穩健 NT$5,000、百萬 NT$10,000、300 萬富裕 NT$20,000、千萬 NT$50,000、一億 NT$100,000；舊等級領過的獎勵會抵掉），和真的一無所有時的急難紓困。週薪在那週第一次打開任何 App 時入帳，沒打開的週下次補發。',
-        '「真相」把你的錢分成四方：系統發的、和 Quadra 的輸贏（Play 的稅前輸贏，扣掉透支利息和信貸利息）、政府（中獎稅、證交稅、股利扣繳和二代健保，減去急難紓困），和你自己的成績（投資的漲跌）。',
-        '餘額可以是負的（透支），每月計息 1%。就像交割款沒付，2 天內沒補足就是違約交割：扣透支金額 7% 的違約金、自動賣出持股補足，而且 5 年內不能融資、融券。自己先賣就沒事。融資借來的錢只能留在 Securities 買賣，不能拿去 Play 或補透支。',
-        'Securities 投資、Play 下注和買彩券；Orbit 的 App 都不用錢。錢只存在 Quadra Pass，不能在帳號之間轉。'
-      ]],
-      ['loan', '信貸與急難紓困', [
-        '信貸跟銀行一樣：開戶滿 4 週可以申請（週薪改制前的帳戶不用等），一次一筆。額度從 NT$100,000 起，每準時還清一筆加 NT$50,000，最多是月薪的 22 倍（約 NT$950,000，DBR 22 倍）；每週還款不能超過週薪的一半。年利率 12% 起，每筆準時還清少 1%（最低 6%），每次逾期加 1%（最高 16%）。開辦費 NT$3,000 從撥款扣除，簽約前會看到總費用年百分率。',
-        '期數 1、2、3 或 5 年，每週一發薪後自動扣款；1 年內提前還清收剩餘本金 2% 的違約金。扣款失敗就逾期並計違約金和遲延利息，餘額一夠就自動補扣。',
-        '逾期 3 期轉催收：全部到期（喪失期限利益），帳戶裡的錢先抵銷，之後每週薪水扣三分之一（強制執行），利息照算到還清為止。聯徵紀錄保留到還清後 1 年，期間不能再借，之後利率 16%、額度回到 NT$100,000。借來的錢不算身價，不會讓你升財富等級。',
-        '急難紓困：現金、股票（成本）和投注中的錢合計低於 NT$2,000、沒有催收中的信貸、離發薪日超過 2 天，可以申請一次 NT$5,000。每 13 週一次、一年最多 3 次，會留在紀錄上。'
+      ['money', '錢在哪裡', [
+        'Quadra Pass 是帳號，不放錢。餘額、每週薪水、信貸、急難紓困、財富等級、繳的稅和每一筆明細，都在 Quadra Securities 的「資金」分頁，跟真的券商帳戶一樣。'
       ]]
     ],
     en: [
@@ -76,9 +63,8 @@ export const HELP = {
         'The account button at the top right of every app (a person, or the avatar you picked) opens the Quadra Pass.'
       ]],
       ['tabs', 'Each tab', [
-        'Pass: the Quadra balance, when it was opened, this month’s money in and out, the next pay and the latest entries; below them this app’s own settings (if it has any), adding a device, notifications, the debug log and security.',
+        'Pass: your account number and when it was opened; below them this app’s own settings (if it has any), adding a device, notifications, the debug log and security.',
         'Looks: pick an avatar and a frame, all free, shown on your account button in every app.',
-        'Truth: where the money comes from and what the house, the broker and the government take, in real numbers and your own record; wealth levels at the foot.',
         'App: every Quadra and Orbit app, when you last used it, its guide and a way in.',
         'Help: how every app works, here.'
       ]],
@@ -106,20 +92,8 @@ export const HELP = {
       ['looks', 'Avatars and frames', [
         'Pick an avatar and a frame in the Quadra Pass’s Looks tab: all free, change them any time, worn on your account button in every app. Tap again to take one off.'
       ]],
-      ['welcome', 'Welcome offer', [
-        'Welcome offer: your first trade in Securities pays no commission (taxes and fees as usual).'
-      ]],
-      ['money', 'Money', [
-        'Every app shares one NT$ wallet. A new pass opens with NT$200,000; every Monday pays a fixed NT$10,000, like a salary: the same however much you hold. The system gives money only as the opening money, the pay, wealth level rewards (paid once, the first time what you’re worth reaches a level: NT$3,000 at NT$300,000, then NT$5,000 at 500,000, NT$10,000 at a million, NT$20,000 at 3 million, NT$50,000 at 10 million and NT$100,000 at 100 million; rewards from the old levels count towards them) and emergency relief for someone with nothing. The pay comes the first time that week you open any app; a week you miss is paid when you’re back.',
-        'Truth splits your money four ways: what the system gave, your result against Quadra (Play’s wins and losses before tax, less overdraft and loan interest), the government (prize tax, transaction tax, dividend withholding and the NHI premium, less emergency relief), and your own result (your investments).',
-        'The balance can go below zero (an overdraft) at 1% a month. Like an unpaid settlement, if it isn’t covered within 2 days it’s a default: a 7% penalty on what’s owed, holdings sold for it, and no margin or short selling for 5 years. Sell something first and none of that happens. Money borrowed on margin stays in Securities for trading: it can’t be bet in Play or cover an overdraft.',
-        'Securities invests, Play bets and sells lottery tickets; the Orbit apps don’t use money. Money lives on the Quadra Pass only and can’t move between passes.'
-      ]],
-      ['loan', 'Loans and relief', [
-        'A personal loan works like a bank’s: after 4 weeks (accounts from before weekly pay don’t wait), one at a time. The limit starts at NT$100,000, grows NT$50,000 with each loan repaid on time, up to 22 months of pay (about NT$950,000, Taiwan’s DBR 22 rule), and an installment can’t take more than half the weekly pay. The rate starts at 12% a year, 1 point less per clean loan (6% at best) and 1 point more per late installment (16% at most). A NT$3,000 set-up fee comes off the money, and the APR with fees is shown before you sign.',
-        'Terms of 1, 2, 3 or 5 years, taken every Monday after the pay; paying off within a year costs 2% of what’s left. A missed installment is late, with charges, and is taken as soon as the balance covers it.',
-        'Three late and it goes to collection: the whole loan falls due, the balance is taken toward it, then a third of every weekly pay until it’s paid, with interest running. The record lasts a year after it’s paid: no loans, then 16% and a NT$100,000 limit. Borrowed money isn’t worth, so it never raises your wealth level.',
-        'Emergency relief: with cash, stocks (at cost) and open bets together under NT$2,000, no loan in collection, and payday more than 2 days away, you can get NT$5,000 once. Once every 13 weeks, 3 times a year at most, and it stays on your record.'
+      ['money', 'Where the money is', [
+        'The Quadra Pass is your account; it holds no money. Your balance, the weekly pay, loans, emergency relief, wealth levels, the taxes you’ve paid and every entry are in Quadra Securities’ Money tab, as at a real broker.'
       ]]
     ]
   },
@@ -131,7 +105,7 @@ export const HELP = {
       ['tabs', '每個分頁', [
         '「首頁」：總資產和今日漲跌、為你推薦、漲跌幅前五名、全球市場，各分類清單（先列 15 檔）和搜尋（中文、英文或代號）；點任何標的看走勢、公司資料和下單。',
         '「資產」：淨值與走勢、配置、持股、現金與各幣別錢包、股利利息收入、定期定額和到價提醒。',
-        '「換匯・融資」：換匯（你付出／你會收到，兩邊都能輸入）、匯率看板、融資（已借、維持率、借款和還款）、理財（定存、借券出借）。',
+        '「資金」：換匯（你付出／你會收到，兩邊都能輸入）、匯率看板、融資、信用帳戶、定存和借券出借；下面是你的帳戶：薪水、信貸、急難紓困、財富等級和「真相」。',
         '「紀錄」：交易明細、委託、統計分析（報酬、費用與稅、和只買大盤比），和回測。',
         '右上角：說明、重新整理和你的 Quadra Pass；漲跌的顏色在 Quadra Pass 的 Pass 分頁設定。'
       ]],
@@ -154,7 +128,7 @@ export const HELP = {
       ['more', '公債、融資、放空', [
         '公債有票面利率和到期日，價格跟殖利率反向；買進要付應計利息，配息照發行國預扣稅，到期自動還本。美國公債照即時殖利率曲線，其他國家用參考殖利率。',
         '買進時可以選「融資」：成交時券商借你一部分，買的股票就是擔保，賣出時先還融資（沒有單獨借現金這回事）。融資成數和券商一樣：台股上市 6 成、上櫃 5 成（借成交價金乘成數，未滿千元的部分不借），海外股票走複委託，只能用現金買賣，不能融資也不能放空；加密貨幣、基金、黃金存摺不能融資；公債 9 成、公司債 7 成。利息加在融資上，還款或賣出時一起付。持股會分開記「現股」和「融資」：融資買進的股票是券商的擔保品，只能融資賣出（賣得的錢先還融資）或用現金償還變成現股；賣出時先賣現股。融資到期、追繳沒補足或沒有信用帳戶時，券商只會處分融資的股票，不會動你的現股。融資的股票一樣有股東權益：配股配息、股東會、現金增資都有份。',
-        '融資、融券和加密貨幣放空都要先開「信用帳戶」（換匯・融資 › 融資）：沒有信用帳戶時，手上的融資和放空會被券商處分。開戶條件：證券帳戶滿 3 個月、最近一年成交 10 筆以上、成交金額達額度的一半；額度 50 萬、100 萬、200 萬、300 萬、500 萬，50 萬以上還要財力證明（總資產達額度 3 成）。台股的融資、融券各用自己的額度。外匯對賣出不算借券，不用信用帳戶。',
+        '融資、融券和加密貨幣放空都要先開「信用帳戶」（資金 › 融資）：沒有信用帳戶時，手上的融資和放空會被券商處分。開戶條件：證券帳戶滿 3 個月、最近一年成交 10 筆以上、成交金額達額度的一半；額度 50 萬、100 萬、200 萬、300 萬、500 萬，50 萬以上還要財力證明（總資產達額度 3 成）。台股的融資、融券各用自己的額度。外匯對賣出不算借券，不用信用帳戶。',
         '融資、融券期限 6 個月，到期前一個月內可以按「展延」再延 6 個月；到期沒展延，融資的股票會被賣出、融券會被買回。融券：要繳賣出金額 9 成的保證金（未滿百元以百元計），賣出的錢也押在券商，買回時一起退；另收 0.08% 融券手續費，不收借券利息；保證金和押著的賣出款有年息 0.2%，買回時付給你。融券要用融券買進（或現券償還）了結；股東會、除權息前要依規定強制回補。加密貨幣放空：借券年費 3%，開倉後資產要有欠款的 150%。',
         '現股當沖：當天買進再賣出，證交稅減半（0.15%，到 2027 年底；只算當天買賣配對的股數，零股不適用）。證券帳戶滿 3 個月、最近一年成交 10 筆，或已開信用帳戶，就能當沖（先買後賣、先賣後買都一樣）；先賣後買有每日當沖額度（淨資產的 2 倍，最少 NT$50 萬、最多 NT$5,000 萬），收盤前一定要買回，沒買回會被自動買回。13:25 起整股進收盤前集合競價：只收限價單，13:30 以收盤價撮合一次。收盤後零股 13:40、整股 14:00 起到 14:30 下的台股單進「盤後交易」（零股盤後、整股盤後定價），14:30 以收盤價撮合一次，沒成交就取消；13:30 到開放前送出的會被退回。',
         '維持率收盤時低於 130% 會追繳，兩個營業日內要補到 166%，或繳足通知的補繳差額；到期還低於 130%，融資買進的持股全部賣出（斷頭）；低於 100% 馬上強制處理。'
@@ -173,9 +147,17 @@ export const HELP = {
         '換匯用市場中間價加減銀行價差；週末外匯休市時價差加倍。融資按天計息。新手禮：第一筆交易免手續費（稅和規費照收）。'
       ]],
       ['money', '錢怎麼算', [
-        'Securities 的新台幣就是 Quadra 餘額：買進時從錢包出去，賣出時回來。月薪和其他 App 的錢都會以新台幣存入，算投入的本金，不算報酬。',
+        '你的錢都在 Securities：新帳號開戶金 NT$200,000，每週一固定發薪 NT$10,000，跟薪水一樣，存多存少都一樣；那週第一次打開 App 時入帳，沒打開的週下次補發。系統發的錢只有這些：開戶金、週薪、財富等級獎勵和急難紓困，都以新台幣存入，算投入的本金，不算報酬。',
+        '財富等級：身價（現金加持股，扣掉信貸）第一次到達一個等級時送一次獎勵：NT$30 萬小資族 NT$3,000、50 萬穩健 NT$5,000、百萬 NT$10,000、300 萬富裕 NT$20,000、千萬 NT$50,000、一億 NT$100,000。',
+        '「真相」（資金 › 真相）用你自己的紀錄算錢從哪裡來：系統發的、政府（證交稅、股利扣繳和二代健保，減去急難紓困）、和你自己的成績；還有一筆交易真正的成本。',
         '股利照各國規定預扣稅，除息日持有就有，現金在發放日入帳（有公布的照公布日期，否則台股約 4 週後、美股約 1 週後，遇假日順延到下一個交易日）；在那之前列為「待入帳」，算在淨值裡但不能花。',
-        '餘額變負的（透支）時不能再花錢，「一鍵賣出補足」會找出最少要賣哪些來補。'
+        '餘額變負的（透支）時不能再花錢，每月計息 1%，「一鍵賣出補足」會找出最少要賣哪些來補。就像交割款沒付，2 天內沒補足就是違約交割：扣 7% 違約金、自動賣出持股，5 年內不能融資、融券。'
+      ]],
+      ['loan', '信貸與急難紓困', [
+        '信貸（資金 › 信貸）跟銀行一樣：開戶滿 4 週可以申請，一次一筆。額度從 NT$100,000 起，每準時還清一筆加 NT$50,000，最多是月薪的 22 倍（約 NT$950,000，DBR 22 倍）；每週還款不能超過週薪的一半。年利率 12% 起，每筆準時還清少 1%（最低 6%），每次逾期加 1%（最高 16%）。開辦費 NT$3,000 從撥款扣除，簽約前會看到總費用年百分率。',
+        '期數 1、2、3 或 5 年，每週一發薪後自動扣款；1 年內提前還清收剩餘本金 2% 的違約金。扣款失敗就逾期並計違約金和遲延利息，餘額一夠就自動補扣。',
+        '逾期 3 期轉催收：全部到期（喪失期限利益），帳戶裡的錢先抵銷，之後每週薪水扣三分之一（強制執行），利息照算到還清為止。聯徵紀錄保留到還清後 1 年，期間不能再借，之後利率 16%、額度回到 NT$100,000。借來的錢不算身價，不會讓你升財富等級。',
+        '急難紓困：現金和股票（成本）合計低於 NT$2,000、沒有催收中的信貸、離發薪日超過 2 天，可以申請一次 NT$5,000。每 13 週一次、一年最多 3 次，會留在紀錄上。'
       ]]
     ],
     en: [
@@ -185,7 +167,7 @@ export const HELP = {
       ['tabs', 'The tabs', [
         'Home: your total and today’s change, for you, the top five up and down, world markets, lists by kind (15 at first) and search (Chinese, English or ticker); tap anything for its chart, company facts and the order ticket.',
         'Portfolio: net worth and its history, allocation, holdings, cash and each currency’s wallet, income, monthly plans and price alerts.',
-        'FX & loans: exchange (you pay / you get, type either), the rates board, loans (borrowed, the ratio, borrowing and repaying) and savings (time deposits, lending shares).',
+        'Money: exchange (you pay / you get, type either), the rates board, margin, the credit account, time deposits and lending shares; below them your account: pay, loans, relief, wealth levels and Truth.',
         'History: activity, orders, stats (returns, costs and taxes, you against just buying an index) and the backtest.',
         'Top right: help, refresh and your Quadra Pass; the colours for up and down are set in its Pass tab.'
       ]],
@@ -208,7 +190,7 @@ export const HELP = {
       ['more', 'Bonds, margin, short selling', [
         'Bonds have a coupon and a maturity, and their price moves against their yield; a purchase pays accrued interest, coupons are paid less the issuer’s withholding, and the face value is repaid at maturity. US Treasuries follow the live yield curve; other countries’ use reference yields.',
         'Buy on margin by choosing 融資 on the order: the broker lends part of it as it fills, the shares its collateral, and selling repays it first (there’s no borrowing cash on its own). How much is lent is a broker’s: Taiwan 60% listed, 50% OTC (of the trade’s value, the part under NT$1,000 not lent); foreign stocks go through 複委託, cash only: no margin and no short selling; none on crypto, funds or the gold passbook; government bonds 90%, corporate 70%. Interest is added to the loan and paid when it’s repaid or the shares are sold. A holding keeps its own shares (現股) and its margin shares (融資) apart: shares bought on margin are the broker’s collateral, sold only as a margin sale (the money repays the loan first) or turned into your own by repaying in cash; a sale sells your own first. When margin is due, a call isn’t met or there’s no credit account, the broker sells only the margin shares, never your own. Margin shares keep every shareholder right: dividends, meetings and rights issues.',
-        'Margin, 融券 and crypto shorts need a credit account first (FX & loans › Loans); without one, the broker closes any margin or shorts held. To open one: the account 3 months old, 10 trades in the last year, and that year’s turnover at least half the limit; limits of NT$500k, 1M, 2M, 3M or 5M, above 500k with proof of means (net worth 30% of the limit). Taiwan’s 融資 and 融券 each have their own limit. Selling a currency pair borrows nothing and needs no credit account.',
+        'Margin, 融券 and crypto shorts need a credit account first (Money › Loans); without one, the broker closes any margin or shorts held. To open one: the account 3 months old, 10 trades in the last year, and that year’s turnover at least half the limit; limits of NT$500k, 1M, 2M, 3M or 5M, above 500k with proof of means (net worth 30% of the limit). Taiwan’s 融資 and 融券 each have their own limit. Selling a currency pair borrows nothing and needs no credit account.',
         'Taiwan margin (融資) and short sales (融券) run six months; within the last month, Extend adds six more. Past due without one, margin shares are sold and shorts bought back. A 融券 short puts up 90% of the sale as a deposit (rounded up to NT$100), and the sale money stays with the broker too, both returned on buying back; it costs a 0.08% fee and no borrow interest, and the deposit and sale money earn 0.2% a year, paid when you buy back. A 融券 position is closed by buying back (or delivering shares you hold), and must be covered before shareholder meetings and ex-dates by the rules. A crypto short: a 3% a year borrow fee, and assets of 150% of what’s owed after opening.',
         'Day trading (現股當沖): bought and sold the same day, the sell tax is halved (0.15%, until the end of 2027; only on the shares matched within the day, never odd lots). Either way round needs the account 3 months old with 10 trades in the last year, or a credit account; selling first has a daily day-trade limit (twice net worth, NT$500,000 to NT$50 million) and must be bought back before the close or it’s bought back for you. From 13:25 whole lots go into the closing call auction: limit orders only, matched once at 13:30 at the close. After the close, Taiwan orders placed from 13:40 (odd lots) or 14:00 (whole lots) until 14:30 go to after-hours trading, matched once at 14:30 at the close; unfilled ones are cancelled, and ones sent before their session opens are refused.',
         'If the maintenance ratio is under 130% at the close, it’s a margin call: two business days to bring it back to 166% or pay the amount called in full; still under 130% at the deadline, margin-bought holdings are sold; under 100% they’re sold at once.'
@@ -227,9 +209,17 @@ export const HELP = {
         'Exchanges are at the mid-market rate plus or minus a bank’s spread, doubled while FX markets are shut. Margin interest accrues daily. Welcome offer: your first trade pays no commission (taxes and fees as usual).'
       ]],
       ['money', 'Money', [
-        'Securities’ NT$ is the Quadra balance: buying spends from it, selling returns to it. The monthly pay and the other apps’ money arrive as NT$ deposits, counted as money put in, not as return.',
+        'Your money lives in Securities: a new account opens with NT$200,000, and every Monday pays a fixed NT$10,000, like a salary, the same however much you hold; it comes the first time that week you open the app, and a week you miss is paid when you’re back. The system gives money only as the opening money, the pay, wealth level rewards and emergency relief, all arriving as NT$ deposits, counted as money put in, not as return.',
+        'Wealth levels: the first time what you’re worth (cash and holdings, less a loan) reaches a level, its reward is paid once: NT$3,000 at NT$300,000, NT$5,000 at 500,000, NT$10,000 at a million, NT$20,000 at 3 million, NT$50,000 at 10 million and NT$100,000 at 100 million.',
+        'Truth (Money › Truth) works out from your own record where your money came from: what the system gave, the government (transaction tax, dividend withholding and the NHI premium, less relief) and your own result; and what a trade really costs.',
         'Dividends have each country’s withholding: held on the ex-date, the cash arrives on the pay day (the announced one where known, else about 4 weeks later in Taiwan and a week in the US, moved past holidays to the next trading day); until then it’s listed as on the way, counted in net worth but not spendable.',
-        'With the balance below zero (an overdraft) nothing more can be spent, and Sell to cover finds the fewest sales that cover it.'
+        'With the balance below zero (an overdraft) nothing more can be spent, it costs 1% a month, and Sell to cover finds the fewest sales that cover it. Like an unpaid settlement, not covered within 2 days it’s a default: a 7% penalty, holdings sold, and no margin or short selling for 5 years.'
+      ]],
+      ['loan', 'Loans and relief', [
+        'A personal loan (Money › Loan) works like a bank’s: after 4 weeks, one at a time. The limit starts at NT$100,000, grows NT$50,000 with each loan repaid on time, up to 22 months of pay (about NT$950,000, Taiwan’s DBR 22 rule), and an installment can’t take more than half the weekly pay. The rate starts at 12% a year, 1 point less per clean loan (6% at best) and 1 point more per late installment (16% at most). A NT$3,000 set-up fee comes off the money, and the APR with fees is shown before you sign.',
+        'Terms of 1, 2, 3 or 5 years, taken every Monday after the pay; paying off within a year costs 2% of what’s left. A missed installment is late, with charges, and is taken as soon as the balance covers it.',
+        'Three late and it goes to collection: the whole loan falls due, the balance is taken toward it, then a third of every weekly pay until it’s paid, with interest running. The record lasts a year after it’s paid: no loans, then 16% and a NT$100,000 limit. Borrowed money isn’t worth, so it never raises your wealth level.',
+        'Emergency relief: with cash and stocks (at cost) together under NT$2,000, no loan in collection, and payday more than 2 days away, you can get NT$5,000 once. Once every 13 weeks, 3 times a year at most, and it stays on your record.'
       ]]
     ]
   },
@@ -394,7 +384,7 @@ export const HELP = {
         '每答對一題 2 XP，第一次精熟一個字再加 15 XP。累計積分決定等級（Lv 2 要 100 XP、Lv 5 要 1,600、Lv 10 要 8,100、Lv 20 要 36,100），每幾級換一個稱號：新手、學徒、好手、高手、達人、大師、傳奇、神話。積分只是你的學習紀錄，不能換任何東西。'
       ]],
       ['money', '錢怎麼算', [
-        'Orbit Words 不用錢，也不發錢：練單字永遠免費。帳戶、頭像和錢的真相，都在每個 App 右上角的 Quadra Pass 裡。'
+        'Orbit Words 不用錢，也不發錢：練單字永遠免費。帳戶和頭像在每個 App 右上角的 Quadra Pass 裡。'
       ]]
     ],
     en: [
@@ -421,7 +411,7 @@ export const HELP = {
         'Each right answer earns 2 XP and a word’s first mastery 15 more. Total XP sets your level (Lv 2 at 100 XP, Lv 5 at 1,600, Lv 10 at 8,100, Lv 20 at 36,100), with a new title every few levels: Rookie, Apprentice, Skilled, Expert, Master, Grandmaster, Legend, Mythic. XP is only a record of learning; it buys nothing.'
       ]],
       ['money', 'Money', [
-        'Orbit Words uses no money and pays none: learning is always free. Your account, looks and the truth about money are in the Quadra Pass at the top right of every app.'
+        'Orbit Words uses no money and pays none: learning is always free. Your account and looks are in the Quadra Pass at the top right of every app.'
       ]]
     ]
   },
@@ -537,7 +527,7 @@ export const HELP = {
         '派彩照台灣運彩的規則：每張彩金超過 NT$5,000 整筆預扣 20% 所得稅；打平或比賽取消算 1.00（足球整數讓分剛好打平是讓分和，不退款）。足球算 90 分鐘、冰球算 60 分鐘（不含延長賽）；中職、日職、韓職和局時不讓分退款。'
       ]],
       ['money', '錢怎麼算', [
-        'Orbit Slips 不賣彩券，也不碰錢：只是幫你看已經買的注單。帳戶、頭像和錢的真相，都在右上角的 Quadra Pass 裡。'
+        'Orbit Slips 不賣彩券，也不碰錢：只是幫你看已經買的注單。帳戶和頭像在右上角的 Quadra Pass 裡。'
       ]]
     ],
     en: [
@@ -557,7 +547,7 @@ export const HELP = {
         'Payouts follow Taiwan Sports Lottery’s rules: 20% income tax on any slip paying over NT$5,000; a push or a game called off counts 1.00 (soccer’s whole-goal spread landing on its line is the handicap draw, not a refund). Soccer is on 90 minutes, hockey on 60 (no overtime); a tied CPBL, NPB or KBO game returns a moneyline pick.'
       ]],
       ['money', 'Money', [
-        'Orbit Slips sells nothing and moves no money: it only follows tickets you’ve bought. The account, looks and the truth about the money are in the Quadra Pass, top right.'
+        'Orbit Slips sells nothing and moves no money: it only follows tickets you’ve bought. The account and looks are in the Quadra Pass, top right.'
       ]]
     ]
   },
@@ -587,7 +577,7 @@ export const HELP = {
         '設定、每組片段的速度和你改過的角色，和每種風格收藏了幾首；打開「依你的口味」，做歌就偏向你喜歡的。聲音本身不離開手機。'
       ]],
       ['money', '錢怎麼算', [
-        'Orbit Beats 免費，不碰錢。帳戶、頭像和錢的真相，都在右上角的 Quadra Pass 裡。'
+        'Orbit Beats 免費，不碰錢。帳戶和頭像在右上角的 Quadra Pass 裡。'
       ]]
     ],
     en: [
@@ -615,7 +605,7 @@ export const HELP = {
         'Your settings, each set’s tempo and the roles you set, and how many songs you kept of each style; with Lean to your taste on, new songs lean to what you like. The sound itself never leaves the phone.'
       ]],
       ['money', 'Money', [
-        'Orbit Beats is free and moves no money. The account, looks and the truth about the money are in the Quadra Pass, top right.'
+        'Orbit Beats is free and moves no money. The account and looks are in the Quadra Pass, top right.'
       ]]
     ]
   },

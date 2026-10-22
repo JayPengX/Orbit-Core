@@ -577,7 +577,7 @@ let token = store.get();
 const APPS = { stock: 'Quadra 證券', odds: 'Quadra Play', match: 'Orbit Sports', vocab: 'Orbit Words', orbit: 'Orbit Class', weather: 'Orbit Weather', transit: 'Orbit Transit', slip: 'Orbit Slips', beats: 'Orbit Beats' };
 const appName = a => APPS[a] || a;
 // A record's kind in words (the key itself when it's one not named here).
-const KINDS = { start: '開戶金', pay: '月薪', grant: '補發', rank: '排名獎', rebase: '重算', vip: 'VIP', admin: '手動調整', plus: 'Plus 月費', plusrefund: 'Plus 退費', loan: '信貸撥款', loanfee: '信貸開辦費', loanpay: '信貸還款', loanlate: '信貸遲延', loanbad: '信貸催收', loangar: '催收扣薪', loanoff: '信貸清償', relief: '急難紓困', od: '透支利息', stake: '下注', payout: '派彩', tax: '運彩稅補扣', win: '派彩', refund: '退款', cashout: '提前兌現', lottery: '彩券', prize: '彩券獎金', undo: '撤銷' };
+const KINDS = { start: '開戶金', pay: '週薪', rank: '財富等級獎勵', rebase: '重算', admin: '手動調整', loan: '信貸撥款', loanfee: '信貸開辦費', loanpay: '信貸還款', loanlate: '信貸遲延', loanbad: '信貸催收', loangar: '催收扣薪', loanoff: '信貸清償', relief: '急難紓困', od: '透支利息', stake: '下注', payout: '派彩', tax: '運彩稅補扣', win: '派彩', refund: '退款', cashout: '提前兌現', lottery: '彩券', prize: '彩券獎金', undo: '撤銷' };
 const kindName = k => KINDS[k] || k;
 
 const WHY = {
@@ -762,7 +762,6 @@ const ECON = [
   ['薪水', 'work', '#16a34a', k => k === 'eco:pay'],
   ['開戶金', 'wallet', '#0ea5e9', k => /^(eco|odds):(start|grant)$/.test(k)],
   ['財富等級', 'trophy', '#d97706', k => k === 'eco:rank'],
-  ['VIP 回饋', 'star', '#a855f7', k => k === 'eco:vip'],
   ['急難紓困', 'spark', '#db2777', k => k === 'eco:relief'],
   ['信貸撥款', 'bank', '#2563eb', k => k === 'eco:loan'],
   ['信貸還款', 'bank', '#4f46e5', k => /^eco:loan(pay|off|gar|bad)$/.test(k)],
@@ -1119,7 +1118,7 @@ function action(title, text, controls, run) {
   return box;
 }
 // A record's kind as a picture.
-const KIND_IC = { start: ['wallet', '#0ea5e9'], grant: ['wallet', '#0ea5e9'], pay: ['work', '#16a34a'], rank: ['trophy', '#d97706'], vip: ['star', '#a855f7'], relief: ['spark', '#db2777'], admin: ['pencil', '#64748b'], rebase: ['swap', '#64748b'], od: ['exchange', '#dc2626'], plus: ['star', '#7c3aed'], plusrefund: ['star', '#7c3aed'], stake: ['ticket', '#1d4ed8'], lottery: ['target', '#1d4ed8'], payout: ['coin', '#0891b2'], tax: ['ticket', '#dc2626'], win: ['coin', '#0891b2'], prize: ['target', '#0891b2'], refund: ['history', '#64748b'], cashout: ['swap', '#0891b2'], plusboost: ['coin', '#7c3aed'] };
+const KIND_IC = { start: ['wallet', '#0ea5e9'], pay: ['work', '#16a34a'], rank: ['trophy', '#d97706'], relief: ['spark', '#db2777'], admin: ['pencil', '#64748b'], rebase: ['swap', '#64748b'], od: ['exchange', '#dc2626'], stake: ['ticket', '#1d4ed8'], lottery: ['target', '#1d4ed8'], payout: ['coin', '#0891b2'], tax: ['ticket', '#dc2626'], win: ['coin', '#0891b2'], prize: ['target', '#0891b2'], refund: ['history', '#64748b'], cashout: ['swap', '#0891b2'], plusboost: ['coin', '#7c3aed'] };
 const kindIc = k => (k.startsWith('loan') || k === 'loan' ? ['bank', '#2563eb'] : KIND_IC[k] || ['list', '#94a3b8']);
 const REC_FILTERS = { all: ['全部', () => true], in: ['進', e => e.amount > 0], out: ['出', e => e.amount < 0], loan: ['信貸', e => e.kind.startsWith('loan')], play: ['Play', e => e.app === 'odds'], eco: ['Quadra', e => e.app === 'eco'] };
 function drawAccount(a) {
@@ -1417,7 +1416,7 @@ async function loadMoney() {
     );
     $('mo-eq').textContent = `系統淨發出 ${big(net)} − Quadra 賺 ${big(n(all, 'quadra'))} − 政府收 ${big(govTake)} ${n(all, 'own') < 0 ? '−' : '+'} 市場 ${big(Math.abs(n(all, 'own')))} = 流通中 ${big(n(live, 'worth'))}`;
     const g = all.gave || {};
-    flow('mo-given', [['開戶金', n(g, 'start')], ['月薪', n(g, 'pay')], ['財富等級獎勵', n(g, 'rank')], ['其他', n(g, 'other'), 'VIP 回饋、補發'], ['刪除的帳戶還回', -n(gone, 'worth'), `${n(gone, 'accounts')} 個`]].filter(r => r[1]), { total: ['淨發出', net] });
+    flow('mo-given', [['開戶金', n(g, 'start')], ['週薪', n(g, 'pay')], ['財富等級獎勵', n(g, 'rank')], ['其他', n(g, 'other'), '手動調整'], ['刪除的帳戶還回', -n(gone, 'worth'), `${n(gone, 'accounts')} 個`]].filter(r => r[1]), { total: ['淨發出', net] });
     flow('mo-where', [['系統淨發出', net], ['Quadra 賺走', -n(all, 'quadra')], ['政府收走', -govTake, '稅減去急難紓困'], ['市場', n(all, 'own')]], { total: ['流通中', n(live, 'worth')] });
     const gp = all.gov?.paid || {};
     flow('mo-gov', [['運彩中獎所得稅', n(gp, 'sports')], ['彩券中獎稅', n(gp, 'lottery'), '所得稅與印花稅'], ['證券交易稅', n(gp, 'trade')], ['股利與利息扣繳', n(gp, 'withheld'), '含外國政府'], ['二代健保補充保費', n(gp, 'nhi')], ['急難紓困', -n(all.gov?.got, 'relief'), '發給玩家']].filter(r => r[1]), { total: ['政府淨收', govTake] });
@@ -1426,7 +1425,7 @@ async function loadMoney() {
     const taxed = wallets.filter(w => w.tax > 0).sort((a, b) => b.tax - a.tax).slice(0, 5);
     $('mo-taxed').innerHTML = taxed.length ? acctCard(taxed.map(w => ({ ...w, shown: `−${money(w.tax)}`, red: true })), { compact: true }) : emptyCard('check', '還沒有人繳稅');
     // (Play's side before the prize tax: the tax is the government's.)
-    flow('mo-quadra', [...byMarket(all.playBy, n(all, 'play'), SPORT_NAMES, ['Play 未分類', '還沒同步的帳戶']), ...[['Plus 月費（扣掉退費）', n(all.fees, 'plus')], ['透支利息', n(all.fees, 'od')], ['信貸（淨）', n(all.fees, 'loan')]].filter(r => r[1])], { total: ['合計', n(all, 'quadra')] });
+    flow('mo-quadra', [...byMarket(all.playBy, n(all, 'play'), SPORT_NAMES, ['Play 未分類', '還沒同步的帳戶']), ...[['透支利息', n(all.fees, 'od')], ['信貸（淨）', n(all.fees, 'loan')]].filter(r => r[1])], { total: ['合計', n(all, 'quadra')] });
     flow('mo-own', byMarket(all.stockBy, n(all, 'own'), MARKET_NAMES, ['其他', '股利、利息、匯兌']), { total: ['合計', n(all, 'own')] });
     $('mo-note').textContent = `帳戶刪除時，剩下的錢還給系統（透支的帳戶，欠的由系統吸收）；它讓 Quadra 賺的和在市場賺賠的照樣留在帳上。Quadra 這邊玩家輸的是正數、贏走的是負數；未結算的注單不算。各市場由 Play 和 Securities 打開時回報，還沒打開過新版的帳戶算在「未分類／其他」。刪除的帳戶${gone.since ? `從 ${fmtDay(gone.since)} 起` : '從現在起'}記錄。${fmt(m.at)} 更新。`;
   } catch (e) {

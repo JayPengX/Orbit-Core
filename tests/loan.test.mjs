@@ -4,10 +4,10 @@ import assert from 'node:assert/strict';
 import { LOAN, RELIEF, schedule, totalApr, loanOffer, loanEntries, activeLoan, loanOwed, payoffAmount, credit, debtOf, maxFor, reliefCheck, weekStart, WEEK, PAY_WEEK } from '../kit/loan.mjs';
 import { paydayEntries, poolBalance, mergeWallet, worthOf, rankEntries } from '../eco.js';
 
-// Wednesday 4 Nov 2026, noon Taipei; the account is from before weekly pay.
+// Wednesday 4 Nov 2026, noon Taipei; the account opened 5 Oct (past the 4 weeks' wait).
 const T0 = Date.UTC(2026, 10, 4, 4);
 const DAY = 86_400_000;
-const base = (cash = 200_000) => ({ v2: 1, created: Date.UTC(2026, 8, 1), entries: [{ id: 'eco:start', t: 1, app: 'eco', kind: 'start', amount: 200_000 }, { id: 'eco:topup:v12', t: 1, app: 'eco', kind: 'start', amount: 0 }, { id: 'seed', t: 1, app: 'odds', kind: 'stake', amount: cash - 200_000 }], snap: {}, settings: {} });
+const base = (cash = 200_000) => ({ v2: 1, created: Date.UTC(2026, 9, 5), entries: [{ id: 'eco:start', t: 1, app: 'eco', kind: 'start', amount: 200_000 }, { id: 'seed', t: 1, app: 'odds', kind: 'stake', amount: cash - 200_000 }], snap: {}, settings: {} });
 // Paid up to `now` (every Monday's pay and what the loan takes), like the Worker.
 const at = (w, now) => mergeWallet(w, { entries: paydayEntries(w, now) });
 const borrow = (w, amount, weeks, now = T0) => {
@@ -66,7 +66,7 @@ test('installments come out of each Monday’s pay, once each', () => {
   // Four weeks on: four installments, four pays.
   w = at(w, mon + 3 * WEEK + 1);
   assert.equal(w.entries.filter(e => e.kind === 'loanpay').length, 4);
-  assert.equal(w.entries.filter(e => e.id.startsWith('eco:wpay:')).length, 7);
+  assert.equal(w.entries.filter(e => e.id.startsWith('eco:wpay:')).length, 9);
 });
 
 test('a missed installment is late with a charge, collected when money arrives; 3 late is 催收', () => {

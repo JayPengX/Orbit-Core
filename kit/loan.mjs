@@ -3,8 +3,7 @@
 // writes the entries. Modelled on how a Taiwan bank and a 社會局 work:
 //
 // 信貸 (an unsecured personal loan, LOAN):
-//   - Who: an account at least 4 weeks old (one from before weekly pay
-//     counts), one loan at a time, no 催收 now and none settled in the last
+//   - Who: an account at least 4 weeks old, one loan at a time, no 催收 now and none settled in the last
 //     52 weeks (a 聯徵 record).
 //   - Limit: NT$100,000 to start, +NT$50,000 per loan repaid with no late
 //     week, up to 22× monthly pay (the DBR 22 rule) ≈ NT$950,000. Its
@@ -43,13 +42,8 @@ const TPE = 8 * 3_600_000;
 const DAY = 86_400_000;
 export const WEEK = 7 * DAY;
 
-// The weekly pay (eco.js pays it each Monday, Taipei time), from the week of
-// WEEKLY_FROM (Monday 2026-10-19).
+// The weekly pay (eco.js pays it each Monday, Taipei time).
 export const PAY_WEEK = 10_000;
-export const WEEKLY_FROM = Date.parse('2026-10-18T16:00:00Z');
-// An account from before weekly pay (raised to the new opening money, or
-// made before it): it can borrow without the 4 weeks' wait.
-export const veteran = wallet => (wallet?.entries || []).some(e => e.id === 'eco:topup:v12') || (Number.isFinite(wallet?.created) && wallet.created < WEEKLY_FROM);
 
 export const LOAN = {
   min: 50_000,
@@ -192,18 +186,18 @@ export function maxFor(apr, weeks, limit) {
 }
 
 // Can this account borrow now, and why not.
-export function canBorrow(wallet, now = Date.now(), { old = veteran(wallet) } = {}) {
+export function canBorrow(wallet, now = Date.now()) {
   const c = credit(wallet, now);
   if (activeLoan(wallet)) return { ok: false, why: 'active', credit: c };
   if (c.inCollection) return { ok: false, why: 'collection', credit: c };
   if (c.bannedUntil) return { ok: false, why: 'record', until: c.bannedUntil, credit: c };
   const age = Number.isFinite(wallet?.created) ? now - wallet.created : 0;
-  if (!old && age < LOAN.minAgeDays * DAY) return { ok: false, why: 'new', until: wallet.created + LOAN.minAgeDays * DAY, credit: c };
+  if (age < LOAN.minAgeDays * DAY) return { ok: false, why: 'new', until: wallet.created + LOAN.minAgeDays * DAY, credit: c };
   return { ok: true, credit: c };
 }
 // A loan offer for `amount` over `weeks`: the terms, or why it's refused.
-export function loanOffer(wallet, amount, weeks, now = Date.now(), opts = {}) {
-  const can = canBorrow(wallet, now, opts);
+export function loanOffer(wallet, amount, weeks, now = Date.now()) {
+  const can = canBorrow(wallet, now);
   if (!can.ok) return { ok: false, why: can.why, until: can.until };
   if (!LOAN.terms.includes(weeks)) return { ok: false, why: 'term' };
   const principal = Math.round(Number(amount) / 1_000) * 1_000;
