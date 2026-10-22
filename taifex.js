@@ -99,9 +99,14 @@ export function parseOptions(text, settle = {}) {
   return opt;
 }
 
+// (A read whose options didn't come — their 4 MB report timed out — is kept
+// only OPT_RETRY_MS and gets the last options read meanwhile, never an empty
+// chain for ten minutes.)
+const OPT_RETRY_MS = 30_000;
 let kept = null;
+let lastOpt = null;
 async function table(fetchFn) {
-  if (kept && Date.now() - kept.at < KEEP_MS) return kept.body;
+  if (kept && Date.now() - kept.at < (Object.keys(kept.body.opt).length ? KEEP_MS : OPT_RETRY_MS)) return kept.body;
   const get = url => fetchFn(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(8_000) }).then(r => (r.ok ? r.text().then(readRows) : Promise.reject(new Error(`TAIFEX ${r.status}`))));
   const now = new Date(Date.now() + 8 * 3_600_000);
   const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 3, 1));
@@ -112,15 +117,27 @@ async function table(fetchFn) {
     fetchFn(FINALS, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'Mozilla/5.0' }, body: form, signal: AbortSignal.timeout(8_000) })
       .then(r => (r.ok ? r.text() : ''))
       .catch(() => ''),
-    fetchFn(`${OPENAPI}/DailyMarketReportOpt`, { signal: AbortSignal.timeout(8_000) })
-      .then(r => (r.ok ? r.text() : ''))
-      .catch(() => '')
+    optionsReport(fetchFn)
   ]);
   const { date, settle } = parseDaily(daily);
   if (!date || !Object.keys(settle).length) throw new Error('TAIFEX: no settlement prices');
-  const body = { date, settle, margin: parseMargins(margins), final: parseFinals(finals), opt: parseOptions(options, settle), optMargin: parseMargins(margins, OPT_MARGIN) };
+  let opt = parseOptions(options, settle);
+  if (Object.keys(opt).length) lastOpt = opt;
+  else opt = lastOpt || {};
+  const body = { date, settle, margin: parseMargins(margins), final: parseFinals(finals), opt, optMargin: parseMargins(margins, OPT_MARGIN) };
   kept = { at: Date.now(), body };
   return body;
+}
+
+// The options report (about 4 MB): 9 s for it, asked twice (inside a phone's 20 s).
+async function optionsReport(fetchFn) {
+  for (let i = 0; i < 2; i++) {
+    const text = await fetchFn(`${OPENAPI}/DailyMarketReportOpt`, { signal: AbortSignal.timeout(9_000) })
+      .then(r => (r.ok ? r.text() : ''))
+      .catch(() => '');
+    if (text) return text;
+  }
+  return '';
 }
 
 export async function taifexResponse(url, fetchFn = fetch) {
