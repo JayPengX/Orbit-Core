@@ -1439,14 +1439,14 @@ async function cachedText(env, key, ttl, make) {
 // ---- Route ---------------------------------------------------------------------------
 
 // The typhoon day off (typhoon.js) on a place's answer, while CWA has a
-// typhoon warning out: the warning read every 10 minutes, the 人事行政總處
-// page every 5 while there is one (both kept in KV for everyone).
+// typhoon warning out: the warning read every 5 minutes, the 人事行政總處
+// page every 3 while there is one (both kept in KV for everyone).
 async function withDayOff(env, resp, at, fetchFn, ctx, now = Date.now()) {
   if (!resp?.place?.county) return resp;
   const defer = ctx?.waitUntil ? p => ctx.waitUntil(p) : null;
-  const ty = await shared(env, 'weather:typhoon', 10 * MIN, () => readTyphoon(fetchFn, now, env.CWA_KEY ? cwaUrl(env, 'W-C0034-005') : null), now, defer);
+  const ty = await shared(env, 'weather:typhoon', 5 * MIN, () => readTyphoon(fetchFn, now, env.CWA_KEY ? cwaUrl(env, 'W-C0034-005') : null), now, defer);
   if (!ty?.data) return resp;
-  const dg = await shared(env, 'weather:dgpa', 5 * MIN, () => readDgpa(env, fetchFn), now, defer);
+  const dg = await shared(env, 'weather:dgpa', 3 * MIN, () => readDgpa(env, fetchFn), now, defer);
   const dayOff = dayOffFor(resp, ty.data, dg?.data, now, at);
   return dayOff ? { ...resp, dayOff } : resp;
 }
