@@ -9,6 +9,7 @@ import { f1Driver, normalizeTeamName } from '#kit/logos.mjs';
 import { f1Outcome } from '#kit/f1live.mjs';
 import { settleSlip } from '#kit/play-odds.mjs';
 import { propResult, propOutcome } from '#kit/play-props.mjs';
+import { overByRule, parseStatus } from '#kit/sports-espn.mjs';
 
 // Every league Play has priced (the catalogue's, catalog.mjs playLeagues): those
 // no longer sold too, for their older slips.
@@ -559,7 +560,10 @@ export function parseEspnResults(data, sport) {
     if (!away || !home) continue;
     const type = comp.status?.type || {};
     const name = type.name || '';
-    const status = VOID_STATUS.test(name) ? 'void' : type.completed && type.state === 'post' ? 'final' : 'pending';
+    // Final the moment the score decides it (the kit's overByRule, Orbit
+    // Sports' result notices' rule), not minutes later when ESPN says so.
+    const byRule = type.state === 'in' && overByRule(parseStatus(comp.status), away, home, sport).state === 'post';
+    const status = VOID_STATUS.test(name) ? 'void' : (type.completed && type.state === 'post') || byRule ? 'final' : 'pending';
     // Each side's period scores; a soccer scoreboard's from its goals when
     // ESPN gives none (its halves, then extra time), with their order.
     const goals = isSoccer(sport) ? soccerGoals(comp, away, home) : null;
@@ -586,7 +590,7 @@ export function parseEspnResults(data, sport) {
       ...(Number.isFinite(away.hits) && Number.isFinite(home.hits) ? { awayHits: away.hits, homeHits: home.hits } : {}),
       // Where a game in progress is: 'in', ESPN's short detail ("Top 7th",
       // "Q3 5:21", "67'") and the period number.
-      state: type.state ?? null,
+      state: byRule ? 'post' : type.state ?? null,
       ...(status === 'pending' && POSTPONED.test(name) ? { postponed: true } : {}),
       ...(status === 'pending' && SUSPENDED.test(name) ? { suspended: true } : {}),
       // Abandoned part way: the score so far still decides what it already has.

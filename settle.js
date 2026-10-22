@@ -15,7 +15,7 @@
 //   - the picks' results and final scores are kept for Play to apply
 //     (`odds-settled/<account>`), the same ids again: nothing twice;
 //   - the real notice (won NT$…, or lost) goes to a phone subscribed to them.
-// A game not over yet is looked at again 15 minutes later; one not played in
+// A game not over yet is looked at again 2 minutes later; one not played in
 // its time (48 hours, baseball its day, American football its week: the
 // kit's voidAt, 台灣運彩's rule) is void, as is a pick whose game is never
 // found by then (48 hours at the least), and Kambi's kept copies (kambi.js)
@@ -29,6 +29,8 @@
 //   POST /play?qt=T { op: 'cashout', id, value }     { refused: { problem: 'closed' } } (no cash out since 2026-10-21)
 //                      or { refused: { problem: 'moved', value } } (the house's value now, null: paused)
 //   POST /play?qt=T { op: 'ack', ids }               records Play has applied
+//   POST /play?qt=T { op: 'settle', ids }            these slips looked at now (their game
+//                      seen over on the phone): { settled } as GET
 //   GET  /play?qt=T                                  { settled: { id: record } }
 //   POST /play?qt=T { op: 'place', slips: [slip…] }  { placed: [id…], wallet } or
 //                      { refused: { slip, problem, moved: [{ id, odds }] } } (price.js)
@@ -44,6 +46,7 @@
 
 import { storeReady, parseDoc, changeDoc, moveOwned } from './doc-store.js';
 import { readOutcomes, legResult, applyResults, finalOf, familyOf, LEAGUES, voidAt, NOT_STARTED_MS } from './kit/settle.mjs';
+import { SHORTEST_MIN } from './kit/sports-espn.mjs';
 import { updateWallet, WALLET_COLLECTION, parseWallet, poolBalance } from './eco.js';
 import { checkSlip, useReads } from './price.js';
 import { handleLotto } from './lotto.js';
@@ -54,14 +57,13 @@ export const SETTLED_COLLECTION = 'odds-settled';
 export const OPEN_INDEX = '_index';
 const MIN = 60_000;
 const HOUR = 60 * MIN;
-// How soon a game of each kind can be over, start to final (a quick one's
-// length), and a margin for the result to be posted: first looked at then,
-// then every few minutes until it's final, so a slip is paid within minutes
-// of the final (as Orbit Sports shows it), not up to an hour after. A game
-// still undecided long after (put off, a source down) is looked at less often.
-export const GAME_HOURS = { baseball: 2.4, football: 2.9, basketball: 2, hockey: 2.2, soccer: 1.85, sets: 1.5, racing: 1.6 };
-const MARGIN = 5 * MIN;
-const AGAIN = 3 * MIN;
+// A game is first looked at the soonest it can be over (the kit's
+// SHORTEST_MIN, as Orbit Sports' result notices), then on every run (2
+// minutes) until it's final, and a final counts the moment the score decides
+// it (settle.mjs, overByRule): a slip is paid within minutes of the last
+// out, as Orbit Sports tells it. A game still undecided long after (put off,
+// a source down) is looked at less often.
+const AGAIN = 2 * MIN;
 const LATE_AGAIN = 15 * MIN;
 const LATE_AFTER = 6 * HOUR;
 // A championship (future) is looked at every 6 hours.
@@ -76,6 +78,8 @@ export const LIVE_DELAY_MS = 5_000;
 export const RUN_LOOK = 60;
 export const RUN_SETTLE = 30;
 const MAX_SLIPS = 40;
+// Slips a phone can have looked at at once (op 'settle').
+const SETTLE_NOW = 10;
 const MAX_LEGS = 20;
 const MAX_SLIP_BYTES = 24_000;
 const SLIP_ID = /^[a-z0-9]{8,32}$/;
@@ -104,9 +108,9 @@ export function cleanSlip(slip) {
   return JSON.stringify(out).length <= MAX_SLIP_BYTES ? out : null;
 }
 
-// When to look at a slip next: the soonest undecided pick's expected end
-// (its start and its kind of game's usual length), or `again` (15 minutes,
-// or at once for a slip just registered) for a game that should be over.
+// When to look at a slip next: the soonest an undecided pick's game can be
+// over (its start and SHORTEST_MIN), or `again` (2 minutes, 15 after 6 hours,
+// or at once for a slip just registered) for a game that could be over.
 export function nextLook(slip, now, again = AGAIN) {
   let next = Infinity;
   for (const leg of slip.legs) {
@@ -116,7 +120,7 @@ export function nextLook(slip, now, again = AGAIN) {
       next = Math.min(next, now + FUTURE_AGAIN);
       continue;
     }
-    const end = start + (GAME_HOURS[familyOf(leg.sport)] ?? 2.5) * HOUR + MARGIN;
+    const end = start + (SHORTEST_MIN[familyOf(leg.sport)] ?? 100) * MIN;
     next = Math.min(next, end > now ? end : now + (again && now - start > LATE_AFTER ? Math.max(again, LATE_AGAIN) : again));
   }
   return Number.isFinite(next) ? next : now;
@@ -259,6 +263,15 @@ export async function handlePlay(request, env, headers, session, deps) {
       // by the cron (payCashOut).
       return json({ refused: { problem: 'closed' } }, 200, headers);
     }
+    if (body.op === 'settle') {
+      // A phone that saw a pick's game end (the same rule, overByRule): its
+      // slips looked at now, not on the next run; the games read here, as
+      // the cron reads them (the phone's word decides nothing).
+      const ids = (Array.isArray(body.ids) ? body.ids : []).map(String).filter(id => SLIP_ID.test(id)).slice(0, SETTLE_NOW);
+      if (ids.length) await settleCron(env, deps, { keys: ids.map(id => keyOf(account, id)) });
+      const doc = await deps.fsGet(env, SETTLED_COLLECTION, account);
+      return json({ settled: parseDoc(doc)?.slips || {} }, 200, headers);
+    }
     if (body.op === 'ack') {
       const ids = new Set((Array.isArray(body.ids) ? body.ids : []).map(String).slice(0, 200));
       await changeRecords(env, deps, account, records => ([...ids].some(id => records[id]?.settled) ? Object.fromEntries(Object.entries(records).filter(([id, r]) => !(ids.has(id) && r.settled))) : records));
@@ -324,11 +337,12 @@ export function slipNotice(slip, lang) {
 
 // One run: the slips that are due, each game read once, what's decided kept,
 // what's settled paid and told.
-export async function settleCron(env, deps) {
+// (`keys`: these slips now, due or not: a phone that saw their game end.)
+export async function settleCron(env, deps, { keys = null } = {}) {
   const now = deps.now();
   const { index } = await readIndex(env, deps);
   const due = Object.entries(index.due)
-    .filter(([, at]) => at <= now)
+    .filter(([key, at]) => (keys ? keys.includes(key) : at <= now))
     .sort((a, b) => a[1] - b[1])
     .slice(0, RUN_LOOK);
   if (!due.length) return { watched: Object.keys(index.due).length, looked: 0 };
