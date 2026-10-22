@@ -118,6 +118,11 @@ test('a place: the official word first, else the chance with its reasons', () =>
   const lamped = dayOffFor(place('新竹市'), { ...far, lamps: { 新竹市: [{ dom: 23, wind: 9, gust: 11 }] } }, null, NOW, HSINCHU);
   assert.equal(lamped.why.gust, 11);
   assert.ok(lamped.chance > calm.chance);
+  // 尚未宣布消息 for the county: still the chance; a few towns' decisions go under it.
+  const pending = dayOffFor(place('臺東縣'), far, { at: 1, counties: { 臺東縣: '尚未宣布消息。 綠島鄉:今天下午停止上班、停止上課。' } }, NOW, HSINCHU);
+  assert.equal(typeof pending.chance, 'number');
+  assert.deepEqual(pending.local.lines, [{ text: '綠島鄉:今天下午停止上班、停止上課', off: 'all' }]);
+  assert.equal(dayOffFor(place('新竹市'), far, { counties: { 新竹市: '尚未宣布消息' } }, NOW, HSINCHU).official, undefined);
   // On its own forecast track (heading this way) the circle reaches 新竹 tomorrow.
   assert.equal(dayOffFor(place('新竹市'), ty, null, NOW, HSINCHU).why.reach, true);
   // No warning, or abroad: nothing.
