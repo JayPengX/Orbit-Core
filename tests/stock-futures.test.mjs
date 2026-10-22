@@ -77,3 +77,16 @@ test('the proxy fills a stock future at its live stock plus the basis', async ()
   const { fills } = await decideFills([order], { read, now: t });
   assert.equal(fills.ssf1?.quote, 2425);
 });
+
+test('a warrant from TWSE’s own quotes: last trade, else the best bid, else the reference price', async () => {
+  const { misQuote } = await import('../kit/stock-quotes.mjs');
+  const q = misQuote('030001.TW', { c: '030001', ex: 'tse', n: '友達台新6A購01', z: '-', y: '0.7200', b: '0.6700_0.5100_', a: '0.6800_', d: '20261022', t: '13:30:00' });
+  assert.equal(q.price, 0.67);
+  assert.equal(q.prev, 0.72);
+  assert.equal(q.ask, 0.68);
+  assert.equal(q.kind, 'warrant');
+  assert.equal(q.marketTime, Date.parse('2026-10-22T13:30:00+08:00'));
+  assert.equal(misQuote('030002.TW', { z: '0.9100', y: '0.8', b: '0.9_', a: '-' }).price, 0.91);
+  assert.equal(misQuote('030003.TW', { z: '-', y: '0.8', b: '-', a: '-' }).price, 0.8);
+  assert.equal(misQuote('030004.TW', { z: '-', y: '-', b: '-', a: '-' }), null);
+});

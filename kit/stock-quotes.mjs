@@ -5,7 +5,7 @@
 // data route in place). Quotes come 20 to a request from
 // /v7/finance/spark (with the day's price line), charts, dividends and
 // splits from /v8/finance/chart, and symbol search from /v1/finance/search.
-import { BASE, METALS, GRAMS_PER_OUNCE, FUND_CUTOFF, isTwFund, isFuture, futureOf, isOption, tickSize, toTick as onTickOf, SSF_RATE, optionOf, optionTick, optionExpiry, seriesFuture, OPTION, kindOf, marketOf, normalizeCurrency } from './stock-markets.mjs';
+import { BASE, METALS, GRAMS_PER_OUNCE, FUND_CUTOFF, isTwFund, isWarrant, isFuture, futureOf, isOption, tickSize, toTick as onTickOf, SSF_RATE, optionOf, optionTick, optionExpiry, seriesFuture, OPTION, kindOf, marketOf, normalizeCurrency } from './stock-markets.mjs';
 import { BONDS, ISSUERS, CURVE_SYMBOLS, bondQuote, bondLine, curveOf } from './stock-bonds.mjs';
 
 export const PROXY_URL = 'https://orbit-workers-proxy.pengzjay.workers.dev';
@@ -21,6 +21,7 @@ const SPARK_BATCH = 20;
 export function ttlFor(url) {
   if (url.startsWith(FUND_NAV) || url === TAIFEX_URL) return 10 * 60_000;
   if (url.startsWith(FUND_HIST)) return 3 * 3_600_000;
+  if (url.startsWith(MIS_URL)) return 25_000;
   if (url.includes('/v1/finance/search')) return 24 * 3_600_000;
   if (url.includes('/v10/finance/quoteSummary')) return 3_600_000;
   const range = /[?&]range=([^&]+)/.exec(url)?.[1] || '1d';
@@ -46,6 +47,67 @@ const FUND_NAV = 'https://funds.quadra/nav.json?codes=';
 const FUND_HIST = 'https://funds.quadra/hist.json?code=';
 const readFundHist = symbol => getJson(FUND_HIST + encodeURIComponent(symbol.slice(0, -4))).catch(() => null);
 const FUND_BATCH = 40;
+
+// TWSE's own live quotes (基本市況報導, mis.twse.com.tw): a warrant's or
+// 牛熊證's price where Yahoo has none (most trade rarely). Its last trade
+// today, else the market maker's best bid (what it can be sold for), else
+// the day's reference price; `bid`/`ask` the best of each. MIS_BATCH to a request.
+const MIS_URL = 'https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=';
+const MIS_BATCH = 40;
+const misChannel = symbol => `${/\.TWO$/i.test(symbol) ? 'otc' : 'tse'}_${symbol.replace(/\.TWO?$/i, '').toLowerCase()}.tw`;
+export function misQuote(symbol, m, now = Date.now()) {
+  const n = x => (Number(x) > 0 ? Number(x) : null);
+  const best = s => n(String(s || '').split('_')[0]);
+  const prev = n(m?.y);
+  const bid = best(m?.b);
+  const ask = best(m?.a);
+  const last = n(m?.z);
+  const price = last ?? bid ?? prev;
+  if (!price) return null;
+  const day = /^\d{8}$/.test(m.d || '') ? `${m.d.slice(0, 4)}-${m.d.slice(4, 6)}-${m.d.slice(6)}` : new Date(now + 8 * 3_600_000).toISOString().slice(0, 10);
+  const at = clock => Date.parse(`${day}T${clock}+08:00`);
+  const marketTime = /^\d\d:\d\d:\d\d$/.test(m.t || '') ? at(m.t) : now;
+  const base = prev || price;
+  return {
+    symbol,
+    name: m.n || symbol,
+    shortName: m.n || symbol,
+    kind: 'warrant',
+    market: 'TW',
+    currency: 'TWD',
+    price,
+    prev: base,
+    change: price - base,
+    pct: base ? price / base - 1 : 0,
+    bid,
+    ask,
+    dayHigh: n(m.h),
+    dayLow: n(m.l),
+    high52: null,
+    low52: null,
+    volume: Number(m.v) || 0,
+    exchange: /\.TWO$/i.test(symbol) ? 'TPEx' : 'TWSE',
+    tz: 'Asia/Taipei',
+    marketTime,
+    session: { start: at('09:00:00'), end: at('13:30:00') },
+    line: [[at('09:00:00'), base], [marketTime, price]]
+  };
+}
+async function fetchMisQuotes(symbols) {
+  const out = new Map();
+  const batches = [];
+  for (let i = 0; i < symbols.length; i += MIS_BATCH) batches.push(symbols.slice(i, i + MIS_BATCH));
+  const results = await Promise.allSettled(batches.map(b => getJson(MIS_URL + b.map(misChannel).join('|'))));
+  for (const r of results) {
+    if (r.status !== 'fulfilled') continue;
+    for (const m of r.value?.msgArray || []) {
+      const symbol = symbols.find(s => misChannel(s) === `${m.ex}_${m.c}.tw`.toLowerCase());
+      const q = symbol && misQuote(symbol, m);
+      if (q) out.set(symbol, q);
+    }
+  }
+  return out;
+}
 export function fundQuote(symbol, f) {
   if (!f || !(f.nav > 0)) return null;
   const prev = f.prev > 0 ? f.prev : f.nav;
@@ -420,6 +482,9 @@ export async function fetchQuotes(symbols, { range = '1d', interval = '5m' } = {
     }
     for (const u of new Set([TAIEX, ...futs.map(s => futureOf(s).underlying)])) if (!symbols.includes(u)) out.delete(u);
   }
+  // Warrants Yahoo has no price for: TWSE's own.
+  const noPrice = symbols.filter(s => isWarrant(s) && !out.has(s));
+  if (noPrice.length) for (const [k, v] of await fetchMisQuotes(noPrice).catch(() => new Map())) out.set(k, v);
   if (fundRead) {
     const f = await fundRead;
     for (const [k, v] of f.out) out.set(k, v);
@@ -541,7 +606,12 @@ export async function fetchChart(symbol, rangeKey = '1mo', { events = false } = 
     return { quote, points, dividends: [], splits: [] };
   }
   const url = `${YAHOO}/v8/finance/chart/${encodeURIComponent(symbol)}?range=${range}&interval=${interval}${events ? '&events=div%2Csplit' : ''}`;
-  return parseChart(await getJson(url));
+  if (!isWarrant(symbol)) return parseChart(await getJson(url));
+  // A warrant Yahoo doesn't chart: today's from TWSE's own quote.
+  const chart = await getJson(url).then(parseChart, () => null);
+  if (chart?.points?.length > 1) return chart;
+  const quote = (await fetchMisQuotes([symbol])).get(symbol);
+  return quote ? { quote, points: quote.line, bars: [], dividends: [], splits: [] } : chart;
 }
 
 // Price bars since `since`, as fine as Yahoo keeps them: 5 minutes for the

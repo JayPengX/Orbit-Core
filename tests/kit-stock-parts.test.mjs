@@ -370,7 +370,7 @@ test('stockRow: down, flat, missing parts, data, change as a stand-in', () => {
   assert.equal(one.children.length, 3, 'one point is no line');
   const amt = ui.stockRow({ name: 'D', price: 10, change: -0.5 });
   assert.equal(amt.children[2].children[1].className, 'q-move down solid');
-  assert.equal(amt.children[2].children[1].textContent, '−0.5');
+  assert.equal(amt.children[2].children[1].textContent, '−0.50');
   const flatSpark = ui.stockRow({ name: 'E', spark: [4, 4, 4] });
   assert.ok(flatSpark.children[1] && flatSpark.children.at(-2).innerHTML.includes('q-spark flat'));
 });
