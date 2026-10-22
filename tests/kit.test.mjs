@@ -51,24 +51,6 @@ test('pass codes', () => {
   assert.equal(kit.formatPass('ABCDE23456'), 'ABCDE-23456');
 });
 
-test('account details: this month in and out, latest entries first', () => {
-  const now = Date.UTC(2026, 9, 15, 4);
-  const w = {
-    created: Date.UTC(2026, 0, 1),
-    entries: [
-      { id: 'a', t: Date.UTC(2026, 8, 30), amount: 500, app: 'odds', kind: 'payout' },
-      { id: 'b', t: Date.UTC(2026, 9, 2), amount: 7000, app: 'eco', kind: 'pay' },
-      { id: 'c', t: Date.UTC(2026, 9, 3), amount: -200, app: 'odds', kind: 'stake' }
-    ]
-  };
-  const d = kit.accountDetails(w, 'zh', now);
-  assert.equal(d.in, 7000);
-  assert.equal(d.out, -200);
-  assert.equal(d.count, 2);
-  assert.equal(d.recent[0].amount, -200);
-  assert.match(d.recent[1].text, /Quadra · 薪水/);
-});
-
 test('proxyJson batches requests made together and remembers answers', async () => {
   const calls = [];
   globalThis.fetch = async url => {
@@ -219,8 +201,8 @@ test('the pay: fixed, whatever the account holds', () => {
   assert.equal(kit.paydayFor({ entries: [] }), 10_000);
   assert.equal(kit.paydayFor({ entries: [{ id: 'a', amount: 60_000, app: 'odds' }] }), 10_000);
   assert.equal(kit.paydayFor({ entries: [], snap: { stock: { cash: 50_000, holdings: 500_000, t: 1 } } }), 10_000);
-  // Wednesday 21 Oct: next Monday the 26th.
-  assert.equal(kit.paydayText('zh', Date.UTC(2026, 9, 21, 4)), '下次發薪 NT$10,000 · 10/26（一）');
+  // Wednesday 21 Oct (Taipei): next Monday the 26th, 00:00 Taipei.
+  assert.equal(kit.nextPayday(Date.UTC(2026, 9, 21, 4)), Date.UTC(2026, 9, 25, 16));
 });
 
 test('token requests made together share one sign-in call to the Worker', async () => {
@@ -430,10 +412,7 @@ test('CPBL: a month the proxy can\'t read comes from TheSportsDB\'s day lists on
   assert.equal((await asiaMonth(async () => ({ games: [{ id: 'x' }] }), 'cpbl', '2026-10', { now, fetchJson })).length, 1);
 });
 
-test('an old Plus boost still reads in the statement', () => {
-  assert.match(kit.describeEntry({ app: 'odds', kind: 'plusboost', amount: 42 }), /Plus/);
-  assert.match(kit.describeEntry({ app: 'eco', kind: 'plusrefund', amount: 190 }), /Plus/);
-  // Plus is gone from the kit.
+test('no Plus in the kit', () => {
   assert.equal(kit.PLUS, undefined);
   assert.equal(kit.openPlus, undefined);
 });
@@ -457,19 +436,13 @@ test('pictures: national sides get flags, names in either order', async () => {
   for (const key of ['kleague', 'euroleague', 'npb', 'cpbl']) assert.ok(L.leagueLogo(key), key);
 });
 
-test('the kit and the Worker agree on the pay; the statement skips free bet tokens', async () => {
+test('the kit and the Worker agree on the pay and the levels', async () => {
   const eco = await import('../eco.js');
   assert.equal(kit.ECONOMY.weekly, eco.PAY.week);
   assert.equal(kit.ECONOMY.start, eco.PAY.start);
   assert.deepEqual(kit.WEALTH_RANKS.map(r => [r.id, r.min, r.reward]), eco.RANKS.map(r => [r.id, r.min, r.reward]));
   assert.ok(kit.WEALTH_RANKS[1].min > kit.ECONOMY.start, 'the opening money alone reaches no level');
   assert.match(kit.describeEntry({ app: 'eco', kind: 'rank', note: 'welloff', amount: 10_000 }), /百萬身價/);
-  assert.match(kit.describeEntry({ app: 'eco', kind: 'rank', note: 'saver', amount: 1_000 }, 'en'), /Saver \(old\)/);
-  const now = Date.UTC(2026, 9, 10);
-  const w = { entries: [{ id: 'eco:pay:2026-10', t: now - 2, app: 'eco', kind: 'pay', amount: 8_000 }, { id: 'eco:fb:welcome', t: now - 1, app: 'eco', kind: 'freebet', amount: 0, note: '200' }] };
-  const d = kit.accountDetails(w, 'en', now);
-  assert.deepEqual(d.recent.map(r => r.amount), [8_000]);
-  assert.equal(d.count, 1);
 });
 
 test('looks: an avatar and a frame for everyone, from the lists only', () => {
@@ -485,27 +458,11 @@ test('looks: an avatar and a frame for everyone, from the lists only', () => {
   assert.ok([...kit.AVATARS, ...kit.FRAMES].every(x => !x.streak));
 });
 
-test('where the money came from: an account older than the shared wallet, its opening money in the apps, reset to 30,000', () => {
-  // Securities opened with 100,000 (no Play then): the reset, its fix, a month's pay, the old games' money, interest and its refund.
-  const old = {
-    entries: [
-      { id: 'eco:rebase:v3', app: 'eco', kind: 'rebase', amount: -80_000 },
-      { id: 'eco:rebase:v3fix', app: 'eco', kind: 'rebase', amount: 10_000 },
-      { id: 'eco:pay:2026-10', app: 'eco', kind: 'pay', amount: 8_000 },
-      { id: 'eco:rebase:hub', app: 'eco', kind: 'rebase', amount: 7_648, note: 'hub' },
-      { id: 'eco:od:2026-10', app: 'eco', kind: 'od', amount: -466 },
-      { id: 'eco:odback:v3', app: 'eco', kind: 'od', amount: 466 }
-    ],
-    snap: { stock: { cash: 100_000, opened: 100_000, holdings: 0 } }
-  };
-  const s = kit.moneySides(old);
-  assert.deepEqual(s.gave, { start: 30_000, pay: 8_000, rank: 0, other: 7_648 });
-  assert.equal(s.quadra, 0);
-  assert.equal(s.own, 0);
-  // With Play's old 10,000 too (its own entry), no fix: still 30,000.
-  const both = kit.moneySides({ entries: [{ id: 'eco:rebase:v3', app: 'eco', kind: 'rebase', amount: -80_000 }, { id: 'odds:start', app: 'odds', kind: 'start', amount: 10_000 }], snap: { stock: { cash: 100_000, opened: 100_000 } } });
-  assert.deepEqual([both.gave.start, both.own], [30_000, 0]);
-  // A new account: the opening money is the Worker's own entry.
+test('where the money came from: the system, Play, the government and the account itself', () => {
+  // The opening money is the Worker's own entry; the pay and the owner's grants are the system's too.
+  const paid = kit.moneySides({ entries: [{ id: 'eco:start', app: 'eco', kind: 'start', amount: 200_000 }, { id: 'eco:wpay:2026-10-19', app: 'eco', kind: 'pay', amount: 10_000 }, { id: 'eco:admin:1', app: 'eco', kind: 'admin', amount: 500 }], snap: {} });
+  assert.deepEqual(paid.gave, { start: 200_000, pay: 10_000, rank: 0, other: 500 });
+  assert.equal(paid.own, 0);
   const fresh = kit.moneySides({ entries: [{ id: 'eco:start', app: 'eco', kind: 'start', amount: 30_000 }], snap: {} });
   assert.deepEqual([fresh.gave.start, fresh.own], [30_000, 0]);
   // Play: an open bet is money at stake (in the worth, on neither side); settled, it's against Quadra, either way.
@@ -515,7 +472,7 @@ test('where the money came from: an account older than the shared wallet, its op
   assert.deepEqual([placed.atStake, placed.quadra, placed.own, placed.worth], [500, 0, 0, 30_000]);
   const won = kit.moneySides({ entries: [start, bet, { id: 'odds:payout-a', app: 'odds', kind: 'payout', amount: 1_200 }], snap: {} });
   assert.deepEqual([won.atStake, won.quadra, won.own, won.worth], [0, 700, 0, 30_700]);
-  const lost = kit.moneySides({ entries: [start, bet, { id: 'odds:payout-a', app: 'odds', kind: 'payout', amount: 0 }, { id: 'eco:plus:2026-10', app: 'eco', kind: 'plus', amount: -490 }], snap: {} });
+  const lost = kit.moneySides({ entries: [start, bet, { id: 'odds:payout-a', app: 'odds', kind: 'payout', amount: 0 }, { id: 'eco:od:2026-10', app: 'eco', kind: 'od', amount: -490 }], snap: {} });
   assert.deepEqual([lost.quadra, lost.fees, lost.own, lost.worth], [-990, 490, 0, 29_010]);
   // Securities' gains are the account's own.
   const gain = kit.moneySides({ entries: [start], snap: { stock: { cash: -10_000, holdings: 12_000 } } });

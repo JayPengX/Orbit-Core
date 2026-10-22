@@ -2844,12 +2844,7 @@ dialog.q-moved::backdrop {
   background: var(--q-good);
 }
 
-/* ---- Account details in the pass sheet ---- */
-.q-details {
-  display: grid;
-  gap: 12px;
-  margin-bottom: 6px;
-}
+/* ---- The account card in the pass sheet (no balance: money is Securities') ---- */
 .q-card-hero {
   display: grid;
   gap: 2px;
@@ -2872,10 +2867,6 @@ dialog.q-moved::backdrop {
 .q-hero-brand {
   font-weight: 800;
 }
-.q-hero-no {
-  letter-spacing: 0.08em;
-  white-space: nowrap;
-}
 .q-hero-label,
 .q-hero-sub {
   font-size: 12.5px;
@@ -2888,185 +2879,8 @@ dialog.q-moved::backdrop {
   line-height: 1.15;
   white-space: nowrap;
 }
-.q-month {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-.q-month > div {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-  padding: 10px 12px;
-  border-radius: var(--q-radius-sm);
-  background: var(--q-sunken);
-}
-.q-month small {
-  font-size: 11.5px;
-  color: var(--q-muted);
-  white-space: nowrap;
-}
-.q-month strong {
-  font-size: 15px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.q-details .up {
-  color: var(--q-good);
-}
-.q-details .down {
-  color: var(--q-bad);
-}
-.q-details .q-payday {
-  margin: 0;
-  font-weight: 500;
-  font-size: 12.5px;
-  color: var(--q-muted);
-}
-.q-recent {
-  border: 1px solid var(--q-border);
-  border-radius: var(--q-radius-sm);
-  background: var(--q-surface);
-}
-.q-recent summary {
-  padding: 11px 14px;
-  font-weight: 700;
-  font-size: 14px;
-  cursor: pointer;
-}
-.q-recent ul {
-  list-style: none;
-  margin: 0;
-  padding: 0 14px 6px;
-}
-.q-recent li {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 0;
-  border-top: 1px solid var(--q-divider);
-  font-size: 13.5px;
-}
-.q-recent-when {
-  color: var(--q-muted);
-  font-size: 12px;
-}
-.q-recent-what {
-  min-width: 0;
-  /* Two lines before it's cut (English names ran out on one at 320 px). */
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  overflow: hidden;
-  overflow-wrap: break-word;
-}
-
-.q-pass-code {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 10px;
-  padding: 12px 14px;
-  border: 1px solid var(--q-border);
-  border-radius: 16px;
-  background: var(--q-surface);
-}
-.q-pass-code strong {
-  font: 700 19px/1 ui-monospace, 'SF Mono', Menlo, monospace;
-  letter-spacing: 0.08em;
-}
-
-/* ---- Devices, a new pass shown once, and in-app notices ---- */
-.q-device {
-  display: grid;
-  gap: 4px;
-  padding: 14px;
-  border-radius: var(--q-radius-sm);
-  background: var(--q-accent-wash);
-  border: 1px solid color-mix(in srgb, var(--q-accent) 25%, transparent);
-  text-align: center;
-}
-.q-device[hidden] { display: none; }
-.q-device-label { font-size: 12px; font-weight: 700; color: var(--q-muted); }
-.q-device-code { font-size: 30px; font-weight: 800; letter-spacing: 0.12em; color: var(--q-text); }
-.q-device-left { font-size: 12px; font-weight: 700; color: var(--q-accent); }
-.q-device-how { font-size: 12px; color: var(--q-text-2); line-height: 1.45; }
-/* The new pass is a modal <dialog> (the top layer): it fills the screen. */
-dialog.q-newpass {
-  width: 100vw;
-  max-width: none;
-  height: 100dvh;
-  max-height: none;
-  margin: 0;
-  border: 0;
-  box-sizing: border-box;
-}
-dialog.q-newpass::backdrop { background: var(--q-page); }
-.q-newpass-label { margin-top: 6px; font-size: 14px; font-weight: 700; color: var(--q-text-2); }
-.q-newpass-check { width: 11ch; text-align: center; font-size: 22px; font-weight: 800; letter-spacing: 0.2em; text-transform: uppercase; }
-.q-newpass-hint { min-height: 1.2em; font-size: 13px; color: var(--q-bad); }
-.q-newpass .q-pass-code { justify-content: center; margin: 8px 0 4px; }
-.q-newpass .q-pass-code strong { font-size: 28px; letter-spacing: 0.08em; }
-
-/* ---- Notification settings (account sheet) ---- */
-.q-notice-note {
-  margin: 8px 4px 0;
-  font: 400 12.5px/1.45 var(--q-font);
-  color: var(--q-muted);
-}
-.q-notice-kinds {
-  margin-top: 8px;
-}
-.q-notice-group + .q-notice-group {
-  border-top: 1px solid var(--q-divider);
-}
-.q-notice-app {
-  margin: 0;
-  padding: 12px 16px 2px;
-  font: 800 11px/1.2 var(--q-font);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--q-muted);
-}
-.q-notice-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
-  min-height: 52px;
-  box-sizing: border-box;
-}
-.q-notice-row.master {
-  padding: 12px 16px;
-}
-.q-notice-icon {
-  font-size: 20px;
-  flex: 0 0 auto;
-}
-.q-notice-text {
-  display: grid;
-  gap: 2px;
-  flex: 1 1 auto;
-  min-width: 0;
-}
-.q-notice-text strong {
-  font: 650 15px/1.3 var(--q-font);
-  color: var(--q-text);
-}
 .q-notice-sub {
   font: 400 12.5px/1.4 var(--q-font);
-  color: var(--q-muted);
-}
-
-/* The payday line under the balance in the account sheet. */
-.q-payday {
-  margin: 8px 4px 2px;
-  font-size: 13px;
-  font-weight: 600;
   color: var(--q-muted);
 }
 
@@ -3075,104 +2889,6 @@ dialog.q-newpass::backdrop { background: var(--q-page); }
    or an arrow key brings it back (quadra.mjs sets data-q-keys). */
 html:not([data-q-keys]) :is(:focus-visible, :focus):not(input, textarea, select) {
   outline: none !important;
-}
-
-/* An overdraft: said plainly where the balance is. */
-.q-details .q-overdraft {
-  margin: 0;
-  padding: 10px 12px;
-  border-radius: var(--q-radius-sm);
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--q-bad);
-  background: color-mix(in srgb, var(--q-bad) 10%, transparent);
-}
-
-/* 信貸 and 急難紓困 (quadra.mjs loanCard): a bank card under the balance. */
-.q-loan {
-  display: grid;
-  gap: 10px;
-  margin-bottom: 6px;
-}
-.q-loan-card {
-  display: grid;
-  gap: 10px;
-  padding: 14px 16px;
-  border-radius: var(--q-radius);
-  background: var(--q-surface);
-}
-.q-loan-card.bad {
-  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--q-bad) 60%, transparent);
-}
-.q-loan-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 8px;
-  font-weight: 600;
-}
-.q-loan-head > :last-child {
-  flex: none;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--q-muted);
-}
-.q-loan-facts {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-.q-loan-facts.three {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-.q-loan-fact {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-.q-loan-fact small {
-  font-size: 12px;
-  color: var(--q-muted);
-}
-.q-loan-fact strong {
-  font-size: 17px;
-}
-.q-loan-fact strong.down {
-  color: var(--q-bad);
-}
-.q-loan-bar {
-  height: 6px;
-  border-radius: 3px;
-  background: var(--q-fill);
-  overflow: hidden;
-}
-.q-loan-bar > span {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--q-good);
-}
-.q-loan-sub {
-  margin: 0;
-  font-size: 13px;
-  color: var(--q-muted);
-}
-.q-loan-warn {
-  margin: 0;
-  padding: 10px 12px;
-  border-radius: var(--q-radius-sm);
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--q-bad);
-  background: color-mix(in srgb, var(--q-bad) 10%, transparent);
-}
-.q-loan-amount {
-  font-size: 28px;
-  text-align: center;
-}
-.q-loan-range {
-  width: 100%;
-  accent-color: var(--q-accent);
 }
 
 /* A sheet or detail view open: the page behind it stays still (no scrolling
@@ -3186,7 +2902,7 @@ dialog {
   overscroll-behavior: contain;
 }
 
-/* ---- The Quadra Pass sheet (pass.mjs): Pass, 外觀, 真相, App, 說明 ---- */
+/* ---- The Quadra Pass sheet (pass.mjs): Pass, 外觀, App, 說明 ---- */
 .q-pass {
   --accent: var(--q-accent, #4f46e5);
   --accent-wash: color-mix(in srgb, var(--accent) 12%, transparent);
@@ -3202,8 +2918,6 @@ dialog {
 .q-pass p, .q-pass h3 { margin: 0; }
 .q-pass-toasts { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 3; display: grid; gap: 8px; width: min(420px, calc(100vw - 32px)); pointer-events: none; }
 .q-pass .toast { background: var(--q-text); color: var(--q-page); border-radius: 12px; padding: 10px 14px; font-size: 14px; box-shadow: var(--q-shadow); }
-.q-pass .meter { height: 8px; border-radius: 99px; background: var(--q-sunken); overflow: hidden; }
-.q-pass .meter > i { display: block; height: 100%; border-radius: inherit; background: var(--accent); transition: width 0.4s ease; }
 .q-pass .muted { color: var(--q-muted); }
 .q-pass .num { font-variant-numeric: tabular-nums; }
 .q-pass .pad { padding: 14px; }
@@ -3213,12 +2927,7 @@ dialog {
 .q-pass .two-btn { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
 .q-pass .q-btn.ghost { background: none; border-color: transparent; }
 .q-pass .q-btn.block { width: 100%; }
-.q-pass .stat-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; text-align: center; }
-.q-pass .stat { display: grid; }
-.q-pass .stat strong { font-size: 20px; font-weight: 800; }
-.q-pass .stat small { font-size: 12px; color: var(--q-muted); }
 .q-pass .q-chips.small .q-chip { min-height: 30px; padding: 0 12px; font-size: 13px; }
-.q-pass .side-total > span small { display: block; font-size: 12px; font-weight: 600; }
 .q-pass .app-card.here { border-color: var(--accent); }
 .q-pass .help-list { display: grid; gap: 12px; margin: 10px 0 14px; }
 .q-pass .help-card h3 { font-size: 16px; font-weight: 800; margin-bottom: 8px; }
@@ -3227,7 +2936,6 @@ dialog {
 .q-pass .help-card.focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-wash); }
 .q-pass .help-list .q-card + .q-card { margin-top: 0; }
 
-.q-pass .stat-row.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
 .q-pass .looks { display: grid; gap: 10px; }
 
@@ -3241,60 +2949,6 @@ dialog {
 .q-pass .av-tile small { font-size: 11.5px; color: var(--q-muted); white-space: nowrap; }
 .q-pass .av-tile.on small { color: var(--accent); font-weight: 700; }
 .q-pass .fr-preview { display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; font-size: 22px; line-height: 1; }
-/* ---- Truth ---- */
-.q-pass .truth-hero { display: grid; gap: 6px; margin-top: 6px; padding: 16px 18px; border-radius: 20px; background: linear-gradient(135deg, var(--accent-wash), var(--q-surface) 75%); border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent); }
-.q-pass .truth-hero strong { font-size: 19px; font-weight: 800; }
-.q-pass .truth-hero p { font-size: 14px; line-height: 1.65; color: var(--q-text-2); }
-/* (Its own layout, whatever an app's own .facts is: Orbit Sports' is a two-column grid.) */
-.q-pass .facts { display: block; grid-template-columns: none; gap: 0; margin: 0; padding: 0; list-style: none; font-size: inherit; color: inherit; }
-.q-pass .facts .t-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 11px 14px; border-top: 1px solid var(--q-divider, var(--q-border)); }
-.q-pass .facts .t-row:first-child { border-top: 0; }
-.q-pass .t-label { display: grid; gap: 2px; min-width: 0; }
-.q-pass .t-label strong { font-size: 14px; }
-.q-pass .t-label small { font-size: 12px; line-height: 1.45; }
-.q-pass .t-value { font-size: 16px; white-space: nowrap; }
-.q-pass .t-row.up .t-value { color: var(--q-good); }
-.q-pass .t-row.down .t-value { color: var(--q-bad); }
-.q-pass .facts-foot { padding: 11px 14px 13px; border-top: 1px solid var(--q-border); background: var(--q-sunken); font-size: 13px; line-height: 1.6; color: var(--q-text-2); }
-.q-pass .tricks .trick { display: grid; gap: 2px; padding: 11px 14px; border-top: 1px solid var(--q-divider, var(--q-border)); }
-.q-pass .tricks .trick:first-child { border-top: 0; }
-.q-pass .trick strong { font-size: 14px; }
-.q-pass .trick small { font-size: 12.5px; line-height: 1.55; }
-.q-pass .sides .side-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-top: 1px solid var(--q-divider, var(--q-border)); }
-.q-pass .sides .side-row:first-child { border-top: 0; }
-.q-pass .side-icon { font-size: 22px; flex: none; }
-.q-pass .gov { overflow: hidden; }
-.q-pass .gov-tiles { padding: 14px 10px; gap: 8px; }
-.q-pass .gov-tile { padding: 10px 4px; border-radius: 14px; background: var(--q-sunken); }
-.q-pass .gov-tile strong { font-size: 16px; }
-.q-pass .gov-tile.up strong { color: var(--q-good); }
-.q-pass .gov-tile.down strong { color: var(--q-bad); }
-.q-pass .gov-row { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-top: 1px solid var(--q-divider, var(--q-border)); }
-.q-pass .gov-row.none { opacity: 0.55; }
-.q-pass .gov-text { display: grid; gap: 3px; flex: 1; min-width: 0; }
-.q-pass .gov-text small { font-size: 12px; line-height: 1.4; }
-.q-pass .gov-text .meter { height: 5px; margin-top: 3px; }
-.q-pass .gov-row > .num { flex: none; font-size: 14.5px; }
-.q-pass .gov-row.paid > .num { color: var(--q-bad); }
-.q-pass .gov-row.got > .num { color: var(--q-good); }
-.q-pass .gov-row.none > .num { color: var(--q-muted); }
-.q-pass .meter.good > i { background: var(--q-good); }
-.q-pass .meter.bad > i { background: var(--q-bad); }
-.q-pass .side-text { display: grid; flex: 1; min-width: 0; }
-.q-pass .side-text small { font-size: 12px; }
-.q-pass .side-row.took > .num { color: var(--q-bad); }
-.q-pass .side-row.up > .num { color: var(--q-good); }
-.q-pass .side-row.down > .num { color: var(--q-bad); }
-.q-pass .side-total { display: flex; justify-content: space-between; padding: 12px 14px; border-top: 1px solid var(--q-border); background: var(--q-sunken); font-weight: 650; }
-.q-pass .rank-progress { display: grid; gap: 6px; padding: 12px 14px; }
-.q-pass .rank-row { display: flex; align-items: center; gap: 10px; padding: 9px 14px; border-top: 1px solid var(--q-divider, var(--q-border)); font-size: 14px; }
-.q-pass .rank-row.passed { opacity: 0.55; }
-.q-pass .rank-row.current { background: var(--accent-wash); }
-.q-pass .rank-row.current strong { color: var(--accent); }
-.q-pass .rank-icon { font-size: 18px; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 9px; background: var(--q-sunken); flex: none; }
-.q-pass .rank-name { display: grid; flex: 1; min-width: 0; }
-.q-pass .rank-reward { font-weight: 750; font-size: 13px; color: var(--accent); white-space: nowrap; }
-.q-pass .rank-reward.paid { color: var(--q-muted); font-weight: 600; }
 /* ---- Apps ---- */
 .q-pass .app-list { display: grid; gap: 12px; }
 .q-pass .app-card { display: grid; gap: 10px; }
@@ -3304,9 +2958,7 @@ dialog {
 .q-pass .app-name { display: grid; min-width: 0; }
 .q-pass .app-name small, .q-pass .app-last { font-size: 12px; }
 .q-pass .app-last { white-space: nowrap; }
-.q-pass .app-status { font-size: 13px; color: var(--q-text-2); }
 .q-pass .pass-guide { margin-top: 18px; }
-.q-pass .side-total > span small { display: block; font-size: 12px; font-weight: 600; }
 .q-pass-tabs .q-chip { padding: 0 13px; flex: none; }
 /* A narrow phone: the five tabs share the row (說明/Help was off its end at 320 px). */
 @media (max-width: 380px) {
@@ -3343,32 +2995,6 @@ html.q-recording body::after {
 .q-team-disc { width: 34px; height: 34px; flex: none; display: inline-grid; place-items: center; border-radius: 50%; overflow: hidden; background: var(--team, #8a8f98); color: #fff; font-size: 0.62rem; font-weight: 800; }
 .q-team-disc .logo-wrap { display: contents; }
 .q-team-disc-img { width: 72%; height: 72%; object-fit: contain; }
-
-/* A disclosure row: iOS's chevron on the right, not the browser's triangle. */
-.q-recent summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  list-style: none;
-  font-weight: 600;
-  font-size: 15px;
-}
-.q-recent summary::-webkit-details-marker {
-  display: none;
-}
-.q-recent summary::after {
-  content: '';
-  width: 7px;
-  height: 7px;
-  margin-right: 3px;
-  border-right: 2px solid var(--q-muted);
-  border-bottom: 2px solid var(--q-muted);
-  transform: rotate(-45deg);
-  transition: transform 0.25s var(--q-ease);
-}
-.q-recent[open] summary::after {
-  transform: rotate(45deg);
-}
 
 /* ---- Upright only (2026-10-10): a phone on its side, the page turned back
    against it (quadra.mjs uprightTurn), so it stays upright on the glass.

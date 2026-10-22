@@ -31,7 +31,7 @@
 
 import { BRANDS, FAMILIES, pathOf, appIcon, familyMark } from './brand.mjs';
 import { DEV, cleanDev } from './brand.mjs';
-import { icons, tile, pullToRefresh, setSheetDetent, segmented, h as node } from './ui.mjs';
+import { icons, tile, pullToRefresh, setSheetDetent, h as node } from './ui.mjs';
 
 export const ECO_URL = 'https://orbit-workers-proxy.pengzjay.workers.dev/eco';
 export const PROXY_URL = 'https://orbit-workers-proxy.pengzjay.workers.dev/sports-proxy';
@@ -106,9 +106,9 @@ export const appName = app => APPS[app]?.name || app;
 // NT$10,000, the same for every account, like a salary (eco.js pays it,
 // back pay for weeks nobody came). With the wealth level rewards and 急難紓困
 // for someone with nothing, those are the only money Quadra gives; more is
-// borrowed (信貸, loan.mjs) and repaid from the pay. Securities is where it
-// grows (the market, real costs); Play and the lottery are where it goes (the
-// house keeps about 14% of a single, a third of a treble, half of a draw ticket).
+// borrowed (信貸, loan.mjs) and repaid from the pay. All of it is shown in
+// Securities (its 資金 tab: pay, 信貸, 紓困, 財富等級, 真相); the Pass itself
+// is the account and the family, never money.
 export const ECONOMY = {
   start: 200_000,
   weekly: PAY_WEEK
@@ -119,8 +119,7 @@ export const ECONOMY = {
 export const worthOf = (wallet, now = Date.now()) => poolBalance(wallet) + finiteOr0(wallet?.snap?.stock?.holdings) - debtOf(wallet, now);
 // 財富等級: what the account is worth (worthOf) puts it on a level; the
 // first time it reaches one, Quadra's economy pays the level's reward once
-// (eco.js RANKS, the same table: `eco:rank:<id>`; scaled 2026-10-20 to the
-// NT$200,000 start, old levels' rewards counting towards the new).
+// (eco.js RANKS, the same table: `eco:rank:<id>`).
 export const WEALTH_RANKS = [
   { id: 'start', min: 0, reward: 0, icon: '🌱', zh: '起步', en: 'Starter' },
   { id: 'thrifty', min: 300_000, reward: 3_000, icon: '🪙', zh: '小資族', en: 'Saver' },
@@ -130,26 +129,17 @@ export const WEALTH_RANKS = [
   { id: 'tenmil', min: 10_000_000, reward: 50_000, icon: '👑', zh: '千萬富翁', en: 'Ten-millionaire' },
   { id: 'hundredmil', min: 100_000_000, reward: 100_000, icon: '🚀', zh: '億萬大亨', en: 'Tycoon' }
 ];
-// The levels before 2026-10-20 (their rewards stay in the statement).
-const OLD_RANK_NAMES = { saver: ['小資族（舊）', 'Saver (old)'], steady: ['穩健（舊）', 'Steady (old)'], comfort: ['小康（舊）', 'Comfortable (old)'], wealthy: ['富裕（舊）', 'Wealthy (old)'], rich: ['有錢人（舊）', 'Rich (old)'], multi: ['千萬富翁（舊）', 'Multi-millionaire (old)'], tycoon: ['億萬大亨（舊）', 'Tycoon (old)'] };
 const rankName = (id, i) => {
   const r = WEALTH_RANKS.find(x => x.id === id);
-  return r ? (i ? r.en : r.zh) : OLD_RANK_NAMES[id]?.[i] || id;
+  return r ? (i ? r.en : r.zh) : id;
 };
 // Where the money came from and went (all time, NT$): what the system gave
-// (opening money, pay, level rewards, resets, old VIP cashback), the government
+// (opening money, pay, level rewards, the owner's grants), the government
 // (govOf: relief less taxes), the account
 // against Quadra (Play's settled bets less fees, loan costs and overdraft interest:
 // a surplus when it has won more than it lost and paid), and its own result
 // (markets, savings: worth less the other two). A bet still open is in the
 // worth, as money at stake, and in neither side until it's settled.
-// An account older than the shared wallet opened in the apps' own books:
-// Securities' deposit (NT$100,000, or what it was opened with: it reports
-// it as `snap.stock.opened`) and Play's NT$10,000 (its `odds:start` entry,
-// with its weekly grants). The reset (`eco:rebase:v3`, −80,000) and its fix
-// (`eco:rebase:v3fix`, for an account that had less than 110,000) brought
-// that to the NT$30,000 everyone opens with: all of it is opening money.
-const RESET_ID = 'eco:rebase:v3';
 // 政府 (kit/gov.mjs): the same figures the admin page adds up.
 import { govOf } from './gov.mjs';
 import { twDay, finiteOr0 } from './format.mjs';
@@ -157,7 +147,7 @@ export { govOf };
 export function moneySides(wallet) {
   const gave = { start: 0, pay: 0, rank: 0, other: 0 };
   // Play's settled bets (payouts less stakes) and what Quadra charges (overdraft
-  // interest, old fees); a bet still open is neither yet: it's money
+  // interest); a bet still open is neither yet: it's money
   // at stake, still the account's.
   let play = 0;
   let fees = 0;
@@ -168,16 +158,15 @@ export function moneySides(wallet) {
   const entries = wallet?.entries || [];
   const ids = new Set(entries.map(e => e.id));
   const open = e => e.kind === 'stake' && typeof e.id === 'string' && e.id.startsWith('odds:stake-') && !ids.has(`odds:payout-${e.id.slice(11)}`) && !ids.has(`odds:refund-${e.id.slice(11)}`);
-  if (entries.some(e => e.id === RESET_ID) && !entries.some(e => e.id === 'eco:start')) gave.start += finiteOr0(wallet?.snap?.stock?.opened ?? 100_000);
   for (const e of entries) {
     const a = Number(e.amount) || 0;
     if (e.app === 'eco') {
-      if (e.kind === 'start' || e.kind === 'grant' || e.id.startsWith(RESET_ID)) gave.start += a;
+      if (e.kind === 'start') gave.start += a;
       else if (e.kind === 'pay') gave.pay += a;
       else if (e.kind === 'rank') gave.rank += a;
       // (A correction or prize from the admin page: money Quadra gave, either way.)
-      else if (e.kind === 'rebase' || e.kind === 'vip' || e.kind === 'admin') gave.other += a;
-      else if (e.kind === 'plus' || e.kind === 'plusrefund' || e.kind === 'od') fees -= a;
+      else if (e.kind === 'rebase' || e.kind === 'admin') gave.other += a;
+      else if (e.kind === 'od') fees -= a;
       else if (LOAN_KINDS.has(e.kind)) loanFlow += a;
     } else if (e.app === 'odds') {
       if (e.kind === 'start') gave.start += a;
@@ -203,15 +192,11 @@ export const paydayFor = () => ECONOMY.weekly;
 // Below zero: an overdraft (1% a month, eco.js), fixed by selling something
 // in Securities or borrowing on margin there.
 export const OVERDRAFT_RATE = 0.01;
-export const overdraft = wallet => Math.max(0, -poolBalance(wallet));
 
 // 信貸 and 急難紓困: loan.mjs, shared with the Worker.
-import { PAY_WEEK, LOAN, RELIEF, loans, activeLoan, loanOwed, payoffAmount, debtOf, credit, canBorrow, loanOffer, maxFor, dueCount, reliefCheck, openStakes, nextPayday as nextWeekPayday } from './loan.mjs';
-export { LOAN, RELIEF, loans, activeLoan, loanOwed, payoffAmount, debtOf, credit, canBorrow, loanOffer, reliefCheck };
+import { PAY_WEEK, LOAN, RELIEF, loans, activeLoan, loanOwed, payoffAmount, debtOf, credit, canBorrow, loanOffer, maxFor, dueCount, reliefCheck, openStakes, nextPayday } from './loan.mjs';
+export { PAY_WEEK, LOAN, RELIEF, loans, activeLoan, loanOwed, payoffAmount, debtOf, credit, canBorrow, loanOffer, maxFor, dueCount, reliefCheck, openStakes, nextPayday };
 const LOAN_KINDS = new Set(['loan', 'loanfee', 'loanpay', 'loanlate', 'loanbad', 'loangar', 'loanoff']);
-// Free bets (history only): plus.mjs, shared with the Worker.
-import { FREEBET } from './plus.mjs';
-export { FREEBET };
 
 // ---- Looks: an avatar and a frame, free for everyone ------------------------------------
 //
@@ -1666,6 +1651,7 @@ const KIND = {
   start: ['開戶金', 'Opening money'],
   grant: ['零用金', 'Allowance'],
   pay: ['薪水', 'Pay'],
+  rebase: ['經濟調整', 'Adjustment'],
   loan: ['信貸撥款', 'Loan paid out'],
   loanfee: ['信貸開辦費', 'Loan set-up fee'],
   loanpay: ['信貸還款', 'Loan installment'],
@@ -1680,25 +1666,19 @@ const KIND = {
   refund: ['退款', 'Refund'],
   lottery: ['彩券', 'Lottery ticket'],
   prize: ['彩券獎金', 'Lottery prize'],
-  plus: ['Quadra Plus 月費', 'Quadra Plus'],
-  plusrefund: ['Quadra Plus 退費', 'Quadra Plus refund'],
-  rebase: ['經濟調整', 'Economy reset'],
   rank: ['財富等級獎勵', 'Wealth level reward'],
   od: ['透支利息', 'Overdraft interest'],
   cashout: ['提前兌現', 'Cash out'],
   freebet: ['免費投注', 'Free bet'],
   plusboost: ['✦ Plus 串關加成', '✦ Plus parlay boost'],
-  vip: ['VIP 投注回饋', 'VIP cashback'],
   welcome: ['新手禮', 'Welcome offer'],
   'xfer-in': ['轉入', 'Transfer in'],
   'xfer-out': ['轉出', 'Transfer out'],
   merge: ['合併帶入', 'Carried over']
 };
-// One-off Worker entries named for what they were.
-const NAMED = { 'eco:topup:v12': ['開戶金補發', 'Opening money raised'], 'eco:rebase:v3fix': ['開戶金補足', 'Opening money made up'], 'eco:odback:v3': ['透支利息退還', 'Overdraft interest refunded'] };
 export function describeEntry(e, lang = 'zh') {
   const i = lang === 'en' ? 1 : 0;
-  const what = NAMED[e.id]?.[i] || KIND[e.kind]?.[i] || e.kind;
+  const what = KIND[e.kind]?.[i] || e.kind;
   const from = e.app === 'eco' ? 'Quadra' : APPS[e.app]?.short || e.app;
   const peer = e.peer ? ` ${e.peer}` : '';
   const note = e.kind === 'rank' && e.app === 'eco' && e.note ? rankName(e.note, i) : e.note;
@@ -1718,7 +1698,6 @@ export function money(x, { sign = false, cents = false } = {}) {
 
 // ---- Taiwan days -------------------------------------------------------------------------
 
-const TPE = 8 * 3_600_000;
 export const taipeiDay = (t = Date.now()) => twDay(t);
 
 // ---- Recommendations: one engine for every app -------------------------------------------
@@ -2077,73 +2056,11 @@ export function ask({ title, body = '', points = [], ok = '', cancel = '', dange
 }
 export const tell = (opts = {}) => ask({ ...opts, alertOnly: true }).then(() => undefined);
 
-// The next payday: next Monday 00:00 Taiwan time.
-export const nextPayday = (now = Date.now()) => nextWeekPayday(now);
-const mdText = t => {
-  const d = new Date(t + TPE);
-  return `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
-};
-export function paydayText(lang, now = Date.now()) {
-  const next = mdText(nextPayday(now));
-  const amount = money(ECONOMY.weekly);
-  return lang === 'en' ? `Next pay ${amount} · Mon ${next}` : `下次發薪 ${amount} · ${next}（一）`;
-}
-
-// The account at a glance: its number, since when, this month's money in
-// and out, and the latest entries (every app's, like a bank statement).
-// An entry that moved money (free bet tokens are amount 0).
-const moved = e => e.amount !== 0;
-export function accountDetails(wallet, lang = 'zh', now = Date.now()) {
-  const entries = [...(wallet?.entries || [])].sort((a, b) => b.t - a.t);
-  const month = taipeiDay(now).slice(0, 7);
-  const thisMonth = entries.filter(e => taipeiDay(e.t).slice(0, 7) === month);
-  const sum = list => Math.round(list.reduce((x, e) => x + e.amount, 0) * 100) / 100;
-  return {
-    created: Number.isFinite(wallet?.created) ? wallet.created : null,
-    in: sum(thisMonth.filter(e => e.amount > 0)),
-    out: sum(thisMonth.filter(e => e.amount < 0)),
-    count: thisMonth.filter(moved).length,
-    recent: entries.filter(moved).slice(0, 8).map(e => ({ t: e.t, amount: e.amount, text: describeEntry(e, lang), app: e.app }))
-  };
-}
-const accountNumber = id => (id ? `QP ${id.slice(0, 4).toUpperCase()} ${id.slice(4, 8).toUpperCase()} ${id.slice(8, 12).toUpperCase()}` : '');
-function detailsCard(s) {
-  const en = s.lang === 'en';
-  const T = (zh, e) => (en ? e : zh);
-  const d = accountDetails(s.wallet, s.lang);
-  const date = t => new Date(t).toLocaleDateString(en ? 'en-US' : 'zh-TW', { year: 'numeric', month: 'short', day: 'numeric' });
-  const short = t => new Date(t).toLocaleDateString(en ? 'en-US' : 'zh-TW', { month: 'numeric', day: 'numeric' });
-  const days = d.created ? Math.max(1, Math.round((Date.now() - d.created) / 86_400_000)) : 0;
-  return node('div', { class: 'q-details' }, [
-    node('div', { class: 'q-card-hero' }, [
-      node('div', { class: 'q-hero-top' }, [node('span', { class: 'q-hero-brand', text: 'QUADRA PASS' }), node('span', { class: 'q-hero-no num', text: accountNumber(s.pass) })]),
-      node('span', { class: 'q-hero-label', text: T('Quadra 餘額', 'Quadra balance') }),
-      node('strong', { class: 'q-hero-balance num', text: money(s.pool) }),
-      node('span', { class: 'q-hero-sub', text: d.created ? T(`${date(d.created)} 開戶 · 第 ${days} 天`, `Opened ${date(d.created)} · day ${days}`) : '' })
-    ]),
-    node('div', { class: 'q-month' }, [
-      node('div', {}, [node('small', { text: T('本月收入', 'In this month') }), node('strong', { class: 'num up', text: money(d.in, { sign: true }) })]),
-      node('div', {}, [node('small', { text: T('本月支出', 'Out this month') }), node('strong', { class: 'num down', text: money(d.out) })])
-    ]),
-    overdraft(s.wallet) > 0 ? node('p', { class: 'q-overdraft', text: T(`帳戶透支 ${money(overdraft(s.wallet))}：每月計息 1%。2 天內沒補足就是違約交割：扣 7% 違約金、賣出持股，5 年內不能融資。`, `Overdrawn by ${money(overdraft(s.wallet))}: 1% a month. Not covered within 2 days, it's a default: a 7% penalty, holdings sold, and no margin for 5 years.`) }) : null,
-    node('p', { class: 'q-payday', text: paydayText(s.lang) }),
-    d.recent.length
-      ? node('details', { class: 'q-recent' }, [
-          node('summary', { text: T(`最近明細（本月 ${d.count} 筆）`, `Latest entries (${d.count} this month)`) }),
-          node(
-            'ul',
-            {},
-            d.recent.map(e => node('li', {}, [node('span', { class: 'q-recent-when num', text: short(e.t) }), node('span', { class: 'q-recent-what', text: e.text }), node('strong', { class: `num ${e.amount < 0 ? 'down' : 'up'}`, text: money(e.amount, { sign: true }) })]))
-          )
-        ])
-      : null
-  ].filter(Boolean));
-}
 // The Quadra Pass sheet, in every app (the account button, #help= links; its
 // 說明 tab is the one place the guide lives now): Pass (this account), 外觀
-// (avatar and frame), 真相 (how the money moves), App (every app) and 說明
-// (every app's guide). Loaded when first opened (pass.mjs). tab: 'pass' |
-// 'looks' | 'truth' | 'apps' | 'help';
+// (avatar and frame), App (every app) and 說明 (every app's guide). Never
+// money: that's Securities'. Loaded when first opened (pass.mjs). tab:
+// 'pass' | 'looks' | 'apps' | 'help';
 // help: { app, topic } for the guide to open on.
 export async function accountSheet(s, { extra = null, tab = 'pass', help = null } = {}) {
   const { openPass } = await import('./pass.mjs');
@@ -2151,166 +2068,20 @@ export async function accountSheet(s, { extra = null, tab = 'pass', help = null 
 }
 export const openHelp = (s, app = s.app, topic = null) => accountSheet(s, { tab: 'help', help: { app, topic } });
 
-// ---- 信貸 and 急難紓困 on screen (the rules: loan.mjs) -------------------------------------
-//
-// In the Pass tab under the balance: the loan as a bank shows it (what's
-// left, the weekly installment, late weeks or 催收 in red, pay it off), or
-// an application (amount, term, every cost before signing), and relief
-// only when the account has nothing.
-const pctText = x => `${Math.round(x * 1000) / 10}%`;
-const LOAN_WHY = {
-  active: ['一次只能有一筆信貸。', 'One loan at a time.'],
-  collection: ['催收中，不能再借。', 'In collection: no new loans.'],
-  record: ['聯徵有違約紀錄，{d} 前不能借款。', 'A default on your credit record: no loans until {d}.'],
-  new: ['開戶滿 4 週才能申請，{d} 起可以借。', 'Accounts can borrow after 4 weeks: from {d}.'],
-  term: ['請選擇期數。', 'Pick a term.'],
-  amount: ['金額要在 {min} 到 {max} 之間。', 'The amount must be between {min} and {max}.']
-};
-const RELIEF_WHY = {
-  cooldown: ['每 13 週只能申請一次，{d} 起可以再申請。', 'Once every 13 weeks: again from {d}.'],
-  year: ['今年已申請 3 次，明年再來。', 'Three times this year already.'],
-  collection: ['催收中的帳戶不能申請。', 'Not while a loan is in collection.'],
-  payday: ['發薪日快到了，{d} 會入帳。', 'Payday is close: your pay arrives {d}.'],
-  worth: ['名下現金、股票和投注中的錢合計要低於 {v}。', 'Your cash, stocks and open bets together must be under {v}.']
-};
-const whyText = (table, why, lang, vars = {}) => (table[why]?.[lang === 'en' ? 1 : 0] || '').replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? '');
-const dayText = (t, lang) => new Date(t).toLocaleDateString(lang === 'en' ? 'en-US' : 'zh-TW', { month: 'numeric', day: 'numeric' });
-export function loanCard(s) {
+// The account at a glance: its number and since when. Never a balance:
+// money is Securities' alone.
+const accountNumber = id => (id ? `QP ${id.slice(0, 4).toUpperCase()} ${id.slice(4, 8).toUpperCase()} ${id.slice(8, 12).toUpperCase()}` : '');
+function accountCard(s) {
   const en = s.lang === 'en';
-  const T = (zh, e) => (en ? e : zh);
-  const box = node('div', { class: 'q-loan' });
-  const note = node('p', { class: 'q-sheet-note', role: 'status' });
-  let weeks = LOAN.terms[0];
-  let amount = null;
-  let open = false;
-  const refusal = e =>
-    e.code === 'ECO_LOAN_REFUSED' && e.why
-      ? whyText(LOAN_WHY, e.why, s.lang, { min: money(LOAN.min), max: money(e.max || 0), d: e.until ? dayText(e.until, s.lang) : '' })
-      : e.code === 'ECO_RELIEF_REFUSED' && e.why
-        ? whyText(RELIEF_WHY, e.why, s.lang, { v: money(RELIEF.under), d: e.until ? dayText(e.until, s.lang) : '' })
-        : errorText(e, s.lang);
-  const btn = (label, fn, cls = 'q-btn tinted block') =>
-    node('button', {
-      class: cls,
-      type: 'button',
-      text: label,
-      onclick: async event => {
-        const b = event.currentTarget;
-        b.disabled = true;
-        note.textContent = '';
-        try {
-          await fn();
-        } catch (e) {
-          note.textContent = refusal(e);
-        } finally {
-          b.disabled = false;
-        }
-      }
-    });
-  const head = (left, right) => node('div', { class: 'q-loan-head' }, [node('span', { text: left }), node('span', { class: 'num', text: right })]);
-  const fact = (label, value, tone = '') => node('div', { class: 'q-loan-fact' }, [node('small', { text: label }), node('strong', { class: `num ${tone}`, text: value })]);
-  const sub = text => node('p', { class: 'q-loan-sub', text });
-  function current(loan, now) {
-    const owed = loanOwed(loan, now);
-    const late = Math.max(0, dueCount(loan, now) - loan.paid);
-    const payoff = payoffAmount(loan, now);
-    const years = T(`${loan.weeks / 52} 年`, `${loan.weeks / 52} yr`);
-    const next = dayText(nextPayday(now), s.lang);
-    return [
-      head(loan.bad ? T('信貸 · 催收中', 'Loan · in collection') : T('信貸', 'Personal loan'), `${pctText(loan.apr)} · ${years}`),
-      node('div', { class: 'q-loan-facts' }, [
-        fact(loan.bad ? T('尚欠', 'Owed') : T('剩餘未還', 'Left to repay'), money(owed), loan.bad || late ? 'down' : ''),
-        loan.bad ? fact(T('每週扣薪', 'Taken from pay'), money(Math.round(PAY_WEEK * LOAN.garnish)), 'down') : fact(T('每週扣款', 'Each Monday'), money(loan.installment))
-      ]),
-      loan.bad ? null : node('div', { class: 'q-loan-bar', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': String(loan.weeks), 'aria-valuenow': String(loan.paid) }, [node('span', { style: `width:${Math.round((loan.paid / loan.weeks) * 100)}%` })]),
-      loan.bad ? null : sub(T(`已繳 ${loan.paid} / ${loan.weeks} 期 · ${next}（一）發薪後扣款`, `${loan.paid} of ${loan.weeks} paid · next Mon ${next}, after the pay`)),
-      loan.bad
-        ? node('p', { class: 'q-loan-warn', text: T('已轉催收：存款已抵銷，之後每週薪水扣三分之一，利息照算，直到還清。聯徵紀錄保留到還清後 1 年。', "In collection: your balance was taken, then a third of every weekly pay until it's paid, with interest running. Your credit record keeps it for a year after.") })
-        : late
-          ? node('p', { class: 'q-loan-warn', text: T(`逾期 ${late} 期，已計違約金。餘額一夠就自動扣款；逾期滿 ${LOAN.missesToDefault} 期就轉催收，全部到期。`, `${late} installment${late > 1 ? 's' : ''} late, with late charges. It's taken as soon as the balance covers it; at ${LOAN.missesToDefault} late the whole loan falls due and goes to collection.`) })
-          : null,
-      btn(
-        T(`一次還清 · ${money(payoff)}`, `Pay it all off · ${money(payoff)}`),
-        async () => {
-          const body = payoff > owed ? T(`含提前清償違約金 ${money(payoff - owed)}（借款 1 年內 2%）。`, `Includes ${money(payoff - owed)} for paying off early (2% in the first year).`) : T('從 Quadra 餘額扣款。', 'Taken from your Quadra balance.');
-          if (!(await ask({ lang: s.lang, icon: '🏦', title: T(`還清 ${money(payoff)}？`, `Pay off ${money(payoff)}?`), body, ok: T('還清', 'Pay off') }))) return;
-          await s.loan('payoff');
-          note.textContent = T('信貸已還清。', 'The loan is paid off.');
-        },
-        'q-btn plain block'
-      )
-    ].filter(Boolean);
-  }
-  function apply(w, now) {
-    const can = canBorrow(w, now);
-    const c = can.credit;
-    if (!can.ok) return [head(T('信貸', 'Personal loan'), pctText(c.apr)), sub(whyText(LOAN_WHY, can.why, s.lang, { d: can.until ? dayText(can.until, s.lang) : '' }))];
-    if (!open) {
-      return [
-        head(T('信貸', 'Personal loan'), T(`年利率 ${pctText(c.apr)}`, `${pctText(c.apr)} a year`)),
-        node('div', { class: 'q-loan-facts' }, [fact(T('可借額度', 'You can borrow'), money(c.limit)), fact(T('最長', 'Up to'), T(`${LOAN.terms.at(-1) / 52} 年`, `${LOAN.terms.at(-1) / 52} years`))]),
-        btn(T('申請信貸', 'Apply for a loan'), async () => ((open = true), paint()))
-      ];
-    }
-    const max = maxFor(c.apr, weeks, c.limit);
-    amount = Math.min(max, Math.max(LOAN.min, amount ?? LOAN.base));
-    const offer = loanOffer(w, amount, weeks, now);
-    const out = node('strong', { class: 'q-loan-amount num', text: money(amount) });
-    const range = node('input', { type: 'range', class: 'q-loan-range', min: String(LOAN.min), max: String(Math.max(LOAN.min, max)), step: '10000', value: String(amount), 'aria-label': T('借款金額', 'Amount') });
-    range.addEventListener('input', () => ((amount = Number(range.value)), (out.textContent = money(amount))));
-    range.addEventListener('change', () => paint());
-    const seg = segmented(
-      LOAN.terms.map(n => ({ id: n, label: T(`${n / 52} 年`, `${n / 52} yr`) })),
-      { value: weeks, onChange: id => ((weeks = id), paint()), label: T('期數', 'Term') }
-    );
-    const sign = async () => {
-      const points = [
-        ['📅', T(`每週一扣 ${money(offer.installment)}`, `${money(offer.installment)} each Monday`), T(`年利率 ${pctText(offer.apr)}，共 ${weeks} 期，發薪後自動扣款`, `${pctText(offer.apr)} a year, ${weeks} installments, taken after the pay`)],
-        ['🧾', T(`總共要還 ${money(offer.total)}`, `${money(offer.total)} to repay in all`), T(`開辦費 ${money(offer.fee)} 從撥款扣除`, `A ${money(offer.fee)} set-up fee comes off the money`)],
-        ['⚠️', T('逾期 3 期轉催收', '3 late and it goes to collection'), T('全部到期、存款抵銷、每週扣薪三分之一', 'It all falls due: your balance is taken, then a third of every pay')],
-        ['🔒', T('1 年內還清收 2%', '2% to pay off within a year'), T('提前清償違約金', 'An early repayment charge')]
-      ];
-      if (!(await ask({ lang: s.lang, icon: '🏦', title: T(`借 ${money(offer.principal)}？`, `Borrow ${money(offer.principal)}?`), points, ok: T('簽約', 'Sign'), cancel: T('先不要', 'Not now') }))) return;
-      await s.loan('borrow', { amount: offer.principal, weeks });
-      open = false;
-      note.textContent = T(`已撥款 ${money(offer.principal - offer.fee)}。`, `${money(offer.principal - offer.fee)} paid in.`);
-      paint();
-    };
-    return [
-      head(T('申請信貸', 'Apply for a loan'), T(`最多 ${money(max)}`, `Up to ${money(max)}`)),
-      out,
-      range,
-      seg,
-      offer.ok ? node('div', { class: 'q-loan-facts three' }, [fact(T('每週扣款', 'Each Monday'), money(offer.installment)), fact(T('利息＋開辦費', 'Interest + fee'), money(offer.cost), 'down'), fact(T('總費用年百分率', 'APR with fees'), pctText(offer.totalApr))]) : null,
-      offer.ok ? btn(T(`簽約借款 · 實拿 ${money(offer.principal - offer.fee)}`, `Sign · you get ${money(offer.principal - offer.fee)}`), sign) : sub(whyText(LOAN_WHY, offer.why, s.lang, { min: money(LOAN.min), max: money(max) })),
-      btn(T('取消', 'Cancel'), async () => ((open = false), paint()), 'q-btn plain block')
-    ].filter(Boolean);
-  }
-  function relief(w, now) {
-    const worth = poolBalance(w) + finiteOr0(w?.snap?.stock?.holdings) + openStakes(w);
-    if (!(worth < RELIEF.under)) return [];
-    const check = reliefCheck(w, worth, now);
-    return [
-      head(T('急難紓困', 'Emergency relief'), money(RELIEF.amount)),
-      check.ok
-        ? btn(T(`申請 ${money(RELIEF.amount)}`, `Apply for ${money(RELIEF.amount)}`), async () => {
-            if (!(await ask({ lang: s.lang, icon: '🤝', title: T(`申請急難紓困 ${money(RELIEF.amount)}？`, `Apply for ${money(RELIEF.amount)} relief?`), body: T('一次性救助：每 13 週一次、一年最多 3 次，會留在紀錄上。', 'One-off help: once every 13 weeks, 3 times a year at most, and it stays on your record.'), ok: T('申請', 'Apply') }))) return;
-            await s.relief();
-            note.textContent = T(`已撥入 ${money(RELIEF.amount)}。`, `${money(RELIEF.amount)} paid in.`);
-          })
-        : sub(whyText(RELIEF_WHY, check.why, s.lang, { v: money(RELIEF.under), d: check.until ? dayText(check.until, s.lang) : '' }))
-    ];
-  }
-  function paint() {
-    const w = s.wallet;
-    const now = Date.now();
-    const loan = activeLoan(w);
-    const help = relief(w, now);
-    box.replaceChildren(node('div', { class: `q-loan-card${loan?.bad ? ' bad' : ''}` }, loan ? current(loan, now) : apply(w, now)), ...(help.length ? [node('div', { class: 'q-loan-card' }, help)] : []), note);
-  }
-  paint();
-  s.on?.('wallet', () => box.isConnected && !open && paint());
-  return box;
+  const created = s.wallet?.created;
+  const since = Number.isFinite(created) ? new Date(created).toLocaleDateString(en ? 'en-US' : 'zh-TW', { year: 'numeric', month: 'short', day: 'numeric' }) : '';
+  const days = since ? Math.max(1, Math.round((Date.now() - created) / 86_400_000)) : 0;
+  return node('div', { class: 'q-card-hero' }, [
+    node('div', { class: 'q-hero-top' }, [node('span', { class: 'q-hero-brand', text: 'QUADRA PASS' })]),
+    node('span', { class: 'q-hero-label', text: en ? 'Account' : '帳號' }),
+    node('strong', { class: 'q-hero-balance num', text: accountNumber(s.pass) }),
+    node('span', { class: 'q-hero-sub', text: since ? (en ? `Opened ${since} · day ${days}` : `${since} 開戶 · 第 ${days} 天`) : '' })
+  ]);
 }
 
 // The Pass tab: the account, its devices, notices and security. close()
@@ -2357,8 +2128,7 @@ export function passAccount(s, { extra = null, close = () => {} } = {}) {
     tick = setInterval(paint, 15_000);
   };
   const nodes = [
-    detailsCard(s),
-    loanCard(s),
+    accountCard(s),
     ...(extra ? [extra] : []),
     node('h3', { class: 'q-sheet-h', text: T('裝置', 'Devices') }),
     node('div', { class: 'q-rows' }, [act(T('新增裝置（取得裝置代碼）', 'Add a device (get a device code)'), async () => showCode(await s.deviceCode())), device]),
