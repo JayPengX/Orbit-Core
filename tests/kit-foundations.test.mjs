@@ -35,6 +35,9 @@ class FakeEl extends FakeNode {
     this.attrs[k] = v;
     if (k === 'hidden') this.hidden = true;
   }
+  removeAttribute(k) {
+    delete this.attrs[k];
+  }
   addEventListener(k, f) {
     this.handlers[k] = f;
   }
@@ -141,6 +144,28 @@ test('segmented: a count badge after the label, none for 0 or null', () => {
   assert.equal(html.match(/q-seg-count/g).length, 1);
   assert.match(html, />A<span class="q-seg-count">2<\/span><\/button>/);
   assert.equal(ui.segHtml([['a', 'A']], 'a'), '<div class="q-seg" role="tablist" style="--q-seg-n:1;--q-seg-i:0" data-to="0"><button type="button" role="tab" aria-selected="true" >A</button></div>', 'unchanged without a count');
+});
+
+test('pickSeg: a few as the capsule (aria-pressed, thumb from the last pick), more as chips', async () => {
+  const picks = [];
+  const a = ui.pickSeg([['x', 'X'], ['y', 'Y', 4]], 'x', id => picks.push(id), { cls: 'test-seg' });
+  assert.equal(a.className, 'q-seg test-seg');
+  assert.deepEqual(a.children.map(b => b.attrs['aria-pressed']), ['true', 'false']);
+  assert.equal(a.children[1].find('q-seg-count').textContent, '4');
+  a.children[0].handlers.click();
+  a.children[1].handlers.click();
+  assert.deepEqual(picks, ['y'], 'a tap on the one on does nothing');
+  const b = ui.pickSeg([{ id: 'x', label: 'X' }, { id: 'y', label: 'Y' }], 'y', () => {}, { cls: 'test-seg' });
+  assert.match(b.attrs.style, /--q-seg-i:0/, 'starts on the last pick');
+  assert.equal(b.attrs['data-to'], '1');
+  await Promise.resolve();
+  assert.equal(b.style.props['--q-seg-i'], '1', 'not in the page: straight to the pick');
+  const many = ui.pickSeg(['a', 'b', 'c', 'd', 'e'].map(k => [k, k]), 'c', () => {});
+  assert.equal(many.className, 'q-chips');
+  assert.equal(many.children[2].className, 'q-chip');
+  assert.equal(ui.pickSeg(['a', 'b', 'c', 'd', 'e'].map(k => [k, k]), 'c', () => {}, { seg: true }).className, 'q-seg');
+  assert.equal(ui.pickSeg([['a', 'A']], 'a', () => {}, { chips: true }).className, 'q-chips');
+  assert.equal(ui.segHtml([['a', 'A']], 'a', { pressed: true, cls: 'small' }), '<div class="q-seg small" role="group" style="--q-seg-n:1;--q-seg-i:0" data-to="0"><button type="button" aria-pressed="true" >A</button></div>');
 });
 
 test('toast: as before, an action button, and batch', () => {
