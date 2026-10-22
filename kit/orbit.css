@@ -3653,7 +3653,7 @@ div.q-ritem {
    .pro, .q-empty-tile); nothing above changes for markup that predates them.
    - .q-section-head.q-shd / .q-sh-count / .q-sh-more: a head with a count and a 44px link;
    - .q-logo: a team or company logo, the hero of its card;
-   - .q-match, .q-price, .q-live-strip, .q-actions-grid: home and game cards;
+   - .q-match, .q-live-strip, .q-actions-grid: home and game cards;
    - .q-sheet-hero, .q-sheet-foot.q-sf: a sheet's hero and its sticky action bar;
    - .q-ask.pro, .q-empty-tile: the dialog and the empty state with an icon tile;
    - .q-stake, .q-balls: an amount to stake, lottery balls;
@@ -3797,32 +3797,6 @@ div.q-ritem {
 .q-match.wide .q-match-teams {
   min-height: 64px;
 }
-/* Each side over its own price (Jay 2026-10-20: "not centered and weird"):
-   two prices, the sides on the same two columns with VS on the seam
-   between them; three (home, draw, away), the same three columns, VS over
-   the draw. */
-.q-match:has(.q-match-prices > :nth-child(2):last-child) .q-match-teams {
-  position: relative;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
-}
-.q-match:has(.q-match-prices > :nth-child(2):last-child) .q-match-side {
-  padding-inline: 16px;
-}
-.q-match:has(.q-match-prices > :nth-child(2):last-child) .q-match-mid {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  min-width: 0;
-  transform: translate(-50%, -50%);
-}
-.q-match:has(.q-match-prices > :nth-child(3):last-child) .q-match-teams {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
-}
-.q-match:has(.q-match-prices > :nth-child(3):last-child) .q-match-mid {
-  min-width: 0;
-}
 .q-match-side {
   display: flex;
   flex-direction: column;
@@ -3862,44 +3836,6 @@ div.q-ritem {
   color: var(--q-label-2);
   font: 600 13px/1.2 var(--q-font);
 }
-.q-match-prices {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
-  gap: 6px;
-}
-.q-price {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  min-height: 48px;
-  border: 0;
-  border-radius: 12px;
-  background: var(--q-fill);
-  color: var(--q-label);
-  font-family: var(--q-font);
-}
-.q-price small {
-  color: var(--q-label-2);
-  font: 500 11px/1 var(--q-font);
-}
-.q-price b {
-  font: 700 17px/1 var(--q-font);
-  font-variant-numeric: tabular-nums;
-}
-.q-price[aria-pressed='true'] {
-  background: var(--q-blue);
-  color: #ffffff;
-}
-.q-price[aria-pressed='true'] small {
-  color: rgba(255, 255, 255, 0.8);
-}
-.q-price:disabled {
-  opacity: 0.4;
-}
-
 /* -- Games on now (liveStrip) -- */
 .q-live-strip {
   display: flex;
@@ -4898,24 +4834,6 @@ html.q-kb .q-kb-dock {
 /* A bar fixed at the foot whose field is being typed in (a composer): on the keys. */
 html.q-kb .q-kb-docked {
   bottom: calc(var(--q-kb) + 8px) !important;
-}
-
-/* ---- A market that can't be bet now (ui.mjs lockedRow): one bar across
-   the row, never half its prices locked ---- */
-.q-locked-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 48px;
-  border-radius: 12px;
-  background: var(--q-fill-3);
-  color: var(--q-label-2);
-  font: 600 14px/1 var(--q-font);
-}
-.q-locked-row svg {
-  width: 16px;
-  height: 16px;
 }
 
 /* ---- Grids that never leave a hole: the kit's panels, and any app grid
