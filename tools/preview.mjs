@@ -354,7 +354,7 @@ const server = (h2 && !serve ? (fn => createSecureServer(h2Cert(), fn)) : create
   }
 });
 await new Promise(r => server.listen(serve ? port : 0, r));
-const base = `${h2 && !serve ? 'https' : 'http'}://localhost:${server.address().port}/${renamed}/`;
+const base = `${h2 && !serve ? 'https' : 'http'}://localhost:${server.address().port}/${repo}/`;
 
 // ---- Upstream data, straight from the source ----
 // Given up after 8 s, like the Worker (SPORTS_PROXY_UPSTREAM_TIMEOUT_MS).
