@@ -153,7 +153,7 @@ export async function sendPush(env, sub, message) {
 
 // ---- The lists ------------------------------------------------------------------
 
-const APP_KEYS = new Set(['match', 'odds', 'stock', 'vocab', 'orbit', 'weather', 'transit', 'slip']);
+const APP_KEYS = new Set(['match', 'stock', 'vocab', 'orbit', 'weather', 'transit']);
 const MAX_ITEMS = 60;
 const HOLD_MS = 8 * 3_600_000;
 const CHECK_EVERY = 15 * 60_000;
@@ -388,7 +388,7 @@ export async function runCheck(check, lang, env) {
 // A game ESPN still has 'in' that its score says is over: it keeps one
 // for minutes at "End of 4th" or "Mid 9th" before its 'post' (the owner's
 // rule: never wait on a stale feed). The kit's rule (overByRule), the one
-// the app and Play's settling use: only what the rules settle exactly.
+// the app uses: only what the rules settle exactly.
 const LEAGUE_OF = Object.fromEntries(Object.entries(LEAGUES).filter(([, l]) => l.espn).map(([k, l]) => [l.espn, k]));
 export function overNow(comp, espn) {
   const league = LEAGUE_OF[espn];
@@ -459,7 +459,7 @@ export async function sendDue(env, now = Date.now()) {
 }
 
 // News the Worker learns itself, told at once to the account's device for
-// `app` (a settled slip, settle.js): `make(lang)` the message. Nothing kept
+// `app` (the owner's bill alerts, ops.js): `make(lang)` the message. Nothing kept
 // (KV's writes are few), unless the device has unsubscribed.
 export async function notifyNow(env, account, app, kind, make) {
   const kv = env.RATE_LIMIT_KV;

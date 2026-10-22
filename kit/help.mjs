@@ -12,13 +12,13 @@
 //
 // HELP[app][lang] = [[topic id, title, [paragraphs]], …]
 
-export const HELP_ORDER = ['pass', 'stock', 'odds', 'match', 'vocab', 'orbit', 'weather', 'transit', 'slip', 'beats'];
+export const HELP_ORDER = ['pass', 'stock', 'match', 'vocab', 'orbit', 'weather', 'transit', 'beats'];
 
 export const HELP = {
   pass: {
     zh: [
       ['what', 'Orbit Pass 是什麼', [
-        'Orbit Pass 是你在所有 App 的帳號：Orbit 的 Securities、Play，和 Orbit 的 Class、Weather、Transit、Sports、Words。每個 App 都用它登入，資料都存在它裡面，每台裝置都一樣。',
+        'Orbit Pass 是你在所有 App 的帳號：Orbit 的 Securities、Class、Weather、Transit、Sports、Words。每個 App 都用它登入，資料都存在它裡面，每台裝置都一樣。',
         '通行碼是一組 10 個字的代碼，由分享 Orbit 給你的人發給你，App 裡不能自己建立。它就是帳號的鑰匙：知道它的人就能用，所以不要給別人。它只在拿到或更換時顯示一次，裝置上不會保存，請記在安全的地方。',
         '每個 App 右上角的帳戶按鈕（人像，或你挑的頭像）打開 Orbit Pass。'
       ]],
@@ -38,11 +38,11 @@ export const HELP = {
       ]],
       ['net', '沒有網路的時候', [
         'Words、Weather 和 Class 沒有網路也能打開：背單字、上次的天氣預報和你的課表都在手機上，連上網路後再同步。底部會顯示「沒有網路連線」。',
-        'Securities、Play、Transit 和 Sports 的內容都是即時的（報價、賠率、公車到站、比分），舊的資料會讓人誤會，所以沒有網路時只顯示「沒有網路連線」和「重試」，連上網路就自動回來。',
+        'Securities、Transit 和 Sports 的內容都是即時的（報價、公車到站、比分），舊的資料會讓人誤會，所以沒有網路時只顯示「沒有網路連線」和「重試」，連上網路就自動回來。',
         '網路很慢時，App 會先用手機上的資料打開，底部顯示「網路連線很慢」，新資料到了就更新。'
       ]],
       ['notify', '通知與除錯紀錄', [
-        '「系統通知」一個開關管全部，下面依 App 分開，每種通知各自開關（比賽開打、投注單結算、成交、上課、降雨、公車到站…）。設定跟著 Orbit Pass，每個 App、每台裝置都一樣；App 開著時，通知顯示在畫面上方。',
+        '「系統通知」一個開關管全部，下面依 App 分開，每種通知各自開關（比賽開打、成交、上課、降雨、公車到站…）。設定跟著 Orbit Pass，每個 App、每台裝置都一樣；App 開著時，通知顯示在畫面上方。',
         '除錯紀錄：打開「記錄操作過程」，App 會記下它做了什麼；遇到問題時按「複製紀錄」或「分享檔案」傳出去。紀錄裡沒有通行碼。關閉時只留每件事的最後一次。'
       ]],
       ['safe', '安全', [
@@ -58,7 +58,7 @@ export const HELP = {
     ],
     en: [
       ['what', 'What the Orbit Pass is', [
-        'The Orbit Pass is your account in every app: Orbit’s Securities and Play, and Orbit’s Class, Weather, Transit, Sports and Words. Each signs in with it and keeps its data on it, the same on every device.',
+        'The Orbit Pass is your account in every app: Orbit’s Securities, Class, Weather, Transit, Sports and Words. Each signs in with it and keeps its data on it, the same on every device.',
         'The pass is a 10-character code, given to you by whoever shared Orbit with you: it can’t be made in an app. It’s the key to the account: anyone who knows it can use it, so keep it to yourself. It’s shown only when you get it or change it and never kept on a device: write it down somewhere safe.',
         'The account button at the top right of every app (a person, or the avatar you picked) opens the Orbit Pass.'
       ]],
@@ -78,11 +78,11 @@ export const HELP = {
       ]],
       ['net', 'Without a connection', [
         'Words, Weather and Class open with no connection: your words, the last forecast and your timetable are on the phone, and sync once you’re back online. A note at the bottom says “No internet connection”.',
-        'Securities, Play, Transit and Sports are live (prices, odds, buses, scores), and old figures would mislead, so with no connection they show only “No internet connection” and Try again, and come back by themselves once you’re online.',
+        'Securities, Transit and Sports are live (prices, buses, scores), and old figures would mislead, so with no connection they show only “No internet connection” and Try again, and come back by themselves once you’re online.',
         'On a slow connection an app opens on what the phone has, says “Slow internet connection” at the bottom, and updates as the new data arrives.'
       ]],
       ['notify', 'Notifications and the debug log', [
-        'One switch, System notices, turns them all on or off; below it each app’s kinds have their own switches (a game starts, a slip settled, an order filled, a class, rain, a bus nearly here…). The settings follow your Orbit Pass, the same in every app and on every device; while an app is open, a notice shows at the top of the screen.',
+        'One switch, System notices, turns them all on or off; below it each app’s kinds have their own switches (a game starts, an order filled, a class, rain, a bus nearly here…). The settings follow your Orbit Pass, the same in every app and on every device; while an app is open, a notice shows at the top of the screen.',
         'Debug log: turn on “Record what the app does” and the app notes what it did; when something goes wrong, Copy or Share file to send it. It never holds your pass. Off, it keeps only the last of each thing.'
       ]],
       ['safe', 'Security', [
@@ -220,74 +220,6 @@ export const HELP = {
         'Terms of 1, 2, 3 or 5 years, taken every Monday after the pay; paying off within a year costs 2% of what’s left. A missed installment is late, with charges, and is taken as soon as the balance covers it.',
         'Three late and it goes to collection: the whole loan falls due, the balance is taken toward it, then a third of every weekly pay until it’s paid, with interest running. The record lasts a year after it’s paid: no loans, then 16% and a NT$100,000 limit. Borrowed money isn’t worth, so it never raises your wealth level.',
         'Emergency relief: with cash and stocks (at cost) together under NT$2,000, no loan in collection, and payday more than 2 days away, you can get NT$5,000 once. Once every 13 weeks, 3 times a year at most, and it stays on your record.'
-      ]]
-    ]
-  },
-  odds: {
-    zh: [
-      ['what', 'Quadra Play 是什麼', [
-        'Orbit 玩樂的地方：照台灣運動彩券的玩法、賠率和規則下注，還有台灣彩券的電腦彩券和刮刮樂。棒球、籃球、足球、美式足球、冰球和 F1，每場比賽和冠軍盤都有；跟運彩一樣，沒有球員玩法。',
-        '運彩賠率由 DraftKings、Kambi、Polymarket 的價格去掉抽成，再照運彩實際的抽成定價；還沒有人開盤的比賽由 Orbit 自己估。彩券用台灣彩券的真實開獎號碼。'
-      ]],
-      ['tabs', '每個分頁', [
-        '「首頁」：餘額（投注中的金額）、場中焦點、為你推薦（照你在 Orbit Sports 追蹤的球隊和聯賽，前三個可以一次串成一張）、焦點賽事、你的投注和彩券頭獎。',
-        '「賽事」：選運動、聯賽和日期（台灣時間），或搜尋球隊和聯賽；點賠率加入投注單，點比賽看它的所有玩法（分頁、更多）。冠軍盤和 F1 各一張。',
-        '「彩券」：8 種電腦彩券和台灣彩券正在賣的 5 種刮刮樂。',
-        '「紀錄」：投注單（進行中、等待開賽、已結算）、彩券、戰績和統計分析。',
-        '投注單不是分頁：有選項時，分頁列上方會出現投注單列（幾個選項、金額、最多拿回多少），點開確認送出。'
-      ]],
-      ['bet', '怎麼下注', [
-        '投注單照運彩的規則：一關（每個選項各一張，預設）、全部過關、過關組合（2 到 12 場，過 1 關…全過）。最多 12 個選項，串關同一場只能選一個；每張 NT$100–100,000，彩金上限 NT$2,000 萬。每張投注單的彩金超過 NT$5,000 就整筆扣 20% 所得稅；會員帳戶免 0.4% 印花稅。',
-        '送出前會告訴你花多少、最多拿回多少；照當下的賠率成交。賠率變了會直接標在投注單上（▲ 變高、▼ 變低）；「賠率變動時」選接受較高（預設）、全部接受或每次確認，要確認時按一下「接受賠率變動」就好，不會跳視窗。場中投注等 5 秒，用那時的賠率再確認一次，跟真的運彩一樣。',
-        '🔒 是不開放的選項；「限2關」「限3關」只能放在夠多場的串關裡。',
-        '比賽一結束（比分已經決定勝負就算，不等官方）伺服器幾分鐘內自動結算並通知你，App 關著也一樣；取消的比賽算賠率 1.00（無效）；延期的比賽 48 小時內沒開打也是（棒球看當地的當天、美式足球看當週），中斷的比賽沒在同樣時間內打完，還沒有結果的選項無效。冰球每種玩法都只算 60 分鐘（不含延長賽和射門大賽），所以不讓分有和局。'
-      ]],
-      ['lottery', '彩券', [
-        '威力彩、大樂透、今彩539、3星彩、4星彩、39／49樂合彩和賓果賓果，照台灣彩券的規則和真實開獎對獎；晚上開獎的 20:00 截止。威力彩前兩獎和大樂透前四獎照那期每注實際派彩，和真的中獎人一起分，派彩公布後才入帳。',
-        '照台灣彩券的投注方式：威力彩、大樂透、今彩539 可以包牌（系統組合，最多 16 個號碼；威力彩第 2 區 2 到 8 個），樂合彩系統組合 3 到 10 個號碼；倍數只有樂合彩（最多 10 倍）、3星彩、4星彩和賓果賓果（最多 50 倍）；多期投注威力彩、大樂透、49樂合彩 2 到 10 期，賓果賓果 2 到 12 期，其他 2 到 24 期，每期一張、各自對獎。',
-        '真的彩券要自己去兌獎：開獎次日起三個月內，NT$5,000 以下在投注站，NT$500 萬以下在中國信託，更高要先預約。Orbit 不用兌獎，中獎自動入帳。',
-        '刮刮樂是台灣彩券正在賣的每一種，照真的獎金結構和總中獎率；買的時候就決定中多少，刮開就知道。',
-        '選號時快選補滿，+1／+5／+10 再加幾注；購買列一直在下面。中獎自動入帳並通知你。'
-      ]],
-      ['final', '買了就算數', [
-        '跟台灣運彩一樣：投注單買了就不能取消、修改或提前兌現，照買的時候的賠率結算；沒有串關加成，也沒有免費投注。',
-        '冠軍玩法只列還有機會的隊伍和車手：被淘汰、季後賽出局或積分已追不上的，會自動從看板拿掉。'
-      ]],
-      ['money', '錢怎麼算', [
-        '下注和買彩券從 Orbit 餘額扣款；派彩和彩券獎金都由伺服器入帳，並通知你。彩券獎金照規定每注計算：單注超過 NT$5,000 扣 20% 所得稅和 0.4% 印花稅。'
-      ]]
-    ],
-    en: [
-      ['what', 'What Quadra Play is', [
-        'Orbit’s place to play: bets with Taiwan Sports Lottery’s markets, odds and rules, and Taiwan Lottery’s draw games and scratch cards. Baseball, basketball, soccer, American football, hockey and F1: every game and outrights; no player markets, as at the sports lottery.',
-        'Odds come from DraftKings’, Kambi’s and Polymarket’s prices with their margins taken out, then priced at the cuts the sports lottery really takes; a game nobody prices yet is priced by Orbit itself. The lottery uses Taiwan Lottery’s real draws.'
-      ]],
-      ['tabs', 'The tabs', [
-        'Home: your balance (what’s in open bets), live now, for you (from the teams and leagues you follow in Orbit Sports; its top three as one parlay), featured games, your bets and the lottery jackpots.',
-        'Games: pick a sport, league and day (Taiwan time), or search teams and leagues; tap a price to add it to the slip, a game for all its markets (by tab, more). Outrights and F1 have a board each.',
-        'Lottery: 8 draw games and 5 of Taiwan Lottery’s scratch cards on sale.',
-        'History: slips (in play, waiting, settled), tickets, wins and stats.',
-        'The slip isn’t a tab: with picks on it, a bar above the tab bar shows how many, the stake and the most it pays; tap it to confirm and place.'
-      ]],
-      ['bet', 'Placing a bet', [
-        'The slip follows the sports lottery: singles (one ticket a pick, the default), an all-in parlay, or systems (2 to 12 games, singles … all). Up to 12 picks, one per game in a parlay; NT$100–100,000 a ticket, a NT$20 million cap. A slip paying over NT$5,000 has 20% income tax withheld from the whole payout; a member account pays no 0.4% stamp duty.',
-        'Before it’s placed you’re told the cost and the most it pays; it’s bought at the odds shown. A price that moves is marked on the slip (▲ up, ▼ down); “When odds change” takes higher ones (the default), any, or always asks, and then one tap on “Accept odds changes” does it, no pop-up. A live bet waits 5 seconds and is priced again then, as at a real sportsbook.',
-        '🔒 marks a market that isn’t open; 限2關 and 限3關 picks go only in a parlay of that many games.',
-        'The server settles each slip within minutes of its games ending (the moment the score decides it, not when the feed says so) and tells you, with the app closed too; a cancelled game counts at 1.00 (void), and so does a postponed one not started within 48 hours (baseball: that local day; American football: that week); a suspended game not finished in that time voids the picks it hadn’t decided yet. Every hockey market counts 60 minutes only (no overtime or shootout), so its winner has a draw.'
-      ]],
-      ['lottery', 'Lottery', [
-        'Super Lotto 威力彩, Lotto 6/49 大樂透, Daily Cash 539, 3 Star and 4 Star, 39/49 樂合彩 and BINGO BINGO, checked against Taiwan Lottery’s rules and real draws; evening draws stop selling at 20:00. 威力彩’s top two prizes and 大樂透’s top four pay what that draw paid per winner, shared with the real winners, once the payout is announced.',
-        'As Taiwan Lottery sells them: 威力彩, 大樂透 and 今彩539 take a system bet (包牌, up to 16 numbers; 2 to 8 in 威力彩’s second zone), 樂合彩 a system of 3 to 10 numbers; only 樂合彩 (up to ×10), 3 Star, 4 Star and BINGO (up to ×50) take a multiple; multi-draw is 2 to 10 draws on 威力彩, 大樂透 and 49樂合彩, 2 to 12 on BINGO and 2 to 24 on the rest, a ticket a draw, each checked on its own.',
-        'A real ticket is claimed in person within three months of the day after its draw: up to NT$5,000 at a retailer, up to NT$5 million at CTBC Bank, more by appointment. Orbit needs no claiming: prizes are paid in automatically.',
-        'The scratch cards are every one Taiwan Lottery sells now, at their real prize table and win rate; the prize is fixed when a card is bought, and scratching shows it.',
-        'Quick pick fills a line, +1/+5/+10 add more, and the buy bar stays in view. Wins are paid in automatically and you’re told.'
-      ]],
-      ['final', 'A bet is final', [
-        'As at Taiwan Sports Lottery: a slip can’t be cancelled, changed or cashed out once bought, and settles at the odds it was bought at; there’s no parlay boost and no free bet.',
-        'Outright boards list only who can still win: a team knocked out or out of the play-offs, or a driver who can no longer catch the leader on points, comes off the board by itself.'
-      ]],
-      ['money', 'Money', [
-        'Bets and tickets come out of the Orbit balance; payouts and prizes are paid in by the server, and you’re told. Lottery prizes are taxed bet by bet, by law: each bet paying over NT$5,000 has 20% income tax and 0.4% stamp duty withheld.'
       ]]
     ]
   },
@@ -507,48 +439,6 @@ export const HELP = {
         'Morning weather: one line each day at that time (rain, temperature, UV, air), for the pinned place you’re at then. Rain alert: rain likely within 2 hours in the daytime, once a day at most. Both switches are in the Orbit Pass’s notifications.'
       ]],
       ['money', 'Money', ['Orbit Weather uses no money.']]
-    ]
-  },
-  slip: {
-    zh: [
-      ['what', 'Orbit Slips 是什麼', [
-        'Orbit 的運彩追蹤：你在台灣運彩買的注單，比賽即時跟著看。每張注單顯示每場的比分、這張現在還會中的機率、現在值多少，和彩券拿走多少。注單存在 Orbit Pass，換手機也在；沒有網路時用手機上的副本。'
-      ]],
-      ['add', '新增注單', [
-        '「拍注單自動填入」：拍注單或截圖，Gemini 讀出每一場、玩法和賠率，對到真的比賽後填進下面，確認後再儲存；對不到的會列出來讓你手動加。比賽已經打完的舊注單也可以拍：照購買日期找到當時的比賽，直接用最終比分結算，記在當時的日子。每個帳戶一天可以掃 30 張。',
-        '手動新增：選聯盟（盃賽和社區盾也有）和日期（昨天到後天，或「更早」選以前任何一天補登舊注單），點比賽選玩法（不讓分、讓分、大小、單雙；足球和冰球的不讓分有和局，足球整數讓分有讓分和），每一邊都標出運彩大概的賠率；輸入注單上的賠率，會算出公平價和彩券的抽成；不記得就留空，用收盤盤口估計的賠率，標「估」。過關方式（單場、N串1、N串M）和每組金額填好就能儲存。'
-      ]],
-      ['live', '比賽中', [
-        '每場的圓圈：現在會中是綠色、不會中是紅色，進行中會跳動；結束後打勾、打叉或退回。每張注單：全中可得（稅後）、現在價值（從現在起平均拿回多少）、有派彩的機率，和開賽前的機率做比較。',
-        '「看數字」打開三張收據：全中的話（或已結算的派彩）稅前派彩和所得稅 20% 一行一行列出；開賽前的機會；長期平均拿回多少。'
-      ]],
-      ['math', '機率怎麼算', [
-        '每場比賽的比分模型，用 DraftKings 的收盤盤口（經 ESPN，抽水拿掉）去配：足球和冰球用 Poisson 進球，其他用分差和總分的常態分布。比賽中把剩下的時間按比例算，加上現在的比分。沒有盤口的比賽，用注單賠率扣掉運彩量到的抽成估計（標「估」）。',
-        '派彩照台灣運彩的規則：每張彩金超過 NT$5,000 整筆預扣 20% 所得稅；打平或比賽取消算 1.00（足球整數讓分剛好打平是讓分和，不退款）。足球算 90 分鐘、冰球算 60 分鐘（不含延長賽）；中職、日職、韓職和局時不讓分退款。'
-      ]],
-      ['money', '錢怎麼算', [
-        'Orbit Slips 不賣彩券，也不碰錢：只是幫你看已經買的注單。帳戶和頭像在右上角的 Orbit Pass 裡。'
-      ]]
-    ],
-    en: [
-      ['what', 'What Orbit Slips is', [
-        'Orbit’s tracker for the tickets you bought at Taiwan Sports Lottery, followed live: each ticket shows its games’ scores, the chance it still lands, what it’s worth now and what the lottery takes. Tickets are kept on your Orbit Pass, so a new phone has them; offline, the copy on the phone.'
-      ]],
-      ['add', 'Adding a ticket', [
-        'Scan a ticket: a photo or screenshot, read by Gemini; each game, market and price is matched to a real game and filled in for you to check before saving; any it can’t place are listed to add by hand. An old ticket works too: its games are found from the day it was bought, settled on their final scores and kept on that day. 30 scans a day an account.',
-        'By hand: pick the league (cups and the Community Shield too) and day (yesterday to the day after tomorrow, or Earlier for any past day, to add an old ticket), tap a game and its market (moneyline, spread, total, odd/even; soccer’s and hockey’s moneyline have a draw, and soccer’s whole-goal spread a handicap draw); each side shows the lottery’s likely price; type the ticket’s odds to see the fair price and the cut, or leave them empty for an estimate from the closing lines, marked est. Set the kind (single, N-leg parlay, system) and the stake per combination, and save.'
-      ]],
-      ['live', 'While it plays', [
-        'Each pick’s ring: green when it would win now, red when not, pulsing while live; a tick, a cross or a return once decided. Each ticket: the payout if all land (after tax), what it’s worth now (the average payout from here), the chance of any payout, against where it stood before the games.',
-        'The numbers opens three receipts: the payout if all land (or what it paid), with the 20% income tax line by line; the chances before the games; and the long-run average.'
-      ]],
-      ['math', 'How the chances are worked out', [
-        'Each game’s score model is fitted to DraftKings’ closing lines (through ESPN, the margin taken out): Poisson goals for soccer and hockey, a normal margin and total for the rest. In play, the rest of the game is scaled to the time left, plus the score. A game with no market uses the ticket’s odds less the lottery’s measured cut (marked est.).',
-        'Payouts follow Taiwan Sports Lottery’s rules: 20% income tax on any slip paying over NT$5,000; a push or a game called off counts 1.00 (soccer’s whole-goal spread landing on its line is the handicap draw, not a refund). Soccer is on 90 minutes, hockey on 60 (no overtime); a tied CPBL, NPB or KBO game returns a moneyline pick.'
-      ]],
-      ['money', 'Money', [
-        'Orbit Slips sells nothing and moves no money: it only follows tickets you’ve bought. The account and looks are in the Orbit Pass, top right.'
-      ]]
     ]
   },
   beats: {

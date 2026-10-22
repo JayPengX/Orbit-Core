@@ -2,7 +2,7 @@
 // copy: the Pass's copy is read and merged in before anything is written
 // over it, every time it may have changed since (never an older copy over a
 // newer one; a copy that can't be read is never written over). One for
-// every app with a payload (Orbit Words, Orbit Weather, Orbit Slips); the
+// every app with a payload (Orbit Words, Orbit Weather); the
 // app brings only its own decode, merge and encode.
 //
 // Only one app on one device is live on a Pass at a time (the Worker refuses

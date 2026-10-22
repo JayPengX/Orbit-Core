@@ -1,7 +1,5 @@
-// Every sport and league Orbit covers, once, for Orbit Sports and Play alike
-// (from the kit). Each app
-// builds its own view of it (Orbit Sports' lib/leagues.mjs, Play's lib/teams.mjs),
-// so a league added or fixed here reaches both.
+// Every sport and league Orbit covers, once (from the kit): Orbit Sports
+// builds its view of it (lib/leagues.mjs), the proxy's builders read it.
 //
 //   sport   one of SPORTS
 //   kind    'match' two sides; 'field' a race weekend
@@ -9,14 +7,10 @@
 //           'kambi' (kambi path), 'asia' (the leagues' own sites, through the
 //           sports proxy: asiaMonth below). Orbit Sports shows only the leagues on ELTA.tv
 //           or Apple TV in Taiwan (its lib/broadcast.mjs).
-//   bet     Quadra Play's key when Play sells it; `odds` where Play prices it
-//           ('espn': DraftKings through ESPN; 'kambi'), F1 has its own board
-//   espn / kambi   the paths on each source (a league can have both: an
-//           ESPN league with a Kambi path is priced by Kambi first, DraftKings
-//           the cross-check, and settled from ESPN)
+//   bet     the league's key for its logos and team names (logos.mjs, names.mjs)
+//   espn / kambi   the paths on each source
 //   standings  a cup with a table ESPN keeps (a league phase, groups):
 //           its table shown and each game's group said
-//   play-only details: logo (ESPN league logo id), icon, badge
 
 export const SPORTS = {
   soccer: { zh: '足球', en: 'Soccer', icon: '⚽' },
@@ -44,9 +38,7 @@ export const CATALOG = {
   euroleague: { sport: 'basketball', kind: 'match', data: 'kambi', kambi: 'basketball/euroleague', zh: '歐洲籃球聯賽', en: 'EuroLeague', bet: 'euroleague', odds: 'kambi', icon: '🏀', badge: '7xjtuy1554397263' },
   // Football
   nfl: espn('football', 'football/nfl', 'NFL', 'NFL', 'nfl', { top: true, kambi: 'american_football/nfl' }),
-  // 台灣運彩's 美式足球 is the NFL alone (its 玩法 list, 2026): college
-  // football is shown, settled for old slips, never sold (sold: false).
-  ncaaf: espn('football', 'football/college-football', '美國大學美式足球', 'College Football', 'ncaaf', { kambi: 'american_football/ncaaf', icon: '🏈', sold: false }),
+  ncaaf: espn('football', 'football/college-football', '美國大學美式足球', 'College Football', 'ncaaf', { kambi: 'american_football/ncaaf', icon: '🏈' }),
   // Hockey
   nhl: espn('hockey', 'hockey/nhl', 'NHL', 'NHL', 'nhl', { kambi: 'ice_hockey/nhl' }),
   // Soccer
@@ -75,45 +67,26 @@ export const CATALOG = {
   f1: { sport: 'racing', kind: 'field', data: 'espn', espn: 'racing/f1', zh: 'F1 一級方程式', en: 'Formula 1', bet: 'f1', top: true, standings: true }
 };
 
-// Play's kind of markets for a sport.
+// A sport's family (its own name: Orbit Sports groups by it).
 export const familyOfSport = sport => sport;
 
-// Every league Play prices (`sold: true`: only those it still sells; the
-// rest stay for settling older slips): its kind of markets (family) and
-// where its games and odds come from: an ESPN `path` (its schedule and
-// results) with Kambi's list as its first price (`book`), or a `kambi` list
-// alone (its schedule and prices; Asian baseball also its league's month
-// lists, `schedule`). Keyed by Play's key (`bet`). One table for Play's
-// board (play-teams.mjs) and the settling (settle.mjs).
-export function playLeagues({ sold = false } = {}) {
-  return Object.fromEntries(
-    Object.values(CATALOG)
-      .filter(l => l.bet && l.odds && (!sold || l.sold !== false))
-      .map(l => {
-        const league = { family: familyOfSport(l.sport) };
-        if (l.odds === 'espn') {
-          league.path = l.espn;
-          if (l.kambi) league.book = l.kambi;
-        } else {
-          league.kambi = l.kambi;
-          if (l.data === 'asia') league.schedule = { asia: l.asia };
-        }
-        for (const k of ['logo', 'icon', 'badge', 'top']) if (l[k] !== undefined) league[k] = l[k];
-        return [l.bet, league];
-      })
-  );
+// The sports shown home side first, as their fans read them: soccer (and
+// rugby, handball, volleyball). Every US-style sport (baseball, basketball,
+// American football, hockey; and Asia's baseball leagues) lists the visitors
+// first ("Lakers @ Celtics"), and so does anything not known here.
+const HOME_FIRST = new Set(['soccer', 'rugby', 'handball', 'volleyball']);
+
+// A game's two sides in the order to show them: [first, second]. `game` has
+// `home` and `away` (a team, a name or a score: whatever the screen draws)
+// and the league key as `sport` (or the sport itself as `family`).
+export function sidesInOrder(game) {
+  const family = game?.family || CATALOG[game?.sport]?.sport || game?.sport;
+  return HOME_FIRST.has(family) ? [game?.home, game?.away] : [game?.away, game?.home];
 }
 
 // ESPN's site API (scoreboards, summaries, teams) and its dates (YYYYMMDD, UTC).
 export const ESPN_SITE = 'https://site.api.espn.com/apis/site/v2/sports';
 export const yyyymmdd = date => date.toISOString().slice(0, 10).replaceAll('-', '');
-
-// How far ahead Play sells a game (and Orbit Sports shows its 投注): one reach
-// for every league and every price, a bookmaker's or the house's own (Play's
-// house.mjs). Two weeks: the next two soccer matchweeks (an international
-// break between), two football weeks, two weeks of daily sports, while a
-// price still has most of the news it will get.
-export const SOLD_DAYS = 14;
 
 // ---- Asian baseball (NPB, KBO, CPBL) -------------------------------------------------
 //
@@ -133,12 +106,7 @@ export const asiaMonthOf = ms => new Date(ms + 8 * 3_600_000).toISOString().slic
 // Nothing read anywhere (the proxy and every day on the device refused) is
 // an error, never a month with no games: Sports said 沒有比賽 for 中華職棒
 // while both were down (2026-10-18).
-// (`useDirectReader(read)`: another reader of those day lists, `null` the plain one: the Worker
-// building Play's board reads none, not eighty day lists asked of TheSportsDB every ten minutes.)
-let direct = null;
-export const useDirectReader = reader => (direct = reader);
-const directly = url => (direct ? direct(url) : directJson(url));
-export async function asiaMonth(getJson, league, ym, { now = Date.now(), fetchJson = directly } = {}) {
+export async function asiaMonth(getJson, league, ym, { now = Date.now(), fetchJson = directJson } = {}) {
   let down = null;
   const data = await getJson(asiaMonthUrl(league, ym)).catch(error => ((down = error), null));
   const games = Array.isArray(data?.games) ? data.games : [];

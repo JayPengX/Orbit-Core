@@ -1,4 +1,4 @@
-// Every league's season from ESPN, for Orbit Sports and Quadra Play: a
+// Every league's season from ESPN, for Orbit Sports: a
 // season's games come from here, not through the data proxy (a season's page
 // is 6 MB: parsing them froze phones). Built each night by the proxy
 // (builders/run.js, 16:17 UTC: midnight in Taiwan) into the family's data

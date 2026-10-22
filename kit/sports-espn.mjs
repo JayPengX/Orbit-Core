@@ -50,7 +50,7 @@ export { yyyymmdd };
 // ---- Parsing: statuses and sides --------------------------------------------------
 
 // Called off. A delay (rain, a late start) or a suspension isn't: the game
-// is still on, only waiting (Play keeps it live too).
+// is still on, only waiting.
 const VOID = /POSTPONED|CANCELED|CANCELLED|FORFEIT|ABANDONED/;
 const WAITING = /DELAYED|SUSPENDED|RAIN_DELAY/;
 export function parseStatus(s) {
@@ -76,7 +76,7 @@ export function parseStatus(s) {
 // ahead (it doesn't bat), or the end of an inning from the 9th apart, or
 // the home side ahead in the bottom of the 9th or later (a walk-off ends it
 // there).
-// (`league`: a catalogue key, Orbit Sports' or Quadra Play's: the same keys.)
+// (`league`: a catalogue key, Orbit Sports' and the catalogue's: the same keys.)
 const REGULATION = { basketball: 4 };
 export function overByRule(status, away, home, league) {
   if (!status || status.state !== 'in' || status.void) return status;
@@ -100,7 +100,7 @@ export function overByRule(status, away, home, league) {
 }
 
 // The soonest a game of each sport can be over, in minutes from its start: when
-// a final is first asked for (Orbit Sports' result notices, Play's settling),
+// a final is first asked for (Orbit Sports' result notices),
 // then every 2 minutes. A quick game is under its usual length (a 2 h 20
 // baseball game, a blowout), so never that.
 export const SHORTEST_MIN = { soccer: 105, baseball: 110, basketball: 110, football: 160, hockey: 115, sets: 60, racing: 90 };
@@ -142,7 +142,7 @@ const CDN = 'https://a.espncdn.com/i';
 const HEADSHOTS = { racing: 'rpm' };
 export function fallbackLogo(league, side) {
   if (!side || side.logo) return side?.logo || null;
-  // The shared kit's (Quadra Play's) logo for the club.
+  // The shared kit's logo for the club.
   const kit = teamLogo(LEAGUES[league]?.play || league, side.name);
   // A side not decided yet (ESPN's "TBD", ids -1 and -2) has no logo.
   if (kit || !/^\d+$/.test(String(side.id ?? '')) || league === 'nba') return kit;
@@ -159,7 +159,7 @@ export function fallbackLogo(league, side) {
 const nbaLogo = (league, side) => (league === 'nba' && side && !side.athlete ? { ...side, logo: teamLogo('nba', side.en || side.name), ...(NBA_ID[side.en || side.name] ? {} : { guest: true }) } : side);
 // A team as shown: its logo (an NBA team's, above), and its name in the
 // reader's language: Chinese from the kit's names (lib/names.mjs) when it has
-// the team, the English kept as `en` (Play's ids and the matching use it).
+// the team, the English kept as `en` (the matching uses it).
 // People (players, drivers) keep their names.
 export function localSide(league, raw, lang = 'zh') {
   const side = nbaLogo(league, raw);

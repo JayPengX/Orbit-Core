@@ -6,8 +6,8 @@ Chromium) in `~/.local/opt/playwright`; `preview.mjs` finds them itself.
 ## `node tools/preview.mjs <app> [view…]`
 
 An app on an iPhone-sized page, signed in with a made-up wallet. Apps:
-`sports`, `play`, `securities`, `words`, `orbit` (Class), `weather`,
-`transit`, `slips`, `beats`, `admin`.
+`sports`, `securities`, `words`, `orbit` (Class), `weather`,
+`transit`, `beats`, `law`, `admin`.
 
 It prints console errors and three kinds of layout fault:
 
@@ -41,7 +41,7 @@ node tools/preview.mjs sports --live --width 375
 | `--geo lat,lon`, `--geo-path "lat,lon;…" --geo-every ms`, `--no-geo` | Where the phone is (Transit's default is 新竹車站), moving during `--wait`, or refusing the position |
 | `--safari` | Opened in Safari, not from the home screen: the install screen |
 | `--signed-out` | The sign-in screen, as a new device sees it |
-| `--entry '{json}'`, `--snap '{json}'` | Add a wallet entry (an economy scenario); start with this wallet snap (e.g. Play's open slips) |
+| `--entry '{json}'`, `--snap '{json}'` | Add a wallet entry (an economy scenario); start with this wallet snap |
 | `--fake-yahoo` | Made-up Yahoo prices, for when Yahoo answers 429 |
 | `--freezes` | Report main-thread stalls while it runs |
 
@@ -67,7 +67,6 @@ importScripts('../Shared-Proxy/kit/sw.js');
 
 | Tool | What |
 | --- | --- |
-| `node tools/economy.mjs` | Each kind of user over a year, and what the house keeps |
 | `node tools/accent-css.mjs` | Write each app's accent colours (`kit/brand.mjs`) into `kit/orbit.css`; run after changing a brand colour |
 | `node tools/leagues-audit.mjs [--sport soccer] [--json]` | Every catalogue league against its sources today |
 | `node tools/hk-lots.mjs [file.xlsx]` | Every HKEX security's board lot into `kit/stock-hk-lots.mjs` (HKEX's List of Securities); run it now and then for new listings |

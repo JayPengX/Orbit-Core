@@ -25,18 +25,11 @@ jobs:
           done
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      # The Pass's store, counted (never a document): its collections, and
-      # what from before the money lock-down (2026-10-12 09:00 UTC) is still
-      # waiting: slips and tickets staked then, not paid, not watched.
+      # The Pass's store, counted (never a document): its collections.
       - name: The store, counted
         run: |
           cd "$RUNNER_TEMP"
           q() { npx --yes wrangler@4 d1 execute quadra-store --remote --json --command "$1" 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.stringify(JSON.parse(s)[0].results))}catch{console.log("(unreadable)")}})'; }
           echo "== documents by collection"; q "SELECT coll, COUNT(*) AS n FROM docs GROUP BY coll"
-          echo "== pre-lock slips unpaid and unwatched"
-          q "SELECT COUNT(*) AS n FROM docs w, json_each(w.payload, '\$.entries') e WHERE w.coll = 'eco-wallets' AND json_extract(e.value, '\$.kind') = 'stake' AND json_extract(e.value, '\$.t') < 1791795600000 AND NOT EXISTS (SELECT 1 FROM json_each(w.payload, '\$.entries') p WHERE json_extract(p.value, '\$.id') = 'odds:payout-' || substr(json_extract(e.value, '\$.id'), 12)) AND NOT EXISTS (SELECT 1 FROM docs o WHERE o.coll = 'odds-open' AND o.id = w.id || '_' || substr(json_extract(e.value, '\$.id'), 12))"
-          echo "== pre-lock tickets unpaid and unwatched"
-          q "SELECT COUNT(*) AS n FROM docs w, json_each(w.payload, '\$.entries') e WHERE w.coll = 'eco-wallets' AND json_extract(e.value, '\$.kind') = 'lottery' AND json_extract(e.value, '\$.t') < 1791795600000 AND NOT EXISTS (SELECT 1 FROM json_each(w.payload, '\$.entries') p WHERE json_extract(p.value, '\$.id') = 'odds:prize-' || substr(json_extract(e.value, '\$.id'), 12)) AND NOT EXISTS (SELECT 1 FROM docs o WHERE o.coll = 'odds-tickets' AND o.id = w.id || '_' || substr(json_extract(e.value, '\$.id'), 12))"
-          echo "== watched now"; q "SELECT coll, COUNT(*) AS n FROM docs WHERE coll IN ('odds-open', 'odds-tickets') GROUP BY coll"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

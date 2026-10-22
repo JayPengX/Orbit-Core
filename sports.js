@@ -1,7 +1,7 @@
 // ---- sports.js: /sports-proxy, the data proxy ----
 // One of the Worker's routes (worker.js routes it, beside /eco, /transit,
 // /weather…): a host-allowlisted pass-through to the public sources Orbit
-// Sports, Quadra Play and Orbit Securities read (ESPN, MLB, Jolpica,
+// Sports and Orbit Securities read (ESPN, MLB, Jolpica,
 // Polymarket, Kambi, Yahoo, ELTA, YouTube, formula1.com, F1's live timing,
 // the Asian leagues), with the shared edge cache by tier, trims and batches.
 // It and the F1 lap log's cron (sportsCron) run in the same Worker as the
@@ -57,11 +57,9 @@ const SPORTS_PROXY_ALLOWED_HOSTS = [
   // Polymarket's price history of one market (only /prices-history): Orbit
   // Sports' win probability line where ESPN draws none (soccer, MLB live, CPBL).
   'clob.polymarket.com',
-  // Kambi's public odds feed: Play's Asian baseball, EuroLeague and K League
-  // odds and live scores.
+  // Kambi's public feed: Sports' live baseball scores.
   'eu-offering-api.kambicdn.com',
-  // OpenF1's race control messages: Quadra Play's safety car, VSC and red
-  // flag picks are settled from them.
+  // OpenF1's sessions and race control messages (Sports' F1).
   'api.openf1.org',
   // Yahoo Finance's public chart, spark and search endpoints (no key): Stock
   // Study's quotes, charts, dividends and splits for stocks, ETFs, funds,
@@ -259,13 +257,6 @@ function scoreboardPolicy(url) {
   return from <= today + 1 && to >= today - 1 ? CACHE_LIVE : CACHE_SCHEDULE;
 }
 
-// A month's board as Play reads it (`&trim=espn-board`: games to come and
-// their lines, no scores): two minutes, as Kambi's pre-match lists. Read
-// whole every 10 seconds before (the live tier), megabytes each. A month
-// read untrimmed (Orbit Sports' cups, with scores) stays live.
-const CACHE_BOARD_MONTH = { tier: 'board-month', fresh: 2 * MINUTE, stale: 0 };
-const policyOf = (url, trim) => (trim === TRIM_ESPN_BOARD && /^\d{6}$/.test(url.searchParams.get('dates') || '') ? CACHE_BOARD_MONTH : cachePolicyFor(url));
-
 function cachePolicyFor(url) {
   switch (url.hostname) {
     case 'site.api.espn.com':
@@ -296,7 +287,7 @@ function cachePolicyFor(url) {
     case 'gamma-api.polymarket.com':
       return url.pathname === '/public-search' ? CACHE_FUTURES : CACHE_ODDS;
     case 'eu-offering-api.kambicdn.com':
-      // A league's matches in play (Play's live board) move by the second.
+      // A league's matches in play move by the second.
       if (url.pathname.endsWith('/in-play.json')) return CACHE_ODDS;
       // A match's own markets: pre-match lists move like the league's (a live
       // match's are asked for in play, at the live list's pace).
@@ -362,9 +353,8 @@ const TRIM_POLYMARKET_EVENTS = 'polymarket-events';
 // probability (lib/polymarket.mjs there). One day of the Premier League is
 // ~2.8MB raw, ~10KB trimmed.
 const TRIM_POLYMARKET_GAMES = 'polymarket-games';
-// Opt-in (`&trim=polymarket-markets`) for Gamma's /markets (Play's games'
-// winner markets, read apart from their events: kit/play-sources.mjs
-// polymarketGames): each market's prices, liquidity and its event's id.
+// Opt-in (`&trim=polymarket-markets`) for Gamma's /markets: each market's
+// prices, liquidity and its event's id.
 const TRIM_POLYMARKET_MARKETS = 'polymarket-markets';
 // Opt-in (`&trim=kambi-events`) trimming for Kambi's list views and live
 // feed: only the fields Odds Study reads (lib/kambi.mjs), a small fraction
@@ -390,29 +380,7 @@ function trimKambi(data) {
   };
 }
 
-// Opt-in (`&trim=kambi-offers`) for one match's full list of markets
-// (betoffer/event/<id>.json, Play's game page: every line, half, corner and
-// player market): each offer's label, kind and outcomes (who, line, price),
-// about a fifth of Kambi's record.
-const TRIM_KAMBI_OFFERS = 'kambi-offers';
-export function trimKambiOffers(data) {
-  if (!data || typeof data !== 'object') return data;
-  const offers = Array.isArray(data.betOffers)
-    ? data.betOffers.map(o => ({
-        id: o.id,
-        eventId: o.eventId,
-        criterion: { englishLabel: o.criterion?.englishLabel, shortEnglishLabel: o.criterion?.shortEnglishLabel, occurrenceType: o.criterion?.occurrenceType, lifetime: o.criterion?.lifetime },
-        betOfferType: { englishName: o.betOfferType?.englishName },
-        tags: Array.isArray(o.tags) ? o.tags.filter(t => t === 'MAIN_LINE' || t === 'OFFERED_LIVE') : undefined,
-        suspended: o.suspended || undefined,
-        outcomes: (o.outcomes || []).map(x => ({ type: x.type, odds: x.odds, line: x.line, status: x.status, label: x.englishLabel, participant: x.participant, participantId: x.participantId }))
-      }))
-    : undefined;
-  const events = Array.isArray(data.events) ? data.events.map(e => ({ id: e.id, homeName: e.homeName, awayName: e.awayName, start: e.start, state: e.state })) : undefined;
-  return { betOffers: offers, events };
-}
-
-// Opt-in (`&trim=espn-roster`) for a team's roster (Play's players): each
+// Opt-in (`&trim=espn-roster`) for a team's roster (Sports' players): each
 // player's id, name, position, headshot and injury, and (soccer) the
 // season's numbers, in ESPN's own shape (grouped by position or not).
 const TRIM_ESPN_ROSTER = 'espn-roster';
@@ -432,52 +400,6 @@ export function trimEspnRoster(data) {
     };
   const athletes = data.athletes.map(x => (Array.isArray(x?.items) ? { position: x.position, items: x.items.map(player) } : player(x)));
   return { team: data.team ? { id: data.team.id, displayName: data.team.displayName } : undefined, athletes };
-}
-
-// Opt-in (`&trim=espn-teams`) for a league's team list (Play's logos and
-// clubs, kit/play-sources.mjs loadLeagueTeams): each club's name, nickname
-// and first logo, in ESPN's own shape. The 11 lists Play reads on its first
-// open were 2.3 MB; this is about a twentieth.
-const TRIM_ESPN_TEAMS = 'espn-teams';
-export function trimEspnTeams(data) {
-  const teams = data?.sports?.[0]?.leagues?.[0]?.teams;
-  if (!Array.isArray(teams)) return data;
-  const team = t => t && { displayName: t.displayName, name: t.name, shortDisplayName: t.shortDisplayName, logos: t.logos?.[0]?.href ? [{ href: t.logos[0].href }] : [] };
-  return { sports: [{ leagues: [{ teams: teams.map(x => ({ team: team(x?.team) })) }] }] };
-}
-
-// Opt-in (`&trim=espn-standings`) for a league's table (Play's house prices,
-// kit/play-house.mjs parseStandings): each team's name and its record
-// (wins, losses, ties, games, share), the season, and the tables' nesting,
-// in ESPN's own shape; with points, ESPN's clinch mark ('e': out) and the
-// table's name, which Play's 冠軍 boards read to drop who can't win
-// (kit/play-alive.mjs), and a driver's name for F1's table. A table carries dozens of stats and notes per team:
-// the ones Play reads on its first open were several MB.
-const TRIM_ESPN_STANDINGS = 'espn-standings';
-const STANDING_STATS = new Set(['wins', 'losses', 'ties', 'otLosses', 'gamesPlayed', 'winPercent', 'points', 'championshipPts', 'clincher']);
-export function trimEspnStandings(data) {
-  const node = n => {
-    if (!n || typeof n !== 'object') return undefined;
-    const out = {};
-    if (n.standings) {
-      out.standings = {
-        season: n.standings.season,
-        entries: (n.standings.entries || []).map(e => ({
-          ...(e?.team ? { team: { displayName: e.team.displayName ?? e.team.name } } : {}),
-          ...(e?.athlete ? { athlete: { displayName: e.athlete.displayName } } : {}),
-          stats: (e?.stats || []).filter(x => STANDING_STATS.has(x?.name) || STANDING_STATS.has(x?.type)).map(x => (x.name === 'clincher' ? { name: x.name, value: x.value, displayValue: x.displayValue } : { name: x.name, type: x.type, value: x.value }))
-        }))
-      };
-    }
-    if (Array.isArray(n.children)) out.children = n.children.map(node);
-    if (typeof n.name === 'string') out.name = n.name;
-    return out;
-  };
-  if (!data || typeof data !== 'object') return data;
-  const out = node(data);
-  if (Array.isArray(data.seasons)) out.seasons = data.seasons.slice(0, 1).map(x => ({ year: x?.year }));
-  if (data.season) out.season = { year: data.season.year };
-  return out;
 }
 
 // Opt-in (`&trim=espn-news`) for a league's or a team's news (Sports' news
@@ -649,34 +571,6 @@ export function trimFotmobStat(data) {
     format: t.StatFormat,
     decimals: t.StatDecimals,
     list: (t.StatList || []).slice(0, 100).map(x => ({ id: x.ParticiantId ?? x.ParticipantId, name: x.ParticipantName, teamId: x.TeamId, teamName: x.TeamName, value: x.StatValue, sub: x.SubStatValue, games: x.MatchesPlayed, mins: x.MinutesPlayed, rank: x.Rank }))
-  };
-}
-
-// Opt-in (`&trim=espn-board`) for a league's scoreboard as Play's board
-// reads it (kit/play-sources.mjs parseEspnScoreboard and mlbPostseason): each
-// game's id, time, season type and state, its sides and DraftKings' closing
-// lines; and what this proxy reads of it (settledData, quietFor). NHL's
-// month falls from ~4.5 MB to ~0.13 MB.
-const TRIM_ESPN_BOARD = 'espn-board';
-export function trimEspnBoard(data) {
-  if (!data || typeof data !== 'object' || !Array.isArray(data.events)) return data;
-  const type = t => t && { state: t.state, completed: t.completed };
-  const status = x => x && { type: type(x.type) };
-  const close = x => x && { close: x.close && { odds: x.close.odds, line: x.close.line } };
-  const sides = (x, keys) => x && Object.fromEntries(keys.map(k => [k, close(x[k])]));
-  const team = t => t && { id: t.id, displayName: t.displayName, abbreviation: t.abbreviation, logo: t.logo };
-  const game = c =>
-    c && {
-      date: c.date,
-      timeValid: c.timeValid,
-      neutralSite: c.neutralSite,
-      notes: Array.isArray(c.notes) ? c.notes.slice(0, 1).map(n => ({ headline: n?.headline })) : undefined,
-      status: status(c.status),
-      competitors: Array.isArray(c.competitors) ? c.competitors.map(x => x && { homeAway: x.homeAway, team: team(x.team) }) : c.competitors,
-      odds: Array.isArray(c.odds) ? c.odds.slice(0, 1).map(o => o && { moneyline: sides(o.moneyline, ['away', 'home', 'draw']), total: sides(o.total, ['over', 'under']), pointSpread: sides(o.pointSpread, ['away', 'home']) }) : undefined
-    };
-  return {
-    events: data.events.map(e => e && { id: e.id, date: e.date, season: e.season && { type: e.season.type }, status: status(e.status), competitions: Array.isArray(e.competitions) ? e.competitions.slice(0, 1).map(game) : e.competitions })
   };
 }
 
@@ -1051,7 +945,7 @@ export function emptyTranslation(text) {
 // The translate endpoint: the text goes in a POST body (a GET mixes in
 // simplified characters for zh-TW, and long texts don't fit an address).
 // Google often answers the proxy's own address with nothing (busy, or
-// holding Cloudflare off: Play's snooker players and Belgian clubs stayed in
+// holding Cloudflare off: snooker players and Belgian clubs stayed in
 // English, 2026-10-21): then Google's other public endpoint (client=gtx,
 // translate.googleapis.com), its segments joined into the first one's shape.
 async function translateUpstream(upstreamUrl) {
@@ -1135,7 +1029,7 @@ async function fetchUpstream(upstreamUrl, trim) {
     if (trim) {
       try {
         const parsed = JSON.parse(new TextDecoder().decode(body));
-        body = JSON.stringify(trim === TRIM_KAMBI_EVENTS ? trimKambi(parsed) : trim === TRIM_KAMBI_OFFERS ? trimKambiOffers(parsed) : trim === TRIM_ESPN_ROSTER ? trimEspnRoster(parsed) : trim === TRIM_ESPN_TEAMS ? trimEspnTeams(parsed) : trim === TRIM_ESPN_STANDINGS ? trimEspnStandings(parsed) : trim === TRIM_ESPN_ATHLETES ? trimEspnAthletes(parsed) : trim === TRIM_ESPN_NEWS ? trimEspnNews(parsed) : trim === TRIM_ESPN_LEADERS ? trimEspnLeaders(parsed) : trim === TRIM_JOLPICA_RESULTS ? trimJolpicaResults(parsed) : trim === TRIM_FOTMOB_PAGE || trim === TRIM_FOTMOB_TEAM ? trimFotmobPage(parsed) : trim === TRIM_FOTMOB_STAT ? trimFotmobStat(parsed) : trim === TRIM_ESPN_INJURIES ? trimEspnInjuries(parsed) : trim === TRIM_ESPN_BOARD ? trimEspnBoard(parsed) : trim === TRIM_ELTA ? trimElta(parsed) : trim === TRIM_POLYMARKET_GAMES ? trimPolymarketGames(parsed) : trim === TRIM_POLYMARKET_MARKETS ? trimPolymarketMarkets(parsed) : trimPolymarketEvents(parsed));
+        body = JSON.stringify(trim === TRIM_KAMBI_EVENTS ? trimKambi(parsed) : trim === TRIM_ESPN_ROSTER ? trimEspnRoster(parsed) : trim === TRIM_ESPN_ATHLETES ? trimEspnAthletes(parsed) : trim === TRIM_ESPN_NEWS ? trimEspnNews(parsed) : trim === TRIM_ESPN_LEADERS ? trimEspnLeaders(parsed) : trim === TRIM_JOLPICA_RESULTS ? trimJolpicaResults(parsed) : trim === TRIM_FOTMOB_PAGE || trim === TRIM_FOTMOB_TEAM ? trimFotmobPage(parsed) : trim === TRIM_FOTMOB_STAT ? trimFotmobStat(parsed) : trim === TRIM_ESPN_INJURIES ? trimEspnInjuries(parsed) : trim === TRIM_ELTA ? trimElta(parsed) : trim === TRIM_POLYMARKET_GAMES ? trimPolymarketGames(parsed) : trim === TRIM_POLYMARKET_MARKETS ? trimPolymarketMarkets(parsed) : trimPolymarketEvents(parsed));
       } catch {
         // Not the JSON shape expected - pass it through untouched.
       }
@@ -1243,15 +1137,11 @@ function trimFor(trimParam, upstreamUrl) {
   if (trimParam === TRIM_POLYMARKET_MARKETS && upstreamUrl.hostname === 'gamma-api.polymarket.com' && upstreamUrl.pathname === '/markets') return TRIM_POLYMARKET_MARKETS;
   if (trimParam === TRIM_KAMBI_EVENTS && upstreamUrl.hostname === 'eu-offering-api.kambicdn.com') return TRIM_KAMBI_EVENTS;
   if (trimParam === TRIM_ESPN_ROSTER && upstreamUrl.hostname === 'site.api.espn.com' && upstreamUrl.pathname.endsWith('/roster')) return TRIM_ESPN_ROSTER;
-  if (trimParam === TRIM_ESPN_TEAMS && upstreamUrl.hostname === 'site.api.espn.com' && upstreamUrl.pathname.endsWith('/teams')) return TRIM_ESPN_TEAMS;
-  if (trimParam === TRIM_ESPN_STANDINGS && upstreamUrl.hostname === 'site.api.espn.com' && upstreamUrl.pathname.endsWith('/standings')) return TRIM_ESPN_STANDINGS;
   if (trimParam === TRIM_ESPN_ATHLETES && upstreamUrl.hostname === 'site.api.espn.com' && upstreamUrl.pathname.endsWith('/statistics/byathlete')) return TRIM_ESPN_ATHLETES;
   if (trimParam === TRIM_ESPN_LEADERS && upstreamUrl.hostname === 'site.api.espn.com' && /\/(leaders|statistics)$/.test(upstreamUrl.pathname)) return TRIM_ESPN_LEADERS;
   if (trimParam === TRIM_JOLPICA_RESULTS && upstreamUrl.hostname === 'api.jolpi.ca' && /\/(results|qualifying\/1)\.json$/.test(upstreamUrl.pathname)) return TRIM_JOLPICA_RESULTS;
   if (trimParam === TRIM_ESPN_NEWS && upstreamUrl.hostname === 'site.api.espn.com' && upstreamUrl.pathname.endsWith('/news')) return TRIM_ESPN_NEWS;
-  if (trimParam === TRIM_ESPN_BOARD && upstreamUrl.hostname === 'site.api.espn.com' && upstreamUrl.pathname.endsWith('/scoreboard')) return TRIM_ESPN_BOARD;
   if (trimParam === TRIM_ESPN_INJURIES && upstreamUrl.hostname === 'site.api.espn.com' && upstreamUrl.pathname.endsWith('/injuries')) return TRIM_ESPN_INJURIES;
-  if (trimParam === TRIM_KAMBI_OFFERS && upstreamUrl.hostname === 'eu-offering-api.kambicdn.com' && upstreamUrl.pathname.includes('/betoffer/')) return TRIM_KAMBI_OFFERS;
   return null;
 }
 
@@ -1350,7 +1240,7 @@ async function keep(key, url, body) {
 }
 
 async function resolveOne(upstreamUrl, trim, ctx, { mirror = true, within } = {}) {
-  let policy = policyOf(upstreamUrl, trim);
+  let policy = cachePolicyFor(upstreamUrl);
   const cache = caches.default;
   // A trimmed response is cached under its own key (a marker param on the
   // cache key only - never sent upstream), so it can't be served to a
@@ -1563,7 +1453,7 @@ async function handleSportsProxyRequest(request, env, headers, ip, ctx) {
   const gate = await checkSession(env, requestParams, headers, 1, request, ip);
   if (gate.error) return gate.error;
   const trim = trimFor(requestParams.get('trim'), upstreamUrl);
-  headers['X-Sports-Proxy-Cache-Tier'] = policyOf(upstreamUrl, trim).tier;
+  headers['X-Sports-Proxy-Cache-Tier'] = cachePolicyFor(upstreamUrl).tier;
 
   // (`within`: this Worker's own reads only, a live bet checked on a copy that young.)
   const within = ip === 'worker' && requestParams.has('within') ? Math.max(0, Number(requestParams.get('within')) || 0) : undefined;

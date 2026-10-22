@@ -79,8 +79,6 @@ head_sampling_rate = 0.25
 [limits]
 cpu_ms = 30000
 
-# /kambi cron (kambi.js): Kambi matches with open Quadra Play bets, every 2 minutes (one index read when nothing is on).
-# The odd minutes: Quadra Play's slips settled (settle.js, worker.js SETTLE_CRON), an invocation of its own.
 # Every lap of an F1 session while it runs (f1-live.js: F1's archive has
 # them only after the flag): a minute's look kept in a Durable Object. It
 # moved here with the sports proxy (2026-10-13); the old Worker's log of past

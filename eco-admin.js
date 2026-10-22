@@ -17,7 +17,6 @@
 import { systemReport, alertAccount, tell, OPS_DOC } from './ops.js';
 import { newPasscode, updateWallet, deleteAccount, ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, PAIR_MS, ECO_LIMITS, parseWallet, poolBalance, gen, emptyWallet } from './eco.js';
 import { sendPush, dueLists } from './push.js';
-import { KAMBI_COLLECTION } from './kambi.js';
 import { usage as transitUsage, CAPS as TRANSIT_CAPS, TDX_POINTS, tdxPoints, tdxGuard } from './transit.js';
 import { twDate, GOOGLE_DAILY_CALLS } from './weather.js';
 import { cleanDev } from './kit/devconfig.mjs';
@@ -75,9 +74,10 @@ export async function capacityCron(env, deps) {
   return { scale: p.scale, week: p.users.week, expected: p.users.expected, changed: !same };
 }
 
-export const RETIRED_COLLECTIONS = ['orbit-schedules', 'eco-links', 'stock-study-leagues'];
+// (Play's slips, tickets and Kambi watch left with it for Longshot, 2026-10-22.)
+export const RETIRED_COLLECTIONS = ['orbit-schedules', 'eco-links', 'stock-study-leagues', 'odds-open', 'odds-settled', 'odds-tickets', 'kambi-results'];
 // (A function: eco.js and this file import each other.)
-const keep = () => new Set([WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, KAMBI_COLLECTION, CONFIG_COLLECTION, ...Object.values(ECO_APPS).map(a => a.collection)]);
+const keep = () => new Set([WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, CONFIG_COLLECTION, ...Object.values(ECO_APPS).map(a => a.collection)]);
 // The store's batches go 500 at a time; a call stops after this many so it
 // stays inside the Worker's limits.
 const PER_CALL = 1500;
@@ -373,14 +373,13 @@ async function pushRecords(env, prefix = 'push:') {
 // The sources the apps lean on, each asked once (public reads only, no keys),
 // with what each one feeds.
 const HEALTH = [
-  ['ESPN', 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard', 'Sports、Play：比分、賽程、球員'],
-  ['Kambi', 'https://eu-offering-api.kambicdn.com/offering/v2018/ub/listView/formula_1/all/all/all/competitions.json?lang=en_GB&market=GB', 'Play、Sports：賠率'],
-  ['Polymarket', 'https://gamma-api.polymarket.com/events?limit=1&closed=false', 'Play、Sports：預測市場機率'],
-  ['OpenF1', 'https://api.openf1.org/v1/sessions?session_key=latest', 'Sports、Play：F1 賽段、勝率'],
+  ['ESPN', 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard', 'Sports：比分、賽程、球員'],
+  ['Kambi', 'https://eu-offering-api.kambicdn.com/offering/v2018/ub/listView/formula_1/all/all/all/competitions.json?lang=en_GB&market=GB', 'Sports：場中比分'],
+  ['Polymarket', 'https://gamma-api.polymarket.com/events?limit=1&closed=false', 'Sports：預測市場機率'],
+  ['OpenF1', 'https://api.openf1.org/v1/sessions?session_key=latest', 'Sports：F1 賽段、勝率'],
   ['NLSC 地點', 'https://api.nlsc.gov.tw/other/TownVillagePointQuery1/121.5645/25.0341', 'Weather、Transit：所在的鄉鎮'],
   // (Read from the bucket itself: a Worker asking its own workers.dev address gets a 404.)
-  ['資料（R2）', 'r2:sports/nba/days.json', '所有 App：每晚建好的資料'],
-  ['台灣彩券', 'https://api.taiwanlottery.com/TLCAPIWeB/Lottery/LatestResult', 'Play 彩券：開獎號碼、對獎']
+  ['資料（R2）', 'r2:sports/nba/days.json', '所有 App：每晚建好的資料']
 ];
 
 export const ADMIN_TOOLS = {

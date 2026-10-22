@@ -4,7 +4,7 @@
 // draws every icon and share card from it. Every app's icon is a planet with
 // its ring and a moon, the app's symbol on the planet.
 //
-// `id` stays what the apps and the pass store under (stock, odds, match,
+// `id` stays what the apps and the pass store under (stock, match,
 // vocab…); only the names and looks are the brand's.
 
 export const GOLD = '#f5c451';
@@ -13,12 +13,10 @@ export const FAMILY = { name: 'Orbit', from: '#312e81', to: '#020617', ink: '#1e
 // repo: the GitHub repo (and Pages path) each app lives at.
 export const BRANDS = {
   stock: { name: 'Orbit Securities', short: 'Securities', repo: 'Orbit-Securities', from: '#2dd4bf', to: '#0f3d5c', ink: '#0f766e', color: '#0d9488', role: { zh: '投資與理財', en: 'Invest and grow' }, tag: { zh: '全球股市模擬投資：真實報價、換匯與融資', en: 'Invest in markets worldwide with play money' } },
-  odds: { name: 'Quadra Play', short: 'Play', repo: 'Quadra-Play', from: '#60a5fa', to: '#1e3a8a', ink: '#1d4ed8', color: '#2563eb', role: { zh: '運彩與彩券', en: 'Sports bets and lottery' }, tag: { zh: '運彩與彩券：每一注的數學都看得見', en: 'Sports bets and the lottery, with the maths shown' } },
   orbit: { name: 'Orbit Class', short: 'Class', repo: 'Orbit-Class', from: '#7dd3fc', to: '#0c4a6e', ink: '#0369a1', color: '#0ea5e9', role: { zh: '課表', en: 'Class schedule' }, tag: { zh: '即時課表：現在、下一節與倒數', en: 'Your class schedule, live' } },
   weather: { name: 'Orbit Weather', short: 'Weather', repo: 'Orbit-Weather', from: '#a5b4fc', to: '#312e81', ink: '#4338ca', color: '#6366f1', role: { zh: '天氣', en: 'Weather' }, tag: { zh: '一個答案的天氣：降雨、紫外線、空氣，跟著你的行程', en: 'One clear forecast for wherever you’ll be' } },
   transit: { name: 'Orbit Transit', short: 'Transit', repo: 'Orbit-Transit', from: '#6ee7b7', to: '#064e3b', ink: '#047857', color: '#10b981', role: { zh: '大眾運輸', en: 'Public transport' }, tag: { zh: '全台公車、火車、捷運與 YouBike，一次規劃', en: 'Buses, trains, metros and bikes across Taiwan' } },
   match: { name: 'Orbit Sports', short: 'Sports', repo: 'Orbit-Sports', from: '#fdba74', to: '#9a3412', ink: '#c2410c', color: '#ea580c', role: { zh: '賽程與比分', en: 'Scores and schedules' }, tag: { zh: '所有運動的賽程、比分與數據', en: 'Every sport, every match, every stat' } },
-  slip: { name: 'Orbit Slips', short: 'Slips', repo: 'Orbit-Slips', from: '#fcd34d', to: '#78350f', ink: '#b45309', color: '#d97706', role: { zh: '運彩追蹤', en: 'Ticket tracker' }, tag: { zh: '買了的運彩，即時追蹤：比分、機率、現在價值', en: 'Your sports lottery tickets, followed live' } },
   beats: { name: 'Orbit Beats', short: 'Beats', repo: 'Orbit-Beats', from: '#f0abfc', to: '#701a75', ink: '#a21caf', color: '#c026d3', role: { zh: '節拍作曲', en: 'Beat maker' }, tag: { zh: '把你的節拍片段，排成一首首新歌', en: 'Your beat pieces, arranged into new songs' } },
   law: { name: 'Orbit Law', short: 'Law', repo: 'Orbit-Law', from: '#a5b4fc', to: '#1e1b4b', ink: '#4338ca', color: '#4f46e5', role: { zh: '法規與法案', en: 'Laws and bills' }, tag: { zh: '台灣的法規，每個條號都能點；立法院的法案，走到哪一步一眼就懂。', en: 'Taiwan\'s laws with linked references, and 立法院 bills by stage' } },
   vocab: { name: 'Orbit Words', short: 'Words', repo: 'Orbit-Words', from: '#f9a8d4', to: '#831843', ink: '#be185d', color: '#db2777', role: { zh: '英文單字', en: 'English words' }, tag: { zh: '背得住的英文單字：大考 6000 字，真人發音', en: 'English words that stay with you' } }
@@ -39,8 +37,6 @@ export const PASS = { name: 'Orbit Pass', short: 'Pass', from: '#334155', to: '#
 export const GLYPHS = {
   // A rising line and its arrow.
   stock: c => `<path d="M22 96 L52 64 L72 80 L106 40" fill="none" stroke="${c}" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/><path d="M82 38 L108 36 L106 62" fill="none" stroke="${c}" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>`,
-  // A play button inside a ticket.
-  odds: c => `<path d="M20 36 H108 V54 A10 10 0 0 0 108 74 V92 H20 V74 A10 10 0 0 0 20 54 Z" fill="none" stroke="${c}" stroke-width="10" stroke-linejoin="round"/><path d="M54 48 L82 64 L54 80 Z" fill="${c}" stroke="${c}" stroke-width="6" stroke-linejoin="round"/>`,
   // The day's periods: a card of rows, the one now marked.
   orbit: c => `<rect x="24" y="22" width="80" height="84" rx="16" fill="none" stroke="${c}" stroke-width="10"/><path d="M44 48 H84 M44 66 H84 M44 84 H70" stroke="${c}" stroke-width="10" stroke-linecap="round"/>`,
   // The sun behind a cloud.
@@ -51,8 +47,6 @@ export const GLYPHS = {
   match: c => `<circle cx="64" cy="64" r="42" fill="none" stroke="${c}" stroke-width="10"/><path d="M64 22 V106 M22 64 H106" stroke="${c}" stroke-width="8"/><path d="M34 34 C48 48 48 80 34 94 M94 34 C80 48 80 80 94 94" fill="none" stroke="${c}" stroke-width="8" stroke-linecap="round"/>`,
   // An open book.
   vocab: c => `<path d="M64 38 C52 28 34 26 18 30 V100 C34 96 52 98 64 108 C76 98 94 96 110 100 V30 C94 26 76 28 64 38 Z" fill="none" stroke="${c}" stroke-width="10" stroke-linejoin="round"/><path d="M64 38 V106" stroke="${c}" stroke-width="10" stroke-linecap="round"/>`,
-  // A ticket torn along its line, a tick on it.
-  slip: (c, a = '#16a34a') => `<path d="M24 30 H104 V54 A10 10 0 0 0 104 74 V98 H24 V74 A10 10 0 0 0 24 54 Z" fill="none" stroke="${c}" stroke-width="10" stroke-linejoin="round"/><path d="M48 64 L60 76 L82 50" fill="none" stroke="${a}" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>`,
   // A waveform: five bars, the middle one tallest, a beat lit on it.
   beats: (c, a = '#f472b6') => `<path d="M24 52 V76 M44 38 V90 M64 22 V106 M84 38 V90 M104 52 V76" stroke="${c}" stroke-width="12" stroke-linecap="round"/><circle cx="64" cy="64" r="9" fill="${a}"/>`,
   // A pair of scales: a post, a beam, two pans.
@@ -104,7 +98,6 @@ export const DEV = {
   f1Feed: { def: 10, min: 4, max: 120, unit: 's', group: 'f1', zh: 'F1 即時計時（全 App）', en: 'F1 live timing, app-wide', note: '首頁卡片和誰在場上' },
   f1Board: { def: 4, min: 2, max: 60, unit: 's', group: 'f1', zh: 'F1 即時看板', en: 'F1 live board', note: '賽事頁打開進行中的一節（F1 的來源每 4 秒一次）' },
   f1Laps: { def: 15, min: 5, max: 120, unit: 's', group: 'f1', zh: 'F1 每圈資料', en: 'F1 laps', note: '數據的車手比較與圈速' },
-  playLive: { def: 5, min: 3, max: 120, unit: 's', group: 'play', zh: 'Play 即時比分與兌現', en: 'Play live scores', note: 'Quadra Play 有比賽進行中的注單、即時盤' },
   // Orbit Transit (TDX, measured 2026-10-11 by its own update times): bus
   // arrivals and the metro's board change every 30 s, trains' every 20-30,
   // YouBike every 60. Kept a third of that on the Worker, read as often.
@@ -118,7 +111,7 @@ export const DEV = {
   autoScale: { def: false, group: 'scale', zh: '依人數自動調整', en: 'Scale with people', note: '人數預估會超過 Cloudflare $5 方案的額度時，上面的即時更新一起放慢（每 6 小時檢查）；有空間就回到上面的設定' },
   mirror: { def: true, group: 'data', zh: '使用每晚的資料副本', en: 'Use the nightly copies', note: '關掉：所有 App 都直接問代理（除錯用）' }
 };
-export const DEV_GROUPS = { proxy: '代理（sports-proxy）', sports: 'Orbit Sports', f1: 'F1', play: 'Quadra Play', transit: 'Orbit Transit（TDX）', scale: '容量', data: '資料' };
+export const DEV_GROUPS = { proxy: '代理（sports-proxy）', sports: 'Orbit Sports', f1: 'F1', transit: 'Orbit Transit（TDX）', scale: '容量', data: '資料' };
 
 // Settings as stored: each known key, in range, else its default.
 export function cleanDev(x = {}) {

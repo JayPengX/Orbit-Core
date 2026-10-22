@@ -11,7 +11,7 @@
 //                          [--signed-out]  (the sign-in screen, as a new device sees it)
 //                          [--entry '{json}']  (a wallet entry to add: an economy scenario)
 //                          [--clock 2026-10-06T10:05]  (the page's clock, Taipei time)
-//                          [--snap '{json}']  (the wallet's snap to start with, e.g. Play's open slips)
+//                          [--snap '{json}']  (the wallet's snap to start with)
 //                          [--fixture 'text-in-url=file.json']  (repeatable: that saved answer
 //                          for any upstream URL containing the text, e.g. when Yahoo rate-limits;
 //                          the file is read at each ask, so swapping it mid-run changes the game)
@@ -25,7 +25,7 @@
 //                          [--fake-yahoo]  (made-up Yahoo prices: spark and chart answers
 //                          for any symbol, for when Yahoo answers 429)
 //
-//   app   sports | play | securities | words | orbit | weather | transit | slips (or the repo's folder name)
+//   app   sports | securities | words | orbit | weather | transit | beats | law (or the repo's folder name)
 //         | admin [overview accounts money health usage dev tools]  (the admin panel, made-up accounts)
 //
 // Orbit Transit: /transit is answered by transit.js itself on made-up TDX
@@ -123,7 +123,7 @@ const UAS = {
 const width = Number(opt('width', (SIZES[device] || SIZES.iphone)[0]));
 const height = Number(opt('height', (SIZES[device] || SIZES.iphone)[1]));
 const lang = opt('lang', 'zh');
-// --snap '{json}': the wallet's snap (each app's figures: Play's open slips for Orbit Sports, say).
+// --snap '{json}': the wallet's snap (each app's figures).
 const snapStart = JSON.parse(opt('snap', '{}'));
 const wait = Number(opt('wait', 6000));
 const payloadFile = opt('payload', '');
@@ -266,7 +266,7 @@ async function snapshotRoot(when, repos) {
 }
 const [appArg, ...hashes] = args;
 
-const APPS = { sports: ['Orbit-Sports', 'match'], play: ['Quadra-Play', 'odds'], securities: ['Orbit-Securities', 'stock'], words: ['Orbit-Words', 'vocab'], orbit: ['Orbit-Class', 'orbit'], weather: ['Orbit-Weather', 'weather'], transit: ['Orbit-Transit', 'transit'], slips: ['Orbit-Slips', 'slip'], beats: ['Orbit-Beats', 'beats'], law: ['Orbit-Law', 'law'], admin: ['Shared-Proxy', 'admin'] };
+const APPS = { sports: ['Orbit-Sports', 'match'], securities: ['Orbit-Securities', 'stock'], words: ['Orbit-Words', 'vocab'], orbit: ['Orbit-Class', 'orbit'], weather: ['Orbit-Weather', 'weather'], transit: ['Orbit-Transit', 'transit'], beats: ['Orbit-Beats', 'beats'], law: ['Orbit-Law', 'law'], admin: ['Shared-Proxy', 'admin'] };
 // The admin panel's key in a preview: the run's own, never the owner's.
 const ADMIN_KEY = 'preview-admin-key-0123456789abcdef0123456789';
 // The old names still work.
@@ -670,41 +670,6 @@ const stockDocs = new Map();
 await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(?!weather|push|transit|sports-proxy|law-page|data\/)/, async route => {
   const req = route.request();
   const body = req.postDataJSON?.() || {};
-  // Quadra Play's slips (settle.js): placing checks every pick's price on
-  // today's real data with the Worker's own check (price.js); nothing settled.
-  if (new URL(req.url()).pathname === '/play') {
-    let reply = req.method() === 'GET' ? { settled: {} } : { ok: true };
-    // The lottery as lotto.js sells it (its draw, its prize), on no store.
-    if (body.op === 'tickets') {
-      const { buyTicket } = await import('../kit/play-lottery.mjs');
-      const bottomless = { v: 1, created: '', ledger: [{ id: 'x', amount: 1e12 }], slips: [], tickets: [] };
-      // (多期: a ticket a draw, `tickets`; before 多期, `ticket` alone.)
-      const sold = (body.tickets || []).map(x => buyTicket(bottomless, x, new Date()));
-      reply = sold.some(r => r.error) ? { refused: { problem: sold.find(r => r.error).error } } : { tickets: sold.flatMap(r => r.tickets || [r.ticket]) };
-    }
-    if (body.op === 'scratch') {
-      const { CARDS, drawPrize } = await import('../kit/play-scratch.mjs');
-      const one = x => ({ id: x.id, t: new Date().toISOString(), game: `scratch:${x.card}`, card: x.card, cost: CARDS[x.card].price, prize: drawPrize(x.card), seed: Math.floor(Math.random() * 2 ** 31), status: 'open' });
-      reply = Array.isArray(body.cards) ? { tickets: body.cards.map(one) } : { ticket: one(body) };
-    }
-    if (body.op === 'reveal') reply = { prize: 0 };
-    // (Cash out: taken at the value asked; the Worker checks it against its own.)
-    if (body.op === 'cashout') reply = { cashedOut: Math.floor(body.value) };
-    if (body.op === 'place') {
-      const { checkSlip, useReads } = await import('../price.js');
-      const { cleanSlip } = await import('../settle.js');
-      const reads = { read: async url => { const x = await upstream(url); if (x.status !== 200) throw new Error(String(x.status)); return JSON.parse(x.body); }, pack: async path => JSON.parse((await curlText(`https://orbit-workers-proxy.pengzjay.workers.dev/data/${path}`)) || 'null') };
-      const once = useReads(reads);
-      const slips = (body.slips || []).map(cleanSlip);
-      reply = { placed: slips.map(x => x?.id) };
-      for (const slip of slips) {
-        const r = slip ? await checkSlip(slip, wallet, reads, new Date(), once) : { problem: 'shape' };
-        if (!r.ok) (reply = { refused: { slip: slip?.id, ...r } }), console.log('play place refused', JSON.stringify(r));
-        if (!r.ok) break;
-      }
-    }
-    return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(reply) });
-  }
   // Orbit Securities' orders, plans and 新股申購 (stock-fill.js): the
   // Worker's own code on a store of the run's, today's real data.
   if (new URL(req.url()).pathname === '/stock') {
@@ -1163,8 +1128,8 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
       .filter(el => {
         const cs = getComputedStyle(el);
         // (A row of cards made to slide: a flex row, a grid flowing by
-        // column, or one snapping sideways, as Play's 為你推薦 and
-        // Securities' 全球行情 are.)
+        // column, or one snapping sideways, as Securities'
+        // 全球行情 is.)
         const row = (cs.display.includes('flex') && cs.flexDirection === 'row' && cs.flexWrap === 'nowrap') || (cs.display.includes('grid') && cs.gridAutoFlow.startsWith('column')) || /^x\b/.test(cs.scrollSnapType);
         // (And a table made to slide under a pinned first column, as Sports' box scores.)
         const cell = el.querySelector(':scope > table tr > :first-child');

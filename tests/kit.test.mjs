@@ -18,7 +18,7 @@ test('the pool is every entry and every app figure', () => {
 test('recommendations follow affinity, stay diverse, and learn from dismissals', () => {
   store.clear();
   const now = Date.UTC(2026, 9, 1);
-  for (let i = 0; i < 5; i++) kit.recordAffinity('odds', ['team:mlb:LAD', 'league:mlb'], 1, now);
+  for (let i = 0; i < 5; i++) kit.recordAffinity('match', ['team:mlb:LAD', 'league:mlb'], 1, now);
   kit.recordAffinity('match', ['league:epl'], 1, now);
   const items = [
     ...Array.from({ length: 6 }, (_, i) => ({ id: `lad${i}`, keys: ['team:mlb:LAD', 'league:mlb'], quality: 0.5, group: 'LAD' })),

@@ -24,16 +24,13 @@
 import { json } from './http.js';
 import { sessionLimited } from './orbit-token.js';
 import { sha256, gunzip } from './builders/store.js';
-import { BOARD_PATH } from './kit/play-boardfile.mjs';
 
 const TYPES = { json: 'application/json', gz: 'application/gzip', txt: 'text/plain; charset=utf-8', html: 'text/html; charset=utf-8' };
 const typeOf = path => TYPES[/\.([a-z]+)$/.exec(path)?.[1]] || 'application/octet-stream';
-// How long a phone and the edge keep a file: Play's board (built every ten
-// minutes, its odds the freshest thing here) a minute, then served stale
-// while the next is read; an index a few minutes (a new build is seen soon),
-// the rest ten.
-const maxAge = path => (path === BOARD_PATH ? 60 : /(^|\/)index\.json$|watch\.json$|unread\.json$/.test(path) ? 120 : 600);
-export const cacheControl = path => `public, max-age=${maxAge(path)}${path === BOARD_PATH ? ', stale-while-revalidate=300' : ''}`;
+// How long a phone and the edge keep a file: an index a few minutes (a new
+// build is seen soon), the rest ten.
+const maxAge = path => (/(^|\/)index\.json$|watch\.json$|unread\.json$/.test(path) ? 120 : 600);
+export const cacheControl = path => `public, max-age=${maxAge(path)}`;
 export const READS_PER_MIN = 900;
 const DELETE = 0xffffffff;
 

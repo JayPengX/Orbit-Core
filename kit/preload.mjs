@@ -1,8 +1,8 @@
 // A build tool (each app's deploy, never served): the kit modules an app's
 // first screen imports, listed in the page as modulepreload, so the browser
 // asks for them all with the page instead of finding them one import level
-// at a time (Play's chain play-sources → play-kambi → play-house → settle →
-// play-odds → play-rules was five round trips after the app's own files).
+// at a time (a chain five modules deep was five round trips after the app's
+// own files).
 //
 //   import { kitPreloads } from '<kit>/preload.mjs';
 //   html = html.replace('<!-- /kit:head -->', `<!-- /kit:head -->\n${await kitPreloads([entry…], kitDir)}`);

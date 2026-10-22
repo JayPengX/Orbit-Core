@@ -119,7 +119,7 @@ export function emptyWallet(now = Date.now()) {
 // `eco:wpay:<Monday>`. A new pass (v2) gets its opening money here too.
 // Securities shows all of it (its 資金 tab); the Pass shows no money.
 //
-// The economy (tools/economy.mjs has the numbers): NT$200,000 to open and a
+// The economy: NT$200,000 to open and a
 // fixed NT$10,000 a week, the same for every account whatever it holds, like
 // a salary.
 // Money beyond that is borrowed (信貸, kit/loan.mjs: repaid from the pay) or

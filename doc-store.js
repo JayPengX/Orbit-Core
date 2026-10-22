@@ -1,4 +1,4 @@
-// The Pass's store (every wallet, each app's data, Play's slips, the config):
+// The Pass's store (every wallet, each app's data, the config):
 // documents of one text `payload` each, by collection and id, in Cloudflare
 // D1 (binding STORE, database quadra-store).
 //
@@ -145,7 +145,7 @@ export async function changeDoc(env, deps, collection, id, change, { read = v =>
 // time) lists is written again as `<to>_<id>` with `account: to`, the old
 // one deleted, and the index changed to match. How many moved.
 // (`all`: also the account's documents the index doesn't name, found by one
-// listing of the collection's ids: Play's scratch cards, kept until revealed.)
+// listing of the collection's ids.)
 export async function moveOwned(env, deps, collection, indexId, from, to, { all = false } = {}) {
   const asIndex = v => (v && typeof v.due === 'object' ? v : { due: {} });
   const index = asIndex(parseDoc(await deps.fsGet(env, collection, indexId)));

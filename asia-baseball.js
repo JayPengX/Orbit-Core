@@ -1,5 +1,5 @@
 // Asian baseball's schedules and scores from the leagues' own sites, as one
-// shape for Orbit Sports and Play. Kambi (Play's odds feed) only lists a
+// shape for Orbit Sports. Kambi only lists a
 // game a day or so ahead and drops it after, and ESPN doesn't carry these
 // leagues, so without this Orbit Sports had "no recent games" mid-season.
 //

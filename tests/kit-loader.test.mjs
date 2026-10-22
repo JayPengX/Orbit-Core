@@ -38,7 +38,7 @@ test('every served module loads in Node on its own (the Worker and the tests imp
   for (const name of served) await import(new URL(name, KIT));
 });
 
-test("the preload graph follows the kit's own imports (Play's chain to the odds)", async () => {
-  const found = await kitGraph([new URL('play-sources.mjs', KIT).pathname], new URL('.', KIT).pathname);
-  for (const name of ['play-kambi.mjs', 'play-house.mjs', 'settle.mjs', 'play-odds.mjs', 'play-rules.mjs']) assert.ok(found.has(name), name);
+test("the preload graph follows the kit's own imports", async () => {
+  const found = await kitGraph([new URL('sports-highlights.mjs', KIT).pathname], new URL('.', KIT).pathname);
+  for (const name of ['sports-broadcast.mjs', 'names.mjs']) assert.ok(found.has(name), name);
 });

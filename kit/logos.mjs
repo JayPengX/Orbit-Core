@@ -1,7 +1,7 @@
 // Orbit's logos, for every app that shows a team, a league or a driver
-// (Quadra Play and Orbit Sports): ESPN's logo files, TheSportsDB's club
+// (Orbit Sports): ESPN's logo files, TheSportsDB's club
 // and league badges for what ESPN doesn't carry, national flags, and the F1
-// grid's colours. Keys are Quadra Play's league keys (Orbit Sports maps its own
+// grid's colours. Keys are the catalogue's `bet` keys (Orbit Sports maps its own
 // to them). Part of the shared kit.
 
 // Strips club-suffix boilerplate so ESPN's "Liverpool" matches Polymarket's
@@ -187,7 +187,7 @@ export const F1_TEAMS = {
 // Driver names as Taiwan's broadcasts and press say them (羅素, 安東內利).
 // Not shown any more: the apps name drivers in English, as every other
 // sport's players (the owner's call, 2026-10). Kept for reading back what
-// was saved in Chinese (a Play ticket's "羅素") and for older copies of the
+// was saved in Chinese ("羅素") and for older copies of the
 // apps that import it.
 const F1_ZH = {
   Russell: '羅素',

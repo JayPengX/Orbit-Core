@@ -1603,7 +1603,7 @@ function drawDev() {
   // How far behind ESPN a live game is, worst case and on average, by the draft.
   const proxy = devDraft.proxyLive || 5;
   $('dev-lag').replaceChildren(
-    ...[['比賽頁', devDraft.sportsGame], ['列表', devDraft.sportsList], ['Play', devDraft.playLive]].map(([n, poll]) =>
+    ...[['比賽頁', devDraft.sportsGame], ['列表', devDraft.sportsList]].map(([n, poll]) =>
       el('div', {}, [el('small', { text: `${n} · 最慢 / 平均` }), el('strong', { text: `${proxy + poll} / ${Math.round((proxy + poll) / 2)} 秒` })])
     ),
     el('div', {}, [el('small', { text: 'F1 看板 · 最慢' }), el('strong', { text: `${4 + devDraft.f1Board} 秒` })])
@@ -1695,7 +1695,7 @@ $('dev-save').onclick = () =>
 
 // ---- 系統 (ops.js) ----
 const GH = 'https://api.github.com/repos/JayPengX/';
-const REPOS = [['Shared-Proxy', 'Workers 與共用套件'], ['Orbit-Sports', 'Orbit Sports'], ['Quadra-Play', 'Quadra Play'], ['Orbit-Securities', 'Orbit 證券'], ['Orbit-Words', 'Orbit Words'], ['Orbit-Class', 'Orbit Class'], ['Orbit-Weather', 'Orbit Weather'], ['Orbit-Transit', 'Orbit Transit'], ['Orbit-Beats', 'Orbit Beats'], ['Orbit-Slips', 'Orbit Slips'], ['Orbit-Law', 'Orbit Law']];
+const REPOS = [['Shared-Proxy', 'Workers 與共用套件'], ['Orbit-Sports', 'Orbit Sports'], ['Orbit-Securities', 'Orbit 證券'], ['Orbit-Words', 'Orbit Words'], ['Orbit-Class', 'Orbit Class'], ['Orbit-Weather', 'Orbit Weather'], ['Orbit-Transit', 'Orbit Transit'], ['Orbit-Beats', 'Orbit Beats'], ['Orbit-Law', 'Orbit Law']];
 const getJ = async (url, ms = 8000) => { const r = await fetch(url, { signal: AbortSignal.timeout(ms), cache: 'no-store' }); if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); };
 // GitHub's open API: 60 reads an hour from here, kept two minutes.
 async function gh(path) {
@@ -1714,7 +1714,7 @@ const runRow = (r, label) => el('li', {}, [el('span', { class: `dot ${runDot(r)}
 const BILL_NAME = { requests: 'Workers 請求', cpuMs: 'Workers CPU', kvRead: 'KV 讀取', kvWrite: 'KV 寫入', kvDelete: 'KV 刪除', kvList: 'KV 列出', kvBytes: 'KV 儲存', doRequests: 'Durable Objects 請求', doBytes: 'Durable Objects 儲存', r2ClassA: 'R2 寫入', r2ClassB: 'R2 讀取', r2Bytes: 'R2 儲存', d1RowsRead: 'D1 讀取', d1RowsWritten: 'D1 寫入', d1Bytes: 'D1 儲存' };
 const PACE_WORD = ['照設定', '放慢 ×2，可以等的建置暫停', '放慢 ×4，建置全停，每個人讀取減半', '放慢 ×8，讀取剩四分之一'];
 // Each job: its name, and how long between runs before it's late.
-const JOBS = { kambi: ['Kambi 比分', 10], notices: ['通知', 10], settle: ['Play 結算', 15], lottery: ['彩券開獎', 15], alerts: ['帳單警示', 30], f1: ['F1 圈速（週四到週一）', 10], 'weather-skill': ['天氣評分（每小時）', 120], capacity: ['容量（每 6 小時）', 420], 'build:watch': ['建置：精華連結（每小時）', 120], 'build:cutouts': ['建置：去背照片（每小時）', 120], 'build:buses': ['建置：公車（每小時）', 120], 'build:daily': ['建置：每日（賽程、CPBL、照片、勝率）', 120] };
+const JOBS = { notices: ['通知', 10], alerts: ['帳單警示', 30], f1: ['F1 圈速（週四到週一）', 10], 'weather-skill': ['天氣評分（每小時）', 120], capacity: ['容量（每 6 小時）', 420], 'build:watch': ['建置：精華連結（每小時）', 120], 'build:cutouts': ['建置：去背照片（每小時）', 120], 'build:buses': ['建置：公車（每小時）', 120], 'build:daily': ['建置：每日（賽程、CPBL、照片、勝率）', 120] };
 // F1's laps run Thursday to Monday, UTC (worker.js's F1_DAYS): the other days it rests, never late.
 const restsToday = (b, now) => b.job === 'f1' && ![0, 1, 4, 5, 6].includes(new Date(now).getUTCDay());
 const isLate = (b, now) => !restsToday(b, now) && now - b.at > (JOBS[b.job]?.[1] || 120) * 60_000;
@@ -1724,7 +1724,7 @@ const SECRET_GROUPS = [
   ['台灣的開放資料', ['CWA_KEY', 'MOENV_KEY', 'TDX_CLIENT_ID', 'TDX_CLIENT_SECRET']],
   ['退場中（12/6 自動移除）', ['FIREBASE_PRIVATE_KEY']]
 ];
-const BIND_WORD = { STORE: 'D1 資料庫（Pass、Play、設定）', DATA: 'R2 資料（quadra-data）', RATE_LIMIT_KV: 'KV（通知、帳單狀態、快取）', F1_LOG: 'F1 圈速紀錄（Durable Object）', GEMINI_RELAY: 'Gemini 台灣中繼', GUARD: '帳單保護（quota-guard）' };
+const BIND_WORD = { STORE: 'D1 資料庫（Pass、設定）', DATA: 'R2 資料（quadra-data）', RATE_LIMIT_KV: 'KV（通知、帳單狀態、快取）', F1_LOG: 'F1 圈速紀錄（Durable Object）', GEMINI_RELAY: 'Gemini 台灣中繼', GUARD: '帳單保護（quota-guard）' };
 // A job's note (its result, JSON) as words: "watched 0 · sent 2"; an error as it is.
 const noteText = note => {
   try {
@@ -1842,7 +1842,7 @@ $('sys-actions').replaceChildren(
   })
 );
 const LINKS = [
-  ['Orbit Sports', '/Orbit-Sports/'], ['Quadra Play', '/Quadra-Play/'], ['Orbit 證券', '/Orbit-Securities/'], ['Orbit Words', '/Orbit-Words/'], ['Orbit Class', '/Orbit-Class/'], ['Orbit Weather', '/Orbit-Weather/'], ['Orbit Transit', '/Orbit-Transit/'],
+  ['Orbit Sports', '/Orbit-Sports/'], ['Orbit 證券', '/Orbit-Securities/'], ['Orbit Words', '/Orbit-Words/'], ['Orbit Class', '/Orbit-Class/'], ['Orbit Weather', '/Orbit-Weather/'], ['Orbit Transit', '/Orbit-Transit/'],
   ['Shared-Proxy Actions', 'https://github.com/JayPengX/Shared-Proxy/actions'],
   ['Cloudflare Workers', 'https://dash.cloudflare.com/?to=/:account/workers-and-pages'], ['Cloudflare D1', 'https://dash.cloudflare.com/?to=/:account/workers/d1'], ['Cloudflare R2', 'https://dash.cloudflare.com/?to=/:account/r2/overview'], ['Cloudflare 帳單', 'https://dash.cloudflare.com/?to=/:account/billing'], ['Cloudflare 通知', 'https://dash.cloudflare.com/?to=/:account/notifications'], ['GitHub', 'https://github.com/JayPengX?tab=repositories']
 ];

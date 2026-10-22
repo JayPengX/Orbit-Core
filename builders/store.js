@@ -45,7 +45,7 @@ export function r2Store(bucket) {
     },
     // Written when changed: data (an object, written as JSON) or bytes.
     // `always`: written whatever the sum (a file whose `built` stamp is its
-    // heartbeat, the Play board's: phones read how old it is).
+    // heartbeat: phones read how old it is).
     async put(path, data, { always = false } = {}) {
       let b = data instanceof Uint8Array ? data : enc.encode(typeof data === 'string' ? data : JSON.stringify(data));
       if (path.endsWith('.gz') && !isGz(b)) b = await gzip(b);
