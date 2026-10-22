@@ -87,6 +87,7 @@ test('US at 國泰 to 2026-12-31: a stock 0.08% with no minimum, an ETF US$3 a t
 
 test('plans: listed shares only in Taiwan and the US; a US one from US$10, bought in fractional shares, which sell down to 0.0001', () => {
   assert.equal(SA.planAllowed({ market: 'JP', kind: 'stock' }), false);
+  assert.equal(['fut', 'opt', 'warrant', 'cb'].some(kind => SA.planAllowed({ market: kind === 'fut' || kind === 'opt' ? 'TAIFEX' : 'TW', kind })), false);
   assert.equal(SA.planAllowed({ market: 'US', kind: 'etf' }) && SA.planAllowed({ market: 'TW', kind: 'stock' }) && SA.planAllowed({ market: 'JP', kind: 'fund' }), true);
   const acc = SA.newAccount(1_000_000, NOW - 800 * DAY, 'acc');
   assert.equal(SA.setPlan(acc, { symbol: '7203.T', amount: 10_000, day: 5, market: 'JP', kind: 'stock' }).error, 'planMarket');

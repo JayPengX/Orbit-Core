@@ -2279,7 +2279,9 @@ export const PLAN_MAX_CATCHUP = 24;
 // US$10 a buy (國泰, 2026), its NT$ exchanged first.
 export const PLAN_MARKETS = ['TW', 'US'];
 export const PLAN_MIN_LOCAL = { US: 10 };
-export const planAllowed = ({ market, kind } = {}) => !LISTED.has(kind) || PLAN_MARKETS.includes(market);
+// (Never a future, an option, a warrant or a convertible: no broker plans those.)
+const NO_PLAN = new Set(['fut', 'opt', 'warrant', 'cb']);
+export const planAllowed = ({ market, kind } = {}) => !NO_PLAN.has(kind) && (!LISTED.has(kind) || PLAN_MARKETS.includes(market));
 const MARKET_CURRENCY = { US: 'USD' };
 // The least NT$ a plan's buy can be: NT$100, or what exchanges for US$10
 // at `twd` NT$ a dollar (a US one).
