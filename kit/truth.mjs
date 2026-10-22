@@ -9,6 +9,7 @@ import { BASE_CUT } from './play-rules.mjs';
 import { SLIP_RULES } from './play-odds.mjs';
 import { DEFAULT_PENALTY } from './stock-account.mjs';
 import { CARDS, CARD_ORDER, onSale, expectedReturn } from './play-scratch.mjs';
+import { OFF_RECORD, offRecord } from './gov.mjs';
 
 // ---- Quadra Play's prices (its lib/rules.mjs, odds.mjs) ---------------------
 //
@@ -72,23 +73,8 @@ export function roundTrip(amount, { dayTrade = false } = {}) {
 // and its lottery tickets and prizes, the old Plus fees (less its refund),
 // overdraft interest, and the three sides of the money (the kit's
 // moneySides).
-// Test slips the owner asked off the record (2026-10-20): his 1.08 single
-// for NT$28,630 placed that morning, paid NT$30,920. Found by its wallet
-// entries; the wallet keeps them (the balance doesn't move), the record
-// (here and Play's account) leaves them out.
-export const OFF_RECORD = [{ day: '2026-10-20', cost: 28_630, paid: 30_920 }];
-export function offRecord(wallet) {
-  const entries = (wallet?.entries || []).filter(e => e?.app === 'odds' && typeof e.id === 'string');
-  const paid = new Map(entries.filter(e => e.id.startsWith('odds:payout-')).map(e => [e.id.slice(12), e.amount]));
-  const out = new Set();
-  for (const e of entries) {
-    if (!e.id.startsWith('odds:stake-') || !Number.isFinite(new Date(e.t).getTime())) continue;
-    const id = e.id.slice(11);
-    const day = new Date(e.t).toISOString().slice(0, 10);
-    if (OFF_RECORD.some(x => x.day === day && -e.amount === x.cost && paid.get(id) === x.paid)) out.add(id);
-  }
-  return out;
-}
+// Test slips the owner asked off the record: kit/gov.mjs's list.
+export { OFF_RECORD, offRecord };
 const slipOfId = id => /^odds:(?:stake|payout|refund|tax|plus\w*|cashout)-(.+)$/.exec(id || '')?.[1];
 
 export function record(wallet) {
