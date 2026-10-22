@@ -23,7 +23,8 @@
 
 export const SESSION_MS = 20 * 60_000;
 // A session run out is still good this long for reading public data through
-// /sports-proxy (scores, prices, odds: nothing of the account's): an app
+// /sports-proxy, /weather and /transit (scores, prices, odds, forecasts,
+// buses: nothing of the account's): an app
 // opened again after a while reads with the token it kept, not after a
 // sign-in round trip first (1-2 s on a phone's link). Writes and /eco never.
 export const READ_GRACE_MS = 6 * 3_600_000;
