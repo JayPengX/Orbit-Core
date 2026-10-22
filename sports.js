@@ -51,9 +51,6 @@ const ROTOWIRE_NBA = '/basketball/nba-lineups.php';
 const SPORTS_PROXY_FETCH_USER_AGENT = 'Orbit-Sports-Bot/1.0 (+https://github.com/JayPengX/Orbit-Sports)';
 const SPORTS_PROXY_ALLOWED_HOSTS = [
   'site.api.espn.com',
-  // Per-fixture odds (Match Find's pre-game line for games already in
-  // progress - the scoreboard drops it once a game starts).
-  'sports.core.api.espn.com',
   'statsapi.mlb.com',
   'api.jolpi.ca',
   'gamma-api.polymarket.com',
@@ -179,11 +176,8 @@ const CACHE_SCHEDULE = { tier: 'schedule', fresh: 10 * MINUTE, stale: DAY };
 const CACHE_SEASON = { tier: 'season', fresh: 3 * MINUTE, stale: 30 * MINUTE };
 const CACHE_STANDINGS = { tier: 'standings', fresh: 30 * MINUTE, stale: DAY };
 const CACHE_TEAM_SCHEDULE = { tier: 'team-schedule', fresh: 3 * MINUTE, stale: DAY };
-// ESPN core odds is only ever asked for a game's PRE-game line, which
-// can't change once the game has started.
-const CACHE_PREGAME_LINE = { tier: 'pregame-line', fresh: HOUR, stale: DAY };
-// A side's roster for one game (ESPN core): its starters are marked as the
-// team announces them, half an hour before an NBA tip-off (Sports' 先發陣容).
+// A side's five for one game (RotoWire): confirmed as the team announces
+// it, half an hour before an NBA tip-off (Sports' 先發陣容).
 const CACHE_LINEUP = { tier: 'lineup', fresh: MINUTE, stale: 10 * MINUTE };
 // Pre-match odds from Kambi's list views move slowly (minutes, not seconds),
 // and every viewer asks for the same few leagues: one upstream fetch every 2
@@ -279,8 +273,6 @@ function cachePolicyFor(url) {
       // A team's injuries on game day (Sports' game sheet reads its roster for them): minutes.
       if (url.pathname.endsWith('/roster') && url.searchParams.get('enable') === 'injuries') return CACHE_TEAM_SCHEDULE;
       return url.pathname.endsWith('/scoreboard') ? scoreboardPolicy(url) : url.pathname.endsWith('/schedule') ? CACHE_TEAM_SCHEDULE : CACHE_STANDINGS;
-    case 'sports.core.api.espn.com':
-      return /\/competitors\/\d+\/roster$/.test(url.pathname) ? CACHE_LINEUP : CACHE_PREGAME_LINE;
     case 'statsapi.mlb.com':
       // A day's games with their linescore (Sports' live count, runners,
       // batter and pitcher when ESPN's feed leaves them out): live.
@@ -1074,7 +1066,7 @@ async function fetchUpstream(upstreamUrl, trim) {
         ? await translateUpstream(upstreamUrl)
         : await fetchAllowed(upstreamUrl, {
           // YouTube in English, past its cookie notice, as a browser sees it.
-          headers: upstreamUrl.hostname === YT_HOST ? { 'User-Agent': BROWSER_UA, 'Accept-Language': 'en-US,en;q=0.9', Cookie: 'SOCS=CAI; CONSENT=YES+' } : upstreamUrl.hostname === ROTOWIRE_HOST || upstreamUrl.hostname === 'sports.core.api.espn.com' ? { 'User-Agent': BROWSER_UA, Accept: '*/*' } : { 'User-Agent': SPORTS_PROXY_FETCH_USER_AGENT },
+          headers: upstreamUrl.hostname === YT_HOST ? { 'User-Agent': BROWSER_UA, 'Accept-Language': 'en-US,en;q=0.9', Cookie: 'SOCS=CAI; CONSENT=YES+' } : upstreamUrl.hostname === ROTOWIRE_HOST ? { 'User-Agent': BROWSER_UA, Accept: '*/*' } : { 'User-Agent': SPORTS_PROXY_FETCH_USER_AGENT },
           signal: AbortSignal.timeout(SPORTS_PROXY_UPSTREAM_TIMEOUT_MS)
         });
   } catch (error) {

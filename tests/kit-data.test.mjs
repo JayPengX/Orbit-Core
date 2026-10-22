@@ -91,3 +91,12 @@ test('signing out wipes the device but its language, safe area and kit version',
   assert.deepEqual([...local.keys()].sort(), ['quadra.kit', 'quadra.lang', 'quadra.safeBottom']);
   assert.equal(stores.has('quadra-data-v1'), false);
 });
+
+// ESPN's core API refuses the proxy (403, 2026-10-22): read from the device itself.
+test('an ESPN core API read goes straight to ESPN, never through the proxy', async () => {
+  const url = 'https://sports.core.api.espn.com/v2/sports/racing/leagues/f1/events/1/competitions/2/competitors/3/statistics';
+  asked.length = 0;
+  answer = () => new Response('{"splits":{}}');
+  assert.deepEqual(await kit.proxyJson(url, { ttl: 1 }), { splits: {} });
+  assert.deepEqual(asked, [url]);
+});
