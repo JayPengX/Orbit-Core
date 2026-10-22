@@ -265,10 +265,48 @@ function directRead(url) {
     directNext();
   });
 }
+// Each answer also kept on the device (the kit's data cache): a day two or
+// more back, final, is read from there at any age; a nearer one when it's
+// under 10 minutes old; any copy when TheSportsDB refuses. CPBL's month on
+// a phone was 14 day lists two at a time at every opening (3 s and more on
+// a phone's link, the proxy refused all October).
+const DEVICE_CACHE = 'quadra-data-v1';
+const deviceKey = url => `https://quadra.data/${encodeURIComponent(url)}`;
+async function deviceCopy(url) {
+  try {
+    const hit = await (await caches.open(DEVICE_CACHE)).match(deviceKey(url));
+    return hit ? { at: Number(hit.headers.get('x-at')) || 0, data: await hit.json() } : null;
+  } catch {
+    return null;
+  }
+}
+function keepOnDevice(url, data) {
+  caches
+    .open(DEVICE_CACHE)
+    .then(c => c.put(deviceKey(url), new Response(JSON.stringify(data), { headers: { 'content-type': 'application/json', 'x-at': String(Date.now()) } })))
+    .catch(() => {});
+}
+const settledDay = url => {
+  const d = /[?&]d=(\d{4}-\d{2}-\d{2})/.exec(url)?.[1];
+  return Boolean(d && d < new Date(Date.now() + 8 * 3_600_000 - 2 * 86_400_000).toISOString().slice(0, 10));
+};
+async function directKept(url) {
+  const onDevice = typeof caches !== 'undefined' && typeof Response !== 'undefined';
+  const saved = onDevice ? await deviceCopy(url) : null;
+  if (saved && (settledDay(url) || Date.now() - saved.at < 10 * 60_000)) return saved.data;
+  try {
+    const data = await directRead(url);
+    if (onDevice) keepOnDevice(url, data);
+    return data;
+  } catch (error) {
+    if (saved) return saved.data;
+    throw error;
+  }
+}
 function directJson(url) {
   const hit = directCache.get(url);
   if (hit && Date.now() - hit.at < 10 * 60_000) return hit.p;
-  const p = directRead(url);
+  const p = directKept(url);
   directCache.set(url, { at: Date.now(), p });
   p.catch(() => directCache.delete(url));
   return p;
