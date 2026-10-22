@@ -6,8 +6,8 @@
 //          and this account's own record (truth.mjs)
 //   App    every app, Quadra's and Orbit's, when it was last used, a way in
 //   說明   every app's guide (help.mjs)
-import { APPS, AVATARS, FRAMES, VIP, money, vipStatus, vipName, worthOf, WEALTH_RANKS, OVERDRAFT_RATE, ECONOMY, settingPatch, passAccount, appIcon, el as node } from '#kit/quadra.mjs';
-import { PLAY, STOCK, houseKeep, roundTrip, scratchBacks, record, overdraftYear, vipShare } from './truth.mjs';
+import { APPS, AVATARS, FRAMES, money, worthOf, WEALTH_RANKS, OVERDRAFT_RATE, ECONOMY, settingPatch, passAccount, appIcon, el as node } from '#kit/quadra.mjs';
+import { PLAY, STOCK, houseKeep, roundTrip, scratchBacks, record, overdraftYear } from './truth.mjs';
 import { LOAN, RELIEF, PAY_WEEK, schedule, totalApr, debtOf } from './loan.mjs';
 import { HELP_ORDER, helpFor } from './help.mjs';
 import { sheet, section } from './ui.mjs';
@@ -89,12 +89,6 @@ export const STRINGS = {
     yourTicketsSub: '買了 {paid}，中了 {won}',
     lotteryFoot: '刮刮樂最常開出的是「中回本」（獎金等於票價）和只差一個的牌面，讓你覺得快中了、再買一張；越貴的卡回收率越高，是要讓你買貴的。',
     lotterySub: '每 NT$100 長期平均拿回多少。',
-    freeTitle: 'VIP 回饋',
-    vipSub: '投注 {min} 起；莊家每留下 NT$100，只還你 {per}',
-    yourVip: '你本月的 VIP',
-    yourVipSub: '本月投注 {stakes}，下個月回饋 {back}',
-    freeFoot: 'VIP 每月歸零，月底差一點升級時，你會想多下一點。',
-    freeSub: 'Play 唯一還會還你的錢：每月照投注量退一點。免費投注、加成、提前兌現和 Quadra Plus 都已取消，跟台灣運彩一樣。',
     stockTitle: '交易成本',
     tripCost: 'NT$100,000 台股買進再賣出',
     tripCostSub: '手續費 {fee} + 證交稅 {tax}，一來一回 {share}',
@@ -119,7 +113,6 @@ export const STRINGS = {
     usedToday: '今天用過',
     usedDaysAgo: '{n} 天前用過',
     statusStock: '現金 {cash} · 持股 {held}',
-    statusStakes: '本月投注 {v}',
     neverUsed: '還沒用過',
     guide: '說明',
     open: '打開',
@@ -167,8 +160,6 @@ export const STRINGS = {
     frame_candy: '糖果',
     frame_lava: '熔岩',
     frame_skylantern: '天燈',
-    trick_vip: 'VIP 等級',
-    trickHow_vip: '每月歸零的等級，讓你在月底為了升級多下注；回饋只是抽成的一小部分。',
     trick_nearmiss: '差一點就中',
     trickHow_nearmiss: '刮刮樂的牌面常有兩個一樣、只差一個就中的組合，真的刮刮樂也這樣排，讓你覺得運氣快來了。',
     trick_notify: '通知與連續天數',
@@ -265,12 +256,6 @@ export const STRINGS = {
     yourTicketsSub: 'Spent {paid}, won {won}',
     lotteryFoot: 'The commonest scratch card wins are “your money back” (a prize the size of the price) and faces one short of a win, so another card feels due; dearer cards pay back more, to sell you the dearer ones.',
     lotterySub: 'What comes back of every NT$100, on average, over time.',
-    freeTitle: 'VIP cashback',
-    vipSub: 'From {min} staked; for every NT$100 the house keeps, {per} comes back',
-    yourVip: 'Your VIP this month',
-    yourVipSub: 'Staked {stakes} this month: {back} back next month',
-    freeFoot: 'VIP tiers start again every month, so just short of the next one at the month’s end, you’ll want to bet a little more.',
-    freeSub: 'The only money Play still gives back: a little of each month’s stakes. Free bets, boosts, cash out and Quadra Plus are gone, as at Taiwan Sports Lottery.',
     stockTitle: 'Trading costs',
     tripCost: 'NT$100,000 of a Taiwan stock, bought and sold',
     tripCostSub: 'Commission {fee} + transaction tax {tax}: {share} of it there and back',
@@ -295,7 +280,6 @@ export const STRINGS = {
     usedToday: 'Used today',
     usedDaysAgo: 'Used {n} days ago',
     statusStock: 'Cash {cash} · holdings {held}',
-    statusStakes: 'Staked this month {v}',
     neverUsed: 'Not used yet',
     guide: 'Guide',
     open: 'Open',
@@ -343,8 +327,6 @@ export const STRINGS = {
     frame_candy: 'Candy',
     frame_lava: 'Lava',
     frame_skylantern: 'Sky lantern',
-    trick_vip: 'VIP tiers',
-    trickHow_vip: 'Tiers that start again every month make you bet more at the month’s end to reach one; the cashback is a sliver of the cut.',
     trick_nearmiss: 'Near misses',
     trickHow_nearmiss: 'Scratch card faces often show two of a kind, one short of a win, as real cards do, so luck feels close.',
     trick_notify: 'Notices and streaks',
@@ -519,7 +501,6 @@ function renderTruth(box, { t, state }) {
   const legs = [1, 2, 3, 5, 7];
   const trip = roundTrip(100_000);
   const dayTrip = roundTrip(100_000, { dayTrade: true });
-  const vip = vipStatus(w);
   put(
     box,
     el('div', { class: 'truth-hero' }, [el('strong', { text: t('truthTitle') }), el('p', { text: t('truthLead') })]),
@@ -562,17 +543,6 @@ function renderTruth(box, { t, state }) {
       { sub: t('lotterySub') }
     ),
     section(
-      t('freeTitle'),
-      facts(
-        [
-          ...VIP.tiers.map(tier => row(vipName(tier, state.locale), pct(tier.back), t('vipSub', { min: money(tier.min), per: money(Math.round(vipShare(tier) * 100)) }))),
-          vip.tier ? row(t('yourVip'), vipName(vip.tier, state.locale), t('yourVipSub', { stakes: money(vip.stakes), back: money(vip.back) })) : null
-        ],
-        t('freeFoot')
-      ),
-      { sub: t('freeSub') }
-    ),
-    section(
       t('stockTitle'),
       facts(
         [
@@ -599,7 +569,7 @@ function renderTruth(box, { t, state }) {
     section(t('ranksTitle'), ranksCard(t, w, state.locale), { sub: t('ranksSub', { start: money(ECONOMY.start), next: money(WEALTH_RANKS[1].min) }) })
   );
 }
-const TRICKS = ['installment', 'vip', 'nearmiss', 'notify'];
+const TRICKS = ['installment', 'nearmiss', 'notify'];
 const sideRow = (icon, label, value, sub, cls = '') => el('div', { class: `side-row ${cls}` }, [el('span', { class: 'side-icon', 'aria-hidden': 'true', text: icon }), el('span', { class: 'side-text' }, [el('strong', { text: label }), el('small', { class: 'muted', text: sub })]), el('strong', { class: 'num', text: value })]);
 
 // 政府: three tiles (paid, given, net), then every tax and payment with a bar
@@ -682,11 +652,7 @@ const ago = (t, then) => {
 function renderApps(box, { q, t, locale, state, openHelp }) {
   const w = state.wallet;
   const status = {
-    stock: () => (w.snap?.stock ? t('statusStock', { cash: money(w.snap.stock.cash || 0), held: money(w.snap.stock.holdings || 0) }) : ''),
-    odds: () => {
-      const v = vipStatus(w);
-      return [t('statusStakes', { v: money(v.stakes) }), v.tier ? vipName(v.tier, locale) : ''].filter(Boolean).join(' · ');
-    }
+    stock: () => (w.snap?.stock ? t('statusStock', { cash: money(w.snap.stock.cash || 0), held: money(w.snap.stock.holdings || 0) }) : '')
   };
   const card = ([id, a]) => {
     const last = w.apps?.[id]?.last;

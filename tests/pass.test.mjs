@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} };
-const { houseKeep, roundTrip, record, overdraftYear, vipShare } = await import('../kit/truth.mjs');
+const { houseKeep, roundTrip, record, overdraftYear } = await import('../kit/truth.mjs');
 const { HELP, HELP_ORDER } = await import('../kit/help.mjs');
 const kit = await import('#kit/quadra.mjs');
 const brand = await import('../kit/brand.mjs');
@@ -18,7 +18,6 @@ test('truth: what the house keeps, what trading costs', () => {
   // The commission minimum still applies.
   assert.equal(roundTrip(1_000).fee, 40);
   assert.ok(overdraftYear() > 0.12 && overdraftYear() < 0.13);
-  assert.ok(kit.VIP.tiers.every(t => vipShare(t) < 0.15));
 });
 
 test('truth: this account’s own record from the wallet', () => {

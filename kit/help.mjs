@@ -8,7 +8,7 @@
 //   …       what's particular to it (a few topics)
 //   money   「錢怎麼算」: how it touches the one Quadra wallet
 // (The Quadra Pass's own guide: what, tabs, devices, one, net, notify, safe,
-// looks, vip, money.)
+// looks, welcome, money.)
 //
 // HELP[app][lang] = [[topic id, title, [paragraphs]], …]
 
@@ -53,12 +53,11 @@ export const HELP = {
       ['looks', '頭像與頭像框', [
         '在 Quadra Pass 的「外觀」挑頭像和頭像框，全部免費、隨時換；戴上後每個 App 的帳戶按鈕都看得到。再點一次就拿下。'
       ]],
-      ['vip', 'VIP 投注回饋與新手禮', [
-        'VIP 不用加入也不用付費：每個月在 Play 的投注（運彩、彩券、刮刮樂，退款不算）決定當月等級，下個月第一次打開任何 App 時回饋當月投注額的一部分：銅卡 NT$10,000 起 0.5%、銀卡 NT$50,000 起 0.8%、金卡 NT$150,000 起 1.2%、黑卡 NT$500,000 起 1.5%。Play 首頁的餘額卡上看得到本月等級和離下一級還差多少。',
+      ['welcome', '新手禮', [
         '新手禮：在 Securities 的第一筆交易免手續費（稅和規費照收）。'
       ]],
       ['money', '錢怎麼算', [
-        '所有 App 共用一個新台幣錢包。新帳號開戶金 NT$200,000；每週一固定發薪 NT$10,000，跟薪水一樣，存多存少都一樣。系統發的錢只有這些：開戶金、週薪、財富等級獎勵（身價第一次到達一個等級時送一次：NT$30 萬小資族 NT$3,000、50 萬穩健 NT$5,000、百萬 NT$10,000、300 萬富裕 NT$20,000、千萬 NT$50,000、一億 NT$100,000；舊等級領過的獎勵會抵掉）、Play 的 VIP 回饋，和真的一無所有時的急難紓困。週薪在那週第一次打開任何 App 時入帳，沒打開的週下次補發。',
+        '所有 App 共用一個新台幣錢包。新帳號開戶金 NT$200,000；每週一固定發薪 NT$10,000，跟薪水一樣，存多存少都一樣。系統發的錢只有這些：開戶金、週薪、財富等級獎勵（身價第一次到達一個等級時送一次：NT$30 萬小資族 NT$3,000、50 萬穩健 NT$5,000、百萬 NT$10,000、300 萬富裕 NT$20,000、千萬 NT$50,000、一億 NT$100,000；舊等級領過的獎勵會抵掉），和真的一無所有時的急難紓困。週薪在那週第一次打開任何 App 時入帳，沒打開的週下次補發。',
         '「真相」把你的錢分成四方：系統發的、和 Quadra 的輸贏（Play 的稅前輸贏，扣掉透支利息和信貸利息）、政府（中獎稅、證交稅、股利扣繳和二代健保，減去急難紓困），和你自己的成績（投資的漲跌）。',
         '餘額可以是負的（透支），每月計息 1%。就像交割款沒付，2 天內沒補足就是違約交割：扣透支金額 7% 的違約金、自動賣出持股補足，而且 5 年內不能融資、融券。自己先賣就沒事。融資借來的錢只能留在 Securities 買賣，不能拿去 Play 或補透支。',
         'Securities 投資、Play 下注和買彩券；Orbit 的 App 都不用錢。錢只存在 Quadra Pass，不能在帳號之間轉。'
@@ -107,12 +106,11 @@ export const HELP = {
       ['looks', 'Avatars and frames', [
         'Pick an avatar and a frame in the Quadra Pass’s Looks tab: all free, change them any time, worn on your account button in every app. Tap again to take one off.'
       ]],
-      ['vip', 'VIP cashback and welcome offers', [
-        'VIP is free and needs no sign-up: what you stake in Play in a month (bets, lottery and scratch cards; refunds don’t count) sets that month’s tier, and a share of it comes back the first time you open any app the next month: Bronze from NT$10,000 0.5%, Silver from NT$50,000 0.8%, Gold from NT$150,000 1.2%, Black from NT$500,000 1.5%. Play’s balance card shows this month’s tier and what’s left to the next.',
+      ['welcome', 'Welcome offer', [
         'Welcome offer: your first trade in Securities pays no commission (taxes and fees as usual).'
       ]],
       ['money', 'Money', [
-        'Every app shares one NT$ wallet. A new pass opens with NT$200,000; every Monday pays a fixed NT$10,000, like a salary: the same however much you hold. The system gives money only as the opening money, the pay, wealth level rewards (paid once, the first time what you’re worth reaches a level: NT$3,000 at NT$300,000, then NT$5,000 at 500,000, NT$10,000 at a million, NT$20,000 at 3 million, NT$50,000 at 10 million and NT$100,000 at 100 million; rewards from the old levels count towards them), Play’s VIP cashback, and emergency relief for someone with nothing. The pay comes the first time that week you open any app; a week you miss is paid when you’re back.',
+        'Every app shares one NT$ wallet. A new pass opens with NT$200,000; every Monday pays a fixed NT$10,000, like a salary: the same however much you hold. The system gives money only as the opening money, the pay, wealth level rewards (paid once, the first time what you’re worth reaches a level: NT$3,000 at NT$300,000, then NT$5,000 at 500,000, NT$10,000 at a million, NT$20,000 at 3 million, NT$50,000 at 10 million and NT$100,000 at 100 million; rewards from the old levels count towards them) and emergency relief for someone with nothing. The pay comes the first time that week you open any app; a week you miss is paid when you’re back.',
         'Truth splits your money four ways: what the system gave, your result against Quadra (Play’s wins and losses before tax, less overdraft and loan interest), the government (prize tax, transaction tax, dividend withholding and the NHI premium, less emergency relief), and your own result (your investments).',
         'The balance can go below zero (an overdraft) at 1% a month. Like an unpaid settlement, if it isn’t covered within 2 days it’s a default: a 7% penalty on what’s owed, holdings sold for it, and no margin or short selling for 5 years. Sell something first and none of that happens. Money borrowed on margin stays in Securities for trading: it can’t be bet in Play or cover an overdraft.',
         'Securities invests, Play bets and sells lottery tickets; the Orbit apps don’t use money. Money lives on the Quadra Pass only and can’t move between passes.'
@@ -242,7 +240,7 @@ export const HELP = {
         '運彩賠率由 DraftKings、Kambi、Polymarket 的價格去掉抽成，再照運彩實際的抽成定價；還沒有人開盤的比賽由 Quadra 自己估。彩券用台灣彩券的真實開獎號碼。'
       ]],
       ['tabs', '每個分頁', [
-        '「首頁」：餘額（投注中的金額和本月 VIP）、場中焦點、為你推薦（照你在 Orbit Sports 追蹤的球隊和聯賽，前三個可以一次串成一張）、焦點賽事、你的投注和彩券頭獎。',
+        '「首頁」：餘額（投注中的金額）、場中焦點、為你推薦（照你在 Orbit Sports 追蹤的球隊和聯賽，前三個可以一次串成一張）、焦點賽事、你的投注和彩券頭獎。',
         '「賽事」：選運動、聯賽和日期（台灣時間），或搜尋球隊和聯賽；點賠率加入投注單，點比賽看它的所有玩法（分頁、更多）。冠軍盤和 F1 各一張。',
         '「彩券」：8 種電腦彩券和台灣彩券正在賣的 5 種刮刮樂。',
         '「紀錄」：投注單（進行中、等待開賽、已結算）、彩券、戰績和統計分析。',
@@ -266,8 +264,7 @@ export const HELP = {
         '冠軍玩法只列還有機會的隊伍和車手：被淘汰、季後賽出局或積分已追不上的，會自動從看板拿掉。'
       ]],
       ['money', '錢怎麼算', [
-        '下注和買彩券從 Quadra 餘額扣款；派彩和彩券獎金都由伺服器入帳，並通知你。彩券獎金照規定每注計算：單注超過 NT$5,000 扣 20% 所得稅和 0.4% 印花稅。',
-        '每個月的投注決定 VIP 等級，下個月回饋一部分，詳見 Quadra Pass 的說明。'
+        '下注和買彩券從 Quadra 餘額扣款；派彩和彩券獎金都由伺服器入帳，並通知你。彩券獎金照規定每注計算：單注超過 NT$5,000 扣 20% 所得稅和 0.4% 印花稅。'
       ]]
     ],
     en: [
@@ -276,7 +273,7 @@ export const HELP = {
         'Odds come from DraftKings’, Kambi’s and Polymarket’s prices with their margins taken out, then priced at the cuts the sports lottery really takes; a game nobody prices yet is priced by Quadra itself. The lottery uses Taiwan Lottery’s real draws.'
       ]],
       ['tabs', 'The tabs', [
-        'Home: your balance (what’s in open bets and this month’s VIP), live now, for you (from the teams and leagues you follow in Orbit Sports; its top three as one parlay), featured games, your bets and the lottery jackpots.',
+        'Home: your balance (what’s in open bets), live now, for you (from the teams and leagues you follow in Orbit Sports; its top three as one parlay), featured games, your bets and the lottery jackpots.',
         'Games: pick a sport, league and day (Taiwan time), or search teams and leagues; tap a price to add it to the slip, a game for all its markets (by tab, more). Outrights and F1 have a board each.',
         'Lottery: 8 draw games and 5 of Taiwan Lottery’s scratch cards on sale.',
         'History: slips (in play, waiting, settled), tickets, wins and stats.',
@@ -300,8 +297,7 @@ export const HELP = {
         'Outright boards list only who can still win: a team knocked out or out of the play-offs, or a driver who can no longer catch the leader on points, comes off the board by itself.'
       ]],
       ['money', 'Money', [
-        'Bets and tickets come out of the Quadra balance; payouts and prizes are paid in by the server, and you’re told. Lottery prizes are taxed bet by bet, by law: each bet paying over NT$5,000 has 20% income tax and 0.4% stamp duty withheld.',
-        'What you stake each month sets your VIP tier, and part of it comes back the month after: see the Quadra Pass’s guide.'
+        'Bets and tickets come out of the Quadra balance; payouts and prizes are paid in by the server, and you’re told. Lottery prizes are taxed bet by bet, by law: each bet paying over NT$5,000 has 20% income tax and 0.4% stamp duty withheld.'
       ]]
     ]
   },

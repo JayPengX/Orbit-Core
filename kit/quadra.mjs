@@ -137,7 +137,7 @@ const rankName = (id, i) => {
   return r ? (i ? r.en : r.zh) : OLD_RANK_NAMES[id]?.[i] || id;
 };
 // Where the money came from and went (all time, NT$): what the system gave
-// (opening money, pay, level rewards, resets, VIP cashback), the government
+// (opening money, pay, level rewards, resets, old VIP cashback), the government
 // (govOf: relief less taxes), the account
 // against Quadra (Play's settled bets less fees, loan costs and overdraft interest:
 // a surplus when it has won more than it lost and paid), and its own result
@@ -152,7 +152,7 @@ const rankName = (id, i) => {
 const RESET_ID = 'eco:rebase:v3';
 // 政府 (kit/gov.mjs): the same figures the admin page adds up.
 import { govOf } from './gov.mjs';
-import { twDay, twMonth, finiteOr0 } from './format.mjs';
+import { twDay, finiteOr0 } from './format.mjs';
 export { govOf };
 export function moneySides(wallet) {
   const gave = { start: 0, pay: 0, rank: 0, other: 0 };
@@ -209,9 +209,9 @@ export const overdraft = wallet => Math.max(0, -poolBalance(wallet));
 import { PAY_WEEK, LOAN, RELIEF, loans, activeLoan, loanOwed, payoffAmount, debtOf, credit, canBorrow, loanOffer, maxFor, dueCount, reliefCheck, openStakes, nextPayday as nextWeekPayday } from './loan.mjs';
 export { LOAN, RELIEF, loans, activeLoan, loanOwed, payoffAmount, debtOf, credit, canBorrow, loanOffer, reliefCheck };
 const LOAN_KINDS = new Set(['loan', 'loanfee', 'loanpay', 'loanlate', 'loanbad', 'loangar', 'loanoff']);
-// Free bets and VIP: plus.mjs, shared with the Worker.
-import { FREEBET, VIP, vipStakes, vipTier } from './plus.mjs';
-export { FREEBET, VIP, vipStakes, vipTier };
+// Free bets (history only): plus.mjs, shared with the Worker.
+import { FREEBET } from './plus.mjs';
+export { FREEBET };
 
 // ---- Looks: an avatar and a frame, free for everyone ------------------------------------
 //
@@ -237,23 +237,6 @@ export const FRAMES = [
 const worn = (wallet, key, list) => list.find(x => x.id === setting(wallet, key, null)?.id) || null;
 export const avatarOf = wallet => worn(wallet, 'avatar', AVATARS);
 export const frameOf = wallet => worn(wallet, 'frame', FRAMES);
-
-// ---- VIP: free tiers by what's played, with cashback -----------------------------------
-//
-// The table and a month's stakes are plus.mjs's (VIP, vipStakes, vipTier),
-// one copy for the kit and the Worker that pays the cashback.
-// This month so far: stakes, tier, the cashback it's heading for, the next
-// tier and what's left to reach it; and last month's cashback if paid.
-export function vipStatus(wallet, now = Date.now()) {
-  const month = twMonth(now);
-  const stakes = vipStakes(wallet, month);
-  const tier = vipTier(stakes);
-  const next = VIP.tiers.find(t => stakes < t.min) ?? null;
-  const paid = (wallet?.entries || []).filter(e => e.app === 'eco' && e.kind === 'vip').sort((a, b) => b.t - a.t)[0] ?? null;
-  return { month, stakes, tier, back: tier ? Math.floor(stakes * tier.back) : 0, next, toNext: next ? next.min - stakes : 0, paid };
-}
-// The tier's name alone (a medal emoji before it read as clip art, the owner 2026-10-18).
-export const vipName = (tier, lang = 'zh') => (tier ? (lang === 'en' ? tier.en : tier.zh) : '');
 
 // ---- Language ------------------------------------------------------------------------
 

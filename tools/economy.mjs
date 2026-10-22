@@ -5,7 +5,7 @@
 //
 // Faucets: the opening money, the weekly pay, the market. Sinks: Play's hold
 // on bets (singles and parlays), the lottery's and scratch cards' hold,
-// Securities' trading costs and VIP cashback. The holds are the house's
+// Securities' trading costs. The holds are the house's
 // measured ones (see the kit's play-odds.mjs, play-lottery.mjs,
 // play-scratch.mjs).
 
@@ -41,37 +41,27 @@ const FREEBET_RETURN = 0.45; // a free bet returns its winnings only: about 45% 
 //
 // The house's side of it: what each product keeps (the gaming take: Play's
 // hold, the lottery's and scratch cards'), what it gives back to bring play
-// in (promotions: free bets, VIP cashback, the points catalogue), and what it
+// in (promotions: free bets, the points catalogue), and what it
 // earns besides (Securities' commission). A real sportsbook spends 20-30% of
 // its gaming take on promotions; Quadra's should stay under that and never
 // turn a product into a loss.
 const CUT = 1.158;
 const ODDS = 1.85;
 const trebleHold = boost => 1 - ((1 / CUT) ** 3 * (1 + (ODDS ** 3 - 1) * (1 + boost))) / ODDS ** 3;
-// The kit's VIP (Shared-Proxy/kit/quadra.mjs, eco.js).
-export const VIP_TIERS = [
-  [500_000, 0.015],
-  [150_000, 0.012],
-  [50_000, 0.008],
-  [10_000, 0.005]
-];
-const vipBack = stakes => (VIP_TIERS.find(([min]) => stakes >= min)?.[1] ?? 0) * stakes;
 const COMMISSION = 0.001425 * 2; // of turnover (a buy and a sell); the rest of TRADE_COST is the sell tax
 
 // One month for person `p` worth `worth`, a member or not: every flow, from
 // the house's side and the person's.
 export function monthOf(settings, p, worth, member = false) {
   const bets = p.slips * p.stake * DAYS;
-  const tickets = (p.draw + p.scratch) * DAYS;
   const gaming = bets * ((1 - p.trebles) * HOLD.single + p.trebles * trebleHold(0.05)) + p.draw * DAYS * HOLD.draw + p.scratch * DAYS * HOLD.scratch;
   // Promotions.
   const bonus = member && p.slips > 0 ? ((PLUS.bonusBet * 52) / 12) * FREEBET_RETURN : 0;
-  const vip = vipBack(bets + tickets);
   // Other revenue.
   const commission = p.turnover * COMMISSION * (member ? PLUS.commission : 1);
   // The points catalogue: free bets, a voucher that takes off at most the commission there is (the rest is lost), deposit bonuses, a member's month.
   const catalog = (p.catBets || 0) * FREEBET_RETURN + Math.min(p.catVouchers || 0, commission) + (p.catTd || 0) + (member ? (PLUS.fee * (p.catPlus || 0)) / 12 : 0);
-  const promo = bonus + vip + catalog;
+  const promo = bonus + catalog;
   const tax = p.turnover * (TRADE_COST - COMMISSION);
   const plusFee = member ? PLUS.fee : 0;
   const packs = (p.packMonth || 0) * (member ? PLUS.packShare : 1);
@@ -83,7 +73,7 @@ export function monthOf(settings, p, worth, member = false) {
   const market = Math.max(0, worth * p.invested) * MARKET;
   const house = gaming - promo + commission + plusFee + shop;
   const flow = pay + market - tax - house;
-  return { gaming, bonus, vip, catalog, promo, commission, tax, plusFee, shop, pay, market, house, flow };
+  return { gaming, bonus, catalog, promo, commission, tax, plusFee, shop, pay, market, house, flow };
 }
 
 // Per day unless said: bets (slips a day, stake, share that are trebles),
