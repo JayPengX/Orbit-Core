@@ -9,6 +9,11 @@
 // unique within its company). Listed ETFs, priced on the exchange, are left out:
 //   { funds: { code: { name, company, currency, nav, prev, date } } }
 // `date` is the NAV's own day (YYYY-MM-DD); `prev` the day's before it.
+//
+// A fund's history and profile (`/hist.json?code=00526748A`): SITCA keeps no
+// history in the open, so these are Anue's (鉅亨, fund.api.cnyes.com), found
+// by the fund's name and checked by the 基金統編 Anue keeps with it:
+//   { code, points: [[ms, nav], …] (ten years, daily), profile: { … } }
 
 export const FUND_HOST = 'funds.quadra';
 const NAV_CSV = 'https://www.sitca.org.tw/MemberK0000/F/03/nav.csv';
@@ -65,8 +70,97 @@ async function navTable(fetchFn) {
   return funds;
 }
 
+const ANUE = 'https://fund.api.cnyes.com/fund/api';
+const HIST_YEARS = 10;
+// 基金統編 → Anue's id, as found (an isolate's memory).
+const anueIds = new Map();
+const plain = name => String(name || '').replace(/<\/?mark>/g, '').replace(/[\s　()（）\-－_]/g, '').toUpperCase();
+const getJson = async (fetchFn, url) => {
+  const res = await fetchFn(url, { headers: { 'User-Agent': 'Mozilla/5.0', Accept: 'application/json' }, signal: AbortSignal.timeout(8_000) });
+  if (!res.ok) throw new Error(`Anue ${res.status}`);
+  return res.json();
+};
+const chartOf = (fetchFn, id) => {
+  const end = Math.floor(Date.now() / 1000);
+  return getJson(fetchFn, `${ANUE}/v1/funds/${id}/nav?format=chart&startAt=${end - HIST_YEARS * 365 * 86_400}&endAt=${end}`);
+};
+
+// Anue's candidates for a fund, likeliest first: the same name, then the same NAV.
+export function anueCandidates(rows, fund) {
+  const name = plain(fund.name);
+  const score = r => (plain(r.displayNameLocal) === name ? 2 : 0) + (Math.abs(Number(r.nav) - fund.nav) < 1e-6 ? 1 : 0);
+  return rows.filter(r => r?.cnyesId && score(r) > 0).sort((a, b) => score(b) - score(a)).map(r => r.cnyesId);
+}
+
+// Anue's chart answer as our history: the points oldest first, and the facts a fund page shows.
+export function parseAnueChart(items) {
+  const t = items.tradeDate || [];
+  const nav = items.nav || [];
+  const points = t.map((s, i) => [s * 1000, Number(nav[i])]).filter(([s, v]) => s > 0 && v > 0).sort((a, b) => a[0] - b[0]);
+  const num = v => (v == null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
+  const ms = v => (num(v) ? num(v) * 1000 : null);
+  return {
+    points,
+    profile: {
+      category: items.categoryLocal || items.globalCategory || null,
+      area: items.investmentArea || null,
+      risk: num(items.riskLevel),
+      managementFee: num(items.managementFee),
+      frontLoadFee: num(items.frontLoadFee),
+      custodianFee: num(items.custodianFee),
+      netAsset: num(items.totalNetAsset),
+      netAssetCurrency: items.netAssetCurrency || items.baseCurrency || null,
+      netAssetDate: ms(items.netAssetDate),
+      inception: ms(items.inceptionDate),
+      manager: items.managerNameLocal || null,
+      company: items.investmentProviderNameLocal || items.fundCompanyNameLocal || null,
+      custodian: items.custodianNameLocal || null,
+      distribution: /Inc/i.test(items.distributionStatus || '') ? 'income' : /Acc/i.test(items.distributionStatus || '') ? 'accumulate' : null,
+      returns: { ytd: num(items.returnYTDLocal), '1y': num(items.return1YearLocal), '3y': num(items.accReturn3YearLocal), '5y': num(items.accReturn5YearLocal), '10y': num(items.accReturn10YearLocal) },
+      stars: num(items.starRating),
+      isin: items.isin || null
+    }
+  };
+}
+
+async function fundHistory(code, fetchFn) {
+  const known = anueIds.get(code);
+  if (known) {
+    const got = await chartOf(fetchFn, known);
+    if (got?.items?.sitca === code) return parseAnueChart(got.items);
+  }
+  const fund = (await navTable(fetchFn))[code];
+  if (!fund) return null;
+  // By the whole name, then without the class (「-新台幣A」) or 「基金」.
+  const names = [...new Set([fund.name, fund.name.split(/[-－(（]/)[0], fund.name.replace(/基金.*$/, ''), fund.name.slice(0, 6)])].filter(n => n.length >= 2);
+  const tried = new Set();
+  for (const name of names) {
+    const found = await getJson(fetchFn, `${ANUE}/v2/search/fund?fundName=${encodeURIComponent(name)}&page=1`);
+    const ids = anueCandidates(found?.items?.data || [], fund).filter(id => !tried.has(id));
+    for (const id of ids.slice(0, 4)) {
+      tried.add(id);
+      const got = await chartOf(fetchFn, id);
+      if (got?.items?.sitca === code) {
+        anueIds.set(code, id);
+        return parseAnueChart(got.items);
+      }
+    }
+  }
+  return null;
+}
+
 export async function fundNavResponse(url, fetchFn = fetch) {
   const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+  if (url.pathname === '/hist.json') {
+    const code = url.searchParams.get('code') || '';
+    if (!/^[A-Za-z0-9]{2,12}$/.test(code)) return json({ error: 'code' }, 400);
+    try {
+      const hist = await fundHistory(code, fetchFn);
+      return hist ? json({ code, ...hist }) : json({ error: 'not found' }, 404);
+    } catch (error) {
+      return json({ error: String(error.message || error) }, 502);
+    }
+  }
   if (url.pathname !== '/nav.json') return json({ error: 'not found' }, 404);
   const codes = (url.searchParams.get('codes') || '').split(',').filter(c => /^[A-Za-z0-9]{2,12}$/.test(c));
   if (!codes.length || codes.length > MAX_CODES) return json({ error: 'codes' }, 400);

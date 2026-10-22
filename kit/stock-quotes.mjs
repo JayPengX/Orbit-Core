@@ -20,6 +20,7 @@ const SPARK_BATCH = 20;
 // hour, company numbers an hour, searches a day.
 export function ttlFor(url) {
   if (url.startsWith(FUND_NAV) || url === TAIFEX_URL) return 10 * 60_000;
+  if (url.startsWith(FUND_HIST)) return 3 * 3_600_000;
   if (url.includes('/v1/finance/search')) return 24 * 3_600_000;
   if (url.includes('/v10/finance/quoteSummary')) return 3_600_000;
   const range = /[?&]range=([^&]+)/.exec(url)?.[1] || '1d';
@@ -41,6 +42,9 @@ const getJson = url => {
 // `${統編}.TWF`; its price is the NAV dated `date` (that day's, out in the
 // evening), as of the cutoff it answers (FUND_CUTOFF).
 const FUND_NAV = 'https://funds.quadra/nav.json?codes=';
+// A fund's ten years of NAVs and its profile (fund-nav.js /hist.json: Anue's, checked by 統編).
+const FUND_HIST = 'https://funds.quadra/hist.json?code=';
+const readFundHist = symbol => getJson(FUND_HIST + encodeURIComponent(symbol.slice(0, -4))).catch(() => null);
 const FUND_BATCH = 40;
 export function fundQuote(symbol, f) {
   if (!f || !(f.nav > 0)) return null;
@@ -508,10 +512,21 @@ export async function fetchChart(symbol, rangeKey = '1mo', { events = false } = 
     const points = chart.points.filter(([t]) => t < expiry).map(([t, c]) => [t, pricer.price(c, t)]);
     return { quote, points, bars: [], dividends: [], splits: [] };
   }
-  // A fund: its NAV and the day's before (SITCA's list has only those two).
+  // A fund: its NAVs over the range (Anue's history), today's from SITCA's
+  // list last; only those two where the history isn't found.
   if (isTwFund(symbol)) {
-    const quote = (await fetchQuotes([symbol])).get(symbol) || null;
-    return quote && { quote, points: quote.line, bars: [], dividends: [], splits: [] };
+    const [quotes, hist] = await Promise.all([fetchQuotes([symbol]), readFundHist(symbol)]);
+    const quote = quotes.get(symbol) || null;
+    if (!quote) return null;
+    const span = { '1d': 1, '5d': 5, '1mo': 30, '6mo': 182, '1y': 365, '5y': 1826, max: 3650 }[rangeKey];
+    const from = rangeKey === 'ytd' ? Date.UTC(new Date(quote.marketTime).getUTCFullYear(), 0, 1) - 8 * 3_600_000 : quote.marketTime - (span || 30) * 86_400_000 - 43_200_000;
+    // (Anue dates a NAV at its day's midnight UTC; SITCA's at the 15:30 cutoff.)
+    const day = t => new Date(t + 8 * 3_600_000).toISOString().slice(0, 10);
+    const today = day(quote.marketTime);
+    const points = (hist?.points || []).filter(([t]) => t >= from && day(t) < today);
+    // A week or less: the history's days too few for a line; the last two NAVs as SITCA gives them.
+    if (points.length < 2) return { quote, points: quote.line, bars: [], dividends: [], splits: [] };
+    return { quote, points: [...points, [quote.marketTime, quote.price]], bars: [], dividends: [], splits: [] };
   }
   if (METALS[symbol]) {
     const [future, usd] = await Promise.all([fetchChart(METALS[symbol].future, rangeKey), fetchChart(fxSymbol('USD'), rangeKey)]);
@@ -671,7 +686,38 @@ export function parseFundamentals(json) {
   return out;
 }
 
+// A Taiwan fund's facts from its profile (fund-nav.js /hist.json), in the
+// names Yahoo's give a fund's: 經理費 as its yearly cost, the returns as
+// fractions (3 and 5 years a year's, as Yahoo's), and Taiwan's own: the
+// 風險收益等級 (RR1–RR5), 經理人, 保管銀行, 申購手續費 上限, distribution.
+export function fundFacts(p) {
+  if (!p) return null;
+  const f = x => (x == null ? null : x / 100);
+  const yearly = (x, n) => (x == null ? null : Math.pow(1 + x / 100, 1 / n) - 1);
+  return {
+    currency: p.netAssetCurrency ? normalizeCurrency(p.netAssetCurrency).currency : null,
+    family: p.company ? p.company.replace(/證券投資信託.*$|投信.*$/, '投信') : null,
+    category: p.category || null,
+    expenseRatio: f(p.managementFee),
+    totalAssets: p.netAsset,
+    inception: p.inception,
+    ytd: f(p.returns?.ytd),
+    return1y: f(p.returns?.['1y']),
+    return3y: yearly(p.returns?.['3y'], 3),
+    return5y: yearly(p.returns?.['5y'], 5),
+    risk: p.risk,
+    manager: p.manager,
+    custodian: p.custodian,
+    frontLoadMax: f(p.frontLoadFee),
+    distribution: p.distribution,
+    holdings: [],
+    sectors: [],
+    mix: null
+  };
+}
+
 export async function fetchFundamentals(symbol) {
+  if (isTwFund(symbol)) return fundFacts((await readFundHist(symbol))?.profile);
   const modules = 'assetProfile,summaryDetail,defaultKeyStatistics,financialData,fundProfile,topHoldings,calendarEvents,earnings';
   return parseFundamentals(await getJson(`${YAHOO}/v10/finance/quoteSummary/${encodeURIComponent(symbol)}?modules=${modules}`));
 }
