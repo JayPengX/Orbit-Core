@@ -40,9 +40,9 @@ test("CPBL: TheSportsDB's day list", () => {
 });
 
 test('the address names a league and a month', () => {
-  assert.deepEqual(asiaTarget(new URL('https://asia-baseball.quadra/kbo/2026-09.json')), { league: 'kbo', year: 2026, month: 9 });
-  assert.equal(asiaTarget(new URL('https://asia-baseball.quadra/mlb/2026-09.json')), null);
-  assert.equal(asiaTarget(new URL('https://asia-baseball.quadra/npb/2026-13.json')), null);
+  assert.deepEqual(asiaTarget(new URL('https://asia-baseball.orbit/kbo/2026-09.json')), { league: 'kbo', year: 2026, month: 9 });
+  assert.equal(asiaTarget(new URL('https://asia-baseball.orbit/mlb/2026-09.json')), null);
+  assert.equal(asiaTarget(new URL('https://asia-baseball.orbit/npb/2026-13.json')), null);
 });
 
 test('CPBL: every source refusing is an error, never an empty month', async () => {
@@ -50,7 +50,7 @@ test('CPBL: every source refusing is an error, never an empty month', async () =
   const real = globalThis.fetch;
   globalThis.fetch = async url => new Response('no', { status: String(url).includes('thesportsdb') ? 403 : 404 });
   try {
-    const r = await asiaBaseballResponse(new URL('https://asia-baseball.quadra/cpbl/2026-10.json'));
+    const r = await asiaBaseballResponse(new URL('https://asia-baseball.orbit/cpbl/2026-10.json'));
     assert.equal(r.status, 502);
     assert.match((await r.json()).error, /tsdb 403/);
   } finally {
@@ -69,12 +69,12 @@ test('CPBL: TheSportsDB refusing a day is not asked again (the phones read it); 
     return new Response(JSON.stringify({ events: [{ idEvent: '9', strTimestamp: '2026-11-01T09:05:00', strHomeTeam: 'CTBC Brothers', strAwayTeam: 'Uni-President Lions', strStatus: 'NS' }] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
   };
   try {
-    const r = await asiaBaseballResponse(new URL('https://asia-baseball.quadra/cpbl/2026-11.json'));
+    const r = await asiaBaseballResponse(new URL('https://asia-baseball.orbit/cpbl/2026-11.json'));
     assert.equal(r.status, 200);
     assert.ok((await r.json()).games.length >= 1);
     assert.ok([...asked.values()].every(n => n === 1));
     asked.clear();
-    const dec = await asiaBaseballResponse(new URL('https://asia-baseball.quadra/cpbl/2026-12.json'));
+    const dec = await asiaBaseballResponse(new URL('https://asia-baseball.orbit/cpbl/2026-12.json'));
     assert.equal(dec.status, 200);
     assert.deepEqual((await dec.json()).games, []);
     assert.equal(asked.size, 0);
@@ -84,8 +84,8 @@ test('CPBL: TheSportsDB refusing a day is not asked again (the phones read it); 
 });
 
 test("CPBL's box score: its page's getlive answer as the app's box (sides, batters in order, pitchers' decisions, each at-bat's last pitch)", () => {
-  assert.deepEqual(cpblBoxTarget(new URL('https://asia-baseball.quadra/cpbl/box/2026-290.json')), { year: 2026, sno: 290, kind: 'A' });
-  assert.equal(cpblBoxTarget(new URL('https://asia-baseball.quadra/cpbl/2026-08.json')), null);
+  assert.deepEqual(cpblBoxTarget(new URL('https://asia-baseball.orbit/cpbl/box/2026-290.json')), { year: 2026, sno: 290, kind: 'A' });
+  assert.equal(cpblBoxTarget(new URL('https://asia-baseball.orbit/cpbl/2026-08.json')), null);
   const j = x => JSON.stringify(x);
   const data = {
     CurtGameDetailJson: j({ GameStatus: 3, GameStatusChi: '比賽結束', VisitingTeamName: '台鋼雄鷹', HomeTeamName: '富邦悍將', VisitingTotalScore: 1, HomeTotalScore: 2 }),
@@ -117,7 +117,7 @@ test("CPBL's box score: its page's getlive answer as the app's box (sides, batte
 test('CPBL play-offs: TheSportsDB by round 0; a play-off box read by its kind', () => {
   const tsdb = parseTsdbDay({ events: [{ idEvent: '1', strTimestamp: '2026-10-09T09:05:00', strHomeTeam: 'CTBC Brothers', strAwayTeam: 'Uni-President Lions', intRound: '0', strStatus: 'FT', intHomeScore: '4', intAwayScore: '1' }, { idEvent: '2', strTimestamp: '2026-10-01T09:05:00', strHomeTeam: 'TSG Hawks', strAwayTeam: 'Rakuten Monkeys', intRound: '21', strStatus: 'FT', intHomeScore: '1', intAwayScore: '2' }] });
   assert.deepEqual(tsdb.map(g => g.playoff), [true, undefined]);
-  assert.deepEqual(cpblBoxTarget(new URL('https://asia-baseball.quadra/cpbl/box/2026-E2.json')), { year: 2026, sno: 2, kind: 'E' });
+  assert.deepEqual(cpblBoxTarget(new URL('https://asia-baseball.orbit/cpbl/box/2026-E2.json')), { year: 2026, sno: 2, kind: 'E' });
 });
 
 test('TheSportsDB leaves a scoreless side empty: it is 0 once the other side has a score', () => {

@@ -34,7 +34,7 @@ test('every import inside the kit resolves to a kit module, by #kit/ or ./', asy
 });
 
 test('every served module loads in Node on its own (the Worker and the tests import them so)', async () => {
-  // (quadra.mjs and the modules with a page wait for a document only when used.)
+  // (orbit.mjs and the modules with a page wait for a document only when used.)
   for (const name of served) await import(new URL(name, KIT));
 });
 

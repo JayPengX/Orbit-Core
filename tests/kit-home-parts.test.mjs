@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as ui from '../kit/ui.mjs';
 
-const rawCss = readFileSync(new URL('../kit/quadra.css', import.meta.url), 'utf8');
+const rawCss = readFileSync(new URL('../kit/orbit.css', import.meta.url), 'utf8');
 const css = rawCss.replace(/\/\*[\s\S]*?\*\//g, '');
 
 // ---- A just-enough DOM ----

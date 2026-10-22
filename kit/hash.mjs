@@ -40,7 +40,7 @@ let esbuild = null;
 // esbuild, installed once into the machine's temp folder (CI: each run).
 async function loadEsbuild() {
   if (esbuild) return esbuild;
-  const dir = join(tmpdir(), `quadra-esbuild-${ESBUILD}`);
+  const dir = join(tmpdir(), `orbit-esbuild-${ESBUILD}`);
   const main = join(dir, 'node_modules/esbuild/lib/main.js');
   if (!existsSync(main)) {
     mkdirSync(dir, { recursive: true });

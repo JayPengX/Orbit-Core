@@ -25,9 +25,9 @@ export default {
   ECO_INVALID_SOURCES: 'List 1 to 12 codes to merge.',
   NOT_FOUND: 'Not found',
   ECO_TOKEN_INVALID: 'Your sign-in has expired. Signing in again…',
-  ECO_SIGNED_OUT: 'This device was signed out. Sign in with your Quadra Pass.',
-  ECO_SESSION_MOVED: 'Quadra is open in another app.',
-  ECO_HANDOFF_EXPIRED: 'This link has expired. Sign in with your Quadra Pass.',
+  ECO_SIGNED_OUT: 'This device was signed out. Sign in with your Orbit Pass.',
+  ECO_SESSION_MOVED: 'Orbit is open in another app.',
+  ECO_HANDOFF_EXPIRED: 'This link has expired. Sign in with your Orbit Pass.',
   ECO_NOTHING_TO_SHARE: 'There is no schedule to share yet.',
   ECO_SHARE_NOT_FOUND: 'No schedule has this key, or it has expired.',
   WORKER_FAILED: 'Something went wrong. Please try again.'

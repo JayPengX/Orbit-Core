@@ -1,5 +1,5 @@
-// Preview any Quadra app on a phone-sized screen, signed in, with real data,
-// without a Quadra Pass: a quick look (screenshots) after a change.
+// Preview any Orbit app on a phone-sized screen, signed in, with real data,
+// without a Orbit Pass: a quick look (screenshots) after a change.
 //
 //   node tools/preview.mjs <app> [hash…] [--out dir] [--width 390] [--height 844]
 //                          [--full] [--lang zh|en] [--dark] [--wait ms] [--click selector]
@@ -110,7 +110,7 @@ const fakeYahoo = flag('fake-yahoo');
 // --webkit: Safari's engine instead of Chromium (on a Mac, close to the
 // iPhone's Safari; what most of the apps' people use).
 const engine = flag('webkit') ? 'webkit' : 'chromium';
-const out = resolve(opt('out', '/tmp/quadra-preview'));
+const out = resolve(opt('out', '/tmp/orbit-preview'));
 // --device ipad (an iPad: says Macintosh, with touch, 820×1180) or pc (a
 // computer's browser, 1440×900, no touch); the default an iPhone.
 const device = opt('device', 'iphone');
@@ -247,7 +247,7 @@ const ROOT = resolve(opt('root', new URL('../../', import.meta.url).pathname));
 const h2 = flag('h2');
 // The repos as they were at --upgrade's date or ref, copied out of git.
 async function snapshotRoot(when, repos) {
-  const to = await mkdtemp(join(tmpdir(), 'quadra-upgrade-'));
+  const to = await mkdtemp(join(tmpdir(), 'orbit-upgrade-'));
   for (const [name, paths] of repos) {
     const src = join(ROOT, name);
     if (!existsSync(src)) continue;
@@ -266,17 +266,14 @@ async function snapshotRoot(when, repos) {
 }
 const [appArg, ...hashes] = args;
 
-const APPS = { sports: ['Orbit-Sports', 'match'], play: ['Quadra-Play', 'odds'], securities: ['Quadra-Securities', 'stock'], words: ['Orbit-Words', 'vocab'], orbit: ['Orbit-Class', 'orbit'], weather: ['Orbit-Weather', 'weather'], transit: ['Orbit-Transit', 'transit'], slips: ['Orbit-Slips', 'slip'], beats: ['Orbit-Beats', 'beats'], law: ['Orbit-Law', 'law'], admin: ['Shared-Proxy', 'admin'] };
+const APPS = { sports: ['Orbit-Sports', 'match'], play: ['Quadra-Play', 'odds'], securities: ['Orbit-Securities', 'stock'], words: ['Orbit-Words', 'vocab'], orbit: ['Orbit-Class', 'orbit'], weather: ['Orbit-Weather', 'weather'], transit: ['Orbit-Transit', 'transit'], slips: ['Orbit-Slips', 'slip'], beats: ['Orbit-Beats', 'beats'], law: ['Orbit-Law', 'law'], admin: ['Shared-Proxy', 'admin'] };
 // The admin panel's key in a preview: the run's own, never the owner's.
 const ADMIN_KEY = 'preview-admin-key-0123456789abcdef0123456789';
 // The old names still work.
 const ALIAS = { fixtures: 'sports', hub: 'words' };
 const key = Object.keys(APPS).find(k => k === (ALIAS[appArg] || appArg) || APPS[k][0].toLowerCase() === String(appArg).toLowerCase());
 if (!key) throw new Error(`usage: node tools/preview.mjs <${Object.keys(APPS).join('|')}> [hash…]`);
-const [renamed, appId] = APPS[key];
-// A clone made before the rename keeps the old folder name.
-const OLD = { 'Orbit-Sports': 'Quadra-Fixtures', 'Orbit-Words': 'Quadra-Hub' };
-const repo = existsSync(join(ROOT, renamed)) || !OLD[renamed] ? renamed : OLD[renamed];
+const [repo, appId] = APPS[key];
 const dir = key === 'orbit' ? join(ROOT, repo, 'dist') : key === 'admin' ? join(ROOT, repo, 'site') : join(ROOT, repo, 'public');
 if (!existsSync(dir)) throw new Error(`${dir} missing${key === 'orbit' ? ' (run npm run build in Orbit-Class)' : ''}`);
 
@@ -290,7 +287,7 @@ const oldRoot = upgrade ? await snapshotRoot(upgrade, [[repo, [key === 'orbit' ?
 async function stampRoot(root, version) {
   const app = join(root, repo);
   if (key !== 'orbit' && existsSync(join(app, 'scripts/stamp-version.mjs'))) execFileSync('node', ['scripts/stamp-version.mjs', version], { cwd: app, stdio: 'ignore' });
-  const out = await mkdtemp(join(tmpdir(), 'quadra-kit-'));
+  const out = await mkdtemp(join(tmpdir(), 'orbit-kit-'));
   execFileSync('node', [join(root, 'Shared-Proxy/kit/stamp.mjs'), out, `kit-${version}`], { stdio: 'ignore' });
   await rm(join(root, 'Shared-Proxy/kit'), { recursive: true, force: true });
   await cp(join(out, 'kit'), join(root, 'Shared-Proxy/kit'), { recursive: true });
@@ -298,7 +295,7 @@ async function stampRoot(root, version) {
 let newRoot = null;
 if (oldRoot) {
   await stampRoot(oldRoot, 'old');
-  newRoot = await mkdtemp(join(tmpdir(), 'quadra-new-'));
+  newRoot = await mkdtemp(join(tmpdir(), 'orbit-new-'));
   for (const part of [key === 'orbit' ? 'dist' : 'public', ...(key === 'orbit' ? [] : ['scripts', 'package.json'])]) if (existsSync(join(ROOT, repo, part))) await cp(join(ROOT, repo, part), join(newRoot, repo, part), { recursive: true });
   await cp(join(ROOT, 'Shared-Proxy/kit'), join(newRoot, 'Shared-Proxy/kit'), { recursive: true });
   await stampRoot(newRoot, 'new');
@@ -328,7 +325,7 @@ async function external(req, res) {
 }
 const pointFetch = `(()=>{const f=window.fetch;window.fetch=(i,o={})=>{const u=typeof i==='string'?i:i.url;return /^https:\\/\\/(orbit-workers-proxy|sports-proxy)\\.pengzjay\\.workers\\.dev\\//.test(u)${live ? "&&!/orbit-workers-proxy\\.pengzjay\\.workers\\.dev\\/(transit|weather)/.test(u)" : ''}?f('/__ext?u='+encodeURIComponent(u),{method:o.method||i.method||'GET',body:o.body,headers:o.headers}):f(i,o)}})();`;
 const h2Cert = () => {
-  const dir = join(tmpdir(), `quadra-h2-${process.pid}`);
+  const dir = join(tmpdir(), `orbit-h2-${process.pid}`);
   mkdirSync(dir, { recursive: true });
   execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1', '-subj', '/CN=localhost', '-keyout', join(dir, 'key.pem'), '-out', join(dir, 'cert.pem')], { stdio: 'ignore' });
   return { key: readFileSync(join(dir, 'key.pem')), cert: readFileSync(join(dir, 'cert.pem')), allowHTTP1: true };
@@ -524,7 +521,7 @@ const contextOptions = {
   userAgent: UAS[device] || UAS.iphone,
   ignoreHTTPSErrors: true
 };
-const context = serve ? stub : persistent ? await playwright[engine].launchPersistentContext(await mkdtemp(join(tmpdir(), 'quadra-webkit-')), contextOptions) : await browser.newContext(contextOptions);
+const context = serve ? stub : persistent ? await playwright[engine].launchPersistentContext(await mkdtemp(join(tmpdir(), 'orbit-webkit-')), contextOptions) : await browser.newContext(contextOptions);
 if (clock && !serve) await context.clock.install({ time: clockTime(clock) }).then(() => context.clock.resume());
 if (appId === 'weather' && !noGeo) {
   await context.grantPermissions(['geolocation']);
@@ -598,12 +595,12 @@ await context.addInitScript(
   ([refresh, lang, stores]) => {
     try {
       for (const [k, v] of stores) localStorage.setItem(k, v);
-      if (refresh) localStorage.setItem('quadra.refresh', refresh);
-      if (refresh) localStorage.setItem('quadra.account', '0123456789abcdef');
-      localStorage.setItem('quadra.lang', lang);
+      if (refresh) localStorage.setItem('orbit.refresh', refresh);
+      if (refresh) localStorage.setItem('orbit.account', '0123456789abcdef');
+      localStorage.setItem('orbit.lang', lang);
     } catch {}
   },
-  [signedOut ? '' : refresh, lang, key === 'admin' && !signedOut ? [...stores, ['quadra.admin', ADMIN_KEY]] : stores]
+  [signedOut ? '' : refresh, lang, key === 'admin' && !signedOut ? [...stores, ['orbit.admin', ADMIN_KEY]] : stores]
 );
 // Orbit Weather's routes (see the top): weather.js on the fixtures, one KV
 // for the run.
@@ -708,7 +705,7 @@ await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(?!
     }
     return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(reply) });
   }
-  // Quadra Securities' orders, plans and 新股申購 (stock-fill.js): the
+  // Orbit Securities' orders, plans and 新股申購 (stock-fill.js): the
   // Worker's own code on a store of the run's, today's real data.
   if (new URL(req.url()).pathname === '/stock') {
     const { handleStock } = await import('../stock-fill.js');

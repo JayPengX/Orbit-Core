@@ -7,8 +7,8 @@
 //
 // Loaded with import() and a fallback (an older kit cached on a phone lacks it).
 
-export const F1_LIVE = 'https://f1-live.quadra/now.json';
-export const f1Archive = start => `https://f1-live.quadra/session.json?start=${encodeURIComponent(new Date(start).toISOString())}`;
+export const F1_LIVE = 'https://f1-live.orbit/now.json';
+export const f1Archive = start => `https://f1-live.orbit/session.json?start=${encodeURIComponent(new Date(start).toISOString())}`;
 
 // The feed's session is this one: its kind ('Race', 'Qualifying', 'Sprint',
 // 'Sprint Qualifying', 'Practice', or ESPN's short name: FP1, Qual, SR…) and

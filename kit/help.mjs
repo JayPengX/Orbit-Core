@@ -1,13 +1,13 @@
-// The help centre: how every app works, in one place: the Quadra Pass
+// The help centre: how every app works, in one place: the Orbit Pass
 // sheet's 說明 tab, in every app (pass.mjs). A page opens it with
 // #help=<app>, or #help=<app>:<topic> for one topic.
 //
 // Every app's guide has the same shape, in the same words:
-//   what    「X 是什麼」: its part in Quadra, in two or three lines
+//   what    「X 是什麼」: its part in Orbit, in two or three lines
 //   tabs    「每個分頁」: one line per tab, in the tab bar's order
 //   …       what's particular to it (a few topics)
 //   money   「錢怎麼算」: how it touches the money (Securities' alone)
-// (The Quadra Pass's own guide: what, tabs, devices, one, net, notify, safe,
+// (The Orbit Pass's own guide: what, tabs, devices, one, net, notify, safe,
 // looks, money.)
 //
 // HELP[app][lang] = [[topic id, title, [paragraphs]], …]
@@ -17,21 +17,21 @@ export const HELP_ORDER = ['pass', 'stock', 'odds', 'match', 'vocab', 'orbit', '
 export const HELP = {
   pass: {
     zh: [
-      ['what', 'Quadra Pass 是什麼', [
-        'Quadra Pass 是你在所有 App 的帳號：Quadra 的 Securities、Play，和 Orbit 的 Class、Weather、Transit、Sports、Words。每個 App 都用它登入，資料都存在它裡面，每台裝置都一樣。',
-        '通行碼是一組 10 個字的代碼，由分享 Quadra 給你的人發給你，App 裡不能自己建立。它就是帳號的鑰匙：知道它的人就能用，所以不要給別人。它只在拿到或更換時顯示一次，裝置上不會保存，請記在安全的地方。',
-        '每個 App 右上角的帳戶按鈕（人像，或你挑的頭像）打開 Quadra Pass。'
+      ['what', 'Orbit Pass 是什麼', [
+        'Orbit Pass 是你在所有 App 的帳號：Orbit 的 Securities、Play，和 Orbit 的 Class、Weather、Transit、Sports、Words。每個 App 都用它登入，資料都存在它裡面，每台裝置都一樣。',
+        '通行碼是一組 10 個字的代碼，由分享 Orbit 給你的人發給你，App 裡不能自己建立。它就是帳號的鑰匙：知道它的人就能用，所以不要給別人。它只在拿到或更換時顯示一次，裝置上不會保存，請記在安全的地方。',
+        '每個 App 右上角的帳戶按鈕（人像，或你挑的頭像）打開 Orbit Pass。'
       ]],
       ['tabs', '每個分頁', [
         'Pass：帳號和開戶日；下面是這個 App 自己的設定（有的話）、新增裝置、通知、除錯紀錄和帳戶安全。',
         '外觀：挑一個頭像和頭像框，全部免費，每個 App 的帳戶按鈕都看得到。',
-        'App：每個 Quadra 和 Orbit 的 App、上次什麼時候用、它的說明，和打開它。',
+        'App：每個 Orbit App、上次什麼時候用、它的說明，和打開它。',
         '說明：每個 App 怎麼用，就是這裡。'
       ]],
       ['devices', '登入與裝置', [
         '在新裝置登入：輸入通行碼，或在已登入的裝置打開 Pass，按「新增裝置」取得 8 碼裝置代碼（10 分鐘內、只能用一次）。',
-        '從一個 App 打開另一個（例如 Quadra Pass 的「App」分頁）會自動帶著登入。',
-        '「在這台裝置登出」會清除這台裝置上的所有資料；資料都還在 Quadra Pass，再登入就回來。'
+        '從一個 App 打開另一個（例如 Orbit Pass 的「App」分頁）會自動帶著登入。',
+        '「在這台裝置登出」會清除這台裝置上的所有資料；資料都還在 Orbit Pass，再登入就回來。'
       ]],
       ['one', '一次只用一個 App', [
         '同一個通行碼一次只在一個 App、一台裝置上使用。打開另一個 App（或另一台裝置），原本那個會暫停並顯示在哪裡使用中，按「在這裡繼續」就能拿回來，資料不會互相蓋掉。'
@@ -42,7 +42,7 @@ export const HELP = {
         '網路很慢時，App 會先用手機上的資料打開，底部顯示「網路連線很慢」，新資料到了就更新。'
       ]],
       ['notify', '通知與除錯紀錄', [
-        '「系統通知」一個開關管全部，下面依 App 分開，每種通知各自開關（比賽開打、投注單結算、成交、上課、降雨、公車到站…）。設定跟著 Quadra Pass，每個 App、每台裝置都一樣；App 開著時，通知顯示在畫面上方。',
+        '「系統通知」一個開關管全部，下面依 App 分開，每種通知各自開關（比賽開打、投注單結算、成交、上課、降雨、公車到站…）。設定跟著 Orbit Pass，每個 App、每台裝置都一樣；App 開著時，通知顯示在畫面上方。',
         '除錯紀錄：打開「記錄操作過程」，App 會記下它做了什麼；遇到問題時按「複製紀錄」或「分享檔案」傳出去。紀錄裡沒有通行碼。關閉時只留每件事的最後一次。'
       ]],
       ['safe', '安全', [
@@ -50,28 +50,28 @@ export const HELP = {
         'Pass 的「帳戶安全」可以「登出其他所有裝置」（這台保持登入），或「更換通行碼」：舊的立刻失效、其他裝置登出，新的只顯示一次，要輸入它的最後 5 個字確認記好了。忘記通行碼時，在還登入的裝置更換一組就好。'
       ]],
       ['looks', '頭像與頭像框', [
-        '在 Quadra Pass 的「外觀」挑頭像和頭像框，全部免費、隨時換；戴上後每個 App 的帳戶按鈕都看得到。再點一次就拿下。'
+        '在 Orbit Pass 的「外觀」挑頭像和頭像框，全部免費、隨時換；戴上後每個 App 的帳戶按鈕都看得到。再點一次就拿下。'
       ]],
       ['money', '錢在哪裡', [
-        'Quadra Pass 是帳號，不放錢。餘額、每週薪水、信貸、急難紓困、財富等級、繳的稅和每一筆明細，都在 Quadra Securities 的「資金」分頁，跟真的券商帳戶一樣。'
+        'Orbit Pass 是帳號，不放錢。餘額、每週薪水、信貸、急難紓困、財富等級、繳的稅和每一筆明細，都在 Orbit Securities 的「資金」分頁，跟真的券商帳戶一樣。'
       ]]
     ],
     en: [
-      ['what', 'What the Quadra Pass is', [
-        'The Quadra Pass is your account in every app: Quadra’s Securities and Play, and Orbit’s Class, Weather, Transit, Sports and Words. Each signs in with it and keeps its data on it, the same on every device.',
-        'The pass is a 10-character code, given to you by whoever shared Quadra with you: it can’t be made in an app. It’s the key to the account: anyone who knows it can use it, so keep it to yourself. It’s shown only when you get it or change it and never kept on a device: write it down somewhere safe.',
-        'The account button at the top right of every app (a person, or the avatar you picked) opens the Quadra Pass.'
+      ['what', 'What the Orbit Pass is', [
+        'The Orbit Pass is your account in every app: Orbit’s Securities and Play, and Orbit’s Class, Weather, Transit, Sports and Words. Each signs in with it and keeps its data on it, the same on every device.',
+        'The pass is a 10-character code, given to you by whoever shared Orbit with you: it can’t be made in an app. It’s the key to the account: anyone who knows it can use it, so keep it to yourself. It’s shown only when you get it or change it and never kept on a device: write it down somewhere safe.',
+        'The account button at the top right of every app (a person, or the avatar you picked) opens the Orbit Pass.'
       ]],
       ['tabs', 'Each tab', [
         'Pass: your account number and when it was opened; below them this app’s own settings (if it has any), adding a device, notifications, the debug log and security.',
         'Looks: pick an avatar and a frame, all free, shown on your account button in every app.',
-        'App: every Quadra and Orbit app, when you last used it, its guide and a way in.',
+        'App: every Orbit app, when you last used it, its guide and a way in.',
         'Help: how every app works, here.'
       ]],
       ['devices', 'Signing in and devices', [
         'On a new device, enter the pass, or on a signed-in device open Pass and choose “Add a device” for an 8-character device code (10 minutes, once).',
-        'Opening one app from another (from the Quadra Pass’s App tab, say) arrives signed in.',
-        '“Sign out on this device” wipes everything on this device; it all stays on your Quadra Pass and comes back when you sign in.'
+        'Opening one app from another (from the Orbit Pass’s App tab, say) arrives signed in.',
+        '“Sign out on this device” wipes everything on this device; it all stays on your Orbit Pass and comes back when you sign in.'
       ]],
       ['one', 'One app at a time', [
         'A pass is used in one app on one device at a time. Opening another app (or device) pauses the first, which says where it’s in use; “Continue here” takes it back, so nothing overwrites anything.'
@@ -82,7 +82,7 @@ export const HELP = {
         'On a slow connection an app opens on what the phone has, says “Slow internet connection” at the bottom, and updates as the new data arrives.'
       ]],
       ['notify', 'Notifications and the debug log', [
-        'One switch, System notices, turns them all on or off; below it each app’s kinds have their own switches (a game starts, a slip settled, an order filled, a class, rain, a bus nearly here…). The settings follow your Quadra Pass, the same in every app and on every device; while an app is open, a notice shows at the top of the screen.',
+        'One switch, System notices, turns them all on or off; below it each app’s kinds have their own switches (a game starts, a slip settled, an order filled, a class, rain, a bus nearly here…). The settings follow your Orbit Pass, the same in every app and on every device; while an app is open, a notice shows at the top of the screen.',
         'Debug log: turn on “Record what the app does” and the app notes what it did; when something goes wrong, Copy or Share file to send it. It never holds your pass. Off, it keeps only the last of each thing.'
       ]],
       ['safe', 'Security', [
@@ -90,27 +90,27 @@ export const HELP = {
         'Pass’s Security can sign out every other device (this one stays in) or change the pass: the old one stops at once and other devices sign out, and the new one is shown once, closed only when you type its last 5 characters. Forgot it? Change it from a device that’s still signed in.'
       ]],
       ['looks', 'Avatars and frames', [
-        'Pick an avatar and a frame in the Quadra Pass’s Looks tab: all free, change them any time, worn on your account button in every app. Tap again to take one off.'
+        'Pick an avatar and a frame in the Orbit Pass’s Looks tab: all free, change them any time, worn on your account button in every app. Tap again to take one off.'
       ]],
       ['money', 'Where the money is', [
-        'The Quadra Pass is your account; it holds no money. Your balance, the weekly pay, loans, emergency relief, wealth levels, the taxes you’ve paid and every entry are in Quadra Securities’ Money tab, as at a real broker.'
+        'The Orbit Pass is your account; it holds no money. Your balance, the weekly pay, loans, emergency relief, wealth levels, the taxes you’ve paid and every entry are in Orbit Securities’ Money tab, as at a real broker.'
       ]]
     ]
   },
   stock: {
     zh: [
-      ['what', 'Quadra Securities 是什麼', [
-        'Quadra 讓錢長大的地方：用錢包裡的新台幣投資全世界的股票、ETF、各國公債、共同基金、加密貨幣、黃金白銀存摺和外匯，價格是真實的市場價格，規則照真的券商。'
+      ['what', 'Orbit Securities 是什麼', [
+        'Orbit 讓錢長大的地方：用錢包裡的新台幣投資全世界的股票、ETF、各國公債、共同基金、加密貨幣、黃金白銀存摺和外匯，價格是真實的市場價格，規則照真的券商。'
       ]],
       ['tabs', '每個分頁', [
         '「首頁」：總資產和今日漲跌、為你推薦、漲跌幅前五名、全球市場，各分類清單（先列 15 檔）和搜尋（中文、英文或代號）；點任何標的看走勢、公司資料和下單。',
         '「資產」：淨值與走勢、配置、持股、現金與各幣別錢包、股利利息收入、定期定額和到價提醒。',
         '「資金」：換匯（你付出／你會收到，兩邊都能輸入）、匯率看板、融資、信用帳戶、定存和借券出借；下面是你的帳戶：薪水、信貸、急難紓困、財富等級和「真相」。',
         '「紀錄」：交易明細、委託、統計分析（報酬、費用與稅、和只買大盤比），和回測。',
-        '右上角：說明、重新整理和你的 Quadra Pass；漲跌的顏色在 Quadra Pass 的 Pass 分頁設定。'
+        '右上角：說明、重新整理和你的 Orbit Pass；漲跌的顏色在 Orbit Pass 的 Pass 分頁設定。'
       ]],
       ['orders', '委託單', [
-        '每筆委託都由 Quadra 的伺服器用它的即時報價成交；掛著的時候，要用的現金或股票會先保留。',
+        '每筆委託都由 Orbit 的伺服器用它的即時報價成交；掛著的時候，要用的現金或股票會先保留。',
         '市價單：開盤時立刻成交（買在賣價、賣在買價）；休市時送出的，開盤後第一個報價成交，多保留 3%，沒用到的退回；台股市價和停損單照券商的算法，以漲停價保留現金、計算額度。限價單：買進到限價或更低、賣出到限價或更高才成交。停損／觸價單：價格穿過觸發價時用市價成交。',
         '限價和停損單預設「當日有效」，收盤還沒成交就失效；選「長效」保留 30 天。加密貨幣和外匯對永遠是長效。觸發時現金不夠，委託會被取消。',
         'App 關著也照算：伺服器用那段時間的價格，找出第一個碰到你價格的時間成交，記在那個時間。',
@@ -118,7 +118,7 @@ export const HELP = {
       ]],
       ['plans', '定期定額與到價提醒', [
         '定期定額（📅）：每月 1 到 31 日選一天、每次至少 NT$100（那個月沒有這天就在月底買）。台股那天以盤中零股第一盤（09:10，2026/12/7 起 09:00）的限價成交，扣掉成本能買多少就買多少，每筆手續費 NT$1（2026 年底前，之後 0.1425%、最低 NT$1）；外幣標的只換需要的新台幣。那個月餘額不夠就跳過，連續 3 個月扣款失敗，定期定額就停止。股票、ETF 只有台股和美股能定期定額；美股每次至少 US$10，買到小數點後 4 位的碎股。',
-        '到價提醒（🔔）：漲到或跌到某個價格時通知你，App 關著時伺服器也會檢查。成交、委託失效、維持率偏低和股利利息入帳也會通知；每一種都能在 Quadra Pass 的通知各自開關。'
+        '到價提醒（🔔）：漲到或跌到某個價格時通知你，App 關著時伺服器也會檢查。成交、委託失效、維持率偏低和股利利息入帳也會通知；每一種都能在 Orbit Pass 的通知各自開關。'
       ]],
       ['fx', '換匯與外幣', [
         '每種貨幣有自己的錢包：美股用美元、日股用日圓…只有新台幣時，下單會直接換好剛好需要的金額。',
@@ -161,18 +161,18 @@ export const HELP = {
       ]]
     ],
     en: [
-      ['what', 'What Quadra Securities is', [
-        'Where Quadra’s money grows: invest the NT$ in your wallet in stocks, ETFs, government bonds, mutual funds, crypto, gold and silver passbooks and forex worldwide, at real market prices and a real broker’s rules.'
+      ['what', 'What Orbit Securities is', [
+        'Where Orbit’s money grows: invest the NT$ in your wallet in stocks, ETFs, government bonds, mutual funds, crypto, gold and silver passbooks and forex worldwide, at real market prices and a real broker’s rules.'
       ]],
       ['tabs', 'The tabs', [
         'Home: your total and today’s change, for you, the top five up and down, world markets, lists by kind (15 at first) and search (Chinese, English or ticker); tap anything for its chart, company facts and the order ticket.',
         'Portfolio: net worth and its history, allocation, holdings, cash and each currency’s wallet, income, monthly plans and price alerts.',
         'Money: exchange (you pay / you get, type either), the rates board, margin, the credit account, time deposits and lending shares; below them your account: pay, loans, relief, wealth levels and Truth.',
         'History: activity, orders, stats (returns, costs and taxes, you against just buying an index) and the backtest.',
-        'Top right: help, refresh and your Quadra Pass; the colours for up and down are set in its Pass tab.'
+        'Top right: help, refresh and your Orbit Pass; the colours for up and down are set in its Pass tab.'
       ]],
       ['orders', 'Orders', [
-        'Every order is filled by Quadra’s server at its own live quote; while an order waits, the cash or shares it needs are held.',
+        'Every order is filled by Orbit’s server at its own live quote; while an order waits, the cash or shares it needs are held.',
         'Market: fills at once while the market is open (buying at the ask, selling at the bid); placed while it’s closed, at the first price after the open, holding 3% extra (the unused part comes back); a Taiwan market or stop order holds its cost and counts against limits at the day’s limit-up price, as brokers do. Limit: a buy fills at your price or lower, a sell at your price or higher. Stop: a market order once the price passes your stop.',
         'Limit and stop orders are day orders by default: not filled by the close, they lapse; GTC keeps one for 30 days. Crypto and currency pairs are always GTC. An order whose cash is no longer there when it triggers is dropped.',
         'Closed apps still count: the server walks the prices of the time away, fills at the first moment that reached your price, and dates it then.',
@@ -180,7 +180,7 @@ export const HELP = {
       ]],
       ['plans', 'Monthly plans and price alerts', [
         'Monthly plan (📅): at least NT$100 on a day from 1 to 31 (in a shorter month, its last day). A Taiwan one buys with a limit order at the odd-lot session’s first match (09:10, 09:00 from 2026-12-07), as much as the money covers after costs, at NT$1 a buy (until the end of 2026; then 0.1425%, at least NT$1); a foreign one exchanges only the NT$ it needs. A month without enough is skipped; three in a row end the plan. Stocks and ETFs by plan only in Taiwan and the US; a US one at least US$10 a buy, in fractional shares to 4 decimals.',
-        'Price alert (🔔): tells you when a price rises or falls to yours, checked by the server while the app is closed. Fills, lapsed orders, low margin and dividends and interest are told too; each kind has its own switch in the Quadra Pass’s notifications.'
+        'Price alert (🔔): tells you when a price rises or falls to yours, checked by the server while the app is closed. Fills, lapsed orders, low margin and dividends and interest are told too; each kind has its own switch in the Orbit Pass’s notifications.'
       ]],
       ['fx', 'Exchange and currencies', [
         'Each currency has its own wallet: US stocks in US$, Japanese in yen… With only NT$, an order exchanges just what it needs.',
@@ -226,8 +226,8 @@ export const HELP = {
   odds: {
     zh: [
       ['what', 'Quadra Play 是什麼', [
-        'Quadra 玩樂的地方：照台灣運動彩券的玩法、賠率和規則下注，還有台灣彩券的電腦彩券和刮刮樂。棒球、籃球、足球、美式足球、冰球和 F1，每場比賽和冠軍盤都有；跟運彩一樣，沒有球員玩法。',
-        '運彩賠率由 DraftKings、Kambi、Polymarket 的價格去掉抽成，再照運彩實際的抽成定價；還沒有人開盤的比賽由 Quadra 自己估。彩券用台灣彩券的真實開獎號碼。'
+        'Orbit 玩樂的地方：照台灣運動彩券的玩法、賠率和規則下注，還有台灣彩券的電腦彩券和刮刮樂。棒球、籃球、足球、美式足球、冰球和 F1，每場比賽和冠軍盤都有；跟運彩一樣，沒有球員玩法。',
+        '運彩賠率由 DraftKings、Kambi、Polymarket 的價格去掉抽成，再照運彩實際的抽成定價；還沒有人開盤的比賽由 Orbit 自己估。彩券用台灣彩券的真實開獎號碼。'
       ]],
       ['tabs', '每個分頁', [
         '「首頁」：餘額（投注中的金額）、場中焦點、為你推薦（照你在 Orbit Sports 追蹤的球隊和聯賽，前三個可以一次串成一張）、焦點賽事、你的投注和彩券頭獎。',
@@ -245,7 +245,7 @@ export const HELP = {
       ['lottery', '彩券', [
         '威力彩、大樂透、今彩539、3星彩、4星彩、39／49樂合彩和賓果賓果，照台灣彩券的規則和真實開獎對獎；晚上開獎的 20:00 截止。威力彩前兩獎和大樂透前四獎照那期每注實際派彩，和真的中獎人一起分，派彩公布後才入帳。',
         '照台灣彩券的投注方式：威力彩、大樂透、今彩539 可以包牌（系統組合，最多 16 個號碼；威力彩第 2 區 2 到 8 個），樂合彩系統組合 3 到 10 個號碼；倍數只有樂合彩（最多 10 倍）、3星彩、4星彩和賓果賓果（最多 50 倍）；多期投注威力彩、大樂透、49樂合彩 2 到 10 期，賓果賓果 2 到 12 期，其他 2 到 24 期，每期一張、各自對獎。',
-        '真的彩券要自己去兌獎：開獎次日起三個月內，NT$5,000 以下在投注站，NT$500 萬以下在中國信託，更高要先預約。Quadra 不用兌獎，中獎自動入帳。',
+        '真的彩券要自己去兌獎：開獎次日起三個月內，NT$5,000 以下在投注站，NT$500 萬以下在中國信託，更高要先預約。Orbit 不用兌獎，中獎自動入帳。',
         '刮刮樂是台灣彩券正在賣的每一種，照真的獎金結構和總中獎率；買的時候就決定中多少，刮開就知道。',
         '選號時快選補滿，+1／+5／+10 再加幾注；購買列一直在下面。中獎自動入帳並通知你。'
       ]],
@@ -254,13 +254,13 @@ export const HELP = {
         '冠軍玩法只列還有機會的隊伍和車手：被淘汰、季後賽出局或積分已追不上的，會自動從看板拿掉。'
       ]],
       ['money', '錢怎麼算', [
-        '下注和買彩券從 Quadra 餘額扣款；派彩和彩券獎金都由伺服器入帳，並通知你。彩券獎金照規定每注計算：單注超過 NT$5,000 扣 20% 所得稅和 0.4% 印花稅。'
+        '下注和買彩券從 Orbit 餘額扣款；派彩和彩券獎金都由伺服器入帳，並通知你。彩券獎金照規定每注計算：單注超過 NT$5,000 扣 20% 所得稅和 0.4% 印花稅。'
       ]]
     ],
     en: [
       ['what', 'What Quadra Play is', [
-        'Quadra’s place to play: bets with Taiwan Sports Lottery’s markets, odds and rules, and Taiwan Lottery’s draw games and scratch cards. Baseball, basketball, soccer, American football, hockey and F1: every game and outrights; no player markets, as at the sports lottery.',
-        'Odds come from DraftKings’, Kambi’s and Polymarket’s prices with their margins taken out, then priced at the cuts the sports lottery really takes; a game nobody prices yet is priced by Quadra itself. The lottery uses Taiwan Lottery’s real draws.'
+        'Orbit’s place to play: bets with Taiwan Sports Lottery’s markets, odds and rules, and Taiwan Lottery’s draw games and scratch cards. Baseball, basketball, soccer, American football, hockey and F1: every game and outrights; no player markets, as at the sports lottery.',
+        'Odds come from DraftKings’, Kambi’s and Polymarket’s prices with their margins taken out, then priced at the cuts the sports lottery really takes; a game nobody prices yet is priced by Orbit itself. The lottery uses Taiwan Lottery’s real draws.'
       ]],
       ['tabs', 'The tabs', [
         'Home: your balance (what’s in open bets), live now, for you (from the teams and leagues you follow in Orbit Sports; its top three as one parlay), featured games, your bets and the lottery jackpots.',
@@ -278,7 +278,7 @@ export const HELP = {
       ['lottery', 'Lottery', [
         'Super Lotto 威力彩, Lotto 6/49 大樂透, Daily Cash 539, 3 Star and 4 Star, 39/49 樂合彩 and BINGO BINGO, checked against Taiwan Lottery’s rules and real draws; evening draws stop selling at 20:00. 威力彩’s top two prizes and 大樂透’s top four pay what that draw paid per winner, shared with the real winners, once the payout is announced.',
         'As Taiwan Lottery sells them: 威力彩, 大樂透 and 今彩539 take a system bet (包牌, up to 16 numbers; 2 to 8 in 威力彩’s second zone), 樂合彩 a system of 3 to 10 numbers; only 樂合彩 (up to ×10), 3 Star, 4 Star and BINGO (up to ×50) take a multiple; multi-draw is 2 to 10 draws on 威力彩, 大樂透 and 49樂合彩, 2 to 12 on BINGO and 2 to 24 on the rest, a ticket a draw, each checked on its own.',
-        'A real ticket is claimed in person within three months of the day after its draw: up to NT$5,000 at a retailer, up to NT$5 million at CTBC Bank, more by appointment. Quadra needs no claiming: prizes are paid in automatically.',
+        'A real ticket is claimed in person within three months of the day after its draw: up to NT$5,000 at a retailer, up to NT$5 million at CTBC Bank, more by appointment. Orbit needs no claiming: prizes are paid in automatically.',
         'The scratch cards are every one Taiwan Lottery sells now, at their real prize table and win rate; the prize is fixed when a card is bought, and scratching shows it.',
         'Quick pick fills a line, +1/+5/+10 add more, and the buy bar stays in view. Wins are paid in automatically and you’re told.'
       ]],
@@ -287,7 +287,7 @@ export const HELP = {
         'Outright boards list only who can still win: a team knocked out or out of the play-offs, or a driver who can no longer catch the leader on points, comes off the board by itself.'
       ]],
       ['money', 'Money', [
-        'Bets and tickets come out of the Quadra balance; payouts and prizes are paid in by the server, and you’re told. Lottery prizes are taxed bet by bet, by law: each bet paying over NT$5,000 has 20% income tax and 0.4% stamp duty withheld.'
+        'Bets and tickets come out of the Orbit balance; payouts and prizes are paid in by the server, and you’re told. Lottery prizes are taxed bet by bet, by law: each bet paying over NT$5,000 has 20% income tax and 0.4% stamp duty withheld.'
       ]]
     ]
   },
@@ -301,7 +301,7 @@ export const HELP = {
         '「賽事」：依運動和聯賽找比賽，打開就在離現在最近的比賽日；賽程、排名、季後賽／淘汰賽；最上面搜尋聯賽、球隊和球員（中文英文都可以）。F1 每站一張卡。',
         '「轉播」：什麼時候、在哪一台。正在轉播的比賽（點「觀看」直接開愛爾達或 Apple TV）、你追蹤的接下來 7 天的轉播、接下來 24 小時的其他比賽、剛結束的，和愛爾達完整轉播表。',
         '「追蹤」：你追蹤的比賽、球隊和選手現在怎麼樣：排名、近況、上一場和下一場；「我的設定」也在這裡。',
-        '右上角：說明、重新整理和你的 Quadra Pass；再點一次目前的分頁會回到頂端。'
+        '右上角：說明、重新整理和你的 Orbit Pass；再點一次目前的分頁會回到頂端。'
       ]],
       ['game', '比賽頁', [
         '比分、系列賽戰況和逐局（節、半場）比分；進行中有即時面板（壘包和球數、進球和紅牌、得分最多的球員）和勝率走勢，按住走勢看每個時刻，關鍵時刻標在線上。',
@@ -310,7 +310,7 @@ export const HELP = {
       ]],
       ['follow', '追蹤與通知', [
         '「我的設定」（追蹤分頁）：運動依優先順序排（第一個最優先）、各運動的聯賽、追蹤的對象和喜歡的轉播語言（英文原音、中文、雙語）。球隊和選手在他們的頁面或比賽頁按「+ 追蹤」，追蹤球隊也會追蹤它的聯賽；單一場比賽按「追蹤這場」、F1 按「追蹤這一站」，開始後兩天自動移除。',
-        '通知：追蹤的球隊開賽（有台灣轉播時）和終場比分、今日推薦每一場開賽和賽果、F1 的排位賽、衝刺賽和正賽開始，和衝刺賽、正賽的前三名；每一種都能在 Quadra Pass 的通知各自開關。',
+        '通知：追蹤的球隊開賽（有台灣轉播時）和終場比分、今日推薦每一場開賽和賽果、F1 的排位賽、衝刺賽和正賽開始，和衝刺賽、正賽的前三名；每一種都能在 Orbit Pass 的通知各自開關。',
         '球隊頁和比賽概況有傷兵報告（NBA、WNBA、NFL、NHL、MLB）：誰受傷、狀態、預計何時回歸；球員頁有 🩹 標記。F1 比賽中的賽事幹事訊息會翻成中文。'
       ]],
       ['picks', '今日推薦', [
@@ -334,7 +334,7 @@ export const HELP = {
         'Matches: find games by sport and league, opening on the game day nearest now; schedule, tables, playoffs or knockouts; search leagues, teams and players at the top (Chinese or English). F1 has a card per weekend.',
         'On TV: when and where. What’s on now (Watch opens ELTA or Apple TV), your follows’ games in the next 7 days, the next 24 hours’ other games, games just ended, and ELTA’s whole guide.',
         'Following: how the matches, teams and drivers you follow are doing: table place, form, last and next game; My settings lives here too.',
-        'Top right: help, refresh and your Quadra Pass; tap the open tab again to go back to its top.'
+        'Top right: help, refresh and your Orbit Pass; tap the open tab again to go back to its top.'
       ]],
       ['game', 'A game’s page', [
         'The score, the series and the line score; while it’s on, a live panel (bases and count, goals and red cards, the top scorers) and the win chance over time: hold it to read any moment, the key moments marked on its line.',
@@ -343,7 +343,7 @@ export const HELP = {
       ]],
       ['follow', 'Following and notices', [
         'My settings (in Following): your sports in order (the first counts most), each sport’s leagues, who you follow and the commentary you like (English, Chinese, both). Follow a team or player with + Follow on their page or a game’s, which follows its league too; Follow this game, or Follow this race weekend for F1, is let go two days after it starts.',
-        'Notices: a followed team’s game starting (when it’s on TV here) and its final score, each of today’s picks starting and its result, and F1’s qualifying, sprint and race starting, and the sprint’s and race’s top three; each kind has its own switch in the Quadra Pass’s notifications.',
+        'Notices: a followed team’s game starting (when it’s on TV here) and its final score, each of today’s picks starting and its result, and F1’s qualifying, sprint and race starting, and the sprint’s and race’s top three; each kind has its own switch in the Orbit Pass’s notifications.',
         'Team pages and a game’s summary have the injury report (NBA, WNBA, NFL, NHL, MLB): who, their status and when they’re expected back; a player’s page has a 🩹 tag. F1 race control messages are translated into Chinese.'
       ]],
       ['picks', 'Today’s picks', [
@@ -362,7 +362,7 @@ export const HELP = {
   vocab: {
     zh: [
       ['what', 'Orbit Words 是什麼', [
-        'Orbit 的背單字 App：大考中心高中英文參考詞彙 6,169 字，每個字都有真人發音，記憶模型替你安排什麼時候複習。沒有網路也能用，進度每一步都存在手機上，連上網路再和 Quadra Pass 合併。'
+        'Orbit 的背單字 App：大考中心高中英文參考詞彙 6,169 字，每個字都有真人發音，記憶模型替你安排什麼時候複習。沒有網路也能用，進度每一步都存在手機上，連上網路再和 Orbit Pass 合併。'
       ]],
       ['tabs', '每個分頁', [
         '「今天」：今天的目標、連續天數、等級，該複習、還沒學和已精熟的字數，一鍵開始這一輪；背新字、上次答錯的字用卡片看一遍，還有今日單字。',
@@ -384,12 +384,12 @@ export const HELP = {
         '每答對一題 2 XP，第一次精熟一個字再加 15 XP。累計積分決定等級（Lv 2 要 100 XP、Lv 5 要 1,600、Lv 10 要 8,100、Lv 20 要 36,100），每幾級換一個稱號：新手、學徒、好手、高手、達人、大師、傳奇、神話。積分只是你的學習紀錄，不能換任何東西。'
       ]],
       ['money', '錢怎麼算', [
-        'Orbit Words 不用錢，也不發錢：練單字永遠免費。帳戶和頭像在每個 App 右上角的 Quadra Pass 裡。'
+        'Orbit Words 不用錢，也不發錢：練單字永遠免費。帳戶和頭像在每個 App 右上角的 Orbit Pass 裡。'
       ]]
     ],
     en: [
       ['what', 'What Orbit Words is', [
-        'Orbit’s vocabulary app: the 6,169 words of Taiwan’s high-school English reference list, each recorded by a real voice, with a memory model deciding when each comes back. It works offline: progress is kept on the phone at every step and merged with your Quadra Pass once you’re online.'
+        'Orbit’s vocabulary app: the 6,169 words of Taiwan’s high-school English reference list, each recorded by a real voice, with a memory model deciding when each comes back. It works offline: progress is kept on the phone at every step and merged with your Orbit Pass once you’re online.'
       ]],
       ['tabs', 'The tabs', [
         'Today: the day’s goal, your streak and level, how many words are due, new and mastered, and a round a tap away; new words to study as cards, last time’s missed words as cards, and the word of the day.',
@@ -411,14 +411,14 @@ export const HELP = {
         'Each right answer earns 2 XP and a word’s first mastery 15 more. Total XP sets your level (Lv 2 at 100 XP, Lv 5 at 1,600, Lv 10 at 8,100, Lv 20 at 36,100), with a new title every few levels: Rookie, Apprentice, Skilled, Expert, Master, Grandmaster, Legend, Mythic. XP is only a record of learning; it buys nothing.'
       ]],
       ['money', 'Money', [
-        'Orbit Words uses no money and pays none: learning is always free. Your account and looks are in the Quadra Pass at the top right of every app.'
+        'Orbit Words uses no money and pays none: learning is always free. Your account and looks are in the Orbit Pass at the top right of every app.'
       ]]
     ]
   },
   orbit: {
     zh: [
       ['what', 'Orbit Class 是什麼', [
-        'Orbit 的課表 App。打開就知道現在是哪一節、還剩幾分鐘、下一節是什麼。課表存在 Quadra Pass，登入的每台裝置都一樣；沒有網路也能看，改的地方連上網路再送出。'
+        'Orbit 的課表 App。打開就知道現在是哪一節、還剩幾分鐘、下一節是什麼。課表存在 Orbit Pass，登入的每台裝置都一樣；沒有網路也能看，改的地方連上網路再送出。'
       ]],
       ['tabs', '每個分頁', [
         '「今天」：目前這一節（午休、打掃也算）、倒數和下一節；下面是今天的全部課程，點一節看詳細資料（一週哪幾天、第幾節上這門課）。今天的課上完了，就換成下一個上課日的課。倒數活動也在這裡，左右滑動換一個。',
@@ -430,11 +430,11 @@ export const HELP = {
         '只換那兩天，其他週照舊；調過的課標著橘色「調課」，通知也跟著換。點那節或「課表」裡的調課可以取消。'
       ]],
       ['notify', '上課提醒與假日', [
-        '每堂課開始前 5 分鐘通知你課名、時間、老師和教室，App 關著也會；開關在 Quadra Pass 的通知。',
+        '每堂課開始前 5 分鐘通知你課名、時間、老師和教室，App 關著也會；開關在 Orbit Pass 的通知。',
         '國定假日和補假沒有課，也不會通知；「下一個上課日」會跳過它們。倒數活動打開「結束後自動刪除」，活動過了就自己刪掉。'
       ]],
       ['share', '分享課表', [
-        '課表只有建立它的 Quadra Pass 能編輯。要分享時在「工具」按「產生分享金鑰」（24 小時內有效），對方在自己的 Orbit Class 輸入就得到一份自己的副本，可以自己改。',
+        '課表只有建立它的 Orbit Pass 能編輯。要分享時在「工具」按「產生分享金鑰」（24 小時內有效），對方在自己的 Orbit Class 輸入就得到一份自己的副本，可以自己改。',
         '另一台裝置在你之後改過課表時，以比較新的為準，這台的修改會先另外存起來並告訴你，不會蓋掉。'
       ]],
       ['money', '錢怎麼算', [
@@ -443,7 +443,7 @@ export const HELP = {
     ],
     en: [
       ['what', 'What Orbit Class is', [
-        'Orbit’s class schedule app: open it to see the period now, the minutes left and what’s next. The schedule lives on your Quadra Pass, the same on every device you sign in on; it opens offline too, and an edit made then is sent once you’re back online.'
+        'Orbit’s class schedule app: open it to see the period now, the minutes left and what’s next. The schedule lives on your Orbit Pass, the same on every device you sign in on; it opens offline too, and an edit made then is sent once you’re back online.'
       ]],
       ['tabs', 'The tabs', [
         'Today: the period now (lunch and cleaning too), its countdown and the next; below, the whole day, a tap on a class for its details (which days and periods it meets). Once the day’s classes are over, it shows the next school day’s. Countdowns are here too: swipe between them.',
@@ -455,11 +455,11 @@ export const HELP = {
         'Only those two dates change, every other week as before; a swapped class carries an orange Swap tag, and its notice follows it. Tap it, or the swap in Timetable, to undo it.'
       ]],
       ['notify', 'Class reminders and holidays', [
-        'Five minutes before each class you’re told its name, time, teacher and room, with the app closed too; the switch is in the Quadra Pass’s notifications.',
+        'Five minutes before each class you’re told its name, time, teacher and room, with the app closed too; the switch is in the Orbit Pass’s notifications.',
         'Taiwan’s holidays and their make-up days off have no classes and no reminders, and the next school day skips them. A countdown with Delete when over clears itself once it has passed.'
       ]],
       ['share', 'Sharing a schedule', [
-        'Only the Quadra Pass that made a schedule edits it. To share it, make a share key in Tools (valid 24 hours): entering it in their own Orbit Class gives a classmate their own copy to change as they like.',
+        'Only the Orbit Pass that made a schedule edits it. To share it, make a share key in Tools (valid 24 hours): entering it in their own Orbit Class gives a classmate their own copy to change as they like.',
         'If another device changed the schedule after you, the newer one stands: the change made here is set aside on the device and you’re told, never written over it.'
       ]],
       ['money', 'Money', [
@@ -484,7 +484,7 @@ export const HELP = {
       ]],
       ['notify', '設定與通知', [
         '右上角的 ⚙︎：卡片的順序、關掉不需要的卡片，和早晨天氣的時間。',
-        '早晨天氣：每天在設定的時間一句話（降雨、溫度、紫外線、空氣），以那時的釘選地點為準。降雨提醒：白天 2 小時內可能下雨時，一天最多一次。兩個開關都在 Quadra Pass 的通知。'
+        '早晨天氣：每天在設定的時間一句話（降雨、溫度、紫外線、空氣），以那時的釘選地點為準。降雨提醒：白天 2 小時內可能下雨時，一天最多一次。兩個開關都在 Orbit Pass 的通知。'
       ]],
       ['money', '錢怎麼算', ['Orbit Weather 不用錢。']]
     ],
@@ -504,7 +504,7 @@ export const HELP = {
       ]],
       ['notify', 'Settings and notices', [
         '⚙︎ at the top right: the cards’ order, hiding the ones you don’t need, and the morning brief’s time.',
-        'Morning weather: one line each day at that time (rain, temperature, UV, air), for the pinned place you’re at then. Rain alert: rain likely within 2 hours in the daytime, once a day at most. Both switches are in the Quadra Pass’s notifications.'
+        'Morning weather: one line each day at that time (rain, temperature, UV, air), for the pinned place you’re at then. Rain alert: rain likely within 2 hours in the daytime, once a day at most. Both switches are in the Orbit Pass’s notifications.'
       ]],
       ['money', 'Money', ['Orbit Weather uses no money.']]
     ]
@@ -512,7 +512,7 @@ export const HELP = {
   slip: {
     zh: [
       ['what', 'Orbit Slips 是什麼', [
-        'Orbit 的運彩追蹤：你在台灣運彩買的注單，比賽即時跟著看。每張注單顯示每場的比分、這張現在還會中的機率、現在值多少，和彩券拿走多少。注單存在 Quadra Pass，換手機也在；沒有網路時用手機上的副本。'
+        'Orbit 的運彩追蹤：你在台灣運彩買的注單，比賽即時跟著看。每張注單顯示每場的比分、這張現在還會中的機率、現在值多少，和彩券拿走多少。注單存在 Orbit Pass，換手機也在；沒有網路時用手機上的副本。'
       ]],
       ['add', '新增注單', [
         '「拍注單自動填入」：拍注單或截圖，Gemini 讀出每一場、玩法和賠率，對到真的比賽後填進下面，確認後再儲存；對不到的會列出來讓你手動加。比賽已經打完的舊注單也可以拍：照購買日期找到當時的比賽，直接用最終比分結算，記在當時的日子。每個帳戶一天可以掃 30 張。',
@@ -527,12 +527,12 @@ export const HELP = {
         '派彩照台灣運彩的規則：每張彩金超過 NT$5,000 整筆預扣 20% 所得稅；打平或比賽取消算 1.00（足球整數讓分剛好打平是讓分和，不退款）。足球算 90 分鐘、冰球算 60 分鐘（不含延長賽）；中職、日職、韓職和局時不讓分退款。'
       ]],
       ['money', '錢怎麼算', [
-        'Orbit Slips 不賣彩券，也不碰錢：只是幫你看已經買的注單。帳戶和頭像在右上角的 Quadra Pass 裡。'
+        'Orbit Slips 不賣彩券，也不碰錢：只是幫你看已經買的注單。帳戶和頭像在右上角的 Orbit Pass 裡。'
       ]]
     ],
     en: [
       ['what', 'What Orbit Slips is', [
-        'Orbit’s tracker for the tickets you bought at Taiwan Sports Lottery, followed live: each ticket shows its games’ scores, the chance it still lands, what it’s worth now and what the lottery takes. Tickets are kept on your Quadra Pass, so a new phone has them; offline, the copy on the phone.'
+        'Orbit’s tracker for the tickets you bought at Taiwan Sports Lottery, followed live: each ticket shows its games’ scores, the chance it still lands, what it’s worth now and what the lottery takes. Tickets are kept on your Orbit Pass, so a new phone has them; offline, the copy on the phone.'
       ]],
       ['add', 'Adding a ticket', [
         'Scan a ticket: a photo or screenshot, read by Gemini; each game, market and price is matched to a real game and filled in for you to check before saving; any it can’t place are listed to add by hand. An old ticket works too: its games are found from the day it was bought, settled on their final scores and kept on that day. 30 scans a day an account.',
@@ -547,7 +547,7 @@ export const HELP = {
         'Payouts follow Taiwan Sports Lottery’s rules: 20% income tax on any slip paying over NT$5,000; a push or a game called off counts 1.00 (soccer’s whole-goal spread landing on its line is the handicap draw, not a refund). Soccer is on 90 minutes, hockey on 60 (no overtime); a tied CPBL, NPB or KBO game returns a moneyline pick.'
       ]],
       ['money', 'Money', [
-        'Orbit Slips sells nothing and moves no money: it only follows tickets you’ve bought. The account and looks are in the Quadra Pass, top right.'
+        'Orbit Slips sells nothing and moves no money: it only follows tickets you’ve bought. The account and looks are in the Orbit Pass, top right.'
       ]]
     ]
   },
@@ -573,11 +573,11 @@ export const HELP = {
         '「⋯」：變奏一首、換個鼓、編排（段落上移、重複、換段落、改小節數或拿掉）、分享、下載 WAV、下載分軌、匯出 MIDI。播放器播完接下一首、單曲重複或重複這一段。',
         '「混音」預設打開；關掉的話，每段跟錄的一模一樣。'
       ]],
-      ['pass', '存在 Quadra Pass 的', [
+      ['pass', '存在 Orbit Pass 的', [
         '設定、每組片段的速度和你改過的角色，和每種風格收藏了幾首；打開「依你的口味」，做歌就偏向你喜歡的。聲音本身不離開手機。'
       ]],
       ['money', '錢怎麼算', [
-        'Orbit Beats 免費，不碰錢。帳戶和頭像在右上角的 Quadra Pass 裡。'
+        'Orbit Beats 免費，不碰錢。帳戶和頭像在右上角的 Orbit Pass 裡。'
       ]]
     ],
     en: [
@@ -601,11 +601,11 @@ export const HELP = {
         '⋯: a variation, another groove, Arrange (move a section up, repeat it, change its kind or bars, or remove it), Share, Download WAV, Download stems, Export MIDI. The player goes on to the next song, repeats one, or repeats a section.',
         'Mix is on by default; off, every piece plays exactly as recorded.'
       ]],
-      ['pass', 'On your Quadra Pass', [
+      ['pass', 'On your Orbit Pass', [
         'Your settings, each set’s tempo and the roles you set, and how many songs you kept of each style; with Lean to your taste on, new songs lean to what you like. The sound itself never leaves the phone.'
       ]],
       ['money', 'Money', [
-        'Orbit Beats is free and moves no money. The account and looks are in the Quadra Pass, top right.'
+        'Orbit Beats is free and moves no money. The account and looks are in the Orbit Pass, top right.'
       ]]
     ]
   },
@@ -633,7 +633,7 @@ export const HELP = {
       ]],
       ['alerts', '到站提醒與通知', [
         '到站提醒（🔔）：例如「5608 離我的站 5 分鐘時告訴我」，到時通知你，手機鎖著也會。',
-        '導航中：該出發、要搭的公車快到了、火車快開、下一站要下車，都會通知到鎖定畫面。兩種通知都在 Quadra Pass 的通知各自開關。'
+        '導航中：該出發、要搭的公車快到了、火車快開、下一站要下車，都會通知到鎖定畫面。兩種通知都在 Orbit Pass 的通知各自開關。'
       ]],
       ['money', '錢怎麼算', ['Orbit Transit 不用錢；票價只是參考。']]
     ],
@@ -660,7 +660,7 @@ export const HELP = {
       ]],
       ['alerts', 'Bus alerts and notices', [
         'Bus alert (🔔): “tell me when the 5608 is 5 minutes from my stop”, even with the phone locked.',
-        'Navigating: time to leave, your bus nearly here, your train about to leave, your stop next, all on the lock screen. Both kinds have their own switch in the Quadra Pass’s notifications.'
+        'Navigating: time to leave, your bus nearly here, your train about to leave, your stop next, all on the lock screen. Both kinds have their own switch in the Orbit Pass’s notifications.'
       ]],
       ['money', 'Money', ['Orbit Transit is free; fares are a guide.']]
     ]

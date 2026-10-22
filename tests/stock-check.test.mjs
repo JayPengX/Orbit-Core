@@ -203,7 +203,7 @@ test('a future: issued fills count, and its expiry only at TAIFEX final settleme
   const expiry = Date.parse('2026-10-21T13:30:00+08:00');
   const d = deps({ f1: { quote: 46_000, t: T, s: sym, side: 'buy', q: 1, k: 'market' } });
   const read = d.read;
-  d.read = async url => (url.startsWith('https://taifex.quadra/') ? { date: '2026-10-21', settle: {}, margin: {}, final: { 202610: 46_650 } } : read(url));
+  d.read = async url => (url.startsWith('https://taifex.orbit/') ? { date: '2026-10-21', settle: {}, margin: {}, final: { 202610: 46_650 } } : read(url));
   const base = { type: 'fill', symbol: sym, name: '微台指 10月', kind: 'fut', market: 'TAIFEX', currency: 'TWD', qty: 1, commission: 25, tax: 46, fee: 0, twd: 1 };
   const buy = { ...base, id: 'fill:f1', orderId: 'f1', t: T, side: 'buy', price: 46_001, quote: 46_000, gross: 46_001, total: 46_001 + 71 };
   const settle = (id, price) => ({ ...base, id, orderId: null, maturity: true, t: expiry, side: 'sell', price, quote: price, gross: price, commission: 0, tax: 47, total: price - 47 });
@@ -218,7 +218,7 @@ test('an option: issued fills count at NT$50 a point, and its expiry only at wha
   const expiry = Date.parse('2026-10-21T13:30:00+08:00');
   const d = deps({ o1: { quote: 300, t: T, s: sym, side: 'buy', q: 2, k: 'market' } });
   const read = d.read;
-  d.read = async url => (url.startsWith('https://taifex.quadra/') ? { date: '2026-10-21', settle: {}, margin: {}, final: { 202610: 46_650 } } : read(url));
+  d.read = async url => (url.startsWith('https://taifex.orbit/') ? { date: '2026-10-21', settle: {}, margin: {}, final: { 202610: 46_650 } } : read(url));
   const base = { type: 'fill', symbol: sym, name: '台指選 10月 46000 買權', kind: 'opt', market: 'TAIFEX', currency: 'TWD', qty: 2, fee: 0, twd: 1 };
   const buy = { ...base, id: 'fill:o1', orderId: 'o1', t: T, side: 'buy', price: 301, quote: 300, gross: 30_100, commission: 50, tax: 30, total: 30_180 };
   const settle = (id, price) => ({ ...base, id, orderId: null, maturity: true, t: expiry, side: 'sell', price, quote: 46_650, gross: price * 100, commission: 0, tax: Math.round(price * 100 * 0.001), total: price * 100 - Math.round(price * 100 * 0.001) });
@@ -232,7 +232,7 @@ test('an option written: its premium in only with the margin behind it, and assi
   const expiry = Date.parse('2026-10-21T13:30:00+08:00');
   const d = deps({ w1: { quote: 300, t: T, s: sym, side: 'sell', q: 1, k: 'market' }, w2: { quote: 300, t: T + 1000, s: sym, side: 'sell', q: 1, k: 'market' } });
   const read = d.read;
-  d.read = async url => (url.startsWith('https://taifex.quadra/') ? { date: '2026-10-21', settle: {}, margin: {}, final: { 202610: 45_800 } } : read(url));
+  d.read = async url => (url.startsWith('https://taifex.orbit/') ? { date: '2026-10-21', settle: {}, margin: {}, final: { 202610: 45_800 } } : read(url));
   const base = { type: 'fill', symbol: sym, name: '台指選 10月 46000 賣權', kind: 'opt', market: 'TAIFEX', currency: 'TWD', qty: 1, fee: 0, twd: 1 };
   // One written (NT$100,000 covers its 72,000 + premium); a second wouldn't fit.
   const sell = (id, t) => ({ ...base, id: `fill:${id}`, orderId: id, t, side: 'sell', price: 299, quote: 300, gross: 14_950, commission: 25, tax: 15, total: 14_910, im: 177_000 });

@@ -1,38 +1,28 @@
-// The brand: two families and their apps, one source for the names, the
+// The brand: one family, Orbit, and its apps: one source for the names, the
 // colours, the lines that describe them and the marks (SVG strings). The kit
 // reads it (APPS, the Pass's app list, the loading screen); brand/generate.mjs
-// draws every icon and share card from it.
-//
-//   Quadra  where the money is: Quadra Securities, Quadra Play, and the
-//           Quadra Pass every app signs in with. A square tile with a gold
-//           corner (the fourth quadrant).
-//   Orbit   everyday tools: Orbit Class, Weather, Transit, Sports, Words,
-//           Slips, Beats.
-//           A planet with its ring and a moon.
+// draws every icon and share card from it. Every app's icon is a planet with
+// its ring and a moon, the app's symbol on the planet.
 //
 // `id` stays what the apps and the pass store under (stock, odds, match,
 // vocab…); only the names and looks are the brand's.
 
 export const GOLD = '#f5c451';
-export const FAMILIES = {
-  quadra: { name: 'Quadra', from: '#1e293b', to: '#020617', ink: '#0f172a', accent: GOLD, tag: { zh: '投資與娛樂，一個帳戶', en: 'Markets and play, one account' } },
-  orbit: { name: 'Orbit', from: '#312e81', to: '#020617', ink: '#1e1b4b', accent: '#a5b4fc', tag: { zh: '每天用得到的小工具', en: 'Everyday tools that keep you on track' } }
-};
+export const FAMILY = { name: 'Orbit', from: '#312e81', to: '#020617', ink: '#1e1b4b', accent: '#a5b4fc', tag: { zh: '每天用得到的 App，一個 Orbit Pass', en: 'Everyday apps, one Orbit Pass' } };
 
 // repo: the GitHub repo (and Pages path) each app lives at.
 export const BRANDS = {
-  stock: { family: 'quadra', name: 'Quadra Securities', short: 'Securities', repo: 'Quadra-Securities', from: '#2dd4bf', to: '#0f3d5c', ink: '#0f766e', color: '#0d9488', role: { zh: '投資與理財', en: 'Invest and grow' }, tag: { zh: '全球股市模擬投資：真實報價、換匯與融資', en: 'Invest in markets worldwide with play money' } },
-  odds: { family: 'quadra', name: 'Quadra Play', short: 'Play', repo: 'Quadra-Play', from: '#60a5fa', to: '#1e3a8a', ink: '#1d4ed8', color: '#2563eb', role: { zh: '運彩與彩券', en: 'Sports bets and lottery' }, tag: { zh: '運彩與彩券：每一注的數學都看得見', en: 'Sports bets and the lottery, with the maths shown' } },
-  orbit: { family: 'orbit', name: 'Orbit Class', short: 'Class', repo: 'Orbit-Class', from: '#7dd3fc', to: '#0c4a6e', ink: '#0369a1', color: '#0ea5e9', role: { zh: '課表', en: 'Class schedule' }, tag: { zh: '即時課表：現在、下一節與倒數', en: 'Your class schedule, live' } },
-  weather: { family: 'orbit', name: 'Orbit Weather', short: 'Weather', repo: 'Orbit-Weather', from: '#a5b4fc', to: '#312e81', ink: '#4338ca', color: '#6366f1', role: { zh: '天氣', en: 'Weather' }, tag: { zh: '一個答案的天氣：降雨、紫外線、空氣，跟著你的行程', en: 'One clear forecast for wherever you’ll be' } },
-  transit: { family: 'orbit', name: 'Orbit Transit', short: 'Transit', repo: 'Orbit-Transit', from: '#6ee7b7', to: '#064e3b', ink: '#047857', color: '#10b981', role: { zh: '大眾運輸', en: 'Public transport' }, tag: { zh: '全台公車、火車、捷運與 YouBike，一次規劃', en: 'Buses, trains, metros and bikes across Taiwan' } },
-  match: { family: 'orbit', name: 'Orbit Sports', short: 'Sports', repo: 'Orbit-Sports', was: 'Quadra-Fixtures', from: '#fdba74', to: '#9a3412', ink: '#c2410c', color: '#ea580c', role: { zh: '賽程與比分', en: 'Scores and schedules' }, tag: { zh: '所有運動的賽程、比分與數據', en: 'Every sport, every match, every stat' } },
-  slip: { family: 'orbit', name: 'Orbit Slips', short: 'Slips', repo: 'Orbit-Slips', from: '#fcd34d', to: '#78350f', ink: '#b45309', color: '#d97706', role: { zh: '運彩追蹤', en: 'Ticket tracker' }, tag: { zh: '買了的運彩，即時追蹤：比分、機率、現在價值', en: 'Your sports lottery tickets, followed live' } },
-  beats: { family: 'orbit', name: 'Orbit Beats', short: 'Beats', repo: 'Orbit-Beats', from: '#f0abfc', to: '#701a75', ink: '#a21caf', color: '#c026d3', role: { zh: '節拍作曲', en: 'Beat maker' }, tag: { zh: '把你的節拍片段，排成一首首新歌', en: 'Your beat pieces, arranged into new songs' } },
-  law: { family: 'orbit', name: 'Orbit Law', short: 'Law', repo: 'Orbit-Law', from: '#a5b4fc', to: '#1e1b4b', ink: '#4338ca', color: '#4f46e5', role: { zh: '法規與法案', en: 'Laws and bills' }, tag: { zh: '台灣的法規，每個條號都能點；立法院的法案，走到哪一步一眼就懂。', en: 'Taiwan\'s laws with linked references, and 立法院 bills by stage' } },
-  vocab: { family: 'orbit', name: 'Orbit Words', short: 'Words', repo: 'Orbit-Words', was: 'Quadra-Hub', from: '#f9a8d4', to: '#831843', ink: '#be185d', color: '#db2777', role: { zh: '英文單字', en: 'English words' }, tag: { zh: '背得住的英文單字：大考 6000 字，真人發音', en: 'English words that stay with you' } }
+  stock: { name: 'Orbit Securities', short: 'Securities', repo: 'Orbit-Securities', from: '#2dd4bf', to: '#0f3d5c', ink: '#0f766e', color: '#0d9488', role: { zh: '投資與理財', en: 'Invest and grow' }, tag: { zh: '全球股市模擬投資：真實報價、換匯與融資', en: 'Invest in markets worldwide with play money' } },
+  odds: { name: 'Quadra Play', short: 'Play', repo: 'Quadra-Play', from: '#60a5fa', to: '#1e3a8a', ink: '#1d4ed8', color: '#2563eb', role: { zh: '運彩與彩券', en: 'Sports bets and lottery' }, tag: { zh: '運彩與彩券：每一注的數學都看得見', en: 'Sports bets and the lottery, with the maths shown' } },
+  orbit: { name: 'Orbit Class', short: 'Class', repo: 'Orbit-Class', from: '#7dd3fc', to: '#0c4a6e', ink: '#0369a1', color: '#0ea5e9', role: { zh: '課表', en: 'Class schedule' }, tag: { zh: '即時課表：現在、下一節與倒數', en: 'Your class schedule, live' } },
+  weather: { name: 'Orbit Weather', short: 'Weather', repo: 'Orbit-Weather', from: '#a5b4fc', to: '#312e81', ink: '#4338ca', color: '#6366f1', role: { zh: '天氣', en: 'Weather' }, tag: { zh: '一個答案的天氣：降雨、紫外線、空氣，跟著你的行程', en: 'One clear forecast for wherever you’ll be' } },
+  transit: { name: 'Orbit Transit', short: 'Transit', repo: 'Orbit-Transit', from: '#6ee7b7', to: '#064e3b', ink: '#047857', color: '#10b981', role: { zh: '大眾運輸', en: 'Public transport' }, tag: { zh: '全台公車、火車、捷運與 YouBike，一次規劃', en: 'Buses, trains, metros and bikes across Taiwan' } },
+  match: { name: 'Orbit Sports', short: 'Sports', repo: 'Orbit-Sports', from: '#fdba74', to: '#9a3412', ink: '#c2410c', color: '#ea580c', role: { zh: '賽程與比分', en: 'Scores and schedules' }, tag: { zh: '所有運動的賽程、比分與數據', en: 'Every sport, every match, every stat' } },
+  slip: { name: 'Orbit Slips', short: 'Slips', repo: 'Orbit-Slips', from: '#fcd34d', to: '#78350f', ink: '#b45309', color: '#d97706', role: { zh: '運彩追蹤', en: 'Ticket tracker' }, tag: { zh: '買了的運彩，即時追蹤：比分、機率、現在價值', en: 'Your sports lottery tickets, followed live' } },
+  beats: { name: 'Orbit Beats', short: 'Beats', repo: 'Orbit-Beats', from: '#f0abfc', to: '#701a75', ink: '#a21caf', color: '#c026d3', role: { zh: '節拍作曲', en: 'Beat maker' }, tag: { zh: '把你的節拍片段，排成一首首新歌', en: 'Your beat pieces, arranged into new songs' } },
+  law: { name: 'Orbit Law', short: 'Law', repo: 'Orbit-Law', from: '#a5b4fc', to: '#1e1b4b', ink: '#4338ca', color: '#4f46e5', role: { zh: '法規與法案', en: 'Laws and bills' }, tag: { zh: '台灣的法規，每個條號都能點；立法院的法案，走到哪一步一眼就懂。', en: 'Taiwan\'s laws with linked references, and 立法院 bills by stage' } },
+  vocab: { name: 'Orbit Words', short: 'Words', repo: 'Orbit-Words', from: '#f9a8d4', to: '#831843', ink: '#be185d', color: '#db2777', role: { zh: '英文單字', en: 'English words' }, tag: { zh: '背得住的英文單字：大考 6000 字，真人發音', en: 'English words that stay with you' } }
 };
-// `was` is an old repo name (brand/ and tools/moved/ forward it).
 export const SITE_URL = 'https://jaypengx.github.io';
 export const pathOf = id => {
   const b = BRANDS[id];
@@ -41,8 +31,8 @@ export const pathOf = id => {
 // Where an app will live (the new repo), for its links shared outside.
 export const homeOf = id => `${SITE_URL}/${BRANDS[id].repo}/`;
 
-// The Quadra Pass: the account, in every app's top-right.
-export const PASS = { family: 'quadra', name: 'Quadra Pass', short: 'Pass', from: '#334155', to: '#020617', ink: '#0f172a', tag: { zh: '一組通行碼，所有 App 共用', en: 'One pass for every app' } };
+// The Orbit Pass: the account, in every app's top-right.
+export const PASS = { name: 'Orbit Pass', short: 'Pass', from: '#334155', to: '#020617', ink: '#0f172a', tag: { zh: '一組通行碼，所有 App 共用', en: 'One pass for every app' } };
 
 // Each app's symbol in a 128×128 box, drawn in `c` (an accent `a` where it
 // has a second colour).
@@ -78,10 +68,6 @@ const bg = (id, a, { shape }) => {
 };
 // The family's sign on an icon, inside `s` (1 full size, less for a
 // maskable icon's safe zone), centred on 256.
-const quadraFace = (id, a, s) => {
-  const t = (x, y) => `translate(${256 + (x - 256) * s} ${256 + (y - 256) * s}) scale(${s})`;
-  return `<g transform="${t(0, 0)}"><rect x="352" y="64" width="104" height="104" rx="28" fill="${GOLD}"/><rect x="104" y="128" width="280" height="280" rx="72" fill="#fff"/><g transform="translate(104 128) scale(2.1875)">${GLYPHS[id](a.ink)}</g></g>`;
-};
 const orbitFace = (id, a, s) => `<g transform="translate(${256 - 256 * s} ${256 - 256 * s}) scale(${s})"><ellipse cx="256" cy="256" rx="218" ry="78" transform="rotate(-24 256 256)" fill="none" stroke="#fff" stroke-opacity="0.5" stroke-width="18"/><circle cx="256" cy="256" r="142" fill="#fff"/><ellipse cx="256" cy="256" rx="218" ry="78" transform="rotate(-24 256 256)" fill="none" stroke="#fff" stroke-width="18" stroke-dasharray="0 330 420 2000" stroke-linecap="round"/><circle cx="438" cy="152" r="24" fill="#fff"/><g transform="translate(158 158) scale(1.53125)">${GLYPHS[id](a.ink)}</g></g>`;
 
 // An app's icon (512×512). shape: 'rounded' (a favicon, a picture in a
@@ -90,23 +76,14 @@ const orbitFace = (id, a, s) => `<g transform="translate(${256 - 256 * s} ${256 
 export function appIcon(id, { shape = 'rounded' } = {}) {
   const a = of(id);
   const s = shape === 'maskable' ? 0.78 : 1;
-  const face = a.family === 'orbit' ? orbitFace(id, a, s) : quadraFace(id, a, s);
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">${bg(id, a, { shape })}${face}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">${bg(id, a, { shape })}${orbitFace(id, a, s)}</svg>`;
 }
 
-// A family's own mark. Quadra: four tiles, the fourth gold. Orbit: a planet,
-// its ring and a moon.
-export function familyMark(family, { shape = 'rounded', plain = false } = {}) {
-  const f = FAMILIES[family];
-  const back = plain ? '' : bg(`fam-${family}`, f, { shape });
-  if (family === 'quadra') {
-    const tile = (x, y, fill) => `<rect x="${x}" y="${y}" width="150" height="150" rx="38" fill="${fill}"/>`;
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">${back}${tile(96, 96, '#fff')}${tile(266, 96, GOLD)}${tile(96, 266, '#fff')}${tile(266, 266, '#fff')}</svg>`;
-  }
+// The family's own mark: a planet, its ring and a moon.
+export function familyMark({ shape = 'rounded', plain = false } = {}) {
+  const back = plain ? '' : bg('fam-orbit', FAMILY, { shape });
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">${back}<defs><linearGradient id="orbit-planet" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e0e7ff"/><stop offset="1" stop-color="#a5b4fc"/></linearGradient></defs><ellipse cx="256" cy="256" rx="220" ry="80" transform="rotate(-24 256 256)" fill="none" stroke="#fff" stroke-opacity="0.45" stroke-width="20"/><circle cx="256" cy="256" r="130" fill="url(#orbit-planet)"/><ellipse cx="256" cy="256" rx="220" ry="80" transform="rotate(-24 256 256)" fill="none" stroke="#fff" stroke-width="20" stroke-dasharray="0 330 420 2000" stroke-linecap="round"/><circle cx="440" cy="150" r="26" fill="#fff"/></svg>`;
 }
-
-export const familyOf = id => FAMILIES[of(id)?.family] || FAMILIES.quadra;
 
 // The developer settings (the admin panel's 開發): how fast live data is
 // read again, by the apps and by the sports proxy, and the switches. Kept
@@ -158,7 +135,7 @@ export function cleanDev(x = {}) {
 }
 
 
-// Each app's colour as quadra.css sets it under <html data-app="id"> (the
+// Each app's colour as orbit.css sets it under <html data-app="id"> (the
 // block between app-colours markers; tools/accent-css.mjs writes it): the
 // brand colour in light, halfway to its lighter `from` in dark. At no
 // specificity, so an app's own :root { --q-accent } still wins.
@@ -170,7 +147,7 @@ export function accentCss() {
   return `${rules('')}\n@media (prefers-color-scheme: dark) {\n${rules(":not([data-theme='light'])").replace(/^/gm, '  ')}\n}\n${rules("[data-theme='dark']")}`;
 }
 
-// <html data-app="id">: the app's colour from the first paint (quadra.css).
+// <html data-app="id">: the app's colour from the first paint (orbit.css).
 export function withApp(html, id) {
   return html.replace(/<html\b([^>]*)>/i, (tag, attrs) => (/\sdata-app=/.test(attrs) ? tag.replace(/\sdata-app=(["'])[^"']*\1/, ` data-app="${id}"`) : `<html${attrs} data-app="${id}">`));
 }

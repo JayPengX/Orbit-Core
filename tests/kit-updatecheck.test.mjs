@@ -1,7 +1,7 @@
 // An app lifts its loading screen only once boot.js's first update check has answered.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { updateChecked } from '../kit/quadra.mjs';
+import { updateChecked } from '../kit/orbit.mjs';
 
 test('the loading screen waits for the first update check, and stays up while it reloads', async () => {
   delete globalThis.__bootCheck;

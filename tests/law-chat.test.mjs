@@ -96,7 +96,7 @@ globalThis.fetch = async (url, init) => {
 const worker = (await import('../worker.js')).default;
 const { LAW_LIMITS, forgetLawCounts, forgetLists } = await import('../law.js');
 const { CHAT_LIMITS, readChat, readPlan, checkChat, textHits } = await import('../law-chat.js');
-const { signToken } = await import('../quadra-token.js');
+const { signToken } = await import('../orbit-token.js');
 const { forgetPace } = await import('../pace.js');
 const ctx = { waitUntil: p => p };
 

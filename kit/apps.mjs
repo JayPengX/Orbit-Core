@@ -4,7 +4,7 @@
 // the latest loader.html between each page's kit:head / kit:boot markers
 // (the one thing an app keeps of the kit, changed very rarely).
 //   node kit/apps.mjs
-import { readFile, writeFile, rm, access } from 'node:fs/promises';
+import { readFile, writeFile, access } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -18,19 +18,19 @@ const block = name => loader.slice(loader.indexOf(`<!-- kit:${name}`), loader.in
 export const HEAD = block('head');
 export const BOOT = block('boot');
 
-// Each app: its id (kit/brand.mjs; the page's <html data-app>), its site folder, the kit modules it uses (by the name the app
-// imports them as), and the copies the old sync left in it.
+// Each app: its id (kit/brand.mjs; the page's <html data-app>), its site folder, and the kit modules it uses (by the name the app
+// imports them as).
 const APPS = {
-  'Quadra-Securities': { id: 'stock', site: 'public', mods: ['quadra'], copies: ['lib/quadra.mjs', 'quadra.css', 'boot.js', 'sw-images.js'] },
-  'Quadra-Play': { id: 'odds', site: 'public', mods: ['quadra', 'logos', 'names', 'photos', 'catalog'], copies: ['lib/quadra.mjs', 'quadra.css', 'boot.js', 'sw-images.js', 'lib/logos.mjs', 'lib/names.mjs', 'lib/photos.mjs', 'lib/catalog.mjs'] },
-  'Orbit-Sports': { id: 'match', site: 'public', mods: ['quadra', 'logos', 'names', 'photos', 'catalog'], copies: ['lib/quadra.mjs', 'quadra.css', 'boot.js', 'sw-images.js', 'lib/logos.mjs', 'lib/names.mjs', 'lib/photos.mjs', 'lib/catalog.mjs'] },
-  'Orbit-Words': { id: 'vocab', site: 'public', mods: ['quadra'], copies: ['lib/quadra.mjs', 'quadra.css', 'boot.js', 'sw-images.js'] },
-  'Orbit-Weather': { id: 'weather', site: 'public', mods: ['quadra'], copies: ['lib/quadra.mjs', 'quadra.css', 'boot.js'] },
-  'Orbit-Transit': { id: 'transit', site: 'public', mods: ['quadra'], copies: ['lib/quadra.mjs', 'quadra.css', 'boot.js'] },
-  'Orbit-Class': { id: 'orbit', site: '.', mods: ['quadra'], copies: ['src/quadra.mjs', 'css/quadra.css'] },
-  'Orbit-Slips': { id: 'slip', site: 'public', mods: ['quadra'], copies: [] },
-  'Orbit-Beats': { id: 'beats', site: 'public', mods: ['quadra'], copies: [] },
-  'Orbit-Law': { id: 'law', site: 'public', mods: ['quadra'], copies: [] }
+  'Orbit-Securities': { id: 'stock', site: 'public', mods: ['orbit'] },
+  'Quadra-Play': { id: 'odds', site: 'public', mods: ['orbit', 'logos', 'names', 'photos', 'catalog'] },
+  'Orbit-Sports': { id: 'match', site: 'public', mods: ['orbit', 'logos', 'names', 'photos', 'catalog'] },
+  'Orbit-Words': { id: 'vocab', site: 'public', mods: ['orbit'] },
+  'Orbit-Weather': { id: 'weather', site: 'public', mods: ['orbit'] },
+  'Orbit-Transit': { id: 'transit', site: 'public', mods: ['orbit'] },
+  'Orbit-Class': { id: 'orbit', site: '.', mods: ['orbit'] },
+  'Orbit-Slips': { id: 'slip', site: 'public', mods: ['orbit'] },
+  'Orbit-Beats': { id: 'beats', site: 'public', mods: ['orbit'] },
+  'Orbit-Law': { id: 'law', site: 'public', mods: ['orbit'] }
 };
 const CHECKOUT = `      - name: The shared kit (Shared-Proxy/kit), for the tests
         uses: actions/checkout@v4
@@ -68,14 +68,13 @@ async function walk(dir, out = []) {
 
 // The page: the kit's stylesheet and boot script become the loader.
 function page(html, app) {
-  const swap = (name, snippet, ...olds) => {
+  const swap = (name, snippet) => {
     const marked = new RegExp(`<!-- kit:${name}[\\s\\S]*?<!-- /kit:${name} -->`);
-    if (marked.test(html)) return (html = html.replace(marked, snippet));
-    for (const old of olds) if (old.test(html)) return (html = html.replace(old, snippet));
-    throw new Error(`${app}: no place for kit:${name}`);
+    if (!marked.test(html)) throw new Error(`${app}: no place for kit:${name}`);
+    html = html.replace(marked, snippet);
   };
-  swap('head', HEAD, /<link rel="stylesheet" href="(?:\.\/)?(?:css\/)?quadra\.css[^"]*" ?\/?>/);
-  swap('boot', BOOT, /<script src="\.\/boot\.js"><\/script>/);
+  swap('head', HEAD);
+  swap('boot', BOOT);
   return withApp(html, APPS[app].id);
 }
 
@@ -93,7 +92,6 @@ for (const [app, cfg] of Object.entries(APPS)) {
   for (const file of await walk(dir)) await edit(file, text => text.replace(spec, (_, q, m) => `${q}#kit/${m}.mjs${q}`));
   // The service worker's pictures from other sites.
   await edit(join(site, 'sw.js'), text => text.replace("importScripts('./sw-images.js')", "importScripts('../Shared-Proxy/kit/sw-images.js')"));
-  for (const copy of cfg.copies) await rm(join(cfg.site === '.' ? dir : site, copy), { force: true });
   // Tests import the kit as the page does (#kit/…): package.json's imports,
   // through .kit (a link to ../Shared-Proxy/kit here, a checkout in CI).
   await edit(join(dir, 'package.json'), text => {

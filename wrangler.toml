@@ -34,13 +34,13 @@ TDX_PER_MIN = "240"
 # …and a second: calls wait their turn, 4 a second (TDX refuses past 5).
 TDX_PER_SEC = "4"
 # A local dev page (the preview's --live) may ask for transit data without a
-# Quadra Pass, rate-limited (worker.js). "off" closes it.
+# Orbit Pass, rate-limited (worker.js). "off" closes it.
 TRANSIT_DEV = "on"
 # Weather's the same (worker.js): the forecast and the place from a local
 # page, 30 a minute an address. "off" closes it.
 WEATHER_DEV = "on"
 # The sports proxy's dev door (sports.js checkSession): a local
-# page may read without a Quadra Pass, rate-limited. "off" closes it.
+# page may read without a Orbit Pass, rate-limited. "off" closes it.
 SPORTS_DEV = "on"
 
 # GEMINI_API_KEY (for /gemini and /nl-edit) and ECO_TOKEN_SECRET
@@ -49,7 +49,7 @@ SPORTS_DEV = "on"
 # store is D1 (doc-store.js; the [[d1_databases]] binding STORE is added by
 # deploy.yml). FIREBASE_PRIVATE_KEY stays a secret only until 2026-12-05:
 # sign-ins made before ECO_TOKEN_SECRET (2026-10-05, 60 days) were signed
-# with a key made from it (quadra-token.js); deploy.yml removes it then.
+# with a key made from it (orbit-token.js); deploy.yml removes it then.
 
 # Workers KV: what has to outlive an isolate and be seen by the crons:
 # push subscriptions (push.js), Orbit Transit's monthly Google meter and TDX

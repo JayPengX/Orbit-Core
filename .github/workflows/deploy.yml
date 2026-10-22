@@ -117,11 +117,11 @@ jobs:
           cd "$RUNNER_TEMP" && npx --yes wrangler@4 delete sports-proxy --force && echo "sports-proxy deleted"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      # The Quadra Pass token secret (see quadra-token.js): /eco signs
+      # The Orbit Pass token secret (see orbit-token.js): /eco signs
       # session tokens with it and every route checks them. Only when the repo has the secret
       # ECO_TOKEN_SECRET (any long random string); until then the proxy's
-      # Quadra Pass gate is simply off.
-      - name: Quadra Pass token secret on the proxy
+      # Orbit Pass gate is simply off.
+      - name: Orbit Pass token secret on the proxy
         if: ${{ env.HAS_TOKEN_SECRET == 'true' }}
         run: |
           printf '%s' "$ECO_TOKEN_SECRET" | npx --yes wrangler@4 secret put ECO_TOKEN_SECRET
@@ -156,7 +156,7 @@ jobs:
       # doc-store.js) and MATCH_FIND_DISPATCH_TOKEN (a GitHub token for the
       # /match-dispatch route, removed long ago). FIREBASE_PRIVATE_KEY stays
       # until 2026-12-05: sign-ins made before ECO_TOKEN_SECRET (2026-10-05,
-      # 60 days) were signed with a key made from it (quadra-token.js).
+      # 60 days) were signed with a key made from it (orbit-token.js).
       - name: Retired secrets off the proxy
         continue-on-error: true
         run: |

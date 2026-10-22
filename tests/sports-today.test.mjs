@@ -104,11 +104,11 @@ test('a league that failed, or a page of it, is missed (never "no games"); the r
   assert.ok(!('nba' in body.events), 'a league missed has no events: the phone reads it itself');
   // Kept only a moment, so the next ask reads what failed again.
   assert.match(res.headers.get('Cache-Control'), /^private, max-age=0$/);
-  const stored = [...store.entries()].find(([k]) => k.includes('orbit-sports-today.quadra'))[1];
+  const stored = [...store.entries()].find(([k]) => k.includes('orbit-sports-today.orbit'))[1];
   assert.equal(stored.headers.get('X-Sports-Today-Ttl'), '10');
   failing.clear();
   assert.equal((await ask(today)).headers.get('X-Sports-Today'), 'HIT', 'within those seconds the same answer');
-  const key = [...store.keys()].find(k => k.includes('orbit-sports-today.quadra'));
+  const key = [...store.keys()].find(k => k.includes('orbit-sports-today.orbit'));
   store.set(key, new Response(await stored.clone().text(), { headers: { ...Object.fromEntries(stored.headers), 'X-Sports-Today-Built': String(Date.now() - 11_000) } }));
   const again = await (await ask(today)).json();
   assert.deepEqual(again.missed, []);
@@ -125,7 +125,7 @@ test('read while one is still kept: no read again; past its time: built again; a
   assert.equal(calls.length, n, 'a copy kept is answered without a read');
   assert.deepEqual(await hit.json(), await first.json());
   // Its 60 s gone (the edge drops it itself; a copy that's older than it says is never answered).
-  const key = [...store.keys()].find(k => k.includes('orbit-sports-today.quadra'));
+  const key = [...store.keys()].find(k => k.includes('orbit-sports-today.orbit'));
   const old = store.get(key);
   store.set(key, new Response(await old.clone().text(), { headers: { ...Object.fromEntries(old.headers), 'X-Sports-Today-Built': String(Date.now() - 61_000) } }));
   assert.equal((await ask(today)).headers.get('X-Sports-Today'), 'MISS');

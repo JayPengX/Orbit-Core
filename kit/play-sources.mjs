@@ -126,7 +126,7 @@ export const EXTRA_FUTURES = [
   { key: 'f1constructors', sport: 'f1', query: "F1 Constructors' Champion", title: /^F1 Constructors' Champion$/i }
 ];
 
-// The proxy answers signed-in apps only: the Quadra session (quadra.mjs)
+// The proxy answers signed-in apps only: the Orbit session (orbit.mjs)
 // supplies the token.
 let session = null;
 export function useSourcesSession(s) {
@@ -159,7 +159,7 @@ function ttlFor(url) {
   if (day) return Math.abs(Date.parse(`${day.slice(0, 4)}-${day.slice(4, 6)}-${day.slice(6)}T12:00:00Z`) - Date.now()) < 36 * 3_600_000 ? LIVE_TTL : 60_000;
   if (/scoreboard\?dates=/.test(url)) return 60_000;
   // A finished F1 session from F1's archive: it doesn't change.
-  if (url.startsWith('https://f1-live.quadra/session.json')) return 24 * 3_600_000;
+  if (url.startsWith('https://f1-live.orbit/session.json')) return 24 * 3_600_000;
   return LIVE_TTL;
 }
 // What's on now is read again after this long (the proxy keeps it 10 s).
@@ -1248,9 +1248,9 @@ export async function loadLeagueTeams(sport) {
 
 // The team lists kept on the device for a week (clubs change once a
 // season), so opening the app doesn't download every league's again. In
-// the browser's Cache Storage, shared by the Quadra apps on this site; the
+// the browser's Cache Storage, shared by the Orbit apps on this site; the
 // service workers never clear it.
-const TEAMS_CACHE = 'quadra-teams-v1';
+const TEAMS_CACHE = 'orbit-teams-v1';
 const TEAMS_FRESH_MS = 7 * 24 * 3600 * 1000;
 async function storedTeams(url) {
   try {

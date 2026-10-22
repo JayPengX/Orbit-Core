@@ -1,11 +1,11 @@
 // ---- eco-admin.js ----
 // The store's clean-up: POST /eco { op: 'admin', token, action }.
 //
-// Only Quadra data stays. `scan` counts what's there and what a clean would
+// Only Orbit data stays. `scan` counts what's there and what a clean would
 // remove; `clean` removes it, a bounded amount per call (run it again until
 // `done`):
-//   - collections from before the Quadra Pass (RETIRED_COLLECTIONS), whole;
-//   - each app's documents with no Quadra Pass behind them (the old per-app
+//   - collections from before the Orbit Pass (RETIRED_COLLECTIONS), whole;
+//   - each app's documents with no Orbit Pass behind them (the old per-app
 //     sync accounts shared those collections);
 //   - inbox documents no wallet points at, expired device codes and share
 //     keys, share keys of the old follow-style shape;
@@ -60,7 +60,7 @@ async function writeDev(env, deps, base, p) {
   const next = { ...applied, at: deps.now(), base, auto: p ? { at: p.at, scale: p.scale, over: p.over, week: p.users.week, expected: p.users.expected, on: !!base.autoScale } : null };
   await deps.fsWrite(env, CONFIG_COLLECTION, 'dev', JSON.stringify(next));
   // GET /config's minute in the cache let go here (this colo's), so the change is read at once.
-  if (typeof caches !== 'undefined') await caches.default.delete(new Request('https://orbit-config.quadra/dev')).catch(() => {});
+  if (typeof caches !== 'undefined') await caches.default.delete(new Request('https://orbit-config.orbit/dev')).catch(() => {});
   return next;
 }
 // The cron's check (worker.js, every 6 hours): with 依人數自動調整 on, the
@@ -549,7 +549,7 @@ export const ADMIN_TOOLS = {
     const app = String(body.app || '');
     const record = env.RATE_LIMIT_KV ? await env.RATE_LIMIT_KV.get(`push:${hit.id}:${app}`, 'json') : null;
     if (!record?.sub) return { error: 'ADMIN_NO_PUSH', status: 404 };
-    const r = await sendPush(env, record.sub, { title: 'Quadra 測試通知', body: '這是管理頁送出的測試通知，收到代表通知正常。', tag: `test:${deps.now()}` });
+    const r = await sendPush(env, record.sub, { title: 'Orbit 測試通知', body: '這是管理頁送出的測試通知，收到代表通知正常。', tag: `test:${deps.now()}` });
     return { ok: r === 'sent', result: String(r) };
   },
   // An account gone for good, used or not, at its owner's request or the
@@ -585,7 +585,7 @@ export const ADMIN_TOOLS = {
     }
     return { ok: true, ref: hit.id.slice(0, 8), balance, apps: appsOf(hit.wallet).map(a => a.app), shares, pushes };
   },
-  // The account behind a Quadra Pass someone read out (its reference).
+  // The account behind a Orbit Pass someone read out (its reference).
   async find({ env, deps, body }) {
     const code = String(body.passcode || '').trim().toUpperCase().replace(/[\s-]/g, '');
     if (code.length < 6) return { error: 'SYNC_PASSCODE_NOT_FOUND', status: 404 };
@@ -757,7 +757,7 @@ export const ADMIN_TOOLS = {
     const doc = await readDevDoc(env, deps);
     return capacityNow(env, deps, doc.base, doc.now);
   },
-  // Quadra's money as a whole (money.js): what the system gave, what Quadra
+  // Orbit's money as a whole (money.js): what the system gave, what Orbit
   // earned and what players made, by market, live accounts and deleted ones.
   async money({ env, deps }) {
     const wallets = (await deps.fsList(env, WALLET_COLLECTION, 300)).map(w => parseWallet(w.payload)).filter(Boolean);
@@ -788,7 +788,7 @@ export const ADMIN_TOOLS = {
   async 'alert-test'({ env, deps }) {
     const account = await alertAccount(env, deps);
     if (!account) return { told: 'no account set' };
-    const told = await tell(env, account, lang => ({ title: lang === 'en' ? 'Quadra admin: a test notice' : 'Quadra 管理：測試通知', body: lang === 'en' ? 'Bill alerts arrive here.' : '帳單警示會送到這裡。', tag: 'ops:test', kind: 'bill', url: 'https://jaypengx.github.io/Shared-Proxy/admin/' }));
+    const told = await tell(env, account, lang => ({ title: lang === 'en' ? 'Orbit admin: a test notice' : 'Orbit 管理：測試通知', body: lang === 'en' ? 'Bill alerts arrive here.' : '帳單警示會送到這裡。', tag: 'ops:test', kind: 'bill', url: 'https://jaypengx.github.io/Shared-Proxy/admin/' }));
     return { told };
   },
   // One tiny Gemini call through the relay.

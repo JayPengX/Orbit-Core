@@ -70,9 +70,9 @@ import { BONDS, couponDates } from '#kit/stock-bonds.mjs';
 import { creditAccount, creditUsed, dayTradeBuyFirst, dayTradeSellFirst, dayTradeRoom, termDue, afterHours, closingAuction, shortDeposit, SHORT_HANDLING, SHORT_INTEREST } from '#kit/stock-credit.mjs';
 
 export const ACCOUNT_VERSION = 1;
-// Every new account opens with the same NT$100,000 (Quadra's base amount);
+// Every new account opens with the same NT$100,000 (Orbit's base amount);
 // the range below is only what an older, chosen start can be.
-// What Securities itself gave a new account before Quadra paid the opening money.
+// What Securities itself gave a new account before Orbit paid the opening money.
 export const START_AMOUNT = 100_000;
 export const MIN_START = 10_000;
 export const MAX_START = 1_000_000_000;
@@ -91,8 +91,8 @@ export function randomId() {
 // Taiwan date (YYYY-MM-DD) of a moment.
 export const taipeiDay = twDay;
 
-// start 0: an account funded by the Quadra pool alone (a pass that got its
-// opening money from Quadra itself).
+// start 0: an account funded by the Orbit pool alone (a pass that got its
+// opening money from Orbit itself).
 export function newAccount(start = START_AMOUNT, now = Date.now(), id = randomId()) {
   const amount = Math.round(Number(start));
   if (!(amount === 0 || (amount >= MIN_START && amount <= MAX_START))) throw new Error('start amount out of range');
@@ -563,7 +563,7 @@ export function withdrawable(account, s, now = Date.now()) {
 
 // What a trade of `qty` at `price` costs or brings in, all in. `first`: the
 // account's first trade ever, which pays no commission (the welcome offer,
-// Quadra's: taxes and fees as usual). The app marks an account that hasn't
+// Orbit's: taxes and fees as usual). The app marks an account that hasn't
 // traded (`withWelcome`); the offer is its first fill.
 const traded = account => (account?.events || []).some(e => e.type === 'fill');
 export const withWelcome = account => (account && !traded(account) && !account.welcome ? { ...account, welcome: true } : account);
@@ -1852,7 +1852,7 @@ export function liquidationPlan(account, valuation) {
   return plan;
 }
 
-// Selling to cover an overdraft (the Quadra pool below zero, NT$ cash
+// Selling to cover an overdraft (the Orbit pool below zero, NT$ cash
 // negative): the fewest sales that raise `owedTWD` (plus 1% for costs), from
 // the largest holdings down, each only as much as it needs (rounded up to
 // what can be traded). Holdings with no price now are skipped.
@@ -2588,8 +2588,8 @@ export function incomeSummary(account, now = Date.now()) {
 export const startAmount = account => account?.events.find(e => e.id === 'deposit:start')?.amount || 0;
 
 // NT$ a month.
-// Securities' own monthly pay before Quadra's payday (months up to 2026-09):
-// NT$5,000, what it was then. Quadra's payday is ECONOMY.monthly.
+// Securities' own monthly pay before Orbit's payday (months up to 2026-09):
+// NT$5,000, what it was then. Orbit's payday is ECONOMY.monthly.
 export function incomeAmount() {
   return 5_000;
 }
@@ -2601,7 +2601,7 @@ export function nextPayday(t) {
 }
 
 // Paydays due up to `now` and not yet paid, added as deposits.
-// From this Taiwan month on, pay comes from Quadra itself into the pool
+// From this Taiwan month on, pay comes from Orbit itself into the pool
 // (Shared-Proxy's eco.js weekly pay), whichever app is opened.
 export const INCOME_UNTIL_MONTH = '2026-10';
 
@@ -2624,11 +2624,11 @@ export function applyIncome(account, now = Date.now()) {
 // Paydays from now on for an account opened before they existed.
 export const startIncome = (account, now = Date.now()) => (account.income ? account : { ...account, income: { since: now } });
 
-// ---- The Quadra pool -----------------------------------------------------------
+// ---- The Orbit pool -----------------------------------------------------------
 //
-// With a Quadra Pass this account's NT$ cash is the shared money pool (see
-// quadra.mjs): money the other apps put in or took out (Play's bets and
-// winnings, Quadra's pay) arrives here as NT$ deposits with
+// With a Orbit Pass this account's NT$ cash is the shared money pool (see
+// orbit.mjs): money the other apps put in or took out (Play's bets and
+// winnings, Orbit's pay) arrives here as NT$ deposits with
 // fixed ids ('x:<entry id>', `pool: true`), counted as money put in or taken
 // out rather than as return. What this account shares back is its own part:
 // its NT$ cash less those deposits.
@@ -2664,7 +2664,7 @@ export function ownCash(account, s, now = Date.now()) {
   return Math.round((cash - pooled) * 100) / 100;
 }
 
-// Another, separate account folded in (the Quadra merge tool): both logs,
+// Another, separate account folded in (the Orbit merge tool): both logs,
 // with the second's fixed ids ('deposit:start', 'pay:…', 'int:…') renamed so
 // both count, and its old pool deposits left out (the merge carried that
 // money over already).

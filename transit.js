@@ -1,7 +1,7 @@
 // ---- transit.js ----
 // Orbit Transit's server side: Taiwan's transit data (TDX, the Ministry of
 // Transportation's platform), Google's map, place search and transit routes,
-// all behind a Quadra Pass session, all cached and shared, and every billed
+// all behind a Orbit Pass session, all cached and shared, and every billed
 // Google call counted against a monthly cap kept under Google's free tier.
 //
 //   GET /transit/config   the map to draw: Google's (with the browser key,
@@ -264,7 +264,7 @@ async function devNow() {
   if (Date.now() - devT.at < 60_000) return devT.v;
   devT.at = Date.now();
   try {
-    const hit = await globalThis.caches?.default?.match(new Request('https://orbit-config.quadra/dev'));
+    const hit = await globalThis.caches?.default?.match(new Request('https://orbit-config.orbit/dev'));
     if (hit) devT.v = cleanDev(await hit.json());
   } catch {}
   return devT.v;
@@ -391,7 +391,7 @@ export async function tdxGet(env, raw, { fetchFn = fetch, cache = globalThis.cac
   const req = tdxRequest(raw);
   if (!req) return { status: 400, body: JSON.stringify({ code: 'TDX_NOT_ALLOWED' }), state: 'error' };
   const url = `${TDX_BASE}${req.path}?${req.query}`;
-  const key = new Request(`https://transit-cache.quadra/${req.path}?${req.query}`);
+  const key = new Request(`https://transit-cache.orbit/${req.path}?${req.query}`);
   const keepWarm = WARM.test(req.path);
   const later = p => (ctx?.waitUntil ? ctx.waitUntil(p.catch(() => {})) : p.catch(() => {}));
   if (keepWarm && !warm) later(warmMark(env, raw, now));
@@ -596,7 +596,7 @@ async function search(env, q, { fetchFn, ctx, now, cache }) {
     // for the same words within ~1 km.
     const near = async origin => {
       if (text.length < 2) return [];
-      const key = new Request(`https://transit-cache.quadra/text/${encodeURIComponent(squash(text))}/${origin ? `${origin.latitude.toFixed(2)},${origin.longitude.toFixed(2)}` : 'tw'}`);
+      const key = new Request(`https://transit-cache.orbit/text/${encodeURIComponent(squash(text))}/${origin ? `${origin.latitude.toFixed(2)},${origin.longitude.toFixed(2)}` : 'tw'}`);
       try {
         const hit = cache && (await cache.match(key));
         if (hit) return parseTextSearch(await hit.json(), lat, lon).filter(p => inTaiwan(p.lat, p.lon));
@@ -621,7 +621,7 @@ async function search(env, q, { fetchFn, ctx, now, cache }) {
   const params = new URLSearchParams({ q: text, format: 'jsonv2', countrycodes: 'tw', 'accept-language': 'zh-TW', limit: '8' });
   if (lat != null && lon != null) params.set('viewbox', `${lon - 0.3},${lat + 0.3},${lon + 0.3},${lat - 0.3}`);
   const url = `${NOMINATIM}?${params}`;
-  const key = new Request(`https://transit-cache.quadra/osm?${params}`);
+  const key = new Request(`https://transit-cache.orbit/osm?${params}`);
   try {
     const hit = cache && (await cache.match(key));
     if (hit) return { items: nearFirst(parseNominatim(await hit.json()).map(i => ({ ...i, dist: lat != null && lon != null ? Math.round(distM(lat, lon, i.lat, i.lon)) : null })), [], text), by: 'osm' };
@@ -652,7 +652,7 @@ async function place(env, q, { fetchFn, ctx, now, cache }) {
   if (!googleKey(env)) return [{ code: 'NO_KEY' }, 503];
   // A place's name is Pro; its position and address Essentials. A copy kept
   // here is looked for first: only a call Google bills counts toward its cap.
-  const keyOf = pro => new Request(`https://transit-cache.quadra/place/${id}?pro=${pro ? 1 : 0}`);
+  const keyOf = pro => new Request(`https://transit-cache.orbit/place/${id}?pro=${pro ? 1 : 0}`);
   const kept = async pro => {
     try {
       const hit = cache && (await cache.match(keyOf(pro)));
@@ -963,7 +963,7 @@ async function routes(env, q, { fetchFn, ctx, now, cache }) {
   // `src`: one planner's plans alone (google, or tdx: TDX's two), so the app
   // shows Google's (a tenth of a second) without waiting for TDX's (seconds).
   const src = ['google', 'tdx'].includes(q.get('src')) ? q.get('src') : '';
-  const cacheKey = new Request(`https://transit-cache.quadra/route/${round(from.lat)},${round(from.lon)}/${round(to.lat)},${round(to.lon)}/${by}/${slot}/${modeKey}${src ? `/${src}` : ''}`);
+  const cacheKey = new Request(`https://transit-cache.orbit/route/${round(from.lat)},${round(from.lon)}/${round(to.lat)},${round(to.lon)}/${by}/${slot}/${modeKey}${src ? `/${src}` : ''}`);
   try {
     const hit = cache && (await cache.match(cacheKey));
     if (hit) return [{ ...(await hit.json()), cached: true }, 200];
@@ -1065,7 +1065,7 @@ async function statusSample(env, name, deps) {
     const got = await tdxGet(env, SAMPLES[name], deps);
     return { name, status: got.status, state: got.state, body: cut(got.body) };
   }
-  const key = new Request(`https://transit-cache.quadra/sample/${name}${deps.transit ? `?transit=${encodeURIComponent(deps.transit)}` : ''}`);
+  const key = new Request(`https://transit-cache.orbit/sample/${name}${deps.transit ? `?transit=${encodeURIComponent(deps.transit)}` : ''}`);
   // fresh=1: ask again now (after a key's settings changed).
   const hit = !deps.fresh && deps.cache && (await deps.cache.match(key).catch(() => null));
   if (hit) return { ...(await hit.json()), cached: true };
@@ -1128,7 +1128,7 @@ async function walks(env, q, { fetchFn, ctx, now, cache }) {
   if (!from || !tos.length || tos.some(t => !t)) return [{ code: 'BAD_LOCATION' }, 400];
   const line = q.get('line') === '1' && tos.length === 1;
   const p5 = v => v.toFixed(5);
-  const keyOf = t => new Request(`https://transit-cache.quadra/walk/${p5(from.lat)},${p5(from.lon)}/${p5(t.lat)},${p5(t.lon)}${line ? '/line' : ''}`);
+  const keyOf = t => new Request(`https://transit-cache.orbit/walk/${p5(from.lat)},${p5(from.lon)}/${p5(t.lat)},${p5(t.lon)}${line ? '/line' : ''}`);
   const out = await Promise.all(tos.map(async t => {
     try {
       const hit = cache && (await cache.match(keyOf(t)));

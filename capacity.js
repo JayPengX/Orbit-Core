@@ -1,4 +1,4 @@
-// How many people use Quadra and Orbit, and whether the plans the family
+// How many people use Orbit, and whether the plans the family
 // runs on hold at that many: the admin panel's 容量 (開發), and the Worker's
 // own adjustment when 依人數自動調整 is on.
 //

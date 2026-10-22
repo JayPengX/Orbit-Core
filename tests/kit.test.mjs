@@ -7,7 +7,7 @@ const store = new Map();
 const tabStore = new Map();
 globalThis.localStorage = storage(store);
 globalThis.sessionStorage = storage(tabStore);
-const kit = await import('../kit/quadra.mjs');
+const kit = await import('../kit/orbit.mjs');
 
 test('the pool is every entry and every app figure', () => {
   const w = { entries: [{ id: 'a', amount: 100, app: 'odds' }, { id: 'b', amount: -40, app: 'eco' }], snap: { stock: { cash: 1000, t: 1 } } };
@@ -187,10 +187,10 @@ test('a device keeps its sign-in and the account id, never the pass', () => {
   store.clear();
   assert.equal(kit.storedAccount(), '');
   const claims = Buffer.from(JSON.stringify({ k: 'ref', d: 'abcdef0123456789abcdef', s: 'S', g: 0, e: 9e15 })).toString('base64url');
-  store.set('quadra.refresh', `${claims}.sig`);
-  store.set('quadra.account', 'abcdef0123456789');
+  store.set('orbit.refresh', `${claims}.sig`);
+  store.set('orbit.account', 'abcdef0123456789');
   assert.equal(kit.storedAccount(), 'abcdef0123456789');
-  store.delete('quadra.refresh');
+  store.delete('orbit.refresh');
   assert.equal(kit.storedAccount(), '', 'no sign-in, no account');
   assert.equal(kit.formatPass('ABCDE23456'), 'ABCDE-23456');
   assert.equal(kit.formatPass('ABCD2345'), 'ABCD-2345');
@@ -208,15 +208,15 @@ test('the pay: fixed, whatever the account holds', () => {
 test('token requests made together share one sign-in call to the Worker', async () => {
   store.clear();
   const claims = Buffer.from(JSON.stringify({ k: 'ref', d: 'abcdef0123456789abcdef', s: 'S', g: 0, e: 9e15 })).toString('base64url');
-  store.set('quadra.refresh', `${claims}.sig`);
-  store.set('quadra.account', 'abcdef0123456789');
+  store.set('orbit.refresh', `${claims}.sig`);
+  store.set('orbit.account', 'abcdef0123456789');
   const calls = [];
   globalThis.fetch = async (url, init = {}) => {
     calls.push(JSON.parse(init.body || '{}').op);
     await new Promise(r => setTimeout(r, 20));
     return new Response(JSON.stringify({ token: 'tok', wallet: { entries: [] }, active: true }), { status: 200 });
   };
-  const s = kit.quadraSession('stock', { heartbeat: 1e9 });
+  const s = kit.orbitSession('stock', { heartbeat: 1e9 });
   const [a, b, c] = await Promise.all([s.ensureToken(), s.ensureToken(), s.ensureToken()]);
   assert.deepEqual([a, b, c], ['tok', 'tok', 'tok']);
   assert.deepEqual(calls, ['refresh']);
@@ -228,11 +228,11 @@ test('token requests made together share one sign-in call to the Worker', async 
 test("every claim says it ended ('claim'), also one that left this app live as it was; 'active' only on a change", async () => {
   store.clear();
   const claims = Buffer.from(JSON.stringify({ k: 'ref', d: 'abcdef0123456789abcdef', s: 'S', g: 0, e: 9e15 })).toString('base64url');
-  store.set('quadra.refresh', `${claims}.sig`);
-  store.set('quadra.account', 'abcdef0123456789');
+  store.set('orbit.refresh', `${claims}.sig`);
+  store.set('orbit.account', 'abcdef0123456789');
   let reply = { token: 'tok', wallet: { entries: [] }, active: true };
   globalThis.fetch = async () => (reply ? new Response(JSON.stringify(reply), { status: 200 }) : Promise.reject(new TypeError('offline')));
-  const s = kit.quadraSession('words', { heartbeat: 1e9 });
+  const s = kit.orbitSession('words', { heartbeat: 1e9 });
   const seen = [];
   s.on('active', live => seen.push(['active', live]));
   s.on('claim', c => seen.push(['claim', c]));
@@ -265,18 +265,18 @@ test("a cold start uses its app's own kept token while it's young and the accoun
   };
   const fresh = (app, kept) => {
     store.clear();
-    store.set('quadra.refresh', `${claims}.sig`);
-    store.set('quadra.account', 'abcdef0123456789');
-    if (kept) store.set(`quadra.token:${kept.app || app}`, JSON.stringify({ t: 'kept', at: Date.now() - (kept.ago || 0), account: kept.account || 'abcdef0123456789' }));
+    store.set('orbit.refresh', `${claims}.sig`);
+    store.set('orbit.account', 'abcdef0123456789');
+    if (kept) store.set(`orbit.token:${kept.app || app}`, JSON.stringify({ t: 'kept', at: Date.now() - (kept.ago || 0), account: kept.account || 'abcdef0123456789' }));
     calls.length = 0;
-    return kit.quadraSession(app, { heartbeat: 1e9 });
+    return kit.orbitSession(app, { heartbeat: 1e9 });
   };
   // Young, this account's: used at once, no call to the Worker; a new one, once made, kept in its place.
   let s = fresh('vocab', { ago: 5 * 60_000 });
   assert.equal(await s.ensureToken(), 'kept');
   assert.deepEqual(calls, []);
   assert.equal(await s.ensureToken({ renew: true }), 'new');
-  assert.equal(JSON.parse(store.get('quadra.token:vocab')).t, 'new', 'the new one kept');
+  assert.equal(JSON.parse(store.get('orbit.token:vocab')).t, 'new', 'the new one kept');
   // Another account's, too old, or another app's: a sign-in first.
   for (const [app, kept] of [['weather', { account: 'ffffffffffffffff' }], ['transit', { ago: 13 * 60_000 }], ['orbit', { app: 'odds' }]]) {
     s = fresh(app, kept);
@@ -288,7 +288,7 @@ test("a cold start uses its app's own kept token while it's young and the accoun
 test('the data proxy turning a token away (its secret changed) gets a new one at once, and the ask again', async () => {
   store.clear();
   const claims = Buffer.from(JSON.stringify({ k: 'ref', d: 'abcdef0123456789abcdef', s: 'S', g: 0, e: 9e15 })).toString('base64url');
-  store.set('quadra.refresh', `${claims}.sig`);
+  store.set('orbit.refresh', `${claims}.sig`);
   let n = 0;
   const asked = [];
   globalThis.fetch = async (url, init = {}) => {
@@ -297,7 +297,7 @@ test('the data proxy turning a token away (its secret changed) gets a new one at
     // The first token it sees was signed before the secret changed.
     return asked.length === 1 ? new Response('{}', { status: 401 }) : new Response('{"ok":1}', { status: 200 });
   };
-  kit.quadraSession('match', { heartbeat: 1e9 });
+  kit.orbitSession('match', { heartbeat: 1e9 });
   assert.equal((await kit.proxyJson('https://x.test/renew', { persist: false })).ok, 1);
   assert.equal(asked.length, 2);
   assert.notEqual(asked[0], asked[1], 'asked again with a new token');
@@ -310,7 +310,7 @@ test('notice switches follow the pass: newest wins', async () => {
   kit.setKind('stock', 'alert', false);
   assert.equal(kit.kindOn('stock', 'alert'), false);
   assert.equal(kit.kindOn('stock', 'fill'), true);
-  store.set('quadra.notify.prefs', JSON.stringify({ on: true, off: ['stock:alert'], t: 1 }));
+  store.set('orbit.notify.prefs', JSON.stringify({ on: true, off: ['stock:alert'], t: 1 }));
   // The pass's copy is newer: taken.
   assert.equal(kit.adoptNotifyPrefs({ settings: { notify: { value: { on: false, off: ['match:end'] }, t: 5 } } }), true);
   assert.equal(kit.kindOn('stock', 'alert'), true);
@@ -465,28 +465,28 @@ test('where the money came from: the system, Play, the government and the accoun
   assert.equal(paid.own, 0);
   const fresh = kit.moneySides({ entries: [{ id: 'eco:start', app: 'eco', kind: 'start', amount: 30_000 }], snap: {} });
   assert.deepEqual([fresh.gave.start, fresh.own], [30_000, 0]);
-  // Play: an open bet is money at stake (in the worth, on neither side); settled, it's against Quadra, either way.
+  // Play: an open bet is money at stake (in the worth, on neither side); settled, it's against Orbit, either way.
   const start = { id: 'eco:start', app: 'eco', kind: 'start', amount: 30_000 };
   const bet = { id: 'odds:stake-a', app: 'odds', kind: 'stake', amount: -500 };
   const placed = kit.moneySides({ entries: [start, bet], snap: {} });
-  assert.deepEqual([placed.atStake, placed.quadra, placed.own, placed.worth], [500, 0, 0, 30_000]);
+  assert.deepEqual([placed.atStake, placed.orbit, placed.own, placed.worth], [500, 0, 0, 30_000]);
   const won = kit.moneySides({ entries: [start, bet, { id: 'odds:payout-a', app: 'odds', kind: 'payout', amount: 1_200 }], snap: {} });
-  assert.deepEqual([won.atStake, won.quadra, won.own, won.worth], [0, 700, 0, 30_700]);
+  assert.deepEqual([won.atStake, won.orbit, won.own, won.worth], [0, 700, 0, 30_700]);
   const lost = kit.moneySides({ entries: [start, bet, { id: 'odds:payout-a', app: 'odds', kind: 'payout', amount: 0 }, { id: 'eco:od:2026-10', app: 'eco', kind: 'od', amount: -490 }], snap: {} });
-  assert.deepEqual([lost.quadra, lost.fees, lost.own, lost.worth], [-990, 490, 0, 29_010]);
+  assert.deepEqual([lost.orbit, lost.fees, lost.own, lost.worth], [-990, 490, 0, 29_010]);
   // Securities' gains are the account's own.
   const gain = kit.moneySides({ entries: [start], snap: { stock: { cash: -10_000, holdings: 12_000 } } });
-  assert.deepEqual([gain.quadra, gain.own], [0, 2_000]);
+  assert.deepEqual([gain.orbit, gain.own], [0, 2_000]);
 });
 
 test('signing out wipes every app’s keys on this device, keeping only its language and safe area', () => {
   store.clear();
-  for (const k of ['quadra.refresh', 'quadra.account', 'quadra.wallet', 'quadra.payload.odds', 'oddsStudy.account:abc', 'stockStudy.settings', 'classFocusData', 'quadra.notify.prefs', 'fx.day.v3']) store.set(k, 'x');
-  store.set('quadra.lang', 'en');
-  store.set('quadra.safeBottom', '{"p":34}');
-  tabStore.set('quadra.visit', '1');
+  for (const k of ['orbit.refresh', 'orbit.account', 'orbit.wallet', 'orbit.payload.odds', 'oddsStudy.account:abc', 'stockStudy.settings', 'classFocusData', 'orbit.notify.prefs', 'fx.day.v3']) store.set(k, 'x');
+  store.set('orbit.lang', 'en');
+  store.set('orbit.safeBottom', '{"p":34}');
+  tabStore.set('orbit.visit', '1');
   kit.wipeDevice();
-  assert.deepEqual([...store.keys()].sort(), ['quadra.lang', 'quadra.safeBottom']);
+  assert.deepEqual([...store.keys()].sort(), ['orbit.lang', 'orbit.safeBottom']);
   assert.equal(tabStore.size, 0);
   assert.equal(kit.storedAccount(), '');
 });
@@ -512,7 +512,7 @@ test('names: fold, one name however written (accents, case, spaces, the letters 
 });
 
 test('pressSelector: every :active a press the kit sets, not one iOS puts on a scrolling finger', async () => {
-  const kit = await import('../kit/quadra.mjs');
+  const kit = await import('../kit/orbit.mjs');
   assert.equal(kit.pressSelector('.card:active, .q-tab:active .q-tab-icon'), '.card[data-q-press], .q-tab[data-q-press] .q-tab-icon');
   assert.equal(kit.pressSelector('button:active:not(:disabled)'), 'button[data-q-press]:not(:disabled)');
   assert.equal(kit.pressSelector('.q-switch:active::after'), '.q-switch[data-q-press]::after');
@@ -522,7 +522,7 @@ test('pressSelector: every :active a press the kit sets, not one iOS puts on a s
 test('a pack a phone kept before the move (under the Pages address) is still its copy: opened at once, nothing asked', async () => {
   const had = globalThis.caches;
   const kept = new Map();
-  const oldKey = `https://quadra.data/${encodeURIComponent('https://jaypengx.github.io/Shared-Data/sports/mlb/2026.json')}`;
+  const oldKey = `https://orbit.data/${encodeURIComponent('https://jaypengx.github.io/Shared-Data/sports/mlb/2026.json')}`;
   kept.set(oldKey, new Response('{"events":["kept"]}', { headers: { 'x-at': String(Date.now()) } }));
   globalThis.caches = { open: async () => ({ match: async k => kept.get(typeof k === 'string' ? k : k.url)?.clone() || null, put: async () => {}, keys: async () => [], delete: async () => true }) };
   const asked = [];
@@ -541,20 +541,20 @@ test('what the device keeps is pruned of copies older than a few days, at most e
   const had = { caches: globalThis.caches, idle: globalThis.requestIdleCallback };
   globalThis.caches = { open: async () => ({ match: async k => kept.get(k)?.clone() || null, put: async (k, r) => void kept.set(k, r), keys: async () => (keysRead++, [...kept.keys()]), delete: async k => kept.delete(k) }) };
   globalThis.requestIdleCallback = f => f();
-  store.delete('quadra.dataPruned');
+  store.delete('orbit.dataPruned');
   // (A kit just loaded: an app opened.)
-  const fresh = await import('../kit/quadra.mjs?pruning');
-  kept.set('https://quadra.data/old', new Response('{}', { headers: { 'x-at': String(Date.now() - 5 * 86_400_000) } }));
+  const fresh = await import('../kit/orbit.mjs?pruning');
+  kept.set('https://orbit.data/old', new Response('{}', { headers: { 'x-at': String(Date.now() - 5 * 86_400_000) } }));
   globalThis.fetch = async () => new Response('{"n":1}', { status: 200 });
   await fresh.proxyJson('https://x.test/prune-1', { ttl: 1 });
   await new Promise(r => setTimeout(r, 30));
-  assert.equal(kept.has('https://quadra.data/old'), false, 'the old copy went');
+  assert.equal(kept.has('https://orbit.data/old'), false, 'the old copy went');
   assert.equal(keysRead, 1);
   // Another read (another open) within 6 hours: nothing walked again.
-  await (await import('../kit/quadra.mjs?pruning-again')).proxyJson('https://x.test/prune-2', { ttl: 1 });
+  await (await import('../kit/orbit.mjs?pruning-again')).proxyJson('https://x.test/prune-2', { ttl: 1 });
   await new Promise(r => setTimeout(r, 30));
   assert.equal(keysRead, 1);
-  assert.ok(Number(store.get('quadra.dataPruned')) > 0);
+  assert.ok(Number(store.get('orbit.dataPruned')) > 0);
   globalThis.caches = had.caches;
   globalThis.requestIdleCallback = had.idle;
 });
@@ -577,7 +577,7 @@ test("中場休息 counts down from the half's last play, by the league's break"
   assert.equal(kit.watchHalftime('t:1', { sport: 'soccer', read: async () => summary }), null);
   await new Promise(r => setTimeout(r, 0));
   assert.equal(kit.halftimeEnd('t:1'), end);
-  assert.deepEqual(JSON.parse(store.get('quadra.halftime'))['t:1'], end);
+  assert.deepEqual(JSON.parse(store.get('orbit.halftime'))['t:1'], end);
   // A copy from before the whistle isn't taken.
   kit.watchHalftime('t:2', { sport: 'soccer', read: async () => ({ ...summary, header: { competitions: [{ status: { type: { name: 'STATUS_FIRST_HALF' } } }] } }) });
   await new Promise(r => setTimeout(r, 0));
@@ -656,9 +656,9 @@ test('政府: taxes the apps report and relief, a side of its own; the four side
   assert.deepEqual([g.paidTotal, g.gotTotal, g.net], [14_420, 5_000, -9_420]);
   const s = kit.moneySides(w);
   // Play's side is before tax (relief isn't the system's).
-  assert.equal(s.quadra, 48_010 - 1_000 + 14_030);
+  assert.equal(s.orbit, 48_010 - 1_000 + 14_030);
   assert.equal(s.gave.other, 0);
-  assert.equal(s.given + s.quadra + s.gov.net + s.own, s.worth);
+  assert.equal(s.given + s.orbit + s.gov.net + s.own, s.worth);
   // Nothing reported, junk ignored.
   assert.equal(kit.govOf({ snap: { odds: { gov: { sports: 'x', lottery: -5 } } } }).paidTotal, 0);
 });

@@ -399,7 +399,7 @@ test("IPO subscriptions: TWSE's list, the window, the draw and what comes back",
 // ---- Days and paydays ---------------------------------------------------------
 
 test("Taiwan's day of a moment, the same in every kit module", async () => {
-  const q = await import('../kit/quadra.mjs').catch(() => null);
+  const q = await import('../kit/orbit.mjs').catch(() => null);
   const { taipeiDate } = await import('../kit/play-lottery.mjs');
   for (const t of [Date.parse('2026-10-17T15:59:59.999Z'), Date.parse('2026-10-17T16:00:00Z'), Date.parse('2026-12-31T16:00:00Z'), Date.parse('2027-01-01T00:00:00Z')]) {
     const day = taipeiDay(t);
@@ -410,11 +410,11 @@ test("Taiwan's day of a moment, the same in every kit module", async () => {
   assert.equal(taipeiDay(Date.parse('2026-10-17T16:00:00Z')), '2026-10-18');
   assert.equal(iso(nextPayday(Date.parse('2026-12-31T15:59:59Z'))), '2026-12-31T16:00:00.000Z');
   assert.equal(iso(nextPayday(Date.parse('2026-12-31T16:00:00Z'))), '2027-01-31T16:00:00.000Z');
-  // Quadra's own payday is weekly: next Monday 00:00 Taipei.
+  // Orbit's own payday is weekly: next Monday 00:00 Taipei.
   if (q) assert.equal(iso(q.nextPayday(Date.parse('2026-10-21T04:00:00Z'))), '2026-10-25T16:00:00.000Z');
 });
 
-test("Securities' own paydays stop where Quadra's begin, each month once", () => {
+test("Securities' own paydays stop where Orbit's begin, each month once", () => {
   const created = Date.parse('2026-07-15T00:00:00Z');
   const acc = newAccount(100_000, created, 'acc');
   const { account, added } = applyIncome(acc, Date.parse('2026-12-15T00:00:00Z'));

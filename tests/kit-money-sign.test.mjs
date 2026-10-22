@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { money } from '../kit/quadra.mjs';
+import { money } from '../kit/orbit.mjs';
 import { tick } from '../kit/ui.mjs';
 
 test('money: no +NT$0 or −NT$0', () => {
@@ -18,27 +18,27 @@ test('money: no +NT$0 or −NT$0', () => {
 
 test('tick: the kit haptic, and a vibration where there is one', () => {
   const calls = [];
-  const had = globalThis.quadraHaptic;
+  const had = globalThis.orbitHaptic;
   const nav = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
-  globalThis.quadraHaptic = () => calls.push('haptic');
+  globalThis.orbitHaptic = () => calls.push('haptic');
   Object.defineProperty(globalThis, 'navigator', { value: { vibrate: ms => calls.push(ms) }, configurable: true });
   try {
     tick();
   } finally {
-    globalThis.quadraHaptic = had;
+    globalThis.orbitHaptic = had;
     if (nav) Object.defineProperty(globalThis, 'navigator', nav);
   }
   assert.deepEqual(calls, ['haptic', 8]);
 });
 
 test('.q-actions sits trailing', () => {
-  const css = readFileSync(new URL('../kit/quadra.css', import.meta.url), 'utf8');
+  const css = readFileSync(new URL('../kit/orbit.css', import.meta.url), 'utf8');
   assert.match(css, /\.q-actions \{[^}]*margin-left: auto/);
 });
 
-test('app colours: quadra.css carries brand.mjs accentCss, each page its data-app', async () => {
+test('app colours: orbit.css carries brand.mjs accentCss, each page its data-app', async () => {
   const { accentCss, withApp, BRANDS } = await import('../kit/brand.mjs');
-  const css = readFileSync(new URL('../kit/quadra.css', import.meta.url), 'utf8');
+  const css = readFileSync(new URL('../kit/orbit.css', import.meta.url), 'utf8');
   assert.ok(css.includes(`/* app-colours */\n${accentCss()}\n/* /app-colours */`), 'run node tools/accent-css.mjs');
   for (const id of Object.keys(BRANDS)) assert.match(css, new RegExp(`:root\\[data-app='${id}'\\]\\) \\{\\n  --q-accent: #[0-9a-f]{6};`));
   for (const t of ['--q-up: var(--q-red)', '--q-down: var(--q-green)', '--q-win:', '--q-loss:', '--q-draw:', '--q-live:']) assert.ok(css.includes(t), t);

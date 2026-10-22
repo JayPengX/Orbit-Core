@@ -1,5 +1,5 @@
 // ---- eco.js ----
-// /eco: the Quadra Pass, one account for every Quadra app (Quadra
+// /eco: the Orbit Pass, one account for every Orbit app (Orbit
 // Securities, Quadra Play, Orbit Sports, Orbit Words, and Orbit Class
 // beside them). Play money only.
 //
@@ -50,7 +50,7 @@
 
 import { retire } from './money.js';
 import { storeReady } from './doc-store.js';
-import { tokenSecret, signToken, readToken, seal, unseal, sessionLimited, SESSION_MS, REFRESH_MS, HANDOFF_MS } from './quadra-token.js';
+import { tokenSecret, signToken, readToken, seal, unseal, sessionLimited, SESSION_MS, REFRESH_MS, HANDOFF_MS } from './orbit-token.js';
 import { handleAdmin } from './eco-admin.js';
 import { PAY_WEEK, weekStart, mondayId, debtOf, activeLoan, loanOffer, loanEntries, loanDue, payoffAmount, reliefCheck, reliefEntry, openStakes } from './kit/loan.mjs';
 
@@ -65,7 +65,7 @@ export const PAIR_MS = 10 * 60_000;
 const CODE8 = /^[2-9A-HJ-NP-Z]{8}$/;
 
 // Each app's data collection.
-//   stock  Quadra Securities
+//   stock  Orbit Securities
 //   odds   Quadra Play
 //   match  Orbit Sports, a related add-on: follows and services
 //   vocab  Orbit Words, a related add-on: word progress

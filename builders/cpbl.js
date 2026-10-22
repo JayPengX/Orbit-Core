@@ -121,7 +121,7 @@ export async function runCpbl({ store, get = fetch, now = Date.now() }) {
   const official = await page(get)
     .then(parseStandings)
     .catch(() => null);
-  const wiki = await get(WIKI(year), { headers: { 'User-Agent': 'Quadra/1.0 (https://github.com/JayPengX/Shared-Proxy)' }, signal: AbortSignal.timeout(20_000) })
+  const wiki = await get(WIKI(year), { headers: { 'User-Agent': 'Orbit/1.0 (https://github.com/JayPengX/Shared-Proxy)' }, signal: AbortSignal.timeout(20_000) })
     .then(r => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
     .then(d => parseWiki(d?.parse?.wikitext, year))
     .catch(() => []);

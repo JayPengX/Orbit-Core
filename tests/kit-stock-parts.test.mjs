@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as ui from '../kit/ui.mjs';
-import * as quadra from '../kit/quadra.mjs';
+import * as orbit from '../kit/orbit.mjs';
 
 
 // ---- A just-enough DOM ----
@@ -152,7 +152,7 @@ Object.assign(doc, {
 globalThis.Node = FakeNode;
 globalThis.document = doc;
 const closed = [];
-globalThis.quadraCloseSheet = d => (closed.push(d), d.close());
+globalThis.orbitCloseSheet = d => (closed.push(d), d.close());
 
 const reset = () => {
   for (const c of body.children) if (c instanceof FakeEl) connect(c, false);
@@ -160,7 +160,7 @@ const reset = () => {
   doc.scrollingElement.scrollTop = 0;
 };
 
-const cssText = readFileSync(new URL('../kit/quadra.css', import.meta.url), 'utf8');
+const cssText = readFileSync(new URL('../kit/orbit.css', import.meta.url), 'utf8');
 
 FakeEl.prototype.focus = () => {};
 const type = (input, text) => {
@@ -276,7 +276,7 @@ test('logoTileHtml + wireLogos: the same walk', () => {
 // ---- confirm points ----
 test('ask(): points as {icon, text}; arrays unchanged', async () => {
   reset();
-  const p = quadra.ask({ title: 't', lang: 'en', points: [['★', 'Head', 'line'], { icon: 'star', text: 'Starred', tint: '#f00' }, { icon: '🙂', text: 'Emoji' }] });
+  const p = orbit.ask({ title: 't', lang: 'en', points: [['★', 'Head', 'line'], { icon: 'star', text: 'Starred', tint: '#f00' }, { icon: '🙂', text: 'Emoji' }] });
   const dialog = body.children.at(-1);
   const ul = dialog.querySelector('ul');
   const [old, ico, emoji] = ul.children;

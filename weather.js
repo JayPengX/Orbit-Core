@@ -18,7 +18,7 @@
 //                                  (SAMPLES, cached an hour): the tests'
 //                                  fixtures and tools/weather-stations.mjs.
 //
-// Orbit Weather is a Quadra app: /weather and /weather/where need a Quadra
+// Orbit Weather is a Orbit app: /weather and /weather/where need a Orbit
 // Pass session (worker.js), 30 a minute a session. Google is asked at most
 // GOOGLE_DAILY_CALLS times a day in all (under the key's 500-a-day quota):
 // a refresh is 4 calls (now, 48 hours in 2 pages, 10 days), but only 1 (now)

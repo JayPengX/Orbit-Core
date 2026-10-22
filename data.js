@@ -22,7 +22,7 @@
 // 10M reads a month) is watched by guard.js like the rest of the bill.
 
 import { json } from './http.js';
-import { sessionLimited } from './quadra-token.js';
+import { sessionLimited } from './orbit-token.js';
 import { sha256, gunzip } from './builders/store.js';
 import { BOARD_PATH } from './kit/play-boardfile.mjs';
 
@@ -49,7 +49,7 @@ export function cleanPath(raw) {
 }
 
 async function readFile(env, ctx, path, request) {
-  const key = new Request(`https://quadra-data.quadra/${path}`);
+  const key = new Request(`https://orbit-data.orbit/${path}`);
   const cache = typeof caches !== 'undefined' ? caches.default : null;
   const hit = cache && (await cache.match(key));
   // (A file not built yet is noted at the edge for 2 minutes: an app asks
@@ -139,7 +139,7 @@ async function push(request, env, ctx, headers) {
     purge.push(path);
   }
   // The edge's copies of what changed go, so the new ones are read at once.
-  if (typeof caches !== 'undefined') ctx.waitUntil(Promise.all(purge.map(p => caches.default.delete(new Request(`https://quadra-data.quadra/${p}`)))));
+  if (typeof caches !== 'undefined') ctx.waitUntil(Promise.all(purge.map(p => caches.default.delete(new Request(`https://orbit-data.orbit/${p}`)))));
   return json({ put, gone, bad }, 200, headers);
 }
 

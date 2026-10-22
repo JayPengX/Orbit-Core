@@ -43,8 +43,8 @@ test('an address gets 2 scans a minute', async () => {
   assert.deepEqual(codes, [200, 200, 429, 429]);
 });
 
-test('with a Quadra Pass, scans count per account (3 a minute), whatever the address', async () => {
-  const { signToken } = await import('../quadra-token.js');
+test('with a Orbit Pass, scans count per account (3 a minute), whatever the address', async () => {
+  const { signToken } = await import('../orbit-token.js');
   const env = { GEMINI_API_KEY: 'k', ECO_TOKEN_SECRET: 'test-secret' };
   const qt = await signToken('test-secret', { k: 'ses', s: 'sess1', d: 'acct-scan', e: Date.now() + 60_000 });
   assert.equal((await scan({ ip: '203.0.113.20', env, qt: 'forged.token' })).status, 401);

@@ -371,7 +371,7 @@ test('deleting the account removes everything', async () => {
   assert.equal([...t.store.keys()].filter(k => k.startsWith(WALLET_COLLECTION) || k.startsWith(ECO_APPS.stock.collection)).length, 0);
 });
 
-test('clean-up: only Quadra data stays, and wallets lose retired settings', async () => {
+test('clean-up: only Orbit data stays, and wallets lose retired settings', async () => {
   const t = setup();
   const acct = await newPass(t, 'odds');
   await t.call('PATCH', `${t.qt(acct.token)}&app=odds`, { payload: 'gz1:mine', wallet: { settings: { oddsWeeklyLimit: { value: 2000, t: 1 }, 'act:odds': { value: {}, t: 1 } } } });
@@ -505,7 +505,7 @@ test('wealth levels: each level reached pays its reward once, from what the acco
 });
 
 test('setting ECO_TOKEN_SECRET signs nobody out: tokens signed the old way (from the Firebase key) still read', async () => {
-  const { tokenSecret, signToken, readToken } = await import('../quadra-token.js');
+  const { tokenSecret, signToken, readToken } = await import('../orbit-token.js');
   const before = { FIREBASE_PRIVATE_KEY: 'k' };
   const old = await signToken(await tokenSecret(before), { k: 'ref', d: 'd', s: 's', e: Date.now() + 60_000 });
   const after = { FIREBASE_PRIVATE_KEY: 'k', ECO_TOKEN_SECRET: 'new-secret' };
@@ -824,7 +824,7 @@ test('op loan and relief: the Worker signs only what the account qualifies for',
 
 
 test('a session run out still reads public data for READ_GRACE_MS, never past it', async () => {
-  const { signToken, readToken, READ_GRACE_MS } = await import('../quadra-token.js');
+  const { signToken, readToken, READ_GRACE_MS } = await import('../orbit-token.js');
   const secret = 'grace-test-secret';
   const now = Date.now();
   const ranOut = await signToken(secret, { k: 'ses', d: 'x', e: now - 3_600_000 });

@@ -1,11 +1,11 @@
-// The Quadra Pass sheet, the same in every app (accountSheet in quadra.mjs
+// The Orbit Pass sheet, the same in every app (accountSheet in orbit.mjs
 // opens it; loaded the first time it's opened). The Pass is the account and
 // the family, never money (money lives in Securities). Four tabs:
 //   Pass   this account: devices, notices, security
 //   外觀   an avatar and a frame, free for everyone
-//   App    every app, Quadra's and Orbit's, when it was last used, a way in
+//   App    every app, Orbit's and Orbit's, when it was last used, a way in
 //   說明   every app's guide (help.mjs)
-import { APPS, AVATARS, FRAMES, settingPatch, passAccount, appIcon, el as node } from '#kit/quadra.mjs';
+import { APPS, AVATARS, FRAMES, settingPatch, passAccount, appIcon, el as node } from '#kit/orbit.mjs';
 import { HELP_ORDER, helpFor } from './help.mjs';
 import { sheet, section } from './ui.mjs';
 
@@ -15,14 +15,14 @@ export const STRINGS = {
     lookOn: '戴著',
     avatarsTitle: '頭像',
     framesTitle: '頭像框',
-    looksSub: '全部免費。戴上後，每個 Quadra App 的帳戶按鈕都看得到。',
+    looksSub: '全部免費。戴上後，每個 Orbit App 的帳戶按鈕都看得到。',
     failed: '沒有成功，請再試一次',
     usedToday: '今天用過',
     usedDaysAgo: '{n} 天前用過',
     neverUsed: '還沒用過',
     guide: '說明',
     open: '打開',
-    passGuide: 'Quadra Pass 說明',
+    passGuide: 'Orbit Pass 說明',
     frame_bronze: '青銅',
     frame_silver: '白銀',
     frame_jade: '翡翠',
@@ -59,22 +59,21 @@ export const STRINGS = {
     tab_apps: 'App',
     tab_help: '說明',
     here: '這裡',
-    appsQuadraSub: '你的錢、信貸和稅都在 Securities 裡。',
-    appsOrbitSub: '每天用得到的小工具，用同一個 Quadra Pass。'
+    appsSub: '每天用得到的 App，用同一個 Orbit Pass。'
   },
   en: {
     looksTitle: 'Avatar and frame',
     lookOn: 'Wearing',
     avatarsTitle: 'Avatars',
     framesTitle: 'Frames',
-    looksSub: 'All free. Worn on your account button in every Quadra app.',
+    looksSub: 'All free. Worn on your account button in every Orbit app.',
     failed: 'That didn’t work; please try again',
     usedToday: 'Used today',
     usedDaysAgo: 'Used {n} days ago',
     neverUsed: 'Not used yet',
     guide: 'Guide',
     open: 'Open',
-    passGuide: 'The Quadra Pass guide',
+    passGuide: 'The Orbit Pass guide',
     frame_bronze: 'Bronze',
     frame_silver: 'Silver',
     frame_jade: 'Jade',
@@ -111,8 +110,7 @@ export const STRINGS = {
     tab_apps: 'Apps',
     tab_help: 'Help',
     here: 'Here',
-    appsQuadraSub: 'Your money, loans and taxes all live in Securities.',
-    appsOrbitSub: 'Everyday tools, on the same Quadra Pass.'
+    appsSub: 'Everyday apps, on the same Orbit Pass.'
   }
 };
 const TABS = ['pass', 'looks', 'apps', 'help'];
@@ -192,8 +190,8 @@ export function openPass(s, { extra = null, tab = 'pass', help = null } = {}) {
   paint();
   // The kit's one sheet (ui.mjs): ✕, Escape, a tap outside and a swipe all close it the same way.
   const sh = sheet({
-    title: el('span', { class: 'q-pass-title' }, [el('img', { src: svgUrl(appIcon('pass')), alt: '', width: 28, height: 28 }), document.createTextNode('Quadra Pass')]),
-    label: 'Quadra Pass',
+    title: el('span', { class: 'q-pass-title' }, [el('img', { src: svgUrl(appIcon('pass')), alt: '', width: 28, height: 28 }), document.createTextNode('Orbit Pass')]),
+    label: 'Orbit Pass',
     cls: 'q-pass',
     closeLabel: t('close'),
     body: [tabs, body, toastBox],
@@ -217,7 +215,7 @@ export function openPass(s, { extra = null, tab = 'pass', help = null } = {}) {
 
 function renderHelp(box, { q, t, locale }, { app, topic }) {
   const at = HELP_ORDER.includes(app) ? app : 'pass';
-  const name = a => (a === 'pass' ? 'Quadra Pass' : APPS[a]?.short || a);
+  const name = a => (a === 'pass' ? 'Orbit Pass' : APPS[a]?.short || a);
   const chips = el(
     'div',
     { class: 'q-chips small' },
@@ -260,7 +258,7 @@ const ago = (t, then) => {
   const days = Math.floor((Date.now() - then) / 86_400_000);
   return days <= 0 ? t('usedToday') : t('usedDaysAgo', { n: days });
 };
-// Every app, Quadra's then Orbit's: what it's for, when it was last used,
+// Every app, Orbit's then Orbit's: what it's for, when it was last used,
 // its guide and a way in.
 function renderApps(box, { q, t, locale, state, openHelp }) {
   const w = state.wallet;
@@ -272,6 +270,5 @@ function renderApps(box, { q, t, locale, state, openHelp }) {
       el('div', { class: 'two-btn' }, [el('button', { class: 'q-btn', type: 'button', text: t('guide'), onclick: () => openHelp(id) }), here ? null : el('button', { class: 'q-btn primary', type: 'button', text: t('open'), onclick: () => q.go(id) })])
     ]);
   };
-  const of = family => Object.entries(APPS).filter(([, a]) => a.family === family);
-  put(box, section('Quadra', el('div', { class: 'app-list' }, of('quadra').map(card)), { sub: t('appsQuadraSub') }), section('Orbit', el('div', { class: 'app-list' }, of('orbit').map(card)), { sub: t('appsOrbitSub') }), el('button', { class: 'q-btn block ghost pass-guide', type: 'button', text: t('passGuide'), onclick: () => openHelp('pass') }));
+  put(box, section('Orbit', el('div', { class: 'app-list' }, Object.entries(APPS).map(card)), { sub: t('appsSub') }), el('button', { class: 'q-btn block ghost pass-guide', type: 'button', text: t('passGuide'), onclick: () => openHelp('pass') }));
 }

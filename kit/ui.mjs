@@ -1,5 +1,5 @@
 // ---- kit/ui.mjs: iOS 27's controls, built the same in every app ----
-// The pieces the kit's stylesheet draws (quadra.css, "Components") as DOM,
+// The pieces the kit's stylesheet draws (orbit.css, "Components") as DOM,
 // with what makes them move: a segmented control whose thumb slides on a
 // spring, a sheet that rises from the foot (dragged down to close: the
 // kit's sheetSwipe), a menu that grows out of its button, a toast, an
@@ -38,11 +38,11 @@ export function h(tag, props = {}, children = []) {
 }
 
 // A haptic tick where the phone gives one: the kit's own (globalThis.
-// quadraHaptic, iOS's switch trick) and a short vibration where allowed
+// orbitHaptic, iOS's switch trick) and a short vibration where allowed
 // (Android; iOS has none, so it's never felt twice).
 export function tick() {
   try {
-    globalThis.quadraHaptic?.();
+    globalThis.orbitHaptic?.();
     globalThis.navigator?.vibrate?.(8);
   } catch {}
 }
@@ -262,8 +262,8 @@ export function daySwipe(panel, step) {
 }
 // A day bar stuck under the status bar takes the page's colour (.stuck); at
 // rest it has none. Every .q-day-bar, nothing to call.
-if (typeof document !== 'undefined' && !globalThis.__quadraDayBars) {
-  globalThis.__quadraDayBars = true;
+if (typeof document !== 'undefined' && !globalThis.__orbitDayBars) {
+  globalThis.__orbitDayBars = true;
   globalThis.addEventListener?.('scroll', () => {
     for (const bar of document.querySelectorAll('.q-day-bar')) if (bar.isConnected && bar.offsetParent) bar.classList.toggle('stuck', globalThis.scrollY > 0 && bar.getBoundingClientRect().top <= parseFloat(getComputedStyle(bar).top) + 0.5);
   }, { passive: true });
@@ -355,12 +355,12 @@ export function pickSeg(options, current, onPick, { cls = '', chips = false, seg
 // large) | 'large' (the screen less its top inset, as iOS's); foot: a node
 // stuck to the bottom above the safe area (sheetFoot()); body: nodes.
 // Returns { el, close, head, setDetent }. The ✕, Escape, a tap on the
-// dimmed page and a swipe down all close it the same way (quadra.mjs's
+// dimmed page and a swipe down all close it the same way (orbit.mjs's
 // closeSheet: it slides to the foot), and onClose fires once.
 const DETENTS = ['medium', 'large'];
 // A sheet's size: 'medium' (half the screen) or 'large' (full less the top).
 // A sheet opened medium stays expandable (data-expandable), and the swipe in
-// quadra.mjs moves it between the two.
+// orbit.mjs moves it between the two.
 export function setSheetDetent(d, detent) {
   if (!DETENTS.includes(detent)) return;
   d.setAttribute('data-detent', detent);
@@ -372,8 +372,8 @@ export function bindSheet(d, { onClose = () => {} } = {}) {
   let done = false;
   const shut = () => {
     if (done) return;
-    // (quadra.mjs's closeSheet: the slide down, every app's sheets alike.)
-    (globalThis.quadraCloseSheet || (x => x.close()))(d);
+    // (orbit.mjs's closeSheet: the slide down, every app's sheets alike.)
+    (globalThis.orbitCloseSheet || (x => x.close()))(d);
   };
   d.addEventListener('close', () => {
     if (done) return;
@@ -746,7 +746,7 @@ export function navTitle(title = '', { scroller = null } = {}) {
 // calls onRefresh() (it may return a promise: the spinner turns until it
 // settles). Not while a sheet is open, a load is running (`disabled()`), or
 // the finger started in a sideways list, a field or a scrolled box. Returns
-// stop(). quadra.mjs's topActions does this for any app that has a refresh.
+// stop(). orbit.mjs's topActions does this for any app that has a refresh.
 const PTR_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 11.5a7.5 7.5 0 1 0-2.2 5.4"/><path d="M19.5 4.5v7h-7"/></svg>';
 // How far the spinner is drawn for a finger pulled `dy`: 1:1 at first, never past `max`.
 export const rubber = (dy, max = 90) => (dy > 0 ? max * (1 - Math.exp(-dy / max)) : 0);
@@ -991,7 +991,7 @@ export function logoTileHtml(src, { size = 40, alt = '', fallbackText = '', tint
 }
 export function wireLogos(root = document) {
   const fall = img => {
-    // (Its dark-screen version missing: quadra.mjs darkLogos put the ordinary one back.)
+    // (Its dark-screen version missing: orbit.mjs darkLogos put the ordinary one back.)
     if (img.dataset?.qDarkFailed) return;
     const t = img.closest?.('.q-logo');
     // The next URL of a list first, the letter once they are used up.
@@ -1009,8 +1009,8 @@ export function wireLogos(root = document) {
   };
   // (An image that already failed before this ran.)
   for (const img of root.querySelectorAll('.q-logo img')) if (img.complete && img.naturalWidth === 0) fall(img);
-  if (root.__quadraLogos) return;
-  root.__quadraLogos = true;
+  if (root.__orbitLogos) return;
+  root.__orbitLogos = true;
   root.addEventListener('error', e => e.target?.tagName === 'IMG' && fall(e.target), true);
 }
 // (logoHtml / statusHtml: trusted markup for the `logo` and `status` slots; status may also be a list of tags.)
@@ -1033,7 +1033,7 @@ export function placeTileHtml(kind = 'pin', size = '') {
   return `<span class="${clsOf('q-tile', size && E(size), 'q-place', k)}" aria-hidden="true">${icons[k]}</span>`;
 }
 
-// ---- The premium layer (quadra.css "Premium layer"): Law's and Beats' look ----
+// ---- The premium layer (orbit.css "Premium layer"): Law's and Beats' look ----
 // Glyphs drawn on one 24-unit grid with round 2px strokes, for tiles, hero
 // cards and rows: icons.home, icons.spark… (a string of SVG).
 const g = (d, fill = false) => `<svg viewBox="0 0 24 24" ${fill ? 'fill="currentColor"' : 'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"'} aria-hidden="true">${d}</svg>`;
@@ -1154,7 +1154,7 @@ export function section(title, body, { more = '', moreHref = '', onMore = null, 
   return h('section', { class: cls ? `q-section ${cls}` : 'q-section' }, [head, sub ? h('p', { class: 'section-sub', text: sub }) : null, ...[].concat(body)]);
 }
 
-// ---- More components (quadra.css "Premium components (round 3)") ----
+// ---- More components (orbit.css "Premium components (round 3)") ----
 
 // A section's head: its title, a count beside it, a link to the rest on the
 // right. sectionHead('為你推薦', { count: 4, more: '全部', onMore | data: { tab: 'all' } }); the same
@@ -1293,10 +1293,10 @@ export function sheetFoot({ summary = null, button = {} } = {}) {
 }
 
 // A confirm dialog: confirm({ icon, tint, title, body, ok, cancel, danger })
-// resolves true or false. quadra.mjs's ask(); `icon` a key of `icons` shows
+// resolves true or false. orbit.mjs's ask(); `icon` a key of `icons` shows
 // as a 56px colour tile, anything else (an emoji) as it always did.
 export async function confirm(opts = {}) {
-  return (await import('./quadra.mjs')).ask(opts);
+  return (await import('./orbit.mjs')).ask(opts);
 }
 
 // An amount to stake: stakeInput({ value, presets: [100, 500…], onChange,
@@ -1402,7 +1402,7 @@ export function placeTile(kind = 'pin', size = '') {
   return t;
 }
 
-// ---- Home parts: ring, month calendar, panels, league tile (quadra.css "Home parts (r4)") ----
+// ---- Home parts: ring, month calendar, panels, league tile (orbit.css "Home parts (r4)") ----
 const clamp01 = v => (Number.isFinite(Number(v)) ? Math.min(1, Math.max(0, Number(v))) : 0);
 const pad2 = n => String(n).padStart(2, '0');
 // An icon slot: an icons key or an svg string is a glyph, anything else text.

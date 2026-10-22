@@ -1,4 +1,4 @@
-// An app's payload on the Quadra Pass, kept in step with the phone's own
+// An app's payload on the Orbit Pass, kept in step with the phone's own
 // copy: the Pass's copy is read and merged in before anything is written
 // over it, every time it may have changed since (never an older copy over a
 // newer one; a copy that can't be read is never written over). One for
@@ -30,7 +30,7 @@
 // Loaded with import('#kit/pass-sync.mjs').catch(() => null): an older kit
 // cached on a phone lacks it (that load stays on the app's own copy).
 //
-//   const sync = passSync(q, { decode, apply, encode });   q: quadraSession(…)
+//   const sync = passSync(q, { decode, apply, encode });   q: orbitSession(…)
 //   await sync.first(await q.start(), { local })  the sign-in's reply
 //   sync.watch()     stale (and read again) whenever this app may have stopped being live
 //   sync.changed()   something here changed: written at the next sync

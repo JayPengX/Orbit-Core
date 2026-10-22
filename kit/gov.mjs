@@ -1,5 +1,5 @@
 // 政府: what the government took and gave one account (all time, whole
-// NT$). One copy for the Pass's 真相 (kit/quadra.mjs) and the admin page's
+// NT$). One copy for the Pass's 真相 (kit/orbit.mjs) and the admin page's
 // 金流 (money.js), so the two always agree.
 //
 // Taken: 運彩's 20% income tax on a big combination and the lottery's 20%

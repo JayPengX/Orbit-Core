@@ -28,7 +28,7 @@ node tools/preview.mjs sports --live --width 375
 | `--click "<selector>"` or `--click "js:…"` | Act before the shot (repeatable) |
 | `--eval "<js>"`, `--wait ms` | Read something out; wait first |
 | `--store key=value`, `--payload file.json` | Start with this localStorage or Pass payload |
-| `--out dir` | Where shots go (default `/tmp/quadra-preview`) |
+| `--out dir` | Where shots go (default `/tmp/orbit-preview`) |
 | `--webkit` | Safari's engine instead of Chromium (cloud: once, `apt-get install -y libavif16 libenchant-2-2 libsecret-1-0 libwayland-server0 libmanette-0.2-0 libgles2 libgtk-4-1 libgraphene-1.0-0 libwoff1 libevent-2.1-7t64 libgstreamer-gl1.0-0 libgstreamer-plugins-bad1.0-0 gstreamer1.0-plugins-base`) |
 | `--reopen` | Open twice with storage kept (a returning phone) |
 | `--upgrade <date\|ref>` | The old version, then today's, in one storage |
@@ -58,7 +58,7 @@ it, since Pages' CDN ignores `?v=`). An app's `sw.js` is its settings, then
 the kit's (the options are at the top of `kit/sw.js`):
 
 ```js
-self.QUADRA_SW = { cache: 'orbit-law-v1', title: 'Orbit Law' };
+self.ORBIT_SW = { cache: 'orbit-law-v1', title: 'Orbit Law' };
 importScripts('../Shared-Proxy/kit/sw-images.js');   // pictures from other sites, when it shows them
 importScripts('../Shared-Proxy/kit/sw.js');
 ```
@@ -68,7 +68,7 @@ importScripts('../Shared-Proxy/kit/sw.js');
 | Tool | What |
 | --- | --- |
 | `node tools/economy.mjs` | Each kind of user over a year, and what the house keeps |
-| `node tools/accent-css.mjs` | Write each app's accent colours (`kit/brand.mjs`) into `kit/quadra.css`; run after changing a brand colour |
+| `node tools/accent-css.mjs` | Write each app's accent colours (`kit/brand.mjs`) into `kit/orbit.css`; run after changing a brand colour |
 | `node tools/leagues-audit.mjs [--sport soccer] [--json]` | Every catalogue league against its sources today |
 | `node tools/hk-lots.mjs [file.xlsx]` | Every HKEX security's board lot into `kit/stock-hk-lots.mjs` (HKEX's List of Securities); run it now and then for new listings |
 | `node tools/tw-boards.mjs` | Every 興櫃 stock (`TW_EMERGING`) and listed 可轉債 with its maturity (`TW_CB`) into `kit/stock-markets.mjs`, from TPEx open data; run it now and then |

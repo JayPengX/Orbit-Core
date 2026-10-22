@@ -194,7 +194,7 @@ async function lawGist(ask, env, ctx, headers, gemini) {
 }
 
 // gemini(parts, schema) -> the upstream Response (worker.js's proxyGeminiRequest);
-// session: the request's Quadra Pass session (worker.js), or null.
+// session: the request's Orbit Pass session (worker.js), or null.
 export async function handleLawGist(request, env, ctx, headers, session, gemini) {
   const ask = await opening(request, env, headers, { maxBody: GIST_LIMITS.maxBody, read: readGist, who: passOf(session), busy: ['law:gist:m', GIST_LIMITS.perMinute] });
   if (ask instanceof Response) return ask;

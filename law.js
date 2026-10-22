@@ -11,7 +11,7 @@
 //     diff/<p>.json (each article's text before and after), every point
 //     citing one of those articles.
 //
-// A Quadra Pass of Orbit Law's (worker.js reads it; none, a 401 {error:
+// A Orbit Pass of Orbit Law's (worker.js reads it; none, a 401 {error:
 // 'pass'}), from Orbit Law's origin (or a localhost page) only: 10 asks a
 // minute a Pass in memory, and Gemini's calls 40 a day a Pass (hashed) and
 // 300 a day in all (Taiwan's day), counted in D1 before each call (a failed
@@ -25,7 +25,7 @@
 import { json, LOCAL_ORIGIN, bodyText, sha256Hex } from './http.js';
 import { groundFor, groundKey, groundOut, groundPrompt } from './law-ground.js';
 import { paceOf } from './pace.js';
-import { sessionLimited } from './quadra-token.js';
+import { sessionLimited } from './orbit-token.js';
 
 const ORIGIN = 'https://jaypengx.github.io';
 export const DATA = 'https://jaypengx.github.io/Orbit-Law/data/';
@@ -358,7 +358,7 @@ export async function modelJson(gemini, prompt, schema) {
   return JSON.parse((j?.candidates?.[0]?.content?.parts || []).map(x => x.text || '').join(''));
 }
 
-// The Quadra Pass behind a session of Orbit Law's (worker.js reads `qt=`):
+// The Orbit Pass behind a session of Orbit Law's (worker.js reads `qt=`):
 // its account (the pass's SHA-256), or null.
 export const passOf = session => (session?.a === 'law' && typeof session.d === 'string' && session.d ? session.d : null);
 // A Pass's day's count on a route, by a hash of the Pass and the day.
@@ -446,7 +446,7 @@ const JOBS = {
 };
 
 // gemini(parts, schema) -> the upstream Response (worker.js's proxyGeminiRequest);
-// session: the request's Quadra Pass session (worker.js), or null.
+// session: the request's Orbit Pass session (worker.js), or null.
 export async function handleLawAsk(request, env, ctx, headers, session, gemini) {
   const pass = passOf(session);
   const ask = await opening(request, env, headers, { maxBody: LAW_LIMITS.maxBody, read: readAsk, who: pass });

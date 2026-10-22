@@ -116,7 +116,7 @@ test('each minute\'s look keeps every car\'s last lap once, the places and stops
   const mem = memoryLog();
   await mem.add('k', lapSample(look(20)));
   assert.equal((await mem.get('k')).cars['1'].length, 1);
-  assert.equal((await f1LiveResponse(new URL('https://f1-live.quadra/laps.json?start=nope'))).status, 502);
+  assert.equal((await f1LiveResponse(new URL('https://f1-live.orbit/laps.json?start=nope'))).status, 502);
 });
 
 test('the Durable Object keeps a session\'s log under its start and a fortnight of them', async () => {

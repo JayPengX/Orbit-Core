@@ -159,7 +159,7 @@ export async function dataFolders(bucket, { pages = 30 } = {}) {
 // (Listing is R2's dearer kind of operation: kept an hour in the edge cache.)
 async function foldersKept(env) {
   const cache = typeof caches !== 'undefined' ? caches.default : null;
-  const key = new Request('https://ops.quadra/data-folders');
+  const key = new Request('https://ops.orbit/data-folders');
   const hit = cache && (await cache.match(key));
   if (hit) return hit.json();
   const out = { ...(await dataFolders(env.DATA)), at: Date.now() };

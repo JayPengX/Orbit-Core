@@ -5,7 +5,7 @@
 //     own lines are theirs alone);
 //   - Weather's and Transit's weekday places (school, work): that place's
 //     township, 停課 for a school, 停班 for the rest;
-//   - Quadra Securities: the exchange, by 臺北市 (TWSE closes when Taipei
+//   - Orbit Securities: the exchange, by 臺北市 (TWSE closes when Taipei
 //     stops work for the morning or the day; an afternoon stop trades on).
 // The Worker reads the page every 3 minutes (GET /weather/dayoff); here each
 // place's answer is kept 3 minutes in memory and the browser (one origin for

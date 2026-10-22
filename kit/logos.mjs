@@ -1,4 +1,4 @@
-// Quadra's logos, for every app that shows a team, a league or a driver
+// Orbit's logos, for every app that shows a team, a league or a driver
 // (Quadra Play and Orbit Sports): ESPN's logo files, TheSportsDB's club
 // and league badges for what ESPN doesn't carry, national flags, and the F1
 // grid's colours. Keys are Quadra Play's league keys (Orbit Sports maps its own
@@ -297,7 +297,7 @@ export const flagEmoji = code => (code ? String.fromCodePoint(...[...code.slice(
 // connection, a slow CDN), then gives way to the fallback; a failure is
 // remembered for ten minutes only. A `guess` (an address that may not exist:
 // a photo by id) isn't tried again, so the next one comes at once.
-const LOGO_SEEN_KEY = 'quadra.logos.v2';
+const LOGO_SEEN_KEY = 'orbit.logos.v2';
 const SEEN_MAX = 2_000;
 const BAD_FOR_MS = 10 * 60_000;
 const RETRY_MS = [400, 1_500, 4_000];

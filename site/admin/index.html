@@ -4,8 +4,8 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
 <meta name="robots" content="noindex,nofollow" />
-<title>Quadra 管理</title>
-<link rel="stylesheet" href="../kit/quadra.css" />
+<title>Orbit 管理</title>
+<link rel="stylesheet" href="../kit/orbit.css" />
 <style>
   :root { --q-accent: #2563eb; }
   body { margin: 0; background: var(--q-page); color: var(--q-text); font-family: var(--q-font); }
@@ -341,8 +341,8 @@
 <main>
   <section id="gate" class="card gate">
     <span class="gate-mark" id="gate-mark"></span>
-    <h2>Quadra 管理</h2>
-    <p class="muted">貼上「Quadra 管理金鑰.txt」裡的那一行。這台裝置會記住它。</p>
+    <h2>Orbit 管理</h2>
+    <p class="muted">貼上「Orbit 管理金鑰.txt」裡的那一行。這台裝置會記住它。</p>
     <div class="row"><input id="key" class="grow" type="password" autocomplete="off" placeholder="管理金鑰" /><button id="enter" class="primary">進入</button></div>
     <p id="gate-error" class="error"></p>
   </section>
@@ -413,7 +413,7 @@
 
     <!-- 金流 -->
     <section data-pane="money" hidden>
-      <div class="pane-head"><div><h2>金流</h2><p class="muted">系統發的、Quadra 賺的、政府收的和發的、市場賺賠的，四方加起來就是流通中的錢。</p></div></div>
+      <div class="pane-head"><div><h2>金流</h2><p class="muted">系統發的、Orbit 賺的、政府收的和發的、市場賺賠的，四方加起來就是流通中的錢。</p></div></div>
       <p id="mo-error" class="error"></p>
       <div id="mo" hidden>
         <div class="tiles" id="mo-tiles"></div>
@@ -423,7 +423,7 @@
           <div><h3>系統</h3><div class="card"><ul class="flow" id="mo-given"></ul></div></div>
         </div>
         <div class="twocol">
-          <div><h3>Quadra：莊家和費用賺的</h3><div class="card"><ul class="flow" id="mo-quadra"></ul></div></div>
+          <div><h3>Orbit：莊家和費用賺的</h3><div class="card"><ul class="flow" id="mo-orbit"></ul></div></div>
           <div><h3>市場：玩家投資賺的</h3><div class="card"><ul class="flow" id="mo-own"></ul></div></div>
         </div>
         <div class="twocol">
@@ -459,7 +459,7 @@
       <div class="card" style="margin-top:18px">
         <strong>警示通知</strong>
         <p class="muted" id="alert-note" style="margin:6px 0 10px"></p>
-        <div class="row"><input id="alert-pass" placeholder="你的 Quadra Pass" autocomplete="off" spellcheck="false" style="flex:1 1 0;min-width:0" /><button id="alert-save" class="small" style="flex:none">設定</button><button id="alert-test" class="small" style="flex:none">測試</button></div>
+        <div class="row"><input id="alert-pass" placeholder="你的 Orbit Pass" autocomplete="off" spellcheck="false" style="flex:1 1 0;min-width:0" /><button id="alert-save" class="small" style="flex:none">設定</button><button id="alert-test" class="small" style="flex:none">測試</button></div>
         <p id="alert-ok" class="ok"></p>
       </div>
       <div class="pane-head"><div><h2>連結</h2></div></div>
@@ -518,7 +518,7 @@
     <section data-pane="tools" hidden>
       <div class="tool-grid" id="tool-grid"></div>
       <div class="card tool" id="tool-issue">
-        <div class="tool-head"><i data-ic="ticket" style="--t:#2563eb"></i><div><h3>發放 Quadra Pass</h3><p class="muted">誰先登入就是誰的。這裡只顯示這一次，先複製或下載。</p></div></div>
+        <div class="tool-head"><i data-ic="ticket" style="--t:#2563eb"></i><div><h3>發放 Orbit Pass</h3><p class="muted">誰先登入就是誰的。這裡只顯示這一次，先複製或下載。</p></div></div>
         <div class="row"><input id="count" type="number" min="1" max="500" value="10" /><span class="muted">組</span><button id="issue" class="primary">發放</button></div>
         <p id="issue-error" class="error"></p>
         <div id="issued" hidden>
@@ -547,7 +547,7 @@
         </details>
       </div>
       <div class="card tool" id="tool-clean">
-        <div class="tool-head"><i data-ic="trash" style="--t:#64748b"></i><div><h3>資料整理</h3><p class="muted">只留 Quadra 的資料：舊集合、沒有帳戶的資料、過期的代碼、已刪帳戶的訂閱。先掃描再整理。</p></div></div>
+        <div class="tool-head"><i data-ic="trash" style="--t:#64748b"></i><div><h3>資料整理</h3><p class="muted">只留 Orbit 的資料：舊集合、沒有帳戶的資料、過期的代碼、已刪帳戶的訂閱。先掃描再整理。</p></div></div>
         <div class="row"><button id="scan">掃描</button><button id="clean" class="danger" disabled>整理</button></div>
         <p id="clean-error" class="error"></p>
         <p id="clean-ok" class="ok"></p>
@@ -570,11 +570,11 @@
 import { DEV, DEV_GROUPS, cleanDev, BRANDS, appIcon, familyMark } from '../kit/brand.mjs';
 import { icons, tileHtml, heroCardHtml, escHtml } from '../kit/ui.mjs';
 const ECO_URL = 'https://orbit-workers-proxy.pengzjay.workers.dev/eco';
-const KEY = 'quadra.admin';
+const KEY = 'orbit.admin';
 const $ = id => document.getElementById(id);
 const store = { get: () => { try { return localStorage.getItem(KEY) || ''; } catch { return ''; } }, set: v => { try { v ? localStorage.setItem(KEY, v) : localStorage.removeItem(KEY); } catch {} } };
 let token = store.get();
-const APPS = { stock: 'Quadra 證券', odds: 'Quadra Play', match: 'Orbit Sports', vocab: 'Orbit Words', orbit: 'Orbit Class', weather: 'Orbit Weather', transit: 'Orbit Transit', slip: 'Orbit Slips', beats: 'Orbit Beats' };
+const APPS = { stock: 'Orbit 證券', odds: 'Quadra Play', match: 'Orbit Sports', vocab: 'Orbit Words', orbit: 'Orbit Class', weather: 'Orbit Weather', transit: 'Orbit Transit', slip: 'Orbit Slips', beats: 'Orbit Beats' };
 const appName = a => APPS[a] || a;
 // A record's kind in words (the key itself when it's one not named here).
 const KINDS = { start: '開戶金', pay: '週薪', rank: '財富等級獎勵', rebase: '重算', admin: '手動調整', loan: '信貸撥款', loanfee: '信貸開辦費', loanpay: '信貸還款', loanlate: '信貸遲延', loanbad: '信貸催收', loangar: '催收扣薪', loanoff: '信貸清償', relief: '急難紓困', od: '透支利息', stake: '下注', payout: '派彩', tax: '運彩稅補扣', win: '派彩', refund: '退款', cashout: '提前兌現', lottery: '彩券', prize: '彩券獎金', undo: '撤銷' };
@@ -583,7 +583,7 @@ const kindName = k => KINDS[k] || k;
 const WHY = {
   FORBIDDEN: '管理金鑰不對（或還沒部署好，等一分鐘再試）。',
   ECO_PAIR_NOT_FOUND: '找不到這個帳戶代號（或對到不只一個，多貼幾碼）。',
-  SYNC_PASSCODE_NOT_FOUND: '找不到這組 Quadra Pass。',
+  SYNC_PASSCODE_NOT_FOUND: '找不到這組 Orbit Pass。',
   RATE_LIMITED: '太頻繁了，等一下再試。',
   ADMIN_BAD_AMOUNT: '金額要是非零的數字（±1,000,000 以內），而且要寫原因。',
   ADMIN_IN_USE: '這個帳戶用過了，不能收回；要清空請用「重置」。',
@@ -640,7 +640,7 @@ const APP_SRC = Object.fromEntries(Object.keys(BRANDS).map(id => [id, svgUrl(app
 const appIc = id => (BRANDS[id] ? `<img class="app-ic" src="${APP_SRC[id]}" alt="${escHtml(appName(id))}" title="${escHtml(appName(id))}">` : '');
 const refColor = ref => `hsl(${parseInt(String(ref).slice(0, 4), 16) % 360} 52% 46%)`;
 for (const i of document.querySelectorAll('i[data-ic]')) i.innerHTML = ic(i.dataset.ic);
-$('mark').innerHTML = $('gate-mark').innerHTML = `<img src="${svgUrl(familyMark('quadra'))}" alt="">`;
+$('mark').innerHTML = $('gate-mark').innerHTML = `<img src="${svgUrl(familyMark())}" alt="">`;
 $('omni-ic').innerHTML = $('search-ic').innerHTML = ic('search');
 $('refresh').innerHTML = ic('history');
 $('acct-close').innerHTML = ic('x');
@@ -707,7 +707,7 @@ $('refresh').onclick = async () => {
   const b = $('refresh');
   if (b.classList.contains('spin')) return;
   b.classList.add('spin');
-  for (let i = sessionStorage.length - 1; i >= 0; i--) if (sessionStorage.key(i)?.startsWith('quadra.admin.gh:')) sessionStorage.removeItem(sessionStorage.key(i));
+  for (let i = sessionStorage.length - 1; i >= 0; i--) if (sessionStorage.key(i)?.startsWith('orbit.admin.gh:')) sessionStorage.removeItem(sessionStorage.key(i));
   await show(view, { reload: true });
   b.classList.remove('spin');
 };
@@ -943,7 +943,7 @@ const FILTERS = {
   idle: ['30 天沒用', w => w.lastUsed && Date.now() - lastOf(w) > 30 * 86_400_000]
 };
 const SORTS = { lastUsed: lastOf, balance: w => w.balance ?? -Infinity, created: w => Date.parse(w.created || 0) || 0 };
-// A Quadra Pass as typed (10 letters and digits, a dash or spaces anywhere).
+// A Orbit Pass as typed (10 letters and digits, a dash or spaces anywhere).
 const asPass = q => {
   const c = q.toUpperCase().replace(/[\s-]/g, '');
   return /^[A-Z0-9]{10}$/.test(c) ? c : '';
@@ -965,7 +965,7 @@ function drawWallets() {
   $('wallets').innerHTML = rows.length
     ? acctCard(rows, {})
     : pass
-      ? `<button type="button" class="empty-card" id="find-go" style="width:100%">${tileHtml(ic('key'), '#0d9488', 'sm')}<span>用這組 Quadra Pass 找帳戶</span></button>`
+      ? `<button type="button" class="empty-card" id="find-go" style="width:100%">${tileHtml(ic('key'), '#0d9488', 'sm')}<span>用這組 Orbit Pass 找帳戶</span></button>`
       : emptyCard('search', '沒有符合的帳戶');
   $('find-go')?.addEventListener('click', () => findPass(pass));
   fitAll($('wallets-sum'));
@@ -1011,7 +1011,7 @@ $('csv').onclick = () => {
   const head = ['代號', '狀態', 'App', '建立', '最後使用', '餘額', '紀錄筆數', '信貸', '未還', '紓困次數', '繳稅'];
   const rows = wallets.map(w => [w.ref, w.lastUsed ? '使用中' : '未使用', w.apps.map(appName).join(' / '), w.created || '', w.lastUsed || '', w.balance ?? '', w.entries, w.loan ? LOAN_TAG[w.loan][0] : '', w.owed || '', w.reliefs || '', w.tax || '']);
   const text = '﻿' + [head, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
-  const a = el('a', { href: URL.createObjectURL(new Blob([text], { type: 'text/csv' })), download: `Quadra 帳戶 ${new Date().toISOString().slice(0, 10)}.csv` });
+  const a = el('a', { href: URL.createObjectURL(new Blob([text], { type: 'text/csv' })), download: `Orbit 帳戶 ${new Date().toISOString().slice(0, 10)}.csv` });
   a.click();
 };
 
@@ -1023,7 +1023,7 @@ const PLACES = [
   ['健康', 'health', 'live', '#16a34a', '系統 排程 資料來源 部署 金鑰 r2 d1 帳單保護 節流 health cron'],
   ['用量', 'usage', 'chart', '#7c3aed', 'google 帳單 tdx 額度 usage billing'],
   ['設定', 'dev', 'target', '#64748b', '速度 開發 容量 dev config'],
-  ['發放 Quadra Pass', 'tools', 'ticket', '#2563eb', '發 pass 新帳戶 issue', 'tool-issue'],
+  ['發放 Orbit Pass', 'tools', 'ticket', '#2563eb', '發 pass 新帳戶 issue', 'tool-issue'],
   ['找回帳戶', 'tools', 'lock', '#0d9488', '裝置代碼 遺失 recover', 'tool-recover'],
   ['廣播通知', 'tools', 'bell', '#ea580c', '通知 推播 broadcast push', 'tool-notify'],
   ['資料整理', 'tools', 'trash', '#64748b', '清理 掃描 clean', 'tool-clean']
@@ -1038,7 +1038,7 @@ async function omniDraw() {
   if (!wallets.length) await loadWallets();
   const hits = [];
   const pass = asPass(raw);
-  if (pass) hits.push({ group: 'Quadra Pass', html: `${tileHtml(ic('key'), '#0d9488', 'sm')}<span>用這組 Pass 找帳戶<small>${escHtml(pretty(pass))}</small></span>`, run: () => findPass(pass).then(() => $('find-error').textContent && (show('accounts'), ($('search').value = raw), drawWallets())) });
+  if (pass) hits.push({ group: 'Orbit Pass', html: `${tileHtml(ic('key'), '#0d9488', 'sm')}<span>用這組 Pass 找帳戶<small>${escHtml(pretty(pass))}</small></span>`, run: () => findPass(pass).then(() => $('find-error').textContent && (show('accounts'), ($('search').value = raw), drawWallets())) });
   const accts = wallets.filter(w => matches(w, q)).sort((a, b) => lastOf(b) - lastOf(a));
   for (const w of accts.slice(0, 6)) hits.push({ group: '帳戶', html: `<span class="av" style="--t:${refColor(w.ref)};width:32px;height:32px;border-radius:9px;display:grid;place-items:center;color:#fff;font:700 12px ui-monospace,monospace;background:${refColor(w.ref)}">${escHtml(w.ref.slice(0, 2).toUpperCase())}</span><span><span class="mono">${escHtml(w.ref)}</span><small>${escHtml(w.apps.map(appName).join('、') || '還沒用過')}</small></span><em>${escHtml(money(w.balance))}</em>`, run: () => openAccount(w.ref) });
   if (accts.length > 6) hits.push({ group: '帳戶', html: `${tileHtml(ic('list'), '#64748b', 'sm')}<span>全部 ${accts.length} 個符合的帳戶</span>`, run: () => (show('accounts'), ($('search').value = raw), drawWallets()) });
@@ -1085,7 +1085,7 @@ document.addEventListener('keydown', e => {
 });
 
 // ---- 工具: a row of shortcuts to each tool ----
-$('tool-grid').innerHTML = PLACES.filter(p => p[5]).map(([name, , icon, color, , to]) => `<button type="button" class="act" data-go="tools" data-to="${to}">${tileHtml(ic(icon), color, 'sm')}<span>${escHtml(name.replace('Quadra ', ''))}</span></button>`).join('');
+$('tool-grid').innerHTML = PLACES.filter(p => p[5]).map(([name, , icon, color, , to]) => `<button type="button" class="act" data-go="tools" data-to="${to}">${tileHtml(ic(icon), color, 'sm')}<span>${escHtml(name.replace('Orbit ', ''))}</span></button>`).join('');
 
 // ---- 一個帳戶 ----
 const dialog = $('acct');
@@ -1120,7 +1120,7 @@ function action(title, text, controls, run) {
 // A record's kind as a picture.
 const KIND_IC = { start: ['wallet', '#0ea5e9'], pay: ['work', '#16a34a'], rank: ['trophy', '#d97706'], relief: ['spark', '#db2777'], admin: ['pencil', '#64748b'], rebase: ['swap', '#64748b'], od: ['exchange', '#dc2626'], stake: ['ticket', '#1d4ed8'], lottery: ['target', '#1d4ed8'], payout: ['coin', '#0891b2'], tax: ['ticket', '#dc2626'], win: ['coin', '#0891b2'], prize: ['target', '#0891b2'], refund: ['history', '#64748b'], cashout: ['swap', '#0891b2'], plusboost: ['coin', '#7c3aed'] };
 const kindIc = k => (k.startsWith('loan') || k === 'loan' ? ['bank', '#2563eb'] : KIND_IC[k] || ['list', '#94a3b8']);
-const REC_FILTERS = { all: ['全部', () => true], in: ['進', e => e.amount > 0], out: ['出', e => e.amount < 0], loan: ['信貸', e => e.kind.startsWith('loan')], play: ['Play', e => e.app === 'odds'], eco: ['Quadra', e => e.app === 'eco'] };
+const REC_FILTERS = { all: ['全部', () => true], in: ['進', e => e.amount > 0], out: ['出', e => e.amount < 0], loan: ['信貸', e => e.kind.startsWith('loan')], play: ['Play', e => e.app === 'odds'], eco: ['Orbit', e => e.app === 'eco'] };
 function drawAccount(a) {
   const reload = () => openAccount(a.ref);
   const tags = [a.balance < 0 ? '透支' : '', a.loan ? LOAN_TAG[a.loan][0] : '', a.reliefs ? `紓困 ×${a.reliefs}` : '', a.lastUsed ? '' : '未使用'].filter(Boolean);
@@ -1182,7 +1182,7 @@ function drawAccount(a) {
       })
     : null;
   if (pushTest) pushBtn.onclick = () => pushTest.run(pushBtn);
-  const pass = el('input', { class: 'grow', placeholder: '本人的 Quadra Pass', autocomplete: 'off' });
+  const pass = el('input', { class: 'grow', placeholder: '本人的 Orbit Pass', autocomplete: 'off' });
   const keepBoxes = Object.entries(APPS).map(([k, n]) => el('label', { class: 'keep' }, [el('input', { type: 'checkbox', value: k }), el('span', { text: `保留 ${n}` })]));
   const resetBtn = el('button', { class: 'danger', text: '重置' });
   const reset = action('重置帳戶', '本人要求時（要他的 Pass）：保留 Pass 和勾選的 App，其他重來。無法復原。', [pass, resetBtn], async () => {
@@ -1218,7 +1218,7 @@ function drawAccount(a) {
   const exportBtn = el('button', { class: 'primary', text: '下載 JSON' });
   const exporter = action('匯出', '錢包和每個 App 的資料，原樣存成一個檔。', [exportBtn], async () => {
     const r = await admin('export', { wallet: a.ref });
-    el('a', { href: URL.createObjectURL(new Blob([JSON.stringify(r, null, 2)], { type: 'application/json' })), download: `Quadra 帳戶 ${a.ref} ${new Date().toISOString().slice(0, 10)}.json` }).click();
+    el('a', { href: URL.createObjectURL(new Blob([JSON.stringify(r, null, 2)], { type: 'application/json' })), download: `Orbit 帳戶 ${a.ref} ${new Date().toISOString().slice(0, 10)}.json` }).click();
     return '已下載';
   });
   exportBtn.onclick = () => exporter.run(exportBtn);
@@ -1334,7 +1334,7 @@ $('issue').onclick = async () => {
     loaded.delete('overview');
   }
 };
-const listText = () => `Quadra Pass（${new Date().toLocaleString('zh-TW')}）\n\n` + lastPasses.map((p, i) => `${i + 1}. ${pretty(p)}`).join('\n') + '\n';
+const listText = () => `Orbit Pass（${new Date().toLocaleString('zh-TW')}）\n\n` + lastPasses.map((p, i) => `${i + 1}. ${pretty(p)}`).join('\n') + '\n';
 $('copy').onclick = async () => {
   try {
     await navigator.clipboard.writeText(listText());
@@ -1342,7 +1342,7 @@ $('copy').onclick = async () => {
     setTimeout(() => ($('copy').textContent = '全部複製'), 1500);
   } catch {}
 };
-$('download').onclick = () => el('a', { href: URL.createObjectURL(new Blob([listText()], { type: 'text/plain' })), download: `Quadra Pass ${new Date().toISOString().slice(0, 10)}.txt` }).click();
+$('download').onclick = () => el('a', { href: URL.createObjectURL(new Blob([listText()], { type: 'text/plain' })), download: `Orbit Pass ${new Date().toISOString().slice(0, 10)}.txt` }).click();
 $('recover').onclick = async () => {
   $('recover-error').textContent = '';
   $('recovered').hidden = true;
@@ -1409,15 +1409,15 @@ async function loadMoney() {
     const govTake = -n(all.gov, 'net');
     $('mo-tiles').replaceChildren(
       tile('系統淨發出', big(net), gone.accounts ? `還回 ${big(n(gone, 'worth'))}` : `${n(live, 'accounts')} 個帳戶`),
-      tile('Quadra 賺', big(n(all, 'quadra')), n(all, 'quadra') >= 0 ? '莊家和費用淨收' : '玩家從 Play 贏走'),
+      tile('Orbit 賺', big(n(all, 'orbit')), n(all, 'orbit') >= 0 ? '莊家和費用淨收' : '玩家從 Play 贏走'),
       tile('政府收', big(govTake), `稅減紓困`),
       tile('市場', big(n(all, 'own')), n(all, 'own') >= 0 ? '玩家投資淨賺' : '玩家投資淨賠'),
       tile('流通中', big(n(live, 'worth')), n(live, 'atStake') ? `下注中 ${big(n(live, 'atStake'))}` : '現有帳戶的身價')
     );
-    $('mo-eq').textContent = `系統淨發出 ${big(net)} − Quadra 賺 ${big(n(all, 'quadra'))} − 政府收 ${big(govTake)} ${n(all, 'own') < 0 ? '−' : '+'} 市場 ${big(Math.abs(n(all, 'own')))} = 流通中 ${big(n(live, 'worth'))}`;
+    $('mo-eq').textContent = `系統淨發出 ${big(net)} − Orbit 賺 ${big(n(all, 'orbit'))} − 政府收 ${big(govTake)} ${n(all, 'own') < 0 ? '−' : '+'} 市場 ${big(Math.abs(n(all, 'own')))} = 流通中 ${big(n(live, 'worth'))}`;
     const g = all.gave || {};
     flow('mo-given', [['開戶金', n(g, 'start')], ['週薪', n(g, 'pay')], ['財富等級獎勵', n(g, 'rank')], ['其他', n(g, 'other'), '手動調整'], ['刪除的帳戶還回', -n(gone, 'worth'), `${n(gone, 'accounts')} 個`]].filter(r => r[1]), { total: ['淨發出', net] });
-    flow('mo-where', [['系統淨發出', net], ['Quadra 賺走', -n(all, 'quadra')], ['政府收走', -govTake, '稅減去急難紓困'], ['市場', n(all, 'own')]], { total: ['流通中', n(live, 'worth')] });
+    flow('mo-where', [['系統淨發出', net], ['Orbit 賺走', -n(all, 'orbit')], ['政府收走', -govTake, '稅減去急難紓困'], ['市場', n(all, 'own')]], { total: ['流通中', n(live, 'worth')] });
     const gp = all.gov?.paid || {};
     flow('mo-gov', [['運彩中獎所得稅', n(gp, 'sports')], ['彩券中獎稅', n(gp, 'lottery'), '所得稅與印花稅'], ['證券交易稅', n(gp, 'trade')], ['股利與利息扣繳', n(gp, 'withheld'), '含外國政府'], ['二代健保補充保費', n(gp, 'nhi')], ['急難紓困', -n(all.gov?.got, 'relief'), '發給玩家']].filter(r => r[1]), { total: ['政府淨收', govTake] });
     if (!n(all.gov, 'paidTotal') && !n(all.gov, 'gotTotal')) $('mo-gov').innerHTML = '<li class="muted" style="display:block">還沒有稅或紓困（Play 和 Securities 同步後就會出現）。</li>';
@@ -1425,9 +1425,9 @@ async function loadMoney() {
     const taxed = wallets.filter(w => w.tax > 0).sort((a, b) => b.tax - a.tax).slice(0, 5);
     $('mo-taxed').innerHTML = taxed.length ? acctCard(taxed.map(w => ({ ...w, shown: `−${money(w.tax)}`, red: true })), { compact: true }) : emptyCard('check', '還沒有人繳稅');
     // (Play's side before the prize tax: the tax is the government's.)
-    flow('mo-quadra', [...byMarket(all.playBy, n(all, 'play'), SPORT_NAMES, ['Play 未分類', '還沒同步的帳戶']), ...[['透支利息', n(all.fees, 'od')], ['信貸（淨）', n(all.fees, 'loan')]].filter(r => r[1])], { total: ['合計', n(all, 'quadra')] });
+    flow('mo-orbit', [...byMarket(all.playBy, n(all, 'play'), SPORT_NAMES, ['Play 未分類', '還沒同步的帳戶']), ...[['透支利息', n(all.fees, 'od')], ['信貸（淨）', n(all.fees, 'loan')]].filter(r => r[1])], { total: ['合計', n(all, 'orbit')] });
     flow('mo-own', byMarket(all.stockBy, n(all, 'own'), MARKET_NAMES, ['其他', '股利、利息、匯兌']), { total: ['合計', n(all, 'own')] });
-    $('mo-note').textContent = `帳戶刪除時，剩下的錢還給系統（透支的帳戶，欠的由系統吸收）；它讓 Quadra 賺的和在市場賺賠的照樣留在帳上。Quadra 這邊玩家輸的是正數、贏走的是負數；未結算的注單不算。各市場由 Play 和 Securities 打開時回報，還沒打開過新版的帳戶算在「未分類／其他」。刪除的帳戶${gone.since ? `從 ${fmtDay(gone.since)} 起` : '從現在起'}記錄。${fmt(m.at)} 更新。`;
+    $('mo-note').textContent = `帳戶刪除時，剩下的錢還給系統（透支的帳戶，欠的由系統吸收）；它讓 Orbit 賺的和在市場賺賠的照樣留在帳上。Orbit 這邊玩家輸的是正數、贏走的是負數；未結算的注單不算。各市場由 Play 和 Securities 打開時回報，還沒打開過新版的帳戶算在「未分類／其他」。刪除的帳戶${gone.since ? `從 ${fmtDay(gone.since)} 起` : '從現在起'}記錄。${fmt(m.at)} 更新。`;
   } catch (e) {
     $('mo-error').textContent = e.message;
   }
@@ -1695,11 +1695,11 @@ $('dev-save').onclick = () =>
 
 // ---- 系統 (ops.js) ----
 const GH = 'https://api.github.com/repos/JayPengX/';
-const REPOS = [['Shared-Proxy', 'Workers 與共用套件'], ['Orbit-Sports', 'Orbit Sports'], ['Quadra-Play', 'Quadra Play'], ['Quadra-Securities', 'Quadra 證券'], ['Orbit-Words', 'Orbit Words'], ['Orbit-Class', 'Orbit Class'], ['Orbit-Weather', 'Orbit Weather'], ['Orbit-Transit', 'Orbit Transit'], ['Orbit-Beats', 'Orbit Beats'], ['Orbit-Slips', 'Orbit Slips'], ['Orbit-Law', 'Orbit Law']];
+const REPOS = [['Shared-Proxy', 'Workers 與共用套件'], ['Orbit-Sports', 'Orbit Sports'], ['Quadra-Play', 'Quadra Play'], ['Orbit-Securities', 'Orbit 證券'], ['Orbit-Words', 'Orbit Words'], ['Orbit-Class', 'Orbit Class'], ['Orbit-Weather', 'Orbit Weather'], ['Orbit-Transit', 'Orbit Transit'], ['Orbit-Beats', 'Orbit Beats'], ['Orbit-Slips', 'Orbit Slips'], ['Orbit-Law', 'Orbit Law']];
 const getJ = async (url, ms = 8000) => { const r = await fetch(url, { signal: AbortSignal.timeout(ms), cache: 'no-store' }); if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); };
 // GitHub's open API: 60 reads an hour from here, kept two minutes.
 async function gh(path) {
-  const k = `quadra.admin.gh:${path}`;
+  const k = `orbit.admin.gh:${path}`;
   try { const c = JSON.parse(sessionStorage.getItem(k) || 'null'); if (c && Date.now() - c.at < 120_000) return c.d; } catch {}
   const d = await getJ(GH + path);
   try { sessionStorage.setItem(k, JSON.stringify({ at: Date.now(), d })); } catch {}
@@ -1753,7 +1753,7 @@ async function loadSystem() {
     // (Only when it says something the 節流 tile doesn't: slowed down, or the bill unread.)
     $('sys-pace').textContent = [r.pace.pace ? `現在：${PACE_WORD[r.pace.pace] || ''}。` : '', g?.error ? `讀取失敗：${g.error}` : ''].join(' ').trim();
     $('sys-pace').hidden = !$('sys-pace').textContent;
-    $('alert-note').textContent = r.alertAccount ? `警示送到帳戶 ${r.alertAccount}（它第一個開了通知的 App）：用量過 50%、75%、90%，節流改變，或代理停了。` : '還沒設定：輸入你的 Quadra Pass，用量過 50%、75%、90%、節流改變或代理停了，就會通知你開了通知的 App。';
+    $('alert-note').textContent = r.alertAccount ? `警示送到帳戶 ${r.alertAccount}（它第一個開了通知的 App）：用量過 50%、75%、90%，節流改變，或代理停了。` : '還沒設定：輸入你的 Orbit Pass，用量過 50%、75%、90%、節流改變或代理停了，就會通知你開了通知的 App。';
     const now = Date.now();
     const beats = Array.isArray(r.beats) ? r.beats : [];
     const known = Object.keys(JOBS);
@@ -1842,7 +1842,7 @@ $('sys-actions').replaceChildren(
   })
 );
 const LINKS = [
-  ['Orbit Sports', '/Orbit-Sports/'], ['Quadra Play', '/Quadra-Play/'], ['Quadra 證券', '/Quadra-Securities/'], ['Orbit Words', '/Orbit-Words/'], ['Orbit Class', '/Orbit-Class/'], ['Orbit Weather', '/Orbit-Weather/'], ['Orbit Transit', '/Orbit-Transit/'],
+  ['Orbit Sports', '/Orbit-Sports/'], ['Quadra Play', '/Quadra-Play/'], ['Orbit 證券', '/Orbit-Securities/'], ['Orbit Words', '/Orbit-Words/'], ['Orbit Class', '/Orbit-Class/'], ['Orbit Weather', '/Orbit-Weather/'], ['Orbit Transit', '/Orbit-Transit/'],
   ['Shared-Proxy Actions', 'https://github.com/JayPengX/Shared-Proxy/actions'],
   ['Cloudflare Workers', 'https://dash.cloudflare.com/?to=/:account/workers-and-pages'], ['Cloudflare D1', 'https://dash.cloudflare.com/?to=/:account/workers/d1'], ['Cloudflare R2', 'https://dash.cloudflare.com/?to=/:account/r2/overview'], ['Cloudflare 帳單', 'https://dash.cloudflare.com/?to=/:account/billing'], ['Cloudflare 通知', 'https://dash.cloudflare.com/?to=/:account/notifications'], ['GitHub', 'https://github.com/JayPengX?tab=repositories']
 ];

@@ -27,7 +27,7 @@
 import { paceOf } from './pace.js';
 import { json } from './http.js';
 import { twDay } from './kit/format.mjs';
-import { sessionLimited } from './quadra-token.js';
+import { sessionLimited } from './orbit-token.js';
 import { readThrough } from './sports.js';
 import { LEAGUES, espnDaysOf, scoreboardUrl, eventsOfPages, slimEvent } from './kit/sports-espn.mjs';
 
@@ -111,7 +111,7 @@ export async function buildDay(day, { read, bounds = null, now = Date.now() }) {
 
 // One build of a day at a time in an isolate: asks that come while it's under way wait for it.
 const building = new Map();
-const cacheKey = day => new Request(`https://orbit-sports-today.quadra/${day}`);
+const cacheKey = day => new Request(`https://orbit-sports-today.orbit/${day}`);
 const answer = (body, headers, { browser }, how) => new Response(body, { status: 200, headers: { ...headers, 'Content-Type': 'application/json', 'Cache-Control': `private, max-age=${browser}`, 'X-Sports-Today': how } });
 
 // The route (worker.js checks the origin first). `deps.bounds`: the season bounds.

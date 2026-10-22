@@ -1,5 +1,5 @@
 // 刮刮樂: every instant scratch card Taiwan Lottery has on sale (台灣彩券
-// 刮刮樂 遊戲介紹 and each card's 上市公告, 2026-10), played with Quadra
+// 刮刮樂 遊戲介紹 and each card's 上市公告, 2026-10), played with Orbit
 // money. A card's table is its real one: every prize and how many of it were
 // printed (獎金結構, 中獎張數 of 發行張數), so its win rate is the card's own
 // 本期整體中獎率 and it pays back what the real card does (60-75%). What a

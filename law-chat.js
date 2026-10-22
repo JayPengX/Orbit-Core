@@ -17,7 +17,7 @@
 //   4. guard: a point or consequence citing anything not given is dropped
 //      (as checkAnswer), and so is an agency no given article names.
 //
-// A Quadra Pass of Orbit Law's (worker.js reads it): 30 turns a day a Pass
+// A Orbit Pass of Orbit Law's (worker.js reads it): 30 turns a day a Pass
 // (a turn's plan counts with its answer), in /law-ask's day of Gemini
 // answers in all (law.js). A first question is kept in KV 30 days: its plan
 // by the question, its answer by the versions (m) of the laws found too, so
@@ -375,7 +375,7 @@ export function checkChat(raw, articles, lang, grounded = false, others = []) {
 // ---- The route ------------------------------------------------------------------
 
 // gemini(parts, schema) -> the upstream Response (worker.js's proxyGeminiRequest);
-// session: the request's Quadra Pass session (worker.js), or null.
+// session: the request's Orbit Pass session (worker.js), or null.
 export async function handleLawChat(request, env, ctx, headers, session, gemini) {
   const pass = passOf(session);
   const chat = await opening(request, env, headers, { maxBody: CHAT_LIMITS.maxBody, read: readChat, who: pass });

@@ -1,4 +1,4 @@
-/* ==== Quadra UI: iOS 27, for every app in the family ====
+/* ==== Orbit UI: iOS 27, for every app in the family ====
    The canonical copy lives in Shared-Proxy/kit/ and every app loads it from
    Shared-Proxy's Pages. What iOS 27 draws, drawn the same: its system
    colours (the iOS 26 palette), grouped backgrounds and cells, label and
@@ -129,7 +129,7 @@
   --q-accent-wash: color-mix(in srgb, var(--q-accent) 12%, transparent);
 }
 /* Each app's colour, set by <html data-app> (kit/apps.mjs writes it into
-   each page, quadraSession() too), from kit/brand.mjs. */
+   each page, orbitSession() too), from kit/brand.mjs. */
 /* app-colours */
 :where(:root[data-app='stock']) {
   --q-accent: #0d9488;
@@ -373,7 +373,7 @@ body {
 /* Text never cut off or wrapped mid-number; inputs 16px so iOS never zooms.
    No zooming at all: no double-tap zoom (a quick second tap on a button
    zoomed the page) and no two-finger zoom; the apps size their text to be
-   read as they are (quadra.mjs also stops iOS's pinch gesture). */
+   read as they are (orbit.mjs also stops iOS's pinch gesture). */
 html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
@@ -408,7 +408,7 @@ body {
   overflow-wrap: break-word;
 }
 /* The phone's status bar: a solid strip under it (.q-statusbar, added by
-   quadra.mjs). Since iOS 26 an installed web app gets a "Liquid Glass" blur
+   orbit.mjs). Since iOS 26 an installed web app gets a "Liquid Glass" blur
    laid over its top edge, whatever the status bar style; iOS skips it only
    when a real fixed box with a background, over 10px tall and the page's
    full width, covers that edge (a ::before doesn't count). iOS finds that
@@ -478,7 +478,7 @@ body {
   height: 72px;
   border-radius: 18px;
   box-shadow: 0 14px 34px -10px rgba(14, 17, 22, 0.35);
-  animation: quadra-breathe 1.8s ease-in-out infinite;
+  animation: orbit-breathe 1.8s ease-in-out infinite;
 }
 .q-boot-brand {
   margin: 12px 0 0;
@@ -541,12 +541,12 @@ body {
   border-radius: 50%;
   border: 2.5px solid color-mix(in srgb, var(--q-accent) 18%, transparent);
   border-top-color: var(--q-accent);
-  animation: quadra-spin 0.8s linear infinite;
+  animation: orbit-spin 0.8s linear infinite;
 }
 .spinner[hidden] {
   display: none;
 }
-@keyframes quadra-spin {
+@keyframes orbit-spin {
   to {
     transform: rotate(360deg);
   }
@@ -570,7 +570,7 @@ body {
   box-shadow: var(--q-glass-rim), var(--q-glass-drop);
 }
 
-/* ---- A control under a finger: iOS's give (kit/quadra.mjs sets
+/* ---- A control under a finger: iOS's give (kit/orbit.mjs sets
    [data-q-press] the moment a touch lands, before :active would) ---- */
 button,
 [role='button'],
@@ -913,7 +913,7 @@ button,
 /* A phone or a tablet (a narrow window, or html.q-touch from the device):
    the top line is the status and the glass buttons, and the tabs a capsule
    of glass floating over the page's foot, the chosen tab lit by a softer
-   pill that slides between them (kit/quadra.mjs tabBar sets --q-tab-x and
+   pill that slides between them (kit/orbit.mjs tabBar sets --q-tab-x and
    --q-tab-w), shrinking to its icons while the page scrolls down. What
    scrolls beneath fades towards the edge (iOS's scroll edge effect). */
 @media (max-width: 720px) {
@@ -1056,7 +1056,7 @@ button,
     top: 1px;
     left: calc(50% + 10px);
   }
-  /* Scrolling down: the bar draws in to its icons (quadra.mjs sets .q-tabs-small). */
+  /* Scrolling down: the bar draws in to its icons (orbit.mjs sets .q-tabs-small). */
   .q-tabs-small .q-tabbar .q-tab {
     min-height: 44px;
   }
@@ -1307,7 +1307,7 @@ button,
 
 /* ---- Sheets: up from the foot on a spring, floating inside the screen's
    edges with its deep corners, a grabber, a centred title between glass
-   circles; dragged down to close (quadra.mjs sheetSwipe) ---- */
+   circles; dragged down to close (orbit.mjs sheetSwipe) ---- */
 /* (Inside a sheet, its cells are a shade lifted from it, as iOS's are.) */
 .q-sheet {
   --q-surface: var(--q-sheet-cell, var(--q-grouped-2));
@@ -1358,7 +1358,7 @@ button,
 }
 /* Rises quick and settles, no long crawl at the end (iOS's sheet: about
    0.4 s; a spring's tail on a sheet this tall was a slow last 90 px).
-   Once (.q-risen, quadra.mjs): a drag turns the animation off, and turned
+   Once (.q-risen, orbit.mjs): a drag turns the animation off, and turned
    back on it played again, so a sheet let go of dropped and rose anew. */
 .q-sheet[open]:not(.q-risen) {
   animation: q-sheet-up 0.42s var(--q-ease);
@@ -1374,13 +1374,13 @@ button,
 .q-sheet.q-settle {
   transition: transform 0.36s var(--q-spring-snappy);
 }
-/* Under a finger (quadra.mjs sheetSwipe): its own layer, nothing between it and the finger. */
+/* Under a finger (orbit.mjs sheetSwipe): its own layer, nothing between it and the finger. */
 .q-sheet.q-dragging {
   animation: none;
   transition: none;
   will-change: transform;
 }
-/* Closing (quadra.mjs closeSheet): down to the foot from the finger's own speed, easing out, the dimming fading with it. */
+/* Closing (orbit.mjs closeSheet): down to the foot from the finger's own speed, easing out, the dimming fading with it. */
 .q-sheet.q-leaving {
   animation: none;
   transition: transform var(--q-leave, 0.45s) var(--q-leave-ease, cubic-bezier(0.3, 0.3, 0.2, 1));
@@ -2243,7 +2243,7 @@ input[type='checkbox'][switch] {
   transform: translate(-50%, 16px) scale(0.94);
   transition: opacity 0.2s, transform 0.3s var(--q-ease);
 }
-/* An online-only app with no connection (quadra.mjs onlineOnly): covered, the page's own colour, its mark in the middle. */
+/* An online-only app with no connection (orbit.mjs onlineOnly): covered, the page's own colour, its mark in the middle. */
 .q-offline {
   position: fixed;
   inset: 0;
@@ -2502,7 +2502,7 @@ input[type='checkbox'][switch] {
   }
 }
 
-/* ---- A live number that changed pops once (data-q-live, kit/quadra.mjs) ---- */
+/* ---- A live number that changed pops once (data-q-live, kit/orbit.mjs) ---- */
 :where(span, b, strong, small, em, i)[data-q-live] {
   display: inline-block;
 }
@@ -2561,7 +2561,7 @@ input[type='checkbox'][switch] {
 .q-signing-in body > *:not(.q-gate):not(dialog) {
   display: none !important;
 }
-/* Quadra's screens are top-layer <dialog>s (quadra.mjs keepOnTop): full
+/* Orbit's screens are top-layer <dialog>s (orbit.mjs keepOnTop): full
    screen, above anything an app draws. */
 dialog.q-gate,
 dialog.q-moved {
@@ -2718,7 +2718,7 @@ dialog.q-moved::backdrop {
   overflow-wrap: anywhere;
 }
 
-/* ---- Paused: Quadra is open in another app ---- */
+/* ---- Paused: Orbit is open in another app ---- */
 .q-moved {
   position: fixed;
   inset: 0;
@@ -2886,7 +2886,7 @@ dialog.q-moved::backdrop {
 
 /* The focus ring for the keyboard only: a sheet opening or a button focused
    in code (iOS counts those as :focus-visible) shows no blue square; a Tab
-   or an arrow key brings it back (quadra.mjs sets data-q-keys). */
+   or an arrow key brings it back (orbit.mjs sets data-q-keys). */
 html:not([data-q-keys]) :is(:focus-visible, :focus):not(input, textarea, select) {
   outline: none !important;
 }
@@ -2902,7 +2902,7 @@ dialog {
   overscroll-behavior: contain;
 }
 
-/* ---- The Quadra Pass sheet (pass.mjs): Pass, 外觀, App, 說明 ---- */
+/* ---- The Orbit Pass sheet (pass.mjs): Pass, 外觀, App, 說明 ---- */
 .q-pass {
   --accent: var(--q-accent, #4f46e5);
   --accent-wash: color-mix(in srgb, var(--accent) 12%, transparent);
@@ -2997,7 +2997,7 @@ html.q-recording body::after {
 .q-team-disc-img { width: 72%; height: 72%; object-fit: contain; }
 
 /* ---- Upright only (2026-10-10): a phone on its side, the page turned back
-   against it (quadra.mjs uprightTurn), so it stays upright on the glass.
+   against it (orbit.mjs uprightTurn), so it stays upright on the glass.
    The page's box is the upright screen's; what floats in the top layer
    (sheets, alerts) is turned the same way. ---- */
 html[data-q-turn='-90'],
@@ -4182,7 +4182,7 @@ div.q-ritem {
 }
 
 /* -- Detents (sheet({ detent })): medium is about half the screen, large the
-   screen less its top inset. A medium one is dragged up to large (quadra.mjs
+   screen less its top inset. A medium one is dragged up to large (orbit.mjs
    sheetSwipe sets data-detent); on a phone, large meets the screen's sides -- */
 .q-sheet[data-detent='medium'] {
   height: min(52dvh, 900px);
@@ -4222,7 +4222,7 @@ div.q-ritem {
   padding: 4px 0 8px;
   font: var(--q-t-large);
   letter-spacing: 0.01em;
-  /* One line, shrunk to fit (quadra.mjs fitNames), as iOS's large title. */
+  /* One line, shrunk to fit (orbit.mjs fitNames), as iOS's large title. */
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -4788,7 +4788,7 @@ button.q-cal-d {
   color: inherit;
 }
 
-/* ---- The on-screen keyboard (quadra.mjs watchKeyboard: --q-kb, --q-vvh,
+/* ---- The on-screen keyboard (orbit.mjs watchKeyboard: --q-kb, --q-vvh,
    html.q-kb while it's up) ---- */
 /* An open sheet sits on the keys and fits what's left of the screen, its
    fields never under them. */
@@ -4873,7 +4873,7 @@ html.q-kb .q-kb-docked {
   align-content: space-between;
 }
 
-/* ---- A name on one line (quadra.mjs fitNames): .q-fit shrinks its text,
+/* ---- A name on one line (orbit.mjs fitNames): .q-fit shrinks its text,
    down to 72%, rather than wrap or cut (the size set inline) ---- */
 .q-fit {
   display: block;
@@ -4893,7 +4893,7 @@ html.q-kb .q-kb-docked {
   text-overflow: ellipsis;
 }
 
-/* A logo's tone on a dark screen (quadra.mjs toneLogos): a dark mark in one
+/* A logo's tone on a dark screen (orbit.mjs toneLogos): a dark mark in one
    colour drawn white; a dark one in colours, or one mostly lost on the tile,
    drawn brighter in its own colours (never a light plate: Jay), so no logo
    vanishes into the dark. */

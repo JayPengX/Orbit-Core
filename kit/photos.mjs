@@ -9,7 +9,7 @@
 import { CATALOG } from '#kit/catalog.mjs';
 import { logoPicture, f1Driver, f1Constructor } from '#kit/logos.mjs';
 import { fold } from '#kit/names.mjs';
-import * as kit from '#kit/quadra.mjs';
+import * as kit from '#kit/orbit.mjs';
 
 import { CDN, smallPhoto, espnHeadshot, espnCollegeHeadshot } from './photo-urls.mjs';
 export { smallPhoto, espnHeadshot, espnCollegeHeadshot };
