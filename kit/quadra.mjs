@@ -521,16 +521,21 @@ export function wipeDevice() {
 // The last copy kept on this device, of any age: { at, data } or null.
 export const peekJson = (url, { trim = '' } = {}) => persisted(dataKey(url, trim));
 
-async function dataToken(renew = false) {
+// (`read`: a data proxy read, which takes a session run out up to 6 hours
+// (quadra-token.js READ_GRACE_MS): the token kept on the device goes at once,
+// not after the sign-in's round trip, when the app opens again after a while.)
+async function dataToken(renew = false, read = false) {
   const s = dataSession;
   if (!s) return '';
+  const kept = read && !renew ? s.readToken?.() : '';
+  if (kept) return kept;
   return s.ensureToken({ renew }).catch(() => s.token || '');
 }
 // A proxy ask with this app's token: turned away for it (401: a token signed
 // before the proxy's secret changed, or run out), asked once more with a new one.
 async function signedFetch(address, init) {
   const withToken = t => fetch(`${address}${t ? `&qt=${encodeURIComponent(t)}` : ''}`, init);
-  const res = await withToken(await dataToken());
+  const res = await withToken(await dataToken(false, address.startsWith(PROXY_URL)));
   return res.status === 401 && dataSession ? withToken(await dataToken(true)) : res;
 }
 // One of the Worker's own routes, signed with the
@@ -1314,9 +1319,12 @@ function makeSession(app, { lang, heartbeat }) {
   // its 20 minutes (quadra-token.js SESSION_MS); the refresh token beside it
   // is the stronger key already. Gone with the account (signedOut, wipeDevice).
   const tokenKey = `quadra.token:${app}`;
+  // (One older, up to 6 hours, still reads public data through the proxy: readToken.)
+  let keptRead = ['', 0];
   try {
     const kept = JSON.parse(readStore(tokenKey) || 'null');
     if (kept?.t && kept.account && kept.account === storedAccount() && Date.now() - kept.at < 12 * 60_000) [token, tokenAt] = [kept.t, kept.at];
+    else if (kept?.t && kept.account && kept.account === storedAccount()) keptRead = [kept.t, kept.at];
   } catch {}
   let active = false;
   let live = null;
@@ -1451,6 +1459,7 @@ function makeSession(app, { lang, heartbeat }) {
     if (had) wipeDevice();
     else for (const k of [KEY.refresh, KEY.account, KEY.wallet, payloadKey(app), tokenKey]) writeStore(k, null);
     token = '';
+    keptRead = ['', 0];
     wallet = null;
     active = false;
     emit('signedout');
@@ -1532,6 +1541,12 @@ function makeSession(app, { lang, heartbeat }) {
   s.op = (op, body = {}) => withToken(qt => call('POST', '', { op, qt, ...body }));
   // The data proxy, signed in.
   s.proxy = (url, extra = '') => `${PROXY_URL}?url=${encodeURIComponent(url)}${extra}&app=${app}${token ? `&qt=${encodeURIComponent(token)}` : ''}`;
+  // A token for a data proxy read, without waiting: the one held or kept, up
+  // to 6 hours old (READ_GRACE_MS, less a margin); '' when there's none.
+  s.readToken = () => {
+    const [t, at] = token ? [token, tokenAt] : keptRead;
+    return t && storedAccount() && Date.now() - at < 5.5 * 3_600_000 ? t : '';
+  };
   // (`renew`: a new one now, whatever the age of this one: the proxy turned it away.)
   s.ensureToken = async ({ renew = false } = {}) => {
     if (renew) tokenAt = 0;
