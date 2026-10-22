@@ -5219,6 +5219,21 @@ html.q-kb .q-kb-docked {
 .q-day-bar.stuck::before {
   opacity: 1;
 }
+/* In a sheet or a card (dayBar's flat): where it stands, edge to edge of a sheet. */
+.q-day-bar.flat {
+  position: relative;
+  top: auto;
+  z-index: auto;
+  margin: 0 0 8px;
+  padding: 0;
+}
+.q-sheet .q-day-bar.flat {
+  margin: 0 calc(-1 * var(--q-margin)) 8px;
+  padding: 0 var(--q-margin);
+}
+.q-day-bar.flat::before {
+  display: none;
+}
 .q-day-strip-wrap {
   display: flex;
   flex: 1 1 auto;
@@ -5304,14 +5319,14 @@ html.q-kb .q-kb-docked {
   opacity: 0;
   cursor: pointer;
 }
-.q-day-swipe.swiping > :not(.q-day-bar) {
+.q-day-swipe.swiping > :not(.q-day-bar, .q-sheet-head) {
   transform: translateX(var(--swipe, 0));
   opacity: 0.85;
 }
-.q-day-swipe.day-in-next > :not(.q-day-bar) {
+.q-day-swipe.day-in-next > :not(.q-day-bar, .q-sheet-head) {
   animation: q-day-in-next 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-.q-day-swipe.day-in-prev > :not(.q-day-bar) {
+.q-day-swipe.day-in-prev > :not(.q-day-bar, .q-sheet-head) {
   animation: q-day-in-prev 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 @keyframes q-day-in-next {
