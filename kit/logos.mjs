@@ -11,6 +11,8 @@ export function normalizeTeamName(name) {
     .toLowerCase()
     .normalize('NFKD')
     .replace(/[̀-ͯ]/g, '')
+    // The letters NFKD doesn't take apart (Białystok, Łódź, Bodø).
+    .replace(/[øœæßđðłıþ]/g, c => ({ ø: 'o', œ: 'oe', æ: 'ae', ß: 'ss', đ: 'd', ð: 'd', ł: 'l', ı: 'i', þ: 'th' })[c])
     .replace(/&/g, ' ')
     .replace(/\b(fc|afc|cf|sc|and)\b/g, '')
     .replace(/[^a-z0-9]+/g, ' ')

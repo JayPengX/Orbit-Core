@@ -598,7 +598,42 @@ export function trimFotmobPage(data) {
     season: data.details?.selectedSeason || '',
     teamId: st.teamId,
     stats: list.map(x => ({ header: x.header, name: x.participant?.stat?.name || '', format: x.participant?.stat?.format || '', fractions: x.participant?.stat?.fractions ?? 0, url: x.fetchAllUrl || '', top: (x.topThree || []).map(fotmobPerson) })),
-    teams: [...teams.values()]
+    teams: [...teams.values()],
+    ...(data.details?.type === 'team' ? { home: fotmobHome(data) } : {})
+  };
+}
+// A club's own league from its team page: the league, its table and the
+// club's games in every competition (a club opened from a European cup whose
+// league ESPN doesn't have: Lech Poznań's Ekstraklasa). Its table only when
+// it's the club's league's (FotMob's team page has its cup's too).
+// Kept apart from a league page's (TRIM_FOTMOB_TEAM: its own cache).
+const TRIM_FOTMOB_TEAM = 'fotmob-team';
+function fotmobHome(data) {
+  const id = data.stats?.primaryLeagueId ?? data.fixtures?.primaryTournamentId ?? null;
+  const team = Number(data.details?.id);
+  const own = (data.table || []).map(t => t?.data).find(t => t && t.leagueId === id);
+  const tables = own ? [own.table, ...(own.tables || []).map(x => x?.table)].filter(Boolean) : [];
+  const rows = (tables.find(t => (t.all || []).some(r => r?.id === team)) || tables[0])?.all || [];
+  const side = x => ({ id: x?.id, name: x?.name || '', score: x?.score ?? null });
+  return {
+    league: own ? { id, name: own.leagueName || '', ccode: own.ccode || '' } : id != null ? { id, name: '', ccode: '' } : null,
+    table: rows.map(r => ({ id: r.id, name: r.name, shortName: r.shortName, pos: r.idx, played: r.played, wins: r.wins, draws: r.draws, losses: r.losses, scores: r.scoresStr, gd: r.goalConDiff, pts: r.pts, color: r.qualColor || null })),
+    zones: (own?.legend || []).map(z => ({ title: z.title, color: z.color, at: z.indices || [] })),
+    games: (data.fixtures?.allFixtures?.fixtures || []).map(f => ({
+      id: f.id,
+      league: f.tournament?.leagueId ?? null,
+      comp: f.tournament?.name || '',
+      home: side(f.home),
+      away: side(f.away),
+      at: f.status?.utcTime || '',
+      timeTbd: Boolean(f.status?.matchTimeTbd),
+      started: Boolean(f.status?.started),
+      finished: Boolean(f.status?.finished),
+      cancelled: Boolean(f.status?.cancelled),
+      live: Boolean(f.status?.ongoing),
+      clock: f.status?.liveTime?.short || '',
+      reason: f.status?.reason?.short || ''
+    }))
   };
 }
 // One of FotMob's stat lists (always): its name and the top hundred, each
@@ -1099,7 +1134,7 @@ async function fetchUpstream(upstreamUrl, trim) {
     if (trim) {
       try {
         const parsed = JSON.parse(new TextDecoder().decode(body));
-        body = JSON.stringify(trim === TRIM_KAMBI_EVENTS ? trimKambi(parsed) : trim === TRIM_KAMBI_OFFERS ? trimKambiOffers(parsed) : trim === TRIM_ESPN_ROSTER ? trimEspnRoster(parsed) : trim === TRIM_ESPN_TEAMS ? trimEspnTeams(parsed) : trim === TRIM_ESPN_STANDINGS ? trimEspnStandings(parsed) : trim === TRIM_ESPN_ATHLETES ? trimEspnAthletes(parsed) : trim === TRIM_ESPN_NEWS ? trimEspnNews(parsed) : trim === TRIM_ESPN_LEADERS ? trimEspnLeaders(parsed) : trim === TRIM_JOLPICA_RESULTS ? trimJolpicaResults(parsed) : trim === TRIM_FOTMOB_PAGE ? trimFotmobPage(parsed) : trim === TRIM_FOTMOB_STAT ? trimFotmobStat(parsed) : trim === TRIM_ESPN_INJURIES ? trimEspnInjuries(parsed) : trim === TRIM_ESPN_BOARD ? trimEspnBoard(parsed) : trim === TRIM_ELTA ? trimElta(parsed) : trim === TRIM_POLYMARKET_GAMES ? trimPolymarketGames(parsed) : trim === TRIM_POLYMARKET_MARKETS ? trimPolymarketMarkets(parsed) : trimPolymarketEvents(parsed));
+        body = JSON.stringify(trim === TRIM_KAMBI_EVENTS ? trimKambi(parsed) : trim === TRIM_KAMBI_OFFERS ? trimKambiOffers(parsed) : trim === TRIM_ESPN_ROSTER ? trimEspnRoster(parsed) : trim === TRIM_ESPN_TEAMS ? trimEspnTeams(parsed) : trim === TRIM_ESPN_STANDINGS ? trimEspnStandings(parsed) : trim === TRIM_ESPN_ATHLETES ? trimEspnAthletes(parsed) : trim === TRIM_ESPN_NEWS ? trimEspnNews(parsed) : trim === TRIM_ESPN_LEADERS ? trimEspnLeaders(parsed) : trim === TRIM_JOLPICA_RESULTS ? trimJolpicaResults(parsed) : trim === TRIM_FOTMOB_PAGE || trim === TRIM_FOTMOB_TEAM ? trimFotmobPage(parsed) : trim === TRIM_FOTMOB_STAT ? trimFotmobStat(parsed) : trim === TRIM_ESPN_INJURIES ? trimEspnInjuries(parsed) : trim === TRIM_ESPN_BOARD ? trimEspnBoard(parsed) : trim === TRIM_ELTA ? trimElta(parsed) : trim === TRIM_POLYMARKET_GAMES ? trimPolymarketGames(parsed) : trim === TRIM_POLYMARKET_MARKETS ? trimPolymarketMarkets(parsed) : trimPolymarketEvents(parsed));
       } catch {
         // Not the JSON shape expected - pass it through untouched.
       }
@@ -1199,7 +1234,7 @@ function trimFor(trimParam, upstreamUrl) {
   if (upstreamUrl.hostname === F1_HOST) return TRIM_F1PAGE;
   if (upstreamUrl.hostname === ROTOWIRE_HOST) return TRIM_ROTOWIRE;
   if (upstreamUrl.hostname === ELTA_VOD_HOST) return TRIM_ELTA_VOD;
-  if (upstreamUrl.hostname === FOTMOB_HOST) return TRIM_FOTMOB_PAGE;
+  if (upstreamUrl.hostname === FOTMOB_HOST) return upstreamUrl.pathname === '/api/data/teams' ? TRIM_FOTMOB_TEAM : TRIM_FOTMOB_PAGE;
   if (upstreamUrl.hostname === FOTMOB_DATA_HOST) return TRIM_FOTMOB_STAT;
   if (upstreamUrl.hostname === YT_HOST) return upstreamUrl.pathname === '/watch' ? TRIM_YT_VIDEO : TRIM_YT_SEARCH;
   if (trimParam === TRIM_POLYMARKET_EVENTS && upstreamUrl.hostname === 'gamma-api.polymarket.com' && upstreamUrl.pathname === '/events') return TRIM_POLYMARKET_EVENTS;
