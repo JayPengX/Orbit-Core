@@ -244,8 +244,12 @@ test('a slip is placed through the Worker: checked, its stake taken, watched; al
   const w = doc(WALLET_COLLECTION, ACCOUNT);
   assert.equal(w.entries.filter(e => e.kind === 'stake').reduce((s, e) => s + e.amount, 0), -200);
   assert.ok(doc(OPEN_COLLECTION, `${ACCOUNT}_slipwin01`));
-  // Placed again: refused, nothing taken twice.
-  assert.equal((await post(deps, { op: 'place', slips: [slip('slipwin01', [later])] })).body.refused.problem, 'placed');
+  // Sent again (its answer lost on the way): answered as placed, nothing taken twice.
+  const again = await post(deps, { op: 'place', slips: [slip('slipwin01', [later])] });
+  assert.deepEqual(again.body.placed, ['slipwin01']);
+  assert.equal(doc(WALLET_COLLECTION, ACCOUNT).entries.filter(e => e.kind === 'stake').length, 2);
+  // Some of a batch in already: refused.
+  assert.equal((await post(deps, { op: 'place', slips: [slip('slipwin01', [later]), slip('slipwin09', [later])] })).body.refused.problem, 'placed');
   // A price better than the house's: the house's price back, nothing taken.
   const bad = await post(deps, { op: 'place', slips: [slip('slipwin03', [later]), slip('badprice01', [later])] });
   assert.equal(bad.body.refused.problem, 'moved');

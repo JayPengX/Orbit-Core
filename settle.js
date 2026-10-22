@@ -223,7 +223,12 @@ export async function handlePlay(request, env, headers, session, deps) {
       const wallet = doc.exists ? parseWallet(doc.payload) : null;
       if (!wallet) return errorJson('ECO_SIGNED_OUT', 401, headers, request);
       const have = new Set(wallet.entries.map(e => e.id));
-      if (clean.some(x => have.has(`odds:stake-${x.id}`))) return json({ refused: { problem: 'placed' } }, 200, headers);
+      // Sent again with the same ids (Play asks again when an answer didn't
+      // come back): every one already in, it's answered as placed, nothing
+      // taken twice; some only, refused.
+      const already = clean.filter(x => have.has(`odds:stake-${x.id}`));
+      if (already.length === clean.length) return json({ placed: clean.map(x => x.id), wallet, again: true }, 200, headers);
+      if (already.length) return json({ refused: { problem: 'placed' } }, 200, headers);
       const once = deps.prices ? useReads(deps.prices) : null;
       for (const slip of clean) {
         const r = await (deps.checkSlip || checkSlip)(slip, wallet, deps.prices, new Date(now), once);
