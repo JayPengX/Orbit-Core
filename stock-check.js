@@ -42,7 +42,7 @@
 import { replay, ownCash, applyFills, planOrderType, futMargin } from './kit/stock-account.mjs';
 import { unpack } from './kit/stock-codec.mjs';
 import { BONDS } from './kit/stock-bonds.mjs';
-import { marketFill, dealPrice, currencyInfo, isSubBrokered, cbMaturity, futureOf, futureExpiry, optionOf, optionExpiry, optionIntrinsic, unitMult, OPTION, OPT_MARGIN } from './kit/stock-markets.mjs';
+import { marketFill, dealPrice, currencyInfo, isSubBrokered, cbMaturity, futureOf, futureExpiry, futFinal, optionOf, optionExpiry, optionIntrinsic, unitMult, OPTION, OPT_MARGIN } from './kit/stock-markets.mjs';
 import { fxSymbol } from './kit/stock-quotes.mjs';
 import { readFillsBook, decideFills, ipoList, ipoDraw, ipoKeyOf } from './stock-fill.js';
 import { parseDoc } from './doc-store.js';
@@ -198,7 +198,7 @@ export async function checkEvent(e, account, wallet, read, issued = {}, ctx = {}
         if (!f || !due || e.t !== due || e.t > now || ctx.used?.has(`maturity:${e.symbol}`)) return 'bad';
         const held = replay(account, e.t).positions[e.symbol]?.qty || 0;
         if ((e.side === 'sell' ? held : -held) + 1e-6 < e.qty) return 'bad';
-        const final = (await read(TAIFEX_URL))?.final?.[`${f.year}${String(f.month).padStart(2, '0')}`];
+        const final = futFinal(e.symbol, await read(TAIFEX_URL));
         if (!(final > 0)) return now - e.t > 30 * DAY ? 'bad' : 'later';
         return near(e.price, final, 1e-9) ? 'ok' : 'bad';
       }

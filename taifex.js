@@ -1,8 +1,12 @@
-// TAIFEX's TAIEX futures (臺股期貨, 小型臺指, 微型臺指) for Securities: each
-// contract month's latest settlement price, the margins, and the months'
-// final settlement prices, from TAIFEX's open data and its download page.
+// TAIFEX's futures for Securities, the index's (臺股期貨, 小型臺指, 微型臺指)
+// and the stocks' and ETFs' (股票期貨, ETF期貨: the kit's TW_SSF): each
+// contract month's latest settlement price, the margins, and the final
+// settlement prices, from TAIFEX's open data and its download page.
 // Served by the sports proxy as if from `https://taifex.quadra/fut.json`:
-//   { date: 'YYYY-MM-DD', settle: { TX202611: 46510, … }, margin: { TX: [initial, maintenance], … },
+//   { date: 'YYYY-MM-DD', settle: { TX202611: 46510, CDF202611: 2431, … },
+//     margin: { TX: [initial, maintenance], NYF: […] (an ETF's), … },
+//     ssfRate: { CDF: [initial, maintenance] (of the contract's value), … },
+//     ssfFinal: { CDF202610: 2405.59, … } (the latest month's),
 //     final: { '202610': 46650, … }, opt: { '202611': { C: { 46500: 312, … }, P: { … } } },
 //     optMargin: { A: [initial, maintenance], B: […], C: […] } }
 // `opt`: 臺指選擇權's settlement prices by series (a month, or a weekly:
@@ -12,12 +16,12 @@
 // prices a contract from it and the live 加權指數 (TAIFEX publishes no live
 // quotes); a month's final settlement settles what's held at its expiry.
 
-import { seriesFuture } from './kit/stock-markets.mjs';
+import { seriesFuture, stockFutureCodes } from './kit/stock-markets.mjs';
 
 export const TAIFEX_HOST = 'taifex.quadra';
 const OPENAPI = 'https://openapi.taifex.com.tw/v1';
 const FINALS = 'https://www.taifex.com.tw/cht/5/fSPDataDown';
-const CODES = new Set(['TX', 'MTX', 'TMF']);
+const CODES = new Set(['TX', 'MTX', 'TMF', ...stockFutureCodes()]);
 const MARGIN_NAMES = { 臺股期貨: 'TX', 小型臺指: 'MTX', 微型臺指期貨: 'TMF' };
 const KEEP_MS = 10 * 60_000;
 const OPT_SPAN = 2_500;
@@ -25,7 +29,7 @@ const OPT_FINE = 1_000;
 const SERIES = /^\d{6}([WF][1-5])?$/;
 const OPT_MARGIN = { '臺指選擇權風險保證金(A)值': 'A', '臺指選擇權風險保證金(B)值': 'B', '臺指選擇權風險保證金(C)值': 'C' };
 
-// The day session's (一般) settlement price of each TX/MTX/TMF month.
+// The day session's (一般) settlement price of each contract month (TX/MTX/TMF, and the stocks').
 export function parseDaily(rows) {
   const settle = {};
   let date = null;
@@ -46,6 +50,26 @@ export function parseMargins(rows, names = MARGIN_NAMES) {
     if (code && im > 0 && mm > 0) margin[code] = [im, mm];
   }
   return margin;
+}
+// A stock future's margin rates (SingleStockFuturesMargining: "13.50%"), by contract.
+export function parseRates(rows) {
+  const rate = {};
+  const of = x => Number(String(x || '').replace('%', '')) / 100;
+  for (const r of Array.isArray(rows) ? rows : []) {
+    const [im, mm] = [of(r.InitialMarginRate), of(r.MaintenanceMarginRate)];
+    if (/^[A-Z]{3}$/.test(r.Contract || '') && im > 0 && mm > 0) rate[r.Contract] = [im, mm];
+  }
+  return rate;
+}
+// The stock futures' latest final settlement prices (FinalSettlementPriceSSF), by contract and month.
+export function parseSsfFinals(rows) {
+  const final = {};
+  for (const r of Array.isArray(rows) ? rows : []) {
+    const month = String(r.ContractDeliveryMonth || '').trim();
+    const price = Number(r.TheFinalSettlementPrice);
+    if (/^[A-Z]{3}$/.test(r.Contract || '') && /^\d{6}$/.test(month) && price > 0) final[`${r.Contract}${month}`] = price;
+  }
+  return final;
 }
 // The final settlement CSV (Big5; only its ASCII fields are read): TXO's
 // monthly price is the futures' too (one final settlement price for both);
@@ -111,20 +135,33 @@ async function table(fetchFn) {
   const now = new Date(Date.now() + 8 * 3_600_000);
   const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 3, 1));
   const form = `start_year=${from.getUTCFullYear()}&start_month=${String(from.getUTCMonth() + 1).padStart(2, '0')}&end_year=${now.getUTCFullYear()}&end_month=${String(now.getUTCMonth() + 1).padStart(2, '0')}&dlFileType=3`;
-  const [daily, margins, finals, options] = await Promise.all([
+  const [daily, margins, finals, options, rates, etfMargins, ssfFinals] = await Promise.all([
     get(`${OPENAPI}/DailyMarketReportFut`),
     get(`${OPENAPI}/IndexFuturesAndOptionsMargining`).catch(() => []),
     fetchFn(FINALS, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'Mozilla/5.0' }, body: form, signal: AbortSignal.timeout(8_000) })
       .then(r => (r.ok ? r.text() : ''))
       .catch(() => ''),
-    optionsReport(fetchFn)
+    optionsReport(fetchFn),
+    get(`${OPENAPI}/SingleStockFuturesMargining`).catch(() => []),
+    get(`${OPENAPI}/SingleStockFuturesETFMargining`).catch(() => []),
+    get(`${OPENAPI}/FinalSettlementPriceSSF`).catch(() => [])
   ]);
   const { date, settle } = parseDaily(daily);
   if (!date || !Object.keys(settle).length) throw new Error('TAIFEX: no settlement prices');
   let opt = parseOptions(options, settle);
   if (Object.keys(opt).length) lastOpt = opt;
   else opt = lastOpt || {};
-  const body = { date, settle, margin: parseMargins(margins), final: parseFinals(finals), opt, optMargin: parseMargins(margins, OPT_MARGIN) };
+  const etf = Object.fromEntries((Array.isArray(etfMargins) ? etfMargins : []).map(r => [r.Contract, r.Contract]));
+  const body = {
+    date,
+    settle,
+    margin: { ...parseMargins(etfMargins, etf), ...parseMargins(margins) },
+    ssfRate: parseRates(rates),
+    final: parseFinals(finals),
+    ssfFinal: parseSsfFinals(ssfFinals),
+    opt,
+    optMargin: parseMargins(margins, OPT_MARGIN)
+  };
   kept = { at: Date.now(), body };
   return body;
 }

@@ -5,7 +5,7 @@
 // data route in place). Quotes come 20 to a request from
 // /v7/finance/spark (with the day's price line), charts, dividends and
 // splits from /v8/finance/chart, and symbol search from /v1/finance/search.
-import { BASE, METALS, GRAMS_PER_OUNCE, FUND_CUTOFF, isTwFund, isFuture, futureOf, isOption, optionOf, optionTick, optionExpiry, seriesFuture, OPTION, kindOf, marketOf, normalizeCurrency } from './stock-markets.mjs';
+import { BASE, METALS, GRAMS_PER_OUNCE, FUND_CUTOFF, isTwFund, isFuture, futureOf, isOption, tickSize, toTick as onTickOf, SSF_RATE, optionOf, optionTick, optionExpiry, seriesFuture, OPTION, kindOf, marketOf, normalizeCurrency } from './stock-markets.mjs';
 import { BONDS, ISSUERS, CURVE_SYMBOLS, bondQuote, bondLine, curveOf } from './stock-bonds.mjs';
 
 export const PROXY_URL = 'https://orbit-workers-proxy.pengzjay.workers.dev';
@@ -85,31 +85,45 @@ async function fetchFundQuotes(symbols) {
 }
 
 // TAIFEX's futures (期貨): TAIFEX publishes no live prices, so a contract is
-// the live 加權指數 plus its basis (正逆價差) at the last settlement: its
-// settlement price less that day's index close. The proxy's copy of TAIFEX's
-// table (taifex.js): settlement prices, margins and final settlements.
+// what it's on, live (the 加權指數, or a stock or ETF for 股票期貨), plus its
+// basis (正逆價差) at the last settlement: its settlement price less that
+// day's close of what it's on. The proxy's copy of TAIFEX's table
+// (taifex.js): settlement prices, margins and final settlements.
 const TAIFEX_URL = 'https://taifex.quadra/fut.json';
 const TAIEX = '^TWII';
 const taipeiDate = t => new Date(t + 8 * 3_600_000).toISOString().slice(0, 10);
-// The points a contract stands above (below) the index, or null.
-export function futBasis(symbol, taiex, table) {
+// How far a contract stands above (below) what it's on, or null. `under`:
+// that one's quote (the index's for 台指期).
+export function futBasis(symbol, under, table) {
   const f = futureOf(symbol);
   const settle = f && table?.settle?.[`${f.code}${f.year}${String(f.month).padStart(2, '0')}`];
-  if (!settle || !taiex) return null;
-  // (The table's day: today's close once it's out, else yesterday's, the index's previous close.)
-  const close = taipeiDate(taiex.marketTime) === table.date ? taiex.price : taiex.prev;
+  if (!settle || !under) return null;
+  // (The table's day: today's close once it's out, else yesterday's, the previous close.)
+  const close = taipeiDate(under.marketTime) === table.date ? under.price : under.prev;
   return settle - close;
 }
-export function futQuote(symbol, taiex, table) {
+// A contract's margins, NT$ [initial, maintenance] at `price`: TAIFEX's
+// amounts (the index's, an ETF's), else its rates of the contract's value.
+export function futMarginAt(symbol, price, table) {
   const f = futureOf(symbol);
-  const basis = futBasis(symbol, taiex, table);
+  if (!f) return null;
+  if (table?.margin?.[f.code]) return table.margin[f.code];
+  if (!f.stock || !(price > 0)) return null;
+  const [im, mm] = table?.ssfRate?.[f.code] || SSF_RATE;
+  return [Math.round(price * f.mult * im), Math.round(price * f.mult * mm)];
+}
+export function futQuote(symbol, under, table) {
+  const f = futureOf(symbol);
+  const basis = futBasis(symbol, under, table);
   if (basis === null) return null;
-  const at = x => (Number.isFinite(x) ? Math.round(x + basis) : null);
-  const price = at(taiex.price);
-  const prev = at(taiex.prev);
+  // (The index's futures in whole points; a stock's at its ticks.)
+  const at = x => (Number.isFinite(x) ? (f.stock ? onTickOf(x + basis, tickSize('TAIFEX', 'fut', x + basis, symbol)) : Math.round(x + basis)) : null);
+  const price = at(under.price);
+  const prev = at(under.prev);
   const month = `${f.year}${String(f.month).padStart(2, '0')}`;
+  const final = f.stock ? table.ssfFinal?.[`${f.code}${month}`] : table.final?.[month];
   return {
-    ...taiex,
+    ...under,
     symbol,
     name: `${f.zh} ${f.month}月`,
     shortName: `${f.zh} ${f.month}月`,
@@ -120,16 +134,17 @@ export function futQuote(symbol, taiex, table) {
     prev,
     change: price - prev,
     pct: prev ? price / prev - 1 : 0,
-    dayHigh: at(taiex.dayHigh),
-    dayLow: at(taiex.dayLow),
+    dayHigh: at(under.dayHigh),
+    dayLow: at(under.dayLow),
     high52: null,
     low52: null,
     volume: null,
     exchange: 'TAIFEX',
+    underlying: f.underlying,
     basis,
-    margin: table.margin?.[f.code] || null,
-    ...(table.final?.[month] ? { final: table.final[month] } : {}),
-    line: (taiex.line || []).map(([t, c]) => [t, c + basis])
+    margin: futMarginAt(symbol, price, table),
+    ...(final ? { final } : {}),
+    line: (under.line || []).map(([t, c]) => [t, c + basis])
   };
 }
 const readTaifex = () => getJson(TAIFEX_URL);
@@ -349,7 +364,8 @@ function upstreamSymbols(symbols) {
       set.add(fxSymbol('USD'));
     } else if (BONDS[s]) {
       if (BONDS[s].live) for (const c of CURVE_SYMBOLS) set.add(c);
-    } else if (isFuture(s) || isOption(s)) set.add(TAIEX);
+    } else if (isFuture(s)) set.add(futureOf(s).underlying);
+    else if (isOption(s)) set.add(TAIEX);
     else if (s !== BASE && !isTwFund(s)) set.add(s);
   }
   return [...set];
@@ -390,14 +406,15 @@ export async function fetchQuotes(symbols, { range = '1d', interval = '5m' } = {
     const table = await futRead;
     const taiex = out.get(TAIEX);
     for (const s of futs) {
-      const q = table && taiex && futQuote(s, taiex, table);
+      const under = out.get(futureOf(s).underlying);
+      const q = table && under && futQuote(s, under, table);
       if (q) out.set(s, q);
     }
     for (const s of opts) {
       const q = table && taiex && optQuote(s, taiex, table);
       if (q) out.set(s, q);
     }
-    if (!symbols.includes(TAIEX)) out.delete(TAIEX);
+    for (const u of new Set([TAIEX, ...futs.map(s => futureOf(s).underlying)])) if (!symbols.includes(u)) out.delete(u);
   }
   if (fundRead) {
     const f = await fundRead;
@@ -473,9 +490,9 @@ export async function fetchChart(symbol, rangeKey = '1mo', { events = false } = 
     const points = bondLine(bond, times, t => (bond.live ? curveFromLines(lines, t) : curveOf(bond.issuer)));
     return { quote, points, bars: [], dividends: [], splits: [] };
   }
-  // A future: the index's chart, at today's basis (its history approximated).
+  // A future: the chart of what it's on, at today's basis (its history approximated).
   if (isFuture(symbol)) {
-    const [chart, table] = await Promise.all([fetchChart(TAIEX, rangeKey), readTaifex()]);
+    const [chart, table] = await Promise.all([fetchChart(futureOf(symbol).underlying, rangeKey), readTaifex()]);
     const quote = chart && futQuote(symbol, chart.quote, table);
     if (!quote) return null;
     const shift = ([t, c]) => [t, c + quote.basis];
@@ -520,7 +537,7 @@ export async function fetchBars(symbol, since, { prePost = false } = {}) {
   const day = 86_400_000;
   if (isTwFund(symbol) || isOption(symbol)) return [];
   if (isFuture(symbol)) {
-    const [bars, quotes] = await Promise.all([fetchBars(TAIEX, since), fetchQuotes([symbol])]);
+    const [bars, quotes] = await Promise.all([fetchBars(futureOf(symbol).underlying, since), fetchQuotes([symbol])]);
     const basis = quotes.get(symbol)?.basis;
     return basis == null ? [] : bars.map(b => ({ ...b, o: b.o + basis, h: b.h + basis, l: b.l + basis, c: b.c + basis }));
   }

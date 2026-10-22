@@ -57,6 +57,7 @@ import {
   futureOf,
   futureExpiry,
   FUT_MARGIN,
+  SSF_RATE,
   OPTION,
   optionExpiry,
   optionIntrinsic,
@@ -436,8 +437,13 @@ function applyFill(s, e) {
 
 // ---- Futures (期貨) ----
 // A future's margins a contract, NT$ [initial, maintenance]: TAIFEX's on its
-// quote, else the kit's table.
-export const futMargin = (symbol, quote = null) => quote?.margin || FUT_MARGIN[futureOf(symbol)?.code] || [0, 0];
+// quote, else the kit's table (a stock's future: SSF_RATE of its value at `price`).
+export function futMargin(symbol, quote = null, price = quote?.price) {
+  if (quote?.margin) return quote.margin;
+  const f = futureOf(symbol);
+  if (FUT_MARGIN[f?.code]) return FUT_MARGIN[f.code];
+  return f?.stock && price > 0 ? SSF_RATE.map(r => Math.round(price * f.mult * r)) : [0, 0];
+}
 // How many of an order's contracts open a position (the rest close what's held).
 export function futOpening(held, side, qty) {
   const dir = side === 'buy' ? 1 : -1;
@@ -456,7 +462,7 @@ export function optFreed(s, symbol, qty) {
 // The margin the account's futures and written options hold, NT$ (each at
 // its latest fill's margin a contract).
 export const futMarginHeld = s =>
-  Object.values(s.positions).reduce((sum, p) => sum + (p.kind === 'fut' ? Math.abs(p.qty) * (p.im || futMargin(p.symbol)[0]) : p.kind === 'opt' && p.qty < 0 ? -p.qty * (p.im || optWriteMargin(p.symbol, p.last || 0, 0)) : 0), 0);
+  Object.values(s.positions).reduce((sum, p) => sum + (p.kind === 'fut' ? Math.abs(p.qty) * (p.im || futMargin(p.symbol, null, p.last ?? p.mark)[0]) : p.kind === 'opt' && p.qty < 0 ? -p.qty * (p.im || optWriteMargin(p.symbol, p.last || 0, 0)) : 0), 0);
 // A futures fill: no contract value changes hands, only the costs; what
 // it closes pays its gain or loss since the position's price (`mark`, its
 // average), in NT$ at the contract's NT$ a point. `entry` is the same
@@ -1033,7 +1039,7 @@ function fillOrder(account, order, price, rates, now, at = now) {
     if (!order.forced) {
       const have = Math.min(...moments.map(tt => (available(account, replay(account, tt)).cash[BASE] || 0))) + (order.reserve || 0);
       const opening = futOpening(replay(account, at).positions[order.symbol]?.qty || 0, order.side, order.qty);
-      const need = opening * (order.im || futMargin(order.symbol)[0]) + est.costs;
+      const need = opening * (order.im || futMargin(order.symbol, null, order.price || order.limit)[0]) + est.costs;
       if (need > have + EPS) {
         const rejected = { ...order, status: 'rejected', reason: 'funds', rev: order.rev + 1, done: now };
         return { account: updateOrder(account, rejected), order: rejected, fill: null, error: 'funds', need, have };
@@ -1482,7 +1488,7 @@ export function valuate(s, quotes, rates) {
       const pl = (price - p.entry) * mult * p.qty;
       const from = q ? (p.first > (q.session?.start ?? Infinity) ? p.entry : q.prev) : price;
       const day = (price - from) * mult * p.qty;
-      const [im, mm] = futMargin(p.symbol, q);
+      const [im, mm] = futMargin(p.symbol, q, price);
       futTWD += open;
       futMarginTWD += Math.abs(p.qty) * (p.im || im);
       futInitTWD += Math.abs(p.qty) * (p.im || im);

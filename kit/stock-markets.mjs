@@ -258,16 +258,23 @@ export function jpTickTable(kind, symbol) {
   if (kind === 'etf') return jpEtfUnit(symbol) >= 10 ? JP_FINE : JP_ETF_ONE;
   return inTopix500(symbol) ? JP_FINE : JP_OTHER;
 }
+const twStockTick = price => (price < 10 ? 0.01 : price < 50 ? 0.05 : price < 100 ? 0.1 : price < 500 ? 0.5 : price < 1000 ? 1 : 5);
 export function tickSize(market, kind, price, symbol = null) {
   // 臺股期貨 and its smaller ones: a whole index point; an option by its premium.
-  if (market === 'TAIFEX') return kind === 'opt' ? optionTick(price) : 1;
+  if (market === 'TAIFEX') {
+    if (kind === 'opt') return optionTick(price);
+    // A stock's or ETF's future: its stock's ticks (TAIFEX 股票期貨升降單位).
+    const f = symbol ? futureOf(symbol) : null;
+    if (f?.stock) return f.etf ? (price < 50 ? 0.01 : 0.05) : twStockTick(price);
+    return 1;
+  }
   if (market === 'TW') {
     if (kind === 'etf' || kind === 'bond') return price < 50 ? 0.01 : 0.05;
     // A convertible bond, by price per NT$100 of face (TPEx 轉換公司債升降單位).
     if (kind === 'cb') return price < 150 ? 0.05 : price < 1000 ? 1 : 5;
     // A warrant or 牛熊證 (TWSE 認購(售)權證升降單位).
     if (kind === 'warrant') return price < 5 ? 0.01 : price < 10 ? 0.05 : price < 50 ? 0.1 : price < 100 ? 0.5 : price < 500 ? 1 : 5;
-    return price < 10 ? 0.01 : price < 50 ? 0.05 : price < 100 ? 0.1 : price < 500 ? 0.5 : price < 1000 ? 1 : 5;
+    return twStockTick(price);
   }
   if (market === 'US') return price < 1 ? 0.0001 : 0.01;
   if (market === 'HK')
@@ -657,13 +664,56 @@ export const FUTURES = {
 export const FUT_MARGIN = { TX: [701_000, 538_000], MTX: [175_250, 134_500], TMF: [35_050, 26_900] };
 // 期貨交易稅: 0.002% of the contract's value, each way, to the dollar.
 export const FUT_TAX = 0.00002;
-const FUT_RE = /^(TX|MTX|TMF)(\d{4})(\d{2})\.TF$/;
-export const isFuture = symbol => FUT_RE.test(symbol || '');
+// TAIFEX's 股票期貨 and ETF期貨, on one Taiwan stock or ETF each (`CDF202611.TF`,
+// 台積電期貨): code:stock:flags:name (tools/tw-futures.mjs writes it; flags e
+// an ETF, o 上櫃, m 小型). A contract is 2,000 shares (小型 100), an ETF's
+// 10,000 units (小型 1,000), priced in NT$ a share at the stock's ticks.
+// Margins are TAIFEX's rates of the contract's value (an ETF's a fixed
+// amount), read with its prices; SSF_RATE (級距1) the fallback.
+export const TW_SSF = 'CAF:1303::南亞,CBF:2002::中鋼,CCF:2303::聯電,CDF:2330::台積電,CEF:2881::富邦金,CFF:1301::台塑,CGF:2324::仁寶,CHF:2409::友達,CJF:2880::華南金,CKF:2882::國泰金,CLF:2886::兆豐金,CMF:2887::台新新光金,CNF:2891::中信金,CQF:1216::統一,CRF:1402::遠東新,CSF:1605::華新,CUF:2323::中環,CWF:2352::佳世達,CXF:2371::大同,CYF:2408::南亞科,CZF:2603::長榮,DAF:2609::陽明,DBF:2610::華航,DCF:2801::彰銀,DEF:2890::永豐金,DFF:1101::台泥,DGF:1326::台化,DHF:2317::鴻海,DIF:2337::旺宏,DJF:2357::華碩,DKF:2382::廣達,DLF:2412::中華電,DNF:2884::玉山金,DOF:2885::元大金,DPF:2892::第一金,DQF:3481::群創,DSF:2353::宏碁,DVF:2454::聯發科,DWF:2915::潤泰全,DXF:3231::緯創,DYF:1102::亞泥,DZF:1210::大成,EEF:1312::國喬,EGF:1314::中石化,EHF:1319::東陽,EKF:1440::南紡,EMF:1504::東元,EOF:1560::中砂,EPF:1590::亞德客-KY,EYF:1718::中纖,EZF:1722::台肥,FBF:2006::東和鋼鐵,FEF:2027::大成鋼,FFF:2049::上銀,FGF:2059::川湖,FKF:2105::正新,FNF:2201::裕隆,FQF:2301::光寶科,FRF:2308::台達電,FSF:2312::金寶,FTF:2313::華通,FVF:2331::精英,FWF:2332::友訊,FYF:2340::台亞,FZF:2344::華邦電,GAF:2347::聯強,GCF:2354::鴻準,GHF:2376::技嘉,GIF:2377::微星,GJF:2379::瑞昱,GKF:2385::群光,GLF:2392::正崴,GMF:2393::億光,GNF:2401::凌陽,GOF:2404::漢唐,GRF:2449::京元電子,GUF:2455::全新,GVF:2457::飛宏,GWF:2458::義隆,GXF:2474::可成,GYF:2481::強茂,GZF:2485::兆赫,HAF:2489::瑞軒,HBF:2492::華新科,HCF:2498::宏達電,HHF:2515::中工,HIF:2520::冠德,HLF:2542::興富發,HOF:2548::華固,HQF:2605::新興,HSF:2618::長榮航,IAF:2834::臺企銀,IHF:2913::農林,IIF:3006::晶豪科,IJF:3008::大立光,IMF:3019::亞光,IOF:3034::聯詠,IPF:3035::智原,IQF:3036::文曄,IRF:3037::欣興,ITF:3042::晶技,IXF:3189::景碩,IYF:3376::新日興,IZF:3380::明泰,JBF:3443::創意,JFF:3533::嘉澤,JMF:3653::健策,JNF:3673::TPK-KY,JPF:3702::大聯大,JSF:4938::和碩,JWF:5534::長虹,JXF:6005::群益證,JZF:6153::嘉聯益,KAF:6176::瑞儀,KBF:6213::聯茂,KCF:6239::力成,KDF:6271::同欣電,KEF:6278::台表科,KFF:6282::康舒,KGF:6285::啟碁,KIF:8039::台虹,KKF:8163::達方,KLF:9904::寶成,KOF:9939::宏全,KPF:9945::潤泰新,KSF:1477::聚陽,KUF:1802::台玻,KWF:2328::廣宇,LBF:3044::健鼎,LCF:3045::台灣大,LEF:3406::玉晶光,LIF:6269::台郡,LMF:9914::美利達,LOF:5880::合庫金,LQF:2356::英業達,LRF:2883::凱基金,LTF:4904::遠傳,LUF:4958::臻鼎-KY,LVF:5871::中租-KY,LWF:1476::儒鴻,LXF:2327::國巨*,LYF:8046::南電,MBF:2355::敬鵬,MJF:2360::致茂,MKF:2439::美律,MQF:6257::矽格,MVF:9938::百和,MYF:1565:o:精華,NAF:3105:o:穩懋,NBF:3152:o:璟德,NCF:3211:o:順達,NDF:3260:o:威剛,NEF:3264:o:欣銓,NGF:3691:o:碩禾,NIF:4123:o:晟德,NJF:5009:o:榮剛,NLF:5347:o:世界,NOF:5483:o:中美晶,NQF:6121:o:新普,NSF:6147:o:頎邦,NUF:8044:o:網家,NVF:8069:o:元太,NWF:8299:o:群聯,NYF:0050:e:元大台灣50,OAF:006205:e:富邦上証,OBF:006206:e:元大上證50,ODF:2231::為升,OEF:6116::彩晶,OHF:6279:o:胡連,OJF:00636:e:國泰中國A50,OKF:00639:e:富邦深100,OLF:3008:m:大立光,OMF:1565:om:精華,OOF:00643:e:群益深証中小,OPF:2345::智邦,OQF:6414::樺漢,ORF:1536::和大,OSF:1909::榮成,OTF:3081:o:聯亞,OUF:3552:o:同致,OVF:6274:o:台燿,OWF:6488:o:環球晶,OXF:6510:o:精測,OYF:6510:om:精測,OZF:3711::日月光投控,PAF:3227:o:原相,PBF:6488:om:環球晶,PCF:4162:o:智擎,PDF:4736::泰博,PEF:5425:o:台半,PFF:0056:e:元大高股息,PGF:2633::台灣高鐵,PHF:5269::祥碩,PIF:3529:o:力旺,PJF:2383::台光電,PKF:6173:o:信昌電,PLF:6182:o:合晶,PMF:8436:o:大江,PNF:5269:m:祥碩,PPF:5457:o:宣德,PQF:8358:o:金居,PRF:8086:o:宏捷科,PSF:3706::神達,PTF:3324:o:雙鴻,PUF:2454:m:聯發科,PVF:6669::緯穎,PWF:6669:m:緯穎,PXF:3293:o:鈊象,PYF:3293:om:鈊象,PZF:5274:o:信驊,QAF:5274:om:信驊,QBF:3714::富采,QCF:2606::裕民,QDF:3532::台勝科,QEF:2327:m:國巨*,QFF:2330:m:台積電,QGF:2379:m:瑞昱,QHF:3034:m:聯詠,QIF:3105:om:穩懋,QJF:3406:m:玉晶光,QKF:1907::永豐餘,QLF:3374:o:精材,QMF:2049:m:上銀,QNF:8299:om:群聯,QOF:1717::長興,QPF:1904::正隆,QQF:3078:o:僑威,QRF:2357:m:華碩,QSF:8046:m:南電,QTF:2441::超豐,QUF:8150::南茂,QVF:2338::光罩,QWF:2388::威盛,QXF:2615::萬海,QYF:6547:o:高端疫苗,QZF:6770::力積電,RAF:3017::奇鋐,RBF:5388::中磊,RCF:2634::漢翔,RDF:4128:o:中天,REF:4919::新唐,RFF:3533:m:嘉澤,RGF:3653:m:健策,RIF:00878:e:國泰永續高股息,RJF:1609::大亞,RKF:2368::金像電,RLF:6443::元晶,RNF:4743:o:合一,ROF:6245:o:立端,RPF:5904:o:寶雅*,RRF:5904:om:寶雅*,RSF:3529:om:力旺,RUF:9958::世紀鋼,RVF:2308:m:台達電,RWF:3443:m:創意,RXF:00885:e:富邦越南,RYF:00923:e:群益台ESG低碳50,RZF:00679B:eo:元大美債20年,SAF:1795::美時,SBF:1905::華紙,SCF:1477:m:聚陽,SDF:1513::中興電,SEF:2345:m:智邦,SFF:2383:m:台光電,SGF:00893:e:國泰智能電動車,SIF:00719B:eo:元大美債1-3,SJF:3005::神基,SKF:8112::至上,SLF:2376:m:技嘉,SMF:00919:e:群益台灣精選高息,SNF:00929:e:復華台灣科技優息,SQF:00772B:eo:中信高評級公司債,SRF:0050:em:元大台灣50,SSF:0056:em:元大高股息,SUF:00940:e:元大台灣價值高息,SVF:2059:m:川湖,SWF:9958:m:世紀鋼,SYF:3680:o:家登,SZF:3680:om:家登,UAF:1503::士電,UBF:6139::亞翔,UCF:6188:o:廣明,UEF:5876::上海商銀,UFF:6505::台塑化,UGF:6526::達發,UHF:3017:m:奇鋐,UIF:6526:m:達發,UJF:00937B:eo:群益ESG投等債20+,UKF:00687B:eo:國泰20年美債,ULF:3324:om:雙鴻,UMF:3661::世芯-KY,UOF:3661:m:世芯-KY,UPF:6472::保瑞,UQF:6472:m:保瑞,URF:00757:e:統一FANG+,USF:00757:em:統一FANG+,UTF:2486::一詮,UUF:6757::台灣虎航,UVF:6223:o:旺矽,UWF:6223:om:旺矽,UXF:2329::華泰,UYF:6290:o:良維,UZF:2404:m:漢唐,VAF:1608::華榮,VBF:2367::燿華,VCF:2421::建準,VDF:2360:m:致茂,VEF:3665::貿聯-KY,VFF:3665:m:貿聯-KY,VGF:2368:m:金像電,VHF:0052:e:富邦科技,VIF:2395::研華,VJF:3211:om:順達,VKF:6139:m:亞翔,VLF:8932:o:智通*,VMF:1519::華城,VNF:1519:m:華城,VOF:2449:m:京元電子,VPF:3711:m:日月光投控,VQF:3718:o:中光電投控'; // 2026-10-23, 320 contracts
+export const SSF_RATE = [0.135, 0.1035];
+let ssfMap = null;
+function ssfOf(code) {
+  if (!ssfMap) {
+    ssfMap = new Map();
+    for (const x of TW_SSF.split(',')) {
+      const [c, stock, flags = '', name = ''] = x.split(':');
+      if (c && stock) ssfMap.set(c, { stock, etf: flags.includes('e'), otc: flags.includes('o'), mini: flags.includes('m'), name });
+    }
+  }
+  return ssfMap.get(code) || null;
+}
+// Every stock and ETF future's code, in TW_SSF's order.
+export const stockFutureCodes = () => (ssfOf(''), [...ssfMap.keys()]);
+const FUT_RE = /^([A-Z]{2,3})(\d{4})(\d{2})\.TF$/;
 export function futureOf(symbol) {
   const m = FUT_RE.exec(symbol || '');
-  return m ? { code: m[1], year: Number(m[2]), month: Number(m[3]), ...FUTURES[m[1]] } : null;
+  if (!m) return null;
+  const at = { code: m[1], year: Number(m[2]), month: Number(m[3]) };
+  if (FUTURES[m[1]]) return { ...at, ...FUTURES[m[1]], underlying: '^TWII' };
+  const s = ssfOf(m[1]);
+  if (!s) return null;
+  return {
+    ...at,
+    zh: `${s.mini ? '小型' : ''}${s.name}期`,
+    en: `${s.stock} ${s.mini ? 'mini ' : ''}futures`,
+    mult: s.etf ? (s.mini ? 1_000 : 10_000) : s.mini ? 100 : 2_000,
+    fee: s.mini ? 12 : 30,
+    stock: true,
+    etf: s.etf,
+    underlying: `${s.stock}.${s.otc ? 'TWO' : 'TW'}`
+  };
 }
+export const isFuture = symbol => Boolean(futureOf(symbol));
 export const futMult = symbol => futureOf(symbol)?.mult ?? 1;
+// The final settlement price of a contract from TAIFEX's table: the month's
+// for the index futures (its options' too), each contract's own for a stock's.
+export function futFinal(symbol, table) {
+  const f = futureOf(symbol);
+  if (!f) return null;
+  const month = `${f.year}${String(f.month).padStart(2, '0')}`;
+  return (f.stock ? table?.ssfFinal?.[`${f.code}${month}`] : table?.final?.[month]) ?? null;
+}
 // A contract month's last trading day (and final settlement): its third
 // Wednesday, the next business day when that's a holiday; it trades to 13:30.
 export function futureExpiry(symbol) {
