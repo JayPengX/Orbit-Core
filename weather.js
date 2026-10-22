@@ -1361,6 +1361,7 @@ const SAMPLES = {
   'cwa-rain': env => cwaUrl(env, 'O-A0002-001'),
   'cwa-uv': env => cwaUrl(env, 'O-A0005-001'),
   'cwa-warn': env => cwaUrl(env, 'W-C0033-001'),
+  'cwa-track': env => cwaUrl(env, 'W-C0034-005'),
   'moenv-aqi': env => moenvUrl(env, 'aqx_p_432', '&limit=1000'),
   'moenv-aqf': env => moenvUrl(env, 'aqf_p_01', '&limit=100'),
   'moenv-uv': env => moenvUrl(env, 'uv_s_01', '&limit=100'),
