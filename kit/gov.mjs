@@ -41,6 +41,8 @@ function sportsTax(wallet, odds) {
   const ids = new Set((wallet?.entries || []).map(e => e?.id));
   const folded = [...ids].some(id => typeof id === 'string' && id.startsWith('fold:odds:stake:'));
   const off = offRecord(wallet);
+  // A back charge taken back (`eco:untax-<slip>`) is no tax either.
+  for (const id of ids) if (typeof id === 'string' && id.startsWith('eco:untax-')) off.add(id.slice(10));
   let sum = 0;
   for (const [id, tax] of Object.entries(odds.slips)) if (!off.has(id) && (folded || ids.has(`odds:stake-${id}`))) sum += nn(tax);
   return sum;
