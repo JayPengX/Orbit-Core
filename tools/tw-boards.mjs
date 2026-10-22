@@ -5,7 +5,9 @@
 //   TW_EMERGING  every stock on the emerging board (興櫃), from its daily
 //                quote list; each code a base-36 gap from the one before.
 //   TW_CB        every listed convertible bond (可轉債), from its issue data:
-//                code:maturity (YYMMDD), its face repaid then.
+//                code:maturity (YYMMDD), its face repaid then:conversion
+//                price at issue:put date (YYMMDD):put price (per 100), the
+//                last three empty where it has none.
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const get = async url => (await fetch(url)).json();
@@ -18,7 +20,11 @@ const asOf = day.length === 7 ? `${Number(day.slice(0, 3)) + 1911}-${day.slice(3
 // Listed (ListingStatus 2) convertible and exchangeable bonds with a code.
 const cbs = (await get('https://www.tpex.org.tw/openapi/v1/bond_ISSBD5_data'))
   .filter(r => r.ListingStatus === '2' && /^[1-9]\d{4}$/.test(r.BondCode || '') && /^\d{8}$/.test(r.MaturityDate || ''))
-  .map(r => [r.BondCode, r.MaturityDate.slice(2)])
+  .map(r => {
+    const n = x => (Number(x) > 0 ? String(Number(x)) : '');
+    const put = /^\d{8}$/.test(r.PutOptionDate || '') && Number(r.PutOptionPrice) > 0;
+    return [r.BondCode, r.MaturityDate.slice(2), n(r['Conversion/ExchangePriceAtIssuance']), put ? r.PutOptionDate.slice(2) : '', put ? n(r.PutOptionPrice) : ''];
+  })
   .sort((a, b) => a[0].localeCompare(b[0]));
 if (cbs.length < 200) throw new Error(`only ${cbs.length} convertible bonds`);
 
@@ -30,6 +36,6 @@ const put = (name, value, note) => {
   src = src.replace(re, () => `export const ${name} = '${value}'; // ${note}`);
 };
 put('TW_EMERGING', codes.map((c, i) => (c - (codes[i - 1] || 0)).toString(36)).join(','), `${asOf}, ${codes.length} stocks`);
-put('TW_CB', cbs.map(c => c.join(':')).join(','), `${asOf}, ${cbs.length} bonds`);
+put('TW_CB', cbs.map(c => c.join(':').replace(/:+$/, '')).join(','), `${asOf}, ${cbs.length} bonds`);
 writeFileSync(file, src);
 console.log(`${codes.length} emerging stocks, ${cbs.length} convertible bonds`);
