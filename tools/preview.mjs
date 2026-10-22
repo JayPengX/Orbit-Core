@@ -687,7 +687,8 @@ await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(?!
     }
     if (body.op === 'scratch') {
       const { CARDS, drawPrize } = await import('../kit/play-scratch.mjs');
-      reply = { ticket: { id: body.id, t: new Date().toISOString(), game: `scratch:${body.card}`, card: body.card, cost: CARDS[body.card].price, prize: drawPrize(body.card), seed: Math.floor(Math.random() * 2 ** 31), status: 'open' } };
+      const one = x => ({ id: x.id, t: new Date().toISOString(), game: `scratch:${x.card}`, card: x.card, cost: CARDS[x.card].price, prize: drawPrize(x.card), seed: Math.floor(Math.random() * 2 ** 31), status: 'open' });
+      reply = Array.isArray(body.cards) ? { tickets: body.cards.map(one) } : { ticket: one(body) };
     }
     if (body.op === 'reveal') reply = { prize: 0 };
     // (Cash out: taken at the value asked; the Worker checks it against its own.)

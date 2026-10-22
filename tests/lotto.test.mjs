@@ -112,6 +112,18 @@ test('a scratch card\'s prize is drawn by the Worker and paid once, when it is s
   assert.ok(doc(WALLET_COLLECTION, ACCOUNT).entries.filter(e => e.id === 'odds:prize-scratch001').length <= 1);
 });
 
+test('several scratch cards bought at once: one charge, all or none', async () => {
+  const now = { t: Date.parse('2026-10-12T04:00:00Z') };
+  const { deps, doc } = setup(now, money);
+  const r = await post(deps, { op: 'scratch', cards: [{ id: 'many00001', card: 'lucky7' }, { id: 'many00002', card: 'lucky7' }, { id: 'many00003', card: 'lucky7' }] });
+  assert.equal(r.body.tickets?.length, 3, JSON.stringify(r.body));
+  assert.equal(doc(WALLET_COLLECTION, ACCOUNT).entries.filter(e => e.kind === 'lottery').length, 3);
+  // NT$700 left: a NT$100 card with a NT$1,000 one is refused whole.
+  assert.equal((await post(deps, { op: 'scratch', cards: [{ id: 'many00004', card: 'lucky7' }, { id: 'many00005', card: 'mahjong' }] })).body.refused.problem, 'funds');
+  assert.equal(doc(WALLET_COLLECTION, ACCOUNT).entries.filter(e => e.kind === 'lottery').length, 3);
+  assert.equal((await post(deps, { op: 'scratch', cards: [...Array(11)].map((_, i) => ({ id: `many1${String(i).padStart(4, '0')}`, card: 'lucky7' })) })).body.refused.problem, 'shape', 'eleven at once');
+});
+
 test('one ticket id twice in a sale: refused, nothing charged', async () => {
   const now = { t: Date.parse('2026-10-12T04:00:00Z') };
   const { deps, doc } = setup(now, money);

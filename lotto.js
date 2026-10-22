@@ -8,7 +8,8 @@
 //        cost from the pool, all or none; 多期: a ticket a draw, <id>-2 …):
 //        { tickets: [ticket…], wallet }
 //   POST /play { op: 'scratch', id, card }   a card bought, its prize drawn
-//        here: { ticket, wallet }
+//        here: { ticket, wallet }; { op: 'scratch', cards: [{ id, card }…] }
+//        several at once (one charge): { tickets, wallet }
 //   POST /play { op: 'reveal', id }          scratched: its prize paid
 //   cron (with the slips): drawn tickets settled from Taiwan Lottery's results
 //
@@ -26,6 +27,8 @@ export const TICKET_INDEX = '_index';
 const MAX_TICKETS = 50;
 // Tickets one sale makes at most, 多期 counted (each a write and a cron read).
 const MAX_SOLD = 120;
+// Scratch cards one sale makes at most (Play's page buys 1 to 10).
+const MAX_CARDS = 10;
 const TICKET_ID = /^[a-z0-9]{8,32}$/;
 // Tickets settled a run at most (each a draw read and two writes; the free
 // plan's 50 fetches set it at 6).
@@ -92,14 +95,23 @@ export async function handleLotto(body, env, account, deps, now) {
     return { tickets, wallet };
   }
   if (body.op === 'scratch') {
-    const id = String(body.id || '');
-    const card = CARDS[body.card];
-    if (!TICKET_ID.test(id) || !card || !onSale(body.card, new Date(now))) return { refused: { problem: 'shape' } };
-    const ticket = { id, t: new Date(now).toISOString(), game: `scratch:${body.card}`, card: body.card, cost: card.price, prize: drawPrize(body.card, cryptoUnit), seed: cryptoSeed(), status: 'open' };
-    const wallet = await charge(env, deps, account, [{ id: `odds:lotto-${id}`, t: now, app: 'odds', kind: 'lottery', amount: -card.price }], card.price);
+    // One card ({ id, card }), or several at once ({ cards: [{ id, card }…] },
+    // at most MAX_CARDS: one charge, all or none).
+    const asked = Array.isArray(body.cards) ? body.cards : [{ id: body.id, card: body.card }];
+    if (!asked.length || asked.length > MAX_CARDS) return { refused: { problem: 'shape' } };
+    const tickets = [];
+    for (const x of asked) {
+      const id = String(x?.id || '');
+      const card = CARDS[x?.card];
+      if (!TICKET_ID.test(id) || !card || !onSale(x.card, new Date(now))) return { refused: { problem: 'shape' } };
+      tickets.push({ id, t: new Date(now).toISOString(), game: `scratch:${x.card}`, card: x.card, cost: card.price, prize: drawPrize(x.card, cryptoUnit), seed: cryptoSeed(), status: 'open' });
+    }
+    if (new Set(tickets.map(x => x.id)).size !== tickets.length) return { refused: { problem: 'shape' } };
+    const cost = tickets.reduce((s, x) => s + x.cost, 0);
+    const wallet = await charge(env, deps, account, tickets.map(x => ({ id: `odds:lotto-${x.id}`, t: now, app: 'odds', kind: 'lottery', amount: -x.cost })), cost);
     if (!wallet) return { refused: { problem: 'funds' } };
-    await watch(env, deps, account, [ticket], now);
-    return { ticket, wallet };
+    await watch(env, deps, account, tickets, now);
+    return Array.isArray(body.cards) ? { tickets, wallet } : { ticket: tickets[0], wallet };
   }
   if (body.op === 'reveal') {
     const id = String(body.id || '');
