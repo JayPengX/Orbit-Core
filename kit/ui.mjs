@@ -306,7 +306,7 @@ export function segmented(items, { value = items[0]?.id, onChange = () => {}, bi
 // The same control for a view that draws itself again on each pick:
 //   pickSeg([[id, label, count?] | { id, label, count }…], current, onPick, { cls, chips, seg, label })
 // A few (four, or up to seven with `seg`) are the capsule, its thumb sliding
-// from the last pick (remembered per cls, else per set of ids); more, or
+// from the last pick (remembered per cls and set of ids); more, or
 // `chips`, are the chips row that scrolls. Buttons are aria-pressed, and a
 // tap on the one already on does nothing.
 const lastPicks = new Map();
@@ -318,7 +318,7 @@ export function pickSeg(options, current, onPick, { cls = '', chips = false, seg
     h('button', { type: 'button', ...(few ? {} : { class: 'q-chip' }), 'aria-pressed': String(o.id === current), onclick: () => o.id !== current && onPick(o.id) }, [o.label, segBadge(o.count)])
   );
   if (!few) return h('div', attrs, buttons);
-  const key = cls || list.map(o => o.id).join('|');
+  const key = `${cls}:${list.map(o => o.id).join('|')}`;
   const at = id => Math.max(0, list.findIndex(o => o.id === id));
   const from = lastPicks.has(key) ? lastPicks.get(key) : current;
   lastPicks.set(key, current);
