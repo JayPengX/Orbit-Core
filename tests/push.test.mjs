@@ -2,7 +2,7 @@
 // notice lists the Worker keeps.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { encryptPush, cleanItems, sendDue, handlePush, runCheck, pushEndpoint } from '../push.js';
+import { encryptPush, cleanItems, sendDue, handlePush, runCheck, pushEndpoint, overNow } from '../push.js';
 
 const unb64u = t => Buffer.from(t, 'base64url');
 async function pairFrom(priv, pub) {
@@ -365,4 +365,60 @@ test('a check or a push that hangs is given up on (the cron sends the rest)', as
   }
   assert.equal(signals.length, 3);
   assert.ok(signals.every(s => s instanceof AbortSignal));
+});
+
+test("a game's final: asked at every run while it runs long, not written each time, told at the next run once over", async () => {
+  const kv = memoryKv();
+  const env = { RATE_LIMIT_KV: kv };
+  const post = (session, path, body) => handlePush(new Request(`https://w/${path}`, { method: 'POST', body: JSON.stringify(body) }), env, {}, session, path);
+  const match = { d: 'acct', a: 'match' };
+  await post(match, '/push/subscribe', { sub: { endpoint: 'https://fcm.googleapis.com/fcm/send/s', keys: { p256dh: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4', auth: 'BTBZMqHH6r4Tts7J_aSIgg' } } });
+  const now = Date.now();
+  await post(match, '/push/schedule', { items: [{ at: now, title: '道奇 vs 教士', body: '{result}', tag: 'end:mlb:1', kind: 'end', check: { espn: 'baseball/mlb', event: '1' } }] });
+  let state = { state: 'in', name: 'STATUS_IN_PROGRESS', shortDetail: 'Top 9th' };
+  let asks = 0;
+  const pushes = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async url => {
+    if (!String(url).includes('espn.com')) return pushes.push(url), new Response(null, { status: 201 });
+    asks++;
+    return new Response(JSON.stringify({ header: { competitions: [{ status: { period: 9, type: state }, competitors: [{ homeAway: 'away', score: '3', team: { shortDisplayName: '教士' } }, { homeAway: 'home', score: '5', team: { shortDisplayName: '道奇' } }] }] } }), { status: 200 });
+  };
+  const puts = [];
+  const put = kv.put;
+  kv.put = async (k, v, o) => (puts.push(k), put(k, v, o));
+  try {
+    assert.equal((await sendDue(env, now + 60_000)).sent, 0);
+    assert.equal((await sendDue(env, now + 180_000)).sent, 0);
+    assert.equal((await sendDue(env, now + 300_000)).sent, 0);
+    assert.equal(asks, 3, 'asked at every run, not every 15 minutes');
+    assert.equal(puts.length, 1, 'written once (its first miss), not at every run');
+    // The top of the 9th done, the home side ahead: ESPN still says 'in', the game is over.
+    state = { state: 'in', name: 'STATUS_IN_PROGRESS', shortDetail: 'Mid 9th' };
+    assert.equal((await sendDue(env, now + 420_000)).sent, 1);
+    assert.equal(JSON.parse(kv.m.get('push:acct:match')).items.length, 0);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+test('over from the score while ESPN still says in, only when nothing can change it (the kit rule)', () => {
+  const comp = (period, type, away, home) => ({ status: { period, type: { state: 'in', name: 'STATUS_IN_PROGRESS', ...type } }, competitors: [{ homeAway: 'away', score: String(away) }, { homeAway: 'home', score: String(home) }] });
+  const mlb = 'baseball/mlb';
+  assert.equal(overNow(comp(9, { shortDetail: 'Mid 9th' }, 2, 4), mlb), true);
+  assert.equal(overNow(comp(9, { shortDetail: 'Mid 9th' }, 4, 2), mlb), false, 'the home side still bats');
+  assert.equal(overNow(comp(9, { shortDetail: 'Bot 9th' }, 4, 5), mlb), true, 'a walk-off');
+  assert.equal(overNow(comp(9, { shortDetail: 'Bot 9th' }, 5, 4), mlb), false);
+  assert.equal(overNow(comp(10, { shortDetail: 'End 10th' }, 5, 4), mlb), true);
+  assert.equal(overNow(comp(9, { shortDetail: 'Top 9th' }, 1, 4), mlb), false);
+  assert.equal(overNow(comp(8, { shortDetail: 'Mid 8th' }, 1, 4), mlb), false);
+  assert.equal(overNow(comp(8, { shortDetail: 'Bot 8th' }, 1, 4), mlb), false);
+  assert.equal(overNow(comp(9, { shortDetail: 'End 9th' }, 4, 4), mlb), false, 'level: extra innings');
+  const nba = 'basketball/nba';
+  assert.equal(overNow(comp(4, { name: 'STATUS_END_PERIOD', shortDetail: 'End of 4th' }, 100, 98), nba), true);
+  assert.equal(overNow(comp(4, { name: 'STATUS_END_PERIOD', shortDetail: 'End of 4th' }, 100, 100), nba), false, 'overtime');
+  assert.equal(overNow(comp(4, { shortDetail: '0.4 - 4th' }, 100, 98), nba), false, 'the clock still running');
+  assert.equal(overNow(comp(3, { name: 'STATUS_END_PERIOD', shortDetail: 'End of 3rd' }, 100, 70), nba), false);
+  assert.equal(overNow(comp(2, { name: 'STATUS_END_PERIOD', shortDetail: 'End of 2nd Half' }, 1, 0), 'soccer/eng.1'), false, "soccer waits for ESPN's full time");
+  assert.equal(overNow({ ...comp(9, { shortDetail: 'Mid 9th' }, 2, 4), status: { period: 9, type: { state: 'post' } } }, mlb), false);
 });
