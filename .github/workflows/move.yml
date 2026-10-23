@@ -1,0 +1,52 @@
+# One-off (by hand): the Pass's store and the family's data move to their
+# Orbit names (tools/move/worker.js). Made: R2 orbit-data and D1 orbit-store
+# (Asia-Pacific), a Worker that copies across, called until done, then deleted.
+name: Move store and data to Orbit names
+on:
+  workflow_dispatch:
+jobs:
+  move:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: The account
+        run: |
+          id=$(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" https://api.cloudflare.com/client/v4/accounts | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.parse(s).result[0].id)}catch{console.log("")}})')
+          [ -n "$id" ] || { echo "the token sees no account"; exit 1; }
+          echo "CLOUDFLARE_ACCOUNT_ID=$id" >> "$GITHUB_ENV"
+      - name: Make the new bucket and database, deploy the mover
+        run: |
+          set -e
+          cd tools/move
+          npx --yes wrangler@4 r2 bucket list | grep -qE 'name:\s*orbit-data$' || npx --yes wrangler@4 r2 bucket create orbit-data --location apac
+          dbid() { npx --yes wrangler@4 d1 list --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const d=JSON.parse(s).find(x=>x.name===process.argv[1]);console.log(d?d.uuid:"")})' "$1"; }
+          [ -n "$(dbid orbit-store)" ] || npx --yes wrangler@4 d1 create orbit-store --location apac
+          old=$(dbid quadra-store); new=$(dbid orbit-store)
+          [ -n "$old" ] && [ -n "$new" ] || { echo "databases: old=$old new=$new"; exit 1; }
+          printf 'name = "orbit-move"\nmain = "worker.js"\ncompatibility_date = "2025-01-01"\nworkers_dev = true\n[[r2_buckets]]\nbinding = "OLD_DATA"\nbucket_name = "quadra-data"\n[[r2_buckets]]\nbinding = "NEW_DATA"\nbucket_name = "orbit-data"\n[[d1_databases]]\nbinding = "OLD_STORE"\ndatabase_name = "quadra-store"\ndatabase_id = "%s"\n[[d1_databases]]\nbinding = "NEW_STORE"\ndatabase_name = "orbit-store"\ndatabase_id = "%s"\n' "$old" "$new" > wrangler.toml
+          npx --yes wrangler@4 deploy 2>&1 | tee deploy.log
+          url=$(grep -oE 'https://orbit-move\.[a-z0-9-]+\.workers\.dev' deploy.log | head -1)
+          [ -n "$url" ] || { echo "no workers.dev address"; exit 1; }
+          echo "MOVE_URL=$url" >> "$GITHUB_ENV"
+          key=$(openssl rand -hex 24)
+          echo "::add-mask::$key"
+          echo "MOVE_KEY=$key" >> "$GITHUB_ENV"
+          printf '%s' "$key" | npx --yes wrangler@4 secret put MOVE_KEY
+      - name: Copy
+        run: |
+          set -e
+          sleep 20
+          call() { for t in 1 2 3 4 5; do r=$(curl -sf -H "Authorization: Bearer $MOVE_KEY" "$MOVE_URL$1") && { echo "$r"; return 0; }; sleep $((t*5)); done; return 1; }
+          q() { node -e 'console.log(encodeURIComponent(process.argv[1]))' "$1"; }
+          after='["",""]'; rows=0; changed=0
+          while :; do r=$(call "/d1?after=$(q "$after")"); rows=$((rows+$(echo "$r" | jq .seen))); changed=$((changed+$(echo "$r" | jq .copied))); a=$(echo "$r" | jq -c .after); [ "$a" = null ] && break; after=$a; done
+          echo "store: $rows rows seen, $changed written"
+          call /count
+          cursor=''; files=0; copied=0
+          while :; do r=$(call "/r2?cursor=$(q "$cursor")"); files=$((files+$(echo "$r" | jq .seen))); copied=$((copied+$(echo "$r" | jq .copied))); c=$(echo "$r" | jq -r '.cursor // empty'); [ -z "$c" ] && break; cursor=$c; done
+          echo "data: $files files seen, $copied copied"
+      - name: Delete the mover
+        if: always()
+        run: npx --yes wrangler@4 delete --name orbit-move --force || true
