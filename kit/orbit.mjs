@@ -119,12 +119,12 @@ export const worthOf = (wallet, now = Date.now()) => poolBalance(wallet) + finit
 // (eco.js RANKS, the same table: `eco:rank:<id>`).
 export const WEALTH_RANKS = [
   { id: 'start', min: 0, reward: 0, icon: '🌱', zh: '起步', en: 'Starter' },
-  { id: 'thrifty', min: 300_000, reward: 3_000, icon: '🪙', zh: '小資族', en: 'Saver' },
-  { id: 'solid', min: 500_000, reward: 5_000, icon: '💼', zh: '穩健', en: 'Steady' },
-  { id: 'welloff', min: 1_000_000, reward: 10_000, icon: '🏡', zh: '百萬身價', en: 'Millionaire' },
-  { id: 'affluent', min: 3_000_000, reward: 20_000, icon: '💎', zh: '富裕', en: 'Wealthy' },
-  { id: 'tenmil', min: 10_000_000, reward: 50_000, icon: '👑', zh: '千萬富翁', en: 'Ten-millionaire' },
-  { id: 'hundredmil', min: 100_000_000, reward: 100_000, icon: '🚀', zh: '億萬大亨', en: 'Tycoon' }
+  { id: 'thrifty', min: 300_000, reward: 30_000, icon: '🪙', zh: '小資族', en: 'Saver' },
+  { id: 'solid', min: 500_000, reward: 50_000, icon: '💼', zh: '穩健', en: 'Steady' },
+  { id: 'welloff', min: 1_000_000, reward: 100_000, icon: '🏡', zh: '百萬身價', en: 'Millionaire' },
+  { id: 'affluent', min: 3_000_000, reward: 250_000, icon: '💎', zh: '富裕', en: 'Wealthy' },
+  { id: 'tenmil', min: 10_000_000, reward: 600_000, icon: '👑', zh: '千萬富翁', en: 'Ten-millionaire' },
+  { id: 'hundredmil', min: 100_000_000, reward: 3_000_000, icon: '🚀', zh: '億萬大亨', en: 'Tycoon' }
 ];
 const rankName = (id, i) => {
   const r = WEALTH_RANKS.find(x => x.id === id);

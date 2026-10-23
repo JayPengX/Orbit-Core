@@ -167,12 +167,12 @@ export function paydayEntries(wallet, now) {
 // is NT$100,000 of real gains away (about ten weeks' pay saved).
 export const RANKS = [
   { id: 'start', min: 0, reward: 0 },
-  { id: 'thrifty', min: 300_000, reward: 3_000 },
-  { id: 'solid', min: 500_000, reward: 5_000 },
-  { id: 'welloff', min: 1_000_000, reward: 10_000 },
-  { id: 'affluent', min: 3_000_000, reward: 20_000 },
-  { id: 'tenmil', min: 10_000_000, reward: 50_000 },
-  { id: 'hundredmil', min: 100_000_000, reward: 100_000 }
+  { id: 'thrifty', min: 300_000, reward: 30_000 },
+  { id: 'solid', min: 500_000, reward: 50_000 },
+  { id: 'welloff', min: 1_000_000, reward: 100_000 },
+  { id: 'affluent', min: 3_000_000, reward: 250_000 },
+  { id: 'tenmil', min: 10_000_000, reward: 600_000 },
+  { id: 'hundredmil', min: 100_000_000, reward: 3_000_000 }
 ];
 export function rankEntries(wallet, now) {
   const have = new Set((wallet?.entries || []).map(e => e.id));

@@ -148,7 +148,7 @@ export const HELP = {
       ]],
       ['money', '錢怎麼算', [
         '你的錢都在 Securities：新帳號開戶金 NT$200,000，每週一固定發薪 NT$10,000，跟薪水一樣，存多存少都一樣；那週第一次打開 App 時入帳，沒打開的週下次補發。系統發的錢只有這些：開戶金、週薪、財富等級獎勵和急難紓困，都以新台幣存入，算投入的本金，不算報酬。',
-        '財富等級：身價（現金加持股，扣掉信貸）第一次到達一個等級時送一次獎勵：NT$30 萬小資族 NT$3,000、50 萬穩健 NT$5,000、百萬 NT$10,000、300 萬富裕 NT$20,000、千萬 NT$50,000、一億 NT$100,000。',
+        '財富等級：身價（現金加持股，扣掉信貸）第一次到達一個等級時送一次獎勵：NT$30 萬小資族 NT$30,000、50 萬穩健 NT$50,000、百萬 NT$100,000、300 萬富裕 NT$250,000、千萬 NT$600,000、一億 NT$3,000,000。',
         '「真相」（資金 › 真相）用你自己的紀錄算錢從哪裡來：系統發的、政府（證交稅、股利扣繳和二代健保，減去急難紓困）、和你自己的成績；還有一筆交易真正的成本。',
         '股利照各國規定預扣稅，除息日持有就有，現金在發放日入帳（有公布的照公布日期，否則台股約 4 週後、美股約 1 週後，遇假日順延到下一個交易日）；在那之前列為「待入帳」，算在淨值裡但不能花。',
         '餘額變負的（透支）時不能再花錢，每月計息 1%，「一鍵賣出補足」會找出最少要賣哪些來補。就像交割款沒付，2 天內沒補足就是違約交割：扣 7% 違約金、自動賣出持股，5 年內不能融資、融券。'
@@ -210,7 +210,7 @@ export const HELP = {
       ]],
       ['money', 'Money', [
         'Your money lives in Securities: a new account opens with NT$200,000, and every Monday pays a fixed NT$10,000, like a salary, the same however much you hold; it comes the first time that week you open the app, and a week you miss is paid when you’re back. The system gives money only as the opening money, the pay, wealth level rewards and emergency relief, all arriving as NT$ deposits, counted as money put in, not as return.',
-        'Wealth levels: the first time what you’re worth (cash and holdings, less a loan) reaches a level, its reward is paid once: NT$3,000 at NT$300,000, NT$5,000 at 500,000, NT$10,000 at a million, NT$20,000 at 3 million, NT$50,000 at 10 million and NT$100,000 at 100 million.',
+        'Wealth levels: the first time what you’re worth (cash and holdings, less a loan) reaches a level, its reward is paid once: NT$30,000 at NT$300,000, NT$50,000 at 500,000, NT$100,000 at a million, NT$250,000 at 3 million, NT$600,000 at 10 million and NT$3,000,000 at 100 million.',
         'Truth (Money › Truth) works out from your own record where your money came from: what the system gave, the government (transaction tax, dividend withholding and the NHI premium, less relief) and your own result; and what a trade really costs.',
         'Dividends have each country’s withholding: held on the ex-date, the cash arrives on the pay day (the announced one where known, else about 4 weeks later in Taiwan and a week in the US, moved past holidays to the next trading day); until then it’s listed as on the way, counted in net worth but not spendable.',
         'With the balance below zero (an overdraft) nothing more can be spent, it costs 1% a month, and Sell to cover finds the fewest sales that cover it. Like an unpaid settlement, not covered within 2 days it’s a default: a 7% penalty, holdings sold, and no margin or short selling for 5 years.'
