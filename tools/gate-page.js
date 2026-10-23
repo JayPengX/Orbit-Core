@@ -221,7 +221,7 @@
         if (el.closest('.q-statusbar, #loading, .q-offline') || !pinned(el)) continue;
         const cs = getComputedStyle(el);
         if (cs.visibility === 'hidden' || +cs.opacity === 0 || clippedBy(el)) continue;
-        const bar = el.matches('.q-tabbar, .q-accessory, .q-navbar, .q-banner, dialog[open]');
+        const bar = el.matches('.q-tabbar, .q-accessory, .q-navbar, .q-banner, dialog[open]:not(.q-gate, .q-moved)');
         if (!bar && !el.matches('img, svg, canvas, video, button, input, [role=button]') && ![...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) continue;
         const r = el.getBoundingClientRect();
         if (outside(r)) out.column.push(`${name(el)} ${Math.round(r.left)}–${Math.round(r.right)}, ${column}`);
