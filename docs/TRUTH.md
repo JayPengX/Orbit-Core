@@ -107,7 +107,9 @@ break it and say so in a line.
 - **Chinese (Traditional, Taiwan) first**, in Taiwan's words; English
   second. Teams in Chinese (`kit/names.mjs`), people in their own names.
 - **Native iOS look from the kit**, for a phone held upright at 375 px.
-  No unplanned wrap, ellipsis or clipped edge on anything a row is *for*
+  Phones only: 320 px to a Pro Max's 440; an iPad or a computer shows the
+  same phone layout in a centred column (orbit.css `--q-col-max`), with no
+  tablet or wide layouts anywhere. No unplanned wrap, ellipsis or clipped edge on anything a row is *for*
   (a name, a score): lay it out for its longest real content. Nothing
   wider than the screen. Respect the safe areas.
 - **Real data, no guessing.** A dash, not a made-up 0; 待定 when a time

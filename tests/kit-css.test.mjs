@@ -8,7 +8,7 @@ const css = readFileSync(new URL('../kit/orbit.css', import.meta.url), 'utf8').r
 // iOS 27's look for the family: glass that floats (the top-right buttons, the
 // tab bar) is lit at the rim, never outlined; and both themes define it.
 test('floating glass has a lit rim and no outline ring, in light and dark', () => {
-  for (const sel of ['.q-icon-btn', '.q-actions:has(> :nth-child(2))', '.q-touch .q-tabbar.q-tabbar', '.q-ask', '.q-banner']) {
+  for (const sel of ['.q-icon-btn', '.q-actions:has(> :nth-child(2))', '.q-tabbar.q-tabbar', '.q-ask', '.q-banner']) {
     const all = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].filter(([, s]) => s.split(',').map(x => x.trim()).includes(sel)).map(([, , b]) => b);
     const last = all.filter(b => /box-shadow/.test(b)).pop() || '';
     assert.match(last, /var\(--q-glass-rim\)/, `${sel} is lit at the rim`);

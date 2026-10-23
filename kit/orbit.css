@@ -420,12 +420,10 @@ body {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
-@media (max-width: 640px) {
-  input:not([type='checkbox']):not([type='radio']):not([type='range']),
-  select,
-  textarea {
-    font-size: max(16px, 1em);
-  }
+input:not([type='checkbox']):not([type='radio']):not([type='range']),
+select,
+textarea {
+  font-size: max(16px, 1em);
 }
 
 /* ---- Loading ---- */
@@ -749,35 +747,27 @@ button,
   }
 }
 
-/* ---- The app frame: the top line and its buttons; the tabs ---- */
+/* ---- The app frame: the top line (the status and the glass buttons), and
+   the tabs a capsule of glass floating over the page's foot, the chosen tab
+   lit by a softer pill that slides between them (kit/orbit.mjs tabBar sets
+   --q-tab-x and --q-tab-w), shrinking to its icons while the page scrolls
+   down. What scrolls beneath fades towards the edge (iOS's scroll edge
+   effect). A phone's frame on every screen (the column, below). ---- */
 :root {
-  --q-page-max: 1120px;
-  --q-nav: 0px;
+  --q-bar-gap: max(calc(env(safe-area-inset-bottom) - 14px), calc(var(--q-safe-bottom, 0px) - 14px), 12px);
+  --q-nav: calc(62px + var(--q-bar-gap));
 }
 .q-appbar {
-  position: sticky;
-  top: 0;
+  position: static;
   z-index: 50;
   padding-top: var(--q-top);
-  background: var(--q-glass);
-  -webkit-backdrop-filter: var(--q-glass-blur);
-  backdrop-filter: var(--q-glass-blur);
-  box-shadow: inset 0 -0.5px 0 var(--q-sep);
-}
-@media (display-mode: standalone) {
-  .q-appbar {
-    background: var(--q-page);
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-  }
 }
 .q-appbar-inner {
   display: flex;
   align-items: center;
-  gap: 14px;
-  max-width: var(--q-page-max);
-  margin: 0 auto;
-  padding: 8px max(16px, env(safe-area-inset-right)) 8px max(16px, env(safe-area-inset-left));
+  gap: 10px;
+  min-height: 44px;
+  padding: 6px 16px 4px;
 }
 .q-brand {
   display: flex;
@@ -786,19 +776,12 @@ button,
   flex: 1 1 auto;
   min-width: 0;
 }
-.q-brand-logo {
-  width: 34px;
-  height: 34px;
-  flex: none;
-  border-radius: 9px;
-}
 .q-brand-text {
   min-width: 0;
 }
+.q-brand-logo,
 .q-brand h1 {
-  margin: 0;
-  font: var(--q-t-headline);
-  white-space: nowrap;
+  display: none;
 }
 .q-status {
   margin: 0;
@@ -811,31 +794,70 @@ button,
 .q-status:empty {
   display: none;
 }
-
-/* The tabs on a computer: a segmented control in the bar. */
-.q-tabbar {
-  position: relative;
-  display: flex;
-  gap: 2px;
-  padding: 3px;
+.q-tabbar.q-tabbar {
+  position: fixed;
+  z-index: 60;
+  left: 50%;
+  bottom: var(--q-bar-gap);
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 0;
+  width: min(calc(var(--q-vw) - 32px), calc(var(--q-tabs, 4) * 92px));
+  margin: 0;
+  padding: 4px;
   border-radius: 999px;
-  background: var(--q-fill-3);
+  background: var(--q-glass);
+  -webkit-backdrop-filter: var(--q-glass-blur);
+  backdrop-filter: var(--q-glass-blur);
+  box-shadow: var(--q-glass-rim), var(--q-glass-drop);
+  transform: translateX(-50%);
+  transition: transform var(--q-dur-smooth) var(--q-spring-smooth), padding var(--q-dur-smooth) var(--q-spring-smooth);
+}
+.q-tabbar.q-tabbar::before {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  top: 4px;
+  bottom: 4px;
+  left: 0;
+  width: var(--q-tab-w, 0px);
+  border-radius: 999px;
+  background: var(--q-glass-pick);
+  transform: translateX(var(--q-tab-x, 0px));
+  transition: transform var(--q-dur-snappy) var(--q-spring-snappy), width var(--q-dur-snappy) var(--q-spring-snappy);
+  pointer-events: none;
+}
+.q-tabbar.q-tabbar::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  left: 50%;
+  bottom: calc(-1 * var(--q-bar-gap));
+  width: var(--q-vw);
+  height: calc(100% + var(--q-bar-gap) + 30px);
+  transform: translateX(-50%);
+  background: linear-gradient(to top, color-mix(in srgb, var(--q-page) 82%, transparent), color-mix(in srgb, var(--q-page) 40%, transparent) 55%, transparent);
+  pointer-events: none;
 }
 .q-tab {
   position: relative;
   z-index: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 7px;
-  padding: 7px 16px;
+  justify-content: center;
+  gap: 1px;
+  min-width: 0;
+  min-height: 54px;
+  padding: 5px 2px 6px;
   border: 0;
-  border-radius: 999px;
   background: none;
   color: var(--q-label);
-  font: 500 14px/1.2 var(--q-font);
+  font: 500 10px/12px var(--q-font);
   white-space: nowrap;
   cursor: pointer;
-  transition: color 0.2s, background-color 0.25s;
+  transition: color 0.2s, min-height var(--q-dur-smooth) var(--q-spring-smooth);
 }
 .q-tab[hidden] {
   display: none;
@@ -844,27 +866,40 @@ button,
   position: relative;
   display: grid;
   place-items: center;
+  height: 28px;
+  transition: transform var(--q-dur-bouncy) var(--q-spring-bouncy);
 }
 .q-tab svg {
-  width: 18px;
-  height: 18px;
+  width: 25px;
+  height: 25px;
   flex: none;
   fill: none;
   stroke: currentColor;
-  stroke-width: 2;
+  stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+.q-tab-label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: opacity 0.2s, height var(--q-dur-smooth) var(--q-spring-smooth);
+}
 .q-tab[aria-selected='true'] {
-  background: var(--q-grouped-2);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 3px 8px rgba(0, 0, 0, 0.06);
-  color: var(--q-label);
+  color: var(--q-accent);
   font-weight: 600;
+}
+.q-tab[aria-selected='true'] svg {
+  stroke-width: 2.2;
+}
+.q-tab:is(:active, [data-q-press]) .q-tab-icon {
+  transform: scale(1.14);
+  transition-duration: 0.14s;
 }
 .q-tab-badge {
   position: absolute;
-  top: -6px;
-  left: calc(100% - 7px);
+  top: -2px;
+  left: calc(50% + 6px);
   min-width: 18px;
   height: 18px;
   padding: 0 5px;
@@ -884,267 +919,18 @@ button,
   color: var(--q-accent-ink);
 }
 .q-tab-badge.dot {
-  top: -2px;
-  left: calc(100% - 3px);
+  top: 1px;
+  left: calc(50% + 10px);
   min-width: 0;
   width: 10px;
   height: 10px;
   padding: 0;
 }
-
-/* A phone or a tablet (a narrow window, or html.q-touch from the device):
-   the top line is the status and the glass buttons, and the tabs a capsule
-   of glass floating over the page's foot, the chosen tab lit by a softer
-   pill that slides between them (kit/orbit.mjs tabBar sets --q-tab-x and
-   --q-tab-w), shrinking to its icons while the page scrolls down. What
-   scrolls beneath fades towards the edge (iOS's scroll edge effect). */
-@media (max-width: 720px) {
-  :root {
-    --q-bar-gap: max(calc(env(safe-area-inset-bottom) - 14px), calc(var(--q-safe-bottom, 0px) - 14px), 12px);
-    --q-nav: calc(62px + var(--q-bar-gap));
-  }
-}
-:root.q-touch {
-  --q-bar-gap: max(calc(env(safe-area-inset-bottom) - 14px), calc(var(--q-safe-bottom, 0px) - 14px), 12px);
-  --q-nav: calc(62px + var(--q-bar-gap));
-}
-@media (max-width: 720px) {
-  .q-appbar {
-    position: static;
-    background: none;
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-    box-shadow: none;
-  }
-  .q-appbar-inner {
-    gap: 10px;
-    min-height: 44px;
-    padding: 6px max(16px, env(safe-area-inset-right)) 4px max(16px, env(safe-area-inset-left));
-  }
-  .q-brand-logo,
-  .q-brand h1 {
-    display: none;
-  }
-}
-.q-touch .q-appbar {
-  position: static;
-  background: none;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-  box-shadow: none;
-}
-.q-touch .q-appbar-inner {
-  gap: 10px;
-  min-height: 44px;
-  padding: 6px max(16px, env(safe-area-inset-right)) 4px max(16px, env(safe-area-inset-left));
-}
-.q-touch .q-brand-logo,
-.q-touch .q-brand h1 {
-  display: none;
-}
-@media (max-width: 720px) {
-  .q-tabbar.q-tabbar {
-    position: fixed;
-    z-index: 60;
-    left: 50%;
-    bottom: var(--q-bar-gap);
-    display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(0, 1fr);
-    gap: 0;
-    width: min(calc(100vw - 2 * max(16px, env(safe-area-inset-left))), calc(var(--q-tabs, 4) * 92px));
-    margin: 0;
-    padding: 4px;
-    border-radius: 999px;
-    background: var(--q-glass);
-    -webkit-backdrop-filter: var(--q-glass-blur);
-    backdrop-filter: var(--q-glass-blur);
-    box-shadow: var(--q-glass-rim), var(--q-glass-drop);
-    transform: translateX(-50%);
-    transition: transform var(--q-dur-smooth) var(--q-spring-smooth), padding var(--q-dur-smooth) var(--q-spring-smooth);
-  }
-  .q-tabbar.q-tabbar::before {
-    content: '';
-    position: absolute;
-    z-index: 0;
-    top: 4px;
-    bottom: 4px;
-    left: 0;
-    width: var(--q-tab-w, 0px);
-    border-radius: 999px;
-    background: var(--q-glass-pick);
-    transform: translateX(var(--q-tab-x, 0px));
-    transition: transform var(--q-dur-snappy) var(--q-spring-snappy), width var(--q-dur-snappy) var(--q-spring-snappy);
-    pointer-events: none;
-  }
-  .q-tabbar.q-tabbar::after {
-    content: '';
-    position: absolute;
-    z-index: -1;
-    left: 50%;
-    bottom: calc(-1 * var(--q-bar-gap));
-    width: 100vw;
-    height: calc(100% + var(--q-bar-gap) + 30px);
-    transform: translateX(-50%);
-    background: linear-gradient(to top, color-mix(in srgb, var(--q-page) 82%, transparent), color-mix(in srgb, var(--q-page) 40%, transparent) 55%, transparent);
-    pointer-events: none;
-  }
-  .q-tabbar .q-tab {
-    flex-direction: column;
-    justify-content: center;
-    gap: 1px;
-    min-width: 0;
-    min-height: 54px;
-    padding: 5px 2px 6px;
-    background: none;
-    box-shadow: none;
-    color: var(--q-label);
-    font: 500 10px/12px var(--q-font);
-    transition: color 0.2s, min-height var(--q-dur-smooth) var(--q-spring-smooth);
-  }
-  .q-tabbar .q-tab-icon {
-    height: 28px;
-    transition: transform var(--q-dur-bouncy) var(--q-spring-bouncy);
-  }
-  .q-tabbar .q-tab svg {
-    width: 25px;
-    height: 25px;
-    stroke-width: 1.8;
-  }
-  .q-tabbar .q-tab-label {
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    transition: opacity 0.2s, height var(--q-dur-smooth) var(--q-spring-smooth);
-  }
-  .q-tabbar .q-tab[aria-selected='true'] {
-    background: none;
-    box-shadow: none;
-    color: var(--q-accent);
-    font-weight: 600;
-  }
-  .q-tabbar .q-tab[aria-selected='true'] svg {
-    stroke-width: 2.2;
-  }
-  .q-tabbar .q-tab:is(:active, [data-q-press]) .q-tab-icon {
-    transform: scale(1.14);
-    transition-duration: 0.14s;
-  }
-  .q-tabbar .q-tab-badge {
-    top: -2px;
-    left: calc(50% + 6px);
-  }
-  .q-tabbar .q-tab-badge.dot {
-    top: 1px;
-    left: calc(50% + 10px);
-  }
-  /* Scrolling down: the bar draws in to its icons (orbit.mjs sets .q-tabs-small). */
-  .q-tabs-small .q-tabbar .q-tab {
-    min-height: 44px;
-  }
-  .q-tabs-small .q-tabbar .q-tab-label {
-    height: 0;
-    opacity: 0;
-  }
-}
-.q-touch .q-tabbar.q-tabbar {
-  position: fixed;
-  z-index: 60;
-  left: 50%;
-  bottom: var(--q-bar-gap);
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
-  gap: 0;
-  width: min(calc(100vw - 2 * max(16px, env(safe-area-inset-left))), calc(var(--q-tabs, 4) * 92px));
-  margin: 0;
-  padding: 4px;
-  border-radius: 999px;
-  background: var(--q-glass);
-  -webkit-backdrop-filter: var(--q-glass-blur);
-  backdrop-filter: var(--q-glass-blur);
-  box-shadow: var(--q-glass-rim), var(--q-glass-drop);
-  transform: translateX(-50%);
-}
-.q-touch .q-tabbar.q-tabbar::before {
-  content: '';
-  position: absolute;
-  z-index: 0;
-  top: 4px;
-  bottom: 4px;
-  left: 0;
-  width: var(--q-tab-w, 0px);
-  border-radius: 999px;
-  background: var(--q-glass-pick);
-  transform: translateX(var(--q-tab-x, 0px));
-  transition: transform var(--q-dur-snappy) var(--q-spring-snappy), width var(--q-dur-snappy) var(--q-spring-snappy);
-  pointer-events: none;
-}
-.q-touch .q-tabbar.q-tabbar::after {
-  content: '';
-  position: absolute;
-  z-index: -1;
-  left: 50%;
-  bottom: calc(-1 * var(--q-bar-gap));
-  width: 100vw;
-  height: calc(100% + var(--q-bar-gap) + 30px);
-  transform: translateX(-50%);
-  background: linear-gradient(to top, color-mix(in srgb, var(--q-page) 82%, transparent), color-mix(in srgb, var(--q-page) 40%, transparent) 55%, transparent);
-  pointer-events: none;
-}
-.q-touch .q-tabbar .q-tab {
-  flex-direction: column;
-  justify-content: center;
-  gap: 1px;
-  min-width: 0;
-  min-height: 54px;
-  padding: 5px 2px 6px;
-  background: none;
-  box-shadow: none;
-  color: var(--q-label);
-  font: 500 10px/12px var(--q-font);
-  transition: color 0.2s, min-height var(--q-dur-smooth) var(--q-spring-smooth);
-}
-.q-touch .q-tabbar .q-tab-icon {
-  height: 28px;
-  transition: transform var(--q-dur-bouncy) var(--q-spring-bouncy);
-}
-.q-touch .q-tabbar .q-tab svg {
-  width: 25px;
-  height: 25px;
-  stroke-width: 1.8;
-}
-.q-touch .q-tabbar .q-tab-label {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  transition: opacity 0.2s, height var(--q-dur-smooth) var(--q-spring-smooth);
-}
-.q-touch .q-tabbar .q-tab[aria-selected='true'] {
-  background: none;
-  box-shadow: none;
-  color: var(--q-accent);
-  font-weight: 600;
-}
-.q-touch .q-tabbar .q-tab[aria-selected='true'] svg {
-  stroke-width: 2.2;
-}
-.q-touch .q-tabbar .q-tab:is(:active, [data-q-press]) .q-tab-icon {
-  transform: scale(1.14);
-  transition-duration: 0.14s;
-}
-.q-touch .q-tabbar .q-tab-badge {
-  top: -2px;
-  left: calc(50% + 6px);
-}
-.q-touch .q-tabbar .q-tab-badge.dot {
-  top: 1px;
-  left: calc(50% + 10px);
-}
-.q-touch.q-tabs-small .q-tabbar .q-tab {
+/* Scrolling down: the bar draws in to its icons (orbit.mjs sets .q-tabs-small). */
+.q-tabs-small .q-tabbar .q-tab {
   min-height: 44px;
 }
-.q-touch.q-tabs-small .q-tabbar .q-tab-label {
+.q-tabs-small .q-tabbar .q-tab-label {
   height: 0;
   opacity: 0;
 }
@@ -1159,7 +945,7 @@ button,
   display: flex;
   align-items: center;
   gap: 12px;
-  width: min(calc(100vw - 2 * max(16px, env(safe-area-inset-left))), 560px);
+  width: calc(var(--q-vw) - 32px);
   min-height: 56px;
   margin: 0;
   padding: 8px 8px 8px 10px;
@@ -1192,41 +978,22 @@ button,
 }
 
 /* ---- The dock (<html class="q-dock">): the tabs as one bar along the
-   screen's foot instead of a capsule floating over the page, and the
+   column's foot instead of a capsule floating over the page, and the
    accessory (an app's order bar) a row joined to its top edge, so nothing hovers
    over content: the page ends where the dock begins. Its surface is the
    page's own colour, never white in dark ---- */
 :root.q-dock {
   --q-dock-bg: var(--q-page);
   --q-dock-safe: max(env(safe-area-inset-bottom), var(--q-safe-bottom, 0px));
-}
-@media (max-width: 720px) {
-  :root.q-dock {
-    --q-bar-gap: 0px;
-    --q-nav: calc(52px + var(--q-dock-safe));
-  }
-  :root.q-dock .q-tabbar.q-tabbar {
-    left: 0;
-    right: 0;
-    bottom: 0;
-    width: auto;
-    padding: 0 max(8px, env(safe-area-inset-right)) var(--q-dock-safe) max(8px, env(safe-area-inset-left));
-    border-radius: 0;
-    background: var(--q-dock-bg);
-    box-shadow: inset 0 var(--q-hairline) 0 var(--q-sep);
-    transform: none;
-  }
-}
-:root.q-touch.q-dock {
   --q-bar-gap: 0px;
   --q-nav: calc(52px + var(--q-dock-safe));
 }
-:root.q-touch.q-dock .q-tabbar.q-tabbar {
-  left: 0;
-  right: 0;
+:root.q-dock .q-tabbar.q-tabbar {
+  left: var(--q-side);
+  right: var(--q-side);
   bottom: 0;
   width: auto;
-  padding: 0 max(8px, env(safe-area-inset-right), calc((100vw - var(--q-tabs, 4) * 120px) / 2)) var(--q-dock-safe) max(8px, env(safe-area-inset-left), calc((100vw - var(--q-tabs, 4) * 120px) / 2));
+  padding: 0 8px var(--q-dock-safe);
   border-radius: 0;
   background: var(--q-dock-bg);
   box-shadow: inset 0 var(--q-hairline) 0 var(--q-sep);
@@ -1250,12 +1017,12 @@ button,
   height: 24px;
 }
 :root.q-dock .q-accessory {
-  left: 0;
+  left: var(--q-side);
+  right: var(--q-side);
   bottom: var(--q-nav);
   width: auto;
-  right: 0;
   min-height: 0;
-  padding: 8px max(16px, env(safe-area-inset-right), calc((100vw - var(--q-tabs, 4) * 120px) / 2)) 8px max(16px, env(safe-area-inset-left), calc((100vw - var(--q-tabs, 4) * 120px) / 2));
+  padding: 8px 16px;
   border-radius: 0;
   background: var(--q-dock-bg);
   box-shadow: inset 0 var(--q-hairline) 0 var(--q-sep);
@@ -1272,28 +1039,13 @@ button,
     transform: translateY(12px);
   }
 }
-/* (On a wide screen without the bottom tabs, the accessory stays a card.) */
-@media (min-width: 721px) {
-  :root.q-dock:not(.q-touch) .q-accessory,
-  :root.q-dock:not(.q-touch) .q-accessory:is(:active, [data-q-press]) {
-    left: 50%;
-    bottom: 18px;
-    right: auto;
-    width: min(calc(100vw - 32px), 560px);
-    border-radius: 28px;
-    background: var(--q-glass);
-    box-shadow: var(--q-glass-rim), var(--q-glass-drop);
-    transform: translateX(-50%);
-  }
-}
-
 /* ---- Sheets: up from the foot on a spring, floating inside the screen's
    edges with its deep corners, a grabber, a centred title between glass
    circles; dragged down to close (orbit.mjs sheetSwipe) ---- */
 /* (Inside a sheet, its cells are a shade lifted from it, as iOS's are.) */
 .q-sheet {
   --q-surface: var(--q-sheet-cell, var(--q-grouped-2));
-  width: min(520px, calc(100vw - 16px));
+  width: calc(var(--q-vw) - 16px);
   max-width: none;
   max-height: min(calc(100dvh - var(--q-top) - 16px), 900px);
   margin: auto auto 8px;
@@ -1308,20 +1060,13 @@ button,
   overflow-y: auto;
   overscroll-behavior: contain;
 }
-@media (min-width: 720px) {
-  .q-sheet {
-    margin: auto;
-  }
-}
-/* A full-height sheet (iOS's large detent, .q-full): on a phone it meets the
-   screen's sides and foot, as iOS 26's does at full height, not floating 8 px
-   in with the page behind showing down its sides. */
-@media (max-width: 719px) {
-  dialog.q-sheet.q-full {
-    width: 100vw;
-    margin: auto 0 0;
-    border-radius: var(--q-r-sheet) var(--q-r-sheet) 0 0;
-  }
+/* A full-height sheet (iOS's large detent, .q-full): it meets the column's
+   sides and foot, as iOS 26's does at full height, not floating 8 px in with
+   the page behind showing down its sides. */
+dialog.q-sheet.q-full {
+  width: var(--q-vw);
+  margin: auto auto 0;
+  border-radius: var(--q-r-sheet) var(--q-r-sheet) 0 0;
 }
 .q-sheet::backdrop {
   background: var(--q-dim);
@@ -1385,15 +1130,6 @@ button,
 @keyframes q-fade-in {
   from {
     opacity: 0;
-  }
-}
-@media (min-width: 720px) {
-  .q-sheet::before {
-    display: none;
-  }
-  /* Once, as the phone's rise (a card let go of after a swipe popped in again). */
-  .q-sheet[open]:not(.q-risen) {
-    animation: q-pop-in var(--q-dur-snappy) var(--q-spring-snappy);
   }
 }
 @keyframes q-pop-in {
@@ -1461,7 +1197,7 @@ button,
 
 /* ---- Alerts (ask / tell): a glass slab, centred, capsule buttons ---- */
 .q-ask {
-  width: min(320px, calc(100vw - 48px));
+  width: min(320px, calc(var(--q-vw) - 48px));
   margin: auto;
   padding: 22px 18px 16px;
   border: 0;
@@ -2065,7 +1801,7 @@ input[type='checkbox'][switch] {
   left: 50%;
   top: calc(var(--q-top) + 8px);
   transform: translateX(-50%);
-  width: min(420px, calc(100vw - 16px));
+  width: min(420px, calc(var(--q-vw) - 16px));
   display: flex;
   align-items: center;
   gap: 12px;
@@ -2165,7 +1901,7 @@ input[type='checkbox'][switch] {
   z-index: 2147482900;
   left: 50%;
   bottom: calc(var(--q-nav, 0px) + 12px);
-  max-width: calc(100vw - 32px);
+  max-width: calc(var(--q-vw) - 32px);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -2189,7 +1925,7 @@ input[type='checkbox'][switch] {
   display: flex;
   align-items: center;
   gap: 8px;
-  max-width: calc(100vw - 32px);
+  max-width: calc(var(--q-vw) - 32px);
   padding: 11px 18px;
   border: 0;
   border-radius: 999px;
@@ -2375,7 +2111,7 @@ input[type='checkbox'][switch] {
   position: fixed;
   z-index: 2147482800;
   min-width: 230px;
-  max-width: calc(100vw - 32px);
+  max-width: calc(var(--q-vw) - 32px);
   margin: 0;
   padding: 6px;
   border: 0;
@@ -2547,14 +2283,14 @@ input[type='checkbox'][switch] {
    screen, above anything an app draws. */
 dialog.q-gate,
 dialog.q-moved {
-  /* Its padding inside the 100vw, whatever box-sizing the app uses (Orbit
+  /* Its padding inside the column, whatever box-sizing the app uses (Orbit
      Weather and Transit set none: the screen was 40px wider and scrolled). */
   box-sizing: border-box;
-  width: 100vw;
+  width: var(--q-vw);
   max-width: none;
   height: 100dvh;
   max-height: none;
-  margin: 0;
+  margin: 0 auto;
   border: 0;
 }
 /* …and everything in it: the steps box and the sign-in form are 100% wide
@@ -2899,11 +2635,11 @@ dialog.q-moved::backdrop {
 .q-device-how { font-size: 12px; color: var(--q-text-2); line-height: 1.45; }
 /* The new pass is a modal <dialog> (the top layer): it fills the screen. */
 dialog.q-newpass {
-  width: 100vw;
+  width: var(--q-vw);
   max-width: none;
   height: 100dvh;
   max-height: none;
-  margin: 0;
+  margin: 0 auto;
   border: 0;
   box-sizing: border-box;
 }
@@ -2996,7 +2732,7 @@ dialog {
 .q-pass .q-section { margin-top: 14px; }
 .q-pass .q-section-head h2 { font-size: 17px; font-weight: 800; margin: 0 0 8px; }
 .q-pass p, .q-pass h3 { margin: 0; }
-.q-pass-toasts { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 3; display: grid; gap: 8px; width: min(420px, calc(100vw - 32px)); pointer-events: none; }
+.q-pass-toasts { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 3; display: grid; gap: 8px; width: min(420px, calc(var(--q-vw) - 32px)); pointer-events: none; }
 .q-pass .toast { background: var(--q-text); color: var(--q-page); border-radius: 12px; padding: 10px 14px; font-size: 14px; box-shadow: var(--q-shadow); }
 .q-pass .muted { color: var(--q-muted); }
 .q-pass .num { font-variant-numeric: tabular-nums; }
@@ -4021,7 +3757,7 @@ div.q-ritem {
 
 /* -- A dialog headed by an icon tile (ask / confirm with a named icon) -- */
 .q-ask.pro {
-  width: min(340px, calc(100vw - 48px));
+  width: min(340px, calc(var(--q-vw) - 48px));
   padding: 24px;
   border-radius: 24px;
 }
@@ -4211,12 +3947,10 @@ div.q-ritem {
 .q-sheet[data-detent]:not(.q-leaving):not(.q-dragging) {
   transition: height var(--q-dur-smooth) var(--q-spring-smooth), width 0.3s var(--q-ease), margin-bottom 0.3s var(--q-ease), border-radius 0.3s var(--q-ease), transform 0.36s var(--q-spring-snappy);
 }
-@media (max-width: 719px) {
-  dialog.q-sheet[data-detent='large'] {
-    width: 100vw;
-    margin: auto auto 0;
-    border-radius: var(--q-r-sheet) var(--q-r-sheet) 0 0;
-  }
+dialog.q-sheet[data-detent='large'] {
+  width: var(--q-vw);
+  margin: auto auto 0;
+  border-radius: var(--q-r-sheet) var(--q-r-sheet) 0 0;
 }
 
 /* -- Nothing here (empty()): an accent tile, one line, one button -- */
@@ -4229,8 +3963,7 @@ div.q-ritem {
 }
 
 /* -- A large title that collapses into a small centred one in a glass bar
-   (navTitle). The bar is only on a phone's or tablet's screen; on a wide
-   one the title just scrolls away -- */
+   (navTitle) -- */
 .q-nav-title {
   margin: 0;
   /* (Level with the page's content: every tab's page already keeps the
@@ -4246,10 +3979,10 @@ div.q-ritem {
 .q-navbar {
   position: fixed;
   top: 0;
-  left: 0;
-  right: 0;
+  left: var(--q-side);
+  right: var(--q-side);
   z-index: 49;
-  display: none;
+  display: grid;
   place-items: center;
   box-sizing: border-box;
   height: calc(var(--q-top) + 44px);
@@ -4272,14 +4005,6 @@ div.q-ritem {
   letter-spacing: -0.025em;
   white-space: nowrap;
   text-overflow: ellipsis;
-}
-@media (max-width: 720px) {
-  .q-navbar {
-    display: grid;
-  }
-}
-:root.q-touch .q-navbar {
-  display: grid;
 }
 
 /* -- Pull to refresh (pullToRefresh): a glass spinner that follows the finger -- */
@@ -4812,13 +4537,11 @@ html.q-kb dialog.q-sheet[open] {
   max-height: calc(var(--q-vvh) - 16px);
   margin-bottom: calc(var(--q-kb) + 8px);
 }
-@media (max-width: 719px) {
-  html.q-kb dialog.q-sheet.q-full[open] {
-    margin-bottom: var(--q-kb);
-  }
+html.q-kb dialog.q-sheet.q-full[open] {
+  margin-bottom: var(--q-kb);
 }
 /* The sign-in screen with the keys up: its form from the top, the rest of
-   it scrolling above the keys (centred, the field sat under them on an iPad). */
+   it scrolling above the keys (centred, the field sat under them). */
 html.q-kb .q-gate {
   place-items: start center;
   padding-bottom: calc(var(--q-kb) + 28px);
@@ -5070,75 +4793,21 @@ html.q-kb .q-kb-docked {
   }
 }
 
-/* ---- Every screen, phone to iPad (Jay 2026-10-21: "iPad just so many
-   blank"): one content column that grows with the screen, rails that run
-   to the column's edge showing whole cards, and side-by-side sections
-   where there's room. An app's page wraps its content in .q-col (or sets
-   max-width: var(--q-col) and padding-inline: var(--q-gutter) itself).
-   - phone (to 699 px): the screen's width, 16 px in from each side;
-   - iPad portrait and split view (700+): 32 px in, rails of 3 (small 5);
-   - iPad landscape (1100+): up to 1240 px, 40 px in, rails of 4 (small 7).
-   Inside .q-col, --q-margin is the gutter, so whatever bleeds to the edge
-   (a rail) still meets it; sheets keep the phone's 16 px. ---- */
+/* ---- One phone's column on every screen (Jay 2026-10-23: designed for
+   phones only). A phone's own width, from 320 px to a Pro Max's 440; on
+   anything wider (an iPad, a computer) the same phone layout in a centred
+   column, the page's background filling both sides. What's fixed (the tab
+   bar, the dock, banners, sheets, alerts) sits inside it: --q-vw is the
+   column's width, --q-side what's left beside it on each side. ---- */
 :root {
-  --q-col: 640px;
-  --q-gutter: 16px;
+  --q-col-max: 440px;
+  --q-vw: min(100vw, var(--q-col-max));
+  --q-side: max(0px, (100vw - var(--q-col-max)) / 2);
 }
-@media (min-width: 700px) {
-  :root {
-    --q-col: 1240px;
-    --q-gutter: 32px;
-    --q-rail-n: 3;
-    --q-rail-small-n: 5;
-  }
-}
-@media (min-width: 1100px) {
-  :root {
-    --q-gutter: 40px;
-    --q-rail-n: 4;
-    --q-rail-small-n: 7;
-  }
-}
-.q-col {
-  --q-margin: var(--q-gutter);
-  width: 100%;
-  max-width: var(--q-col);
+:root > body {
+  max-width: var(--q-col-max);
   margin-inline: auto;
-  padding-inline: max(var(--q-gutter), env(safe-area-inset-left)) max(var(--q-gutter), env(safe-area-inset-right));
-  box-sizing: border-box;
 }
 .q-sheet {
   --q-margin: 16px;
-}
-@media (min-width: 700px) {
-  /* Whole cards across the column; the next one peeks into the gutter. */
-  .q-rail {
-    grid-auto-columns: minmax(calc((100% - (var(--q-rail-n) - 1) * 12px) / var(--q-rail-n)), 1fr);
-  }
-  :where(.q-rail.small) {
-    --q-rail-n: var(--q-rail-small-n);
-  }
-  .q-sheet .q-rail {
-    --q-rail-n: 2;
-  }
-  /* The day bar's 📅 leads, so the days run on to the screen's right edge. */
-  .q-day-bar {
-    padding-right: 0;
-  }
-  .q-day-strip-wrap > .q-day-pick {
-    order: -1;
-  }
-  /* Games on now as whole cards across the column (fewer stretch to fill it). */
-  .q-live-strip > .q-live-card {
-    flex: 1 0 calc((100% - (var(--q-rail-n) - 1) * 8px) / var(--q-rail-n));
-    width: auto;
-    min-width: 0;
-  }
-  /* Two sections side by side (.q-split > two children); one under the other on a phone. */
-  .q-split {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0 28px;
-    align-items: start;
-  }
 }
