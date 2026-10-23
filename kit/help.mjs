@@ -33,8 +33,8 @@ export const HELP = {
         '從一個 App 打開另一個（例如 Orbit Pass 的「App」分頁）會自動帶著登入。',
         '「在這台裝置登出」會清除這台裝置上的所有資料；資料都還在 Orbit Pass，再登入就回來。'
       ]],
-      ['one', '一次只用一個 App', [
-        '同一個通行碼一次只在一個 App、一台裝置上使用。打開另一個 App（或另一台裝置），原本那個會暫停並顯示在哪裡使用中，按「在這裡繼續」就能拿回來，資料不會互相蓋掉。'
+      ['one', '每個 App 只在一處使用', [
+        '所有 Orbit App 可以同時使用。同一個 App 一次只在一處使用：在另一台裝置（或 Safari 與主畫面 App 之間）打開同一個 App，原本那個會暫停，按「在這裡繼續」就能拿回來，資料不會互相蓋掉。'
       ]],
       ['net', '沒有網路的時候', [
         'Words、Weather 和 Class 沒有網路也能打開：背單字、上次的天氣預報和你的課表都在手機上，連上網路後再同步。底部會顯示「沒有網路連線」。',
@@ -73,8 +73,8 @@ export const HELP = {
         'Opening one app from another (from the Orbit Pass’s App tab, say) arrives signed in.',
         '“Sign out on this device” wipes everything on this device; it all stays on your Orbit Pass and comes back when you sign in.'
       ]],
-      ['one', 'One app at a time', [
-        'A pass is used in one app on one device at a time. Opening another app (or device) pauses the first, which says where it’s in use; “Continue here” takes it back, so nothing overwrites anything.'
+      ['one', 'Each app in one place', [
+        'Every Orbit app can be open at once. Each one runs in one place at a time: opening the same app on another device (or in Safari beside the home-screen app) pauses the first; “Continue here” takes it back, so nothing overwrites anything.'
       ]],
       ['net', 'Without a connection', [
         'Words, Weather and Class open with no connection: your words, the last forecast and your timetable are on the phone, and sync once you’re back online. A note at the bottom says “No internet connection”.',

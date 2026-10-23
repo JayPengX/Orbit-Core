@@ -19,7 +19,9 @@
 //                 notice switches)
 //       apps      when each app was first and last opened
 //       inbox     other passes' app data a merge brought in, per app
-//       live      which app (and session) is the live one
+//       live      each app's live session: { [app]: { sid, t } }. Every app
+//                 runs at once; one app runs in one place (a device, or
+//                 Safari beside the home-screen app) at a time
 //       sec       the token generation (bumped to sign every device out)
 //   - each app's own data (ECO_APPS[app].collection), under the same id;
 //   - inbox documents (`eco-inbox`), device codes (`eco-pairs`) and Orbit
@@ -27,7 +29,7 @@
 //
 // With a session token (`qt`):
 //   GET    /eco?qt=T[&app=A][&inbox=1][&w=W][&since=U]   the wallet, app A's
-//            data; `active` says whether this session is the account's live
+//            data; `active` says whether this session is app A's live
 //            one, and while it is a fresh `token` comes back. The wallet the
 //            device holds (`w`, its walletTime) isn't sent again (`same`); nor
 //            is A's data when it's still the one of `since` (its updateTime):
@@ -333,9 +335,13 @@ export function publicWallet(w) {
   return rest;
 }
 
-const isActive = (wallet, claims) => wallet?.live?.sid === claims.s && wallet?.live?.app === claims.a;
+// The live session of each app (an app opened somewhere else takes only its
+// own over: Sports open beside Securities changes nothing for either).
+const lives = wallet => (wallet?.live && !wallet.live.sid ? wallet.live : {});
+const isActive = (wallet, claims) => lives(wallet)[claims.a]?.sid === claims.s;
 export const gen = wallet => wallet?.sec?.gen || 0;
-const liveOf = wallet => (wallet?.live ? { app: wallet.live.app, t: wallet.live.t } : null);
+const liveOf = (wallet, app) => (lives(wallet)[app] ? { app, t: lives(wallet)[app].t } : null);
+const goLive = (w, app, sid, now) => ({ ...w, live: { ...lives(w), [app]: { sid, t: now } } });
 
 // ---- Handler ---------------------------------------------------------------
 //
@@ -406,7 +412,7 @@ export async function handleEcoRequest(request, env, headers, ip, deps) {
       let wallet = walletDoc.exists ? parseWallet(walletDoc.payload) : null;
       if (!wallet || claims.g !== gen(wallet)) return errorJson('ECO_SIGNED_OUT', 401, headers, request);
       let walletTime = walletDoc.updateTime;
-      const out = { exists: true, active: isActive(wallet, claims), live: liveOf(wallet) };
+      const out = { exists: true, active: isActive(wallet, claims), live: liveOf(wallet, claims.a) };
       if (out.active) {
         if (paydayEntries(wallet, deps.now()).length) {
           const paid = await updateWallet(env, deps, docId, w => mergeWallet(w, { entries: paydayEntries(w, deps.now()) }));
@@ -443,8 +449,8 @@ export async function handleEcoRequest(request, env, headers, ip, deps) {
         w => {
           refused = null;
           if (claims.g !== gen(w)) return (refused = 'ECO_SIGNED_OUT'), w;
-          // Only the live app writes: an app the person has moved away from
-          // must not overwrite what the live one did since.
+          // Only the app's live session writes: the same app opened somewhere
+          // else since must not be overwritten by this one.
           if (!isActive(w, claims)) return (refused = 'ECO_SESSION_MOVED'), w;
           const patch = atMostNow(cleanPatch(body.wallet), now);
           w = atMostNow(w, now);
@@ -459,7 +465,7 @@ export async function handleEcoRequest(request, env, headers, ip, deps) {
         { skipIf: () => refused }
       );
       if (!result) return errorJson('ECO_SIGNED_OUT', 401, headers, request);
-      if (refused) return json({ error: { code: refused, message: refused }, live: liveOf(result.wallet) }, refused === 'ECO_SIGNED_OUT' ? 401 : 409, headers);
+      if (refused) return json({ error: { code: refused, message: refused }, live: liveOf(result.wallet, claims.a) }, refused === 'ECO_SIGNED_OUT' ? 401 : 409, headers);
       const out = { wallet: publicWallet(result.wallet), walletTime: result.updateTime, pool: poolBalance(result.wallet), token: await sessionToken(secret, claims, now) };
       // (A save that left the wallet as the device holds it: not sent back.)
       if (body.w && body.w === result.updateTime) {
@@ -506,7 +512,7 @@ const refreshToken = (secret, c, now) => signToken(secret, { k: 'ref', d: c.d, s
 
 // ---- Sessions -------------------------------------------------------------------
 
-// A new device session on account `docId` for `app`, made the live one: the
+// A new device session on account `docId` for `app`, made app's live one: the
 // reply every way of signing in shares (a refresh token for the device, a
 // session for the app, the wallet and the app's data).
 async function signIn(ctx, docId, { passcode = null } = {}) {
@@ -514,7 +520,7 @@ async function signIn(ctx, docId, { passcode = null } = {}) {
   if (!ECO_APPS[app]) return deps.errorJson('ECO_UNKNOWN_APP', 400, headers, ctx.request);
   const now = deps.now();
   const sid = deps.generateCode(12);
-  const result = await updateWallet(env, deps, docId, w => ({ ...touchApp(mergeWallet(w, { entries: paydayEntries(w, now) }), app, now), live: { sid, app, t: now } }));
+  const result = await updateWallet(env, deps, docId, w => goLive(touchApp(mergeWallet(w, { entries: paydayEntries(w, now) }), app, now), app, sid, now));
   if (!result) return null;
   const c = { d: docId, s: sid, a: app, g: gen(result.wallet) };
   const out = await sessionReply(env, deps, secret, result, c, now, { app, inbox: body.inbox });
@@ -588,8 +594,8 @@ async function ecoLogin(ctx) {
   return res || deps.errorJson('SYNC_PASSCODE_NOT_FOUND', 404, headers, request);
 }
 
-// A device's refresh token for a session in `app`. With `claim` this app
-// becomes the live one; without, a session comes back only if it already
+// A device's refresh token for a session in `app`. With `claim` this device
+// becomes the app's live one (other apps untouched); without, a session comes back only if it already
 // is (else { active: false, live }). The refresh token is renewed each time.
 async function ecoRefresh(ctx) {
   const { env, headers, deps, body, secret, app, request } = ctx;
@@ -605,16 +611,16 @@ async function ecoRefresh(ctx) {
   const claims = { d: c.d, s: c.s, a: app, g: c.g };
   const live = isActive(wallet, claims);
   const w = str(body.w, 100);
-  if (!live && !body.claim) return json(sameWallet({ active: false, live: liveOf(wallet), wallet: publicWallet(wallet), walletTime: doc.updateTime, pool: poolBalance(wallet) }, w), 200, headers);
+  if (!live && !body.claim) return json(sameWallet({ active: false, live: liveOf(wallet, app), wallet: publicWallet(wallet), walletTime: doc.updateTime, pool: poolBalance(wallet) }, w), 200, headers);
   let result = { wallet, updateTime: doc.updateTime };
   if (!live || paydayEntries(wallet, now).length) {
-    result = await updateWallet(env, deps, c.d, w => ({ ...touchApp(mergeWallet(w, { entries: paydayEntries(w, now) }), app, now), live: { sid: c.s, app, t: now } }));
+    result = await updateWallet(env, deps, c.d, w => goLive(touchApp(mergeWallet(w, { entries: paydayEntries(w, now) }), app, now), app, c.s, now));
   }
   const out = sameWallet(await sessionReply(env, deps, secret, result, claims, now, { app: body.data ? app : '', inbox: body.inbox, since: str(body.since, 100) }), w);
   out.refresh = await refreshToken(secret, claims, now);
-  // Taken back from another device or app that was live meanwhile: this
-  // app's copy may be behind (the kit tells the app, 'active').
-  if (!live && wallet.live) out.took = true;
+  // Taken back from the same app open somewhere else meanwhile: this copy
+  // may be behind (the kit tells the app, 'active').
+  if (!live && lives(wallet)[app]) out.took = true;
   return json(out, 200, headers);
 }
 
@@ -631,8 +637,8 @@ async function liveSession(ctx) {
 }
 
 // The Worker's one way to change the wallet for an op: paid up first, then
-// `change(paid)` gives the entries to add (or a refusal code). Only the live
-// app can do it.
+// `change(paid)` gives the entries to add (or a refusal code). Only the app's
+// live session can do it.
 async function walletOp(ctx, limitKey, change) {
   const { env, deps, headers, request, body, secret } = ctx;
   const now = deps.now();
@@ -660,7 +666,7 @@ async function walletOp(ctx, limitKey, change) {
     { skipIf: () => refused }
   );
   if (!result) return deps.errorJson('ECO_SIGNED_OUT', 401, headers, request);
-  if (refused) return deps.json({ error: { code: refused, message: refused, ...extra }, live: liveOf(result.wallet) }, refused === 'ECO_SIGNED_OUT' ? 401 : 409, headers);
+  if (refused) return deps.json({ error: { code: refused, message: refused, ...extra }, live: liveOf(result.wallet, c.a) }, refused === 'ECO_SIGNED_OUT' ? 401 : 409, headers);
   return deps.json({ wallet: publicWallet(result.wallet), walletTime: result.updateTime, pool: poolBalance(result.wallet), ...extra }, 200, headers);
 }
 

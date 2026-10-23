@@ -118,24 +118,39 @@ test('there is no transfer between passes', async () => {
   assert.equal((await t.call('POST', '', { op: 'transfer', passcode: acct.passcode, to: 'ABCDEFGHJK', amount: 1, id: 'x' })).data.error.code, 'ECO_UNKNOWN_OP');
 });
 
-test('one app at a time: another app claiming makes the first read-only', async () => {
+test('every app at once: another app claiming leaves the first live', async () => {
   const t = setup();
   const acct = await newPass(t);
   const words = await t.call('POST', '', { op: 'refresh', refresh: acct.refresh, app: 'vocab', claim: true });
   assert.equal(words.data.active, true);
   assert.ok(words.data.refresh, 'the refresh token is renewed');
   const read = await t.call('GET', t.qt(acct.token));
+  assert.equal(read.data.active, true);
+  assert.ok(read.data.token);
+  assert.equal((await t.call('PATCH', `${t.qt(acct.token)}&app=stock`, { payload: 'gz1:x' })).status, 200);
+  assert.equal((await t.call('PATCH', `${t.qt(words.data.token)}&app=vocab`, { payload: 'v:x' })).status, 200);
+});
+
+test('one app in one place: the same app opened on another device pauses the first', async () => {
+  const t = setup();
+  const acct = await newPass(t);
+  const other = await t.call('POST', '', { op: 'login', passcode: acct.passcode, app: 'stock' });
+  assert.equal(other.data.active, true);
+  const read = await t.call('GET', t.qt(acct.token));
   assert.equal(read.data.active, false);
-  assert.equal(read.data.live.app, 'vocab');
+  assert.equal(read.data.live.app, 'stock');
   assert.equal(read.data.token, undefined);
   const write = await t.call('PATCH', `${t.qt(acct.token)}&app=stock`, { payload: 'gz1:x' });
   assert.equal(write.status, 409);
   assert.equal(write.data.error.code, 'ECO_SESSION_MOVED');
   const peek = await t.call('POST', '', { op: 'refresh', refresh: acct.refresh, app: 'stock' });
   assert.equal(peek.data.active, false);
+  // Its other apps are its own: Words on this device goes live untouched.
+  assert.equal((await t.call('POST', '', { op: 'refresh', refresh: acct.refresh, app: 'vocab', claim: true })).data.active, true);
   const back = await t.call('POST', '', { op: 'refresh', refresh: acct.refresh, app: 'stock', claim: true });
   assert.equal(back.data.active, true);
   assert.equal((await t.call('PATCH', `${t.qt(back.data.token)}&app=stock`, { payload: 'gz1:y' })).status, 200);
+  assert.equal((await t.call('PATCH', `${t.qt(other.data.token)}&app=stock`, { payload: 'gz1:z' })).status, 409);
 });
 
 test('login with the pass; an unknown pass is refused', async () => {
