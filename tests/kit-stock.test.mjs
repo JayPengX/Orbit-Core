@@ -543,3 +543,19 @@ test("a dividend's pay date: Yahoo's own where it has one, else the usual delay 
   const { added } = SA.applyCorporateActions(acc, 'AAPL', { dividends: [{ date: usEx, amount: 0.26 }, { date: Date.parse('2026-05-11T13:30:00Z'), amount: 0.26 }], exDividendDate: f.exDividendDate, dividendDate: f.dividendDate }, { rates: { USD: 32 }, now: usEx + DAY_MS });
   assert.deepEqual(added.map(e => iso(e.t)), ['2026-08-13T13:30:00.000Z', '2026-05-18T13:30:00.000Z']);
 });
+
+test('興櫃 trades 09:00–15:00 (by negotiation), past the listed market’s 13:30: open, its day orders lasting to then', async () => {
+  const { isOpen, sessionEnd, isEmerging } = await import('../kit/stock-markets.mjs');
+  const { dayOrderEnd } = await import('../kit/stock-account.mjs');
+  const day = '2026-10-22';
+  const at = hm => Date.parse(`${day}T${hm}:00+08:00`);
+  const q = symbol => ({ market: 'TW', kind: 'stock', tz: 'Asia/Taipei', symbol, session: { start: at('09:00'), end: at('13:30') } });
+  assert.ok(isEmerging('1260.TWO'));
+  assert.equal(sessionEnd(q('1260.TWO')), at('15:00'));
+  assert.equal(sessionEnd(q('2330.TW')), at('13:30'));
+  assert.equal(isOpen(q('1260.TWO'), at('14:20')), true);
+  assert.equal(isOpen(q('2330.TW'), at('14:20')), false);
+  assert.equal(isOpen(q('1260.TWO'), at('15:00')), false);
+  assert.equal(dayOrderEnd(q('1260.TWO'), at('10:00')), at('15:00'));
+  assert.equal(dayOrderEnd(q('2330.TW'), at('10:00')), at('13:30'));
+});

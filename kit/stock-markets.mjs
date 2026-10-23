@@ -1074,13 +1074,20 @@ export const MARGIN_CALL = 1.3;
 export const MARGIN_RESTORE = 1.66;
 export const MARGIN_LIQUIDATE = 1;
 
+// When a quote's session ends: Yahoo's, but 興櫃 trades 09:00–15:00 (by
+// negotiation), past the listed market's 13:30 that Yahoo reports.
+export function sessionEnd(quote) {
+  const s = quote?.session;
+  if (!s) return null;
+  return quote.market === 'TW' && isEmerging(quote.symbol) ? Math.max(s.end, Date.parse(`${localDayOf(s.start, 'TW')}T15:00:00+08:00`)) : s.end;
+}
 // Open for trading right now? Crypto never closes; everything else follows
 // the session Yahoo reports for it (holidays included).
 export function isOpen(quote, now = Date.now()) {
   if (!quote) return false;
   if (quote.kind === 'crypto') return true;
   const s = quote.session;
-  if (!(s && now >= s.start && now < s.end)) return false;
+  if (!(s && now >= s.start && now < sessionEnd(quote))) return false;
   if (atLunch(quote.market, now)) return false;
   // A half day: shut from its early close, whatever the session says.
   const early = earlyCloseAt(quote.market, now);
