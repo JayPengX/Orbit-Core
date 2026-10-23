@@ -12,8 +12,14 @@ export default {
   async fetch(request, env) {
     if (!env.MOVE_KEY || request.headers.get('Authorization') !== `Bearer ${env.MOVE_KEY}`) return json({ error: 'key' }, 401);
     const u = new URL(request.url);
+    // The keys only (1000 a page): how many there are, and each page's cursor.
+    if (u.pathname === '/list') {
+      const page = await env.OLD_DATA.list({ cursor: u.searchParams.get('cursor') || undefined, limit: 1000 });
+      return json({ n: page.objects.length, cursor: page.truncated ? page.cursor : null });
+    }
+    // One page copied, 50 at a time; a file already there (same etag) is skipped.
     if (u.pathname === '/r2') {
-      const page = await env.OLD_DATA.list({ cursor: u.searchParams.get('cursor') || undefined, limit: 200 });
+      const page = await env.OLD_DATA.list({ cursor: u.searchParams.get('cursor') || undefined, limit: Number(u.searchParams.get('limit')) || 250 });
       let copied = 0;
       const one = async o => {
         const there = await env.NEW_DATA.head(o.key);
@@ -23,8 +29,7 @@ export default {
         await env.NEW_DATA.put(o.key, obj.body, { httpMetadata: obj.httpMetadata, customMetadata: obj.customMetadata });
         copied++;
       };
-      // 20 at a time.
-      for (let i = 0; i < page.objects.length; i += 20) await Promise.all(page.objects.slice(i, i + 20).map(one));
+      for (let k = 0; k < page.objects.length; k += 50) await Promise.all(page.objects.slice(k, k + 50).map(one));
       return json({ seen: page.objects.length, copied, cursor: page.truncated ? page.cursor : null });
     }
     if (u.pathname === '/d1') {
