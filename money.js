@@ -16,12 +16,12 @@
 // add up to the side.
 //
 // A deleted account's money goes back to the system: its sides are kept in
-// `quadra-config/ledger` (retired), and its worth counts as returned.
+// `orbit-config/ledger` (retired), and its worth counts as returned.
 
 import { changeDoc } from './doc-store.js';
 import { govOf } from './kit/gov.mjs';
 
-export const LEDGER = ['quadra-config', 'ledger'];
+export const LEDGER = ['orbit-config', 'ledger'];
 const LOAN_KINDS = new Set(['loan', 'loanfee', 'loanpay', 'loanlate', 'loangar', 'loanoff']);
 // The government's side of one account: the kit's own govOf (kit/gov.mjs), so the two always agree.
 export { govOf };
