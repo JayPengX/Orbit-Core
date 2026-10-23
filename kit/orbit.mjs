@@ -180,15 +180,94 @@ const LOAN_KINDS = new Set(['loan', 'loanfee', 'loanpay', 'loanlate', 'loanbad',
 // `avatar`: { id }, one of brand.mjs's drawn planets) and a frame around
 // it (`frame`: { id }), chosen in the Orbit Pass sheet (外觀). Every one is
 // open to every account.
-import { AVATARS, avatarSrc } from './brand.mjs';
-export { AVATARS, avatarSrc };
+import { AVATARS, MEDAL_AVATARS, DEFAULT_AVATAR, avatarSrc } from './brand.mjs';
+export { AVATARS, MEDAL_AVATARS, DEFAULT_AVATAR, avatarSrc };
 export const FRAMES = [
   'bronze', 'silver', 'jade', 'gold', 'neon', 'aurora', 'sakura', 'ocean', 'ember', 'mint', 'sapphire', 'ruby', 'legend', 'prism', 'mythic', 'celestial',
   'pearl', 'matcha', 'milktea', 'sunset', 'midnight', 'forest', 'candy', 'lava', 'skylantern'
 ].map(id => ({ id }));
-const worn = (wallet, key, list) => list.find(x => x.id === setting(wallet, key, null)?.id) || null;
-export const avatarOf = wallet => worn(wallet, 'avatar', AVATARS);
-export const frameOf = wallet => worn(wallet, 'frame', FRAMES);
+
+// Milestones: one for each app and one for the family, each reached once
+// and kept for good, each earning its own avatar and frame (`ms-<id>`, both).
+// Broad on purpose: a goal anyone gets to by using the app. How far along:
+// - what the wallet shows already: every app opened (`pass`), what the
+//   account is worth (`stock`, worthOf);
+// - `days`: the Taiwan days the app was opened, counted by the kit;
+// - the rest: a count the app reports with milestone(s, id, n), or adds one
+//   to with milestone(s, id).
+// Kept on the pass as the wallet setting `ms.<id>`: { n, d (the last day
+// counted), done }. Once done, always done.
+export const MILESTONES = [
+  { id: 'pass', goal: Object.keys(APPS).length, zh: '用遍 Orbit', en: 'All of Orbit', unit: { zh: 'App', en: 'apps' } },
+  { id: 'stock', goal: 1_000_000, money: true, zh: '百萬身價', en: 'Millionaire', unit: { zh: '', en: '' } },
+  { id: 'vocab', goal: 500, zh: '五百字', en: '500 words', unit: { zh: '字', en: '' } },
+  { id: 'beats', goal: 10, zh: '十首歌', en: '10 songs', unit: { zh: '首', en: '' } },
+  { id: 'transit', goal: 10, zh: '十趟旅程', en: '10 trips', unit: { zh: '趟', en: '' } },
+  { id: 'law', goal: 10, zh: '十個問題', en: '10 questions', unit: { zh: '問', en: '' } },
+  { id: 'match', goal: 30, days: true, zh: '鐵粉', en: 'Superfan', unit: { zh: '天', en: 'days' } },
+  { id: 'weather', goal: 30, days: true, zh: '看天的人', en: 'Sky watcher', unit: { zh: '天', en: 'days' } },
+  { id: 'orbit', goal: 30, days: true, zh: '全勤', en: 'Attendance', unit: { zh: '天', en: 'days' } }
+];
+const MS_FRAMES = MILESTONES.map(m => ({ id: `ms-${m.id}`, ms: m.id }));
+const msKept = (wallet, id) => setting(wallet, `ms.${id}`, null) || {};
+// { n, goal, done } for one milestone (n never past the goal).
+export function milestoneOf(wallet, m) {
+  const kept = msKept(wallet, m.id);
+  const n = m.id === 'pass' ? Object.keys(APPS).filter(a => wallet?.apps?.[a]).length : m.id === 'stock' ? Math.max(0, worthOf(wallet)) : finiteOr0(kept.n);
+  return { n: Math.min(n, m.goal), goal: m.goal, done: Boolean(kept.done) || n >= m.goal };
+}
+export const earned = (wallet, id) => {
+  const m = MILESTONES.find(x => x.id === id);
+  return Boolean(m && wallet && milestoneOf(wallet, m).done);
+};
+// What may be worn: the free ones, and an earned one.
+const wearable = (wallet, x) => (x ? (x.ms || x.app ? earned(wallet, x.ms || x.app) : true) : false);
+const worn = (wallet, key, list) => {
+  const x = list.find(y => y.id === setting(wallet, key, null)?.id);
+  return wearable(wallet, x) ? x : null;
+};
+export const avatarOf = wallet => worn(wallet, 'avatar', [...AVATARS, ...MEDAL_AVATARS]);
+export const frameOf = wallet => worn(wallet, 'frame', [...FRAMES, ...MS_FRAMES]);
+
+// An app's count toward its milestone: `n` the count now, or none to add
+// one. Written to the pass only as it moves a tenth of the way (or gets
+// there), so a count reported often costs nothing.
+const msWriting = new Set();
+export function milestone(s, id, n = null) {
+  const m = MILESTONES.find(x => x.id === id);
+  const w = s?.wallet;
+  if (!m || !w || msWriting.has(id)) return;
+  const kept = msKept(w, id);
+  if (kept.done) return;
+  const was = finiteOr0(kept.n);
+  const now = n == null ? was + 1 : Math.max(was, Math.floor(finiteOr0(n)));
+  const step = x => Math.floor((x / m.goal) * 10);
+  if (now === was || (n != null && now < m.goal && step(now) === step(was))) return;
+  msWrite(s, id, { ...kept, n: now, done: now >= m.goal || undefined });
+}
+function msWrite(s, id, value) {
+  msWriting.add(id);
+  s.write?.({ wallet: settingPatch(`ms.${id}`, JSON.parse(JSON.stringify(value))) })
+    .catch(() => {})
+    .finally(() => msWriting.delete(id));
+}
+// Each time the wallet arrives: today counted for this app (once a Taiwan
+// day), and a milestone the wallet shows reached kept as done (worth can
+// fall again; the milestone stays).
+function msTick(s) {
+  const w = s.wallet;
+  if (!w || !s.pass) return;
+  const day = twDay(Date.now());
+  const own = MILESTONES.find(m => m.days && m.id === s.app);
+  if (own) {
+    const kept = msKept(w, own.id);
+    if (kept.d !== day && !msWriting.has(own.id)) {
+      const n = finiteOr0(kept.n) + 1;
+      msWrite(s, own.id, { ...kept, n, d: day, done: kept.done || n >= own.goal || undefined });
+    }
+  }
+  for (const m of MILESTONES) if ((m.id === 'pass' || m.id === 'stock') && !msKept(w, m.id).done && milestoneOf(w, m).done && !msWriting.has(m.id)) msWrite(s, m.id, { done: true });
+}
 
 // ---- Language ------------------------------------------------------------------------
 
@@ -1236,6 +1315,7 @@ export function orbitSession(app, { lang = detectLang(), heartbeat = 120_000 } =
   const help = typeof location !== 'undefined' && /(?:^|[#&])help=([a-z]+)(?::([a-z0-9]+))?/.exec(location.hash);
   if (help && typeof document !== 'undefined') setTimeout(() => !document.querySelector('dialog[open]') && openHelp(made, help[1], help[2] || null), 800);
   made.app ??= app;
+  made.on('wallet', () => msTick(made));
   dataSession = made;
   return made;
 }
@@ -1922,7 +2002,7 @@ const PERSON_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" 
 export function accountButton(s, { extra = null } = {}) {
   const btn = node('button', { class: 'q-account', type: 'button', 'aria-label': s.lang === 'en' ? 'Orbit Pass' : 'Orbit Pass 帳戶', title: BRAND.pass });
   const dot = node('span', { class: 'q-account-dot', 'aria-hidden': 'true' });
-  // The avatar worn, else the person.
+  // The avatar worn (the default planet once signed in), else the person.
   const paint = () => {
     const a = avatarOf(s.wallet);
     const f = frameOf(s.wallet);
@@ -1930,7 +2010,7 @@ export function accountButton(s, { extra = null } = {}) {
     for (const c of [...btn.classList]) if (c.startsWith('q-frame-')) btn.classList.remove(c);
     if (f) btn.classList.add('q-framed', `q-frame-${f.id}`);
     else btn.classList.remove('q-framed');
-    if (a) btn.append(node('img', { class: 'q-avatar', alt: '', src: avatarSrc(a.id) }));
+    if (a || s.wallet) btn.append(node('img', { class: 'q-avatar', alt: '', src: avatarSrc(a?.id || DEFAULT_AVATAR) }));
     else btn.innerHTML = PERSON_SVG;
     btn.append(dot);
     btn.classList.toggle('signed', Boolean(s.wallet));
@@ -2010,23 +2090,33 @@ export const openHelp = (s, app = s.app, topic = null) => accountSheet(s, { tab:
 
 // The account at a glance: its number and since when. Never a balance:
 // money is Securities' alone.
-const accountNumber = id => (id ? `QP ${id.slice(0, 4).toUpperCase()} ${id.slice(4, 8).toUpperCase()} ${id.slice(8, 12).toUpperCase()}` : '');
-function accountCard(s) {
+// The account number: the pass's id in three fours (a name for the
+// account, never the pass itself).
+const accountNumber = id => (id ? id.slice(0, 12).toUpperCase().replace(/(.{4})(?=.)/g, '$1 ') : '');
+// The card atop the Pass tab: who you are here (the avatar and frame worn)
+// and how far along the milestones are; a tap opens 外觀.
+function accountCard(s, onLooks) {
   const en = s.lang === 'en';
-  const created = s.wallet?.created;
-  const since = Number.isFinite(created) ? new Date(created).toLocaleDateString(en ? 'en-US' : 'zh-TW', { year: 'numeric', month: 'short', day: 'numeric' }) : '';
-  const days = since ? Math.max(1, Math.round((Date.now() - created) / 86_400_000)) : 0;
-  return node('div', { class: 'q-card-hero' }, [
-    node('div', { class: 'q-hero-top' }, [node('span', { class: 'q-hero-brand', text: 'ORBIT PASS' })]),
-    node('span', { class: 'q-hero-label', text: en ? 'Account' : '帳號' }),
-    node('strong', { class: 'q-hero-balance num', text: accountNumber(s.pass) }),
-    node('span', { class: 'q-hero-sub', text: since ? (en ? `Opened ${since} · day ${days}` : `${since} 開戶 · 第 ${days} 天`) : '' })
+  const w = s.wallet || {};
+  const a = avatarOf(w);
+  const f = frameOf(w);
+  const got = MILESTONES.filter(m => milestoneOf(w, m).done).length;
+  return node('button', { class: 'q-pass-card', type: 'button', onclick: onLooks, 'aria-label': en ? `Milestones ${got} of ${MILESTONES.length}` : `里程碑 ${got} / ${MILESTONES.length}` }, [
+    node('span', { class: 'q-pc-top' }, [
+      node('span', { class: `q-pc-face${f ? ` q-framed q-frame-${f.id}` : ''}` }, [node('img', { alt: '', src: avatarSrc(a?.id || DEFAULT_AVATAR) })]),
+      node('span', { class: 'q-pc-id' }, [
+        node('span', { class: 'q-pc-brand', text: 'ORBIT PASS' }),
+        node('strong', { class: 'q-pc-big' }, [document.createTextNode(en ? 'Milestones ' : '里程碑 '), node('span', { class: 'num', text: `${got}/${MILESTONES.length}` })]),
+        node('span', { class: 'q-pc-no num', text: accountNumber(s.pass) })
+      ])
+    ]),
+    node('span', { class: 'q-pc-ms', 'aria-hidden': 'true' }, MILESTONES.map(m => node('img', { class: milestoneOf(w, m).done ? 'got' : '', alt: '', src: avatarSrc(`ms-${m.id}`) })))
   ]);
 }
 
 // The Pass tab: the account, its devices, notices and security. close()
 // closes the sheet (before a new pass is shown over everything).
-export function passAccount(s, { extra = null, close = () => {} } = {}) {
+export function passAccount(s, { extra = null, close = () => {}, looks = () => {} } = {}) {
   const en = s.lang === 'en';
   const T = (zh, e) => (en ? e : zh);
   const note = node('p', { class: 'q-sheet-note', role: 'status' });
@@ -2068,7 +2158,7 @@ export function passAccount(s, { extra = null, close = () => {} } = {}) {
     tick = setInterval(paint, 15_000);
   };
   const nodes = [
-    accountCard(s),
+    accountCard(s, looks),
     ...(extra ? [extra] : []),
     node('h3', { class: 'q-sheet-h', text: T('裝置', 'Devices') }),
     node('div', { class: 'q-rows' }, [act(T('新增裝置（取得裝置代碼）', 'Add a device (get a device code)'), async () => showCode(await s.deviceCode())), device]),

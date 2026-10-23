@@ -462,6 +462,45 @@ test('looks: an avatar and a frame for everyone, from the lists only', () => {
   assert.ok([...kit.AVATARS, ...kit.FRAMES].every(x => !x.streak));
 });
 
+test('milestones: reached once, kept for good, and only then worn', async () => {
+  const now = Date.UTC(2026, 9, 23);
+  const set = (k, v) => ({ [k]: { value: v, t: now } });
+  const base = { entries: [], apps: {}, settings: {} };
+  const of = (w, id) => kit.milestoneOf(w, kit.MILESTONES.find(m => m.id === id));
+  // One per app and one for the family, each with its drawn avatar and a frame.
+  assert.deepEqual(kit.MILESTONES.map(m => m.id).sort(), ['pass', ...Object.keys(kit.APPS)].sort());
+  const css = await import('node:fs').then(fs => fs.readFileSync(new URL('../kit/orbit.css', import.meta.url), 'utf8'));
+  for (const m of kit.MILESTONES) {
+    assert.ok(css.includes(`.q-frame-ms-${m.id} {`), m.id);
+    assert.ok(!/\p{Extended_Pictographic}/u.test(decodeURIComponent(kit.avatarSrc(`ms-${m.id}`))));
+  }
+  // A locked one isn't worn, an earned one is.
+  const wearing = { ...base, settings: { ...set('avatar', { id: 'ms-vocab' }), ...set('frame', { id: 'ms-vocab' }) } };
+  assert.equal(kit.avatarOf(wearing), null);
+  assert.equal(kit.frameOf(wearing), null);
+  const got = { ...wearing, settings: { ...wearing.settings, ...set('ms.vocab', { n: 500, done: true }) } };
+  assert.equal(kit.avatarOf(got).id, 'ms-vocab');
+  assert.equal(kit.frameOf(got).id, 'ms-vocab');
+  // The family's from the apps opened; never past the goal.
+  const all = Object.fromEntries(Object.keys(kit.APPS).map(a => [a, { first: now, last: now }]));
+  assert.equal(of({ ...base, apps: { law: { first: now, last: now } } }, 'pass').n, 1);
+  assert.equal(of({ ...base, apps: all }, 'pass').done, true);
+  // A count kept on the pass; once done, done even if it fell back.
+  assert.deepEqual(of({ ...base, settings: set('ms.match', { n: 12, d: '2026-10-23' }) }, 'match'), { n: 12, goal: 30, done: false });
+  assert.equal(of({ ...base, settings: set('ms.stock', { done: true }) }, 'stock').done, true);
+  // An app's count goes to the pass a tenth of the way at a time.
+  const writes = [];
+  const s = { wallet: { ...base, settings: set('ms.vocab', { n: 100 }) }, write: p => (writes.push(p), Promise.resolve()) };
+  kit.milestone(s, 'vocab', 120);
+  assert.equal(writes.length, 0);
+  kit.milestone(s, 'vocab', 150);
+  assert.equal(writes[0].wallet.settings['ms.vocab'].value.n, 150);
+  await new Promise(r => setTimeout(r, 0));
+  // One added: written each time.
+  kit.milestone({ ...s, wallet: { ...base, settings: set('ms.law', { n: 9 }) } }, 'law');
+  assert.deepEqual(writes[1].wallet.settings['ms.law'].value, { n: 10, done: true });
+});
+
 test('where the money came from: the system, the bank, the government and the account itself', () => {
   // The opening money is the Worker's own entry; the pay and the owner's grants are the system's too.
   const paid = kit.moneySides({ entries: [{ id: 'eco:start', app: 'eco', kind: 'start', amount: 200_000 }, { id: 'eco:wpay:2026-10-19', app: 'eco', kind: 'pay', amount: 10_000 }, { id: 'eco:admin:1', app: 'eco', kind: 'admin', amount: 500 }], snap: {} });
