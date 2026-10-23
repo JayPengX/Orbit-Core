@@ -3169,6 +3169,7 @@ liftOnPictures();
 // names (a row's title, a large title, a stock's or a team's name), are
 // shrunk just enough to fit their box (down to 72%) before any ellipsis,
 // redone as the page changes or turns. Nothing to call.
+let fontLoads = 0;
 const FIT = '.q-fit, .q-fit-wrap, .q-ritem-title, .q-nav-title, .q-seg > button, .q-stock-id b, .q-match-side b, .q-league strong';
 export function fitNames(root = document) {
   // (Every box read first, then every size set: one layout, not one a name.)
@@ -3179,7 +3180,8 @@ export function fitNames(root = document) {
     const w = el.clientWidth;
     if (!w) continue;
     // (A choice set in bold is wider: its own key.)
-    const key = `${w}|${el.textContent}|${el.getAttribute('aria-pressed') || el.getAttribute('aria-selected') || ''}`;
+    // (The fonts loaded since counts too: a name measured in the fallback font is measured again.)
+    const key = `${w}|${el.textContent}|${el.getAttribute('aria-pressed') || el.getAttribute('aria-selected') || ''}|${fontLoads}`;
     if (el.dataset.qFitKey === key) continue;
     // (.q-fit-wrap: a sentence more than a name, measured on one line, wrapped only when shrinking can't fit it.)
     const wraps = el.matches('.q-fit-wrap, .q-match-side b');
@@ -3191,7 +3193,8 @@ export function fitNames(root = document) {
     const was = parseFloat(el.style.fontSize) / base || 1;
     // (The text against the room inside the padding: only the text scales.)
     const pad = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
-    const k = Math.min(1, (w - pad - 1) / ((el.scrollWidth - pad) / was));
+    // (The box to the fraction of a pixel, less a pixel and a half: clientWidth and scrollWidth are rounded, and a text 0.1 px over its box is cut.)
+    const k = Math.min(1, (el.getBoundingClientRect().width - pad - 1.5) / ((el.scrollWidth - pad) / was));
     todo.push([el, key, base, was, wraps && k < 0.72 ? 'wrap' : Math.max(0.72, k)]);
   }
   for (const [el, key, base, was, k] of todo) {
@@ -3249,6 +3252,7 @@ function watchNames() {
     // (A tab or sheet shown again counts too: a name drawn while hidden had no box to fit.)
     new MutationObserver(soon).observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['hidden', 'open', 'aria-selected', 'aria-pressed'] });
     globalThis.addEventListener('resize', soon);
+    document.fonts?.addEventListener?.('loadingdone', () => (fontLoads++, soon()));
     soon();
   };
   if (document.body) start();
