@@ -250,10 +250,14 @@ import map, so a file has one address whichever loader a page carries.
 | `sw.js` | The one service worker every app imports (its settings in its own `sw.js`); keeps a file only when it matches its address's hash |
 | `lang.mjs`, `format.mjs` | `W`, `makeT`, `detectLang`; `money`, `pct`, `price`, `DASH`, `twDay` (Taiwan's date) |
 
-**Securities' broker rules** follow Taiwan's real ones (`stock-credit.mjs`):
-現股當沖 either way round after 3 months with 10 trades or with a credit
-account; a daily 當沖額度 on what's sold first, twice net worth in NT$100,000
-steps, NT$500,000 to NT$50,000,000 (`dayTradeRoom`).
+**Securities' broker rules** follow Taiwan's real ones (`stock-credit.mjs`,
+`stock-access.mjs`): a product is bought only once its account or papers are
+in place (開戶與交易資格: KYC with fund RR limits, 現股當沖, 權證, 興櫃,
+槓反 ETF, 期貨帳戶, 複委託, 專業投資人; the broker-approved ones open the
+next trading day; selling or closing never asks; accounts from before
+2026-10-24 keep what they'd traded); 結匯 US$5M a year each way; a daily
+當沖額度 on what's sold first, twice net worth in NT$100,000 steps,
+NT$500,000 to NT$50,000,000 (`dayTradeRoom`).
 
 **Brand:** `node brand/generate.mjs [id…|site]` writes every app's icons,
 share cards, manifest and page tags. Renamed repos (Passion-Beats) are small redirect
