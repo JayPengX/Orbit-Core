@@ -144,3 +144,110 @@ export function accentCss() {
 export function withApp(html, id) {
   return html.replace(/<html\b([^>]*)>/i, (tag, attrs) => (/\sdata-app=/.test(attrs) ? tag.replace(/\sdata-app=(["'])[^"']*\1/, ` data-app="${id}"`) : `<html${attrs} data-app="${id}">`));
 }
+
+// ---- Avatars ----------------------------------------------------------------------------
+//
+// Orbit's avatars: little planets with faces, drawn here as SVG (never
+// emoji). Each is a colour (the palette: body, shade and sky) and a feature
+// (a ring, bands, craters, a moon, a storm spot or a sparkle), with a face
+// that changes along the list so neighbours never look alike. The planet and
+// its tilted ring are the family mark's (familyMark, above).
+//
+// AVATARS: { id, zh, en } for every pairing; avatarSvg(id) the drawing;
+// avatarSrc(id) a data: URL for an <img> (a picture keeps each drawing's
+// gradients to itself, so many on one page never clash).
+
+const PALETTES = [
+  ['indigo', '靛藍', 'Indigo', '#eef2ff', '#a5b4fc', '#4338ca', '#0b1026'],
+  ['mint', '薄荷', 'Mint', '#ecfdf5', '#6ee7b7', '#047857', '#022c22'],
+  ['peach', '蜜桃', 'Peach', '#fff7ed', '#fdba74', '#c2410c', '#431407'],
+  ['sakura', '櫻花', 'Sakura', '#fdf2f8', '#f9a8d4', '#be185d', '#500724'],
+  ['sky', '晴空', 'Sky', '#f0f9ff', '#7dd3fc', '#0369a1', '#082f49'],
+  ['orchid', '蘭紫', 'Orchid', '#fdf4ff', '#f0abfc', '#a21caf', '#4a044e'],
+  ['lemon', '檸檬', 'Lemon', '#fefce8', '#fde047', '#a16207', '#422006'],
+  ['teal', '湖水', 'Teal', '#f0fdfa', '#5eead4', '#0f766e', '#042f2e'],
+  ['coral', '珊瑚', 'Coral', '#fff1f2', '#fda4af', '#be123c', '#4c0519'],
+  ['matcha', '抹茶', 'Matcha', '#f7fee7', '#bef264', '#4d7c0f', '#1a2e05'],
+  ['milktea', '奶茶', 'Milk tea', '#fffbeb', '#e7c9a0', '#92400e', '#2b1406'],
+  ['violet', '紫羅蘭', 'Violet', '#f5f3ff', '#c4b5fd', '#6d28d9', '#2e1065'],
+  ['moon', '月白', 'Moon', '#f8fafc', '#cbd5e1', '#475569', '#020617'],
+  ['ocean', '海洋', 'Ocean', '#eff6ff', '#93c5fd', '#1d4ed8', '#172554'],
+  ['amber', '琥珀', 'Amber', '#fffbeb', '#fbbf24', '#b45309', '#451a03'],
+  ['lava', '熔岩', 'Lava', '#fef2f2', '#fca5a5', '#b91c1c', '#1c0a0a']
+].map(([id, zh, en, light, body, deep, night]) => ({ id, zh, en, light, body, deep, night }));
+
+const FEATURES = [
+  ['ring', '光環', 'ring'],
+  ['bands', '條紋', 'stripes'],
+  ['craters', '隕石坑', 'craters'],
+  ['moon', '小衛星', 'moon'],
+  ['storm', '風暴', 'storm'],
+  ['spark', '星光', 'stars']
+].map(([id, zh, en]) => ({ id, zh, en }));
+
+export const AVATARS = PALETTES.flatMap((p, i) => FEATURES.map((f, j) => ({ id: `${p.id}-${f.id}`, zh: `${p.zh}${f.zh}`, en: `${p.en} ${f.en}`, p: i, f: j })));
+
+const INK = '#1e1b4b';
+const PLANET = { x: 32, y: 33, r: 20 };
+
+// The faces: eyes near 29, the mouth near 37.
+const FACES = [
+  // Smile.
+  () => `<circle cx="26" cy="30" r="2.2" fill="${INK}"/><circle cx="38" cy="30" r="2.2" fill="${INK}"/><path d="M27.5 35.5q4.5 4 9 0" fill="none" stroke="${INK}" stroke-width="2" stroke-linecap="round"/>`,
+  // Happy (closed eyes), blushing.
+  () => `<path d="M23.5 31q2.5-3.2 5 0M35.5 31q2.5-3.2 5 0" fill="none" stroke="${INK}" stroke-width="2" stroke-linecap="round"/><circle cx="22.5" cy="35" r="2.4" fill="#fb7185" opacity=".45"/><circle cx="41.5" cy="35" r="2.4" fill="#fb7185" opacity=".45"/><path d="M28 35q4 4 8 0" fill="none" stroke="${INK}" stroke-width="2" stroke-linecap="round"/>`,
+  // Grin.
+  () => `<circle cx="26" cy="29.5" r="2.2" fill="${INK}"/><circle cx="38" cy="29.5" r="2.2" fill="${INK}"/><path d="M26.5 34.5h11q-1 5.5-5.5 5.5t-5.5-5.5z" fill="${INK}"/><path d="M29 38.2q3 1.6 6 0" fill="none" stroke="#fb7185" stroke-width="1.6" stroke-linecap="round"/>`,
+  // Wink.
+  () => `<circle cx="26" cy="30" r="2.2" fill="${INK}"/><path d="M35.5 30.5q2.5-2.4 5 0" fill="none" stroke="${INK}" stroke-width="2" stroke-linecap="round"/><path d="M28 35.5q4 3.6 8 0" fill="none" stroke="${INK}" stroke-width="2" stroke-linecap="round"/>`,
+  // Wow: big bright eyes, a small round mouth.
+  () => `<circle cx="26" cy="29.5" r="3" fill="${INK}"/><circle cx="38" cy="29.5" r="3" fill="${INK}"/><circle cx="27" cy="28.5" r="1" fill="#fff"/><circle cx="39" cy="28.5" r="1" fill="#fff"/><ellipse cx="32" cy="37" rx="2" ry="2.4" fill="${INK}"/>`,
+  // Cool: sunglasses and a half smile.
+  () => `<path d="M21.5 27.5h21v1.6h-1.4q-.4 4.4-4.6 4.4t-4.3-4.2h-.4q-.1 4.2-4.3 4.2t-4.6-4.4h-1.4z" fill="${INK}"/><path d="M24.5 29.5l2-1.4" stroke="#fff" stroke-opacity=".7" stroke-width="1.1" stroke-linecap="round"/><path d="M29 37q3.5 1.8 7-1" fill="none" stroke="${INK}" stroke-width="2" stroke-linecap="round"/>`,
+  // Sleepy.
+  () => `<path d="M23.5 30q2.5 2.6 5 0M35.5 30q2.5 2.6 5 0" fill="none" stroke="${INK}" stroke-width="2" stroke-linecap="round"/><ellipse cx="32" cy="36.5" rx="1.6" ry="1.2" fill="${INK}"/><path d="M44 19h4l-4 4h4" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity=".9"/>`,
+  // Cheeky: a smile with its tongue out.
+  () => `<circle cx="26" cy="30" r="2.2" fill="${INK}"/><circle cx="38" cy="30" r="2.2" fill="${INK}"/><path d="M27 35q5 3.4 10 0" fill="none" stroke="${INK}" stroke-width="2" stroke-linecap="round"/><path d="M32.4 36.6h3.4v1.6a1.7 1.7 0 0 1-3.4 0z" fill="#fb7185"/>`
+];
+
+// The features: what's drawn behind the planet, on it, and in front of it.
+const FEAT = {
+  ring: p => ({
+    back: `<g transform="rotate(-18 32 41)"><path d="M5 41a27 7.5 0 0 1 54 0" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="3"/></g>`,
+    front: `<g transform="rotate(-18 32 41)"><path d="M5 41a27 7.5 0 0 0 54 0" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/></g>`,
+    sky: `<circle cx="51" cy="14" r="2" fill="#fff" opacity=".8"/>`
+  }),
+  bands: p => ({
+    on: `<path d="M10 19h44v3.4H10zM10 43h44v3.6H10zM10 49h44v2.2H10z" fill="${p.deep}" opacity=".4"/>`,
+    sky: `<circle cx="12" cy="15" r="1.4" fill="#fff" opacity=".7"/><circle cx="52" cy="50" r="1.2" fill="#fff" opacity=".6"/>`
+  }),
+  craters: p => ({
+    on: `<circle cx="20" cy="40" r="3.4" fill="${p.deep}" opacity=".34"/><circle cx="43.5" cy="41.5" r="2.4" fill="${p.deep}" opacity=".34"/><circle cx="40" cy="20" r="2" fill="${p.deep}" opacity=".24"/><circle cx="33" cy="46.5" r="1.5" fill="${p.deep}" opacity=".24"/>`,
+    sky: `<circle cx="11" cy="17" r="1.3" fill="#fff" opacity=".7"/>`
+  }),
+  moon: p => ({
+    back: `<path d="M8 22a25 9 -20 0 1 48-6" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="1.2" stroke-dasharray="2 2.4"/>`,
+    front: `<circle cx="52" cy="13" r="5" fill="${p.light}"/><circle cx="50.6" cy="12" r="1.2" fill="${p.deep}" opacity=".3"/>`
+  }),
+  storm: p => ({
+    on: `<ellipse cx="40" cy="43" rx="6" ry="3.2" fill="${p.deep}" opacity=".35"/><ellipse cx="40" cy="43" rx="3" ry="1.5" fill="${p.deep}" opacity=".35"/><path d="M14 23q8-3 16 0t20 0" fill="none" stroke="${p.deep}" stroke-opacity=".25" stroke-width="2.4" stroke-linecap="round"/>`,
+    sky: `<circle cx="53" cy="18" r="1.3" fill="#fff" opacity=".75"/>`
+  }),
+  spark: () => ({
+    sky: `<path d="M51 7l1.5 4 4 1.5-4 1.5-1.5 4-1.5-4-4-1.5 4-1.5zM11 45l1 2.6 2.6 1-2.6 1-1 2.6-1-2.6-2.6-1 2.6-1z" fill="#fff"/><circle cx="13" cy="14" r="1.4" fill="#fff" opacity=".8"/><circle cx="54" cy="44" r="1" fill="#fff" opacity=".7"/>`
+  })
+};
+
+const svgs = new Map();
+export function avatarSvg(id) {
+  if (svgs.has(id)) return svgs.get(id);
+  const a = AVATARS.find(x => x.id === id);
+  if (!a) return '';
+  const p = PALETTES[a.p];
+  const f = FEAT[FEATURES[a.f].id](p);
+  const face = FACES[(a.p * 3 + a.f * 5) % FACES.length]();
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><radialGradient id="s" cx=".3" cy=".2" r="1"><stop offset="0" stop-color="${p.deep}"/><stop offset="1" stop-color="${p.night}"/></radialGradient><radialGradient id="b" cx=".34" cy=".28" r=".8"><stop offset="0" stop-color="${p.light}"/><stop offset=".55" stop-color="${p.body}"/><stop offset="1" stop-color="${p.deep}" stop-opacity=".9"/></radialGradient><clipPath id="c"><circle cx="${PLANET.x}" cy="${PLANET.y}" r="${PLANET.r}"/></clipPath></defs><rect width="64" height="64" fill="url(#s)"/>${f.sky || ''}${f.back || ''}<circle cx="${PLANET.x}" cy="${PLANET.y}" r="${PLANET.r}" fill="url(#b)"/><g clip-path="url(#c)">${f.on || ''}<ellipse cx="25" cy="21" rx="6" ry="3.4" fill="#fff" opacity=".45" transform="rotate(-28 25 21)"/></g>${face}${f.front || ''}</svg>`;
+  svgs.set(id, svg);
+  return svg;
+}
+export const avatarSrc = id => `data:image/svg+xml,${encodeURIComponent(avatarSvg(id))}`;

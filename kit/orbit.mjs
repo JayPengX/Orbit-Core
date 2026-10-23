@@ -177,20 +177,11 @@ const LOAN_KINDS = new Set(['loan', 'loanfee', 'loanpay', 'loanlate', 'loanbad',
 // ---- Looks: an avatar and a frame, free for everyone ------------------------------------
 //
 // The account button in every app can wear an avatar (the wallet setting
-// `avatar`: { id }) and a frame around it (`frame`: { id }), chosen in the
-// Orbit Pass sheet (外觀). Every one is open to every account.
-export const AVATARS = [
-  ...[
-    ['sprout', '🌱'], ['fox', '🦊'], ['panda', '🐼'], ['lion', '🦁'], ['dragon', '🐉'], ['unicorn', '🦄'], ['crown', '👑'], ['cat', '🐱'], ['dog', '🐶'], ['frog', '🐸'],
-    ['penguin', '🐧'], ['rocket', '🚀'], ['rainbow', '🌈'], ['fire', '🔥'], ['gem', '💎'], ['star', '✦'], ['tiger', '🐯'], ['eagle', '🦅'], ['trophy', '🏆'], ['owl', '🦉'],
-    ['octopus', '🐙'], ['whale', '🐳'], ['butterfly', '🦋'], ['cactus', '🌵'], ['sun', '🌞'], ['ball', '⚽'], ['chart', '📈'], ['wolf', '🐺'], ['shark', '🦈'], ['bolt', '⚡'],
-    ['peacock', '🦚'], ['planet', '🪐'], ['drake', '🐲'], ['comet', '☄️'], ['galaxy', '🌌'], ['trident', '🔱'],
-    // Taiwan's own, and more everyday faces.
-    ['boba', '🧋'], ['dumpling', '🥟'], ['mango', '🥭'], ['lantern', '🏮'], ['mountain', '🏔️'], ['train', '🚄'], ['bike', '🚲'], ['baseball', '⚾'], ['basketball', '🏀'], ['koala', '🐨'],
-    ['rabbit', '🐰'], ['bear', '🐻'], ['monkey', '🐵'], ['chick', '🐤'], ['turtle', '🐢'], ['dolphin', '🐬'], ['dino', '🦖'], ['guitar', '🎸'], ['headphones', '🎧'], ['game', '🎮'],
-    ['camera', '📷'], ['moon', '🌙'], ['clover', '🍀'], ['cherry', '🌸'], ['coffee', '☕'], ['bull', '🐂']
-  ].map(([id, glyph]) => ({ id, glyph }))
-];
+// `avatar`: { id }, one of brand.mjs's drawn planets) and a frame around
+// it (`frame`: { id }), chosen in the Orbit Pass sheet (外觀). Every one is
+// open to every account.
+import { AVATARS, avatarSrc } from './brand.mjs';
+export { AVATARS, avatarSrc };
 export const FRAMES = [
   'bronze', 'silver', 'jade', 'gold', 'neon', 'aurora', 'sakura', 'ocean', 'ember', 'mint', 'sapphire', 'ruby', 'legend', 'prism', 'mythic', 'celestial',
   'pearl', 'matcha', 'milktea', 'sunset', 'midnight', 'forest', 'candy', 'lava', 'skylantern'
@@ -1939,7 +1930,7 @@ export function accountButton(s, { extra = null } = {}) {
     for (const c of [...btn.classList]) if (c.startsWith('q-frame-')) btn.classList.remove(c);
     if (f) btn.classList.add('q-framed', `q-frame-${f.id}`);
     else btn.classList.remove('q-framed');
-    if (a) btn.append(node('span', { class: 'q-avatar', 'aria-hidden': 'true', text: a.glyph }));
+    if (a) btn.append(node('img', { class: 'q-avatar', alt: '', src: avatarSrc(a.id) }));
     else btn.innerHTML = PERSON_SVG;
     btn.append(dot);
     btn.classList.toggle('signed', Boolean(s.wallet));
