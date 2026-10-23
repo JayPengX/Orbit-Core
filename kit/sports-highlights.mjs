@@ -323,7 +323,7 @@ export async function loadWatchMonth(e, readPack, now = Date.now()) {
 }
 export const watchOf = e => (e ? pack?.games?.[watchKey(e)] || (e.start ? months.get(watchMonthPath(e))?.[watchKey(e)] : null) || null : null);
 // Found ones kept on the device too (a game opened before the pack had it).
-const KEPT = 'fx.highlights.v5';
+const KEPT = 'fx.highlights.v6';
 function kept() {
   try {
     return JSON.parse(localStorage.getItem(KEPT) || '{}') || {};
@@ -331,7 +331,10 @@ function kept() {
     return {};
   }
 }
-export const knownHighlights = e => (e ? kept()[watchKey(e)] || watchOf(e)?.hl || null : null);
+// A football game's found before the extended cut was looked for (no
+// `ext`, no `x`): not known, looked for again (Jay 2026-10-23).
+const current = (e, v) => (v && (!football(e) || e.kind !== 'match' || v.ext || v.x) ? v : null);
+export const knownHighlights = e => (e ? current(e, kept()[watchKey(e)]) || current(e, watchOf(e)?.hl) || null : null);
 function keep(e, v) {
   try {
     const all = kept();
@@ -341,7 +344,7 @@ function keep(e, v) {
     localStorage.setItem(KEPT, JSON.stringify(Object.fromEntries(list)));
   } catch {}
 }
-const short = v => ({ id: v.id, channel: v.channel, channelId: v.channelId, length: v.length, official: Boolean(v.official), ...(v.ext ? { ext: true } : {}) });
+const short = (v, e) => ({ id: v.id, channel: v.channel, channelId: v.channelId, length: v.length, official: Boolean(v.official), ...(v.ext ? { ext: true } : football(e) ? { x: 1 } : {}) });
 // What a video is, for its row's name: ELTA's (CPBL), the league's or a
 // side's own, or a full-game channel's (the NBA's).
 export const ELTA_CHANNEL = 'UCCQvP4hsRW9emj0meGk15jg';
@@ -361,8 +364,8 @@ export async function findHighlights(e, read, now = Date.now()) {
     if (got && (!v || (got.ext && !v.ext))) v = got;
     if (v && (v.ext || !football(e))) break;
   }
-  if (v) keep(e, short(v));
-  return v ? short(v) : null;
+  if (v) keep(e, short(v, e));
+  return v ? short(v, e) : null;
 }
 // Recent games over that the pack doesn't have yet: looked up one at a time
 // in the background, so a sheet opened later has its video at once. Each
