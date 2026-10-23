@@ -436,9 +436,9 @@ test('wealth levels: each level reached pays its reward once, from what the acco
   assert.deepEqual(rankEntries(at(200_000), now), []);
   assert.deepEqual(rankEntries(at(290_000), now), []);
   // 350,000 in cash and 200,000 in shares: worth 550,000, two levels at once.
-  assert.deepEqual(rankEntries(at(350_000, 200_000), now).map(e => [e.id, e.amount, e.kind]), [['eco:rank:thrifty', 3_000, 'rank'], ['eco:rank:solid', 5_000, 'rank']]);
+  assert.deepEqual(rankEntries(at(350_000, 200_000), now).map(e => [e.id, e.amount, e.kind]), [['eco:rank:thrifty', 30_000, 'rank'], ['eco:rank:solid', 50_000, 'rank']]);
   // Paid already, or fallen back: nothing again.
-  assert.deepEqual(rankEntries(at(600_000, 0, [{ id: 'eco:rank:thrifty', app: 'eco', kind: 'rank', amount: 3_000 }, { id: 'eco:rank:solid', app: 'eco', kind: 'rank', amount: 5_000 }]), now), []);
+  assert.deepEqual(rankEntries(at(600_000, 0, [{ id: 'eco:rank:thrifty', app: 'eco', kind: 'rank', amount: 30_000 }, { id: 'eco:rank:solid', app: 'eco', kind: 'rank', amount: 50_000 }]), now), []);
   assert.equal(RANKS.length, 7);
   // In the payday's entries, after the pay.
   assert.ok(paydayEntries({ entries: [{ id: 'eco:start', amount: 295_000 }] }, now).some(e => e.id === 'eco:rank:thrifty'));
