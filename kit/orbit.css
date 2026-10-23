@@ -2283,14 +2283,16 @@ input[type='checkbox'][switch] {
    screen, above anything an app draws. */
 dialog.q-gate,
 dialog.q-moved {
-  /* Its padding inside the column, whatever box-sizing the app uses (Orbit
-     Weather and Transit set none: the screen was 40px wider and scrolled). */
+  /* The whole screen (its glow filling the sides; what's on it keeps to the
+     column's width), its padding inside the 100vw whatever box-sizing the
+     app uses (Orbit Weather and Transit set none: the screen was 40px wider
+     and scrolled). */
   box-sizing: border-box;
-  width: var(--q-vw);
+  width: 100vw;
   max-width: none;
   height: 100dvh;
   max-height: none;
-  margin: 0 auto;
+  margin: 0;
   border: 0;
 }
 /* …and everything in it: the steps box and the sign-in form are 100% wide
