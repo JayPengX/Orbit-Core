@@ -338,6 +338,9 @@ export async function checkEvent(e, account, wallet, read, issued = {}, ctx = {}
     case 'recall':
     case 'extend':
     case 'credit':
+    case 'access':
+    // (入金 / 出金 to the futures account: a pocket of the NT$ cash.)
+    case 'futx':
       return 'ok';
     default:
       return 'bad';
@@ -402,7 +405,7 @@ function affordable(counted, e) {
 // Events a phone dates by its own clock when the person acts (the rest, a
 // dividend's pay day, a deposit's or a loan's end, an IPO's draw and
 // listing, are dated by their rules and may lie ahead).
-const PHONE_DATED = new Set(['fill', 'fx', 'deposit', 'td', 'lend', 'recall', 'borrow', 'repay', 'extend', 'ipo', 'penalty']);
+const PHONE_DATED = new Set(['fill', 'fx', 'deposit', 'td', 'lend', 'recall', 'borrow', 'repay', 'extend', 'ipo', 'penalty', 'futx']);
 export async function checkStock(env, docId, payload, wallet, deps, lockSince, now = Date.now()) {
   const account = await unpack(payload).catch(() => null);
   if (!account || !Array.isArray(account.events)) return null;

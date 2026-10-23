@@ -429,6 +429,30 @@ export function isEmerging(symbol) {
   return emerging.has(Number(m[1]));
 }
 
+// A code list's membership for a Taiwan symbol (listed .TW or OTC .TWO).
+const codeSet = list => {
+  let set = null;
+  return symbol => {
+    const m = /^(\d{4,6}[A-Z]?)\.TWO?$/i.exec(symbol || '');
+    return Boolean(m) && (set ||= new Set(list.split(','))).has(m[1].toUpperCase());
+  };
+};
+// 全額交割股 (變更交易方法, TWSE 營業細則 §49 and TPEx's): the broker takes
+// the whole price before a buy and the shares before a sale (預收款券), so
+// no 融資, 融券 or 當沖, and only cash and shares already settled count.
+// Written by tools/tw-boards.mjs.
+export const TW_FULL = '1213,1538,2067,2314,2321,2424,3064,3259,3593,3625,3629,3632,3664,3710,4529,4609,4943,5301,5355,5701,6225,6236,8084,8101,8277,8291,8444,8933,9110'; // 2026-10-22, 29 stocks
+export const isFullDelivery = codeSet(TW_FULL);
+// 臺灣創新板 (TWSE's innovation board): bought only once its 風險預告書 is
+// signed (stock-access.mjs). Written by tools/tw-boards.mjs.
+export const TW_INNOVATION = '2237,2254,2258,2432,3150,4195,4582,4590,6534,6645,6771,6854,6908,6921,6924,6949,6951,6955,6969,6988,7610,7631,7730,7740,7803,7812,7823,7827,7835,8162,8487'; // 2026-10-22, 31 stocks
+export const isInnovation = codeSet(TW_INNOVATION);
+// Leveraged and inverse futures ETFs (槓桿反向期貨 ETF: a futures trust's,
+// its code ending L or R, its name 期…): the first buy needs TWSE's 交易檢核表
+// (受益憑證買賣辦法 §4-1, stock-access.mjs). Written by tools/tw-boards.mjs.
+export const TW_LI_FUTURES = '00673R,00674R,00683L,00684R,00706L,00707R,00708L,00715L'; // 2026-10-22, 8 ETFs
+export const isLiFutures = codeSet(TW_LI_FUTURES);
+
 // Taiwan's convertible bonds (可轉債, TPEx; a five-digit code, the issuer's
 // four and the issue's number): quoted per NT$100 of face, a 張 of 1,000
 // units, ±10% a day, no margin or short; repaid at face (100) on maturity,
@@ -909,7 +933,8 @@ export const TRADABLE_KINDS = new Set(['stock', 'etf', 'bond', 'fund', 'crypto',
 // What can be sold short (borrowed and sold): listed shares, crypto and
 // currency pairs (selling EUR/USD bets on the euro falling).
 export const SHORTABLE_KINDS = new Set(['stock', 'etf', 'bond', 'crypto', 'fx']);
-export const isShortable = (kind, symbol = '') => SHORTABLE_KINDS.has(kind) && !isEmerging(symbol);
+// (Never 興櫃 or a 全額交割股: neither is lent against or borrowed.)
+export const isShortable = (kind, symbol = '') => SHORTABLE_KINDS.has(kind) && !isEmerging(symbol) && !isFullDelivery(symbol);
 // Yearly fee for borrowing what's sold short, on the value it was sold at.
 export const SHORT_FEE = 0.03;
 // Opening a short needs assets of at least this much of all that's owed
@@ -1057,7 +1082,7 @@ export const COLLATERAL = { stock: 0.5, etf: 0.5, bond: 0.7, govbond: 0.9, fund:
 const NO_MARGIN_MARKETS = new Set(['CN', 'IN']);
 export function collateralRate(kind, market, symbol = '') {
   if (!(kind in COLLATERAL)) return 0;
-  if (isEmerging(symbol)) return 0;
+  if (isEmerging(symbol) || isFullDelivery(symbol)) return 0;
   if (kind !== 'stock' && kind !== 'etf') return COLLATERAL[kind];
   if (NO_MARGIN_MARKETS.has(market)) return 0;
   if (market === 'TW') return /\.TWO$/i.test(symbol) ? 0.5 : 0.6;

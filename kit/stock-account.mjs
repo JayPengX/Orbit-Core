@@ -37,6 +37,7 @@ import {
   isTradable,
   isShortable,
   isEmerging,
+  isFullDelivery,
   cbMaturity,
   qtyStep,
   roundCash,
@@ -68,7 +69,7 @@ import { nextTradingStart, isTradingDay } from '#kit/stock-holidays.mjs';
 import { twDay } from '#kit/format.mjs';
 import { TD_MIN, tdRate, addMonths, tdInterest, incomeTaxes, lendable, LEND_RATE, LEND_RATE_MIN, LEND_RATE_MAX, LEND_LOT, LEND_RECALL, lendEnds, addWeekdays, lendFee } from '#kit/stock-savings.mjs';
 import { BONDS, couponDates } from '#kit/stock-bonds.mjs';
-import { accessProblem, leverageOf, fxCapProblem } from '#kit/stock-access.mjs';
+import { accessProblem, accessState, leverageOf, fxCapProblem, ACCESS_SINCE } from '#kit/stock-access.mjs';
 import { creditAccount, creditUsed, dayTradeBuyFirst, dayTradeSellFirst, dayTradeRoom, termDue, afterHours, closingAuction, shortDeposit, SHORT_HANDLING, SHORT_INTEREST } from '#kit/stock-credit.mjs';
 
 export const ACCOUNT_VERSION = 1;
@@ -117,7 +118,8 @@ const add = (map, key, amount) => (map[key] = (map[key] || 0) + amount);
 
 function accrue(s, t) {
   // NT$ cash earns the demand-deposit rate.
-  const cash = s.cash[BASE] || 0;
+  // (Not the futures account's: a futures broker pays none on it.)
+  const cash = (s.cash[BASE] || 0) - (s.futSplit ? s.futCash : 0);
   if (t > s.cashLast && cash > 0) s.cashInterest += (cash * CASH_RATE * (t - s.cashLast)) / YEAR_MS;
   s.cashLast = Math.max(s.cashLast, t);
   for (const p of Object.values(s.positions)) {
@@ -151,6 +153,10 @@ function startState(account) {
     lendIncome: 0,
     // 新股申購 (stock-ipo.mjs) by issue: its application and what came of it ('drawing', 'won', 'lost').
     ipos: {},
+    // The futures account's money (期貨保證金專戶, futx): part of the NT$
+    // cash, in its own pocket from FUT_SPLIT on (futSplit).
+    futCash: 0,
+    futSplit: (account?.created ?? 0) >= FUT_SPLIT,
     dividends: 0,
     // Bank interest on NT$ cash: accrued so far, and paid out (net).
     cashInterest: 0,
@@ -200,6 +206,10 @@ function applyEvent(s, e) {
       case 'deposit':
         add(s.cash, e.currency, e.amount);
         s.deposits += e.amount * (e.twd || 1);
+        break;
+      // 入金 (+) or 出金 (−) between the NT$ cash and the futures account.
+      case 'futx':
+        if (s.futSplit) s.futCash = Math.max(0, s.futCash + e.amount);
         break;
       case 'fx':
         add(s.cash, e.from, -e.amount);
@@ -332,9 +342,11 @@ export function replay(account, now = Date.now()) {
     // The account as it stood at `now`: later events (a dividend still to be
     // paid, or a moment in the past being checked) don't count yet.
     if (e.t > now) break;
+    if (!s.futSplit && e.t >= FUT_SPLIT) splitFutures(s);
     accrue(s, e.t);
     applyEvent(s, e);
   }
+  if (!s.futSplit && now >= FUT_SPLIT) splitFutures(s);
   accrue(s, now);
   for (const [cur, v] of Object.entries(s.cash)) if (Math.abs(v) < EPS) s.cash[cur] = 0;
   // Dividends past their ex-date and not paid yet: owed to the account (the
@@ -342,6 +354,26 @@ export function replay(account, now = Date.now()) {
   s.receivable = (account?.events || []).filter(e => e.type === 'div' && e.ex != null && e.ex <= now && e.t > now).reduce((sum, e) => sum + e.net * (e.twd || 1), 0);
   return s;
 }
+
+// ---- The futures account (期貨保證金專戶) ----
+// From FUT_SPLIT, TAIFEX futures and options trade from their own account's
+// money, as a futures broker keeps it: moved in and out (入金, 出金: `futx`
+// events) from the NT$ cash, margins held there, premiums, costs, gains and
+// losses paid in and out of it. It stays part of the NT$ cash (worth, the
+// pool), a pocket of it: the rest is what stocks and the rest trade from.
+// A loss past what's in it comes out of the rest (the broker claims it).
+// An account from before: at FUT_SPLIT, the margin its futures and written
+// options held then moved in (splitFutures), so they carry on as they were.
+export const FUT_SPLIT = ACCESS_SINCE;
+// (No accrual step of its own: that would compound the loans' interest once more.)
+function splitFutures(s) {
+  s.futSplit = true;
+  s.futCash = Math.max(0, Math.min(s.cash[BASE] || 0, futMarginHeld(s)));
+}
+// Money in or out of the futures account with a TAIFEX trade.
+const futFlow = (s, e, amount) => {
+  if (s.futSplit && e.market === 'TAIFEX') s.futCash = Math.max(0, s.futCash + amount);
+};
 
 function applyFill(s, e) {
   if (e.kind === 'fut') return applyFutFill(s, e);
@@ -353,6 +385,7 @@ function applyFill(s, e) {
   held.market ||= e.market;
   const buy = e.side === 'buy';
   add(s.cash, e.currency, buy ? -e.total : e.total);
+  futFlow(s, e, buy ? -e.total : e.total);
   if (buy) held.bought += e.total * twd;
   else held.sold += e.total * twd;
   const p = (s.positions[e.symbol] ||= {
@@ -479,6 +512,7 @@ function applyFutFill(s, e) {
   s.paid.tax += e.tax || 0;
   s.paid.fee += e.fee || 0;
   add(s.cash, BASE, -costs);
+  futFlow(s, e, -costs);
   const held = (s.held[e.symbol] ||= { first: e.t, realized: 0, bought: 0, sold: 0 });
   held.market ||= e.market;
   const p = (s.positions[e.symbol] ||= {
@@ -493,6 +527,7 @@ function applyFutFill(s, e) {
     const side = Math.sign(p.qty);
     const pnl = (e.price - p.mark) * mult * close * side;
     add(s.cash, BASE, pnl);
+    futFlow(s, e, pnl);
     const share = costs * (close / e.qty);
     const realized = (e.price - p.entry) * mult * close * side - share;
     s.realized += realized;
@@ -517,27 +552,48 @@ function applyFutFill(s, e) {
   if (Math.abs(p.qty) <= EPS) delete s.positions[e.symbol];
 }
 
+// What a TAIFEX order trades from: the futures account once split, else the NT$ cash.
+const futHave = (s, avail) => (s.futSplit ? avail.fut : avail.cash[BASE] || 0);
+// The money free for an order at `t`: its currency's cash, or a TAIFEX one's futures account.
+function pocketAt(account, t, order) {
+  const s = replay(account, t);
+  const avail = available(account, s);
+  return order.market === 'TAIFEX' ? futHave(s, avail) : avail.cash[order.currency] || 0;
+}
+
 // Cash and shares not already promised to open orders (and the futures' margin).
+// `fut`: the futures account's money free (its margins and orders held), the
+// NT$ cash less all of it; before the split (futSplit), the NT$ cash less the
+// margins, `fut` 0.
 export function available(account, s) {
   const cash = { ...s.cash };
   const qty = {};
   for (const p of Object.values(s.positions)) qty[p.symbol] = p.qty;
   const margin = futMarginHeld(s);
-  if (margin) cash[BASE] = (cash[BASE] || 0) - margin;
+  let fut = 0;
+  if (s.futSplit) {
+    cash[BASE] = (cash[BASE] || 0) - s.futCash;
+    fut = s.futCash - margin;
+  } else if (margin) cash[BASE] = (cash[BASE] || 0) - margin;
+  // (A TAIFEX order's hold: the futures account's, once split.)
+  const hold = (o, amount) => {
+    if (s.futSplit && o.market === 'TAIFEX') fut -= amount;
+    else cash[o.currency] = (cash[o.currency] || 0) - amount;
+  };
   // Lent shares (until they're back) can't be sold.
   for (const l of Object.values(s.lent || {})) qty[l.symbol] = (qty[l.symbol] || 0) - l.qty;
   for (const o of account.orders || []) {
     if (o.status !== 'open') continue;
-    if (o.side === 'buy') cash[o.currency] = (cash[o.currency] || 0) - (o.reserve || 0);
+    if (o.side === 'buy') hold(o, o.reserve || 0);
     else {
       qty[o.symbol] = (qty[o.symbol] || 0) - o.qty;
       // A 融券 order waiting holds its 90% deposit; a sale opening a future
       // or writing an option, its margin.
       if (o.deposit) cash[o.currency] = (cash[o.currency] || 0) - o.deposit;
-      if (o.reserve) cash[o.currency] = (cash[o.currency] || 0) - o.reserve;
+      if (o.reserve) hold(o, o.reserve);
     }
   }
-  return { cash, qty };
+  return { cash, qty, fut };
 }
 
 // Cash that can leave its market (be exchanged): what's available less sale
@@ -740,6 +796,15 @@ export function placeOrder(account, req, { quote, rates, valuation, now = Date.n
     const gate = accessProblem(account, quote, { side, opening, rr: req.rr ?? null }, now);
     if (gate) return gate;
   }
+  // A 全額交割股 (isFullDelivery): the price paid and the shares delivered
+  // before the order (預收款券): cash and shares already settled, so never
+  // on 融資, short, or sold the day (or the two) it was bought.
+  const full = quote.market === 'TW' && isFullDelivery(quote.symbol) && !req.forced && !req.cover;
+  if (full && req.margin) return { error: 'fullDelivery', part: 'margin' };
+  if (full && side === 'sell') {
+    const have = Math.max(0, (avail.qty[quote.symbol] || 0) - settlingQty(account, quote.symbol, now));
+    if (qty > have + EPS) return { error: 'fullDelivery', part: 'shares', have };
+  }
   const order = {
     id,
     symbol: quote.symbol,
@@ -846,7 +911,7 @@ export function placeOrder(account, req, { quote, rates, valuation, now = Date.n
       const im = optWriteMargin(quote.symbol, ref, quote.index, quote.optMargin);
       const est = estimate({ market: quote.market, kind: 'opt', currency: BASE, side, qty, price: ref, symbol: quote.symbol });
       const reserve = Math.max(0, Math.round(write * (im - ref * OPTION.mult) + est.costs));
-      const have = avail.cash[BASE] || 0;
+      const have = futHave(s, avail);
       if (!req.forced && reserve > have + EPS) return { error: 'optNoWrite', need: reserve, have: Math.max(0, have), currency: BASE };
       order.reserve = reserve;
       order.im = im;
@@ -861,7 +926,7 @@ export function placeOrder(account, req, { quote, rates, valuation, now = Date.n
     const im = futMargin(quote.symbol, quote)[0];
     const est = estimate({ market: quote.market, kind: 'fut', currency: BASE, side, qty, price: quote.price, symbol: quote.symbol });
     const reserve = Math.round(opening * im + est.costs);
-    const have = avail.cash[BASE] || 0;
+    const have = futHave(s, avail);
     if (!req.forced && reserve > have + EPS) return { error: 'funds', need: reserve, have: Math.max(0, have), currency: BASE };
     order.reserve = reserve;
     order.im = im;
@@ -931,7 +996,8 @@ export function placeOrder(account, req, { quote, rates, valuation, now = Date.n
     // (Buying back written options frees their margin.)
     const freed = quote.kind === 'opt' ? optFreed(s, quote.symbol, qty) : 0;
     const reserve = Math.max(0, requiredCash(order, quote, now).reserve - freed);
-    const have = avail.cash[quote.currency] || 0;
+    const have = quote.market === 'TAIFEX' ? futHave(s, avail) : (avail.cash[quote.currency] || 0) - (full ? unsettled(account, now)[quote.currency] || 0 : 0);
+    if (full && reserve > have + EPS) return { error: 'fullDelivery', part: 'cash', need: reserve, have: Math.max(0, have) };
     if (reserve > have + EPS) return { error: 'funds', need: reserve, have: Math.max(0, have), currency: quote.currency };
     order.reserve = reserve;
   }
@@ -1013,6 +1079,12 @@ export function dayTradeShare(account, order, at) {
 
 // Shares of `symbol` bought on Taiwan's day of `at`: what can't be sold
 // again before tomorrow without 當沖 (the day's sales were of older shares).
+// Shares bought and not yet settled (T+2: not delivered yet).
+function settlingQty(account, symbol, now) {
+  let qty = 0;
+  for (const e of account.events) if (e.type === 'fill' && e.side === 'buy' && e.symbol === symbol && e.t <= now && e.settle > now) qty += e.qty;
+  return qty;
+}
 function boughtToday(account, symbol, at) {
   const day = localDayOf(at, 'TW');
   let qty = 0;
@@ -1049,7 +1121,7 @@ function fillOrder(account, order, price, rates, now, at = now) {
   if (order.kind === 'fut') {
     // A future: the margin for what it opens, and its costs, free then and now.
     if (!order.forced) {
-      const have = Math.min(...moments.map(tt => (available(account, replay(account, tt)).cash[BASE] || 0))) + (order.reserve || 0);
+      const have = Math.min(...moments.map(tt => pocketAt(account, tt, order))) + (order.reserve || 0);
       const opening = futOpening(replay(account, at).positions[order.symbol]?.qty || 0, order.side, order.qty);
       const need = opening * (order.im || futMargin(order.symbol, null, order.price || order.limit)[0]) + est.costs;
       if (need > have + EPS) {
@@ -1064,7 +1136,7 @@ function fillOrder(account, order, price, rates, now, at = now) {
     const write = Math.max(0, order.qty - held);
     if (write > EPS) {
       writeIm = order.im || optWriteMargin(order.symbol, est.price, 0);
-      const have = Math.min(...moments.map(tt => (available(account, replay(account, tt)).cash[BASE] || 0))) + (order.reserve || 0);
+      const have = Math.min(...moments.map(tt => pocketAt(account, tt, order))) + (order.reserve || 0);
       const need = Math.round(write * (writeIm - est.price * OPTION.mult) + est.costs);
       if (!order.forced && need > have + EPS) {
         const rejected = { ...order, status: 'rejected', reason: 'funds', rev: order.rev + 1, done: now };
@@ -1075,7 +1147,7 @@ function fillOrder(account, order, price, rates, now, at = now) {
     // This order's own hold is released as it fills (and buying back written
     // options, their margin).
     const freed = order.kind === 'opt' ? Math.min(...moments.map(tt => optFreed(replay(account, tt), order.symbol, order.qty))) : 0;
-    const have = Math.min(...moments.map(tt => (available(account, replay(account, tt)).cash[order.currency] || 0))) + (order.reserve || 0) + freed;
+    const have = Math.min(...moments.map(tt => pocketAt(account, tt, order))) + (order.reserve || 0) + freed;
     const lent = order.margin ? marginLoan(order.market, order.currency, est.gross, est.total, order.margin) : 0;
     if (est.total - lent > have + EPS) {
       const rejected = { ...order, status: 'rejected', reason: 'funds', rev: order.rev + 1, done: now };
@@ -1319,6 +1391,35 @@ export function exchange(account, { from, to, amount }, { rates, fxOpen = true, 
 }
 
 // Add money (NT$) to the account; tracked apart from returns.
+// The futures account (期貨保證金專戶, FUT_SPLIT): what can be taken out
+// (出金): its money free of the margins and orders it holds, less any open
+// loss (an open gain isn't money yet). `valuation`: for that open loss.
+export function futWithdrawable(account, valuation, now = Date.now()) {
+  const s = replay(account, now);
+  if (!s.futSplit) return 0;
+  return Math.max(0, Math.floor(available(account, s).fut + Math.min(0, valuation?.futTWD || 0)));
+}
+// 入金 (amount > 0) from the NT$ cash, settled money only (a sale's money
+// that hasn't settled isn't in the bank yet), or 出金 (amount < 0) back to
+// it. Only with the futures account open (stock-access.mjs). Returns
+// { account, event } or { error }.
+export function futTransfer(account, amount, { valuation, now = Date.now(), id = randomId() } = {}) {
+  const s = replay(account, now);
+  amount = Math.round(Number(amount));
+  if (!s.futSplit) return { error: 'futNotYet' };
+  if (!accessState(account, 'futures', now).open) return { error: 'accessNeeded', key: 'futures', pending: accessState(account, 'futures', now).pending };
+  if (!(Math.abs(amount) >= 1 && Math.abs(amount) <= MAX_START)) return { error: 'amount' };
+  if (amount > 0) {
+    const have = Math.floor(withdrawable(account, s, now)[BASE] || 0);
+    if (amount > have) return { error: 'funds', need: amount, have: Math.max(0, have), currency: BASE };
+  } else {
+    const have = futWithdrawable(account, valuation, now);
+    if (-amount > have) return { error: 'futOut', have };
+  }
+  const event = { id: `futx:${id}`, type: 'futx', t: now, currency: BASE, amount };
+  return { account: { ...account, events: [...account.events, event] }, event };
+}
+
 export function deposit(account, amount, now = Date.now(), id = randomId()) {
   amount = Math.round(Number(amount));
   if (!(amount > 0 && amount <= MAX_START)) return { error: 'amount' };
@@ -1380,7 +1481,7 @@ export function lendableQty(account, symbol, now = Date.now()) {
   const p = s.positions[symbol];
   if (!p || p.qty <= 0 || !lendable(p.market, p.kind) || p.financed > 0) return 0;
   const free = available(account, s).qty[symbol] || 0;
-  const settling = account.events.filter(e => e.type === 'fill' && e.symbol === symbol && e.side === 'buy' && e.t <= now && e.settle > now).reduce((sum, e) => sum + e.qty, 0);
+  const settling = settlingQty(account, symbol, now);
   return Math.max(0, Math.floor((Math.min(free, p.qty - settling) + EPS) / LEND_LOT) * LEND_LOT);
 }
 
@@ -1593,8 +1694,12 @@ export function valuate(s, quotes, rates) {
     futMarginTWD,
     // (Written options count in both: their margin, and what buying them back costs.)
     optShortTWD,
-    futCall: futMarginTWD > 0 && (s.cash[BASE] || 0) + futTWD - optShortTWD < futMaintTWD,
-    futRisk: futMarginTWD > 0 && (s.cash[BASE] || 0) + futTWD - optShortTWD < futInitTWD * 0.25,
+    // (The futures account's money once split: 權益數 is it, the open gains
+    // and losses, less what buying back written options costs.)
+    futCash: s.futSplit ? s.futCash : null,
+    futEquity: (s.futSplit ? s.futCash : s.cash[BASE] || 0) + futTWD - optShortTWD,
+    futCall: futMarginTWD > 0 && (s.futSplit ? s.futCash : s.cash[BASE] || 0) + futTWD - optShortTWD < futMaintTWD,
+    futRisk: futMarginTWD > 0 && (s.futSplit ? s.futCash : s.cash[BASE] || 0) + futTWD - optShortTWD < futInitTWD * 0.25,
     longTWD,
     shortTWD,
     assets,
@@ -2675,8 +2780,9 @@ export function applyPool(account, wallet) {
 // This account's own part of the pool: spendable NT$ (open orders' cash
 // held back) less what came from the other apps.
 export function ownCash(account, s, now = Date.now()) {
-  // (Futures' margin is still the account's own.)
-  const cash = (available(account, s).cash[BASE] || 0) + futMarginHeld(s);
+  // (Futures' margin, and the futures account's money, are still the account's own.)
+  const avail = available(account, s);
+  const cash = (avail.cash[BASE] || 0) + (avail.fut || 0) + futMarginHeld(s);
   const pooled = account.events.filter(e => e.pool && e.t <= now).reduce((sum, e) => sum + e.amount, 0);
   return Math.round((cash - pooled) * 100) / 100;
 }

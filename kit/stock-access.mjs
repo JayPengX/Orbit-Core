@@ -14,11 +14,18 @@
 // - warrant (權證・牛熊證): the 認購(售)權證風險預告書 signed before the
 //   first buy (TWSE 認購(售)權證買賣辦法 §4).
 // - emerging (興櫃): the 興櫃股票風險預告書 signed before the first buy.
+// - innovation (臺灣創新板): its 風險預告書 signed before a person's first
+//   buy (TWSE; from 2025-01-06 there's no qualified-investor test).
 // - leveraged (槓桿・反向 ETF/ETN): one of a credit account, 10 warrant
 //   trades or 10 TAIFEX futures trades in the last year, or a buy of one
 //   before; and its 風險預告書 signed (TWSE 受益憑證買賣辦法 §4). Abroad the
 //   same, and a non-professional investor buys no more than 2× long or 1×
 //   short, and no leveraged or inverse ETN (受託買賣外國有價證券管理規則).
+//   A 專業投資人 needs none of the four ways (§4 ¶3), only the notice.
+// - liFutures (槓桿反向期貨 ETF 交易檢核表): before the first buy of a
+//   futures trust's leveraged or inverse ETF (isLiFutures), TWSE's checklist
+//   (LI_FUTURES_CHECK) answered right and signed (受益憑證買賣辦法 §4-1); a
+//   專業投資人 is exempt.
 // - futures (期貨帳戶): KYC, the 期貨交易風險預告書 and 受託契約 signed; the
 //   futures broker approves it for the next trading day. TAIFEX futures and
 //   options open positions only once it's open.
@@ -38,7 +45,7 @@
 // 結匯: a person converts at most US$5,000,000 a calendar year each way
 // (NT$ to foreign currency, and back; 外匯收支或交易申報辦法 §4); each
 // conversion of NT$500,000 or more is declared (申報書) as it's made.
-import { localDayOf, isEmerging, isSubBrokered } from '#kit/stock-markets.mjs';
+import { localDayOf, isEmerging, isSubBrokered, isInnovation, isLiFutures } from '#kit/stock-markets.mjs';
 import { isTradingDay } from '#kit/stock-holidays.mjs';
 import { addMonths } from '#kit/stock-savings.mjs';
 
@@ -50,7 +57,9 @@ export const ACCESS = {
   daytrade: { docs: ['dayTradeRisk', 'dayTradeAuth'], wait: true },
   warrant: { docs: ['warrantRisk'] },
   emerging: { docs: ['emergingRisk'] },
+  innovation: { docs: ['innovationRisk'] },
   leveraged: { docs: ['leveragedRisk'] },
+  liFutures: { docs: [], quiz: true },
   futures: { docs: ['futuresRisk', 'futuresContract'], wait: true, kyc: true },
   sub: { docs: ['subRisk', 'subContract'], wait: true, kyc: true },
   pro: { docs: ['proApply', 'proNotice'], wait: true, kyc: true, valid: YEAR }
@@ -89,6 +98,8 @@ function hadBefore(account, key) {
   const bought = test => fills(account).some(e => e.t < ACCESS_SINCE && test(e));
   if (key === 'warrant') return bought(e => e.side === 'buy' && e.kind === 'warrant');
   if (key === 'emerging') return bought(e => e.side === 'buy' && e.market === 'TW' && isEmerging(e.symbol));
+  if (key === 'innovation') return bought(e => e.side === 'buy' && e.market === 'TW' && isInnovation(e.symbol));
+  if (key === 'liFutures') return bought(e => e.side === 'buy' && e.market === 'TW' && isLiFutures(e.symbol));
   if (key === 'leveraged') return bought(e => e.side === 'buy' && (twLeveraged(e.symbol) || e.leveraged));
   if (key === 'sub') return bought(e => e.side === 'buy' && isSubBrokered(e.market) && !SUB_KIND.has(e.kind));
   if (key === 'futures') return bought(e => e.market === 'TAIFEX');
@@ -177,6 +188,22 @@ export function kycResult(answers = {}) {
   return { score, level, maxRR };
 }
 
+// TWSE's 槓桿反向指數股票型期貨信託基金受益憑證交易檢核表 (範本): each
+// statement's right answer, true for 是, in its order (the app has the
+// statements). All must be answered right before it's signed.
+export const LI_FUTURES_CHECK = [false, true, true, true, true, true, true, false, true, true, true, true, true, true, true, true, true];
+// answers: [true|false…] in that order → { ok, wrong: [index…], missing: [index…] }.
+export function liCheckResult(answers = []) {
+  const wrong = [];
+  const missing = [];
+  LI_FUTURES_CHECK.forEach((right, i) => {
+    const a = answers?.[i];
+    if (typeof a !== 'boolean') missing.push(i);
+    else if (a !== right) wrong.push(i);
+  });
+  return { ok: !wrong.length && !missing.length, wrong, missing };
+}
+
 // What applying for `key` still needs: [{ key, have, want, from }]. `ctx`:
 // { netWorthTWD }.
 export function accessNeeds(account, key, ctx = {}, now = Date.now()) {
@@ -189,7 +216,7 @@ export function accessNeeds(account, key, ctx = {}, now = Date.now()) {
     const trades = lastYear(account, now);
     if (trades < MIN_TRADES) needs.push({ key: 'trades', have: trades, want: MIN_TRADES });
   }
-  if (key === 'leveraged') {
+  if (key === 'leveraged' && !accessState(account, 'pro', now).open) {
     const q = leveragedQualified(account, now);
     if (!q.ok) needs.push({ key: 'leveragedWay', warrants: q.warrants, futures: q.futures, want: MIN_TRADES });
   }
@@ -231,6 +258,10 @@ export function applyAccess(account, key, ctx = {}, now = Date.now()) {
     if (!r) return { error: 'kycAnswers' };
     Object.assign(event, r);
   }
+  if (spec.quiz) {
+    const r = liCheckResult(ctx.answers);
+    if (!r.ok) return { error: 'liCheck', wrong: r.wrong, missing: r.missing };
+  }
   return { account: { ...account, events: [...account.events, event] }, event };
 }
 
@@ -253,10 +284,12 @@ export function accessProblem(account, quote, { side, opening = 0, rr = null } =
   if (isSubBrokered(quote.market) && quote.kind !== 'crypto' && quote.kind !== 'fx' && !open('sub')) return need('sub');
   if (quote.kind === 'warrant' && !open('warrant')) return need('warrant');
   if (quote.market === 'TW' && isEmerging(quote.symbol) && !open('emerging')) return need('emerging');
+  if (quote.market === 'TW' && isInnovation(quote.symbol) && !open('innovation')) return need('innovation');
   const lev = leverageOf(quote);
   if (lev) {
     if (quote.market !== 'TW' && !retailLeverageOk(lev) && !open('pro')) return { error: 'proOnly', mult: lev.mult, inverse: lev.inverse, etn: lev.etn };
     if (!open('leveraged')) return need('leveraged');
+    if (quote.market === 'TW' && isLiFutures(quote.symbol) && !open('liFutures') && !open('pro')) return need('liFutures');
   }
   return null;
 }
