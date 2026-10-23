@@ -209,7 +209,14 @@ export function upcomingHolidays(market, day, n = 5) {
       const [yy, mm, dd] = d.split('-').map(Number);
       if (d >= day && ![0, 6].includes(dow(yy, mm, dd))) out.push(d);
     }
-  return out.slice(0, n);
+  // A typhoon day the exchange closes for (announced today or the night before) is one too.
+  if (cal === 'TW')
+    for (let k = 0; k < 3; k++) {
+      const d = new Date(Date.parse(`${day}T00:00:00Z`) + k * 86_400_000).toISOString().slice(0, 10);
+      const [yy, mm, dd] = d.split('-').map(Number);
+      if (![0, 6].includes(dow(yy, mm, dd)) && !out.includes(d) && dayOffOn(d, TWSE, 'trade')) out.push(d);
+    }
+  return out.sort().slice(0, n);
 }
 
 // Moves a session start (a moment) forward by whole days past weekends and
