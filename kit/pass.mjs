@@ -5,7 +5,7 @@
 //   外觀   an avatar and a frame, free for everyone
 //   App    every app, Orbit's and Orbit's, when it was last used, a way in
 //   說明   every app's guide (help.mjs)
-import { APPS, AVATARS, FRAMES, avatarSrc, settingPatch, passAccount, appIcon, el as node } from '#kit/orbit.mjs';
+import { APPS, AVATARS, FRAMES, MILESTONES, DEFAULT_AVATAR, milestoneOf, avatarSrc, settingPatch, passAccount, appIcon, el as node } from '#kit/orbit.mjs';
 import { HELP_ORDER, helpFor } from './help.mjs';
 import { sheet, section } from './ui.mjs';
 
@@ -15,7 +15,9 @@ export const STRINGS = {
     lookOn: '戴著',
     avatarsTitle: '頭像',
     framesTitle: '頭像框',
-    looksSub: '全部免費。戴上後，每個 Orbit App 的帳戶按鈕都看得到。',
+    looksSub: '戴上後，每個 Orbit App 的帳戶按鈕都看得到。',
+    msTitle: '里程碑',
+    msDone: '已達成',
     failed: '沒有成功，請再試一次',
     usedToday: '今天用過',
     usedDaysAgo: '{n} 天前用過',
@@ -50,10 +52,6 @@ export const STRINGS = {
     frame_skylantern: '天燈',
     close: '關閉',
     openApp: '打開 {app}',
-    avatarWorn: '頭像已換上',
-    avatarOff: '已拿下頭像',
-    frameWorn: '頭像框已換上',
-    frameOff: '已拿下頭像框',
     tab_pass: 'Pass',
     tab_looks: '外觀',
     tab_apps: 'App',
@@ -66,7 +64,9 @@ export const STRINGS = {
     lookOn: 'Wearing',
     avatarsTitle: 'Avatars',
     framesTitle: 'Frames',
-    looksSub: 'All free. Worn on your account button in every Orbit app.',
+    looksSub: 'Worn on your account button in every Orbit app.',
+    msTitle: 'Milestones',
+    msDone: 'Earned',
     failed: 'That didn’t work; please try again',
     usedToday: 'Used today',
     usedDaysAgo: 'Used {n} days ago',
@@ -101,10 +101,6 @@ export const STRINGS = {
     frame_skylantern: 'Sky lantern',
     close: 'Close',
     openApp: 'Open {app}',
-    avatarWorn: 'Avatar on',
-    avatarOff: 'Avatar off',
-    frameWorn: 'Frame on',
-    frameOff: 'Frame off',
     tab_pass: 'Pass',
     tab_looks: 'Looks',
     tab_apps: 'Apps',
@@ -154,15 +150,29 @@ export function openPass(s, { extra = null, tab = 'pass', help = null } = {}) {
     },
     wornOf: key => (key in pending ? pending[key] : s.wallet?.settings?.[key]?.value?.id) ?? null,
     async wear(key, id) {
+      // The ring on the tile says it's on: no notice over the sheet.
       pending[key] = id;
       paint();
-      toast(t(id ? `${key}Worn` : `${key}Off`), 'good');
       try {
         await s.write({ wallet: settingPatch(key, id ? { id } : null) });
       } catch {
         toast(t('failed'));
       } finally {
         delete pending[key];
+      }
+    },
+    // A milestone's avatar and frame, on (or off) together.
+    async wearPair(id) {
+      pending.avatar = id;
+      pending.frame = id;
+      paint();
+      try {
+        await s.write({ wallet: { settings: { ...settingPatch('avatar', id ? { id } : null).settings, ...settingPatch('frame', id ? { id } : null).settings } } });
+      } catch {
+        toast(t('failed'));
+      } finally {
+        delete pending.avatar;
+        delete pending.frame;
       }
     },
     openHelp: (app = s.app, topic = null) => show('help', { app, topic })
@@ -178,7 +188,7 @@ export function openPass(s, { extra = null, tab = 'pass', help = null } = {}) {
     account?.stop();
     account = null;
     if (state.tab === 'pass') {
-      account = passAccount(s, { extra: state.extra, close });
+      account = passAccount(s, { extra: state.extra, close, looks: () => show('looks') });
       return put(body, ...account.nodes);
     }
     if (state.tab === 'looks') return put(body, looksSection(ctx));
@@ -229,9 +239,13 @@ function renderHelp(box, { q, t, locale }, { app, topic }) {
   if (topic) setTimeout(() => box.querySelector(`#q-help-${topic}`)?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 50);
 }
 
-// Avatars and frames, free for everyone: a tap wears one, a second tap
-// takes it off.
-function looksSection({ t, locale, wornOf, wear }) {
+// The looks: the milestones' (earned once, each an avatar and a frame, worn
+// together), then the free avatars and frames. A tap wears one, a second
+// tap takes it off.
+const compact = (n, en) => (en ? (n >= 1e6 ? `${+(n / 1e6).toFixed(1)}M` : n >= 1000 ? `${Math.floor(n / 1000)}K` : String(n)) : n >= 10_000 ? `${Math.floor(n / 10_000)}萬` : String(n));
+function looksSection({ q, t, locale, wornOf, wear, wearPair }) {
+  const en = locale === 'en';
+  const wallet = q.wallet || {};
   const avatar = wornOf('avatar');
   const frame = wornOf('frame');
   const face = id => el('img', { class: 'av-face', alt: '', src: avatarSrc(id) });
@@ -242,15 +256,35 @@ function looksSection({ t, locale, wornOf, wear }) {
   };
   const faces = {
     avatar: a => face(a.id),
-    frame: f => el('span', { class: `fr-preview q-framed q-frame-${f.id}${frame === f.id ? ' on' : ''}`, 'aria-hidden': 'true' }, avatar ? [face(avatar)] : [])
+    frame: f => el('span', { class: `fr-preview q-framed q-frame-${f.id}${frame === f.id ? ' on' : ''}`, 'aria-hidden': 'true' }, [face(AVATARS.some(a => a.id === avatar) ? avatar : DEFAULT_AVATAR)])
   };
   const grid = (key, list) => el('div', { class: `av-grid ${key}s` }, list.map(x => tile(key, x, faces[key](x))));
-  return section(
-    t('looksTitle'),
-    el('div', { class: 'q-card pad looks' }, [el('small', { class: 'lv-h', text: t('avatarsTitle') }), grid('avatar', AVATARS), el('small', { class: 'lv-h', text: t('framesTitle') }), grid('frame', FRAMES)]),
-    { sub: t('looksSub') }
-  );
+  // A milestone: its look (dim, with a lock, until earned), its name, and
+  // how far along (a bar and the count) or that it's earned.
+  const ms = m => {
+    const st = milestoneOf(wallet, m);
+    const id = `ms-${m.id}`;
+    const on = avatar === id && frame === id;
+    const unit = m.unit[en ? 'en' : 'zh'];
+    const count = m.money ? `${compact(st.n, en)}/${compact(m.goal, en)}` : `${st.n}/${m.goal}${unit ? ` ${unit}` : ''}`;
+    return el('button', { class: `ms-tile${st.done ? ' got' : ''}${on ? ' on' : ''}`, type: 'button', 'aria-pressed': String(on), 'aria-disabled': String(!st.done), 'aria-label': `${m[locale]} ${st.done ? t('msDone') : count}`, onclick: () => st.done && wearPair(on ? null : id) }, [
+      el('span', { class: `ms-look q-framed q-frame-${id}` }, [face(id), st.done ? null : el('span', { class: 'ms-lock', html: LOCK })]),
+      el('strong', { text: m[locale] }),
+      st.done
+        ? el('small', { class: 'ms-state', text: on ? t('lookOn') : t('msDone') })
+        : el('span', { class: 'ms-prog' }, [el('span', { class: 'ms-bar' }, [el('i', { style: `width:${Math.round((st.n / m.goal) * 100)}%` })]), el('small', { class: 'num' }, [el('img', { src: svgUrl(appIcon(m.id)), alt: '', width: 13, height: 13 }), document.createTextNode(count)])])
+    ]);
+  };
+  return el('div', {}, [
+    section(t('msTitle'), el('div', { class: 'ms-grid' }, MILESTONES.map(ms))),
+    section(
+      t('looksTitle'),
+      el('div', { class: 'q-card pad looks' }, [el('small', { class: 'lv-h', text: t('avatarsTitle') }), grid('avatar', AVATARS), el('small', { class: 'lv-h', text: t('framesTitle') }), grid('frame', FRAMES)]),
+      { sub: t('looksSub') }
+    )
+  ]);
 }
+const LOCK = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5" fill="currentColor"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" fill="none" stroke="currentColor" stroke-width="2.2"/></svg>';
 
 // ---- Apps -----------------------------------------------------------------------------------
 

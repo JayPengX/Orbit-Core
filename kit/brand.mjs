@@ -190,6 +190,8 @@ const FEATURES = [
 ].map(([id, zh, en]) => ({ id, zh, en }));
 
 export const AVATARS = PALETTES.flatMap((p, i) => FEATURES.map((f, j) => ({ id: `${p.id}-${f.id}`, zh: `${p.zh}${f.zh}`, en: `${p.en} ${f.en}`, p: i, f: j })));
+// Who hasn't picked one (or wore one that no longer exists) wears this.
+export const DEFAULT_AVATAR = AVATARS[0].id;
 
 const INK = '#1e1b4b';
 const PLANET = { x: 32, y: 33, r: 20 };
@@ -245,8 +247,7 @@ const FEAT = {
 const svgs = new Map();
 export function avatarSvg(id) {
   if (svgs.has(id)) return svgs.get(id);
-  const a = AVATARS.find(x => x.id === id);
-  if (!a) return '';
+  const a = AVATARS.find(x => x.id === id) || AVATARS[0];
   const p = PALETTES[a.p];
   const f = FEAT[FEATURES[a.f].id](p);
   const face = FACES[(a.p * 3 + a.f * 5) % FACES.length]();
@@ -254,4 +255,15 @@ export function avatarSvg(id) {
   svgs.set(id, svg);
   return svg;
 }
-export const avatarSrc = id => `data:image/svg+xml,${encodeURIComponent(avatarSvg(id))}`;
+// Earned ones (orbit.mjs MILESTONES): one for each app and one for the
+// family, `ms-<app>`, a planet in the app's colours in a gold ring, the
+// app's sign on a gold medal.
+const MEDAL = { pass: { body: '#a5b4fc', deep: '#4338ca', night: '#1e1b4b' } };
+export const MEDAL_AVATARS = ['pass', ...Object.keys(BRANDS)].map(app => ({ id: `ms-${app}`, app }));
+function medalSvg(app) {
+  const b = BRANDS[app];
+  const p = MEDAL[app] || { body: b.from, deep: b.ink, night: b.to };
+  const ring = (d, o) => `<g transform="rotate(-18 32 41)"><path d="M3 41a29 8 0 0 ${d} 58 0" fill="none" stroke="url(#g)" stroke-width="3.4" stroke-linecap="round" opacity="${o}"/></g>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><radialGradient id="s" cx=".3" cy=".2" r="1"><stop offset="0" stop-color="${p.deep}"/><stop offset="1" stop-color="${p.night}"/></radialGradient><radialGradient id="b" cx=".34" cy=".28" r=".8"><stop offset="0" stop-color="#f8fafc"/><stop offset=".5" stop-color="${p.body}"/><stop offset="1" stop-color="${p.deep}"/></radialGradient><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fef3c7"/><stop offset=".5" stop-color="#fbbf24"/><stop offset="1" stop-color="#b45309"/></linearGradient></defs><rect width="64" height="64" fill="url(#s)"/><path d="M51 6l1.4 3.6 3.6 1.4-3.6 1.4-1.4 3.6-1.4-3.6-3.6-1.4 3.6-1.4z" fill="#fde68a"/><circle cx="12" cy="14" r="1.3" fill="#fff" opacity=".8"/>${ring(1, 0.55)}<circle cx="${PLANET.x}" cy="${PLANET.y}" r="${PLANET.r}" fill="url(#b)"/><ellipse cx="25" cy="21" rx="6" ry="3.4" fill="#fff" opacity=".4" transform="rotate(-28 25 21)"/>${FACES[1]()}${ring(0, 1)}<circle cx="50" cy="50" r="11" fill="url(#g)" stroke="${p.night}" stroke-width="1.6"/><g transform="translate(41.5 41.5) scale(.1328)">${GLYPHS[app](p.night, '#fff')}</g></svg>`;
+}
+export const avatarSrc = id => `data:image/svg+xml,${encodeURIComponent(/^ms-/.test(id) && MEDAL_AVATARS.some(m => m.id === id) ? medalSvg(id.slice(3)) : avatarSvg(id))}`;

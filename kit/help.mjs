@@ -18,82 +18,82 @@ export const HELP = {
   pass: {
     zh: [
       ['what', 'Orbit Pass 是什麼', [
-        'Orbit Pass 是你在所有 App 的帳號：Orbit 的 Securities、Class、Weather、Transit、Sports、Words。每個 App 都用它登入，資料都存在它裡面，每台裝置都一樣。',
-        '通行碼是一組 10 個字的代碼，由分享 Orbit 給你的人發給你，App 裡不能自己建立。它就是帳號的鑰匙：知道它的人就能用，所以不要給別人。它只在拿到或更換時顯示一次，裝置上不會保存，請記在安全的地方。',
-        '每個 App 右上角的帳戶按鈕（人像，或你挑的頭像）打開 Orbit Pass。'
+        '你在每個 Orbit App 的帳號：Securities、Sports、Words、Class、Weather、Transit、Beats、Law。每個 App 都用它登入，資料存在它裡面，換裝置也一樣。',
+        '通行碼是 10 個字的代碼，由分享 Orbit 給你的人發給你。知道它就能用這個帳號，所以別給別人；它只顯示一次，請記在安全的地方。',
+        '每個 App 右上角的頭像就是 Orbit Pass 的入口。'
       ]],
-      ['tabs', '每個分頁', [
-        'Pass：帳號和開戶日；下面是這個 App 自己的設定（有的話）、新增裝置、通知、除錯紀錄和帳戶安全。',
-        '外觀：挑一個頭像和頭像框，全部免費，每個 App 的帳戶按鈕都看得到。',
-        'App：每個 Orbit App、上次什麼時候用、它的說明，和打開它。',
-        '說明：每個 App 怎麼用，就是這裡。'
+      ['tabs', '四個分頁', [
+        'Pass：上方是你的卡片（頭像、里程碑、帳號），點它換外觀。下面是這個 App 的設定、新增裝置、通知、除錯紀錄和帳戶安全。',
+        '外觀：里程碑，和免費的頭像、頭像框。',
+        'App：每個 Orbit App，上次什麼時候用，一點就打開。',
+        '說明：就是這裡。'
+      ]],
+      ['looks', '頭像、頭像框與里程碑', [
+        '免費的頭像和頭像框隨時換，點一下戴上，再點一下拿下。每個 App 的帳戶按鈕都看得到。',
+        '里程碑每個 App 一個，達成一次就永久保留，送一組專屬頭像和頭像框（一起戴上）。沒達成的會上鎖，下面的進度條顯示還差多少。',
+        '用遍 Orbit：打開過全部 8 個 App。百萬身價：Securities 的身價到 NT$100 萬（之後跌回去也算）。五百字：Words 精熟 500 個字。十首歌：Beats 收藏 10 首歌。十趟旅程：Transit 跟著導航抵達 10 次。十個問題：在 Law 問 10 個問題。鐵粉、看天的人、全勤：分別在 30 天打開 Sports、Weather、Class。'
       ]],
       ['devices', '登入與裝置', [
-        '在新裝置登入：輸入通行碼，或在已登入的裝置打開 Pass，按「新增裝置」取得 8 碼裝置代碼（10 分鐘內、只能用一次）。',
-        '從一個 App 打開另一個（例如 Orbit Pass 的「App」分頁）會自動帶著登入。',
-        '「在這台裝置登出」會清除這台裝置上的所有資料；資料都還在 Orbit Pass，再登入就回來。'
+        '新裝置：輸入通行碼，或在已登入的裝置按「新增裝置」拿 8 碼裝置代碼（10 分鐘內、只能用一次）。',
+        '從一個 App 打開另一個，會自動帶著登入。',
+        '「在這台裝置登出」只清掉這台裝置的資料；都還在 Orbit Pass，登入就回來。'
       ]],
-      ['one', '每個 App 只在一處使用', [
-        '所有 Orbit App 可以同時使用。同一個 App 一次只在一處使用：在另一台裝置（或 Safari 與主畫面 App 之間）打開同一個 App，原本那個會暫停，按「在這裡繼續」就能拿回來，資料不會互相蓋掉。'
+      ['one', '一個 App 一個地方', [
+        '所有 App 可以同時開。同一個 App 在另一台裝置（或 Safari 和主畫面 App 之間）打開時，原本那個會暫停，按「在這裡繼續」拿回來，資料不會互相蓋掉。'
       ]],
       ['net', '沒有網路的時候', [
-        'Words、Weather 和 Class 沒有網路也能打開：背單字、上次的天氣預報和你的課表都在手機上，連上網路後再同步。底部會顯示「沒有網路連線」。',
-        'Securities、Transit 和 Sports 的內容都是即時的（報價、公車到站、比分），舊的資料會讓人誤會，所以沒有網路時只顯示「沒有網路連線」和「重試」，連上網路就自動回來。',
-        '網路很慢時，App 會先用手機上的資料打開，底部顯示「網路連線很慢」，新資料到了就更新。'
+        'Words、Weather、Class 沒網路也能開，連上後再同步。Securities、Transit、Sports 是即時的，沒網路時只顯示「沒有網路連線」，連上就回來。網路慢時先用手機上的資料。'
       ]],
       ['notify', '通知與除錯紀錄', [
-        '「系統通知」一個開關管全部，下面依 App 分開，每種通知各自開關（比賽開打、成交、上課、降雨、公車到站…）。設定跟著 Orbit Pass，每個 App、每台裝置都一樣；App 開著時，通知顯示在畫面上方。',
-        '除錯紀錄：打開「記錄操作過程」，App 會記下它做了什麼；遇到問題時按「複製紀錄」或「分享檔案」傳出去。紀錄裡沒有通行碼。關閉時只留每件事的最後一次。'
+        '「系統通知」一個開關管全部，下面每個 App 的每種通知各自開關。設定跟著 Orbit Pass，每台裝置都一樣。',
+        '除錯紀錄：打開「記錄操作過程」，出問題時按「複製紀錄」或「分享檔案」傳出去。紀錄裡沒有通行碼。'
       ]],
       ['safe', '安全', [
-        '伺服器只保存通行碼的雜湊值；裝置上只有會過期、可以撤銷的登入憑證，不會有通行碼本身。',
-        'Pass 的「帳戶安全」可以「登出其他所有裝置」（這台保持登入），或「更換通行碼」：舊的立刻失效、其他裝置登出，新的只顯示一次，要輸入它的最後 5 個字確認記好了。忘記通行碼時，在還登入的裝置更換一組就好。'
-      ]],
-      ['looks', '頭像與頭像框', [
-        '在 Orbit Pass 的「外觀」挑頭像和頭像框，全部免費、隨時換；戴上後每個 App 的帳戶按鈕都看得到。再點一次就拿下。'
+        '伺服器只存通行碼的雜湊值，裝置上只有會過期、可撤銷的登入。',
+        '「帳戶安全」可以登出其他所有裝置，或更換通行碼（舊的立刻失效，新的只顯示一次）。忘了通行碼，就在還登入的裝置換一組。'
       ]],
       ['money', '錢在哪裡', [
-        'Orbit Pass 是帳號，不放錢。餘額、每週薪水、信貸、急難紓困、財富等級、繳的稅和每一筆明細，都在 Orbit Securities 的「資金」分頁，跟真的券商帳戶一樣。'
+        'Orbit Pass 不放錢。餘額、每週薪水、信貸、紓困、財富等級和明細都在 Orbit Securities 的「資金」分頁。'
       ]]
     ],
     en: [
       ['what', 'What the Orbit Pass is', [
-        'The Orbit Pass is your account in every app: Orbit’s Securities, Class, Weather, Transit, Sports and Words. Each signs in with it and keeps its data on it, the same on every device.',
-        'The pass is a 10-character code, given to you by whoever shared Orbit with you: it can’t be made in an app. It’s the key to the account: anyone who knows it can use it, so keep it to yourself. It’s shown only when you get it or change it and never kept on a device: write it down somewhere safe.',
-        'The account button at the top right of every app (a person, or the avatar you picked) opens the Orbit Pass.'
+        'Your account in every Orbit app: Securities, Sports, Words, Class, Weather, Transit, Beats and Law. Each signs in with it and keeps its data on it, the same on any device.',
+        'The pass is a 10-character code from whoever shared Orbit with you. Anyone who knows it can use the account, so keep it to yourself; it’s shown once, so write it down somewhere safe.',
+        'The avatar at the top right of every app opens the Orbit Pass.'
       ]],
-      ['tabs', 'Each tab', [
-        'Pass: your account number and when it was opened; below them this app’s own settings (if it has any), adding a device, notifications, the debug log and security.',
-        'Looks: pick an avatar and a frame, all free, shown on your account button in every app.',
-        'App: every Orbit app, when you last used it, its guide and a way in.',
-        'Help: how every app works, here.'
+      ['tabs', 'The four tabs', [
+        'Pass: your card on top (avatar, milestones, account number); tap it to change your look. Below: this app’s settings, adding a device, notifications, the debug log and security.',
+        'Looks: milestones, and the free avatars and frames.',
+        'Apps: every Orbit app, when you last used it, a tap to open it.',
+        'Help: here.'
+      ]],
+      ['looks', 'Avatars, frames and milestones', [
+        'The free avatars and frames change any time: tap to wear, tap again to take off. They show on your account button in every app.',
+        'One milestone per app, earned once and kept for good, each with its own avatar and frame (worn together). Until then it’s locked, with a bar showing how far along you are.',
+        'All of Orbit: open all 8 apps. Millionaire: be worth NT$1,000,000 in Securities (it stays if you drop back). 500 words: master 500 in Words. 10 songs: keep 10 songs in Beats. 10 trips: arrive with Transit’s navigation 10 times. 10 questions: ask Law 10 questions. Superfan, Sky watcher, Attendance: open Sports, Weather, Class on 30 days.'
       ]],
       ['devices', 'Signing in and devices', [
-        'On a new device, enter the pass, or on a signed-in device open Pass and choose “Add a device” for an 8-character device code (10 minutes, once).',
-        'Opening one app from another (from the Orbit Pass’s App tab, say) arrives signed in.',
-        '“Sign out on this device” wipes everything on this device; it all stays on your Orbit Pass and comes back when you sign in.'
+        'On a new device, enter the pass, or choose “Add a device” on a signed-in one for an 8-character device code (10 minutes, once).',
+        'Opening one app from another arrives signed in.',
+        '“Sign out on this device” wipes only this device; it all stays on your Orbit Pass.'
       ]],
       ['one', 'Each app in one place', [
-        'Every Orbit app can be open at once. Each one runs in one place at a time: opening the same app on another device (or in Safari beside the home-screen app) pauses the first; “Continue here” takes it back, so nothing overwrites anything.'
+        'Every app can be open at once. Opening the same app somewhere else (another device, or Safari beside the home-screen app) pauses the first; “Continue here” takes it back, and nothing is overwritten.'
       ]],
       ['net', 'Without a connection', [
-        'Words, Weather and Class open with no connection: your words, the last forecast and your timetable are on the phone, and sync once you’re back online. A note at the bottom says “No internet connection”.',
-        'Securities, Transit and Sports are live (prices, buses, scores), and old figures would mislead, so with no connection they show only “No internet connection” and Try again, and come back by themselves once you’re online.',
-        'On a slow connection an app opens on what the phone has, says “Slow internet connection” at the bottom, and updates as the new data arrives.'
+        'Words, Weather and Class open offline and sync once you’re back. Securities, Transit and Sports are live, so offline they show only “No internet connection” and come back by themselves. On a slow connection an app opens on what the phone has.'
       ]],
       ['notify', 'Notifications and the debug log', [
-        'One switch, System notices, turns them all on or off; below it each app’s kinds have their own switches (a game starts, an order filled, a class, rain, a bus nearly here…). The settings follow your Orbit Pass, the same in every app and on every device; while an app is open, a notice shows at the top of the screen.',
-        'Debug log: turn on “Record what the app does” and the app notes what it did; when something goes wrong, Copy or Share file to send it. It never holds your pass. Off, it keeps only the last of each thing.'
+        'One switch, System notices, turns them all on or off; below it each app’s kinds have their own. They follow your Orbit Pass to every device.',
+        'Debug log: turn on “Record what the app does”, then Copy or Share file when something goes wrong. It never holds your pass.'
       ]],
       ['safe', 'Security', [
-        'The server keeps only a hash of the pass; devices keep only sign-ins that expire and can be revoked, never the pass itself.',
-        'Pass’s Security can sign out every other device (this one stays in) or change the pass: the old one stops at once and other devices sign out, and the new one is shown once, closed only when you type its last 5 characters. Forgot it? Change it from a device that’s still signed in.'
-      ]],
-      ['looks', 'Avatars and frames', [
-        'Pick an avatar and a frame in the Orbit Pass’s Looks tab: all free, change them any time, worn on your account button in every app. Tap again to take one off.'
+        'The server keeps only a hash of the pass; devices keep only sign-ins that expire and can be revoked.',
+        'Security can sign out every other device or change the pass (the old one stops at once, the new one is shown once). Forgot it? Change it on a device that’s still signed in.'
       ]],
       ['money', 'Where the money is', [
-        'The Orbit Pass is your account; it holds no money. Your balance, the weekly pay, loans, emergency relief, wealth levels, the taxes you’ve paid and every entry are in Orbit Securities’ Money tab, as at a real broker.'
+        'The Orbit Pass holds no money. Balance, weekly pay, loans, relief, wealth levels and every entry are in Orbit Securities’ 資金 tab.'
       ]]
     ]
   },
