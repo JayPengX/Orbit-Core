@@ -46,7 +46,7 @@
 
 import { STATIONS } from './weather-stations.js';
 import { twDay } from './kit/format.mjs';
-import { COUNTIES, readTyphoon, readDgpa, readSeatRain, dayOffFor, closuresFor, tradeClosed } from './typhoon.js';
+import { COUNTIES, readTyphoon, readDgpa, readSeatRain, dayOffFor, closuresFor, tradeClosed, stampSeen } from './typhoon.js';
 
 export const GOOGLE = 'https://weather.googleapis.com/v1/';
 export const GOOGLE_AIR = 'https://airquality.googleapis.com/v1/';
@@ -1544,6 +1544,13 @@ async function cachedText(env, key, ttl, make) {
 // it, from sources kept in KV for everyone (none with a daily cap of ours):
 // the warning every 5 minutes, the 人事行政總處 page every 3, the seats'
 // rain forecast every 30, CWA's rain warnings every 30.
+// 人事行政總處's page with when each decision first showed on it (typhoon.js stampSeen; KV, 3 days).
+async function readDgpaSeen(env, fetchFn, now) {
+  const page = await readDgpa(env, fetchFn);
+  const seen = stampSeen(page, await kvJson(env, 'weather:dgpa:seen'), now);
+  await kvPut(env, 'weather:dgpa:seen', seen, 3 * 86_400);
+  return { ...page, seen };
+}
 async function withDayOff(env, resp, at, fetchFn, ctx, now = Date.now()) {
   if (!resp?.place?.county) return resp;
   const defer = ctx?.waitUntil ? p => ctx.waitUntil(p) : null;
@@ -1552,7 +1559,7 @@ async function withDayOff(env, resp, at, fetchFn, ctx, now = Date.now()) {
     const ty = await shared(env, 'weather:typhoon', 5 * MIN, () => readTyphoon(fetchFn, now, env.CWA_KEY ? cwaUrl(env, 'W-C0034-005') : null), now, defer);
     if (!ty?.data) return {};
     const [dg, rain, warn] = await Promise.all([
-      shared(env, 'weather:dgpa', 3 * MIN, () => readDgpa(env, fetchFn), now, defer),
+      shared(env, 'weather:dgpa', 3 * MIN, () => readDgpaSeen(env, fetchFn, now), now, defer),
       shared(env, 'weather:dayoff:rain', 30 * MIN, () => readSeatRain(fetchFn), now, defer),
       env.CWA_KEY ? shared(env, 'weather:cwa:warn', 30 * MIN, () => getJson(fetchFn, cwaUrl(env, 'W-C0033-001'), env), now, defer) : null
     ]);
@@ -1600,7 +1607,7 @@ export async function handleWeather(request, env, headers, path, { session = nul
     county = county ? county.replace(/台/g, '臺') : null;
     if (!county || !COUNTIES.includes(county)) return send({ at: Date.now(), place: null, days: {} }, 200);
     const now = Date.now();
-    const dg = await shared(env, 'weather:dgpa', 3 * MIN, () => readDgpa(env, fetchFn), now, ctx?.waitUntil ? p => ctx.waitUntil(p) : null);
+    const dg = await shared(env, 'weather:dgpa', 3 * MIN, () => readDgpaSeen(env, fetchFn, now), now, ctx?.waitUntil ? p => ctx.waitUntil(p) : null);
     const days = closuresFor(dg?.data, county, town);
     if (county === '臺北市') for (const d of Object.values(days)) d.trade = { off: tradeClosed(d) };
     return new Response(JSON.stringify({ at: dg?.data?.at ?? null, place: { county, town: town || null }, days }), { headers: { ...headers, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=60' } });

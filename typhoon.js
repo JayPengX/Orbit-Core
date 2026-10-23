@@ -16,6 +16,8 @@ export const NCDR_FEED = 'https://alerts.ncdr.nat.gov.tw/RssAtomFeed.ashx';
 const NCDR_HOST = 'alerts.ncdr.nat.gov.tw';
 export const DGPA_NDS = 'https://www.dgpa.gov.tw/typh/daily/nds.html';
 
+import { twWorkday } from './kit/holidays.mjs';
+
 const tai = s => String(s || '').replace(/台/g, '臺');
 export const COUNTIES = ['基隆市', '臺北市', '新北市', '桃園市', '新竹市', '新竹縣', '苗栗縣', '臺中市', '彰化縣', '南投縣', '雲林縣', '嘉義市', '嘉義縣', '臺南市', '高雄市', '屏東縣', '宜蘭縣', '花蓮縣', '臺東縣', '澎湖縣', '金門縣', '連江縣'];
 const twDate = t => new Date(t + TW).toISOString().slice(0, 10);
@@ -191,8 +193,14 @@ const seat = c => ({ lat: SEATS[c][0], lon: SEATS[c][1] });
 // county seats).
 const MAIN = COUNTIES.filter(c => !['澎湖縣', '金門縣', '連江縣'].includes(c)).map(seat);
 
-// The day asked about: today until 10:00 (announced by then), else tomorrow.
-export const targetDay = now => (new Date(now + TW).getUTCHours() < 10 ? twDate(now) : twDate(now + 24 * HOUR));
+// The day asked about: today until 10:00 (announced by then), else the next working day.
+// (Only a working day: a weekend or a national holiday is off anyway, so
+// Friday afternoon asks about Monday; a 補班 Saturday is a working day.)
+export function targetDay(now) {
+  let t = new Date(now + TW).getUTCHours() < 10 ? now : now + 24 * HOUR;
+  for (let i = 0; i < 10 && !twWorkday(twDate(t)); i++) t += 24 * HOUR;
+  return twDate(t);
+}
 
 // The chance a county closes on the day, fitted to what counties decided
 // for 68 storms, 2019-08 to 2026-09 (4,671 county-days of storms near
@@ -253,7 +261,30 @@ function linesOf(dgpa, county) {
   if (!said || /無停班停課/.test(said)) return [];
   const day = twDate(dgpa.at || Date.now());
   const next = twDate(Date.parse(`${day}T12:00:00+08:00`) + 24 * HOUR);
-  return officialLines(said).map(l => ({ ...l, date: /明天|明日/.test(l.text) ? next : day, scoped: PLACE_RE.test(l.text) }));
+  return officialLines(said).map(l => {
+    const x = { ...l, date: /明天|明日/.test(l.text) ? next : day, scoped: PLACE_RE.test(l.text) };
+    return { ...x, at: dgpa.seen?.[seenKey(county, x)] ?? null };
+  });
+}
+
+// When each decision was first on the page (the page's own time is its last
+// update, not the county's announcement): kept by the reader, every 3
+// minutes. A county+day+place+decision is one key, so 明天… turning into 今天…
+// at midnight keeps its time. Those already there when first read: unknown (null).
+const seenKey = (county, l) => `${county}|${l.date}|${PLACE_RE.exec(l.text)?.[1] || ''}|${l.off}`;
+export function stampSeen(dgpa, prev, now) {
+  const seen = {};
+  const first = !prev;
+  for (const county of Object.keys(dgpa?.counties || {})) {
+    for (const l of linesOf({ ...dgpa, seen: null }, county)) {
+      if (l.off === 'wait') continue;
+      const k = seenKey(county, l);
+      seen[k] = prev && k in prev ? prev[k] : first ? null : now;
+    }
+  }
+  // (Kept two days after they leave the page, so a decision dropped and put back keeps its time.)
+  for (const [k, v] of Object.entries(prev || {})) if (!(k in seen) && k.split('|')[1] >= twDate(now - 2 * 24 * HOUR)) seen[k] = v;
+  return seen;
 }
 
 // CWA's rain warnings (W-C0033-001) for a county over the day, as the least
@@ -288,8 +319,8 @@ export function dayOffFor(county, ty, dgpa, now, rain = null, warn = null) {
   // 尚未宣布) replaces the chance; its other lines (some towns only, 綠島鄉:…;
   // another day) go under it.
   const lines = linesOf(dgpa, county);
-  if (lines.some(l => !l.scoped && l.date === date && l.off !== 'wait')) return { ...storm, official: { lines: lines.map(({ text, off }) => ({ text, off })), at: dgpa.at } };
-  const local = lines.filter(l => l.off !== 'wait').map(({ text, off }) => ({ text, off }));
+  if (lines.some(l => !l.scoped && l.date === date && l.off !== 'wait')) return { ...storm, official: { lines: lines.map(({ text, off, at }) => ({ text, off, at })), at: dgpa.at } };
+  const local = lines.filter(l => l.off !== 'wait').map(({ text, off, at }) => ({ text, off, at }));
   const towns = local.length ? { local: { lines: local, at: dgpa.at } } : {};
   // Neighbours that have decided the day, each way.
   const nearby = NEIGHBOURS[county] || [];
