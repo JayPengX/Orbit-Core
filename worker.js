@@ -48,7 +48,7 @@ import { applyScale } from './capacity.js';
 import { handleSports, sportsCron, useDevSettings } from './sports.js';
 import { handleToday } from './sports-today.js';
 import { isAllowedOrigin, corsHeaders, json, LOCAL_ORIGIN, bodyText, sha256Hex } from './http.js';
-import { handleData, withOldData } from './data.js';
+import { handleData } from './data.js';
 import { handleStock, moveBook } from './stock-fill.js';
 import { runBuilders, SLOTS as BUILD_SLOTS } from './builders/run.js';
 import { docStore, storeReady } from './doc-store.js';
@@ -1295,7 +1295,6 @@ export default {
   // A route that throws is still answered with the CORS headers (an app sees
   // a failure it can try again, not a blocked request), and logged.
   async fetch(request, env, ctx) {
-    env = withOldData(env);
     const origin = request.headers.get('Origin') || '';
     const headers = corsHeaders(origin, request.cf?.colo);
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
@@ -1311,7 +1310,6 @@ export default {
   // The cron (wrangler.toml [triggers]): the notices that are due (push.js),
   // F1's laps, the builders and the guard.
   async scheduled(event, env, ctx) {
-    env = withOldData(env);
     const tick = new Date(event.scheduledTime || Date.now());
     const min = tick.getUTCMinutes();
     // Each job's heartbeat kept (ops.js: the admin panel's 系統); a failure logged.

@@ -45,26 +45,6 @@ export function cleanPath(raw) {
   }
 }
 
-// The data's old bucket (R2 quadra-data, OLD_DATA) while the family's data
-// moves to orbit-data: a file not in the new bucket is read from the old one
-// and written into the new, so nothing waits for a rebuild. Every other call
-// (head, put, list, delete) is the new bucket's.
-export function withOldData(env) {
-  if (!env.DATA || !env.OLD_DATA) return env;
-  const now = env.DATA;
-  const old = env.OLD_DATA;
-  const get = async (path, opts) => {
-    const hit = await now.get(path, opts);
-    if (hit) return hit;
-    const was = await old.get(path);
-    if (!was) return null;
-    await now.put(path, await was.arrayBuffer(), { httpMetadata: was.httpMetadata, customMetadata: was.customMetadata });
-    return now.get(path, opts);
-  };
-  const DATA = new Proxy(now, { get: (t, k) => (k === 'get' ? get : typeof t[k] === 'function' ? t[k].bind(t) : t[k]) });
-  return { ...env, DATA };
-}
-
 async function readFile(env, ctx, path, request) {
   const key = new Request(`https://orbit-data.orbit/${path}`);
   const cache = typeof caches !== 'undefined' ? caches.default : null;
