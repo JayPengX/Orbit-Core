@@ -129,6 +129,10 @@ export const AUDIO_NAMES = {
 // Whether a channel has the commentary the person likes: Chinese on every
 // kind but 'en'; the original on 'en' and on 'dual' (its second track).
 export const ALT_VIEW = new Set(['data', 'cam']);
+// The player a 球員特寫視角 follows, as ELTA's title names him ("阿斯頓維拉 VS
+// 曼城 第8輪(Haaland球員特寫視角)", its video's "(Joao Pedro球員特寫視角)"),
+// or '' (its live listing mostly doesn't: "(球員特寫視角)").
+export const camPlayer = title => /[(（]\s*([^()（）]*?)\s*球員(?:特寫)?視角\s*[)）]/.exec(String(title || ''))?.[1].trim() || '';
 export const hasAudio = (c, prefer = 'en') => !ALT_VIEW.has(c.audio) && (prefer === 'zh' ? c.audio !== 'en' : c.audio === 'en' || c.audio === 'dual');
 // How well a channel suits the person: no ads first (a MAX channel before
 // the 體育台 with the same game, whatever their commentary: the owner's
@@ -484,7 +488,8 @@ function episodeParts(title) {
 // counts only when it's the only one that fits.
 // `prefer`: the commentary the person likes ('en': the 原音 cut of a game
 // ELTA put up twice, its own Chinese one otherwise).
-export function eltaEpisode(episodes, e, sides, { prefer = 'en' } = {}) {
+// `cam`: its 球員特寫視角 instead (who it followed, said in the title).
+export function eltaEpisode(episodes, e, sides, { prefer = 'en', cam = false } = {}) {
   if (!episodes?.length || !e) return null;
   const tw = new Date(Date.parse(e.start) + 8 * 3_600_000);
   const dateless = episodes.filter(x => !episodeParts(x.title).day).length * 2 >= episodes.length;
@@ -495,7 +500,7 @@ export function eltaEpisode(episodes, e, sides, { prefer = 'en' } = {}) {
   const shifts = football && tw.getUTCHours() < 6 ? [0, -1] : [0];
   const off = ([m, d]) => shifts.map(shift => new Date(tw.getTime() + shift * 86_400_000)).findIndex(x => x.getUTCMonth() + 1 === m && x.getUTCDate() === d);
   const fits = episodes
-    .filter(x => !/視角|精華|集錦|Highlights/i.test(x.title))
+    .filter(x => (cam ? /球員(?:特寫)?視角/.test(x.title) : !/視角|精華|集錦|Highlights/i.test(x.title)))
     .map(x => ({ x, ...episodeParts(x.title) }))
     .map(x => ({ ...x, off: x.day ? Math.min(off(x.day), 1) : 2 }))
     .filter(x => x.teams.length === 2 && (!x.day || off(x.day) >= 0))
