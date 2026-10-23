@@ -770,10 +770,11 @@ if (typeof globalThis !== 'undefined') globalThis.orbitHaptic = haptic;
 // px/ms) and eases out to the foot over 0.38 to 0.5 s (a ✕ 0.45 s from an
 // even start), the way UIKit's
 // sheet does (a flick had been gone in a sixth of a second, the ✕'s in a
-// quarter: too quick for iOS). One asked for no motion just closes.
+// quarter: too quick for iOS). One asked for no motion (or a page that
+// can't read a transform, as the tests' DOM) just closes.
 export function closeSheet(d, speed = 0) {
   if (!d?.open || d.classList.contains('q-leaving')) return;
-  if (globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return d.close();
+  if (typeof DOMMatrixReadOnly !== 'function' || globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return d.close();
   // Where the finger left it (a swipe's translateY) and how far is left to go: the
   // way to the foot measured from its place at rest, as the transform is (from where
   // it was dragged to, it stopped that far short of the foot, then vanished: the owner, 2026-10-18).
