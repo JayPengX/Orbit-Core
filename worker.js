@@ -1157,25 +1157,10 @@ async function sessionOf(request, env, grace = 0) {
   return qt ? readToken(await tokenSecret(env), qt, 'ses', Date.now() - grace) : null;
 }
 
-// TEMPORARY (one run, then removed): copies this Worker's Gemini key onto the
-// longshot Worker's secrets, inside Cloudflare, so nobody has to look it up.
-// Needs the account's own Cloudflare token; never answers with the key.
-async function copyGeminiKeyToLongshot(request, env) {
-  const token = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
-  if (!token || !env.GEMINI_API_KEY) return new Response(null, { status: 400 });
-  const cf = (path, init = {}) => fetch(`https://api.cloudflare.com/client/v4${path}`, { ...init, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }).then((r) => r.json()).catch(() => ({}));
-  const id = (await cf('/accounts')).result?.[0]?.id;
-  if (!id) return new Response(null, { status: 403 });
-  if ((await cf(`/accounts/${id}/workers/subdomain`)).result?.subdomain !== 'pengzjay') return new Response(null, { status: 403 });
-  const put = await cf(`/accounts/${id}/workers/scripts/longshot/secrets`, { method: 'PUT', body: JSON.stringify({ name: 'GEMINI_API_KEY', text: env.GEMINI_API_KEY, type: 'secret_text' }) });
-  return new Response(null, { status: put.success ? 204 : 502 });
-}
-
 // Every route, by path (fetch below answers anything that throws).
 async function route(request, env, ctx, headers, origin) {
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
   const path = new URL(request.url).pathname.replace(/\/+$/, '');
-  if (path === '/ops/longshot-gemini-key' && request.method === 'POST') return copyGeminiKeyToLongshot(request, env); // TEMPORARY
 
   // See GEMINI_BILLED_PATHS' own comment - a real, enforced reject, not
   // just the advisory CORS headers fetch computed.
