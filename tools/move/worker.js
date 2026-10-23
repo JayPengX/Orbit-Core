@@ -15,14 +15,16 @@ export default {
     if (u.pathname === '/r2') {
       const page = await env.OLD_DATA.list({ cursor: u.searchParams.get('cursor') || undefined, limit: 200 });
       let copied = 0;
-      for (const o of page.objects) {
+      const one = async o => {
         const there = await env.NEW_DATA.head(o.key);
-        if (there && there.etag === o.etag) continue;
+        if (there && there.etag === o.etag) return;
         const obj = await env.OLD_DATA.get(o.key);
-        if (!obj) continue;
+        if (!obj) return;
         await env.NEW_DATA.put(o.key, obj.body, { httpMetadata: obj.httpMetadata, customMetadata: obj.customMetadata });
         copied++;
-      }
+      };
+      // 20 at a time.
+      for (let i = 0; i < page.objects.length; i += 20) await Promise.all(page.objects.slice(i, i + 20).map(one));
       return json({ seen: page.objects.length, copied, cursor: page.truncated ? page.cursor : null });
     }
     if (u.pathname === '/d1') {
