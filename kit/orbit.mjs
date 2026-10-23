@@ -2652,12 +2652,56 @@ const inAppBrowser = () => /Line\/|FBAN|FBAV|Instagram|Messenger|MicroMessenger|
 // too (a hand-over no longer lets it run in the browser). Returns true when
 // it covered the page (the app shouldn't start).
 let installCovered = false;
+
+// Adding every app, one after another (the owner, 2026-10-23): Safari can't
+// add a page by itself and each app is added from its own address, so the
+// relay walks the person through: an app's install screen opened with
+// ?install=next shows every app (the ones added ticked) and a button to the
+// next one's. Started from the family page or the Pass's App tab. The apps
+// added are kept on this origin (one for every app); an app opened from
+// the home screen notes itself too. (Longshot has its own Pass: not in it.)
+const INSTALLED = 'orbit.installed';
+export const installedApps = () => readJson(INSTALLED, {}) || {};
+export function markInstalled(app) {
+  if (!APPS[app] || installedApps()[app]) return;
+  writeStore(INSTALLED, JSON.stringify({ ...installedApps(), [app]: 1 }));
+}
+// The next app to add after `after` (in the family's order), null when every one is.
+export function nextToInstall(after = null) {
+  const order = Object.keys(APPS);
+  const done = installedApps();
+  const from = after ? order.indexOf(after) + 1 : 0;
+  return [...order.slice(from), ...order.slice(0, Math.max(0, from - 1))].find(a => a !== after && !done[a]) || null;
+}
+export const installRelayUrl = app => `${SITE}${APPS[app].path}?install=next`;
+const inRelay = () => /[?&]install=next\b/.test(globalThis.location?.search || '');
+function relayPart(app, en) {
+  const order = Object.keys(APPS);
+  const done = installedApps();
+  const next = nextToInstall(app);
+  const at = order.indexOf(app) + 1;
+  return [
+    node('p', { class: 'q-relay-count', text: en ? `App ${at} of ${order.length}` : `第 ${at} / ${order.length} 個` }),
+    node(
+      'div',
+      { class: 'q-relay-apps', 'aria-hidden': 'true' },
+      order.map(a => node('span', { class: `q-relay-app${a === app ? ' here' : done[a] ? ' done' : ''}` }, [node('img', { src: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(appIcon(a))}`, alt: '', width: '34', height: '34' })]))
+    ),
+    next
+      ? node('a', { class: 'q-btn primary block q-relay-next', href: installRelayUrl(next), onclick: () => markInstalled(app) }, [document.createTextNode(en ? `Added. Next: ${APPS[next].short || appName(next)}` : `加好了，下一個：${APPS[next].short || appName(next)}`)])
+      : node('p', { class: 'q-relay-done', text: en ? 'The last one: add it and you’re done.' : '最後一個：加好就全部完成了。' })
+  ];
+}
+
 export function installGate(app, lang = detectLang()) {
+  // (Opened from the home screen: added.)
+  if (isStandalone()) markInstalled(app);
   if (!isPhoneOrTablet() || isStandalone()) return false;
   if (installCovered) return true;
   installCovered = true;
   const en = lang === 'en';
   const name = appName(app);
+  const relay = inRelay() && !inAppBrowser();
   const steps = inAppBrowser()
     ? en
       ? ['Open this page in Safari (iPhone) or Chrome (Android): tap ⋯ and “Open in browser”.', 'Then add it to your home screen.']
@@ -2678,7 +2722,8 @@ export function installGate(app, lang = detectLang()) {
         'ol',
         { class: 'q-steps' },
         steps.map(t => node('li', { text: t }))
-      )
+      ),
+      ...(relay ? relayPart(app, en) : [])
     ])
   ]);
   keepOnTop(gate);

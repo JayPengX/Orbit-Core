@@ -703,3 +703,21 @@ test('every EuroLeague and K League club has a Chinese name (Jay 2026-10-21)', a
   for (const n of el) assert.match(teamZh('euroleague', n, 'basketball'), /\p{Script=Han}/u, n);
   for (const n of ['Bucheon FC 1995', ...Object.keys(TEAM_BADGES?.kleague || {})]) assert.match(teamZh('kleague', n, 'soccer'), /\p{Script=Han}/u, n);
 });
+
+test('the install relay: every app in the family order, the ones added skipped, none after the last', async () => {
+  const mem = new Map();
+  globalThis.localStorage ??= { getItem: k => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, String(v)), removeItem: k => mem.delete(k) };
+  const { nextToInstall, markInstalled, installRelayUrl, installedApps, APPS } = await import('../kit/orbit.mjs');
+  localStorage.removeItem('orbit.installed');
+  const order = Object.keys(APPS);
+  assert.equal(nextToInstall(), order[0]);
+  assert.equal(nextToInstall(order[0]), order[1]);
+  markInstalled(order[1]);
+  assert.equal(nextToInstall(order[0]), order[2], 'one added is skipped');
+  for (const a of order.slice(0, -1)) markInstalled(a);
+  assert.equal(nextToInstall(order.at(-1)), null, 'the last, every other one added');
+  assert.equal(nextToInstall(order[3]), order.at(-1), 'one left anywhere: that one');
+  assert.equal(installRelayUrl('vocab'), 'https://jaypengx.github.io/Orbit-Words/?install=next');
+  assert.ok(!('longshot' in installedApps()) && !order.includes('longshot'), 'Longshot is not in it');
+  localStorage.removeItem('orbit.installed');
+});

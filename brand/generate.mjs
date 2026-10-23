@@ -187,14 +187,15 @@ if (!only.length || only.includes('site')) {
 }
 await browser.close();
 
-// The family's home (Shared-Proxy's Pages root): every app.
+// The family's home (Shared-Proxy's Pages root): every app, and on a phone
+// 依序加入主畫面 (the kit's install relay, from the first app not added yet).
 function homePage() {
   const home = 'https://jaypengx.github.io/Shared-Proxy/';
   const card = id => {
     const b = BRANDS[id];
-    return `<a class="app" href="${pathOf(id)}"><img src="brand/${id}.svg" alt="" width="64" height="64"><span><strong>${esc(b.name)}</strong><small>${esc(b.tag.zh)}</small><small class="en">${esc(b.tag.en)}</small></span></a>`;
+    return `<a class="app" href="${pathOf(id)}" data-app="${id}"><img src="brand/${id}.svg" alt="" width="64" height="64"><span><strong>${esc(b.name)}</strong><small>${esc(b.tag.zh)}</small><small class="en">${esc(b.tag.en)}</small></span></a>`;
   };
-  const family = `<section><h2><img src="brand/family-orbit.svg" alt="" width="36" height="36">${FAMILY.name}<small>${esc(FAMILY.tag.zh)}</small></h2><div class="apps">${Object.keys(BRANDS).map(card).join('')}</div></section>`;
+  const family = `<section><h2><img src="brand/family-orbit.svg" alt="" width="36" height="36">${FAMILY.name}<small>${esc(FAMILY.tag.zh)}</small></h2><a class="install-all" id="install-all" href="${pathOf(Object.keys(BRANDS)[0])}?install=next" hidden><strong>依序加入主畫面</strong><small>一個接一個，把每個 App 加到主畫面</small><small class="en">Add every app to your home screen</small></a><div class="apps">${Object.keys(BRANDS).map(card).join('')}</div></section>`;
   const og = (k, v) => `<meta property="og:${k}" content="${esc(v)}">`;
   return `<!doctype html>
 <html lang="zh-Hant"><head>
@@ -217,10 +218,12 @@ h2{display:flex;align-items:center;gap:10px;font-size:22px;margin:32px 0 12px}h2
 .app:hover{border-color:var(--muted)}.app img{flex:none;border-radius:15px}.app span{display:grid;min-width:0}
 .app small{color:var(--muted);font-size:13px}.app small.en{font-size:12px}
 footer{margin-top:40px;color:var(--muted);font-size:13px}
+.install-all{display:grid;gap:2px;margin:0 0 12px;padding:14px 16px;border-radius:18px;background:var(--card);border:1px solid #6366f1;color:inherit;text-decoration:none}.install-all strong{color:#6366f1}.install-all small{color:var(--muted);font-size:13px}.install-all small.en{font-size:12px}
 </style></head><body><main>
 <header><img src="brand/pass.svg" alt=""><div><h1>Orbit Pass</h1><p>${esc(PASS.tag.zh)} · ${esc(PASS.tag.en)}</p></div></header>
 ${family}
 <footer>Shared-Proxy: the Workers, the kit every app loads (kit/) and these marks (brand/).</footer>
-</main></body></html>
+</main>
+<script>(()=>{const ua=navigator.userAgent;if(!(/iPhone|iPad|iPod|Android/i.test(ua)||(/Macintosh/.test(ua)&&navigator.maxTouchPoints>1)))return;let done={};try{done=JSON.parse(localStorage.getItem('orbit.installed')||'{}')||{}}catch{}const apps=[...document.querySelectorAll('.apps .app')].map(a=>[a.dataset.app,a.getAttribute('href')]);const next=apps.find(([id])=>!done[id]);const b=document.getElementById('install-all');if(!next||!b)return;b.href=next[1]+'?install=next';b.hidden=false})()</script></body></html>
 `;
 }
