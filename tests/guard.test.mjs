@@ -56,7 +56,7 @@ function fakeCf(use, { cpuField = true, fail = false, d1Fail = false } = {}) {
       }
       if (q.includes('d1AnalyticsAdaptiveGroups')) return d1Fail ? json({ errors: [{ message: 'unknown field "rowsRead"' }] }) : acc({ x: [{ sum: { rowsRead: 0, rowsWritten: once('d1').d1RowsWritten || 0 } }] });
       if (q.includes('kvStorageAdaptiveGroups')) return acc({ x: [{ max: { byteCount: use.kvBytes || 0 }, dimensions: { date: '2026-10-20' } }] });
-      if (q.includes('r2StorageAdaptiveGroups')) return acc({ x: [{ max: { payloadSize: use.r2Bytes || 0, metadataSize: 0 }, dimensions: { bucketName: 'quadra-data', datetime: '2026-10-20T00:00:00Z' } }, { max: { payloadSize: 1, metadataSize: 0 }, dimensions: { bucketName: 'quadra-data', datetime: '2026-10-19T00:00:00Z' } }] });
+      if (q.includes('r2StorageAdaptiveGroups')) return acc({ x: [{ max: { payloadSize: use.r2Bytes || 0, metadataSize: 0 }, dimensions: { bucketName: 'orbit-data', datetime: '2026-10-20T00:00:00Z' } }, { max: { payloadSize: 1, metadataSize: 0 }, dimensions: { bucketName: 'orbit-data', datetime: '2026-10-19T00:00:00Z' } }] });
       return acc({ x: [] });
     }
     if (url.endsWith('/accounts')) return json({ success: true, result: [{ id: 'acct-1' }] });

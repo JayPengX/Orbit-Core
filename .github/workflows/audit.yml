@@ -29,7 +29,7 @@ jobs:
       - name: The store, counted
         run: |
           cd "$RUNNER_TEMP"
-          q() { npx --yes wrangler@4 d1 execute quadra-store --remote --json --command "$1" 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.stringify(JSON.parse(s)[0].results))}catch{console.log("(unreadable)")}})'; }
+          q() { npx --yes wrangler@4 d1 execute orbit-store --remote --json --command "$1" 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.stringify(JSON.parse(s)[0].results))}catch{console.log("(unreadable)")}})'; }
           echo "== documents by collection"; q "SELECT coll, COUNT(*) AS n FROM docs GROUP BY coll"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

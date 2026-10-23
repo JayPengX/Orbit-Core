@@ -130,7 +130,7 @@ on `SPORTS_PROXY_ALLOWED_HOSTS`. Two hosts are not real:
 
 ### 3.2 The family's data (`data.js`, `builders/`)
 
-R2 bucket `quadra-data`, served at `/data/<path>`. The builders run from
+R2 bucket `orbit-data`, served at `/data/<path>`. The builders run from
 `builders/run.js` on the even-minute cron, each only as often as its data
 changes, writing a file only when it changed (`builders/store.js`):
 
@@ -274,7 +274,7 @@ now, its own app and Worker (JayPengX/Longshot), nothing of theirs here.
     `ECO_TOKEN_SECRET`, `ECO_ADMIN_TOKEN`.
   - The proxy: Google's keys, `CWA_KEY`, `MOENV_KEY`, `TDX_CLIENT_*`, and
     `FIREBASE_PRIVATE_KEY` (removed 2026-12-06).
-- **Bindings:** D1 `quadra-store`, R2 `quadra-data`, KV `RATE_LIMIT_KV`,
+- **Bindings:** D1 `orbit-store`, R2 `orbit-data`, KV `RATE_LIMIT_KV`,
   DO `F1Log`, and the services `GEMINI_RELAY` and `GUARD`.
 
 ## 10. Tools and tests

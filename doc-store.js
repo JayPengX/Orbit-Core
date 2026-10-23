@@ -1,6 +1,6 @@
 // The Pass's store (every wallet, each app's data, the config):
 // documents of one text `payload` each, by collection and id, in Cloudflare
-// D1 (binding STORE, database quadra-store).
+// D1 (binding STORE, database orbit-store).
 //
 // Firebase's Firestore held it until 2026-10-14 (the owner, 2026-10-13:
 // Firebase moves to Cloudflare, then is abandoned): every document was

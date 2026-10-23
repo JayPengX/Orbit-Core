@@ -11,7 +11,7 @@
 //     75%, 90% reached this period, its pace and whether it stopped the
 //     proxy. Every ten minutes the cron compares that with what the owner was
 //     last told (`guard:told` in KV, written only when there's news) and
-//     sends a notice to the account set in the admin panel (`quadra-config`
+//     sends a notice to the account set in the admin panel (`orbit-config`
 //     `ops`: { alertAccount }), on the first of its apps with notices on.
 //   - The system report (POST /eco admin `system`, and /ops for the repo's
 //     workflow): the guard, the pace, the heartbeats, the store's
@@ -24,7 +24,7 @@ import { notifyNow } from './push.js';
 import { ECO_APPS } from './eco.js';
 
 export const TOLD_KEY = 'guard:told';
-export const OPS_DOC = ['quadra-config', 'ops'];
+export const OPS_DOC = ['orbit-config', 'ops'];
 const BEATS = 'CREATE TABLE IF NOT EXISTS beats (job TEXT PRIMARY KEY, at INTEGER NOT NULL, ok INTEGER NOT NULL, ms INTEGER NOT NULL, note TEXT NOT NULL, ok_at INTEGER, fails INTEGER NOT NULL DEFAULT 0)';
 const made = new WeakSet();
 async function beatsTable(db) {

@@ -79,7 +79,7 @@ export const ECO_APPS = {
   stock: { collection: 'stock-study-accounts', maxPayload: 1_000_000 },
   vocab: { collection: 'vocab-progress-sync', maxPayload: 600_000 },
   match: { collection: 'match-find-settings', maxPayload: 100_000 },
-  orbit: { collection: 'orbit-quadra', maxPayload: 200_000 },
+  orbit: { collection: 'orbit-class', maxPayload: 200_000 },
   weather: { collection: 'orbit-weather', maxPayload: 50_000 },
   transit: { collection: 'orbit-transit', maxPayload: 200_000 },
   beats: { collection: 'orbit-beats', maxPayload: 50_000 },

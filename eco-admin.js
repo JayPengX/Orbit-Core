@@ -28,7 +28,7 @@ import { govOf } from './kit/gov.mjs';
 
 // The developer settings (kit/devconfig.mjs), one document; GET /config
 // answers them to everyone (worker.js), the panel's 開發 changes them.
-export const CONFIG_COLLECTION = 'quadra-config';
+export const CONFIG_COLLECTION = 'orbit-config';
 // Stored: the settings in use, the owner's own (`base`: what they saved;
 // the same unless capacity.js slowed the live ones for more people) and
 // the last adjustment (`auto`). GET /config answers only the ones in use.

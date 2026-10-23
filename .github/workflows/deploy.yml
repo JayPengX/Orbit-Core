@@ -51,29 +51,29 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.ref_name }}
-      # The family's data (R2 bucket quadra-data, in Asia-Pacific; data.js):
+      # The family's data (R2 bucket orbit-data, in Asia-Pacific; data.js):
       # made once, and bound to the proxy when it's there. R2 has to be
       # turned on once in the dashboard (README §11); until then the proxy
       # deploys without it and /data/ answers from Shared-Data's Pages.
       - name: The data bucket
         continue-on-error: true
         run: |
-          if ! npx --yes wrangler@4 r2 bucket list 2>/dev/null | grep -qE 'name:\s*quadra-data'; then npx --yes wrangler@4 r2 bucket create quadra-data --location apac; fi
-          printf '\n[[r2_buckets]]\nbinding = "DATA"\nbucket_name = "quadra-data"\n' >> wrangler.toml
-          echo "quadra-data bound as DATA"
+          if ! npx --yes wrangler@4 r2 bucket list 2>/dev/null | grep -qE 'name:\s*orbit-data'; then npx --yes wrangler@4 r2 bucket create orbit-data --location apac; fi
+          printf '\n[[r2_buckets]]\nbinding = "DATA"\nbucket_name = "orbit-data"\n' >> wrangler.toml
+          echo "orbit-data bound as DATA"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      # The Pass's store on Cloudflare (D1 quadra-store, doc-store.js): made
+      # The Pass's store on Cloudflare (D1 orbit-store, doc-store.js): made
       # once and bound to the proxy with its id (the Worker makes its table).
       # The deploy token needs Account · D1 · Edit (README §11).
       - name: The store database
         continue-on-error: true
         run: |
-          id=$(npx --yes wrangler@4 d1 list --json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const d=JSON.parse(s).find(x=>x.name==="quadra-store");console.log(d?d.uuid:"")}catch{console.log("")}})')
-          if [ -z "$id" ]; then npx --yes wrangler@4 d1 create quadra-store --location apac; id=$(npx --yes wrangler@4 d1 list --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const d=JSON.parse(s).find(x=>x.name==="quadra-store");console.log(d?d.uuid:"")})'); fi
+          id=$(npx --yes wrangler@4 d1 list --json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const d=JSON.parse(s).find(x=>x.name==="orbit-store");console.log(d?d.uuid:"")}catch{console.log("")}})')
+          if [ -z "$id" ]; then npx --yes wrangler@4 d1 create orbit-store --location apac; id=$(npx --yes wrangler@4 d1 list --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const d=JSON.parse(s).find(x=>x.name==="orbit-store");console.log(d?d.uuid:"")})'); fi
           [ -n "$id" ] || exit 1
-          printf '\n[[d1_databases]]\nbinding = "STORE"\ndatabase_name = "quadra-store"\ndatabase_id = "%s"\n' "$id" >> wrangler.toml
-          echo "quadra-store bound as STORE ($id)"
+          printf '\n[[d1_databases]]\nbinding = "STORE"\ndatabase_name = "orbit-store"\ndatabase_id = "%s"\n' "$id" >> wrangler.toml
+          echo "orbit-store bound as STORE ($id)"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       # Gemini's relay, pinned to Taiwan (gemini-relay.js): before the proxy that binds it.
