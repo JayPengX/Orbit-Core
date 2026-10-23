@@ -580,7 +580,10 @@ test('TAIEX options written: the premium in, TAIFEX margin held, bought back or 
   assert.deepEqual([done.added[0].side, done.added[0].price, done.added[0].gross, done.added[0].total], ['buy', 500, 25_000, 25_025]);
   const end = SA.replay(done.account, at('2026-11-18T14:00:00'));
   assert.equal(end.positions[put], undefined);
-  assert.equal(SA.available(done.account, end).cash.TWD, end.cash.TWD);
+  // (Past FUT_SPLIT the margin it held stays in the futures account, free, until it's taken out.)
+  const free = SA.available(done.account, end);
+  assert.equal(free.cash.TWD + free.fut, end.cash.TWD);
+  assert.ok(free.fut > 0);
 });
 
 test('TAIEX weekly options: each series by its Wednesday or Friday, priced on the futures it expires with', async () => {

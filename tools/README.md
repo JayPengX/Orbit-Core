@@ -70,7 +70,7 @@ importScripts('../Shared-Proxy/kit/sw.js');
 | `node tools/accent-css.mjs` | Write each app's accent colours (`kit/brand.mjs`) into `kit/orbit.css`; run after changing a brand colour |
 | `node tools/leagues-audit.mjs [--sport soccer] [--json]` | Every catalogue league against its sources today |
 | `node tools/hk-lots.mjs [file.xlsx]` | Every HKEX security's board lot into `kit/stock-hk-lots.mjs` (HKEX's List of Securities); run it now and then for new listings |
-| `node tools/tw-boards.mjs` | Every 興櫃 stock (`TW_EMERGING`) and listed 可轉債 with its maturity (`TW_CB`) into `kit/stock-markets.mjs`, from TPEx open data; run it now and then |
+| `node tools/tw-boards.mjs` | Every 興櫃 stock (`TW_EMERGING`), listed 可轉債 with its maturity (`TW_CB`), 全額交割股 (`TW_FULL`), 創新板 stock (`TW_INNOVATION`) and 槓反期貨 ETF (`TW_LI_FUTURES`) into `kit/stock-markets.mjs`, from TWSE's and TPEx's open data; run it now and then |
 | `node tools/tw-futures.mjs` | Every TAIFEX 股票期貨 and ETF期貨 (`TW_SSF`: code, stock, ETF/上櫃/小型) into `kit/stock-markets.mjs`, from TAIFEX open data; run it now and then for new contracts |
 | `node tools/jp-lists.mjs` | TOPIX500 (Tokyo's finer ticks) and every Tokyo ETF's trading unit into `kit/stock-jp-lists.mjs` (JPX's files; needs `pdftotext`); run it after TOPIX's October review |
 | `node tools/espn.mjs <path> [query]` | The shape of an ESPN answer |
