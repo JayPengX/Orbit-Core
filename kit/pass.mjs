@@ -5,7 +5,7 @@
 //   外觀   an avatar and a frame, free for everyone
 //   App    every app, Orbit's and Orbit's, when it was last used, a way in
 //   說明   every app's guide (help.mjs)
-import { APPS, AVATARS, FRAMES, settingPatch, passAccount, appIcon, el as node } from '#kit/orbit.mjs';
+import { APPS, AVATARS, FRAMES, avatarSrc, settingPatch, passAccount, appIcon, el as node } from '#kit/orbit.mjs';
 import { HELP_ORDER, helpFor } from './help.mjs';
 import { sheet, section } from './ui.mjs';
 
@@ -231,20 +231,20 @@ function renderHelp(box, { q, t, locale }, { app, topic }) {
 
 // Avatars and frames, free for everyone: a tap wears one, a second tap
 // takes it off.
-function looksSection({ t, wornOf, wear }) {
+function looksSection({ t, locale, wornOf, wear }) {
   const avatar = wornOf('avatar');
   const frame = wornOf('frame');
-  const glyph = AVATARS.find(a => a.id === avatar)?.glyph || '🙂';
-  const tile = (key, item, face) => {
+  const face = id => el('img', { class: 'av-face', alt: '', src: avatarSrc(id) });
+  const tile = (key, item, look) => {
     const on = wornOf(key) === item.id;
-    const name = key === 'frame' ? t(`frame_${item.id}`) : item.glyph;
-    return el('button', { class: `av-tile${on ? ' on' : ''}`, type: 'button', 'aria-pressed': String(on), 'aria-label': name, onclick: () => wear(key, on ? null : item.id) }, [face, el('small', { text: on ? t('lookOn') : key === 'frame' ? name : '' })]);
+    const name = key === 'frame' ? t(`frame_${item.id}`) : item[locale];
+    return el('button', { class: `av-tile${on ? ' on' : ''}`, type: 'button', 'aria-pressed': String(on), 'aria-label': name, onclick: () => wear(key, on ? null : item.id) }, key === 'frame' ? [look, el('small', { text: on ? t('lookOn') : name })] : [look]);
   };
   const faces = {
-    avatar: a => el('span', { class: 'av-glyph', 'aria-hidden': 'true', text: a.glyph }),
-    frame: f => el('span', { class: `fr-preview q-framed q-frame-${f.id}${frame === f.id ? ' on' : ''}`, 'aria-hidden': 'true', text: glyph })
+    avatar: a => face(a.id),
+    frame: f => el('span', { class: `fr-preview q-framed q-frame-${f.id}${frame === f.id ? ' on' : ''}`, 'aria-hidden': 'true' }, avatar ? [face(avatar)] : [])
   };
-  const grid = (key, list) => el('div', { class: 'av-grid' }, list.map(x => tile(key, x, faces[key](x))));
+  const grid = (key, list) => el('div', { class: `av-grid ${key}s` }, list.map(x => tile(key, x, faces[key](x))));
   return section(
     t('looksTitle'),
     el('div', { class: 'q-card pad looks' }, [el('small', { class: 'lv-h', text: t('avatarsTitle') }), grid('avatar', AVATARS), el('small', { class: 'lv-h', text: t('framesTitle') }), grid('frame', FRAMES)]),

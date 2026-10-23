@@ -446,14 +446,19 @@ test('the kit and the Worker agree on the pay and the levels', async () => {
 
 test('looks: an avatar and a frame for everyone, from the lists only', () => {
   const now = Date.UTC(2026, 9, 10);
-  const w = { entries: [], settings: { avatar: { value: { id: 'panda' }, t: now }, frame: { value: { id: 'gold' }, t: now } } };
-  assert.equal(kit.avatarOf(w).glyph, '🐼');
+  const w = { entries: [], settings: { avatar: { value: { id: 'mint-ring' }, t: now }, frame: { value: { id: 'gold' }, t: now } } };
+  assert.equal(kit.avatarOf(w).id, 'mint-ring');
   assert.equal(kit.frameOf(w).id, 'gold');
-  assert.equal(kit.avatarOf({ ...w, settings: { avatar: { value: { id: 'boba' }, t: now } } }).glyph, '🧋');
-  assert.equal(kit.avatarOf({ ...w, settings: { avatar: { value: { id: 'unlisted' }, t: now } } }), null);
+  // The emoji ones are gone: an old pick shows the person.
+  assert.equal(kit.avatarOf({ ...w, settings: { avatar: { value: { id: 'panda' }, t: now } } }), null);
+  // Drawn, never emoji, and named in both languages.
+  for (const a of kit.AVATARS) {
+    assert.match(kit.avatarSrc(a.id), /^data:image\/svg\+xml,/);
+    assert.ok(a.zh && a.en && !/\p{Extended_Pictographic}/u.test(decodeURIComponent(kit.avatarSrc(a.id))));
+  }
   // Every id once, and more of them than Plus had.
   for (const list of [kit.AVATARS, kit.FRAMES]) assert.equal(new Set(list.map(x => x.id)).size, list.length);
-  assert.ok(kit.AVATARS.length >= 50 && kit.FRAMES.length >= 25);
+  assert.ok(kit.AVATARS.length >= 90 && kit.FRAMES.length >= 25);
   assert.ok([...kit.AVATARS, ...kit.FRAMES].every(x => !x.streak));
 });
 
