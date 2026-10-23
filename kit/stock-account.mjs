@@ -67,6 +67,7 @@ import { nextTradingStart, isTradingDay } from '#kit/stock-holidays.mjs';
 import { twDay } from '#kit/format.mjs';
 import { TD_MIN, tdRate, addMonths, tdInterest, incomeTaxes, lendable, LEND_RATE, LEND_RATE_MIN, LEND_RATE_MAX, LEND_LOT, LEND_RECALL, lendEnds, addWeekdays, lendFee } from '#kit/stock-savings.mjs';
 import { BONDS, couponDates } from '#kit/stock-bonds.mjs';
+import { accessProblem, leverageOf, fxCapProblem } from '#kit/stock-access.mjs';
 import { creditAccount, creditUsed, dayTradeBuyFirst, dayTradeSellFirst, dayTradeRoom, termDue, afterHours, closingAuction, shortDeposit, SHORT_HANDLING, SHORT_INTEREST } from '#kit/stock-credit.mjs';
 
 export const ACCOUNT_VERSION = 1;
@@ -729,6 +730,13 @@ export function placeOrder(account, req, { quote, rates, valuation, now = Date.n
     const can = Math.max(0, (avail.qty[quote.symbol] || 0) - boughtToday);
     if (qty > can + EPS) return { error: 'tPlus1', can };
   }
+  // What the product needs opened, signed or qualified for first (開戶與交易
+  //資格, stock-access.mjs): only for what opens or adds a position.
+  if (!req.forced && !req.cover) {
+    const opening = quote.market === 'TAIFEX' ? futOpening(s.positions[quote.symbol]?.qty || 0, side, qty) : 0;
+    const gate = accessProblem(account, quote, { side, opening, rr: req.rr ?? null }, now);
+    if (gate) return gate;
+  }
   const order = {
     id,
     symbol: quote.symbol,
@@ -742,7 +750,8 @@ export function placeOrder(account, req, { quote, rates, valuation, now = Date.n
     t: now,
     status: 'open',
     rev: 1,
-    ...(req.fromMargin && side === 'sell' ? { fromMargin: true } : {})
+    ...(req.fromMargin && side === 'sell' ? { fromMargin: true } : {}),
+    ...(side === 'buy' && leverageOf(quote) ? { leveraged: true } : {})
   };
   if (type === 'limit') order.limit = Number(req.limit);
   if (type === 'stop') order.stop = Number(req.stop);
@@ -1096,7 +1105,8 @@ function fillOrder(account, order, price, rates, now, at = now) {
     tax: est.tax,
     fee: est.fee,
     total: est.total,
-    twd: rates[order.currency]
+    twd: rates[order.currency],
+    ...(order.leveraged ? { leveraged: true } : {})
   };
   if (order.forced) fill.forced = true;
   if (order.cover) fill.cover = true;
@@ -1278,6 +1288,9 @@ export function exchange(account, { from, to, amount }, { rates, fxOpen = true, 
   const q = quoteExchange(from, to, amount, rates, fxOpen, now);
   if (!q) return { error: 'fx' };
   if (!(q.received > 0)) return { error: 'tooSmall' };
+  // A person's 結匯 is US$5,000,000 a year each way (stock-access.mjs).
+  const cap = fxCapProblem(account, { from, to, amount, received: q.received }, rates, now);
+  if (cap) return cap;
   const free = withdrawable(account, replay(account, now), now);
   if ((free[from] || 0) + EPS < amount) {
     const pending = unsettled(account, now)[from] || 0;
@@ -1296,7 +1309,8 @@ export function exchange(account, { from, to, amount }, { rates, fxOpen = true, 
     spread: q.spread,
     spreadTWD: q.spreadTWD,
     twdFrom: rates[from],
-    twdTo: rates[to]
+    twdTo: rates[to],
+    usd: rates.USD
   };
   return { account: { ...account, events: [...account.events, event] }, event };
 }
