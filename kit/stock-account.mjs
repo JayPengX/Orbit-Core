@@ -12,6 +12,7 @@
 // counts as owed in the maintenance ratio.
 import {
   BASE,
+  sessionEnd,
   collateralRate,
   CLOSED_FX_MULTIPLIER,
   MARGIN_CALL,
@@ -668,10 +669,12 @@ export function dayOrderEnd(quote, now = Date.now()) {
   const s = quote?.session;
   if (!s || !(s.end > s.start)) return now + 86_400_000;
   const end = (start, close) => Math.min(close, earlyCloseAt(quote.market, start) ?? Infinity);
-  const close = end(s.start, s.end);
+  // (興櫃's session runs to 15:00: sessionEnd.)
+  const long = (sessionEnd(quote) ?? s.end) - s.start;
+  const close = end(s.start, s.start + long);
   if (now < close && s.start - now < 20 * 3_600_000) return close;
   const start = nextTradingStart(quote.market, s.start, quote.tz, now);
-  return end(start, start + (s.end - s.start));
+  return end(start, start + long);
 }
 // Orders past their end: expired, their cash or shares free again.
 export function expireOrders(account, now = Date.now()) {
