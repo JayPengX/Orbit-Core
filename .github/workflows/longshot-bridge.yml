@@ -1,7 +1,7 @@
-# TEMPORARY: deploys Longshot's own Worker (JayPengX/Longshot, worker/)
-# with this repo's Cloudflare token, until the owner adds CLOUDFLARE_API_TOKEN
-# to the Longshot repo, whose worker.yml then takes over.
-# Delete this file then. Longshot shares nothing with this repo's Workers.
+# Deploys Longshot's own Worker (JayPengX/Longshot, worker/) with this
+# repo's Cloudflare token: Jay chose (2026-10-23) not to add a token to the
+# Longshot repo. If it ever has CLOUDFLARE_API_TOKEN, its worker.yml takes
+# over and this file goes. Longshot shares nothing with this repo's Workers.
 name: Longshot bridge
 
 on:
