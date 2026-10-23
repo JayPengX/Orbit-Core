@@ -195,7 +195,8 @@ export function openPass(s, { extra = null, tab = 'pass', help = null } = {}) {
     if (state.tab === 'apps') return renderApps(body, ctx);
     renderHelp(body, ctx, state.help);
   }
-  const onWallet = () => dialog?.open && !Object.keys(pending).length && state.tab !== 'pass' && state.tab !== 'help' && paint();
+  // (The Pass tab only redraws its card: a device code or a note on it stays.)
+  const onWallet = () => dialog?.open && !Object.keys(pending).length && (state.tab === 'pass' ? account?.card?.() : state.tab !== 'help' && paint());
   s.on?.('wallet', onWallet);
   paint();
   // The kit's one sheet (ui.mjs): ✕, Escape, a tap outside and a swipe all close it the same way.

@@ -30,8 +30,7 @@ export const HELP = {
       ]],
       ['looks', '頭像、頭像框與里程碑', [
         '免費的頭像和頭像框隨時換，點一下戴上，再點一下拿下。每個 App 的帳戶按鈕都看得到。',
-        '里程碑每個 App 一個，達成一次就永久保留，送一組專屬頭像和頭像框（一起戴上）。沒達成的會上鎖，下面的進度條顯示還差多少。',
-        '用遍 Orbit：打開過全部 8 個 App。百萬身價：Securities 的身價到 NT$100 萬（之後跌回去也算）。五百字：Words 精熟 500 個字。十首歌：Beats 收藏 10 首歌。十趟旅程：Transit 跟著導航抵達 10 次。十個問題：在 Law 問 10 個問題。鐵粉、看天的人、全勤：分別在 30 天打開 Sports、Weather、Class。'
+        '里程碑每個 App 一個，達成一次就永久保留，送一組專屬頭像和頭像框（一起戴上）。沒達成的會上鎖，格子上寫著要做什麼、還差多少。'
       ]],
       ['devices', '登入與裝置', [
         '新裝置：輸入通行碼，或在已登入的裝置按「新增裝置」拿 8 碼裝置代碼（10 分鐘內、只能用一次）。',
@@ -70,8 +69,7 @@ export const HELP = {
       ]],
       ['looks', 'Avatars, frames and milestones', [
         'The free avatars and frames change any time: tap to wear, tap again to take off. They show on your account button in every app.',
-        'One milestone per app, earned once and kept for good, each with its own avatar and frame (worn together). Until then it’s locked, with a bar showing how far along you are.',
-        'All of Orbit: open all 8 apps. Millionaire: be worth NT$1,000,000 in Securities (it stays if you drop back). 500 words: master 500 in Words. 10 songs: keep 10 songs in Beats. 10 trips: arrive with Transit’s navigation 10 times. 10 questions: ask Law 10 questions. Superfan, Sky watcher, Attendance: open Sports, Weather, Class on 30 days.'
+        'One milestone per app, earned once and kept for good, each with its own avatar and frame (worn together). Until then it’s locked; its tile says what to do and how far along you are.'
       ]],
       ['devices', 'Signing in and devices', [
         'On a new device, enter the pass, or choose “Add a device” on a signed-in one for an 8-character device code (10 minutes, once).',

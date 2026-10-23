@@ -2194,7 +2194,14 @@ export function passAccount(s, { extra = null, close = () => {}, looks = () => {
     node('p', { class: 'q-sheet-sub', text: T('忘記通行碼？在已登入的裝置按「更換通行碼」。', 'Forgot your pass? Choose “Change my pass” on a signed-in device.') }),
     note
   ];
-  return { nodes, stop: () => clearInterval(tick) };
+  // card(): the card drawn again alone (a milestone or a look changed while
+  // the tab is open), the rest (a device code counting down, a note) left as it is.
+  const card = () => {
+    const fresh = accountCard(s, looks);
+    nodes[0].replaceWith(fresh);
+    nodes[0] = fresh;
+  };
+  return { nodes, card, stop: () => clearInterval(tick) };
 }
 export function showNewPass(s, passcode) {
   const en = s.lang === 'en';
