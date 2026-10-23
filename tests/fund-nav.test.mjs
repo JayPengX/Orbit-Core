@@ -1,7 +1,7 @@
 // Taiwan's funds' NAVs from SITCA's CSV (fund-nav.js).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseNav, fundNavResponse, anueCandidates, parseAnueChart } from '../fund-nav.js';
+import { parseNav, fundNavResponse, anueCandidates, parseAnueChart, forgetNav } from '../fund-nav.js';
 import { fundFacts } from '../kit/stock-quotes.mjs';
 
 const CSV = [
@@ -48,4 +48,19 @@ test('Anue history: oldest first, in ms; the profile in our names', () => {
   assert.equal(f.expenseRatio, 0.016);
   assert.ok(Math.abs(f.return3y - (Math.cbrt(5.163) - 1)) < 1e-9);
   assert.equal(f.ytd, 0.955);
+});
+
+test("a short or failed SITCA list (a day off's few dozen) is laid over the last whole one, never taken alone", async () => {
+  const head = '﻿日期,公司代號,公司名稱,基金代號,基金統編,基金名稱,基金淨值,漲跌,幣別,受益憑證代號';
+  const row = (day, code, nav) => `${day},A0001,兆豐投信,01,${code},基金${code},${nav},0.1,TWD,`;
+  const whole = [head, ...Array.from({ length: 2100 }, (_, i) => row('20261022', `F${i}`, 10 + i / 1000))].join('\r\n');
+  const short = [head, row('20261023', 'F1', 99), row('20261023', 'NEW', 5)].join('\r\n');
+  const ask = async (csv, codes) => (await (await fundNavResponse(new URL(`https://funds.orbit/nav.json?codes=${codes}`), async () => (csv ? new Response(csv) : new Response('', { status: 503 })))).json()).funds;
+  forgetNav();
+  assert.equal((await ask(whole, 'F1,F2')).F2.nav, 10.002);
+  forgetNav();
+  const day = await ask(short, 'F1,F2,NEW');
+  assert.deepEqual([day.F1.nav, day.F1.date, day.F2.nav, day.NEW.nav], [99, '2026-10-23', 10.002, 5], "today's few over the rest");
+  forgetNav();
+  assert.equal((await ask(null, 'F2')).F2.nav, 10.002, 'SITCA down: the last whole list');
 });
