@@ -151,6 +151,9 @@ export const TDX_RULES = [
   { re: /^basic\/v2\/Rail\/Metro\/LiveBoard\/[A-Z]+$/, fresh: 20e3, stale: 60e3, tier: 'live' },
   { re: /^basic\/v3\/Rail\/TRA\/(StationLiveBoard(\/Station\/\d+)?|TrainLiveBoard(\/TrainNo\/\w+)?|Alert)$/, fresh: 50e3, stale: 3 * MIN, tier: 'live' },
   { re: /^basic\/v2\/Rail\/THSR\/AlertInfo$/, fresh: 5 * MIN, stale: 30 * MIN, tier: 'live' },
+  // Operators' notices: a bus route or metro line stopped or changed (typhoons, works).
+  { re: /^basic\/v2\/Bus\/(Alert|News)\/(City\/[A-Za-z]+|InterCity)$/, fresh: 3 * MIN, stale: 30 * MIN, tier: 'live' },
+  { re: /^basic\/v2\/Rail\/Metro\/(Alert|News)\/[A-Z]+$/, fresh: 3 * MIN, stale: 30 * MIN, tier: 'live' },
   // Timetables: a day's trains, a metro station's departures.
   { re: /^basic\/v3\/Rail\/TRA\/DailyTrainTimetable\/(TrainDate\/\d{4}-\d{2}-\d{2}|OD\/\d+\/to\/\d+\/\d{4}-\d{2}-\d{2})$/, fresh: 6 * HOUR, stale: DAY, tier: 'timetable' },
   { re: /^basic\/v2\/Rail\/THSR\/DailyTimetable\/(TrainDate\/\d{4}-\d{2}-\d{2}|OD\/\d+\/to\/\d+\/\d{4}-\d{2}-\d{2})$/, fresh: 6 * HOUR, stale: DAY, tier: 'timetable' },
