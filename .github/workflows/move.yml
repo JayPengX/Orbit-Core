@@ -41,11 +41,11 @@ jobs:
           call() { for t in 1 2 3 4 5; do r=$(curl -sf -H "Authorization: Bearer $MOVE_KEY" "$MOVE_URL$1") && { echo "$r"; return 0; }; sleep $((t*5)); done; return 1; }
           q() { node -e 'console.log(encodeURIComponent(process.argv[1]))' "$1"; }
           after='["",""]'; rows=0; changed=0
-          while :; do r=$(call "/d1?after=$(q "$after")"); rows=$((rows+$(echo "$r" | jq .seen))); changed=$((changed+$(echo "$r" | jq .copied))); a=$(echo "$r" | jq -c .after); [ "$a" = null ] && break; after=$a; done
+          while :; do r=$(call "/d1?after=$(q "$after")"); rows=$((rows+$(echo "$r" | jq .seen))); changed=$((changed+$(echo "$r" | jq .copied))); a=$(echo "$r" | jq -c .after); [ "$a" = null ] && break; after=$a; [ $((rows % 2000)) -lt 40 ] && echo "store: $rows rows so far"; done
           echo "store: $rows rows seen, $changed written"
           call /count
           cursor=''; files=0; copied=0
-          while :; do r=$(call "/r2?cursor=$(q "$cursor")"); files=$((files+$(echo "$r" | jq .seen))); copied=$((copied+$(echo "$r" | jq .copied))); c=$(echo "$r" | jq -r '.cursor // empty'); [ -z "$c" ] && break; cursor=$c; done
+          while :; do r=$(call "/r2?cursor=$(q "$cursor")"); files=$((files+$(echo "$r" | jq .seen))); copied=$((copied+$(echo "$r" | jq .copied))); c=$(echo "$r" | jq -r '.cursor // empty'); [ -z "$c" ] && break; cursor=$c; [ $((files % 5000)) -lt 200 ] && echo "data: $files files so far, $copied copied"; done
           echo "data: $files files seen, $copied copied"
       - name: Delete the mover
         if: always()
