@@ -8,6 +8,7 @@
 import { writeFile, readFile, mkdir, rm, access } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { execSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { BRANDS, FAMILY, PASS, appIcon, familyMark, homeOf, pathOf } from '../kit/brand.mjs';
 import { FORMATS, shareCard } from './marks.mjs';
 
@@ -57,14 +58,16 @@ async function cards(id, dir, formats = Object.keys(FORMATS)) {
     const { w, h, file } = FORMATS[format];
     await page.setViewportSize({ width: w, height: h });
     await page.setContent(shareCard(id, format), { waitUntil: 'load' });
-    await page.evaluate(() => document.fonts.ready);
+    await page.evaluate(() => window.fitted || document.fonts.ready);
     await page.screenshot({ path: `${dir}${file}`, type: 'jpeg', quality: 86 });
   }
 }
 const esc = t => String(t).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 
 // The page's name, icons and link-preview tags, as one block.
-function headBlock(id, { href, description, xhtml }) {
+// Each card's link carries ?v= from its picture, so a chat app that kept the
+// old preview fetches the new one.
+function headBlock(id, { href, description, xhtml, ver = {} }) {
   const b = BRANDS[id];
   const fam = FAMILY;
   const home = homeOf(id);
@@ -72,7 +75,8 @@ function headBlock(id, { href, description, xhtml }) {
   const alt = `${b.name} — ${b.tag.zh}`;
   const meta = (k, v, attr = 'name') => `<meta ${attr}="${k}" content="${esc(v)}"${end}`;
   const og = (k, v) => meta(`og:${k}`, v, 'property');
-  const image = (file, w, h) => [og('image', `${home}share/${file}`), og('image:type', 'image/jpeg'), og('image:width', w), og('image:height', h), og('image:alt', alt)];
+  const at = file => `${home}share/${file}${ver[file] ? `?v=${ver[file]}` : ''}`;
+  const image = (file, w, h) => [og('image', at(file)), og('image:type', 'image/jpeg'), og('image:width', w), og('image:height', h), og('image:alt', alt)];
   return [
     '<!-- brand: Shared-Proxy/brand/generate.mjs writes this block -->',
     `<title>${esc(b.name)}</title>`,
@@ -94,7 +98,7 @@ function headBlock(id, { href, description, xhtml }) {
     meta('twitter:card', 'summary_large_image'),
     meta('twitter:title', b.name),
     meta('twitter:description', description),
-    meta('twitter:image', `${home}share/${FORMATS.x.file}`),
+    meta('twitter:image', at(FORMATS.x.file)),
     meta('twitter:image:alt', alt),
     '<!-- /brand -->'
   ].join('\n');
@@ -109,7 +113,9 @@ async function writePage(id, place) {
   let html = await readFile(place.page, 'utf8');
   const { description } = brandPage(html, id);
   const xhtml = / \/>/.test(html.match(/<meta charset[^>]*>/)?.[0] || '');
-  const block = headBlock(id, { href: place.href, description, xhtml });
+  const ver = {};
+  for (const { file } of Object.values(FORMATS)) ver[file] = createHash('sha1').update(await readFile(`${place.site}share/${file}`)).digest('hex').slice(0, 8);
+  const block = headBlock(id, { href: place.href, description, xhtml, ver });
   if (/<!-- brand[\s\S]*?<!-- \/brand -->/.test(html)) html = html.replace(/<!-- brand[\s\S]*?<!-- \/brand -->/, block);
   else {
     const lines = html.split('\n');

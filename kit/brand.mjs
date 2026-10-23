@@ -12,14 +12,14 @@ export const FAMILY = { name: 'Orbit', from: '#312e81', to: '#020617', ink: '#1e
 
 // repo: the GitHub repo (and Pages path) each app lives at.
 export const BRANDS = {
-  stock: { name: 'Orbit Securities', short: 'Securities', repo: 'Orbit-Securities', from: '#2dd4bf', to: '#0f3d5c', ink: '#0f766e', color: '#0d9488', role: { zh: '投資與理財', en: 'Invest and grow' }, tag: { zh: '全球股市模擬投資：真實報價、換匯與融資', en: 'Invest in markets worldwide with play money' } },
-  orbit: { name: 'Orbit Class', short: 'Class', repo: 'Orbit-Class', from: '#7dd3fc', to: '#0c4a6e', ink: '#0369a1', color: '#0ea5e9', role: { zh: '課表', en: 'Class schedule' }, tag: { zh: '即時課表：現在、下一節與倒數', en: 'Your class schedule, live' } },
-  weather: { name: 'Orbit Weather', short: 'Weather', repo: 'Orbit-Weather', from: '#a5b4fc', to: '#312e81', ink: '#4338ca', color: '#6366f1', role: { zh: '天氣', en: 'Weather' }, tag: { zh: '一個答案的天氣：降雨、紫外線、空氣，跟著你的行程', en: 'One clear forecast for wherever you’ll be' } },
-  transit: { name: 'Orbit Transit', short: 'Transit', repo: 'Orbit-Transit', from: '#6ee7b7', to: '#064e3b', ink: '#047857', color: '#10b981', role: { zh: '大眾運輸', en: 'Public transport' }, tag: { zh: '全台公車、火車、捷運與 YouBike，一次規劃', en: 'Buses, trains, metros and bikes across Taiwan' } },
-  match: { name: 'Orbit Sports', short: 'Sports', repo: 'Orbit-Sports', from: '#fdba74', to: '#9a3412', ink: '#c2410c', color: '#ea580c', role: { zh: '賽程與比分', en: 'Scores and schedules' }, tag: { zh: '所有運動的賽程、比分與數據', en: 'Every sport, every match, every stat' } },
-  beats: { name: 'Orbit Beats', short: 'Beats', repo: 'Orbit-Beats', from: '#f0abfc', to: '#701a75', ink: '#a21caf', color: '#c026d3', role: { zh: '節拍作曲', en: 'Beat maker' }, tag: { zh: '把你的節拍片段，排成一首首新歌', en: 'Your beat pieces, arranged into new songs' } },
-  law: { name: 'Orbit Law', short: 'Law', repo: 'Orbit-Law', from: '#a5b4fc', to: '#1e1b4b', ink: '#4338ca', color: '#4f46e5', role: { zh: '法規與法案', en: 'Laws and bills' }, tag: { zh: '台灣的法規，每個條號都能點；立法院的法案，走到哪一步一眼就懂。', en: 'Taiwan\'s laws with linked references, and 立法院 bills by stage' } },
-  vocab: { name: 'Orbit Words', short: 'Words', repo: 'Orbit-Words', from: '#f9a8d4', to: '#831843', ink: '#be185d', color: '#db2777', role: { zh: '英文單字', en: 'English words' }, tag: { zh: '背得住的英文單字：大考 6000 字，真人發音', en: 'English words that stay with you' } }
+  stock: { name: 'Orbit Securities', short: 'Securities', repo: 'Orbit-Securities', from: '#2dd4bf', to: '#0f3d5c', ink: '#0f766e', color: '#0d9488', paint: ['#5eead4', '#0d9488', '#134e4a'], spot: '#fde047', pitch: { zh: '全球股市，模擬投資', en: 'Invest worldwide, risk-free' }, role: { zh: '投資與理財', en: 'Invest and grow' }, tag: { zh: '全球股市模擬投資：真實報價、換匯與融資', en: 'Invest in markets worldwide with play money' } },
+  orbit: { name: 'Orbit Class', short: 'Class', repo: 'Orbit-Class', from: '#7dd3fc', to: '#0c4a6e', ink: '#0369a1', color: '#0ea5e9', paint: ['#67e8f9', '#0891b2', '#164e63'], spot: '#fde047', pitch: { zh: '今天的課，一眼看懂', en: 'Today’s classes at a glance' }, role: { zh: '課表', en: 'Class schedule' }, tag: { zh: '即時課表：現在、下一節與倒數', en: 'Your class schedule, live' } },
+  weather: { name: 'Orbit Weather', short: 'Weather', repo: 'Orbit-Weather', from: '#a5b4fc', to: '#312e81', ink: '#4338ca', color: '#6366f1', paint: ['#93c5fd', '#2563eb', '#1e3a8a'], spot: '#fcd34d', pitch: { zh: '一個答案的天氣', en: 'One clear forecast' }, role: { zh: '天氣', en: 'Weather' }, tag: { zh: '一個答案的天氣：降雨、紫外線、空氣，跟著你的行程', en: 'One clear forecast for wherever you’ll be' } },
+  transit: { name: 'Orbit Transit', short: 'Transit', repo: 'Orbit-Transit', from: '#6ee7b7', to: '#064e3b', ink: '#047857', color: '#10b981', paint: ['#86efac', '#16a34a', '#14532d'], spot: '#fde047', pitch: { zh: '公車、火車、YouBike', en: 'Bus, train and bike' }, role: { zh: '大眾運輸', en: 'Public transport' }, tag: { zh: '全台公車、火車、捷運與 YouBike，一次規劃', en: 'Buses, trains, metros and bikes across Taiwan' } },
+  match: { name: 'Orbit Sports', short: 'Sports', repo: 'Orbit-Sports', from: '#fdba74', to: '#9a3412', ink: '#c2410c', color: '#ea580c', paint: ['#fdba74', '#f97316', '#9a3412'], spot: '#fff', pitch: { zh: '每場比賽，即時比分', en: 'Every game, live' }, role: { zh: '賽程與比分', en: 'Scores and schedules' }, tag: { zh: '所有運動的賽程、比分與數據', en: 'Every sport, every match, every stat' } },
+  beats: { name: 'Orbit Beats', short: 'Beats', repo: 'Orbit-Beats', from: '#f0abfc', to: '#701a75', ink: '#a21caf', color: '#c026d3', paint: ['#f0abfc', '#c026d3', '#581c87'], spot: '#fde047', pitch: { zh: '做出你的節拍', en: 'Make your own beats' }, role: { zh: '節拍作曲', en: 'Beat maker' }, tag: { zh: '把你的節拍片段，排成一首首新歌', en: 'Your beat pieces, arranged into new songs' } },
+  law: { name: 'Orbit Law', short: 'Law', repo: 'Orbit-Law', from: '#a5b4fc', to: '#1e1b4b', ink: '#4338ca', color: '#4f46e5', paint: ['#6366f1', '#3730a3', '#1e1b4b'], spot: '#fcd34d', pitch: { zh: '法規、裁判、立法', en: 'Laws, rulings, bills' }, role: { zh: '法規與法案', en: 'Laws and bills' }, tag: { zh: '台灣的法規，每個條號都能點；立法院的法案，走到哪一步一眼就懂。', en: 'Taiwan\'s laws with linked references, and 立法院 bills by stage' } },
+  vocab: { name: 'Orbit Words', short: 'Words', repo: 'Orbit-Words', from: '#f9a8d4', to: '#831843', ink: '#be185d', color: '#db2777', paint: ['#fda4af', '#e11d48', '#881337'], spot: '#fde047', pitch: { zh: '背得住的英文單字', en: 'Words that stay' }, role: { zh: '英文單字', en: 'English words' }, tag: { zh: '背得住的英文單字：大考 6000 字，真人發音', en: 'English words that stay with you' } }
 };
 export const SITE_URL = 'https://jaypengx.github.io';
 export const pathOf = id => {
@@ -30,46 +30,50 @@ export const pathOf = id => {
 export const homeOf = id => `${SITE_URL}/${BRANDS[id].repo}/`;
 
 // The Orbit Pass: the account, in every app's top-right.
-export const PASS = { name: 'Orbit Pass', short: 'Pass', from: '#334155', to: '#020617', ink: '#0f172a', tag: { zh: '一組通行碼，所有 App 共用', en: 'One pass for every app' } };
+export const PASS = { name: 'Orbit Pass', short: 'Pass', from: '#334155', to: '#020617', ink: '#0f172a', paint: ['#64748b', '#1e293b', '#020617'], spot: GOLD, pitch: { zh: '一組通行碼，所有 App', en: 'One pass, every app' }, tag: { zh: '一組通行碼，所有 App 共用', en: 'One pass for every app' } };
 
-// Each app's symbol in a 128×128 box, drawn in `c` (an accent `a` where it
-// has a second colour).
+// Each app's symbol in a 128×128 box, drawn in `c` (white on the icons),
+// its second colour `a` (the app's `spot`) where it has one, `d` the app's
+// own deep colour (a bus's windows).
 export const GLYPHS = {
-  // A rising line and its arrow.
-  stock: c => `<path d="M22 96 L52 64 L72 80 L106 40" fill="none" stroke="${c}" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/><path d="M82 38 L108 36 L106 62" fill="none" stroke="${c}" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>`,
-  // The day's periods: a card of rows, the one now marked.
-  orbit: c => `<rect x="24" y="22" width="80" height="84" rx="16" fill="none" stroke="${c}" stroke-width="10"/><path d="M44 48 H84 M44 66 H84 M44 84 H70" stroke="${c}" stroke-width="10" stroke-linecap="round"/>`,
+  // A rising line and its arrow, a turn on it lit.
+  stock: (c, a = GOLD) => `<path d="M18 98 L48 66 L70 82 L104 44" fill="none" stroke="${c}" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/><path d="M78 40 L108 38 L106 68" fill="none" stroke="${c}" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/><circle cx="48" cy="66" r="9" fill="${a}"/>`,
+  // The day's timetable: a page with its top bar, the period now lit.
+  orbit: (c, a = GOLD) => `<rect x="20" y="18" width="88" height="94" rx="18" fill="none" stroke="${c}" stroke-width="11"/><path d="M20 44 H108" stroke="${c}" stroke-width="11"/><path d="M42 12 V26 M86 12 V26" stroke="${c}" stroke-width="11" stroke-linecap="round"/><rect x="36" y="58" width="56" height="16" rx="8" fill="${a}"/><path d="M42 92 H74" stroke="${c}" stroke-width="10" stroke-linecap="round"/>`,
   // The sun behind a cloud.
-  weather: (c, a = '#f59e0b') => `<circle cx="78" cy="46" r="22" fill="${a}"/><path d="M34 98 H86 A18 18 0 0 0 86 62 A26 26 0 0 0 38 64 A17 17 0 0 0 34 98 Z" fill="${c}"/>`,
-  // A bus, from the front.
-  transit: (c, a = '#f59e0b') => `<rect x="30" y="18" width="68" height="80" rx="18" fill="none" stroke="${c}" stroke-width="10"/><rect x="40" y="32" width="48" height="28" rx="6" fill="${c}"/><circle cx="46" cy="78" r="6" fill="${a}"/><circle cx="82" cy="78" r="6" fill="${a}"/><path d="M42 98 V110 M86 98 V110" stroke="${c}" stroke-width="10" stroke-linecap="round"/>`,
+  weather: (c, a = GOLD) => `<circle cx="80" cy="44" r="24" fill="${a}"/><path d="M30 102 H88 A20 20 0 0 0 88 62 A28 28 0 0 0 36 64 A19 19 0 0 0 30 102 Z" fill="${c}"/>`,
+  // A bus, from the front, its lights on.
+  transit: (c, a = GOLD, d = '#14532d') => `<rect x="26" y="14" width="76" height="86" rx="20" fill="${c}"/><rect x="38" y="28" width="52" height="30" rx="7" fill="${d}"/><circle cx="45" cy="80" r="7" fill="${a}"/><circle cx="83" cy="80" r="7" fill="${a}"/><path d="M42 100 V112 M86 100 V112" stroke="${c}" stroke-width="12" stroke-linecap="round"/>`,
   // A ball and its seams.
-  match: c => `<circle cx="64" cy="64" r="42" fill="none" stroke="${c}" stroke-width="10"/><path d="M64 22 V106 M22 64 H106" stroke="${c}" stroke-width="8"/><path d="M34 34 C48 48 48 80 34 94 M94 34 C80 48 80 80 94 94" fill="none" stroke="${c}" stroke-width="8" stroke-linecap="round"/>`,
-  // An open book.
-  vocab: c => `<path d="M64 38 C52 28 34 26 18 30 V100 C34 96 52 98 64 108 C76 98 94 96 110 100 V30 C94 26 76 28 64 38 Z" fill="none" stroke="${c}" stroke-width="10" stroke-linejoin="round"/><path d="M64 38 V106" stroke="${c}" stroke-width="10" stroke-linecap="round"/>`,
+  match: c => `<circle cx="64" cy="64" r="44" fill="none" stroke="${c}" stroke-width="11"/><path d="M64 20 V108 M20 64 H108" stroke="${c}" stroke-width="9"/><path d="M33 33 C48 48 48 80 33 95 M95 33 C80 48 80 80 95 95" fill="none" stroke="${c}" stroke-width="9" stroke-linecap="round"/>`,
+  // An open book, a bookmark in it.
+  vocab: (c, a = GOLD) => `<path d="M64 36 C52 26 32 24 14 28 V100 C32 96 52 98 64 108 C76 98 96 96 114 100 V28 C96 24 76 26 64 36 Z" fill="none" stroke="${c}" stroke-width="11" stroke-linejoin="round"/><path d="M64 36 V106" stroke="${c}" stroke-width="11" stroke-linecap="round"/><path d="M82 30 V62 L90 55 L98 62 V27" fill="${a}"/>`,
   // A waveform: five bars, the middle one tallest, a beat lit on it.
-  beats: (c, a = '#f472b6') => `<path d="M24 52 V76 M44 38 V90 M64 22 V106 M84 38 V90 M104 52 V76" stroke="${c}" stroke-width="12" stroke-linecap="round"/><circle cx="64" cy="64" r="9" fill="${a}"/>`,
-  // A pair of scales: a post, a beam, two pans.
-  law: c => `<path d="M64 22 V100 M46 106 H82 M30 36 H98" fill="none" stroke="${c}" stroke-width="10" stroke-linecap="round"/><path d="M30 36 L16 70 M30 36 L44 70 M98 36 L84 70 M98 36 L112 70" fill="none" stroke="${c}" stroke-width="6" stroke-linecap="round"/><path d="M16 70 A14 14 0 0 0 44 70 Z M84 70 A14 14 0 0 0 112 70 Z" fill="${c}" stroke="${c}" stroke-width="4" stroke-linejoin="round"/>`,
+  beats: (c, a = GOLD) => `<path d="M22 52 V76 M43 36 V92 M64 18 V110 M85 36 V92 M106 52 V76" stroke="${c}" stroke-width="13" stroke-linecap="round"/><circle cx="64" cy="64" r="10" fill="${a}"/>`,
+  // A pair of scales: a post, a beam, two gold pans.
+  law: (c, a = GOLD) => `<path d="M64 20 V102 M42 108 H86 M26 34 H102" fill="none" stroke="${c}" stroke-width="11" stroke-linecap="round"/><circle cx="64" cy="22" r="8" fill="${c}"/><path d="M26 34 L12 70 M26 34 L40 70 M102 34 L88 70 M102 34 L116 70" fill="none" stroke="${c}" stroke-width="6" stroke-linecap="round"/><path d="M10 70 A16 16 0 0 0 42 70 Z M86 70 A16 16 0 0 0 118 70 Z" fill="${a}" stroke="${a}" stroke-width="4" stroke-linejoin="round"/>`,
   // The pass: a card with its chip.
-  pass: (c, a = GOLD) => `<rect x="16" y="32" width="96" height="64" rx="12" fill="none" stroke="${c}" stroke-width="10"/><rect x="30" y="50" width="22" height="16" rx="4" fill="${a}"/><path d="M30 80 H72" stroke="${c}" stroke-width="8" stroke-linecap="round"/>`
+  pass: (c, a = GOLD) => `<rect x="12" y="28" width="104" height="72" rx="14" fill="none" stroke="${c}" stroke-width="11"/><rect x="28" y="48" width="26" height="20" rx="5" fill="${a}"/><path d="M28 82 H76" stroke="${c}" stroke-width="9" stroke-linecap="round"/>`
 };
 
 const of = id => (id === 'pass' ? PASS : BRANDS[id]);
+// The app's colour, bright at the top to deep at the foot, lit from the top left.
 const bg = (id, a, { shape }) => {
   const r = shape === 'rounded' ? 116 : 0;
-  return `<defs><linearGradient id="${id}-bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${a.from}"/><stop offset="1" stop-color="${a.to}"/></linearGradient><radialGradient id="${id}-hl" cx="0.22" cy="0.15" r="0.85"><stop offset="0" stop-color="#fff" stop-opacity="0.3"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs><rect width="512" height="512" rx="${r}" fill="url(#${id}-bg)"/><rect width="512" height="512" rx="${r}" fill="url(#${id}-hl)"/>`;
+  const [hi, mid, lo] = a.paint || [a.from, a.ink, a.to];
+  return `<defs><linearGradient id="${id}-bg" x1="0.15" y1="0" x2="0.6" y2="1"><stop offset="0" stop-color="${hi}"/><stop offset="0.5" stop-color="${mid}"/><stop offset="1" stop-color="${lo}"/></linearGradient><radialGradient id="${id}-hl" cx="0.2" cy="0.05" r="0.75"><stop offset="0" stop-color="#fff" stop-opacity="0.32"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient><filter id="${id}-sh" filterUnits="userSpaceOnUse" x="0" y="0" width="512" height="512"><feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#000" flood-opacity="0.3"/></filter></defs><rect width="512" height="512" rx="${r}" fill="url(#${id}-bg)"/><rect width="512" height="512" rx="${r}" fill="url(#${id}-hl)"/>`;
 };
-// The family's sign on an icon, inside `s` (1 full size, less for a
-// maskable icon's safe zone), centred on 256.
-const orbitFace = (id, a, s) => `<g transform="translate(${256 - 256 * s} ${256 - 256 * s}) scale(${s})"><ellipse cx="256" cy="256" rx="218" ry="78" transform="rotate(-24 256 256)" fill="none" stroke="#fff" stroke-opacity="0.5" stroke-width="18"/><circle cx="256" cy="256" r="142" fill="#fff"/><ellipse cx="256" cy="256" rx="218" ry="78" transform="rotate(-24 256 256)" fill="none" stroke="#fff" stroke-width="18" stroke-dasharray="0 330 420 2000" stroke-linecap="round"/><circle cx="438" cy="152" r="24" fill="#fff"/><g transform="translate(158 158) scale(1.53125)">${GLYPHS[id](a.ink)}</g></g>`;
+// The family's sign behind every symbol: a tilted orbit and its moon. The
+// symbol itself big and white, so it reads at a home screen's size. Inside
+// `s` (1 full size, less for a maskable icon's safe zone), centred on 256.
+const orbitFace = (id, a, s) => `<g transform="translate(${256 - 256 * s} ${256 - 256 * s}) scale(${s})"><ellipse cx="256" cy="256" rx="236" ry="92" transform="rotate(-24 256 256)" fill="none" stroke="#fff" stroke-opacity="0.3" stroke-width="14"/><circle cx="424" cy="131" r="20" fill="#fff"/><g filter="url(#${id}-sh)"><g transform="translate(${256 - 64 * 2.3} ${256 - 64 * 2.3}) scale(2.3)">${GLYPHS[id]('#fff', a.spot, a.paint?.[1])}</g></g></g>`;
 
 // An app's icon (512×512). shape: 'rounded' (a favicon, a picture in a
 // page), 'square' (a home-screen icon: the phone rounds it) or 'maskable'
 // (Android's adaptive icon: the sign inside the middle 80%).
 export function appIcon(id, { shape = 'rounded' } = {}) {
   const a = of(id);
-  const s = shape === 'maskable' ? 0.78 : 1;
+  const s = shape === 'maskable' ? 0.8 : 1;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">${bg(id, a, { shape })}${orbitFace(id, a, s)}</svg>`;
 }
 
