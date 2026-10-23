@@ -98,7 +98,7 @@ test('a county: the official word first, else one chance for the whole county', 
   const ty = parseTyphoonCap(raw('warning-sea.cap'), NOW);
   const dg = parseDgpa(raw('dgpa.html'));
   const off = dayOffFor('台北市', ty, dg, NOW);
-  assert.deepEqual(off.official.lines, [{ text: '明天停止上班、停止上課', off: 'all' }]);
+  assert.deepEqual(off.official.lines, [{ text: '明天停止上班、停止上課', off: 'all', at: null }]);
   assert.equal(off.chance, undefined);
   // 新竹市 named nothing for tomorrow on a quiet page: the chance.
   // (The storm held where it is now, far out at sea; a dry day.)
@@ -127,7 +127,7 @@ test('a county: the official word first, else one chance for the whole county', 
   // 尚未宣布消息 for the county: still the chance; a few towns' decisions go under it.
   const pending = dayOffFor('臺東縣', far, { at: 1, counties: { 臺東縣: '尚未宣布消息。 綠島鄉:今天下午停止上班、停止上課。' } }, NOW);
   assert.equal(typeof pending.chance, 'number');
-  assert.deepEqual(pending.local.lines, [{ text: '綠島鄉:今天下午停止上班、停止上課', off: 'all' }]);
+  assert.deepEqual(pending.local.lines, [{ text: '綠島鄉:今天下午停止上班、停止上課', off: 'all', at: null }]);
   assert.equal(dayOffFor('新竹市', far, { counties: { 新竹市: '尚未宣布消息' } }, NOW).official, undefined);
   // Neighbours deciding the day move it: closed up, open down; another day's
   // word for the county itself goes under the chance.
@@ -140,7 +140,7 @@ test('a county: the official word first, else one chance for the whole county', 
   assert.ok(open.chance < alone, `${open.chance} vs ${alone}`);
   const today = dayOffFor('新竹市', ty, page({ 新竹市: '今天照常上班、照常上課。' }), NOW);
   assert.equal(typeof today.chance, 'number');
-  assert.deepEqual(today.local.lines, [{ text: '今天照常上班、照常上課', off: 'open' }]);
+  assert.deepEqual(today.local.lines, [{ text: '今天照常上班、照常上課', off: 'open', at: null }]);
   // No rain forecast and no lamp: left out, not read as calm and dry.
   const blind = dayOffFor('新竹縣', ty, null, NOW);
   assert.equal(blind.why.mm, null);
@@ -253,4 +253,24 @@ test("a place's closures for every app: county, its own town, the exchange's rul
   assert.equal(offFrom('今天下午04:00起停止上班'), '16:00');
   assert.equal(offFrom('明天停止上班'), null);
   assert.deepEqual(closuresFor({ counties: { 臺北市: '尚未宣布消息' } }, '臺北市'), {});
+});
+
+test('the day asked about is a working day; each decision keeps when it first showed', async () => {
+  const { stampSeen, parseDgpa } = await import('../typhoon.js');
+  // Friday 10/23 after 10:00: Monday 10/26 is 光復節補假, so Tuesday.
+  assert.equal(targetDay(Date.parse('2026-10-23T13:00:00+08:00')), '2026-10-27');
+  assert.equal(targetDay(Date.parse('2026-10-23T09:00:00+08:00')), '2026-10-23');
+  assert.equal(targetDay(Date.parse('2026-10-21T13:00:00+08:00')), '2026-10-22');
+  const thu = { at: Date.parse('2026-10-22T19:11:00+08:00'), counties: { 新竹縣: '明天停止上班、停止上課。' } };
+  const first = stampSeen(thu, null, thu.at);
+  assert.deepEqual(Object.values(first), [null], 'already there when first read: unknown');
+  const before = { at: Date.parse('2026-10-22T18:00:00+08:00'), counties: { 新竹縣: '尚未宣布消息' } };
+  const s0 = stampSeen(before, {}, before.at);
+  const s1 = stampSeen(thu, s0, thu.at);
+  // After midnight the page says 今天…: the same decision, its time kept.
+  const fri = { at: Date.parse('2026-10-23T06:00:00+08:00'), counties: { 新竹縣: '今天停止上班、停止上課。' } };
+  const s2 = stampSeen(fri, s1, fri.at);
+  assert.deepEqual(Object.values(s2), [thu.at]);
+  const off = dayOffFor('新竹縣', parseTyphoonCap(raw('warning-sea.cap'), fri.at), { ...fri, seen: s2 }, Date.parse('2026-10-23T09:00:00+08:00'));
+  assert.equal(off.official.lines[0].at, thu.at);
 });
