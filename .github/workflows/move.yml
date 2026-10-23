@@ -4,6 +4,14 @@
 name: Move store and data to Orbit names
 on:
   workflow_dispatch:
+    inputs:
+      key:
+        description: The mover's key (the caller drives the copy); empty runs the copy here
+        required: false
+      delete:
+        description: Only delete the mover
+        type: boolean
+        default: false
 jobs:
   move:
     runs-on: ubuntu-latest
@@ -17,6 +25,7 @@ jobs:
           [ -n "$id" ] || { echo "the token sees no account"; exit 1; }
           echo "CLOUDFLARE_ACCOUNT_ID=$id" >> "$GITHUB_ENV"
       - name: Make the new bucket and database, deploy the mover
+        if: ${{ !inputs.delete }}
         run: |
           set -e
           cd tools/move
@@ -30,11 +39,12 @@ jobs:
           url=$(grep -oE 'https://orbit-move\.[a-z0-9-]+\.workers\.dev' deploy.log | head -1)
           [ -n "$url" ] || { echo "no workers.dev address"; exit 1; }
           echo "MOVE_URL=$url" >> "$GITHUB_ENV"
-          key=$(openssl rand -hex 24)
+          key="${{ inputs.key }}"; [ -n "$key" ] || key=$(openssl rand -hex 24)
           echo "::add-mask::$key"
           echo "MOVE_KEY=$key" >> "$GITHUB_ENV"
           printf '%s' "$key" | npx --yes wrangler@4 secret put MOVE_KEY
       - name: Copy
+        if: ${{ !inputs.key && !inputs.delete }}
         run: |
           set -e
           sleep 20
@@ -45,5 +55,5 @@ jobs:
           echo "store: $rows rows seen, $changed written"
           call /count
       - name: Delete the mover
-        if: always()
+        if: ${{ always() && (!inputs.key || inputs.delete) }}
         run: npx --yes wrangler@4 delete --name orbit-move --force || true

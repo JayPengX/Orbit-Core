@@ -61,6 +61,8 @@ jobs:
           if ! npx --yes wrangler@4 r2 bucket list 2>/dev/null | grep -qE 'name:\s*orbit-data'; then npx --yes wrangler@4 r2 bucket create orbit-data --location apac; fi
           printf '\n[[r2_buckets]]\nbinding = "DATA"\nbucket_name = "orbit-data"\n' >> wrangler.toml
           echo "orbit-data bound as DATA"
+          # The old bucket, read when a file isn't in orbit-data yet (data.js withOldData).
+          if npx --yes wrangler@4 r2 bucket list 2>/dev/null | grep -qE 'name:\s*quadra-data'; then printf '\n[[r2_buckets]]\nbinding = "OLD_DATA"\nbucket_name = "quadra-data"\n' >> wrangler.toml; echo "quadra-data bound as OLD_DATA"; fi
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       # The Pass's store on Cloudflare (D1 orbit-store, doc-store.js): made
