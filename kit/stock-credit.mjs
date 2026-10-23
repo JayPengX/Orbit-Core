@@ -10,6 +10,7 @@
 import { addMonths } from '#kit/stock-savings.mjs';
 import { localDayOf } from '#kit/stock-markets.mjs';
 import { isTradingDay } from '#kit/stock-holidays.mjs';
+import { accessState, nextBusinessOpen, ACCESS_SINCE } from '#kit/stock-access.mjs';
 
 const DAY = 86_400_000;
 const YEAR = 365 * DAY;
@@ -45,12 +46,9 @@ export const SHORT_HANDLING = 0.0008;
 export const SHORT_INTEREST = 0.002;
 export const shortDeposit = value => Math.max(0, Math.ceil((SHORT_DEPOSIT * value) / 100 - 1e-9) * 100);
 // Day trading (現股當沖), TWSE's 當日沖銷作業辦法: either way round (buying
-// then selling the same day, or selling first and buying back), the account
-// open three months with ten trades in the last year, or a credit account
-// (信用帳戶) open, which needs as much. A day-trade short not bought back by
-// the close is bought back for the account.
-export const DAY_TRADE_BUY_FIRST_MONTHS = 3;
-export const DAY_TRADE_SELL_FIRST_MONTHS = 3;
+// then selling the same day, or selling first and buying back), once
+// applied for (stock-access.mjs `daytrade`). A day-trade short not bought
+// back by the close is bought back for the account.
 // The day's day-trade limit (當沖額度), as a Taiwan broker sets it from what
 // the account is worth: twice its net worth in NT$, in steps of NT$100,000,
 // at least NT$500,000 (a new account's usual 委託額度) and at most
@@ -87,13 +85,19 @@ export function yearOfTrading(account, now = Date.now()) {
 
 const monthsOpen = (account, months, now) => Boolean(account?.created) && addMonths(account.created, months) <= now;
 
-// The credit account: { open, limit, since }. Every account opens one the
-// same way (openCredit), once it meets the rules.
+// The credit account: { open, limit, since, pending }. Every account opens
+// one the same way (openCredit), once it meets the rules: the 融資融券契約
+// and its 風險預告書 signed, the broker opening it the next trading day
+// (`from`; a raised limit too: until then the old one).
 export function creditAccount(account, now = Date.now()) {
-  const opened = (account?.events || []).filter(e => e.type === 'credit' && e.t <= now).sort((a, b) => a.t - b.t);
+  const asked = (account?.events || []).filter(e => e.type === 'credit' && e.t <= now).sort((a, b) => a.t - b.t);
+  const opened = asked.filter(e => (e.from ?? e.t) <= now);
   const last = opened.at(-1);
-  return last ? { open: true, limit: last.limit, since: opened[0].t } : { open: false, limit: 0, since: null };
+  const waiting = asked.find(e => (e.from ?? e.t) > now);
+  const pending = waiting ? { from: waiting.from, limit: waiting.limit } : null;
+  return last ? { open: true, limit: last.limit, since: opened[0].from ?? opened[0].t, pending } : { open: false, limit: 0, since: null, pending };
 }
+export const CREDIT_DOCS = ['creditContract', 'creditRisk'];
 
 // Whether `limit` can be had now, and why not: { ok, needs: [{ key, have, want }] }.
 export function creditCheck(account, limit, netWorthTWD, now = Date.now()) {
@@ -111,17 +115,23 @@ export function bestTier(account, netWorthTWD, now = Date.now()) {
 }
 
 // Opens the credit account (or raises its limit). Returns { account, event } or { error, needs }.
-export function openCredit(account, limit, netWorthTWD, now = Date.now()) {
+export function openCredit(account, limit, netWorthTWD, now = Date.now(), { docs = [] } = {}) {
   const check = creditCheck(account, limit, netWorthTWD, now);
   if (!check.ok) return { error: 'credit', needs: check.needs };
-  const event = { id: `credit:${now}`, type: 'credit', t: now, limit };
+  if (creditAccount(account, now).pending) return { error: 'accessDone' };
+  const first = !creditAccount(account, now).open;
+  if (first && CREDIT_DOCS.some(d => !docs.includes(d))) return { error: 'accessDocs', docs: CREDIT_DOCS.filter(d => !docs.includes(d)) };
+  const event = { id: `credit:${now}`, type: 'credit', t: now, from: nextBusinessOpen(now), limit };
+  if (first) event.docs = CREDIT_DOCS;
   return { account: { ...account, events: [...account.events, event] }, event };
 }
 
-// Day trading allowed, and which way.
-const dayTrader = (account, months, now) => creditAccount(account, now).open || (monthsOpen(account, months, now) && yearOfTrading(account, now).trades >= CREDIT_MIN_TRADES);
-export const dayTradeBuyFirst = (account, now = Date.now()) => dayTrader(account, DAY_TRADE_BUY_FIRST_MONTHS, now);
-export const dayTradeSellFirst = (account, now = Date.now()) => dayTrader(account, DAY_TRADE_SELL_FIRST_MONTHS, now);
+// Day trading allowed, and which way: either way once applied for (the
+// rules met and the 當沖 papers signed: stock-access.mjs `daytrade`).
+// (Before the rules came, ACCESS_SINCE: the old one, three months open with ten trades in the last year, or a credit account.)
+const dayTrader = (account, now) => (now < ACCESS_SINCE ? creditAccount(account, now).open || (monthsOpen(account, 3, now) && yearOfTrading(account, now).trades >= CREDIT_MIN_TRADES) : accessState(account, 'daytrade', now).open);
+export const dayTradeBuyFirst = (account, now = Date.now()) => dayTrader(account, now);
+export const dayTradeSellFirst = (account, now = Date.now()) => dayTrader(account, now);
 
 // What the credit account has out now, in NT$ at cost: 融資 lent and 融券 sold.
 export function creditUsed(valuation) {
