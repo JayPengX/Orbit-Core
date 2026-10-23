@@ -13,6 +13,8 @@
 //   GET /transit/search   places by name: Google's autocomplete, or
 //                         OpenStreetMap's search past the cap
 //   GET /transit/place    one place's position and name (Google Place Details)
+//   GET /transit/running  ?city=: which of a city's bus routes have a bus on
+//                         the road now (from TDX's estimates, one ask a city)
 //   GET /transit/route    plans from A to B: Google's transit routes and TDX's
 //                         planner, made one shape (the app adds YouBike plans)
 //   GET /transit/status   (open) this month's use against each cap, which
@@ -202,6 +204,49 @@ export function tdxRequest(raw) {
   }
   out.push('$format=JSON');
   return { path, query: out.join('&'), rule };
+}
+
+// ---- Which buses are on the road ------------------------------------------------------
+
+// A city's estimates (TDX N1, every stop of every route) → { RouteUID: n }:
+// how many of its stops have a bus coming now (0: none on the road), -1 when
+// TDX says 今日未營運 at every stop. A phone reads this (a few KB) instead of
+// the city's whole answer, to tell a route that isn't running (a typhoon,
+// most of 新竹's buses on 2026-10-23) from one between its buses.
+export function runningOf(rows) {
+  const out = {};
+  const off = {};
+  for (const r of Array.isArray(rows) ? rows : []) {
+    const uid = r?.RouteUID;
+    if (!uid) continue;
+    out[uid] ??= 0;
+    off[uid] ??= true;
+    const st = Number(r.StopStatus) || 0;
+    if (st === 0 && r.EstimateTime != null) out[uid]++;
+    if (st !== 4) off[uid] = false;
+  }
+  for (const uid of Object.keys(out)) if (!out[uid] && off[uid]) out[uid] = -1;
+  return out;
+}
+const RUN_CITY = /^(InterCity|[A-Z][A-Za-z]+)$/;
+const runMemo = new Map();
+export async function running(env, city, deps = {}) {
+  if (!RUN_CITY.test(city)) return { status: 400, body: { code: 'BAD_CITY' } };
+  const now = deps.now ?? Date.now();
+  const kept = runMemo.get(city);
+  if (kept && now - kept.at < 50e3) return { status: 200, body: kept };
+  const scope = city === 'InterCity' ? 'InterCity' : `City/${city}`;
+  const got = await tdxGet(env, `basic/v2/Bus/EstimatedTimeOfArrival/${scope}?$select=RouteUID,StopStatus,EstimateTime&$top=60000`, deps);
+  if (got.status !== 200 || got.body == null) return kept ? { status: 200, body: kept } : { status: got.status || 502, body: { code: 'TDX_FAILED' } };
+  let rows;
+  try {
+    rows = JSON.parse(got.body);
+  } catch {
+    return { status: 502, body: { code: 'TDX_FAILED' } };
+  }
+  const body = { at: now - (got.age || 0), routes: runningOf(rows) };
+  runMemo.set(city, body);
+  return { status: 200, body };
 }
 
 // The access token (a day long): kept in memory and KV, asked for again an
@@ -1205,6 +1250,10 @@ async function transitRoute(request, env, headers, path, { session = null, limit
     // (A dev page gets NLSC's map: the browser key works only on the site, and no map load is spent.)
     const google = !session.dev && Boolean(env.GOOGLE_MAPS_BROWSER_KEY) && (await spend(env, 'maps', 1, now, ctx));
     return send({ map: google ? { provider: 'google', key: env.GOOGLE_MAPS_BROWSER_KEY } : { provider: 'nlsc' }, search: googleKey(env) ? 'google' : 'osm', tdx: Boolean(env.TDX_CLIENT_ID) });
+  }
+  if (path === '/transit/running') {
+    const got = await running(env, q.get('city') || '', deps);
+    return send(got.body, got.status);
   }
   if (path === '/transit/tdx') {
     const got = await tdxGet(env, q.get('p') || '', deps);
