@@ -5,9 +5,9 @@
 // every app with a payload (Orbit Words, Orbit Weather); the
 // app brings only its own decode, merge and encode.
 //
-// Only one app on one device is live on a Pass at a time (the Worker refuses
-// a write from any other), but an app sent to the background isn't told when
-// another device (or the same app elsewhere) took over and wrote: it still
+// Each app is live in one place at a time (the Worker refuses a write from
+// the same app anywhere else), but an app sent to the background isn't told
+// when the same app on another device took over and wrote: it still
 // holds `active` from before when it comes back. So the Pass's copy counts
 // as unread again (`stale`) whenever this app may have stopped being the
 // live one: on coming back to the screen, at any change of `active`, and

@@ -22,9 +22,10 @@
 // NT$ money pool (play money only), and the pass is the only place anything
 // is saved.
 //
-// One app at a time: the app in use is the account's live one. Opening
-// another app (or the same app on another device) makes that one live; the
-// one left behind stops refreshing and shows where Orbit is open, with a
+// Every app at once, each in one place: Sports, Securities and the rest all
+// run side by side, but one app runs on one device at a time (Safari and the
+// home-screen app count as two). Opening the same app somewhere else makes
+// that one live; the one left behind stops refreshing and says so, with a
 // button to continue there. Links between the apps carry the sign-in along.
 
 import { BRANDS, FAMILY, pathOf, appIcon, familyMark } from './brand.mjs';
@@ -1227,8 +1228,8 @@ function keepStatusStrip() {
 }
 if (typeof document !== 'undefined') document.body ? keepStatusStrip() : document.addEventListener('DOMContentLoaded', keepStatusStrip);
 
-// The heartbeat (another device's changes, whether this app is still the live
-// one) every 2 minutes: a read of the pass each time; back on screen it's
+// The heartbeat (another device's changes, whether this is still the app's
+// live session) every 2 minutes: a read of the pass each time; back on screen it's
 // asked at once anyway (wake), and a write from an app no longer live is
 // refused by the Worker whatever the beat.
 export function orbitSession(app, { lang = detectLang(), heartbeat = 120_000 } = {}) {
@@ -1787,7 +1788,7 @@ const ERR = {
   ECO_LOAN_NONE: ['沒有未還清的信貸。', 'There’s no loan to pay off.'],
   ECO_LOAN_REFUSED: ['銀行婉拒了這筆申請。', 'The bank turned this application down.'],
   ECO_RELIEF_REFUSED: ['目前不符合急難紓困資格。', 'You don’t qualify for relief right now.'],
-  ECO_SESSION_MOVED: ['帳戶正在另一個 App 使用中，回到這裡後再試一次。', 'Your account is in use in another app. Come back here and try again.'],
+  ECO_SESSION_MOVED: ['這個 App 已在別處開啟，回到這裡後再試一次。', 'This app is open somewhere else. Come back here and try again.'],
   INVALID_PASSCODE: ['請輸入 10 碼通行碼（例如 ABCDE-23456）或 8 碼裝置代碼。', 'Enter your 10-character pass (like ABCDE-23456) or an 8-character device code.']
 };
 export const errorText = (error, lang) => {
@@ -1887,17 +1888,16 @@ function signInGate(s) {
   });
 }
 
-// "Orbit is open in another app": this one waits.
+// "This app is open somewhere else": this one waits.
 let movedEl = null;
 function showMoved(s) {
   if (movedEl || typeof document === 'undefined') return;
   const en = s.lang === 'en';
-  const where = s.live?.app && APPS[s.live.app] ? APPS[s.live.app].name : en ? 'another app' : '另一個 App';
-  const same = s.live?.app === s.app;
+  const name = APPS[s.app]?.name || 'Orbit';
   movedEl = node('dialog', { class: 'q-moved', 'aria-modal': 'true' }, [
     node('div', { class: 'q-moved-box' }, [
-      node('p', { class: 'q-moved-title', text: same ? (en ? 'Open on another device' : '已在其他裝置使用') : en ? `In use in ${where}` : `正在 ${where} 使用中` }),
-      node('p', { class: 'q-moved-text', text: en ? 'Orbit runs in one app at a time. This one paused so nothing gets out of step.' : 'Orbit 一次只在一個 App 使用，這裡先暫停，資料才不會互相覆蓋。' }),
+      node('p', { class: 'q-moved-title', text: en ? 'Open somewhere else' : '已在別處開啟' }),
+      node('p', { class: 'q-moved-text', text: en ? `${name} was opened on another device or in another browser, so it paused here. Your other Orbit apps keep running.` : `${name} 已在其他裝置或瀏覽器開啟，這裡先暫停；其他 Orbit App 照常使用。` }),
       node('button', {
         class: 'q-btn primary block',
         type: 'button',
