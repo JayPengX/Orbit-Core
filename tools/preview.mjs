@@ -8,6 +8,7 @@
 //                          [--geo lat,lon]  (where the phone is; Transit's default 新竹車站)
 //                          [--geo-path 'lat,lon;…' --geo-every ms]  (the phone moving, during --wait)
 //                          [--safari]  (opened in Safari, not from the home screen: the install screen)
+//                          [--query 'install=next']  (the page's address with that ?query)
 //                          [--signed-out]  (the sign-in screen, as a new device sees it)
 //                          [--entry '{json}']  (a wallet entry to add: an economy scenario)
 //                          [--clock 2026-10-06T10:05]  (the page's clock, Taipei time)
@@ -193,6 +194,8 @@ const reopen = flag('reopen') || Boolean(upgrade) || Boolean(net);
 const freezes = flag('freezes');
 // --profile: where the page's main thread spent its time until the loading
 // screen went (Chromium): each function's own time, the 15 largest.
+// --query: the page opened at ?<query> (the install relay's ?install=next).
+const query = opt('query', '');
 const profileFor = Number(opt('profile-for', 0));
 const profile = flag('profile') || profileFor > 0;
 // --cpu N: (Chromium) the page's processor N times slower, about a phone's
@@ -913,7 +916,7 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
   const cdp = profile && engine !== 'webkit' ? await context.newCDPSession(page) : null;
   if (cdp) await cdp.send('Profiler.enable').then(() => cdp.send('Profiler.setSamplingInterval', { interval: 500 })).then(() => cdp.send('Profiler.start'));
   // (With --net, from the page's first bytes: a slow connection's whole load is what's measured below.)
-  const went = await page.goto(key === 'admin' ? `${base}admin/` : `${base}${hash ? `#${hash}` : ''}`, net ? { waitUntil: 'commit' } : {}).then(() => '', e => e.message.split('\n')[0]);
+  const went = await page.goto(key === 'admin' ? `${base}admin/` : `${base}${query ? `?${query}` : ''}${hash ? `#${hash}` : ''}`, net ? { waitUntil: 'commit' } : {}).then(() => '', e => e.message.split('\n')[0]);
   if (went) console.log(`net: the page didn't open (${went})`);
   if (net && !first && !went) {
     // When the loading screen went (a person stuck behind it is the bug), and what the page says.
