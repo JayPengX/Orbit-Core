@@ -60,14 +60,51 @@ export function parseNav(text) {
 }
 
 let kept = null;
+// The last whole list: SITCA's on a day off (a typhoon's 停班, 2026-10-23)
+// held 36 funds of thousands, and every fund's price was gone. A short or
+// failed list is laid over the last whole one (this isolate's, else the
+// colo's cache, two weeks), never taken alone.
+const MIN_FUNDS = 2000;
+const WHOLE_URL = `https://${FUND_HOST}/whole-nav.json`;
+let whole = null;
+const cache = () => (typeof caches !== 'undefined' ? caches.default : null);
+async function keepWhole(funds) {
+  whole = funds;
+  await cache()
+    ?.put(new Request(WHOLE_URL), new Response(JSON.stringify(funds), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'max-age=1209600' } }))
+    .catch(() => {});
+}
+async function lastWhole() {
+  if (whole) return whole;
+  const hit = await cache()?.match(new Request(WHOLE_URL)).catch(() => null);
+  return hit ? (whole = await hit.json().catch(() => null)) : null;
+}
+// (Tests: this isolate's ten-minute copy forgotten, the last whole list kept.)
+export const forgetNav = () => (kept = null);
 async function navTable(fetchFn) {
   if (kept && Date.now() - kept.at < KEEP_MS) return kept.funds;
-  const res = await fetchFn(NAV_CSV, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(8_000) });
-  if (!res.ok) throw new Error(`SITCA ${res.status}`);
-  const funds = parseNav(await res.text());
-  if (Object.keys(funds).length < 2000) throw new Error('SITCA NAV list too short');
-  kept = { at: Date.now(), funds };
-  return funds;
+  let funds = null;
+  let failed = null;
+  try {
+    const res = await fetchFn(NAV_CSV, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(8_000) });
+    if (!res.ok) throw new Error(`SITCA ${res.status}`);
+    funds = parseNav(await res.text());
+    if (Object.keys(funds).length >= MIN_FUNDS) {
+      await keepWhole(funds);
+      kept = { at: Date.now(), funds };
+      return funds;
+    }
+    failed = new Error('SITCA NAV list too short');
+  } catch (error) {
+    failed = error;
+  }
+  const last = await lastWhole();
+  if (!last) throw failed;
+  // (Today's few over the whole list: a fund newer in today's wins.)
+  const merged = { ...last };
+  for (const [code, f] of Object.entries(funds || {})) if (!merged[code] || f.date >= merged[code].date) merged[code] = f;
+  kept = { at: Date.now(), funds: merged };
+  return merged;
 }
 
 const ANUE = 'https://fund.api.cnyes.com/fund/api';
