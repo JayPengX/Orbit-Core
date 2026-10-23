@@ -103,3 +103,25 @@ test('a typhoon day: by each app\'s own place, the exchange by 臺北市', async
   assert.equal(isTradingDay('TAIFEX', '2026-10-23'), false);
   assert.equal(isTradingDay('US', '2026-10-23'), true);
 });
+
+test('a typhoon day off is off like a holiday: one answer for weekends, holidays and 停班停課, from its hour on a moment', async () => {
+  const { dayOffAt, keepDayOff } = await import('../kit/dayoff.mjs');
+  const hsinchu = { county: '新竹市', town: '東區' };
+  keepDayOff(hsinchu, { '2026-10-23': { work: { off: true }, class: { off: true } }, '2026-10-22': { work: { off: true, from: '12:00' } } });
+  assert.equal(dayOffAt('2026-10-10').kind, 'holiday');
+  assert.equal(dayOffAt('2026-10-24').kind, 'weekend');
+  assert.equal(dayOffAt('2026-10-23'), null, 'no place: the national calendar alone');
+  assert.equal(dayOffAt('2026-10-23', hsinchu).kind, 'typhoon');
+  assert.equal(dayOffAt('2026-10-23', hsinchu, 'class').zh, '颱風停課');
+  assert.equal(dayOffAt('2026-10-23', { county: '高雄市' }), null, 'another county works');
+  assert.equal(dayOffAt(Date.parse('2026-10-22T02:00:00Z'), hsinchu), null, '10:00, before an afternoon off');
+  assert.equal(dayOffAt(Date.parse('2026-10-22T05:00:00Z'), hsinchu).from, '12:00');
+  assert.equal(dayOffAt('2026-10-22', hsinchu).kind, 'typhoon', 'the day, as a date');
+});
+
+test("the exchange's typhoon closing is on Securities' list of days it's shut", async () => {
+  const { keepDayOff, TWSE } = await import('../kit/dayoff.mjs');
+  const { upcomingHolidays } = await import('../kit/stock-holidays.mjs');
+  keepDayOff(TWSE, { '2026-10-29': { work: { off: true }, trade: { off: true } } });
+  assert.deepEqual(upcomingHolidays('TW', '2026-10-28', 2), ['2026-10-29', '2026-12-25']);
+});

@@ -18,9 +18,14 @@
 //   onDayOff(fn)                  fn() when a place's answer changes (redraw)
 //   setPlace(role, place) / placeOf(role)   a person's places (role: 'school' | 'work' | 'home'),
 //                                 { county, town } or { lat, lon }, shared by the apps
+//   dayOffAt(t, place, need)      the one answer to "is this off?": a weekend, a national
+//                                 holiday or a typhoon day alike, { kind, zh, en } or null
+//   myPlace(need)                 the person's own place for it (work, else school, else home)
 //
 // A place: { county, town? } or { lat, lon }. Nothing known, or the Worker
 // unreachable: no typhoon day (the national calendar still holds).
+
+import { twHoliday, twWorkday } from './holidays.mjs';
 
 const URL_ = 'https://orbit-workers-proxy.pengzjay.workers.dev/weather/dayoff';
 const FRESH_MS = 3 * 60_000;
@@ -30,17 +35,18 @@ const PLACES = 'q-dayoff-places';
 
 export const TWSE = Object.freeze({ county: '臺北市' });
 
-const store = typeof localStorage === 'undefined' ? null : localStorage;
+// (Looked up when used: a page's, or none where there isn't one.)
+const store = () => (typeof localStorage === 'undefined' ? null : localStorage);
 const read = k => {
   try {
-    return JSON.parse(store?.getItem(k) || 'null');
+    return JSON.parse(store()?.getItem(k) || 'null');
   } catch {
     return null;
   }
 };
 const write = (k, v) => {
   try {
-    store?.setItem(k, JSON.stringify(v));
+    store()?.setItem(k, JSON.stringify(v));
   } catch {}
 };
 
@@ -118,3 +124,23 @@ export function setPlace(role, place) {
   write(PLACES, all);
 }
 export const placeOf = role => (read(PLACES) || {})[role] || null;
+
+// A person's own place for a need: where they work (or study, for school), else the other, else home.
+export const myPlace = (need = 'work') => (need === 'class' ? placeOf('school') || placeOf('work') : placeOf('work') || placeOf('school')) || placeOf('home');
+
+// Off, the one way every app asks (the owner, 2026-10-23: a typhoon day off
+// works like a holiday everywhere): `t` a moment or a Taiwan day
+// ('YYYY-MM-DD'); a national holiday, a weekend (a 補班 Saturday is a
+// workday), or a typhoon day at `place` (none: the national calendar
+// alone). A typhoon day called from an hour is off from that hour on a
+// moment, the whole day on a date. { kind: 'holiday' | 'weekend' | 'typhoon', zh, en, from? } or null.
+export function dayOffAt(t, place = null, need = 'work') {
+  const day = dayOf(t);
+  const h = twHoliday(day);
+  if (h) return { kind: 'holiday', zh: h.zh, en: h.en };
+  if (!twWorkday(day)) return { kind: 'weekend', zh: '週末', en: 'Weekend' };
+  const ty = place ? dayOffOn(day, place, need) : null;
+  if (!ty) return null;
+  if (ty.from && typeof t === 'number' && new Date(t + 8 * 3_600_000).toISOString().slice(11, 16) < ty.from) return null;
+  return { kind: 'typhoon', zh: ty.zh, en: ty.en, from: ty.from };
+}
