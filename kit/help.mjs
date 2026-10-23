@@ -34,7 +34,6 @@ export const HELP = {
       ]],
       ['devices', '登入與裝置', [
         '新裝置：輸入通行碼，或在已登入的裝置按「新增裝置」拿 8 碼裝置代碼（10 分鐘內、只能用一次）。',
-        '從一個 App 打開另一個，會自動帶著登入。',
         '「在這台裝置登出」只清掉這台裝置的資料；都還在 Orbit Pass，登入就回來。'
       ]],
       ['one', '一個 App 一個地方', [
@@ -73,7 +72,6 @@ export const HELP = {
       ]],
       ['devices', 'Signing in and devices', [
         'On a new device, enter the pass, or choose “Add a device” on a signed-in one for an 8-character device code (10 minutes, once).',
-        'Opening one app from another arrives signed in.',
         '“Sign out on this device” wipes only this device; it all stays on your Orbit Pass.'
       ]],
       ['one', 'Each app in one place', [

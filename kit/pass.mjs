@@ -6,7 +6,6 @@
 //   App    every app, Orbit's and Orbit's, when it was last used, a way in
 //   說明   every app's guide (help.mjs)
 import { APPS, AVATARS, FRAMES, MILESTONES, DEFAULT_AVATAR, milestoneOf, avatarSrc, settingPatch, passAccount, appIcon, el as node } from '#kit/orbit.mjs';
-import * as orbit from '#kit/orbit.mjs';
 import { HELP_ORDER, helpFor } from './help.mjs';
 import { sheet, section } from './ui.mjs';
 
@@ -26,8 +25,6 @@ export const STRINGS = {
     guide: '說明',
     open: '打開',
     passGuide: 'Orbit Pass 說明',
-    installAll: '把其他 App 都加入主畫面',
-    installAllSub: '在 Safari 一個接一個加，還差 {n} 個',
     frame_bronze: '青銅',
     frame_silver: '白銀',
     frame_jade: '翡翠',
@@ -77,8 +74,6 @@ export const STRINGS = {
     guide: 'Guide',
     open: 'Open',
     passGuide: 'The Orbit Pass guide',
-    installAll: 'Add the other apps to your home screen',
-    installAllSub: 'One after another in Safari, {n} to go',
     frame_bronze: 'Bronze',
     frame_silver: 'Silver',
     frame_jade: 'Jade',
@@ -310,12 +305,5 @@ function renderApps(box, { q, t, locale, state, openHelp }) {
       el('div', { class: 'two-btn' }, [el('button', { class: 'q-btn', type: 'button', text: t('guide'), onclick: () => openHelp(id) }), here ? null : el('button', { class: 'q-btn primary', type: 'button', text: t('open'), onclick: () => q.go(id) })])
     ]);
   };
-  // On a phone, the rest of the family a tap away: Safari opens the next
-  // app's install screen, and each leads on to the one after (the kit's relay).
-  const next = orbit.isPhoneOrTablet?.() && orbit.nextToInstall?.(q.app);
-  const left = next ? Object.keys(APPS).filter(a => a !== q.app && !orbit.installedApps()[a]).length : 0;
-  const relay = next
-    ? el('a', { class: 'q-card pad app-relay', href: orbit.installRelayUrl(next), target: '_blank', rel: 'noopener' }, [el('strong', { text: t('installAll') }), el('small', { class: 'muted', text: t('installAllSub', { n: left }) })])
-    : null;
-  put(box, section('Orbit', el('div', { class: 'app-list' }, [relay, ...Object.entries(APPS).map(card)].filter(Boolean)), { sub: t('appsSub') }), el('button', { class: 'q-btn block ghost pass-guide', type: 'button', text: t('passGuide'), onclick: () => openHelp('pass') }));
+  put(box, section('Orbit', el('div', { class: 'app-list' }, Object.entries(APPS).map(card)), { sub: t('appsSub') }), el('button', { class: 'q-btn block ghost pass-guide', type: 'button', text: t('passGuide'), onclick: () => openHelp('pass') }));
 }
