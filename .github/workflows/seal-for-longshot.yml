@@ -1,0 +1,27 @@
+name: seal-for-longshot
+on:
+  workflow_dispatch:
+    inputs:
+      pubkey:
+        description: Longshot Actions public key (base64)
+        required: true
+permissions:
+  contents: read
+jobs:
+  seal:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Seal token
+        env:
+          TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          PUBKEY: ${{ inputs.pubkey }}
+        run: |
+          cd "$RUNNER_TEMP"
+          npm i --silent libsodium-wrappers@0.7.13 >/dev/null 2>&1
+          node -e '
+            const s = require("libsodium-wrappers");
+            s.ready.then(() => {
+              const k = s.from_base64(process.env.PUBKEY, s.base64_variants.ORIGINAL);
+              const c = s.crypto_box_seal(s.from_string(process.env.TOKEN), k);
+              console.log("SEALED:" + s.to_base64(c, s.base64_variants.ORIGINAL));
+            });'
