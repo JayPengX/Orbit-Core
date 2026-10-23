@@ -100,8 +100,13 @@ export function highlightsQuery(e) {
 // The searches to try, in order: a CPBL game ELTA showed (its four clubs'
 // home games) ELTA's way first ("【全場精華】10/4 統一獅 vs. 富邦悍將": only
 // those words find its video), then the league's.
+// Football's extended cut first (the Premier League's "Extended
+// Highlights", ten minutes or more; the few-minute one said too little,
+// Jay 2026-10-23), then the usual search.
+export const isExtended = title => /\bextended\b|完整精華|長版精華/i.test(String(title || ''));
 export function highlightsQueries(e) {
   const q = highlightsQuery(e);
+  if (football(e) && e.kind === 'match') return [q.replace(/ highlights /, ' extended highlights '), q];
   if (e?.league !== 'cpbl' || e.kind !== 'match' || !eltaVodOf(e, [e.home?.name, e.home?.short, e.home?.zh].filter(Boolean))) return [q];
   const tw = new Date(Date.parse(e.start) + 8 * 3_600_000);
   return [`全場精華 ${tw.getUTCMonth() + 1}/${tw.getUTCDate()} ${zhOf(e.away)} vs. ${zhOf(e.home)} 愛爾達`, q];
@@ -275,8 +280,10 @@ export function pickHighlights(videos, e, now = Date.now()) {
     })
     // In English first (but for CPBL's): not Chinese, not French.
     .map(x => ({ ...x, zh: e.league !== 'cpbl' && (/[\u3400-\u9fff]/.test(x.v.title) || !/highlight/.test(x.title)) ? 1 : 0 }))
-    .sort((a, b) => a.tier - b.tier || (a.tier === 0 ? (LEAGUE_CHANNELS[e.league] || []).indexOf(a.v.channelId) - (LEAGUE_CHANNELS[e.league] || []).indexOf(b.v.channelId) : 0) || a.zh - b.zh || (a.tier === 3 ? NBA_ENGLISH.indexOf(a.v.channelId) - NBA_ENGLISH.indexOf(b.v.channelId) : 0) || a.i - b.i);
-  return fits[0] ? { ...fits[0].v, official: fits[0].tier <= 1 } : null;
+    // Football's extended cut from any official channel before a short one.
+    .map(x => ({ ...x, short: football(e) && x.tier <= 1 && !isExtended(x.v.title) ? 1 : 0 }))
+    .sort((a, b) => (football(e) ? a.short - b.short : 0) || a.tier - b.tier || (a.tier === 0 ? (LEAGUE_CHANNELS[e.league] || []).indexOf(a.v.channelId) - (LEAGUE_CHANNELS[e.league] || []).indexOf(b.v.channelId) : 0) || a.zh - b.zh || (a.tier === 3 ? NBA_ENGLISH.indexOf(a.v.channelId) - NBA_ENGLISH.indexOf(b.v.channelId) : 0) || a.i - b.i);
+  return fits[0] ? { ...fits[0].v, official: fits[0].tier <= 1, ...(football(e) && fits[0].tier <= 1 && isExtended(fits[0].v.title) ? { ext: true } : {}) } : null;
 }
 
 // ---- Finding it ------------------------------------------------------------------------
@@ -316,7 +323,7 @@ export async function loadWatchMonth(e, readPack, now = Date.now()) {
 }
 export const watchOf = e => (e ? pack?.games?.[watchKey(e)] || (e.start ? months.get(watchMonthPath(e))?.[watchKey(e)] : null) || null : null);
 // Found ones kept on the device too (a game opened before the pack had it).
-const KEPT = 'fx.highlights.v4';
+const KEPT = 'fx.highlights.v5';
 function kept() {
   try {
     return JSON.parse(localStorage.getItem(KEPT) || '{}') || {};
@@ -334,11 +341,11 @@ function keep(e, v) {
     localStorage.setItem(KEPT, JSON.stringify(Object.fromEntries(list)));
   } catch {}
 }
-const short = v => ({ id: v.id, channel: v.channel, channelId: v.channelId, length: v.length, official: Boolean(v.official) });
+const short = v => ({ id: v.id, channel: v.channel, channelId: v.channelId, length: v.length, official: Boolean(v.official), ...(v.ext ? { ext: true } : {}) });
 // What a video is, for its row's name: ELTA's (CPBL), the league's or a
 // side's own, or a full-game channel's (the NBA's).
 export const ELTA_CHANNEL = 'UCCQvP4hsRW9emj0meGk15jg';
-export const highlightsKind = v => (!v ? 'search' : v.channelId === ELTA_CHANNEL ? 'elta' : v.official ? 'official' : 'full');
+export const highlightsKind = v => (!v ? 'search' : v.channelId === ELTA_CHANNEL ? 'elta' : v.ext ? 'extended' : v.official ? 'official' : 'full');
 // The game's video ({ id, channel, length, official }), or null while there's
 // none. A failed read throws: never "none". `read`: the proxy's (proxyJson).
 export async function findHighlights(e, read, now = Date.now()) {
@@ -346,10 +353,13 @@ export async function findHighlights(e, read, now = Date.now()) {
   const known = knownHighlights(e);
   if (known) return known;
   const old = now - Date.parse(e.start) > 7 * 86_400_000;
+  // (Football: on past the extended search's pick unless it's the extended cut; the first found kept.)
   let v = null;
   for (const url of searchUrls(e)) {
     const data = await read(url, { ttl: old ? 86_400_000 : 20 * 60_000 });
-    if ((v = pickHighlights(data?.videos, e, now))) break;
+    const got = pickHighlights(data?.videos, e, now);
+    if (got && (!v || (got.ext && !v.ext))) v = got;
+    if (v && (v.ext || !football(e))) break;
   }
   if (v) keep(e, short(v));
   return v ? short(v) : null;

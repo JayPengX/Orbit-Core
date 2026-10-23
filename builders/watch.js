@@ -170,14 +170,16 @@ const APPLE_SEARCHES = 40;
 // (the archive's `checked` below it): 1, every football game's (a return
 // leg's video counted); 2, MLS's ("New York" named both clubs, 2026-10-12);
 // 3, the leagues played in innings, quarters or periods (a part of a game's
-// cut counted, 2026-10-13). How many, back.
-export const CHECKED = 3;
+// cut counted, 2026-10-13); 4, football's last three weeks without the
+// extended cut (Jay, 2026-10-23). How many, back.
+export const CHECKED = 4;
 // (As the kit's sports-highlights.mjs has them.)
 export const TIMED = new Set(['mlb', 'cpbl', 'npb', 'kbo', 'nba', 'wnba', 'nbl', 'nhl', 'nfl', 'ncaaf']);
-export function recheck(store, checked, isSoccer) {
+export function recheck(store, checked, isSoccer, now = Date.now()) {
   const again = new Set();
   const due = key => (checked < 1 && isSoccer(key)) || (checked < 2 && key === 'mls') || (checked < 3 && TIMED.has(key));
   for (const [key, games] of store) if (due(key)) for (const [k, v] of games) if (v.hl) again.add(`${key}\n${k}`);
+  if (checked < 4) for (const [key, games] of store) if (isSoccer(key)) for (const [k, v] of games) if (v.hl && !v.hl.ext && v.t > now - 21 * 86_400_000) again.add(`${key}\n${k}`);
   for (const x of again) {
     const [key, k] = x.split('\n');
     const { hl: _hl, miss: _miss, ...rest } = store.get(key).get(k);
@@ -359,7 +361,7 @@ export async function runWatch({ store, proxy, get = fetch, now = Date.now(), un
     touched.add(`${e.league}/${monthOf(Date.parse(e.start))}`);
   };
   if (full) {
-    if ((index?.checked || 0) < CHECKED) for (const k of Object.keys(out)) if (TIMED.has(k.split(':')[0])) delete out[k].hl;
+    if ((index?.checked || 0) < CHECKED) for (const k of Object.keys(out)) if (((index?.checked || 0) < 3 && TIMED.has(k.split(':')[0])) || (CATALOG[k.split(':')[0]]?.sport === 'soccer' && !out[k].hl?.ext)) delete out[k].hl;
     recheck(archive, index?.checked || 0, key => CATALOG[key]?.sport === 'soccer');
     for (const [id, list] of shared(archive)) shareOut(archive, id, list, Date.parse((await read(`${HL.YT}/watch?v=${id}`).catch(() => null))?.published || ''));
   }
