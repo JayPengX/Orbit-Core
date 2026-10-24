@@ -511,7 +511,10 @@ export function trimFotmobPage(data) {
   const list = Array.isArray(st.players) ? st.players : Object.values(st.players || {});
   const tables = (data.table || []).flatMap(t => [t?.data?.table, ...(t?.data?.tables || []).map(x => x?.table)]).filter(Boolean);
   const teams = new Map();
-  for (const t of tables) for (const r of t.all || []) if (r?.id != null) teams.set(r.id, { id: r.id, name: r.name, shortName: r.shortName });
+  for (const t of tables) for (const r of t.all || []) if (r?.id != null) teams.set(String(r.id), { id: r.id, name: r.name, shortName: r.shortName });
+  // A cup's clubs from its fixtures too (the FA Cup has no table: none were
+  // found, and Leicester's page from it had no league, no results).
+  for (const m of data.fixtures?.allMatches || []) for (const x of [m?.home, m?.away]) if (x?.id != null && !teams.has(String(x.id))) teams.set(String(x.id), { id: Number(x.id) || x.id, name: x.name, shortName: x.shortName });
   return {
     id: data.details?.id,
     season: data.details?.selectedSeason || '',

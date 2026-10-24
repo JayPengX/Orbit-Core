@@ -440,3 +440,9 @@ test("Jolpica's season results for F1's 數據領先: each result to what's coun
   assert.deepEqual(t.MRData.RaceTable.Races[0].Results[0], { position: '1', positionText: '1', grid: '1', points: '25', laps: '58', status: 'Finished', FastestLap: { rank: '6' }, Driver: { driverId: 'russell', code: 'RUS', givenName: 'George', familyName: 'Russell' }, Constructor: { constructorId: 'mercedes', name: 'Mercedes' } });
   assert.equal(t.MRData.total, '374');
 });
+
+test("FotMob's cup page: its clubs from its fixtures (the FA Cup has no table)", async () => {
+  const { trimFotmobPage } = await import('../sports.js');
+  const page = trimFotmobPage({ details: { id: 132, selectedSeason: '2026/2027' }, stats: { players: [] }, fixtures: { allMatches: [{ id: '1', home: { id: '8197', name: 'Leicester City', shortName: 'Leicester' }, away: { id: '161836', name: 'Oxford City', shortName: 'Oxford City' } }] } });
+  assert.deepEqual(page.teams, [{ id: 8197, name: 'Leicester City', shortName: 'Leicester' }, { id: 161836, name: 'Oxford City', shortName: 'Oxford City' }]);
+});
