@@ -734,3 +734,24 @@ test('a break not in the summary yet is asked again by itself while it is on scr
     Object.assign(globalThis, had);
   }
 });
+
+test('CPBL: a month the proxy read only in part has its missing days of these four weeks read on the device', async () => {
+  const { asiaMonth } = await import('../kit/catalog.mjs');
+  // October 24th: the proxy read the 17th on (its days nearest now) but not the challenge on the 11th.
+  const now = Date.parse('2026-10-24T03:00:00Z');
+  const asked = [];
+  const fetchJson = async url => {
+    asked.push(url.match(/d=([\d-]+)/)[1]);
+    return url.includes('d=2026-10-11') ? { events: [{ idEvent: '11', strTimestamp: '2026-10-11T09:05:00', strHomeTeam: 'CTBC Brothers', strAwayTeam: 'Uni-President Lions', intHomeScore: '2', intAwayScore: '4', strStatus: 'FT', intRound: '0' }] } : { events: null };
+  };
+  const read = Array.from({ length: 15 }, (_, i) => `2026-10-${String(17 + i).padStart(2, '0')}`);
+  const proxy = async () => ({ games: [{ id: 'x', start: '2026-10-17T09:05:00.000Z', home: { en: 'Wei Chuan Dragons' }, away: { en: 'CTBC Brothers' }, homeScore: 3, awayScore: 0, state: 'post', playoff: true }], read });
+  const games = await asiaMonth(proxy, 'cpbl', '2026-10', { now, fetchJson });
+  assert.deepEqual(games.map(g => [g.start.slice(0, 10), g.state, Boolean(g.playoff)]), [['2026-10-11', 'post', true], ['2026-10-17', 'post', true]]);
+  // Only the days it lacked, within two weeks back.
+  assert.deepEqual(asked.sort(), ['2026-10-10', '2026-10-11', '2026-10-12', '2026-10-13', '2026-10-14', '2026-10-15', '2026-10-16']);
+  // Read whole: nothing asked on the device.
+  asked.length = 0;
+  await asiaMonth(async () => ({ games: [], read, whole: 1 }), 'cpbl', '2026-10', { now, fetchJson });
+  assert.equal(asked.length, 0);
+});

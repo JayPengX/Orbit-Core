@@ -1086,6 +1086,10 @@ export function settledData(url, data, now = Date.now()) {
   if (url.hostname === ASIA_HOST) {
     const [y, m] = (/(\d{4})-(\d{2})\.json$/.exec(url.pathname) || []).slice(1).map(Number);
     if (!y || Date.UTC(y, m, 1) > now) return false;
+    // A CPBL month only with every day read (its route reads the 16 days
+    // nearest now, a day TheSportsDB turns away missing): settled from part
+    // of it, September 2026's three games were kept as the month for good.
+    if (/^\/cpbl\//.test(url.pathname) && !data?.whole) return false;
     const games = data?.games || [];
     return games.length > 0 && games.every(g => g.state === 'post' || g.state === 'void' || (g.state === 'pre' && Date.parse(g.start) < now - 6 * 3_600_000));
   }
@@ -1205,6 +1209,26 @@ const gunzipped = async raw => (raw[0] === 0x1f && raw[1] === 0x8b ? new Uint8Ar
 // edge's 2-second copy at every beat, an R2 read (and a round trip) each time.
 const NOT_KEPT_MS = 10 * MINUTE;
 const notKept = new Map(); // key → until when it isn't asked again
+// A kept copy as it is, over or not (a CPBL month's missing days filled from it), or null.
+async function keptCopy(key) {
+  const obj = await dataBucket.get(key).catch(() => null);
+  if (!obj) return null;
+  try {
+    return JSON.parse(new TextDecoder().decode(await gunzipped(new Uint8Array(await obj.arrayBuffer()))));
+  } catch {
+    return null;
+  }
+}
+// A CPBL month read in part (its route's `read` days): the days it didn't
+// read from the nightly whole copy (builders/asia.js), whole then if that was.
+const isCpblMonth = url => url.hostname === ASIA_HOST && /^\/cpbl\/\d{4}-\d{2}\.json$/.test(url.pathname);
+export function fillCpblMonth(fresh, kept) {
+  if (!fresh || fresh.whole || !Array.isArray(fresh.read) || !kept?.games?.length) return fresh;
+  const read = new Set(fresh.read);
+  const day = g => new Date(Date.parse(g.start) + 8 * 3_600_000).toISOString().slice(0, 10);
+  const games = [...kept.games.filter(g => !read.has(day(g))), ...fresh.games].sort((a, b) => a.start.localeCompare(b.start));
+  return { ...fresh, games, ...(kept.whole ? { whole: 1 } : {}) };
+}
 async function readKept(key, url) {
   if (notKept.get(key) > Date.now()) return null;
   const obj = await dataBucket.get(key).catch(() => null);
@@ -1215,7 +1239,9 @@ async function readKept(key, url) {
   }
   try {
     const copy = JSON.parse(new TextDecoder().decode(await gunzipped(new Uint8Array(await obj.arrayBuffer()))));
-    // (The nightly mirror's copies carry a day's `until`; one that's over for good is kept for good.)
+    // (The nightly mirror's copies carry a day's `until`; one that's over for good is kept for good.
+    // A CPBL month only whole: one cut short was kept "for good" by the route.)
+    if (isCpblMonth(url) && !copy?.data?.whole) return null;
     return copy?.until > Date.now() || settledData(url, copy?.data) ? JSON.stringify(copy.data) : null;
   } catch {
     return null;
@@ -1298,6 +1324,12 @@ async function resolveOne(upstreamUrl, trim, ctx, { mirror = true, within } = {}
     return { ...result, cache: 'KEPT', age: 0, policy: CACHE_FINAL };
   }
   const result = await fetchUpstream(upstreamUrl, trim);
+  // A CPBL month read in part: the rest from the nightly copy, settled then if it's all over.
+  if (result.status === 200 && keepKey && isCpblMonth(upstreamUrl)) {
+    const fresh = parsed(result.body);
+    const filled = fillCpblMonth(fresh, (await keptCopy(keepKey))?.data);
+    if (filled !== fresh) Object.assign(result, { body: JSON.stringify(filled), final: settledData(upstreamUrl, filled) });
+  }
   if (result.status === 200) {
     // (The body is read once: the edge's copy and R2's from the same bytes.)
     if (result.body && typeof result.body !== 'string' && !(result.body instanceof ArrayBuffer) && !ArrayBuffer.isView(result.body)) result.body = await new Response(result.body).arrayBuffer();
