@@ -317,6 +317,9 @@ const ROUNDS = [
   [/group stage|league phase|group [a-z]\b/i, '小組賽'],
   [/\bfinal\b/i, '決賽'],
   [/all-?star/i, '明星賽'],
+  // The NBA Cup's own words ("NBA Cup - Group Play", "NBA Cup Championship"), before its name alone.
+  [/group play/i, '小組賽'],
+  [/cup championship/i, '冠軍賽'],
   [/nba cup|in-season tournament|emirates cup/i, 'NBA 盃'],
   [/friendly|exhibition/i, '友誼賽']
 ];
