@@ -4389,8 +4389,9 @@ export function watchHalftime(key, { sport, league = '', read }) {
 // stopping play's clock on the wall in ESPN's summary. (No countdown for a
 // stop with no set length: an injury, a review, a rain delay.)
 //   basketball  NBA: 2:10 between quarters and before overtime; a period's
-//               first two timeouts are its mandatory ones, 2:45 (3:15 on
-//               national TV), any more 1:15 (Rule 5); FIBA (EuroLeague,
+//               first two timeouts are its mandatory ones, 3:00 to play
+//               again (Rule 5's 2:45 and the walk back: Pistons at Heat's
+//               six, 2026-10-23; 3:15 on national TV), any more 1:15; FIBA (EuroLeague,
 //               NBL): 2:00, 60 s.
 //   football    NFL: 2:00 between quarters, a timeout and the two-minute
 //               warning on TV 2:00; half-time 13 min (college 20).
@@ -4431,7 +4432,7 @@ export function breakOf({ sport, league = '', status = {}, live = {}, post = fal
   if (sport === 'baseball' && /pitching change/i.test(last)) return pick('pitching', /./, live.lastId);
   if (/timeout/i.test(last) && !/end (of )?timeout/i.test(last)) {
     const b = pick('timeout', /./, live.lastId);
-    return b && league === 'nba' ? { ...b, mandatory: { first: 2, local: 165, national: 195 } } : b;
+    return b && league === 'nba' ? { ...b, mandatory: { first: 2, local: 180, national: 195 } } : b;
   }
   return null;
 }
@@ -4462,7 +4463,9 @@ export function watchBreak(key, { seconds, read, test = /./, play = '', mandator
     .then(summary => {
       const status = summary?.header?.competitions?.[0]?.status?.type || {};
       const own = play ? [...(summary?.plays || []), ...(summary?.drives?.current?.plays || []), ...(summary?.drives?.previous || []).flatMap(d => d?.plays || [])].find(p => String(p?.id) === String(play)) : null;
-      const start = own ? Date.parse(own.wallclock || '') : play ? null : halftimeStartOf(summary);
+      // Never after now: a game's feed can stamp its plays minutes ahead (Clippers at Lakers, 2026-10-23: 2:37), a 暫停 5:54.
+      const stamped = own ? Date.parse(own.wallclock || '') : play ? null : halftimeStartOf(summary);
+      const start = stamped && Math.min(stamped, Date.now());
       if (!Number.isFinite(start) || !start || (!play && !test.test(`${status.name || ''} ${status.shortDetail || ''}`.trim()) && !test.test(status.shortDetail || ''))) return;
       halftimeEnds.set(key, start + breakSeconds(summary, own, seconds, mandatory) * 1000);
       try {
