@@ -653,10 +653,12 @@ test('every break counts down by its rule: quarters, innings, timeouts', async (
   kit.watchBreak('t:m1', { ...nbaTo, read: async () => national });
   kit.watchBreak('t:m3', { ...nbaTo, play: '4', read: async () => national });
   kit.watchBreak('t:m1l', { ...nbaTo, read: async () => ({ plays }) });
+  kit.watchBreak('t:m1p', { ...nbaTo, read: async () => ({ header: { competitions: [{ broadcasts: [{ type: { shortName: 'Streaming' }, media: { shortName: 'Prime Video' }, isNational: true }] }] }, plays }) });
   await new Promise(r => setTimeout(r, 0));
   assert.equal(kit.halftimeEnd('t:m1'), Date.parse('2026-10-21T00:00:31Z') + 195_000);
   assert.equal(kit.halftimeEnd('t:m3'), Date.parse('2026-10-21T00:12:00Z') + 75_000);
   assert.equal(kit.halftimeEnd('t:m1l'), Date.parse('2026-10-21T00:00:31Z') + 180_000);
+  assert.equal(kit.halftimeEnd('t:m1p'), Date.parse('2026-10-21T00:00:31Z') + 195_000);
   // A play stamped ahead of now (a feed's clock minutes fast): the break from now, never longer than its rule.
   const ahead = { plays: [{ id: 'f', period: { number: 1 }, type: { text: 'Full Timeout' }, wallclock: new Date(Date.now() + 157_000).toISOString() }] };
   kit.watchBreak('t:ahead', { seconds: 75, read: async () => ahead, play: 'f' });

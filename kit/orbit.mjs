@@ -4451,7 +4451,8 @@ function breakSeconds(summary, own, seconds, mandatory) {
   const at = plays.indexOf(own);
   const n = plays.slice(0, at + 1).filter(p => isTimeout(p) && p?.period?.number === own?.period?.number).length;
   if (!n || n > mandatory.first) return seconds;
-  const national = (summary?.header?.competitions?.[0]?.broadcasts || []).some(b => b?.isNational && /tv/i.test(b?.type?.shortName || ''));
+  // National on TV or streamed (Prime Video's Rockets at Spurs, 2026-10-23: its timeouts ran 3:15 and more, counted as local's 3:00).
+  const national = (summary?.header?.competitions?.[0]?.broadcasts || []).some(b => b?.isNational);
   return national ? mandatory.national : mandatory.local;
 }
 export function watchBreak(key, { seconds, read, test = /./, play = '', mandatory = null }) {
