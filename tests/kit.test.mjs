@@ -710,3 +710,27 @@ test('every EuroLeague and K League club has a Chinese name (Jay 2026-10-21)', a
   for (const n of el) assert.match(teamZh('euroleague', n, 'basketball'), /\p{Script=Han}/u, n);
   for (const n of ['Bucheon FC 1995', ...Object.keys(TEAM_BADGES?.kleague || {})]) assert.match(teamZh('kleague', n, 'soccer'), /\p{Script=Han}/u, n);
 });
+
+test('a break not in the summary yet is asked again by itself while it is on screen', async t => {
+  const kit = await import('../kit/orbit.mjs');
+  // A half ended on a review: the summary still said the 2nd quarter, then half-time (Rockets at Spurs, 2026-10-23).
+  const plays = [{ id: '1', type: { text: 'End Period' }, period: { number: 2 }, wallclock: new Date(Date.now() - 60_000).toISOString() }];
+  const reads = [{ header: { competitions: [{ status: { type: { name: 'STATUS_END_PERIOD', shortDetail: 'End of 2nd Quarter' } } }] }, plays }, { header: { competitions: [{ status: { type: { name: 'STATUS_HALFTIME', shortDetail: 'Halftime' } } }] }, plays }];
+  let n = 0;
+  const had = { document: globalThis.document, CSS: globalThis.CSS };
+  globalThis.document = { querySelector: sel => (sel.includes('t:review') ? {} : null), querySelectorAll: () => [] };
+  globalThis.CSS = { escape: s => s };
+  t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
+  try {
+    kit.watchBreak('t:review', { seconds: 900, read: async () => reads[Math.min(n++, 1)], test: /HALFTIME|^HT$|^half/i });
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+    assert.equal(kit.halftimeEnd('t:review'), null);
+    t.mock.timers.tick(20_000);
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+    assert.equal(n, 2);
+    assert.equal(kit.halftimeEnd('t:review'), Date.parse(plays[0].wallclock) + 900_000);
+  } finally {
+    t.mock.timers.reset();
+    Object.assign(globalThis, had);
+  }
+});

@@ -4459,22 +4459,36 @@ export function watchBreak(key, { seconds, read, test = /./, play = '', mandator
   key = String(key);
   if (!seconds || halftimeEnds.has(key) || Date.now() - (halftimeAsked.get(key) || 0) < 20_000) return halftimeEnd(key);
   halftimeAsked.set(key, Date.now());
-  Promise.resolve()
-    .then(read)
-    .then(summary => {
-      const status = summary?.header?.competitions?.[0]?.status?.type || {};
-      const own = play ? [...(summary?.plays || []), ...(summary?.drives?.current?.plays || []), ...(summary?.drives?.previous || []).flatMap(d => d?.plays || [])].find(p => String(p?.id) === String(play)) : null;
-      // Never after now: a game's feed can stamp its plays minutes ahead (Clippers at Lakers, 2026-10-23: 2:37), a 暫停 5:54.
-      const stamped = own ? Date.parse(own.wallclock || '') : play ? null : halftimeStartOf(summary);
-      const start = stamped && Math.min(stamped, Date.now());
-      if (!Number.isFinite(start) || !start || (!play && !test.test(`${status.name || ''} ${status.shortDetail || ''}`.trim()) && !test.test(status.shortDetail || ''))) return;
-      halftimeEnds.set(key, start + breakSeconds(summary, own, seconds, mandatory) * 1000);
-      try {
-        localStorage.setItem(HALFTIME_KEY, JSON.stringify(Object.fromEntries(halftimeEnds)));
-      } catch {}
-      halftimeBeat();
-    })
-    .catch(() => {});
+  // Not found yet (the summary a step behind the list: a half ended on a
+  // review still read "End of 2nd Quarter"): asked again 20 s on by itself
+  // while the break is on screen, up to 5 minutes. (It waited for the list
+  // to be drawn again, and a half-time's list, nothing moving, never was:
+  // Rockets at Spurs, 2026-10-23, 中場休息 with no countdown.)
+  const again = n => {
+    if (halftimeEnds.has(key) || n >= 15 || typeof document === 'undefined' || !document.querySelector(`[data-halftime="${CSS.escape(key)}"]`)) return;
+    setTimeout(() => {
+      halftimeAsked.set(key, Date.now());
+      ask(n + 1);
+    }, 20_000);
+  };
+  const ask = n =>
+    Promise.resolve()
+      .then(read)
+      .then(summary => {
+        const status = summary?.header?.competitions?.[0]?.status?.type || {};
+        const own = play ? [...(summary?.plays || []), ...(summary?.drives?.current?.plays || []), ...(summary?.drives?.previous || []).flatMap(d => d?.plays || [])].find(p => String(p?.id) === String(play)) : null;
+        // Never after now: a game's feed can stamp its plays minutes ahead (Clippers at Lakers, 2026-10-23: 2:37), a 暫停 5:54.
+        const stamped = own ? Date.parse(own.wallclock || '') : play ? null : halftimeStartOf(summary);
+        const start = stamped && Math.min(stamped, Date.now());
+        if (!Number.isFinite(start) || !start || (!play && !test.test(`${status.name || ''} ${status.shortDetail || ''}`.trim()) && !test.test(status.shortDetail || ''))) return again(n);
+        halftimeEnds.set(key, start + breakSeconds(summary, own, seconds, mandatory) * 1000);
+        try {
+          localStorage.setItem(HALFTIME_KEY, JSON.stringify(Object.fromEntries(halftimeEnds)));
+        } catch {}
+        halftimeBeat();
+      })
+      .catch(() => again(n));
+  ask(0);
   halftimeBeat();
   return null;
 }
