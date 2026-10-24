@@ -979,7 +979,23 @@ export function gtxText(text) {
 // The F1 lap log (env.F1_LOG), set by the first request this isolate serves.
 let f1Log = null;
 const YAHOO_HOSTS = new Set(['query1.finance.yahoo.com', 'query2.finance.yahoo.com']);
+// A CPBL month: the days its route didn't read filled from the nightly copy
+// (whole then if that was, and settled if all over); nothing read at all
+// (TheSportsDB turning every day away), the nightly copy as it is.
 async function fetchUpstream(upstreamUrl, trim) {
+  const result = await fetchUpstreamRaw(upstreamUrl, trim);
+  if (!isCpblMonth(upstreamUrl) || !dataBucket) return result;
+  const kept = (await keptCopy(`${mirrorPath(upstreamUrl.toString(), trim)}.gz`))?.data;
+  if (result.status === 200) {
+    const fresh = parsed(result.body);
+    const filled = fillCpblMonth(fresh, kept);
+    return filled === fresh ? result : { ...result, body: JSON.stringify(filled), final: settledData(upstreamUrl, filled) };
+  }
+  if (!kept?.games?.length) return result;
+  if (result.body?.cancel) result.body.cancel().catch(() => {});
+  return { status: 200, contentType: 'application/json', body: JSON.stringify(kept), final: settledData(upstreamUrl, kept), quiet: 0, maxAge: 0 };
+}
+async function fetchUpstreamRaw(upstreamUrl, trim) {
   let upstream;
   try {
     upstream = upstreamUrl.hostname === ASIA_HOST
@@ -1273,6 +1289,9 @@ async function resolveOne(upstreamUrl, trim, ctx, { mirror = true, within } = {}
   let cached = match && { status: match.status, contentType: match.headers.get('Content-Type') || 'application/json', storedAt: Number(match.headers.get('X-Sports-Proxy-Stored-At')), body: await match.arrayBuffer() };
   // This Worker's own check of a live bet (price.js): only a copy this many seconds old.
   if (cached && within != null && !(Date.now() - cached.storedAt <= within * 1000)) cached = null;
+  // A CPBL month kept "for good" cut short (settled from part of it, before
+  // only whole months were): not a copy at all (September 2026's 3 games).
+  if (cached && isCpblMonth(upstreamUrl) && match.headers.get('X-Sports-Proxy-Final') === '1' && !parsed(cached.body)?.whole) cached = null;
   if (cached) {
     // A copy over for good is fresh a day (CACHE_FINAL), not its address's seconds.
     if (match.headers.get('X-Sports-Proxy-Final') === '1') policy = CACHE_FINAL;
@@ -1324,12 +1343,6 @@ async function resolveOne(upstreamUrl, trim, ctx, { mirror = true, within } = {}
     return { ...result, cache: 'KEPT', age: 0, policy: CACHE_FINAL };
   }
   const result = await fetchUpstream(upstreamUrl, trim);
-  // A CPBL month read in part: the rest from the nightly copy, settled then if it's all over.
-  if (result.status === 200 && keepKey && isCpblMonth(upstreamUrl)) {
-    const fresh = parsed(result.body);
-    const filled = fillCpblMonth(fresh, (await keptCopy(keepKey))?.data);
-    if (filled !== fresh) Object.assign(result, { body: JSON.stringify(filled), final: settledData(upstreamUrl, filled) });
-  }
   if (result.status === 200) {
     // (The body is read once: the edge's copy and R2's from the same bytes.)
     if (result.body && typeof result.body !== 'string' && !(result.body instanceof ArrayBuffer) && !ArrayBuffer.isView(result.body)) result.body = await new Response(result.body).arrayBuffer();

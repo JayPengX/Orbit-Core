@@ -96,9 +96,7 @@ export const yyyymmdd = date => date.toISOString().slice(0, 10).replaceAll('-', 
 // state: 'pre' | 'in' | 'post' | 'void', venue }] }. `getJson(url)` is the
 // app's proxied fetch.
 export const ASIA_URL = 'https://asia-baseball.orbit';
-// (CPBL's at a new address, ?v=2: its old one held months cut short for good,
-// September 2026's three games of 66, at the edge and in R2.)
-export const asiaMonthUrl = (league, ym) => `${ASIA_URL}/${league}/${ym}.json${league === 'cpbl' ? '?v=2' : ''}`;
+export const asiaMonthUrl = (league, ym) => `${ASIA_URL}/${league}/${ym}.json`;
 // "2026-09" for a date (Asia's own calendar: UTC+8 is close enough for all three).
 export const asiaMonthOf = ms => new Date(ms + 8 * 3_600_000).toISOString().slice(0, 7);
 // The month's games. CPBL's own site has stopped answering, and the proxy's

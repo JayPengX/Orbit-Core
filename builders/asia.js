@@ -53,16 +53,17 @@ export async function runAsia({ store, now = Date.now(), get, sleep }) {
   if (!CATALOG.cpbl?.asia) return { off: true };
   const months = [asiaMonthOf(now)];
   if (new Date(now + 8 * 3_600_000).getUTCDate() <= 3) months.unshift(asiaMonthOf(now - 4 * 86_400_000));
-  // The season's earlier months not kept whole (a day refused, or a new
-  // address: kit asiaMonthUrl's ?v=2), up to three a run, the latest first.
+  // Then one earlier month of the season not kept whole (a day refused, or
+  // kept cut short by the route before only whole months settled), the
+  // latest first: one a run (a month's days one at a time, with TheSportsDB's
+  // waits, can take minutes).
   const [y, m] = asiaMonthOf(now).split('-').map(Number);
-  let repairs = 0;
-  for (let k = m - 1; k >= 3 && repairs < 3; k--) {
+  for (let k = m - 1; k >= 3; k--) {
     const ym = `${y}-${String(k).padStart(2, '0')}`;
     if (months.includes(ym)) continue;
     if ((await store.json(`${mirrorPath(asiaMonthUrl(CATALOG.cpbl.asia, ym), '')}.gz`))?.data?.whole) continue;
-    months.unshift(ym);
-    repairs++;
+    months.push(ym);
+    break;
   }
   const out = {};
   const settled = g => g.state === 'post' || g.state === 'void' || (g.state === 'pre' && Date.parse(g.start) < now - 6 * 3_600_000);

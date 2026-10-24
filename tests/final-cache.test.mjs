@@ -21,7 +21,7 @@ test('a game over and a day all over are kept a day; anything still to change is
 });
 
 test('a CPBL month is over for good only read whole; the days not read come from the nightly copy', () => {
-  const sept = u('https://asia-baseball.orbit/cpbl/2026-09.json?v=2');
+  const sept = u('https://asia-baseball.orbit/cpbl/2026-09.json');
   const g = (start, state = 'post') => ({ id: start, start, state });
   // September 2026 as the route read it (its 16 days nearest October, most refused): 3 games, all over.
   const part = { games: [g('2026-09-30T10:35:00Z'), g('2026-09-30T10:36:00Z'), g('2026-09-30T10:37:00Z')], read: ['2026-09-30'] };
