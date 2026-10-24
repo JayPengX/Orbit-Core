@@ -229,9 +229,19 @@ async function fetchCpblTsdb(year, month, { from = Date.UTC(year, month - 1, 1),
       if (!r.ok) throw new Error(`tsdb ${r.status}`);
       return parseTsdbDay(await r.json());
     });
-  const lists = await inTurns(days, 2, d => day(d).catch(error => (failures.push(String(error.message || error)), [])));
+  // A day TheSportsDB turns away asked again through the relay pinned to Taiwan (as cpblDay does).
+  const read = [];
+  const lists = await inTurns(days, 2, d =>
+    day(d)
+      .catch(error => (relay ? relay.fetch(`https://gemini-relay/?to=${encodeURIComponent(`${TSDB}?d=${d}&l=${TSDB_CPBL}`)}`, { signal: AbortSignal.timeout(TSDB_TIMEOUT) }).then(async r => (r.ok ? parseTsdbDay(await r.json()) : Promise.reject(error)), () => Promise.reject(error)) : Promise.reject(error)))
+      .then(list => (read.push(d), list))
+      .catch(error => (failures.push(String(error.message || error)), []))
+  );
   if (days.length && failures.length === days.length) throw new Error(`${failures[0]} (every day)`);
-  return lists.flat();
+  // The days read (a day missing is never "no games": the data proxy fills
+  // it from the nightly whole copy), and whether that's every day of the month.
+  const all = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return { games: lists.flat(), read: read.sort(), ...(read.length === all ? { whole: 1 } : {}) };
 }
 // CPBL's month from TheSportsDB's day lists: CPBL's own site turns every
 // address outside Taiwan away (Cloudflare's too), and TheSportsDB's free key
@@ -240,7 +250,7 @@ async function fetchCpblTsdb(year, month, { from = Date.UTC(year, month - 1, 1),
 async function cpbl(year, month, now = Date.now()) {
   // December to February: no CPBL games (the season opens in March, 台灣大賽
   // is over by early November), nothing to ask for.
-  if (month === 12 || month <= 2) return [];
+  if (month === 12 || month <= 2) return { games: [], read: [], whole: 1 };
   return fetchCpblTsdb(year, month, { now });
 }
 const FETCHERS = { npb: fetchNpb, kbo: fetchKbo, cpbl };
@@ -396,8 +406,9 @@ export async function asiaBaseballResponse(url) {
   const target = asiaTarget(url);
   if (!target) return new Response('{"error":"unknown"}', { status: 404, headers: { 'Content-Type': 'application/json' } });
   try {
-    const games = (await FETCHERS[target.league](target.year, target.month)).sort((a, b) => a.start.localeCompare(b.start));
-    return new Response(JSON.stringify({ league: target.league, month: `${target.year}-${String(target.month).padStart(2, '0')}`, games }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    const got = await FETCHERS[target.league](target.year, target.month);
+    const { games, ...more } = Array.isArray(got) ? { games: got } : got;
+    return new Response(JSON.stringify({ league: target.league, month: `${target.year}-${String(target.month).padStart(2, '0')}`, games: games.sort((a, b) => a.start.localeCompare(b.start)), ...more }), { status: 200, headers: { 'Content-Type': 'application/json' } });
   } catch (error) {
     return new Response(JSON.stringify({ error: String(error.message || error) }), { status: 502, headers: { 'Content-Type': 'application/json' } });
   }

@@ -96,7 +96,9 @@ export const yyyymmdd = date => date.toISOString().slice(0, 10).replaceAll('-', 
 // state: 'pre' | 'in' | 'post' | 'void', venue }] }. `getJson(url)` is the
 // app's proxied fetch.
 export const ASIA_URL = 'https://asia-baseball.orbit';
-export const asiaMonthUrl = (league, ym) => `${ASIA_URL}/${league}/${ym}.json`;
+// (CPBL's at a new address, ?v=2: its old one held months cut short for good,
+// September 2026's three games of 66, at the edge and in R2.)
+export const asiaMonthUrl = (league, ym) => `${ASIA_URL}/${league}/${ym}.json${league === 'cpbl' ? '?v=2' : ''}`;
 // "2026-09" for a date (Asia's own calendar: UTC+8 is close enough for all three).
 export const asiaMonthOf = ms => new Date(ms + 8 * 3_600_000).toISOString().slice(0, 7);
 // The month's games. CPBL's own site has stopped answering, and the proxy's
@@ -119,6 +121,16 @@ export async function asiaMonth(getJson, league, ym, { now = Date.now(), fetchJs
   // one only when it read the days, a 502 when it couldn't. An empty
   // off-season month read again here was TheSportsDB's days two at a time on
   // every opening, 2-3 s on a phone's link.)
+  // Read in part (days TheSportsDB turned the proxy away, and not yet in its
+  // nightly whole copy): the missing days of the last two weeks and the next
+  // two from here.
+  if (!down && Array.isArray(data.read) && !data.whole) {
+    const missing = tsdbDays(ym, now).filter(d => !data.read.includes(d));
+    const extra = (await Promise.all(missing.map(d => fetchJson(`${TSDB_DAY}?d=${d}&l=${TSDB_CPBL}`).then(x => parseTsdbDay(x, now)).catch(() => [])))).flat();
+    const day = g => new Date(Date.parse(g.start) + 8 * 3_600_000).toISOString().slice(0, 10);
+    const have = new Set(games.map(g => g.id));
+    return cpblFresh([...games, ...extra.filter(g => !have.has(g.id) && missing.includes(day(g)))].sort((x, y) => x.start.localeCompare(y.start)), now, fetchJson);
+  }
   if (!down) return cpblFresh(games, now, fetchJson);
   const days = tsdbDays(ym, now);
   let failed = 0;
