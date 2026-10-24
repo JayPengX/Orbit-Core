@@ -4457,6 +4457,10 @@ function breakSeconds(summary, own, seconds, mandatory) {
 }
 export function watchBreak(key, { seconds, read, test = /./, play = '', mandatory = null }) {
   key = String(key);
+  // The beat on first, whatever's known: a break's end kept from before (the
+  // app opened again mid-break) never started it, and its countdown moved
+  // only when the list was drawn again, every few seconds.
+  halftimeBeat();
   if (!seconds || halftimeEnds.has(key) || Date.now() - (halftimeAsked.get(key) || 0) < 20_000) return halftimeEnd(key);
   halftimeAsked.set(key, Date.now());
   // Not found yet (the summary a step behind the list: a half ended on a
@@ -4505,8 +4509,11 @@ function halftimeBeat() {
       if (node.textContent !== text) node.textContent = text;
     }
   };
+  // A quarter of a second: each second's change shown as it comes (a 1 s
+  // timer drifts against the break's own second, steps uneven); only text
+  // that changed is written.
   tick();
-  halftimeTimer = setInterval(tick, 1000);
+  halftimeTimer = setInterval(tick, 250);
 }
 
 // ---- A live number that changed: a small spring pop -------------------------------------------
