@@ -168,3 +168,31 @@ test("the session to log: the index's running one; F1's archive turned away (401
   assert.equal(sessionToLog(null, race, Date.UTC(2026, 9, 26, 1, 0)), false);
   assert.equal(sessionToLog(null, {}, now), false);
 });
+
+test('a race read from OpenF1 when F1’s archive is shut: each lap with its gap and place at its end, the stops', async () => {
+  const { openF1Laps } = await import('../f1-live.js');
+  const t0 = Date.parse('2026-10-25T20:03:00Z');
+  const iso = ms => new Date(t0 + ms).toISOString();
+  const got = openF1Laps({
+    laps: [
+      { driver_number: 12, lap_number: 1, lap_duration: null, date_start: iso(0) },
+      { driver_number: 12, lap_number: 2, lap_duration: 100, date_start: iso(110_000) },
+      { driver_number: 1, lap_number: 2, lap_duration: 101.5, date_start: iso(112_000) },
+      { driver_number: 1, lap_number: 3, lap_duration: 120, date_start: iso(213_500), is_pit_out_lap: false }
+    ],
+    intervals: [
+      { driver_number: 1, date: iso(200_000), gap_to_leader: 2.4 },
+      { driver_number: 1, date: iso(330_000), gap_to_leader: '+1 LAP' }
+    ],
+    position: [
+      { driver_number: 12, date: iso(-60_000), position: 1 },
+      { driver_number: 1, date: iso(-60_000), position: 2 },
+      { driver_number: 1, date: iso(300_000), position: 3 }
+    ],
+    pit: [{ driver_number: 1, lap_number: 3, stop_duration: 2.3, lane_duration: 21.1 }]
+  });
+  assert.deepEqual(got.cars['12'], [[2, 100000, 0, 1, 0]]);
+  assert.deepEqual(got.cars['1'], [[2, 101500, 2.4, 2, 0], [3, 120000, null, 3, 1]]);
+  assert.deepEqual(got.places['1'], [2, 0, 2, 3]);
+  assert.deepEqual(got.stops['1'], [[3, 2.3, 21.1]]);
+});

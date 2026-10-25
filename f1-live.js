@@ -463,9 +463,89 @@ export function memoryLog() {
   return { get: async key => m.get(key) || null, add: async (key, sample) => void m.set(key, addSample(m.get(key), sample)) };
 }
 
+// Every car's laps from OpenF1's tables (its laps, gaps, places and stops),
+// for when F1's archive turns everyone away (from 2026-10-25, every year's,
+// a CloudFront 401). `rows` = { laps, intervals, position, pit }, each
+// OpenF1's list. The same shape as the archive's: { cars: { no: [[lap, ms,
+// gap, place, pit]…] }, places: { no: [grid, lap 1, …] }, stops: { no: [[lap, stop s, lane s]…] } }.
+export function openF1Laps({ laps = [], intervals = [], position = [], pit = [] } = {}) {
+  const byCar = (rows, key = 'date') => {
+    const m = {};
+    for (const r of rows || []) if (r?.driver_number != null && r[key]) (m[r.driver_number] ||= []).push(r);
+    for (const k in m) m[k].sort((a, b) => Date.parse(a[key]) - Date.parse(b[key]));
+    return m;
+  };
+  // The last row at or before a time.
+  const at = (rows, t) => {
+    let found = null;
+    for (const r of rows || []) {
+      if (Date.parse(r.date) > t) break;
+      found = r;
+    }
+    return found;
+  };
+  const gaps = byCar(intervals), places = byCar(position), stopsBy = {};
+  for (const p of pit || []) if (p?.driver_number != null && p.lap_number) (stopsBy[p.driver_number] ||= []).push(p);
+  const cars = {}, placesOut = {}, stops = {};
+  for (const [no, rows] of Object.entries(byCar(laps, 'date_start'))) {
+    const pitLaps = new Set((stopsBy[no] || []).map(p => Number(p.lap_number)));
+    const out = [];
+    for (const l of rows) {
+      const n = Number(l.lap_number) || 0;
+      const ms = Math.round((Number(l.lap_duration) || 0) * 1000);
+      if (!n) continue;
+      const end = Date.parse(l.date_start) + (ms || 90_000);
+      const pos = Number(at(places[no], end)?.position) || 0;
+      const g = at(gaps[no], end)?.gap_to_leader;
+      const gap = pos === 1 ? 0 : typeof g === 'number' ? g : /^\+?\d+(\.\d+)?$/.test(String(g ?? '')) ? Number(String(g).replace('+', '')) : null;
+      if (ms) out.push([n, ms, gap, pos, pitLaps.has(n) || l.is_pit_out_lap ? 1 : 0]);
+      ((placesOut[no] ||= [Number(places[no]?.[0]?.position) || 0])[n] = pos);
+    }
+    cars[no] = out;
+    placesOut[no] = Array.from(placesOut[no] || [], x => x || 0);
+  }
+  for (const [no, ps] of Object.entries(stopsBy))
+    stops[no] = ps
+      .map(p => [Number(p.lap_number), Number(p.stop_duration) || 0, Number(p.lane_duration ?? p.pit_duration) || 0])
+      .sort((a, b) => a[0] - b[0]);
+  return { cars, places: placesOut, stops };
+}
+const OPENF1 = 'https://api.openf1.org/v1/';
+const openF1Json = async path => {
+  const res = await fetch(`${OPENF1}${path}`, { signal: AbortSignal.timeout(20_000) });
+  if (!res.ok) throw new Error(`openf1 ${res.status}`);
+  return res.json();
+};
+async function openF1Session(start) {
+  const t = Date.parse(start);
+  const day = new Date(t).toISOString().slice(0, 10);
+  const list = await openF1Json(`sessions?date_start%3E%3D${day}&date_start%3C${new Date(t + 86_400_000).toISOString().slice(0, 10)}`);
+  const s = (list || []).find(x => Math.abs(Date.parse(x.date_start) - t) < 20 * 60_000);
+  if (!s) throw new Error('not in openf1');
+  const names = ['laps', 'intervals', 'position', 'pit'];
+  const rows = await Promise.all(names.map(n => openF1Json(`${n}?session_key=${s.session_key}`).catch(() => [])));
+  const got = openF1Laps(Object.fromEntries(names.map((n, i) => [n, rows[i]])));
+  if (!Object.values(got.cars).some(x => x.length)) throw new Error('openf1 no laps');
+  return { at: Date.now(), ...got };
+}
+
 // Every car's laps: once over, from F1's archive (the timing stream, exact
-// at each line); while it runs, the log. `{ at, cars, places, stops, live }`.
-async function laps(start, log) {
+// at each line), else OpenF1's; while it runs, the log. `{ at, cars, places, stops, live }`.
+async function laps(start, log, final = false) {
+  try {
+    return await archiveLaps(start, final ? null : log);
+  } catch (error) {
+    // (F1's archive shut: OpenF1's, open once the session's over; still
+    // running, or OpenF1 shut too, the log, or the archive's own failure.)
+    const kept = /archive 40[13]|stream 40[13]|not archived|not in the index/.test(String(error.message)) ? await openF1Session(start).catch(() => null) : null;
+    if (kept) return kept;
+    // (Over and nothing else: what the log kept while it ran, marked so the phone asks again.)
+    const logged = final && log ? await log.get(new Date(start).toISOString()).catch(() => null) : null;
+    if (logged) return { ...logged, live: true };
+    throw error;
+  }
+}
+async function archiveLaps(start, log) {
   if (!Number.isFinite(Date.parse(start))) throw new Error('start');
   // (The index unread, F1's archive turned away: the log, under the start asked for.)
   const index = log ? await indexOf(new Date(start).getUTCFullYear()).catch(() => null) : await indexOf(new Date(start).getUTCFullYear());
@@ -516,7 +596,7 @@ export async function f1LiveResponse(url, { log = null } = {}) {
   }
   if (url.pathname === '/laps.json' || url.pathname === '/circuit.json') {
     try {
-      return json(url.pathname === '/laps.json' ? await laps(url.searchParams.get('start') || '', url.searchParams.get('final') ? null : log) : await circuit(url.searchParams.get('key'), url.searchParams.get('year')), 200);
+      return json(url.pathname === '/laps.json' ? await laps(url.searchParams.get('start') || '', log, Boolean(url.searchParams.get('final'))) : await circuit(url.searchParams.get('key'), url.searchParams.get('year')), 200);
     } catch (error) {
       return json({ error: String(error.message || error) }, 502);
     }
