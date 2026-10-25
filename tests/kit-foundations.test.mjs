@@ -165,6 +165,14 @@ test('pickSeg: a few as the capsule (aria-pressed, thumb from the last pick), mo
   assert.equal(many.children[2].className, 'q-chip');
   assert.equal(ui.pickSeg(['a', 'b', 'c', 'd', 'e'].map(k => [k, k]), 'c', () => {}, { seg: true }).className, 'q-seg');
   assert.equal(ui.pickSeg([['a', 'A']], 'a', () => {}, { chips: true }).className, 'q-chips');
+  // A row not drawn again on a pick: it shows the pick, and a tap back on the first one counts (F1's 排名 after 賽道).
+  const got = [];
+  const row = ui.pickSeg([['o', '排名'], ['t', '賽道'], ['y', '輪胎']], 'o', id => got.push(id), { chips: true });
+  row.children[1].handlers.click();
+  assert.deepEqual(row.children.map(b => b.attrs['aria-pressed']), ['false', 'true', 'false']);
+  row.children[0].handlers.click();
+  row.children[0].handlers.click();
+  assert.deepEqual(got, ['t', 'o']);
   assert.equal(ui.segHtml([['a', 'A']], 'a', { pressed: true, cls: 'small' }), '<div class="q-seg small" role="group" style="--q-seg-n:1;--q-seg-i:0" data-to="0"><button type="button" aria-pressed="true" >A</button></div>');
 });
 

@@ -327,16 +327,27 @@ export function pickSeg(options, current, onPick, { cls = '', chips = false, seg
   const list = options.map(o => (Array.isArray(o) ? { id: o[0], label: o[1], count: o[2] } : o));
   const few = !chips && (list.length <= 4 || (seg && list.length <= 7));
   const attrs = { class: `${few ? 'q-seg' : 'q-chips'} ${cls}`.trim(), role: 'group', ...(label ? { 'aria-label': label } : {}) };
+  // (The pick kept here as it changes: a row the app doesn't draw again on
+  // a pick still shows it, and a tap back on the first one isn't ignored.)
+  let now = current;
+  const pick = id => {
+    if (id === now) return;
+    now = id;
+    buttons.forEach((b, i) => b.setAttribute('aria-pressed', String(list[i].id === id)));
+    if (few) root.style.setProperty('--q-seg-i', String(at(id)));
+    onPick(id);
+  };
   const buttons = list.map(o =>
-    h('button', { type: 'button', ...(few ? {} : { class: 'q-chip' }), 'aria-pressed': String(o.id === current), onclick: () => o.id !== current && onPick(o.id) }, [o.label, segBadge(o.count)])
+    h('button', { type: 'button', ...(few ? {} : { class: 'q-chip' }), 'aria-pressed': String(o.id === current), onclick: () => pick(o.id) }, [o.label, segBadge(o.count)])
   );
-  if (!few) return h('div', attrs, buttons);
+  let root = null;
+  if (!few) return (root = h('div', attrs, buttons));
   const key = `${cls}:${list.map(o => o.id).join('|')}`;
   const at = id => Math.max(0, list.findIndex(o => o.id === id));
   const from = lastPicks.has(key) ? lastPicks.get(key) : current;
   lastPicks.set(key, current);
   const to = String(at(current));
-  const root = h('div', { ...attrs, style: `--q-seg-n:${list.length};--q-seg-i:${at(from)}`, 'data-to': to }, buttons);
+  root = h('div', { ...attrs, style: `--q-seg-n:${list.length};--q-seg-i:${at(from)}`, 'data-to': to }, buttons);
   // (Not in the page yet: no slide, straight to the pick.)
   queueMicrotask(() => {
     if (root.isConnected) return settleSegs(root.parentNode);
