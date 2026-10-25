@@ -1052,8 +1052,6 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
           }
           if (t.id !== 'start' && (await page.evaluate(() => document.querySelector('.q-tab[aria-selected=true]')?.dataset.tab).catch(() => t.id)) !== t.id) await page.click(`.q-tab[data-tab="${t.id}"]`).catch(() => {});
           await page.waitForTimeout(300);
-          // Back again: nothing of where it went left on the screen (the top bar's name).
-          for (const l of (await page.evaluate(() => globalThis.__gate.check().header).catch(() => [])) || []) if (!(found.header ||= []).some(x => x.endsWith(l))) found.header.push(`back from "${want}": ${l}`);
         }
       }
     }

@@ -4000,8 +4000,7 @@ dialog.q-sheet[data-detent='large'] {
   text-wrap: balance;
 }
 
-/* -- A large title that collapses into a small centred one in a glass bar
-   (navTitle) -- */
+/* -- A large title at a tab's top (navTitle) -- */
 .q-nav-title {
   margin: 0;
   /* (Level with the page's content: every tab's page already keeps the
@@ -4011,36 +4010,6 @@ dialog.q-sheet[data-detent='large'] {
   letter-spacing: 0.01em;
   /* One line, shrunk to fit (orbit.mjs fitNames), as iOS's large title. */
   overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-.q-navbar {
-  position: fixed;
-  top: 0;
-  left: var(--q-side);
-  right: var(--q-side);
-  z-index: 49;
-  display: grid;
-  place-items: center;
-  box-sizing: border-box;
-  height: calc(var(--q-top) + 44px);
-  padding: var(--q-top) 72px 0;
-  background: var(--q-glass);
-  -webkit-backdrop-filter: var(--q-glass-blur);
-  backdrop-filter: var(--q-glass-blur);
-  box-shadow: inset 0 -0.5px 0 var(--q-sep);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s;
-}
-.q-navbar.on {
-  opacity: 1;
-}
-.q-navbar-title {
-  max-width: 100%;
-  overflow: hidden;
-  font: var(--q-t-headline);
-  letter-spacing: -0.025em;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
@@ -4088,7 +4057,6 @@ dialog.q-sheet[data-detent='large'] {
 }
 @media (prefers-reduced-motion: reduce) {
   .q-sheet[data-detent]:not(.q-leaving):not(.q-dragging),
-  .q-navbar,
   .q-ptr.hold,
   .q-ptr.out {
     transition: none;

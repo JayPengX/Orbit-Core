@@ -290,85 +290,14 @@ test('actionGrid and sectionHead take data-* attributes, in both forms', () => {
 });
 
 // ---- navTitle ----
-class FakeIO {
-  static all = [];
-  constructor(cb, opts) {
-    this.cb = cb;
-    this.opts = opts;
-    this.off = false;
-    FakeIO.all.push(this);
-  }
-  observe() {}
-  disconnect() {
-    this.off = true;
-  }
-}
-class FakeMO {
-  static all = [];
-  constructor(cb) {
-    this.cb = cb;
-    FakeMO.all.push(this);
-  }
-  observe() {}
-  disconnect() {}
-}
-test('navTitle: a large title; scrolled under the bar a small one shows there; hidden or back, it goes', () => {
+test('navTitle: a large title that scrolls away with the page, no bar', () => {
   reset();
-  globalThis.IntersectionObserver = FakeIO;
-  globalThis.MutationObserver = FakeMO;
-  FakeIO.all.length = 0;
   const h1 = ui.navTitle('賽程');
   assert.equal(h1.tag, 'h1');
   assert.ok(h1.classList.contains('q-nav-title'));
-  const io = FakeIO.all.at(-1);
-  assert.match(io.opts.rootMargin, /^-\d+px 0px 0px 0px$/);
-  const bar = () => body.querySelector('.q-navbar');
-  assert.ok(bar(), 'the bar exists');
-  assert.equal(bar().classList.contains('on'), false);
-  const entry = (over = {}) => [{ isIntersecting: false, boundingClientRect: { top: -60, bottom: -20, height: 40 }, rootBounds: { top: 0 }, ...over }];
-  io.cb(entry());
-  assert.equal(bar().classList.contains('on'), true, 'scrolled under the bar');
-  assert.equal(bar().textContent, '賽程');
   h1.setTitle('比賽');
-  assert.equal(bar().textContent, '比賽');
-  io.cb(entry({ isIntersecting: true }));
-  assert.equal(bar().classList.contains('on'), false, 'back in view');
-  io.cb(entry());
-  io.cb(entry({ boundingClientRect: { top: 0, bottom: 0, height: 0 } }));
-  assert.equal(bar().classList.contains('on'), false, 'a hidden tab has no box: not collapsed');
-  io.cb(entry({ boundingClientRect: { top: 900, bottom: 940, height: 40 } }));
-  assert.equal(bar().classList.contains('on'), false, 'below the fold is not collapsed');
-});
-
-test('navTitle: leaves the bar and the observers when its element leaves the page', () => {
-  reset();
-  FakeIO.all.length = 0;
-  const h1 = ui.navTitle('A');
-  body.append(h1);
-  const io = FakeIO.all.at(-1);
-  const mo = FakeMO.all[0];
-  mo.cb();
-  io.cb([{ isIntersecting: false, boundingClientRect: { top: -60, bottom: -20, height: 40 }, rootBounds: { top: 0 } }]);
-  assert.equal(body.querySelector('.q-navbar').classList.contains('on'), true);
-  h1.remove();
-  mo.cb();
-  assert.equal(io.off, true, 'observer disconnected');
-  assert.equal(body.querySelector('.q-navbar').classList.contains('on'), false, 'the bar let go');
-});
-
-test('navTitle: another tab\'s title takes over, the first can not turn it off', () => {
-  reset();
-  FakeIO.all.length = 0;
-  ui.navTitle('A');
-  ui.navTitle('B');
-  const [a, b] = FakeIO.all.slice(-2);
-  const gone = [{ isIntersecting: false, boundingClientRect: { top: -60, bottom: -20, height: 40 }, rootBounds: { top: 0 } }];
-  a.cb(gone);
-  b.cb(gone);
-  const bar = body.querySelector('.q-navbar');
-  assert.equal(bar.textContent, 'B');
-  a.cb([{ isIntersecting: true, boundingClientRect: { top: 10, bottom: 50, height: 40 }, rootBounds: { top: 0 } }]);
-  assert.equal(bar.classList.contains('on'), true, 'A is not the owner');
+  assert.equal(h1.textContent, '比賽');
+  assert.equal(body.querySelector('.q-navbar'), null);
 });
 
 // ---- pull to refresh ----
@@ -538,7 +467,7 @@ test('the stylesheet: a chosen chip is accent on a 14% wash, the shell section i
   assert.match(chosen, /color:\s*var\(--q-accent\)/);
   assert.doesNotMatch(chosen, /--q-label/);
   assert.match(css, /\.q-pass-tabs \.q-chip\[aria-selected='true'\] \{ background: var\(--accent-wash\)/);
-  for (const c of ['q-has-foot', 'q-navbar', 'q-navbar-title', 'q-nav-title', 'q-ptr']) assert.match(css, new RegExp(`\\.${c}(?![\\w-])`), `.${c}`);
+  for (const c of ['q-has-foot', 'q-nav-title', 'q-ptr']) assert.match(css, new RegExp(`\\.${c}(?![\\w-])`), `.${c}`);
   assert.match(css, /\.q-sheet\[data-detent='medium'\]/);
   assert.match(css, /\.q-sheet\[data-detent='large'\]/);
   const at = rawCss.indexOf('Shell (design review)');
@@ -618,35 +547,3 @@ test('sheet(): a subtitle under the title, before the ✕; none by default', () 
   assert.equal(ui.sheet({ title: 'T' }).head.children.length, 3);
 });
 
-test('navTitle: a collapsed title hidden with its tab lets the bar go (no intersection change comes), and asks again when shown', () => {
-  reset();
-  globalThis.IntersectionObserver = FakeIO;
-  globalThis.MutationObserver = FakeMO;
-  const ros = [];
-  globalThis.ResizeObserver = class {
-    constructor(cb) {
-      this.cb = cb;
-      ros.push(this);
-    }
-    observe() {}
-    disconnect() {}
-  };
-  try {
-    FakeIO.all.length = 0;
-    const h1 = ui.navTitle('彩券');
-    let shown = true;
-    h1.getClientRects = () => (shown ? [{}] : []);
-    const bar = () => body.querySelector('.q-navbar');
-    FakeIO.all.at(-1).cb([{ isIntersecting: false, boundingClientRect: { top: -60, bottom: -20, height: 40 }, rootBounds: { top: 0 } }]);
-    assert.equal(bar().classList.contains('on'), true, 'collapsed into the bar');
-    shown = false;
-    ros[0].cb();
-    assert.equal(bar().classList.contains('on'), false, 'its tab hidden: the bar no longer says 彩券');
-    const before = FakeIO.all.length;
-    shown = true;
-    ros[0].cb();
-    assert.equal(FakeIO.all.length, before + 1, 'shown again: watched afresh');
-  } finally {
-    delete globalThis.ResizeObserver;
-  }
-});
