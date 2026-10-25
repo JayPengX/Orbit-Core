@@ -25,7 +25,10 @@ const list = x => (Array.isArray(x) ? x : x && typeof x === 'object' ? Object.va
 // is the set's age: less the age it was fitted at), new or used. A stint
 // the feed splits without a change of tyres (TyresNotChanged: a red flag,
 // the laps to the grid) is the same set: one stint, not a stop.
-export function stintsOf(raw) {
+// In a race (`raced`: the car's laps), the set on now has run at least the
+// laps since the last stop: the feed's count lagged (Stroll from the pit
+// lane, Austin 2026: 1 lap on it at lap 4).
+export function stintsOf(raw, raced = 0) {
   const out = [];
   for (const x of list(raw)) {
     const total = Number(x?.TotalLaps) || 0;
@@ -36,7 +39,10 @@ export function stintsOf(raw) {
     }
     out.push({ c: x?.Compound || '', start: Number(x?.StartLaps) || 0, total, new: x?.New === 'true' });
   }
-  return out.map(x => ({ c: x.c, laps: Math.max(0, x.total - x.start), new: x.new }));
+  const stints = out.map(x => ({ c: x.c, laps: Math.max(0, x.total - x.start), new: x.new }));
+  const last = stints.at(-1);
+  if (last && raced) last.laps = Math.max(last.laps, raced - stints.slice(0, -1).reduce((n, x) => n + x.laps, 0));
+  return stints;
 }
 
 // The feed's state, trimmed to what the board shows.
@@ -79,7 +85,7 @@ export function trimF1Live(r, now = Date.now()) {
         tyreLaps: Number(stint?.TotalLaps) || 0,
         tyreNew: stint?.New === 'true',
         // Orbit Sports' 數據: every stint (compound, laps), the grid slot, the best sectors and the speed trap's best (each with its place).
-        stints: stintsOf(app[no]?.Stints),
+        stints: stintsOf(app[no]?.Stints, /race/i.test(info.Type || '') ? Number(l.NumberOfLaps) || 0 : 0),
         grid: Number(app[no]?.GridPos) || 0,
         // Its last lap's three sectors (as each comes; the one not done yet empty).
         lastSectors: list(l.Sectors).map(x => x?.Value || ''),
