@@ -118,8 +118,11 @@ good once read: OpenF1 shuts while any session runs.
 - **Edge cache tiers:** live 2 s, final 24 h, odds 10 s, standings 30 min,
   quotes 30 s, history 30 min… (`sports.js`). `X-Sports-Proxy-Cache` says
   `HIT`, `STALE`, `MISS` or `KEPT`.
-- **Kept on demand:** a finished game, or a day or month all over, is kept
-  in R2 the first time it's read (`settleable`, `readKept`).
+- **Kept on demand:** what's over for good is kept in R2 the first time
+  it's read (`settleable`, `readKept`): an ESPN game, or day or month all
+  over; an Asian month; an F1 session's 數據 and laps, a track's map; a
+  race's Jolpica results 3 days on, a past F1 season's; a past MLB day all
+  over. Each goes with its season (`builders/kept.js`, nightly).
 - **A day in one answer** (`GET /sports-today?day=YYYY-MM-DD`, a Taiwan day,
   `sports-today.js`): Orbit Sports' first screen, `{v, day, built, covered,
   missed, events}`. Built when someone asks (no cron: nothing runs while
@@ -145,6 +148,7 @@ changes, writing a file only when it changed (`builders/store.js`):
 | `photos.js` | photo lists, cutouts | hourly / daily 18:00 |
 | `buses.js` | `bus/…`, `shape/…`, `where.json` | a city once a week |
 | `asia.js`, `cpbl.js` | CPBL's month and standings | daily 15:00 |
+| `kept.js` | wipes the proxy's kept copies (`mirror/`) from before a league's first askable day | daily 17:00 |
 
 A season is kept whole until the next season's first game (preseason
 included), then wiped whole. `private/` is never served.

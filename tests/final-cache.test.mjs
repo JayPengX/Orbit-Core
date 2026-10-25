@@ -48,3 +48,25 @@ test('a finished F1 session is kept for good: 數據 with laps run, every lap on
   assert.equal(settled(u('/laps.json?start=x'), body({ cars })), false);
   assert.equal(settled(u('/now.json'), body({ final: true, cars: [{ laps: 3 }] })), false);
 });
+
+test('a track map, a race’s results days on, a past F1 season and a past MLB day all over are kept for good', () => {
+  const body = x => JSON.stringify(x);
+  assert.equal(settled(u('https://f1-live.orbit/circuit.json?key=9&year=2026'), body({ x: [1, 2] })), true);
+  assert.equal(settled(u('https://f1-live.orbit/circuit.json?key=9&year=2026'), body({ x: [] })), false);
+  const race = (date, n = 20) => body({ MRData: { total: String(n ? 1 : 0), RaceTable: { Races: n ? [{ date, time: '19:00:00Z', Results: Array(n).fill({}) }] : [] } } });
+  const round = u('https://api.jolpi.ca/ergast/f1/2026/18/results.json?limit=40');
+  assert.equal(settled(round, race('2026-10-01')), true);
+  // Stewards may still change it; a race to come has none.
+  assert.equal(settled(round, race(new Date().toISOString().slice(0, 10))), false);
+  assert.equal(settled(round, race('', 0)), false);
+  // `current` moves to the next season: never.
+  assert.equal(settled(u('https://api.jolpi.ca/ergast/f1/current/results.json?limit=100'), race('2026-03-08')), false);
+  assert.equal(settled(u('https://api.jolpi.ca/ergast/f1/2025/driverstandings.json'), body({ MRData: { total: '1' } })), true);
+  assert.equal(settled(u('https://api.jolpi.ca/ergast/f1/2025.json?limit=40'), body({ MRData: { total: '24' } })), true);
+  const mlb = d => u(`https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${d}&hydrate=linescore,previousPlay`);
+  const games = (...s) => body({ dates: [{ games: s.map(([a, d]) => ({ status: { abstractGameState: a, detailedState: d } })) }] });
+  assert.equal(settled(mlb('2026-10-20'), games(['Final', 'Final'], ['Final', 'Postponed'])), true);
+  assert.equal(settled(mlb('2026-10-20'), games(['Final', 'Final'], ['Live', 'In Progress'])), false);
+  assert.equal(settled(mlb(new Date().toISOString().slice(0, 10)), games(['Final', 'Final'])), false);
+  assert.equal(settled(mlb('2026-10-20'), body({ dates: [] })), false);
+});

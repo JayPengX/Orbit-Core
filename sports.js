@@ -22,6 +22,7 @@ import { F1_LIVE_HOST, f1LiveResponse, doLog, sampleLive } from './f1-live.js';
 import { cleanDev } from './kit/devconfig.mjs';
 import { json, LOCAL_ORIGIN } from './http.js';
 import { mirrorPath } from './kit/mirror.mjs';
+import { keptDay } from './builders/kept.js';
 
 // ==== /sports-proxy - CORS passthrough for public sports data ==============
 const ELTA_HOST = 'piceltaott-elta.cdn.hinet.net';
@@ -1098,14 +1099,40 @@ export function settleable(url) {
   if (url.hostname === 'site.api.espn.com') return url.pathname.endsWith('/summary') || (url.pathname.endsWith('/scoreboard') && /^\d{6}(\d{2})?$/.test(url.searchParams.get('dates') || ''));
   // A finished F1 session (f1-live.js): 數據 and every lap, kept for good
   // (F1's archive shut, OpenF1 shut while any session runs: read once, kept).
-  if (url.hostname === F1_LIVE_HOST) return url.pathname === '/session.json' || (url.pathname === '/laps.json' && Boolean(url.searchParams.get('final')));
+  // A track's map too (MultiViewer's, one a circuit a year).
+  if (url.hostname === F1_LIVE_HOST) return url.pathname === '/session.json' || url.pathname === '/circuit.json' || (url.pathname === '/laps.json' && Boolean(url.searchParams.get('final')));
+  // Jolpica's by year (never `current`, which moves to the next season): a
+  // race's results, sprint or qualifying; anything of a season past.
+  if (url.hostname === 'api.jolpi.ca') return JOLPICA_ROUND.test(url.pathname) || jolpicaYear(url) < new Date().getUTCFullYear();
+  // MLB's day of games (a past day's, all over).
+  if (url.hostname === 'statsapi.mlb.com') return url.pathname === '/api/v1/schedule' && /^\d{4}-\d{2}-\d{2}$/.test(url.searchParams.get('date') || '');
   return url.hostname === ASIA_HOST && /\/\d{4}-\d{2}\.json$/.test(url.pathname);
 }
+const JOLPICA_ROUND = /^\/ergast\/f1\/\d{4}\/\d+\/(results|sprint|qualifying)\.json$/;
+const jolpicaYear = url => Number(/^\/ergast\/f1\/(\d{4})(\/|\.json)/.exec(url.pathname)?.[1]) || Infinity;
+// A race's results stand once its stewards are done (a penalty can come days on).
+const JOLPICA_SETTLES = 3 * 86_400_000;
 // …and whether this answer of one is: the game completed; every game of the
 // day or month completed (a month's last day passed); every game of an Asian
 // month over, called off or six hours past a start it never had.
 export function settledData(url, data, now = Date.now()) {
-  if (url.hostname === F1_LIVE_HOST) return url.pathname === '/session.json' ? data?.final === true && (data.cars || []).some(c => c.laps > 0) : !data?.live && Object.values(data?.cars || {}).filter(x => x?.length).length >= 10;
+  if (url.hostname === F1_LIVE_HOST) {
+    if (url.pathname === '/circuit.json') return data?.x?.length > 0;
+    return url.pathname === '/session.json' ? data?.final === true && (data.cars || []).some(c => c.laps > 0) : !data?.live && Object.values(data?.cars || {}).filter(x => x?.length).length >= 10;
+  }
+  if (url.hostname === 'api.jolpi.ca') {
+    const m = data?.MRData;
+    if (!(Number(m?.total) > 0)) return false;
+    if (jolpicaYear(url) < new Date(now).getUTCFullYear()) return true;
+    const race = m.RaceTable?.Races?.[0];
+    const at = Date.parse(`${race?.date}T${race?.time || '23:59:59Z'}`);
+    return (race?.Results || race?.SprintResults || race?.QualifyingResults || []).length > 0 && at < now - JOLPICA_SETTLES;
+  }
+  if (url.hostname === 'statsapi.mlb.com') {
+    const games = data?.dates?.[0]?.games || [];
+    // (A day's over: the next day begun at the date line.)
+    return Date.parse(`${url.searchParams.get('date')}T12:00:00Z`) + 86_400_000 < now && games.length > 0 && games.every(g => g?.status?.abstractGameState === 'Final' || /postponed|cancel/i.test(g?.status?.detailedState || ''));
+  }
   if (url.hostname === ASIA_HOST) {
     const [y, m] = (/(\d{4})-(\d{2})\.json$/.exec(url.pathname) || []).slice(1).map(Number);
     if (!y || Date.UTC(y, m, 1) > now) return false;
@@ -1274,7 +1301,8 @@ async function keep(key, url, body) {
   try {
     const data = JSON.parse(typeof body === 'string' ? body : new TextDecoder().decode(body));
     const text = JSON.stringify({ until: FOREVER, data: url.hostname === 'site.api.espn.com' ? slimEspn(data) : data });
-    await dataBucket.put(key, await gz(new TextEncoder().encode(text)), { httpMetadata: { contentType: 'application/gzip' } });
+    // (Its day, so it goes with its season: builders/kept.js.)
+    await dataBucket.put(key, await gz(new TextEncoder().encode(text)), { httpMetadata: { contentType: 'application/gzip' }, customMetadata: { day: keptDay(url, data) } });
     notKept.delete(key);
   } catch {}
 }
