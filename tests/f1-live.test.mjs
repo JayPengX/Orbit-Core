@@ -63,6 +63,9 @@ test("a stint split without a change of tyres is one stint; its laps are the set
   assert.deepEqual(stintsOf(raw), [{ c: 'INTERMEDIATE', laps: 20, new: true }]);
   // A used set fitted at 3 laps old and run 12: 12 here.
   assert.deepEqual(stintsOf([{ Compound: 'SOFT', New: 'false', TotalLaps: 15, StartLaps: 3 }]), [{ c: 'SOFT', laps: 12, new: false }]);
+  // Austin 2026: Stroll from the pit lane, 1 lap on the feed at his 4th: the 4 he's run.
+  assert.deepEqual(stintsOf([{ Compound: 'MEDIUM', New: 'true', TotalLaps: 1, StartLaps: 0 }], 4), [{ c: 'MEDIUM', laps: 4, new: true }]);
+  assert.deepEqual(stintsOf([{ Compound: 'SOFT', New: 'true', TotalLaps: 10, StartLaps: 0 }, { Compound: 'HARD', New: 'true', TotalLaps: 1, StartLaps: 0 }], 14), [{ c: 'SOFT', laps: 10, new: true }, { c: 'HARD', laps: 4, new: true }]);
 });
 
 test('lapsOf: each car\'s laps from the timing stream, gap, place and pit laps', async () => {
