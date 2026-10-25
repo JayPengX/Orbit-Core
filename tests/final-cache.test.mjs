@@ -36,3 +36,15 @@ test('a CPBL month is over for good only read whole; the days not read come from
   // No nightly copy: as read, never whole.
   assert.equal(fillCpblMonth(part, null), part);
 });
+
+test('a finished F1 session is kept for good: 數據 with laps run, every lap once not the live log', () => {
+  const u = path => new URL(`https://f1-live.orbit${path}`);
+  const body = x => JSON.stringify(x);
+  assert.equal(settled(u('/session.json?start=2026-10-18T19:00:00.000Z'), body({ final: true, cars: [{ laps: 56 }] })), true);
+  assert.equal(settled(u('/session.json?start=2026-10-18T19:00:00.000Z'), body({ final: true, cars: [{ laps: 0 }] })), false);
+  const cars = Object.fromEntries(Array.from({ length: 20 }, (_, i) => [String(i + 1), [[2, 99000, 0, 1, 0]]]));
+  assert.equal(settled(u('/laps.json?start=x&final=1'), body({ cars })), true);
+  assert.equal(settled(u('/laps.json?start=x&final=1'), body({ cars, live: true })), false);
+  assert.equal(settled(u('/laps.json?start=x'), body({ cars })), false);
+  assert.equal(settled(u('/now.json'), body({ final: true, cars: [{ laps: 3 }] })), false);
+});
