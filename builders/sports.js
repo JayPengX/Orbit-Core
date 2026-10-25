@@ -211,7 +211,8 @@ export async function runSports({ store, get = fetch, now = Date.now(), sleep = 
   }
   // Most of it missing: something's wrong (ESPN down): the index as it was.
   if (failed.length > leagues.length) return { failed };
-  await store.put('sports/index.json', index);
+  // (Every night, changed or not: its date is the builder's heartbeat, which the admin's 健康 reads.)
+  await store.put('sports/index.json', index, { always: true });
   if (!only.length) {
     const askable = Object.fromEntries(Object.entries(index.leagues).filter(([, v]) => v.bounds).map(([k, v]) => [k, v.bounds]));
     for (const [key, l] of Object.entries(CATALOG).filter(([, l]) => l.asia)) {

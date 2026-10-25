@@ -398,11 +398,23 @@ async function indexOf(year) {
 }
 
 // The cron's minute: nothing unless a session runs; then one look, kept.
+// The session to log: the index's running one; the index unread (F1 turned
+// its whole archive away, 401, mid-race on 2026-10-25), the feed's own
+// session while it's within its four hours (`info`: its SessionInfo, null
+// before the feed is read). False: nothing to log.
+export function sessionToLog(index, info, now = Date.now()) {
+  if (index) return liveSession(index, now) || false;
+  if (info === null) return null;
+  const t = Date.parse(sessionStartUtc(info));
+  return Number.isFinite(t) && t - 10 * 60_000 <= now && now <= t + 4 * 3_600_000 && !/^(Finalised|Ends)$/i.test(info.SessionStatus || '') ? info : false;
+}
 export async function sampleLive(log, now = Date.now()) {
   if (!log) return 'no log';
-  const s = liveSession(await indexOf(new Date(now).getUTCFullYear()), now);
-  if (!s) return 'idle';
+  const index = await indexOf(new Date(now).getUTCFullYear()).catch(() => null);
+  if (sessionToLog(index, null, now) === false) return 'idle';
   const raw = await snapshot(SAMPLE_TOPICS);
+  const s = sessionToLog(index, raw.SessionInfo || {}, now);
+  if (!s) return 'idle';
   // (The feed on another session than the index's, between two: not kept.)
   const key = sessionStartUtc(s);
   if (raw.SessionInfo?.StartDate && Math.abs(Date.parse(sessionStartUtc(raw.SessionInfo)) - Date.parse(key)) > 20 * 60_000) return 'other session';
@@ -455,10 +467,12 @@ export function memoryLog() {
 // at each line); while it runs, the log. `{ at, cars, places, stops, live }`.
 async function laps(start, log) {
   if (!Number.isFinite(Date.parse(start))) throw new Error('start');
-  const s = indexedSession(await indexOf(new Date(start).getUTCFullYear()), start);
-  if (!s) throw new Error('not in the index');
-  if (!s.Path) {
-    const kept = log ? await log.get(sessionStartUtc(s)) : null;
+  // (The index unread, F1's archive turned away: the log, under the start asked for.)
+  const index = log ? await indexOf(new Date(start).getUTCFullYear()).catch(() => null) : await indexOf(new Date(start).getUTCFullYear());
+  const s = index ? indexedSession(index, start) : null;
+  if (index && !s) throw new Error('not in the index');
+  if (!s?.Path) {
+    const kept = log ? await log.get(s ? sessionStartUtc(s) : new Date(start).toISOString()) : null;
     if (!kept) throw new Error('not archived');
     return { ...kept, live: true };
   }

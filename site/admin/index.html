@@ -1517,9 +1517,9 @@ async function loadHealth() {
     $('health').replaceChildren(
       ...h.checks.map(c =>
         el('li', {}, [
-          el('span', { class: `dot${c.busy || c.late || (c.ok && c.ms > 2500) ? ' slow' : !c.ok ? ' bad' : ''}` }),
-          el('span', {}, [c.name, ...(c.use ? [el('small', { text: c.busy ? `${c.use}・限流中，App 用快取` : c.built ? `${c.use}・${ago(c.built)}建好` : c.use })] : [])]),
-          el('span', { class: 'muted num', text: c.busy ? '限流' : c.ok ? `${c.ms} ms` : `失敗 ${c.status || c.error || ''}` })
+          el('span', { class: `dot${c.busy || c.locked || c.late || (c.ok && c.ms > 2500) ? ' slow' : !c.ok ? ' bad' : ''}` }),
+          el('span', {}, [c.name, ...(c.use ? [el('small', { text: c.busy ? `${c.use}・限流中，App 用快取` : c.locked ? `${c.use}・F1 比賽中只開放付費，App 用快取` : c.built ? `${c.use}・${ago(c.built)}建好` : c.use })] : [])]),
+          el('span', { class: 'muted num', text: c.busy ? '限流' : c.locked ? '比賽中' : c.ok ? `${c.ms} ms` : `失敗 ${c.status || c.error || ''}` })
         ])
       )
     );

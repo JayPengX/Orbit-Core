@@ -346,10 +346,12 @@ const priceAt = (series, t) => {
 const READ = 8;
 const SHOWN = 5;
 // The race's line: each shown driver's chance at each lap's end (laps, from
-// raceLaps), else every two minutes from the start while the laps aren't in
-// (a race on now): { source, market, drivers: [names], by: 'lap' | 'time',
-// points: [{ lap | t, c: [chance per driver] }] }.
-export async function raceLine(start, getJson, laps = null) {
+// raceLaps; a race on now: the laps so far, counted from F1's own feed),
+// else every two minutes from the start while the laps aren't in:
+// { source, market, drivers: [names], by: 'lap' | 'time', points: [{ lap |
+// t, c: [chance per driver] }] }. `live`: the race still on (no one need
+// lead it yet).
+export async function raceLine(start, getJson, laps = null, live = false) {
   const market = await findRaceMarket(start, getJson);
   if (!market) return null;
   const from = Math.floor(Date.parse(start) / 60_000) * 60;
@@ -386,7 +388,7 @@ export async function raceLine(start, getJson, laps = null) {
     while (points.length > 1 && settled(points.at(-1)) && settled(points.at(-2))) points.pop();
   }
   // A race over is won by someone: a line with no one near it at the end missed the winner (a failed read, never kept).
-  if (laps?.length && points.length && Math.max(...points.at(-1).c) < 0.5) throw new Error(`${market.slug}: the winner isn't in the line`);
+  if (laps?.length && !live && points.length && Math.max(...points.at(-1).c) < 0.5) throw new Error(`${market.slug}: the winner isn't in the line`);
   return points.length > 3 ? { source: 'polymarket', market: market.slug, drivers: shown.map(d => d.name), by: laps?.length ? 'lap' : 'time', points } : null;
 }
 // A race to come: the drivers' chances now, the likeliest first (five).
