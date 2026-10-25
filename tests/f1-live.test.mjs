@@ -136,3 +136,20 @@ test('the Durable Object keeps a session\'s log under its start and a fortnight 
   await o.fetch(new Request(`https://f1-log/?key=${key}`, { method: 'POST', body: JSON.stringify({ cars: { 1: [4, 90000, 0, 1, 0] } }) }));
   assert.equal(lists, 1);
 });
+
+test("stewardsOf: penalties to serve and incidents under investigation, by car", async () => {
+  const { stewardsOf } = await import('../f1-live.js');
+  const M = Message => ({ Message });
+  // Austin 2026, lap 13: Russell's 5 seconds; Bortoleto investigated; Bearman and Gasly only noted.
+  const msgs = [
+    M('FIA STEWARDS: TURN 13 INCIDENT INVOLVING CAR 63 (RUS) UNDER INVESTIGATION - LEAVING THE TRACK AND GAINING AN ADVANTAGE (15:04:59)'),
+    M('TURN 13 INCIDENT INVOLVING CARS 87 (BEA) AND 10 (GAS) NOTED - CAUSING A COLLISION (15:06:57)'),
+    M('FIA STEWARDS: TURN 11 INCIDENT INVOLVING CAR 5 (BOR) UNDER INVESTIGATION - LEAVING THE TRACK AND GAINING AN ADVANTAGE (15:06:39)'),
+    M('FIA STEWARDS: 5 SECOND TIME PENALTY FOR CAR 63 (RUS) - LEAVING THE TRACK AND GAINING AN ADVANTAGE (15:04:59)')
+  ];
+  assert.deepEqual(stewardsOf(msgs), { 63: { pen: ['5s'], probe: false }, 5: { pen: [], probe: true } });
+  // Served: gone. Closed with no further action: gone. Two cars investigated: both.
+  assert.deepEqual(stewardsOf([...msgs, M('FIA STEWARDS: PENALTY SERVED - 5 SECOND TIME PENALTY FOR CAR 63 (RUS) - LEAVING THE TRACK AND GAINING AN ADVANTAGE (15:04:59)'), M('FIA STEWARDS: TURN 11 INCIDENT INVOLVING CAR 5 (BOR) REVIEWED NO FURTHER INVESTIGATION (15:06:39)')]), {});
+  assert.deepEqual(stewardsOf([M('FIA STEWARDS: TURN 1 INCIDENT INVOLVING CARS 41 (LIN) AND 55 (SAI) UNDER INVESTIGATION - CAUSING A COLLISION (15:03:49)')]), { 41: { pen: [], probe: true }, 55: { pen: [], probe: true } });
+  assert.deepEqual(stewardsOf(null), {});
+});

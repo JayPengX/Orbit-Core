@@ -45,6 +45,37 @@ export function stintsOf(raw, raced = 0) {
   return stints;
 }
 
+// Each car's standing with the stewards from race control's messages: its
+// penalties not yet served (5s, 10s, drive-through, stop-go) and whether an
+// incident of its is under investigation (until a word on that incident,
+// by its time stamp, closes it). { '63': { pen: ['5s'], probe: false } }.
+export function stewardsOf(msgs) {
+  const out = {};
+  const of = no => (out[no] ||= { pen: [], probe: false });
+  const probes = new Map();
+  for (const m of list(msgs)) {
+    const t = String(m?.Message || '').toUpperCase();
+    const cars = [...t.matchAll(/\bCARS? (\d+) \(\w+\)(?: AND (\d+) \(\w+\))?/g)].flatMap(x => [x[1], x[2]]).filter(Boolean);
+    const stamp = /\((\d\d:\d\d:\d\d)\)\s*$/.exec(t)?.[1] || '';
+    const kind = /(\d+) SECOND TIME PENALTY/.exec(t)?.[1] ? `${/(\d+) SECOND TIME PENALTY/.exec(t)[1]}s` : /DRIVE THROUGH PENALTY/.test(t) ? 'DT' : /(\d+) SECOND STOP\/GO PENALTY/.test(t) ? `SG${/(\d+) SECOND STOP\/GO/.exec(t)[1]}` : /STOP\/GO PENALTY/.test(t) ? 'SG' : '';
+    if (/UNDER INVESTIGATION/.test(t)) {
+      probes.set(stamp || t, cars);
+      continue;
+    }
+    // Any later word on the incident (a penalty, no further action, a reprimand) closes it.
+    if (stamp && probes.has(stamp) && /STEWARDS|PENALTY|NO FURTHER|REPRIMAND|NOT INVESTIGATED/.test(t)) probes.delete(stamp);
+    if (!kind || !cars.length) continue;
+    const car = of(cars[0]);
+    if (/PENALTY SERVED/.test(t)) {
+      const i = car.pen.indexOf(kind);
+      if (i >= 0) car.pen.splice(i, 1);
+    } else if (!/REVOKED|CANCELLED|WITHDRAWN/.test(t)) car.pen.push(kind);
+  }
+  for (const cars of probes.values()) for (const no of cars) of(no).probe = true;
+  for (const [no, x] of Object.entries(out)) if (!x.pen.length && !x.probe) delete out[no];
+  return out;
+}
+
 // The feed's state, trimmed to what the board shows.
 export function trimF1Live(r, now = Date.now()) {
   const info = r?.SessionInfo || {};
@@ -143,6 +174,8 @@ export function trimF1Live(r, now = Date.now()) {
       .filter(m => m.Category === 'SafetyCar' || /SAFETY CAR|VSC|STOPPED|CRASH|BARRIER|GRAVEL|INCIDENT INVOLVING|\bRED FLAG\b|TRACK CLEAR/i.test(m.Message || '') || m.Flag === 'RED' || (m.Flag === 'GREEN' && /RESUME|TRACK CLEAR/i.test(m.Message || '')))
       .slice(-30)
       .map(m => ({ at: m.Utc || '', lap: Number(m.Lap) || 0, category: m.Category || '', flag: m.Flag || '', message: m.Message || '' })),
+    // Who's under investigation or has a penalty to serve (Orbit Sports' 成績).
+    stewards: stewardsOf(r?.RaceControlMessages?.Messages),
     cars
   };
 }
