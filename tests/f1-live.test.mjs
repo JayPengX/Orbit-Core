@@ -196,3 +196,39 @@ test('a race read from OpenF1 when F1’s archive is shut: each lap with its gap
   assert.deepEqual(got.places['1'], [2, 0, 2, 3]);
   assert.deepEqual(got.stops['1'], [[3, 2.3, 21.1]]);
 });
+
+test('a finished session from OpenF1 when F1’s archive is shut: the board’s shape, each car’s order, gap, best lap, sectors, speeds, tyres, grid', async () => {
+  const { openF1Raw, trimF1Live } = await import('../f1-live.js');
+  const t0 = Date.parse('2026-10-25T20:03:00Z');
+  const iso = ms => new Date(t0 + ms).toISOString();
+  const lap = (no, n, d, s1, s2, s3, st) => ({ driver_number: no, lap_number: n, lap_duration: d, duration_sector_1: s1, duration_sector_2: s2, duration_sector_3: s3, i1_speed: 300, i2_speed: 280, st_speed: st, date_start: iso(n * 100_000) });
+  const raw = openF1Raw({
+    session: { session_key: 9999, session_type: 'Race', session_name: 'Race', date_start: '2026-10-25T20:00:00+00:00', gmt_offset: '-05:00:00', circuit_key: 9 },
+    meeting: { meeting_name: 'United States Grand Prix' },
+    rows: {
+      drivers: [{ driver_number: 12, name_acronym: 'ANT', first_name: 'Kimi', last_name: 'Antonelli', team_name: 'Mercedes', team_colour: '27F4D2' }, { driver_number: 16, name_acronym: 'LEC', first_name: 'Charles', last_name: 'Leclerc', team_name: 'Ferrari', team_colour: 'E80020' }],
+      session_result: [{ driver_number: 12, position: 1, number_of_laps: 2, gap_to_leader: 0, duration: 200 }, { driver_number: 16, position: 2, number_of_laps: 2, gap_to_leader: 1.5, duration: 201.5 }],
+      laps: [lap(12, 1, null, null, 40, 33, 330), lap(12, 2, 99.5, 26.3, 39.9, 33.3, 335), lap(16, 1, null, null, 40.2, 33.1, 331), lap(16, 2, 98.9, 26.1, 39.5, 33.3, 340)],
+      stints: [{ driver_number: 12, stint_number: 1, compound: 'MEDIUM', lap_start: 1, lap_end: 2, tyre_age_at_start: 0 }],
+      starting_grid: [{ driver_number: 12, position: 1 }, { driver_number: 16, position: 2 }],
+      race_control: [{ date: iso(0), lap_number: 1, category: 'Flag', flag: 'GREEN', message: 'GREEN LIGHT - PIT EXIT OPEN' }],
+      weather: [{ air_temperature: 27.2, track_temperature: 35.5, rainfall: 0, wind_speed: 2, humidity: 40 }]
+    }
+  });
+  const b = trimF1Live(raw);
+  assert.equal(b.session.type, 'Race');
+  assert.equal(b.session.start, '2026-10-25T15:00:00');
+  assert.equal(b.meeting, 'United States Grand Prix');
+  assert.deepEqual(b.cars.map(c => [c.no, c.tla, c.pos, c.gap, c.grid]), [['12', 'ANT', 1, '', 1], ['16', 'LEC', 2, '+1.500', 2]]);
+  const lec = b.cars[1];
+  assert.equal(lec.best, '1:38.900');
+  assert.deepEqual(lec.sectors.map(x => [x.v, x.p]), [['26.100', 1], ['39.500', 1], ['33.100', 2]]);
+  assert.deepEqual([lec.speed.v, lec.speed.p], [340, 1]);
+  assert.deepEqual(b.cars[0].stints, [{ c: 'MEDIUM', laps: 2, new: true }]);
+  assert.deepEqual(b.lap, { now: 2, of: 2 });
+  assert.equal(b.weather.air, 27.2);
+  // A qualifying: each part's lap, the best of them.
+  const q = trimF1Live(openF1Raw({ session: { session_type: 'Qualifying', session_name: 'Qualifying', date_start: '2026-10-24T21:00:00+00:00' }, rows: { drivers: [{ driver_number: 12, name_acronym: 'ANT' }], session_result: [{ driver_number: 12, position: 1, duration: [95.1, 94.6, 94.035], gap_to_leader: [0, 0, 0] }] } }));
+  assert.deepEqual(q.cars[0].parts, ['1:35.100', '1:34.600', '1:34.035']);
+  assert.equal(q.cars[0].best, '1:34.035');
+});

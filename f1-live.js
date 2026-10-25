@@ -248,7 +248,18 @@ export function archivedSession(index, start) {
     }
   return null;
 }
+// A finished session: F1's archive, else (it turns everyone away) OpenF1's tables.
 async function archived(start) {
+  try {
+    return await archiveSession(start);
+  } catch (error) {
+    if (!/archive 40[13]|not archived/.test(String(error.message))) throw error;
+    return openF1Archived(start).catch(e => {
+      throw new Error(`${error.message}; ${e.message}`);
+    });
+  }
+}
+async function archiveSession(start) {
   if (!Number.isFinite(Date.parse(start))) throw new Error('start');
   const year = new Date(start).getUTCFullYear();
   const s = archivedSession(await archiveJson(`${year}/Index.json`), start);
@@ -511,22 +522,141 @@ export function openF1Laps({ laps = [], intervals = [], position = [], pit = [] 
   return { cars, places: placesOut, stops };
 }
 const OPENF1 = 'https://api.openf1.org/v1/';
+// (OpenF1 allows a few asks a second: one turned away (429) asked again a moment later.)
 const openF1Json = async path => {
-  const res = await fetch(`${OPENF1}${path}`, { signal: AbortSignal.timeout(20_000) });
-  if (!res.ok) throw new Error(`openf1 ${res.status}`);
-  return res.json();
+  for (let k = 0; ; k++) {
+    const res = await fetch(`${OPENF1}${path}`, { signal: AbortSignal.timeout(20_000) });
+    if (res.ok) return res.json();
+    if (res.status !== 429 || k >= 3) throw new Error(`openf1 ${res.status}`);
+    await new Promise(r => setTimeout(r, 600 * (k + 1)));
+  }
 };
-async function openF1Session(start) {
+// The session starting at `start` and the tables named, from OpenF1
+// (two asked at a time). { session, meeting, rows: { name: [...] } }.
+async function openF1Rows(start, names) {
   const t = Date.parse(start);
   const day = new Date(t).toISOString().slice(0, 10);
-  const list = await openF1Json(`sessions?date_start%3E%3D${day}&date_start%3C${new Date(t + 86_400_000).toISOString().slice(0, 10)}`);
-  const s = (list || []).find(x => Math.abs(Date.parse(x.date_start) - t) < 20 * 60_000);
-  if (!s) throw new Error('not in openf1');
-  const names = ['laps', 'intervals', 'position', 'pit'];
-  const rows = await Promise.all(names.map(n => openF1Json(`${n}?session_key=${s.session_key}`).catch(() => [])));
-  const got = openF1Laps(Object.fromEntries(names.map((n, i) => [n, rows[i]])));
+  const found = await openF1Json(`sessions?date_start%3E%3D${day}&date_start%3C${new Date(t + 86_400_000).toISOString().slice(0, 10)}`);
+  const session = (found || []).find(x => Math.abs(Date.parse(x.date_start) - t) < 20 * 60_000);
+  if (!session) throw new Error('not in openf1');
+  const rows = {};
+  const todo = [...names];
+  const one = async () => {
+    for (let n; (n = todo.shift()); ) rows[n] = await openF1Json(`${n}?session_key=${session.session_key}`).catch(() => []);
+  };
+  const [meeting] = await Promise.all([openF1Json(`meetings?meeting_key=${session.meeting_key}`).then(x => x?.[0] || null).catch(() => null), one(), one()]);
+  return { session, meeting, rows };
+}
+async function openF1Session(start) {
+  const { rows } = await openF1Rows(start, ['laps', 'intervals', 'position', 'pit']);
+  const got = openF1Laps(rows);
   if (!Object.values(got.cars).some(x => x.length)) throw new Error('openf1 no laps');
   return { at: Date.now(), ...got };
+}
+
+// A finished session's archive files (as trimF1Live reads them) made from
+// OpenF1's tables, for when F1's archive turns everyone away: the order and
+// gaps (session_result), each car's laps, best sectors and speed traps
+// (laps), tyres (stints), stops (pit), the grid (starting_grid), race
+// control, the weather. Pure: rows in, the files out.
+const clockOf = s => {
+  if (!(Number(s) > 0)) return '';
+  const m = Math.floor(s / 60);
+  const rest = (s - m * 60).toFixed(3).padStart(6, '0');
+  return m ? `${m}:${rest}` : (s - m * 60).toFixed(3);
+};
+export function openF1Raw({ session = {}, meeting = null, rows = {} } = {}) {
+  const race = /race/i.test(session.session_type || session.session_name || '');
+  const quali = /qualifying|shootout/i.test(session.session_type || session.session_name || '');
+  const by = (xs, key = 'driver_number') => {
+    const m = {};
+    for (const x of xs || []) if (x?.[key] != null) (m[x[key]] ||= []).push(x);
+    return m;
+  };
+  const laps = by(rows.laps);
+  const results = Object.fromEntries((rows.session_result || []).map(r => [r.driver_number, r]));
+  const grid = Object.fromEntries((rows.starting_grid || []).map(r => [r.driver_number, r.position]));
+  const stops = by(rows.pit);
+  const nos = [...new Set([...(rows.drivers || []).map(d => d.driver_number), ...Object.keys(results).map(Number)])].map(String);
+  // Each car's best of a lap's measure, and its place among all cars' bests (lower better, or higher for speeds).
+  const bestOf = (no, key, high = false) => {
+    const vs = (laps[no] || []).map(l => Number(l[key])).filter(v => v > 0);
+    return vs.length ? (high ? Math.max(...vs) : Math.min(...vs)) : 0;
+  };
+  const placeOf = (no, key, high = false) => {
+    const mine = bestOf(no, key, high);
+    if (!mine) return 0;
+    return 1 + nos.filter(o => o !== no && bestOf(o, key, high) && (high ? bestOf(o, key, high) > mine : bestOf(o, key, high) < mine)).length;
+  };
+  const gapText = g => (typeof g === 'number' ? (g > 0 ? `+${g.toFixed(3)}` : '') : typeof g === 'string' ? g.replace(/^\+?(\d+) LAPS?$/i, '$1L') : '');
+  const Lines = {}, App = {}, Stats = {}, Series = {}, Pits = {};
+  for (const no of nos) {
+    const r = results[no] || {};
+    const mine = (laps[no] || []).sort((a, b) => a.lap_number - b.lap_number);
+    const last = [...mine].reverse().find(l => l.lap_duration > 0);
+    const best = bestOf(no, 'lap_duration');
+    const bestLap = mine.find(l => Number(l.lap_duration) === best);
+    const durations = Array.isArray(r.duration) ? r.duration : [];
+    const gap = Array.isArray(r.gap_to_leader) ? r.gap_to_leader.filter(x => x != null).at(-1) : r.gap_to_leader;
+    Lines[no] = {
+      Position: String(r.position || ''),
+      BestLapTime: { Value: clockOf(quali && durations.some(x => x > 0) ? Math.min(...durations.filter(x => x > 0)) : best) },
+      BestLapTimes: quali ? durations.map(x => ({ Value: clockOf(x) })) : undefined,
+      LastLapTime: { Value: clockOf(last?.lap_duration) },
+      GapToLeader: r.position === 1 ? '' : gapText(gap),
+      NumberOfLaps: Number(r.number_of_laps) || mine.length,
+      NumberOfPitStops: (stops[no] || []).length,
+      Retired: Boolean(r.dnf),
+      Stopped: Boolean(r.dns),
+      KnockedOut: quali && durations.length > 0 && durations.filter(x => x > 0).length < 3 && r.position > 10
+    };
+    if (!race) Lines[no].TimeDiffToFastest = gapText(gap);
+    const stints = (rows.stints || []).filter(x => String(x.driver_number) === no).sort((a, b) => a.stint_number - b.stint_number);
+    App[no] = {
+      GridPos: String(grid[no] || ''),
+      Stints: stints.map(x => {
+        const start = Number(x.tyre_age_at_start) || 0;
+        const run = Math.max(0, (Number(x.lap_end) || 0) - (Number(x.lap_start) || 0) + 1);
+        return { Compound: String(x.compound || '').toUpperCase(), StartLaps: start, TotalLaps: start + run, New: String(start === 0) };
+      })
+    };
+    const pb = bestLap ? { Value: clockOf(best), Lap: bestLap.lap_number, Position: placeOf(no, 'lap_duration') } : null;
+    Stats[no] = {
+      BestSectors: ['duration_sector_1', 'duration_sector_2', 'duration_sector_3'].map(k => ({ Value: bestOf(no, k) ? bestOf(no, k).toFixed(3) : '', Position: placeOf(no, k) })),
+      BestSpeeds: Object.fromEntries([['I1', 'i1_speed'], ['I2', 'i2_speed'], ['ST', 'st_speed']].map(([k, f]) => [k, { Value: String(bestOf(no, f, true) || ''), Position: placeOf(no, f, true) }])),
+      PersonalBestLapTime: pb
+    };
+  }
+  const lapRows = race ? openF1Laps(rows) : { places: {}, stops: {} };
+  for (const [no, ps] of Object.entries(lapRows.places)) Series[no] = { LapPosition: ps.map(String) };
+  for (const [no, ps] of Object.entries(lapRows.stops)) Pits[no] = ps.map(([Lap, PitStopTime, PitLaneTime]) => ({ PitStop: { Lap, PitStopTime, PitLaneTime } }));
+  const w = (rows.weather || []).at(-1);
+  const most = Math.max(0, ...Object.values(Lines).map(l => l.NumberOfLaps));
+  const gmt = String(session.gmt_offset || '00:00:00');
+  // (The start as F1 writes it: local, with the offset beside it.)
+  const sign = gmt.startsWith('-') ? -1 : 1;
+  const [h, mm] = gmt.replace('-', '').split(':').map(Number);
+  const local = new Date(Date.parse(session.date_start) + sign * ((h || 0) * 60 + (mm || 0)) * 60_000).toISOString().slice(0, 19);
+  return {
+    SessionInfo: { Key: session.session_key, Type: race ? 'Race' : quali ? 'Qualifying' : 'Practice', Name: session.session_name || '', StartDate: local, GmtOffset: gmt, Meeting: { Name: meeting?.meeting_name || '', Circuit: { Key: session.circuit_key || meeting?.circuit_key || 0 } } },
+    SessionStatus: { Status: 'Finalised' },
+    DriverList: Object.fromEntries((rows.drivers || []).map(d => [String(d.driver_number), { Tla: d.name_acronym || '', FirstName: d.first_name || '', LastName: d.last_name || '', FullName: d.full_name || '', TeamName: d.team_name || '', TeamColour: d.team_colour || '' }])),
+    TimingData: { Lines, SessionPart: 0 },
+    TimingAppData: { Lines: App },
+    TimingStats: { Lines: Stats },
+    RaceControlMessages: { Messages: (rows.race_control || []).map(m => ({ Utc: m.date, Lap: m.lap_number || 0, Category: m.category || '', Flag: m.flag || '', Message: m.message || '' })) },
+    WeatherData: w ? { AirTemp: w.air_temperature, TrackTemp: w.track_temperature, Rainfall: w.rainfall ? '1' : '0', WindSpeed: w.wind_speed, Humidity: w.humidity } : null,
+    LapCount: race && most ? { CurrentLap: most, TotalLaps: most } : null,
+    LapSeries: Series,
+    PitStopSeries: { PitTimes: Pits }
+  };
+}
+async function openF1Archived(start) {
+  const names = ['drivers', 'session_result', 'laps', 'stints', 'pit', 'race_control', 'weather', 'starting_grid', 'position', 'intervals'];
+  const got = await openF1Rows(start, names);
+  // (Kept for good once read: never from a table OpenF1 didn't give.)
+  for (const n of ['drivers', 'session_result', 'laps', 'stints']) if (!(got.rows[n] || []).length) throw new Error(`openf1 no ${n}`);
+  return { ...trimF1Live(openF1Raw(got)), final: true, from: 'openf1' };
 }
 
 // Every car's laps: once over, from F1's archive (the timing stream, exact

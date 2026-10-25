@@ -106,7 +106,10 @@ runs near each caller; only Gemini goes through `gemini-relay.js`, pinned to Tai
 on `SPORTS_PROXY_ALLOWED_HOSTS`. Two hosts are not real:
 `asia-baseball.orbit` (NPB, KBO, CPBL from their own sites) and
 `f1-live.orbit` (F1's live timing: `now.json`, `session.json`,
-`laps.json`, `circuit.json`; a Durable Object `F1Log` logs laps).
+`laps.json`, `circuit.json`; a Durable Object `F1Log` logs laps). A
+finished session is F1's archive's, else (shut to everyone since
+2026-10-25) rebuilt from OpenF1's tables (`openF1Raw`), and kept in R2 for
+good once read: OpenF1 shuts while any session runs.
 
 - **Trims** (`&trim=`) return only what an app reads (Polymarket, Kambi,
   ESPN's heavy pages, Jolpica, FotMob, ELTA, YouTube, formula1.com).

@@ -1096,12 +1096,16 @@ export function quietFor(url, data, now = Date.now()) {
 // month's scoreboard (ESPN), a month of Asia's baseball.
 export function settleable(url) {
   if (url.hostname === 'site.api.espn.com') return url.pathname.endsWith('/summary') || (url.pathname.endsWith('/scoreboard') && /^\d{6}(\d{2})?$/.test(url.searchParams.get('dates') || ''));
+  // A finished F1 session (f1-live.js): 數據 and every lap, kept for good
+  // (F1's archive shut, OpenF1 shut while any session runs: read once, kept).
+  if (url.hostname === F1_LIVE_HOST) return url.pathname === '/session.json' || (url.pathname === '/laps.json' && Boolean(url.searchParams.get('final')));
   return url.hostname === ASIA_HOST && /\/\d{4}-\d{2}\.json$/.test(url.pathname);
 }
 // …and whether this answer of one is: the game completed; every game of the
 // day or month completed (a month's last day passed); every game of an Asian
 // month over, called off or six hours past a start it never had.
 export function settledData(url, data, now = Date.now()) {
+  if (url.hostname === F1_LIVE_HOST) return url.pathname === '/session.json' ? data?.final === true && (data.cars || []).some(c => c.laps > 0) : !data?.live && Object.values(data?.cars || {}).filter(x => x?.length).length >= 10;
   if (url.hostname === ASIA_HOST) {
     const [y, m] = (/(\d{4})-(\d{2})\.json$/.exec(url.pathname) || []).slice(1).map(Number);
     if (!y || Date.UTC(y, m, 1) > now) return false;
