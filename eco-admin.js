@@ -380,7 +380,10 @@ const HEALTH = [
   ['OpenF1', 'https://api.openf1.org/v1/sessions?session_key=latest', 'Sports：F1 賽段、勝率'],
   ['NLSC 地點', 'https://api.nlsc.gov.tw/other/TownVillagePointQuery1/121.5645/25.0341', 'Weather、Transit：所在的鄉鎮'],
   // (Read from the bucket itself: a Worker asking its own workers.dev address gets a 404.)
-  ['資料（R2）', 'r2:sports/nba/days.json', '所有 App：每晚建好的資料']
+  // (The sports index: written every night, changed or not, so its date is
+  // the last build's; a league's days.json is written only when its days
+  // change and read two days old with the builder fine.)
+  ['資料（R2）', 'r2:sports/index.json', '所有 App：每晚建好的資料']
 ];
 
 export const ADMIN_TOOLS = {
@@ -812,9 +815,11 @@ export const ADMIN_TOOLS = {
       }
       try {
         const res = await fetch(url, { headers: { 'User-Agent': 'curl/8.4.0' }, signal: AbortSignal.timeout(8000) });
-        await res.arrayBuffer();
+        const text = await res.text();
         // A 429 is the source turning the shared address away for a while: the proxy answers its kept copy meanwhile.
-        return { name, use, ok: res.ok, status: res.status, ms: Date.now() - t, busy: res.status === 429 };
+        // OpenF1 shuts everyone without a paid key out while an F1 session is on (401, "Live F1 session in progress"), past sessions too, till it ends: the same.
+        const locked = res.status === 401 && /live f1 session/i.test(text);
+        return { name, use, ok: res.ok, status: res.status, ms: Date.now() - t, busy: res.status === 429, locked };
       } catch (e) {
         return { name, use, ok: false, status: 0, ms: Date.now() - t, error: String(e?.name || e) };
       }

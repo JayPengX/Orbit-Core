@@ -153,3 +153,18 @@ test("stewardsOf: penalties to serve and incidents under investigation, by car",
   assert.deepEqual(stewardsOf([M('FIA STEWARDS: TURN 1 INCIDENT INVOLVING CARS 41 (LIN) AND 55 (SAI) UNDER INVESTIGATION - CAUSING A COLLISION (15:03:49)')]), { 41: { pen: [], probe: true }, 55: { pen: [], probe: true } });
   assert.deepEqual(stewardsOf(null), {});
 });
+
+test("the session to log: the index's running one; F1's archive turned away (401, mid-race), the feed's own while it runs", async () => {
+  const { sessionToLog } = await import('../f1-live.js');
+  const now = Date.UTC(2026, 9, 25, 21, 0);
+  const race = { Name: 'Race', StartDate: '2026-10-25T15:00:00', GmtOffset: '-05:00:00', SessionStatus: 'Started' };
+  const index = { Meetings: [{ Sessions: [race] }] };
+  assert.equal(sessionToLog(index, null, now), race);
+  assert.equal(sessionToLog({ Meetings: [] }, null, now), false);
+  // No index: asked again once the feed is read.
+  assert.equal(sessionToLog(null, null, now), null);
+  assert.equal(sessionToLog(null, race, now), race);
+  assert.equal(sessionToLog(null, { ...race, SessionStatus: 'Finalised' }, now), false);
+  assert.equal(sessionToLog(null, race, Date.UTC(2026, 9, 26, 1, 0)), false);
+  assert.equal(sessionToLog(null, {}, now), false);
+});
