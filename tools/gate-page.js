@@ -123,7 +123,7 @@
 
   // Every fault on the screen now.
   gate.check = () => {
-    const out = { blank: [], pictures: [], overflow: [], wraps: [], cut: [], letters: [], slots: [], halfEmpty: [], bareEmpty: [], loading: [], orphan: [], tables: [], sheets: [], old: [], header: [], scroll: [], white: [], english: [], column: [] };
+    const out = { blank: [], pictures: [], overflow: [], wraps: [], cut: [], letters: [], slots: [], halfEmpty: [], bareEmpty: [], loading: [], orphan: [], tables: [], sheets: [], old: [], scroll: [], white: [], english: [], column: [] };
     const all = [...document.querySelectorAll('body *')].filter(seen);
     const clippedBy = el => {
       for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) if (/auto|scroll|hidden|clip/.test(getComputedStyle(p).overflowX)) return true;
@@ -221,7 +221,7 @@
         if (el.closest('.q-statusbar, #loading, .q-offline') || !pinned(el)) continue;
         const cs = getComputedStyle(el);
         if (cs.visibility === 'hidden' || +cs.opacity === 0 || clippedBy(el)) continue;
-        const bar = el.matches('.q-tabbar, .q-accessory, .q-navbar, .q-banner, dialog[open]:not(.q-gate, .q-moved)');
+        const bar = el.matches('.q-tabbar, .q-accessory, .q-banner, dialog[open]:not(.q-gate, .q-moved)');
         if (!bar && !el.matches('img, svg, canvas, video, button, input, [role=button]') && ![...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) continue;
         const r = el.getBoundingClientRect();
         if (outside(r)) out.column.push(`${name(el)} ${Math.round(r.left)}–${Math.round(r.right)}, ${column}`);
@@ -361,14 +361,6 @@
       return false;
     })();
     if (!cover && !document.querySelector('#loading:not([hidden]), dialog[open], .q-menu, [role=menu]') && se.scrollHeight > innerHeight + 40 && [document.documentElement, document.body].some(e => /hidden|clip/.test(getComputedStyle(e).overflowY))) out.scroll.push(`page ${se.scrollHeight} px tall, scrolling locked (html ${getComputedStyle(document.documentElement).overflowY}, body ${getComputedStyle(document.body).overflowY}${document.querySelector(':modal') ? `, ${name(document.querySelector(':modal'))} open` : ''}${lockedBy()})`);
-    // The bar's small title belongs to a large title on this screen that has
-    // scrolled up under it; never a page left or another tab's.
-    const bar = document.querySelector('.q-navbar.on');
-    if (bar && shown(bar)) {
-      const t = text(bar);
-      const owner = [...document.querySelectorAll('[data-q-nav], .q-nav-title')].find(h => h.isConnected && !h.closest('[hidden], dialog:not([open])') && text(h) === t && h.getBoundingClientRect().bottom <= bar.getBoundingClientRect().bottom + 2 && h.getClientRects().length);
-      if (!owner) out.header.push(`bar says "${t.slice(0, 20)}" with no such title above it`);
-    }
     // A screen with nothing on it, and pictures that failed (an empty logo circle).
     if (screenNow().chars < 15) out.blank.push(`${location.hash || 'start'}: nothing on the screen`);
     for (const img of document.querySelectorAll('img')) if (seen(img) && img.complete && !img.naturalWidth && img.getBoundingClientRect().top < innerHeight * 2) out.pictures.push(`${name(img.parentElement)} ${String(img.getAttribute('src')).slice(0, 80)}`);

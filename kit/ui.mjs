@@ -589,155 +589,16 @@ export function empty({ icon = 'list', tint = '', title = '', body = '', action 
   return h('div', { class: cls ? `q-empty ${cls}` : 'q-empty' }, [mark, title ? h('strong', { text: title }) : null, body ? h('p', { text: body }) : null, button]);
 }
 
-// ---- A large title that collapses into the bar (iOS's navigation title) ----
-// navTitle('賽程', { scroller }) is the 34pt title at a tab's top; scrolled
-// up under the top of the screen, a small centred title fades into a glass
-// bar there (.q-navbar, one for the page). For a tab that isn't the first:
-// the first tab has no large title (it opens straight onto content).
-// `scroller`: the element that scrolls, when it isn't the page. Returns the
-// <h1>: put it in the tab's panel, setTitle(text) renames it, and it lets go
-// of the bar by itself when it leaves the page (or dispose()).
-// Wide screens keep the bar where it was: there the title just scrolls away.
-let navbar = null;
-let navOwner = null;
-let navOwnerEl = null;
-// The bar's title only while its own title is on the page and shown: a
-// tab switched or a title gone with no observer telling (an iPhone switching
-// tabs kept 賽事's "F1 一級方程式" over 轉播, 2026-10-21) lets go at the next scroll or frame.
-let navCheckFrame = 0;
-const navCheck = () => {
-  navCheckFrame = 0;
-  if (!navOwner || !navbar) return;
-  const el = navOwnerEl;
-  // (A hidden tab stays laid out, content-visibility: hidden: [hidden] says it's gone.)
-  if (!el?.isConnected || !el.getClientRects().length || el.closest('[hidden]')) {
-    navOwner = null;
-    navOwnerEl = null;
-    navbar.classList.remove('on');
-  }
-};
-const navSoon = () => {
-  if (navOwner && !navCheckFrame && typeof requestAnimationFrame === 'function') navCheckFrame = requestAnimationFrame(navCheck);
-};
-const navWatched = new Set();
-let navMO = null;
-const navBar = () => {
-  if (navbar?.isConnected) return navbar;
-  navbar = h('div', { class: 'q-navbar', 'aria-hidden': 'true' }, [h('span', { class: 'q-navbar-title' })]);
-  document.body.append(navbar);
-  return navbar;
-};
-// A title whose element left the page stops watching (one that was never put
-// in the page is let go of after a while).
-// A title in a tab or page that was hidden lets the bar go; shown again, it
-// asks afresh. (Hidden tabs stay laid out, content-visibility: hidden, so
-// their pictures don't flash: a title there keeps its box and its "scrolled
-// off" state, and the bar kept a pushed page's or another tab's name, F1
-// 一級方程式 over the scores, Jay 2026-10-21.)
-const navSweep = records => {
-  if (records?.some(r => r.type === 'attributes')) for (const w of navWatched) w.recheck();
-  for (const w of [...navWatched]) {
-    if (w.el.isConnected) w.seen = true;
-    else if (w.seen) w.stop();
-  }
-  if (!navWatched.size) {
-    navMO?.disconnect();
-    navMO = null;
-  }
-};
-export function bindNavTitle(el, { scroller = null } = {}) {
-  if (typeof IntersectionObserver !== 'function') return Object.assign(el, { dispose() {}, setTitle: t => void (el.textContent = t) });
-  const token = {};
-  let io = null;
-  const set = on => {
-    const b = navBar();
-    if (on) {
-      navOwner = token;
-      navOwnerEl = el;
-      b.firstChild.textContent = el.textContent;
-      b.classList.add('on');
-    } else if (navOwner === token) {
-      navOwner = null;
-      navOwnerEl = null;
-      b.classList.remove('on');
-    }
-  };
-  // (Measured at the next frame, never mid-render: a title built while the app
-  // is still drawing forced a layout each time, over a second of a league
-  // switch in Sports on a phone. Any number of titles: one layout a frame.)
-  let frame = 0;
-  const observe = () => {
-    if (typeof requestAnimationFrame !== 'function') return measure();
-    cancelAnimationFrame(frame);
-    frame = requestAnimationFrame(measure);
-  };
-  const measure = () => {
-    frame = 0;
-    io?.disconnect();
-    // The top of the screen to the bar's foot is where a title is "under".
-    const under = Math.max(0, Math.round((navBar().getBoundingClientRect().height || 44) - (scroller ? scroller.getBoundingClientRect().top : 0)));
-    io = new IntersectionObserver(
-      entries => {
-        const e = entries[entries.length - 1];
-        const r = e.boundingClientRect;
-        // Collapsed: gone off the top (not below the fold, not a hidden tab's empty box).
-        set(!e.isIntersecting && r.height > 0 && r.bottom <= (e.rootBounds ? e.rootBounds.top : under) + 1 && !el.closest('[hidden]'));
-      },
-      { root: scroller, rootMargin: `-${under}px 0px 0px 0px`, threshold: 0 }
-    );
-    io.observe(el);
-  };
-  // A title hidden with its tab (display:none while already scrolled off) gets
-  // no intersection change, so the bar would keep its name: its box going
-  // lets the bar go, its box coming back asks again (scrolled off or not).
-  let boxed = true;
-  const ro =
-    typeof ResizeObserver === 'function'
-      ? new ResizeObserver(() => {
-          const now = el.getClientRects().length > 0;
-          if (now === boxed) return;
-          boxed = now;
-          if (!now) set(false);
-          else observe();
-        })
-      : null;
-  ro?.observe(el);
-  const w = {
-    el,
-    seen: false,
-    recheck() {
-      if (el.closest('[hidden]')) set(false);
-      else if (el.isConnected) observe();
-    },
-    stop() {
-      if (frame) cancelAnimationFrame(frame);
-      ro?.disconnect();
-      io?.disconnect();
-      io = null;
-      set(false);
-      navWatched.delete(w);
-      globalThis.removeEventListener?.('resize', observe);
-    }
-  };
-  navWatched.add(w);
-  if (!navMO && typeof MutationObserver === 'function') {
-    globalThis.addEventListener?.('scroll', navSoon, { passive: true });
-    navMO = new MutationObserver(records => (navSweep(records), navSoon()));
-    navMO.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden'] });
-  }
-  setTimeout(() => !w.seen && !el.isConnected && w.stop(), 10_000);
-  globalThis.addEventListener?.('resize', observe);
-  observe();
-  return Object.assign(el, {
-    dispose: w.stop,
-    setTitle(t) {
-      el.textContent = t;
-      if (navOwner === token) navBar().firstChild.textContent = t;
-    }
-  });
+// ---- A large title (iOS's navigation title) ----
+// navTitle('賽程') is the 34pt title at a tab's top; it scrolls away with the
+// page (no bar takes its place). For a tab that isn't the first: the first
+// tab has no large title (it opens straight onto content). Returns the <h1>:
+// put it in the tab's panel; setTitle(text) renames it.
+export function bindNavTitle(el) {
+  return Object.assign(el, { dispose() {}, setTitle: t => void (el.textContent = t) });
 }
-export function navTitle(title = '', { scroller = null } = {}) {
-  return bindNavTitle(h('h1', { class: 'q-nav-title', 'data-q-nav': '', text: title }), { scroller });
+export function navTitle(title = '') {
+  return bindNavTitle(h('h1', { class: 'q-nav-title', 'data-q-nav': '', text: title }));
 }
 
 // ---- Pull to refresh (iOS's) ----
@@ -932,14 +793,14 @@ export function emptyHtml({ icon = 'list', tint = '', title = '', body = '', act
   const button = !action ? '' : typeof action === 'string' ? action : action.href ? `<a class="q-btn primary" href="${E(action.href)}"${dataOf(action.data)}>${E(action.label)}</a>` : `<button class="q-btn primary" type="button"${dataOf({ tap: action.tap, ...action.data })}>${E(action.label)}</button>`;
   return `<div class="${clsOf('q-empty', cls)}">${mark}${title ? `<strong>${E(title)}</strong>` : ''}${body ? `<p>${E(body)}</p>` : ''}${button}</div>`;
 }
-// navTitleHtml(title), then wireNavTitles(root, { scroller }) once it's in the page.
+// navTitleHtml(title), then wireNavTitles(root) once it's in the page.
 export function navTitleHtml(title = '') {
   return `<h1 class="q-nav-title" data-q-nav>${E(title)}</h1>`;
 }
-export function wireNavTitles(root = document, { scroller = null } = {}) {
+export function wireNavTitles(root = document) {
   for (const el of root.querySelectorAll('[data-q-nav]:not([data-q-bound])')) {
     el.setAttribute('data-q-bound', '');
-    bindNavTitle(el, { scroller });
+    bindNavTitle(el);
   }
 }
 // heroCardHtml({ eyebrow, icon (svg), title, big, sub, pill, actions: [{ label, tap, href, ghost }], tap, href, color, color2 }, childrenHtml)

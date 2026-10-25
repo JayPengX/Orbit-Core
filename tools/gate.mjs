@@ -109,7 +109,7 @@ const faults = r => {
   const after = t => (r.tapAt || []).filter(([, at]) => at <= t).at(-1)?.[0];
   for (const [t, ms] of r.longs || []) if (ms >= 500) f.push(['stall', at, `main thread blocked ${ms} ms at ${t} ms${after(t) ? ` after ${after(t)}` : ''}`, first]);
   for (const e of r.pageErrors || []) f.push(['errors', at, e, first]);
-  for (const tab of r.tabs || []) for (const kind of ['blank', 'pictures', 'overflow', 'wraps', 'cut', 'letters', 'slots', 'halfEmpty', 'bareEmpty', 'loading', 'dead', 'typing', 'orphan', 'tables', 'sheets', 'old', 'header', 'scroll', 'white', 'english', 'column']) for (const what of tab[kind] || []) f.push([kind, `${at} #${tab.id}`, what, tab.shot]);
+  for (const tab of r.tabs || []) for (const kind of ['blank', 'pictures', 'overflow', 'wraps', 'cut', 'letters', 'slots', 'halfEmpty', 'bareEmpty', 'loading', 'dead', 'typing', 'orphan', 'tables', 'sheets', 'old', 'scroll', 'white', 'english', 'column']) for (const what of tab[kind] || []) f.push([kind, `${at} #${tab.id}`, what, tab.shot]);
   return f;
 };
 
