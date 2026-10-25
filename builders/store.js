@@ -76,6 +76,24 @@ export function r2Store(bucket) {
       } while (cursor);
       return out;
     },
+    // Every file under a prefix with when it was written and its metadata: [{ key, uploaded, meta }].
+    async objects(prefix) {
+      const out = [];
+      let cursor;
+      do {
+        const r = await bucket.list({ prefix, cursor, limit: 1000, include: ['customMetadata'] });
+        out.push(...r.objects.map(o => ({ key: o.key, uploaded: o.uploaded ? +new Date(o.uploaded) : 0, meta: o.customMetadata || {} })));
+        cursor = r.truncated ? r.cursor : undefined;
+      } while (cursor);
+      return out;
+    },
+    // Many at once (R2 takes a thousand keys a call).
+    async deleteMany(paths) {
+      for (let i = 0; i < paths.length; i += 1000) {
+        await bucket.delete(paths.slice(i, i + 1000));
+        stats.deleted += Math.min(1000, paths.length - i);
+      }
+    },
     // A whole folder replaced by `files` ({ path: data }): what's not in it goes.
     async replace(prefix, files) {
       for (const [p, d] of Object.entries(files)) await store.put(p, d);

@@ -26,6 +26,7 @@ import { runAsia, ASIA_HOUR } from './asia.js';
 import { runSports, SPORTS_HOUR } from './sports.js';
 import { runPhotos, runCutouts, PHOTOS_HOUR } from './photos.js';
 import { runBuses } from './buses.js';
+import { runKept, KEPT_HOUR } from './kept.js';
 
 export const WINPROB_HOUR = 23;
 
@@ -59,11 +60,15 @@ export async function runBuilders(env, { proxy, now = Date.now(), job = SLOTS[ne
   if (only === 'sports') await step('sports', () => runSports({ store, now }));
   if (only === 'photos') await step('photos', () => runPhotos({ store, proxy, now }));
   if (only === 'winprob') await step('winprob', () => runWinprob({ store, proxy, now }));
+  // (kept-dry: what would go, nothing wiped.)
+  if (only === 'kept' || only === 'kept-dry') await step('kept', () => runKept({ store, now, dry: only === 'kept-dry' }));
   if (job === 'daily') {
     if (hour === ASIA_HOUR) await step('asia', () => runAsia({ store, now }));
     if (hour === CPBL_HOUR) await step('cpbl', () => runCpbl({ store, now }));
     if (hour === SPORTS_HOUR) await step('sports', () => runSports({ store, now }));
     if (hour === PHOTOS_HOUR) await step('photos', () => runPhotos({ store, proxy, now }));
+    // (The proxy's kept copies of a season wiped: after sports' bounds.)
+    if (hour === KEPT_HOUR) await step('kept', () => runKept({ store, now }));
     if (hour === WINPROB_HOUR) await step('winprob', () => runWinprob({ store, proxy, now }));
   }
   done.store = store.stats;

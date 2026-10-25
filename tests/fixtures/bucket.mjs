@@ -19,7 +19,7 @@ export function memoryBucket(init = {}) {
       m.set(k, { b: new Uint8Array(b), meta: o.customMetadata || {} });
     },
     async delete(k) {
-      m.delete(k);
+      for (const key of [].concat(k)) m.delete(key);
     },
     async list({ prefix = '', cursor, limit = 1000 } = {}) {
       const keys = [...m.keys()].filter(k => k.startsWith(prefix)).sort();
