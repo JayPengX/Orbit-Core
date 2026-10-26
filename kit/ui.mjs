@@ -217,13 +217,17 @@ export function daySwipe(panel, step) {
   if (!panel) return;
   panel.classList.add('q-day-swipe');
   let start = null;
+  // What a finger lands on: true (its own swipe: a field, a chip row), a
+  // box scrolling sideways (its swipe while it can go that way; at its edge
+  // the page's: a bracket's first round, swiped right, goes back a tab), or null.
   const sideways = node => {
     for (let n = node; n && n !== panel; n = n.parentElement) {
       if (n.matches?.('input, select, textarea, .q-seg, .q-day-bar, .day-bar, [data-noswipe]')) return true;
-      if (n.scrollWidth > n.clientWidth + 2 && /auto|scroll/.test(getComputedStyle(n).overflowX)) return true;
+      if (n.scrollWidth > n.clientWidth + 2 && /auto|scroll/.test(getComputedStyle(n).overflowX)) return n;
     }
-    return false;
+    return null;
   };
+  const canScroll = (n, dx) => (dx < 0 ? n.scrollLeft + n.clientWidth < n.scrollWidth - 2 : n.scrollLeft > 2);
   const settle = () => {
     panel.classList.remove('swiping');
     panel.style.removeProperty('--swipe');
@@ -231,13 +235,14 @@ export function daySwipe(panel, step) {
   panel.addEventListener('touchstart', ev => {
     // (Not under a sheet: one open over the page has the finger; a panel inside that sheet swipes.)
     const over = [...document.querySelectorAll('dialog[open]')].some(d => !d.contains(panel));
-    start = ev.touches.length === 1 && !over && !sideways(ev.target) ? { x: ev.touches[0].clientX, y: ev.touches[0].clientY, at: Date.now(), lock: null } : null;
+    const box = ev.touches.length === 1 && !over ? sideways(ev.target) : true;
+    start = box !== true ? { x: ev.touches[0].clientX, y: ev.touches[0].clientY, at: Date.now(), lock: null, box } : null;
   }, { passive: true });
   panel.addEventListener('touchmove', ev => {
     if (!start) return;
     const dx = ev.touches[0].clientX - start.x;
     const dy = ev.touches[0].clientY - start.y;
-    if (start.lock == null && Math.hypot(dx, dy) > 10) start.lock = Math.abs(dx) > Math.abs(dy) * 1.3 ? 'x' : 'y';
+    if (start.lock == null && Math.hypot(dx, dy) > 10) start.lock = Math.abs(dx) > Math.abs(dy) * 1.3 && !(start.box && canScroll(start.box, dx)) ? 'x' : 'y';
     if (start.lock !== 'x') return;
     ev.preventDefault();
     panel.classList.add('swiping');
