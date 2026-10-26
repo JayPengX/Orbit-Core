@@ -24,12 +24,12 @@ test('a run reads the sessions not kept, skips what’s kept, until its time is 
   // The newest kept already.
   for (const url of [f1SessionUrl('2026-10-25T20:00Z'), f1LapsUrl('2026-10-25T20:00Z')]) await bucket.put(`${mirrorPath(url, '')}.gz`, new Uint8Array([1]));
   const asked = [];
-  const r = await runF1Kept({ store: r2Store(bucket), proxy: async url => (asked.push(url), {}), now, per: 2, sleep: async () => {} });
+  const r = await runF1Kept({ store: r2Store(bucket), proxy: async url => (asked.push(url), {}), now, per: 2, clock: () => now, sleep: async () => {} });
   // (Counted as kept once read: the proxy keeps what it reads.)
   assert.deepEqual(r, { sessions: 4, kept: 3, read: 2, again: 0 });
   assert.deepEqual(asked, [f1SessionUrl('2026-10-11T12:00Z'), f1LapsUrl('2026-10-11T12:00Z'), f1SessionUrl('2026-10-10T09:00Z'), f1LapsUrl('2026-10-10T09:00Z')]);
   let waited = 0;
-  const shut = await runF1Kept({ store: r2Store(bucket), proxy: async () => null, now, sleep: async ms => (waited += ms) });
+  const shut = await runF1Kept({ store: r2Store(bucket), proxy: async () => null, now, clock: () => now, sleep: async ms => (waited += ms) });
   // Each tried once more 20 seconds on, the three left each failing: stopped at the third.
   assert.ok(waited >= 3 * 20_000);
   assert.equal(shut.read, 0);
