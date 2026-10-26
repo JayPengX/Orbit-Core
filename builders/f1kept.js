@@ -13,7 +13,7 @@ import { mirrorPath } from '../kit/mirror.mjs';
 const at = start => encodeURIComponent(new Date(start).toISOString());
 // The app's addresses: a session's 數據 (v=2, see lib/f1.mjs ARCHIVE), a race's every lap.
 export const f1SessionUrl = start => `https://f1-live.orbit/session.json?start=${at(start)}&v=2`;
-export const f1LapsUrl = start => `https://f1-live.orbit/laps.json?start=${at(start)}&final=1`;
+export const f1LapsUrl = start => `https://f1-live.orbit/laps.json?start=${at(start)}&final=1&v=2`;
 // A session counted over three hours after its start (a red-flagged race runs long).
 const OVER_MS = 3 * 3_600_000;
 
