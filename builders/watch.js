@@ -42,6 +42,8 @@ import { within } from './within.js';
 const DAY = 86_400_000;
 const KEEP = 10 * DAY;
 const HL_DAYS = 4 * DAY;
+// A stand-in video (football's short cut) looked for again this long on (doubled each time).
+const AGAIN_MS = 2 * 3_600_000;
 const MISSES = 2;
 // Days an older game is looked for on ELTA before it's given up (ELTA puts a
 // season's videos up within a week or two, or never: its small sides).
@@ -367,14 +369,24 @@ export async function runWatch({ store, proxy, get = fetch, now = Date.now(), un
     for (const [id, list] of shared(archive)) shareOut(archive, id, list, Date.parse((await read(`${HL.YT}/watch?v=${id}`).catch(() => null))?.published || ''));
   }
 
-  // Highlights: each recent game not yet found, four days at most after it (one search at a time: the proxy's pace).
+  // Highlights: each recent game not yet found, four days at most after it
+  // (one search at a time: the proxy's pace); and one whose video is a
+  // stand-in (football's short cut: the clubs put the extended one up hours
+  // later, the Premier League's the day after) looked for again, AGAIN_MS
+  // on and twice as long each time after (2, 4, 8… hours: five or so
+  // searches a game), until the better one is up or its four days are.
   let found = 0;
   let failed = 0;
-  const todo = recent.filter(e => !out[HL.watchKey(e)]?.hl && !stored(e)?.hl && now - Date.parse(e.start) < HL_DAYS);
+  const hlOf = e => out[HL.watchKey(e)]?.hl || stored(e)?.hl;
+  const due = e => !hlOf(e) || (HL.standIn(e, hlOf(e)) && !(now - (hlOf(e).looked || 0) < AGAIN_MS * 2 ** (hlOf(e).tries || 0)));
+  const todo = recent.filter(e => due(e) && now - Date.parse(e.start) < HL_DAYS);
   for (const e of todo) {
     try {
-      const v = await HL.findHighlights(e, read, now);
-      if (v) (out[HL.watchKey(e)] = { ...out[HL.watchKey(e)], hl: v, at: Date.parse(e.start) }), found++;
+      const had = hlOf(e);
+      let v = await HL.findHighlights(e, read, now, { again: Boolean(had) });
+      // (No better one yet: the one it has, looked at now.)
+      if (had && (!v || HL.standIn(e, v))) v = { ...had, looked: now, tries: (had.tries || 0) + 1 };
+      if (v) (out[HL.watchKey(e)] = { ...out[HL.watchKey(e)], hl: v, at: Date.parse(e.start) }), had ? keep(e, { hl: v }) : found++;
     } catch {
       failed++;
       await sleep(5000);
@@ -558,7 +570,7 @@ export async function runWatch({ store, proxy, get = fetch, now = Date.now(), un
     if ((v?.hl && !stored(e)?.hl) || (has(v) && !has(stored(e)))) keep(e, { ...(v.hl ? { hl: v.hl } : {}), ...(has(v) ? { elta: v.elta } : {}) });
   }
   // What's still waiting: recent games without highlights (four days) or ELTA (three).
-  const waiting = recent.filter(e => (!out[HL.watchKey(e)]?.hl && now - Date.parse(e.start) < HL_DAYS) || (!has(out[HL.watchKey(e)]) && !has(stored(e)) && now - Date.parse(e.start) < 3 * DAY));
+  const waiting = recent.filter(e => ((!out[HL.watchKey(e)]?.hl || HL.standIn(e, out[HL.watchKey(e)].hl)) && now - Date.parse(e.start) < HL_DAYS) || (!has(out[HL.watchKey(e)]) && !has(stored(e)) && now - Date.parse(e.start) < 3 * DAY));
   const pendingFile = { games: waiting.map(({ id, league, kind, start, status, home, away, note, series, sessionKey, name, enName, official }) => ({ id, league, kind, start, status, home, away, note, series, sessionKey, name, enName, official })) };
 
   // The archive: whole in the full run (a season let go goes), else the months touched.

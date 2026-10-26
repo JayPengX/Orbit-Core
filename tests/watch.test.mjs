@@ -269,3 +269,48 @@ test("an hourly run keeps a game found days ago in the recent pack for its ten d
   assert.deepEqual(pack.games['mlb:33:'], { hl: { id: 'ZVjnWhgxzjM' }, at });
   assert.equal(pack.games['mlb:9:'], undefined, 'past ten days: the archive has it');
 });
+
+test('football’s short cut stands in: looked for again, spaced out, until the extended one is up, which then replaces it', async () => {
+  const { runWatch } = await import('../builders/watch.js');
+  const { r2Store } = await import('../builders/store.js');
+  const { memoryBucket } = await import('./fixtures/bucket.mjs');
+  const HL = await import('../kit/sports-highlights.mjs');
+  const start = '2026-10-25T14:00:00Z';
+  const game = { id: '9', league: 'epl', kind: 'match', start, status: { state: 'post', completed: true }, home: { name: 'Arsenal', short: 'Arsenal', score: '2' }, away: { name: 'Chelsea', short: 'Chelsea', score: '1' } };
+  const key = HL.watchKey(game);
+  const short = { id: 'short1', channel: 'Arsenal', channelId: 'UCpryVRk_VDudG8SHXgWcG0w', length: '2:00', official: true, x: 1 };
+  const ext = { id: 'ext1', title: 'EXTENDED HIGHLIGHTS | Arsenal v Chelsea (2-1) | Premier League', channel: 'Arsenal', channelId: 'UCpryVRk_VDudG8SHXgWcG0w', length: '10:01', age: '1 hour ago', verified: true };
+  let up = false;
+  let searched = 0;
+  const proxy = async url => (String(url).includes('/results?') ? (searched++, { videos: up ? [ext] : [] }) : null);
+  const run = async now => {
+    const store0 = run.store;
+    const real = globalThis.fetch;
+    globalThis.fetch = async () => new Response('', { status: 404 });
+    try {
+      await runWatch({ store: store0, proxy, get: globalThis.fetch, now, until: now, sleep: async () => {}, full: false });
+    } finally {
+      globalThis.fetch = real;
+    }
+    return (await store0.json('sports/watch.json')).games[key]?.hl;
+  };
+  run.store = r2Store(memoryBucket({ 'sports/watch/index.json': { checked: 5, leagues: {} }, 'sports/watch/_pending.json': { games: [game] }, 'sports/watch.json': { games: { [key]: { hl: short, at: Date.parse(start) } } } }));
+  const t0 = Date.parse('2026-10-25T18:00:00Z');
+  // Not up yet: kept, looked at.
+  let hl = await run(t0);
+  assert.equal(hl.id, 'short1');
+  assert.equal(hl.tries, 1);
+  const n = searched;
+  // An hour on: not looked for again yet (the next look is 4 hours on).
+  hl = await run(t0 + 3_600_000);
+  assert.equal(searched, n);
+  // Up, and due: the extended cut in its place.
+  up = true;
+  hl = await run(t0 + 5 * 3_600_000);
+  assert.equal(hl.id, 'ext1');
+  assert.equal(hl.ext, true);
+  // Found: never looked for again.
+  const m = searched;
+  await run(t0 + 30 * 3_600_000);
+  assert.equal(searched, m);
+});

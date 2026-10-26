@@ -143,7 +143,7 @@ changes, writing a file only when it changed (`builders/store.js`):
 | Builder | Writes | When (UTC) |
 | --- | --- | --- |
 | `sports.js` | `sports/<league>/<year>.json`, `days.json`, `bounds.json` | daily 16:00 |
-| `watch.js` | `sports/watch.json` (hourly), the season archive (daily 20:00) | hourly / daily |
+| `watch.js` | `sports/watch.json` (hourly), the season archive (daily 20:00); football's short cut looked for again (2, 4, 8… h) until the extended one is up | hourly / daily |
 | `winprob.js` | `winprob/…` | daily 23:00 |
 | `photos.js` | photo lists, cutouts | hourly / daily 18:00 |
 | `buses.js` | `bus/…`, `shape/…`, `where.json` | a city once a week |
