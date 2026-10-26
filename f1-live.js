@@ -632,9 +632,11 @@ export function openF1Raw({ session = {}, meeting = null, rows = {} } = {}) {
     const r = results[no] || {};
     const mine = (laps[no] || []).sort((a, b) => a.lap_number - b.lap_number);
     const last = [...mine].reverse().find(l => l.lap_duration > 0);
-    const best = bestOf(no, 'lap_duration');
-    const bestLap = mine.find(l => Number(l.lap_duration) === best);
     const durations = Array.isArray(r.duration) ? r.duration : [];
+    // A practice's best as classified (a lap deleted for track limits not
+    // in it: Verstappen's 1:35.860 at Austin 2026's FP1 had him P2 quicker than P1).
+    const best = (!race && !quali && Number(r.duration) > 0 && Number(r.duration)) || bestOf(no, 'lap_duration');
+    const bestLap = mine.find(l => Math.abs(Number(l.lap_duration) - best) < 0.0005);
     const gap = Array.isArray(r.gap_to_leader) ? r.gap_to_leader.filter(x => x != null).at(-1) : r.gap_to_leader;
     Lines[no] = {
       Position: String(r.position || ''),
