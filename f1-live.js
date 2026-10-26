@@ -523,28 +523,43 @@ export function openF1Laps({ laps = [], intervals = [], position = [], pit = [] 
 }
 const OPENF1 = 'https://api.openf1.org/v1/';
 // (OpenF1 allows a few asks a second: one turned away (429) asked again a moment later.)
+// (Nothing there: OpenF1's 404 "No results found", an empty table. Too many
+// asked, from the Worker's shared addresses too: waited out, its Retry-After
+// when it says, up to four times.)
 const openF1Json = async path => {
   for (let k = 0; ; k++) {
     const res = await fetch(`${OPENF1}${path}`, { signal: AbortSignal.timeout(20_000) });
     if (res.ok) return res.json();
-    if (res.status !== 429 || k >= 3) throw new Error(`openf1 ${res.status}`);
-    await new Promise(r => setTimeout(r, 600 * (k + 1)));
+    if (res.status === 404) return [];
+    if (res.status !== 429 || k >= 4) throw new Error(`openf1 ${res.status}`);
+    await new Promise(r => setTimeout(r, Math.min(5_000, (Number(res.headers.get('retry-after')) || k + 1) * 1000)));
   }
 };
-// The session starting at `start` and the tables named, from OpenF1
-// (two asked at a time). { session, meeting, rows: { name: [...] } }.
+// The grid a session started from: OpenF1 files it under the qualifying
+// that set it (the meeting's, the last of them before the session).
+export const gridOf = (rows, sessionKey) => {
+  const keys = [...new Set(rows.map(r => r.session_key))].filter(k => k < sessionKey);
+  const from = Math.max(...keys);
+  return rows.filter(r => r.session_key === from);
+};
+// The session starting at `start` and the tables named, from OpenF1, one at
+// a time a third of a second apart (three a second is its limit). A table
+// it won't give fails the whole read: a copy kept for good is never one
+// with a hole in it. { session, meeting, rows: { name: [...] } }.
 async function openF1Rows(start, names) {
   const t = Date.parse(start);
   const day = new Date(t).toISOString().slice(0, 10);
   const found = await openF1Json(`sessions?date_start%3E%3D${day}&date_start%3C${new Date(t + 86_400_000).toISOString().slice(0, 10)}`);
   const session = (found || []).find(x => Math.abs(Date.parse(x.date_start) - t) < 20 * 60_000);
   if (!session) throw new Error('not in openf1');
+  const pause = () => new Promise(r => setTimeout(r, 340));
+  await pause();
+  const meeting = (await openF1Json(`meetings?meeting_key=${session.meeting_key}`))?.[0] || null;
   const rows = {};
-  const todo = [...names];
-  const one = async () => {
-    for (let n; (n = todo.shift()); ) rows[n] = await openF1Json(`${n}?session_key=${session.session_key}`).catch(() => []);
-  };
-  const [meeting] = await Promise.all([openF1Json(`meetings?meeting_key=${session.meeting_key}`).then(x => x?.[0] || null).catch(() => null), one(), one()]);
+  for (const n of names) {
+    await pause();
+    rows[n] = n === 'starting_grid' ? gridOf(await openF1Json(`starting_grid?meeting_key=${session.meeting_key}`), session.session_key) : await openF1Json(`${n}?session_key=${session.session_key}`);
+  }
   return { session, meeting, rows };
 }
 async function openF1Session(start) {
