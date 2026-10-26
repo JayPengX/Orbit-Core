@@ -25,9 +25,14 @@ test('a run reads three sessions not kept at most, skips what’s kept, stops at
   for (const url of [f1SessionUrl('2026-10-25T20:00Z'), f1LapsUrl('2026-10-25T20:00Z')]) await bucket.put(`${mirrorPath(url, '')}.gz`, new Uint8Array([1]));
   const asked = [];
   const r = await runF1Kept({ store: r2Store(bucket), proxy: async url => (asked.push(url), {}), now, per: 2 });
-  assert.deepEqual(r, { kept: 1, read: 2 });
+  // (Counted as kept once read: the proxy keeps what it reads.)
+  assert.deepEqual(r, { sessions: 4, kept: 3, read: 2 });
   assert.deepEqual(asked, [f1SessionUrl('2026-10-11T12:00Z'), f1LapsUrl('2026-10-11T12:00Z'), f1SessionUrl('2026-10-10T09:00Z'), f1LapsUrl('2026-10-10T09:00Z')]);
   const shut = await runF1Kept({ store: r2Store(bucket), proxy: async () => null, now });
-  assert.equal(shut.read, 1);
+  assert.equal(shut.read, 0);
+  // (The fake proxy keeps nothing: the three still missing.)
+  assert.equal(shut.kept, 1);
   assert.equal(shut.stopped, f1SessionUrl('2026-10-11T12:00Z'));
+  // Counted only: nothing read.
+  assert.deepEqual(await runF1Kept({ store: r2Store(bucket), proxy: async () => assert.fail(), now, per: 0 }), { sessions: 4, kept: 1, read: 0 });
 });

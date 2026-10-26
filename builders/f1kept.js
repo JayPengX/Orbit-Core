@@ -2,7 +2,7 @@
 // owner, 2026-10-26: 數據 has to be there, not only for the sessions
 // someone opened while OpenF1 was open). F1's archive is shut and OpenF1
 // shuts while any session runs and turns quick askers away (429), so read
-// slowly: each hour, the newest sessions over that the data proxy hasn't
+// slowly: three times an hour, the newest sessions over that the data proxy hasn't
 // kept, three at most, through the proxy's own route (which keeps them),
 // stopped at the first it can't read (OpenF1 shut or busy: the next hour).
 // The addresses are the app's own (Orbit Sports lib/f1.mjs), so the app
@@ -25,21 +25,21 @@ export function f1ToKeep(events, now = Date.now()) {
   return sessions.sort((a, b) => Date.parse(b.date) - Date.parse(a.date)).map(c => [f1SessionUrl(c.date), f1LapsUrl(c.date)]);
 }
 
+// `per`: sessions read a run (0: only counted). → { sessions, kept, read, stopped? }.
 export async function runF1Kept({ store, proxy, now = Date.now(), per = 3 }) {
   const year = new Date(now).getUTCFullYear();
   const events = (await store.json(`sports/f1/${year}.json`))?.events || [];
-  let read = 0;
-  let kept = 0;
-  for (const urls of f1ToKeep(events, now)) {
+  const missing = [];
+  const all = f1ToKeep(events, now);
+  for (const urls of all) {
     const todo = [];
     for (const url of urls) if (!(await store.has(`${mirrorPath(url, '')}.gz`))) todo.push(url);
-    if (!todo.length) {
-      kept++;
-      continue;
-    }
-    if (read >= per) break;
-    read++;
-    for (const url of todo) if (!(await proxy(url).catch(() => null))) return { kept, read, stopped: url };
+    if (todo.length) missing.push(todo);
   }
-  return { kept, read };
+  let read = 0;
+  for (const todo of missing.slice(0, per)) {
+    for (const url of todo) if (!(await proxy(url).catch(() => null))) return { sessions: all.length, kept: all.length - missing.length + read, read, stopped: url };
+    read++;
+  }
+  return { sessions: all.length, kept: all.length - missing.length + read, read };
 }
