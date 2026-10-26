@@ -547,6 +547,14 @@ const openF1Json = async path => {
 };
 // The grid a session started from: OpenF1 files it under the qualifying
 // that set it (the meeting's, the last of them before the session).
+// OpenF1's session nearest a start, within 90 minutes (ESPN's times and
+// OpenF1's differ: Singapore 2026's qualifying 13:30 and 13:00; a weekend's
+// sessions are hours apart), else undefined.
+export function nearestSession(sessions, t) {
+  const near = x => Math.abs(Date.parse(x.date_start) - t);
+  return (sessions || []).filter(x => near(x) < 90 * 60_000).sort((a, b) => near(a) - near(b))[0];
+}
+
 export const gridOf = (rows, sessionKey) => {
   const keys = [...new Set(rows.map(r => r.session_key))].filter(k => k < sessionKey);
   const from = Math.max(...keys);
@@ -558,9 +566,9 @@ export const gridOf = (rows, sessionKey) => {
 // with a hole in it. { session, meeting, rows: { name: [...] } }.
 async function openF1Rows(start, names) {
   const t = Date.parse(start);
-  const day = new Date(t).toISOString().slice(0, 10);
-  const found = await openF1Json(`sessions?date_start%3E%3D${day}&date_start%3C${new Date(t + 86_400_000).toISOString().slice(0, 10)}`);
-  const session = (found || []).find(x => Math.abs(Date.parse(x.date_start) - t) < 20 * 60_000);
+  const day = new Date(t - 2 * 3_600_000).toISOString().slice(0, 10);
+  const found = await openF1Json(`sessions?date_start%3E%3D${day}&date_start%3C${new Date(t + 26 * 3_600_000).toISOString().slice(0, 10)}`);
+  const session = nearestSession(found, t);
   if (!session) throw new Error('not in openf1');
   const pause = () => new Promise(r => setTimeout(r, 340));
   await pause();
