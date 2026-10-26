@@ -16,12 +16,15 @@ export const f1SessionUrl = start => `https://f1-live.orbit/session.json?start=$
 export const f1LapsUrl = start => `https://f1-live.orbit/laps.json?start=${at(start)}&final=1&v=2`;
 // A session counted over three hours after its start (a red-flagged race runs long).
 const OVER_MS = 3 * 3_600_000;
+// One called off (2026's Bahrain and Saudi weekends) has nothing to keep:
+// left out, or ten in a row turned away stop every run before the older ones.
+const CALLED_OFF = new Set(['STATUS_CANCELED', 'STATUS_POSTPONED']);
 
 // What to read: [數據, every lap] for each session over, newest first
 // ({ date } from the season pack; every session's laps: a practice's long
 // runs, a qualifying's laps, a race's gaps and places).
 export function f1ToKeep(events, now = Date.now()) {
-  const sessions = (events || []).flatMap(e => e.competitions || []).filter(c => Date.parse(c.date) < now - OVER_MS);
+  const sessions = (events || []).flatMap(e => e.competitions || []).filter(c => Date.parse(c.date) < now - OVER_MS && !CALLED_OFF.has(c.status?.type?.name));
   return sessions.sort((a, b) => Date.parse(b.date) - Date.parse(a.date)).map(c => [f1SessionUrl(c.date), f1LapsUrl(c.date)]);
 }
 

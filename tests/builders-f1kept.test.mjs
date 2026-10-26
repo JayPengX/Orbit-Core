@@ -15,6 +15,9 @@ test('the sessions over, newest first, at the app’s own addresses, each with i
   assert.deepEqual(list.map(x => x.length), [2, 2, 2, 2]);
   assert.equal(list[0][0], 'https://f1-live.orbit/session.json?start=2026-10-25T20%3A00%3A00.000Z&v=2');
   assert.equal(list[0][1], 'https://f1-live.orbit/laps.json?start=2026-10-25T20%3A00%3A00.000Z&final=1&v=2');
+  // A session called off: nothing to keep.
+  const off = { date: '2026-10-24T20:00Z', type: { abbreviation: 'Race' }, status: { type: { name: 'STATUS_CANCELED' } } };
+  assert.equal(f1ToKeep([...events, { competitions: [off] }], now).length, 4);
   // Over only three hours on.
   assert.equal(f1ToKeep(events, Date.parse('2026-10-25T22:00Z'))[0][0], f1SessionUrl('2026-10-11T12:00Z'));
 });
