@@ -15,8 +15,13 @@ const at = start => encodeURIComponent(new Date(start).toISOString());
 // (v=4, as Orbit-Sports lib/f1.mjs ARCHIVE: a practice's classified best, the laps deleted.)
 export const f1SessionUrl = start => `https://f1-live.orbit/session.json?start=${at(start)}&v=4`;
 export const f1LapsUrl = start => `https://f1-live.orbit/laps.json?start=${at(start)}&final=1&v=2`;
-// A session counted over three hours after its start (a red-flagged race runs long).
-const OVER_MS = 3 * 3_600_000;
+// A session counted over two hours after its start (an hour's practice or
+// qualifying, a red flag's wait in); a race (and a sprint) three (a
+// red-flagged one runs long). Before, OpenF1 turns it away anyway: it shuts
+// while a session runs. (Three hours for all left a Saturday's FP3 one run,
+// :46, before qualifying shut OpenF1 again.)
+const RACE = new Set(['Race', 'SR']);
+const overAt = c => Date.parse(c.date) + (RACE.has(c.type?.abbreviation) ? 3 : 2) * 3_600_000;
 // One called off (2026's Bahrain and Saudi weekends) has nothing to keep:
 // left out, or ten in a row turned away stop every run before the older ones.
 const CALLED_OFF = new Set(['STATUS_CANCELED', 'STATUS_POSTPONED']);
@@ -25,7 +30,7 @@ const CALLED_OFF = new Set(['STATUS_CANCELED', 'STATUS_POSTPONED']);
 // ({ date } from the season pack; every session's laps: a practice's long
 // runs, a qualifying's laps, a race's gaps and places).
 export function f1ToKeep(events, now = Date.now()) {
-  const sessions = (events || []).flatMap(e => e.competitions || []).filter(c => Date.parse(c.date) < now - OVER_MS && !CALLED_OFF.has(c.status?.type?.name));
+  const sessions = (events || []).flatMap(e => e.competitions || []).filter(c => overAt(c) < now && !CALLED_OFF.has(c.status?.type?.name));
   return sessions.sort((a, b) => Date.parse(b.date) - Date.parse(a.date)).map(c => [f1SessionUrl(c.date), f1LapsUrl(c.date)]);
 }
 

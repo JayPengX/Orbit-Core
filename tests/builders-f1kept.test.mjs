@@ -18,8 +18,11 @@ test('the sessions over, newest first, at the app’s own addresses, each with i
   // A session called off: nothing to keep.
   const off = { date: '2026-10-24T20:00Z', type: { abbreviation: 'Race' }, status: { type: { name: 'STATUS_CANCELED' } } };
   assert.equal(f1ToKeep([...events, { competitions: [off] }], now).length, 4);
-  // Over only three hours on.
+  // A race over only three hours on; a practice or a qualifying two (Saturday's FP3 before qualifying starts).
   assert.equal(f1ToKeep(events, Date.parse('2026-10-25T22:00Z'))[0][0], f1SessionUrl('2026-10-11T12:00Z'));
+  const sat = [ev(['2026-10-31T17:30Z', 'FP3'], ['2026-10-31T21:00Z', 'Qual'])];
+  assert.deepEqual(f1ToKeep(sat, Date.parse('2026-10-31T19:20Z')), []);
+  assert.equal(f1ToKeep(sat, Date.parse('2026-10-31T19:40Z'))[0][0], f1SessionUrl('2026-10-31T17:30Z'));
 });
 
 test('a run reads the sessions not kept, skips what’s kept, until its time is up, tries a refused one once more then stops', async () => {
