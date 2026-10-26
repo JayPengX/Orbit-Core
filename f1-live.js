@@ -479,47 +479,57 @@ export function memoryLog() {
 // a CloudFront 401). `rows` = { laps, intervals, position, pit }, each
 // OpenF1's list. The same shape as the archive's: { cars: { no: [[lap, ms,
 // gap, place, pit]…] }, places: { no: [grid, lap 1, …] }, stops: { no: [[lap, stop s, lane s]…] } }.
-export function openF1Laps({ laps = [], intervals = [], position = [], pit = [] } = {}) {
-  const byCar = (rows, key = 'date') => {
-    const m = {};
-    for (const r of rows || []) if (r?.driver_number != null && r[key]) (m[r.driver_number] ||= []).push(r);
-    for (const k in m) m[k].sort((a, b) => Date.parse(a[key]) - Date.parse(b[key]));
-    return m;
+// Every car's laps from OpenF1's laps table alone (the intervals and
+// positions tables, 3.5 MB a race, got the Worker turned away, 429): when
+// each car crossed the line at each lap's end (the next lap's start, else
+// this one's start and time), its place among the cars to finish that lap
+// (by when), its gap to the first of them (none a lap or more down, as F1's
+// own: "1L"); lap 0 its grid place. `{ cars: { no: [[lap, ms, gap, pos, pit]] }, places, stops }`.
+export function openF1Laps({ laps = [], pit = [], starting_grid = [] } = {}) {
+  const byCar = {};
+  for (const l of laps || []) if (l?.driver_number != null && Number(l.lap_number) > 0) (byCar[l.driver_number] ||= new Map()).set(Number(l.lap_number), l);
+  // When a car crossed the line ending lap n (ms), or NaN.
+  const crossed = (no, n) => {
+    const next = Date.parse(byCar[no].get(n + 1)?.date_start || '');
+    if (Number.isFinite(next)) return next;
+    const l = byCar[no].get(n);
+    return Date.parse(l?.date_start || '') + (Number(l?.lap_duration) || NaN) * 1000;
   };
-  // The last row at or before a time.
-  const at = (rows, t) => {
-    let found = null;
-    for (const r of rows || []) {
-      if (Date.parse(r.date) > t) break;
-      found = r;
-    }
-    return found;
-  };
-  const gaps = byCar(intervals), places = byCar(position), stopsBy = {};
+  const nos = Object.keys(byCar);
+  const most = Math.max(0, ...nos.map(no => Math.max(...byCar[no].keys())));
+  const at = {};
+  for (let n = 1; n <= most; n++) {
+    const line = nos.map(no => [no, crossed(no, n)]).filter(([, t]) => Number.isFinite(t)).sort((x, y) => x[1] - y[1]);
+    const lead = line[0];
+    line.forEach(([no, t], i) => {
+      // (A lap or more down: crossed after the leader ended its next lap.)
+      const down = lead && Number.isFinite(crossed(lead[0], n + 1)) && t > crossed(lead[0], n + 1);
+      (at[no] ||= {})[n] = { pos: i + 1, gap: i === 0 ? 0 : down ? null : Math.round(t - lead[1]) / 1000 };
+    });
+  }
+  const grid = Object.fromEntries((starting_grid || []).map(r => [r.driver_number, Number(r.position) || 0]));
+  const stopsBy = {};
   for (const p of pit || []) if (p?.driver_number != null && p.lap_number) (stopsBy[p.driver_number] ||= []).push(p);
-  const cars = {}, placesOut = {}, stops = {};
-  for (const [no, rows] of Object.entries(byCar(laps, 'date_start'))) {
+  const cars = {}, places = {}, stops = {};
+  for (const no of nos) {
     const pitLaps = new Set((stopsBy[no] || []).map(p => Number(p.lap_number)));
     const out = [];
-    for (const l of rows) {
-      const n = Number(l.lap_number) || 0;
+    const ps = [grid[no] || 0];
+    for (const n of [...byCar[no].keys()].sort((x, y) => x - y)) {
+      const l = byCar[no].get(n);
       const ms = Math.round((Number(l.lap_duration) || 0) * 1000);
-      if (!n) continue;
-      const end = Date.parse(l.date_start) + (ms || 90_000);
-      const pos = Number(at(places[no], end)?.position) || 0;
-      const g = at(gaps[no], end)?.gap_to_leader;
-      const gap = pos === 1 ? 0 : typeof g === 'number' ? g : /^\+?\d+(\.\d+)?$/.test(String(g ?? '')) ? Number(String(g).replace('+', '')) : null;
-      if (ms) out.push([n, ms, gap, pos, pitLaps.has(n) || l.is_pit_out_lap ? 1 : 0]);
-      ((placesOut[no] ||= [Number(places[no]?.[0]?.position) || 0])[n] = pos);
+      const here = at[no]?.[n];
+      ps[n] = here?.pos || 0;
+      if (ms) out.push([n, ms, here ? here.gap : null, here?.pos || 0, pitLaps.has(n) || l.is_pit_out_lap ? 1 : 0]);
     }
     cars[no] = out;
-    placesOut[no] = Array.from(placesOut[no] || [], x => x || 0);
+    places[no] = Array.from(ps, x => x || 0);
   }
   for (const [no, ps] of Object.entries(stopsBy))
     stops[no] = ps
       .map(p => [Number(p.lap_number), Number(p.stop_duration) || 0, Number(p.lane_duration ?? p.pit_duration) || 0])
       .sort((a, b) => a[0] - b[0]);
-  return { cars, places: placesOut, stops };
+  return { cars, places, stops };
 }
 const OPENF1 = 'https://api.openf1.org/v1/';
 // (OpenF1 allows a few asks a second: one turned away (429) asked again a moment later.)
@@ -563,7 +573,7 @@ async function openF1Rows(start, names) {
   return { session, meeting, rows };
 }
 async function openF1Session(start) {
-  const { rows } = await openF1Rows(start, ['laps', 'intervals', 'position', 'pit']);
+  const { rows } = await openF1Rows(start, ['laps', 'pit', 'starting_grid']);
   const got = openF1Laps(rows);
   if (!Object.values(got.cars).some(x => x.length)) throw new Error('openf1 no laps');
   return { at: Date.now(), ...got };
@@ -589,7 +599,12 @@ export function openF1Raw({ session = {}, meeting = null, rows = {} } = {}) {
     return m;
   };
   const laps = by(rows.laps);
-  const results = Object.fromEntries((rows.session_result || []).map(r => [r.driver_number, r]));
+  // A car out unclassified has no place in OpenF1's results: after the
+  // classified ones, the most laps first (F1's own order; the board drew "99").
+  const res = rows.session_result || [];
+  const placed = Math.max(0, ...res.map(r => Number(r.position) || 0));
+  const unplaced = res.filter(r => !(Number(r.position) > 0)).sort((a, b) => (Number(b.number_of_laps) || 0) - (Number(a.number_of_laps) || 0));
+  const results = Object.fromEntries(res.map(r => [r.driver_number, Number(r.position) > 0 ? r : { ...r, position: placed + 1 + unplaced.indexOf(r) }]));
   const grid = Object.fromEntries((rows.starting_grid || []).map(r => [r.driver_number, r.position]));
   const stops = by(rows.pit);
   const nos = [...new Set([...(rows.drivers || []).map(d => d.driver_number), ...Object.keys(results).map(Number)])].map(String);

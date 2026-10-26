@@ -1379,15 +1379,36 @@ async function resolveOne(upstreamUrl, trim, ctx, { mirror = true, within } = {}
     ctx.waitUntil(cache.put(cacheKey, cacheEntry(result, CACHE_FINAL)));
     return { ...result, cache: 'KEPT', age: 0, policy: CACHE_FINAL };
   }
-  const result = await fetchUpstream(upstreamUrl, trim);
-  if (result.status === 200) {
-    // (The body is read once: the edge's copy and R2's from the same bytes.)
-    if (result.body && typeof result.body !== 'string' && !(result.body instanceof ArrayBuffer) && !ArrayBuffer.isView(result.body)) result.body = await new Response(result.body).arrayBuffer();
-    ctx.waitUntil(cache.put(cacheKey, cacheEntry(result, policy)));
-    if (keepKey && result.final) ctx.waitUntil(keep(keepKey, upstreamUrl, result.body));
+  // A read to keep for good goes on to the end whoever stops waiting (an F1
+  // session rebuilt from OpenF1 takes up to half a minute while it turns
+  // asks away: the phone gave up, the read was cut off, nothing kept), and
+  // one at a time an isolate (each viewer's own, together, set off its limit).
+  const first = async () => {
+    const result = await fetchUpstream(upstreamUrl, trim);
+    // (The body is read once: the edge's copy and R2's from the same bytes;
+    // a shared read's, a failure's too, for each waiting on it.)
+    if ((result.status === 200 || keepKey) && result.body && typeof result.body !== 'string' && !(result.body instanceof ArrayBuffer) && !ArrayBuffer.isView(result.body)) result.body = await new Response(result.body).arrayBuffer();
+    if (result.status === 200) {
+      ctx.waitUntil(cache.put(cacheKey, cacheEntry(result, policy)));
+      if (keepKey && result.final) ctx.waitUntil(keep(keepKey, upstreamUrl, result.body));
+    }
+    return result;
+  };
+  let reading = keepKey ? firstReads.get(cacheKey.url) : null;
+  if (!reading) {
+    reading = first();
+    if (keepKey) {
+      firstReads.set(cacheKey.url, reading);
+      ctx.waitUntil(reading.catch(() => {}).finally(() => firstReads.delete(cacheKey.url)));
+    }
   }
-  return { ...result, cache: 'MISS', age: 0, policy: result.final ? CACHE_FINAL : policy };
+  const result = await reading;
+  // (Shared: each its own copy of the body.)
+  const body = result.body instanceof ArrayBuffer ? result.body.slice(0) : result.body;
+  return { ...result, body, cache: 'MISS', age: 0, policy: result.final ? CACHE_FINAL : policy };
 }
+// First reads of what's kept for good, under way in this isolate (by cache key).
+const firstReads = new Map();
 
 // How long the browser may keep an answer itself (its own copy, by the
 // address it asked for): the fresh part of the cache policy, at most 10

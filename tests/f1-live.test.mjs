@@ -169,31 +169,26 @@ test("the session to log: the index's running one; F1's archive turned away (401
   assert.equal(sessionToLog(null, {}, now), false);
 });
 
-test('a race read from OpenF1 when F1’s archive is shut: each lap with its gap and place at its end, the stops', async () => {
+test('a race read from OpenF1 when F1’s archive is shut: from its laps alone, each lap with its gap and place at the line, the grid, the stops', async () => {
   const { openF1Laps } = await import('../f1-live.js');
   const t0 = Date.parse('2026-10-25T20:03:00Z');
-  const iso = ms => new Date(t0 + ms).toISOString();
+  const iso = s => new Date(t0 + s * 1000).toISOString();
+  const lap = (no, n, start, dur, extra = {}) => ({ driver_number: no, lap_number: n, date_start: start == null ? null : iso(start), lap_duration: dur, ...extra });
   const got = openF1Laps({
     laps: [
-      { driver_number: 12, lap_number: 1, lap_duration: null, date_start: iso(0) },
-      { driver_number: 12, lap_number: 2, lap_duration: 100, date_start: iso(110_000) },
-      { driver_number: 1, lap_number: 2, lap_duration: 101.5, date_start: iso(112_000) },
-      { driver_number: 1, lap_number: 3, lap_duration: 120, date_start: iso(213_500), is_pit_out_lap: false }
+      // (Lap 1's start unknown, as OpenF1's often is: its end is lap 2's start.)
+      lap(12, 1, null, 100), lap(12, 2, 100, 100), lap(12, 3, 200, 100),
+      lap(1, 1, 0, 102), lap(1, 2, 102, 101), lap(1, 3, 203, 125, { is_pit_out_lap: false }),
+      // Slow: a lap down by its second.
+      lap(4, 1, 0, 160), lap(4, 2, 160, 160)
     ],
-    intervals: [
-      { driver_number: 1, date: iso(200_000), gap_to_leader: 2.4 },
-      { driver_number: 1, date: iso(330_000), gap_to_leader: '+1 LAP' }
-    ],
-    position: [
-      { driver_number: 12, date: iso(-60_000), position: 1 },
-      { driver_number: 1, date: iso(-60_000), position: 2 },
-      { driver_number: 1, date: iso(300_000), position: 3 }
-    ],
-    pit: [{ driver_number: 1, lap_number: 3, stop_duration: 2.3, lane_duration: 21.1 }]
+    pit: [{ driver_number: 1, lap_number: 3, stop_duration: 2.3, lane_duration: 21.1 }],
+    starting_grid: [{ driver_number: 1, position: 1 }, { driver_number: 12, position: 2 }, { driver_number: 4, position: 3 }]
   });
-  assert.deepEqual(got.cars['12'], [[2, 100000, 0, 1, 0]]);
-  assert.deepEqual(got.cars['1'], [[2, 101500, 2.4, 2, 0], [3, 120000, null, 3, 1]]);
-  assert.deepEqual(got.places['1'], [2, 0, 2, 3]);
+  assert.deepEqual(got.cars['12'], [[1, 100000, 0, 1, 0], [2, 100000, 0, 1, 0], [3, 100000, 0, 1, 0]]);
+  assert.deepEqual(got.cars['1'], [[1, 102000, 2, 2, 0], [2, 101000, 3, 2, 0], [3, 125000, 28, 2, 1]]);
+  assert.deepEqual(got.cars['4'], [[1, 160000, 60, 3, 0], [2, 160000, null, 3, 0]]);
+  assert.deepEqual([got.places['12'], got.places['1'], got.places['4']], [[2, 1, 1, 1], [1, 2, 2, 2], [3, 3, 3]]);
   assert.deepEqual(got.stops['1'], [[3, 2.3, 21.1]]);
 });
 
