@@ -232,3 +232,11 @@ test('a finished session from OpenF1 when F1’s archive is shut: the board’s 
   assert.deepEqual(q.cars[0].parts, ['1:35.100', '1:34.600', '1:34.035']);
   assert.equal(q.cars[0].best, '1:34.035');
 });
+
+test('a race’s grid is the one its qualifying set (OpenF1 files it there), a sprint’s its sprint qualifying’s', async () => {
+  const { gridOf } = await import('../f1-live.js');
+  const rows = [{ session_key: 11379, driver_number: 3, position: 2 }, { session_key: 11384, driver_number: 3, position: 1 }];
+  assert.deepEqual(gridOf(rows, 11388).map(r => r.position), [1]);
+  assert.deepEqual(gridOf(rows, 11383).map(r => r.position), [2]);
+  assert.deepEqual(gridOf(rows, 11379), []);
+});
