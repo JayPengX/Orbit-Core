@@ -56,7 +56,7 @@ export async function runBuilders(env, { proxy, now = Date.now(), job = SLOTS[ne
   if (job === 'cutouts') await step('cutouts', () => runCutouts({ store, now }));
   if (job === 'buses') await step('buses', () => runBuses({ store, env, now, until: now + 6 * 60_000 }));
   // (f1kept-count: how many are kept, none read.)
-  if (job === 'f1kept' || only === 'f1kept' || only === 'f1kept-count') await step('f1kept', () => runF1Kept({ store, proxy, now, per: only === 'f1kept-count' ? 0 : 3 }));
+  if (job === 'f1kept' || only === 'f1kept' || only === 'f1kept-count') await step('f1kept', () => runF1Kept({ store, proxy, now, ...(only === 'f1kept-count' ? { per: 0 } : {}) }));
   // (By hand, POST /data/build: one of the daily ones now.)
   if (only === 'asia') await step('asia', () => runAsia({ store, now }));
   if (only === 'cpbl') await step('cpbl', () => runCpbl({ store, now }));

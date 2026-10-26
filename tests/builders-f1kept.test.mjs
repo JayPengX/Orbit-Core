@@ -19,20 +19,24 @@ test('the sessions over, newest first, at the app’s own addresses, each with i
   assert.equal(f1ToKeep(events, Date.parse('2026-10-25T22:00Z'))[0][0], f1SessionUrl('2026-10-11T12:00Z'));
 });
 
-test('a run reads three sessions not kept at most, skips what’s kept, stops at the first it can’t read', async () => {
+test('a run reads the sessions not kept, skips what’s kept, until its time is up, tries a refused one once more then stops', async () => {
   const bucket = memoryBucket({ 'sports/f1/2026.json': { events } });
   // The newest kept already.
   for (const url of [f1SessionUrl('2026-10-25T20:00Z'), f1LapsUrl('2026-10-25T20:00Z')]) await bucket.put(`${mirrorPath(url, '')}.gz`, new Uint8Array([1]));
   const asked = [];
-  const r = await runF1Kept({ store: r2Store(bucket), proxy: async url => (asked.push(url), {}), now, per: 2 });
+  const r = await runF1Kept({ store: r2Store(bucket), proxy: async url => (asked.push(url), {}), now, per: 2, sleep: async () => {} });
   // (Counted as kept once read: the proxy keeps what it reads.)
   assert.deepEqual(r, { sessions: 4, kept: 3, read: 2 });
   assert.deepEqual(asked, [f1SessionUrl('2026-10-11T12:00Z'), f1LapsUrl('2026-10-11T12:00Z'), f1SessionUrl('2026-10-10T09:00Z'), f1LapsUrl('2026-10-10T09:00Z')]);
-  const shut = await runF1Kept({ store: r2Store(bucket), proxy: async () => null, now });
+  let waited = 0;
+  const shut = await runF1Kept({ store: r2Store(bucket), proxy: async () => null, now, sleep: async ms => (waited += ms) });
+  assert.equal(waited, 60_000, 'tried once more a minute on');
   assert.equal(shut.read, 0);
   // (The fake proxy keeps nothing: the three still missing.)
   assert.equal(shut.kept, 1);
   assert.equal(shut.stopped, f1SessionUrl('2026-10-11T12:00Z'));
   // Counted only: nothing read.
   assert.deepEqual(await runF1Kept({ store: r2Store(bucket), proxy: async () => assert.fail(), now, per: 0 }), { sessions: 4, kept: 1, read: 0 });
+  // Its time up: none read.
+  assert.equal((await runF1Kept({ store: r2Store(bucket), proxy: async () => ({}), now, until: now, clock: () => now, sleep: async () => {} })).read, 0);
 });
