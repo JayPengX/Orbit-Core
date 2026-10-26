@@ -247,3 +247,15 @@ test('nearestSession: the nearest within 90 minutes', async () => {
   assert.equal(nearestSession(s, Date.parse('2026-10-10T17:00Z')), undefined);
   assert.equal(nearestSession(null, 0), undefined);
 });
+
+test('deletedOf: each car\'s lap times taken away, one given back not', async () => {
+  const { deletedOf } = await import('../f1-live.js');
+  const msgs = [
+    { Message: 'CAR 3 (VER) TIME 1:35.860 DELETED - TRACK LIMITS AT TURN 9 LAP 14 13:10:34' },
+    { Message: 'CAR 44 (HAM) TIME 1:39.009 DELETED - TRACK LIMITS AT TURN 9 LAP 3 12:34:40' },
+    { Message: 'CAR 44 (HAM) TIME 1:39.009 REINSTATED' },
+    { Message: 'TRACK LIMITS - CAR 16 (LEC) LAP 5' }
+  ];
+  assert.deepEqual(deletedOf(msgs), { 3: [95860], 44: [] });
+  assert.deepEqual(deletedOf(null), {});
+});

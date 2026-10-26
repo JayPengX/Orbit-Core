@@ -49,6 +49,21 @@ export function stintsOf(raw, raced = 0) {
 // penalties not yet served (5s, 10s, drive-through, stop-go) and whether an
 // incident of its is under investigation (until a word on that incident,
 // by its time stamp, closes it). { '63': { pen: ['5s'], probe: false } }.
+// Each car's lap times taken away (track limits), as race control said
+// them: { no: [ms…] }; one given back ("REINSTATED") not. (Orbit Sports'
+// 車手比較 leaves them out: Verstappen's deleted 1:35.860 at Austin 2026's
+// FP1 his best on the chart, his classified one 1:36.136.)
+export function deletedOf(msgs) {
+  const out = {};
+  for (const m of list(msgs)) {
+    const x = /CAR (\d+)\b.*?TIME (\d+):(\d\d\.\d{3}) (DELETED|REINSTATED)/.exec(m?.Message || '');
+    if (!x) continue;
+    const ms = Math.round((Number(x[2]) * 60 + Number(x[3])) * 1000);
+    out[x[1]] = x[4] === 'DELETED' ? [...(out[x[1]] || []), ms] : (out[x[1]] || []).filter(v => v !== ms);
+  }
+  return out;
+}
+
 export function stewardsOf(msgs) {
   const out = {};
   const of = no => (out[no] ||= { pen: [], probe: false });
@@ -176,6 +191,7 @@ export function trimF1Live(r, now = Date.now()) {
       .map(m => ({ at: m.Utc || '', lap: Number(m.Lap) || 0, category: m.Category || '', flag: m.Flag || '', message: m.Message || '' })),
     // Who's under investigation or has a penalty to serve (Orbit Sports' 成績).
     stewards: stewardsOf(r?.RaceControlMessages?.Messages),
+    deleted: deletedOf(r?.RaceControlMessages?.Messages),
     cars
   };
 }
