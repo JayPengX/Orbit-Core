@@ -39,7 +39,9 @@ test('a run reads the sessions not kept, skips what’s kept, until its time is 
   // (The fake proxy keeps nothing: the three still missing.)
   assert.equal(shut.kept, 1);
   assert.equal(shut.failed.length, 3);
-  assert.equal(shut.stopped, f1SessionUrl('2026-10-09T08:30Z'));
+  assert.equal(shut.stopped, f1SessionUrl('2026-10-09T08:30Z', 'FP1'));
+  // (A practice's at v=3: its best lap the classified one.)
+  assert.match(shut.stopped, /&v=3$/);
   // Counted only: nothing read.
   assert.deepEqual(await runF1Kept({ store: r2Store(bucket), proxy: async () => assert.fail(), now, per: 0 }), { sessions: 4, kept: 1, read: 0, again: 0 });
   // Its time up: none read.
