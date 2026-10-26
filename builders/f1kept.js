@@ -54,9 +54,8 @@ export async function runF1Kept({ store, proxy, now = Date.now(), per = Infinity
     let ok = true;
     for (const url of todo) {
       if (await proxy(url).catch(() => null)) continue;
-      // (Turned away: once more 20 seconds on, OpenF1's limit a minute's
-      // worth; still not, the next session: one
-      // OpenF1 can't give (a session called off) never holds up the rest.)
+      // (Turned away: once more 20 seconds on; still not, the next session:
+      // one OpenF1 can't give (a session called off) never holds up the rest.)
       again++;
       await sleep(20_000);
       if (await proxy(url).catch(() => null)) continue;
