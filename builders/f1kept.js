@@ -43,17 +43,26 @@ export async function runF1Kept({ store, proxy, now = Date.now(), per = Infinity
     if (todo.length) missing.push(todo);
   }
   let read = 0;
-  const out = extra => ({ sessions: all.length, kept: all.length - missing.length + read, read, ...extra });
+  const failed = [];
+  let inRow = 0;
+  const out = extra => ({ sessions: all.length, kept: all.length - missing.length + read, read, ...(failed.length ? { failed } : {}), ...extra });
   for (const todo of missing) {
     if (read >= per || clock() + SESSION_MS > until) break;
     const began = clock();
+    let ok = true;
     for (const url of todo) {
       if (await proxy(url).catch(() => null)) continue;
-      // (Turned away: once more a minute on, then the next run.)
+      // (Turned away: once more a minute on; still not, the next session: one
+      // OpenF1 can't give (a session called off) never holds up the rest.)
       await sleep(60_000);
-      if (!(await proxy(url).catch(() => null))) return out({ stopped: url });
+      if (await proxy(url).catch(() => null)) continue;
+      ok = false;
+      failed.push(url);
+      break;
     }
-    read++;
+    if (ok) (read++, (inRow = 0));
+    // Three in a row: OpenF1 shut or turning this Worker away, the next run.
+    else if (++inRow >= 3) return out({ stopped: failed.at(-1) });
     await sleep(Math.max(0, SESSION_MS - (clock() - began)));
   }
   return out();

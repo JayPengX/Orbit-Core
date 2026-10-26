@@ -235,3 +235,15 @@ test('a race’s grid is the one its qualifying set (OpenF1 files it there), a s
   assert.deepEqual(gridOf(rows, 11383).map(r => r.position), [2]);
   assert.deepEqual(gridOf(rows, 11379), []);
 });
+
+test('nearestSession: the nearest within 90 minutes', async () => {
+  const { nearestSession } = await import('../f1-live.js');
+  const s = [
+    { session_key: 1, date_start: '2026-10-10T09:30:00+00:00' },
+    { session_key: 2, date_start: '2026-10-10T13:00:00+00:00' }
+  ];
+  assert.equal(nearestSession(s, Date.parse('2026-10-10T13:30Z')).session_key, 2);
+  assert.equal(nearestSession(s, Date.parse('2026-10-10T09:30Z')).session_key, 1);
+  assert.equal(nearestSession(s, Date.parse('2026-10-10T17:00Z')), undefined);
+  assert.equal(nearestSession(null, 0), undefined);
+});
