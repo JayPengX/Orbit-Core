@@ -682,7 +682,7 @@ export function openF1Raw({ session = {}, meeting = null, rows = {} } = {}) {
   };
 }
 async function openF1Archived(start) {
-  const names = ['drivers', 'session_result', 'laps', 'stints', 'pit', 'race_control', 'weather', 'starting_grid', 'position', 'intervals'];
+  const names = ['drivers', 'session_result', 'laps', 'stints', 'pit', 'race_control', 'weather', 'starting_grid'];
   const got = await openF1Rows(start, names);
   // (Kept for good once read: never from a table OpenF1 didn't give.)
   for (const n of ['drivers', 'session_result', 'laps', 'stints']) if (!(got.rows[n] || []).length) throw new Error(`openf1 no ${n}`);
