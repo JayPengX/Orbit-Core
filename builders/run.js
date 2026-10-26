@@ -34,7 +34,7 @@ export const WINPROB_HOUR = 23;
 // `proxy(url, trim)`: a read through the data proxy's route (its trims and edge cache), its JSON or null.
 // One job a run (each run its own 30 s of CPU: the whole hour's work in one
 // went past it, 2026-10-13), each on its own even minute of the hour.
-export const SLOTS = { 16: 'watch', 20: 'cutouts', 22: 'daily', 24: 'buses', 26: 'f1kept' };
+export const SLOTS = { 6: 'f1kept', 16: 'watch', 20: 'cutouts', 22: 'daily', 24: 'buses', 26: 'f1kept', 46: 'f1kept' };
 
 // `proxy(url, trim)`: a read through the data proxy's route (its trims and edge cache), its JSON or null.
 // `pace` (pace.js): at 1 only what phones would miss runs, from 2 nothing
@@ -55,7 +55,8 @@ export async function runBuilders(env, { proxy, now = Date.now(), job = SLOTS[ne
   if (job === 'watch') await step('watch', () => runWatch({ store, proxy, now, until: now + 8 * 60_000, full }));
   if (job === 'cutouts') await step('cutouts', () => runCutouts({ store, now }));
   if (job === 'buses') await step('buses', () => runBuses({ store, env, now, until: now + 6 * 60_000 }));
-  if (job === 'f1kept' || only === 'f1kept') await step('f1kept', () => runF1Kept({ store, proxy, now }));
+  // (f1kept-count: how many are kept, none read.)
+  if (job === 'f1kept' || only === 'f1kept' || only === 'f1kept-count') await step('f1kept', () => runF1Kept({ store, proxy, now, per: only === 'f1kept-count' ? 0 : 3 }));
   // (By hand, POST /data/build: one of the daily ones now.)
   if (only === 'asia') await step('asia', () => runAsia({ store, now }));
   if (only === 'cpbl') await step('cpbl', () => runCpbl({ store, now }));
