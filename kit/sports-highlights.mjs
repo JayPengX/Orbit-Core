@@ -334,7 +334,16 @@ function kept() {
 // A football game's found before the extended cut was looked for (no
 // `ext`, no `x`): not known, looked for again (Jay 2026-10-23).
 const current = (e, v) => (v && (!football(e) || e.kind !== 'match' || v.ext || v.x) ? v : null);
-export const knownHighlights = e => (e ? current(e, kept()[watchKey(e)]) || current(e, watchOf(e)?.hl) || null : null);
+// A video that a better cut may yet replace: football's short one (the
+// clubs' extended cut goes up hours later). The proxy's builder looks again.
+export const standIn = (e, v) => Boolean(v && football(e) && e.kind === 'match' && !v.ext);
+// The pack's first when it has the better cut (found after the phone kept a stand-in), else the phone's own.
+export const knownHighlights = e => {
+  if (!e) return null;
+  const mine = current(e, kept()[watchKey(e)]);
+  const pack = current(e, watchOf(e)?.hl);
+  return (pack && standIn(e, mine) && !standIn(e, pack) ? pack : mine || pack) || null;
+};
 function keep(e, v) {
   try {
     const all = kept();
@@ -351,9 +360,10 @@ export const ELTA_CHANNEL = 'UCCQvP4hsRW9emj0meGk15jg';
 export const highlightsKind = v => (!v ? 'search' : v.channelId === ELTA_CHANNEL ? 'elta' : v.ext ? 'extended' : v.official ? 'official' : 'full');
 // The game's video ({ id, channel, length, official }), or null while there's
 // none. A failed read throws: never "none". `read`: the proxy's (proxyJson).
-export async function findHighlights(e, read, now = Date.now()) {
+// `again`: a stand-in's better cut looked for (what's known not taken).
+export async function findHighlights(e, read, now = Date.now(), { again = false } = {}) {
   if (e?.status?.state !== 'post' || e.status.void) return null;
-  const known = knownHighlights(e);
+  const known = again ? null : knownHighlights(e);
   if (known) return known;
   const old = now - Date.parse(e.start) > 7 * 86_400_000;
   // (Football: on past the extended search's pick unless it's the extended cut; the first found kept.)
