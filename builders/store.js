@@ -39,6 +39,10 @@ export function r2Store(bucket) {
       if (obj.customMetadata?.sha256) known.set(path, obj.customMetadata.sha256);
       return b;
     },
+    // Whether there's a file (its head only).
+    async has(path) {
+      return Boolean(await bucket.head(path));
+    },
     async json(path) {
       const b = await store.bytes(path);
       return b ? JSON.parse(dec.decode(b)) : null;

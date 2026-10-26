@@ -10,7 +10,7 @@ on:
       job:
         description: The job
         type: choice
-        options: [watch, watch-full, cutouts, buses, play, asia, cpbl, sports, photos, winprob, kept, kept-dry, gemini-check, system]
+        options: [watch, watch-full, cutouts, buses, play, asia, cpbl, sports, photos, winprob, kept, kept-dry, f1kept, gemini-check, system]
         default: watch
 jobs:
   run:
