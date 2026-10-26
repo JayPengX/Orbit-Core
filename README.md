@@ -148,7 +148,7 @@ changes, writing a file only when it changed (`builders/store.js`):
 | `photos.js` | photo lists, cutouts | hourly / daily 18:00 |
 | `buses.js` | `bus/…`, `shape/…`, `where.json` | a city once a week |
 | `asia.js`, `cpbl.js` | CPBL's month and standings | daily 15:00 |
-| `f1kept.js` | each finished F1 session's 數據 and every lap kept before anyone opens them (three a run, through the proxy: OpenF1 shuts while sessions run and turns quick askers away) | :06, :26, :46 |
+| `f1kept.js` | each finished F1 session's 數據 and every lap kept before anyone opens them (two hours after a practice or qualifying starts, three after a race; a session each half minute for 12 minutes a run, through the proxy: OpenF1 shuts while sessions run and turns quick askers away) | :06, :26, :46 |
 | `kept.js` | wipes the proxy's kept copies (`mirror/`) from before a league's first askable day | daily 17:00 |
 
 A season is kept whole until the next season's first game (preseason

@@ -28,14 +28,14 @@ const soccer = (path, zh, en, bet, extra = {}) => espn('soccer', `soccer/${path}
 export const CATALOG = {
   // Baseball
   mlb: espn('baseball', 'baseball/mlb', 'MLB 美國職棒', 'MLB', 'mlb', { top: true, kambi: 'baseball/mlb' }),
-  npb: { sport: 'baseball', kind: 'match', data: 'asia', asia: 'npb', kambi: 'baseball/japan/npb', zh: '日本職棒', en: 'NPB', bet: 'npb', icon: '⚾', badge: 'lk85rg1575038781' },
+  npb: { sport: 'baseball', kind: 'match', data: 'asia', asia: 'npb', homeFirst: true, kambi: 'baseball/japan/npb', zh: '日本職棒', en: 'NPB', bet: 'npb', icon: '⚾', badge: 'lk85rg1575038781' },
   kbo: { sport: 'baseball', kind: 'match', data: 'asia', asia: 'kbo', kambi: 'baseball/south_korea/kbo_league', zh: '韓國職棒', en: 'KBO', bet: 'kbo', icon: '⚾', badge: 'qfr1hx1589707979' },
   cpbl: { sport: 'baseball', kind: 'match', data: 'asia', asia: 'cpbl', kambi: 'baseball/taiwan/chinese_professional_baseball', zh: '中華職棒', en: 'CPBL', bet: 'cpbl', top: true, icon: '⚾', badge: 'c3vetj1655924198' },
   // Basketball
   nba: espn('basketball', 'basketball/nba', 'NBA', 'NBA', 'nba', { top: true, kambi: 'basketball/nba' }),
   wnba: espn('basketball', 'basketball/wnba', 'WNBA', 'WNBA', 'wnba', { kambi: 'basketball/wnba' }),
-  nbl: espn('basketball', 'basketball/nbl', '澳洲職籃', 'NBL', 'nbl', { kambi: 'basketball/australia/nbl' }),
-  euroleague: { sport: 'basketball', kind: 'match', data: 'kambi', kambi: 'basketball/euroleague', zh: '歐洲籃球聯賽', en: 'EuroLeague', bet: 'euroleague', icon: '🏀', badge: '7xjtuy1554397263' },
+  nbl: espn('basketball', 'basketball/nbl', '澳洲職籃', 'NBL', 'nbl', { kambi: 'basketball/australia/nbl', homeFirst: true }),
+  euroleague: { sport: 'basketball', kind: 'match', data: 'kambi', homeFirst: true, kambi: 'basketball/euroleague', zh: '歐洲籃球聯賽', en: 'EuroLeague', bet: 'euroleague', icon: '🏀', badge: '7xjtuy1554397263' },
   // Football
   nfl: espn('football', 'football/nfl', 'NFL', 'NFL', 'nfl', { top: true, kambi: 'american_football/nfl' }),
   ncaaf: espn('football', 'football/college-football', '美國大學美式足球', 'College Football', 'ncaaf', { kambi: 'american_football/ncaaf', icon: '🏈' }),
@@ -70,10 +70,13 @@ export const CATALOG = {
 // A sport's family (its own name: Orbit Sports groups by it).
 export const familyOfSport = sport => sport;
 
-// The sports shown home side first, as their fans read them: soccer (and
-// rugby, handball, volleyball). Every US-style sport (baseball, basketball,
-// American football, hockey; and Asia's baseball leagues) lists the visitors
-// first ("Lakers @ Celtics"), and so does anything not known here.
+// The sports shown home side first, as their own broadcasts show them:
+// soccer (and rugby, handball, volleyball). Every US-style sport (baseball,
+// basketball, American football, hockey) lists the visitors first ("Lakers
+// @ Celtics"), and so does anything not known here. A league that goes its
+// own way says so (`homeFirst`): EuroLeague and Australia's NBL, as Europe
+// and Australia list games; Japan's NPB (巨人－阪神 is the Giants at home).
+// The CPBL and the KBO keep the visitors first, as their broadcasts do.
 const HOME_FIRST = new Set(['soccer', 'rugby', 'handball', 'volleyball']);
 
 // A game's two sides in the order to show them: [first, second]. `game` has
@@ -81,7 +84,7 @@ const HOME_FIRST = new Set(['soccer', 'rugby', 'handball', 'volleyball']);
 // and the league key as `sport` (or the sport itself as `family`).
 export function sidesInOrder(game) {
   const family = game?.family || CATALOG[game?.sport]?.sport || game?.sport;
-  return HOME_FIRST.has(family) ? [game?.home, game?.away] : [game?.away, game?.home];
+  return (CATALOG[game?.sport]?.homeFirst ?? HOME_FIRST.has(family)) ? [game?.home, game?.away] : [game?.away, game?.home];
 }
 
 // ESPN's site API (scoreboards, summaries, teams) and its dates (YYYYMMDD, UTC).

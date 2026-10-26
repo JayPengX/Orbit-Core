@@ -125,6 +125,9 @@ test('sidesInOrder: soccer home first, US-style away first', () => {
   assert.deepEqual(sidesInOrder(game('mlb')), ['A', 'H']);
   assert.deepEqual(sidesInOrder(game('nba')), ['A', 'H']);
   assert.deepEqual(sidesInOrder(game('nfl')), ['A', 'H']);
+  // Leagues that go their own way: Europe's and Australia's basketball, Japan's baseball home first; Taiwan's and Korea's not.
+  for (const k of ['euroleague', 'nbl', 'npb']) assert.deepEqual(sidesInOrder(game(k)), ['H', 'A'], k);
+  for (const k of ['cpbl', 'kbo', 'wnba']) assert.deepEqual(sidesInOrder(game(k)), ['A', 'H'], k);
   assert.deepEqual(sidesInOrder({ family: 'soccer', home: 1, away: 2 }), [1, 2]);
   assert.deepEqual(sidesInOrder({ family: 'basketball', home: 1, away: 2 }), [2, 1]);
   assert.deepEqual(sidesInOrder(game('unknown')), ['A', 'H']);
