@@ -10,9 +10,9 @@ const ev = (...cs) => ({ competitions: cs.map(([date, abbreviation]) => ({ date,
 const events = [ev(['2026-10-09T08:30Z', 'FP1'], ['2026-10-10T09:00Z', 'SR'], ['2026-10-11T12:00Z', 'Race']), ev(['2026-10-25T20:00Z', 'Race'], ['2026-11-01T20:00Z', 'Race'])];
 const now = Date.parse('2026-10-26T04:00Z');
 
-test('the sessions over, newest first, at the app’s own addresses; a race’s and a sprint’s laps too', () => {
+test('the sessions over, newest first, at the app’s own addresses, each with its every lap', () => {
   const list = f1ToKeep(events, now);
-  assert.deepEqual(list.map(x => x.length), [2, 2, 2, 1]);
+  assert.deepEqual(list.map(x => x.length), [2, 2, 2, 2]);
   assert.equal(list[0][0], 'https://f1-live.orbit/session.json?start=2026-10-25T20%3A00%3A00.000Z&v=2');
   assert.equal(list[0][1], 'https://f1-live.orbit/laps.json?start=2026-10-25T20%3A00%3A00.000Z&final=1&v=2');
   // Over only three hours on.

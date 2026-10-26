@@ -17,12 +17,12 @@ export const f1LapsUrl = start => `https://f1-live.orbit/laps.json?start=${at(st
 // A session counted over three hours after its start (a red-flagged race runs long).
 const OVER_MS = 3 * 3_600_000;
 
-// What to read: [url…] for each session over, newest first ({ date, type } from the season pack).
+// What to read: [數據, every lap] for each session over, newest first
+// ({ date } from the season pack; every session's laps: a practice's long
+// runs, a qualifying's laps, a race's gaps and places).
 export function f1ToKeep(events, now = Date.now()) {
   const sessions = (events || []).flatMap(e => e.competitions || []).filter(c => Date.parse(c.date) < now - OVER_MS);
-  return sessions
-    .sort((a, b) => Date.parse(b.date) - Date.parse(a.date))
-    .map(c => [f1SessionUrl(c.date), ...(['Race', 'SR'].includes(c.type?.abbreviation) ? [f1LapsUrl(c.date)] : [])]);
+  return sessions.sort((a, b) => Date.parse(b.date) - Date.parse(a.date)).map(c => [f1SessionUrl(c.date), f1LapsUrl(c.date)]);
 }
 
 export async function runF1Kept({ store, proxy, now = Date.now(), per = 3 }) {
