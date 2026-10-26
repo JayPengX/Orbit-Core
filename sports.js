@@ -322,8 +322,10 @@ function cachePolicyFor(url) {
     case F1_LIVE_HOST:
       // A finished session from F1's archive (f1-live.js /session.json): it doesn't change.
       if (url.pathname === '/session.json' || url.pathname === '/circuit.json') return CACHE_STANDINGS;
-      // Every car's laps: while a session runs, read again each 15 seconds (over: ?final=1, kept).
-      if (url.pathname === '/laps.json') return url.searchParams.get('final') ? CACHE_STANDINGS : CACHE_F1_LAPS;
+      // Every car's laps: read again each 15 seconds, over (?final=1) too
+      // until every lap is in (then kept for good: settled; the live log
+      // standing in for OpenF1, shut or busy, was kept half an hour).
+      if (url.pathname === '/laps.json') return CACHE_F1_LAPS;
       return CACHE_F1_LIVE;
     default:
       return CACHE_LIVE;
