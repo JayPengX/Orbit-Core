@@ -28,7 +28,8 @@ export function f1ToKeep(events, now = Date.now()) {
 // As fast as OpenF1 lets it (about 30 asks a minute; a session's 數據 and
 // laps are about 15): a session, then the rest of its half minute, on
 // until `until` (a run's 12 minutes) or `per` sessions; one turned away
-// tried again a minute on, then the next run. `per` 0: only counted.
+// tried again 20 seconds on, then the next session (three in a row: the
+// next run). `per` 0: only counted.
 // → { sessions, kept, read, stopped? }.
 export const F1KEPT_MS = 12 * 60_000;
 const SESSION_MS = 30_000;
@@ -45,16 +46,19 @@ export async function runF1Kept({ store, proxy, now = Date.now(), per = Infinity
   let read = 0;
   const failed = [];
   let inRow = 0;
-  const out = extra => ({ sessions: all.length, kept: all.length - missing.length + read, read, ...(failed.length ? { failed } : {}), ...extra });
+  let again = 0;
+  const out = extra => ({ sessions: all.length, kept: all.length - missing.length + read, read, again, ...(failed.length ? { failed } : {}), ...extra });
   for (const todo of missing) {
     if (read >= per || clock() + SESSION_MS > until) break;
     const began = clock();
     let ok = true;
     for (const url of todo) {
       if (await proxy(url).catch(() => null)) continue;
-      // (Turned away: once more a minute on; still not, the next session: one
+      // (Turned away: once more 20 seconds on, OpenF1's limit a minute's
+      // worth; still not, the next session: one
       // OpenF1 can't give (a session called off) never holds up the rest.)
-      await sleep(60_000);
+      again++;
+      await sleep(20_000);
       if (await proxy(url).catch(() => null)) continue;
       ok = false;
       failed.push(url);
