@@ -682,11 +682,13 @@ async function laps(start, log, final = false) {
   } catch (error) {
     // (F1's archive shut: OpenF1's, open once the session's over; still
     // running, or OpenF1 shut too, the log, or the archive's own failure.)
-    const kept = /archive 40[13]|stream 40[13]|not archived|not in the index/.test(String(error.message)) ? await openF1Session(start).catch(() => null) : null;
+    let why = String(error.message);
+    const kept = /archive 40[13]|stream 40[13]|not archived|not in the index/.test(why) ? await openF1Session(start).catch(e => ((why += `; ${e.message}`), null)) : null;
     if (kept) return kept;
-    // (Over and nothing else: what the log kept while it ran, marked so the phone asks again.)
+    // (Over and nothing else: what the log kept while it ran, marked so the
+    // phone asks again, and why the whole race isn't in.)
     const logged = final && log ? await log.get(new Date(start).toISOString()).catch(() => null) : null;
-    if (logged) return { ...logged, live: true };
+    if (logged) return { ...logged, live: true, why };
     throw error;
   }
 }
