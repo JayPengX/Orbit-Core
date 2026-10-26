@@ -109,6 +109,16 @@ const logoOf = team => team?.logo || team?.logos?.[0]?.href || null;
 // ESPN's F1 headshots (headshots/f1/) stopped in 2021 (a newer driver has
 // none); its racing ones (headshots/rpm/) are this season's, every driver.
 export const freshHeadshot = url => (typeof url === 'string' ? url.replace('/i/headshots/f1/players/', '/i/headshots/rpm/players/') : url);
+// A side's short name, ESPN's unless it cut the full one mid-word or
+// squeezed it ("Worcester Ci", "Kid'minster": the FA Cup's non-league
+// clubs, 2026-10): then the full one ("Man United" kept).
+const shortName = who => {
+  const [short, full] = [who.shortDisplayName || who.shortName || '', who.displayName || ''];
+  if (!short) return full;
+  const cut = full !== short && full.startsWith(short) && /\w$/.test(short) && /^\w/.test(full.slice(short.length));
+  const squeezed = /\w'\w/.test(short) && !full.includes("'");
+  return full && (cut || squeezed) ? full : short;
+};
 function parseSide(c) {
   if (!c) return null;
   const team = c.team || {};
@@ -119,7 +129,7 @@ function parseSide(c) {
     id: String(who.id ?? c.id ?? ''),
     athlete: !c.team && Boolean(c.athlete),
     name: who.displayName || who.fullName || who.name || '',
-    short: who.shortDisplayName || who.shortName || who.displayName || '',
+    short: shortName(who),
     abbr: who.abbreviation || (who.shortName || '').slice(0, 3).toUpperCase(),
     logo: logoOf(team) || athlete.flag?.href || freshHeadshot(athlete.headshot?.href) || null,
     color: team.color ? `#${team.color}` : null,
@@ -171,7 +181,12 @@ export function localSide(league, raw, lang = 'zh') {
   const nation = countryName(en, lang);
   return nation && nation !== en ? { ...side, en, name: nation, short: nation } : side;
 }
-export const withLogo = (league, side, lang = 'zh') => localSide(league, side && !side.logo ? { ...side, logo: fallbackLogo(league, side) } : side, lang);
+// (A logo found here by the club's ESPN id, not given by the feed, is a guess: `logoGuess`, not tried again when it fails.)
+export const withLogo = (league, side, lang = 'zh') => {
+  if (!side || side.logo) return localSide(league, side, lang);
+  const logo = fallbackLogo(league, side);
+  return localSide(league, { ...side, logo, ...(logo?.startsWith(`${CDN}/teamlogos/`) ? { logoGuess: true } : {}) }, lang);
+};
 
 // A playoff series: its summary ("LAL lead series 2-1") and each side's wins.
 export function parseSeries(s) {
