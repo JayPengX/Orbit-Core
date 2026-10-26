@@ -172,6 +172,17 @@ export const eltaDays = programs => {
   return days.length ? { from: days[0], to: days.at(-1) } : null;
 };
 
+// ELTA's own names for clubs ours too far from to match (by ours): checked
+// against its videos of 2026-27 (歐冠, 歐霸, 德甲, 法甲, 蘇超), each one a game it
+// showed that wasn't found (Jay, 2026-10-27: 歐國聯's and others' games
+// with no ELTA mark). A new name ELTA writes goes here.
+export const ELTA_AS = {
+  不來梅: ['文達布萊梅'], 埃爾弗斯貝格: ['艾佛斯堡'], 特魯瓦: ['特華'], 勒芒: ['利曼'], 登地: ['鄧迪FC', '鄧迪'], 登地聯: ['鄧迪聯隊', '鄧迪聯'],
+  費耶諾德: ['飛燕諾'], 'PSV 燕豪芬': ['艾因霍溫'], 博德閃耀: ['柏多格林特'],
+  托倫斯: ['托連塞'], 奈梅亨: ['尼梅根'], 比亞維斯托克: ['雅蓋隆'], 采列: ['切利耶'], 尼科西亞奧摩尼亞: ['歐摩諾伊亞']
+};
+// A side's names with ELTA's for it.
+export const withEltaNames = names => [...names, ...names.flatMap(n => ELTA_AS[n] || [])];
 // How alike two ways of writing a side are, 0 to 1: the characters they
 // share in order, against the shorter one. ELTA's names are often not ours:
 // 波赫 for 波士尼亞與赫塞哥維納 and 波圖 for 波爾圖 (1), 帕弗斯 for 帕福斯
@@ -507,8 +518,10 @@ export function eltaEpisode(episodes, e, sides, { prefer = 'en', cam = false } =
     .map(x => ({ ...x, fit: pairFit(x.teams, sides, { both: true, order: football ? 'home' : AWAY_FIRST.has(e.league) ? 'away' : '' }) }))
     .filter(x => x.fit >= FIT)
     // A title with no day only in a season ELTA mostly writes so (UEFA's);
-    // in a dated one (MLB's) it's a stray, never a game's.
-    .filter(x => x.day || dateless)
+    // in a dated one (MLB's) it's a stray, never a game's. Or a league
+    // phase's (第1比賽日: each pair meets once in it), dated or not: 歐霸's
+    // first matchday came undated in a season dated after (尤文圖斯 VS 尼梅根).
+    .filter(x => x.day || dateless || /第\s*\d+\s*比賽日/.test(x.x.title))
     .sort((a, b) => a.off - b.off || b.fit - a.fit || (prefer === 'zh' ? -1 : 1) * (episodeEnglish(b.x.title) - episodeEnglish(a.x.title)));
   if (!fits.length) return null;
   // As close and as good a fit for two other sides (a title with no day, the

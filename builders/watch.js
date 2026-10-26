@@ -31,8 +31,9 @@
 
 import { CATALOG, ESPN_SITE as SITE, asiaMonthOf, asiaMonthUrl } from '../kit/catalog.mjs';
 import { teamNameZh } from '../kit/names.mjs';
+import { countryName } from '../kit/logos.mjs';
 import * as HL from '../kit/sports-highlights.mjs';
-import { BROADCAST, eltaVodsOf, eltaVodUrl, eltaEpisode, eltaSessionEpisode, parseEltaIndex, eltaPages } from '../kit/sports-broadcast.mjs';
+import { BROADCAST, withEltaNames, eltaVodsOf, eltaVodUrl, eltaEpisode, eltaSessionEpisode, parseEltaIndex, eltaPages } from '../kit/sports-broadcast.mjs';
 import { mirrorPath } from '../kit/mirror.mjs';
 import { trimEltaVod } from '../sports.js';
 import { asiaBaseballResponse } from '../asia-baseball.js';
@@ -48,6 +49,11 @@ const MISSES = 2;
 // Days an older game is looked for on ELTA before it's given up (ELTA puts a
 // season's videos up within a week or two, or never: its small sides).
 export const ELTA_TRIES = 10;
+// How games are matched to ELTA's videos: a game's tries count only under the
+// matching they were made with (2: national sides by their country's name,
+// 歐國聯's 英格蘭 VS 捷克, none of whose were found before, 2026-10-27).
+export const ELTA_MATCH = 2;
+const eltaTries = v => (v?.em === ELTA_MATCH ? v.ea || 0 : 0);
 export const ELTA_A_RUN = 1500;
 const ARCHIVE = 'sports/watch';
 const sleepFor = ms => new Promise(r => setTimeout(r, ms));
@@ -85,11 +91,14 @@ const asiaGames = list =>
     .map(g => ({ id: g.id, league: 'cpbl', kind: 'match', start: g.start, status: { state: 'post' }, home: { id: g.home.en, en: g.home.en, name: g.home.zh, zh: g.home.zh, score: String(g.homeScore ?? '') }, away: { id: g.away.en, en: g.away.en, name: g.away.zh, zh: g.away.zh, score: String(g.awayScore ?? '') }, post: new Date(g.start).getUTCMonth() >= 9 }));
 
 // A game's sides in Chinese, every way they're written ([home's, away's]), as the app's tv.mjs.
-const zhSides = e => {
+export const zhSides = e => {
   const l = CATALOG[e.league];
   return [e.home, e.away].map(s => {
-    const zh = teamNameZh(l?.bet ?? e.league, s?.en || s?.name, l?.sport);
-    return [s?.name, s?.short, s?.zh, zh?.full, zh?.short].filter(Boolean);
+    const en = s?.en || s?.name;
+    const zh = teamNameZh(l?.bet ?? e.league, en, l?.sport);
+    // A national side (歐國聯's): its country's name, as the app's localSide.
+    const nation = !zh && en ? countryName(en, 'zh') : '';
+    return withEltaNames([s?.name, s?.short, s?.zh, zh?.full, zh?.short, nation !== en && nation].filter(Boolean));
   });
 };
 
@@ -416,7 +425,7 @@ export async function runWatch({ store, proxy, get = fetch, now = Date.now(), un
       return false;
     }
     // (Looked for on ELTA_TRIES days and never found: never looked for again.)
-    return (full && (stored(e)?.ea || 0) < ELTA_TRIES) || now - Date.parse(e.start) < 3 * DAY;
+    return (full && eltaTries(stored(e)) < ELTA_TRIES) || now - Date.parse(e.start) < 3 * DAY;
   });
   // (Newest first, at most ELTA_A_RUN: a run's CPU is 30 s; the rest the next days.)
   wanted.sort((a, b) => Date.parse(b.start) - Date.parse(a.start)).splice(ELTA_A_RUN);
@@ -441,7 +450,7 @@ export async function runWatch({ store, proxy, get = fetch, now = Date.now(), un
     }
     if (!hit) {
       // A game over three days without it: a day's try counted (ELTA puts up most within days).
-      if (full && now - Date.parse(e.start) >= 3 * DAY) keep(e, { ea: (stored(e)?.ea || 0) + 1 });
+      if (full && now - Date.parse(e.start) >= 3 * DAY) keep(e, { ea: eltaTries(stored(e)) + 1, em: ELTA_MATCH });
       continue;
     }
     elta++;

@@ -314,3 +314,19 @@ test('football’s short cut stands in: looked for again, spaced out, until the 
   await run(t0 + 30 * 3_600_000);
   assert.equal(searched, m);
 });
+
+test("ELTA's videos found for national sides, an undated league phase's, and clubs ELTA writes its own way (2026-10-27: 歐國聯's none found)", async () => {
+  const { zhSides, ELTA_MATCH } = await import('../builders/watch.js');
+  const { eltaEpisode } = await import('../kit/sports-broadcast.mjs');
+  const game = (league, home, away, start) => ({ id: '1', league, kind: 'match', start, status: { state: 'post' }, home: { id: '1', en: home, name: home }, away: { id: '2', en: away, name: away } });
+  // A national side by its country's name (ELTA's titles have no day: UEFA's).
+  const unl = game('nationsleague', 'England', 'Czechia', '2026-10-13T18:45Z');
+  assert.ok(zhSides(unl)[0].includes('英格蘭') && zhSides(unl)[1].includes('捷克'));
+  const unlEps = [{ id: '9', title: 'UEFA歐國聯 英格蘭 VS 捷克 第4輪(原音)' }, { id: '8', title: 'UEFA歐國聯 克羅埃西亞 VS 西班牙 第4輪' }];
+  assert.equal(eltaEpisode(unlEps, unl, zhSides(unl))?.id, '9');
+  // 歐霸's first matchday undated in a dated season, and ELTA's 尼梅根 for 奈梅亨.
+  const uel = game('uel', 'Juventus', 'NEC Nijmegen', '2026-09-17T19:00Z');
+  const uelEps = [{ id: '1', title: '10/2 UEFA歐霸 羅馬 VS 里昂 第2比賽日' }, { id: '2', title: '10/2 UEFA歐霸 波圖 VS 塞爾提克 第2比賽日' }, { id: '3', title: 'UEFA歐霸 尤文圖斯 VS 尼梅根 第1比賽日' }];
+  assert.equal(eltaEpisode(uelEps, uel, zhSides(uel))?.id, '3');
+  assert.ok(ELTA_MATCH >= 2);
+});
