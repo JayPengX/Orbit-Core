@@ -106,7 +106,7 @@ export const asiaMonthOf = ms => new Date(ms + 8 * 3_600_000).toISOString().slic
 // Nothing read anywhere (the proxy and every day on the device refused) is
 // an error, never a month with no games: Sports said 沒有比賽 for 中華職棒
 // while both were down (2026-10-18).
-export async function asiaMonth(getJson, league, ym, { now = Date.now(), fetchJson = directJson } = {}) {
+export async function asiaMonth(getJson, league, ym, { now = Date.now(), fetchJson = directJson, seriesJson = wikiJson } = {}) {
   let down = null;
   const data = await getJson(asiaMonthUrl(league, ym)).catch(error => ((down = error), null));
   const games = Array.isArray(data?.games) ? data.games : [];
@@ -115,6 +115,9 @@ export async function asiaMonth(getJson, league, ym, { now = Date.now(), fetchJs
     if (down) throw down;
     return games;
   }
+  return withCpblSeries(await cpblMonth(data, games, down, ym, now, fetchJson), ym, { fetchJson: seriesJson });
+}
+async function cpblMonth(data, games, down, ym, now, fetchJson) {
   // (The proxy's answer, games or none, is the month: it answers an empty
   // one only when it read the days, a 502 when it couldn't. An empty
   // off-season month read again here was TheSportsDB's days two at a time on
@@ -135,6 +138,93 @@ export async function asiaMonth(getJson, league, ym, { now = Date.now(), fetchJs
   const lists = await Promise.all(days.map(d => fetchJson(`${TSDB_DAY}?d=${d}&l=${TSDB_CPBL}`).then(x => parseTsdbDay(x, now)).catch(() => (failed++, []))));
   if (down && failed === days.length) throw down;
   return lists.flat().sort((x, y) => x.start.localeCompare(y.start));
+}
+
+// CPBL's play-offs as Wikipedia's pages for them have them (its {{ts}}
+// table: each game's date, park, sides, score; each game's own section its
+// start). TheSportsDB is edited by hand and lags them: 台灣大賽 G5 put off by
+// a typhoon from 10/23 to 10/25 was never moved, G6 and G7 never listed
+// (2026-10-26), and cpbl.com.tw answers no server. The month's play-off
+// games are Wikipedia's, a game TheSportsDB has the same day of the same
+// two clubs keeping its id (and its score while it's on); one called off
+// kept (延期 on its day). Games not needed once a series is won left off.
+// Its pages unread, or no play-off game in the month: the month as it was.
+const CPBL_SHORT = { 中信: 'CTBC Brothers', 統一: 'Uni-President Lions', 樂天: 'Rakuten Monkeys', 富邦: 'Fubon Guardians', 味全: 'Wei Chuan Dragons', 台鋼: 'TSG Hawks' };
+// The parks as the pages shorten them.
+const CPBL_PARK = { 大巨蛋: '臺北大巨蛋', 天母: '天母棒球場', 新莊: '新莊棒球場', 洲際: '臺中洲際棒球場', 亞太主: '臺南亞太棒球場', 台南: '臺南棒球場', 澄清湖: '澄清湖棒球場', 樂天桃園: '樂天桃園棒球場', 斗六: '斗六棒球場', 花蓮: '花蓮棒球場' };
+const CN_NUM = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7 };
+export const cpblSeriesUrl = page => `https://zh.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(page)}&prop=wikitext&format=json&formatversion=2&origin=*`;
+export const cpblSeriesPages = year => [[`${year}年中華職棒季後挑戰賽`, 'challenge'], [`${year}年台灣大賽`, 'final']];
+export function parseCpblSeries(wikitext, year, kind) {
+  const w = String(wikitext || '');
+  const ts = /\{\{ts\|([\s\S]*?)\n\}\}/.exec(w)?.[1] || '';
+  const field = Object.fromEntries([...ts.matchAll(/\|\s*([^=|]+?)\s*=([^|\n]*)/g)].map(m => [m[1], m[2].trim()]));
+  const club = short => {
+    const en = CPBL_SHORT[short];
+    return en ? { en, zh: CPBL_CLUBS.find(c => c[0] === en)[1] } : null;
+  };
+  // Each game's start (Taipei) from its section (=== 第五場（10月25日） === … |開始時間=17:05).
+  const at = {};
+  for (const m of w.matchAll(/===\s*第(.)場[\s\S]*?\|開始時間=\s*(\d{1,2}:\d{2})/g)) at[CN_NUM[m[1]]] ??= m[2];
+  const num = x => (x === '' || x == null || !Number.isFinite(Number(x)) ? null : Number(x));
+  const games = [];
+  for (let n = 1; field[`G${n}日期`]; n++) {
+    const [mo, d] = field[`G${n}日期`].split('/').map(Number);
+    const [home, away] = [club(field[`G${n}主隊`]), club(field[`G${n}客隊`])];
+    if (!mo || !d || !home || !away) continue;
+    const [hh, mm] = (at[n] || '18:35').split(':').map(Number);
+    const start = new Date(Date.UTC(year, mo - 1, d, hh - 8, mm)).toISOString();
+    const said = field[`G${n}情況`] || '';
+    const [homeScore, awayScore] = [num(field[`G${n}主隊得分`]), num(field[`G${n}客隊得分`])];
+    const state = /延|取消|保留/.test(said) ? 'void' : said === '已賽' && homeScore != null && awayScore != null ? 'post' : 'pre';
+    games.push({ id: `cpbl-wiki-${year}-${kind}-${n}`, start, home, away, homeScore: state === 'post' ? homeScore : null, awayScore: state === 'post' ? awayScore : null, state, venue: CPBL_PARK[field[`G${n}球場`]] || field[`G${n}球場`] || '', playoff: kind });
+  }
+  // Won: the games after it left off (the challenge's given win, 保, counted).
+  const need = kind === 'final' ? 4 : 3;
+  const wins = {};
+  if (field['保'] && CPBL_SHORT[field['保']]) wins[CPBL_SHORT[field['保']]] = 1;
+  const out = [];
+  for (const g of games) {
+    if (Math.max(0, ...Object.values(wins)) >= need) break;
+    out.push(g);
+    if (g.state === 'post' && g.homeScore !== g.awayScore) {
+      const w = g.homeScore > g.awayScore ? g.home.en : g.away.en;
+      wins[w] = (wins[w] || 0) + 1;
+    }
+  }
+  return out;
+}
+// Wikipedia's pages read apart from TheSportsDB's queue (its refusals hold
+// that a minute: the series went unread with it), each kept 10 minutes.
+const wikiCache = new Map();
+function wikiJson(url) {
+  const hit = wikiCache.get(url);
+  if (hit && Date.now() - hit.at < 10 * 60_000) return hit.p;
+  const p = fetch(url).then(r => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))));
+  wikiCache.set(url, { at: Date.now(), p });
+  p.catch(() => wikiCache.delete(url));
+  return p;
+}
+export async function withCpblSeries(games, ym, { fetchJson = wikiJson } = {}) {
+  const [y, m] = ym.split('-').map(Number);
+  // (Only a month with a play-off game TheSportsDB knows of: September's
+  // regular season isn't read twice on every opening.)
+  if (m < 9 || m > 11 || !games.some(g => g.playoff)) return games;
+  const day = g => new Date(Date.parse(g.start) + 8 * 3_600_000).toISOString().slice(0, 10);
+  const series = (await Promise.all(cpblSeriesPages(y).map(([page, kind]) => fetchJson(cpblSeriesUrl(page)).then(x => parseCpblSeries(x?.parse?.wikitext, y, kind), () => [])))).flat().filter(g => day(g).startsWith(ym));
+  if (!series.length) return games;
+  const pair = g => [g.home.en, g.away.en].sort().join('|');
+  const pairs = new Set(series.map(pair));
+  const key = g => `${day(g)}|${pair(g)}`;
+  const theirs = new Map(games.filter(g => g.state !== 'void' && pairs.has(pair(g))).map(g => [key(g), g]));
+  const mine = series.map(g => {
+    const t = theirs.get(key(g));
+    if (!t) return g;
+    const live = g.state !== 'post' && (t.state === 'in' || t.state === 'post');
+    return { ...g, id: t.id, ...(live ? { homeScore: t.homeScore, awayScore: t.awayScore, state: t.state } : {}) };
+  });
+  const kept = games.filter(g => !(g.playoff && pairs.has(pair(g)) && g.state !== 'void') && !(g.state === 'void' && series.some(s => key(s) === key(g))));
+  return [...kept, ...mine].sort((a, b) => a.start.localeCompare(b.start));
 }
 
 // The proxy's copy can lag a game (台灣大賽 G1 still "pre" the day after,

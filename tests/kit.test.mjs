@@ -755,3 +755,39 @@ test('CPBL: a month the proxy read only in part has its missing days of these fo
   await asiaMonth(async () => ({ games: [], read, whole: 1 }), 'cpbl', '2026-10', { now, fetchJson });
   assert.equal(asked.length, 0);
 });
+
+test("CPBL's play-offs from Wikipedia's pages: a game put off and the ones after it where TheSportsDB never moved them", async () => {
+  const { asiaMonth, parseCpblSeries } = await import('../kit/catalog.mjs');
+  // 2026年台灣大賽 on 2026-10-26: G5 put off from 10/23 to 10/25, G6 today, G7 if needed.
+  const wiki = `{{ts|G=7
+|G1情況=已賽|G1日期=10/21|G1球場=大巨蛋|G1客隊=味全|G1客隊得分=4|G1主隊=中信|G1主隊得分=5|G1結果=主
+|G2情況=已賽|G2日期=10/25|G2球場=大巨蛋|G2客隊=中信|G2客隊得分=4|G2主隊=味全|G2主隊得分=3|G2結果=客
+|G3情況=未賽|G3日期=10/26|G3球場=大巨蛋|G3客隊=中信|G3客隊得分=|G3主隊=味全|G3主隊得分=|G3結果=
+|G4情況=如有需要|G4日期=10/27|G4球場=樂天桃園|G4客隊=中信|G4客隊得分=|G4主隊=味全|G4主隊得分=|G4結果=
+}}
+=== 第二場（10月25日） ===
+|日期=2026/10/25{{efn|x}} |開始時間=17:05
+=== 第三場（10月26日） ===
+|日期=2026/10/26 |開始時間=15:05
+`;
+  const brothers = { en: 'CTBC Brothers', zh: '中信兄弟' };
+  const dragons = { en: 'Wei Chuan Dragons', zh: '味全龍' };
+  const tsdb = [
+    { id: 'cpbl-tsdb-1', start: '2026-10-21T10:35:00.000Z', home: brothers, away: dragons, homeScore: 5, awayScore: 4, state: 'post', venue: '', playoff: true },
+    { id: 'cpbl-tsdb-2', start: '2026-10-23T10:35:00.000Z', home: dragons, away: brothers, homeScore: null, awayScore: null, state: 'void', venue: '', playoff: true }
+  ];
+  const fetchJson = async url => (url.includes('wikipedia') ? (url.includes(encodeURIComponent('台灣大賽')) ? { parse: { wikitext: wiki } } : Promise.reject(new Error('404'))) : { events: [] });
+  const games = await asiaMonth(async () => ({ games: tsdb, whole: 1 }), 'cpbl', '2026-10', { now: Date.parse('2026-10-26T04:00:00Z'), fetchJson, seriesJson: fetchJson });
+  assert.deepEqual(games.map(g => [g.id, g.start, g.state, g.venue]), [
+    ['cpbl-tsdb-1', '2026-10-21T10:35:00.000Z', 'post', '臺北大巨蛋'],
+    ['cpbl-tsdb-2', '2026-10-23T10:35:00.000Z', 'void', ''],
+    ['cpbl-wiki-2026-final-2', '2026-10-25T09:05:00.000Z', 'post', '臺北大巨蛋'],
+    ['cpbl-wiki-2026-final-3', '2026-10-26T07:05:00.000Z', 'pre', '臺北大巨蛋'],
+    ['cpbl-wiki-2026-final-4', '2026-10-27T10:35:00.000Z', 'pre', '樂天桃園棒球場']
+  ]);
+  assert.equal(games[2].awayScore, 4);
+  assert.equal(games.every(g => g.playoff), true);
+  // A series won: the games after it left off (the challenge's given win counted).
+  const won = parseCpblSeries(`{{ts|G=4\n|保=中信\n|G1情況=已賽|G1日期=10/09|G1球場=洲際|G1客隊=統一|G1客隊得分=1|G1主隊=中信|G1主隊得分=4\n|G2情況=已賽|G2日期=10/10|G2球場=洲際|G2客隊=統一|G2客隊得分=0|G2主隊=中信|G2主隊得分=2\n|G3情況=如有需要|G3日期=10/11|G3球場=洲際|G3客隊=統一|G3客隊得分=|G3主隊=中信|G3主隊得分=\n}}`, 2026, 'challenge');
+  assert.equal(won.length, 2);
+});
