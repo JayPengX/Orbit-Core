@@ -35,3 +35,10 @@ test('a route that throws answers 500 with the CORS headers, not a blocked reque
   assert.equal(res.headers.get('Access-Control-Allow-Origin'), ORIGIN);
   assert.equal((await res.json()).error.code, 'WORKER_FAILED');
 });
+
+test('a caller is an IPv4 address, or an IPv6 /64 (a guesser changing address within its block counts as one)', async () => {
+  const { ipBucket } = await import('../http.js');
+  assert.equal(ipBucket('1.2.3.4'), '1.2.3.4');
+  assert.equal(ipBucket('2001:db8::1'), ipBucket('2001:0db8:0000:0000:ffff::9'));
+  assert.notEqual(ipBucket('2001:db8:0:1::1'), ipBucket('2001:db8:0:2::1'));
+});

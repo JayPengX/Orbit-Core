@@ -34,6 +34,7 @@ export const HELP = {
       ]],
       ['devices', '登入與裝置', [
         '新裝置：輸入通行碼，或在已登入的裝置按「新增裝置」拿 8 碼裝置代碼（10 分鐘內、只能用一次）。',
+        '通行密鑰：在 Pass 分頁加入後，新裝置按「用通行密鑰登入」，用 Face ID、Touch ID 或 Windows Hello 就能登入；通行碼照樣能用。',
         '「在這台裝置登出」只清掉這台裝置的資料；都還在 Orbit Pass，登入就回來。'
       ]],
       ['one', '一個 App 一個地方', [
@@ -72,6 +73,7 @@ export const HELP = {
       ]],
       ['devices', 'Signing in and devices', [
         'On a new device, enter the pass, or choose “Add a device” on a signed-in one for an 8-character device code (10 minutes, once).',
+        'Passkeys: add one in the Pass tab, then on a new device choose “Sign in with a passkey” and use Face ID, Touch ID or Windows Hello. Your pass still works.',
         '“Sign out on this device” wipes only this device; it all stays on your Orbit Pass.'
       ]],
       ['one', 'Each app in one place', [

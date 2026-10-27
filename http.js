@@ -10,6 +10,18 @@ export const ALLOWED_ORIGINS = ORIGINS;
 // one, as Pages serves a phone): the dev doors let it in (sports.js, worker.js).
 export const LOCAL_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1):\d+$/;
 
+// The part of an address that counts as one caller: an IPv4 address whole,
+// an IPv6 one by its first 64 bits (a home's or a phone's whole block).
+export function ipBucket(ip) {
+  const a = String(ip || '');
+  if (!a.includes(':')) return a;
+  const [head, tail = ''] = a.toLowerCase().split('::');
+  const h = head ? head.split(':') : [];
+  const t = a.includes('::') ? (tail ? tail.split(':') : []) : [];
+  const groups = [...h, ...Array(Math.max(0, 8 - h.length - t.length)).fill('0'), ...t];
+  return `${groups.slice(0, 4).map(g => g.replace(/^0+(?=.)/, '')).join(':')}::/64`;
+}
+
 export function isAllowedOrigin(origin) {
   return ALLOWED_ORIGINS.includes(origin) || LOCAL_ORIGIN.test(origin || '');
 }
