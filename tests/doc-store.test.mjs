@@ -43,7 +43,7 @@ test('a new version never repeats the one it replaces', async () => {
   const s = d1Store(fakeD1());
   const w = await s.write('c', 'a', 'one');
   // The same stamp asked for again: a different one is used.
-  const again = await s.write('c', 'a', 'two', { updateTime: w.updateTime }, w.updateTime);
+  const again = await s.write('c', 'a', 'two', { updateTime: w.updateTime }, { updated: w.updateTime });
   assert.notEqual(again.updateTime, w.updateTime);
   await assert.rejects(s.write('c', 'a', 'three', { updateTime: w.updateTime }), e => e.precondition);
 });
@@ -87,4 +87,56 @@ test('changeDoc: one JSON document read, changed and written over the version re
   assert.equal(parseDoc(await s.get('c', 'bad')), null);
   assert.equal(parseDoc({ exists: false }), null);
   assert.equal(parseDoc(null), null);
+});
+
+test('history: the version a write replaces kept at most hourly, always before a wipe, a delete or a restore; thinned to a day each after 2 days, gone after 30', async () => {
+  let t = Date.UTC(2026, 9, 1);
+  const s = d1Store(fakeD1(), { keep: c => c === 'eco-wallets', now: () => t });
+  const big = n => JSON.stringify({ n, pad: 'x'.repeat(500) });
+  const v1 = await s.write('eco-wallets', 'a', big(1));
+  await s.write('eco-wallets', 'a', big(2));
+  t += 60_000;
+  await s.write('eco-wallets', 'a', big(3));
+  // One copy within the hour (v1, the first replaced).
+  assert.deepEqual((await s.versions('a')).map(v => [v.updated, v.why]), [[v1.updateTime, 'hour']]);
+  // A save under half the size: the one it replaces kept, whatever the hour.
+  await s.write('eco-wallets', 'a', '{}');
+  assert.deepEqual((await s.versions('a')).map(v => v.why), ['shrink', 'hour']);
+  assert.equal(JSON.parse(await s.version('eco-wallets', 'a', (await s.versions('a'))[0].updated)).n, 3);
+  // A collection not kept: no history.
+  await s.write('eco-pairs', 'p', 'one');
+  await s.write('eco-pairs', 'p', 'two');
+  await s.delete('eco-pairs', 'p');
+  assert.equal((await s.versions('p')).length, 0);
+  // Deleted: kept, listed as gone, and put back.
+  t += 1000;
+  await s.delete('eco-wallets', 'a');
+  assert.equal((await s.get('eco-wallets', 'a')).exists, false);
+  assert.deepEqual((await s.kept('eco-wallets', { gone: true })).map(g => g.id), ['a']);
+  const shrunk = (await s.versions('a')).find(v => v.why === 'shrink');
+  await s.restore('eco-wallets', 'a', shrunk.updated);
+  assert.equal(JSON.parse((await s.get('eco-wallets', 'a')).payload).n, 3);
+  assert.deepEqual(await s.kept('eco-wallets', { gone: true }), []);
+  assert.equal(await s.restore('eco-wallets', 'a', 'nope'), null);
+  // A write that lost its race changes nothing but may keep the current version.
+  await assert.rejects(s.write('eco-wallets', 'a', big(9), { updateTime: 'old' }), e => e.precondition);
+  assert.equal(JSON.parse((await s.get('eco-wallets', 'a')).payload).n, 3);
+  // Thinning: 3 days on, a day keeps its newest; 31 days on, nothing.
+  const before = (await s.versions('a')).length;
+  assert.ok(before >= 3);
+  t += 3 * 86_400_000;
+  await s.prune();
+  assert.equal((await s.versions('a')).length, 1);
+  t += 31 * 86_400_000;
+  await s.prune();
+  assert.equal((await s.versions('a')).length, 0);
+});
+
+test('page: every document in (coll, id) order, a page at a time', async () => {
+  const s = d1Store(fakeD1());
+  for (const [c, id] of [['b', '1'], ['a', '2'], ['a', '1'], ['c', '0']]) await s.write(c, id, `${c}${id}`);
+  const seen = [];
+  let from = ['', ''];
+  for (let rows; (rows = await s.page(from, 2)).length; from = [rows.at(-1).coll, rows.at(-1).id]) seen.push(...rows.map(r => r.payload));
+  assert.deepEqual(seen, ['a1', 'a2', 'b1', 'c0']);
 });

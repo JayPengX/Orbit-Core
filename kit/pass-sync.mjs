@@ -80,7 +80,7 @@ export function passSync(q, { decode, apply, encode, now = Date.now }) {
     seen = time || '';
     if (at === era) pulled = true;
   }
-  async function push() {
+  async function push(again = true) {
     if (!q.active || unreadable) return;
     if (!pulled) {
       const at = era;
@@ -92,11 +92,14 @@ export function passSync(q, { decode, apply, encode, now = Date.now }) {
     if (!dirty) return;
     dirty = false;
     try {
-      seen = (await q.write({ payload: await encode() }))?.updateTime || '';
+      // Only over the copy merged here (`base`): the Worker refuses it when
+      // the Pass's copy changed since, and it's read, merged and saved again.
+      seen = (await q.write({ payload: await encode(), base: seen || undefined }))?.updateTime || '';
     } catch (error) {
       dirty = true;
-      // Refused (another session live) or lost: the Pass's copy is read first next time.
+      // Refused (another session live, or a newer copy) or lost: the Pass's copy is read first next time.
       stale();
+      if (again && error?.code === 'ECO_DATA_CHANGED') return push(false);
       throw error;
     }
   }
@@ -134,7 +137,7 @@ export function passSync(q, { decode, apply, encode, now = Date.now }) {
     },
     stale,
     sync() {
-      chain = chain.then(push).catch(() => {});
+      chain = chain.then(() => push()).catch(() => {});
       return chain;
     },
     // Stale (and read again) whenever this app may have stopped being the live one.

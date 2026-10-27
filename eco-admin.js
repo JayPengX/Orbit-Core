@@ -25,6 +25,7 @@ import { plan as capacityPlan, usersFrom } from './capacity.js';
 import { STATE_KEY as GUARD_STATE } from './guard.js';
 import { loans, loanOwed } from './kit/loan.mjs';
 import { govOf } from './kit/gov.mjs';
+import { listBackups, fromBackup } from './store-backup.js';
 
 // The developer settings (kit/devconfig.mjs), one document; GET /config
 // answers them to everyone (worker.js), the panel's 開發 changes them.
@@ -827,3 +828,62 @@ export const ADMIN_TOOLS = {
     return { at: Date.now(), checks: await Promise.all(HEALTH.map(one)) };
   }
 };
+
+// ---- 備份: kept versions and the nightly copies (doc-store.js, store-backup.js) ----
+//
+// An account named by the start of its reference, alive or deleted within
+// the 30 days its versions are kept. What's put back is the wallet or an
+// app's data; then every device of the account is signed out (as `reset`
+// does), so none sends its old copy back over it.
+async function accountId(env, deps, ref) {
+  const r = String(ref || '').trim();
+  if (r.length < 6) return null;
+  const live = await findWallet(env, deps, r);
+  if (live) return live.id;
+  const gone = await deps.store.kept(env, WALLET_COLLECTION, { prefix: r });
+  return gone.length === 1 ? gone[0].id : null;
+}
+const appOfColl = () => ({ [WALLET_COLLECTION]: 'wallet', ...Object.fromEntries(Object.entries(ECO_APPS).map(([a, x]) => [x.collection, a])) });
+async function putBack(env, deps, id, coll, payload) {
+  if (payload == null) return notFound;
+  if (coll === WALLET_COLLECTION && !parseWallet(payload)) return { error: 'ECO_PAYLOAD_INVALID', status: 400 };
+  const was = await deps.fsGet(env, WALLET_COLLECTION, id);
+  const before = was.exists ? gen(parseWallet(was.payload)) : 0;
+  const { updateTime } = await deps.store.restore(env, coll, id, '', payload);
+  await updateWallet(env, deps, id, w => ({ ...w, sec: { ...(w.sec || {}), gen: Math.max(gen(w), before) + 1 }, live: null }));
+  return { restored: true, ref: id.slice(0, 8), app: appOfColl()[coll], updateTime };
+}
+Object.assign(ADMIN_TOOLS, {
+  // No account named: those deleted in the last 30 days. One account: its
+  // kept versions, newest first ({ app, updated, at, why, size }).
+  async versions({ env, deps, body }) {
+    if (!body.wallet) return { gone: (await deps.store.kept(env, WALLET_COLLECTION, { gone: true })).map(g => ({ ref: g.id.slice(0, 8), at: g.at })) };
+    const id = await accountId(env, deps, body.wallet);
+    if (!id) return notFound;
+    const apps = appOfColl();
+    return { ref: id.slice(0, 8), versions: (await deps.store.versions(env, id)).filter(v => apps[v.coll]).map(v => ({ app: apps[v.coll], coll: v.coll, updated: v.updated, at: v.at, why: v.why, size: v.size })) };
+  },
+  // { wallet, coll, updated }: that kept version put back.
+  async restore({ env, deps, body }) {
+    const id = await accountId(env, deps, body.wallet);
+    if (!id || !appOfColl()[body.coll]) return notFound;
+    return putBack(env, deps, id, body.coll, await deps.store.version(env, body.coll, id, String(body.updated || '')));
+  },
+  // The nightly copies in R2: [{ day, size, docs }], newest first.
+  async backups({ env }) {
+    return { backups: env.DATA ? await listBackups(env) : [] };
+  },
+  // { day, wallet }: the account's documents in that night's copy; with
+  // `coll`, that one put back (an account gone longer than 30 days too).
+  async 'backup-restore'({ env, deps, body }) {
+    const ref = String(body.wallet || '').trim();
+    const apps = appOfColl();
+    if (!env.DATA || ref.length < 6 || !/^\d{4}-\d{2}-\d{2}$/.test(body.day || '')) return notFound;
+    const rows = await fromBackup(env, body.day, r => apps[r.coll] && r.id.startsWith(ref));
+    const ids = new Set((rows || []).map(r => r.id));
+    if (ids.size !== 1) return notFound;
+    const [id] = ids;
+    if (!body.coll) return { ref: id.slice(0, 8), docs: rows.map(r => ({ app: apps[r.coll], coll: r.coll, updated: r.updated, size: r.payload.length })) };
+    return putBack(env, deps, id, body.coll, rows.find(r => r.coll === body.coll)?.payload);
+  }
+});

@@ -1334,6 +1334,11 @@ function makeSession(app, { lang, heartbeat }) {
   const tokenKey = `orbit.token:${app}`;
   // (One older, up to 6 hours, still reads public data through the proxy: readToken.)
   let keptRead = ['', 0];
+  // The updateTime of the app's data last read or written here (null: not
+  // known). Sent with each save (`seen`): one over a version this device never
+  // saw keeps the one it replaces on the Pass (doc-store.js history).
+  let dataAt = null;
+  const sawData = res => typeof res?.updateTime === 'string' && (res.payload !== undefined || res.unchanged) && (dataAt = res.updateTime);
   try {
     const kept = JSON.parse(readStore(tokenKey) || 'null');
     if (kept?.t && kept.account && kept.account === storedAccount() && Date.now() - kept.at < 12 * 60_000) [token, tokenAt] = [kept.t, kept.at];
@@ -1458,6 +1463,7 @@ function makeSession(app, { lang, heartbeat }) {
     if (!ref) return signedOut();
     try {
       const res = absorb(await call('POST', '', { op: 'refresh', refresh: ref, app, claim, data, inbox: data, w: wallet ? walletAt : '', since: data ? since : '' }));
+      if (data) sawData(res);
       if (res.same) res.wallet = wallet;
       return res;
     } catch (error) {
@@ -1473,6 +1479,7 @@ function makeSession(app, { lang, heartbeat }) {
     else for (const k of [KEY.refresh, KEY.account, KEY.wallet, payloadKey(app), tokenKey]) writeStore(k, null);
     token = '';
     keptRead = ['', 0];
+    dataAt = null;
     wallet = null;
     active = false;
     emit('signedout');
@@ -1527,10 +1534,13 @@ function makeSession(app, { lang, heartbeat }) {
   s.read = ({ data = false, inbox = false, since = '' } = {}) =>
     withToken(qt => call('GET', qs({ qt, app: data ? app : '', inbox: inbox ? '1' : '', w: wallet ? walletAt : '', since: data ? since : '' }))).then(res => {
       absorb(res);
+      if (data) sawData(res);
       if (res.same) res.wallet = wallet;
       return res;
     });
-  s.write = ({ payload, wallet: patch } = {}) =>
+  // (`base`: the updateTime this save was merged over; another version on
+  // the Pass refuses it, ECO_DATA_CHANGED: read, merge, save again.)
+  s.write = ({ payload, wallet: patch, base } = {}) =>
     withToken(qt => {
       if (!active) {
         const error = new Error('not live');
@@ -1538,9 +1548,13 @@ function makeSession(app, { lang, heartbeat }) {
         error.live = live;
         throw error;
       }
-      return call('POST', qs({ app }), { op: 'write', qt, payload, wallet: patch, w: wallet ? walletAt : '' });
+      const keep = typeof payload === 'string' ? { seen: dataAt ?? undefined, base: base || undefined } : {};
+      return call('POST', qs({ app }), { op: 'write', qt, payload, wallet: patch, w: wallet ? walletAt : '', ...keep });
     }).then(res => {
-      if (typeof payload === 'string') cachePayload(app, storedAccount(), payload);
+      if (typeof payload === 'string') {
+        cachePayload(app, storedAccount(), payload);
+        if (typeof res.updateTime === 'string') dataAt = res.updateTime;
+      }
       absorb(res);
       if (res.same) res.wallet = wallet;
       return res;
@@ -1583,6 +1597,7 @@ function makeSession(app, { lang, heartbeat }) {
     let first = null;
     try {
       first = await takeHandoff(app);
+      sawData(first);
       if (first) await claimed(Promise.resolve(first).then(f => (absorb({ ...f, active: true }), f)));
       if (!first && storedAccount()) {
         first = await refresh({ claim: true, data });

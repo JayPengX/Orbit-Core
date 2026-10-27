@@ -15,6 +15,19 @@ export function fakeD1(schema = '') {
         all: async () => ({ results: st.all(...args) })
       };
       return self;
+    },
+    // One transaction, as D1's batch.
+    batch: async list => {
+      db.exec('BEGIN');
+      try {
+        const out = [];
+        for (const q of list) out.push(await q.run());
+        db.exec('COMMIT');
+        return out;
+      } catch (e) {
+        db.exec('ROLLBACK');
+        throw e;
+      }
     }
   };
 }

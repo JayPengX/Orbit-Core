@@ -34,14 +34,15 @@ import { handleLawGist } from './law-gist.js';
 import { handleLawPage } from './law-page.js';
 import en from './locales/en.js';
 import zhTW from './locales/zh-TW.js';
-import { handleEcoRequest, LOCK_SINCE } from './eco.js';
+import { handleEcoRequest, LOCK_SINCE, ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION } from './eco.js';
 import { checkStock } from './stock-check.js';
 import { readToken, tokenSecret, signToken, sessionLimited, READ_GRACE_MS } from './orbit-token.js';
 import { handlePush, sendDue } from './push.js';
 import { handleWeather } from './weather.js';
 import { weatherCron, skillReport } from './weather-skill.js';
 import { handleTransit, tally, warmBikes } from './transit.js';
-import { readDev, capacityCron } from './eco-admin.js';
+import { readDev, capacityCron, CONFIG_COLLECTION } from './eco-admin.js';
+import { backupStore } from './store-backup.js';
 import { paceOf } from './pace.js';
 import { beat, tellOwner, systemReport } from './ops.js';
 import { applyScale } from './capacity.js';
@@ -1059,8 +1060,10 @@ function generateCode(length) {
 // a leak of the database never hands over a working pass.
 
 // ---- /eco: the Orbit Pass (see eco.js) ------------------------------------
-// The Pass's store (doc-store.js): D1.
-const DOCS = docStore();
+// The Pass's store (doc-store.js): D1. Every version these replace is kept
+// (doc-store.js history): the wallets, each app's data, the inbox, the
+// config and the books, and Securities' checked money and fills.
+const DOCS = docStore({ keep: new Set([WALLET_COLLECTION, INBOX_COLLECTION, CONFIG_COLLECTION, 'stock-verified', 'stock-fills', ...Object.values(ECO_APPS).map(a => a.collection)]) });
 const ECO_DEPS = {
   json,
   errorJson,
@@ -1074,6 +1077,8 @@ const ECO_DEPS = {
   fsList: DOCS.list,
   fsCollections: DOCS.collections,
   fsBatch: DOCS.batch,
+  // Kept versions and the nightly copies (doc-store.js, store-backup.js): the admin panel's 備份.
+  store: DOCS,
   sha256Hex,
   generateCode,
   now: () => Date.now(),
@@ -1334,6 +1339,9 @@ export default {
     // Orbit Weather's scoring, once an hour (weather-skill.js).
     if (!pace && min === 10) run('weather-skill', () => weatherCron(env));
     if (!storeReady(env)) return;
+    // The Pass's store kept safe each night, 04:30 Taiwan: old versions
+    // thinned (doc-store.js), then the whole store copied to R2 (store-backup.js).
+    if (min === 30 && tick.getUTCHours() === 20) run('store-backup', async () => ({ pruned: await DOCS.prune(env), ...(await backupStore(env, DOCS, tick.getTime())) }));
     // The live refreshes by how many people there are (capacity.js), every 6 hours.
     if (min === 20 && tick.getUTCHours() % 6 === 0) run('capacity', () => capacityCron(env, ECO_DEPS));
   }
