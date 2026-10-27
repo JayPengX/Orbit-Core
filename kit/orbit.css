@@ -4810,7 +4810,7 @@ html.q-kb .q-kb-docked {
   display: grid;
   justify-items: center;
   gap: 3px;
-  min-width: 50px;
+  min-width: 58px;
   min-height: 54px;
   padding: 6px 4px;
   border-radius: 16px;
@@ -4838,10 +4838,6 @@ html.q-kb .q-kb-docked {
 .q-day-bar .q-day-strip .q-chip.day[aria-pressed='true'] > span,
 .q-day-bar .q-day-strip .q-chip.day[aria-pressed='true'] small {
   color: #ffffff;
-}
-.q-day-bar .q-day-strip .q-chip.day.month-start:not([aria-pressed='true']) {
-  border-radius: 0 16px 16px 0;
-  box-shadow: inset 1.5px 0 0 var(--q-sep);
 }
 .q-day-bar .q-day-pick {
   position: relative;
