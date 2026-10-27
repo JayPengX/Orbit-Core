@@ -19,9 +19,12 @@ test('site: an app at its short name is its repo on GitHub Pages, query kept', a
   assert.equal(p.asked[0].init.headers.get('Cookie'), null);
   assert.equal(res.headers.get('Cache-Control'), 'max-age=600');
   await site(new Request('https://example.tw/pass/brand/pass.svg'), p.fetcher);
-  assert.equal(p.asked[1].url, 'https://jaypengx.github.io/Shared-Proxy/brand/pass.svg');
+  assert.equal(p.asked[1].url, 'https://jaypengx.github.io/Orbit-Core/brand/pass.svg');
+  await site(new Request('https://example.tw/Orbit-Core/kit/orbit.mjs?v=1'), p.fetcher);
+  assert.equal(p.asked[2].url, 'https://jaypengx.github.io/Orbit-Core/kit/orbit.mjs?v=1');
+  // The repo's old name, which pages a phone keeps still load the kit from.
   await site(new Request('https://example.tw/Shared-Proxy/kit/orbit.mjs?v=1'), p.fetcher);
-  assert.equal(p.asked[2].url, 'https://jaypengx.github.io/Shared-Proxy/kit/orbit.mjs?v=1');
+  assert.equal(p.asked[3].url, 'https://jaypengx.github.io/Orbit-Core/kit/orbit.mjs?v=1');
 });
 
 test("site: a repo's own name isn't an address on the domain", async () => {
@@ -34,7 +37,7 @@ test("site: Pages' redirects land on the short name; the bare domain opens the f
   const p = pages(301, { Location: 'https://jaypengx.github.io/Orbit-Law/' });
   const res = await site(new Request('https://example.tw/law'), p.fetcher);
   assert.equal(res.headers.get('Location'), 'https://example.tw/law/');
-  const kit = pages(301, { Location: 'https://jaypengx.github.io/Shared-Proxy/' });
+  const kit = pages(301, { Location: 'https://jaypengx.github.io/Orbit-Core/' });
   assert.equal((await site(new Request('https://example.tw/pass'), kit.fetcher)).headers.get('Location'), 'https://example.tw/pass/');
   assert.equal((await site(new Request('https://example.tw/'), p.fetcher)).headers.get('Location'), 'https://example.tw/pass/');
 });
