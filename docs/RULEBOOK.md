@@ -149,6 +149,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 10-22 One product bar in 市場; every list = picks, then the whole listing.
 - Orders are filled and cash counted by the proxy (`stock-fill.js`), never the phone.
 - 10-23 Securities follows 臺北市's 停止上班 for trading days.
+- 10-28 A symbol's sheet opens on the app's teal focus card (as 資產's), the chart on it in white; 買進/賣出 two even buttons, the price not repeated. The order ticket keeps one floating button, the total on its second line, the page fading under it (Jay: "floating is ugly, need redesign (not stripping away floating)").
 
 ### Money (Jay's own books, real money)
 - 10-27 Never invent entries, balances or categories; Jay started fresh 2026-11-01; never re-add the 天天記帳 import or commit his CSV.
