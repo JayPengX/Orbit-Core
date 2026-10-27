@@ -3306,6 +3306,9 @@ div.q-ritem {
   padding: 0;
   background: none;
   font: 500 13px/18px var(--q-font);
+  /* A fact is text: a long one wraps instead of running off the screen. */
+  white-space: normal;
+  max-width: 100%;
 }
 .q-tag:is(.green, .red, .orange, .indigo, .blue, .tint) {
   background: color-mix(in srgb, var(--t) 16%, transparent);
