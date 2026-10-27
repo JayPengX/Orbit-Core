@@ -157,15 +157,18 @@ export async function dataFolders(bucket, { pages = 30 } = {}) {
   } while (cursor && ++n < pages);
   return { folders: out, more: !!cursor };
 }
-// (Listing is R2's dearer kind of operation: kept an hour in the edge cache.)
-async function foldersKept(env) {
-  const cache = typeof caches !== 'undefined' ? caches.default : null;
-  const key = new Request('https://ops.orbit/data-folders');
-  const hit = cache && (await cache.match(key));
-  if (hit) return hit.json();
+// Listing R2 takes ~16 list calls and 20-odd seconds (15,000+ files), so the
+// cron counts it every 6 hours (worker.js, `data-folders`) and keeps it in KV;
+// the report only reads that (the edge cache it used before doesn't exist on
+// workers.dev, so every panel load listed it all again).
+export const FOLDERS_KEY = 'ops:data-folders';
+export async function countFolders(env) {
   const out = { ...(await dataFolders(env.DATA)), at: Date.now() };
-  if (cache) await cache.put(key, new Response(JSON.stringify(out), { headers: { 'Cache-Control': 'public, max-age=3600' } }));
-  return out;
+  await env.RATE_LIMIT_KV?.put(FOLDERS_KEY, JSON.stringify(out), { expirationTtl: 2 * 86_400 });
+  return { files: Object.values(out.folders).reduce((n, f) => n + f.files, 0) };
+}
+async function foldersKept(env) {
+  return JSON.parse((await env.RATE_LIMIT_KV?.get(FOLDERS_KEY)) || 'null') || { pending: true };
 }
 export async function systemReport(env, deps) {
   const kv = env.RATE_LIMIT_KV;
