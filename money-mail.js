@@ -1,20 +1,24 @@
 // Orbit Money's mail-in 載具 invoices. A person can't have 財政部's AppID, so
-// the 載具's invoices come as the CSV the 電子發票平台 emails (查詢消費發票 ›
-// 匯出); a mail rule forwards it to the account's own address,
-// <box>@MAIL_DOMAIN, and this reads it (Cloudflare Email Routing's catch-all
-// sends every address to the Worker's email handler).
+// the 載具's invoices come by mail: the person gives the 電子發票平台 the
+// account's own address, <box>@MAIL_DOMAIN, as the 手機條碼's email and turns
+// on 消費發票彙整通知, and the platform mails the CSV every week by itself
+// (Cloudflare Email Routing's catch-all sends every address to the Worker's
+// email handler). A one-off 匯出, or a Gmail forward, lands the same way.
 //
 //   email     the mail's CSV attachments read (kit/carrier-csv.mjs), their
 //             invoices kept for the box's Pass until the app takes them;
 //             an address no Pass owns is turned away
 //   /money-mail (the app, signed with its session):
-//     GET  ?op=box          { address, items, confirm }  (the box made on first ask;
-//                           address '' until MAIL_DOMAIN is set; confirm: Gmail's
-//                           forwarding code { code, at }, when one came)
+//     GET  ?op=box          { address, items, confirm, note, got }  (the box made
+//                           on first ask; address '' until MAIL_DOMAIN is set;
+//                           confirm: Gmail's forwarding code { code, at }; note:
+//                           財政部's last mail with no invoices, such as the check
+//                           of a new address { subject, link, code, at }; got:
+//                           the last mail with invoices { at, n })
 //     POST ?op=took {upto}  the items received up to then dropped (in the books now)
 //     POST ?op=new          a new address (the old one stops)
 //
-// Store: orbit-money-mail/<pass> { box, items: [{ …invoice, at }] } and
+// Store: orbit-money-mail/<pass> { box, items: [{ …invoice, at }], confirm, note, got } and
 // orbit-money-mail/box_<box> { pass }.
 import { json } from './http.js';
 import { changeDoc, parseDoc } from './doc-store.js';
@@ -99,6 +103,55 @@ export function mailInvoices(raw) {
   return [...byNo.values()];
 }
 
+// The text a person reads in a mail: its text/plain and text/html parts that
+// aren't attachments, decoded with their charset.
+export function mailText(raw, depth = 0) {
+  const { headers, body } = splitEntity(raw);
+  const type = headers['content-type'] || 'text/plain';
+  if (/^multipart\//i.test(type) && depth < 6) {
+    const boundary = param(type, 'boundary');
+    if (!boundary) return '';
+    return body
+      .split(`--${boundary}`)
+      .slice(1)
+      .filter(p => !p.startsWith('--'))
+      .map(p => mailText(p.replace(/^\r?\n/, ''), depth + 1))
+      .join('\n');
+  }
+  if (!/^text\/(plain|html)/i.test(type) || /attachment/i.test(headers['content-disposition'] || '')) return '';
+  const bytes = decodeBody(body, headers['content-transfer-encoding']);
+  let charset = param(type, 'charset') || 'utf-8';
+  try {
+    return new TextDecoder(charset).decode(bytes);
+  } catch {
+    return new TextDecoder('utf-8').decode(bytes);
+  }
+}
+// A header's encoded words (=?UTF-8?B?…?=, =?Big5?Q?…?=) read.
+export function headerText(value) {
+  return String(value || '').replace(/=\?([^?]+)\?([BQ])\?([^?]*)\?=\s*/gi, (_, charset, enc, text) => {
+    const bin = enc.toUpperCase() === 'B' ? (() => { try { return atob(text); } catch { return ''; } })() : text.replace(/_/g, ' ').replace(/=([0-9A-Fa-f]{2})/g, (__, h) => String.fromCharCode(parseInt(h, 16)));
+    try {
+      return new TextDecoder(charset).decode(Uint8Array.from(bin, c => c.charCodeAt(0) & 255));
+    } catch {
+      return bin;
+    }
+  });
+}
+// 財政部's own mail that carries no invoices (the check of a new address, a
+// prize notice): its subject, the platform link to open (one with a query
+// first: the check's), and any code in it, for the app to show. null for
+// anyone else's mail.
+export function einvoiceNote(from, raw) {
+  if (!/@([a-z0-9-]+\.)*nat\.gov\.tw\b/i.test(String(from || ''))) return null;
+  const { headers } = splitEntity(raw);
+  const text = mailText(raw).replace(/&amp;/g, '&');
+  const links = [...new Set(text.match(/https?:\/\/[a-z0-9.-]*einvoice\.nat\.gov\.tw[^\s"'<>)\]]*/gi) || [])].filter(u => !/\.(png|jpe?g|gif|svg|css|js)(\?|$)/i.test(u));
+  const link = links.find(u => u.includes('?')) || links[0] || '';
+  const code = /(?:驗證碼|認證碼|verification code)[^0-9A-Za-z]{0,12}([0-9A-Za-z]{4,12})/i.exec(text.replace(/<[^>]+>/g, ' '))?.[1] || '';
+  return { subject: headerText(headers.subject).trim().slice(0, 120), link: link.slice(0, 600), code };
+}
+
 // Gmail's forwarding check: its confirmation code, or ''.
 export function gmailCode(from, raw) {
   if (!/forwarding-noreply@google\.com/i.test(String(from || ''))) return '';
@@ -128,8 +181,13 @@ export async function handleMoneyMail(message, env, deps) {
     return { owner, added: 0 };
   }
   const invoices = mailInvoices(raw);
-  if (!invoices.length) return { owner, added: 0 };
-  await changeDoc(env, deps, MAIL_COLLECTION, owner, v => ({ ...v, items: addItems(v.items, invoices, at) }), { read: v => v || { box: local, items: [] } });
+  if (!invoices.length) {
+    // 財政部 checking the address (the app shows its link to tap), or another notice.
+    const note = einvoiceNote(message.from, raw);
+    if (note) await changeDoc(env, deps, MAIL_COLLECTION, owner, v => ({ ...v, note: { ...note, at } }), { read: v => v || { box: local, items: [] } });
+    return { owner, added: 0 };
+  }
+  await changeDoc(env, deps, MAIL_COLLECTION, owner, v => ({ ...v, items: addItems(v.items, invoices, at), got: { at, n: invoices.length } }), { read: v => v || { box: local, items: [] } });
   return { owner, added: invoices.length };
 }
 
@@ -147,17 +205,18 @@ export async function handleMoneyMailRequest(request, env, headers, session, dep
     if (doc.box && !fresh) return doc;
     const box = newBox();
     await deps.fsWrite(env, MAIL_COLLECTION, `box_${box}`, JSON.stringify({ pass }), { exists: false });
-    const next = await changeDoc(env, deps, MAIL_COLLECTION, pass, v => ({ ...v, box }), { read });
+    // (A new address starts over: the platform has to be told it again.)
+    const next = await changeDoc(env, deps, MAIL_COLLECTION, pass, v => (fresh ? { ...v, box, note: null, got: null, confirm: null } : { ...v, box }), { read });
     if (doc.box) await deps.fsDelete(env, MAIL_COLLECTION, `box_${doc.box}`).catch(() => {});
     return next;
   };
   if (op === 'box' && request.method === 'GET') {
     const doc = await boxFor(false);
-    return json({ address: addressOf(env, doc.box), items: doc.items || [], confirm: doc.confirm || null }, 200, headers);
+    return json({ address: addressOf(env, doc.box), items: doc.items || [], confirm: doc.confirm || null, note: doc.note || null, got: doc.got || null }, 200, headers);
   }
   if (op === 'new' && request.method === 'POST') {
     const doc = await boxFor(true);
-    return json({ address: addressOf(env, doc.box), items: doc.items || [] }, 200, headers);
+    return json({ address: addressOf(env, doc.box), items: doc.items || [], note: null, got: null }, 200, headers);
   }
   if (op === 'took' && request.method === 'POST') {
     let upto = 0;
