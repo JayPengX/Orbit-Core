@@ -70,6 +70,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - Every Orbit app sits behind the Orbit Pass and asks for Add to Home Screen on a phone (exceptions: Showcase; Longshot has its own Pass).
 - Visual over text: icons, colour, cards; less text, no source names or back-end notes on screen (TRUTH §6).
 - Chinese (Taiwan) first, English second (TRUTH §6).
+- 10-27 One language at a time ("mixed with two languages, time to step up"): every page all Chinese or all English by the Orbit language, the family page and loading screen too. Names come in English where a source has them (kit `place()` for counties and townships, TDX's stops and stations); only what has no English (a fund's name, an operator's notice, a law's text, a word's meaning) stays Chinese, marked `lang="zh-Hant"`. People keep their own names. `tools/gate.mjs` flags it as `mixed` (`--quick --lang en`).
 
 ## 3. Design
 
