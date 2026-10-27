@@ -32,12 +32,14 @@ test('notice lists keep only sane items, in time order', () => {
       { at: now - 86_400_000, title: 'old' },
       { at: now + 120_000, check: { espn: 'football/nfl', event: '401' } },
       { at: now + 120_000, check: { yahoo: '2330.TW', op: 'above', price: 1200 }, title: '台積電' },
-      { at: now + 120_000, check: { espn: '../x', event: 'a' } }
+      { at: now + 120_000, check: { espn: '../x', event: 'a' } },
+      { at: now + 7_200_000, title: 'domain', url: 'https://orbit.jaypengx.com/money/#cal' }
     ],
     now
   );
-  assert.deepEqual(list.map(x => x.title), ['soon', '', '台積電', 'later']);
+  assert.deepEqual(list.map(x => x.title), ['soon', '', '台積電', 'later', 'domain']);
   assert.equal(list[3].url, '');
+  assert.equal(list[4].url, 'https://orbit.jaypengx.com/money/#cal');
   assert.deepEqual(list[1].check, { espn: 'football/nfl', event: '401' });
 });
 

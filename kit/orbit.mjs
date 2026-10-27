@@ -2738,6 +2738,9 @@ export const NOTICE_KINDS = {
     ['pick', '今日推薦開賽', 'Today’s picks start', '今日推薦的每一場開始時。', 'When each of today’s picks starts.'],
     ['pickend', '今日推薦賽果', 'Today’s picks: final', '今日推薦每場打完，附比分。', 'When each of today’s picks ends, with the score.']
   ],
+  money: [
+    ['renew', '到期提醒', 'Renewal reminder', 'TPASS 這類有效期的票，到期前一晚和當天早上。', 'For a pass like TPASS: the evening before it ends, and that morning.']
+  ],
   vocab: [
     ['streak', '連續練習快斷了', 'Streak ending', '今天還沒練習單字，連續天數今晚就會歸零時。', 'When you haven’t practised today and your streak ends tonight.']
   ],

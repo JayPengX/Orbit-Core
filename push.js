@@ -153,7 +153,7 @@ export async function sendPush(env, sub, message) {
 
 // ---- The lists ------------------------------------------------------------------
 
-const APP_KEYS = new Set(['match', 'stock', 'vocab', 'orbit', 'weather', 'transit']);
+const APP_KEYS = new Set(['match', 'stock', 'vocab', 'orbit', 'weather', 'transit', 'money']);
 const MAX_ITEMS = 60;
 const HOLD_MS = 8 * 3_600_000;
 const CHECK_EVERY = 15 * 60_000;
@@ -164,7 +164,8 @@ const BUS_EVERY = 60_000;
 // Runs are 2 minutes apart: told up to a minute early rather than late.
 const BUS_EARLY = 60;
 const cleanText = (x, n) => String(x ?? '').slice(0, n);
-const okUrl = u => (typeof u === 'string' && /^https:\/\/jaypengx\.github\.io\//.test(u) ? u : '');
+// (The apps' own domain since 2026-10-27; the old Pages address still opens.)
+const okUrl = u => (typeof u === 'string' && /^https:\/\/(orbit\.jaypengx\.com|jaypengx\.github\.io)\//.test(u) ? u : '');
 
 export function cleanItems(items, now = Date.now()) {
   return (Array.isArray(items) ? items : [])
