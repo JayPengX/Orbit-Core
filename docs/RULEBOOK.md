@@ -48,6 +48,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 10-20 Slow internet must work (hashed files, nothing re-downloaded, no cache wipe on update).
 - 10-21 No bright white surfaces in dark mode (glass tiles and buttons; logos without white plates).
 - 10-21 No wraps, orphan pills, cut numbers, sideways tables or scrolling sheets.
+- 10-27 Addresses: every Orbit app at `orbit.jaypengx.com/<short>` (one origin, so one Pass sign-in), Longshot at `longshot.jaypengx.com`, the proxy at `api.jaypengx.com`. The bare `jaypengx.com` is Jay's own homepage (handle JayPengX only: no real name or school; no betting or Longshot link; open to all; livelier than the apps), with the showcase at `/showcase/`. Clean break, no redirects from older addresses.
 - 10-21 The keyboard never pushes content off screen; the iPhone's own keyboard, never an in-app keypad. Kit `watchKeyboard` since 10-27.
 - 10-21 Stats show the current season; last season only where this one is empty (e.g. 上季對戰).
 - 10-21 No manual "check results" buttons; automatic over buttons.
@@ -169,6 +170,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - Content changes only when Jay says "catch up the showcase". The raw record stays private in project files, never in a repo.
 
 ### Longshot (outside the family)
+- 10-27 Lives at `longshot.jaypengx.com`, its own origin (no shared storage with Orbit).
 - 10-22 Its own app, Worker and Pass; never import from, link to or depend on Orbit-Core; its rules are `Longshot/docs/TRUTH.md`.
 - 10-22 League sports and F1 only; no tennis, UFC, golf or other non-league sports.
 - 10-20 Lock a whole market, never a lone open side; no 限關 pills.
@@ -201,8 +203,8 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 | Money on the Pass | Money in Securities only | 10-22 |
 | Beats pieces exactly as recorded | Full mixer on by default | 10-18 |
 | Weekly 15-min recheck for game finals | Every 2 min | 10-22 |
-| Own domain: same `/<Repo>/` paths | Short paths (`jaypengx.com/law`), old paths 404, no redirects | 10-27 |
-| Apps share the `jaypengx.github.io` origin | They share `jaypengx.com` | 10-27 |
+| Own domain: same `/<Repo>/` paths | Short paths (`orbit.jaypengx.com/law`), old paths 404, no redirects | 10-27 |
+| Apps share the `jaypengx.github.io` origin | They share `orbit.jaypengx.com`; Longshot has `longshot.jaypengx.com`; the bare `jaypengx.com` is Jay's homepage with `/showcase/` | 10-27 |
 | Longshot's own keyboard rule | The same rule in the shared kit for every app | 10-27 |
 | Sell-first 當沖 needs 12 months of history | TWSE's 3 months + 10 trades, or a credit account |  10-24 |
 | Handoff: "don't touch the Cloudflare data rename" | Rename finished (`orbit-data`, `orbit-store`) | 10-23 |
