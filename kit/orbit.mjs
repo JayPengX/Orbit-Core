@@ -2018,7 +2018,7 @@ function signInGate(s) {
     const input = passInput(BRAND.pass, { save: 'current-password' });
     const error = node('p', { class: 'q-gate-error', role: 'alert' });
     const enter = node('button', { class: 'q-btn primary block', type: 'submit', text: en ? 'Sign in' : '登入' });
-    const keys = passkeyHere() && passkeyGate(s, error, res => finish(res), on => busy(on));
+    const keys = passkeyHere() ? passkeyGate(s, error, res => finish(res), on => busy(on)) : null;
     const busy = on => [enter, input, keys?.button].forEach(b => b && (b.disabled = on));
     let over = false;
     const finish = res => {
