@@ -75,6 +75,7 @@ const CODE8 = /^[2-9A-HJ-NP-Z]{8}$/;
 //   transit  Orbit Transit, a related add-on: its bus groups, places and settings
 //   beats  Orbit Beats, a related add-on: its settings and each kit's tempo and roles
 //   law    Orbit Law, a related add-on: its followed laws, marks and settings
+//   money  Orbit Money, a related add-on: its accounts, entries, budgets and settings (the person's own records, never Orbit's money)
 export const ECO_APPS = {
   stock: { collection: 'stock-study-accounts', maxPayload: 1_000_000 },
   vocab: { collection: 'vocab-progress-sync', maxPayload: 600_000 },
@@ -83,7 +84,8 @@ export const ECO_APPS = {
   weather: { collection: 'orbit-weather', maxPayload: 50_000 },
   transit: { collection: 'orbit-transit', maxPayload: 200_000 },
   beats: { collection: 'orbit-beats', maxPayload: 50_000 },
-  law: { collection: 'orbit-law', maxPayload: 100_000 }
+  law: { collection: 'orbit-law', maxPayload: 100_000 },
+  money: { collection: 'orbit-money', maxPayload: 1_000_000 }
 };
 // Who can write entries: Securities, the one app that moves money, and this
 // Worker itself ('eco': pay, loans, merges). An app can't write 'eco' entries; the related

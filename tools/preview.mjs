@@ -25,7 +25,7 @@
 //                          [--fake-yahoo]  (made-up Yahoo prices: spark and chart answers
 //                          for any symbol, for when Yahoo answers 429)
 //
-//   app   sports | securities | words | orbit | weather | transit | beats | law (or the repo's folder name)
+//   app   sports | securities | words | orbit | weather | transit | beats | law | money (or the repo's folder name)
 //         | admin [overview accounts money health usage dev tools]  (the admin panel, made-up accounts)
 //
 // Orbit Transit: /transit is answered by transit.js itself on made-up TDX
@@ -63,6 +63,7 @@ import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join, extname, resolve } from 'node:path';
 import { createRequire } from 'node:module';
 import { ASIA_HOST, asiaBaseballResponse } from '../asia-baseball.js';
+import { INVOICE_HOST, invoiceResponse } from '../invoice.js';
 import { F1_LIVE_HOST, f1LiveResponse, memoryLog, sampleLive } from '../f1-live.js';
 import { trimF1Page, trimEltaVod, trimYtSearch, trimYtVideo, trimFotmobPage } from '../sports.js';
 import { handleWeather } from '../weather.js';
@@ -266,7 +267,7 @@ async function snapshotRoot(when, repos) {
 }
 const [appArg, ...hashes] = args;
 
-const APPS = { sports: ['Orbit-Sports', 'match'], securities: ['Orbit-Securities', 'stock'], words: ['Orbit-Words', 'vocab'], orbit: ['Orbit-Class', 'orbit'], weather: ['Orbit-Weather', 'weather'], transit: ['Orbit-Transit', 'transit'], beats: ['Orbit-Beats', 'beats'], law: ['Orbit-Law', 'law'], admin: ['Shared-Proxy', 'admin'] };
+const APPS = { sports: ['Orbit-Sports', 'match'], securities: ['Orbit-Securities', 'stock'], words: ['Orbit-Words', 'vocab'], orbit: ['Orbit-Class', 'orbit'], weather: ['Orbit-Weather', 'weather'], transit: ['Orbit-Transit', 'transit'], beats: ['Orbit-Beats', 'beats'], law: ['Orbit-Law', 'law'], money: ['Orbit-Money', 'money'], admin: ['Shared-Proxy', 'admin'] };
 // The admin panel's key in a preview: the run's own, never the owner's.
 const ADMIN_KEY = 'preview-admin-key-0123456789abcdef0123456789';
 // The old names still work.
@@ -450,6 +451,10 @@ const upstream = url => {
   // Asian baseball: gathered here by the Worker's own module (asia-baseball.js).
   // F1's live timing: a fresh snapshot each time (run with NODE_USE_ENV_PROXY=1 behind a proxy).
   if (url.startsWith(`https://${F1_LIVE_HOST}/`)) return f1LiveResponse(new URL(url), { log: f1Log }).then(async r => ({ status: r.status, body: await r.text() }));
+  if (url.startsWith(`https://${INVOICE_HOST}/`)) {
+    if (!cache.has(url)) cache.set(url, invoiceResponse(new URL(url)).then(async r => ({ status: r.status, body: await r.text() })));
+    return cache.get(url);
+  }
   if (url.startsWith(`https://${ASIA_HOST}/`)) {
     if (!cache.has(url)) cache.set(url, asiaBaseballResponse(new URL(url)).then(async r => ({ status: r.status, body: await r.text() })));
     return cache.get(url);
@@ -643,6 +648,11 @@ if (!live) await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.worker
   const res = await handleTransit(new Request(req.url()), transitEnv, cors, u.pathname, { session: { s: 'preview' }, fetchFn, cache: null });
   await route.fulfill({ status: res.status, contentType: 'application/json', headers: cors, body: await res.text() });
 });
+// Orbit Money's /money-mail (money-mail.js), made up: an address on an
+// example domain and a Gmail code, nothing waiting.
+await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/money-mail/, route =>
+  route.fulfill({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ address: 'k7m2q9xw4a@mail.example', items: [], confirm: { code: '123456789', at: Date.now() } }) })
+);
 // Orbit Law's /law-page, read here (no Pass): the Worker's own reader, over
 // Node's https with legacy TLS renegotiation allowed (ppg.ly.gov.tw needs it).
 const legacyFetch = (url, init = {}) =>
@@ -666,7 +676,7 @@ await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/law
 });
 // The /stock Worker's store for the run.
 const stockDocs = new Map();
-await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(?!weather|push|transit|sports-proxy|law-page|data\/)/, async route => {
+await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(?!weather|push|transit|sports-proxy|law-page|money-mail|data\/)/, async route => {
   const req = route.request();
   const body = req.postDataJSON?.() || {};
   // Orbit Securities' orders, plans and 新股申購 (stock-fill.js): the

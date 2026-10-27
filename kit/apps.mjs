@@ -28,7 +28,8 @@ const APPS = {
   'Orbit-Transit': { id: 'transit', site: 'public', mods: ['orbit'] },
   'Orbit-Class': { id: 'orbit', site: '.', mods: ['orbit'] },
   'Orbit-Beats': { id: 'beats', site: 'public', mods: ['orbit'] },
-  'Orbit-Law': { id: 'law', site: 'public', mods: ['orbit'] }
+  'Orbit-Law': { id: 'law', site: 'public', mods: ['orbit'] },
+  'Orbit-Money': { id: 'money', site: 'public', mods: ['orbit'] }
 };
 const CHECKOUT = `      - name: The shared kit (Shared-Proxy/kit), for the tests
         uses: actions/checkout@v4

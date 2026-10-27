@@ -66,7 +66,7 @@ const quick = flag('quick');
 const wide = flag('wide');
 // --quick --dark: 390 dark only (the white check).
 const darkOnly = flag('dark');
-const ALL = ['sports', 'securities', 'words', 'orbit', 'weather', 'transit', 'beats', 'law'];
+const ALL = ['sports', 'securities', 'words', 'orbit', 'weather', 'transit', 'beats', 'law', 'money'];
 const apps = args.length ? args : ALL;
 const runs = [];
 if (!wide) for (const app of apps)

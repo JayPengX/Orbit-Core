@@ -38,7 +38,7 @@ export const WATCH = {
   transitLive: { app: 'transit', min: 12 },
   transitBike: { app: 'transit', min: 8 }
 };
-export const BASE_REQ = { match: 60, stock: 60, transit: 40, weather: 12, orbit: 10, vocab: 10, beats: 2 };
+export const BASE_REQ = { match: 60, stock: 60, transit: 40, weather: 12, orbit: 10, vocab: 10, beats: 2, money: 4 };
 // The settings that may be slowed (the live refreshes on the phones).
 export const SCALED = Object.keys(WATCH);
 // Of a week's people, about this share open an app on a given day (until the
