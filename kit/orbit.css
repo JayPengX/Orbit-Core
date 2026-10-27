@@ -68,7 +68,10 @@
   --q-dim: rgba(0, 0, 0, 0.26);
 
   /* Shapes: concentric corners, deep where the screen's are. */
-  --q-r-card: 26px;
+  /* One radius for every container on the page (hero, row card, list,
+     card); cells and tiles inside take --q-r-cell; controls are capsules.
+     (docs/DESIGN.md: one shape family, so nothing looks templated.) */
+  --q-r-card: 22px;
   --q-r-cell: 12px;
   --q-r-sheet: 38px;
   --q-r-alert: 34px;
@@ -76,6 +79,16 @@
   --q-margin: 16px;
   --q-row: 52px;
   --q-hairline: 0.5px;
+  /* Space: a 4-point scale. 8 inside a group, 16 a card's padding and the
+     page margin, 24 between a focal block and what follows, 32 between
+     sections. Nothing in between (docs/DESIGN.md). */
+  --q-s-1: 4px;
+  --q-s-2: 8px;
+  --q-s-3: 12px;
+  --q-s-4: 16px;
+  --q-s-5: 24px;
+  --q-s-6: 32px;
+  --q-s-7: 48px;
 
   /* Type: iOS's sizes (large text at the default setting). */
   --q-t-large: 700 34px/41px var(--q-font);
@@ -88,6 +101,10 @@
   --q-t-footnote: 400 13px/18px var(--q-font);
   --q-t-caption: 400 12px/16px var(--q-font);
   --q-t-caption2: 400 11px/13px var(--q-font);
+  /* The one number a screen is about (.q-focus, .q-hc-big), and a figure
+     beside it: rounded, the only 700 on the screen besides a large title. */
+  --q-t-focal: 700 44px/50px var(--q-font-rounded);
+  --q-t-figure: 600 17px/22px var(--q-font-rounded);
 
   /* Movement: SwiftUI's springs (response, bounce), sampled as linear(). */
   --q-spring-smooth: linear(0, 0.0204, 0.0708, 0.1387, 0.2155, 0.2951, 0.3734, 0.448, 0.5173, 0.5805, 0.6375, 0.6882, 0.7329, 0.772, 0.806, 0.8354, 0.8607, 0.8824, 0.901, 0.9167, 0.9301, 0.9415, 0.951, 0.9591, 0.9659, 0.9716, 0.9763, 0.9803, 0.9837, 0.9864, 0.9888, 0.9907, 0.9923, 0.9936, 0.9947, 0.9956, 0.9964, 0.997, 0.9976, 0.998, 1);
@@ -1496,7 +1513,7 @@ dialog.q-sheet.q-full {
 
 /* ---- Sections and cards on the page ---- */
 .q-section {
-  margin: 28px 0 0;
+  margin: var(--q-s-6) 0 0;
 }
 .q-section-head {
   display: flex;
@@ -1509,8 +1526,7 @@ dialog.q-sheet.q-full {
   margin: 0;
   overflow: hidden;
   font: var(--q-t-title3);
-  font-weight: 700;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.01em;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
@@ -3020,9 +3036,8 @@ html[data-q-turn] dialog[open] {
 }
 
 .q-hero-card {
-  --q-hc-a: color-mix(in srgb, var(--q-accent) 62%, #0b1020);
-  --q-hc-b: var(--q-accent);
-  --q-hc-glow: color-mix(in srgb, var(--q-accent) 45%, #ffffff);
+  --q-hc-a: color-mix(in srgb, var(--q-accent) 74%, #0b1020);
+  --q-hc-b: color-mix(in srgb, var(--q-accent) 86%, #0b1020);
   position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -3030,13 +3045,16 @@ html[data-q-turn] dialog[open] {
   padding: 16px;
   overflow: hidden;
   border: 0;
-  border-radius: 22px;
-  background: radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--q-hc-glow) 55%, transparent), transparent 60%), linear-gradient(135deg, var(--q-hc-a), var(--q-hc-b));
+  border-radius: var(--q-r-card);
+  /* One deep colour, lit a shade from the top: no glow, no diagonal sweep,
+     no coloured bloom under it. It is the screen's one coloured surface;
+     what's on it does the talking (docs/DESIGN.md). */
+  background: linear-gradient(180deg, var(--q-hc-b), var(--q-hc-a));
   color: #ffffff;
   font: inherit;
   text-align: left;
   text-decoration: none;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 18px 36px -20px color-mix(in srgb, var(--q-hc-b) 80%, transparent);
+  box-shadow: none;
   -webkit-tap-highlight-color: transparent;
 }
 /* In dark the accents brighten; the card keeps a deep colour so white type
@@ -3046,21 +3064,18 @@ html[data-q-turn] dialog[open] {
   :where(:root:not([data-theme='light'])) .q-hero-card {
     --q-hc-a: color-mix(in srgb, var(--q-accent) 38%, #05070d);
     --q-hc-b: color-mix(in srgb, var(--q-accent) 72%, #05070d);
-    --q-hc-glow: color-mix(in srgb, var(--q-accent) 60%, transparent);
   }
 }
 :where(:root[data-theme='dark']) .q-hero-card {
   --q-hc-a: color-mix(in srgb, var(--q-accent) 38%, #05070d);
   --q-hc-b: color-mix(in srgb, var(--q-accent) 72%, #05070d);
-  --q-hc-glow: color-mix(in srgb, var(--q-accent) 60%, transparent);
 }
 .q-hc-eyebrow {
   display: flex;
   align-items: center;
   gap: 6px;
-  font: 700 13px/1 var(--q-font);
-  letter-spacing: 0.04em;
-  opacity: 0.9;
+  font: 500 15px/20px var(--q-font);
+  opacity: 0.78;
 }
 .q-hc-eyebrow svg {
   width: 16px;
@@ -3072,7 +3087,7 @@ html[data-q-turn] dialog[open] {
   letter-spacing: -0.01em;
 }
 .q-hc-big {
-  font: 700 40px/44px var(--q-font-rounded);
+  font: var(--q-t-focal);
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
 }
@@ -3201,7 +3216,7 @@ html[data-q-turn] dialog[open] {
   margin: 0;
   padding: 0;
   overflow: hidden;
-  border-radius: 18px;
+  border-radius: var(--q-r-card);
   background: var(--q-surface);
   list-style: none;
 }
@@ -3528,7 +3543,7 @@ div.q-ritem {
   padding: 0 4px 10px;
 }
 .q-section-head.q-shd h2 {
-  font: 700 20px/1.2 var(--q-font);
+  font: 600 20px/1.2 var(--q-font);
   text-overflow: clip;
 }
 .q-sh-count {
@@ -4909,3 +4924,87 @@ html.q-kb .q-kb-docked {
 }
 /* A menu over a sheet: solid, so its rows never mix with what's under them (Money's 付款方式 over the keypad). */
 dialog[open] .q-menu { background: var(--q-sheet); }
+
+/* ---- The focal point, open on the page (docs/DESIGN.md) ----
+   A screen's one answer: a quiet label, the number, one line under it, a
+   thin bar if there's a limit, and at most three figures beside it. No card,
+   no colour: size and the space around it make it the focus.
+   .q-focus > .q-focus-label, .q-focus-value, .q-focus-bar > i,
+   .q-focus-sub, .q-focus-figs > div > small + b (.in / .out on b: meaning). */
+.q-focus {
+  display: grid;
+  gap: var(--q-s-1);
+  min-width: 0;
+  padding: var(--q-s-2) 4px var(--q-s-2);
+}
+.q-focus-label {
+  color: var(--q-label-2);
+  font: 500 15px/20px var(--q-font);
+}
+.q-focus-value {
+  display: block;
+  max-width: 100%;
+  color: var(--q-label);
+  font: var(--q-t-focal);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+.q-focus-bar {
+  height: 4px;
+  margin-top: var(--q-s-2);
+  overflow: hidden;
+  border-radius: 99px;
+  background: var(--q-fill-2);
+}
+.q-focus-bar > i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--q-accent);
+}
+.q-focus-bar.over > i {
+  background: var(--q-red);
+}
+.q-focus-sub {
+  color: var(--q-label-2);
+  font: var(--q-t-subhead);
+  font-variant-numeric: tabular-nums;
+}
+.q-focus-figs {
+  display: flex;
+  gap: var(--q-s-5);
+  margin-top: var(--q-s-3);
+}
+.q-focus-figs > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.q-focus-figs small {
+  color: var(--q-label-2);
+  font: var(--q-t-footnote);
+}
+.q-focus-figs b {
+  font: var(--q-t-figure);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.q-focus-figs b.in {
+  color: var(--q-good);
+}
+
+/* ---- A list's own label (.q-section-head.q-list-head): names a group of
+   rows, not a part of the page, so it's quiet and sits close to its rows. */
+.q-section-head.q-list-head {
+  margin-bottom: 6px;
+  padding: 0 4px;
+}
+.q-section-head.q-list-head h2 {
+  color: var(--q-label-2);
+  font: 600 15px/20px var(--q-font);
+  letter-spacing: 0;
+}
+.q-section:has(> .q-list-head) + .q-section:has(> .q-list-head) {
+  margin-top: var(--q-s-5);
+}
