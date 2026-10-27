@@ -2108,6 +2108,12 @@ export async function accountSheet(s, { extra = null, tab = 'pass', help = null 
   return openPass(s, { extra, tab, help });
 }
 export const openHelp = (s, app = s.app, topic = null) => accountSheet(s, { tab: 'help', help: { app, topic } });
+// Sharing a link: the sheet with its QR code, styled by the person and saved
+// as PNG or SVG (share.mjs, loaded when first opened). { url, title, app, icon, lang }.
+export async function shareSheet(opts = {}) {
+  const { shareSheet: open } = await import('./share.mjs');
+  return open({ lang: detectLang(), ...opts });
+}
 
 // The account at a glance: its number and since when. Never a balance:
 // money is Securities' alone.

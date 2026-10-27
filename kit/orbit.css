@@ -2848,7 +2848,7 @@ dialog {
 .q-pass .q-card + .q-card { margin-top: 12px; }
 .q-pass .q-card.list { padding: 0; overflow: hidden; }
 .q-pass .section-sub { color: var(--q-muted); font-size: 13px; margin: -6px 0 10px; }
-.q-pass .two-btn { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+.q-pass .two-btn { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 10px; margin-top: 12px; }
 .q-pass .q-btn.ghost { background: none; border-color: transparent; }
 .q-pass .q-btn.block { width: 100%; }
 .q-pass .q-chips.small .q-chip { min-height: 30px; padding: 0 12px; font-size: 13px; }
@@ -5038,4 +5038,136 @@ dialog[open] .q-menu { background: var(--q-sheet); }
 }
 .q-section:has(> .q-list-head) + .q-section:has(> .q-list-head) {
   margin-top: var(--q-s-5);
+}
+
+/* ---- The share sheet (kit/share.mjs): the code is the focus, open on the
+   sheet; its style below as rows (a label, then a segmented choice). ---- */
+.q-share-top {
+  display: grid;
+  justify-items: center;
+  gap: var(--q-s-2);
+  padding-top: var(--q-s-2);
+}
+.q-share-qr {
+  width: clamp(150px, 27vh, 228px);
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: var(--q-r-cell);
+  box-shadow: 0 0 0 var(--q-hairline) var(--q-sep);
+}
+.q-share-qr svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.q-share-warn {
+  margin: 0;
+  color: var(--q-warn);
+  font: var(--q-t-footnote);
+  text-align: center;
+}
+.q-share-warn:empty {
+  display: none;
+}
+.q-share-actions {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: var(--q-s-2);
+  width: 100%;
+  margin-top: var(--q-s-1);
+}
+.q-share-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--q-s-3);
+  min-height: 46px;
+  padding: 6px 12px 6px 16px;
+}
+.q-share-row + .q-share-row::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 16px;
+  right: 0;
+  height: var(--q-hairline);
+  background: var(--q-sep);
+}
+.q-share-row > span {
+  flex: none;
+  font: var(--q-t-body);
+}
+.q-share-row > .q-seg {
+  flex: 0 1 216px;
+  min-width: 0;
+}
+.q-share-swatches,
+.q-share-colours {
+  display: flex;
+  gap: var(--q-s-2);
+}
+.q-share-swatch {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--sw);
+  cursor: pointer;
+}
+.q-share-swatch.custom {
+  background: conic-gradient(var(--q-red), var(--q-orange), var(--q-green), var(--q-cyan), var(--q-indigo), var(--q-pink), var(--q-red));
+}
+.q-share-row[hidden] {
+  display: none;
+}
+.q-share-swatch[aria-pressed='true'] {
+  box-shadow: 0 0 0 2px var(--q-sheet), 0 0 0 4px var(--q-accent);
+}
+.q-share-color {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 12px 0 4px;
+  border-radius: 999px;
+  background: var(--q-fill-3);
+  font: 500 14px/1 var(--q-font);
+  cursor: pointer;
+}
+.q-share-color input {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.q-share-color input::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+.q-share-color input::-webkit-color-swatch {
+  border: var(--q-hairline) solid var(--q-sep);
+  border-radius: 50%;
+}
+.q-share-color input::-moz-color-swatch {
+  border: var(--q-hairline) solid var(--q-sep);
+  border-radius: 50%;
+}
+.q-share-foot {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--q-s-2);
+}
+/* On a computer (the showcase's wide layout): a card in the middle, not a strip across the screen. */
+@media (min-width: 700px) {
+  dialog.q-sheet.q-share {
+    width: 480px;
+    margin: auto;
+  }
 }

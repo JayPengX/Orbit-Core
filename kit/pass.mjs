@@ -5,9 +5,10 @@
 //   外觀   an avatar and a frame, free for everyone
 //   App    every app, Orbit's and Orbit's, when it was last used, a way in
 //   說明   every app's guide (help.mjs)
-import { APPS, AVATARS, FRAMES, MILESTONES, DEFAULT_AVATAR, milestoneOf, avatarSrc, settingPatch, passAccount, appIcon, el as node } from '#kit/orbit.mjs';
+import { APPS, AVATARS, FRAMES, MILESTONES, DEFAULT_AVATAR, milestoneOf, avatarSrc, settingPatch, passAccount, appIcon, closeSheet, el as node } from '#kit/orbit.mjs';
 import { HELP_ORDER, helpFor } from './help.mjs';
 import { sheet, section } from './ui.mjs';
+import { homeOf } from './brand.mjs';
 
 export const STRINGS = {
   zh: {
@@ -57,6 +58,7 @@ export const STRINGS = {
     tab_apps: 'App',
     tab_help: '說明',
     here: '這裡',
+    share: '分享',
     appsSub: '每天用得到的 App，用同一個 Orbit Pass。'
   },
   en: {
@@ -106,6 +108,7 @@ export const STRINGS = {
     tab_apps: 'Apps',
     tab_help: 'Help',
     here: 'Here',
+    share: 'Share',
     appsSub: 'Everyday apps, on the same Orbit Pass.'
   }
 };
@@ -299,12 +302,22 @@ const ago = (t, then) => {
 // its guide and a way in.
 function renderApps(box, { q, t, locale, state, openHelp }) {
   const w = state.wallet;
+  // Its link and QR code (share.mjs), over this sheet, which closes.
+  const shareApp = async id => {
+    const { shareSheet } = await import('./share.mjs');
+    if (open) closeSheet(open.dialog);
+    shareSheet({ url: homeOf(id), title: APPS[id].name, app: id, lang: locale });
+  };
   const card = ([id, a]) => {
     const last = w.apps?.[id]?.last;
     const here = id === q.app;
     return el('div', { class: `q-card pad app-card${here ? ' here' : ''}` }, [
       el('div', { class: 'app-top' }, [el('img', { class: 'app-logo', src: svgUrl(appIcon(id)), alt: '', width: 48, height: 48 }), el('div', { class: 'app-name' }, [el('strong', { text: a.name }), el('small', { class: 'muted', text: a.role[locale === 'en' ? 'en' : 'zh'] })]), el('small', { class: 'muted app-last', text: here ? t('here') : last ? ago(t, last) : t('neverUsed') })]),
-      el('div', { class: 'two-btn' }, [el('button', { class: 'q-btn', type: 'button', text: t('guide'), onclick: () => openHelp(id) }), here ? null : el('button', { class: 'q-btn primary', type: 'button', text: t('open'), onclick: () => q.go(id) })])
+      el('div', { class: 'two-btn' }, [
+        el('button', { class: 'q-btn', type: 'button', text: t('guide'), onclick: () => openHelp(id) }),
+        el('button', { class: 'q-btn', type: 'button', text: t('share'), onclick: () => shareApp(id) }),
+        here ? null : el('button', { class: 'q-btn primary', type: 'button', text: t('open'), onclick: () => q.go(id) })
+      ])
     ]);
   };
   put(box, section('Orbit', el('div', { class: 'app-list' }, Object.entries(APPS).map(card)), { sub: t('appsSub') }), el('button', { class: 'q-btn block ghost pass-guide', type: 'button', text: t('passGuide'), onclick: () => openHelp('pass') }));
