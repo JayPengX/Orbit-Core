@@ -30,11 +30,14 @@ export async function site(request, fetcher = fetch) {
   }
   const res = await fetcher(`${PAGES}${path}${url.search}`, { method: request.method, headers, redirect: 'manual' });
   const out = new Response(res.body, res);
-  // Pages' own redirects (/Orbit-Law → /Orbit-Law/) stay on this domain, at the short name.
+  // Pages' own redirects (/Orbit-Law → /Orbit-Law/) stay on this domain, at
+  // the name asked for (/pass → /pass/, not the kit's /Shared-Proxy/).
   const loc = out.headers.get('Location');
   if (loc?.startsWith(PAGES)) {
     const p = loc.slice(PAGES.length);
-    out.headers.set('Location', url.origin + (shortPath(p) || p));
+    const repo = Object.hasOwn(SHORT, first) ? `/${SHORT[first]}` : '';
+    const asked = repo && (p === repo || p.startsWith(`${repo}/`)) ? `/${first}${p.slice(repo.length)}` : null;
+    out.headers.set('Location', url.origin + (asked || shortPath(p) || p));
   }
   return out;
 }

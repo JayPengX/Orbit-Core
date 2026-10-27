@@ -34,6 +34,8 @@ test("site: Pages' redirects land on the short name; the bare domain opens the f
   const p = pages(301, { Location: 'https://jaypengx.github.io/Orbit-Law/' });
   const res = await site(new Request('https://example.tw/law'), p.fetcher);
   assert.equal(res.headers.get('Location'), 'https://example.tw/law/');
+  const kit = pages(301, { Location: 'https://jaypengx.github.io/Shared-Proxy/' });
+  assert.equal((await site(new Request('https://example.tw/pass'), kit.fetcher)).headers.get('Location'), 'https://example.tw/pass/');
   assert.equal((await site(new Request('https://example.tw/'), p.fetcher)).headers.get('Location'), 'https://example.tw/pass/');
 });
 
