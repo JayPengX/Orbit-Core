@@ -1,36 +1,49 @@
 // orbit-site: the family's apps on its own domain (kit/domain.mjs DOMAIN),
-// https://<DOMAIN>/<Repo>/, the very paths GitHub Pages serves them at, so
-// the kit's '../Shared-Proxy/kit/' and every link between apps hold as
-// they are. Each file is GitHub Pages' own, read through: an app's push
-// still deploys it (its Pages workflow), live on both addresses at once;
-// nothing is copied, nothing to keep in step. Cloudflare's cache keeps what
-// Pages says may be kept (its 10 minutes for files; the kit's and apps'
-// files carry their hash, so an update is never held back).
-// No domain yet: never deployed (deploy.yml), and nothing points here.
+// each at its short name (kit/brand.mjs SHORT): https://<DOMAIN>/law/ is
+// GitHub Pages' /Orbit-Law/, read through, so an app's push still deploys
+// it (its Pages workflow), live on both addresses at once; nothing is
+// copied, nothing to keep in step. The kit stays at /Shared-Proxy/kit/ (the
+// apps load it as '../Shared-Proxy/kit/'), the family's data at
+// /Shared-Data/. An app's old path (/Orbit-Law/…) is sent to its short one
+// for good (301), but for its service worker and version.json: a worker
+// installed there before keeps updating instead of failing on a redirect.
+// Cloudflare's cache keeps what Pages says may be kept (its 10 minutes for
+// files; the kit's and apps' files carry their hash, so an update is never
+// held back).
 import { PAGES } from './kit/domain.mjs';
-import { BRANDS } from './kit/brand.mjs';
+import { SHORT, shortPath } from './kit/brand.mjs';
 
-// The folders served: every app, the kit and the family's home page, and the
-// apps outside the brand list. Anything else at github.io isn't the family's.
-export const FOLDERS = new Set([...Object.values(BRANDS).map(b => b.repo), 'Shared-Proxy', 'Shared-Data', 'Longshot', 'Orbit-Money']);
+const AS_IS = new Set(['Shared-Proxy', 'Shared-Data']);
+const KEEP = /\/(sw\.js|version\.json)$/;
 
 export async function site(request, fetcher = fetch) {
   const url = new URL(request.url);
   if (request.method !== 'GET' && request.method !== 'HEAD') return new Response('', { status: 405, headers: { Allow: 'GET, HEAD' } });
-  // The domain itself: the family's home page.
-  if (url.pathname === '/' || url.pathname === '/index.html') return Response.redirect(`${url.origin}/Shared-Proxy/`, 302);
-  const folder = url.pathname.split('/')[1];
-  if (!FOLDERS.has(folder)) return new Response('Not found', { status: 404, headers: { 'Content-Type': 'text/plain' } });
+  // The domain itself: the family's page.
+  if (url.pathname === '/' || url.pathname === '/index.html') return Response.redirect(`${url.origin}/pass/`, 302);
+  const [, first = '', rest = ''] = /^\/([^/]*)(.*)$/.exec(url.pathname) || [];
+  let path;
+  if (Object.hasOwn(SHORT, first)) path = `/${SHORT[first]}${rest}`;
+  else if (AS_IS.has(first)) path = url.pathname;
+  else {
+    const moved = shortPath(url.pathname);
+    if (!moved) return new Response('Not found', { status: 404, headers: { 'Content-Type': 'text/plain' } });
+    if (!KEEP.test(url.pathname)) return Response.redirect(`${url.origin}${moved}${url.search}`, 301);
+    path = url.pathname;
+  }
   const headers = new Headers();
   for (const k of ['Accept', 'Accept-Encoding', 'Accept-Language', 'If-None-Match', 'If-Modified-Since', 'Range', 'User-Agent']) {
     const v = request.headers.get(k);
     if (v) headers.set(k, v);
   }
-  const res = await fetcher(`${PAGES}${url.pathname}${url.search}`, { method: request.method, headers, redirect: 'manual' });
+  const res = await fetcher(`${PAGES}${path}${url.search}`, { method: request.method, headers, redirect: 'manual' });
   const out = new Response(res.body, res);
-  // Pages' own redirects (/Orbit-Law → /Orbit-Law/) stay on this domain.
+  // Pages' own redirects (/Orbit-Law → /Orbit-Law/) stay on this domain, at the short name.
   const loc = out.headers.get('Location');
-  if (loc?.startsWith(PAGES)) out.headers.set('Location', url.origin + loc.slice(PAGES.length));
+  if (loc?.startsWith(PAGES)) {
+    const p = loc.slice(PAGES.length);
+    out.headers.set('Location', url.origin + (shortPath(p) || p));
+  }
   return out;
 }
 

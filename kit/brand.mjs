@@ -7,30 +7,41 @@
 // `id` stays what the apps and the pass store under (stock, match,
 // vocab…); only the names and looks are the brand's.
 
-import { SITE } from './domain.mjs';
+import { SITE, DOMAIN, onDomain } from './domain.mjs';
 
 export const GOLD = '#f5c451';
 export const FAMILY = { name: 'Orbit', from: '#312e81', to: '#020617', ink: '#1e1b4b', accent: '#a5b4fc', tag: { zh: '每天用得到的 App，一個 Orbit Pass', en: 'Everyday apps, one Orbit Pass' } };
 
 // repo: the GitHub repo (and Pages path) each app lives at.
 export const BRANDS = {
-  stock: { name: 'Orbit Securities', short: 'Securities', repo: 'Orbit-Securities', from: '#2dd4bf', to: '#0f3d5c', ink: '#0f766e', color: '#0d9488', paint: ['#5eead4', '#0d9488', '#134e4a'], spot: '#fde047', pitch: { zh: '全球股市，模擬投資', en: 'Invest worldwide, risk-free' }, role: { zh: '投資與理財', en: 'Invest and grow' }, tag: { zh: '全球股市模擬投資：真實報價、換匯與融資', en: 'Invest in markets worldwide with play money' } },
-  orbit: { name: 'Orbit Class', short: 'Class', repo: 'Orbit-Class', from: '#7dd3fc', to: '#0c4a6e', ink: '#0369a1', color: '#0ea5e9', paint: ['#67e8f9', '#0891b2', '#164e63'], spot: '#fde047', pitch: { zh: '今天的課，一眼看懂', en: 'Today’s classes at a glance' }, role: { zh: '課表', en: 'Class schedule' }, tag: { zh: '即時課表：現在、下一節與倒數', en: 'Your class schedule, live' } },
-  weather: { name: 'Orbit Weather', short: 'Weather', repo: 'Orbit-Weather', from: '#a5b4fc', to: '#312e81', ink: '#4338ca', color: '#6366f1', paint: ['#93c5fd', '#2563eb', '#1e3a8a'], spot: '#fcd34d', pitch: { zh: '一個答案的天氣', en: 'One clear forecast' }, role: { zh: '天氣', en: 'Weather' }, tag: { zh: '一個答案的天氣：降雨、紫外線、空氣，跟著你的行程', en: 'One clear forecast for wherever you’ll be' } },
-  transit: { name: 'Orbit Transit', short: 'Transit', repo: 'Orbit-Transit', from: '#6ee7b7', to: '#064e3b', ink: '#047857', color: '#10b981', paint: ['#86efac', '#16a34a', '#14532d'], spot: '#fde047', pitch: { zh: '公車、火車、YouBike', en: 'Bus, train and bike' }, role: { zh: '大眾運輸', en: 'Public transport' }, tag: { zh: '全台公車、火車、捷運與 YouBike，一次規劃', en: 'Buses, trains, metros and bikes across Taiwan' } },
-  match: { name: 'Orbit Sports', short: 'Sports', repo: 'Orbit-Sports', from: '#fdba74', to: '#9a3412', ink: '#c2410c', color: '#ea580c', paint: ['#fdba74', '#f97316', '#9a3412'], spot: '#fff', pitch: { zh: '每場比賽，即時比分', en: 'Every game, live' }, role: { zh: '賽程與比分', en: 'Scores and schedules' }, tag: { zh: '所有運動的賽程、比分與數據', en: 'Every sport, every match, every stat' } },
-  beats: { name: 'Orbit Beats', short: 'Beats', repo: 'Orbit-Beats', from: '#f0abfc', to: '#701a75', ink: '#a21caf', color: '#c026d3', paint: ['#f0abfc', '#c026d3', '#581c87'], spot: '#fde047', pitch: { zh: '做出你的節拍', en: 'Make your own beats' }, role: { zh: '節拍作曲', en: 'Beat maker' }, tag: { zh: '把你的節拍片段，排成一首首新歌', en: 'Your beat pieces, arranged into new songs' } },
-  law: { name: 'Orbit Law', short: 'Law', repo: 'Orbit-Law', from: '#a5b4fc', to: '#1e1b4b', ink: '#4338ca', color: '#4f46e5', paint: ['#6366f1', '#3730a3', '#1e1b4b'], spot: '#fcd34d', pitch: { zh: '法規、裁判、立法', en: 'Laws, rulings, bills' }, role: { zh: '法規與法案', en: 'Laws and bills' }, tag: { zh: '台灣的法規，每個條號都能點；立法院的法案，走到哪一步一眼就懂。', en: 'Taiwan\'s laws with linked references, and 立法院 bills by stage' } },
-  money: { name: 'Orbit Money', short: 'Money', repo: 'Orbit-Money', from: '#fde047', to: '#713f12', ink: '#a16207', color: '#ca8a04', paint: ['#facc15', '#ca8a04', '#713f12'], spot: GOLD, pitch: { zh: '每一筆，記得清楚', en: 'Every dollar, in its place' }, role: { zh: '記帳', en: 'Money tracker' }, tag: { zh: '記帳：月曆一眼看每天花多少，帳戶、悠遊卡、信用卡一起算，發票掃一下就記好', en: 'Your spending by day, every account and card, invoices scanned in' } },
-  vocab: { name: 'Orbit Words', short: 'Words', repo: 'Orbit-Words', from: '#f9a8d4', to: '#831843', ink: '#be185d', color: '#db2777', paint: ['#fda4af', '#e11d48', '#881337'], spot: '#fde047', pitch: { zh: '背得住的英文單字', en: 'Words that stay' }, role: { zh: '英文單字', en: 'English words' }, tag: { zh: '背得住的英文單字：大考 6000 字，真人發音', en: 'English words that stay with you' } }
+  stock: { name: 'Orbit Securities', short: 'Securities', repo: 'Orbit-Securities', slug: 'securities', from: '#2dd4bf', to: '#0f3d5c', ink: '#0f766e', color: '#0d9488', paint: ['#5eead4', '#0d9488', '#134e4a'], spot: '#fde047', pitch: { zh: '全球股市，模擬投資', en: 'Invest worldwide, risk-free' }, role: { zh: '投資與理財', en: 'Invest and grow' }, tag: { zh: '全球股市模擬投資：真實報價、換匯與融資', en: 'Invest in markets worldwide with play money' } },
+  orbit: { name: 'Orbit Class', short: 'Class', repo: 'Orbit-Class', slug: 'class', from: '#7dd3fc', to: '#0c4a6e', ink: '#0369a1', color: '#0ea5e9', paint: ['#67e8f9', '#0891b2', '#164e63'], spot: '#fde047', pitch: { zh: '今天的課，一眼看懂', en: 'Today’s classes at a glance' }, role: { zh: '課表', en: 'Class schedule' }, tag: { zh: '即時課表：現在、下一節與倒數', en: 'Your class schedule, live' } },
+  weather: { name: 'Orbit Weather', short: 'Weather', repo: 'Orbit-Weather', slug: 'weather', from: '#a5b4fc', to: '#312e81', ink: '#4338ca', color: '#6366f1', paint: ['#93c5fd', '#2563eb', '#1e3a8a'], spot: '#fcd34d', pitch: { zh: '一個答案的天氣', en: 'One clear forecast' }, role: { zh: '天氣', en: 'Weather' }, tag: { zh: '一個答案的天氣：降雨、紫外線、空氣，跟著你的行程', en: 'One clear forecast for wherever you’ll be' } },
+  transit: { name: 'Orbit Transit', short: 'Transit', repo: 'Orbit-Transit', slug: 'transit', from: '#6ee7b7', to: '#064e3b', ink: '#047857', color: '#10b981', paint: ['#86efac', '#16a34a', '#14532d'], spot: '#fde047', pitch: { zh: '公車、火車、YouBike', en: 'Bus, train and bike' }, role: { zh: '大眾運輸', en: 'Public transport' }, tag: { zh: '全台公車、火車、捷運與 YouBike，一次規劃', en: 'Buses, trains, metros and bikes across Taiwan' } },
+  match: { name: 'Orbit Sports', short: 'Sports', repo: 'Orbit-Sports', slug: 'sports', from: '#fdba74', to: '#9a3412', ink: '#c2410c', color: '#ea580c', paint: ['#fdba74', '#f97316', '#9a3412'], spot: '#fff', pitch: { zh: '每場比賽，即時比分', en: 'Every game, live' }, role: { zh: '賽程與比分', en: 'Scores and schedules' }, tag: { zh: '所有運動的賽程、比分與數據', en: 'Every sport, every match, every stat' } },
+  beats: { name: 'Orbit Beats', short: 'Beats', repo: 'Orbit-Beats', slug: 'beats', from: '#f0abfc', to: '#701a75', ink: '#a21caf', color: '#c026d3', paint: ['#f0abfc', '#c026d3', '#581c87'], spot: '#fde047', pitch: { zh: '做出你的節拍', en: 'Make your own beats' }, role: { zh: '節拍作曲', en: 'Beat maker' }, tag: { zh: '把你的節拍片段，排成一首首新歌', en: 'Your beat pieces, arranged into new songs' } },
+  law: { name: 'Orbit Law', short: 'Law', repo: 'Orbit-Law', slug: 'law', from: '#a5b4fc', to: '#1e1b4b', ink: '#4338ca', color: '#4f46e5', paint: ['#6366f1', '#3730a3', '#1e1b4b'], spot: '#fcd34d', pitch: { zh: '法規、裁判、立法', en: 'Laws, rulings, bills' }, role: { zh: '法規與法案', en: 'Laws and bills' }, tag: { zh: '台灣的法規，每個條號都能點；立法院的法案，走到哪一步一眼就懂。', en: 'Taiwan\'s laws with linked references, and 立法院 bills by stage' } },
+  money: { name: 'Orbit Money', short: 'Money', repo: 'Orbit-Money', slug: 'money', from: '#fde047', to: '#713f12', ink: '#a16207', color: '#ca8a04', paint: ['#facc15', '#ca8a04', '#713f12'], spot: GOLD, pitch: { zh: '每一筆，記得清楚', en: 'Every dollar, in its place' }, role: { zh: '記帳', en: 'Money tracker' }, tag: { zh: '記帳：月曆一眼看每天花多少，帳戶、悠遊卡、信用卡一起算，發票掃一下就記好', en: 'Your spending by day, every account and card, invoices scanned in' } },
+  vocab: { name: 'Orbit Words', short: 'Words', repo: 'Orbit-Words', slug: 'words', from: '#f9a8d4', to: '#831843', ink: '#be185d', color: '#db2777', paint: ['#fda4af', '#e11d48', '#881337'], spot: '#fde047', pitch: { zh: '背得住的英文單字', en: 'Words that stay' }, role: { zh: '英文單字', en: 'English words' }, tag: { zh: '背得住的英文單字：大考 6000 字，真人發音', en: 'English words that stay with you' } }
 };
 export const SITE_URL = SITE;
-export const pathOf = id => {
-  const b = BRANDS[id];
-  return b ? `/${b.repo}/` : '/';
-};
-// Where an app will live (the new repo), for its links shared outside.
-export const homeOf = id => `${SITE_URL}/${BRANDS[id].repo}/`;
+// An app's folder: /<repo>/ on GitHub Pages, /<slug>/ on the family's own
+// domain (site.js serves each slug from its repo's Pages and sends the
+// repo's path there). pathOf: as the page it runs on has it.
+export const repoPathOf = id => (BRANDS[id] ? `/${BRANDS[id].repo}/` : '/');
+export const shortPathOf = id => (BRANDS[id] ? `/${BRANDS[id].slug}/` : '/');
+export const pathOf = id => (onDomain ? shortPathOf(id) : repoPathOf(id));
+// Where an app lives, for its links shared outside (a QR code, a share card, a notice).
+export const homeOf = id => `${SITE_URL}${DOMAIN ? shortPathOf(id) : repoPathOf(id)}`;
+// The folders served on the domain, by their short name: every app's, and the
+// family's others (the Pass's page, Longshot, the showcase).
+export const SHORT = { ...Object.fromEntries(Object.values(BRANDS).map(b => [b.slug, b.repo])), pass: 'Shared-Proxy', longshot: 'Longshot', showcase: 'Showcase' };
+// A path on GitHub Pages as it is on the domain ('/Orbit-Law/x' → '/law/x'); null if it isn't one that moved.
+export function shortPath(path) {
+  const [, first, rest = ''] = /^\/([^/]+)(.*)$/.exec(path) || [];
+  const slug = Object.keys(SHORT).find(k => SHORT[k] === first && k !== 'pass');
+  return slug ? `/${slug}${rest}` : null;
+}
 
 // The Orbit Pass: the account, in every app's top-right.
 export const PASS = { name: 'Orbit Pass', short: 'Pass', from: '#334155', to: '#020617', ink: '#0f172a', paint: ['#64748b', '#1e293b', '#020617'], spot: GOLD, pitch: { zh: '一組通行碼，所有 App', en: 'One pass, every app' }, tag: { zh: '一組通行碼，所有 App 共用', en: 'One pass for every app' } };

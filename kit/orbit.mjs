@@ -29,7 +29,7 @@
 // that one live; the one left behind stops refreshing and says so, with a
 // button to continue there. Links between the apps carry the sign-in along.
 
-import { BRANDS, FAMILY, pathOf, appIcon, familyMark } from './brand.mjs';
+import { BRANDS, FAMILY, pathOf, homeOf, shortPath, appIcon, familyMark } from './brand.mjs';
 import { DEV, cleanDev } from './brand.mjs';
 import { API, SITE as HOME, PAGES, isApi } from './domain.mjs';
 import { icons, tile, pullToRefresh, setSheetDetent, h as node } from './ui.mjs';
@@ -1697,7 +1697,7 @@ async function moveTo(s) {
     try {
       parts.push(`qh=${(await s.op('handoff')).handoff}`);
     } catch {}
-  loc.replace(`${HOME}${loc.pathname}${loc.search}${parts.length ? `#${parts.join('&')}` : ''}`);
+  loc.replace(`${HOME}${shortPath(loc.pathname) || loc.pathname}${loc.search}${parts.length ? `#${parts.join('&')}` : ''}`);
   return true;
 }
 async function movedNotice(app, lang) {
@@ -1706,7 +1706,7 @@ async function movedNotice(app, lang) {
   if (!(await newHomeUp())) return;
   writeStore(key, twDay(Date.now()));
   const en = lang === 'en';
-  const url = `${HOME}${APPS[app]?.path || '/'}`;
+  const url = homeOf(app);
   const host = url.replace(/^https:\/\//, '');
   const copy = await ask({
     icon: 'home',
@@ -2792,7 +2792,7 @@ function insideGate(app, home, lang) {
   installCovered = true;
   const en = lang === 'en';
   const name = appName(app);
-  const url = `${SITE}${APPS[app].path}`;
+  const url = homeOf(app);
   const copy = node('button', {
     class: 'q-btn',
     type: 'button',
@@ -2837,7 +2837,7 @@ export function phoneOnlyGate(app, { lang = detectLang(), qr = '' } = {}) {
   if (isPhoneOrTablet()) return false;
   const en = lang === 'en';
   const name = appName(app);
-  const url = `${SITE}${APPS[app].path}`;
+  const url = homeOf(app);
   const qrBox = node('div', { class: 'q-qr', role: 'img', 'aria-label': en ? `QR code for ${url}` : `${url} 的 QR code` });
   qrBox.innerHTML = qr;
   const copy = node('button', {
