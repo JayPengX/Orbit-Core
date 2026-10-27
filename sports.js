@@ -1300,6 +1300,7 @@ async function keptCopy(key) {
 }
 // A CPBL month read in part (its route's `read` days): the days it didn't
 // read from the nightly whole copy (builders/asia.js), whole then if that was.
+const isRaceDay = url => url.hostname === 'site.api.espn.com' && /\/racing\/[^/]+\/scoreboard$/.test(url.pathname);
 const isCpblMonth = url => url.hostname === ASIA_HOST && /^\/cpbl\/\d{4}-\d{2}\.json$/.test(url.pathname);
 export function fillCpblMonth(fresh, kept) {
   if (!fresh || fresh.whole || !Array.isArray(fresh.read) || !kept?.games?.length) return fresh;
@@ -1321,6 +1322,9 @@ async function readKept(key, url) {
     // (The nightly mirror's copies carry a day's `until`; one that's over for good is kept for good.
     // A CPBL month only whole: one cut short was kept "for good" by the route.)
     if (isCpblMonth(url) && !copy?.data?.whole) return null;
+    // (A race weekend's day kept before 2026-10-27 may have been kept with
+    // sessions still to come: kept only if over by today's rule.)
+    if (isRaceDay(url)) return settledData(url, copy?.data) ? JSON.stringify(copy.data) : null;
     return copy?.until > Date.now() || settledData(url, copy?.data) ? JSON.stringify(copy.data) : null;
   } catch {
     return null;
@@ -1358,7 +1362,7 @@ async function resolveOne(upstreamUrl, trim, ctx, { mirror = true, within } = {}
   if (cached && isCpblMonth(upstreamUrl) && match.headers.get('X-Sports-Proxy-Final') === '1' && !parsed(cached.body)?.whole) cached = null;
   // A race weekend's day kept "for good" before all its sessions were over
   // (the rule before 2026-10-27): not a copy either, read again.
-  if (cached && /\/racing\/[^/]+\/scoreboard$/.test(upstreamUrl.pathname) && match.headers.get('X-Sports-Proxy-Final') === '1' && !settledData(upstreamUrl, parsed(cached.body))) cached = null;
+  if (cached && isRaceDay(upstreamUrl) && match.headers.get('X-Sports-Proxy-Final') === '1' && !settledData(upstreamUrl, parsed(cached.body))) cached = null;
   if (cached) {
     // A copy over for good is fresh a day (CACHE_FINAL), not its address's seconds.
     if (match.headers.get('X-Sports-Proxy-Final') === '1') policy = CACHE_FINAL;
