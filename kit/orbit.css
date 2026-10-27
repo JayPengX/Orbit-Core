@@ -2774,20 +2774,24 @@ dialog.q-moved::backdrop {
 .q-pc-brand { font: 500 13px/18px var(--q-font); opacity: 0.7; }
 .q-pc-big { font: 700 22px/28px var(--q-font); white-space: nowrap; }
 .q-pc-no { font-size: 12.5px; opacity: 0.7; letter-spacing: 0.04em; white-space: nowrap; }
-.q-pc-ms { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 6px; }
-.q-pc-ms img { display: block; width: 100%; aspect-ratio: 1; border-radius: 50%; filter: grayscale(0.6); opacity: 0.45; }
-.q-pc-ms img.got { filter: none; opacity: 1; box-shadow: 0 0 0 1.5px #fbbf24; }
+.q-pc-ms { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; }
+.q-pc-ms img { display: block; width: 100%; max-width: 40px; aspect-ratio: 1; border-radius: 50%; }
+.q-pc-ms img.dim { opacity: 0.4; }
 /* Milestone frames: the app's colours with gold, turning. */
-.q-frame-ms-pass { --q-frame: conic-gradient(from var(--q-spin), #2dd4bf, #7dd3fc, #a5b4fc, #6ee7b7, #fbbf24, #fdba74, #f0abfc, #f9a8d4, #2dd4bf); box-shadow: 0 0 10px rgba(251, 191, 36, 0.55); animation: q-spin 8s linear infinite; }
-.q-frame-ms-stock { --q-frame: conic-gradient(from var(--q-spin), #2dd4bf, #fbbf24, #0f3d5c, #fde68a, #2dd4bf); box-shadow: 0 0 9px rgba(45, 212, 191, 0.5); animation: q-spin 9s linear infinite; }
-.q-frame-ms-orbit { --q-frame: conic-gradient(from var(--q-spin), #7dd3fc, #fbbf24, #0c4a6e, #fde68a, #7dd3fc); box-shadow: 0 0 9px rgba(14, 165, 233, 0.5); animation: q-spin 9s linear infinite; }
-.q-frame-ms-weather { --q-frame: conic-gradient(from var(--q-spin), #a5b4fc, #fbbf24, #312e81, #fde68a, #a5b4fc); box-shadow: 0 0 9px rgba(99, 102, 241, 0.5); animation: q-spin 9s linear infinite; }
-.q-frame-ms-transit { --q-frame: conic-gradient(from var(--q-spin), #6ee7b7, #fbbf24, #064e3b, #fde68a, #6ee7b7); box-shadow: 0 0 9px rgba(16, 185, 129, 0.5); animation: q-spin 9s linear infinite; }
-.q-frame-ms-match { --q-frame: conic-gradient(from var(--q-spin), #fdba74, #fbbf24, #9a3412, #fde68a, #fdba74); box-shadow: 0 0 9px rgba(234, 88, 12, 0.5); animation: q-spin 9s linear infinite; }
-.q-frame-ms-beats { --q-frame: conic-gradient(from var(--q-spin), #f0abfc, #fbbf24, #701a75, #fde68a, #f0abfc); box-shadow: 0 0 9px rgba(192, 38, 211, 0.5); animation: q-spin 9s linear infinite; }
-.q-frame-ms-law { --q-frame: conic-gradient(from var(--q-spin), #818cf8, #fbbf24, #1e1b4b, #fde68a, #818cf8); box-shadow: 0 0 9px rgba(79, 70, 229, 0.5); animation: q-spin 9s linear infinite; }
-.q-frame-ms-vocab { --q-frame: conic-gradient(from var(--q-spin), #f9a8d4, #fbbf24, #831843, #fde68a, #f9a8d4); box-shadow: 0 0 9px rgba(219, 39, 119, 0.5); animation: q-spin 9s linear infinite; }
-.q-frame-ms-money { --q-frame: conic-gradient(from var(--q-spin), #fde047, #fbbf24, #713f12, #fef3c7, #fde047); box-shadow: 0 0 9px rgba(161, 98, 7, 0.5); animation: q-spin 9s linear infinite; }
+.q-frame-ms-pass { --q-frame: conic-gradient(from var(--q-spin), #2dd4bf, #7dd3fc, #a5b4fc, #6ee7b7, #fbbf24, #fdba74, #f0abfc, #f9a8d4, #2dd4bf); animation: q-spin 8s linear infinite; }
+.q-frame-ms-stock { --q-frame: conic-gradient(from var(--q-spin), #2dd4bf, #fbbf24, #0f3d5c, #fde68a, #2dd4bf); animation: q-spin 9s linear infinite; }
+.q-frame-ms-orbit { --q-frame: conic-gradient(from var(--q-spin), #7dd3fc, #fbbf24, #0c4a6e, #fde68a, #7dd3fc); animation: q-spin 9s linear infinite; }
+.q-frame-ms-weather { --q-frame: conic-gradient(from var(--q-spin), #a5b4fc, #fbbf24, #312e81, #fde68a, #a5b4fc); animation: q-spin 9s linear infinite; }
+.q-frame-ms-transit { --q-frame: conic-gradient(from var(--q-spin), #6ee7b7, #fbbf24, #064e3b, #fde68a, #6ee7b7); animation: q-spin 9s linear infinite; }
+.q-frame-ms-match { --q-frame: conic-gradient(from var(--q-spin), #fdba74, #fbbf24, #9a3412, #fde68a, #fdba74); animation: q-spin 9s linear infinite; }
+.q-frame-ms-beats { --q-frame: conic-gradient(from var(--q-spin), #f0abfc, #fbbf24, #701a75, #fde68a, #f0abfc); animation: q-spin 9s linear infinite; }
+.q-frame-ms-law { --q-frame: conic-gradient(from var(--q-spin), #818cf8, #fbbf24, #1e1b4b, #fde68a, #818cf8); animation: q-spin 9s linear infinite; }
+.q-frame-ms-vocab { --q-frame: conic-gradient(from var(--q-spin), #f9a8d4, #fbbf24, #831843, #fde68a, #f9a8d4); animation: q-spin 9s linear infinite; }
+/* A milestone's frame in its tier's metal: bronze and silver still, gold
+   the app's own colours turning (above). */
+.q-framed.q-ms-t1 { --q-frame: linear-gradient(135deg, #7c2d12, #fdba74, #b45309, #fed7aa); animation: none; }
+.q-framed.q-ms-t2 { --q-frame: linear-gradient(135deg, #64748b, #f8fafc, #94a3b8, #e2e8f0); animation: none; }
+.q-frame-ms-money { --q-frame: conic-gradient(from var(--q-spin), #fde047, #fbbf24, #713f12, #fef3c7, #fde047); animation: q-spin 9s linear infinite; }
 .q-notice-sub {
   font: var(--q-t-footnote);
   color: var(--q-muted);
@@ -2942,23 +2946,39 @@ dialog {
 
 
 .q-pass .looks { display: grid; gap: 10px; }
-.q-pass .ms-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.q-pass .ms-tile { display: grid; justify-items: center; align-content: start; gap: 5px; min-width: 0; padding: 12px 4px 10px; border: 1.5px solid var(--q-border); border-radius: 14px; background: var(--q-surface); color: inherit; font: inherit; cursor: default; }
-.q-pass .ms-tile.got { cursor: pointer; }
-.q-pass .ms-tile.on { border-color: var(--accent); background: var(--accent-wash); }
-.q-pass .ms-look { position: relative; display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; }
-.q-pass .ms-tile:not(.got) .ms-look { --q-frame: var(--q-border); box-shadow: none; animation: none; }
-.q-pass .ms-tile:not(.got) .av-face { filter: grayscale(0.45); opacity: 0.6; }
-.q-pass .ms-lock { position: absolute; right: -4px; bottom: -4px; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--q-surface); color: var(--q-muted); box-shadow: 0 0 0 1.5px var(--q-border); }
-.q-pass .ms-lock svg { width: 12px; height: 12px; }
-.q-pass .ms-tile strong { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-.q-pass .ms-prog { display: grid; gap: 4px; width: 100%; padding: 0 6px; box-sizing: border-box; }
-.q-pass .ms-bar { display: block; height: 5px; border-radius: 3px; background: color-mix(in srgb, var(--q-text) 12%, transparent); overflow: hidden; }
-.q-pass .ms-bar i { display: block; min-width: 5px; height: 100%; border-radius: 3px; background: linear-gradient(90deg, #f59e0b, #fbbf24); }
-.q-pass .ms-prog small { display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 11px; color: var(--q-muted); white-space: nowrap; }
-.q-pass .ms-prog small img { border-radius: 3px; flex: none; }
-.q-pass .ms-state { font-size: 11.5px; font-weight: 700; color: #f59e0b; }
-.q-pass .ms-tile.on .ms-state { color: var(--accent); }
+/* 里程碑: the next medal open on the page (the focal number, a bar, the
+   medal it earns), then one row each in a list. */
+.q-pass .ms-got { margin-left: auto; color: var(--q-label-2); font: var(--q-t-footnote); }
+.q-pass .ms-next { display: flex; align-items: center; gap: 16px; margin: 4px 0 24px; }
+.q-pass .ms-next-text { display: grid; gap: 4px; flex: 1 1 auto; min-width: 0; }
+.q-pass .ms-next-text small { color: var(--q-label-2); font: var(--q-t-subhead); }
+.q-pass .ms-next-n { font: var(--q-t-focal); letter-spacing: -0.02em; white-space: nowrap; }
+.q-pass .ms-next-n span { color: var(--q-label-2); font: var(--q-t-figure); }
+.q-pass .ms-next-look { flex: none; display: grid; place-items: center; width: 76px; height: 76px; border-radius: 50%; }
+.q-pass .ms-next-look .av-face { width: 100%; height: 100%; border-radius: 50%; }
+.q-pass .ms-bar { display: block; height: 4px; margin: 4px 0 2px; border-radius: 2px; background: var(--q-fill-3, color-mix(in srgb, var(--q-text) 12%, transparent)); overflow: hidden; }
+.q-pass .ms-bar i { display: block; min-width: 4px; height: 100%; border-radius: 2px; background: var(--accent); }
+.q-pass .ms-list { --q-sep-left: 68px; }
+.q-pass .ms-row { width: 100%; min-width: 0; min-height: 64px; }
+.q-pass .ms-row:not(.got) { cursor: default; }
+.q-pass .ms-look { flex: none; display: block; width: 40px; height: 40px; border-radius: 50%; overflow: hidden; }
+.q-pass .ms-look .av-face { display: block; width: 100%; height: 100%; }
+.q-pass .ms-look.icon { border-radius: 10px; opacity: 0.85; }
+.q-pass .ms-name { display: flex; align-items: baseline; gap: 8px; }
+.q-pass .ms-name em { color: var(--accent); font: var(--q-t-footnote); font-style: normal; }
+.q-pass .ms-row.on .ms-look { box-shadow: 0 0 0 2px var(--q-surface), 0 0 0 4px var(--accent); }
+.q-pass .ms-row .q-cell-text small { white-space: normal; text-wrap: pretty; }
+.q-pass .ms-side { flex: none; display: grid; justify-items: end; gap: 6px; }
+.q-pass .ms-side small { color: var(--q-label-2); font: var(--q-t-footnote); white-space: nowrap; }
+.q-pass .ms-pips { display: flex; gap: 4px; }
+.q-pass .ms-pips i { width: 8px; height: 8px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--q-sep); }
+.q-pass .ms-pips i.on { box-shadow: none; }
+.q-pass .ms-pips i.t1.on { background: #c2410c; }
+.q-pass .ms-pips i.t2.on { background: #94a3b8; }
+.q-pass .ms-pips i.t3.on { background: #f59e0b; }
+.q-pass .ms-pips i.t1.next { box-shadow: inset 0 0 0 1.5px #c2410c; }
+.q-pass .ms-pips i.t2.next { box-shadow: inset 0 0 0 1.5px #94a3b8; }
+.q-pass .ms-pips i.t3.next { box-shadow: inset 0 0 0 1.5px #f59e0b; }
 
 .q-pass .lv-h { color: var(--q-muted); font-size: 12.5px; font-weight: 700; }
 .q-pass .av-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }

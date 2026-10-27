@@ -5,7 +5,7 @@
 //   外觀   an avatar and a frame, free for everyone
 //   App    every app, Orbit's and Orbit's, when it was last used, a way in
 //   說明   every app's guide (help.mjs)
-import { APPS, AVATARS, FRAMES, MILESTONES, DEFAULT_AVATAR, milestoneOf, avatarSrc, settingPatch, passAccount, appIcon, closeSheet, el as node } from '#kit/orbit.mjs';
+import { APPS, AVATARS, FRAMES, MILESTONES, TIERS, DEFAULT_AVATAR, milestoneOf, avatarSrc, settingPatch, passAccount, appIcon, closeSheet, el as node } from '#kit/orbit.mjs';
 import { HELP_ORDER, helpFor } from './help.mjs';
 import { sheet, section } from './ui.mjs';
 import { homeOf } from './brand.mjs';
@@ -18,7 +18,11 @@ export const STRINGS = {
     framesTitle: '頭像框',
     looksSub: '戴上後，每個 Orbit App 的帳戶按鈕都看得到。',
     msTitle: '里程碑',
-    msDone: '已達成',
+    msNext: '下一枚：{name}{tier}牌',
+    msGot: '{n}/{all} 枚',
+    msMax: '金牌到手，全部達成',
+    msHow: '{tier}牌：{goal}',
+    msReward: '拿到就能戴上它的頭像和頭像框。',
     failed: '沒有成功，請再試一次',
     usedToday: '今天用過',
     usedDaysAgo: '{n} 天前用過',
@@ -68,7 +72,11 @@ export const STRINGS = {
     framesTitle: 'Frames',
     looksSub: 'Worn on your account button in every Orbit app.',
     msTitle: 'Milestones',
-    msDone: 'Earned',
+    msNext: 'Next: {name}, {tier}',
+    msGot: '{n} of {all}',
+    msMax: 'Gold, all done',
+    msHow: '{tier}: {goal}',
+    msReward: 'Earn it to wear its avatar and frame.',
     failed: 'That didn’t work; please try again',
     usedToday: 'Used today',
     usedDaysAgo: 'Used {n} days ago',
@@ -265,24 +273,46 @@ function looksSection({ q, t, locale, wornOf, wear, wearPair }) {
     frame: f => el('span', { class: `fr-preview q-framed q-frame-${f.id}${frame === f.id ? ' on' : ''}`, 'aria-hidden': 'true' }, [face(AVATARS.some(a => a.id === avatar) ? avatar : DEFAULT_AVATAR)])
   };
   const grid = (key, list) => el('div', { class: `av-grid ${key}s` }, list.map(x => tile(key, x, faces[key](x))));
-  // A milestone: its look (dim, with a lock, until earned), its name, and
-  // how far along (a bar and the count) or that it's earned.
-  const ms = m => {
-    const st = milestoneOf(wallet, m);
+  // The milestones. First the one nearest its next tier, open on the page:
+  // how far along (the focal number and a bar), what the tier asks, and the
+  // medal it earns. Then all of them, one row each: the medal in the metal
+  // reached (the app's icon before any), its name, the next tier's goal and
+  // how far along, and a pip per tier. An earned row wears its avatar and
+  // frame together; a second tap takes them off. (The count sits over the
+  // pips, never wrapped into the line.)
+  const all = MILESTONES.map(m => ({ m, st: milestoneOf(wallet, m) }));
+  const tierName = i => TIERS[i - 1][en ? 'en' : 'zh'];
+  const count = (m, n) => (m.money ? compact(n, en) : `${n}`);
+  const unit = m => m.unit[en ? 'en' : 'zh'];
+  const goalText = (m, n) => m.do[en ? 'en' : 'zh'].replace('{n}', m.money ? `${en ? 'NT$' : ''}${compact(n, en)}` : n);
+  const share = ({ st }) => st.n / st.goal;
+  const next = all.filter(x => !x.st.max).sort((a, b) => share(b) - share(a) || a.st.tier - b.st.tier)[0];
+  const focus = next
+    ? el('div', { class: 'ms-next' }, [
+        el('div', { class: 'ms-next-text' }, [
+          el('small', { text: t('msNext', { name: next.m[locale], tier: tierName(next.st.tier + 1) }) }),
+          el('strong', { class: 'ms-next-n num' }, [document.createTextNode(count(next.m, next.st.n)), el('span', { text: ` / ${count(next.m, next.st.goal)}${unit(next.m) ? ` ${unit(next.m)}` : ''}` })]),
+          el('span', { class: 'ms-bar' }, [el('i', { style: `width:${Math.round(share(next) * 100)}%` })]),
+          el('small', { text: `${goalText(next.m, next.st.goal)}${en ? '. ' : '，'}${t('msReward')}` })
+        ]),
+        el('span', { class: `ms-next-look q-framed q-frame-ms-${next.m.id} q-ms-t${next.st.tier + 1}` }, [face(`ms-${next.m.id}.${next.st.tier + 1}`)])
+      ])
+    : null;
+  // (The next tier's pip is ringed in its metal: what the line's goal earns.)
+  const pips = st => el('span', { class: 'ms-pips', 'aria-hidden': 'true' }, TIERS.map((x, i) => el('i', { class: `t${i + 1}${st.tier > i ? ' on' : st.tier === i ? ' next' : ''}` })));
+  const row = ({ m, st }) => {
     const id = `ms-${m.id}`;
     const on = avatar === id && frame === id;
-    const unit = m.unit[en ? 'en' : 'zh'];
-    const count = m.money ? `${compact(st.n, en)}/${compact(m.goal, en)}` : `${st.n}/${m.goal}${unit ? ` ${unit}` : ''}`;
-    return el('button', { class: `ms-tile${st.done ? ' got' : ''}${on ? ' on' : ''}`, type: 'button', 'aria-pressed': String(on), 'aria-disabled': String(!st.done), 'aria-label': `${m[locale]} ${st.done ? t('msDone') : count}`, onclick: () => st.done && wearPair(on ? null : id) }, [
-      el('span', { class: `ms-look q-framed q-frame-${id}` }, [face(id), st.done ? null : el('span', { class: 'ms-lock', html: LOCK })]),
-      el('strong', { text: m[locale] }),
-      st.done
-        ? el('small', { class: 'ms-state', text: on ? t('lookOn') : t('msDone') })
-        : el('span', { class: 'ms-prog' }, [el('span', { class: 'ms-bar' }, [el('i', { style: `width:${Math.round((st.n / m.goal) * 100)}%` })]), el('small', { class: 'num' }, [el('img', { src: svgUrl(appIcon(m.id)), alt: '', width: 13, height: 13 }), document.createTextNode(count)])])
+    const line = st.max ? t('msMax') : goalText(m, st.goal);
+    return el('button', { class: `q-cell ms-row${st.done ? ' got' : ''}${on ? ' on' : ''}`, type: 'button', 'aria-pressed': String(on), 'aria-disabled': String(!st.done), 'aria-label': `${m[locale]}, ${st.done ? tierName(st.tier) : ''}${st.max ? '' : ` ${t('msHow', { tier: tierName(st.tier + 1), goal: line })}`}`, onclick: () => st.done && wearPair(on ? null : id) }, [
+      st.done ? el('span', { class: 'ms-look' }, [face(`${id}.${st.tier}`)]) : el('img', { class: 'ms-look icon', src: svgUrl(appIcon(m.id)), alt: '' }),
+      el('span', { class: 'q-cell-text' }, [el('span', { class: 'ms-name' }, [document.createTextNode(m[locale]), on ? el('em', { text: t('lookOn') }) : null]), el('small', { class: 'num', text: line })]),
+      el('span', { class: 'ms-side' }, [st.max ? null : el('small', { class: 'num', text: `${count(m, st.n)}/${count(m, st.goal)}` }), pips(st)])
     ]);
   };
+  const got = all.reduce((sum, x) => sum + x.st.tier, 0);
   return el('div', {}, [
-    section(t('msTitle'), el('div', { class: 'ms-grid' }, MILESTONES.map(ms))),
+    section(t('msTitle'), [focus, el('div', { class: 'q-list ms-list' }, all.map(row))], { action: el('small', { class: 'ms-got num', text: t('msGot', { n: got, all: MILESTONES.length * TIERS.length }) }) }),
     section(
       t('looksTitle'),
       el('div', { class: 'q-card pad looks' }, [el('small', { class: 'lv-h', text: t('avatarsTitle') }), grid('avatar', AVATARS), el('small', { class: 'lv-h', text: t('framesTitle') }), grid('frame', FRAMES)]),
@@ -290,7 +320,6 @@ function looksSection({ q, t, locale, wornOf, wear, wearPair }) {
     )
   ]);
 }
-const LOCK = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5" fill="currentColor"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" fill="none" stroke="currentColor" stroke-width="2.2"/></svg>';
 
 // ---- Apps -----------------------------------------------------------------------------------
 

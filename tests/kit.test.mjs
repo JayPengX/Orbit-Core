@@ -462,43 +462,57 @@ test('looks: an avatar and a frame for everyone, from the lists only', () => {
   assert.ok([...kit.AVATARS, ...kit.FRAMES].every(x => !x.streak));
 });
 
-test('milestones: reached once, kept for good, and only then worn', async () => {
+test('milestones: three tiers, each reached once and kept, and only then worn', async () => {
   const now = Date.UTC(2026, 9, 23);
   const set = (k, v) => ({ [k]: { value: v, t: now } });
   const base = { entries: [], apps: {}, settings: {} };
   const of = (w, id) => kit.milestoneOf(w, kit.MILESTONES.find(m => m.id === id));
-  // One per app and one for the family, each with its drawn avatar and a frame.
+  // One per app and one for the family, each with its drawn avatar (one per tier) and a frame.
   assert.deepEqual(kit.MILESTONES.map(m => m.id).sort(), ['pass', ...Object.keys(kit.APPS)].sort());
   const css = await import('node:fs').then(fs => fs.readFileSync(new URL('../kit/orbit.css', import.meta.url), 'utf8'));
   for (const m of kit.MILESTONES) {
     assert.ok(css.includes(`.q-frame-ms-${m.id} {`), m.id);
-    assert.ok(!/\p{Extended_Pictographic}/u.test(decodeURIComponent(kit.avatarSrc(`ms-${m.id}`))));
+    assert.equal(m.goals.length, kit.TIERS.length);
+    assert.ok(m.goals.every((g, i) => !i || g > m.goals[i - 1]), m.id);
+    assert.ok(m.do.zh.includes('{n}') && m.do.en.includes('{n}'), m.id);
+    const drawn = [0, 1, 2, 3].map(t => kit.avatarSrc(`ms-${m.id}.${t}`));
+    assert.equal(new Set(drawn).size, 4, m.id);
+    assert.ok(drawn.every(d => !/\p{Extended_Pictographic}/u.test(decodeURIComponent(d))));
   }
-  // A locked one isn't worn, an earned one is.
+  assert.ok(!/(?:^|[^-])box-shadow/.test(css.match(/\.q-frame-ms-[^\n]*/g).join('\n')), 'no glows');
+  // A locked one isn't worn, an earned one is, drawn in the tier reached.
   const wearing = { ...base, settings: { ...set('avatar', { id: 'ms-vocab' }), ...set('frame', { id: 'ms-vocab' }) } };
   assert.equal(kit.avatarOf(wearing), null);
   assert.equal(kit.frameOf(wearing), null);
-  const got = { ...wearing, settings: { ...wearing.settings, ...set('ms.vocab', { n: 500, done: true }) } };
-  assert.equal(kit.avatarOf(got).id, 'ms-vocab');
-  assert.equal(kit.frameOf(got).id, 'ms-vocab');
-  // The family's from the apps opened; never past the goal.
+  const got = { ...wearing, settings: { ...wearing.settings, ...set('ms.vocab', { n: 120, t: 1, done: true }) } };
+  assert.equal(kit.avatarOf(got).id, 'ms-vocab.1');
+  assert.equal(kit.frameOf(got).tier, 1);
+  assert.equal(kit.frameClass(kit.frameOf(got)), 'q-framed q-frame-ms-vocab q-ms-t1');
+  // Before tiers: a `done` is the tier its one goal was (500 words: silver).
+  assert.equal(of({ ...base, settings: set('ms.vocab', { n: 500, done: true }) }, 'vocab').tier, 2);
+  // The family's from the apps opened; never past gold.
   const all = Object.fromEntries(Object.keys(kit.APPS).map(a => [a, { first: now, last: now }]));
   assert.equal(of({ ...base, apps: { law: { first: now, last: now } } }, 'pass').n, 1);
-  assert.equal(of({ ...base, apps: all }, 'pass').done, true);
-  // A count kept on the pass; once done, done even if it fell back.
-  assert.deepEqual(of({ ...base, settings: set('ms.match', { n: 12, d: '2026-10-23' }) }, 'match'), { n: 12, goal: 30, done: false });
-  assert.equal(of({ ...base, settings: set('ms.stock', { done: true }) }, 'stock').done, true);
-  // An app's count goes to the pass a tenth of the way at a time.
+  assert.deepEqual(of({ ...base, apps: all }, 'pass'), { n: Object.keys(kit.APPS).length, tier: 3, goal: Object.keys(kit.APPS).length, from: Object.keys(kit.APPS).length, done: true, max: true });
+  // A count kept on the pass, its next goal the next tier's; a tier stays even if the count fell back.
+  assert.deepEqual(of({ ...base, settings: set('ms.match', { n: 12, d: '2026-10-23' }) }, 'match'), { n: 12, tier: 1, goal: 30, from: 7, done: true, max: false });
+  assert.deepEqual(of({ ...base, settings: set('ms.match', { n: 2 }) }, 'match'), { n: 2, tier: 0, goal: 7, from: 0, done: false, max: false });
+  assert.equal(of({ ...base, settings: set('ms.stock', { t: 2, done: true }) }, 'stock').tier, 2);
+  // An app's count goes to the pass a tenth of the way to the next tier at a time.
   const writes = [];
-  const s = { wallet: { ...base, settings: set('ms.vocab', { n: 100 }) }, write: p => (writes.push(p), Promise.resolve()) };
+  const s = { wallet: { ...base, settings: set('ms.vocab', { n: 100, t: 1, done: true }) }, write: p => (writes.push(p), Promise.resolve()) };
   kit.milestone(s, 'vocab', 120);
   assert.equal(writes.length, 0);
   kit.milestone(s, 'vocab', 150);
-  assert.equal(writes[0].wallet.settings['ms.vocab'].value.n, 150);
+  assert.deepEqual(writes[0].wallet.settings['ms.vocab'].value, { n: 150, t: 1, done: true });
   await new Promise(r => setTimeout(r, 0));
-  // One added: written each time.
-  kit.milestone({ ...s, wallet: { ...base, settings: set('ms.law', { n: 9 }) } }, 'law');
-  assert.deepEqual(writes[1].wallet.settings['ms.law'].value, { n: 10, done: true });
+  // One added: written each time, the tier with it.
+  kit.milestone({ ...s, wallet: { ...base, settings: set('ms.law', { n: 9, t: 1, done: true }) } }, 'law');
+  assert.deepEqual(writes[1].wallet.settings['ms.law'].value, { n: 10, t: 2, done: true });
+  await new Promise(r => setTimeout(r, 0));
+  // Gold: nothing more to count.
+  kit.milestone({ ...s, wallet: { ...base, settings: set('ms.law', { n: 50, t: 3, done: true }) } }, 'law');
+  assert.equal(writes.length, 2);
 });
 
 test('where the money came from: the system, the bank, the government and the account itself', () => {
