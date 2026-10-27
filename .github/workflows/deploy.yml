@@ -216,14 +216,13 @@ jobs:
           for pair in "$domain orbit-site" "api.$domain orbit-workers-proxy"; do
             set -- $pair
             out=$(curl -sS --max-time 60 -X PUT -H "$auth" -H 'Content-Type: application/json' -d "{\"environment\":\"production\",\"hostname\":\"$1\",\"service\":\"$2\",\"zone_id\":\"$zone\"}" "$cf/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/domains")
-            if printf '%s' "$out" | grep -q '"success":true'; then echo "$1 → $2"; else echo "::error::$1 → $2 not attached: $out"; fail=1; fi
+            if printf '%s' "$out" | grep -qE '"success": ?true'; then echo "$1 → $2"; else echo "::error::$1 → $2 not attached: $out"; fail=1; fi
           done
-          # Orbit Money's mail-in (money-mail.js): Email Routing on, its catch-all to the proxy
+          # Orbit Money's mail-in (money-mail.js): Email Routing's catch-all to the proxy
           # (set in the dashboard; only read here, said in the log when it isn't so).
-          er=$(curl -sS --max-time 30 -H "$auth" "$cf/zones/$zone/email/routing" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const j=JSON.parse(s);console.log(j.success?`email routing: ${j.result.enabled?"on":"off"} (${j.result.status})`:`email routing unreadable: ${(j.errors||[]).map(e=>e.message).join("; ")}`)}catch{console.log("email routing unreadable")}})')
           ca=$(curl -sS --max-time 30 -H "$auth" "$cf/zones/$zone/email/routing/rules/catch_all" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const j=JSON.parse(s);const a=(j.result?.actions||[])[0];console.log(j.success?`catch-all: ${j.result.enabled?"on":"off"} → ${a?.type} ${(a?.value||[]).join(",")}`:`catch-all unreadable: ${(j.errors||[]).map(e=>e.message).join("; ")}`)}catch{console.log("catch-all unreadable")}})')
-          echo "$er"; echo "$ca"
-          printf '%s' "$ca" | grep -q 'on → worker orbit-workers-proxy' || echo "::warning::mail-in: $er; $ca (wanted: catch-all on → worker orbit-workers-proxy)"
+          echo "$ca"
+          printf '%s' "$ca" | grep -q 'on → worker orbit-workers-proxy' || echo "::warning::mail-in: $ca (wanted: catch-all on → worker orbit-workers-proxy)"
           exit $fail
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
