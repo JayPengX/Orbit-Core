@@ -223,6 +223,14 @@ per app. News that happens once is told once.
   panel, served by `/config`): `sportsList`, `sportsGame`, `f1*`,
   `playLive`, `tdx*`, `transit*`. `autoScale` slows them together as the
   family grows (`capacity.js`).
+- **AI caps** are settings too (`DEV ai*`, each naming its Gemini routes):
+  calls a day for everyone together, 0 pauses the feature. `worker.js
+  aiCap` reads them for `/gemini`, `/nl-edit`, `/law-ask`, `/law-chat`,
+  `/money-read`; each call is tallied `gemd:<feature>:<day>` for the panel.
+- **Errors**: the proxy tallies each route's 5xx (`err:<route>:<day>`); the
+  guard answers `/errors` (each Worker's errors in 24 h) over the `GUARD`
+  binding. The panel's 部署 starts or re-runs GitHub workflows with
+  `GH_ACTIONS_TOKEN` (fine-grained, Actions read and write, family repos only).
 - **`quota-guard`** (`guard.js`, a Durable Object alarm every 5 minutes):
   - reads the account's use from Cloudflare's analytics against `PLAN`
     (Workers, CPU, KV, DO, R2, D1);
