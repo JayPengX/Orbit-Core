@@ -63,6 +63,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 10-22 One date selector in every app (kit `dayBar`/`dayStrip`); never an app's own day chip row.
 - 10-22 Hates floating buttons over content: docked bars (`html.q-dock`, `.q-accessory`).
 - 10-23 Phones only, 320 to 440 px; iPad and computers show the phone column centred; no tablet or wide layouts ever.
+- 10-27 Exception: the admin panel (`site/admin`) has a real desktop layout (sidebar, wide grids) as well as the phone one, and on a phone nothing in it is cut or squeezed (secondary lines wrap). The Showcase is the other exception.
 - 10-23 Every team name in Chinese; people (players, drivers) in their own English names in both languages; never transliterate.
 - 10-23 One session per app: all apps run at once; only the same app opened in a second place pauses the first.
 - 10-23 A typhoon day off (停班停課) acts like a holiday in every app (kit `dayoff.mjs`, per place and need).
