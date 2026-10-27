@@ -1935,12 +1935,14 @@ const BILL_DEFAULTS = {
   }
 };
 const BILL_NAMES = { maps: '地圖載入（Transit）', autocomplete: '地點搜尋', details: '地點詳細', detailsPro: '地點名稱（Pro）', textSearch: '地點搜尋（補充）', routes: '路線規劃', weather: '天氣 API' };
+// Each Gemini route, by what the person sees.
+const GEMINI_FEATURES = { gemini: '課表照片匯入（Class）', 'nl-edit': '課表 AI 修改（Class）', 'law-ask': '白話解釋（Law）', 'law-chat': '問法律（Law）' };
 let bill = null;
 const ntd = v => `NT$${(Math.round(v * 10) / 10).toLocaleString()}`;
 function billPrices() {
   const p = { ...BILL_DEFAULTS.prices, ...(bill?.saved?.prices || {}) };
   // A model not priced here: as a Flash (the dearer guess).
-  for (const m of Object.keys(bill?.gemini || {})) p[m] ||= { in: 0.75, cached: 0.075, out: 3.75 };
+  for (const m of [...Object.keys(bill?.gemini || {}), ...Object.values(bill?.features || {}).flatMap(Object.keys)]) p[m] ||= { in: 0.75, cached: 0.075, out: 3.75 };
   return p;
 }
 function billCosts() {
@@ -1956,7 +1958,12 @@ function billCosts() {
     const q = p[m];
     rows.push({ k: m, name: `Gemini ${m.replace(/^gemini-/, '')}`, used: `${Math.round((t.in + t.cached + t.out) / 1000).toLocaleString()}k token`, free: null, ntd: ((t.in * q.in + t.cached * q.cached + t.out * q.out) / 1e6) * rate });
   }
-  return { rows, total: rows.reduce((a, r) => a + r.ntd, 0), rate };
+  // Where Gemini's share went, by feature (already in the rows above: not added again).
+  for (const [f, models] of Object.entries(bill.features || {})) {
+    const t = Object.entries(models).reduce((a, [m, d]) => ({ n: a.n + d.n, ntd: a.ntd + ((d.in * p[m].in + d.cached * p[m].cached + d.out * p[m].out) / 1e6) * rate }), { n: 0, ntd: 0 });
+    rows.push({ k: `f:${f}`, name: `　↳ ${GEMINI_FEATURES[f] || f}`, used: `${t.n.toLocaleString()} 次`, free: null, ntd: t.ntd, part: true });
+  }
+  return { rows, total: rows.reduce((a, r) => a + (r.part ? 0 : r.ntd), 0), rate };
 }
 function drawBilling() {
   const { rows, total, rate } = billCosts();
@@ -1968,7 +1975,7 @@ function drawBilling() {
     tile('輸入後花了', sv ? ntd(Math.max(0, since)) : '—', sv && sv.month !== bill.month ? '跨月：只算這個月的' : ''),
     tile('本月估計', ntd(total), `1 USD = NT$${rate}`)
   );
-  $('bill-rows').tBodies[0].replaceChildren(...rows.map(r => el('tr', {}, [el('td', { text: r.name }), el('td', { class: 'right' }, [document.createTextNode(r.used), r.free == null ? null : el('span', { class: 'muted', text: ` / ${(r.free / 1000).toLocaleString()}k` })]), el('td', { class: `right ${r.ntd > 0 ? 'neg' : ''}`, text: ntd(r.ntd) })])));
+  $('bill-rows').tBodies[0].replaceChildren(...rows.map(r => el('tr', {}, [el('td', { text: r.name, class: r.part ? 'muted' : '' }), el('td', { class: 'right' }, [document.createTextNode(r.used), r.free == null ? null : el('span', { class: 'muted', text: ` / ${(r.free / 1000).toLocaleString()}k` })]), el('td', { class: `right ${r.ntd > 0 ? 'neg' : ''}`, text: ntd(r.ntd) })])));
   const p = billPrices();
   // Each service a row: its name, then its prices as labelled boxes (a table of six columns ran off a phone).
   const box = (k, f, label) => el('label', {}, [el('small', { text: label }), el('input', { type: 'number', min: '0', step: 'any', value: p[k]?.[f] ?? '', 'data-k': k, 'data-f': f })]);

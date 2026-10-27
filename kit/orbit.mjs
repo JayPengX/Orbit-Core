@@ -3668,7 +3668,7 @@ steadyTabBar();
 // netState() 'online' | 'offline' | 'slow'.
 const NET_SLOW_MS = 5000;
 // The proxy's AI routes (Gemini at work for 5 to 30 s): their wait says nothing of the network.
-const AI_ROUTES = /\/(law-chat|law-ask|law-gist|gemini|nl-edit)(\?|$)/;
+const AI_ROUTES = /\/(law-chat|law-ask|gemini|nl-edit)(\?|$)/;
 export const slowByNature = url => {
   try {
     const u = new URL(url, globalThis.location?.href);

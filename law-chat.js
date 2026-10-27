@@ -26,7 +26,7 @@ import { json, sha256Hex } from './http.js';
 import { groundFor, groundKey, groundOut, groundPrompt, hasGround } from './law-ground.js';
 import { moreFor, moreKey, moreOut, morePrompt, moreCites, hasMore, readMine } from './law-more.js';
 import { matchBills, readGround } from './law-ground.js';
-import { LAW_LIMITS, PCODE, ART, fail, twDay, citeKey, cited, label, readData, readList, readLaw, opening, passOf, passKey, spend, countOf, kept, keep, modelJson } from './law.js';
+import { LAW_LIMITS, PCODE, ART, fail, twDay, citeKey, cited, label, readData, readList, readLaw, askKey, opening, passOf, passKey, spend, countOf, kept, keep, modelJson } from './law.js';
 
 export const CHAT_LIMITS = { maxQ: 500, maxTurns: 6, maxTurn: 1500, maxPins: 2, maxArts: 14, maxChars: 14_000, maxLaws: 8, maxBuckets: 16, maxBody: 40_000 };
 const CHAT_TTL_S = 30 * 86_400;
@@ -414,7 +414,7 @@ async function answerChat(chat, pass, env, ctx, headers, gemini, stage = () => {
     const laws = await readList('index.json');
     const names = new Map(laws.rows.map(r => [r[0], r[1]]));
     const nameOf = p => names.get(p) || '';
-    const planKey = `law:plan:v1:${await sha256Hex([chat.q, pin, chat.lang].join('|'))}`;
+    const planKey = `law:plan:v1:${await sha256Hex([askKey(chat.q), pin, chat.lang].join('|'))}`;
     let plan = first ? await kept(env, planKey) : null;
     if (!plan) {
       if (!env.GEMINI_API_KEY) return fail('setup', 503, headers);
@@ -432,7 +432,7 @@ async function answerChat(chat, pass, env, ctx, headers, gemini, stage = () => {
     stage({ stage: 'write', cases: more.cases.length, rules: more.rules.length });
     const extra = { ...groundOut(ground), ...moreOut(more) };
     const versions = [...new Set(articles.map(a => `${a.p}@${a.m}`))].sort().join(',');
-    const answerKey = first && `law:chat:v2:${await sha256Hex([chat.q, pin, chat.lang, versions, groundKey(ground), moreKey(more)].join('|'))}`;
+    const answerKey = first && `law:chat:v2:${await sha256Hex([askKey(chat.q), pin, chat.lang, versions, groundKey(ground), moreKey(more)].join('|'))}`;
     const hit = answerKey && (await kept(env, answerKey));
     const leftNow = async () => left(used ?? (await countOf(env, who, day)));
     if (hit) return json({ ...hit, ...extra, cached: true, left: await leftNow() }, 200, headers);

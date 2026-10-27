@@ -196,7 +196,7 @@ export function rowKey(text) {
 // 議案名稱, by: 提案單位/委員, why: 案由, rows: [{ key, law, old, now, added,
 // note }] } (its 對照表, the rows whose article it can tell); null when
 // there's no such bill.
-export async function readBill(id) {
+async function readBill(id) {
   const res = await fetch(`${LY}${encodeURIComponent(id)}`, { cf: { cacheTtlByStatus: { '200-299': 86_400, 404: 60, '500-599': 0 }, cacheEverything: true }, signal: AbortSignal.timeout(8000) });
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`bill ${res.status}`);
@@ -218,7 +218,7 @@ export async function readBill(id) {
 }
 
 // The rows a prompt quotes: in order, while they fit in `max` characters.
-export function billRows(rows, max) {
+function billRows(rows, max) {
   const out = [];
   let n = 0;
   for (const r of rows) {
@@ -229,7 +229,7 @@ export function billRows(rows, max) {
   }
   return out;
 }
-export const rowText = r => `[key "${r.key}"] ${r.law} ${label(r.key, 'zh')}\n${r.old ? `現行: ${r.old}\n` : ''}${r.now ? `${r.added ? '增訂' : '修正'}: ${r.now}\n` : '(刪除)\n'}${r.note ? `說明: ${r.note}` : ''}`;
+const rowText = r => `[key "${r.key}"] ${r.law} ${label(r.key, 'zh')}\n${r.old ? `現行: ${r.old}\n` : ''}${r.now ? `${r.added ? '增訂' : '修正'}: ${r.now}\n` : '(刪除)\n'}${r.note ? `說明: ${r.note}` : ''}`;
 
 const BILL_SCHEMA = {
   type: 'object',
@@ -289,7 +289,7 @@ Rules:
 
 // ---- The day's counts: D1 (STORE), or memory with no store (the tests) ----
 // One row a key a day: 'g' the day's calls in all, 'ask:<hash>' and
-// 'chat:<hash>' a Pass's, 'gist' the day's new gists (law-gist.js).
+// 'chat:<hash>' a Pass's.
 const memory = new Map();
 const ready = new WeakSet();
 async function table(env, day) {
@@ -335,6 +335,11 @@ export async function spend(env, who, cap, day) {
   const used = await addOne(env, who, day);
   return used > cap ? 0 : used;
 }
+
+// A question as its kept answer's key reads it: full-width folded, any
+// case, without the end's ? or 。, so the same question typed a little
+// differently is answered from the one already kept (no second Gemini call).
+export const askKey = q => String(q).normalize('NFKC').toLowerCase().replace(/\s+/g, ' ').trim().replace(/[\s?!.,~、。…]+$/u, '');
 
 // An answer kept in KV (RATE_LIMIT_KV): read, null when it isn't (or KV
 // fails); kept for ttl seconds after the answer is sent.
@@ -402,7 +407,7 @@ const JOBS = {
     // (A question: the figures, notices and bills it names, as /law-chat's.)
     const ground = ask.q ? await groundFor(ask.q) : null;
     return {
-      key: `law:ask:v1:${await sha256Hex([law.p, law.m, [...keys].sort().join(','), ask.q, ask.lang, groundKey(ground)].join('|'))}`,
+      key: `law:ask:v1:${await sha256Hex([law.p, law.m, [...keys].sort().join(','), askKey(ask.q), ask.lang, groundKey(ground)].join('|'))}`,
       ttl: ANSWER_TTL_S,
       info: { law: { p: law.p, n: law.n, m: law.m }, ...groundOut(ground) },
       prompt: lawPrompt(law, articles, ask.q, ask.lang, groundPrompt(ground)),

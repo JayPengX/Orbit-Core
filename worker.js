@@ -11,7 +11,6 @@
 //   POST  /law-ask               Orbit Law's questions on a law's articles (law.js)
 //   POST  /law-chat              Orbit Law's 問法律, answered from the articles it finds (law-chat.js)
 //   GET   /law-page              A government page (gov.tw) read inside Orbit Law (law-page.js)
-//   POST  /law-gist              Orbit Law's shared one-line bill and law summaries (law-gist.js)
 //   GET/POST /push/…             notices while an app is closed (push.js)
 //   GET   /weather/…             Orbit Weather's blended forecast (weather.js)
 //   GET   /transit/…             Orbit Transit's map, places, routes and TDX data (transit.js)
@@ -30,7 +29,6 @@
 
 import { handleLawAsk } from './law.js';
 import { handleLawChat } from './law-chat.js';
-import { handleLawGist } from './law-gist.js';
 import { handleLawPage } from './law-page.js';
 import en from './locales/en.js';
 import zhTW from './locales/zh-TW.js';
@@ -607,6 +605,8 @@ async function logGeminiUsage(stream, feature, model, env = null, ctx = null) {
       const cached = usage.cachedContentTokenCount ?? 0;
       const counts = { in: Math.max(0, (usage.promptTokenCount ?? 0) - cached), cached, out: (usage.candidatesTokenCount ?? 0) + (usage.thoughtsTokenCount ?? 0) };
       for (const [k, n] of Object.entries(counts)) if (n) await tally(env, `gem:${model}:${k}:${day}`, n, Date.now(), ctx);
+      // (And by feature for the month, with its calls: which one the bill comes from.)
+      for (const [k, n] of Object.entries({ ...counts, n: 1 })) if (n) await tally(env, `gemf:${feature}:${model}:${k}`, n, Date.now(), ctx);
     }
     console.log(
       JSON.stringify({
@@ -1197,8 +1197,6 @@ async function route(request, env, ctx, headers, origin) {
   const lawGemini = feature => (parts, schema, model = GEMINI_ALLOWED_MODELS[0]) => proxyGeminiRequest(GEMINI_ALLOWED_MODELS.includes(model) ? model : GEMINI_ALLOWED_MODELS[0], parts, schema, env, headers, ctx, feature, model === GEMINI_ALLOWED_MODELS[0] ? 25_000 : 40_000);
   if (path === '/law-ask') return handleLawAsk(request, env, ctx, headers, await sessionOf(request, env), lawGemini('law-ask'));
   if (path === '/law-chat') return handleLawChat(request, env, ctx, headers, await sessionOf(request, env), lawGemini('law-chat'));
-  // …and its summaries for cards (law-gist.js): the same Pass, shared and kept, a day's cap in all.
-  if (path === '/law-gist') return handleLawGist(request, env, ctx, headers, await sessionOf(request, env), lawGemini('law-gist'));
   // …and government pages read inside the app (law-page.js): the same Pass, gov.tw only, nothing stored.
   if (path === '/law-page') return handleLawPage(request, env, ctx, headers, await sessionOf(request, env));
   // Orbit Money's mail-in 載具 invoices (money-mail.js).

@@ -714,9 +714,13 @@ export const ADMIN_TOOLS = {
         })
       );
     const gemini = {};
+    // (By feature too: /gemini, /nl-edit, /law-ask, /law-chat, each model's tokens and calls this month.)
+    const features = {};
     for (const [k, n] of Object.entries(used)) {
       const m = /^gem:(.+):(in|cached|out):(\d{4}-\d{2}-\d{2})$/.exec(k);
       if (m) ((gemini[m[1]] ||= {})[m[3]] ||= { in: 0, cached: 0, out: 0 })[m[2]] += n;
+      const f = /^gemf:([\w-]+):(.+):(in|cached|out|n)$/.exec(k);
+      if (f) (((features[f[1]] ||= {})[f[2]] ||= { in: 0, cached: 0, out: 0, n: 0 })[f[3]] += n);
     }
     const maps = Object.fromEntries(Object.entries(TRANSIT_CAPS).map(([k]) => [k, used[k] || 0]));
     const doc = await deps.fsGet(env, CONFIG_COLLECTION, 'billing').catch(() => ({ exists: false }));
@@ -726,7 +730,7 @@ export const ADMIN_TOOLS = {
     try {
       if (doc.exists) saved = JSON.parse(doc.payload);
     } catch {}
-    return { at: now, month, maps, weather, gemini, saved };
+    return { at: now, month, maps, weather, gemini, features, saved };
   },
   async 'billing-set'({ env, deps, body }) {
     const b = body.billing || {};
