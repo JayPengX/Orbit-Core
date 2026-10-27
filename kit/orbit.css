@@ -2832,10 +2832,17 @@ dialog {
 
 /* 除錯紀錄: its buttons under the switch, and a small red dot at the top while recording. */
 .q-rec-acts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  /* (One row of three at any width: wrapped, 清除 sat alone on a 320 px phone.) */
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
   padding: 2px 14px 12px;
+}
+.q-rec-acts .q-chip {
+  justify-content: center;
+  min-width: 0;
+  padding-inline: 6px;
+  white-space: nowrap;
 }
 html.q-recording body::after {
   content: '';
@@ -4547,20 +4554,49 @@ button.q-cal-d {
 
 /* ---- The on-screen keyboard (orbit.mjs watchKeyboard: --q-kb, --q-vvh,
    html.q-kb while it's up) ---- */
-/* An open sheet sits on the keys and fits what's left of the screen, its
-   fields never under them. */
+/* An open sheet (or the sign-in) keeps to what's being typed: its hero
+   and anything marked .q-kb-hide wait behind the keys (back as they go
+   down), so the field and its button fit above the keys whole, never
+   scrolling. On a phone the
+   sheet runs on under the keys, across the screen, its button right above
+   them: no page shows between the sheet and the keys or round their
+   corners (Jay 2026-10-23, 新增注單 and 選擇玩法). */
+html.q-kb :is(dialog.q-sheet[open], .q-gate):focus-within :is(.q-sheet-hero, .q-kb-hide):not(:focus-within) {
+  display: none;
+}
 html.q-kb dialog.q-sheet[open] {
-  max-height: calc(var(--q-vvh) - 16px);
-  margin-bottom: calc(var(--q-kb) + 8px);
+  width: var(--q-vw);
+  height: fit-content;
+  max-height: calc(var(--q-vvh) + var(--q-kb) - 8px);
+  margin: auto auto 0;
+  padding-bottom: calc(var(--q-kb) + 12px);
+  border-radius: var(--q-r-sheet) var(--q-r-sheet) 0 0;
 }
-html.q-kb dialog.q-sheet.q-full[open] {
-  margin-bottom: var(--q-kb);
+/* (A short phone, 320×548: its title and ✕ wait behind the keys too, or the
+   button went under them.) */
+@media (max-height: 600px) {
+  html.q-kb dialog.q-sheet[open]:focus-within > .q-sheet-head:not(:focus-within) {
+    display: none;
+  }
+  html.q-kb dialog.q-sheet[open]:focus-within:has(> .q-sheet-head) {
+    padding-top: 8px;
+  }
 }
-/* The sign-in screen with the keys up: its form from the top, the rest of
-   it scrolling above the keys (centred, the field sat under them). */
+/* The sign-in screen (and the new pass) with the keys up: from the top,
+   its blurbs (and on a short screen its icon and title) behind the keys, so
+   its field and button sit above them (centred, the field sat under them;
+   我已經記下來了 went under the ^ ˅ ✓ bar). */
 html.q-kb .q-gate {
   place-items: start center;
   padding-bottom: calc(var(--q-kb) + 28px);
+}
+html.q-kb .q-gate:focus-within :is(.q-gate-brand, .q-gate-lede) {
+  display: none;
+}
+@media (max-height: 740px) {
+  html.q-kb .q-gate:focus-within :is(.q-gate-icon, .q-gate-title) {
+    display: none;
+  }
 }
 /* The tab bar waits behind the keys, not floating on them. */
 html.q-kb .q-tabbar {

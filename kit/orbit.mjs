@@ -3137,8 +3137,10 @@ keepStrips();
 // a search at the top was pushed off the screen. The kit follows the visible
 // part of the screen (visualViewport) and writes it as CSS variables on
 // <html>: --q-kb (how much the keys cover at the foot), --q-vvh (the height
-// still seen); .q-kb while the keys are up. orbit.css lifts open sheets
-// above the keys and fits them to what's left, hides the tab bar, and
+// still seen); .q-kb while the keys are up. orbit.css keeps an open sheet to
+// its field (its hero and .q-kb-hide parts wait behind the keys) and runs it
+// under the keys with its button right above them (as Longshot's kit, proven
+// on an iPhone 2026-10-23), hides the tab bar, and
 // anything marked .q-kb-dock (a bar that belongs on top of the keys) sits
 // there, as does a bar fixed at the foot holding the field (.q-kb-docked).
 // A focused field is brought into view inside its own scroller, and the
@@ -3166,29 +3168,35 @@ function watchKeyboard() {
     if (fullW !== globalThis.innerWidth) ((fullW = globalThis.innerWidth), (full = 0));
     full = now ? Math.max(full, globalThis.innerHeight) : globalThis.innerHeight;
     const shrunk = full ? full - globalThis.innerHeight : 0;
-    // The keys' own height (iOS's slide doesn't change it) and what they cover at the foot.
+    // The keys' own height, and what they cover at the foot once iOS's slide
+    // (vv.offsetTop) is put back, as lift() does. (Less the slide, read
+    // mid-slide and held, a sheet stayed 126px low with its button under the
+    // keys: Jay 2026-10-23, 選擇玩法.)
     const keys = Math.max(0, Math.round(globalThis.innerHeight - vv.height));
     const up = (keys > 80 || shrunk > 80) && now;
-    // Held while the same field is typed in: iOS's slide (vv.offsetTop) moves
-    // as the page answers it, and a sheet lifted by each new reading moved,
-    // iOS slid again, and the screen flickered (Jay 2026-10-21, an iPad on
-    // its side: the sign-in). Read again for another field,
-    // or keys that really changed height (more than 60px).
+    // Held while the same field is typed in: iOS's slide moves as the page
+    // answers it, and a sheet lifted by each new reading moved, iOS slid
+    // again, and the screen flickered (Jay 2026-10-21, an iPad on its side:
+    // the sign-in and Play's stake). Read again for another field, or keys
+    // that really changed height (more than 60px).
     const el = document.activeElement;
     if (!up) held = null;
-    else if (!held || held.el !== el || Math.abs(held.keys - keys) > 60) {
-      held = { el, keys, kb: Math.max(0, Math.round(globalThis.innerHeight - vv.height - vv.offsetTop)), vvh: Math.round(vv.height), lift: true };
-    }
-    root.style.setProperty('--q-kb', `${held ? held.kb : 0}px`);
+    else if (!held || held.el !== el || Math.abs(held.keys - keys) > 60) held = { el, keys, vvh: Math.round(vv.height), lift: true, backs: 0 };
+    root.style.setProperty('--q-kb', `${held ? held.keys : 0}px`);
     root.style.setProperty('--q-vvh', `${held ? held.vvh : Math.round(vv.height)}px`);
     root.classList.toggle('q-kb', up);
     for (const d of document.querySelectorAll('.q-kb-docked')) if (!up || !d.contains(document.activeElement)) d.classList.remove('q-kb-docked');
     // (Lifted once per field and keys, never on the scrolls and resizes it causes itself.)
     if (held?.lift) {
       held.lift = false;
-      lift(el, held.kb);
+      lift(el, held.keys);
+    } else if (held && vv.offsetTop > 1 && held.backs < 3 && el.closest?.('dialog[open]')) {
+      // (A slide iOS makes later, under a sheet's field: put back too, a few times at most, never a tug of war.)
+      held.backs++;
+      unslide();
     }
   };
+  const unslide = () => globalThis.scrollTo?.(globalThis.scrollX, Math.max(0, globalThis.scrollY - vv.offsetTop));
   let held = null;
   // The field in what's left above the keys. One in a bar fixed at the
   // foot (a composer, a stake bar) rides on the keys with its bar; any
@@ -3207,12 +3215,18 @@ function watchKeyboard() {
   const lift = (el, kb) => {
     if (!el?.getBoundingClientRect) return;
     for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+      // (A sheet is never such a bar: core.css runs it under the keys.)
+      if (p.matches('dialog[open]')) break;
       const cs = getComputedStyle(p);
       // (A bar at the foot: fixed, its lower edge in the screen's lower part, not a full-height panel.)
       const pr = cs.position === 'fixed' && p.getBoundingClientRect();
       if (pr && pr.bottom > globalThis.innerHeight * 0.6 && pr.height < globalThis.innerHeight * 0.5) return void p.classList.add('q-kb-docked');
-      if (cs.position === 'fixed' || p.matches('dialog[open]')) break;
+      if (cs.position === 'fixed') break;
     }
+    // (In a sheet the slide goes first: core.css fits the sheet above the
+    // keys, so the slide only pushed its top off the screen, 170px of it
+    // on 新增注單's stake.)
+    if (vv.offsetTop > 0 && el.closest('dialog[open]')) unslide();
     const top = vv.offsetTop + 8;
     let bottom = globalThis.innerHeight - kb - 12;
     // (A sheet's own bar at its foot, buy/sell or place, stays up over its content: the field goes above it too.)
@@ -3224,7 +3238,7 @@ function watchKeyboard() {
     if (by) scroller(el).scrollBy?.({ top: by });
     if (vv.offsetTop > 0) {
       const after = el.getBoundingClientRect();
-      if (after.top >= 0 && after.bottom <= globalThis.innerHeight - kb) globalThis.scrollTo?.(globalThis.scrollX, globalThis.scrollY - vv.offsetTop);
+      if (after.top >= 0 && after.bottom <= globalThis.innerHeight - kb) unslide();
     }
   };
   const soon = () => (frame ||= requestAnimationFrame(apply));
