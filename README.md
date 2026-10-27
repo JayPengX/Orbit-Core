@@ -167,6 +167,17 @@ included), then wiped whole. `private/` is never served.
   app, `settings`, `apps`, `inbox`, `live`, `sec`), merged by the Worker
   under a version check (`doc-store.js`). Each app's data is in its own
   collection under the same id.
+- **Nothing lost:** a save is refused if it would turn JSON data into
+  anything else, or (`base`, pass-sync.mjs) if it was merged over an older
+  copy. Every version a write or delete replaces in the wallets, the apps'
+  data, the inbox, the config and Securities' books is kept in D1's
+  `history` (at most hourly while saved again and again; always before a
+  wipe, a delete, a restore or a save from a device that never saw it):
+  whole for 2 days, then daily for 30. Each night (04:30) the whole store
+  also goes to R2 (`store-backup.js`, `private/store/<day>.jsonl.gz`, 14
+  nights and a year of firsts), and D1's Time Travel covers any minute of
+  30 days. The admin page's 備份與復原 puts back any version or night;
+  the account's devices are signed out after.
 - **Ops:** login, refresh, read/patch/delete, device codes, `#qh=`
   hand-offs between apps, loans and relief, sign out everywhere, rotate, merge passes,
   Class's share keys, admin.

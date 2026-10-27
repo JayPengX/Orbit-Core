@@ -438,6 +438,15 @@ export async function handleEcoRequest(request, env, headers, ip, deps) {
       if (hasPayload && !(app && typeof body.payload === 'string' && body.payload && body.payload.length <= ECO_APPS[app].maxPayload)) {
         return errorJson('MISSING_PAYLOAD', 400, headers, request);
       }
+      // The app's data as stored now: a save that would break it is refused
+      // (`savable`), and so is one made over a version its device never read
+      // (`base`: the updateTime the device last read or wrote; pass-sync.mjs
+      // sends it and merges first).
+      const coll = hasPayload && ECO_APPS[app].collection;
+      const stored = hasPayload ? await deps.fsGet(env, coll, docId) : null;
+      if (hasPayload && !savable(stored, body.payload)) return errorJson('ECO_PAYLOAD_INVALID', 400, headers, request);
+      const base = str(body.base, 64);
+      if (base && base !== stored.updateTime) return json({ error: { code: 'ECO_DATA_CHANGED', message: 'ECO_DATA_CHANGED' }, updateTime: stored.updateTime }, 409, headers);
       const now = deps.now();
       let refused = null;
       // Securities' save: its money counted by the Worker (stock-check.js).
@@ -472,7 +481,20 @@ export async function handleEcoRequest(request, env, headers, ip, deps) {
         delete out.wallet;
         out.same = true;
       }
-      if (hasPayload) out.updateTime = (await deps.fsWrite(env, ECO_APPS[app].collection, docId, body.payload)).updateTime;
+      if (hasPayload) {
+        // Over the version read above only. Another write between (or, from a
+        // kit that says what it last saw, `seen`, a version it never saw):
+        // a `base` save is refused; any other goes on, the version it
+        // replaces kept whatever its age (doc-store.js history).
+        const over = typeof body.seen === 'string' && body.seen !== stored.updateTime ? { why: 'overwrite' } : undefined;
+        try {
+          out.updateTime = (await deps.fsWrite(env, coll, docId, body.payload, stored.exists ? { updateTime: stored.updateTime } : { exists: false }, over)).updateTime;
+        } catch (error) {
+          if (!error.precondition) throw error;
+          if (base) return json({ error: { code: 'ECO_DATA_CHANGED', message: 'ECO_DATA_CHANGED' } }, 409, headers);
+          out.updateTime = (await deps.fsWrite(env, coll, docId, body.payload, null, { why: 'overwrite' })).updateTime;
+        }
+      }
       return json(out, 200, headers);
     }
 
@@ -499,6 +521,18 @@ export async function handleEcoRequest(request, env, headers, ip, deps) {
     return upstreamFailed(error, headers);
   }
 }
+
+// A save that keeps the app's data readable: data stored as JSON (an object
+// or a list) is never replaced by anything else. (Only the new one is parsed.)
+const asJson = text => {
+  try {
+    const v = JSON.parse(text);
+    return v !== null && typeof v === 'object';
+  } catch {
+    return false;
+  }
+};
+export const savable = (stored, payload) => !stored?.exists || !/^\s*[[{]/.test(stored.payload) || asJson(payload);
 
 // (Read side by side, not one after another: up to 12 round trips to D1.)
 async function readInbox(env, deps, wallet, app) {
@@ -864,6 +898,8 @@ export async function updateWallet(env, deps, docId, change, { create = false, s
     if (current && (skipIf() || next === current)) return { wallet: current, updateTime: doc.updateTime };
     const text = JSON.stringify(next);
     if (text.length > WALLET_MAX_LENGTH) throw new Error('wallet too big');
+    // Never a wallet that wouldn't read back (a change that lost its entries).
+    if (!parseWallet(text)) throw new Error('wallet invalid');
     try {
       const written = await deps.fsWrite(env, WALLET_COLLECTION, docId, text, doc.exists ? { updateTime: doc.updateTime } : { exists: false });
       return { wallet: next, updateTime: written.updateTime };

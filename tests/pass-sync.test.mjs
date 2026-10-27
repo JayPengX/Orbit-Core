@@ -39,7 +39,8 @@ function worker() {
         return { payload: w.payload, updateTime: stamp() };
       },
       read: async () => (w.reads++, q.set(w.live === name), { payload: w.payload, updateTime: stamp() }),
-      write: async ({ payload }) => {
+      write: async ({ payload, base }) => {
+        if (base && base !== stamp()) throw Object.assign(new Error('changed'), { code: 'ECO_DATA_CHANGED' });
         if (w.fail) {
           const error = w.fail;
           w.fail = null;
@@ -296,4 +297,17 @@ test('a read whose merge keeps something only this phone has writes it up at onc
   a.sync.stale();
   await a.sync.sync();
   assert.equal(w.writes, writes);
+});
+
+test('a save over a copy the Pass no longer holds is refused, then read, merged and saved again at once', async () => {
+  const w = worker();
+  const a = device(w, 'A');
+  await a.open();
+  await a.add('apple', 1);
+  // Another phone saved while this one never heard (no stale): the Worker's version moved on.
+  const other = { items: { ...decodeCopy(w.payload).items, banana: 2 } };
+  [w.payload, w.time] = [encodeCopy(other), w.time + 1];
+  await a.add('cherry', 3);
+  assert.deepEqual(keys(w.payload), ['apple', 'banana', 'cherry']);
+  assert.equal(a.state.items.banana, 2);
 });

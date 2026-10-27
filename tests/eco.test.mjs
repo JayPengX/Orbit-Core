@@ -751,3 +751,55 @@ test('a session run out still reads public data for READ_GRACE_MS, never past it
   const long = await signToken(secret, { k: 'ses', d: 'x', e: now - READ_GRACE_MS - 60_000 });
   assert.equal(await readToken(secret, long, 'ses', now - READ_GRACE_MS), null);
 });
+
+test('a save never breaks or blindly replaces the stored data: JSON stays JSON, a stale `base` is refused, a `seen` the Pass moved past keeps the old version', async () => {
+  const t = setup();
+  const a = await newPass(t, 'law');
+  const save = body => t.call('POST', '?app=law', { op: 'write', qt: a.token, ...body });
+  const kept = [];
+  const write = t.deps.fsWrite;
+  t.deps.fsWrite = (env, c, id, p, pre, o) => (o?.why && kept.push(o.why), write(env, c, id, p, pre, o));
+  const first = await save({ payload: '{"marks":[1]}' });
+  assert.equal(first.status, 200);
+  // Not JSON over JSON: refused, the stored copy untouched.
+  assert.equal((await save({ payload: 'oops' })).data.error.code, 'ECO_PAYLOAD_INVALID');
+  assert.equal((await save({ payload: 'null' })).status, 400);
+  // Merged over the version stored: saved; over an older one: refused, nothing written.
+  const second = await save({ payload: '{"marks":[1,2]}', base: first.data.updateTime });
+  assert.equal(second.status, 200);
+  const stale = await save({ payload: '{"marks":[9]}', base: first.data.updateTime });
+  assert.equal(stale.status, 409);
+  assert.equal(stale.data.error.code, 'ECO_DATA_CHANGED');
+  assert.equal(stale.data.updateTime, second.data.updateTime);
+  assert.equal(t.store.get(`${ECO_APPS.law.collection}/${(await t.deps.sha256Hex(a.passcode))}`).payload, '{"marks":[1,2]}');
+  // A kit that says what it last saw: saved, and the version it replaced kept.
+  assert.equal((await save({ payload: '{"marks":[3]}', seen: first.data.updateTime })).status, 200);
+  assert.deepEqual(kept, ['overwrite']);
+  assert.equal((await save({ payload: '{"marks":[4]}', seen: t.store.get(`${ECO_APPS.law.collection}/${(await t.deps.sha256Hex(a.passcode))}`).updateTime })).status, 200);
+  assert.deepEqual(kept, ['overwrite']);
+});
+
+test('admin 備份: a deleted account listed, its wallet and app data put back from kept versions, every device signed out after', async () => {
+  const { fakeD1 } = await import('./fake-d1.mjs');
+  const { docStore, SCHEMA } = await import('../doc-store.js');
+  const t = setup();
+  const DOCS = docStore({ keep: new Set([WALLET_COLLECTION, ...Object.values(ECO_APPS).map(a => a.collection)]) });
+  t.env.STORE = fakeD1(SCHEMA);
+  Object.assign(t.deps, { fsGet: DOCS.get, fsWrite: DOCS.write, fsDelete: DOCS.delete, fsList: DOCS.list, fsCollections: DOCS.collections, fsBatch: DOCS.batch, store: DOCS });
+  const a = await newPass(t, 'law');
+  assert.equal((await t.call('POST', '?app=law', { op: 'write', qt: a.token, payload: '{"marks":[1,2,3]}' })).status, 200);
+  assert.equal((await t.call('DELETE', `${t.qt(a.token)}`)).status, 200);
+  const admin = (action, extra = {}) => t.call('POST', '', { op: 'admin', token: 'o'.repeat(40), action, ...extra }).then(r => r.data);
+  const { gone } = await admin('versions');
+  assert.equal(gone.length, 1);
+  const { versions } = await admin('versions', { wallet: gone[0].ref });
+  assert.deepEqual([...new Set(versions.map(v => v.app))].sort(), ['law', 'wallet']);
+  assert.equal(versions.find(v => v.app === 'wallet').why, 'delete');
+  for (const v of versions.filter((v, i) => versions.findIndex(x => x.coll === v.coll) === i)) assert.equal((await admin('restore', { wallet: gone[0].ref, coll: v.coll, updated: v.updated })).restored, true);
+  // The pass works again, on its data; the old devices are signed out.
+  assert.equal((await t.call('GET', `${t.qt(a.token)}&app=law`)).status, 401);
+  const back = await t.call('POST', '', { op: 'login', passcode: a.passcode, app: 'law' });
+  assert.equal(back.status, 200);
+  assert.equal(back.data.payload, '{"marks":[1,2,3]}');
+  assert.equal((await admin('restore', { wallet: gone[0].ref, coll: 'eco-pairs', updated: 'x' })).error.code, 'ECO_PAIR_NOT_FOUND');
+});

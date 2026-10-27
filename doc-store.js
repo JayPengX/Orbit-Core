@@ -15,41 +15,82 @@
 //
 // One table, docs(coll, id, payload, updated): `updated` is a document's
 // version (a write only if it's still what was read).
+//
+// Nothing of the Pass is ever lost to a write (Jay, 2026-10-27: "make sure
+// our data never get lost or corrupted"). For the collections the Worker
+// names (`keep`: every wallet, every app's data, the inbox, the config), the
+// version a write or a delete replaces is copied into `history` first, in
+// the same transaction:
+//   - at most one an hour a document while it's saved again and again
+//     (Words saves at each answer), the copy being the version replaced;
+//   - always when the new one is under half the old one's size (a wipe or a
+//     broken save looks like that), when it's deleted, restored, or written
+//     over a version its device never saw (`why`);
+// kept whole for 2 days, then one a day for 30 days (`prune`, the nightly
+// job). Any version is put back with `restore`. Beside it, the whole store
+// goes to R2 each night (store-backup.js), and D1's own Time Travel can take
+// the database back to any minute of the last 30 days.
 
 export const SCHEMA = 'CREATE TABLE IF NOT EXISTS docs (coll TEXT NOT NULL, id TEXT NOT NULL, payload TEXT NOT NULL, updated TEXT NOT NULL, PRIMARY KEY (coll, id))';
+export const HISTORY_SCHEMA = [
+  'CREATE TABLE IF NOT EXISTS history (coll TEXT NOT NULL, id TEXT NOT NULL, updated TEXT NOT NULL, payload TEXT NOT NULL, at INTEGER NOT NULL, why TEXT NOT NULL, PRIMARY KEY (coll, id, updated))',
+  'CREATE INDEX IF NOT EXISTS history_at ON history (at)'
+];
+const HOUR = 3_600_000;
+const DAY = 24 * HOUR;
+export const HISTORY = { every: HOUR, whole: 2 * DAY, days: 30, maxBytes: 1_500_000_000 };
 
 // A new version: an ISO time to the microsecond (Firestore's shape, which the
 // documents copied from it keep), unique enough.
 export const stamp = (now = Date.now()) => `${new Date(now).toISOString().slice(0, 23)}${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}Z`;
 const precondition = msg => Object.assign(new Error(msg), { precondition: true });
 
-// The table, made once an isolate (one cheap query; the deploy needn't run SQL).
+// The tables, made once an isolate (cheap queries; the deploy needn't run SQL).
 const ready = new WeakMap();
 const tableOf = db => {
-  if (!ready.has(db)) ready.set(db, db.prepare(SCHEMA).run().catch(e => (ready.delete(db), Promise.reject(e))));
+  if (!db) return Promise.reject(new Error('no store bound'));
+  if (!ready.has(db)) ready.set(db, [SCHEMA, ...HISTORY_SCHEMA].reduce((p, sql) => p.then(() => db.prepare(sql).run()), Promise.resolve()).catch(e => (ready.delete(db), Promise.reject(e))));
   return ready.get(db);
 };
-export function d1Store(raw) {
-  // Every query waits on the table being there.
-  const db = { prepare: sql => {
-    const st = { args: [] };
-    const go = fn => tableOf(raw).then(() => fn(raw.prepare(sql).bind(...st.args)));
-    const self = { bind: (...a) => ((st.args = a), self), first: () => go(q => q.first()), run: () => go(q => q.run()), all: () => go(q => q.all()) };
-    return self;
-  } };
-  return {
+// The version a write replaces, copied into history (see the top): a
+// statement of the write's own transaction. ?5 the new payload's length.
+const SNAPSHOT = `INSERT OR IGNORE INTO history (coll, id, updated, payload, at, why)
+  SELECT coll, id, updated, payload, ?1, CASE WHEN ?2 <> '' THEN ?2 WHEN length(payload) > 2 * ?5 + 64 THEN 'shrink' ELSE 'hour' END
+  FROM docs WHERE coll = ?3 AND id = ?4
+  AND (?2 <> '' OR length(payload) > 2 * ?5 + 64 OR NOT EXISTS (SELECT 1 FROM history h WHERE h.coll = ?3 AND h.id = ?4 AND h.at > ?6))`;
+
+// keep(collection): whether its versions are kept (the Worker's list).
+export function d1Store(raw, { keep = () => false, now = Date.now } = {}) {
+  // Every query waits on the tables being there.
+  const db = {
+    prepare: sql => {
+      const st = { sql, args: [] };
+      const go = fn => tableOf(raw).then(() => fn(raw.prepare(sql).bind(...st.args)));
+      const self = { st, bind: (...a) => ((st.args = a), self), first: () => go(q => q.first()), run: () => go(q => q.run()), all: () => go(q => q.all()) };
+      return self;
+    },
+    // One transaction (D1's batch): every statement or none.
+    batch: list => tableOf(raw).then(() => raw.batch(list.map(q => raw.prepare(q.st.sql).bind(...q.st.args))))
+  };
+  const snapshot = (collection, id, why, size) => db.prepare(SNAPSHOT).bind(now(), why, collection, id, size, now() - HISTORY.every);
+  // A statement run with the version it replaces kept first (when kept).
+  const kept = async (collection, id, why, size, q) => (keep(collection) ? (await db.batch([snapshot(collection, id, why, size), q]))[1] : q.run());
+  const store = {
     async get(collection, id) {
       const row = await db.prepare('SELECT payload, updated FROM docs WHERE coll = ? AND id = ?').bind(collection, id).first();
       return row ? { exists: true, updateTime: row.updated, payload: row.payload } : { exists: false, updateTime: '', payload: '' };
     },
-    async write(collection, id, payload, pre, updated = stamp()) {
+    // `why`: the version replaced is kept whatever its age ('overwrite',
+    // 'restore'; see the top).
+    async write(collection, id, payload, pre, { why = '', updated = stamp() } = {}) {
       // A new version is never the one it replaces (the same millisecond and
       // the same three random digits would let a stale write through).
       while (pre?.updateTime && updated === pre.updateTime) updated = stamp();
-      let r;
-      if (pre?.updateTime) r = await db.prepare('UPDATE docs SET payload = ?, updated = ? WHERE coll = ? AND id = ? AND updated = ?').bind(payload, updated, collection, id, pre.updateTime).run();
-      else if (pre?.exists === false) r = await db.prepare('INSERT OR IGNORE INTO docs (coll, id, payload, updated) VALUES (?, ?, ?, ?)').bind(collection, id, payload, updated).run();
-      else r = await db.prepare('INSERT INTO docs (coll, id, payload, updated) VALUES (?, ?, ?, ?) ON CONFLICT (coll, id) DO UPDATE SET payload = excluded.payload, updated = excluded.updated').bind(collection, id, payload, updated).run();
+      let q;
+      if (pre?.updateTime) q = db.prepare('UPDATE docs SET payload = ?, updated = ? WHERE coll = ? AND id = ? AND updated = ?').bind(payload, updated, collection, id, pre.updateTime);
+      else if (pre?.exists === false) q = db.prepare('INSERT OR IGNORE INTO docs (coll, id, payload, updated) VALUES (?, ?, ?, ?)').bind(collection, id, payload, updated);
+      else q = db.prepare('INSERT INTO docs (coll, id, payload, updated) VALUES (?, ?, ?, ?) ON CONFLICT (coll, id) DO UPDATE SET payload = excluded.payload, updated = excluded.updated').bind(collection, id, payload, updated);
+      const r = await kept(collection, id, why, payload.length, q);
       if (pre && !r.meta?.changes) throw precondition(`${collection}/${id}: changed since it was read`);
       return { updateTime: updated };
     },
@@ -67,8 +108,8 @@ export function d1Store(raw) {
       const status = [];
       for (const w of writes) {
         try {
-          if (w.delete) await db.prepare('DELETE FROM docs WHERE coll = ? AND id = ?').bind(...w.delete).run();
-          else await this.write(w.update[0], w.update[1], w.update[2], w.updateTime ? { updateTime: w.updateTime } : null);
+          if (w.delete) await store.delete(...w.delete);
+          else await store.write(w.update[0], w.update[1], w.update[2], w.updateTime ? { updateTime: w.updateTime } : null);
           status.push({});
         } catch (e) {
           status.push({ code: e.precondition ? 9 : 13, message: String(e.message || e) });
@@ -77,20 +118,77 @@ export function d1Store(raw) {
       return { status };
     },
     async delete(collection, id) {
-      await db.prepare('DELETE FROM docs WHERE coll = ? AND id = ?').bind(collection, id).run();
+      await kept(collection, id, 'delete', 0, db.prepare('DELETE FROM docs WHERE coll = ? AND id = ?').bind(collection, id));
+    },
+
+    // ---- Kept versions ----
+    // Every kept version of documents with this id, in any collection (an
+    // account's wallet and each app's data share its id), newest first:
+    // [{ coll, updated, at, why, size }].
+    async versions(id, collection = '') {
+      const { results } = await db.prepare(`SELECT coll, updated, at, why, length(payload) AS size FROM history WHERE id = ?${collection ? ' AND coll = ?' : ''} ORDER BY at DESC, updated DESC LIMIT 500`).bind(...(collection ? [id, collection] : [id])).all();
+      return results;
+    },
+    // Documents of a collection that are gone but still have kept versions
+    // (an account deleted within 30 days), or those whose id starts with
+    // `prefix`: [{ id, at }] (the newest version's time).
+    async kept(collection, { prefix = '', gone = false } = {}) {
+      const { results } = await db.prepare(`SELECT id, MAX(at) AS at FROM history h WHERE coll = ? AND id LIKE ? ${gone ? 'AND NOT EXISTS (SELECT 1 FROM docs d WHERE d.coll = h.coll AND d.id = h.id) ' : ''}GROUP BY id ORDER BY at DESC LIMIT 100`).bind(collection, `${prefix.replace(/[%_]/g, '')}%`).all();
+      return results;
+    },
+    async version(collection, id, updated) {
+      const row = await db.prepare('SELECT payload FROM history WHERE coll = ? AND id = ? AND updated = ?').bind(collection, id, updated).first();
+      return row ? row.payload : null;
+    },
+    // A kept version made the document again (the one it replaces kept
+    // too). Its new updateTime, or null without such a version.
+    async restore(collection, id, updated, payload = null) {
+      payload ??= await store.version(collection, id, updated);
+      if (payload == null) return null;
+      return store.write(collection, id, payload, null, { why: 'restore' });
+    },
+    // The nightly thinning: everything of the last 2 days, then the newest
+    // of each day, nothing past 30 days; the oldest go first should all of
+    // it pass HISTORY.maxBytes. How many went.
+    async prune(at = now()) {
+      let gone = 0;
+      const n = async q => (gone += (await q.run()).meta?.changes || 0);
+      await n(db.prepare('DELETE FROM history WHERE at < ?').bind(at - HISTORY.days * DAY));
+      const edge = at - HISTORY.whole;
+      await n(db.prepare('DELETE FROM history WHERE at < ? AND rowid NOT IN (SELECT MAX(rowid) FROM history WHERE at < ? GROUP BY coll, id, at / 86400000)').bind(edge, edge));
+      for (let i = 0; i < 20; i++) {
+        const { bytes } = (await db.prepare('SELECT COALESCE(SUM(length(payload)), 0) AS bytes FROM history').first()) || {};
+        if (!(bytes > HISTORY.maxBytes)) break;
+        await n(db.prepare('DELETE FROM history WHERE rowid IN (SELECT rowid FROM history ORDER BY at LIMIT 200)'));
+      }
+      return gone;
+    },
+    // Every document, a page at a time in (coll, id) order after `from`
+    // ([coll, id]); for the nightly copy to R2.
+    async page(from = ['', ''], size = 200) {
+      const { results } = await db.prepare('SELECT coll, id, payload, updated FROM docs WHERE coll > ?1 OR (coll = ?1 AND id > ?2) ORDER BY coll, id LIMIT ?3').bind(from[0], from[1], size).all();
+      return results;
     }
   };
+  return store;
 }
 
 // Whether the store can be used: D1 bound.
 export const storeReady = env => Boolean(env.STORE);
 
-// The calls worker.js hands on, each (env, …).
-export function docStore() {
-  const d1 = env => d1Store(env.STORE);
+// The calls worker.js hands on, each (env, …). `keep`: the collections
+// whose versions are kept (a Set).
+export function docStore({ keep = new Set() } = {}) {
+  const d1 = env => d1Store(env.STORE, { keep: c => keep.has(c) });
   return {
     get: (env, c, id) => d1(env).get(c, id),
-    write: (env, c, id, payload, pre) => d1(env).write(c, id, payload, pre),
+    write: (env, c, id, payload, pre, o) => d1(env).write(c, id, payload, pre, o),
+    versions: (env, id, c) => d1(env).versions(id, c),
+    kept: (env, c, o) => d1(env).kept(c, o),
+    version: (env, c, id, updated) => d1(env).version(c, id, updated),
+    restore: (env, c, id, updated, payload) => d1(env).restore(c, id, updated, payload),
+    prune: env => d1(env).prune(),
+    page: (env, from, size) => d1(env).page(from, size),
     list: (env, c, pageSize, o) => d1(env).list(c, pageSize, o),
     collections: env => d1(env).collections(),
     batch: (env, writes) => d1(env).batch(writes),

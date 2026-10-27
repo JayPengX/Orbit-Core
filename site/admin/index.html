@@ -546,6 +546,14 @@
           <p id="push-note" class="muted"></p>
         </details>
       </div>
+      <div class="card tool" id="tool-backup">
+        <div class="tool-head"><i data-ic="history" style="--t:#0891b2"></i><div><h3>備份與復原</h3><p class="muted">每份資料被覆蓋或刪除前的版本留 30 天（2 天內每小時，之後每天一份），每晚整份另存 R2。復原後他的裝置全部登出。</p></div></div>
+        <div class="row"><input id="bk-ref" class="grow" autocomplete="off" placeholder="帳戶代號（空白：列出已刪除的帳戶）" /><button id="bk-versions" class="primary">版本</button></div>
+        <div class="row" style="margin-top:10px"><select id="bk-day"><option value="">每晚備份…</option></select><button id="bk-day-go">查看</button></div>
+        <p id="bk-error" class="error"></p>
+        <p id="bk-ok" class="ok"></p>
+        <div id="bk-out" class="tablewrap" style="margin-top:12px" hidden><table><thead><tr><th>資料</th><th>時間</th><th class="right">大小</th><th></th></tr></thead><tbody></tbody></table></div>
+      </div>
       <div class="card tool" id="tool-clean">
         <div class="tool-head"><i data-ic="trash" style="--t:#64748b"></i><div><h3>資料整理</h3><p class="muted">只留 Orbit 的資料：舊集合、沒有帳戶的資料、過期的代碼、已刪帳戶的訂閱。先掃描再整理。</p></div></div>
         <div class="row"><button id="scan">掃描</button><button id="clean" class="danger" disabled>整理</button></div>
@@ -685,7 +693,7 @@ const VIEWS = {
   health: () => Promise.all([loadSystem(), loadHealth()]),
   usage: () => Promise.all([loadBilling(), loadUsage()]),
   dev: () => loadDev(),
-  tools: () => loadPushes()
+  tools: () => Promise.all([loadPushes(), loadBackups()])
 };
 const loaded = new Set();
 let view = 'overview';
@@ -1024,6 +1032,7 @@ const PLACES = [
   ['發放 Orbit Pass', 'tools', 'ticket', '#2563eb', '發 pass 新帳戶 issue', 'tool-issue'],
   ['找回帳戶', 'tools', 'lock', '#0d9488', '裝置代碼 遺失 recover', 'tool-recover'],
   ['廣播通知', 'tools', 'bell', '#ea580c', '通知 推播 broadcast push', 'tool-notify'],
+  ['備份與復原', 'tools', 'history', '#0891b2', '備份 復原 版本 還原 backup restore', 'tool-backup'],
   ['資料整理', 'tools', 'trash', '#64748b', '清理 掃描 clean', 'tool-clean']
 ];
 let omniHits = [];
@@ -1353,6 +1362,64 @@ $('recover').onclick = async () => {
     $('recover-error').textContent = e.message;
   }
 };
+
+// ---- 備份與復原 (doc-store.js history, store-backup.js) ----
+const WHY_KEPT = { hour: '每小時', shrink: '變小前', delete: '刪除前', restore: '復原前', overwrite: '被舊裝置覆蓋前' };
+const kb = n => `${Math.max(1, Math.round(n / 1024)).toLocaleString()} KB`;
+const bkName = a => (a === 'wallet' ? '錢包' : appName(a));
+function bkRows(rows) {
+  const body = $('bk-out').querySelector('tbody');
+  body.replaceChildren(...rows.map(r => el('tr', {}, [el('td', {}, r.name), el('td', {}, r.when), el('td', { class: 'right' }, r.size || ''), el('td', { class: 'right' }, r.go ? [r.go] : [])])));
+  $('bk-out').hidden = !rows.length;
+}
+const bkButton = (label, run) => {
+  const b = el('button', { class: 'small' }, label);
+  b.onclick = async () => {
+    if (!confirm(`${label}？他的裝置會全部登出。`)) return;
+    $('bk-error').textContent = $('bk-ok').textContent = '';
+    try {
+      const r = await run();
+      $('bk-ok').textContent = `已復原 ${r.ref} 的${bkName(r.app)}。`;
+    } catch (e) {
+      $('bk-error').textContent = e.message;
+    }
+  };
+  return b;
+};
+$('bk-versions').onclick = async () => {
+  $('bk-error').textContent = $('bk-ok').textContent = '';
+  const ref = $('bk-ref').value.trim();
+  try {
+    if (!ref) {
+      const { gone } = await admin('versions');
+      if (!gone.length) $('bk-ok').textContent = '30 天內沒有刪除的帳戶。';
+      return bkRows(gone.map(g => ({ name: g.ref, when: `刪除 ${fmtShort(g.at)}`, go: Object.assign(el('button', { class: 'small' }, '看版本'), { onclick: () => (($('bk-ref').value = g.ref), $('bk-versions').click()) }) })));
+    }
+    const { ref: r, versions } = await admin('versions', { wallet: ref });
+    if (!versions.length) $('bk-ok').textContent = '還沒有留下的版本。';
+    bkRows(versions.map(v => ({ name: `${bkName(v.app)}・${WHY_KEPT[v.why] || v.why}`, when: fmtShort(v.at), size: kb(v.size), go: bkButton('復原這版', () => admin('restore', { wallet: r, coll: v.coll, updated: v.updated })) })));
+  } catch (e) {
+    $('bk-error').textContent = e.message;
+  }
+};
+$('bk-day-go').onclick = async () => {
+  $('bk-error').textContent = $('bk-ok').textContent = '';
+  const day = $('bk-day').value;
+  const ref = $('bk-ref').value.trim();
+  if (!day || ref.length < 6) return ($('bk-error').textContent = '選一晚的備份，並填帳戶代號。');
+  try {
+    const { ref: r, docs } = await admin('backup-restore', { day, wallet: ref });
+    bkRows(docs.map(d => ({ name: bkName(d.app), when: day, size: kb(d.size), go: bkButton('從這晚復原', () => admin('backup-restore', { day, wallet: r, coll: d.coll })) })));
+  } catch (e) {
+    $('bk-error').textContent = e.message;
+  }
+};
+async function loadBackups() {
+  try {
+    const { backups } = await admin('backups');
+    $('bk-day').replaceChildren(el('option', { value: '' }, backups.length ? '每晚備份…' : '還沒有每晚備份'), ...backups.map(b => el('option', { value: b.day }, `${b.day}（${b.docs} 份，${kb(b.size)}）`)));
+  } catch {}
+}
 
 // ---- 金流 ----
 const MARKET_NAMES = {"TW":"台股","US":"美股","JP":"日股","HK":"港股","CN":"陸股","KR":"韓股","UK":"英股","FR":"法股","DE":"德股","NL":"荷股","IT":"義股","ES":"西股","CH":"瑞士股","DK":"丹麥股","CA":"加股","AU":"澳股","SG":"星股","IN":"印度股","CRYPTO":"加密貨幣","METAL":"黃金存摺","BOND":"公債","FX":"外匯","INTL":"其他市場"};
