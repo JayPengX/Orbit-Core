@@ -134,7 +134,9 @@ export function openPass(s, { extra = null, tab = 'pass', help = null } = {}) {
   open?.dialog.close();
   let dialog = null;
   const body = el('div', { class: 'q-pass-body' });
-  const tabs = el('div', { class: 'q-chips q-pass-tabs', role: 'tablist' });
+  // The four tabs switch the whole sheet: a segmented control (docs/DESIGN.md §6), pinned at its top.
+  const seg = el('div', { class: 'q-seg', role: 'tablist' });
+  const tabs = el('div', { class: 'q-pass-tabs' }, [seg]);
   toastBox = el('div', { class: 'toasts q-pass-toasts', 'aria-live': 'polite' });
   // Looks chosen here, until the write that carries them comes back.
   const pending = {};
@@ -184,7 +186,7 @@ export function openPass(s, { extra = null, tab = 'pass', help = null } = {}) {
     dialog.scrollTop = 0;
   }
   function paint() {
-    put(tabs, ...TABS.map(id => el('button', { class: 'q-chip', type: 'button', role: 'tab', 'aria-selected': String(state.tab === id), 'aria-pressed': String(state.tab === id), text: t(`tab_${id}`), onclick: () => show(id) })));
+    put(seg, ...TABS.map(id => el('button', { type: 'button', role: 'tab', 'aria-selected': String(state.tab === id), 'aria-pressed': String(state.tab === id), text: t(`tab_${id}`), onclick: () => show(id) })));
     account?.stop();
     account = null;
     if (state.tab === 'pass') {

@@ -466,7 +466,6 @@ test('the stylesheet: a chosen chip is accent on a 14% wash, the shell section i
   assert.match(chosen, /color-mix\(in srgb, var\(--q-accent\) 14%, transparent\)/);
   assert.match(chosen, /color:\s*var\(--q-accent\)/);
   assert.doesNotMatch(chosen, /--q-label/);
-  assert.match(css, /\.q-pass-tabs \.q-chip\[aria-selected='true'\] \{ background: var\(--accent-wash\)/);
   for (const c of ['q-has-foot', 'q-nav-title', 'q-ptr']) assert.match(css, new RegExp(`\\.${c}(?![\\w-])`), `.${c}`);
   assert.match(css, /\.q-sheet\[data-detent='medium'\]/);
   assert.match(css, /\.q-sheet\[data-detent='large'\]/);
