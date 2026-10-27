@@ -790,19 +790,29 @@ export function trimRotowireNba(html) {
 // A formula1.com driver or team page's figures, as the page shows them: its
 // grids of label and value, in order ({ grids: [[[label, value], …], …] }),
 // e.g. the season's (position, points), its Grand Prix and Sprint numbers,
-// the career's, the biography or the team's profile.
+// the career's, the biography or the team's profile. A race weekend's page
+// (/racing/<year>/<slug>): its circuit's figures as facts, each [label,
+// value, its small line] (["Fastest lap time", "1:17.774", "Valtteri
+// Bottas (2021)"]). A season's page (/racing/<year>): each round's slug
+// ({ races: [{ round, slug }] }).
 const TRIM_F1PAGE = 'f1page';
 export function trimF1Page(html) {
   const text = nextText(html);
   const grids = [];
+  const facts = [];
   let cur = null;
-  for (const m of text.matchAll(/DataGrid-module_dataGrid|"children":"([^"]{1,48})"\}\],\["\$","dd",null,\{"className":"[^"]*","children":"([^"]{0,96})"/g)) {
+  for (const m of text.matchAll(/DataGrid-module_dataGrid|"children":"([^"]{1,48})"\}\],\["\$","dd",null,\{"className":"[^"]*","children":"([^"]{0,96})"\}\](?:,\["\$","span",null,\{"className":"[^"]*","children":"([^"]{1,64})"\}\])?/g)) {
     if (!m[1]) {
       cur = [];
       grids.push(cur);
     } else if (cur) cur.push([m[1], m[2]]);
+    else facts.push(m[3] ? [m[1], m[2], m[3]] : [m[1], m[2]]);
   }
-  return { grids: grids.filter(g => g.length) };
+  const races = [];
+  for (const m of String(html || '').matchAll(/href="\/en\/racing\/\d{4}\/([a-z0-9-]+)"[\s\S]{0,1500}?ROUND (\d+)/g)) {
+    if (!races.some(r => r.round === Number(m[2]))) races.push({ round: Number(m[2]), slug: m[1] });
+  }
+  return { grids: grids.filter(g => g.length), ...(facts.length ? { facts } : {}), ...(races.length ? { races: races.sort((a, b) => a.round - b.round) } : {}) };
 }
 
 export function trimElta(data) {
