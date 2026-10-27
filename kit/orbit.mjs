@@ -1037,7 +1037,12 @@ function segThumbs() {
         if (m.type === 'attributes') {
           const seg = m.target.parentElement;
           if (seg?.classList.contains('q-seg')) fit(seg);
-        } else m.addedNodes.forEach(scan);
+        } else {
+          // Its options drawn anew inside the same control (the Pass sheet's
+          // tabs): the control itself never arrives, so it's fitted here.
+          if (m.target.classList?.contains('q-seg')) fit(m.target);
+          m.addedNodes.forEach(scan);
+        }
       }
     }).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['aria-pressed', 'aria-selected'] });
   };
