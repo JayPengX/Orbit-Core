@@ -6,7 +6,7 @@
 
 <p align="center">
   <b>The engine room behind every Orbit app.</b><br>
-  <a href="https://jaypengx.com/pass/"><b>jaypengx.com</b></a> · proxy at <code>api.jaypengx.com</code>
+  <a href="https://orbit.jaypengx.com/pass/"><b>orbit.jaypengx.com</b></a> · proxy at <code>api.jaypengx.com</code>
 </p>
 
 <p align="center">
@@ -23,17 +23,17 @@ The Orbit apps are static sites. Everything server-side, plus the kit and brand 
 
 | App | Link | What it is |
 | --- | --- | --- |
-| [Orbit Sports](https://github.com/JayPengX/Orbit-Sports) | [jaypengx.com/sports](https://jaypengx.com/sports/) | Every game, live |
-| [Orbit Transit](https://github.com/JayPengX/Orbit-Transit) | [jaypengx.com/transit](https://jaypengx.com/transit/) | Bus, train and bike |
-| [Orbit Weather](https://github.com/JayPengX/Orbit-Weather) | [jaypengx.com/weather](https://jaypengx.com/weather/) | One clear forecast |
-| [Orbit Words](https://github.com/JayPengX/Orbit-Words) | [jaypengx.com/words](https://jaypengx.com/words/) | English words that stay |
-| [Orbit Securities](https://github.com/JayPengX/Orbit-Securities) | [jaypengx.com/securities](https://jaypengx.com/securities/) | Invest worldwide, risk-free |
-| [Orbit Class](https://github.com/JayPengX/Orbit-Class) | [jaypengx.com/class](https://jaypengx.com/class/) | Today's classes at a glance |
-| [Orbit Beats](https://github.com/JayPengX/Orbit-Beats) | [jaypengx.com/beats](https://jaypengx.com/beats/) | Make your own beats |
-| [Orbit Law](https://github.com/JayPengX/Orbit-Law) | [jaypengx.com/law](https://jaypengx.com/law/) | Laws, rulings, bills |
-| [Orbit Money](https://github.com/JayPengX/Orbit-Money) | [jaypengx.com/money](https://jaypengx.com/money/) | Every dollar, in its place |
+| [Orbit Sports](https://github.com/JayPengX/Orbit-Sports) | [orbit.jaypengx.com/sports](https://orbit.jaypengx.com/sports/) | Every game, live |
+| [Orbit Transit](https://github.com/JayPengX/Orbit-Transit) | [orbit.jaypengx.com/transit](https://orbit.jaypengx.com/transit/) | Bus, train and bike |
+| [Orbit Weather](https://github.com/JayPengX/Orbit-Weather) | [orbit.jaypengx.com/weather](https://orbit.jaypengx.com/weather/) | One clear forecast |
+| [Orbit Words](https://github.com/JayPengX/Orbit-Words) | [orbit.jaypengx.com/words](https://orbit.jaypengx.com/words/) | English words that stay |
+| [Orbit Securities](https://github.com/JayPengX/Orbit-Securities) | [orbit.jaypengx.com/securities](https://orbit.jaypengx.com/securities/) | Invest worldwide, risk-free |
+| [Orbit Class](https://github.com/JayPengX/Orbit-Class) | [orbit.jaypengx.com/class](https://orbit.jaypengx.com/class/) | Today's classes at a glance |
+| [Orbit Beats](https://github.com/JayPengX/Orbit-Beats) | [orbit.jaypengx.com/beats](https://orbit.jaypengx.com/beats/) | Make your own beats |
+| [Orbit Law](https://github.com/JayPengX/Orbit-Law) | [orbit.jaypengx.com/law](https://orbit.jaypengx.com/law/) | Laws, rulings, bills |
+| [Orbit Money](https://github.com/JayPengX/Orbit-Money) | [orbit.jaypengx.com/money](https://orbit.jaypengx.com/money/) | Every dollar, in its place |
 
-The family page and Orbit Pass sign-in are at [jaypengx.com/pass](https://jaypengx.com/pass/); how it's all built, in pictures and numbers, is at [jaypengx.com/showcase](https://jaypengx.com/showcase/).
+The family page and Orbit Pass sign-in are at [orbit.jaypengx.com/pass](https://orbit.jaypengx.com/pass/); how it's all built, in pictures and numbers, is at [jaypengx.com/showcase](https://jaypengx.com/showcase/).
 
 ## Features
 
@@ -42,7 +42,7 @@ The family page and Orbit Pass sign-in are at [jaypengx.com/pass](https://jaypen
 - **Notices** that reach a phone while the app is closed: game starts, class reminders, bus arrivals, rain, price alerts.
 - **Data builds** on the proxy's cron into Cloudflare R2: seasons, game days, bus routes and shapes, photos, highlights.
 - **The kit:** the shared look (an iOS-style design system), the sign-in sheet, sheets, tab bars, the date strip, offline handling, the service worker and the helpers every app loads.
-- **The site Worker** that serves every app at its short jaypengx.com address from each repo's GitHub Pages.
+- **The site Worker** that serves every app at its short orbit.jaypengx.com address (and Jay's homepage at jaypengx.com) from each repo's GitHub Pages.
 - **A cost guard** that reads the bill every five minutes and slows, then stops, the proxy before the $5 plan runs out.
 - **Brand:** every app's icon, share card and manifest generated from one file.
 - **Tools:** a phone-sized preview of any app with real data, and the audits and list builders the apps rely on.
@@ -75,7 +75,7 @@ orbit-workers-proxy (one Worker)
    /gemini, /nl-edit, /law-ask, /law-chat   Gemini via gemini-relay
    /data          the family's data in R2, built by builders/ on the cron
 quota-guard   reads the bill every 5 minutes; paces, then stops the proxy at 90% of the plan
-orbit-site    serves jaypengx.com/<app>/ from each repo's GitHub Pages
+orbit-site    serves orbit.jaypengx.com/<app>/, jaypengx.com and longshot.jaypengx.com from GitHub Pages
 ```
 
 A read from an app goes down these layers until one answers: memory, the phone's Cache Storage, the family's data in R2, the proxy's edge cache, reads kept for good in R2, and only then the upstream. A failed read is a failure, never "nothing there".
@@ -99,7 +99,7 @@ worker.js            the proxy's router; each route's work in its own file:
 └── data.js, http.js, capacity.js, pace.js, ops.js, doc-store.js, store-backup.js
 gemini-relay.js      Gemini, pinned to Taiwan
 guard.js             the cost guard (its own Worker)
-site.js              the jaypengx.com site Worker
+site.js              the site Worker (orbit.jaypengx.com, jaypengx.com, longshot.jaypengx.com)
 builders/            data builds into R2 (seasons, buses, photos, highlights…)
 kit/                 the shared kit every app loads
 site/                the family page and the admin page

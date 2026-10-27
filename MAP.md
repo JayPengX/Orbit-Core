@@ -18,7 +18,7 @@ Rules for working on any of it: `docs/TRUTH.md` (one page).
 | Orbit Law | `law` | Orbit-Law |
 | Orbit Money | `money` | Orbit-Money |
 
-Each lives at `https://jaypengx.com/<slug>/` (§9), served from its repo's
+Each lives at `https://orbit.jaypengx.com/<slug>/` (§9), served from its repo's
 GitHub Pages. The kit, the family's page and the admin page are this
 repo's Pages.
 
@@ -312,13 +312,16 @@ now, its own app and Worker (JayPengX/Longshot), nothing of theirs here.
 - **Bindings:** D1 `orbit-store`, R2 `orbit-data`, KV `RATE_LIMIT_KV`,
   DO `F1Log`, and the services `GEMINI_RELAY` and `GUARD`.
 - **The family's own domain:** `kit/domain.mjs` `DOMAIN` (jaypengx.com),
-  the one place it is set. Every app is at `https://<DOMAIN>/<slug>/`
-  (`kit/brand.mjs` `slug`/`SHORT`; `/pass/` the family page, `/` goes
-  there): `site.js`, Worker `orbit-site`, reads each repo's GitHub Pages
-  through, so the apps still deploy by their own Pages. The proxy is at
-  `api.<DOMAIN>`. `deploy.yml` attaches both hostnames (the deploy token
-  has the zone); the guard takes them off with the proxy. A new app: a
-  `slug` in `kit/brand.mjs`.
+  the one place it is set. `site.js`, Worker `orbit-site`, reads GitHub
+  Pages through, so every repo still deploys by its own Pages, on three hosts:
+  `orbit.<DOMAIN>/<slug>/` every Orbit app (`kit/brand.mjs` `slug`/`SHORT`;
+  `/pass/` the family page, `/` goes there; one origin, so one Pass sign-in),
+  `<DOMAIN>/` Jay's homepage (Orbit-Showcase `public/home/`) with the
+  showcase at `/showcase/`, and `longshot.<DOMAIN>/` Longshot on its own
+  origin. The proxy is at `api.<DOMAIN>`; mail to `*@<DOMAIN>` reaches it
+  by Email Routing's catch-all. `deploy.yml` attaches all four hostnames
+  (the deploy token has the zone); the guard takes them off with the proxy.
+  A new app: a `slug` in `kit/brand.mjs`.
 
 ## 10. Tools and tests
 

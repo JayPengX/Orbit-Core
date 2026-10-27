@@ -33,15 +33,10 @@ export const shortPathOf = id => (BRANDS[id] ? `/${BRANDS[id].slug}/` : '/');
 export const pathOf = id => (onDomain ? shortPathOf(id) : repoPathOf(id));
 // Where an app lives, for its links shared outside (a QR code, a share card, a notice).
 export const homeOf = id => `${SITE_URL}${DOMAIN ? shortPathOf(id) : repoPathOf(id)}`;
-// The folders served on the domain, by their short name: every app's, and the
-// family's others (the Pass's page, Longshot, the showcase).
-export const SHORT = { ...Object.fromEntries(Object.values(BRANDS).map(b => [b.slug, b.repo])), pass: 'Orbit-Core', longshot: 'Longshot', showcase: 'Orbit-Showcase' };
-// A path on GitHub Pages as it is on the domain ('/Orbit-Law/x' → '/law/x'); null if it isn't one that moved.
-export function shortPath(path) {
-  const [, first, rest = ''] = /^\/([^/]+)(.*)$/.exec(path) || [];
-  const slug = Object.keys(SHORT).find(k => SHORT[k] === first && k !== 'pass');
-  return slug ? `/${slug}${rest}` : null;
-}
+// The folders served on orbit.<domain>, by their short name: every app's, and
+// the Pass's page. (The showcase is on the bare domain, Longshot on its own
+// host: site.js.)
+export const SHORT = { ...Object.fromEntries(Object.values(BRANDS).map(b => [b.slug, b.repo])), pass: 'Orbit-Core' };
 
 // The Orbit Pass: the account, in every app's top-right.
 export const PASS = { name: 'Orbit Pass', short: 'Pass', from: '#334155', to: '#020617', ink: '#0f172a', paint: ['#64748b', '#1e293b', '#020617'], spot: GOLD, pitch: { zh: '一組通行碼，所有 App', en: 'One pass, every app' }, tag: { zh: '一組通行碼，所有 App 共用', en: 'One pass for every app' } };

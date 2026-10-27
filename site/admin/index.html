@@ -586,7 +586,7 @@
 <script type="module">
 import { DEV, DEV_GROUPS, cleanDev, BRANDS, appIcon, familyMark, pathOf } from '../kit/brand.mjs';
 import { icons, tileHtml, heroCardHtml, escHtml } from '../kit/ui.mjs';
-import { API, onDomain } from '../kit/domain.mjs';
+import { API, DOMAIN } from '../kit/domain.mjs';
 const ECO_URL = `${API}/eco`;
 const KEY = 'orbit.admin';
 const $ = id => document.getElementById(id);
@@ -1994,9 +1994,9 @@ $('sys-actions').replaceChildren(
 );
 const LINKS = [
   // Each at its address on the page's own home (a repo's name isn't one on the domain).
-  ...Object.entries(BRANDS).map(([id, b]) => [b.name, pathOf(id)]), ['Orbit Showcase', onDomain ? '/showcase/' : '/Orbit-Showcase/'],
+  ...Object.entries(BRANDS).map(([id, b]) => [b.name, pathOf(id)]), ['Orbit Showcase', DOMAIN ? `https://${DOMAIN}/showcase/` : '/Orbit-Showcase/'],
   // Longshot's own panel: its own Worker, accounts and sign-in.
-  ['Longshot 管理', onDomain ? '/longshot/admin/' : '/Longshot/admin/'],
+  ['Longshot 管理', DOMAIN ? `https://longshot.${DOMAIN}/admin/` : '/Longshot/admin/'],
   ['Orbit-Core Actions', 'https://github.com/JayPengX/Orbit-Core/actions'],
   ['Cloudflare Workers', 'https://dash.cloudflare.com/?to=/:account/workers-and-pages'], ['Cloudflare D1', 'https://dash.cloudflare.com/?to=/:account/workers/d1'], ['Cloudflare R2', 'https://dash.cloudflare.com/?to=/:account/r2/overview'], ['Cloudflare 帳單', 'https://dash.cloudflare.com/?to=/:account/billing'], ['Cloudflare 通知', 'https://dash.cloudflare.com/?to=/:account/notifications'], ['GitHub', 'https://github.com/JayPengX?tab=repositories']
 ];

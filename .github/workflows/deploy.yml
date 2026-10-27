@@ -194,8 +194,9 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       # The family's own domain (kit/domain.mjs DOMAIN; nothing while it's
       # empty): orbit-site (site.js, the apps read through from GitHub Pages)
-      # deployed, and both hostnames attached as Workers custom domains,
-      # <DOMAIN> to orbit-site and api.<DOMAIN> to the proxy (Cloudflare makes
+      # deployed, and the hostnames attached as Workers custom domains,
+      # orbit.<DOMAIN> (the apps), <DOMAIN> (Jay's homepage and the showcase)
+      # and longshot.<DOMAIN> to orbit-site, api.<DOMAIN> to the proxy (Cloudflare makes
       # their DNS records and certificates). Safe to repeat: an attached one
       # is left as it is. While the guard has the proxies stopped, nothing is
       # attached: the guard puts the domains back with them.
@@ -213,7 +214,7 @@ jobs:
           zone=$(curl -sS --max-time 30 -H "$auth" "$cf/zones?name=$domain" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.parse(s).result[0].id)}catch{console.log("")}})')
           [ -n "$zone" ] || { echo "::error::$domain is not a zone the deploy token can see (the token needs this zone: MAP.md §9)"; exit 1; }
           fail=0
-          for pair in "$domain orbit-site" "api.$domain orbit-workers-proxy"; do
+          for pair in "orbit.$domain orbit-site" "$domain orbit-site" "longshot.$domain orbit-site" "api.$domain orbit-workers-proxy"; do
             set -- $pair
             out=$(curl -sS --max-time 60 -X PUT -H "$auth" -H 'Content-Type: application/json' -d "{\"environment\":\"production\",\"hostname\":\"$1\",\"service\":\"$2\",\"zone_id\":\"$zone\"}" "$cf/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/domains")
             if printf '%s' "$out" | grep -qE '"success": ?true'; then echo "$1 → $2"; else echo "::error::$1 → $2 not attached: $out"; fail=1; fi
