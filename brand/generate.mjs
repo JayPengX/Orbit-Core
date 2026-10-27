@@ -63,6 +63,19 @@ async function cards(id, dir, formats = Object.keys(FORMATS)) {
     await page.screenshot({ path: `${dir}${file}`, type: 'jpeg', quality: 86 });
   }
 }
+// An .ico holding one PNG (what a browser asks a site's root for).
+function ico(png, size) {
+  const head = Buffer.alloc(22);
+  head.writeUInt16LE(1, 2);
+  head.writeUInt16LE(1, 4);
+  head.writeUInt8(size, 6);
+  head.writeUInt8(size, 7);
+  head.writeUInt16LE(1, 10);
+  head.writeUInt16LE(32, 12);
+  head.writeUInt32LE(png.length, 14);
+  head.writeUInt32LE(22, 18);
+  return Buffer.concat([head, png]);
+}
 const esc = t => String(t).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 
 // The page's name, icons and link-preview tags, as one block.
@@ -181,6 +194,12 @@ if (!only.length || only.includes('site')) {
   await mkdir(out, { recursive: true });
   await writeFile(`${out}family-orbit.svg`, familyMark());
   await writeFile(`${out}pass.svg`, appIcon('pass'));
+  // The PNGs Safari and iOS want (they don't take the SVG), and favicon.ico
+  // at Orbit-Core's root, which site.js serves at orbit.<domain>/favicon.ico.
+  await mkdir(`${here}site/icons`, { recursive: true });
+  await png(appIcon('pass', { shape: 'square' }), 180, `${here}site/icons/apple-touch-icon.png`);
+  await png(appIcon('pass'), 32, `${here}site/icons/favicon-32.png`);
+  await writeFile(`${here}site/favicon.ico`, ico(await readFile(`${here}site/icons/favicon-32.png`), 32));
   await cards('pass', `${out}pass-`, ['og', 'x']);
   for (const id of Object.keys(BRANDS)) await writeFile(`${out}${id}.svg`, appIcon(id));
   await writeFile(`${here}site/index.html`, homePage());
@@ -202,7 +221,7 @@ function homePage() {
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Orbit</title>
 <meta name="description" content="Orbit：每天用得到的 App，全部用同一個 Orbit Pass。">
-<link rel="icon" href="brand/pass.svg" type="image/svg+xml">
+<link rel="icon" href="brand/pass.svg" type="image/svg+xml"><link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 ${og('type', 'website')}${og('site_name', 'Orbit')}${og('title', 'Orbit')}${og('description', 'Orbit：每天用得到的 App，一個 Orbit Pass。')}${og('url', home)}${og('image', `${home}brand/pass-og.jpg`)}${og('image:width', 1200)}${og('image:height', 630)}
 <meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="${home}brand/pass-x.jpg">
 <style>

@@ -70,3 +70,17 @@ test("site: the bare domain is Jay's homepage and the showcase; longshot.<domain
   const l = pages(301, { Location: 'https://jaypengx.github.io/Longshot/admin/' });
   assert.equal((await site(new Request('https://longshot.example.tw/admin'), l.fetcher)).headers.get('Location'), 'https://longshot.example.tw/admin/');
 });
+
+test("site: each host's root icons (Safari's tab, iOS's bookmark) are its own", async () => {
+  const p = pages();
+  for (const [u, want] of [
+    ['https://example.tw/favicon.ico', '/Orbit-Showcase/home/favicon.ico'],
+    ['https://example.tw/apple-touch-icon.png', '/Orbit-Showcase/home/apple-touch-icon.png'],
+    ['https://orbit.example.tw/favicon.ico', '/Orbit-Core/favicon.ico'],
+    ['https://orbit.example.tw/apple-touch-icon-precomposed.png', '/Orbit-Core/icons/apple-touch-icon.png'],
+    ['https://longshot.example.tw/favicon.ico', '/Longshot/favicon.ico']
+  ]) {
+    await site(new Request(u), p.fetcher);
+    assert.equal(p.asked.at(-1).url, `https://jaypengx.github.io${want}`, u);
+  }
+});
