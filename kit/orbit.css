@@ -4911,3 +4911,5 @@ html.q-kb .q-kb-docked {
 .q-sheet {
   --q-margin: 16px;
 }
+/* A menu over a sheet: solid, so its rows never mix with what's under them (Money's 付款方式 over the keypad). */
+dialog[open] .q-menu { background: var(--q-sheet); }
