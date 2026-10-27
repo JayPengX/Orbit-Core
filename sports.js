@@ -1238,7 +1238,7 @@ function parseTarget(target) {
     // A search (its words, in English as seen from Taiwan) or a video's page, nothing else.
     if (u.hostname === YT_HOST && !(u.pathname === '/results' ? [...u.searchParams.keys()].every(k => ['search_query', 'hl', 'gl'].includes(k)) && (u.searchParams.get('search_query') || '').length > 0 && (u.searchParams.get('search_query') || '').length <= 200 : u.pathname === '/watch' && [...u.searchParams.keys()].join() === 'v' && /^[\w-]{11}$/.test(u.searchParams.get('v')))) return null;
     if (u.hostname === ROTOWIRE_HOST && !(u.pathname === ROTOWIRE_NBA && (u.search === '' || u.search === '?date=tomorrow'))) return null;
-    if (u.hostname === F1_HOST && !/^\/en\/(drivers|teams)\/[a-z-]+$/.test(u.pathname)) return null;
+    if (u.hostname === F1_HOST && !/^\/en\/((drivers|teams)\/[a-z-]+|racing\/20\d\d(\/[a-z0-9-]+)?)$/.test(u.pathname)) return null;
     if (u.hostname === FOTMOB_HOST && !(/^\/api\/data\/(leagues|teams)$/.test(u.pathname) && [...u.searchParams.keys()].join() === 'id' && /^\d{1,8}$/.test(u.searchParams.get('id')))) return null;
     if (u.hostname === FOTMOB_DATA_HOST && (!/^\/stats\/\d{1,8}\/season\/\d{1,8}\/[a-z0-9_]{2,60}\.json$/.test(u.pathname) || u.search)) return null;
     return u.protocol === 'https:' && SPORTS_PROXY_ALLOWED_HOSTS.includes(u.hostname) ? u : null;

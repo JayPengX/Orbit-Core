@@ -112,6 +112,17 @@ test("a formula1.com driver or team page comes trimmed to its grids of figures",
   assert.deepEqual(grids, [[['Season Position', '1st'], ['Season Points', '302']], [['Date of Birth', '25/08/2006']]]);
 });
 
+test("a formula1.com race page gives its circuit's figures, a season page each round's slug", async () => {
+  const { trimF1Page } = await import('../sports.js');
+  const fact = (k, v, sub) => `["$","dt",null,{"className":"x","children":"${k}"}],["$","dd",null,{"className":"y","children":"${v}"}]${sub ? `,["$","span",null,{"className":"z","children":"${sub}"}]` : ''}`;
+  const flight = `0:[[${fact('Circuit Length', '4.304km')}],[${fact('Fastest lap time', '1:17.774', 'Valtteri Bottas (2021)')}]]`;
+  const { facts } = trimF1Page(`<script>self.__next_f.push([1,${JSON.stringify(flight)}])</script>`);
+  assert.deepEqual(facts, [['Circuit Length', '4.304km'], ['Fastest lap time', '1:17.774', 'Valtteri Bottas (2021)']]);
+  const card = (slug, n) => `<a href="/en/racing/2026/${slug}"><span>ROUND ${n}</span></a>`;
+  const { races } = trimF1Page(card('mexico', 19) + card('australia', 1) + card('mexico', 19));
+  assert.deepEqual(races, [{ round: 1, slug: 'australia' }, { round: 19, slug: 'mexico' }]);
+});
+
 test("RotoWire's NBA lineups page comes trimmed to each side's five and who may not play", async () => {
   const { trimRotowireNba } = await import('../sports.js');
   const player = (pos, full, short, inj = '') => `<li class="lineup__player is-pct-play-100" title="x"><div class="lineup__pos" >${pos}</div><a title="${full}" href="/p">${short}</a>${inj ? `<span class="lineup__inj">${inj}</span>` : ''}</li>`;
