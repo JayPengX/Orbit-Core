@@ -1726,7 +1726,7 @@ async function loadCapacity() {
     $('cap-bill').textContent = !g
       ? 'Cloudflare 帳單保護還沒跑過（quota-guard 部署後五分鐘內）。'
       : !g.armed
-        ? 'Cloudflare 帳單保護還沒啟動：GitHub 的 Shared-Proxy 需要 CF_GUARD_TOKEN（見 README §11）。沒有它，超過 $5 的用量會計費。'
+        ? 'Cloudflare 帳單保護還沒啟動：GitHub 的 Shared-Proxy 需要 CF_GUARD_TOKEN（見 MAP.md §11）。沒有它，超過 $5 的用量會計費。'
         : g.stopped
           ? `代理已經停了（${fmt(g.stopped.at)}，${g.stopped.why.map(k => BILL_ZH[k] || '讀不到用量').join('、')}到 ${Math.round(g.stopAt * 100)}%），下個帳單週期開始時自動恢復，不會多付一毛。`
           : g.error

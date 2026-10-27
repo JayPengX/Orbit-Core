@@ -31,7 +31,7 @@
 // The caps are this Worker's own count (KV, flushed in batches so KV's
 // million writes a month aren't spent on counting): the hard stop is
 // Google Cloud's per-day quotas, which the owner sets on each API (the
-// README, §3.3).
+// MAP.md, §3.3).
 
 import { cleanDev } from './kit/devconfig.mjs';
 import { twDay } from './kit/format.mjs';
