@@ -93,3 +93,44 @@ test('a box made on first ask; mail to it lands; taken items go; unknown boxes a
   assert.equal(old.rejected, 'No such mailbox');
   assert.ok(deps.docs.has(`${MAIL_COLLECTION}/box_${next.address.split('@')[0]}`));
 });
+
+// 財政部's own mail: the check of a new address, as Big5 HTML.
+test("財政部's check of the address: its link and subject kept for the app; invoices mark the box received", async () => {
+  const raw = [
+    'From: =?UTF-8?B?6LKh5pS/6YOo?= <einvoice@einvoice.nat.gov.tw>',
+    'Subject: =?UTF-8?B?6Zu75a2Q5L+h566x6amX6K2J?=',
+    'Content-Type: multipart/alternative; boundary="b1"',
+    '',
+    '--b1',
+    'Content-Type: text/html; charset=UTF-8',
+    'Content-Transfer-Encoding: quoted-printable',
+    '',
+    '<img src=3D"https://www.einvoice.nat.gov.tw/static/logo.png"><a href=3D"https://www.einvoice.nat.gov.tw/portal/verify?token=3Dabc&amp;id=3D9">=E9=A9=97=E8=AD=89</a>',
+    '--b1--',
+    ''
+  ].join('\r\n');
+  const { einvoiceNote } = await import('../money-mail.js');
+  const note = einvoiceNote('einvoice@einvoice.nat.gov.tw', raw);
+  assert.equal(note.subject, '電子信箱驗證');
+  assert.equal(note.link, 'https://www.einvoice.nat.gov.tw/portal/verify?token=abc&id=9');
+  assert.equal(einvoiceNote('me@gmail.com', raw), null);
+
+  const deps = memory();
+  const box = (await ask(deps, 'box')).address.split('@')[0];
+  const message = (raw, from) => {
+    const bytes = Uint8Array.from(raw, c => c.charCodeAt(0));
+    return { to: `${box}@mail.example`, from, rawSize: bytes.length, raw: new Response(bytes).body, setReject() {} };
+  };
+  await handleMoneyMail(message(raw, 'einvoice@einvoice.nat.gov.tw'), {}, deps);
+  let r = await ask(deps, 'box');
+  assert.equal(r.note.link, note.link);
+  assert.equal(r.got, null);
+  await handleMoneyMail(message(mail(), 'einvoice@einvoice.nat.gov.tw'), {}, deps);
+  r = await ask(deps, 'box');
+  assert.equal(r.got.n, 1);
+  // A new address starts over.
+  r = await ask(deps, 'new', 'POST');
+  r = await ask(deps, 'box');
+  assert.equal(r.got, null);
+  assert.equal(r.note, null);
+});
