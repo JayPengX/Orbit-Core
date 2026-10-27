@@ -443,17 +443,23 @@ export function menu(anchor, items) {
   // (Inside an open sheet when it's from one: a menu in the page lay under the
   // sheet, out of sight, and the tap meant for it closed the sheet: Money's
   // 付款方式, Jay 2026-10-27.)
-  (anchor.closest?.('dialog[open]') || document.body).append(m);
+  const host = anchor.closest?.('dialog[open]') || document.body;
+  // (A sheet that moves, as one sliding up does, places its fixed children
+  // from its own corner, not the screen's: a probe there finds how far off
+  // that corner is, and the menu is measured at the screen's corner with all
+  // its width, so nothing lands off screen or squeezed. iPhone, Jay 2026-10-27.)
+  const probe = h('i', { style: 'position:fixed;left:0;top:0;width:0;height:0;visibility:hidden' });
+  host.append(probe);
+  const o = probe.getBoundingClientRect();
+  probe.remove();
+  Object.assign(m.style, { left: `${-o.left}px`, top: `${-o.top}px`, maxWidth: `${innerWidth - 32}px` });
+  host.append(m);
   const r = anchor.getBoundingClientRect();
   const w = m.offsetWidth;
   const left = Math.min(Math.max(16, r.right - w), innerWidth - w - 16);
   const below = r.bottom + 8 + m.offsetHeight < innerHeight - 16;
   const top = below ? r.bottom + 8 : Math.max(16, r.top - 8 - m.offsetHeight);
-  Object.assign(m.style, { left: `${left}px`, top: `${top}px` });
-  // (A sheet that moves, as one sliding up does, places its fixed children
-  // from its own corner: put back by however far off it landed.)
-  const at = m.getBoundingClientRect();
-  if (Math.abs(at.left - left) > 1 || Math.abs(at.top - top) > 1) Object.assign(m.style, { left: `${2 * left - at.left}px`, top: `${2 * top - at.top}px` });
+  Object.assign(m.style, { left: `${left - o.left}px`, top: `${top - o.top}px` });
   m.style.setProperty('--q-menu-origin', `${r.left + r.width / 2 - left}px ${below ? '0' : '100%'}`);
   const off = e => {
     if (!m.contains(e.target)) shut();
