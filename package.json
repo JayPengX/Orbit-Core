@@ -1,5 +1,5 @@
 {
-  "name": "shared-proxy",
+  "name": "orbit-core",
   "private": true,
   "type": "module",
   "scripts": {

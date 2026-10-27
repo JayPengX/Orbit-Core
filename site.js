@@ -34,10 +34,7 @@ export async function site(request, fetcher = fetch) {
     const v = request.headers.get(k);
     if (v) headers.set(k, v);
   }
-  const get = p => fetcher(`${PAGES}${p}${url.search}`, { method: request.method, headers, redirect: 'manual' });
-  let res = await get(path);
-  // Until GitHub renames the repo, its Pages are still at the old name.
-  if (res.status === 404 && path.startsWith('/Orbit-Core')) res = await get(`/Shared-Proxy${path.slice('/Orbit-Core'.length)}`);
+  const res = await fetcher(`${PAGES}${path}${url.search}`, { method: request.method, headers, redirect: 'manual' });
   const out = new Response(res.body, res);
   // Pages' own redirects (/Orbit-Law → /Orbit-Law/) stay on this domain, at
   // the name asked for (/pass → /pass/, not the kit's /Orbit-Core/).

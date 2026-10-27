@@ -1,5 +1,5 @@
 // The kit: what every app shares, Orbit's and Orbit's. It lives in
-// Shared-Proxy/kit/ and is served from Shared-Proxy's GitHub Pages; every
+// Orbit-Core/kit/ and is served from Orbit-Core's GitHub Pages; every
 // app loads it from there (kit/loader.html), so one push changes it for all.
 //
 //   Orbit Securities   stock   where money lives and grows
@@ -16,7 +16,7 @@
 // sheet behind every app's account button (pass.mjs).
 //
 // One account works everywhere: the Orbit Pass, a 10-character code for
-// Shared-Proxy's /eco. It is required: every app opens on a sign-in screen
+// Orbit-Core's /eco. It is required: every app opens on a sign-in screen
 // until the device is signed in, and the data proxy only answers signed-in
 // apps. A device keeps a revocable sign-in, never the pass; another device
 // signs in with the pass or a 10-minute device code. Behind the pass is one
@@ -2278,7 +2278,7 @@ export function showNewPass(s, passcode) {
 // start, a class, a streak about to end) and what the Worker can find out
 // itself (a final score, a price reached) goes to the Worker as a list,
 // schedulePush(s, items), and arrives as a push notice while the app is
-// closed (Shared-Proxy/push.js).
+// closed (Orbit-Core/push.js).
 
 // Notices on for the pass (every app, every device) and allowed on this one.
 export const notifyOn = () => notifyPrefs().on === true && globalThis.Notification?.permission === 'granted';

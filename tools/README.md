@@ -59,8 +59,8 @@ the kit's (the options are at the top of `kit/sw.js`):
 
 ```js
 self.ORBIT_SW = { cache: 'orbit-law-v1', title: 'Orbit Law' };
-importScripts('../Shared-Proxy/kit/sw-images.js');   // pictures from other sites, when it shows them
-importScripts('../Shared-Proxy/kit/sw.js');
+importScripts('../Orbit-Core/kit/sw-images.js');   // pictures from other sites, when it shows them
+importScripts('../Orbit-Core/kit/sw.js');
 ```
 
 ## Others

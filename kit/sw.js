@@ -5,7 +5,7 @@
 //
 // An app's sw.js is its settings, then this file:
 //   self.ORBIT_SW = { cache: 'orbit-law-v1', title: 'Orbit Law' };
-//   importScripts('../Shared-Proxy/kit/sw.js');
+//   importScripts('../Orbit-Core/kit/sw.js');
 // cache: this app's cache (a new name drops the old one); prefix: what every
 // version of its name starts with (the cache without its vN, by default), so
 // only this app's old ones are deleted (the apps share one site); spare:
@@ -212,7 +212,7 @@ self.addEventListener('notificationclick', event => {
   );
 });
 
-// A notice the Worker sent while the app was closed (Shared-Proxy/push.js):
+// A notice the Worker sent while the app was closed (Orbit-Core/push.js):
 // shown as it came; a tap opens the app where it points.
 self.addEventListener('push', event => {
   let data;

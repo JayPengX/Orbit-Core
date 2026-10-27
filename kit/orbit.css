@@ -1,6 +1,6 @@
 /* ==== Orbit UI: iOS 27, for every app in the family ====
-   The canonical copy lives in Shared-Proxy/kit/ and every app loads it from
-   Shared-Proxy's Pages. What iOS 27 draws, drawn the same: its system
+   The canonical copy lives in Orbit-Core/kit/ and every app loads it from
+   Orbit-Core's Pages. What iOS 27 draws, drawn the same: its system
    colours (the iOS 26 palette), grouped backgrounds and cells, label and
    fill greys, hairline separators, Liquid Glass on whatever floats (the tab
    bar, the top buttons, sheets, alerts, menus, banners), the San Francisco

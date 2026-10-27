@@ -4,7 +4,7 @@
 // the leagues ESPN doesn't cover (Asian baseball, K League, EuroLeague). Never a page's casual picture: no face is better than a wrong
 // one. Both sources are open to browsers (CORS), so not through the proxy;
 // answers are kept on the device (a found photo two months, none a week).
-// The kit's copy (Shared-Proxy/kit/photos.mjs), synced into Orbit Sports
+// The kit's copy (Orbit-Core/kit/photos.mjs), synced into Orbit Sports
 // as lib/photos.mjs: never edit an app's copy.
 import { CATALOG } from '#kit/catalog.mjs';
 import { logoPicture, f1Driver, f1Constructor } from '#kit/logos.mjs';

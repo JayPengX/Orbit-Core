@@ -2,7 +2,7 @@
   <img src="site/brand/family-orbit.svg" width="96" height="96" alt="">
 </p>
 
-<h1 align="center">Shared-Proxy</h1>
+<h1 align="center">Orbit-Core</h1>
 
 <p align="center">
   <b>The engine room behind every Orbit app.</b><br>
@@ -116,8 +116,8 @@ wrangler*.toml       one per Worker
 Requirements: Node.js 22 or newer; Playwright for the preview tool.
 
 ```bash
-git clone https://github.com/JayPengX/Shared-Proxy.git
-cd Shared-Proxy
+git clone https://github.com/JayPengX/Orbit-Core.git
+cd Orbit-Core
 npm test
 ```
 

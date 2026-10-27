@@ -17,7 +17,7 @@ import { within } from './within.js';
 // one day at a time `gap` apart (66 games on 26 days for September, none
 // refused at 1.5 s). A day refused (429) waits and is asked again; a day
 // never read leaves the month not `whole` (read again next run).
-export async function cpblMonthWhole(ym, { day, league, parse, now = Date.now(), gap = 1500, wait = 30_000, sleep = ms => new Promise(r => setTimeout(r, ms)), get = url => within(30_000, signal => fetch(url, { signal, headers: { 'User-Agent': 'Orbit/1.0 (https://github.com/JayPengX/Shared-Proxy)' } })) } = {}) {
+export async function cpblMonthWhole(ym, { day, league, parse, now = Date.now(), gap = 1500, wait = 30_000, sleep = ms => new Promise(r => setTimeout(r, ms)), get = url => within(30_000, signal => fetch(url, { signal, headers: { 'User-Agent': 'Orbit/1.0 (https://github.com/JayPengX/Orbit-Core)' } })) } = {}) {
   const [y, m] = ym.split('-').map(Number);
   const days = Array.from({ length: new Date(Date.UTC(y, m, 0)).getUTCDate() }, (_, i) => `${ym}-${String(i + 1).padStart(2, '0')}`);
   const games = [];

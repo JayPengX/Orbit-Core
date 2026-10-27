@@ -1,5 +1,5 @@
 // Points every app checked out next to this repo at the kit served from
-// Shared-Proxy's GitHub Pages (kit/loader.html), instead of a copy in each
+// Orbit-Core's GitHub Pages (kit/loader.html), instead of a copy in each
 // app. Safe to run again: it only rewrites what still needs it, and it puts
 // the latest loader.html between each page's kit:head / kit:boot markers
 // (the one thing an app keeps of the kit, changed very rarely).
@@ -31,10 +31,10 @@ const APPS = {
   'Orbit-Law': { id: 'law', site: 'public', mods: ['orbit'] },
   'Orbit-Money': { id: 'money', site: 'public', mods: ['orbit'] }
 };
-const CHECKOUT = `      - name: The shared kit (Shared-Proxy/kit), for the tests
+const CHECKOUT = `      - name: The shared kit (Orbit-Core/kit), for the tests
         uses: actions/checkout@v4
         with:
-          repository: JayPengX/Shared-Proxy
+          repository: JayPengX/Orbit-Core
           path: .shared
           sparse-checkout: kit
       - run: ln -sfn .shared/kit .kit
@@ -90,21 +90,21 @@ for (const [app, cfg] of Object.entries(APPS)) {
   const spec = new RegExp(`(['"])(?:\\.{1,2}\\/)+(?:public\\/|src\\/)?(?:lib\\/)?(${mods})\\.mjs\\1`, 'g');
   for (const file of await walk(dir)) await edit(file, text => text.replace(spec, (_, q, m) => `${q}#kit/${m}.mjs${q}`));
   // The service worker's pictures from other sites.
-  await edit(join(site, 'sw.js'), text => text.replace("importScripts('./sw-images.js')", "importScripts('../Shared-Proxy/kit/sw-images.js')"));
+  await edit(join(site, 'sw.js'), text => text.replace("importScripts('./sw-images.js')", "importScripts('../Orbit-Core/kit/sw-images.js')"));
   // Tests import the kit as the page does (#kit/…): package.json's imports,
-  // through .kit (a link to ../Shared-Proxy/kit here, a checkout in CI).
+  // through .kit (a link to ../Orbit-Core/kit here, a checkout in CI).
   await edit(join(dir, 'package.json'), text => {
     const p = JSON.parse(text);
     p.imports = { ...(p.imports || {}), '#kit/*': './.kit/*' };
     p.scripts ||= {};
-    p.scripts.pretest = 'test -e .kit || ln -s ../Shared-Proxy/kit .kit';
+    p.scripts.pretest = 'test -e .kit || ln -s ../Orbit-Core/kit .kit';
     return JSON.stringify(p, null, 2) + '\n';
   });
   if (await exists(join(dir, '.gitignore'))) await edit(join(dir, '.gitignore'), t => (/^\.kit$/m.test(t) ? t : `${t.trimEnd()}\n.kit\n.shared\n`));
   else await writeFile(join(dir, '.gitignore'), '.kit\n.shared\nnode_modules/\n');
   const { readdir } = await import('node:fs/promises');
   for (const wf of await readdir(join(dir, '.github/workflows')).catch(() => [])) {
-    await edit(join(dir, '.github/workflows', wf), y => (y.includes('repository: JayPengX/Shared-Proxy') ? y : y.replace(/( {6}- name: (?:Run tests|Install dependencies)\n)/, `${CHECKOUT}$1`)));
+    await edit(join(dir, '.github/workflows', wf), y => (y.includes('repository: JayPengX/Orbit-Core') ? y : y.replace(/( {6}- name: (?:Run tests|Install dependencies)\n)/, `${CHECKOUT}$1`)));
   }
   console.log('kit from Pages:', app);
 }

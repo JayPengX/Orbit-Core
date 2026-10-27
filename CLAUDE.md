@@ -1,4 +1,4 @@
-# Working on Shared-Proxy
+# Working on Orbit-Core
 
 Read `docs/TRUTH.md` first (one page: how the owner works and what matters).
 MAP.md is this repo's map (README.md is the short public front page).

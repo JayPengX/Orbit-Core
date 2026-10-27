@@ -1,5 +1,5 @@
 # The shared kit (kit/) and the family's home page (site/) on GitHub Pages,
-# at https://jaypengx.github.io/Shared-Proxy/: every app loads the kit from
+# at https://jaypengx.github.io/Orbit-Core/: every app loads the kit from
 # here (kit/loader.html), so a change to the kit is this one push.
 # One-time setup: repo Settings -> Pages -> Source: GitHub Actions.
 name: Kit to Pages

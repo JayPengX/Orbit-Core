@@ -575,9 +575,9 @@
 <!-- The built kit's modules import each other as #kit/… (kit/stamp.mjs). -->
 <script type="importmap">{"imports":{"#kit/":"../kit/"}}</script>
 <script type="module">
-import { DEV, DEV_GROUPS, cleanDev, BRANDS, appIcon, familyMark } from '../kit/brand.mjs';
+import { DEV, DEV_GROUPS, cleanDev, BRANDS, appIcon, familyMark, pathOf } from '../kit/brand.mjs';
 import { icons, tileHtml, heroCardHtml, escHtml } from '../kit/ui.mjs';
-import { API } from '../kit/domain.mjs';
+import { API, onDomain } from '../kit/domain.mjs';
 const ECO_URL = `${API}/eco`;
 const KEY = 'orbit.admin';
 const $ = id => document.getElementById(id);
@@ -1726,7 +1726,7 @@ async function loadCapacity() {
     $('cap-bill').textContent = !g
       ? 'Cloudflare 帳單保護還沒跑過（quota-guard 部署後五分鐘內）。'
       : !g.armed
-        ? 'Cloudflare 帳單保護還沒啟動：GitHub 的 Shared-Proxy 需要 CF_GUARD_TOKEN（見 MAP.md §11）。沒有它，超過 $5 的用量會計費。'
+        ? 'Cloudflare 帳單保護還沒啟動：GitHub 的 Orbit-Core 需要 CF_GUARD_TOKEN（見 MAP.md §11）。沒有它，超過 $5 的用量會計費。'
         : g.stopped
           ? `代理已經停了（${fmt(g.stopped.at)}，${g.stopped.why.map(k => BILL_ZH[k] || '讀不到用量').join('、')}到 ${Math.round(g.stopAt * 100)}%），下個帳單週期開始時自動恢復，不會多付一毛。`
           : g.error
@@ -1759,7 +1759,7 @@ $('dev-save').onclick = () =>
 
 // ---- 系統 (ops.js) ----
 const GH = 'https://api.github.com/repos/JayPengX/';
-const REPOS = [['Shared-Proxy', 'Workers 與共用套件'], ['Orbit-Sports', 'Orbit Sports'], ['Orbit-Securities', 'Orbit 證券'], ['Orbit-Words', 'Orbit Words'], ['Orbit-Class', 'Orbit Class'], ['Orbit-Weather', 'Orbit Weather'], ['Orbit-Transit', 'Orbit Transit'], ['Orbit-Beats', 'Orbit Beats'], ['Orbit-Law', 'Orbit Law']];
+const REPOS = [['Orbit-Core', 'Workers 與共用套件'], ['Orbit-Sports', 'Orbit Sports'], ['Orbit-Securities', 'Orbit 證券'], ['Orbit-Words', 'Orbit Words'], ['Orbit-Class', 'Orbit Class'], ['Orbit-Weather', 'Orbit Weather'], ['Orbit-Transit', 'Orbit Transit'], ['Orbit-Beats', 'Orbit Beats'], ['Orbit-Law', 'Orbit Law']];
 const getJ = async (url, ms = 8000) => { const r = await fetch(url, { signal: AbortSignal.timeout(ms), cache: 'no-store' }); if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); };
 // GitHub's open API: 60 reads an hour from here, kept two minutes.
 async function gh(path) {
@@ -1842,7 +1842,7 @@ async function loadSystem() {
     $('secrets').replaceChildren(
       ...SECRET_GROUPS.flatMap(([group, names]) => names.map(n => checkRow(r.secrets[n] ? '' : 'bad', n, group, r.secrets[n] ? '已設定' : '沒設定'))),
       ...Object.entries(r.bindings).map(([n, on]) => checkRow(on ? '' : 'bad', n, BIND_WORD[n] || '綁定', on ? '已綁定' : '沒綁定')),
-      checkRow('', 'GitHub：Shared-Proxy', 'CLOUDFLARE_API_TOKEN（部署）、CF_GUARD_TOKEN（帳單保護）、DATA_PUSH_SECRET、ECO_TOKEN_SECRET、ECO_ADMIN_TOKEN', '5 個')
+      checkRow('', 'GitHub：Orbit-Core', 'CLOUDFLARE_API_TOKEN（部署）、CF_GUARD_TOKEN（帳單保護）、DATA_PUSH_SECRET、ECO_TOKEN_SECRET、ECO_ADMIN_TOKEN', '5 個')
     );
   } catch (e) {
     $('sys-error').textContent = e.message;
@@ -1906,8 +1906,11 @@ $('sys-actions').replaceChildren(
   })
 );
 const LINKS = [
-  ['Orbit Sports', '/Orbit-Sports/'], ['Orbit 證券', '/Orbit-Securities/'], ['Orbit Words', '/Orbit-Words/'], ['Orbit Class', '/Orbit-Class/'], ['Orbit Weather', '/Orbit-Weather/'], ['Orbit Transit', '/Orbit-Transit/'],
-  ['Shared-Proxy Actions', 'https://github.com/JayPengX/Shared-Proxy/actions'],
+  // Each at its address on the page's own home (a repo's name isn't one on the domain).
+  ['Orbit Sports', pathOf('match')], ['Orbit 證券', pathOf('stock')], ['Orbit Words', pathOf('vocab')], ['Orbit Class', pathOf('orbit')], ['Orbit Weather', pathOf('weather')], ['Orbit Transit', pathOf('transit')],
+  // Longshot's own panel: its own Worker, accounts and sign-in.
+  ['Longshot 管理', onDomain ? '/longshot/admin/' : '/Longshot/admin/'],
+  ['Orbit-Core Actions', 'https://github.com/JayPengX/Orbit-Core/actions'],
   ['Cloudflare Workers', 'https://dash.cloudflare.com/?to=/:account/workers-and-pages'], ['Cloudflare D1', 'https://dash.cloudflare.com/?to=/:account/workers/d1'], ['Cloudflare R2', 'https://dash.cloudflare.com/?to=/:account/r2/overview'], ['Cloudflare 帳單', 'https://dash.cloudflare.com/?to=/:account/billing'], ['Cloudflare 通知', 'https://dash.cloudflare.com/?to=/:account/notifications'], ['GitHub', 'https://github.com/JayPengX?tab=repositories']
 ];
 $('links').replaceChildren(...LINKS.map(([n, href]) => el('a', { href, target: '_blank', rel: 'noopener', text: n })));

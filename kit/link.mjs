@@ -1,5 +1,5 @@
 // For working on the apps here: links each app checked out next to this repo
-// to this kit (<app>/.kit -> ../Shared-Proxy/kit), so its tests import the
+// to this kit (<app>/.kit -> ../Orbit-Core/kit), so its tests import the
 // kit the way the deployed page does (`#kit/orbit.mjs`, package.json
 // "imports"). The apps' own `npm test` makes the link too when it's missing;
 // their CI checks this repo out instead.
@@ -16,7 +16,7 @@ for (const app of await readdir(root)) {
     await lstat(link);
     console.log('linked', app);
   } catch {
-    await symlink('../Shared-Proxy/kit', link);
+    await symlink('../Orbit-Core/kit', link);
     console.log('linked', app, '(new)');
   }
 }

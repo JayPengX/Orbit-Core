@@ -25,12 +25,12 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 10-19 No separate test step and no Mac test gate: check your own cloud screenshots, push to `main`, Jay tests on his phone.
 - 10-21 "Don't ask me, just push, I allow anything" (repeated 10-22): never post push cards, kit pushes included.
 - 10-21 Fetch and rebase onto `origin/main` right before every push; never push a tree from an old checkout (a stale push wiped Law's 裁判).
-- 10-22 Kit push order: Shared-Proxy `main` first, wait for `pages.yml`, then apps; run affected apps' `npm test` against the new kit first (a CI break emails Jay).
+- 10-22 Kit push order: Orbit-Core `main` first, wait for `pages.yml`, then apps; run affected apps' `npm test` against the new kit first (a CI break emails Jay).
 - 10-22 No failure or cancel emails: never add a cancelling `concurrency:` to a Pages workflow; copy the `queue` job; builds check out main's tip, not `github.sha`.
 - 10-22 Orbit-Securities: after a push, confirm "Deploy to Pages" started; if not, run `deploy.yml` by hand.
 - 10-23 Secrets are copied sealed inside Cloudflare/GitHub; never ask Jay to dig up keys; get his written yes up front when a safety check needs his words.
 - 10-23 While Jay is away or quota is out: don't ask him anything, wait for the reset and resume.
-- 10-27 Anything two apps use lives in the Shared-Proxy kit, never copied; move duplicates there when you see them (TRUTH §4).
+- 10-27 Anything two apps use lives in the Orbit-Core kit, never copied; move duplicates there when you see them (TRUTH §4).
 - Questions to Jay: tap options (a decision card), never typed questions, never overnight; one message when everything is done.
 - Coordinator posts an hourly digest (Live / In progress / Waiting on) only when something shipped.
 - Files for Jay go into `/mnt/project-files/` by category (its `INDEX.md`); nothing loose at the top.
@@ -168,7 +168,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - Content changes only when Jay says "catch up the showcase". The raw record stays private in project files, never in a repo.
 
 ### Longshot (outside the family)
-- 10-22 Its own app, Worker and Pass; never import from, link to or depend on Shared-Proxy; its rules are `Longshot/docs/TRUTH.md`.
+- 10-22 Its own app, Worker and Pass; never import from, link to or depend on Orbit-Core; its rules are `Longshot/docs/TRUTH.md`.
 - 10-22 League sports and F1 only; no tennis, UFC, golf or other non-league sports.
 - 10-20 Lock a whole market, never a lone open side; no 限關 pills.
 - 10-21 No cash out, boosts, free bets, VIP or player markets; 冠軍 boards drop impossible picks.
