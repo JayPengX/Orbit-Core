@@ -20,13 +20,14 @@ loud things mean something.
   the biggest type on the screen, with the most space around it. Money's
   月曆: what I spent this month. Weather: how warm it is now. Sports: the
   game on now.
-- **The focus sits on a plain card; size and space inside it make it the
-  focus.** The default focal block (`.q-focus`: a quiet label, the number at
-  `--q-t-focal`, one line under it, at most three small figures) is on the
-  flat surface card every list uses (`--q-surface`, radius 22, no shadow, no
-  colour). Jay 2026-10-27: open on the page it read as bare text ("plain
-  text ugly"). A coloured card (`.q-hero-card`) is for when the focus is an
-  *action* (Law's 問法律, a game to open), never just to hold a number.
+- **The focus sits on the app's colour.** The focal block (`.q-focus`: a
+  quiet label, the number at `--q-t-focal`, one line under it, at most three
+  small figures) is a card in the app's colour lit from the corner, the same
+  surface as `.q-hero-card` (an app may give it its own, as Money's black and
+  gold). What's *on* it stays calm: one big number, plain words, no capsules.
+  Jay 2026-10-27: the rollout's open, colourless focus made every screen
+  "feel so empty"; "the cleaner approach is right, but stripping out
+  background is shitty". Clean the content, keep the colour.
 - At most **one** coloured surface per screen. A second one means two
   things are shouting; demote one.
 - Everything else steps down: section heads, then rows, then captions. If
@@ -69,8 +70,12 @@ loud things mean something.
 - **Meaning colours** only where the value carries the meaning: red/green
   for up/down (Taiwan's way, `--q-up` / `--q-down`), `--q-good` for money
   in, red for over budget or empty, `--q-live` for live. Never as decoration.
-- No glows, no diagonal sweeps, no coloured shadows. A coloured card is one
-  deep colour, lit a shade from the top (the kit's hero does this).
+- **Keep the surfaces.** The hero and focus cards wear the app's colour lit
+  from the corner with a soft shadow of it; class, subject and sport cards
+  their own colour; icon tiles a gradient. Calm comes from what's on a card
+  (fewer capsules, weights and accent marks), never from stripping its
+  background (Jay 2026-10-27). Don't add a second coloured hero to a screen
+  that has one.
 - Icon tiles (white glyph on a colour squircle) say *which kind* (a
   category, an account). Not on every row or heading, and a group that's all
   the same kind needs none.
@@ -83,8 +88,11 @@ Tokens `--q-s-1` … `--q-s-7` = 4, 8, 12, 16, 24, 32, 48.
   one left edge (16 + 16 inside a card).
 - 4–8: things that belong together (a label over its number, a list label
   over its rows).
-- 24: after the focal block, and between groups of the same kind.
-- 32: between sections.
+- 16: after the focal block, and between groups of one list (現金 / 銀行帳戶).
+- 24: between sections (`.q-section`). Never more between two parts of
+  one page: a gap bigger than the thing it separates reads as a hole
+  (Jay 2026-10-27, "so much gap for IDK what" on Money 帳戶 and Sports
+  首頁). A line naming what follows (Sports' 今天 · 11 場) sits 8 above it.
 - **Group by space before lines, and by lines before boxes.** Closer = related.
   If a hairline already separates two rows, they don't also need two cards.
 - Equal gaps for equal relationships. A random 14 here and 10 there is
@@ -148,12 +156,13 @@ The map's question is "where am I and what can I use near me". So:
   only the month's few biggest days (over twice the budget's daily share,
   top five) carry the accent. Today is accent text; the picked day the one
   filled circle.
-- **Money 帳戶:** the net worth on its focus card; 現金 / 銀行帳戶 / 信用卡 are
+- **Money 帳戶:** the net worth on its black-and-gold focus card; 現金 / 銀行帳戶 / 信用卡 are
   list labels (15, grey), not section titles competing with it; balances 500.
 - **Money 統計:** "平均每天 NT$645" was a gold capsule: a fact, so plain text.
-- **Law 首頁:** the 問法律 card kept (it's an action) but as one deep indigo,
-  no glow; the over-line a plain grey word, not spaced caps.
-- **Don't:** a hero card on every tab; a colour tile on every row; a tag on
+- **Law 首頁:** the 問法律 card kept (it's an action) in its indigo; the
+  over-line a plain grey word, not spaced caps.
+- **Don't:** strip a card's colour to make it calm (it reads empty); a
+  gap bigger than what it separates; a colour tile on every row; a tag on
   every row; bold values in every row; 3 radii on one screen; accent on
   icons, labels, numbers and buttons all at once.
 
