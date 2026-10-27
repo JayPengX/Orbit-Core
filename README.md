@@ -16,7 +16,9 @@
 The Orbit apps are static sites. Everything server-side, plus the kit and brand they all share, lives here: the proxy, the Orbit Pass account, notices, data builds, and the family's home page.
 
 <p align="center">
-  <img src="docs/screenshots/family-page.webp" width="260" alt="The family page and Orbit Pass">
+  <img src="docs/screenshots/family-1.webp" width="30%" alt="One pass for every app">
+  <img src="docs/screenshots/family-2.webp" width="30%" alt="Milestones across the family">
+  <img src="docs/screenshots/family-3.webp" width="30%" alt="Settings that follow you">
 </p>
 
 ## The family
