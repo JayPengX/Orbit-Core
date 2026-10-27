@@ -58,8 +58,11 @@ export const CAPS = {
   detailsPro: 4_500, // Place Details Pro (a place's name), 5,000
   textSearch: 4_500, // Text Search Pro (a search's places with their names and positions), 5,000
   routes: 9_000, // Compute Routes Essentials (transit, and a walk with its line), 10,000
-  matrix: 9_000 // Compute Route Matrix Essentials (walks, an element each), 10,000
+  matrix: 9_000, // Compute Route Matrix Essentials (walks, an element each), 10,000
+  showcaseMaps: 600 // the showcase's Transit demo (no sign-in): its own share, each also counted as a map load above
 };
+// Where the showcase's demo runs (an Origin is only text, so its share above is the real bound).
+const SHOWCASE_ORIGINS = new Set(['https://jaypengx.com', 'https://jaypengx.github.io']);
 
 // Google bills by the calendar month on Pacific time: counted the same way
 // (UTC-8, a little early in summer, never late).
@@ -1240,6 +1243,12 @@ async function transitRoute(request, env, headers, path, { session = null, limit
   if (path === '/transit/status') {
     const sample = q.get('sample');
     if (!sample) return send({ month: billingMonth(now), used: await usage(env, now), caps: CAPS, keys: { tdx: Boolean(env.TDX_CLIENT_ID && env.TDX_CLIENT_SECRET), mapsBrowser: Boolean(env.GOOGLE_MAPS_BROWSER_KEY), google: Boolean(googleKey(env)) }, tdxPerMin: Number(env.TDX_PER_MIN) || 5 });
+  }
+  if (path === '/transit/showcase-map') {
+    // The showcase's Transit demo draws Google's map like the real app: one
+    // map load, from its own small share and the month's cap; NLSC's past either.
+    const google = SHOWCASE_ORIGINS.has(request.headers.get('Origin') || '') && Boolean(env.GOOGLE_MAPS_BROWSER_KEY) && !limited() && (await usage(env, now)).maps < CAPS.maps && (await spend(env, 'showcaseMaps', 1, now, ctx)) && (await spend(env, 'maps', 1, now, ctx));
+    return send({ map: google ? { provider: 'google', key: env.GOOGLE_MAPS_BROWSER_KEY } : { provider: 'nlsc' } });
   }
   if (!session) return send({ code: 'ECO_TOKEN_INVALID' }, 401);
   if (limited()) return send({ code: 'RATE_LIMITED' }, 429);
