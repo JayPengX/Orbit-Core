@@ -63,7 +63,8 @@ test('the stylesheet has each new class, and keeps the old section-head rules', 
 test('the new CSS adds no hex colours except white, the logo tile and the place tiles', () => {
   const mine = css.slice(css.indexOf('--q-logo-bg: #ffffff'));
   const hexes = [...mine.matchAll(/#[0-9a-fA-F]{3,8}\b/g)].map(m => m[0].toLowerCase());
-  const allowed = new Set(['#fff', '#ffffff', '#000', '#ff9500', '#6155f5', '#0a84ff', '#ff383c', '#f5b301']);
+  // (#0b1020: the heroes' deep ink, the page hero's and the sheet hero's alike.)
+  const allowed = new Set(['#fff', '#ffffff', '#000', '#ff9500', '#6155f5', '#0a84ff', '#ff383c', '#f5b301', '#0b1020']);
   assert.deepEqual(hexes.filter(x => !allowed.has(x)), []);
   assert.doesNotMatch(mine, /--q-label2|--q-card\b/, 'the kit\'s token names');
 });
