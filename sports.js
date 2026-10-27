@@ -63,6 +63,9 @@ const SPORTS_PROXY_ALLOWED_HOSTS = [
   'eu-offering-api.kambicdn.com',
   // OpenF1's sessions and race control messages (Sports' F1).
   'api.openf1.org',
+  // Open-Meteo's forecast (no key): the weather at an F1 circuit on its
+  // weekend (Sports). Through here, one read a circuit shared by every phone.
+  'api.open-meteo.com',
   // Yahoo Finance's public chart, spark and search endpoints (no key): Stock
   // Study's quotes, charts, dividends and splits for stocks, ETFs, funds,
   // currencies, crypto, metals and indexes worldwide.
@@ -286,6 +289,8 @@ function cachePolicyFor(url) {
       return CACHE_STANDINGS;
     case 'api.openf1.org':
       return CACHE_OPENF1;
+    case 'api.open-meteo.com':
+      return CACHE_STANDINGS;
     case 'clob.polymarket.com':
       return CACHE_ODDS;
     case 'gamma-api.polymarket.com':
@@ -1238,6 +1243,7 @@ function parseTarget(target) {
     // A search (its words, in English as seen from Taiwan) or a video's page, nothing else.
     if (u.hostname === YT_HOST && !(u.pathname === '/results' ? [...u.searchParams.keys()].every(k => ['search_query', 'hl', 'gl'].includes(k)) && (u.searchParams.get('search_query') || '').length > 0 && (u.searchParams.get('search_query') || '').length <= 200 : u.pathname === '/watch' && [...u.searchParams.keys()].join() === 'v' && /^[\w-]{11}$/.test(u.searchParams.get('v')))) return null;
     if (u.hostname === ROTOWIRE_HOST && !(u.pathname === ROTOWIRE_NBA && (u.search === '' || u.search === '?date=tomorrow'))) return null;
+    if (u.hostname === 'api.open-meteo.com' && u.pathname !== '/v1/forecast') return null;
     if (u.hostname === F1_HOST && !/^\/en\/((drivers|teams)\/[a-z-]+|racing\/20\d\d(\/[a-z0-9-]+)?)$/.test(u.pathname)) return null;
     if (u.hostname === FOTMOB_HOST && !(/^\/api\/data\/(leagues|teams)$/.test(u.pathname) && [...u.searchParams.keys()].join() === 'id' && /^\d{1,8}$/.test(u.searchParams.get('id')))) return null;
     if (u.hostname === FOTMOB_DATA_HOST && (!/^\/stats\/\d{1,8}\/season\/\d{1,8}\/[a-z0-9_]{2,60}\.json$/.test(u.pathname) || u.search)) return null;
