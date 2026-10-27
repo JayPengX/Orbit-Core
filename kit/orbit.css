@@ -166,26 +166,17 @@
 /* Each app's colour, set by <html data-app> (kit/apps.mjs writes it into
    each page, orbitSession() too), from kit/brand.mjs. */
 /* app-colours */
-:where(:root[data-app='stock']) {
-  --q-accent: #0d9488;
-}
-:where(:root[data-app='orbit']) {
-  --q-accent: #0ea5e9;
-}
-:where(:root[data-app='weather']) {
-  --q-accent: #6366f1;
+:where(:root[data-app='match']) {
+  --q-accent: #ea580c;
 }
 :where(:root[data-app='transit']) {
   --q-accent: #10b981;
 }
-:where(:root[data-app='match']) {
-  --q-accent: #ea580c;
+:where(:root[data-app='weather']) {
+  --q-accent: #6366f1;
 }
-:where(:root[data-app='beats']) {
-  --q-accent: #c026d3;
-}
-:where(:root[data-app='law']) {
-  --q-accent: #4f46e5;
+:where(:root[data-app='orbit']) {
+  --q-accent: #0ea5e9;
 }
 :where(:root[data-app='money']) {
   --q-accent: #ca8a04;
@@ -193,27 +184,27 @@
 :where(:root[data-app='vocab']) {
   --q-accent: #db2777;
 }
+:where(:root[data-app='beats']) {
+  --q-accent: #c026d3;
+}
+:where(:root[data-app='law']) {
+  --q-accent: #4f46e5;
+}
+:where(:root[data-app='stock']) {
+  --q-accent: #0d9488;
+}
 @media (prefers-color-scheme: dark) {
-  :where(:root[data-app='stock']:not([data-theme='light'])) {
-    --q-accent: #1db4a4;
-  }
-  :where(:root[data-app='orbit']:not([data-theme='light'])) {
-    --q-accent: #46bcf3;
-  }
-  :where(:root[data-app='weather']:not([data-theme='light'])) {
-    --q-accent: #848df7;
+  :where(:root[data-app='match']:not([data-theme='light'])) {
+    --q-accent: #f48940;
   }
   :where(:root[data-app='transit']:not([data-theme='light'])) {
     --q-accent: #3fd09c;
   }
-  :where(:root[data-app='match']:not([data-theme='light'])) {
-    --q-accent: #f48940;
+  :where(:root[data-app='weather']:not([data-theme='light'])) {
+    --q-accent: #848df7;
   }
-  :where(:root[data-app='beats']:not([data-theme='light'])) {
-    --q-accent: #d869e8;
-  }
-  :where(:root[data-app='law']:not([data-theme='light'])) {
-    --q-accent: #7a7df1;
+  :where(:root[data-app='orbit']:not([data-theme='light'])) {
+    --q-accent: #46bcf3;
   }
   :where(:root[data-app='money']:not([data-theme='light'])) {
     --q-accent: #e4b526;
@@ -221,21 +212,33 @@
   :where(:root[data-app='vocab']:not([data-theme='light'])) {
     --q-accent: #ea68a6;
   }
+  :where(:root[data-app='beats']:not([data-theme='light'])) {
+    --q-accent: #d869e8;
+  }
+  :where(:root[data-app='law']:not([data-theme='light'])) {
+    --q-accent: #7a7df1;
+  }
+  :where(:root[data-app='stock']:not([data-theme='light'])) {
+    --q-accent: #1db4a4;
+  }
 }
-:where(:root[data-app='stock'][data-theme='dark']) {
-  --q-accent: #1db4a4;
-}
-:where(:root[data-app='orbit'][data-theme='dark']) {
-  --q-accent: #46bcf3;
-}
-:where(:root[data-app='weather'][data-theme='dark']) {
-  --q-accent: #848df7;
+:where(:root[data-app='match'][data-theme='dark']) {
+  --q-accent: #f48940;
 }
 :where(:root[data-app='transit'][data-theme='dark']) {
   --q-accent: #3fd09c;
 }
-:where(:root[data-app='match'][data-theme='dark']) {
-  --q-accent: #f48940;
+:where(:root[data-app='weather'][data-theme='dark']) {
+  --q-accent: #848df7;
+}
+:where(:root[data-app='orbit'][data-theme='dark']) {
+  --q-accent: #46bcf3;
+}
+:where(:root[data-app='money'][data-theme='dark']) {
+  --q-accent: #e4b526;
+}
+:where(:root[data-app='vocab'][data-theme='dark']) {
+  --q-accent: #ea68a6;
 }
 :where(:root[data-app='beats'][data-theme='dark']) {
   --q-accent: #d869e8;
@@ -243,11 +246,8 @@
 :where(:root[data-app='law'][data-theme='dark']) {
   --q-accent: #7a7df1;
 }
-:where(:root[data-app='money'][data-theme='dark']) {
-  --q-accent: #e4b526;
-}
-:where(:root[data-app='vocab'][data-theme='dark']) {
-  --q-accent: #ea68a6;
+:where(:root[data-app='stock'][data-theme='dark']) {
+  --q-accent: #1db4a4;
 }
 /* /app-colours */
 /* What a colour means, the same in every app. Taiwan's market convention:

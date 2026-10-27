@@ -12,13 +12,13 @@
 //
 // HELP[app][lang] = [[topic id, title, [paragraphs]], …]
 
-export const HELP_ORDER = ['pass', 'stock', 'match', 'vocab', 'orbit', 'weather', 'transit', 'beats', 'money'];
+import { APP_ORDER } from './brand.mjs';
 
 export const HELP = {
   pass: {
     zh: [
       ['what', 'Orbit Pass 是什麼', [
-        '你在每個 Orbit App 的帳號：Securities、Sports、Words、Class、Weather、Transit、Beats、Law、Money。每個 App 都用它登入，資料存在它裡面，換裝置也一樣。',
+        '你在每個 Orbit App 的帳號：Sports、Transit、Weather、Class、Money、Words、Beats、Law、Securities。每個 App 都用它登入，資料存在它裡面，換裝置也一樣。',
         '通行碼是 10 個字的代碼，由分享 Orbit 給你的人發給你。知道它就能用這個帳號，所以別給別人；它只顯示一次，請記在安全的地方。',
         '每個 App 右上角的頭像就是 Orbit Pass 的入口。'
       ]],
@@ -41,7 +41,7 @@ export const HELP = {
         '所有 App 可以同時開。同一個 App 在另一台裝置（或 Safari 和主畫面 App 之間）打開時，原本那個會暫停，按「在這裡繼續」拿回來，資料不會互相蓋掉。'
       ]],
       ['net', '沒有網路的時候', [
-        'Words、Weather、Class 沒網路也能開，連上後再同步。Securities、Transit、Sports 是即時的，沒網路時只顯示「沒有網路連線」，連上就回來。網路慢時先用手機上的資料。'
+        'Weather、Class、Words 沒網路也能開，連上後再同步。Sports、Transit、Securities 是即時的，沒網路時只顯示「沒有網路連線」，連上就回來。網路慢時先用手機上的資料。'
       ]],
       ['notify', '通知與除錯紀錄', [
         '「系統通知」一個開關管全部，下面每個 App 的每種通知各自開關。設定跟著 Orbit Pass，每台裝置都一樣。',
@@ -57,7 +57,7 @@ export const HELP = {
     ],
     en: [
       ['what', 'What the Orbit Pass is', [
-        'Your account in every Orbit app: Securities, Sports, Words, Class, Weather, Transit, Beats, Law and Money. Each signs in with it and keeps its data on it, the same on any device.',
+        'Your account in every Orbit app: Sports, Transit, Weather, Class, Money, Words, Beats, Law and Securities. Each signs in with it and keeps its data on it, the same on any device.',
         'The pass is a 10-character code from whoever shared Orbit with you. Anyone who knows it can use the account, so keep it to yourself; it’s shown once, so write it down somewhere safe.',
         'The avatar at the top right of every app opens the Orbit Pass.'
       ]],
@@ -80,7 +80,7 @@ export const HELP = {
         'Every app can be open at once. Opening the same app somewhere else (another device, or Safari beside the home-screen app) pauses the first; “Continue here” takes it back, and nothing is overwritten.'
       ]],
       ['net', 'Without a connection', [
-        'Words, Weather and Class open offline and sync once you’re back. Securities, Transit and Sports are live, so offline they show only “No internet connection” and come back by themselves. On a slow connection an app opens on what the phone has.'
+        'Weather, Class and Words open offline and sync once you’re back. Sports, Transit and Securities are live, so offline they show only “No internet connection” and come back by themselves. On a slow connection an app opens on what the phone has.'
       ]],
       ['notify', 'Notifications and the debug log', [
         'One switch, System notices, turns them all on or off; below it each app’s kinds have their own. They follow your Orbit Pass to every device.',
@@ -600,6 +600,9 @@ export const HELP = {
     ]
   }
 };
+
+// The family's order (brand.mjs APP_ORDER), the apps with a guide.
+export const HELP_ORDER = ['pass', ...APP_ORDER.filter(a => a in HELP)];
 
 export function helpFor(app, lang = 'zh') {
   return HELP[app]?.[lang === 'en' ? 'en' : 'zh'] || [];
