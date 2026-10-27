@@ -231,6 +231,13 @@ test('the map is Google’s under the cap, Taiwan’s NLSC map past it', async (
   await kv.put(`transit:use:${billingMonth(NOW)}`, JSON.stringify({ maps: CAPS.maps }));
   res = await handleTransit(req, env, {}, '/transit/config', { session, now: NOW, cache: memCache() });
   assert.deepEqual((await res.json()).map, { provider: 'nlsc' });
+  // A dev page: NLSC's, unless it asks for Google's (the preview's screenshots).
+  resetMeter();
+  await kv.put(`transit:use:${billingMonth(NOW)}`, JSON.stringify({ maps: 0 }));
+  res = await handleTransit(req, env, {}, '/transit/config', { session: { s: 'dev', dev: true }, now: NOW, cache: memCache() });
+  assert.deepEqual((await res.json()).map, { provider: 'nlsc' });
+  res = await handleTransit(new Request('https://w/transit/config?map=google'), env, {}, '/transit/config', { session: { s: 'dev', dev: true }, now: NOW, cache: memCache() });
+  assert.deepEqual((await res.json()).map, { provider: 'google', key: 'browser-key' });
   // No session: nothing.
   res = await handleTransit(req, env, {}, '/transit/config', { session: null, now: NOW });
   assert.equal(res.status, 401);

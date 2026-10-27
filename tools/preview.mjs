@@ -22,6 +22,7 @@
 //                          [--root dir]  (the repos from there, e.g. a stamped copy)
 //                          [--h2]  (the app's files over HTTP/2, as GitHub Pages serves them:
 //                          no six-connection queue; a throwaway certificate)
+//                          [--google-map]  (with --live, Orbit Transit: Google's map, as on the site)
 //                          [--fake-yahoo]  (made-up Yahoo prices: spark and chart answers
 //                          for any symbol, for when Yahoo answers 429)
 //
@@ -854,6 +855,31 @@ await context.route(/^https:\/\/(?!orbit-workers-proxy|sports-proxy|localhost[:/
   const json = /^\s*[[{]/.test(body.subarray(0, 8).toString());
   await route.fulfill({ status: 200, contentType: json ? 'application/json' : type, headers: { 'Access-Control-Allow-Origin': '*', ...(/^image\//.test(type) && !json ? { 'Cache-Control': 'max-age=3600' } : {}) }, body });
 });
+// --live --google-map (Orbit Transit): Google's map, as the site gets it. The
+// dev door gives the browser key when asked (?map=google), and Google is asked
+// as from the site (the key only works there): its Referer, and the page's
+// address in what Maps sends, are the site's.
+const googleMap = live && flag('google-map');
+if (googleMap) {
+  const site = 'https://orbit.jaypengx.com/transit/';
+  const asSite = url => url.split(encodeURIComponent(base)).join(encodeURIComponent(site)).split(base).join(site).split(encodeURIComponent(new URL(base).origin)).join(encodeURIComponent(new URL(site).origin));
+  const googleBin = url => new Promise(resolve => execFile('curl', ['-s', '-L', '-f', '-m', '20', '-H', `Referer: ${site}`, '-H', `Origin: ${new URL(site).origin}`, url], { encoding: 'buffer', maxBuffer: 32 * 1024 * 1024 }, (err, out) => resolve(err ? null : out)));
+  await context.route(/^https:\/\/maps\.(googleapis|gstatic)\.com\//, async route => {
+    const url = route.request().url();
+    if (!outside.has(url)) outside.set(url, googleBin(asSite(url)));
+    const body = await outside.get(url);
+    if (!body) return route.abort();
+    const magic = body.subarray(0, 4).toString('hex');
+    const type = magic === '89504e47' ? 'image/png' : magic.startsWith('ffd8') ? 'image/jpeg' : magic === '52494646' ? 'image/webp' : /\.svg/.test(url) ? 'image/svg+xml' : /\/(vt|kh)\?|\/vt\//.test(url) ? 'application/octet-stream' : 'text/javascript';
+    await route.fulfill({ status: 200, contentType: type, headers: { 'Access-Control-Allow-Origin': '*' }, body });
+  });
+  await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/transit\/config/, async route => {
+    const u = new URL(route.request().url());
+    u.searchParams.set('map', 'google');
+    const r = await fetch(u, { headers: { Origin: new URL(base).origin } });
+    await route.fulfill({ status: r.status, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: await r.text() });
+  });
+}
 // The family's data (the proxy's /data/, R2): the real files, as a phone reads them.
 await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/data\//, async route => {
   const body = await curlBin(route.request().url());
