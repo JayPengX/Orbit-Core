@@ -248,6 +248,19 @@ test('the map is Google’s under the cap, Taiwan’s NLSC map past it', async (
   assert.ok(!JSON.stringify(status).includes('browser-key'));
 });
 
+test('showcase map: Google’s from the showcase’s address within its share, NLSC otherwise', async () => {
+  fresh();
+  const kv = memKv();
+  const env = { RATE_LIMIT_KV: kv, GOOGLE_MAPS_BROWSER_KEY: 'browser-key' };
+  const ask = origin => handleTransit(new Request('https://w/transit/showcase-map', { headers: origin ? { Origin: origin } : {} }), env, {}, '/transit/showcase-map', { now: NOW });
+  assert.deepEqual((await (await ask('https://jaypengx.com')).json()).map, { provider: 'google', key: 'browser-key' });
+  assert.deepEqual((await (await ask('https://elsewhere.example')).json()).map, { provider: 'nlsc' });
+  assert.deepEqual((await (await ask('')).json()).map, { provider: 'nlsc' });
+  resetMeter();
+  await kv.put(`transit:use:${billingMonth(NOW)}`, JSON.stringify({ showcaseMaps: CAPS.showcaseMaps }));
+  assert.deepEqual((await (await ask('https://jaypengx.com')).json()).map, { provider: 'nlsc' });
+});
+
 test('search: Google’s suggestions, OpenStreetMap’s past the cap', async () => {
   fresh();
   const kv = memKv();
