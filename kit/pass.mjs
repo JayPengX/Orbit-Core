@@ -14,6 +14,7 @@ export const STRINGS = {
   zh: {
     looksTitle: '頭像與頭像框',
     lookOn: '戴著',
+    wear: '戴上',
     avatarsTitle: '頭像',
     framesTitle: '頭像框',
     looksSub: '戴上後，每個 Orbit App 的帳戶按鈕都看得到。',
@@ -68,6 +69,7 @@ export const STRINGS = {
   en: {
     looksTitle: 'Avatar and frame',
     lookOn: 'Wearing',
+    wear: 'Wear',
     avatarsTitle: 'Avatars',
     framesTitle: 'Frames',
     looksSub: 'Worn on your account button in every Orbit app.',
@@ -172,6 +174,9 @@ export function openPass(s, { extra = null, tab = 'pass', help = null } = {}) {
         toast(t('failed'));
       } finally {
         delete pending[key];
+        // What the pass now has (a failed one back off; a wallet that came
+        // while this was on its way was skipped).
+        if (dialog?.open && state.tab === 'looks') paint();
       }
     },
     // A milestone's avatar and frame, on (or off) together.
@@ -186,6 +191,7 @@ export function openPass(s, { extra = null, tab = 'pass', help = null } = {}) {
       } finally {
         delete pending.avatar;
         delete pending.frame;
+        if (dialog?.open && state.tab === 'looks') paint();
       }
     },
     openHelp: (app = s.app, topic = null) => show('help', { app, topic })
@@ -278,7 +284,7 @@ function looksSection({ q, t, locale, wornOf, wear, wearPair }) {
   // medal it earns. Then all of them, one row each: the medal in the metal
   // reached (the app's icon before any), its name, the next tier's goal and
   // how far along, and a pip per tier. An earned row wears its avatar and
-  // frame together; a second tap takes them off. (The count sits over the
+  // frame together (its 戴上 says so); a second tap takes them off. (The count sits over the
   // pips, never wrapped into the line.)
   const all = MILESTONES.map(m => ({ m, st: milestoneOf(wallet, m) }));
   const tierName = i => TIERS[i - 1][en ? 'en' : 'zh'];
@@ -306,7 +312,7 @@ function looksSection({ q, t, locale, wornOf, wear, wearPair }) {
     const line = st.max ? t('msMax') : goalText(m, st.goal);
     return el('button', { class: `q-cell ms-row${st.done ? ' got' : ''}${on ? ' on' : ''}`, type: 'button', 'aria-pressed': String(on), 'aria-disabled': String(!st.done), 'aria-label': `${m[locale]}, ${st.done ? tierName(st.tier) : ''}${st.max ? '' : ` ${t('msHow', { tier: tierName(st.tier + 1), goal: line })}`}`, onclick: () => st.done && wearPair(on ? null : id) }, [
       st.done ? el('span', { class: 'ms-look' }, [face(`${id}.${st.tier}`)]) : el('img', { class: 'ms-look icon', src: svgUrl(appIcon(m.id)), alt: '' }),
-      el('span', { class: 'q-cell-text' }, [el('span', { class: 'ms-name' }, [document.createTextNode(m[locale]), on ? el('em', { text: t('lookOn') }) : null]), el('small', { class: 'num', text: line })]),
+      el('span', { class: 'q-cell-text' }, [el('span', { class: 'ms-name' }, [document.createTextNode(m[locale]), on ? el('em', { text: `✓ ${t('lookOn')}` }) : st.done ? el('span', { class: 'ms-wear', text: t('wear') }) : null]), el('small', { class: 'num', text: line })]),
       el('span', { class: 'ms-side' }, [st.max ? null : el('small', { class: 'num', text: `${count(m, st.n)}/${count(m, st.goal)}` }), pips(st)])
     ]);
   };

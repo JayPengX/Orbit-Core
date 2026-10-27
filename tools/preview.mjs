@@ -701,6 +701,8 @@ await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(?!
     });
     return route.fulfill({ status: res.status, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: await res.text() });
   }
+  // A write's wallet settings kept (newest wins per key, as the Worker does): a look worn stays worn.
+  if (body.op === 'write' && body.wallet?.settings) for (const [k, v] of Object.entries(body.wallet.settings)) if (!wallet.settings[k] || (v?.t ?? 0) >= wallet.settings[k].t) wallet.settings[k] = v;
   const reply = { token: 'preview', wallet, active: true, live: { app: appId } };
   // The app's data, as the Worker gives it: on a sign-in, and on a read
   // that names the app ('' when nothing is saved).
