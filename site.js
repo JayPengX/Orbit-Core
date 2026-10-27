@@ -28,6 +28,12 @@ const APPS = [...Object.entries(SHORT).map(([slug, repo]) => [`/${slug}`, `/${re
 const BARE = [['/showcase', '/Orbit-Showcase'], ...AS_IS];
 const LONGSHOT = [['', '/Longshot']];
 const HOME = '/Orbit-Showcase/home/';
+// What a browser asks a host's root for on its own (Safari's tab, iOS's
+// bookmark): each host's own icon.
+const ROOT_ICONS = {
+  orbit: { '/favicon.ico': '/Orbit-Core/favicon.ico', '/apple-touch-icon.png': '/Orbit-Core/icons/apple-touch-icon.png', '/apple-touch-icon-precomposed.png': '/Orbit-Core/icons/apple-touch-icon.png' },
+  bare: Object.fromEntries(['favicon.ico', 'favicon.svg', 'favicon-32.png', 'apple-touch-icon.png', 'icon-512.png'].map(f => [`/${f}`, `${HOME}${f}`]).concat([['/apple-touch-icon-precomposed.png', `${HOME}apple-touch-icon.png`]]))
+};
 
 const under = (path, base) => path === base || path.startsWith(`${base}/`) || base === '';
 const notFound = () => new Response('Not found', { status: 404, headers: { 'Content-Type': 'text/plain' } });
@@ -40,9 +46,11 @@ export async function site(request, fetcher = fetch) {
   const root = url.pathname === '/' || url.pathname === '/index.html';
   // orbit.<domain> itself: the family's page.
   if (root && mounts === APPS) return Response.redirect(`${url.origin}/pass/`, 302);
-  let mount = mounts.find(([asked]) => under(url.pathname, asked));
+  const icons = ROOT_ICONS[mounts === APPS ? 'orbit' : mounts === BARE ? 'bare' : ''] || {};
+  const mount = mounts.find(([asked]) => under(url.pathname, asked));
   let path;
   if (root && mounts === BARE) path = HOME;
+  else if (Object.hasOwn(icons, url.pathname)) path = icons[url.pathname];
   else if (mount) path = renamed(mount[1] + url.pathname.slice(mount[0].length));
   else return notFound();
   const headers = new Headers();
