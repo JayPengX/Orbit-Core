@@ -9,7 +9,7 @@
 // proxy's own cron (which runs) wakes it through the service binding GUARD
 // every ten minutes in case it ever stopped, and it keeps running while the
 // guard has the proxy stopped, to start it again in the next period.
-import { guardRun } from './guard.js';
+import { guardRun, workerErrors } from './guard.js';
 
 const EVERY = 5 * 60_000;
 const next = now => Math.floor(now / EVERY) * EVERY + EVERY;
@@ -40,8 +40,15 @@ export class GuardClock {
 
 export default {
   // The proxy's wake (service binding): the clock started if it isn't.
+  // /errors: each Worker's errors in 24 hours, for the admin panel.
   async fetch(request, env) {
-    if (new URL(request.url).pathname !== '/tick') return new Response('', { status: 404 });
+    const path = new URL(request.url).pathname;
+    if (path === '/errors')
+      return workerErrors(env).then(
+        r => Response.json(r),
+        e => Response.json({ error: String(e?.message || e).slice(0, 200) })
+      );
+    if (path !== '/tick') return new Response('', { status: 404 });
     return env.CLOCK.get(env.CLOCK.idFromName('clock')).fetch('https://clock/');
   },
   // (Kept: should the cron ever run, it's the same.)

@@ -20,6 +20,7 @@ import { sendPush, dueLists } from './push.js';
 import { usage as transitUsage, CAPS as TRANSIT_CAPS, TDX_POINTS, tdxPoints, tdxGuard } from './transit.js';
 import { twDate, GOOGLE_DAILY_CALLS } from './weather.js';
 import { cleanDev, DEV } from './kit/devconfig.mjs';
+import { BRANDS } from './kit/brand.mjs';
 import { SITE } from './kit/domain.mjs';
 import { sidesOf, addSides, LEDGER } from './money.js';
 import { plan as capacityPlan, usersFrom } from './capacity.js';
@@ -698,7 +699,7 @@ export const ADMIN_TOOLS = {
       tdx: { days, points: pts.month, today: pts.today, guard: tdxGuard(pts, now), plan: TDX_POINTS, total: transit.tdx || 0 },
       ai,
       // (The meter keeps Gemini's tokens and calls too: those are the bill's and AI's, not Transit's.)
-      transit: Object.fromEntries(Object.entries(transit).filter(([k]) => !/^(tdx:|gem[df]?:)/.test(k)).map(([k, n]) => [k, { used: n, cap: TRANSIT_CAPS[k] ?? null }])),
+      transit: Object.fromEntries(Object.entries(transit).filter(([k]) => !/^(tdx:|gem[df]?:|err:)/.test(k)).map(([k, n]) => [k, { used: n, cap: TRANSIT_CAPS[k] ?? null }])),
       weather: { googleToday: weatherCalls, cap: GOOGLE_DAILY_CALLS }
     };
   },
@@ -898,5 +899,50 @@ Object.assign(ADMIN_TOOLS, {
     const [id] = ids;
     if (!body.coll) return { ref: id.slice(0, 8), docs: rows.map(r => ({ app: apps[r.coll], coll: r.coll, updated: r.updated, size: r.payload.length })) };
     return putBack(env, deps, id, body.coll, rows.find(r => r.coll === body.coll)?.payload);
+  }
+});
+
+// ---- 錯誤 and 部署: what failed, and jobs run again from the panel ----
+//
+// The proxy's own failures (worker.js counts each route's 5xx by Taiwan's
+// day) beside Cloudflare's count of each Worker's errors in 24 hours (the
+// guard reads it with its analytics token, guard.js workerErrors).
+// GitHub: a workflow started on main, or a failed run's failed jobs again,
+// with GH_ACTIONS_TOKEN (a fine-grained token: Actions read and write on the
+// family's repos, never Longshot's). Its value is never shown or sent back.
+const GH_OWNER = 'JayPengX';
+export const GH_REPOS = ['Orbit-Core', ...Object.values(BRANDS).map(b => b.repo), 'Orbit-Showcase'];
+async function ghPost(env, path, body) {
+  const res = await fetch(`https://api.github.com/repos/${GH_OWNER}/${path}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${env.GH_ACTIONS_TOKEN}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'User-Agent': 'orbit-admin', 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(10_000)
+  });
+  return res.ok ? { ok: true } : { ok: false, why: res.status === 401 || res.status === 403 ? 'token' : res.status === 404 ? 'missing' : `HTTP ${res.status}` };
+}
+Object.assign(ADMIN_TOOLS, {
+  // { repo, workflow } starts it on main; { repo, run } re-runs that run's failed jobs.
+  async 'gh-run'({ env, body }) {
+    const repo = String(body.repo || '');
+    const workflow = Number(body.workflow);
+    const run = Number(body.run);
+    if (!GH_REPOS.includes(repo) || !(workflow > 0 || run > 0)) return { error: 'ECO_UNKNOWN_OP', status: 400 };
+    if (!env.GH_ACTIONS_TOKEN) return { ok: false, why: 'unset' };
+    return run > 0 ? ghPost(env, `${repo}/actions/runs/${run}/rerun-failed-jobs`) : ghPost(env, `${repo}/actions/workflows/${workflow}/dispatches`, { ref: 'main' });
+  },
+  // { routes: { '/transit': { today, yesterday } }, workers: guard's 24 hours }
+  async errors({ env, deps }) {
+    const now = deps.now();
+    const used = await transitUsage(env, now).catch(() => ({}));
+    const today = twDate(now);
+    const yesterday = twDate(now - DAY);
+    const routes = {};
+    for (const [k, n] of Object.entries(used)) {
+      const m = /^err:(.+):(\d{4}-\d{2}-\d{2})$/.exec(k);
+      if (m && (m[2] === today || m[2] === yesterday)) (routes[m[1]] ||= { today: 0, yesterday: 0 })[m[2] === today ? 'today' : 'yesterday'] += n;
+    }
+    const workers = env.GUARD ? await env.GUARD.fetch('https://quota-guard/errors').then(r => r.json()).catch(e => ({ error: String(e?.message || e).slice(0, 200) })) : { off: true };
+    return { at: now, routes, workers };
   }
 });

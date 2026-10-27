@@ -273,3 +273,19 @@ test('a custom domain (api.<domain>, the site) goes off with its Worker and come
   assert.equal(back.stopped, null);
   assert.deepEqual(cf3.domains.map(d => `${d.service} ${d.hostname} ${d.zone_id}`).sort(), ['orbit-site example.tw z1', 'orbit-workers-proxy api.example.tw z1']);
 });
+
+test("each Worker's errors in 24 hours: the family's Workers only, a status apart from success counted", async () => {
+  const { workerErrors } = await import('../guard.js');
+  const rows = [
+    { sum: { requests: 1000, errors: 0 }, dimensions: { scriptName: 'orbit-workers-proxy', status: 'success' } },
+    { sum: { requests: 7, errors: 7 }, dimensions: { scriptName: 'orbit-workers-proxy', status: 'scriptThrewException' } },
+    { sum: { requests: 9, errors: 9 }, dimensions: { scriptName: 'someone-else', status: 'scriptThrewException' } }
+  ];
+  let asked = null;
+  const fetcher = async (url, init) => ((asked = JSON.parse(init.body)), new Response(JSON.stringify({ data: { viewer: { accounts: [{ x: rows }] } } })));
+  const r = await workerErrors({ CF_GUARD_TOKEN: 't', CF_ACCOUNT_ID: 'acc' }, { fetcher, now: Date.parse('2026-10-27T12:00:00Z'), kv: null });
+  assert.equal(asked.variables.a, 'acc');
+  assert.equal(asked.variables.s, '2026-10-26T12:00:00.000Z');
+  assert.deepEqual(r.workers, { 'orbit-workers-proxy': { requests: 1007, errors: 7, by: { scriptThrewException: 7 } } });
+  assert.deepEqual(await workerErrors({}), { off: true });
+});

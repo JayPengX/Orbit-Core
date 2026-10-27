@@ -395,3 +395,25 @@ export async function guardRun(env, { fetcher = fetch, now = Date.now(), kv = en
   }
   return state;
 }
+
+// ---- Each Worker's errors in the last 24 hours (the admin panel's 錯誤) ----
+// From the same analytics as the bill: requests and errors by Worker and the
+// way an invocation ended (`status`: scriptThrewException, exceededResources…).
+const ERRORS_Q = `query($a: string!, $s: Time!, $e: Time!) { viewer { accounts(filter: { accountTag: $a }) { x: workersInvocationsAdaptive(limit: 1000, filter: { datetime_geq: $s, datetime_leq: $e }) { sum { requests errors } dimensions { scriptName status } } } } }`;
+export async function workerErrors(env, { fetcher = fetch, now = Date.now(), kv = env.RATE_LIMIT_KV } = {}) {
+  if (!env.CF_GUARD_TOKEN) return { off: true };
+  const state = JSON.parse((await kv?.get(STATE_KEY).catch(() => null)) || 'null') || {};
+  const a = env.CF_ACCOUNT_ID || state.account || (await accountOf(env, fetcher));
+  const acc = await graphql(env, fetcher, ERRORS_Q, { a, s: new Date(now - DAY).toISOString(), e: new Date(now).toISOString() });
+  const workers = {};
+  for (const r of acc.x || []) {
+    const name = r.dimensions?.scriptName;
+    if (!WORKERS.includes(name)) continue;
+    const w = (workers[name] ||= { requests: 0, errors: 0, by: {} });
+    w.requests += r.sum?.requests || 0;
+    w.errors += r.sum?.errors || 0;
+    const st = r.dimensions.status;
+    if (st && st !== 'success' && r.sum?.requests) w.by[st] = (w.by[st] || 0) + r.sum.requests;
+  }
+  return { at: now, workers };
+}

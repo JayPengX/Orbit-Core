@@ -95,6 +95,7 @@
   .checks .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--q-good); flex: none; }
   .checks .dot.bad { background: var(--q-bad); }
   .checks .dot.slow { background: #d4a017; }
+  .checks .dot.off { background: var(--q-muted); }
   .checks span:nth-child(2) { flex: 1; font-weight: 600; min-width: 0; }
   .checks small { display: block; font-weight: 400; font-size: 12px; color: var(--q-muted); overflow-wrap: anywhere; }
   /* The account sheet */
@@ -151,8 +152,9 @@
   /* 資料與部署 */
   .runs { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
   .runs li { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: var(--q-surface-2); }
-  .runs li a { color: inherit; text-decoration: none; font-weight: 650; min-width: 0; overflow-wrap: anywhere; }
-  .runs li small { color: var(--q-muted); font-size: 12.5px; white-space: nowrap; }
+  .runs li > span:nth-child(2) { min-width: 0; }
+  .runs li a { display: block; color: inherit; text-decoration: none; font-weight: 650; overflow-wrap: anywhere; }
+  .runs li small { display: block; color: var(--q-muted); font-size: 12.5px; }
   .runs .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--q-good); }
   .runs .dot.bad { background: var(--q-bad); }
   .runs .dot.run { background: #d4a017; animation: pulse 1.2s ease-in-out infinite; }
@@ -445,7 +447,11 @@
       <ul id="health" class="checks"></ul>
       <div class="pane-head"><div><h2>排程工作</h2><p class="muted">黃色是比平常晚，紅色是失敗。</p></div></div>
       <ul class="checks" id="beats"></ul>
-      <div class="pane-head"><div><h2>部署</h2></div></div>
+      <div class="pane-head"><div><h2>錯誤</h2><p class="muted">Cloudflare 數的是 24 小時，代理的路徑是今天和昨天。</p></div></div>
+      <p id="err-error" class="error"></p>
+      <ul class="checks" id="errs"></ul>
+      <div class="pane-head"><div><h2>部署</h2><p class="muted">失敗的可以重跑，其他的可以再跑一次（在 main 上）。</p></div></div>
+      <p id="run-out" class="muted"></p>
       <ul class="runs" id="deploys"></ul>
       <div class="pane-head"><div><h2>檢查與建置</h2><p class="muted">不管節流，現在跑一次。</p></div></div>
       <div class="checks" id="sys-actions"></div>
@@ -694,7 +700,7 @@ const VIEWS = {
   overview: () => loadOverview(),
   accounts: () => loadWallets(),
   money: () => loadMoney(),
-  health: () => Promise.all([loadSystem(), loadHealth()]),
+  health: () => Promise.all([loadSystem(), loadHealth(), loadErrors()]),
   usage: () => Promise.all([loadBilling(), loadUsage()]),
   dev: () => loadDev(),
   tools: () => Promise.all([loadPushes(), loadBackups()])
@@ -834,7 +840,9 @@ const HEALTH_CELLS = [
   ['jobs', '排程工作', 'clock'],
   ['sources', '資料來源', 'live'],
   ['deploys', '部署', 'send'],
-  ['secrets', '金鑰與綁定', 'key']
+  ['secrets', '金鑰與綁定', 'key'],
+  ['errors', '錯誤', 'flame'],
+  ['ai', 'AI 今天', 'spark']
 ];
 const TONE = { ok: 'var(--q-good)', warn: '#d97706', bad: 'var(--q-bad)', wait: '#94a3b8' };
 function setHealth(k, tone, value, issue = '') {
@@ -844,7 +852,7 @@ function setHealth(k, tone, value, issue = '') {
 function drawHealth() {
   $('ov-health').innerHTML = HEALTH_CELLS.map(([k, name, icon]) => {
     const c = health.cells[k] || { tone: 'wait', value: '檢查中…' };
-    return `<button type="button" class="hcell" data-go="health"><span class="st ${c.tone}">${tileHtml(ic(icon), TONE[c.tone], 'sm')}</span><span><b>${escHtml(name)}</b><small>${escHtml(c.value)}</small></span></button>`;
+    return `<button type="button" class="hcell" data-go="${k === 'ai' ? 'usage' : 'health'}"><span class="st ${c.tone}">${tileHtml(ic(icon), TONE[c.tone], 'sm')}</span><span><b>${escHtml(name)}</b><small>${escHtml(c.value)}</small></span></button>`;
   }).join('');
   const bad = Object.values(health.cells).filter(c => c.tone === 'bad' || c.tone === 'warn');
   $('health-badge').hidden = !bad.length;
@@ -856,7 +864,7 @@ function drawHero() {
   const o = ovData;
   if (!o) return;
   const chips = [
-    ...Object.values(health.cells).filter(c => c.issue).map(c => [c.issue, 'health', c.tone]),
+    ...Object.entries(health.cells).filter(([, c]) => c.issue).map(([k, c]) => [c.issue, k === 'ai' ? 'usage' : 'health', c.tone]),
     ...(o.attention.length ? [[`${o.attention.length} 個帳戶要處理`, 'overview', 'warn', 'ov-attn']] : [])
   ];
   const tone = chips.some(c => c[2] === 'bad') ? 'bad' : chips.length ? 'warn' : 'ok';
@@ -915,6 +923,16 @@ function healthSummary() {
     const down = h.checks.filter(c => !c.ok && !c.busy), slow = h.checks.filter(c => c.busy || c.late || (c.ok && c.ms > 2500));
     setHealth('sources', down.length ? 'bad' : slow.length ? 'warn' : 'ok', down.length ? `${down.map(c => c.name).join('、')} 沒回應` : slow.length ? `${slow.map(c => c.name).join('、')} ${slow.some(c => c.busy) ? '限流中' : '慢'}` : `${h.checks.length} 個都正常`, down.length ? `${down.length} 個資料來源沒回應` : '');
   }, () => setHealth('sources', 'warn', '沒檢查到'));
+  admin('errors').then(r => {
+    const [tone, words] = errSum(r);
+    setHealth('errors', tone, words, tone === 'ok' ? '' : '錯誤變多了');
+  }, () => setHealth('errors', 'warn', '沒檢查到'));
+  admin('usage').then(u => {
+    const ai = u.ai || [];
+    const full = ai.filter(a => a.cap && a.days[6] >= a.cap), near = ai.filter(a => aiTone(a) === 'slow'), paused = ai.filter(a => !a.cap);
+    const name = a => (DEV[a.key]?.zh || a.key).replace(/（.*）/, '');
+    setHealth('ai', full.length ? 'bad' : near.length ? 'warn' : 'ok', full.length ? `${full.map(name).join('、')} 用完了` : near.length ? `${near.map(name).join('、')} 快用完` : `今天 ${ai.reduce((n, a) => n + a.days[6], 0)} 次${paused.length ? ` · ${paused.length} 個暫停` : ''}`, full.length ? 'AI 今天的上限用完了' : near.length ? 'AI 快到上限' : '');
+  }, () => setHealth('ai', 'warn', '沒檢查到'));
   deployRuns().then(runs => {
     const bad = runs.filter(r => r.run && runDot(r.run) === 'bad');
     const going = runs.filter(r => r.run && runDot(r.run) === 'run');
@@ -1786,11 +1804,59 @@ async function gh(path) {
 const mb = n => (n >= 1e9 ? `${(n / 1e9).toFixed(2)} GB` : `${(n / 1e6).toFixed(n < 1e7 ? 1 : 0)} MB`);
 const pct = v => `${v >= 0.1 ? Math.round(v * 100) : (v * 100).toFixed(1)}%`;
 const runDot = r => (r.status !== 'completed' ? 'run' : r.conclusion === 'success' ? '' : r.conclusion === 'cancelled' || r.conclusion === 'skipped' ? 'off' : 'bad');
-const runWord = r => (r.status !== 'completed' ? '進行中' : { success: '成功', failure: '失敗・點開可重跑', cancelled: '取消', skipped: '略過' }[r.conclusion] || r.conclusion);
+const runWord = r => (r.status !== 'completed' ? '進行中' : { success: '成功', failure: '失敗', cancelled: '取消', skipped: '略過' }[r.conclusion] || r.conclusion);
 const mins = r => (r.status === 'completed' ? `${Math.max(1, Math.round((Date.parse(r.updated_at) - Date.parse(r.run_started_at || r.created_at)) / 60000))} 分鐘` : '');
-const runRow = (r, label) => el('li', {}, [el('span', { class: `dot ${runDot(r)}` }), el('a', { href: r.html_url, target: '_blank', rel: 'noopener', text: label || r.display_title }), el('small', { text: [runWord(r), mins(r), ago(Date.parse(r.created_at))].filter(Boolean).join(' · ') })]);
+const runRow = (r, label, repo) => {
+  const bad = runDot(r) === 'bad';
+  const go = repo && r.status === 'completed' ? el('button', { class: 'small', text: bad ? '重跑' : '再跑' }) : null;
+  if (go) go.onclick = () => busy(go, () => ghRun(repo, bad ? { run: r.id } : { workflow: r.workflow_id }, `${label}`));
+  return el('li', {}, [el('span', { class: `dot ${runDot(r)}` }), el('span', {}, [el('a', { href: r.html_url, target: '_blank', rel: 'noopener', text: label || r.display_title }), el('small', { text: [runWord(r), mins(r), ago(Date.parse(r.created_at))].filter(Boolean).join(' · ') })]), go]);
+};
+// A workflow started on main, or a failed run's failed jobs again (eco-admin.js gh-run).
+const GH_WHY = { unset: '還沒設定 GH_ACTIONS_TOKEN（Cloudflare › orbit-workers-proxy › 變數與密碼）', token: 'GitHub 不接受這把金鑰：過期了，或沒有 Actions 的讀寫權限', missing: 'GitHub 找不到：這把金鑰沒有這個 repo' };
+async function ghRun(repo, what, label) {
+  $('run-out').textContent = `${label}：送出中…`;
+  try {
+    const r = await admin('gh-run', { repo, ...what });
+    $('run-out').textContent = r.ok ? `${label}：已${what.run ? '重跑' : '開始'}，一分鐘內會出現在下面。` : `${label}：沒送出，${GH_WHY[r.why] || r.why}`;
+    if (r.ok) setTimeout(() => { for (let i = sessionStorage.length - 1; i >= 0; i--) if (sessionStorage.key(i)?.startsWith('orbit.admin.gh:')) sessionStorage.removeItem(sessionStorage.key(i)); loadSystem(); }, 8000);
+  } catch (e) {
+    $('run-out').textContent = `${label}：${e.message}`;
+  }
+}
 const BILL_NAME = { requests: 'Workers 請求', cpuMs: 'Workers CPU', kvRead: 'KV 讀取', kvWrite: 'KV 寫入', kvDelete: 'KV 刪除', kvList: 'KV 列出', kvBytes: 'KV 儲存', doRequests: 'Durable Objects 請求', doBytes: 'Durable Objects 儲存', r2ClassA: 'R2 寫入', r2ClassB: 'R2 讀取', r2Bytes: 'R2 儲存', d1RowsRead: 'D1 讀取', d1RowsWritten: 'D1 寫入', d1Bytes: 'D1 儲存' };
 const PACE_WORD = ['照設定', '放慢 ×2，可以等的建置暫停', '放慢 ×4，建置全停，每個人讀取減半', '放慢 ×8，讀取剩四分之一'];
+// ---- 錯誤 (eco-admin.js errors): each Worker's in 24 hours, the proxy's by route ----
+const STATUS_ZH = { scriptThrewException: '程式出錯', exceededResources: '超過資源上限', exceededCpu: '超過 CPU', exceededMemory: '超過記憶體', internalError: 'Cloudflare 內部錯誤', responseStreamDisconnected: '回應中斷' };
+const WORKER_ZH = { 'orbit-workers-proxy': '代理（api）', 'orbit-site': '網站（jaypengx.com）', 'sports-proxy': 'Sports 代理' };
+const errRate = w => (w.requests ? w.errors / w.requests : 0);
+const errTone = w => (errRate(w) > 0.05 ? 'bad' : errRate(w) > 0.005 ? 'slow' : '');
+// The worst of it, for the 錯誤 cell: [tone, words].
+function errSum(r) {
+  const ws = Object.values(r.workers?.workers || {});
+  const errs = ws.reduce((n, w) => n + w.errors, 0);
+  const routes = Object.values(r.routes || {}).reduce((n, x) => n + x.today, 0);
+  const tone = ws.some(w => errTone(w) === 'bad') ? 'bad' : ws.some(w => errTone(w)) || routes >= 20 ? 'warn' : 'ok';
+  return [tone, r.workers?.workers ? `24 小時 ${errs.toLocaleString()} 次` : `代理今天 ${routes} 次`];
+}
+async function loadErrors() {
+  $('err-error').textContent = '';
+  try {
+    const r = await admin('errors');
+    const ws = r.workers || {};
+    const rows = [];
+    if (ws.off || ws.error) rows.push(checkRow('off', 'Cloudflare 的錯誤數', ws.off ? '帳單保護沒有金鑰' : `讀不到：${ws.error}`, ''));
+    else
+      for (const [name, w] of Object.entries(ws.workers || {}).sort((a, b) => b[1].errors - a[1].errors))
+        rows.push(checkRow(errTone(w), WORKER_ZH[name] || name, Object.entries(w.by).filter(([st]) => st !== 'clientDisconnected').map(([st, n]) => `${STATUS_ZH[st] || st} ${n.toLocaleString()}`).join(' · ') || '沒有錯誤', `${w.errors.toLocaleString()} / ${w.requests.toLocaleString()}`));
+    const routes = Object.entries(r.routes || {}).sort((a, b) => b[1].today - a[1].today || b[1].yesterday - a[1].yesterday);
+    rows.push(...(routes.length ? routes.map(([route, n]) => checkRow(n.today >= 20 ? 'slow' : '', `代理 ${route}`, `伺服器錯誤 · 昨天 ${n.yesterday}`, `今天 ${n.today}`)) : [checkRow('', '代理的路徑', '今天和昨天都沒有伺服器錯誤', '')]));
+    $('errs').replaceChildren(...rows);
+  } catch (e) {
+    $('errs').replaceChildren();
+    $('err-error').textContent = e.message;
+  }
+}
 // Each job: its name, and how long between runs before it's late.
 const JOBS = { notices: ['通知', 10], alerts: ['帳單警示', 30], f1: ['F1 圈速（週四到週一）', 10], 'weather-skill': ['天氣評分（每小時）', 120], capacity: ['容量（每 6 小時）', 420], 'build:watch': ['建置：精華連結（每小時）', 120], 'build:cutouts': ['建置：去背照片（每小時）', 120], 'build:buses': ['建置：公車（每小時）', 120], 'build:daily': ['建置：每日（賽程、CPBL、照片、勝率）', 120], bikes: ['YouBike 保溫（每 2 分鐘）', 10], 'store-backup': ['每晚備份（04:30）', 26 * 60], mail: ['發票寄入（Money，有信才跑）', Infinity] };
 // F1's laps run Thursday to Monday, UTC (worker.js's F1_DAYS): the other days it rests, never late.
@@ -1800,6 +1866,7 @@ const SECRET_GROUPS = [
   ['登入與管理', ['ECO_TOKEN_SECRET', 'ECO_ADMIN_TOKEN', 'DATA_PUSH_SECRET']],
   ['Google', ['GEMINI_API_KEY', 'GOOGLE_MAPS_KEY', 'GOOGLE_MAPS_BROWSER_KEY', 'GOOGLE_WEATHER_KEY']],
   ['台灣的開放資料', ['CWA_KEY', 'MOENV_KEY', 'TDX_CLIENT_ID', 'TDX_CLIENT_SECRET']],
+  ['GitHub（部署的重跑）', ['GH_ACTIONS_TOKEN']],
   ['退場中（12/6 自動移除）', ['FIREBASE_PRIVATE_KEY']]
 ];
 const BIND_WORD = { STORE: 'D1 資料庫（Pass、設定）', DATA: 'R2 資料（orbit-data）', RATE_LIMIT_KV: 'KV（通知、帳單狀態、快取）', F1_LOG: 'F1 圈速紀錄（Durable Object）', GEMINI_RELAY: 'Gemini 台灣中繼', GUARD: '帳單保護（quota-guard）' };
@@ -1862,7 +1929,7 @@ async function loadSystem() {
     $('sys-error').textContent = e.message;
   }
   const runs = await deployRuns();
-  $('deploys').replaceChildren(...runs.map(({ name, run, error }) => (run ? runRow(run, `${name} · ${run.name}`) : el('li', {}, [el('span', { class: 'dot off' }), el('span', { text: name }), el('small', { text: error || '沒有紀錄' })]))));
+  $('deploys').replaceChildren(...runs.map(({ name, repo, run, error }) => (run ? runRow(run, `${name} · ${run.name}`, repo) : el('li', {}, [el('span', { class: 'dot off' }), el('span', {}, [el('a', { text: name }), el('small', { text: error || '沒有紀錄' })])]))));
 }
 // Each repo's workflows, the latest run of each (Law's 裁判 backfill, Orbit-Core's
 // Workers and kit apart), from one read a repo (GitHub's open API, kept two
@@ -1875,9 +1942,9 @@ const deployRuns = () =>
         // (A workflow quiet for 30 days is one that's gone: its last run isn't news.)
         const recent = r => Date.now() - Date.parse(r.created_at) < 30 * 86_400_000;
         for (const r of (await gh(`${repo}/actions/runs?per_page=30`)).workflow_runs || []) if (recent(r) && !latest.has(r.workflow_id)) latest.set(r.workflow_id, r);
-        return latest.size ? [...latest.values()].map(run => ({ name, run })) : [{ name, run: null }];
+        return latest.size ? [...latest.values()].map(run => ({ name, repo, run })) : [{ name, repo, run: null }];
       } catch (e) {
-        return [{ name, run: null, error: e.message }];
+        return [{ name, repo, run: null, error: e.message }];
       }
     })
   ).then(all => all.flat().sort((a, b) => (a.run && runDot(a.run) === 'bad' ? 0 : 1) - (b.run && runDot(b.run) === 'bad' ? 0 : 1)));

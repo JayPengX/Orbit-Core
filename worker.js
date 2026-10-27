@@ -190,6 +190,13 @@ async function rateLimitResponse(env, ip, feature, limit, headers, request) {
 async function isDailyGlobalCapped(env, feature, limit) {
   return isRateLimited(env, 'global', `daily-cap:${feature}`, limit, DAY_WINDOW_MS);
 }
+// A 5xx counted by its route ('/transit/tdx' → '/transit') and Taiwan's day:
+// the admin panel's 錯誤 (one tally in the usage meter, flushed with it).
+function countError(env, ctx, request) {
+  const route = `/${new URL(request.url).pathname.split('/')[1] || ''}`.slice(0, 40);
+  const day = new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 10);
+  ctx.waitUntil(tally(env, `err:${route}:${day}`, 1, Date.now(), ctx).catch(() => {}));
+}
 // Each Gemini feature's cap a day, as the admin panel's 設定 has it (kit/brand.mjs
 // DEV `ai*`, read a minute at a time with the other settings; 0 pauses it).
 async function aiCap(env, ctx, feature) {
@@ -1319,9 +1326,12 @@ export default {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
     const t0 = Date.now();
     try {
-      return timed(await route(request, env, ctx, headers, origin), t0);
+      const res = await route(request, env, ctx, headers, origin);
+      if (res.status >= 500) countError(env, ctx, request);
+      return timed(res, t0);
     } catch (error) {
       console.log('route failed', new URL(request.url).pathname, String(error?.message || error).slice(0, 200));
+      countError(env, ctx, request);
       return errorJson('WORKER_FAILED', 500, headers, request);
     }
   },
