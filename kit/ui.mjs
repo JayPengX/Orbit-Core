@@ -59,7 +59,8 @@ export function tick() {
 //   days: the days shown ('YYYY-MM-DD', in order); current: the day chosen;
 //   onPick(day): a day chosen (a tap, 📅); label(day) / sub(day): a chip's
 //   two lines (dayTop / dayNum unless given); today (Taiwan's unless given);
-//   cls(day): more classes for a chip (month-start unless given);
+//   cls(day): more classes for a chip (none unless given; a new month needs no
+//   mark: its date says 11/1, and a line at its edge showed beside 📅 as a stray divider);
 //   clamp(day): the day 📅's date becomes (unless given: the first shown
 //   on or after it, else the last); bounds {from, to}: 📅's limits (the
 //   days' ends unless given; null: none); follow: every new day to the middle, a tapped
@@ -106,7 +107,7 @@ const CAL_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" st
 export function dayStrip(s, { days = [], current = null, onPick = () => {}, label = null, sub = null, today = dayToday(), cls = null, clamp = null, bounds, follow = false, pickLabel = '', lang } = {}) {
   label ??= d => dayTop(d, { today, lang });
   sub ??= d => dayNum(d, { today });
-  cls ??= d => (d.endsWith('-01') ? 'month-start' : '');
+  cls ??= () => '';
   clamp ??= v => days.find(d => d >= v) ?? days.at(-1) ?? v;
   if (bounds === undefined) bounds = days.length ? { from: days[0], to: days.at(-1) } : null;
   pickLabel ||= dayLang(lang) === 'zh' ? '選擇日期' : 'Pick a date';
@@ -135,14 +136,15 @@ export function dayStrip(s, { days = [], current = null, onPick = () => {}, labe
       r.classList.toggle('q-more-after', r.scrollLeft + r.clientWidth < r.scrollWidth - 1);
     };
     // Whole days only: as many chips as fit, sharing the row's width (never one
-    // cut in half beside the 📅); the row comes to rest on a chip's edge.
+    // cut in half beside the 📅), each at least 62px (the date with room on iPhone's
+    // wider digits); the row comes to rest on a chip's edge.
     s.fit = () => {
       const r = s.row;
       if (!r.clientWidth) return;
       const cs = getComputedStyle(r);
       const room = r.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
       const gap = parseFloat(cs.columnGap) || 0;
-      const n = Math.max(1, Math.floor((room + gap) / (56 + gap)));
+      const n = Math.max(1, Math.floor((room + gap) / (62 + gap)));
       const w = `${Math.floor(((room - gap * (n - 1)) / n) * 10) / 10}px`;
       if (r.style.getPropertyValue('--q-day-w') !== w) r.style.setProperty('--q-day-w', w);
       s.edges();
