@@ -1,7 +1,7 @@
 // Orbit Money's mail-in 載具 invoices. A person can't have 財政部's AppID, so
 // the 載具's invoices come by mail: the person gives the 電子發票平台 the
 // account's own address, <box>@MAIL_DOMAIN, as the 手機條碼's email and turns
-// on 消費發票彙整通知, and the platform mails the CSV every week by itself
+// on 消費發票彙整通知, and the platform mails the CSV every month by itself
 // (Cloudflare Email Routing's catch-all sends every address to the Worker's
 // email handler). A one-off 匯出, or a Gmail forward, lands the same way.
 //
