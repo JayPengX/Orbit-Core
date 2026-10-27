@@ -151,6 +151,11 @@ for (let c; (c = opt('store', null)); ) stores.push([c.slice(0, c.indexOf('=')),
 // e.g. '{"id":"eco:rebase:v3","app":"eco","kind":"rebase","amount":-80000}'.
 const extraEntries = [];
 for (let c; (c = opt('entry', null)); ) extraEntries.push({ t: Date.now(), ...JSON.parse(c) });
+// --setting 'key={json}': a wallet setting the account starts with (repeatable),
+// e.g. 'ms.beats={"n":12}' or 'avatar={"id":"ms-beats"}'; --apps law,beats: apps it has opened.
+const extraSettings = {};
+for (let c; (c = opt('setting', null)); ) extraSettings[c.slice(0, c.indexOf('='))] = { value: JSON.parse(c.slice(c.indexOf('=') + 1)), t: Date.now() };
+const openedApps = Object.fromEntries(opt('apps', '').split(',').filter(Boolean).map(a => [a, { first: Date.now(), last: Date.now() }]));
 // --eval 'js': an expression run on the page after the clicks; its result is printed.
 // --shot selector: also a picture of that element alone, whole (a sheet that scrolls inside), as <file>-shot.png.
 const shotSel = opt('shot', null);
@@ -485,8 +490,8 @@ const wallet = {
     ...extraEntries
   ],
   snap: snapStart,
-  settings: {},
-  apps: {},
+  settings: extraSettings,
+  apps: openedApps,
   inbox: {}
 };
 const payload = payloadFile ? await readFile(payloadFile, 'utf8') : null;

@@ -42,6 +42,7 @@ node tools/preview.mjs sports --live --width 375
 | `--safari` | Opened in Safari, not from the home screen: the install screen |
 | `--signed-out` | The sign-in screen, as a new device sees it |
 | `--entry '{json}'`, `--snap '{json}'` | Add a wallet entry (an economy scenario); start with this wallet snap |
+| `--setting 'key={json}'`, `--apps a,b` | Start with this wallet setting (milestones `ms.<id>`, `avatar`, `frame`; repeatable); apps already opened |
 | `--fake-yahoo` | Made-up Yahoo prices, for when Yahoo answers 429 |
 | `--freezes` | Report main-thread stalls while it runs |
 

@@ -191,39 +191,57 @@ export const FRAMES = [
   'pearl', 'matcha', 'milktea', 'sunset', 'midnight', 'forest', 'candy', 'lava', 'skylantern'
 ].map(id => ({ id }));
 
-// Milestones: one for each app and one for the family, each reached once
-// and kept for good, each earning its own avatar and frame (`ms-<id>`, both).
-// Broad on purpose: a goal anyone gets to by using the app. How far along:
-// - what the wallet shows already: every app opened (`pass`), what the
-//   account is worth (`stock`, worthOf);
+// Milestones: one for each app and one for the family, each in three tiers
+// (銅, 銀, 金), every tier reached once and kept for good. Earning the
+// first wears the milestone's avatar and frame (`ms-<id>`, both), drawn in
+// the metal of the highest tier reached. Broad on purpose: goals anyone
+// gets to by using the app. How far along:
+// - what the wallet shows already: apps opened (`pass`), what the account
+//   is worth (`stock`, worthOf);
 // - `days`: the Taiwan days the app was opened, counted by the kit;
 // - the rest: a count the app reports with milestone(s, id, n), or adds one
 //   to with milestone(s, id).
 // Kept on the pass as the wallet setting `ms.<id>`: { n, d (the last day
-// counted), done }. Once done, always done.
+// counted), t (the tier reached), done (any tier: what an older kit reads) }.
+// Before tiers there was one goal; a `done` from then is tier `was`.
+export const TIERS = [
+  { id: 'bronze', zh: '銅', en: 'Bronze' },
+  { id: 'silver', zh: '銀', en: 'Silver' },
+  { id: 'gold', zh: '金', en: 'Gold' }
+];
+const APP_COUNT = Object.keys(APPS).length;
 export const MILESTONES = [
-  { id: 'pass', goal: Object.keys(APPS).length, zh: '用遍 Orbit', en: 'All of Orbit', unit: { zh: 'App', en: 'apps' } },
-  { id: 'stock', goal: 1_000_000, money: true, zh: '百萬身價', en: 'Millionaire', unit: { zh: '', en: '' } },
-  { id: 'vocab', goal: 500, zh: '五百字', en: '500 words', unit: { zh: '字', en: '' } },
-  { id: 'beats', goal: 10, zh: '十首歌', en: '10 songs', unit: { zh: '首', en: '' } },
-  { id: 'transit', goal: 10, zh: '十趟旅程', en: '10 trips', unit: { zh: '趟', en: '' } },
-  { id: 'law', goal: 10, zh: '十個問題', en: '10 questions', unit: { zh: '問', en: '' } },
-  { id: 'match', goal: 30, days: true, zh: '鐵粉', en: 'Superfan', unit: { zh: '天', en: 'days' } },
-  { id: 'weather', goal: 30, days: true, zh: '看天的人', en: 'Sky watcher', unit: { zh: '天', en: 'days' } },
-  { id: 'orbit', goal: 30, days: true, zh: '全勤', en: 'Attendance', unit: { zh: '天', en: 'days' } },
-  { id: 'money', goal: 30, days: true, zh: '天天記帳', en: 'Daily books', unit: { zh: '天', en: 'days' } }
+  { id: 'pass', goals: [3, 6, APP_COUNT], was: 3, zh: 'Orbit 旅人', en: 'Explorer', unit: { zh: '個 App', en: 'apps' }, do: { zh: '用過 {n} 個 App', en: 'Use {n} Orbit apps' } },
+  { id: 'stock', goals: [300_000, 1_000_000, 10_000_000], was: 2, money: true, zh: '身價', en: 'Net worth', unit: { zh: '', en: '' }, do: { zh: '身價到 {n}', en: 'Reach {n}' } },
+  { id: 'vocab', goals: [100, 500, 2000], was: 2, zh: '單字量', en: 'Vocabulary', unit: { zh: '字', en: 'words' }, do: { zh: '熟記 {n} 個單字', en: 'Master {n} words' } },
+  { id: 'beats', goals: [3, 10, 50], was: 2, zh: '歌單', en: 'Songbook', unit: { zh: '首', en: 'songs' }, do: { zh: '收藏 {n} 首歌', en: 'Keep {n} songs' } },
+  { id: 'transit', goals: [3, 10, 50], was: 2, zh: '旅程', en: 'Journeys', unit: { zh: '趟', en: 'trips' }, do: { zh: '跟著導航抵達 {n} 趟', en: 'Finish {n} trips' } },
+  { id: 'law', goals: [3, 10, 50], was: 2, zh: '好奇心', en: 'Curious mind', unit: { zh: '問', en: 'asked' }, do: { zh: '問 {n} 個法律問題', en: 'Ask {n} law questions' } },
+  { id: 'match', goals: [7, 30, 100], was: 2, days: true, zh: '鐵粉', en: 'Superfan', unit: { zh: '天', en: 'days' }, do: { zh: '{n} 天打開 Sports', en: 'Open Sports on {n} days' } },
+  { id: 'weather', goals: [7, 30, 100], was: 2, days: true, zh: '看天的人', en: 'Sky watcher', unit: { zh: '天', en: 'days' }, do: { zh: '{n} 天看天氣', en: 'Check the weather on {n} days' } },
+  { id: 'orbit', goals: [7, 30, 100], was: 2, days: true, zh: '全勤', en: 'Attendance', unit: { zh: '天', en: 'days' }, do: { zh: '{n} 天打開課表', en: 'Open Class on {n} days' } },
+  { id: 'money', goals: [7, 30, 100], was: 2, days: true, zh: '天天記帳', en: 'Daily books', unit: { zh: '天', en: 'days' }, do: { zh: '{n} 天記帳', en: 'Keep the books on {n} days' } }
 ];
 const MS_FRAMES = MILESTONES.map(m => ({ id: `ms-${m.id}`, ms: m.id }));
 const msKept = (wallet, id) => setting(wallet, `ms.${id}`, null) || {};
-// { n, goal, done } for one milestone (n never past the goal).
+const keptTier = (m, kept) => Math.min(3, kept.t != null ? Math.floor(finiteOr0(kept.t)) : kept.done ? m.was : 0);
+const tierAt = (m, n) => m.goals.filter(g => n >= g).length;
+// { n, tier (0 none … 3 gold), goal (the next tier's, or gold's), from (the
+// tier before's goal), done (a tier reached), max (gold) } for one
+// milestone; n never past gold.
 export function milestoneOf(wallet, m) {
   const kept = msKept(wallet, m.id);
   const n = m.id === 'pass' ? Object.keys(APPS).filter(a => wallet?.apps?.[a]).length : m.id === 'stock' ? Math.max(0, worthOf(wallet)) : finiteOr0(kept.n);
-  return { n: Math.min(n, m.goal), goal: m.goal, done: Boolean(kept.done) || n >= m.goal };
+  const tier = Math.max(keptTier(m, kept), tierAt(m, n));
+  return { n: Math.min(n, m.goals[2]), tier, goal: m.goals[Math.min(tier, 2)], from: tier ? m.goals[Math.min(tier, 3) - 1] : 0, done: tier > 0, max: tier === 3 };
 }
 export const earned = (wallet, id) => {
   const m = MILESTONES.find(x => x.id === id);
   return Boolean(m && wallet && milestoneOf(wallet, m).done);
+};
+const tierOf = (wallet, id) => {
+  const m = MILESTONES.find(x => x.id === id);
+  return m && wallet ? milestoneOf(wallet, m).tier : 0;
 };
 // What may be worn: the free ones, and an earned one.
 const wearable = (wallet, x) => (x ? (x.ms || x.app ? earned(wallet, x.ms || x.app) : true) : false);
@@ -231,25 +249,40 @@ const worn = (wallet, key, list) => {
   const x = list.find(y => y.id === setting(wallet, key, null)?.id);
   return wearable(wallet, x) ? x : null;
 };
-export const avatarOf = wallet => worn(wallet, 'avatar', [...AVATARS, ...MEDAL_AVATARS]);
-export const frameOf = wallet => worn(wallet, 'frame', [...FRAMES, ...MS_FRAMES]);
+// A milestone's avatar comes back as `ms-<id>.<tier>`, the tier's drawing
+// (avatarSrc), and its frame with `tier`, for frameClass.
+export const avatarOf = wallet => {
+  const x = worn(wallet, 'avatar', [...AVATARS, ...MEDAL_AVATARS]);
+  return x?.app ? { ...x, id: `${x.id}.${tierOf(wallet, x.app)}` } : x;
+};
+export const frameOf = wallet => {
+  const x = worn(wallet, 'frame', [...FRAMES, ...MS_FRAMES]);
+  return x?.ms ? { ...x, tier: tierOf(wallet, x.ms) } : x;
+};
+// The classes that draw a frame (a milestone's in its tier's metal).
+export const frameClass = f => (f ? `q-framed q-frame-${f.id}${f.tier ? ` q-ms-t${f.tier}` : ''}` : '');
 
 // An app's count toward its milestone: `n` the count now, or none to add
-// one. Written to the pass only as it moves a tenth of the way (or gets
-// there), so a count reported often costs nothing.
+// one. Written to the pass only as it moves a tenth of the way to the next
+// tier (or gets there), so a count reported often costs nothing.
 const msWriting = new Set();
 export function milestone(s, id, n = null) {
   const m = MILESTONES.find(x => x.id === id);
   const w = s?.wallet;
   if (!m || !w || msWriting.has(id)) return;
   const kept = msKept(w, id);
-  if (kept.done) return;
+  const st = milestoneOf(w, m);
+  if (st.max) return;
   const was = finiteOr0(kept.n);
   const now = n == null ? was + 1 : Math.max(was, Math.floor(finiteOr0(n)));
-  const step = x => Math.floor((x / m.goal) * 10);
-  if (now === was || (n != null && now < m.goal && step(now) === step(was))) return;
-  msWrite(s, id, { ...kept, n: now, done: now >= m.goal || undefined });
+  const step = x => Math.floor((x / st.goal) * 10);
+  if (now === was || (n != null && now < st.goal && step(now) === step(was))) return;
+  msWrite(s, id, msValue(m, kept, now));
 }
+const msValue = (m, kept, n) => {
+  const t = Math.max(keptTier(m, kept), tierAt(m, n));
+  return { ...kept, n, t: t || undefined, done: t > 0 || undefined };
+};
 function msWrite(s, id, value) {
   msWriting.add(id);
   s.write?.({ wallet: settingPatch(`ms.${id}`, JSON.parse(JSON.stringify(value))) })
@@ -257,8 +290,8 @@ function msWrite(s, id, value) {
     .finally(() => msWriting.delete(id));
 }
 // Each time the wallet arrives: today counted for this app (once a Taiwan
-// day), and a milestone the wallet shows reached kept as done (worth can
-// fall again; the milestone stays).
+// day), and a tier the wallet shows reached kept (worth can fall again;
+// the tier stays).
 function msTick(s) {
   const w = s.wallet;
   if (!w || !s.pass) return;
@@ -266,12 +299,14 @@ function msTick(s) {
   const own = MILESTONES.find(m => m.days && m.id === s.app);
   if (own) {
     const kept = msKept(w, own.id);
-    if (kept.d !== day && !msWriting.has(own.id)) {
-      const n = finiteOr0(kept.n) + 1;
-      msWrite(s, own.id, { ...kept, n, d: day, done: kept.done || n >= own.goal || undefined });
-    }
+    if (kept.d !== day && !msWriting.has(own.id)) msWrite(s, own.id, { ...msValue(own, kept, finiteOr0(kept.n) + 1), d: day });
   }
-  for (const m of MILESTONES) if ((m.id === 'pass' || m.id === 'stock') && !msKept(w, m.id).done && milestoneOf(w, m).done && !msWriting.has(m.id)) msWrite(s, m.id, { done: true });
+  for (const m of MILESTONES) {
+    if (m.id !== 'pass' && m.id !== 'stock') continue;
+    const kept = msKept(w, m.id);
+    const t = milestoneOf(w, m).tier;
+    if (t > keptTier(m, kept) && !msWriting.has(m.id)) msWrite(s, m.id, { ...kept, t, done: true });
+  }
 }
 
 // ---- Language ------------------------------------------------------------------------
@@ -2177,8 +2212,8 @@ export function accountButton(s, { extra = null } = {}) {
     const a = avatarOf(s.wallet);
     const f = frameOf(s.wallet);
     btn.replaceChildren();
-    for (const c of [...btn.classList]) if (c.startsWith('q-frame-')) btn.classList.remove(c);
-    if (f) btn.classList.add('q-framed', `q-frame-${f.id}`);
+    for (const c of [...btn.classList]) if (c.startsWith('q-frame-') || c.startsWith('q-ms-t')) btn.classList.remove(c);
+    if (f) btn.classList.add(...frameClass(f).split(' '));
     else btn.classList.remove('q-framed');
     if (a || s.wallet) btn.append(node('img', { class: 'q-avatar', alt: '', src: avatarSrc(a?.id || DEFAULT_AVATAR) }));
     else btn.innerHTML = PERSON_SVG;
@@ -2278,17 +2313,20 @@ function accountCard(s, onLooks) {
   const w = s.wallet || {};
   const a = avatarOf(w);
   const f = frameOf(w);
-  const got = MILESTONES.filter(m => milestoneOf(w, m).done).length;
-  return node('button', { class: 'q-pass-card', type: 'button', onclick: onLooks, 'aria-label': en ? `Milestones ${got} of ${MILESTONES.length}` : `里程碑 ${got} / ${MILESTONES.length}` }, [
+  const tiers = MILESTONES.map(m => milestoneOf(w, m).tier);
+  const got = tiers.reduce((a, b) => a + b, 0);
+  const all = MILESTONES.length * TIERS.length;
+  return node('button', { class: 'q-pass-card', type: 'button', onclick: onLooks, 'aria-label': en ? `Milestones ${got} of ${all}` : `里程碑 ${got} / ${all}` }, [
     node('span', { class: 'q-pc-top' }, [
-      node('span', { class: `q-pc-face${f ? ` q-framed q-frame-${f.id}` : ''}` }, [node('img', { alt: '', src: avatarSrc(a?.id || DEFAULT_AVATAR) })]),
+      node('span', { class: `q-pc-face ${frameClass(f)}` }, [node('img', { alt: '', src: avatarSrc(a?.id || DEFAULT_AVATAR) })]),
       node('span', { class: 'q-pc-id' }, [
         node('span', { class: 'q-pc-brand', text: BRAND.pass }),
-        node('strong', { class: 'q-pc-big' }, [document.createTextNode(en ? 'Milestones ' : '里程碑 '), node('span', { class: 'num', text: `${got}/${MILESTONES.length}` })]),
+        node('strong', { class: 'q-pc-big' }, [document.createTextNode(en ? 'Milestones ' : '里程碑 '), node('span', { class: 'num', text: `${got}/${all}` })]),
         node('span', { class: 'q-pc-no num', text: accountNumber(s.pass) })
       ])
     ]),
-    node('span', { class: 'q-pc-ms', 'aria-hidden': 'true' }, MILESTONES.map(m => node('img', { class: milestoneOf(w, m).done ? 'got' : '', alt: '', src: avatarSrc(`ms-${m.id}`) })))
+    // One medal per milestone, in its tier's metal, on one row however many.
+    node('span', { class: 'q-pc-ms', 'aria-hidden': 'true' }, MILESTONES.map((m, i) => node('img', { class: tiers[i] ? '' : 'dim', alt: '', src: avatarSrc(`ms-${m.id}.${tiers[i]}`) })))
   ]);
 }
 
