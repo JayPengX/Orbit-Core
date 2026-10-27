@@ -43,7 +43,7 @@ import { handleTransit, tally, warmBikes } from './transit.js';
 import { readDev, capacityCron, CONFIG_COLLECTION } from './eco-admin.js';
 import { backupStore } from './store-backup.js';
 import { paceOf } from './pace.js';
-import { beat, tellOwner, systemReport } from './ops.js';
+import { beat, tellOwner, systemReport, countFolders, FOLDERS_KEY } from './ops.js';
 import { applyScale } from './capacity.js';
 import { handleSports, sportsCron, useDevSettings } from './sports.js';
 import { handleToday } from './sports-today.js';
@@ -1386,5 +1386,7 @@ export default {
     if (min === 30 && tick.getUTCHours() === 20) run('store-backup', async () => ({ pruned: await DOCS.prune(env), ...(await backupStore(env, DOCS, tick.getTime())) }));
     // The live refreshes by how many people there are (capacity.js), every 6 hours.
     if (min === 20 && tick.getUTCHours() % 6 === 0) run('capacity', () => capacityCron(env, ECO_DEPS));
+    // R2's folders for the panel's 健康 (ops.js countFolders), every 6 hours (and on the first run after a deploy).
+    if (env.DATA && min === 40 && (tick.getUTCHours() % 6 === 0 || !(await env.RATE_LIMIT_KV?.get(FOLDERS_KEY).catch(() => null)))) run('data-folders', () => countFolders(env));
   }
 };
