@@ -5,6 +5,8 @@ here. These are strong defaults, not laws: weigh each against speed and
 use judgement. When a rule gets in the way of a clearly better result,
 break it and say so in a line.
 
+Jay's specific decisions, app by app and dated, are in [`RULEBOOK.md`](RULEBOOK.md).
+
 ## 1. The owner
 
 - **One person owns the whole family** and decides what the products are.
@@ -146,7 +148,7 @@ Folder-Link is a separate Windows tool with its own notes.
 
 ## 8. Docs
 
-- **This file**, `DESIGN.md` (how screens look), each repo's `CLAUDE.md` (a pointer here plus what's
+- **This file**, `RULEBOOK.md` (every rule Jay set, dated, newest wins), `DESIGN.md` (how screens look), each repo's `CLAUDE.md` (a pointer here plus what's
   special to that repo), each repo's README (the short public front page: what it is, the link,
   the stack) and its MAP.md: a short map with what the
   app is, where the code is, how to run and test it, and the decisions
