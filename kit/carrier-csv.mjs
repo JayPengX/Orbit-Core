@@ -36,6 +36,35 @@ const cells = (line, sep) => {
   out.push(cur.trim());
   return out;
 };
+// A whole CSV as rows of cells (RFC 4180: quoted cells may hold commas,
+// doubled quotes and line breaks). Another app's export (Orbit Money's
+// lib/oldbooks.mjs) reads with it too.
+export function parseCsvRows(text, sep = ',') {
+  const rows = [];
+  let row = [];
+  let cur = '';
+  let q = false;
+  const s = String(text || '');
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (q) {
+      if (c === '"' && s[i + 1] === '"') (cur += '"'), i++;
+      else if (c === '"') q = false;
+      else cur += c;
+    } else if (c === '"') q = true;
+    else if (c === sep) row.push(cur), (cur = '');
+    else if (c === '\n' || c === '\r') {
+      if (c === '\r' && s[i + 1] === '\n') i++;
+      row.push(cur);
+      if (row.some(x => x !== '')) rows.push(row);
+      (row = []), (cur = '');
+    } else cur += c;
+  }
+  row.push(cur);
+  if (row.some(x => x !== '')) rows.push(row);
+  return rows;
+}
+
 // A date cell as yyyy-mm-dd: 20261005, 2026/10/05, 115/10/05, 1151005.
 export function csvDay(s) {
   const t = String(s || '').trim();
