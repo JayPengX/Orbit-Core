@@ -440,12 +440,20 @@ export function menu(anchor, items) {
         h('button', { type: 'button', role: 'menuitem', class: it.danger ? 'danger' : '', onclick: () => (shut(), it.onClick?.()) }, [h('span', { text: it.label }), it.icon ? h('span', { 'aria-hidden': 'true', text: it.icon }) : null])
       );
   }
-  document.body.append(m);
+  // (Inside an open sheet when it's from one: a menu in the page lay under the
+  // sheet, out of sight, and the tap meant for it closed the sheet: Money's
+  // 付款方式, Jay 2026-10-27.)
+  (anchor.closest?.('dialog[open]') || document.body).append(m);
   const r = anchor.getBoundingClientRect();
   const w = m.offsetWidth;
   const left = Math.min(Math.max(16, r.right - w), innerWidth - w - 16);
   const below = r.bottom + 8 + m.offsetHeight < innerHeight - 16;
-  Object.assign(m.style, { left: `${left}px`, top: below ? `${r.bottom + 8}px` : `${Math.max(16, r.top - 8 - m.offsetHeight)}px` });
+  const top = below ? r.bottom + 8 : Math.max(16, r.top - 8 - m.offsetHeight);
+  Object.assign(m.style, { left: `${left}px`, top: `${top}px` });
+  // (A sheet that moves, as one sliding up does, places its fixed children
+  // from its own corner: put back by however far off it landed.)
+  const at = m.getBoundingClientRect();
+  if (Math.abs(at.left - left) > 1 || Math.abs(at.top - top) > 1) Object.assign(m.style, { left: `${2 * left - at.left}px`, top: `${2 * top - at.top}px` });
   m.style.setProperty('--q-menu-origin', `${r.left + r.width / 2 - left}px ${below ? '0' : '100%'}`);
   const off = e => {
     if (!m.contains(e.target)) shut();

@@ -942,6 +942,54 @@ button,
   height: 10px;
   padding: 0;
 }
+/* The app's main action (tabBar's action): a round button of its own at the
+   bar's right, the two centred together; the bar gives it the room. */
+.q-tabbar.q-tabbar.q-tabbar-act {
+  left: calc(50% - (var(--q-tb-w) + 72px) / 2);
+  width: var(--q-tb-w);
+  transform: none;
+}
+.q-tab-action {
+  position: fixed;
+  z-index: 60;
+  left: calc(50% + (var(--q-tb-w, 0px) + 72px) / 2 - 62px);
+  bottom: var(--q-bar-gap);
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--q-accent);
+  color: #fff;
+  box-shadow: var(--q-glass-drop), 0 8px 20px -8px color-mix(in srgb, var(--q-accent) 70%, transparent);
+  cursor: pointer;
+  transition: transform var(--q-dur-bouncy) var(--q-spring-bouncy), width var(--q-dur-smooth) var(--q-spring-smooth), height var(--q-dur-smooth) var(--q-spring-smooth);
+}
+:root {
+  --q-tb-w: min(calc(var(--q-vw) - 32px - 72px), calc(var(--q-tabs, 4) * 86px));
+}
+.q-tab-action:active {
+  transform: scale(0.92);
+}
+.q-tab-action svg {
+  width: 28px;
+  height: 28px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+}
+.q-tabs-small .q-tab-action {
+  width: 52px;
+  height: 52px;
+  left: calc(50% + (var(--q-tb-w, 0px) + 72px) / 2 - 52px);
+}
+html.q-kb .q-tab-action {
+  visibility: hidden;
+}
+
 /* Scrolling down: the bar draws in to its icons (orbit.mjs sets .q-tabs-small). */
 .q-tabs-small .q-tabbar .q-tab {
   min-height: 44px;
