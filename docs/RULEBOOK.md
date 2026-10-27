@@ -61,7 +61,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 10-21 Reflect results the moment they happen: never hide data because a feed is stale; compute it from live results.
 - 10-21 Test UI in WebKit (Safari's engine), not only Chromium.
 - 10-22 One date selector in every app (kit `dayBar`/`dayStrip`); never an app's own day chip row.
-- 10-22 Hates floating buttons over content: docked bars (`html.q-dock`, `.q-accessory`).
+- 10-27 One tab bar in every app: the kit's floating capsule (`tabBar`), Securities and Longshot included; an app's in-progress bar is a `.q-accessory` pill above it. Never `html.q-dock` for a tab bar.
 - 10-23 Phones only, 320 to 440 px; iPad and computers show the phone column centred; no tablet or wide layouts ever.
 - 10-27 Exception: the admin panel (`site/admin`) has a real desktop layout (sidebar, wide grids) as well as the phone one, and on a phone nothing in it is cut or squeezed (secondary lines wrap). The Showcase is the other exception.
 - 10-23 Every team name in Chinese; people (players, drivers) in their own English names in both languages; never transliterate.
@@ -202,6 +202,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 | Fit iPad and every screen size | Phones only (320–440 px) | 10-23 |
 | Gradient hero card per tab, colour tiles, tags instead of sentences (round 2) | `DESIGN.md`: one focus, grey facts, chips only for taps (backgrounds kept) | 10-27 |
 | Focus number open on the page, then on a grey card | `.q-focus` on the app's colour | 10-27 |
+| Floating buttons hated: Securities and Longshot on the docked bar (`html.q-dock`) | Every app on the floating capsule tab bar (Jay: the 10-22 note wasn't meant for the tab bar) | 10-27 |
 | Flat heroes, no glow, no coloured shadow, flat tiles (rollout) | Backgrounds kept; only the content made calmer | 10-27 |
 | 32 between sections | 24 | 10-27 |
 | Help pill in the top bar | Help in the Pass sheet | 10-19 |
