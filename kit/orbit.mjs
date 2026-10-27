@@ -29,7 +29,7 @@
 // that one live; the one left behind stops refreshing and says so, with a
 // button to continue there. Links between the apps carry the sign-in along.
 
-import { BRANDS, FAMILY, pathOf, homeOf, appIcon, familyMark } from './brand.mjs';
+import { BRANDS, APP_ORDER, FAMILY, pathOf, homeOf, appIcon, familyMark } from './brand.mjs';
 import { DEV, cleanDev } from './brand.mjs';
 import { API, SITE as HOME, isApi } from './domain.mjs';
 import { passkeyHere, passkeyName, deviceName, makePasskey, usePasskey, forgetPasskey, cancelled } from './passkey.mjs';
@@ -210,6 +210,7 @@ export const TIERS = [
   { id: 'gold', zh: '金', en: 'Gold' }
 ];
 const APP_COUNT = Object.keys(APPS).length;
+// The Explorer first, then the apps in the family's order (APP_ORDER).
 export const MILESTONES = [
   { id: 'pass', goals: [3, 6, APP_COUNT], was: 3, zh: 'Orbit 旅人', en: 'Explorer', unit: { zh: '個 App', en: 'apps' }, do: { zh: '用過 {n} 個 App', en: 'Use {n} Orbit apps' } },
   { id: 'stock', goals: [300_000, 1_000_000, 10_000_000], was: 2, money: true, zh: '身價', en: 'Net worth', unit: { zh: '', en: '' }, do: { zh: '身價到 {n}', en: 'Reach {n}' } },
@@ -221,7 +222,7 @@ export const MILESTONES = [
   { id: 'weather', goals: [7, 30, 100], was: 2, days: true, zh: '看天的人', en: 'Sky watcher', unit: { zh: '天', en: 'days' }, do: { zh: '{n} 天看天氣', en: 'Check the weather on {n} days' } },
   { id: 'orbit', goals: [7, 30, 100], was: 2, days: true, zh: '全勤', en: 'Attendance', unit: { zh: '天', en: 'days' }, do: { zh: '{n} 天打開課表', en: 'Open Class on {n} days' } },
   { id: 'money', goals: [7, 30, 100], was: 2, days: true, zh: '天天記帳', en: 'Daily books', unit: { zh: '天', en: 'days' }, do: { zh: '{n} 天記帳', en: 'Keep the books on {n} days' } }
-];
+].sort((a, b) => (a.id === 'pass' ? -1 : b.id === 'pass' ? 1 : APP_ORDER.indexOf(a.id) - APP_ORDER.indexOf(b.id)));
 const MS_FRAMES = MILESTONES.map(m => ({ id: `ms-${m.id}`, ms: m.id }));
 const msKept = (wallet, id) => setting(wallet, `ms.${id}`, null) || {};
 const keptTier = (m, kept) => Math.min(3, kept.t != null ? Math.floor(finiteOr0(kept.t)) : kept.done ? m.was : 0);

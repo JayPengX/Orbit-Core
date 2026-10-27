@@ -67,6 +67,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 10-23 Every team name in Chinese; people (players, drivers) in their own English names in both languages; never transliterate.
 - 10-23 One session per app: all apps run at once; only the same app opened in a second place pauses the first.
 - 10-23 A typhoon day off (停班停課) acts like a holiday in every app (kit `dayoff.mjs`, per place and need).
+- 10-27 One app order everywhere the apps are listed (Pass App tab, family page, milestones, medals, help, admin, Showcase): Sports, Transit, Weather, Class, Money, Words, Beats, Law, Securities. Everyday tools first, Securities (the play-money game) last ("weird how securities is put first"). Kit `APP_ORDER` (`brand.mjs`, the order of `BRANDS`); never a list of its own.
 - Every Orbit app sits behind the Orbit Pass and asks for Add to Home Screen on a phone (exceptions: Showcase; Longshot has its own Pass).
 - Visual over text: icons, colour, cards; less text, no source names or back-end notes on screen (TRUTH §6).
 - Chinese (Taiwan) first, English second (TRUTH §6).
