@@ -20,11 +20,13 @@ loud things mean something.
   the biggest type on the screen, with the most space around it. Money's
   月曆: what I spent this month. Weather: how warm it is now. Sports: the
   game on now.
-- **Size and space make the focus, not a box.** The default focal block is
-  open on the page (`.q-focus`: a quiet label, the number at `--q-t-focal`,
-  one line under it, at most three small figures). A coloured card
-  (`.q-hero-card`) is for when the focus is an *action* (Law's 問法律, a game
-  to open), never just to hold a number.
+- **The focus sits on a plain card; size and space inside it make it the
+  focus.** The default focal block (`.q-focus`: a quiet label, the number at
+  `--q-t-focal`, one line under it, at most three small figures) is on the
+  flat surface card every list uses (`--q-surface`, radius 22, no shadow, no
+  colour). Jay 2026-10-27: open on the page it read as bare text ("plain
+  text ugly"). A coloured card (`.q-hero-card`) is for when the focus is an
+  *action* (Law's 問法律, a game to open), never just to hold a number.
 - At most **one** coloured surface per screen. A second one means two
   things are shouting; demote one.
 - Everything else steps down: section heads, then rows, then captions. If
@@ -140,13 +142,13 @@ The map's question is "where am I and what can I use near me". So:
 
 - **Money 月曆, before:** a black-and-gold gradient card with four bold
   numbers, then 31 day squares each tinted gold, each with a bold date and a
-  bold amount. Nothing led. **After:** the month's spending open on the page
+  bold amount. Nothing led. **After:** the month's spending on its focus card
   at the focal size, a 4 px budget bar, one grey line, income and 結餘 as two
   small figures. Days are plain numerals with the amount small and grey;
   only the month's few biggest days (over twice the budget's daily share,
   top five) carry the accent. Today is accent text; the picked day the one
   filled circle.
-- **Money 帳戶:** the net worth open on the page; 現金 / 銀行帳戶 / 信用卡 are
+- **Money 帳戶:** the net worth on its focus card; 現金 / 銀行帳戶 / 信用卡 are
   list labels (15, grey), not section titles competing with it; balances 500.
 - **Money 統計:** "平均每天 NT$645" was a gold capsule: a fact, so plain text.
 - **Law 首頁:** the 問法律 card kept (it's an action) but as one deep indigo,

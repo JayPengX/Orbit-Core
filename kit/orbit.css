@@ -5044,17 +5044,20 @@ html.q-kb .q-kb-docked {
 /* A menu over a sheet: solid, so its rows never mix with what's under them (Money's 付款方式 over the keypad). */
 dialog[open] .q-menu { background: var(--q-sheet); }
 
-/* ---- The focal point, open on the page (docs/DESIGN.md) ----
+/* ---- The focal point, on its card (docs/DESIGN.md) ----
    A screen's one answer: a quiet label, the number, one line under it, a
-   thin bar if there's a limit, and at most three figures beside it. No card,
-   no colour: size and the space around it make it the focus.
+   thin bar if there's a limit, and at most three figures beside it, on a
+   plain card (Jay 2026-10-27: open on the page read as bare text). The card
+   is flat, the surface every card uses; size and space still make the focus.
    .q-focus > .q-focus-label, .q-focus-value, .q-focus-bar > i,
    .q-focus-sub, .q-focus-figs > div > small + b (.in / .out on b: meaning). */
 .q-focus {
   display: grid;
   gap: var(--q-s-1);
   min-width: 0;
-  padding: var(--q-s-2) 4px var(--q-s-2);
+  padding: var(--q-s-4) 18px 18px;
+  border-radius: var(--q-r-card);
+  background: var(--q-surface);
 }
 .q-focus-label {
   color: var(--q-label-2);
