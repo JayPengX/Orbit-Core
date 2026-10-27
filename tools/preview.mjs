@@ -224,6 +224,8 @@ const serve = flag('serve');
 // failures (asked without the made-up token), each batch item that failed
 // or was slow printed.
 const live = flag('live');
+// --google-map: see the transit routes below.
+const googleMap = flag('google-map') && live;
 const port = Number(opt('port', 8123));
 const inits = [];
 const extRoutes = [];
@@ -859,13 +861,19 @@ await context.route(/^https:\/\/(?!orbit-workers-proxy|sports-proxy|localhost[:/
 // dev door gives the browser key when asked (?map=google), and Google is asked
 // as from the site (the key only works there): its Referer, and the page's
 // address in what Maps sends, are the site's.
-const googleMap = live && flag('google-map');
 if (googleMap) {
   const site = 'https://orbit.jaypengx.com/transit/';
   const asSite = url => url.split(encodeURIComponent(base)).join(encodeURIComponent(site)).split(base).join(site).split(encodeURIComponent(new URL(base).origin)).join(encodeURIComponent(new URL(site).origin));
   const googleBin = url => new Promise(resolve => execFile('curl', ['-s', '-L', '-f', '-m', '20', '-H', `Referer: ${site}`, '-H', `Origin: ${new URL(site).origin}`, url], { encoding: 'buffer', maxBuffer: 32 * 1024 * 1024 }, (err, out) => resolve(err ? null : out)));
   await context.route(/^https:\/\/maps\.(googleapis|gstatic)\.com\//, async route => {
-    const url = route.request().url();
+    const req = route.request();
+    const url = req.url();
+    // (Maps' own calls, a POST's body and its type, go as they are, from the site.)
+    if (req.method() !== 'GET') {
+      const r = await fetch(asSite(url), { method: req.method(), headers: { ...req.headers(), referer: site, origin: new URL(site).origin }, body: req.postDataBuffer() }).catch(() => null);
+      if (!r) return route.abort();
+      return route.fulfill({ status: r.status, contentType: r.headers.get('content-type') || 'application/octet-stream', headers: { 'Access-Control-Allow-Origin': '*' }, body: Buffer.from(await r.arrayBuffer()) });
+    }
     if (!outside.has(url)) outside.set(url, googleBin(asSite(url)));
     const body = await outside.get(url);
     if (!body) return route.abort();
