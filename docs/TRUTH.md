@@ -72,7 +72,8 @@ break it and say so in a line.
   `onAir`, `sessionStatus`), so screens can't disagree.
 - **UI from the kit** (`orbit.css`, `ui.mjs`: tab bar, sheets, segmented,
   lists, toasts, `ask` / `tell`). Draw your own only for what is truly the
-  app's (a pitch, a map, a chart).
+  app's (a pitch, a map, a chart). How a screen should look (focus, type,
+  colour, space, chips): `docs/DESIGN.md`.
 - **Ids never change with a name**: storage keys, cache names and the
   manifests' `id` survive renames.
 - **Saved data:** a failed read is a failure, never "nothing there", and
@@ -145,7 +146,7 @@ Folder-Link is a separate Windows tool with its own notes.
 
 ## 8. Docs
 
-- **This file**, each repo's `CLAUDE.md` (a pointer here plus what's
+- **This file**, `DESIGN.md` (how screens look), each repo's `CLAUDE.md` (a pointer here plus what's
   special to that repo), and each repo's README: a short map with what the
   app is, where the code is, how to run and test it, and the decisions
   still in force.
