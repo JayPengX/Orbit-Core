@@ -8,8 +8,9 @@
 //   2. find: the names looked up in Orbit Law's lists (exact, short, then a
 //      prefix), the terms in its full-text index over the laws and the
 //      regulations (16 bucket files at most); the pinned articles, the last
-//      answer's cites, the planned articles and the best hits, 14 articles
-//      and 14,000 characters at most; then (law-ground.js, law-more.js) the
+//      answer's cites, the planned articles and the best hits (6 at most,
+//      only those two terms or a named law agree on; 2 on a question about
+//      the 立法院), 10 articles and 12,000 characters at most; then (law-ground.js, law-more.js) the
 //      figures, notices, bills, budgets, similar judgments, 行政規則,
 //      legislators, votes and meetings the question is about;
 //   3. answer: a stronger model applies them to the reader's facts (who is
@@ -24,11 +25,12 @@
 // a new version asks again. Follow-ups aren't kept (they rarely repeat).
 import { json, sha256Hex } from './http.js';
 import { groundFor, groundKey, groundOut, groundPrompt, hasGround } from './law-ground.js';
-import { moreFor, moreKey, moreOut, morePrompt, moreCites, hasMore, readMine } from './law-more.js';
+import { moreFor, moreKey, moreOut, morePrompt, moreCites, hasMore, readMine, matchPeople, asksLy } from './law-more.js';
+import { viaTaiwan } from './law-hosts.js';
 import { matchBills, readGround } from './law-ground.js';
 import { LAW_LIMITS, PCODE, ART, fail, twDay, citeKey, cited, label, readData, readList, readLaw, askKey, opening, passOf, passKey, spend, countOf, kept, keep, modelJson } from './law.js';
 
-export const CHAT_LIMITS = { maxQ: 500, maxTurns: 6, maxTurn: 1500, maxPins: 2, maxArts: 14, maxChars: 14_000, maxLaws: 8, maxBuckets: 16, maxBody: 40_000 };
+export const CHAT_LIMITS = { maxQ: 500, maxTurns: 6, maxTurn: 1500, maxPins: 2, maxArts: 10, maxHits: 6, lyHits: 2, maxChars: 12_000, maxLaws: 6, maxBuckets: 16, maxCities: 3, maxBody: 40_000 };
 const CHAT_TTL_S = 30 * 86_400;
 const BILL_WORDS = /修法|修正|草案|立法院|立委|三讀|二讀|一讀|法案|進度|提案|bill/i;
 // The answer's model: Gemini's second (Flash), for the reasoning; the plan stays on the first.
@@ -64,7 +66,10 @@ export function readChat(body) {
     if (!Array.isArray(x.arts) || !x.arts.length || x.arts.length > LAW_LIMITS.maxArts || !x.arts.every(a => typeof a === 'string' && ART.test(a))) return 'pin';
     pins.push({ p: x.p, arts: [...new Set(x.arts)] });
   }
-  return { q, history: turns, pin: pins, mine, lang, stream: body.stream === true };
+  // The reader's cities (their 地方法規 only): '臺北市', at most 3.
+  const city = body.city ?? [];
+  if (!Array.isArray(city) || city.length > CHAT_LIMITS.maxCities || !city.every(c => typeof c === 'string' && /^[\u4e00-\u9fff]{1,4}[市縣]$/.test(c.replace(/台/g, '臺')))) return 'city';
+  return { q, history: turns, pin: pins, mine, lang, city: [...new Set(city.map(c => c.replace(/台/g, '臺')))], stream: body.stream === true };
 }
 
 // ---- 1. Plan ---------------------------------------------------------------------
@@ -203,7 +208,7 @@ export async function searchText(query, bucket) {
 // The terms' hits, best first: [id], scored by the terms an article has,
 // one more in a law the plan named. Terms are searched while their buckets
 // fit in 16 files (a bucket that can't be read fails the turn).
-export async function textHits(terms, named, maxBuckets = CHAT_LIMITS.maxBuckets) {
+export async function textHits(terms, named, maxBuckets = CHAT_LIMITS.maxBuckets, withScore = false) {
   const files = new Set();
   const use = [];
   for (const t of terms) {
@@ -216,15 +221,17 @@ export async function textHits(terms, named, maxBuckets = CHAT_LIMITS.maxBuckets
   const score = new Map();
   for (const t of use) for (const id of await searchText(t, b => got.get(b))) score.set(id, (score.get(id) || 0) + 1);
   for (const id of score.keys()) if (named.has(Math.floor(id / PER_LAW))) score.set(id, score.get(id) + 1);
-  return [...score.entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0]).map(([id]) => id);
+  return [...score.entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0]).map(([id, s]) => (withScore ? [id, s] : id));
 }
 
 // The candidates: [{ p, n, m, key, text }], in this order: the pinned
 // articles, the last answer's cites, the planned articles that exist, the
-// best hits, and the competent-authority article (所稱主管機關) of the first
-// of their laws that has one; at most 14 articles from 8 laws and 14,000
-// characters.
-export async function find(chat, plan) {
+// best hits (a hit one term alone found only while fewer than 3 are in; at
+// most 6, 2 when `ly`: a question about the 立法院's work, where every
+// question once pulled 14), and the competent-authority article (所稱主管機關)
+// of the first of their laws that has one; at most 10 articles from 6 laws
+// and 12,000 characters.
+export async function find(chat, plan, ly = false) {
   const laws = await readList('index.json');
   const row = resolver(laws);
   const resolved = (await Promise.all(plan.laws.map(row))).filter(Boolean);
@@ -236,7 +243,10 @@ export async function find(chat, plan) {
   const planned = await Promise.all(plan.arts.map(async a => ({ p: (await row(a.law))?.[0], key: a.key })));
   const last = [...chat.history].reverse().find(t => t.role === 'model');
   const wants = [...chat.pin.flatMap(x => x.arts.map(key => ({ p: x.p, key }))), ...(last?.cites || []).map(c => ({ p: c.split(':')[0], key: c.split(':')[1] })), ...planned.filter(a => a.p)];
-  const hits = (await textHits(plan.terms, named)).slice(0, CHAT_LIMITS.maxArts).map(id => ({ p: rows[Math.floor(id / PER_LAW)]?.[0], ord: id % PER_LAW }));
+  const scored = await textHits(plan.terms, named, CHAT_LIMITS.maxBuckets, true);
+  const strong = scored.filter(([, s]) => s >= 2);
+  const take = ly ? CHAT_LIMITS.lyHits : CHAT_LIMITS.maxHits;
+  const hits = (strong.length >= 3 ? strong : scored.slice(0, 3)).slice(0, take).map(([id]) => ({ p: rows[Math.floor(id / PER_LAW)]?.[0], ord: id % PER_LAW }));
   const all = [...wants, ...hits.filter(h => h.p)];
   // The laws' text, the first 8 laws asked for (a law not there is skipped).
   const ps = [...new Set(all.map(a => a.p))].slice(0, CHAT_LIMITS.maxLaws);
@@ -258,7 +268,7 @@ export async function find(chat, plan) {
     if (!arts.has(a.p)) continue;
     add(a.p, a.ord != null ? arts.get(a.p)[a.ord] : arts.get(a.p).find(x => String(x[1]) === a.key));
   }
-  const authority = [...new Set(out.map(a => a.p))].map(p => [p, arts.get(p).find(x => /所稱主管機關/.test(x[2]))]).find(([, art]) => art);
+  const authority = ly ? null : [...new Set(out.map(a => a.p))].map(p => [p, arts.get(p).find(x => /所稱主管機關/.test(x[2]))]).find(([, art]) => art);
   if (authority) add(...authority);
   return out;
 }
@@ -374,6 +384,34 @@ export function checkChat(raw, articles, lang, grounded = false, others = []) {
 
 // ---- The route ------------------------------------------------------------------
 
+// What the reader is told is being looked at, after the articles: ['budget' |
+// 'bills' | 'news' | 'people' | 'votes' | 'cases'], in that order.
+export function lookOf(ground, people = [], ly = false) {
+  const out = [];
+  if (ground?.budgets?.length) out.push('budget');
+  if (ground?.bills?.length) out.push('bills');
+  if (ground?.news?.length || ground?.facts?.length) out.push('news');
+  if (people.length) out.push('people');
+  if (ly && !people.length && !out.length) out.push('ly');
+  if (!ly) out.push('cases');
+  return out;
+}
+
+// The judgments and rules shown under an answer: only those it cites (a
+// rule asked for by name too). The rest were candidates the model read and
+// set aside: shown, they were noise (Jay 2026-10-27: 加重詐欺 under a fake plate).
+export function shownOf(extra, out) {
+  const used = new Set(Array.isArray(out?.cited) ? out.cited : []);
+  const res = { ...extra };
+  const cases = (extra.cases || []).filter(c => used.has(c.jid));
+  const rules = (extra.rules || []).filter(r => used.has(r.id) || r.asked);
+  if (cases.length) res.cases = cases;
+  else delete res.cases;
+  if (rules.length) res.rules = rules;
+  else delete res.rules;
+  return res;
+}
+
 // gemini(parts, schema) -> the upstream Response (worker.js's proxyGeminiRequest);
 // session: the request's Orbit Pass session (worker.js), or null.
 export async function handleLawChat(request, env, ctx, headers, session, gemini, dayCap = LAW_LIMITS.perDay) {
@@ -422,20 +460,26 @@ async function answerChat(chat, pass, env, ctx, headers, gemini, stage = () => {
       plan = readPlan(await modelJson(gemini, planPrompt(chat, nameOf), PLAN));
       if (first) keep(env, ctx, planKey, plan, CHAT_TTL_S);
     }
-    const articles = await find(chat, plan);
-    stage({ stage: 'found', arts: articles.length, laws: [...new Set(articles.map(a => a.n))].slice(0, 3) });
-    // A question about bills: those of the laws found too, when it named none.
+    // (A question about the 立法院's work: few articles, no judgments or rules.)
+    const people = matchPeople((await readGround('ly/people.json'))?.people, asked);
+    const ly = asksLy(asked);
+    const articles = await find(chat, plan, ly);
+    // What it looks at next, said as it is (Jay 2026-10-27: it always said 找條文 while it read a legislator's record).
+    stage({ stage: 'found', arts: articles.length, laws: [...new Set(articles.map(a => a.n))].slice(0, 3), look: lookOf(ground, people, ly) });
+    // A question about bills: those of the laws found too, when it named none (and isn't about a budget).
     const items = (await readGround('bills/items.json'))?.items || [];
-    if (!ground.bills.length && BILL_WORDS.test(chat.q)) ground.bills = matchBills(items, `${chat.q} ${[...new Set(articles.map(a => a.n))].join(' ')}`);
-    const more = await moreFor(`${asked} ${plan.terms.join(' ')}`, articles, { mine: chat.mine, items, today: day });
+    if (!ground.bills.length && !ground.budgets?.length && BILL_WORDS.test(chat.q)) ground.bills = matchBills(items, `${chat.q} ${[...new Set(articles.map(a => a.n))].join(' ')}`);
+    // (司法院's judgment pages serve only Taiwan: read through the relay there.)
+    const fetcher = env?.GEMINI_RELAY ? (u, init) => (viaTaiwan(u) ? env.GEMINI_RELAY.fetch(`https://gemini-relay/?to=${encodeURIComponent(u)}`, { headers: init?.headers, signal: init?.signal }) : fetch(u, init)) : fetch;
+    const more = await moreFor(`${asked} ${plan.terms.join(' ')}`, articles, { mine: chat.mine, items, today: day, cities: chat.city, fetcher });
     const grounded = hasGround(ground) || hasMore(more);
-    stage({ stage: 'write', cases: more.cases.length, rules: more.rules.length });
+    stage({ stage: 'write', arts: articles.length, cases: more.cases.length, rules: more.rules.length, people: more.people.map(p => p.n), votes: more.votes.length, bills: ground.bills.length, budgets: ground.budgets?.length || 0, news: ground.news.length + ground.facts.length });
     const extra = { ...groundOut(ground), ...moreOut(more) };
     const versions = [...new Set(articles.map(a => `${a.p}@${a.m}`))].sort().join(',');
     const answerKey = first && `law:chat:v2:${await sha256Hex([askKey(chat.q), pin, chat.lang, versions, groundKey(ground), moreKey(more)].join('|'))}`;
     const hit = answerKey && (await kept(env, answerKey));
     const leftNow = async () => left(used ?? (await countOf(env, who, day)));
-    if (hit) return json({ ...hit, ...extra, cached: true, left: await leftNow() }, 200, headers);
+    if (hit) return json({ ...hit, ...shownOf(extra, hit), cached: true, left: await leftNow() }, 200, headers);
     let out;
     // Nothing found: not covered, without the answer's call.
     if (!articles.length && !grounded) out = checkChat({ covered: false }, [], chat.lang);
@@ -445,7 +489,7 @@ async function answerChat(chat, pass, env, ctx, headers, gemini, stage = () => {
       out = checkChat(await modelJson((parts, schema) => gemini(parts, schema, ANSWER_MODEL), answerPrompt(chat, articles, nameOf, ground, more), ANSWER), articles, chat.lang, grounded, moreCites(more));
     }
     if (answerKey) keep(env, ctx, answerKey, out, CHAT_TTL_S);
-    return json({ ...out, ...extra, cached: false, left: await leftNow() }, 200, headers);
+    return json({ ...out, ...shownOf(extra, out), cached: false, left: await leftNow() }, 200, headers);
   } catch {
     return fail('upstream', 502, headers, used ? { left: left(used) } : undefined);
   }

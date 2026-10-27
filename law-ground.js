@@ -229,6 +229,7 @@ About these:
 export function groundOut(g) {
   if (!hasGround(g)) return {};
   const notices = [...g.facts.map(f => ({ t: cut(f.t || f.text, 120), url: urls(f.src)[0] || '', d: cut(f.d ?? f.date ?? '', 40), agency: cut(f.agency ?? '', 40) })), ...g.news.map(n => ({ t: cut(n[2], 120), url: urls([n[3]])[0] || '', d: cut(n[0], 10), agency: cut(n[1], 40) }))];
-  const bills = [...g.bills.map(b => ({ k: b.k, n: b.n, stage: b.stage })), ...budgetsOf(g).map(b => ({ k: `budget:${b.k}`, n: b.title, stage: -1 }))];
+  // (A budget first: it's what a budget question asked, not 預算法's bills; Jay 2026-10-27 found it under 更多1件.)
+  const bills = [...budgetsOf(g).map(b => ({ k: `budget:${b.k}`, n: b.title, stage: -1, d: cut(b.stage, 20) })), ...g.bills.map(b => ({ k: b.k, n: b.n, stage: b.stage }))];
   return { ...(notices.length ? { notices } : {}), ...(bills.length ? { bills } : {}) };
 }

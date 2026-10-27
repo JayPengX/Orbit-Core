@@ -1,13 +1,16 @@
 // What /law-chat finds besides the articles: judgments, 釋字, 行政規則, legislators, votes, meetings, the reader's own.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { matchRulings, matchCons, judgmentGist, readMine, asksMine, matchVotes, matchMeets, matchRules, caseLabel, ruleTitle, vendorHits, vendorText, localRows } from '../law-more.js';
+import { matchRulings, matchCons, judgmentGist, readMine, asksMine, matchVotes, matchMeets, matchRules, caseLabel, ruleTitle, vendorHits, vendorText, localRows, citiesIn } from '../law-more.js';
 
 test('judgments: 3 for each article found they cite, the 案由 sharing the question; 3 at least, newer first', () => {
   const rows = [['TPSV,114,台上,1,20250101,1', '2025-01-01', '請求返還押金', ['B0000001:456']], ['TPSV,114,台上,2,20260101,1', '2026-01-01', '請求返還押金', ['B0000001:456']], ['TPSM,115,台上,3,20260101,1', '2026-01-01', '加重詐欺', ['C0000001:339']], ['bad', '', '押金', []]];
   assert.deepEqual(matchRulings(rows, ['B0000001:456'], '房東不還押金').map(r => r.jid), ['TPSV,114,台上,2,20260101,1', 'TPSV,114,台上,1,20250101,1']);
   assert.deepEqual(matchRulings(rows, ['C0000001:339'], '詐欺被抓會判多久').map(r => r.jid), ['TPSM,115,台上,3,20260101,1']);
   assert.equal(caseLabel('TPSM,115,台上,3,20260101,1'), '最高法院刑事 115年度台上字第3號');
+  // (Articles alone aren't enough: a 詐欺 case citing 刑法 第212條 isn't like a fake plate.)
+  const fraud = [['TPSM,114,台上,6464,20250813,1', '2025-08-13', '加重詐欺', ['C0000001:212', 'C0000001:216', 'C0000001:339-4']]];
+  assert.deepEqual(matchRulings(fraud, ['C0000001:212', 'C0000001:216', 'K0040012:12'], '掛假牌汽車會怎麼樣 偽造 牌照'), []);
   assert.equal(caseLabel('s748'), '司法院釋字第748號');
 });
 
@@ -60,4 +63,13 @@ test('a city 自治條例 is found with the ministries rules, its text read from
   const [r] = matchRules(rows, '新北市營業衛生管理自治條例罰多少', []);
   assert.deepEqual([r.id, r.agency, r.dir], ['NTPC:1C0130046', '新北市', 'local']);
   assert.equal(matchRules(rows, '學生會注意事項', [])[0].dir, 'agency');
+});
+
+test('a city\'s rules only for the reader\'s city, or one the question names', () => {
+  const local = [['KHH:1', '高雄市政府警察局執行交通違規車輛移置與保管作業規定', '高雄市', '2025-12-08', '', []], ['TNN:1', '臺南市政府警察局執行交通違規車輛移置與保管作業規定', '臺南市', '2025-02-05', '', []]];
+  assert.deepEqual(localRows(local, new Set(['臺南市'])).map(r => r[0]), ['TNN:1']);
+  assert.deepEqual(localRows(local, new Set()).map(r => r[0]), []);
+  assert.equal(localRows(local).length, 2);
+  assert.deepEqual(citiesIn('台南違停被拖吊怎麼領車', local), ['臺南市']);
+  assert.deepEqual(citiesIn('違停被拖吊怎麼領車', local), []);
 });
