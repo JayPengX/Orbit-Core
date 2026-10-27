@@ -9,7 +9,7 @@ import { writeFile, readFile, mkdir, rm, access } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { BRANDS, FAMILY, PASS, SITE_URL, appIcon, familyMark, homeOf, pathOf } from '../kit/brand.mjs';
+import { BRANDS, FAMILY, PASS, SITE_URL, appIcon, familyMark, homeOf, pathOf, shortPathOf } from '../kit/brand.mjs';
 import { FORMATS, shareCard } from './marks.mjs';
 import { DOMAIN } from '../kit/domain.mjs';
 
@@ -193,7 +193,7 @@ function homePage() {
   const home = `${SITE_URL}${DOMAIN ? '/pass/' : '/Shared-Proxy/'}`;
   const card = id => {
     const b = BRANDS[id];
-    return `<a class="app" href="${pathOf(id)}"><img src="brand/${id}.svg" alt="" width="64" height="64"><span><strong>${esc(b.name)}</strong><small>${esc(b.tag.zh)}</small><small class="en">${esc(b.tag.en)}</small></span></a>`;
+    return `<a class="app" href="${DOMAIN ? shortPathOf(id) : pathOf(id)}"><img src="brand/${id}.svg" alt="" width="64" height="64"><span><strong>${esc(b.name)}</strong><small>${esc(b.tag.zh)}</small><small class="en">${esc(b.tag.en)}</small></span></a>`;
   };
   const family = `<section><h2><img src="brand/family-orbit.svg" alt="" width="36" height="36">${FAMILY.name}<small>${esc(FAMILY.tag.zh)}</small></h2><div class="apps">${Object.keys(BRANDS).map(card).join('')}</div></section>`;
   const og = (k, v) => `<meta property="og:${k}" content="${esc(v)}">`;

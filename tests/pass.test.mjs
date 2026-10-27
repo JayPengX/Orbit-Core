@@ -43,5 +43,5 @@ test('the brand: one family, Orbit; ids never change', () => {
 test('the family page (site/index.html) links where the kit does: regenerate it after a rename', () => {
   const page = readFileSync(new URL('../site/index.html', import.meta.url), 'utf8');
   const links = [...page.matchAll(/class="app" href="([^"]+)"/g)].map(m => m[1]).sort();
-  assert.deepEqual(links, Object.values(kit.APPS).map(a => a.path).sort());
+  assert.deepEqual(links, Object.keys(kit.APPS).map(brand.shortPathOf).sort());
 });

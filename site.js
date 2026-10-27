@@ -4,9 +4,7 @@
 // it (its Pages workflow), live on both addresses at once; nothing is
 // copied, nothing to keep in step. The kit stays at /Shared-Proxy/kit/ (the
 // apps load it as '../Shared-Proxy/kit/'), the family's data at
-// /Shared-Data/. An app's old path (/Orbit-Law/…) is sent to its short one
-// for good (301), but for its service worker and version.json: a worker
-// installed there before keeps updating instead of failing on a redirect.
+// /Shared-Data/. Nothing else: a repo's own name (/Orbit-Law/) isn't an address here.
 // Cloudflare's cache keeps what Pages says may be kept (its 10 minutes for
 // files; the kit's and apps' files carry their hash, so an update is never
 // held back).
@@ -14,7 +12,6 @@ import { PAGES } from './kit/domain.mjs';
 import { SHORT, shortPath } from './kit/brand.mjs';
 
 const AS_IS = new Set(['Shared-Proxy', 'Shared-Data']);
-const KEEP = /\/(sw\.js|version\.json)$/;
 
 export async function site(request, fetcher = fetch) {
   const url = new URL(request.url);
@@ -25,12 +22,7 @@ export async function site(request, fetcher = fetch) {
   let path;
   if (Object.hasOwn(SHORT, first)) path = `/${SHORT[first]}${rest}`;
   else if (AS_IS.has(first)) path = url.pathname;
-  else {
-    const moved = shortPath(url.pathname);
-    if (!moved) return new Response('Not found', { status: 404, headers: { 'Content-Type': 'text/plain' } });
-    if (!KEEP.test(url.pathname)) return Response.redirect(`${url.origin}${moved}${url.search}`, 301);
-    path = url.pathname;
-  }
+  else return new Response('Not found', { status: 404, headers: { 'Content-Type': 'text/plain' } });
   const headers = new Headers();
   for (const k of ['Accept', 'Accept-Encoding', 'Accept-Language', 'If-None-Match', 'If-Modified-Since', 'Range', 'User-Agent']) {
     const v = request.headers.get(k);

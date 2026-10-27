@@ -29,9 +29,9 @@
 // that one live; the one left behind stops refreshing and says so, with a
 // button to continue there. Links between the apps carry the sign-in along.
 
-import { BRANDS, FAMILY, pathOf, homeOf, shortPath, appIcon, familyMark } from './brand.mjs';
+import { BRANDS, FAMILY, pathOf, homeOf, appIcon, familyMark } from './brand.mjs';
 import { DEV, cleanDev } from './brand.mjs';
-import { API, SITE as HOME, PAGES, isApi } from './domain.mjs';
+import { API, SITE as HOME, isApi } from './domain.mjs';
 import { icons, tile, pullToRefresh, setSheetDetent, h as node } from './ui.mjs';
 
 export const ECO_URL = `${API}/eco`;
@@ -1598,7 +1598,7 @@ function makeSession(app, { lang, heartbeat }) {
     // home screen only (installGate, its page covered and nothing started),
     // then a Orbit Pass (signInGate below). An app that asked first is
     // covered once.
-    if (typeof document !== 'undefined' && ((stillOnPages() && (await moveHome(s))) || installGate(app, lang))) return new Promise(() => {});
+    if (typeof document !== 'undefined' && installGate(app, lang)) return new Promise(() => {});
     started = true;
     let first = null;
     try {
@@ -1615,7 +1615,6 @@ function makeSession(app, { lang, heartbeat }) {
     }
     if (!first) first = await signInGate(s);
     s.first = first;
-    movedNotice(app, lang);
     // The loading screen's line (boot.js): signed in, the app's data next.
     globalThis.__bootStep?.('', 0.8);
     loop();
@@ -1664,64 +1663,6 @@ function makeSession(app, { lang, heartbeat }) {
     globalThis.location.assign(target);
   };
   return s;
-}
-
-// ---- The family's own domain (kit/domain.mjs) ----
-// Once it's set, a page still on GitHub Pages moves there. In a browser it
-// goes at once to the same page on the domain, signed in (a handoff). An old
-// home-screen icon can't move (its icon and storage belong to github.io): it
-// keeps working and says, once a day, where the new one is. Both only once
-// the domain answers, so a domain not up yet sends nobody to it.
-const stillOnPages = () => HOME !== PAGES && globalThis.location?.origin === PAGES;
-async function newHomeUp() {
-  try {
-    // (The site and the proxy's api. both: a page there needs the two.)
-    const up = await Promise.all([`${HOME}/Shared-Proxy/kit/version.json`, `${HOME.replace('https://', 'https://api.')}/config`].map(u => fetch(u, { cache: 'no-store', signal: AbortSignal.timeout(5000) }).then(r => r.ok)));
-    return up.every(Boolean);
-  } catch {
-    return false;
-  }
-}
-// (The apps call installGate / phoneOnlyGate before starting: they set it
-// going too, without a session to hand over; the new home asks to sign in.)
-let moving = null;
-function moveHome(s) {
-  if (!stillOnPages() || isStandalone()) return Promise.resolve(false);
-  return (moving ||= moveTo(s));
-}
-async function moveTo(s) {
-  if (!(await newHomeUp())) return false;
-  const loc = globalThis.location;
-  const parts = loc.hash.slice(1).split('&').filter(Boolean);
-  if (s && storedAccount())
-    try {
-      parts.push(`qh=${(await s.op('handoff')).handoff}`);
-    } catch {}
-  loc.replace(`${HOME}${shortPath(loc.pathname) || loc.pathname}${loc.search}${parts.length ? `#${parts.join('&')}` : ''}`);
-  return true;
-}
-async function movedNotice(app, lang) {
-  const key = 'orbit.moved.asked';
-  if (!stillOnPages() || !isStandalone() || readStore(key) === twDay(Date.now())) return;
-  if (!(await newHomeUp())) return;
-  writeStore(key, twDay(Date.now()));
-  const en = lang === 'en';
-  const url = homeOf(app);
-  const host = url.replace(/^https:\/\//, '');
-  const copy = await ask({
-    icon: 'home',
-    title: en ? 'Orbit has a new address' : 'Orbit 搬到新網址了',
-    points: en
-      ? [{ icon: 'share', text: `Open ${host} in Safari` }, { icon: 'plus', text: 'Add it to your home screen' }, { icon: 'trash', text: 'Then delete this old icon' }]
-      : [{ icon: 'share', text: `在 Safari 打開 ${host}` }, { icon: 'plus', text: '加入主畫面' }, { icon: 'trash', text: '再刪掉這個舊圖示' }],
-    ok: en ? 'Copy the link' : '複製連結',
-    cancel: en ? 'Later' : '稍後',
-    lang
-  });
-  if (copy)
-    try {
-      await navigator.clipboard.writeText(url);
-    } catch {}
 }
 
 export function appUrl(app, hash = '') {
@@ -2745,7 +2686,6 @@ function windowApp(app) {
   return app;
 }
 export function installGate(app, lang = detectLang()) {
-  moveHome();
   if (!isPhoneOrTablet()) return false;
   if (isStandalone()) {
     const home = windowApp(app);
@@ -2833,7 +2773,6 @@ function insideGate(app, home, lang) {
 // instead (a QR code the app draws, `qr` as SVG markup, and the link), then
 // how to add it to the home screen. Returns true when it covered the page.
 export function phoneOnlyGate(app, { lang = detectLang(), qr = '' } = {}) {
-  moveHome();
   if (isPhoneOrTablet()) return false;
   const en = lang === 'en';
   const name = appName(app);

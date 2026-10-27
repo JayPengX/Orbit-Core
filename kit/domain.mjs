@@ -3,14 +3,13 @@
 // Empty, everything is as it always was: the apps on GitHub Pages
 // (jaypengx.github.io/<Repo>/) and the Workers on workers.dev. Set to the
 // domain (a bare name, 'example.tw'), one push here moves the family:
-//   https://<DOMAIN>/<Repo>/   every app, at the same paths as on GitHub
-//                              Pages (site.js reads Pages through, so an
-//                              app's push still deploys it as before)
+//   https://<DOMAIN>/<slug>/   every app, by its short name (kit/brand.mjs;
+//                              site.js reads its repo's Pages through, so
+//                              an app's push still deploys it as before)
 //   https://api.<DOMAIN>       the proxy (orbit-workers-proxy)
 //   <anything>@<DOMAIN>        Orbit Money's mail-in invoices
-// deploy.yml attaches both hostnames to their Workers. GitHub Pages and
-// workers.dev keep answering, so a phone with the old icon goes on working
-// until it moves (orbit.mjs moveHome, movedNotice).
+// deploy.yml attaches both hostnames to their Workers. GitHub Pages stays
+// what site.js reads; workers.dev stays the proxy's address off the domain.
 export const DOMAIN = 'jaypengx.com';
 
 export const PAGES = 'https://jaypengx.github.io';
