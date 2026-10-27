@@ -122,7 +122,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 ### Law
 - 10-19 No Cloudflare cost; data built at deploy, never committed.
 - 10-21 Three equal, linked pillars: law, rulings (all 憲法法庭/大法官 included), legislation; one id scheme, one search.
-- 10-21 The AI answers anything in the app and makes the judgement call with citations; does the work itself (no generic 下一步 or 找哪個機關); verdict first, few facts, no wall of text; newest budgets first.
+- 10-21 The AI answers anything in the app and makes the judgement call with citations; does the work itself (no generic 下一步 or 找哪個機關); verdict first, few facts, no wall of text; recent items first (newest budgets unless a year is asked).
 - 10-21 Coverage: all 法規命令, ministry 行政規則, local 自治條例 and 規則 (Taiwan-only county sites through the Taiwan relay).
 - 10-22 直播中 only when IVOD says so (fresh); never live from the schedule; never live on a day off.
 - Rulings backfill runs 00:00–06:00 TW nightly; only `rulings.yml` writes that cache.
@@ -169,6 +169,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 ### Longshot (outside the family)
 - 10-22 Its own app, Worker and Pass; never import from, link to or depend on Shared-Proxy; its rules are `Longshot/docs/TRUTH.md`.
 - 10-22 League sports and F1 only; no tennis, UFC, golf or other non-league sports.
+- 10-20 Lock a whole market, never a lone open side; no 限關 pills.
 - 10-21 No cash out, boosts, free bets, VIP or player markets; 冠軍 boards drop impossible picks.
 - 10-20 Tax: 20% of a slip's whole payout when it pays over NT$5,000, at any odds (Jay's choice over the per-注 rule); prevent losing wins by design (house guards), not refusals.
 - 10-22 Odds changes are taken at once (▲/▼, one 賠率已更新 line); no accept button or setting.
