@@ -304,3 +304,21 @@ export async function handleMoneyMailRequest(request, env, headers, session, dep
   }
   return json({ error: 'op' }, 400, headers);
 }
+
+// The repo's own check (/ops?check=mail, build.yml's mail-check): a sample
+// 財政部 summary, with a one-invoice CSV, copied to `to` as a real one would be.
+export async function mailCheck(env, to) {
+  if (!env.EMAIL) return { ok: false, code: 'NO_BINDING' };
+  if (!fwdOk(to, env)) return { ok: false, code: 'BAD_ADDRESS' };
+  const csv = '表頭=M|載具名稱|載具號碼|發票日期|商店統編|商店店名|發票號碼|總金額|發票狀態|\r\nM|手機條碼|/TEST000|20261027|00000000|Orbit 測試|ZZ00000000|1|開立|\r\n';
+  const b64 = btoa(binary(new TextEncoder().encode(csv)));
+  const subj = btoa(binary(new TextEncoder().encode('Orbit Money 轉寄測試：消費發票彙整通知')));
+  const body = btoa(binary(new TextEncoder().encode('這是 Orbit Money 的轉寄測試。財政部寄到你 Orbit 信箱的信，會像這樣寄一份到這裡。\n')));
+  const raw = ['From: einvoice@einvoice.nat.gov.tw', `Subject: =?UTF-8?B?${subj}?=`, 'Content-Type: multipart/mixed; boundary="t"', '', '--t', 'Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: base64', '', body, '--t', 'Content-Type: text/csv; name="einvoice-test.csv"', 'Content-Disposition: attachment; filename="einvoice-test.csv"', 'Content-Transfer-Encoding: base64', '', b64, '--t--', ''].join('\r\n');
+  try {
+    const r = await env.EMAIL.send(mailCopy(raw, 'einvoice@einvoice.nat.gov.tw', to, mailDomain(env)));
+    return { ok: true, id: r?.messageId || '' };
+  } catch (error) {
+    return { ok: false, code: String(error?.code || error?.message || 'failed').slice(0, 120) };
+  }
+}
