@@ -142,8 +142,10 @@ test("財政部's mail is copied on to the person's own inbox: same subject, wor
   assert.equal(c.from.email, 'money@mail.example');
   assert.equal(c.from.name, 'Orbit Money');
   assert.equal(c.replyTo, 'einvoice@einvoice.nat.gov.tw');
-  assert.equal(c.subject, '[轉寄] Fwd: 消費發票明細');
-  assert.match(c.text, /^Orbit Money 幫你轉寄：einvoice@einvoice\.nat\.gov\.tw/);
+  assert.equal(c.subject, '載具發票 1 張 · 共 NT$85 · 10/5 – 10/5');
+  assert.match(c.html, /全家/);
+  assert.match(c.html, /拿鐵/);
+  assert.match(c.text, /^載具發票 1 張/);
   assert.match(c.text, /hello/);
   assert.equal(c.attachments.length, 1);
   assert.equal(c.attachments[0].filename, 'detail.csv');

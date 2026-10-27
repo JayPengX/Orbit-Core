@@ -185,6 +185,25 @@ const decodeText = (bytes, charset) => {
 // theirs reads as phishing, and Gmail put the first test in spam), with a
 // line on top saying what it is and replies going to the one who wrote it.
 const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+// The invoices of a mail as something to read (Jay: a bare CSV isn't): the
+// count and total, then each one's day, store, items and amount, newest first.
+const nt = n => `NT$${Math.round(n).toLocaleString('en-US')}`;
+const md = day => `${Number(day.slice(5, 7))}/${Number(day.slice(8, 10))}`;
+export function invoiceDigest(invoices) {
+  const live = invoices.filter(i => !i.void).sort((x, y) => y.day.localeCompare(x.day) || y.no.localeCompare(x.no));
+  const total = live.reduce((t, i) => t + i.total, 0);
+  const span = live.length ? `${md(live.at(-1).day)} – ${md(live[0].day)}` : '';
+  const head = `載具發票 ${live.length} 張 · 共 ${nt(total)}${span ? ` · ${span}` : ''}`;
+  const itemsOf = i => i.items.map(x => (x.qty > 1 ? `${x.name} ×${x.qty}` : x.name)).join('、');
+  const text = [head, '', ...live.map(i => `${md(i.day)}  ${i.seller || i.no}  ${nt(i.total)}${i.items.length ? `\n      ${itemsOf(i)}` : ''}`)].join('\n');
+  const cell = 'padding:10px 0;border-bottom:1px solid #eee;vertical-align:top';
+  const rows = live
+    .map(i => `<tr><td style="${cell};width:44px;color:#888;font-size:13px">${md(i.day)}</td><td style="${cell}"><div style="font-size:15px;color:#111">${esc(i.seller || i.no)}</div>${i.items.length ? `<div style="font-size:13px;color:#888;margin-top:2px">${esc(itemsOf(i))}</div>` : ''}</td><td style="${cell};text-align:right;white-space:nowrap;font-size:15px;color:#111">${nt(i.total)}</td></tr>`)
+    .join('');
+  const html = `<div style="max-width:560px;font-family:-apple-system,'PingFang TC','Noto Sans TC',sans-serif"><div style="font-size:13px;color:#888">載具發票</div><div style="font-size:24px;font-weight:600;color:#111;margin:2px 0 4px">${nt(total)}</div><div style="font-size:13px;color:#888;margin-bottom:12px">${live.length} 張${span ? ` · ${span}` : ''}</div><table style="width:100%;border-collapse:collapse">${rows}</table></div>`;
+  return { text, html, head };
+}
+
 export function mailCopy(raw, from, to, domain) {
   const { headers } = splitEntity(raw);
   const leaves = leafParts(raw);
@@ -192,14 +211,22 @@ export function mailCopy(raw, from, to, domain) {
   const html = leaves.find(l => l.inline && l.type === 'text/html');
   const files = leaves.filter(l => !l.inline).slice(0, 10);
   const sender = String(from || '').replace(/^.*<([^>]+)>.*$/, '$1').trim();
-  const lead = `Orbit Money 幫你轉寄：${sender || '財政部電子發票'} 寄到你 Orbit 信箱的信（發票已自動記帳）。`;
+  const invoices = mailInvoices(raw);
+  const digest = invoices.length ? invoiceDigest(invoices) : null;
+  const lead = digest ? '已自動記進 Orbit Money。' : `Orbit Money 幫你轉寄：${sender || '財政部電子發票'} 寄到你 Orbit 信箱的信。`;
+  const site = `https://${domain}/money/`;
+  const origText = text ? decodeText(text.bytes, text.charset) : '';
+  const origHtml = html ? decodeText(html.bytes, html.charset) : origText ? `<pre style="white-space:pre-wrap;font:inherit">${esc(origText)}</pre>` : '';
+  const foot = `<p style="font-size:12px;color:#999;margin-top:16px">${esc(lead)} <a href="${site}" style="color:#999">打開 Orbit Money</a></p>`;
   return {
     from: { email: `money@${domain}`, name: 'Orbit Money' },
     to,
     replyTo: sender || undefined,
-    subject: `[轉寄] ${headerText(headers.subject).trim().slice(0, 190) || '財政部電子發票'}`,
-    text: `${lead}\n\n${text ? decodeText(text.bytes, text.charset) : ''}`,
-    ...(html ? { html: `<p style="color:#666;font-size:13px">${esc(lead)}</p><hr>${decodeText(html.bytes, html.charset)}` } : {}),
+    subject: digest ? digest.head : `[轉寄] ${headerText(headers.subject).trim().slice(0, 190) || '財政部電子發票'}`,
+    text: digest ? `${digest.text}\n\n${lead} ${site}\n\n— 財政部原信 —\n${origText}` : `${lead}\n\n${origText}`,
+    html: `<div style="font-family:-apple-system,'PingFang TC','Noto Sans TC',sans-serif">${digest
+      ? `${digest.html}${foot}${origHtml ? `<div style="margin-top:24px;padding-top:12px;border-top:1px solid #eee;font-size:12px;color:#999">財政部原信</div><div style="font-size:13px;color:#555">${origHtml}</div>` : ''}`
+      : `${origHtml || ''}${foot}`}</div>`,
     ...(files.length ? { attachments: files.map((f, i) => ({ content: f.bytes, filename: f.name || `attachment-${i + 1}`, type: f.type || 'application/octet-stream', disposition: 'attachment' })) } : {})
   };
 }
@@ -313,7 +340,7 @@ export async function handleMoneyMailRequest(request, env, headers, session, dep
 export async function mailCheck(env, to) {
   if (!env.EMAIL) return { ok: false, code: 'NO_BINDING' };
   if (!fwdOk(to, env)) return { ok: false, code: 'BAD_ADDRESS' };
-  const csv = '表頭=M|載具名稱|載具號碼|發票日期|商店統編|商店店名|發票號碼|總金額|發票狀態|\r\nM|手機條碼|/TEST000|20261027|00000000|Orbit 測試|ZZ00000000|1|開立|\r\n';
+  const csv = ['表頭=M|載具名稱|載具號碼|發票日期|商店統編|商店店名|發票號碼|總金額|發票狀態|', '明細=D|發票號碼|小計|品項名稱|', 'M|手機條碼|/TEST000|20261027|00000000|（測試）全家便利商店|ZZ00000001|85|開立|', 'D|ZZ00000001|55|拿鐵咖啡|', 'D|ZZ00000001|30|御飯糰|', 'M|手機條碼|/TEST000|20261026|00000000|（測試）台灣大車隊|ZZ00000002|240|開立|', 'D|ZZ00000002|240|計程車資|', ''].join('\r\n');
   const b64 = btoa(binary(new TextEncoder().encode(csv)));
   const subj = btoa(binary(new TextEncoder().encode('Orbit Money 轉寄測試：消費發票彙整通知')));
   const body = btoa(binary(new TextEncoder().encode('這是 Orbit Money 的轉寄測試。財政部寄到你 Orbit 信箱的信，會像這樣寄一份到這裡。\n')));
