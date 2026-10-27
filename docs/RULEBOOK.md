@@ -74,8 +74,9 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 
 ## 3. Design
 
-- 10-27 `DESIGN.md` is the standard ("looks AI-made"): one focal point per screen, weight 700 only for the focal number and large titles, accent as a pointer (about 4 uses), chips only for taps or exceptions, one radius, 4-point spacing, no glows. Fix with design principles, never by copying another app; change the kit, not every screen.
-- 10-27 A focus block (`.q-focus`) sits on a plain flat card (surface colour, radius 22), never as bare text on the page (Jay: "plain text ugly").
+- 10-27 `DESIGN.md` is the standard ("looks AI-made"): one focal point per screen, weight 700 only for the focal number and large titles, accent as a pointer (about 4 uses), chips only for taps or exceptions, one radius, 4-point spacing, backgrounds kept (see below). Fix with design principles, never by copying another app; change the kit, not every screen.
+- 10-27 Keep backgrounds: hero and focus cards on the app's colour (lit, soft shadow), class/sport/subject cards and icon tiles in their colours. Clean the content (one focus, fewer chips, quieter weights and accents), never by stripping colour (Jay: "the cleaner approach is right, but stripping out background is shitty").
+- 10-27 Tight spacing: 24 between sections, 16 between groups of one list and after the focus, 8 under a line that names what follows; no gap bigger than what it separates (Jay: "so much gap for IDK what").
 - 10-19 No app-name title and no intro or status lines over content; open straight onto content.
 - 10-19 Top bar: account pill plus at most one tab action, trailing; help lives in the Pass sheet; refresh is pull-to-refresh.
 - 10-19 One sheet, one empty state, one segmented control (whole-view switch, at most 4 parts), chips for filters, all from the kit.
@@ -199,8 +200,10 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 | Push to the session branch and main | `main` only, no PRs or branches (TRUTH §3) | 10-19 |
 | Only the kit thread may change the kit | Any lane pushes the kit, in kit push order | 10-21 |
 | Fit iPad and every screen size | Phones only (320–440 px) | 10-23 |
-| Gradient hero card per tab, colour tiles, tags instead of sentences (round 2) | `DESIGN.md`: flat, one focus, grey facts, chips only for taps | 10-27 |
-| Focus number open on the page, no card | `.q-focus` on a plain flat card | 10-27 |
+| Gradient hero card per tab, colour tiles, tags instead of sentences (round 2) | `DESIGN.md`: one focus, grey facts, chips only for taps (backgrounds kept) | 10-27 |
+| Focus number open on the page, then on a grey card | `.q-focus` on the app's colour | 10-27 |
+| Flat heroes, no glow, no coloured shadow, flat tiles (rollout) | Backgrounds kept; only the content made calmer | 10-27 |
+| 32 between sections | 24 | 10-27 |
 | Help pill in the top bar | Help in the Pass sheet | 10-19 |
 | Play sells everything 運彩 sells (tennis, esports…) | Cut back, then all non-league sports removed | 10-22 |
 | Slips shows F1 drivers in Chinese | People in English in both languages (Slips is now part of Longshot) | 10-23 |
