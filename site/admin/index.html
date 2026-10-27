@@ -468,6 +468,9 @@
 
     <!-- 用量 -->
     <section data-pane="usage" hidden>
+      <div class="pane-head"><div><h2>AI 今天</h2><p class="muted">每個功能全部人一天加起來的次數。上限和暫停在設定。</p></div><button class="small" data-go="dev" data-to="set-ai">上限</button></div>
+      <p id="ai-error" class="error"></p>
+      <ul class="checks" id="ai-use"></ul>
       <div class="pane-head"><div><h2>Google 帳單</h2><p class="muted">Google 沒有預付餘額的 API：每次加值後輸入一次餘額，花費依下面的價格估算。</p></div></div>
       <p id="bill-error" class="error"></p>
       <div class="card">
@@ -726,9 +729,11 @@ document.addEventListener('click', e => {
   if (a) return openAccount(a.dataset.acct);
   const g = e.target.closest('[data-go]');
   if (g) {
-    show(g.dataset.go);
-    const to = g.dataset.to && $(g.dataset.to);
-    to ? setTimeout(() => to.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50) : scrollTo({ top: 0 });
+    // (A part drawn once the view has loaded is scrolled to then.)
+    const shown = show(g.dataset.go);
+    if (!g.dataset.to) return scrollTo({ top: 0 });
+    const go = () => $(g.dataset.to)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    $(g.dataset.to) ? setTimeout(go, 50) : shown.then(() => setTimeout(go, 50));
   }
 });
 
@@ -913,7 +918,7 @@ function healthSummary() {
   deployRuns().then(runs => {
     const bad = runs.filter(r => r.run && runDot(r.run) === 'bad');
     const going = runs.filter(r => r.run && runDot(r.run) === 'run');
-    setHealth('deploys', bad.length ? 'bad' : runs.every(r => !r.run) ? 'wait' : 'ok', bad.length ? `${bad.map(r => r.name).join('、')} 失敗` : going.length ? `${going.length} 個進行中` : `${runs.filter(r => r.run).length} 個都成功`, bad.length ? `${bad.length} 個部署失敗` : '');
+    setHealth('deploys', bad.length ? 'bad' : runs.every(r => !r.run) ? 'wait' : 'ok', bad.length ? `${bad.map(r => `${r.name} ${r.run.name}`).join('、')} 失敗` : going.length ? `${going.length} 個進行中` : `${runs.filter(r => r.run).length} 個都成功`, bad.length ? `${bad.length} 個部署失敗` : '');
   });
 }
 function drawChart(o) {
@@ -1530,6 +1535,7 @@ async function loadUsage() {
   $('use-error').textContent = '';
   try {
     const u = await admin('usage');
+    drawAi(u.ai);
     drawTdx(u.tdx, u.at);
     const share = (n, cap) => (cap ? `${Math.round((n / cap) * 100)}% · 上限 ${cap.toLocaleString()}` : '只計數');
     $('use-tiles').replaceChildren(
@@ -1539,6 +1545,13 @@ async function loadUsage() {
   } catch (e) {
     $('use-error').textContent = e.message;
   }
+}
+// Each AI feature today against its cap (0: paused), the week beside it.
+const aiTone = a => (!a.cap ? 'off' : a.days[6] >= a.cap ? 'bad' : a.days[6] >= a.cap * 0.8 ? 'slow' : '');
+function drawAi(ai = []) {
+  $('ai-use').replaceChildren(
+    ...ai.map(a => checkRow(aiTone(a), DEV[a.key]?.zh || a.key, `近 7 天 ${a.days.reduce((x, y) => x + y, 0).toLocaleString()} 次 · 最多一天 ${Math.max(...a.days).toLocaleString()}`, a.cap ? `${a.days[6].toLocaleString()} / ${a.cap.toLocaleString()}` : '已暫停'))
+  );
 }
 // TDX's points: this month's against the plan, where the month ends at this rate, each day.
 function drawTdx(t, now) {
@@ -1658,7 +1671,7 @@ function drawDev() {
         el('p', {}, [document.createTextNode(d.note || ''), el('span', { class: 'def', text: `預設 ${typeof d.def === 'boolean' ? (d.def ? '開' : '關') : `${d.def} ${UNIT[d.unit] || d.unit}`}` })])
       ]);
     });
-    return el('div', { class: 'card set-group' }, [el('h3', { text: title }), ...rows]);
+    return el('div', { class: 'card set-group', id: `set-${g}` }, [el('h3', { text: title }), ...rows]);
   });
   $('dev-sets').replaceChildren(...groups);
   const dirty = Object.keys(DEV).some(k => devDraft[k] !== devSaved[k]);
@@ -1759,7 +1772,8 @@ $('dev-save').onclick = () =>
 
 // ---- 系統 (ops.js) ----
 const GH = 'https://api.github.com/repos/JayPengX/';
-const REPOS = [['Orbit-Core', 'Workers 與共用套件'], ['Orbit-Sports', 'Orbit Sports'], ['Orbit-Securities', 'Orbit 證券'], ['Orbit-Words', 'Orbit Words'], ['Orbit-Class', 'Orbit Class'], ['Orbit-Weather', 'Orbit Weather'], ['Orbit-Transit', 'Orbit Transit'], ['Orbit-Beats', 'Orbit Beats'], ['Orbit-Law', 'Orbit Law']];
+// Every repo of the family (its apps from BRANDS), and the showcase.
+const REPOS = [['Orbit-Core', 'Orbit-Core'], ...Object.values(BRANDS).map(b => [b.repo, b.name]), ['Orbit-Showcase', 'Orbit Showcase']];
 const getJ = async (url, ms = 8000) => { const r = await fetch(url, { signal: AbortSignal.timeout(ms), cache: 'no-store' }); if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); };
 // GitHub's open API: 60 reads an hour from here, kept two minutes.
 async function gh(path) {
@@ -1772,13 +1786,13 @@ async function gh(path) {
 const mb = n => (n >= 1e9 ? `${(n / 1e9).toFixed(2)} GB` : `${(n / 1e6).toFixed(n < 1e7 ? 1 : 0)} MB`);
 const pct = v => `${v >= 0.1 ? Math.round(v * 100) : (v * 100).toFixed(1)}%`;
 const runDot = r => (r.status !== 'completed' ? 'run' : r.conclusion === 'success' ? '' : r.conclusion === 'cancelled' || r.conclusion === 'skipped' ? 'off' : 'bad');
-const runWord = r => (r.status !== 'completed' ? '進行中' : { success: '成功', failure: '失敗', cancelled: '取消', skipped: '略過' }[r.conclusion] || r.conclusion);
+const runWord = r => (r.status !== 'completed' ? '進行中' : { success: '成功', failure: '失敗・點開可重跑', cancelled: '取消', skipped: '略過' }[r.conclusion] || r.conclusion);
 const mins = r => (r.status === 'completed' ? `${Math.max(1, Math.round((Date.parse(r.updated_at) - Date.parse(r.run_started_at || r.created_at)) / 60000))} 分鐘` : '');
 const runRow = (r, label) => el('li', {}, [el('span', { class: `dot ${runDot(r)}` }), el('a', { href: r.html_url, target: '_blank', rel: 'noopener', text: label || r.display_title }), el('small', { text: [runWord(r), mins(r), ago(Date.parse(r.created_at))].filter(Boolean).join(' · ') })]);
 const BILL_NAME = { requests: 'Workers 請求', cpuMs: 'Workers CPU', kvRead: 'KV 讀取', kvWrite: 'KV 寫入', kvDelete: 'KV 刪除', kvList: 'KV 列出', kvBytes: 'KV 儲存', doRequests: 'Durable Objects 請求', doBytes: 'Durable Objects 儲存', r2ClassA: 'R2 寫入', r2ClassB: 'R2 讀取', r2Bytes: 'R2 儲存', d1RowsRead: 'D1 讀取', d1RowsWritten: 'D1 寫入', d1Bytes: 'D1 儲存' };
 const PACE_WORD = ['照設定', '放慢 ×2，可以等的建置暫停', '放慢 ×4，建置全停，每個人讀取減半', '放慢 ×8，讀取剩四分之一'];
 // Each job: its name, and how long between runs before it's late.
-const JOBS = { notices: ['通知', 10], alerts: ['帳單警示', 30], f1: ['F1 圈速（週四到週一）', 10], 'weather-skill': ['天氣評分（每小時）', 120], capacity: ['容量（每 6 小時）', 420], 'build:watch': ['建置：精華連結（每小時）', 120], 'build:cutouts': ['建置：去背照片（每小時）', 120], 'build:buses': ['建置：公車（每小時）', 120], 'build:daily': ['建置：每日（賽程、CPBL、照片、勝率）', 120] };
+const JOBS = { notices: ['通知', 10], alerts: ['帳單警示', 30], f1: ['F1 圈速（週四到週一）', 10], 'weather-skill': ['天氣評分（每小時）', 120], capacity: ['容量（每 6 小時）', 420], 'build:watch': ['建置：精華連結（每小時）', 120], 'build:cutouts': ['建置：去背照片（每小時）', 120], 'build:buses': ['建置：公車（每小時）', 120], 'build:daily': ['建置：每日（賽程、CPBL、照片、勝率）', 120], bikes: ['YouBike 保溫（每 2 分鐘）', 10], 'store-backup': ['每晚備份（04:30）', 26 * 60], mail: ['發票寄入（Money，有信才跑）', Infinity] };
 // F1's laps run Thursday to Monday, UTC (worker.js's F1_DAYS): the other days it rests, never late.
 const restsToday = (b, now) => b.job === 'f1' && ![0, 1, 4, 5, 6].includes(new Date(now).getUTCDay());
 const isLate = (b, now) => !restsToday(b, now) && now - b.at > (JOBS[b.job]?.[1] || 120) * 60_000;
@@ -1850,17 +1864,23 @@ async function loadSystem() {
   const runs = await deployRuns();
   $('deploys').replaceChildren(...runs.map(({ name, run, error }) => (run ? runRow(run, `${name} · ${run.name}`) : el('li', {}, [el('span', { class: 'dot off' }), el('span', { text: name }), el('small', { text: error || '沒有紀錄' })]))));
 }
-// Each repo's latest run (GitHub's open API, kept two minutes): { name, run } or { name, error }.
+// Each repo's workflows, the latest run of each (Law's 裁判 backfill, Orbit-Core's
+// Workers and kit apart), from one read a repo (GitHub's open API, kept two
+// minutes): { name, run } or { name, error }, failures first.
 const deployRuns = () =>
   Promise.all(
     REPOS.map(async ([repo, name]) => {
       try {
-        return { name, run: ((await gh(`${repo}/actions/runs?per_page=1`)).workflow_runs || [])[0] || null };
+        const latest = new Map();
+        // (A workflow quiet for 30 days is one that's gone: its last run isn't news.)
+        const recent = r => Date.now() - Date.parse(r.created_at) < 30 * 86_400_000;
+        for (const r of (await gh(`${repo}/actions/runs?per_page=30`)).workflow_runs || []) if (recent(r) && !latest.has(r.workflow_id)) latest.set(r.workflow_id, r);
+        return latest.size ? [...latest.values()].map(run => ({ name, run })) : [{ name, run: null }];
       } catch (e) {
-        return { name, run: null, error: e.message };
+        return [{ name, run: null, error: e.message }];
       }
     })
-  );
+  ).then(all => all.flat().sort((a, b) => (a.run && runDot(a.run) === 'bad' ? 0 : 1) - (b.run && runDot(b.run) === 'bad' ? 0 : 1)));
 $('alert-save').onclick = () =>
   busy($('alert-save'), async () => {
     $('alert-ok').textContent = $('sys-error').textContent = '';
@@ -1907,7 +1927,7 @@ $('sys-actions').replaceChildren(
 );
 const LINKS = [
   // Each at its address on the page's own home (a repo's name isn't one on the domain).
-  ['Orbit Sports', pathOf('match')], ['Orbit 證券', pathOf('stock')], ['Orbit Words', pathOf('vocab')], ['Orbit Class', pathOf('orbit')], ['Orbit Weather', pathOf('weather')], ['Orbit Transit', pathOf('transit')],
+  ...Object.entries(BRANDS).map(([id, b]) => [b.name, pathOf(id)]), ['Orbit Showcase', onDomain ? '/showcase/' : '/Orbit-Showcase/'],
   // Longshot's own panel: its own Worker, accounts and sign-in.
   ['Longshot 管理', onDomain ? '/longshot/admin/' : '/Longshot/admin/'],
   ['Orbit-Core Actions', 'https://github.com/JayPengX/Orbit-Core/actions'],
@@ -1939,7 +1959,7 @@ const BILL_DEFAULTS = {
 };
 const BILL_NAMES = { maps: '地圖載入（Transit）', autocomplete: '地點搜尋', details: '地點詳細', detailsPro: '地點名稱（Pro）', textSearch: '地點搜尋（補充）', routes: '路線規劃', weather: '天氣 API' };
 // Each Gemini route, by what the person sees.
-const GEMINI_FEATURES = { gemini: '課表照片匯入（Class）', 'nl-edit': '課表 AI 修改（Class）', 'law-ask': '白話解釋（Law）', 'law-chat': '問法律（Law）' };
+const GEMINI_FEATURES = { gemini: '課表照片匯入（Class）', 'nl-edit': '課表 AI 修改（Class）', 'law-ask': '白話解釋（Law）', 'law-chat': '問法律（Law）', 'money-read': '發票讀圖（Money）' };
 let bill = null;
 const ntd = v => `NT$${(Math.round(v * 10) / 10).toLocaleString()}`;
 function billPrices() {
