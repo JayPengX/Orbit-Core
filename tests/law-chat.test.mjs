@@ -414,3 +414,41 @@ test('similar judgments, 行政規則, legislators, votes, meetings and the read
     forgetGround();
   }
 });
+
+test('only the judgments and rules the answer cites come back; a judgment is read from Taiwan; a city\'s rules only for its reader', async () => {
+  const { forgetGround } = await import('../law-ground.js');
+  const { shownOf, lookOf } = await import('../law-chat.js');
+  const jid = 'TPSV,114,台上,2031,20260514,1';
+  GROUND['rulings/all.json'] = { rulings: [[jid, '2026-05-14', '請求返還押金', ['B0000001:456', 'B0000001:455']]] };
+  GROUND['local/all.json'] = { rules: [['TPE:1', '臺北市房屋租賃押金返還自治條例', '臺北市', '2025-01-01', '', ['B0000001']], ['KHH:1', '高雄市房屋租賃押金返還自治條例', '高雄市', '2025-01-01', '', ['B0000001']]] };
+  forgetGround();
+  const relayed = [];
+  const was = answer;
+  answer = { ...answer, points: [{ text: '押金返還請求權二年消滅', cites: ['B0000001:456'] }] };
+  const env = { ...envOf(), GEMINI_RELAY: { fetch: async (u, init) => String(u).includes('generativelanguage') ? fetch(new URL(u).searchParams.get('to'), init) : (relayed.push(String(u)), new Response('<div class="htmlcontent"><div>主文</div><div>上訴駁回。</div><div>理由</div><div>一、押金應返還。</div></div>')) } };
+  try {
+    // (Not cited: the judgment and the rules were read, but not shown.)
+    const r = await chat({ q: '房東不還押金 租賃押金返還', lang: 'zh', city: ['台北市'] }, { env });
+    assert.equal(r.status, 200);
+    const j = await r.json();
+    const p = lastOf('answer');
+    assert.match(p, /主文：上訴駁回/);
+    assert.ok(relayed[0].startsWith('https://gemini-relay/?to=' + encodeURIComponent('https://judgment.judicial.gov.tw/FJUD/data.aspx')));
+    assert.match(p, /臺北市房屋租賃押金返還自治條例/);
+    assert.doesNotMatch(p, /高雄市房屋/);
+    assert.equal(j.cases, undefined);
+    assert.equal(j.rules, undefined);
+    // (No city of the reader's and none named: no city's rules at all.)
+    await chat({ q: '房東不還押金 租賃押金返還 自治條例', lang: 'zh' }, { env });
+    assert.doesNotMatch(lastOf('answer'), /自治條例」/);
+    assert.equal((await chat({ q: '押金', lang: 'zh', city: ['Taipei'] })).status, 400);
+  } finally {
+    answer = was;
+    for (const k of Object.keys(GROUND)) delete GROUND[k];
+    forgetGround();
+  }
+  assert.deepEqual(shownOf({ cases: [{ jid: 'a' }, { jid: 'b' }], rules: [{ id: 'x:1' }, { id: 'y:2', asked: true }], bills: [1] }, { cited: ['b'] }), { cases: [{ jid: 'b' }], rules: [{ id: 'y:2', asked: true }], bills: [1] });
+  assert.deepEqual(lookOf({ budgets: [1], bills: [], news: [], facts: [] }, [], true), ['budget']);
+  assert.deepEqual(lookOf({ budgets: [], bills: [], news: [], facts: [] }, [{ n: '林思銘' }], true), ['people']);
+  assert.deepEqual(lookOf({ budgets: [], bills: [], news: [], facts: [] }, [], false), ['cases']);
+});

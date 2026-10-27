@@ -29,6 +29,24 @@ export function twOnly(raw) {
   return u.protocol === 'https:' && !u.username && !u.password && !u.port && TW_ONLY_HOSTS.has(u.hostname.toLowerCase()) && RULE_PAGE.test(u.pathname);
 }
 
+// 司法院's judgment pages (judgment.judicial.gov.tw/FJUD/data.aspx) turned
+// away every address outside Taiwan by 2026-10-27 (GitHub's US runner timed
+// out connecting; the app's 類似判決 and #r= rulings never loaded): a
+// Pass's /law-page read of one, and /law-chat's gist of one, go through
+// gemini-relay from Taiwan too. That page only, GET only.
+const JUDGMENT = /^\/FJUD\/data\.aspx$/i;
+export function judgmentPage(raw) {
+  let u;
+  try {
+    u = new URL(String(raw || ''));
+  } catch {
+    return false;
+  }
+  return u.protocol === 'https:' && !u.username && !u.password && !u.port && u.hostname.toLowerCase() === 'judgment.judicial.gov.tw' && JUDGMENT.test(u.pathname);
+}
+// A page read from Taiwan: a county's rule page or a judgment.
+export const viaTaiwan = raw => twOnly(raw) || judgmentPage(raw);
+
 // The build's key matches the secret (compared in constant time); no secret set, no door.
 export function buildKeyOk(given, secret) {
   const a = String(given || '');

@@ -134,6 +134,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 10-21 The AI answers anything in the app and makes the judgement call with citations; does the work itself (no generic 下一步 or 找哪個機關); verdict first, few facts, no wall of text; recent items first (newest budgets unless a year is asked).
 - 10-21 Coverage: all 法規命令, ministry 行政規則, local 自治條例 and 規則 (Taiwan-only county sites through the Taiwan relay).
 - 10-22 直播中 only when IVOD says so (fresh); never live from the schedule; never live on a day off.
+- 10-27 問法律 shows only what it used: similar rulings and rules only when the answer cites them (a rule asked by name always); a city's 地方法規 only for the reader's own city (picked in 問法律, else their family places' county) or one the question names; few articles per question; the status says what it is really checking; every 立法院 card a tap away (a budget first, never behind 更多 N 件); citation chips one line.
 - Rulings backfill runs 00:00–06:00 TW nightly; only `rulings.yml` writes that cache.
 
 ### Weather

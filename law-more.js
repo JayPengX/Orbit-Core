@@ -54,8 +54,10 @@ export const caseLabel = (jid, label = '') => {
 };
 
 // The judgments most like the question: 3 for each article found they cite
-// (1/4 for a law found), and 1.5 for each pair their 案由 shares with the
-// question; 4 at least (two articles, or one and its 案由), newer first on a tie.
+// (1/4 for a law found, 1 at most), and 1.5 for each pair their 案由 shares
+// with the question; 4.5 at least and their 案由 sharing a pair with it,
+// newer first on a tie. (Articles alone brought 加重詐欺 to a fake plate:
+// a 詐欺 case cites 刑法 第212條 too. Jay 2026-10-27: useless.)
 export function matchRulings(rows, cites, text, max = MORE_LIMITS.cases) {
   const arts = new Set(cites);
   const laws = new Set(cites.map(c => c.split(':')[0]));
@@ -64,10 +66,11 @@ export function matchRulings(rows, cites, text, max = MORE_LIMITS.cases) {
   for (const r of Array.isArray(rows) ? rows : []) {
     if (!Array.isArray(r) || typeof r[0] !== 'string' || !JID.test(r[0])) continue;
     const cs = Array.isArray(r[3]) ? r[3] : [];
-    let s = 0;
-    for (const c of cs) s += arts.has(c) ? 3 : laws.has(String(c).split(':')[0]) ? 0.25 : 0;
-    s += shared(r[2], want) * 1.5;
-    if (s >= 4) scored.push([s, r]);
+    let s = 0, near = 0;
+    for (const c of cs) arts.has(c) ? (s += 3) : laws.has(String(c).split(':')[0]) ? (near += 0.25) : 0;
+    const words = shared(r[2], want);
+    s += Math.min(1, near) + words * 1.5;
+    if (words && s >= 4.5) scored.push([s, r]);
   }
   return scored
     .sort((a, b) => b[0] - a[0] || String(b[1][1]).localeCompare(String(a[1][1])))
@@ -98,16 +101,17 @@ export function judgmentGist(html, max = MORE_LIMITS.caseChars) {
   return m || why ? `主文：${m}${why ? `／理由：${cut(flat(why), Math.max(200, max - m.length))}` : ''}` : '';
 }
 
-// 釋字 and 憲判字 like the question: as the judgments, at most 2.
+// 釋字 and 憲判字 like the question, at most 2: one on an article found
+// whose name or question shares a pair with it, or one sharing 5.
 export function matchCons(rows, cites, text, max = 2) {
   const arts = new Set(cites);
   const want = hanPairs(text);
   const scored = [];
   for (const r of Array.isArray(rows) ? rows : []) {
     if (!Array.isArray(r) || !CONS_ID.test(String(r[0]))) continue;
-    let s = shared(`${r[2] || ''} ${r[3] || ''}`, want) * 0.75;
-    for (const c of r[4] || []) if (arts.has(c)) s += 3;
-    if (s >= 3) scored.push([s, r]);
+    const words = shared(`${r[2] || ''} ${r[3] || ''}`, want);
+    const on = (r[4] || []).filter(c => arts.has(c)).length;
+    if ((on && words) || words >= 5) scored.push([on * 3 + words * 0.75, r]);
   }
   return scored
     .sort((a, b) => b[0] - a[0] || String(b[1][1]).localeCompare(String(a[1][1])))
@@ -115,13 +119,13 @@ export function matchCons(rows, cites, text, max = 2) {
     .map(([, r]) => ({ jid: r[0], d: String(r[1] || ''), t: String(r[2] || r[3] || ''), cites: (r[4] || []).slice(0, 8) }));
 }
 
-async function caseText(jid) {
+async function caseText(jid, fetcher = fetch) {
   if (CONS_ID.test(jid)) {
     const j = await readOne(`cons/${jid}.json`);
     return j ? `${j.issue ? `爭點：${cut(j.issue, 200)}／` : ''}主文：${cut(j.main, 400)}${j.reason ? `／理由：${cut(j.reason, 500)}` : ''}` : '';
   }
   try {
-    const res = await fetch(`${JUDGMENT}${encodeURIComponent(jid)}`, { cf: { cacheTtlByStatus: { '200-299': 30 * 86_400, 404: 60, '500-599': 0 }, cacheEverything: true }, signal: AbortSignal.timeout(6000) });
+    const res = await fetcher(`${JUDGMENT}${encodeURIComponent(jid)}`, { cf: { cacheTtlByStatus: { '200-299': 30 * 86_400, 404: 60, '500-599': 0 }, cacheEverything: true }, signal: AbortSignal.timeout(6000) });
     return res.ok ? judgmentGist(await res.text()) : '';
   } catch {
     return '';
@@ -220,8 +224,18 @@ export function matchRules(rows, text, cites) {
     .slice(0, MORE_LIMITS.rules)
     .map(([, r]) => ({ id: r[0], n: r[1], agency: String(r[2] || ''), d: String(r[3] || ''), url: /^https:\/\//.test(r[4]) ? r[4] : '', dir: r.dir || 'agency' }));
 }
-// The cities' 地方法規 (local/all.json: [id, name, city, date, url, laws]) as rule rows.
-export const localRows = rows => (Array.isArray(rows) ? rows.filter(Array.isArray).map(r => Object.assign([r[0], r[1], r[2], r[3], r[4], [], r[5] || []], { dir: 'local' })) : []);
+// The cities' 地方法規 (local/all.json: [id, name, city, date, url, laws]) as
+// rule rows: only those of the cities given (a city's rules bind only who
+// lives there: Jay 2026-10-27, 高雄's and 臺南's towing rules on a fake plate).
+export const localRows = (rows, cities = null) =>
+  Array.isArray(rows) ? rows.filter(r => Array.isArray(r) && (!cities || cities.has(tai(r[2])))).map(r => Object.assign([r[0], r[1], r[2], r[3], r[4], [], r[5] || []], { dir: 'local' })) : [];
+const tai = s => String(s || '').replace(/台/g, '臺');
+// The cities a question names (臺北市, 台北, 高雄…) among those the rules have.
+export function citiesIn(text, rows) {
+  const t = tai(text);
+  const all = new Set((Array.isArray(rows) ? rows : []).filter(Array.isArray).map(r => tai(r[2])).filter(Boolean));
+  return [...all].filter(c => t.includes(c) || (c.length === 3 && t.includes(c.slice(0, 2)) && !/^(新竹|嘉義)/.test(c)));
+}
 
 // The ministries' rule sites (one software: SearchAllResultList, LawContent), as build-agency.mjs lists them.
 export const RULE_SITES = [
@@ -274,7 +288,8 @@ export async function liveRule(title) {
 
 // ---- The reader's own --------------------------------------------------------------------
 
-const LY_ONLY = /修法|草案|立委|表決|投票|三讀|二讀|一讀|進度|議程|預算|法案/;
+const LY_ONLY = /修法|草案|立委|立法院|表決|投票|三讀|二讀|一讀|進度|議程|預算|法案/;
+export const asksLy = text => LY_ONLY.test(String(text || ''));
 const MINE_WORDS = /我(的|追蹤|關注|收藏|存的|標記)|追蹤的|收藏的|書籤|my |i follow|followed|saved|bookmark/i;
 // What the reader follows and marked ({ laws: [p], items: [k], people: [id],
 // marks: ['p:key'] }), checked; a string is what's wrong with it.
@@ -296,8 +311,10 @@ export const asksMine = text => MINE_WORDS.test(String(text || ''));
 
 // { cases, people, votes, meets, rules, mine } for the question, given the
 // articles found ([{ p, n, key }]) and the bills' items; each read only
-// when the question can use it.
-export async function moreFor(text, articles, { mine = null, items = [], today = '' } = {}) {
+// when the question can use it. cities: the reader's own (their 地方法規
+// only; none, only a city the question names); fetcher: how a judgment's
+// page is read (from Taiwan: law-hosts.js).
+export async function moreFor(text, articles, { mine = null, items = [], today = '', cities = [], fetcher = fetch } = {}) {
   const cites = articles.map(a => `${a.p}:${a.key}`);
   const ps = [...new Set(articles.map(a => a.p))];
   const lawNames = [...new Set(articles.map(a => a.n))];
@@ -307,12 +324,14 @@ export async function moreFor(text, articles, { mine = null, items = [], today =
   const partyOf = new Map((peopleF?.people || []).map(p => [p.n, p.party]));
   const votes = votesF ? matchVotes(votesF, text, ps, people) : [];
   const cons = matchCons(consF?.items, cites, text);
-  // (A question about the 立法院's work gets no judgments: they'd be noise there.)
-  const cases = LY_ONLY.test(text) ? [] : [...cons, ...matchRulings(rulings?.rulings, cites, text)].slice(0, MORE_LIMITS.cases);
-  const texts = await Promise.all(cases.slice(0, MORE_LIMITS.caseTexts + cons.length).map(c => caseText(c.jid)));
+  // (A question about the 立法院's work gets no judgments or rules: they'd be noise there.)
+  const ly = LY_ONLY.test(text);
+  const cases = ly ? [] : [...cons, ...matchRulings(rulings?.rulings, cites, text)].slice(0, MORE_LIMITS.cases);
+  const texts = await Promise.all(cases.slice(0, MORE_LIMITS.caseTexts + cons.length).map(c => caseText(c.jid, fetcher)));
   texts.forEach((t, i) => (cases[i].gist = t));
   // The ministries' 行政規則 and the cities' 地方法規, one list; a text kept on the site is read from there.
-  let rules = matchRules([...(rulesF?.rules || []), ...localRows(localF?.rules)], text, cites);
+  const mineCities = new Set([...cities, ...citiesIn(text, localF?.rules)].map(tai));
+  let rules = ly ? [] : matchRules([...(rulesF?.rules || []), ...localRows(localF?.rules, mineCities)], text, cites);
   const ruleTexts = await Promise.all(rules.map(r => readOne(`${r.dir}/text/${textFile(r.id)}.json`)));
   ruleTexts.forEach((j, i) => ((rules[i].text = typeof j?.t === 'string' ? cut(j.t, MORE_LIMITS.ruleChars) : ''), (rules[i].kept = Boolean(rules[i].text))));
   // A rule asked by its name that the nightly build hasn't reached: found on its ministry's site now.
@@ -321,6 +340,8 @@ export async function moreFor(text, articles, { mine = null, items = [], today =
     const live = await liveRule(title);
     if (live) rules = [live, ...rules.filter(r => r.n !== live.n)].slice(0, MORE_LIMITS.rules);
   }
+  // (A rule asked for by its name is shown whether or not the answer cites it.)
+  for (const r of rules) if (title && r.n === title) r.asked = true;
   // A rule kept by name only: its text read from its page now.
   await Promise.all(rules.filter(r => !r.text && VENDOR_PAGE.test(r.url)).slice(0, 2).map(async r => (r.text = cut(vendorText(await page(r.url)), MORE_LIMITS.ruleChars))));
   const persons = await Promise.all(people.map(p => readOne(`ly/person/${p.id}.json`)));
@@ -366,7 +387,7 @@ export function moreOut(m) {
   if (!hasMore(m)) return {};
   const out = {};
   if (m.cases.length) out.cases = m.cases.map(c => ({ jid: c.jid, d: c.d, t: cut(c.t, 60), no: caseLabel(c.jid, c.label) }));
-  if (m.rules.length) out.rules = m.rules.map(r => ({ id: r.id, n: r.n, agency: r.agency, d: r.d, url: r.url, text: Boolean(r.kept), ...(r.dir === 'local' ? { dir: 'local' } : {}) }));
+  if (m.rules.length) out.rules = m.rules.map(r => ({ id: r.id, n: r.n, agency: r.agency, d: r.d, url: r.url, text: Boolean(r.kept), ...(r.dir === 'local' ? { dir: 'local' } : {}), ...(r.asked ? { asked: true } : {}) }));
   if (m.people.length) out.people = m.people.map(p => ({ id: String(p.id), n: p.n, party: p.party || '' }));
   if (m.votes.length) out.votes = m.votes.map(v => ({ id: v.id, d: v.d, t: cut(v.t, 80) }));
   if (m.meets.length) out.meets = m.meets.map(x => ({ id: x.id, t: x.t, d: x.d }));

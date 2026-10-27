@@ -14,7 +14,7 @@
 import { json, isAllowedOrigin } from './http.js';
 import { fail, twDay, passOf, passKey, countOf, addOne } from './law.js';
 import { sessionLimited } from './orbit-token.js';
-import { twOnly, buildKeyOk } from './law-hosts.js';
+import { twOnly, viaTaiwan, buildKeyOk } from './law-hosts.js';
 
 export const PAGE_LIMITS = { perPass: 500, perMinute: 60, buildPerMinute: 720, hops: 5, timeoutMs: 20_000, maxHtml: 2 * 1024 * 1024, maxBytes: 6 * 1024 * 1024 };
 const LONG = new Set(['judgment.judicial.gov.tw', 'cons.judicial.gov.tw']);
@@ -145,8 +145,8 @@ export async function handleLawPage(request, env, ctx, headers, session, fetchFn
   const url = pageUrl(raw);
   if (!url) return fail('host', 400, headers);
   if (sessionLimited(build ? 'law:build' : `law:page:${pass}`, build ? PAGE_LIMITS.buildPerMinute : PAGE_LIMITS.perMinute)) return fail('busy', 429, headers);
-  // A site that serves only Taiwan is read from there (when the relay is bound).
-  const via = twOnly(url) && env?.GEMINI_RELAY ? (u, init) => env.GEMINI_RELAY.fetch(`https://gemini-relay/?to=${encodeURIComponent(u)}`, init) : fetchFn;
+  // A site that serves only Taiwan (a county's rules, 司法院's judgments) is read from there (when the relay is bound).
+  const via = viaTaiwan(url) && env?.GEMINI_RELAY ? (u, init) => env.GEMINI_RELAY.fetch(`https://gemini-relay/?to=${encodeURIComponent(u)}`, init) : fetchFn;
 
   const cache = edge();
   const key = cacheKey(url);

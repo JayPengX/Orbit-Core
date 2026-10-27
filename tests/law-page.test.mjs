@@ -93,3 +93,15 @@ test('the build key reads a Taiwan-only county site, from Taiwan; nothing else g
   assert.match((await ok.json()).html, /規則/);
   assert.match(via[0], /^https:\/\/gemini-relay\/\?to=https%3A%2F%2Flaw\.tycg\.gov\.tw/);
 });
+
+test('司法院\'s judgment pages (Taiwan only since 2026-10) are read from Taiwan, for a Pass; the build key still can\'t', async () => {
+  const { judgmentPage, viaTaiwan } = await import('../law-hosts.js');
+  const jd = 'https://judgment.judicial.gov.tw/FJUD/data.aspx?ty=JD&id=TPSM%2C115%2C%E5%8F%B0%E4%B8%8A%2C2613%2C20261008%2C1';
+  assert.equal(judgmentPage(jd), true);
+  assert.equal(viaTaiwan(jd), true);
+  for (const bad of ['https://judgment.judicial.gov.tw/FJUD/default.aspx', 'http://judgment.judicial.gov.tw/FJUD/data.aspx?id=1', 'https://cons.judicial.gov.tw/FJUD/data.aspx']) assert.equal(judgmentPage(bad), false, bad);
+  const KEY = 'k'.repeat(32);
+  const env = { LAW_BUILD_KEY: KEY, GEMINI_RELAY: { fetch: async () => html('<p>判決</p>') } };
+  const r = await handleLawPage(new Request(`https://proxy.test/law-page?v=1&u=${encodeURIComponent(jd)}`, { headers: { 'X-Build-Key': KEY } }), env, null, {}, null, async () => html('<p>direct</p>'));
+  assert.equal(r.status, 401);
+});
