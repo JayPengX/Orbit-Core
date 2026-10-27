@@ -20,6 +20,7 @@ import { sendPush, dueLists } from './push.js';
 import { usage as transitUsage, CAPS as TRANSIT_CAPS, TDX_POINTS, tdxPoints, tdxGuard } from './transit.js';
 import { twDate, GOOGLE_DAILY_CALLS } from './weather.js';
 import { cleanDev } from './kit/devconfig.mjs';
+import { SITE } from './kit/domain.mjs';
 import { sidesOf, addSides, LEDGER } from './money.js';
 import { plan as capacityPlan, usersFrom } from './capacity.js';
 import { STATE_KEY as GUARD_STATE } from './guard.js';
@@ -792,7 +793,7 @@ export const ADMIN_TOOLS = {
   async 'alert-test'({ env, deps }) {
     const account = await alertAccount(env, deps);
     if (!account) return { told: 'no account set' };
-    const told = await tell(env, account, lang => ({ title: lang === 'en' ? 'Orbit admin: a test notice' : 'Orbit 管理：測試通知', body: lang === 'en' ? 'Bill alerts arrive here.' : '帳單警示會送到這裡。', tag: 'ops:test', kind: 'bill', url: 'https://jaypengx.github.io/Shared-Proxy/admin/' }));
+    const told = await tell(env, account, lang => ({ title: lang === 'en' ? 'Orbit admin: a test notice' : 'Orbit 管理：測試通知', body: lang === 'en' ? 'Bill alerts arrive here.' : '帳單警示會送到這裡。', tag: 'ops:test', kind: 'bill', url: `${SITE}/Shared-Proxy/admin/` }));
     return { told };
   },
   // One tiny Gemini call through the relay.

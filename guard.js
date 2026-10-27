@@ -6,7 +6,8 @@
 // use this billing period from Cloudflare's analytics every five minutes and,
 // once anything reaches STOP_AT of what the plan includes, takes both proxies
 // off the air until the next period:
-//   - each one's workers.dev address is turned off (a request that never
+//   - each one's workers.dev address and custom domains (api.<domain>, the
+//     site on the family's domain) are turned off (a request that never
 //     reaches a Worker isn't a Worker request: nothing billed);
 //   - each one's crons are emptied (a cron run is a billed request too),
 //     the schedules kept in KV and put back with the address when the new
@@ -90,8 +91,10 @@ export const PACES = [
 export const ALERTS = [0.5, 0.75, 0.9];
 // (sports-proxy, the old forwarder, is deleted from 2026-10-20: a 404 for it is
 // nothing to stop or start. Stopped with the proxy until then: it reaches the
-// proxy through a service binding, not its address.)
-export const WORKERS = ['orbit-workers-proxy', 'sports-proxy'];
+// proxy through a service binding, not its address.) orbit-site mirrors the
+// apps onto the family's own domain (site.js; none until kit/domain.mjs has
+// one, a 404 here like the forwarder's).
+export const WORKERS = ['orbit-workers-proxy', 'orbit-site', 'sports-proxy'];
 export const STATE_KEY = 'guard:state';
 // Unreadable this long while armed: stopped too (a bill can't be watched blind).
 export const BLIND_MS = 6 * 3_600_000;
@@ -283,9 +286,12 @@ async function accountOf(env, fetcher) {
   return id;
 }
 
-// ---- Cloudflare's API: a Worker's address and crons ----
+// ---- Cloudflare's API: a Worker's addresses and crons ----
 async function cf(env, fetcher, method, path, body) {
-  const res = await fetcher(`${API}/accounts/${env.CF_ACCOUNT_ID}/workers/scripts/${path}`, {
+  return cfAt(env, fetcher, method, `workers/scripts/${path}`, body);
+}
+async function cfAt(env, fetcher, method, path, body) {
+  const res = await fetcher(`${API}/accounts/${env.CF_ACCOUNT_ID}/${path}`, {
     method,
     headers: { Authorization: `Bearer ${env.CF_GUARD_TOKEN}`, 'Content-Type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body)
@@ -295,7 +301,9 @@ async function cf(env, fetcher, method, path, body) {
   return j.result;
 }
 
-// Off the air: the address off, the crons emptied (theirs kept in `saved`).
+// Off the air: the workers.dev address and any custom domain (api.<domain>,
+// the site's) off, the crons emptied (domains and crons kept in `saved`).
+const DOMAINS = name => `${name}@domains`;
 export async function stopWorker(env, fetcher, name, saved) {
   const sub = await cf(env, fetcher, 'GET', `${name}/subdomain`);
   if (sub?.enabled) await cf(env, fetcher, 'DELETE', `${name}/subdomain`);
@@ -305,11 +313,16 @@ export async function stopWorker(env, fetcher, name, saved) {
     saved[name] = crons;
     await cf(env, fetcher, 'PUT', `${name}/schedules`, []);
   }
-  return { addressWasOn: !!sub?.enabled, crons: crons.length };
+  // (Last: a token that can't reach the domains still stopped the rest.)
+  const doms = (await cfAt(env, fetcher, 'GET', `workers/domains?service=${encodeURIComponent(name)}`)) || [];
+  for (const d of doms) await cfAt(env, fetcher, 'DELETE', `workers/domains/${d.id}`);
+  if (doms.length) saved[DOMAINS(name)] = [...new Map([...(saved[DOMAINS(name)] || []), ...doms.map(d => ({ hostname: d.hostname, zone_id: d.zone_id }))].map(d => [d.hostname, d])).values()];
+  return { addressWasOn: !!sub?.enabled || doms.length > 0, crons: crons.length };
 }
 // Back on: the address, and the crons it had.
 export async function startWorker(env, fetcher, name, saved) {
   await cf(env, fetcher, 'POST', `${name}/subdomain`, { enabled: true });
+  for (const d of saved?.[DOMAINS(name)] || []) await cfAt(env, fetcher, 'PUT', 'workers/domains', { environment: 'production', hostname: d.hostname, service: name, zone_id: d.zone_id });
   if (saved?.[name]?.length) await cf(env, fetcher, 'PUT', `${name}/schedules`, saved[name].map(cron => ({ cron })));
 }
 

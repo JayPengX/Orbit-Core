@@ -12,6 +12,7 @@ on:
       - 'locales/**'
       - 'wrangler.toml'
       - 'wrangler.gemini.toml'
+      - 'wrangler.site.toml'
       - '.github/workflows/deploy.yml'
   # On 20 October (the old sports-proxy deleted) and 6 December (the
   # Firebase key off: sign-ins it signed ran out on 2026-12-05), even if
@@ -181,6 +182,7 @@ jobs:
           state=$(curl -fsS --max-time 30 -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/storage/kv/namespaces/8b24d75fbe0a4a69aef0f35cb7a8d847/values/guard%3Astate" || true)
           stopped=$(printf '%s' "$state" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.parse(s).stopped?"yes":"no")}catch{console.log("no")}})')
           echo "stopped: $stopped"
+          echo "GUARD_STOPPED=$stopped" >> "$GITHUB_ENV"
           [ "$stopped" = "yes" ] || exit 0
           api="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts"
           for w in orbit-workers-proxy sports-proxy; do
@@ -188,5 +190,34 @@ jobs:
             curl -fsS --max-time 30 -X DELETE -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$api/$w/subdomain" >/dev/null && echo "$w address off"
             curl -fsS --max-time 30 -X PUT -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H 'Content-Type: application/json' -d '[]' "$api/$w/schedules" >/dev/null && echo "$w crons off"
           done
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      # The family's own domain (kit/domain.mjs DOMAIN; nothing while it's
+      # empty): orbit-site (site.js, the apps read through from GitHub Pages)
+      # deployed, and both hostnames attached as Workers custom domains,
+      # <DOMAIN> to orbit-site and api.<DOMAIN> to the proxy (Cloudflare makes
+      # their DNS records and certificates). Safe to repeat: an attached one
+      # is left as it is. While the guard has the proxies stopped, nothing is
+      # attached: the guard puts the domains back with them.
+      - name: The family's own domain
+        if: ${{ always() }}
+        continue-on-error: true
+        timeout-minutes: 5
+        run: |
+          domain=$(node -e 'import("./kit/domain.mjs").then(m=>console.log(m.DOMAIN.trim().toLowerCase()))')
+          [ -n "$domain" ] || { echo "no domain yet (kit/domain.mjs)"; exit 0; }
+          npx --yes wrangler@4 deploy --config wrangler.site.toml
+          [ "$GUARD_STOPPED" = "yes" ] && { echo "the guard has the proxies stopped: domains left off"; exit 0; }
+          cf="https://api.cloudflare.com/client/v4"
+          auth="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
+          zone=$(curl -sS --max-time 30 -H "$auth" "$cf/zones?name=$domain" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.parse(s).result[0].id)}catch{console.log("")}})')
+          [ -n "$zone" ] || { echo "::error::$domain is not a zone the deploy token can see (the token needs this zone: README §9)"; exit 1; }
+          fail=0
+          for pair in "$domain orbit-site" "api.$domain orbit-workers-proxy"; do
+            set -- $pair
+            out=$(curl -sS --max-time 60 -X PUT -H "$auth" -H 'Content-Type: application/json' -d "{\"environment\":\"production\",\"hostname\":\"$1\",\"service\":\"$2\",\"zone_id\":\"$zone\"}" "$cf/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/domains")
+            if printf '%s' "$out" | grep -q '"success":true'; then echo "$1 → $2"; else echo "::error::$1 → $2 not attached: $out"; fail=1; fi
+          done
+          exit $fail
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

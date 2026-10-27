@@ -26,9 +26,10 @@
   if (/iPhone|iPad|iPod|Android/i.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) document.documentElement.classList.add('q-touch');
   // The Worker's connection (DNS, TCP, TLS: two or three round trips on a
   // phone's link) opened now, while the app's files load, not at its first ask.
+  // (A page on the family's own domain reaches it at api.<domain>, domain.mjs API.)
   var pre = document.createElement('link');
   pre.rel = 'preconnect';
-  pre.href = 'https://orbit-workers-proxy.pengzjay.workers.dev';
+  pre.href = /^(jaypengx\.github\.io|localhost|127\.0\.0\.1)$/.test(location.hostname) ? 'https://orbit-workers-proxy.pengzjay.workers.dev' : 'https://api.' + location.hostname;
   pre.crossOrigin = 'anonymous';
   document.head.appendChild(pre);
   var box = document.getElementById('loading');

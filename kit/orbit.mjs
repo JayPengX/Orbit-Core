@@ -31,16 +31,18 @@
 
 import { BRANDS, FAMILY, pathOf, appIcon, familyMark } from './brand.mjs';
 import { DEV, cleanDev } from './brand.mjs';
+import { API, SITE as HOME, PAGES, isApi } from './domain.mjs';
 import { icons, tile, pullToRefresh, setSheetDetent, h as node } from './ui.mjs';
 
-export const ECO_URL = 'https://orbit-workers-proxy.pengzjay.workers.dev/eco';
-export const PROXY_URL = 'https://orbit-workers-proxy.pengzjay.workers.dev/sports-proxy';
+export const ECO_URL = `${API}/eco`;
+export const PROXY_URL = `${API}/sports-proxy`;
+export { API };
 
 // The developer settings (devconfig.mjs, the admin panel's 設定): how often
 // live data is read again, the switches. The device's copy at once, the
 // Worker's read every five minutes behind it (a change reaches an open app
 // within minutes, a reopened one at once).
-const DEV_URL = 'https://orbit-workers-proxy.pengzjay.workers.dev/config';
+const DEV_URL = `${API}/config`;
 const DEV_KEY = 'orbit.dev';
 let devNow = (() => {
   try {
@@ -88,7 +90,7 @@ export function everyDev(key, fn) {
   beat();
   return () => ((stopped = true), clearTimeout(timer));
 }
-export const SITE = 'https://jaypengx.github.io';
+export const SITE = HOME;
 export const BRAND = { name: 'Orbit', pass: 'Orbit Pass' };
 export { BRANDS, FAMILY, appIcon, familyMark };
 
@@ -716,7 +718,7 @@ export function proxyJson(url, { ttl = 60_000, trim = '', persist: keep = true, 
 // (not built yet) is a failure (404) the app reads another way. Saved on the
 // device under the address the packs had on GitHub Pages (PACKS_KEY), so
 // what a phone kept before the move is still its copy.
-export const PACKS_URL = 'https://orbit-workers-proxy.pengzjay.workers.dev/data/';
+export const PACKS_URL = `${API}/data/`;
 const PACKS_KEY = 'https://jaypengx.github.io/Shared-Data/';
 export function packJson(path, { ttl = 3 * 3_600_000, timeout = 30_000 } = {}) {
   const url = `${PACKS_URL}${path}`;
@@ -1594,7 +1596,7 @@ function makeSession(app, { lang, heartbeat }) {
     // home screen only (installGate, its page covered and nothing started),
     // then a Orbit Pass (signInGate below). An app that asked first is
     // covered once.
-    if (typeof document !== 'undefined' && installGate(app, lang)) return new Promise(() => {});
+    if (typeof document !== 'undefined' && ((stillOnPages() && (await moveHome(s))) || installGate(app, lang))) return new Promise(() => {});
     started = true;
     let first = null;
     try {
@@ -1611,6 +1613,7 @@ function makeSession(app, { lang, heartbeat }) {
     }
     if (!first) first = await signInGate(s);
     s.first = first;
+    movedNotice(app, lang);
     // The loading screen's line (boot.js): signed in, the app's data next.
     globalThis.__bootStep?.('', 0.8);
     loop();
@@ -1659,6 +1662,55 @@ function makeSession(app, { lang, heartbeat }) {
     globalThis.location.assign(target);
   };
   return s;
+}
+
+// ---- The family's own domain (kit/domain.mjs) ----
+// Once it's set, a page still on GitHub Pages moves there. In a browser it
+// goes at once to the same page on the domain, signed in (a handoff). An old
+// home-screen icon can't move (its icon and storage belong to github.io): it
+// keeps working and says, once a day, where the new one is. Both only once
+// the domain answers, so a domain not up yet sends nobody to it.
+const stillOnPages = () => HOME !== PAGES && globalThis.location?.origin === PAGES;
+async function newHomeUp() {
+  try {
+    return (await fetch(`${HOME}/Shared-Proxy/kit/version.json`, { cache: 'no-store', signal: AbortSignal.timeout(5000) })).ok;
+  } catch {
+    return false;
+  }
+}
+async function moveHome(s) {
+  if (!stillOnPages() || isStandalone() || !(await newHomeUp())) return false;
+  const loc = globalThis.location;
+  const parts = loc.hash.slice(1).split('&').filter(Boolean);
+  if (storedAccount())
+    try {
+      parts.push(`qh=${(await s.op('handoff')).handoff}`);
+    } catch {}
+  loc.replace(`${HOME}${loc.pathname}${loc.search}${parts.length ? `#${parts.join('&')}` : ''}`);
+  return true;
+}
+async function movedNotice(app, lang) {
+  const key = 'orbit.moved.asked';
+  if (!stillOnPages() || !isStandalone() || readStore(key) === twDay(Date.now())) return;
+  if (!(await newHomeUp())) return;
+  writeStore(key, twDay(Date.now()));
+  const en = lang === 'en';
+  const url = `${HOME}${APPS[app]?.path || '/'}`;
+  const host = url.replace(/^https:\/\//, '');
+  const copy = await ask({
+    icon: 'home',
+    title: en ? 'Orbit has a new address' : 'Orbit 搬到新網址了',
+    points: en
+      ? [{ icon: 'share', text: `Open ${host} in Safari` }, { icon: 'plus', text: 'Add it to your home screen' }, { icon: 'trash', text: 'Then delete this old icon' }]
+      : [{ icon: 'share', text: `在 Safari 打開 ${host}` }, { icon: 'plus', text: '加入主畫面' }, { icon: 'trash', text: '再刪掉這個舊圖示' }],
+    ok: en ? 'Copy the link' : '複製連結',
+    cancel: en ? 'Later' : '稍後',
+    lang
+  });
+  if (copy)
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {}
 }
 
 export function appUrl(app, hash = '') {
@@ -3606,7 +3658,7 @@ const AI_ROUTES = /\/(law-chat|law-ask|law-gist|gemini|nl-edit)(\?|$)/;
 export const slowByNature = url => {
   try {
     const u = new URL(url, globalThis.location?.href);
-    return u.hostname.endsWith('.workers.dev') && AI_ROUTES.test(u.pathname + (u.search ? '?' : ''));
+    return isApi(u.href) && AI_ROUTES.test(u.pathname + (u.search ? '?' : ''));
   } catch {
     return false;
   }
@@ -3761,7 +3813,7 @@ function watchNet() {
   const ours = url => {
     try {
       const u = new URL(url, location.href);
-      return u.origin === location.origin || u.hostname.endsWith('.workers.dev') || (globalThis.ORBIT_KIT?.base && u.href.startsWith(new URL(globalThis.ORBIT_KIT.base, location.href).href));
+      return u.origin === location.origin || isApi(u.href) || (globalThis.ORBIT_KIT?.base && u.href.startsWith(new URL(globalThis.ORBIT_KIT.base, location.href).href));
     } catch {
       return true;
     }
