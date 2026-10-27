@@ -86,7 +86,8 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 10-23 Icons: each app its own bright hue, big white symbol over the family ring; share cards are icon + name + one short line (kit `brand.mjs`, `node brand/generate.mjs`).
 - 10-23 Avatars: 96 drawn looks, never emoji; the signed-in dot is small, on the rim, never over the face; picking a look shows no pop-up.
 - 10-27 Maps are weighted by relevance; markers get quieter, never hidden (DESIGN §7).
-- 10-27 Screenshots (READMEs, the showcase): framing edits are fine (crop, a zoomed-in callout of a detail, a headline, a background); content edits never (no faked numbers, no moved or hidden UI, no pixels the app didn't draw). Sample or public data only, in English for the READMEs, light and dark mixed, each set leading with the app's selling point.
+- 10-27 Screenshots (READMEs, the showcase): framing edits are fine (crop, a zoomed-in callout of a detail, a headline, a background); content edits never (no faked numbers, no moved or hidden UI, no pixels the app didn't draw). Sample or public data only, in English for the READMEs (both languages for the showcase), light and dark mixed.
+- 10-28 Screenshot order is an advertiser's: shot 1 is the app's strongest, most representative hero screen (what you see on opening it, full of real content); signature features follow; niche or just-requested features (a game mode, an import flow, a feature Jay just asked for) go later, never first. Retake from the live apps after UI changes.
 - Jay's test, before calling UI done: open every tab and sheet you changed at 320 and 390 px, light and dark; look for overflow, cut text, duplicates, small logos, emoji, empty screens, leftover old sheets. Run `tools/gate.mjs` on the app.
 
 ## 4. Data, money and cost
@@ -230,6 +231,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 | Apps share the `jaypengx.github.io` origin | They share `orbit.jaypengx.com`; Longshot has `longshot.jaypengx.com`; the bare `jaypengx.com` is Jay's homepage with `/showcase/` | 10-27 |
 | Longshot's own keyboard rule | The same rule in the shared kit for every app | 10-27 |
 | Sell-first 當沖 needs 12 months of history | TWSE's 3 months + 10 trades, or a credit account |  10-24 |
+| Screenshot sets lead with the latest feature asked for (Beats' game, Class's import) | Lead with the app's hero screen; requested features later | 10-28 |
 | Handoff: "don't touch the Cloudflare data rename" | Rename finished (`orbit-data`, `orbit-store`) | 10-23 |
 
 ## 7. Contradictions to watch
