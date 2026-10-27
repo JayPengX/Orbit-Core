@@ -52,6 +52,7 @@ import { handleStock, moveBook } from './stock-fill.js';
 import { runBuilders, SLOTS as BUILD_SLOTS } from './builders/run.js';
 import { docStore, storeReady } from './doc-store.js';
 import { handleMoneyMail, handleMoneyMailRequest } from './money-mail.js';
+import { handleMoneyRead } from './money-read.js';
 import { STATE_KEY as GUARD_STATE } from './guard.js';
 // The F1 lap log's Durable Object (f1-live.js), bound as F1_LOG.
 export { F1Log } from './f1-live.js';
@@ -1201,6 +1202,8 @@ async function route(request, env, ctx, headers, origin) {
   if (path === '/law-page') return handleLawPage(request, env, ctx, headers, await sessionOf(request, env));
   // Orbit Money's mail-in 載具 invoices (money-mail.js).
   if (path === '/money-mail') return handleMoneyMailRequest(request, env, headers, await sessionOf(request, env), ECO_DEPS);
+  // …and its 讀圖: a picture of purchases read by Gemini, on a tap only (money-read.js).
+  if (path === '/money-read') return handleMoneyRead(request, env, headers, await sessionOf(request, env), lawGemini('money-read'));
   // The bill's guard (guard.js), as it last read the bill: armed or not,
   // each count's share of the $5 plan, stopped or not. No key or token.
   if (path === '/guard' && request.method === 'GET') {
