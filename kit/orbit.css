@@ -3299,6 +3299,14 @@ div.q-ritem {
   font: 600 12px/1 var(--q-font);
   white-space: nowrap;
 }
+/* A plain tag (no colour, nothing of the app's on it) is a fact: grey text,
+   no capsule (docs/DESIGN.md §6). The coloured ones, the exceptions, keep theirs. */
+.q-tag:is([class='q-tag'], [class='q-tag '], [class='q-tag num'], .gray) {
+  min-height: 0;
+  padding: 0;
+  background: none;
+  font: 500 13px/18px var(--q-font);
+}
 .q-tag:is(.green, .red, .orange, .indigo, .blue, .tint) {
   background: color-mix(in srgb, var(--t) 16%, transparent);
   color: var(--t);
