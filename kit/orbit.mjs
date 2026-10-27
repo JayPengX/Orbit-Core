@@ -1682,11 +1682,18 @@ async function newHomeUp() {
     return false;
   }
 }
-async function moveHome(s) {
-  if (!stillOnPages() || isStandalone() || !(await newHomeUp())) return false;
+// (The apps call installGate / phoneOnlyGate before starting: they set it
+// going too, without a session to hand over; the new home asks to sign in.)
+let moving = null;
+function moveHome(s) {
+  if (!stillOnPages() || isStandalone()) return Promise.resolve(false);
+  return (moving ||= moveTo(s));
+}
+async function moveTo(s) {
+  if (!(await newHomeUp())) return false;
   const loc = globalThis.location;
   const parts = loc.hash.slice(1).split('&').filter(Boolean);
-  if (storedAccount())
+  if (s && storedAccount())
     try {
       parts.push(`qh=${(await s.op('handoff')).handoff}`);
     } catch {}
@@ -2738,6 +2745,7 @@ function windowApp(app) {
   return app;
 }
 export function installGate(app, lang = detectLang()) {
+  moveHome();
   if (!isPhoneOrTablet()) return false;
   if (isStandalone()) {
     const home = windowApp(app);
@@ -2825,6 +2833,7 @@ function insideGate(app, home, lang) {
 // instead (a QR code the app draws, `qr` as SVG markup, and the link), then
 // how to add it to the home screen. Returns true when it covered the page.
 export function phoneOnlyGate(app, { lang = detectLang(), qr = '' } = {}) {
+  moveHome();
   if (isPhoneOrTablet()) return false;
   const en = lang === 'en';
   const name = appName(app);
