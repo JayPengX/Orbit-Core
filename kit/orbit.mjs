@@ -1675,7 +1675,9 @@ function makeSession(app, { lang, heartbeat }) {
 const stillOnPages = () => HOME !== PAGES && globalThis.location?.origin === PAGES;
 async function newHomeUp() {
   try {
-    return (await fetch(`${HOME}/Shared-Proxy/kit/version.json`, { cache: 'no-store', signal: AbortSignal.timeout(5000) })).ok;
+    // (The site and the proxy's api. both: a page there needs the two.)
+    const up = await Promise.all([`${HOME}/Shared-Proxy/kit/version.json`, `${HOME.replace('https://', 'https://api.')}/config`].map(u => fetch(u, { cache: 'no-store', signal: AbortSignal.timeout(5000) }).then(r => r.ok)));
+    return up.every(Boolean);
   } catch {
     return false;
   }
