@@ -19,7 +19,7 @@
 //     POST ?op=new          a new address (the old one stops)
 //     POST ?op=fwd {to}     the person's own inbox ('' for none): each of
 //                           財政部's mails is copied there (Email Sending,
-//                           env.EMAIL, from einvoice@MAIL_DOMAIN, reply-to 財政部),
+//                           env.EMAIL, from Orbit Money <money@MAIL_DOMAIN>, reply-to 財政部),
 //                           so giving the platform this address loses nothing
 //
 // Store: orbit-money-mail/<pass> { box, items: [{ …invoice, at }], confirm, note, got, fwd, sent } and
@@ -180,23 +180,26 @@ const decodeText = (bytes, charset) => {
     return new TextDecoder('utf-8').decode(bytes);
   }
 };
-// A mail as Email Sending's send() takes it: the same subject, words and
-// files, sent from our domain (only an onboarded domain may send) with
-// replies going to the one who wrote it.
+// A mail as Email Sending's send() takes it: the same words and files, sent
+// honestly as Orbit Money's copy (a mail named 財政部 from a domain that isn't
+// theirs reads as phishing, and Gmail put the first test in spam), with a
+// line on top saying what it is and replies going to the one who wrote it.
+const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 export function mailCopy(raw, from, to, domain) {
   const { headers } = splitEntity(raw);
   const leaves = leafParts(raw);
   const text = leaves.find(l => l.inline && l.type === 'text/plain');
   const html = leaves.find(l => l.inline && l.type === 'text/html');
   const files = leaves.filter(l => !l.inline).slice(0, 10);
+  const sender = String(from || '').replace(/^.*<([^>]+)>.*$/, '$1').trim();
+  const lead = `Orbit Money 幫你轉寄：${sender || '財政部電子發票'} 寄到你 Orbit 信箱的信（發票已自動記帳）。`;
   return {
-    from: { email: `einvoice@${domain}`, name: '財政部電子發票（Orbit 轉寄）' },
+    from: { email: `money@${domain}`, name: 'Orbit Money' },
     to,
-    replyTo: String(from || '').replace(/^.*<([^>]+)>.*$/, '$1').trim() || undefined,
-    subject: headerText(headers.subject).trim().slice(0, 200) || '財政部電子發票',
-    ...(text ? { text: decodeText(text.bytes, text.charset) } : {}),
-    ...(html ? { html: decodeText(html.bytes, html.charset) } : {}),
-    ...(!text && !html ? { text: ' ' } : {}),
+    replyTo: sender || undefined,
+    subject: `[轉寄] ${headerText(headers.subject).trim().slice(0, 190) || '財政部電子發票'}`,
+    text: `${lead}\n\n${text ? decodeText(text.bytes, text.charset) : ''}`,
+    ...(html ? { html: `<p style="color:#666;font-size:13px">${esc(lead)}</p><hr>${decodeText(html.bytes, html.charset)}` } : {}),
     ...(files.length ? { attachments: files.map((f, i) => ({ content: f.bytes, filename: f.name || `attachment-${i + 1}`, type: f.type || 'application/octet-stream', disposition: 'attachment' })) } : {})
   };
 }

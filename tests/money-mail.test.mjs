@@ -139,10 +139,12 @@ test("財政部's mail is copied on to the person's own inbox: same subject, wor
   const { mailCopy, fwdOk } = await import('../money-mail.js');
   const raw = mail().replace('From: me@gmail.com', 'From: einvoice@einvoice.nat.gov.tw');
   const c = mailCopy(raw, '財政部 <einvoice@einvoice.nat.gov.tw>', 'me@gmail.com', 'mail.example');
-  assert.equal(c.from.email, 'einvoice@mail.example');
+  assert.equal(c.from.email, 'money@mail.example');
+  assert.equal(c.from.name, 'Orbit Money');
   assert.equal(c.replyTo, 'einvoice@einvoice.nat.gov.tw');
-  assert.equal(c.subject, 'Fwd: 消費發票明細');
-  assert.equal(c.text.trim(), 'hello');
+  assert.equal(c.subject, '[轉寄] Fwd: 消費發票明細');
+  assert.match(c.text, /^Orbit Money 幫你轉寄：einvoice@einvoice\.nat\.gov\.tw/);
+  assert.match(c.text, /hello/);
   assert.equal(c.attachments.length, 1);
   assert.equal(c.attachments[0].filename, 'detail.csv');
   assert.match(new TextDecoder().decode(c.attachments[0].content), /AB12345678/);
