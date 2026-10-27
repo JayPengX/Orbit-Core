@@ -1,8 +1,11 @@
+import { ORIGINS } from './kit/domain.mjs';
+
 // What every route of the proxy answers with (worker.js routes; sports.js,
 // transit.js, weather.js, … handle): who may call it, the CORS headers, and
 // a JSON answer.
 
-export const ALLOWED_ORIGINS = ['https://jaypengx.github.io'];
+// The apps' pages (kit/domain.mjs: GitHub Pages, and the family's own domain once set).
+export const ALLOWED_ORIGINS = ORIGINS;
 // A page served from this computer (the preview tool; over --h2 an https
 // one, as Pages serves a phone): the dev doors let it in (sports.js, worker.js).
 export const LOCAL_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1):\d+$/;

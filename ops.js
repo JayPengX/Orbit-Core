@@ -22,6 +22,7 @@ import { STATE_KEY as GUARD_STATE } from './guard.js';
 import { paceOf } from './pace.js';
 import { notifyNow } from './push.js';
 import { ECO_APPS } from './eco.js';
+import { SITE } from './kit/domain.mjs';
 
 export const TOLD_KEY = 'guard:told';
 export const OPS_DOC = ['orbit-config', 'ops'];
@@ -91,7 +92,7 @@ export function billNotice(g, lang) {
   const body = en
     ? `Pace ${pace}${pace ? ` (live refreshes ×${[1, 2, 4, 8][pace]} slower)` : ' (as configured)'}; nothing is billed past $5.`
     : `節流 ${pace}${pace ? `（即時更新放慢 ×${[1, 2, 4, 8][pace]}）` : '（照設定）'}；不會超過 $5。`;
-  return { title, body, tag: 'ops:bill', kind: 'bill', url: 'https://jaypengx.github.io/Shared-Proxy/admin/#health' };
+  return { title, body, tag: 'ops:bill', kind: 'bill', url: `${SITE}/Shared-Proxy/admin/#health` };
 }
 // What's news: a higher alert, a stop, or a pace that changed (this period).
 export function news(g, told) {

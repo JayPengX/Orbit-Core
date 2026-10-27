@@ -22,12 +22,11 @@
 // The rest of Orbit Law's AI (law-chat.js) shares this file's pieces: the
 // opening checks, the law's text, the day's counts, the KV cache and the
 // cite check.
-import { json, LOCAL_ORIGIN, bodyText, sha256Hex } from './http.js';
+import { json, isAllowedOrigin, bodyText, sha256Hex } from './http.js';
 import { groundFor, groundKey, groundOut, groundPrompt } from './law-ground.js';
 import { paceOf } from './pace.js';
 import { sessionLimited } from './orbit-token.js';
 
-const ORIGIN = 'https://jaypengx.github.io';
 export const DATA = 'https://jaypengx.github.io/Orbit-Law/data/';
 // perDay: Gemini's answers a day in all, /law-ask's and /law-chat's (a chat
 // turn's plan counts with its answer, as one), near the low end of the
@@ -372,7 +371,7 @@ export const passKey = async (route, who, day) => `${route}:${(await sha256Hex(`
 export async function opening(request, env, headers, { maxBody, read, who, busy = ['law:m', LAW_LIMITS.perMinute] }) {
   if (request.method !== 'POST') return fail('method', 405, headers);
   const origin = request.headers.get('Origin') || '';
-  if (origin !== ORIGIN && !LOCAL_ORIGIN.test(origin)) return fail('origin', 403, headers);
+  if (!isAllowedOrigin(origin)) return fail('origin', 403, headers);
   if (!who) return fail('pass', 401, headers);
   const text = await bodyText(request, maxBody);
   if (text == null) return fail('size', 413, headers);

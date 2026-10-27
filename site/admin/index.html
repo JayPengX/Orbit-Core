@@ -577,7 +577,8 @@
 <script type="module">
 import { DEV, DEV_GROUPS, cleanDev, BRANDS, appIcon, familyMark } from '../kit/brand.mjs';
 import { icons, tileHtml, heroCardHtml, escHtml } from '../kit/ui.mjs';
-const ECO_URL = 'https://orbit-workers-proxy.pengzjay.workers.dev/eco';
+import { API } from '../kit/domain.mjs';
+const ECO_URL = `${API}/eco`;
 const KEY = 'orbit.admin';
 const $ = id => document.getElementById(id);
 const store = { get: () => { try { return localStorage.getItem(KEY) || ''; } catch { return ''; } }, set: v => { try { v ? localStorage.setItem(KEY, v) : localStorage.removeItem(KEY); } catch {} } };

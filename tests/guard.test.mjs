@@ -34,6 +34,7 @@ function fakeCf(use, { cpuField = true, fail = false, d1Fail = false } = {}) {
   const seen = new Set();
   const workers = Object.fromEntries(WORKERS.map(w => [w, { on: true, crons: w === 'sports-proxy' ? ['* * * * SUN'] : ['*/2 * * * *', '1-59/2 * * * *'] }]));
   const calls = [];
+  const domains = [];
   const fetcher = async (url, init = {}) => {
     calls.push(`${init.method || 'GET'} ${url.replace(/^.*\/client\/v4/, '')}`);
     const json = b => ({ ok: true, status: 200, json: async () => b });
@@ -60,6 +61,14 @@ function fakeCf(use, { cpuField = true, fail = false, d1Fail = false } = {}) {
       return acc({ x: [] });
     }
     if (url.endsWith('/accounts')) return json({ success: true, result: [{ id: 'acct-1' }] });
+    const dm = /workers\/domains(?:\?service=([^&]+)|\/([^/?]+))?$/.exec(url);
+    if (dm) {
+      const method = init.method || 'GET';
+      if (method === 'GET') return json({ success: true, result: domains.filter(d => d.service === decodeURIComponent(dm[1])) });
+      if (method === 'DELETE') domains.splice(domains.findIndex(d => d.id === dm[2]), 1);
+      if (method === 'PUT') domains.push({ id: `d${domains.length + 9}`, ...JSON.parse(init.body) });
+      return json({ success: true, result: null });
+    }
     const m = /scripts\/([^/]+)\/(subdomain|schedules)$/.exec(url);
     const w = workers[m[1]];
     if (!w) return { ok: false, status: 404, json: async () => ({ success: false, errors: [{ message: 'This Worker does not exist on your account.' }] }) };
@@ -72,7 +81,7 @@ function fakeCf(use, { cpuField = true, fail = false, d1Fail = false } = {}) {
     if (method === 'PUT') w.crons = JSON.parse(init.body).map(s => s.cron);
     return json({ success: true, result: { schedules: w.crons.map(cron => ({ cron })) } });
   };
-  return { fetcher, workers, calls };
+  return { fetcher, workers, calls, domains };
 }
 function fakeKv() {
   const m = new Map();
@@ -243,4 +252,24 @@ test('the account is the token\'s own (asked once, kept); the pace is written fo
   const again = await guardRun(bare, { fetcher: fakeCf({ requests: 2_000_000 }).fetcher, kv, now: T('2026-10-18T00:05:00Z') });
   assert.equal(again.pace, 3);
   assert.equal(kv.m.get('guard:pace'), undefined, 'unchanged: not written again');
+});
+
+test('a custom domain (api.<domain>, the site) goes off with its Worker and comes back with it', async () => {
+  const cf = fakeCf({ requests: 9_100_000 });
+  cf.domains.push({ id: 'd1', hostname: 'api.example.tw', service: 'orbit-workers-proxy', zone_id: 'z1' }, { id: 'd2', hostname: 'example.tw', service: 'orbit-site', zone_id: 'z1' });
+  const kv = fakeKv();
+  const s = await guardRun(env, { fetcher: cf.fetcher, kv, now: T('2026-10-30T00:00:00Z') });
+  assert.deepEqual(cf.domains, []);
+  assert.ok(s.acts.includes('orbit-site off'));
+  // A deploy attaches api. again while stopped: off again the next run, still kept once.
+  const cf2 = fakeCf({ requests: 9_200_000 });
+  Object.assign(cf2.workers, cf.workers);
+  cf2.domains.push({ id: 'd3', hostname: 'api.example.tw', service: 'orbit-workers-proxy', zone_id: 'z1' });
+  await guardRun(env, { fetcher: cf2.fetcher, kv, now: T('2026-10-30T00:05:00Z') });
+  assert.deepEqual(cf2.domains, []);
+  const cf3 = fakeCf({ requests: 1000 });
+  Object.assign(cf3.workers, cf.workers);
+  const back = await guardRun(env, { fetcher: cf3.fetcher, kv, now: T('2026-11-13T00:05:00Z') });
+  assert.equal(back.stopped, null);
+  assert.deepEqual(cf3.domains.map(d => `${d.service} ${d.hostname} ${d.zone_id}`).sort(), ['orbit-site example.tw z1', 'orbit-workers-proxy api.example.tw z1']);
 });

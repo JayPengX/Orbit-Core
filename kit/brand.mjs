@@ -7,6 +7,8 @@
 // `id` stays what the apps and the pass store under (stock, match,
 // vocab…); only the names and looks are the brand's.
 
+import { SITE } from './domain.mjs';
+
 export const GOLD = '#f5c451';
 export const FAMILY = { name: 'Orbit', from: '#312e81', to: '#020617', ink: '#1e1b4b', accent: '#a5b4fc', tag: { zh: '每天用得到的 App，一個 Orbit Pass', en: 'Everyday apps, one Orbit Pass' } };
 
@@ -22,7 +24,7 @@ export const BRANDS = {
   money: { name: 'Orbit Money', short: 'Money', repo: 'Orbit-Money', from: '#fde047', to: '#713f12', ink: '#a16207', color: '#a16207', paint: ['#facc15', '#ca8a04', '#713f12'], spot: GOLD, pitch: { zh: '每一筆，記得清楚', en: 'Every dollar, in its place' }, role: { zh: '記帳', en: 'Money tracker' }, tag: { zh: '記帳：月曆一眼看每天花多少，帳戶、悠遊卡、信用卡一起算，發票掃一下就記好', en: 'Your spending by day, every account and card, invoices scanned in' } },
   vocab: { name: 'Orbit Words', short: 'Words', repo: 'Orbit-Words', from: '#f9a8d4', to: '#831843', ink: '#be185d', color: '#db2777', paint: ['#fda4af', '#e11d48', '#881337'], spot: '#fde047', pitch: { zh: '背得住的英文單字', en: 'Words that stay' }, role: { zh: '英文單字', en: 'English words' }, tag: { zh: '背得住的英文單字：大考 6000 字，真人發音', en: 'English words that stay with you' } }
 };
-export const SITE_URL = 'https://jaypengx.github.io';
+export const SITE_URL = SITE;
 export const pathOf = id => {
   const b = BRANDS[id];
   return b ? `/${b.repo}/` : '/';

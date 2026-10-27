@@ -25,9 +25,10 @@
 // A place: { county, town? } or { lat, lon }. Nothing known, or the Worker
 // unreachable: no typhoon day (the national calendar still holds).
 
+import { API } from './domain.mjs';
 import { twHoliday, twWorkday } from './holidays.mjs';
 
-const URL_ = 'https://orbit-workers-proxy.pengzjay.workers.dev/weather/dayoff';
+const URL_ = `${API}/weather/dayoff`;
 const FRESH_MS = 3 * 60_000;
 const KEEP_MS = 2 * 86_400_000;
 const STORE = 'q-dayoff';

@@ -1,0 +1,17 @@
+# orbit-site (site.js): the apps on the family's own domain, read through
+# from GitHub Pages. deploy.yml deploys it, and attaches <DOMAIN> to it, only
+# once kit/domain.mjs has a domain. No workers.dev address: the domain is its
+# only door. guard.js takes the domain off with the proxy's when the plan's
+# amounts are nearly used.
+name = "orbit-site"
+main = "site.js"
+compatibility_date = "2025-01-01"
+workers_dev = false
+preview_urls = false
+
+[limits]
+cpu_ms = 50
+
+[observability]
+enabled = true
+head_sampling_rate = 0.05

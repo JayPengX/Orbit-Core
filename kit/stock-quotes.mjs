@@ -5,10 +5,11 @@
 // data route in place). Quotes come 20 to a request from
 // /v7/finance/spark (with the day's price line), charts, dividends and
 // splits from /v8/finance/chart, and symbol search from /v1/finance/search.
+import { API } from './domain.mjs';
 import { BASE, METALS, GRAMS_PER_OUNCE, FUND_CUTOFF, isTwFund, isWarrant, isFuture, futureOf, isOption, tickSize, toTick as onTickOf, SSF_RATE, optionOf, optionTick, optionExpiry, seriesFuture, OPTION, kindOf, marketOf, normalizeCurrency } from './stock-markets.mjs';
 import { BONDS, ISSUERS, CURVE_SYMBOLS, bondQuote, bondLine, curveOf } from './stock-bonds.mjs';
 
-export const PROXY_URL = 'https://orbit-workers-proxy.pengzjay.workers.dev';
+export const PROXY_URL = API;
 const YAHOO = 'https://query1.finance.yahoo.com';
 const SPARK_BATCH = 20;
 
