@@ -29,3 +29,7 @@ test('the 載具 export as a plain CSV, one row per item, quoted cells, Big5 byt
   assert.equal(I.csvText(new TextEncoder().encode('﻿牛奶')), '牛奶');
   assert.deepEqual(I.parseCarrierCsv('nothing here'), []);
 });
+
+test('a whole CSV as rows: quoted commas, quotes and line breaks', () => {
+  assert.deepEqual(I.parseCsvRows('a,b\r\n"x, y","say ""hi""\nthere"\n\n1,2'), [['a', 'b'], ['x, y', 'say "hi"\nthere'], ['1', '2']]);
+});
