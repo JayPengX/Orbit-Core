@@ -1217,7 +1217,7 @@ async function route(request, env, ctx, headers, origin) {
     if (!env.STORE) return json({ d1: false }, 200, headers);
     return json({ d1: true, collections: await DOCS.count(env) }, 200, headers);
   }
-  // The repo's own checks (Shared-Proxy's build.yml), Bearer DATA_PUSH_SECRET:
+  // The repo's own checks (Orbit-Core's build.yml), Bearer DATA_PUSH_SECRET:
   // ?check=gemini (one tiny call through the relay) or system (ops.js).
   if (path === '/ops' && request.method === 'POST') {
     if (!env.DATA_PUSH_SECRET || request.headers.get('Authorization') !== `Bearer ${env.DATA_PUSH_SECRET}`) return errorJson('FORBIDDEN_ORIGIN', 403, headers, request);
@@ -1227,7 +1227,7 @@ async function route(request, env, ctx, headers, origin) {
     return json({ error: { message: 'check=gemini|system' } }, 400, headers);
   }
   // A builder's job now (builders/run.js), by hand: Bearer DATA_PUSH_SECRET
-  // (Shared-Proxy's build.yml). ?job=watch|cutouts|buses, or
+  // (Orbit-Core's build.yml). ?job=watch|cutouts|buses, or
   // ?only=asia|cpbl|sports|photos|winprob; &full=1 a full watch run.
   if (path === '/data/build' && request.method === 'POST') {
     if (!env.DATA_PUSH_SECRET || request.headers.get('Authorization') !== `Bearer ${env.DATA_PUSH_SECRET}`) return errorJson('FORBIDDEN_ORIGIN', 403, headers, request);

@@ -50,7 +50,7 @@ Jay's specific decisions, app by app and dated, are in [`RULEBOOK.md`](RULEBOOK.
   HEAD:main`). `main` deploys: GitHub Pages for the apps and the kit,
   Cloudflare for the Workers. No PRs.
 - **Check what a person would see:** if the change is visible, one 375 px
-  screenshot with real data (`node Shared-Proxy/tools/preview.mjs <app>
+  screenshot with real data (`node Orbit-Core/tools/preview.mjs <app>
   --live --width 375`). Fix anything it reports under `wraps:`, `cut:` or
   `scrolls sideways:`. Heavier modes (`--webkit`, `--reopen`, `--flaky`,
   the iOS Simulator) only when the bug is about them.
@@ -63,9 +63,9 @@ Jay's specific decisions, app by app and dated, are in [`RULEBOOK.md`](RULEBOOK.
 
 ## 4. Code structure
 
-- **Kit by default.** Anything two apps use lives in `Shared-Proxy/kit/`.
+- **Kit by default.** Anything two apps use lives in `Orbit-Core/kit/`.
   Move duplicates there whenever you see them. The kit is served, not
-  copied: apps load it from Shared-Proxy's Pages (`#kit/…`), and
+  copied: apps load it from Orbit-Core's Pages (`#kit/…`), and
   `node kit/link.mjs` links it for tests.
 - **A new kit export is used with a fallback** (`kit.newThing?.(…)`):
   a phone may still run an older kit, and importing a missing name stops
@@ -92,7 +92,7 @@ Jay's specific decisions, app by app and dated, are in [`RULEBOOK.md`](RULEBOOK.
 - **Read on demand.** Nothing is prefetched that nobody opens. What
   doesn't change in a day comes from R2 (built by the proxy's cron,
   `builders/`); the data proxy is for what's live. The layers are in
-  Shared-Proxy's MAP.md §2.
+  Orbit-Core's MAP.md §2.
 - **Use the existing crons** (the proxy's even and odd minutes, or a
   Durable Object alarm). New Cron Triggers registered in October 2026
   never ran.
@@ -133,7 +133,7 @@ Jay's specific decisions, app by app and dated, are in [`RULEBOOK.md`](RULEBOOK.
 
 | Repo | What |
 | --- | --- |
-| Shared-Proxy | The kit, the Workers (proxy, Pass, push, guard), R2 builders, tools |
+| Orbit-Core | The kit, the Workers (proxy, Pass, push, guard), R2 builders, tools |
 | Orbit-Sports | What to watch in Taiwan: leagues, games, TV |
 | Orbit-Transit | Taiwan trips: bus, train, YouBike, live navigation |
 | Orbit-Weather | One forecast to the township |

@@ -42,7 +42,7 @@
 //
 // What it does:
 //   - serves the app's public/ (Orbit Class: its built dist/ after `npm run build`)
-//     and the kit at /Shared-Proxy/kit/, as Pages does
+//     and the kit at /Orbit-Core/kit/, as Pages does
 //     on localhost;
 //   - opens it in Chromium (Playwright, preinstalled in the Claude Code cloud
 //     container) as an iPhone-sized page already signed in: the Worker's /eco
@@ -267,7 +267,7 @@ async function snapshotRoot(when, repos) {
 }
 const [appArg, ...hashes] = args;
 
-const APPS = { sports: ['Orbit-Sports', 'match'], securities: ['Orbit-Securities', 'stock'], words: ['Orbit-Words', 'vocab'], orbit: ['Orbit-Class', 'orbit'], weather: ['Orbit-Weather', 'weather'], transit: ['Orbit-Transit', 'transit'], beats: ['Orbit-Beats', 'beats'], law: ['Orbit-Law', 'law'], money: ['Orbit-Money', 'money'], admin: ['Shared-Proxy', 'admin'] };
+const APPS = { sports: ['Orbit-Sports', 'match'], securities: ['Orbit-Securities', 'stock'], words: ['Orbit-Words', 'vocab'], orbit: ['Orbit-Class', 'orbit'], weather: ['Orbit-Weather', 'weather'], transit: ['Orbit-Transit', 'transit'], beats: ['Orbit-Beats', 'beats'], law: ['Orbit-Law', 'law'], money: ['Orbit-Money', 'money'], admin: ['Orbit-Core', 'admin'] };
 // The admin panel's key in a preview: the run's own, never the owner's.
 const ADMIN_KEY = 'preview-admin-key-0123456789abcdef0123456789';
 // The old names still work.
@@ -280,7 +280,7 @@ if (!existsSync(dir)) throw new Error(`${dir} missing${key === 'orbit' ? ' (run 
 
 // What's served: the current repos, or --upgrade's old ones for the first opening.
 const served = { root: ROOT, dir };
-const oldRoot = upgrade ? await snapshotRoot(upgrade, [[repo, [key === 'orbit' ? 'dist' : 'public', ...(key === 'orbit' ? [] : ['scripts', 'package.json'])]], ['Shared-Proxy', ['kit']]]) : null;
+const oldRoot = upgrade ? await snapshotRoot(upgrade, [[repo, [key === 'orbit' ? 'dist' : 'public', ...(key === 'orbit' ? [] : ['scripts', 'package.json'])]], ['Orbit-Core', ['kit']]]) : null;
 // Both stamped as a deploy is (the app's ?v= files and version.json, the
 // kit's): unstamped, a page says it's 'dev' and never updates, so an
 // installed app's update (the old page finding the new one, its service
@@ -289,16 +289,16 @@ async function stampRoot(root, version) {
   const app = join(root, repo);
   if (key !== 'orbit' && existsSync(join(app, 'scripts/stamp-version.mjs'))) execFileSync('node', ['scripts/stamp-version.mjs', version], { cwd: app, stdio: 'ignore' });
   const out = await mkdtemp(join(tmpdir(), 'orbit-kit-'));
-  execFileSync('node', [join(root, 'Shared-Proxy/kit/stamp.mjs'), out, `kit-${version}`], { stdio: 'ignore' });
-  await rm(join(root, 'Shared-Proxy/kit'), { recursive: true, force: true });
-  await cp(join(out, 'kit'), join(root, 'Shared-Proxy/kit'), { recursive: true });
+  execFileSync('node', [join(root, 'Orbit-Core/kit/stamp.mjs'), out, `kit-${version}`], { stdio: 'ignore' });
+  await rm(join(root, 'Orbit-Core/kit'), { recursive: true, force: true });
+  await cp(join(out, 'kit'), join(root, 'Orbit-Core/kit'), { recursive: true });
 }
 let newRoot = null;
 if (oldRoot) {
   await stampRoot(oldRoot, 'old');
   newRoot = await mkdtemp(join(tmpdir(), 'orbit-new-'));
   for (const part of [key === 'orbit' ? 'dist' : 'public', ...(key === 'orbit' ? [] : ['scripts', 'package.json'])]) if (existsSync(join(ROOT, repo, part))) await cp(join(ROOT, repo, part), join(newRoot, repo, part), { recursive: true });
-  await cp(join(ROOT, 'Shared-Proxy/kit'), join(newRoot, 'Shared-Proxy/kit'), { recursive: true });
+  await cp(join(ROOT, 'Orbit-Core/kit'), join(newRoot, 'Orbit-Core/kit'), { recursive: true });
   await stampRoot(newRoot, 'new');
 }
 
@@ -339,9 +339,9 @@ const server = (h2 && !serve ? (fn => createSecureServer(h2Cert(), fn)) : create
   if (versionLatency && path.endsWith('/version.json')) await new Promise(r => setTimeout(r, versionLatency));
   // The kit's version.json is stamped only on Pages (kit/stamp.mjs): here
   // one the kit takes as the first it's seen (only noted, no reload).
-  if (path === '/Shared-Proxy/kit/version.json' && !existsSync(join(served.root, 'Shared-Proxy/kit/version.json'))) return res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }).end('{"version":"local"}');
-  // The kit, as the apps load it from Shared-Proxy's Pages (kit/loader.html).
-  let file = path.startsWith('/Shared-Proxy/kit/') ? join(served.root, path) : join(served.dir, path.replace(/^\/[^/]+\//, '/'));
+  if (path === '/Orbit-Core/kit/version.json' && !existsSync(join(served.root, 'Orbit-Core/kit/version.json'))) return res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }).end('{"version":"local"}');
+  // The kit, as the apps load it from Orbit-Core's Pages (kit/loader.html).
+  let file = path.startsWith('/Orbit-Core/kit/') ? join(served.root, path) : join(served.dir, path.replace(/^\/[^/]+\//, '/'));
   if (latency) await new Promise(r => setTimeout(r, latency));
   try {
     if ((await stat(file)).isDirectory()) file = join(file, 'index.html');
@@ -623,7 +623,7 @@ await context.route(live ? /^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.d
   await route.fulfill({ status: res.status, contentType: 'application/json', headers: cors, body: await res.text() });
 });
 // Orbit Transit's routes (see the top): transit.js on the made-up TDX answers;
-// or, with the real keys in Shared-Proxy/.env (git-ignored; TDX_CLIENT_ID,
+// or, with the real keys in Orbit-Core/.env (git-ignored; TDX_CLIENT_ID,
 // TDX_CLIENT_SECRET, optionally GOOGLE_MAPS_KEY), on the real TDX and Google:
 // today's buses, bikes and trains, still with the made-up account.
 const dotEnv = existsSync(new URL('../.env', import.meta.url))

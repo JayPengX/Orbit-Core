@@ -797,7 +797,7 @@ export const ADMIN_TOOLS = {
   async 'alert-test'({ env, deps }) {
     const account = await alertAccount(env, deps);
     if (!account) return { told: 'no account set' };
-    const told = await tell(env, account, lang => ({ title: lang === 'en' ? 'Orbit admin: a test notice' : 'Orbit 管理：測試通知', body: lang === 'en' ? 'Bill alerts arrive here.' : '帳單警示會送到這裡。', tag: 'ops:test', kind: 'bill', url: `${SITE}/Shared-Proxy/admin/` }));
+    const told = await tell(env, account, lang => ({ title: lang === 'en' ? 'Orbit admin: a test notice' : 'Orbit 管理：測試通知', body: lang === 'en' ? 'Bill alerts arrive here.' : '帳單警示會送到這裡。', tag: 'ops:test', kind: 'bill', url: `${SITE}/Orbit-Core/admin/` }));
     return { told };
   },
   // One tiny Gemini call through the relay.

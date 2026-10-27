@@ -1,4 +1,4 @@
-# Shared-Proxy: the map
+# Orbit-Core: the map
 
 The server side, the shared kit and the brand of every Orbit
 app. The apps are static sites on GitHub Pages; everything server-side is

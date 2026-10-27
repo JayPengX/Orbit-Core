@@ -1,5 +1,5 @@
 // Writes the brand into the apps checked out next to this repo, and the
-// family's own files into site/ (Shared-Proxy's Pages): every icon, every
+// family's own files into site/ (Orbit-Core's Pages): every icon, every
 // share card, each page's name and link-preview tags (between <!-- brand -->
 // and <!-- /brand -->) and its manifest. The marks and words are the kit's
 // (kit/brand.mjs). Needs Playwright's Chromium:
@@ -79,7 +79,7 @@ function headBlock(id, { href, description, xhtml, ver = {} }) {
   const at = file => `${home}share/${file}${ver[file] ? `?v=${ver[file]}` : ''}`;
   const image = (file, w, h) => [og('image', at(file)), og('image:type', 'image/jpeg'), og('image:width', w), og('image:height', h), og('image:alt', alt)];
   return [
-    '<!-- brand: Shared-Proxy/brand/generate.mjs writes this block -->',
+    '<!-- brand: Orbit-Core/brand/generate.mjs writes this block -->',
     `<title>${esc(b.name)}</title>`,
     meta('description', description),
     meta('application-name', b.name),
@@ -188,9 +188,9 @@ if (!only.length || only.includes('site')) {
 }
 await browser.close();
 
-// The family's home (Shared-Proxy's Pages root): every app.
+// The family's home (Orbit-Core's Pages root): every app.
 function homePage() {
-  const home = `${SITE_URL}${DOMAIN ? '/pass/' : '/Shared-Proxy/'}`;
+  const home = `${SITE_URL}${DOMAIN ? '/pass/' : '/Orbit-Core/'}`;
   const card = id => {
     const b = BRANDS[id];
     return `<a class="app" href="${DOMAIN ? shortPathOf(id) : pathOf(id)}"><img src="brand/${id}.svg" alt="" width="64" height="64"><span><strong>${esc(b.name)}</strong><small>${esc(b.tag.zh)}</small><small class="en">${esc(b.tag.en)}</small></span></a>`;
@@ -221,7 +221,7 @@ footer{margin-top:40px;color:var(--muted);font-size:13px}
 </style></head><body><main>
 <header><img src="brand/pass.svg" alt=""><div><h1>Orbit Pass</h1><p>${esc(PASS.tag.zh)} · ${esc(PASS.tag.en)}</p></div></header>
 ${family}
-<footer>Shared-Proxy: the Workers, the kit every app loads (kit/) and these marks (brand/).</footer>
+<footer>Orbit-Core: the Workers, the kit every app loads (kit/) and these marks (brand/).</footer>
 </main></body></html>
 `;
 }

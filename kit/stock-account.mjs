@@ -1251,7 +1251,7 @@ export function processOrders(account, quotes, rates, now = Date.now(), { halt =
 
 // The proxy's fills (the owner, 2026-10-14: Securities' orders filled by the
 // proxy): { orderId: { quote, t, twd } } from its own fresh
-// quote (Shared-Proxy stock-fill.js), each applied to its open order at
+// quote (Orbit-Core stock-fill.js), each applied to its open order at
 // that price and moment; the account's own rules (cash, shares, the
 // spread, costs) as fillOrder has them. Orders it hasn't filled stay open.
 export function applyFills(account, fills, rates, now = Date.now()) {
@@ -2724,7 +2724,7 @@ export function nextPayday(t) {
 
 // Paydays due up to `now` and not yet paid, added as deposits.
 // From this Taiwan month on, pay comes from Orbit itself into the pool
-// (Shared-Proxy's eco.js weekly pay), whichever app is opened.
+// (Orbit-Core's eco.js weekly pay), whichever app is opened.
 export const INCOME_UNTIL_MONTH = '2026-10';
 
 export function applyIncome(account, now = Date.now()) {

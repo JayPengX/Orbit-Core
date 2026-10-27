@@ -34,7 +34,7 @@ test('files that import each other share one hash, and each points at it', async
 test("an app's deploy: every reference stamped with its file's hash, the page's version and preloads in place", async () => {
   const root = await mkdtemp(join(tmpdir(), 'stamp-app-'));
   await mkdir(join(root, 'lib'));
-  await writeFile(join(root, 'index.html'), `<meta name="build-version" content="dev"><!-- /kit:head --><script>!function(){}('../Shared-Proxy/kit/',null)</script><link rel="stylesheet" href="./styles.css"><script type="module" src="./app.mjs"></script></head>`);
+  await writeFile(join(root, 'index.html'), `<meta name="build-version" content="dev"><!-- /kit:head --><script>!function(){}('../Orbit-Core/kit/',null)</script><link rel="stylesheet" href="./styles.css"><script type="module" src="./app.mjs"></script></head>`);
   await writeFile(join(root, 'app.mjs'), "import { a } from './lib/a.mjs';\nimport './lib/side.mjs';\n// a note\nconsole.log(a);\n");
   await writeFile(join(root, 'lib/a.mjs'), "import { b } from '../b.mjs';\nexport const a = b + 1;\n");
   await writeFile(join(root, 'lib/side.mjs'), 'globalThis.side = 1;\n');
@@ -48,7 +48,7 @@ test("an app's deploy: every reference stamped with its file's hash, the page's 
   assert.match(page, /href="\.\/styles\.css\?v=[0-9a-f]{12}"/);
   assert.match(page, /src="\.\/app\.mjs\?v=[0-9a-f]{12}"/);
   assert.match(page, /<link rel="modulepreload" href="\.\/lib\/a\.mjs\?v=[0-9a-f]{12}" \/>/);
-  assert.ok(page.includes(`('../Shared-Proxy/kit/',${JSON.stringify(kit)})`), 'the kit hashes baked in');
+  assert.ok(page.includes(`('../Orbit-Core/kit/',${JSON.stringify(kit)})`), 'the kit hashes baked in');
   assert.match(app, /from"\.\/lib\/a\.mjs\?v=[0-9a-f]{12}"/);
   assert.match(app, /import"\.\/lib\/side\.mjs\?v=[0-9a-f]{12}"/);
   assert.ok(!app.includes('a note'), 'minified');

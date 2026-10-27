@@ -4,7 +4,7 @@
 //
 // The first time, it makes your admin token: a random one, kept only on this
 // computer (Desktop/Orbit 管理金鑰.txt, readable by you alone; the admin
-// page, Shared-Proxy/admin/, takes it too), put on GitHub as the
+// page, Orbit-Core/admin/, takes it too), put on GitHub as the
 // secret ECO_ADMIN_TOKEN, and deployed to the eco Worker (it waits for that).
 // Then it asks the Worker for the passes, 100 at a time, and writes them to
 // ~/Documents/Orbit Passes <date>.txt as they come: nothing goes in a repo,
@@ -17,7 +17,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 const ECO_URL = 'https://orbit-workers-proxy.pengzjay.workers.dev/eco';
-const REPO = 'JayPengX/Shared-Proxy';
+const REPO = 'JayPengX/Orbit-Core';
 const count = Math.max(1, Math.floor(Number(process.argv[2]) || 300));
 const tokenFile = join(homedir(), 'Desktop', 'Orbit 管理金鑰.txt');
 const sh = (cmd, args, input) => execFileSync(cmd, args, { input, stdio: [input ? 'pipe' : 'ignore', 'pipe', 'inherit'] }).toString().trim();

@@ -35,7 +35,7 @@ export const pathOf = id => (onDomain ? shortPathOf(id) : repoPathOf(id));
 export const homeOf = id => `${SITE_URL}${DOMAIN ? shortPathOf(id) : repoPathOf(id)}`;
 // The folders served on the domain, by their short name: every app's, and the
 // family's others (the Pass's page, Longshot, the showcase).
-export const SHORT = { ...Object.fromEntries(Object.values(BRANDS).map(b => [b.slug, b.repo])), pass: 'Shared-Proxy', longshot: 'Longshot', showcase: 'Orbit-Showcase' };
+export const SHORT = { ...Object.fromEntries(Object.values(BRANDS).map(b => [b.slug, b.repo])), pass: 'Orbit-Core', longshot: 'Longshot', showcase: 'Orbit-Showcase' };
 // A path on GitHub Pages as it is on the domain ('/Orbit-Law/x' → '/law/x'); null if it isn't one that moved.
 export function shortPath(path) {
   const [, first, rest = ''] = /^\/([^/]+)(.*)$/.exec(path) || [];

@@ -24,7 +24,7 @@ import { join, dirname, relative, resolve } from 'node:path';
 import { hashFiles } from './hash.mjs';
 import { kitPreloads } from './preload.mjs';
 
-const KIT_VERSION_URL = 'https://jaypengx.github.io/Shared-Proxy/kit/version.json';
+const KIT_VERSION_URL = 'https://jaypengx.github.io/Orbit-Core/kit/version.json';
 
 async function files(dir) {
   const out = [];
@@ -86,7 +86,7 @@ export async function stampApp({ root, version, kitDir, minify = true, kit = und
     .join('\n');
   const baked = kit === undefined ? await kitNow() : kit;
   let page = stamped.get(index).replace('content="dev"', `content="${version}"`).replace('<!-- /kit:head -->', `<!-- /kit:head -->${kitLinks ? `\n${kitLinks}` : ''}`);
-  if (baked) page = page.replace("('../Shared-Proxy/kit/',null)", `('../Shared-Proxy/kit/',${JSON.stringify(baked)})`);
+  if (baked) page = page.replace("('../Orbit-Core/kit/',null)", `('../Orbit-Core/kit/',${JSON.stringify(baked)})`);
   if (preloads) page = page.replace('</head>', `${preloads}\n</head>`);
   await writeFile(index, page);
   await writeFile(join(root, 'version.json'), JSON.stringify({ version }) + '\n');
