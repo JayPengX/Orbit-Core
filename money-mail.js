@@ -20,6 +20,7 @@ import { json } from './http.js';
 import { changeDoc, parseDoc } from './doc-store.js';
 import { sessionLimited } from './orbit-token.js';
 import { parseCarrierCsv, csvText } from './kit/carrier-csv.mjs';
+import { MAIL_DOMAIN } from './kit/domain.mjs';
 
 export const MAIL_COLLECTION = 'orbit-money-mail';
 export const MAX_MAIL_BYTES = 4_000_000;
@@ -28,7 +29,9 @@ const BOX = /^[a-z0-9]{10}$/;
 
 export const passOfMoney = session => (session?.a === 'money' && typeof session.d === 'string' && session.d ? session.d : null);
 const newBox = () => Array.from(crypto.getRandomValues(new Uint8Array(10)), b => 'abcdefghijkmnpqrstuvwxyz23456789'[b % 32]).join('');
-const addressOf = (env, box) => (env.MAIL_DOMAIN && box ? `${box}@${env.MAIL_DOMAIN}` : '');
+// (The family's domain, kit/domain.mjs; a MAIL_DOMAIN var overrides it.)
+const mailDomain = env => env.MAIL_DOMAIN || MAIL_DOMAIN;
+const addressOf = (env, box) => (mailDomain(env) && box ? `${box}@${mailDomain(env)}` : '');
 
 // ---- The mail ---------------------------------------------------------------------
 
