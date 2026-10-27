@@ -1171,7 +1171,11 @@ export function settledData(url, data, now = Date.now()) {
   const dates = url.searchParams.get('dates') || '';
   if (dates.length === 6 && Date.UTC(+dates.slice(0, 4), +dates.slice(4, 6), 2) > now) return false;
   const events = data?.events || [];
-  return events.length > 0 && events.every(e => (e?.status?.type ?? e?.competitions?.[0]?.status?.type)?.completed === true);
+  // (A race weekend is one event of many sessions: every one of them over, not
+  // the event's own word. The US weekend's Saturday copy, FP1 and FP2 done and
+  // the race to come, was kept as 10/25 for good, so the race never had its podium.)
+  const done = x => x?.status?.type?.completed === true;
+  return events.length > 0 && events.every(e => (e?.status?.type ?? e?.competitions?.[0]?.status?.type)?.completed === true && (e?.competitions || []).every(c => !c?.status || done(c)));
 }
 
 function cacheEntry(result, policy) {
