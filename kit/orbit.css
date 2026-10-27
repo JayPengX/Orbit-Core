@@ -1792,7 +1792,7 @@ input[type='checkbox'][switch] {
 .q-fig b,
 .q-fig .num {
   display: block;
-  font: 700 20px/26px var(--q-font-rounded);
+  font: 600 20px/26px var(--q-font-rounded);
   font-variant-numeric: tabular-nums;
 }
 
@@ -3476,7 +3476,7 @@ div.q-ritem {
   gap: 6px;
   min-width: 0;
   padding: 14px 16px;
-  border-radius: 20px;
+  border-radius: var(--q-r-card);
   background: var(--q-surface);
   color: var(--q-label);
   text-decoration: none;
@@ -4405,7 +4405,7 @@ button.q-cal-d {
   gap: 4px;
   min-width: 0;
   padding: 14px 16px;
-  border-radius: 20px;
+  border-radius: var(--q-r-card);
   background: var(--q-surface);
   color: var(--q-label);
 }
@@ -4565,20 +4565,18 @@ button.q-cal-d {
   font-weight: 500;
 }
 .q-panel-lv {
+  /* (A level is a fact: grey text, no capsule; up/down colour it with meaning. docs/DESIGN.md §6) */
   flex: none;
   margin-inline-start: auto;
-  padding: 1px 7px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--t) 16%, transparent);
-  color: var(--t);
-  font: var(--q-t-caption2);
-  font-weight: 600;
+  color: var(--q-label-2);
+  font: var(--q-t-caption);
+  font-weight: 500;
 }
 .q-panel-lv.up {
-  --t: var(--q-up);
+  color: var(--q-up);
 }
 .q-panel-lv.down {
-  --t: var(--q-down);
+  color: var(--q-down);
 }
 .q-panel-row {
   display: flex;
