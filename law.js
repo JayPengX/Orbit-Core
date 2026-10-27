@@ -26,12 +26,13 @@ import { json, isAllowedOrigin, bodyText, sha256Hex } from './http.js';
 import { groundFor, groundKey, groundOut, groundPrompt } from './law-ground.js';
 import { paceOf } from './pace.js';
 import { sessionLimited } from './orbit-token.js';
+import { DEV } from './kit/brand.mjs';
 
 export const DATA = 'https://jaypengx.github.io/Orbit-Law/data/';
 // perDay: Gemini's answers a day in all, /law-ask's and /law-chat's (a chat
 // turn's plan counts with its answer, as one), near the low end of the
-// spec's estimate (about 200 turns a day).
-export const LAW_LIMITS = { perPass: 40, chatPerPass: 30, perDay: 300, perMinute: 10, maxArts: 8, maxQ: 300, maxBody: 4096, billChars: 14_000 };
+// spec's estimate (about 200 turns a day); the admin panel's 設定 (aiLaw) sets it.
+export const LAW_LIMITS = { perPass: 40, chatPerPass: 30, perDay: DEV.aiLaw.def, perMinute: 10, maxArts: 8, maxQ: 300, maxBody: 4096, billChars: 14_000 };
 export const PCODE = /^[A-Z]\d{7}$/;
 export const ART = /^\d{1,4}(-\d{1,3})?$/;
 export const BILL = /^\d{6,24}$/;
@@ -329,9 +330,9 @@ export const forgetLawCounts = () => memory.clear();
 // counted before the call, `who` first (a capped one adds nothing to the
 // day's), then the day's, then `who` again (two at once). → `who`'s count
 // now, or 0 when it's capped (a count that fails is capped).
-export async function spend(env, who, cap, day) {
+export async function spend(env, who, cap, day, dayCap = LAW_LIMITS.perDay) {
   if ((await countOf(env, who, day)) >= cap) return 0;
-  if ((await addOne(env, 'g', day)) > LAW_LIMITS.perDay) return 0;
+  if ((await addOne(env, 'g', day)) > dayCap) return 0;
   const used = await addOne(env, who, day);
   return used > cap ? 0 : used;
 }
@@ -451,7 +452,7 @@ const JOBS = {
 
 // gemini(parts, schema) -> the upstream Response (worker.js's proxyGeminiRequest);
 // session: the request's Orbit Pass session (worker.js), or null.
-export async function handleLawAsk(request, env, ctx, headers, session, gemini) {
+export async function handleLawAsk(request, env, ctx, headers, session, gemini, dayCap = LAW_LIMITS.perDay) {
   const pass = passOf(session);
   const ask = await opening(request, env, headers, { maxBody: LAW_LIMITS.maxBody, read: readAsk, who: pass });
   if (ask instanceof Response) return ask;
@@ -472,7 +473,7 @@ export async function handleLawAsk(request, env, ctx, headers, session, gemini) 
   if (hit) return json({ ...hit, ...job.info, cached: true, left: left(await countOf(env, who, day)) }, 200, headers);
 
   if (!env.GEMINI_API_KEY) return fail('setup', 503, headers);
-  const used = await spend(env, who, cap, day);
+  const used = await spend(env, who, cap, day, dayCap);
   if (!used) return fail('cap', 429, headers, { left: 0 });
 
   let out;

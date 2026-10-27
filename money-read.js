@@ -13,8 +13,9 @@ import { json, isAllowedOrigin, bodyText, sha256Hex } from './http.js';
 import { sessionLimited } from './orbit-token.js';
 import { countOf, addOne } from './law.js';
 import { passOfMoney } from './money-mail.js';
+import { DEV } from './kit/brand.mjs';
 
-export const READ_LIMITS = { perPass: 30, perDay: 300, maxBody: 6_000_000, maxBuys: 60, maxItems: 60 };
+export const READ_LIMITS = { perPass: 30, perDay: DEV.aiMoneyRead.def, maxBody: 6_000_000, maxBuys: 60, maxItems: 60 };
 const MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const INVOICE = /^[A-Z]{2}\d{8}$/;
@@ -71,7 +72,7 @@ export function cleanBuys(raw, today) {
   return out;
 }
 
-export async function handleMoneyRead(request, env, headers, session, gemini) {
+export async function handleMoneyRead(request, env, headers, session, gemini, dayCap = READ_LIMITS.perDay) {
   if (request.method !== 'POST') return json({ error: 'method' }, 405, headers);
   if (!isAllowedOrigin(request.headers.get('Origin') || '')) return json({ error: 'origin' }, 403, headers);
   const pass = passOfMoney(session);
@@ -89,7 +90,7 @@ export async function handleMoneyRead(request, env, headers, session, gemini) {
   const day = twDay();
   const who = `money-read:${(await sha256Hex(`money|${day}|${pass}`)).slice(0, 24)}`;
   if ((await countOf(env, who, day)) >= READ_LIMITS.perPass) return json({ error: 'cap', left: 0 }, 429, headers);
-  if ((await addOne(env, 'money-read:g', day)) > READ_LIMITS.perDay) return json({ error: 'cap', left: 0 }, 429, headers);
+  if ((await addOne(env, 'money-read:g', day)) > dayCap) return json({ error: 'cap', left: 0 }, 429, headers);
   const used = await addOne(env, who, day);
   if (used > READ_LIMITS.perPass) return json({ error: 'cap', left: 0 }, 429, headers);
   const left = Math.max(0, READ_LIMITS.perPass - used);

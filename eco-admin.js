@@ -19,7 +19,7 @@ import { newPasscode, updateWallet, deleteAccount, ECO_APPS, WALLET_COLLECTION, 
 import { sendPush, dueLists } from './push.js';
 import { usage as transitUsage, CAPS as TRANSIT_CAPS, TDX_POINTS, tdxPoints, tdxGuard } from './transit.js';
 import { twDate, GOOGLE_DAILY_CALLS } from './weather.js';
-import { cleanDev } from './kit/devconfig.mjs';
+import { cleanDev, DEV } from './kit/devconfig.mjs';
 import { SITE } from './kit/domain.mjs';
 import { sidesOf, addSides, LEDGER } from './money.js';
 import { plan as capacityPlan, usersFrom } from './capacity.js';
@@ -687,10 +687,18 @@ export const ADMIN_TOOLS = {
     }
     for (const d of Object.values(days)) d.points = d.basic / TDX_POINTS.basic + d.advanced / TDX_POINTS.advanced;
     const pts = tdxPoints(transit, now);
+    // Each paid AI feature's calls today and the six days before, against its cap (kit DEV `ai*`, 0 = paused).
+    const dev = await readDev(env, deps).catch(() => cleanDev());
+    const week = Array.from({ length: 7 }, (_, i) => twDate(now - (6 - i) * DAY));
+    const ai = Object.entries(DEV)
+      .filter(([, d]) => d.ai)
+      .map(([key, d]) => ({ key, cap: dev[key], days: week.map(day => d.ai.reduce((n, f) => n + (transit[`gemd:${f}:${day}`] || 0), 0)) }));
     return {
       at: now,
       tdx: { days, points: pts.month, today: pts.today, guard: tdxGuard(pts, now), plan: TDX_POINTS, total: transit.tdx || 0 },
-      transit: Object.fromEntries(Object.entries(transit).filter(([k]) => !k.startsWith('tdx:')).map(([k, n]) => [k, { used: n, cap: TRANSIT_CAPS[k] ?? null }])),
+      ai,
+      // (The meter keeps Gemini's tokens and calls too: those are the bill's and AI's, not Transit's.)
+      transit: Object.fromEntries(Object.entries(transit).filter(([k]) => !/^(tdx:|gem[df]?:)/.test(k)).map(([k, n]) => [k, { used: n, cap: TRANSIT_CAPS[k] ?? null }])),
       weather: { googleToday: weatherCalls, cap: GOOGLE_DAILY_CALLS }
     };
   },

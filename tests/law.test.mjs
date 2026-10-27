@@ -307,3 +307,13 @@ test('no amendment of the law is a 404 {error:"diff"}, none of the articles a 40
   }
   assert.equal(gemini.length, before);
 });
+
+test("the panel's daily cap: the day's count stops at it, and 0 pauses the AI", async () => {
+  const { spend } = await import('../law.js');
+  const env = envOf();
+  const day = '2026-10-27';
+  assert.equal(await spend(env, 'p1', 40, day, 2), 1);
+  assert.equal(await spend(env, 'p2', 40, day, 2), 1);
+  assert.equal(await spend(env, 'p3', 40, day, 2), 0, 'the third of the day is past a cap of 2');
+  assert.equal(await spend(envOf(), 'p1', 40, day, 0), 0, '0 pauses it');
+});

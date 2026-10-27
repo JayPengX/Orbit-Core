@@ -376,11 +376,11 @@ export function checkChat(raw, articles, lang, grounded = false, others = []) {
 
 // gemini(parts, schema) -> the upstream Response (worker.js's proxyGeminiRequest);
 // session: the request's Orbit Pass session (worker.js), or null.
-export async function handleLawChat(request, env, ctx, headers, session, gemini) {
+export async function handleLawChat(request, env, ctx, headers, session, gemini, dayCap = LAW_LIMITS.perDay) {
   const pass = passOf(session);
   const chat = await opening(request, env, headers, { maxBody: CHAT_LIMITS.maxBody, read: readChat, who: pass });
   if (chat instanceof Response) return chat;
-  if (!chat.stream) return answerChat(chat, pass, env, ctx, headers, gemini);
+  if (!chat.stream) return answerChat(chat, pass, env, ctx, headers, gemini, undefined, dayCap);
   // Streamed (the app asks so): a line as each step starts, then the answer's
   // own line with its status, so the reader sees the work, not a stalled wait.
   const { readable, writable } = new TransformStream();
@@ -389,7 +389,7 @@ export async function handleLawChat(request, env, ctx, headers, session, gemini)
   const line = o => w.write(enc.encode(`${JSON.stringify(o)}\n`)).catch(() => {});
   const done = (async () => {
     line({ stage: 'find' });
-    const res = await answerChat(chat, pass, env, ctx, headers, gemini, stage => line(stage));
+    const res = await answerChat(chat, pass, env, ctx, headers, gemini, stage => line(stage), dayCap);
     line({ status: res.status, ...(await res.json().catch(() => ({ error: 'upstream' }))) });
     await w.close().catch(() => {});
   })();
@@ -398,13 +398,13 @@ export async function handleLawChat(request, env, ctx, headers, session, gemini)
 }
 
 // The answer as a Response; `stage` hears each step ({ stage: 'found' | 'write', … }).
-async function answerChat(chat, pass, env, ctx, headers, gemini, stage = () => {}) {
+async function answerChat(chat, pass, env, ctx, headers, gemini, stage = () => {}, dayCap = LAW_LIMITS.perDay) {
   const day = twDay();
   const who = await passKey('chat', pass, day);
   const left = n => Math.max(0, LAW_LIMITS.chatPerPass - n);
   // The turn is spent once, before its first Gemini call (0: capped).
   let used = null;
-  const turn = async () => (used ??= await spend(env, who, LAW_LIMITS.chatPerPass, day));
+  const turn = async () => (used ??= await spend(env, who, LAW_LIMITS.chatPerPass, day, dayCap));
   const first = !chat.history.length;
   const pin = JSON.stringify(chat.pin.map(x => [x.p, [...x.arts].sort()]));
   try {

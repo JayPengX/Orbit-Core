@@ -129,9 +129,17 @@ export const DEV = {
   // expected in 30 days would run past Cloudflare's $5 plan (checked every
   // 6 hours); the numbers above stay the owner's own, the floor.
   autoScale: { def: false, group: 'scale', zh: '依人數自動調整', en: 'Scale with people', note: '人數預估會超過 Cloudflare $5 方案的額度時，上面的即時更新一起放慢（每 6 小時檢查）；有空間就回到上面的設定' },
-  mirror: { def: true, group: 'data', zh: '使用每晚的資料副本', en: 'Use the nightly copies', note: '關掉：所有 App 都直接問代理（除錯用）' }
+  mirror: { def: true, group: 'data', zh: '使用每晚的資料副本', en: 'Use the nightly copies', note: '關掉：所有 App 都直接問代理（除錯用）' },
+  // Each paid AI feature's calls a day, everyone together (the proxy's
+  // routes named in `ai`; 0 pauses it, the app then says today's AI is used up).
+  aiClassPhoto: { def: 300, min: 0, max: 3000, unit: '次', group: 'ai', ai: ['gemini'], zh: '課表照片匯入（Class）', en: 'Class photo import', note: '每個 Worker 各自計數；0 = 暫停' },
+  aiClassEdit: { def: 300, min: 0, max: 3000, unit: '次', group: 'ai', ai: ['nl-edit'], zh: '課表 AI 修改（Class）', en: 'Class AI edit', note: '每個 Worker 各自計數；0 = 暫停' },
+  aiLaw: { def: 300, min: 0, max: 3000, unit: '次', group: 'ai', ai: ['law-ask', 'law-chat'], zh: '法律 AI（Law）', en: 'Law AI', note: '白話解釋和問法律一起算；0 = 暫停' },
+  aiMoneyRead: { def: 300, min: 0, max: 3000, unit: '次', group: 'ai', ai: ['money-read'], zh: '發票讀圖（Money）', en: 'Money invoice reading', note: '0 = 暫停' }
 };
-export const DEV_GROUPS = { proxy: '代理（sports-proxy）', sports: 'Orbit Sports', f1: 'F1', transit: 'Orbit Transit（TDX）', scale: '容量', data: '資料' };
+export const DEV_GROUPS = { proxy: '代理（sports-proxy）', sports: 'Orbit Sports', f1: 'F1', transit: 'Orbit Transit（TDX）', scale: '容量', data: '資料', ai: 'AI 每天上限（全部人一起）' };
+// The setting that caps a Gemini feature ('law-chat' → 'aiLaw').
+export const aiSettingOf = feature => Object.keys(DEV).find(k => DEV[k].ai?.includes(feature)) || null;
 
 // Settings as stored: each known key, in range, else its default.
 export function cleanDev(x = {}) {

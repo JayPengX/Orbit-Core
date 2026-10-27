@@ -29,6 +29,7 @@
 
 import { handleLawAsk } from './law.js';
 import { handleLawChat } from './law-chat.js';
+import { DEV, aiSettingOf } from './kit/brand.mjs';
 import { handleLawPage } from './law-page.js';
 import en from './locales/en.js';
 import zhTW from './locales/zh-TW.js';
@@ -188,6 +189,17 @@ async function rateLimitResponse(env, ip, feature, limit, headers, request) {
 // key are the other halves.
 async function isDailyGlobalCapped(env, feature, limit) {
   return isRateLimited(env, 'global', `daily-cap:${feature}`, limit, DAY_WINDOW_MS);
+}
+// Each Gemini feature's cap a day, as the admin panel's 設定 has it (kit/brand.mjs
+// DEV `ai*`, read a minute at a time with the other settings; 0 pauses it).
+async function aiCap(env, ctx, feature) {
+  const k = aiSettingOf(feature);
+  try {
+    const v = JSON.parse(await devBody(env, ctx))[k];
+    return Number.isFinite(v) ? v : DEV[k].def;
+  } catch {
+    return DEV[k].def;
+  }
 }
 
 // ---- Origin gate for every route that calls the real, billed Gemini API ---
@@ -606,6 +618,8 @@ async function logGeminiUsage(stream, feature, model, env = null, ctx = null) {
       const cached = usage.cachedContentTokenCount ?? 0;
       const counts = { in: Math.max(0, (usage.promptTokenCount ?? 0) - cached), cached, out: (usage.candidatesTokenCount ?? 0) + (usage.thoughtsTokenCount ?? 0) };
       for (const [k, n] of Object.entries(counts)) if (n) await tally(env, `gem:${model}:${k}:${day}`, n, Date.now(), ctx);
+      // (And each feature's calls by the day, against its cap: the panel's AI 今天.)
+      await tally(env, `gemd:${feature}:${day}`, 1, Date.now(), ctx);
       // (And by feature for the month, with its calls: which one the bill comes from.)
       for (const [k, n] of Object.entries({ ...counts, n: 1 })) if (n) await tally(env, `gemf:${feature}:${model}:${k}`, n, Date.now(), ctx);
     }
@@ -661,9 +675,6 @@ const MAX_FILES_PER_REQUEST = 6;
 // bad luck (or a couple of manual retries on top of it) burn through a
 // tighter limit for reasons that have nothing to do with actual abuse.
 const GEMINI_RATE_LIMIT = 30;
-// See isDailyGlobalCapped's own comment - a hard ceiling on TOTAL real
-// Gemini calls across every caller combined, independent of source IP.
-const GEMINI_DAILY_GLOBAL_CAP = 300;
 
 // Reads the `files: [{mime_type, data}, ...]` body. Returns a plain error
 // string rather than throwing - every failure here is a 400 with that
@@ -708,7 +719,7 @@ async function handleGeminiRequest(request, env, headers, ip, ctx, session = nul
   // Signed in with a Orbit Pass (required): counted per session in memory.
   if (!session) return errorJson('ECO_TOKEN_INVALID', 401, headers, request);
   if (sessionLimited(`g:${session.s}`, GEMINI_RATE_LIMIT, 3_600_000)) return errorJson('RATE_LIMITED', 429, headers, request);
-  if (await isDailyGlobalCapped(env, 'gemini', GEMINI_DAILY_GLOBAL_CAP)) {
+  if (await isDailyGlobalCapped(env, 'gemini', await aiCap(env, ctx, 'gemini'))) {
     return errorJson('DAILY_QUOTA_EXCEEDED', 429, headers, request);
   }
 
@@ -772,7 +783,6 @@ const MAX_NL_EDIT_CONTEXT_LENGTH = 40000;
 // See GEMINI_RATE_LIMIT's own comment - same reasoning, same 3x headroom for
 // the location-block retry's own worst case.
 const NL_EDIT_RATE_LIMIT = 30;
-const NL_EDIT_DAILY_GLOBAL_CAP = 300;
 
 // /nl-edit's own schedule-cell edit shape: one (day, period, key) triple -
 // see NL_EDIT_RESPONSE_SCHEMA's own comment for why the response describes
@@ -1011,7 +1021,7 @@ async function handleNlEditRequest(request, env, headers, ip, ctx, session = nul
 
   if (!session) return errorJson('ECO_TOKEN_INVALID', 401, headers, request);
   if (sessionLimited(`n:${session.s}`, NL_EDIT_RATE_LIMIT, 3_600_000)) return errorJson('RATE_LIMITED', 429, headers, request);
-  if (await isDailyGlobalCapped(env, 'nl-edit', NL_EDIT_DAILY_GLOBAL_CAP)) {
+  if (await isDailyGlobalCapped(env, 'nl-edit', await aiCap(env, ctx, 'nl-edit'))) {
     return errorJson('DAILY_QUOTA_EXCEEDED', 429, headers, request);
   }
 
@@ -1196,14 +1206,14 @@ async function route(request, env, ctx, headers, origin) {
   // (Gemini's first model, Flash-Lite: a few seconds' work.)
   // (/law-chat's answer asks for Flash by name: reasoning on the reader's facts, 40 s at most.)
   const lawGemini = feature => (parts, schema, model = GEMINI_ALLOWED_MODELS[0]) => proxyGeminiRequest(GEMINI_ALLOWED_MODELS.includes(model) ? model : GEMINI_ALLOWED_MODELS[0], parts, schema, env, headers, ctx, feature, model === GEMINI_ALLOWED_MODELS[0] ? 25_000 : 40_000);
-  if (path === '/law-ask') return handleLawAsk(request, env, ctx, headers, await sessionOf(request, env), lawGemini('law-ask'));
-  if (path === '/law-chat') return handleLawChat(request, env, ctx, headers, await sessionOf(request, env), lawGemini('law-chat'));
+  if (path === '/law-ask') return handleLawAsk(request, env, ctx, headers, await sessionOf(request, env), lawGemini('law-ask'), await aiCap(env, ctx, 'law-ask'));
+  if (path === '/law-chat') return handleLawChat(request, env, ctx, headers, await sessionOf(request, env), lawGemini('law-chat'), await aiCap(env, ctx, 'law-chat'));
   // …and government pages read inside the app (law-page.js): the same Pass, gov.tw only, nothing stored.
   if (path === '/law-page') return handleLawPage(request, env, ctx, headers, await sessionOf(request, env));
   // Orbit Money's mail-in 載具 invoices (money-mail.js).
   if (path === '/money-mail') return handleMoneyMailRequest(request, env, headers, await sessionOf(request, env), ECO_DEPS);
   // …and its 讀圖: a picture of purchases read by Gemini, on a tap only (money-read.js).
-  if (path === '/money-read') return handleMoneyRead(request, env, headers, await sessionOf(request, env), lawGemini('money-read'));
+  if (path === '/money-read') return handleMoneyRead(request, env, headers, await sessionOf(request, env), lawGemini('money-read'), await aiCap(env, ctx, 'money-read'));
   // The bill's guard (guard.js), as it last read the bill: armed or not,
   // each count's share of the $5 plan, stopped or not. No key or token.
   if (path === '/guard' && request.method === 'GET') {
@@ -1322,8 +1332,12 @@ export default {
   // 載具 exports, forwarded to an account's own address (money-mail.js).
   async email(message, env) {
     try {
-      const r = await handleMoneyMail(message, env, ECO_DEPS);
-      if (r) console.log('money-mail', r.added);
+      // (Its heartbeat: the panel's 排程工作 shows the last mail and what it added; never whose.)
+      const r = await beat(env, 'mail', async () => {
+        const got = await handleMoneyMail(message, env, ECO_DEPS);
+        return got ? { added: got.added } : { refused: 1 };
+      });
+      if (r.added) console.log('money-mail', r.added);
     } catch (error) {
       console.log('money-mail failed', String(error?.message || error).slice(0, 200));
       message.setReject('Try again later');
