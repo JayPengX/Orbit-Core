@@ -137,7 +137,7 @@ export async function tellOwner(env, deps) {
 
 // ---- The system report ----
 // The secrets and bindings the proxy runs on: set or not (never a value).
-export const SECRETS = ['ECO_TOKEN_SECRET', 'ECO_ADMIN_TOKEN', 'DATA_PUSH_SECRET', 'GEMINI_API_KEY', 'GOOGLE_MAPS_KEY', 'GOOGLE_MAPS_BROWSER_KEY', 'GOOGLE_WEATHER_KEY', 'CWA_KEY', 'MOENV_KEY', 'TDX_CLIENT_ID', 'TDX_CLIENT_SECRET', 'FIREBASE_PRIVATE_KEY'];
+export const SECRETS = ['ECO_TOKEN_SECRET', 'ECO_ADMIN_TOKEN', 'DATA_PUSH_SECRET', 'GEMINI_API_KEY', 'GOOGLE_MAPS_KEY', 'GOOGLE_MAPS_BROWSER_KEY', 'GOOGLE_WEATHER_KEY', 'CWA_KEY', 'MOENV_KEY', 'TDX_CLIENT_ID', 'TDX_CLIENT_SECRET', 'GH_ACTIONS_TOKEN', 'FIREBASE_PRIVATE_KEY'];
 export const BINDINGS = ['STORE', 'DATA', 'RATE_LIMIT_KV', 'F1_LOG', 'GEMINI_RELAY', 'GUARD'];
 // R2's folders: files and bytes under each top folder (one list a 1,000).
 export async function dataFolders(bucket, { pages = 30 } = {}) {
