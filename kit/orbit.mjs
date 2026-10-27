@@ -2176,7 +2176,7 @@ function accountCard(s, onLooks) {
     node('span', { class: 'q-pc-top' }, [
       node('span', { class: `q-pc-face${f ? ` q-framed q-frame-${f.id}` : ''}` }, [node('img', { alt: '', src: avatarSrc(a?.id || DEFAULT_AVATAR) })]),
       node('span', { class: 'q-pc-id' }, [
-        node('span', { class: 'q-pc-brand', text: 'ORBIT PASS' }),
+        node('span', { class: 'q-pc-brand', text: BRAND.pass }),
         node('strong', { class: 'q-pc-big' }, [document.createTextNode(en ? 'Milestones ' : '里程碑 '), node('span', { class: 'num', text: `${got}/${MILESTONES.length}` })]),
         node('span', { class: 'q-pc-no num', text: accountNumber(s.pass) })
       ])
@@ -2430,9 +2430,9 @@ function pushedHere(app, key) {
 export const NOTICE_KINDS = {
   match: [
     ['start', '比賽開打', 'A game starts', '你追蹤的球隊比賽開始時。', 'When a team you follow starts a game.'],
-    ['end', '比賽結束', 'Final score', '你追蹤的球隊比賽結束，附上比分。', 'When a team you follow finishes a game, with the score.'],
+    ['end', '比賽結束', 'Final score', '你追蹤的球隊打完，附比分。', 'When a team you follow finishes a game, with the score.'],
     ['pick', '今日推薦開賽', 'Today’s picks start', '今日推薦的每一場開始時。', 'When each of today’s picks starts.'],
-    ['pickend', '今日推薦賽果', 'Today’s picks: final', '今日推薦的每一場結束，附上比分。', 'When each of today’s picks ends, with the score.']
+    ['pickend', '今日推薦賽果', 'Today’s picks: final', '今日推薦每場打完，附比分。', 'When each of today’s picks ends, with the score.']
   ],
   vocab: [
     ['streak', '連續練習快斷了', 'Streak ending', '今天還沒練習單字，連續天數今晚就會歸零時。', 'When you haven’t practised today and your streak ends tonight.']
