@@ -2223,7 +2223,12 @@ export function accountButton(s, { extra = null } = {}) {
   };
   paint();
   s.on('wallet', paint);
+  // The sheet's code is fetched while the app sits idle, and again from the
+  // finger's touch: fetched only at the tap, a phone on 4G waited a second
+  // for it after each kit deploy (Jay 2026-10-27, "sometimes slow").
+  btn.addEventListener('pointerdown', warmPass, { passive: true });
   btn.addEventListener('click', () => accountSheet(s, { extra: extra ? extra() : null }));
+  warmPassLater();
   return btn;
 }
 
@@ -2288,8 +2293,23 @@ export const tell = (opts = {}) => ask({ ...opts, alertOnly: true }).then(() => 
 // money: that's Securities'. Loaded when first opened (pass.mjs). tab:
 // 'pass' | 'looks' | 'apps' | 'help';
 // help: { app, topic } for the guide to open on.
+// The sheet's module, once: the first tap opens it from memory when the
+// page fetched it while idle (warmPassLater), and its guides (help.mjs)
+// follow it, also while idle.
+let passing = null;
+export function warmPass() {
+  passing ||= import('./pass.mjs').catch(e => ((passing = null), Promise.reject(e)));
+  return passing;
+}
+let passWarmed = false;
+function warmPassLater() {
+  if (passWarmed) return;
+  passWarmed = true;
+  const idle = f => (globalThis.requestIdleCallback ? globalThis.requestIdleCallback(f, { timeout: 4000 }) : setTimeout(f, 2000));
+  idle(() => warmPass().then(m => idle(() => m.loadHelp?.().catch(() => {}))).catch(() => {}));
+}
 export async function accountSheet(s, { extra = null, tab = 'pass', help = null } = {}) {
-  const { openPass } = await import('./pass.mjs');
+  const { openPass } = await warmPass();
   return openPass(s, { extra, tab, help });
 }
 export const openHelp = (s, app = s.app, topic = null) => accountSheet(s, { tab: 'help', help: { app, topic } });

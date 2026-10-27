@@ -6,7 +6,11 @@
 //   App    every app, Orbit's and Orbit's, when it was last used, a way in
 //   說明   every app's guide (help.mjs)
 import { APPS, AVATARS, FRAMES, MILESTONES, TIERS, DEFAULT_AVATAR, milestoneOf, avatarSrc, settingPatch, passAccount, appIcon, closeSheet, el as node } from '#kit/orbit.mjs';
-import { HELP_ORDER, helpFor } from './help.mjs';
+// The guides (80 KB) only for the 說明 tab: fetched after the sheet's own
+// code while the app is idle (orbit.mjs warmPassLater), or when that tab opens.
+let helpMod = null;
+let helpLoad = null;
+export const loadHelp = () => (helpLoad ||= import('./help.mjs').then(m => (helpMod = m)).catch(e => ((helpLoad = null), Promise.reject(e))));
 import { sheet, section } from './ui.mjs';
 import { homeOf } from './brand.mjs';
 
@@ -244,6 +248,17 @@ export function openPass(s, { extra = null, tab = 'pass', help = null } = {}) {
 // ---- Help -----------------------------------------------------------------------------------
 
 function renderHelp(box, { q, t, locale }, { app, topic }) {
+  if (!helpMod) {
+    // (Only while this wait is still what the sheet shows: another tab may be open by then.)
+    const wait = el('p', { class: 'q-sheet-note', role: 'status', text: '…' });
+    put(box, wait);
+    loadHelp().then(
+      () => wait.isConnected && renderHelp(box, { q, t, locale }, { app, topic }),
+      () => wait.isConnected && (wait.textContent = t('failed'))
+    );
+    return;
+  }
+  const { HELP_ORDER, helpFor } = helpMod;
   const at = HELP_ORDER.includes(app) ? app : 'pass';
   const name = a => (a === 'pass' ? 'Orbit Pass' : APPS[a]?.short || a);
   const chips = el(
