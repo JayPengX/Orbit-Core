@@ -269,6 +269,7 @@ import map, so a file has one address whichever loader a page carries.
 | `boot.js` | The loading screen and the version check |
 | `brand.mjs` | Families, names, colours, marks, repos, `DEV` |
 | `pass.mjs`, `help.mjs` | The Pass sheet (account, looks, apps, guides: no money); every app's guide |
+| `share.mjs`, `qrcode.mjs` | The share sheet (`shareSheet({ url, title, app, icon })`, orbit.mjs loads it): the link and its QR code in the person's own style (colours, dots, corners, a centre icon or photo, margin), saved as PNG (2048 px) or SVG; error correction H with a centre image, a warning for faint or light-on-dark colours. Opened from each app's card in the Pass sheet's App tab and the Showcase. `qrcode.mjs` is qrcode-generator 2.0.4 (MIT), vendored as is |
 | `pass-sync.mjs` | An app's payload kept in step with the Pass's copy (read and merged before any write; once per return, none under 10 s away, an unchanged copy not merged again); Words, Weather |
 | `catalog.mjs`, `logos.mjs`, `names.mjs`, `photos.mjs` | Leagues; logos; Chinese team names; studio headshots |
 | `f1live.mjs`, `postseason.mjs`, `sports-*.mjs` | F1 sessions; MLB's postseason; highlights, broadcast, win probability (also run by builders) |
