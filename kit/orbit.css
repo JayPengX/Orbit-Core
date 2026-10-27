@@ -2269,6 +2269,16 @@ input[type='checkbox'][switch] {
 .q-menu button:is(:active, [data-q-press], :hover) {
   background: var(--q-fill-3);
 }
+/* An item's own picture first (menu({ lead }): an account's logo). */
+.q-menu-lead {
+  display: grid;
+  flex: none;
+  margin-right: -4px;
+}
+.q-menu button:has(> .q-menu-lead) > span:nth-child(2) {
+  flex: 1;
+  min-width: 0;
+}
 .q-menu button.danger {
   color: var(--q-red);
 }
