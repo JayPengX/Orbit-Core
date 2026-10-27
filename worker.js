@@ -52,7 +52,6 @@ import { handleData } from './data.js';
 import { handleStock, moveBook } from './stock-fill.js';
 import { runBuilders, SLOTS as BUILD_SLOTS } from './builders/run.js';
 import { docStore, storeReady } from './doc-store.js';
-import { handleMoneyMail, handleMoneyMailRequest, mailCheck } from './money-mail.js';
 import { handleMoneyRead } from './money-read.js';
 import { STATE_KEY as GUARD_STATE } from './guard.js';
 // The F1 lap log's Durable Object (f1-live.js), bound as F1_LOG.
@@ -1217,8 +1216,6 @@ async function route(request, env, ctx, headers, origin) {
   if (path === '/law-chat') return handleLawChat(request, env, ctx, headers, await sessionOf(request, env), lawGemini('law-chat'), await aiCap(env, ctx, 'law-chat'));
   // …and government pages read inside the app (law-page.js): the same Pass, gov.tw only, nothing stored.
   if (path === '/law-page') return handleLawPage(request, env, ctx, headers, await sessionOf(request, env));
-  // Orbit Money's mail-in 載具 invoices (money-mail.js).
-  if (path === '/money-mail') return handleMoneyMailRequest(request, env, headers, await sessionOf(request, env), ECO_DEPS);
   // …and its 讀圖: a picture of purchases read by Gemini, on a tap only (money-read.js).
   if (path === '/money-read') return handleMoneyRead(request, env, headers, await sessionOf(request, env), lawGemini('money-read'), await aiCap(env, ctx, 'money-read'));
   // The bill's guard (guard.js), as it last read the bill: armed or not,
@@ -1241,9 +1238,14 @@ async function route(request, env, ctx, headers, origin) {
     const check = new URL(request.url).searchParams.get('check');
     if (check === 'gemini') return json(await geminiCheck(env), 200, headers);
     if (check === 'system') return json(await systemReport(env, ECO_DEPS), 200, headers);
-    // Email Sending end to end: a sample 財政部 mail copied as Orbit Money copies one (money-mail.js) to &to=.
-    if (check === 'mail') return json(await mailCheck(env, new URL(request.url).searchParams.get('to') || ''), 200, headers);
-    return json({ error: { message: 'check=gemini|system|mail' } }, 400, headers);
+    // Orbit Money's mail-in, removed 2026-10-27 (Jay: too privacy-invading): its
+    // stored boxes and invoices deleted, once (build.yml purge-money-mail).
+    if (check === 'purge-money-mail') {
+      const docs = await DOCS.list(env, 'orbit-money-mail', 300, { idsOnly: true });
+      for (const d of docs) await DOCS.delete(env, 'orbit-money-mail', d.id);
+      return json({ deleted: docs.length }, 200, headers);
+    }
+    return json({ error: { message: 'check=gemini|system|purge-money-mail' } }, 400, headers);
   }
   // A builder's job now (builders/run.js), by hand: Bearer DATA_PUSH_SECRET
   // (Orbit-Core's build.yml). ?job=watch|cutouts|buses, or
@@ -1340,20 +1342,10 @@ export default {
 
   // The cron (wrangler.toml [triggers]): the notices that are due (push.js),
   // F1's laps, the builders and the guard.
-  // Mail (Cloudflare Email Routing's catch-all on MAIL_DOMAIN): Orbit Money's
-  // 載具 exports, forwarded to an account's own address (money-mail.js).
-  async email(message, env) {
-    try {
-      // (Its heartbeat: the panel's 排程工作 shows the last mail and what it added; never whose.)
-      const r = await beat(env, 'mail', async () => {
-        const got = await handleMoneyMail(message, env, ECO_DEPS);
-        return got ? { added: got.added } : { refused: 1 };
-      });
-      if (r.added) console.log('money-mail', r.added);
-    } catch (error) {
-      console.log('money-mail failed', String(error?.message || error).slice(0, 200));
-      message.setReject('Try again later');
-    }
+  // Mail to the domain (Email Routing's catch-all, if still on): nobody's
+  // mailbox since Orbit Money's mail-in was removed (2026-10-27).
+  async email(message) {
+    message.setReject('No mailbox here');
   },
 
   async scheduled(event, env, ctx) {

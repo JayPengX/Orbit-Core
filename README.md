@@ -96,7 +96,7 @@ worker.js            the proxy's router; each route's work in its own file:
 ├── transit.js                                 transit
 ├── sports.js, sports-today.js, f1-live.js, asia-baseball.js
 ├── stock-fill.js, stock-check.js, fund-nav.js, taifex.js   Securities
-├── money.js, money-read.js, money-mail.js, invoice.js      Money
+├── money.js, money-read.js, invoice.js      Money
 ├── law.js, law-chat.js, law-ground.js, law-more.js, law-page.js, law-hosts.js
 └── data.js, http.js, capacity.js, pace.js, ops.js, doc-store.js, store-backup.js
 gemini-relay.js      Gemini, pinned to Taiwan

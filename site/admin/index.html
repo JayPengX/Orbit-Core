@@ -1866,7 +1866,7 @@ async function loadErrors() {
   }
 }
 // Each job: its name, and how long between runs before it's late.
-const JOBS = { notices: ['通知', 10], alerts: ['帳單警示', 30], f1: ['F1 圈速（週四到週一）', 10], 'weather-skill': ['天氣評分（每小時）', 120], capacity: ['容量（每 6 小時）', 420], 'build:watch': ['建置：精華連結（每小時）', 120], 'build:cutouts': ['建置：去背照片（每小時）', 120], 'build:buses': ['建置：公車（每小時）', 120], 'build:daily': ['建置：每日（賽程、CPBL、照片、勝率）', 120], bikes: ['YouBike 保溫（每 2 分鐘）', 10], 'store-backup': ['每晚備份（04:30）', 26 * 60], mail: ['發票寄入（Money，有信才跑）', Infinity], 'build:f1kept': ['建置：F1 過去的賽段', 26 * 60], 'data-folders': ['R2 資料的檔案數（每 6 小時）', 7 * 60] };
+const JOBS = { notices: ['通知', 10], alerts: ['帳單警示', 30], f1: ['F1 圈速（週四到週一）', 10], 'weather-skill': ['天氣評分（每小時）', 120], capacity: ['容量（每 6 小時）', 420], 'build:watch': ['建置：精華連結（每小時）', 120], 'build:cutouts': ['建置：去背照片（每小時）', 120], 'build:buses': ['建置：公車（每小時）', 120], 'build:daily': ['建置：每日（賽程、CPBL、照片、勝率）', 120], bikes: ['YouBike 保溫（每 2 分鐘）', 10], 'store-backup': ['每晚備份（04:30）', 26 * 60], 'build:f1kept': ['建置：F1 過去的賽段', 26 * 60], 'data-folders': ['R2 資料的檔案數（每 6 小時）', 7 * 60] };
 // F1's laps run Thursday to Monday, UTC (worker.js's F1_DAYS): the other days it rests, never late.
 const restsToday = (b, now) => b.job === 'f1' && ![0, 1, 4, 5, 6].includes(new Date(now).getUTCDay());
 const isLate = (b, now) => !restsToday(b, now) && now - b.at > (JOBS[b.job]?.[1] || 120) * 60_000;
