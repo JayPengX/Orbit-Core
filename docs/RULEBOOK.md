@@ -155,6 +155,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 10-27 Categories have subs and are the person's to edit; auto-fill (自動帶入) is set per user, never hardcoded.
 - 10-27 Sheets fit their content; nothing that matters below the fold; 手機條碼 stays black on white in dark mode.
 - 悠遊卡/一卡通 are 儲值卡, never 電子錢包; removing an account never loses history.
+- 10-27 記一筆: the amount is a field (tap the number, the iPhone's keys; no keypad of our own); every category in view, no pages to swipe. Something not set shows nothing (no example values); 預算 sits in 更多 until one is set, then in 統計. Ways to pay show their own logos.
 - 10-27 退款 is never income: it comes off its spend, all or part. A friend's share of what you paid comes off too; their cash counts once handed over.
 - 10-27 Every change to what entries mean works on what's already logged (old books upgraded on open).
 - 10-27 A 自動加值 nobody in the books paid for (a parent's card) is 收入.
