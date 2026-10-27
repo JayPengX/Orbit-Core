@@ -2965,7 +2965,8 @@ dialog {
 .q-pass .ms-look .av-face { display: block; width: 100%; height: 100%; }
 .q-pass .ms-look.icon { border-radius: 10px; opacity: 0.85; }
 .q-pass .ms-name { display: flex; align-items: baseline; gap: 8px; }
-.q-pass .ms-name em { color: var(--accent); font: var(--q-t-footnote); font-style: normal; }
+.q-pass .ms-name em { color: var(--accent); font: var(--q-t-footnote); font-style: normal; white-space: nowrap; }
+.q-pass .ms-wear { padding: 1px 10px; border-radius: 999px; background: var(--accent-wash); color: var(--accent); font: 600 13px/20px var(--q-font); white-space: nowrap; }
 .q-pass .ms-row.on .ms-look { box-shadow: 0 0 0 2px var(--q-surface), 0 0 0 4px var(--accent); }
 .q-pass .ms-row .q-cell-text small { white-space: normal; text-wrap: pretty; }
 .q-pass .ms-side { flex: none; display: grid; justify-items: end; gap: 6px; }

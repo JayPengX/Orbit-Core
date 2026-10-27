@@ -278,6 +278,7 @@ export function avatarSvg(id) {
 // family, `ms-<app>.<tier>`, a planet in the app's colours ringed in the
 // tier's metal (0 none yet, 1 bronze, 2 silver, 3 gold; a bare `ms-<app>`
 // is gold), the app's sign on a medal of that metal, a star for each tier.
+// The medal sits inside the circle the picture is shown in (r 32), whole.
 const MEDAL = { pass: { body: '#a5b4fc', deep: '#4338ca', night: '#1e1b4b' } };
 const METALS = [
   ['#e2e8f0', '#94a3b8', '#475569'],
@@ -293,7 +294,7 @@ function medalSvg(app, tier = 3) {
   const [hi, mid, lo] = METALS[tier];
   const ring = (d, o) => `<g transform="rotate(-18 32 41)"><path d="M3 41a29 8 0 0 ${d} 58 0" fill="none" stroke="url(#g)" stroke-width="3.4" stroke-linecap="round" opacity="${o}"/></g>`;
   const stars = STARS.slice(0, tier).map(d => `<path d="${d}" fill="${hi}"/>`).join('') || '<circle cx="51" cy="10" r="1.3" fill="#fff" opacity=".6"/>';
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><radialGradient id="s" cx=".3" cy=".2" r="1"><stop offset="0" stop-color="${p.deep}"/><stop offset="1" stop-color="${p.night}"/></radialGradient><radialGradient id="b" cx=".34" cy=".28" r=".8"><stop offset="0" stop-color="#f8fafc"/><stop offset=".5" stop-color="${p.body}"/><stop offset="1" stop-color="${p.deep}"/></radialGradient><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${hi}"/><stop offset=".5" stop-color="${mid}"/><stop offset="1" stop-color="${lo}"/></linearGradient></defs><rect width="64" height="64" fill="url(#s)"/>${stars}${ring(1, 0.55)}<circle cx="${PLANET.x}" cy="${PLANET.y}" r="${PLANET.r}" fill="url(#b)"/><ellipse cx="25" cy="21" rx="6" ry="3.4" fill="#fff" opacity=".4" transform="rotate(-28 25 21)"/>${FACES[1]()}${ring(0, 1)}<circle cx="50" cy="50" r="11" fill="url(#g)" stroke="${p.night}" stroke-width="1.6"/><g transform="translate(41.5 41.5) scale(.1328)">${GLYPHS[app](p.night, '#fff')}</g></svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><radialGradient id="s" cx=".3" cy=".2" r="1"><stop offset="0" stop-color="${p.deep}"/><stop offset="1" stop-color="${p.night}"/></radialGradient><radialGradient id="b" cx=".34" cy=".28" r=".8"><stop offset="0" stop-color="#f8fafc"/><stop offset=".5" stop-color="${p.body}"/><stop offset="1" stop-color="${p.deep}"/></radialGradient><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${hi}"/><stop offset=".5" stop-color="${mid}"/><stop offset="1" stop-color="${lo}"/></linearGradient></defs><rect width="64" height="64" fill="url(#s)"/>${stars}${ring(1, 0.55)}<circle cx="${PLANET.x}" cy="${PLANET.y}" r="${PLANET.r}" fill="url(#b)"/><ellipse cx="25" cy="21" rx="6" ry="3.4" fill="#fff" opacity=".4" transform="rotate(-28 25 21)"/>${FACES[1]()}${ring(0, 1)}<circle cx="45.5" cy="45.5" r="10" fill="url(#g)" stroke="${p.night}" stroke-width="1.5"/><g transform="translate(37.8 37.8) scale(.12)">${GLYPHS[app](p.night, '#fff')}</g></svg>`;
 }
 const medalOf = id => {
   const [, app, tier] = /^ms-(\w+)(?:\.([0-3]))?$/.exec(id) || [];
