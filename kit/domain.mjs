@@ -57,4 +57,3 @@ export const ORIGINS = here.origins;
 export const API = here.api;
 export const onDomain = here.on;
 export const isApi = here.isApi;
-export const MAIL_DOMAIN = here.domain;

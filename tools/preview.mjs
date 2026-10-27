@@ -648,14 +648,6 @@ if (!live) await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.worker
   const res = await handleTransit(new Request(req.url()), transitEnv, cors, u.pathname, { session: { s: 'preview' }, fetchFn, cache: null });
   await route.fulfill({ status: res.status, contentType: 'application/json', headers: cors, body: await res.text() });
 });
-// Orbit Money's /money-mail (money-mail.js), made up: an address on an
-// example domain, nothing received yet (--fixture 'money-mail=file.json' for
-// another state: a note, got).
-await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/money-mail/, async route => {
-  const fixture = fixtures.find(([text]) => route.request().url().includes(text));
-  const body = fixture ? await readFile(fixture[1], 'utf8') : JSON.stringify({ address: 'k7m2q9xw4a@mail.example', items: [], note: null, got: null });
-  await route.fulfill({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body });
-});
 // Orbit Law's /law-page, read here (no Pass): the Worker's own reader, over
 // Node's https with legacy TLS renegotiation allowed (ppg.ly.gov.tw needs it).
 const legacyFetch = (url, init = {}) =>
@@ -679,7 +671,7 @@ await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/law
 });
 // The /stock Worker's store for the run.
 const stockDocs = new Map();
-await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(?!weather|push|transit|sports-proxy|law-page|money-mail|data\/)/, async route => {
+await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(?!weather|push|transit|sports-proxy|law-page|data\/)/, async route => {
   const req = route.request();
   const body = req.postDataJSON?.() || {};
   // Orbit Securities' orders, plans and 新股申購 (stock-fill.js): the

@@ -1,8 +1,6 @@
 // The 載具's invoices as 財政部's 電子發票整合服務平台 exports them (查詢消費發票
 // › 匯出, a CSV it emails). A person can't have the platform's AppID, so this
-// file is how a 載具's invoices reach Orbit Money: picked in the app, or
-// forwarded to the account's own mail address (the Worker's email handler,
-// money-mail.js). Pure; both read it.
+// file is how a 載具's invoices reach Orbit Money: picked in the app. Pure.
 //
 // The layouts: '|'-separated M (invoice) and
 // D (item) rows under 表頭=/明細= lines naming their columns, or a plain CSV

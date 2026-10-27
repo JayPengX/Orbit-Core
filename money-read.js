@@ -12,7 +12,8 @@
 import { json, isAllowedOrigin, bodyText, sha256Hex } from './http.js';
 import { sessionLimited } from './orbit-token.js';
 import { countOf, addOne } from './law.js';
-import { passOfMoney } from './money-mail.js';
+// The Pass behind an Orbit Money session (its token's `d`), or null.
+const passOfMoney = session => (session?.a === 'money' && typeof session.d === 'string' && session.d ? session.d : null);
 import { DEV } from './kit/brand.mjs';
 
 export const READ_LIMITS = { perPass: 30, perDay: DEV.aiMoneyRead.def, maxBody: 6_000_000, maxBuys: 60, maxItems: 60 };

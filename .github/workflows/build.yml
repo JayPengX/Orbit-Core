@@ -10,12 +10,8 @@ on:
       job:
         description: The job
         type: choice
-        options: [watch, watch-full, cutouts, buses, play, asia, cpbl, sports, photos, winprob, kept, kept-dry, f1kept, f1kept-count, gemini-check, system, mail-check]
+        options: [watch, watch-full, cutouts, buses, play, asia, cpbl, sports, photos, winprob, kept, kept-dry, f1kept, f1kept-count, gemini-check, system, purge-money-mail]
         default: watch
-      to:
-        description: mail-check only, the inbox the sample copy goes to
-        type: string
-        default: ''
 jobs:
   run:
     runs-on: ubuntu-latest
@@ -27,7 +23,7 @@ jobs:
           case "$JOB" in
             gemini-check) url="$base/ops?check=gemini" ;;
             system) url="$base/ops?check=system" ;;
-            mail-check) url="$base/ops?check=mail&to=$(node -p 'encodeURIComponent(process.env.TO)')" ;;
+            purge-money-mail) url="$base/ops?check=purge-money-mail" ;;
             watch-full) url="$base/data/build?job=watch&full=1" ;;
             watch|cutouts|buses) url="$base/data/build?job=$JOB" ;;
             *) url="$base/data/build?only=$JOB" ;;
@@ -35,5 +31,4 @@ jobs:
           curl -sS --max-time 900 -X POST -H "Authorization: Bearer $DATA_PUSH_SECRET" "$url"; echo
         env:
           JOB: ${{ inputs.job }}
-          TO: ${{ inputs.to }}
           DATA_PUSH_SECRET: ${{ secrets.DATA_PUSH_SECRET }}
