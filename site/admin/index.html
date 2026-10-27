@@ -10,7 +10,8 @@
 <link rel="apple-touch-icon" href="../icons/apple-touch-icon.png" />
 <link rel="stylesheet" href="../kit/orbit.css" />
 <style>
-  :root { --q-accent: #2563eb; }
+  /* The panel is the family's one desktop page besides the showcase (Jay 2026-10-27): the kit's phone column lifted. */
+  :root { --q-accent: #2563eb; --q-col-max: 100vw; }
   body { margin: 0; background: var(--q-page); color: var(--q-text); font-family: var(--q-font); }
   main { width: min(980px, 100%); margin: 0 auto; box-sizing: border-box; }
  color: var(--q-muted); margin: 4px 2px 16px; line-height: 1.5; }
@@ -42,6 +43,7 @@
   /* Figures */
   .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
   .card .tiles { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+  @media (min-width: 900px) { .tiles { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); } .card .tiles { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); } }
   .tile { padding: 12px 14px; border-radius: 16px; background: var(--q-fill-4); min-width: 0; }
   .tile small { display: block; color: var(--q-muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .tile strong { display: block; font-size: 24px; font-weight: 800; margin-top: 2px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -254,7 +256,7 @@
   .q-ritem-value.big.neg { color: var(--q-bad); }
   .q-ritem .q-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
   .health-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-  @media (min-width: 700px) { .health-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @media (min-width: 700px) { .health-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
   .hcell { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 12px; border-radius: 16px; background: var(--q-surface); color: var(--q-text); font-weight: 400; text-align: left; white-space: normal; }
   .hcell > span:last-child { flex: 1 1 0; min-width: 0; }
   .hcell b { display: block; overflow: hidden; font-size: 14px; font-weight: 650; white-space: nowrap; text-overflow: ellipsis; }
@@ -284,7 +286,8 @@
   .kpis.two { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 0; }
   .credit { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
   @media (min-width: 700px) { .credit { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-  .app-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 10px; }
+  .app-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  @media (min-width: 700px) { .app-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
   .app-card { display: grid; grid-template-columns: 34px minmax(0, 1fr); column-gap: 10px; align-items: center; padding: 12px; border-radius: 16px; background: var(--q-surface); min-width: 0; }
   .app-card .app-ic { grid-row: 1 / span 2; width: 34px; height: 34px; }
   .app-card b { overflow: hidden; font-size: 14px; white-space: nowrap; text-overflow: ellipsis; }
@@ -340,6 +343,8 @@
   .tool-head i svg { width: 22px; height: 22px; }
   .tool-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
   [hidden] { display: none !important; }
+  /* Secondary lines (a label, a sub-line, a note) wrap onto a second line on a narrow screen, never cut with an ellipsis; names and figures stay on one line. */
+  .tile small, .tile em, .kpi small, .kpi em, .hcell small, .hit small, .stats-strip small, .q-ritem-text > small { white-space: normal; text-overflow: clip; overflow-wrap: anywhere; }
 </style>
 </head>
 <body>
