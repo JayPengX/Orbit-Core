@@ -142,6 +142,9 @@ test('the same ask again is kept and free; a new version of the law asks again',
   assert.equal(again.cached, true);
   assert.equal(again.left, first.left);
   assert.deepEqual(again.points, first.points);
+  // (Full-width, case and the end's ? or 。 don't make it a new question.)
+  for (const q of ['誰可以 聲請', '誰可以 聲請?', '誰可以 聲請。']) assert.equal((await (await ask({ ...OK, q }, { env, pass })).json()).cached, true);
+  assert.equal(gemini.length, calls);
   LAW.m = '20260101';
   try {
     const fresh = await (await ask({ ...OK, q: '誰可以 聲請？' }, { env, pass })).json();
