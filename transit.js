@@ -1247,8 +1247,9 @@ async function transitRoute(request, env, headers, path, { session = null, limit
   if (path === '/transit/status') return send(await statusSample(env, q.get('sample'), { ...deps, fresh: q.get('fresh') === '1', transit: q.get('transit') || '' }));
   if (path === '/transit/config') {
     // One map load per call (the app asks once each time it opens).
-    // (A dev page gets NLSC's map: the browser key works only on the site, and no map load is spent.)
-    const google = !session.dev && Boolean(env.GOOGLE_MAPS_BROWSER_KEY) && (await spend(env, 'maps', 1, now, ctx));
+    // (A dev page gets NLSC's map: the browser key works only on the site, and no map load is spent;
+    // unless it asks ?map=google, as the preview's screenshots do, seen as the site.)
+    const google = (!session.dev || q.get('map') === 'google') && Boolean(env.GOOGLE_MAPS_BROWSER_KEY) && (await spend(env, 'maps', 1, now, ctx));
     return send({ map: google ? { provider: 'google', key: env.GOOGLE_MAPS_BROWSER_KEY } : { provider: 'nlsc' }, search: googleKey(env) ? 'google' : 'osm', tdx: Boolean(env.TDX_CLIENT_ID) });
   }
   if (path === '/transit/running') {
