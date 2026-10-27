@@ -649,10 +649,13 @@ if (!live) await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.worker
   await route.fulfill({ status: res.status, contentType: 'application/json', headers: cors, body: await res.text() });
 });
 // Orbit Money's /money-mail (money-mail.js), made up: an address on an
-// example domain and a Gmail code, nothing waiting.
-await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/money-mail/, route =>
-  route.fulfill({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ address: 'k7m2q9xw4a@mail.example', items: [], confirm: { code: '123456789', at: Date.now() } }) })
-);
+// example domain, nothing received yet (--fixture 'money-mail=file.json' for
+// another state: a note, got).
+await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/money-mail/, async route => {
+  const fixture = fixtures.find(([text]) => route.request().url().includes(text));
+  const body = fixture ? await readFile(fixture[1], 'utf8') : JSON.stringify({ address: 'k7m2q9xw4a@mail.example', items: [], note: null, got: null });
+  await route.fulfill({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body });
+});
 // Orbit Law's /law-page, read here (no Pass): the Worker's own reader, over
 // Node's https with legacy TLS renegotiation allowed (ppg.ly.gov.tw needs it).
 const legacyFetch = (url, init = {}) =>
