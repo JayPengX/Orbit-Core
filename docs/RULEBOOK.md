@@ -132,8 +132,9 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 10-22 Typhoon day-off chance: one number per county, the % is the only indicator (no accuracy shown), the official word wins; hidden under 5%.
 
 ### Securities
-- 10-21 List every securities product a person in Taiwan can legally buy; 10-23: with its real rules, applications and restrictions, however annoying (access gates on branch `claude/securities-access`, never merged without the app's 開戶與交易資格 sheet).
+- 10-21 List every securities product a person in Taiwan can legally buy; 10-23: with its real rules, applications and restrictions, however annoying (kit `stock-access.mjs` gates + the app's 開戶與交易資格 sheet, live).
 - 10-21 No balance on the home page (real-broker feel).
+- 10-27 現股當沖 follows TWSE: account open 3 months with 10 trades in the last year, or a credit account, plus the signed 風險預告書 (`stock-access.mjs` `daytrade`).
 - 10-22 One product bar in 市場; every list = picks, then the whole listing.
 - Orders are filled and cash counted by the proxy (`stock-fill.js`), never the phone.
 - 10-23 Securities follows 臺北市's 停止上班 for trading days.
@@ -202,6 +203,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 | Own domain: same `/<Repo>/` paths | Short paths (`jaypengx.com/law`), old paths 404, no redirects | 10-27 |
 | Apps share the `jaypengx.github.io` origin | They share `jaypengx.com` | 10-27 |
 | Longshot's own keyboard rule | The same rule in the shared kit for every app | 10-27 |
+| Sell-first 當沖 needs 12 months of history | TWSE's 3 months + 10 trades, or a credit account |  10-24 |
 | Handoff: "don't touch the Cloudflare data rename" | Rename finished (`orbit-data`, `orbit-store`) | 10-23 |
 
 ## 7. Contradictions to watch
@@ -209,4 +211,3 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - New kit exports: `TRUTH.md` says use them with a `kit.x?.()` fallback, while the 10-20 cleanup made existing fallbacks direct. Both hold: a new export gets the fallback; once every phone has the kit it can go direct.
 - Longshot keeps its own kit copy although "anything two apps use lives in the kit": Longshot is outside the family on purpose, so look changes are ported to it by hand.
 - Helper tiers: the 10-18 kit roadmap said Strong = opus/high; the 10-19 rule sheet says opus/medium. The newer one (medium) holds.
-- Securities sell-first 當沖: the kit asks 12 months of history, TWSE asks 3 months (with a credit-account exemption). Offered to Jay 10-18, never answered.
