@@ -125,6 +125,8 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 10-23 Following a league counts like following a team; games 00:00–05:00 TW are never "my game".
 - 10-23 Win-probability rows use team logos and shirt colours; the lead row lands on the right play.
 - 10-26 For a game to come, the betting market goes ahead of ESPN's predictor.
+- 10-27 Standings card: once first is settled, the race moves to 2nd, then 3rd, down the table until every place is settled (reverses a 10-26 "zones, not second place" change).
+- 10-27 Swipes: 賽事's tabs swipe where there's no date strip (F1's 賽程 too), and past the last or first tab to the next league; team and player tabs swipe; not a game page (its charts take the finger).
 
 ### Law
 - 10-19 No Cloudflare cost; data built at deploy, never committed.
