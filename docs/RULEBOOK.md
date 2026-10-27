@@ -80,6 +80,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 10-23 Icons: each app its own bright hue, big white symbol over the family ring; share cards are icon + name + one short line (kit `brand.mjs`, `node brand/generate.mjs`).
 - 10-23 Avatars: 96 drawn looks, never emoji; the signed-in dot is small, on the rim, never over the face; picking a look shows no pop-up.
 - 10-27 Maps are weighted by relevance; markers get quieter, never hidden (DESIGN §7).
+- 10-27 Screenshots (READMEs, the showcase): framing edits are fine (crop, a zoomed-in callout of a detail, a headline, a background); content edits never (no faked numbers, no moved or hidden UI, no pixels the app didn't draw). Sample or public data only, in English for the READMEs, light and dark mixed, each set leading with the app's selling point.
 - Jay's test, before calling UI done: open every tab and sheet you changed at 320 and 390 px, light and dark; look for overflow, cut text, duplicates, small logos, emoji, empty screens, leftover old sheets. Run `tools/gate.mjs` on the app.
 
 ## 4. Data, money and cost
