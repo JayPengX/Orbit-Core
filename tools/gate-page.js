@@ -123,7 +123,7 @@
 
   // Every fault on the screen now.
   gate.check = () => {
-    const out = { blank: [], pictures: [], overflow: [], wraps: [], cut: [], letters: [], slots: [], halfEmpty: [], bareEmpty: [], loading: [], orphan: [], tables: [], sheets: [], old: [], scroll: [], white: [], english: [], column: [] };
+    const out = { blank: [], pictures: [], overflow: [], wraps: [], cut: [], letters: [], slots: [], halfEmpty: [], bareEmpty: [], loading: [], orphan: [], tables: [], sheets: [], old: [], scroll: [], white: [], english: [], mixed: [], column: [] };
     const all = [...document.querySelectorAll('body *')].filter(seen);
     const clippedBy = el => {
       for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) if (/auto|scroll|hidden|clip/.test(getComputedStyle(p).overflowX)) return true;
@@ -280,6 +280,43 @@
         if (!/^[A-Za-zÀ-ž][A-Za-zÀ-ž0-9 .'’&-]{3,}$/.test(tx) || /^[A-Z0-9 .&-]+$/.test(tx) || seenNames.has(tx)) continue;
         seenNames.add(tx);
         out.english.push(`${name(el)} "${tx.slice(0, 40)}"`);
+      }
+    }
+    // The other language on the page (Jay 2026-10-27: "mixed with two languages"): a text
+    // that mixes the two (In 立法院 this week, 例如 Daan), or a control or heading in the
+    // other one (a button, a tab, a title, a field's hint). In Chinese an English word in
+    // lower case counts (names, abbreviations and units don't). A name with no other
+    // language (a stop, a fund, a law's text) may stand in a row as it is; text marked
+    // with its own lang (a word being learned) is left alone.
+    {
+      let page = 'zh';
+      try {
+        page = localStorage.getItem('orbit.lang') === 'en' ? 'en' : 'zh';
+      } catch {}
+      const UNITS = /^(km|kg|cm|mm|ml|min|sec|hpa|kwh|kcal|mph|ppm|ppb|pts|vs|www|com|net|org|gov|http|https|io|app|ios|url|png|jpg|pdf|csv|svg|code)$/;
+      const HAN = /[㐀-鿿豈-﫿]/;
+      const latinWord = t => (t.replace(/https?:\S+|\S+@\S+/g, '').match(/(?<![A-Za-z])[a-z]{3,}(?![A-Za-z])/g) || []).some(w => !UNITS.test(w));
+      const CHROME = 'button, [role=button], [role=tab], label, h1, h2, h3, h4, th, legend, summary, .q-list-head, .q-sheet-title, .q-nav-title, .q-tab, .q-seg';
+      const skip = el => {
+        if (el.closest('input, textarea, select, [contenteditable], code, kbd, [translate="no"], .q-lang-switch')) return true;
+        const marked = el.closest('body [lang]')?.getAttribute('lang');
+        return Boolean(marked) && !marked.startsWith(page);
+      };
+      const off = (t, chrome) => {
+        if (page === 'en') return HAN.test(t) && (/[A-Za-z]{2,}/.test(t.replace(/[A-Z0-9]{1,4}(?![a-z])/g, '')) || chrome);
+        return latinWord(t) && (HAN.test(t) || (chrome && !/[A-Z]/.test(t[0])));
+      };
+      const seenMixed = new Set();
+      for (const el of all) {
+        if (skip(el)) continue;
+        const chrome = Boolean(el.closest(CHROME));
+        // Text right in this element (not its children's: each is looked at on its own).
+        const tx = [...el.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join(' ').replace(/\s+/g, ' ').trim();
+        for (const [t, ctl] of [[tx, chrome], [el.getAttribute('placeholder') || '', true], [el.getAttribute('aria-label') || '', true]]) {
+          if (!t || seenMixed.has(t) || !off(t, ctl)) continue;
+          seenMixed.add(t);
+          out.mixed.push(`${name(el)} "${t.slice(0, 50)}"`);
+        }
       }
     }
     // A table that slides sideways (a stats grid wider than the screen).

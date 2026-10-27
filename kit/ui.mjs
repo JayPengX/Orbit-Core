@@ -66,7 +66,18 @@ export function tick() {
 //   days' ends unless given; null: none); follow: every new day to the middle, a tapped
 //   one too; pickLabel: 📅's name; lang: 'zh' | 'en' (the page's).
 // Returns the strip (.q-day-strip-wrap) to put in the bar.
-const dayLang = lang => lang || (/^en/i.test(globalThis.document?.documentElement?.lang || '') ? 'en' : 'zh');
+// (The page's lang, else the Orbit language saved by any app: the kit's own words follow it.)
+const pageLang = () => {
+  const html = globalThis.document?.documentElement?.lang || '';
+  if (html) return /^en/i.test(html) ? 'en' : 'zh';
+  try {
+    return globalThis.localStorage?.getItem('orbit.lang') === 'en' ? 'en' : 'zh';
+  } catch {
+    return 'zh';
+  }
+};
+const dayLang = lang => lang || pageLang();
+const kitW = (zh, en) => (pageLang() === 'en' ? en : zh);
 // Taiwan's today, 'YYYY-MM-DD'.
 export const dayToday = () => twDay(Date.now());
 // The days from `from` to `to` ('YYYY-MM-DD', both kept), in order.
@@ -412,7 +423,7 @@ export function bindSheet(d, { onClose = () => {} } = {}) {
   });
   return shut;
 }
-export function sheet({ title = '', body = [], onClose = () => {}, cls = '', lead = null, trailing = null, detent = '', foot = null, closeLabel = '關閉', label = '', subtitle = '' } = {}) {
+export function sheet({ title = '', body = [], onClose = () => {}, cls = '', lead = null, trailing = null, detent = '', foot = null, closeLabel = kitW('關閉', 'Close'), label = '', subtitle = '' } = {}) {
   const d = h('dialog', { class: `q-sheet ${cls}`.trim(), 'aria-label': label || (typeof title === 'string' ? title : '') || null });
   if (foot) d.classList.add('q-has-foot');
   if (DETENTS.includes(detent)) {
@@ -584,10 +595,10 @@ export function list(rows, { head = '', foot = '', big = false } = {}) {
 }
 
 // ---- Search field ----
-export function search({ placeholder = '搜尋', value = '', onInput = () => {}, onSubmit = null, label = placeholder } = {}) {
+export function search({ placeholder = kitW('搜尋', 'Search'), value = '', onInput = () => {}, onSubmit = null, label = placeholder } = {}) {
   const input = h('input', { type: 'search', placeholder, 'aria-label': label, enterkeyhint: 'search', autocomplete: 'off', autocorrect: 'off', spellcheck: 'false' });
   input.value = value;
-  const clear = h('button', { class: 'q-search-clear', type: 'button', 'aria-label': '清除', text: '✕', onclick: () => ((input.value = ''), input.focus(), onInput('')) });
+  const clear = h('button', { class: 'q-search-clear', type: 'button', 'aria-label': kitW('清除', 'Clear'), text: '✕', onclick: () => ((input.value = ''), input.focus(), onInput('')) });
   input.addEventListener('input', () => onInput(input.value));
   if (onSubmit) input.addEventListener('keydown', e => e.key === 'Enter' && onSubmit(input.value));
   const box = h('label', { class: 'q-search' }, [input, clear]);
@@ -1312,7 +1323,7 @@ export function monthGrid(year, month) {
 }
 const isoDay = (y, m, d) => `${y}-${pad2(m)}-${pad2(d)}`;
 const todayKey = t => (t instanceof Date ? isoDay(t.getFullYear(), t.getMonth() + 1, t.getDate()) : typeof t === 'string' && t ? t : todayKey(new Date()));
-const calLang = lang => lang || (/^en/i.test(globalThis.document?.documentElement?.lang || '') ? 'en' : 'zh');
+const calLang = lang => lang || pageLang();
 const calParts = ({ year, month, marks = {}, today, lang, last } = {}) => {
   const tk = todayKey(today);
   const cell = (key, d) => { const mark = marks?.[key]; return { d, key, mark: mark ? String(mark).replace(/[^\w-]/g, '') : '', today: key === tk }; };
@@ -1322,10 +1333,10 @@ const calParts = ({ year, month, marks = {}, today, lang, last } = {}) => {
     const [ty, tm, td] = tk.split('-').map(Number);
     const end = Date.UTC(ty, tm - 1, td);
     const days_ = Array.from({ length: n }, (_, i) => { const t = new Date(end - (n - 1 - i) * 864e5); return cell(isoDay(t.getUTCFullYear(), t.getUTCMonth() + 1, t.getUTCDate()), t.getUTCDate()); });
-    return { offset: new Date(end - (n - 1) * 864e5).getUTCDay(), days: n, tk, week, days_, label: `last ${n}` };
+    return { offset: new Date(end - (n - 1) * 864e5).getUTCDay(), days: n, tk, week, days_, label: calLang(lang) === 'en' ? `Last ${n} days` : `最近 ${n} 天` };
   }
   const g = monthGrid(year, month);
-  return { ...g, tk, week, label: `${year}-${pad2(month)}`, days_: Array.from({ length: g.days }, (_, i) => cell(isoDay(year, month, i + 1), i + 1)) };
+  return { ...g, tk, week, label: calLang(lang) === 'en' ? `${year}-${pad2(month)}` : `${year} 年 ${month} 月`, days_: Array.from({ length: g.days }, (_, i) => cell(isoDay(year, month, i + 1), i + 1)) };
 };
 // monthCalendar({ year, month (1..12), marks: { 'YYYY-MM-DD': 'done' | 'part' | any word }, today, onPick(key) | data }).
 // `last: N` instead of year/month: the trailing N days ending today, in Sunday-first week rows (leading blanks).
