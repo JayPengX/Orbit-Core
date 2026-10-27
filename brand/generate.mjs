@@ -207,14 +207,18 @@ if (!only.length || only.includes('site')) {
 }
 await browser.close();
 
-// The family's home (Orbit-Core's Pages root): every app.
+// The family's home (Orbit-Core's Pages root): every app, in one language at a
+// time (Jay 2026-10-27: "mixed with two languages"). The page is written in
+// Chinese; each text carries its English in data-en, and a few lines swap them
+// for a reader whose Orbit language (orbit.lang, kit detectLang's rule) is English.
 function homePage() {
   const home = `${SITE_URL}${DOMAIN ? '/pass/' : '/Orbit-Core/'}`;
+  const two = (tag, t, attrs = '') => `<${tag}${attrs} data-en="${esc(t.en)}">${esc(t.zh)}</${tag}>`;
   const card = id => {
     const b = BRANDS[id];
-    return `<a class="app" href="${DOMAIN ? shortPathOf(id) : pathOf(id)}"><img src="brand/${id}.svg" alt="" width="64" height="64"><span><strong>${esc(b.name)}</strong><small>${esc(b.tag.zh)}</small><small class="en">${esc(b.tag.en)}</small></span></a>`;
+    return `<a class="app" href="${DOMAIN ? shortPathOf(id) : pathOf(id)}"><img src="brand/${id}.svg" alt="" width="64" height="64"><span><strong>${esc(b.name)}</strong>${two('small', b.tag)}</span></a>`;
   };
-  const family = `<section><h2><img src="brand/family-orbit.svg" alt="" width="36" height="36">${FAMILY.name}<small>${esc(FAMILY.tag.zh)}</small></h2><div class="apps">${Object.keys(BRANDS).map(card).join('')}</div></section>`;
+  const family = `<section><h2><img src="brand/family-orbit.svg" alt="" width="36" height="36">${FAMILY.name}${two('small', FAMILY.tag)}</h2><div class="apps">${Object.keys(BRANDS).map(card).join('')}</div></section>`;
   const og = (k, v) => `<meta property="og:${k}" content="${esc(v)}">`;
   return `<!doctype html>
 <html lang="zh-Hant"><head>
@@ -224,6 +228,7 @@ function homePage() {
 <link rel="icon" href="brand/pass.svg" type="image/svg+xml"><link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 ${og('type', 'website')}${og('site_name', 'Orbit')}${og('title', 'Orbit')}${og('description', 'Orbit：每天用得到的 App，一個 Orbit Pass。')}${og('url', home)}${og('image', `${home}brand/pass-og.jpg`)}${og('image:width', 1200)}${og('image:height', 630)}
 <meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="${home}brand/pass-x.jpg">
+<script>(()=>{let l;try{l=localStorage.getItem('orbit.lang')}catch{}if(l!=='zh'&&l!=='en'){const n=navigator.languages||[navigator.language||'zh-TW'];l=n.some(x=>/^zh/i.test(x))||!n.some(x=>/^en/i.test(x))?'zh':'en'}if(l==='en')document.documentElement.lang='en'})()</script>
 <style>
 :root{color-scheme:light dark;--bg:#f4f5f8;--card:#fff;--text:#0f172a;--muted:#64748b;--line:#e2e8f0}
 @media (prefers-color-scheme:dark){:root{--bg:#020617;--card:#0f172a;--text:#e2e8f0;--muted:#94a3b8;--line:#1e293b}}
@@ -231,16 +236,18 @@ ${og('type', 'website')}${og('site_name', 'Orbit')}${og('title', 'Orbit')}${og('
 main{max-width:880px;margin:0 auto;padding:40px 16px 64px}
 header{display:flex;align-items:center;gap:16px;margin-bottom:28px}header img{width:72px;height:72px}
 h1{margin:0;font-size:32px;letter-spacing:-.02em}header p{margin:2px 0 0;color:var(--muted)}
+.lang{display:block;margin:32px auto 0;padding:8px 16px;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--muted);font:500 13px/1.2 inherit;cursor:pointer}
 h2{display:flex;align-items:center;gap:10px;font-size:22px;margin:32px 0 12px}h2 img{border-radius:9px}h2 small{font-size:14px;font-weight:500;color:var(--muted)}
 .apps{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
 .app{display:flex;gap:14px;align-items:center;padding:14px;border-radius:18px;background:var(--card);border:1px solid var(--line);color:inherit;text-decoration:none}
 .app:hover{border-color:var(--muted)}.app img{flex:none;border-radius:15px}.app span{display:grid;min-width:0}
-.app small{color:var(--muted);font-size:13px}.app small.en{font-size:12px}
-footer{margin-top:40px;color:var(--muted);font-size:13px}
+.app small{color:var(--muted);font-size:13px}
 </style></head><body><main>
-<header><img src="brand/pass.svg" alt=""><div><h1>Orbit Pass</h1><p>${esc(PASS.tag.zh)} · ${esc(PASS.tag.en)}</p></div></header>
+<header><img src="brand/pass.svg" alt=""><div><h1>Orbit Pass</h1>${two('p', PASS.tag)}</div></header>
 ${family}
-<footer>Orbit-Core: the Workers, the kit every app loads (kit/) and these marks (brand/).</footer>
-</main></body></html>
+<button class="lang" type="button" data-en="中文">English</button>
+</main>
+<script>(()=>{const zh=new Map(),show=l=>{document.documentElement.lang=l==='en'?'en':'zh-Hant';for(const el of document.querySelectorAll('[data-en]')){if(!zh.has(el))zh.set(el,el.textContent);el.textContent=l==='en'?el.dataset.en:zh.get(el)}};if(document.documentElement.lang==='en')show('en');document.querySelector('.lang').onclick=()=>{const l=document.documentElement.lang==='en'?'zh':'en';try{localStorage.setItem('orbit.lang',l)}catch{}show(l)}})()</script>
+</body></html>
 `;
 }
