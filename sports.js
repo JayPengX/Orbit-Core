@@ -1356,6 +1356,9 @@ async function resolveOne(upstreamUrl, trim, ctx, { mirror = true, within } = {}
   // A CPBL month kept "for good" cut short (settled from part of it, before
   // only whole months were): not a copy at all (September 2026's 3 games).
   if (cached && isCpblMonth(upstreamUrl) && match.headers.get('X-Sports-Proxy-Final') === '1' && !parsed(cached.body)?.whole) cached = null;
+  // A race weekend's day kept "for good" before all its sessions were over
+  // (the rule before 2026-10-27): not a copy either, read again.
+  if (cached && /\/racing\/[^/]+\/scoreboard$/.test(upstreamUrl.pathname) && match.headers.get('X-Sports-Proxy-Final') === '1' && !settledData(upstreamUrl, parsed(cached.body))) cached = null;
   if (cached) {
     // A copy over for good is fresh a day (CACHE_FINAL), not its address's seconds.
     if (match.headers.get('X-Sports-Proxy-Final') === '1') policy = CACHE_FINAL;
