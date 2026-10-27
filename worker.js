@@ -41,13 +41,14 @@ import { handleWeather } from './weather.js';
 import { weatherCron, skillReport } from './weather-skill.js';
 import { handleTransit, tally, warmBikes } from './transit.js';
 import { readDev, capacityCron, CONFIG_COLLECTION } from './eco-admin.js';
+import { PASSKEY_COLLECTION } from './passkey.js';
 import { backupStore } from './store-backup.js';
 import { paceOf } from './pace.js';
 import { beat, tellOwner, systemReport, countFolders, FOLDERS_KEY } from './ops.js';
 import { applyScale } from './capacity.js';
 import { handleSports, sportsCron, useDevSettings } from './sports.js';
 import { handleToday } from './sports-today.js';
-import { isAllowedOrigin, corsHeaders, json, LOCAL_ORIGIN, bodyText, sha256Hex } from './http.js';
+import { isAllowedOrigin, corsHeaders, json, LOCAL_ORIGIN, bodyText, sha256Hex, ipBucket } from './http.js';
 import { handleData } from './data.js';
 import { handleStock, moveBook } from './stock-fill.js';
 import { runBuilders, SLOTS as BUILD_SLOTS } from './builders/run.js';
@@ -169,8 +170,10 @@ export function isRateLimitedInMemory(bucketKey, limit, windowMs = RATE_WINDOW_M
 
 // `feature` keys the counter (e.g. 'gemini', 'sync:read', 'sync:write') so
 // every call site's limit is tracked apart from every other's.
+// (An IPv6 address is counted by its /64: one home or phone holds 2^64 of
+// them, so a guesser changing address every try would have counted as new.)
 function isRateLimited(env, ip, feature, limit, windowMs = RATE_WINDOW_MS) {
-  return isRateLimitedInMemory(`${feature}:${ip}`, limit, windowMs);
+  return isRateLimitedInMemory(`${feature}:${ipBucket(ip)}`, limit, windowMs);
 }
 
 // Charges one request against `feature`'s per-IP hourly counter and returns
@@ -1081,7 +1084,7 @@ function generateCode(length) {
 // The Pass's store (doc-store.js): D1. Every version these replace is kept
 // (doc-store.js history): the wallets, each app's data, the inbox, the
 // config and the books, and Securities' checked money and fills.
-const DOCS = docStore({ keep: new Set([WALLET_COLLECTION, INBOX_COLLECTION, CONFIG_COLLECTION, 'stock-verified', 'stock-fills', ...Object.values(ECO_APPS).map(a => a.collection)]) });
+const DOCS = docStore({ keep: new Set([WALLET_COLLECTION, INBOX_COLLECTION, CONFIG_COLLECTION, PASSKEY_COLLECTION, 'stock-verified', 'stock-fills', ...Object.values(ECO_APPS).map(a => a.collection)]) });
 const ECO_DEPS = {
   json,
   errorJson,

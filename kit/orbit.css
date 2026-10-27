@@ -1500,6 +1500,22 @@ dialog.q-sheet.q-full {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+.q-cell-act {
+  flex: none;
+  min-height: 34px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--q-accent);
+  font: var(--q-t-body);
+  cursor: pointer;
+}
+.q-cell-act.danger {
+  color: var(--q-red);
+}
+.q-cell-act:disabled {
+  opacity: 0.4;
+}
 .q-cell.chevron::after,
 .q-row-btn.chevron::after {
   content: '';
@@ -2482,6 +2498,70 @@ dialog.q-moved::backdrop {
 .q-pass-input:focus {
   outline: 2px solid var(--q-accent);
   outline-offset: 1px;
+}
+/* The pass as a password: dots, with 顯示 at its end; the username a
+   password manager files it under is there but never seen. */
+.q-pass-field {
+  position: relative;
+}
+.q-pass-field .q-pass-input {
+  padding: 0 64px;
+}
+.q-pass-eye {
+  position: absolute;
+  inset: 0 6px 0 auto;
+  margin: auto 0;
+  height: 40px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--q-accent);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+}
+.q-pass-user {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  opacity: 0;
+}
+/* Or a passkey: under the form, as Sign in with Apple sits under a login. */
+.q-gate-or {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+}
+.q-gate-or-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--q-muted);
+  font-size: 12.5px;
+}
+.q-gate-or-line::before,
+.q-gate-or-line::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--q-border);
+}
+.q-passkey-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.q-passkey-btn svg {
+  width: 20px;
+  height: 20px;
+  flex: none;
 }
 .q-gate-error {
   min-height: 1em;

@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { handleEcoRequest, mergeWallet, poolBalance, cleanPatch, emptyWallet, paydayEntries, worthOf, PAY, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, ECO_APPS, rankEntries, RANKS } from '../eco.js';
 import { planClean, tidyWallet } from '../eco-admin.js';
+import { passKey } from '../eco.js';
 
 function setup() {
   const store = new Map();
@@ -281,7 +282,7 @@ test('one pass merged into two at once: its money lands once', async () => {
   const b = await newPass(t);
   const src = await newPass(t);
   const { updateWallet } = await import('../eco.js');
-  await updateWallet(t.env, t.deps, await t.deps.sha256Hex(src.passcode), w => ({ ...w, entries: [...w.entries, { id: 'stock:gift', t: 1, app: 'stock', kind: 'fee', amount: -500 }] }));
+  await updateWallet(t.env, t.deps, await passKey(t.env, src.passcode), w => ({ ...w, entries: [...w.entries, { id: 'stock:gift', t: 1, app: 'stock', kind: 'fee', amount: -500 }] }));
   slowReads(t);
   const [ma, mb] = await Promise.all([a, b].map(x => t.call('POST', '', { op: 'merge', qt: x.token, sources: [{ passcode: src.passcode }] })));
   assert.deepEqual([ma.status, mb.status].sort(), [200, 404]);
@@ -580,7 +581,7 @@ test('the lock-down: an app adds no money to the pool (the Worker does), not eve
   // (The clock after the lock-down.)
   t.advance(Date.parse('2026-10-13T00:00:00Z') - 1_700_000_000_000);
   const acct = await newPass(t, 'stock');
-  acct.docId = await t.deps.sha256Hex(acct.passcode);
+  acct.docId = await passKey(t.env, acct.passcode);
   const send = entries => t.call('PATCH', `${t.qt(acct.token)}&app=stock`, { wallet: { entries } });
   const before = Date.parse('2026-10-10T00:00:00Z');
   const w = await send([
@@ -771,11 +772,11 @@ test('a save never breaks or blindly replaces the stored data: JSON stays JSON, 
   assert.equal(stale.status, 409);
   assert.equal(stale.data.error.code, 'ECO_DATA_CHANGED');
   assert.equal(stale.data.updateTime, second.data.updateTime);
-  assert.equal(t.store.get(`${ECO_APPS.law.collection}/${(await t.deps.sha256Hex(a.passcode))}`).payload, '{"marks":[1,2]}');
+  assert.equal(t.store.get(`${ECO_APPS.law.collection}/${(await passKey(t.env, a.passcode))}`).payload, '{"marks":[1,2]}');
   // A kit that says what it last saw: saved, and the version it replaced kept.
   assert.equal((await save({ payload: '{"marks":[3]}', seen: first.data.updateTime })).status, 200);
   assert.deepEqual(kept, ['overwrite']);
-  assert.equal((await save({ payload: '{"marks":[4]}', seen: t.store.get(`${ECO_APPS.law.collection}/${(await t.deps.sha256Hex(a.passcode))}`).updateTime })).status, 200);
+  assert.equal((await save({ payload: '{"marks":[4]}', seen: t.store.get(`${ECO_APPS.law.collection}/${(await passKey(t.env, a.passcode))}`).updateTime })).status, 200);
   assert.deepEqual(kept, ['overwrite']);
 });
 

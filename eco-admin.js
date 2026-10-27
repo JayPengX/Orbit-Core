@@ -15,7 +15,7 @@
 // SHA-256; the token itself is never in the repo). Without the secret, no one gets in.
 
 import { systemReport, alertAccount, tell, OPS_DOC } from './ops.js';
-import { newPasscode, updateWallet, deleteAccount, ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, PAIR_MS, ECO_LIMITS, parseWallet, poolBalance, gen, emptyWallet } from './eco.js';
+import { newPasscode, passAccount, updateWallet, deleteAccount, ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, PAIR_MS, ECO_LIMITS, parseWallet, poolBalance, gen, emptyWallet } from './eco.js';
 import { sendPush, dueLists } from './push.js';
 import { usage as transitUsage, CAPS as TRANSIT_CAPS, TDX_POINTS, tdxPoints, tdxGuard } from './transit.js';
 import { twDate, GOOGLE_DAILY_CALLS } from './weather.js';
@@ -28,6 +28,7 @@ import { STATE_KEY as GUARD_STATE } from './guard.js';
 import { loans, loanOwed } from './kit/loan.mjs';
 import { govOf } from './kit/gov.mjs';
 import { listBackups, fromBackup } from './store-backup.js';
+import { PASSKEY_COLLECTION, passkeySummary, removePasskey } from './passkey.js';
 
 // The developer settings (kit/devconfig.mjs), one document; GET /config
 // answers them to everyone (worker.js), the panel's 開發 changes them.
@@ -81,7 +82,7 @@ export async function capacityCron(env, deps) {
 // them for Longshot, 2026-10-22.)
 export const RETIRED_COLLECTIONS = ['orbit-schedules', 'eco-links', 'stock-study-leagues', 'odds-open', 'odds-settled', 'odds-tickets', 'kambi-results', 'odds-study-accounts', 'orbit-slip'];
 // (A function: eco.js and this file import each other.)
-const keep = () => new Set([WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, CONFIG_COLLECTION, ...Object.values(ECO_APPS).map(a => a.collection)]);
+const keep = () => new Set([WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, CONFIG_COLLECTION, PASSKEY_COLLECTION, ...Object.values(ECO_APPS).map(a => a.collection)]);
 // The store's batches go 500 at a time; a call stops after this many so it
 // stays inside the Worker's limits.
 const PER_CALL = 1500;
@@ -180,7 +181,7 @@ export async function handleAdmin({ env, deps, headers, request, ip, body }) {
   // every device signed out (so no device sends its old copy back).
   if (body.action === 'reset') {
     const code = String(body.passcode || '').trim().toUpperCase().replace(/[\s-]/g, '');
-    const docId = code ? await deps.sha256Hex(code) : '';
+    const docId = code ? await passAccount(env, deps, code) : '';
     const w = docId ? await deps.fsGet(env, WALLET_COLLECTION, docId) : { exists: false };
     const wallet = w.exists ? parseWallet(w.payload) : null;
     if (!wallet) return deps.errorJson('SYNC_PASSCODE_NOT_FOUND', 404, headers, request);
@@ -193,7 +194,9 @@ export async function handleAdmin({ env, deps, headers, request, ip, body }) {
       sec: { ...(wallet.sec || {}), gen: gen(wallet) + 1 },
       settings: Object.fromEntries(Object.entries(wallet.settings || {}).filter(([k]) => kept(k) || k === 'lang' || k === 'notify')),
       apps: Object.fromEntries(Object.entries(wallet.apps || {}).filter(([a]) => keep.has(a))),
-      inbox: Object.fromEntries(Object.entries(wallet.inbox || {}).filter(([a]) => keep.has(a)))
+      inbox: Object.fromEntries(Object.entries(wallet.inbox || {}).filter(([a]) => keep.has(a))),
+      // (Its passkeys stay, as the pass does: they're how its owner signs in.)
+      ...(wallet.passkeys ? { passkeys: wallet.passkeys } : {})
     };
     const gone = [];
     for (const [app, { collection }] of Object.entries(ECO_APPS)) {
@@ -236,6 +239,7 @@ async function walletList(env, deps) {
       entries: wallet?.entries?.length || 0,
       balance: wallet ? poolBalance(wallet) : null,
       gen: wallet ? gen(wallet) : null,
+      passkeys: wallet?.passkeys?.keys?.length || 0,
       ...creditOf(wallet, now),
       updateTime: w.updateTime
     };
@@ -252,6 +256,7 @@ export async function planClean(env, deps) {
   counts[WALLET_COLLECTION] = wallets.length;
   const accounts = new Set(wallets.map(w => w.id));
   const inboxIds = new Set();
+  const keyIds = new Set();
   const tidy = [];
   const retired = { entries: 0, money: 0, settings: 0, looks: 0 };
   for (const w of wallets) {
@@ -262,6 +267,7 @@ export async function planClean(env, deps) {
       continue;
     }
     for (const ids of Object.values(wallet.inbox || {})) for (const id of ids) inboxIds.add(id);
+    for (const k of wallet.passkeys?.keys || []) keyIds.add(`${w.id}:${k.id}`);
     const { wallet: next, gone } = tidyWallet(wallet, now);
     if (JSON.stringify(next) === JSON.stringify(wallet)) continue;
     tidy.push({ id: w.id, wallet: next, updateTime: w.updateTime });
@@ -270,7 +276,7 @@ export async function planClean(env, deps) {
   }
   for (const name of collections) {
     if (name === WALLET_COLLECTION) continue;
-    const docs = await deps.fsList(env, name, 300, { idsOnly: name !== SHARE_COLLECTION && name !== PAIR_COLLECTION });
+    const docs = await deps.fsList(env, name, 300, { idsOnly: ![SHARE_COLLECTION, PAIR_COLLECTION, PASSKEY_COLLECTION].includes(name) });
     counts[name] = docs.length;
     if (RETIRED_COLLECTIONS.includes(name)) {
       for (const d of docs) deletes.push([name, d.id]);
@@ -281,6 +287,15 @@ export async function planClean(env, deps) {
       for (const d of docs) if (!accounts.has(d.id)) deletes.push([name, d.id]);
     } else if (name === INBOX_COLLECTION) {
       for (const d of docs) if (!inboxIds.has(d.id) || !accounts.has(d.id.split('-')[0])) deletes.push([name, d.id]);
+    } else if (name === PASSKEY_COLLECTION) {
+      // A passkey's finder whose account no longer has that key.
+      for (const d of docs) {
+        let v = null;
+        try {
+          v = JSON.parse(d.payload);
+        } catch {}
+        if (!keyIds.has(`${v?.d}:${v?.id}`)) deletes.push([name, d.id]);
+      }
     } else if (name === SHARE_COLLECTION || name === PAIR_COLLECTION) {
       for (const d of docs) {
         let v = null;
@@ -496,6 +511,7 @@ export const ADMIN_TOOLS = {
       settings: Object.keys(wallet.settings || {}).sort(),
       inbox: Object.fromEntries(Object.entries(wallet.inbox || {}).map(([k, v]) => [k, v.length])),
       pushes,
+      passkeys: passkeySummary(wallet),
       ...creditOf(wallet, now),
       gov: govOf(wallet),
       loans: loans(wallet).map(l => ({ id: l.id, t: l.t, principal: l.principal, apr: l.apr, weeks: l.weeks, paid: l.paid, lates: l.lates, bad: !!l.bad, settled: l.settled, owed: Math.round(loanOwed(l, now)) }))
@@ -519,6 +535,14 @@ export const ADMIN_TOOLS = {
     if (!hit) return notFound;
     const res = await updateWallet(env, deps, hit.id, w => ({ ...w, sec: { ...(w.sec || {}), gen: gen(w) + 1 }, live: null }));
     return { ok: true, gen: gen(res.wallet) };
+  },
+  // One passkey taken off (a lost phone): the pass and its other keys still sign in.
+  async 'passkey-remove'({ env, deps, body }) {
+    const hit = await findWallet(env, deps, body.wallet);
+    if (!hit) return notFound;
+    if (!(hit.wallet.passkeys?.keys || []).some(k => k.id === body.id)) return { error: 'ECO_PASSKEY_UNKNOWN', status: 404 };
+    const res = await removePasskey(env, deps, hit.id, body.id);
+    return { ok: true, passkeys: passkeySummary(res?.wallet) };
   },
   // A pass handed out and never used, taken back (its code stops working).
   async remove({ env, deps, body }) {
@@ -595,9 +619,9 @@ export const ADMIN_TOOLS = {
   async find({ env, deps, body }) {
     const code = String(body.passcode || '').trim().toUpperCase().replace(/[\s-]/g, '');
     if (code.length < 6) return { error: 'SYNC_PASSCODE_NOT_FOUND', status: 404 };
-    const doc = await deps.fsGet(env, WALLET_COLLECTION, await deps.sha256Hex(code));
-    if (!doc.exists) return { error: 'SYNC_PASSCODE_NOT_FOUND', status: 404 };
-    return { ref: (await deps.sha256Hex(code)).slice(0, 8) };
+    const id = await passAccount(env, deps, code);
+    if (!id) return { error: 'SYNC_PASSCODE_NOT_FOUND', status: 404 };
+    return { ref: id.slice(0, 8) };
   },
   // One record undone: an 'admin' entry of the opposite amount, once.
   async undo({ env, deps, body }) {
@@ -797,7 +821,8 @@ export const ADMIN_TOOLS = {
   async 'alerts-set'({ env, deps, body }) {
     let account = String(body.account || '').trim();
     const code = String(body.passcode || '').trim().toUpperCase().replace(/[\s-]/g, '');
-    if (code) account = await deps.sha256Hex(code);
+    if (code) account = await passAccount(env, deps, code);
+    if (code && !account) return { error: 'SYNC_PASSCODE_NOT_FOUND', status: 404 };
     if (account && !(await deps.fsGet(env, WALLET_COLLECTION, account).catch(() => null))?.exists) return { error: 'SYNC_PASSCODE_NOT_FOUND', status: 404 };
     await deps.fsWrite(env, ...OPS_DOC, JSON.stringify({ alertAccount: account, at: deps.now() }));
     return { alertAccount: account ? account.slice(0, 8) : '' };

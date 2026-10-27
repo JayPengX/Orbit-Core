@@ -184,6 +184,7 @@
   .gate { max-width: 440px; margin: 18vh auto 0; text-align: center; }
   .gate h2 { margin: 12px 0 4px; }
   .gate .row { margin-top: 14px; }
+  .sr-user { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); opacity: 0; }
   .gate-mark, .mark { display: block; overflow: hidden; border-radius: 22%; }
   .gate-mark { width: 64px; height: 64px; margin: 0 auto; }
   .gate-mark img, .mark img { display: block; width: 100%; height: 100%; }
@@ -353,7 +354,8 @@
     <span class="gate-mark" id="gate-mark"></span>
     <h2>Orbit 管理</h2>
     <p class="muted">貼上「Orbit 管理金鑰.txt」裡的那一行。這台裝置會記住它。</p>
-    <div class="row"><input id="key" class="grow" type="password" autocomplete="off" placeholder="管理金鑰" /><button id="enter" class="primary">進入</button></div>
+    <!-- A real sign-in form, so iCloud Keychain or the browser offers to keep the key (username "Orbit 管理", beside the apps' "Orbit Pass"). -->
+    <form id="gate-form" class="row" method="post" action="#"><input class="sr-user" type="text" name="username" autocomplete="username" value="Orbit 管理" readonly tabindex="-1" aria-hidden="true" /><input id="key" class="grow" type="password" name="password" autocomplete="current-password" placeholder="管理金鑰" /><button id="enter" class="primary" type="submit">進入</button></form>
     <p id="gate-error" class="error"></p>
   </section>
 
@@ -595,6 +597,7 @@
 import { DEV, DEV_GROUPS, cleanDev, BRANDS, appIcon, familyMark, pathOf } from '../kit/brand.mjs';
 import { icons, tileHtml, heroCardHtml, escHtml } from '../kit/ui.mjs';
 import { API, DOMAIN } from '../kit/domain.mjs';
+import { passkeyName } from '../kit/passkey.mjs';
 const ECO_URL = `${API}/eco`;
 const KEY = 'orbit.admin';
 const $ = id => document.getElementById(id);
@@ -614,6 +617,7 @@ const WHY = {
   ADMIN_BAD_AMOUNT: '金額要是非零的數字（±1,000,000 以內），而且要寫原因。',
   ADMIN_IN_USE: '這個帳戶用過了，不能收回；要清空請用「重置」。',
   ADMIN_NO_PUSH: '這個帳戶在這個 App 沒有訂閱通知。',
+  ECO_PASSKEY_UNKNOWN: '這個帳戶沒有這個通行密鑰（可能已經移除）。',
   ADMIN_CONFIRM: '要刪除，請完整輸入這個帳戶的 8 碼代號。',
   ADMIN_NO_ENTRY: '找不到這筆紀錄（或它沒有金額）。',
   ADMIN_DONE_ALREADY: '這筆已經撤銷過了。',
@@ -686,7 +690,8 @@ function open() {
   const want = location.hash.slice(1);
   show(VIEWS[want] ? want : 'overview');
 }
-$('enter').onclick = async () => {
+$('gate-form').onsubmit = async event => {
+  event.preventDefault();
   token = $('key').value.trim();
   $('gate-error').textContent = '';
   try {
@@ -697,7 +702,6 @@ $('enter').onclick = async () => {
     $('gate-error').textContent = e.message;
   }
 };
-$('key').addEventListener('keydown', e => e.key === 'Enter' && $('enter').click());
 $('forget').onclick = () => {
   store.set('');
   location.reload();
@@ -978,7 +982,8 @@ const FILTERS = {
   loan: ['信貸', w => w.loan],
   late: ['逾期／催收', w => w.loan === 'late' || w.loan === 'bad'],
   relief: ['紓困過', w => w.reliefs],
-  idle: ['30 天沒用', w => w.lastUsed && Date.now() - lastOf(w) > 30 * 86_400_000]
+  idle: ['30 天沒用', w => w.lastUsed && Date.now() - lastOf(w) > 30 * 86_400_000],
+  passkey: ['有通行密鑰', w => w.passkeys > 0]
 };
 const SORTS = { lastUsed: lastOf, balance: w => w.balance ?? -Infinity, created: w => Date.parse(w.created || 0) || 0 };
 // A Orbit Pass as typed (10 letters and digits, a dash or spaces anywhere).
@@ -1046,8 +1051,8 @@ $('sort').onclick = e => {
   drawWallets();
 };
 $('csv').onclick = () => {
-  const head = ['代號', '狀態', 'App', '建立', '最後使用', '餘額', '紀錄筆數', '信貸', '未還', '紓困次數', '繳稅'];
-  const rows = wallets.map(w => [w.ref, w.lastUsed ? '使用中' : '未使用', w.apps.map(appName).join(' / '), w.created || '', w.lastUsed || '', w.balance ?? '', w.entries, w.loan ? LOAN_TAG[w.loan][0] : '', w.owed || '', w.reliefs || '', w.tax || '']);
+  const head = ['代號', '狀態', 'App', '建立', '最後使用', '餘額', '紀錄筆數', '信貸', '未還', '紓困次數', '繳稅', '通行密鑰'];
+  const rows = wallets.map(w => [w.ref, w.lastUsed ? '使用中' : '未使用', w.apps.map(appName).join(' / '), w.created || '', w.lastUsed || '', w.balance ?? '', w.entries, w.loan ? LOAN_TAG[w.loan][0] : '', w.owed || '', w.reliefs || '', w.tax || '', w.passkeys || 0]);
   const text = '﻿' + [head, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
   const a = el('a', { href: URL.createObjectURL(new Blob([text], { type: 'text/csv' })), download: `Orbit 帳戶 ${new Date().toISOString().slice(0, 10)}.csv` });
   a.click();
@@ -1166,7 +1171,7 @@ function drawAccount(a) {
   const hero = el('div', { class: 'acct-hero' });
   hero.innerHTML = heroCardHtml({ eyebrow: '餘額', icon: ic('wallet'), big: money(a.balance), sub: a.apps.length ? `${a.apps.length} 個 App · ${ago(a.lastUsed)}用過` : '還沒用過', color: refColor(a.ref) }, tags.length ? `<div class="hero-chips">${tags.map(t => `<button type="button" tabindex="-1">${escHtml(t)}</button>`).join('')}</div>` : '');
   const facts = el('div', { class: 'facts' });
-  facts.innerHTML = [['建立', fmtDay(a.created)], ['紀錄', `${a.entries} 筆`], ['通知', a.pushes.length ? `${a.pushes.length} 個 App` : '沒訂閱'], ['登入世代', String(a.gen)], ['設定', `${a.settings.length} 項`], ['收件匣', `${Object.values(a.inbox || {}).reduce((x, y) => x + y, 0)} 則`]].map(([k, v]) => `<div><small>${k}</small><strong>${escHtml(v)}</strong></div>`).join('');
+  facts.innerHTML = [['建立', fmtDay(a.created)], ['紀錄', `${a.entries} 筆`], ['通知', a.pushes.length ? `${a.pushes.length} 個 App` : '沒訂閱'], ['登入世代', String(a.gen)], ['通行密鑰', a.passkeys?.length ? `${a.passkeys.length} 個` : '沒有'], ['設定', `${a.settings.length} 項`], ['收件匣', `${Object.values(a.inbox || {}).reduce((x, y) => x + y, 0)} 則`]].map(([k, v]) => `<div><small>${k}</small><strong>${escHtml(v)}</strong></div>`).join('');
   const apps = el('div', { class: 'app-grid' });
   apps.innerHTML = [...a.apps].sort((x, y) => (y.last || 0) - (x.last || 0)).map(x => `<div class="app-card" style="--c:${BRANDS[x.app]?.color || 'var(--q-accent)'}">${appIc(x.app)}<b>${escHtml(BRANDS[x.app]?.short || appName(x.app))}</b><small>${escHtml(ago(x.last))}</small></div>`).join('');
   // 信貸: the one being paid (or in 催收) and how many are settled.
@@ -1331,12 +1336,33 @@ function drawAccount(a) {
     recList.replaceChildren(card);
   };
   drawRecs();
+  // 通行密鑰: each one, who keeps it, when added and last used; one removed (a lost phone).
+  const keyBox = a.passkeys?.length ? el('div', { class: 'q-rowcard' }) : null;
+  for (const k of a.passkeys || []) {
+    const item = el('div', { class: 'q-ritem' });
+    item.innerHTML = `${tileHtml(ic('key'), '#0a84ff', 'sm')}<span class="q-ritem-text"><span class="q-ritem-title">${escHtml(passkeyName(k, 'zh'))}${k.sync ? '' : ' · 只在這台裝置'}</span><small>${escHtml(`${fmtDay(k.t)} 加入 · ${k.used ? `${ago(k.used)}用過` : '還沒用過'}`)}</small></span>`;
+    const btn = el('button', { class: 'icon-btn', title: '移除這個通行密鑰', 'aria-label': '移除這個通行密鑰' });
+    btn.innerHTML = ic('trash');
+    btn.onclick = () =>
+      busy(btn, async () => {
+        if (!confirm(`移除帳戶 ${a.ref} 的「${passkeyName(k, 'zh')}」？\n通行碼和其他通行密鑰照常可用。`)) return;
+        try {
+          await admin('passkey-remove', { wallet: a.ref, id: k.id });
+          reload();
+        } catch (e) {
+          alert(e.message);
+        }
+      });
+    item.append(btn);
+    keyBox.append(item);
+  }
   $('acct-body').replaceChildren(
     hero,
     facts,
     ...(a.apps.length ? [el('div', { class: 'sec-head' }, [el('h2', { text: 'App' })]), apps] : []),
     ...(loanBox ? [loanBox] : []),
     ...(govBox ? [el('div', { class: 'sec-head' }, [el('h2', { text: '政府' })]), govBox] : []),
+    ...(keyBox ? [el('div', { class: 'sec-head' }, [el('h2', { text: '通行密鑰' })]), keyBox] : []),
     el('div', { class: 'sec-head' }, [el('h2', { text: '操作' })]),
     acts,
     pane,

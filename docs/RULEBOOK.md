@@ -162,6 +162,9 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 
 ### Orbit Pass
 - 10-23 Pass card: avatar, 里程碑 n/9, account number without prefix, medal strip; no money on the Pass.
+- 10-27 Passkeys (Face ID, Touch ID, Windows Hello, a password manager, a security key, a phone by QR): any number per Pass, each named and removable; an existing Pass adds one any time (one-time offer 「加入 Face ID 登入」, never asked again). Keep it simple: the 10-character pass and passkeys both sign in, no "passkey only" mode. One passkey for every Orbit app and the admin page (RP ID the domain); Longshot keeps its own Pass.
+- 10-27 The pass is stored hashed slow and peppered (a stolen database alone is useless); no lockouts and no forced resets: older passes upgrade when changed. Account number shown: its first 6.
+- 10-27 Every sign-in (Orbit, the admin key, Longshot and its admin) is a form password managers save and fill.
 
 ### Showcase (Jay's 自主學習 portfolio)
 - 10-27 Open to all (no Pass, no install gate) and a real desktop layout besides the phone one (exceptions to §2).

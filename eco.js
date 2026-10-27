@@ -49,11 +49,13 @@
 //   POST   /eco { op: 'share-create', qt }            an Orbit share key
 //   POST   /eco { op: 'share-redeem', qt, key }       a copy of that schedule
 //   POST   /eco { op: 'admin', token, action }        the store's clean-up
+//   POST   /eco { op: 'passkey-…' }                    passkeys (passkey.js)
 
 import { retire } from './money.js';
 import { storeReady } from './doc-store.js';
 import { tokenSecret, signToken, readToken, seal, unseal, sessionLimited, SESSION_MS, REFRESH_MS, HANDOFF_MS } from './orbit-token.js';
 import { handleAdmin } from './eco-admin.js';
+import { passkeyBegin, passkeyLogin, passkeyAddBegin, passkeyAdd, passkeyRemove, passkeySummary, pointPasskeys, dropIndex, passkeyIds } from './passkey.js';
 import { PAY_WEEK, weekStart, mondayId, debtOf, activeLoan, loanOffer, loanEntries, loanDue, payoffAmount, reliefCheck, reliefEntry } from './kit/loan.mjs';
 
 export const ECO_PASSCODE_LENGTH = 10;
@@ -102,7 +104,7 @@ const MAX_MERGE_SOURCES = 12;
 // session are counted per session and app in memory (TOKEN_LIMIT a minute).
 // (admin: the owner's panel, whose token is 32+ random characters; its tools
 // call several times a view.)
-export const ECO_LIMITS = { create: 20, login: 30, merge: 20, share: 30, admin: 600 };
+export const ECO_LIMITS = { create: 20, login: 30, merge: 20, share: 30, admin: 600, passkey: 120 };
 export const TOKEN_LIMIT = 90;
 
 export function emptyWallet(now = Date.now()) {
@@ -302,6 +304,7 @@ export function mergeWallet(a, b) {
     ...(base.v2 || b.v2 ? { v2: base.v2 || b.v2 } : {}),
     ...(base.live ? { live: base.live } : {}),
     ...(base.sec ? { sec: base.sec } : {}),
+    ...(base.passkeys ? { passkeys: base.passkeys } : {}),
     ...(base.merged ? { merged: base.merged } : {})
   };
 }
@@ -330,11 +333,12 @@ function touchApp(wallet, app, now) {
   return { ...wallet, apps: { ...(wallet.apps || {}), [app]: { first: had?.first ?? now, last: now } } };
 }
 
-// What clients see of the wallet: not the Worker's own bookkeeping.
+// What clients see of the wallet: not the Worker's own bookkeeping, and of
+// its passkeys only what the Pass sheet lists (never a key).
 export function publicWallet(w) {
   if (!w) return w;
-  const { sec, ...rest } = w;
-  return rest;
+  const { sec, passkeys, ...rest } = w;
+  return passkeys ? { ...rest, passkeys: passkeySummary(w) } : rest;
 }
 
 // The live session of each app (an app opened somewhere else takes only its
@@ -370,7 +374,12 @@ const OPS = {
   'share-redeem': shareRedeem,
   loan: ecoLoan,
   relief: ecoRelief,
-  admin: ctx => handleAdmin(ctx)
+  admin: ctx => handleAdmin(ctx),
+  'passkey-begin': passkeyBegin,
+  'passkey-login': passkeyLogin,
+  'passkey-add-begin': passkeyAddBegin,
+  'passkey-add': passkeyAdd,
+  'passkey-remove': passkeyRemove
 };
 
 export async function handleEcoRequest(request, env, headers, ip, deps) {
@@ -551,7 +560,7 @@ const refreshToken = (secret, c, now) => signToken(secret, { k: 'ref', d: c.d, s
 // A new device session on account `docId` for `app`, made app's live one: the
 // reply every way of signing in shares (a refresh token for the device, a
 // session for the app, the wallet and the app's data).
-async function signIn(ctx, docId, { passcode = null } = {}) {
+export async function signIn(ctx, docId, { passcode = null } = {}) {
   const { env, headers, deps, secret, body, app } = ctx;
   if (!ECO_APPS[app]) return deps.errorJson('ECO_UNKNOWN_APP', 400, headers, ctx.request);
   const now = deps.now();
@@ -621,12 +630,13 @@ async function ecoCreate(ctx) {
 
 // Sign in with the pass.
 async function ecoLogin(ctx) {
-  const { deps, headers, request, body } = ctx;
+  const { env, deps, headers, request, body } = ctx;
   const hit = await limited(ctx, 'login');
   if (hit) return hit;
   const passcode = cleanCode(body.passcode);
   if (!ECO_PASSCODE_PATTERN.test(passcode)) return deps.errorJson('INVALID_PASSCODE', 400, headers, request);
-  const res = await signIn(ctx, await deps.sha256Hex(passcode));
+  const docId = await passAccount(env, deps, passcode);
+  const res = docId && (await signIn(ctx, docId));
   return res || deps.errorJson('SYNC_PASSCODE_NOT_FOUND', 404, headers, request);
 }
 
@@ -786,7 +796,8 @@ async function ecoHandoff(ctx) {
 async function ecoRedeem(ctx) {
   const { env, deps, headers, request, body, secret } = ctx;
   const data = await unseal(secret, body.handoff);
-  if (!data || !(data.e > deps.now()) || typeof data.d !== 'string') return deps.errorJson('ECO_HANDOFF_EXPIRED', 410, headers, request);
+  // (Only a handoff: a passkey's sealed challenge, which has a kind, is none.)
+  if (!data || data.k || !(data.e > deps.now()) || typeof data.d !== 'string') return deps.errorJson('ECO_HANDOFF_EXPIRED', 410, headers, request);
   const w = await deps.fsGet(env, WALLET_COLLECTION, data.d);
   if (!w.exists || gen(parseWallet(w.payload)) !== data.g) return deps.errorJson('ECO_HANDOFF_EXPIRED', 410, headers, request);
   const res = await signIn(ctx, data.d);
@@ -832,6 +843,8 @@ async function ecoRotate(ctx) {
       (inbox[app] ||= []).push(next);
     }
   await deps.fsWrite(env, WALLET_COLLECTION, docId, JSON.stringify({ ...wallet, inbox, sec: { gen: gen(wallet) }, live: null }), { exists: false });
+  // (The passkeys come along: they sign in to the new pass.)
+  await pointPasskeys(env, deps, docId, wallet);
   await deleteAccount(env, deps, c.d);
   return signIn({ ...ctx, app: c.a }, docId, { passcode });
 }
@@ -879,11 +892,15 @@ async function shareRedeem(ctx) {
 // An account taken by this request alone, for a rotate or a merge: its
 // generation moved on (every token of it stops) over the version read. The
 // wallet as taken, or null when another request took it first.
+// (`taken`: when, so a second merge that reads it just after can't take it
+// again at the generation it now has.)
+const TAKEN_MS = 60_000;
 async function claimAccount(env, deps, docId, g) {
   let took = false;
+  const now = deps.now();
   const result = await updateWallet(env, deps, docId, w => {
-    took = gen(w) === g;
-    return took ? { ...w, sec: { ...(w.sec || {}), gen: g + 1 }, live: null } : w;
+    took = gen(w) === g && !(w.sec?.taken > now - TAKEN_MS);
+    return took ? { ...w, sec: { ...(w.sec || {}), gen: g + 1, taken: now }, live: null } : w;
   });
   return took && result ? result.wallet : null;
 }
@@ -920,7 +937,45 @@ export async function deleteAccount(env, deps, docId, { retire: gone = false } =
   if (gone && wallet) await retire(env, deps, wallet).catch(() => {});
   for (const ids of Object.values(wallet?.inbox || {})) for (const id of ids) await deps.fsDelete(env, INBOX_COLLECTION, id);
   for (const { collection } of Object.values(ECO_APPS)) await deps.fsDelete(env, collection, docId);
+  await dropIndex(env, deps, docId, passkeyIds(wallet));
   await deps.fsDelete(env, WALLET_COLLECTION, docId);
+}
+
+// ---- The pass's id ----------------------------------------------------------------
+//
+// An account's id is worked out from its pass, so a pass alone finds it.
+// Since 2026-10-27 (Jay: "10 digits are easy to steal") it is PBKDF2-SHA256
+// of the pass, 100,000 rounds, salted with a pepper made from
+// ECO_TOKEN_SECRET: the database (or an account number read off a
+// screenshot) without that secret gives nothing to guess against, and with
+// it each guess costs 100,000 hashes. ECO_TOKEN_SECRET must therefore never
+// change: the passes made since would no longer find their accounts (the
+// admin page's 找回帳戶 still would).
+//
+// Passes made before keep their id, the pass's plain SHA-256 (the
+// cheapest to guess against a stolen copy): they move to the new kind when
+// their owner picks 更換通行碼. (Moving every account's id at once would sign
+// every device out and move every record, for a database nobody but the
+// owner can read.)
+export const PASS_ROUNDS = 100_000;
+const peppers = new Map();
+export async function passKey(env, passcode) {
+  const secret = env.ECO_TOKEN_SECRET;
+  if (!secret) return '';
+  if (!peppers.has(secret)) {
+    const k = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+    peppers.set(secret, new Uint8Array(await crypto.subtle.sign('HMAC', k, new TextEncoder().encode('orbit-pass:v1'))));
+  }
+  const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(passcode), 'PBKDF2', false, ['deriveBits']);
+  const bits = new Uint8Array(await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: peppers.get(secret), iterations: PASS_ROUNDS }, base, 256));
+  return Array.from(bits, b => b.toString(16).padStart(2, '0')).join('');
+}
+// The account a pass opens ('' for none): the new kind of id, else the old.
+export async function passAccount(env, deps, passcode) {
+  const key = await passKey(env, passcode);
+  if (key && (await deps.fsGet(env, WALLET_COLLECTION, key)).exists) return key;
+  const old = await deps.sha256Hex(passcode);
+  return (await deps.fsGet(env, WALLET_COLLECTION, old)).exists ? old : '';
 }
 
 export async function newPasscode(env, deps) {
@@ -928,7 +983,7 @@ export async function newPasscode(env, deps) {
   // but checked all the same.
   for (let i = 0; i < 4; i++) {
     const passcode = deps.generateCode(ECO_PASSCODE_LENGTH);
-    const docId = await deps.sha256Hex(passcode);
+    const docId = (await passKey(env, passcode)) || (await deps.sha256Hex(passcode));
     if (!(await deps.fsGet(env, WALLET_COLLECTION, docId)).exists) return { passcode, docId };
   }
   throw new Error('could not mint a passcode');
@@ -960,7 +1015,8 @@ async function ecoMerge(ctx) {
   for (const [i, raw] of sources.entries()) {
     const code = cleanCode(raw?.passcode);
     if (!ECO_PASSCODE_PATTERN.test(code)) return json({ error: { code: 'ECO_INVALID_SOURCE', index: i, message: 'bad passcode' } }, 400, headers);
-    const docId = await deps.sha256Hex(code);
+    const docId = await passAccount(env, deps, code);
+    if (!docId) return json({ error: { code: 'ECO_SOURCE_NOT_FOUND', index: i, message: 'not found' } }, 404, headers);
     if (seen.has(docId)) continue;
     seen.add(docId);
     const w = await deps.fsGet(env, WALLET_COLLECTION, docId);
@@ -1026,8 +1082,12 @@ async function ecoMerge(ctx) {
   // (This pass taken meanwhile, by a rotate or a merge into another: nothing
   // lands on it and the sources stay, their money where it was.)
   let ours = true;
-  let result = await updateWallet(env, deps, targetId, w => ((ours = gen(w) === c.g) ? { ...mergeWallet(w, { entries: carried, settings, inbox: inboxAdd }), merged: { t: now, apps: mergedApps } } : w));
+  // The sources' passkeys sign in to this pass from now on.
+  const keys = found.flatMap(src => src.wallet.passkeys?.keys || []);
+  const withKeys = w => (keys.length ? { ...w, passkeys: { user: w.passkeys?.user || found.find(src => src.wallet.passkeys?.user)?.wallet.passkeys.user, keys: [...(w.passkeys?.keys || []), ...keys.filter(k => !(w.passkeys?.keys || []).some(x => x.id === k.id))] } } : w);
+  let result = await updateWallet(env, deps, targetId, w => ((ours = gen(w) === c.g) ? withKeys({ ...mergeWallet(w, { entries: carried, settings, inbox: inboxAdd }), merged: { t: now, apps: mergedApps } }) : w));
   if (!result || !ours) return errorJson('ECO_SIGNED_OUT', 401, headers, request);
+  if (keys.length) await pointPasskeys(env, deps, targetId, { passkeys: { keys } });
   // What this Worker still watches for a source (Securities' fills book) goes to this pass, then anything it paid the
   // source meanwhile comes along too (the same ids: nothing twice).
   for (const src of found) {

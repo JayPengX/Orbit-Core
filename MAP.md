@@ -71,7 +71,7 @@ runs near each caller; only Gemini goes through `gemini-relay.js`, pinned to Tai
 
 | Route | File | What |
 | --- | --- | --- |
-| `/eco` | `eco.js`, `eco-admin.js`, `money.js` | The Pass (§4); `op: 'admin'` is the owner's panel |
+| `/eco` | `eco.js`, `eco-admin.js`, `money.js`, `passkey.js`, `webauthn.js` | The Pass (§4); `op: 'admin'` is the owner's panel |
 | `/stock` | `stock-fill.js`, `stock-check.js` | Securities' fills; replaying the account on each save |
 | `/push/…` | `push.js` | Subscriptions, scheduled notices, checks (an ESPN final, a Yahoo price, weather, a bus) |
 | `/weather…` | `weather.js`, `weather-skill.js`, `typhoon.js` | The blend for a ~1 km cell, the township, scoring sources hourly; while CWA has a typhoon warning out (NCDR's open CAP feed, every 5 minutes), `dayOff`: one answer per county, worked out for all 22 every 3 minutes and shared by every place in it: the county's 停班停課 from 人事行政總處's page (through `gemini-relay`, every 3 minutes), else a chance fitted to the counties' real decisions (68 storms, 2019–2026) at the county seat: the storm circle's edge from CWA's 5-day track (`W-C0034-005`), the storm's strength, the 強風 lamps' gust, the day's rain (MET Norway at the seats, else Open-Meteo, every 30 minutes, floored by CWA's rain warnings) and the neighbours' announcements |
@@ -159,9 +159,26 @@ included), then wiped whole. `private/` is never served.
 
 ## 4. The Orbit Pass (`/eco`)
 
-- **A pass** is a random 10-character code, stored only as its SHA-256.
-  Passes are issued by the owner (admin page or `tools/issue-passes.mjs`);
-  there's no sign-up.
+- **A pass** is a random 10-character code. Its account's id is worked
+  out from it: PBKDF2-SHA256, 100,000 rounds, salted with a pepper made
+  from `ECO_TOKEN_SECRET` (`eco.js passKey`), so the database or an
+  account number gives nothing to guess against. **`ECO_TOKEN_SECRET` must
+  never change**: passes made since 2026-10-27 would no longer find their
+  accounts (the admin page's 找回帳戶 still would). Passes made before keep
+  their plain SHA-256 id until 更換通行碼. Passes are issued by the owner
+  (admin page or `tools/issue-passes.mjs`); there's no sign-up. Sign-in
+  tries are 30 an hour per address (an IPv6 one by its /64).
+- **Passkeys** (`passkey.js`, checked by `webauthn.js`, WebCrypto only):
+  any number per Pass, made in the Pass sheet or the one-time offer
+  (`kit/passkey.mjs`), used on the sign-in screen; the pass still signs in
+  too (no passkey-only mode). RP ID `jaypengx.com`, taken from
+  `https://orbit.<DOMAIN>` only; ES256, EdDSA, RS256; user verification
+  required. Kept in the wallet (`passkeys`, history and backups cover
+  them; the apps see names and dates, never a key); `eco-passkeys` finds
+  the account by a key's id. They follow a new pass and a merge.
+- **Password managers:** the sign-in screen, a new pass and the admin key
+  are real forms (username "Orbit Pass" or "Orbit 管理", the code as a
+  password), so iCloud Keychain or the browser saves and fills them.
 - **Devices never keep the pass:** a refresh token (60 days) and a short
   session token (`orbit-token.js`, HMAC under `ECO_TOKEN_SECRET`).
 - **One app at a time:** the last to claim is live; others get
@@ -268,6 +285,7 @@ import map, so a file has one address whichever loader a page carries.
 | `boot.js` | The loading screen and the version check |
 | `brand.mjs` | Families, names, colours, marks, repos, `DEV` |
 | `pass.mjs`, `help.mjs` | The Pass sheet (account, looks, apps, guides: no money); every app's guide |
+| `passkey.mjs` | Passkeys in the browser: made, used, named (`passkeyHere()` false where a browser can't, and only the pass shows) |
 | `share.mjs`, `qrcode.mjs` | The share sheet (`shareSheet({ url, title, app, icon })`, orbit.mjs loads it): the link and its QR code in the person's own style (colours, dots, corners, a centre icon or photo, margin), saved as PNG (2048 px) or SVG; error correction H with a centre image, a warning for faint or light-on-dark colours. Opened from each app's card in the Pass sheet's App tab and the Showcase. `qrcode.mjs` is qrcode-generator 2.0.4 (MIT), vendored as is |
 | `pass-sync.mjs` | An app's payload kept in step with the Pass's copy (read and merged before any write; once per return, none under 10 s away, an unchanged copy not merged again); Words, Weather |
 | `catalog.mjs`, `logos.mjs`, `names.mjs`, `photos.mjs` | Leagues; logos; Chinese team names; studio headshots |

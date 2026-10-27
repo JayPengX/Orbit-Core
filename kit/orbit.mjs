@@ -32,7 +32,8 @@
 import { BRANDS, FAMILY, pathOf, homeOf, appIcon, familyMark } from './brand.mjs';
 import { DEV, cleanDev } from './brand.mjs';
 import { API, SITE as HOME, isApi } from './domain.mjs';
-import { icons, tile, pullToRefresh, setSheetDetent, h as node } from './ui.mjs';
+import { passkeyHere, passkeyName, deviceName, makePasskey, usePasskey, forgetPasskey, cancelled } from './passkey.mjs';
+import { icons, tile, pullToRefresh, setSheetDetent, toast, h as node } from './ui.mjs';
 
 export const ECO_URL = `${API}/eco`;
 export const PROXY_URL = `${API}/sports-proxy`;
@@ -1537,6 +1538,13 @@ function makeSession(app, { lang, heartbeat }) {
     });
   // A device code: sign in on another device within 10 minutes, once.
   s.deviceCode = () => withToken(qt => call('POST', '', { op: 'pair-create', qt }));
+  // Passkeys (passkey.mjs makes and uses them; the Worker checks): a
+  // challenge first (fetched ahead of the tap), then the key's answer.
+  s.passkeyBegin = () => call('POST', '', { op: 'passkey-begin' });
+  s.passkeyLogin = (challenge, credential) => signIn({ op: 'passkey-login', challenge, credential });
+  s.passkeyAddBegin = () => withToken(qt => call('POST', '', { op: 'passkey-add-begin', qt }));
+  s.passkeyAdd = (challenge, credential) => withToken(qt => call('POST', '', { op: 'passkey-add', qt, challenge, credential, device: deviceName() })).then(absorb);
+  s.passkeyRemove = id => withToken(qt => call('POST', '', { op: 'passkey-remove', qt, id })).then(absorb);
   // (The heartbeat's read every 2 minutes: the whole wallet, up to hundreds
   // of KB, came back each time, and every app redrew for it.)
   // (`since`: the updateTime of the app's data held here; while it's still
@@ -1620,6 +1628,8 @@ function makeSession(app, { lang, heartbeat }) {
     }
     if (!first) first = await signInGate(s);
     s.first = first;
+    // A while after opening signed in: the one-time passkey offer.
+    if (!first?.offline) setTimeout(() => passkeyOffer(s).catch(() => {}), 12_000);
     // The loading screen's line (boot.js): signed in, the app's data next.
     globalThis.__bootStep?.('', 0.8);
     loop();
@@ -1867,12 +1877,35 @@ export { node as el };
 const typedPass = text => cleanCode(text).replace(/[^2-9A-HJ-NP-Z]/g, '').slice(0, 10);
 // No maxlength: a pass is copied as ABCDE-23456 (11 characters), and a
 // maxlength of 10 cut its last character off before the dash was taken out.
-function passInput(label) {
-  const input = node('input', { class: 'q-pass-input', type: 'text', inputmode: 'text', autocomplete: 'off', autocapitalize: 'characters', autocorrect: 'off', spellcheck: 'false', placeholder: 'ABCDE23456', 'aria-label': label });
+// `save`: the field a password manager keeps the pass from ('current-password'
+// to sign in, 'new-password' for a new one), with the keyboard's passkey
+// suggestion beside it where there are passkeys; without, a plain field
+// (other passes typed in to merge).
+let passIds = 0;
+function passInput(label, { save = '' } = {}) {
+  const input = node('input', { class: 'q-pass-input', id: `q-pass-${++passIds}`, type: save ? 'password' : 'text', inputmode: 'text', autocomplete: save ? `${save}${save === 'current-password' && passkeyHere() ? ' webauthn' : ''}` : 'off', autocapitalize: 'characters', autocorrect: 'off', spellcheck: 'false', placeholder: 'ABCDE23456', 'aria-label': label, ...(save ? { name: 'password' } : {}) });
   input.addEventListener('input', () => {
     input.value = typedPass(input.value);
   });
   return input;
+}
+// The username a password manager files the pass under: always "Orbit Pass".
+const passUser = () => node('input', { class: 'q-pass-user', type: 'text', name: 'username', autocomplete: 'username', value: BRAND.pass, readonly: '', tabindex: '-1', 'aria-hidden': 'true' });
+// A pass field with its 顯示 button (it types as dots, as a password does).
+function passField(input, lang) {
+  const en = lang === 'en';
+  const eye = node('button', {
+    class: 'q-pass-eye',
+    type: 'button',
+    text: en ? 'Show' : '顯示',
+    onclick: () => {
+      const show = input.type === 'password';
+      input.type = show ? 'text' : 'password';
+      eye.textContent = show ? (en ? 'Hide' : '隱藏') : en ? 'Show' : '顯示';
+      input.focus();
+    }
+  });
+  return node('div', { class: 'q-pass-field' }, [input, eye]);
 }
 const ERR = {
   SYNC_PASSCODE_NOT_FOUND: ['找不到這組通行碼。', 'No Orbit Pass has this code.'],
@@ -1884,6 +1917,11 @@ const ERR = {
   ECO_LOAN_REFUSED: ['銀行婉拒了這筆申請。', 'The bank turned this application down.'],
   ECO_RELIEF_REFUSED: ['目前不符合急難紓困資格。', 'You don’t qualify for relief right now.'],
   ECO_SESSION_MOVED: ['這個 App 已在別處開啟，回到這裡後再試一次。', 'This app is open somewhere else. Come back here and try again.'],
+  ECO_PASSKEY_UNKNOWN: ['這個通行密鑰已不在任何 Orbit Pass 上，請用通行碼登入。', 'This passkey isn’t on any Orbit Pass any more. Sign in with your pass.'],
+  ECO_PASSKEY_INVALID: ['這個通行密鑰無法使用，請再試一次或用通行碼登入。', 'That passkey didn’t work. Try again, or use your pass.'],
+  ECO_PASSKEY_EXPIRED: ['等太久了，請再試一次。', 'That took too long. Please try again.'],
+  ECO_PASSKEY_TAKEN: ['這個通行密鑰已經加入過了。', 'This passkey is already added.'],
+  ECO_PASSKEY_FULL: ['最多 10 個通行密鑰，請先移除一個。', 'Ten passkeys at most: remove one first.'],
   INVALID_PASSCODE: ['請輸入 10 碼通行碼（例如 ABCDE-23456）或 8 碼裝置代碼。', 'Enter your 10-character pass (like ABCDE-23456) or an 8-character device code.']
 };
 export const errorText = (error, lang) => {
@@ -1929,40 +1967,58 @@ function dropFromTop(dialog) {
 }
 
 // The sign-in screen: nothing of the app shows until there's a pass.
+// A real form a password manager knows (iCloud Keychain, Chrome, Bitwarden
+// offer to save the pass and fill it in later): a username that is always
+// "Orbit Pass" (one entry for orbit.<domain>, every app and the admin page's
+// next to it under its own name) and the pass as a password. A device code
+// typed here is no password: the field stops being one before it's sent, so
+// nothing offers to save it over the pass. Where passkeys work, a button
+// (and the keyboard's passkey suggestion) signs in with one.
 function signInGate(s) {
   const en = s.lang === 'en';
   const a = APPS[s.app];
   document.getElementById('loading')?.setAttribute('hidden', '');
   return new Promise(resolve => {
-    const input = passInput(BRAND.pass);
+    const input = passInput(BRAND.pass, { save: 'current-password' });
     const error = node('p', { class: 'q-gate-error', role: 'alert' });
     const enter = node('button', { class: 'q-btn primary block', type: 'submit', text: en ? 'Sign in' : '登入' });
-    const busy = on => [enter, input].forEach(b => (b.disabled = on));
+    const keys = passkeyHere() && passkeyGate(s, error, res => finish(res));
+    const busy = on => [enter, input, keys?.button].forEach(b => b && (b.disabled = on));
+    let over = false;
+    const finish = res => {
+      if (over) return;
+      over = true;
+      keys?.stop();
+      dropFromTop(gate);
+      document.documentElement.classList.remove('q-signing-in');
+      resolve(res);
+    };
     const done = async task => {
       busy(true);
       error.textContent = '';
       try {
-        const res = await task();
-        dropFromTop(gate);
-        document.documentElement.classList.remove('q-signing-in');
-        resolve(res);
+        finish(await task());
       } catch (e) {
         error.textContent = errorText(e, s.lang);
         busy(false);
+        input.type = 'password';
       }
     };
     const form = node(
       'form',
       {
         class: 'q-gate-form',
+        method: 'post',
+        action: '#',
         onsubmit: event => {
           event.preventDefault();
           const code = cleanCode(input.value);
           if (!PASS_PATTERN.test(code) && !DEVICE_CODE_PATTERN.test(code)) return void (error.textContent = errorText({ code: 'INVALID_PASSCODE' }, s.lang));
+          if (DEVICE_CODE_PATTERN.test(code)) input.type = 'text';
           done(() => s.login(code));
         }
       },
-      [node('label', { class: 'q-gate-label', text: en ? 'Your Orbit Pass or a device code' : 'Orbit Pass 或裝置代碼' }), input, error, enter]
+      [passUser(), node('label', { class: 'q-gate-label', for: input.id, text: en ? 'Your Orbit Pass or a device code' : 'Orbit Pass 或裝置代碼' }), passField(input, s.lang), error, enter]
     );
     const gate = node('dialog', { class: 'q-gate', 'aria-modal': 'true', style: `--q-accent:${a.color}` }, [
       node('div', { class: 'q-gate-box' }, [
@@ -1971,6 +2027,7 @@ function signInGate(s) {
         node('h1', { class: 'q-gate-title', text: a.name }),
         node('p', { class: 'q-gate-lede', text: en ? 'Sign in with your Orbit Pass: one account for every Orbit app.' : '用 Orbit Pass 登入：所有 Orbit 的 App 共用一個帳戶。' }),
         form,
+        ...(keys ? [keys.row] : []),
         node('p', { class: 'q-gate-note', text: en ? 'No Orbit Pass yet? Ask the person who shared Orbit with you for one.' : '還沒有 Orbit Pass？請向分享 Orbit 給你的人索取。' }),
         node('p', { class: 'q-gate-note', text: en ? 'Signed in on another device? Its Account sheet gives a device code for this one.' : '已在其他裝置登入？在那裡的「帳戶」取得裝置代碼，就能在這裡登入。' })
       ])
@@ -1979,10 +2036,94 @@ function signInGate(s) {
     // Alone on screen: any sheet the app had open closes first.
     for (const d of document.querySelectorAll('dialog[open]')) if (!onTop.has(d)) d.close();
     keepOnTop(gate);
+    keys?.start();
     setTimeout(() => input.focus(), 50);
   });
 }
 
+// The passkey half of the sign-in screen: { row, button, start, stop }.
+// The challenge is asked for as the screen opens (Safari takes a passkey
+// request only during the tap itself) and again before it runs out; where
+// the browser offers passkeys in the keyboard (conditional mediation), it
+// waits there too, and the button takes over from it.
+function passkeyGate(s, error, signedIn) {
+  const en = s.lang === 'en';
+  let begin = null;
+  let wait = null;
+  let quiet = null;
+  let timer = 0;
+  let stopped = false;
+  const fresh = () => begin && begin.exp - Date.now() > 30_000;
+  const ask = async () => {
+    try {
+      begin = await s.passkeyBegin();
+    } catch {
+      begin = null;
+    }
+    clearTimeout(timer);
+    if (!stopped) timer = setTimeout(ask, begin ? Math.max(30_000, begin.exp - Date.now() - 45_000) : 60_000);
+    return begin;
+  };
+  const run = async (challenge, credential) => {
+    try {
+      signedIn(await s.passkeyLogin(challenge, credential));
+    } catch (e) {
+      if (e.code === 'ECO_PASSKEY_UNKNOWN') forgetPasskey(credential.id);
+      error.textContent = errorText(e, s.lang);
+      button.disabled = false;
+      ask().then(listen);
+    }
+  };
+  // The keyboard's suggestion (iOS 16+, Chrome, Edge): a passkey picked there signs in.
+  const listen = async () => {
+    if (stopped || !(await globalThis.PublicKeyCredential?.isConditionalMediationAvailable?.().catch(() => false))) return;
+    if (!fresh()) await ask();
+    if (!begin || stopped) return;
+    quiet?.abort();
+    quiet = new AbortController();
+    const challenge = begin.challenge;
+    try {
+      const cred = await usePasskey(challenge, { signal: quiet.signal, conditional: true });
+      if (!stopped) run(challenge, cred);
+    } catch {}
+  };
+  const button = node('button', {
+    class: 'q-btn block q-passkey-btn',
+    type: 'button',
+    html: `${icons.key || ''}<span>${en ? 'Sign in with a passkey' : '用通行密鑰登入'}</span>`,
+    onclick: async () => {
+      error.textContent = '';
+      quiet?.abort();
+      button.disabled = true;
+      const b = fresh() ? begin : await ask();
+      if (!b) {
+        button.disabled = false;
+        error.textContent = errorText({}, s.lang);
+        return;
+      }
+      try {
+        wait = new AbortController();
+        const cred = await usePasskey(b.challenge, { signal: wait.signal });
+        await run(b.challenge, cred);
+      } catch (e) {
+        button.disabled = false;
+        if (!cancelled(e)) error.textContent = errorText({ code: 'ECO_PASSKEY_INVALID' }, s.lang);
+        ask().then(listen);
+      }
+    }
+  });
+  const row = node('div', { class: 'q-gate-or' }, [node('span', { class: 'q-gate-or-line', text: en ? 'or' : '或' }), button]);
+  return {
+    row,
+    button,
+    start: () => ask().then(listen),
+    stop: () => {
+      stopped = true;
+      clearTimeout(timer);
+      quiet?.abort();
+    }
+  };
+}
 // "This app is open somewhere else": this one waits.
 let movedEl = null;
 function showMoved(s) {
@@ -2122,9 +2263,11 @@ export async function shareSheet(opts = {}) {
 
 // The account at a glance: its number and since when. Never a balance:
 // money is Securities' alone.
-// The account number: the pass's id in three fours (a name for the
-// account, never the pass itself).
-const accountNumber = id => (id ? id.slice(0, 12).toUpperCase().replace(/(.{4})(?=.)/g, '$1 ') : '');
+// The account number: the first 6 of the account's id (a name for the
+// account, never the pass itself; what the admin page finds it by). Only 6:
+// an older pass's id is its plain SHA-256, and the 12 shown before were
+// enough to guess the pass from a screenshot.
+const accountNumber = id => (id ? id.slice(0, 6).toUpperCase() : '');
 // The card atop the Pass tab: who you are here (the avatar and frame worn)
 // and how far along the milestones are; a tap opens 外觀.
 function accountCard(s, onLooks) {
@@ -2194,6 +2337,7 @@ export function passAccount(s, { extra = null, close = () => {}, looks = () => {
     ...(extra ? [extra] : []),
     node('h3', { class: 'q-sheet-h', text: T('裝置', 'Devices') }),
     node('div', { class: 'q-rows' }, [act(T('新增裝置（取得裝置代碼）', 'Add a device (get a device code)'), async () => showCode(await s.deviceCode())), device]),
+    ...passkeyRows(s, note),
     node('h3', { class: 'q-sheet-h', text: T('通知', 'Notifications') }),
     ...notifyRows(s, note),
     node('h3', { class: 'q-sheet-h', text: T('除錯紀錄', 'Debug log') }),
@@ -2235,6 +2379,136 @@ export function passAccount(s, { extra = null, close = () => {}, looks = () => {
   };
   return { nodes, card, stop: () => clearInterval(tick) };
 }
+// ---- Passkeys: the Pass sheet's list and the one-time offer -----------------------------
+
+// A challenge to make a passkey, asked for ahead of the tap (Safari takes
+// the request only during it): { get(), fresh() }.
+function addChallenge(s) {
+  let begin = null;
+  let asking = null;
+  const get = () =>
+    (asking ||= s
+      .passkeyAddBegin()
+      .then(b => (begin = b))
+      .finally(() => (asking = null)));
+  const fresh = () => (begin && begin.exp - Date.now() > 30_000 ? begin : null);
+  return { get, fresh };
+}
+// Made and kept: the challenge in hand (or fetched now), then the browser's
+// sheet (Face ID, Windows Hello, a phone by QR…). true once added; false if
+// the person closed the sheet.
+async function addPasskey(s, ch) {
+  const begin = ch.fresh() || (await ch.get());
+  try {
+    const cred = await makePasskey(begin);
+    await s.passkeyAdd(begin.challenge, cred);
+    return true;
+  } catch (e) {
+    ch.get().catch(() => {});
+    if (cancelled(e) || e?.name === 'InvalidStateError') return e?.name === 'InvalidStateError' ? 'here' : false;
+    throw e;
+  }
+}
+const dayOf = (t, en) => new Date(t).toLocaleDateString(en ? 'en-US' : 'zh-TW', { month: 'short', day: 'numeric', ...(Date.now() - t > 300 * 86_400_000 ? { year: 'numeric' } : {}) });
+const passkeysOf = s => (Array.isArray(s.wallet?.passkeys) ? s.wallet.passkeys : []);
+
+// The Pass tab's 通行密鑰: every passkey of the account (named by who keeps
+// it, when added and last used), each removable, and a button to add one
+// where this browser can. Shown also where it can't, once there are some.
+function passkeyRows(s, note) {
+  const en = s.lang === 'en';
+  const T = (zh, e) => (en ? e : zh);
+  const here = passkeyHere();
+  const ch = here ? addChallenge(s) : null;
+  const box = node('div', { class: 'q-rows q-passkeys' });
+  const head = node('h3', { class: 'q-sheet-h', text: T('通行密鑰', 'Passkeys') });
+  const sub = node('p', { class: 'q-sheet-sub', text: T('用 Face ID、Touch ID 或 Windows Hello 登入，不必輸入通行碼；通行碼照樣能用。', 'Sign in with Face ID, Touch ID or Windows Hello instead of typing your pass. Your pass still works.') });
+  const paint = () => {
+    const keys = passkeysOf(s);
+    head.hidden = box.hidden = sub.hidden = !here && !keys.length;
+    box.replaceChildren(
+      ...keys.map(k =>
+        node('div', { class: 'q-cell' }, [
+          node('span', { class: 'q-cell-icon', style: '--q-cell-tint:#0a84ff', html: icons.key || '' }),
+          node('span', { class: 'q-cell-text' }, [node('span', { text: passkeyName(k, s.lang) }), node('small', { text: [T(`${dayOf(k.t, en)} 加入`, `Added ${dayOf(k.t, en)}`), k.used ? T(`上次使用 ${dayOf(k.used, en)}`, `last used ${dayOf(k.used, en)}`) : T('還沒用過', 'not used yet')].join(' · ') })]),
+          node('button', {
+            class: 'q-cell-act danger',
+            type: 'button',
+            text: T('移除', 'Remove'),
+            onclick: async event => {
+              const b = event.currentTarget;
+              if (!(await ask({ lang: s.lang, icon: '🔑', title: T('移除這個通行密鑰？', 'Remove this passkey?'), body: T(`「${passkeyName(k, s.lang)}」就不能再登入這個 Orbit Pass。通行碼和其他通行密鑰照常可用。`, `“${passkeyName(k, s.lang)}” will no longer sign in to this Orbit Pass. Your pass and other passkeys still work.`), ok: T('移除', 'Remove'), danger: true }))) return;
+              b.disabled = true;
+              try {
+                await s.passkeyRemove(k.id);
+                forgetPasskey(k.id);
+                note.textContent = T('已移除通行密鑰。', 'Passkey removed.');
+              } catch (e) {
+                b.disabled = false;
+                note.textContent = errorText(e, s.lang);
+              }
+            }
+          })
+        ])
+      ),
+      ...(here
+        ? [
+            node('button', {
+              class: 'q-row-btn',
+              type: 'button',
+              text: keys.length ? T('再加一個通行密鑰', 'Add another passkey') : T('加入通行密鑰（Face ID／Touch ID）', 'Add a passkey (Face ID, Touch ID)'),
+              disabled: keys.length >= 10,
+              onclick: async event => {
+                const b = event.currentTarget;
+                b.disabled = true;
+                note.textContent = '';
+                try {
+                  const done = await addPasskey(s, ch);
+                  if (done === true) note.textContent = T('已加入通行密鑰，下次可以直接用它登入。', 'Passkey added: next time, sign in with it.');
+                  if (done === 'here') note.textContent = T('這台裝置已經有這個 Orbit Pass 的通行密鑰。', 'This device already has a passkey for this Orbit Pass.');
+                } catch (e) {
+                  note.textContent = errorText(e, s.lang);
+                } finally {
+                  b.disabled = false;
+                }
+              }
+            })
+          ]
+        : [])
+    );
+  };
+  paint();
+  if (here) ch.get().catch(() => {});
+  s.on('wallet', () => box.isConnected && paint());
+  return [head, box, sub];
+}
+
+// Once, a while after an app opens signed in: "加入 Face ID 登入", where this
+// browser can make a passkey and the account has none. 以後再說 or done, it
+// never asks again (the account's setting `passkeyAsk`, every device).
+export async function passkeyOffer(s) {
+  if (typeof document === 'undefined' || !passkeyHere() || !s.wallet || passkeysOf(s).length || s.wallet.settings?.passkeyAsk) return;
+  const en = s.lang === 'en';
+  const T = (zh, e) => (en ? e : zh);
+  const ch = addChallenge(s);
+  if (!(await ch.get().catch(() => null))) return;
+  // (Nothing else of Orbit's on screen first: no sheet, no sign-in, no dialog.)
+  if (document.querySelector('dialog[open]') || document.visibilityState === 'hidden' || passkeysOf(s).length) return;
+  // (Kept fresh while the question waits: the tap on 加入 goes straight to the browser.)
+  const keep = setInterval(() => ch.get().catch(() => {}), 240_000);
+  const yes = await ask({ lang: s.lang, icon: 'key', tint: '#0a84ff', title: T('加入 Face ID 登入', 'Sign in with Face ID'), body: T('建立通行密鑰，之後在新裝置用 Face ID 或 Touch ID 就能登入，不必輸入通行碼。', 'Make a passkey: on a new device, sign in with Face ID or Touch ID instead of typing your pass.'), ok: T('加入', 'Add'), cancel: T('以後再說', 'Not now') });
+  clearInterval(keep);
+  if (yes) {
+    try {
+      if ((await addPasskey(s, ch)) === true) toast(T('已加入通行密鑰', 'Passkey added'));
+    } catch (e) {
+      toast(errorText(e, s.lang));
+    }
+  }
+  // Asked once, whatever the answer (the Pass sheet's 通行密鑰 adds one any time).
+  s.write({ wallet: settingPatch('passkeyAsk', yes ? 'yes' : 'no') }).catch(() => {});
+}
+
 export function showNewPass(s, passcode) {
   const en = s.lang === 'en';
   const T = (zh, e) => (en ? e : zh);
@@ -2268,8 +2542,15 @@ export function showNewPass(s, passcode) {
         ok
       ])
     ]);
+    // Sent as a form when confirmed, so a password manager offers to keep
+    // the new pass (in place of the old one under "Orbit Pass").
+    const saver = node('form', { class: 'q-pass-saver', method: 'post', action: '#', onsubmit: event => event.preventDefault() }, [passUser(), node('input', { class: 'q-pass-user', type: 'password', name: 'password', autocomplete: 'new-password', value: shown, readonly: '', tabindex: '-1', 'aria-hidden': 'true' })]);
+    box.querySelector('.q-gate-box').append(saver);
     // Not closed by Esc or a tap outside: only by the confirmed button.
     ok.addEventListener('click', () => {
+      try {
+        saver.requestSubmit?.();
+      } catch {}
       dropFromTop(box);
       resolve();
     });
