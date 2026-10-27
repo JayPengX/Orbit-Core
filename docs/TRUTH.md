@@ -90,7 +90,7 @@ break it and say so in a line.
 - **Read on demand.** Nothing is prefetched that nobody opens. What
   doesn't change in a day comes from R2 (built by the proxy's cron,
   `builders/`); the data proxy is for what's live. The layers are in
-  Shared-Proxy's README §2.
+  Shared-Proxy's MAP.md §2.
 - **Use the existing crons** (the proxy's even and odd minutes, or a
   Durable Object alarm). New Cron Triggers registered in October 2026
   never ran.
@@ -147,7 +147,8 @@ Folder-Link is a separate Windows tool with its own notes.
 ## 8. Docs
 
 - **This file**, `DESIGN.md` (how screens look), each repo's `CLAUDE.md` (a pointer here plus what's
-  special to that repo), and each repo's README: a short map with what the
+  special to that repo), each repo's README (the short public front page: what it is, the link,
+  the stack) and its MAP.md: a short map with what the
   app is, where the code is, how to run and test it, and the decisions
   still in force.
 - Update a doc only when the change made it wrong. No handoffs, plans or

@@ -1,5 +1,5 @@
 # By hand (Run workflow), read-only: each Worker's secret names (never
-# values), for the README's secrets table, and the Pass's store counted
+# values), for the MAP.md's secrets table, and the Pass's store counted
 # (never a document).
 name: Audit
 on:
