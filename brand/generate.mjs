@@ -11,6 +11,7 @@ import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { BRANDS, FAMILY, PASS, SITE_URL, appIcon, familyMark, homeOf, pathOf } from '../kit/brand.mjs';
 import { FORMATS, shareCard } from './marks.mjs';
+import { DOMAIN } from '../kit/domain.mjs';
 
 // The global one, or a Mac's in ~/.local/opt/playwright (as tools/preview.mjs).
 const require = createRequire(`${execSync('npm root -g').toString().trim()}/`);
@@ -189,7 +190,7 @@ await browser.close();
 
 // The family's home (Shared-Proxy's Pages root): every app.
 function homePage() {
-  const home = `${SITE_URL}/Shared-Proxy/`;
+  const home = `${SITE_URL}${DOMAIN ? '/pass/' : '/Shared-Proxy/'}`;
   const card = id => {
     const b = BRANDS[id];
     return `<a class="app" href="${pathOf(id)}"><img src="brand/${id}.svg" alt="" width="64" height="64"><span><strong>${esc(b.name)}</strong><small>${esc(b.tag.zh)}</small><small class="en">${esc(b.tag.en)}</small></span></a>`;
