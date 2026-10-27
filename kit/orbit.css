@@ -3804,7 +3804,7 @@ div.q-ritem {
   margin: 4px 0 16px;
   padding: 16px;
   border-radius: 20px;
-  background: linear-gradient(135deg, color-mix(in srgb, var(--t) 92%, #000), color-mix(in srgb, var(--t) 70%, #fff));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--t) 86%, #0b1020), color-mix(in srgb, var(--t) 74%, #0b1020));
   color: #ffffff;
 }
 .q-sh-logos {
