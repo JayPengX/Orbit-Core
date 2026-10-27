@@ -11,7 +11,7 @@
 // deploy.yml attaches both hostnames to their Workers. GitHub Pages and
 // workers.dev keep answering, so a phone with the old icon goes on working
 // until it moves (orbit.mjs moveHome, movedNotice).
-export const DOMAIN = '';
+export const DOMAIN = 'jaypengx.com';
 
 export const PAGES = 'https://jaypengx.github.io';
 export const WORKERS_DEV = 'https://orbit-workers-proxy.pengzjay.workers.dev';
