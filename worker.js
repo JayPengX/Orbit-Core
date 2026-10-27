@@ -52,7 +52,7 @@ import { handleData } from './data.js';
 import { handleStock, moveBook } from './stock-fill.js';
 import { runBuilders, SLOTS as BUILD_SLOTS } from './builders/run.js';
 import { docStore, storeReady } from './doc-store.js';
-import { handleMoneyMail, handleMoneyMailRequest } from './money-mail.js';
+import { handleMoneyMail, handleMoneyMailRequest, mailCheck } from './money-mail.js';
 import { handleMoneyRead } from './money-read.js';
 import { STATE_KEY as GUARD_STATE } from './guard.js';
 // The F1 lap log's Durable Object (f1-live.js), bound as F1_LOG.
@@ -1241,7 +1241,9 @@ async function route(request, env, ctx, headers, origin) {
     const check = new URL(request.url).searchParams.get('check');
     if (check === 'gemini') return json(await geminiCheck(env), 200, headers);
     if (check === 'system') return json(await systemReport(env, ECO_DEPS), 200, headers);
-    return json({ error: { message: 'check=gemini|system' } }, 400, headers);
+    // Email Sending end to end: a sample 財政部 mail copied as Orbit Money copies one (money-mail.js) to &to=.
+    if (check === 'mail') return json(await mailCheck(env, new URL(request.url).searchParams.get('to') || ''), 200, headers);
+    return json({ error: { message: 'check=gemini|system|mail' } }, 400, headers);
   }
   // A builder's job now (builders/run.js), by hand: Bearer DATA_PUSH_SECRET
   // (Orbit-Core's build.yml). ?job=watch|cutouts|buses, or
