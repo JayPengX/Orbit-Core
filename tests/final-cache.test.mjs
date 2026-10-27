@@ -20,6 +20,14 @@ test('a game over and a day all over are kept a day; anything still to change is
   assert.equal(settled(summary, new TextEncoder().encode(game('post', true)).buffer), true);
 });
 
+test("a race weekend's day is over only when every session is", () => {
+  const f1 = u('https://site.api.espn.com/apis/site/v2/sports/racing/f1/scoreboard?dates=20261025&limit=200');
+  const s = completed => ({ status: { type: { completed } } });
+  const weekend = (...done) => JSON.stringify({ events: [{ status: { type: { completed: true } }, competitions: done.map(s) }] });
+  assert.equal(settled(f1, weekend(true, true, false, false, false)), false, 'FP1 and FP2 done, the race to come');
+  assert.equal(settled(f1, weekend(true, true, true, true, true)), true);
+});
+
 test('a CPBL month is over for good only read whole; the days not read come from the nightly copy', () => {
   const sept = u('https://asia-baseball.orbit/cpbl/2026-09.json');
   const g = (start, state = 'post') => ({ id: start, start, state });
