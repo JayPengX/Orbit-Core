@@ -18,9 +18,9 @@ Rules for working on any of it: `docs/TRUTH.md` (one page).
 | Orbit Law | `law` | Orbit-Law |
 | Orbit Money | `money` | Orbit-Money |
 
-Each lives at `https://jaypengx.github.io/<Repo>/` (and on the family's own
-domain once set, §9). The kit, the family's page and the admin page are
-this repo's Pages.
+Each lives at `https://jaypengx.com/<slug>/` (§9), served from its repo's
+GitHub Pages. The kit, the family's page and the admin page are this
+repo's Pages.
 
 ## 1. The system
 
@@ -303,16 +303,14 @@ now, its own app and Worker (JayPengX/Longshot), nothing of theirs here.
     `FIREBASE_PRIVATE_KEY` (removed 2026-12-06).
 - **Bindings:** D1 `orbit-store`, R2 `orbit-data`, KV `RATE_LIMIT_KV`,
   DO `F1Log`, and the services `GEMINI_RELAY` and `GUARD`.
-- **The family's own domain:** `kit/domain.mjs` `DOMAIN`, the one place it
-  is set (empty: GitHub Pages and workers.dev, as ever). Set, one push puts
-  every app at `https://<DOMAIN>/<Repo>/` (`site.js`, Worker `orbit-site`,
-  reading GitHub Pages through, so the apps still deploy by their own
-  Pages), the proxy at `api.<DOMAIN>`, and both homes in CORS; `deploy.yml`
-  attaches the hostnames (`CLOUDFLARE_API_TOKEN` needs the zone: Zone Read,
-  Workers Routes Edit, DNS Edit), the guard takes them off with the proxy.
-  Pages on github.io move by themselves (a browser) or say where to
-  (an old home-screen icon, `orbit.mjs` `moveHome`, `movedNotice`). After the switch,
-  `node brand/generate.mjs` points every app's share links at the domain.
+- **The family's own domain:** `kit/domain.mjs` `DOMAIN` (jaypengx.com),
+  the one place it is set. Every app is at `https://<DOMAIN>/<slug>/`
+  (`kit/brand.mjs` `slug`/`SHORT`; `/pass/` the family page, `/` goes
+  there): `site.js`, Worker `orbit-site`, reads each repo's GitHub Pages
+  through, so the apps still deploy by their own Pages. The proxy is at
+  `api.<DOMAIN>`. `deploy.yml` attaches both hostnames (the deploy token
+  has the zone); the guard takes them off with the proxy. A new app: a
+  `slug` in `kit/brand.mjs`.
 
 ## 10. Tools and tests
 

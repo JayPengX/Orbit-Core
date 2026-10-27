@@ -24,15 +24,10 @@ test('site: an app at its short name is its repo on GitHub Pages, query kept', a
   assert.equal(p.asked[2].url, 'https://jaypengx.github.io/Shared-Proxy/kit/orbit.mjs?v=1');
 });
 
-test('site: an old path goes to the short one for good, but a service worker and version.json still answer there', async () => {
+test("site: a repo's own name isn't an address on the domain", async () => {
   const p = pages();
-  const res = await site(new Request('https://example.tw/Orbit-Sports/index.html?a=b'), p.fetcher);
-  assert.equal(res.status, 301);
-  assert.equal(res.headers.get('Location'), 'https://example.tw/sports/index.html?a=b');
-  assert.equal((await site(new Request('https://example.tw/Longshot/'), p.fetcher)).headers.get('Location'), 'https://example.tw/longshot/');
+  for (const path of ['/Orbit-Sports/', '/Orbit-Sports/sw.js', '/Longshot/', '/Orbit-Showcase/']) assert.equal((await site(new Request(`https://example.tw${path}`), p.fetcher)).status, 404, path);
   assert.equal(p.asked.length, 0);
-  assert.equal((await site(new Request('https://example.tw/Orbit-Sports/sw.js'), p.fetcher)).status, 200);
-  assert.equal(p.asked[0].url, 'https://jaypengx.github.io/Orbit-Sports/sw.js');
 });
 
 test("site: Pages' redirects land on the short name; the bare domain opens the family page", async () => {
