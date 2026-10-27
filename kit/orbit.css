@@ -153,7 +153,7 @@
   --q-accent: #4f46e5;
 }
 :where(:root[data-app='money']) {
-  --q-accent: #a16207;
+  --q-accent: #ca8a04;
 }
 :where(:root[data-app='vocab']) {
   --q-accent: #db2777;
@@ -181,7 +181,7 @@
     --q-accent: #7a7df1;
   }
   :where(:root[data-app='money']:not([data-theme='light'])) {
-    --q-accent: #cfa127;
+    --q-accent: #e4b526;
   }
   :where(:root[data-app='vocab']:not([data-theme='light'])) {
     --q-accent: #ea68a6;
@@ -209,7 +209,7 @@
   --q-accent: #7a7df1;
 }
 :where(:root[data-app='money'][data-theme='dark']) {
-  --q-accent: #cfa127;
+  --q-accent: #e4b526;
 }
 :where(:root[data-app='vocab'][data-theme='dark']) {
   --q-accent: #ea68a6;
