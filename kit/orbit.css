@@ -8,11 +8,29 @@
    every movement (SwiftUI's smooth, snappy and bouncy, as CSS linear()).
    Apps build on these tokens and the q- components (kit/ui.mjs makes the
    ones that move); they don't restyle them. */
+/* Chinese inside a rounded number line ("3 張", a title in the focal
+   spot): iPhone's rounded face (ui-rounded) has no Chinese and falls to an
+   odd heavy face for it (Money's 更多 title came out garbled, Jay 10-27).
+   This face takes only the Chinese characters and draws them in PingFang (Noto
+   elsewhere); digits and Latin go on to ui-rounded. Put first in
+   --q-font-rounded; where no listed font is there it is skipped. */
+@font-face {
+  font-family: 'Q Han';
+  src: local('PingFangTC-Regular'), local('PingFang TC'), local('Noto Sans TC'), local('Noto Sans CJK TC');
+  font-weight: 100 549;
+  unicode-range: U+2E80-2FFF, U+3000-303F, U+3100-31FF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FE30-FE4F, U+FF00-FFEF;
+}
+@font-face {
+  font-family: 'Q Han';
+  src: local('PingFangTC-Semibold'), local('PingFang TC Semibold'), local('Noto Sans TC Bold'), local('NotoSansCJKtc-Bold');
+  font-weight: 550 1000;
+  unicode-range: U+2E80-2FFF, U+3000-303F, U+3100-31FF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FE30-FE4F, U+FF00-FFEF;
+}
 :root {
   /* San Francisco (and PingFang for Chinese) on Apple's devices; the
      nearest system face elsewhere. Rounded for big numbers. */
   --q-font: -apple-system, BlinkMacSystemFont, system-ui, 'SF Pro Text', 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', 'Segoe UI', sans-serif;
-  --q-font-rounded: ui-rounded, 'SF Pro Rounded', var(--q-font);
+  --q-font-rounded: 'Q Han', ui-rounded, 'SF Pro Rounded', var(--q-font);
   --q-font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
 
   /* The iOS 26/27 palette, light. */
@@ -4952,6 +4970,11 @@ dialog[open] .q-menu { background: var(--q-sheet); }
   white-space: nowrap;
 }
 /* The rest of a value ("/ 6,169", a unit): smaller and grey beside it. */
+.q-focus-value.q-words {
+  /* (A focal line in words, not a number: the text face, which reads better.) */
+  font-family: var(--q-font);
+  letter-spacing: -0.01em;
+}
 .q-focus-value .dim {
   color: var(--q-label-2);
   font-size: 0.5em;
