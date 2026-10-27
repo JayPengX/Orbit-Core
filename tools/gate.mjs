@@ -25,6 +25,8 @@
 //   sheets    a sheet taller than the screen, or one that scrolls for a sliver
 //   white     (dark) a near-white box: a logo tile or a button glaring
 //   english   (zh) a team still in English: a match card's or a team row's name in Latin letters only
+//   mixed     the other language on the page: a text mixing the two, or a button, tab,
+//             title or field hint in the other one (in Chinese: English words in lower case)
 //   scroll    a page longer than the screen that won't scroll
 //   header    the top bar naming a page left or another tab
 //   old       a season two or more years back shown as current
@@ -36,7 +38,7 @@
 //
 //   node tools/gate.mjs [app…] [--jobs 4] [--out dir] [--no-taps] [--quick]
 //
-// --quick: 390 light only. --wide: the wide runs only (every app at
+// --quick: 390 light only (--lang en: in English). --wide: the wide runs only (every app at
 // 1180×820 as an iPad, with its taps); a full run has them too. Writes <out>/report.md (each fault with its
 // screenshot) and report.json; exits 1 when anything failed.
 import { execFile } from 'node:child_process';
@@ -66,12 +68,14 @@ const quick = flag('quick');
 const wide = flag('wide');
 // --quick --dark: 390 dark only (the white check).
 const darkOnly = flag('dark');
+// --quick --lang en: 390 in English, with its taps (the mixed-language check).
+const onlyLang = opt('lang', '');
 const ALL = ['sports', 'securities', 'words', 'orbit', 'weather', 'transit', 'beats', 'law', 'money'];
 const apps = args.length ? args : ALL;
 const runs = [];
 if (!wide) for (const app of apps)
   for (const width of quick ? [390] : [320, 390])
-    for (const dark of quick ? [darkOnly] : [false, true]) runs.push({ app, width, dark, taps: taps && width === 390 && !dark });
+    for (const dark of quick ? [darkOnly] : [false, true]) runs.push({ app, width, dark, taps: taps && width === 390 && !dark, ...(onlyLang ? { lang: onlyLang } : {}) });
 // English, the longer words, at the narrowest screen.
 if (!quick && !wide) for (const app of apps) runs.push({ app, width: 320, dark: false, lang: 'en' });
 // Every app on a screen wider than a phone (an iPad on its side): the phone's
@@ -109,7 +113,7 @@ const faults = r => {
   const after = t => (r.tapAt || []).filter(([, at]) => at <= t).at(-1)?.[0];
   for (const [t, ms] of r.longs || []) if (ms >= 500) f.push(['stall', at, `main thread blocked ${ms} ms at ${t} ms${after(t) ? ` after ${after(t)}` : ''}`, first]);
   for (const e of r.pageErrors || []) f.push(['errors', at, e, first]);
-  for (const tab of r.tabs || []) for (const kind of ['blank', 'pictures', 'overflow', 'wraps', 'cut', 'letters', 'slots', 'halfEmpty', 'bareEmpty', 'loading', 'dead', 'typing', 'orphan', 'tables', 'sheets', 'old', 'scroll', 'white', 'english', 'column']) for (const what of tab[kind] || []) f.push([kind, `${at} #${tab.id}`, what, tab.shot]);
+  for (const tab of r.tabs || []) for (const kind of ['blank', 'pictures', 'overflow', 'wraps', 'cut', 'letters', 'slots', 'halfEmpty', 'bareEmpty', 'loading', 'dead', 'typing', 'orphan', 'tables', 'sheets', 'old', 'scroll', 'white', 'english', 'mixed', 'column']) for (const what of tab[kind] || []) f.push([kind, `${at} #${tab.id}`, what, tab.shot]);
   return f;
 };
 

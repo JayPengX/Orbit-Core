@@ -32,9 +32,17 @@
   pre.href = /^(jaypengx\.github\.io|localhost|127\.0\.0\.1)$/.test(location.hostname) ? 'https://orbit-workers-proxy.pengzjay.workers.dev' : 'https://api.' + location.hostname;
   pre.crossOrigin = 'anonymous';
   document.head.appendChild(pre);
+  // The Orbit language (orbit.mjs detectLang's rule: the one picked in any app, else the
+  // phone's), and the page's lang set to it, so nothing shows the other language first.
+  var saved = '';
+  try {
+    saved = localStorage.getItem('orbit.lang') || '';
+  } catch (e) {}
+  var langs = navigator.languages || [navigator.language || 'zh-TW'];
+  var zh = saved === 'zh' || (saved !== 'en' && (langs.some(function (l) { return /^zh/i.test(l); }) || !langs.some(function (l) { return /^en/i.test(l); })));
+  document.documentElement.lang = zh ? 'zh-Hant' : 'en';
   var box = document.getElementById('loading');
   if (!box) return;
-  var zh = /^zh/i.test(document.documentElement.lang || navigator.language || '');
   var L = function (a, b) {
     return zh ? a : b;
   };
