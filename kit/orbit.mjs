@@ -9,6 +9,7 @@
 //   Orbit Sports        match   scores, schedules and stats
 //   Orbit Words         vocab   English words
 //   Orbit Beats         beats   beat pieces arranged into songs
+//   Orbit Money         money   the person's own spending, accounts and invoices
 //
 // The names, colours and marks are brand.mjs's. The Orbit Pass (the
 // account, its looks, the truth about the money, every app and its guide) is the
@@ -206,7 +207,8 @@ export const MILESTONES = [
   { id: 'law', goal: 10, zh: '十個問題', en: '10 questions', unit: { zh: '問', en: '' } },
   { id: 'match', goal: 30, days: true, zh: '鐵粉', en: 'Superfan', unit: { zh: '天', en: 'days' } },
   { id: 'weather', goal: 30, days: true, zh: '看天的人', en: 'Sky watcher', unit: { zh: '天', en: 'days' } },
-  { id: 'orbit', goal: 30, days: true, zh: '全勤', en: 'Attendance', unit: { zh: '天', en: 'days' } }
+  { id: 'orbit', goal: 30, days: true, zh: '全勤', en: 'Attendance', unit: { zh: '天', en: 'days' } },
+  { id: 'money', goal: 30, days: true, zh: '天天記帳', en: 'Daily books', unit: { zh: '天', en: 'days' } }
 ];
 const MS_FRAMES = MILESTONES.map(m => ({ id: `ms-${m.id}`, ms: m.id }));
 const msKept = (wallet, id) => setting(wallet, `ms.${id}`, null) || {};

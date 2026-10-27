@@ -19,6 +19,7 @@ export const BRANDS = {
   match: { name: 'Orbit Sports', short: 'Sports', repo: 'Orbit-Sports', from: '#fdba74', to: '#9a3412', ink: '#c2410c', color: '#ea580c', paint: ['#fdba74', '#f97316', '#9a3412'], spot: '#fff', pitch: { zh: '每場比賽，即時比分', en: 'Every game, live' }, role: { zh: '賽程與比分', en: 'Scores and schedules' }, tag: { zh: '所有運動的賽程、比分與數據', en: 'Every sport, every match, every stat' } },
   beats: { name: 'Orbit Beats', short: 'Beats', repo: 'Orbit-Beats', from: '#f0abfc', to: '#701a75', ink: '#a21caf', color: '#c026d3', paint: ['#f0abfc', '#c026d3', '#581c87'], spot: '#fde047', pitch: { zh: '做出你的節拍', en: 'Make your own beats' }, role: { zh: '節拍作曲', en: 'Beat maker' }, tag: { zh: '把你的節拍片段，排成一首首新歌', en: 'Your beat pieces, arranged into new songs' } },
   law: { name: 'Orbit Law', short: 'Law', repo: 'Orbit-Law', from: '#a5b4fc', to: '#1e1b4b', ink: '#4338ca', color: '#4f46e5', paint: ['#6366f1', '#3730a3', '#1e1b4b'], spot: '#fcd34d', pitch: { zh: '法規、裁判、立法', en: 'Laws, rulings, bills' }, role: { zh: '法規與法案', en: 'Laws and bills' }, tag: { zh: '台灣的法規，每個條號都能點；立法院的法案，走到哪一步一眼就懂。', en: 'Taiwan\'s laws with linked references, and 立法院 bills by stage' } },
+  money: { name: 'Orbit Money', short: 'Money', repo: 'Orbit-Money', from: '#fde047', to: '#713f12', ink: '#a16207', color: '#a16207', paint: ['#facc15', '#ca8a04', '#713f12'], spot: GOLD, pitch: { zh: '每一筆，記得清楚', en: 'Every dollar, in its place' }, role: { zh: '記帳', en: 'Money tracker' }, tag: { zh: '記帳：月曆一眼看每天花多少，帳戶、悠遊卡、信用卡一起算，發票掃一下就記好', en: 'Your spending by day, every account and card, invoices scanned in' } },
   vocab: { name: 'Orbit Words', short: 'Words', repo: 'Orbit-Words', from: '#f9a8d4', to: '#831843', ink: '#be185d', color: '#db2777', paint: ['#fda4af', '#e11d48', '#881337'], spot: '#fde047', pitch: { zh: '背得住的英文單字', en: 'Words that stay' }, role: { zh: '英文單字', en: 'English words' }, tag: { zh: '背得住的英文單字：大考 6000 字，真人發音', en: 'English words that stay with you' } }
 };
 export const SITE_URL = 'https://jaypengx.github.io';
@@ -53,6 +54,8 @@ export const GLYPHS = {
   // A pair of scales: a post, a beam, two gold pans.
   law: (c, a = GOLD) => `<path d="M64 20 V102 M42 108 H86 M26 34 H102" fill="none" stroke="${c}" stroke-width="11" stroke-linecap="round"/><circle cx="64" cy="22" r="8" fill="${c}"/><path d="M26 34 L12 70 M26 34 L40 70 M102 34 L88 70 M102 34 L116 70" fill="none" stroke="${c}" stroke-width="6" stroke-linecap="round"/><path d="M10 70 A16 16 0 0 0 42 70 Z M86 70 A16 16 0 0 0 118 70 Z" fill="${a}" stroke="${a}" stroke-width="4" stroke-linejoin="round"/>`,
   // The pass: a card with its chip.
+  // A wallet, its clasp lit.
+  money: (c, a = GOLD) => `<path d="M30 34 L82 16 L90 34" fill="none" stroke="${c}" stroke-width="10" stroke-linejoin="round" stroke-linecap="round"/><rect x="14" y="34" width="100" height="72" rx="18" fill="none" stroke="${c}" stroke-width="11"/><rect x="70" y="56" width="44" height="28" rx="12" fill="${c}"/><circle cx="88" cy="70" r="7" fill="${a}"/>`,
   pass: (c, a = GOLD) => `<rect x="12" y="28" width="104" height="72" rx="14" fill="none" stroke="${c}" stroke-width="11"/><rect x="28" y="48" width="26" height="20" rx="5" fill="${a}"/><path d="M28 82 H76" stroke="${c}" stroke-width="9" stroke-linecap="round"/>`
 };
 

@@ -152,6 +152,9 @@
 :where(:root[data-app='law']) {
   --q-accent: #4f46e5;
 }
+:where(:root[data-app='money']) {
+  --q-accent: #a16207;
+}
 :where(:root[data-app='vocab']) {
   --q-accent: #db2777;
 }
@@ -177,6 +180,9 @@
   :where(:root[data-app='law']:not([data-theme='light'])) {
     --q-accent: #7a7df1;
   }
+  :where(:root[data-app='money']:not([data-theme='light'])) {
+    --q-accent: #cfa127;
+  }
   :where(:root[data-app='vocab']:not([data-theme='light'])) {
     --q-accent: #ea68a6;
   }
@@ -201,6 +207,9 @@
 }
 :where(:root[data-app='law'][data-theme='dark']) {
   --q-accent: #7a7df1;
+}
+:where(:root[data-app='money'][data-theme='dark']) {
+  --q-accent: #cfa127;
 }
 :where(:root[data-app='vocab'][data-theme='dark']) {
   --q-accent: #ea68a6;
@@ -2615,6 +2624,7 @@ dialog.q-moved::backdrop {
 .q-frame-ms-beats { --q-frame: conic-gradient(from var(--q-spin), #f0abfc, #fbbf24, #701a75, #fde68a, #f0abfc); box-shadow: 0 0 9px rgba(192, 38, 211, 0.5); animation: q-spin 9s linear infinite; }
 .q-frame-ms-law { --q-frame: conic-gradient(from var(--q-spin), #818cf8, #fbbf24, #1e1b4b, #fde68a, #818cf8); box-shadow: 0 0 9px rgba(79, 70, 229, 0.5); animation: q-spin 9s linear infinite; }
 .q-frame-ms-vocab { --q-frame: conic-gradient(from var(--q-spin), #f9a8d4, #fbbf24, #831843, #fde68a, #f9a8d4); box-shadow: 0 0 9px rgba(219, 39, 119, 0.5); animation: q-spin 9s linear infinite; }
+.q-frame-ms-money { --q-frame: conic-gradient(from var(--q-spin), #fde047, #fbbf24, #713f12, #fef3c7, #fde047); box-shadow: 0 0 9px rgba(161, 98, 7, 0.5); animation: q-spin 9s linear infinite; }
 .q-notice-sub {
   font: 400 12.5px/1.4 var(--q-font);
   color: var(--q-muted);

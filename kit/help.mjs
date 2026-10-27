@@ -12,13 +12,13 @@
 //
 // HELP[app][lang] = [[topic id, title, [paragraphs]], …]
 
-export const HELP_ORDER = ['pass', 'stock', 'match', 'vocab', 'orbit', 'weather', 'transit', 'beats'];
+export const HELP_ORDER = ['pass', 'stock', 'match', 'vocab', 'orbit', 'weather', 'transit', 'beats', 'money'];
 
 export const HELP = {
   pass: {
     zh: [
       ['what', 'Orbit Pass 是什麼', [
-        '你在每個 Orbit App 的帳號：Securities、Sports、Words、Class、Weather、Transit、Beats、Law。每個 App 都用它登入，資料存在它裡面，換裝置也一樣。',
+        '你在每個 Orbit App 的帳號：Securities、Sports、Words、Class、Weather、Transit、Beats、Law、Money。每個 App 都用它登入，資料存在它裡面，換裝置也一樣。',
         '通行碼是 10 個字的代碼，由分享 Orbit 給你的人發給你。知道它就能用這個帳號，所以別給別人；它只顯示一次，請記在安全的地方。',
         '每個 App 右上角的頭像就是 Orbit Pass 的入口。'
       ]],
@@ -56,7 +56,7 @@ export const HELP = {
     ],
     en: [
       ['what', 'What the Orbit Pass is', [
-        'Your account in every Orbit app: Securities, Sports, Words, Class, Weather, Transit, Beats and Law. Each signs in with it and keeps its data on it, the same on any device.',
+        'Your account in every Orbit app: Securities, Sports, Words, Class, Weather, Transit, Beats, Law and Money. Each signs in with it and keeps its data on it, the same on any device.',
         'The pass is a 10-character code from whoever shared Orbit with you. Anyone who knows it can use the account, so keep it to yourself; it’s shown once, so write it down somewhere safe.',
         'The avatar at the top right of every app opens the Orbit Pass.'
       ]],
@@ -435,6 +435,52 @@ export const HELP = {
         'Morning weather: one line each day at that time (rain, temperature, UV, air), for the pinned place you’re at then. Rain alert: rain likely within 2 hours in the daytime, once a day at most. Both switches are in the Orbit Pass’s notifications.'
       ]],
       ['money', 'Money', ['Orbit Weather uses no money.']]
+    ]
+  },
+  money: {
+    zh: [
+      ['what', 'Orbit Money 是什麼', [
+        '你自己的記帳本：每天花了多少、每個帳戶還有多少、發票有沒有中獎。記的是你真實的錢，和 Securities、Longshot 的遊戲錢完全分開，不會互相影響。資料存在你的 Orbit Pass 裡，換手機也在。'
+      ]],
+      ['tabs', '每個分頁', [
+        '「月曆」：這個月花了多少、收入和結餘，每天格子下面是當天的支出；點一天看那天的每一筆。右下角的 ＋ 隨時記一筆。',
+        '「帳戶」：現金、銀行帳戶、悠遊卡等電子票證、電子支付、信用卡，各自的餘額；可以把某個帳戶設成不計入總資產（例如定存或別人的錢）。銀行帳戶可以加簽帳金融卡，信用卡設好結帳日、繳款日和從哪個帳戶繳。',
+        '「統計」：週、月、年的支出，和上一期比較、每天平均、每個分類占多少，還有每月預算。',
+        '「發票」：手機條碼（結帳時給店員掃）、掃描紙本發票、匯入載具發票，開獎後自動對獎。'
+      ]],
+      ['entry', '記一筆', [
+        '選支出、收入或轉帳，用下面的鍵盤輸入金額（可以打 120+35 這樣相加），選分類、從哪個帳戶付、日期，要的話寫備註。常用的帳戶和分類會記住。',
+        '轉帳是錢在你自己的帳戶之間移動（例如提款、儲值悠遊卡、繳卡費），不算支出。固定收支（房租、薪水、訂閱）設一次，到日子自動記上。'
+      ]],
+      ['invoice', '發票與載具', [
+        '紙本發票：按「掃描發票」對準左右兩個 QR code，金額、日期、店家和品項都會帶進來。',
+        '載具裡的發票：財政部不開放個人直接讀取，所以在電子發票平台「查詢消費發票」按「匯出」，再到「匯入載具」選那個檔案；設定好信箱自動匯入的話，轉寄那封信就好。記過的發票不會重複記。',
+        '每期開獎後，掃過或匯入的發票會自動對獎，中了會列在最上面，寫著領獎期限。'
+      ]],
+      ['money', '錢怎麼算', [
+        'Orbit Money 只記你自己的帳，不用 Orbit 的錢，也不發錢。'
+      ]]
+    ],
+    en: [
+      ['what', 'What Orbit Money is', [
+        'Your own books: what you spend each day, what each account holds, and whether an invoice won. It tracks your real money, kept apart from the play money in Securities and Longshot. It lives on your Orbit Pass, the same on any phone.'
+      ]],
+      ['tabs', 'Each tab', [
+        'Calendar: the month’s spending, income and what’s left, with each day’s spending under its date; tap a day for its entries. The + adds one any time.',
+        'Accounts: cash, bank accounts, stored-value cards like EasyCard, e-payments and credit cards, each with its balance. An account can be left out of the total (a deposit, someone else’s money). Banks take debit cards; a credit card has its statement day, due day and the account that pays it.',
+        'Stats: spending by week, month or year, against the last one, a day on average, by category, and monthly budgets.',
+        'Invoices: your mobile barcode for the till, paper invoices scanned, carrier invoices imported, and every one checked at the draw.'
+      ]],
+      ['entry', 'Adding an entry', [
+        'Pick spent, income or transfer, type the amount on the keypad (120+35 adds up), then the category, the account, the day and a note if you like. Your usual account and category are remembered.',
+        'A transfer moves money between your own accounts (a withdrawal, an EasyCard top-up, a card bill) and isn’t spending. Repeats (rent, salary, subscriptions) are set once and added on their day.'
+      ]],
+      ['invoice', 'Invoices and the carrier', [
+        'Paper invoices: tap Scan and point at both QR codes; amount, day, store and items come in.',
+        'Carrier invoices: the Ministry of Finance lets no person read them directly, so export them on the e-invoice platform and pick that file under Import. With import by mail set up, forward that mail instead. An invoice already in is never added twice.',
+        'After each draw, every invoice in your books is checked; a winner shows at the top with its claim date.'
+      ]],
+      ['money', 'Money', ['Orbit Money only keeps your own books: it neither uses nor pays Orbit money.']]
     ]
   },
   beats: {

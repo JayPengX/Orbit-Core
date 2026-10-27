@@ -138,6 +138,7 @@ break it and say so in a line.
 | Orbit-Words | Vocabulary that catches what you don't know |
 | Orbit-Beats | Beats from your own drum kit |
 | Orbit-Law | Taiwan's laws with linked references, and 立法院 bills by stage |
+| Orbit-Money | Jay's own books (real money, not Orbit's): calendar, accounts and cards, stats and budgets, 發票 scan, 載具 import and 對獎 |
 | Orbit-Securities | A Taiwan broker, on play money |
 
 Folder-Link is a separate Windows tool with its own notes.

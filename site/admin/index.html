@@ -582,7 +582,7 @@ const KEY = 'orbit.admin';
 const $ = id => document.getElementById(id);
 const store = { get: () => { try { return localStorage.getItem(KEY) || ''; } catch { return ''; } }, set: v => { try { v ? localStorage.setItem(KEY, v) : localStorage.removeItem(KEY); } catch {} } };
 let token = store.get();
-const APPS = { stock: 'Orbit 證券', match: 'Orbit Sports', vocab: 'Orbit Words', orbit: 'Orbit Class', weather: 'Orbit Weather', transit: 'Orbit Transit', beats: 'Orbit Beats', law: 'Orbit Law' };
+const APPS = { stock: 'Orbit 證券', match: 'Orbit Sports', vocab: 'Orbit Words', orbit: 'Orbit Class', weather: 'Orbit Weather', transit: 'Orbit Transit', beats: 'Orbit Beats', law: 'Orbit Law', money: 'Orbit Money' };
 const appName = a => APPS[a] || a;
 // A record's kind in words (the key itself when it's one not named here).
 const KINDS = { start: '開戶金', pay: '週薪', rank: '財富等級獎勵', rebase: '重算', admin: '手動調整', loan: '信貸撥款', loanfee: '信貸開辦費', loanpay: '信貸還款', loanlate: '信貸遲延', loanbad: '信貸催收', loangar: '催收扣薪', loanoff: '信貸清償', relief: '急難紓困', od: '透支利息', undo: '撤銷' };

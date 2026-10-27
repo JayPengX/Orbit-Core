@@ -53,6 +53,7 @@ import { handleData } from './data.js';
 import { handleStock, moveBook } from './stock-fill.js';
 import { runBuilders, SLOTS as BUILD_SLOTS } from './builders/run.js';
 import { docStore, storeReady } from './doc-store.js';
+import { handleMoneyMail, handleMoneyMailRequest } from './money-mail.js';
 import { STATE_KEY as GUARD_STATE } from './guard.js';
 // The F1 lap log's Durable Object (f1-live.js), bound as F1_LOG.
 export { F1Log } from './f1-live.js';
@@ -1200,6 +1201,8 @@ async function route(request, env, ctx, headers, origin) {
   if (path === '/law-gist') return handleLawGist(request, env, ctx, headers, await sessionOf(request, env), lawGemini('law-gist'));
   // …and government pages read inside the app (law-page.js): the same Pass, gov.tw only, nothing stored.
   if (path === '/law-page') return handleLawPage(request, env, ctx, headers, await sessionOf(request, env));
+  // Orbit Money's mail-in 載具 invoices (money-mail.js).
+  if (path === '/money-mail') return handleMoneyMailRequest(request, env, headers, await sessionOf(request, env), ECO_DEPS);
   // The bill's guard (guard.js), as it last read the bill: armed or not,
   // each count's share of the $5 plan, stopped or not. No key or token.
   if (path === '/guard' && request.method === 'GET') {
@@ -1314,6 +1317,18 @@ export default {
 
   // The cron (wrangler.toml [triggers]): the notices that are due (push.js),
   // F1's laps, the builders and the guard.
+  // Mail (Cloudflare Email Routing's catch-all on MAIL_DOMAIN): Orbit Money's
+  // 載具 exports, forwarded to an account's own address (money-mail.js).
+  async email(message, env) {
+    try {
+      const r = await handleMoneyMail(message, env, ECO_DEPS);
+      if (r) console.log('money-mail', r.added);
+    } catch (error) {
+      console.log('money-mail failed', String(error?.message || error).slice(0, 200));
+      message.setReject('Try again later');
+    }
+  },
+
   async scheduled(event, env, ctx) {
     const tick = new Date(event.scheduledTime || Date.now());
     const min = tick.getUTCMinutes();
