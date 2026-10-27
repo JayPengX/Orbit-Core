@@ -441,7 +441,8 @@ export function sheet({ title = '', body = [], onClose = () => {}, cls = '', lea
 }
 
 // ---- Menu ----
-// items: [{ label, icon?, danger?, onClick } | 'divider'] from `anchor`:
+// items: [{ label, icon?, lead?, danger?, onClick } | 'divider'] from `anchor`
+// (lead: a picture before the label, an account's logo):
 // glass that grows out of it, closed by a choice, a tap elsewhere or Escape.
 export function menu(anchor, items) {
   document.querySelector('.q-menu')?.remove();
@@ -450,7 +451,7 @@ export function menu(anchor, items) {
     if (it === 'divider') m.append(h('hr'));
     else
       m.append(
-        h('button', { type: 'button', role: 'menuitem', class: it.danger ? 'danger' : '', onclick: () => (shut(), it.onClick?.()) }, [h('span', { text: it.label }), it.icon ? h('span', { 'aria-hidden': 'true', text: it.icon }) : null])
+        h('button', { type: 'button', role: 'menuitem', class: it.danger ? 'danger' : '', onclick: () => (shut(), it.onClick?.()) }, [it.lead ? h('span', { class: 'q-menu-lead', 'aria-hidden': 'true' }, [it.lead]) : null, h('span', { text: it.label }), it.icon ? h('span', { 'aria-hidden': 'true', text: it.icon }) : null])
       );
   }
   // (Inside an open sheet when it's from one: a menu in the page lay under the
