@@ -15,6 +15,7 @@ export const STRINGS = {
     looksTitle: '頭像與頭像框',
     lookOn: '戴著',
     wear: '戴上',
+    wornNow: '現在戴著：{name}',
     avatarsTitle: '頭像',
     framesTitle: '頭像框',
     looksSub: '戴上後，每個 Orbit App 的帳戶按鈕都看得到。',
@@ -23,7 +24,6 @@ export const STRINGS = {
     msGot: '{n}/{all} 枚',
     msMax: '金牌到手，全部達成',
     msHow: '{tier}牌：{goal}',
-    msReward: '拿到就能戴上它的頭像和頭像框。',
     failed: '沒有成功，請再試一次',
     usedToday: '今天用過',
     usedDaysAgo: '{n} 天前用過',
@@ -70,6 +70,7 @@ export const STRINGS = {
     looksTitle: 'Avatar and frame',
     lookOn: 'Wearing',
     wear: 'Wear',
+    wornNow: 'Wearing now: {name}',
     avatarsTitle: 'Avatars',
     framesTitle: 'Frames',
     looksSub: 'Worn on your account button in every Orbit app.',
@@ -78,7 +79,6 @@ export const STRINGS = {
     msGot: '{n} of {all}',
     msMax: 'Gold, all done',
     msHow: '{tier}: {goal}',
-    msReward: 'Earn it to wear its avatar and frame.',
     failed: 'That didn’t work; please try again',
     usedToday: 'Used today',
     usedDaysAgo: 'Used {n} days ago',
@@ -262,6 +262,8 @@ function renderHelp(box, { q, t, locale }, { app, topic }) {
 // The looks: the milestones' (earned once, each an avatar and a frame, worn
 // together), then the free avatars and frames. A tap wears one, a second
 // tap takes it off.
+// A ring that fills with `p` (0–1), around the goal's medal.
+const ring = p => `<svg viewBox="0 0 80 80" aria-hidden="true"><circle cx="40" cy="40" r="37" fill="none" stroke="currentColor" stroke-opacity=".14" stroke-width="4"/><circle cx="40" cy="40" r="37" fill="none" stroke="var(--accent)" stroke-width="4" stroke-linecap="round" pathLength="100" stroke-dasharray="${Math.max(1, Math.round(p * 100))} 100" transform="rotate(-90 40 40)"/></svg>`;
 const compact = (n, en) => (en ? (n >= 1e6 ? `${+(n / 1e6).toFixed(1)}M` : n >= 1000 ? `${Math.floor(n / 1000)}K` : String(n)) : n >= 10_000 ? `${Math.floor(n / 10_000)}萬` : String(n));
 function looksSection({ q, t, locale, wornOf, wear, wearPair }) {
   const en = locale === 'en';
@@ -279,13 +281,13 @@ function looksSection({ q, t, locale, wornOf, wear, wearPair }) {
     frame: f => el('span', { class: `fr-preview q-framed q-frame-${f.id}${frame === f.id ? ' on' : ''}`, 'aria-hidden': 'true' }, [face(AVATARS.some(a => a.id === avatar) ? avatar : DEFAULT_AVATAR)])
   };
   const grid = (key, list) => el('div', { class: `av-grid ${key}s` }, list.map(x => tile(key, x, faces[key](x))));
-  // The milestones. First the one nearest its next tier, open on the page:
-  // how far along (the focal number and a bar), what the tier asks, and the
-  // medal it earns. Then all of them, one row each: the medal in the metal
-  // reached (the app's icon before any), its name, the next tier's goal and
-  // how far along, and a pip per tier. An earned row wears its avatar and
-  // frame together (its 戴上 says so); a second tap takes them off. (The count sits over the
-  // pips, never wrapped into the line.)
+  // The milestones. First what's worn now (a quiet line), then the one
+  // nearest its next tier, open on the page: how far along (the focal number,
+  // and a ring round the medal it earns, faint: a goal, not a look) and what
+  // the tier asks. Then all of them, one row each: the medal in the metal
+  // reached (the app's icon before any), its name, the next tier's goal, the
+  // count over a pip per tier. An earned row says 戴上 and wears its avatar
+  // and frame together; a second tap takes them off.
   const all = MILESTONES.map(m => ({ m, st: milestoneOf(wallet, m) }));
   const tierName = i => TIERS[i - 1][en ? 'en' : 'zh'];
   const count = (m, n) => (m.money ? compact(n, en) : `${n}`);
@@ -298,12 +300,19 @@ function looksSection({ q, t, locale, wornOf, wear, wearPair }) {
         el('div', { class: 'ms-next-text' }, [
           el('small', { text: t('msNext', { name: next.m[locale], tier: tierName(next.st.tier + 1) }) }),
           el('strong', { class: 'ms-next-n num' }, [document.createTextNode(count(next.m, next.st.n)), el('span', { text: ` / ${count(next.m, next.st.goal)}${unit(next.m) ? ` ${unit(next.m)}` : ''}` })]),
-          el('span', { class: 'ms-bar' }, [el('i', { style: `width:${Math.round(share(next) * 100)}%` })]),
-          el('small', { text: `${goalText(next.m, next.st.goal)}${en ? '. ' : '，'}${t('msReward')}` })
+          el('small', { text: goalText(next.m, next.st.goal) })
         ]),
-        el('span', { class: `ms-next-look q-framed q-frame-ms-${next.m.id} q-ms-t${next.st.tier + 1}` }, [face(`ms-${next.m.id}.${next.st.tier + 1}`)])
+        // The goal, not a look: the medal faint inside a ring that fills as it nears.
+        el('span', { class: 'ms-goal', html: ring(share(next)) }, [face(`ms-${next.m.id}.${next.st.tier + 1}`)])
       ])
     : null;
+  // What's worn now, its own quiet line over the goal (so the goal's medal
+  // is never read as the look on).
+  const wornMs = all.find(({ m, st }) => st.done && avatar === `ms-${m.id}`);
+  const wornName = wornMs ? `${wornMs.m[locale]}${en ? ', ' : ''}${tierName(wornMs.st.tier)}${en ? '' : '牌'}` : (AVATARS.find(a => a.id === avatar) || AVATARS.find(a => a.id === DEFAULT_AVATAR))[locale];
+  const wornFrame = MILESTONES.find(m => frame === `ms-${m.id}`);
+  const wornFrameCls = wornFrame ? (all.find(x => x.m === wornFrame).st.done ? `q-framed q-frame-${frame} q-ms-t${all.find(x => x.m === wornFrame).st.tier}` : '') : frame ? `q-framed q-frame-${frame}` : '';
+  const wearing = el('div', { class: 'ms-worn' }, [el('span', { class: `ms-worn-face ${wornFrameCls}` }, [face(wornMs ? `${avatar}.${wornMs.st.tier}` : AVATARS.some(a => a.id === avatar) ? avatar : DEFAULT_AVATAR)]), el('small', { text: t('wornNow', { name: wornName }) })]);
   // (The next tier's pip is ringed in its metal: what the line's goal earns.)
   const pips = st => el('span', { class: 'ms-pips', 'aria-hidden': 'true' }, TIERS.map((x, i) => el('i', { class: `t${i + 1}${st.tier > i ? ' on' : st.tier === i ? ' next' : ''}` })));
   const row = ({ m, st }) => {
@@ -318,7 +327,7 @@ function looksSection({ q, t, locale, wornOf, wear, wearPair }) {
   };
   const got = all.reduce((sum, x) => sum + x.st.tier, 0);
   return el('div', {}, [
-    section(t('msTitle'), [focus, el('div', { class: 'q-list ms-list' }, all.map(row))], { action: el('small', { class: 'ms-got num', text: t('msGot', { n: got, all: MILESTONES.length * TIERS.length }) }) }),
+    section(t('msTitle'), [wearing, focus, el('div', { class: 'q-list ms-list' }, all.map(row))], { action: el('small', { class: 'ms-got num', text: t('msGot', { n: got, all: MILESTONES.length * TIERS.length }) }) }),
     section(
       t('looksTitle'),
       el('div', { class: 'q-card pad looks' }, [el('small', { class: 'lv-h', text: t('avatarsTitle') }), grid('avatar', AVATARS), el('small', { class: 'lv-h', text: t('framesTitle') }), grid('frame', FRAMES)]),

@@ -2946,18 +2946,22 @@ dialog {
 
 
 .q-pass .looks { display: grid; gap: 10px; }
-/* 里程碑: the next medal open on the page (the focal number, a bar, the
-   medal it earns), then one row each in a list. */
+/* 里程碑: what's worn, the next medal open on the page (the focal number,
+   a ring round the faint medal it earns), then one row each in a list. */
 .q-pass .ms-got { margin-left: auto; color: var(--q-label-2); font: var(--q-t-footnote); }
 .q-pass .ms-next { display: flex; align-items: center; gap: 16px; margin: 4px 0 24px; }
 .q-pass .ms-next-text { display: grid; gap: 4px; flex: 1 1 auto; min-width: 0; }
 .q-pass .ms-next-text small { color: var(--q-label-2); font: var(--q-t-subhead); }
 .q-pass .ms-next-n { font: var(--q-t-focal); letter-spacing: -0.02em; white-space: nowrap; }
 .q-pass .ms-next-n span { color: var(--q-label-2); font: var(--q-t-figure); }
-.q-pass .ms-next-look { flex: none; display: grid; place-items: center; width: 76px; height: 76px; border-radius: 50%; }
-.q-pass .ms-next-look .av-face { width: 100%; height: 100%; border-radius: 50%; }
-.q-pass .ms-bar { display: block; height: 4px; margin: 4px 0 2px; border-radius: 2px; background: var(--q-fill-3, color-mix(in srgb, var(--q-text) 12%, transparent)); overflow: hidden; }
-.q-pass .ms-bar i { display: block; min-width: 4px; height: 100%; border-radius: 2px; background: var(--accent); }
+.q-pass .ms-goal { position: relative; flex: none; display: grid; place-items: center; width: 80px; height: 80px; }
+.q-pass .ms-goal svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.q-pass .ms-goal .av-face { width: 56px; height: 56px; border-radius: 50%; filter: grayscale(0.5); opacity: 0.55; }
+.q-pass .ms-worn { display: flex; align-items: center; gap: 8px; margin: 0 0 16px; }
+.q-pass .ms-worn-face { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; overflow: hidden; }
+.q-pass .ms-worn-face.q-framed { border-width: 2px; }
+.q-pass .ms-worn-face .av-face { display: block; width: 100%; height: 100%; border-radius: 50%; }
+.q-pass .ms-worn small { color: var(--q-label-2); font: var(--q-t-subhead); }
 .q-pass .ms-list { --q-sep-left: 68px; }
 .q-pass .ms-row { width: 100%; min-width: 0; min-height: 64px; }
 .q-pass .ms-row:not(.got) { cursor: default; }
