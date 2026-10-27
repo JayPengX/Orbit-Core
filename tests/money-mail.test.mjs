@@ -134,3 +134,43 @@ test("財政部's check of the address: its link and subject kept for the app; i
   assert.equal(r.got, null);
   assert.equal(r.note, null);
 });
+
+test("財政部's mail is copied on to the person's own inbox: same subject, words and files, from our domain", async () => {
+  const { mailCopy, fwdOk } = await import('../money-mail.js');
+  const raw = mail().replace('From: me@gmail.com', 'From: einvoice@einvoice.nat.gov.tw');
+  const c = mailCopy(raw, '財政部 <einvoice@einvoice.nat.gov.tw>', 'me@gmail.com', 'mail.example');
+  assert.equal(c.from.email, 'einvoice@mail.example');
+  assert.equal(c.replyTo, 'einvoice@einvoice.nat.gov.tw');
+  assert.equal(c.subject, 'Fwd: 消費發票明細');
+  assert.equal(c.text.trim(), 'hello');
+  assert.equal(c.attachments.length, 1);
+  assert.equal(c.attachments[0].filename, 'detail.csv');
+  assert.match(new TextDecoder().decode(c.attachments[0].content), /AB12345678/);
+  assert.ok(fwdOk('me@gmail.com', { MAIL_DOMAIN: 'mail.example' }));
+  assert.ok(!fwdOk('abcdefghjk@mail.example', { MAIL_DOMAIN: 'mail.example' }));
+  assert.ok(!fwdOk('nope', { MAIL_DOMAIN: 'mail.example' }));
+
+  const deps = memory();
+  const box = (await ask(deps, 'box')).address.split('@')[0];
+  assert.equal((await ask(deps, 'fwd', 'POST', JSON.stringify({ to: `${box}@mail.example` }))).status, 400);
+  assert.equal((await ask(deps, 'fwd', 'POST', JSON.stringify({ to: 'me@gmail.com' }))).fwd, 'me@gmail.com');
+  const sent = [];
+  const env = { MAIL_DOMAIN: 'mail.example', EMAIL: { send: async m => (sent.push(m), { messageId: 'x' }) } };
+  const message = (from, r) => {
+    const bytes = Uint8Array.from(r, ch => ch.charCodeAt(0));
+    return { to: `${box}@mail.example`, from, rawSize: bytes.length, raw: new Response(bytes).body, setReject() {} };
+  };
+  await handleMoneyMail(message('einvoice@einvoice.nat.gov.tw', raw), env, deps);
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].to, 'me@gmail.com');
+  // Nobody else's mail is copied (a stranger can't use the box to reach the inbox).
+  await handleMoneyMail(message('someone@else.com', mail()), env, deps);
+  assert.equal(sent.length, 1);
+  // A failed send is noted for the app; the invoices still land.
+  env.EMAIL.send = async () => { throw Object.assign(new Error('x'), { code: 'E_SENDER_NOT_VERIFIED' }); };
+  await handleMoneyMail(message('einvoice@einvoice.nat.gov.tw', raw), env, deps);
+  const r = await ask(deps, 'box');
+  assert.equal(r.sent.ok, false);
+  assert.equal(r.sent.code, 'E_SENDER_NOT_VERIFIED');
+  assert.equal(r.fwd, 'me@gmail.com');
+});

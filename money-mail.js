@@ -17,8 +17,12 @@
 //                           the last mail with invoices { at, n })
 //     POST ?op=took {upto}  the items received up to then dropped (in the books now)
 //     POST ?op=new          a new address (the old one stops)
+//     POST ?op=fwd {to}     the person's own inbox ('' for none): each of
+//                           財政部's mails is copied there (Email Sending,
+//                           env.EMAIL, from einvoice@MAIL_DOMAIN, reply-to 財政部),
+//                           so giving the platform this address loses nothing
 //
-// Store: orbit-money-mail/<pass> { box, items: [{ …invoice, at }], confirm, note, got } and
+// Store: orbit-money-mail/<pass> { box, items: [{ …invoice, at }], confirm, note, got, fwd, sent } and
 // orbit-money-mail/box_<box> { pass }.
 import { json } from './http.js';
 import { changeDoc, parseDoc } from './doc-store.js';
@@ -152,6 +156,54 @@ export function einvoiceNote(from, raw) {
   return { subject: headerText(headers.subject).trim().slice(0, 120), link: link.slice(0, 600), code };
 }
 
+// Every leaf part of a mail: { type, name, inline, bytes }.
+export function leafParts(raw, depth = 0) {
+  const { headers, body } = splitEntity(raw);
+  const type = headers['content-type'] || 'text/plain';
+  if (/^multipart\//i.test(type) && depth < 6) {
+    const boundary = param(type, 'boundary');
+    if (!boundary) return [];
+    return body
+      .split(`--${boundary}`)
+      .slice(1)
+      .filter(p => !p.startsWith('--'))
+      .flatMap(p => leafParts(p.replace(/^\r?\n/, ''), depth + 1));
+  }
+  const disposition = headers['content-disposition'] || '';
+  const name = headerText(param(disposition, 'filename') || param(type, 'name'));
+  return [{ type: type.split(';')[0].trim().toLowerCase(), charset: param(type, 'charset'), name, inline: !/attachment/i.test(disposition) && !name, bytes: decodeBody(body, headers['content-transfer-encoding']) }];
+}
+const decodeText = (bytes, charset) => {
+  try {
+    return new TextDecoder(charset || 'utf-8').decode(bytes);
+  } catch {
+    return new TextDecoder('utf-8').decode(bytes);
+  }
+};
+// A mail as Email Sending's send() takes it: the same subject, words and
+// files, sent from our domain (only an onboarded domain may send) with
+// replies going to the one who wrote it.
+export function mailCopy(raw, from, to, domain) {
+  const { headers } = splitEntity(raw);
+  const leaves = leafParts(raw);
+  const text = leaves.find(l => l.inline && l.type === 'text/plain');
+  const html = leaves.find(l => l.inline && l.type === 'text/html');
+  const files = leaves.filter(l => !l.inline).slice(0, 10);
+  return {
+    from: { email: `einvoice@${domain}`, name: '財政部電子發票（Orbit 轉寄）' },
+    to,
+    replyTo: String(from || '').replace(/^.*<([^>]+)>.*$/, '$1').trim() || undefined,
+    subject: headerText(headers.subject).trim().slice(0, 200) || '財政部電子發票',
+    ...(text ? { text: decodeText(text.bytes, text.charset) } : {}),
+    ...(html ? { html: decodeText(html.bytes, html.charset) } : {}),
+    ...(!text && !html ? { text: ' ' } : {}),
+    ...(files.length ? { attachments: files.map((f, i) => ({ content: f.bytes, filename: f.name || `attachment-${i + 1}`, type: f.type || 'application/octet-stream', disposition: 'attachment' })) } : {})
+  };
+}
+// An inbox a copy may go to: a plain address, never one of our own boxes.
+export const fwdOk = (to, env) => typeof to === 'string' && to.length <= 254 && /^[^\s@<>"]+@[^\s@<>"]+\.[a-z]{2,}$/i.test(to) && !to.toLowerCase().endsWith(`@${mailDomain(env)}`);
+const fromGov = from => /@([a-z0-9-]+\.)*nat\.gov\.tw\b/i.test(String(from || ''));
+
 // Gmail's forwarding check: its confirmation code, or ''.
 export function gmailCode(from, raw) {
   if (!/forwarding-noreply@google\.com/i.test(String(from || ''))) return '';
@@ -181,13 +233,25 @@ export async function handleMoneyMail(message, env, deps) {
     return { owner, added: 0 };
   }
   const invoices = mailInvoices(raw);
+  const read = v => v || { box: local, items: [] };
+  let doc;
   if (!invoices.length) {
     // 財政部 checking the address (the app shows its link to tap), or another notice.
     const note = einvoiceNote(message.from, raw);
-    if (note) await changeDoc(env, deps, MAIL_COLLECTION, owner, v => ({ ...v, note: { ...note, at } }), { read: v => v || { box: local, items: [] } });
-    return { owner, added: 0 };
+    if (note) doc = await changeDoc(env, deps, MAIL_COLLECTION, owner, v => ({ ...v, note: { ...note, at } }), { read });
+  } else doc = await changeDoc(env, deps, MAIL_COLLECTION, owner, v => ({ ...v, items: addItems(v.items, invoices, at), got: { at, n: invoices.length } }), { read });
+  // 財政部's mail copied on to the person's own inbox, as it used to arrive.
+  if (doc?.fwd && fromGov(message.from) && env.EMAIL && fwdOk(doc.fwd, env)) {
+    let sent;
+    try {
+      await env.EMAIL.send(mailCopy(raw, message.from, doc.fwd, mailDomain(env)));
+      sent = { at, ok: true };
+    } catch (error) {
+      sent = { at, ok: false, code: String(error?.code || error?.message || 'failed').slice(0, 60) };
+      console.log('money-mail copy failed', sent.code);
+    }
+    await changeDoc(env, deps, MAIL_COLLECTION, owner, v => ({ ...v, sent }), { read }).catch(() => {});
   }
-  await changeDoc(env, deps, MAIL_COLLECTION, owner, v => ({ ...v, items: addItems(v.items, invoices, at), got: { at, n: invoices.length } }), { read: v => v || { box: local, items: [] } });
   return { owner, added: invoices.length };
 }
 
@@ -212,11 +276,11 @@ export async function handleMoneyMailRequest(request, env, headers, session, dep
   };
   if (op === 'box' && request.method === 'GET') {
     const doc = await boxFor(false);
-    return json({ address: addressOf(env, doc.box), items: doc.items || [], confirm: doc.confirm || null, note: doc.note || null, got: doc.got || null }, 200, headers);
+    return json({ address: addressOf(env, doc.box), items: doc.items || [], confirm: doc.confirm || null, note: doc.note || null, got: doc.got || null, fwd: doc.fwd || '', sent: doc.sent || null }, 200, headers);
   }
   if (op === 'new' && request.method === 'POST') {
     const doc = await boxFor(true);
-    return json({ address: addressOf(env, doc.box), items: doc.items || [], note: null, got: null }, 200, headers);
+    return json({ address: addressOf(env, doc.box), items: doc.items || [], note: null, got: null, fwd: doc.fwd || '', sent: doc.sent || null }, 200, headers);
   }
   if (op === 'took' && request.method === 'POST') {
     let upto = 0;
@@ -228,6 +292,15 @@ export async function handleMoneyMailRequest(request, env, headers, session, dep
       return items.length === (v.items || []).length ? v : { ...v, items };
     }, { read });
     return json({ items: doc?.items || [] }, 200, headers);
+  }
+  if (op === 'fwd' && request.method === 'POST') {
+    let to = '';
+    try {
+      to = String(JSON.parse(await request.text()).to || '').trim();
+    } catch {}
+    if (to && !fwdOk(to, env)) return json({ error: 'address' }, 400, headers);
+    const doc = await changeDoc(env, deps, MAIL_COLLECTION, pass, v => ({ ...v, fwd: to, sent: null }), { read });
+    return json({ fwd: doc?.fwd || '' }, 200, headers);
   }
   return json({ error: 'op' }, 400, headers);
 }
