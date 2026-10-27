@@ -1982,7 +1982,7 @@ function signInGate(s) {
     const input = passInput(BRAND.pass, { save: 'current-password' });
     const error = node('p', { class: 'q-gate-error', role: 'alert' });
     const enter = node('button', { class: 'q-btn primary block', type: 'submit', text: en ? 'Sign in' : '登入' });
-    const keys = passkeyHere() && passkeyGate(s, error, res => finish(res));
+    const keys = passkeyHere() && passkeyGate(s, error, res => finish(res), on => busy(on));
     const busy = on => [enter, input, keys?.button].forEach(b => b && (b.disabled = on));
     let over = false;
     const finish = res => {
@@ -2046,7 +2046,9 @@ function signInGate(s) {
 // request only during the tap itself) and again before it runs out; where
 // the browser offers passkeys in the keyboard (conditional mediation), it
 // waits there too, and the button takes over from it.
-function passkeyGate(s, error, signedIn) {
+// `lock(on)`: the whole form held (the pass box, 登入, this button) while
+// a passkey is checked, and let go when it fails or is closed.
+function passkeyGate(s, error, signedIn, lock) {
   const en = s.lang === 'en';
   let begin = null;
   let wait = null;
@@ -2065,12 +2067,13 @@ function passkeyGate(s, error, signedIn) {
     return begin;
   };
   const run = async (challenge, credential) => {
+    lock(true);
     try {
       signedIn(await s.passkeyLogin(challenge, credential));
     } catch (e) {
       if (e.code === 'ECO_PASSKEY_UNKNOWN') forgetPasskey(credential.id);
       error.textContent = errorText(e, s.lang);
-      button.disabled = false;
+      lock(false);
       ask().then(listen);
     }
   };
@@ -2094,10 +2097,10 @@ function passkeyGate(s, error, signedIn) {
     onclick: async () => {
       error.textContent = '';
       quiet?.abort();
-      button.disabled = true;
+      lock(true);
       const b = fresh() ? begin : await ask();
       if (!b) {
-        button.disabled = false;
+        lock(false);
         error.textContent = errorText({}, s.lang);
         return;
       }
@@ -2106,7 +2109,7 @@ function passkeyGate(s, error, signedIn) {
         const cred = await usePasskey(b.challenge, { signal: wait.signal });
         await run(b.challenge, cred);
       } catch (e) {
-        button.disabled = false;
+        lock(false);
         if (!cancelled(e)) error.textContent = errorText({ code: 'ECO_PASSKEY_INVALID' }, s.lang);
         ask().then(listen);
       }
