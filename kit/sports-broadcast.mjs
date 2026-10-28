@@ -36,13 +36,18 @@ export const BROADCAST = {
   uecl: [ELTA],
   scotland: [ELTA],
   mls: [APPLE],
-  facup: [ELTA],
+  // From the third round only (January, the Premier League's clubs in): the
+  // first two rounds' lower-league games aren't in ELTA's list (2026-10-28:
+  // none of the first round's 11/7–11/10).
+  facup: [{ ...ELTA, rounds: { not: ['first-round', 'second-round'] } }],
   nationsleague: [ELTA],
   // Every session, practice too (2026-2029): its channel once ELTA's list names it.
   f1: [{ ...ELTA, every: true }]
 };
 
 export const broadcastsOf = league => BROADCAST[league] || [];
+// A round of a cup its service doesn't carry (the FA Cup's first two): known not on.
+export const roundOff = e => Boolean(e?.round?.key && broadcastsOf(e.league)[0]?.rounds?.not?.includes(e.round.key));
 // Where a game's channels came from, under the card: ELTA's schedule (a
 // channel named), NBA.com (its ELTA games, the channel not yet), else when
 // the list was checked. A league ELTA carries whole (F1) is no NBA.com game.
@@ -335,6 +340,7 @@ const playoffToCome = (e, base) => e.kind === 'match' && e.series && !base.note 
 export function broadcastsFor(e, programs, { sides = [], others = [], prefer = 'en', nba = null, sidesOf = null } = {}) {
   const base = broadcastsOf(e.league);
   if (base[0]?.svc !== 'elta') return base;
+  if (roundOff(e)) return [];
   const listed = eltaListed(programs, e);
   const seen = new Set();
   const channels = listed
