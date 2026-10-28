@@ -3030,9 +3030,21 @@ const inAppBrowser = () => /Line\/|FBAN|FBAV|Instagram|Messenger|MicroMessenger|
 // too (a hand-over no longer lets it run in the browser). Returns true when
 // it covered the page (the app shouldn't start).
 let installCovered = false;
+// Chrome on Android offers its own install (an app, not a bookmark): kept
+// from the moment the kit loads, shown as a button on the gate.
+let installPrompt = null;
+let installButton = null;
+globalThis.addEventListener?.('beforeinstallprompt', e => {
+  e.preventDefault();
+  installPrompt = e;
+  if (installButton) installButton.hidden = false;
+});
 // The app this home-screen window was opened as (kept for the window only):
 // another app opened from inside it (the Pass's 打開, a link) loads in the
 // same window, still "standalone", and must be added and opened on its own too.
+// iPhone only: Android keeps each app's pages in its own window already, and
+// moves a tab with its sessionStorage (Chrome → the new app's window), so the
+// key there named the app it came from and the new app never opened.
 const WINDOW_APP = 'orbit.window';
 function windowApp(app) {
   try {
@@ -3045,13 +3057,19 @@ function windowApp(app) {
 export function installGate(app, lang = detectLang()) {
   if (!isPhoneOrTablet()) return false;
   if (isStandalone()) {
+    if (!isIOS()) return false;
     const home = windowApp(app);
     return home === app ? false : insideGate(app, home, lang);
   }
   if (installCovered) return true;
   installCovered = true;
+  // Installed from this page (Chrome moves the tab into the app's window
+  // without loading it again): start for real.
+  globalThis.matchMedia?.('(display-mode: standalone)').addEventListener?.('change', e => e.matches && location.reload());
   const en = lang === 'en';
   const name = appName(app);
+  // Chrome's "Add to home screen" asks Install or Create shortcut; a
+  // shortcut opens in the browser, so it lands on this page again.
   const steps = inAppBrowser()
     ? en
       ? ['Open this page in Safari (iPhone) or Chrome (Android): tap ⋯ and “Open in browser”.', 'Then add it to your home screen.']
@@ -3061,13 +3079,32 @@ export function installGate(app, lang = detectLang()) {
         ? ['Tap Share (the square with an arrow) in Safari.', 'Choose “Add to Home Screen”, then “Add”.', `Open ${name} from its new icon.`]
         : ['點 Safari 的「分享」（方框加箭頭）。', '選「加入主畫面」，再點「新增」。', `從主畫面的新圖示打開 ${name}。`]
       : en
-        ? ['Tap ⋮ at the top right of Chrome.', 'Choose “Add to Home screen” (or “Install app”).', `Open ${name} from its new icon.`]
-        : ['點 Chrome 右上角的 ⋮。', '選「加入主畫面」或「安裝應用程式」。', `從主畫面的新圖示打開 ${name}。`];
+        ? ['Tap ⋮ at the top right of Chrome.', 'Choose “Add to Home screen”, then “Install” (not “Create shortcut”).', `Open ${name} from its new icon. If an icon only shows this page again, remove it and add ${name} again with “Install”.`]
+        : ['點 Chrome 右上角的 ⋮。', '選「加入主畫面」，再選「安裝」（不要選「建立捷徑」）。', `從主畫面的新圖示打開 ${name}。如果圖示打開又是這一頁，請刪掉那個圖示，重新加入並選「安裝」。`];
+  installButton = isIOS() || inAppBrowser()
+    ? null
+    : node('button', {
+        class: 'q-btn primary block',
+        type: 'button',
+        hidden: !installPrompt,
+        text: en ? `Install ${name}` : `安裝 ${name}`,
+        onclick: async () => {
+          const ask = installPrompt;
+          if (!ask) return;
+          installPrompt = null;
+          installButton.hidden = true;
+          ask.prompt();
+          try {
+            await ask.userChoice;
+          } catch {}
+        }
+      });
   const gate = node('dialog', { class: 'q-gate q-install', 'aria-modal': 'true', style: `--q-accent:${APPS[app].color}` }, [
     node('div', { class: 'q-gate-box' }, [
       node('img', { class: 'q-gate-icon', src: './favicon.svg', alt: '', width: '72', height: '72' }),
       node('p', { class: 'q-gate-brand', text: 'ORBIT' }),
       node('h1', { class: 'q-gate-title', text: en ? `Add ${name} to your home screen` : `把 ${name} 加入主畫面` }),
+      installButton,
       node(
         'ol',
         { class: 'q-steps' },
