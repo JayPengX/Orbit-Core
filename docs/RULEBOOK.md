@@ -75,6 +75,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 
 ## 3. Design
 
+- 10-28 The look is final as it is now: Jay saw 7 whole-app looks (Paper, Poster, Aurora, Ledger, Tint, Clay, Spotlight) and chose no change, since today's look is the best in dark. No redesign or restyle rounds unless Jay asks for one; fixes keep today's look.
 - 10-27 `DESIGN.md` is the standard ("looks AI-made"): one focal point per screen, weight 700 only for the focal number and large titles, accent as a pointer (about 4 uses), chips only for taps or exceptions, one radius, 4-point spacing, backgrounds kept (see below). Fix with design principles, never by copying another app; change the kit, not every screen.
 - 10-27 Keep backgrounds: hero and focus cards on the app's colour (lit, soft shadow), class/sport/subject cards and icon tiles in their colours. Clean the content (one focus, fewer chips, quieter weights and accents), never by stripping colour (Jay: "the cleaner approach is right, but stripping out background is shitty").
 - 10-27 Tight spacing: 24 between sections, 16 between groups of one list and after the focus, 8 under a line that names what follows; no gap bigger than what it separates (Jay: "so much gap for IDK what").
