@@ -628,6 +628,9 @@ button,
   cursor: pointer;
   transition: transform var(--q-dur-snappy) var(--q-spring-snappy), background-color 0.2s, opacity 0.2s, color 0.2s;
 }
+.q-btn[hidden] {
+  display: none;
+}
 .q-btn:is(:active, [data-q-press]):not(:disabled) {
   transform: scale(0.96);
   transition-duration: 0.12s;
