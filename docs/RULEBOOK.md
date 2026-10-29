@@ -113,6 +113,8 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 10-23 Operators' 停駛 notices are rules: stopped services are never planned; likely-off is labelled 可能停駛, never 停駛.
 - 10-23 附近 must load; on a "nothing running" day it still works and just says what's stopped.
 - 10-27 A trip's legs fit one line (tighten, never wrap); 查時刻 is visual (journey bar, live 準點/晚, next train lit), not text.
+- 10-29 偏好電輔車 is a per-trip choice on the plans card: of stations about as near, the one with 電輔車, ridden at their pace.
+- 10-29 換附近的站 while navigating is asked only when a station runs low (2 or fewer bikes or docks; no 電輔車 for an e-bike ride); otherwise the count is a quiet tap.
 
 ### Sports
 - 10-20 Every break gets a countdown, timeouts too.
