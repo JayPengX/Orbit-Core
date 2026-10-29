@@ -4805,6 +4805,13 @@ html.q-kb .q-gate:focus-within :is(.q-gate-brand, .q-gate-lede) {
 html.q-kb .q-tabbar {
   visibility: hidden;
 }
+/* The keys gone but the fixed bars' frame left short (orbit.mjs watchKeyboard,
+   --q-foot-gap): the bars at the foot moved down to the screen's foot.
+   (translate, apart from their own transform; an app marks its own foot
+   bars .q-foot.) */
+html.q-foot-stuck :is(.q-tabbar, .q-accessory, .q-toast, .q-net, .q-foot) {
+  translate: 0 var(--q-foot-gap);
+}
 /* A bar that belongs on top of the keys (a composer, a search's results bar). */
 html.q-kb .q-kb-dock {
   bottom: var(--q-kb) !important;

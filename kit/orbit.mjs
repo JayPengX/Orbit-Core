@@ -3531,6 +3531,18 @@ function watchKeyboard() {
     root.style.setProperty('--q-kb', `${held ? held.keys : 0}px`);
     root.style.setProperty('--q-vvh', `${held ? held.vvh : Math.round(vv.height)}px`);
     root.classList.toggle('q-kb', up);
+    // The keys gone, the foot left behind: iOS 26 can keep the frame that
+    // fixed bars sit in where the keys had it (the page's height still
+    // shrunk, or the visible part still slid down: WebKit 297779), and the
+    // tab bar and what floats on it hang mid-screen over the page while it
+    // scrolls under and past them (Jay 2026-10-29, Transit 我的: the trip
+    // bar and the tabs over 釘選). --q-foot-gap is how far that frame's foot
+    // is above the screen's; orbit.css moves the foot's bars down by it.
+    const gap = up ? 0 : footGap();
+    if (gap && !wasGap) unstick();
+    wasGap = gap > 0;
+    root.style.setProperty('--q-foot-gap', `${gap}px`);
+    root.classList.toggle('q-foot-stuck', gap > 0);
     for (const d of document.querySelectorAll('.q-kb-docked')) if (!up || !d.contains(document.activeElement)) d.classList.remove('q-kb-docked');
     // (Lifted once per field and keys, never on the scrolls and resizes it causes itself.)
     if (held?.lift) {
@@ -3543,6 +3555,21 @@ function watchKeyboard() {
     }
   };
   const unslide = () => globalThis.scrollTo?.(globalThis.scrollX, Math.max(0, globalThis.scrollY - vv.offsetTop));
+  // (The screen's foot: what the visible part reaches, or on an installed
+  // iPhone app upright, the whole screen, which its page always fills.)
+  const standalone = () => globalThis.navigator?.standalone === true || Boolean(globalThis.matchMedia?.('(display-mode: standalone)').matches);
+  const footGap = () => {
+    if (root.dataset.qTurn) return 0;
+    let foot = vv.offsetTop + vv.height;
+    const scr = globalThis.screen;
+    if (isIOS() && standalone() && scr && Math.abs(scr.width - globalThis.innerWidth) < 2) foot = Math.max(foot, scr.height);
+    const gap = Math.round(foot - globalThis.innerHeight);
+    // (A few px is rounding; more than half the screen is not this.)
+    return gap > 8 && gap < globalThis.innerHeight ? gap : 0;
+  };
+  // (Asked once as it starts: a scroll to where the page already is makes iOS lay its frame out again, and the gap often closes by itself.)
+  const unstick = () => setTimeout(() => (globalThis.scrollTo?.(globalThis.scrollX, globalThis.scrollY), soon()), 0);
+  let wasGap = false;
   let held = null;
   // The field in what's left above the keys. One in a bar fixed at the
   // foot (a composer, a stake bar) rides on the keys with its bar; any
