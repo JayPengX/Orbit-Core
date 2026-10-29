@@ -3538,7 +3538,13 @@ function watchKeyboard() {
     // scrolls under and past them (Jay 2026-10-29, Transit 我的: the trip
     // bar and the tabs over 釘選). --q-foot-gap is how far that frame's foot
     // is above the screen's; orbit.css moves the foot's bars down by it.
-    const gap = up ? 0 : footGap();
+    // (Only right after the keys were up, and only what the visible part
+    // shows: measured against the whole screen, an installed app whose page
+    // starts under the status bar read that bar as a gap, and coming back to
+    // the app the tab bar was pushed off the foot, Jay 2026-10-29.)
+    if (up) keysWere = true;
+    const gap = up || !keysWere ? 0 : footGap();
+    if (!up && !gap) keysWere = false;
     if (gap && !wasGap) unstick();
     wasGap = gap > 0;
     root.style.setProperty('--q-foot-gap', `${gap}px`);
@@ -3555,21 +3561,16 @@ function watchKeyboard() {
     }
   };
   const unslide = () => globalThis.scrollTo?.(globalThis.scrollX, Math.max(0, globalThis.scrollY - vv.offsetTop));
-  // (The screen's foot: what the visible part reaches, or on an installed
-  // iPhone app upright, the whole screen, which its page always fills.)
-  const standalone = () => globalThis.navigator?.standalone === true || Boolean(globalThis.matchMedia?.('(display-mode: standalone)').matches);
+  // (The screen's foot: what the visible part reaches.)
   const footGap = () => {
     if (root.dataset.qTurn) return 0;
-    let foot = vv.offsetTop + vv.height;
-    const scr = globalThis.screen;
-    if (isIOS() && standalone() && scr && Math.abs(scr.width - globalThis.innerWidth) < 2) foot = Math.max(foot, scr.height);
-    const gap = Math.round(foot - globalThis.innerHeight);
+    const gap = Math.round(vv.offsetTop + vv.height - globalThis.innerHeight);
     // (A few px is rounding; more than half the screen is not this.)
     return gap > 8 && gap < globalThis.innerHeight ? gap : 0;
   };
   // (Asked once as it starts: a scroll to where the page already is makes iOS lay its frame out again, and the gap often closes by itself.)
   const unstick = () => setTimeout(() => (globalThis.scrollTo?.(globalThis.scrollX, globalThis.scrollY), soon()), 0);
-  let wasGap = false;
+  let wasGap = false, keysWere = false;
   let held = null;
   // The field in what's left above the keys. One in a bar fixed at the
   // foot (a composer, a stake bar) rides on the keys with its bar; any
@@ -3620,6 +3621,9 @@ function watchKeyboard() {
   globalThis.addEventListener?.('resize', soon);
   document.addEventListener('focusin', () => setTimeout(soon, 60));
   document.addEventListener('focusout', () => setTimeout(soon, 60));
+  // (Back in the app: measured again.)
+  document.addEventListener('visibilitychange', () => document.hidden || soon());
+  globalThis.addEventListener?.('pageshow', soon);
   apply();
 }
 watchKeyboard();
