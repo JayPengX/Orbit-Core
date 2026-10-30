@@ -13,6 +13,7 @@ on:
       - 'wrangler.toml'
       - 'wrangler.gemini.toml'
       - 'wrangler.site.toml'
+      - 'wrangler.ig.toml'
       - '.github/workflows/deploy.yml'
   # On 20 October (the old sports-proxy deleted) and 6 December (the
   # Firebase key off: sign-ins it signed ran out on 2026-12-05), even if
@@ -100,6 +101,15 @@ jobs:
           # explicitly rather than relying on the action's own default,
           # so a future change to that default can't silently break this
           # again the same way.
+          wranglerVersion: '4'
+      # orbit-ig (ig.js): the test of whether Instagram answers a Worker.
+      - name: Deploy orbit-ig
+        continue-on-error: true
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --config wrangler.ig.toml
           wranglerVersion: '4'
       # The old address (sports-proxy.pengzjay.workers.dev, a forwarder to the
       # proxy since the move on 2026-10-13): no code calls it, and a phone on
