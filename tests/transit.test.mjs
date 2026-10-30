@@ -779,6 +779,13 @@ test('buses due: one TDX call for a whole city, every ask answered with its own 
   assert.deepEqual(run.routes, { TPE10: 2, TPE11: 1, TPE12: 0 });
   assert.equal(log.length, 1, 'every stop, every route and the running list from the one call');
   assert.equal((await ask('city=Taipei&stops=nope')).status, 400);
+  // 公路客運 (all Taiwan, too big to keep whole): its stops' own ask.
+  const many = Array.from({ length: 50 }, (_, i) => `THB${100 + i}`);
+  await ask(`city=InterCity&stops=${many.join(',')}`);
+  const inter = log.slice(1).map(decodeURIComponent);
+  assert.equal(inter.length, 2, '40 stops a call');
+  assert.ok(inter.every(u => /InterCity\?\$filter=StopUID eq 'THB\d+'( or StopUID eq 'THB\d+')*&\$select=/.test(u)));
+  log.length = 1;
   const path = 'basic/v2/Rail/Metro/S2STravelTime/TRTCMG';
   assert.equal((await tdxGet(env, path, { fetchFn, cache, now: NOW })).status, 502);
   assert.equal((await tdxGet(env, path, { fetchFn, cache, now: NOW + 60_000 })).status, 502);

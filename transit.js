@@ -240,6 +240,18 @@ export async function running(env, city, deps = {}) {
   const now = deps.now ?? Date.now();
   const kept = runMemo.get(city);
   if (kept && now - kept.at < 50e3) return { status: 200, body: kept };
+  // (公路客運's whole list is too big to keep whole (60,000 rows, 24 MB): its own slim read.)
+  if (city === 'InterCity') {
+    const got = await tdxGet(env, `basic/v2/Bus/EstimatedTimeOfArrival/InterCity?$select=RouteUID,StopStatus,EstimateTime&$top=60000`, deps);
+    let rows = null;
+    try {
+      rows = got.status === 200 && got.body != null ? JSON.parse(got.body) : null;
+    } catch {}
+    if (!rows) return kept ? { status: 200, body: kept } : { status: got.status || 502, body: { code: 'TDX_FAILED' } };
+    const body = { at: now - (got.age || 0), routes: runningOf(rows) };
+    runMemo.set(city, body);
+    return { status: 200, body };
+  }
   const got = await cityEta(env, city, deps);
   if (!got.idx) return kept ? { status: 200, body: kept } : { status: got.status || 502, body: { code: 'TDX_FAILED' } };
   const body = { at: got.idx.at, routes: (got.idx.running ||= runningOf(got.idx.rows)) };
@@ -255,7 +267,11 @@ export async function running(env, city, deps = {}) {
 // isolate a copy, and each ask answered with its own stops' rows (or one
 // route's). A trip asked TDX ten to forty times a city, a stop list each,
 // every call queued at 4 a second: 2–6 s of a plan's wait (2026-10-30).
-export const ETA_SELECT = 'StopUID,StopName,RouteUID,RouteName,SubRouteUID,Direction,EstimateTime,StopStatus,NextBusTime,PlateNumb,IsLastBus,Estimates,StopCountDown,DataTime';
+// Kept a little longer than one stop's (2 minutes at once, refreshed behind):
+// each row says when it was estimated, and the phone counts from then.
+// 公路客運 (InterCity, all Taiwan: 60,000 rows) is asked by its stops instead.
+export const ETA_SELECT = 'StopUID,RouteUID,RouteName,Direction,EstimateTime,StopStatus,NextBusTime,PlateNumb,IsLastBus,Estimates,StopCountDown,DataTime';
+const ETA_STALE = 2 * MIN;
 export const cityEtaPath = city => `basic/v2/Bus/EstimatedTimeOfArrival/${city === 'InterCity' ? 'InterCity' : `City/${city}`}?$select=${ETA_SELECT}&$top=60000`;
 const etaIndex = new Map(); // city → { at, rows, stops: Map(uid → rows), routes: Map(uid → rows), running }
 export const resetEta = () => (etaIndex.clear(), runMemo.clear());
@@ -277,7 +293,7 @@ export async function cityEta(env, city, deps = {}) {
   const idx = etaIndex.get(city);
   // (This isolate's copy while it's fresh: the 9 MB never read again for each ask.)
   if (idx && now - idx.at < (await freshOf(TDX_RULES[0], null))) return { idx, age: now - idx.at };
-  const got = await tdxGet(env, cityEtaPath(city), deps);
+  const got = await tdxGet(env, cityEtaPath(city), { ...deps, stale: ETA_STALE });
   if (got.status !== 200 || got.body == null) return idx ? { idx, age: now - idx.at } : { status: got.status || 502 };
   const at = now - (got.age || 0);
   if (idx?.at === at) return { idx, age: got.age || 0 };
@@ -292,7 +308,7 @@ export async function cityEta(env, city, deps = {}) {
   etaIndex.delete(city);
   etaIndex.set(city, next);
   // (A few cities at a time in memory: the oldest asked goes.)
-  while (etaIndex.size > 6) etaIndex.delete(etaIndex.keys().next().value);
+  while (etaIndex.size > 3) etaIndex.delete(etaIndex.keys().next().value);
   return { idx: next, age: got.age || 0 };
 }
 // GET /transit/eta?city=<TDX city | InterCity>&stops=<StopUID,…> (or &route=<RouteUID>):
@@ -304,6 +320,23 @@ export async function etaRows(env, q, deps = {}) {
   const stops = (q.get('stops') || '').split(',').filter(u => UID.test(u)).slice(0, 400);
   const route = q.get('route') || '';
   if (!stops.length && !UID.test(route)) return { status: 400, body: { code: 'BAD_STOPS' } };
+  if (city === 'InterCity') {
+    // (Its stops' own ask, 40 to a call (TDX_RULES' 1,500 characters), as the phone asked before.)
+    const q1 = u => `'${u}'`;
+    const parts = [];
+    if (!stops.length) parts.push(`RouteUID eq ${q1(route)}`);
+    for (let i = 0; i < stops.length; i += 40) parts.push(stops.slice(i, i + 40).map(u => `StopUID eq ${q1(u)}`).join(' or '));
+    const all = await Promise.all(parts.map(f => tdxGet(env, `basic/v2/Bus/EstimatedTimeOfArrival/InterCity?$filter=${f}&$select=${ETA_SELECT}`, deps)));
+    if (all.some(g => g.status !== 200 || g.body == null)) {
+      const busy = all.some(g => g.status === 429);
+      return { status: busy ? 429 : 502, body: { code: busy ? 'TDX_BUSY' : 'TDX_FAILED' } };
+    }
+    try {
+      return { status: 200, body: all.flatMap(g => JSON.parse(g.body)), age: Math.max(...all.map(g => g.age || 0)) };
+    } catch {
+      return { status: 502, body: { code: 'TDX_FAILED' } };
+    }
+  }
   const got = await cityEta(env, city, deps);
   if (!got.idx) return { status: got.status === 429 ? 429 : 502, body: { code: got.status === 429 ? 'TDX_BUSY' : 'TDX_FAILED' } };
   const body = stops.length ? stops.flatMap(u => got.idx.stops.get(u) || []) : got.idx.routes.get(route) || [];
@@ -496,8 +529,10 @@ export async function warmBikes(env, deps = {}) {
 // One TDX answer, from the shared cache when it's fresh enough.
 // → { status, body (text), age (ms), state: 'hit' | 'miss' | 'stale' | 'busy' | 'error' }
 // `warm` (the cron's): refreshed when its copy is past its fresh time, else 'warm'.
-export async function tdxGet(env, raw, { fetchFn = fetch, cache = globalThis.caches?.default, ctx = null, now = Date.now(), warm = false } = {}) {
+export async function tdxGet(env, raw, { fetchFn = fetch, cache = globalThis.caches?.default, ctx = null, now = Date.now(), warm = false, stale = null } = {}) {
   const req = tdxRequest(raw);
+  // (`stale`: served at once that long, instead of the rule's.)
+  const staleMs = stale ?? req?.rule.stale;
   if (!req) return { status: 400, body: JSON.stringify({ code: 'TDX_NOT_ALLOWED' }), state: 'error' };
   const url = `${TDX_BASE}${req.path}?${req.query}`;
   const key = new Request(`https://transit-cache.orbit/${req.path}?${req.query}`);
@@ -515,7 +550,7 @@ export async function tdxGet(env, raw, { fetchFn = fetch, cache = globalThis.cac
   let at = hit ? Number(hit.headers.get('X-Fetched-At')) || 0 : 0;
   let body = hit ? await hit.text() : null;
   // (This colo's copy missing or past its stale time: KV's, when newer.)
-  if (keepWarm && (warm || !hit || now - at >= req.rule.stale)) {
+  if (keepWarm && (warm || !hit || now - at >= staleMs)) {
     const w = await warmRead(env, req);
     if (w && (body == null || w.at > at)) [body, at] = [w.body, w.at];
   }
@@ -566,7 +601,7 @@ export async function tdxGet(env, raw, { fetchFn = fetch, cache = globalThis.cac
     const got = await refresh().catch(err => ({ status: 502, state: 'error', why: String(err?.message || err) }));
     return { status: got.status, age: 0, state: got.state };
   }
-  if (body != null && age < req.rule.stale) {
+  if (body != null && age < staleMs) {
     // At once, refreshed behind.
     later(refresh());
     return { status: 200, body, age, state: 'stale' };
