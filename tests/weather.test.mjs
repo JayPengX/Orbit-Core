@@ -205,6 +205,28 @@ test('the cell cache: fresh from KV; an old one refreshed, its answer if in with
   assert.equal(JSON.parse(kv.store.get('weather:cell:25.03,121.57')).at, NOW + 120 * 60_000);
 });
 
+test('a national list past its time: the kept copy at once, the new one made behind the answer', async () => {
+  const kv = memKv();
+  const e = { ...env, RATE_LIMIT_KV: kv };
+  const ok = upstream();
+  let slow = 0;
+  let moenv = 0;
+  const f = async (url, init) => (String(url).includes('aqx_p_432') && (moenv++, slow && (await new Promise(r => setTimeout(r, slow)))), ok(url, init));
+  const first = [];
+  await cellForecast(e, { waitUntil: p => first.push(p) }, 25.034, 121.565, { fetchFn: f, now: NOW });
+  await Promise.all(first);
+  // Half an hour on (MOENV's sites are kept 20 minutes), MOENV slow: another cell isn't held up by it.
+  slow = 3000;
+  const waits = [];
+  const t0 = Date.now();
+  const other = await cellForecast(e, { waitUntil: p => waits.push(p) }, 25.06, 121.52, { fetchFn: f, now: NOW + 30 * 60_000 });
+  assert.ok(Date.now() - t0 < 1500, `waited ${Date.now() - t0} ms`);
+  assert.ok(other.air);
+  assert.equal(moenv, 2);
+  await Promise.all(waits);
+  assert.equal(JSON.parse(kv.store.get('weather:moenv:aqi')).at, NOW + 30 * 60_000);
+});
+
 test('a cell nobody has: the near answer at once, the far hours and air forecast behind it', async () => {
   const kv = memKv();
   const e = { ...env, RATE_LIMIT_KV: kv };

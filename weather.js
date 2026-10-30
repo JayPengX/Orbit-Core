@@ -641,19 +641,38 @@ export async function keepJson(env, key, entry, ttlS, prev = null, defer = null)
 const later = (p, defer) => (defer ? void defer(p) : p);
 
 // A national list kept whole (MOENV's AQI sites and forecast, CWA's
-// warnings): fresh for `freshMs`, the last good copy used while under
-// KEEP_MS if the source fails.
+// warnings, the typhoon and 停班停課 reads): fresh for `freshMs`, the last
+// good copy used while under KEEP_MS if the source fails. Past `freshMs`
+// with a request to hand it to (`defer`), the kept copy is the answer at
+// once and the new one is made behind it: nobody waits on a slow national
+// list (MOENV's took 2–10 s, and every answer waited on the 停班停課 read
+// every 3 minutes). One make at a time per list in an isolate.
+const making = new Map();
 async function shared(env, key, freshMs, make, now, defer = null) {
   const hit = await keptJson(env, key);
   if (hit && now - hit.at < freshMs) return { ...hit, state: 'ok' };
-  try {
-    const data = await make();
-    const entry = await keepJson(env, key, { at: now, data }, KEEP_MS / 1000, hit, defer);
-    return { ...entry, state: 'ok' };
-  } catch (e) {
-    if (hit && now - hit.at < KEEP_MS) return { ...hit, state: 'stale' };
-    return { at: now, data: null, state: 'error', error: String(e.message || e).slice(0, 120) };
+  let job = making.get(key);
+  if (!job) {
+    job = (async () => {
+      await null;
+      try {
+        const data = await make();
+        const entry = await keepJson(env, key, { at: now, data }, KEEP_MS / 1000, hit, defer);
+        return { ...entry, state: 'ok' };
+      } catch (e) {
+        if (hit && now - hit.at < KEEP_MS) return { ...hit, state: 'stale' };
+        return { at: now, data: null, state: 'error', error: String(e.message || e).slice(0, 120) };
+      } finally {
+        making.delete(key);
+      }
+    })();
+    making.set(key, job);
   }
+  if (defer && hit && now - hit.at < KEEP_MS) {
+    defer(job);
+    return { ...hit, state: now - hit.at < 2 * freshMs ? 'ok' : 'stale' };
+  }
+  return job;
 }
 
 // Today's Google calls, counted in KV: true while `calls` more fit under
@@ -1423,7 +1442,8 @@ export async function cellForecast(env, ctx, lat, lon, { fetchFn = fetch, now = 
     // the old copy, said to be refreshing (the page asks again in seconds).
     // (No lock: two refreshes of one cell at once are harmless.)
     const job = refresh().catch(e => (console.log('weather refresh failed', String(e.message || e)), null));
-    const done = await Promise.race([job, new Promise(r => setTimeout(r, FRESH_WAIT_MS, null))]);
+    // (Followed on the same request: waited on only FOLLOW_WAIT_MS, the new one streamed after.)
+    const done = await Promise.race([job, new Promise(r => setTimeout(r, follow ? FOLLOW_WAIT_MS : FRESH_WAIT_MS, null))]);
     if (done?.resp) return done.resp;
     behind(job);
     return { ...hit.resp, cached: true, refreshing: true };
@@ -1436,6 +1456,9 @@ export async function cellForecast(env, ctx, lat, lon, { fetchFn = fetch, now = 
 }
 // How long an old copy's refresh is waited on before the copy is the answer.
 export const FRESH_WAIT_MS = 4000;
+// …when the request follows the refresh (the page's `lines=1`): the old copy
+// sooner, the new one on the same request the moment it's in.
+export const FOLLOW_WAIT_MS = 1200;
 // How long a quick entry's finishing job gets before it's started again.
 export const QUICK_FINISH_MS = 45_000;
 
