@@ -44,6 +44,8 @@ The family page and Orbit Pass sign-in are at [orbit.jaypengx.com/pass](https://
 - **Notices** that reach a phone while the app is closed: game starts, class reminders, bus arrivals, rain, price alerts.
 - **Data builds** on the proxy's cron into Cloudflare R2: seasons, game days, bus routes and shapes, photos, highlights.
 - **The kit:** the shared look (an iOS-style design system), the sign-in sheet, sheets, tab bars, the date strip, offline handling, the service worker and the helpers every app loads.
+- **Add to Home Screen** steps written for the phone's own browser (Safari, iPad, Chrome on iPhone, Android Chrome, Samsung Internet, LINE and other in-app browsers), in Chinese and English.
+- **Recommendations that learn** (`kit/feedback.mjs`): what a list of picks showed and what was opened from it, kept on the phone for 30 days, so picks you pass over sink.
 - **The site Worker** that serves every app at its short orbit.jaypengx.com address (and Jay's homepage at jaypengx.com) from each repo's GitHub Pages.
 - **A cost guard** that reads the bill every five minutes and slows, then stops, the proxy before the $5 plan runs out.
 - **Brand:** every app's icon, share card and manifest generated from one file.
