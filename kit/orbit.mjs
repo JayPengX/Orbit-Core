@@ -1845,8 +1845,10 @@ export function dismiss(id) {
 const dismissed = () => readJson(KEY.dismiss, {});
 
 // items: [{ id, keys: [...], quality (0..1), group }]; returns the best
-// `n`, each with `why` (its strongest matching key) and `score`.
-export function rank(items, { wallet, n = 10, diversity = 0.35, explore = 0.08, now = Date.now(), aff = affinity(wallet, now) } = {}) {
+// `n`, each with `why` (its strongest matching key) and `score`. `lift`:
+// what the person opened and passed over among picks shown before
+// (feedback.mjs lifter), × on each score.
+export function rank(items, { wallet, n = 10, diversity = 0.35, explore = 0.08, now = Date.now(), aff = affinity(wallet, now), lift = null } = {}) {
   const gone = dismissed();
   const max = Math.max(1, ...Object.values(aff));
   const scored = items.map(item => {
@@ -1862,7 +1864,7 @@ export function rank(items, { wallet, n = 10, diversity = 0.35, explore = 0.08, 
     // A little for the unexplored: items touching nothing known yet.
     const novelty = seen ? 0 : explore * (0.5 + hash01(`${item.id}:${taipeiDay(now)}`));
     const penalty = gone[item.id] ? 0.25 : 1;
-    return { ...item, why, score: (q * (0.6 + 1.4 * best) + novelty) * penalty };
+    return { ...item, why, score: (q * (0.6 + 1.4 * best) + novelty) * penalty * (lift ? lift(item) : 1) };
   });
   // Maximal marginal relevance over groups.
   const picked = [];
