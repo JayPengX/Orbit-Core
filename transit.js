@@ -15,6 +15,8 @@
 //   GET /transit/place    one place's position and name (Google Place Details)
 //   GET /transit/running  ?city=: which of a city's bus routes have a bus on
 //                         the road now (from TDX's estimates, one ask a city)
+//   GET /transit/eta      ?city=&stops= (or &route=): those stops' buses due,
+//                         from one ask of the whole city's estimates, shared
 //   GET /transit/route    plans from A to B: Google's transit routes and TDX's
 //                         planner, made one shape (the app adds YouBike plans)
 //   GET /transit/status   (open) this month's use against each cap, which
@@ -238,18 +240,74 @@ export async function running(env, city, deps = {}) {
   const now = deps.now ?? Date.now();
   const kept = runMemo.get(city);
   if (kept && now - kept.at < 50e3) return { status: 200, body: kept };
-  const scope = city === 'InterCity' ? 'InterCity' : `City/${city}`;
-  const got = await tdxGet(env, `basic/v2/Bus/EstimatedTimeOfArrival/${scope}?$select=RouteUID,StopStatus,EstimateTime&$top=60000`, deps);
-  if (got.status !== 200 || got.body == null) return kept ? { status: 200, body: kept } : { status: got.status || 502, body: { code: 'TDX_FAILED' } };
+  const got = await cityEta(env, city, deps);
+  if (!got.idx) return kept ? { status: 200, body: kept } : { status: got.status || 502, body: { code: 'TDX_FAILED' } };
+  const body = { at: got.idx.at, routes: (got.idx.running ||= runningOf(got.idx.rows)) };
+  runMemo.set(city, body);
+  return { status: 200, body };
+}
+
+// ---- A city's buses due, one TDX call for every stop -------------------------------------
+//
+// Every stop's estimates in a city (TDX N1, the whole city at once: 33,000
+// rows, 9 MB, for 新北) kept and refreshed as any TDX answer (fresh at the
+// live speed, served at once and refreshed behind for a minute), read once an
+// isolate a copy, and each ask answered with its own stops' rows (or one
+// route's). A trip asked TDX ten to forty times a city, a stop list each,
+// every call queued at 4 a second: 2–6 s of a plan's wait (2026-10-30).
+export const ETA_SELECT = 'StopUID,StopName,RouteUID,RouteName,SubRouteUID,Direction,EstimateTime,StopStatus,NextBusTime,PlateNumb,IsLastBus,Estimates,StopCountDown,DataTime';
+export const cityEtaPath = city => `basic/v2/Bus/EstimatedTimeOfArrival/${city === 'InterCity' ? 'InterCity' : `City/${city}`}?$select=${ETA_SELECT}&$top=60000`;
+const etaIndex = new Map(); // city → { at, rows, stops: Map(uid → rows), routes: Map(uid → rows), running }
+export const resetEta = () => (etaIndex.clear(), runMemo.clear());
+function indexEta(rows, at) {
+  const stops = new Map();
+  const routes = new Map();
+  for (const r of rows) {
+    if (!r?.StopUID) continue;
+    if (!stops.has(r.StopUID)) stops.set(r.StopUID, []);
+    stops.get(r.StopUID).push(r);
+    if (!routes.has(r.RouteUID)) routes.set(r.RouteUID, []);
+    routes.get(r.RouteUID).push(r);
+  }
+  return { at, rows, stops, routes, running: null };
+}
+// → { idx } or { status } when there's no copy at all.
+export async function cityEta(env, city, deps = {}) {
+  const now = deps.now ?? Date.now();
+  const idx = etaIndex.get(city);
+  // (This isolate's copy while it's fresh: the 9 MB never read again for each ask.)
+  if (idx && now - idx.at < (await freshOf(TDX_RULES[0], null))) return { idx, age: now - idx.at };
+  const got = await tdxGet(env, cityEtaPath(city), deps);
+  if (got.status !== 200 || got.body == null) return idx ? { idx, age: now - idx.at } : { status: got.status || 502 };
+  const at = now - (got.age || 0);
+  if (idx?.at === at) return { idx, age: got.age || 0 };
   let rows;
   try {
     rows = JSON.parse(got.body);
   } catch {
-    return { status: 502, body: { code: 'TDX_FAILED' } };
+    return idx ? { idx, age: now - idx.at } : { status: 502 };
   }
-  const body = { at: now - (got.age || 0), routes: runningOf(rows) };
-  runMemo.set(city, body);
-  return { status: 200, body };
+  if (!Array.isArray(rows)) return idx ? { idx, age: now - idx.at } : { status: 502 };
+  const next = indexEta(rows, at);
+  etaIndex.delete(city);
+  etaIndex.set(city, next);
+  // (A few cities at a time in memory: the oldest asked goes.)
+  while (etaIndex.size > 6) etaIndex.delete(etaIndex.keys().next().value);
+  return { idx: next, age: got.age || 0 };
+}
+// GET /transit/eta?city=<TDX city | InterCity>&stops=<StopUID,…> (or &route=<RouteUID>):
+// the rows of those stops (or that route), as TDX's own filtered ask would answer.
+const UID = /^[A-Z]{3}[0-9A-Za-z_-]{1,24}$/;
+export async function etaRows(env, q, deps = {}) {
+  const city = q.get('city') || '';
+  if (!RUN_CITY.test(city)) return { status: 400, body: { code: 'BAD_CITY' } };
+  const stops = (q.get('stops') || '').split(',').filter(u => UID.test(u)).slice(0, 400);
+  const route = q.get('route') || '';
+  if (!stops.length && !UID.test(route)) return { status: 400, body: { code: 'BAD_STOPS' } };
+  const got = await cityEta(env, city, deps);
+  if (!got.idx) return { status: got.status === 429 ? 429 : 502, body: { code: got.status === 429 ? 'TDX_BUSY' : 'TDX_FAILED' } };
+  const body = stops.length ? stops.flatMap(u => got.idx.stops.get(u) || []) : got.idx.routes.get(route) || [];
+  return { status: 200, body, age: got.age };
 }
 
 // The access token (a day long): kept in memory and KV, asked for again an
@@ -446,8 +504,12 @@ export async function tdxGet(env, raw, { fetchFn = fetch, cache = globalThis.cac
   const keepWarm = WARM.test(req.path);
   const later = p => (ctx?.waitUntil ? ctx.waitUntil(p.catch(() => {})) : p.catch(() => {}));
   if (keepWarm && !warm) later(warmMark(env, raw, now));
+  // (A path TDX refused (400, 404: a system it doesn't have, 'TRTCMG' for S2STravelTime) is refused here for a day, never asked again at each launch.)
+  const refusedKey = new Request(`https://transit-cache.orbit/refused/${req.path}?${req.query}`);
   let hit = null;
   try {
+    const no = cache ? await cache.match(refusedKey) : null;
+    if (no) return { status: 502, body: JSON.stringify({ code: 'TDX_FAILED', upstream: Number(no.headers.get('X-Upstream')) || 400, why: 'refused' }), state: 'error' };
     hit = cache ? await cache.match(key) : null;
   } catch {}
   let at = hit ? Number(hit.headers.get('X-Fetched-At')) || 0 : 0;
@@ -482,6 +544,11 @@ export async function tdxGet(env, raw, { fetchFn = fetch, cache = globalThis.cac
       // On the free plan (no TDX_PER_SEC) a 429 means the minute is spent.
       if (res.status === 429 && !Number(env.TDX_PER_SEC)) pace.until = now + 30_000;
       if (res.status === 401) resetTdxToken();
+      if ((res.status === 400 || res.status === 404) && cache) {
+        const put = cache.put(refusedKey, new Response('', { headers: { 'X-Upstream': String(res.status), 'Cache-Control': 'public, max-age=86400' } })).catch(() => {});
+        if (ctx?.waitUntil) ctx.waitUntil(put);
+        else await put;
+      }
       if (!res.ok) return { status: res.status, state: 'error', why: (await res.text().catch(() => '')).slice(0, 160) };
       const text = await res.text();
       const puts = [];
@@ -1264,6 +1331,10 @@ async function transitRoute(request, env, headers, path, { session = null, limit
   if (path === '/transit/running') {
     const got = await running(env, q.get('city') || '', deps);
     return send(got.body, got.status);
+  }
+  if (path === '/transit/eta') {
+    const got = await etaRows(env, q, deps);
+    return send(got.body, got.status, got.age != null ? { 'X-Transit-Age': String(Math.round(got.age / 1000)) } : {});
   }
   if (path === '/transit/tdx') {
     const got = await tdxGet(env, q.get('p') || '', deps);

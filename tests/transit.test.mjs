@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   tdxRequest, tdxGet, warmBikes, SLOW_MS, tdxAccess, resetTdxToken, resetPace, resetTurns, resetMeter, spend, usage, flushUse, billingMonth, CAPS,
-  parseGoogleRoutes, parseAutocomplete, nearFirst, parseNominatim, parsePlace, parseTdxRoutes, planSig, googleRouteBody, handleTransit, GOOGLE_ROUTE_FIELDS, tdxPoints, tdxGuard, onceName
+  parseGoogleRoutes, parseAutocomplete, nearFirst, parseNominatim, parsePlace, parseTdxRoutes, planSig, googleRouteBody, handleTransit, GOOGLE_ROUTE_FIELDS, tdxPoints, tdxGuard, onceName, resetEta
 } from '../transit.js';
 
 const NOW = Date.parse('2026-10-03T01:00:00Z');
@@ -749,4 +749,38 @@ test("TDX's plans: a metro exit's doubled station said once (台北車站 M1, no
   assert.deepEqual(p.legs.map(l => l.to.name), ['台北車站 M1', '板橋站 出口3']);
   assert.ok(p.legs.every(l => !(l.mode === 'walk' && l.dist < 5)));
   for (const n of ['高高屏', '新竹', '台北車站', '屏東屏東']) assert.equal(onceName(n), n === '屏東屏東' ? '屏東' : n);
+});
+
+test('buses due: one TDX call for a whole city, every ask answered with its own stops (or route) from it; a path TDX refuses is not asked again', async () => {
+  fresh();
+  resetEta();
+  const env = { TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 'secret', RATE_LIMIT_KV: memKv(), TDX_PER_MIN: '100' };
+  const cache = memCache();
+  const log = [];
+  const fetchFn = async url => {
+    if (url.includes('token')) return json({ access_token: 'T', expires_in: 86400 });
+    log.push(url);
+    if (url.includes('S2STravelTime')) return new Response('{"Message":"RailSystem: \'TRTCMG\' is not accepted"}', { status: 400 });
+    return json([
+      { StopUID: 'TPE1', RouteUID: 'TPE10', EstimateTime: 60 },
+      { StopUID: 'TPE1', RouteUID: 'TPE11', EstimateTime: 300 },
+      { StopUID: 'TPE2', RouteUID: 'TPE10', EstimateTime: 120 },
+      { StopUID: 'TPE3', RouteUID: 'TPE12', StopStatus: 1 }
+    ]);
+  };
+  const ask = (qs, now = NOW) => handleTransit(new Request(`https://w/transit/eta?${qs}`), env, {}, '/transit/eta', { session: { s: 'S' }, fetchFn, now, cache });
+  const a = await (await ask('city=Taipei&stops=TPE1,TPE3')).json();
+  assert.deepEqual(a.map(r => r.RouteUID), ['TPE10', 'TPE11', 'TPE12']);
+  assert.equal(log.length, 1);
+  assert.match(decodeURIComponent(log[0]), /EstimatedTimeOfArrival\/City\/Taipei\?\$select=StopUID,.*&\$top=60000/);
+  const b = await (await ask('city=Taipei&route=TPE10', NOW + 5000)).json();
+  assert.deepEqual(b.map(r => r.StopUID), ['TPE1', 'TPE2']);
+  const run = await (await handleTransit(new Request('https://w/transit/running?city=Taipei'), env, {}, '/transit/running', { session: { s: 'S' }, fetchFn, now: NOW + 6000, cache })).json();
+  assert.deepEqual(run.routes, { TPE10: 2, TPE11: 1, TPE12: 0 });
+  assert.equal(log.length, 1, 'every stop, every route and the running list from the one call');
+  assert.equal((await ask('city=Taipei&stops=nope')).status, 400);
+  const path = 'basic/v2/Rail/Metro/S2STravelTime/TRTCMG';
+  assert.equal((await tdxGet(env, path, { fetchFn, cache, now: NOW })).status, 502);
+  assert.equal((await tdxGet(env, path, { fetchFn, cache, now: NOW + 60_000 })).status, 502);
+  assert.equal(log.filter(u => u.includes('S2STravelTime')).length, 1, 'refused once, never asked again that day');
 });

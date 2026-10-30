@@ -30,6 +30,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 10-22 Orbit-Securities: after a push, confirm "Deploy to Pages" started; if not, run `deploy.yml` by hand.
 - 10-23 Secrets are copied sealed inside Cloudflare/GitHub; never ask Jay to dig up keys; get his written yes up front when a safety check needs his words.
 - 10-23 While Jay is away or quota is out: don't ask him anything, wait for the reset and resume.
+- 10-30 "Faster" means a substantial improvement ("when I request faster it better be a substantial improvement"): find where the wait really goes, cut it structurally, and report measured before/after times; small trims don't count.
 - 10-27 Anything two apps use lives in the Orbit-Core kit, never copied; move duplicates there when you see them (TRUTH §4).
 - Questions to Jay: tap options (a decision card), never typed questions, never overnight; one message when everything is done.
 - Coordinator posts an hourly digest (Live / In progress / Waiting on) only when something shipped.
