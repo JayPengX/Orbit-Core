@@ -2,7 +2,7 @@
 // nothing else, only from the showcase, within its limits.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { handleShowcasePass, showcaseOf, SHOW_MS, SHOW_PER_HOUR, SHOW_DAY_CAP } from '../showcase.js';
+import { handleShowcasePass, showcaseOf, placeOf, SHOW_MS, SHOW_PER_HOUR, SHOW_DAY_CAP } from '../showcase.js';
 import { readToken, signToken } from '../orbit-token.js';
 import { handleTransit, resetMeter, billingMonth } from '../transit.js';
 
@@ -13,7 +13,7 @@ const memKv = () => {
 };
 const SHOW = 'https://jaypengx.com';
 let n = 0;
-const nextIp = () => `203.0.113.${++n}`;
+const nextIp = () => `198.51.${++n}.7`;
 const mint = (env, { ip, origin = SHOW, method = 'POST', now = Date.now() } = {}) =>
   handleShowcasePass(new Request('https://w/showcase/pass', { method }), env, {}, { ip, origin, now });
 
@@ -29,7 +29,9 @@ test('a showcase pass: from the showcase only, short, and never a Pass session',
   assert.equal(await readToken(SECRET, qt, 'ses'), null);
   // Read back only from the showcase and the address it went to.
   const ask = (origin, from) => showcaseOf(new Request(`https://w/transit/eta?qt=${encodeURIComponent(qt)}`), env, { ip: from, origin });
-  assert.deepEqual(await ask(SHOW, ip), { s: `show:${ip}`, showcase: true });
+  assert.deepEqual(await ask(SHOW, ip), { s: `show:${placeOf(ip)}`, showcase: true });
+  // (another address of the same /24: a carrier moving it around)
+  assert.ok(await ask(SHOW, ip.replace(/\.7$/, '.200')));
   assert.equal(await ask('https://elsewhere.example', ip), null);
   assert.equal(await ask(SHOW, nextIp()), null);
   // Run out: nothing.
