@@ -68,6 +68,7 @@ importScripts('../Orbit-Core/kit/sw.js');
 
 | Tool | What |
 | --- | --- |
+| `node tools/test-apps.mjs [app…]` | Every app's tests (checkouts beside this one) against this kit; run before pushing a kit change, since each app's deploy tests against main's kit and a break mails Jay |
 | `node tools/accent-css.mjs` | Write each app's accent colours (`kit/brand.mjs`) into `kit/orbit.css`; run after changing a brand colour |
 | `node tools/leagues-audit.mjs [--sport soccer] [--json]` | Every catalogue league against its sources today |
 | `node tools/hk-lots.mjs [file.xlsx]` | Every HKEX security's board lot into `kit/stock-hk-lots.mjs` (HKEX's List of Securities); run it now and then for new listings |
