@@ -436,7 +436,10 @@ export async function handleLawChat(request, env, ctx, headers, session, gemini,
 }
 
 // The answer as a Response; `stage` hears each step ({ stage: 'found' | 'write', … }).
-async function answerChat(chat, pass, env, ctx, headers, gemini, stage = () => {}, dayCap = LAW_LIMITS.perDay) {
+// `ms` (the ops check's): each step's time is written into it.
+export async function answerChat(chat, pass, env, ctx, headers, gemini, stage = () => {}, dayCap = LAW_LIMITS.perDay, ms = null) {
+  const t0 = Date.now();
+  const mark = k => ms && (ms[k] = Date.now() - t0);
   const day = twDay();
   const who = await passKey('chat', pass, day);
   const left = n => Math.max(0, LAW_LIMITS.chatPerPass - n);
@@ -449,21 +452,24 @@ async function answerChat(chat, pass, env, ctx, headers, gemini, stage = () => {
     // (The question and the reader's last turn: what the figures, notices and bills are matched by.)
     const asked = [chat.q, chat.history.filter(t => t.role === 'user').at(-1)?.text || ''].join(' ');
     const ground = await groundFor(asked);
+    mark('ground');
     const laws = await readList('index.json');
     const names = new Map(laws.rows.map(r => [r[0], r[1]]));
     const nameOf = p => names.get(p) || '';
     const planKey = `law:plan:v1:${await sha256Hex([askKey(chat.q), pin, chat.lang].join('|'))}`;
-    let plan = first ? await kept(env, planKey) : null;
+    let plan = first && !ms ? await kept(env, planKey) : null;
     if (!plan) {
       if (!env.GEMINI_API_KEY) return fail('setup', 503, headers);
       if (!(await turn())) return fail('cap', 429, headers, { left: 0 });
       plan = readPlan(await modelJson(gemini, planPrompt(chat, nameOf), PLAN));
-      if (first) keep(env, ctx, planKey, plan, CHAT_TTL_S);
+      if (first && !ms) keep(env, ctx, planKey, plan, CHAT_TTL_S);
     }
+    mark('plan');
     // (A question about the 立法院's work: few articles, no judgments or rules.)
     const people = matchPeople((await readGround('ly/people.json'))?.people, asked);
     const ly = asksLy(asked);
     const articles = await find(chat, plan, ly);
+    mark('find');
     // What it looks at next, said as it is (Jay 2026-10-27: it always said 找條文 while it read a legislator's record).
     stage({ stage: 'found', arts: articles.length, laws: [...new Set(articles.map(a => a.n))].slice(0, 3), look: lookOf(ground, people, ly) });
     // A question about bills: those of the laws found too, when it named none (and isn't about a budget).
@@ -472,12 +478,13 @@ async function answerChat(chat, pass, env, ctx, headers, gemini, stage = () => {
     // (司法院's judgment pages serve only Taiwan: read through the relay there.)
     const fetcher = env?.GEMINI_RELAY ? (u, init) => (viaTaiwan(u) ? env.GEMINI_RELAY.fetch(`https://gemini-relay/?to=${encodeURIComponent(u)}`, { headers: init?.headers, signal: init?.signal }) : fetch(u, init)) : fetch;
     const more = await moreFor(`${asked} ${plan.terms.join(' ')}`, articles, { mine: chat.mine, items, today: day, cities: chat.city, fetcher });
+    mark('more');
     const grounded = hasGround(ground) || hasMore(more);
     stage({ stage: 'write', arts: articles.length, cases: more.cases.length, rules: more.rules.length, people: more.people.map(p => p.n), votes: more.votes.length, bills: ground.bills.length, budgets: ground.budgets?.length || 0, news: ground.news.length + ground.facts.length });
     const extra = { ...groundOut(ground), ...moreOut(more) };
     const versions = [...new Set(articles.map(a => `${a.p}@${a.m}`))].sort().join(',');
     const answerKey = first && `law:chat:v2:${await sha256Hex([askKey(chat.q), pin, chat.lang, versions, groundKey(ground), moreKey(more)].join('|'))}`;
-    const hit = answerKey && (await kept(env, answerKey));
+    const hit = answerKey && !ms && (await kept(env, answerKey));
     const leftNow = async () => left(used ?? (await countOf(env, who, day)));
     if (hit) return json({ ...hit, ...shownOf(extra, hit), cached: true, left: await leftNow() }, 200, headers);
     let out;
@@ -488,9 +495,25 @@ async function answerChat(chat, pass, env, ctx, headers, gemini, stage = () => {
       if (!(await turn())) return fail('cap', 429, headers, { left: 0 });
       out = checkChat(await modelJson((parts, schema) => gemini(parts, schema, ANSWER_MODEL), answerPrompt(chat, articles, nameOf, ground, more), ANSWER), articles, chat.lang, grounded, moreCites(more));
     }
-    if (answerKey) keep(env, ctx, answerKey, out, CHAT_TTL_S);
+    mark('answer');
+    if (answerKey && !ms) keep(env, ctx, answerKey, out, CHAT_TTL_S);
     return json({ ...out, ...shownOf(extra, out), cached: false, left: await leftNow() }, 200, headers);
   } catch {
     return fail('upstream', 502, headers, used ? { left: left(used) } : undefined);
   }
+}
+
+// The ops check (worker.js /ops?check=law-chat): real questions answered in
+// turn, nothing kept read or written; each one's steps' times since it started.
+export const TIMED_QS = ['房東不還押金怎麼辦', '酒駕被抓會怎樣', '公司沒給加班費可以告嗎'];
+export async function lawChatTimes(env, ctx, headers, gemini) {
+  const out = [];
+  for (const q of TIMED_QS) {
+    const ms = {};
+    const chat = readChat({ q });
+    const res = await answerChat(chat, 'ops', env, ctx, headers, gemini, () => {}, LAW_LIMITS.perDay, ms);
+    const j = await res.json().catch(() => ({}));
+    out.push({ q, status: res.status, ms, arts: j.sources?.length ?? null, cases: j.cases?.length ?? 0, verdict: j.verdict || j.error || '' });
+  }
+  return { at: new Date().toISOString(), out };
 }
