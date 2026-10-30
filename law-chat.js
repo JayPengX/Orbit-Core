@@ -25,7 +25,7 @@
 // a new version asks again. Follow-ups aren't kept (they rarely repeat).
 import { json, sha256Hex } from './http.js';
 import { groundFor, groundKey, groundOut, groundPrompt, hasGround } from './law-ground.js';
-import { moreFor, moreKey, moreOut, morePrompt, moreCites, hasMore, readMine, matchPeople, asksLy } from './law-more.js';
+import { moreFor, moreKey, moreOut, morePrompt, moreCites, hasMore, readMine, matchPeople, asksLy, warmMore } from './law-more.js';
 import { viaTaiwan } from './law-hosts.js';
 import { matchBills, readGround } from './law-ground.js';
 import { LAW_LIMITS, PCODE, ART, fail, twDay, citeKey, cited, label, readData, readList, readLaw, askKey, opening, passOf, passKey, spend, countOf, kept, keep, modelJson } from './law.js';
@@ -291,6 +291,8 @@ const ANSWER = {
     next: strings,
     followups: strings
   },
+  // (In this order: the verdict and the answer first, so they can be shown while the rest is written.)
+  propertyOrdering: ['covered', 'verdict', 'answer', 'facts', 'timeline', 'points', 'consequences', 'agency', 'next', 'followups'],
   required: ['covered', 'verdict', 'answer', 'points', 'next', 'followups']
 };
 
@@ -435,9 +437,28 @@ export async function handleLawChat(request, env, ctx, headers, session, gemini,
   return new Response(readable, { status: 200, headers: { ...headers, 'Content-Type': 'application/x-ndjson', 'Cache-Control': 'no-store' } });
 }
 
-// The answer as a Response; `stage` hears each step ({ stage: 'found' | 'write', … }).
-// `ms` (the ops check's): each step's time is written into it.
-export async function answerChat(chat, pass, env, ctx, headers, gemini, stage = () => {}, dayCap = LAW_LIMITS.perDay, ms = null) {
+// The verdict and the answer as far as the model has written them, read from
+// its JSON so far (the schema writes them first): { verdict, answer }, each ''
+// until it starts. What the reader sees while the rest is still being written.
+export function draftOf(text) {
+  const field = k => {
+    const m = String(text).match(new RegExp(`"${k}"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)`));
+    if (!m) return '';
+    // (A cut escape at the end, \ or \u12, waits for the next piece.)
+    const s = m[1].replace(/\\(u[0-9a-fA-F]{0,3})?$/, '');
+    try {
+      return JSON.parse(`"${s}"`);
+    } catch {
+      return '';
+    }
+  };
+  return { verdict: field('verdict'), answer: field('answer') };
+}
+
+// The answer as a Response; `stage` hears each step ({ stage: 'found' | 'write'
+// | 'draft', … }). tune (the ops check's): { model, plan, answer } thinking
+// levels and the answer's model to try; ms: each step's time is written into it.
+export async function answerChat(chat, pass, env, ctx, headers, gemini, stage = () => {}, dayCap = LAW_LIMITS.perDay, ms = null, tune = {}) {
   const t0 = Date.now();
   const mark = k => ms && (ms[k] = Date.now() - t0);
   const day = twDay();
@@ -451,33 +472,44 @@ export async function answerChat(chat, pass, env, ctx, headers, gemini, stage = 
   try {
     // (The question and the reader's last turn: what the figures, notices and bills are matched by.)
     const asked = [chat.q, chat.history.filter(t => t.role === 'user').at(-1)?.text || ''].join(' ');
-    const ground = await groundFor(asked);
-    mark('ground');
-    const laws = await readList('index.json');
-    const names = new Map(laws.rows.map(r => [r[0], r[1]]));
-    const nameOf = p => names.get(p) || '';
+    // Everything that doesn't wait on the plan starts with it: the figures,
+    // notices and bills, the lists, the legislators, and the rulings', rules'
+    // and votes' files (moreFor's). The plan was the only thing running for
+    // its 2 s; now the reading is done by the time it's back.
+    const lawsP = readList('index.json');
+    const namesP = lawsP.then(laws => new Map(laws.rows.map(r => [r[0], r[1]])));
+    const groundP = groundFor(asked);
+    const side = Promise.all([readList('orders.json'), readGround('ly/people.json'), readGround('bills/items.json'), warmMore()]);
+    side.catch(() => {});
+    groundP.catch(() => {});
     const planKey = `law:plan:v1:${await sha256Hex([askKey(chat.q), pin, chat.lang].join('|'))}`;
     let plan = first && !ms ? await kept(env, planKey) : null;
+    const names = await namesP;
+    const nameOf = p => names.get(p) || '';
     if (!plan) {
       if (!env.GEMINI_API_KEY) return fail('setup', 503, headers);
       if (!(await turn())) return fail('cap', 429, headers, { left: 0 });
-      plan = readPlan(await modelJson(gemini, planPrompt(chat, nameOf), PLAN));
+      plan = readPlan(await modelJson((parts, schema) => gemini(parts, schema, undefined, { thinking: tune.plan }), planPrompt(chat, nameOf), PLAN));
       if (first && !ms) keep(env, ctx, planKey, plan, CHAT_TTL_S);
     }
     mark('plan');
+    const ground = await groundP;
+    const [, peopleF, itemsF] = await side;
     // (A question about the 立法院's work: few articles, no judgments or rules.)
-    const people = matchPeople((await readGround('ly/people.json'))?.people, asked);
+    const people = matchPeople(peopleF?.people, asked);
     const ly = asksLy(asked);
     const articles = await find(chat, plan, ly);
     mark('find');
     // What it looks at next, said as it is (Jay 2026-10-27: it always said 找條文 while it read a legislator's record).
     stage({ stage: 'found', arts: articles.length, laws: [...new Set(articles.map(a => a.n))].slice(0, 3), look: lookOf(ground, people, ly) });
     // A question about bills: those of the laws found too, when it named none (and isn't about a budget).
-    const items = (await readGround('bills/items.json'))?.items || [];
+    const items = itemsF?.items || [];
     if (!ground.bills.length && !ground.budgets?.length && BILL_WORDS.test(chat.q)) ground.bills = matchBills(items, `${chat.q} ${[...new Set(articles.map(a => a.n))].join(' ')}`);
     // (司法院's judgment pages serve only Taiwan: read through the relay there.)
     const fetcher = env?.GEMINI_RELAY ? (u, init) => (viaTaiwan(u) ? env.GEMINI_RELAY.fetch(`https://gemini-relay/?to=${encodeURIComponent(u)}`, { headers: init?.headers, signal: init?.signal }) : fetch(u, init)) : fetch;
-    const more = await moreFor(`${asked} ${plan.terms.join(' ')}`, articles, { mine: chat.mine, items, today: day, cities: chat.city, fetcher });
+    // (A judgment's gist, once read, kept 90 days: 司法院's site is the slowest read of a turn.)
+    const gists = env.RATE_LIMIT_KV ? { get: jid => env.RATE_LIMIT_KV.get(`law:jd:v1:${jid}`, { type: 'json' }), put: (jid, t) => keep(env, ctx, `law:jd:v1:${jid}`, t, 90 * 86_400) } : null;
+    const more = await moreFor(`${asked} ${plan.terms.join(' ')}`, articles, { mine: chat.mine, items, today: day, cities: chat.city, fetcher, gists });
     mark('more');
     const grounded = hasGround(ground) || hasMore(more);
     stage({ stage: 'write', arts: articles.length, cases: more.cases.length, rules: more.rules.length, people: more.people.map(p => p.n), votes: more.votes.length, bills: ground.bills.length, budgets: ground.budgets?.length || 0, news: ground.news.length + ground.facts.length });
@@ -493,7 +525,20 @@ export async function answerChat(chat, pass, env, ctx, headers, gemini, stage = 
     else {
       if (!env.GEMINI_API_KEY) return fail('setup', 503, headers);
       if (!(await turn())) return fail('cap', 429, headers, { left: 0 });
-      out = checkChat(await modelJson((parts, schema) => gemini(parts, schema, ANSWER_MODEL), answerPrompt(chat, articles, nameOf, ground, more), ANSWER), articles, chat.lang, grounded, moreCites(more));
+      // Streamed: the verdict and the answer go to the reader as they're
+      // written, seconds before the points and the rest are done.
+      let said = '';
+      const onText = text => {
+        if (ms && !ms.first) mark('first');
+        const d = draftOf(text);
+        const now = `${d.verdict}\n${d.answer}`;
+        if (d.verdict && now.length > said.length + 3) {
+          said = now;
+          stage({ stage: 'draft', ...d });
+        }
+      };
+      const answerModel = tune.model === 'lite' ? undefined : ANSWER_MODEL;
+      out = checkChat(await modelJson((parts, schema) => gemini(parts, schema, answerModel, { onText, thinking: tune.answer }), answerPrompt(chat, articles, nameOf, ground, more), ANSWER), articles, chat.lang, grounded, moreCites(more));
     }
     mark('answer');
     if (answerKey && !ms) keep(env, ctx, answerKey, out, CHAT_TTL_S);
@@ -503,17 +548,20 @@ export async function answerChat(chat, pass, env, ctx, headers, gemini, stage = 
   }
 }
 
-// The ops check (worker.js /ops?check=law-chat): real questions answered in
-// turn, nothing kept read or written; each one's steps' times since it started.
+// The ops check (worker.js /ops?check=law-chat&try=…): real questions answered
+// in turn, nothing kept read or written; each one's steps' times since it
+// started (first: the answer's first words). try: 'model=lite,plan=minimal,answer=minimal'.
 export const TIMED_QS = ['房東不還押金怎麼辦', '酒駕被抓會怎樣', '公司沒給加班費可以告嗎'];
-export async function lawChatTimes(env, ctx, headers, gemini) {
+export async function lawChatTimes(env, ctx, headers, gemini, tryOut = '') {
+  const tune = Object.fromEntries(String(tryOut).split(',').map(x => x.split('=')).filter(([k, v]) => ['model', 'plan', 'answer'].includes(k) && v));
   const out = [];
   for (const q of TIMED_QS) {
     const ms = {};
+    const drafts = [];
     const chat = readChat({ q });
-    const res = await answerChat(chat, 'ops', env, ctx, headers, gemini, () => {}, LAW_LIMITS.perDay, ms);
+    const res = await answerChat(chat, 'ops', env, ctx, headers, gemini, s => s.stage === 'draft' && drafts.push(s.verdict), LAW_LIMITS.perDay, ms, tune);
     const j = await res.json().catch(() => ({}));
-    out.push({ q, status: res.status, ms, arts: j.sources?.length ?? null, cases: j.cases?.length ?? 0, verdict: j.verdict || j.error || '' });
+    out.push({ q, status: res.status, ms, drafts: drafts.length, arts: j.sources?.length ?? null, points: j.points?.length ?? null, cases: j.cases?.length ?? 0, verdict: j.verdict || j.error || '', answer: (j.answer || '').slice(0, 80) });
   }
-  return { at: new Date().toISOString(), out };
+  return { at: new Date().toISOString(), tune, out };
 }

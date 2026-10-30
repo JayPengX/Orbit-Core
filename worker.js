@@ -567,13 +567,13 @@ const GEMINI_RESPONSE_SCHEMA = {
 // (e.g. which slots got a placeholder replaced) between otherwise-identical
 // attempts, which is exactly the "inconsistent" failure mode this feature
 // most needs to avoid.
-function buildGenerationConfig(model, schema) {
+function buildGenerationConfig(model, schema, thinking = null) {
   return {
     response_mime_type: 'application/json',
     response_schema: schema,
     temperature: 0,
     maxOutputTokens: 24576,
-    thinkingConfig: /^gemini-2\./.test(model) ? { thinkingBudget: 0 } : { thinkingLevel: 'low' }
+    thinkingConfig: /^gemini-2\./.test(model) ? { thinkingBudget: 0 } : { thinkingLevel: thinking || 'low' }
   };
 }
 
@@ -583,14 +583,14 @@ function buildGenerationConfig(model, schema) {
 // in the Worker first only adds the upstream's full download time to every
 // request before a single byte reaches the browser.
 // (timeoutMs: given up on after that long; Orbit Law's asks, a few seconds' work.)
-async function proxyGeminiRequest(model, parts, schema, env, headers, ctx, feature, timeoutMs) {
+async function proxyGeminiRequest(model, parts, schema, env, headers, ctx, feature, timeoutMs, thinking = null) {
   try {
     const upstream = await geminiFetch(env, geminiUrl(model, env), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts }],
-        generationConfig: buildGenerationConfig(model, schema)
+        generationConfig: buildGenerationConfig(model, schema, thinking)
       }),
       signal: timeoutMs ? AbortSignal.timeout(timeoutMs) : undefined
     });
@@ -604,6 +604,57 @@ async function proxyGeminiRequest(model, parts, schema, env, headers, ctx, featu
       status: upstream.status,
       headers: { ...headers, 'Content-Type': 'application/json' }
     });
+  } catch (error) {
+    return upstreamFailed(error, headers);
+  }
+}
+
+// The same call streamed (Gemini's streamGenerateContent, SSE): onText hears
+// the reply's text so far as each piece comes, so a route can show the answer
+// while it's still being written (/law-chat's verdict and answer). Returns the
+// whole reply as the plain call's JSON, so callers read it the same way.
+async function streamGeminiRequest(model, parts, schema, env, headers, ctx, feature, timeoutMs, onText, thinking = null) {
+  try {
+    const url = geminiUrl(model, env).replace(':generateContent?', ':streamGenerateContent?alt=sse&');
+    const upstream = await geminiFetch(env, url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ parts }], generationConfig: buildGenerationConfig(model, schema, thinking) }),
+      signal: timeoutMs ? AbortSignal.timeout(timeoutMs) : undefined
+    });
+    if (!upstream.ok || !upstream.body) return new Response(upstream.body, { status: upstream.status, headers: { ...headers, 'Content-Type': 'application/json' } });
+    const reader = upstream.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+    let text = '';
+    let usage = null;
+    let finish = null;
+    const take = line => {
+      if (!line.startsWith('data:')) return;
+      const j = JSON.parse(line.slice(5));
+      const c = j?.candidates?.[0];
+      const piece = (c?.content?.parts || []).filter(x => !x.thought).map(x => x.text || '').join('');
+      if (j?.usageMetadata) usage = j.usageMetadata;
+      if (c?.finishReason) finish = c.finishReason;
+      if (piece) {
+        text += piece;
+        try {
+          onText(text);
+        } catch {}
+      }
+    };
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop();
+      lines.forEach(take);
+    }
+    take(buf.trim());
+    const body = JSON.stringify({ candidates: [{ content: { parts: [{ text }] }, finishReason: finish }], usageMetadata: usage || {} });
+    if (ctx) ctx.waitUntil(logGeminiUsage(new Response(body).body, feature, model, env, ctx));
+    return new Response(body, { status: 200, headers: { ...headers, 'Content-Type': 'application/json' } });
   } catch (error) {
     return upstreamFailed(error, headers);
   }
@@ -1214,7 +1265,14 @@ async function route(request, env, ctx, headers, origin) {
   // Pass of Orbit Law's, its origin only, a day's caps a Pass in D1.
   // (Gemini's first model, Flash-Lite: a few seconds' work.)
   // (/law-chat's answer asks for Flash by name: reasoning on the reader's facts, 40 s at most.)
-  const lawGemini = feature => (parts, schema, model = GEMINI_ALLOWED_MODELS[0]) => proxyGeminiRequest(GEMINI_ALLOWED_MODELS.includes(model) ? model : GEMINI_ALLOWED_MODELS[0], parts, schema, env, headers, ctx, feature, model === GEMINI_ALLOWED_MODELS[0] ? 25_000 : 40_000);
+  // (onText: streamed, hearing the reply as it's written, /law-chat's answer;
+  // thinking: the model's thinking level, 'low' unless said.)
+  const lawGemini = feature => (parts, schema, model = GEMINI_ALLOWED_MODELS[0], { onText = null, thinking = null } = {}) => {
+    const m = GEMINI_ALLOWED_MODELS.includes(model) ? model : GEMINI_ALLOWED_MODELS[0];
+    const ms = m === GEMINI_ALLOWED_MODELS[0] ? 25_000 : 40_000;
+    const level = ['minimal', 'low', 'medium'].includes(thinking) ? thinking : null;
+    return onText ? streamGeminiRequest(m, parts, schema, env, headers, ctx, feature, ms, onText, level) : proxyGeminiRequest(m, parts, schema, env, headers, ctx, feature, ms, level);
+  };
   if (path === '/law-ask') return handleLawAsk(request, env, ctx, headers, await sessionOf(request, env), lawGemini('law-ask'), await aiCap(env, ctx, 'law-ask'));
   if (path === '/law-chat') return handleLawChat(request, env, ctx, headers, await sessionOf(request, env), lawGemini('law-chat'), await aiCap(env, ctx, 'law-chat'));
   // …and government pages read inside the app (law-page.js): the same Pass, gov.tw only, nothing stored.
@@ -1241,7 +1299,7 @@ async function route(request, env, ctx, headers, origin) {
     const check = new URL(request.url).searchParams.get('check');
     if (check === 'gemini') return json(await geminiCheck(env), 200, headers);
     // 問法律's steps timed on real questions, nothing kept read or written (law-chat.js).
-    if (check === 'law-chat') return json(await lawChatTimes(env, ctx, headers, lawGemini('law-chat')), 200, headers);
+    if (check === 'law-chat') return json(await lawChatTimes(env, ctx, headers, lawGemini('law-chat'), new URL(request.url).searchParams.get('try') || ''), 200, headers);
     if (check === 'system') return json(await systemReport(env, ECO_DEPS), 200, headers);
     // Orbit Money's mail-in, removed 2026-10-27 (Jay: too privacy-invading): its
     // stored boxes and invoices deleted, once (build.yml purge-money-mail).

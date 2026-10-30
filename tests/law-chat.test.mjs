@@ -77,7 +77,13 @@ globalThis.fetch = async (url, init) => {
   if (u.includes('generativelanguage')) {
     const sent = JSON.parse(init.body);
     const kind = 'terms' in sent.generationConfig.response_schema.properties ? 'plan' : 'answer';
-    gemini.push({ kind, prompt: sent.contents[0].parts[0].text });
+    gemini.push({ kind, prompt: sent.contents[0].parts[0].text, stream: u.includes(':streamGenerateContent?alt=sse&') });
+    // (The answer is streamed: its JSON in two pieces, as server-sent events.)
+    if (u.includes('streamGenerateContent') && geminiStatus === 200) {
+      const t = JSON.stringify(kind === 'plan' ? plan : answer);
+      const ev = (x, more = {}) => `data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: x }] } }], ...more })}\r\n\r\n`;
+      return new Response(ev(t.slice(0, 40)) + ev(t.slice(40), { usageMetadata: { promptTokenCount: 10 } }));
+    }
     return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(kind === 'plan' ? plan : answer) }] } }] }), { status: geminiStatus });
   }
   if (u.startsWith('https://judgment.judicial.gov.tw/')) return JUDGMENTS[decodeURIComponent(u.split('id=')[1])] ? new Response(JUDGMENTS[decodeURIComponent(u.split('id=')[1])]) : new Response('', { status: 404 });
@@ -369,6 +375,31 @@ test('a regulation\'s article found by its words reaches the answer (the index r
   }
 });
 
+test('streamed: each step, then the verdict and the answer as they are written, then the whole answer', async () => {
+  const { draftOf } = await import('../law-chat.js');
+  assert.deepEqual(draftOf('{"covered":true,"verdict":"房東不能'), { verdict: '房東不能', answer: '' });
+  assert.deepEqual(draftOf('{"covered":true,"verdict":"可以","answer":"押金\\u6'), { verdict: '可以', answer: '押金' });
+  assert.deepEqual(draftOf('{"verdict":"a\\"b","answer":"c\\'), { verdict: 'a"b', answer: 'c' });
+  const was = answer;
+  answer = { ...answer, verdict: '房東不能扣光押金', answer: '押金在租約結束、房子交還後就要還，扣款要有實際損害。' };
+  try {
+    const r = await chat({ q: '押金可以全扣嗎', lang: 'zh', stream: true });
+    assert.match(r.headers.get('Content-Type'), /ndjson/);
+    const lines = (await r.text()).trim().split('\n').map(l => JSON.parse(l));
+    assert.deepEqual(lines.slice(0, 3).map(l => l.stage), ['find', 'found', 'write']);
+    const drafts = lines.filter(l => l.stage === 'draft');
+    assert.ok(drafts.length >= 1);
+    assert.equal(drafts.at(-1).verdict, '房東不能扣光押金');
+    const last = lines.at(-1);
+    assert.equal(last.status, 200);
+    assert.equal(last.verdict, '房東不能扣光押金');
+    assert.equal(gemini.at(-1).stream, true);
+    assert.equal(gemini.filter(g => g.kind === 'plan').at(-1).stream, false);
+  } finally {
+    answer = was;
+  }
+});
+
 test('similar judgments, 行政規則, legislators, votes, meetings and the reader\'s own follows ground the answer, cited and linked', async () => {
   const { forgetGround } = await import('../law-ground.js');
   const jid = 'TPSV,114,台上,2031,20260514,1';
@@ -383,8 +414,9 @@ test('similar judgments, 行政規則, legislators, votes, meetings and the read
   GROUND['bills/items.json'] = { items: [{ k: '11:01126', n: '民法', stage: 2, u: '2026-10-01' }] };
   forgetGround();
   answer = { ...answer, points: [...answer.points, { text: '法院認為押金應返還', cites: [jid] }, { text: '注意事項', cites: ['教育部:FL001'] }, { text: '沒給的判決', cites: ['TPSV,100,台上,1,20200101,1'] }] };
+  const env = envOf();
   try {
-    const r = await chat({ q: '房東不還押金，吳春城怎麼看民法押金？什麼時候開會？我追蹤的有更新嗎？', lang: 'zh', mine: { items: ['11:01126'], people: [], laws: [], marks: [] } });
+    const r = await chat({ q: '房東不還押金，吳春城怎麼看民法押金？什麼時候開會？我追蹤的有更新嗎？', lang: 'zh', mine: { items: ['11:01126'], people: [], laws: [], marks: [] } }, { env });
     assert.equal(r.status, 200);
     const j = await r.json();
     const p = lastOf('answer');
@@ -407,6 +439,12 @@ test('similar judgments, 行政規則, legislators, votes, meetings and the read
     assert.deepEqual(j.people, [{ id: '1261', n: '吳春城', party: '台灣民眾黨' }]);
     assert.deepEqual(j.votes.map(v => v.id), ['v1']);
     assert.deepEqual(j.meets.map(m => m.id), ['m1']);
+    // (A judgment's gist is kept once read: asked again, 司法院's page isn't.)
+    const page = JUDGMENTS[jid];
+    delete JUDGMENTS[jid];
+    await chat({ q: '那押金呢？', lang: 'zh', history: [{ role: 'user', text: '房東不還押金' }, { role: 'model', text: '可以要回', cites: ['B0000001:456'] }] }, { env });
+    assert.match(lastOf('answer'), /主文：上訴駁回。／理由：一、押金應於租賃關係終止/);
+    JUDGMENTS[jid] = page;
   } finally {
     for (const k of Object.keys(GROUND)) delete GROUND[k];
     delete JUDGMENTS[jid];
