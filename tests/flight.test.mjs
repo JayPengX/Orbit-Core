@@ -135,3 +135,17 @@ test('the route: a session, sane minutes and a real hex', async () => {
   assert.equal(ok.status, 200);
   assert.equal((await ok.json()).flights[0].no, 'BR190');
 });
+
+test('a source that hangs is left out within the budget, never waited on', async () => {
+  const { fn } = fakeFetch();
+  // adsb.lol hangs (until its timeout); adsb.fi answers like adsb.lol would.
+  const hang = async (url, init) => {
+    if (/adsb\.lol/.test(url)) return new Promise((_, reject) => init.signal.addEventListener('abort', () => reject(new Error('timeout'))));
+    if (/adsb\.fi/.test(url)) return fn(url.replace('opendata.adsb.fi/api/v2/lat/', 'api.adsb.lol/v2/point/'), init);
+    return fn(url, init);
+  };
+  const t0 = Date.now();
+  const out = await pickFlights(25, { fetchFn: hang, now });
+  assert.equal(out[0].no, 'BR190');
+  assert.ok(Date.now() - t0 < 1000);
+});
