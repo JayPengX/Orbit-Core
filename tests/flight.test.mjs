@@ -72,6 +72,10 @@ test('picks: closest landing first, one per destination and airline, never none 
   assert.deepEqual(out.map(f => f.to.iata), ['NRT', 'ICN', 'BKK', 'HKG']);
   assert.deepEqual(choose([at(90, 'NRT', 'EVA')], 25, now).map(f => f.to.iata), ['NRT']);
   assert.deepEqual(choose([at(0.5, 'NRT', 'EVA')], 25, now), []);
+  // A whole flight (just off the ground) before the end of a long one landing as close.
+  const hop = { ...at(26, 'KHH', 'UIA'), from: TPE, to: { iata: 'KHH', lat: 22.57, lon: 120.35 }, fix: along(TPE, { lat: 22.57, lon: 120.35 }, 0.1) };
+  const tail = { ...at(25, 'NRT', 'JAL'), from: SEA, to: { iata: 'NRT', ...NRT }, fix: along(SEA, NRT, 0.95) };
+  assert.equal(choose([tail, hop], 25, now)[0].to.iata, 'KHH');
 });
 
 test('a plane takes its route only if it fits', () => {
