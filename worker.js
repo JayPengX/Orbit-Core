@@ -36,6 +36,7 @@ import zhTW from './locales/zh-TW.js';
 import { handleEcoRequest, LOCK_SINCE, ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION } from './eco.js';
 import { checkStock } from './stock-check.js';
 import { readToken, tokenSecret, signToken, sessionLimited, READ_GRACE_MS } from './orbit-token.js';
+import { handleShowcasePass, showcaseOf, SHOW_PER_MIN } from './showcase.js';
 import { handlePush, sendDue } from './push.js';
 import { handleWeather } from './weather.js';
 import { weatherCron, skillReport } from './weather-skill.js';
@@ -1255,6 +1256,8 @@ async function route(request, env, ctx, headers, origin) {
   // The data proxy for Sports and Securities (sports.js): its own
   // session gate and per-app limits.
   if (path === '/sports-proxy') return handleSports(request, env, ctx, headers, ip);
+  // The showcase's live demos (showcase.js): a short pass for its reads, never a real Pass.
+  if (path === '/showcase/pass') return handleShowcasePass(request, env, headers, { ip, origin, ctx });
   // Orbit Sports' day of scoreboards on one request (sports-today.js): public
   // scores, so no Pass, but a page of ours or a local one (the origin, as the
   // Gemini routes'); built on demand, kept 60 s at the edge, no cron.
@@ -1351,8 +1354,10 @@ async function route(request, env, ctx, headers, origin) {
     if (path === '/weather/skill') return new Response(JSON.stringify(await skillReport(env)), { headers: { ...headers, 'Content-Type': 'application/json' } });
     const signed = await sessionOf(request, env, READ_GRACE_MS);
     const dev = !signed && env.WEATHER_DEV !== 'off' && LOCAL_ORIGIN.test(origin);
-    const session = signed || (dev ? { s: 'dev', dev: true } : null);
-    return handleWeather(request, env, headers, path, { session, ctx, limited: () => sessionLimited(dev ? `w:dev:${ip}` : `w:${session?.s}`, 30) });
+    // (or the showcase's live demo, showcase.js: a showcase pass, its own asks a minute)
+    const show = !signed && !dev && (await showcaseOf(request, env, { ip, origin }));
+    const session = signed || (dev ? { s: 'dev', dev: true } : null) || show || null;
+    return handleWeather(request, env, headers, path, { session, ctx, limited: () => sessionLimited(dev ? `w:dev:${ip}` : `w:${session?.s}`, show ? 10 : 30) });
   }
   // Orbit Transit (transit.js): a Orbit Pass session for everything but
   // the usage page. Or a local dev page (localhost, http or https: the
@@ -1363,8 +1368,10 @@ async function route(request, env, ctx, headers, origin) {
   if (path === '/transit' || path.startsWith('/transit/')) {
     const signed = await sessionOf(request, env, READ_GRACE_MS);
     const dev = !signed && env.TRANSIT_DEV !== 'off' && LOCAL_ORIGIN.test(origin);
-    const session = signed || (dev ? { s: 'dev', dev: true } : null);
-    return handleTransit(request, env, headers, path, { session, ctx, limited: () => sessionLimited(dev ? `t:dev:${ip}` : `t:${session?.s}`, dev ? 300 : 90) });
+    // (or the showcase's live demo, showcase.js: its paid asks from their own share, transit.js)
+    const show = !signed && !dev && (await showcaseOf(request, env, { ip, origin }));
+    const session = signed || (dev ? { s: 'dev', dev: true } : null) || show || null;
+    return handleTransit(request, env, headers, path, { session, ctx, limited: () => sessionLimited(dev ? `t:dev:${ip}` : `t:${session?.s}`, dev ? 300 : show ? SHOW_PER_MIN : 90) });
   }
   // Orbit Class's 專注飛行 (flight.js): real planes landing in about N
   // minutes, then one followed. A Pass session, or the dev door as Transit's.
