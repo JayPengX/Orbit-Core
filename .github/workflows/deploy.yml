@@ -101,13 +101,6 @@ jobs:
           # so a future change to that default can't silently break this
           # again the same way.
           wranglerVersion: '4'
-      # orbit-ig (an Instagram test, dropped 2026-10-30): the Worker deleted.
-      # This step goes in the next push once the run has deleted it.
-      - name: The orbit-ig test Worker deleted
-        continue-on-error: true
-        run: cd "$RUNNER_TEMP" && npx --yes wrangler@4 delete orbit-ig --force && echo "orbit-ig deleted"
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       # The old address (sports-proxy.pengzjay.workers.dev, a forwarder to the
       # proxy since the move on 2026-10-13): no code calls it, and a phone on
       # an older kit takes the new one at its next opening; 10 minutes of its
