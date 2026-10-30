@@ -119,14 +119,21 @@ export function matchCons(rows, cites, text, max = 2) {
     .map(([, r]) => ({ jid: r[0], d: String(r[1] || ''), t: String(r[2] || r[3] || ''), cites: (r[4] || []).slice(0, 8) }));
 }
 
-async function caseText(jid, fetcher = fetch) {
+// A judgment's gist: kept (gists: { get, put }, the proxy's KV) once read, since
+// a judgment never changes; else read from 司法院's page (through Taiwan, a slow
+// site: 3.5 s at most, then the case goes in by its 案由 alone).
+async function caseText(jid, fetcher = fetch, gists = null) {
   if (CONS_ID.test(jid)) {
     const j = await readOne(`cons/${jid}.json`);
     return j ? `${j.issue ? `爭點：${cut(j.issue, 200)}／` : ''}主文：${cut(j.main, 400)}${j.reason ? `／理由：${cut(j.reason, 500)}` : ''}` : '';
   }
+  const had = await gists?.get(jid).catch(() => null);
+  if (had) return had;
   try {
-    const res = await fetcher(`${JUDGMENT}${encodeURIComponent(jid)}`, { cf: { cacheTtlByStatus: { '200-299': 30 * 86_400, 404: 60, '500-599': 0 }, cacheEverything: true }, signal: AbortSignal.timeout(6000) });
-    return res.ok ? judgmentGist(await res.text()) : '';
+    const res = await fetcher(`${JUDGMENT}${encodeURIComponent(jid)}`, { signal: AbortSignal.timeout(3500) });
+    const gist = res.ok ? judgmentGist(await res.text()) : '';
+    if (gist) gists?.put(jid, gist);
+    return gist;
   } catch {
     return '';
   }
@@ -314,12 +321,15 @@ export const asksMine = text => MINE_WORDS.test(String(text || ''));
 // when the question can use it. cities: the reader's own (their 地方法規
 // only; none, only a city the question names); fetcher: how a judgment's
 // page is read (from Taiwan: law-hosts.js).
-export async function moreFor(text, articles, { mine = null, items = [], today = '', cities = [], fetcher = fetch } = {}) {
+const MORE_FILES = ['rulings/all.json', 'ly/people.json', 'ly/votes.json', 'ly/agenda.json', 'agency/all.json', 'cons/index.json', 'local/all.json'];
+// Its files read ahead (while the plan is written): moreFor finds them read.
+export const warmMore = () => Promise.all(MORE_FILES.map(p => readGround(p)));
+export async function moreFor(text, articles, { mine = null, items = [], today = '', cities = [], fetcher = fetch, gists = null } = {}) {
   const cites = articles.map(a => `${a.p}:${a.key}`);
   const ps = [...new Set(articles.map(a => a.p))];
   const lawNames = [...new Set(articles.map(a => a.n))];
   const own = mine && asksMine(text) ? mine : null;
-  const [rulings, peopleF, votesF, agendaF, rulesF, consF, localF] = await Promise.all(['rulings/all.json', 'ly/people.json', 'ly/votes.json', 'ly/agenda.json', 'agency/all.json', 'cons/index.json', 'local/all.json'].map(p => readGround(p)));
+  const [rulings, peopleF, votesF, agendaF, rulesF, consF, localF] = await warmMore();
   const people = matchPeople(peopleF?.people, text, own?.people || []);
   const partyOf = new Map((peopleF?.people || []).map(p => [p.n, p.party]));
   const votes = votesF ? matchVotes(votesF, text, ps, people) : [];
@@ -327,7 +337,7 @@ export async function moreFor(text, articles, { mine = null, items = [], today =
   // (A question about the 立法院's work gets no judgments or rules: they'd be noise there.)
   const ly = LY_ONLY.test(text);
   const cases = ly ? [] : [...cons, ...matchRulings(rulings?.rulings, cites, text)].slice(0, MORE_LIMITS.cases);
-  const texts = await Promise.all(cases.slice(0, MORE_LIMITS.caseTexts + cons.length).map(c => caseText(c.jid, fetcher)));
+  const texts = await Promise.all(cases.slice(0, MORE_LIMITS.caseTexts + cons.length).map(c => caseText(c.jid, fetcher, gists)));
   texts.forEach((t, i) => (cases[i].gist = t));
   // The ministries' 行政規則 and the cities' 地方法規, one list; a text kept on the site is read from there.
   const mineCities = new Set([...cities, ...citiesIn(text, localF?.rules)].map(tai));

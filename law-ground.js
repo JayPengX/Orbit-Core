@@ -22,19 +22,17 @@ export const STAGES = ['提案', '一讀', '委員會', '審查完畢', '協商'
 const HOUR_MS = 3_600_000;
 
 // A file, kept an hour at the edge and in the isolate; null when it isn't
-// there or can't be read.
+// there or can't be read. (Its read is shared: asked twice at once, read once.)
 const files = new Map();
 export const forgetGround = () => files.clear();
-export async function readGround(path, now = Date.now()) {
+export function readGround(path, now = Date.now()) {
   const had = files.get(path);
-  if (had && now - had.at < HOUR_MS) return had.v;
-  let v = null;
-  try {
-    const res = await fetch(`${DATA}${path}`, { cf: { cacheTtlByStatus: { '200-299': 3600, 404: 60, '500-599': 0 }, cacheEverything: true }, signal: AbortSignal.timeout(8000) });
-    if (res.ok) v = await res.json();
-  } catch {}
-  files.set(path, { at: now, v });
-  return v;
+  if (had && now - had.at < HOUR_MS) return had.p;
+  const p = fetch(`${DATA}${path}`, { cf: { cacheTtlByStatus: { '200-299': 3600, 404: 60, '500-599': 0 }, cacheEverything: true }, signal: AbortSignal.timeout(8000) })
+    .then(res => (res.ok ? res.json() : null))
+    .catch(() => null);
+  files.set(path, { at: now, p });
+  return p;
 }
 
 // ---- Matching ----------------------------------------------------------------------

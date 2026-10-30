@@ -147,16 +147,20 @@ export async function readLaw(p) {
 // in the isolate (orders.json is a megabyte).
 const lists = new Map();
 export const forgetLists = () => lists.clear();
-export async function readList(name, now = Date.now()) {
+export function readList(name, now = Date.now()) {
   const had = lists.get(name);
-  if (had && now - had.at < 3_600_000) return had.v;
-  const j = await readData(name);
-  if (!Array.isArray(j?.laws)) throw new Error(`${name} shape`);
-  const rows = j.laws.filter(r => Array.isArray(r) && typeof r[0] === 'string' && typeof r[1] === 'string');
-  const v = { rows, byP: new Map(rows.map((r, i) => [r[0], i])), byName: new Map() };
-  rows.forEach((r, i) => !r[5] && !v.byName.has(r[1]) && v.byName.set(r[1], i));
-  lists.set(name, { at: now, v });
-  return v;
+  if (had && now - had.at < 3_600_000) return had.p;
+  const p = readData(name).then(j => {
+    if (!Array.isArray(j?.laws)) throw new Error(`${name} shape`);
+    const rows = j.laws.filter(r => Array.isArray(r) && typeof r[0] === 'string' && typeof r[1] === 'string');
+    const v = { rows, byP: new Map(rows.map((r, i) => [r[0], i])), byName: new Map() };
+    rows.forEach((r, i) => !r[5] && !v.byName.has(r[1]) && v.byName.set(r[1], i));
+    return v;
+  });
+  // (A read that failed isn't kept: the next one tries again.)
+  p.catch(() => lists.get(name)?.p === p && lists.delete(name));
+  lists.set(name, { at: now, p });
+  return p;
 }
 
 // A law's or a regulation's row, by its code; null when neither has it.
