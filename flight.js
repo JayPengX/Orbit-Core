@@ -24,7 +24,7 @@ export const AREAS = {
 };
 
 // (A whole pick answers within budgetMs: a slow source or lookup is left out, never waited on.)
-export const LIMITS = { minMin: 10, maxMin: 180, lookups: 900, batch: 150, want: 6, areaMs: 5000, routeMs: 3000, budgetMs: 9000 };
+export const LIMITS = { minMin: 10, maxMin: 180, lookups: 900, batch: 150, want: 6, areaMs: 4000, routeMs: 2500, budgetMs: 7000 };
 const UA = 'Orbit-Class/1.0 (+https://github.com/JayPengX/Orbit-Class)';
 const AREA_TTL = 60;
 const ROUTE_TTL = 86_400;
@@ -128,11 +128,9 @@ export function flightOf(c, route, now) {
 }
 
 // Every airliner in the air now with a route that fits it, landing within
-// three hours: one pool every three minutes, built by the first phone to ask
-// in each Cloudflare city and kept there (Cloudflare's cache, and this copy of
-// the Worker's memory), so the rest are answered at once. (Its fixes up to
-// three minutes old: the phone flies each plane on from its fix, and asks for
-// a new one as soon as it follows one.) The phone
+// three hours, built in each Cloudflare city and kept there (poolNow). (Its
+// fixes a few minutes old: the phone flies each plane on from its fix, and
+// asks for a new one as soon as it follows one.) The phone
 // picks from it itself (kit/flight.mjs choose), whatever the minutes.
 export async function buildPool({ fetchFn = fetch, now = Date.now() } = {}) {
   const t0 = Date.now();
@@ -151,30 +149,38 @@ export async function buildPool({ fetchFn = fetch, now = Date.now() } = {}) {
 const placeSlim = p => ({ iata: p.iata, icao: p.icao, city: p.city, lat: p.lat, lon: p.lon });
 const slim = f => ({ hex: f.hex, cs: f.cs, no: f.no, airline: f.airline, from: placeSlim(f.from), to: placeSlim(f.to), type: f.type, fix: f.fix, eta: f.eta });
 
-const POOL_MS = 180_000;
-const pools = new Map();
-export async function poolNow({ fetchFn = fetch, now = Date.now() } = {}) {
-  const minute = Math.floor(now / POOL_MS);
+const POOL_FRESH_MS = 180_000;
+const POOL_KEEP_S = 1800;
+let poolMem = null;
+let building = null;
+// The pool kept: fresh (three minutes) as it is; older (up to half an hour),
+// answered at once while a new one is built behind (`ctx.waitUntil`), so only
+// a city's very first ask waits on a build.
+export async function poolNow({ fetchFn = fetch, now = Date.now(), ctx = null } = {}) {
   // (Sources faked, as the tests do: built each time.)
   if (fetchFn !== globalThis.fetch) return buildPool({ fetchFn, now });
-  if (pools.has(minute)) return pools.get(minute);
   const c = edge();
-  const key = new Request(`https://flight.orbit/pool/${minute}`);
-  const job = (async () => {
-    const hit = c && (await c.match(key).catch(() => null));
-    if (hit) return hit.json();
-    const pool = await buildPool({ fetchFn, now });
-    if (pool && c) await c.put(key, new Response(JSON.stringify(pool), { headers: { 'Cache-Control': 'max-age=200' } })).catch(() => {});
-    return pool;
-  })();
-  pools.clear();
-  pools.set(minute, job);
-  job.then(p => p || pools.delete(minute), () => pools.delete(minute));
-  return job;
+  const key = new Request('https://flight.orbit/pool/v2');
+  const build = () =>
+    (building ||= buildPool({ fetchFn, now })
+      .then(async pool => {
+        if (!pool) return null;
+        poolMem = { at: now, pool };
+        if (c) await c.put(key, new Response(JSON.stringify(poolMem), { headers: { 'Cache-Control': `max-age=${POOL_KEEP_S}` } })).catch(() => {});
+        return pool;
+      })
+      .finally(() => (building = null)));
+  if (!poolMem && c) poolMem = await c.match(key).then(r => r?.json()).catch(() => null);
+  if (!poolMem || now - poolMem.at > POOL_KEEP_S * 1000) return build();
+  if (now - poolMem.at > POOL_FRESH_MS) {
+    const next = build().catch(() => null);
+    ctx?.waitUntil?.(next);
+  }
+  return poolMem.pool;
 }
 
-export async function pickFlights(minutes, { fetchFn = fetch, now = Date.now() } = {}) {
-  const pool = await poolNow({ fetchFn, now });
+export async function pickFlights(minutes, { fetchFn = fetch, now = Date.now(), ctx = null } = {}) {
+  const pool = await poolNow({ fetchFn, now, ctx });
   return pool ? choose(pool, minutes, now) : null;
 }
 
@@ -207,7 +213,7 @@ export async function probeSources(fetchFn = fetch) {
   return { lol, fi, adsbdb };
 }
 
-export async function handleFlight(request, headers, { session, limited, fetchFn = fetch, colo = '' }) {
+export async function handleFlight(request, headers, { session, limited, fetchFn = fetch, colo = '', ctx = null }) {
   if (new URL(request.url).searchParams.get('probe') === '1') {
     const c = edge();
     const key = new Request(`https://flight.orbit/probe/${colo}`);
@@ -228,11 +234,11 @@ export async function handleFlight(request, headers, { session, limited, fetchFn
   }
   // ?pool=1: the whole pool, for the phone to pick from.
   if (q.get('pool') === '1') {
-    const pool = await poolNow({ fetchFn });
+    const pool = await poolNow({ fetchFn, ctx });
     return pool ? json({ flights: pool, at: Date.now() }, 200, headers) : json({ error: { code: 'UPSTREAM' } }, 502, headers);
   }
   const minutes = Math.round(Number(q.get('min')));
   if (!(minutes >= LIMITS.minMin && minutes <= LIMITS.maxMin)) return json({ error: { code: 'BAD_MINUTES' } }, 400, headers);
-  const flights = await pickFlights(minutes, { fetchFn });
+  const flights = await pickFlights(minutes, { fetchFn, ctx });
   return flights ? json({ flights, at: Date.now() }, 200, headers) : json({ error: { code: 'UPSTREAM' } }, 502, headers);
 }
