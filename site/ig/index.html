@@ -13,7 +13,7 @@ main{max-width:560px;margin:0 auto;padding:32px 16px 56px}
 h1{margin:0 0 4px;font-size:28px;letter-spacing:-.02em}
 .lead{margin:0 0 20px;color:var(--muted)}
 .card{padding:16px;border-radius:18px;background:var(--card);border:1px solid var(--line);margin-bottom:12px}
-.card h2{font-size:17px;margin:0 0 6px}.card p{margin:0;color:var(--muted);font-size:15px}
+.card h2{font-size:17px;margin:0 0 6px}.card p{margin:0;color:var(--muted);font-size:15px}.card p+p{margin-top:8px}
 .go{display:block;text-align:center;margin:12px 0 0;padding:14px;border-radius:999px;background:var(--accent);color:#fff;font-weight:700;text-decoration:none}
 .side{display:inline-block;margin-top:8px;color:var(--accent);font-size:15px}
 ul{margin:0;padding-left:20px;color:var(--muted);font-size:15px}
@@ -35,6 +35,10 @@ ul{margin:0;padding-left:20px;color:var(--muted);font-size:15px}
 
 <div class="card"><h2 data-en="4. Use Instagram in Safari">4. 用 Safari 開 Instagram</h2>
 <p data-en="Open instagram.com in Safari and log in. The Instagram app isn't changed, so delete it or lock it with Screen Time.">在 Safari 打開 instagram.com 並登入。Instagram App 本身不會改變，請刪掉或用「螢幕使用時間」鎖起來。</p></div>
+
+<div class="card"><h2 data-en="5. A Home Screen icon">5. 放到主畫面</h2>
+<p data-en="On instagram.com in Safari, tap Share → Add to Home Screen, then turn off “Open as Web App” before tapping Add. The icon then opens Safari, where the script runs (as a web app it can't).">在 Safari 的 instagram.com，點「分享」→「加入主畫面」，先關掉「以網頁 App 開啟」再點「新增」。這樣圖示會用 Safari 開，腳本才會執行（網頁 App 裡不會執行）。</p>
+<p data-en="No such switch (before iOS 26)? In the Shortcuts app make a shortcut with one action, Open URLs: https://www.instagram.com/, then Share → Add to Home Screen.">沒有這個開關（iOS 26 以前）？在「捷徑」App 新增一個捷徑，只放一個動作「打開 URL」：https://www.instagram.com/，再點「分享」→「加入主畫面」。</p></div>
 
 <div class="card"><h2 data-en="What it does">它做了什麼</h2>
 <ul><li data-en="Hides ads, Reels, suggested posts and suggested accounts">隱藏廣告、Reels、推薦貼文和推薦帳號</li>
