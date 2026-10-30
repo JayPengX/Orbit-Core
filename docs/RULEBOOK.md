@@ -158,6 +158,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 10-27 Never invent entries, balances or categories; Jay started fresh 2026-11-01; never re-add the 天天記帳 import or commit his CSV.
 - 10-27 發票 is one feature (更多's hero: scan, screenshot, 載具 file, mail-in); free QR read first, Gemini only on a tap with review before saving.
 - 10-27 Categories have subs and are the person's to edit; auto-fill (自動帶入) is set per user, never hardcoded.
+- 10-30 Category sets for kinds of people (學生, 上班族, 家庭, 全部), asked once before the first 記一筆; a set only changes what shows, never what's logged; the person's own changes are their own set (「我的」).
 - 10-27 Sheets fit their content; nothing that matters below the fold; 手機條碼 stays black on white in dark mode.
 - 悠遊卡/一卡通 are 儲值卡, never 電子錢包; removing an account never loses history.
 - 10-27 記一筆: the amount is a field (tap the number, the iPhone's keys; no keypad of our own); every category in view, no pages to swipe. Something not set shows nothing (no example values); 預算 sits in 更多 until one is set, then in 統計. Ways to pay show their own logos.
