@@ -408,11 +408,20 @@ test("espn-leaders: basketball's and baseball's leaders and football's scorers, 
   assert.deepEqual(trimEspnLeaders({ results: [] }), { results: [] }, 'not a leaders page: as it was');
 });
 
+test("Teams' numbers: ESPN's byteam trimmed to each team's categories, FotMob's clubs' lists kept on a league's page", async () => {
+  const { trimEspnTeams, trimFotmobPage } = await import('../sports.js');
+  const raw = { pagination: {}, glossary: [{}], requestedSeason: { year: 2027, displayName: '2026-27', type: { name: 'Regular Season', week: {} } }, categories: [{ name: 'offensive', names: ['avgPoints'], descriptions: ['x'] }, { name: 'offensive' }], teams: [{ team: { id: '9', abbreviation: 'GS', displayName: 'Golden State Warriors', shortDisplayName: 'Warriors', logos: [{ href: 'gs.png' }], links: [] }, categories: [{ name: 'offensive', displayName: 'Own Offensive', splitId: '0', values: [117.123456], totals: ['117.1'], ranks: ['-'] }] }] };
+  assert.deepEqual(trimEspnTeams(raw), { requestedSeason: { year: 2027, displayName: '2026-27', type: { name: 'Regular Season' } }, categories: [{ name: 'offensive', names: ['avgPoints'] }], teams: [{ team: { id: '9', abbreviation: 'GS', displayName: 'Golden State Warriors', shortDisplayName: 'Warriors', logo: 'gs.png' }, categories: [{ name: 'offensive', splitId: '0', values: [117.123], totals: ['117.1'] }] }] });
+  assert.deepEqual(trimEspnTeams({ athletes: [] }), { athletes: [] });
+  const page = trimFotmobPage({ details: { id: 47 }, stats: { players: [], teams: [{ header: 'Goals per match', participant: { stat: { name: 'goals_team_match', fractions: 1 } }, fetchAllUrl: 'https://data.fotmob.com/stats/47/season/1/goals_team_match.json', topThree: [{ id: 8456, name: 'Manchester City', value: 2.5, extra: 1 }] }] } });
+  assert.deepEqual(page.teamStats, [{ header: 'Goals per match', name: 'goals_team_match', fractions: 1, url: 'https://data.fotmob.com/stats/47/season/1/goals_team_match.json', top: [{ id: 8456, name: 'Manchester City', teamId: undefined, teamName: undefined, value: 2.5 }] }]);
+});
+
 test("FotMob for football's 數據領先: only a league's or team's page and its stat lists, each trimmed to its leaders", async () => {
   const { trimFotmobPage, trimFotmobStat } = await import('../sports.js');
   const p = { id: 1, name: 'Erling Haaland', teamId: 8456, teamName: 'Manchester City', value: 8, ccode: 'NOR', teamColors: {} };
   const page = trimFotmobPage({ details: { id: 47, selectedSeason: '2026/2027' }, table: [{ data: { table: { all: [{ id: 8456, name: 'Manchester City', shortName: 'Man City', pts: 21 }] } } }], stats: { teamId: 8456, players: [{ header: 'Top scorer', participant: { stat: { name: 'goals', format: 'number', fractions: 0 } }, fetchAllUrl: 'https://data.fotmob.com/stats/47/season/36781/goals.json', topThree: [p] }] } });
-  assert.deepEqual(page, { id: 47, season: '2026/2027', teamId: 8456, stats: [{ header: 'Top scorer', name: 'goals', format: 'number', fractions: 0, url: 'https://data.fotmob.com/stats/47/season/36781/goals.json', top: [{ id: 1, name: 'Erling Haaland', teamId: 8456, teamName: 'Manchester City', value: 8 }] }], teams: [{ id: 8456, name: 'Manchester City', shortName: 'Man City' }] });
+  assert.deepEqual(page, { id: 47, season: '2026/2027', teamId: 8456, stats: [{ header: 'Top scorer', name: 'goals', format: 'number', fractions: 0, url: 'https://data.fotmob.com/stats/47/season/36781/goals.json', top: [{ id: 1, name: 'Erling Haaland', teamId: 8456, teamName: 'Manchester City', value: 8 }] }], teamStats: [], teams: [{ id: 8456, name: 'Manchester City', shortName: 'Man City' }] });
   const stat = trimFotmobStat({ TopLists: [{ StatName: 'total_tackle', Title: 'Tackles per 90', StatFormat: 'fraction', StatDecimals: 1, StatList: Array.from({ length: 120 }, (_, i) => ({ ParticipantName: `P${i}`, ParticiantId: i, TeamId: 1, TeamName: 'X', StatValue: 4 - i / 10, SubStatValue: 10, MatchesPlayed: 4, MinutesPlayed: 300, Rank: i + 1, Positions: [1] })) }] });
   assert.equal(stat.list.length, 100);
   assert.deepEqual(stat.list[0], { id: 0, name: 'P0', teamId: 1, teamName: 'X', value: 4, sub: 10, games: 4, mins: 300, rank: 1 });

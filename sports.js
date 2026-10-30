@@ -452,6 +452,23 @@ export function trimEspnAthletes(data) {
   };
 }
 
+// Opt-in (`&trim=espn-teams`) for a league's teams' season numbers
+// (statistics/byteam): each team's id, names and logo, and each category's
+// numbers as ESPN writes them (its own and its opponents', splitId 900); the
+// category names once. ~260 KB falls to ~40 KB.
+const TRIM_ESPN_TEAMS = 'espn-teams';
+export function trimEspnTeams(data) {
+  if (!data || typeof data !== 'object' || !Array.isArray(data.teams)) return data;
+  return {
+    requestedSeason: data.requestedSeason ? { year: data.requestedSeason.year, displayName: data.requestedSeason.displayName, type: { name: data.requestedSeason.type?.name } } : undefined,
+    categories: (data.categories || []).filter(c => c.names?.length).map(c => ({ name: c.name, names: c.names })),
+    teams: data.teams.map(x => ({
+      team: { id: x.team?.id, abbreviation: x.team?.abbreviation, displayName: x.team?.displayName, shortDisplayName: x.team?.shortDisplayName, logo: x.team?.logos?.[0]?.href },
+      categories: (x.categories || []).map(c => ({ name: c.name, splitId: c.splitId, values: Array.isArray(c.values) ? c.values.map(v => (typeof v === 'number' ? Math.round(v * 1000) / 1000 : v)) : c.values, totals: c.totals }))
+    }))
+  };
+}
+
 // Opt-in (`&trim=espn-leaders`) for a league's leaders, as Orbit Sports'
 // 數據領先 reads them (its lib/leaders.mjs): basketball's and baseball's
 // list (site v3 /leaders) and football's top scorers and assists (site v2
@@ -533,6 +550,8 @@ export function trimFotmobPage(data) {
     season: data.details?.selectedSeason || '',
     teamId: st.teamId,
     stats: list.map(x => ({ header: x.header, name: x.participant?.stat?.name || '', format: x.participant?.stat?.format || '', fractions: x.participant?.stat?.fractions ?? 0, url: x.fetchAllUrl || '', top: (x.topThree || []).map(fotmobPerson) })),
+    // (A league's page: its clubs' own numbers too, each with its whole list's file: Sports' 數據 球隊.)
+    teamStats: (Array.isArray(st.teams) ? st.teams : []).map(x => ({ header: x.header, name: x.participant?.stat?.name || '', fractions: x.participant?.stat?.fractions ?? 0, url: x.fetchAllUrl || '', top: (x.topThree || []).map(fotmobPerson) })),
     teams: [...teams.values()],
     ...(data.details?.type === 'team' ? { home: fotmobHome(data) } : {})
   };
@@ -1065,7 +1084,7 @@ async function fetchUpstreamRaw(upstreamUrl, trim) {
     if (trim) {
       try {
         const parsed = JSON.parse(new TextDecoder().decode(body));
-        body = JSON.stringify(trim === TRIM_KAMBI_EVENTS ? trimKambi(parsed) : trim === TRIM_ESPN_ROSTER ? trimEspnRoster(parsed) : trim === TRIM_ESPN_ATHLETES ? trimEspnAthletes(parsed) : trim === TRIM_ESPN_NEWS ? trimEspnNews(parsed) : trim === TRIM_ESPN_LEADERS ? trimEspnLeaders(parsed) : trim === TRIM_JOLPICA_RESULTS ? trimJolpicaResults(parsed) : trim === TRIM_FOTMOB_PAGE || trim === TRIM_FOTMOB_TEAM ? trimFotmobPage(parsed) : trim === TRIM_FOTMOB_STAT ? trimFotmobStat(parsed) : trim === TRIM_ESPN_INJURIES ? trimEspnInjuries(parsed) : trim === TRIM_ELTA ? trimElta(parsed) : trim === TRIM_POLYMARKET_GAMES ? trimPolymarketGames(parsed) : trimPolymarketEvents(parsed));
+        body = JSON.stringify(trim === TRIM_KAMBI_EVENTS ? trimKambi(parsed) : trim === TRIM_ESPN_ROSTER ? trimEspnRoster(parsed) : trim === TRIM_ESPN_ATHLETES ? trimEspnAthletes(parsed) : trim === TRIM_ESPN_TEAMS ? trimEspnTeams(parsed) : trim === TRIM_ESPN_NEWS ? trimEspnNews(parsed) : trim === TRIM_ESPN_LEADERS ? trimEspnLeaders(parsed) : trim === TRIM_JOLPICA_RESULTS ? trimJolpicaResults(parsed) : trim === TRIM_FOTMOB_PAGE || trim === TRIM_FOTMOB_TEAM ? trimFotmobPage(parsed) : trim === TRIM_FOTMOB_STAT ? trimFotmobStat(parsed) : trim === TRIM_ESPN_INJURIES ? trimEspnInjuries(parsed) : trim === TRIM_ELTA ? trimElta(parsed) : trim === TRIM_POLYMARKET_GAMES ? trimPolymarketGames(parsed) : trimPolymarketEvents(parsed));
       } catch {
         // Not the JSON shape expected - pass it through untouched.
       }
@@ -1211,6 +1230,7 @@ function trimFor(trimParam, upstreamUrl) {
   if (trimParam === TRIM_KAMBI_EVENTS && upstreamUrl.hostname === 'eu-offering-api.kambicdn.com') return TRIM_KAMBI_EVENTS;
   if (trimParam === TRIM_ESPN_ROSTER && upstreamUrl.hostname === 'site.api.espn.com' && upstreamUrl.pathname.endsWith('/roster')) return TRIM_ESPN_ROSTER;
   if (trimParam === TRIM_ESPN_ATHLETES && upstreamUrl.hostname === 'site.api.espn.com' && upstreamUrl.pathname.endsWith('/statistics/byathlete')) return TRIM_ESPN_ATHLETES;
+  if (trimParam === TRIM_ESPN_TEAMS && upstreamUrl.hostname === 'site.api.espn.com' && upstreamUrl.pathname.endsWith('/statistics/byteam')) return TRIM_ESPN_TEAMS;
   if (trimParam === TRIM_ESPN_LEADERS && upstreamUrl.hostname === 'site.api.espn.com' && /\/(leaders|statistics)$/.test(upstreamUrl.pathname)) return TRIM_ESPN_LEADERS;
   if (trimParam === TRIM_JOLPICA_RESULTS && upstreamUrl.hostname === 'api.jolpi.ca' && /\/(results|qualifying\/1)\.json$/.test(upstreamUrl.pathname)) return TRIM_JOLPICA_RESULTS;
   if (trimParam === TRIM_ESPN_NEWS && upstreamUrl.hostname === 'site.api.espn.com' && upstreamUrl.pathname.endsWith('/news')) return TRIM_ESPN_NEWS;
