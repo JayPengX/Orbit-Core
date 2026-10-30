@@ -714,30 +714,14 @@ test("a session writes its own app's data only: never another app's save or figu
   assert.equal((await t.call('PATCH', `${t.qt(acct.token)}&app=vocab`, { payload: 'gz1:mine' })).status, 200);
 });
 
-test('op loan and relief: the Worker signs only what the account qualifies for', async () => {
+test('op relief: the Worker pays only an account that qualifies; there is no op loan', async () => {
   const t = setup();
   t.advance(Date.UTC(2026, 10, 4, 4) - 1_700_000_000_000);
   const acct = await newPass(t);
-  // A brand-new pass waits 4 weeks for a loan.
-  const early = await t.call('POST', '', { op: 'loan', qt: acct.token, action: 'borrow', amount: 100_000, weeks: 52 });
-  assert.equal(early.status, 409);
-  assert.equal(early.data.error.why, 'new');
-  t.advance(29 * 86_400_000);
-  const fresh = await t.call('POST', '', { op: 'refresh', refresh: acct.refresh, app: 'stock', claim: true });
-  const qt = fresh.data.token;
-  const before = fresh.data.pool;
-  const big = await t.call('POST', '', { op: 'loan', qt, action: 'borrow', amount: 900_000, weeks: 52 });
-  assert.equal(big.data.error.why, 'amount');
-  const ok = await t.call('POST', '', { op: 'loan', qt, action: 'borrow', amount: 100_000, weeks: 52 });
-  assert.equal(ok.status, 200);
-  assert.equal(ok.data.pool, before + 100_000 - 3_000);
-  // An app can't write the Worker's loan entries itself.
-  assert.equal(cleanPatch({ entries: [{ id: 'eco:loanoff:x', t: 1, app: 'stock', kind: 'loanoff', amount: 0 }] }).entries.length, 0);
-  const off = await t.call('POST', '', { op: 'loan', qt, action: 'payoff' });
-  assert.equal(off.status, 200);
-  assert.equal(off.data.pool, before - 3_000 - 2_000);
+  const loan = await t.call('POST', '', { op: 'loan', qt: acct.token, action: 'borrow', amount: 100_000, weeks: 52 });
+  assert.notEqual(loan.status, 200);
   // Relief: not with NT$200,000 in the account.
-  const relief = await t.call('POST', '', { op: 'relief', qt });
+  const relief = await t.call('POST', '', { op: 'relief', qt: acct.token });
   assert.equal(relief.data.error.why, 'worth');
 });
 

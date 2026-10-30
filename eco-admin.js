@@ -25,7 +25,6 @@ import { SITE } from './kit/domain.mjs';
 import { sidesOf, addSides, LEDGER } from './money.js';
 import { plan as capacityPlan, usersFrom } from './capacity.js';
 import { STATE_KEY as GUARD_STATE } from './guard.js';
-import { loans, loanOwed } from './kit/loan.mjs';
 import { govOf } from './kit/gov.mjs';
 import { listBackups, fromBackup } from './store-backup.js';
 import { PASSKEY_COLLECTION, passkeySummary, removePasskey } from './passkey.js';
@@ -240,7 +239,7 @@ async function walletList(env, deps) {
       balance: wallet ? poolBalance(wallet) : null,
       gen: wallet ? gen(wallet) : null,
       passkeys: wallet?.passkeys?.keys?.length || 0,
-      ...creditOf(wallet, now),
+      ...creditOf(wallet),
       updateTime: w.updateTime
     };
   });
@@ -355,16 +354,9 @@ async function findWallet(env, deps, ref) {
   return wallet ? { id: hits[0].id, wallet, updateTime: hits[0].updateTime } : null;
 }
 const notFound = { error: 'ECO_PAIR_NOT_FOUND', status: 404 };
-// Where an account stands with 信貸 and 紓困 (kit/loan.mjs): `loan` 'bad'
-// (催收), 'late' (an installment missed), 'on' (paying) or null; what it
-// still owes; how many times it got relief.
-export function creditOf(wallet, now) {
-  const all = wallet ? loans(wallet) : [];
-  const open = all.find(l => !l.settled) || null;
-  const owed = Math.round(all.reduce((sum, l) => sum + loanOwed(l, now), 0));
+// How many times an account got relief (kit/pay.mjs), and its taxes.
+export function creditOf(wallet) {
   return {
-    loan: !open ? null : open.bad ? 'bad' : open.lates ? 'late' : 'on',
-    owed,
     reliefs: (wallet?.entries || []).filter(e => e.app === 'eco' && e.kind === 'relief').length,
     // 政府 (kit/gov.mjs): taxes paid, all time.
     tax: govOf(wallet).paidTotal
@@ -431,9 +423,8 @@ export const ADMIN_TOOLS = {
     const days = Array.from({ length: 14 }, (_, i) => day(now - (13 - i) * DAY));
     const byDay = f => days.map(d => list.filter(x => f(x.w) && day(f(x.w)) === d).length);
     const balances = list.map(x => poolBalance(x.w));
-    // Money in and out each day (the 14 days), and the loan book now.
+    // Money in and out each day (the 14 days).
     const daily = { in: days.map(() => 0), out: days.map(() => 0) };
-    const book = { active: 0, owed: 0, late: 0, bad: 0, lent: 0, repaid: 0 };
     const relief = { week: 0, month: 0, total: 0, paid: 0 };
     const rows = [];
     let gov = {};
@@ -445,9 +436,7 @@ export const ADMIN_TOOLS = {
       }
       for (const e of x.w.entries) {
         if (e.app !== 'eco') continue;
-        if (e.kind === 'loan') book.lent += e.amount;
-        else if (e.kind === 'loanpay' || e.kind === 'loanoff' || e.kind === 'loangar' || e.kind === 'loanbad') book.repaid -= e.amount;
-        else if (e.kind === 'relief') {
+        if (e.kind === 'relief') {
           relief.total++;
           relief.paid += e.amount;
           if (now - e.t < 7 * DAY) relief.week++;
@@ -455,21 +444,13 @@ export const ADMIN_TOOLS = {
         }
       }
       gov = addSides(gov, govOf(x.w));
-      const c = creditOf(x.w, now);
-      if (c.loan) {
-        book.active++;
-        book.owed += c.owed;
-        if (c.loan === 'late') book.late++;
-        if (c.loan === 'bad') book.bad++;
-      }
+      const c = creditOf(x.w);
       rows.push({ ref: x.id.slice(0, 8), balance: Math.round(poolBalance(x.w)), created: x.w.created || 0, last: lastUsed(x.w), apps: appsOf(x.w).map(a => a.app), ...c });
     }
     for (const k of ['in', 'out']) daily[k] = daily[k].map(Math.round);
-    for (const k of ['lent', 'repaid', 'owed']) book[k] = Math.round(book[k]);
-    // Who needs a look: in 催收, a missed installment, overdrawn (worst first).
-    const rank = r => (r.loan === 'bad' ? 0 : r.loan === 'late' ? 1 : 2);
-    const attention = rows.filter(r => r.loan === 'bad' || r.loan === 'late' || r.balance < 0).sort((a, b) => rank(a) - rank(b) || a.balance - b.balance).slice(0, 12);
-    const pick = r => ({ ref: r.ref, balance: r.balance, created: r.created, last: r.last, apps: r.apps, loan: r.loan, owed: r.owed });
+    // Who needs a look: overdrawn (worst first).
+    const attention = rows.filter(r => r.balance < 0).sort((a, b) => a.balance - b.balance).slice(0, 12);
+    const pick = r => ({ ref: r.ref, balance: r.balance, created: r.created, last: r.last, apps: r.apps });
     return {
       at: now,
       accounts: list.length,
@@ -483,7 +464,6 @@ export const ADMIN_TOOLS = {
       signups: byDay(w => w.created || 0),
       lastSeen: byDay(lastUsed),
       daily,
-      loans: book,
       relief,
       gov,
       attention: attention.map(pick),
@@ -512,9 +492,8 @@ export const ADMIN_TOOLS = {
       inbox: Object.fromEntries(Object.entries(wallet.inbox || {}).map(([k, v]) => [k, v.length])),
       pushes,
       passkeys: passkeySummary(wallet),
-      ...creditOf(wallet, now),
-      gov: govOf(wallet),
-      loans: loans(wallet).map(l => ({ id: l.id, t: l.t, principal: l.principal, apr: l.apr, weeks: l.weeks, paid: l.paid, lates: l.lates, bad: !!l.bad, settled: l.settled, owed: Math.round(loanOwed(l, now)) }))
+      ...creditOf(wallet),
+      gov: govOf(wallet)
     };
   },
   // Money by hand (a correction, a prize): an 'eco' entry, kind 'admin', with its reason.

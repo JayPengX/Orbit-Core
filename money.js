@@ -4,7 +4,7 @@
 //
 //   given   what the system paid in: opening money, weekly pay, wealth-rank
 //           rewards, and the rest (admin grants, rebases)
-//   orbit   what Orbit earned: overdraft interest and loan costs
+//   orbit   what Orbit earned: overdraft interest
 //   gov     the government, from the player's side: 急難紓困 in, less every
 //           tax out (Securities' `snap.stock.gov`: trade tax, withholding,
 //           二代健保), all-time totals it works out again from its whole history
@@ -22,14 +22,13 @@ import { changeDoc } from './doc-store.js';
 import { govOf } from './kit/gov.mjs';
 
 export const LEDGER = ['orbit-config', 'ledger'];
-const LOAN_KINDS = new Set(['loan', 'loanfee', 'loanpay', 'loanlate', 'loangar', 'loanoff']);
 // The government's side of one account: the kit's own govOf (kit/gov.mjs), so the two always agree.
 export { govOf };
 const num = v => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
 
 export function sidesOf(wallet) {
   const gave = { start: 0, pay: 0, rank: 0, other: 0 };
-  const fees = { od: 0, loan: 0 };
+  const fees = { od: 0 };
   const entries = wallet?.entries || [];
   for (const e of entries) {
     if (e.app !== 'eco') continue;
@@ -38,8 +37,6 @@ export function sidesOf(wallet) {
     else if (e.kind === 'pay') gave.pay += a;
     else if (e.kind === 'rank') gave.rank += a;
     else if (e.kind === 'rebase' || e.kind === 'admin') gave.other += a;
-    // A loan's money in and out: net of what's paid back, its fee, interest and late charges (less while one is still owed).
-    else if (LOAN_KINDS.has(e.kind)) fees.loan -= a;
     else if (e.kind === 'od') fees.od -= a;
   }
   let pool = 0;
@@ -49,7 +46,7 @@ export function sidesOf(wallet) {
   const given = gave.start + gave.pay + gave.rank + gave.other;
   const gov = govOf(wallet);
   // Orbit's side from the house's view: above 0 when it kept more.
-  const orbit = fees.od + fees.loan;
+  const orbit = fees.od;
   const own = worth - given + orbit - gov.net;
   const r = n => Math.round(n);
   const markets = (pl, sign) => Object.fromEntries(Object.entries(pl && typeof pl === 'object' ? pl : {}).filter(([, v]) => Number.isFinite(v)).map(([k, v]) => [k, r(sign * v)]));
@@ -58,7 +55,7 @@ export function sidesOf(wallet) {
     given: r(given),
     gave: Object.fromEntries(Object.entries(gave).map(([k, v]) => [k, r(v)])),
     orbit: r(orbit),
-    fees: { od: r(fees.od), loan: r(fees.loan) },
+    fees: { od: r(fees.od) },
     gov,
     own: r(own),
     stockBy: markets(wallet?.snap?.stock?.pl, 1),

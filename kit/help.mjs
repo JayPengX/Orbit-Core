@@ -52,7 +52,7 @@ export const HELP = {
         '「帳戶安全」可以登出其他所有裝置，或更換通行碼（舊的立刻失效，新的只顯示一次）。忘了通行碼，就在還登入的裝置換一組。'
       ]],
       ['money', '錢在哪裡', [
-        'Orbit Pass 不放錢。餘額、每週薪水、信貸、紓困、財富等級和明細都在 Orbit Securities 的「資金」分頁。'
+        'Orbit Pass 不放錢。餘額、每週薪水、紓困、財富等級和明細都在 Orbit Securities 的「資金」分頁。'
       ]]
     ],
     en: [
@@ -91,7 +91,7 @@ export const HELP = {
         'Security can sign out every other device or change the pass (the old one stops at once, the new one is shown once). Forgot it? Change it on a device that’s still signed in.'
       ]],
       ['money', 'Where the money is', [
-        'The Orbit Pass holds no money. Balance, weekly pay, loans, relief, wealth levels and every entry are in Orbit Securities’ 資金 tab.'
+        'The Orbit Pass holds no money. Balance, weekly pay, relief, wealth levels and every entry are in Orbit Securities’ 資金 tab.'
       ]]
     ]
   },
@@ -103,7 +103,7 @@ export const HELP = {
       ['tabs', '每個分頁', [
         '「首頁」：總資產和今日漲跌、為你推薦、漲跌幅前五名、全球市場，各分類清單（先列 15 檔）和搜尋（中文、英文或代號）；點任何標的看走勢、公司資料和下單。',
         '「資產」：淨值與走勢、配置、持股、現金與各幣別錢包、股利利息收入、定期定額和到價提醒。',
-        '「資金」：換匯（你付出／你會收到，兩邊都能輸入）、匯率看板、融資、信用帳戶、定存和借券出借；下面是你的帳戶：薪水、信貸、急難紓困、財富等級和「真相」。',
+        '「資金」：換匯（你付出／你會收到，兩邊都能輸入）、匯率看板、融資、信用帳戶、定存和借券出借；下面是你的帳戶：薪水、急難紓困、財富等級和「真相」。',
         '「紀錄」：交易明細、委託、統計分析（報酬、費用與稅、和只買大盤比），和回測。',
         '右上角：說明、重新整理和你的 Orbit Pass；漲跌的顏色在 Orbit Pass 的 Pass 分頁設定。'
       ]],
@@ -146,16 +146,13 @@ export const HELP = {
       ]],
       ['money', '錢怎麼算', [
         '你的錢都在 Securities：新帳號開戶金 NT$200,000，每週一固定發薪 NT$10,000，跟薪水一樣，存多存少都一樣；那週第一次打開 App 時入帳，沒打開的週下次補發。系統發的錢只有這些：開戶金、週薪、財富等級獎勵和急難紓困，都以新台幣存入，算投入的本金，不算報酬。',
-        '財富等級：身價（現金加持股，扣掉信貸）第一次到達一個等級時送一次獎勵：NT$30 萬小資族 NT$30,000、50 萬穩健 NT$50,000、百萬 NT$100,000、300 萬富裕 NT$250,000、千萬 NT$600,000、一億 NT$3,000,000。',
+        '財富等級：身價（現金加持股）第一次到達一個等級時送一次獎勵：NT$30 萬小資族 NT$30,000、50 萬穩健 NT$50,000、百萬 NT$100,000、300 萬富裕 NT$250,000、千萬 NT$600,000、一億 NT$3,000,000。',
         '「真相」（資金 › 真相）用你自己的紀錄算錢從哪裡來：系統發的、政府（證交稅、股利扣繳和二代健保，減去急難紓困）、和你自己的成績；還有一筆交易真正的成本。',
         '股利照各國規定預扣稅，除息日持有就有，現金在發放日入帳（有公布的照公布日期，否則台股約 4 週後、美股約 1 週後，遇假日順延到下一個交易日）；在那之前列為「待入帳」，算在淨值裡但不能花。',
         '餘額變負的（透支）時不能再花錢，每月計息 1%，「一鍵賣出補足」會找出最少要賣哪些來補。就像交割款沒付，2 天內沒補足就是違約交割：扣 7% 違約金、自動賣出持股，5 年內不能融資、融券。'
       ]],
-      ['loan', '信貸與急難紓困', [
-        '信貸（資金 › 信貸）跟銀行一樣：開戶滿 4 週可以申請，一次一筆。額度從 NT$100,000 起，每準時還清一筆加 NT$50,000，最多是月薪的 22 倍（約 NT$950,000，DBR 22 倍）；每週還款不能超過週薪的一半。年利率 12% 起，每筆準時還清少 1%（最低 6%），每次逾期加 1%（最高 16%）。開辦費 NT$3,000 從撥款扣除，簽約前會看到總費用年百分率。',
-        '期數 1、2、3 或 5 年，每週一發薪後自動扣款；1 年內提前還清收剩餘本金 2% 的違約金。扣款失敗就逾期並計違約金和遲延利息，餘額一夠就自動補扣。',
-        '逾期 3 期轉催收：全部到期（喪失期限利益），帳戶裡的錢先抵銷，之後每週薪水扣三分之一（強制執行），利息照算到還清為止。聯徵紀錄保留到還清後 1 年，期間不能再借，之後利率 16%、額度回到 NT$100,000。借來的錢不算身價，不會讓你升財富等級。',
-        '急難紓困：現金和股票（成本）合計低於 NT$2,000、沒有催收中的信貸、離發薪日超過 2 天，可以申請一次 NT$5,000。每 13 週一次、一年最多 3 次，會留在紀錄上。'
+      ['relief', '急難紓困', [
+        '現金和股票（成本）合計低於 NT$2,000、離發薪日超過 2 天，可以申請一次 NT$5,000。每 13 週一次、一年最多 3 次，會留在紀錄上。'
       ]]
     ],
     en: [
@@ -165,7 +162,7 @@ export const HELP = {
       ['tabs', 'The tabs', [
         'Home: your total and today’s change, for you, the top five up and down, world markets, lists by kind (15 at first) and search (Chinese, English or ticker); tap anything for its chart, company facts and the order ticket.',
         'Portfolio: net worth and its history, allocation, holdings, cash and each currency’s wallet, income, monthly plans and price alerts.',
-        'Money: exchange (you pay / you get, type either), the rates board, margin, the credit account, time deposits and lending shares; below them your account: pay, loans, relief, wealth levels and Truth.',
+        'Money: exchange (you pay / you get, type either), the rates board, margin, the credit account, time deposits and lending shares; below them your account: pay, relief, wealth levels and Truth.',
         'History: activity, orders, stats (returns, costs and taxes, you against just buying an index) and the backtest.',
         'Top right: help, refresh and your Orbit Pass; the colours for up and down are set in its Pass tab.'
       ]],
@@ -208,16 +205,13 @@ export const HELP = {
       ]],
       ['money', 'Money', [
         'Your money lives in Securities: a new account opens with NT$200,000, and every Monday pays a fixed NT$10,000, like a salary, the same however much you hold; it comes the first time that week you open the app, and a week you miss is paid when you’re back. The system gives money only as the opening money, the pay, wealth level rewards and emergency relief, all arriving as NT$ deposits, counted as money put in, not as return.',
-        'Wealth levels: the first time what you’re worth (cash and holdings, less a loan) reaches a level, its reward is paid once: NT$30,000 at NT$300,000, NT$50,000 at 500,000, NT$100,000 at a million, NT$250,000 at 3 million, NT$600,000 at 10 million and NT$3,000,000 at 100 million.',
+        'Wealth levels: the first time what you’re worth (cash and holdings) reaches a level, its reward is paid once: NT$30,000 at NT$300,000, NT$50,000 at 500,000, NT$100,000 at a million, NT$250,000 at 3 million, NT$600,000 at 10 million and NT$3,000,000 at 100 million.',
         'Truth (Money › Truth) works out from your own record where your money came from: what the system gave, the government (transaction tax, dividend withholding and the NHI premium, less relief) and your own result; and what a trade really costs.',
         'Dividends have each country’s withholding: held on the ex-date, the cash arrives on the pay day (the announced one where known, else about 4 weeks later in Taiwan and a week in the US, moved past holidays to the next trading day); until then it’s listed as on the way, counted in net worth but not spendable.',
         'With the balance below zero (an overdraft) nothing more can be spent, it costs 1% a month, and Sell to cover finds the fewest sales that cover it. Like an unpaid settlement, not covered within 2 days it’s a default: a 7% penalty, holdings sold, and no margin or short selling for 5 years.'
       ]],
-      ['loan', 'Loans and relief', [
-        'A personal loan (Money › Loan) works like a bank’s: after 4 weeks, one at a time. The limit starts at NT$100,000, grows NT$50,000 with each loan repaid on time, up to 22 months of pay (about NT$950,000, Taiwan’s DBR 22 rule), and an installment can’t take more than half the weekly pay. The rate starts at 12% a year, 1 point less per clean loan (6% at best) and 1 point more per late installment (16% at most). A NT$3,000 set-up fee comes off the money, and the APR with fees is shown before you sign.',
-        'Terms of 1, 2, 3 or 5 years, taken every Monday after the pay; paying off within a year costs 2% of what’s left. A missed installment is late, with charges, and is taken as soon as the balance covers it.',
-        'Three late and it goes to collection: the whole loan falls due, the balance is taken toward it, then a third of every weekly pay until it’s paid, with interest running. The record lasts a year after it’s paid: no loans, then 16% and a NT$100,000 limit. Borrowed money isn’t worth, so it never raises your wealth level.',
-        'Emergency relief: with cash and stocks (at cost) together under NT$2,000, no loan in collection, and payday more than 2 days away, you can get NT$5,000 once. Once every 13 weeks, 3 times a year at most, and it stays on your record.'
+      ['relief', 'Emergency relief', [
+        'With cash and stocks (at cost) together under NT$2,000 and payday more than 2 days away, you can get NT$5,000 once. Once every 13 weeks, 3 times a year at most, and it stays on your record.'
       ]]
     ]
   },
