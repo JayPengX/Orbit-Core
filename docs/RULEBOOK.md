@@ -109,6 +109,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 
 ### Transit
 - 10-22 YouBike is crucial: never plan a trip without bikes as a fallback; make it load reliably instead.
+- 10-30 YouBike shows its own logo everywhere except the map (map pins keep the bike glyph: it is the only bike); pins and cards count regular bikes and 電輔車 apart.
 - 10-22 Navigation follows ONE standard table (leg type × phase × auto/user view) in one function (`navLook`); change the table, never add one-off rules.
 - 10-22 On a ride: frame the remaining ride only, no zoom-follow on bus or train; own YouBike station icon-only (counts when Jay zooms in); no nearby stations or parking badges; boarding and start marks; ring one stop before yours; no swipe-down minimize.
 - 10-23 Operators' 停駛 notices are rules: stopped services are never planned; likely-off is labelled 可能停駛, never 停駛.
