@@ -28,7 +28,7 @@
 // sources are. The Orbit Pass is the only way anything is saved.
 
 import { handleLawAsk } from './law.js';
-import { handleLawChat } from './law-chat.js';
+import { handleLawChat, lawChatTimes } from './law-chat.js';
 import { DEV, aiSettingOf } from './kit/brand.mjs';
 import { handleLawPage } from './law-page.js';
 import en from './locales/en.js';
@@ -1240,6 +1240,8 @@ async function route(request, env, ctx, headers, origin) {
     if (!env.DATA_PUSH_SECRET || request.headers.get('Authorization') !== `Bearer ${env.DATA_PUSH_SECRET}`) return errorJson('FORBIDDEN_ORIGIN', 403, headers, request);
     const check = new URL(request.url).searchParams.get('check');
     if (check === 'gemini') return json(await geminiCheck(env), 200, headers);
+    // 問法律's steps timed on real questions, nothing kept read or written (law-chat.js).
+    if (check === 'law-chat') return json(await lawChatTimes(env, ctx, headers, lawGemini('law-chat')), 200, headers);
     if (check === 'system') return json(await systemReport(env, ECO_DEPS), 200, headers);
     // Orbit Money's mail-in, removed 2026-10-27 (Jay: too privacy-invading): its
     // stored boxes and invoices deleted, once (build.yml purge-money-mail).

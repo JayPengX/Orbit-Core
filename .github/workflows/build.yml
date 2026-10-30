@@ -10,7 +10,7 @@ on:
       job:
         description: The job
         type: choice
-        options: [watch, watch-full, cutouts, buses, play, asia, cpbl, sports, photos, winprob, kept, kept-dry, f1kept, f1kept-count, gemini-check, system, purge-money-mail]
+        options: [watch, watch-full, cutouts, buses, play, asia, cpbl, sports, photos, winprob, kept, kept-dry, f1kept, f1kept-count, gemini-check, law-chat-time, system, purge-money-mail]
         default: watch
 jobs:
   run:
@@ -22,6 +22,7 @@ jobs:
           base=https://orbit-workers-proxy.pengzjay.workers.dev
           case "$JOB" in
             gemini-check) url="$base/ops?check=gemini" ;;
+            law-chat-time) url="$base/ops?check=law-chat" ;;
             system) url="$base/ops?check=system" ;;
             purge-money-mail) url="$base/ops?check=purge-money-mail" ;;
             watch-full) url="$base/data/build?job=watch&full=1" ;;
