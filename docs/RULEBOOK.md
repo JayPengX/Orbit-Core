@@ -63,6 +63,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 10-21 Test UI in WebKit (Safari's engine), not only Chromium.
 - 10-22 One date selector in every app (kit `dayBar`/`dayStrip`); never an app's own day chip row.
 - 10-27 One tab bar in every app: the kit's floating capsule (`tabBar`), Securities and Longshot included; an app's in-progress bar is a `.q-accessory` pill above it. Never `html.q-dock` for a tab bar.
+- 10-30 The tab bar stays whole while scrolling (the fold to icons is gone: Jay gave the call, it hid labels and mis-fired); the app's round action button beside it is smaller than the bar and sits on its middle, never a big ring ("too big and fat").
 - 10-23 Phones only, 320 to 440 px; iPad and computers show the phone column centred; no tablet or wide layouts ever.
 - 10-27 Exception: the admin panel (`site/admin`) has a real desktop layout (sidebar, wide grids) as well as the phone one, and on a phone nothing in it is cut or squeezed (secondary lines wrap). The Showcase is the other exception.
 - 10-23 Every team name in Chinese; people (players, drivers) in their own English names in both languages; never transliterate.
