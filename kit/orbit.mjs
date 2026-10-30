@@ -4389,14 +4389,17 @@ const reducedMotion = () => globalThis.matchMedia?.('(prefers-reduced-motion: re
 //   Each tab keeps its place: switching back returns to where it was
 //   (select(id, { top: true }) starts it at the top instead).
 //   hash(id): the address for a tab ('#<id>' by default; null leaves it).
-// action: { icon, label, onTap } — the app's one main thing to do (Money's
-// 記一筆), a round button of its own beside the bar, as iOS 26 sets search
-// apart: always a thumb away, never one tab among the others.
+// action: { icon, label, onTap, id? } — the app's one main thing to do (Money's
+// 記一筆, Law's 問法律), a round button of its own beside the bar, as iOS 26
+// sets search apart: always a thumb away, never one tab among the others.
+// With an id it's a screen of its own: select(id) lights it (aria-pressed)
+// and no tab.
 export function tabBar({ tabs, onSelect, hash = id => `#${id}`, nav = document.getElementById('tabs'), label: ariaLabel = '', action = null } = {}) {
   const buttons = new Map();
   const places = {};
   const visited = new Set();
   let current = null;
+  let actBtn = null;
   nav.classList.add('q-tabbar');
   nav.setAttribute('role', 'tablist');
   if (ariaLabel) nav.setAttribute('aria-label', ariaLabel);
@@ -4421,7 +4424,9 @@ export function tabBar({ tabs, onSelect, hash = id => `#${id}`, nav = document.g
     // (A drawn icon as it is; a name from the bar's own set, + by default.)
     act.innerHTML = /^<svg/.test(action.icon || '') ? action.icon : icon(ICONS[action.icon] ? action.icon : '<path d="M12 5v14M5 12h14"/>');
     act.addEventListener('click', () => (haptic(), action.onTap?.()));
+    if (action.id) act.setAttribute('aria-pressed', 'false');
     nav.after(act);
+    actBtn = act;
   }
   // The chosen tab's pill (the bar's ::before) slides to it on a spring:
   // its place and width as CSS variables, set without a slide the first time.
@@ -4491,6 +4496,9 @@ export function tabBar({ tabs, onSelect, hash = id => `#${id}`, nav = document.g
       const first = current == null;
       if (changed && !first) places[current] = globalThis.scrollY || 0;
       current = id;
+      // (The action's own screen: it's lit, and no tab is, the pill hidden.)
+      if (action?.id) actBtn?.setAttribute('aria-pressed', String(id === action.id));
+      nav.classList.toggle('q-tab-none', !buttons.has(id));
       // (The same tab again, as an app's redraw asks: nothing written, the pill left.)
       if (changed) requestAnimationFrame(() => pill(first));
       for (const [tid, b] of buttons) {

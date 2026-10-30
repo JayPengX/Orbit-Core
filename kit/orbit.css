@@ -1011,6 +1011,13 @@ button,
 .q-tab-action:active {
   transform: scale(0.92);
 }
+/* Its own screen open (tabBar's action.id): a ring round it, no tab's pill. */
+.q-tab-action[aria-pressed='true'] {
+  box-shadow: 0 0 0 3px var(--q-page), 0 0 0 5px var(--q-accent), var(--q-glass-drop);
+}
+.q-tabbar.q-tab-none::before {
+  opacity: 0;
+}
 .q-tab-action svg {
   width: 28px;
   height: 28px;
