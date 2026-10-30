@@ -169,6 +169,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 10-27 A TPASS (any sub with 有效天數) is counted down on 月曆, with a notice the evening before and the morning of its last day.
 - 10-27 統計 is a full statistics area: every category with its subs and each one's share of the total, and every useful cut (account and way to pay, a category across months, against the period before, fixed vs day to day, fees, money back, largest, places, weekdays, income vs spending, any dates). 支出 and 收入 are separate views, never netted (a high income must not hide high spending); the share kept is secondary, under 收入.
 - 10-27 數位 keeps upkeep (AI, 雲端網域, 軟體) and fun (影音串流, 遊戲) as separate subs ("really different"), each shown on its own in 統計.
+- 10-30 記一筆 guesses everything from the person's own entries (time of day, weekday/weekend, place when allowed, past picks): kind, category, sub and way to pay are pre-picked; the amount is only offered and fills on a tap. Location is opt-in (更多 › 智慧帶入), kept to about 100 m.
 
 ### Class, Words
 - 10-21 Class never guesses what to bring (要帶).
