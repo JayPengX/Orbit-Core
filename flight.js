@@ -209,7 +209,33 @@ export async function trackFlight(hex, { fetchFn = fetch, now = Date.now() } = {
   return fixOf(list.find(x => String(x?.hex || '').toLowerCase() === hex) || null, now);
 }
 
-export async function handleFlight(request, headers, { session, limited, fetchFn = fetch }) {
+// ?probe=1: how each source answers from this Cloudflare city (no session:
+// nothing of anyone's, the sources asked straight, at most once a minute a city).
+export async function probeSources(fetchFn = fetch) {
+  const time = async url => {
+    const t0 = Date.now();
+    try {
+      const res = await fetchFn(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(LIMITS.areaMs) });
+      await res.arrayBuffer();
+      return { status: res.status, ms: Date.now() - t0 };
+    } catch (e) {
+      return { error: String(e?.name || e), ms: Date.now() - t0 };
+    }
+  };
+  const [lol, fi, adsbdb] = await Promise.all([time('https://api.adsb.lol/v2/point/25.08/121.23/250'), time('https://opendata.adsb.fi/api/v2/lat/25.08/lon/121.23/dist/250'), time('https://api.adsbdb.com/v0/callsign/EVA25')]);
+  return { lol, fi, adsbdb };
+}
+
+export async function handleFlight(request, headers, { session, limited, fetchFn = fetch, colo = '' }) {
+  if (new URL(request.url).searchParams.get('probe') === '1') {
+    const c = edge();
+    const key = new Request(`https://flight.orbit/probe/${colo}`);
+    const hit = c && (await c.match(key).catch(() => null));
+    if (hit) return json({ colo, kept: true, ...(await hit.json()) }, 200, headers);
+    const out = await probeSources(fetchFn);
+    if (c) await c.put(key, new Response(JSON.stringify(out), { headers: { 'Cache-Control': 'max-age=60' } })).catch(() => {});
+    return json({ colo, ...out }, 200, headers);
+  }
   if (!session) return json({ error: { code: 'NO_SESSION' } }, 401, headers);
   if (limited()) return json({ error: { code: 'RATE_LIMITED' } }, 429, headers);
   const q = new URL(request.url).searchParams;
