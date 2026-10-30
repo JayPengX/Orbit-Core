@@ -12,6 +12,9 @@ on:
         type: choice
         options: [watch, watch-full, cutouts, buses, play, asia, cpbl, sports, photos, winprob, kept, kept-dry, f1kept, f1kept-count, gemini-check, law-chat-time, system, purge-money-mail]
         default: watch
+      try:
+        description: "law-chat-time only: settings to try, e.g. answer=minimal,plan=minimal,model=lite"
+        default: ''
 jobs:
   run:
     runs-on: ubuntu-latest
@@ -22,7 +25,7 @@ jobs:
           base=https://orbit-workers-proxy.pengzjay.workers.dev
           case "$JOB" in
             gemini-check) url="$base/ops?check=gemini" ;;
-            law-chat-time) url="$base/ops?check=law-chat" ;;
+            law-chat-time) url="$base/ops?check=law-chat&try=$TRY" ;;
             system) url="$base/ops?check=system" ;;
             purge-money-mail) url="$base/ops?check=purge-money-mail" ;;
             watch-full) url="$base/data/build?job=watch&full=1" ;;
@@ -32,4 +35,5 @@ jobs:
           curl -sS --max-time 900 -X POST -H "Authorization: Bearer $DATA_PUSH_SECRET" "$url"; echo
         env:
           JOB: ${{ inputs.job }}
+          TRY: ${{ inputs.try }}
           DATA_PUSH_SECRET: ${{ secrets.DATA_PUSH_SECRET }}
