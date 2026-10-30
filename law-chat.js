@@ -482,9 +482,11 @@ export async function answerChat(chat, pass, env, ctx, headers, gemini, stage = 
     const side = Promise.all([readList('orders.json'), readGround('ly/people.json'), readGround('bills/items.json'), warmMore()]);
     side.catch(() => {});
     groundP.catch(() => {});
+    namesP.catch(() => {});
     const planKey = `law:plan:v1:${await sha256Hex([askKey(chat.q), pin, chat.lang].join('|'))}`;
     let plan = first && !ms ? await kept(env, planKey) : null;
-    const names = await namesP;
+    // (The names only quote earlier turns' cites: a first question's plan doesn't wait for them.)
+    let names = chat.history.some(t => t.cites.length) ? await namesP : new Map();
     const nameOf = p => names.get(p) || '';
     if (!plan) {
       if (!env.GEMINI_API_KEY) return fail('setup', 503, headers);
@@ -493,6 +495,7 @@ export async function answerChat(chat, pass, env, ctx, headers, gemini, stage = 
       if (first && !ms) keep(env, ctx, planKey, plan, CHAT_TTL_S);
     }
     mark('plan');
+    names = await namesP;
     const ground = await groundP;
     const [, peopleF, itemsF] = await side;
     // (A question about the 立法院's work: few articles, no judgments or rules.)
