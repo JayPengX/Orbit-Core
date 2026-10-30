@@ -320,27 +320,43 @@ export async function etaRows(env, q, deps = {}) {
   const stops = (q.get('stops') || '').split(',').filter(u => UID.test(u)).slice(0, 400);
   const route = q.get('route') || '';
   if (!stops.length && !UID.test(route)) return { status: 400, body: { code: 'BAD_STOPS' } };
-  if (city === 'InterCity') {
-    // (Its stops' own ask, 40 to a call (TDX_RULES' 1,500 characters), as the phone asked before.)
-    const q1 = u => `'${u}'`;
-    const parts = [];
-    if (!stops.length) parts.push(`RouteUID eq ${q1(route)}`);
-    for (let i = 0; i < stops.length; i += 40) parts.push(stops.slice(i, i + 40).map(u => `StopUID eq ${q1(u)}`).join(' or '));
-    const all = await Promise.all(parts.map(f => tdxGet(env, `basic/v2/Bus/EstimatedTimeOfArrival/InterCity?$filter=${f}&$select=${ETA_SELECT}`, deps)));
-    if (all.some(g => g.status !== 200 || g.body == null)) {
-      const busy = all.some(g => g.status === 429);
-      return { status: busy ? 429 : 502, body: { code: busy ? 'TDX_BUSY' : 'TDX_FAILED' } };
-    }
-    try {
-      return { status: 200, body: all.flatMap(g => JSON.parse(g.body)), age: Math.max(...all.map(g => g.age || 0)) };
-    } catch {
-      return { status: 502, body: { code: 'TDX_FAILED' } };
-    }
+  if (city === 'InterCity') return etaAsked(env, city, stops, route, deps);
+  const now = deps.now ?? Date.now();
+  const pick = got => ({ status: 200, body: stops.length ? stops.flatMap(u => got.idx.stops.get(u) || []) : got.idx.routes.get(route) || [], age: got.age });
+  const idx = etaIndex.get(city);
+  if (idx && now - idx.at < (await freshOf(TDX_RULES[0], null))) return pick({ idx, age: now - idx.at });
+  const whole = cityEta(env, city, deps);
+  if (idx && now - idx.at < ETA_STALE) {
+    const got = await whole;
+    return got.idx ? pick(got) : { status: 502, body: { code: 'TDX_FAILED' } };
   }
-  const got = await cityEta(env, city, deps);
-  if (!got.idx) return { status: got.status === 429 ? 429 : 502, body: { code: got.status === 429 ? 'TDX_BUSY' : 'TDX_FAILED' } };
-  const body = stops.length ? stops.flatMap(u => got.idx.stops.get(u) || []) : got.idx.routes.get(route) || [];
-  return { status: 200, body, age: got.age };
+  // No copy young enough here (the city's first ask in a while): these stops'
+  // own ask beside the city's, whichever answers first; the city's goes on
+  // for the next ask (a stop's card waited 3 s for a whole city it needed 10 rows of).
+  const own = etaAsked(env, city, stops, route, deps);
+  const young = got => got.idx && now - got.idx.at < ETA_STALE;
+  const first = await Promise.any([whole.then(g => (young(g) ? pick(g) : Promise.reject())), own.then(g => (g.status === 200 ? g : Promise.reject()))]).catch(() => null);
+  if (deps.ctx?.waitUntil) deps.ctx.waitUntil(whole.catch(() => {}));
+  if (first) return first;
+  const got = await whole.catch(() => ({}));
+  return got.idx ? pick(got) : own;
+}
+// Those stops' (or that route's) own ask of TDX, 40 stops a call (TDX_RULES' 1,500 characters).
+async function etaAsked(env, city, stops, route, deps) {
+  const scope = city === 'InterCity' ? 'InterCity' : `City/${city}`;
+  const parts = [];
+  if (!stops.length) parts.push(`RouteUID eq '${route}'`);
+  for (let i = 0; i < stops.length; i += 40) parts.push(stops.slice(i, i + 40).map(u => `StopUID eq '${u}'`).join(' or '));
+  const all = await Promise.all(parts.map(f => tdxGet(env, `basic/v2/Bus/EstimatedTimeOfArrival/${scope}?$filter=${f}&$select=${ETA_SELECT}`, deps)));
+  if (all.some(g => g.status !== 200 || g.body == null)) {
+    const busy = all.some(g => g.status === 429);
+    return { status: busy ? 429 : 502, body: { code: busy ? 'TDX_BUSY' : 'TDX_FAILED' } };
+  }
+  try {
+    return { status: 200, body: all.flatMap(g => JSON.parse(g.body)), age: Math.max(...all.map(g => g.age || 0)) };
+  } catch {
+    return { status: 502, body: { code: 'TDX_FAILED' } };
+  }
 }
 
 // The access token (a day long): kept in memory and KV, asked for again an
