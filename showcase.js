@@ -5,7 +5,7 @@
 // its own kind ('show', orbit-token.js), so no route that wants a real Pass
 // session ('ses') ever takes it. It is good for SHOW_MS, only from the
 // showcase's address, and only from the address it was given to (its IP's
-// block, http.js ipBucket). It opens reads only, and only these: Transit and
+// block or an IPv4 /24, placeOf). It opens reads only, and only these: Transit and
 // Weather (worker.js) and the data proxy's reads for Sports (sports.js). The
 // Pass, wallets, orders, AI, notices and every write still want a real Pass.
 //
@@ -21,12 +21,20 @@ import { ipBucket } from './http.js';
 export const SHOWCASE_ORIGINS = new Set(['https://jaypengx.com', 'https://jaypengx.github.io']);
 export const SHOW_KIND = 'show';
 export const SHOW_MS = 30 * 60_000;
-// Passes an address may take an hour (a visitor opening a few demos, twice).
-export const SHOW_PER_HOUR = 6;
+// Passes an address may take an hour (a /24 can be a carrier's many phones).
+export const SHOW_PER_HOUR = 30;
 // Passes a day, everyone together.
 export const SHOW_DAY_CAP = 2_000;
 // Asks a minute a pass may make, per app (the callers count them).
 export const SHOW_PER_MIN = 60;
+
+// The address a pass is bound to: an IPv6 block (/64, http.js ipBucket), or
+// an IPv4 address's /24 (a phone's carrier, or an office, moves its outgoing
+// address around within one, request by request).
+export const placeOf = ip => {
+  const b = ipBucket(ip);
+  return b.includes(':') ? b : b.split('.').slice(0, 3).join('.') + '.0/24';
+};
 
 const twDay = now => new Date(now + 8 * 3_600_000).toISOString().slice(0, 10);
 const dayKey = now => `showcase:passes:${twDay(now)}`;
@@ -36,7 +44,7 @@ export async function handleShowcasePass(request, env, headers, { ip = '', origi
   const send = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { ...headers, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
   if (request.method !== 'POST') return send({ code: 'POST_ONLY' }, 405);
   if (!SHOWCASE_ORIGINS.has(origin)) return send({ code: 'FORBIDDEN_ORIGIN' }, 403);
-  const who = ipBucket(ip);
+  const who = placeOf(ip);
   if (sessionLimited(`show:mint:${who}`, SHOW_PER_HOUR, 3_600_000, now)) return send({ code: 'RATE_LIMITED' }, 429);
   const kv = env.RATE_LIMIT_KV;
   const used = Number((await kv?.get(dayKey(now)).catch(() => null)) || 0);
@@ -57,6 +65,6 @@ export async function showcaseOf(request, env, { ip = '', origin = '', now = Dat
   const qt = new URL(request.url).searchParams.get('qt');
   if (!qt) return null;
   const claims = await readToken(await tokenSecret(env), qt, SHOW_KIND, now);
-  if (!claims || claims.ip !== ipBucket(ip)) return null;
+  if (!claims || claims.ip !== placeOf(ip)) return null;
   return { s: claims.s, showcase: true };
 }
