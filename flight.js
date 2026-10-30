@@ -28,7 +28,8 @@ const HOME = ['tpe', 'nrt', 'hkg', 'icn'];
 const ABROAD = Object.keys(AREAS).filter(k => !HOME.includes(k));
 export const areasFor = minute => [...HOME, ...[0, 1, 2].map(i => ABROAD[(minute * 3 + i) % ABROAD.length])];
 
-export const LIMITS = { minMin: 10, maxMin: 180, lookups: 140, batch: 35, want: 3, timeoutMs: 8000 };
+// (A whole pick answers within budgetMs: a slow source or lookup is left out, never waited on.)
+export const LIMITS = { minMin: 10, maxMin: 180, lookups: 140, batch: 35, want: 3, areaMs: 5000, routeMs: 3000, budgetMs: 9000 };
 const UA = 'Orbit-Class/1.0 (+https://github.com/JayPengX/Orbit-Class)';
 const AREA_TTL = 60;
 const ROUTE_TTL = 86_400;
@@ -39,14 +40,14 @@ const AIRLINE = /^[A-Z]{3}\d{1,4}[A-Z]{0,2}$/;
 const edge = () => (typeof caches !== 'undefined' && caches.default) || null;
 
 // A JSON read through Cloudflare's cache (`ttl` seconds), a failure as null.
-async function cachedJson(key, url, ttl, fetchFn, opts = {}) {
+async function cachedJson(key, url, ttl, fetchFn, ms, opts = {}) {
   const c = edge();
   const req = new Request(key);
   const hit = c && (await c.match(req).catch(() => null));
   if (hit) return hit.json().catch(() => null);
   let res;
   try {
-    res = await fetchFn(url, { ...opts, headers: { 'User-Agent': UA, Accept: 'application/json', ...(opts.headers || {}) }, signal: AbortSignal.timeout(LIMITS.timeoutMs) });
+    res = await fetchFn(url, { ...opts, headers: { 'User-Agent': UA, Accept: 'application/json', ...(opts.headers || {}) }, signal: AbortSignal.timeout(ms) });
   } catch {
     return null;
   }
@@ -83,13 +84,13 @@ export function fixOf(a, now) {
   };
 }
 
-// The planes round one area: adsb.lol's, else adsb.fi's.
+// The planes round one area: adsb.lol's or adsb.fi's, whichever answers
+// first (one of them can be slow or shut from a Cloudflare city).
 async function areaPlanes(key, fetchFn) {
   const [lat, lon] = AREAS[key];
-  const a = await cachedJson(`https://flight.orbit/area/${key}`, `https://api.adsb.lol/v2/point/${lat}/${lon}/250`, AREA_TTL, fetchFn);
-  if (Array.isArray(a?.ac)) return a.ac;
-  const b = await cachedJson(`https://flight.orbit/area-fi/${key}`, `https://opendata.adsb.fi/api/v2/lat/${lat}/lon/${lon}/dist/250`, AREA_TTL, fetchFn);
-  return Array.isArray(b?.aircraft) ? b.aircraft : Array.isArray(b?.ac) ? b.ac : null;
+  const listOf = d => (Array.isArray(d?.ac) ? d.ac : Array.isArray(d?.aircraft) ? d.aircraft : null);
+  const ask = (k, url) => cachedJson(`https://flight.orbit/${k}/${key}`, url, AREA_TTL, fetchFn, LIMITS.areaMs).then(d => listOf(d) || Promise.reject(new Error('none')));
+  return Promise.any([ask('area', `https://api.adsb.lol/v2/point/${lat}/${lon}/250`), ask('area-fi', `https://opendata.adsb.fi/api/v2/lat/${lat}/lon/${lon}/dist/250`)]).catch(() => null);
 }
 
 // A callsign's route (adsbdb), as { airline, from, to } or null.
@@ -104,7 +105,7 @@ export function routeOf(data) {
   if (!from || !to) return null;
   return { no: r.callsign_iata || '', airline: { name: r.airline?.name || '', iata: r.airline?.iata || '', icao: r.airline?.icao || '' }, from, to };
 }
-const routeFor = (cs, fetchFn) => cachedJson(`https://flight.orbit/route/${cs}`, `https://api.adsbdb.com/v0/callsign/${cs}`, ROUTE_TTL, fetchFn).then(routeOf);
+const routeFor = (cs, fetchFn) => cachedJson(`https://flight.orbit/route/${cs}`, `https://api.adsbdb.com/v0/callsign/${cs}`, ROUTE_TTL, fetchFn, LIMITS.routeMs).then(routeOf);
 
 // The planes worth looking up: airliners in the air, flying, seen just now,
 // once each.
@@ -182,11 +183,12 @@ export function lookupOrder(list, minutes, minute) {
 
 export async function pickFlights(minutes, { fetchFn = fetch, now = Date.now() } = {}) {
   const minute = Math.floor(now / 60_000);
+  const t0 = Date.now();
   const lists = await Promise.all(areasFor(minute).map(k => areaPlanes(k, fetchFn)));
   if (lists.every(x => !x)) return null;
   const order = lookupOrder(candidates(lists, now), minutes, minute).slice(0, LIMITS.lookups);
   const found = [];
-  for (let i = 0; i < order.length; i += LIMITS.batch) {
+  for (let i = 0; i < order.length && Date.now() - t0 < LIMITS.budgetMs - LIMITS.routeMs; i += LIMITS.batch) {
     const part = order.slice(i, i + LIMITS.batch);
     const routes = await Promise.all(part.map(c => routeFor(c.cs, fetchFn)));
     part.forEach((c, j) => found.push(flightOf(c, routes[j], now)));
@@ -197,10 +199,10 @@ export async function pickFlights(minutes, { fetchFn = fetch, now = Date.now() }
 
 // One plane's latest fix (kept 8 s: every phone following it shares it).
 export async function trackFlight(hex, { fetchFn = fetch, now = Date.now() } = {}) {
-  const a = await cachedJson(`https://flight.orbit/hex/${hex}/${Math.floor(now / 8000)}`, `https://api.adsb.lol/v2/hex/${hex}`, 8, fetchFn);
+  const a = await cachedJson(`https://flight.orbit/hex/${hex}/${Math.floor(now / 8000)}`, `https://api.adsb.lol/v2/hex/${hex}`, 8, fetchFn, LIMITS.areaMs);
   let list = Array.isArray(a?.ac) ? a.ac : null;
   if (!list) {
-    const b = await cachedJson(`https://flight.orbit/hex-fi/${hex}/${Math.floor(now / 8000)}`, `https://opendata.adsb.fi/api/v2/hex/${hex}`, 8, fetchFn);
+    const b = await cachedJson(`https://flight.orbit/hex-fi/${hex}/${Math.floor(now / 8000)}`, `https://opendata.adsb.fi/api/v2/hex/${hex}`, 8, fetchFn, LIMITS.areaMs);
     list = Array.isArray(b?.aircraft) ? b.aircraft : Array.isArray(b?.ac) ? b.ac : null;
   }
   if (!list) return undefined;
