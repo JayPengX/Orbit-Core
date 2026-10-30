@@ -1372,7 +1372,7 @@ async function route(request, env, ctx, headers, origin) {
     const signed = await sessionOf(request, env, READ_GRACE_MS);
     const dev = !signed && LOCAL_ORIGIN.test(origin);
     const session = signed || (dev ? { s: 'dev', dev: true } : null);
-    return handleFlight(request, headers, { session, limited: () => sessionLimited(dev ? `f:dev:${ip}` : `f:${session?.s}`, 30) });
+    return handleFlight(request, headers, { session, colo: request.cf?.colo || '', limited: () => sessionLimited(dev ? `f:dev:${ip}` : `f:${session?.s}`, 30) });
   }
   return errorJson('NOT_FOUND', 404, headers, request);
 }
