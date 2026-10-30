@@ -49,10 +49,11 @@ Jay's specific decisions, app by app and dated, are in [`RULEBOOK.md`](RULEBOOK.
 - **`npm test`, then push straight to `main`** (`git push origin
   HEAD:main`). `main` deploys: GitHub Pages for the apps and the kit,
   Cloudflare for the Workers. No PRs.
-- **Check what a person would see:** if the change is visible, one 375 px
-  screenshot with real data (`node Orbit-Core/tools/preview.mjs <app>
-  --live --width 375`). Fix anything it reports under `wraps:`, `cut:` or
-  `scrolls sideways:`. Heavier modes (`--webkit`, `--reopen`, `--flaky`,
+- **Check what a person would see:** if the change is visible,
+  `node Orbit-Core/tools/shots.mjs <app> [page…] --before main` (every
+  page at 320 and 390, light and dark, real data, and what changed against
+  what's live, on one sheet). Fix anything it reports under `wraps:`, `cut:`
+  or `scrolls sideways:`. Heavier modes (`--webkit`, `--reopen`, `--flaky`,
   the iOS Simulator) only when the bug is about them.
 - **Tests for logic only:** money, data, ranking, planning and settling,
   where a bug is silent. None for layout or wording.

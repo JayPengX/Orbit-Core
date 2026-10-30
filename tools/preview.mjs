@@ -60,7 +60,7 @@ import { createSecureServer } from 'node:http2';
 import { execFile, execFileSync } from 'node:child_process';
 import { readFile, stat, mkdir, mkdtemp, rm, cp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, extname, resolve } from 'node:path';
 import { createRequire } from 'node:module';
 import { ASIA_HOST, asiaBaseballResponse } from '../asia-baseball.js';
@@ -129,6 +129,11 @@ const lang = opt('lang', 'zh');
 const snapStart = JSON.parse(opt('snap', '{}'));
 const wait = Number(opt('wait', 6000));
 const payloadFile = opt('payload', '');
+// --keep-account file: what the app saves to its account during the run
+// (its payload, as the Worker would keep it) written to that file, and read
+// back on the next sign-in or reopen: a demo account built by using the app
+// (follows, a watchlist, a timetable), for --payload later (tools/shots.mjs --account).
+const keepAccount = opt('keep-account', '');
 const fixtures = [];
 for (let f = opt('fixture', ''); f; f = opt('fixture', '')) {
   // (Split at the last '=': the text can be a URL's own, 'dates=20261017'.)
@@ -495,7 +500,7 @@ const wallet = {
   apps: openedApps,
   inbox: {}
 };
-const payload = payloadFile ? await readFile(payloadFile, 'utf8') : null;
+let payload = payloadFile ? await readFile(payloadFile, 'utf8') : null;
 const b64 = s => Buffer.from(s).toString('base64url');
 const refresh = `${b64(JSON.stringify({ d: '0123456789abcdef0123456789abcdef' }))}.preview`;
 
@@ -702,6 +707,11 @@ await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(?!
     return route.fulfill({ status: res.status, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: await res.text() });
   }
   // A write's wallet settings kept (newest wins per key, as the Worker does): a look worn stays worn.
+  if (body.op === 'write' && keepAccount && typeof body.payload === 'string') {
+    payload = body.payload;
+    mkdirSync(resolve(keepAccount, '..'), { recursive: true });
+    writeFileSync(keepAccount, payload);
+  }
   if (body.op === 'write' && body.wallet?.settings) for (const [k, v] of Object.entries(body.wallet.settings)) if (!wallet.settings[k] || (v?.t ?? 0) >= wallet.settings[k].t) wallet.settings[k] = v;
   const reply = { token: 'preview', wallet, active: true, live: { app: appId } };
   // The app's data, as the Worker gives it: on a sign-in, and on a read
