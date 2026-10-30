@@ -14,22 +14,17 @@
 // Cloudflare's cache, so however many phones ask, the sources are asked
 // about once a minute an area.
 import { json } from './http.js';
-import { distKm, etaMin, onRoute } from './kit/flight.mjs';
+import { distKm, etaMin, onRoute, choose } from './kit/flight.mjs';
 
 // Where planes are read: busy airports, 250 nautical miles round each.
-// East Asia every time (the people using it are here), and three of the
-// rest, changing each minute, so the picks span the world.
 export const AREAS = {
   tpe: [25.08, 121.23], nrt: [35.6, 139.9], hkg: [22.3, 113.9], pvg: [31.2, 121.6], icn: [37.46, 126.44],
   sin: [1.35, 103.99], bkk: [13.7, 100.7], dxb: [25.25, 55.36], fra: [50.03, 8.57], lhr: [51.47, -0.45],
   jfk: [40.64, -73.78], lax: [33.94, -118.4], ord: [41.97, -87.9], syd: [-33.94, 151.18], del: [28.56, 77.1]
 };
-const HOME = ['tpe', 'nrt', 'hkg', 'icn'];
-const ABROAD = Object.keys(AREAS).filter(k => !HOME.includes(k));
-export const areasFor = minute => [...HOME, ...[0, 1, 2].map(i => ABROAD[(minute * 3 + i) % ABROAD.length])];
 
 // (A whole pick answers within budgetMs: a slow source or lookup is left out, never waited on.)
-export const LIMITS = { minMin: 10, maxMin: 180, lookups: 140, batch: 35, want: 3, areaMs: 5000, routeMs: 3000, budgetMs: 9000 };
+export const LIMITS = { minMin: 10, maxMin: 180, lookups: 900, batch: 150, want: 6, areaMs: 5000, routeMs: 3000, budgetMs: 9000 };
 const UA = 'Orbit-Class/1.0 (+https://github.com/JayPengX/Orbit-Class)';
 const AREA_TTL = 60;
 const ROUTE_TTL = 86_400;
@@ -132,69 +127,55 @@ export function flightOf(c, route, now) {
   return { hex: c.hex, cs: c.cs, no: route.no || c.cs, airline: route.airline, from: route.from, to: route.to, type: c.type, reg: c.reg, fix: c.fix, total: Math.round(distKm(route.from, route.to)), eta: Math.round(c.fix.at + min * 60_000), left: Math.round(min * 10) / 10 };
 }
 
-// The picks: those landing within a tenth of the minutes (at least two
-// minutes either way), closest first, one per destination and, while there
-// are enough, per airline. `wide`: a fifth, when the tenth finds too few.
-export function choose(flights, minutes, now, want = LIMITS.want) {
-  const off = f => Math.abs((f.eta - now) / 60_000 - minutes);
-  const sorted = flights.filter(Boolean).sort((a, b) => off(a) - off(b));
-  for (const share of [0.1, 0.2]) {
-    const near = sorted.filter(f => off(f) <= Math.max(2, minutes * share));
-    if (near.length < want && share < 0.2) continue;
-    const out = [];
-    const to = new Set();
-    const by = new Set();
-    for (const strict of [true, false])
-      for (const f of near) {
-        if (out.length >= want) break;
-        if (out.includes(f) || to.has(f.to.iata || f.to.icao) || (strict && by.has(f.airline.icao || f.cs.slice(0, 3)))) continue;
-        out.push(f);
-        to.add(f.to.iata || f.to.icao);
-        by.add(f.airline.icao || f.cs.slice(0, 3));
-      }
-    return out;
-  }
-  return [];
-}
-
-// The order to look planes up in: the ones that look like landing in about
-// the time first (nearly at an area's airport with about that time to fly
-// at its speed), then the rest, mixed by the minute (a new set each minute).
-export function lookupOrder(list, minutes, minute) {
-  const score = c => {
-    let best = Infinity;
-    for (const [lat, lon] of Object.values(AREAS)) {
-      const m = etaMin(c.fix, { lat, lon }, c.fix.gs);
-      if (m < 60) best = Math.min(best, Math.abs(m - minutes));
-    }
-    return best;
-  };
-  const mix = s => {
-    let h = minute;
-    for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-    return h;
-  };
-  const near = Math.max(3, minutes * 0.25);
-  return list
-    .map(c => ({ c, likely: score(c) <= near, m: mix(c.hex) }))
-    .sort((a, b) => Number(b.likely) - Number(a.likely) || a.m - b.m)
-    .map(x => x.c);
-}
-
-export async function pickFlights(minutes, { fetchFn = fetch, now = Date.now() } = {}) {
-  const minute = Math.floor(now / 60_000);
+// Every airliner in the air now with a route that fits it, landing within
+// three hours: one pool every three minutes, built by the first phone to ask
+// in each Cloudflare city and kept there (Cloudflare's cache, and this copy of
+// the Worker's memory), so the rest are answered at once. (Its fixes up to
+// three minutes old: the phone flies each plane on from its fix, and asks for
+// a new one as soon as it follows one.) The phone
+// picks from it itself (kit/flight.mjs choose), whatever the minutes.
+export async function buildPool({ fetchFn = fetch, now = Date.now() } = {}) {
   const t0 = Date.now();
-  const lists = await Promise.all(areasFor(minute).map(k => areaPlanes(k, fetchFn)));
+  const lists = await Promise.all(Object.keys(AREAS).map(k => areaPlanes(k, fetchFn)));
   if (lists.every(x => !x)) return null;
-  const order = lookupOrder(candidates(lists, now), minutes, minute).slice(0, LIMITS.lookups);
+  const order = candidates(lists, now).slice(0, LIMITS.lookups);
   const found = [];
   for (let i = 0; i < order.length && Date.now() - t0 < LIMITS.budgetMs - LIMITS.routeMs; i += LIMITS.batch) {
     const part = order.slice(i, i + LIMITS.batch);
     const routes = await Promise.all(part.map(c => routeFor(c.cs, fetchFn)));
     part.forEach((c, j) => found.push(flightOf(c, routes[j], now)));
-    if (choose(found, minutes, now).length >= LIMITS.want) break;
   }
-  return choose(found, minutes, now);
+  return found.filter(f => f && f.eta - now <= (LIMITS.maxMin + 30) * 60_000 && f.eta > now).map(slim);
+}
+// (What the phone reads of each, nothing more.)
+const placeSlim = p => ({ iata: p.iata, icao: p.icao, city: p.city, lat: p.lat, lon: p.lon });
+const slim = f => ({ hex: f.hex, cs: f.cs, no: f.no, airline: f.airline, from: placeSlim(f.from), to: placeSlim(f.to), type: f.type, fix: f.fix, eta: f.eta });
+
+const POOL_MS = 180_000;
+const pools = new Map();
+export async function poolNow({ fetchFn = fetch, now = Date.now() } = {}) {
+  const minute = Math.floor(now / POOL_MS);
+  // (Sources faked, as the tests do: built each time.)
+  if (fetchFn !== globalThis.fetch) return buildPool({ fetchFn, now });
+  if (pools.has(minute)) return pools.get(minute);
+  const c = edge();
+  const key = new Request(`https://flight.orbit/pool/${minute}`);
+  const job = (async () => {
+    const hit = c && (await c.match(key).catch(() => null));
+    if (hit) return hit.json();
+    const pool = await buildPool({ fetchFn, now });
+    if (pool && c) await c.put(key, new Response(JSON.stringify(pool), { headers: { 'Cache-Control': 'max-age=200' } })).catch(() => {});
+    return pool;
+  })();
+  pools.clear();
+  pools.set(minute, job);
+  job.then(p => p || pools.delete(minute), () => pools.delete(minute));
+  return job;
+}
+
+export async function pickFlights(minutes, { fetchFn = fetch, now = Date.now() } = {}) {
+  const pool = await poolNow({ fetchFn, now });
+  return pool ? choose(pool, minutes, now) : null;
 }
 
 // One plane's latest fix (kept 8 s: every phone following it shares it).
@@ -244,6 +225,11 @@ export async function handleFlight(request, headers, { session, limited, fetchFn
     if (!HEX.test(hex)) return json({ error: { code: 'BAD_HEX' } }, 400, headers);
     const fix = await trackFlight(hex, { fetchFn });
     return fix === undefined ? json({ error: { code: 'UPSTREAM' } }, 502, headers) : json({ fix }, 200, headers);
+  }
+  // ?pool=1: the whole pool, for the phone to pick from.
+  if (q.get('pool') === '1') {
+    const pool = await poolNow({ fetchFn });
+    return pool ? json({ flights: pool, at: Date.now() }, 200, headers) : json({ error: { code: 'UPSTREAM' } }, 502, headers);
   }
   const minutes = Math.round(Number(q.get('min')));
   if (!(minutes >= LIMITS.minMin && minutes <= LIMITS.maxMin)) return json({ error: { code: 'BAD_MINUTES' } }, 400, headers);

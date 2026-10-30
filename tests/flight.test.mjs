@@ -2,7 +2,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { distKm, bearing, along, gcLine, etaMin, onRoute, aheadOf, landedFix, turn } from '../kit/flight.mjs';
-import { candidates, flightOf, choose, pickFlights, trackFlight, handleFlight, areasFor, AREAS } from '../flight.js';
+import { choose } from '../kit/flight.mjs';
+import { candidates, flightOf, pickFlights, trackFlight, handleFlight, AREAS } from '../flight.js';
 
 const TPE = { lat: 25.0777, lon: 121.233 };
 const NRT = { lat: 35.7647, lon: 140.386 };
@@ -64,14 +65,13 @@ test('only airliners in the air, seen just now, once each', () => {
 const route = (no, from, to, icao = no.slice(0, 2)) => ({ no, airline: { name: icao, iata: icao, icao }, from: { iata: from.iata, lat: from.lat, lon: from.lon, city: '' }, to: { iata: to.iata, lat: to.lat, lon: to.lon, city: '' } });
 const at = (min, toIata, airline, hex = `${toIata}${airline}`.toLowerCase()) => ({ hex, cs: `${airline}1`, airline: { icao: airline }, to: { iata: toIata }, eta: now + min * 60_000 });
 
-test('picks: within a tenth of the time, closest first, one per destination and airline', () => {
-  const list = [at(25, 'NRT', 'EVA'), at(26, 'NRT', 'CAL'), at(24, 'HKG', 'EVA'), at(27, 'ICN', 'KAL'), at(23, 'BKK', 'THA'), at(40, 'SIN', 'SIA')];
-  const out = choose(list, 25, now);
-  // (HKG is EVA's again: another airline's first.)
-  assert.deepEqual(out.map(f => f.to.iata), ['NRT', 'ICN', 'BKK']);
-  // Too few within a tenth: a fifth.
-  assert.deepEqual(choose([at(29, 'NRT', 'EVA')], 25, now).map(f => f.to.iata), ['NRT']);
-  assert.deepEqual(choose([at(40, 'NRT', 'EVA')], 25, now), []);
+test('picks: closest landing first, one per destination and airline, never none while planes are up', () => {
+  const list = [at(25, 'NRT', 'EVA'), at(26, 'NRT', 'CAL'), at(24, 'HKG', 'EVA'), at(27, 'ICN', 'KAL'), at(23, 'BKK', 'THA'), at(40, 'SIN', 'SIA'), at(90, 'LAX', 'UAL')];
+  const out = choose(list, 25, now, 4);
+  // (HKG is EVA's again: other airlines first; then SIN, further away.)
+  assert.deepEqual(out.map(f => f.to.iata), ['NRT', 'ICN', 'BKK', 'HKG']);
+  assert.deepEqual(choose([at(90, 'NRT', 'EVA')], 25, now).map(f => f.to.iata), ['NRT']);
+  assert.deepEqual(choose([at(0.5, 'NRT', 'EVA')], 25, now), []);
 });
 
 test('a plane takes its route only if it fits', () => {
@@ -104,10 +104,8 @@ test('picking: a plane read round the areas, its route looked up and fitted', as
   assert.equal(out.length, 1);
   assert.equal(out[0].no, 'BR190');
   assert.equal(out[0].to.iata, 'NRT');
-  assert.ok(Math.abs(out[0].left - 25) < 1);
-  // East Asia every minute, the rest changing.
-  assert.ok(areasFor(1).includes('tpe') && areasFor(1).every(k => AREAS[k]));
-  assert.notDeepEqual(areasFor(1), areasFor(2));
+  assert.ok(Math.abs((out[0].eta - now) / 60_000 - 25) < 1);
+  assert.ok(AREAS.tpe);
 });
 
 test('no source answering is a failure, not "no planes"', async () => {
