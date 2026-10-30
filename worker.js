@@ -54,6 +54,7 @@ import { handleStock, moveBook } from './stock-fill.js';
 import { runBuilders, SLOTS as BUILD_SLOTS } from './builders/run.js';
 import { docStore, storeReady } from './doc-store.js';
 import { handleMoneyRead } from './money-read.js';
+import { handleFlight } from './flight.js';
 import { STATE_KEY as GUARD_STATE } from './guard.js';
 // The F1 lap log's Durable Object (f1-live.js), bound as F1_LOG.
 export { F1Log } from './f1-live.js';
@@ -1364,6 +1365,14 @@ async function route(request, env, ctx, headers, origin) {
     const dev = !signed && env.TRANSIT_DEV !== 'off' && LOCAL_ORIGIN.test(origin);
     const session = signed || (dev ? { s: 'dev', dev: true } : null);
     return handleTransit(request, env, headers, path, { session, ctx, limited: () => sessionLimited(dev ? `t:dev:${ip}` : `t:${session?.s}`, dev ? 300 : 90) });
+  }
+  // Orbit Class's 專注飛行 (flight.js): real planes landing in about N
+  // minutes, then one followed. A Pass session, or the dev door as Transit's.
+  if (path === '/flight') {
+    const signed = await sessionOf(request, env, READ_GRACE_MS);
+    const dev = !signed && LOCAL_ORIGIN.test(origin);
+    const session = signed || (dev ? { s: 'dev', dev: true } : null);
+    return handleFlight(request, headers, { session, limited: () => sessionLimited(dev ? `f:dev:${ip}` : `f:${session?.s}`, 30) });
   }
   return errorJson('NOT_FOUND', 404, headers, request);
 }
