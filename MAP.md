@@ -343,6 +343,7 @@ now, its own app and Worker (JayPengX/Longshot), nothing of theirs here.
 
 | Tool | What |
 | --- | --- |
+| `node tools/shots.mjs <app> [page…]` | Every screenshot a change needs: 320/390 × light/dark (× WebKit where installed), live data, signed in; contact sheet, faults, `--before main` diff (`tools/README.md`). Pages by name in `tools/shots/pages.mjs`, demo accounts in `tools/shots/accounts/` |
 | `node tools/preview.mjs <app>` | The app at phone size with real data (`--live`, `--width 375`, `--lang en`, `--click`, `--eval`, `--store`, `--webkit`, `--reopen`, `--serve`…; `tools/README.md`). Prints `wraps:`, `cut:`, `scrolls sideways:` |
 | `node tools/leagues-audit.mjs` | Every catalogue league against its sources |
 | `node tools/hk-lots.mjs` | Hong Kong board lots for Securities, from HKEX |

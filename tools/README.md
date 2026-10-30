@@ -3,6 +3,49 @@
 On the owner's Mac: Node 22 in `~/.local/opt/node`, Playwright (WebKit and
 Chromium) in `~/.local/opt/playwright`; `preview.mjs` finds them itself.
 
+## `node tools/shots.mjs <app> [page…]`: every screenshot a change needs
+
+The one way to take screenshots. Each page at 320 and 390 px, light and
+dark, in Chromium and WebKit (when installed: a Mac; the cloud has only
+Chromium), with real live data, signed in. One contact sheet, the faults of
+every shot, and what changed.
+
+```bash
+node tools/shots.mjs transit                     # the app's default pages (its tabs, and more)
+node tools/shots.mjs transit trip board --before main   # your change against what's live
+node tools/shots.mjs money --account demo        # signed in to a demo account
+```
+
+It prints the faults and three files to look at: `index.html` (tap a shot;
+Before / After / Diff when comparing), `sheet.png` (every shot as one
+picture: read it, or attach it for Jay) and `changes.png` (each changed shot
+as before | after | diff, the change in pink). Exit code 1 on a fault.
+
+| | What |
+| --- | --- |
+| `page` | A name from `tools/shots/pages.mjs`, a tab's id (`week`), `tabs` (every tab, read off the app), `start`, or `#hash` |
+| `--before <ref>` | Shoot that git ref too, side by side, and compare. `main` = origin/main = what's live |
+| `--at <ref>` | Shoot a ref instead of the working tree (`main` for the live build, a branch for a preview) |
+| `--against <dir>` | Compare with an earlier run's folder |
+| `--account <name\|file>` | Start with that account: `tools/shots/accounts/<app>-<name>.txt`, or Money's `demo` (its sample books) |
+| `--widths`, `--themes`, `--engines`, `--lang en` | The matrix (default 320,390 · light,dark · chromium,webkit · zh) |
+| `--fixtures` | Saved answers instead of live data: offline checks only, never a shot anyone sees |
+| `--out`, `--jobs` | Where (default a new folder in the temp dir) and how many at once (4) |
+| `-- …` | Anything after it goes to each `preview.mjs` run (`--clock`, `--geo`, `--wait`…) |
+
+**Pages.** `tools/shots/pages.mjs` says how to reach each moment worth a
+look (a trip planned to 臺北車站, 查時刻's board, the rhythm game mid-play),
+with taps written for both languages. When you work out how to reach a
+page, add it there: the next thread gets it by name.
+
+**Authentic.** Jay: screenshots and demos show the real app. The world's
+data (games, trains, weather, prices, laws) is always live. Only what a
+person keeps in their own account comes from a demo account, and that is
+made by using the app: `node tools/preview.mjs <app> --keep-account
+tools/shots/accounts/<app>-<name>.txt --click …` saves what the app wrote
+(follows, a watchlist, a timetable). A new account with nothing in it is a
+real state too (its welcome sheet): shoot that when it's what you changed.
+
 ## `node tools/preview.mjs <app> [view…]`
 
 An app on an iPhone-sized page, signed in with a made-up wallet. Apps:
@@ -28,6 +71,7 @@ node tools/preview.mjs sports --live --width 375
 | `--click "<selector>"` or `--click "js:…"` | Act before the shot (repeatable) |
 | `--eval "<js>"`, `--wait ms` | Read something out; wait first |
 | `--store key=value`, `--payload file.json` | Start with this localStorage or Pass payload |
+| `--keep-account file` | Save what the app writes to its account during the run (a demo account for `shots.mjs --account`) |
 | `--out dir` | Where shots go (default `/tmp/orbit-preview`) |
 | `--webkit` | Safari's engine instead of Chromium (cloud: once, `apt-get install -y libavif16 libenchant-2-2 libsecret-1-0 libwayland-server0 libmanette-0.2-0 libgles2 libgtk-4-1 libgraphene-1.0-0 libwoff1 libevent-2.1-7t64 libgstreamer-gl1.0-0 libgstreamer-plugins-bad1.0-0 gstreamer1.0-plugins-base`) |
 | `--reopen` | Open twice with storage kept (a returning phone) |
