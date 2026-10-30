@@ -35,6 +35,7 @@
 // Google Cloud's per-day quotas, which the owner sets on each API (the
 // MAP.md, §3.3).
 
+import { SHOWCASE_ORIGINS } from './showcase.js';
 import { cleanDev } from './kit/devconfig.mjs';
 import { twDay } from './kit/format.mjs';
 import { kvJson, kvPut } from './weather.js';
@@ -61,10 +62,15 @@ export const CAPS = {
   textSearch: 4_500, // Text Search Pro (a search's places with their names and positions), 5,000
   routes: 9_000, // Compute Routes Essentials (transit, and a walk with its line), 10,000
   matrix: 9_000, // Compute Route Matrix Essentials (walks, an element each), 10,000
-  showcaseMaps: 600 // the showcase's Transit demo (no sign-in): its own share, each also counted as a map load above
+  showcaseMaps: 600, // the showcase's Transit demo (no sign-in): its own share, each also counted as a map load above
+  // The showcase's live demo (a showcase pass, showcase.js): every ask, and
+  // the paid ones (search, a place, a route, a walk) out of their own share;
+  // past either the demo plays its recording.
+  showcaseAsks: 30_000,
+  showcasePaid: 1_500
 };
-// Where the showcase's demo runs (an Origin is only text, so its share above is the real bound).
-const SHOWCASE_ORIGINS = new Set(['https://jaypengx.com', 'https://jaypengx.github.io']);
+// The asks that spend Google's paid calls (a map load is counted apart, showcaseMaps).
+const SHOWCASE_PAID = new Set(['/transit/search', '/transit/place', '/transit/route', '/transit/walk']);
 
 // Google bills by the calendar month on Pacific time: counted the same way
 // (UTC-8, a little early in summer, never late).
@@ -1370,13 +1376,18 @@ async function transitRoute(request, env, headers, path, { session = null, limit
   }
   if (!session) return send({ code: 'ECO_TOKEN_INVALID' }, 401);
   if (limited()) return send({ code: 'RATE_LIMITED' }, 429);
+  if (session.showcase) {
+    if (path === '/transit/status') return send({ code: 'ECO_TOKEN_INVALID' }, 401);
+    if (!(await spend(env, 'showcaseAsks', 1, now, ctx))) return send({ code: 'CAP_REACHED' }, 429);
+    if (SHOWCASE_PAID.has(path) && !(await spend(env, 'showcasePaid', 1, now, ctx))) return send({ code: 'CAP_REACHED' }, 429);
+  }
   // A sample spends a real ask (Google's routes, TDX's points): a session's or the dev door's, never anyone's.
   if (path === '/transit/status') return send(await statusSample(env, q.get('sample'), { ...deps, fresh: q.get('fresh') === '1', transit: q.get('transit') || '' }));
   if (path === '/transit/config') {
     // One map load per call (the app asks once each time it opens).
     // (A dev page gets NLSC's map: the browser key works only on the site, and no map load is spent;
     // unless it asks ?map=google, as the preview's screenshots do, seen as the site.)
-    const google = (!session.dev || q.get('map') === 'google') && Boolean(env.GOOGLE_MAPS_BROWSER_KEY) && (await spend(env, 'maps', 1, now, ctx));
+    const google = (!session.dev || q.get('map') === 'google') && Boolean(env.GOOGLE_MAPS_BROWSER_KEY) && (!session.showcase || (await spend(env, 'showcaseMaps', 1, now, ctx))) && (await spend(env, 'maps', 1, now, ctx));
     return send({ map: google ? { provider: 'google', key: env.GOOGLE_MAPS_BROWSER_KEY } : { provider: 'nlsc' }, search: googleKey(env) ? 'google' : 'osm', tdx: Boolean(env.TDX_CLIENT_ID) });
   }
   if (path === '/transit/running') {

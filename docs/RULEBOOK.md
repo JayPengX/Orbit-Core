@@ -201,7 +201,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 10-27 Open to all (no Pass, no install gate) and a real desktop layout besides the phone one (exceptions to §2).
 - 10-27 Only structure, numbers and demos; plain words for non-tech readers; Jay sets direction, Claude types.
 - 10-27 No betting anywhere; every number from git; "on GitHub since", never "began on".
-- 10-27 Demos are frozen snapshots, full screen on phones, bug-free; small coach-mark tours.
+- 10-30 Demos may run the real apps on live data, not only a recording, and may use the APIs' quota; limited so they never get round the Orbit Pass: a short showcase pass (showcase.js) from the showcase's address only, reads only (no Pass, wallet, orders, AI, notices or writes), per-address and daily caps, paid asks from their own share; past any limit the recording plays. Full screen on phones, bug-free; small coach-mark tours.
 - Content changes only when Jay says "catch up the showcase". The raw record stays private in project files, never in a repo.
 
 ### Longshot (outside the family)
@@ -243,6 +243,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 | Beats pieces exactly as recorded | Full mixer on by default | 10-18 |
 | Weekly 15-min recheck for game finals | Every 2 min | 10-22 |
 | Own domain: same `/<Repo>/` paths | Short paths (`orbit.jaypengx.com/law`), old paths 404, no redirects | 10-27 |
+| Showcase demos are frozen snapshots only | They may run live on real data, read-only behind a showcase pass with its own limits (showcase.js) | 10-30 |
 | Apps share the `jaypengx.github.io` origin | They share `orbit.jaypengx.com`; Longshot has `longshot.jaypengx.com`; the bare `jaypengx.com` is Jay's homepage with `/showcase/` | 10-27 |
 | Longshot's own keyboard rule | The same rule in the shared kit for every app | 10-27 |
 | Sell-first 當沖 needs 12 months of history | TWSE's 3 months + 10 trades, or a credit account |  10-24 |

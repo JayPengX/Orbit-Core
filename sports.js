@@ -22,6 +22,7 @@ import { INVOICE_HOST, invoiceResponse } from './invoice.js';
 import { F1_LIVE_HOST, f1LiveResponse, doLog, sampleLive } from './f1-live.js';
 import { cleanDev } from './kit/devconfig.mjs';
 import { json, LOCAL_ORIGIN } from './http.js';
+import { showcaseOf, SHOW_PER_MIN } from './showcase.js';
 import { mirrorPath } from './kit/mirror.mjs';
 import { keptDay } from './builders/kept.js';
 
@@ -1488,6 +1489,12 @@ async function checkSession(env, requestParams, headers, weight = 1, request = n
   if (!env.ECO_TOKEN_SECRET || dev) {
     for (let i = 0; i < weight; i++) if (sessionLimited(`ip:${app}:${ip}`, SESSION_RATE_LIMIT)) return { error: tooMany(headers) };
     return { session: { s: `ip:${ip}`, dev, open: !env.ECO_TOKEN_SECRET } };
+  }
+  // The showcase's live demo (showcase.js): a showcase pass reads too, its own asks a minute.
+  const show = request && (await showcaseOf(request, env, { ip, origin: request.headers.get('Origin') || '' }));
+  if (show) {
+    for (let i = 0; i < weight; i++) if (sessionLimited(`${app}:${show.s}`, SHOW_PER_MIN)) return { error: tooMany(headers) };
+    return { session: show };
   }
   const session = await readToken(env.ECO_TOKEN_SECRET, requestParams.get('qt') || '', 'ses', Date.now() - READ_GRACE_MS);
   if (!session) return { error: json({ error: { code: 'ORBIT_PASS_REQUIRED', message: 'Sign in with a Orbit Pass.' } }, 401, headers) };
