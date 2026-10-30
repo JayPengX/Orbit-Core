@@ -3008,7 +3008,21 @@ export function isPhoneOrTablet() {
   return /Macintosh/.test(ua) && (globalThis.navigator?.maxTouchPoints || 0) > 1;
 }
 const isIOS = () => /iPhone|iPad|iPod/i.test(globalThis.navigator?.userAgent || '') || (/Macintosh/.test(globalThis.navigator?.userAgent || '') && (globalThis.navigator?.maxTouchPoints || 0) > 1);
-const inAppBrowser = () => /Line\/|FBAN|FBAV|Instagram|Messenger|MicroMessenger|KAKAOTALK/i.test(globalThis.navigator?.userAgent || '');
+// Apps whose links open in their own browser, which can't add to the home
+// screen (named so the page can say where you are).
+const IN_APPS = [
+  [/\bLine\//i, 'LINE'],
+  [/Instagram/i, 'Instagram'],
+  [/Barcelona/i, 'Threads'],
+  [/FBAN|FBAV|FB_IAB|FBIOS/i, 'Facebook'],
+  [/MicroMessenger/i, 'WeChat'],
+  [/Messenger|MESSENGER/, 'Messenger'],
+  [/KAKAOTALK/i, 'KakaoTalk'],
+  [/musical_ly|BytedanceWebview|TikTok/i, 'TikTok'],
+  [/Discord/i, 'Discord'],
+  [/; wv\)/, '']
+];
+const inAppName = (ua = globalThis.navigator?.userAgent || '') => IN_APPS.find(([re]) => re.test(ua))?.[1];
 // On phones and tablets the apps run from the home screen only, every one
 // of them: opened from another app or a link in Safari, it asks to be added
 // too (a hand-over no longer lets it run in the browser). Returns true when
@@ -3038,6 +3052,139 @@ function windowApp(app) {
   } catch {}
   return app;
 }
+// How this phone adds an app to its home screen: which browser, which
+// version (Safari 26 hides Share behind ⋯), or another app's browser that
+// has to hand the page to a real one first.
+export function installWay(ua = globalThis.navigator?.userAgent || '', touch = globalThis.navigator?.maxTouchPoints || 0) {
+  const ios = /iPhone|iPad|iPod/i.test(ua) || (/Macintosh/.test(ua) && touch > 1);
+  const android = /Android/i.test(ua);
+  if (!ios && !android) return { way: 'computer' };
+  const app = inAppName(ua);
+  if (app != null) return { way: app === 'LINE' ? 'line' : ios ? 'inapp-ios' : 'inapp-android', app };
+  if (ios) {
+    const ipad = /iPad/.test(ua) || /Macintosh/.test(ua);
+    if (/CriOS/.test(ua)) return { way: 'ios-chrome' };
+    if (/FxiOS|EdgiOS|OPiOS|OPT\/|YaBrowser|DuckDuckGo|Brave|GSA\//.test(ua) || !/Safari\//.test(ua)) return { way: 'ios-other' };
+    const v26 = Number(/Version\/(\d+)/.exec(ua)?.[1] || 0) >= 26;
+    return { way: ipad ? 'ipad-safari' : v26 ? 'ios-safari-26' : 'ios-safari', v26 };
+  }
+  if (/SamsungBrowser/.test(ua)) return { way: 'samsung' };
+  if (/Chrome\//.test(ua) && !/EdgA|OPR\/|Firefox|YaBrowser|MiuiBrowser|HeyTapBrowser|VivoBrowser|UCBrowser|DuckDuckGo|HuaweiBrowser/.test(ua)) return { way: 'android-chrome' };
+  return { way: 'android-other' };
+}
+// The buttons the steps name, drawn as the browser draws them ({share} in a
+// step's text).
+const GLYPHS = {
+  share: '<path d="M12 3.5v11M8 7.5l4-4 4 4"/><path d="M8.5 10.5H6.5a1.5 1.5 0 0 0-1.5 1.5v7a1.5 1.5 0 0 0 1.5 1.5h11a1.5 1.5 0 0 0 1.5-1.5v-7a1.5 1.5 0 0 0-1.5-1.5h-2"/>',
+  add: '<rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 8.5v7M8.5 12h7"/>',
+  dots: '<circle cx="6" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.6" fill="currentColor" stroke="none"/>',
+  kebab: '<circle cx="12" cy="6" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="18" r="1.6" fill="currentColor" stroke="none"/>',
+  menu: '<path d="M5 7h14M5 12h14M5 17h14"/>'
+};
+const glyph = (name, cls = 'q-glyph') => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${GLYPHS[name]}</svg>`;
+// What each way says: a picture of where the first tap is (`spot` on a
+// phone, the `tap` button drawn there), the button the page offers itself
+// (`act`), a line saying why (`lede`) and the steps.
+export function installSteps({ way, app, v26 } = {}, name = 'Orbit', en = false) {
+  const open = en ? `Open ${name} from its new icon on your home screen.` : `從主畫面的新圖示打開 ${name}。`;
+  const addSheet = v26
+    ? en
+      ? 'Leave “Open as Web App” on, then tap “Add”.'
+      : '「打開為網頁 App」保持開啟，再點「加入」。'
+    : en
+      ? 'Tap “Add” at the top right.'
+      : '點右上角的「加入」。';
+  const pickAdd = en ? 'Scroll down and tap “Add to Home Screen” {add}. Not there? Tap “View More” first.' : '往下滑，點「加入主畫面」{add}。沒看到就先點「檢視更多」。';
+  const where = en ? (app ? `You’re in ${app}’s own browser, which can’t add apps.` : 'You’re in another app’s browser, which can’t add apps.') : app ? `你在 ${app} 的內建瀏覽器裡，這裡不能加入主畫面。` : '你在其他 App 的內建瀏覽器裡，這裡不能加入主畫面。';
+  switch (way) {
+    case 'ios-safari':
+      return { spot: 'bottom', tap: 'share', steps: en ? ['Tap Share {share} in the middle of the bar at the bottom.', pickAdd, addSheet, open] : ['點下方工具列中間的分享鍵 {share}。', pickAdd, addSheet, open] };
+    case 'ios-safari-26':
+      return { spot: 'bottom-right', tap: 'dots', steps: en ? ['Tap {dots} beside the address bar, then “Share” {share}.', pickAdd, addSheet, open] : ['點網址列旁的 {dots}，再點「分享」{share}。', pickAdd, addSheet, open] };
+    case 'ipad-safari':
+      return { spot: 'top-right', tap: 'share', steps: en ? ['Tap Share {share} at the top right.', pickAdd, addSheet, open] : ['點右上角的分享鍵 {share}。', pickAdd, addSheet, open] };
+    case 'ios-chrome':
+      return { spot: 'top-right', tap: 'share', steps: en ? ['Tap Share {share} at the right of the address bar.', pickAdd, addSheet, open] : ['點網址列右邊的分享鍵 {share}。', pickAdd, addSheet, open] };
+    case 'ios-other':
+      return {
+        act: 'copy',
+        lede: en ? 'This browser can’t add apps to the home screen. Use Safari.' : '這個瀏覽器不能加入主畫面，請改用 Safari。',
+        steps: en
+          ? ['Tap “Copy the link” above.', 'Open Safari and paste the link into the address bar.', 'Safari then shows the steps to add it.']
+          : ['點上面的「複製連結」。', '打開 Safari，把連結貼到網址列。', 'Safari 會接著告訴你怎麼加入主畫面。']
+      };
+    case 'line':
+      return {
+        act: 'browser',
+        lede: where,
+        steps: en
+          ? ['Tap “Open in browser” above.', 'Nothing happened? Tap {dots} or {share} in LINE and choose to open it in your browser.', 'The browser then shows the steps to add it.']
+          : ['點上面的「用瀏覽器打開」。', '沒有反應的話，點 LINE 畫面上的 {dots} 或 {share}，選「用瀏覽器開啟」。', '瀏覽器會接著告訴你怎麼加入主畫面。']
+      };
+    case 'inapp-ios':
+      return {
+        spot: 'top-right',
+        tap: 'dots',
+        act: 'copy',
+        lede: where,
+        steps: en
+          ? ['Tap {dots} at the top right (or {share} at the bottom).', 'Choose “Open in Safari” (or “Open in browser”).', 'Can’t find it? Tap “Copy the link” above and paste it into Safari.', 'Safari then shows the steps to add it.']
+          : ['點右上角的 {dots}（或下方的 {share}）。', '選「在 Safari 中開啟」或「用瀏覽器開啟」。', '找不到的話，點上面的「複製連結」，貼到 Safari。', 'Safari 會接著告訴你怎麼加入主畫面。']
+      };
+    case 'inapp-android':
+      return {
+        act: 'chrome',
+        lede: where,
+        steps: en
+          ? ['Tap “Open in Chrome” above.', 'Nothing happened? Tap {kebab} at the top right and choose “Open in browser”.', 'Chrome then shows the steps to add it.']
+          : ['點上面的「用 Chrome 打開」。', '沒有反應的話，點右上角的 {kebab}，選「用瀏覽器開啟」。', 'Chrome 會接著告訴你怎麼加入主畫面。']
+      };
+    case 'samsung':
+      return {
+        spot: 'bottom-right',
+        tap: 'menu',
+        steps: en ? ['Tap {menu} at the bottom right.', 'Tap “Add page to”, then “Home screen”.', 'Tap “Add”.', open] : ['點右下角的 {menu}。', '點「新增頁面至」，再點「主螢幕」。', '點「新增」。', open]
+      };
+    case 'android-other':
+      return {
+        act: 'chrome',
+        lede: en ? 'Chrome adds it best.' : '用 Chrome 加入最穩定。',
+        steps: en
+          ? ['Tap “Open in Chrome” above.', 'Chrome then shows the steps to add it.', 'No Chrome? Find “Add to Home screen” or “Install” in this browser’s menu {kebab}.']
+          : ['點上面的「用 Chrome 打開」。', 'Chrome 會接著告訴你怎麼加入主畫面。', '沒有 Chrome 的話，在這個瀏覽器的選單 {kebab} 找「加到主畫面」或「安裝」。']
+      };
+    default:
+      return {
+        spot: 'top-right',
+        tap: 'kebab',
+        steps: en
+          ? ['Tap {kebab} at the top right of Chrome.', 'Tap “Install app” or “Add to Home screen” {add}.', 'Choose “Install”, not “Create shortcut”.', open]
+          : ['點 Chrome 右上角的 {kebab}。', '點「安裝應用程式」或「加到主畫面」{add}。', '選「安裝」，不要選「建立捷徑」。', open]
+      };
+  }
+}
+// A step's text with its buttons drawn in.
+const stepItem = text =>
+  node('li', {
+    html: text
+      .replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c])
+      // (kept on one line with the character before and the stop after it)
+      .replace(/(\S?)\s?\{(\w+)\}([。，、）.,)]?)/g, (_, a, g, z) => `<span class="q-keep">${a}<span class="q-key">${glyph(g)}</span>${z}</span>`)
+  });
+// Where the first tap is: a phone, its browser bar at the top or the
+// bottom, and the button there, ringed.
+function tapPicture(spot, tap) {
+  const top = spot === 'top-right';
+  const x = spot === 'bottom' ? 60 : 92;
+  const y = top ? 36 : 176;
+  const bar = top ? '<rect x="18" y="24" width="84" height="24" rx="8" class="q-tap-bar"/>' : '<rect x="18" y="164" width="84" height="24" rx="8" class="q-tap-bar"/>';
+  const lines = [64, 82, 100, 118, 136].map((ly, i) => `<rect x="28" y="${top ? ly : ly - 34}" width="${[64, 48, 58, 40, 52][i]}" height="7" rx="3.5" class="q-tap-line"/>`).join('');
+  return node('figure', {
+    class: 'q-tap',
+    'aria-hidden': 'true',
+    html: `<svg viewBox="0 0 120 210" width="120" height="210"><rect x="8" y="4" width="104" height="202" rx="22" class="q-tap-phone"/>${bar}${lines}<circle cx="${x}" cy="${y}" r="17" class="q-tap-ring"/><g transform="translate(${x - 11} ${y - 11}) scale(0.9167)" class="q-tap-key">${GLYPHS[tap]}</g></svg>`
+  });
+}
 export function installGate(app, lang = detectLang()) {
   if (!isPhoneOrTablet()) return false;
   if (isStandalone()) {
@@ -3052,48 +3199,48 @@ export function installGate(app, lang = detectLang()) {
   globalThis.matchMedia?.('(display-mode: standalone)').addEventListener?.('change', e => e.matches && location.reload());
   const en = lang === 'en';
   const name = appName(app);
+  const how = installWay();
+  const { spot, tap, act, lede, steps } = installSteps(how, name, en);
+  const url = location.href.split('#')[0];
+  let action = null;
+  if (act === 'copy') action = copyButton(url, en);
+  // LINE opens a link in the phone's browser when it asks to; Android
+  // hands an intent:// link to Chrome (or the link to any browser).
+  else if (act === 'browser') action = node('a', { class: 'q-btn primary block', href: `${url}${url.includes('?') ? '&' : '?'}openExternalBrowser=1`, text: en ? 'Open in browser' : '用瀏覽器打開' });
+  else if (act === 'chrome') action = node('a', { class: 'q-btn primary block', href: `intent://${url.replace(/^https?:\/\//, '')}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(url)};end`, text: en ? 'Open in Chrome' : '用 Chrome 打開' });
+  // Chrome on Android offers its own install: one tap when it's ready.
+  else if (!isIOS())
+    action = installButton = node('button', {
+      class: 'q-btn primary block',
+      type: 'button',
+      hidden: !installPrompt,
+      text: en ? `Install ${name}` : `安裝 ${name}`,
+      onclick: async () => {
+        const ask = installPrompt;
+        if (!ask) return;
+        installPrompt = null;
+        installButton.hidden = true;
+        ask.prompt();
+        try {
+          await ask.userChoice;
+        } catch {}
+      }
+    });
   // Chrome's "Add to home screen" asks Install or Create shortcut; a
   // shortcut opens in the browser, so it lands on this page again.
-  const steps = inAppBrowser()
-    ? en
-      ? ['Open this page in Safari (iPhone) or Chrome (Android): tap ⋯ and “Open in browser”.', 'Then add it to your home screen.']
-      : ['請先用 Safari（iPhone）或 Chrome（Android）開啟：點右上角 ⋯，選「在瀏覽器開啟」。', '再加入主畫面。']
-    : isIOS()
-      ? en
-        ? ['Tap Share (the square with an arrow) in Safari.', 'Choose “Add to Home Screen”, then “Add”.', `Open ${name} from its new icon.`]
-        : ['點 Safari 的「分享」（方框加箭頭）。', '選「加入主畫面」，再點「新增」。', `從主畫面的新圖示打開 ${name}。`]
-      : en
-        ? ['Tap ⋮ at the top right of Chrome.', 'Choose “Add to Home screen”, then “Install” (not “Create shortcut”).', `Open ${name} from its new icon. If an icon only shows this page again, remove it and add ${name} again with “Install”.`]
-        : ['點 Chrome 右上角的 ⋮。', '選「加入主畫面」，再選「安裝」（不要選「建立捷徑」）。', `從主畫面的新圖示打開 ${name}。如果圖示打開又是這一頁，請刪掉那個圖示，重新加入並選「安裝」。`];
-  installButton = isIOS() || inAppBrowser()
-    ? null
-    : node('button', {
-        class: 'q-btn primary block',
-        type: 'button',
-        hidden: !installPrompt,
-        text: en ? `Install ${name}` : `安裝 ${name}`,
-        onclick: async () => {
-          const ask = installPrompt;
-          if (!ask) return;
-          installPrompt = null;
-          installButton.hidden = true;
-          ask.prompt();
-          try {
-            await ask.userChoice;
-          } catch {}
-        }
-      });
+  const already = en
+    ? `Already added? Open ${name} from its home-screen icon, not from a link or the browser.${how.way === 'android-chrome' || how.way === 'samsung' ? ' If the icon brings you back here, it was added as a shortcut: remove it and add it again with “Install”.' : ''}`
+    : `已經加入了？請從主畫面的圖示打開 ${name}，不要從連結或瀏覽器打開。${how.way === 'android-chrome' || how.way === 'samsung' ? '圖示打開又回到這一頁，表示加成了捷徑：刪掉它，重新加入並選「安裝」。' : ''}`;
   const gate = node('dialog', { class: 'q-gate q-install', 'aria-modal': 'true', style: `--q-accent:${APPS[app].color}` }, [
     node('div', { class: 'q-gate-box' }, [
       node('img', { class: 'q-gate-icon', src: './favicon.svg', alt: '', width: '72', height: '72' }),
       node('p', { class: 'q-gate-brand', text: 'ORBIT' }),
       node('h1', { class: 'q-gate-title', text: en ? `Add ${name} to your home screen` : `把 ${name} 加入主畫面` }),
-      installButton,
-      node(
-        'ol',
-        { class: 'q-steps' },
-        steps.map(t => node('li', { text: t }))
-      )
+      lede ? node('p', { class: 'q-gate-lede', text: lede }) : null,
+      action,
+      spot ? tapPicture(spot, tap) : null,
+      node('ol', { class: 'q-steps q-install-steps' }, steps.map(stepItem)),
+      node('p', { class: 'q-gate-note', text: already })
     ])
   ]);
   keepOnTop(gate);
@@ -3101,18 +3248,9 @@ export function installGate(app, lang = detectLang()) {
   document.getElementById('loading')?.setAttribute('hidden', '');
   return true;
 }
-
-// An app opened inside another app's home-screen window (the owner,
-// 2026-10-23: it ran there unguarded): open it from its own icon, added
-// from Safari first; a way back to the app this window belongs to.
-function insideGate(app, home, lang) {
-  if (installCovered) return true;
-  installCovered = true;
-  const en = lang === 'en';
-  const name = appName(app);
-  const url = homeOf(app);
+function copyButton(url, en, primary = true) {
   const copy = node('button', {
-    class: 'q-btn',
+    class: primary ? 'q-btn primary block' : 'q-btn',
     type: 'button',
     text: en ? 'Copy the link' : '複製連結',
     onclick: async () => {
@@ -3122,22 +3260,31 @@ function insideGate(app, home, lang) {
       } catch {}
     }
   });
-  const steps = isIOS()
-    ? en
-      ? ['Open the link in Safari.', 'Add it to your home screen.', 'Open it from its new icon.']
-      : ['在 Safari 打開連結。', '加入主畫面。', '從新的圖示打開。']
-    : en
-      ? ['Open the link in Chrome.', 'Add it to your home screen.', 'Open it from its new icon.']
-      : ['在 Chrome 打開連結。', '加入主畫面。', '從新的圖示打開。'];
+  return copy;
+}
+
+// An app opened inside another app's home-screen window (the owner,
+// 2026-10-23: it ran there unguarded; iPhone only, see windowApp): open it
+// from its own icon, added from Safari first; a way back to the app this
+// window belongs to.
+function insideGate(app, home, lang) {
+  if (installCovered) return true;
+  installCovered = true;
+  const en = lang === 'en';
+  const name = appName(app);
+  const url = homeOf(app);
+  const steps = en
+    ? ['Tap “Copy the link”.', 'Open Safari and paste it into the address bar.', 'Tap Share {share}, then “Add to Home Screen” {add}.', `From then on, open ${name} from its own icon.`]
+    : ['點「複製連結」。', '打開 Safari，把連結貼到網址列。', '點分享鍵 {share}，再點「加入主畫面」{add}。', `之後從它自己的圖示打開 ${name}。`];
   const gate = node('dialog', { class: 'q-gate q-install', 'aria-modal': 'true', style: `--q-accent:${APPS[app].color}` }, [
     node('div', { class: 'q-gate-box' }, [
       node('img', { class: 'q-gate-icon', src: './favicon.svg', alt: '', width: '72', height: '72' }),
       node('p', { class: 'q-gate-brand', text: 'ORBIT' }),
       node('h1', { class: 'q-gate-title', text: en ? `Open ${name} from its icon` : `從主畫面打開 ${name}` }),
-      node('p', { class: 'q-gate-lede', text: en ? 'Every Orbit app opens from its own icon.' : '每個 Orbit App 都從自己的圖示打開。' }),
+      node('p', { class: 'q-gate-lede', text: en ? `Every Orbit app opens from its own icon, so ${name} can’t open inside ${appName(home)}.` : `每個 Orbit App 都從自己的圖示打開，${name} 不能在 ${appName(home)} 裡面開。` }),
       node('p', { class: 'q-qr-url', text: url.replace(/^https:\/\//, '') }),
-      copy,
-      node('ol', { class: 'q-steps' }, steps.map(t => node('li', { text: t }))),
+      copyButton(url, en, false),
+      node('ol', { class: 'q-steps q-install-steps' }, steps.map(stepItem)),
       node('a', { class: 'q-btn primary block', href: appUrl(home) }, [document.createTextNode(en ? `Back to ${APPS[home].short || appName(home)}` : `回到 ${APPS[home].short || appName(home)}`)])
     ])
   ]);
@@ -3181,8 +3328,8 @@ export function phoneOnlyGate(app, { lang = detectLang(), qr = '' } = {}) {
         'ol',
         { class: 'q-steps' },
         (en
-          ? ['Scan the code with your phone’s camera (or open the link on it).', 'Add it to the home screen: Share → “Add to Home Screen” on iPhone, ⋮ → “Install app” on Android.', 'Sign in with your Orbit Pass or a device code: your schedule is already there.']
-          : ['用手機相機掃描上面的條碼（或在手機打開連結）。', '加入主畫面：iPhone 點「分享」→「加入主畫面」；Android 點 ⋮ →「安裝應用程式」。', '用 Orbit Pass 或裝置代碼登入，課表就在裡面。']
+          ? ['Scan the code with your phone’s camera (or open the link on it).', 'Add it to the home screen: in Safari on iPhone, Share → “Add to Home Screen”; in Chrome on Android, ⋮ → “Install app”.', 'Sign in with your Orbit Pass or a device code: your schedule is already there.']
+          : ['用手機相機掃描上面的條碼（或在手機打開連結）。', '加入主畫面：iPhone 用 Safari 點分享鍵 →「加入主畫面」；Android 用 Chrome 點 ⋮ →「安裝應用程式」。', '用 Orbit Pass 或裝置代碼登入，課表就在裡面。']
         ).map(t => node('li', { text: t }))
       )
     ])

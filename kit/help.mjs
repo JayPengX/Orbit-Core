@@ -22,6 +22,13 @@ export const HELP = {
         '通行碼是 10 個字的代碼，由分享 Orbit 給你的人發給你。知道它就能用這個帳號，所以別給別人；它只顯示一次，請記在安全的地方。',
         '每個 App 右上角的頭像就是 Orbit Pass 的入口。'
       ]],
+      ['install', '加入主畫面', [
+        'iPhone、iPad 用 Safari：點分享鍵（iOS 26 先點網址列旁的 ⋯，再點「分享」），往下滑點「加入主畫面」，再點「加入」。iPhone 上的 Chrome 也可以：網址列右邊的分享鍵 →「加入主畫面」。',
+        'Android 用 Chrome：點右上角 ⋮ →「安裝應用程式」或「加到主畫面」，選「安裝」，不要選「建立捷徑」。三星網際網路：右下角 ≡ →「新增頁面至」→「主螢幕」。',
+        '在 LINE、Instagram、Facebook 裡點開的連結不能加入主畫面：先點右上角的選單，選「用瀏覽器開啟」，再照上面的步驟。',
+        '電腦不用安裝，直接在瀏覽器打開。想要自己的視窗：Chrome、Edge 點網址列右邊的安裝圖示；Mac 的 Safari 選「檔案」→「加入 Dock」。',
+        '加好以後，每次都從主畫面的圖示打開。Android 的圖示打開又回到加入的那一頁，表示加成了捷徑：刪掉它，重新加入並選「安裝」。'
+      ]],
       ['tabs', '四個分頁', [
         'Pass：上方是你的卡片（頭像、里程碑、帳號），點它換外觀。下面是這個 App 的設定、新增裝置、通知、除錯紀錄和帳戶安全。',
         '外觀：里程碑，和免費的頭像、頭像框。',
@@ -60,6 +67,13 @@ export const HELP = {
         'Your account in every Orbit app: Sports, Transit, Weather, Class, Money, Words, Beats, Law and Securities. Each signs in with it and keeps its data on it, the same on any device.',
         'The pass is a 10-character code from whoever shared Orbit with you. Anyone who knows it can use the account, so keep it to yourself; it’s shown once, so write it down somewhere safe.',
         'The avatar at the top right of every app opens the Orbit Pass.'
+      ]],
+      ['install', 'Adding to the home screen', [
+        'iPhone and iPad, in Safari: tap Share (on iOS 26, tap ⋯ beside the address bar, then “Share”), scroll down to “Add to Home Screen”, then tap “Add”. Chrome on iPhone works too: Share at the right of the address bar → “Add to Home Screen”.',
+        'Android, in Chrome: tap ⋮ at the top right → “Install app” or “Add to Home screen”, and choose “Install”, not “Create shortcut”. Samsung Internet: ≡ at the bottom right → “Add page to” → “Home screen”.',
+        'A link opened inside LINE, Instagram or Facebook can’t be added: tap the menu at the top right, choose “Open in browser”, then follow the steps above.',
+        'On a computer there’s nothing to install: just use the browser. For a window of its own: in Chrome or Edge, tap the install icon at the right of the address bar; in Safari on a Mac, choose File → “Add to Dock”.',
+        'Once added, always open it from its home-screen icon. On Android, an icon that brings back the “add” page was added as a shortcut: remove it and add it again with “Install”.'
       ]],
       ['tabs', 'The four tabs', [
         'Pass: your card on top (avatar, milestones, account number); tap it to change your look. Below: this app’s settings, adding a device, notifications, the debug log and security.',

@@ -2611,6 +2611,62 @@ dialog.q-moved::backdrop {
 .q-steps li + li {
   margin-top: 6px;
 }
+/* The add-to-home-screen steps: each button drawn in as a small key, and
+   a phone with the first one ringed where it sits. */
+.q-install-steps li + li {
+  margin-top: 8px;
+}
+.q-key {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  margin: 0 3px;
+  vertical-align: -7px;
+  border: 1px solid var(--q-border);
+  border-radius: 8px;
+  background: var(--q-surface-2);
+  color: var(--q-accent);
+}
+.q-keep {
+  white-space: nowrap;
+}
+.q-glyph {
+  width: 18px;
+  height: 18px;
+}
+.q-tap {
+  margin: 6px 0 0;
+}
+.q-tap svg {
+  display: block;
+  width: 76px;
+  height: auto;
+}
+.q-tap-phone {
+  fill: var(--q-surface);
+  stroke: var(--q-border);
+  stroke-width: 2;
+}
+.q-tap-bar,
+.q-tap-line {
+  fill: var(--q-surface-2);
+}
+.q-tap-ring {
+  fill: var(--q-surface);
+  stroke: var(--q-accent);
+  stroke-width: 3;
+}
+.q-tap-key {
+  fill: none;
+  stroke: var(--q-accent);
+  stroke-width: 2.1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.q-tap-key circle {
+  fill: var(--q-accent);
+}
 
 /* ---- A phone-only app on a computer: a QR code to open it on the phone ---- */
 .q-qr {
