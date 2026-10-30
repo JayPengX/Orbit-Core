@@ -819,6 +819,16 @@ if (!live) await context.route(SPORTS, async route => {
   await route.fulfill({ status: x.status, contentType: 'application/json', headers: cors, body: x.body });
 });
 
+// Orbit Class's 專注飛行 (/flight): with --live the real Worker's dev door
+// (real planes in the air now), else none to pick.
+await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/flight/, async route => {
+  const cors = { 'Access-Control-Allow-Origin': '*' };
+  if (!live) return route.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: '{"flights":[]}' });
+  const url = route.request().url().replace(/[?&]qt=[^&]*/, '');
+  const body = await new Promise(resolve => execFile('curl', ['-s', '-m', '30', '-H', `Origin: http://localhost:${port}`, url], (err, out) => resolve(err ? '' : out)));
+  await route.fulfill({ status: body ? 200 : 502, contentType: 'application/json', headers: cors, body: body || '{}' });
+});
+
 // Everything else from outside (logos, fonts): fetched by curl too, so the
 // container's HTTPS proxy is used (the browser itself goes nowhere).
 const curlBin = url =>
