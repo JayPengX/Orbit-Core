@@ -3865,6 +3865,8 @@ div.q-ritem {
 }
 .q-match-side b {
   display: -webkit-box;
+  /* (Held to its column: centred in a flex column it would grow past the card, 特拉維夫夏普爾 at 320.) */
+  max-width: 100%;
   overflow: hidden;
   font: 600 15px/1.25 var(--q-font);
   text-align: center;
