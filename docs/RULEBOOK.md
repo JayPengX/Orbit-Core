@@ -164,6 +164,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 10-30 Category sets for kinds of people (學生, 上班族, 家庭, 全部), asked once before the first 記一筆; a set only changes what shows, never what's logged; the person's own changes are their own set (「我的」).
 - 10-27 Sheets fit their content; nothing that matters below the fold; 手機條碼 stays black on white in dark mode.
 - 悠遊卡/一卡通 are 儲值卡, never 電子錢包; removing an account never loses history.
+- 10-30 Cards carry their network (卡別: Visa, Mastercard, JCB, American Express, UnionPay…), picked when adding or editing a card and shown wherever the card is (its real mark).
 - 10-27 記一筆: the amount is a field (tap the number, the iPhone's keys; no keypad of our own); every category in view, no pages to swipe. Something not set shows nothing (no example values); 預算 sits in 更多 until one is set, then in 統計. Ways to pay show their own logos.
 - 10-27 退款 is never income: it comes off its spend, all or part. A friend's share of what you paid comes off too; their cash counts once handed over.
 - 10-27 Every change to what entries mean works on what's already logged (old books upgraded on open).
