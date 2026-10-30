@@ -771,21 +771,20 @@ test('buses due: one TDX call for a whole city, every ask answered with its own 
   const ask = (qs, now = NOW) => handleTransit(new Request(`https://w/transit/eta?${qs}`), env, {}, '/transit/eta', { session: { s: 'S' }, fetchFn, now, cache });
   const a = await (await ask('city=Taipei&stops=TPE1,TPE3')).json();
   assert.deepEqual(a.map(r => r.RouteUID), ['TPE10', 'TPE11', 'TPE12']);
-  assert.equal(log.length, 1);
-  assert.match(decodeURIComponent(log[0]), /EstimatedTimeOfArrival\/City\/Taipei\?\$select=StopUID,.*&\$top=60000/);
+  assert.equal(log.length, 2, 'a city’s first ask: the whole city, and these stops beside it');
+  assert.ok(log.some(u => /EstimatedTimeOfArrival\/City\/Taipei\?\$select=StopUID,.*&\$top=60000/.test(decodeURIComponent(u))));
   const b = await (await ask('city=Taipei&route=TPE10', NOW + 5000)).json();
   assert.deepEqual(b.map(r => r.StopUID), ['TPE1', 'TPE2']);
   const run = await (await handleTransit(new Request('https://w/transit/running?city=Taipei'), env, {}, '/transit/running', { session: { s: 'S' }, fetchFn, now: NOW + 6000, cache })).json();
   assert.deepEqual(run.routes, { TPE10: 2, TPE11: 1, TPE12: 0 });
-  assert.equal(log.length, 1, 'every stop, every route and the running list from the one call');
+  assert.equal(log.length, 2, 'then every stop, every route and the running list from the one call');
   assert.equal((await ask('city=Taipei&stops=nope')).status, 400);
   // 公路客運 (all Taiwan, too big to keep whole): its stops' own ask.
   const many = Array.from({ length: 50 }, (_, i) => `THB${100 + i}`);
   await ask(`city=InterCity&stops=${many.join(',')}`);
-  const inter = log.slice(1).map(decodeURIComponent);
+  const inter = log.slice(2).map(decodeURIComponent);
   assert.equal(inter.length, 2, '40 stops a call');
   assert.ok(inter.every(u => /InterCity\?\$filter=StopUID eq 'THB\d+'( or StopUID eq 'THB\d+')*&\$select=/.test(u)));
-  log.length = 1;
   const path = 'basic/v2/Rail/Metro/S2STravelTime/TRTCMG';
   assert.equal((await tdxGet(env, path, { fetchFn, cache, now: NOW })).status, 502);
   assert.equal((await tdxGet(env, path, { fetchFn, cache, now: NOW + 60_000 })).status, 502);
