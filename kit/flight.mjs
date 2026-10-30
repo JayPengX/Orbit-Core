@@ -108,3 +108,28 @@ export function aheadOf(fix, dest, ms) {
 
 // A fix that says the plane is down: on the ground, or slow and near the airport.
 export const landedFix = (fix, dest) => Boolean(fix) && (fix.ground || ((Number(fix.gs) || 0) < 60 && distKm(fix, dest) < 15));
+
+// The flights to offer for a focus of `minutes`: the ones landing closest to
+// its end first, one per destination and, while there are enough, per
+// airline; never none while any plane is up (one landing earlier hands over
+// to another, one landing later is still flying when the time's up).
+export function choose(flights, minutes, now, want = 6) {
+  const off = f => Math.abs((f.eta - now) / 60_000 - minutes);
+  const sorted = flights.filter(f => f && f.eta > now + 60_000).sort((a, b) => off(a) - off(b));
+  const out = [];
+  const to = new Set();
+  const by = new Set();
+  const placeOf = f => f.to.iata || f.to.icao;
+  const lineOf = f => f.airline?.icao || String(f.cs || f.no || '').slice(0, 3);
+  for (const pass of ['strict', 'places', 'any'])
+    for (const f of sorted) {
+      if (out.length >= want) return out;
+      if (out.includes(f) || (pass !== 'any' && to.has(placeOf(f))) || (pass === 'strict' && by.has(lineOf(f)))) continue;
+      // (Within a fifth of the time first; only then further away.)
+      if (pass === 'strict' && off(f) > Math.max(3, minutes * 0.2)) continue;
+      out.push(f);
+      to.add(placeOf(f));
+      by.add(lineOf(f));
+    }
+  return out;
+}
