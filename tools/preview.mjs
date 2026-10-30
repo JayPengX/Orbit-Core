@@ -726,15 +726,11 @@ if (key === 'admin') {
   for (let i = 0; i < 12; i++) {
     const made = now - (40 - i * 3) * DAY;
     const apps = Object.fromEntries(APPS_USED.filter((a, j) => (i + j) % 3 !== 0).map((a, j) => [a, { first: made, last: now - ((i * 7 + j) % 9) * DAY - i * 3_600_000 }]));
-    // (A loan on every third account: one paying, one a week late, one in 催收; relief for two; one overdrawn.)
-    const L = `p${i}`, lt = now - 30 * DAY;
+    // (Relief for two; one overdrawn.)
     const entries = [
       { id: 'eco:start', t: made, app: 'eco', kind: 'start', amount: 200_000 },
       { id: 'eco:pay:2026-10-19', t: now - 1 * DAY, app: 'eco', kind: 'pay', amount: 10_000 },
       ...(i % 4 === 0 ? [{ id: `eco:rank:${i}`, t: now - 2 * DAY, app: 'eco', kind: 'rank', amount: 20_000, note: 'L3' }] : []),
-      ...(i % 3 === 0 ? [{ id: `eco:loan:${L}`, t: lt, app: 'eco', kind: 'loan', amount: 150_000, note: '150000|1200|104' }, { id: `eco:loanfee:${L}`, t: lt, app: 'eco', kind: 'loanfee', amount: -3_000 }, ...Array.from({ length: 4 }, (_, k) => ({ id: `eco:loanpay:${L}:${k + 1}`, t: lt + (k + 1) * 7 * DAY, app: 'eco', kind: 'loanpay', amount: -1_578 }))] : []),
-      ...(i === 3 ? [{ id: `eco:loanlate:${L}:2`, t: now - 6 * DAY, app: 'eco', kind: 'loanlate', amount: -42 }] : []),
-      ...(i === 6 ? [{ id: `eco:loanbad:${L}`, t: now - 3 * DAY, app: 'eco', kind: 'loanbad', amount: -60_000, note: '84000' }] : []),
       ...(i === 5 || i === 10 ? [{ id: `eco:relief:2026-10-19`, t: now - 2 * DAY, app: 'eco', kind: 'relief', amount: 5_000 }] : []),
       ...(i === 8 ? [{ id: 'eco:admin:1', t: now - 4 * DAY, app: 'eco', kind: 'admin', amount: -215_000, note: '更正重複入帳' }] : [])
     ];

@@ -95,8 +95,8 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 
 - 10-18 No paid TheSportsDB key.
 - 10-19 No paid membership ever (Orbit Plus removed 10-20; VIP and free bets removed 10-22).
-- 10-22 Money lives in Securities: the Pass shows no balance; 信貸, 紓困, 財富等級 and 真相 are in Securities › 資金 › 你的帳戶. Securities is the only app that moves Orbit's play money; only the proxy adds money.
-- 10-19 Orbit economy: NT$200,000 start, NT$10,000 every Monday; 信貸 helpful but dangerous (12% APR, 3 late → 催收); 急難紓困 NT$5,000 when worth < 2,000; 財富等級 rewards raised 10× on 10-23 (300K/30K … 100M/3M).
+- 10-22 Money lives in Securities: the Pass shows no balance; 紓困, 財富等級 and 真相 are in Securities › 資金 › 你的帳戶. Securities is the only app that moves Orbit's play money; only the proxy adds money.
+- 10-19 Orbit economy: NT$200,000 start, NT$10,000 every Monday; 急難紓困 NT$5,000 when worth < 2,000; 財富等級 rewards raised 10× on 10-23 (300K/30K … 100M/3M).
 - 10-22 Removed items drop out of every total (a refunded tax must not come back from an old device copy).
 - 10-27 Data must never be lost or corrupted; saves stay lean. Kept collections get version history and nightly backups; new user-data collections join the keep set in `worker.js`.
 - 10-27 Keep the US$5 Workers Paid plan; don't re-propose dropping it unless heavy work leaves Workers.
@@ -149,6 +149,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 ### Securities
 - 10-21 List every securities product a person in Taiwan can legally buy; 10-23: with its real rules, applications and restrictions, however annoying (kit `stock-access.mjs` gates + the app's 開戶與交易資格 sheet, live).
 - 10-21 No balance on the home page (real-broker feel).
+- 10-30 No 信貸 (personal loan): a broker doesn't make one. The only borrowing is 融資 against the shares it buys (Jay: "be realistic, if it's not realistic or game breaking remove it").
 - 10-27 現股當沖 follows TWSE: account open 3 months with 10 trades in the last year, or a credit account, plus the signed 風險預告書 (`stock-access.mjs` `daytrade`).
 - 10-22 One product bar in 市場; every list = picks, then the whole listing.
 - Orders are filled and cash counted by the proxy (`stock-fill.js`), never the phone.
@@ -241,6 +242,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 | Longshot's own keyboard rule | The same rule in the shared kit for every app | 10-27 |
 | Sell-first 當沖 needs 12 months of history | TWSE's 3 months + 10 trades, or a credit account |  10-24 |
 | Screenshot sets lead with the latest feature asked for (Beats' game, Class's import) | Lead with the app's hero screen; requested features later | 10-28 |
+| 信貸 helpful but dangerous (12% APR, 3 late → 催收, in 資金 › 你的帳戶) | No personal loan; only 融資 (not something a broker offers) | 10-30 |
 | Handoff: "don't touch the Cloudflare data rename" | Rename finished (`orbit-data`, `orbit-store`) | 10-23 |
 
 ## 7. Contradictions to watch

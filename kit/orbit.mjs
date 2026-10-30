@@ -107,18 +107,17 @@ export const appName = app => APPS[app]?.name || app;
 // a new pass opens with NT$200,000; every Monday (Taiwan time) pays a fixed
 // NT$10,000, the same for every account, like a salary (eco.js pays it,
 // back pay for weeks nobody came). With the wealth level rewards and 急難紓困
-// for someone with nothing, those are the only money Orbit gives; more is
-// borrowed (信貸, loan.mjs) and repaid from the pay. All of it is shown in
-// Securities (its 資金 tab: pay, 信貸, 紓困, 財富等級, 真相); the Pass itself
+// for someone with nothing, those are the only money Orbit gives (the only
+// borrowing is 融資 in Securities). All of it is shown in
+// Securities (its 資金 tab: pay, 紓困, 財富等級, 真相); the Pass itself
 // is the account and the family, never money.
 export const ECONOMY = {
   start: 200_000,
   weekly: PAY_WEEK
 };
 
-// What the account is worth: the pool and Securities' holdings, less what a
-// loan still owes (borrowed money is nobody's worth).
-export const worthOf = (wallet, now = Date.now()) => poolBalance(wallet) + finiteOr0(wallet?.snap?.stock?.holdings) - debtOf(wallet, now);
+// What the account is worth: the pool and Securities' holdings.
+export const worthOf = wallet => poolBalance(wallet) + finiteOr0(wallet?.snap?.stock?.holdings);
 // 財富等級: what the account is worth (worthOf) puts it on a level; the
 // first time it reaches one, Orbit's economy pays the level's reward once
 // (eco.js RANKS, the same table: `eco:rank:<id>`).
@@ -137,8 +136,7 @@ const rankName = (id, i) => {
 };
 // Where the money came from and went (all time, NT$): what the system gave
 // (opening money, pay, level rewards, the owner's grants), the government
-// (govOf: relief less taxes), Orbit's bank (loan costs and overdraft
-// interest), and the account's own result (markets, savings: worth less the
+// (govOf: relief less taxes), Orbit's overdraft interest, and the account's own result (markets, savings: worth less the
 // other three).
 // 政府 (kit/gov.mjs): the same figures the admin page adds up.
 import { govOf } from './gov.mjs';
@@ -146,10 +144,8 @@ import { twDay, finiteOr0 } from './format.mjs';
 export { govOf };
 export function moneySides(wallet) {
   const gave = { start: 0, pay: 0, rank: 0, other: 0 };
-  // What Orbit charges: overdraft interest, and a loan's cost (what came in
-  // less what went back, with what's still owed: its interest and fees).
+  // What Orbit charges: overdraft interest.
   let fees = 0;
-  let loanFlow = 0;
   for (const e of wallet?.entries || []) {
     if (e.app !== 'eco') continue;
     const a = Number(e.amount) || 0;
@@ -159,9 +155,7 @@ export function moneySides(wallet) {
     // (A correction or prize from the admin page: money Orbit gave, either way.)
     else if (e.kind === 'rebase' || e.kind === 'admin') gave.other += a;
     else if (e.kind === 'od') fees -= a;
-    else if (LOAN_KINDS.has(e.kind)) loanFlow += a;
   }
-  fees += debtOf(wallet) - loanFlow;
   const given = gave.start + gave.pay + gave.rank + gave.other;
   const gov = govOf(wallet);
   const worth = worthOf(wallet);
@@ -173,10 +167,9 @@ export const paydayFor = () => ECONOMY.weekly;
 // in Securities or borrowing on margin there.
 export const OVERDRAFT_RATE = 0.01;
 
-// 信貸 and 急難紓困: loan.mjs, shared with the Worker.
-import { PAY_WEEK, LOAN, RELIEF, loans, activeLoan, loanOwed, payoffAmount, debtOf, credit, canBorrow, loanOffer, maxFor, dueCount, reliefCheck, nextPayday } from './loan.mjs';
-export { PAY_WEEK, LOAN, RELIEF, loans, activeLoan, loanOwed, payoffAmount, debtOf, credit, canBorrow, loanOffer, maxFor, dueCount, reliefCheck, nextPayday };
-const LOAN_KINDS = new Set(['loan', 'loanfee', 'loanpay', 'loanlate', 'loanbad', 'loangar', 'loanoff']);
+// The weekly pay and 急難紓困: pay.mjs, shared with the Worker.
+import { PAY_WEEK, RELIEF, reliefCheck, nextPayday } from './pay.mjs';
+export { PAY_WEEK, RELIEF, reliefCheck, nextPayday };
 
 // ---- Looks: an avatar and a frame, free for everyone ------------------------------------
 //
@@ -1614,8 +1607,7 @@ function makeSession(app, { lang, heartbeat }) {
       if (res.same) res.wallet = wallet;
       return res;
     });
-  // 信貸 and 急難紓困 (loan.mjs): the Worker checks and writes them.
-  s.loan = (action, body = {}) => withToken(qt => call('POST', '', { op: 'loan', qt, action, ...body })).then(res => (absorb(res), res));
+  // 急難紓困 (pay.mjs): the Worker checks and writes it.
   s.relief = () => withToken(qt => call('POST', '', { op: 'relief', qt })).then(res => (absorb(res), res));
   s.dropInbox = id => withToken(qt => call('POST', qs({ app }), { op: 'drop-inbox', qt, inbox: id }));
   // Other passes into this one (they're deleted after).
@@ -1757,13 +1749,6 @@ const KIND = {
   start: ['開戶金', 'Opening money'],
   pay: ['薪水', 'Pay'],
   rebase: ['經濟調整', 'Adjustment'],
-  loan: ['信貸撥款', 'Loan paid out'],
-  loanfee: ['信貸開辦費', 'Loan set-up fee'],
-  loanpay: ['信貸還款', 'Loan installment'],
-  loanlate: ['信貸逾期違約金', 'Late payment charge'],
-  loanbad: ['催收：存款抵銷', 'Collection: balance taken'],
-  loangar: ['催收：薪資扣押', 'Collection: pay garnished'],
-  loanoff: ['信貸清償', 'Loan paid off'],
   relief: ['急難紓困', 'Emergency relief'],
   rank: ['財富等級獎勵', 'Wealth level reward'],
   od: ['透支利息', 'Overdraft interest'],
@@ -1948,9 +1933,6 @@ const ERR = {
   ECO_CREATE_CLOSED: ['Orbit Pass 由擁有者發放，請向分享給你的人索取。', 'Orbit Passes are handed out by their owner: ask the person who shared Orbit with you.'],
   ECO_PAIR_NOT_FOUND: ['這組裝置代碼無效或已過期（10 分鐘內、只能用一次）。', 'That device code isn’t valid or has expired (10 minutes, once).'],
   RATE_LIMITED: ['嘗試太多次，請稍後再試。', 'Too many tries. Please wait a little.'],
-  ECO_LOAN_FUNDS: ['餘額不足以一次還清。', 'Your balance doesn’t cover paying it all off.'],
-  ECO_LOAN_NONE: ['沒有未還清的信貸。', 'There’s no loan to pay off.'],
-  ECO_LOAN_REFUSED: ['銀行婉拒了這筆申請。', 'The bank turned this application down.'],
   ECO_RELIEF_REFUSED: ['目前不符合急難紓困資格。', 'You don’t qualify for relief right now.'],
   ECO_SESSION_MOVED: ['這個 App 已在別處開啟，回到這裡後再試一次。', 'This app is open somewhere else. Come back here and try again.'],
   ECO_PASSKEY_UNKNOWN: ['這個通行密鑰已不在任何 Orbit Pass 上，請用通行碼登入。', 'This passkey isn’t on any Orbit Pass any more. Sign in with your pass.'],

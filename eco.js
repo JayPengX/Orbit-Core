@@ -56,7 +56,7 @@ import { storeReady } from './doc-store.js';
 import { tokenSecret, signToken, readToken, seal, unseal, sessionLimited, SESSION_MS, REFRESH_MS, HANDOFF_MS } from './orbit-token.js';
 import { handleAdmin } from './eco-admin.js';
 import { passkeyBegin, passkeyLogin, passkeyAddBegin, passkeyAdd, passkeyRemove, passkeySummary, pointPasskeys, dropIndex, passkeyIds } from './passkey.js';
-import { PAY_WEEK, weekStart, mondayId, debtOf, activeLoan, loanOffer, loanEntries, loanDue, payoffAmount, reliefCheck, reliefEntry } from './kit/loan.mjs';
+import { PAY_WEEK, weekStart, mondayId, reliefCheck, reliefEntry } from './kit/pay.mjs';
 
 export const ECO_PASSCODE_LENGTH = 10;
 export const ECO_PASSCODE_PATTERN = /^[2-9A-HJ-NP-Z]{10}$/;
@@ -90,7 +90,7 @@ export const ECO_APPS = {
   money: { collection: 'orbit-money', maxPayload: 1_000_000 }
 };
 // Who can write entries: Securities, the one app that moves money, and this
-// Worker itself ('eco': pay, loans, merges). An app can't write 'eco' entries; the related
+// Worker itself ('eco': pay, relief, merges). An app can't write 'eco' entries; the related
 // add-ons (Orbit Sports, Hub, Orbit Class) write none.
 const ENTRY_APPS = new Set(['stock']);
 
@@ -122,8 +122,8 @@ export function emptyWallet(now = Date.now()) {
 // The economy: NT$200,000 to open and a
 // fixed NT$10,000 a week, the same for every account whatever it holds, like
 // a salary.
-// Money beyond that is borrowed (信貸, kit/loan.mjs: repaid from the pay) or
-// relief for someone with nothing (急難紓困); the house's cut, the broker's
+// Money beyond that is relief for someone with nothing (急難紓困, kit/pay.mjs);
+// the only borrowing is 融資 in Securities. The house's cut, the broker's
 // costs, interest and penalties are the sinks.
 export const PAY = { start: 200_000, week: PAY_WEEK };
 // An overdraft (the pool below zero) costs OVERDRAFT_RATE a month, charged
@@ -134,8 +134,7 @@ export const OVERDRAFT_RATE = 0.01;
 const finiteOr0 = v => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
 // (Securities' holdings at what was paid for them, the Worker's count: a
 // figure a phone sends can't raise a rank.)
-// A loan still owed counts against it: borrowed money is nobody's worth.
-export const worthOf = (wallet, now = Date.now()) => poolBalance(wallet) + finiteOr0(wallet?.snap?.stock?.held) - debtOf(wallet, now);
+export const worthOf = wallet => poolBalance(wallet) + finiteOr0(wallet?.snap?.stock?.held);
 const TPE = 8 * 3_600_000;
 const WEEK = 7 * 86_400_000;
 export const taipeiMonth = t => new Date(t + TPE).toISOString().slice(0, 7);
@@ -156,8 +155,6 @@ export function paydayEntries(wallet, now) {
     const id = `eco:wpay:${mondayId(w)}`;
     if (!have.has(id)) out.push({ id, t: now, app: 'eco', kind: 'pay', amount: PAY.week });
   }
-  // The loan's installments come out of the pay (kit/loan.mjs loanDue).
-  out.push(...loanDue(wallet, poolBalance({ ...wallet, entries: [...(wallet.entries || []), ...out] }), now));
   // Level rewards for wealth levels reached (after the pay that may reach one).
   out.push(...rankEntries({ ...wallet, entries: [...(wallet.entries || []), ...out] }, now));
   return out;
@@ -165,8 +162,7 @@ export function paydayEntries(wallet, now) {
 
 // ---- 財富等級: wealth levels and their one-time rewards -----------------------------
 //
-// What the account is worth (the pool and Securities' holdings, less a
-// loan's debt) puts it on a level; the first time it reaches one, the
+// What the account is worth (the pool and Securities' holdings) puts it on a level; the first time it reaches one, the
 // economy pays that level's reward once (`eco:rank:<id>`, kind 'rank'). Falling
 // back keeps what was paid; reaching a level again pays nothing. The same
 // table as the kit's WEALTH_RANKS. A new pass starts at 起步; the first level
@@ -182,7 +178,7 @@ export const RANKS = [
 ];
 export function rankEntries(wallet, now) {
   const have = new Set((wallet?.entries || []).map(e => e.id));
-  const worth = worthOf(wallet, now);
+  const worth = worthOf(wallet);
   return RANKS.filter(r => r.reward > 0 && worth >= r.min && !have.has(`eco:rank:${r.id}`)).map(r => ({ id: `eco:rank:${r.id}`, t: now, app: 'eco', kind: 'rank', amount: r.reward, note: r.id }));
 }
 
@@ -206,7 +202,7 @@ export function cleanEntry(e, { allowEco = false } = {}) {
   const app = str(e.app, 12);
   if (!id || t == null || amount == null || Math.abs(amount) > MAX_AMOUNT) return null;
   if (!(ENTRY_APPS.has(app) || (allowEco && app === 'eco'))) return null;
-  // The Worker's own ids (pay, loans) are its alone.
+  // The Worker's own ids (pay, relief) are its alone.
   if (!allowEco && id.startsWith('eco:')) return null;
   const out = { id, t: Math.round(t), app, kind: str(e.kind, 24) || 'other', amount: Math.round(amount * 100) / 100 };
   const note = str(e.note, 80);
@@ -372,7 +368,6 @@ const OPS = {
   merge: ecoMerge,
   'share-create': shareCreate,
   'share-redeem': shareRedeem,
-  loan: ecoLoan,
   relief: ecoRelief,
   admin: ctx => handleAdmin(ctx),
   'passkey-begin': passkeyBegin,
@@ -706,7 +701,7 @@ async function walletOp(ctx, limitKey, change) {
       extra = r.extra || {};
       if (r.refused) return (refused = r.refused), w;
       const done = mergeWallet(paid, { entries: r.entries });
-      // A loan settled can reach a level: its reward with it.
+      // What the op paid can reach a level: its reward with it.
       return mergeWallet(done, { entries: rankEntries(done, now) });
     },
     { skipIf: () => refused }
@@ -716,32 +711,9 @@ async function walletOp(ctx, limitKey, change) {
   return deps.json({ wallet: publicWallet(result.wallet), walletTime: result.updateTime, pool: poolBalance(result.wallet), ...extra }, 200, headers);
 }
 
-// 信貸 (kit/loan.mjs has the rules): { op: 'loan', qt, action: 'borrow',
-// amount, weeks } signs a loan the account qualifies for (the money in,
-// the 開辦費 out); { action: 'payoff' } clears the active one from the
-// balance (with 提前清償違約金 in the first year, or what's owed in 催收).
-async function ecoLoan(ctx) {
-  const { body } = ctx;
-  return walletOp(ctx, 'loan', (w, now) => {
-    if (body.action === 'borrow') {
-      const offer = loanOffer(w, finite(body.amount), finite(body.weeks), now);
-      if (!offer.ok) return { refused: 'ECO_LOAN_REFUSED', extra: { why: offer.why, ...(offer.max != null ? { max: offer.max } : {}), ...(offer.until ? { until: offer.until } : {}) } };
-      return { entries: loanEntries(offer, now), extra: { loan: offer } };
-    }
-    if (body.action === 'payoff') {
-      const loan = activeLoan(w);
-      if (!loan) return { refused: 'ECO_LOAN_NONE' };
-      const amount = payoffAmount(loan, now);
-      if (poolBalance(w) < amount) return { refused: 'ECO_LOAN_FUNDS', extra: { need: amount } };
-      return { entries: [{ id: `eco:loanoff:${loan.id}`, t: now, app: 'eco', kind: 'loanoff', amount: -amount }] };
-    }
-    return { refused: 'ECO_LOAN_ACTION' };
-  });
-}
-
 // 急難紓困: { op: 'relief', qt } pays RELIEF.amount to an account with
 // nothing (cash and stocks at cost under RELIEF.under), on the
-// kit's conditions (kit/loan.mjs reliefCheck).
+// kit's conditions (kit/pay.mjs reliefCheck).
 async function ecoRelief(ctx) {
   return walletOp(ctx, 'relief', (w, now) => {
     const worth = poolBalance(w) + finiteOr0(w?.snap?.stock?.held);

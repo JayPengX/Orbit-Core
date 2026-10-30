@@ -286,7 +286,6 @@
   .econ .dv i.out { right: 50%; background: var(--q-bad); }
   .kpis.two { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 0; }
   .credit { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
-  @media (min-width: 700px) { .credit { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
   .app-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   @media (min-width: 700px) { .app-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
   .app-card { display: grid; grid-template-columns: 34px minmax(0, 1fr); column-gap: 10px; align-items: center; padding: 12px; border-radius: 16px; background: var(--q-surface); min-width: 0; }
@@ -322,10 +321,6 @@
   .act[aria-expanded='true'] { box-shadow: 0 0 0 2px var(--q-accent); }
   .act.dangerous span:last-child { color: var(--q-bad); }
   .act-pane .action { margin-top: 10px; }
-  .loan-card { margin-top: 10px; padding: 14px; border-radius: 18px; background: var(--q-surface); }
-  .loan-card .row { justify-content: space-between; }
-  .loan-meter { height: 8px; margin: 10px 0 6px; border-radius: 4px; background: var(--q-fill-4); overflow: hidden; }
-  .loan-meter i { display: block; height: 100%; border-radius: 4px; background: var(--q-good); }
   .rec-filters { margin: 4px 0 8px; }
   .recs .q-ritem-value.pos, .q-ritem-value.pos { color: var(--q-good); }
   .recs .q-ritem-value.neg { color: var(--q-bad); }
@@ -435,7 +430,7 @@
           <div><h3>系統</h3><div class="card"><ul class="flow" id="mo-given"></ul></div></div>
         </div>
         <div class="twocol">
-          <div><h3>Orbit：透支利息和信貸費用</h3><div class="card"><ul class="flow" id="mo-orbit"></ul></div></div>
+          <div><h3>Orbit：透支利息</h3><div class="card"><ul class="flow" id="mo-orbit"></ul></div></div>
           <div><h3>市場：玩家投資賺的</h3><div class="card"><ul class="flow" id="mo-own"></ul></div></div>
         </div>
         <div class="twocol">
@@ -606,7 +601,7 @@ let token = store.get();
 const APPS = { stock: 'Orbit 證券', match: 'Orbit Sports', vocab: 'Orbit Words', orbit: 'Orbit Class', weather: 'Orbit Weather', transit: 'Orbit Transit', beats: 'Orbit Beats', law: 'Orbit Law', money: 'Orbit Money' };
 const appName = a => APPS[a] || a;
 // A record's kind in words (the key itself when it's one not named here).
-const KINDS = { start: '開戶金', pay: '週薪', rank: '財富等級獎勵', rebase: '重算', admin: '手動調整', loan: '信貸撥款', loanfee: '信貸開辦費', loanpay: '信貸還款', loanlate: '信貸遲延', loanbad: '信貸催收', loangar: '催收扣薪', loanoff: '信貸清償', relief: '急難紓困', od: '透支利息', undo: '撤銷' };
+const KINDS = { start: '開戶金', pay: '週薪', rank: '財富等級獎勵', rebase: '重算', admin: '手動調整', relief: '急難紓困', od: '透支利息', undo: '撤銷' };
 const kindName = k => KINDS[k] || k;
 
 const WHY = {
@@ -773,17 +768,15 @@ const tile = (label, value, sub = '') => {
 const kpi = ({ icon, color, label, value, sub = '', up = false, trend = null, go = '' }) =>
   `<${go ? `button type="button" data-go="${go}"` : 'div'} class="kpi">${tileHtml(ic(icon), color, 'sm')}${trend ? spark(trend, color) : ''}<small>${escHtml(label)}</small><strong>${escHtml(value)}</strong>${sub ? `<em class="${up ? 'up' : ''}">${escHtml(sub)}</em>` : ''}</${go ? 'button' : 'div'}>`;
 // An account as a row: its colour, its reference, where it stands, its money.
-const LOAN_TAG = { bad: ['催收', 'red'], late: ['逾期', 'orange'], on: ['信貸', 'blue'] };
 function acctItem(w, { value = w.shown ?? money(w.balance), sub, compact = false } = {}) {
   const tags = [
     w.balance < 0 ? `<span class="q-tag red">透支</span>` : '',
-    w.loan ? `<span class="q-tag ${LOAN_TAG[w.loan][1]}">${LOAN_TAG[w.loan][0]}</span>` : '',
     w.reliefs ? `<span class="q-tag indigo">紓困 ×${w.reliefs}</span>` : '',
     !w.last && !w.lastUsed ? `<span class="q-tag">未使用</span>` : ''
   ].join('');
   const apps = compact ? '' : (w.apps || []).map(appIc).join('');
   const last = w.last || (w.lastUsed ? Date.parse(w.lastUsed) : 0);
-  return `<button class="q-ritem chevron" type="button" data-acct="${escHtml(w.ref)}"><span class="av" style="--t:${refColor(w.ref)}">${escHtml(w.ref.slice(0, 2).toUpperCase())}</span><span class="q-ritem-text"><span class="q-ritem-title mono">${escHtml(w.ref)}</span><small>${escHtml(sub ?? [last ? ago(last) : '還沒人用', w.loan && w.owed ? `欠 ${wan(w.owed)}` : ''].filter(Boolean).join(' · '))}</small>${tags ? `<span class="q-tags">${tags}</span>` : ''}${apps ? `<span class="apps">${apps}</span>` : ''}</span><span class="q-ritem-value big ${w.red ?? w.balance < 0 ? 'neg' : ''}">${escHtml(value)}</span></button>`;
+  return `<button class="q-ritem chevron" type="button" data-acct="${escHtml(w.ref)}"><span class="av" style="--t:${refColor(w.ref)}">${escHtml(w.ref.slice(0, 2).toUpperCase())}</span><span class="q-ritem-text"><span class="q-ritem-title mono">${escHtml(w.ref)}</span><small>${escHtml(sub ?? [last ? ago(last) : '還沒人用'].filter(Boolean).join(' · '))}</small>${tags ? `<span class="q-tags">${tags}</span>` : ''}${apps ? `<span class="apps">${apps}</span>` : ''}</span><span class="q-ritem-value big ${w.red ?? w.balance < 0 ? 'neg' : ''}">${escHtml(value)}</span></button>`;
 }
 // A sum in 萬 for a short line (欠 8.4萬).
 const wan = v => (Math.abs(v) >= 1e4 ? `${(v / 1e4).toLocaleString(undefined, { maximumFractionDigits: 1 })}萬` : Math.round(v).toLocaleString());
@@ -795,9 +788,6 @@ const ECON = [
   ['開戶金', 'wallet', '#0ea5e9', k => k === 'eco:start'],
   ['財富等級', 'trophy', '#d97706', k => k === 'eco:rank'],
   ['急難紓困', 'spark', '#db2777', k => k === 'eco:relief'],
-  ['信貸撥款', 'bank', '#2563eb', k => k === 'eco:loan'],
-  ['信貸還款', 'bank', '#4f46e5', k => /^eco:loan(pay|off|gar|bad)$/.test(k)],
-  ['信貸費用', 'bank', '#7c3aed', k => /^eco:loan(fee|late)$/.test(k)],
   ['證券', 'chart', '#0d9488', k => k.startsWith('stock:')],
   ['手動調整', 'pencil', '#64748b', k => k === 'eco:admin'],
   ['其他', 'list', '#94a3b8', () => true]
@@ -829,11 +819,9 @@ function drawEcon(o) {
     svg += `<rect x="${i * bw + bw * 0.2}" y="${mid - a}" width="${bw * 0.6}" height="${a}" rx="3" fill="var(--q-good)"><title>${d} 進 ${money(o.daily.in[i])}</title></rect><rect x="${i * bw + bw * 0.2}" y="${mid}" width="${bw * 0.6}" height="${b}" rx="3" fill="var(--q-bad)" fill-opacity=".8"><title>${d} 出 ${money(o.daily.out[i])}</title></rect>`;
   });
   $('ov-flow').innerHTML = svg;
-  const L = o.loans || {}, R = o.relief || {};
+  const R = o.relief || {};
   $('ov-credit').innerHTML = [
-    kpi({ icon: 'bank', color: '#2563eb', label: '信貸放款中', value: `${L.active || 0} 筆`, sub: `未還 ${big(L.owed || 0)}`, go: 'accounts' }),
-    kpi({ icon: 'clock', color: '#d97706', label: '逾期', value: `${L.late || 0} 筆`, sub: `已還 ${big(L.repaid || 0)}` }),
-    kpi({ icon: 'flag', color: '#dc2626', label: '催收', value: `${L.bad || 0} 筆`, sub: L.bad ? '每週扣三分之一薪水' : '沒有' }),
+    kpi({ icon: 'flag', color: '#dc2626', label: '透支中', value: `${o.money?.overdrawn || 0} 個帳戶`, sub: o.money?.overdrawn ? '每月計息 1%' : '沒有', go: 'accounts' }),
     kpi({ icon: 'spark', color: '#db2777', label: '急難紓困（30 天）', value: `${R.month || 0} 次`, sub: `共 ${R.total || 0} 次 · ${big(R.paid || 0)}` })
   ].join('');
   // 政府, all time: what it took (its biggest tax named) and its net.
@@ -979,8 +967,6 @@ const FILTERS = {
   week: ['這週用過', w => Date.now() - lastOf(w) < 7 * 86_400_000],
   unused: ['未使用', w => !w.lastUsed],
   neg: ['透支', w => w.balance < 0],
-  loan: ['信貸', w => w.loan],
-  late: ['逾期／催收', w => w.loan === 'late' || w.loan === 'bad'],
   relief: ['紓困過', w => w.reliefs],
   idle: ['30 天沒用', w => w.lastUsed && Date.now() - lastOf(w) > 30 * 86_400_000],
   passkey: ['有通行密鑰', w => w.passkeys > 0]
@@ -1051,8 +1037,8 @@ $('sort').onclick = e => {
   drawWallets();
 };
 $('csv').onclick = () => {
-  const head = ['代號', '狀態', 'App', '建立', '最後使用', '餘額', '紀錄筆數', '信貸', '未還', '紓困次數', '繳稅', '通行密鑰'];
-  const rows = wallets.map(w => [w.ref, w.lastUsed ? '使用中' : '未使用', w.apps.map(appName).join(' / '), w.created || '', w.lastUsed || '', w.balance ?? '', w.entries, w.loan ? LOAN_TAG[w.loan][0] : '', w.owed || '', w.reliefs || '', w.tax || '', w.passkeys || 0]);
+  const head = ['代號', '狀態', 'App', '建立', '最後使用', '餘額', '紀錄筆數', '紓困次數', '繳稅', '通行密鑰'];
+  const rows = wallets.map(w => [w.ref, w.lastUsed ? '使用中' : '未使用', w.apps.map(appName).join(' / '), w.created || '', w.lastUsed || '', w.balance ?? '', w.entries, w.reliefs || '', w.tax || '', w.passkeys || 0]);
   const text = '﻿' + [head, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
   const a = el('a', { href: URL.createObjectURL(new Blob([text], { type: 'text/csv' })), download: `Orbit 帳戶 ${new Date().toISOString().slice(0, 10)}.csv` });
   a.click();
@@ -1163,26 +1149,17 @@ function action(title, text, controls, run) {
 }
 // A record's kind as a picture.
 const KIND_IC = { start: ['wallet', '#0ea5e9'], pay: ['work', '#16a34a'], rank: ['trophy', '#d97706'], relief: ['spark', '#db2777'], admin: ['pencil', '#64748b'], rebase: ['swap', '#64748b'], od: ['exchange', '#dc2626'] };
-const kindIc = k => (k.startsWith('loan') || k === 'loan' ? ['bank', '#2563eb'] : KIND_IC[k] || ['list', '#94a3b8']);
-const REC_FILTERS = { all: ['全部', () => true], in: ['進', e => e.amount > 0], out: ['出', e => e.amount < 0], loan: ['信貸', e => e.kind.startsWith('loan')], eco: ['Orbit', e => e.app === 'eco'] };
+const kindIc = k => KIND_IC[k] || ['list', '#94a3b8'];
+const REC_FILTERS = { all: ['全部', () => true], in: ['進', e => e.amount > 0], out: ['出', e => e.amount < 0], eco: ['Orbit', e => e.app === 'eco'] };
 function drawAccount(a) {
   const reload = () => openAccount(a.ref);
-  const tags = [a.balance < 0 ? '透支' : '', a.loan ? LOAN_TAG[a.loan][0] : '', a.reliefs ? `紓困 ×${a.reliefs}` : '', a.lastUsed ? '' : '未使用'].filter(Boolean);
+  const tags = [a.balance < 0 ? '透支' : '', a.reliefs ? `紓困 ×${a.reliefs}` : '', a.lastUsed ? '' : '未使用'].filter(Boolean);
   const hero = el('div', { class: 'acct-hero' });
   hero.innerHTML = heroCardHtml({ eyebrow: '餘額', icon: ic('wallet'), big: money(a.balance), sub: a.apps.length ? `${a.apps.length} 個 App · ${ago(a.lastUsed)}用過` : '還沒用過', color: refColor(a.ref) }, tags.length ? `<div class="hero-chips">${tags.map(t => `<button type="button" tabindex="-1">${escHtml(t)}</button>`).join('')}</div>` : '');
   const facts = el('div', { class: 'facts' });
   facts.innerHTML = [['建立', fmtDay(a.created)], ['紀錄', `${a.entries} 筆`], ['通知', a.pushes.length ? `${a.pushes.length} 個 App` : '沒訂閱'], ['登入世代', String(a.gen)], ['通行密鑰', a.passkeys?.length ? `${a.passkeys.length} 個` : '沒有'], ['設定', `${a.settings.length} 項`], ['收件匣', `${Object.values(a.inbox || {}).reduce((x, y) => x + y, 0)} 則`]].map(([k, v]) => `<div><small>${k}</small><strong>${escHtml(v)}</strong></div>`).join('');
   const apps = el('div', { class: 'app-grid' });
   apps.innerHTML = [...a.apps].sort((x, y) => (y.last || 0) - (x.last || 0)).map(x => `<div class="app-card" style="--c:${BRANDS[x.app]?.color || 'var(--q-accent)'}">${appIc(x.app)}<b>${escHtml(BRANDS[x.app]?.short || appName(x.app))}</b><small>${escHtml(ago(x.last))}</small></div>`).join('');
-  // 信貸: the one being paid (or in 催收) and how many are settled.
-  const open = a.loans?.find(l => !l.settled);
-  const done = (a.loans || []).filter(l => l.settled).length;
-  const loanBox = a.loans?.length ? el('div', { class: 'loan-card' }) : null;
-  if (loanBox)
-    loanBox.innerHTML = open
-      ? `<div class="row"><strong>信貸 ${escHtml(money(open.principal))}</strong><span class="q-tag ${LOAN_TAG[a.loan]?.[1] || 'blue'}">${escHtml(LOAN_TAG[a.loan]?.[0] || '信貸')}</span></div><div class="loan-meter"><i style="width:${Math.min(100, (open.paid / open.weeks) * 100)}%"></i></div><div class="row muted"><span>已繳 ${open.paid} / ${open.weeks} 期 · 年利率 ${(open.apr * 100).toFixed(1)}%</span><span>未還 ${escHtml(money(open.owed))}</span></div>${open.lates ? `<p class="muted" style="margin:6px 0 0">遲繳 ${open.lates} 次${open.bad ? '，已轉催收' : ''}</p>` : ''}${done ? `<p class="muted" style="margin:6px 0 0">之前 ${done} 筆已清償</p>` : ''}`
-      : `<div class="row"><strong>信貸</strong><span class="q-tag green">都已清償</span></div><p class="muted" style="margin:6px 0 0">${done} 筆，最近一筆 ${escHtml(fmtDay(a.loans.at(-1).t))}</p>`;
-
   // 政府: what this account paid and got (as its 真相 shows it).
   const G = a.gov || {};
   const govRows = GOV_ROWS.map(([k, , side, icon, short]) => [short, side === 'got' ? G.got?.[k] || 0 : -(G.paid?.[k] || 0), icon]).filter(r => r[1]);
@@ -1360,7 +1337,6 @@ function drawAccount(a) {
     hero,
     facts,
     ...(a.apps.length ? [el('div', { class: 'sec-head' }, [el('h2', { text: 'App' })]), apps] : []),
-    ...(loanBox ? [loanBox] : []),
     ...(govBox ? [el('div', { class: 'sec-head' }, [el('h2', { text: '政府' })]), govBox] : []),
     ...(keyBox ? [el('div', { class: 'sec-head' }, [el('h2', { text: '通行密鑰' })]), keyBox] : []),
     el('div', { class: 'sec-head' }, [el('h2', { text: '操作' })]),
@@ -1531,7 +1507,7 @@ async function loadMoney() {
     const govTake = -n(all.gov, 'net');
     $('mo-tiles').replaceChildren(
       tile('系統淨發出', big(net), gone.accounts ? `還回 ${big(n(gone, 'worth'))}` : `${n(live, 'accounts')} 個帳戶`),
-      tile('Orbit 賺', big(n(all, 'orbit')), '透支利息和信貸費用'),
+      tile('Orbit 賺', big(n(all, 'orbit')), '透支利息'),
       tile('政府收', big(govTake), `稅減紓困`),
       tile('市場', big(n(all, 'own')), n(all, 'own') >= 0 ? '玩家投資淨賺' : '玩家投資淨賠'),
       tile('流通中', big(n(live, 'worth')), '現有帳戶的身價')
@@ -1546,7 +1522,7 @@ async function loadMoney() {
     if (!wallets.length) await loadWallets();
     const taxed = wallets.filter(w => w.tax > 0).sort((a, b) => b.tax - a.tax).slice(0, 5);
     $('mo-taxed').innerHTML = taxed.length ? acctCard(taxed.map(w => ({ ...w, shown: `−${money(w.tax)}`, red: true })), { compact: true }) : emptyCard('check', '還沒有人繳稅');
-    flow('mo-orbit', [['透支利息', n(all.fees, 'od')], ['信貸（淨）', n(all.fees, 'loan')]].filter(r => r[1]), { total: ['合計', n(all, 'orbit')] });
+    flow('mo-orbit', [['透支利息', n(all.fees, 'od')]].filter(r => r[1]), { total: ['合計', n(all, 'orbit')] });
     flow('mo-own', byMarket(all.stockBy, n(all, 'own'), MARKET_NAMES, ['其他', '股利、利息、匯兌']), { total: ['合計', n(all, 'own')] });
     $('mo-note').textContent = `帳戶刪除時，剩下的錢還給系統（透支的帳戶，欠的由系統吸收）；它讓 Orbit 賺的和在市場賺賠的照樣留在帳上。各市場由 Securities 打開時回報，還沒打開過新版的帳戶算在「未分類／其他」。刪除的帳戶${gone.since ? `從 ${fmtDay(gone.since)} 起` : '從現在起'}記錄。${fmt(m.at)} 更新。`;
   } catch (e) {
