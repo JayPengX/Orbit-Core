@@ -1,7 +1,7 @@
 // Orbit Law's figures, notices and bills, matched to a question.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { matchFacts, matchNews, matchBills, matchBudgets, budgetYear, budgetMoney, expand, groundPrompt, groundOut } from '../law-ground.js';
+import { forElection, groundFor, forgetGround, matchFacts, matchNews, matchBills, matchBudgets, budgetYear, budgetMoney, expand, groundPrompt, groundOut } from '../law-ground.js';
 
 test('synonyms count both ways: 基本工資 finds 最低工資', () => {
   assert.match(expand('基本工資多少'), /最低工資/);
@@ -45,6 +45,31 @@ test('bills on a 立法院 question: by its topic, never by 立法院 itself; wi
   assert.deepEqual(matchBills(items, '最近有什麼兩大黨的支持通過的法案').map(b => b.k), ['old', 'mil']);
   assert.deepEqual(matchBills(items, '立法院最近通過了什麼').map(b => b.k), ['old', 'tax', 'mil']);
   assert.deepEqual(matchBills(items, '立法院職權行使法修到哪').map(b => b.k), ['ly2']);
+});
+
+test('「為了選舉」 reads two ways: election-law bills, and the newest passed beside them', async () => {
+  assert.ok(forElection('最近為了選舉立法院搞了啥'));
+  assert.ok(forElection('選前立法院通過了什麼'));
+  assert.ok(!forElection('選舉權幾歲'));
+  const items = [
+    { k: 'vote', n: '公職人員選舉罷免法', stage: 4, u: '2026-08-14' },
+    { k: 'old', n: '老人福利法', stage: 6, u: '2026-10-20', passed: '2026-10-16' },
+    { k: 'tax', n: '所得稅法', stage: 7, u: '2026-09-11', passed: '2026-08-21' }
+  ];
+  const real = globalThis.fetch;
+  globalThis.fetch = async url => new Response(String(url).endsWith('bills/items.json') ? JSON.stringify({ items }) : 'null', { status: String(url).endsWith('bills/items.json') ? 200 : 404 });
+  forgetGround();
+  try {
+    const g = await groundFor('最近為了選舉立法院搞了啥');
+    assert.deepEqual(g.bills.map(b => b.k), ['vote']);
+    assert.deepEqual(g.recent.map(b => b.k), ['old', 'tax']);
+    assert.match(groundPrompt(g), /最近三讀的法案[\s\S]*老人福利法/);
+    assert.deepEqual(groundOut(g).bills.map(b => b.k), ['vote', 'old', 'tax']);
+    assert.deepEqual((await groundFor('選舉權幾歲')).recent, []);
+  } finally {
+    globalThis.fetch = real;
+    forgetGround();
+  }
 });
 
 test('nothing matched: no block, nothing added to the answer', () => {

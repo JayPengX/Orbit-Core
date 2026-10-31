@@ -326,8 +326,9 @@ Rules:
 - next: only concrete steps the reader can take now, naming the actual office, form, deadline or amount from what is given (e.g. 「30 日內向勞工局申請調解」); leave it empty rather than give generic advice. Each at most 24 Chinese characters (evidence to keep, who to write to, deadlines from the articles, where to file); never a law that isn't above.
 - followups: up to 3 questions the reader may ask next, each at most 14 Chinese characters (6 English words).
 - covered: true when the material lets you give a reasoned answer, even by applying general articles (e.g. 民法 第184條) to the facts. Set it false only when nothing above bears on the question; then say plainly what's missing, and next may suggest a lawyer or 法律扶助基金會.
-${ly ? `- This is a question about what the 立法院 is doing, not a legal case: answer it as a well-informed news summary from the bills, votes, budgets and meetings above (what moved, what each does, who proposed or backed it, and when), newest first. The articles only explain how the 立法院 works; don't make them the answer. covered is true whenever a bill, vote, budget or meeting above bears on it. If the reader means something none of the lines show, say in one line what the latest ones are instead; never say records are missing. next: only where to follow it (a bill's next step), never a lawyer or 法律扶助.
-` : ''}- Don't add a disclaimer; the app shows one.
+${ly ? `- Today is ${twDay()}. This is a question about what the 立法院 is doing, not a legal case: answer it as a well-informed news summary from the bills, votes, budgets and meetings above (what moved, what each does, who proposed or backed it, and when), newest first. The articles are background on the laws those bills change; don't make them the answer. covered is true whenever a bill, vote, budget or meeting above bears on it. If the reader means something none of the lines show, say in one line what the latest ones are instead; never say records are missing. next: only where to follow it (a bill's next step), never a lawyer or 法律扶助.
+${ground?.recent?.length ? `- The reader asks what was done "for" an election, which reads two ways: changes to election law (the 立法院進度 lines), and what the 立法院 passed just before an election that voters will feel (the 最近三讀 lines). Cover both, briefly, each bill with what it does and who proposed it. State only what happened and when; never claim or guess a motive, and give no election date that isn't above.
+` : ''}` : ''}- Don't add a disclaimer; the app shows one.
 - Write everything in ${en ? 'plain English' : 'Traditional Chinese as used in Taiwan (繁體中文)'}.`;
 }
 
@@ -504,7 +505,13 @@ export async function answerChat(chat, pass, env, ctx, headers, gemini, stage = 
     // (A question about the 立法院's work: few articles, no judgments or rules.)
     const people = matchPeople(peopleF?.people, asked);
     const ly = asksLy(asked);
-    const articles = await find(chat, plan, ly);
+    let articles = await find(chat, plan, ly);
+    // A question about the 立法院's work with its bills found: only those bills' laws' articles (and the
+    // reader's own), not how a 三讀 works or 國民大會's 選舉 (Jay 2026-10-31: they read as the answer).
+    if (ly && ground.bills.length) {
+      const keep = new Set([...ground.bills.map(b => b.p), ...chat.pin.map(x => x.p), ...chat.history.flatMap(t => t.cites.map(c => c.split(':')[0]))].filter(Boolean));
+      articles = articles.filter(a => keep.has(a.p));
+    }
     mark('find');
     // What it looks at next, said as it is (Jay 2026-10-27: it always said 找條文 while it read a legislator's record).
     stage({ stage: 'found', arts: articles.length, laws: [...new Set(articles.map(a => a.n))].slice(0, 3), look: lookOf(ground, people, ly) });

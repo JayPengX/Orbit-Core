@@ -161,14 +161,15 @@ export function bothYes(v, names, partyOf) {
 // The votes a question is about: a law found or named (by its code), the
 // newest first; else, when it names legislators, their newest; else, with
 // vote words, the ones whose 議題 shares the most with it. Asked what both
-// big parties backed: only votes most of each voted yes on (any law when
+// big parties backed: only whole-bill votes most of each voted yes on (any law when
 // none found has one).
 export function matchVotes(data, text, ps, people, partyOf = new Map()) {
   let rows = (Array.isArray(data?.votes) ? data.votes : []).filter(v => Array.isArray(v) && typeof v[0] === 'string');
   const newer = (a, b) => String(b[1]).localeCompare(String(a[1]));
   const asked = VOTE_WORDS.test(text) || people.length > 0;
   if (!asked) return [];
-  if (BOTH.test(text) && partyOf.size) rows = rows.filter(v => bothYes(v, data.names || [], partyOf));
+  // (Whole bills only: a 復議案 or one article's 再修正動議 isn't a law both backed.)
+  if (BOTH.test(text) && partyOf.size) rows = rows.filter(v => /全案/.test(v[2]) && bothYes(v, data.names || [], partyOf));
   const want = new Set(ps);
   const ofLaw = rows.filter(v => (v[7] || []).some(p => want.has(p)));
   if (ofLaw.length) return ofLaw.sort(newer).slice(0, MORE_LIMITS.votes);

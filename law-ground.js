@@ -152,11 +152,22 @@ export function matchBills(items, text, max = GROUND_LIMITS.bills) {
   // A topic no bill is on: none (the laws the plan finds bring theirs).
   if (want.size) return [];
   // No topic: what the 立法院 did lately (Jay 2026-10-31: 「最近有什麼兩大黨支持通過的法案」 got 立法院組織法).
-  const passed = PASSED.test(t);
-  const pool = list.filter(b => !b.dropped && (!passed || b.passed) && (!BOTH.test(t) || bothSides(b)));
+  return latestBills(list, { passed: PASSED.test(t), both: BOTH.test(t) }, max);
+}
+
+// The 立法院's latest: the newest passed (passed), or moved; only those both big parties proposed (both).
+export function latestBills(items, { passed = false, both = false } = {}, max = GROUND_LIMITS.bills) {
+  const pool = (Array.isArray(items) ? items : []).filter(b => b && typeof b.n === 'string' && Number.isInteger(b.stage) && !b.dropped && (!passed || b.passed) && (!both || bothSides(b)));
   const when = b => String((passed && b.passed) || b.u || '');
   return pool.sort((a, b) => when(b).localeCompare(when(a))).slice(0, max);
 }
+
+// 「為了選舉搞了啥」 reads two ways: election law, or what passed just before
+// an election for voters to feel (Jay 2026-10-31). The second gets the newest
+// passed too, whatever they're on.
+const ELECTION = /選舉|選前|大選|九合一|選情|選票/;
+const FOR_IT = /為了|選前|前夕|之前|拚|衝|討好|騙|政績|買票/;
+export const forElection = text => ELECTION.test(String(text || '')) && FOR_IT.test(String(text || ''));
 
 // The budgets a budget question is about: those of the 年度 it names (116,
 // 116年, 2027 → 116; the k or the title), else the newest 年度's (its 總預算
@@ -229,11 +240,15 @@ const factLine = f => {
   return parts.join('；');
 };
 const newsLine = n => `${cut(n[0], 10)} ${cut(n[1], 30)}「${cut(n[2], 120)}」${cut(n[4], GROUND_LIMITS.newsChars)} 來源：${urls([n[3]])[0] || ''}`;
+const isoDay = d => String(d || '').replace(/^(\d{4})(\d{2})(\d{2})$/, '$1-$2-$3');
 const billLine = b => {
   const stage = STAGES[b.stage] || '';
   const by = (Array.isArray(b.by) ? b.by : []).filter(x => Array.isArray(x)).map(([p, n]) => `${p} ${n}案`).join('、');
-  const marks = [b.dropped && '已撤回或不予審議', b.held && '擱置', b.passed && `三讀 ${b.passed}`, b.pub && `公布 ${b.pub}`].filter(Boolean).join('，');
-  return `「${cut(b.n, 120)}」進度：${stage}${marks ? `（${marks}）` : ''}${by ? `；提案：${by}` : ''}${b.u ? `；更新 ${b.u}` : ''}${b.about ? `；目的：${cut(b.about, 90)}` : ''}`;
+  const done = [b.passed && `${isoDay(b.passed)} 三讀`, b.pub && `${isoDay(b.pub)} 公布`].filter(Boolean).join('、');
+  // (Passed, then new versions: what passed and what's open now, apart; 「協商（三讀 …）」 read as both at once.)
+  const where = done && b.stage < 6 ? `已於 ${done}；之後${b.open ? `又有 ${b.open} 個新版本，` : ''}停在「${stage}」` : b.stage === 6 ? `${done || '三讀'}，待總統公布` : `${stage}${done ? `（${done}）` : ''}`;
+  const marks = [b.dropped && '已撤回或不予審議', b.held && '擱置'].filter(Boolean).join('，');
+  return `「${cut(b.n, 120)}」進度：${where}${marks ? `（${marks}）` : ''}${by ? `；提案：${by}` : ''}${b.u ? `；更新 ${b.u}` : ''}${b.about ? `；最新版本的目的：${cut(b.about, 90)}` : ''}`;
 };
 
 // The grounding for a question: { facts, news, bills } matched, read from
@@ -243,14 +258,17 @@ export async function groundFor(text) {
   const budgets = matchBudgets(y?.budgets, text);
   // (A budget question gets the budgets, not every bill whose name says 預算; a law it names still brings its bills.)
   const bills = matchBills(b?.items, text).filter(x => !budgets.length || (lawOf(x.n).length >= 3 && text.includes(lawOf(x.n))));
-  return { facts: matchFacts(f?.facts, text), news: matchNews(n?.news, text), bills, budgets };
+  const seen = new Set(bills.map(x => x.k));
+  const recent = forElection(text) ? latestBills(b?.items, { passed: true }).filter(x => !seen.has(x.k)) : [];
+  return { facts: matchFacts(f?.facts, text), news: matchNews(n?.news, text), bills, budgets, recent };
 }
+const recentOf = g => g?.recent || [];
 
 const budgetsOf = g => g?.budgets || [];
-export const hasGround = g => Boolean(g && (g.facts.length || g.news.length || g.bills.length || budgetsOf(g).length));
+export const hasGround = g => Boolean(g && (g.facts.length || g.news.length || g.bills.length || budgetsOf(g).length || recentOf(g).length));
 
 // What changes the answer: a fingerprint for the kept answers' keys.
-export const groundKey = g => (hasGround(g) ? [...g.facts.map(f => `${f.id}=${f.now ?? ''}>${f.next ?? ''}`), ...g.news.map(n => n[3]), ...g.bills.map(b => `${b.k}@${b.stage}${b.u ?? ''}`), ...budgetsOf(g).map(b => `budget:${b.k}@${b.last ?? ''}${b.money ? `$${b.money.total ?? ''}/${b.money.cut ?? ''}` : ''}`)].join('|') : '');
+export const groundKey = g => (hasGround(g) ? [...g.facts.map(f => `${f.id}=${f.now ?? ''}>${f.next ?? ''}`), ...g.news.map(n => n[3]), ...[...g.bills, ...recentOf(g)].map(b => `${b.k}@${b.stage}${b.u ?? ''}`), ...budgetsOf(g).map(b => `budget:${b.k}@${b.last ?? ''}${b.money ? `$${b.money.total ?? ''}/${b.money.cut ?? ''}` : ''}`)].join('|') : '');
 
 // The prompt's blocks, and its rule (empty when nothing matched).
 export function groundPrompt(g) {
@@ -258,6 +276,7 @@ export function groundPrompt(g) {
   const blocks = [];
   if (g.facts.length || g.news.length) blocks.push(`政府公告與數字 (official figures and agencies' notices, newest data Orbit Law has):\n${[...g.facts.map(factLine), ...g.news.map(newsLine)].map(l => `- ${l}`).join('\n')}`);
   if (g.bills.length || budgetsOf(g).length) blocks.push(`立法院進度 (bills and budgets in the 立法院 and their stage):\n${[...g.bills.map(billLine), ...budgetsOf(g).map(budgetLine)].map(l => `- ${l}`).join('\n')}`);
+  if (recentOf(g).length) blocks.push(`最近三讀的法案 (the newest the 立法院 passed, on any subject: what it passed ahead of an election):\n${recentOf(g).map(l => `- ${billLine(l)}`).join('\n')}`);
   return `${blocks.join('\n\n')}
 
 About these:
@@ -271,11 +290,13 @@ About these:
 `;
 }
 
+// The bill cards (the app shows 6): with the newest passed beside them, 3 of each first.
+const billsShown = g => (recentOf(g).length ? [...g.bills.slice(0, 3), ...recentOf(g).slice(0, 3), ...g.bills.slice(3), ...recentOf(g).slice(3)] : g.bills);
 // What the answer carries: the notices and bills the model was given.
 export function groundOut(g) {
   if (!hasGround(g)) return {};
   const notices = [...g.facts.map(f => ({ t: cut(f.t || f.text, 120), url: urls(f.src)[0] || '', d: cut(f.d ?? f.date ?? '', 40), agency: cut(f.agency ?? '', 40) })), ...g.news.map(n => ({ t: cut(n[2], 120), url: urls([n[3]])[0] || '', d: cut(n[0], 10), agency: cut(n[1], 40) }))];
   // (A budget first: it's what a budget question asked, not 預算法's bills; Jay 2026-10-27 found it under 更多1件.)
-  const bills = [...budgetsOf(g).map(b => ({ k: `budget:${b.k}`, n: b.title, stage: -1, d: cut(b.stage, 20) })), ...g.bills.map(b => ({ k: b.k, n: b.n, stage: b.stage, ...(b.passed || b.u ? { d: String(b.passed || b.u).slice(0, 10) } : {}) }))];
+  const bills = [...budgetsOf(g).map(b => ({ k: `budget:${b.k}`, n: b.title, stage: -1, d: cut(b.stage, 20) })), ...billsShown(g).map(b => ({ k: b.k, n: b.n, stage: b.stage, ...(b.passed || b.u ? { d: String(b.passed || b.u).slice(0, 10) } : {}) }))];
   return { ...(notices.length ? { notices } : {}), ...(bills.length ? { bills } : {}) };
 }
