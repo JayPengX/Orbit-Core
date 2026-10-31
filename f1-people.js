@@ -2,7 +2,8 @@
 // driver, a team's reserve) has no formula1.com page and no ESPN headshot.
 // Two reads for Orbit Sports, through the F1 live host (f1-live.js):
 //   /about.json?name=Gabriele Minì: who he is, Wikipedia's first lines
-//     ({ en, zh, url }: the Chinese article's own where there is one);
+//     ({ en, zh, url }: the Chinese article's own where there is one), and
+//     his studio cutout (TheSportsDB's: `photo`), found once for every phone;
 //   /face.json?u=<a TheSportsDB cutout>: where his head is in it
 //     ({ x, y, s }: the crop's centre as shares of the picture, and how far
 //     in to go), so a round face is his head and shoulders like ESPN's,
@@ -23,9 +24,20 @@ async function summary(host, title, headers) {
   const d = await res.json();
   return d?.type === 'standard' ? d : null;
 }
+// His TheSportsDB cutout: a motorsport player of the same name (accents aside).
+const foldName = s => String(s || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+async function cutoutOf(name) {
+  const res = await get(`https://www.thesportsdb.com/api/v1/json/123/searchplayers.php?p=${encodeURIComponent(name)}`).catch(() => null);
+  const list = (res?.ok ? await res.json().catch(() => null) : null)?.player || [];
+  return list.find(p => p.strSport === 'Motorsport' && foldName(p.strPlayer) === foldName(name) && p.strCutout)?.strCutout || '';
+}
 export async function driverAbout(name) {
   const n = String(name || '').replace(/\s+/g, ' ').trim();
   if (!n || n.length > 60) return null;
+  const photo = cutoutOf(n);
+  return { ...(await wikiAbout(n)), photo: await photo };
+}
+async function wikiAbout(n) {
   let en = await summary('en.wikipedia.org', n);
   if (en && !WIKI_DRIVER.test(`${en.description || ''} ${en.extract || ''}`)) en = null;
   // "Ryo Hirakawa" may be under "Ryō Hirakawa": Wikipedia's search, its first driver.
