@@ -117,7 +117,9 @@ const CLUBS = {
   // The FA Cup's first round 2026-27 (its non-league clubs, ESPN's names, some cut short: "Worcester Ci")
   'oxford city': '牛津城', 'stafford rangers': '斯塔福德流浪者', 'afc hornchurch': '霍恩徹奇', hornchurch: '霍恩徹奇', marine: '馬林', 'rushden diamonds': '拉什登鑽石', rushden: '拉什登鑽石', 'yeovil town': '約維爾', yeovil: '約維爾',
   'worcester city': '伍斯特城', 'dover athletic': '多佛競技', dover: '多佛競技', rochdale: '羅奇代爾', guiseley: '吉斯利', 'afc fylde': '費爾德', fylde: '費爾德', 'kidderminster harriers': '基德明斯特', kidderminster: '基德明斯特',
-  'harborough town': '哈伯勒', alvechurch: '阿爾夫徹奇', 'salisbury fc': '索爾茲伯里', salisbury: '索爾茲伯里', sholing: '肖林', 'cray wanderers': '克雷流浪者', 'wimborne town': '溫伯恩', 'plymouth parkway': '普利茅斯公園路', berkhamsted: '伯克姆斯特德'
+  'harborough town': '哈伯勒', alvechurch: '阿爾夫徹奇', 'salisbury fc': '索爾茲伯里', salisbury: '索爾茲伯里', sholing: '肖林', 'cray wanderers': '克雷流浪者', 'wimborne town': '溫伯恩', 'plymouth parkway': '普利茅斯公園路', berkhamsted: '伯克姆斯特德',
+  // Met in players' careers (Sports' 生涯球隊): Germany's second tier, Switzerland
+  hertha: '柏林赫塔', 'hertha bsc': '柏林赫塔', 'hertha berlin': '柏林赫塔', 'fortuna dusseldorf': '杜塞道夫', 'hannover 96': '漢諾威 96', nurnberg: '紐倫堡', '1 nurnberg': '紐倫堡', karlsruher: '卡爾斯魯厄', kaiserslautern: '凱澤斯勞滕', '1 kaiserslautern': '凱澤斯勞滕', sion: '錫永', basel: '巴塞爾', 'basel 1893': '巴塞爾', zurich: '蘇黎世', lugano: '盧加諾', servette: '塞爾維特', 'st gallen': '聖加崙'
 };
 
 // NPB, KBO, CPBL as Taiwan writes them (their own names and Kambi's spellings), by normalizeTeamName().
