@@ -17,6 +17,10 @@ export const PAGES = {
   sports: {
     default: ['tabs'],
     'nba-game': { args: click('#tab-matches', '[data-league=nba]', "js:[...document.querySelectorAll('.q-chip.day.is-today')].find(e=>e.offsetParent)?.click()", "js:[...document.querySelectorAll('.event-row')].find(e=>e.offsetParent)?.click()", wait(4000)) },
+    // Today's first NBA game (under 全部), scrolled to a card by its title: 勝率走勢 (the chart and 關鍵時刻), 本季對戰.
+    'nba-chart': { args: click('#tab-matches', wait(3000), "js:document.querySelector('.all-league[data-league=nba] .event-row').click()", wait(9000), "js:[...document.querySelectorAll('dialog.q-sheet[open] .q-card')].find(c=>/勝率走勢|Win probability/.test(c.textContent))?.scrollIntoView({block:'start'})", wait(1500)) },
+    'nba-series': { args: click('#tab-matches', wait(3000), "js:document.querySelector('.all-league[data-league=nba] .event-row').click()", wait(9000), "js:[...document.querySelectorAll('dialog.q-sheet[open] .q-card')].find(c=>/本季對戰|Season series/.test(c.textContent))?.scrollIntoView({block:'start'})", wait(1500)) },
+    'nba-closing': { args: click('#tab-matches', wait(3000), "js:document.querySelector('.all-league[data-league=nba] .event-row').click()", wait(9000), "js:document.querySelector('dialog.q-sheet[open] .lp-scoring')?.scrollIntoView({block:'start'})", wait(1500)) },
     // A football game to come (the first MLS one two days on, under 全部): 先發陣容 and 勝率預測.
     'mls-game': { args: click('#tab-matches', "js:[...document.querySelectorAll('.q-chip.day')].filter(e=>e.offsetParent)[[...document.querySelectorAll('.q-chip.day')].filter(e=>e.offsetParent).findIndex(e=>e.classList.contains('is-today'))+2].click()", wait(4000), "js:document.querySelector('.all-league[data-league=mls] .event-row').click()", wait(12000)) },
     'f1-weekend': { args: click('#tab-matches', '[data-league=f1]', tap('Ended|已結束'), "js:document.querySelector('.wk-card.done')?.click()", wait(4000)) },
