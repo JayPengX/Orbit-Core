@@ -2410,6 +2410,9 @@ dialog.q-moved::backdrop {
 }
 .q-gate-box {
   width: min(400px, 100%);
+  /* (Centred while it fits, from its top when it's taller than the screen,
+     a phone on its side: centred, its top went out of reach.) */
+  margin-block: auto;
   display: grid;
   justify-items: center;
   gap: 10px;
@@ -5112,8 +5115,17 @@ html.q-tabrail .q-tab-action {
   bottom: auto;
   left: calc(var(--q-tabrail-x) + (68px - var(--q-act)) / 2);
 }
-/* A phone on its side is short: the large titles a size down, as iOS's. */
+/* A phone on its side is short: the large titles a size down, as iOS's;
+   the sign-in screens without their big mark. */
 @media (orientation: landscape) and (max-height: 520px) {
+  .q-gate-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+  }
+  .q-gate-brand {
+    display: none;
+  }
   :root {
     --q-t-large: 700 28px/34px var(--q-font);
   }
