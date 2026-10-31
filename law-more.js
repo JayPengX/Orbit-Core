@@ -158,6 +158,8 @@ export function bothYes(v, names, partyOf) {
   const of = (list, p) => (list || []).filter(i => partyOf.get(names[i]) === p).length;
   return BIG.every(p => of(v[4], p) >= 10 && of(v[4], p) > of(v[5], p) + of(v[6], p));
 }
+// The question names this law (its full name, or without 法/條例 at the end).
+export const lawNamed = (text, n) => Boolean(n) && (String(text).includes(n) || (n.length > 3 && String(text).includes(n.replace(/(施行細則|條例|法)$/, ''))));
 // The votes a question is about: a law found or named (by its code), the
 // newest first; else, when it names legislators, their newest; else, with
 // vote words, the ones whose 議題 shares the most with it. Asked what both
@@ -350,7 +352,12 @@ export async function moreFor(text, articles, { mine = null, items = [], today =
   const [rulings, peopleF, votesF, agendaF, rulesF, consF, localF] = await warmMore();
   const people = matchPeople(peopleF?.people, text, own?.people || []);
   const partyOf = new Map((peopleF?.people || []).map(p => [p.n, p.party]));
-  const votes = votesF ? matchVotes(votesF, text, ps, people, partyOf) : [];
+  // Asked about legislators (by name, or the ones followed): their newest votes,
+  // narrowed to a law only when the question names it (an article the search
+  // found for 我追蹤的立委投了什麼票 would pin the answer to that law's old votes).
+  const named = people.length ? ps.filter(p => lawNamed(text, articles.find(a => a.p === p)?.n)) : ps;
+  const votes = votesF ? matchVotes(votesF, text, named, people, partyOf) : [];
+  const votesThrough = votesF ? (votesF.votes || []).reduce((m, v) => (Array.isArray(v) && String(v[1]) > m ? String(v[1]) : m), '') : '';
   const cons = matchCons(consF?.items, cites, text);
   // (A question about the 立法院's work gets no judgments or rules: they'd be noise there.)
   const ly = LY_ONLY.test(text);
@@ -380,6 +387,7 @@ export async function moreFor(text, articles, { mine = null, items = [], today =
     cases,
     people,
     votes: votes.map(v => ({ id: v[0], d: String(v[1] || ''), t: voteTopic(v, votesF), line: voteLine(v, votesF, partyOf, people) })),
+    votesThrough,
     meets,
     rules,
     mine: own ? { ...own, items: myItems } : null
@@ -399,7 +407,7 @@ export function morePrompt(m) {
   if (m.rules.length) blocks.push(`行政規則 (ministries' administrative rules; cite one by its id in quotes):\n${m.rules.map(r => `[cite "${r.id}"] ${r.agency}「${r.n}」${r.d ? `（${r.d}）` : ''}${r.text ? `\n${r.text}` : '（全文未收錄，只有名稱）'}`).join('\n\n')}`);
   if (m.cases.length) blocks.push(`法院判決 (similar cases the courts decided; cite one by its id in quotes):\n${m.cases.map(c => `[cite "${c.jid}"] ${caseLabel(c.jid, c.label)}（${c.d}）${CONS_ID.test(c.jid) ? '' : '案由：'}${cut(c.t, 60)}${c.gist ? `\n${c.gist}` : ''}`).join('\n\n')}`);
   if (m.people.length) blocks.push(`立委 (legislators the reader named; this term):\n${m.people.map(p => `- ${p.n}（${p.party || '無黨籍'}，${p.area || ''}${p.to && p.to < '2028' && p.to !== p.from ? `，任期至 ${p.to}` : ''}）：提案 ${p.counts?.bills ?? '?'} 件、連署 ${p.counts?.cosign ?? '?'} 件、記名表決 ${p.counts?.votes ?? '?'} 次、質詢影片 ${p.counts?.clips ?? '?'} 段${p.bills.length ? `；最近提案：${p.bills.map(b => `${cut(b[1], 10)}「${cut(b[2], 60)}」${cut(b[3], 12)}`).join('；')}` : ''}`).join('\n')}`);
-  if (m.votes.length) blocks.push(`記名表決 (roll-call votes in 立法院):\n${m.votes.map(v => `- ${v.line}`).join('\n')}`);
+  if (m.votes.length) blocks.push(`記名表決 (roll-call votes in 立法院${m.votesThrough ? `; 立法院公報 has published them through ${m.votesThrough}, later floor votes aren't out yet: say so when the reader asks for the latest` : ''}):\n${m.votes.map(v => `- ${v.line}`).join('\n')}`);
   if (m.meets.length) blocks.push(`立法院議程 (coming meetings):\n${m.meets.map(x => `- ${x.d}「${x.t}」${x.why ? `：${x.why}` : ''}`).join('\n')}`);
   if (m.mine) {
     const lines = [];

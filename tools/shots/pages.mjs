@@ -93,7 +93,11 @@ export const PAGES = {
     'bill-diff': { hash: 'item=11-01192', args: click(wait(3000), "js:document.querySelector('.lw-item-diff')?.scrollIntoView({block:'start'})", wait(800)) },
     'article-items': { hash: 'law=G0340003&a=4-5' },
     'in-force': { hash: 'law=B0000001', args: click('.lw-tool[aria-label="更多"], .lw-tool[aria-label="More"]', 'button.q-cell:has-text("施行日期"), button.q-cell:has-text("In force")', wait(800)) },
-    draft: { args: click('#tab-bills', tap('預告|Drafts'), wait(2000), "js:document.querySelector('a.lw-bill.notice')?.click()", wait(3000), "js:document.querySelector('.lw-notice-about')?.click()", "js:document.querySelector('.lw-notice-about')?.scrollIntoView({block:'start'})", wait(800)) }
+    draft: { args: click('#tab-bills', tap('預告|Drafts'), wait(2000), "js:document.querySelector('a.lw-bill.notice')?.click()", wait(3000), "js:document.querySelector('.lw-notice-about')?.click()", "js:document.querySelector('.lw-notice-about')?.scrollIntoView({block:'start'})", wait(800)) },
+    // 立委 by 縣市 (the default), by party, and an independent in the 國民黨 caucus (陳超明).
+    people: { hash: 'tab=bills&f=people', args: click(wait(2500)) },
+    'people-party': { hash: 'tab=bills&f=people', args: click(wait(2500), '[data-by=party]', wait(800)) },
+    independent: { hash: 'who=837', args: click(wait(4000), "js:document.querySelector('.lw-person-line')?.scrollIntoView({block:'center'})", wait(600)) }
   },
   securities: {
     default: ['tabs'],
