@@ -201,10 +201,21 @@
   // wrong is asked again past the browser's cache, which may keep a wrong
   // copy 10 minutes; nothing right is downloaded again. Says how many are
   // still wrong (the CDN still answering the old file).
+  // (Each ask with a time limit: one the connection left hanging held the
+  // mend, and the app, on 正在完成更新… until it was closed.)
+  var timed = function (u, init) {
+    var c = window.AbortController ? new AbortController() : null;
+    setTimeout(function () {
+      if (c) c.abort();
+    }, 10000);
+    var o = init || {};
+    if (c) o.signal = c.signal;
+    return fetch(u, o);
+  };
   var mend = function () {
     var urls = pageFiles();
     var one = function (u) {
-      return fetch(u)
+      return timed(u)
         .then(function (r) {
           return isTrue(u, r);
         })
@@ -212,7 +223,7 @@
           return false;
         })
         .then(function (ok) {
-          return ok || fetch(u, { cache: 'reload' }).then(function (r) {
+          return ok || timed(u, { cache: 'reload' }).then(function (r) {
             return isTrue(u, r);
           });
         })

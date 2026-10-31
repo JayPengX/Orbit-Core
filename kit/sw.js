@@ -70,15 +70,47 @@ async function isTrue(url, response) {
     return false;
   }
 }
+// A request the network leaves hanging: nothing back in STALL_MS (or the
+// file not all in BODY_MS after that) is dropped and asked once more, fresh.
+// It had no limit: a phone's connection that went dead in its sleep (or a
+// stream the CDN never answered) held a file the page imports, and the app
+// sat on its loading screen; reloading asked the same dead connection, and
+// only closing the app and opening it again got it going (Sports, 2026-10-31).
+const STALL_MS = 8000;
+const BODY_MS = 30_000;
+async function fetchOnce(request, init) {
+  const ctl = new AbortController();
+  let timer = setTimeout(() => ctl.abort(), STALL_MS);
+  try {
+    const res = await fetch(request, { ...init, signal: ctl.signal });
+    // (A redirect or another site's answer goes as it came: only a plain file's body is waited for here.)
+    if (res.type !== 'basic' || res.status !== 200 || !res.body) return res;
+    clearTimeout(timer);
+    timer = setTimeout(() => ctl.abort(), BODY_MS);
+    const body = await res.arrayBuffer();
+    return new Response(body, { status: res.status, statusText: res.statusText, headers: res.headers });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+async function fetchSure(request, init = {}) {
+  try {
+    return await fetchOnce(request, init);
+  } catch (error) {
+    // Offline is offline (the kept copies answer); a hung or cut one is asked again, past the browser's cache.
+    if (self.navigator?.onLine === false) throw error;
+    return fetchOnce(typeof request === 'string' ? request : request.url, { ...init, cache: 'reload', credentials: 'same-origin' });
+  }
+}
 // The CDN still on the old file: asked again past the browser's cache (which
 // may hold the same wrong copy for 10 minutes), a moment apart.
 const AGAIN_MS = [0, 1500, 3500];
 async function fetchTrue(request) {
-  const first = await fetch(request);
+  const first = await fetchSure(request);
   if (await isTrue(request.url, first)) return first;
   for (const wait of AGAIN_MS) {
     if (wait) await new Promise(done => setTimeout(done, wait));
-    const res = await fetch(request.url, { cache: 'reload', credentials: 'same-origin' }).catch(() => null);
+    const res = await fetchOnce(request.url, { cache: 'reload', credentials: 'same-origin' }).catch(() => null);
     if (res && (await isTrue(request.url, res))) return res;
   }
   return new Response('', { status: 503, statusText: 'Update not ready', headers: { 'X-Orbit-Stale': '1' } });
@@ -114,7 +146,7 @@ async function networkFirstNow(request, later) {
     // when unchanged): GitHub Pages lets browsers keep it 10 minutes, which
     // would open the last deploy's page right after a new one. By address,
     // since a navigation can't be re-sent with options.
-    const response = request.mode === 'navigate' ? await fetch(request.url, { cache: 'no-cache', credentials: 'same-origin', redirect: 'manual' }) : await fetch(request);
+    const response = request.mode === 'navigate' ? await fetchSure(request.url, { cache: 'no-cache', credentials: 'same-origin', redirect: 'manual' }) : await fetchSure(request);
     later(keep(request, response.clone()));
     return response;
   } catch (error) {
