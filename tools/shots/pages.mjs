@@ -42,7 +42,13 @@ export const PAGES = {
   words: {
     default: ['tabs'],
     quiz: { args: click(tap('開始|Start'), wait(2000)) },
-    word: { hash: 'word=track' }
+    // 練習模式's 句子填空: a round on the words' own examples, the first question answered.
+    sentence: { args: click(wait(2500), "js:[...document.querySelectorAll('.mode-card')].find(e=>/句子填空|Sentences/.test(e.textContent)).click()", wait(1500), "js:document.querySelector('.choice')?.click()", wait(800)) },
+    // 拼字比賽 handed in at once (every question blank): the results page.
+    contest: { args: click(wait(3000), "js:[...document.querySelectorAll('.contest-card button.primary')][0].click()", wait(1500)) },
+    word: { hash: 'word=track' },
+    // A word's sheet once it has been answered (its 學習紀錄): a 句子填空 answered wrong, then that word's sheet.
+    'word-record': { args: click("js:(async()=>{const z=ms=>new Promise(r=>setTimeout(r,ms));await z(2500);[...document.querySelectorAll('.mode-card')].find(e=>/句子填空|Sentences/.test(e.textContent)).click();await z(1500);[...document.querySelectorAll('.choice')][1].click();await z(800);location.hash='word='+document.querySelector('.choice.right .choice-text').textContent;await z(1500);[...document.querySelectorAll('dialog[open]')].pop().querySelector('.word-body').lastElementChild.scrollIntoView();await z(600)})()") }
   },
   beats: {
     default: ['tabs'],
