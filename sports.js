@@ -199,6 +199,7 @@ const CACHE_FUTURES = { tier: 'futures', fresh: 10 * MINUTE, stale: DAY };
 const CACHE_QUOTES = { tier: 'quotes', fresh: 30 * SECOND, stale: 0 };
 const CACHE_HISTORY = { tier: 'history', fresh: 30 * MINUTE, stale: DAY };
 const CACHE_SEARCH = { tier: 'search', fresh: DAY, stale: 7 * DAY };
+const CACHE_CAREER = { tier: 'career', fresh: 7 * DAY, stale: 30 * DAY };
 // A company's numbers (P/E, market value, dividend yield, what it does)
 // change with the price at most: an hour fresh, a day's copy while it
 // refreshes. Search with news (newsCount > 0) is kept 30 minutes.
@@ -284,7 +285,10 @@ function cachePolicyFor(url) {
       if (url.pathname === '/api/v1/schedule' && url.searchParams.get('gameType')) return CACHE_TEAM_SCHEDULE;
       return CACHE_STANDINGS;
     case 'api.jolpi.ca':
-      return CACHE_STANDINGS;
+      // A driver's teams and his years with each (Sports' 生涯車隊): kept a week,
+      // a month old while a fresh one is asked. Jolpica turns the proxy away
+      // after a few hundred reads an hour; these change once a season.
+      return /^\/ergast\/f1\/drivers\/[a-z_]+\/constructors(\/[a-z_]+\/seasons)?\.json$/.test(url.pathname) ? CACHE_CAREER : CACHE_STANDINGS;
     case 'api.openf1.org':
       return CACHE_OPENF1;
     case 'api.open-meteo.com':
