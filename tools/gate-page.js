@@ -388,7 +388,7 @@
     };
     // A page longer than the screen that can't be scrolled by a finger.
     const se = document.scrollingElement || document.documentElement;
-    // (A full-screen page over it, Now Playing or an editor, rightly holds the page behind still.)
+    // (A full-screen page over it, Now Playing or an editor, or an app's own sheet up (aria-modal), rightly holds the page behind still.)
     const cover = (() => {
       for (let e = document.elementFromPoint(innerWidth / 2, innerHeight / 2); e && e !== document.body; e = e.parentElement) {
         const r = e.getBoundingClientRect();
@@ -396,7 +396,7 @@
       }
       return false;
     })();
-    if (!cover && !document.querySelector('#loading:not([hidden]), dialog[open], .q-menu, [role=menu]') && se.scrollHeight > innerHeight + 40 && [document.documentElement, document.body].some(e => /hidden|clip/.test(getComputedStyle(e).overflowY))) out.scroll.push(`page ${se.scrollHeight} px tall, scrolling locked (html ${getComputedStyle(document.documentElement).overflowY}, body ${getComputedStyle(document.body).overflowY}${document.querySelector(':modal') ? `, ${name(document.querySelector(':modal'))} open` : ''}${lockedBy()})`);
+    if (!cover && !document.querySelector('#loading:not([hidden]), dialog[open], .q-menu, [role=menu]') && ![...document.querySelectorAll('[aria-modal=true]:not(dialog)')].some(e => e.checkVisibility?.({ visibilityProperty: true })) && se.scrollHeight > innerHeight + 40 && [document.documentElement, document.body].some(e => /hidden|clip/.test(getComputedStyle(e).overflowY))) out.scroll.push(`page ${se.scrollHeight} px tall, scrolling locked (html ${getComputedStyle(document.documentElement).overflowY}, body ${getComputedStyle(document.body).overflowY}${document.querySelector(':modal') ? `, ${name(document.querySelector(':modal'))} open` : ''}${lockedBy()})`);
     // A screen with nothing on it, and pictures that failed (an empty logo circle).
     if (screenNow().chars < 15) out.blank.push(`${location.hash || 'start'}: nothing on the screen`);
     for (const img of document.querySelectorAll('img')) if (seen(img) && img.complete && !img.naturalWidth && img.getBoundingClientRect().top < innerHeight * 2) out.pictures.push(`${name(img.parentElement)} ${String(img.getAttribute('src')).slice(0, 80)}`);

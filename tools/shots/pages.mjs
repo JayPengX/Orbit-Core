@@ -52,7 +52,17 @@ export const PAGES = {
     day: { args: click('.wx-hero[data-day]', wait(1500)) },
     search: { args: click('.wx-title', wait(1200)) }
   },
-  orbit: { default: ['tabs'] },
+  orbit: {
+    default: ['tabs'],
+    // (Class needs a timetable: --account demo, or -- --store classFocusData=….)
+    class: { args: click('#cx-hero', wait(1200)) },
+    editor: { args: click('js:window.openEditor()', wait(1200)) },
+    key: { args: click("js:window.openTransferSheet('key')", wait(1200)) },
+    photo: { args: click("js:window.openTransferSheet('photo')", wait(1200)) },
+    swap: { hash: 'week', args: click('.cx-way.is-swap', wait(1200)) },
+    flight: { hash: 'tools', args: click('.cx-fly-card', wait(2500)) },
+    sim: { args: click('js:window.openTestPanel()', wait(1200)) }
+  },
   money: {
     default: ['tabs'],
     // 記一筆 on 數位, its subs and the + for one's own.
