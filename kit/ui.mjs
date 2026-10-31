@@ -157,7 +157,13 @@ export function dayStrip(s, { days = [], current = null, onPick = () => {}, labe
       const gap = parseFloat(cs.columnGap) || 0;
       const n = Math.max(1, Math.floor((room + gap) / (62 + gap)));
       const w = `${Math.floor(((room - gap * (n - 1)) / n) * 10) / 10}px`;
-      if (r.style.getPropertyValue('--q-day-w') !== w) r.style.setProperty('--q-day-w', w);
+      if (r.style.getPropertyValue('--q-day-w') !== w) {
+        r.style.setProperty('--q-day-w', w);
+        // (Every chip a new width: the scroll that centred the chosen day is
+        // stale (a computer's wide row left it half out of view). Centred again.)
+        const chip = r.querySelector('[aria-pressed="true"]');
+        if (chip) r.scrollLeft = chip.offsetLeft - r.offsetLeft - r.clientWidth / 2 + chip.clientWidth / 2;
+      }
       s.edges();
     };
     s.row.addEventListener('scroll', s.edges, { passive: true });
