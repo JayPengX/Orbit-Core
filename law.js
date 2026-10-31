@@ -10,6 +10,9 @@
 //   { mode: 'diff', p, arts, lang }: an amendment explained from Orbit Law's
 //     diff/<p>.json (each article's text before and after), every point
 //     citing one of those articles.
+//   { mode: 'ruling', id, q, lang }: a ruling (憲法法庭's or a top court's)
+//     explained or asked about from its own paragraphs (law-ruling.js),
+//     every point citing one of them.
 //
 // A Orbit Pass of Orbit Law's (worker.js reads it; none, a 401 {error:
 // 'pass'}), from Orbit Law's origin (or a localhost page) only: 10 asks a
@@ -27,6 +30,7 @@ import { groundFor, groundKey, groundOut, groundPrompt } from './law-ground.js';
 import { paceOf } from './pace.js';
 import { sessionLimited } from './orbit-token.js';
 import { DEV } from './kit/brand.mjs';
+import { rulingId, rulingJob } from './law-ruling.js';
 
 export const DATA = 'https://jaypengx.github.io/Orbit-Law/data/';
 // perDay: Gemini's answers a day in all, /law-ask's and /law-chat's (a chat
@@ -85,13 +89,14 @@ export function readAsk(body) {
   const { p, arts, lang = 'zh', mode = 'ask' } = body;
   if (lang !== 'zh' && lang !== 'en') return 'lang';
   if (mode === 'bill') return typeof body.bill === 'string' && BILL.test(body.bill) ? { mode, bill: body.bill, lang } : 'bill';
+  if (body.q != null && typeof body.q !== 'string') return 'q';
+  const q = (body.q || '').replace(/\s+/g, ' ').trim();
+  if (q.length > LAW_LIMITS.maxQ) return 'q';
+  if (mode === 'ruling') return rulingId(body.id) ? { mode, id: body.id, q, lang } : 'id';
   if (mode !== 'ask' && mode !== 'diff') return 'mode';
   if (typeof p !== 'string' || !PCODE.test(p)) return 'p';
   if (!Array.isArray(arts) || !arts.length || arts.length > LAW_LIMITS.maxArts || !arts.every(a => typeof a === 'string' && ART.test(a))) return 'arts';
   if (mode === 'diff') return { mode, p, arts: [...new Set(arts)], lang };
-  if (body.q != null && typeof body.q !== 'string') return 'q';
-  const q = (body.q || '').replace(/\s+/g, ' ').trim();
-  if (q.length > LAW_LIMITS.maxQ) return 'q';
   return { mode, p, arts: [...new Set(arts)], q, lang };
 }
 
@@ -451,7 +456,8 @@ const JOBS = {
       schema: SCHEMA,
       check: raw => checkAnswer(raw, keys)
     };
-  }
+  },
+  ruling: (ask, headers, env) => rulingJob(ask, { env, askKey, fail: (code, status) => fail(code, status, headers) })
 };
 
 // gemini(parts, schema) -> the upstream Response (worker.js's proxyGeminiRequest);
@@ -464,7 +470,7 @@ export async function handleLawAsk(request, env, ctx, headers, session, gemini, 
 
   let job;
   try {
-    job = await JOBS[ask.mode](ask, headers);
+    job = await JOBS[ask.mode](ask, headers, env);
   } catch {
     return fail('upstream', 502, headers);
   }
