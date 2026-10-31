@@ -86,6 +86,7 @@ export const billingMonth = (now = Date.now()) => new Date(now - 8 * HOUR).toISO
 const meter = { month: '', stored: null, readAt: 0, pending: {}, flushedAt: 0 };
 export function resetMeter() {
   Object.assign(meter, { month: '', stored: null, readAt: 0, pending: {}, flushedAt: 0 });
+  Object.assign(lastMeter, { month: '', stored: null, readAt: 0 });
 }
 const meterKey = month => `transit:use:${month}`;
 
@@ -131,8 +132,27 @@ export const tally = (env, key, n = 1, now = Date.now(), ctx = null) => spend(en
 export const TDX_POINTS = { month: 200, basic: 1500, advanced: 200 };
 export const tdxKind = path => (String(path).startsWith('basic/') ? 'b' : 'a');
 export async function tallyTdx(env, path, now = Date.now(), ctx = null) {
-  await tally(env, 'tdx', 1, now, ctx);
   await tally(env, `tdx:${tdxKind(path)}:${twDay(now)}`, 1, now, ctx);
+}
+// TDX's calls this Taiwan month, by kind and day. TDX's month starts at
+// 00:00 on the 1st in Taiwan; the meter's (Google's, Pacific) 16 hours
+// later, so the 1st's first 16 hours sit in last month's meter: read too
+// (once a minute), or they dropped out of the month at 16:00 on the 1st.
+const lastMeter = { month: '', stored: null, readAt: 0 };
+const prevMonth = month => new Date(Date.UTC(+month.slice(0, 4), +month.slice(5, 7) - 2, 1)).toISOString().slice(0, 7);
+export async function tdxUse(env, now = Date.now()) {
+  const month = twDay(now).slice(0, 7);
+  const out = {};
+  const add = from => {
+    for (const [k, n] of Object.entries(from || {})) if (/^tdx:[ab]:/.test(k) && k.slice(6, 13) === month) out[k] = (out[k] || 0) + n;
+  };
+  add(await usage(env, now));
+  if (billingMonth(now) === month) {
+    const last = prevMonth(month);
+    if (lastMeter.month !== last || now - lastMeter.readAt > MIN) Object.assign(lastMeter, { month: last, stored: (await kvJson(env, meterKey(last))) || {}, readAt: now });
+    add(lastMeter.stored);
+  }
+  return out;
 }
 export async function flushUse(env, now = Date.now()) {
   const pending = meter.pending;
@@ -438,22 +458,16 @@ async function devNow() {
 // advanced ones seen since (half when none yet).
 export function tdxPoints(used, now = Date.now()) {
   const today = twDay(now);
-  // TDX's month is Taiwan's; the meter is Google's (Pacific): its first 16 hours of a Taiwan month still hold last month's days, never counted in this one.
+  // (TDX's month is Taiwan's: a day of another month in `used` never counts in this one.)
   const thisMonth = today.slice(0, 7);
-  let b = 0, a = 0, all = 0, todayPts = 0;
+  let month = 0, todayPts = 0;
   for (const [k, n] of Object.entries(used || {})) {
     const m = /^tdx:([ab]):(\d{4}-\d{2}-\d{2})$/.exec(k);
-    if (!m) continue;
-    all += n;
-    if (!m[2].startsWith(thisMonth)) continue;
+    if (!m || !m[2].startsWith(thisMonth)) continue;
     const p = n / (m[1] === 'b' ? TDX_POINTS.basic : TDX_POINTS.advanced);
-    if (m[1] === 'b') b += n;
-    else a += n;
+    month += p;
     if (m[2] === today) todayPts += p;
   }
-  const before = Math.max(0, (used?.tdx || 0) - all);
-  const share = a + b ? a / (a + b) : 0.5;
-  const month = b / TDX_POINTS.basic + a / TDX_POINTS.advanced + before * (share / TDX_POINTS.advanced + (1 - share) / TDX_POINTS.basic);
   return { month, today: todayPts };
 }
 // The guard (the owner navigates by it: the month's 200 points must last,
@@ -484,7 +498,7 @@ export async function freshOf(rule, env = null, path = '', now = Date.now()) {
   const d = await devNow();
   const base = (/Bike/.test(rule.re.source) ? d.tdxBike : d.tdxLive) * 1000;
   if (!env) return base;
-  const g = tdxGuard(tdxPoints(await usage(env, now).catch(() => ({})), now), now);
+  const g = tdxGuard(tdxPoints(await tdxUse(env, now).catch(() => ({})), now), now);
   return base * (tdxKind(path) === 'b' ? g.basic : g.advanced);
 }
 

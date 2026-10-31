@@ -43,11 +43,10 @@ test('a scoreboard is quiet until 5 minutes before its next game (10 minutes at 
 test("TDX's points and the guard: a month's 200 last, slower never off", async () => {
   const { tdxPoints, tdxGuard } = await import('../transit.js');
   const now = Date.parse('2026-10-11T04:00:00Z'); // 12:00 in Taiwan, the 11th
-  const used = { tdx: 4000, 'tdx:b:2026-10-11': 1500, 'tdx:a:2026-10-11': 500 };
+  const used = { 'tdx:b:2026-10-11': 1500, 'tdx:a:2026-10-11': 500, 'tdx:a:2026-10-02': 200 };
   const p = tdxPoints(used, now);
   assert.equal(p.today, 1 + 2.5);
-  // 2,000 counted before the days were: at the 25% advanced seen since.
-  assert.ok(Math.abs(p.month - (3.5 + 2000 * (0.25 / 200 + 0.75 / 1500))) < 1e-9);
+  assert.equal(p.month, 4.5);
   // Never in the way while the rest of the month is covered at the owner's pace.
   assert.equal(tdxGuard(p, now).advanced, 1);
   // 55 used over 10 days (5.5 a day): 20 days more need 110. A heavy day of 30: 115 left, still fine.

@@ -756,6 +756,11 @@ if (key === 'admin') {
   }
   const kv = new Map();
   const env = { ECO_ADMIN_TOKEN: ADMIN_KEY, RATE_LIMIT_KV: { get: async k => kv.get(k) ?? null, put: async (k, v) => void kv.set(k, v), list: async () => ({ keys: [] }), delete: async k => void kv.delete(k) } };
+  // (Made-up Gemini calls over the week, the panel's AI 今天 and Google's day: D1 over node:sqlite.)
+  env.STORE = (await import('../tests/fake-d1.mjs')).fakeD1();
+  const { logCall } = await import('../gemini-use.js');
+  const usage = { promptTokenCount: 1800, cachedContentTokenCount: 400, candidatesTokenCount: 220, thoughtsTokenCount: 90 };
+  for (let i = 0; i < 60; i++) await logCall(env, { feature: ['law-ask', 'law-chat', 'money-read', 'nl-edit'][i % 4], model: i % 4 === 1 ? 'gemini-3.7-flash' : 'gemini-3.5-flash-lite', status: i === 7 ? 429 : 200, usage, at: Date.now() - i * 2.7 * 3_600_000 });
   const stamp = () => new Date().toISOString();
   const deps = {
     now: () => Date.now(),

@@ -240,7 +240,11 @@ per app. News that happens once is told once.
 - **AI caps** are settings too (`DEV ai*`, each naming its Gemini routes):
   calls a day for everyone together, 0 pauses the feature. `worker.js
   aiCap` reads them for `/gemini`, `/nl-edit`, `/law-ask`, `/law-chat`,
-  `/money-read`; each call is tallied `gemd:<feature>:<day>` for the panel.
+  `/money-read`. Every Gemini call (refusals too) is a row in D1
+  `gemini_call` (`gemini-use.js`): the panel's AI 今天 (Taiwan's day),
+  each model on Google's day (Pacific, its daily limits) and the bill.
+- **TDX** counts by Taiwan's day in the meter; its month is Taiwan's
+  (`transit.js tdxUse` reads last month's meter too for the 1st's first 16 h).
 - **Errors**: the proxy tallies each route's 5xx (`err:<route>:<day>`); the
   guard answers `/errors` (each Worker's errors in 24 h) over the `GUARD`
   binding. The panel's 部署 starts or re-runs GitHub workflows with

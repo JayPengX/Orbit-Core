@@ -17,7 +17,8 @@
 import { systemReport, alertAccount, tell, OPS_DOC } from './ops.js';
 import { newPasscode, passAccount, updateWallet, deleteAccount, ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, PAIR_MS, ECO_LIMITS, parseWallet, poolBalance, gen, emptyWallet } from './eco.js';
 import { sendPush, dueLists } from './push.js';
-import { usage as transitUsage, CAPS as TRANSIT_CAPS, TDX_POINTS, tdxPoints, tdxGuard } from './transit.js';
+import { usage as transitUsage, CAPS as TRANSIT_CAPS, TDX_POINTS, tdxPoints, tdxGuard, tdxUse } from './transit.js';
+import { aiUse } from './gemini-use.js';
 import { twDate, GOOGLE_DAILY_CALLS } from './weather.js';
 import { cleanDev, DEV } from './kit/devconfig.mjs';
 import { BRANDS } from './kit/brand.mjs';
@@ -676,33 +677,41 @@ export const ADMIN_TOOLS = {
     return { ok: true, asked: records.length, ...out };
   },
   // What the Worker uses of what it's allowed: Google (Transit's month,
-  // Weather's day) and TDX calls this month.
+  // Weather's day, Gemini's day), TDX this Taiwan month, each AI feature's day.
   async usage({ env, deps }) {
     const now = deps.now();
     const transit = await transitUsage(env, now).catch(() => ({}));
     const weatherCalls = env.RATE_LIMIT_KV ? Number(await env.RATE_LIMIT_KV.get(`weather:google:${twDate(now)}`).catch(() => 0)) || 0 : null;
-    // TDX by Taiwan's day ({ day: { basic, advanced, points } }), the month's points beside its plan.
+    // TDX by Taiwan's day ({ day: { basic, advanced, points } }), this Taiwan month only (it starts again on the 1st).
+    const tdx = await tdxUse(env, now).catch(() => ({}));
     const days = {};
-    for (const [k, n] of Object.entries(transit)) {
+    let total = 0;
+    for (const [k, n] of Object.entries(tdx)) {
       const m = /^tdx:([ab]):(\d{4}-\d{2}-\d{2})$/.exec(k);
       if (!m) continue;
       const d = (days[m[2]] ||= { basic: 0, advanced: 0 });
       d[m[1] === 'b' ? 'basic' : 'advanced'] += n;
+      total += n;
     }
     for (const d of Object.values(days)) d.points = d.basic / TDX_POINTS.basic + d.advanced / TDX_POINTS.advanced;
-    const pts = tdxPoints(transit, now);
-    // Each paid AI feature's calls today and the six days before, against its cap (kit DEV `ai*`, 0 = paused).
+    const pts = tdxPoints(tdx, now);
+    const tw = new Date(now + 8 * 3_600_000);
+    // (When TDX starts the next month: 00:00 on the 1st in Taiwan.)
+    const resets = Date.UTC(tw.getUTCFullYear(), tw.getUTCMonth() + 1, 1) - 8 * 3_600_000;
+    // Each paid AI feature's calls today and the six days before (Taiwan's), against its cap (kit DEV `ai*`, 0 = paused);
+    // each model on Google's own day (Pacific), when that day ends.
     const dev = await readDev(env, deps).catch(() => cleanDev());
-    const week = Array.from({ length: 7 }, (_, i) => twDate(now - (6 - i) * DAY));
+    const use = await aiUse(env, now).catch(() => null);
     const ai = Object.entries(DEV)
       .filter(([, d]) => d.ai)
-      .map(([key, d]) => ({ key, cap: dev[key], days: week.map(day => d.ai.reduce((n, f) => n + (transit[`gemd:${f}:${day}`] || 0), 0)) }));
+      .map(([key, d]) => ({ key, cap: dev[key], days: (use?.week || []).map(day => d.ai.reduce((n, f) => n + (use.byFeature[f]?.[day] || 0), 0)) }));
     return {
       at: now,
-      tdx: { days, points: pts.month, today: pts.today, guard: tdxGuard(pts, now), plan: TDX_POINTS, total: transit.tdx || 0 },
+      tdx: { days, points: pts.month, today: pts.today, guard: tdxGuard(pts, now), plan: TDX_POINTS, total, resets },
       ai,
-      // (The meter keeps Gemini's tokens and calls too: those are the bill's and AI's, not Transit's.)
-      transit: Object.fromEntries(Object.entries(transit).filter(([k]) => !/^(tdx:|gem[df]?:|err:)/.test(k)).map(([k, n]) => [k, { used: n, cap: TRANSIT_CAPS[k] ?? null }])),
+      google: use ? { day: use.googleDay, resets: use.googleResets, models: use.google } : null,
+      // (The meter keeps errors too: the panel's 錯誤, not Transit's.)
+      transit: Object.fromEntries(Object.entries(transit).filter(([k]) => !/^(tdx|gem[df]?|err)(:|$)/.test(k)).map(([k, n]) => [k, { used: n, cap: TRANSIT_CAPS[k] ?? null }])),
       weather: { googleToday: weatherCalls, cap: GOOGLE_DAILY_CALLS }
     };
   },
@@ -725,15 +734,8 @@ export const ADMIN_TOOLS = {
           if (n) weather[d] = n;
         })
       );
-    const gemini = {};
-    // (By feature too: /gemini, /nl-edit, /law-ask, /law-chat, each model's tokens and calls this month.)
-    const features = {};
-    for (const [k, n] of Object.entries(used)) {
-      const m = /^gem:(.+):(in|cached|out):(\d{4}-\d{2}-\d{2})$/.exec(k);
-      if (m) ((gemini[m[1]] ||= {})[m[3]] ||= { in: 0, cached: 0, out: 0 })[m[2]] += n;
-      const f = /^gemf:([\w-]+):(.+):(in|cached|out|n)$/.exec(k);
-      if (f) (((features[f[1]] ||= {})[f[2]] ||= { in: 0, cached: 0, out: 0, n: 0 })[f[3]] += n);
-    }
+    // Gemini's tokens by model and day, and by feature, Google's month so far (gemini-use.js).
+    const { gemini = {}, features = {} } = (await aiUse(env, now).catch(() => null)) || {};
     const maps = Object.fromEntries(Object.entries(TRANSIT_CAPS).map(([k]) => [k, used[k] || 0]));
     const doc = await deps.fsGet(env, CONFIG_COLLECTION, 'billing').catch(() => ({ exists: false }));
     // Until a balance is saved in the panel: the owner's NT$132 of 2026-10-11,

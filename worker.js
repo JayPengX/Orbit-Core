@@ -55,6 +55,7 @@ import { handleStock, moveBook } from './stock-fill.js';
 import { runBuilders, SLOTS as BUILD_SLOTS } from './builders/run.js';
 import { docStore, storeReady } from './doc-store.js';
 import { handleMoneyRead } from './money-read.js';
+import { logCall } from './gemini-use.js';
 import { handleFlight } from './flight.js';
 import { STATE_KEY as GUARD_STATE } from './guard.js';
 // The F1 lap log's Durable Object (f1-live.js), bound as F1_LOG.
@@ -388,6 +389,8 @@ async function geminiCheck(env, model = GEMINI_ALLOWED_MODELS[0]) {
       signal: AbortSignal.timeout(20_000)
     });
     const j = await res.json().catch(() => null);
+    // (A real call against Google's limits like any other: counted as the panel's check.)
+    await logCall(env, { feature: 'check', model, status: res.status, usage: j?.usageMetadata });
     const text = (j?.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('').trim();
     return { ok: res.ok && !!text, status: res.status, model, via: env.GEMINI_RELAY ? 'relay (Taiwan)' : 'direct', ms: Date.now() - t, reply: text.slice(0, 20), tokens: j?.usageMetadata?.totalTokenCount ?? null, error: res.ok ? undefined : String(j?.error?.message || '').slice(0, 160) };
   } catch (e) {
@@ -597,6 +600,8 @@ async function proxyGeminiRequest(model, parts, schema, env, headers, ctx, featu
       signal: timeoutMs ? AbortSignal.timeout(timeoutMs) : undefined
     });
     let body = upstream.body;
+    // (A call Google turned down counts too: a refusal (429) or a failure is still a call against its limits.)
+    if (!upstream.ok && ctx) ctx.waitUntil(logCall(env, { feature, model, status: upstream.status }));
     if (upstream.ok && body && ctx) {
       const [toClient, toLog] = body.tee();
       body = toClient;
@@ -624,7 +629,10 @@ async function streamGeminiRequest(model, parts, schema, env, headers, ctx, feat
       body: JSON.stringify({ contents: [{ parts }], generationConfig: buildGenerationConfig(model, schema, thinking) }),
       signal: timeoutMs ? AbortSignal.timeout(timeoutMs) : undefined
     });
-    if (!upstream.ok || !upstream.body) return new Response(upstream.body, { status: upstream.status, headers: { ...headers, 'Content-Type': 'application/json' } });
+    if (!upstream.ok || !upstream.body) {
+      if (ctx) ctx.waitUntil(logCall(env, { feature, model, status: upstream.status }));
+      return new Response(upstream.body, { status: upstream.status, headers: { ...headers, 'Content-Type': 'application/json' } });
+    }
     const reader = upstream.body.getReader();
     const dec = new TextDecoder();
     let buf = '';
@@ -670,21 +678,13 @@ async function streamGeminiRequest(model, parts, schema, env, headers, ctx, feat
 // it with `wrangler tail` or the Cloudflare dashboard's Workers logs. Only
 // counts are logged - never the prompt, the schedule, or the reply text.
 async function logGeminiUsage(stream, feature, model, env = null, ctx = null) {
+  let usage = {};
   try {
-    const usage = JSON.parse(await new Response(stream).text()).usageMetadata || {};
-    // Counted too (the admin panel's Google 帳單): by Taiwan's day and the
-    // model, tokens read (less those from the cache), from the cache, and
-    // written (thinking is billed as output).
-    if (env) {
-      const day = new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 10);
-      const cached = usage.cachedContentTokenCount ?? 0;
-      const counts = { in: Math.max(0, (usage.promptTokenCount ?? 0) - cached), cached, out: (usage.candidatesTokenCount ?? 0) + (usage.thoughtsTokenCount ?? 0) };
-      for (const [k, n] of Object.entries(counts)) if (n) await tally(env, `gem:${model}:${k}:${day}`, n, Date.now(), ctx);
-      // (And each feature's calls by the day, against its cap: the panel's AI 今天.)
-      await tally(env, `gemd:${feature}:${day}`, 1, Date.now(), ctx);
-      // (And by feature for the month, with its calls: which one the bill comes from.)
-      for (const [k, n] of Object.entries({ ...counts, n: 1 })) if (n) await tally(env, `gemf:${feature}:${model}:${k}`, n, Date.now(), ctx);
-    }
+    usage = JSON.parse(await new Response(stream).text()).usageMetadata || {};
+  } catch {}
+  // Counted too, a row a call (gemini-use.js): the admin panel's AI 今天, Google's day and its bill.
+  if (env) await logCall(env, { feature, model, status: 200, usage });
+  try {
     console.log(
       JSON.stringify({
         event: 'gemini_usage',

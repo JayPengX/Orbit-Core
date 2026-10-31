@@ -479,9 +479,11 @@
 
     <!-- 用量 -->
     <section data-pane="usage" hidden>
-      <div class="pane-head"><div><h2>AI 今天</h2><p class="muted">每個功能全部人一天加起來的次數。上限和暫停在設定。</p></div><button class="small" data-go="dev" data-to="set-ai">上限</button></div>
+      <div class="pane-head"><div><h2>AI 今天</h2><p class="muted">每個功能全部人一天加起來的次數（台灣的一天）。上限和暫停在設定。</p></div><button class="small" data-go="dev" data-to="set-ai">上限</button></div>
       <p id="ai-error" class="error"></p>
       <ul class="checks" id="ai-use"></ul>
+      <div class="pane-head"><div><h2>Gemini 在 Google 的今天</h2><p class="muted" id="google-note">Google 的每日額度照美國太平洋時間重置。</p></div></div>
+      <ul class="checks" id="google-use"></ul>
       <div class="pane-head"><div><h2>Google 帳單</h2><p class="muted">Google 沒有預付餘額的 API：每次加值後輸入一次餘額，花費依下面的價格估算。</p></div></div>
       <p id="bill-error" class="error"></p>
       <div class="card">
@@ -1558,12 +1560,13 @@ $('bc-send').onclick = () =>
       $('bc-error').textContent = e.message;
     }
   });
-const SKU = { autocomplete: '地點搜尋', detailsPro: '地點詳細', textSearch: '搜尋補充', tdx: 'TDX 呼叫' };
+const SKU = { autocomplete: '地點搜尋', detailsPro: '地點詳細', textSearch: '搜尋補充' };
 async function loadUsage() {
   $('use-error').textContent = '';
   try {
     const u = await admin('usage');
     drawAi(u.ai);
+    drawGoogle(u.google);
     drawTdx(u.tdx, u.at);
     const share = (n, cap) => (cap ? `${Math.round((n / cap) * 100)}% · 上限 ${cap.toLocaleString()}` : '只計數');
     $('use-tiles').replaceChildren(
@@ -1579,6 +1582,18 @@ const aiTone = a => (!a.cap ? 'off' : a.days[6] >= a.cap ? 'bad' : a.days[6] >= 
 function drawAi(ai = []) {
   $('ai-use').replaceChildren(
     ...ai.map(a => checkRow(aiTone(a), DEV[a.key]?.zh || a.key, `近 7 天 ${a.days.reduce((x, y) => x + y, 0).toLocaleString()} 次 · 最多一天 ${Math.max(...a.days).toLocaleString()}`, a.cap ? `${a.days[6].toLocaleString()} / ${a.cap.toLocaleString()}` : '已暫停'))
+  );
+}
+// Each Gemini model on Google's day (it starts again at midnight Pacific): calls, the busiest minute, the ones Google turned away (429: over a limit).
+const twTime = ms => new Date(ms + 8 * 3_600_000).toISOString().slice(5, 16).replace('-', '/').replace('T', ' ');
+function drawGoogle(g) {
+  if (!g) return $('google-use').replaceChildren();
+  $('google-note').textContent = `Google 的每日額度照美國太平洋時間重置：下次在台灣時間 ${twTime(g.resets)}。被擋 = Google 回「超過額度」(429)。`;
+  const models = Object.entries(g.models || {});
+  $('google-use').replaceChildren(
+    ...(models.length
+      ? models.map(([m, v]) => checkRow(v.refused ? 'bad' : '', `Gemini ${m.replace(/^gemini-/, '')}`, `最忙的一分鐘 ${v.peakMinute.toLocaleString()} 次${v.refused ? ` · 被擋 ${v.refused.toLocaleString()} 次` : ' · 沒被擋過'}`, `${v.calls.toLocaleString()} 次`))
+      : [el('li', {}, [el('span', { class: 'muted', text: 'Google 的今天還沒有呼叫。' })])])
   );
 }
 // TDX's points: this month's against the plan, where the month ends at this rate, each day.
@@ -1614,9 +1629,9 @@ function drawTdx(t, now) {
   $('tdx-days').tBodies[0].replaceChildren(
     ...(days.length
       ? days.map(([d, v]) => el('tr', {}, [el('td', { text: d }), el('td', { class: 'right', text: v.basic.toLocaleString() }), el('td', { class: 'right', text: v.advanced.toLocaleString() }), el('td', { class: `right ${v.points > plan / monthDays ? 'neg' : ''}`, text: pts(v.points) })]))
-      : [el('tr', {}, [el('td', { colspan: '4', class: 'muted', text: '從今天開始逐日記錄。' })])])
+      : [el('tr', {}, [el('td', { colspan: '4', class: 'muted', text: '這個月還沒用到。' })])])
   );
-  $('tdx-note').textContent = `本月共 ${t.total.toLocaleString()} 次呼叫（逐日分類從 2026/10/11 開始，之前的依之後的進階比例估算）。點數依 TDX 的扣點規則估算，以 TDX 會員中心為準。只有當今天用到「剩下的點數不夠你照平常的速度用到月底」時，Worker 才會把進階資料保留得更久（沒用的日子會留給之後）；月底前不會用完。`;
+  $('tdx-note').textContent = `本月共 ${t.total.toLocaleString()} 次呼叫。每月 1 日 00:00（台灣時間）自動歸零，下次在 ${twTime(t.resets).slice(0, 5)}。點數依 TDX 的扣點規則估算，以 TDX 會員中心為準。只有當今天用到「剩下的點數不夠你照平常的速度用到月底」時，Worker 才會把進階資料保留得更久（沒用的日子會留給之後）；月底前不會用完。`;
 }
 async function loadHealth() {
   $('health-error').textContent = '';
@@ -2039,7 +2054,7 @@ const BILL_DEFAULTS = {
 };
 const BILL_NAMES = { maps: '地圖載入（Transit）', autocomplete: '地點搜尋', details: '地點詳細', detailsPro: '地點名稱（Pro）', textSearch: '地點搜尋（補充）', routes: '路線規劃', weather: '天氣 API' };
 // Each Gemini route, by what the person sees.
-const GEMINI_FEATURES = { gemini: '課表照片匯入（Class）', 'nl-edit': '課表 AI 修改（Class）', 'law-ask': '白話解釋（Law）', 'law-chat': '問法律（Law）', 'money-read': '發票讀圖（Money）' };
+const GEMINI_FEATURES = { gemini: '課表照片匯入（Class）', 'nl-edit': '課表 AI 修改（Class）', 'law-ask': '白話解釋（Law）', 'law-chat': '問法律（Law）', 'money-read': '拍照記帳（Money）', check: '管理面板的檢查' };
 let bill = null;
 const ntd = v => `NT$${(Math.round(v * 10) / 10).toLocaleString()}`;
 function billPrices() {
