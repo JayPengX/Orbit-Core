@@ -10,6 +10,7 @@
 // (the stream is closed after it), cached a few seconds for everyone.
 //
 // Served by the sports proxy as if from `https://f1-live.orbit/now.json`.
+import { driverAbout, face } from './f1-people.js';
 
 export const F1_LIVE_HOST = 'f1-live.orbit';
 const BASE = 'https://livetiming.formula1.com/signalrcore';
@@ -785,6 +786,14 @@ export async function f1LiveResponse(url, { log = null } = {}) {
   if (url.pathname === '/laps.json' || url.pathname === '/circuit.json') {
     try {
       return json(url.pathname === '/laps.json' ? await laps(url.searchParams.get('start') || '', log, Boolean(url.searchParams.get('final'))) : await circuit(url.searchParams.get('key'), url.searchParams.get('year')), 200);
+    } catch (error) {
+      return json({ error: String(error.message || error) }, 502);
+    }
+  }
+  // A driver the F1 sites don't know (a practice's stand-in): who he is, and where his head is in his cutout (f1-people.js).
+  if (url.pathname === '/about.json' || url.pathname === '/face.json') {
+    try {
+      return json(url.pathname === '/about.json' ? await driverAbout(url.searchParams.get('name')) : await face(url.searchParams.get('u')), 200);
     } catch (error) {
       return json({ error: String(error.message || error) }, 502);
     }

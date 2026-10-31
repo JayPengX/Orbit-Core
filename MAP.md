@@ -365,6 +365,7 @@ the kit.
 | A trim | Every parser that reads it, and the builders |
 | A Cloudflare product or cron | `guard.js` `PLAN` |
 | `f1-live.js` | Sports' F1 board |
+| `f1-people.js` | Drivers the F1 sites don't know (a practice's stand-in): `/about.json` (Wikipedia's first lines) and `/face.json` (where his head is in a TheSportsDB cutout), through `f1-live.js` |
 | `fund-nav.js` | Securities' 境內基金 NAVs (SITCA) |
 | `money-read.js` | Orbit Money's 拍照記帳 (`views/photo.mjs`) |
 | `taifex.js` | Securities' 期貨 and 選擇權: TAIFEX settlements (TX/MTX/TMF, TXO), margins, finals |
