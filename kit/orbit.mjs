@@ -417,7 +417,14 @@ function cachePayload(app, account, payload) {
 // save on a slow upload still gets there). Every call can be sent twice: the
 // Worker's entries have fixed ids and a write sets the whole payload.
 // Without a connection at all it isn't tried (the app's next sync sends it).
-export const callWait = bytes => 10_000 + Math.round(bytes / 20);
+//
+// The first try waits less (5 s plus the same for its size): a call with no
+// answer by then has almost always stalled (a connection the phone left dead,
+// or one an update's reload cut a request on), and the second, asked at once,
+// gets through. Sports' first opening after an update sat 20 s on its loading
+// screen on the opening's sign-in call, where closing the app and opening it
+// again took 5 (2026-10-31).
+export const callWait = (bytes, tries = 1) => (tries ? 10_000 : 5_000) + Math.round(bytes / 20);
 export const CALL_RETRY_MS = 1_500;
 async function call(method, query = '', body) {
   const text = body ? JSON.stringify(body) : undefined;
@@ -429,12 +436,13 @@ async function call(method, query = '', body) {
         method,
         headers: body ? { 'Content-Type': 'text/plain;charset=UTF-8' } : {},
         body: text,
-        signal: AbortSignal.timeout(callWait(text?.length || 0))
+        signal: AbortSignal.timeout(callWait(text?.length || 0, tries))
       });
       break;
     } catch (error) {
       if (tries >= 1 || globalThis.navigator?.onLine === false) throw error;
-      await new Promise(done => setTimeout(done, CALL_RETRY_MS));
+      // (A try that ran out of time is asked again at once; one that failed, a moment later.)
+      if (error?.name !== 'TimeoutError') await new Promise(done => setTimeout(done, CALL_RETRY_MS));
     }
   }
   const data = await res.json().catch(() => ({}));
