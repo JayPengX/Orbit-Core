@@ -82,7 +82,7 @@ runs near each caller; only Gemini goes through `gemini-relay.js`, pinned to Tai
 | `/law-ask` | `law.js` | Orbit Law's questions on 1-8 articles of a law: the text read from Orbit Law's data, every point cited and checked; answers kept in KV by the law's version; `mode: 'bill'` a bill explained from its 對照表 (立法院's API), each change citing a row's article, kept 30 days; `mode: 'diff'` an amendment explained from Orbit Law's `diff/<p>.json`, kept 180 days by version; a Pass of Orbit Law's, 40 Gemini calls a day a Pass and 300 in all with `/law-chat`'s (D1) |
 | `/law-chat` | `law-chat.js` | Orbit Law's 問法律: a plan, the articles found in Orbit Law's lists and full-text index (14 at most), an answer from those only, every point's cites checked; a Pass of Orbit Law's, 30 turns a day a Pass; first questions kept in KV 30 days. Both `/law-chat` and `/law-ask` (with a question) are grounded by `law-ground.js`: Orbit Law's `ai/facts.json` (official figures such as 最低工資), `ai/news.json` (agencies' notices, top 3), `bills/items.json` (立法院 stages, up to 6: a named law's, else those on the question's topic with 立法院's own words set aside, else the newest passed or moved, both big parties' when asked) and `ly/budget.json` (budget progress on a 預算 question: the year asked, else the 2 newest), each read hourly and left out when missing; the answer adds `notices` and `bills` |
 | `/law-page` | `law-page.js` | GET `?u=` a government page (gov.tw and its subdomains, www.edu.tw; https; redirects only on those) read inside Orbit Law: `{url, type:'html', html}` in its own charset (Big5 too), scripts/styles/handlers taken out, 2 MB at most, or `{url, type:'pdf'|'file', size}`; Cloudflare's cache only (judicial rulings 30 days, else a day); a Pass of Orbit Law's, 500 fresh reads a day |
-| `/money-read` | `money-read.js` | Orbit Money's 讀圖: POST `{ image: { mime_type, data } }` (one picture, base64) → `{ buys: [{ day, store, total, invoice, items }], left }`, read by Gemini (Flash-Lite, through the Taiwan relay) and checked (real days, whole totals, an invoice number's form). Only on a tap: the app reads an invoice's QR codes itself first. A Pass of Orbit Money's, 30 a day a Pass, 300 a day in all (law.js's day counts) |
+| `/money-read` | `money-read.js` | Orbit Money's 拍照記帳: POST `{ image: { mime_type, data }, cats, pays }` (one picture, base64; the person's categories and ways to pay) → `{ buys: [{ k, day, store, total, items, cat, pay, invoice }], left }`, read by Gemini (Flash-Lite, through the Taiwan relay) and checked (real days, whole totals, a category and way to pay only from the lists sent). Only on a tap (picking the picture). A Pass of Orbit Money's, 30 a day a Pass, 300 a day in all (law.js's day counts) |
 | `/data/…` | `data.js` | R2, public reads |
 | `/config` | `worker.js` | The live speeds |
 
@@ -366,7 +366,7 @@ the kit.
 | A Cloudflare product or cron | `guard.js` `PLAN` |
 | `f1-live.js` | Sports' F1 board |
 | `fund-nav.js` | Securities' 境內基金 NAVs (SITCA) |
-| `invoice.js` (`invoice.orbit`), `kit/carrier-csv.mjs`, `money-read.js` | Orbit Money's 發票 tab: 對獎, seller names, the 載具 file |
+| `money-read.js` | Orbit Money's 拍照記帳 (`views/photo.mjs`) |
 | `taifex.js` | Securities' 期貨 and 選擇權: TAIFEX settlements (TX/MTX/TMF, TXO), margins, finals |
 | `eco.js` money rules | The kit's tables, Securities' `lib/truth.mjs` and 資金 tab, `help.mjs` |
 | `push.js` checks | The apps that schedule them, `NOTICE_KINDS` |

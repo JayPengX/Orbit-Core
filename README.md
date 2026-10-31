@@ -39,7 +39,7 @@ The family page and Orbit Pass sign-in are at [orbit.jaypengx.com/pass](https://
 
 ## Features
 
-- **The proxy** (`api.jaypengx.com`): one Cloudflare Worker for every live read the apps make (sports, transit, weather, markets, invoices, law), with the apps' AI features behind it, so no key ever reaches a phone.
+- **The proxy** (`api.jaypengx.com`): one Cloudflare Worker for every live read the apps make (sports, transit, weather, markets, law), with the apps' AI features behind it, so no key ever reaches a phone.
 - **The Orbit Pass:** one sign-in and one wallet for every app, with each app's saved data, kept in Cloudflare D1.
 - **Notices** that reach a phone while the app is closed: game starts, class reminders, bus arrivals, rain, price alerts.
 - **Data builds** on the proxy's cron into Cloudflare R2: seasons, game days, bus routes and shapes, photos, highlights.
@@ -98,7 +98,7 @@ worker.js            the proxy's router; each route's work in its own file:
 ├── transit.js                                 transit
 ├── sports.js, sports-today.js, f1-live.js, asia-baseball.js
 ├── stock-fill.js, stock-check.js, fund-nav.js, taifex.js   Securities
-├── money.js, money-read.js, invoice.js      Money
+├── money.js, money-read.js                 Money
 ├── law.js, law-chat.js, law-ground.js, law-more.js, law-page.js, law-hosts.js
 └── data.js, http.js, capacity.js, pace.js, ops.js, doc-store.js, store-backup.js
 gemini-relay.js      Gemini, pinned to Taiwan
