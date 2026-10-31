@@ -316,6 +316,9 @@ function cachePolicyFor(url) {
       return CACHE_STANDINGS;
     case ROTOWIRE_HOST:
       return CACHE_LINEUP;
+    // A footballer's career and the search that finds him: a table's half hour (the rest: live).
+    case FOTMOB_HOST:
+      return /^\/api\/data\/(playerData|search\/suggest)$/.test(url.pathname) ? CACHE_STANDINGS : CACHE_LIVE;
     case YT_HOST:
       return url.pathname === '/watch' ? CACHE_YT_VIDEO : CACHE_YT_SEARCH;
     case ASIA_HOST:
@@ -585,6 +588,44 @@ function fotmobHome(data) {
       clock: f.status?.liveTime?.short || '',
       reason: f.status?.reason?.short || ''
     }))
+  };
+}
+// A player's career on FotMob (Orbit Sports' 資料 and 數據 for a
+// footballer): each senior club and national side with its dates and
+// numbers, each season's club and numbers, and what he won. ~130 KB to ~5 KB.
+const TRIM_FOTMOB_PLAYER = 'fotmob-player';
+const fotmobNum = v => (v == null || v === '' ? null : Number(v));
+const fotmobStint = e => ({ teamId: e?.teamId, team: e?.team || '', from: e?.startDate || '', to: e?.endDate || '', active: Boolean(e?.active), loan: e?.transferType?.localizationKey === 'on_loan', apps: fotmobNum(e?.appearances), goals: fotmobNum(e?.goals), assists: fotmobNum(e?.assists) });
+export function trimFotmobPlayer(data) {
+  if (!data || typeof data !== 'object' || data.id == null) return data;
+  const items = data.careerHistory?.careerItems || {};
+  const senior = items.senior || {};
+  return {
+    id: data.id,
+    name: data.name || '',
+    born: data.birthDate?.utcTime || '',
+    clubs: (senior.teamEntries || []).map(fotmobStint),
+    national: (items['national team']?.teamEntries || []).map(fotmobStint),
+    seasons: (senior.seasonEntries || []).map(x => ({ season: x?.seasonName || '', teamId: x?.teamId, team: x?.team || '', loan: x?.transferType?.localizationKey === 'on_loan', apps: fotmobNum(x?.appearances), goals: fotmobNum(x?.goals), assists: fotmobNum(x?.assists), rating: fotmobNum(x?.rating?.rating) })),
+    trophies: (data.trophies?.playerTrophies || []).flatMap(t => (t?.tournaments || []).map(x => ({ teamId: t.teamId, team: t.teamName || '', leagueId: x?.leagueId, league: x?.leagueName || '', won: x?.seasonsWon || [] })))
+  };
+}
+// FotMob's search, its players only (to find a footballer ESPN names).
+const TRIM_FOTMOB_SEARCH = 'fotmob-search';
+export function trimFotmobSearch(data) {
+  if (!Array.isArray(data)) return data;
+  return data.flatMap(g => g?.suggestions || []).filter(x => x?.type === 'player').map(x => ({ id: x.id, name: x.name || '', teamId: x.teamId, teamName: x.teamName || '' }));
+}
+// Opt-in (`&trim=espn-career`) for a player's seasons (site v3 athletes/<id>/stats):
+// the regular season's category only (each season's team and numbers), and
+// the teams' names and badges. ~55 KB to ~6 KB.
+const TRIM_ESPN_CAREER = 'espn-career';
+export function trimEspnCareer(data) {
+  if (!data || typeof data !== 'object' || !Array.isArray(data.categories)) return data;
+  const c = data.categories[0] || {};
+  return {
+    teams: Object.fromEntries(Object.entries(data.teams || {}).map(([k, t]) => [k, { id: t?.id, abbreviation: t?.abbreviation, displayName: t?.displayName, shortDisplayName: t?.shortDisplayName, logo: t?.logos?.[0]?.href }])),
+    categories: [{ name: c.name, displayName: c.displayName, labels: c.labels, names: c.names, displayNames: c.displayNames, statistics: (c.statistics || []).map(x => ({ season: x?.season, teamId: x?.teamId, teamSlug: x?.teamSlug, stats: x?.stats })) }]
   };
 }
 // One of FotMob's stat lists (always): its name and the top hundred, each
@@ -1078,7 +1119,7 @@ async function fetchUpstreamRaw(upstreamUrl, trim) {
     if (trim) {
       try {
         const parsed = JSON.parse(new TextDecoder().decode(body));
-        body = JSON.stringify(trim === TRIM_KAMBI_EVENTS ? trimKambi(parsed) : trim === TRIM_ESPN_ROSTER ? trimEspnRoster(parsed) : trim === TRIM_ESPN_ATHLETES ? trimEspnAthletes(parsed) : trim === TRIM_ESPN_TEAMS ? trimEspnTeams(parsed) : trim === TRIM_ESPN_NEWS ? trimEspnNews(parsed) : trim === TRIM_ESPN_LEADERS ? trimEspnLeaders(parsed) : trim === TRIM_JOLPICA_RESULTS ? trimJolpicaResults(parsed) : trim === TRIM_FOTMOB_PAGE || trim === TRIM_FOTMOB_TEAM ? trimFotmobPage(parsed) : trim === TRIM_FOTMOB_STAT ? trimFotmobStat(parsed) : trim === TRIM_ESPN_INJURIES ? trimEspnInjuries(parsed) : trim === TRIM_ELTA ? trimElta(parsed) : trim === TRIM_POLYMARKET_GAMES ? trimPolymarketGames(parsed) : trimPolymarketEvents(parsed));
+        body = JSON.stringify(trim === TRIM_KAMBI_EVENTS ? trimKambi(parsed) : trim === TRIM_ESPN_ROSTER ? trimEspnRoster(parsed) : trim === TRIM_ESPN_ATHLETES ? trimEspnAthletes(parsed) : trim === TRIM_ESPN_TEAMS ? trimEspnTeams(parsed) : trim === TRIM_ESPN_NEWS ? trimEspnNews(parsed) : trim === TRIM_ESPN_LEADERS ? trimEspnLeaders(parsed) : trim === TRIM_JOLPICA_RESULTS ? trimJolpicaResults(parsed) : trim === TRIM_FOTMOB_PAGE || trim === TRIM_FOTMOB_TEAM ? trimFotmobPage(parsed) : trim === TRIM_FOTMOB_STAT ? trimFotmobStat(parsed) : trim === TRIM_FOTMOB_PLAYER ? trimFotmobPlayer(parsed) : trim === TRIM_FOTMOB_SEARCH ? trimFotmobSearch(parsed) : trim === TRIM_ESPN_CAREER ? trimEspnCareer(parsed) : trim === TRIM_ESPN_INJURIES ? trimEspnInjuries(parsed) : trim === TRIM_ELTA ? trimElta(parsed) : trim === TRIM_POLYMARKET_GAMES ? trimPolymarketGames(parsed) : trimPolymarketEvents(parsed));
       } catch {
         // Not the JSON shape expected - pass it through untouched.
       }
@@ -1216,7 +1257,7 @@ function trimFor(trimParam, upstreamUrl) {
   if (upstreamUrl.hostname === F1_HOST) return TRIM_F1PAGE;
   if (upstreamUrl.hostname === ROTOWIRE_HOST) return TRIM_ROTOWIRE;
   if (upstreamUrl.hostname === ELTA_VOD_HOST) return TRIM_ELTA_VOD;
-  if (upstreamUrl.hostname === FOTMOB_HOST) return upstreamUrl.pathname === '/api/data/teams' ? TRIM_FOTMOB_TEAM : TRIM_FOTMOB_PAGE;
+  if (upstreamUrl.hostname === FOTMOB_HOST) return { '/api/data/teams': TRIM_FOTMOB_TEAM, '/api/data/playerData': TRIM_FOTMOB_PLAYER, '/api/data/search/suggest': TRIM_FOTMOB_SEARCH }[upstreamUrl.pathname] || TRIM_FOTMOB_PAGE;
   if (upstreamUrl.hostname === FOTMOB_DATA_HOST) return TRIM_FOTMOB_STAT;
   if (upstreamUrl.hostname === YT_HOST) return upstreamUrl.pathname === '/watch' ? TRIM_YT_VIDEO : TRIM_YT_SEARCH;
   if (trimParam === TRIM_POLYMARKET_EVENTS && upstreamUrl.hostname === 'gamma-api.polymarket.com' && upstreamUrl.pathname === '/events') return TRIM_POLYMARKET_EVENTS;
@@ -1224,6 +1265,7 @@ function trimFor(trimParam, upstreamUrl) {
   if (trimParam === TRIM_KAMBI_EVENTS && upstreamUrl.hostname === 'eu-offering-api.kambicdn.com') return TRIM_KAMBI_EVENTS;
   if (trimParam === TRIM_ESPN_ROSTER && upstreamUrl.hostname === 'site.api.espn.com' && upstreamUrl.pathname.endsWith('/roster')) return TRIM_ESPN_ROSTER;
   if (trimParam === TRIM_ESPN_ATHLETES && upstreamUrl.hostname === 'site.api.espn.com' && upstreamUrl.pathname.endsWith('/statistics/byathlete')) return TRIM_ESPN_ATHLETES;
+  if (trimParam === TRIM_ESPN_CAREER && upstreamUrl.hostname === 'site.api.espn.com' && /\/athletes\/\d+\/stats$/.test(upstreamUrl.pathname)) return TRIM_ESPN_CAREER;
   if (trimParam === TRIM_ESPN_TEAMS && upstreamUrl.hostname === 'site.api.espn.com' && upstreamUrl.pathname.endsWith('/statistics/byteam')) return TRIM_ESPN_TEAMS;
   if (trimParam === TRIM_ESPN_LEADERS && upstreamUrl.hostname === 'site.api.espn.com' && /\/(leaders|statistics)$/.test(upstreamUrl.pathname)) return TRIM_ESPN_LEADERS;
   if (trimParam === TRIM_JOLPICA_RESULTS && upstreamUrl.hostname === 'api.jolpi.ca' && /\/(results|qualifying\/1)\.json$/.test(upstreamUrl.pathname)) return TRIM_JOLPICA_RESULTS;
@@ -1263,7 +1305,8 @@ function parseTarget(target) {
     if (u.hostname === ROTOWIRE_HOST && !(u.pathname === ROTOWIRE_NBA && (u.search === '' || u.search === '?date=tomorrow'))) return null;
     if (u.hostname === 'api.open-meteo.com' && u.pathname !== '/v1/forecast') return null;
     if (u.hostname === F1_HOST && !/^\/en\/((drivers|teams)\/[a-z-]+|racing\/20\d\d(\/[a-z0-9-]+)?)$/.test(u.pathname)) return null;
-    if (u.hostname === FOTMOB_HOST && !(/^\/api\/data\/(leagues|teams)$/.test(u.pathname) && [...u.searchParams.keys()].join() === 'id' && /^\d{1,8}$/.test(u.searchParams.get('id')))) return null;
+    // (A league's, a club's or a player's page by its id; a search by its words.)
+    if (u.hostname === FOTMOB_HOST && !(/^\/api\/data\/(leagues|teams|playerData)$/.test(u.pathname) ? [...u.searchParams.keys()].join() === 'id' && /^\d{1,8}$/.test(u.searchParams.get('id')) : u.pathname === '/api/data/search/suggest' && [...u.searchParams.keys()].join() === 'term' && /^.{2,60}$/u.test(u.searchParams.get('term')))) return null;
     if (u.hostname === FOTMOB_DATA_HOST && (!/^\/stats\/\d{1,8}\/season\/\d{1,8}\/[a-z0-9_]{2,60}\.json$/.test(u.pathname) || u.search)) return null;
     return u.protocol === 'https:' && SPORTS_PROXY_ALLOWED_HOSTS.includes(u.hostname) ? u : null;
   } catch {

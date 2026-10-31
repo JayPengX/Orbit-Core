@@ -451,6 +451,32 @@ test('FotMob: its two hosts only for those pages', async () => {
   assert.equal(await ask('https://www.fotmob.com/api/data/matchDetails?matchId=1'), 400);
   assert.equal(await ask('https://www.fotmob.com/api/data/leagues?id=47&x=1'), 400);
   assert.equal(await ask('https://data.fotmob.com/stats/47/season/36781/../../x.json'), 400);
+  assert.equal(await ask('https://www.fotmob.com/api/data/playerData?id=96x'), 400);
+  assert.equal(await ask('https://www.fotmob.com/api/data/search/suggest?term=Saka&x=1'), 400);
+  assert.equal(await ask(`https://www.fotmob.com/api/data/search/suggest?term=${'a'.repeat(61)}`), 400);
+});
+
+test("A player's career: FotMob's clubs, seasons and trophies, ESPN's seasons, each trimmed", async () => {
+  const { trimFotmobPlayer, trimFotmobSearch, trimEspnCareer } = await import('../sports.js');
+  const loan = { text: 'on loan', localizationKey: 'on_loan' };
+  const p = trimFotmobPlayer({
+    id: 966027, name: 'Conor Gallagher', birthDate: { utcTime: '2000-02-06T00:00:00.000Z' }, recentMatches: [1, 2],
+    careerHistory: { careerItems: {
+      senior: { teamEntries: [{ teamId: 9826, team: 'Crystal Palace', startDate: '2021-07-30T00:00:00', endDate: '2022-06-30T00:00:00', active: false, transferType: loan, appearances: '39', goals: '8', assists: '5' }], seasonEntries: [{ seasonName: '2021/2022', teamId: 9826, team: 'Crystal Palace', transferType: loan, appearances: '39', goals: '8', assists: '5', rating: { rating: '7.25' }, tournamentStats: [{}] }] },
+      'national team': { teamEntries: [{ teamId: 8491, team: 'England', startDate: '2021-11-14T00:00:00', endDate: null, active: true, transferType: null, appearances: '22', goals: '1', assists: null }] }
+    } },
+    trophies: { playerTrophies: [{ teamId: 8455, teamName: 'Chelsea', tournaments: [{ leagueId: 73, leagueName: 'Europa League', seasonsWon: ['2018/2019'], seasonsRunnerUp: [] }] }] }
+  });
+  assert.deepEqual(p, {
+    id: 966027, name: 'Conor Gallagher', born: '2000-02-06T00:00:00.000Z',
+    clubs: [{ teamId: 9826, team: 'Crystal Palace', from: '2021-07-30T00:00:00', to: '2022-06-30T00:00:00', active: false, loan: true, apps: 39, goals: 8, assists: 5 }],
+    national: [{ teamId: 8491, team: 'England', from: '2021-11-14T00:00:00', to: '', active: true, loan: false, apps: 22, goals: 1, assists: null }],
+    seasons: [{ season: '2021/2022', teamId: 9826, team: 'Crystal Palace', loan: true, apps: 39, goals: 8, assists: 5, rating: 7.25 }],
+    trophies: [{ teamId: 8455, team: 'Chelsea', leagueId: 73, league: 'Europa League', won: ['2018/2019'] }]
+  });
+  assert.deepEqual(trimFotmobSearch([{ title: {}, suggestions: [{ type: 'player', id: '961995', score: 1, name: 'Bukayo Saka', teamId: 9825, teamName: 'Arsenal' }, { type: 'team', id: '4124', name: 'Sakaryaspor' }] }]), [{ id: '961995', name: 'Bukayo Saka', teamId: 9825, teamName: 'Arsenal' }]);
+  const c = trimEspnCareer({ filters: [], glossary: [], teams: { 'utah-jazz': { id: '26', abbreviation: 'UTAH', displayName: 'Utah Jazz', shortDisplayName: 'Jazz', logos: [{ href: 'u.png' }, { href: 'd.png' }], links: [] } }, categories: [{ name: 'averages', displayName: 'Regular Season Averages', labels: ['GP', 'PTS'], names: ['gamesPlayed', 'avgPoints'], displayNames: ['Games Played', 'Points'], statistics: [{ teamId: '26', teamSlug: 'utah-jazz', season: { year: 2018, displayName: '2017-18' }, position: 'G', stats: ['79', '20.5'] }] }, { name: 'totals' }] });
+  assert.deepEqual(c, { teams: { 'utah-jazz': { id: '26', abbreviation: 'UTAH', displayName: 'Utah Jazz', shortDisplayName: 'Jazz', logo: 'u.png' } }, categories: [{ name: 'averages', displayName: 'Regular Season Averages', labels: ['GP', 'PTS'], names: ['gamesPlayed', 'avgPoints'], displayNames: ['Games Played', 'Points'], statistics: [{ season: { year: 2018, displayName: '2017-18' }, teamId: '26', teamSlug: 'utah-jazz', stats: ['79', '20.5'] }] }] });
 });
 
 test("Jolpica's season results for F1's 數據領先: each result to what's counted", async () => {

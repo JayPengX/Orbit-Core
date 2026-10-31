@@ -65,7 +65,7 @@ import { join, extname, resolve } from 'node:path';
 import { createRequire } from 'node:module';
 import { ASIA_HOST, asiaBaseballResponse } from '../asia-baseball.js';
 import { F1_LIVE_HOST, f1LiveResponse, memoryLog, sampleLive } from '../f1-live.js';
-import { trimF1Page, trimEltaVod, trimYtSearch, trimYtVideo, trimFotmobPage } from '../sports.js';
+import { trimF1Page, trimEltaVod, trimYtSearch, trimYtVideo, trimFotmobPage, trimFotmobPlayer, trimFotmobSearch } from '../sports.js';
 import { handleWeather } from '../weather.js';
 import { upstream as weatherFixtures } from '../tests/fixtures/weather/upstream.mjs';
 // The F1 lap log the sports proxy's cron keeps (f1-live.js), here in
@@ -444,7 +444,8 @@ const pageTrim = (url, r) => {
   if (host === 'eltaott.tv') return { status: 200, body: JSON.stringify(trimEltaVod(r.body)) };
   if (host === 'www.fotmob.com') {
     try {
-      return { status: 200, body: JSON.stringify(trimFotmobPage(JSON.parse(r.body))) };
+      const trim = { '/api/data/playerData': trimFotmobPlayer, '/api/data/search/suggest': trimFotmobSearch }[new URL(url).pathname] || trimFotmobPage;
+      return { status: 200, body: JSON.stringify(trim(JSON.parse(r.body))) };
     } catch {
       return r;
     }
