@@ -73,6 +73,10 @@ export const PAGES = {
   law: {
     default: ['tabs'],
     article: { hash: 'law=B0000001&a=184' },
+    // 法規 search: a law named (憲法), the start of one's name (憲法增), the start of a short name (勞基).
+    'search-named': { hash: 'tab=laws&q=憲法' },
+    'search-partial': { hash: 'tab=laws&q=憲法增' },
+    'search-short': { hash: 'tab=laws&q=勞基' },
     votes: { args: click('#tab-bills', tap('Votes|表決'), wait(3000)) }
   },
   securities: {
