@@ -3266,51 +3266,10 @@ function insideGate(app, home, lang) {
   return true;
 }
 
-// A phone-only app on a computer: covers the page with where to open it
-// instead (a QR code the app draws, `qr` as SVG markup, and the link), then
-// how to add it to the home screen. Returns true when it covered the page.
-export function phoneOnlyGate(app, { lang = detectLang(), qr = '' } = {}) {
-  if (isPhoneOrTablet()) return false;
-  const en = lang === 'en';
-  const name = appName(app);
-  const url = homeOf(app);
-  const qrBox = node('div', { class: 'q-qr', role: 'img', 'aria-label': en ? `QR code for ${url}` : `${url} 的 QR code` });
-  qrBox.innerHTML = qr;
-  const copy = node('button', {
-    class: 'q-btn',
-    type: 'button',
-    text: en ? 'Copy the link' : '複製連結',
-    onclick: async () => {
-      try {
-        await navigator.clipboard.writeText(url);
-        copy.textContent = en ? 'Copied ✓' : '已複製 ✓';
-      } catch {}
-    }
-  });
-  const gate = node('dialog', { class: 'q-gate q-phone-only', 'aria-modal': 'true', style: `--q-accent:${APPS[app].color}` }, [
-    node('div', { class: 'q-gate-box' }, [
-      node('img', { class: 'q-gate-icon', src: './favicon.svg', alt: '', width: '72', height: '72' }),
-      node('p', { class: 'q-gate-brand', text: 'ORBIT' }),
-      node('h1', { class: 'q-gate-title', text: en ? `${name} is made for your phone` : `${name} 是手機 App` }),
-      node('p', { class: 'q-gate-lede', text: en ? 'It lives in your pocket, beside your day. Open it on your phone:' : '課表跟著你一整天，所以只在手機上使用。用手機打開：' }),
-      qrBox,
-      node('p', { class: 'q-qr-url', text: url.replace(/^https:\/\//, '') }),
-      copy,
-      node(
-        'ol',
-        { class: 'q-steps' },
-        (en
-          ? ['Scan the code with your phone’s camera (or open the link on it).', 'Add it to the home screen: in Safari on iPhone, Share → “Add to Home Screen”; in Chrome on Android, ⋮ → “Install app”.', 'Sign in with your Orbit Pass or a device code: your schedule is already there.']
-          : ['用手機相機掃描上面的條碼（或在手機打開連結）。', '加入主畫面：iPhone 用 Safari 點分享鍵 →「加入主畫面」；Android 用 Chrome 點 ⋮ →「安裝應用程式」。', '用 Orbit Pass 或裝置代碼登入，課表就在裡面。']
-        ).map(t => node('li', { text: t }))
-      )
-    ])
-  ]);
-  keepOnTop(gate);
-  document.documentElement.classList.add('q-signing-in');
-  document.getElementById('loading')?.setAttribute('hidden', '');
-  return true;
-}
+// Gone with phones-only (2026-10-31: every app runs on every screen). Kept
+// as a no-op only for an installed Class from before then, which still
+// imports it: a missing export would stop that page before it could update.
+export const phoneOnlyGate = () => false;
 
 // Keeps every open Orbit page on the latest deploy, at once, whatever the
 // person is doing (the owner's rule: an update never waits for a sheet to

@@ -2623,22 +2623,7 @@ dialog.q-moved::backdrop {
   fill: var(--q-accent);
 }
 
-/* ---- A phone-only app on a computer: a QR code to open it on the phone ---- */
-.q-qr {
-  width: 188px;
-  height: 188px;
-  margin: 10px auto 2px;
-  padding: 12px;
-  border-radius: 20px;
-  background: #fff;
-  box-shadow: var(--q-shadow-sm);
-  border: 1px solid var(--q-border);
-}
-.q-qr svg {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
+/* ---- A link spelled out under a gate's title (the moved page) ---- */
 .q-qr-url {
   margin: 4px 0 8px;
   color: var(--q-muted);
