@@ -63,8 +63,10 @@ test("the built kit: minified, its files import each other through the map, ever
   execFileSync(process.execPath, [new URL('../kit/stamp.mjs', import.meta.url).pathname, out, 'v1'], { stdio: 'ignore' });
   const built = (await readdir(join(out, 'kit'))).sort();
   for (const tool of KIT_TOOLS) assert.ok(!built.includes(tool), `${tool} isn't served`);
-  const { version, files } = JSON.parse(await readFile(join(out, 'kit/version.json'), 'utf8'));
-  assert.equal(version, 'v1');
+  const { version, commit, files } = JSON.parse(await readFile(join(out, 'kit/version.json'), 'utf8'));
+  // The kit's version is its files' (a push that changed none is no update), never a file hash's shape.
+  assert.match(version, /^k[0-9a-f]{12}$/);
+  assert.equal(commit, 'v1');
   assert.deepEqual(Object.keys(files).sort(), built.filter(f => /\.(m?js|css)$/.test(f)));
   for (const name of built.filter(f => f.endsWith('.mjs'))) {
     const text = await readFile(join(out, 'kit', name), 'utf8');
@@ -76,5 +78,7 @@ test("the built kit: minified, its files import each other through the map, ever
   const again = await mkdtemp(join(tmpdir(), 'kit-build-'));
   await cp(join(out, 'kit'), join(again, 'old'), { recursive: true });
   execFileSync(process.execPath, [new URL('../kit/stamp.mjs', import.meta.url).pathname, again, 'v2'], { stdio: 'ignore' });
-  assert.deepEqual(JSON.parse(await readFile(join(again, 'kit/version.json'), 'utf8')).files, files);
+  const second = JSON.parse(await readFile(join(again, 'kit/version.json'), 'utf8'));
+  assert.deepEqual(second.files, files);
+  assert.equal(second.version, version, 'the same kit from another commit: the same version');
 });

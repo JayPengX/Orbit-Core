@@ -183,6 +183,22 @@ const requests = flag('requests');
 // in the same browser: what was saved on the device then is what the new
 // version opens on. Implies --reopen.
 const upgrade = opt('upgrade', '');
+// --deploy-at ms (with --upgrade): the update arrives while the old app is
+// open: that long into the first opening the site switches to the current
+// app and kit, and the same page is watched (--watch ms, 60 s by default) as
+// it finds the update: each load, what the loading screen said, and whether
+// the app ended up running. --cdn-lag ms: for that long after the switch
+// every address whose file existed before is answered with the old file
+// (GitHub Pages' CDN keys by path, so a new ?v= can get old bytes).
+// --hidden-for ms: the app is out of sight (another app in front) from just
+// before the deploy until that long after it, then comes back.
+// --tap selector: tapped on the running app at the end (a part loaded on demand).
+const deployAt = Number(opt('deploy-at', 0));
+const cdnLag = Number(opt('cdn-lag', 0));
+const hiddenFor = Number(opt('hidden-for', 0));
+const watchFor = Number(opt('watch', 60_000));
+const tapAtEnd = opt('tap', '');
+const relaunchAfter = Number(opt('relaunch-after', 0));
 // --flaky <share>: that share of upstream answers fails (502) during the
 // first opening (every opening without --reopen / --upgrade): a phone on a
 // poor connection. Whatever the app saved from a failed read shows on the next.
@@ -293,20 +309,33 @@ if (!existsSync(dir)) throw new Error(`${dir} missing${key === 'orbit' ? ' (run 
 
 // What's served: the current repos, or --upgrade's old ones for the first opening.
 const served = { root: ROOT, dir };
+let lagUntil = 0;
 const oldRoot = upgrade ? await snapshotRoot(upgrade, [[repo, [key === 'orbit' ? 'dist' : 'public', ...(key === 'orbit' ? [] : ['scripts', 'package.json'])]], ['Orbit-Core', ['kit']]]) : null;
 // Both stamped as a deploy is (the app's ?v= files and version.json, the
 // kit's): unstamped, a page says it's 'dev' and never updates, so an
 // installed app's update (the old page finding the new one, its service
 // worker's kept files) went untried. The current one from a copy.
+// (--kit-only: the app's own version the same in both, as when only the kit was pushed.)
+const kitOnly = flag('kit-only');
 async function stampRoot(root, version) {
   const app = join(root, repo);
-  if (key !== 'orbit' && existsSync(join(app, 'scripts/stamp-version.mjs'))) execFileSync('node', ['scripts/stamp-version.mjs', version], { cwd: app, stdio: 'ignore' });
+  if (key !== 'orbit' && existsSync(join(app, 'scripts/stamp-version.mjs'))) execFileSync('node', ['scripts/stamp-version.mjs', kitOnly ? 'app' : version], { cwd: app, stdio: 'ignore' });
   const out = await mkdtemp(join(tmpdir(), 'orbit-kit-'));
   execFileSync('node', [join(root, 'Orbit-Core/kit/stamp.mjs'), out, `kit-${version}`], { stdio: 'ignore' });
   await rm(join(root, 'Orbit-Core/kit'), { recursive: true, force: true });
   await cp(join(out, 'kit'), join(root, 'Orbit-Core/kit'), { recursive: true });
+  // (The kit's hashes baked into the page are this kit's, not the live site's.)
+  const index = join(app, key === 'orbit' ? 'dist' : 'public', 'index.html');
+  if (existsSync(index)) await import('node:fs/promises').then(async fs => fs.writeFile(index, String(await fs.readFile(index)).replace(/\('\.\.\/Orbit-Core\/kit\/',(?:null|\{.*?\}\})\)/, `('../Orbit-Core/kit/',${String(await fs.readFile(join(root, 'Orbit-Core/kit/version.json'))).trim()})`)));
 }
 let newRoot = null;
+// --old-kit-local: the old kit is this one with a line changed in orbit.mjs and boot.js (a kit change
+// tried both ways: the page that finds the update runs this kit's watch, not git's).
+if (oldRoot && flag('old-kit-local')) {
+  await rm(join(oldRoot, 'Orbit-Core/kit'), { recursive: true, force: true });
+  await cp(join(ROOT, 'Orbit-Core/kit'), join(oldRoot, 'Orbit-Core/kit'), { recursive: true });
+  for (const f of ['orbit.mjs', 'boot.js']) await import('node:fs/promises').then(async fs => fs.appendFile(join(oldRoot, 'Orbit-Core/kit', f), '\nglobalThis.__oldKit = 1;\n'));
+}
 if (oldRoot) {
   await stampRoot(oldRoot, 'old');
   newRoot = await mkdtemp(join(tmpdir(), 'orbit-new-'));
@@ -355,10 +384,16 @@ const server = (h2 && !serve ? (fn => createSecureServer(h2Cert(), fn)) : create
   if (path === '/Orbit-Core/kit/version.json' && !existsSync(join(served.root, 'Orbit-Core/kit/version.json'))) return res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }).end('{"version":"local"}');
   // The kit, as the apps load it from Orbit-Core's Pages (kit/loader.html).
   let file = path.startsWith('/Orbit-Core/kit/') ? join(served.root, path) : join(served.dir, path.replace(/^\/[^/]+\//, '/'));
+  // (--cdn-lag: the CDN still on the old file at this path.)
+  if (lagUntil > Date.now() && oldRoot) {
+    const was = path.startsWith('/Orbit-Core/kit/') ? join(oldRoot, path) : join(oldRoot, repo, key === 'orbit' ? 'dist' : 'public', path.replace(/^\/[^/]+\//, '/'));
+    if (existsSync(was) && !path.endsWith('/version.json')) file = was;
+  }
   if (latency) await new Promise(r => setTimeout(r, latency));
   try {
     if ((await stat(file)).isDirectory()) file = join(file, 'index.html');
-    res.writeHead(200, { 'Content-Type': TYPES[extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-store' });
+    // (--deploy-at: as Pages answers, kept 10 minutes by the browser.)
+    res.writeHead(200, { 'Content-Type': TYPES[extname(file)] || 'application/octet-stream', 'Cache-Control': deployAt ? 'max-age=600' : 'no-store' });
     const data = await readFile(file);
     // Served: the made-up sign-in and the fetch pointed here, before anything else runs.
     res.end(serve && file.endsWith('.html') ? String(data).replace('<head>', `<head><script>${inits.join(';')};${pointFetch}</script>`) : data);
@@ -945,6 +980,72 @@ const errors = [];
 let opening = 0;
 // (--net: opened twice online first, as a phone that has used the app: the second has the kit's version noted and kept.)
 const per = net ? 3 : reopen ? 2 : 1;
+// --deploy-at: one page, open while the update arrives (see the option).
+if (deployAt && oldRoot) {
+  Object.assign(served, { root: oldRoot, dir: join(oldRoot, repo, key === 'orbit' ? 'dist' : 'public') });
+  const page = await context.newPage();
+  const t0 = Date.now();
+  const at = () => `${String(((Date.now() - t0) / 1000).toFixed(1)).padStart(6)} s`;
+  page.on('pageerror', e => console.log(`${at()}  page error: ${String(e.message).slice(0, 200)}`));
+  page.on('console', m => m.type() === 'error' && console.log(`${at()}  console: ${m.text().slice(0, 200)}`));
+  page.on('response', r => r.status() >= 400 && r.url().startsWith(base.replace(/[^/]+\/$/, '')) && console.log(`${at()}  ${r.status()} ${r.url().slice(0, 140)}`));
+  page.on('framenavigated', f => f === page.mainFrame() && console.log(`${at()}  load ${f.url().replace(base, '/')}`));
+  const state = () =>
+    page
+      .evaluate(() => {
+        const box = document.getElementById('loading');
+        const said = box && !box.hidden ? [...box.querySelectorAll('p')].filter(p => !p.closest('[hidden]') && !p.hidden).map(p => p.innerText.trim()).filter(Boolean).slice(2).join(' / ') : '';
+        return `${globalThis.__fxStarted ? 'running' : 'not started'}${box && !box.hidden ? `, loading screen: ${said}` : ''}; app ${document.querySelector('meta[name=build-version]')?.content}, kit ${globalThis.ORBIT_KIT?.version}`;
+      })
+      .catch(e => `(${e.message.split('\n')[0].slice(0, 80)})`);
+  let last = '';
+  const watchState = setInterval(async () => {
+    const now = await state();
+    if (now !== last) console.log(`${at()}  ${(last = now)}`);
+  }, 250);
+  // (Opened once before, as an installed app has been: its kit noted, its files kept.)
+  await page.goto(base).catch(e => console.log(`goto: ${e.message.split('\n')[0]}`));
+  await page.waitForTimeout(3000);
+  console.log(`${at()}  opened again`);
+  await page.goto(base).catch(e => console.log(`goto: ${e.message.split('\n')[0]}`));
+  await page.waitForTimeout(Math.max(0, deployAt - (Date.now() - t0)));
+  const setHidden = hidden =>
+    page.evaluate(h => {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => (h ? 'hidden' : 'visible') });
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => h });
+      document.dispatchEvent(new Event('visibilitychange'));
+      if (!h) window.dispatchEvent(new Event('focus'));
+    }, hidden).catch(() => {});
+  if (hiddenFor) {
+    await setHidden(true);
+    console.log(`${at()}  out of sight`);
+  }
+  Object.assign(served, { root: newRoot, dir: join(newRoot, repo, key === 'orbit' ? 'dist' : 'public') });
+  lagUntil = Date.now() + cdnLag;
+  console.log(`${at()}  deployed${cdnLag ? ` (the CDN on the old files for ${cdnLag / 1000} s)` : ''}`);
+  // --relaunch-after ms: the app closed and opened again that long after the deploy.
+  if (relaunchAfter) {
+    await page.waitForTimeout(relaunchAfter);
+    console.log(`${at()}  closed and opened again`);
+    await page.goto(base).catch(e => console.log(`goto: ${e.message.split('\n')[0]}`));
+  }
+  if (hiddenFor) {
+    await page.waitForTimeout(hiddenFor);
+    await setHidden(false);
+    console.log(`${at()}  back on screen`);
+  }
+  await page.waitForTimeout(Math.max(0, deployAt + hiddenFor + watchFor - (Date.now() - t0)));
+  if (tapAtEnd) {
+    await page.click(tapAtEnd, { timeout: 5000 }).then(() => console.log(`${at()}  tapped ${tapAtEnd}`), e => console.log(`${at()}  tap ${tapAtEnd}: ${e.message.split('\n')[0]}`));
+    await page.waitForTimeout(4000);
+    console.log(`${at()}  sheet: ${await page.evaluate(() => document.querySelector('dialog[open]')?.innerText.slice(0, 80).replace(/\s+/g, ' ') || 'none open').catch(() => '?')}`);
+  }
+  clearInterval(watchState);
+  console.log(`${at()}  end: ${await state()}`);
+  await page.screenshot({ path: join(out, `${key}-deploy.png`) }).catch(() => {});
+  await browser?.close();
+  process.exit(0);
+}
 for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(h))) {
   const first = opening++ % per !== per - 1 || per === 1;
   const at = first && oldRoot ? oldRoot : newRoot;

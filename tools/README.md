@@ -77,6 +77,7 @@ node tools/preview.mjs sports --live --width 375
 | `--webkit` | Safari's engine instead of Chromium (cloud: once, `apt-get install -y libavif16 libenchant-2-2 libsecret-1-0 libwayland-server0 libmanette-0.2-0 libgles2 libgtk-4-1 libgraphene-1.0-0 libwoff1 libevent-2.1-7t64 libgstreamer-gl1.0-0 libgstreamer-plugins-bad1.0-0 gstreamer1.0-plugins-base`) |
 | `--reopen` | Open twice with storage kept (a returning phone) |
 | `--upgrade <date\|ref>` | The old version, then today's, in one storage |
+| `--upgrade <date> --deploy-at ms [--cdn-lag ms] [--hidden-for ms] [--relaunch-after ms] [--kit-only] [--old-kit-local] [--tap sel]` | A deploy landing while the old app is open: each load, what the loading screen said, whether it ended up running. `--cdn-lag`: the CDN still answers the old files that long; `--old-kit-local`: the old kit is this one with a line changed (to try a change to the update path itself) |
 | `--flaky <share>`, `--net offline\|slow[:ms]` | Failing or missing network |
 | `--shuffle` | What moved after the loading screen lifted |
 | `--timing`, `--requests`, `--profile`, `--latency ms`, `--version-latency ms`, `--h2`, `--root dir` | Speed: when it opened, every call, the CPU profile, a phone's latency, a deploy's build |

@@ -170,11 +170,20 @@ async function pageFirst(request, later) {
   return kept;
 }
 
+// The kit's boot.js is what mends an update that didn't finish (and draws
+// the loading screen the apps report to): refused while the CDN still had the
+// old one, nothing was left to mend it, and the app sat on a blank loading
+// screen until it was closed and opened again. It stands alone (no imports),
+// so another version of it (kept, else what came) beats none; never kept
+// under this address.
+const SELF_CONTAINED = /\/kit\/boot\.js$/;
 async function cacheFirst(request, later) {
   const cached = await caches.match(request);
   if (cached) return cached;
   try {
     const response = await fetchTrue(request);
+    if (response.headers.get('X-Orbit-Stale') && SELF_CONTAINED.test(new URL(request.url).pathname))
+      return (await caches.match(request, { ignoreSearch: true })) || fetchSure(request.url, { cache: 'reload', credentials: 'same-origin' });
     later(keep(request, response.clone()));
     return response;
   } catch (error) {

@@ -276,6 +276,10 @@ the whole kit or app before). The kit's `version.json` lists every file's
 hash; the device notes them (`orbit.kitFiles`) and the loader asks for each
 file at its hash. Built kit files import each other as `#kit/…`, through the
 import map, so a file has one address whichever loader a page carries.
+The kit's version is its files' hash (`k` + 12 hex), so a push that changes
+no kit file is no update. An open app swaps to a new version only once every
+file it needs is on the phone (`watchUpdates` → `updateReady`); `sw.js` never
+refuses `boot.js`, which mends an update that didn't finish.
 
 | Module | What |
 | --- | --- |

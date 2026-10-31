@@ -3354,6 +3354,52 @@ async function kitLatest() {
   }
 }
 
+// Whether a newer version's files are all on the phone, so the page can be
+// swapped for it (watchUpdates): each fetched through the service worker,
+// which checks it against its hash and keeps it. Swapping first left the new
+// page to fetch them itself: right after a deploy GitHub's CDN can still
+// answer with the old files for a while, so the new page got refused files
+// and sat on its loading screen (or opened half-styled) until the app was
+// closed and opened again. Now the page in use just runs on until the update
+// is all there, and the swap opens it from the phone at once. Only what the
+// page loaded is asked: the kit's files at their new hashes (orbit.kitFiles,
+// just noted by kitLatest), and a new deploy's page with every file it names
+// (unchanged ones are an instant answer from the service worker).
+async function updateReady(latest) {
+  if (typeof fetch === 'undefined') return true;
+  try {
+    const urls = new Set();
+    const kit = KIT();
+    const noted = JSON.parse(readStore('orbit.kitFiles') || 'null')?.files;
+    if (kit?.base && noted) {
+      const base = new URL(kit.base, location.href).href;
+      const used = new Set(['boot.js', 'orbit.css']);
+      for (const r of performance.getEntriesByType?.('resource') || []) if (r.name.startsWith(base)) used.add(r.name.slice(base.length).split('?')[0]);
+      for (const name of used) if (noted[name]) urls.add(`${base}${name}?v=${noted[name]}`);
+    }
+    if (!latest.startsWith('kit:')) {
+      const res = await fetch(location.pathname, { cache: 'no-cache', credentials: 'same-origin' });
+      const page = res.ok ? await res.text() : '';
+      // (The CDN still on the old page: not yet.)
+      if (/<meta name="build-version" content="([^"]*)"/.exec(page)?.[1] !== latest) return false;
+      for (const m of page.matchAll(/(?:src|href)="(\.[^"]+\?v=[0-9a-f]{12})"/g)) urls.add(new URL(m[1], location.href).href);
+    }
+    // (No service worker in charge, the first opening or a browser without one: checked here.)
+    const checked = Boolean(navigator.serviceWorker?.controller);
+    const sure = async (u, r) => {
+      if (!r.ok) return false;
+      const want = new URL(u).searchParams.get('v');
+      if (checked || !/^[0-9a-f]{12}$/.test(want) || !crypto?.subtle) return true;
+      const d = new Uint8Array(await crypto.subtle.digest('SHA-256', await r.arrayBuffer()));
+      return [...d.slice(0, 6)].map(b => b.toString(16).padStart(2, '0')).join('') === want;
+    };
+    const got = await Promise.all([...urls].map(u => fetch(u, { credentials: 'same-origin', cache: checked ? 'default' : 'no-cache' }).then(r => sure(u, r), () => false)));
+    return got.every(Boolean);
+  } catch {
+    return false;
+  }
+}
+
 // Whether the app may lift its loading screen: once boot.js's first update
 // check has answered, true; false when that check is reloading the page onto
 // a newer deploy (the app then shows nothing, so a person never sees the old
@@ -3396,6 +3442,7 @@ export function watchUpdates({ current, key, every = 15_000 } = {}) {
   watching = { current, key };
   let checking = false;
   let retry = 0;
+  let notReady = 0;
   const channel = globalThis.BroadcastChannel ? new BroadcastChannel('orbit-updates') : null;
   async function apply(latest) {
     // (Music playing: not now. The check every few seconds, or the next opening, updates once it stops.)
@@ -3415,6 +3462,15 @@ export function watchUpdates({ current, key, every = 15_000 } = {}) {
       retry = setTimeout(() => check(true), wait + 50);
       return;
     }
+    // The new version's files on the phone first; until they are, this page
+    // runs on and looks again (each look a little later, up to half a minute).
+    if (!(await updateReady(latest))) {
+      clearTimeout(retry);
+      retry = setTimeout(() => check(true), (notReady = Math.min(30_000, notReady ? notReady * 2 : 5_000)));
+      return;
+    }
+    notReady = 0;
+    if (document.visibilityState === 'hidden' || sounding()) return;
     sessionStorage.setItem(flag, `${latest}|${n + 1}|${Date.now()}`);
     rememberPlace();
     // (Leaving: what the page still had on the way fails as the page goes, and says nothing of the network.)
