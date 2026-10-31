@@ -1259,7 +1259,7 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
   for (const js of evals) console.log('eval:', JSON.stringify(await page.evaluate(js).catch(e => `error ${e.message}`)));
   // The language and what was clicked in the name: runs that differ only in those don't overwrite each other.
   const slug = c => c.replace(/^js:/, '').replace(/[^\p{L}\p{N}]+/gu, '_').replace(/^_+|_+$/g, '').slice(0, 32);
-  const file = join(out, `${key}-${hash || 'start'}${reopen ? (first ? '-1' : '-2') : ''}${lang !== 'zh' ? `-${lang}` : ''}${clicks.length ? `-${clicks.map(slug).join('+')}` : ''}${dark ? '-dark' : ''}${engine === 'webkit' ? '-webkit' : ''}.png`);
+  const file = join(out, `${key}-${hash || 'start'}${reopen ? (first ? '-1' : '-2') : ''}${lang !== 'zh' ? `-${lang}` : ''}${clicks.length ? `-${clicks.map(slug).join('+').slice(0, 160)}` : ''}${dark ? '-dark' : ''}${engine === 'webkit' ? '-webkit' : ''}.png`);
   await page.screenshot({ path: file, fullPage: full });
   if (shotSel) {
     // The element at its whole height: its scrollers opened up, laid over the page's top.

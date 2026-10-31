@@ -125,7 +125,16 @@ export const PAGES = {
   },
   securities: {
     default: ['tabs'],
-    stock: { args: click('[data-action=open][data-symbol="2330.TW"]', wait(3000), '[data-action=chart-style][data-v=candle]', '[data-action=range][data-range="6mo"]', wait(4000)) }
+    // 台股 › 上市, the list; 台積電's page (candles, 6 months), its order ticket; the tool sheets.
+    list: { args: click('#tab-markets', '[data-action=product][data-id=tw]', wait(3000)) },
+    stock: { args: click('#tab-markets', '[data-action=product][data-id=tw]', wait(2500), '[data-action=open][data-symbol="2330.TW"]', wait(3000), '[data-action=chart-style][data-v=candle]', '[data-action=range][data-range="6mo"]', wait(4000)) },
+    ticket: { args: click('#tab-markets', '[data-action=product][data-id=tw]', wait(2500), '[data-action=open][data-symbol="2330.TW"]', wait(3000), '[data-action=trade][data-side=buy]', wait(1500)) },
+    alloc: { args: click('#tab-portfolio', '[data-action=tool][data-tool=alloc]', wait(1200)) },
+    rates: { args: click('#tab-fx', '[data-action=tool][data-tool=rates]', wait(1500)) },
+    td: { args: click('#tab-fx', '[data-action=tool][data-tool=td]', wait(1200)) },
+    access: { args: click('#tab-fx', '[data-action=tool][data-tool=access]', wait(1200)) },
+    truth: { args: click('#tab-fx', '[data-action=tool][data-tool=truth]', wait(1200)) },
+    stats: { args: click('#tab-history', '[data-action=hview][data-view=stats]', wait(2500)) }
   },
   admin: { default: ['overview', 'accounts', 'money', 'health'], overview: { hash: 'overview' }, accounts: { hash: 'accounts' }, money: { hash: 'money' }, health: { hash: 'health' } }
 };
