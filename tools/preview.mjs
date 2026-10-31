@@ -684,6 +684,10 @@ const stockDocs = new Map();
 await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(?!weather|push|transit|sports-proxy|law-page|data\/)/, async route => {
   const req = route.request();
   const body = req.postDataJSON?.() || {};
+  // Orbit Law's AI (/law-ask, /law-chat) has no dev door (Gemini costs): a
+  // saved answer only when one is given (--fixture 'law-ask=file.json'), for a sheet's layout.
+  const aiFixture = fixtures.find(([text]) => ['/law-ask', '/law-chat'].includes(new URL(req.url()).pathname) && req.url().includes(text));
+  if (aiFixture) return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: readFileSync(aiFixture[1], 'utf8') });
   // Orbit Securities' orders, plans and 新股申購 (stock-fill.js): the
   // Worker's own code on a store of the run's, today's real data.
   if (new URL(req.url()).pathname === '/stock') {

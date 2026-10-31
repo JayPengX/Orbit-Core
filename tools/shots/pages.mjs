@@ -77,6 +77,9 @@ export const PAGES = {
     'search-named': { hash: 'tab=laws&q=憲法' },
     'search-partial': { hash: 'tab=laws&q=憲法增' },
     'search-short': { hash: 'tab=laws&q=勞基' },
+    // A law's card with a bill in 協商 and 憲法法庭 rulings about it (預算法), and a 沿革 timeline.
+    card: { hash: 'law=T0020001' },
+    history: { hash: 'law=N0030020', args: click('.lw-tool[aria-label="更多"], .lw-tool[aria-label="More"]', 'button.q-cell:has-text("沿革"), button.q-cell:has-text("History")', wait(800)) },
     votes: { args: click('#tab-bills', tap('Votes|表決'), wait(3000)) }
   },
   securities: {

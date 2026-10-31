@@ -317,3 +317,38 @@ test("the panel's daily cap: the day's count stops at it, and 0 pauses the AI", 
   assert.equal(await spend(env, 'p3', 40, day, 2), 0, 'the third of the day is past a cap of 2');
   assert.equal(await spend(envOf(), 'p1', 40, day, 0), 0, '0 pauses it');
 });
+
+test('no question: the article explained (gist, why, examples, terms, today), on Flash, kept apart; related articles only real ones', async () => {
+  const saved = reply;
+  reply = {
+    gist: '大人可以替判斷力不足的人向法院申請輔助。',
+    points: [{ text: '本人或家人可以聲請', cites: ['15-1'] }, { text: '別的條', cites: ['99'] }],
+    why: '保護判斷力較弱的人，又不完全拿走他的權利。',
+    examples: [{ title: '失智的父親', text: '子女向法院聲請輔助宣告。' }, { title: '', text: '' }],
+    terms: [{ term: '輔助宣告', means: '法院指定輔助人。' }],
+    now: '',
+    related: [{ law: '民法', art: '1', why: '法例' }, { law: '民法', art: '15-1', why: '自己' }, { law: '不存在的法', art: '3', why: 'x' }, { law: '民法', art: '999', why: 'x' }],
+    covered: true
+  };
+  try {
+    const env = envOf();
+    const r = await ask({ p: 'B0000001', arts: ['15-1'], lang: 'zh' }, { env, pass: 'explain' });
+    const j = await r.json();
+    assert.equal(r.status, 200);
+    const sent = gemini.at(-1);
+    assert.match(sent.contents[0].parts[0].text, /civics teacher/);
+    assert.ok(Object.keys(sent.generationConfig.response_schema.properties).includes('why'));
+    assert.equal(j.gist, '大人可以替判斷力不足的人向法院申請輔助。');
+    assert.equal(j.answer, j.gist);
+    assert.deepEqual(j.points, [{ text: '本人或家人可以聲請', cites: ['15-1'] }]);
+    assert.deepEqual(j.examples, [{ title: '失智的父親', text: '子女向法院聲請輔助宣告。' }]);
+    assert.deepEqual(j.related, [{ p: 'B0000001', n: '民法', k: '1', why: '法例' }]);
+    assert.equal(j.covered, true);
+    const calls = gemini.length;
+    assert.equal((await (await ask({ p: 'B0000001', arts: ['15-1'], lang: 'zh' }, { env, pass: 'explain' })).json()).cached, true);
+    assert.equal(gemini.length, calls);
+    assert.ok([...env.RATE_LIMIT_KV.m.keys()].some(k => k.startsWith('law:explain:v2:')));
+  } finally {
+    reply = saved;
+  }
+});
