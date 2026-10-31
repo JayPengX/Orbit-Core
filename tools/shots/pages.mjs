@@ -17,7 +17,10 @@ export const PAGES = {
   sports: {
     default: ['tabs'],
     'nba-game': { args: click('#tab-matches', '[data-league=nba]', "js:[...document.querySelectorAll('.q-chip.day.is-today')].find(e=>e.offsetParent)?.click()", "js:[...document.querySelectorAll('.event-row')].find(e=>e.offsetParent)?.click()", wait(4000)) },
-    'f1-weekend': { args: click('#tab-matches', '[data-league=f1]', tap('Ended|已結束'), "js:document.querySelector('.wk-card.done')?.click()", wait(4000)) }
+    'f1-weekend': { args: click('#tab-matches', '[data-league=f1]', tap('Ended|已結束'), "js:document.querySelector('.wk-card.done')?.click()", wait(4000)) },
+    // The next race weekend's sheet scrolled to: 賽道 (the circuit drawn) and last year's podium.
+    'f1-next': { args: click('#tab-matches', '[data-league=f1]', "js:document.querySelector('.wk-card:not(.done)')?.click()", wait(6000), "js:[...document.querySelectorAll('dialog.q-sheet[open] .q-card')].find(c=>/賽道|The circuit/.test(c.textContent))?.scrollIntoView({block:'start'})", wait(2500)) },
+    'f1-podium': { args: click('#tab-matches', '[data-league=f1]', "js:document.querySelector('.wk-card:not(.done)')?.click()", wait(6000), "js:[...document.querySelectorAll('dialog.q-sheet[open] .q-card')].find(c=>/年這一站|Here in/.test(c.textContent))?.scrollIntoView({block:'end'})", wait(2500)) }
   },
   transit: {
     default: ['tabs', 'trip'],
