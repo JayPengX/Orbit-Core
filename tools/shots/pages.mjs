@@ -80,7 +80,11 @@ export const PAGES = {
     // A law's card with a bill in 協商 and 憲法法庭 rulings about it (預算法), and a 沿革 timeline.
     card: { hash: 'law=T0020001' },
     history: { hash: 'law=N0030020', args: click('.lw-tool[aria-label="更多"], .lw-tool[aria-label="More"]', 'button.q-cell:has-text("沿革"), button.q-cell:has-text("History")', wait(800)) },
-    votes: { args: click('#tab-bills', tap('Votes|表決'), wait(3000)) }
+    votes: { args: click('#tab-bills', tap('Votes|表決'), wait(3000)) },
+    // A ruling (115年憲判字第7號): its top, its 理由 opened and scrolled to, and its AI (判了什麼, 為什麼, 影響到誰).
+    ruling: { hash: 'r=j115-7', args: click(wait(4000)) },
+    'ruling-reasons': { hash: 'r=j115-7', args: click(wait(4000), "js:(d=>{d.open=true;d.scrollIntoView({block:'start'})})([...document.querySelectorAll('dialog.q-sheet[open] .lw-cons-reason')].pop())", wait(800)) },
+    'ruling-ai': { hash: 'r=j115-7', args: click(wait(4000), '.lw-ruling-ai', wait(25000), "js:[...document.querySelectorAll('dialog.q-sheet[open] .lw-para')].pop()?.click()", wait(600)) }
   },
   securities: {
     default: ['tabs'],
