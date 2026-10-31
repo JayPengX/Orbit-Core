@@ -16,6 +16,13 @@ const click = (...sels) => sels.flatMap(s => ['--click', s]);
 export const PAGES = {
   sports: {
     default: ['tabs'],
+    // 賽事 on one league, each of its tabs (laid out wide on a tablet or a computer).
+    'epl-table': { args: click('#tab-matches', '[data-league=epl]', wait(2500), tap('排名|Table'), wait(4000)) },
+    'nba-leaders': { args: click('#tab-matches', '[data-league=nba]', wait(2500), tap('數據|Stats'), wait(5000)) },
+    'nba-bracket': { args: click('#tab-matches', '[data-league=nba]', wait(2500), tap('季後賽|Playoffs'), wait(5000)) },
+    'f1-season': { args: click('#tab-matches', '[data-league=f1]', wait(4000)) },
+    // A team's page (the Lakers): 概況.
+    'team-nba': { args: click("js:import('./sheets.js').then(m=>m.openTeam('nba','13'))", wait(7000)) },
     'nba-game': { args: click('#tab-matches', '[data-league=nba]', "js:[...document.querySelectorAll('.q-chip.day.is-today')].find(e=>e.offsetParent)?.click()", "js:[...document.querySelectorAll('.event-row')].find(e=>e.offsetParent)?.click()", wait(4000)) },
     // Today's first NBA game (under 全部), scrolled to a card by its title: 勝率走勢 (the chart and 關鍵時刻), 本季對戰.
     'nba-chart': { args: click('#tab-matches', wait(3000), "js:document.querySelector('.all-league[data-league=nba] .event-row').click()", wait(9000), "js:[...document.querySelectorAll('dialog.q-sheet[open] .q-card')].find(c=>/勝率走勢|Win probability/.test(c.textContent))?.scrollIntoView({block:'start'})", wait(1500)) },
