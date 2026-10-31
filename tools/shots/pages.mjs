@@ -27,9 +27,9 @@ export const PAGES = {
     'f1-guest': { args: click("js:import('./sheets.js').then(m=>m.openPlayer('f1','5910'))", wait(9000)) },
     // A player's 資料 (profile, draft, every team, honours) and 數據 scrolled to its seasons, one per sport.
     ...Object.fromEntries(
-      [['nba', '3945274'], ['mlb', '33192'], ['epl', '280555'], ['f1', '868']].flatMap(([league, id]) => [
-        [`player-${league}`, { args: click(`js:import('./sheets.js').then(m=>m.openPlayer('${league}','${id}'))`, wait(6000), tap('資料|Bio'), wait(6000), "js:[...document.querySelectorAll('dialog.q-sheet[open]')].pop().querySelector('.career-teams')?.closest('.q-card').scrollIntoView({block:'start'})", wait(600)) }],
-        [`player-${league}-stats`, { args: click(`js:import('./sheets.js').then(m=>m.openPlayer('${league}','${id}'))`, wait(6000), tap('數據|Stats'), wait(6000), "js:[...document.querySelectorAll('dialog.q-sheet[open]')].pop().querySelector('.career-seasons')?.scrollIntoView({block:'start'})", wait(600)) }]
+      [['nba', '3945274'], ['mlb', '33192'], ['epl', '280555'], ['f1', '868'], ['epl', '265653', 'epl-loans']].flatMap(([league, id, key = league]) => [
+        [`player-${key}`, { args: click(`js:import('./sheets.js').then(m=>m.openPlayer('${league}','${id}'))`, wait(6000), tap('資料|Bio'), wait(6000), "js:[...document.querySelectorAll('dialog.q-sheet[open]')].pop().querySelector('.career-teams')?.closest('.q-card').scrollIntoView({block:'start'})", wait(600)) }],
+        [`player-${key}-stats`, { args: click(`js:import('./sheets.js').then(m=>m.openPlayer('${league}','${id}'))`, wait(6000), tap('數據|Stats'), wait(6000), "js:[...document.querySelectorAll('dialog.q-sheet[open]')].pop().querySelector('.career-seasons')?.scrollIntoView({block:'start'})", wait(600)) }]
       ])
     )
   },
