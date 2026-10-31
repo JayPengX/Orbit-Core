@@ -4861,8 +4861,16 @@ html.q-kb .q-kb-docked {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin: 0 calc(-1 * max(var(--q-margin, 16px), env(safe-area-inset-left))) 6px;
-  padding: 6px max(var(--q-margin, 16px), env(safe-area-inset-left)) 8px;
+  /* (The screen's safe edges are the page's own padding: <html>'s.) */
+  margin: 0 calc(-1 * var(--q-margin, 16px)) 6px;
+  padding: 6px var(--q-margin, 16px) 8px;
+}
+/* A phone on its side is short: the day bar scrolls with the page. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .q-day-bar {
+    position: relative;
+    top: auto;
+  }
 }
 .q-day-bar[hidden] {
   display: none;
@@ -5053,6 +5061,8 @@ html.q-kb .q-kb-docked {
    bar along its foot; a computer has width to spare beside the page. */
 html.q-tabrail {
   --q-tabrail-w: 92px;
+  /* (Beside the page, never stranded at the far edge of a big screen.) */
+  --q-tabrail-x: max(calc(var(--q-inset-l) + 12px), calc(var(--q-col-l) - 68px - 24px));
   --q-tabrail-tab: 56px;
   --q-tabrail-h: calc(var(--q-tabs, 4) * var(--q-tabrail-tab) + 8px);
   /* (Nothing along the foot: what stood above the bar sits near the edge.) */
@@ -5064,7 +5074,7 @@ html.q-tabrail {
   }
 }
 html.q-tabrail .q-tabbar.q-tabbar {
-  left: calc(var(--q-inset-l) + 12px);
+  left: var(--q-tabrail-x);
   top: 50%;
   bottom: auto;
   grid-auto-flow: row;
@@ -5093,14 +5103,23 @@ html.q-tabrail .q-tab {
 }
 html.q-tabrail .q-tabbar.q-tabbar.q-tabbar-act {
   top: calc(50% - (var(--q-tabrail-h) + var(--q-act-room)) / 2);
-  left: calc(var(--q-inset-l) + 12px);
+  left: var(--q-tabrail-x);
   width: 68px;
   transform: none;
 }
 html.q-tabrail .q-tab-action {
   top: calc(50% - (var(--q-tabrail-h) + var(--q-act-room)) / 2 + var(--q-tabrail-h) + 10px);
   bottom: auto;
-  left: calc(var(--q-inset-l) + 12px + (68px - var(--q-act)) / 2);
+  left: calc(var(--q-tabrail-x) + (68px - var(--q-act)) / 2);
+}
+/* A phone on its side is short: the large titles a size down, as iOS's. */
+@media (orientation: landscape) and (max-height: 520px) {
+  :root {
+    --q-t-large: 700 28px/34px var(--q-font);
+  }
+  .q-page-head {
+    padding: 4px 0 10px;
+  }
 }
 /* An accessory (a player, an order bar) at the foot of the page, as wide
    as it needs, never a strip across a computer. */
