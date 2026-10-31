@@ -23,6 +23,8 @@ export const PAGES = {
     // The next race weekend's sheet scrolled to: 賽道 (the circuit drawn) and last year's podium.
     'f1-next': { args: click('#tab-matches', '[data-league=f1]', "js:document.querySelector('.wk-card:not(.done)')?.click()", wait(6000), "js:[...document.querySelectorAll('dialog.q-sheet[open] .q-card')].find(c=>/賽道|The circuit/.test(c.textContent))?.scrollIntoView({block:'start'})", wait(2500)) },
     'f1-podium': { args: click('#tab-matches', '[data-league=f1]', "js:document.querySelector('.wk-card:not(.done)')?.click()", wait(6000), "js:[...document.querySelectorAll('dialog.q-sheet[open] .q-card')].find(c=>/年這一站|Here in/.test(c.textContent))?.scrollIntoView({block:'end'})", wait(2500)) },
+    // A driver who only ran a practice (an FP1 stand-in: Mexico 2026's Minì), his page.
+    'f1-guest': { args: click("js:import('./sheets.js').then(m=>m.openPlayer('f1','5910'))", wait(9000)) },
     // A player's 資料 (profile, draft, every team, honours) and 數據 scrolled to its seasons, one per sport.
     ...Object.fromEntries(
       [['nba', '3945274'], ['mlb', '33192'], ['epl', '280555'], ['f1', '868']].flatMap(([league, id]) => [
