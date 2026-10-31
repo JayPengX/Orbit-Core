@@ -32,14 +32,15 @@
 //   old       a season two or more years back shown as current
 //   (every kind also checked on what each tap opens: sheets, game and
 //   player pages, 紀錄)
-//   column    (1180×820) something outside the phone's centred column
+//   column    (on its side, tablet, computer) a bar or sheet off the screen, or
+//             the page under the tab rail
 //   typing    (390 light) a field the keyboard covers or pushes off the
 //             screen, one under 16px (iOS zooms), or the page sliding sideways
 //
 //   node tools/gate.mjs [app…] [--jobs 4] [--out dir] [--no-taps] [--quick]
 //
-// --quick: 390 light only (--lang en: in English). --wide: the wide runs only (every app at
-// 1180×820 as an iPad, with its taps); a full run has them too. Writes <out>/report.md (each fault with its
+// --quick: 390 light only (--lang en: in English). --wide: the other screens only (every app
+// on a phone on its side 844×390, a tablet 820×1180 and a computer 1440×900, with taps); a full run has them too. Writes <out>/report.md (each fault with its
 // screenshot) and report.json; exits 1 when anything failed.
 import { execFile } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -78,16 +79,17 @@ if (!wide) for (const app of apps)
     for (const dark of quick ? [darkOnly] : [false, true]) runs.push({ app, width, dark, taps: taps && width === 390 && !dark, ...(onlyLang ? { lang: onlyLang } : {}) });
 // English, the longer words, at the narrowest screen.
 if (!quick && !wide) for (const app of apps) runs.push({ app, width: 320, dark: false, lang: 'en' });
-// Every app on a screen wider than a phone (an iPad on its side): the phone's
-// layout in a centred column, bars and sheets inside it (Jay 2026-10-23).
-if (!quick || wide) for (const app of apps) runs.push({ app, width: 1180, height: 820, dark: false, taps: wide, device: 'ipad' });
-// The sign-in screen there, its fields typed in. One app: the screen is the kit's.
-if (!quick || wide) runs.push({ app: apps[0], width: 1180, height: 820, dark: false, taps: true, signedOut: true });
+// Every app on the other screens (Jay 2026-10-31: every screen, either way up):
+// a phone on its side, a tablet, a computer.
+const OTHER = [{ width: 844, height: 390, device: 'iphone' }, { width: 820, height: 1180, device: 'ipad' }, { width: 1440, height: 900, device: 'pc' }];
+if (!quick || wide) for (const app of apps) for (const sc of OTHER) runs.push({ app, ...sc, dark: false, taps: wide });
+// The sign-in screen on a phone on its side and a tablet, its fields typed in. One app: the screen is the kit's.
+if (!quick || wide) for (const sc of OTHER.slice(0, 2)) runs.push({ app: apps[0], ...sc, dark: false, taps: true, signedOut: true });
 
 const preview = new URL('./preview.mjs', import.meta.url).pathname;
 const one = run =>
   new Promise(done => {
-    const a = [preview, run.app, '--gate', '--live', '--width', String(run.width), '--out', join(out, 'shots'), '--wait', '7000', '--cpu', '2', ...(run.dark ? ['--dark'] : []), ...(run.lang ? ['--lang', run.lang] : []), ...(run.taps ? ['--taps'] : []), ...(run.height ? ['--height', String(run.height), '--device', 'ipad'] : []), ...(run.signedOut ? ['--signed-out'] : [])];
+    const a = [preview, run.app, '--gate', '--live', '--width', String(run.width), '--out', join(out, 'shots'), '--wait', '7000', '--cpu', '2', ...(run.dark ? ['--dark'] : []), ...(run.lang ? ['--lang', run.lang] : []), ...(run.taps ? ['--taps'] : []), ...(run.height ? ['--height', String(run.height), '--device', run.device] : []), ...(run.signedOut ? ['--signed-out'] : [])];
     execFile(process.execPath, a, { maxBuffer: 64 * 1024 * 1024, timeout: 600_000 }, (err, stdout) => {
       const line = String(stdout || '').split('\n').find(l => l.startsWith('gate: '));
       if (!line) return done({ ...run, crashed: String(err?.message || stdout || 'no result').split('\n').slice(0, 3).join(' ') });

@@ -51,7 +51,7 @@ Jay's specific decisions, app by app and dated, are in [`RULEBOOK.md`](RULEBOOK.
   Cloudflare for the Workers. No PRs.
 - **Check what a person would see:** if the change is visible,
   `node Orbit-Core/tools/shots.mjs <app> [page…] --before main` (every
-  page at 320 and 390, light and dark, real data, and what changed against
+  page at 320 and 390, on a phone on its side, a tablet and a computer, light and dark, real data, and what changed against
   what's live, on one sheet). Fix anything it reports under `wraps:`, `cut:`
   or `scrolls sideways:`. Heavier modes (`--webkit`, `--reopen`, `--flaky`,
   the iOS Simulator) only when the bug is about them.
@@ -110,10 +110,11 @@ Jay's specific decisions, app by app and dated, are in [`RULEBOOK.md`](RULEBOOK.
 
 - **Chinese (Traditional, Taiwan) first**, in Taiwan's words; English
   second. Teams in Chinese (`kit/names.mjs`), people in their own names.
-- **Native iOS look from the kit**, for a phone held upright at 375 px.
-  Phones only: 320 px to a Pro Max's 440; an iPad or a computer shows the
-  same phone layout in a centred column (orbit.css `--q-col-max`), with no
-  tablet or wide layouts anywhere. No unplanned wrap, ellipsis or clipped edge on anything a row is *for*
+- **Native iOS look from the kit, on every screen, either way up**: a
+  phone upright (320 px to a Pro Max's 440) or on its side, a tablet, a
+  computer, each laid out for its own space (`DESIGN.md` §10: the tab rail,
+  centred sheets, pages in columns), never a phone's column stretched or
+  left alone in the middle. No unplanned wrap, ellipsis or clipped edge on anything a row is *for*
   (a name, a score): lay it out for its longest real content. Nothing
   wider than the screen. Respect the safe areas.
 - **Real data, no guessing.** A dash, not a made-up 0; 待定 when a time

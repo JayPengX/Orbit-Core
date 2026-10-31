@@ -1195,109 +1195,73 @@ function statusStrip() {
   bar.setAttribute('aria-hidden', 'true');
   document.body.prepend(bar);
 }
-// A phone turned sideways: every app's screens are drawn for a phone held
-// upright (the owner, 2026-10-10), and iOS can't lock a web app's
-// orientation, so the page turns back against the phone: it stays upright
-// on the glass as if the phone hadn't turned (orbit.css html[data-q-turn]).
-// Only a phone (its short side 520 px or less); a tablet turns as it likes.
-function uprightTurn() {
-  if (typeof document === 'undefined' || document.documentElement.dataset.qTurnOn) return;
+// Every screen, either way up (Jay 2026-10-31: "properly work on all
+// resolution horizontal or vertical"). The page is laid out for the screen it
+// is on; <html> carries what kind of screen that is, read off its size, so the
+// kit and the apps lay out by it (orbit.css "Every screen"):
+//   q-rail   the tabs down the left side instead of along the foot: a phone on
+//            its side (too short for a bar at the foot) and a wide screen
+//   q-float  sheets as cards in the middle, not up from the foot (a tablet, a computer)
+//   q-wide   the content has room for two columns side by side (640 px and up)
+//   q-w3     room for three (1000 px and up)
+// --q-sbw is a computer's scroll bar, which 100vw counts and the page hasn't.
+// screenFit() is what it is now; onScreen(fn) calls fn with it on each change.
+const screenFns = new Set();
+let screenNow = null;
+export function screenFit() {
+  if (screenNow) return screenNow;
+  if (typeof document === 'undefined' || !document.documentElement) return { rail: false, float: false, wide: false, w3: false, width: 390 };
+  return measureScreen();
+}
+export function onScreen(fn) {
+  screenFns.add(fn);
+  return () => screenFns.delete(fn);
+}
+let insetProbe = null;
+function measureScreen() {
   const root = document.documentElement;
-  root.dataset.qTurnOn = '1';
-  const set = () => {
-    const w = globalThis.innerWidth;
-    const h = globalThis.innerHeight;
-    const phone = root.classList.contains('q-touch') && Math.min(w, h) <= 520;
-    const angle = Number(globalThis.screen?.orientation?.angle ?? globalThis.orientation ?? 90);
-    // Turned left (90): the page a quarter back to the right, and the other way round.
-    const turn = phone && w > h ? (angle === 270 || angle === -90 ? '90' : '-90') : '';
-    if (turn) {
-      root.style.setProperty('--q-turn-w', `${h}px`);
-      root.style.setProperty('--q-turn-h', `${w}px`);
-    }
-    // Upright, no mark at all: an empty one still matches html[data-q-turn],
-    // whose rules put every alert in the top-left corner.
-    if (turn && root.dataset.qTurn !== turn) root.dataset.qTurn = turn;
-    else if (!turn && 'qTurn' in root.dataset) delete root.dataset.qTurn;
-    turnRules(turn ? [h, w, turn] : null);
-  };
-  set();
-  globalThis.addEventListener?.('resize', set);
-  globalThis.screen?.orientation?.addEventListener?.('change', set);
-  // A stylesheet that arrives later is read the same way.
-  if (typeof MutationObserver === 'function' && document.head) {
-    new MutationObserver(() => root.dataset.qTurn && set()).observe(document.head, { childList: true });
-    document.addEventListener('load', e => e.target?.tagName === 'LINK' && root.dataset.qTurn && set(), true);
+  const w = root.clientWidth || globalThis.innerWidth || 390;
+  const h = globalThis.innerHeight || root.clientHeight || 844;
+  if (!insetProbe && document.body) {
+    insetProbe = document.createElement('div');
+    insetProbe.setAttribute('aria-hidden', 'true');
+    insetProbe.style.cssText = 'position:fixed;visibility:hidden;pointer-events:none;width:0;height:0;padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)';
+    document.body.append(insetProbe);
   }
-}
-// Turned, the page is still laid out by the phone's sideways screen: its
-// @media widths and vw/vh lengths read 874 px wide, and the notch's and home
-// bar's margins (safe-area insets) land on the page's left and right, so
-// the page came out narrower and laid out differently from upright. While
-// turned, each is read against the upright screen instead ([width, height,
-// turn]: an inset is the sideways screen's side that is now the page's
-// top, left, …); null puts every rule back as written.
-const turnedMedia = new Map();
-const turnedStyles = new Map();
-const VIEW_LEN = /(-?[\d.]+)(d|s|l)?v(w|h|min|max)\b|safe-area-inset-(top|right|bottom|left)/g;
-const TURN_SIDES = {
-  '-90': { top: 'left', left: 'bottom', bottom: 'right', right: 'top' },
-  90: { top: 'right', left: 'top', bottom: 'left', right: 'bottom' },
-};
-function turnRules(size) {
-  if (typeof document === 'undefined') return;
-  const [W, H, turn] = size || [];
-  const sizeFits = (_, side, dim, n, unit) => {
-    const px = Number(n) * (unit === 'em' || unit === 'rem' ? 16 : 1);
-    const have = /height/.test(dim) ? H : W;
-    const ok = side === 'min-' ? have >= px : side === 'max-' ? have <= px : have === px;
-    return ok ? '(min-width: 0px)' : '(max-width: 0px)';
-  };
-  const viewLen = (_, n, __, axis, side) => {
-    if (side) return `safe-area-inset-${TURN_SIDES[turn][side]}`;
-    const unit = { w: W, h: H, min: Math.min(W, H), max: Math.max(W, H) }[axis];
-    return `${Math.round(Number(n) * unit) / 100}px`;
-  };
-  const walk = rules => {
-    for (const rule of rules || []) {
-      if (rule.media && rule.cssRules) {
-        const was = turnedMedia.get(rule) ?? rule.media.mediaText;
-        if (/width|height|orientation/.test(was)) {
-          turnedMedia.set(rule, was);
-          const text = size
-            ? was
-                .replace(/\(\s*(min-|max-)?(width|height|device-width|device-height)\s*:\s*([\d.]+)(px|em|rem)?\s*\)/g, sizeFits)
-                .replace(/\(\s*orientation\s*:\s*(\w+)\s*\)/g, (_, o) => (o === 'portrait' ? '(min-width: 0px)' : '(max-width: 0px)'))
-            : was;
-          if (rule.media.mediaText !== text) rule.media.mediaText = text;
-        }
-      }
-      // The turned page's own rules (html[data-q-turn]) already speak sideways.
-      if (rule.style && !/data-q-turn/.test(rule.selectorText || '')) {
-        // The whole declaration block: an inset inside a shorthand (padding)
-        // has no longhand to read.
-        const was = turnedStyles.get(rule) ?? rule.style.cssText;
-        VIEW_LEN.lastIndex = 0;
-        if (VIEW_LEN.test(was)) {
-          turnedStyles.set(rule, was);
-          const text = size ? was.replace(VIEW_LEN, viewLen) : was;
-          if (rule.style.cssText !== text) rule.style.cssText = text;
-        }
-      }
-      if (rule.styleSheet) walk(safeRules(rule.styleSheet));
-      if (rule.cssRules) walk(rule.cssRules);
+  const cs = insetProbe && typeof getComputedStyle === 'function' ? getComputedStyle(insetProbe) : null;
+  const insets = cs ? (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0) : 0;
+  const rail = (w > h && h <= 520) || w >= 1100;
+  const float = w >= 600 && h > 520;
+  const width = Math.round(w - insets - (rail ? 92 : 0));
+  const now = { rail, float, wide: width >= 640, w3: width >= 1000, width };
+  const sbw = Math.max(0, Math.round((globalThis.innerWidth || w) - w));
+  if (root.style.getPropertyValue('--q-sbw') !== `${sbw}px`) root.style.setProperty('--q-sbw', `${sbw}px`);
+  for (const k of ['rail', 'float', 'wide', 'w3']) if (root.classList.contains(`q-${k}`) !== now[k]) root.classList.toggle(`q-${k}`, now[k]);
+  const was = screenNow;
+  screenNow = now;
+  if (was && (was.rail !== now.rail || was.float !== now.float || was.wide !== now.wide || was.w3 !== now.w3 || was.width !== now.width)) for (const fn of screenFns) {
+    try {
+      fn(now);
+    } catch (e) {
+      console.error(e);
     }
-  };
-  if (!size && !turnedMedia.size && !turnedStyles.size) return;
-  for (const sheet of document.styleSheets) walk(safeRules(sheet));
-}
-// Another site's stylesheet (the fonts) can't be read; it has no layout rules.
-function safeRules(sheet) {
-  try {
-    return sheet.cssRules;
-  } catch {
-    return null;
   }
+  return now;
+}
+function watchScreen() {
+  if (typeof document === 'undefined' || document.documentElement.dataset.qScreen) return;
+  document.documentElement.dataset.qScreen = '1';
+  measureScreen();
+  let frame = 0;
+  const again = () => {
+    if (frame) return;
+    frame = requestAnimationFrame(() => ((frame = 0), measureScreen()));
+  };
+  globalThis.addEventListener?.('resize', again);
+  globalThis.screen?.orientation?.addEventListener?.('change', again);
+  // (A page that grows a scroll bar on a computer: the width it leaves.)
+  let seenW = 0;
+  if (typeof ResizeObserver === 'function') new ResizeObserver(es => es[0].contentRect.width !== seenW && ((seenW = es[0].contentRect.width), again())).observe(document.documentElement);
 }
 // The phone paints its own status bar above the page in the theme colour (or
 // black), so the theme colour is the strip's: one colour from the top of the
@@ -1320,7 +1284,7 @@ function syncThemeColor() {
 // Back at once if an app redraws its body (innerHTML) and takes it away.
 function keepStatusStrip() {
   statusStrip();
-  uprightTurn();
+  watchScreen();
   syncThemeColor();
   if (typeof MutationObserver === 'function') {
     // (The colour read again only when the strip came back or the body's
@@ -3702,7 +3666,6 @@ function watchKeyboard() {
   const unslide = () => globalThis.scrollTo?.(globalThis.scrollX, Math.max(0, globalThis.scrollY - vv.offsetTop));
   // (The screen's foot: what the visible part reaches.)
   const footGap = () => {
-    if (root.dataset.qTurn) return 0;
     const gap = Math.round(vv.offsetTop + vv.height - globalThis.innerHeight);
     // (A few px is rounding; more than half the screen is not this.)
     return gap > 8 && gap < globalThis.innerHeight ? gap : 0;
@@ -4580,6 +4543,9 @@ export function tabBar({ tabs, onSelect, hash = id => `#${id}`, nav = document.g
     if (still) nav.style.setProperty('transition', 'none');
     nav.style.setProperty('--q-tab-x', `${b.offsetLeft}px`);
     nav.style.setProperty('--q-tab-w', `${b.offsetWidth}px`);
+    // (Down the side rail: its place from the top.)
+    nav.style.setProperty('--q-tab-y', `${b.offsetTop}px`);
+    nav.style.setProperty('--q-tab-h', `${b.offsetHeight}px`);
     if (still) requestAnimationFrame(() => requestAnimationFrame(() => nav.style.removeProperty('transition')));
   };
   if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => pill(true)).observe(nav);
@@ -4591,7 +4557,7 @@ export function tabBar({ tabs, onSelect, hash = id => `#${id}`, nav = document.g
   nav.addEventListener('keydown', event => {
     const shown = [...buttons].filter(([, b]) => !b.hidden).map(([id]) => id);
     const i = shown.indexOf(current);
-    const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+    const step = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 0;
     if (!step || i < 0) return;
     event.preventDefault();
     const next = shown[(i + step + shown.length) % shown.length];

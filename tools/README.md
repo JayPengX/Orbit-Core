@@ -5,8 +5,9 @@ Chromium) in `~/.local/opt/playwright`; `preview.mjs` finds them itself.
 
 ## `node tools/shots.mjs <app> [page…]`: every screenshot a change needs
 
-The one way to take screenshots. Each page at 320 and 390 px, light and
-dark, in Chromium and WebKit (when installed: a Mac; the cloud has only
+The one way to take screenshots. Each page on every screen (320 and 390
+upright, `land` a phone on its side 844×390, `tablet` 820×1180, `desktop`
+1440×900), light and dark, in Chromium and WebKit (when installed: a Mac; the cloud has only
 Chromium), with real live data, signed in. One contact sheet, the faults of
 every shot, and what changed.
 
@@ -28,7 +29,7 @@ as before | after | diff, the change in pink). Exit code 1 on a fault.
 | `--at <ref>` | Shoot a ref instead of the working tree (`main` for the live build, a branch for a preview) |
 | `--against <dir>` | Compare with an earlier run's folder |
 | `--account <name\|file>` | Start with that account: `tools/shots/accounts/<app>-<name>.txt`, or Money's `demo` (its sample books) |
-| `--widths`, `--themes`, `--engines`, `--lang en` | The matrix (default 320,390 · light,dark · chromium,webkit · zh) |
+| `--screens` (or `--widths`), `--themes`, `--engines`, `--lang en` | The matrix (default 320,390,land,tablet,desktop · light,dark · chromium,webkit · zh; any `WxH` too) |
 | `--fixtures` | Saved answers instead of live data: offline checks only, never a shot anyone sees |
 | `--out`, `--jobs` | Where (default a new folder in the temp dir) and how many at once (4) |
 | `-- …` | Anything after it goes to each `preview.mjs` run (`--clock`, `--geo`, `--wait`…) |

@@ -202,29 +202,28 @@
         if ((bottom - kr.top + pad) / kr.height < 0.55) out.halfEmpty.push(`${name(k)} in ${name(el)} (${Math.round(bottom - kr.top)} of ${Math.round(kr.height)} px used)`);
       }
     }
-    // A screen wider than a phone (an iPad, a computer): the phone's layout in
-    // its centred column (orbit.css --q-col-max), so anything drawn outside
-    // it, on the page, a bar or a sheet, broke out (Jay 2026-10-23: phones only).
-    if (innerWidth > 440) {
-      const side = (innerWidth - 440) / 2;
-      const outside = r => r.width && r.height && r.bottom > 0 && r.top < innerHeight && (r.left < side - 1 || r.right > innerWidth - side + 1);
-      const column = `the column ${Math.round(side)}–${Math.round(innerWidth - side)}`;
-      // (The page clips at its own edges, so it's the page, and whatever is
-      // pinned to the screen or floats in the top layer, that must stay in.)
-      const page = document.body.getBoundingClientRect();
-      if (outside(page)) out.column.push(`the page ${Math.round(page.left)}–${Math.round(page.right)}, ${column}`);
+    // Every screen (Jay 2026-10-31: phones either way up, tablets,
+    // computers): what's pinned to the screen (a bar, a sheet, a banner)
+    // stays on it, and the page never runs under the tab rail down the side.
+    {
       const pinned = el => {
         for (let p = el; p && p !== document.body; p = p.parentElement) if (p.matches('dialog[open]') || getComputedStyle(p).position === 'fixed') return true;
         return false;
       };
+      const rail = document.documentElement.classList.contains('q-rail') ? document.querySelector('.q-tabbar')?.getBoundingClientRect() : null;
       for (const el of all) {
-        if (el.closest('.q-statusbar, #loading, .q-offline') || !pinned(el)) continue;
+        if (el.closest('.q-statusbar, #loading, .q-offline')) continue;
         const cs = getComputedStyle(el);
         if (cs.visibility === 'hidden' || +cs.opacity === 0 || clippedBy(el)) continue;
-        const bar = el.matches('.q-tabbar, .q-accessory, .q-banner, dialog[open]:not(.q-gate, .q-moved)');
-        if (!bar && !el.matches('img, svg, canvas, video, button, input, [role=button]') && ![...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) continue;
+        const shows = el.matches('img, svg, canvas, video, button, input, [role=button]') || [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim());
         const r = el.getBoundingClientRect();
-        if (outside(r)) out.column.push(`${name(el)} ${Math.round(r.left)}–${Math.round(r.right)}, ${column}`);
+        if (!r.width || !r.height || r.bottom <= 0 || r.top >= innerHeight) continue;
+        if (pinned(el)) {
+          const bar = el.matches('.q-tabbar, .q-accessory, .q-banner, .q-tab-action, dialog[open]:not(.q-gate, .q-moved)');
+          if ((bar || shows) && (r.left < -1 || r.right > innerWidth + 1 || (bar && (r.top < -1 || r.bottom > innerHeight + 1)))) out.column.push(`${name(el)} ${Math.round(r.left)}–${Math.round(r.right)} × ${Math.round(r.top)}–${Math.round(r.bottom)}, off the ${innerWidth}×${innerHeight} screen`);
+        } else if (rail && shows && !el.closest('.q-tabbar') && r.left < rail.right - 1 && r.right > rail.left && r.bottom > rail.top && r.top < rail.bottom) {
+          out.column.push(`${name(el)} under the tab rail (${Math.round(r.left)} < ${Math.round(rail.right)})`);
+        }
       }
     }
     // A row of pills or chips wrapped with one left alone on its last line.

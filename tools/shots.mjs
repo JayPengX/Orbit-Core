@@ -1,10 +1,11 @@
-// Every screenshot a change needs, in one run: an app's pages at 320 and 390
-// px, light and dark, in Chromium and (where it's installed) WebKit, on the
+// Every screenshot a change needs, in one run: an app's pages on every kind
+// of screen (a phone upright at 320 and 390, on its side, a tablet, a
+// computer), light and dark, in Chromium and (where it's installed) WebKit, on the
 // real app with real data, signed in. One contact sheet to look at, the
 // layout faults each shot has, and with --before or --against what changed.
 //
 //   node tools/shots.mjs <app> [page…] [--before <ref>] [--against <dir>] [--at <ref>]
-//        [--widths 320,390] [--themes light,dark] [--engines chromium,webkit] [--lang zh|en]
+//        [--screens 320,390,land,tablet,desktop] [--themes light,dark] [--engines chromium,webkit] [--lang zh|en]
 //        [--account <name|file>] [--fixtures] [--out dir] [--jobs 4] [-- preview args…]
 //
 //   app     as tools/preview.mjs takes it (sports, transit, weather, orbit, money, words,
@@ -70,7 +71,14 @@ const flag = name => {
   return true;
 };
 const list = (name, fallback) => String(opt(name, fallback)).split(',').filter(Boolean);
-const widths = list('widths', '320,390').map(Number);
+// The screens: a phone upright (its width: 320, 390, 440), a phone on its
+// side (land, 844×390), a tablet (820×1180, an iPad) and a computer
+// (1440×900), or any WxH. Every app works on all of them (Jay 2026-10-31).
+const SCREENS = { land: { w: 844, h: 390 }, tablet: { w: 820, h: 1180, device: 'ipad' }, desktop: { w: 1440, h: 900, device: 'pc' } };
+const widths = list('widths', list('screens', '320,390,land,tablet,desktop').join(','));
+const screenOf = name => SCREENS[name] || (/^\d+x\d+$/.test(name) ? { w: Number(name.split('x')[0]), h: Number(name.split('x')[1]) } : { w: Number(name), h: Number(height) });
+// (How wide a shot is drawn on the contact sheet.)
+const shownW = name => Math.round(screenOf(name).w / (screenOf(name).w > 500 ? 3 : 2));
 const themes = list('themes', 'light,dark');
 let engines = list('engines', 'chromium,webkit');
 const lang = opt('lang', 'zh');
@@ -79,8 +87,8 @@ const before = opt('before', '');
 const against = opt('against', '');
 const account = opt('account', '');
 const fixtures = flag('fixtures');
-const jobs = Number(opt('jobs', 4));
 const height = opt('height', '844');
+const jobs = Number(opt('jobs', 4));
 const outOpt = opt('out', '');
 const [app, ...named] = args;
 if (!app || app.startsWith('--')) {
@@ -191,7 +199,7 @@ function readFaults(text) {
 async function shoot({ root, page, engine, width, theme, dir }) {
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
-  const argv = [join(HERE, 'preview.mjs'), key, ...(page.hash ? [page.hash] : []), '--root', root, '--width', String(width), '--height', height, '--lang', lang, '--out', dir, ...(fixtures ? [] : ['--live']), ...(theme === 'dark' ? ['--dark'] : []), ...(engine === 'webkit' ? ['--webkit'] : []), ...(accountFile ? ['--payload', accountFile] : []), ...(page.args || []), ...pass];
+  const argv = [join(HERE, 'preview.mjs'), key, ...(page.hash ? [page.hash] : []), '--root', root, '--width', String(screenOf(width).w), '--height', String(screenOf(width).h), ...(screenOf(width).device ? ['--device', screenOf(width).device] : []), '--lang', lang, '--out', dir, ...(fixtures ? [] : ['--live']), ...(theme === 'dark' ? ['--dark'] : []), ...(engine === 'webkit' ? ['--webkit'] : []), ...(accountFile ? ['--payload', accountFile] : []), ...(page.args || []), ...pass];
   const r = await run(process.execPath, argv, { cwd: join(HERE, '..') });
   const png = readdirSync(dir).filter(f => f.endsWith('.png') && !f.endsWith('-shot.png'))[0];
   writeFileSync(join(dir, 'preview.log'), r.text);
@@ -314,12 +322,12 @@ const cellHtml = c => {
   const faults = c.after.faults.map(f => `<li><b>${esc(f.kind)}</b> ${esc(f.items.slice(0, 4).join(' · '))}</li>`).join('');
   const change = c.changed == null ? '' : `<div class="chg ${c.changed > 0.002 ? 'on' : ''}">${c.changed > 0.002 ? `${(c.changed * 100).toFixed(1)}% changed` : 'no change'}</div>`;
   const pics = c.diff ? `data-after="${esc(rel(c.png))}" data-before="${esc(c.was.startsWith('/') ? relative(out, c.was) : rel(c.was))}" data-diff="${esc(rel(c.diff))}"` : '';
-  return `<td ${pics}><a href="${esc(rel(c.png))}"><img loading="lazy" src="${esc(rel(c.png))}" width="${c.width / 2}"></a>${change}${faults ? `<ul>${faults}</ul>` : ''}</td>`;
+  return `<td ${pics}><a href="${esc(rel(c.png))}"><img loading="lazy" src="${esc(rel(c.png))}" width="${shownW(c.width)}"></a>${change}${faults ? `<ul>${faults}</ul>` : ''}</td>`;
 };
 const html = `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${esc(key)} shots</title>
 <style>:root{color-scheme:light dark;--bg:#f4f4f6;--fg:#1c1c1e;--mute:#6b6b70;--bad:#c4271f;--card:#fff}@media(prefers-color-scheme:dark){:root{--bg:#121214;--fg:#eee;--mute:#9a9aa0;--bad:#ff6b5f;--card:#1e1e21}}
 body{margin:16px;background:var(--bg);color:var(--fg);font:13px -apple-system,system-ui,sans-serif}h1{font-size:17px;margin:0 0 4px}p{color:var(--mute);margin:0 0 12px}
-table{border-collapse:separate;border-spacing:8px}th{font-weight:600;text-align:left;color:var(--mute)}td{vertical-align:top;background:var(--card);border-radius:8px;padding:6px;max-width:220px}
+table{border-collapse:separate;border-spacing:8px}th{font-weight:600;text-align:left;color:var(--mute)}td{vertical-align:top;background:var(--card);border-radius:8px;padding:6px;max-width:500px}
 img{display:block;border-radius:6px;height:auto}ul{margin:4px 0 0;padding-left:14px;color:var(--bad);font-size:11px}.chg{font-size:11px;color:var(--mute);margin-top:4px}.chg.on{color:var(--bad);font-weight:600}.fail{color:var(--bad)}
 nav{margin-bottom:8px}nav button{font:inherit;padding:4px 10px;margin-right:4px;border-radius:6px;border:1px solid var(--mute);background:var(--card);color:var(--fg)}nav button.on{background:var(--fg);color:var(--bg)}</style>
 <h1>${esc(key)} · ${esc(manifest.build)}${manifest.compared ? ` vs ${esc(manifest.compared)}` : ''}</h1>
@@ -332,13 +340,13 @@ writeFileSync(join(out, 'index.html'), html);
 
 // The same as pictures: sheet.png (every shot), changes.png (before | after | diff of what changed).
 const browser = await playwright.chromium.launch();
-const view = await browser.newPage({ viewport: { width: Math.max(400, 140 + columns.reduce((n, k) => n + k.w / 2 + 30, 0)), height: 600 } });
+const view = await browser.newPage({ viewport: { width: Math.max(400, 140 + columns.reduce((n, k) => n + shownW(k.w) + 30, 0)), height: 600 } });
 await view.goto(`file://${join(out, 'index.html')}`);
 await view.evaluate(() => Promise.all([...document.images].map(i => (i.loading = 'eager', i.complete ? 0 : new Promise(r => (i.onload = i.onerror = r))))));
 await view.screenshot({ path: join(out, 'sheet.png'), fullPage: true });
 const changed = cells.filter(c => c.changed > 0.002);
 if (changed.length) {
-  const rows = changed.map(c => `<tr><th>${esc(c.page)}<br>${c.width} ${c.theme}<br>${(c.changed * 100).toFixed(1)}%</th>${[c.was.startsWith('/') ? relative(out, c.was) : rel(c.was), rel(c.png), rel(c.diff)].map(f => `<td><img src="${esc(f)}" width="${c.width / 2}"></td>`).join('')}</tr>`);
+  const rows = changed.map(c => `<tr><th>${esc(c.page)}<br>${c.width} ${c.theme}<br>${(c.changed * 100).toFixed(1)}%</th>${[c.was.startsWith('/') ? relative(out, c.was) : rel(c.was), rel(c.png), rel(c.diff)].map(f => `<td><img src="${esc(f)}" width="${shownW(c.width)}"></td>`).join('')}</tr>`);
   writeFileSync(join(out, 'changes.html'), html.split('<h1>')[0] + `<h1>${esc(key)}: what changed</h1><table><tr><th></th><th>before</th><th>after</th><th>diff</th></tr>${rows.join('')}</table>`);
   await view.goto(`file://${join(out, 'changes.html')}`);
   await view.evaluate(() => Promise.all([...document.images].map(i => (i.complete ? 0 : new Promise(r => (i.onload = i.onerror = r))))));

@@ -66,8 +66,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 10-22 One date selector in every app (kit `dayBar`/`dayStrip`); never an app's own day chip row.
 - 10-27 One tab bar in every app: the kit's floating capsule (`tabBar`), Securities included; an app's in-progress bar is a `.q-accessory` pill above it. Never `html.q-dock` for a tab bar.
 - 10-30 The tab bar stays whole while scrolling (the fold to icons is gone: Jay gave the call, it hid labels and mis-fired); the app's round action button beside it is smaller than the bar and sits on its middle, never a big ring ("too big and fat").
-- 10-23 Phones only, 320 to 440 px; iPad and computers show the phone column centred; no tablet or wide layouts ever.
-- 10-27 Exception: the admin panel (`site/admin`) has a real desktop layout (sidebar, wide grids) as well as the phone one, and on a phone nothing in it is cut or squeezed (secondary lines wrap). The Showcase is the other exception.
+- 10-31 Every screen, either way up (Jay: "supporting horizontal on all apps, and no longer stuck on phone screen size and properly work on all resolution horizontal or vertical… all apps"; "I want no problem when it's done"): a phone upright (320 to 440) or on its side, a tablet, a computer. Each is laid out for its own space with today's look (no restyle): the tabs a rail down the left on a phone on its side and on wide screens, sheets as centred cards on tablets and computers, and pages in two or three columns where the width allows, never one column stretched across. Kit: `screenFit()`/`onScreen()`, `html.q-rail/.q-float/.q-wide/.q-w3`, `--q-page-max`, `.q-cols`; `DESIGN.md` §10. Every visible change is shot on all five screens (`tools/shots.mjs`). The admin panel keeps its own desktop layout; on a phone nothing in it is cut or squeezed (secondary lines wrap).
 - 10-23 Every team name in Chinese; people (players, drivers) in their own English names in both languages; never transliterate.
 - 10-23 One session per app: all apps run at once; only the same app opened in a second place pauses the first.
 - 10-23 A typhoon day off (停班停課) acts like a holiday in every app (kit `dayoff.mjs`, per place and need).
@@ -206,7 +205,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 10-27 Every sign-in (Orbit and the admin key) is a form password managers save and fill.
 
 ### Showcase (Jay's 自主學習 portfolio)
-- 10-27 Open to all (no Pass, no install gate) and a real desktop layout besides the phone one (exceptions to §2).
+- 10-27 Open to all (no Pass, no install gate; an exception to §2) and a real desktop layout besides the phone one.
 - 10-27 Only structure, numbers and demos; plain words for non-tech readers; Jay sets direction, Claude types.
 - 10-27 No betting anywhere; every number from git; "on GitHub since", never "began on".
 - 10-30 Demos may run the real apps on live data, not only a recording, and may use the APIs' quota; limited so they never get round the Orbit Pass: a short showcase pass (showcase.js) from the showcase's address only, reads only (no Pass, wallet, orders, AI, notices or writes), per-address and daily caps, paid asks from their own share; past any limit the recording plays. Full screen on phones, bug-free; small coach-mark tours.
@@ -226,6 +225,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 | Push to the session branch and main | `main` only, no PRs or branches (TRUTH §3) | 10-19 |
 | Only the kit thread may change the kit | Any lane pushes the kit, in kit push order | 10-21 |
 | Fit iPad and every screen size | Phones only (320–440 px) | 10-23 |
+| Phones only (320–440 px): wider screens show the phone column centred, a phone on its side turned back upright | Every screen, either way up, each laid out for its space (§2) | 10-31 |
 | Gradient hero card per tab, colour tiles, tags instead of sentences (round 2) | `DESIGN.md`: one focus, grey facts, chips only for taps (backgrounds kept) | 10-27 |
 | Focus number open on the page, then on a grey card | `.q-focus` on the app's colour | 10-27 |
 | Floating buttons hated: Securities and Longshot on the docked bar (`html.q-dock`) | Every app on the floating capsule tab bar (Jay: the 10-22 note wasn't meant for the tab bar) | 10-27 |

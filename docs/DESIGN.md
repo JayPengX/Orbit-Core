@@ -168,11 +168,59 @@ The map's question is "where am I and what can I use near me". So:
 
 ## 9. Checking a screen
 
-Before pushing a visible change: 320 and 390 wide, WebKit, light and dark
-(`tools/preview.mjs <app> --webkit --width 320`). Then ask, in order:
+Before pushing a visible change: every screen (320 and 390 upright, a
+phone on its side, a tablet, a computer), light and dark
+(`tools/shots.mjs <app> --before main`; WebKit where it's installed). Then ask, in order:
 
 1. Squinting, what stands out? Is it the answer to the tab's question?
 2. How many bold things, how many accent things, how many boxes? Can one go?
 3. Do the left edges line up, and the numbers down their column?
 4. Is every capsule something to tap or a real exception?
 5. Same gap for the same relationship everywhere?
+6. On a wide screen: is the space used (columns, a grid), or is it one
+   phone's column with empty sides or one row stretched across?
+
+## 10. Every screen, either way up
+
+Jay 2026-10-31: every app works on a phone upright or on its side, a
+tablet and a computer, each laid out for its own space with today's look.
+The kit reads the screen (`orbit.mjs` `screenFit()`, `onScreen(fn)`) and
+marks `<html>`:
+
+| Mark | When | What the kit does |
+| --- | --- | --- |
+| `q-rail` | a phone on its side (520 px tall or less), or 1100 px wide and up | the tab bar stands down the left side as a rail; the app's round action under it; nothing floats along the foot but an accessory |
+| `q-float` | 600 px wide and up, taller than 520 | sheets are cards in the middle of the screen, every corner round |
+| `q-wide` | the page has 640 px or more | the app lays the page out in two columns |
+| `q-w3` | the page has 1000 px or more | three columns where there's content for them |
+
+The page sits between the safe edges (the notch on a phone on its side)
+and the rail, no wider than `--q-page-max` (720 by default: one readable
+column), centred. Fixed things use `--q-vw` (the page's width), `--q-col-l`
+and `--q-col-r` (beside it), `--q-mid` (its middle); never `100vw`.
+
+**Laying a page out wide.** An app that lays out raises its own
+`--q-page-max` (`:root.q-wide { --q-page-max: 1180px }`) and then:
+
+- **Keeps the phone's order.** Reading left to right, top to bottom gives
+  the same order as the phone's one column. The focus stays first: top
+  left, or across the top.
+- **Two columns of phone width, not one wide one.** The tab's answer and
+  its list on the left; what goes with it (related lists, tools, the next
+  thing) on the right. `.q-cols` (two, `.q-cols-3` three on `q-w3`, `.q-span`
+  runs across). Each column is laid out as on a phone, so nothing inside
+  needs a wide version.
+- **A list and what it opens, side by side** where a tab is a list of
+  things that each open a page (games, laws, entries): on a wide screen
+  the opened one can fill the right pane instead of a sheet.
+- **Like cards become a grid** (`repeat(auto-fill, minmax(300px, 1fr))`),
+  never a list row 1200 px long. A sideways rail of cards shows more cards,
+  never a lone half card at the end.
+- **Reading stays narrow.** Running text (a law, a ruling, a word's
+  meaning) keeps lines under about 40 Chinese characters (720 px).
+- **A phone on its side is short** (330–390 px): no hero taller than half
+  the screen, nothing extra pinned to the top or foot, sheets up from the
+  foot, 600 wide at most.
+- **Inside a sheet** stays a phone's width (600 at most): one column.
+- Charts, maps and canvases redraw at the new size on `onScreen()`.
+
