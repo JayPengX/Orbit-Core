@@ -62,6 +62,8 @@ export const PAGES = {
     contest: { args: click(wait(3000), "js:[...document.querySelectorAll('.contest-card button.primary')][0].click()", wait(1500)) },
     word: { hash: 'word=track' },
     // A word's sheet once it has been answered (its 學習紀錄): a 句子填空 answered wrong, then that word's sheet.
+    // 今天's lower shelves (單字卡, 最近練習的字, 今日單字) after one 選中文 round answered.
+    shelves: { args: click("js:(async()=>{const z=ms=>new Promise(r=>setTimeout(r,ms));await z(2500);[...document.querySelectorAll('.mode-card')].find(e=>/選中文|Meaning/.test(e.textContent)).click();for(let i=0;i<90;i++){await z(300);const c=document.querySelector('.choice:not([disabled])');if(c){c.click();continue}const n=document.querySelector('.next-bar button');if(n){n.click();continue}break}await z(500);[...document.querySelectorAll('button')].find(b=>/^(完成|Done)$/.test(b.textContent.trim()))?.click();await z(1200);document.querySelector('.deck-rail,.recent-rail')?.closest('section')?.scrollIntoView();await z(800)})()") },
     'word-record': { args: click("js:(async()=>{const z=ms=>new Promise(r=>setTimeout(r,ms));await z(2500);[...document.querySelectorAll('.mode-card')].find(e=>/句子填空|Sentences/.test(e.textContent)).click();await z(1500);[...document.querySelectorAll('.choice')][1].click();await z(800);location.hash='word='+document.querySelector('.choice.right .choice-text').textContent;await z(1500);[...document.querySelectorAll('dialog[open]')].pop().querySelector('.word-body').lastElementChild.scrollIntoView();await z(600)})()") }
   },
   beats: {
