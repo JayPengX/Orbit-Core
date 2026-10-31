@@ -3861,7 +3861,12 @@ export function fitNames(root = document) {
     // (The text against the room inside the padding: only the text scales.)
     const pad = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
     // (The box to the fraction of a pixel, less a pixel and a half: clientWidth and scrollWidth are rounded, and a text 0.1 px over its box is cut.)
-    const k = Math.min(1, (el.getBoundingClientRect().width - pad - 1.5) / ((el.scrollWidth - pad) / was));
+    const room = el.getBoundingClientRect().width - pad;
+    const text = (el.scrollWidth - pad) / was;
+    // (A box as wide as its own text (a flex item, an inline block) says nothing about the room: measured
+    // against itself it lost 1.5 px a pass, every redraw, down to 72%: "wheat" smaller than the other options.
+    // Snug: left as it is.)
+    const k = Math.abs(room - text * was) < 1 ? was : Math.min(1, (room - 1.5) / text);
     todo.push([el, key, base, was, wraps && k < 0.72 ? 'wrap' : Math.max(0.72, k)]);
   }
   for (const [el, key, base, was, k] of todo) {
