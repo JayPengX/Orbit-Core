@@ -497,6 +497,8 @@
       if (out.length >= max) break;
       // (What's already chosen, tapped again, rightly does nothing: a picked chip, the segment on, 我的位置 following.)
       if (el.matches('[aria-pressed=true], [aria-selected=true], [aria-current]:not([aria-current=false]), .active, .on, .selected')) continue;
+      // (A computer's 重新整理 reads the same data again: nothing need change on screen.)
+      if (el.matches('.q-refresh')) continue;
       if (!seen(el) || el.disabled || el.getAttribute('aria-disabled') === 'true' || el.closest('#tabs, .q-tabbar, dialog, .q-sheet, [role=dialog]')) continue;
       const r = el.getBoundingClientRect();
       if (r.top > innerHeight - 70 || r.bottom < 0 || r.width < 12) continue;
