@@ -11,13 +11,13 @@
 //                   the 立法院's bills and where each one is.
 // A question gets the facts whose keywords it (or the reader's last turn)
 // names, the 3 notices it matches best (as Orbit Law's matchNews), and, when
-// it is about a law or 立法院 work, up to 5 bills; on a budget question, the
+// it is about a law or 立法院 work, up to 6 bills (matchBills); on a budget question, the
 // budgets of the year it names (民國 or western), else the 2 newest. The prompt quotes them as
 // "政府公告與數字" and "立法院進度"; the answer carries them as notices and
 // bills. A file not there yet (or unreadable) is simply left out.
 import { DATA } from './law.js';
 
-export const GROUND_LIMITS = { news: 3, newsMin: 6, bills: 5, budgets: 2, factChars: 600, newsChars: 300 };
+export const GROUND_LIMITS = { news: 3, newsMin: 6, bills: 6, budgets: 2, factChars: 600, newsChars: 300 };
 export const STAGES = ['提案', '一讀', '委員會', '審查完畢', '協商', '二讀', '三讀', '公布'];
 const HOUR_MS = 3_600_000;
 
@@ -88,11 +88,39 @@ export function matchNews(news, text, max = GROUND_LIMITS.news) {
 
 // A bill's law: its name up to 法, 條例, 通則 or 律 (「勞動基準法部分條文修正草案」 → 勞動基準法).
 const lawOf = n => String(n || '').replace(/[「」『』]/g, '').match(/^(.+?(?:條例|通則|法|律))/)?.[1] || '';
-const LY_WORDS = /修法|修正|草案|立法院|立委|三讀|二讀|一讀|法案|提案|審查|預算/;
+const LY_WORDS = /修法|修正|草案|立法院|立委|國會|三讀|二讀|一讀|法案|提案|審查|預算/;
+// The words that say a question is about the 立法院's work, not what the work
+// is on: dropped before the bills are matched (立法院組織法 came up for 「為了選舉
+// 立法院搞了啥」 on 立法院 alone: Jay 2026-10-31).
+const LY_META = /立法院|立委|委員會?|國會|院會|最近|近期|近來|這陣子|這幾個月|今年|這會期|本會期|法案|議案|草案|修法|修正|通過|三讀|二讀|一讀|進度|審查|提案|表決|投票|支持|反對|贊成|兩大黨|兩黨|朝野|跨黨派|藍綠|政黨|國民黨|民進黨|民眾黨|搞了?|做了?|在幹嘛|幹嘛|在忙|在做|怎麼樣|怎樣|情況|狀況|動態|消息|新聞|什麼|哪些|有沒有|為了|有關|相關|關於|啥|嗎|呢/g;
+export const lyTopic = text => String(text || '').replace(LY_META, ' ');
+const PASSED = /通過|三讀|公布|過了/;
+const BOTH = /兩大黨|兩黨|朝野|跨黨派|藍綠|共識|共同支持/;
+// A version proposed by each big party (or one by the 行政院 and one by the other side): both stand behind it.
+const bothSides = b => {
+  const ps = new Set((Array.isArray(b.by) ? b.by : []).map(x => x?.[0]));
+  return ps.has('國民黨') && (ps.has('民進黨') || ps.has('行政院'));
+};
 
-// The bills a question is about: those of a law it names (2 characters at
-// least), newest first; with 立法院 words and no law named, the bills whose
-// names share the most with it.
+// How rare each pair is among the bills (names and purposes): a pair in many
+// (為了, 修正, 條例) says nothing about which.
+const rarity = new WeakMap();
+function pairCounts(list) {
+  let c = rarity.get(list);
+  if (!c) {
+    c = new Map();
+    for (const b of list) for (const p of hanPairs(`${b.n} ${b.about || ''}`)) c.set(p, (c.get(p) || 0) + 1);
+    rarity.set(list, c);
+  }
+  return c;
+}
+
+// The bills a question is about: those of a law it names (3 characters at
+// least), newest first. Else, with 立法院 words: those whose name (or two of
+// whose purpose's) pairs are rare and the question's topic has, best first
+// (none when no bill is on it); with no topic, the 立法院's latest: the newest passed when it asks
+// what passed, those both big parties proposed when it asks so, else the
+// newest moved.
 export function matchBills(items, text, max = GROUND_LIMITS.bills) {
   const list = (Array.isArray(items) ? items : []).filter(b => b && typeof b.n === 'string' && Number.isInteger(b.stage));
   const t = String(text || '');
@@ -103,12 +131,31 @@ export function matchBills(items, text, max = GROUND_LIMITS.bills) {
   });
   if (named.length) return named.sort(newer).slice(0, max);
   if (!LY_WORDS.test(t)) return [];
-  const want = hanPairs(t);
-  const scored = list.map(b => [[...hanPairs(b.n)].filter(p => want.has(p)).length, b]).filter(([s]) => s >= 2);
-  return scored
-    .sort((a, b) => b[0] - a[0] || newer(a[1], b[1]))
-    .slice(0, max)
-    .map(([, b]) => b);
+  const want = hanPairs(lyTopic(t));
+  const counts = pairCounts(list);
+  const rare = Math.max(3, list.length * 0.05);
+  const idf = p => Math.log(list.length / (counts.get(p) || 1));
+  const scored = [];
+  for (const b of list) {
+    const inName = [...hanPairs(b.n)].filter(p => want.has(p) && counts.get(p) <= rare);
+    const inAbout = [...hanPairs(b.about)].filter(p => want.has(p) && counts.get(p) <= rare && !inName.includes(p));
+    if (inName.length || (inAbout.length && inAbout.length >= Math.min(2, want.size))) scored.push([inName.reduce((s, p) => s + idf(p), 0) + inAbout.reduce((s, p) => s + idf(p) / 2, 0), b]);
+  }
+  if (scored.length) {
+    const top = Math.max(...scored.map(([s]) => s));
+    return scored
+      .filter(([s]) => s >= top / 2)
+      .sort((a, b) => b[0] - a[0] || newer(a[1], b[1]))
+      .slice(0, max)
+      .map(([, b]) => b);
+  }
+  // A topic no bill is on: none (the laws the plan finds bring theirs).
+  if (want.size) return [];
+  // No topic: what the 立法院 did lately (Jay 2026-10-31: 「最近有什麼兩大黨支持通過的法案」 got 立法院組織法).
+  const passed = PASSED.test(t);
+  const pool = list.filter(b => !b.dropped && (!passed || b.passed) && (!BOTH.test(t) || bothSides(b)));
+  const when = b => String((passed && b.passed) || b.u || '');
+  return pool.sort((a, b) => when(b).localeCompare(when(a))).slice(0, max);
 }
 
 // The budgets a budget question is about: those of the 年度 it names (116,
@@ -186,7 +233,7 @@ const billLine = b => {
   const stage = STAGES[b.stage] || '';
   const by = (Array.isArray(b.by) ? b.by : []).filter(x => Array.isArray(x)).map(([p, n]) => `${p} ${n}案`).join('、');
   const marks = [b.dropped && '已撤回或不予審議', b.held && '擱置', b.passed && `三讀 ${b.passed}`, b.pub && `公布 ${b.pub}`].filter(Boolean).join('，');
-  return `「${cut(b.n, 120)}」進度：${stage}${marks ? `（${marks}）` : ''}${by ? `；提案：${by}` : ''}${b.u ? `；更新 ${b.u}` : ''}`;
+  return `「${cut(b.n, 120)}」進度：${stage}${marks ? `（${marks}）` : ''}${by ? `；提案：${by}` : ''}${b.u ? `；更新 ${b.u}` : ''}${b.about ? `；目的：${cut(b.about, 90)}` : ''}`;
 };
 
 // The grounding for a question: { facts, news, bills } matched, read from
@@ -217,7 +264,8 @@ About these:
 - Quote any figure, amount or date exactly as written above, with its date and source (the agency or 立法院); never change or estimate a number.
 - Prefer the official figures over a notice when they differ; a 將來 figure is not in force yet, so say from when it applies.
 - These are not articles: never put them in cites. Use them in answer (and next) only.
-- A bill is not law until it is 三讀 and 公布: say its stage plainly.
+- A bill is not law until it is 三讀 and 公布: say its stage plainly. Say what each bill does (its 目的) in a few words, not just its name.
+- 提案 by party says who proposed versions of it; a bill both big parties proposed has their support. How a party voted is only what a 記名表決 line says (most bills pass without one).
 - A budget's amounts are only those its line gives (in 億元): quote them exactly; a line without amounts has none, so never give a figure for it. 凍結 isn't in the data.
 
 `;
@@ -228,6 +276,6 @@ export function groundOut(g) {
   if (!hasGround(g)) return {};
   const notices = [...g.facts.map(f => ({ t: cut(f.t || f.text, 120), url: urls(f.src)[0] || '', d: cut(f.d ?? f.date ?? '', 40), agency: cut(f.agency ?? '', 40) })), ...g.news.map(n => ({ t: cut(n[2], 120), url: urls([n[3]])[0] || '', d: cut(n[0], 10), agency: cut(n[1], 40) }))];
   // (A budget first: it's what a budget question asked, not 預算法's bills; Jay 2026-10-27 found it under 更多1件.)
-  const bills = [...budgetsOf(g).map(b => ({ k: `budget:${b.k}`, n: b.title, stage: -1, d: cut(b.stage, 20) })), ...g.bills.map(b => ({ k: b.k, n: b.n, stage: b.stage }))];
+  const bills = [...budgetsOf(g).map(b => ({ k: `budget:${b.k}`, n: b.title, stage: -1, d: cut(b.stage, 20) })), ...g.bills.map(b => ({ k: b.k, n: b.n, stage: b.stage, ...(b.passed || b.u ? { d: String(b.passed || b.u).slice(0, 10) } : {}) }))];
   return { ...(notices.length ? { notices } : {}), ...(bills.length ? { bills } : {}) };
 }

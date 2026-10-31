@@ -296,7 +296,7 @@ const ANSWER = {
   required: ['covered', 'verdict', 'answer', 'points', 'next', 'followups']
 };
 
-export function answerPrompt(chat, articles, nameOf, ground = null, more = null) {
+export function answerPrompt(chat, articles, nameOf, ground = null, more = null, ly = false) {
   const body = articles.map(a => `[cite "${a.p}:${a.key}"] 「${a.n}」${label(a.key, 'zh')}\n${a.text}`).join('\n\n');
   const before = turnsText(chat, nameOf, CHAT_LIMITS.maxTurn);
   const en = chat.lang === 'en';
@@ -326,7 +326,8 @@ Rules:
 - next: only concrete steps the reader can take now, naming the actual office, form, deadline or amount from what is given (e.g. 「30 日內向勞工局申請調解」); leave it empty rather than give generic advice. Each at most 24 Chinese characters (evidence to keep, who to write to, deadlines from the articles, where to file); never a law that isn't above.
 - followups: up to 3 questions the reader may ask next, each at most 14 Chinese characters (6 English words).
 - covered: true when the material lets you give a reasoned answer, even by applying general articles (e.g. 民法 第184條) to the facts. Set it false only when nothing above bears on the question; then say plainly what's missing, and next may suggest a lawyer or 法律扶助基金會.
-- Don't add a disclaimer; the app shows one.
+${ly ? `- This is a question about what the 立法院 is doing, not a legal case: answer it as a well-informed news summary from the bills, votes, budgets and meetings above (what moved, what each does, who proposed or backed it, and when), newest first. The articles only explain how the 立法院 works; don't make them the answer. covered is true whenever a bill, vote, budget or meeting above bears on it. If the reader means something none of the lines show, say in one line what the latest ones are instead; never say records are missing. next: only where to follow it (a bill's next step), never a lawyer or 法律扶助.
+` : ''}- Don't add a disclaimer; the app shows one.
 - Write everything in ${en ? 'plain English' : 'Traditional Chinese as used in Taiwan (繁體中文)'}.`;
 }
 
@@ -340,6 +341,8 @@ const NOT_COVERED = {
   zh: { answer: '找到的法規沒有直接回答這個問題。', next: ['可以向律師或法律扶助基金會諮詢。'] },
   en: { answer: 'The laws found don’t directly address this question.', next: ['A lawyer or the Legal Aid Foundation (法律扶助基金會) can advise.'] }
 };
+// (A question about the 立法院's work isn't a case: no lawyer, no 法律扶助. Jay 2026-10-31.)
+const NO_LAWYER = /律師|法律扶助|法扶|lawyer|legal aid/i;
 const strs = (v, max) => (Array.isArray(v) ? v : []).filter(x => typeof x === 'string').map(x => x.trim()).filter(Boolean).slice(0, max);
 
 // The model's answer, checked against the candidates: a point or
@@ -347,7 +350,7 @@ const strs = (v, max) => (Array.isArray(v) ? v : []).filter(x => typeof x === 's
 // only with a given article's cite, in its text when it's in Chinese. No
 // point left, not covered (and the model's answer, then unsupported, is
 // replaced). sources: the candidates the answer still cites.
-export function checkChat(raw, articles, lang, grounded = false, others = []) {
+export function checkChat(raw, articles, lang, grounded = false, others = [], ly = false) {
   const extra = new Set(others);
   const given = new Set([...articles.map(a => `${a.p}:${a.key}`), ...extra]);
   const norm = c => (extra.has(String(c ?? '').trim()) ? String(c).trim() : chatCite(c));
@@ -376,7 +379,7 @@ export function checkChat(raw, articles, lang, grounded = false, others = []) {
     points,
     consequences,
     agency: named ? name : null,
-    next: strs(raw?.next, 4).length ? strs(raw?.next, 4) : covered ? [] : fallback.next,
+    next: ly ? strs(raw?.next, 4).filter(x => !NO_LAWYER.test(x)) : strs(raw?.next, 4).length ? strs(raw?.next, 4) : covered ? [] : fallback.next,
     followups: strs(raw?.followups, 3),
     sources: articles.filter(x => used.has(`${x.p}:${x.key}`)).map(x => ({ p: x.p, n: x.n, key: x.key })),
     // (The judgments and rules it cites: their ids, drawn from the answer's cases and rules.)
@@ -507,7 +510,8 @@ export async function answerChat(chat, pass, env, ctx, headers, gemini, stage = 
     stage({ stage: 'found', arts: articles.length, laws: [...new Set(articles.map(a => a.n))].slice(0, 3), look: lookOf(ground, people, ly) });
     // A question about bills: those of the laws found too, when it named none (and isn't about a budget).
     const items = itemsF?.items || [];
-    if (!ground.bills.length && !ground.budgets?.length && BILL_WORDS.test(chat.q)) ground.bills = matchBills(items, `${chat.q} ${[...new Set(articles.map(a => a.n))].join(' ')}`);
+    // (Not the 立法院's own laws, which a plan guesses for any question about it: only when named.)
+    if (!ground.bills.length && !ground.budgets?.length && BILL_WORDS.test(chat.q)) ground.bills = matchBills(items, `${chat.q} ${[...new Set(articles.map(a => a.n))].filter(n => !n.startsWith('立法院')).join(' ')}`);
     // (司法院's judgment pages serve only Taiwan: read through the relay there.)
     const fetcher = env?.GEMINI_RELAY ? (u, init) => (viaTaiwan(u) ? env.GEMINI_RELAY.fetch(`https://gemini-relay/?to=${encodeURIComponent(u)}`, { headers: init?.headers, signal: init?.signal }) : fetch(u, init)) : fetch;
     // (A judgment's gist, once read, kept 90 days: 司法院's site is the slowest read of a turn.)
@@ -524,7 +528,7 @@ export async function answerChat(chat, pass, env, ctx, headers, gemini, stage = 
     if (hit) return json({ ...hit, ...shownOf(extra, hit), cached: true, left: await leftNow() }, 200, headers);
     let out;
     // Nothing found: not covered, without the answer's call.
-    if (!articles.length && !grounded) out = checkChat({ covered: false }, [], chat.lang);
+    if (!articles.length && !grounded) out = checkChat({ covered: false }, [], chat.lang, false, [], ly);
     else {
       if (!env.GEMINI_API_KEY) return fail('setup', 503, headers);
       if (!(await turn())) return fail('cap', 429, headers, { left: 0 });
@@ -541,7 +545,7 @@ export async function answerChat(chat, pass, env, ctx, headers, gemini, stage = 
         }
       };
       const answerModel = tune.model === 'lite' ? undefined : ANSWER_MODEL;
-      out = checkChat(await modelJson((parts, schema) => gemini(parts, schema, answerModel, { onText, thinking: tune.answer }), answerPrompt(chat, articles, nameOf, ground, more), ANSWER), articles, chat.lang, grounded, moreCites(more));
+      out = checkChat(await modelJson((parts, schema) => gemini(parts, schema, answerModel, { onText, thinking: tune.answer }), answerPrompt(chat, articles, nameOf, ground, more, ly), ANSWER), articles, chat.lang, grounded, moreCites(more), ly);
     }
     mark('answer');
     if (answerKey && !ms) keep(env, ctx, answerKey, out, CHAT_TTL_S);

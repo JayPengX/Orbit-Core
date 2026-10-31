@@ -1,7 +1,7 @@
 // What /law-chat finds besides the articles: judgments, 釋字, 行政規則, legislators, votes, meetings, the reader's own.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { matchRulings, matchCons, judgmentGist, readMine, asksMine, matchVotes, matchMeets, matchRules, caseLabel, ruleTitle, vendorHits, vendorText, localRows, citiesIn } from '../law-more.js';
+import { voteTopic, matchRulings, matchCons, judgmentGist, readMine, asksMine, matchVotes, matchMeets, matchRules, caseLabel, ruleTitle, vendorHits, vendorText, localRows, citiesIn } from '../law-more.js';
 
 test('judgments: 3 for each article found they cite, the 案由 sharing the question; 3 at least, newer first', () => {
   const rows = [['TPSV,114,台上,1,20250101,1', '2025-01-01', '請求返還押金', ['B0000001:456']], ['TPSV,114,台上,2,20260101,1', '2026-01-01', '請求返還押金', ['B0000001:456']], ['TPSM,115,台上,3,20260101,1', '2026-01-01', '加重詐欺', ['C0000001:339']], ['bad', '', '押金', []]];
@@ -37,6 +37,16 @@ test('votes: a law found first; a named legislator\'s newest; none without vote 
   assert.deepEqual(matchVotes(data, '民法修法表決結果', ['B0000001'], []).map(v => v[0]), ['v1']);
   assert.deepEqual(matchVotes(data, '乙最近投了什麼', [], [{ n: '乙' }]).map(v => v[0]), ['v2']);
   assert.deepEqual(matchVotes(data, '押金怎麼辦', ['B0000001'], []), []);
+});
+
+test('votes both big parties backed: most of each voted yes; a vote says what it was on', () => {
+  const names = [...Array.from({ length: 12 }, (_, i) => `綠${i}`), ...Array.from({ length: 12 }, (_, i) => `藍${i}`)];
+  const partyOf = new Map(names.map(n => [n, n[0] === '綠' ? '民主進步黨' : '中國國民黨']));
+  const green = [...Array(12).keys()];
+  const blue = green.map(i => i + 12);
+  const data = { names, agendas: [['a1', '老人福利法修正草案─完成三讀─']], votes: [['both', '2026-10-16', '全案表決', 'a1', [...green, ...blue], [], [], []], ['split', '2026-10-17', '全案表決', 'a2', green, blue, [], []]] };
+  assert.deepEqual(matchVotes(data, '最近有什麼兩大黨的支持通過的法案', [], [], partyOf).map(v => v[0]), ['both']);
+  assert.equal(voteTopic(data.votes[0], data), '老人福利法修正草案：全案表決');
 });
 
 test('meetings: only on a question about when, coming ones, soonest first', () => {
