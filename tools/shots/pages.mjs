@@ -86,7 +86,14 @@ export const PAGES = {
     // A ruling (115年憲判字第7號): its top, its 理由 opened and scrolled to, and its AI (判了什麼, 為什麼, 影響到誰).
     ruling: { hash: 'r=j115-7', args: click(wait(4000)) },
     'ruling-reasons': { hash: 'r=j115-7', args: click(wait(4000), "js:(d=>{d.open=true;d.scrollIntoView({block:'start'})})([...document.querySelectorAll('dialog.q-sheet[open] .lw-cons-reason')].pop())", wait(800)) },
-    'ruling-ai': { hash: 'r=j115-7', args: click(wait(4000), '.lw-ruling-ai', wait(25000), "js:[...document.querySelectorAll('dialog.q-sheet[open] .lw-para')].pop()?.click()", wait(600)) }
+    'ruling-ai': { hash: 'r=j115-7', args: click(wait(4000), '.lw-ruling-ai', wait(25000), "js:[...document.querySelectorAll('dialog.q-sheet[open] .lw-para')].pop()?.click()", wait(600)) },
+    // Plain text read as its structure: a 憲判字's reasons (壹、 headings, 【N】), a bill's 對照表
+    // (款 hung, every 款 number kept), an article's 目, 施行日期, a draft's 總說明 and rows.
+    'ruling-text': { hash: 'r=j111-10', args: click('details.lw-cons-reason summary', wait(600), "js:document.querySelectorAll('.lw-cons-reason .lw-rule-h')[1]?.scrollIntoView({block:'center'})", wait(800)) },
+    'bill-diff': { hash: 'item=11-01192', args: click(wait(3000), "js:document.querySelector('.lw-item-diff')?.scrollIntoView({block:'start'})", wait(800)) },
+    'article-items': { hash: 'law=G0340003&a=4-5' },
+    'in-force': { hash: 'law=B0000001', args: click('.lw-tool[aria-label="更多"], .lw-tool[aria-label="More"]', 'button.q-cell:has-text("施行日期"), button.q-cell:has-text("In force")', wait(800)) },
+    draft: { args: click('#tab-bills', tap('預告|Drafts'), wait(2000), "js:document.querySelector('a.lw-bill.notice')?.click()", wait(3000), "js:document.querySelector('.lw-notice-about')?.click()", "js:document.querySelector('.lw-notice-about')?.scrollIntoView({block:'start'})", wait(800)) }
   },
   securities: {
     default: ['tabs'],
