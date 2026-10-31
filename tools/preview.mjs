@@ -363,6 +363,11 @@ const server = (h2 && !serve ? (fn => createSecureServer(h2Cert(), fn)) : create
     // Served: the made-up sign-in and the fetch pointed here, before anything else runs.
     res.end(serve && file.endsWith('.html') ? String(data).replace('<head>', `<head><script>${inits.join(';')};${pointFetch}</script>`) : data);
   } catch {
+    // Orbit Law's data, never in git (60 MB built at deploy): what's not built here is read from the live site.
+    if (path.startsWith('/Orbit-Law/data/')) {
+      const body = await curlText(`https://jaypengx.github.io${path}`);
+      if (body && !/^\s*</.test(body)) return res.writeHead(200, { 'Content-Type': TYPES[extname(path)] || 'application/json', 'Cache-Control': 'no-store' }).end(body);
+    }
     res.writeHead(404);
     res.end('not found');
   }
