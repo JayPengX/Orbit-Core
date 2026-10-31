@@ -50,6 +50,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 10-21 No bright white surfaces in dark mode (glass tiles and buttons; logos without white plates).
 - 10-21 No wraps, orphan pills, cut numbers, sideways tables or scrolling sheets.
 - 10-31 A sheet never scrolls sideways (Jay, many times; last 新增固定收支's 開始): the kit keeps `.q-sheet` at `overflow-x: hidden` and every date/time field at `appearance: none`, `min-width: 0`, `max-width: 100%` (iPhone Safari sizes a native one to its own text); `tests/kit-css.test.mjs` checks it.
+- 10-31 Never the browser's own popups (Jay: 對話紀錄's 刪除全部 used `confirm()`): ask with the kit's dialog (`ask()`/`tell()` in orbit.mjs, `confirm()` in ui.mjs); a one-tap delete gets an 復原 toast instead of a question. Orbit-Law's tests check it; the admin page is the one place left.
 - 10-27 Addresses: every Orbit app at `orbit.jaypengx.com/<short>` (one origin, so one Pass sign-in), Longshot at `longshot.jaypengx.com`, the proxy at `api.jaypengx.com`. The bare `jaypengx.com` is Jay's own homepage (handle JayPengX only: no real name or school; no betting or Longshot link; open to all; livelier than the apps), with the showcase at `/showcase/`. Clean break, no redirects from older addresses.
 - 10-21 The keyboard never pushes content off screen; the iPhone's own keyboard, never an in-app keypad. Kit `watchKeyboard` since 10-27.
 - 10-21 Stats show the current season; last season only where this one is empty (e.g. 上季對戰).
