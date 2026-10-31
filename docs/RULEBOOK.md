@@ -51,7 +51,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 10-21 No wraps, orphan pills, cut numbers, sideways tables or scrolling sheets.
 - 10-31 A sheet never scrolls sideways (Jay, many times; last 新增固定收支's 開始): the kit keeps `.q-sheet` at `overflow-x: hidden` and every date/time field at `appearance: none`, `min-width: 0`, `max-width: 100%` (iPhone Safari sizes a native one to its own text); `tests/kit-css.test.mjs` checks it.
 - 10-31 Never the browser's own popups (Jay: 對話紀錄's 刪除全部 used `confirm()`): ask with the kit's dialog (`ask()`/`tell()` in orbit.mjs, `confirm()` in ui.mjs); a one-tap delete gets an 復原 toast instead of a question. Orbit-Law's tests check it; the admin page is the one place left.
-- 10-27 Addresses: every Orbit app at `orbit.jaypengx.com/<short>` (one origin, so one Pass sign-in), Longshot at `longshot.jaypengx.com`, the proxy at `api.jaypengx.com`. The bare `jaypengx.com` is Jay's own homepage (handle JayPengX only: no real name or school; no betting or Longshot link; open to all; livelier than the apps), with the showcase at `/showcase/`. Clean break, no redirects from older addresses.
+- 10-27 Addresses: every Orbit app at `orbit.jaypengx.com/<short>` (one origin, so one Pass sign-in), `longshot.jaypengx.com` only Longshot's shutdown notice, the proxy at `api.jaypengx.com`. The bare `jaypengx.com` is Jay's own homepage (handle JayPengX only: no real name or school; no betting or Longshot link; open to all; livelier than the apps), with the showcase at `/showcase/`. Clean break, no redirects from older addresses.
 - 10-21 The keyboard never pushes content off screen; the iPhone's own keyboard, never an in-app keypad. Kit `watchKeyboard` since 10-27.
 - 10-21 Stats show the current season; last season only where this one is empty (e.g. 上季對戰).
 - 10-21 No manual "check results" buttons; automatic over buttons.
@@ -64,7 +64,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 10-21 Reflect results the moment they happen: never hide data because a feed is stale; compute it from live results.
 - 10-21 Test UI in WebKit (Safari's engine), not only Chromium.
 - 10-22 One date selector in every app (kit `dayBar`/`dayStrip`); never an app's own day chip row.
-- 10-27 One tab bar in every app: the kit's floating capsule (`tabBar`), Securities and Longshot included; an app's in-progress bar is a `.q-accessory` pill above it. Never `html.q-dock` for a tab bar.
+- 10-27 One tab bar in every app: the kit's floating capsule (`tabBar`), Securities included; an app's in-progress bar is a `.q-accessory` pill above it. Never `html.q-dock` for a tab bar.
 - 10-30 The tab bar stays whole while scrolling (the fold to icons is gone: Jay gave the call, it hid labels and mis-fired); the app's round action button beside it is smaller than the bar and sits on its middle, never a big ring ("too big and fat").
 - 10-23 Phones only, 320 to 440 px; iPad and computers show the phone column centred; no tablet or wide layouts ever.
 - 10-27 Exception: the admin panel (`site/admin`) has a real desktop layout (sidebar, wide grids) as well as the phone one, and on a phone nothing in it is cut or squeezed (secondary lines wrap). The Showcase is the other exception.
@@ -72,7 +72,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 10-23 One session per app: all apps run at once; only the same app opened in a second place pauses the first.
 - 10-23 A typhoon day off (停班停課) acts like a holiday in every app (kit `dayoff.mjs`, per place and need).
 - 10-27 One app order everywhere the apps are listed (Pass App tab, family page, milestones, medals, help, admin, Showcase): Sports, Transit, Weather, Class, Money, Words, Beats, Law, Securities. Everyday tools first, Securities (the play-money game) last ("weird how securities is put first"). Kit `APP_ORDER` (`brand.mjs`, the order of `BRANDS`); never a list of its own.
-- Every Orbit app sits behind the Orbit Pass and asks for Add to Home Screen on a phone (exceptions: Showcase; Longshot has its own Pass).
+- Every Orbit app sits behind the Orbit Pass and asks for Add to Home Screen on a phone (exception: Showcase).
 - Visual over text: icons, colour, cards; less text, no source names or back-end notes on screen (TRUTH §6).
 - Chinese (Taiwan) first, English second (TRUTH §6).
 - 10-27 One language at a time ("mixed with two languages, time to step up"): every page all Chinese or all English by the Orbit language, the family page and loading screen too. Names come in English where a source has them (kit `place()` for counties and townships, TDX's stops and stations); only what has no English (a fund's name, an operator's notice, a law's text, a word's meaning) stays Chinese, marked `lang="zh-Hant"`. People keep their own names. `tools/gate.mjs` flags it as `mixed` (`--quick --lang en`).
@@ -203,7 +203,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 10-27 Milestones (Jay: the two-row strip, "the achievement kind of suck"): one per app, bronze, silver and gold, each kept for good; 外觀 leads with what's worn now (a quiet line), then the nearest next medal (focal count, a progress ring round the medal drawn faint, never shown like a worn look: Jay 10-27 took it for his own), then one list row each (medal in its metal or the app icon, the goal in words, count and tier pips, 戴上 on earned rows). No locks, no greyed grid, no glows on milestone frames.
 - 10-27 Passkeys (Face ID, Touch ID, Windows Hello, a password manager, a security key, a phone by QR): any number per Pass, each named and removable; an existing Pass adds one any time (one-time offer 「加入 Face ID 登入」, never asked again). Keep it simple: the 10-character pass and passkeys both sign in, no "passkey only" mode. One passkey for every Orbit app and the admin page (RP ID the domain); Longshot keeps its own Pass.
 - 10-27 The pass is stored hashed slow and peppered (a stolen database alone is useless); no lockouts and no forced resets: older passes upgrade when changed. Account number shown: its first 6.
-- 10-27 Every sign-in (Orbit, the admin key, Longshot and its admin) is a form password managers save and fill.
+- 10-27 Every sign-in (Orbit and the admin key) is a form password managers save and fill.
 
 ### Showcase (Jay's 自主學習 portfolio)
 - 10-27 Open to all (no Pass, no install gate) and a real desktop layout besides the phone one (exceptions to §2).
@@ -212,17 +212,8 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 10-30 Demos may run the real apps on live data, not only a recording, and may use the APIs' quota; limited so they never get round the Orbit Pass: a short showcase pass (showcase.js) from the showcase's address only, reads only (no Pass, wallet, orders, AI, notices or writes), per-address and daily caps, paid asks from their own share; past any limit the recording plays. Full screen on phones, bug-free; small coach-mark tours.
 - Content changes only when Jay says "catch up the showcase". The raw record stays private in project files, never in a repo.
 
-### Longshot (outside the family)
-- 10-27 Lives at `longshot.jaypengx.com`, its own origin (no shared storage with Orbit).
-- 10-22 Its own app, Worker and Pass; never import from, link to or depend on Orbit-Core; its rules are `Longshot/docs/TRUTH.md`.
-- 10-22 League sports and F1 only; no tennis, UFC, golf or other non-league sports.
-- 10-20 Lock a whole market, never a lone open side; no 限關 pills.
-- 10-21 No cash out, boosts, free bets, VIP or player markets; 冠軍 boards drop impossible picks.
-- 10-20 Tax: 20% of a slip's whole payout when it pays over NT$5,000, at any odds (Jay's choice over the per-注 rule); prevent losing wins by design (house guards), not refusals.
-- 10-22 Odds changes are taken at once (▲/▼, one 賠率已更新 line); no accept button or setting.
-- 10-23 Name: "Longshot" only. Economy: NT$30,000 to open, NT$10,000 each month, nothing when broke. 紀錄 is the true record. Balance shows in the account capsule.
-- 10-23 刮刮樂 has sound (quiet since 10-25); real-shop feel; a ticket never rotates; 兌獎 reveals, scratching doesn't.
-- No hooks (no push notices, loans or levels).
+### Longshot (shut down)
+- 10-31 Longshot is shut down: its Worker, crons, D1 `longshot-store`, R2 `longshot-data` and secrets are deleted, and nothing in the family supports it. `longshot.jaypengx.com` shows only a shutdown notice (`site-closed.js`). The JayPengX/Longshot repo and its code stay on GitHub for Jay to decide; never revive it unless Jay asks.
 
 ### Folder-Link (Windows tool)
 - 10-18 Same-drive disk check stays strict; merging overwrites same-named files after the warning; self-contained exe on purpose.
@@ -255,6 +246,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 | Showcase demos are frozen snapshots only | They may run live on real data, read-only behind a showcase pass with its own limits (showcase.js) | 10-30 |
 | Apps share the `jaypengx.github.io` origin | They share `orbit.jaypengx.com`; Longshot has `longshot.jaypengx.com`; the bare `jaypengx.com` is Jay's homepage with `/showcase/` | 10-27 |
 | Longshot's own keyboard rule | The same rule in the shared kit for every app | 10-27 |
+| Longshot runs on its own: own app, Worker and Pass at `longshot.jaypengx.com`, its rules in `Longshot/docs/TRUTH.md` | Shut down; only a notice at its address; code left on GitHub | 10-31 |
 | Sell-first 當沖 needs 12 months of history | TWSE's 3 months + 10 trades, or a credit account |  10-24 |
 | Screenshot sets lead with the latest feature asked for (Beats' game, Class's import) | Lead with the app's hero screen; requested features later | 10-28 |
 | 信貸 helpful but dangerous (12% APR, 3 late → 催收, in 資金 › 你的帳戶) | No personal loan; only 融資 (not something a broker offers) | 10-30 |
@@ -263,5 +255,4 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 ## 7. Contradictions to watch
 
 - New kit exports: `TRUTH.md` says use them with a `kit.x?.()` fallback, while the 10-20 cleanup made existing fallbacks direct. Both hold: a new export gets the fallback; once every phone has the kit it can go direct.
-- Longshot keeps its own kit copy although "anything two apps use lives in the kit": Longshot is outside the family on purpose, so look changes are ported to it by hand.
 - Helper tiers: the 10-18 kit roadmap said Strong = opus/high; the 10-19 rule sheet says opus/medium. The newer one (medium) holds.

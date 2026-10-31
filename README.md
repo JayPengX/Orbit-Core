@@ -79,7 +79,7 @@ orbit-workers-proxy (one Worker)
    /gemini, /nl-edit, /law-ask, /law-chat   Gemini via gemini-relay
    /data          the family's data in R2, built by builders/ on the cron
 quota-guard   reads the bill every 5 minutes; paces, then stops the proxy at 90% of the plan
-orbit-site    serves orbit.jaypengx.com/<app>/, jaypengx.com and longshot.jaypengx.com from GitHub Pages
+orbit-site    serves orbit.jaypengx.com/<app>/ and jaypengx.com from GitHub Pages
 ```
 
 A read from an app goes down these layers until one answers: memory, the phone's Cache Storage, the family's data in R2, the proxy's edge cache, reads kept for good in R2, and only then the upstream. A failed read is a failure, never "nothing there".
@@ -103,7 +103,7 @@ worker.js            the proxy's router; each route's work in its own file:
 └── data.js, http.js, capacity.js, pace.js, ops.js, doc-store.js, store-backup.js
 gemini-relay.js      Gemini, pinned to Taiwan
 guard.js             the cost guard (its own Worker)
-site.js              the site Worker (orbit.jaypengx.com, jaypengx.com, longshot.jaypengx.com)
+site.js              the site Worker (orbit.jaypengx.com, jaypengx.com; longshot.jaypengx.com's shutdown notice)
 builders/            data builds into R2 (seasons, buses, photos, highlights…)
 kit/                 the shared kit every app loads
 site/                the family page and the admin page

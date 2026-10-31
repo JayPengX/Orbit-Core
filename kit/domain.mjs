@@ -8,7 +8,7 @@
 //                              sign-in is shared; site.js reads its repo's
 //                              Pages through, so an app's push still deploys it)
 //   https://<DOMAIN>/          Jay's own homepage, and /showcase/
-//   https://longshot.<DOMAIN>/ Longshot, on its own (its own origin)
+//   https://longshot.<DOMAIN>/ only a notice that Longshot has shut down (site.js)
 //   https://api.<DOMAIN>       the proxy (orbit-workers-proxy)
 //   <anything>@<DOMAIN>        Orbit Money's mail-in invoices
 // deploy.yml attaches the hostnames to their Workers. GitHub Pages stays

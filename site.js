@@ -6,7 +6,8 @@
 //                      family page (/pass/). One origin, one Pass sign-in.
 //   <DOMAIN>           Jay's homepage (Orbit-Showcase's public/home/) at /,
 //                      the showcase at /showcase/.
-//   longshot.<DOMAIN>  Longshot alone, at its root (its own origin).
+//   longshot.<DOMAIN>  Longshot's shutdown notice, at every address (Longshot
+//                      closed 2026-10-31; site-closed.js).
 // The kit stays at /Orbit-Core/kit/ wherever a page loads it from
 // ('../Orbit-Core/kit/'), the family's data at /Shared-Data/. Nothing else:
 // a repo's own name (/Orbit-Law/) isn't an address here.
@@ -15,6 +16,7 @@
 // held back).
 import { PAGES } from './kit/domain.mjs';
 import { SHORT } from './kit/brand.mjs';
+import { NOTICE, SW } from './site-closed.js';
 
 // Orbit-Core was Shared-Proxy, and GitHub moved its Pages with it: pages and
 // service workers a phone still keeps load '../Shared-Proxy/kit/', so that
@@ -26,7 +28,6 @@ const AS_IS = ['Orbit-Core', 'Shared-Data', ...Object.keys(RENAMED)].map(r => [`
 // Each host's folders: [the path asked, the path on Pages].
 const APPS = [...Object.entries(SHORT).map(([slug, repo]) => [`/${slug}`, `/${repo}`]), ...AS_IS];
 const BARE = [['/showcase', '/Orbit-Showcase'], ...AS_IS];
-const LONGSHOT = [['', '/Longshot']];
 const HOME = '/Orbit-Showcase/home/';
 // What a browser asks a host's root for on its own (Safari's tab, iOS's
 // bookmark): each host's own icon.
@@ -35,6 +36,12 @@ const ROOT_ICONS = {
   bare: Object.fromEntries(['favicon.ico', 'favicon.svg', 'favicon-32.png', 'apple-touch-icon.png', 'icon-512.png'].map(f => [`/${f}`, `${HOME}${f}`]).concat([['/apple-touch-icon-precomposed.png', `${HOME}apple-touch-icon.png`]]))
 };
 
+// Longshot, shut down: the notice wherever a phone asks, and a service worker
+// that removes the old app from a phone still keeping it.
+const closed = path => path === '/sw.js'
+  ? new Response(SW, { headers: { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-store' } })
+  : new Response(NOTICE, { status: path === '/' || path === '/index.html' ? 200 : 410, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' } });
+
 const under = (path, base) => path === base || path.startsWith(`${base}/`) || base === '';
 const notFound = () => new Response('Not found', { status: 404, headers: { 'Content-Type': 'text/plain' } });
 
@@ -42,11 +49,12 @@ export async function site(request, fetcher = fetch) {
   const url = new URL(request.url);
   if (request.method !== 'GET' && request.method !== 'HEAD') return new Response('', { status: 405, headers: { Allow: 'GET, HEAD' } });
   const sub = url.hostname.split('.')[0];
-  const mounts = sub === 'orbit' ? APPS : sub === 'longshot' ? LONGSHOT : BARE;
+  if (sub === 'longshot') return closed(url.pathname);
+  const mounts = sub === 'orbit' ? APPS : BARE;
   const root = url.pathname === '/' || url.pathname === '/index.html';
   // orbit.<domain> itself: the family's page.
   if (root && mounts === APPS) return Response.redirect(`${url.origin}/pass/`, 302);
-  const icons = ROOT_ICONS[mounts === APPS ? 'orbit' : mounts === BARE ? 'bare' : ''] || {};
+  const icons = ROOT_ICONS[mounts === APPS ? 'orbit' : 'bare'];
   const mount = mounts.find(([asked]) => under(url.pathname, asked));
   let path;
   if (root && mounts === BARE) path = HOME;

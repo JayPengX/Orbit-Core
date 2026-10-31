@@ -40,8 +40,7 @@ export const pathOf = id => (onDomain ? shortPathOf(id) : repoPathOf(id));
 // Where an app lives, for its links shared outside (a QR code, a share card, a notice).
 export const homeOf = id => `${SITE_URL}${DOMAIN ? shortPathOf(id) : repoPathOf(id)}`;
 // The folders served on orbit.<domain>, by their short name: every app's, and
-// the Pass's page. (The showcase is on the bare domain, Longshot on its own
-// host: site.js.)
+// the Pass's page. (The showcase is on the bare domain: site.js.)
 export const SHORT = { ...Object.fromEntries(Object.values(BRANDS).map(b => [b.slug, b.repo])), pass: 'Orbit-Core' };
 
 // The Orbit Pass: the account, in every app's top-right.

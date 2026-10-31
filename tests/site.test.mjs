@@ -53,7 +53,7 @@ test("site: only the family's folders, only reads; every app has a short name", 
   assert.deepEqual(['money', 'sports', 'weather', 'transit', 'law', 'class', 'words', 'beats', 'securities', 'pass'].filter(k => !SHORT[k]), []);
 });
 
-test("site: the bare domain is Jay's homepage and the showcase; longshot.<domain> is Longshot at its root", async () => {
+test("site: the bare domain is Jay's homepage and the showcase; longshot.<domain> is the shutdown notice", async () => {
   const p = pages();
   await site(new Request('https://example.tw/'), p.fetcher);
   assert.equal(p.asked[0].url, 'https://jaypengx.github.io/Orbit-Showcase/home/');
@@ -61,14 +61,16 @@ test("site: the bare domain is Jay's homepage and the showcase; longshot.<domain
   assert.equal(p.asked[1].url, 'https://jaypengx.github.io/Orbit-Showcase/views/home.mjs?v=2');
   await site(new Request('https://example.tw/Orbit-Core/kit/ui.mjs'), p.fetcher);
   assert.equal(p.asked[2].url, 'https://jaypengx.github.io/Orbit-Core/kit/ui.mjs');
-  await site(new Request('https://longshot.example.tw/'), p.fetcher);
-  assert.equal(p.asked[3].url, 'https://jaypengx.github.io/Longshot/');
-  await site(new Request('https://longshot.example.tw/kit/core.mjs?v=1'), p.fetcher);
-  assert.equal(p.asked[4].url, 'https://jaypengx.github.io/Longshot/kit/core.mjs?v=1');
+  const n = await site(new Request('https://longshot.example.tw/'), p.fetcher);
+  assert.equal(n.status, 200);
+  assert.match(await n.text(), /Longshot 已停止服務/);
+  assert.equal((await site(new Request('https://longshot.example.tw/admin/'), p.fetcher)).status, 410);
+  const sw = await site(new Request('https://longshot.example.tw/sw.js'), p.fetcher);
+  assert.match(sw.headers.get('Content-Type'), /javascript/);
+  assert.match(await sw.text(), /unregister/);
+  assert.equal(p.asked.length, 3, 'Longshot reads nothing from Pages');
   const r = pages(301, { Location: 'https://jaypengx.github.io/Orbit-Showcase/' });
   assert.equal((await site(new Request('https://example.tw/showcase'), r.fetcher)).headers.get('Location'), 'https://example.tw/showcase/');
-  const l = pages(301, { Location: 'https://jaypengx.github.io/Longshot/admin/' });
-  assert.equal((await site(new Request('https://longshot.example.tw/admin'), l.fetcher)).headers.get('Location'), 'https://longshot.example.tw/admin/');
 });
 
 test("site: each host's root icons (Safari's tab, iOS's bookmark) are its own", async () => {
@@ -77,8 +79,7 @@ test("site: each host's root icons (Safari's tab, iOS's bookmark) are its own", 
     ['https://example.tw/favicon.ico', '/Orbit-Showcase/home/favicon.ico'],
     ['https://example.tw/apple-touch-icon.png', '/Orbit-Showcase/home/apple-touch-icon.png'],
     ['https://orbit.example.tw/favicon.ico', '/Orbit-Core/favicon.ico'],
-    ['https://orbit.example.tw/apple-touch-icon-precomposed.png', '/Orbit-Core/icons/apple-touch-icon.png'],
-    ['https://longshot.example.tw/favicon.ico', '/Longshot/favicon.ico']
+    ['https://orbit.example.tw/apple-touch-icon-precomposed.png', '/Orbit-Core/icons/apple-touch-icon.png']
   ]) {
     await site(new Request(u), p.fetcher);
     assert.equal(p.asked.at(-1).url, `https://jaypengx.github.io${want}`, u);

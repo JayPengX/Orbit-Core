@@ -312,8 +312,8 @@ NT$500,000 to NT$50,000,000 (`dayTradeRoom`).
 
 **Brand:** `node brand/generate.mjs [id…|site]` writes every app's icons,
 share cards, manifest and page tags. Renamed repos (Passion-Beats) are small redirect
-repos. Play and Slips left the family on 2026-10-22: they are Longshot
-now, its own app and Worker (JayPengX/Longshot), nothing of theirs here.
+repos. Play and Slips left the family on 2026-10-22 as Longshot, which was shut
+down on 2026-10-31 (its Worker and data removed); only its notice is here.
 
 ## 9. Deploying and secrets
 
@@ -337,8 +337,8 @@ now, its own app and Worker (JayPengX/Longshot), nothing of theirs here.
   `orbit.<DOMAIN>/<slug>/` every Orbit app (`kit/brand.mjs` `slug`/`SHORT`;
   `/pass/` the family page, `/` goes there; one origin, so one Pass sign-in),
   `<DOMAIN>/` Jay's homepage (Orbit-Showcase `public/home/`) with the
-  showcase at `/showcase/`, and `longshot.<DOMAIN>/` Longshot on its own
-  origin. The proxy is at `api.<DOMAIN>`; mail to `*@<DOMAIN>` reaches it
+  showcase at `/showcase/`, and `longshot.<DOMAIN>/` a notice that Longshot
+  has shut down (`site-closed.js`, read from nowhere). The proxy is at `api.<DOMAIN>`; mail to `*@<DOMAIN>` reaches it
   by Email Routing's catch-all. `deploy.yml` attaches all four hostnames
   (the deploy token has the zone); the guard takes them off with the proxy.
   A new app: a `slug` in `kit/brand.mjs`.

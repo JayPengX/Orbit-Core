@@ -450,7 +450,7 @@ export const HELP = {
   money: {
     zh: [
       ['what', 'Orbit Money 是什麼', [
-        '你自己的記帳本：每天花了多少、每個帳戶還有多少。記的是你真實的錢，和 Securities、Longshot 的遊戲錢完全分開，不會互相影響。資料存在你的 Orbit Pass 裡，換手機也在。'
+        '你自己的記帳本：每天花了多少、每個帳戶還有多少。記的是你真實的錢，和 Securities 的遊戲錢完全分開，不會互相影響。資料存在你的 Orbit Pass 裡，換手機也在。'
       ]],
       ['tabs', '每個分頁', [
         '「月曆」：這個月花了多少、收入和結餘，每天格子下面是當天的支出；點一天看那天的每一筆。右下角的 ＋ 隨時記一筆。',
@@ -472,7 +472,7 @@ export const HELP = {
     ],
     en: [
       ['what', 'What Orbit Money is', [
-        'Your own books: what you spend each day and what each account holds. It tracks your real money, kept apart from the play money in Securities and Longshot. It lives on your Orbit Pass, the same on any phone.'
+        'Your own books: what you spend each day and what each account holds. It tracks your real money, kept apart from the play money in Securities. It lives on your Orbit Pass, the same on any phone.'
       ]],
       ['tabs', 'Each tab', [
         'Calendar: the month’s spending, income and what’s left, with each day’s spending under its date; tap a day for its entries. The + adds one any time.',

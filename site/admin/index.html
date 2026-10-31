@@ -2023,8 +2023,6 @@ $('sys-actions').replaceChildren(
 const LINKS = [
   // Each at its address on the page's own home (a repo's name isn't one on the domain).
   ...Object.entries(BRANDS).map(([id, b]) => [b.name, pathOf(id)]), ['Orbit Showcase', DOMAIN ? `https://${DOMAIN}/showcase/` : '/Orbit-Showcase/'],
-  // Longshot's own panel: its own Worker, accounts and sign-in.
-  ['Longshot 管理', DOMAIN ? `https://longshot.${DOMAIN}/admin/` : '/Longshot/admin/'],
   ['Orbit-Core Actions', 'https://github.com/JayPengX/Orbit-Core/actions'],
   ['Cloudflare Workers', 'https://dash.cloudflare.com/?to=/:account/workers-and-pages'], ['Cloudflare D1', 'https://dash.cloudflare.com/?to=/:account/workers/d1'], ['Cloudflare R2', 'https://dash.cloudflare.com/?to=/:account/r2/overview'], ['Cloudflare 帳單', 'https://dash.cloudflare.com/?to=/:account/billing'], ['Cloudflare 通知', 'https://dash.cloudflare.com/?to=/:account/notifications'], ['GitHub', 'https://github.com/JayPengX?tab=repositories']
 ];

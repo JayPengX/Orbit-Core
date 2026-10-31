@@ -6,8 +6,7 @@
 //
 // The RP ID is the domain itself (jaypengx.com), so one passkey serves
 // every Orbit app and the admin page (orbit.<DOMAIN>) and any later
-// subdomain; this Worker takes them only from the pages listed in rpOf
-// (Longshot, on longshot.<DOMAIN>, has its own Pass and never asks).
+// subdomain; this Worker takes them only from the pages listed in rpOf.
 //
 // Kept in the wallet (`passkeys`: { user, keys: [{ id, alg, jwk, n, be, bs,
 // via, on, t, used }] }), so its history and nightly copies cover them;

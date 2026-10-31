@@ -3624,8 +3624,8 @@ keepStrips();
 // <html>: --q-kb (how much the keys cover at the foot), --q-vvh (the height
 // still seen); .q-kb while the keys are up. orbit.css keeps an open sheet to
 // its field (its hero and .q-kb-hide parts wait behind the keys) and runs it
-// under the keys with its button right above them (as Longshot's kit, proven
-// on an iPhone 2026-10-23), hides the tab bar, and
+// under the keys with its button right above them (proven on an iPhone
+// 2026-10-23), hides the tab bar, and
 // anything marked .q-kb-dock (a bar that belongs on top of the keys) sits
 // there, as does a bar fixed at the foot holding the field (.q-kb-docked).
 // A focused field is brought into view inside its own scroller, and the

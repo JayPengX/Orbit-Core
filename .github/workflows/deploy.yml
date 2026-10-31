@@ -196,7 +196,7 @@ jobs:
       # empty): orbit-site (site.js, the apps read through from GitHub Pages)
       # deployed, and the hostnames attached as Workers custom domains,
       # orbit.<DOMAIN> (the apps), <DOMAIN> (Jay's homepage and the showcase)
-      # and longshot.<DOMAIN> to orbit-site, api.<DOMAIN> to the proxy (Cloudflare makes
+      # and longshot.<DOMAIN> (only Longshot's shutdown notice) to orbit-site, api.<DOMAIN> to the proxy (Cloudflare makes
       # their DNS records and certificates). Safe to repeat: an attached one
       # is left as it is. While the guard has the proxies stopped, nothing is
       # attached: the guard puts the domains back with them.
