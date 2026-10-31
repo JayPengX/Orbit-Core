@@ -62,12 +62,17 @@ export const PAGES = {
   },
   words: {
     default: ['tabs'],
-    quiz: { args: click(tap('開始|Start'), wait(2000)) },
+    quiz: { args: click('.hero .q-hc-btn', wait(2000)) },
+    // A question answered (the first choice), its verdict and 下一題.
+    answered: { args: click('.hero .q-hc-btn', wait(2000), "js:document.querySelector('.choice')?.click()", wait(800)) },
     // 練習模式's 句子填空: a round on the words' own examples, the first question answered.
     sentence: { args: click(wait(2500), "js:[...document.querySelectorAll('.mode-card')].find(e=>/句子填空|Sentences/.test(e.textContent)).click()", wait(1500), "js:document.querySelector('.choice')?.click()", wait(800)) },
     // 拼字比賽 handed in at once (every question blank): the results page.
     contest: { args: click(wait(3000), "js:[...document.querySelectorAll('.contest-card button.primary')][0].click()", wait(1500)) },
     word: { hash: 'word=track' },
+    // 複習's flash cards (答錯's deck), and 背新字's first card.
+    flash: { hash: 'review', args: click(wait(2000), "js:document.querySelector('#panel-review .hero .q-hc-btn').click()", wait(1200)) },
+    study: { args: click(wait(2500), '.go-card', wait(1500)) },
     // A word's sheet once it has been answered (its 學習紀錄): a 句子填空 answered wrong, then that word's sheet.
     // 今天's lower shelves (單字卡, 最近練習的字, 今日單字) after one 選中文 round answered.
     shelves: { args: click("js:(async()=>{const z=ms=>new Promise(r=>setTimeout(r,ms));await z(2500);[...document.querySelectorAll('.mode-card')].find(e=>/選中文|Meaning/.test(e.textContent)).click();for(let i=0;i<90;i++){await z(300);const c=document.querySelector('.choice:not([disabled])');if(c){c.click();continue}const n=document.querySelector('.next-bar button');if(n){n.click();continue}break}await z(500);[...document.querySelectorAll('button')].find(b=>/^(完成|Done)$/.test(b.textContent.trim()))?.click();await z(1200);document.querySelector('.deck-rail,.recent-rail')?.closest('section')?.scrollIntoView();await z(800)})()") },
