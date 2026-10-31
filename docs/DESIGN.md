@@ -189,7 +189,7 @@ marks `<html>`:
 
 | Mark | When | What the kit does |
 | --- | --- | --- |
-| `q-rail` | a phone on its side (520 px tall or less), or 1100 px wide and up | the tab bar stands down the left side as a rail; the app's round action under it; nothing floats along the foot but an accessory |
+| `q-tabrail` | a phone on its side (520 px tall or less), or 1100 px wide and up | the tab bar stands down the left side as a rail; the app's round action under it; nothing floats along the foot but an accessory |
 | `q-float` | 600 px wide and up, taller than 520 | sheets are cards in the middle of the screen, every corner round |
 | `q-wide` | the page has 640 px or more | the app lays the page out in two columns |
 | `q-w3` | the page has 1000 px or more | three columns where there's content for them |

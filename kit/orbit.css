@@ -5012,7 +5012,7 @@ html.q-kb .q-kb-docked {
    phone screen size and properly work on all resolution horizontal or
    vertical"). The page is laid out for the screen it's on, a phone upright
    or on its side, a tablet, a computer; <html> says which kind (orbit.mjs
-   screenFit): .q-rail (the tabs down the left side), .q-float (sheets as
+   screenFit): .q-tabrail (the tabs down the left side), .q-float (sheets as
    cards in the middle), .q-wide and .q-w3 (room for two or three columns).
    The page sits between the screen's safe edges (the notch and the home
    bar on a phone on its side) and the rail, no wider than --q-page-max,
@@ -5025,8 +5025,8 @@ html.q-kb .q-kb-docked {
 :root {
   --q-inset-l: env(safe-area-inset-left, 0px);
   --q-inset-r: env(safe-area-inset-right, 0px);
-  --q-rail-w: 0px;
-  --q-left: calc(var(--q-inset-l) + var(--q-rail-w));
+  --q-tabrail-w: 0px;
+  --q-left: calc(var(--q-inset-l) + var(--q-tabrail-w));
   --q-right: var(--q-inset-r);
   --q-page-max: 720px;
   --q-avail: calc(100vw - var(--q-sbw, 0px) - var(--q-left) - var(--q-right));
@@ -5051,30 +5051,30 @@ html.q-kb .q-kb-docked {
    middle of the screen's height, its tabs one under another, the app's
    round action under it. A phone on its side has no height to spare for a
    bar along its foot; a computer has width to spare beside the page. */
-:root.q-rail {
-  --q-rail-w: 92px;
-  --q-rail-tab: 56px;
-  --q-rail-h: calc(var(--q-tabs, 4) * var(--q-rail-tab) + 8px);
+html.q-tabrail {
+  --q-tabrail-w: 92px;
+  --q-tabrail-tab: 56px;
+  --q-tabrail-h: calc(var(--q-tabs, 4) * var(--q-tabrail-tab) + 8px);
   /* (Nothing along the foot: what stood above the bar sits near the edge.) */
   --q-nav: var(--q-bar-gap);
 }
 @media (max-height: 430px) {
-  :root.q-rail {
-    --q-rail-tab: 50px;
+  html.q-tabrail {
+    --q-tabrail-tab: 50px;
   }
 }
-:root.q-rail .q-tabbar.q-tabbar {
+html.q-tabrail .q-tabbar.q-tabbar {
   left: calc(var(--q-inset-l) + 12px);
   top: 50%;
   bottom: auto;
   grid-auto-flow: row;
   grid-auto-columns: auto;
-  grid-auto-rows: var(--q-rail-tab);
+  grid-auto-rows: var(--q-tabrail-tab);
   width: 68px;
   max-height: calc(100dvh - 16px);
   transform: translateY(-50%);
 }
-:root.q-rail .q-tabbar.q-tabbar::before {
+html.q-tabrail .q-tabbar.q-tabbar::before {
   top: 0;
   bottom: auto;
   left: 4px;
@@ -5084,27 +5084,27 @@ html.q-kb .q-kb-docked {
   transform: translateY(var(--q-tab-y, 0px));
   transition: transform var(--q-dur-snappy) var(--q-spring-snappy), height var(--q-dur-snappy) var(--q-spring-snappy);
 }
-:root.q-rail .q-tabbar.q-tabbar::after {
+html.q-tabrail .q-tabbar.q-tabbar::after {
   display: none;
 }
-:root.q-rail .q-tab {
+html.q-tabrail .q-tab {
   min-height: 0;
   padding: 4px 2px 5px;
 }
-:root.q-rail .q-tabbar.q-tabbar.q-tabbar-act {
-  top: calc(50% - (var(--q-rail-h) + var(--q-act-room)) / 2);
+html.q-tabrail .q-tabbar.q-tabbar.q-tabbar-act {
+  top: calc(50% - (var(--q-tabrail-h) + var(--q-act-room)) / 2);
   left: calc(var(--q-inset-l) + 12px);
   width: 68px;
   transform: none;
 }
-:root.q-rail .q-tab-action {
-  top: calc(50% - (var(--q-rail-h) + var(--q-act-room)) / 2 + var(--q-rail-h) + 10px);
+html.q-tabrail .q-tab-action {
+  top: calc(50% - (var(--q-tabrail-h) + var(--q-act-room)) / 2 + var(--q-tabrail-h) + 10px);
   bottom: auto;
   left: calc(var(--q-inset-l) + 12px + (68px - var(--q-act)) / 2);
 }
 /* An accessory (a player, an order bar) at the foot of the page, as wide
    as it needs, never a strip across a computer. */
-:root.q-rail .q-accessory,
+html.q-tabrail .q-accessory,
 :root.q-float .q-accessory {
   width: min(calc(var(--q-vw) - 32px), 560px);
 }
@@ -5112,7 +5112,7 @@ html.q-kb .q-kb-docked {
 /* Sheets on a tablet or a computer: a card in the middle of the screen,
    every corner round, as iPad's form sheets; full-height ones a tall card.
    On a phone on its side, still up from the foot, as wide as reads well. */
-:root.q-rail:not(.q-float) {
+html.q-tabrail:not(.q-float) {
   --q-sheet-w: min(600px, calc(100vw - var(--q-inset-l) - var(--q-inset-r) - 16px));
   --q-sheet-full-w: var(--q-sheet-w);
 }
@@ -5134,7 +5134,7 @@ html.q-kb .q-kb-docked {
 :root.q-float .q-sheet::before {
   display: none;
 }
-:root.q-rail:not(.q-float) dialog.q-sheet:is(.q-full, [data-detent='large']) {
+html.q-tabrail:not(.q-float) dialog.q-sheet:is(.q-full, [data-detent='large']) {
   border-radius: var(--q-r-sheet) var(--q-r-sheet) 0 0;
 }
 html.q-kb.q-float dialog.q-sheet[open] {

@@ -1199,7 +1199,7 @@ function statusStrip() {
 // resolution horizontal or vertical"). The page is laid out for the screen it
 // is on; <html> carries what kind of screen that is, read off its size, so the
 // kit and the apps lay out by it (orbit.css "Every screen"):
-//   q-rail   the tabs down the left side instead of along the foot: a phone on
+//   q-tabrail the tabs down the left side instead of along the foot: a phone on
 //            its side (too short for a bar at the foot) and a wide screen
 //   q-float  sheets as cards in the middle, not up from the foot (a tablet, a computer)
 //   q-wide   the content has room for two columns side by side (640 px and up)
@@ -1236,7 +1236,7 @@ function measureScreen() {
   const now = { rail, float, wide: width >= 640, w3: width >= 1000, width };
   const sbw = Math.max(0, Math.round((globalThis.innerWidth || w) - w));
   if (root.style.getPropertyValue('--q-sbw') !== `${sbw}px`) root.style.setProperty('--q-sbw', `${sbw}px`);
-  for (const k of ['rail', 'float', 'wide', 'w3']) if (root.classList.contains(`q-${k}`) !== now[k]) root.classList.toggle(`q-${k}`, now[k]);
+  for (const [k, cls] of [['rail', 'q-tabrail'], ['float', 'q-float'], ['wide', 'q-wide'], ['w3', 'q-w3']]) if (root.classList.contains(cls) !== now[k]) root.classList.toggle(cls, now[k]);
   const was = screenNow;
   screenNow = now;
   if (was && (was.rail !== now.rail || was.float !== now.float || was.wide !== now.wide || was.w3 !== now.w3 || was.width !== now.width)) for (const fn of screenFns) {

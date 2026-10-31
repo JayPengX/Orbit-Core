@@ -210,7 +210,7 @@
         for (let p = el; p && p !== document.body; p = p.parentElement) if (p.matches('dialog[open]') || getComputedStyle(p).position === 'fixed') return true;
         return false;
       };
-      const rail = document.documentElement.classList.contains('q-rail') ? document.querySelector('.q-tabbar')?.getBoundingClientRect() : null;
+      const rail = document.documentElement.classList.contains('q-tabrail') ? document.querySelector('.q-tabbar')?.getBoundingClientRect() : null;
       for (const el of all) {
         if (el.closest('.q-statusbar, #loading, .q-offline')) continue;
         const cs = getComputedStyle(el);
