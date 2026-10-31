@@ -293,10 +293,12 @@ function runWorker(settings, net = {}) {
     const path = new URL(url).pathname;
     asked.push({ path, cache: init?.cache });
     const body = typeof net[path] === 'function' ? net[path](asked.filter(a => a.path === path).length) : net[path];
+    // A request the connection never answers: only its time limit ends it.
+    if (body === HANG) return new Promise((_, no) => init?.signal?.addEventListener('abort', () => no(new DOMException('aborted', 'AbortError'))));
     if (body == null) throw new TypeError('Load failed');
     return new Response(body, { status: 200 });
   };
-  vm.runInNewContext(readFileSync(new URL('../kit/sw.js', import.meta.url), 'utf8'), { self, caches, URL, Request, Response, Promise, setTimeout: f => setTimeout(f, 0), fetch, crypto: webcrypto, Uint8Array });
+  vm.runInNewContext(readFileSync(new URL('../kit/sw.js', import.meta.url), 'utf8'), { self, caches, URL, Request, Response, Promise, setTimeout: f => setTimeout(f, 0), clearTimeout, AbortController, fetch, crypto: webcrypto, Uint8Array });
   const go = async url => {
     let answer;
     const work = [];
@@ -308,6 +310,22 @@ function runWorker(settings, net = {}) {
   return { listeners, store, asked, go, self };
 }
 const served = text => createHash('sha256').update(text).digest('hex').slice(0, 12);
+const HANG = Symbol('hang');
+
+test('a file the connection leaves hanging is dropped and asked again, fresh (an app stuck on its loading screen until it was closed)', async () => {
+  const fresh = 'export const a = 2;';
+  const url = `https://x.test/App/app.mjs?v=${served(fresh)}`;
+  let w = runWorker({ cache: 'app-a-v2' }, { '/App/app.mjs': n => (n === 1 ? HANG : fresh) });
+  assert.equal(await (await w.go(url)).text(), fresh);
+  assert.equal(w.asked.length, 2);
+  assert.equal(w.asked[1].cache, 'reload');
+  // A file without a hash too; one that hangs both times fails (the kept copies answer, or boot.js says so).
+  w = runWorker({ cache: 'app-a-v2' }, { '/App/x.json': n => (n === 1 ? HANG : '{}') });
+  assert.equal(await (await w.go('https://x.test/App/x.json')).text(), '{}');
+  w = runWorker({ cache: 'app-a-v2' }, { '/App/y.json': HANG });
+  await assert.rejects(w.go('https://x.test/App/y.json'));
+  assert.equal(w.asked.length, 2);
+});
 
 test("the worker installs, and drops only this app's old caches (its data kept)", async () => {
   const w = runWorker({ cache: 'app-a-v2', spare: ['app-a-data'] });
