@@ -164,7 +164,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 
 ### Money (Jay's own books, real money)
 - 10-27 Never invent entries, balances or categories; Jay started fresh 2026-11-01; never re-add the 天天記帳 import or commit his CSV.
-- 10-27 發票 is one feature (更多's hero: scan, screenshot, 載具 file, mail-in); free QR read first, Gemini only on a tap with review before saving.
+- 10-31 No 發票 features (Jay: "發票 feature is weak… a more general tool… remove 條碼、自動對獎"): one 拍照記帳 for any picture (receipt, invoice, bill, app screenshot, transfer notice, price tag). AI reads amount, day, store, items, category and way to pay; it opens as a filled entry to check before saving, and a matching entry already logged (same amount, within a day) is offered to merge, never added twice. No 手機條碼, 對獎, QR scanner or 載具 file. (Replaces 10-27's 發票 hero.)
 - 10-27 Categories have subs and are the person's to edit; auto-fill (自動帶入) is set per user, never hardcoded.
 - 10-30 Category sets for kinds of people (學生, 上班族, 家庭, 全部), asked once before the first 記一筆; a set only changes what shows, never what's logged; the person's own changes are their own set (「我的」).
 - 10-27 Sheets fit their content; nothing that matters below the fold; 手機條碼 stays black on white in dark mode.
@@ -243,6 +243,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 | House rules "never by price" | Price guards 限2關 1.25, lock under 1.12 | 10-20 |
 | Orbit Plus, VIP, welcome bet, free bets | Removed, no paid membership | 10-20, 10-22 |
 | Money on the Pass | Money in Securities only | 10-22 |
+| Money's 發票 hero: QR scan, 手機條碼, 對獎, 載具 file | One general 拍照記帳 (AI reads any picture), merge offered on a match | 10-31 |
 | Beats pieces exactly as recorded | Full mixer on by default | 10-18 |
 | Weekly 15-min recheck for game finals | Every 2 min | 10-22 |
 | Own domain: same `/<Repo>/` paths | Short paths (`orbit.jaypengx.com/law`), old paths 404, no redirects | 10-27 |

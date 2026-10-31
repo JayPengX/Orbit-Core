@@ -18,7 +18,6 @@ import { BRANDS } from './kit/brand.mjs';
 import { ASIA_HOST, asiaBaseballResponse, asiaTarget, cpblBoxTarget, useCpblRelay } from './asia-baseball.js';
 import { FUND_HOST, fundNavResponse } from './fund-nav.js';
 import { TAIFEX_HOST, taifexResponse } from './taifex.js';
-import { INVOICE_HOST, invoiceResponse } from './invoice.js';
 import { F1_LIVE_HOST, f1LiveResponse, doLog, sampleLive } from './f1-live.js';
 import { cleanDev } from './kit/devconfig.mjs';
 import { json, LOCAL_ORIGIN } from './http.js';
@@ -100,9 +99,7 @@ const SPORTS_PROXY_ALLOWED_HOSTS = [
   // Securities' 基金.
   FUND_HOST,
   // Nor this: TAIFEX's futures settlement prices and margins (taifex.js), Securities' 期貨.
-  TAIFEX_HOST,
-  // Nor this: 統一發票's winning numbers and the names behind 統一編號 (invoice.js), Orbit Money.
-  INVOICE_HOST
+  TAIFEX_HOST
 ];
 const ELTA_PATH = '/production/json/program_list/sports_live_program_list.json';
 // Per signed-in session and app, a minute, in memory (cache hits included). Looking
@@ -327,8 +324,6 @@ function cachePolicyFor(url) {
     case FUND_HOST:
     // (TAIFEX's settlement prices too: once a day, after the close.)
     case TAIFEX_HOST:
-    // (統一發票's draws: every other month; a company's name hardly ever changes.)
-    case INVOICE_HOST:
       return CACHE_SCHEDULE;
     case F1_LIVE_HOST:
       // A finished session from F1's archive (f1-live.js /session.json): it doesn't change.
@@ -1052,8 +1047,6 @@ async function fetchUpstreamRaw(upstreamUrl, trim) {
       ? await fundNavResponse(upstreamUrl)
       : upstreamUrl.hostname === TAIFEX_HOST
       ? await taifexResponse(upstreamUrl)
-      : upstreamUrl.hostname === INVOICE_HOST
-      ? await invoiceResponse(upstreamUrl)
       : YAHOO_HOSTS.has(upstreamUrl.hostname)
       ? await fetchYahoo(upstreamUrl)
       : upstreamUrl.hostname === 'clients5.google.com'

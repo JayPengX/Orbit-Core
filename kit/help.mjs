@@ -450,22 +450,21 @@ export const HELP = {
   money: {
     zh: [
       ['what', 'Orbit Money 是什麼', [
-        '你自己的記帳本：每天花了多少、每個帳戶還有多少、發票有沒有中獎。記的是你真實的錢，和 Securities、Longshot 的遊戲錢完全分開，不會互相影響。資料存在你的 Orbit Pass 裡，換手機也在。'
+        '你自己的記帳本：每天花了多少、每個帳戶還有多少。記的是你真實的錢，和 Securities、Longshot 的遊戲錢完全分開，不會互相影響。資料存在你的 Orbit Pass 裡，換手機也在。'
       ]],
       ['tabs', '每個分頁', [
         '「月曆」：這個月花了多少、收入和結餘，每天格子下面是當天的支出；點一天看那天的每一筆。右下角的 ＋ 隨時記一筆。',
         '「帳戶」：現金、銀行帳戶、悠遊卡等電子票證、電子支付、信用卡，各自的餘額；可以把某個帳戶設成不計入總資產（例如定存或別人的錢）。銀行帳戶可以加簽帳金融卡，信用卡設好結帳日、繳款日和從哪個帳戶繳。',
         '「統計」：週、月、年的支出，和上一期比較、每天平均、每個分類占多少，還有每月預算。',
-        '「發票」：手機條碼（結帳時給店員掃）、掃描紙本發票、匯入載具發票，開獎後自動對獎。'
+        '「更多」：拍照記帳、分類、到期提醒、固定收支和匯出。'
       ]],
       ['entry', '記一筆', [
         '選支出、收入或轉帳，用下面的鍵盤輸入金額（可以打 120+35 這樣相加），選分類、從哪個帳戶付、日期，要的話寫備註。常用的帳戶和分類會記住。',
         '轉帳是錢在你自己的帳戶之間移動（例如提款、儲值悠遊卡、繳卡費），不算支出。固定收支（房租、薪水、訂閱）設一次，到日子自動記上。'
       ]],
-      ['invoice', '發票與載具', [
-        '紙本發票：按「掃描發票」對準左右兩個 QR code，金額、日期、店家和品項都會帶進來。',
-        '載具裡的發票：財政部不開放個人直接讀取，所以在電子發票平台「查詢消費發票」按「匯出」，再到「匯入載具」選那個檔案；設定好信箱自動匯入的話，轉寄那封信就好。記過的發票不會重複記。',
-        '每期開獎後，掃過或匯入的發票會自動對獎，中了會列在最上面，寫著領獎期限。'
+      ['photo', '拍照記帳', [
+        '在記一筆或「更多」按「拍照」，拍或選一張照片：收據、發票、帳單、外送或付款 App 的截圖、轉帳通知、價格標籤都可以。AI 會讀出金額、日期、店家、品項，猜好分類和付款方式，你看過、改好再儲存。',
+        '如果已經記過同一筆（同樣金額、差不到一天），會問你要不要合併：收據的店家和品項併進原本那筆，不會記兩次。一張截圖裡有好幾筆，會一起列出來給你看過。'
       ]],
       ['money', '錢怎麼算', [
         'Orbit Money 只記你自己的帳，不用 Orbit 的錢，也不發錢。'
@@ -473,22 +472,21 @@ export const HELP = {
     ],
     en: [
       ['what', 'What Orbit Money is', [
-        'Your own books: what you spend each day, what each account holds, and whether an invoice won. It tracks your real money, kept apart from the play money in Securities and Longshot. It lives on your Orbit Pass, the same on any phone.'
+        'Your own books: what you spend each day and what each account holds. It tracks your real money, kept apart from the play money in Securities and Longshot. It lives on your Orbit Pass, the same on any phone.'
       ]],
       ['tabs', 'Each tab', [
         'Calendar: the month’s spending, income and what’s left, with each day’s spending under its date; tap a day for its entries. The + adds one any time.',
         'Accounts: cash, bank accounts, stored-value cards like EasyCard, e-payments and credit cards, each with its balance. An account can be left out of the total (a deposit, someone else’s money). Banks take debit cards; a credit card has its statement day, due day and the account that pays it.',
         'Stats: spending by week, month or year, against the last one, a day on average, by category, and monthly budgets.',
-        'Invoices: your mobile barcode for the till, paper invoices scanned, carrier invoices imported, and every one checked at the draw.'
+        'More: entries from a photo, categories, reminders, repeats and export.'
       ]],
       ['entry', 'Adding an entry', [
         'Pick spent, income or transfer, type the amount on the keypad (120+35 adds up), then the category, the account, the day and a note if you like. Your usual account and category are remembered.',
         'A transfer moves money between your own accounts (a withdrawal, an EasyCard top-up, a card bill) and isn’t spending. Repeats (rent, salary, subscriptions) are set once and added on their day.'
       ]],
-      ['invoice', 'Invoices and the carrier', [
-        'Paper invoices: tap Scan and point at both QR codes; amount, day, store and items come in.',
-        'Carrier invoices: the Ministry of Finance lets no person read them directly, so export them on the e-invoice platform and pick that file under Import. With import by mail set up, forward that mail instead. An invoice already in is never added twice.',
-        'After each draw, every invoice in your books is checked; a winner shows at the top with its claim date.'
+      ['photo', 'Entries from a photo', [
+        'Tap Photo in a new entry or under More, then take or pick a picture: a receipt, an invoice, a bill, a delivery or payment app’s screenshot, a transfer notice, a price tag. AI reads the amount, day, store and items and guesses the category and way to pay, for you to check before saving.',
+        'If the same one is already in (same amount, within a day), you’re asked whether to merge: the store and items go onto the entry you made, so nothing is counted twice. A screenshot with several shows them all for a look first.'
       ]],
       ['money', 'Money', ['Orbit Money only keeps your own books: it neither uses nor pays Orbit money.']]
     ]
