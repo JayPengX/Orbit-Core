@@ -183,6 +183,9 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 10-30 記一筆 guesses everything from the person's own entries (time of day, weekday/weekend, place when allowed, past picks): kind, category, sub and way to pay are pre-picked; the amount is only offered and fills on a tap. Location is opt-in (更多 › 智慧帶入), kept to about 100 m.
 
 ### Class, Words
+- 10-31 Words is a general practice app with its modes in view (練習模式 on 今天); the contest paper is one mode, 拼字比賽, named for no specific competition ("don't build orbit words around 區域決賽").
+- 10-31 Words: only the memory model decides a word is known; no 我會了 / 太簡單 / "I know it" anywhere ("no user can decide if they know it only system can").
+- 10-31 Words: every answer option one text size, never shrunk to fit (a shrunk one gives the answer away).
 - 10-21 Class never guesses what to bring (要帶).
 - Class's local schedule is kept aside if unreadable; the Pass copy restores.
 
