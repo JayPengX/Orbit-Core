@@ -153,6 +153,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 ### Securities
 - 10-21 List every securities product a person in Taiwan can legally buy; 10-23: with its real rules, applications and restrictions, however annoying (kit `stock-access.mjs` gates + the app's 開戶與交易資格 sheet, live).
 - 10-21 No balance on the home page (real-broker feel).
+- 10-31 Home shows every market as a tile with its day's move (each country, 加密, 基金, 黃金, 外匯, 更多), not just 台股 (Jay: "too useless cause only Taiwan market on homepage"); no empty-holdings card.
 - 10-30 No 信貸 (personal loan): a broker doesn't make one. The only borrowing is 融資 against the shares it buys (Jay: "be realistic, if it's not realistic or game breaking remove it").
 - 10-27 現股當沖 follows TWSE: account open 3 months with 10 trades in the last year, or a credit account, plus the signed 風險預告書 (`stock-access.mjs` `daytrade`).
 - 10-22 One product bar in 市場; every list = picks, then the whole listing.
