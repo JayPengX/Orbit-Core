@@ -34,7 +34,11 @@ export const PAGES = {
   orbit: { default: ['tabs'] },
   money: {
     default: ['tabs'],
-    invoices: { hash: 'more', args: click(tap('Invoices|發票對獎'), wait(2500)) }
+    invoices: { hash: 'more', args: click(tap('Invoices|發票對獎'), wait(2500)) },
+    // 記一筆 on 數位, its subs and the + for one's own.
+    'entry-digital': { args: click('[aria-label="記一筆"],[aria-label="Add an entry"]', wait(1200), "js:[...document.querySelectorAll('dialog.q-sheet[open] .q-ritem')].find(e=>/全部|Everything/.test(e.textContent))?.click()", wait(1500), tap('數位|Digital'), wait(800)) },
+    // 新增固定收支 scrolled to its foot (開始, the date field that once poked out sideways).
+    'repeat-new': { hash: 'more', args: click(tap('固定收支|Repeats'), wait(1200), tap('新增固定收支|New repeat'), wait(1200), "js:[...document.querySelectorAll('dialog.q-sheet[open]')].pop().scrollTop=9999", wait(600)) }
   },
   words: {
     default: ['tabs'],

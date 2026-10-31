@@ -1158,7 +1158,30 @@ html.q-kb .q-tab-action {
   font-family: var(--q-font);
   box-sizing: border-box;
   overflow-y: auto;
+  /* Never sideways (Jay, many times; the last a date field 2026-10-31): a
+     sheet scrolls up and down only, whatever pokes past its side. */
+  overflow-x: hidden;
   overscroll-behavior: contain;
+}
+/* A date or time field fits its box: iPhone's Safari sizes one to its own
+   wheel's text and ignores width and min-width while it keeps the native
+   look, which pushed 新增固定收支's 開始 past the sheet's edge. */
+input[type='date'],
+input[type='time'],
+input[type='datetime-local'],
+input[type='month'] {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+input[type='date']::-webkit-date-and-time-value,
+input[type='time']::-webkit-date-and-time-value,
+input[type='datetime-local']::-webkit-date-and-time-value,
+input[type='month']::-webkit-date-and-time-value {
+  min-width: 0;
 }
 /* A full-height sheet (iOS's large detent, .q-full): it meets the column's
    sides and foot, as iOS 26's does at full height, not floating 8 px in with

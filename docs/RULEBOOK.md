@@ -49,6 +49,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 10-20 Slow internet must work (hashed files, nothing re-downloaded, no cache wipe on update).
 - 10-21 No bright white surfaces in dark mode (glass tiles and buttons; logos without white plates).
 - 10-21 No wraps, orphan pills, cut numbers, sideways tables or scrolling sheets.
+- 10-31 A sheet never scrolls sideways (Jay, many times; last 新增固定收支's 開始): the kit keeps `.q-sheet` at `overflow-x: hidden` and every date/time field at `appearance: none`, `min-width: 0`, `max-width: 100%` (iPhone Safari sizes a native one to its own text); `tests/kit-css.test.mjs` checks it.
 - 10-27 Addresses: every Orbit app at `orbit.jaypengx.com/<short>` (one origin, so one Pass sign-in), Longshot at `longshot.jaypengx.com`, the proxy at `api.jaypengx.com`. The bare `jaypengx.com` is Jay's own homepage (handle JayPengX only: no real name or school; no betting or Longshot link; open to all; livelier than the apps), with the showcase at `/showcase/`. Clean break, no redirects from older addresses.
 - 10-21 The keyboard never pushes content off screen; the iPhone's own keyboard, never an in-app keypad. Kit `watchKeyboard` since 10-27.
 - 10-21 Stats show the current season; last season only where this one is empty (e.g. 上季對戰).
@@ -177,7 +178,8 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 10-27 LINE Points (any points or gift card) can pay part of a spend; digital things (domains, AI plans, cloud, games) have their own category, 數位.
 - 10-27 A TPASS (any sub with 有效天數) is counted down on 月曆, with a notice the evening before and the morning of its last day.
 - 10-27 統計 is a full statistics area: every category with its subs and each one's share of the total, and every useful cut (account and way to pay, a category across months, against the period before, fixed vs day to day, fees, money back, largest, places, weekdays, income vs spending, any dates). 支出 and 收入 are separate views, never netted (a high income must not hide high spending); the share kept is secondary, under 收入.
-- 10-27 數位 keeps upkeep (AI, 雲端網域, 軟體) and fun (影音串流, 遊戲) as separate subs ("really different"), each shown on its own in 統計.
+- 10-31 Subs stay broad, because 統計 is built on them ("too specific"). 數位 has four: 專案維運 (a project's running costs: TDX, domains, hosting), 工具訂閱 (AI, apps, storage), 影音串流, 遊戲. Running costs stay under 數位, not a category of their own. Upkeep and fun stay apart. (Replaces 10-27's AI / 雲端網域 / 軟體 split.)
+- 10-31 統計 and 帳戶 open dense: one short card (the total left, two figures right, like 月曆's), the period bars about 76 px tall, and no chart when only one period has anything; groups of a list are 16 apart.
 - 10-30 記一筆 guesses everything from the person's own entries (time of day, weekday/weekend, place when allowed, past picks): kind, category, sub and way to pay are pre-picked; the amount is only offered and fills on a tap. Location is opt-in (更多 › 智慧帶入), kept to about 100 m.
 
 ### Class, Words

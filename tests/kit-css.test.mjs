@@ -21,3 +21,17 @@ test('floating glass has a lit rim and no outline ring, in light and dark', () =
     assert.ok(dark.slice(0, dark.indexOf('}')).includes(token), `${token} dark`);
   }
 });
+
+// Jay asked many times (last 2026-10-31, 新增固定收支's 開始): a sheet never
+// scrolls sideways. iPhone's Safari sizes a date field to its wheel's text
+// unless it drops the native look, so the kit drops it for every one.
+test('sheets never scroll sideways, and date fields fit their box', () => {
+  const rules = sel => [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].filter(([, s]) => s.split(',').map(x => x.trim()).includes(sel)).map(([, , b]) => b).join(';');
+  assert.match(rules('.q-sheet'), /overflow-x:\s*(hidden|clip)/);
+  for (const t of ['date', 'time', 'datetime-local', 'month']) {
+    const b = rules(`input[type='${t}']`);
+    assert.match(b, /-webkit-appearance:\s*none/, t);
+    assert.match(b, /min-width:\s*0/, t);
+    assert.match(b, /max-width:\s*100%/, t);
+  }
+});
