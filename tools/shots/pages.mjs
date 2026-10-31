@@ -141,7 +141,8 @@ export const PAGES = {
     td: { args: click('#tab-fx', '[data-action=tool][data-tool=td]', wait(1200)) },
     access: { args: click('#tab-fx', '[data-action=tool][data-tool=access]', wait(1200)) },
     truth: { args: click('#tab-fx', '[data-action=tool][data-tool=truth]', wait(1200)) },
-    stats: { args: click('#tab-history', '[data-action=hview][data-view=stats]', wait(2500)) }
+    // (Wide screens show 統計分析 beside the activity: no button of its own there.)
+    stats: { args: click('#tab-history', "js:document.querySelector('[data-action=hview][data-view=stats]')?.click()", wait(2500)) }
   },
   admin: { default: ['overview', 'accounts', 'money', 'health'], overview: { hash: 'overview' }, accounts: { hash: 'accounts' }, money: { hash: 'money' }, health: { hash: 'health' } }
 };
