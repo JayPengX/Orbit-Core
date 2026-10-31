@@ -47,7 +47,10 @@ export const PAGES = {
   weather: {
     default: ['tabs'],
     rain: { args: click('.q-panel[data-open="rain"]', '[data-range="rain:10d"]') },
-    air: { args: click('.q-panel[data-open="air"]') }
+    air: { args: click('.q-panel[data-open="air"]') },
+    // The day's sheet (the sky card tapped), and the place search (the title).
+    day: { args: click('.wx-hero[data-day]', wait(1500)) },
+    search: { args: click('.wx-title', wait(1200)) }
   },
   orbit: { default: ['tabs'] },
   money: {

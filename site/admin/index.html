@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="../kit/orbit.css" />
 <style>
   /* The panel is the family's one desktop page besides the showcase (Jay 2026-10-27): the kit's phone column lifted. */
-  :root { --q-accent: #2563eb; --q-col-max: 100vw; }
+  :root { --q-accent: #2563eb; --q-page-max: 100000px; }
   body { margin: 0; background: var(--q-page); color: var(--q-text); font-family: var(--q-font); }
   main { width: min(980px, 100%); margin: 0 auto; box-sizing: border-box; }
  color: var(--q-muted); margin: 4px 2px 16px; line-height: 1.5; }
@@ -214,7 +214,8 @@
   .tabs button i svg { width: 24px; height: 24px; }
   .tabs button[aria-pressed='true'] { color: var(--q-accent); }
   .badge { position: absolute; top: 0; left: calc(50% + 6px); min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: var(--q-bad); color: #fff; font: 700 10.5px/16px var(--q-font); box-sizing: border-box; }
-  @media (min-width: 900px) {
+  /* A computer, or a phone on its side: the views in a sidebar. */
+  @media (min-width: 900px), (orientation: landscape) and (max-height: 520px) and (min-width: 600px) {
     main { width: min(1200px, 100%); padding-bottom: 60px; }
     #panel { display: grid; grid-template-columns: 200px minmax(0, 1fr); column-gap: 28px; align-items: start; }
     .topbar { grid-column: 1 / -1; }
