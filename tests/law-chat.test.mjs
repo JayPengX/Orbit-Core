@@ -345,7 +345,7 @@ test('figures, notices and bills Orbit Law publishes ground the answer, and come
     assert.match(p, /立法院進度/);
     assert.match(p, /勞動基準法部分條文修正草案」進度：委員會/);
     assert.doesNotMatch(p, /民法部分條文/);
-    assert.deepEqual(j.bills, [{ k: 'b1', n: '勞動基準法部分條文修正草案', stage: 2 }]);
+    assert.deepEqual(j.bills, [{ k: 'b1', n: '勞動基準法部分條文修正草案', stage: 2, d: '2026-10-01' }]);
     assert.equal(j.notices.length, 2);
     assert.equal(j.notices[1].url, 'https://www.mol.gov.tw/news/1');
     assert.equal(j.notices[1].agency, '勞動部');

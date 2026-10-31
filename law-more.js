@@ -150,23 +150,34 @@ export function matchPeople(people, text, also = []) {
   return named.filter(p => !seen.has(p.n) && seen.add(p.n)).slice(0, MORE_LIMITS.people);
 }
 
-const VOTE_WORDS = /表決|投票|贊成|反對|棄權|投了|怎麼投|vote/i;
+const VOTE_WORDS = /表決|投票|贊成|反對|棄權|投了|怎麼投|支持|立場|兩大黨|兩黨|朝野|跨黨派|藍綠|vote/i;
+const BOTH = /兩大黨|兩黨|朝野|跨黨派|藍綠|共識|共同支持/;
+// Most of each big party's members voted yes (10 at least each).
+const BIG = ['民主進步黨', '中國國民黨'];
+export function bothYes(v, names, partyOf) {
+  const of = (list, p) => (list || []).filter(i => partyOf.get(names[i]) === p).length;
+  return BIG.every(p => of(v[4], p) >= 10 && of(v[4], p) > of(v[5], p) + of(v[6], p));
+}
 // The votes a question is about: a law found or named (by its code), the
 // newest first; else, when it names legislators, their newest; else, with
-// vote words, the ones whose 議題 shares the most with it.
-export function matchVotes(data, text, ps, people) {
-  const rows = (Array.isArray(data?.votes) ? data.votes : []).filter(v => Array.isArray(v) && typeof v[0] === 'string');
+// vote words, the ones whose 議題 shares the most with it. Asked what both
+// big parties backed: only votes most of each voted yes on (any law when
+// none found has one).
+export function matchVotes(data, text, ps, people, partyOf = new Map()) {
+  let rows = (Array.isArray(data?.votes) ? data.votes : []).filter(v => Array.isArray(v) && typeof v[0] === 'string');
   const newer = (a, b) => String(b[1]).localeCompare(String(a[1]));
-  const want = new Set(ps);
-  const ofLaw = rows.filter(v => (v[7] || []).some(p => want.has(p)));
   const asked = VOTE_WORDS.test(text) || people.length > 0;
   if (!asked) return [];
+  if (BOTH.test(text) && partyOf.size) rows = rows.filter(v => bothYes(v, data.names || [], partyOf));
+  const want = new Set(ps);
+  const ofLaw = rows.filter(v => (v[7] || []).some(p => want.has(p)));
   if (ofLaw.length) return ofLaw.sort(newer).slice(0, MORE_LIMITS.votes);
   if (people.length) {
     const names = data.names || [];
     const at = new Set(people.map(p => names.indexOf(p.n)).filter(i => i >= 0));
     return rows.filter(v => [v[4], v[5], v[6]].some(l => (l || []).some(i => at.has(i)))).sort(newer).slice(0, MORE_LIMITS.votes);
   }
+  if (BOTH.test(text) && partyOf.size) return rows.sort(newer).slice(0, MORE_LIMITS.votes);
   const w = hanPairs(text);
   return rows
     .map(v => [shared(v[2], w), v])
@@ -176,6 +187,12 @@ export function matchVotes(data, text, ps, people) {
     .map(([, v]) => v);
 }
 
+// What a vote was on: its 議案's title (the 議事錄's, its ─完成三讀─ dropped) before its 議題 (討論事項第二十四案 全案表決 alone says nothing).
+export function voteTopic(v, data) {
+  const ag = (Array.isArray(data?.agendas) ? data.agendas : []).find(a => Array.isArray(a) && a[0] === v[3])?.[1];
+  const t = String(ag || '').replace(/─[^─]*─/g, '').replace(/[（(]前接.*$/, '').trim();
+  return t && !String(v[2]).includes(t.slice(0, 8)) ? `${cut(t, 80)}：${v[2]}` : String(v[2] || '');
+}
 // A vote in a line: the counts by party, and how each named legislator voted.
 export function voteLine(v, data, partyOf, people) {
   const names = data.names || [];
@@ -193,7 +210,7 @@ export function voteLine(v, data, partyOf, people) {
     const m = yes.includes(i) ? '贊成' : no.includes(i) ? '反對' : ab.includes(i) ? '棄權' : '未投票';
     return `${p.n}${m}`;
   });
-  return `${cut(v[1], 10)} 表決「${cut(v[2], 140)}」：${yes.length > no.length ? '通過' : '未通過'}，贊成 ${yes.length}（${tally(yes) || '—'}）、反對 ${no.length}（${tally(no) || '—'}）、棄權 ${ab.length}${how.length ? `；${how.join('、')}` : ''}`;
+  return `${cut(v[1], 10)} 表決「${cut(voteTopic(v, data), 160)}」：${yes.length > no.length ? '通過' : '未通過'}，贊成 ${yes.length}（${tally(yes) || '—'}）、反對 ${no.length}（${tally(no) || '—'}）、棄權 ${ab.length}${how.length ? `；${how.join('、')}` : ''}`;
 }
 
 const MEET_WORDS = /議程|開會|會議|審查|排入|排審|今天|明天|本週|這週|下週|什麼時候|何時|when|agenda|meeting/i;
@@ -332,7 +349,7 @@ export async function moreFor(text, articles, { mine = null, items = [], today =
   const [rulings, peopleF, votesF, agendaF, rulesF, consF, localF] = await warmMore();
   const people = matchPeople(peopleF?.people, text, own?.people || []);
   const partyOf = new Map((peopleF?.people || []).map(p => [p.n, p.party]));
-  const votes = votesF ? matchVotes(votesF, text, ps, people) : [];
+  const votes = votesF ? matchVotes(votesF, text, ps, people, partyOf) : [];
   const cons = matchCons(consF?.items, cites, text);
   // (A question about the 立法院's work gets no judgments or rules: they'd be noise there.)
   const ly = LY_ONLY.test(text);
@@ -361,7 +378,7 @@ export async function moreFor(text, articles, { mine = null, items = [], today =
   return {
     cases,
     people,
-    votes: votes.map(v => ({ id: v[0], d: String(v[1] || ''), t: String(v[2] || ''), line: voteLine(v, votesF, partyOf, people) })),
+    votes: votes.map(v => ({ id: v[0], d: String(v[1] || ''), t: voteTopic(v, votesF), line: voteLine(v, votesF, partyOf, people) })),
     meets,
     rules,
     mine: own ? { ...own, items: myItems } : null

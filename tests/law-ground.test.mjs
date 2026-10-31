@@ -30,6 +30,23 @@ test('bills: those of a law the question names, newest first; else 立法院 wor
   assert.deepEqual(matchBills(items, '加班費怎麼算'), [], 'no 立法院 words, no law named');
 });
 
+test('bills on a 立法院 question: by its topic, never by 立法院 itself; with no topic, what passed lately', () => {
+  const items = [
+    { k: 'ly', n: '立法院組織法', stage: 2, u: '2026-10-20', about: '為了健全國會' },
+    { k: 'ly2', n: '立法院職權行使法', stage: 2, u: '2026-10-21' },
+    { k: 'vote', n: '公職人員選舉罷免法', stage: 4, u: '2026-08-14', about: '為了將選舉權年齡調降為十八歲' },
+    { k: 'ref', n: '公民投票法', stage: 4, u: '2026-08-28', about: '為了確保選舉及公民投票程序之公正性' },
+    { k: 'old', n: '老人福利法', stage: 6, u: '2026-10-16', passed: '2026-10-16', by: [['國民黨', 39], ['民進黨', 13]] },
+    { k: 'tax', n: '所得稅法', stage: 7, u: '2026-09-11', passed: '2026-08-21', by: [['國民黨', 4]] },
+    { k: 'mil', n: '強化國防自主暨無人載具產業發展條例', stage: 7, u: '2026-09-11', passed: '2026-08-21', by: [['民進黨', 9], ['國民黨', 3], ['行政院', 1]] },
+    ...Array.from({ length: 40 }, (_, i) => ({ k: `x${i}`, n: `其他法${i}`, stage: 1, u: '2026-01-01', about: '為了修正' }))
+  ];
+  assert.deepEqual(matchBills(items, '最近為了選舉立法院搞了啥').map(b => b.k), ['vote', 'ref']);
+  assert.deepEqual(matchBills(items, '最近有什麼兩大黨的支持通過的法案').map(b => b.k), ['old', 'mil']);
+  assert.deepEqual(matchBills(items, '立法院最近通過了什麼').map(b => b.k), ['old', 'tax', 'mil']);
+  assert.deepEqual(matchBills(items, '立法院職權行使法修到哪').map(b => b.k), ['ly2']);
+});
+
 test('nothing matched: no block, nothing added to the answer', () => {
   const g = { facts: [], news: [], bills: [] };
   assert.equal(groundPrompt(g), '');
