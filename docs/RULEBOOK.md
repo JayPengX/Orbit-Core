@@ -142,6 +142,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 10-26 For a game to come, the betting market goes ahead of ESPN's predictor.
 - 10-27 Standings card: once first is settled, the race moves to 2nd, then 3rd, down the table until every place is settled (reverses a 10-26 "zones, not second place" change).
 - 10-27 Swipes: 賽事's tabs swipe where there's no date strip (F1's 賽程 too), and past the last or first tab to the next league; team and player tabs swipe; not a game page (its charts take the finger).
+- 11-01 Sides level on a record or points are ordered by their league's official tiebreaks, never at random, and the app says why ("make sure this know how same win teams are decided"; "tie breaker are included in all kind of sports"). NBA Cup: head-to-head, point differential and total points without overtime, last season's record, the draw (wild card and seeds without head-to-head), said under each card. Every table: the league's order and the step that settled each pair in 同分怎麼排 (Sports `lib/tiebreak.mjs`).
 
 ### Law
 - 10-19 No Cloudflare cost; data built at deploy, never committed.

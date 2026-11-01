@@ -24,6 +24,8 @@ export const PAGES = {
     'nba-leaders': { args: click('#tab-matches', '[data-league=nba]', wait(2500), tap('數據|Stats'), wait(5000)) },
     'nba-bracket': { args: click('#tab-matches', '[data-league=nba]', wait(2500), tap('季後賽|Playoffs'), wait(5000)) },
     'f1-season': { args: click('#tab-matches', '[data-league=f1]', wait(4000)) },
+    // A table's 同分怎麼排 fold opened (the league's tiebreaks, what settled each level pair), scrolled to.
+    ...Object.fromEntries(['epl', 'nba', 'seriea'].map(l => [`${l}-ties`, { args: click('#tab-matches', `[data-league=${l}]`, wait(2500), tap('排名|Table|Standings'), wait(5000), "js:(()=>{const d=[...document.querySelectorAll('.tie-why')].find(e=>e.offsetParent);if(d){d.open=true;d.scrollIntoView({block:'center'})}})()", wait(800)) }])),
     // A team's page (the Lakers): 概況.
     'team-nba': { args: click("js:import('./sheets.js').then(m=>m.openTeam('nba','13'))", wait(7000)) },
     'nba-game': { args: click('#tab-matches', '[data-league=nba]', "js:[...document.querySelectorAll('.q-chip.day.is-today')].find(e=>e.offsetParent)?.click()", "js:[...document.querySelectorAll('.event-row')].find(e=>e.offsetParent)?.click()", wait(4000)) },
