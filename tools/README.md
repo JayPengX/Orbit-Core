@@ -58,6 +58,13 @@ in Sports); `--without` leaves the kit's keeper (`kit/hold-place.mjs`) out to
 show what it catches. Exit code 1 on a fault. Run it after any change to how
 a page redraws.
 
+## `node tools/store-shots.mjs <app> [n…] [--apply]`: the Showcase's and README's screenshots
+
+One set per app, in both languages, for the Showcase's App tab and the app's README
+(what each shot is: `tools/shots/store.mjs`). Without `--apply` it shoots and writes
+`sheet.png` to look at; `--apply` writes the Showcase's copies and captions and the
+README's framed copies and picture rows (English, then 中文畫面 in a fold).
+
 ## `node tools/preview.mjs <app> [view…]`
 
 An app on an iPhone-sized page, signed in with a made-up wallet. Apps:
