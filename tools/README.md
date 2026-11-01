@@ -101,7 +101,7 @@ accounts, never the owner's key. `DEBUG=1` lists every upstream fetch.
 `kit/sw.js` is the one service worker for every app (the page kept first and
 refreshed behind it, `?v=` files from the cache, the rest network first,
 skipWaiting and clients.claim; every file under its own hash checked against
-it, since Pages' CDN ignores `?v=`). An app's `sw.js` is its settings, then
+it, since a CDN may answer a new `?v=` with an old copy for a while). An app's `sw.js` is its settings, then
 the kit's (the options are at the top of `kit/sw.js`):
 
 ```js

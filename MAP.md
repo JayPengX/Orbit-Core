@@ -349,7 +349,7 @@ down on 2026-10-31 (its Worker and data removed); only its notice is here.
   custom domains; `site-closed.js`). Workers: `orbit-<slug>` per app,
   `orbit-pass` (Orbit-Core: `/`, `/pass/`, `/Orbit-Core/`, the old
   `/Shared-Proxy/`, and anything else on orbit.), `orbit-home` (Orbit-Showcase).
-  Paths behave as on Pages: `/law/` is its index.html, `/law` moves to `/law/`.
+  Paths behave as a plain static site: `/law/` is its index.html, `/law` moves to `/law/`.
   The proxy reads Law's data through the service binding `LAW_SITE`. The proxy is at `api.<DOMAIN>`; mail to `*@<DOMAIN>` reaches it
   by Email Routing's catch-all. `deploy.yml` attaches all four hostnames
   (the deploy token has the zone); the guard takes them off with the proxy.
