@@ -24,8 +24,8 @@ export const PAGES = {
     'nba-leaders': { args: click('#tab-matches', '[data-league=nba]', wait(2500), tap('數據|Stats'), wait(5000)) },
     'nba-bracket': { args: click('#tab-matches', '[data-league=nba]', wait(2500), tap('季後賽|Playoffs'), wait(5000)) },
     'f1-season': { args: click('#tab-matches', '[data-league=f1]', wait(4000)) },
-    // A table's 同分怎麼排 fold opened (the league's tiebreaks, what settled each level pair), scrolled to.
-    ...Object.fromEntries(['epl', 'nba', 'seriea'].map(l => [`${l}-ties`, { args: click('#tab-matches', `[data-league=${l}]`, wait(2500), tap('排名|Table|Standings'), wait(5000), "js:(()=>{const d=[...document.querySelectorAll('.tie-why')].find(e=>e.offsetParent);if(d){d.open=true;d.scrollIntoView({block:'center'})}})()", wait(800)) }])),
+    // A table scrolled to its tie lines (a tie on a zone's edge and what settled it), if any.
+    ...Object.fromEntries(['epl', 'nba', 'seriea', 'ucl', 'mls'].map(l => [`${l}-ties`, { args: click('#tab-matches', `[data-league=${l}]`, wait(2500), tap('排名|Table|Standings'), wait(5000), "js:(()=>{const d=[...document.querySelectorAll('.tie-why')].find(e=>e.offsetParent);if(d){d.open=true;d.scrollIntoView({block:'center'})}})()", wait(800)) }])),
     // A team's page (the Lakers): 概況.
     // An MLS club's 接下來 crossing into next season (the 2027 賽季 line, Jay 2026-11-01): Inter Miami.
     'team-mls': { args: click("js:import('./sheets.js').then(m=>m.openTeam('mls','20232'))", wait(9000), "js:[...document.querySelectorAll('dialog.q-sheet[open] button,dialog.q-sheet[open] [role=tab]')].find(b=>/^(賽程|Games)$/.test(b.textContent.trim()))?.click()", wait(2500), "js:document.querySelector('dialog.q-sheet[open] .season-break')?.scrollIntoView({block:'center'})", wait(1500)) },
