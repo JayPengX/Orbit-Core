@@ -8,7 +8,7 @@ import {
   airForecast, parseGoogleAir, googleAirBody,
   weatherStatus, handleWeather, scrub, cellOf, nearestStation, townIds, airArea, parseCwaTown, cwaAt, parseGoogleDay, parseGoogleHour,
   blend, buildCell, GOOGLE_DAILY_CALLS, parseVillage, whereIs, addAirReading, briefText, rainPhrase, weatherCheck, noteRecent, cellForecast, FRESH_WAIT_MS, advise, adviceWindow, parseCwaWarnings, aqiLevel, uvLevel, num, DEFAULT_WEIGHTS
-, popStep, keepJson, keptJson, KV_EVERY_MS, googleAllowed, googlePace, gridOf } from '../weather.js';
+, popStep, keepJson, keptJson, KV_EVERY_MS, googleAllowed, googlePace, gridOf, keepPast } from '../weather.js';
 import { STATIONS } from '../weather-stations.js';
 import { twDay } from '../kit/format.mjs';
 import { upstream as fixtureUpstream } from './fixtures/weather/upstream.mjs';
@@ -694,4 +694,16 @@ test("Weather's dev door: a page on this computer without a pass, as Transit's; 
   assert.equal((await ask('https://jaypengx.github.io')).status, 401);
   assert.equal((await ask('https://localhost.evil.com')).status, 401);
   assert.equal((await ask('http://localhost:8123', { WEATHER_DEV: 'off' })).status, 401);
+});
+
+test('today\'s earlier hours are kept from the last answer, for the day sheet (Jay 2026-11-01)', () => {
+  const H = 3_600_000;
+  const at = Date.parse('2026-11-01T21:10:00+08:00');
+  const hour = s => ({ t: Date.parse(`${s}+08:00`), temp: 24 });
+  const old = { past: [hour('2026-11-01T06:00:00'), hour('2026-10-31T23:00:00')], hours: [hour('2026-11-01T18:00:00'), hour('2026-11-01T19:00:00'), hour('2026-11-01T20:00:00'), hour('2026-11-01T21:00:00')] };
+  const resp = { tz: 'Asia/Taipei', hours: [hour('2026-11-01T21:00:00'), hour('2026-11-01T22:00:00')] };
+  const past = keepPast(old, resp, at);
+  assert.deepEqual(past.map(h => h.t), [6, 18, 19, 20].map(n => Date.parse(`2026-11-01T${String(n).padStart(2, '0')}:00:00+08:00`)), 'today\'s only, before the first hour, oldest first');
+  assert.deepEqual(keepPast(null, resp, at), []);
+  assert.equal(keepPast(old, resp, at + 3 * H).length, 0, 'gone the next day');
 });
