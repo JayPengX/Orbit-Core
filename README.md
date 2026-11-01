@@ -39,11 +39,11 @@ The family page and Orbit Pass sign-in are at [orbit.jaypengx.com/pass](https://
 
 ## Features
 
-- **The proxy** (`api.jaypengx.com`): one Cloudflare Worker for every live read the apps make (sports, transit, weather, markets, law), with the apps' AI features behind it, so no key ever reaches a phone.
+- **The proxy** (`api.jaypengx.com`): one Cloudflare Worker for every live read the apps make (sports, transit, weather, markets, law, Class's planes in the air, 立法院's live sittings), answering at each app's own address (`orbit.jaypengx.com/api`, so no cross-site calls), with the apps' AI features behind it, so no key ever reaches a phone.
 - **The Orbit Pass:** one sign-in and one wallet for every app, with each app's saved data, kept in Cloudflare D1.
 - **Notices** that reach a phone while the app is closed: game starts, class reminders, bus arrivals, rain, price alerts.
 - **Data builds** on the proxy's cron into Cloudflare R2: seasons, game days, bus routes and shapes, photos, highlights.
-- **The kit:** the shared look (an iOS-style design system), the sign-in sheet, sheets, tab bars, the date strip, offline handling, the service worker and the helpers every app loads.
+- **The kit:** the shared look (an iOS-style design system) on every screen either way up (a phone upright or on its side, a tablet, a computer: the tab bar becomes a rail at the side, sheets centred cards, pages in columns), the sign-in sheet, sheets, tab bars, the date strip, offline handling, the service worker and the helpers every app loads.
 - **Add to Home Screen** steps written for the phone's own browser (Safari, iPad, Chrome on iPhone, Android Chrome, Samsung Internet, LINE and other in-app browsers), in Chinese and English.
 - **Recommendations that learn** (`kit/feedback.mjs`): what a list of picks showed and what was opened from it, kept on the phone for 30 days, so picks you pass over sink.
 - **The site publisher** (`deploy/cf-site.mjs`): every repo's push puts its site on Cloudflare at its short orbit.jaypengx.com address (Jay's homepage at jaypengx.com), served as static files.
