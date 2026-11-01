@@ -34,6 +34,7 @@ import { DEV, cleanDev } from './brand.mjs';
 import { API, SITE as HOME, isApi } from './domain.mjs';
 import { passkeyHere, passkeyName, deviceName, makePasskey, usePasskey, forgetPasskey, cancelled } from './passkey.mjs';
 import { icons, tile, pullToRefresh, setSheetDetent, toast, h as node } from './ui.mjs';
+import { scrollBusy } from './hold-place.mjs';
 
 export const ECO_URL = `${API}/eco`;
 export const PROXY_URL = `${API}/sports-proxy`;
@@ -72,21 +73,24 @@ readDev();
 // fn again every dev(key) seconds, the setting read at each beat (a change
 // applies at the next one). Answers a stop.
 // A sheet under a finger or on its way out: a live redraw then stutters
-// the drag (each app's beats wait for the next one).
+// the drag; a finger on the page or a fling still running: iOS stops a
+// scroll whose content is swapped under it. Each beat waits till it's over.
 export const sheetHeld = () => typeof document !== 'undefined' && Boolean(document.querySelector('dialog.q-sheet.q-dragging, dialog.q-sheet.q-leaving'));
 export function everyDev(key, fn) {
   let timer = 0;
   let stopped = false;
-  const beat = () => {
+  const beat = soon => {
     timer = setTimeout(() => {
       if (stopped) return;
       readDev();
+      // (A finger on the screen or a scroll still running: tried again in a moment, not drawn under it.)
+      if (sheetHeld() || scrollBusy()) return beat(400);
       try {
-        if (!sheetHeld()) fn();
+        fn();
       } finally {
         beat();
       }
-    }, Math.max(1, dev(key)) * 1000);
+    }, soon ?? Math.max(1, dev(key)) * 1000);
   };
   beat();
   return () => ((stopped = true), clearTimeout(timer));

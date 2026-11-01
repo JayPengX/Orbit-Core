@@ -65,6 +65,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 10-21 AI editors can do anything the app can do by hand.
 - 10-21 No cross-app spending pop-ups; notification permission asked at most once.
 - 10-21 Never blame the network for a slow AI or a failed update.
+- 11-01 A live update never moves the page (Jay, the second time: "a live game reset my scroll because it redraw… make sure that doesn't happen in our app ever again across features"). iPhone's Safari has no scroll anchoring, so a redraw that grows something above the view, or leaves the page short for a moment, threw the reader off their place or to the top. The kit holds every page's, sheet's and panel's place through any redraw the person didn't make (`kit/hold-place.mjs`, loaded by every app through `ui.mjs`), and live beats (`everyDev`) wait while a finger is down or a fling runs. Apps still patch in place (the same nodes, `put`), never rebuild what didn't change. Check with `node tools/live-scroll.mjs <app>` (Safari's way, a page and a sheet; `--without` shows what it catches); `tests/kit-hold-place.test.mjs` keeps the keeper wired in.
 - 10-21 Reflect results the moment they happen: never hide data because a feed is stale; compute it from live results.
 - 10-21 Test UI in WebKit (Safari's engine), not only Chromium.
 - 10-22 One date selector in every app (kit `dayBar`/`dayStrip`); never an app's own day chip row.

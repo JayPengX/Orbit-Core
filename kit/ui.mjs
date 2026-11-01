@@ -16,6 +16,8 @@
 // { tab: 'ipo' } as data-tab="ipo" attributes (a builder's `data`, for taps wired by delegation).
 // (By path, not #kit/: a page whose import map predates format.mjs still loads ui.mjs.)
 import { DASH, pct, price as fmtPrice, twDay, addDays as dayAdd } from './format.mjs';
+// (A live redraw never moves the page: the kit holds every scroller's place, hold-place.mjs.)
+export { scrollBusy } from './hold-place.mjs';
 
 const dataProps = (data = null) => Object.fromEntries(Object.entries(data || {}).filter(([, v]) => v != null && v !== false).map(([k, v]) => [`data-${String(k).replace(/[^a-z0-9-]/gi, '')}`, v === true ? '' : String(v)]));
 const reduced = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;

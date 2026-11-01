@@ -5551,3 +5551,6 @@ dialog[open] .q-menu { background: var(--q-sheet); }
     margin: auto;
   }
 }
+
+/* Room held at a page's or sheet's end after a live redraw made it shorter than where the person was (hold-place.mjs), until they next touch it. */
+.q-hold-room::after { content: ''; display: block; height: var(--q-hold-room, 0); pointer-events: none; }
