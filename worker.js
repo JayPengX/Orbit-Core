@@ -11,6 +11,7 @@
 //   POST  /law-ask               Orbit Law's questions on a law's articles (law.js)
 //   POST  /law-chat              Orbit Law's 問法律, answered from the articles it finds (law-chat.js)
 //   GET   /law-page              A government page (gov.tw) read inside Orbit Law (law-page.js)
+//   GET   /law-live              What 立法院's IVOD streams now, for Orbit Law's 議程 (law-live.js)
 //   GET/POST /push/…             notices while an app is closed (push.js)
 //   GET   /weather/…             Orbit Weather's blended forecast (weather.js)
 //   GET   /transit/…             Orbit Transit's map, places, routes and TDX data (transit.js)
@@ -31,6 +32,7 @@ import { handleLawAsk, useLawSite } from './law.js';
 import { handleLawChat, lawChatTimes } from './law-chat.js';
 import { DEV, aiSettingOf } from './kit/brand.mjs';
 import { handleLawPage } from './law-page.js';
+import { handleLawLive } from './law-live.js';
 import en from './locales/en.js';
 import zhTW from './locales/zh-TW.js';
 import { handleEcoRequest, LOCK_SINCE, ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION } from './eco.js';
@@ -1281,6 +1283,11 @@ async function route(request, env, ctx, headers, origin) {
   if (path === '/law-chat') return handleLawChat(request, env, ctx, headers, await sessionOf(request, env), lawGemini('law-chat'), await aiCap(env, ctx, 'law-chat'));
   // …and government pages read inside the app (law-page.js): the same Pass, gov.tw only, nothing stored.
   if (path === '/law-page') return handleLawPage(request, env, ctx, headers, await sessionOf(request, env));
+  // …and what IVOD streams now (law-live.js): public, our pages only, 60 s at the edge.
+  if (path === '/law-live') {
+    if (request.method !== 'GET' || !isAllowedOrigin(origin)) return errorJson('FORBIDDEN_ORIGIN', 403, headers, request);
+    return handleLawLive(ctx, headers);
+  }
   // …and its 讀圖: a picture of purchases read by Gemini, on a tap only (money-read.js).
   if (path === '/money-read') return handleMoneyRead(request, env, headers, await sessionOf(request, env), lawGemini('money-read'), await aiCap(env, ctx, 'money-read'));
   // The bill's guard (guard.js), as it last read the bill: armed or not,
