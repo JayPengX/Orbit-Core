@@ -400,7 +400,7 @@ const server = (h2 && !serve ? (fn => createSecureServer(h2Cert(), fn)) : create
   } catch {
     // Orbit Law's data, never in git (60 MB built at deploy): what's not built here is read from the live site.
     if (path.startsWith('/Orbit-Law/data/')) {
-      const body = await curlText(`https://jaypengx.github.io${path}`);
+      const body = await curlText(`https://orbit.jaypengx.com${path.replace(/^\/Orbit-Law\//, '/law/')}`);
       if (body && !/^\s*</.test(body)) return res.writeHead(200, { 'Content-Type': TYPES[extname(path)] || 'application/json', 'Cache-Control': 'no-store' }).end(body);
     }
     res.writeHead(404);

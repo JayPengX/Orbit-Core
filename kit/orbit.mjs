@@ -2643,7 +2643,7 @@ export async function schedulePush(s, items) {
     if (readStore(storeKey) && readStore(storeKey) !== '[]' && (await pushPost(s, 'schedule', { items: [] }))) writeStore(storeKey, '[]');
     return;
   }
-  const base = `${globalThis.location?.origin || 'https://jaypengx.github.io'}${APPS[s.app]?.path || '/'}`;
+  const base = `${globalThis.location?.origin || SITE}${APPS[s.app]?.path || '/'}`;
   const list = items
     .filter(x => x && Number.isFinite(x.at) && kindOn(s.app, x.kind))
     .map(x => ({ at: Math.round(x.at), title: x.title || '', body: x.body || '', tag: `${s.app}:${x.tag || x.title}`, ...(x.kind ? { kind: x.kind } : {}), url: `${base}${x.hash ? `#${x.hash}` : ''}`, ...(x.check ? { check: x.check } : {}), ...(x.until ? { until: Math.round(x.until) } : {}) }))
